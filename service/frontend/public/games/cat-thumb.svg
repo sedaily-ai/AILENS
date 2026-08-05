@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250">
+  <defs>
+    <linearGradient id="nightSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a3e"/>
+      <stop offset="100%" style="stop-color:#2d3a5a"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Night sky -->
+  <rect width="400" height="250" fill="url(#nightSky)"/>
+
+  <!-- Snowflakes -->
+  <g fill="#fff" opacity="0.8">
+    <circle cx="30" cy="40" r="3"/>
+    <circle cx="80" cy="70" r="2"/>
+    <circle cx="150" cy="30" r="2.5"/>
+    <circle cx="220" cy="60" r="2"/>
+    <circle cx="280" cy="25" r="3"/>
+    <circle cx="350" cy="50" r="2"/>
+    <circle cx="50" cy="120" r="2"/>
+    <circle cx="120" cy="90" r="1.5"/>
+    <circle cx="300" cy="100" r="2"/>
+    <circle cx="370" cy="80" r="2.5"/>
+    <circle cx="180" cy="110" r="1.5"/>
+    <circle cx="250" cy="85" r="2"/>
+    <circle cx="20" cy="180" r="2"/>
+    <circle cx="380" cy="150" r="1.5"/>
+  </g>
+
+  <!-- Snow ground -->
+  <ellipse cx="200" cy="250" rx="220" ry="40" fill="#e8f0f8"/>
+
+  <!-- Cardboard box -->
+  <g transform="translate(200, 170)" filter="url(#shadow)">
+    <rect x="-70" y="-30" width="140" height="60" rx="3" fill="#b8956e"/>
+    <rect x="-70" y="-30" width="140" height="15" fill="#a08060"/>
+    <!-- Box texture -->
+    <line x1="-60" y1="-15" x2="60" y2="-15" stroke="#9a7a5a" stroke-width="1"/>
+    <line x1="-60" y1="0" x2="60" y2="0" stroke="#9a7a5a" stroke-width="1"/>
+    <line x1="-60" y1="15" x2="60" y2="15" stroke="#9a7a5a" stroke-width="1"/>
+  </g>
+
+  <!-- Sleeping cat -->
+  <g transform="translate(200, 145)">
+    <!-- Body (curled up) -->
+    <ellipse cx="0" cy="0" rx="45" ry="25" fill="#f5a623"/>
+    <ellipse cx="0" cy="0" rx="40" ry="20" fill="#f7b844"/>
+    <!-- Head -->
+    <circle cx="-30" cy="-5" r="20" fill="#f5a623"/>
+    <!-- Ears -->
+    <path d="M-45,-20 L-40,-35 L-35,-20" fill="#f5a623"/>
+    <path d="M-20,-22 L-18,-37 L-13,-22" fill="#f5a623"/>
+    <path d="M-43,-22 L-40,-32 L-37,-22" fill="#ffcc80"/>
+    <path d="M-20,-24 L-18,-34 L-15,-24" fill="#ffcc80"/>
+    <!-- Closed eyes (sleeping) -->
+    <path d="M-38,-5 Q-35,-8 -32,-5" stroke="#333" stroke-width="2" fill="none"/>
+    <path d="M-28,-5 Q-25,-8 -22,-5" stroke="#333" stroke-width="2" fill="none"/>
+    <!-- Nose -->
+    <ellipse cx="-30" cy="2" rx="3" ry="2" fill="#ff9999"/>
+    <!-- Tail (curled) -->
+    <path d="M40,5 Q60,0 55,-20 Q50,-30 40,-25" stroke="#f5a623" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <!-- Stripes -->
+    <path d="M-10,-15 Q0,-20 10,-15" stroke="#e09020" stroke-width="3" fill="none"/>
+    <path d="M-5,-8 Q5,-12 15,-8" stroke="#e09020" stroke-width="3" fill="none"/>
+  </g>
+
+  <!-- Newspaper blanket being placed -->
+  <g transform="translate(200, 130) rotate(-5)" filter="url(#shadow)">
+    <rect x="-55" y="-25" width="110" height="70" rx="3" fill="#f5f5dc" opacity="0.9"/>
+    <!-- Newspaper text -->
+    <rect x="-45" y="-18" width="90" height="8" fill="#1a1a1a"/>
+    <rect x="-45" y="-6" width="90" height="3" fill="#888"/>
+    <rect x="-45" y="0" width="90" height="3" fill="#888"/>
+    <rect x="-45" y="6" width="70" height="3" fill="#888"/>
+    <rect x="-45" y="15" width="90" height="20" fill="#ddd"/>
+  </g>
+
+  <!-- Hands placing newspaper -->
+  <g fill="#ffcc99">
+    <ellipse cx="100" cy="100" rx="15" ry="20" transform="rotate(-20, 100, 100)"/>
+    <ellipse cx="300" cy="105" rx="15" ry="20" transform="rotate(20, 300, 105)"/>
+  </g>
+
+  <!-- Zzz sleep effect -->
+  <g filter="url(#glow)">
+    <text x="240" y="100" font-family="Arial, sans-serif" font-size="16" fill="#fff" opacity="0.7">z</text>
+    <text x="255" y="85" font-family="Arial, sans-serif" font-size="20" fill="#fff" opacity="0.8">z</text>
+    <text x="275" y="65" font-family="Arial, sans-serif" font-size="24" fill="#fff" opacity="0.9">Z</text>
+  </g>
+
+  <!-- Warmth heart -->
+  <g transform="translate(50, 60)" filter="url(#glow)">
+    <path d="M0,-8 C-4,-12 -10,-10 -10,-4 C-10,4 0,10 0,10 C0,10 10,4 10,-4 C10,-10 4,-12 0,-8" fill="#ff6b6b" opacity="0.8"/>
+  </g>
+
+  <!-- Street lamp glow -->
+  <g transform="translate(350, 50)">
+    <rect x="-3" y="0" width="6" height="80" fill="#555"/>
+    <ellipse cx="0" cy="0" rx="15" ry="10" fill="#ffd700" opacity="0.3"/>
+    <rect x="-10" y="-5" width="20" height="10" rx="3" fill="#666"/>
+    <ellipse cx="0" cy="5" rx="8" ry="5" fill="#ffeaa7" filter="url(#glow)"/>
+  </g>
+</svg>

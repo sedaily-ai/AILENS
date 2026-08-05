@@ -1,0 +1,62 @@
+# AI LENS (ailens.sedaily.ai) — robots policy
+# en.sedaily.com 의 AEO 보고서 기준: AI 검색엔진(ChatGPT/Perplexity/Claude/Gemini)이
+# 트래픽의 49% 차지. AI 크롤러를 명시적으로 환영하는 정책.
+
+# ── 전통 검색엔진 (Google, Bing, ...) ───────────────────────
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /onboarding/
+Disallow: /login
+
+# ── 한국 검색엔진 ──────────────────────────────────────────
+User-agent: Yeti
+Allow: /
+
+User-agent: Daumoa
+Allow: /
+
+# ── AI 검색 (사용자 질의 응답용 — 우리 콘텐츠 노출에 유리) ────
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+# ── AI 학습 크롤러 (모델 학습에 콘텐츠 포함되는 것 허용) ─────
+User-agent: GPTBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+# ── 사이트맵 ──────────────────────────────────────────────
+Sitemap: https://ailens.sedaily.ai/sitemap.xml

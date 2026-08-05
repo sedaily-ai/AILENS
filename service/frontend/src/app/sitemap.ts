@@ -1,0 +1,109 @@
+import type { MetadataRoute } from 'next';
+
+// AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
+// 정적 export 모드 — 빌드 시점에 sitemap.xml 이 /out 루트에 생성.
+export const dynamic = 'force-static';
+
+const BASE = 'https://ailens.sedaily.ai';
+
+// 빌드타임 라이브 seed — mock 제거(2026-07-24) 후 최근 발행 레터를 API 에서
+// 가져온다. prerender(generateStaticParams) 와 같은 SEED_DAYS 로 맞춰 sitemap 에
+// prerender 안 된 URL 이 실리지 않게 한다. 빌드 시 API 불통이면 레터 URL 생략.
+const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
+const SEED_DAYS = 14;
+
+async function fetchLetterIdsRecent(days: number): Promise<string[]> {
+  const ids = new Set<string>();
+  const t = new Date();
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(t);
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    try {
+      const res = await fetch(`${API_BASE}/api/v2/today-letters?date=${iso}`);
+      if (!res.ok) continue;
+      const data = (await res.json()) as { letters?: Array<{ mbti_group: string }> };
+      for (const l of data.letters ?? []) {
+        ids.add(`${l.mbti_group.toLowerCase()}-${iso}`);
+      }
+    } catch {
+      /* 이 날짜 skip */
+    }
+  }
+  return [...ids];
+}
+
+// 정적 라우트 — 항상 노출되는 핵심 페이지
+const STATIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
+  { path: '/',             priority: 1.0, changeFrequency: 'hourly'  }, // 메인 피드 — 매일 갱신
+  { path: '/editors',      priority: 0.9, changeFrequency: 'daily'   },
+  { path: '/fortune',      priority: 0.9, changeFrequency: 'daily'   }, // 일진 매일 바뀜
+  { path: '/saju-match',   priority: 0.8, changeFrequency: 'weekly'  },
+  { path: '/timemachine',  priority: 0.7, changeFrequency: 'weekly'  },
+  { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly'  },
+];
+
+// 에디터 4명 디렉토리
+const EDITOR_IDS = ['NT-min', 'NF-ha', 'ST-jun', 'SF-soy'];
+
+// freshness 기반 priority — 최신 레터일수록 높게
+function freshnessPriority(daysOld: number): number {
+  if (daysOld < 1)   return 1.0;   // 오늘
+  if (daysOld < 7)   return 0.9;   // 이번 주
+  if (daysOld < 30)  return 0.8;   // 이번 달
+  if (daysOld < 90)  return 0.7;
+  if (daysOld < 180) return 0.6;
+  return 0.5;                       // 오래된 레터
+}
+
+function daysBetween(isoDate: string): number {
+  const [y, m, d] = isoDate.split('-').map((s) => parseInt(s, 10));
+  const target = new Date(y, m - 1, d).getTime();
+  const today = Date.now();
+  return Math.max(0, Math.floor((today - target) / (1000 * 60 * 60 * 24)));
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const now = new Date();
+  const entries: MetadataRoute.Sitemap = [];
+
+  // 정적 라우트
+  for (const r of STATIC_ROUTES) {
+    entries.push({
+      url: `${BASE}${r.path}`,
+      lastModified: now,
+      changeFrequency: r.changeFrequency,
+      priority: r.priority,
+    });
+  }
+
+  // 에디터 상세 4명
+  for (const id of EDITOR_IDS) {
+    entries.push({
+      url: `${BASE}/editors/${id}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    });
+  }
+
+  // 레터 상세 — 최근 SEED_DAYS 일의 라이브 발행 레터 (빌드타임 fetch).
+  const letterIds = await fetchLetterIdsRecent(SEED_DAYS);
+
+  for (const id of letterIds) {
+    const match = id.match(/^(nt|nf|st|sf)-(\d{4}-\d{2}-\d{2})$/);
+    if (!match) continue;
+    const date = match[2];
+    const daysOld = daysBetween(date);
+    entries.push({
+      url: `${BASE}/letters/${id}`,
+      // 발행일 = lastModified. 레터는 발행 후 수정 안 함.
+      lastModified: new Date(date + 'T07:00:00+09:00'),
+      // 기사는 발행 후 변하지 않음 — AI 크롤러에 명확히 시그널
+      changeFrequency: 'never',
+      priority: freshnessPriority(daysOld),
+    });
+  }
+
+  return entries;
+}

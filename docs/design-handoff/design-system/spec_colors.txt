@@ -1,0 +1,29 @@
+[모듈] 컬러 — 전역 토큰 + 그룹/페르소나 팔레트
+출처: frontend-next/src/app/globals.css, mbtiGroups.ts, editorsData.ts, editorPersonas.ts
+
+■ 전역 토큰 (globals.css :root / @theme)
+  --color-bg            #ffffff   배경
+  --color-text          #000000   본문 텍스트
+  --color-text-muted    #6b7280   보조 텍스트
+  --color-primary       #2563eb   주 액션 (※ @theme inline 에서 #ffffff 로 재정의 — 충돌, 정리 필요)
+  --color-border        #e5e7eb   보더
+  --color-accent        #60a5fa   강조
+  배경/전경 기본 = 화이트 베이스, 블랙 텍스트. 다크모드 없음.
+
+■ 팔레트 A — 그룹 색 (피드/태그/뱃지) : mbtiGroups.ts
+  NT  #3B82F6  blue   (bg blue-50  / text blue-600  / border blue-300)
+  NF  #8B5CF6  violet (bg violet-50/ text violet-600/ border violet-300)
+  ST  #22C55E  green  (bg green-50 / text green-600 / border green-300)
+  SF  #F97316  orange (bg orange-50/ text orange-600/ border orange-300)
+
+■ 팔레트 B — 캐릭터/온보딩 accent (에디터 상세·온보딩 카드) : editorsData.ts + editorPersonas.ts
+            accent     배경(accentBg)  잉크(accentInk)  soft
+  NT(민철)  #7c3aed    #f5f3ff         #5b21b6          #ede9fe
+  NF(하은)  #e11d48    #fff1f2         #9f1239          #ffe4e6
+  ST(준서)  #059669    #ecfdf5         #047857          #d1fae5
+  SF(소율)  #d97706    #fffbeb         #92400e          #fef3c7
+
+★ 중요: 같은 그룹인데 팔레트 A와 B의 hue가 다르다
+  (예: NT = A에서 blue #3B82F6, B에서 violet #7c3aed).
+  현재 화면별로 섞여 있음. 디자이너가 "그룹 1색 = 정본" 결정 필요.
+  → notes/spec_known_issues.txt 참고.

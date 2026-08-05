@@ -1,0 +1,169 @@
+/**
+ * Archive API client — "내 서랍" server-side operations.
+ *
+ * For logged-in users: calls backend API for persistent storage + similarity search.
+ * For anonymous users: falls back to localStorage (handled by caller).
+ */
+
+import { API_URL } from '@/shared/config/api';
+import { authFetch } from '@/shared/lib/authFetch';
+
+export interface ArchiveSentencePayload {
+  user_id: string;
+  text: string;
+  article_id: string;
+  article_title: string;
+  article_published_at?: string;
+}
+
+export interface ArchiveSentenceResponse {
+  id: string;
+  text: string;
+  article_id: string;
+  article_title: string;
+  article_published_at: string;
+  created_at: string;
+}
+
+export interface SimilarSentence {
+  user_id: string;
+  sentence_text: string;
+  article_id: string;
+  distance: number;
+  created_at: string;
+}
+
+/**
+ * Save a sentence to the archive.
+ * Returns the saved sentence with server-generated ID.
+ */
+export async function saveArchiveSentence(
+  payload: ArchiveSentencePayload,
+): Promise<{ sentence: ArchiveSentenceResponse; vector_status: string }> {
+  const res = await authFetch(`${API_URL}/api/archive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Archive save failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * List archived sentences for a user.
+ * Returns newest first.
+ */
+export async function listArchiveSentences(
+  userId: string,
+  options?: { dateFrom?: string; dateTo?: string; limit?: number },
+): Promise<{ sentences: ArchiveSentenceResponse[]; count: number }> {
+  const params = new URLSearchParams({ user_id: userId });
+  if (options?.dateFrom) params.set('date_from', options.dateFrom);
+  if (options?.dateTo) params.set('date_to', options.dateTo);
+  if (options?.limit) params.set('limit', String(options.limit));
+
+  // Listing is per-user, so it requires auth (anonymous archive lives in
+  // localStorage; the caller decides which path to take).
+  const res = await authFetch(`${API_URL}/api/archive?${params}`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Archive list failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Delete an archived sentence.
+ */
+export async function deleteArchiveSentence(
+  archiveId: string,
+  userId: string,
+): Promise<void> {
+  const res = await authFetch(
+    `${API_URL}/api/archive/${encodeURIComponent(archiveId)}?user_id=${encodeURIComponent(userId)}`,
+    { method: 'DELETE' },
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Archive delete failed: ${res.status}`);
+  }
+}
+
+/**
+ * Find sentences similar to the given text.
+ * Requires pgvector to be configured on the backend.
+ * Returns 503 gracefully if pgvector is unavailable.
+ */
+export async function searchSimilarSentences(
+  userId: string,
+  text: string,
+  limit: number = 5,
+): Promise<{ similar_sentences: SimilarSentence[]; count: number } | null> {
+  // Similar-search is read-only but scoped to the user's archive — same
+  // auth requirement as listing.
+  const res = await authFetch(`${API_URL}/api/archive/similar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, text, limit }),
+  });
+
+  // 503 = pgvector not configured — expected in dev
+  if (res.status === 503) return null;
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Similarity search failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// ── 키워드 기반 기사 추천 (raw XML 버킷에서 검색) ──────────────────────
+// 백엔드 GET /s3-articles/keyword?keywords=...&days=N&limit=N
+// 사용자 저장 문장에서 추출한 키워드 → 최근 N일 XML 의 title+content 매칭.
+
+export interface KeywordArticle {
+  news_id: string;
+  title: string;
+  sub_title?: string;
+  published_at: string;
+  category: string;
+  provider?: string;
+  byline?: string;
+  image_url?: string | null;
+  original_link?: string;
+  matches: number;
+}
+
+export interface KeywordSearchResponse {
+  keywords: string[];
+  days_searched: number;
+  total: number;
+  articles: KeywordArticle[];
+}
+
+export async function searchArticlesByKeywords(
+  keywords: string[],
+  options?: { days?: number; limit?: number },
+): Promise<KeywordSearchResponse> {
+  const params = new URLSearchParams();
+  params.set('keywords', keywords.join(','));
+  params.set('days', String(options?.days ?? 7));
+  params.set('limit', String(options?.limit ?? 20));
+
+  // 인증 불필요 — 공개 read 엔드포인트
+  const res = await fetch(`${API_URL}/s3-articles/keyword?${params}`);
+  if (!res.ok) {
+    throw new Error(`Keyword article search failed: ${res.status}`);
+  }
+  return res.json();
+}
+

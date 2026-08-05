@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#b0c4de"/>
+      <stop offset="100%" style="stop-color:#d3d3d3"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="250" fill="url(#bgGrad)"/>
+
+  <!-- Pigeons -->
+  <g fill="#808080">
+    <ellipse cx="100" cy="40" rx="15" ry="10"/>
+    <circle cx="110" cy="35" r="6"/>
+    <ellipse cx="200" cy="30" rx="15" ry="10"/>
+    <circle cx="210" cy="25" r="6"/>
+    <ellipse cx="300" cy="45" rx="15" ry="10"/>
+    <circle cx="310" cy="40" r="6"/>
+  </g>
+
+  <!-- Falling poops -->
+  <g>
+    <ellipse cx="100" cy="80" rx="8" ry="6" fill="#8B4513"/>
+    <ellipse cx="200" cy="100" rx="7" ry="5" fill="#8B4513"/>
+    <ellipse cx="300" cy="70" rx="9" ry="7" fill="#8B4513"/>
+    <ellipse cx="150" cy="120" rx="6" ry="5" fill="#8B4513"/>
+    <ellipse cx="250" cy="90" rx="8" ry="6" fill="#8B4513"/>
+  </g>
+
+  <!-- Person with newspaper shield -->
+  <g transform="translate(200, 180)">
+    <!-- Body -->
+    <rect x="-12" y="10" width="24" height="40" rx="5" fill="#3498db"/>
+    <!-- Head -->
+    <circle cx="0" cy="-5" r="18" fill="#ffcc99"/>
+    <!-- Worried face -->
+    <circle cx="-6" cy="-8" r="3" fill="#333"/>
+    <circle cx="6" cy="-8" r="3" fill="#333"/>
+    <path d="M-8,5 Q0,0 8,5" stroke="#333" stroke-width="2" fill="none"/>
+    <!-- Arms holding newspaper -->
+    <line x1="-12" y1="20" x2="-35" y2="-10" stroke="#ffcc99" stroke-width="8" stroke-linecap="round"/>
+    <line x1="12" y1="20" x2="35" y2="-10" stroke="#ffcc99" stroke-width="8" stroke-linecap="round"/>
+    <!-- Newspaper shield -->
+    <g transform="translate(0, -50)" filter="url(#shadow)">
+      <rect x="-50" y="-20" width="100" height="60" rx="3" fill="#f5f5dc"/>
+      <rect x="-42" y="-12" width="84" height="8" fill="#1a1a1a"/>
+      <rect x="-42" y="0" width="84" height="3" fill="#888"/>
+      <rect x="-42" y="6" width="84" height="3" fill="#888"/>
+      <rect x="-42" y="12" width="60" height="3" fill="#888"/>
+      <rect x="-42" y="20" width="84" height="15" fill="#ddd"/>
+    </g>
+  </g>
+
+  <!-- Splat effects (blocked) -->
+  <g fill="#8B4513" opacity="0.6">
+    <ellipse cx="170" cy="115" rx="12" ry="8" transform="rotate(-20, 170, 115)"/>
+    <ellipse cx="230" cy="125" rx="10" ry="7" transform="rotate(15, 230, 125)"/>
+  </g>
+
+  <!-- Score -->
+  <g transform="translate(50, 30)">
+    <rect x="-40" y="-15" width="80" height="30" rx="5" fill="rgba(0,0,0,0.5)"/>
+    <text x="0" y="5" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">SCORE: 42</text>
+  </g>
+</svg>

@@ -1,0 +1,42 @@
+# MBTI 프롬프트 평가 하네스 — 설정 + AWS 리소스 추적
+# 생성: 2026-05-16 (feat/prompt-v2)
+
+region: us-east-1
+account: "887078546492"
+
+# Bedrock application inference profiles (전용 — eval 비용 분리 추적)
+# 태그: Service=p1(prism 롤업) / ServiceName=MBTI-PromptEval(분리 필터) / Environment=dev
+# 무과금 생성·삭제 가능. 과금은 호출 토큰분만.
+profiles:
+  generator:                       # 본문 생성
+    name: mbti-eval-sonnet-46
+    model: anthropic.claude-sonnet-4-6
+    id: ymxbqn4lqro1
+    arn: arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/ymxbqn4lqro1
+  judge:                           # 페어와이즈 채점 (Generator와 다른 모델 — self-enhancement 완화)
+    name: mbti-eval-opus-47
+    model: anthropic.claude-opus-4-7
+    id: 7pr9ue3os1ro
+    arn: arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/7pr9ue3os1ro
+    note: Opus 4.7 는 inferenceConfig.temperature 미지원 — 호출 시 제외
+
+# 고정 입력 (소재 효과 통제)
+clusters_dir: docs/prompt-eval/clusters       # 5세트 동결, 인덱스=clusters.json
+prompt_versions_dir: docs/prompt-mbti-v2 # 평가 대상 프롬프트 버전 루트 (nt/nf/st/sf)
+
+# 평가 방법론 (2026 보편 + 우리 보정)
+method:
+  primary: pairwise            # 절대점수 아님 — 블라인드 페어와이즈 승률
+  position_swap: true          # A/B 순서 스왑 2회 — position bias 상쇄
+  blind: true                  # 버전 라벨 숨김
+  dimensions:                  # 5축 (14축 과설계 폐기)
+    - 신선도
+    - 깊이
+    - 내러티브
+    - 페르소나차별
+    - 신뢰_팩트
+  judge_temperature_generator: 0.7   # 생성 다양성
+  human_alignment_threshold: 0.7     # 영광님 골든셋 vs Judge Pearson r 하한
+  golden_set_size: 30                # 동결 인간 라벨 쌍 (드리프트 감시용)
+
+runs_dir: docs/prompt-eval/runs     # 실행별 산출물/평가/리포트 (대용량 — git 제외 권장)

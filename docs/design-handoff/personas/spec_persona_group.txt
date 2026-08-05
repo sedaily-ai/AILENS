@@ -1,0 +1,58 @@
+[모듈] MBTI 유형별 페르소나 — 4 그룹 정의
+출처: frontend-next/src/shared/data/mbtiGroups.ts (24곳에서 import되는 단일 원천)
+
+AI LENS는 16개 MBTI를 4개 그룹으로 묶고, 그룹마다 하나의 콘텐츠 스타일·캐릭터를 둔다.
+
+────────────────────────────────────────
+NT — 전략형  (라벨: "NT 전략형")
+  16타입 매핑 : INTJ, INTP, ENTJ, ENTP
+  콘텐츠 스타일 : 애널리스트 리포트
+  아이콘       : 📊
+  대표 색      : #3B82F6 (blue-500)  / 연한배경 blue-50 / 텍스트 blue-600 / 보더 blue-300
+  사고 축      : 추상 + 분석
+  설명         : 데이터와 논리로 핵심을 꿰뚫는 분석형 뉴스
+  리드 캐릭터  : 민철 (avatar /editors/intj.png)
+
+────────────────────────────────────────
+NF — 가치형  (라벨: "NF 가치형")
+  16타입 매핑 : INFJ, INFP, ENFJ, ENFP
+  콘텐츠 스타일 : 칼럼 / 에세이
+  아이콘       : 💡
+  대표 색      : #8B5CF6 (violet-500) / violet-50 / violet-600 / violet-300
+  사고 축      : 추상 + 감성
+  설명         : 의미와 가치를 찾아 깊이 읽는 인문형 뉴스
+  리드 캐릭터  : 하은 (avatar /editors/infp.png)
+
+────────────────────────────────────────
+ST — 실용형  (라벨: "ST 실용형")
+  16타입 매핑 : ISTJ, ISTP, ESTJ, ESTP
+  콘텐츠 스타일 : 팩트시트
+  아이콘       : ✅
+  대표 색      : #22C55E (green-500) / green-50 / green-600 / green-300
+  사고 축      : 구체 + 분석
+  설명         : 숫자와 팩트로 빠르게 파악하는 실용형 뉴스
+  리드 캐릭터  : 준서 (avatar /editors/istj.png)
+
+────────────────────────────────────────
+SF — 공감형  (라벨: "SF 공감형")
+  16타입 매핑 : ISFJ, ISFP, ESFJ, ESFP
+  콘텐츠 스타일 : 친구 톡
+  아이콘       : 💬
+  대표 색      : #F97316 (orange-500) / orange-50 / orange-600 / orange-300
+  사고 축      : 구체 + 감성
+  설명         : 친근한 대화체로 쉽게 이해하는 공감형 뉴스
+  리드 캐릭터  : 소율 (avatar /editors/esfp.png)
+
+────────────────────────────────────────
+[그룹 기본 MBTI 시드] 사용자가 그룹만 고르고 정확한 MBTI를 안 줬을 때:
+  NT→INTJ, NF→INFP, ST→ISTJ, SF→ESFP
+  (캐릭터 이미지 파일명이 이 시드를 따름: intj/infp/istj/esfp.png)
+
+[2x2 좌표 — 디자인 시 그룹 배치 근거]
+              분석                 감성
+  추상   NT(전략·📊·blue)     NF(가치·💡·violet)
+  구체   ST(실용·✅·green)    SF(공감·💬·orange)
+
+※ 색 주의: 위 색은 mbtiGroups(피드·태그용) 팔레트.
+  캐릭터 상세/온보딩 화면은 다른 accent 팔레트를 쓴다.
+  → notes/spec_known_issues.txt 의 "색 팔레트 2종 공존" 반드시 확인.

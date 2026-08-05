@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+:root {
+  --color-bg: #ffffff;
+  --color-text: #000000;
+  --color-text-muted: #6b7280;
+  --color-primary: #2563eb;
+  --color-border: #e5e7eb;
+  --max-container: 1080px;
+  --gutter: 20px;
+}
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --color-primary: #ffffff;
+  --color-accent: #60a5fa;
+  --font-sans: 'Pretendard Variable', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Merriweather', Georgia, 'Times New Roman', serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --spacing-gutter: min(32px, 5vw);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Pretendard Variable', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-y: scroll;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.max-w-container {
+  max-width: var(--max-container);
+}
+
+.px-gutter {
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px 16px;
+  z-index: 100;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+.no-hover:hover {
+  text-decoration: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* @view-transition 제거 — Next 16 클라이언트 라우팅과 충돌해
+   letter 카드 클릭이 hang 되고 새 페이지 스크롤 위치가 페이지 하단으로
+   복원되는 버그 발생. 데코레이션 fade 보다 정상 navigation 우선. */
+
+/* 모바일에서 의도된 줄바꿈 br 을 자연 wrap 으로 대체.
+   데스크탑 의도 디자인(2-3줄로 끊어 보이기)은 그대로, 모바일은 좁아 어색 → br 무시. */
+@media (max-width: 600px) {
+  .br-desktop-only br {
+    display: none;
+  }
+}

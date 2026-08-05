@@ -1,0 +1,67 @@
+{
+  "frozen_at": "2026-05-16",
+  "source": "sedaily 20260515.xml",
+  "purpose": "버전 간 프롬프트 비교의 고정 입력 — 소재 효과 통제",
+  "clusters": [
+    {
+      "cluster_id": "C1_macro_policy",
+      "label": "거시정책 — 정부 회복진단 vs 매파 금통위·국고채·수입물가",
+      "cohesion": "강",
+      "nsids": [
+        "2KCF10RPOE",
+        "2KCF1HUEBS",
+        "2KCF2C942Z",
+        "2KCEKSBLKA"
+      ],
+      "total_chars": 4201
+    },
+    {
+      "cluster_id": "C2_securities_earnings",
+      "label": "증권사 실적·자본시장 — 돈잔치·순익·미국상장·유증",
+      "cohesion": "강",
+      "nsids": [
+        "2KCEZG7K01",
+        "2KCF0E1VW2",
+        "2KCF0K1EAI",
+        "2KCEL2OJEC"
+      ],
+      "total_chars": 11659
+    },
+    {
+      "cluster_id": "C3_housing_policy",
+      "label": "부동산·청년정책 — 서울 아파트값·태릉·사업자대출·신혼부부",
+      "cohesion": "강",
+      "nsids": [
+        "2KCF09PFJG",
+        "2KCEZM2TE3",
+        "2KCF0X34PB",
+        "2KCF255X9F"
+      ],
+      "total_chars": 7486
+    },
+    {
+      "cluster_id": "C4_industry_infra",
+      "label": "산업·인프라 — SK AI밸류체인·반도체클러스터·수도권한계·해상풍력",
+      "cohesion": "강",
+      "nsids": [
+        "2KCF1DCW86",
+        "2KCF0ZWZ7L",
+        "2KCF22WV6V",
+        "2KCF20111C"
+      ],
+      "total_chars": 6302
+    },
+    {
+      "cluster_id": "C5_stress_loose",
+      "label": "스트레스(의도적 약결합) — 노벨상·그랜저·세금포인트·인공태양",
+      "cohesion": "약",
+      "nsids": [
+        "2KCF14ZQLB",
+        "2KCF0V9FZ3",
+        "2KCEZEFHNR",
+        "2KCF0ZF1SF"
+      ],
+      "total_chars": 3263
+    }
+  ]
+}

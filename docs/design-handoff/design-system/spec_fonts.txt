@@ -1,0 +1,30 @@
+[모듈] 폰트 — 스택·용도·라이선스·다운로드 출처
+출처: frontend-next/src/app/globals.css + 컴포넌트 인라인 fontFamily
+
+★ 폰트 파일은 레포에 번들되어 있지 않다 (woff/ttf/otf 없음).
+  시스템/CDN 폰트로 동작. 디자이너는 아래 출처에서 정품 파일을 받아야 한다.
+
+■ 본문/UI (sans) — globals.css --font-sans, html
+  스택: 'Pretendard Variable', 'Noto Sans KR', -apple-system,
+        BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
+  1순위 Pretendard Variable — 사실상 사이트 기본 서체
+  다운로드: https://github.com/orioncactus/pretendard (SIL OFL 1.1, 상업·임베드 자유)
+  Noto Sans KR fallback: Google Fonts (SIL OFL 1.1)
+
+■ 에디토리얼 본문/레터/투데이 (serif) — 컴포넌트 인라인
+  실사용: 'Noto Serif KR', serif  /  일부 'Pretendard Variable, Noto Serif KR, serif'
+  사용처: letters/[id], today, editors/[id], onboarding steps, editors/page 제목
+  다운로드: Noto Serif KR — Google Fonts (SIL OFL 1.1)
+  성격: 레터/오피니언 톤의 명조 — 캐릭터(특히 NF 하은) 분위기와 연결
+
+■ 디자인 토큰엔 있으나 실렌더링 거의 안 됨 (정리 대상)
+  --font-serif   : 'Merriweather', Georgia, 'Times New Roman', serif
+  --font-display : 'Playfair Display', Georgia, serif
+  → 토큰만 선언, 실제 화면은 Noto Serif KR 사용. 디자이너 혼동 주의.
+
+■ 타임머신 화면 한정: 'Georgia, serif' (레트로 연출용, 의도적)
+
+[정리 권고]
+- 실질 2서체 체계: Pretendard(UI/본문) + Noto Serif KR(에디토리얼).
+- Merriweather/Playfair 토큰은 미사용 → 디자인 시스템에서 제거하거나 실제 적용 결정.
+- 한글 가변폰트 Pretendard Variable 기준으로 weight 스케일 설계 권장.

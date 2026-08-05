@@ -1,0 +1,35 @@
+{
+  "name": "AI LENS — 같은 뉴스, 네 가지 시선",
+  "short_name": "AI LENS",
+  "description": "서울경제신문이 운영하는 MBTI 기반 맞춤형 경제 뉴스. 네 명의 AI 에디터가 같은 사건을 각자의 결로 다시 씁니다.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
