@@ -164,21 +164,6 @@ class UserProfile:
             last_login=item.get('last_login', ''),
         )
 
-    def to_api(self) -> Dict[str, Any]:
-        """Convert to API response format."""
-        return {
-            'user_id': self.user_id,
-            'email': self.email,
-            'name': self.name,
-            'picture': self.picture,
-            'mbti_group': self.mbti_group,
-            'temperature': self.temperature,
-            'badges': self.badges,
-            'title': self.title,
-            'created_at': self.created_at,
-            'last_login': self.last_login,
-        }
-
 
 @dataclass
 class ReadingRecord:

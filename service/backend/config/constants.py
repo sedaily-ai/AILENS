@@ -44,7 +44,6 @@ S3_BODY_FIELDS = [
 # HTTP Timeouts (seconds)
 # =============================================================================
 
-HTTP_TIMEOUT_SHORT = 10      # For quick operations (revalidation, health checks)
 HTTP_TIMEOUT_MEDIUM = 30     # For API calls (BigKinds, search)
 HTTP_TIMEOUT_LONG = 60       # For heavy operations (translation)
 HTTP_TIMEOUT_SCRAPER = 10    # For web scraping (byline, time)
@@ -61,16 +60,9 @@ REDIS_SOCKET_TIMEOUT = 2            # seconds
 # URLs
 # =============================================================================
 
-# Frontend
-FRONTEND_URL_DEFAULT = 'https://mbti.sedaily.com'
-
 # External APIs
 BIGKINDS_API_URL_DEFAULT = 'https://tools.kinds.or.kr'
 ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-
-# Default Video URL
-NAVER_TV_DEFAULT_URL = 'https://tv.naver.com/v/90963232?playlistNo=998605'
-NAVER_TV_URL_DEFAULT = NAVER_TV_DEFAULT_URL  # Alias for consistency
 
 # =============================================================================
 # AI Model Configuration
@@ -111,8 +103,6 @@ BEDROCK_MODEL_ID_CHATBOT = 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
 BEDROCK_MODEL_ID_NOVA_LITE = 'amazon.nova-lite-v1:0'
 # Nova Pro — Higher quality for complex classification
 BEDROCK_MODEL_ID_NOVA_PRO = 'amazon.nova-pro-v1:0'
-# Default Nova model (used by pipeline steps)
-BEDROCK_MODEL_ID_NOVA = BEDROCK_MODEL_ID_NOVA_LITE
 
 # AWS Bedrock Embedding Models
 # Titan Text Embeddings V2 — 1024-dim, up to 8192 tokens input
@@ -278,8 +268,6 @@ EDITORIAL_BYLINE = '서울경제 편집부'
 
 ITEM_TYPE_ARTICLE = 'article'
 ITEM_TYPE_SETTINGS = 'settings_config'
-ITEM_TYPE_COLLECTION_LOG = 'collection_log'
-ITEM_TYPE_ARTICLE_VERSION = 'article_version'
 ITEM_TYPE_USER_PROFILE = 'user_profile'
 ITEM_TYPE_ARCHIVED_SENTENCE = 'archived_sentence'
 ITEM_TYPE_READING_RECORD = 'reading_record'
@@ -292,14 +280,6 @@ ITEM_TYPE_NEWS_BRIEFING = 'news_briefing'
 
 NEWS_BRIEFING_ID = 'news_briefing_latest'
 NEWS_BRIEFING_MAX_AGE_HOURS = 36  # 하루 1회 갱신 기준, 여유 12시간 포함
-
-# =============================================================================
-# Settings Keys
-# =============================================================================
-
-SETTINGS_KEY_VIDEO_SCHEDULES = 'video_schedules'
-SETTINGS_KEY_TRANSLATION_PROMPT = 'translation_prompt'
-SETTINGS_KEY_PROMPT_HISTORY = 'prompt_history'
 
 # =============================================================================
 # CORS Headers

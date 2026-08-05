@@ -22,7 +22,6 @@ from .constants import (
     BEDROCK_MODEL_ID_NOVA_LITE,
     BEDROCK_EMBEDDING_MODEL_ID,
     BIGKINDS_API_URL_DEFAULT,
-    FRONTEND_URL_DEFAULT,
     CACHE_TTL_DEFAULT,
 )
 
@@ -90,11 +89,6 @@ class Settings:
     api_host: str = '0.0.0.0'
     api_port: int = 8000
     log_level: str = 'INFO'
-
-    # ── Frontend ─────────────────────────────────────────────────────────────
-
-    frontend_url: str = FRONTEND_URL_DEFAULT
-    revalidate_secret: Optional[str] = None
 
     # ── Cognito (JWT verification) ──────────────────────────────────────────
     # Defaults match the production pool (see frontend-next/src/shared/config/auth.ts).
@@ -165,10 +159,6 @@ class Settings:
             api_host=os.getenv('API_HOST', '0.0.0.0'),
             api_port=int(os.getenv('API_PORT', '8000')),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
-
-            # Frontend
-            frontend_url=os.getenv('FRONTEND_URL', FRONTEND_URL_DEFAULT),
-            revalidate_secret=os.getenv('REVALIDATE_SECRET'),
 
             # Cognito
             cognito_region=os.getenv('COGNITO_REGION', 'us-east-1'),

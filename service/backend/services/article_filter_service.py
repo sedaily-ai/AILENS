@@ -263,15 +263,3 @@ JSON 형식으로 제외할 기사만 출력하세요:
             logger.error(f"AI filter error: {e}")
 
         return {}
-
-
-# Singleton instance
-_filter_service = None
-
-
-def get_filter_service() -> ArticleFilterService:
-    """Get or create singleton ArticleFilterService instance."""
-    global _filter_service
-    if _filter_service is None:
-        _filter_service = ArticleFilterService()
-    return _filter_service

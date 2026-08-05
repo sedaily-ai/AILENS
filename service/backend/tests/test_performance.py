@@ -159,21 +159,6 @@ def test_embedding_latency() -> Dict[str, Any]:
         return {'service': 'bedrock_embedding', 'error': str(e)[:100]}
 
 
-def test_metrics_collection_latency() -> Dict[str, Any]:
-    """Measure how long the metrics dashboard takes to collect."""
-    try:
-        from services.metrics_service import get_metrics_service
-        svc = get_metrics_service()
-
-        start = time.time()
-        asyncio.run(svc.get_dashboard(3))
-        ms = int((time.time() - start) * 1000)
-
-        return {'service': 'metrics_dashboard', 'latency_ms': ms}
-    except Exception as e:
-        return {'service': 'metrics_dashboard', 'error': str(e)[:100]}
-
-
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -225,15 +210,6 @@ def main():
             print(f'  Medium text: {emb["medium_text_ms"]}ms')
         else:
             print(f'  Error: {emb["error"]}')
-
-        # Metrics collection
-        print('\n── Metrics Dashboard Collection ──\n')
-        met = test_metrics_collection_latency()
-        report['metrics_collection'] = met
-        if 'error' not in met:
-            print(f'  Dashboard collection: {met["latency_ms"]}ms')
-        else:
-            print(f'  Error: {met["error"]}')
 
     # Save report
     results_dir = os.path.join(os.path.dirname(__file__), 'results')

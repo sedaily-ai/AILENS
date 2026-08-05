@@ -131,8 +131,6 @@ services/           → Business logic: article_filter, prompt_loader,
                      다른 DDB 스키마)이 담당 — 이 서술은 낡은 정보였다.
                      stock_service (used by services/chatbot_engine.py for inline stock lookups).
                      2026-08-05: `handlers/chatbot_handler.py`(869줄, SOLID 위반 확인)를
-                     stock_service (used by services/chatbot_engine.py for inline stock lookups).
-                     2026-08-05: `handlers/chatbot_handler.py`(869줄, SOLID 위반 확인)를
                      3개로 분리 — `chatbot_context_service.py`(DynamoDB/S3 raw boto3 조회:
                      briefing, 최근기사, 연관기사 검색), `chatbot_prompt_service.py`(시스템
                      프롬프트·tool 정의 조립), `chatbot_engine.py`(Bedrock 호출, tool-use
@@ -141,19 +139,58 @@ services/           → Business logic: article_filter, prompt_loader,
                      이제 HTTP 라우팅/검증/응답 조립만 담당. ⚠️ 동기(`generate_chat_response`)와
                      스트리밍(`generate_chat_response_stream`) 경로가 tool-use 루프를 각자
                      중복 구현 중 — 이번엔 구조만 옮기고 통합은 안 함(로직 변경이라 별도 작업).
-models/             → Dataclasses: Article, UserProfile/ArchivedSentence/ReadingRecord
-                     (in personal.py), ABTest
+                     ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
+                     2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
+                     사용처 0 (수동 perf 스크립트 한 곳뿐이었음). `clients/cloudwatch_metrics.py`
+                     (today_letters 관측용, 살아있음)와는 별개 시스템이니 혼동 주의.
+                     `article_filter_service.py`의 `get_filter_service()` 싱글턴도 같은 날
+                     삭제(호출자 0) — `article_collector.py`는 이 getter 없이 직접 인스턴스화함,
+                     나머지(`FilterResult`, `ArticleFilterService` 본체)는 살아있음.
+models/             → `personal.py`(ArchivedSentence/ReadingRecord/UserProfile)만 남음.
+                     ⚠️ `article.py`(371줄: Article/ArticleVersion/CollectionLog/ContentBlock 등)
+                     와 `ab_test.py`(171줄)는 2026-08-05 전체 삭제 — 둘 다 import하는 곳이
+                     `models/__init__.py`의 재export 말고는 전혀 없었다. `article.py`의
+                     `ContentBlock`/`RelatedNews`/`PushInfo`/`PaperInfo`는 이름이 같아 헷갈리기
+                     쉬운데 `clients/s3_xml_client.py`가 독자적으로 갖고 있는 동명 클래스가
+                     실제로 쓰이는 것 — 이 파일 것들은 처음부터 무관한 그림자였다.
+                     `UserProfile.to_api()`(14줄)도 같은 날 삭제 — `user_handler.py`가 이 대신
+                     동일 로직을 인라인 재구현해서 씀.
 core/               → Framework: decorators.py (@lambda_handler, @require_params, etc.),
                      exceptions.py (thin re-export of common/errors.py's BackendError
                      hierarchy — see "common/" below), response.py (delegates to
-                     common/http.py, injects CORS_HEADERS), revalidation.py
-                     (CacheRevalidator — triggers frontend cache invalidation)
+                     common/http.py, injects CORS_HEADERS).
+                     ⚠️ revalidation.py(`CacheRevalidator`, 287줄)는 2026-08-05 삭제됨 —
+                     자체 docstring이 "admin_handler.py·cms_update_handler.py에서 추출"이라고
+                     밝히는데 둘 다 현재 트리에 없고, 프론트에 `/api/revalidate` 라우트
+                     자체가 없어 이 모듈이 호출해도 받을 곳이 없었다. 테스트 커버리지도 0 —
+                     `common/errors.py`의 미사용 예외 클래스들(아래)과 달리 "의도적으로
+                     갖춰둔 범용 프레임워크"가 아니라 순수 죽은 통합 코드였음.
+                     `config/settings.py`의 `frontend_url`/`revalidate_secret` 필드도
+                     같이 삭제(이 모듈 전용이었음).
+                     ⚠️ `common/errors.py`의 `BackendError` 하위 10개 클래스 중 7개
+                     (`NotFoundError`, `RepositoryError`, `TranslationError`,
+                     `ExternalServiceError`, `AuthorizationError`, `RateLimitError`,
+                     `ConfigurationError`)는 프로덕션 코드에서 한 번도 raise되지 않지만
+                     **의도적으로 유지한다** — `common/tests/test_errors.py`와
+                     `tests/test_core_response_contract.py` 둘 다 10개 전부를 파라미터화된
+                     테이블로 명시적으로 테스트하고 있어, "미래에 어떤 handler든 재사용할 수
+                     있도록 갖춰둔 범용 에러 계층"으로 판단 — 이번 세션에서 지운 다른
+                     것들(테스트도 참조도 0인 진짜 고아)과는 다른 카테고리.
 config/             → settings.py (env-var-driven @dataclass Settings, cached
                      via @lru_cache get_settings()) + constants.py (model IDs,
                      DynamoDB table names, S3_BODY_FIELDS, CORS_HEADERS,
                      category normalization + search aliases, MBTI_GROUP_INFO,
                      Polly podcast voice styles). Never call `os.getenv` in
                      handlers — go through `config.settings`.
+                     ⚠️ `constants.py`에 사용처 0인 상수가 25~30개 정도 더 있다(대부분
+                     `OPENSEARCH_INDEX_DEFAULT`/`BEDROCK_MODEL_ID_NOVA_PRO`/`NOVA_LITE`류,
+                     `PODCAST_VOICE_STYLES`류, `SLUG_*`류 — settings.py를 거치거나 수동
+                     통합 스크립트가 참조해서 파급이 얽혀있음) — 2026-08-05엔 완전히
+                     고립된 것만 정리(`FRONTEND_URL_DEFAULT`, `HTTP_TIMEOUT_SHORT`,
+                     `NAVER_TV_DEFAULT_URL`/`_URL_DEFAULT`, `BEDROCK_MODEL_ID_NOVA`,
+                     `ITEM_TYPE_COLLECTION_LOG`/`ARTICLE_VERSION`,
+                     `SETTINGS_KEY_TRANSLATION_PROMPT`/`VIDEO_SCHEDULES`/`PROMPT_HISTORY`).
+                     나머지는 다음에 개별적으로 볼 것.
 prompts/            → AI prompt templates organized by purpose:
                      transform/ (nt/nf/st/sf.md), chatbot/ (nt/nf/st/sf.md),
                      selection/ (article_scorer.md), validation/ (validator.md),
