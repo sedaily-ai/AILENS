@@ -5,32 +5,7 @@ import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import { getWeekDays, isSameDay, getMonthDays } from "@/shared/utils/dateUtils";
 import { votePost, addComment, fetchComments } from "@/shared/lib/communityApi";
 import { useAuth } from "@/features/auth";
-
-// 커뮤니티 포스트 타입
-export interface CommunityComment {
-  id: string;
-  userName: string;
-  userMbti: string;
-  userAvatar: string;
-  text: string;
-  timeAgo: string;
-  likes: number;
-}
-
-export interface CommunityPost {
-  id: string;
-  userName: string;
-  userMbti: string;
-  userAvatar: string;
-  timeAgo: string;
-  archivedSentence: string;
-  userComment: string;
-  articleTitle: string;
-  tags: string[];
-  upvotes: number;
-  commentCount: number;
-  commentList: CommunityComment[];
-}
+import type { CommunityComment, CommunityPost } from "@/shared/types/community";
 
 // 유저 프로필 타입
 export interface UserProfile {

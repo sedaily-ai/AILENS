@@ -3,14 +3,9 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
+import type { DailyQuestionItem } from "@/shared/types/question";
 
 export const dailyQuestions = [{ id: "q1" }, { id: "q2" }];
-
-export interface DailyQuestionItem {
-  id: string;
-  question?: string;
-  options?: Array<{ id: string; text: string; description?: string }>;
-}
 
 interface Props {
   currentQuestionIndex: number;

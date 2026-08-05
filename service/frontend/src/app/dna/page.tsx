@@ -5,7 +5,7 @@ import { Header } from "@/widgets/Header";
 import Link from 'next/link';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
 import { UserMenu } from '@/features/auth';
-import { DnaContent } from '@/features/dna/components/DnaContent';
+import { DnaContent } from '@/features/dna';
 import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 

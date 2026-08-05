@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { AuthProvider } from '@/features/auth';
-import { NavProgress } from '@/widgets/NavProgress/NavProgress';
+import { NavProgress } from '@/widgets/NavProgress';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (

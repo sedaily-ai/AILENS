@@ -1,5 +1,5 @@
 import { API_URL } from "@/shared/config/api";
-import type { CommunityPost, CommunityComment } from "@/features/community";
+import type { CommunityPost, CommunityComment } from "@/shared/types/community";
 import { authFetch } from "@/shared/lib/authFetch";
 
 const BASE = `${API_URL}/api/posts`;

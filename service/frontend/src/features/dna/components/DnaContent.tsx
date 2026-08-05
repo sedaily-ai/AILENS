@@ -1,6 +1,6 @@
 'use client';
 
-import { useCountUp } from '@/features/news-feed/utils/useCountUp';
+import { useCountUp } from '@/features/news-feed';
 import {
   MOCK_DNA_STATS,
   MOCK_PERSPECTIVE_SHARE,

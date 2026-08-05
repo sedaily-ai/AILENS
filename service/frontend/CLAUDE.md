@@ -137,8 +137,38 @@ features/[feature-name]/
   - 유틸: 동사 또는 설명적 이름 (`formatDate`, `convertByline`)
   - 타입: 도메인명 (`article.ts`, `user.ts`)
 
-## 현재 핵심 의존성 (이동 시 주의)
-- @/data/mbtiGroups: 24곳에서 import → shared/data/로 이동 대상
-- @/config/api: 14곳 → shared/config/로 이동 대상
-- @/contexts/AuthContext: 9곳 → features/auth/로 이동 대상
-- @/types/article: 3곳 → entities/article/로 이동 대상
+## FSD 이행 현황 (2026-08-05 기준)
+
+### 완료된 이동
+- @/data/mbtiGroups → shared/data/mbtiGroups (완료, 옛 경로 참조 0건)
+- @/config/api → shared/config/api (완료)
+- @/contexts/AuthContext → features/auth (완료)
+- @/types/article → entities는 아직 없음, article 타입은 shared/types에 있음 (완료)
+
+### pages / entities 레이어 — 0% 구현
+- `src/pages/`, `src/entities/` 폴더 자체가 존재하지 않음
+- `src/components/`(mbti/story/timeline/character, 총 6000줄+)가 사실상 "페이지 조합"
+  역할을 FSD 밖에서 담당 중 — 예: `src/components/mbti/FeedPage.tsx`가 `/` 라우트의
+  실제 진입점(`src/app/page.tsx`가 이걸 렌더)
+- 큰 구조 논의가 필요해서 아직 손대지 않음, 현황만 기록
+
+### widgets/ — 스캐폴딩 아님, 실사용 중
+- `widgets/Header/`: 배럴(`index.ts`) 있음
+- `widgets/NavProgress/`, `widgets/SiteFooter/`: 2026-08-05에 배럴 추가 완료
+  (`app/layout.tsx`, `app/providers.tsx`가 이제 배럴 경유로 import)
+
+### 남은 위반 (다음 라운드)
+- deep-import 18건: `fortune/lib/engine`이 6곳에서 우회당함,
+  `couple-match`/`ideal-match`가 서로 lateral import — 파급 넓어서 보류
+- `features/dna`가 `features/news-feed`를 import(같은 레이어 간 import, 원래는
+  entities나 shared로 뺄 자원이지만 지금은 `features/news-feed`의 배럴(`useCountUp`)
+  경유로만 접근하도록 고쳐둠 — 근본 해결은 아님, 다음 논의 대상)
+
+### 2026-08-05 정리 라운드 1 완료 내역
+- `FeedPage.tsx` 죽은 코드 제거: 안 쓰는 아이콘/함수/useState 다수 + 도달 불가능한
+  팟캐스트 플레이어·페이월 블록(~550줄) 삭제. 2171줄 → 1623줄.
+  (팟캐스트 재생은 `/letters/[id]`(`LetterDetailClient.tsx`)로 이미 이관되어 있었음)
+- `features/dna/index.ts`, `widgets/NavProgress/index.ts`, `widgets/SiteFooter/index.ts`
+  배럴 신설, 관련 deep import 4건 수정
+- `shared → features` 역방향 의존성 2건 해소: `CommunityPost`/`CommunityComment` →
+  `shared/types/community.ts`, `DailyQuestionItem` → `shared/types/question.ts` 로 이동

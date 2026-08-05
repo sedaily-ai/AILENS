@@ -1,5 +1,5 @@
 import { API_URL } from "@/shared/config/api";
-import type { DailyQuestionItem } from "@/features/question";
+import type { DailyQuestionItem } from "@/shared/types/question";
 
 export async function fetchDailyQuestions(date: string): Promise<DailyQuestionItem[]> {
   try {

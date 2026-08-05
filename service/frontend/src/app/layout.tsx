@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
-import { ConditionalFooter } from "@/widgets/SiteFooter/ConditionalFooter";
+import { ConditionalFooter } from "@/widgets/SiteFooter";
 
 // GA4 Measurement ID — ailens.sedaily.ai 전용 속성.
 const GA_ID = "G-BJZ09B6PB6";
