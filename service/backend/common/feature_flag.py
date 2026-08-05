@@ -24,7 +24,6 @@ DDB layout (sedaily-mbti-admin-config-dev):
 import logging
 import os
 import time
-from typing import Optional
 
 import boto3
 
@@ -115,14 +114,3 @@ def get_threshold(name: str, default: int) -> int:
     return value
 
 
-def invalidate(name: Optional[str] = None) -> None:
-    """수동 cache invalidate (테스트 / 즉시 반영 강제용).
-
-    name=None → 전체 clear. name 지정 시 flag/threshold 양쪽 모두 제거 (key 와
-    `_threshold_<name>` 두 entry 시도).
-    """
-    if name is None:
-        _cache.clear()
-    else:
-        _cache.pop(name, None)
-        _cache.pop(f"_threshold_{name}", None)

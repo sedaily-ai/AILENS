@@ -14,11 +14,10 @@ DDB schema (Admin-1 import):
     sk = 'LATEST'  → {active_version: <int>, updated_at}
     sk = 'v#<int>' → {content: <str>, created_at, actor}
 
-Caller API (unchanged from filesystem-only era so 6 call sites need no edits):
-    load_prompt(category, name)        — canonical, used directly by 5 of 6 sites
+Caller API:
+    load_prompt(category, name)        — canonical
     load_transform_prompt(group)       — wrapper for prompts/transform/{nt,nf,st,sf}
     load_chatbot_prompt(group)         — wrapper for prompts/chatbot/{nt,nf,st,sf}
-    load_prompt_by_path(relative_path) — splits 'category/name' for DDB; used by tooling
 
 IAM: any Lambda invoking load_prompt needs `dynamodb:GetItem` on
 sedaily-mbti-admin-prompts-dev. v1 shared role inherits AmazonDynamoDBFullAccess.
@@ -28,7 +27,6 @@ AdminPromptsDDBRead, scoped to that single table).
 import logging
 import os
 import time
-from typing import Optional
 
 import boto3
 
@@ -112,27 +110,3 @@ def load_chatbot_prompt(group: str) -> str:
     return load_prompt("chatbot", group.lower())
 
 
-def load_prompt_by_path(relative_path: str) -> str:
-    """Load by 'category/name' subpath. Splits on first '/' for DDB lookup.
-
-    Single-segment paths (no '/') route directly to filesystem since they don't
-    map to the DDB schema. None of the current 6 call sites use that form.
-    """
-    parts = relative_path.split("/", 1)
-    if len(parts) == 2:
-        return load_prompt(parts[0], parts[1])
-    path = os.path.join(PROMPTS_DIR, f"{relative_path}.md")
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def invalidate(category: Optional[str] = None, name: Optional[str] = None) -> None:
-    """Manual cache invalidate (tests / immediate-effect overrides)."""
-    if category is None:
-        _cache.clear()
-        return
-    if name is None:
-        for k in [k for k in _cache if k[0] == category]:
-            _cache.pop(k, None)
-        return
-    _cache.pop((category, name), None)

@@ -15,7 +15,6 @@ design:
 """
 import os
 import time
-from typing import Optional
 
 import boto3
 
@@ -56,9 +55,3 @@ def get_pg_password() -> str:
     return get_secret(param_name)
 
 
-def invalidate(param_name: Optional[str] = None) -> None:
-    """수동 cache invalidate (테스트 / 즉시 반영 강제용)."""
-    if param_name is None:
-        _cache.clear()
-    else:
-        _cache.pop(param_name, None)

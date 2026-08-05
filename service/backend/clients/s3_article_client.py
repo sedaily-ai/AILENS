@@ -151,18 +151,3 @@ class S3ArticleClient:
             Dict containing only the body fields
         """
         return {field: article.get(field) for field in S3_BODY_FIELDS if article.get(field) is not None}
-
-    @staticmethod
-    def strip_body_fields(article: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Return a copy of article dict with body fields removed.
-
-        Used during save to produce the metadata-only dict for DynamoDB.
-
-        Args:
-            article: Full article dict
-
-        Returns:
-            New dict with body fields removed
-        """
-        return {k: v for k, v in article.items() if k not in S3_BODY_FIELDS}

@@ -65,9 +65,21 @@ newsletter/         → render.py/sender.py/subscribers.py — 뉴스레터 구�
                      1순위로 쓰고, 실패 시 로컬 미러(`newsletter/local_letters.py`)→
                      하드코딩 mock 순으로 폴백한다.
 clients/            → Service clients: dynamodb, personal_db, s3_article, s3_xml,
-                     embedding (Titan), translate (AWS Translate).
+                     embedding (Titan).
                      daily_letters_ddb_client / cms_posts_ddb_client 는 옛 v2 소스
                      통합분 — today_letters·newsletter·cms_posts_public이 사용.
+                     ⚠️ `translate_client.py`(AWS Translate 래퍼)는 2026-08-05 삭제됨 —
+                     2026-07-30 폐기된 translation 핸들러의 유일한 클라이언트, 호출자·
+                     테스트 둘 다 0 (`common/errors.py`의 `TranslationError`가 한 번도
+                     raise 안 되는 것과 같은 얘기).
+                     ⚠️ `cloudwatch_metrics.py`도 2026-08-05 삭제됨 — **이전 버전 이
+                     문서가 "today_letters 관측용, 살아있음"이라고 잘못 적어놨었다,
+                     재검증 결과 오류**. 실제로는 어떤 handler/service도 emit 함수를
+                     호출하지 않는다 — 자체 docstring이 밝히는 유일한 호출자
+                     `core1_collector.py`(Phase 4-A CollectorPaperPass)가 이미 삭제됨.
+                     삭제 시 `tests/conftest.py`의 `_block_real_cloudwatch` autouse
+                     fixture(모든 테스트마다 자동 실행되며 이 모듈을 import)도 같이
+                     제거해야 전체 테스트 스위트가 안 깨진다 — 실제로 그렇게 했다.
                      ⚠️ `pgvector_v2_client.py` — 원래 1986줄·34메서드 God Object였다
                      (기사 수집, MBTI 버전, 유저 프로필/인터랙션, 자동생성 파이프라인
                      전체가 여기 있었음). 파이프라인 폐기로 대부분 삭제하고
@@ -76,7 +88,18 @@ clients/            → Service clients: dynamodb, personal_db, s3_article, s3_x
                      **다만 front-page도 같은 RDS에 의존해 지금 500 에러 상태다** —
                      이 클라이언트를 고친 게 아니라 죽은 메서드만 걷어낸 것. front-page
                      복구 여부는 별도 결정 사항.
-                     s3_article_v2_client 도 front_page.py 가 사용 (S3 본문 조회).
+                     s3_article_v2_client 도 front_page.py 가 사용 (S3 본문 조회) —
+                     ⚠️ `put_article_file`/`delete_article_file`/`build_uri`(쓰기용,
+                     Core 1 Collector·Core 2 Transform 전용이었음)는 둘 다 이미 삭제된
+                     파이프라인이라 2026-08-05 삭제, `get_article_file`(front_page의
+                     유일한 읽기 경로)만 남음.
+                     ⚠️ `s3_article_client.py`(v1)의 `strip_body_fields`도 같은 날 삭제
+                     (호출자·테스트 0). `delete_body`는 프로덕션 호출자가 없는데도
+                     **의도적으로 유지** — `tests/test_split_storage.py::test_s3_client_direct`가
+                     mock 없이 실 S3에 대고 put→get→delete까지 검증하는 진짜 통합 테스트로
+                     계속 통과 중이라, 특정 폐기 기능에 묶인 게 아니라 아직 UI가 없는
+                     범용 삭제 기능일 가능성 — `common/errors.py`의 미사용 예외 클래스와
+                     같은 논리로 보존.
                      Bedrock Claude is wrapped by clients/mbti_transform_service.py (unusual
                      placement — it's a service file inside clients/). Polly has no client file;
                      podcast_handler calls boto3 polly directly (tts_handler 는 폐기).
@@ -141,11 +164,13 @@ services/           → Business logic: article_filter, prompt_loader,
                      중복 구현 중 — 이번엔 구조만 옮기고 통합은 안 함(로직 변경이라 별도 작업).
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
-                     사용처 0 (수동 perf 스크립트 한 곳뿐이었음). `clients/cloudwatch_metrics.py`
-                     (today_letters 관측용, 살아있음)와는 별개 시스템이니 혼동 주의.
+                     사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
                      `article_filter_service.py`의 `get_filter_service()` 싱글턴도 같은 날
                      삭제(호출자 0) — `article_collector.py`는 이 getter 없이 직접 인스턴스화함,
                      나머지(`FilterResult`, `ArticleFilterService` 본체)는 살아있음.
+                     ⚠️ `prompt_loader.py`의 `load_prompt_by_path`/`invalidate`도 호출자 0이라
+                     2026-08-05 삭제 — 살아있는 `load_prompt`/`load_transform_prompt`/
+                     `load_chatbot_prompt`는 그대로.
 models/             → `personal.py`(ArchivedSentence/ReadingRecord/UserProfile)만 남음.
                      ⚠️ `article.py`(371줄: Article/ArticleVersion/CollectionLog/ContentBlock 등)
                      와 `ab_test.py`(171줄)는 2026-08-05 전체 삭제 — 둘 다 import하는 곳이
@@ -204,6 +229,9 @@ common/             → Cross-track shared utilities (모든 handler + admin이 
                      Fail-open / fail-safe, own 5-min TTL cache.
                      - `secrets.py`      — SSM SecureString reader. Fail-closed, own
                      5-min TTL cache.
+                     ⚠️ `feature_flag.py`/`secrets.py`의 `invalidate()`(캐시 무효화용
+                     escape hatch)는 둘 다 2026-08-05 삭제 — 호출자·테스트 0. TTL
+                     캐시라 자연 만료되고, 강제 무효화를 실제로 쓰는 곳이 없었다.
                      - `http.py`         — CORS-neutral response builder (`success`/`error`/
                      `json_dumps`). No cache; doesn't import `config/` so CORS can't leak
                      in. `core/response.py` and `admin/shared/response.py` both delegate

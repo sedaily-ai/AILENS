@@ -141,47 +141,6 @@ def _block_real_feature_flags(request, monkeypatch):
     _ff._cache.clear()
 
 
-@pytest.fixture(autouse=True)
-def _block_real_cloudwatch(request, monkeypatch):
-    """유닛 테스트가 운영 CloudWatch 네임스페이스에 쓰지 못하게 막는다.
-
-    ``emit_count`` / ``emit_bedrock_tokens`` 는 ``_get_cw_client().
-    put_metric_data(...)`` 로 **실제 PutMetricData** 를 호출한다
-    (``cloudwatch_metrics.py:98``). 핸들러 코드가 도는 유닛 테스트는 그
-    경로를 그대로 타므로, 개발 워크스테이션의 AWS 자격증명으로 운영
-    네임스페이스 ``sedaily-mbti/v2`` 에 테스트 값이 섞여 들어간다. 실측:
-    ``v2/tests/`` 1회 실행당 **PutMetricData 17회**.
-
-    아무도 눈치채지 못한 이유는 ``emit_count`` 가 모든 예외를
-    ``logger.warning`` 으로 삼키기 때문이다 — 성공하면 조용히 오염되고,
-    실패해도 조용하다.
-
-    SSM 과 달리 **예외를 던지지 않고 MagicMock 을 준다.** 근거는
-    ``get_threshold`` 와 같다 — 메트릭은 fire-and-forget 관측 수단이라
-    "안 나갔음"이 결정적이고 자연스러운 테스트 상태다. 예외를 던져 봐야
-    ``emit_count`` 가 그 자리에서 삼켜 경고 로그만 남기므로 신호도 못 된다.
-    MagicMock 이면 호출 기록이 남아 메트릭을 검증하고 싶은 테스트는
-    그대로 단언할 수 있다.
-
-    ``_get_cw_client`` 하나만 막으면 모든 emit 경로가 덮인다 —
-    ``test_cloudwatch_metrics.py`` 가 이미 같은 지점을 패치해 검증한다
-    (그 파일의 안쪽 ``patch`` 는 나중에 적용돼 이 fixture 를 덮으므로
-    충돌하지 않는다).
-
-    ``@pytest.mark.integration`` 은 실 AWS 가 목적이므로 제외한다.
-    """
-    if request.node.get_closest_marker("integration"):
-        yield
-        return
-
-    from unittest.mock import MagicMock
-
-    from clients import cloudwatch_metrics as _cw
-
-    monkeypatch.setattr(_cw, "_get_cw_client", lambda: MagicMock())
-    yield
-
-
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_test_prefixes():
     """Session-wide belt-and-suspenders cleanup for v2 pgvector tests.
