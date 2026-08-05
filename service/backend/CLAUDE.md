@@ -52,6 +52,11 @@ handlers/           → Lambda entry points. Each handler does its own HTTP meth
                      (개인화 피드·기사 — 2026-05-13부터 항상 빈 응답만 내던 죽은 코드)
                      — 자동생성 파이프라인 자체를 관리자 수동 업로드로 대체하기로
                      결정. 경위·복원: infrastructure/decommission-2026-07-30/README.md
+                     ⚠️ archive.py 의 삭제 경로("내 서랍")가 예전엔 삭제할 때마다 Bedrock
+                     임베딩 호출 + pgvector 유사도 검색을 해놓고 로그 한 줄만 남기고
+                     실제로는 아무것도 안 지우는 순수 낭비 코드였다 — 2026-08-05 제거
+                     (archive_vectors row는 여전히 정리 안 됨, row UUID를 저장 안 해서
+                     특정이 안 됨 — 실제로 지우려면 스키마 변경 필요, 별도 작업).
 newsletter/         → render.py/sender.py/subscribers.py — 뉴스레터 구독/발송.
                      handlers/subscribe.py가 사용. handlers/newsletter.py 자체의
                      배포된 Lambda는 2026-07-30 폐기됐지만(미결선·실호출 0),
@@ -95,7 +100,15 @@ clients/            → Service clients: dynamodb, personal_db, s3_article, s3_x
                      `store_sentence_embedding`). `handlers/archive_handler.py`("내 서랍"
                      유사 문장 검색)가 쓰는 `insert_archive_vector`/`search_similar_sentences`
                      2개만 남기고 2026-08-05 축소, 209줄.
-repositories/       → Business-level data access on top of clients (Personal, Settings, Log)
+repositories/       → PersonalRepository만 남음(personal_db_client.py 기반, "내 서랍"·유저
+                     프로필·독서기록에서 사용). ⚠️ base.py(BaseDynamoDBRepository) +
+                     그걸 상속하던 log_repository.py/settings_repository.py(~930줄)는
+                     2026-08-05 전체 삭제 — repositories/__init__.py가 PersonalRepository만
+                     재export했고, 대응하는 log_handler.py/settings_handler.py 자체가
+                     없어서 어디서도 인스턴스화된 적이 없었다(배선 안 된 죽은 인프라).
+                     get_archived_sentence(personal_repository.py)도 같은 날 삭제 —
+                     archive_handler.py는 이 대신 list_archived_sentences 스캔으로
+                     조회해서 호출자가 없었다.
 services/           → Business logic: article_filter, prompt_loader,
                      metrics, briefing_generator (used by briefing_handler).
                      ⚠️ `prompt_service.py`(`PromptService`, "번역 프롬프트 CRUD"용)는

@@ -186,17 +186,12 @@ async def _handle_delete(
     if not user_id:
         return _error(400, 'user_id is required')
 
-    # Parse archive_id to extract article_id and timestamp
-    # Format: "{user_id}-{article_id}-{timestamp}"
-    parts = archive_id.split('-', 2)
-    if len(parts) < 3:
+    # Format: "{user_id}-{article_id}-{timestamp}" — but article_id/timestamp may
+    # contain hyphens, so we can't reliably split it apart. Look up by exact id
+    # match instead (see the scan below); this just checks the shape is plausible.
+    if len(archive_id.split('-', 2)) < 3:
         return _error(400, 'Invalid archive_id format')
 
-    _, article_id_part, ts_part = parts[0], parts[1], parts[2]
-
-    # Reconstruct the article_id (may contain hyphens — take everything between
-    # the first and last segments). The actual SK uses created_at with ':' → '-'.
-    # We need to query by SK prefix to find the exact item.
     repo = get_personal_repository()
 
     # List user's archives for this article to find the exact match
@@ -219,32 +214,11 @@ async def _handle_delete(
     if not deleted:
         return _error(500, '문장 삭제에 실패했습니다.')
 
-    # Best-effort pgvector cleanup
-    pg = _get_pgvector()
-    if pg:
-        try:
-            # Find and delete matching vectors by user_id + article_id + text
-            similar = pg.search_similar_sentences(
-                embedding=EmbeddingClient().embed_text(target.text),
-                user_id=user_id,
-                limit=5,
-            )
-            for row in similar:
-                if row.get('sentence_text') == target.text:
-                    # Exact match — would need row ID which we don't store.
-                    # For now, log that cleanup should happen.
-                    logger.info(
-                        f"pgvector cleanup needed for archive "
-                        f"user={user_id} article={target.article_id}"
-                    )
-                    break
-        except Exception as e:
-            logger.warning(f"pgvector cleanup attempt failed (non-fatal): {e}")
-        finally:
-            try:
-                pg.close()
-            except Exception:
-                pass
+    # pgvector 쪽 archive_vectors row는 정리되지 않는다 — 그 row의 UUID를
+    # DynamoDB에 저장해두지 않아 특정할 방법이 없다(이전에는 여기서 매 삭제마다
+    # Bedrock 임베딩 호출 + 유사도 검색을 해서 "지워야 함" 로그만 남기고 실제로는
+    # 아무것도 안 지우는 코드가 있었다 — 실비용만 태우는 순수 낭비라 2026-08-05 제거).
+    # 실제로 지우려면 insert 시점에 row UUID를 같이 저장하는 스키마 변경이 필요.
 
     return _success({'deleted': True, 'archive_id': archive_id})
 

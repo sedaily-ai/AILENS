@@ -62,29 +62,6 @@ class PersonalRepository:
             )
         return success
 
-    async def get_archived_sentence(
-        self,
-        user_id: str,
-        article_id: str,
-        timestamp: str,
-    ) -> Optional[ArchivedSentence]:
-        """
-        Get a specific archived sentence.
-
-        Args:
-            user_id: User ID
-            article_id: Article ID
-            timestamp: Creation timestamp (ISO format, used in SK)
-
-        Returns:
-            ArchivedSentence or None
-        """
-        sk = f"ARCHIVE#{article_id}#{timestamp.replace(':', '-')}"
-        item = await self._client.get_item(user_id, sk)
-        if item:
-            return ArchivedSentence.from_item(item)
-        return None
-
     async def delete_archived_sentence(
         self,
         user_id: str,
