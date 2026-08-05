@@ -81,13 +81,30 @@ clients/            → Service clients: dynamodb, personal_db, s3_article, s3_x
                      검색·RAG-유사 기능을 구현했다.
                      ⚠️ `dynamodb_client.py` — 989줄 중 12개 메서드(43%)가 완전 고아였다
                      (article versioning, failed-article DLQ, naver TV URL, slug 체크 등 —
-                     전부 호출자 0). 2026-08-05 삭제, 562줄로 축소. `s3_xml_client.py`도
-                     같은 날 죽은 메서드 2개(`get_today_articles`, `article_to_dict`) 삭제
-                     — 이쪽은 대부분 살아있는 XML 파싱 파이프라인이라 SOLID 위반은 아니었음.
+                     전부 호출자 0). 2026-08-05 삭제, 이어서 `get_article_by_slug`도
+                     삭제(유일한 호출자였던 `article_handler.py`의 도달 불가 slug 라우트도
+                     같이 삭제) — 최종 509줄로 축소. `s3_xml_client.py`도 같은 날 죽은
+                     메서드 2개(`get_today_articles`, `article_to_dict`) 삭제 — 이쪽은
+                     대부분 살아있는 XML 파싱 파이프라인이라 SOLID 위반은 아니었음.
+                     ⚠️ `pgvector_client.py`(v1 — `pgvector_v2_client.py`와는 완전히 다른
+                     시스템, `PG_HOST`/db `ailens` vs `PG_V2_HOST`/db `ailens_v2`, 이름이
+                     비슷해 혼동 주의) — 445줄 중 기사 벡터 검색 관련 6메서드+alias 3개가
+                     호출자 0이었다(`init_tables`, `insert_article_vector`,
+                     `delete_article_vectors`, `search_similar_articles`,
+                     `delete_archive_vector`, `store_embedding`, `search_similar`,
+                     `store_sentence_embedding`). `handlers/archive_handler.py`("내 서랍"
+                     유사 문장 검색)가 쓰는 `insert_archive_vector`/`search_similar_sentences`
+                     2개만 남기고 2026-08-05 축소, 209줄.
 repositories/       → Business-level data access on top of clients (Personal, Settings, Log)
-services/           → Business logic: article_filter, prompt_service(⚠️ 사용처 없음,
-                     translation prompt CRUD용이었던 걸로 보임 — 조사 대상), prompt_loader,
-                     metrics, briefing_generator (used by briefing_handler),
+services/           → Business logic: article_filter, prompt_loader,
+                     metrics, briefing_generator (used by briefing_handler).
+                     ⚠️ `prompt_service.py`(`PromptService`, "번역 프롬프트 CRUD"용)는
+                     2026-08-05 삭제됨 — 어디서도 import 안 됐고(사용처 0), 유일한 잠재
+                     호출자였던 `translation` 핸들러가 2026-07-30에 이미 폐기됐다. 실제
+                     관리자 프롬프트 관리는 완전히 다른 모듈(`admin/routes/prompts.py`,
+                     다른 DDB 스키마)이 담당 — 이 서술은 낡은 정보였다.
+                     stock_service (used by services/chatbot_engine.py for inline stock lookups).
+                     2026-08-05: `handlers/chatbot_handler.py`(869줄, SOLID 위반 확인)를
                      stock_service (used by services/chatbot_engine.py for inline stock lookups).
                      2026-08-05: `handlers/chatbot_handler.py`(869줄, SOLID 위반 확인)를
                      3개로 분리 — `chatbot_context_service.py`(DynamoDB/S3 raw boto3 조회:

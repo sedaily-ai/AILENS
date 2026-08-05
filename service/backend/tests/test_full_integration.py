@@ -282,61 +282,6 @@ def test_phase2_opensearch():
     return True
 
 
-def test_phase2_pgvector():
-    """Index test article in pgvector and run similarity search."""
-    print('')
-    print('── Phase 2b: pgvector Indexing + Search ──')
-    print('')
-
-    if not PG_HOST or not PG_PASSWORD:
-        results.skip('pgvector indexing', 'PG_HOST/PG_PASSWORD not set')
-        results.skip('pgvector similarity search', 'PG_HOST/PG_PASSWORD not set')
-        return False
-
-    from clients.pgvector_client import PgVectorClient
-    from clients.embedding_client import EmbeddingClient
-
-    pg = PgVectorClient(host=PG_HOST, password=PG_PASSWORD)
-    embed = EmbeddingClient()
-
-    try:
-        pg.init_tables()
-    except Exception as e:
-        results.fail('pgvector: init tables', str(e)[:100])
-        return False
-
-    # Insert
-    name = 'pgvector: insert article vector'
-    try:
-        emb = embed.embed_text('삼성전자 1분기 영업이익 6조원 반도체 부문 호조')
-        row_id = pg.insert_article_vector(TEST_NEWS_ID, 'NT', '삼성전자 실적', emb)
-        results.ok(name, f'row_id={row_id[:12]}...')
-    except Exception as e:
-        results.fail(name, str(e)[:100])
-        pg.close()
-        return False
-
-    # Search
-    name = 'pgvector: similarity search'
-    try:
-        query_emb = embed.embed_text('경제 실적 분석')
-        hits = pg.search_similar_articles(query_emb, limit=5)
-        found = any(h['news_id'] == TEST_NEWS_ID for h in hits)
-        results.ok(name, f'{len(hits)} hits, test_article_found={found}')
-    except Exception as e:
-        results.fail(name, str(e)[:100])
-
-    # Cleanup
-    def cleanup_pg():
-        try:
-            pg.delete_article_vectors(TEST_NEWS_ID)
-            pg.close()
-        except Exception:
-            pass
-    cleanup_actions.append(cleanup_pg)
-
-    return True
-
 
 # =============================================================================
 # PHASE 3: Chatbot RAG
@@ -478,7 +423,6 @@ def main():
 
         # Phase 2: Vector indexing (optional)
         test_phase2_opensearch()
-        test_phase2_pgvector()
 
         # Phase 3: Chatbot (always runs — tests fallback too)
         test_phase3_chatbot()

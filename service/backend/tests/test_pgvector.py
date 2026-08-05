@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-pgvector Integration Tests
-============================
-Tests PostgreSQL + pgvector: table creation, vector insertion,
-cosine similarity search for articles and archived sentences.
+pgvector Integration Tests — "내 서랍"(Archive) 유사 문장 검색 전용.
+
+2026-08-05: `clients/pgvector_client.py`가 archive_vectors(내 서랍) 전용으로
+축소되며(articles_vectors 테이블 관련 기능은 호출자가 없어 삭제) 이 테스트도
+같이 축소했다. archive_vectors 테이블 자체의 생성/스키마 관리는 더 이상 이
+클라이언트가 하지 않는다 — 이미 프로비저닝된 환경을 전제로 한다.
+
+Tests PostgreSQL + pgvector: archived-sentence vector insertion, cosine
+similarity search.
 
 Prerequisites:
-  - RDS instance available (run provision_pgvector.sh, wait ~10 min)
-  - pgvector extension enabled (provision_pgvector.sh --init-ext)
+  - RDS instance available with archive_vectors table + pgvector extension
+    (run provision_pgvector.sh)
   - PG_HOST and PG_PASSWORD environment variables set
   - Bedrock access (for embedding generation)
 
@@ -77,8 +82,6 @@ results = TestResult()
 
 pg_client = None
 embed_client = None
-test_embedding = None
-inserted_article_id = None
 inserted_archive_id = None
 
 
@@ -106,71 +109,22 @@ def init_clients():
     return True
 
 
-# ── Test 1: Init tables ─────────────────────────────────────────────────────
-
-def test_init_tables():
-    """Create articles_vectors and archive_vectors tables + indexes."""
-    name = 'Init tables (CREATE TABLE IF NOT EXISTS)'
-
-    try:
-        pg_client.init_tables()
-
-        # Verify tables exist
-        tables = pg_client.conn.run(
-            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
-            "AND tablename IN ('articles_vectors', 'archive_vectors')"
-        )
-        table_names = [row[0] for row in tables]
-
-        if 'articles_vectors' not in table_names:
-            results.fail(name, 'articles_vectors table not created')
-            return False
-
-        if 'archive_vectors' not in table_names:
-            results.fail(name, 'archive_vectors table not created')
-            return False
-
-        # Verify vector extension
-        ext = pg_client.conn.run(
-            "SELECT extname, extversion FROM pg_extension WHERE extname = 'vector'"
-        )
-        if not ext:
-            results.fail(name, 'pgvector extension not installed')
-            return False
-
-        ext_version = ext[0][1]
-
-        # Verify indexes
-        indexes = pg_client.conn.run(
-            "SELECT indexname FROM pg_indexes WHERE tablename IN ('articles_vectors', 'archive_vectors')"
-        )
-        idx_names = [row[0] for row in indexes]
-
-        results.ok(name, f'2 tables, pgvector v{ext_version}, {len(idx_names)} indexes')
-        return True
-
-    except Exception as e:
-        results.fail(name, str(e)[:200])
-        return False
-
-
-# ── Test 2: Generate embedding ───────────────────────────────────────────────
+# ── Test 1: Generate embedding ───────────────────────────────────────────────
 
 def test_generate_embedding():
-    """Generate test embeddings via Bedrock Titan."""
-    global test_embedding
+    """Generate a test embedding via Bedrock Titan (Bedrock access sanity check)."""
     name = 'Generate embedding'
 
     try:
-        test_embedding = embed_client.embed_text(
+        embedding = embed_client.embed_text(
             "삼성전자가 1분기 영업이익 6조원을 달성했다. 반도체 부문 호조."
         )
 
-        if len(test_embedding) != 1024:
-            results.fail(name, f'Dimension {len(test_embedding)}, expected 1024')
+        if len(embedding) != 1024:
+            results.fail(name, f'Dimension {len(embedding)}, expected 1024')
             return False
 
-        results.ok(name, f'dim={len(test_embedding)}')
+        results.ok(name, f'dim={len(embedding)}')
         return True
 
     except Exception as e:
@@ -178,99 +132,7 @@ def test_generate_embedding():
         return False
 
 
-# ── Test 3: Insert article vector ────────────────────────────────────────────
-
-def test_insert_article_vector():
-    """Insert an article chunk embedding."""
-    global inserted_article_id
-    name = 'Insert article vector'
-
-    try:
-        row_id = pg_client.insert_article_vector(
-            news_id=TEST_NEWS_ID,
-            mbti_group='NT',
-            chunk_text='삼성전자가 1분기 영업이익 6조원을 달성했다.',
-            embedding=test_embedding,
-        )
-
-        inserted_article_id = row_id
-
-        if not row_id:
-            results.fail(name, 'No row ID returned')
-            return False
-
-        # Verify by direct query
-        rows = pg_client.conn.run(
-            "SELECT id, news_id, mbti_group FROM articles_vectors WHERE id = :id",
-            id=row_id,
-        )
-
-        if not rows:
-            results.fail(name, 'Row not found after insert')
-            return False
-
-        results.ok(name, f'row_id={row_id[:12]}..., news_id={TEST_NEWS_ID}, group=NT')
-        return True
-
-    except Exception as e:
-        results.fail(name, str(e)[:200])
-        return False
-
-
-# ── Test 4: Insert second article vector (different group) ───────────────────
-
-def test_insert_second_vector():
-    """Insert a second vector for the same article (NF version)."""
-    name = 'Insert second vector (NF)'
-
-    try:
-        nf_embedding = embed_client.embed_text(
-            "삼성전자의 실적이 한국 경제에 어떤 의미를 가지는지 생각해 보아야 한다."
-        )
-
-        row_id = pg_client.insert_article_vector(
-            news_id=TEST_NEWS_ID,
-            mbti_group='NF',
-            chunk_text='삼성전자의 실적이 한국 경제에 어떤 의미를 가지는지.',
-            embedding=nf_embedding,
-        )
-
-        results.ok(name, f'row_id={row_id[:12]}...')
-        return True
-
-    except Exception as e:
-        results.fail(name, str(e)[:200])
-        return False
-
-
-# ── Test 5: Search similar articles ──────────────────────────────────────────
-
-def test_search_similar_articles():
-    """Cosine similarity search across article vectors."""
-    name = 'Search similar articles'
-
-    try:
-        query_embedding = embed_client.embed_text('경제 관련 뉴스')
-        hits = pg_client.search_similar_articles(
-            embedding=query_embedding,
-            limit=5,
-        )
-
-        if not hits:
-            results.fail(name, 'No results returned')
-            return
-
-        first = hits[0]
-        distance = first['distance']
-        found_test = any(h['news_id'] == TEST_NEWS_ID for h in hits)
-
-        results.ok(name, f'{len(hits)} hits, top_distance={distance:.4f}, test_article_found={found_test}')
-
-    except Exception as e:
-        results.fail(name, str(e)[:200])
-
-
-# ── Test 6: Insert archive vector ────────────────────────────────────────────
+# ── Test 2: Insert archive vector ────────────────────────────────────────────
 
 def test_insert_archive_vector():
     """Insert an archived sentence embedding."""
@@ -299,7 +161,7 @@ def test_insert_archive_vector():
         return False
 
 
-# ── Test 7: Search similar sentences ─────────────────────────────────────────
+# ── Test 3: Search similar sentences ─────────────────────────────────────────
 
 def test_search_similar_sentences():
     """Cosine similarity search on archived sentences."""
@@ -325,7 +187,7 @@ def test_search_similar_sentences():
         results.fail(name, str(e)[:200])
 
 
-# ── Test 8: Search sentences filtered by user ────────────────────────────────
+# ── Test 4: Search sentences filtered by user ────────────────────────────────
 
 def test_search_user_sentences():
     """Search archived sentences for a specific user only."""
@@ -355,37 +217,6 @@ def test_search_user_sentences():
         results.fail(name, str(e)[:200])
 
 
-# ── Test 9: Delete and verify ────────────────────────────────────────────────
-
-def test_delete_vectors():
-    """Delete test vectors and verify they're gone."""
-    name = 'Delete vectors'
-
-    try:
-        # Delete article vectors
-        pg_client.delete_article_vectors(TEST_NEWS_ID)
-
-        # Verify
-        rows = pg_client.conn.run(
-            "SELECT COUNT(*) FROM articles_vectors WHERE news_id = :nid",
-            nid=TEST_NEWS_ID,
-        )
-        count = rows[0][0] if rows else -1
-
-        if count != 0:
-            results.fail(name, f'{count} article vectors still exist after delete')
-            return
-
-        # Delete archive vector
-        if inserted_archive_id:
-            pg_client.delete_archive_vector(inserted_archive_id)
-
-        results.ok(name, 'Article + archive vectors deleted')
-
-    except Exception as e:
-        results.fail(name, str(e)[:200])
-
-
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 
 def cleanup():
@@ -397,10 +228,6 @@ def cleanup():
     print('  Cleaning up test data...')
 
     try:
-        pg_client.conn.run(
-            "DELETE FROM articles_vectors WHERE news_id = :nid",
-            nid=TEST_NEWS_ID,
-        )
         pg_client.conn.run(
             "DELETE FROM archive_vectors WHERE user_id = :uid",
             uid=TEST_USER_ID,
@@ -440,28 +267,12 @@ def main():
         sys.exit(1)
 
     try:
-        # Schema
-        print('── Schema ──')
-        print('')
-        tables_ok = test_init_tables()
-        if not tables_ok:
-            return
-
         # Embedding
-        print('')
         print('── Embedding ──')
         print('')
         embed_ok = test_generate_embedding()
         if not embed_ok:
             return
-
-        # Article vectors
-        print('')
-        print('── Article Vectors ──')
-        print('')
-        test_insert_article_vector()
-        test_insert_second_vector()
-        test_search_similar_articles()
 
         # Archive vectors
         print('')
@@ -470,12 +281,6 @@ def main():
         test_insert_archive_vector()
         test_search_similar_sentences()
         test_search_user_sentences()
-
-        # Cleanup
-        print('')
-        print('── Cleanup ──')
-        print('')
-        test_delete_vectors()
 
     finally:
         cleanup()

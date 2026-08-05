@@ -417,59 +417,6 @@ class DynamoDBClient:
         logger.info(f"Retrieved {len(result)} articles with hash out of {len(news_ids)} requested")
         return result
 
-    async def get_article_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
-        """
-        Get article by slug using Global Secondary Index (GSI).
-
-        This method queries the 'slug-index' GSI to retrieve an article by its slug.
-        The GSI must be created on the 'slug' attribute for this to work.
-
-        Args:
-            slug: SEO-friendly URL slug (e.g., "samsung-q4-earnings-beat-expectations")
-
-        Returns:
-            Article dict if found, None otherwise
-
-        Note:
-            Requires GSI 'slug-index' to be created on the DynamoDB table.
-            AWS CLI command to create GSI:
-            ```bash
-            aws dynamodb update-table \
-              --table-name sedaily-mbti-articles-dev \
-              --attribute-definitions AttributeName=slug,AttributeType=S \
-              --global-secondary-indexes \
-                "[{
-                  \"IndexName\": \"slug-index\",
-                  \"KeySchema\": [{\"AttributeName\":\"slug\",\"KeyType\":\"HASH\"}],
-                  \"Projection\": {\"ProjectionType\":\"ALL\"},
-                  \"ProvisionedThroughput\": {\"ReadCapacityUnits\": 5, \"WriteCapacityUnits\": 5}
-                }]"
-            ```
-        """
-        import logging
-        logger = logging.getLogger(__name__)
-
-        try:
-            response = self.table.query(
-                IndexName='slug-index',
-                KeyConditionExpression='slug = :slug',
-                ExpressionAttributeValues={':slug': slug}
-            )
-
-            items = response.get('Items', [])
-
-            if not items:
-                logger.debug(f"No article found with slug: {slug}")
-                return None
-
-            if len(items) > 1:
-                logger.warning(f"Multiple articles found with slug: {slug} (count: {len(items)})")
-
-            return items[0]
-
-        except Exception as e:
-            logger.error(f"Failed to query article by slug '{slug}': {e}", exc_info=True)
-            return None
     async def save_collection_log(self, log_data: Dict[str, Any]) -> bool:
         """
         Save article collection log to DynamoDB.
