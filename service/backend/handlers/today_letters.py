@@ -133,7 +133,9 @@ def _enrich_body(letter_row: Dict[str, Any]) -> Dict[str, Any]:
     return {"body": [], "key_points": []}
 
 
-def _shape_letter_response(row: Dict[str, Any]) -> Dict[str, Any]:
+def shape_letter_response(row: Dict[str, Any]) -> Dict[str, Any]:
+    """DDB row → API 응답 shape. handlers/newsletter.py도 이 함수를 재사용한다
+    (발송 내용이 라이브 '오늘의 한 통'과 동일해야 하므로) — public API로 취급."""
     enriched = _enrich_body(row)
     keywords = row.get("keywords") or []
     if isinstance(keywords, str):
@@ -189,7 +191,7 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "letters": [],
         })
 
-    shaped = [_shape_letter_response(r) for r in rows]
+    shaped = [shape_letter_response(r) for r in rows]
     mode = rows[0].get("mode") if rows else None
 
     return success_response({

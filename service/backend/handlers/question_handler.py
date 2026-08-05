@@ -15,6 +15,7 @@ from typing import Dict, Any, List
 from datetime import datetime, timezone, timedelta
 
 import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.config import Config
 
 from config import settings
@@ -100,8 +101,8 @@ def _fetch_article_titles(date_str: str) -> List[str]:
         for cat in CATEGORIES_KOREAN:
             resp = table.query(
                 IndexName='category-published_at-index',
-                KeyConditionExpression=boto3.dynamodb.conditions.Key('category').eq(cat)
-                    & boto3.dynamodb.conditions.Key('published_at').begins_with(date_prefix),
+                KeyConditionExpression=Key('category').eq(cat)
+                    & Key('published_at').begins_with(date_prefix),
                 ProjectionExpression='title_ko',
                 Limit=10,
             )

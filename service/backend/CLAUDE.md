@@ -63,7 +63,10 @@ newsletter/         → render.py/sender.py/subscribers.py — 뉴스레터 구�
                      패키지는 subscribe.py의 라이브 의존성이라 유지. `_load_today_letters()`는
                      `clients/daily_letters_ddb_client.py`(today_letters.py와 동일 소스)를
                      1순위로 쓰고, 실패 시 로컬 미러(`newsletter/local_letters.py`)→
-                     하드코딩 mock 순으로 폴백한다.
+                     하드코딩 mock 순으로 폴백한다. `handlers/today_letters.py`의
+                     `shape_letter_response()`(row→API shape 변환)도 재사용하는데,
+                     원래 밑줄 붙은 private 함수(`_shape_letter_response`)를 다른 모듈이
+                     import해 쓰던 캡슐화 위반이었다 — 2026-08-05 public으로 승격.
 clients/            → Service clients: dynamodb, personal_db, s3_article, s3_xml,
                      embedding (Titan).
                      daily_letters_ddb_client / cms_posts_ddb_client 는 옛 v2 소스
@@ -159,9 +162,13 @@ services/           → Business logic: article_filter, prompt_loader,
                      프롬프트·tool 정의 조립), `chatbot_engine.py`(Bedrock 호출, tool-use
                      루프, 스트리밍 — `handlers/websocket/message.py`가 여기서
                      `generate_chat_response_stream`을 직접 import해 쓴다). `chatbot_handler.py`는
-                     이제 HTTP 라우팅/검증/응답 조립만 담당. ⚠️ 동기(`generate_chat_response`)와
-                     스트리밍(`generate_chat_response_stream`) 경로가 tool-use 루프를 각자
-                     중복 구현 중 — 이번엔 구조만 옮기고 통합은 안 함(로직 변경이라 별도 작업).
+                     이제 HTTP 라우팅/검증/응답 조립만 담당. 동기(`generate_chat_response`)와
+                     스트리밍(`generate_chat_response_stream`)이 각자 중복 구현하던 tool-use
+                     루프 중 진짜 동일했던 부분(Bedrock 요청 body 조립, tool_use 블록 실행+결과
+                     조립)은 `_build_bedrock_request`/`_execute_tool_batch` 공유 헬퍼로 추출
+                     (2026-08-05 후속, 순수 추출·응답 내용 변경 없음 — 직접 만든 요청/실행 output을
+                     old-style 인라인 코드와 비교해 바이트 단위로 검증). 스트리밍 특유의 증분
+                     yield 흐름은 성격이 달라 그대로 둠.
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
@@ -221,9 +228,11 @@ prompts/            → AI prompt templates organized by purpose:
                      selection/ (article_scorer.md), validation/ (validator.md),
                      podcast/ (podcast_script.md), question/ (daily_question.md).
                      editor_letter/ + editor_letter_v3/ 는 2026-08-05 core25와 함께 삭제
-utils/              → Small helpers included in the Lambda zip: date_utils.py,
-                     hash_utils.py. Not a layer in the architectural sense —
-                     just shared utilities.
+utils/              → Small helpers included in the Lambda zip: date_utils.py
+                     (`get_kst_today()` — 2026-08-05 추가, `article_handler.py`/
+                     `s3_articles_handler.py`에 토씨 하나까지 같게 중복돼 있던
+                     `_get_kst_today()`를 여기로 통합), hash_utils.py. Not a layer
+                     in the architectural sense — just shared utilities.
 common/             → Cross-track shared utilities (모든 handler + admin이 import).
                      - `feature_flag.py` — DDB-backed feature flags + numeric thresholds.
                      Fail-open / fail-safe, own 5-min TTL cache.

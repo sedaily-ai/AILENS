@@ -4,10 +4,12 @@
 이 파일로 옮기기 전부터 이미 다른 Lambda(`handlers/websocket/message.py`)가
 handler 파일에서 직접 import해 쓰고 있었다 — 사실상 서비스였는데 경계가 없었을 뿐.
 
-⚠️ `generate_chat_response`(동기)와 `generate_chat_response_stream`(스트리밍)은
-tool-use 루프 로직을 각자 따로 구현하고 있다(시스템 프롬프트 구성, 메시지 구성,
-tool 결과 처리 전부 중복). 동작이 미묘하게 갈릴 수 있는 로직 변경이라 이번
-분리에서는 통합하지 않고 그대로 옮겼다 — 통합은 별도 작업.
+2026-08-05(같은 날 후속): `generate_chat_response`(동기)와
+`generate_chat_response_stream`(스트리밍)이 각자 독립 구현하던 tool-use 루프 중
+실제로 동일했던 두 부분(`_build_bedrock_request` — Bedrock 요청 body 조립,
+`_execute_tool_batch` — tool_use 블록 실행+결과 조립)을 공유 헬퍼로 추출했다.
+스트리밍 특유의 증분 yield 흐름 자체는 성격이 달라 억지로 합치지 않고 그대로
+둠 — 진짜 중복이었던 부분만 하나로 합쳤다(순수 추출, 응답 내용 변경 없음).
 """
 import logging
 import boto3
@@ -95,6 +97,42 @@ def _execute_tool(tool_name: str, tool_input: dict) -> str:
     return json.dumps({"error": f"Unknown tool: {tool_name}"}, ensure_ascii=False)
 
 
+def _build_bedrock_request(system_prompt: str, tools: list, messages: list) -> str:
+    """동기(``generate_chat_response``/``_handle_tool_use``)와 스트리밍
+    (``generate_chat_response_stream``) 양쪽이 매 호출마다 만드는 요청 body —
+    3곳에 똑같이 흩어져 있던 걸 하나로 합쳤다(로직 변경 없음, 순수 추출)."""
+    return json.dumps({
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 2048,
+        "system": [
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+        "tools": tools,
+        "messages": messages,
+    })
+
+
+def _execute_tool_batch(tool_blocks: list) -> list:
+    """``{id, name, input}`` 형태의 tool_use 블록들을 실행하고 Bedrock에 돌려줄
+    ``tool_result`` 콘텐츠 리스트를 만든다. 동기 tool-loop(``_handle_tool_use``)와
+    스트리밍 tool-loop(``generate_chat_response_stream``)이 각자 독립적으로
+    구현하고 있던 동일 로직을 하나로 합쳤다(로직 변경 없음, 순수 추출)."""
+    tool_results = []
+    for block in tool_blocks:
+        logger.info(f"Tool call: {block['name']}({block.get('input', {})})")
+        result = _execute_tool(block["name"], block.get("input", {}))
+        tool_results.append({
+            "type": "tool_result",
+            "tool_use_id": block["id"],
+            "content": result,
+        })
+    return tool_results
+
+
 def _split_system_turns(conversation_history: list) -> tuple:
     """``conversation_history`` 에서 ``role: "system"`` 항목을 분리한다.
 
@@ -166,19 +204,7 @@ async def generate_chat_response(
 
     try:
         # Call Claude via Bedrock with tool use support
-        request_body = json.dumps({
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2048,
-            "system": [
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            "tools": tools,
-            "messages": messages
-        })
+        request_body = _build_bedrock_request(system_prompt, tools, messages)
 
         response = client.invoke_model(
             modelId=BEDROCK_MODEL_ID_CHATBOT,
@@ -224,25 +250,10 @@ async def _handle_tool_use(client, system_prompt: str, tools: list, messages: li
 
         messages.append({"role": "assistant", "content": current_response["content"]})
 
-        tool_results = []
-        for tool_block in tool_use_blocks:
-            logger.info(f"Tool call: {tool_block['name']}({tool_block.get('input', {})})")
-            result = _execute_tool(tool_block["name"], tool_block.get("input", {}))
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tool_block["id"],
-                "content": result,
-            })
-
+        tool_results = _execute_tool_batch(tool_use_blocks)
         messages.append({"role": "user", "content": tool_results})
 
-        request_body = json.dumps({
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2048,
-            "system": [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
-            "tools": tools,
-            "messages": messages,
-        })
+        request_body = _build_bedrock_request(system_prompt, tools, messages)
 
         response = client.invoke_model(
             modelId=BEDROCK_MODEL_ID_CHATBOT,
@@ -284,13 +295,7 @@ def generate_chat_response_stream(
     messages = _build_messages(conversation_history, user_message)
 
     for iteration in range(3):
-        request_body = json.dumps({
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2048,
-            "system": [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
-            "tools": tools,
-            "messages": messages
-        })
+        request_body = _build_bedrock_request(system_prompt, tools, messages)
 
         response = client.invoke_model_with_response_stream(
             modelId=BEDROCK_MODEL_ID_CHATBOT,
@@ -352,15 +357,7 @@ def generate_chat_response_stream(
         logger.info(f"Stream: handling {len(tool_blocks)} tool calls (iteration {iteration})")
         messages.append({"role": "assistant", "content": content_blocks})
 
-        tool_results = []
-        for tb in tool_blocks:
-            result = _execute_tool(tb['name'], tb['input'])
-            logger.info(f"Tool {tb['name']} → {result[:100]}")
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tb['id'],
-                "content": result
-            })
+        tool_results = _execute_tool_batch(tool_blocks)
         messages.append({"role": "user", "content": tool_results})
 
     yield "죄송해요, 응답을 생성하지 못했어요."

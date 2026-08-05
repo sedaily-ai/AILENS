@@ -12,12 +12,12 @@ Articles without MBTI versions will display original content.
 import logging
 from typing import Optional
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
 
 from clients.dynamodb_client import DynamoDBClient
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import success_response, error_response
+from utils.date_utils import get_kst_today
 
 logger = logging.getLogger(__name__)
 
@@ -168,12 +168,6 @@ class ArticleHandler:
             )
 
 
-def _get_kst_today() -> str:
-    """Get today's date in YYYYMMDD format (KST)."""
-    kst = timezone(timedelta(hours=9))
-    return datetime.now(kst).strftime("%Y%m%d")
-
-
 def _extract_image_url(images) -> Optional[str]:
     """Extract first image URL from an article's images field.
 
@@ -269,7 +263,7 @@ async def list_handler(event: dict, context) -> dict:
 
     query_params = event.get("queryStringParameters") or {}
 
-    date_str = (query_params.get("date") or "").strip() or _get_kst_today()
+    date_str = (query_params.get("date") or "").strip() or get_kst_today()
     mbti_group = (query_params.get("mbti_group") or "").strip().upper()
 
     try:

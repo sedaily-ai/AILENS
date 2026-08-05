@@ -65,18 +65,18 @@ def _load_today_letters(date_str: str) -> tuple[Dict[str, Dict[str, Any]], str]:
     """그룹→레터 맵 + 소스('dynamodb'|'local'|'mock').
 
     today_letters API 와 동일 경로(daily_letters_ddb_client.get_daily_letters +
-    _shape_letter_response)를 재사용 — 발송 내용이 라이브 '오늘의 한 통'과 동일.
+    shape_letter_response)를 재사용 — 발송 내용이 라이브 '오늘의 한 통'과 동일.
     (2026-08-05: pgvector RDS 삭제로 죽어 있던 1순위 경로를 실제 라이브 소스인
     DynamoDB로 교체 — 이전에는 이 시도가 항상 실패해 매번 local/mock으로
     폴백하고 있었다.) 4그룹 미완/조회실패/오프라인이면 MOCK 폴백.
     """
     try:
         from clients import daily_letters_ddb_client as letters_client  # noqa: lazy
-        from handlers.today_letters import _shape_letter_response  # noqa: lazy
+        from handlers.today_letters import shape_letter_response  # noqa: lazy
 
         rows = letters_client.get_daily_letters(date_str)
         if rows:
-            shaped = [_shape_letter_response(r) for r in rows]
+            shaped = [shape_letter_response(r) for r in rows]
             by = {s["mbti_group"]: s for s in shaped if s.get("mbti_group")}
             if len(by) == 4:
                 logger.info('{"event":"letters_loaded","date":"%s","src":"dynamodb"}', date_str)

@@ -23,6 +23,7 @@ from typing import Optional, List
 
 from clients.s3_xml_client import S3XMLClient
 from config import settings
+from utils.date_utils import get_kst_today
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -36,12 +37,6 @@ def get_s3_client() -> S3XMLClient:
     if _s3_client is None:
         _s3_client = S3XMLClient(region=settings.s3_region)
     return _s3_client
-
-
-def _get_kst_today() -> str:
-    """Get today's date in YYYYMMDD format (KST)"""
-    kst = timezone(timedelta(hours=9))
-    return datetime.now(kst).strftime("%Y%m%d")
 
 
 async def get_articles_list(
@@ -61,7 +56,7 @@ async def get_articles_list(
         Dict with date, total count, and articles list
     """
     if not date_str:
-        date_str = _get_kst_today()
+        date_str = get_kst_today()
 
     client = get_s3_client()
     articles = await client.get_articles_by_date(date_str)
@@ -238,7 +233,7 @@ async def get_article_detail(
     dates_to_try = []
     if date_str:
         dates_to_try.append(date_str)
-    dates_to_try.append(_get_kst_today())
+    dates_to_try.append(get_kst_today())
 
     # Add last 7 days
     kst = timezone(timedelta(hours=9))
