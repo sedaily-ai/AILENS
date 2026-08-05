@@ -1,0 +1,14 @@
+# v2-specific artifacts (root .gitignore already covers __pycache__, *.pyc, *.zip, lambda-build/)
+
+# v2 Lambda packages
+lambda_package_v2.zip
+lambda-build-v2/
+
+# v2 env file (local only, never commit)
+.env.v2
+.env.v2.local
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/

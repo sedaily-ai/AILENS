@@ -1,0 +1,9 @@
+{
+    "Name": "sedaily-mbti-pipeline-schedule-dev",
+    "Arn": "arn:aws:events:us-east-1:887078546492:rule/sedaily-mbti-pipeline-schedule-dev",
+    "ScheduleExpression": "rate(3 hours)",
+    "State": "DISABLED",
+    "Description": "Every 3 hours (8 runs/day) trigger for MBTI transform pipeline",
+    "EventBusName": "default",
+    "CreatedBy": "887078546492"
+}

@@ -1,0 +1,99 @@
+{
+  "widgets": [
+    {
+      "type": "text",
+      "x": 0, "y": 0, "width": 24, "height": 3,
+      "properties": {
+        "markdown": "# sedaily-mbti v2 — Bedrock token & cost estimate\n\n**Source**: CloudWatch metric `sedaily-mbti/v2/BedrockTokens` (emitted by EmbeddingV2Client + transform_v2_service since Cost-1b commit 5da37f8).\n\n**Pricing assumptions** (us-east-1, on-demand, 2026-05):\n- Titan V2 embed: $0.00002 / 1k input tokens (no output charge)\n- Opus 4.6: $0.005 / 1k input, $0.025 / 1k output\n\n⚠️ **Estimate ≤ actual billing** because:\n1. Cross-region inference adds ~10% (not currently used)\n2. Provisioned Throughput / fine-tuning cost not represented\n3. Other Bedrock costs (Knowledge Bases, Agents, Guardrails) not represented\n\n⚠️ **Output tokens cost 5× input** for Opus — watch the output column.\n\n⚠️ Update this dashboard's price constants when Opus version migrates (e.g. 4.6 → 4.7 has same rate but ~0-35% more tokens per same input due to new tokenizer)."
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 3, "width": 12, "height": 6,
+      "properties": {
+        "title": "Total tokens — 24h",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "metrics": [
+          [ "sedaily-mbti/v2", "BedrockTokens", "TokenType", "input", { "label": "Input tokens", "stat": "Sum" } ],
+          [ "...", "TokenType", "output", { "label": "Output tokens", "stat": "Sum" } ]
+        ],
+        "period": 300,
+        "yAxis": { "left": { "label": "tokens" } }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 3, "width": 12, "height": 6,
+      "properties": {
+        "title": "Cost estimate — 24h (USD)",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "metrics": [
+          [ { "expression": "(titan_in / 1000) * 0.00002", "label": "Titan embed input ($)", "id": "titan_cost", "region": "us-east-1" } ],
+          [ { "expression": "(opus_in / 1000) * 0.005", "label": "Opus 4.6 input ($)", "id": "opus_in_cost", "region": "us-east-1" } ],
+          [ { "expression": "(opus_out / 1000) * 0.025", "label": "Opus 4.6 output ($)", "id": "opus_out_cost", "region": "us-east-1" } ],
+          [ "sedaily-mbti/v2", "BedrockTokens", "Model", "amazon.titan-embed-text-v2:0", "TokenType", "input", { "id": "titan_in", "stat": "Sum", "visible": false } ],
+          [ "...", "Model", "us.anthropic.claude-opus-4-6-v1", "TokenType", "input", { "id": "opus_in", "stat": "Sum", "visible": false } ],
+          [ "...", "Model", "us.anthropic.claude-opus-4-6-v1", "TokenType", "output", { "id": "opus_out", "stat": "Sum", "visible": false } ]
+        ],
+        "period": 300,
+        "yAxis": { "left": { "label": "USD" } }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 9, "width": 12, "height": 6,
+      "properties": {
+        "title": "Tokens by Lambda (sum, 24h)",
+        "view": "bar",
+        "stacked": true,
+        "region": "us-east-1",
+        "metrics": [
+          [ "sedaily-mbti/v2", "BedrockTokens", "Lambda", "sedaily-mbti-v2-collector-dev", "TokenType", "input", { "stat": "Sum" } ],
+          [ "...", "Lambda", "sedaily-mbti-v2-transform-dev", "TokenType", "input", { "stat": "Sum" } ],
+          [ "...", "Lambda", "sedaily-mbti-v2-transform-dev", "TokenType", "output", { "stat": "Sum" } ]
+        ],
+        "period": 86400,
+        "yAxis": { "left": { "label": "tokens" } }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 9, "width": 12, "height": 6,
+      "properties": {
+        "title": "Cost by Model (sum, 24h, USD)",
+        "view": "bar",
+        "stacked": false,
+        "region": "us-east-1",
+        "metrics": [
+          [ { "expression": "(titan_in / 1000) * 0.00002", "label": "Titan embed", "id": "titan_total" } ],
+          [ { "expression": "((opus_in / 1000) * 0.005) + ((opus_out / 1000) * 0.025)", "label": "Opus 4.6 total", "id": "opus_total" } ],
+          [ "sedaily-mbti/v2", "BedrockTokens", "Model", "amazon.titan-embed-text-v2:0", "TokenType", "input", { "id": "titan_in", "stat": "Sum", "visible": false } ],
+          [ "...", "Model", "us.anthropic.claude-opus-4-6-v1", "TokenType", "input", { "id": "opus_in", "stat": "Sum", "visible": false } ],
+          [ "...", "Model", "us.anthropic.claude-opus-4-6-v1", "TokenType", "output", { "id": "opus_out", "stat": "Sum", "visible": false } ]
+        ],
+        "period": 86400,
+        "yAxis": { "left": { "label": "USD" } }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 15, "width": 24, "height": 6,
+      "properties": {
+        "title": "Hourly trend — input vs output",
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "us-east-1",
+        "metrics": [
+          [ "sedaily-mbti/v2", "BedrockTokens", "TokenType", "input", { "label": "Input", "stat": "Sum" } ],
+          [ "...", "TokenType", "output", { "label": "Output (5× cost factor for Opus)", "stat": "Sum" } ]
+        ],
+        "period": 3600,
+        "yAxis": { "left": { "label": "tokens/hour" } }
+      }
+    }
+  ]
+}

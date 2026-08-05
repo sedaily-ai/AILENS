@@ -1,0 +1,745 @@
+{
+    "Items": [
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "00b77wl",
+            "RouteKey": "OPTIONS /api/engagement/{articleId}/comments",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "00haeq3",
+            "RouteKey": "OPTIONS /api/articles",
+            "Target": "integrations/h97efbd"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "0crh8c7",
+            "RouteKey": "POST /api/newsletter/subscribe",
+            "Target": "integrations/et3ndqk"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "0tudvfp",
+            "RouteKey": "POST /api/user/read",
+            "Target": "integrations/wu2xpn6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "0ufy7b5",
+            "RouteKey": "GET /s3-article/{article_id}",
+            "Target": "integrations/hc4ahgd"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "0v1vp67",
+            "RouteKey": "POST /api/voice/stt-presign",
+            "Target": "integrations/x2q67pi"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "11lvyrf",
+            "RouteKey": "OPTIONS /api/archive/similar",
+            "Target": "integrations/ppsg0c5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "1o69s0a",
+            "RouteKey": "GET /api/article/{article_id}",
+            "Target": "integrations/h97efbd"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "1pwpays",
+            "RouteKey": "GET /admin/letters",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "2bktam9",
+            "RouteKey": "POST /admin/posts",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "2qb3otg",
+            "RouteKey": "GET /api/user/stats",
+            "Target": "integrations/wu2xpn6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "2vn9vff",
+            "RouteKey": "OPTIONS /api/podcast/generate",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "41z14d8",
+            "RouteKey": "POST /api/v2/subscribe",
+            "Target": "integrations/mjzf35m"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "430k179",
+            "RouteKey": "GET /api/v2/posts",
+            "Target": "integrations/lpflhfs"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "4dni0ml",
+            "RouteKey": "ANY /api/ab-test/{proxy+}",
+            "Target": "integrations/e4z1f13"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "4hk7tbo",
+            "RouteKey": "ANY /api/metrics/{proxy+}",
+            "Target": "integrations/y1l2xqa"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "5ijil9b",
+            "RouteKey": "OPTIONS /api/article/{article_id}",
+            "Target": "integrations/h97efbd"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "634qm62",
+            "RouteKey": "POST /api/tts",
+            "Target": "integrations/xbannu4"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "6v39w4o",
+            "RouteKey": "GET /admin/prompts",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "7a61f0t",
+            "RouteKey": "GET /api/stats/visitors",
+            "Target": "integrations/9ckc5f5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "7ciizbd",
+            "RouteKey": "POST /api/engagement/{articleId}/comments/like",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "7d530vf",
+            "RouteKey": "POST /saju",
+            "Target": "integrations/4bpj9mr"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "803tyr2",
+            "RouteKey": "POST /api/questions",
+            "Target": "integrations/ycna2wj"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "8chn4if",
+            "RouteKey": "POST /api/posts",
+            "Target": "integrations/yoh595e"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "8s3gx5t",
+            "RouteKey": "OPTIONS /api/v2/health",
+            "Target": "integrations/uxvcdem"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "9htgevb",
+            "RouteKey": "GET /api/user/history",
+            "Target": "integrations/wu2xpn6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "9ia676a",
+            "RouteKey": "GET /api/v2/posts/{slug}",
+            "Target": "integrations/lpflhfs"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "a4sizm5",
+            "RouteKey": "GET /api/podcast/{podcast_id}",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "as4g561",
+            "RouteKey": "POST /admin/password-change",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "at7txsr",
+            "RouteKey": "OPTIONS /api/engagement/{articleId}/rating",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "bgqp3m6",
+            "RouteKey": "POST /admin/drivers/threshold/{name}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "bkqoyj3",
+            "RouteKey": "OPTIONS /api/recommend",
+            "Target": "integrations/ssv653s"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "btdbum8",
+            "RouteKey": "POST /admin/posts/{id}/unpublish",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "btn028n",
+            "RouteKey": "POST /admin/media/presign",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "bulfr54",
+            "RouteKey": "OPTIONS /api/recommend/analysis",
+            "Target": "integrations/ssv653s"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "ca1o71j",
+            "RouteKey": "PUT /admin/posts/{id}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "cf4yx19",
+            "RouteKey": "OPTIONS /api/chat",
+            "Target": "integrations/lvl83b9"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "ciwp3u2",
+            "RouteKey": "POST /api/archive/similar",
+            "Target": "integrations/ppsg0c5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "cmdn1o7",
+            "RouteKey": "GET /api/engagement/{articleId}",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "crcaqje",
+            "RouteKey": "OPTIONS /api/podcast/list",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "csudezp",
+            "RouteKey": "GET /admin/cost",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "cyb0ybb",
+            "RouteKey": "GET /api/podcast/article/{article_id}",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "d09oual",
+            "RouteKey": "OPTIONS /api/posts/{post_id}",
+            "Target": "integrations/yoh595e"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "d8f3af8",
+            "RouteKey": "POST /admin/drivers/{id}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "ds8qir3",
+            "RouteKey": "GET /api/v2/unsubscribe",
+            "Target": "integrations/mjzf35m"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "edrgvjo",
+            "RouteKey": "GET /admin/drivers",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "efhsava",
+            "RouteKey": "POST /api/engagement/{articleId}/rating",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "eo74mjd",
+            "RouteKey": "DELETE /api/posts/{post_id}",
+            "Target": "integrations/yoh595e"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "flkoehb",
+            "RouteKey": "OPTIONS /api/engagement/{articleId}/reaction",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "gcwqaog",
+            "RouteKey": "OPTIONS /api/podcast/article/{article_id}",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "gjw2sg2",
+            "RouteKey": "POST /api/podcast/generate",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "glz30ca",
+            "RouteKey": "GET /api/v2/front-page",
+            "Target": "integrations/75drdel"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "gva7d8k",
+            "RouteKey": "GET /admin/posts/{id}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "gvqvog7",
+            "RouteKey": "GET /admin/newsletter/stats",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "h67cwcg",
+            "RouteKey": "POST /api/user/profile",
+            "Target": "integrations/wu2xpn6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "hhuuty9",
+            "RouteKey": "POST /api/v2/interactions",
+            "Target": "integrations/29tqs67"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "j1enw5h",
+            "RouteKey": "OPTIONS /saju",
+            "Target": "integrations/4bpj9mr"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "j3sekxs",
+            "RouteKey": "GET /api/v2/feed",
+            "Target": "integrations/pf7fqpb"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "jcnrq06",
+            "RouteKey": "OPTIONS /api/voice/stt-url",
+            "Target": "integrations/rtzxwiu"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "jtq6u8i",
+            "RouteKey": "GET /admin/letters/{id}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "kghof0m",
+            "RouteKey": "OPTIONS /api/archive",
+            "Target": "integrations/ppsg0c5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "ku52o9e",
+            "RouteKey": "POST /api/stats/pageview",
+            "Target": "integrations/9ckc5f5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "kx5xfn0",
+            "RouteKey": "POST /api/chat",
+            "Target": "integrations/lvl83b9"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "kz5wyjf",
+            "RouteKey": "GET /api/voice/stt-url",
+            "Target": "integrations/rtzxwiu"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "l2w49lg",
+            "RouteKey": "OPTIONS /api/posts",
+            "Target": "integrations/yoh595e"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "lj2rntl",
+            "RouteKey": "POST /api/archive",
+            "Target": "integrations/ppsg0c5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "m1sj8em",
+            "RouteKey": "GET /api/recommend/analysis",
+            "Target": "integrations/ssv653s"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "megdb18",
+            "RouteKey": "GET /admin/posts",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "mrgm090",
+            "RouteKey": "GET /api/v2/today-letters",
+            "Target": "integrations/fezffau"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "nk5m3l9",
+            "RouteKey": "GET /api/v2/health",
+            "Target": "integrations/jfc573i"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "nqjgxj2",
+            "RouteKey": "POST /podcasts/generate"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "oc3r3j3",
+            "RouteKey": "GET /api/engagement/{articleId}/comments",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "om7tmdl",
+            "RouteKey": "ANY /api/ab-test",
+            "Target": "integrations/e4z1f13"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "oxh7jvd",
+            "RouteKey": "POST /api/voice/tts",
+            "Target": "integrations/xv21jf5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "p4q0uii",
+            "RouteKey": "PUT /api/user/mbti",
+            "Target": "integrations/wu2xpn6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "p56oaxh",
+            "RouteKey": "POST /admin/posts/{id}/publish",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "phla04v",
+            "RouteKey": "OPTIONS /api/podcast/{podcast_id}",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "puxdkyc",
+            "RouteKey": "POST /api/engagement/{articleId}/reaction",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "q7b8pf5",
+            "RouteKey": "OPTIONS /api/engagement/{articleId}",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "q9wzmwe",
+            "RouteKey": "GET /podcasts/{category}",
+            "Target": "integrations/zz6gkqq"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "qbl4xxc",
+            "RouteKey": "GET /s3-articles",
+            "Target": "integrations/hc4ahgd"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "qegvl03",
+            "RouteKey": "GET /s3-articles/keyword",
+            "Target": "integrations/hc4ahgd"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "qkzwt1a",
+            "RouteKey": "POST /admin/drivers/feature-flag/{name}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "rozwygm",
+            "RouteKey": "DELETE /api/archive/{archive_id}",
+            "Target": "integrations/ppsg0c5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "sbau9xp",
+            "RouteKey": "GET /api/posts",
+            "Target": "integrations/yoh595e"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "sskwiwm",
+            "RouteKey": "GET /api/recommend",
+            "Target": "integrations/ssv653s"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "tf164bo",
+            "RouteKey": "OPTIONS /api/questions",
+            "Target": "integrations/ycna2wj"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "tihd8et",
+            "RouteKey": "GET /admin/prompts/{category}/{name}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "tnkp8rn",
+            "RouteKey": "DELETE /admin/posts/{id}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "tq5qdcp",
+            "RouteKey": "GET /api/questions",
+            "Target": "integrations/ycna2wj"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "ugtsbgk",
+            "RouteKey": "GET /admin/audit",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "uh5ia15",
+            "RouteKey": "GET /time-machine",
+            "Target": "integrations/gm7w74j"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "umqnuts",
+            "RouteKey": "ANY /api/metrics",
+            "Target": "integrations/y1l2xqa"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "upvcoti",
+            "RouteKey": "POST /admin/prompts/{category}/{name}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "uwg4uvf",
+            "RouteKey": "GET /api/podcast/list",
+            "Target": "integrations/uja6vs0"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "vap1hdf",
+            "RouteKey": "POST /api/search",
+            "Target": "integrations/74radgo"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "vdifvdf",
+            "RouteKey": "GET /api/articles",
+            "Target": "integrations/h97efbd"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "vhzgvan",
+            "RouteKey": "OPTIONS /api/voice/tts",
+            "Target": "integrations/1doq1gp"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "vzahamh",
+            "RouteKey": "POST /admin/login",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "wh6wcjm",
+            "RouteKey": "GET /api/archive",
+            "Target": "integrations/ppsg0c5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "wu4qye9",
+            "RouteKey": "DELETE /admin/letters/{id}",
+            "Target": "integrations/lgj4lzl"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "xkce062",
+            "RouteKey": "GET /api/v2/article/{news_id}",
+            "Target": "integrations/gb5v1oj"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "y39pdd0",
+            "RouteKey": "OPTIONS /api/archive/{archive_id}",
+            "Target": "integrations/ppsg0c5"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "zdr0b81",
+            "RouteKey": "GET /api/posts/{post_id}",
+            "Target": "integrations/yoh595e"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "zfkt2i5",
+            "RouteKey": "POST /api/engagement/{articleId}/comments",
+            "Target": "integrations/rak0tt6"
+        },
+        {
+            "ApiKeyRequired": false,
+            "AuthorizationType": "NONE",
+            "RouteId": "zpfmtp8",
+            "RouteKey": "PUT /admin/letters/{id}",
+            "Target": "integrations/lgj4lzl"
+        }
+    ]
+}

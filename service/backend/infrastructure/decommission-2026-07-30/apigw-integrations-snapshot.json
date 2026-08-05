@@ -1,0 +1,328 @@
+{
+    "Items": [
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "00cjbgk",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-health-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "1doq1gp",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-tts-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "29tqs67",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-interaction-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "4bpj9mr",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:saju-api",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "74radgo",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-search-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "75drdel",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-front-page-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "9ckc5f5",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-stats-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "9jrun2s",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-health-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "e4z1f13",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-abtest-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "et3ndqk",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-newsletter-subscribe-dev/invocations",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "fezffau",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-today-letters-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "fpjkzzm",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-subscribe-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "gb5v1oj",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-article-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "gm7w74j",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-time-machine-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "h97efbd",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-article-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "hc4ahgd",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-s3-articles-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "jfc573i",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-health-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "lgj4lzl",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-admin-api-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "lpflhfs",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-posts-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "lvl83b9",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-chatbot-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "mjzf35m",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-subscribe-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "pf7fqpb",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-feed-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "ppsg0c5",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-archive-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "rak0tt6",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-engagement-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "rtzxwiu",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-stt-url-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "ssv653s",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-recommend-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "uja6vs0",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-podcast-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "uxvcdem",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-health-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "wu2xpn6",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-user-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "x2q67pi",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-stt-presign-dev/invocations",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "xbannu4",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-tts-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "xv21jf5",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-tts-dev/invocations",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "y1l2xqa",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-metrics-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "ycna2wj",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-question-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "yoh595e",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-post-dev",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        },
+        {
+            "ConnectionType": "INTERNET",
+            "IntegrationId": "zz6gkqq",
+            "IntegrationMethod": "POST",
+            "IntegrationType": "AWS_PROXY",
+            "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:GenerateScriptFromMBTI",
+            "PayloadFormatVersion": "2.0",
+            "TimeoutInMillis": 30000
+        }
+    ]
+}

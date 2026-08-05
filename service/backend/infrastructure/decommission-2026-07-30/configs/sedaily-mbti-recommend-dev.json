@@ -1,0 +1,69 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-recommend-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-recommend-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.recommendation_handler.lambda_handler",
+    "CodeSize": 23624232,
+    "Description": "",
+    "Timeout": 300,
+    "MemorySize": 512,
+    "LastModified": "2026-07-29T19:33:15.000+0000",
+    "CodeSha256": "kCdaYUCTttKOgs0oYpZZklwWNyIVxVl+7WQGWumuV5A=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "DYNAMODB_TABLE_PODCAST": "sedaily-mbti-podcast-dev",
+        "OPENSEARCH_ENDPOINT": "https://search-sedaily-mbti-search-dev-gzdjx6llvzyx4pmjwasew5kj6i.us-east-1.es.amazonaws.com",
+        "PG_PORT": "5432",
+        "S3_ARTICLE_BODY_BUCKET": "sedaily-mbti-article-body-dev",
+        "PG_HOST": "sedaily-mbti-pgvector-dev.c83iuyksky7r.us-east-1.rds.amazonaws.com",
+        "PG_DATABASE": "ailens",
+        "DYNAMODB_TABLE_PERSONAL": "sedaily-mbti-personal-dev",
+        "DYNAMODB_TABLE_ARTICLES": "sedaily-mbti-articles-dev",
+        "OPENSEARCH_INDEX": "sedaily-articles",
+        "PG_USER": "ailens",
+        "S3_AUDIO_BUCKET": "sedaily-mbti-audio-dev"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "3dad71e6-2165-4d92-ba9a-a09e3ab39e83",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:81a2f2bcc7b606f63601c58153453037785e00ca30d21476cee5f82df01b0d71"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-recommend-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "sedaily-mbti",
+    "Owner": "one",
+    "ManagedBy": "claude-code",
+    "Phase": "phase-1",
+    "Subsystem": "recommend",
+    "Environment": "dev",
+    "Service": "mbti",
+    "Component": "backend-v1"
+  }
+}

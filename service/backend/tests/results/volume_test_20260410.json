@@ -1,0 +1,47 @@
+{
+  "test_date": "2026-04-10",
+  "days_processed": 1,
+  "days_succeeded": 0,
+  "total_articles_transformed": 0,
+  "total_articles_stored": 0,
+  "avg_pipeline_duration_seconds": 0.0,
+  "avg_pipeline_duration_minutes": 0.0,
+  "total_bedrock_input_tokens": 0,
+  "total_bedrock_output_tokens": 0,
+  "total_bedrock_cost_usd": 0,
+  "total_opensearch_indexed": 0,
+  "total_pgvector_indexed": 0,
+  "total_vector_failures": 0,
+  "total_lambda_throttles": 0,
+  "total_dynamodb_throttles": 0,
+  "error_count": 1,
+  "errors": [
+    {
+      "date": "20260410",
+      "error": "State machine not deployed"
+    }
+  ],
+  "total_test_duration_seconds": 1.0,
+  "per_day": [
+    {
+      "date": "20260410",
+      "execution_name": "volume-test-20260410-003131",
+      "status": "skipped",
+      "duration_seconds": 0,
+      "stored_count": 0,
+      "rejected_count": 0,
+      "failed_count": 0,
+      "total_selected": 0,
+      "total_classified": 0,
+      "total_transformed": 0,
+      "transform_input_tokens": 0,
+      "transform_output_tokens": 0,
+      "opensearch_indexed": 0,
+      "pgvector_indexed": 0,
+      "vector_failed": 0,
+      "errors": [
+        "State machine not deployed"
+      ]
+    }
+  ]
+}

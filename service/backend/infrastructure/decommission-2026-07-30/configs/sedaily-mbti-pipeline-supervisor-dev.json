@@ -1,0 +1,68 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-pipeline-supervisor-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-pipeline-supervisor-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.pipeline.supervisor.lambda_handler",
+    "CodeSize": 23670693,
+    "Description": "",
+    "Timeout": 300,
+    "MemorySize": 1024,
+    "LastModified": "2026-07-29T13:18:17.000+0000",
+    "CodeSha256": "5QSsVEROgWeati7Hq6nVoBgIl3FlLzJcnIFcm657YZE=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "OPENSEARCH_ENDPOINT": "https://search-sedaily-mbti-search-dev-gzdjx6llvzyx4pmjwasew5kj6i.us-east-1.es.amazonaws.com",
+        "PG_PORT": "5432",
+        "S3_ARTICLE_BODY_BUCKET": "sedaily-mbti-article-body-dev",
+        "PG_HOST": "sedaily-mbti-pgvector-dev.c83iuyksky7r.us-east-1.rds.amazonaws.com",
+        "PG_PASSWORD": "<<REDACTED — 원본은 삭제 전 Lambda 환경변수에 있었음. 복원 시 운영자가 재입력>>",
+        "PG_DATABASE": "ailens",
+        "DYNAMODB_TABLE_ARTICLES": "sedaily-mbti-articles-dev",
+        "IAM_REFRESH": "1776013353",
+        "OPENSEARCH_INDEX": "sedaily-articles",
+        "PG_USER": "<<REDACTED — 원본은 삭제 전 Lambda 환경변수에 있었음. 복원 시 운영자가 재입력>>"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "4076baae-d36f-4ea6-82ee-33988a95dc60",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:81a2f2bcc7b606f63601c58153453037785e00ca30d21476cee5f82df01b0d71"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-pipeline-supervisor-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거 — 코드는 별도 아카이브 참조>>"
+  },
+  "Tags": {
+    "Project": "sedaily-mbti",
+    "Owner": "one",
+    "ManagedBy": "claude-code",
+    "Phase": "phase-1",
+    "Subsystem": "pipeline-supervisor",
+    "Environment": "dev",
+    "Service": "mbti",
+    "Component": "backend-v1"
+  }
+}

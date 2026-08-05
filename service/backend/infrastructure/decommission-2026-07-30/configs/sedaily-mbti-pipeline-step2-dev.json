@@ -1,0 +1,59 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-pipeline-step2-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-pipeline-step2-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.pipeline.step2_classify.lambda_handler",
+    "CodeSize": 23670693,
+    "Description": "",
+    "Timeout": 300,
+    "MemorySize": 256,
+    "LastModified": "2026-07-29T13:18:10.000+0000",
+    "CodeSha256": "5QSsVEROgWeati7Hq6nVoBgIl3FlLzJcnIFcm657YZE=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "DYNAMODB_TABLE_ARTICLES": "sedaily-mbti-articles-dev"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "5464126b-6c9b-448e-8007-347ab7affc92",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:81a2f2bcc7b606f63601c58153453037785e00ca30d21476cee5f82df01b0d71"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-pipeline-step2-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거 — 코드는 별도 아카이브 참조>>"
+  },
+  "Tags": {
+    "Project": "sedaily-mbti",
+    "Owner": "one",
+    "ManagedBy": "claude-code",
+    "Phase": "phase-1",
+    "Subsystem": "pipeline-step2",
+    "Environment": "dev",
+    "Service": "mbti",
+    "Component": "backend-v1"
+  }
+}

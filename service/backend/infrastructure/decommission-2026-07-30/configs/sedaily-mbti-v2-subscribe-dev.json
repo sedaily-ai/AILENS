@@ -1,0 +1,59 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-v2-subscribe-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-subscribe-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/service-role/sedaily-mbti-v2-collector-dev-role-nbf99tic",
+    "Handler": "v2.handlers.subscribe.lambda_handler",
+    "CodeSize": 7492258,
+    "Description": "",
+    "Timeout": 30,
+    "MemorySize": 256,
+    "LastModified": "2026-07-29T13:18:49.000+0000",
+    "CodeSha256": "2s6R225kz3f/+WgdK4x1mGFpbT2OGUgHUp40jqTKCyM=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "NEWSLETTER_FROM": "AI LENS <letter@mbti.sedaily.ai>",
+        "NEWSLETTER_DRY_RUN": "0",
+        "SES_REGION": "us-east-1",
+        "NEWSLETTER_CONFIG_SET": "ailens-newsletter",
+        "SUBSCRIBERS_TABLE": "sedaily-mbti-newsletter-subscribers-dev"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "81bf69ec-b469-4bbb-857e-da6e3d4799b7",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:81a2f2bcc7b606f63601c58153453037785e00ca30d21476cee5f82df01b0d71"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-v2-subscribe-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "AI-LENS",
+    "CostCenter": "sedaily-ai",
+    "Environment": "dev",
+    "Service": "mbti"
+  }
+}

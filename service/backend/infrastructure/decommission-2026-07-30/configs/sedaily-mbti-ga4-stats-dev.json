@@ -1,0 +1,50 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-ga4-stats-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-ga4-stats-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.ga4_stats_handler.lambda_handler",
+    "CodeSize": 31658923,
+    "Description": "GA4 Data API + Real-Time stats with 5min DDB cache",
+    "Timeout": 15,
+    "MemorySize": 512,
+    "LastModified": "2026-05-26T13:06:30.000+0000",
+    "CodeSha256": "6LrrsmdbLhNbareCQV73uBdlTxvpkJARviqrdRKdzyw=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "GA4_KEY_SSM_PARAMETER": "/sedaily-mbti/ga4/service-account-key",
+        "GA4_PROPERTY_ID": "538669891"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "addd54bf-edf9-4307-b138-694853d2abe4",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:15606da216b3bff5de1872be70ce1a6be87f1f26dafc9bcf45233c0dc338335b"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-ga4-stats-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거 — 코드는 별도 아카이브 참조>>"
+  }
+}

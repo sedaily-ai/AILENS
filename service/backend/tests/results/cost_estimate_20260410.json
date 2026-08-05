@@ -1,0 +1,73 @@
+{
+  "analysis_date": "2026-04-10",
+  "period_days": 3,
+  "budget_usd": 26000,
+  "bedrock": {
+    "total_daily": 0.0858,
+    "models": {
+      "claude_haiku": {
+        "total_invocations": 71,
+        "daily_avg_invocations": 23.7,
+        "est_input_tokens": 142000,
+        "est_output_tokens": 177500,
+        "total_cost": 0.2574,
+        "daily_cost": 0.0858
+      },
+      "nova_lite": {
+        "total_invocations": 0,
+        "daily_avg_invocations": 0.0,
+        "est_input_tokens": 0,
+        "est_output_tokens": 0,
+        "total_cost": 0.0,
+        "daily_cost": 0.0
+      },
+      "titan_embed": {
+        "total_invocations": 16,
+        "daily_avg_invocations": 5.3,
+        "est_input_tokens": 8000,
+        "est_output_tokens": 0,
+        "total_cost": 0.0002,
+        "daily_cost": 0.0001
+      }
+    }
+  },
+  "dynamodb": {
+    "total_wcu": 56,
+    "total_rcu": 39,
+    "daily_wcu": 19.0,
+    "daily_rcu": 13.0,
+    "total_cost": 0.0001,
+    "daily_cost": 0.0
+  },
+  "lambda": {
+    "total_invocations": 1743,
+    "daily_invocations": 581.0,
+    "total_duration_seconds": 5676.8,
+    "total_gb_seconds": 2838.4,
+    "total_cost": 0.0477,
+    "daily_cost": 0.0159
+  },
+  "s3": {
+    "storage_gb": 0.0,
+    "total_puts": 0,
+    "total_gets": 0,
+    "monthly_storage_cost": 0.0,
+    "request_cost": 0.0,
+    "daily_cost": 0.0
+  },
+  "fixed_infrastructure": {
+    "opensearch_monthly": 25.92,
+    "rds_monthly": 15.26,
+    "total_fixed_monthly": 41.18,
+    "total_fixed_daily": 1.37
+  },
+  "summary": {
+    "daily_variable_cost": 0.1017,
+    "daily_fixed_cost": 1.37,
+    "daily_total_cost": 1.4717,
+    "monthly_projected_cost": 44.15,
+    "yearly_projected_cost": 529.81,
+    "budget_months_remaining": 588.9,
+    "budget_percent_per_month": 0.17
+  }
+}

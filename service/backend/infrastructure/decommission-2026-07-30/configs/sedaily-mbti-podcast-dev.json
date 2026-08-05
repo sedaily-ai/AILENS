@@ -1,0 +1,64 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-podcast-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-podcast-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.podcast_handler.lambda_handler",
+    "CodeSize": 23624232,
+    "Description": "",
+    "Timeout": 300,
+    "MemorySize": 512,
+    "LastModified": "2026-07-29T18:13:52.000+0000",
+    "CodeSha256": "kCdaYUCTttKOgs0oYpZZklwWNyIVxVl+7WQGWumuV5A=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "DYNAMODB_TABLE_PODCAST": "sedaily-mbti-podcast-dev",
+        "ROTATION_AT": "1778032646",
+        "S3_ARTICLE_BODY_BUCKET": "sedaily-mbti-article-body-dev",
+        "DYNAMODB_TABLE_PERSONAL": "sedaily-mbti-personal-dev",
+        "DYNAMODB_TABLE_ARTICLES": "sedaily-mbti-articles-dev",
+        "S3_AUDIO_BUCKET": "sedaily-mbti-audio-dev"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "b8879c13-33c1-4893-a9b8-1b614432655a",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:81a2f2bcc7b606f63601c58153453037785e00ca30d21476cee5f82df01b0d71"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-podcast-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "sedaily-mbti",
+    "Owner": "one",
+    "ManagedBy": "claude-code",
+    "Phase": "phase-1",
+    "Subsystem": "podcast",
+    "Environment": "dev",
+    "Service": "mbti",
+    "Component": "backend-v1"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "date": "2026-04-10",
+  "api_url": "https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev",
+  "api_latencies": [
+    {
+      "endpoint": "/s3-articles",
+      "method": "GET",
+      "status": 200,
+      "latency_ms": 1194,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/search",
+      "method": "POST",
+      "status": 200,
+      "latency_ms": 725,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/chat",
+      "method": "POST",
+      "status": 200,
+      "latency_ms": 19331,
+      "ok": true
+    },
+    {
+      "endpoint": "/time-machine",
+      "method": "GET",
+      "status": 500,
+      "latency_ms": 698,
+      "ok": false
+    },
+    {
+      "endpoint": "/saju",
+      "method": "POST",
+      "status": 200,
+      "latency_ms": 672,
+      "ok": true
+    },
+    {
+      "endpoint": "/api/metrics/dashboard",
+      "method": "GET",
+      "status": 404,
+      "latency_ms": 605,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/recommend",
+      "method": "GET",
+      "status": 404,
+      "latency_ms": 639,
+      "ok": false
+    },
+    {
+      "endpoint": "/api/archive",
+      "method": "GET",
+      "status": 404,
+      "latency_ms": 650,
+      "ok": false
+    }
+  ],
+  "api_summary": {
+    "tested": 8,
+    "ok": 4,
+    "avg_ms": 5480,
+    "min_ms": 672,
+    "max_ms": 19331,
+    "p95_ms": 19331
+  },
+  "dynamodb": {
+    "service": "dynamodb_gsi",
+    "queries": 3,
+    "avg_ms": 658,
+    "timings_ms": [
+      1300,
+      467,
+      207
+    ]
+  },
+  "embedding": {
+    "service": "bedrock_embedding",
+    "short_text_ms": 1163,
+    "medium_text_ms": 320
+  },
+  "metrics_collection": {
+    "service": "metrics_dashboard",
+    "latency_ms": 6478
+  }
+}

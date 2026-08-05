@@ -1,0 +1,61 @@
+{
+  "test_date": "2026-04-09",
+  "total_articles": 1,
+  "categories": {
+    "경제": 1
+  },
+  "claude_haiku": {
+    "model_id": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    "success_count": 1,
+    "success_rate": 100.0,
+    "avg_response_time_ms": 28432,
+    "min_response_time_ms": 28432,
+    "max_response_time_ms": 28432,
+    "total_input_tokens": 1130,
+    "total_output_tokens": 1742,
+    "avg_cost_per_article": 0.00246,
+    "total_cost_usd": 0.0025,
+    "completion_rate": 100.0
+  },
+  "nova_pro": {
+    "model_id": "amazon.nova-pro-v1:0",
+    "success_count": 1,
+    "success_rate": 100.0,
+    "avg_response_time_ms": 33062,
+    "min_response_time_ms": 33062,
+    "max_response_time_ms": 33062,
+    "total_input_tokens": 19908,
+    "total_output_tokens": 3739,
+    "avg_cost_per_article": 0.027891,
+    "total_cost_usd": 0.0279,
+    "completion_rate": 100.0
+  },
+  "per_article": [
+    {
+      "news_id": "2K8PD4WP3R",
+      "category": "경제",
+      "title": "정부, 고정밀 지도 해외 반출 여부 이번주 결론",
+      "content_length": 953,
+      "claude": {
+        "success": true,
+        "response_time_ms": 28432,
+        "input_tokens": 1130,
+        "output_tokens": 1742,
+        "cost_usd": 0.00246,
+        "complete": true,
+        "truncated": false,
+        "error": ""
+      },
+      "nova_pro": {
+        "success": true,
+        "response_time_ms": 33062,
+        "input_tokens": 19908,
+        "output_tokens": 3739,
+        "cost_usd": 0.027891,
+        "complete": true,
+        "truncated": false,
+        "error": ""
+      }
+    }
+  ]
+}
