@@ -782,131 +782,17 @@ class S3XMLClient:
             logger.error(f"Failed to fetch/parse XML from {key}: {e}", exc_info=True)
             return []
 
-    async def get_today_articles(self) -> List[S3Article]:
-        """Get all articles for today (KST)"""
-        kst = timezone(timedelta(hours=9))
-        today = datetime.now(kst).strftime("%Y%m%d")
-        return await self.get_articles_by_date(today)
-
-    async def get_articles_to_process(self, date_str: str = None) -> Dict[str, List[S3Article]]:
+    async def get_articles_to_process(self, date_str: str) -> Dict[str, List[S3Article]]:
         """
         Get articles grouped by action type
 
         Returns:
             Dict with 'new', 'updated', 'deleted' keys
         """
-        if date_str is None:
-            articles = await self.get_today_articles()
-        else:
-            articles = await self.get_articles_by_date(date_str)
+        articles = await self.get_articles_by_date(date_str)
 
         return {
             'new': [a for a in articles if a.action == 'I'],
             'updated': [a for a in articles if a.action == 'U'],
             'deleted': [a for a in articles if a.action == 'D']
-        }
-
-    def article_to_dict(self, article: S3Article) -> Dict[str, Any]:
-        """
-        Convert S3Article to dictionary for DynamoDB storage
-
-        Preserves all data from Korean site structure
-        """
-        return {
-            # IDs
-            'nsid': article.nsid,
-            'news_id': article.nsid,  # Alias for compatibility
-            'action': article.action,
-            'item_type': article.item_type,
-            'press': article.press,
-
-            # Content (Korean)
-            'title_ko': article.title,
-            'sub_title_ko': article.sub_title or '',
-            'content_ko': article.content_clean,
-            'content_raw': article.content_raw,
-            'content_blocks': [
-                # Text block: include text fields and style
-                {
-                    'type': 'text',
-                    'text_ko': block.text_ko,
-                    'text_en': block.text_en,
-                    'style': block.style  # "normal", "bold", or "heading"
-                } if block.block_type == "text" else
-                # Image block: include image fields with translations
-                {
-                    'type': 'image',
-                    'url': block.image_url,
-                    'alt': block.image_alt,  # Korean
-                    'alt_en': block.image_alt_en,  # English
-                    'width': block.image_width,
-                    'caption': block.image_caption,  # Korean
-                    'caption_en': block.image_caption_en  # English
-                }
-                for block in article.content_blocks
-            ],
-
-            # Author
-            'author': article.author,
-            'author_name': article.author_name,
-            'author_email': article.author_email,
-            'byline': article.author_name,  # Alias for compatibility
-
-            # Date/Time
-            'date': article.date,
-            'time': article.time,
-            'published_at': article.published_at,
-
-            # Category
-            'categories': [
-                {'code': c.code, 'name': c.name,
-                 'main': c.main_category, 'sub': c.sub_category, 'detail': c.detail_category}
-                for c in article.categories
-            ],
-            'category': article.main_category,
-
-            # URL
-            'url': article.url,
-            'original_link': article.url,
-
-            # Images (standalone images from XML <image> tag)
-            'images': [
-                {'url': img.url, 'width': img.width, 'height': img.height,
-                 'caption_title': img.caption_title, 'caption_content': img.caption_content}
-                for img in article.images
-            ],
-            # Note: content_images removed - use content_blocks instead
-
-            # Related news
-            'related_news': [
-                {'title': rel.title, 'url': rel.url, 'nsid': rel.nsid}
-                for rel in article.related_news
-            ],
-
-            # Leverage (stock codes)
-            'leverage': [
-                {'service_id': lev.service_id, 'service_type': lev.service_type}
-                for lev in article.leverage
-            ],
-
-            # Push notification
-            'is_breaking_news': article.is_breaking_news,
-            'push': {
-                'push_id': article.push.push_id,
-                'grade': article.push.grade,
-                'title': article.push.title,
-                'date': article.push.date,
-                'time': article.push.time
-            } if article.push else None,
-
-            # Paper info
-            'paper': {
-                'publish_date': article.paper.publish_date,
-                'number': article.paper.number,
-                'print_number': article.paper.print_number,
-                'paper_number': article.paper.paper_number,
-                'paragraph': article.paper.paragraph,
-                'position': article.paper.position,
-                'detail_position': article.paper.detail_position
-            } if article.paper else None
         }

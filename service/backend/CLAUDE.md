@@ -77,12 +77,27 @@ clients/            → Service clients: dynamodb, personal_db, s3_article, s3_x
                      podcast_handler calls boto3 polly directly (tts_handler 는 폐기).
                      ⚠️ opensearch_client.py 는 2026-08-05 삭제됐다 — 어떤 handler 도
                      import하지 않던 죽은 코드였다(원래 도메인 sedaily-mbti-search-dev도
-                     2026-08-04 삭제). search_handler.py/chatbot_handler.py 는 처음부터
-                     DynamoDB GSI 쿼리로 검색·RAG-유사 기능을 구현했다.
+                     2026-08-04 삭제). search_handler.py 는 처음부터 DynamoDB GSI 쿼리로
+                     검색·RAG-유사 기능을 구현했다.
+                     ⚠️ `dynamodb_client.py` — 989줄 중 12개 메서드(43%)가 완전 고아였다
+                     (article versioning, failed-article DLQ, naver TV URL, slug 체크 등 —
+                     전부 호출자 0). 2026-08-05 삭제, 562줄로 축소. `s3_xml_client.py`도
+                     같은 날 죽은 메서드 2개(`get_today_articles`, `article_to_dict`) 삭제
+                     — 이쪽은 대부분 살아있는 XML 파싱 파이프라인이라 SOLID 위반은 아니었음.
 repositories/       → Business-level data access on top of clients (Personal, Settings, Log)
-services/           → Business logic: article_filter, prompt_service, prompt_loader,
+services/           → Business logic: article_filter, prompt_service(⚠️ 사용처 없음,
+                     translation prompt CRUD용이었던 걸로 보임 — 조사 대상), prompt_loader,
                      metrics, briefing_generator (used by briefing_handler),
-                     stock_service (used by chatbot_handler for inline stock lookups)
+                     stock_service (used by services/chatbot_engine.py for inline stock lookups).
+                     2026-08-05: `handlers/chatbot_handler.py`(869줄, SOLID 위반 확인)를
+                     3개로 분리 — `chatbot_context_service.py`(DynamoDB/S3 raw boto3 조회:
+                     briefing, 최근기사, 연관기사 검색), `chatbot_prompt_service.py`(시스템
+                     프롬프트·tool 정의 조립), `chatbot_engine.py`(Bedrock 호출, tool-use
+                     루프, 스트리밍 — `handlers/websocket/message.py`가 여기서
+                     `generate_chat_response_stream`을 직접 import해 쓴다). `chatbot_handler.py`는
+                     이제 HTTP 라우팅/검증/응답 조립만 담당. ⚠️ 동기(`generate_chat_response`)와
+                     스트리밍(`generate_chat_response_stream`) 경로가 tool-use 루프를 각자
+                     중복 구현 중 — 이번엔 구조만 옮기고 통합은 안 함(로직 변경이라 별도 작업).
 models/             → Dataclasses: Article, UserProfile/ArchivedSentence/ReadingRecord
                      (in personal.py), ABTest
 core/               → Framework: decorators.py (@lambda_handler, @require_params, etc.),

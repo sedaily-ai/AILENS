@@ -26,7 +26,7 @@ _BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from handlers.chatbot_handler import (  # noqa: E402
+from services.chatbot_engine import (  # noqa: E402
     _build_messages,
     _split_system_turns,
 )

@@ -100,8 +100,7 @@ class S3ArticleV2Client:
         The body is encoded with ``ensure_ascii=False`` so Korean content
         is stored as UTF-8 instead of ``\\uXXXX`` escapes — roughly 3×
         smaller for Korean articles. ``default=str`` covers datetime and
-        other non-JSON types that the collector may pass through from
-        ``S3XMLClient.article_to_dict``.
+        other non-JSON types the collector may pass through.
 
         No-op mode returns ``""`` without making an AWS call.
         """

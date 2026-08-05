@@ -13,8 +13,8 @@ from config import settings
 from handlers.time_machine_handler import get_time_machine_data
 from clients.s3_xml_client import S3XMLClient
 from fastapi.responses import StreamingResponse
-from handlers.chatbot_handler import (
-    generate_chat_response, generate_chat_response_stream,
+from services.chatbot_engine import generate_chat_response, generate_chat_response_stream
+from services.chatbot_context_service import (
     get_cached_briefing, get_recent_articles, search_related_articles,
 )
 
