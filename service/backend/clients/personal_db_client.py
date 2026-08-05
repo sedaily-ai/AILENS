@@ -25,7 +25,6 @@ from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
 from config.constants import AWS_REGION_DEFAULT
-from models.personal import ArchivedSentence, ReadingRecord, UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -239,61 +238,3 @@ class PersonalDBClient:
         except Exception as e:
             logger.error(f"Failed to update item ({user_id}, {sk}): {e}", exc_info=True)
             return None
-
-    # ── Domain methods ───────────────────────────────────────────────────
-
-    async def put_archived_sentence(self, sentence: ArchivedSentence) -> Dict[str, Any]:
-        """Save an archived sentence. Returns the item dict."""
-        item = sentence.to_item()
-        await self.put_item(item)
-        return item
-
-    async def get_archived_sentences(
-        self,
-        user_id: str,
-        limit: int = 50,
-        date_from: Optional[str] = None,
-        date_to: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Get archived sentences for a user, newest first."""
-        if date_from and date_to:
-            sk_start = f"ARCHIVE#{date_from}"
-            sk_end = f"ARCHIVE#{date_to}~"  # ~ sorts after all normal chars
-            items = await self.query_by_user(
-                user_id, sk_between=(sk_start, sk_end), limit=limit,
-            )
-        else:
-            items = await self.query_by_user(
-                user_id, sk_prefix='ARCHIVE#', limit=limit,
-            )
-        return items
-
-    async def delete_archived_sentence(self, user_id: str, sk: str) -> bool:
-        """Delete an archived sentence by user_id and sort key."""
-        return await self.delete_item(user_id, sk)
-
-    async def put_reading_record(self, record: ReadingRecord) -> Dict[str, Any]:
-        """Save a reading record. Returns the item dict."""
-        item = record.to_item()
-        await self.put_item(item)
-        return item
-
-    async def get_reading_records(
-        self,
-        user_id: str,
-        limit: int = 100,
-    ) -> List[Dict[str, Any]]:
-        """Get reading records for a user, newest first."""
-        return await self.query_by_user(
-            user_id, sk_prefix='READING#', limit=limit,
-        )
-
-    async def put_user_profile(self, profile: UserProfile) -> Dict[str, Any]:
-        """Save or update a user profile. Returns the item dict."""
-        item = profile.to_item()
-        await self.put_item(item)
-        return item
-
-    async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get a user profile, or None if not found."""
-        return await self.get_item(user_id, UserProfile.SK)

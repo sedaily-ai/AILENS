@@ -100,6 +100,19 @@ clients/            → Service clients: dynamodb, personal_db, s3_article, s3_x
                      `store_sentence_embedding`). `handlers/archive_handler.py`("내 서랍"
                      유사 문장 검색)가 쓰는 `insert_archive_vector`/`search_similar_sentences`
                      2개만 남기고 2026-08-05 축소, 209줄.
+                     ⚠️ `personal_db_client.py` — "Domain methods" 섹션(`put_archived_sentence`,
+                     `get_archived_sentences`, `delete_archived_sentence`,
+                     `put_reading_record`, `get_reading_records`, `put_user_profile`,
+                     `get_user_profile`, ~57줄)이 전부 고아였다 — `PersonalRepository`가
+                     이 래퍼들을 호출하는 대신 `get_item`/`put_item`/`delete_item`/
+                     `query_by_user`/`update_item` 5개 primitive를 직접 호출해 같은 로직을
+                     중복 구현하고 있었음. 2026-08-05 삭제, 241줄로 축소.
+                     `embedding_client.py`(v1 Titan) — `embed_text`/`_call_bedrock`만
+                     살아있고(`handlers/archive_handler.py`가 사용), `embed_batch`/
+                     `get_embedding`/`get_embeddings_batch`는 호출자 0이라 같은 날 삭제.
+                     `mbti_transform_service.py`의 no-op `close()`도 삭제 — 여전히
+                     `article_collector.py`가 쓰는 살아있는 클래스이지만 이 메서드 하나만
+                     죽어있었음(pass만 하는 스텁, 호출자 0).
 repositories/       → PersonalRepository만 남음(personal_db_client.py 기반, "내 서랍"·유저
                      프로필·독서기록에서 사용). ⚠️ base.py(BaseDynamoDBRepository) +
                      그걸 상속하던 log_repository.py/settings_repository.py(~930줄)는

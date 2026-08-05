@@ -44,7 +44,6 @@ class EmbeddingClient:
     Usage:
         client = EmbeddingClient()
         vec = client.embed_text("삼성전자 1분기 실적 발표")
-        vecs = client.embed_batch(["text1", "text2"])
     """
 
     def __init__(
@@ -114,40 +113,6 @@ class EmbeddingClient:
             # Bedrock error during ingestion.
             logger.error(f"Embedding failed for text ({len(text)} chars): {e}", exc_info=True)
             raise EmbeddingError(f"Embedding failed: {e}") from e
-
-    def embed_batch(self, texts: List[str]) -> List[List[float]]:
-        """
-        Generate embeddings for multiple texts.
-
-        Each text is independently embedded (with chunking if needed).
-        Titan Embeddings does not support native batching, so this
-        iterates and calls embed_text for each.
-
-        Args:
-            texts: List of input texts
-
-        Returns:
-            List of embedding vectors (same order as input)
-        """
-        results = []
-        for i, text in enumerate(texts):
-            try:
-                vec = self.embed_text(text)
-                results.append(vec)
-            except EmbeddingError:
-                logger.warning(f"Embedding failed for batch item {i}, using zero vector")
-                results.append([0.0] * self.dimension)
-        return results
-
-    # ── Aliases (match spec naming) ─────────────────────────────────────────
-
-    def get_embedding(self, text: str) -> List[float]:
-        """Alias for embed_text."""
-        return self.embed_text(text)
-
-    def get_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """Alias for embed_batch."""
-        return self.embed_batch(texts)
 
     # ── Bedrock call ─────────────────────────────────────────────────────────
 

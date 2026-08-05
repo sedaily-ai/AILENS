@@ -346,7 +346,3 @@ class MbtiTransformService:
             "versions": versions,
             "usage": total_usage,
         }
-
-    async def close(self):
-        """Close resources (no-op for Bedrock client)"""
-        pass
