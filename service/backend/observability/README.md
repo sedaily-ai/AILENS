@@ -1,4 +1,4 @@
-# v2 Observability
+# Observability
 
 CloudWatch dashboard / metric 정의. SCP 가 Cost Explorer / Budgets 를 차단한 환경에서 application-level cost proxy 로 운영.
 
@@ -13,7 +13,7 @@ CloudWatch dashboard / metric 정의. SCP 가 Cost Explorer / Budgets 를 차단
 
 **View**: https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=sedaily-mbti-v2-bedrock-cost
 
-**Metric source**: `sedaily-mbti/v2/BedrockTokens` (Cost-1b commit 5da37f8) — EmbeddingV2Client + transform_v2_service 가 매 Bedrock invoke 시 input/output token count 를 CloudWatch 에 emit.
+**Metric source**: `sedaily-mbti/v2/BedrockTokens` (Cost-1b commit 5da37f8) — EmbeddingV2Client가 매 Bedrock invoke 시 input/output token count 를 CloudWatch 에 emit. (⚠️ transform_v2_service.py는 2026-08-05 삭제됨 — Transform 파이프라인이 2026-08-04에 이미 폐기되어 죽은 코드였다. 아래 Opus 관련 예시는 그 시절 기록이다.)
 
 **Dimensions**:
 - `Lambda` — 호출 Lambda 함수명 (예: `sedaily-mbti-v2-transform-dev`)
@@ -49,7 +49,8 @@ Master account admin 이 `ce:*` / `budgets:*` 권한 풀어주면:
 
 ## Lambda metric emit 코드
 
-- `backend/v2/clients/cloudwatch_metrics.py` — `emit_bedrock_token_usage`, `parse_bedrock_response_tokens`
-- `backend/v2/clients/embedding_v2_client.py` — Titan V2 호출 후 emit (response 헤더 직접 read)
-- `backend/v2/clients/transform_v2_service.py` — Opus 4.6 호출 후 emit (v1 service 의 aggregated `usage` dict trust, cache_creation+cache_read 합산)
-- 향후 selector_service / core2/validator 의 Nova Lite 호출도 통합 가능 (보류 — Nova Lite 가 Opus 대비 50배 저렴해서 우선순위 낮음)
+(2026-08-05, v1/v2 소스 통합으로 경로가 `backend/v2/clients/` → `backend/clients/`로 바뀜)
+
+- `backend/clients/cloudwatch_metrics.py` — `emit_bedrock_token_usage`, `parse_bedrock_response_tokens`
+- `backend/clients/embedding_v2_client.py` — Titan V2 호출 후 emit (response 헤더 직접 read, Collector가 사용)
+- ~~`transform_v2_service.py`~~ — 2026-08-05 삭제됨 (Transform 파이프라인 자체가 2026-08-04 폐기)

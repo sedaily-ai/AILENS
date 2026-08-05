@@ -4,14 +4,18 @@
 #
 # 2026-08-05: v1/v2 소스 통합 — 예전에 별도였던 deploy-v2.sh(별도 zip, 별도
 # 함수 그룹)를 이 스크립트 하나로 합쳤다. 소스 트리가 이미 하나로 합쳐졌으니
-# (core25/, core3/, newsletter/, clients/*_v2_client.py 등이 이 루트로 이동)
-# 배포도 zip 하나, 스크립트 하나면 충분하다. Lambda 함수 이름 자체는 바꾸지
-# 않았다 — `sedaily-mbti-v2-*-dev` 로 이미 배포되어 있는 이름 그대로 사용.
+# (newsletter/, clients/*_v2_client.py 등이 이 루트로 이동) 배포도 zip 하나,
+# 스크립트 하나면 충분하다. Lambda 함수 이름 자체는 바꾸지 않았다 —
+# `sedaily-mbti-v2-*-dev` 로 이미 배포되어 있는 이름 그대로 사용.
+#
+# 같은 날, 자동 수집→AI 생성 파이프라인(Collector/Editor Pick/Core 3 개인화)이
+# 폐기 결정나며 core25/, core3/ 와 관련 핸들러가 전부 삭제됐다 — 콘텐츠는 이제
+# 관리자 대시보드 수동 업로드(handlers/cms_posts_public.py, DynamoDB 기반)로
+# 대체된다. `cron` 배포 타깃도 그래서 없다.
 #
 # Usage:
-#   ./deploy.sh           — Deploy all functions (api + cron)
+#   ./deploy.sh           — Deploy all functions (= api, 현재는 동의어)
 #   ./deploy.sh api       — Deploy API functions only
-#   ./deploy.sh cron      — Deploy scheduled/cron functions only (collector, editor-pick)
 
 set -e
 
@@ -31,7 +35,6 @@ mkdir lambda-build
 
 # Install dependencies for Linux (Lambda runtime)
 # Only runtime deps — no pytest, no fastapi/uvicorn (dev-only).
-# json-repair 는 옛 v2 전용 의존성이었다 (core25 editor pick 서비스가 사용).
 echo "  -> Installing runtime dependencies for Linux (Python 3.11)..."
 pip3 install \
   httpx==0.27.0 \
@@ -45,7 +48,6 @@ pip3 install \
   requests-aws4auth==1.3.1 \
   pg8000==1.31.2 \
   "PyJWT[crypto]==2.10.1" \
-  json-repair==0.61.7 \
   -t lambda-build \
   --platform manylinux2014_x86_64 \
   --python-version 3.11 \
@@ -55,10 +57,9 @@ pip3 install \
   --quiet
 
 # Copy source code modules
-# core25/ core3/ newsletter/ 는 옛 v2 소스 통합분 (2026-08-05) — today_letters,
-# editor pick, feed API 등 실제 배포된 라이브 코드다.
+# newsletter/ 는 옛 v2 소스 통합분 (2026-08-05) — handlers/subscribe.py 가 사용.
 echo "  -> Copying source code..."
-for dir in clients handlers config core models repositories services utils common core25 core3 newsletter; do
+for dir in clients handlers config core models repositories services utils common newsletter; do
   if [ -d "$dir" ]; then
     echo "    -> $dir/"
     cp -r "$dir" lambda-build/
@@ -136,23 +137,19 @@ API_V2_FUNCTIONS=(
   "sedaily-mbti-v2-health-dev"
   "sedaily-mbti-v2-today-letters-dev"  # 오늘의 한 통 GET API (handlers/today_letters.py)
   "sedaily-mbti-v2-subscribe-dev"      # 구독/수신거부 (handlers/subscribe.py)
-  "sedaily-mbti-v2-front-page-dev"     # 지면 1면 (handlers/front_page.py)
+  "sedaily-mbti-v2-front-page-dev"     # 지면 1면 (handlers/front_page.py) — ⚠️ pgvector RDS
+                                        # 삭제로 현재 500 에러, 복구 여부 별도 결정 대기
   "sedaily-mbti-v2-posts-dev"          # CMS 글 공개 조회 (handlers/cms_posts_public.py)
-  "sedaily-mbti-v2-feed-dev"           # 개인화 피드 — 응답은 설계상 빈 배열 (handlers/core3_feed.py)
-  "sedaily-mbti-v2-article-dev"        # 기사 상세 (handlers/core3_article.py)
-)
-
-# --- Cron/스케줄 Functions (매일 자동 실행, API Gateway 라우트 없음) ---
-CRON_FUNCTIONS=(
-  "sedaily-mbti-v2-collector-dev"     # 일 1회 수집 (handlers/core1_collector.py)
-  "sedaily-mbti-v2-editor-pick-dev"   # 새벽 1시, 오늘의 한 통 생성 (handlers/core25_editor_pick.py)
 )
 
 # --- Pipeline Functions ---
 # 2026-07-30: v1 Step Functions 파이프라인(step1~4 + supervisor)과 상태머신
-# sedaily-mbti-transform-pipeline-dev 를 폐기했다. 스케줄이 이미 DISABLED 였고
-# 30일 실호출 0회였으며, v2 collector가 수집을 대신한다(Selector/Transform은
-# 2026-08-04 자체가 폐기됨).
+# sedaily-mbti-transform-pipeline-dev 를 폐기했다.
+# 2026-08-05: 자동 수집→AI 생성 파이프라인(v2 collector/editor-pick/개인화 feed·article)도
+# 전부 폐기 — RDS 삭제로 매일 조용히 실패하고 있었고, 콘텐츠는 관리자 대시보드 수동
+# 업로드로 대체하기로 결정. 관련 Lambda(sedaily-mbti-v2-collector-dev,
+# -editor-pick-dev, -feed-dev, -article-dev)는 이 배포 대상에서 제외됐다 — 소스가
+# 삭제됐을 뿐 AWS 쪽 Lambda 함수 자체는 아직 남아있을 수 있음(수동 정리 필요).
 # 경위와 복원 방법: infrastructure/decommission-2026-07-30/README.md
 PIPELINE_FUNCTIONS=()
 
@@ -165,14 +162,11 @@ case "$DEPLOY_TARGET" in
   api)
     FUNCTIONS=("${API_FUNCTIONS[@]}" "${API_V2_FUNCTIONS[@]}")
     ;;
-  cron)
-    FUNCTIONS=("${CRON_FUNCTIONS[@]}")
-    ;;
   all)
-    FUNCTIONS=("${API_FUNCTIONS[@]}" "${API_V2_FUNCTIONS[@]}" "${CRON_FUNCTIONS[@]}")
+    FUNCTIONS=("${API_FUNCTIONS[@]}" "${API_V2_FUNCTIONS[@]}")
     ;;
   *)
-    echo "Unknown target: $DEPLOY_TARGET (use: all, api, cron)"
+    echo "Unknown target: $DEPLOY_TARGET (use: all, api)"
     exit 1
     ;;
 esac
