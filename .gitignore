@@ -1,1 +1,15 @@
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Lambda build artifacts
+lambda-build/
+lambda-build-v2/
+lambda_package.zip
+lambda_package_v2.zip
