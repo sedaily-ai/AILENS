@@ -81,7 +81,9 @@ export function ColumnPreviewSection() {
     };
   }, []);
 
-  const cards = cmsCards && cmsCards.length > 0 ? cmsCards : FALLBACK;
+  // 홈은 최신 3개만 티저로 — 전체는 '더보기'로 이동하는 /letters 아카이브에서.
+  // (전체를 다 보여주면 '더보기' 링크 자체가 무의미해진다.)
+  const cards = (cmsCards && cmsCards.length > 0 ? cmsCards : FALLBACK).slice(0, 3);
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
