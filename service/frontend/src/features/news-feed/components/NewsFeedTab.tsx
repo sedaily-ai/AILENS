@@ -13,6 +13,7 @@ import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";
 import { MiniHeadlinesSection } from "./MiniHeadlinesSection";
 import { VideoPreviewSection } from "./VideoPreviewSection";
+import { TimelinePreviewSection } from "./TimelinePreviewSection";
 
 interface Props {
   selectedDate: Date;
@@ -141,6 +142,12 @@ export function NewsFeedTab({
               "점박이(캐러셀 도트) 있어야 배너답다, 웹툰·사주도 같이 소개하자"는
               피드백으로 3슬라이드 캐러셀(HomeHeroCarousel.tsx)로 확장. */}
           <HomeHeroCarousel />
+
+          {/* 타임라인 최상단 배치(2026-08-07) — "실시간으로 계속 갱신되니 더
+              눈에 띄어야 한다"는 피드백으로 단어 퀴즈보다 위로. 지금은 프론트
+              목업만 두고, 실시간 데이터 연결(자동 갱신 주기 포함)은 백엔드
+              담당 팀원이 이어서 작업 — TimelinePreviewSection.tsx 상단 주석 참조. */}
+          <TimelinePreviewSection />
 
           {/* 섹션 재정렬(2026-08-06) — 오늘 하루 기능을 하나씩 얹다 보니
               본편(오늘의 레터)이 다섯 번째 섹션까지 밀려나 있었다("재밌는

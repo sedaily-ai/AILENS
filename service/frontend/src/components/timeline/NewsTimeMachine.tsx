@@ -597,6 +597,22 @@ export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
     setPhase('rewinding');
   }
 
+  // 홈 "실시간 News" 티저에서 날짜를 미리 고르고 들어온 경우
+  // (?date=YYYY-MM-DD) — useSearchParams는 정적 export에서 Suspense
+  // 경계가 필요해 대신 window.location.search를 직접 읽는다. 값이 있으면
+  // 입력창에 채우는 데서 그치지 않고 곧바로 되감기까지 시작한다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search).get('date');
+    if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회, URL 쿼리 초기화
+      setDate(q);
+      setTarget(q);
+      setPhase('rewinding');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
+  }, []);
+
   // 되감기 모션 — 오늘 → 목표일까지 날짜를 거꾸로 흘리고, 그 사이 fetch
   useEffect(() => {
     if (phase !== 'rewinding' || !target) return;
