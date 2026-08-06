@@ -41,8 +41,10 @@ DynamoDB 이관 이후 importer 0명 — 이미 고아였음), 대응 테스트 
   monkeypatch하도록 다시 써서 8/8 통과(연결-close 개념 자체가 없는 DynamoDB라
   관련 테스트 1개는 제거).
 - `deploy.sh` — `API_V2_FUNCTIONS`에서 `sedaily-mbti-v2-front-page-dev` 제거.
-  AWS Lambda 함수·API Gateway 라우트 자체는 수동 정리 전까지 남아있을 수 있음
-  (기존 decommission 패턴과 동일 — 소스만 뺌).
+- **AWS 리소스 실삭제 완료**(같은 날 후속 확인): API Gateway 라우트
+  `GET /api/v2/front-page`(`chzwwtjtgk`) + 그 통합, Lambda 함수
+  `sedaily-mbti-v2-front-page-dev` 전부 삭제. 라이브 확인 — 그 API 호출 시
+  이제 500 대신 404.
 
 **검증**: 전체 `.py` 문법 체크·import 통과, `pytest tests/ -m "not integration"`
 106 passed(에러 6건은 전부 무관 — 폐기된 v1 Step Functions 파이프라인용
