@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { Press_Start_2P } from 'next/font/google';
 import { trackEvent } from '@/shared/lib/trackEvent';
 
 interface Props {
@@ -10,7 +11,9 @@ interface Props {
   src: string;
 }
 
-const ARCADE_FONT = '"Press Start 2P", "Courier New", monospace';
+// next/font로 이 라우트 청크에만 번들 — GamesClient.tsx와 동일 이유.
+const arcadeFont = Press_Start_2P({ weight: '400', subsets: ['latin'], display: 'swap' });
+const ARCADE_FONT = `${arcadeFont.style.fontFamily}, "Courier New", monospace`;
 
 export default function GamePlayClient({ slug, title, src }: Props) {
   useEffect(() => {
