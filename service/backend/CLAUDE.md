@@ -79,11 +79,16 @@ DynamoDB 이관 이후 importer 0명 — 이미 고아였음), 대응 테스트 
   안 쓰는 패키지를 로드하고 있었다. `pg8000`은 `pgvector_client.py`/
   `pgvector_v2_client.py`/`admin/shared/pg_client.py`가 실사용 중이라 유지.
 
-### 다음에 볼 것 (이번엔 안 건드림)
-- 메모리 256MB 방치(5개 중 4개) — `deploy.sh`에 메모리 설정 로직 자체가 없음
-- `front_page.py`가 클라이언트를 매 요청마다 생성 후 `finally`에서 닫아
-  컨테이너 재사용 이점을 스스로 무효화, `subscribe.py`도 매 호출 boto3 재생성
-- API Gateway 캐싱 — HTTP API 타입이라 애초에 미지원(REST API 전환 필요)
+### 후속 조치 (같은 날 마저 처리)
+- **메모리 256→512MB**: `today-letters-dev`/`posts-dev`/`subscribe-dev` 3개
+  전부 올림(`health-dev`는 원래 512였음). `deploy.sh`엔 여전히 메모리 설정
+  로직이 없다 — 콘솔/CLI로 수동 조정한 값이라 다음에 함수를 새로 만들 때는
+  똑같이 잊히기 쉬움, 언젠가 provision 스크립트에 흡수할 것.
+- **`subscribe.py` 커넥션 재사용**: `_table()`이 매 요청마다 `import boto3` +
+  `boto3.resource("dynamodb")`를 새로 만들던 것을 모듈 레벨 싱글턴으로 고침.
+  이 배포에 맞춰 Handler 접두사도 같이 정리(위 🔴 항목 참조).
+- `front_page.py`의 매 요청 클라이언트 생성 이슈는 파일 자체가 삭제되며 해소.
+- API Gateway 캐싱은 여전히 미지원(HTTP API 타입 한계, 변경 안 함).
 
 ---
 
@@ -99,23 +104,23 @@ Selector→Transform→개인화 파이프라인이 2026-08-04 비용 문제로 
 않았을 뿐, 소스 위치나 아키텍처상의 의미는 없는 레거시 이름표다. `deploy.sh`
 하나가 이 이름들과 원래 v1 이름 함수들을 전부 같은 zip으로 배포하는 게 **의도**다.
 
-**🔴 Handler 접두사 함정 — v2 계열 5개 중 아직 4개 안 고쳐짐.** 이 5개 함수의
+**🔴 Handler 접두사 함정 — v2 계열 원래 5개 중 1개만 남음.** 이 함수들의
 `Handler` 설정이 원래 `v2.handlers.X.lambda_handler`(구 `v2/` 하위 폴더 구조
 전제)였는데, 2026-08-05 폴더 통합 이후 `deploy.sh`가 만드는 zip은 평평한 구조
 (`handlers/`가 루트)라 `v2/` 폴더가 없다 — Handler를 안 고치고 이 zip으로
-재배포하면 "모듈을 못 찾음" 에러로 깨진다.
-- `sedaily-mbti-v2-posts-dev`: **2026-08-06 고침** — Handler를
-  `handlers.cms_posts_public.lambda_handler`로 변경 후 평평한 zip 배포·라이브
-  확인 완료(cover_image_url 필드 추가 작업 중 실제로 이 함수를 건드려야 해서
-  검증까지 마침). VPC/IAM은 그대로 둬도 문제없었다.
-- 나머지 4개(`today-letters`, `health`, `front-page`, `subscribe`)는 **아직
-  구 Handler 그대로**다 — 아직 이 zip으로 재배포된 적이 없어서 지금은 멀쩡히
-  동작하지만, 다음에 `./deploy.sh api`나 `./deploy.sh`를 돌려서 이 4개 함수의
-  코드 업데이트가 실제로 성공하면 그 순간 깨진다. 고칠 때는 `posts-dev`에서
-  검증한 절차 그대로: (1) 배포 전 `aws lambda get-function`으로 현재 코드
-  zip 백업, (2) `update-function-configuration --handler`로 접두사 제거,
-  (3) `update-function-code`, (4) 즉시 라이브 호출로 확인 — 실패하면 백업 zip
-  으로 코드 복구 + Handler 원복.
+재배포하면 "모듈을 못 찾음" 에러로 깨진다. 고칠 때 절차: (1) `aws lambda
+get-function`으로 현재 코드 zip 백업, (2) `update-function-configuration
+--handler`로 접두사 제거, (3) `update-function-code`, (4) 즉시 라이브 호출로
+확인 — 실패하면 백업 zip으로 코드 복구 + Handler 원복.
+- `sedaily-mbti-v2-posts-dev`: 2026-08-06 고침(cover_image_url 필드 추가 작업 중)
+- `sedaily-mbti-v2-today-letters-dev`: 2026-08-06 고침(외부 콘텐츠 API 작업 중)
+- `sedaily-mbti-v2-subscribe-dev`: 2026-08-06 고침(subscribe.py 커넥션 재사용
+  수정 배포하면서 같이) — 메모리도 이참에 256→512MB
+- `sedaily-mbti-v2-front-page-dev`: **함수 자체가 삭제됨**(pgvector RDS 제거
+  라운드) — 더 이상 해당 없음
+- `sedaily-mbti-v2-health-dev`: **아직 안 고침**, 남은 마지막 하나. 지금은
+  이 zip으로 재배포된 적이 없어 멀쩡히 동작 중이지만, 다음에 `./deploy.sh`가
+  이 함수 코드 업데이트에 실제로 성공하면 그 순간 깨진다.
 
 **같은 날, 자동 수집→AI 생성 파이프라인 자체를 폐기했다.** 폴더 통합 직후 운영
 상태를 점검하다가 "오늘의 한 통"이 실제로 비어있는 걸 발견했다 — 2026-08-04

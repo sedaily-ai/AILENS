@@ -18,6 +18,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
+import boto3
+
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
@@ -29,11 +31,13 @@ SUBSCRIBERS_TABLE = os.environ.get("SUBSCRIBERS_TABLE", "sedaily-mbti-newsletter
 _GROUPS = {"NT", "NF", "ST", "SF"}
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# 모듈 레벨 — 콜드스타트 1회만 생성, 웜 컨테이너에서 재사용 (기존엔 매 요청마다
+# boto3.resource() 를 새로 만들고 있었다).
+_resource = boto3.resource("dynamodb")
+
 
 def _table():
-    import boto3  # lazy
-
-    return boto3.resource("dynamodb").Table(SUBSCRIBERS_TABLE)
+    return _resource.Table(SUBSCRIBERS_TABLE)
 
 
 def _parse(event: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any], Dict[str, str]]:
