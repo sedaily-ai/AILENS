@@ -41,11 +41,8 @@ pip3 install \
   python-dotenv==1.0.1 \
   requests==2.32.3 \
   beautifulsoup4==4.12.3 \
-  redis \
   boto3 \
   botocore \
-  opensearch-py==2.4.2 \
-  requests-aws4auth==1.3.1 \
   pg8000==1.31.2 \
   "PyJWT[crypto]==2.10.1" \
   -t lambda-build \

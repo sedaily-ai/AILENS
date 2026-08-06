@@ -7,6 +7,33 @@ service/frontend/CLAUDE.md / admin/CLAUDE.md 패턴 일관.
 
 ---
 
+## 2026-08-06: 콜드스타트 정리 — VPC 낭비 제거 + 안 쓰는 의존성 제거
+
+속도 감사 중 발견. 둘 다 코드 변경 없이 설정/빌드만 고침.
+
+- **VPC 분리**: `sedaily-mbti-v2-today-letters-dev`, `sedaily-mbti-v2-posts-dev`,
+  `sedaily-mbti-v2-front-page-dev` 3개가 `vpc-07a3a75110d6594aa`에 붙어있었다.
+  grep으로 재확인한 결과 앞의 두 개는 코드에 `PG_V2_HOST`/`psycopg`/`pg8000`
+  참조가 전혀 없다 — RDS를 아예 안 쓰면서 ENI 어태치 콜드스타트 비용만 지던
+  순수 낭비였다. `front-page-dev`는 `pgvector_v2_client`를 실제로 쓰지만 그
+  RDS 자체가 2026-08-04에 삭제돼 이미 500 에러 상태라 VPC가 있으나 없으나
+  기능은 안 됨 — 셋 다 `update-function-configuration --vpc-config
+  '{"SubnetIds":[],"SecurityGroupIds":[]}'`로 분리했다. `today-letters`/`posts`
+  라이브 200 재확인 완료.
+- **deploy.sh 의존성 트림**: `opensearch-py`, `requests-aws4auth`, `redis`
+  전부 grep으로 실제 import 0건 확인(OpenSearch는 2026-08-05 도메인 자체가
+  삭제됨). pip install 목록에서 제거 — 22개 함수 전부가 매 콜드스타트마다
+  안 쓰는 패키지를 로드하고 있었다. `pg8000`은 `pgvector_client.py`/
+  `pgvector_v2_client.py`/`admin/shared/pg_client.py`가 실사용 중이라 유지.
+
+### 다음에 볼 것 (이번엔 안 건드림)
+- 메모리 256MB 방치(5개 중 4개) — `deploy.sh`에 메모리 설정 로직 자체가 없음
+- `front_page.py`가 클라이언트를 매 요청마다 생성 후 `finally`에서 닫아
+  컨테이너 재사용 이점을 스스로 무효화, `subscribe.py`도 매 호출 boto3 재생성
+- API Gateway 캐싱 — HTTP API 타입이라 애초에 미지원(REST API 전환 필요)
+
+---
+
 ## 2026-08-05: v1/v2 폴더 구분 제거 + 자동생성 파이프라인 폐기
 
 한때 `service/backend/v2/`가 "차세대 재설계" 병렬 스택으로 따로 존재했다. 핵심이던
