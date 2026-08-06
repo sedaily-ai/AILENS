@@ -57,7 +57,7 @@ export function Character2D({ mood = "neutral", size = "medium", className = "" 
       {/* 고양이 캐릭터 이미지 - 단독으로 크게 */}
       <div className={`w-full h-full flex items-center justify-center ${animationClass}`}>
         {imageLoaded && (
-          <img
+          <img loading="lazy"
             src={imageSrc}
             alt={`고양이 - ${mood}`}
             className="w-full h-full object-contain drop-shadow-lg"

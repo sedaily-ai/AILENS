@@ -71,7 +71,7 @@ export function DnaContent() {
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy"
           src={editor.avatar}
           alt={editor.name}
           style={{

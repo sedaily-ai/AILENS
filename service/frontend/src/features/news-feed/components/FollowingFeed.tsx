@@ -204,7 +204,7 @@ export function FollowingFeed({ selectedGroup }: Props) {
                 style={{ background: l.accentBg }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <img loading="lazy"
                   src={TODAY_ARTICLE_THUMBNAILS[l.letterId] ?? l.thumbnailUrl ?? l.editorAvatar}
                   alt={l.title}
                   className="w-full h-full transition-transform duration-300 group-hover:scale-[1.04]"

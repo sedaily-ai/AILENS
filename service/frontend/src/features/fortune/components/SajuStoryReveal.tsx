@@ -59,7 +59,7 @@ export function SajuStoryReveal({ group, onChangeGroup, context, ohaengCounts }:
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy"
           src={p.avatar}
           alt={p.name}
           style={{

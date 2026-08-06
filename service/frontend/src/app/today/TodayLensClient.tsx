@@ -232,7 +232,7 @@ export function TodayLensClient() {
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
-                <img
+                <img loading="lazy"
                   src={recommendedEditor.avatar}
                   alt={recommendedEditor.name}
                   style={{
@@ -488,7 +488,7 @@ export function TodayLensClient() {
 
           {/* 페르소나 코멘트 — 사주 기반 */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 16, background: recommendedEditor.soft, borderRadius: 16 }}>
-            <img
+            <img loading="lazy"
               src={recommendedEditor.avatar}
               alt={recommendedEditor.name}
               style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
@@ -565,7 +565,7 @@ export function TodayLensClient() {
                     {article.title}
                   </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 10, borderTop: '1px solid #f3f4f6' }}>
-                    <img src={p.avatar} alt={p.name} style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} />
+                    <img loading="lazy" src={p.avatar} alt={p.name} style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} />
                     <span style={{ fontSize: 11, color: '#6b7280' }}>
                       {p.name} <span style={{ color: '#d1d5db' }}>·</span> {p.nickname}
                     </span>
@@ -704,7 +704,7 @@ export function TodayLensClient() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <img
+            <img loading="lazy"
               src={recommendedEditor.avatar}
               alt={recommendedEditor.name}
               style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}

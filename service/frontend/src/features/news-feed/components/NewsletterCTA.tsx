@@ -170,7 +170,7 @@ export function NewsletterCTA() {
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <img loading="lazy"
                   src={p.avatar}
                   alt=""
                   style={{
@@ -259,7 +259,7 @@ export function NewsletterCTA() {
         >
           <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <img loading="lazy"
               src={sampleLetter.persona.avatar}
               alt=""
               style={{

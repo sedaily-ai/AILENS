@@ -479,7 +479,7 @@ export function EditorsClient() {
                 )}
 
                 <div style={{ position: 'relative', marginTop: 16, marginBottom: 20 }}>
-                  <img
+                  <img loading="lazy"
                     src={ed.avatar}
                     alt={ed.name}
                     style={{
@@ -668,7 +668,7 @@ export function EditorsClient() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-              <img
+              <img loading="lazy"
                 src={modalEditor.avatar}
                 alt={modalEditor.name}
                 style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }}

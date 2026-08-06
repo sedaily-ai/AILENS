@@ -188,7 +188,7 @@ export function OnboardingPage({ onSelectGroup, onStartBriefing, onBack }: Props
             <div className={`absolute inset-0 bg-gradient-to-br ${editor.gradient}`} />
 
             {/* 이미지 - 진입 시 애니메이션 */}
-            <img
+            <img loading="lazy"
               src={editor.image}
               alt={editor.name}
               className={`h-[115%] w-auto object-cover object-top absolute bottom-0 left-1/2 -translate-x-1/2 z-[1] transition-all duration-700 ease-out ${

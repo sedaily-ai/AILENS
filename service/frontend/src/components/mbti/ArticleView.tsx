@@ -168,7 +168,7 @@ function ArticleImage({ url }: { url: string | null }) {
   if (!url) return null;
   return (
     <div className="mb-8 -mx-6 md:mx-0 md:rounded-2xl overflow-hidden">
-      <img src={url} alt="" className="w-full" />
+      <img loading="lazy" src={url} alt="" className="w-full" />
     </div>
   );
 }

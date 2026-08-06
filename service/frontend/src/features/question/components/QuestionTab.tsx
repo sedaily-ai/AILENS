@@ -152,7 +152,7 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
 
           <Reveal delay={250}>
             <div className="flex items-center gap-3 mt-8">
-              <img src={ed.avatar} alt={ed.name} className="w-10 h-10 rounded-full object-cover shadow-lg" />
+              <img loading="lazy" src={ed.avatar} alt={ed.name} className="w-10 h-10 rounded-full object-cover shadow-lg" />
               <div>
                 <p className="text-[14px] font-medium text-gray-800">{ed.name}</p>
                 <p className="text-[12px] text-gray-400">오늘의 브리핑</p>
@@ -260,7 +260,7 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
                     const isMine = type === selectedGroup;
                     return (
                       <div key={type} className={`flex-1 text-center py-3.5 rounded-2xl ${isMine ? 'bg-gray-900' : 'bg-gray-50'}`}>
-                        <img src={e.avatar} alt={e.name} className="w-7 h-7 rounded-full object-cover mx-auto mb-1.5" />
+                        <img loading="lazy" src={e.avatar} alt={e.name} className="w-7 h-7 rounded-full object-cover mx-auto mb-1.5" />
                         <p className={`text-[11px] font-medium ${isMine ? 'text-gray-400' : 'text-gray-500'}`}>{e.name}</p>
                         <p className={`text-[16px] font-bold tabular-nums ${isMine ? 'text-white' : 'text-gray-800'}`}>{rate}%</p>
                       </div>
@@ -354,7 +354,7 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
         {/* ── CTA ── */}
         <section className="py-20 flex flex-col items-center">
           <Reveal>
-            <img src={ed.avatar} alt={ed.name} className="w-20 h-20 rounded-full object-cover shadow-2xl mb-6" />
+            <img loading="lazy" src={ed.avatar} alt={ed.name} className="w-20 h-20 rounded-full object-cover shadow-2xl mb-6" />
           </Reveal>
           <Reveal delay={100}>
             <p className="text-[14px] text-gray-400 mb-8">{ed.name}이(가) 준비한 뉴스피드로 이동해요.</p>

@@ -15,7 +15,7 @@ export function LoginButton() {
     return (
       <div className="flex items-center gap-3">
         {user.picture && (
-          <img
+          <img loading="lazy"
             src={user.picture}
             alt=""
             className="w-8 h-8 rounded-full"

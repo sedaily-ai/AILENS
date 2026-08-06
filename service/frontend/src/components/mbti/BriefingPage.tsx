@@ -335,7 +335,7 @@ export function BriefingPage({ groupId, onFinish, onBack }: Props) {
             className={`w-40 h-40 rounded-full overflow-hidden border-4 ${isSpeaking ? 'animate-pulse' : ''}`}
             style={{ borderColor: editor.color }}
           >
-            <img
+            <img loading="lazy"
               src={editor.image}
               alt={editor.name}
               className="w-full h-full object-cover object-top"

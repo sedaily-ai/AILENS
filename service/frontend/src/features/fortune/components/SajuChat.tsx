@@ -162,7 +162,7 @@ export function SajuChat({ group, context }: Props) {
       style={{ boxShadow: '0 1px 3px rgba(17,24,39,0.04), 0 4px 16px rgba(17,24,39,0.04)' }}
     >
       <header className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-50">
-        <img src={p.avatar} alt={p.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
+        <img loading="lazy" src={p.avatar} alt={p.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
         <div className="flex-1">
           <p className="text-[11px] font-bold tracking-[0.08em]" style={{ color: c.ink }}>
             더 궁금한 것
@@ -203,7 +203,7 @@ export function SajuChat({ group, context }: Props) {
               className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {m.role === 'assistant' && (
-                <img src={p.avatar} alt={p.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-1" />
+                <img loading="lazy" src={p.avatar} alt={p.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-1" />
               )}
               <div
                 className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed whitespace-pre-wrap ${
@@ -221,7 +221,7 @@ export function SajuChat({ group, context }: Props) {
           ))}
           {loading && (
             <div className="flex gap-2.5">
-              <img src={p.avatar} alt={p.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-1" />
+              <img loading="lazy" src={p.avatar} alt={p.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-1" />
               <div className="px-3.5 py-2.5 bg-gray-50 rounded-2xl rounded-bl-md">
                 <div className="flex gap-1">
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

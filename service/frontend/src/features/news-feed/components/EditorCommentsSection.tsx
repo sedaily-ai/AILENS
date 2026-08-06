@@ -98,7 +98,7 @@ export function EditorCommentsSection({ otherLetters, letterDate }: Props) {
                   }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img loading="lazy" src={p.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span

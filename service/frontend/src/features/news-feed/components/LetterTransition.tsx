@@ -114,7 +114,7 @@ export function LetterTransition({ group }: { group: MbtiGroupId }) {
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <img loading="lazy"
                 src={p.char}
                 alt={p.name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}

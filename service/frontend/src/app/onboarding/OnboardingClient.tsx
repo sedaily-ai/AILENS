@@ -379,7 +379,7 @@ function PersonasSection() {
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <img loading="lazy"
                 src={p.avatar}
                 alt=""
                 style={{
@@ -629,7 +629,7 @@ function SampleLetterSection() {
               style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <img loading="lazy"
                 src={persona.avatar}
                 alt=""
                 style={{

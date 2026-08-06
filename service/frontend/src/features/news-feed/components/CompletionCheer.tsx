@@ -69,7 +69,7 @@ export function CompletionCheer({ selectedGroup }: Props) {
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={cheer.avatar} alt={cheer.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img loading="lazy" src={cheer.avatar} alt={cheer.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
       <p
         className="text-gray-700"

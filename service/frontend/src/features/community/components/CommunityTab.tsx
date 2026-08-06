@@ -311,7 +311,7 @@ export function CommunityTab({
                     <div className="p-6 pb-0">
                       <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-full overflow-hidden bg-gray-50 ring-2 ring-gray-100">
-                          <img src={editor.avatar} alt={editor.name} className="w-full h-full object-cover" />
+                          <img loading="lazy" src={editor.avatar} alt={editor.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -437,7 +437,7 @@ export function CommunityTab({
                                 }`}
                               >
                                 <div className="flex items-center gap-2 mb-2">
-                                  <img src={e.avatar} alt={e.name} className="w-6 h-6 rounded-full object-cover" />
+                                  <img loading="lazy" src={e.avatar} alt={e.name} className="w-6 h-6 rounded-full object-cover" />
                                   <span className="text-[12px] font-semibold text-gray-800">{e.name}</span>
                                   {isCurrent && (
                                     <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">나</span>
@@ -478,7 +478,7 @@ export function CommunityTab({
                           onClick={() => setSelectedUser({ userName: post.userName, userMbti: post.userMbti, userAvatar: post.userAvatar })}
                           className="w-11 h-11 rounded-full overflow-hidden bg-gray-50 ring-2 ring-gray-100 hover:ring-gray-300 transition-all cursor-pointer"
                         >
-                          <img
+                          <img loading="lazy"
                             src={post.userAvatar}
                             alt={post.userName}
                             className="w-full h-full object-cover"
@@ -628,7 +628,7 @@ export function CommunityTab({
                         <div className="px-6 py-4 border-b border-gray-100">
                           <div className="flex gap-3">
                             <div className="w-8 h-8 rounded-full overflow-hidden bg-amber-50 ring-1 ring-amber-100 flex-shrink-0">
-                              <img
+                              <img loading="lazy"
                                 src="https://api.dicebear.com/7.x/notionists/svg?seed=me&backgroundColor=fef3c7&scale=90"
                                 alt="나"
                                 className="w-full h-full object-cover"
@@ -665,7 +665,7 @@ export function CommunityTab({
                                 onClick={() => setSelectedUser({ userName: comment.userName, userMbti: comment.userMbti, userAvatar: comment.userAvatar })}
                                 className="w-8 h-8 rounded-full overflow-hidden bg-gray-50 ring-1 ring-gray-100 hover:ring-gray-300 flex-shrink-0 transition-all"
                               >
-                                <img
+                                <img loading="lazy"
                                   src={comment.userAvatar}
                                   alt={comment.userName}
                                   className="w-full h-full object-cover"
@@ -803,7 +803,7 @@ export function CommunityTab({
 
                           {/* 아바타 */}
                           <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-50 ring-1 ring-gray-100">
-                            <img
+                            <img loading="lazy"
                               src={profile.avatar}
                               alt={name}
                               className="w-full h-full object-cover"

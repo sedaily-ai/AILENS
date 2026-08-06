@@ -95,7 +95,7 @@ export function EditorDetailClient({ editor }: Props) {
         <section style={{ marginBottom: 48 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 24 }}>
             <div style={{ position: 'relative', marginBottom: 16 }}>
-              <img
+              <img loading="lazy"
                 src={editor.avatar}
                 alt={editor.name}
                 style={{
@@ -444,7 +444,7 @@ export function EditorDetailClient({ editor }: Props) {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <img src={editor.avatar} alt={editor.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} />
+              <img loading="lazy" src={editor.avatar} alt={editor.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} />
               <div>
                 <p style={{ fontSize: 12, color: editor.accentInk, fontWeight: 600 }}>{editor.role}</p>
                 <h3 style={{ fontSize: 17, fontWeight: 800, color: '#111827' }}>{editor.name} 뉴스레터</h3>

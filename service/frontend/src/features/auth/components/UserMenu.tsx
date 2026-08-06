@@ -50,7 +50,7 @@ export function UserMenu() {
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
         {user.picture ? (
-          <img
+          <img loading="lazy"
             src={user.picture}
             alt=""
             className="w-8 h-8 rounded-full border border-gray-200"

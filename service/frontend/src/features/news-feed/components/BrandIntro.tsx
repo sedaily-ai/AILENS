@@ -46,7 +46,7 @@ export function BrandIntro() {
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <img loading="lazy"
           src="/lens.png"
           alt="AI LENS — Let's Enjoy News in your Style / 뉴스를 내 스타일로"
           className="top-[47%] w-[300%] sm:w-[200%]"
@@ -103,7 +103,7 @@ export function BrandIntro() {
             {/* 4장 모두 2000x1000(2:1) 원본 그대로 — objectFit/고정박스 없음 →
                 크롭 원천 불가, 동일 비율이라 칸 높이 자동 일치. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <img loading="lazy"
               src={l.img}
               alt={l.alt}
               style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 16 }}

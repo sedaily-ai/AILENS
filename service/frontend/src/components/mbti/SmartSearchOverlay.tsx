@@ -630,7 +630,7 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
                       }`}
                     >
                       <div className="relative mb-3">
-                        <img
+                        <img loading="lazy"
                           src={p.avatar}
                           alt={p.name}
                           className={`w-16 h-16 rounded-full object-cover transition-transform ${
@@ -689,7 +689,7 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
                   className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {m.role === 'assistant' && (
-                    <img
+                    <img loading="lazy"
                       src={editor.avatar}
                       alt={editor.name}
                       className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-1"
@@ -743,7 +743,7 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
                         : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200/80'
                     }`}
                   >
-                    <img src={p.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                    <img loading="lazy" src={p.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
                     <span className="font-medium">{p.name}</span>
                   </button>
                 );
@@ -754,7 +754,7 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
           {mode === 'text' ? (
             <form onSubmit={handleSubmit}>
               <div className="flex items-end gap-2 rounded-3xl bg-gray-100/80 px-4 py-2.5 shadow-[0_2px_12px_-6px_rgba(0,0,0,0.1)] transition-all focus-within:bg-white focus-within:shadow-[0_8px_24px_-10px_rgba(0,0,0,0.14)]">
-                <img
+                <img loading="lazy"
                   src={editor.avatar}
                   alt={editor.name}
                   className="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-1"
