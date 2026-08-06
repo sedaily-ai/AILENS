@@ -7,6 +7,7 @@ import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
 import { UserMenu } from '@/features/auth';
 import { CalendarMonthView } from '@/features/calendar/components/CalendarMonthView';
 import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
+import { TIMELINE_HREF } from '@/shared/lib/headerTabs';
 
 export default function CalendarPage() {
   const [showSearch, setShowSearch] = useState(false);
@@ -24,7 +25,7 @@ export default function CalendarPage() {
           { key: "feed", label: "레터", href: "/", active: true },
           { key: "editors", label: "에디터", href: "/editors" },
           { key: "fortune", label: "사주", href: "/fortune" },
-          { key: "timeline", label: "타임라인", href: "/timemachine" },
+          { key: "timeline", label: "타임라인", href: TIMELINE_HREF },
           { key: "games", label: "게임", href: "/games" },
           { key: "community", label: "커뮤니티", href: "/?tab=community" },
           { key: "archive", label: "내 서랍", href: "/?tab=archive" },

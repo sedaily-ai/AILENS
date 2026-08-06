@@ -1,5 +1,12 @@
 .DS_Store
 
+# 환경변수 (비밀값) — 어느 깊이에서든 잡히게 경로 접두사 없이 적는다.
+# service/backend/.env 에 BIGKINDS_API_KEY, .env.v2 에 PG_V2_PASSWORD 가 들어간다.
+# (프론트 쪽 .env* 는 service/frontend/.gitignore 가 따로 덮는다)
+.env
+.env.*
+!.env.example
+
 # Python
 __pycache__/
 *.pyc
