@@ -1,53 +1,38 @@
 """
 Archive Handler — "내 서랍" (My Drawer) API
 =============================================
-Manages user-archived sentences with vector similarity search.
+Manages user-archived sentences.
 
 Storage:
   - Personal DB (DynamoDB): sentence metadata + CRUD
-  - pgvector (PostgreSQL): sentence embeddings for similarity search
-  - Bedrock Titan Embeddings: embedding generation
 
 Routes:
   POST   /api/archive          — Save a sentence
   GET    /api/archive          — List archived sentences
   DELETE /api/archive/{id}     — Delete a sentence
-  POST   /api/archive/similar  — Find similar sentences
 
 Replaces the frontend's Mock data (React state, 8 sample sentences).
+
+2026-08-06: pgvector 유사 문장 검색("similar") 제거 — v1 RDS
+(sedaily-mbti-pgvector-dev)가 계정에 더 이상 존재하지 않는다(삭제 시점 불명,
+재확인 결과 없음). PG_PASSWORD 도 안 잡혀있어 이 기능은 이미 조용히 비활성
+상태였고(vector_status 항상 'skipped'), 실호출도 30일 0건이었다 — 재구축
+필요해지면 그때 다시 설계.
 """
 import base64
 import json
 import logging
 from typing import Dict, Any, Optional
 
-from config import settings
 from config.constants import CORS_HEADERS
 from models.personal import ArchivedSentence
 from repositories.personal_repository import get_personal_repository
-from clients.embedding_client import EmbeddingClient, EmbeddingError
 from core.decorators import lambda_handler as handler_decorator
 from core.auth import get_authenticated_user_id, try_get_authenticated_user_id
 from core.exceptions import AuthenticationError
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-# ── pgvector (lazy, non-fatal) ───────────────────────────────────────────────
-
-def _get_pgvector():
-    """Create pgvector client if configured. Returns None otherwise."""
-    if not settings.pg_password:
-        return None
-    from clients.pgvector_client import PgVectorClient
-    return PgVectorClient(
-        host=settings.pg_host,
-        port=settings.pg_port,
-        database=settings.pg_database,
-        user=settings.pg_user,
-        password=settings.pg_password,
-    )
 
 
 # ── Route handlers ───────────────────────────────────────────────────────────
@@ -100,45 +85,13 @@ async def _handle_save(body: Dict[str, Any]) -> Dict:
     if not saved:
         return _error(500, '문장 저장에 실패했습니다.')
 
-    # 2. Generate embedding + save to pgvector (non-fatal)
-    vector_status = 'skipped'
-    pg = _get_pgvector()
-
-    if pg:
-        try:
-            embed_client = EmbeddingClient()
-            embedding = embed_client.embed_text(text)
-
-            pg.insert_archive_vector(
-                user_id=user_id,
-                sentence_text=text,
-                article_id=article_id,
-                embedding=embedding,
-            )
-            vector_status = 'indexed'
-
-        except EmbeddingError as e:
-            logger.warning(f"Embedding failed for archive (non-fatal): {e}")
-            vector_status = 'embedding_failed'
-
-        except Exception as e:
-            logger.warning(f"pgvector insert failed for archive (non-fatal): {e}")
-            vector_status = 'pgvector_failed'
-
-        finally:
-            try:
-                pg.close()
-            except Exception:
-                pass
-
-    logger.info(
-        f"Archive saved: user={user_id} article={article_id} "
-        f"vector={vector_status}"
-    )
+    logger.info(f"Archive saved: user={user_id} article={article_id}")
 
     return _success({
         'sentence': sentence.to_api(),
-        'vector_status': vector_status,
+        # 프론트 타입(archiveApi.ts)이 이 필드를 필수로 기대한다 — pgvector
+        # 유사문장 검색 제거(2026-08-06) 이후 항상 'disabled' 고정값.
+        'vector_status': 'disabled',
     }, status_code=201)
 
 
@@ -221,61 +174,6 @@ async def _handle_delete(
     # 실제로 지우려면 insert 시점에 row UUID를 같이 저장하는 스키마 변경이 필요.
 
     return _success({'deleted': True, 'archive_id': archive_id})
-
-
-async def _handle_similar(body: Dict[str, Any]) -> Dict:
-    """
-    POST /api/archive/similar — Find similar archived sentences.
-
-    Body:
-      {
-        "user_id": "abc123",   (optional — scope to user's own archive)
-        "text": "반도체 수출이 호조를 보이고 있다",
-        "limit": 10
-      }
-
-    Embeds the query text and performs pgvector cosine similarity search.
-    """
-    text = body.get('text', '').strip()
-    if not text:
-        return _error(400, 'text is required')
-
-    user_id = body.get('user_id')
-    limit = int(body.get('limit', 10))
-
-    pg = _get_pgvector()
-    if not pg:
-        return _error(503, '유사 문장 검색 서비스가 설정되지 않았습니다.')
-
-    try:
-        embed_client = EmbeddingClient()
-        embedding = embed_client.embed_text(text)
-
-        results = pg.search_similar_sentences(
-            embedding=embedding,
-            user_id=user_id,
-            limit=limit,
-        )
-
-        return _success({
-            'similar_sentences': results,
-            'count': len(results),
-            'query_text': text[:100],
-        })
-
-    except EmbeddingError as e:
-        logger.error(f"Embedding failed for similarity search: {e}")
-        return _error(500, '임베딩 생성에 실패했습니다.')
-
-    except Exception as e:
-        logger.error(f"Similarity search failed: {e}", exc_info=True)
-        return _error(500, '유사 문장 검색에 실패했습니다.')
-
-    finally:
-        try:
-            pg.close()
-        except Exception:
-            pass
 
 
 # ── Response helpers ─────────────────────────────────────────────────────────
@@ -367,9 +265,10 @@ async def lambda_handler(event: dict, context) -> dict:
         if anon_user_id:
             params['user_id'] = anon_user_id
 
-    # POST /api/archive/similar
-    if '/similar' in path and method == 'POST':
-        return await _handle_similar(body)
+    # POST /api/archive/similar — 2026-08-06 제거(pgvector RDS 없음). 저장으로
+    # 잘못 떨어지지 않도록 명시적으로 막는다.
+    if '/similar' in path:
+        return _error(410, '유사 문장 검색 기능은 더 이상 제공되지 않습니다.')
 
     # POST /api/archive — Save
     if method == 'POST':

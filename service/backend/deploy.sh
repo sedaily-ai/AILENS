@@ -134,8 +134,10 @@ API_V2_FUNCTIONS=(
   "sedaily-mbti-v2-health-dev"
   "sedaily-mbti-v2-today-letters-dev"  # 오늘의 한 통 GET API (handlers/today_letters.py)
   "sedaily-mbti-v2-subscribe-dev"      # 구독/수신거부 (handlers/subscribe.py)
-  "sedaily-mbti-v2-front-page-dev"     # 지면 1면 (handlers/front_page.py) — ⚠️ pgvector RDS
-                                        # 삭제로 현재 500 에러, 복구 여부 별도 결정 대기
+  # sedaily-mbti-v2-front-page-dev(지면 1면)는 2026-08-06 소스 삭제 —
+  # pgvector RDS(v1·v2 둘 다) 계정에서 완전히 사라짐 확인, 재구축 필요해지면
+  # 그때 다시 설계. AWS Lambda 함수/API Gateway 라우트 자체는 수동 정리 전까지
+  # 남아있을 수 있음(더 이상 이 배포 대상에서 코드 업데이트 안 됨).
   "sedaily-mbti-v2-posts-dev"          # CMS 글 공개 조회 (handlers/cms_posts_public.py)
 )
 

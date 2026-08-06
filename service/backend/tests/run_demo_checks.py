@@ -137,12 +137,6 @@ def main():
     else:
         warn('OpenSearch: not configured (RAG fallback to DynamoDB)')
 
-    # pgvector
-    if settings.pg_password:
-        ok(f'pgvector: configured ({settings.pg_host})')
-    else:
-        warn('pgvector: not configured (similarity search unavailable)')
-
     # ── 2. Data ──────────────────────────────────────────────────────
     print('\n── 데이터 (Data) ──\n')
 

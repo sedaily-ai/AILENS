@@ -68,14 +68,6 @@ class Settings:
     opensearch_endpoint: str = ''
     opensearch_index: str = OPENSEARCH_INDEX_DEFAULT
 
-    # ── PostgreSQL (pgvector) ────────────────────────────────────────────────
-
-    pg_host: str = ''
-    pg_port: int = 5432
-    pg_database: str = 'ailens'
-    pg_user: str = 'ailens'
-    pg_password: str = ''
-
     # ── Redis Cache ──────────────────────────────────────────────────────────
 
     redis_host: str = 'localhost'
@@ -140,13 +132,6 @@ class Settings:
             # OpenSearch
             opensearch_endpoint=os.getenv('OPENSEARCH_ENDPOINT', ''),
             opensearch_index=os.getenv('OPENSEARCH_INDEX', OPENSEARCH_INDEX_DEFAULT),
-
-            # PostgreSQL (pgvector)
-            pg_host=os.getenv('PG_HOST', ''),
-            pg_port=int(os.getenv('PG_PORT', '5432')),
-            pg_database=os.getenv('PG_DATABASE', 'ailens'),
-            pg_user=os.getenv('PG_USER', 'ailens'),
-            pg_password=os.getenv('PG_PASSWORD', ''),
 
             # Redis
             redis_host=os.getenv('REDIS_HOST', 'localhost'),

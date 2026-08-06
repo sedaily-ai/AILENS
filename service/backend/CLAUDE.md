@@ -7,6 +7,57 @@ service/frontend/CLAUDE.md / admin/CLAUDE.md 패턴 일관.
 
 ---
 
+## 2026-08-06: pgvector 전면 제거 — v1·v2 RDS 둘 다 계정에 없음
+
+"pgvector 어디 쓰냐"는 질문에서 시작. 확인해보니 `aws rds describe-db-instances`
+결과 살아있는 postgres 인스턴스가 `ensedaily-db`(영문사이트, AI LENS와 무관)
+하나뿐 — **v1(`sedaily-mbti-pgvector-dev`)도 v2(`sedaily-mbti-pgvector-v2-dev`,
+2026-08-04 삭제는 이미 알고 있었음)도 계정에 없다.** v1은 대신 라이브 Lambda에
+`PG_PASSWORD`가 아예 안 잡혀있어 조용히 비활성 상태였다(에러 없이
+`vector_status='skipped'`). 두 기능 다 "복구 안 함, 필요해지면 재설계"로
+결정하고 전면 삭제.
+
+**삭제한 파일**: `clients/pgvector_client.py`(v1), `clients/pgvector_v2_client.py`(v2),
+`clients/s3_article_v2_client.py`(front-page 전용, 다른 호출자 없음 확인),
+`handlers/front_page.py`(지면 1면), `admin/shared/pg_client.py`(2026-08-04
+DynamoDB 이관 이후 importer 0명 — 이미 고아였음), 대응 테스트 4개
+(`test_pgvector.py`, `test_pgvector_v2_client.py`, `test_front_page.py`,
+`test_s3_article_v2_client.py`).
+
+**정리한 코드**:
+- `handlers/archive_handler.py`("내 서랍") — pgvector 유사문장 검색
+  (`POST /api/archive/similar`, 30일 실호출 0건) 제거, 저장 경로는 DynamoDB만
+  남기고 단순화. `/similar` 경로는 410로 명시 응답(저장 핸들러로 잘못 안 새게).
+- `config/settings.py` — `pg_host`/`pg_port`/`pg_database`/`pg_user`/`pg_password`
+  (v1 전용) 필드 제거.
+- `tests/conftest.py` — v2 pgvector 세션 정리 fixture(`_cleanup_test_prefixes`)
+  + `_TEST_PREFIXES` 제거. 참조하던 테스트 파일들(`test_core1_collector.py` 등)은
+  이미 예전 라운드에서 다 삭제돼 있었다.
+- `tests/test_cms_posts_public.py` — **부수 발견**: 이 테스트가 2026-08-04
+  DynamoDB 이관 이전 버전을 기대하며 `PgVectorV2Client`를 monkeypatch하고
+  있었다(실제로는 `posts_client` = `cms_posts_ddb_client`를 씀) — 9개 테스트가
+  전부 `AttributeError`로 조용히 깨져 있었고, 지난 여러 라운드 커밋에서 "9개
+  실패는 무관한 사전 존재 실패"로 계속 넘겨온 바로 그것이었다. `posts_client`를
+  monkeypatch하도록 다시 써서 8/8 통과(연결-close 개념 자체가 없는 DynamoDB라
+  관련 테스트 1개는 제거).
+- `deploy.sh` — `API_V2_FUNCTIONS`에서 `sedaily-mbti-v2-front-page-dev` 제거.
+  AWS Lambda 함수·API Gateway 라우트 자체는 수동 정리 전까지 남아있을 수 있음
+  (기존 decommission 패턴과 동일 — 소스만 뺌).
+
+**검증**: 전체 `.py` 문법 체크·import 통과, `pytest tests/ -m "not integration"`
+106 passed(에러 6건은 전부 무관 — 폐기된 v1 Step Functions 파이프라인용
+`test_pipeline.py`와 `news_id` CLI 픽스처를 기대하는 수동 스크립트
+`test_regression.py`, pytest 컨벤션이 아닌 독립 실행 스크립트라 pgvector
+제거와 무관).
+
+**다음에 볼 것 (이번엔 안 건드림)**: `clients/embedding_client.py` — archive
+유사문장 검색이 유일한 프로덕션 호출자였는데 그게 없어져서 지금 프로덕션
+호출자가 0명이다. 다만 `test_performance.py`/`test_full_integration.py`가
+더 넓은 통합 흐름 안에서 부르고 있어 그 테스트들 성격부터 확인 필요 — 이번
+라운드 범위 밖으로 남김.
+
+---
+
 ## 2026-08-06: 콜드스타트 정리 — VPC 낭비 제거 + 안 쓰는 의존성 제거
 
 속도 감사 중 발견. 둘 다 코드 변경 없이 설정/빌드만 고침.
