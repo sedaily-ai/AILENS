@@ -1,8 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { CoverImageField } from "@/components/CoverImageField";
+import { uploadImage, ImageUploadError } from "@/lib/uploadImage";
+import { useToast } from "@/components/Toast";
 import type {
+  CmsImage,
   CmsKeyword,
   CmsPostBody,
   CmsPostInput,
@@ -40,13 +44,134 @@ interface Props {
    * (■/[라벨]/Q.A./![]()) 형식을 그대로 유지해야 해서 plain 텍스트 에디터를
    * 쓰고, 사람이 처음부터 쓰는 CMS 글만 리치텍스트(Tiptap, body_html)로 간다.
    */
-  mode?: "post" | "letter" | "trend_card";
+  mode?: "post" | "letter" | "trend_card" | "webtoon" | "video";
 }
 
 const SECTION_LABEL: Record<"trend" | "column", string> = {
   trend: "요즘 화제의 경제 이슈",
   column: "이번 주 인기 칼럼",
 };
+
+// 영상 콘텐츠(2026-08-06) — 썸네일 미리보기용. watch?v=, youtu.be/, embed/
+// 세 형태 전부 지원. 프론트 shared/lib/videoEmbed.ts 와 로직 동일(중복이지만
+// admin과 frontend가 별도 빌드라 공유 불가 — cms_posts_ddb_client.py 같은
+// 이유로 이미 이 저장소 전체가 감수하는 패턴).
+function extractYouTubeId(url: string): string | null {
+  const m = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+  );
+  return m ? m[1] : null;
+}
+
+// 웹툰 파일럿(2026-08-06) — 컷 이미지+캡션 나열. 새 필드 없이 기존
+// body_inline.images(url+caption)를 컷 목록으로 그대로 쓴다(백엔드
+// _shape_webtoon 과 1:1). 그림 자체는 GPT 등 외부 생성 후 여기서 업로드만.
+function WebtoonPanelsEditor({
+  panels,
+  onChange,
+}: {
+  panels: CmsImage[];
+  onChange: (next: CmsImage[]) => void;
+}) {
+  const toast = useToast();
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
+  const doUpload = async (file: File): Promise<string | null> => {
+    try {
+      return await uploadImage(file);
+    } catch (err) {
+      toast.show(err instanceof ImageUploadError ? err.message : "업로드 실패", "error");
+      return null;
+    }
+  };
+
+  const addPanel = async (file: File) => {
+    setUploadingIndex(panels.length);
+    const url = await doUpload(file);
+    if (url) onChange([...panels, { url, caption: "" }]);
+    setUploadingIndex(null);
+  };
+
+  const replacePanel = async (index: number, file: File) => {
+    setUploadingIndex(index);
+    const url = await doUpload(file);
+    if (url) onChange(panels.map((p, i) => (i === index ? { ...p, url } : p)));
+    setUploadingIndex(null);
+  };
+
+  const removePanel = (index: number) => onChange(panels.filter((_, i) => i !== index));
+
+  const move = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= panels.length) return;
+    const next = [...panels];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  };
+
+  const setCaption = (index: number, caption: string) =>
+    onChange(panels.map((p, i) => (i === index ? { ...p, caption } : p)));
+
+  return (
+    <div className="space-y-3">
+      {panels.map((p, i) => (
+        <div key={i} className="ui-card rounded-xl p-3 flex gap-3">
+          <div className="shrink-0 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본 URL */}
+            <img src={p.url} alt="" className="h-28 w-28 rounded-lg object-cover bg-gray-100" />
+            <label className="mt-1 block text-[11px] font-medium text-blue-700 cursor-pointer">
+              {uploadingIndex === i ? "업로드 중..." : "교체"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void replacePanel(i, file);
+                }}
+              />
+            </label>
+          </div>
+          <div className="flex-1 space-y-2 min-w-0">
+            <textarea
+              value={p.caption ?? ""}
+              onChange={(e) => setCaption(i, e.target.value)}
+              rows={3}
+              placeholder={`컷 ${i + 1} 대사/캡션 (선택)`}
+              className="ui-input w-full rounded-lg px-3 py-2 text-sm leading-relaxed"
+            />
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="hover:text-gray-900 disabled:opacity-30 cursor-pointer disabled:cursor-default">
+                ↑ 위로
+              </button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === panels.length - 1} className="hover:text-gray-900 disabled:opacity-30 cursor-pointer disabled:cursor-default">
+                ↓ 아래로
+              </button>
+              <button type="button" onClick={() => removePanel(i)} className="ml-auto text-red-500 hover:text-red-700 cursor-pointer">
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <label className="flex items-center justify-center rounded-xl border border-dashed border-gray-300 py-6 text-sm text-gray-500 cursor-pointer hover:bg-gray-50">
+        {uploadingIndex === panels.length ? "업로드 중..." : "+ 컷 추가 (이미지 업로드)"}
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void addPanel(file);
+          }}
+        />
+      </label>
+    </div>
+  );
+}
 
 // 문단마다 박스를 늘어놓던 옛 UI 대신, 빈 줄로 문단을 가르는 텍스트영역
 // 하나로 — AI 레터 본문(body[] + ■/[라벨]/Q.A./![]() 마커)은 이 plain
@@ -265,6 +390,20 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
                 ))}
               </select>
             </label>
+            <span className="h-3.5 w-px bg-gray-300" />
+            <label className="flex items-center gap-1.5 text-gray-400">
+              /letters 태그
+              <span className="ml-0.5 font-normal text-gray-300">(선택)</span>
+              <select
+                value={body.section ?? ""}
+                onChange={(e) => patchBody({ section: (e.target.value || undefined) as "trend" | "column" | undefined })}
+                className="cursor-pointer border-0 bg-transparent font-medium text-gray-700 outline-none"
+              >
+                <option value="">일반 레터</option>
+                <option value="trend">트렌드</option>
+                <option value="column">인기 칼럼</option>
+              </select>
+            </label>
           </div>
 
           <div className="border-t border-gray-100">
@@ -353,6 +492,140 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
               rows={3}
               placeholder="카드에 들어갈 두어 문장 요약"
               className="ui-input w-full rounded-lg px-3 py-2.5 text-sm leading-relaxed"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // mode="webtoon" — 연재 웹툰 파일럿(2026-08-06). 컷(이미지+캡션)을 순서대로
+  // 쌓는 게 전부라 트렌드 카드보다도 가볍다. 그림은 GPT 등으로 미리 만들어와
+  // 업로드만 하면 된다.
+  if (mode === "webtoon") {
+    return (
+      <div className="max-w-[640px] mx-auto space-y-4">
+        <div className="ui-card rounded-2xl p-5 space-y-4">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+            <label className="flex items-center gap-1.5 text-gray-400">
+              발행일
+              <input
+                type="date"
+                value={value.publish_date ?? ""}
+                onChange={(e) => patch({ publish_date: e.target.value })}
+                className="border-0 bg-transparent font-medium text-gray-700 outline-none"
+              />
+            </label>
+          </div>
+
+          <div>
+            <label className={LABEL}>제목 *</label>
+            <input
+              value={value.headline ?? ""}
+              onChange={(e) => patch({ headline: e.target.value })}
+              placeholder="예: 관세전쟁 1화 — 협상 테이블의 그 남자"
+              className="ui-input w-full rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className={LABEL}>줄거리 요약</label>
+            <textarea
+              value={value.subtitle ?? ""}
+              onChange={(e) => patch({ subtitle: e.target.value })}
+              rows={2}
+              placeholder="목록 카드에 들어갈 한두 문장"
+              className="ui-input w-full rounded-lg px-3 py-2.5 text-sm leading-relaxed"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className={LABEL}>
+            컷
+            <span className="ml-2 font-normal text-gray-500">
+              위에서 아래로 순서대로 보여집니다. 컷마다 캡션(대사)을 달 수 있어요.
+            </span>
+          </label>
+          <WebtoonPanelsEditor
+            panels={body.images}
+            onChange={(v) => patchBody({ images: v })}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // mode="video" — 영상 콘텐츠(2026-08-06). URL 하나만 있으면 되는 가장 가벼운
+  // 포맷 — YouTube 링크를 그대로 붙여넣으면 프론트가 임베드로 바꾼다.
+  if (mode === "video") {
+    const videoId = extractYouTubeId(body.video_url ?? "");
+    return (
+      <div className="max-w-[640px] mx-auto space-y-4">
+        <div className="ui-card rounded-2xl p-5 space-y-4">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+            <label className="flex items-center gap-1.5 text-gray-400">
+              발행일
+              <input
+                type="date"
+                value={value.publish_date ?? ""}
+                onChange={(e) => patch({ publish_date: e.target.value })}
+                className="border-0 bg-transparent font-medium text-gray-700 outline-none"
+              />
+            </label>
+          </div>
+
+          <div>
+            <label className={LABEL}>제목 *</label>
+            <input
+              value={value.headline ?? ""}
+              onChange={(e) => patch({ headline: e.target.value })}
+              placeholder="예: 3분으로 보는 이번 주 금리 이슈"
+              className="ui-input w-full rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className={LABEL}>영상 URL</label>
+            <input
+              value={body.video_url ?? ""}
+              onChange={(e) => patchBody({ video_url: e.target.value })}
+              placeholder="https://www.youtube.com/watch?v=... 또는 youtu.be/..."
+              className="ui-input w-full rounded-lg px-3 py-2 text-sm"
+            />
+            {videoId ? (
+              <div className="mt-3 aspect-video w-full max-w-[360px] overflow-hidden rounded-lg bg-black">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : body.video_url ? (
+              <p className="mt-2 text-xs text-amber-600">YouTube 링크가 아니면 썸네일 미리보기가 안 뜰 수 있어요 — 저장은 그대로 됩니다.</p>
+            ) : null}
+          </div>
+
+          <div>
+            <label className={LABEL}>설명</label>
+            <textarea
+              value={value.subtitle ?? ""}
+              onChange={(e) => patch({ subtitle: e.target.value })}
+              rows={2}
+              placeholder="카드에 들어갈 한두 문장"
+              className="ui-input w-full rounded-lg px-3 py-2.5 text-sm leading-relaxed"
+            />
+          </div>
+
+          <div>
+            <label className={LABEL}>
+              커버 이미지
+              <span className="ml-2 font-normal text-gray-500">비워두면 YouTube 썸네일을 자동으로 씁니다</span>
+            </label>
+            <CoverImageField
+              value={value.cover_image_url ?? null}
+              onChange={(url) => patch({ cover_image_url: url })}
             />
           </div>
         </div>

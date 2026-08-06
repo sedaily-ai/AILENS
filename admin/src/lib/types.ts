@@ -85,7 +85,7 @@ export interface NewsletterSubscriber {
 
 // --- CMS posts (backend/admin/routes/posts.py 와 1:1) ---
 
-export type CmsChannel = "letters" | "paper" | "feed" | "trend_card";
+export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video";
 export type CmsCardSection = "trend" | "column";
 export type CmsStatus = "draft" | "published" | "archived";
 export type MbtiGroup = "NT" | "NF" | "ST" | "SF";
@@ -114,6 +114,8 @@ export interface CmsPostBody {
   // _shape_trend_card 참조). category 는 카드에 붙는 짧은 라벨(예: 증시, 투자 인사이트).
   section?: CmsCardSection;
   category?: string;
+  // channels: ["video"] 글만 씀 — YouTube 등 외부 임베드 URL 원문 그대로.
+  video_url?: string;
 }
 
 export interface CmsPost {

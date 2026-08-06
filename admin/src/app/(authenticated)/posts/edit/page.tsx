@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { PostForm, splitRichBody } from "@/components/PostForm";
-import { ErrorNote, FormSkeleton } from "@/components/Feedback";
+import { ErrorNote } from "@/components/Feedback";
 import type { CmsPost, CmsPostInput } from "@/lib/types";
 
 function todayKST(): string {
@@ -59,12 +59,16 @@ function PostEditPage() {
   const [busy, setBusy] = useState(false);
   // 새 글일 때만 고를 수 있다 — 저장된 글의 종류를 나중에 바꾸면 이미 발행된
   // 카드/레터가 엉뚱한 채널로 옮겨간다. 기존 글은 draft.channels 로 그대로 추론.
-  const [newKind, setNewKind] = useState<"letters" | "trend_card">("letters");
-  const kind: "letters" | "trend_card" = isNew
+  const [newKind, setNewKind] = useState<"letters" | "trend_card" | "webtoon" | "video">("letters");
+  const kind: "letters" | "trend_card" | "webtoon" | "video" = isNew
     ? newKind
     : draft.channels?.includes("trend_card")
       ? "trend_card"
-      : "letters";
+      : draft.channels?.includes("webtoon")
+        ? "webtoon"
+        : draft.channels?.includes("video")
+          ? "video"
+          : "letters";
 
   useEffect(() => {
     if (!id) return;
@@ -124,6 +128,29 @@ function PostEditPage() {
               category: draft.body_inline?.category ?? "",
             },
           }
+        : kind === "webtoon"
+        ? {
+            ...draft,
+            channels: ["webtoon"],
+            body_inline: {
+              body: [],
+              key_points: [],
+              keywords: [],
+              images: draft.body_inline?.images ?? [],
+            },
+          }
+        : kind === "video"
+        ? {
+            ...draft,
+            channels: ["video"],
+            body_inline: {
+              body: [],
+              key_points: [],
+              keywords: [],
+              images: [],
+              video_url: draft.body_inline?.video_url ?? "",
+            },
+          }
         : (() => {
             // "핵심 정리"/"키워드"/"닫는 줄" 소제목으로 나눠 쓴 본문을 여기서
             // 실제 필드로 갈라낸다 — PostForm 은 mode="post" 일 때 리치텍스트
@@ -138,6 +165,9 @@ function PostEditPage() {
                 key_points: split.key_points,
                 keywords: split.keywords,
                 images: draft.body_inline?.images ?? [],
+                // /letters 아카이브 필터 태그(트렌드/인기 칼럼) — trend_card 채널
+                // 전용이 아니라 일반 레터도 달 수 있다(PostForm mode="post").
+                section: draft.body_inline?.section,
               },
               closing_line: split.closing_line || draft.closing_line,
             };
@@ -262,6 +292,8 @@ function PostEditPage() {
             [
               { key: "letters", label: "레터 글" },
               { key: "trend_card", label: "트렌드·칼럼 카드" },
+              { key: "webtoon", label: "웹툰 (파일럿)" },
+              { key: "video", label: "영상" },
             ] as const
           ).map((k) => (
             <button
@@ -282,15 +314,18 @@ function PostEditPage() {
         </div>
       )}
 
-      {/* 새 글은 즉시 폼을 띄운다. 기존 글은 불러오는 동안 스켈레톤 —
+      {/* 새 글은 즉시 폼을 띄운다. 기존 글은 불러오는 동안 아무것도 안 그린다 —
+          스켈레톤이 전환을 오히려 느리게 느껴지게 한다는 피드백으로 제거.
           빈 폼을 보여줬다가 값이 뒤늦게 채워지면 사용자가 이미 타이핑을
-          시작했을 수 있다. */}
-      {isNew || saved ? (
+          시작했을 수 있어 그냥 비워둔다(값 도착하면 바로 폼 등장). */}
+      {(isNew || saved) && (
         <div className="ui-enter">
-          <PostForm value={draft} onChange={setDraft} mode={kind === "trend_card" ? "trend_card" : "post"} />
+          <PostForm
+            value={draft}
+            onChange={setDraft}
+            mode={kind === "trend_card" || kind === "webtoon" || kind === "video" ? kind : "post"}
+          />
         </div>
-      ) : (
-        <FormSkeleton />
       )}
     </div>
   );

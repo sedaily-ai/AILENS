@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/adminClient";
-import { EmptyState, ErrorNote, TableSkeleton } from "@/components/Feedback";
+import { EmptyState, ErrorNote } from "@/components/Feedback";
 import type { CmsPost, CmsStatus } from "@/lib/types";
 
 const STATUS_LABEL: Record<CmsStatus, string> = {
@@ -31,6 +31,8 @@ const CHANNEL_FILTERS: Array<{ key: string; label: string }> = [
   { key: "", label: "전체" },
   { key: "letters", label: "레터" },
   { key: "trend_card", label: "트렌드·칼럼" },
+  { key: "webtoon", label: "웹툰" },
+  { key: "video", label: "영상" },
 ];
 
 const SECTION_LABEL: Record<string, string> = {
@@ -38,18 +40,15 @@ const SECTION_LABEL: Record<string, string> = {
   column: "인기 칼럼",
 };
 
-// trend_card 는 channels 하나로는 "경제 이슈"/"인기 칼럼"이 안 갈려서
-// body_inline.section 을 붙여 보여준다 — 목록에서 뭐가 뭔지 구분하기 위함.
+// channels 하나로는 "경제 이슈"/"인기 칼럼" 태그가 안 보여서 옆에 같이 표시한다
+// — trend_card 채널 글뿐 아니라, letters 채널에 태그만 붙인 글도 해당.
 function channelLabel(p: CmsPost): string {
   if (!p.channels.length) return "-";
-  return p.channels
-    .map((c) => {
-      if (c === "trend_card" && p.body_inline.section) {
-        return `trend_card · ${SECTION_LABEL[p.body_inline.section] ?? p.body_inline.section}`;
-      }
-      return c;
-    })
-    .join(", ");
+  const base = p.channels.join(", ");
+  if (p.body_inline.section) {
+    return `${base} · ${SECTION_LABEL[p.body_inline.section] ?? p.body_inline.section}`;
+  }
+  return base;
 }
 
 const PAGE_SIZE = 15;
@@ -70,13 +69,22 @@ export default function PostsPage() {
       limit: 200,
     };
     if (status) params.status = status;
-    if (channel) params.channel = channel;
     if (date) params.date = date;
+    // "트렌드·칼럼" 필터는 trend_card 채널뿐 아니라, letters 채널에 태그만 붙인
+    // 글(PostForm mode="post" 의 /letters 태그 selector)도 잡아야 한다 —
+    // channel 서버 필터로는 안 갈리니 여기선 안 넘기고 클라이언트에서 거른다.
+    if (channel && channel !== "trend_card") params.channel = channel;
     adminApi
       .listPosts(params)
       .then((r) => {
         if (cancelled) return;
-        setPosts(r.posts);
+        const filtered =
+          channel === "trend_card"
+            ? r.posts.filter(
+                (p) => p.channels.includes("trend_card") || Boolean(p.body_inline.section),
+              )
+            : r.posts;
+        setPosts(filtered);
         setError(null);
       })
       .catch((err) => {
@@ -192,7 +200,6 @@ export default function PostsPage() {
       </div>
 
       {error && <ErrorNote message={error} />}
-      {!posts && !error && <TableSkeleton rows={5} cols={4} />}
 
       {posts && posts.length === 0 && (
         <EmptyState
