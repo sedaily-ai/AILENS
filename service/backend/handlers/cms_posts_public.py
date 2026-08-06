@@ -57,6 +57,9 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         "body_html": b.get("body_html"),
         "key_points": b.get("key_points") or [],
         "keywords": b.get("keywords") or [],
+        # 배경자료의 수치 인포그래픽을 AI LENS 자체 스타일로 재구성할 때 씀
+        # (LetterChartBlock, frontend). 원본 이미지가 아니라 데이터만 가져온다.
+        "chart": b.get("chart"),
         "images": b.get("images") or [],
         # 피드 카드 썸네일 — admin에서 지정 안 하면 None, 프론트가 에디터
         # 아바타로 폴백한다 (todayLettersApi.ts::toTodayLetterCard).

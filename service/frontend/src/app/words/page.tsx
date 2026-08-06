@@ -1,18 +1,26 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
 import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
+import { toLetterIdFromApi } from '@/shared/lib/todayLettersApi';
+import { letterHref } from '@/shared/lib/letterHref';
 
 // 레터마다 본문 하단에 있던 "단어" 목록을 전부 모아 보여준다 — 새 데이터 구조
 // 없이 이미 있는 letter.keywords 를 모으기만 하면 돼서(레서 참고 — 2026-08-06),
 // 단어장 자체가 하나의 새 콘텐츠 타입은 아니고 기존 데이터의 다른 진입점이다.
+//
+// 2026-08-07: 단어를 눌렀을 때 그 단어를 다룬 레터(스토리)로 이동하는 링크
+// 추가 — 용어가 어느 레터에서 왔는지 원래는 버려지던 정보를 href로 살려둔다.
+// 용어 하나가 여러 레터에 등장하면(중복 dedupe) 그중 설명이 더 긴 쪽의 출처를 쓴다.
 interface Term {
   term: string;
   explain: string;
+  href: string | null;
 }
 
 function dedupeTerms(all: Term[]): Term[] {
@@ -23,7 +31,7 @@ function dedupeTerms(all: Term[]): Term[] {
     // 같은 단어가 여러 레터에 나오면 설명이 더 긴(자세한) 쪽을 남긴다.
     const prev = seen.get(key);
     if (!prev || t.explain.length > prev.explain.length) {
-      seen.set(key, { term: key, explain: t.explain.trim() });
+      seen.set(key, { term: key, explain: t.explain.trim(), href: t.href });
     }
   }
   return [...seen.values()].sort((a, b) => a.term.localeCompare(b.term, 'ko'));
@@ -52,7 +60,11 @@ export default function WordsPage() {
     let cancelled = false;
     fetchCmsPosts('letters', undefined, 100).then((letters) => {
       if (cancelled) return;
-      const all = letters.flatMap((l) => l.keywords ?? []);
+      const all = letters.flatMap((l) => {
+        const id = l.mbti_group ? toLetterIdFromApi(l.mbti_group, l.publish_date ?? '') : l.id;
+        const href = letterHref(id);
+        return (l.keywords ?? []).map((k) => ({ ...k, href }));
+      });
       setTerms(dedupeTerms(all));
     });
     return () => {
@@ -175,24 +187,16 @@ export default function WordsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filtered.map((t, i) => {
               const { accent, bg } = ACCENT_PALETTE[i % ACCENT_PALETTE.length];
-              return (
-                <div
-                  key={t.term}
-                  className="flex transition-colors"
-                  style={{
-                    borderRadius: 12,
-                    background: '#fff',
-                    border: '1px solid #f1efe9',
-                    borderLeft: `4px solid ${accent}`,
-                    overflow: 'hidden',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = bg;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#fff';
-                  }}
-                >
+              const rowStyle = {
+                borderRadius: 12,
+                background: '#fff',
+                border: '1px solid #f1efe9',
+                borderLeft: `4px solid ${accent}`,
+                overflow: 'hidden' as const,
+                cursor: t.href ? ('pointer' as const) : ('default' as const),
+              };
+              const rowInner = (
+                <>
                   <div style={{ padding: '13px 16px', flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 15, fontWeight: 700, color: '#1c1917', margin: '0 0 4px', letterSpacing: '-0.01em' }}>
                       {t.term}
@@ -201,6 +205,31 @@ export default function WordsPage() {
                       <p style={{ fontSize: 13, color: '#78716c', margin: 0, lineHeight: 1.65 }}>{t.explain}</p>
                     )}
                   </div>
+                  {/* 스토리(더보기)가 있는 단어만 화살표로 눌러볼 수 있다는 걸 표시 */}
+                  {t.href && (
+                    <div className="flex items-center flex-shrink-0" style={{ padding: '0 14px' }}>
+                      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#a8a29e" strokeWidth={2.4} aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+                      </svg>
+                    </div>
+                  )}
+                </>
+              );
+              const handlers = {
+                onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
+                  e.currentTarget.style.background = bg;
+                },
+                onMouseLeave: (e: React.MouseEvent<HTMLElement>) => {
+                  e.currentTarget.style.background = '#fff';
+                },
+              };
+              return t.href ? (
+                <Link key={t.term} href={t.href} className="flex items-center transition-colors" style={rowStyle} {...handlers}>
+                  {rowInner}
+                </Link>
+              ) : (
+                <div key={t.term} className="flex items-center transition-colors" style={rowStyle} {...handlers}>
+                  {rowInner}
                 </div>
               );
             })}
