@@ -114,7 +114,12 @@ def get(post_id: str) -> dict | None:
     return _to_dict(item)
 
 
-def list_posts(status: str | None, channel: str | None, limit: int = 50) -> list[dict]:
+def list_posts(
+    status: str | None,
+    channel: str | None,
+    limit: int = 50,
+    date: str | None = None,
+) -> list[dict]:
     table = posts_table()
     if status:
         resp = table.query(
@@ -130,6 +135,8 @@ def list_posts(status: str | None, channel: str | None, limit: int = 50) -> list
     items = [i for i in items if not i.get("deleted_at")]
     if channel:
         items = [i for i in items if channel in (i.get("channels") or [])]
+    if date:
+        items = [i for i in items if i.get("publish_date") == date]
     items.sort(
         key=lambda i: (i.get("publish_date", ""), i.get("created_at", "")),
         reverse=True,

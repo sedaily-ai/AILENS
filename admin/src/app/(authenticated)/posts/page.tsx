@@ -24,17 +24,56 @@ const FILTERS: Array<{ key: string; label: string }> = [
   { key: "published", label: "발행" },
 ];
 
+// channels 는 글 하나가 여러 개 가질 수 있는 배열이지만(letters/paper/feed 등
+// 스펙상 허용), 실제 발행 흐름은 항상 단일 채널로 고정한다(PostForm 참조) —
+// 필터도 그 전제로 단순하게 간다.
+const CHANNEL_FILTERS: Array<{ key: string; label: string }> = [
+  { key: "", label: "전체" },
+  { key: "letters", label: "레터" },
+  { key: "trend_card", label: "트렌드·칼럼" },
+];
+
+const SECTION_LABEL: Record<string, string> = {
+  trend: "경제 이슈",
+  column: "인기 칼럼",
+};
+
+// trend_card 는 channels 하나로는 "경제 이슈"/"인기 칼럼"이 안 갈려서
+// body_inline.section 을 붙여 보여준다 — 목록에서 뭐가 뭔지 구분하기 위함.
+function channelLabel(p: CmsPost): string {
+  if (!p.channels.length) return "-";
+  return p.channels
+    .map((c) => {
+      if (c === "trend_card" && p.body_inline.section) {
+        return `trend_card · ${SECTION_LABEL[p.body_inline.section] ?? p.body_inline.section}`;
+      }
+      return c;
+    })
+    .join(", ");
+}
+
+const PAGE_SIZE = 15;
+
 export default function PostsPage() {
   const [posts, setPosts] = useState<CmsPost[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("");
+  const [channel, setChannel] = useState("");
+  const [date, setDate] = useState("");
+  const [page, setPage] = useState(1);
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
   // 필터를 바꿔도 이전 목록을 유지하다가 새 응답이 오면 교체 — 깜빡임도 없다.
   useEffect(() => {
     let cancelled = false;
+    const params: { status?: string; channel?: string; date?: string; limit?: number } = {
+      limit: 200,
+    };
+    if (status) params.status = status;
+    if (channel) params.channel = channel;
+    if (date) params.date = date;
     adminApi
-      .listPosts(status ? { status } : undefined)
+      .listPosts(params)
       .then((r) => {
         if (cancelled) return;
         setPosts(r.posts);
@@ -46,7 +85,14 @@ export default function PostsPage() {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, [status, channel, date]);
+
+  // 필터가 바뀌면 이전 필터 기준 페이지 번호가 새 목록 범위를 벗어날 수 있다
+  // (예: 3페이지 보다가 필터링해서 1페이지 분량만 남는 경우) — state 를 별도로
+  // 리셋하는 effect 대신 렌더 시점에 유효 범위로 클램프해서 보여준다.
+  const pageCount = posts ? Math.max(1, Math.ceil(posts.length / PAGE_SIZE)) : 1;
+  const effectivePage = Math.min(page, pageCount);
+  const pageItems = posts ? posts.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE) : [];
 
   return (
     <div className="space-y-6">
@@ -67,24 +113,82 @@ export default function PostsPage() {
         </Link>
       </div>
 
-      <div className="flex gap-1">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setStatus(f.key)}
-            className={`text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
-              status === f.key ? "font-semibold" : "hover:bg-[var(--surface-sunken)]"
-            }`}
-            style={{
-              background: status === f.key ? "var(--accent-soft)" : undefined,
-              color:
-                status === f.key ? "var(--accent)" : "var(--text-secondary)",
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="flex gap-1">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => {
+                setStatus(f.key);
+                setPage(1);
+              }}
+              className={`text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                status === f.key ? "font-semibold" : "hover:bg-[var(--surface-sunken)]"
+              }`}
+              style={{
+                background: status === f.key ? "var(--accent-soft)" : undefined,
+                color:
+                  status === f.key ? "var(--accent)" : "var(--text-secondary)",
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <span className="h-4 w-px bg-gray-200" />
+
+        <div className="flex gap-1">
+          {CHANNEL_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => {
+                setChannel(f.key);
+                setPage(1);
+              }}
+              className={`text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                channel === f.key ? "font-semibold" : "hover:bg-[var(--surface-sunken)]"
+              }`}
+              style={{
+                background: channel === f.key ? "var(--accent-soft)" : undefined,
+                color:
+                  channel === f.key ? "var(--accent)" : "var(--text-secondary)",
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <span className="h-4 w-px bg-gray-200" />
+
+        <label className="flex items-center gap-1.5 text-[13px] text-gray-400">
+          발행일
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => {
+              setDate(e.target.value);
+              setPage(1);
             }}
-          >
-            {f.label}
-          </button>
-        ))}
+            className="border-0 bg-transparent font-medium text-gray-700 outline-none cursor-pointer"
+          />
+          {date && (
+            <button
+              type="button"
+              onClick={() => {
+                setDate("");
+                setPage(1);
+              }}
+              className="text-gray-400 hover:text-gray-700 cursor-pointer"
+              aria-label="발행일 필터 지우기"
+            >
+              ✕
+            </button>
+          )}
+        </label>
       </div>
 
       {error && <ErrorNote message={error} />}
@@ -125,7 +229,7 @@ export default function PostsPage() {
               </tr>
             </thead>
             <tbody>
-              {posts.map((p, i) => (
+              {pageItems.map((p, i) => (
                 <tr
                   key={p.id}
                   className="border-b ui-divider last:border-0 ui-row-hover ui-enter"
@@ -150,7 +254,7 @@ export default function PostsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-[13px] text-[var(--text-muted)]">
-                    {p.channels.length ? p.channels.join(", ") : "-"}
+                    {channelLabel(p)}
                   </td>
                   <td className="px-4 py-3 text-[13px] text-[var(--text-muted)] tabular-nums">
                     {p.publish_date}
@@ -159,6 +263,32 @@ export default function PostsPage() {
               ))}
             </tbody>
           </table>
+
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between border-t ui-divider px-4 py-3">
+              <span className="text-[13px] text-[var(--text-muted)]">
+                {effectivePage} / {pageCount} 페이지 · 총 {posts.length}건
+              </span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={effectivePage <= 1}
+                  className="text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer disabled:cursor-default disabled:opacity-40 hover:bg-[var(--surface-sunken)] text-[var(--text-secondary)]"
+                >
+                  이전
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={effectivePage >= pageCount}
+                  className="text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer disabled:cursor-default disabled:opacity-40 hover:bg-[var(--surface-sunken)] text-[var(--text-secondary)]"
+                >
+                  다음
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

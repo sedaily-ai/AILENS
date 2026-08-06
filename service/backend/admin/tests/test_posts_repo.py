@@ -126,6 +126,14 @@ def test_list_posts_excludes_soft_deleted(ddb_table) -> None:
     assert posts_repo.list_posts("draft", None, limit=20) == []
 
 
+def test_list_posts_filters_by_date(ddb_table) -> None:
+    _create(ddb_table, publish_date="2026-08-05")
+    _create(ddb_table, publish_date="2026-08-06")
+    out = posts_repo.list_posts("draft", None, limit=20, date="2026-08-06")
+    assert len(out) == 1
+    assert out[0]["publish_date"] == "2026-08-06"
+
+
 def test_set_status_publish_stamps_published_at(ddb_table) -> None:
     post = _create(ddb_table)
     out = posts_repo.set_status(post["id"], "published")

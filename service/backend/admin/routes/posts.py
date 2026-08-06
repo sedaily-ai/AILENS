@@ -56,7 +56,7 @@ def handle_list(body: dict, path_params: dict, query_params: dict) -> dict:
         limit = max(1, min(int(q.get("limit", 50)), 200))
     except (TypeError, ValueError):
         limit = 50
-    found = posts_repo.list_posts(q.get("status"), q.get("channel"), limit)
+    found = posts_repo.list_posts(q.get("status"), q.get("channel"), limit, q.get("date"))
     return response.ok({"posts": found, "count": len(found)})
 
 

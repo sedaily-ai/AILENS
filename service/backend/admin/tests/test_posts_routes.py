@@ -105,20 +105,22 @@ def test_delete_returns_404_when_already_gone(monkeypatch) -> None:
 def test_list_passes_filters(monkeypatch) -> None:
     seen = {}
 
-    def _fake_list(status, channel, limit):
-        seen.update(status=status, channel=channel, limit=limit)
+    def _fake_list(status, channel, limit, date=None):
+        seen.update(status=status, channel=channel, limit=limit, date=date)
         return [_post()]
 
     monkeypatch.setattr(posts.posts_repo, "list_posts", _fake_list)
-    resp = posts.handle_list({}, {}, {"status": "draft", "channel": "letters", "limit": "5"})
+    resp = posts.handle_list(
+        {}, {}, {"status": "draft", "channel": "letters", "limit": "5", "date": "2026-08-06"}
+    )
     assert resp["statusCode"] == 200
-    assert seen == {"status": "draft", "channel": "letters", "limit": 5}
+    assert seen == {"status": "draft", "channel": "letters", "limit": 5, "date": "2026-08-06"}
 
 
 def test_list_clamps_bad_limit(monkeypatch) -> None:
     seen = {}
 
-    def _fake_list(status, channel, limit):
+    def _fake_list(status, channel, limit, date=None):
         seen["limit"] = limit
         return []
 

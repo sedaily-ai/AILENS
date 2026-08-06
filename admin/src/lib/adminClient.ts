@@ -143,11 +143,12 @@ export const adminApi = {
     request<NewsletterStatsResponse>(`/admin/newsletter/stats?days=${days}`),
 
   // CMS posts
-  listPosts: (params?: { status?: string; channel?: string; limit?: number }) => {
+  listPosts: (params?: { status?: string; channel?: string; limit?: number; date?: string }) => {
     const qs = new URLSearchParams();
     if (params?.status) qs.set("status", params.status);
     if (params?.channel) qs.set("channel", params.channel);
     if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.date) qs.set("date", params.date);
     const suffix = qs.toString() ? `?${qs}` : "";
     return request<{ posts: CmsPost[]; count: number }>(`/admin/posts${suffix}`);
   },
