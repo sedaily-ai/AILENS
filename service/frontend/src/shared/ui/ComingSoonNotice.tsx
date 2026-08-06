@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 interface Props {
-  feature: "community" | "archive" | "dna";
+  feature: "archive" | "dna";
   title: string;
   description: string;
 }

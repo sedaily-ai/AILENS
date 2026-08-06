@@ -80,10 +80,10 @@ interface ChatMessage {
 }
 
 const editorAvatars: Record<MbtiGroupId, { name: string; role: string; avatar: string; tagline: string; accent: string; ring: string }> = {
-  NT: { name: '민철', role: '전략 분석 에디터', avatar: '/editors/intj.webp', tagline: '데이터·논리로 단정적이고 간결하게', accent: 'from-blue-50/80 via-white to-indigo-50/60', ring: 'ring-blue-200/70' },
-  NF: { name: '하은', role: '오피니언 에디터', avatar: '/editors/infp.webp', tagline: '의미와 본질을 함께 사유하는 톤', accent: 'from-rose-50/80 via-white to-pink-50/60', ring: 'ring-rose-200/70' },
-  ST: { name: '준서', role: '팩트 큐레이터', avatar: '/editors/istj.webp', tagline: '군더더기 없이 필요한 정보만', accent: 'from-emerald-50/80 via-white to-teal-50/60', ring: 'ring-emerald-200/70' },
-  SF: { name: '소율', role: '트렌드 캐스터', avatar: '/editors/esfp.webp', tagline: '친구에게 설명하듯 편한 대화체', accent: 'from-amber-50/80 via-white to-orange-50/60', ring: 'ring-amber-200/70' },
+  NT: { name: '민철', role: '한 걸음 더 파고들기', avatar: '/editors/intj.webp', tagline: '데이터·논리로 단정적이고 간결하게', accent: 'from-blue-50/80 via-white to-indigo-50/60', ring: 'ring-blue-200/70' },
+  NF: { name: '하은', role: '내 생각은 이래요', avatar: '/editors/infp.webp', tagline: '의미와 본질을 함께 사유하는 톤', accent: 'from-rose-50/80 via-white to-pink-50/60', ring: 'ring-rose-200/70' },
+  ST: { name: '준서', role: '팩트만 딱딱 정리', avatar: '/editors/istj.webp', tagline: '군더더기 없이 필요한 정보만', accent: 'from-emerald-50/80 via-white to-teal-50/60', ring: 'ring-emerald-200/70' },
+  SF: { name: '소율', role: '가볍게 짚어주는 트렌드', avatar: '/editors/esfp.webp', tagline: '친구에게 설명하듯 편한 대화체', accent: 'from-amber-50/80 via-white to-orange-50/60', ring: 'ring-amber-200/70' },
 };
 
 const personaOrder: MbtiGroupId[] = ['NT', 'NF', 'ST', 'SF'];

@@ -55,6 +55,6 @@ export const personaInfo: Record<MbtiGroupId, Persona> = {
   SF: { name: "친구", style: "편하게 수다 떨듯 알려드려요", color: "bg-orange-500" },
 };
 
-export type TabType = "question" | "feed" | "community" | "archive" | "dna";
+export type TabType = "question" | "feed" | "archive" | "dna";
 export type DnaSubTab = "analysis" | "birthday";
 export type DnaViewMode = "radar" | "chart";

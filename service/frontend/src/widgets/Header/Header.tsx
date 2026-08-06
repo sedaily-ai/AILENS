@@ -21,6 +21,11 @@ export type HeaderTab = {
   soon?: boolean;
   href?: string;
   onClick?: () => void;
+  // 'extra' — 사주·타임라인·게임·웹툰처럼 "덤" 성격의 탭. 드롭다운으로
+  // 숨기는 대신(클릭 한 번 더 필요해서 덜 "효율적"), 뉴닉 참고 — 개수를
+  // 줄이지 않고 무게(굵기·크기·색)만 낮춰서 "본체 vs 덤"을 구분한다
+  // (2026-08-06). 생략하면 기본값 'core'.
+  tier?: 'core' | 'extra';
 };
 
 interface HeaderProps {
@@ -31,10 +36,18 @@ interface HeaderProps {
   frosted?: boolean;
 }
 
+// 폰트 크기(2026-08-06 확대) — 컬리/밑미/밑미도구상점 등 레퍼런스 대비
+// 기존 12~14px가 위축돼 보인다는 지적. 코어 탭은 15~16px대로 키워
+// 존재감을 준다(레퍼런스들도 탭 텍스트가 다 큼직하고 자신감 있음).
 const TAB_BASE =
-  'px-2.5 lg:px-4 py-2 text-[12px] lg:text-[14px] font-medium rounded-lg transition-colors duration-200 whitespace-nowrap flex-shrink-0';
+  'px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] font-semibold rounded-lg transition-colors duration-200 whitespace-nowrap flex-shrink-0';
 const TAB_ACTIVE = 'bg-gray-100 text-gray-900';
-const TAB_IDLE = 'text-gray-500 hover:text-gray-900 hover:bg-gray-50';
+const TAB_IDLE = 'text-gray-600 hover:text-gray-900 hover:bg-gray-50';
+// tier: 'extra' — 코어보다는 작고 옅지만, 이전만큼 위축되진 않게(11px는
+// 레퍼런스 대비 너무 작았다). 뉴닉의 얇은 텍스트 목차 톤 참고(2026-08-06).
+const TAB_EXTRA_BASE =
+  'px-2 lg:px-3 py-2 text-[12.5px] lg:text-[14px] font-normal rounded-lg transition-colors duration-200 whitespace-nowrap flex-shrink-0';
+const TAB_EXTRA_IDLE = 'text-gray-400 hover:text-gray-600 hover:bg-gray-50';
 
 function TabLabel({ tab }: { tab: HeaderTab }) {
   if (!tab.soon) return <>{tab.label}</>;
@@ -50,7 +63,9 @@ function TabLabel({ tab }: { tab: HeaderTab }) {
 
 function DesktopTab({ tab }: { tab: HeaderTab }) {
   const router = useRouter();
-  const cls = `${TAB_BASE} ${tab.active ? TAB_ACTIVE : TAB_IDLE}`;
+  const base = tab.tier === 'extra' ? TAB_EXTRA_BASE : TAB_BASE;
+  const idle = tab.tier === 'extra' ? TAB_EXTRA_IDLE : TAB_IDLE;
+  const cls = `${base} ${tab.active ? TAB_ACTIVE : idle}`;
   if (tab.href) {
     const href = tab.href;
     // hover/touch 시점에 router.prefetch — viewport 자동 prefetch 위에
@@ -169,16 +184,6 @@ function MobileDrawer({
             );
           })}
         </nav>
-        <Link
-          href="/onboarding"
-          onClick={() => requestAnimationFrame(onClose)}
-          className="flex items-center gap-2 px-5 py-4 text-[14px] text-gray-500 border-t border-gray-100 hover:text-gray-900"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          서비스 둘러보기
-        </Link>
       </div>
     </div>,
     document.body,
@@ -220,23 +225,37 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
             </Link>
           )}
 
-          {/* 데스크탑 탭 — 기존 그대로 */}
+          {/* 데스크탑 탭 — core/extra 사이에 옅은 구분선 하나(2026-08-06,
+              탭이 많아 보인다는 피드백 — 드롭다운으로 숨기지 않고 무게로만 구분). */}
           <nav className="hidden md:flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
-              <DesktopTab key={tab.key} tab={tab} />
-            ))}
+            {tabs.map((tab, i) => {
+              const prevTier = tabs[i - 1]?.tier ?? 'core';
+              const showDivider = i > 0 && prevTier !== 'extra' && tab.tier === 'extra';
+              return (
+                <div key={tab.key} className="flex items-center">
+                  {showDivider && (
+                    <span aria-hidden className="mx-1.5 h-4 w-px bg-gray-200 flex-shrink-0" />
+                  )}
+                  <DesktopTab tab={tab} />
+                </div>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+            {/* 검색창처럼 생긴 입력 바로 재설계(2026-08-06) — 실제로는 음성·마크다운
+                지원 AI 챗봇인데, 겉모습은 별 아이콘 + "대화" 라벨뿐이라 뭘 누르는
+                건지 애매하다는 지적. Notion/Linear류 "Search or ask AI" 패턴처럼
+                placeholder 문구가 있는 입력창 모양으로 바꿔 용도를 바로 읽히게 했다. */}
             <button
               onClick={onSearch}
-              className="hidden md:flex items-center gap-2 pl-3 pr-4 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors text-[13px] text-gray-500 group"
+              className="hidden md:flex items-center gap-2 pl-3.5 pr-3 py-1.5 min-w-[176px] lg:min-w-[208px] bg-gray-50 hover:bg-gray-100 border border-gray-200/70 rounded-full transition-colors text-[13px] text-gray-400 group"
             >
-              <svg className="w-3.5 h-3.5 text-violet-500" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" />
               </svg>
-              <span className="group-hover:text-gray-700">대화</span>
-              <span className="hidden lg:inline text-gray-300 ml-1">⌘K</span>
+              <span className="flex-1 text-left truncate group-hover:text-gray-600">이슈에 대해 물어보세요</span>
+              <span className="hidden lg:inline text-gray-300 flex-shrink-0">⌘K</span>
             </button>
             <button
               onClick={onSearch}
@@ -247,16 +266,10 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
                 <path className="text-violet-500" d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" />
               </svg>
             </button>
-            <Link
-              href="/onboarding"
-              className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-[12px] text-gray-400 hover:text-gray-900 transition-colors"
-              aria-label="서비스 둘러보기"
-            >
-              <span>둘러보기</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3 h-3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </Link>
+            {/* '둘러보기'(서비스 소개) 상시 링크 제거(2026-08-06) — 레퍼런스 7곳
+                (컬리/밑미/밑미도구상점/29CM/올리브영 등) 중 "우리 서비스 소개"를
+                상시 헤더에 두는 곳이 하나도 없었다. 이미 쓰고 있는 사용자에겐
+                군더더기 — /onboarding 랜딩 자체는 남기고 외부 유입 경로로만 쓴다. */}
             {/* 로그인 / 사용자 메뉴 — 미로그인 시 '로그인' 버튼, 로그인 시 드롭다운 */}
             <div className="hidden md:flex items-center">
               <UserMenu />

@@ -10,7 +10,7 @@
 import { API_URL } from '@/shared/config/api';
 import type { ApiLetter } from './todayLettersApi';
 
-export type CmsChannel = 'letters' | 'paper' | 'feed' | 'trend_card';
+export type CmsChannel = 'letters' | 'paper' | 'feed' | 'trend_card' | 'webtoon' | 'video';
 
 /** letters/feed 채널 응답은 ApiLetter 와 같은 모양 + is_cms 표식. */
 export type CmsLetter = ApiLetter & { is_cms: true };
@@ -30,13 +30,49 @@ export interface CmsTrendCard {
   is_cms: true;
 }
 
+/**
+ * webtoon 채널 응답 — 연재 웹툰 파일럿(2026-08-06). 컷(이미지+캡션) 나열뿐인
+ * 가벼운 포맷 (backend cms_posts_public.py _shape_webtoon 과 1:1).
+ */
+export interface CmsWebtoonPanel {
+  url: string;
+  caption: string;
+}
+
+export interface CmsWebtoon {
+  id: string;
+  editor_id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  cover_image_url: string | null;
+  panels: CmsWebtoonPanel[];
+  is_cms: true;
+}
+
+/**
+ * video 채널 응답 — 영상 콘텐츠(2026-08-06). YouTube 등 외부 임베드 URL
+ * 하나만 있는 가벼운 포맷 (backend cms_posts_public.py _shape_video 와 1:1).
+ */
+export interface CmsVideo {
+  id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  is_cms: true;
+}
+
 export async function fetchCmsPosts(
   channel: CmsChannel,
   date?: string,
+  limit?: number,
 ): Promise<CmsLetter[]> {
   try {
     const qs = new URLSearchParams({ channel });
     if (date) qs.set('date', date);
+    if (limit) qs.set('limit', String(limit));
     // API 응답의 Cache-Control(max-age=300)을 브라우저가 그대로 따르면 admin
     // 발행/수정/삭제가 최대 5분간 안 보인다 — no-store 로 우회.
     const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, { cache: 'no-store' });
@@ -55,6 +91,41 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
     const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = (await res.json()) as { posts?: CmsTrendCard[] };
+    return data.posts ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { posts?: CmsWebtoon[] };
+    return data.posts ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { post?: CmsWebtoon };
+    return data.post ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchVideos(): Promise<CmsVideo[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/v2/posts?channel=video`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { posts?: CmsVideo[] };
     return data.posts ?? [];
   } catch {
     return [];

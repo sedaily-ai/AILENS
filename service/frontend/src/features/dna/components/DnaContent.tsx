@@ -11,8 +11,8 @@ import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 const EDITOR_BY_GROUP: Record<MbtiGroupId, { name: string; archetype: string; avatar: string; accent: string; soft: string }> = {
   NT: { name: '민철', archetype: '분석가',       avatar: '/editors/intj.webp', accent: '#7c3aed', soft: '#ede9fe' },
   NF: { name: '하은', archetype: '이야기꾼',     avatar: '/editors/infp.webp', accent: '#e11d48', soft: '#ffe4e6' },
-  ST: { name: '준서', archetype: '팩트 큐레이터', avatar: '/editors/istj.webp', accent: '#059669', soft: '#d1fae5' },
-  SF: { name: '소율', archetype: '트렌드 캐스터', avatar: '/editors/esfp.webp', accent: '#d97706', soft: '#fef3c7' },
+  ST: { name: '준서', archetype: '실용주의자', avatar: '/editors/istj.webp', accent: '#059669', soft: '#d1fae5' },
+  SF: { name: '소율', archetype: '공감러',     avatar: '/editors/esfp.webp', accent: '#d97706', soft: '#fef3c7' },
 };
 
 export function DnaContent() {

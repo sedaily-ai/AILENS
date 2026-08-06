@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { MOCK_ECONOMIC_EVENTS, getCategoryMeta } from '@/features/calendar/data/mockEconomicEvents';
 import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { calculateSaju, CG_OH } from '@/features/fortune/lib/engine';
 import { trackEvent } from '@/shared/lib/trackEvent';
@@ -422,21 +421,7 @@ interface HotLetter {
   shortTitle: string;
 }
 
-function getUpcomingEvents(limit = 4) {
-  const today = new Date().toISOString().slice(0, 10);
-  return MOCK_ECONOMIC_EVENTS
-    .filter(e => e.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, limit);
-}
-
-function formatDateChip(iso: string): string {
-  const [, m, d] = iso.split('-');
-  return `${parseInt(m, 10)}.${parseInt(d, 10)}`;
-}
-
 export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: MbtiGroupId }) {
-  const upcoming = getUpcomingEvents(4);
   // "요즘 가장 많이 읽힌 글" — 최신 발행 레터(라이브 훅)의 카드를 그대로 매핑.
   const { cards } = useLatestLetters();
   const hotLetters: HotLetter[] = cards.map((c) => ({
@@ -573,9 +558,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
                     {l.shortTitle}
                   </p>
                   <p className="text-gray-400" style={{ fontSize: 11, letterSpacing: '-0.005em' }}>
-                    <span style={{ color: l.accent, fontWeight: 500 }}>{l.editorName}</span>
-                    <span className="text-gray-300 mx-1">·</span>
-                    {l.archetype}
+                    <span style={{ color: l.accent, fontWeight: 500 }}>{l.archetype}</span>
                   </p>
                 </div>
               </Link>

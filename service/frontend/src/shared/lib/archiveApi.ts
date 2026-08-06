@@ -79,6 +79,31 @@ export async function listArchiveSentences(
   return res.json();
 }
 
+export interface PopularHighlight {
+  text: string;
+  article_id: string;
+  article_title: string;
+  count: number;
+}
+
+/**
+ * "다른 사람들이 담은 문장" — 전체 유저 아카이브를 텍스트 빈도로 집계한
+ * 공개 목록(글쓰기 없이 저장 행위만으로 채워짐, Kindle Popular Highlights
+ * 패턴). 로그인 여부와 무관 — 커뮤니티 탭 대체(2026-08-06).
+ */
+export async function fetchPopularArchiveSentences(
+  limit: number = 20,
+): Promise<PopularHighlight[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/archive/popular?limit=${limit}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.highlights ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Delete an archived sentence.
  */

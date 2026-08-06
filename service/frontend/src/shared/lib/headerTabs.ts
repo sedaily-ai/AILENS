@@ -9,7 +9,7 @@ export type HeaderTabKey =
   | 'fortune'
   | 'timeline'
   | 'games'
-  | 'community'
+  | 'webtoon'
   | 'archive';
 
 export interface HeaderTab {
@@ -17,13 +17,14 @@ export interface HeaderTab {
   label: string;
   href: string;
   active?: boolean;
+  tier?: 'core' | 'extra';
 }
 
 /**
  * '타임라인' 탭이 가리키는 경로 — **단일 출처**.
  *
- * FeedPage 와 캘린더 페이지는 in-page 탭 전환(onClick) 때문에 `buildHeaderTabs()`
- * 를 쓰지 못하고 탭 배열을 각자 하드코딩한다. 그 사본들이 예전 경로
+ * FeedPage 는 in-page 탭 전환(onClick) 때문에 `buildHeaderTabs()`
+ * 를 쓰지 못하고 탭 배열을 하드코딩한다. 그 사본이 예전 경로
  * (`/timemachine`) 를 들고 있어서 페이지마다 같은 라벨이 다른 곳으로 가는
  * 문제가 있었다. **경로 값만이라도 여기서 한 번만 정의**해 재발을 막는다.
  */
@@ -37,15 +38,29 @@ export const TIMELINE_HREF = '/timeline';
  */
 export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
   return [
-    { key: 'feed', label: '레터', href: '/', active: active === 'feed' },
-    { key: 'editors', label: '에디터', href: '/editors', active: active === 'editors' },
-    { key: 'fortune', label: '사주', href: '/fortune', active: active === 'fortune' },
+    // 홈(오늘의 피드)이 아니라 전체 레터 모음(/letters)으로 간다 — 2026-08-06
+    // 이전엔 '/'였는데, 사용자가 "레터 탭 = 레터들이 모인 곳"으로 기대해서 바꿨다.
+    // 홈으로 돌아가는 길은 로고 클릭.
+    { key: 'feed', label: '레터', href: '/letters', active: active === 'feed' },
+    // '내 서랍' 탭도 네비게이션에서 제거(2026-08-06) — 커뮤니티 대체로
+    // "오늘의 한 문장 + 다른 사람들이 담은 문장 + 내 문장" 3단 구조까지
+    // 만들었지만, 워딩(서랍→스크랩) 논의 끝에 상시 탭으로 노출하기보다
+    // 일단 빼기로 결정. 페이지(/?tab=archive)·저장 기능 자체는 그대로
+    // 살아있다 — 다시 노출할 땐 여기 한 줄만 추가하면 된다.
+    // 탭 8개가 전부 같은 무게로 나열돼 "많아 보인다"는 피드백(2026-08-06) —
+    // 뉴닉 참고: 드롭다운으로 숨기면 클릭이 한 번 더 필요해 덜 효율적이니,
+    // 개수는 그대로 두고 tier:'extra'로 굵기·크기·색만 낮춰 "덤"으로 구분한다
+    // (Header.tsx가 core→extra 전환 지점에 구분선을 자동으로 그려준다).
+    //
+    // '에디터' 탭 제거(2026-08-06) — extra 티어 강등을 거쳐 최종적으로 뺐다.
+    // 페이지(/editors)·구독 펀널은 그대로 살아있고, 온보딩 플로우
+    // (TodayLensClient)에서 계속 링크되니 완전히 고아가 되진 않는다.
+    { key: 'fortune', label: '사주', href: '/fortune', active: active === 'fortune', tier: 'extra' },
     // 2026-08-05 까지 `/timemachine` 을 가리키고 있었다 — `/timeline` 에 들어왔다가
     // 다른 탭에 다녀온 뒤 이 탭을 누르면 구 페이지로 빠지는 문제의 원인.
     // `/timemachine`(유명인·투자 시뮬레이션 4탭) 은 직접 URL 로 남겨둔다.
-    { key: 'timeline', label: '타임라인', href: TIMELINE_HREF, active: active === 'timeline' },
-    { key: 'games', label: '게임', href: '/games', active: active === 'games' },
-    { key: 'community', label: '커뮤니티', href: '/?tab=community', active: active === 'community' },
-    { key: 'archive', label: '내 서랍', href: '/?tab=archive', active: active === 'archive' },
+    { key: 'timeline', label: '타임라인', href: TIMELINE_HREF, active: active === 'timeline', tier: 'extra' },
+    { key: 'games', label: '게임', href: '/games', active: active === 'games', tier: 'extra' },
+    { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'extra' },
   ];
 }

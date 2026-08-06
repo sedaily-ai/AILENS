@@ -122,6 +122,89 @@ export function CoinJarIcon({ accent, className }: IconProps) {
   );
 }
 
+// 레터 — 한 통, 웃는 편지봉투 캐릭터
+export function LetterMailIcon({ accent, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 96 96" fill="none" className={className}>
+      <rect x="18" y="30" width="60" height="42" rx="6" stroke="#1a1a1a" strokeWidth={2.6} strokeLinejoin="round" />
+      <path d="M20 34 L48 54 L76 34" stroke="#1a1a1a" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <circle cx="40" cy="60" r="1.8" fill="#1a1a1a" />
+      <circle cx="54" cy="60" r="1.8" fill="#1a1a1a" />
+      <path d="M42 66 Q47 69 52 66" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
+      <path d="M48 16 L48 24 M40 20 L44 24 M56 20 L52 24" stroke={accent} strokeWidth={2.6} strokeLinecap="round" />
+      <circle cx="48" cy="12" r="2.6" fill={accent} />
+    </svg>
+  );
+}
+
+// 잘했어요 도장 — 살짝 삐뚤빼뚤한 손도장 원 + 체크(퀴즈 정답 피드백용)
+export function GoodJobStampIcon({ accent, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 96 96" fill="none" className={className}>
+      <path
+        d="M48 14 Q68 12 76 30 Q84 46 72 62 Q62 78 44 80 Q24 82 14 64 Q6 48 16 30 Q26 14 48 14 Z"
+        stroke="#1a1a1a"
+        strokeWidth={3}
+        strokeLinejoin="round"
+      />
+      <path d="M30 48 L43 61 L67 33" stroke={accent} strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M14 14 L16 20 L22 22 L16 24 L14 30 L12 24 L6 22 L12 20 Z" fill={accent} opacity={0.85} />
+      <path d="M80 58 L81.5 62 L85 63.5 L81.5 65 L80 68.5 L78.5 65 L75 63.5 L78.5 62 Z" fill={accent} opacity={0.7} />
+    </svg>
+  );
+}
+
+// 웹툰 — 웃는 말풍선 캐릭터 + 반짝이(컷/이야기 콘텐츠용)
+export function ComicBubbleIcon({ accent, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 96 96" fill="none" className={className}>
+      <path
+        d="M20 26 Q20 20 26 20 L70 20 Q76 20 76 26 L76 54 Q76 60 70 60 L42 60 L30 72 L32 60 L26 60 Q20 60 20 54 Z"
+        stroke="#1a1a1a"
+        strokeWidth={2.6}
+        strokeLinejoin="round"
+      />
+      <circle cx="38" cy="40" r="2" fill="#1a1a1a" />
+      <circle cx="58" cy="40" r="2" fill="#1a1a1a" />
+      <path d="M38 48 Q48 54 58 48" stroke="#1a1a1a" strokeWidth={2.2} strokeLinecap="round" fill="none" />
+      <path d="M80 16 L82 22 L88 24 L82 26 L80 32 L78 26 L72 24 L78 22 Z" fill={accent} />
+      <path d="M18 68 L19.5 72 L23 73.5 L19.5 75 L18 78.5 L16.5 75 L13 73.5 L16.5 72 Z" fill={accent} opacity={0.7} />
+    </svg>
+  );
+}
+
+// 히어로 캐러셀 웹툰 슬라이드용 — 기존 ComicBubbleIcon(말풍선+눈코입)이
+// "예술적인 연필 스케치" 느낌과는 거리가 멀고 아이콘처럼 밋밋하다는 지적
+// (2026-08-06)으로 새로 그렸다. 웹툰의 "컷" 2장을 손으로 두 번 겹쳐 그은
+// 듯한 이중선(스케치 특유의 삐뚤빼뚤함)으로 표현하고, "바람처럼" 흐르는
+// 모션 라인을 곁들였다. 컬러 배경 박스 없이 그대로 떠 있게 써야
+// 일러스트로 읽힌다(HomeHeroCarousel 참고). 어두운 배경(히어로)과 밝은
+// 크림 배경(웹툰 목업 카드) 둘 다에서 쓰이므로, 뒷장(컷 1) 선 색은
+// `base` 로 배경에 맞춰 넘긴다 — 기본값은 밝은 배경용 잉크색.
+export function WebtoonWindIllustration({
+  accent,
+  className,
+  base = '#1c1917',
+}: IconProps & { base?: string }) {
+  return (
+    <svg viewBox="0 0 120 120" fill="none" className={className}>
+      <g transform="rotate(-7 55 52)">
+        <rect x="26" y="20" width="46" height="58" rx="5" stroke={base} strokeOpacity={0.85} strokeWidth={2} />
+        <rect x="27.6" y="21.4" width="42.8" height="55.2" rx="5" stroke={base} strokeOpacity={0.28} strokeWidth={1.1} />
+      </g>
+      <g transform="rotate(6 68 66)">
+        <rect x="46" y="38" width="46" height="58" rx="5" stroke={accent} strokeWidth={2.4} />
+        <rect x="47.6" y="39.4" width="42.8" height="55.2" rx="5" stroke={accent} strokeWidth={1} opacity={0.4} />
+      </g>
+      <path d="M4 44 Q20 37 33 44 T60 41" stroke={accent} strokeWidth={2} strokeLinecap="round" fill="none" opacity={0.85} />
+      <path d="M2 58 Q18 53 29 59 T54 55" stroke={base} strokeOpacity={0.5} strokeWidth={1.6} strokeLinecap="round" fill="none" />
+      <path d="M8 72 Q22 68 32 73" stroke={accent} strokeWidth={1.6} strokeLinecap="round" fill="none" opacity={0.5} />
+      <path d="M97 18 L99.4 24.6 L106 27 L99.4 29.4 L97 36 L94.6 29.4 L88 27 L94.6 24.6 Z" fill={accent} opacity={0.9} />
+      <path d="M101 85 L102 88 L105 89 L102 90 L101 93 L100 90 L97 89 L100 88 Z" fill={base} fillOpacity={0.75} />
+    </svg>
+  );
+}
+
 // 오늘의 시선 — 작은 집과 해 (부동산/도시 이슈)
 export function HouseSunIcon({ accent, className }: IconProps) {
   return (

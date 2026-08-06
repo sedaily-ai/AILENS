@@ -7,10 +7,10 @@ type Persona = 'NT' | 'NF' | 'ST' | 'SF';
 type Perspective = 'persona' | 'expert' | 'global' | 'reader' | 'opposite';
 
 const PERSONAS: Record<Persona, { name: string; role: string; nickname: string; avatar: string; ink: string; soft: string; pill: string }> = {
-  NT: { name: '민철', role: '전략 분석 에디터', nickname: '분석가', avatar: '/editors/intj.webp', ink: '#5b21b6', soft: '#f5f3ff', pill: '#ede9fe' },
-  NF: { name: '하은', role: '오피니언 에디터', nickname: '이야기꾼', avatar: '/editors/infp.webp', ink: '#9f1239', soft: '#fff1f2', pill: '#ffe4e6' },
-  ST: { name: '준서', role: '팩트 큐레이터', nickname: '실용주의자', avatar: '/editors/istj.webp', ink: '#065f46', soft: '#ecfdf5', pill: '#d1fae5' },
-  SF: { name: '소율', role: '트렌드 캐스터', nickname: '공감러', avatar: '/editors/esfp.webp', ink: '#92400e', soft: '#fffbeb', pill: '#fef3c7' },
+  NT: { name: '민철', role: '한 걸음 더 파고들기', nickname: '분석가', avatar: '/editors/intj.webp', ink: '#5b21b6', soft: '#f5f3ff', pill: '#ede9fe' },
+  NF: { name: '하은', role: '내 생각은 이래요', nickname: '이야기꾼', avatar: '/editors/infp.webp', ink: '#9f1239', soft: '#fff1f2', pill: '#ffe4e6' },
+  ST: { name: '준서', role: '팩트만 딱딱 정리', nickname: '실용주의자', avatar: '/editors/istj.webp', ink: '#065f46', soft: '#ecfdf5', pill: '#d1fae5' },
+  SF: { name: '소율', role: '가볍게 짚어주는 트렌드', nickname: '공감러', avatar: '/editors/esfp.webp', ink: '#92400e', soft: '#fffbeb', pill: '#fef3c7' },
 };
 
 // 사주 + MBTI 기반 mock 프로필

@@ -33,7 +33,7 @@ const dicebear = (seed: string) =>
 export const editors: EditorDetail[] = [
   // ── NT 전략·논리 ──
   {
-    id: 'NT-min', group: 'NT', name: '민철', role: '전략 분석 에디터', nickname: '분석가',
+    id: 'NT-min', group: 'NT', name: '민철', role: '한 걸음 더 파고들기', nickname: '분석가',
     bio: '데이터로 본질만 짚어드립니다. 감정 빼고 구조만.',
     longBio: '거시경제와 IT·산업 흐름을 비교 분석해 단 한 편을 골라 전합니다. 인과·구조 차이를 데이터로 보여주는 것이 강점입니다.',
     philosophy: '감정은 변수에 넣지 않는다. 변수의 관계가 모든 답이다.',
@@ -82,7 +82,7 @@ export const editors: EditorDetail[] = [
 
   // ── NF 의미·공감 ──
   {
-    id: 'NF-ha', group: 'NF', name: '하은', role: '오피니언 에디터', nickname: '이야기꾼',
+    id: 'NF-ha', group: 'NF', name: '하은', role: '내 생각은 이래요', nickname: '이야기꾼',
     bio: '숫자 뒤에 있는 사람의 이야기를 함께 읽습니다.',
     longBio: '뉴스 안에 담긴 가치와 의미, 사람의 결을 따라가는 글을 씁니다. 빠른 결론보다 천천히 머무는 시간을 만듭니다.',
     philosophy: '뉴스는 결국 한 사람의 이야기다.',
@@ -129,7 +129,7 @@ export const editors: EditorDetail[] = [
 
   // ── ST 팩트·실용 ──
   {
-    id: 'ST-jun', group: 'ST', name: '준서', role: '팩트 큐레이터', nickname: '실용주의자',
+    id: 'ST-jun', group: 'ST', name: '준서', role: '팩트만 딱딱 정리', nickname: '실용주의자',
     bio: '결론부터. 3분 안에 핵심만.',
     longBio: '시간 대비 정보 밀도가 높은 기사만 추립니다. 수식어 빼고 사실과 숫자만 정리합니다.',
     philosophy: '결론이 먼저, 이유는 나중.',
@@ -176,7 +176,7 @@ export const editors: EditorDetail[] = [
 
   // ── SF 트렌드·재미 ──
   {
-    id: 'SF-soy', group: 'SF', name: '소율', role: '트렌드 캐스터', nickname: '공감러',
+    id: 'SF-soy', group: 'SF', name: '소율', role: '가볍게 짚어주는 트렌드', nickname: '공감러',
     bio: '친근하게, 가볍게 시작해서 깊게 들어갑니다.',
     longBio: '혼자 보기 아까운 뉴스를 친구처럼 전합니다. 가볍지만 알맹이는 빠뜨리지 않습니다.',
     philosophy: '재미는 정보를 가장 멀리 나르는 도구다.',

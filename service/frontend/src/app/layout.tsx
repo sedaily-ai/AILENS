@@ -1,11 +1,32 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ConditionalFooter } from "@/widgets/SiteFooter";
+import { AnnouncementBar } from "@/widgets/AnnouncementBar";
 
 // GA4 Measurement ID — ailens.sedaily.ai 전용 속성.
 const GA_ID = "G-BJZ09B6PB6";
+
+// globals.css의 --font-sans가 'Pretendard Variable'을 가리키고 있었지만
+// 실제로 로드하는 코드가 어디에도 없어(웹폰트 미적용) 브라우저가 계속
+// 시스템 폰트로 폴백하고 있었다(2026-08-06 디자인 감사에서 발견) — 토스·
+// 배민 등이 쓰는 그 폰트인데 안 쓰이고 있던 것. next/font/local로 self-host
+// (CDN 왕복 없음, layout shift 없음, font-display:swap). 가변 폰트 TTF(6.7MB)
+// 대신 실제 쓰는 굵기만 정적 woff2 5종(굵기당 ~770KB, 브라우저가 실제 렌더링에
+// 쓰는 굵기만 지연 로드)으로 용량을 줄였다.
+const pretendard = localFont({
+  src: [
+    { path: "./fonts/Pretendard-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Pretendard-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/Pretendard-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/Pretendard-Bold.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/Pretendard-ExtraBold.woff2", weight: "800", style: "normal" },
+  ],
+  variable: "--font-pretendard",
+  display: "swap",
+});
 
 const SITE_URL = "https://ailens.sedaily.ai";
 const SITE_TITLE = "AI LENS — 같은 뉴스, 네 가지 시선";
@@ -120,8 +141,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="antialiased">
+    <html lang="ko" className={`antialiased ${pretendard.variable}`}>
       <head>
+        {/* Noto Serif KR — 세리프 헤딩에 여러 컴포넌트가 인라인 fontFamily로
+            그대로 참조 중이라(문자열 다 안 바꿈, 위험 대비 최소 diff) 문자열은
+            유지하고 로딩 방식만 고친다. 3개 파일(NewsFeedTab/FrontPageView/
+            FrontPageArticleView)이 각자 컴포넌트 <style> 안에서 렌더 블로킹
+            @import를 중복 실행하던 걸(2026-08-06 폰트 감사에서 발견) 여기
+            <link> 하나로 통합 — preconnect로 왕복도 줄인다. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700;900&display=swap"
+        />
         {/* JSON-LD — WebSite + NewsMediaOrganization (E-E-A-T) */}
         <script
           type="application/ld+json"
@@ -170,6 +203,7 @@ export default function RootLayout({
           <a href="#main-content" className="skip-link">
             본문 바로가기
           </a>
+          <AnnouncementBar />
           {children}
           <ConditionalFooter />
         </Providers>

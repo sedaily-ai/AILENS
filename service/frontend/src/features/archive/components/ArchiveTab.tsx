@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import type { ArchivedSentence, MbtiArticle, TabType } from "@/shared/types/mbti";
 import { getWeekDays, isSameDay, getMonthDays } from "@/shared/utils/dateUtils";
 import { useAuth } from "@/features/auth";
@@ -9,10 +10,14 @@ import {
   deleteArchiveSentence,
   searchSimilarSentences,
   searchArticlesByKeywords,
+  fetchPopularArchiveSentences,
   type ArchiveSentenceResponse,
   type SimilarSentence,
   type KeywordArticle,
+  type PopularHighlight,
 } from "@/shared/lib/archiveApi";
+import { fetchTodayLetters, toTodayLetterCard, type TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
+import { letterHref } from "@/shared/lib/letterHref";
 
 type Article = MbtiArticle;
 
@@ -323,6 +328,18 @@ export function ArchiveTab({
 
       <div className="max-w-[600px] mx-auto px-6 py-10">
 
+        {/* 오늘의 한 문장 — "다른 사람들이 담은 문장"은 실사용자가 쌓여야
+            나타나므로, 서비스 초기엔 그마저도 비어있을 수 있다(2026-08-06
+            논의). 매일 실제로 발행되는 레터에서 자동으로 뽑아 항상 채워지는
+            층을 하나 더 둔다 — 누가 골라줄 필요 없이 오늘자 레터가 있으면
+            무조건 뜬다. 가짜 데이터 아님: 오늘 실제로 나간 문장 그대로. */}
+        <TodaysSentenceSection />
+
+        {/* 다른 사람들이 담은 문장 — 커뮤니티 탭(글쓰기 필요) 대체(2026-08-06).
+            로그인/보관 여부와 무관하게 항상 먼저 보여준다 — 빈 서랍일 때도
+            "다들 이런 걸 저장하는구나"가 첫 저장의 동기가 되도록. */}
+        <PopularHighlightsSection />
+
         {/* Loading skeleton */}
         {isLoading && (
           <div className="space-y-4 animate-pulse">
@@ -522,6 +539,144 @@ export function ArchiveTab({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── 오늘의 한 문장 ────────────────────────────────────────────────
+// "볼거리"가 실사용자 archive 축적에 의존하지 않도록 하는 항상-채워지는
+// 층(2026-08-06). 오늘 발행된 실제 레터의 closing_line(없으면 요약 문장)을
+// 그날짜 기준 결정적으로 하나 골라 보여준다 — 단어 퀴즈처럼 매일 자동으로
+// 바뀌는 습관형 콘텐츠지만, 여긴 조작 없이 그냥 보여주기만 한다.
+function TodaysSentenceSection() {
+  const [loading, setLoading] = useState(true);
+  const [letter, setLetter] = useState<TodayLetterCardLike | null>(null);
+  const [sentence, setSentence] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTodayLetters()
+      .then((res) => {
+        if (cancelled) return;
+        const candidates = res.letters.filter(
+          (l) => l.closing_line?.trim() || l.subtitle?.trim(),
+        );
+        if (candidates.length === 0) return;
+        const picked = candidates[new Date().getDate() % candidates.length];
+        const card = toTodayLetterCard(picked, res.date);
+        setSentence(picked.closing_line?.trim() || card.excerpt);
+        setLetter(card);
+      })
+      .catch(() => {
+        // 오늘 레터를 못 불러와도 이 섹션만 조용히 숨는다 — 서랍 나머지는
+        // 정상 동작해야 하므로 여기서 에러를 전파하지 않는다.
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 오늘 발행분이 없으면(휴일 등) 조용히 숨긴다 — 가짜로 채우지 않는다.
+  if (!loading && !letter) return null;
+
+  return (
+    <div className="mb-10">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+          <svg className="w-[18px] h-[18px] text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-[14px] font-bold text-gray-900">오늘의 한 문장</p>
+          <p className="text-[11px] text-gray-400">오늘 발행된 레터에서 골라봤어요</p>
+        </div>
+      </div>
+
+      {loading || !letter ? (
+        <div className="bg-gray-100 rounded-2xl h-[96px] animate-pulse" />
+      ) : (
+        <Link
+          href={letterHref(letter.letterId)}
+          className="block p-5 rounded-2xl transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+          style={{ background: letter.accentBg }}
+        >
+          <p className="text-[15px] font-medium leading-relaxed mb-3 text-gray-800">&quot;{sentence}&quot;</p>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={letter.editorAvatar} alt={letter.editorName} className="w-5 h-5 rounded-full object-cover" />
+            <span className="text-[12px] font-semibold" style={{ color: letter.accent }}>{letter.editorName}</span>
+            <span className="text-[11px] text-gray-400 truncate">· {letter.title}</span>
+          </div>
+        </Link>
+      )}
+    </div>
+  );
+}
+
+// ── 다른 사람들이 담은 문장 ────────────────────────────────────────
+// 커뮤니티 탭(업다운보트·댓글·"내 문장 공유하기" 글쓰기) 대체(2026-08-06) —
+// 신생 서비스에서 능동적 글쓰기는 냉스타트로 거의 확실히 실패한다는 판단.
+// 대신 다들 이미 하는 저비용 행동(문장 저장)만으로 채워지는 집계 피드
+// (Kindle Popular Highlights와 같은 패턴) — 유저 식별 정보는 아예 안 보여준다.
+function PopularHighlightsSection() {
+  const [highlights, setHighlights] = useState<PopularHighlight[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPopularArchiveSentences(12)
+      .then((data) => {
+        if (!cancelled) setHighlights(data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 표본이 아직 작아 집계 결과가 없으면(모두 1건뿐) 조용히 숨긴다 —
+  // 가짜로 채우지 않는다는 세션 전반의 원칙.
+  if (!loading && highlights.length === 0) return null;
+
+  return (
+    <div className="mb-12">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
+          <svg className="w-[18px] h-[18px] text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 0a4 4 0 100-8 4 4 0 000 8z" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-[14px] font-bold text-gray-900">다른 사람들이 담은 문장</p>
+          <p className="text-[11px] text-gray-400">여러 사람이 같이 눈여겨본 문장이에요</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-gray-100 rounded-2xl h-[72px]" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {highlights.map((h, idx) => (
+            <div key={`${h.article_id}-${idx}`} className="p-4 bg-gray-50 rounded-2xl">
+              <p className="text-[14px] text-gray-800 leading-relaxed line-clamp-2 mb-2">&quot;{h.text}&quot;</p>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] text-gray-400 truncate">{h.article_title}</span>
+                <span className="text-[11px] text-indigo-500 font-semibold flex-shrink-0">{h.count}명이 담았어요</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

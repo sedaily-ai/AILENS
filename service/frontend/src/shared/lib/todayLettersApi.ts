@@ -55,6 +55,12 @@ export interface ApiLetter {
   podcast_audio_url?: string | null;
   // 피드 카드 썸네일 (CMS 글 전용 — admin에서 지정 안 하면 null, 에디터 아바타로 폴백).
   cover_image_url?: string | null;
+  // 채널 목록 조회(fetchCmsPosts)로 여러 날짜가 섞여 나올 때만 필요 —
+  // fetchTodayLetters(date) 호출부는 이미 date 를 알고 있어 안 씀.
+  publish_date?: string | null;
+  // /letters 아카이브 필터용 가벼운 태그 — channel(letters)은 그대로 두고
+  // "트렌드"/"인기 칼럼"으로도 분류하고 싶을 때만 admin 이 지정.
+  section?: 'trend' | 'column' | null;
 }
 
 export interface ApiTodayLettersResponse {
@@ -79,16 +85,16 @@ export interface DisplayLetter extends ApiLetter {
  * 새 화면에서 이름/색상이 필요하면 **여기서 import** 할 것 (네 번째 출처 만들지 말 것).
  */
 export const PERSONA_META: Record<MbtiGroupId, Omit<DisplayLetter, keyof ApiLetter>> = {
-  NT: { editorName: '민철', editorRole: '전략 분석 에디터', editorAvatar: '/editors/intj.webp', accent: '#7c3aed', accentBg: '#ede9fe' },
-  NF: { editorName: '하은', editorRole: '오피니언 에디터', editorAvatar: '/editors/infp.webp', accent: '#e11d48', accentBg: '#ffe4e6' },
-  ST: { editorName: '준서', editorRole: '팩트 큐레이터', editorAvatar: '/editors/istj.webp', accent: '#059669', accentBg: '#d1fae5' },
-  SF: { editorName: '소율', editorRole: '트렌드 캐스터', editorAvatar: '/editors/esfp.webp', accent: '#d97706', accentBg: '#fef3c7' },
+  NT: { editorName: '민철', editorRole: '한 걸음 더 파고들기', editorAvatar: '/editors/intj.webp', accent: '#7c3aed', accentBg: '#ede9fe' },
+  NF: { editorName: '하은', editorRole: '내 생각은 이래요', editorAvatar: '/editors/infp.webp', accent: '#e11d48', accentBg: '#ffe4e6' },
+  ST: { editorName: '준서', editorRole: '팩트만 딱딱 정리', editorAvatar: '/editors/istj.webp', accent: '#059669', accentBg: '#d1fae5' },
+  SF: { editorName: '소율', editorRole: '가볍게 짚어주는 트렌드', editorAvatar: '/editors/esfp.webp', accent: '#d97706', accentBg: '#fef3c7' },
 };
 
 // 특정 에디터 없이 발행된 CMS 글 (mbti_group null) — 백엔드 _DEFAULT_EDITOR 와 동일 명의.
 const DEFAULT_META: Omit<DisplayLetter, keyof ApiLetter> = {
-  editorName: 'AI LENS 편집팀',
-  editorRole: '편집팀',
+  editorName: 'AI LENS',
+  editorRole: '팀이 함께 정리했어요',
   editorAvatar: '/lens.png',
   accent: '#111827',
   accentBg: '#f3f4f6',
@@ -206,6 +212,28 @@ function firstProseLine(body: string[]): string {
   return '';
 }
 
+// firstProseLine은 body[] 안에서 마커를 걸러내는데, subtitle 필드 자체에
+// "[주요 이슈 브리핑] ■ ..." 처럼 마커가 그대로 박혀 오는 경우는 안 걸러졌다
+// — "이슈 톡톡" 카드 설명글만 내부 포맷이 그대로 노출돼 정제 안 된 느낌을
+// 준다는 지적(2026-08-06)으로 발견. subtitle에도 같은 마커 제거를 적용.
+function stripLeadingMarkers(s: string): string {
+  let t = s.trim();
+  for (let i = 0; i < 3; i++) {
+    const bracket = t.match(BRACKET_LABEL_RE);
+    if (bracket && bracket[2].trim()) {
+      t = bracket[2].trim();
+      continue;
+    }
+    const section = t.match(SECTION_HEADER_RE);
+    if (section && section[1].trim()) {
+      t = section[1].trim();
+      continue;
+    }
+    break;
+  }
+  return t;
+}
+
 function truncate(s: string, max: number): string {
   const t = s.trim();
   return t.length <= max ? t : `${t.slice(0, max).trimEnd()}…`;
@@ -283,13 +311,13 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
     editorRole: meta.editorRole,
     editorAvatar: meta.editorAvatar,
     thumbnailUrl: letter.cover_image_url || null,
-    archetype: letter.archetype ?? `이번 주의 ${meta.editorRole}`,
+    archetype: letter.archetype ?? meta.editorRole,
     accent: meta.accent,
     accentBg: meta.accentBg,
     title: letter.headline,
     subtitle: letter.subtitle ?? '',
     excerpt: truncate(
-      letter.subtitle?.trim() ||
+      stripLeadingMarkers(letter.subtitle?.trim() || '') ||
         (letter.body_html ? stripHtml(letter.body_html) : firstProseLine(letter.body)),
       200,
     ),

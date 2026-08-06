@@ -43,14 +43,6 @@ function shiftDate(isoDate: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
-
-// "2026-05-24" → "5월 24일 토요일" (오늘/어제 상대 표현 안 씀, 항상 절대 날짜)
-function formatHeaderLabel(isoDate: string): string {
-  const [yy, mm, dd] = isoDate.split('-').map((s) => parseInt(s, 10));
-  const dow = DOW_KO[new Date(yy, mm - 1, dd).getDay()];
-  return `${mm}월 ${dd}일 ${dow}요일`;
-}
 
 export function FollowingFeed({ selectedGroup }: Props) {
   const today = useMemo(() => todayKST(), []);
@@ -106,8 +98,6 @@ export function FollowingFeed({ selectedGroup }: Props) {
     };
   }, [selectedGroup, selectedDate]);
 
-  const headerLabel = formatHeaderLabel(selectedDate);
-
   return (
     <section
       style={{
@@ -130,30 +120,33 @@ export function FollowingFeed({ selectedGroup }: Props) {
           Letter
         </p>
         <div className="flex items-center justify-between" style={{ gap: 8 }}>
+          {/* "OO월 OO일의 한 통 N편" + "발행분" 날짜 표기를 뺐다 — 매일 새로
+              발행되는 걸 강조하기보다, 계속 쌓이는 콘텐츠 더미처럼 보이게
+              (2026-08-06 피드백). 날짜가 궁금하면 카드 안 날짜로 충분하다. */}
+          {/* 섹션 제목 타이포 통일(2026-08-06) — 웹툰만 굵은 산세리프라 튀어
+              보인다는 지적으로, 홈 화면 섹션 제목을 전부 Pretendard Bold로
+              맞췄다(개별 레터 제목은 에디토리얼 느낌을 남기려 세리프 유지). */}
           <h2
-            className="font-medium text-gray-900"
+            className="text-gray-900"
             style={{
-              fontFamily: '"Noto Serif KR", serif',
               fontSize: 'clamp(22px, 5vw, 28px)',
-              letterSpacing: '-0.025em',
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
               lineHeight: 1.35,
             }}
           >
-            {headerLabel}의 한 통 {loading || empty ? '' : `${letters.length}편`}
+            이슈 톡톡
           </h2>
-          {/* /?tab=feed 는 홈과 상태가 같아 클릭해도 화면이 안 바뀌는 문제가 있었음 —
-              캘린더 페이지가 정확히 "다른 날짜 레터 둘러보기"를 담당하는 실제 목적지. */}
+          {/* 지금까지 발행된 전체 레터 목록 — 경제 캘린더로 잘못 연결돼 있던 걸
+              2026-08-06 수정(캘린더 페이지 자체를 폐기). */}
           <Link
-            href="/calendar"
+            href="/letters"
             className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors"
             style={{ fontSize: 13, fontWeight: 500 }}
           >
             더보기 →
           </Link>
         </div>
-        <p className="text-gray-500 mt-1" style={{ fontSize: 13, letterSpacing: '-0.005em' }}>
-          {`${selectedDate.replace(/-/g, '.')} 발행분`}
-        </p>
       </header>
 
       {empty && (
@@ -190,14 +183,25 @@ export function FollowingFeed({ selectedGroup }: Props) {
               prefetch
               className="group flex flex-col h-full overflow-hidden transition-all duration-200 hover:-translate-y-1"
               style={{
-                borderRadius: 16,
+                // "매거진 고급짐" 카드 톤(2026-08-06) — 정보성 카드(이슈 톡톡·트렌드·칼럼)만
+                // 이 톤으로: 둥근 라운드(16)는 앱스러운 느낌이라 액자처럼 각지게(8) 줄이고,
+                // 테두리는 없애 그림자만으로 경계를 주고, 그림자도 옅고 촘촘하게(뜬 느낌 대신
+                // 얹힌 느낌). 웹툰·스타일 등 "재미" 섹션은 원래 톤(둥근 라운드·팝코믹) 유지 —
+                // 정보엔 신뢰, 재미엔 텐션으로 톤을 나누기로 함(사용자 확인).
+                borderRadius: 8,
                 background: '#fff',
-                border: '1px solid #f1f1f0',
-                boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.05)',
+                boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
+                // 그림자만으로는 가장자리가 흐릿해 보일 수 있어 아주 옅은 헤어라인을
+                // 같이 준다(노션·리니어식 패턴) — 두꺼우면 촌스럽지만 이 정도 옅기는 괜찮다.
+                border: '1px solid rgba(0,0,0,0.06)',
                 textDecoration: 'none',
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
+              {/* 상단 컬러 바를 시도했다가 카드마다 다른 원색이 나란히 있으니 무지개
+                  줄무늬처럼 촌스러워 보였다(2026-08-06 피드백) — 뺐다. 매거진 고급짐은
+                  색을 아예 거의 안 쓰는 쪽이 맞다, 사진·타이포만으로 절제되게. */}
+
               {/* 썸네일 — 수동 매칭 사진(PoC, 옛 날짜 한정) > CMS 지정 썸네일 > 에디터 포트레이트 폴백 */}
               <div
                 className="aspect-square overflow-hidden"
@@ -213,12 +217,13 @@ export function FollowingFeed({ selectedGroup }: Props) {
               </div>
 
               <div style={{ padding: 'clamp(8px, 2vw, 12px)', display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                {/* 작가 라벨 */}
+                {/* 작가 라벨 — 색 있는 굵은 글씨 대신, 섹션 이거브로우(Trend/Letter)와
+                    같은 무채색 소문자 킥커 톤으로(2026-08-06, "매거진 고급짐" 통일). */}
                 <p
-                  className="font-semibold truncate"
-                  style={{ fontSize: 10.5, color: l.accent, letterSpacing: '0.01em', marginBottom: 4 }}
+                  className="truncate text-gray-400"
+                  style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}
                 >
-                  {l.editorName} · {l.archetype}
+                  {l.archetype}
                 </p>
 
                 {/* 글 제목 */}
@@ -239,7 +244,9 @@ export function FollowingFeed({ selectedGroup }: Props) {
                   {l.title}
                 </h3>
 
-                {/* 설명글 — subtitle 없으면 본문 첫 문장으로 폴백(최대 200자), 카드 폭에 맞춰 일부만 노출 */}
+                {/* 설명글 — subtitle 없으면 본문 첫 문장으로 폴백(최대 200자), 카드 폭에 맞춰 일부만 노출.
+                    4줄 클램프라 빽빽한 브리핑처럼 보였다("웹툰은 짧고 이야기하듯 쓰는데 이슈 톡톡은
+                    설명이 너무 빽빽하다", 2026-08-06) — 2줄로 줄여 더 가볍게. */}
                 <p
                   className="text-gray-500"
                   style={{
@@ -247,7 +254,7 @@ export function FollowingFeed({ selectedGroup }: Props) {
                     lineHeight: 1.5,
                     letterSpacing: '-0.005em',
                     display: '-webkit-box',
-                    WebkitLineClamp: 4,
+                    WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
                     marginBottom: 4,

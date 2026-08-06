@@ -52,8 +52,8 @@ export function FrontPageArticleView() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Noto Serif KR 로딩은 layout.tsx <head>의 <link>로 통합(2026-08-06) */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700;900&display=swap');
         .editorial-title { font-family: 'Noto Serif KR', serif; }
       `}</style>
 

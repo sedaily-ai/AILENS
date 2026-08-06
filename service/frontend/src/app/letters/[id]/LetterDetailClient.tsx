@@ -789,9 +789,14 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
 
       {letter.keywords.length > 0 && (
         <section style={{ borderTop: '1px solid #f3f4f6', paddingTop: 24, marginBottom: 24 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: 1.2, margin: '0 0 14px', textTransform: 'uppercase' }}>
-            단어
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: 1.2, margin: 0, textTransform: 'uppercase' }}>
+              단어
+            </p>
+            <Link href="/words" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>
+              전체 단어장 보기 →
+            </Link>
+          </div>
           {letter.keywords.map((kw, i) => (
             <div key={i} style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: '0 0 2px' }}>{kw.term}</p>

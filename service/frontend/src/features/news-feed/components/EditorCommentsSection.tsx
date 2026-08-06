@@ -26,8 +26,8 @@ interface PersonaMini {
 const PERSONAS: Record<MbtiGroupId, PersonaMini> = {
   NT: { group: 'NT', name: '민철', archetype: '분석가',       avatar: '/editors/intj.webp', editorId: 'NT-min', accent: '#7c3aed', soft: '#ede9fe' },
   NF: { group: 'NF', name: '하은', archetype: '이야기꾼',     avatar: '/editors/infp.webp', editorId: 'NF-ha',  accent: '#e11d48', soft: '#ffe4e6' },
-  ST: { group: 'ST', name: '준서', archetype: '팩트 큐레이터', avatar: '/editors/istj.webp', editorId: 'ST-jun', accent: '#059669', soft: '#d1fae5' },
-  SF: { group: 'SF', name: '소율', archetype: '트렌드 캐스터', avatar: '/editors/esfp.webp', editorId: 'SF-soy', accent: '#d97706', soft: '#fef3c7' },
+  ST: { group: 'ST', name: '준서', archetype: '실용주의자', avatar: '/editors/istj.webp', editorId: 'ST-jun', accent: '#059669', soft: '#d1fae5' },
+  SF: { group: 'SF', name: '소율', archetype: '공감러',     avatar: '/editors/esfp.webp', editorId: 'SF-soy', accent: '#d97706', soft: '#fef3c7' },
 };
 
 export function EditorCommentsSection({ otherLetters, letterDate }: Props) {

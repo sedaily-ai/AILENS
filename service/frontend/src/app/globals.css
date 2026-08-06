@@ -16,7 +16,7 @@
   --color-foreground: var(--color-text);
   --color-primary: #ffffff;
   --color-accent: #60a5fa;
-  --font-sans: 'Pretendard Variable', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: var(--font-pretendard), 'Pretendard Variable', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Merriweather', Georgia, 'Times New Roman', serif;
   --font-display: 'Playfair Display', Georgia, serif;
   --spacing-gutter: min(32px, 5vw);
@@ -27,7 +27,7 @@
 }
 
 html {
-  font-family: 'Pretendard Variable', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-pretendard), 'Pretendard Variable', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-y: scroll;
