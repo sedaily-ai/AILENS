@@ -46,7 +46,12 @@ aws s3 cp out/ "s3://$S3_BUCKET/" \
 
 echo ""
 echo "=== Stale 파일 정리 ==="
-aws s3 sync out/ "s3://$S3_BUCKET/" --delete --region "$S3_REGION" --no-progress
+# _next/static/* 는 --delete 대상에서 뺀다 — 이름이 콘텐츠 해시라 절대
+# 충돌하지 않고, 배포 순간에 이미 열려있던 탭이 옛 청크 파일을 그대로
+# 참조 중이면(클라이언트 사이드 네비게이션 시) 그 파일이 바로 지워져서
+# 요청이 걸리고 라우터가 멈춘다("무한 로딩", 새로고침해야 풀림) — 용량은
+# immutable 캐시라 무해하게 쌓이니 지울 이유가 없다.
+aws s3 sync out/ "s3://$S3_BUCKET/" --delete --exclude "_next/static/*" --region "$S3_REGION" --no-progress
 
 echo ""
 echo "=== CloudFront 무효화 (/* — 전체) ==="
