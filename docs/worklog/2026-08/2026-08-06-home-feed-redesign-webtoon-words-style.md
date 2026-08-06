@@ -33,15 +33,28 @@
 
 - 저장소 루트의 `images/`(1~4.png)는 코드에서 참조되지 않아 디자인 참고용으로
   판단, 커밋하지 않고 워킹트리에 그대로 뒀다(untracked).
-- 배포는 하지 않았다 — 사용자가 "푸시"만 요청, 별도 배포 요청 시 진행.
 
 ## 다음
 
-- 프로덕션 배포 필요 시: `service/backend/deploy.sh api`,
-  `admin/deploy-admin-api.sh`는 이번 변경과 무관(admin-api Lambda 쪽 변경 없음
-  — admin 콘솔 프론트만 바뀜), `admin/deploy-admin.sh`,
-  `service/frontend/deploy.sh` 3개.
 - 헤더에서 뺀 '내 서랍'·'에디터' 탭은 페이지·기능 자체는 살아있음 — 다시
   노출하려면 `headerTabs.ts`에 한 줄만 추가.
 - webtoon 콘텐츠는 아직 실제 발행 글이 없다 — admin에서 최소 1건 작성해
   `/webtoon` 목록·상세 흐름을 실데이터로 확인할 것.
+
+## 배포 (같은 날, 이어서)
+
+- `service/backend/deploy.sh api`(archive-dev + v2-posts-dev 포함),
+  `service/backend/admin/deploy-admin-api.sh`(`admin/routes/posts.py` 반영),
+  `admin/deploy-admin.sh`, `service/frontend/deploy.sh` 4개 전부 실행.
+- 배포 후 스모크 체크에서 `GET /api/archive/popular`만 404 — API Gateway에
+  이 경로 라우트가 아예 없었다(기존엔 `GET /api/archive`, `POST /api/archive`,
+  `POST /api/archive/similar`, `DELETE /api/archive/{archive_id}`만 존재).
+  Lambda 코드는 배포됐지만 API Gateway 단계에서 막힌 것 — 사용자 승인 받고
+  `GET /api/archive/popular` 라우트를 `sedaily-mbti-archive-dev` 통합
+  (`integrations/ppsg0c5`, 기존 `GET /api/archive`와 동일 통합)으로 신규
+  생성(`RouteId: 4hd28vl`). OPTIONS 라우트는 안 만들었다 — 프론트 호출이
+  커스텀 헤더 없는 단순 GET이라 preflight 자체가 안 뜬다.
+- 최종 확인: `ailens.sedaily.ai`/`/webtoon`/`/words`/`/style`/`/letters`
+  전부 200, `mbti-admin.sedaily.ai` 200, `/api/v2/today-letters` 200,
+  `/api/archive/popular` 200(더미 데모 데이터 8건 — 실제 아카이브 사용자가
+  없어 코드 배포 시점 시드 데이터로 추정, 확인 필요), `/api/v2/posts?channel=letters` 200.
