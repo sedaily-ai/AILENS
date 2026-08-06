@@ -74,22 +74,6 @@ function adaptV2FeedItem(v2: Record<string, unknown>): Article {
   };
 }
 
-// v2 Article API의 version 객체를 MbtiVersion shape로 변환.
-// v1의 tone 필드가 v2엔 없어서 빈 문자열로 채움. v1 frontend 컴포넌트는 tone을
-// 표시 용도로만 쓰며, 빈 문자열이면 단순히 안 보임 (data-driven hide 패턴).
-function adaptV2Version(v2Version: Record<string, unknown>): MbtiVersion {
-  return {
-    title: (v2Version.title as string) || '',
-    subtitle: (v2Version.subtitle as string) || '',
-    body: (v2Version.body as string) || '',
-    key_points: Array.isArray(v2Version.key_points)
-      ? (v2Version.key_points as string[])
-      : [],
-    closing_line: (v2Version.closing_line as string) || '',
-    tone: '',
-  };
-}
-
 interface Props {
   selectedGroup: MbtiGroupId;
   onChangeGroup: () => void;
@@ -140,6 +124,179 @@ const getMonthDays = (year: number, month: number): (Date | null)[] => {
   }
   return days;
 };
+
+// 유저 프로필 데이터 (온도, 칭호, MBTI, 아바타)
+const userProfiles: { [key: string]: { temperature: number; title: string; titleType: 'crown' | 'star' | 'lightning' | 'heart' | 'book' | 'chart'; badges: { name: string; type: 'trophy' | 'fire' | 'chat' | 'bulb' | 'target' | 'chart' }[]; mbti: string; avatar: string } } = {
+  "서연": { temperature: 48.5, title: "분석의 여왕", titleType: "crown", badges: [{ name: "추천왕", type: "trophy" }, { name: "데이터러버", type: "chart" }], mbti: "INTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=analyst&backgroundColor=e8f4f8&scale=90" },
+  "하은": { temperature: 52.3, title: "스토리텔러", titleType: "star", badges: [{ name: "수다쟁이", type: "chat" }, { name: "트렌드세터", type: "target" }], mbti: "ENFP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=storyteller&backgroundColor=faf5ff&scale=90" },
+  "지우": { temperature: 44.8, title: "실용주의자", titleType: "lightning", badges: [{ name: "아이디어뱅크", type: "bulb" }], mbti: "ISTP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=practical&backgroundColor=f0fdf4&scale=90" },
+  "민준": { temperature: 56.2, title: "친화력甲", titleType: "heart", badges: [{ name: "공감왕", type: "trophy" }], mbti: "ESFJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=friend&backgroundColor=fff7ed&scale=90" },
+  "도윤": { temperature: 41.2, title: "전략가", titleType: "chart", badges: [{ name: "인사이트", type: "bulb" }], mbti: "ENTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=leader&backgroundColor=fef3c7&scale=90" },
+  "수아": { temperature: 49.7, title: "문장수집가", titleType: "book", badges: [{ name: "필사러", type: "chat" }], mbti: "INFJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=dreamer&backgroundColor=e0e7ff&scale=90" },
+  "예준": { temperature: 38.5, title: "지식탐구자", titleType: "book", badges: [{ name: "논리왕", type: "trophy" }], mbti: "INTP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=thinker&backgroundColor=f3e8ff&scale=90" },
+  "시우": { temperature: 58.9, title: "액션히어로", titleType: "lightning", badges: [{ name: "속도왕", type: "fire" }], mbti: "ESTP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=action&backgroundColor=fce7f3&scale=90" },
+  "지아": { temperature: 47.3, title: "감성러버", titleType: "heart", badges: [{ name: "힐링메이커", type: "target" }], mbti: "ISFP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=artist&backgroundColor=ccfbf1&scale=90" },
+  "현우": { temperature: 43.1, title: "원칙주의자", titleType: "chart", badges: [{ name: "팩트체커", type: "target" }], mbti: "ESTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=exec&backgroundColor=fee2e2&scale=90" },
+  "유나": { temperature: 54.6, title: "응원단장", titleType: "star", badges: [{ name: "에너자이저", type: "fire" }], mbti: "ENFJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=mentor&backgroundColor=dbeafe&scale=90" },
+  "준서": { temperature: 42.0, title: "신뢰의 아이콘", titleType: "heart", badges: [{ name: "약속지킴이", type: "trophy" }], mbti: "ISTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=steady&backgroundColor=fef9c3&scale=90" },
+  "채원": { temperature: 61.2, title: "분위기메이커", titleType: "star", badges: [{ name: "파티플래너", type: "target" }], mbti: "ESFP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=performer&backgroundColor=d1fae5&scale=90" },
+};
+
+// 타이틀 아이콘 SVG
+const TitleIcon = ({ type, className = "w-4 h-4" }: { type: string; className?: string }) => {
+  const icons: { [key: string]: React.ReactElement } = {
+    crown: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.5 5 5.5.5-4 4 1 5.5-5-3-5 3 1-5.5-4-4 5.5-.5L12 3z" /></svg>,
+    star: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>,
+    lightning: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>,
+    heart: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>,
+    book: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>,
+    chart: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>,
+  };
+  return icons[type] || icons.star;
+};
+
+// 뱃지 아이콘 SVG
+const BadgeIcon = ({ type, className = "w-3 h-3" }: { type: string; className?: string }) => {
+  const icons: { [key: string]: React.ReactElement } = {
+    trophy: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0" /></svg>,
+    fire: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" /></svg>,
+    chat: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg>,
+    bulb: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>,
+    target: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 15a3 3 0 100-6 3 3 0 000 6z" /></svg>,
+  };
+  return icons[type] || icons.trophy;
+};
+
+// 온도에 따른 색상
+const getTemperatureColor = (temp: number) => {
+  if (temp >= 55) return "text-red-500";
+  if (temp >= 45) return "text-orange-500";
+  if (temp >= 35) return "text-yellow-500";
+  return "text-blue-500";
+};
+
+const getTemperatureBarColor = (temp: number) => {
+  if (temp >= 55) return "from-red-400 to-orange-400";
+  if (temp >= 45) return "from-orange-400 to-yellow-400";
+  if (temp >= 35) return "from-yellow-400 to-green-400";
+  return "from-blue-400 to-cyan-400";
+};
+
+// 커뮤니티 목업 데이터 - 아카이빙 문장 + 코멘트 형태
+const mockCommunityPosts: {
+  id: string; userName: string; userMbti: string; userAvatar: string;
+  timeAgo: string; archivedSentence: string; userComment: string;
+  articleTitle: string; tags: string[]; upvotes: number;
+  commentCount: number; commentList: { id: string; userName: string; userMbti: string; userAvatar: string; text: string; timeAgo: string; likes: number }[];
+}[] = [
+  {
+    id: "mock-1",
+    userName: "서연",
+    userMbti: "INTJ",
+    userAvatar: userProfiles["서연"].avatar,
+    timeAgo: "2시간 전",
+    archivedSentence: "삼성전자가 HBM3E 12단을 엔비디아 차세대 GPU에 단독 공급하기로 했다.",
+    userComment: "드디어 HBM 점유율 역전 신호. SK하이닉스가 선점한 HBM 시장이 흔들리는 변곡점이라고 봐요. 단독 공급은 협상력에서 큰 차이를 만듭니다.",
+    articleTitle: "삼성전자, 엔비디아 차세대 GPU에 HBM3E 12단 단독 공급",
+    tags: ["반도체", "AI", "빅테크"],
+    upvotes: 124,
+    commentCount: 3,
+    commentList: [
+      { id: "c1-1", userName: "도윤", userMbti: "ENTJ", userAvatar: userProfiles["도윤"].avatar, text: "단독 공급이 진짜면 게임체인저죠. 다만 수율 안정화가 관건.", timeAgo: "1시간 전", likes: 12 },
+      { id: "c1-2", userName: "예준", userMbti: "INTP", userAvatar: userProfiles["예준"].avatar, text: "수율 데이터 공개 전엔 신중하게 봐야 함. 루머일 가능성도.", timeAgo: "45분 전", likes: 8 },
+      { id: "c1-3", userName: "현우", userMbti: "ESTJ", userAvatar: userProfiles["현우"].avatar, text: "실적 발표 시 확인 가능. 일단 시장은 반응 중.", timeAgo: "30분 전", likes: 5 },
+    ],
+  },
+  {
+    id: "mock-2",
+    userName: "하은",
+    userMbti: "ENFP",
+    userAvatar: userProfiles["하은"].avatar,
+    timeAgo: "3시간 전",
+    archivedSentence: "금리 인하 시점이 늦춰질수록 부동산 시장의 양극화는 더 깊어진다.",
+    userComment: "이 문장에 진짜 공감해요. 강남이랑 지방 격차가 점점 벌어지는데 금리만 탓하긴 어려운 거 같아요. 결국 사람들이 모이는 곳에 돈이 모이는 구조.",
+    articleTitle: "美 연준 금리 동결 기조 장기화…국내 부동산 양극화 심화",
+    tags: ["금리", "부동산"],
+    upvotes: 89,
+    commentCount: 2,
+    commentList: [
+      { id: "c2-1", userName: "지아", userMbti: "ISFP", userAvatar: userProfiles["지아"].avatar, text: "지방 살이라 더 체감돼요... 진짜 답답합니다.", timeAgo: "2시간 전", likes: 15 },
+      { id: "c2-2", userName: "민준", userMbti: "ESFJ", userAvatar: userProfiles["민준"].avatar, text: "주변에서도 비슷한 이야기 많이 들어요. 정책이 좀 풀리길.", timeAgo: "1시간 전", likes: 7 },
+    ],
+  },
+  {
+    id: "mock-3",
+    userName: "수아",
+    userMbti: "INFJ",
+    userAvatar: userProfiles["수아"].avatar,
+    timeAgo: "5시간 전",
+    archivedSentence: "전기차 캐즘은 단순한 수요 둔화가 아니라 소비자 신뢰의 위기다.",
+    userComment: "캐즘이라는 표현이 와닿네요. 충전 인프라, 배터리 화재, 중고차 잔존가치... 신뢰가 무너지면 가격으로도 회복이 어렵죠.",
+    articleTitle: "전기차 수요 둔화 장기화…완성차 업계, '캐즘' 돌파 전략 고심",
+    tags: ["전기차", "투자"],
+    upvotes: 67,
+    commentCount: 4,
+    commentList: [
+      { id: "c3-1", userName: "지우", userMbti: "ISTP", userAvatar: userProfiles["지우"].avatar, text: "현실적으로 가격이 답이긴 한데, 중국차 대비 경쟁력이 애매.", timeAgo: "4시간 전", likes: 20 },
+      { id: "c3-2", userName: "시우", userMbti: "ESTP", userAvatar: userProfiles["시우"].avatar, text: "그래도 일단 사봐야 안다. 타보면 좋음 ㅋㅋ", timeAgo: "3시간 전", likes: 9 },
+      { id: "c3-3", userName: "유나", userMbti: "ENFJ", userAvatar: userProfiles["유나"].avatar, text: "결국 인프라가 받쳐줘야 신뢰가 생기죠. 정부 차원 투자 필요.", timeAgo: "2시간 전", likes: 11 },
+      { id: "c3-4", userName: "준서", userMbti: "ISTJ", userAvatar: userProfiles["준서"].avatar, text: "데이터 보면 캐즘은 명확. 다만 회복 시점이 문제.", timeAgo: "1시간 전", likes: 6 },
+    ],
+  },
+  {
+    id: "mock-4",
+    userName: "도윤",
+    userMbti: "ENTJ",
+    userAvatar: userProfiles["도윤"].avatar,
+    timeAgo: "7시간 전",
+    archivedSentence: "AI 인프라 투자가 거품이라는 우려에도 빅테크의 자본지출은 멈추지 않는다.",
+    userComment: "거품 논쟁은 항상 있었음. 닷컴 버블도 결국 살아남는 기업이 인터넷 시대를 정의했듯, AI도 같은 패턴 갈 거라 봅니다. 베팅 사이즈가 다를 뿐.",
+    articleTitle: "MS·구글·메타 AI 인프라 투자 확대…거품 우려에도 베팅 가속",
+    tags: ["AI", "빅테크", "투자"],
+    upvotes: 156,
+    commentCount: 5,
+    commentList: [
+      { id: "c4-1", userName: "예준", userMbti: "INTP", userAvatar: userProfiles["예준"].avatar, text: "ROI가 명확히 나오기 전엔 신중하게. 닷컴 때도 살아남은 기업은 소수.", timeAgo: "5시간 전", likes: 22 },
+      { id: "c4-2", userName: "서연", userMbti: "INTJ", userAvatar: userProfiles["서연"].avatar, text: "현금흐름 보면 빅테크는 버틸 수 있음. 스타트업 거품이 위험.", timeAgo: "4시간 전", likes: 18 },
+      { id: "c4-3", userName: "채원", userMbti: "ESFP", userAvatar: userProfiles["채원"].avatar, text: "오 이거 재밌네요. 그래서 어디 사면 돼요? ㅋㅋ", timeAgo: "3시간 전", likes: 4 },
+    ],
+  },
+  {
+    id: "mock-5",
+    userName: "민준",
+    userMbti: "ESFJ",
+    userAvatar: userProfiles["민준"].avatar,
+    timeAgo: "12시간 전",
+    archivedSentence: "투자는 결국 시간과 인내, 그리고 분산이라는 세 가지 원칙으로 수렴한다.",
+    userComment: "복잡한 분석보다 이 세 가지 지키는 게 더 어려운 것 같아요. 특히 분산. 다들 한 종목에 몰빵하고 싶어하잖아요.",
+    articleTitle: "장기투자 원칙 재조명…변동성 시대의 자산 배분 전략",
+    tags: ["투자"],
+    upvotes: 78,
+    commentCount: 2,
+    commentList: [
+      { id: "c5-1", userName: "준서", userMbti: "ISTJ", userAvatar: userProfiles["준서"].avatar, text: "맞아요. 분산이 제일 어렵죠. 자기 확신이 강할수록 더.", timeAgo: "10시간 전", likes: 14 },
+      { id: "c5-2", userName: "지아", userMbti: "ISFP", userAvatar: userProfiles["지아"].avatar, text: "조금씩 적립식으로 가는 게 마음 편하긴 해요.", timeAgo: "8시간 전", likes: 6 },
+    ],
+  },
+  {
+    id: "mock-6",
+    userName: "시우",
+    userMbti: "ESTP",
+    userAvatar: userProfiles["시우"].avatar,
+    timeAgo: "1일 전",
+    archivedSentence: "엔비디아 시가총액이 3조 달러를 돌파하며 애플을 제쳤다.",
+    userComment: "솔직히 이거 보고 놀랐음. 1년 전만 해도 상상 못 했는데. AI 사이클이 진짜인지, 이 가격이 적정인지는 모르겠지만 모멘텀은 확실.",
+    articleTitle: "엔비디아 시총 3조 달러 돌파…애플 제치고 글로벌 2위",
+    tags: ["AI", "반도체", "빅테크"],
+    upvotes: 201,
+    commentCount: 3,
+    commentList: [
+      { id: "c6-1", userName: "하은", userMbti: "ENFP", userAvatar: userProfiles["하은"].avatar, text: "와 이게 진짜로 일어났네요... 시대가 바뀌는 게 느껴져요.", timeAgo: "20시간 전", likes: 25 },
+      { id: "c6-2", userName: "현우", userMbti: "ESTJ", userAvatar: userProfiles["현우"].avatar, text: "PER 보면 부담스러운 건 사실. 다만 성장률이 받쳐주면 정당화 가능.", timeAgo: "18시간 전", likes: 13 },
+      { id: "c6-3", userName: "도윤", userMbti: "ENTJ", userAvatar: userProfiles["도윤"].avatar, text: "다음 타깃은 5조. 가능할 거라 봅니다.", timeAgo: "12시간 전", likes: 9 },
+    ],
+  },
+];
 
 export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
   const router = useRouter();
@@ -348,179 +505,6 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
   // 유저 프로필 모달
   const [selectedUser, setSelectedUser] = useState<{ userName: string; userMbti: string; userAvatar: string } | null>(null);
 
-  // 유저 프로필 데이터 (온도, 칭호, MBTI, 아바타)
-  const userProfiles: { [key: string]: { temperature: number; title: string; titleType: 'crown' | 'star' | 'lightning' | 'heart' | 'book' | 'chart'; badges: { name: string; type: 'trophy' | 'fire' | 'chat' | 'bulb' | 'target' | 'chart' }[]; mbti: string; avatar: string } } = {
-    "서연": { temperature: 48.5, title: "분석의 여왕", titleType: "crown", badges: [{ name: "추천왕", type: "trophy" }, { name: "데이터러버", type: "chart" }], mbti: "INTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=analyst&backgroundColor=e8f4f8&scale=90" },
-    "하은": { temperature: 52.3, title: "스토리텔러", titleType: "star", badges: [{ name: "수다쟁이", type: "chat" }, { name: "트렌드세터", type: "target" }], mbti: "ENFP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=storyteller&backgroundColor=faf5ff&scale=90" },
-    "지우": { temperature: 44.8, title: "실용주의자", titleType: "lightning", badges: [{ name: "아이디어뱅크", type: "bulb" }], mbti: "ISTP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=practical&backgroundColor=f0fdf4&scale=90" },
-    "민준": { temperature: 56.2, title: "친화력甲", titleType: "heart", badges: [{ name: "공감왕", type: "trophy" }], mbti: "ESFJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=friend&backgroundColor=fff7ed&scale=90" },
-    "도윤": { temperature: 41.2, title: "전략가", titleType: "chart", badges: [{ name: "인사이트", type: "bulb" }], mbti: "ENTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=leader&backgroundColor=fef3c7&scale=90" },
-    "수아": { temperature: 49.7, title: "문장수집가", titleType: "book", badges: [{ name: "필사러", type: "chat" }], mbti: "INFJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=dreamer&backgroundColor=e0e7ff&scale=90" },
-    "예준": { temperature: 38.5, title: "지식탐구자", titleType: "book", badges: [{ name: "논리왕", type: "trophy" }], mbti: "INTP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=thinker&backgroundColor=f3e8ff&scale=90" },
-    "시우": { temperature: 58.9, title: "액션히어로", titleType: "lightning", badges: [{ name: "속도왕", type: "fire" }], mbti: "ESTP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=action&backgroundColor=fce7f3&scale=90" },
-    "지아": { temperature: 47.3, title: "감성러버", titleType: "heart", badges: [{ name: "힐링메이커", type: "target" }], mbti: "ISFP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=artist&backgroundColor=ccfbf1&scale=90" },
-    "현우": { temperature: 43.1, title: "원칙주의자", titleType: "chart", badges: [{ name: "팩트체커", type: "target" }], mbti: "ESTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=exec&backgroundColor=fee2e2&scale=90" },
-    "유나": { temperature: 54.6, title: "응원단장", titleType: "star", badges: [{ name: "에너자이저", type: "fire" }], mbti: "ENFJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=mentor&backgroundColor=dbeafe&scale=90" },
-    "준서": { temperature: 42.0, title: "신뢰의 아이콘", titleType: "heart", badges: [{ name: "약속지킴이", type: "trophy" }], mbti: "ISTJ", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=steady&backgroundColor=fef9c3&scale=90" },
-    "채원": { temperature: 61.2, title: "분위기메이커", titleType: "star", badges: [{ name: "파티플래너", type: "target" }], mbti: "ESFP", avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=performer&backgroundColor=d1fae5&scale=90" },
-  };
-
-  // 타이틀 아이콘 SVG
-  const TitleIcon = ({ type, className = "w-4 h-4" }: { type: string; className?: string }) => {
-    const icons: { [key: string]: React.ReactElement } = {
-      crown: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.5 5 5.5.5-4 4 1 5.5-5-3-5 3 1-5.5-4-4 5.5-.5L12 3z" /></svg>,
-      star: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>,
-      lightning: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>,
-      heart: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>,
-      book: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>,
-      chart: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>,
-    };
-    return icons[type] || icons.star;
-  };
-
-  // 뱃지 아이콘 SVG
-  const BadgeIcon = ({ type, className = "w-3 h-3" }: { type: string; className?: string }) => {
-    const icons: { [key: string]: React.ReactElement } = {
-      trophy: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0" /></svg>,
-      fire: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" /></svg>,
-      chat: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg>,
-      bulb: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>,
-      target: <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 15a3 3 0 100-6 3 3 0 000 6z" /></svg>,
-    };
-    return icons[type] || icons.trophy;
-  };
-
-  // 온도에 따른 색상
-  const getTemperatureColor = (temp: number) => {
-    if (temp >= 55) return "text-red-500";
-    if (temp >= 45) return "text-orange-500";
-    if (temp >= 35) return "text-yellow-500";
-    return "text-blue-500";
-  };
-
-  const getTemperatureBarColor = (temp: number) => {
-    if (temp >= 55) return "from-red-400 to-orange-400";
-    if (temp >= 45) return "from-orange-400 to-yellow-400";
-    if (temp >= 35) return "from-yellow-400 to-green-400";
-    return "from-blue-400 to-cyan-400";
-  };
-
-  // 커뮤니티 목업 데이터 - 아카이빙 문장 + 코멘트 형태
-  const mockCommunityPosts: {
-    id: string; userName: string; userMbti: string; userAvatar: string;
-    timeAgo: string; archivedSentence: string; userComment: string;
-    articleTitle: string; tags: string[]; upvotes: number;
-    commentCount: number; commentList: { id: string; userName: string; userMbti: string; userAvatar: string; text: string; timeAgo: string; likes: number }[];
-  }[] = [
-    {
-      id: "mock-1",
-      userName: "서연",
-      userMbti: "INTJ",
-      userAvatar: userProfiles["서연"].avatar,
-      timeAgo: "2시간 전",
-      archivedSentence: "삼성전자가 HBM3E 12단을 엔비디아 차세대 GPU에 단독 공급하기로 했다.",
-      userComment: "드디어 HBM 점유율 역전 신호. SK하이닉스가 선점한 HBM 시장이 흔들리는 변곡점이라고 봐요. 단독 공급은 협상력에서 큰 차이를 만듭니다.",
-      articleTitle: "삼성전자, 엔비디아 차세대 GPU에 HBM3E 12단 단독 공급",
-      tags: ["반도체", "AI", "빅테크"],
-      upvotes: 124,
-      commentCount: 3,
-      commentList: [
-        { id: "c1-1", userName: "도윤", userMbti: "ENTJ", userAvatar: userProfiles["도윤"].avatar, text: "단독 공급이 진짜면 게임체인저죠. 다만 수율 안정화가 관건.", timeAgo: "1시간 전", likes: 12 },
-        { id: "c1-2", userName: "예준", userMbti: "INTP", userAvatar: userProfiles["예준"].avatar, text: "수율 데이터 공개 전엔 신중하게 봐야 함. 루머일 가능성도.", timeAgo: "45분 전", likes: 8 },
-        { id: "c1-3", userName: "현우", userMbti: "ESTJ", userAvatar: userProfiles["현우"].avatar, text: "실적 발표 시 확인 가능. 일단 시장은 반응 중.", timeAgo: "30분 전", likes: 5 },
-      ],
-    },
-    {
-      id: "mock-2",
-      userName: "하은",
-      userMbti: "ENFP",
-      userAvatar: userProfiles["하은"].avatar,
-      timeAgo: "3시간 전",
-      archivedSentence: "금리 인하 시점이 늦춰질수록 부동산 시장의 양극화는 더 깊어진다.",
-      userComment: "이 문장에 진짜 공감해요. 강남이랑 지방 격차가 점점 벌어지는데 금리만 탓하긴 어려운 거 같아요. 결국 사람들이 모이는 곳에 돈이 모이는 구조.",
-      articleTitle: "美 연준 금리 동결 기조 장기화…국내 부동산 양극화 심화",
-      tags: ["금리", "부동산"],
-      upvotes: 89,
-      commentCount: 2,
-      commentList: [
-        { id: "c2-1", userName: "지아", userMbti: "ISFP", userAvatar: userProfiles["지아"].avatar, text: "지방 살이라 더 체감돼요... 진짜 답답합니다.", timeAgo: "2시간 전", likes: 15 },
-        { id: "c2-2", userName: "민준", userMbti: "ESFJ", userAvatar: userProfiles["민준"].avatar, text: "주변에서도 비슷한 이야기 많이 들어요. 정책이 좀 풀리길.", timeAgo: "1시간 전", likes: 7 },
-      ],
-    },
-    {
-      id: "mock-3",
-      userName: "수아",
-      userMbti: "INFJ",
-      userAvatar: userProfiles["수아"].avatar,
-      timeAgo: "5시간 전",
-      archivedSentence: "전기차 캐즘은 단순한 수요 둔화가 아니라 소비자 신뢰의 위기다.",
-      userComment: "캐즘이라는 표현이 와닿네요. 충전 인프라, 배터리 화재, 중고차 잔존가치... 신뢰가 무너지면 가격으로도 회복이 어렵죠.",
-      articleTitle: "전기차 수요 둔화 장기화…완성차 업계, '캐즘' 돌파 전략 고심",
-      tags: ["전기차", "투자"],
-      upvotes: 67,
-      commentCount: 4,
-      commentList: [
-        { id: "c3-1", userName: "지우", userMbti: "ISTP", userAvatar: userProfiles["지우"].avatar, text: "현실적으로 가격이 답이긴 한데, 중국차 대비 경쟁력이 애매.", timeAgo: "4시간 전", likes: 20 },
-        { id: "c3-2", userName: "시우", userMbti: "ESTP", userAvatar: userProfiles["시우"].avatar, text: "그래도 일단 사봐야 안다. 타보면 좋음 ㅋㅋ", timeAgo: "3시간 전", likes: 9 },
-        { id: "c3-3", userName: "유나", userMbti: "ENFJ", userAvatar: userProfiles["유나"].avatar, text: "결국 인프라가 받쳐줘야 신뢰가 생기죠. 정부 차원 투자 필요.", timeAgo: "2시간 전", likes: 11 },
-        { id: "c3-4", userName: "준서", userMbti: "ISTJ", userAvatar: userProfiles["준서"].avatar, text: "데이터 보면 캐즘은 명확. 다만 회복 시점이 문제.", timeAgo: "1시간 전", likes: 6 },
-      ],
-    },
-    {
-      id: "mock-4",
-      userName: "도윤",
-      userMbti: "ENTJ",
-      userAvatar: userProfiles["도윤"].avatar,
-      timeAgo: "7시간 전",
-      archivedSentence: "AI 인프라 투자가 거품이라는 우려에도 빅테크의 자본지출은 멈추지 않는다.",
-      userComment: "거품 논쟁은 항상 있었음. 닷컴 버블도 결국 살아남는 기업이 인터넷 시대를 정의했듯, AI도 같은 패턴 갈 거라 봅니다. 베팅 사이즈가 다를 뿐.",
-      articleTitle: "MS·구글·메타 AI 인프라 투자 확대…거품 우려에도 베팅 가속",
-      tags: ["AI", "빅테크", "투자"],
-      upvotes: 156,
-      commentCount: 5,
-      commentList: [
-        { id: "c4-1", userName: "예준", userMbti: "INTP", userAvatar: userProfiles["예준"].avatar, text: "ROI가 명확히 나오기 전엔 신중하게. 닷컴 때도 살아남은 기업은 소수.", timeAgo: "5시간 전", likes: 22 },
-        { id: "c4-2", userName: "서연", userMbti: "INTJ", userAvatar: userProfiles["서연"].avatar, text: "현금흐름 보면 빅테크는 버틸 수 있음. 스타트업 거품이 위험.", timeAgo: "4시간 전", likes: 18 },
-        { id: "c4-3", userName: "채원", userMbti: "ESFP", userAvatar: userProfiles["채원"].avatar, text: "오 이거 재밌네요. 그래서 어디 사면 돼요? ㅋㅋ", timeAgo: "3시간 전", likes: 4 },
-      ],
-    },
-    {
-      id: "mock-5",
-      userName: "민준",
-      userMbti: "ESFJ",
-      userAvatar: userProfiles["민준"].avatar,
-      timeAgo: "12시간 전",
-      archivedSentence: "투자는 결국 시간과 인내, 그리고 분산이라는 세 가지 원칙으로 수렴한다.",
-      userComment: "복잡한 분석보다 이 세 가지 지키는 게 더 어려운 것 같아요. 특히 분산. 다들 한 종목에 몰빵하고 싶어하잖아요.",
-      articleTitle: "장기투자 원칙 재조명…변동성 시대의 자산 배분 전략",
-      tags: ["투자"],
-      upvotes: 78,
-      commentCount: 2,
-      commentList: [
-        { id: "c5-1", userName: "준서", userMbti: "ISTJ", userAvatar: userProfiles["준서"].avatar, text: "맞아요. 분산이 제일 어렵죠. 자기 확신이 강할수록 더.", timeAgo: "10시간 전", likes: 14 },
-        { id: "c5-2", userName: "지아", userMbti: "ISFP", userAvatar: userProfiles["지아"].avatar, text: "조금씩 적립식으로 가는 게 마음 편하긴 해요.", timeAgo: "8시간 전", likes: 6 },
-      ],
-    },
-    {
-      id: "mock-6",
-      userName: "시우",
-      userMbti: "ESTP",
-      userAvatar: userProfiles["시우"].avatar,
-      timeAgo: "1일 전",
-      archivedSentence: "엔비디아 시가총액이 3조 달러를 돌파하며 애플을 제쳤다.",
-      userComment: "솔직히 이거 보고 놀랐음. 1년 전만 해도 상상 못 했는데. AI 사이클이 진짜인지, 이 가격이 적정인지는 모르겠지만 모멘텀은 확실.",
-      articleTitle: "엔비디아 시총 3조 달러 돌파…애플 제치고 글로벌 2위",
-      tags: ["AI", "반도체", "빅테크"],
-      upvotes: 201,
-      commentCount: 3,
-      commentList: [
-        { id: "c6-1", userName: "하은", userMbti: "ENFP", userAvatar: userProfiles["하은"].avatar, text: "와 이게 진짜로 일어났네요... 시대가 바뀌는 게 느껴져요.", timeAgo: "20시간 전", likes: 25 },
-        { id: "c6-2", userName: "현우", userMbti: "ESTJ", userAvatar: userProfiles["현우"].avatar, text: "PER 보면 부담스러운 건 사실. 다만 성장률이 받쳐주면 정당화 가능.", timeAgo: "18시간 전", likes: 13 },
-        { id: "c6-3", userName: "도윤", userMbti: "ENTJ", userAvatar: userProfiles["도윤"].avatar, text: "다음 타깃은 5조. 가능할 거라 봅니다.", timeAgo: "12시간 전", likes: 9 },
-      ],
-    },
-  ];
-
   const [communityPosts, setCommunityPosts] = useState<{
     id: string; userName: string; userMbti: string; userAvatar: string;
     timeAgo: string; archivedSentence: string; userComment: string;
@@ -544,79 +528,6 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
     const dateStr = formatDateStr(selectedDate);
     fetchDailyQuestions(dateStr).then(qs => setAiQuestions(qs));
   }, [selectedDate]);
-
-  // 프리페칭
-  const prefetchingRef = useRef<Set<string>>(new Set());
-
-  // Prefetch — Round 4: 1 fetch with ?include_all_mbti=true (4-parallel
-  // fallback retained). ArticleView가 진입 시 같은 패턴으로 4 MBTI를
-  // 받아오지만, hover/scroll로 미리 받아두면 카드 클릭 직후 첫 표시
-  // latency를 더 줄일 수 있음. 4 entries 모두 있어야 캐시 저장 (부분
-  // 실패면 ArticleView 진입 시 다시 시도).
-  const prefetchArticle = useCallback((article: Article) => {
-    const id = article.news_id;
-    if (id.startsWith('mock-')) return;
-    if (prefetchCache.has(id) || prefetchingRef.current.has(id)) return;
-    if (article.versions && Object.keys(article.versions).length === 4) return;
-
-    prefetchingRef.current.add(id);
-    const groups = ['NT', 'NF', 'ST', 'SF'] as const;
-    // Use NT as the primary mbti for the single-fetch path. The choice
-    // doesn't affect what we cache (we only read all_versions in Path A);
-    // it just satisfies the required ?mbti param.
-    const primaryGroup = groups[0];
-
-    fetch(
-      `${API_URL}/api/v2/article/${id}?mbti=${primaryGroup}&include_all_mbti=true`
-    )
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        // Path A: full all_versions present.
-        if (
-          data &&
-          data.all_versions &&
-          typeof data.all_versions === 'object' &&
-          groups.every((g) => data.all_versions[g])
-        ) {
-          const versions: Record<string, MbtiVersion> = {};
-          groups.forEach((g) => {
-            versions[g] = adaptV2Version(
-              data.all_versions[g] as Record<string, unknown>
-            );
-          });
-          prefetchCache.set(id, { ...article, versions });
-          return;
-        }
-        // Path B: fallback to 4-parallel.
-        return Promise.all(
-          groups.map((g) =>
-            fetch(`${API_URL}/api/v2/article/${id}?mbti=${g}`).then((r) =>
-              r.ok ? r.json() : null
-            )
-          )
-        ).then((results) => {
-          const versions: Record<string, MbtiVersion> = {};
-          let allOk = true;
-          results.forEach((r, i) => {
-            if (r && r.version) {
-              versions[groups[i]] = adaptV2Version(r.version as Record<string, unknown>);
-            } else {
-              allOk = false;
-            }
-          });
-          if (allOk) {
-            // Article shape 그대로 보존 (openArticle이 setViewArticle(cached ||
-            // article) 흐름이라 Article로 저장돼야 함). versions만 채워넣고
-            // 나머지 필드는 카드의 기존 article 그대로.
-            prefetchCache.set(id, { ...article, versions });
-          }
-        });
-      })
-      .catch(() => {
-        // silent — ArticleView will retry on actual click
-      })
-      .finally(() => prefetchingRef.current.delete(id));
-  }, []);
 
   const openArticle = useCallback((article: Article) => {
     const cachedArticle = prefetchCache.get(article.news_id);
