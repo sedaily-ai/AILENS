@@ -22,7 +22,7 @@ from clients import cms_posts_ddb_client as posts_client
 logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
-_VALID_CHANNELS = ("letters", "paper", "feed")
+_VALID_CHANNELS = ("letters", "paper", "feed", "trend_card")
 _CACHE_CONTROL = "public, max-age=300"
 # editor_id 가 NULL 인 글의 표시 명의 (spec §5.1.1)
 _DEFAULT_EDITOR = "AI LENS 편집팀"
@@ -84,12 +84,32 @@ def _shape_paper(post: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _shape_trend_card(post: Dict[str, Any]) -> Dict[str, Any]:
+    """홈 피드 "요즘 화제의 경제 이슈"/"이번 주 인기 칼럼" 카드 모양
+    (TrendingEconomySection/ColumnPreviewSection 의 MockArticle/MockColumn 과 1:1).
+
+    letters/paper 와 달리 리치텍스트 본문이 없다 — 제목+짧은 요약뿐인 카드라
+    body_inline 에 section/category 만 얹는다 (admin PostForm mode="trend_card").
+    """
+    b = post.get("body_inline") or {}
+    return {
+        "id": post["slug"],
+        "section": b.get("section") or "trend",
+        "category": b.get("category") or "",
+        "title": post.get("headline") or "",
+        "excerpt": post.get("subtitle") or "",
+        "date": post.get("publish_date") or "",
+        "is_cms": True,
+    }
+
+
 _SHAPERS = {
     "letters": _shape_letter,
     "paper": _shape_paper,
     # feed 는 개인화 랭킹 대상이 아니라 상단 고정 카드로 쓰인다 (spec §2.4).
     # 모양은 letters 와 같게 두고 프론트가 고정 배치한다.
     "feed": _shape_letter,
+    "trend_card": _shape_trend_card,
 }
 
 

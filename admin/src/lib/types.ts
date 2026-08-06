@@ -1,0 +1,205 @@
+// Backend admin API response shapes (verified from backend/admin/routes/*.py).
+
+export interface LoginResponse {
+  token: string;
+  expires_at: string;
+}
+
+export type RuleState = "ENABLED" | "DISABLED" | "UNKNOWN";
+
+export type CronPreset =
+  | "5m"
+  | "30m"
+  | "1h"
+  | "3h"
+  | "6h"
+  | "12h"
+  | "daily-22kst"
+  | "daily-04kst"
+  | "custom";
+
+export interface DriverRule {
+  name: string;
+  state: RuleState;
+  schedule: string;
+  preset: CronPreset;
+}
+
+export interface DriversResponse {
+  rules: DriverRule[];
+  feature_flags: Record<string, boolean>;
+  thresholds: Record<string, number>;
+}
+
+export interface PromptListItem {
+  id: string;
+  active_version: number;
+  updated_at: string;
+}
+
+export interface PromptHistoryEntry {
+  version: number;
+  created_at: string;
+  actor: string;
+}
+
+export interface PromptDetail {
+  id: string;
+  active_content: string;
+  active_version: number;
+  history: PromptHistoryEntry[];
+}
+
+export interface CostEntry {
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd: number;
+}
+
+export interface CostResponse {
+  by_lambda: Record<string, Record<string, CostEntry>>;
+  total_7d_usd: number;
+  note: string;
+}
+
+export interface AuditEntry {
+  ts: string;
+  action: string;
+  detail?: Record<string, unknown> | null;
+  actor?: string | null;
+  session?: string | null;
+  source_ip?: string | null;
+}
+
+export interface AuditResponse {
+  audits: AuditEntry[];
+  count: number;
+}
+
+export interface NewsletterSubscriber {
+  email: string; // masked (e.g., t****2@naver.com)
+  mbti_group: string | null;
+  status: string | null;
+  created_at: string | null;
+}
+
+// --- CMS posts (backend/admin/routes/posts.py 와 1:1) ---
+
+export type CmsChannel = "letters" | "paper" | "feed" | "trend_card";
+export type CmsCardSection = "trend" | "column";
+export type CmsStatus = "draft" | "published" | "archived";
+export type MbtiGroup = "NT" | "NF" | "ST" | "SF";
+
+export interface CmsKeyword {
+  term: string;
+  explain: string;
+}
+
+export interface CmsImage {
+  url: string;
+  caption?: string;
+}
+
+export interface CmsPostBody {
+  body: string[];
+  // 리치텍스트 에디터(Tiptap) 결과물. 있으면 렌더러가 이걸 우선하고 body[] 는
+  // 무시한다 — AI 레터(daily_letters)는 여전히 body[] + 마커 방식이라 이 필드가
+  // 비어있고, CMS 수동 글(cms_posts)만 여기 채운다.
+  body_html?: string;
+  key_points: string[];
+  keywords: CmsKeyword[];
+  images: CmsImage[];
+  // channels: ["trend_card"] 글만 씀 — "요즘 화제의 경제 이슈"/"이번 주 인기
+  // 칼럼" 두 섹션을 채널 하나로 묶고 이 값으로 가른다(v2/handlers/cms_posts_public.py
+  // _shape_trend_card 참조). category 는 카드에 붙는 짧은 라벨(예: 증시, 투자 인사이트).
+  section?: CmsCardSection;
+  category?: string;
+}
+
+export interface CmsPost {
+  id: string;
+  slug: string;
+  status: CmsStatus;
+  channels: CmsChannel[];
+  publish_date: string;
+  mbti_group: MbtiGroup | null;
+  editor_id: string | null;
+  headline: string;
+  subtitle: string | null;
+  closing_line: string | null;
+  body_inline: CmsPostBody;
+  cover_image_url: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+}
+
+/** 생성·수정 payload — 부분 수정이므로 전부 선택적. */
+export interface CmsPostInput {
+  headline?: string;
+  subtitle?: string | null;
+  closing_line?: string | null;
+  publish_date?: string;
+  channels?: CmsChannel[];
+  mbti_group?: MbtiGroup | null;
+  editor_id?: string | null;
+  body_inline?: CmsPostBody;
+  cover_image_url?: string | null;
+}
+
+export interface PresignResponse {
+  upload_url: string;
+  public_url: string;
+  key: string;
+  expires_in: number;
+}
+
+// --- AI 레터 편집 (backend/admin/routes/letters.py 와 1:1) ---
+
+export interface AiLetter {
+  id: string;
+  letter_date: string;
+  editor_id: string;
+  mbti_group: MbtiGroup;
+  headline: string;
+  subtitle: string | null;
+  closing_line: string | null;
+  body_inline: { body?: string[]; key_points?: string[] };
+  keywords: CmsKeyword[];
+  mode: string;
+  created_at: string;
+  /** article_id 기반 자동 생성이 안 되는 레터를 위한 수동 업로드 팟캐스트 URL. */
+  podcast_audio_url?: string | null;
+}
+
+/** 레터 수정 payload — 정체성 필드(editor_id·mbti_group·letter_date)는 없다. */
+export interface AiLetterInput {
+  headline?: string;
+  subtitle?: string | null;
+  closing_line?: string | null;
+  body_inline?: { body: string[]; key_points: string[] };
+  keywords?: CmsKeyword[];
+  podcast_audio_url?: string | null;
+}
+
+export interface NewsletterStatsResponse {
+  subscribers: {
+    total: number;
+    active: number;
+    by_group: Record<"NT" | "NF" | "ST" | "SF", number>;
+    recent: NewsletterSubscriber[];
+  };
+  metrics: {
+    days: number;
+    send: number;
+    delivery: number;
+    open: number;
+    click: number;
+    bounce: number;
+    complaint: number;
+    open_rate: number;
+    click_rate: number;
+    delivery_rate: number;
+  };
+}

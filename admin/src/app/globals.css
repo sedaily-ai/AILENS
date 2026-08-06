@@ -1,0 +1,411 @@
+@import "tailwindcss";
+
+/* AI LENS CMS 디자인 시스템 (2026-07-28 개편)
+ *
+ * 방향: 편집국 도구답게. 제목은 세리프(Noto Serif KR)로 — 사용자 사이트의
+ * `editorial-title` 과 같은 얼굴이라 도구와 제품의 브랜드가 이어진다.
+ * 본문·수치는 산세리프로 밀도 있게.
+ *
+ * 색: 회색을 살짝 따뜻하게(stone 계열) 깔아 화면이 차갑지 않게 하고,
+ * 주 버튼은 잉크(near-black)로 둔다. 파랑은 '현재 위치·링크'에만 써서
+ * 흔한 파란 버튼 관리자 화면과 결을 다르게 했다.
+ */
+
+:root {
+  /* 잉크 — 제목·주 버튼 */
+  --ink: #1c1917;
+  --ink-soft: #292524;
+
+  /* 텍스트 (WCAG AA 이상) */
+  --text-primary: #1c1917; /* 16.8:1 on --surface-page */
+  --text-secondary: #44403c; /* 9.6:1 */
+  --text-muted: #57534e; /* 7.2:1 — 메타·타임스탬프 */
+  --text-faint: #a8a29e; /* placeholder 전용, 본문 금지 */
+
+  /* 표면 — 살짝 따뜻한 중립 */
+  --surface-page: #faf9f7;
+  --surface-card: #ffffff;
+  --surface-sunken: #f5f5f4;
+
+  --border-hairline: #eceae7;
+  --border-input: #dcd9d4;
+
+  /* 액센트 — 위치·링크에만 */
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-soft: #eff4ff;
+  --accent-ring: rgba(29, 78, 216, 0.16);
+
+  /* 상태 */
+  --ok: #15803d;
+  --ok-soft: #f0fdf4;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+
+  /* 그림자 — 테두리 1px 만으로는 납작해 보인다. 2단 레이어로 얕게. */
+  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04),
+    0 1px 3px rgba(28, 25, 23, 0.06);
+  --shadow-md: 0 2px 4px rgba(28, 25, 23, 0.04),
+    0 8px 20px -8px rgba(28, 25, 23, 0.12);
+
+  /* 밀도 (Data-Dense Dashboard 권장치) */
+  --row-h: 40px;
+  --sidebar-w: 248px;
+
+  /* ---------- 차트 ----------
+   * 검증기(dataviz/scripts/validate_palette.js)를 흰 표면(#ffffff) 기준으로
+   * 돌려 통과한 조합. 결과: 명도대·채도·CVD 분리·정상시야 전부 PASS,
+   * 대비는 series-3/4 가 3:1 미만이라 WARN → **직접 라벨 의무**(무시 불가).
+   * 그래서 계열이 2개 이상인 차트는 반드시 이름+값을 함께 찍는다.
+   */
+  --series-1: #2a78d6; /* blue */
+  --series-2: #eb6834; /* orange */
+  --series-3: #1baf7a; /* aqua   — 2.82:1, 라벨 필수 */
+  --series-4: #eda100; /* yellow — 2.17:1, 라벨 필수 */
+
+  /* 단일 계열(크기 비교·추이)은 이 하나만 쓴다. 막대 길이가 이미 크기를
+     나타내므로 색까지 크기에 연동하면 채널 낭비다(value-ramp 안티패턴). */
+  --series-solo: #2a78d6;
+  --series-track: #eef1f4; /* 미터·막대 트랙 */
+
+  --grid-line: #eceae7;
+  --axis-line: #d8d5d0;
+}
+
+@theme inline {
+  --color-background: var(--surface-page);
+  --color-foreground: var(--text-primary);
+}
+
+html,
+body {
+  min-height: 100vh;
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 제목용 세리프 — 페이지 타이틀·브랜드에만. 본문에 쓰면 밀도가 죽는다. */
+.font-display {
+  font-family: var(--font-display), "Noto Serif KR", Georgia, serif;
+  letter-spacing: -0.015em;
+  font-feature-settings: "ss01";
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #dcd9d4;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c4bfb8;
+  background-clip: content-box;
+}
+
+/* ---------- 표면 유틸 ---------- */
+
+.ui-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-card-strong {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  box-shadow: var(--shadow-md);
+}
+
+/* 클릭 가능한 카드 — 뜨는 느낌만 주고 레이아웃은 흔들지 않는다
+   (scale 로 띄우면 이웃 카드가 밀린다). */
+.ui-card-interactive {
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+}
+.ui-card-interactive:hover {
+  border-color: var(--border-input);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-input {
+  background: var(--surface-card);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.ui-input::placeholder {
+  color: var(--text-faint);
+}
+.ui-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.ui-thead {
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-input);
+}
+.ui-thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ui-row-hover {
+  transition: background-color 120ms ease;
+}
+.ui-row-hover:hover {
+  background: var(--surface-sunken);
+}
+
+.ui-divider {
+  border-color: var(--border-hairline);
+}
+
+/* ---------- 버튼 ----------
+   공통 리듬: 눌리면 1px 내려가고 그림자가 줄어든다. 물리적으로 눌리는 느낌이
+   나야 클릭됐다는 확신이 생긴다. */
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease,
+    color 150ms ease, box-shadow 150ms ease, transform 80ms ease;
+}
+.ui-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ui-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* 주 버튼 — 잉크. 흔한 파란 버튼 대신. 위쪽 안쪽 하이라이트로 살짝 볼록하게. */
+.ui-btn-primary {
+  background: var(--ink);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), var(--shadow-sm);
+}
+.ui-btn-primary:hover:not(:disabled) {
+  background: var(--ink-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--shadow-md);
+}
+.ui-btn-primary:active:not(:disabled) {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.ui-btn-ghost {
+  background: var(--surface-card);
+  border: 1px solid var(--border-input);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+.ui-btn-ghost:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  border-color: #cfcac2;
+}
+.ui-btn-ghost:active:not(:disabled) {
+  box-shadow: none;
+}
+
+/* 위험 동작 — 평소엔 조용하다가 hover 에서만 붉어진다. */
+.ui-btn-danger:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: #f0c2c2;
+  background: var(--danger-soft);
+}
+
+/* ---------- 모션 ----------
+   전부 짧게(150~320ms). 관리 도구에서 느린 연출은 방해가 된다. */
+
+@keyframes ui-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 진입 — 목록·카드가 스르륵 자리잡는다. --i 로 순차 지연(최대 6칸까지만
+   주고 그 뒤는 동시 등장 — 긴 목록에서 마지막 항목까지 기다리게 하면 답답하다). */
+.ui-enter {
+  animation: ui-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(min(var(--i, 0), 6) * 40ms);
+}
+
+.ui-toast {
+  animation: ui-toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 스켈레톤 — '로드 중...' 텍스트보다 체감 속도가 빠르다. */
+.ui-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    #ebe9e6 37%,
+    var(--surface-sunken) 63%
+  );
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+.ui-spinner {
+  border: 2px solid var(--border-input);
+  border-top-color: var(--accent);
+  border-radius: 9999px;
+  animation: ui-spin 700ms linear infinite;
+}
+
+/* 상태 배지 */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.ui-badge::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+.ui-badge-draft {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.ui-badge-published {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.ui-badge-archived {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+/* 본문 리치텍스트 에디터(Tiptap) 콘텐츠 — 타이포그래피 플러그인 없이 직접
+   스타일. 헤딩/목록/인용구가 문단과 뚜렷이 구분돼야 "진짜 에디터"처럼 느껴진다. */
+.prose-editor p {
+  margin: 0 0 14px;
+  color: var(--text-primary);
+}
+.prose-editor p:last-child {
+  margin-bottom: 0;
+}
+.prose-editor h2 {
+  margin: 28px 0 12px;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.prose-editor h3 {
+  margin: 22px 0 10px;
+  font-size: 17.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.prose-editor ul,
+.prose-editor ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+.prose-editor li {
+  margin: 4px 0;
+}
+.prose-editor blockquote {
+  margin: 16px 0;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--accent);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.prose-editor img {
+  display: block;
+  margin: 20px 0;
+  border-radius: 14px;
+  max-width: 100%;
+}
+.prose-editor strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+.prose-editor a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-editor div[data-youtube-video] {
+  margin: 20px 0;
+}
+
+/* 키보드 포커스만 링을 그린다 — 마우스 클릭엔 안 뜬다. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
