@@ -181,6 +181,47 @@ class PersonalDBClient:
             logger.error(f"Failed to query user {user_id}: {e}", exc_info=True)
             return []
 
+    async def scan_by_sk_prefix(
+        self,
+        sk_prefix: str,
+        max_items: int = 1000,
+    ) -> List[Dict[str, Any]]:
+        """
+        Bounded table-wide scan for items whose SK begins with a prefix,
+        across ALL users. Only for aggregate/anonymous reads (e.g. "popular
+        archived sentences") — never for per-user data, which must use
+        query_by_user instead.
+
+        `max_items` hard-caps total items read (not just returned) so this
+        stays cheap at MVP scale. If the table grows large enough that this
+        stops being representative, replace with a proper GSI.
+        """
+        try:
+            kwargs: Dict[str, Any] = {
+                'FilterExpression': Attr('sk').begins_with(sk_prefix),
+                'Limit': min(max_items, 200),
+            }
+            response = self.table.scan(**kwargs)
+            items = response.get('Items', [])
+
+            while 'LastEvaluatedKey' in response and len(items) < max_items:
+                kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+                kwargs['Limit'] = min(max_items - len(items), 200)
+                response = self.table.scan(**kwargs)
+                items.extend(response.get('Items', []))
+
+            return items[:max_items]
+
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                logger.warning(f"Personal DB table {self.table_name} does not exist yet")
+                return []
+            logger.error(f"Failed to scan by prefix {sk_prefix}: {e}", exc_info=True)
+            return []
+        except Exception as e:
+            logger.error(f"Failed to scan by prefix {sk_prefix}: {e}", exc_info=True)
+            return []
+
     async def update_item(
         self,
         user_id: str,

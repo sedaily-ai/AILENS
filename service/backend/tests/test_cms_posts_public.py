@@ -114,7 +114,7 @@ def test_null_editor_falls_back_to_team_name(monkeypatch) -> None:
     _install(monkeypatch, _FakePosts([_row(editor_id=None)]))
     resp = lambda_handler(_get({"channel": "letters"}), None)
     p = json.loads(resp["body"])["posts"][0]
-    assert p["editor_id"] == "AI LENS 편집팀"
+    assert p["editor_id"] == "AI LENS"
 
 
 def test_slug_lookup_returns_404_when_missing(monkeypatch) -> None:

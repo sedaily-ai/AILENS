@@ -125,6 +125,73 @@ class PersonalRepository:
 
         return [ArchivedSentence.from_item(item) for item in items]
 
+    async def list_popular_archived_sentences(
+        self,
+        limit: int = 20,
+        sample_size: int = 800,
+    ) -> List[Dict[str, Any]]:
+        """
+        Aggregate the most-archived sentences across ALL users — "Popular
+        Highlights" style (Kindle) social proof that needs zero authorship:
+        it's built entirely from the save-a-sentence action every archive
+        user already takes, not from anyone writing a post.
+
+        Deliberately returns no user identity (no user_id/name/avatar) —
+        this is meant to read as "여러 사람이 담았어요", not a per-user feed.
+
+        Args:
+            limit: Max distinct sentences to return
+            sample_size: Max raw ARCHIVE# items to scan (bounded — see
+                PersonalDBClient.scan_by_sk_prefix)
+
+        Returns:
+            List of {text, article_id, article_title, count}, sorted by
+            count desc then most-recently-seen desc.
+        """
+        items = await self._client.scan_by_sk_prefix('ARCHIVE#', max_items=sample_size)
+
+        # normalized text -> aggregate. Keep the first article_id/title seen
+        # for a given text (they should always agree since text is quoted
+        # verbatim from one article).
+        agg: Dict[str, Dict[str, Any]] = {}
+        for item in items:
+            text = str(item.get('text', '')).strip()
+            if not text:
+                continue
+            entry = agg.get(text)
+            created_at = str(item.get('created_at', ''))
+            if entry is None:
+                agg[text] = {
+                    'text': text,
+                    'article_id': item.get('article_id', ''),
+                    'article_title': item.get('article_title', ''),
+                    'count': 1,
+                    'latest_at': created_at,
+                }
+            else:
+                entry['count'] += 1
+                if created_at > entry['latest_at']:
+                    entry['latest_at'] = created_at
+
+        ranked = sorted(
+            agg.values(),
+            key=lambda e: (e['count'], e['latest_at']),
+            reverse=True,
+        )
+        # 1회만 저장된 문장은 "여러 사람이 담았다"는 신호가 아니므로 최소
+        # 2건부터만 노출 — 표본이 아직 작아 전부 1건뿐이면 빈 리스트가
+        # 정직한 결과다(가짜로 채우지 않는다).
+        popular = [e for e in ranked if e['count'] >= 2][:limit]
+        return [
+            {
+                'text': e['text'],
+                'article_id': e['article_id'],
+                'article_title': e['article_title'],
+                'count': e['count'],
+            }
+            for e in popular
+        ]
+
     # =========================================================================
     # User Profile
     # =========================================================================

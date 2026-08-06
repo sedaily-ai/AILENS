@@ -9,6 +9,7 @@ Storage:
 Routes:
   POST   /api/archive          — Save a sentence
   GET    /api/archive          — List archived sentences
+  GET    /api/archive/popular  — Popular sentences across all users (public, no auth)
   DELETE /api/archive/{id}     — Delete a sentence
 
 Replaces the frontend's Mock data (React state, 8 sample sentences).
@@ -18,6 +19,11 @@ Replaces the frontend's Mock data (React state, 8 sample sentences).
 재확인 결과 없음). PG_PASSWORD 도 안 잡혀있어 이 기능은 이미 조용히 비활성
 상태였고(vector_status 항상 'skipped'), 실호출도 30일 0건이었다 — 재구축
 필요해지면 그때 다시 설계.
+
+2026-08-06: GET /api/archive/popular 추가 — 커뮤니티 탭(능동적 글쓰기 필요)을
+없애면서, 이미 하던 행동(문장 저장)만으로 채워지는 "다른 사람들이 담은 문장"
+공개 집계로 대체(Kindle Popular Highlights 패턴). 유저 식별 정보는 응답에
+포함하지 않는다.
 """
 import base64
 import json
@@ -122,6 +128,21 @@ async def _handle_list(params: Dict[str, str]) -> Dict:
         'count': len(sentences),
         'user_id': user_id,
     })
+
+
+async def _handle_popular(params: Dict[str, str]) -> Dict:
+    """
+    GET /api/archive/popular?limit={n}
+
+    "다른 사람들이 담은 문장" — 전체 유저의 아카이브를 텍스트 빈도로 집계한
+    공개(비로그인 포함) 목록. 글쓰기 없이 저장 행위만으로 채워지는 소셜
+    피드(Kindle Popular Highlights 패턴, 2026-08-06 커뮤니티 탭 대체).
+    유저 식별 정보는 포함하지 않는다.
+    """
+    limit = int(params.get('limit', '20'))
+    repo = get_personal_repository()
+    highlights = await repo.list_popular_archived_sentences(limit=limit)
+    return _success({'highlights': highlights, 'count': len(highlights)})
 
 
 async def _handle_delete(
@@ -236,6 +257,7 @@ async def lambda_handler(event: dict, context) -> dict:
     Routes:
       POST   /api/archive          — Save a sentence
       GET    /api/archive          — List archived sentences
+      GET    /api/archive/popular  — Popular sentences across all users (public)
       DELETE /api/archive/{id}     — Delete a sentence
       POST   /api/archive/similar  — Find similar sentences
     """
@@ -245,6 +267,12 @@ async def lambda_handler(event: dict, context) -> dict:
         return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
 
     logger.info(f"Archive request: {method} {path}")
+
+    # GET /api/archive/popular — 완전 공개. 인증 시도조차 안 한다(다른
+    # 라우트처럼 anon_user_id를 붙이면 응답이 그 유저 것으로 스코프된다는
+    # 오해를 살 수 있어 명시적으로 분리).
+    if method == 'GET' and '/popular' in path:
+        return await _handle_popular(params)
 
     # All write operations need an authenticated user. Reads (similarity
     # search, list) accept either an authenticated user (scoped to their
