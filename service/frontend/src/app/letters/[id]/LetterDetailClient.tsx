@@ -18,6 +18,7 @@ import { LETTER_PODCASTS } from '@/features/news-feed/data/letterPodcasts';
 import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
+import { fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
 import {
   fetchTodayLetters,
   parseLetterId,
@@ -68,8 +69,27 @@ export function LetterDetailClient({ letterId }: Props) {
   useEffect(() => {
     const parsed = parseLetterId(letterId);
     if (!parsed) {
-      setLoadState('not-found');
-      return;
+      // mbti_group 없이 발행된 CMS 글 — letterHref 가 slug 를 그대로 id 로 써서
+      // nt|nf|st|sf-YYYY-MM-DD 패턴에 안 걸린다. 날짜/그룹 목록 조회 대신 slug로 직접 조회.
+      let cancelled = false;
+      fetchCmsPostBySlug('letters', letterId)
+        .then((post) => {
+          if (cancelled) return;
+          if (post) {
+            setLetter(withDisplayMeta(post));
+            setOtherLetters([]);
+            setLoadState('ready');
+            trackArticleRead(letterId);
+          } else {
+            setLoadState('not-found');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setLoadState('error');
+        });
+      return () => {
+        cancelled = true;
+      };
     }
     let cancelled = false;
     fetchTodayLetters(parsed.date)
@@ -791,11 +811,11 @@ function fmtTime(s: number): string {
 // 스포티파이식 팟캐스트 플레이어 카드 — 캐릭터 이미지 + 큰 원형 재생 +
 // 진행 바/시간 + 시킹. 자체 <audio> 엘리먼트로 진행률·탐색 제어.
 function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
-  // PoC 정적 녹음 8편(2026-05-18/22)은 LETTER_PODCASTS 에 있을 때만 신뢰 —
-  // letterPodcastUrl 은 id 포맷만 보고 경로를 만들 뿐 실제 파일 존재를 보장 안 함.
-  const staticUrl = LETTER_PODCASTS[letter.id] ? letterPodcastUrl(letter.id) : null;
+  // 우선순위: ① admin 수동 업로드(podcast_audio_url) — article_id 없어도 항상 신뢰
+  // ② PoC 정적 녹음 8편(2026-05-18/22, LETTER_PODCASTS 에 있을 때만) ③ 실시간 생성.
+  const manualUrl = letter.podcast_audio_url || null;
+  const staticUrl = manualUrl ?? (LETTER_PODCASTS[letter.id] ? letterPodcastUrl(letter.id) : null);
   const canGenerate = !!letter.mbti_group && !!letter.article_id;
-  const { isAuthenticated } = useAuth();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -804,30 +824,11 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
   const [dur, setDur] = useState(0);
   const [err, setErr] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(staticUrl);
-  // 정적 파일이 없는 레터는 article_id 기반 실시간 파이프라인(Bedrock+Polly)으로
-  // 온디맨드 생성 — 생성 자체는 인증 필요(비용 방지)라 이미 생성된 것만 익명 재생 가능.
-  const [checked, setChecked] = useState(!!staticUrl);
-  const [available, setAvailable] = useState(!!staticUrl);
-
-  useEffect(() => {
-    if (staticUrl || !canGenerate) {
-      setChecked(true);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { getArticlePodcast } = await import('@/shared/lib/podcastApi');
-      const existing = await getArticlePodcast(letter.article_id, letter.mbti_group!);
-      if (cancelled) return;
-      setAvailable(!!existing || isAuthenticated);
-      setChecked(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [letter.article_id, letter.mbti_group, staticUrl, canGenerate, isAuthenticated]);
 
   const accent = letter.accent;
+  // 정적 녹음도 없고 실시간 생성에 필요한 article_id/mbti_group 도 없는 레터 —
+  // 아이콘은 항상 노출하되(요청사항) 클릭해도 할 수 있는 게 없어 안내만.
+  const notReady = !staticUrl && !canGenerate;
 
   // 이미 있으면 재사용, 없으면(로그인 유저만 도달) 생성 요청 후 완료까지 폴링.
   const resolveUrl = async (): Promise<string> => {
@@ -851,6 +852,7 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
   };
 
   const toggle = async () => {
+    if (notReady) return;
     const a = audioRef.current;
     if (!a) return;
 
@@ -883,36 +885,46 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
 
   const pct = dur > 0 ? (cur / dur) * 100 : 0;
 
-  // 가용성 확인 전이거나(짧은 순간), 재생할 게 없으면(정적 파일도 없고 아직 생성된
-  // 적도 없는 레터를 비로그인으로 보는 경우) 자리 자체를 렌더하지 않는다.
-  if (!checked || !available) return null;
+  const label = notReady
+    ? '아직 준비 중이에요'
+    : err
+      ? '재생 실패 · 다시 시도'
+      : loading && !playing
+        ? '오디오 만드는 중...'
+        : '오늘의 한 통, 귀로 듣기';
+
+  const timeLabel = notReady ? '' : `${fmtTime(cur)} / ${dur ? fmtTime(dur) : '--:--'}`;
 
   return (
     <div
+      className={notReady ? '' : 'group transition-all duration-200 hover:-translate-y-0.5'}
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 16,
-        padding: 16,
+        gap: 14,
+        padding: 14,
         borderRadius: 20,
-        background: '#fff',
-        border: '1px solid #f1f1f0',
-        boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.05)',
+        background: notReady ? '#fafafa' : `linear-gradient(135deg, ${letter.accentBg} 0%, #ffffff 65%)`,
+        border: `1px solid ${notReady ? '#f1f1f0' : `${accent}1f`}`,
+        boxShadow: notReady ? 'none' : '0 1px 2px rgba(17,24,39,0.04), 0 10px 28px -8px rgba(17,24,39,0.10)',
+        opacity: notReady ? 0.75 : 1,
       }}
     >
-      {/* 캐릭터 */}
+      {/* 페르소나 캐릭터 */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={letter.editorAvatar}
           alt={letter.editorName}
+          className={notReady ? '' : 'transition-transform duration-200 group-hover:scale-105'}
           style={{
-            width: 72,
-            height: 72,
+            width: 60,
+            height: 60,
             borderRadius: 16,
             objectFit: 'cover',
             background: letter.accentBg,
-            boxShadow: `0 0 0 1px ${accent}22`,
+            boxShadow: notReady ? 'none' : `0 0 0 1px ${accent}33`,
+            filter: notReady ? 'grayscale(0.5)' : 'none',
           }}
         />
         {playing && (
@@ -921,8 +933,8 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
               position: 'absolute',
               right: -4,
               bottom: -4,
-              width: 22,
-              height: 22,
+              width: 20,
+              height: 20,
               borderRadius: '50%',
               background: accent,
               border: '2px solid #fff',
@@ -931,7 +943,7 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
               justifyContent: 'center',
             }}
           >
-            <span style={{ display: 'flex', gap: 1.5, alignItems: 'flex-end', height: 9 }}>
+            <span style={{ display: 'flex', gap: 1.5, alignItems: 'flex-end', height: 8 }}>
               <i style={{ width: 2, background: '#fff', animation: 'eq 0.9s ease-in-out infinite', height: '40%' }} />
               <i style={{ width: 2, background: '#fff', animation: 'eq 0.9s ease-in-out infinite 0.2s', height: '90%' }} />
               <i style={{ width: 2, background: '#fff', animation: 'eq 0.9s ease-in-out infinite 0.4s', height: '60%' }} />
@@ -940,73 +952,87 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
         )}
       </div>
 
-      {/* 정보 + 진행 */}
+      {/* 정보 + 진행바 — 처음부터 음악 플레이어처럼 보이도록 항상 표시 */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: accent, letterSpacing: '0.06em', margin: '0 0 3px' }}>
-          AI LENS 팟캐스트 · 2인 대화
-        </p>
         <p
           style={{
-            fontSize: 15,
+            fontSize: 10.5,
             fontWeight: 700,
-            color: '#111827',
-            margin: '0 0 10px',
+            color: notReady ? '#9ca3af' : accent,
+            letterSpacing: '0.06em',
+            margin: '0 0 3px',
+          }}
+        >
+          AI 팟캐스트 · {letter.editorName} 에디터가 들려줘요
+        </p>
+        <p
+          className="text-gray-900"
+          style={{
+            fontSize: 14.5,
+            fontWeight: 700,
+            margin: '0 0 9px',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}
         >
-          {letter.editorName} 에디터 × 진행자
+          {label}
         </p>
         <div
-          onClick={seek}
-          style={{ height: 6, borderRadius: 999, background: '#ececec', cursor: 'pointer', position: 'relative' }}
+          onClick={notReady ? undefined : seek}
+          style={{
+            height: 5,
+            borderRadius: 999,
+            background: '#ececec',
+            cursor: notReady ? 'default' : 'pointer',
+            position: 'relative',
+          }}
         >
-          <div style={{ position: 'absolute', inset: 0, width: `${pct}%`, background: accent, borderRadius: 999 }} />
+          <div style={{ position: 'absolute', inset: 0, width: `${pct}%`, background: notReady ? '#d1d5db' : accent, borderRadius: 999, transition: 'width 0.15s linear' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-          <span style={{ fontSize: 11, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(cur)}</span>
-          <span style={{ fontSize: 11, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>
-            {err ? '재생 실패' : dur ? fmtTime(dur) : '··:··'}
-          </span>
-        </div>
+        {!notReady && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
+            <span style={{ fontSize: 10.5, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{timeLabel}</span>
+          </div>
+        )}
       </div>
 
-      {/* 큰 원형 재생 버튼 */}
+      {/* 원형 재생 버튼 */}
       <button
         type="button"
         onClick={toggle}
+        disabled={notReady}
         aria-label={playing ? '일시정지' : '재생'}
         style={{
           flexShrink: 0,
-          width: 56,
-          height: 56,
+          width: 48,
+          height: 48,
           borderRadius: '50%',
           border: 'none',
-          cursor: 'pointer',
-          background: accent,
+          cursor: notReady ? 'default' : 'pointer',
+          background: notReady ? '#e5e7eb' : accent,
           color: '#fff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: `0 6px 16px ${accent}55`,
+          boxShadow: notReady ? 'none' : `0 6px 16px ${accent}55`,
           transition: 'transform 0.12s',
         }}
-        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.94)')}
+        onMouseDown={(e) => !notReady && (e.currentTarget.style.transform = 'scale(0.92)')}
         onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       >
         {loading && !playing ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} style={{ animation: 'spin 0.8s linear infinite' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} style={{ animation: 'spin 0.8s linear infinite' }}>
             <path strokeLinecap="round" d="M12 3a9 9 0 1 0 9 9" />
           </svg>
         ) : playing ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
             <rect x="6" y="5" width="4.5" height="14" rx="1.2" />
             <rect x="13.5" y="5" width="4.5" height="14" rx="1.2" />
           </svg>
         ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.78-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
           </svg>
         )}
