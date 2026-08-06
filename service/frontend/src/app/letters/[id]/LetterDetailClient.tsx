@@ -186,26 +186,39 @@ export function LetterDetailClient({ letterId }: Props) {
   );
 }
 
-// CMS body_html 안 <!--AI_QUIZ:{...json...}--> 마커를 기준으로 HTML 조각과 실제
-// 퀴즈/투표 컴포넌트를 번갈아 배치하기 위한 분리. 마커 안 JSON이 깨져 있으면
-// (수기 편집 실수 등) 조용히 건너뛰고 나머지 HTML은 그대로 렌더.
+// CMS body_html 안 퀴즈/투표 마커를 기준으로 HTML 조각과 실제 인터랙티브
+// 컴포넌트를 번갈아 배치하기 위한 분리. 마커 두 형식을 함께 지원한다:
+//   1) <!--AI_QUIZ:{...}-->            — 초기에 DB에 직접 심었던 구형 마커
+//   2) <div data-ai-quiz="{...}"></div> — admin PostForm 퀴즈 위젯(Tiptap
+//      aiQuiz 노드)이 저장하는 신형 마커. 브라우저가 속성값을 HTML 엔티티로
+//      이스케이프해서 내보내므로 파싱 전에 디코딩한다.
+// 마커 안 JSON이 깨져 있으면(수기 편집 실수 등) 조용히 건너뛰고 나머지
+// HTML은 그대로 렌더.
 type BodyHtmlPart =
   | { type: 'html'; content: string }
   | { type: 'interactive'; data: InteractiveBlockData };
 
+function decodeHtmlEntities(s: string): string {
+  if (typeof document === 'undefined') return s;
+  const ta = document.createElement('textarea');
+  ta.innerHTML = s;
+  return ta.value;
+}
+
 function splitBodyHtml(html: string): BodyHtmlPart[] {
   const parts: BodyHtmlPart[] = [];
-  const markerRe = /<!--AI_QUIZ:([\s\S]*?)-->/g;
+  const markerRe = /<!--AI_QUIZ:([\s\S]*?)-->|<div data-ai-quiz="([^"]*)"[^>]*>\s*<\/div>/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = markerRe.exec(html))) {
     if (match.index > lastIndex) {
       parts.push({ type: 'html', content: html.slice(lastIndex, match.index) });
     }
+    const raw = match[1] ?? decodeHtmlEntities(match[2] ?? '');
     try {
-      parts.push({ type: 'interactive', data: JSON.parse(match[1]) });
+      parts.push({ type: 'interactive', data: JSON.parse(raw) });
     } catch {
-      // 마커가 깨졌으면 원본 주석 그대로 유지(눈에는 안 보임, 데이터 손실 없음)
+      // 마커가 깨졌으면 원본 그대로 유지(눈에는 안 보이거나 빈 div, 데이터 손실 없음)
       parts.push({ type: 'html', content: match[0] });
     }
     lastIndex = markerRe.lastIndex;

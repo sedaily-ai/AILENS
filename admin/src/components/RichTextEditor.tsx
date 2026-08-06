@@ -6,6 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Youtube from "@tiptap/extension-youtube";
 import { uploadImage } from "@/lib/uploadImage";
+import { AiQuiz } from "./aiQuizExtension";
+import { AiQuizModal, type AiQuizData } from "./AiQuizModal";
 
 interface Props {
   /** Tiptap HTML — 미디엄/네이버 블로그처럼 굵게·글머리·이미지가 그 위치에
@@ -79,10 +81,12 @@ function Toolbar({
   editor,
   uploading,
   onPickImage,
+  onInsertQuiz,
 }: {
   editor: Editor;
   uploading: boolean;
   onPickImage: () => void;
+  onInsertQuiz: () => void;
 }) {
   return (
     <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-gray-100 bg-white/95 px-4 py-2 backdrop-blur">
@@ -148,6 +152,10 @@ function Toolbar({
       <ToolbarButton label="이미지 삽입" onClick={onPickImage}>
         {uploading ? <span className="ui-spinner w-3.5 h-3.5" /> : "🖼"}
       </ToolbarButton>
+      <span className="mx-1 h-5 w-px bg-gray-300" />
+      <ToolbarButton label="퀴즈·투표 삽입" onClick={onInsertQuiz}>
+        🎯
+      </ToolbarButton>
     </div>
   );
 }
@@ -155,6 +163,7 @@ function Toolbar({
 export function RichTextEditor({ value, onChange, placeholder }: Props) {
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [insertingQuiz, setInsertingQuiz] = useState(false);
 
   // 드래그드롭·붙여넣기·툴바 버튼 셋 다 여기로 모은다 — 실패를 조용히
   // 삼키면(예전 버그) 아무 반응 없이 그냥 안 들어간 것처럼 보인다.
@@ -200,6 +209,7 @@ export function RichTextEditor({ value, onChange, placeholder }: Props) {
           style: "width:100%;aspect-ratio:16/9;border-radius:14px;border:0;display:block;",
         },
       }),
+      AiQuiz,
     ],
     content: stripBrokenYoutubeEmbeds(value),
     // Next.js(static export 포함) 는 빌드 시점에 한 번 프리렌더하므로, 이걸 안 끄면
@@ -266,9 +276,19 @@ export function RichTextEditor({ value, onChange, placeholder }: Props) {
 
   const isEmpty = editor.isEmpty;
 
+  const insertQuiz = (data: AiQuizData) => {
+    editor.chain().focus().insertContent({ type: "aiQuiz", attrs: { data } }).run();
+    setInsertingQuiz(false);
+  };
+
   return (
     <div className="relative">
-      <Toolbar editor={editor} uploading={uploading} onPickImage={pickImage} />
+      <Toolbar
+        editor={editor}
+        uploading={uploading}
+        onPickImage={pickImage}
+        onInsertQuiz={() => setInsertingQuiz(true)}
+      />
       <div className="relative">
         <EditorContent editor={editor} />
         {isEmpty && placeholder && (
@@ -278,6 +298,13 @@ export function RichTextEditor({ value, onChange, placeholder }: Props) {
         )}
       </div>
       {err && <p className="px-6 pb-4 text-xs text-red-600">이미지 업로드 실패: {err}</p>}
+
+      <AiQuizModal
+        open={insertingQuiz}
+        initial={null}
+        onClose={() => setInsertingQuiz(false)}
+        onSubmit={insertQuiz}
+      />
     </div>
   );
 }
