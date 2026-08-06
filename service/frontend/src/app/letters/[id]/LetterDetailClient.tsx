@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { EditorCommentsSection } from '@/features/news-feed/components/EditorCommentsSection';
 import { CompletionCheer } from '@/features/news-feed/components/CompletionCheer';
 import { SideRail } from '@/features/news-feed/components/SideRail';
+import { InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed/components/InteractiveBlock';
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { trackArticleRead } from '@/shared/lib/readingTracker';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
@@ -165,14 +166,40 @@ export function LetterDetailClient({ letterId }: Props) {
   );
 }
 
+// CMS body_html 안 <!--AI_QUIZ:{...json...}--> 마커를 기준으로 HTML 조각과 실제
+// 퀴즈/투표 컴포넌트를 번갈아 배치하기 위한 분리. 마커 안 JSON이 깨져 있으면
+// (수기 편집 실수 등) 조용히 건너뛰고 나머지 HTML은 그대로 렌더.
+type BodyHtmlPart =
+  | { type: 'html'; content: string }
+  | { type: 'interactive'; data: InteractiveBlockData };
+
+function splitBodyHtml(html: string): BodyHtmlPart[] {
+  const parts: BodyHtmlPart[] = [];
+  const markerRe = /<!--AI_QUIZ:([\s\S]*?)-->/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = markerRe.exec(html))) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'html', content: html.slice(lastIndex, match.index) });
+    }
+    try {
+      parts.push({ type: 'interactive', data: JSON.parse(match[1]) });
+    } catch {
+      // 마커가 깨졌으면 원본 주석 그대로 유지(눈에는 안 보임, 데이터 손실 없음)
+      parts.push({ type: 'html', content: match[0] });
+    }
+    lastIndex = markerRe.lastIndex;
+  }
+  if (lastIndex < html.length) {
+    parts.push({ type: 'html', content: html.slice(lastIndex) });
+  }
+  return parts;
+}
+
 // production letter inline 렌더
 // - 4개 채널 탭 폐기. 한 페이지에서 자연스러운 흐름으로 통합:
 //     헤더 → (있으면) 팟캐스트 미니 플레이어 → 본문 → 핵심 정리/닫는 줄/단어 → 구독
 function LetterBody({ letter }: { letter: DisplayLetter }) {
-  // PoC 정적 녹음(8편) 없는 레터도 article_id 기반 실시간 생성 파이프라인으로 커버.
-  // 실제 표시 여부(이미 생성됐거나 로그인 유저인지)는 LetterPodcastPlayer 내부에서 판단.
-  const hasPodcast = !!LETTER_PODCASTS[letter.id] || (!!letter.mbti_group && !!letter.article_id);
-
   // 본문은 한 흐름으로 렌더 — 중간 mock 이미지는 제거. 하단 4컷 카드가 대체.
   const body = letter.body;
 
@@ -237,25 +264,34 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
         {letter.subtitle && (
           <p style={{ fontSize: 15, color: '#6b7280', margin: 0, lineHeight: 1.6 }}>{letter.subtitle}</p>
         )}
-      </header>
 
-      {/* 팟캐스트 미니 플레이어 — 상단, 페르소나 캐릭터 + 재생 */}
-      {hasPodcast && (
-        <div style={{ marginBottom: 28 }}>
+        {/* 팟캐스트 — 워싱턴포스트 기사 상단 메타줄(헤드셋 아이콘) 참고,
+            헤드라인/부제 바로 아래 작은 아이콘+텍스트 한 줄로. article_id 가
+            없어 실제 생성이 불가능한 레터도 아이콘 자체는 항상 노출(요청사항) —
+            그 경우 클릭 시 LetterPodcastPlayer 내부에서 "준비 중" 안내로 처리. */}
+        <div style={{ marginTop: 14 }}>
           <LetterPodcastPlayer letter={letter} />
         </div>
-      )}
+      </header>
 
       {/* 본문 — 한 흐름. CMS 글(body_html 있음)은 Tiptap 리치텍스트를 그대로
           렌더 — admin 에서 굵게/글머리/이미지를 넣은 위치 그대로 나온다.
           AI 레터는 body_html 이 없어 기존 ■/[라벨]/Q.A./![]() 마커 파싱으로. */}
       <div style={{ marginBottom: 28 }}>
         {letter.body_html ? (
-          <div
-            className="prose prose-neutral max-w-none prose-headings:font-bold prose-img:rounded-2xl prose-p:leading-[1.9]"
-            style={{ fontSize: 16, color: '#374151' }}
-            dangerouslySetInnerHTML={{ __html: letter.body_html }}
-          />
+          <div style={{ fontSize: 16, color: '#374151' }}>
+            {splitBodyHtml(letter.body_html).map((part, i) =>
+              part.type === 'html' ? (
+                <div
+                  key={`h-${i}`}
+                  className="prose prose-neutral max-w-none prose-headings:font-bold prose-img:rounded-2xl prose-p:leading-[1.9]"
+                  dangerouslySetInnerHTML={{ __html: part.content }}
+                />
+              ) : (
+                <InteractiveBlock key={`q-${i}`} data={part.data} />
+              ),
+            )}
+          </div>
         ) : (
           body.map((p, i) => (
             <LetterBlock key={`b-${i}`} text={p} accent={letter.accent} accentBg={letter.accentBg} glossary={glossary} />
