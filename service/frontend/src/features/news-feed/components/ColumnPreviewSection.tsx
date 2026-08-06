@@ -85,18 +85,40 @@ export function ColumnPreviewSection() {
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
-      <header style={{ marginBottom: 14 }}>
-        <p
-          className="text-gray-400"
-          style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
+      <header
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div>
+          <p
+            className="text-gray-400"
+            style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
+          >
+            Column
+          </p>
+          {/* 섹션 제목 타이포 통일(2026-08-06) — 홈 화면 섹션 제목을 전부
+              Pretendard Bold로(웹툰만 튀어 보이던 문제). */}
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            이번 주 인기 칼럼
+          </h2>
+        </div>
+        {/* "더보기 →" — 예전엔 경제 캘린더로 잘못 연결됐던 링크(위 파일 상단
+            주석 참조). /letters 전체 아카이브 페이지가 이미 있어 거기로. */}
+        <Link
+          href="/letters"
+          className="text-gray-500 hover:text-gray-900"
+          style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
-          Column
-        </p>
-        {/* 섹션 제목 타이포 통일(2026-08-06) — 홈 화면 섹션 제목을 전부
-            Pretendard Bold로(웹툰만 튀어 보이던 문제). */}
-        <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-          이번 주 인기 칼럼
-        </h2>
+          더 보기
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+        </Link>
       </header>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(8px, 2vw, 12px)' }}>
