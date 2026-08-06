@@ -17,7 +17,25 @@ Selector→Transform→개인화 파이프라인이 2026-08-04 비용 문제로 
 배포된 Lambda 함수 이름 중 일부는 여전히 `sedaily-mbti-v2-*-dev` 접두사를 쓴다(예:
 `sedaily-mbti-v2-today-letters-dev`) — AWS에 이미 그 이름으로 배포돼 있어 바꾸지
 않았을 뿐, 소스 위치나 아키텍처상의 의미는 없는 레거시 이름표다. `deploy.sh`
-하나가 이 이름들과 원래 v1 이름 함수들을 전부 같은 zip으로 배포한다 (`./deploy.sh api` | `all`).
+하나가 이 이름들과 원래 v1 이름 함수들을 전부 같은 zip으로 배포하는 게 **의도**다.
+
+**🔴 Handler 접두사 함정 — v2 계열 5개 중 아직 4개 안 고쳐짐.** 이 5개 함수의
+`Handler` 설정이 원래 `v2.handlers.X.lambda_handler`(구 `v2/` 하위 폴더 구조
+전제)였는데, 2026-08-05 폴더 통합 이후 `deploy.sh`가 만드는 zip은 평평한 구조
+(`handlers/`가 루트)라 `v2/` 폴더가 없다 — Handler를 안 고치고 이 zip으로
+재배포하면 "모듈을 못 찾음" 에러로 깨진다.
+- `sedaily-mbti-v2-posts-dev`: **2026-08-06 고침** — Handler를
+  `handlers.cms_posts_public.lambda_handler`로 변경 후 평평한 zip 배포·라이브
+  확인 완료(cover_image_url 필드 추가 작업 중 실제로 이 함수를 건드려야 해서
+  검증까지 마침). VPC/IAM은 그대로 둬도 문제없었다.
+- 나머지 4개(`today-letters`, `health`, `front-page`, `subscribe`)는 **아직
+  구 Handler 그대로**다 — 아직 이 zip으로 재배포된 적이 없어서 지금은 멀쩡히
+  동작하지만, 다음에 `./deploy.sh api`나 `./deploy.sh`를 돌려서 이 4개 함수의
+  코드 업데이트가 실제로 성공하면 그 순간 깨진다. 고칠 때는 `posts-dev`에서
+  검증한 절차 그대로: (1) 배포 전 `aws lambda get-function`으로 현재 코드
+  zip 백업, (2) `update-function-configuration --handler`로 접두사 제거,
+  (3) `update-function-code`, (4) 즉시 라이브 호출로 확인 — 실패하면 백업 zip
+  으로 코드 복구 + Handler 원복.
 
 **같은 날, 자동 수집→AI 생성 파이프라인 자체를 폐기했다.** 폴더 통합 직후 운영
 상태를 점검하다가 "오늘의 한 통"이 실제로 비어있는 걸 발견했다 — 2026-08-04

@@ -51,6 +51,10 @@ export interface ApiLetter {
   keywords: Array<{ term: string; explain: string }>;
   chart?: LetterChart; // 이미지 채널 데이터 시각화 (옵션)
   images?: LetterImage[]; // 본문 중간 실 이미지 (옵션, chart 보다 우선)
+  // article_id 기반 자동 생성이 안 되는 레터를 위해 admin 이 수동 업로드한 팟캐스트 URL.
+  podcast_audio_url?: string | null;
+  // 피드 카드 썸네일 (CMS 글 전용 — admin에서 지정 안 하면 null, 에디터 아바타로 폴백).
+  cover_image_url?: string | null;
 }
 
 export interface ApiTodayLettersResponse {
@@ -226,6 +230,8 @@ export interface TodayLetterCardLike {
   editorName: string;
   editorRole: string;
   editorAvatar: string;
+  // CMS에서 지정한 카드 썸네일 — 없으면 null (호출측이 editorAvatar로 폴백).
+  thumbnailUrl: string | null;
   archetype: string;
   accent: string;
   accentBg: string;
@@ -271,6 +277,7 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
     editorName: meta.editorName,
     editorRole: meta.editorRole,
     editorAvatar: meta.editorAvatar,
+    thumbnailUrl: letter.cover_image_url || null,
     archetype: letter.archetype ?? `이번 주의 ${meta.editorRole}`,
     accent: meta.accent,
     accentBg: meta.accentBg,

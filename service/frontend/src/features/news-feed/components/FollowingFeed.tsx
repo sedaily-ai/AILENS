@@ -198,14 +198,14 @@ export function FollowingFeed({ selectedGroup }: Props) {
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              {/* 썸네일 — 기사 내용 매칭 사진(오늘자 3편), 없으면 에디터 포트레이트 폴백 */}
+              {/* 썸네일 — 수동 매칭 사진(PoC, 옛 날짜 한정) > CMS 지정 썸네일 > 에디터 포트레이트 폴백 */}
               <div
                 className="aspect-square overflow-hidden"
                 style={{ background: l.accentBg }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={TODAY_ARTICLE_THUMBNAILS[l.letterId] ?? l.editorAvatar}
+                  src={TODAY_ARTICLE_THUMBNAILS[l.letterId] ?? l.thumbnailUrl ?? l.editorAvatar}
                   alt={l.title}
                   className="w-full h-full transition-transform duration-300 group-hover:scale-[1.04]"
                   style={{ objectFit: 'cover' }}

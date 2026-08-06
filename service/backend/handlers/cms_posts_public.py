@@ -53,6 +53,9 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         "key_points": b.get("key_points") or [],
         "keywords": b.get("keywords") or [],
         "images": b.get("images") or [],
+        # 피드 카드 썸네일 — admin에서 지정 안 하면 None, 프론트가 에디터
+        # 아바타로 폴백한다 (todayLettersApi.ts::toTodayLetterCard).
+        "cover_image_url": post.get("cover_image_url") or None,
         "is_cms": True,
     }
 
