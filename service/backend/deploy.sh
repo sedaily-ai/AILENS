@@ -115,6 +115,9 @@ API_FUNCTIONS=(
   "sedaily-mbti-article-dev"
   "sedaily-mbti-chatbot-dev"
   "sedaily-mbti-time-machine-dev"
+  # 빅카인즈 기반 타임라인 (handlers/timeline_handler.py). 함수가 아직 없으면
+  # 아래 배포 루프가 [SKIP] 으로 조용히 건너뛴다.
+  "sedaily-mbti-timeline-dev"
   "sedaily-mbti-s3-articles-dev"
   "sedaily-mbti-user-dev"
   "sedaily-mbti-archive-dev"

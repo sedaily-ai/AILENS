@@ -1,20 +1,44 @@
 """
 FastAPI application for Sedaily-MBTI backend
 K-Stock Insight MBTI News Style Transformation API
+
+⚠️ 이 파일은 **로컬 개발 전용**이다. 운영은 API Gateway + Lambda 로 돌아가고
+이 shim 은 배포되지 않는다 (requirements.txt 의 fastapi/uvicorn 주석 참조).
+따라서 여기에만 있는 편의 기능(.env 자동 로드, SSE 스트리밍)은 운영에 없다.
 """
-from fastapi import FastAPI, Request, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import json
-import uvicorn
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from config import settings
-from handlers.time_machine_handler import get_time_machine_data
-from clients.s3_xml_client import S3XMLClient
-from fastapi.responses import StreamingResponse
-from services.chatbot_engine import generate_chat_response, generate_chat_response_stream
-from services.chatbot_context_service import (
+
+import uvicorn
+from fastapi import FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+
+# ── .env 로드 (로컬 전용) ────────────────────────────────────────────────────
+# config.settings 는 모듈 로드 시점에 os.getenv 로 값을 읽어 `settings` 싱글턴을
+# 만든다(@lru_cache). 그래서 .env 는 **config import 보다 먼저** 올려야 한다.
+# 운영 Lambda 는 환경변수를 직접 주입받으므로 이 블록과 무관하다.
+try:
+    from dotenv import load_dotenv
+
+    _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(_ENV_PATH):
+        load_dotenv(_ENV_PATH)
+        print(f"[local] .env 로드: {_ENV_PATH}")
+except ImportError:
+    # python-dotenv 미설치 — 셸에서 export 한 환경변수만 쓴다.
+    print("[local] python-dotenv 없음 — 셸 환경변수만 사용")
+
+from config import settings  # noqa: E402  (.env 로드 이후여야 함)
+from clients.s3_xml_client import S3XMLClient  # noqa: E402
+from handlers.time_machine_handler import get_time_machine_data  # noqa: E402
+from handlers.timeline_handler import lambda_handler as timeline_lambda_handler  # noqa: E402
+from services.chatbot_engine import (  # noqa: E402
+    generate_chat_response, generate_chat_response_stream,
+)
+from services.chatbot_context_service import (  # noqa: E402
     get_cached_briefing, get_recent_articles, search_related_articles,
 )
 
@@ -127,6 +151,80 @@ async def time_machine(date: str):
     if "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
+
+
+# ── /api/timeline — 빅카인즈 기반 타임라인 ──────────────────────────────────
+# 운영과 **완전히 같은 코드**를 타도록 Lambda 핸들러를 그대로 호출한다.
+# (로컬에서만 통하는 별도 구현을 두면 로컬 검증이 운영을 보증하지 못한다.)
+# 필요 환경변수: BIGKINDS_API_KEY — service/backend/.env 에 넣으면 위에서 로드된다.
+
+def _invoke_timeline(event: dict) -> JSONResponse:
+    """Lambda 핸들러 응답(statusCode/body)을 FastAPI 응답으로 되돌린다."""
+    result = timeline_lambda_handler(event, None)
+    status = result.get("statusCode", 200)
+    raw_body = result.get("body") or "{}"
+    try:
+        payload = json.loads(raw_body)
+    except json.JSONDecodeError:
+        payload = {"raw": raw_body}
+    return JSONResponse(status_code=status, content=payload)
+
+
+@app.post("/api/timeline")
+async def timeline_post(request: Request):
+    """
+    그 날짜의 지면을 반환한다.
+
+    Body: {"date": "YYYY-MM-DD", "mode"?: flat|personas|issues, "query"?,
+           "categories"?, "providers"?, "all_press"?, "page"?, "page_size"?,
+           "per_persona"?, "issue_count"?, "per_issue"?, "include_trend"?}
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    return _invoke_timeline({
+        "requestContext": {"http": {"method": "POST"}},
+        "body": json.dumps(body, ensure_ascii=False),
+    })
+
+
+@app.get("/api/timeline")
+async def timeline_get(
+    date: str = Query(..., description="YYYY-MM-DD (KST)"),
+    query: Optional[str] = Query(None, description="검색어 (AND/OR/NOT 지원)"),
+    categories: Optional[str] = Query(None, description="표준 카테고리, 콤마 구분"),
+    providers: Optional[str] = Query(None, description="언론사명, 콤마 구분"),
+    all_press: bool = Query(False, description="true 면 전체 언론사"),
+    mode: Optional[str] = Query(None, description="flat | personas | issues"),
+    per_persona: Optional[int] = Query(None, description="에디터별 기사 수 (mode=personas)"),
+    pool_size: Optional[int] = Query(None, description="버킷팅 전 수집량 (mode=personas)"),
+    issue_count: Optional[int] = Query(None, description="이슈 카드 수 (mode=issues)"),
+    per_issue: Optional[int] = Query(None, description="이슈별 기사 수 (mode=issues)"),
+    page: int = Query(1),
+    page_size: int = Query(30),
+    include_trend: bool = Query(False, description="키워드 트렌드 동봉 (query 필요)"),
+):
+    """curl 로 바로 찔러볼 수 있는 GET 버전. POST 와 같은 핸들러를 탄다."""
+    params = {
+        "date": date,
+        "query": query,
+        "categories": categories,
+        "providers": providers,
+        "all_press": str(all_press).lower(),
+        "mode": mode,
+        "per_persona": str(per_persona) if per_persona is not None else None,
+        "pool_size": str(pool_size) if pool_size is not None else None,
+        "issue_count": str(issue_count) if issue_count is not None else None,
+        "per_issue": str(per_issue) if per_issue is not None else None,
+        "page": str(page),
+        "page_size": str(page_size),
+        "include_trend": str(include_trend).lower(),
+    }
+    return _invoke_timeline({
+        "requestContext": {"http": {"method": "GET"}},
+        "queryStringParameters": {k: v for k, v in params.items() if v is not None},
+    })
 
 
 # S3 XML Client 인스턴스 (S3는 ap-northeast-2 리전에 있음)

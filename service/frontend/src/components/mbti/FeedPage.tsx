@@ -21,6 +21,7 @@ import { QuestionTab, dailyQuestions } from "@/features/question";
 import { NewsFeedTab } from "@/features/news-feed";
 import { CommunityTab } from "@/features/community";
 import { ArchiveTab } from "@/features/archive";
+import { TIMELINE_HREF } from "@/shared/lib/headerTabs";
 
 // 프리페칭 캐시
 const prefetchCache = new Map<string, Article>();
@@ -818,7 +819,7 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
           { key: "feed", label: "레터", active: false, onClick: () => setActiveTab("feed") },
           { key: "editors", label: "에디터", href: "/editors" },
           { key: "fortune", label: "사주", href: "/fortune" },
-          { key: "timeline", label: "타임라인", href: "/timemachine" },
+          { key: "timeline", label: "타임라인", href: TIMELINE_HREF },
           { key: "games", label: "게임", href: "/games" },
           { key: "community", label: "커뮤니티", active: activeTab === "community", onClick: () => setActiveTab("community") },
           { key: "archive", label: "내 서랍", active: activeTab === "archive", onClick: () => setActiveTab("archive") },

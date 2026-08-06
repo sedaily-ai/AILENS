@@ -73,7 +73,12 @@ export interface DisplayLetter extends ApiLetter {
 }
 
 // 페르소나 메타 (TodayLensClient 의 PERSONAS 와 같은 매핑)
-const PERSONA_META: Record<MbtiGroupId, Omit<DisplayLetter, keyof ApiLetter>> = {
+/**
+ * 4 에디터의 사용자 노출 표시 정보 — 프론트 쪽 정본.
+ * CLAUDE.md 기준 이름 정본은 이 상수 · v2 프롬프트 · persona-voice-cards.md 세 곳이다.
+ * 새 화면에서 이름/색상이 필요하면 **여기서 import** 할 것 (네 번째 출처 만들지 말 것).
+ */
+export const PERSONA_META: Record<MbtiGroupId, Omit<DisplayLetter, keyof ApiLetter>> = {
   NT: { editorName: '민철', editorRole: '전략 분석 에디터', editorAvatar: '/editors/intj.webp', accent: '#7c3aed', accentBg: '#ede9fe' },
   NF: { editorName: '하은', editorRole: '오피니언 에디터', editorAvatar: '/editors/infp.webp', accent: '#e11d48', accentBg: '#ffe4e6' },
   ST: { editorName: '준서', editorRole: '팩트 큐레이터', editorAvatar: '/editors/istj.webp', accent: '#059669', accentBg: '#d1fae5' },
