@@ -8,6 +8,13 @@ import { extractYouTubeId, youtubeThumbnailUrl, youtubeEmbedUrl } from '@/shared
 // 여기 자동으로 뜬다. "매거진 고급짐" 톤(TrendingEconomySection과 동일 원칙)
 // 을 그대로 따른다 — 이 섹션도 재미보다는 정보 콘텐츠라 톤을 맞췄다.
 // 실제 영상이 하나도 없으면 섹션 자체를 숨긴다 — 가짜 썸네일로 채우지 않는다.
+//
+// 2026-08-07: 3열 그리드 + "채널로 이동" 헤더 링크로 리디자인(경제 매체
+// 홈 화면의 유튜브 섹션 벤치마크 참고). AI LENS 공식 유튜브 채널이 아직
+// 없어 CHANNEL_URL을 비워뒀다 — 채널이 생기면 이 값만 채우면 링크가
+// 자동으로 나타난다(비어있으면 링크 자체가 렌더되지 않는다).
+const CHANNEL_URL = '';
+
 export function VideoPreviewSection() {
   const [videos, setVideos] = useState<CmsVideo[] | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -26,22 +33,46 @@ export function VideoPreviewSection() {
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
-      <header style={{ marginBottom: 14 }}>
-        <p
-          className="text-gray-400"
-          style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
-        >
-          Video
-        </p>
-        <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-          영상으로 보는 이슈
-        </h2>
+      <header
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div>
+          <p
+            className="text-gray-400"
+            style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
+          >
+            Video
+          </p>
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            영상으로 보는 이슈
+          </h2>
+        </div>
+        {CHANNEL_URL && (
+          <a
+            href={CHANNEL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-500 hover:text-gray-900"
+            style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          >
+            채널로 이동
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M9 7h8v8" />
+            </svg>
+          </a>
+        )}
       </header>
 
       <div
         className="grid"
         style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 280px))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
           justifyContent: 'start',
           gap: 'clamp(10px, 2vw, 16px)',
         }}
@@ -103,15 +134,16 @@ export function VideoPreviewSection() {
                   </button>
                 )}
               </div>
-              <div style={{ padding: 'clamp(10px, 2.2vw, 14px)' }}>
+              {/* 캡션은 썸네일 아래 중앙 정렬 — 요약문 없이 제목(최대 2줄)만
+                  둬서 그리드가 촘촘한 영상 목록처럼 보이게 한다. */}
+              <div style={{ padding: 'clamp(10px, 2.2vw, 14px)', textAlign: 'center' }}>
                 <h3
                   className="font-medium text-gray-900"
                   style={{
                     fontFamily: '"Noto Serif KR", serif',
-                    fontSize: 14.5,
-                    lineHeight: 1.4,
+                    fontSize: 14,
+                    lineHeight: 1.45,
                     letterSpacing: '-0.02em',
-                    marginBottom: 6,
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
@@ -120,27 +152,6 @@ export function VideoPreviewSection() {
                 >
                   {v.title}
                 </h3>
-                {v.excerpt && (
-                  <p
-                    className="text-gray-500"
-                    style={{
-                      fontSize: 12,
-                      lineHeight: 1.55,
-                      marginBottom: 6,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {v.excerpt}
-                  </p>
-                )}
-                {v.date && (
-                  <p className="text-gray-400" style={{ fontSize: 11 }}>
-                    {v.date.replaceAll('-', '.')}
-                  </p>
-                )}
               </div>
             </article>
           );
