@@ -1,6 +1,18 @@
 // 전역 푸터 — SEO/E-E-A-T 신호 + 발행처 + 소셜.
 // 모든 페이지 하단에 마운트 (app/layout.tsx). 클라이언트 인터랙션 없음 → 서버 컴포넌트.
+//
+// 2026-08-07: en.sedaily.com 실제 footer(About/Contact/Terms/Privacy 링크 +
+// 사업자정보 + Copyright)와 대조해 같은 구조로 보강 — 여긴 JSON-LD(구조화
+// 데이터)에만 있던 발행처 관계·사업자정보를 화면에 보이는 텍스트로도 노출해야
+// E-E-A-T 신호가 실제로 힘을 받는다는 걸 확인하고 반영했다. 또한 MBTI
+// 4-페르소나(민철·하은·준서·소율) 폐지(f84fd06) 이후에도 남아있던 그 카피를
+// 여기서 마저 제거.
 
+// 아이콘 전부 동일 톤(currentColor 라인아트, rounded-square 컨테이너)으로 통일 —
+// 브랜드 원색을 안 쓰는 게 이 사이트에서 이미 확립된 패턴(HandDrawnIcons 등과
+// 동일 원칙). 2026-08-07: 서울경제신문 공식 채널(네이버TV·유튜브·페이스북·X·
+// 네이버플레이스) + RSS 추가 — 기존엔 JSON-LD sameAs에만 있던 채널들을
+// 실제 보이는 링크로도 노출(E-E-A-T).
 const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
   {
     label: 'Instagram',
@@ -15,7 +27,7 @@ const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
   },
   {
     label: 'YouTube',
-    href: 'https://www.youtube.com/channel/UCBjKiKjXZf4aEA3WqicVhGQ',
+    href: 'https://www.youtube.com/@서울경제신문',
     icon: (
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="2.5" y="6" width="19" height="12" rx="3" />
@@ -23,6 +35,65 @@ const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
       </svg>
     ),
   },
+  {
+    label: '네이버TV',
+    href: 'https://tv.naver.com/sed.thumb',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="3" y="3" width="18" height="18" rx="5" />
+        <text x="12" y="15.8" textAnchor="middle" fontSize="10.5" fontWeight={800} fill="currentColor" stroke="none">N</text>
+      </svg>
+    ),
+  },
+  {
+    label: 'Facebook',
+    href: 'https://www.facebook.com/seouleconomydaily/',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <circle cx="12" cy="12" r="9" />
+        <text x="12" y="16" textAnchor="middle" fontSize="11" fontWeight={800} fontFamily="Georgia, serif" fill="currentColor" stroke="none">f</text>
+      </svg>
+    ),
+  },
+  {
+    label: 'X',
+    href: 'https://x.com/sedaily_com',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="3" y="3" width="18" height="18" rx="5" />
+        <path d="M8 8l8 8M16 8l-8 8" />
+      </svg>
+    ),
+  },
+  {
+    label: '네이버플레이스',
+    href: 'https://map.naver.com/p/search/서울경제신문/place/38281793',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 21s7-7.4 7-12a7 7 0 0 0-14 0c0 4.6 7 12 7 12z" />
+        <circle cx="12" cy="9" r="2.3" />
+      </svg>
+    ),
+  },
+  {
+    label: 'RSS',
+    href: '/rss.xml',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="3" y="3" width="18" height="18" rx="5" />
+        <circle cx="7.2" cy="16.8" r="1.3" fill="currentColor" stroke="none" />
+        <path d="M6.7 11.7a6.1 6.1 0 0 1 5.6 5.6" />
+        <path d="M6.7 7.2a10.6 10.6 0 0 1 10.1 10.1" />
+      </svg>
+    ),
+  },
+];
+
+const NAV: { label: string; href: string }[] = [
+  { label: '회사소개', href: '/about' },
+  { label: '문의', href: '/contact' },
+  { label: '이용약관', href: '/terms' },
+  { label: '개인정보처리방침', href: '/privacy' },
 ];
 
 export function SiteFooter() {
@@ -38,17 +109,17 @@ export function SiteFooter() {
     >
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         {/* 상단 — 브랜드 + 한 줄 설명 + 소셜 */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div style={{ maxWidth: 480 }}>
             <p style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, letterSpacing: '0.16em', marginBottom: 6 }}>
               AI LENS
             </p>
             <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 15, color: '#374151', lineHeight: 1.7 }}>
-              같은 뉴스, 네 가지 시선.<br />
-              민철·하은·준서·소율 네 명의 AI 에디터가 같은 사건을 각자의 결로 다시 씁니다.
+              서울경제신문이 만드는 AI 경제 뉴스.<br />
+              그날의 핵심 이슈를 매일 정리해 전합니다.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {SOCIAL.map((s) => (
               <a
                 key={s.label}
@@ -69,11 +140,27 @@ export function SiteFooter() {
           </div>
         </div>
 
-        {/* 발행처 / E-E-A-T 신호 */}
+        {/* 정책/회사 링크 — en.sedaily.com footer와 동일 구성(About/Contact/Terms/Privacy) */}
+        <nav
+          className="flex flex-wrap"
+          style={{ gap: '6px 16px', paddingBottom: 20, borderBottom: '1px solid #ececec', marginBottom: 20 }}
+        >
+          {NAV.map((n) => (
+            <a
+              key={n.href}
+              href={n.href}
+              style={{ fontSize: 12.5, color: '#6b7280', textDecoration: 'none' }}
+            >
+              {n.label}
+            </a>
+          ))}
+        </nav>
+
+        {/* 발행처 / E-E-A-T 신호 — JSON-LD(layout.tsx의 NewsMediaOrganization:
+            parentOrganization·sameAs·foundingDate)가 주장하는 관계·사업자정보를
+            실제 보이는 텍스트로도 노출한다. */}
         <div
           style={{
-            borderTop: '1px solid #ececec',
-            paddingTop: 20,
             display: 'flex',
             flexDirection: 'column',
             gap: 6,
@@ -82,15 +169,23 @@ export function SiteFooter() {
             lineHeight: 1.7,
           }}
         >
-          <p>
-            <strong style={{ color: '#374151', fontWeight: 700 }}>AI LENS</strong>{' · '}
-            네 명의 AI 에디터가 같은 사건을 각자의 결로 다시 씁니다
+          <p style={{ fontSize: 11.5, color: '#9ca3af' }}>
+            1960년 창간{' '}
+            <a href="https://www.sedaily.com" target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              서울경제신문
+            </a>
+            {' '}· 대표 손동영 · 사업자등록번호 208-81-10310<br />
+            서울특별시 종로구 율곡로 6 트윈트리타워 B동 14~16층 · 대표전화 02-724-8600
+            {' · '}
+            <a href="https://en.sedaily.com" target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              English Edition
+            </a>
           </p>
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
             본 서비스는 AI가 생성한 콘텐츠를 제공합니다. 명리학과 결합한 사주 섹션은 재미와 참고용입니다.
           </p>
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 12 }}>
-            © {year} AI LENS
+            © {year} 서울경제신문. All rights reserved.
           </p>
         </div>
       </div>

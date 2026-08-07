@@ -55,6 +55,10 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/saju-match',   priority: 0.8, changeFrequency: 'weekly'  },
   { path: '/timemachine',  priority: 0.7, changeFrequency: 'weekly'  },
   { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly'  },
+  { path: '/about',        priority: 0.3, changeFrequency: 'yearly'  },
+  { path: '/contact',      priority: 0.3, changeFrequency: 'yearly'  },
+  { path: '/terms',        priority: 0.2, changeFrequency: 'yearly'  },
+  { path: '/privacy',      priority: 0.2, changeFrequency: 'yearly'  },
 ];
 
 // freshness 기반 priority — 최신 레터일수록 높게

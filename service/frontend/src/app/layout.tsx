@@ -29,8 +29,8 @@ const pretendard = localFont({
 });
 
 const SITE_URL = "https://ailens.sedaily.ai";
-const SITE_TITLE = "AI LENS — 같은 뉴스, 네 가지 시선";
-const SITE_DESC = "서울경제신문이 운영하는 MBTI 기반 맞춤형 경제 뉴스. 네 명의 AI 에디터(민철·하은·준서·소율)가 같은 사건을 각자의 결로 다시 씁니다.";
+const SITE_TITLE = "AI LENS — 서울경제신문의 AI 경제 뉴스";
+const SITE_DESC = "서울경제신문이 만드는 AI 경제 뉴스 서비스. 그날의 핵심 경제 이슈를 매일 정리해 전합니다.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -40,9 +40,8 @@ export const metadata: Metadata = {
   },
   description: SITE_DESC,
   keywords: [
-    "AI LENS", "MBTI 뉴스", "맞춤 경제뉴스", "서울경제", "AI 에디터",
-    "민철 NT", "하은 NF", "준서 ST", "소율 SF",
-    "오늘의 한 통", "사주", "오늘의 운세", "사주 궁합", "이상형 역산",
+    "AI LENS", "AI 경제뉴스", "맞춤 경제뉴스", "서울경제", "오늘의 한 통",
+    "이슈 브리핑", "사주", "오늘의 운세", "사주 궁합", "이상형 역산",
     "경제뉴스", "투자", "증권", "AI 뉴스레터",
   ],
   authors: [{ name: "서울경제신문", url: "https://www.sedaily.com" }],
@@ -68,7 +67,7 @@ export const metadata: Metadata = {
     locale: "ko_KR",
     siteName: "AI LENS",
     // 1200x630 OG 이미지 (Kakao/Twitter/Facebook 표준)
-    images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: "AI LENS — 같은 뉴스, 네 가지 시선" }],
+    images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: SITE_TITLE }],
   },
   twitter: {
     card: "summary_large_image",
@@ -117,18 +116,32 @@ const SITE_JSONLD = {
       logo: { "@type": "ImageObject", url: `${SITE_URL}/lens.png` },
       foundingDate: "1960-08-01",
       // 60+ 년 경제 보도 경험을 E-E-A-T 신호로 명시
+      founder: { "@type": "Person", name: "손동영", jobTitle: "대표이사·발행인" },
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "율곡로 6 트윈트리타워 B동 14~16층",
+        addressLocality: "종로구",
+        addressRegion: "서울특별시",
+        addressCountry: "KR",
+      },
+      telephone: "+82-2-724-8600",
+      hasMap: "https://map.naver.com/p/search/서울경제신문/place/38281793",
       parentOrganization: { "@type": "Organization", name: "서울경제신문", url: "https://www.sedaily.com" },
       sameAs: [
         "https://www.sedaily.com",
         "https://en.sedaily.com",
         "https://www.instagram.com/sedaily_economic/",
         "https://www.instagram.com/moneycut_._/",
-        "https://www.youtube.com/channel/UCBjKiKjXZf4aEA3WqicVhGQ",
+        "https://www.youtube.com/@서울경제신문",
+        "https://tv.naver.com/sed.thumb",
+        "https://www.facebook.com/seouleconomydaily/",
+        "https://x.com/sedaily_com",
       ],
       contactPoint: {
         "@type": "ContactPoint",
         contactType: "editorial",
         email: "webmaster@sedaily.com",
+        telephone: "+82-2-724-8600",
         availableLanguage: ["Korean"],
       },
     },
@@ -155,6 +168,9 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700;900&display=swap"
         />
+        {/* RSS — en.sedaily.com/rss/newsall 패턴 참고(2026-08-07). AI 크롤러·
+            뉴스 애그리게이터가 sitemap 외에 이 링크로도 신규 글을 발견한다. */}
+        <link rel="alternate" type="application/rss+xml" title="AI LENS RSS" href="/rss.xml" />
         {/* JSON-LD — WebSite + NewsMediaOrganization (E-E-A-T) */}
         <script
           type="application/ld+json"
