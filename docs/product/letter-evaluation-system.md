@@ -12,7 +12,10 @@
 | **B. 가상 독자 평가** | 5 reader × rubric 10 → 점수 + 코멘트 | 발행 후 또는 후향 | Bedrock 1회 호출/조합 |
 | **C. 실증 데이터** | GA `letter_complete` 완독률·체류·공유 | 발행 1주일 후 | 무료 (이미 박힘) |
 
-본 문서는 **B 계층**(가상 독자 평가)에 집중. A 는 `persona-voice-cards.md`, C 는 `launch-sprint-tracking.md` 참조.
+본 문서는 **B 계층**(가상 독자 평가)에 집중. C 는 `launch-sprint-tracking.md` 참조.
+⚠️ A 계층이 참조하던 `persona-voice-cards.md`(레터 에디터 4-페르소나 카드)는 MBTI
+페르소나 폐지(2026-08)로 `docs/archive/`로 옮겼다 — A 계층 자체가 지금 유효한지도
+다음에 별도 확인 필요(§4 "페르소나별" 문항도 같은 이유로 낡았을 수 있음).
 
 ---
 

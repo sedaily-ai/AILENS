@@ -206,9 +206,11 @@ clients/            → Service clients: dynamodb, personal_db, s3_article, s3_x
                      계속 통과 중이라, 특정 폐기 기능에 묶인 게 아니라 아직 UI가 없는
                      범용 삭제 기능일 가능성 — `common/errors.py`의 미사용 예외 클래스와
                      같은 논리로 보존.
-                     Bedrock Claude is wrapped by clients/mbti_transform_service.py (unusual
-                     placement — it's a service file inside clients/). Polly has no client file;
-                     podcast_handler calls boto3 polly directly (tts_handler 는 폐기).
+                     ⚠️ `clients/mbti_transform_service.py`(Bedrock Claude 래퍼, MBTI
+                     4-페르소나 변환 전용)는 그 페르소나 파이프라인 자체가 폐지되며
+                     삭제됐다(2026-08, `article_collector.py`도 더 이상 참조 안 함).
+                     Polly has no client file; podcast_handler calls boto3 polly directly
+                     (tts_handler 는 폐기).
                      ⚠️ opensearch_client.py 는 2026-08-05 삭제됐다 — 어떤 handler 도
                      import하지 않던 죽은 코드였다(원래 도메인 sedaily-mbti-search-dev도
                      2026-08-04 삭제). search_handler.py 는 처음부터 DynamoDB GSI 쿼리로
@@ -239,9 +241,6 @@ clients/            → Service clients: dynamodb, personal_db, s3_article, s3_x
                      `embedding_client.py`(v1 Titan) — `embed_text`/`_call_bedrock`만
                      살아있고(`handlers/archive_handler.py`가 사용), `embed_batch`/
                      `get_embedding`/`get_embeddings_batch`는 호출자 0이라 같은 날 삭제.
-                     `mbti_transform_service.py`의 no-op `close()`도 삭제 — 여전히
-                     `article_collector.py`가 쓰는 살아있는 클래스이지만 이 메서드 하나만
-                     죽어있었음(pass만 하는 스텁, 호출자 0).
 repositories/       → PersonalRepository만 남음(personal_db_client.py 기반, "내 서랍"·유저
                      프로필·독서기록에서 사용). ⚠️ base.py(BaseDynamoDBRepository) +
                      그걸 상속하던 log_repository.py/settings_repository.py(~930줄)는
@@ -314,9 +313,10 @@ core/               → Framework: decorators.py (@lambda_handler, @require_para
 config/             → settings.py (env-var-driven @dataclass Settings, cached
                      via @lru_cache get_settings()) + constants.py (model IDs,
                      DynamoDB table names, S3_BODY_FIELDS, CORS_HEADERS,
-                     category normalization + search aliases, MBTI_GROUP_INFO,
+                     category normalization + search aliases,
                      Polly podcast voice styles). Never call `os.getenv` in
                      handlers — go through `config.settings`.
+                     ⚠️ `MBTI_GROUP_INFO`는 MBTI 페르소나 폐지와 함께 삭제됐다.
                      ⚠️ `constants.py`에 사용처 0인 상수가 25~30개 정도 더 있다(대부분
                      `OPENSEARCH_INDEX_DEFAULT`/`BEDROCK_MODEL_ID_NOVA_PRO`/`NOVA_LITE`류,
                      `PODCAST_VOICE_STYLES`류, `SLUG_*`류 — settings.py를 거치거나 수동
@@ -327,9 +327,12 @@ config/             → settings.py (env-var-driven @dataclass Settings, cached
                      `SETTINGS_KEY_TRANSLATION_PROMPT`/`VIDEO_SCHEDULES`/`PROMPT_HISTORY`).
                      나머지는 다음에 개별적으로 볼 것.
 prompts/            → AI prompt templates organized by purpose:
-                     transform/ (nt/nf/st/sf.md), chatbot/ (nt/nf/st/sf.md),
-                     selection/ (article_scorer.md), validation/ (validator.md),
-                     podcast/ (podcast_script.md), question/ (daily_question.md).
+                     chatbot/ (default.md — MBTI 그룹별 nt/nf/st/sf.md는 페르소나 폐지로
+                     삭제, `chatbot_prompt_service.py`가 `load_chatbot_prompt('default')`
+                     하나만 부름), selection/ (article_scorer.md),
+                     validation/ (validator.md), podcast/ (podcast_script.md),
+                     question/ (daily_question.md).
+                     transform/ (nt/nf/st/sf.md — MBTI 4-페르소나 리라이팅 프롬프트)와
                      editor_letter/ + editor_letter_v3/ 는 2026-08-05 core25와 함께 삭제
 utils/              → Small helpers included in the Lambda zip: date_utils.py
                      (`get_kst_today()` — 2026-08-05 추가, `article_handler.py`/
@@ -370,5 +373,6 @@ observability/      → CloudWatch 대시보드 정의 (Bedrock 토큰·비용 p
 적용 스크립트, 로컬 editor-pick 테스트, v1→pgvector 백필 도구 모두 그 파이프라인
 전용이었음) 디렉터리 자체를 지웠다.
 
-A legacy `service/backend/MBTI_TRANSFORM_PROMPT.md` still sits at the backend root as the last-resort fallback for `clients/mbti_transform_service.py`. The canonical prompts live in `prompts/transform/` now — don't edit the root file.
+⚠️ `service/backend/MBTI_TRANSFORM_PROMPT.md`(옛 last-resort fallback for
+`clients/mbti_transform_service.py`)는 그 서비스 파일과 함께 삭제됐다 — 더 이상 없다.
 

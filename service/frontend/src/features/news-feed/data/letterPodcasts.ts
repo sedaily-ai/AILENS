@@ -4,9 +4,7 @@
  * 자동화 시 이 구조를 백엔드 Lambda 가 레터별로 LLM 생성해 채운다.
  * speaker: 'host'  = 진행자(2030 청취자 대변, 질문·맞장구)
  *          'editor' = 그 그룹의 에디터 페르소나(분석·설명)
- * host 보이스는 에디터와 성별 대비가 나도록 그룹별로 지정한다.
  */
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 
 export interface PodcastTurn {
   speaker: 'host' | 'editor';
@@ -21,14 +19,6 @@ export interface LetterPodcast {
 // 진행자 보이스 (ElevenLabs ko, generated 팟캐스트 진행자)
 export const HOST_VOICE_FEMALE = '8uGBWRHC9MO9v9Y9VSLn'; // podcast 여성 — 30대 밝고 맑은 라디오 진행자
 export const HOST_VOICE_MALE = 'WpSTgLWhhCMiZDku78J4'; // podcast 남성2 — 30대 따뜻·친근 진행자
-
-// 그룹별 진행자 = 에디터와 성별 대비 (NT/ST 남에디터 → 여진행자, NF/SF 여에디터 → 남진행자)
-export const HOST_VOICE_BY_GROUP: Record<MbtiGroupId, string> = {
-  NT: HOST_VOICE_FEMALE,
-  ST: HOST_VOICE_FEMALE,
-  NF: HOST_VOICE_MALE,
-  SF: HOST_VOICE_MALE,
-};
 
 // letter.id 기준. ⚠️ 아래 키('l-YYYYMMDD-GG')는 MBTI 4-페르소나 체계 폐지
 // (2026-08-07) 이전의 옛 id 스킴이다 — 현재 발행되는 letter.id 와는 절대 매칭되지

@@ -16,7 +16,8 @@ DDB schema (Admin-1 import):
 
 Caller API:
     load_prompt(category, name)        — canonical
-    load_chatbot_prompt(group)         — wrapper for prompts/chatbot/{nt,nf,st,sf}
+    load_chatbot_prompt(group)         — wrapper for prompts/chatbot/<group>.md
+                                          (only 'default' exists post MBTI-persona removal)
 
 IAM: any Lambda invoking load_prompt needs `dynamodb:GetItem` on
 sedaily-mbti-admin-prompts-dev. v1 shared role inherits AmazonDynamoDBFullAccess.

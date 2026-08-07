@@ -81,6 +81,13 @@ DDB-backed prompt storage with 5-minute TTL cache and filesystem fallback. Patte
 - **Write path**: `POST /admin/prompts/<category>/<name>` (admin Lambda, Admin-1) — writes a new `v#N` row and bumps `LATEST.active_version`. Production Lambdas pick up the change within 5 minutes naturally, or immediately on the next cold start.
 - **IAM (v1 vs v2)**: same shape as Feature Flags / Thresholds. v1 shared role inherits `AmazonDynamoDBFullAccess`. v2 shared role got an **`AdminPromptsRead`** inline policy in Admin-3 (Sid `AdminPromptsDDBRead`, scoped to the single `sedaily-mbti-admin-prompts-dev` table). It's intentionally separate from `AdminConfigRead` (Admin-2d) so each policy maps to one logical concern. ⚠️ A v2 Lambda calling `load_prompt` without the policy degrades silently to filesystem (warn-log, not 5xx) — verify the policy is attached when wiring up a new v2 caller.
 - **Integration point in handlers** ⚠️ **call `load_prompt` inside the request-processing function, never at module-load time**. A `MODULE_CONST = load_prompt(...)` at import time freezes the prompt for the warm container's lifetime — defeats the 5-min TTL. Admin-3 fixed exactly this in `step1_select.py:147` (a `SCORING_SYSTEM_PROMPT = load_prompt(...)` at module scope, moved inline to `_score_one_batch`).
+⚠️ **MBTI 페르소나 폐지(2026-08) 이후 아래 항목 무효**: "13/13"과
+`chatbot/{nt,nf,st,sf}` / `transform/{nt,nf,st,sf}` / `mbti_transform_service.py`는
+그 폐지로 전부 삭제됐다. `chatbot/`에는 이제 `default.md` 하나만 있고
+(`chatbot_prompt_service.py`가 `load_chatbot_prompt('default')` 고정 호출), `transform/`
+디렉터리 자체가 없다. 아래는 Admin-3 당시(그 파이프라인이 살아있던 시점)의 히스토리
+기록으로 남겨둔다.
+
 - **Coverage — 13/13 prompts after Admin-3 cutover (option B-1)**: 5 prompts (`selection`/`question`/`supervisor`/`validation`/`podcast`) already used `load_prompt` pre-Admin-3. The other 8 (`chatbot/{nt,nf,st,sf}` + `transform/{nt,nf,st,sf}`) had been bypassing prompt_loader entirely and were folded in by Admin-3:
   - `handlers/chatbot_handler.py` — removed the hardcoded `MBTI_SYSTEM_PROMPTS` dict, replaced with `load_chatbot_prompt(group)`. **⚠️ This changed chatbot response style in production**: the dict was a deprecated short persona that had drifted from `prompts/chatbot/<group>.md` (the source-of-truth versions Admin-1 imported). Verified post-deploy: chatbot now returns the fuller "AI LENS의 김시현" persona from the `.md` versions, not the dict's shorter "시현".
   - `clients/mbti_transform_service.py::_load_group_prompt` — was reading `prompts/transform/<group>.md` directly via `open()` (the bare `PROMPT_FILES` dict). Now delegates to `load_transform_prompt`. Content unchanged on the happy path; the read goes through DDB now.
