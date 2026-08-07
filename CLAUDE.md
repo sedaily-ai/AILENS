@@ -26,9 +26,11 @@ CloudFront(`E1QS7PY350VHF6`, `E1MITYI58DB9UW`), 같은 Lambda 함수 이름
 - 새 세션을 열 때 반드시 `pwd`로 지금 어느 체크아웃인지 확인한다. `dev`라면 사용자에게
   확인 없이 코드를 고치거나 배포하지 않는다.
 - `git remote -v`가 `AI-LENS`(하이픈)를 가리키면 잘못된 체크아웃이다.
-- 배포 스크립트(`service/backend/deploy.sh`, `service/backend/admin/deploy-admin-api.sh`,
-  `service/frontend/deploy.sh`, `admin/deploy-admin.sh`)를 돌리기 전에, 다른 체크아웃
-  쪽에서 더 최근에 배포된 게 없는지(worklog, git log 시각) 먼저 확인한다.
+- 배포 스크립트(`service/backend/deploy.sh`, `admin/backend/deploy-admin-api.sh`,
+  `service/frontend/deploy.sh`, `admin/frontend/deploy-admin.sh`)를 돌리기 전에, 다른
+  체크아웃 쪽에서 더 최근에 배포된 게 없는지(worklog, git log 시각) 먼저 확인한다.
+  (2026-08-08: admin 백엔드가 `service/backend/admin/` → `admin/backend/` 로 이동 —
+  `admin/`이 이제 `admin/frontend/` + `admin/backend/` 로 나뉜다.)
 
 ---
 
@@ -40,9 +42,10 @@ CloudFront(`E1QS7PY350VHF6`, `E1MITYI58DB9UW`), 같은 Lambda 함수 이름
 - `docs/README.md` — 문서 체계 지도, 배치 규칙, worklog 컨벤션
 - `docs/worklog/2026-08/` — 최근 작업 기록 (v1/v2 통합, CMS DynamoDB 마이그레이션,
   파이프라인 폐기 경위 등 전부 여기)
-- `admin/CLAUDE.md` — admin 콘솔 전용 규칙 (Next.js 16 breaking changes 포함)
-- `service/backend/deploy.sh`, `service/frontend/deploy.sh`, `admin/deploy-admin.sh`,
-  `service/backend/admin/deploy-admin-api.sh` — 배포 스크립트 자체가 현재 구조를
+- `admin/frontend/CLAUDE.md` — admin 콘솔 프런트엔드 전용 규칙 (Next.js 16 breaking
+  changes 포함)
+- `service/backend/deploy.sh`, `service/frontend/deploy.sh`, `admin/frontend/deploy-admin.sh`,
+  `admin/backend/deploy-admin-api.sh` — 배포 스크립트 자체가 현재 구조를
   가장 정확히 반영한다 (스크립트 상단 주석 참조)
 
 전체 아키텍처 문서를 dev2 기준으로 새로 정리하는 작업은 별도 세션에서 진행할 것.

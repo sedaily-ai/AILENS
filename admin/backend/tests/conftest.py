@@ -1,11 +1,11 @@
 """admin 테스트 공용 fake + 단언 헬퍼.
 
-admin 은 flat import 규약(zip 루트 = admin/)이므로 sys.path 에 admin/ 를 넣어
-프로덕션과 같은 import 경로를 재현한다.
+admin 은 flat import 규약(zip 루트 = admin/backend/ 내용 그 자체)이므로 sys.path 에
+admin/backend/ 를 넣어 프로덕션과 같은 import 경로를 재현한다.
 
-Run from service/backend/::
+Run from repo root::
 
-    python3 -m pytest admin/tests -q
+    python3 -m pytest admin/backend/tests -q
 """
 from __future__ import annotations
 
@@ -16,11 +16,18 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# admin/__init__.py 와 admin/tests/__init__.py 가 둘 다 존재해 pytest 기본
-# import-mode(prepend)가 이 디렉터리를 `admin.tests` 패키지로 인식, 루트로
-# service/backend/ 를 sys.path 에 넣는다 — admin/tests/ 자체는 올라오지 않는다.
-# test_*.py 가 `from conftest import ...` 로 이 모듈을 bare-import 하려면
-# admin/tests/ 도 별도로 sys.path 에 있어야 한다.
+# 2026-08-08: service/backend/admin/ → admin/backend/ 로 이동하며 common/ 과
+# 물리적으로 갈라졌다(common/ 은 v1/v2 도 같이 쓰는 진짜 공유 코드라 그대로
+# service/backend/ 에 남겨둠). admin/__init__.py 존재로 pytest 의 rootdir
+# 자동탐색이 이제 admin/(repo 최상위) 에서 멈춰버려 common 이 안 잡힌다 —
+# service/backend/ 를 명시적으로 추가한다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "service" / "backend"))
+
+# admin/backend/__init__.py 와 admin/backend/tests/__init__.py 가 둘 다 존재해
+# pytest 기본 import-mode(prepend)가 이 디렉터리를 `backend.tests` 패키지로
+# 인식, 루트로 admin/ 을 sys.path 에 넣는다 — admin/backend/tests/ 자체는
+# 안 올라온다. test_*.py 가 `from conftest import ...` 로 이 모듈을
+# bare-import 하려면 admin/backend/tests/ 도 별도로 sys.path 에 있어야 한다.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 

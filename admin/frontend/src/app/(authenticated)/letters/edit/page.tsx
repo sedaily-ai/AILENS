@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
@@ -100,7 +99,7 @@ function LetterEditPage() {
     try {
       await adminApi.deleteLetter(id);
       toast.show("사용자 화면에서 내렸습니다", "success");
-      router.push("/letters");
+      router.back();
     } catch (err) {
       toast.show((err as Error).message, "error");
       setBusy(false);
@@ -112,9 +111,9 @@ function LetterEditPage() {
       <div className="space-y-3">
         <h1 className="font-display text-[26px] font-bold text-[var(--text-primary)]">AI 레터</h1>
         <ErrorNote message={error} />
-        <Link href="/letters" className="text-sm text-blue-700 hover:underline">
+        <button type="button" onClick={() => router.back()} className="text-sm text-blue-700 hover:underline cursor-pointer">
           ← 목록
-        </Link>
+        </button>
       </div>
     );
   }
@@ -123,12 +122,13 @@ function LetterEditPage() {
     <div className="space-y-6">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
         <div>
-          <Link
-            href="/letters"
-            className="text-sm text-gray-600 hover:text-gray-900"
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="text-sm text-gray-600 hover:text-gray-900 cursor-pointer"
           >
             ← 목록
-          </Link>
+          </button>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 mt-1">
             AI 레터 수정
           </h1>

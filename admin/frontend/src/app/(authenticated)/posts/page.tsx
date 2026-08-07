@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { EmptyState, ErrorNote } from "@/components/Feedback";
@@ -116,18 +117,71 @@ function inDateRange(publishDate: string | null | undefined, range: DateRange): 
 
 const PAGE_SIZE = 15;
 
-export default function PostsPage() {
+// useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수
+// (posts/edit 와 동일 패턴).
+export default function PostsPageWrapper() {
+  return (
+    <Suspense fallback={<div className="ui-spinner w-5 h-5 mt-4" />}>
+      <PostsPage />
+    </Suspense>
+  );
+}
+
+function PostsPage() {
   const toast = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [posts, setPosts] = useState<CmsPost[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState("");
-  const [channel, setChannel] = useState("");
+  // 필터·페이지 상태를 URL(?status=&channel=&from=&to=&page=)에 동기화 —
+  // 글 하나를 열었다가 뒤로가기 했을 때 필터가 "전체"·1페이지로 리셋되던
+  // 문제(2026-08-08 사용자 리포트). 초기값은 URL에서 읽고, 바뀔 때마다
+  // router.replace로 URL도 같이 갱신해 뒤로가기가 그 상태로 돌아오게 한다.
+  const [status, setStatusState] = useState(() => searchParams.get("status") ?? "");
+  const [channel, setChannelState] = useState(() => searchParams.get("channel") ?? "");
   // 발행일 단일값 → 범위(시작~끝)로 변경(2026-08-07, "시작일부터 끝일까지
   // 필터링" 요청). 백엔드 list_posts 는 정확히 일치하는 date= 하나만 지원해서
   // 범위 필터는 서버 파라미터로 못 넘긴다 — 항상 전체를 받아서 클라이언트에서
   // from~to 사이인지로 거른다(channel 필터와 같은 이유·같은 패턴).
-  const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
-  const [page, setPage] = useState(1);
+  const [dateRange, setDateRangeState] = useState<DateRange>(() => ({
+    from: searchParams.get("from") || null,
+    to: searchParams.get("to") || null,
+  }));
+  const [page, setPageState] = useState(() => {
+    const p = parseInt(searchParams.get("page") ?? "1", 10);
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  });
+
+  const syncUrl = (next: { status: string; channel: string; dateRange: DateRange; page: number }) => {
+    const params = new URLSearchParams();
+    if (next.status) params.set("status", next.status);
+    if (next.channel) params.set("channel", next.channel);
+    if (next.dateRange.from) params.set("from", next.dateRange.from);
+    if (next.dateRange.to) params.set("to", next.dateRange.to);
+    if (next.page > 1) params.set("page", String(next.page));
+    const qs = params.toString();
+    router.replace(qs ? `/posts?${qs}` : "/posts", { scroll: false });
+  };
+
+  const setStatus = (next: string) => {
+    setStatusState(next);
+    syncUrl({ status: next, channel, dateRange, page: 1 });
+  };
+  const setChannel = (next: string) => {
+    setChannelState(next);
+    syncUrl({ status, channel: next, dateRange, page: 1 });
+  };
+  const setDateRange = (next: DateRange) => {
+    setDateRangeState(next);
+    syncUrl({ status, channel, dateRange: next, page: 1 });
+  };
+  const setPage = (updater: number | ((prev: number) => number)) => {
+    setPageState((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      syncUrl({ status, channel, dateRange, page: next });
+      return next;
+    });
+  };
   // 일괄 선택/작업(2026-08-07, "체크 가능하게 해서 일괄 삭제·이동·카테고리
   // 변경" 요청). reloadKey 를 올리면 아래 목록 fetch effect 가 다시 돈다 —
   // 일괄 작업 성공 후 최신 상태를 다시 받아오는 용도.

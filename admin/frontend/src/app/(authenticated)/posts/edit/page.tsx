@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
@@ -225,7 +224,7 @@ function PostEditPage() {
     try {
       await adminApi.deletePost(id);
       toast.show("삭제했습니다", "success");
-      router.push("/posts");
+      router.back();
     } catch (err) {
       toast.show((err as Error).message, "error");
       setBusy(false);
@@ -237,9 +236,9 @@ function PostEditPage() {
       <div className="space-y-3">
         <h1 className="font-display text-[26px] font-bold text-[var(--text-primary)]">글</h1>
         <ErrorNote message={error} />
-        <Link href="/posts" className="text-sm text-blue-700 hover:underline">
+        <button type="button" onClick={() => router.back()} className="text-sm text-blue-700 hover:underline cursor-pointer">
           ← 목록
-        </Link>
+        </button>
       </div>
     );
   }
@@ -256,9 +255,9 @@ function PostEditPage() {
         style={{ background: "var(--surface-page)" }}
       >
         <div>
-          <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
+          <button type="button" onClick={() => router.back()} className="text-sm text-gray-600 hover:text-gray-900 cursor-pointer">
             ← 목록
-          </Link>
+          </button>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 mt-1">
             {isNew ? "새 글" : "글 수정"}
           </h1>

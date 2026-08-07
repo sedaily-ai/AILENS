@@ -3,7 +3,7 @@
 # Admin-5 (commit pending).
 #
 # 사용:
-#   cd admin
+#   cd admin/frontend
 #   ./deploy-admin.sh
 #
 # 전제:

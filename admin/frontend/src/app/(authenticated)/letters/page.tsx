@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
 import { CardSkeleton, EmptyState, ErrorNote } from "@/components/Feedback";
 import type { AiLetter } from "@/lib/types";
@@ -14,10 +15,31 @@ function todayKST(): string {
   ).padStart(2, "0")}`;
 }
 
-export default function LettersPage() {
-  const [date, setDate] = useState(todayKST());
+// useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수
+// (posts/edit, letters/edit 와 동일 패턴).
+export default function LettersPageWrapper() {
+  return (
+    <Suspense fallback={<div className="ui-spinner w-5 h-5 mt-4" />}>
+      <LettersPage />
+    </Suspense>
+  );
+}
+
+function LettersPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // 날짜 선택을 URL(?date=)에 동기화 — 글 하나를 열었다가 뒤로가기 했을 때
+  // 고른 날짜가 오늘로 리셋되던 문제(2026-08-08 사용자 리포트: "뒤로가기 하면
+  // 처음 화면으로 돌아간다"). state 는 그대로 두되 초기값을 URL에서 읽고,
+  // 바뀔 때마다 URL도 같이 갱신해 뒤로가기가 그 날짜로 돌아오게 한다.
+  const [date, setDateState] = useState(() => searchParams.get("date") || todayKST());
   const [letters, setLetters] = useState<AiLetter[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const setDate = (next: string) => {
+    setDateState(next);
+    router.replace(`/letters?date=${next}`, { scroll: false });
+  };
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
   useEffect(() => {

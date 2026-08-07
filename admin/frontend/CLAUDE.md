@@ -1,8 +1,14 @@
 @AGENTS.md
 
-# admin/
+# admin/frontend/
 
-Admin console targeting `mbti-admin.sedaily.ai`. The Admin track (Backend Admin Lambda / Feature Flags / Thresholds / Prompts / Secrets / Admin Frontend Admin-4 / Admin-5 deployment) is documented in [`../docs/architecture/admin-stack.md`](../docs/architecture/admin-stack.md) — read that first for any cross-cutting changes.
+Admin console targeting `lensdb.sedaily.ai` (2026-08-08부터 — `mbti-admin.sedaily.ai`는
+폐기됨). Sibling backend Lambda lives at `../backend/` (`admin/backend/`, formerly
+`service/backend/admin/` — moved 2026-08-08 to sit alongside the frontend). The Admin
+track (Backend Admin Lambda / Feature Flags / Thresholds / Prompts / Secrets / Admin
+Frontend Admin-4 / Admin-5 deployment) is documented in
+[`../../docs/architecture/admin-stack.md`](../../docs/architecture/admin-stack.md) —
+read that first for any cross-cutting changes.
 
 ## Stack
 
@@ -25,11 +31,11 @@ Build outputs **13 routes** under `out/`: `/`, `/login`, `/posts`, `/posts/edit`
 ## Deploy
 
 ```bash
-cd admin
+cd admin/frontend
 ./deploy-admin.sh   # npm build → S3 sync → CloudFront /* invalidation
 ```
 
 Live infra (Admin-5 provisioning result):
-- S3 `sedaily-mbti-admin-frontend-dev` (us-east-1, OAC-only) → CloudFront `E1MITYI58DB9UW` → **`ailens-admin.sedaily.ai`** (2026-07-28 추가) + `mbti-admin.sedaily.ai` (레거시 병행).
+- S3 `sedaily-mbti-admin-frontend-dev` (us-east-1, OAC-only) → CloudFront `E1MITYI58DB9UW` → **`lensdb.sedaily.ai`** (2026-08-08부터 주 도메인) + `ailens-admin.sedaily.ai` (병행). `mbti-admin.sedaily.ai`는 2026-08-08 완전 폐기(CloudFront alias·Route53·CORS 전부 제거).
 - 인증서는 단일도메인 `cdca2fe5…` → 와일드카드 `*.sedaily.ai` (`ae647d30…`) 로 교체했다. 새 alias 가 SSL 검증을 통과하려면 필요했고, 덕분에 앞으로 `*.sedaily.ai` 하위 도메인은 인증서 발급 없이 alias 만 추가하면 된다.
 - 403/404 → `/index.html` (200) for SPA fallback on hard reload.

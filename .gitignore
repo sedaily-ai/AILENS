@@ -18,5 +18,7 @@ venv/
 # Lambda build artifacts
 lambda-build/
 lambda-build-v2/
+lambda-build-admin/
 lambda_package.zip
 lambda_package_v2.zip
+lambda_package_admin.zip

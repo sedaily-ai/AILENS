@@ -3,7 +3,7 @@
 service/backend/ 전체의 디렉토리 / 모듈 구조 reference. 본 파일은 service/backend/ 안에서
 작업 시 자동 load.
 
-service/frontend/CLAUDE.md / admin/CLAUDE.md 패턴 일관.
+service/frontend/CLAUDE.md / admin/frontend/CLAUDE.md 패턴 일관.
 
 ---
 
@@ -19,7 +19,7 @@ service/frontend/CLAUDE.md / admin/CLAUDE.md 패턴 일관.
 
 **삭제한 파일**: `clients/pgvector_client.py`(v1), `clients/pgvector_v2_client.py`(v2),
 `clients/s3_article_v2_client.py`(front-page 전용, 다른 호출자 없음 확인),
-`handlers/front_page.py`(지면 1면), `admin/shared/pg_client.py`(2026-08-04
+`handlers/front_page.py`(지면 1면), `admin/backend/shared/pg_client.py`(2026-08-04
 DynamoDB 이관 이후 importer 0명 — 이미 고아였음), 대응 테스트 4개
 (`test_pgvector.py`, `test_pgvector_v2_client.py`, `test_front_page.py`,
 `test_s3_article_v2_client.py`).
@@ -77,7 +77,7 @@ DynamoDB 이관 이후 importer 0명 — 이미 고아였음), 대응 테스트 
   전부 grep으로 실제 import 0건 확인(OpenSearch는 2026-08-05 도메인 자체가
   삭제됨). pip install 목록에서 제거 — 22개 함수 전부가 매 콜드스타트마다
   안 쓰는 패키지를 로드하고 있었다. `pg8000`은 `pgvector_client.py`/
-  `pgvector_v2_client.py`/`admin/shared/pg_client.py`가 실사용 중이라 유지.
+  `pgvector_v2_client.py`/`admin/backend/shared/pg_client.py`가 실사용 중이라 유지.
 
 ### 후속 조치 (같은 날 마저 처리)
 - **메모리 256→512MB**: `today-letters-dev`/`posts-dev`/`subscribe-dev` 3개
@@ -256,7 +256,7 @@ services/           → Business logic: article_filter, prompt_loader,
                      ⚠️ `prompt_service.py`(`PromptService`, "번역 프롬프트 CRUD"용)는
                      2026-08-05 삭제됨 — 어디서도 import 안 됐고(사용처 0), 유일한 잠재
                      호출자였던 `translation` 핸들러가 2026-07-30에 이미 폐기됐다. 실제
-                     관리자 프롬프트 관리는 완전히 다른 모듈(`admin/routes/prompts.py`,
+                     관리자 프롬프트 관리는 완전히 다른 모듈(`admin/backend/routes/prompts.py`,
                      다른 DDB 스키마)이 담당 — 이 서술은 낡은 정보였다.
                      stock_service (used by services/chatbot_engine.py for inline stock lookups).
                      2026-08-05: `handlers/chatbot_handler.py`(869줄, SOLID 위반 확인)를
@@ -346,12 +346,12 @@ common/             → Cross-track shared utilities (모든 handler + admin이 
                      캐시라 자연 만료되고, 강제 무효화를 실제로 쓰는 곳이 없었다.
                      - `http.py`         — CORS-neutral response builder (`success`/`error`/
                      `json_dumps`). No cache; doesn't import `config/` so CORS can't leak
-                     in. `core/response.py` and `admin/shared/response.py` both delegate
+                     in. `core/response.py` and `admin/backend/shared/response.py` both delegate
                      to it (CORS injected by the caller, not this module).
                      - `errors.py`       — `BackendError` hierarchy + `EXCEPTION_STATUS_CODES`
                      + `get_status_code_for_exception()`; `core/exceptions.py` re-exports it.
                      Bundled into the Lambda zip by `deploy.sh` and the admin zip by
-                     `admin/deploy-admin-api.sh`. Import path inside Lambda:
+                     `admin/backend/deploy-admin-api.sh`. Import path inside Lambda:
                      `from common.<module> import ...` (zip root, no `backend.` prefix).
 infrastructure/     → 프로비저닝 스크립트 + 문서. cost_monitoring.sh, provision.sh,
                      provision_pgvector.sh(v1), provision_opensearch.sh, setup_ecr.sh

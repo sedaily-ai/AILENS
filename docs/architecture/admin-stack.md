@@ -10,7 +10,15 @@ CLAUDE.md 본 파일에는 1줄 포인터만 유지.
 
 ### Backend Admin Lambda
 
-`service/backend/admin/` is a **standalone Lambda separate from the 23 production Lambdas** — `sedaily-mbti-admin-api-dev`, deployed but **not built by `deploy.sh` / `deploy-v2.sh`** (its own one-shot zip pattern: `pip install argon2-cffi PyJWT --target /tmp/admin-rebuild && cp -r service/backend/admin/* /tmp/admin-rebuild && zip ...`). Admin-1 skeleton landed in commit `9d94f32`; Admin-2a (commit `0ee43df`) added the feature-flag toggle wire. The admin Lambda intentionally does not share v1's framework:
+⚠️ **폴더 이동(2026-08-08)**: `service/backend/admin/` → `admin/backend/` (repo 최상위,
+`admin/frontend/` 와 짝을 맞추려는 재구조화 — 사용자 요청: "백엔드 폴더랑 프론트 폴더
+만들고 정리해주세요"). 아래 본문의 `service/backend/admin/` 언급은 전부 새 경로
+`admin/backend/` 로 읽을 것. `common/`(v1/v2/admin 공유 유틸)은 v1/v2 도 같이 쓰는 진짜
+공유 코드라 옮기지 않고 `service/backend/common/` 에 그대로 뒀다 — `admin/backend/
+deploy-admin-api.sh` 가 상대경로(`../../service/backend/common`)로 참조한다. 테스트
+실행은 이제 repo 루트에서 `python3 -m pytest admin/backend/tests -q`.
+
+`service/backend/admin/`(현재 `admin/backend/`) is a **standalone Lambda separate from the 23 production Lambdas** — `sedaily-mbti-admin-api-dev`, deployed but **not built by `deploy.sh` / `deploy-v2.sh`** (its own one-shot zip pattern: `pip install argon2-cffi PyJWT --target /tmp/admin-rebuild && cp -r service/backend/admin/* /tmp/admin-rebuild && zip ...`). Admin-1 skeleton landed in commit `9d94f32`; Admin-2a (commit `0ee43df`) added the feature-flag toggle wire. The admin Lambda intentionally does not share v1's framework:
 
 - **Routing**: dispatches by API Gateway HTTP API `routeKey` directly via `admin/handler.py:HANDLERS`. Does **not** use v1's `@lambda_handler` decorator, `core/response.py`, or `core/exceptions.py` — the admin Lambda has its own minimal `shared/response.py` (no CORS headers; HTTP API handles CORS at the gateway level).
 - **Auth**: argon2id password verify + JWT (HS256, 8h expiry); password hash and JWT secret live in SSM Parameter Store at `/sedaily-mbti/admin/password-hash` and `/sedaily-mbti/admin/jwt-secret`. 5 failed logins → 5-minute global lockout, tracked via `pk=AUTH, sk=lockout/global` in the admin config table. `audit_log()` writes a row per mutating action (`pk=AUDIT, sk=<iso-timestamp-ms>`) and is wrapped in try/except so audit failures never block the main flow.
@@ -124,7 +132,7 @@ alias·Route53 A/AAAA 레코드·API Gateway CORS 전부 제거. 관리자 콘�
 Admin-5 (commit pending) is the final round in the admin track and is **complete**. It did not change any code in `admin/` or `service/backend/admin/`; it provisioned AWS infrastructure to put `admin/out/` behind `https://mbti-admin.sedaily.ai`. Live resources are listed in the **"Admin Frontend Infrastructure (Admin-5)"** section above. Per-deploy workflow:
 
 ```bash
-cd admin
+cd admin/frontend
 ./deploy-admin.sh   # npm build → S3 sync (long cache for /_next/, short for entries) → CloudFront /* invalidation
 ```
 
