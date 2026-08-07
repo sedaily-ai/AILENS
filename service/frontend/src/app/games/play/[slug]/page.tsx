@@ -25,7 +25,7 @@ export async function generateMetadata({
   const g = GAMES[slug];
   if (!g) return { title: '게임을 찾을 수 없어요', robots: { index: false } };
   return {
-    title: `${g.title} — AI LENS 게임`,
+    title: `${g.title} — 게임`,
     description: `AI LENS 안에서 바로 플레이하는 ${g.title}.`,
     alternates: { canonical: `https://ailens.sedaily.ai/games/play/${slug}` },
   };

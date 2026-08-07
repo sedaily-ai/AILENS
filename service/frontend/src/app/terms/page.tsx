@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { StaticPageShell } from '@/shared/ui/StaticPageShell';
 
 export const metadata: Metadata = {
-  title: '이용약관 — AI LENS',
+  title: '이용약관',
   description: 'AI LENS(서울경제신문)의 이용약관.',
   alternates: { canonical: 'https://ailens.sedaily.ai/terms' },
   robots: { index: true, follow: true },

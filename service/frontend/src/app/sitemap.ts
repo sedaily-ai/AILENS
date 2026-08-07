@@ -51,6 +51,10 @@ async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
   { path: '/',             priority: 1.0, changeFrequency: 'hourly'  }, // 메인 피드 — 매일 갱신
+  { path: '/letters',      priority: 0.9, changeFrequency: 'daily'   }, // 레터 전체 아카이브
+  { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily'   }, // 웹툰 목록
+  { path: '/words',        priority: 0.6, changeFrequency: 'daily'   }, // 단어장 — 레터 키워드 기반, 매일 갱신
+  { path: '/style',        priority: 0.3, changeFrequency: 'monthly' },
   { path: '/fortune',      priority: 0.9, changeFrequency: 'daily'   }, // 일진 매일 바뀜
   { path: '/saju-match',   priority: 0.8, changeFrequency: 'weekly'  },
   { path: '/timemachine',  priority: 0.7, changeFrequency: 'weekly'  },

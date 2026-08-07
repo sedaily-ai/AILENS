@@ -4,7 +4,7 @@ import { LettersArchiveClient } from './LettersArchiveClient';
 import { buildArchiveItems, PAGE_SIZE } from './archiveItems';
 
 export const metadata: Metadata = {
-  title: '지금까지의 모든 콘텐츠 | AI LENS',
+  title: '지금까지의 모든 콘텐츠',
   description: 'AI LENS가 정리한 레터·트렌드·칼럼·영상을 한 곳에서 모아봅니다.',
 };
 

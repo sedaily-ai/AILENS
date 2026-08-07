@@ -1,48 +1,53 @@
-# AI LENS — 같은 뉴스, 네 가지 시선
+# AI LENS — 서울경제신문의 AI 경제 뉴스
 
-> 서울경제신문이 운영하는 MBTI 기반 맞춤형 경제 뉴스 서비스. 같은 사건을 네 명의 AI 에디터가 각자의 결로 다시 씁니다.
+> 서울경제신문이 만드는 AI 경제 뉴스 서비스. 그날의 핵심 경제 이슈를 매일 정리해 "오늘의 한 통"으로 전한다.
 
 ## 핵심 정보
 
 - 도메인: https://ailens.sedaily.ai
-- 운영: 서울경제신문 (창간 1960년)
+- 운영: 서울경제신문 (창간 1960년, 대표 손동영)
 - 언어: 한국어
-- 주제: 경제·금융·산업·사회 뉴스를 MBTI 그룹별 톤으로 재구성
+- 주제: 경제·금융·산업·사회 뉴스를 AI가 요약·재구성
 
-## 네 명의 AI 에디터
+## 콘텐츠 형식
 
-- **민철 (NT · 전략 분석)** — 데이터·구조 중심 풀이. 본질을 꿰뚫는 분석 톤.
-- **하은 (NF · 가치 탐색)** — 의미·서사 중심. 숫자 뒤의 사람을 읽는 오피니언 톤.
-- **준서 (ST · 실용 큐레이터)** — 결론·근거·체크리스트. 군더더기 없는 팩트 톤.
-- **소율 (SF · 공감 캐스터)** — 가볍고 따뜻한 친구 톡 같은 톤. 30초 핵심 정리.
+- 레터(오늘의 한 통): 원본 기사를 AI가 정리·재구성한 경제 브리핑. 텍스트/팟캐스트(오디오) 둘 다 제공.
+- 트렌드 카드, 인기 칼럼: 가벼운 요약 카드.
+- 웹툰: 그날의 경제 이슈를 컷으로 정리.
+- 단어장: 레터에 나온 경제 용어 모음 + 퀴즈.
+- 사주: 명리학 기반 오늘의 운세·궁합(재미/참고용 — 뉴스 콘텐츠와 별개).
 
-## 주요 기능 페이지
+## 주요 페이지
 
-- 메인 피드 (오늘의 한 통): https://ailens.sedaily.ai/
-- 레터 상세: https://ailens.sedaily.ai/letters/{group-date} (예: /letters/nt-2026-05-22)
-- 에디터 디렉토리: https://ailens.sedaily.ai/editors
-- 에디터 상세: https://ailens.sedaily.ai/editors/{editor-id}
-- 사주 풀이 (만세력·총운·오늘의 운세·대운·일진): https://ailens.sedaily.ai/fortune
-- 사주 궁합 (이상형 역산 + 커플 궁합): https://ailens.sedaily.ai/saju-match
-- 타임머신 (과거 그날의 뉴스): https://ailens.sedaily.ai/timemachine
-- 커뮤니티: https://ailens.sedaily.ai/?tab=community
+- 메인 피드: https://ailens.sedaily.ai/
+- 레터 아카이브(전체 목록): https://ailens.sedaily.ai/letters
+- 레터 상세: https://ailens.sedaily.ai/letters/{slug} (슬러그는 발행일+제목, 예: /letters/2026-08-07-신용점수-700점대인데-왜-대부업-문을-두드릴까요)
+- 웹툰 목록: https://ailens.sedaily.ai/webtoon
+- 웹툰 상세: https://ailens.sedaily.ai/webtoon/{slug}
+- 단어장: https://ailens.sedaily.ai/words
+- 사주 풀이: https://ailens.sedaily.ai/fortune
+- 사주 궁합(이상형 역산 + 커플 궁합): https://ailens.sedaily.ai/saju-match
+- 타임머신(과거 그날의 신문): https://ailens.sedaily.ai/timemachine
+- 실시간 뉴스 타임라인: https://ailens.sedaily.ai/timeline
+- 회사소개: https://ailens.sedaily.ai/about
+- 문의: https://ailens.sedaily.ai/contact
 
 ## 뉴스레터
 
-매일 아침 7시 SES 발송. 메일주소만 입력하면 즉시 첫 번째 레터 도착.
-- 구독 페이지: https://ailens.sedaily.ai/subscription
+레터 상세 페이지 하단에서 이메일만 입력하면 바로 구독할 수 있다(별도 구독 전용 페이지 없음).
+
+## RSS
+
+전체 피드: https://ailens.sedaily.ai/rss.xml
 
 ## E-E-A-T 신뢰 신호
 
-- 모기업 서울경제신문은 1960년 창간된 한국 대표 경제 일간지
-- 60+ 년 경제 보도 경험을 AI 에디터 페르소나에 녹임
-- AI가 생성한 콘텐츠임을 명시하고, 명리학과 결합한 사주 서비스도 같은 톤으로 제공
-
-## 검색
-
-키워드로 검색: https://ailens.sedaily.ai/?q={query}
+- 서울경제신문은 1960년 창간된 한국 최초의 경제 전문지 (사업자등록번호 208-81-10310)
+- WAN-IFRA Digital Media Awards APAC 2026 — Best AI-driven News Product 부문 Gold(AI LENS)
+- AI가 생성한 콘텐츠임을 명시하고, 명리학과 결합한 사주 서비스도 같은 방식으로 고지
+- 상세: https://ailens.sedaily.ai/about
 
 ## 연락
 
-- 서비스 문의: webmaster@sedaily.com
-- 모기업: 서울경제신문 (sedaily.com)
+- 서비스 문의: webmaster@sedaily.com · 02-724-8600
+- 모기업: 서울경제신문 (https://www.sedaily.com), 영문판 (https://en.sedaily.com)

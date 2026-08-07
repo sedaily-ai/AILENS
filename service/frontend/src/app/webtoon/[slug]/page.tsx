@@ -60,7 +60,9 @@ export async function generateMetadata({
   if (!webtoon) {
     return { title: '웹툰을 찾을 수 없어요', robots: { index: false } };
   }
-  const title = `${webtoon.title} — AI LENS 웹툰`;
+  // layout.tsx의 title.template("%s | AI LENS")이 자동으로 브랜드명을 붙인다 —
+  // 여기서 또 붙이면 브랜드명이 중복된다(2026-08-08 발견, letters/[id]와 동일 버그).
+  const title = `${webtoon.title} — 웹툰`;
   const description = trimDescription(webtoon.excerpt || '요즘 이슈를 컷으로 이어 보여드려요.');
   const url = `${SITE_URL}/webtoon/${slug}`;
   const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;

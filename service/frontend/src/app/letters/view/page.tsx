@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { LetterViewClient } from './LetterViewClient';
 
 export const metadata = {
-  title: '오늘의 한 통 | AI LENS',
+  title: '오늘의 한 통',
   description: '에디터가 그날의 뉴스를 한 통으로 정리해 전합니다.',
 };
 

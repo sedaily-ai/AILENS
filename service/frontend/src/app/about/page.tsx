@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { StaticPageShell } from '@/shared/ui/StaticPageShell';
 
 export const metadata: Metadata = {
-  title: '회사소개 — AI LENS',
+  title: '회사소개',
   description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스, AI LENS를 소개합니다.',
   alternates: { canonical: 'https://ailens.sedaily.ai/about' },
   robots: { index: true, follow: true },

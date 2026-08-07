@@ -130,7 +130,7 @@ const SITE_JSONLD = {
       sameAs: [
         "https://www.sedaily.com",
         "https://en.sedaily.com",
-        "https://www.instagram.com/sedaily_economic/",
+        "https://www.instagram.com/seoul_economic/",
         "https://www.instagram.com/moneycut_._/",
         "https://www.youtube.com/@서울경제신문",
         "https://tv.naver.com/sed.thumb",

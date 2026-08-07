@@ -3,7 +3,7 @@ import { fetchWebtoons } from '@/shared/lib/cmsPostsApi';
 import { WebtoonListClient } from './WebtoonListClient';
 
 export const metadata: Metadata = {
-  title: '웹툰 | AI LENS',
+  title: '웹툰',
   description: '요즘 이슈를 컷으로 이어 보여드려요.',
 };
 

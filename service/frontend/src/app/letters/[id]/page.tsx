@@ -78,6 +78,20 @@ function trimDescription(s: string, max = 160): string {
   return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:·\s]+$/, '') + '…';
 }
 
+// MBTI 4-페르소나 체계(폐지 f84fd06) 시절 admin 폼의 기본값으로 깔려있던
+// subtitle — 실제 내용 없이 이 문구 그대로 발행된 레터가 다수 있다(2026-08-08
+// 확인, 최근 45편 중 5편). 그대로 두면 검색결과 스니펫·OG 미리보기·JSON-LD
+// description 이 전부 이 의미 없는 문구로 뜬다 — subtitle 로 안 쳐주고
+// 본문 기반 요약으로 폴백시킨다.
+const STALE_SUBTITLES = new Set(['같은 사실, 네 가지 관점으로']);
+
+function usableSubtitle(subtitle: string | null | undefined): string | null {
+  if (!subtitle) return null;
+  const trimmed = subtitle.trim();
+  if (!trimmed || STALE_SUBTITLES.has(trimmed)) return null;
+  return trimmed;
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -94,8 +108,11 @@ export async function generateMetadata({
     return { title: '레터를 찾을 수 없어요', robots: { index: false } };
   }
   const ed = DEFAULT_AUTHOR;
-  const title = `${letter.headline} — ${ed.name}`;
-  const rawDesc = letter.subtitle ?? `${ed.name}이 풀어낸 ${letter.date} 한 통.`;
+  // layout.tsx의 title.template("%s | AI LENS")이 자동으로 브랜드명을 붙인다 —
+  // 여기서 또 붙이면 "...— AI LENS | AI LENS"로 중복된다(2026-08-08 발견).
+  const title = letter.headline;
+  const bodyExcerpt = letter.body?.length ? letter.body.join(' ') : stripHtml(letter.body_html ?? '');
+  const rawDesc = usableSubtitle(letter.subtitle) ?? (bodyExcerpt || `${ed.name}이 풀어낸 ${letter.date} 한 통.`);
   const description = trimDescription(rawDesc);
   const url = `${SITE_URL}/letters/${id}`;
   // letter 자체의 5개 keyword (term) + 발행처 — 검색엔진과 SNS 양쪽에 노출.
@@ -150,7 +167,8 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
   const url = `${SITE_URL}/letters/${letter.id}`;
   const published = `${letter.date}T07:00:00+09:00`;
   const bodyJoined = letter.body?.length ? letter.body.join('\n\n') : stripHtml(letter.body_html ?? '');
-  const abstract = letter.subtitle ?? bodyJoined.slice(0, 200);
+  const subtitle = usableSubtitle(letter.subtitle);
+  const abstract = subtitle ?? bodyJoined.slice(0, 200);
   // letter 의 5개 키워드 → 검색엔진이 본문 핵심을 인식하는 1순위 신호.
   const letterKeywords =
     (letter as { keywords?: Array<{ term: string }> }).keywords?.map((k) => k.term).filter(Boolean) ?? [];
@@ -167,7 +185,7 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
         '@id': `${url}#article`,
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
         headline: letter.headline,
-        description: letter.subtitle,
+        description: subtitle ?? abstract,
         abstract,
         articleBody: bodyJoined,
         articleSection: '경제',
@@ -194,7 +212,7 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: `${ed.name} (${ed.archetype})`, item: `${SITE_URL}/editors` },
+          { '@type': 'ListItem', position: 2, name: '레터', item: `${SITE_URL}/letters` },
           { '@type': 'ListItem', position: 3, name: letter.headline, item: url },
         ],
       },

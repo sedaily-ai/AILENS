@@ -106,3 +106,75 @@ Code 자동 승인 정책(auto mode classifier)이 차단해 사용자가 직접
 - `aws cloudfront create-response-headers-policy`/`update-distribution` 류 명령이
   auto mode classifier에 걸린다는 걸 확인했다 — 다음에 CloudFront/인프라 변경이
   필요하면 처음부터 사용자가 직접 실행할 각오를 하고 명령만 준비해줄 것.
+
+---
+
+## 이어서 한 것 (같은 날 후속) — 사용자 요청 "빡세게" 재검증 + llms.txt/title 버그 + mbti.sedaily.ai 삭제
+
+사용자가 구글 공식 SEO 가이드(SEO 기본 가이드, 사이트링크 문서)를 직접 붙여주며 JSON-LD·
+sitemap·메타데이터·canonical을 실제로 파싱해서 철저히 검증해달라고 요청 — 다음을 실측했다.
+
+### 검증 중 발견한 실제 버그 3건
+
+1. **`llms.txt`가 완전히 낡아있었음.** MBTI 4-페르소나(민철·하은·준서·소율), 삭제된
+   `/editors` 라우트, `/?tab=community`, 구 URL 형식(`/letters/{group-date}`)을 그대로
+   AI 크롤러에게 안내하고 있었다 — f84fd06(MBTI 폐지)·오늘 초반 세션의 footer 정리 때
+   `public/llms.txt`만 빠뜨렸던 것. 현재 실제 라우트·기능(레터/웹툰/단어장/RSS 등)
+   기준으로 전면 재작성.
+2. **레터 5개 중 1개꼴로 옛 기본값 subtitle이 그대로 노출.** `curl`로 CMS API를 직접
+   조회해 최근 45편 중 5편이 subtitle `"같은 사실, 네 가지 관점으로"`(MBTI 시절 admin
+   폼 기본값)를 그대로 달고 있는 걸 확인 — 이게 검색 스니펫·OG 미리보기·JSON-LD
+   description에 그대로 노출되고 있었다. `letters/[id]/page.tsx`에 `usableSubtitle()`
+   가드를 추가해 이 문구를 감지하면 본문 요약으로 폴백하게 수정. 모든 레터의 JSON-LD
+   BreadcrumbList도 삭제된 `/editors`를 가리키고 있어 `/letters`로 수정.
+3. **사이트 전체 `<title>` 중복 버그.** `layout.tsx`의 `title.template`("%s | AI LENS")이
+   자동으로 브랜드명을 붙이는데, 레터 상세(전체)·웹툰 상세·about/contact/terms/privacy/
+   letters·webtoon 목록/게임 등 12개 파일이 자기 title에 이미 "AI LENS"를 넣어놔서
+   "...— AI LENS | AI LENS"로 중복 노출되고 있었다. `find out -name "*.html"`로 빌드
+   결과물 전체를 스캔해 "AI LENS" 2회 이상 나오는 title을 찾아내는 방식으로 전수
+   확인 후 전부 수정 — 가장 영향이 컸던 건 레터 상세 전체(`letters/[id]/page.tsx`의
+   `title = `${letter.headline} — ${ed.name}`` 패턴)와 웹툰 상세.
+
+### 그 외 검증(문제 없음 확인)
+
+- sitemap.xml의 URL 44개 전부 `curl`로 상태코드 200 확인. 다만 `/letters`(전체 목록)·
+  `/webtoon`(목록)·`/words`·`/style`이 `STATIC_ROUTES`에서 빠져있어 추가.
+- JSON-LD를 실제로 `json.loads()`로 파싱해 NewsArticle 필수 필드(headline/datePublished/
+  author/publisher/image/mainEntityOfPage) 전부 존재 확인.
+- canonical — 홈·레터·웹툰 전부 `ailens.sedaily.ai`로 self-canonical, 레거시 별칭
+  `mbti.sedaily.ai`도 삭제 전까지 동일하게 `ailens.sedaily.ai`로 canonical 걸려있어
+  중복 콘텐츠 리스크 없었음(현재는 도메인 자체가 없어져 무의미).
+- 이미지 alt 텍스트 — 레터/웹툰/영상 컴포넌트 전수 확인, 전부 의미 있는 값(제목 등)
+  이거나 의도적 장식용 `alt=""`.
+
+### 검색 노출 관련 — 정상 범위임을 확인
+
+사용자가 구글에서 "ailens"/"ailens sedaily" 검색 시 사이트가 안 뜨고 "aliens"로
+자동수정되는 스크린샷을 공유 — 기술적 결함이 아니라 신규 색인 사이트에서 흔한 현상임을
+설명했다(구글이 아직 "ailens"를 브랜드로 인식할 만한 신호(백링크·클릭 데이터)가 없는
+상태). en.sedaily.com 리포트의 실제 사례(첫날 순위 24.4위 → 2주 뒤 5.6위)를 근거로
+제시.
+
+### mbti.sedaily.ai 도메인 완전 삭제
+
+사용자가 "이제 안 씁니다, ailens.sedaily.ai로 합칠 거"라고 요청. 처음엔 301 리다이렉트를
+제안했으나(기존 백링크·북마크 보존) 사용자가 명확히 "삭제"를 선택 — 그대로 실행:
+- Route53(`Z07543813V4FC5RK599U0`)에서 `mbti.sedaily.ai`의 A/AAAA 레코드 삭제
+  (`aws route53 change-resource-record-sets`).
+- CloudFront(`E1QS7PY350VHF6`) `Aliases`에서 `mbti.sedaily.ai` 제거, `ailens.sedaily.ai`만
+  남김(`aws cloudfront update-distribution`).
+- 코드에 남아있던 참조(`src/shared/config/auth.ts`의 Cognito `redirectSignIn`/
+  `redirectSignOut` 배열) 제거.
+- `curl`로 `mbti.sedaily.ai` 접속 불가(연결 실패), `ailens.sedaily.ai`는 정상(200)
+  확인.
+- 이번엔 `create-response-headers-policy`/`update-distribution` 둘 다 auto mode
+  classifier 차단 없이 직접 실행됐다 — 어제(2026-08-07) CloudFront 보안 헤더 작업
+  때는 매번 차단됐던 것과 대조적. 어떤 조건에서 막히고 안 막히는지는 불명확.
+
+## 다음 (후속)
+
+- Cognito User Pool `us-east-1_ZS8PgF3iX` 조회 시 `ResourceNotFoundException`을
+  확인했다(auth.ts 정리 중 부수적으로 발견) — 이번 세션 스코프 밖이라 더 파지 않았지만,
+  실제로 유저풀이 없어진 거라면 로그인 기능 자체가 깨져 있을 수 있다. 다음 세션에서
+  로그인 플로우 점검 필요.
+- 개인정보처리방침·이용약관 법률 검토는 여전히 미완.

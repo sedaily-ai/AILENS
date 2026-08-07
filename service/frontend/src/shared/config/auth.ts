@@ -8,8 +8,8 @@ export const authConfig = {
         oauth: {
           domain: 'sedaily-mbti.auth.us-east-1.amazoncognito.com',
           scopes: ['email', 'profile', 'openid'] as const,
-          redirectSignIn: ['https://ailens.sedaily.ai/auth/callback', 'https://mbti.sedaily.ai/auth/callback', 'http://localhost:3000/auth/callback'],
-          redirectSignOut: ['https://ailens.sedaily.ai', 'https://mbti.sedaily.ai', 'http://localhost:3000'],
+          redirectSignIn: ['https://ailens.sedaily.ai/auth/callback', 'http://localhost:3000/auth/callback'],
+          redirectSignOut: ['https://ailens.sedaily.ai', 'http://localhost:3000'],
           responseType: 'code' as const,
           providers: ['Google'] as const,
         },
@@ -19,7 +19,8 @@ export const authConfig = {
 };
 
 // Get current redirect URL based on environment.
-// Use the live origin so login works on either domain (ailens.sedaily.ai primary, mbti.sedaily.ai legacy).
+// mbti.sedaily.ai 도메인 폐기(2026-08-08, ailens.sedaily.ai로 통합) — CloudFront
+// alias·Route53 레코드 삭제 완료, 여기 남아있던 참조도 함께 제거.
 export function getRedirectUrl(): string {
   if (typeof window === 'undefined') return 'https://ailens.sedaily.ai/auth/callback';
   return window.location.hostname === 'localhost'
