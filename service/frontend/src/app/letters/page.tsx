@@ -6,7 +6,7 @@ import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
 import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { fetchCmsPosts, fetchTrendCards } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts, fetchTrendCards, fetchVideos } from '@/shared/lib/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
 import {
   withDisplayMeta,
@@ -14,17 +14,19 @@ import {
 } from '@/shared/lib/todayLettersApi';
 import { LetterMailIcon, StockBullIcon, LightbulbIcon } from '@/features/news-feed/components/icons/HandDrawnIcons';
 
-// 홈의 "레터"/"요즘 화제의 경제 이슈"/"이번 주 인기 칼럼" 세 섹션은 각각 오늘자
-// 몇 편만 보여준다 — 지금까지 쌓인 전체를 훑어보고 싶으면 이 페이지. 예전엔
-// "더보기 →"가 경제 캘린더(시장 일정 표)로 잘못 연결돼 있었다.
+// 홈의 "레터"/"요즘 화제의 경제 이슈"/"이번 주 인기 칼럼"/"영상으로 보는 이슈"
+// 섹션은 각각 오늘자 몇 편만 보여준다 — 지금까지 쌓인 전체를 훑어보고 싶으면
+// 이 페이지. 예전엔 "더보기 →"가 경제 캘린더(시장 일정 표)로 잘못 연결돼 있었다.
 //
 // 필터는 매경 dig(dig.mk.co.kr/Digging)의 카테고리 알약 버튼 형태를 참고했다 —
-// 다만 저긴 "사회/금융/부동산" 같은 주제 카테고리고, 여긴 홈 화면 3섹션(레터/
-// 트렌드/칼럼)을 그대로 필터 축으로 쓴다. 트렌드·칼럼 카드는 아직 자체 상세
-// 페이지가 없어(홈에서도 클릭이 안 됨) 목록에서도 링크 없이 카드로만 보여준다.
+// 다만 저긴 "사회/금융/부동산" 같은 주제 카테고리고, 여긴 홈 화면 섹션(레터/
+// 트렌드/칼럼/영상)을 그대로 필터 축으로 쓴다. 트렌드·칼럼 카드는 아직 자체
+// 상세 페이지가 없어(홈에서도 클릭이 안 됨) 목록에서도 링크 없이 카드로만
+// 보여준다. 영상은 원본 유튜브 URL이 있어 외부 링크로 바로 연결한다
+// (2026-08-07, "영상 섹션도 더보기 있어야 할 듯" 피드백).
 const PAGE_SIZE = 100;
 
-type Kind = 'letter' | 'trend' | 'column';
+type Kind = 'letter' | 'trend' | 'column' | 'video';
 
 interface ArchiveItem {
   key: string;
@@ -34,6 +36,8 @@ interface ArchiveItem {
   date: string;
   accent: string;
   href: string | null;
+  /** true면 외부 링크(target=_blank) — 지금은 video만 해당(원본 유튜브 URL). */
+  external?: boolean;
   avatarUrl: string | null;
   badgeLabel: string;
 }
@@ -43,10 +47,24 @@ const FILTERS: Array<{ key: 'all' | Kind; label: string }> = [
   { key: 'letter', label: '레터' },
   { key: 'trend', label: '트렌드' },
   { key: 'column', label: '인기 칼럼' },
+  { key: 'video', label: '영상' },
 ];
 
 const TREND_ACCENT = '#dc2626';
 const COLUMN_ACCENT = '#059669';
+const VIDEO_ACCENT = '#7c3aed';
+
+// HandDrawnIcons.tsx에 마땅한 영상 아이콘이 없어 이 페이지에서만 쓰는
+// 재생버튼 아이콘을 따로 둔다 — 다른 아이콘들과 같은 accent/className prop
+// 형태를 맞춰서 동일한 렌더 로직에 그대로 끼운다.
+function VideoPlayIcon({ accent, className }: { accent: string; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke={accent} strokeWidth="1.6" />
+      <path d="M10 8.5l6 3.5-6 3.5v-7z" fill={accent} />
+    </svg>
+  );
+}
 
 function dateLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
@@ -66,7 +84,8 @@ export default function LettersArchivePage() {
     Promise.all([
       fetchCmsPosts('letters', undefined, PAGE_SIZE),
       fetchTrendCards(),
-    ]).then(([letters, cards]) => {
+      fetchVideos(),
+    ]).then(([letters, cards, videos]) => {
       if (cancelled) return;
 
       const letterItems: ArchiveItem[] = letters.map((letter) => {
@@ -104,7 +123,20 @@ export default function LettersArchivePage() {
         badgeLabel: c.category || (c.section === 'trend' ? '경제 이슈' : '칼럼'),
       }));
 
-      const all = [...letterItems, ...cardItems].sort((a, b) => b.date.localeCompare(a.date));
+      const videoItems: ArchiveItem[] = videos.map((v) => ({
+        key: `video-${v.id}`,
+        kind: 'video' as const,
+        title: v.title,
+        excerpt: v.excerpt,
+        date: v.date,
+        accent: VIDEO_ACCENT,
+        href: v.video_url || null,
+        external: true,
+        avatarUrl: null,
+        badgeLabel: '영상',
+      }));
+
+      const all = [...letterItems, ...cardItems, ...videoItems].sort((a, b) => b.date.localeCompare(a.date));
       setItems(all);
     });
     return () => {
@@ -186,7 +218,11 @@ export default function LettersArchivePage() {
         {filtered !== null && filtered.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map((item) => {
-              const Icon = item.kind === 'trend' ? StockBullIcon : item.kind === 'column' ? LightbulbIcon : LetterMailIcon;
+              const Icon =
+                item.kind === 'trend' ? StockBullIcon
+                : item.kind === 'column' ? LightbulbIcon
+                : item.kind === 'video' ? VideoPlayIcon
+                : LetterMailIcon;
               const inner = (
                 <>
                   <span
@@ -226,6 +262,20 @@ export default function LettersArchivePage() {
                 </>
               );
 
+              if (item.href && item.external) {
+                return (
+                  <a
+                    key={item.key}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-4 rounded-2xl transition-colors hover:bg-gray-50"
+                    style={{ padding: '14px 16px', border: '1px solid #f1f1f0' }}
+                  >
+                    {inner}
+                  </a>
+                );
+              }
               if (item.href) {
                 return (
                   <Link

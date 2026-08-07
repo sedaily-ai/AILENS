@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/cmsPostsApi';
 import { extractYouTubeId, youtubeThumbnailUrl, youtubeEmbedUrl } from '@/shared/lib/videoEmbed';
 
@@ -53,20 +54,35 @@ export function VideoPreviewSection() {
             영상으로 보는 이슈
           </h2>
         </div>
-        {CHANNEL_URL && (
-          <a
-            href={CHANNEL_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="flex items-center flex-shrink-0" style={{ gap: 14 }}>
+          {/* "더보기" — /letters 아카이브 '영상' 필터로. 다른 섹션들과 동일한
+              패턴(2026-08-07, "영상 섹션도 더보기 있어야 할 듯" 피드백) —
+              CHANNEL_URL(실제 유튜브 채널)과는 별개다, 채널이 생겨도 이건 유지. */}
+          <Link
+            href="/letters"
             className="text-gray-500 hover:text-gray-900"
             style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
-            채널로 이동
+            더 보기
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M9 7h8v8" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
             </svg>
-          </a>
-        )}
+          </Link>
+          {CHANNEL_URL && (
+            <a
+              href={CHANNEL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-500 hover:text-gray-900"
+              style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              채널로 이동
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M9 7h8v8" />
+              </svg>
+            </a>
+          )}
+        </div>
       </header>
 
       <div
