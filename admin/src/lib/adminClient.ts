@@ -85,6 +85,59 @@ async function request<T>(path: string, options: RequestOpts = {}): Promise<T> {
   return JSON.parse(text) as T;
 }
 
+// 읽기 전용 GET 엔드포인트(대시보드가 매 방문마다 부르는 getDrivers/getCost/
+// getAudit) 캐시 — 2026-08-07, "대시보드 스켈레톤이 매번 뜬다"는 피드백.
+// 캐시가 전혀 없어 대시보드를 오갈 때마다 인증된 API 3개를 매번 새로 불러
+// 스켈레톤이 반복해서 보였다. 운영 데이터라 TTL은 짧게(60초) — 값을
+// 대충 최신으로 유지하면서, 사이드바 오갈 때 정도는 캐시로 즉시 렌더한다.
+// sessionStorage 에도 적어 새로고침해도 즉시 뜨고 백그라운드로 갱신한다
+// (public 사이트 cmsPostsApi.ts 의 동일 패턴 참고). 쓰기(mutation) 호출은
+// 캐시하지 않는다 — 여긴 read-only 3개에만 적용.
+const GET_CACHE_TTL_MS = 60 * 1000;
+const SESSION_PREFIX = "ailens-admin-cache:";
+const getCache = new Map<string, { promise: Promise<unknown>; expiresAt: number }>();
+
+function readSession<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { value: T; expiresAt: number };
+    if (typeof parsed.expiresAt !== "number" || parsed.expiresAt < Date.now()) return null;
+    return parsed.value;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: unknown, expiresAt: number) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(SESSION_PREFIX + key, JSON.stringify({ value, expiresAt }));
+  } catch {
+    // 용량 초과 등 — 캐시는 최적화일 뿐이라 실패해도 무시.
+  }
+}
+
+function cachedGet<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const memHit = getCache.get(key);
+  if (memHit && memHit.expiresAt > Date.now()) return memHit.promise as Promise<T>;
+
+  const expiresAt = Date.now() + GET_CACHE_TTL_MS;
+  const store = (p: Promise<T>) => {
+    getCache.set(key, { promise: p, expiresAt });
+    p.then((v) => writeSession(key, v, expiresAt)).catch(() => getCache.delete(key));
+    return p;
+  };
+
+  const sessionValue = readSession<T>(key);
+  if (sessionValue !== null) {
+    store(run()); // 백그라운드 갱신, 현재 호출자에게는 캐시값을 바로 준다.
+    return Promise.resolve(sessionValue);
+  }
+  return store(run());
+}
+
 export const adminApi = {
   // Auth
   login: (password: string) =>
@@ -100,7 +153,7 @@ export const adminApi = {
     }),
 
   // Drivers
-  getDrivers: () => request<DriversResponse>("/admin/drivers"),
+  getDrivers: () => cachedGet("drivers", () => request<DriversResponse>("/admin/drivers")),
   updateRule: (
     id: string,
     body: { action: "enable" | "disable" | "set-cron"; cron_preset?: string }
@@ -134,9 +187,9 @@ export const adminApi = {
     ),
 
   // Cost & Audit
-  getCost: () => request<CostResponse>("/admin/cost"),
+  getCost: () => cachedGet("cost", () => request<CostResponse>("/admin/cost")),
   getAudit: (limit = 50) =>
-    request<AuditResponse>(`/admin/audit?limit=${limit}`),
+    cachedGet(`audit|${limit}`, () => request<AuditResponse>(`/admin/audit?limit=${limit}`)),
 
   // Newsletter
   getNewsletterStats: (days = 7) =>
