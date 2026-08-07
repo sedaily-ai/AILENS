@@ -94,22 +94,46 @@ export function TrendingEconomySection() {
     };
   }, []);
 
-  const cards = cmsCards && cmsCards.length > 0 ? cmsCards : FALLBACK;
+  // 홈은 최신 몇 개만 티저로 — ColumnPreviewSection과 동일한 이유
+  // (2026-08-07, 카드 개수 제한이 없으면 콘텐츠가 늘 때 홈이 무한정 길어진다).
+  const cards = (cmsCards && cmsCards.length > 0 ? cmsCards : FALLBACK).slice(0, 4);
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
-      <header style={{ marginBottom: 14 }}>
-        <p
-          className="text-gray-400"
-          style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
+      <header
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div>
+          <p
+            className="text-gray-400"
+            style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
+          >
+            Trend
+          </p>
+          {/* 섹션 제목 타이포 통일(2026-08-06) — 웹툰만 굵은 산세리프라 튀어
+              보인다는 지적으로, 홈 화면 섹션 제목을 전부 Pretendard Bold로. */}
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            요즘 화제의 경제 이슈
+          </h2>
+        </div>
+        {/* "더보기 →" — ColumnPreviewSection엔 있는데 여긴 빠져있었다(2026-08-07
+            발견). /letters 아카이브에서 '트렌드' 필터로 전체를 볼 수 있다. */}
+        <Link
+          href="/letters"
+          className="text-gray-500 hover:text-gray-900"
+          style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
-          Trend
-        </p>
-        {/* 섹션 제목 타이포 통일(2026-08-06) — 웹툰만 굵은 산세리프라 튀어
-            보인다는 지적으로, 홈 화면 섹션 제목을 전부 Pretendard Bold로. */}
-        <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-          요즘 화제의 경제 이슈
-        </h2>
+          더 보기
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+        </Link>
       </header>
 
       {/* 고정 4열 그리드는 카드가 1~2개뿐일 때 텅 빈 칸이 그대로 남아 어색해
