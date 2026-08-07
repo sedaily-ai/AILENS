@@ -58,6 +58,9 @@ export interface ApiLetter {
   // /letters 아카이브 필터용 가벼운 태그 — channel(letters)은 그대로 두고
   // "트렌드"/"인기 칼럼"으로도 분류하고 싶을 때만 admin 이 지정.
   section?: 'trend' | 'column' | null;
+  // section 이 trend/column 일 때 홈 카드 상단 라벨(예: "증시", "투자 인사이트").
+  // admin PostForm이 지정하지 않으면 null — 호출측이 editor_id 등으로 폴백.
+  category?: string | null;
 }
 
 export interface ApiTodayLettersResponse {

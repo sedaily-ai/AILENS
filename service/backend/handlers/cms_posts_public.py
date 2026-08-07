@@ -67,6 +67,10 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # 싶을 수 있다 — channel 을 trend_card 로 바꾸면 본문·퀴즈가 요약 카드로
         # 축소되니, 대신 가벼운 태그만 얹는다(글 자체는 여전히 상세 페이지 그대로).
         "section": b.get("section"),
+        # section 이 trend/column 일 때 홈 카드 상단 라벨(예: "증시", "투자
+        # 인사이트") — admin PostForm 이 "post" 모드에서도 이제 이 값을 받는다
+        # (mode="trend_card" 의 category 필드와 동일 규약, 2026-08-07).
+        "category": b.get("category") or None,
         "is_cms": True,
     }
 

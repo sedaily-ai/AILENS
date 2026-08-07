@@ -373,6 +373,24 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
                 <option value="column">인기 칼럼</option>
               </select>
             </label>
+            {/* 트렌드/인기 칼럼으로 태그하면 홈 화면 카드 상단 라벨(예: "증시",
+                "투자 인사이트")도 admin이 직접 정할 수 있어야 한다 — 안 정하면
+                이 값이 비어 카드에 기본값("AI LENS")이 그대로 노출된다
+                (2026-08-07 확인, mode="trend_card" 쪽 카테고리 입력과 동일 필드). */}
+            {(body.section === "trend" || body.section === "column") && (
+              <>
+                <span className="h-3.5 w-px bg-gray-300" />
+                <label className="flex items-center gap-1.5 text-gray-400">
+                  {body.section === "trend" ? "카테고리" : "연재명"}
+                  <input
+                    value={body.category ?? ""}
+                    onChange={(e) => patchBody({ category: e.target.value })}
+                    placeholder={body.section === "trend" ? "예: 증시, 환율·금리" : "예: 투자 인사이트"}
+                    className="w-28 border-0 bg-transparent font-medium text-gray-700 outline-none placeholder-gray-300"
+                  />
+                </label>
+              </>
+            )}
           </div>
 
           <div className="border-t border-gray-100">

@@ -166,6 +166,10 @@ function PostEditPage() {
                 // /letters 아카이브 필터 태그(트렌드/인기 칼럼) — trend_card 채널
                 // 전용이 아니라 일반 레터도 달 수 있다(PostForm mode="post").
                 section: draft.body_inline?.section,
+                // section이 trend/column일 때 홈 카드 상단 라벨 — 안 넘기면
+                // 저장 시 계속 빠져서 카드에 기본값("AI LENS")만 노출된다
+                // (2026-08-07 확인, PostForm의 "카테고리"/"연재명" 입력과 짝).
+                category: draft.body_inline?.category,
               },
               closing_line: split.closing_line || draft.closing_line,
             };

@@ -68,7 +68,7 @@ export function ColumnPreviewSection() {
         .map((l) => ({
           id: l.id,
           section: 'column' as const,
-          category: l.editor_id || 'AI LENS',
+          category: l.category || l.editor_id || 'AI LENS',
           title: l.headline,
           excerpt: l.subtitle ?? '',
           date: l.publish_date ?? '',
