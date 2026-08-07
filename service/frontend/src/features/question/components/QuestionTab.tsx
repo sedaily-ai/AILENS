@@ -10,48 +10,27 @@ export const dailyQuestions = [{ id: "q1" }, { id: "q2" }];
 interface Props {
   currentQuestionIndex: number;
   selectedAnswers: Record<string, string>;
+  // mbti 는 단일 명의(AI LENS) 체계(2026-08-07) 이후 더 이상 의미가 없다 —
+  // 호출부(FeedPage.tsx, 이 파일 범위 밖)가 여전히 MbtiGroupId 를 넘길 수 있어
+  // 타입만 유지하고 내부에서는 쓰지 않는다.
   onSelectAnswer: (questionId: string, optionId: string, mbti?: MbtiGroupId) => void;
   onSkip: () => void;
+  // 호출부가 여전히 넘길 수 있어 optional prop 은 유지하되(FeedPage.tsx, 이 파일
+  // 범위 밖), 이 컴포넌트 내부에서는 더 이상 그룹별로 분기하지 않는다 — 화면은
+  // 항상 단일 명의(AI LENS) 톤 하나로 렌더된다.
   selectedGroup?: MbtiGroupId;
 }
 
-const editors: Record<MbtiGroupId, { name: string; avatar: string }> = {
-  NT: { name: '민철', avatar: '/editors/intj.webp' },
-  NF: { name: '하은', avatar: '/editors/infp.webp' },
-  ST: { name: '준서', avatar: '/editors/istj.webp' },
-  SF: { name: '소율', avatar: '/editors/esfp.webp' },
-};
+// 단일 명의 — 4 페르소나 에디터(민철/하은/준서/소율) 대신 하나의 브랜드 목소리로.
+const EDITOR = { name: 'AI LENS', avatar: '/lens.png' };
 
-const greetings: Record<MbtiGroupId, string> = {
-  NT: '오늘의 브리핑,\n핵심만 추렸습니다.',
-  NF: '오늘 하루도\n좋은 이야기로 시작해요.',
-  ST: '오늘 브리핑.\n3분이면 끝남.',
-  SF: '좋은 아침이에요.\n오늘 뉴스 같이 봐요.',
-};
+const GREETING = '오늘의 브리핑,\n핵심만 추렸습니다.';
 
-
-const headlines: Record<MbtiGroupId, string[]> = {
-  NT: [
-    'IMF, 韓 부채비율 2030년 61.7% 전망 — 증가 속도가 핵심',
-    'AI 반도체 재편: 엔비디아 32% 점유율로 1위 탈환',
-    '미-이란 휴전 연장, 국제유가 3% 하락',
-  ],
-  NF: [
-    'IMF 한국 부채 우려 — 다음 세대에 넘어갈 부담',
-    'AI 반도체 경쟁 뒤에 숨겨진 삶의 변화',
-    '미-이란 휴전, 작지만 의미 있는 한 걸음',
-  ],
-  ST: [
-    'IMF 부채 경고: 54.4% → 61.7%, +7.3%p',
-    'AI 반도체 1위 교체, 관련주 체크 필요',
-    '미-이란 휴전으로 유가 하락, 수입물가 영향',
-  ],
-  SF: [
-    '나라 빚이 늘고 있대요, 우리한테 어떤 영향?',
-    'AI 반도체 전쟁이 시작됐어요, 기술 경쟁 뜨거워',
-    '미-이란 휴전 소식, 분위기 좋아지고 있어요',
-  ],
-};
+const HEADLINES = [
+  'IMF, 韓 부채비율 2030년 61.7% 전망 — 증가 속도가 핵심',
+  'AI 반도체 재편: 엔비디아 32% 점유율로 1위 탈환',
+  '미-이란 휴전 연장, 국제유가 3% 하락',
+];
 
 const quiz = {
   category: '경제',
@@ -65,18 +44,9 @@ const quiz = {
   ],
   answer: 'c',
   explanation: 'IMF는 한국의 정부부채가 2030년 GDP 대비 61.7%에 이를 것으로 전망했습니다. "상당히 증가(significant)"라는 표현을 사용했어요.',
-  editorComments: {
-    NT: '비율 자체보다 증가 속도가 관건.',
-    NF: '다음 세대 부담... 마음이 무겁네요.',
-    ST: '54.4% → 61.7%. +7.3%p. 팩트.',
-    SF: '61%면 높은 거 맞죠? 좀 걱정돼요.',
-  } as Record<MbtiGroupId, string>,
-  participation: {
-    NT: { correct: 68, total: 142 },
-    NF: { correct: 51, total: 128 },
-    ST: { correct: 74, total: 98 },
-    SF: { correct: 45, total: 156 },
-  } as Record<MbtiGroupId, { correct: number; total: number }>,
+  // 전체 참여자 집계 — 예전엔 페르소나 4개로 쪼개 보여줬다(참여율 비교
+  // 카드). 단일 명의 체계 이후로는 나눌 대상이 없어 합산 하나만 보여준다.
+  participation: { correct: 238, total: 524 },
 };
 
 const todayVideo = {
@@ -117,16 +87,15 @@ function NL({ text }: { text: string }) {
   return <>{text.split('\n').map((l, i, a) => <span key={i}>{l}{i < a.length - 1 && <br />}</span>)}</>;
 }
 
-export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
+export function QuestionTab({ onSkip }: Props) {
   const [quizPick, setQuizPick] = useState<string | null>(null);
   const [quizDone, setQuizDone] = useState(false);
   const [videoOn, setVideoOn] = useState(false);
 
-  const ed = editors[selectedGroup];
   const dateStr = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
-  const totalP = Object.values(quiz.participation).reduce((s, p) => s + p.total, 0);
+  const totalP = quiz.participation.total;
+  const correctRate = Math.round((quiz.participation.correct / quiz.participation.total) * 100);
   const correct = quizPick === quiz.answer;
-  const edOrder: MbtiGroupId[] = [selectedGroup, ...(["NT", "NF", "ST", "SF"] as const).filter(t => t !== selectedGroup)];
 
   const pickQuiz = (id: string) => {
     if (quizDone) return;
@@ -146,15 +115,15 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
 
           <Reveal delay={100}>
             <h1 className="mt-4 text-[34px] md:text-[44px] font-black text-gray-900 leading-[1.15] tracking-tight">
-              <NL text={greetings[selectedGroup]} />
+              <NL text={GREETING} />
             </h1>
           </Reveal>
 
           <Reveal delay={250}>
             <div className="flex items-center gap-3 mt-8">
-              <img loading="lazy" src={ed.avatar} alt={ed.name} className="w-10 h-10 rounded-full object-cover shadow-lg" />
+              <img loading="lazy" src={EDITOR.avatar} alt={EDITOR.name} className="w-10 h-10 rounded-full object-cover shadow-lg" />
               <div>
-                <p className="text-[14px] font-medium text-gray-800">{ed.name}</p>
+                <p className="text-[14px] font-medium text-gray-800">{EDITOR.name}</p>
                 <p className="text-[12px] text-gray-400">오늘의 브리핑</p>
               </div>
             </div>
@@ -177,7 +146,7 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
           </Reveal>
 
           <div className="space-y-8">
-            {headlines[selectedGroup].map((line, i) => (
+            {HEADLINES.map((line, i) => (
               <Reveal key={i} delay={i * 120}>
                 <div className="flex items-start gap-5">
                   <span className="text-[32px] font-black text-gray-200 tabular-nums leading-none mt-0.5 select-none">
@@ -253,19 +222,11 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
                 <p className="text-[16px] font-bold text-gray-900 mb-3">{correct ? '정답입니다.' : '아쉽지만, 오답이에요.'}</p>
                 <p className="text-[14px] text-gray-600 leading-[1.85]">{quiz.explanation}</p>
 
-                <div className="flex gap-2 mt-8">
-                  {edOrder.map((type) => {
-                    const e = editors[type];
-                    const rate = Math.round((quiz.participation[type].correct / quiz.participation[type].total) * 100);
-                    const isMine = type === selectedGroup;
-                    return (
-                      <div key={type} className={`flex-1 text-center py-3.5 rounded-2xl ${isMine ? 'bg-gray-900' : 'bg-gray-50'}`}>
-                        <img loading="lazy" src={e.avatar} alt={e.name} className="w-7 h-7 rounded-full object-cover mx-auto mb-1.5" />
-                        <p className={`text-[11px] font-medium ${isMine ? 'text-gray-400' : 'text-gray-500'}`}>{e.name}</p>
-                        <p className={`text-[16px] font-bold tabular-nums ${isMine ? 'text-white' : 'text-gray-800'}`}>{rate}%</p>
-                      </div>
-                    );
-                  })}
+                {/* 참여자 정답률 — 예전엔 페르소나 4개로 쪼갠 카드였다. 단일
+                    명의 체계 이후로는 나눌 대상이 없어 합산 하나만 보여준다. */}
+                <div className="flex items-center gap-3 mt-8 bg-gray-50 rounded-2xl py-3.5 px-5">
+                  <p className="text-[16px] font-bold tabular-nums text-gray-900">{correctRate}%</p>
+                  <p className="text-[12px] text-gray-500">정답률 · {totalP.toLocaleString()}명 참여</p>
                 </div>
               </div>
             </Reveal>
@@ -312,7 +273,7 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
               Today&apos;s Fortune
             </p>
             <h3 className="text-center text-[22px] md:text-[26px] font-black text-gray-900 mb-8 tracking-tight">
-              {ed.name}이(가) 본 오늘의 운세는...
+              {EDITOR.name}이(가) 본 오늘의 운세는...
             </h3>
           </Reveal>
           <Reveal delay={100}>
@@ -336,7 +297,7 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-gray-500 mb-1.5 leading-relaxed">
                       생년월일만 입력하면 오늘의 사주를<br />
-                      <span className="font-semibold text-gray-800">{ed.name}</span>의 톤으로 풀어드려요
+                      <span className="font-semibold text-gray-800">{EDITOR.name}</span>의 톤으로 풀어드려요
                     </p>
                     <span className="inline-flex items-center gap-1 text-[13px] font-bold text-violet-700 group-hover:text-violet-900 transition-colors">
                       운세 확인하기
@@ -354,10 +315,10 @@ export function QuestionTab({ onSkip, selectedGroup = 'NT' }: Props) {
         {/* ── CTA ── */}
         <section className="py-20 flex flex-col items-center">
           <Reveal>
-            <img loading="lazy" src={ed.avatar} alt={ed.name} className="w-20 h-20 rounded-full object-cover shadow-2xl mb-6" />
+            <img loading="lazy" src={EDITOR.avatar} alt={EDITOR.name} className="w-20 h-20 rounded-full object-cover shadow-2xl mb-6" />
           </Reveal>
           <Reveal delay={100}>
-            <p className="text-[14px] text-gray-400 mb-8">{ed.name}이(가) 준비한 뉴스피드로 이동해요.</p>
+            <p className="text-[14px] text-gray-400 mb-8">{EDITOR.name}이(가) 준비한 뉴스피드로 이동해요.</p>
           </Reveal>
           <Reveal delay={200}>
             <button

@@ -12,8 +12,17 @@ const BASE = 'https://ailens.sedaily.ai';
 const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
 const SEED_DAYS = 14;
 
-async function fetchLetterIdsRecent(days: number): Promise<string[]> {
-  const ids = new Set<string>();
+// 단일 명의(AI LENS) 체계(2026-08-07) 이후 letter id 는 `{group}-{date}` 가 아니라
+// API가 주는 letter.id 그대로다 — 날짜를 id에서 역산할 수 없으니 조회한 시점의
+// iso 날짜를 같이 들고 다닌다.
+interface SeedLetter {
+  id: string;
+  date: string;
+}
+
+async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
+  const seen = new Set<string>();
+  const out: SeedLetter[] = [];
   const t = new Date();
   for (let i = 0; i < days; i += 1) {
     const d = new Date(t);
@@ -22,29 +31,27 @@ async function fetchLetterIdsRecent(days: number): Promise<string[]> {
     try {
       const res = await fetch(`${API_BASE}/api/v2/today-letters?date=${iso}`);
       if (!res.ok) continue;
-      const data = (await res.json()) as { letters?: Array<{ mbti_group: string }> };
+      const data = (await res.json()) as { letters?: Array<{ id: string }> };
       for (const l of data.letters ?? []) {
-        ids.add(`${l.mbti_group.toLowerCase()}-${iso}`);
+        if (!l.id || seen.has(l.id)) continue;
+        seen.add(l.id);
+        out.push({ id: l.id, date: iso });
       }
     } catch {
       /* 이 날짜 skip */
     }
   }
-  return [...ids];
+  return out;
 }
 
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
   { path: '/',             priority: 1.0, changeFrequency: 'hourly'  }, // 메인 피드 — 매일 갱신
-  { path: '/editors',      priority: 0.9, changeFrequency: 'daily'   },
   { path: '/fortune',      priority: 0.9, changeFrequency: 'daily'   }, // 일진 매일 바뀜
   { path: '/saju-match',   priority: 0.8, changeFrequency: 'weekly'  },
   { path: '/timemachine',  priority: 0.7, changeFrequency: 'weekly'  },
   { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly'  },
 ];
-
-// 에디터 4명 디렉토리
-const EDITOR_IDS = ['NT-min', 'NF-ha', 'ST-jun', 'SF-soy'];
 
 // freshness 기반 priority — 최신 레터일수록 높게
 function freshnessPriority(daysOld: number): number {
@@ -77,23 +84,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  // 에디터 상세 4명
-  for (const id of EDITOR_IDS) {
-    entries.push({
-      url: `${BASE}/editors/${id}`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    });
-  }
-
   // 레터 상세 — 최근 SEED_DAYS 일의 라이브 발행 레터 (빌드타임 fetch).
-  const letterIds = await fetchLetterIdsRecent(SEED_DAYS);
+  const letters = await fetchLettersRecent(SEED_DAYS);
 
-  for (const id of letterIds) {
-    const match = id.match(/^(nt|nf|st|sf)-(\d{4}-\d{2}-\d{2})$/);
-    if (!match) continue;
-    const date = match[2];
+  for (const { id, date } of letters) {
     const daysOld = daysBetween(date);
     entries.push({
       url: `${BASE}/letters/${id}`,

@@ -4,10 +4,7 @@ Handles article detail retrieval.
 
 When user views an article:
 1. Fetch from DynamoDB
-2. Return article with MBTI versions (if available) or original content
-
-NOTE: MBTI transformation is done in article_collector.py for top 10 articles only.
-Articles without MBTI versions will display original content.
+2. Return the article's original content
 """
 import logging
 from typing import Optional
@@ -16,7 +13,7 @@ from dataclasses import dataclass
 from clients.dynamodb_client import DynamoDBClient
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
-from core.response import success_response, error_response
+from core.response import success_response
 from utils.date_utils import get_kst_today
 
 logger = logging.getLogger(__name__)
@@ -24,17 +21,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ArticleDetailResponse:
-    """Article detail response with MBTI-transformed content"""
+    """Article detail response"""
     news_id: str
     title_ko: str
     content_ko: str
     published_at: str
     provider: str
     category: str
-    version_NT: dict = None
-    version_NF: dict = None
-    version_ST: dict = None
-    version_SF: dict = None
     updated_at: Optional[str] = None
     byline: Optional[str] = None
     original_link: Optional[str] = None
@@ -53,14 +46,6 @@ class ArticleDetailResponse:
             self.images_caption = []
         if self.content_blocks is None:
             self.content_blocks = []
-        if self.version_NT is None:
-            self.version_NT = {}
-        if self.version_NF is None:
-            self.version_NF = {}
-        if self.version_ST is None:
-            self.version_ST = {}
-        if self.version_SF is None:
-            self.version_SF = {}
         # Extract first image URL if not already set
         if self.image_url is None and self.images:
             if isinstance(self.images, list) and len(self.images) > 0:
@@ -97,14 +82,13 @@ class ArticleHandler:
         """
         Handle article detail request.
 
-        Returns article with MBTI versions if available, otherwise original content.
-        MBTI transformation is done in article_collector.py for top 10 articles.
+        Returns the article's original content.
 
         Args:
             article_id: Article ID (news_id)
 
         Returns:
-            ArticleDetailResponse with MBTI transformed versions (if available)
+            ArticleDetailResponse
 
         Raises:
             ArticleHandlerError: If retrieval fails
@@ -124,17 +108,6 @@ class ArticleHandler:
 
             logger.info(f"Retrieved article {article_id} from DynamoDB")
 
-            # Check if MBTI versions exist
-            has_versions = (
-                cached_article.get('version_NT') and
-                cached_article.get('version_NF') and
-                cached_article.get('version_ST') and
-                cached_article.get('version_SF')
-            )
-
-            if not has_versions:
-                logger.info(f"Article {article_id} has no MBTI versions - returning original content")
-
             return ArticleDetailResponse(
                 news_id=cached_article['news_id'],
                 title_ko=cached_article.get('title_ko', ''),
@@ -142,10 +115,6 @@ class ArticleHandler:
                 published_at=cached_article.get('published_at', ''),
                 provider=cached_article.get('press', '서울경제'),
                 category=cached_article.get('category', 'news'),
-                version_NT=cached_article.get('version_NT', {}),
-                version_NF=cached_article.get('version_NF', {}),
-                version_ST=cached_article.get('version_ST', {}),
-                version_SF=cached_article.get('version_SF', {}),
                 updated_at=cached_article.get('updated_at'),
                 byline=cached_article.get('byline', '서울경제'),
                 original_link=cached_article.get('original_link'),
@@ -198,63 +167,17 @@ def _transform_article_for_list(article: dict) -> dict:
         'image_url': _extract_image_url(article.get('images')),
         'content': content_ko[:500],
         'original_link': article.get('original_link', ''),
-        'versions': {
-            'NT': article.get('version_NT') or {},
-            'NF': article.get('version_NF') or {},
-            'ST': article.get('version_ST') or {},
-            'SF': article.get('version_SF') or {},
-        },
     }
-
-
-async def _get_type_assignments(table, date_str: str) -> dict:
-    """Fetch MBTI type→article mapping from DynamoDB."""
-    import asyncio
-    try:
-        response = await asyncio.to_thread(
-            table.get_item,
-            Key={'news_id': f'__type_assignments__{date_str}'},
-        )
-        item = response.get('Item')
-        if not item:
-            return None
-        return {
-            'NT': item.get('NT', []),
-            'NF': item.get('NF', []),
-            'ST': item.get('ST', []),
-            'SF': item.get('SF', []),
-        }
-    except Exception as e:
-        logger.warning(f"Failed to get type assignments for {date_str}: {e}")
-        return None
-
-
-async def _fetch_articles_by_ids(dynamodb_client, news_ids: list) -> list:
-    """Fetch full articles (metadata + S3 body) by IDs, preserving order."""
-    articles = []
-    for nid in news_ids:
-        article = await dynamodb_client.get_article(nid)
-        if article:
-            articles.append(article)
-    return articles
-
-
-VALID_MBTI_GROUPS = {'NT', 'NF', 'ST', 'SF'}
 
 
 @handler_decorator
 async def list_handler(event: dict, context) -> dict:
     """
-    GET /api/articles?date=YYYYMMDD&mbti_group=NT&limit=30
+    GET /api/articles?date=YYYYMMDD&limit=30
 
-    List MBTI-transformed articles for a given date. Reads from the Article DB
-    (DynamoDB metadata + S3 body), filtering to articles that have been through
-    the pipeline (those with an s3_body_uri pointer). Each article includes all
-    four MBTI versions pre-loaded in the `versions` field.
-
-    If mbti_group is provided (NT/NF/ST/SF), returns only articles assigned to
-    that type via the pipeline's type_assignments, ordered by relevance score.
-    Falls back to date-range query if type_assignments are not yet available.
+    List articles for a given date. Reads from the Article DB (DynamoDB
+    metadata + S3 body), filtering to articles that have been through the
+    pipeline (those with an s3_body_uri pointer).
 
     Defaults: date = today (KST), limit = 30.
     """
@@ -264,20 +187,12 @@ async def list_handler(event: dict, context) -> dict:
     query_params = event.get("queryStringParameters") or {}
 
     date_str = (query_params.get("date") or "").strip() or get_kst_today()
-    mbti_group = (query_params.get("mbti_group") or "").strip().upper()
 
     try:
         limit = int(query_params.get("limit", 30))
     except (ValueError, TypeError):
         limit = 30
     limit = max(1, min(limit, 200))
-
-    if mbti_group and mbti_group not in VALID_MBTI_GROUPS:
-        return error_response(
-            f"Invalid mbti_group '{mbti_group}'. Must be one of: NT, NF, ST, SF",
-            status_code=400,
-            code='INVALID_MBTI_GROUP',
-        )
 
     s3_article_client = S3ArticleClient(
         bucket_name=settings.s3_article_body_bucket,
@@ -289,23 +204,9 @@ async def list_handler(event: dict, context) -> dict:
         s3_article_client=s3_article_client,
     )
 
-    if mbti_group:
-        assignments = await _get_type_assignments(dynamodb_client.table, date_str)
-        if assignments:
-            type_ids = assignments.get(mbti_group, [])[:limit]
-            articles = await _fetch_articles_by_ids(dynamodb_client, type_ids)
-        else:
-            logger.info(
-                f"No type_assignments for {date_str}, "
-                f"falling back to date query"
-            )
-            articles = await dynamodb_client.get_transformed_articles_by_date(
-                date_str, limit,
-            )
-    else:
-        articles = await dynamodb_client.get_transformed_articles_by_date(
-            date_str, limit,
-        )
+    articles = await dynamodb_client.get_transformed_articles_by_date(
+        date_str, limit,
+    )
 
     result_articles = [_transform_article_for_list(a) for a in articles] if articles else []
 
@@ -314,8 +215,6 @@ async def list_handler(event: dict, context) -> dict:
         "total": len(result_articles),
         "articles": result_articles,
     }
-    if mbti_group:
-        response_data["mbti_group"] = mbti_group
 
     return success_response(response_data)
 
@@ -438,10 +337,6 @@ async def _async_handler(event: dict, context) -> dict:
                 "keywords": response.keywords,
                 "hashtags": response.hashtags,
                 "transformed_at": response.transformed_at,
-                "version_NT": response.version_NT,
-                "version_NF": response.version_NF,
-                "version_ST": response.version_ST,
-                "version_SF": response.version_SF,
             })
         }
     

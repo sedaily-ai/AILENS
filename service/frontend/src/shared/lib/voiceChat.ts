@@ -1,19 +1,21 @@
 /**
- * MBTI 챗봇 음성 통화 클라이언트.
+ * 챗봇 음성 통화 클라이언트.
  *
  * 1) STT — 브라우저 Web Speech API (webkitSpeechRecognition / SpeechRecognition)
  *    한국어 ko-KR, 실시간 partial transcript 지원, 브라우저 무료.
  *    Safari 일부 미지원 → 환경 체크 후 fallback 메시지.
  *    (백엔드 Transcribe Streaming presign 도 준비돼 있어 추후 업그레이드 가능)
  *
- * 2) TTS — 백엔드 POST /api/voice/tts (Polly, 페르소나별 음성).
+ * 2) TTS — 백엔드 POST /api/voice/tts (Polly, 단일 기본 voice).
  *    응답 base64 mp3 → Blob → HTMLAudioElement 재생.
+ *    단일 명의(AI LENS) 체계(2026-08-07) 이후로는 페르소나별 voice 분기가 없다 —
+ *    백엔드가 항상 DEFAULT_CHAT_VOICE 하나로 합성한다
+ *    (service/backend/handlers/voice/tts.py 참조).
  *
  * 3) 핸즈프리 — onresult 의 final 결과를 받자마자 자동 send + onaudioend 시
  *    다시 recognition 시작. 사용자가 종료 누르기 전까지 자동 루프.
  */
 import { API_URL } from '@/shared/config/api';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { TranscribeStreamRecognizer } from '@/shared/lib/transcribeStream';
 
 // Web Speech API — webkit prefix 호환을 위해 동적으로 가져옴.
@@ -123,11 +125,11 @@ export function createRecognizer(opts: VoiceRecognizerOptions): {
 }
 
 /** Polly TTS 호출 → mp3 Blob URL */
-export async function synthesizeSpeech(text: string, mbti_group: MbtiGroupId): Promise<string> {
+export async function synthesizeSpeech(text: string): Promise<string> {
   const res = await fetch(`${API_URL}/api/voice/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, mbti_group }),
+    body: JSON.stringify({ text }),
   });
   if (!res.ok) {
     throw new Error(`TTS HTTP ${res.status}`);

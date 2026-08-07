@@ -1,12 +1,17 @@
 """구독 수집 API — newsletter 회원 자동 적재.
 
 라우팅(같은 Lambda):
-  POST /api/v2/subscribe     body {email, mbti_group, consent[, name]}
+  POST /api/v2/subscribe     body {email, consent[, name]}
        → sedaily-mbti-newsletter-subscribers-dev 에 active 구독자 upsert
   GET  /api/v2/unsubscribe?token=...   → 해당 구독자 status=unsub (1클릭, 법적 필수)
 
 consent=true 강제(CAN-SPAM). 재구독 시 idempotent upsert.
-Auth: NONE (v1 parity, 민감정보 없음 — 이메일+그룹만).
+Auth: NONE (v1 parity, 민감정보 없음 — 이메일만).
+
+2026-08: MBTI 페르소나 개념 폐기로 구독 시 그룹 선택을 받지 않는다 — 모든
+구독자가 동일한 '오늘의 한 통'을 받는다. 기존 저장분에 남아있는 mbti_group
+값은 그대로 두되(마이그레이션 없음), 신규/재구독 upsert 는 더 이상 이 필드를
+쓰지 않는다.
 """
 from __future__ import annotations
 
@@ -28,7 +33,6 @@ logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
 SUBSCRIBERS_TABLE = os.environ.get("SUBSCRIBERS_TABLE", "sedaily-mbti-newsletter-subscribers-dev")
-_GROUPS = {"NT", "NF", "ST", "SF"}
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 # 모듈 레벨 — 콜드스타트 1회만 생성, 웜 컨테이너에서 재사용 (기존엔 매 요청마다
@@ -83,14 +87,11 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     # ── 구독 ────────────────────────────────────
     email = (body.get("email") or "").strip().lower()
-    group = (body.get("mbti_group") or "").strip().upper()
     consent = bool(body.get("consent"))
     name = (body.get("name") or "").strip()[:40]
 
     if not _EMAIL_RE.match(email):
         return error_response("invalid email", status_code=400, code="VALIDATION")
-    if group not in _GROUPS:
-        return error_response("mbti_group must be NT|NF|ST|SF", status_code=400, code="VALIDATION")
     if not consent:
         return error_response("consent required", status_code=400, code="CONSENT_REQUIRED")
 
@@ -99,16 +100,15 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     existing = tbl.get_item(Key={"email": email}).get("Item")
     token = (existing or {}).get("unsubscribe_token") or uuid.uuid4().hex
     tbl.put_item(Item={
-        "email": email, "mbti_group": group, "status": "active",
+        "email": email, "status": "active",
         "consent": True, "unsubscribe_token": token, "name": name,
         "created_at": (existing or {}).get("created_at") or now,
         "updated_at": now,
     })
-    logger.info('{"event":"subscribed","group":"%s","resub":%s}',
-                group, json.dumps(bool(existing)))
+    logger.info('{"event":"subscribed","resub":%s}', json.dumps(bool(existing)))
 
-    # 구독 즉시 — 해당 그룹 당일 레터를 그 이메일로 발송 (환영 발송).
-    send_status = _send_today_letter(email, group, token)
+    # 구독 즉시 — 오늘의 한 통을 그 이메일로 발송 (환영 발송).
+    send_status = _send_today_letter(email, token)
 
     return success_response({
         "ok": True,
@@ -121,23 +121,22 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 _BASE = "https://ailens.sedaily.ai"
 
 
-def _send_today_letter(email: str, group: str, token: str) -> str:
-    """가입 즉시 당일 그룹 레터 발송. 발송 실패해도 구독은 유지(상태만 반환)."""
+def _send_today_letter(email: str, token: str) -> str:
+    """가입 즉시 오늘의 한 통 발송. 발송 실패해도 구독은 유지(상태만 반환)."""
     try:
         from handlers.newsletter import _load_today_letters, _kst_today  # noqa: lazy
         from newsletter.render import render_html, subject  # noqa: lazy
         from newsletter.sender import send  # noqa: lazy
 
         date_str = _kst_today()
-        letters, src = _load_today_letters(date_str)
-        letter = letters.get(group)
+        letter, src = _load_today_letters(date_str)
         if not letter:
-            logger.warning('{"event":"welcome_no_letter","group":"%s","src":"%s"}', group, src)
+            logger.warning('{"event":"welcome_no_letter","src":"%s"}', src)
             return "no_letter"
         unsub = f"{_BASE}/unsubscribe?token={token}"
         res = send(email, subject(letter, date_str), render_html(letter, {"unsubscribe_token": token}, date_str), unsub)
         st = res.get("status", "error")
-        logger.info('{"event":"welcome_send","group":"%s","src":"%s","status":"%s"}', group, src, st)
+        logger.info('{"event":"welcome_send","src":"%s","status":"%s"}', src, st)
         return st
     except Exception as e:
         logger.warning('{"event":"welcome_send_error","err":"%s"}', type(e).__name__)

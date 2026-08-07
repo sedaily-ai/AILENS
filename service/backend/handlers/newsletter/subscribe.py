@@ -4,12 +4,11 @@
 POST /api/newsletter/subscribe
 body = {
   "email": "...",
-  "mbti_group": "NT" | "NF" | "ST" | "SF",
   "consent": true,
   "letter": {            // 선택 — 있으면 즉시 그 레터를 메일로 발송
-    "editor_name": "하은",
-    "editor_role": "오피니언 에디터",
-    "accent": "#e11d48",
+    "editor_name": "AI LENS",
+    "editor_role": "오늘의 한 통",
+    "accent": "#3182F6",
     "headline": "...",
     "subtitle": "...",
     "body": ["...", "..."],
@@ -22,6 +21,12 @@ body = {
 - 새 구독 → DDB put + 환영 + 첫 레터 즉시 발송
 - 이미 구독자 → DDB update + 발송 안 함 (스팸 방지)
 - 발송자: newsletter@mbti.sedaily.ai (SES verified domain)
+
+2026-08: MBTI 페르소나 개념 폐기로 구독 시 그룹 선택을 받지 않는다 — 모든
+구독자가 동일한 '오늘의 한 통'을 받는다. `letter` 페이로드는 여전히 프론트가
+보여주고 있던 화면의 레터 내용을 그대로 실어 보낼 수 있다(그룹 무관).
+기존 저장분에 남아있는 mbti_group 값은 그대로 두되(마이그레이션 없음),
+이 핸들러는 더 이상 그 필드를 읽거나 쓰지 않는다.
 """
 import json
 import logging
@@ -34,7 +39,7 @@ from typing import Any, Dict, List, Optional
 import boto3
 from botocore.exceptions import ClientError
 
-from config.constants import CORS_HEADERS, MBTI_GROUPS
+from config.constants import CORS_HEADERS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -73,7 +78,7 @@ def _esc(s: Optional[str]) -> str:
 
 def _build_html(editor_name: str, editor_role: str, accent: str, headline: str,
                 subtitle: str, body: List[str], key_points: List[str],
-                closing_line: str, mbti_group: str, unsubscribe_token: str) -> str:
+                closing_line: str, unsubscribe_token: str) -> str:
     paragraphs = ''.join(
         f'<p style="font-size:15px;line-height:1.85;color:#1f2937;margin:0 0 16px">{_esc(p)}</p>'
         for p in body
@@ -104,7 +109,7 @@ def _build_html(editor_name: str, editor_role: str, accent: str, headline: str,
     <tr><td align="center">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="640" style="max-width:640px;background:#ffffff;border-radius:20px;padding:40px 32px">
         <tr><td>
-          <p style="font-size:11px;font-weight:700;color:{_esc(accent)};letter-spacing:0.18em;margin:0 0 8px">AI LENS · {_esc(mbti_group)} · {_esc(editor_name)} 에디터</p>
+          <p style="font-size:11px;font-weight:700;color:{_esc(accent)};letter-spacing:0.18em;margin:0 0 8px">AI LENS · {_esc(editor_name)}</p>
           <p style="font-size:12px;color:#9ca3af;margin:0 0 16px">{_esc(editor_role)}</p>
           <h1 style="font-family:'Noto Serif KR',serif;font-size:26px;font-weight:700;color:#111827;letter-spacing:-0.02em;line-height:1.35;margin:0 0 12px">{_esc(headline)}</h1>
           <p style="font-size:15px;color:#6b7280;margin:0 0 28px;line-height:1.6">{_esc(subtitle)}</p>
@@ -127,10 +132,10 @@ def _build_html(editor_name: str, editor_role: str, accent: str, headline: str,
 </body></html>'''
 
 
-def _send_letter_email(to_email: str, mbti_group: str, letter: Dict[str, Any],
+def _send_letter_email(to_email: str, letter: Dict[str, Any],
                        unsubscribe_token: str) -> bool:
     """letter 객체 받아 SES 로 발송. 성공 시 True."""
-    editor_name = letter.get('editor_name') or '에디터'
+    editor_name = letter.get('editor_name') or 'AI LENS'
     headline = letter.get('headline') or 'AI LENS 뉴스레터'
     html = _build_html(
         editor_name=editor_name,
@@ -141,10 +146,9 @@ def _send_letter_email(to_email: str, mbti_group: str, letter: Dict[str, Any],
         body=letter.get('body') or [],
         key_points=letter.get('key_points') or [],
         closing_line=letter.get('closing_line') or '',
-        mbti_group=mbti_group,
         unsubscribe_token=unsubscribe_token,
     )
-    subject = f'[AI LENS · {editor_name}] {headline}'
+    subject = f'[AI LENS] {headline}'
     try:
         kwargs = {
             'FromEmailAddress': _FROM,
@@ -163,7 +167,7 @@ def _send_letter_email(to_email: str, mbti_group: str, letter: Dict[str, Any],
         if _CONFIG_SET:
             kwargs['ConfigurationSetName'] = _CONFIG_SET
         _ses.send_email(**kwargs)
-        logger.info(f"SES sent: to={to_email} group={mbti_group} subject={subject[:60]} config_set={_CONFIG_SET or '(none)'}")
+        logger.info(f"SES sent: to={to_email} subject={subject[:60]} config_set={_CONFIG_SET or '(none)'}")
         return True
     except ClientError as e:
         logger.exception(f"SES send fail: {e}")
@@ -184,13 +188,10 @@ def lambda_handler(event: dict, context) -> dict:
         return _resp(400, {'error': 'invalid JSON body'})
 
     email = (body.get('email') or '').strip().lower()
-    mbti_group = (body.get('mbti_group') or '').upper()
     consent = bool(body.get('consent'))
 
     if not email or not _EMAIL_RE.match(email):
         return _resp(400, {'error': '올바른 이메일 형식이 아닙니다.'})
-    if mbti_group not in MBTI_GROUPS:
-        return _resp(400, {'error': f'mbti_group 은 {MBTI_GROUPS} 중 하나여야 합니다.'})
     if not consent:
         return _resp(400, {'error': '뉴스레터 수신 동의가 필요합니다.'})
 
@@ -205,15 +206,15 @@ def lambda_handler(event: dict, context) -> dict:
 
     resubscribed = bool(existing)
     if resubscribed:
-        # 기존 구독자 → mbti_group 업데이트, status active 복원
+        # 기존 구독자 → status active 복원
         token = existing.get('unsubscribe_token') or secrets.token_urlsafe(24)
         try:
             table.update_item(
                 Key={'email': email},
-                UpdateExpression='SET mbti_group = :g, #s = :a, updated_at = :u, unsubscribe_token = :t',
+                UpdateExpression='SET #s = :a, updated_at = :u, unsubscribe_token = :t',
                 ExpressionAttributeNames={'#s': 'status'},
                 ExpressionAttributeValues={
-                    ':g': mbti_group, ':a': 'active', ':u': now, ':t': token,
+                    ':a': 'active', ':u': now, ':t': token,
                 },
             )
         except ClientError as e:
@@ -225,7 +226,6 @@ def lambda_handler(event: dict, context) -> dict:
         try:
             table.put_item(Item={
                 'email': email,
-                'mbti_group': mbti_group,
                 'status': 'active',
                 'unsubscribe_token': token,
                 'consent_at': now,
@@ -241,13 +241,12 @@ def lambda_handler(event: dict, context) -> dict:
     letter = body.get('letter') or {}
     sent = False
     if letter and letter.get('headline'):
-        sent = _send_letter_email(email, mbti_group, letter, token)
+        sent = _send_letter_email(email, letter, token)
 
-    logger.info(f"newsletter subscribe: {email} → {mbti_group} resub={resubscribed} sent={sent}")
+    logger.info(f"newsletter subscribe: {email} resub={resubscribed} sent={sent}")
     return _resp(200, {
         'ok': True,
         'resubscribed': resubscribed,
         'email': email,
-        'mbti_group': mbti_group,
         'sent': sent,
     })

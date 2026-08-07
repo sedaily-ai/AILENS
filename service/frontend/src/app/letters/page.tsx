@@ -4,14 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
-import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts, fetchTrendCards, fetchVideos } from '@/shared/lib/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
-import {
-  withDisplayMeta,
-  toLetterIdFromApi,
-} from '@/shared/lib/todayLettersApi';
+import { withDisplayMeta } from '@/shared/lib/todayLettersApi';
 import { LetterMailIcon, StockBullIcon, LightbulbIcon } from '@/features/news-feed/components/icons/HandDrawnIcons';
 
 // 홈의 "레터"/"요즘 화제의 경제 이슈"/"이번 주 인기 칼럼"/"영상으로 보는 이슈"
@@ -74,7 +70,6 @@ function dateLabel(iso: string): string {
 }
 
 export default function LettersArchivePage() {
-  const [userGroup] = useMbtiGroup('SF');
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<ArchiveItem[] | null>(null);
   const [filter, setFilter] = useState<'all' | Kind>('all');
@@ -91,7 +86,7 @@ export default function LettersArchivePage() {
       const letterItems: ArchiveItem[] = letters.map((letter) => {
         const meta = withDisplayMeta(letter);
         const date = letter.publish_date ?? '';
-        const id = letter.mbti_group ? toLetterIdFromApi(letter.mbti_group, date) : letter.id;
+        const id = letter.id;
         // admin 이 /letters 태그(트렌드/인기 칼럼)를 달아둔 레터는 채널은
         // 그대로 letters(클릭 가능한 상세 페이지 유지)지만 필터 분류만 그쪽으로.
         const kind: Kind = letter.section === 'trend' || letter.section === 'column' ? letter.section : 'letter';
@@ -153,7 +148,7 @@ export default function LettersArchivePage() {
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('feed')} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} selectedGroup={userGroup} />
+      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 80px' }}>
         <header style={{ marginBottom: 20 }}>

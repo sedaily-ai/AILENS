@@ -3,19 +3,18 @@
 
 POST /api/voice/tts
 body = {
-    "text": "...",
-    "mbti_group": "NT" | "NF" | "ST" | "SF"
+    "text": "..."
 }
+(구 프론트가 "mbti_group" 을 실어 보내도 무시한다 — 2026-08-07 MBTI 페르소나 제거로
+ 페르소나별 voice 분기 자체가 없다. 단일 기본 voice 로 통일.)
 
-페르소나별 dual-provider 매핑:
-  - 여성 페르소나 (하은/소율): AWS Polly (Seoyeon generative, Jihye neural).
-    한국어 신경망 자연도 충분, 비용 저렴.
-  - 남성 페르소나 (민철/준서): ElevenLabs Multilingual v2 — Polly 가 한국어
-    남자 voice 미지원이라 외부 TTS. voice ID 는 frontend/src/shared/lib/elevenlabs.ts
-    의 editorVoices 와 동일 (2026-05-18 음성 카탈로그 선별).
-    API key 는 Secrets Manager ai-labs/elevenlabs.api_key.
+기본 voice: AWS Polly (Seoyeon generative, 실패 시 neural 자동 폴백). 예전에는
+페르소나 성별에 따라 여성(하은/소율)은 Polly, 남성(민철/준서)은 ElevenLabs로
+나눠 썼지만, 페르소나가 없어졌으니 외부 의존성(ElevenLabs API key) 없이 항상
+쓸 수 있는 Polly 로 통일했다. ElevenLabs 연동 코드(`_synth_elevenlabs`)는
+남겨뒀다 — 필요해지면 다시 provider 분기를 붙일 수 있게.
 
-응답: { audio (base64 mp3), provider, voice_id, engine, mbti_group }
+응답: { audio (base64 mp3), provider, voice_id, engine }
 """
 import base64
 import json
@@ -27,7 +26,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import boto3
 
-from config.constants import CORS_HEADERS, MBTI_GROUPS
+from config.constants import CORS_HEADERS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -74,29 +73,12 @@ def _get_elevenlabs_api_key() -> Optional[str]:
     return None
 
 
-# 페르소나별 voice 매핑 — provider 별 분기.
-# 여성 (하은/소율) 는 Polly, 남성 (민철/준서) 은 ElevenLabs.
-# voice_id (elevenlabs) 는 frontend editorVoices 와 sync. 바꿀 때 둘 다 변경.
-# 이름은 정본 v3 (민철/하은/준서/소율) — 그룹→voice 배정은 불변, 표기만 갱신.
-PERSONA_VOICE = {
-    'NT': {  # 민철 — TeddyNote young 남성, 깊고 매력적·신뢰감 (강의 톤)
-        'provider': 'elevenlabs',
-        'voice_id': 'RU7aSi6lT4uQBXMLgDxK',
-    },
-    'NF': {  # 하은 — Seoyeon generative 여성, 부드러운 사유적 톤
-        'provider': 'polly',
-        'voice_id': 'Seoyeon',
-        'engine': 'generative',
-    },
-    'ST': {  # 준서 — Deck young 남성, 안정·신뢰 (팟캐스트/강의)
-        'provider': 'elevenlabs',
-        'voice_id': '5XgfKMHL4qnyg2mabE5t',
-    },
-    'SF': {  # 소율 — Jihye neural 여성, 밝고 또렷
-        'provider': 'polly',
-        'voice_id': 'Jihye',
-        'engine': 'neural',
-    },
+# 단일 기본 챗봇 voice — 2026-08-07 MBTI 페르소나 제거로 그룹별 voice 매핑 대신
+# 이거 하나만 쓴다. Seoyeon generative, 실패 시 _synth_polly 가 neural 로 자동 폴백.
+DEFAULT_CHAT_VOICE = {
+    'provider': 'polly',
+    'voice_id': 'Seoyeon',
+    'engine': 'generative',
 }
 
 # ElevenLabs Multilingual v2 — 한국어 자연 발화 모델.
@@ -192,11 +174,7 @@ def lambda_handler(event: dict, context) -> dict:
     if len(text) > 3000:
         return _resp(400, {'error': 'text 너무 김 (max 3000자)'})
 
-    mbti_group = (body.get('mbti_group') or 'SF').upper()
-    if mbti_group not in MBTI_GROUPS:
-        mbti_group = 'SF'
-
-    spec = PERSONA_VOICE[mbti_group]
+    spec = DEFAULT_CHAT_VOICE
     # 영어 약어·단위·한자 → 한국식 발음으로 치환. ElevenLabs Multilingual v2
     # 도 약어 직독 시 어색 (KT → "케이티" 가 자연) — Polly·ElevenLabs 둘 다
     # 같은 전처리 적용.
@@ -211,7 +189,7 @@ def lambda_handler(event: dict, context) -> dict:
             audio_bytes, used_voice, used_engine = _synth_polly(tts_text, spec)
         audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
         logger.info(
-            f"TTS ok: mbti={mbti_group} provider={provider} voice={used_voice} "
+            f"TTS ok: provider={provider} voice={used_voice} "
             f"engine={used_engine} len={len(text)} bytes={len(audio_bytes)}"
         )
         return _resp(200, {
@@ -220,7 +198,6 @@ def lambda_handler(event: dict, context) -> dict:
             'provider': provider,
             'voice_id': used_voice,
             'engine': used_engine,
-            'mbti_group': mbti_group,
         })
     except Exception as e:
         logger.exception(f"TTS synth fail (provider={provider}): {e}")
@@ -253,8 +230,10 @@ def _synth_polly(text: str, spec: Dict[str, Any]) -> Tuple[bytes, str, str]:
 
 
 def _synth_elevenlabs(text: str, spec: Dict[str, Any]) -> Tuple[bytes, str, str]:
-    """ElevenLabs HTTP 호출. 실패 시 Polly Seoyeon neural fallback (남자→여자
-    임시 — 호출자가 mbti_group 으로 식별 가능하도록 응답 provider 는 'polly')."""
+    """ElevenLabs HTTP 호출. 실패 시 Polly Seoyeon neural fallback — 응답의
+    provider 는 실제로 합성에 쓰인 값을 반영해 'polly'로 내려간다.
+    (기본 voice 는 이미 Polly라 이 함수는 현재 호출되지 않는다 — 위 모듈
+    docstring 참조. ElevenLabs provider 분기가 다시 켜질 때를 위해 남겨둠.)"""
     voice_id = spec['voice_id']
     api_key = _get_elevenlabs_api_key()
     if not api_key:

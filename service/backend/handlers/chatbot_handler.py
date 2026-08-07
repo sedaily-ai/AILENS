@@ -1,24 +1,30 @@
 """
-MBTI Chatbot Handler Lambda Function
-Provides AI-powered chat responses styled for each MBTI group (NT, NF, ST, SF).
+Chatbot Handler Lambda Function
+Provides AI-powered chat responses using a single default persona/voice.
 Uses Claude API via AWS Bedrock.
 
 2026-08-05: 컨텍스트 조회(services/chatbot_context_service.py), 프롬프트 구성
 (services/chatbot_prompt_service.py), Bedrock 호출 엔진(services/chatbot_engine.py)을
 분리 — 이 파일은 이제 HTTP 라우팅/검증/응답 조립만 담당한다.
 (`handlers/briefing_handler.py`가 `services/briefing_generator.py`를 쓰는 것과 같은 패턴.)
+
+2026-08-07: MBTI 페르소나 전체 제거 — 더 이상 그룹별로 분기하지 않는다. 요청
+바디에 `mbti_group`이 실려 와도(구 프론트 잔재) 그냥 무시한다.
 """
 import logging
 import json
 from datetime import datetime
 
-from config.constants import MBTI_GROUPS, CORS_HEADERS
+from config.constants import CORS_HEADERS
 from common.feature_flag import is_enabled
 from services.chatbot_context_service import get_cached_briefing, get_recent_articles, search_related_articles
 from services.chatbot_engine import generate_chat_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# 페르소나 제거 후 단일 기본 챗봇 아이덴티티.
+DEFAULT_PERSONA = {'name': '서울경제 AI', 'role': 'AI 챗봇', 'emoji': '🤖'}
 
 
 def lambda_handler(event: dict, context) -> dict:
@@ -28,21 +34,20 @@ def lambda_handler(event: dict, context) -> dict:
     Expected request body:
     {
         "message": "사용자 메시지",
-        "mbti_group": "NT" | "NF" | "ST" | "SF",
         "conversation_history": [
             {"role": "user", "content": "이전 메시지"},
             {"role": "assistant", "content": "이전 응답"}
         ]
     }
+    (구 프론트가 보내는 "mbti_group" 필드는 있어도 무시한다.)
 
     Response:
     {
         "response": "AI 응답 텍스트",
-        "mbti_group": "NT",
         "persona": {
-            "name": "민철",
-            "role": "전략 분석 에디터",
-            "emoji": "📊"
+            "name": "서울경제 AI",
+            "role": "AI 챗봇",
+            "emoji": "🤖"
         }
     }
     """
@@ -87,7 +92,6 @@ def lambda_handler(event: dict, context) -> dict:
             body = {}
 
         user_message = body.get('message', '').strip()
-        mbti_group = body.get('mbti_group', 'SF').upper()
         conversation_history = body.get('conversation_history', [])
 
         # Validate inputs
@@ -117,13 +121,10 @@ def lambda_handler(event: dict, context) -> dict:
                 }, ensure_ascii=False)
             }
 
-        if mbti_group not in MBTI_GROUPS:
-            mbti_group = 'SF'  # Default fallback
-
-        logger.info(f"Chat request: group={mbti_group}, message_length={len(user_message)}")
+        logger.info(f"Chat request: message_length={len(user_message)}")
 
         # Try cached briefing first, fall back to article query
-        cached_briefing = get_cached_briefing(mbti_group)
+        cached_briefing = get_cached_briefing()
         recent_articles = None if cached_briefing else get_recent_articles(5)
 
         # Generate response (sync wrapper for async function)
@@ -135,7 +136,6 @@ def lambda_handler(event: dict, context) -> dict:
             response_text = loop.run_until_complete(
                 generate_chat_response(
                     user_message=user_message,
-                    mbti_group=mbti_group,
                     conversation_history=conversation_history,
                     recent_articles=recent_articles,
                     cached_briefing=cached_briefing
@@ -143,16 +143,6 @@ def lambda_handler(event: dict, context) -> dict:
             )
         finally:
             loop.close()
-
-        # Build persona info
-        persona_map = {
-            # 정본 = 민철/하은/준서/소율 (v3). 프론트 PERSONA_META
-            # (shared/lib/todayLettersApi.ts) 및 프롬프트와 1:1 유지할 것.
-            'NT': {'name': '민철', 'role': '전략 분석 에디터', 'emoji': '📊'},
-            'NF': {'name': '하은', 'role': '오피니언 에디터', 'emoji': '💡'},
-            'ST': {'name': '준서', 'role': '팩트 큐레이터', 'emoji': '📋'},
-            'SF': {'name': '소율', 'role': '트렌드 캐스터', 'emoji': '💬'},
-        }
 
         # Search related articles based on user message
         related_articles = search_related_articles(user_message, limit=3)
@@ -162,8 +152,7 @@ def lambda_handler(event: dict, context) -> dict:
             'headers': CORS_HEADERS,
             'body': json.dumps({
                 'response': response_text,
-                'mbti_group': mbti_group,
-                'persona': persona_map.get(mbti_group, persona_map['SF']),
+                'persona': DEFAULT_PERSONA,
                 'recommended_articles': related_articles,
                 'timestamp': datetime.now().isoformat()
             }, ensure_ascii=False)

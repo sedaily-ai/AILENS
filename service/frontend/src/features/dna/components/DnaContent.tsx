@@ -1,24 +1,15 @@
 'use client';
 
 import { useCountUp } from '@/features/news-feed';
-import {
-  MOCK_DNA_STATS,
-  MOCK_PERSPECTIVE_SHARE,
-} from '../data/mockDna';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
-import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
+import { MOCK_DNA_STATS } from '../data/mockDna';
 
-const EDITOR_BY_GROUP: Record<MbtiGroupId, { name: string; archetype: string; avatar: string; accent: string; soft: string }> = {
-  NT: { name: '민철', archetype: '분석가',       avatar: '/editors/intj.webp', accent: '#7c3aed', soft: '#ede9fe' },
-  NF: { name: '하은', archetype: '이야기꾼',     avatar: '/editors/infp.webp', accent: '#e11d48', soft: '#ffe4e6' },
-  ST: { name: '준서', archetype: '실용주의자', avatar: '/editors/istj.webp', accent: '#059669', soft: '#d1fae5' },
-  SF: { name: '소율', archetype: '공감러',     avatar: '/editors/esfp.webp', accent: '#d97706', soft: '#fef3c7' },
-};
+// 이 화면의 강조색 — 단일 명의(AI LENS) 체계(2026-08-07) 이전엔 "내가 가장 많이
+// 읽은 페르소나"의 accent color를 그대로 썼다("MY LENS — {에디터}의 시각으로
+// 세상을 봐요" 카드). 4가지 시각 비율(MOCK_PERSPECTIVE_SHARE)이라는 개념 자체가
+// 없어졌으므로 그 카드는 통째로 뺐고, 남은 누적 통계 카드는 브랜드 기본색 하나로.
+const ACCENT = '#111827';
 
 export function DnaContent() {
-  const [group] = useMbtiGroup('ST');
-
-  const editor = EDITOR_BY_GROUP[group];
   const letters = useCountUp(MOCK_DNA_STATS.totalLetters);
   const minutes = useCountUp(MOCK_DNA_STATS.totalMinutes, 900, 250);
   const kws = useCountUp(MOCK_DNA_STATS.totalKeywords, 900, 500);
@@ -58,45 +49,6 @@ export function DnaContent() {
 
       {/* 분석 콘텐츠 */}
 
-      {/* 내 시각 정체성 */}
-      <article
-        style={{
-          padding: 'clamp(24px, 5vw, 32px)',
-          background: editor.soft,
-          borderRadius: 22,
-          marginBottom: 24,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 18,
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img loading="lazy"
-          src={editor.avatar}
-          alt={editor.name}
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            objectFit: 'cover',
-            background: '#fff',
-            boxShadow: `0 6px 16px ${editor.accent}26`,
-            flexShrink: 0,
-          }}
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 11, color: editor.accent, fontWeight: 700, letterSpacing: '0.06em', marginBottom: 4 }}>
-            MY LENS
-          </p>
-          <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 'clamp(20px, 4.6vw, 24px)', fontWeight: 600, letterSpacing: '-0.02em', color: '#111827', marginBottom: 4 }}>
-            {editor.name}의 시각으로 세상을 봐요
-          </p>
-          <p style={{ fontSize: 13, color: '#6b7280', letterSpacing: '-0.005em' }}>
-            {editor.archetype} · {MOCK_PERSPECTIVE_SHARE[0].percent}%의 글을 이 시각으로 읽었어요
-          </p>
-        </div>
-      </article>
-
       {/* 누적 */}
       <article
         style={{
@@ -116,7 +68,7 @@ export function DnaContent() {
             { value: kws, label: '개의 단어' },
           ].map((s, i) => (
             <div key={i} style={{ textAlign: 'center' }}>
-              <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 'clamp(28px, 7vw, 38px)', fontWeight: 600, color: editor.accent, letterSpacing: '-0.03em', lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>
+              <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 'clamp(28px, 7vw, 38px)', fontWeight: 600, color: ACCENT, letterSpacing: '-0.03em', lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>
                 {s.value}
               </p>
               <p style={{ fontSize: 12, color: '#6b7280', marginTop: 4, letterSpacing: '-0.005em' }}>

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
-import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 
@@ -12,7 +11,6 @@ import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 // 나열로 보여준다. 그림은 admin에서 GPT 등으로 미리 만들어 올린다. 우선
 // 딱 하나의 핫이슈로 소량 시도해 반응을 보는 단계라 목록도 단순하게.
 export default function WebtoonListPage() {
-  const [userGroup] = useMbtiGroup('SF');
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<CmsWebtoon[] | null>(null);
 
@@ -29,7 +27,7 @@ export default function WebtoonListPage() {
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('webtoon')} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} selectedGroup={userGroup} />
+      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 80px' }}>
         <header style={{ marginBottom: 24 }}>

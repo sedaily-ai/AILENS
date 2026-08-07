@@ -3,17 +3,17 @@
 /**
  * 공통 — 뉴스레터 구독 입력 (이메일 + 동의 + 버튼).
  *
- * 호출자가 어떤 그룹(들)을 구독시킬지 결정해 props 로 넘긴다.
- * 다중 그룹은 group 별로 N 회 subscribe 호출 (현재 백엔드 API 가 단일 그룹만 받음).
+ * 단일 명의(AI LENS) 체계(2026-08-07) 이후 구독은 그룹 무관 — 이메일 하나당
+ * 구독 신청 1회, 백엔드도 mbti_group 을 더 이상 받지 않는다
+ * (service/backend/handlers/newsletter/subscribe.py 참조).
  */
 import { useEffect, useState } from 'react';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { trackEvent } from '@/shared/lib/trackEvent';
 
 const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
 
-// 구독 즉시 그 페르소나의 최신 letter 한 통을 메일로 함께 발송하고 싶을 때
-// 호출자가 group → letter payload 매핑을 넘긴다. 백엔드가 letter.headline 있으면 발송.
+// 구독 즉시 최신 letter 한 통을 메일로 함께 발송하고 싶을 때 호출자가 넘긴다.
+// 백엔드가 letter.headline 있으면 발송.
 export interface SubscribeLetterPayload {
   editor_name: string;
   editor_role: string;
@@ -26,18 +26,16 @@ export interface SubscribeLetterPayload {
 }
 
 interface Props {
-  groups: MbtiGroupId[];
-  lettersByGroup?: Partial<Record<MbtiGroupId, SubscribeLetterPayload>>;
+  letter?: SubscribeLetterPayload | null;
   accent?: string;
   buttonLabel?: string;
   disabled?: boolean;
   helperText?: string;
-  onSuccess?: (data: { email: string; groups: MbtiGroupId[] }) => void;
+  onSuccess?: (data: { email: string }) => void;
 }
 
 export function NewsletterEmailField({
-  groups,
-  lettersByGroup,
+  letter,
   accent = '#3182F6',
   buttonLabel = '구독하기',
   disabled = false,
@@ -50,23 +48,21 @@ export function NewsletterEmailField({
   const [errMsg, setErrMsg] = useState('');
 
   // 이미 구독한 이메일 자동 채움. 단 done 상태 자동 진입은 X
-  // (재구독·다른 그룹 추가 시 항상 재발송 흐름을 막지 않게).
+  // (재구독 시에도 항상 재발송 흐름을 막지 않게).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem('newsletter-email');
     if (saved) setEmail(saved);
   }, []);
 
-  // 같은 이메일이 이미 모든 선택 그룹을 구독했는지 — 안내 helper 로만 활용 (submit 막지 않음)
-  const alreadyAllSubscribed = (() => {
+  // 이 이메일이 이미 구독 중인지 — 안내 helper 로만 활용 (submit 막지 않음)
+  const alreadySubscribed = (() => {
     if (typeof window === 'undefined') return false;
-    if (groups.length === 0) return false;
-    const existing = (localStorage.getItem('newsletter-groups') || '').split(',').filter(Boolean);
-    return groups.every((g) => existing.includes(g));
+    return localStorage.getItem('newsletter-subscribed') === '1';
   })();
 
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-  const canSubmit = validEmail && consent && groups.length > 0 && !disabled && state !== 'sending';
+  const canSubmit = validEmail && consent && !disabled && state !== 'sending';
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -74,44 +70,26 @@ export function NewsletterEmailField({
     setErrMsg('');
     try {
       const lower = email.trim().toLowerCase();
-      const results = await Promise.allSettled(
-        groups.map((g) => {
-          const payload: Record<string, unknown> = {
-            email: lower,
-            mbti_group: g,
-            consent: true,
-          };
-          // 그 페르소나의 최신 letter 가 주어졌으면 함께 보냄 → 백엔드가 즉시 발송
-          const letter = lettersByGroup?.[g];
-          if (letter) payload.letter = letter;
-          return fetch(`${API_BASE}/api/newsletter/subscribe`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-            .then((r) => r.json())
-            .then((d: { ok?: boolean; error?: string }) => {
-              if (!d.ok) throw new Error(d.error || 'subscribe failed');
-              return d;
-            });
-        }),
-      );
-      const failed = results.filter((r) => r.status === 'rejected');
-      if (failed.length === groups.length) {
-        throw new Error('신청 실패. 잠시 후 다시 시도해주세요.');
-      }
+      const payload: Record<string, unknown> = {
+        email: lower,
+        consent: true,
+      };
+      if (letter) payload.letter = letter;
+      const res = await fetch(`${API_BASE}/api/newsletter/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const d = (await res.json()) as { ok?: boolean; error?: string };
+      if (!d.ok) throw new Error(d.error || 'subscribe failed');
+
       if (typeof window !== 'undefined') {
         localStorage.setItem('newsletter-email', email.trim());
-        const existing = (localStorage.getItem('newsletter-groups') || '').split(',').filter(Boolean);
-        for (const g of groups) if (!existing.includes(g)) existing.push(g);
-        localStorage.setItem('newsletter-groups', existing.join(','));
+        localStorage.setItem('newsletter-subscribed', '1');
       }
-      trackEvent('newsletter_subscribe_multi', {
-        groups: groups.join(','),
-        count: groups.length,
-      });
+      trackEvent('newsletter_subscribe');
       setState('done');
-      onSuccess?.({ email: email.trim(), groups });
+      onSuccess?.({ email: email.trim() });
     } catch (e) {
       setErrMsg(e instanceof Error ? e.message : '신청 실패. 잠시 후 다시 시도해주세요.');
       setState('error');
@@ -141,9 +119,9 @@ export function NewsletterEmailField({
 
   return (
     <div>
-      {(helperText || alreadyAllSubscribed) && (
+      {(helperText || alreadySubscribed) && (
         <p style={{ fontSize: 12.5, color: '#6b7280', lineHeight: 1.6, marginBottom: 12, textAlign: 'center' }}>
-          {helperText ?? '이미 구독 중인 에디터예요. 다시 받기를 눌러도 한 번 더 보내드려요.'}
+          {helperText ?? '이미 구독 중이에요. 다시 받기를 눌러도 한 번 더 보내드려요.'}
         </p>
       )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>

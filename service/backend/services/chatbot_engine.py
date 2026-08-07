@@ -16,7 +16,7 @@ import boto3
 import json
 from typing import Optional, Dict, Any, List
 
-from config.constants import BEDROCK_MODEL_ID_CHATBOT  # Sonnet 4.6 inference profile (mbti-sonnet-46), 4 페르소나 톤
+from config.constants import BEDROCK_MODEL_ID_CHATBOT  # Sonnet 4.6 inference profile (mbti-sonnet-46), single default 챗봇 톤
 from services.chatbot_context_service import search_related_articles
 from services.chatbot_prompt_service import _build_full_system_prompt, _get_tools
 
@@ -174,8 +174,8 @@ def _build_messages(conversation_history: list, user_message: str) -> list:
 
 async def generate_chat_response(
     user_message: str,
-    mbti_group: str,
-    conversation_history: List[Dict[str, str]],
+    mbti_group: str = None,
+    conversation_history: List[Dict[str, str]] = None,
     recent_articles: List[Dict[str, Any]] = None,
     cached_briefing: Optional[str] = None
 ) -> str:
@@ -184,16 +184,19 @@ async def generate_chat_response(
 
     Args:
         user_message: User's input message
-        mbti_group: MBTI group (NT, NF, ST, SF)
+        mbti_group: accepted-but-unused for backward compat — MBTI personas
+            were removed site-wide (single default voice for everyone), but
+            `main.py` (local dev FastAPI server, out of this cleanup's scope)
+            still calls this with a group value.
         conversation_history: Previous messages in the conversation
         recent_articles: Recent news articles for context (fallback)
-        cached_briefing: Pre-generated MBTI-styled briefing text (preferred)
+        cached_briefing: Pre-generated cached briefing text (preferred)
 
     Returns:
         AI-generated response text
     """
     client = get_bedrock_client()
-    system_prompt = _build_full_system_prompt(mbti_group, recent_articles, cached_briefing)
+    system_prompt = _build_full_system_prompt(recent_articles, cached_briefing)
     # 호출자가 conversation_history 에 실어 보낸 system 롤을 합친다
     # (사주 챗의 사주 컨텍스트 — _split_system_turns 주석 참조).
     _extra_system, _ = _split_system_turns(conversation_history)
@@ -276,16 +279,20 @@ async def _handle_tool_use(client, system_prompt: str, tools: list, messages: li
 
 def generate_chat_response_stream(
     user_message: str,
-    mbti_group: str,
-    conversation_history: list,
+    mbti_group: str = None,
+    conversation_history: list = None,
     recent_articles: list = None,
     cached_briefing: str = None
 ):
     """Synchronous generator yielding text chunks from Bedrock streaming API.
     Handles tool use transparently — tools are resolved without streaming,
-    then the final text response is streamed to the caller."""
+    then the final text response is streamed to the caller.
+
+    ``mbti_group`` is accepted-but-unused for backward compat — MBTI personas
+    were removed site-wide, but `main.py` (local dev FastAPI server, out of
+    this cleanup's scope) still calls this with a group value."""
     client = get_bedrock_client()
-    system_prompt = _build_full_system_prompt(mbti_group, recent_articles, cached_briefing)
+    system_prompt = _build_full_system_prompt(recent_articles, cached_briefing)
     # 호출자가 conversation_history 에 실어 보낸 system 롤을 합친다
     # (사주 챗의 사주 컨텍스트 — _split_system_turns 주석 참조).
     _extra_system, _ = _split_system_turns(conversation_history)

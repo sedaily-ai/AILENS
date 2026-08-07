@@ -15,7 +15,9 @@ sys.path.insert(0, BACKEND)
 def test_render_html_contains_letter_and_unsubscribe():
     from newsletter.render import render_html, subject
 
-    letter = {"mbti_group": "NT", "headline": "헤드라인 X",
+    # MBTI 페르소나 폐기(2026-08) 이후 레터는 그룹을 갖지 않는다 — 모든
+    # 구독자에게 동일한 기본 아이덴티티(AI LENS)로 렌더링한다.
+    letter = {"id": "l-2026-05-17", "headline": "헤드라인 X",
               "subtitle": "부제", "body": ["문단1", "문단2"],
               "key_points": ["포인트1"], "closing_line": "마무리"}
     sub = {"email": "a@b.com", "unsubscribe_token": "TOK123"}
@@ -26,12 +28,12 @@ def test_render_html_contains_letter_and_unsubscribe():
     assert "token=TOK123" in html          # 수신거부 링크 필수
     assert "수신거부" in html
     s = subject(letter, "2026-05-17")
-    assert "민철" in s and "헤드라인 X" in s
+    assert "AI LENS" in s and "헤드라인 X" in s
 
 
 def test_render_escapes_html():
     from newsletter.render import render_html
-    letter = {"mbti_group": "SF", "headline": "<script>x</script>",
+    letter = {"id": "l-2026-05-17", "headline": "<script>x</script>",
               "subtitle": "", "body": ["<b>bold</b>"], "key_points": []}
     html = render_html(letter, {"unsubscribe_token": "t"}, "2026-05-17")
     assert "<script>x</script>" not in html

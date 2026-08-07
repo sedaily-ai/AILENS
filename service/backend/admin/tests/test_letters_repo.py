@@ -60,7 +60,6 @@ def _put(table, **overrides) -> dict:
         "id": str(uuid.uuid4()),
         "letter_date": "2026-08-04",
         "editor_id": "민철",
-        "mbti_group": "NT",
         "article_id": "news-1",
         "secondary_article_ids": [],
         "mode": "A",
@@ -78,13 +77,13 @@ def _put(table, **overrides) -> dict:
     return item
 
 
-def test_list_by_date_orders_by_mbti_group(ddb_table) -> None:
-    _put(ddb_table, editor_id="소율", mbti_group="SF")
-    _put(ddb_table, editor_id="민철", mbti_group="NT")
-    _put(ddb_table, editor_id="준서", mbti_group="ST")
-    _put(ddb_table, editor_id="하은", mbti_group="NF")
+def test_list_by_date_orders_by_created_at(ddb_table) -> None:
+    # MBTI 페르소나 폐기(2026-08) 이후 정렬은 그룹이 아니라 생성 시각 기준이다.
+    _put(ddb_table, editor_id="c", created_at="2026-08-04T03:00:00+00:00")
+    _put(ddb_table, editor_id="a", created_at="2026-08-04T01:00:00+00:00")
+    _put(ddb_table, editor_id="b", created_at="2026-08-04T02:00:00+00:00")
     out = letters_repo.list_by_date("2026-08-04")
-    assert [r["mbti_group"] for r in out] == ["NT", "NF", "ST", "SF"]
+    assert [r["editor_id"] for r in out] == ["a", "b", "c"]
 
 
 def test_list_by_date_excludes_soft_deleted(ddb_table) -> None:
@@ -127,12 +126,10 @@ def test_update_only_touches_editable_fields(ddb_table) -> None:
     row = _put(ddb_table)
     out = letters_repo.update(row["id"], {
         "subtitle": "새 부제",
-        "mbti_group": "SF",  # _UPDATABLE 밖 — 무시돼야 함
         "editor_id": "소율",  # _UPDATABLE 밖 — 무시돼야 함
     })
     assert out is not None
     assert out["subtitle"] == "새 부제"
-    assert out["mbti_group"] == "NT"
     assert out["editor_id"] == "민철"
 
 

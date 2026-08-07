@@ -1,36 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
-import { toLetterIdFromApi, type ApiLetter } from '@/shared/lib/todayLettersApi';
+import { letterHref } from '@/shared/lib/letterHref';
+import type { ApiLetter } from '@/shared/lib/todayLettersApi';
 
 interface Props {
-  // 자기 group letter 를 제외한 그날의 다른 3 letter.
-  // 빈 배열이면 섹션 숨김.
+  // 오늘 함께 발행된, 지금 보고 있는 레터를 제외한 다른 레터들. MBTI 4-페르소나
+  // 체계 폐지(2026-08-07) 이후 "그날 다른 3명의 에디터" 라는 고정 구조가 없어져
+  // 0~N개 어느 쪽도 될 수 있다. 빈 배열이면 섹션 자체를 숨긴다.
   otherLetters: ApiLetter[];
-  // 현재 보고있는 레터의 날짜 (YYYY-MM-DD) — 다른 시각 카드 클릭 시
-  // 같은 날 다른 그룹의 letter 라우트 (/letters/{group}-{date}) 로 보내기 위함.
-  letterDate: string;
 }
 
-interface PersonaMini {
-  group: MbtiGroupId;
-  name: string;
-  archetype: string;
-  avatar: string;
-  editorId: string;
-  accent: string;
-  soft: string;
-}
+// 단일 명의 — todayLettersApi.ts 의 DEFAULT_META 와 같은 톤. 페르소나별 아바타/
+// accent lookup 은 폐지, 레터 자체의 cover_image_url 이 있으면 그걸 쓴다.
+const ACCENT = '#111827';
+const SOFT = '#f3f4f6';
 
-const PERSONAS: Record<MbtiGroupId, PersonaMini> = {
-  NT: { group: 'NT', name: '민철', archetype: '분석가',       avatar: '/editors/intj.webp', editorId: 'NT-min', accent: '#7c3aed', soft: '#ede9fe' },
-  NF: { group: 'NF', name: '하은', archetype: '이야기꾼',     avatar: '/editors/infp.webp', editorId: 'NF-ha',  accent: '#e11d48', soft: '#ffe4e6' },
-  ST: { group: 'ST', name: '준서', archetype: '실용주의자', avatar: '/editors/istj.webp', editorId: 'ST-jun', accent: '#059669', soft: '#d1fae5' },
-  SF: { group: 'SF', name: '소율', archetype: '공감러',     avatar: '/editors/esfp.webp', editorId: 'SF-soy', accent: '#d97706', soft: '#fef3c7' },
-};
-
-export function EditorCommentsSection({ otherLetters, letterDate }: Props) {
+export function EditorCommentsSection({ otherLetters }: Props) {
   if (!otherLetters || otherLetters.length === 0) return null;
 
   return (
@@ -66,88 +52,63 @@ export function EditorCommentsSection({ otherLetters, letterDate }: Props) {
             marginBottom: 6,
           }}
         >
-          같은 사건, 다른 시각
+          다른 레터도 읽어보세요
         </h3>
         <p className="text-gray-500" style={{ fontSize: 13, lineHeight: 1.6 }}>
-          내가 받은 글 옆에, 다른 세 사람이 같은 사건을 어떻게 봤는지 옮겨놨어요.
+          같은 날 함께 발행된 다른 이야기들이에요.
         </p>
       </header>
 
       <div className="flex flex-col gap-4">
-        {otherLetters.map((ltr) => {
-          // MBTI 4색 비교 섹션 — 에디터가 안 붙은 CMS 글은 애초에 이 비교 대상이 아니다.
-          if (!ltr.mbti_group) return null;
-          const p = PERSONAS[ltr.mbti_group];
-          return (
-            <article
-              key={ltr.mbti_group}
-              style={{
-                padding: 'clamp(18px, 4vw, 24px) clamp(20px, 4vw, 26px)',
-                background: '#fafaf9',
-                borderRadius: 18,
-              }}
-            >
+        {otherLetters.map((ltr) => (
+          <article
+            key={ltr.id}
+            style={{
+              padding: 'clamp(18px, 4vw, 24px) clamp(20px, 4vw, 26px)',
+              background: '#fafaf9',
+              borderRadius: 18,
+            }}
+          >
+            {ltr.cover_image_url && (
               <header className="flex items-center gap-2.5 mb-3">
                 <div
                   className="rounded-full overflow-hidden"
                   style={{
                     width: 36,
                     height: 36,
-                    background: p.soft,
-                    boxShadow: `0 2px 8px ${p.accent}22`,
+                    background: SOFT,
+                    boxShadow: `0 2px 8px ${ACCENT}22`,
                   }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img loading="lazy" src={p.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span
-                    className="font-medium text-gray-900"
-                    style={{ fontSize: 14, letterSpacing: '-0.01em' }}
-                  >
-                    {p.name}
-                  </span>
-                  <span
-                    className="inline-flex items-center"
-                    style={{
-                      padding: '2px 8px',
-                      background: p.soft,
-                      color: p.accent,
-                      fontSize: 10.5,
-                      fontWeight: 600,
-                      borderRadius: 999,
-                      letterSpacing: '-0.005em',
-                    }}
-                  >
-                    {p.archetype}
-                  </span>
+                  <img loading="lazy" src={ltr.cover_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               </header>
-              <h4
-                className="text-gray-900"
-                style={{
-                  fontFamily: '"Noto Serif KR", serif',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  lineHeight: 1.5,
-                  letterSpacing: '-0.01em',
-                  margin: '0 0 10px',
-                }}
+            )}
+            <h4
+              className="text-gray-900"
+              style={{
+                fontFamily: '"Noto Serif KR", serif',
+                fontSize: 16,
+                fontWeight: 600,
+                lineHeight: 1.5,
+                letterSpacing: '-0.01em',
+                margin: '0 0 10px',
+              }}
+            >
+              {ltr.headline}
+            </h4>
+            <div className="flex items-center justify-end">
+              <Link
+                href={letterHref(ltr.id)}
+                className="inline-flex items-center gap-1 text-xs hover:translate-x-0.5 transition-transform"
+                style={{ color: ACCENT, fontWeight: 500 }}
               >
-                {ltr.headline}
-              </h4>
-              <div className="flex items-center justify-end">
-                <Link
-                  href={`/letters/${toLetterIdFromApi(ltr.mbti_group, letterDate)}`}
-                  className="inline-flex items-center gap-1 text-xs hover:translate-x-0.5 transition-transform"
-                  style={{ color: p.accent, fontWeight: 500 }}
-                >
-                  {p.name}의 한 통 읽기 →
-                </Link>
-              </div>
-            </article>
-          );
-        })}
+                이어서 읽기 →
+              </Link>
+            </div>
+          </article>
+        ))}
       </div>
 
       <footer
@@ -155,7 +116,7 @@ export function EditorCommentsSection({ otherLetters, letterDate }: Props) {
         style={{ borderTop: '1px dashed #f3f4f6' }}
       >
         <p className="text-gray-400" style={{ fontSize: 13, lineHeight: 1.6 }}>
-          당신은 어느 시각이 가장 가깝게 느껴졌나요?
+          오늘 함께 발행된 다른 이야기예요.
         </p>
       </footer>
     </section>

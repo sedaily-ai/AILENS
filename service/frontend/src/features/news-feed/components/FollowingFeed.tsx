@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import {
   fetchTodayLetters,
   toTodayLetterCard,
@@ -10,26 +9,10 @@ import {
 } from '@/shared/lib/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 
-interface Props {
-  selectedGroup: MbtiGroupId;
-}
-
-// 오늘(2026-08-05) 발행 4편에 한해 기사 내용 매칭 사진으로 교체 — letterId 기준
-// 수동 매핑(PoC). 매일 자동 반영하려면 백엔드 letter 응답에 썸네일 필드가 필요.
-// sf: 中 AI/Kimi·DeepSeek, st: 中 반도체 웨이퍼, nt: 스페이스X. nf(엔화 방어)는
-// 사진 미수령 — 받는 대로 추가, 그전까진 에디터 아바타로 폴백.
-const TODAY_ARTICLE_THUMBNAILS: Record<string, string> = {
-  'sf-2026-08-05': '/news-p.v1.20260728.ced959ada08d49a3bd2d78cb19aeca4a_P1.jpg',
-  'st-2026-08-05': '/news-p.v1.20260722.3ffb9035d2504ccaa23d7dd26a98961e_P1.jpg',
-  'nt-2026-08-05': '/news-p.v1.20260804.c2e7a8ece8db4f40919ad85d53e9790f_P1.jpg',
-};
-
-// API 응답 letter 4편을 mock 의 "매칭된 사람 먼저" 정렬로 재배치.
-function orderByMain(letters: TodayLetterCardLike[], mainGroup: MbtiGroupId): TodayLetterCardLike[] {
-  const main = letters.find((l) => l.group === mainGroup);
-  const others = letters.filter((l) => l.group !== mainGroup);
-  return main ? [main, ...others] : letters;
-}
+// 한 행에 보여줄 최대 카드 수 — 예전엔 MBTI 4편이 정확히 나온다는 보장이 있었지만
+// (mbti_group 필터 + 4개 고정), 단일 명의 체계(2026-08-07) 이후로는 그날 letter가
+// 0~N편 어디든 나올 수 있다. 레이아웃이 무너지지 않게 상한만 둔다.
+const MAX_DISPLAY = 4;
 
 // KST 기준 오늘. Intl 로 timezone 안정 처리 — en-CA 로케일이 YYYY-MM-DD 형식 반환.
 function todayKST(): string {
@@ -44,7 +27,7 @@ function shiftDate(isoDate: string, days: number): string {
 }
 
 
-export function FollowingFeed({ selectedGroup }: Props) {
+export function FollowingFeed() {
   const today = useMemo(() => todayKST(), []);
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
@@ -77,22 +60,23 @@ export function FollowingFeed({ selectedGroup }: Props) {
     fetchTodayLetters(selectedDate)
       .then((res) => {
         if (cancelled) return;
-        // 이 카드 행은 4명의 MBTI 에디터 레터 전용 — CMS(편집팀 명의, mbti_group
-        // 없음) 글이 섞이면 5장이 되어 4열 한 줄이 깨진다. 여기서 제외.
+        // 이 카드 행은 "이슈 톡톡"(일반 letters) 전용 — 트렌드/칼럼으로 이미
+        // 따로 태그된 글(TrendingEconomySection/ColumnPreviewSection이 각자
+        // 표시)은 여기서 또 보여주면 중복이라 제외한다.
         //
-        // "비었는지" 판단도 이 mbti 필터링 이후 기준으로 해야 한다 — trend_card/
-        // column 태그만 붙은 CMS letters 글(mbti_group 없음)이 그날 있으면
-        // res.letters.length 는 0이 아니게 되는데, 그 상태로 폴백을 멈춰버리면
-        // MBTI 4편은 하나도 없이 빈 화면만 남는다(2026-08-07 실제 발생 — 오늘
-        // 인기 칼럼 글이 있어서 어제 발행된 진짜 4편까지 못 내려갔다).
-        const mbtiOnly = (res.letters ?? []).filter((l) => l.mbti_group);
-        if (mbtiOnly.length === 0) {
+        // "비었는지" 판단도 이 필터링 이후 기준으로 해야 한다 — trend/column
+        // 태그만 붙은 글이 그날 있으면 res.letters.length는 0이 아니게 되는데,
+        // 그 상태로 폴백을 멈춰버리면 일반 letter는 하나도 없이 빈 화면만
+        // 남는다(2026-08-07 실제 발생 — 오늘 인기 칼럼 글이 있어서 어제 발행된
+        // 진짜 letters까지 못 내려갔다).
+        const general = (res.letters ?? []).filter((l) => l.section !== 'trend' && l.section !== 'column');
+        if (general.length === 0) {
           stepBackOrEmpty();
           return;
         }
         autoFallback.current = false; // 발행본 찾음 — 폴백 종료
-        const mapped = mbtiOnly.map((l) => toTodayLetterCard(l, res.date));
-        setLetters(orderByMain(mapped, selectedGroup));
+        const mapped = general.map((l) => toTodayLetterCard(l, res.date)).slice(0, MAX_DISPLAY);
+        setLetters(mapped);
         setLoading(false);
       })
       .catch(() => {
@@ -102,7 +86,7 @@ export function FollowingFeed({ selectedGroup }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [selectedGroup, selectedDate]);
+  }, [selectedDate]);
 
   return (
     <section
@@ -171,14 +155,16 @@ export function FollowingFeed({ selectedGroup }: Props) {
         </div>
       )}
 
-      {/* 한 행 4열 고정 — 스크롤 없이 항상 한 줄에 다 보이게 (좁아지면 카드 자체가 줄어듦) */}
+      {/* 열 수를 카드 개수에 맞춤(최대 MAX_DISPLAY) — 예전엔 MBTI 4편이 항상
+          보장돼 고정 4열이었지만, 이제는 그날 letter가 1~N편일 수 있어 개수가
+          적을 때 빈 칸이 남지 않게 동적으로 잡는다. */}
       <ol
         className="grid"
         style={{
           listStyle: 'none',
           padding: 0,
           margin: 0,
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gridTemplateColumns: `repeat(${Math.min(Math.max(letters.length, 1), MAX_DISPLAY)}, minmax(0, 1fr))`,
           gap: 'clamp(6px, 1.5vw, 10px)',
         }}
       >
@@ -208,14 +194,14 @@ export function FollowingFeed({ selectedGroup }: Props) {
                   줄무늬처럼 촌스러워 보였다(2026-08-06 피드백) — 뺐다. 매거진 고급짐은
                   색을 아예 거의 안 쓰는 쪽이 맞다, 사진·타이포만으로 절제되게. */}
 
-              {/* 썸네일 — 수동 매칭 사진(PoC, 옛 날짜 한정) > CMS 지정 썸네일 > 에디터 포트레이트 폴백 */}
+              {/* 썸네일 — CMS 지정 썸네일 > 기본 아바타 폴백 */}
               <div
                 className="aspect-square overflow-hidden"
                 style={{ background: l.accentBg }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img loading="lazy"
-                  src={TODAY_ARTICLE_THUMBNAILS[l.letterId] ?? l.thumbnailUrl ?? l.editorAvatar}
+                  src={l.thumbnailUrl ?? l.editorAvatar}
                   alt={l.title}
                   className="w-full h-full transition-transform duration-300 group-hover:scale-[1.04]"
                   style={{ objectFit: 'cover' }}

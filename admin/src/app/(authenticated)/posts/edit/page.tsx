@@ -23,7 +23,6 @@ const EMPTY: CmsPostInput = {
   closing_line: "",
   channels: ["letters"],
   editor_id: null,
-  mbti_group: null,
   body_inline: { body: [""], key_points: [], keywords: [], images: [] },
 };
 
@@ -84,7 +83,6 @@ function PostEditPage() {
           closing_line: post.closing_line ?? "",
           publish_date: post.publish_date,
           channels: post.channels,
-          mbti_group: post.mbti_group,
           editor_id: post.editor_id,
           body_inline: post.body_inline,
           cover_image_url: post.cover_image_url || null,

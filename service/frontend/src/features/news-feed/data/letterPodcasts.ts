@@ -30,7 +30,11 @@ export const HOST_VOICE_BY_GROUP: Record<MbtiGroupId, string> = {
   SF: HOST_VOICE_MALE,
 };
 
-// letter.id 기준
+// letter.id 기준. ⚠️ 아래 키('l-YYYYMMDD-GG')는 MBTI 4-페르소나 체계 폐지
+// (2026-08-07) 이전의 옛 id 스킴이다 — 현재 발행되는 letter.id 와는 절대 매칭되지
+// 않는, 영구히 orphan 된 PoC 데이터(8편)다. 조회부(LetterDetailClient.tsx)는
+// letter.id 로 그대로 lookup 하므로 자연스럽게 무시된다. 실사용 없는 죽은
+// 데이터라 굳이 새 id로 갱신하거나 지울 필요는 없다.
 export const LETTER_PODCASTS: Record<string, LetterPodcast> = {
   'l-20260518-NT': {
     hostVoiceId: HOST_VOICE_FEMALE,

@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, Any, List, Optional
 
-from config.constants import CORS_HEADERS, MBTI_GROUPS
+from config.constants import CORS_HEADERS
 from repositories.personal_repository import get_personal_repository
 from models.personal import UserProfile, ReadingRecord
 from core.auth import get_authenticated_user_id
@@ -45,7 +45,6 @@ async def get_or_create_user(
     email: str = None,
     name: str = None,
     picture: str = None,
-    mbti_group: str = 'SF',
 ) -> Dict[str, Any]:
     """Get or create user profile"""
     repo = get_personal_repository()
@@ -66,7 +65,6 @@ async def get_or_create_user(
             'email': profile.email,
             'name': profile.name,
             'picture': profile.picture,
-            'mbti_group': profile.mbti_group,
             'created_at': profile.created_at,
             'last_login': today,
             'streak': streak,
@@ -80,7 +78,6 @@ async def get_or_create_user(
             email=email or '',
             name=name or '',
             picture=picture or '',
-            mbti_group=mbti_group if mbti_group in MBTI_GROUPS else 'SF',
             created_at=now,
             last_login=today,
         )
@@ -91,25 +88,11 @@ async def get_or_create_user(
             'email': email,
             'name': name,
             'picture': picture,
-            'mbti_group': mbti_group,
             'created_at': now,
             'last_login': today,
             'streak': 1,
             'is_new': True,
         }
-
-
-async def update_user_mbti(user_id: str, mbti_group: str) -> Dict[str, Any]:
-    """Update user's MBTI group"""
-    if mbti_group not in MBTI_GROUPS:
-        raise ValueError(f"Invalid MBTI group: {mbti_group}")
-
-    repo = get_personal_repository()
-    updated = await repo.update_user_profile(user_id, {'mbti_group': mbti_group})
-
-    if updated:
-        return {'success': True, 'mbti_group': mbti_group}
-    raise ValueError("Failed to update MBTI group")
 
 
 # =============================================================================
@@ -256,7 +239,6 @@ def lambda_handler(event: dict, context) -> dict:
 
     Routes:
     - POST /api/user/profile - Get or create user profile (requires auth)
-    - PUT /api/user/mbti - Update MBTI group
     - POST /api/user/read - Record article read
     - GET /api/user/history - Get reading history
     - GET /api/user/stats - Get user statistics
@@ -313,20 +295,11 @@ def lambda_handler(event: dict, context) -> dict:
                 email = body.get('email')
                 name = body.get('name')
                 picture = body.get('picture')
-                mbti_group = body.get('mbti_group', 'SF')
 
                 result = asyncio.run(
-                    get_or_create_user(user_id, email, name, picture, mbti_group)
+                    get_or_create_user(user_id, email, name, picture)
                 )
                 return _success_response(result)
-
-        elif '/mbti' in path and http_method == 'PUT':
-            mbti_group = body.get('mbti_group')
-            if not mbti_group:
-                return _error_response(400, 'mbti_group is required')
-
-            result = asyncio.run(update_user_mbti(user_id, mbti_group))
-            return _success_response(result)
 
         elif '/read' in path and http_method == 'POST':
             article_id = body.get('article_id')

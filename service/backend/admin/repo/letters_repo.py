@@ -1,8 +1,14 @@
 """daily_letters DynamoDB 전담 — AI 레터 편집 (CMS spec §5.3).
 
-파이프라인이 쓰는 테이블이라 수정 범위를 좁게 잡는다. editor_id / mbti_group /
-letter_date / article_id 는 레터의 정체성이라 편집 대상에서 제외한다 —
-_UPDATABLE 에 없으므로 자동으로 무시된다.
+파이프라인이 쓰는 테이블이라 수정 범위를 좁게 잡는다. editor_id / letter_date /
+article_id 는 레터의 정체성이라 편집 대상에서 제외한다 — _UPDATABLE 에 없으므로
+자동으로 무시된다.
+
+2026-08: MBTI 페르소나 개념 폐기로 하루 4편(그룹별) 대신 1편만 생성되는 방향으로
+파이프라인이 바뀐다. mbti_group 필드는 admin 프론트를 포함해 더 이상 아무도
+읽지 않아 serialization 에서 제거했다 (기존 DDB row 에 값이 남아 있어도 무해하게
+무시된다). 그 값에 따라 동작을 분기하던 정렬 로직(4그룹 고정 순서)도 이미
+제거해서 created_at 순으로 정렬한다.
 
 2026-08-04: pgvector RDS(sedaily-mbti-pgvector-v2-dev) 삭제에 따라 SQL 버전을
 DynamoDB(sedaily-mbti-daily-letters-dev)로 재구축. cms_posts 마이그레이션과
@@ -24,9 +30,7 @@ from boto3.dynamodb.conditions import Key
 
 from shared.ddb_client import letters_table
 
-_MBTI_ORDER = {"NT": 1, "NF": 2, "ST": 3, "SF": 4}
-
-# 편집 허용 필드만 — 정체성 필드(editor_id/mbti_group/letter_date/article_id)는 제외.
+# 편집 허용 필드만 — 정체성 필드(editor_id/letter_date/article_id)는 제외.
 # podcast_audio_url: article_id 기반 자동 생성이 안 되는 레터(빈 article_id 등)를
 # 위한 수동 업로드 경로 — admin/routes/media.py 프리사인 업로드로 받은 URL을 그대로 저장.
 _UPDATABLE = ("headline", "subtitle", "closing_line", "body_inline", "keywords", "podcast_audio_url")
@@ -41,7 +45,6 @@ def _to_dict(item: dict) -> dict:
         "id": item["id"],
         "letter_date": item["letter_date"],
         "editor_id": item.get("editor_id"),
-        "mbti_group": item.get("mbti_group"),
         "headline": item.get("headline", ""),
         "subtitle": item.get("subtitle"),
         "closing_line": item.get("closing_line"),
@@ -59,7 +62,7 @@ def list_by_date(date: str) -> list[dict]:
         KeyConditionExpression=Key("letter_date").eq(date),
     )
     items = [i for i in resp.get("Items", []) if not i.get("deleted_at")]
-    items.sort(key=lambda i: _MBTI_ORDER.get(i.get("mbti_group"), 99))
+    items.sort(key=lambda i: i.get("created_at") or "")
     return [_to_dict(i) for i in items]
 
 

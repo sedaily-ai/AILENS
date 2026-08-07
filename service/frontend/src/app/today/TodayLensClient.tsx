@@ -131,9 +131,6 @@ export function TodayLensClient() {
             <Link href="/?tab=archive" style={{ color: '#6b7280', textDecoration: 'none' }}>
               내 서랍
             </Link>
-            <Link href="/editors" style={{ color: '#6b7280', textDecoration: 'none' }}>
-              에디터
-            </Link>
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, color: '#6b7280' }}>{USER_PROFILE.name}</span>
@@ -676,7 +673,7 @@ export function TodayLensClient() {
               </p>
             </div>
             <Link
-              href="/editors/NT-min"
+              href="/letters"
               style={{
                 padding: '13px 26px',
                 borderRadius: 9999,

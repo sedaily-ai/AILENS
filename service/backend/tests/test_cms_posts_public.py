@@ -43,7 +43,6 @@ def _row(**over) -> dict:
         "slug": "2026-07-27-제목",
         "channels": ["letters"],
         "publish_date": "2026-07-27",
-        "mbti_group": "NF",
         "editor_id": "하은",
         "headline": "제목",
         "subtitle": "부제",
@@ -92,7 +91,6 @@ def test_letters_channel_shapes_like_api_letter(monkeypatch) -> None:
     assert p["headline"] == "제목"
     assert p["body"] == ["문단1", "문단2"]
     assert p["key_points"] == ["요점"]
-    assert p["mbti_group"] == "NF"
     assert p["is_cms"] is True
 
 

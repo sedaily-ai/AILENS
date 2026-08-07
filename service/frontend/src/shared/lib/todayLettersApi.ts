@@ -7,7 +7,6 @@
  *   - app/today/preview/page.tsx (검증 페이지)
  *   - app/today/TodayLensClient (추후 통합)
  */
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { fetchCmsPosts } from './cmsPostsApi';
 
 const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
@@ -34,8 +33,6 @@ export interface LetterImage {
 export interface ApiLetter {
   id: string;
   editor_id: string;
-  // CMS 수동 글은 특정 에디터를 안 고르면 null — "AI LENS 편집팀" 명의로 나간다.
-  mbti_group: MbtiGroupId | null;
   article_id: string;
   secondary_article_ids: string[];
   archetype: string | null;
@@ -78,20 +75,8 @@ export interface DisplayLetter extends ApiLetter {
   accentBg: string;
 }
 
-// 페르소나 메타 (TodayLensClient 의 PERSONAS 와 같은 매핑)
-/**
- * 4 에디터의 사용자 노출 표시 정보 — 프론트 쪽 정본.
- * CLAUDE.md 기준 이름 정본은 이 상수 · v2 프롬프트 · persona-voice-cards.md 세 곳이다.
- * 새 화면에서 이름/색상이 필요하면 **여기서 import** 할 것 (네 번째 출처 만들지 말 것).
- */
-export const PERSONA_META: Record<MbtiGroupId, Omit<DisplayLetter, keyof ApiLetter>> = {
-  NT: { editorName: '민철', editorRole: '한 걸음 더 파고들기', editorAvatar: '/editors/intj.webp', accent: '#7c3aed', accentBg: '#ede9fe' },
-  NF: { editorName: '하은', editorRole: '내 생각은 이래요', editorAvatar: '/editors/infp.webp', accent: '#e11d48', accentBg: '#ffe4e6' },
-  ST: { editorName: '준서', editorRole: '팩트만 딱딱 정리', editorAvatar: '/editors/istj.webp', accent: '#059669', accentBg: '#d1fae5' },
-  SF: { editorName: '소율', editorRole: '가볍게 짚어주는 트렌드', editorAvatar: '/editors/esfp.webp', accent: '#d97706', accentBg: '#fef3c7' },
-};
-
-// 특정 에디터 없이 발행된 CMS 글 (mbti_group null) — 백엔드 _DEFAULT_EDITOR 와 동일 명의.
+// 단일 명의 — MBTI 4-페르소나 에디터 체계 폐지(2026-08-07) 이후 모든 레터가
+// 이 표시 정보를 공유한다. 백엔드 EDITORIAL_BYLINE("서울경제 편집부")과 같은 톤.
 const DEFAULT_META: Omit<DisplayLetter, keyof ApiLetter> = {
   editorName: 'AI LENS',
   editorRole: '팀이 함께 정리했어요',
@@ -100,12 +85,8 @@ const DEFAULT_META: Omit<DisplayLetter, keyof ApiLetter> = {
   accentBg: '#f3f4f6',
 };
 
-function personaMeta(group: MbtiGroupId | null): Omit<DisplayLetter, keyof ApiLetter> {
-  return group ? PERSONA_META[group] : DEFAULT_META;
-}
-
 export function withDisplayMeta(letter: ApiLetter): DisplayLetter {
-  return { ...letter, ...personaMeta(letter.mbti_group) };
+  return { ...letter, ...DEFAULT_META };
 }
 
 // 날짜별 응답 캐시 — 같은 date 의 4편 사이 이동 / 페이지네이션 즉시화.
@@ -205,14 +186,6 @@ async function fetchTodayLettersLive(date: string | undefined, expiresAt: number
 // mock 만 알던 deliveryHint 같은 메타는 페르소나별 고정값으로 fallback.
 // ──────────────────────────────────────────────────────────────────────────
 
-// MBTI 별 발송 시간대 — 기존 mock 의 톤 유지
-const DELIVERY_HINT: Record<MbtiGroupId, string> = {
-  NT: '출근길 07:00 도착',
-  NF: '잠들기 전 22:00 도착',
-  ST: '점심시간 12:30 도착',
-  SF: '오전 8시 도착',
-};
-
 const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
 function formatDateLabel(isoDate: string): string {
@@ -303,7 +276,6 @@ function estimateReadMinutes(body: string[], bodyHtml?: string | null): number {
 
 export interface TodayLetterCardLike {
   letterId: string;
-  group: MbtiGroupId | null;
   editorId: string;
   editorName: string;
   editorRole: string;
@@ -323,34 +295,10 @@ export interface TodayLetterCardLike {
   newsId: string;
 }
 
-// /letters/[id] 라우트와 동일한 schema — Next.js export 모드의 generateStaticParams
-// 가 mock의 'nt-2026-05-14' 형식만 prerender 하므로 production UUID 대신 그 형식 그대로.
-export function toLetterIdFromApi(group: MbtiGroupId, date: string): string {
-  return `${group.toLowerCase()}-${date}`;
-}
-
-// "nt-2026-05-14" → { group: 'NT', date: '2026-05-14' }
-// 라우트 파라미터 → API 호출에 필요한 인자 추출.
-export function parseLetterId(letterId: string): { group: MbtiGroupId; date: string } | null {
-  const m = letterId.match(/^(nt|nf|st|sf)-(\d{4}-\d{2}-\d{2})$/i);
-  if (!m) return null;
-  return {
-    group: m[1].toUpperCase() as MbtiGroupId,
-    date: m[2],
-  };
-}
-
 export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayLetterCardLike {
-  const meta = personaMeta(letter.mbti_group);
-  // AI 레터는 그룹+날짜로 정적 라우트 id 를 구성(/letters/nt-2026-08-04 형식,
-  // generateStaticParams 가 이 형식만 prerender). CMS 글은 그런 그룹이 없을 수
-  // 있으니 자기 slug(letter.id)를 그대로 쓴다.
-  const letterId = letter.mbti_group
-    ? toLetterIdFromApi(letter.mbti_group, letterDate)
-    : letter.id;
+  const meta = DEFAULT_META;
   return {
-    letterId,
-    group: letter.mbti_group,
+    letterId: letter.id,
     editorId: letter.editor_id,
     editorName: meta.editorName,
     editorRole: meta.editorRole,
@@ -367,7 +315,7 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
       200,
     ),
     readMinutes: estimateReadMinutes(letter.body, letter.body_html),
-    deliveryHint: letter.mbti_group ? DELIVERY_HINT[letter.mbti_group] : '오늘 발행',
+    deliveryHint: '오늘 발행',
     dateLabel: formatDateLabel(letterDate),
     newsId: letter.article_id,
   };

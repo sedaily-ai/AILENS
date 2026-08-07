@@ -3,7 +3,7 @@ import { OnboardingClient } from './OnboardingClient';
 
 export const metadata: Metadata = {
   title: 'AI LENS 소개',
-  description: 'MBTI 성향에 맞춘 AI 에디터가 매일 한 통, 다른 시선의 뉴스를 전합니다.',
+  description: 'AI가 매일 아침 그날의 경제 뉴스를 정리해 한 통으로 전합니다.',
   alternates: { canonical: '/onboarding' },
 };
 

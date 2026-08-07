@@ -237,7 +237,7 @@ class PersonalRepository:
 
         Args:
             user_id: User ID
-            updates: Fields to update (e.g., {'mbti_group': 'NT', 'last_login': '...'})
+            updates: Fields to update (e.g., {'name': 'New Name', 'last_login': '...'})
 
         Returns:
             Updated UserProfile, or None on failure

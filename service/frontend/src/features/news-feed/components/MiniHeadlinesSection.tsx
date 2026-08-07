@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { fetchCmsPosts, type CmsLetter } from '@/shared/lib/cmsPostsApi';
-import { toLetterIdFromApi } from '@/shared/lib/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 import { GiftBoxIcon } from './GiftBoxIcon';
 
@@ -26,7 +25,7 @@ const PAID_TOPICS: { label: string; keywords: string[] }[] = [
 ];
 
 function hrefFor(l: CmsLetter): string {
-  return letterHref(l.mbti_group ? toLetterIdFromApi(l.mbti_group, l.publish_date ?? '') : l.id);
+  return letterHref(l.id);
 }
 
 const cardStyle = {

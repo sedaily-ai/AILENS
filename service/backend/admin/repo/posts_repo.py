@@ -25,7 +25,7 @@ _VALID_STATUS = ("draft", "published", "archived")
 
 # update() 가 건드릴 수 있는 필드. status/published_at 은 set_status() 전담.
 _UPDATABLE = (
-    "channels", "publish_date", "mbti_group", "editor_id",
+    "channels", "publish_date", "editor_id",
     "headline", "subtitle", "closing_line", "body_inline", "cover_image_url",
 )
 
@@ -43,7 +43,6 @@ def _to_dict(item: dict) -> dict:
         "status": item["status"],
         "channels": list(item.get("channels") or []),
         "publish_date": item["publish_date"],
-        "mbti_group": item.get("mbti_group"),
         "editor_id": item.get("editor_id"),
         "headline": item.get("headline", ""),
         "subtitle": item.get("subtitle"),
@@ -90,7 +89,6 @@ def create(data: dict, created_by: str) -> dict:
         "status": "draft",
         "channels": data.get("channels") or [],
         "publish_date": data["publish_date"],
-        "mbti_group": data.get("mbti_group") or None,
         "editor_id": data.get("editor_id") or None,
         "headline": data.get("headline", ""),
         "subtitle": data.get("subtitle"),

@@ -1,5 +1,3 @@
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
-
 export interface KeywordStat {
   term: string;
   count: number;
@@ -8,15 +6,6 @@ export interface KeywordStat {
 export interface HourStat {
   hour: number;     // 0-23
   weight: number;   // 0-1
-}
-
-export interface PerspectiveShare {
-  group: MbtiGroupId;
-  name: string;
-  archetype: string;
-  percent: number;
-  accent: string;
-  soft: string;
 }
 
 export const MOCK_DNA_STATS = {
@@ -51,10 +40,3 @@ export const MOCK_HOUR_PATTERN: HourStat[] = Array.from({ length: 24 }).map((_, 
   else if (h === 18 || h === 19) weight = 0.15;
   return { hour: h, weight };
 });
-
-export const MOCK_PERSPECTIVE_SHARE: PerspectiveShare[] = [
-  { group: 'ST', name: '준서', archetype: '실용주의자', percent: 64, accent: '#059669', soft: '#d1fae5' },
-  { group: 'NT', name: '민철', archetype: '분석가',     percent: 18, accent: '#7c3aed', soft: '#ede9fe' },
-  { group: 'NF', name: '하은', archetype: '이야기꾼',   percent: 12, accent: '#e11d48', soft: '#ffe4e6' },
-  { group: 'SF', name: '소율', archetype: '공감러',     percent: 6,  accent: '#d97706', soft: '#fef3c7' },
-];

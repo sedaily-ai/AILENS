@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { LightbulbIcon, CoinJarIcon, HouseSunIcon } from './icons/HandDrawnIcons';
 import { fetchTrendCards, fetchCmsPosts, type CmsTrendCard } from '@/shared/lib/cmsPostsApi';
-import { toLetterIdFromApi } from '@/shared/lib/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
@@ -68,7 +67,7 @@ export function ColumnPreviewSection() {
           excerpt: l.subtitle ?? '',
           date: l.publish_date ?? '',
           is_cms: true as const,
-          href: letterHref(l.mbti_group ? toLetterIdFromApi(l.mbti_group, l.publish_date ?? '') : l.id),
+          href: letterHref(l.id),
           imageUrl: l.cover_image_url || null,
         }));
       const merged = [...tagged, ...cards.filter((c) => c.section === 'column')].sort((a, b) =>

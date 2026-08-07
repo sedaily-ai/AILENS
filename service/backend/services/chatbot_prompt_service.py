@@ -6,11 +6,10 @@
 """
 from typing import List, Dict, Any
 
-from config.constants import MBTI_GROUPS
 from services.prompt_loader import load_chatbot_prompt
 
 
-def build_context_prompt(articles: List[Dict[str, Any]], mbti_group: str) -> str:
+def build_context_prompt(articles: List[Dict[str, Any]]) -> str:
     """Build context about recent news for the chatbot"""
     if not articles:
         return ""
@@ -76,19 +75,18 @@ NO_CONTEXT_INSTRUCTIONS = """
 """
 
 
-def _build_full_system_prompt(mbti_group: str, recent_articles=None, cached_briefing=None) -> str:
+def _build_full_system_prompt(recent_articles=None, cached_briefing=None) -> str:
     """Build complete system prompt with context and instructions."""
     # Admin-3: prompt source = sedaily-mbti-admin-prompts-dev (DDB) with 5-min TTL
-    # cache, falling back to prompts/chatbot/<group>.md on DDB miss/error. Unknown
-    # MBTI groups inherit the SF persona — same fallback the legacy hardcoded
-    # MBTI_SYSTEM_PROMPTS dict used.
-    group = mbti_group if mbti_group in MBTI_GROUPS else 'SF'
-    prompt = load_chatbot_prompt(group)
+    # cache, falling back to prompts/chatbot/default.md on DDB miss/error.
+    # MBTI personas were removed site-wide — single default voice for everyone,
+    # no more per-group branching/fallback.
+    prompt = load_chatbot_prompt('default')
 
     if cached_briefing:
         prompt += build_context_from_briefing(cached_briefing)
     elif recent_articles:
-        prompt += build_context_prompt(recent_articles, mbti_group)
+        prompt += build_context_prompt(recent_articles)
     else:
         prompt += NO_CONTEXT_INSTRUCTIONS
 

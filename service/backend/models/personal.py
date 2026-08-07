@@ -112,7 +112,6 @@ class UserProfile:
     email: str = ''
     name: str = ''
     picture: str = ''               # profile image URL
-    mbti_group: str = 'SF'          # NT, NF, ST, SF
     temperature: float = 36.5       # 공감온도 (0-100 scale)
     badges: List[str] = field(default_factory=list)
     title: str = ''                 # 칭호 (e.g., "분석의 여왕")
@@ -135,7 +134,6 @@ class UserProfile:
             'email': self.email,
             'name': self.name,
             'picture': self.picture,
-            'mbti_group': self.mbti_group,
             'temperature': str(self.temperature),  # Decimal-safe
             'badges': self.badges,
             'title': self.title,
@@ -156,7 +154,6 @@ class UserProfile:
             email=item.get('email', ''),
             name=item.get('name', ''),
             picture=item.get('picture', ''),
-            mbti_group=item.get('mbti_group', 'SF'),
             temperature=float(temp),
             badges=item.get('badges', []),
             title=item.get('title', ''),

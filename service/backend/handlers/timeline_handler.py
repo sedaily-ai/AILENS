@@ -34,7 +34,6 @@ from clients.bigkinds_client import (
     standard_to_bigkinds_categories,
 )
 from config.constants import (
-    BIGKINDS_MAX_RETURN_SIZE,
     BIGKINDS_PROVIDER_SEDAILY,
     CORS_HEADERS,
     MAX_PAGE_SIZE,
@@ -45,7 +44,6 @@ from services.day_indicator_service import (
     pick_indicator_headlines,
 )
 from services.issue_digest_service import build_issue_digest
-from services.persona_curation_service import curate_by_persona
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -74,16 +72,6 @@ MAX_IDS_PER_ISSUE = 30
 # 상세 조회 배치 전체 상한 (실측: 300건 요청 → 283건 수신 OK)
 MAX_DETAIL_IDS = 240
 
-# ── personas 모드 ───────────────────────────────────────────────────────────
-# 에디터별로 보여줄 기사 수 (화면 1탭 분량)
-DEFAULT_PER_PERSONA = 6
-MAX_PER_PERSONA = 30
-# 4버킷으로 가르기 전에 하루치를 얼마나 가져올지.
-# 에디터별 상위 N 을 따로 4번 호출하는 대신 **한 번에 넉넉히 받아 나눈다** —
-# 빅카인즈 호출을 1회로 유지하고, 카테고리 필터를 38개씩 실어보내는(NF) 검증 안 된
-# 쿼리를 피한다. 서울경제 하루가 ~450건이라 기본 500이면 대체로 하루 전체를 덮는다.
-DEFAULT_POOL_SIZE = 500
-
 
 class BadRequest(Exception):
     """400 으로 내려보낼 입력 오류."""
@@ -102,22 +90,15 @@ class TimelineRequest:
     page: int = 1
     page_size: int = DEFAULT_PAGE_SIZE
     include_trend: bool = False
-    # 'flat'     — 그날 기사를 최신순 한 줄로 (기본, 기존 동작)
-    # 'personas' — 4 에디터가 각자 고른 기사로 갈라서 (A안)
-    # 'issues'   — 그날 언론이 가장 많이 다룬 이슈 + 언론사별 보도 분포 (B안)
+    # 'flat'   — 그날 기사를 최신순 한 줄로 (기본, 기존 동작)
+    # 'issues' — 그날 언론이 가장 많이 다룬 이슈 + 언론사별 보도 분포 (B안)
     mode: str = 'flat'
-    per_persona: int = DEFAULT_PER_PERSONA
-    pool_size: int = DEFAULT_POOL_SIZE
     issue_count: int = DEFAULT_ISSUE_COUNT
     per_issue: int = DEFAULT_PER_ISSUE
 
     @property
     def return_from(self) -> int:
         return (self.page - 1) * self.page_size
-
-    @property
-    def is_personas(self) -> bool:
-        return self.mode == 'personas'
 
     @property
     def is_issues(self) -> bool:
@@ -214,8 +195,8 @@ def parse_request(event: dict) -> TimelineRequest:
     page_size = max(1, min(page_size, MAX_PAGE_SIZE))
 
     mode = str(pick('mode', default='flat') or 'flat').strip().lower()
-    if mode not in ('flat', 'personas', 'issues'):
-        raise BadRequest(f"mode 는 flat, personas, issues 중 하나입니다: {mode}")
+    if mode not in ('flat', 'issues'):
+        raise BadRequest(f"mode 는 flat, issues 중 하나입니다: {mode}")
 
     issue_count = _parse_int(pick('issue_count', 'issueCount', default=DEFAULT_ISSUE_COUNT),
                              DEFAULT_ISSUE_COUNT)
@@ -224,14 +205,6 @@ def parse_request(event: dict) -> TimelineRequest:
     per_issue = _parse_int(pick('per_issue', 'perIssue', default=DEFAULT_PER_ISSUE),
                            DEFAULT_PER_ISSUE)
     per_issue = max(1, min(per_issue, MAX_PER_ISSUE))
-
-    per_persona = _parse_int(pick('per_persona', 'perPersona', default=DEFAULT_PER_PERSONA),
-                             DEFAULT_PER_PERSONA)
-    per_persona = max(1, min(per_persona, MAX_PER_PERSONA))
-
-    pool_size = _parse_int(pick('pool_size', 'poolSize', default=DEFAULT_POOL_SIZE),
-                           DEFAULT_POOL_SIZE)
-    pool_size = max(per_persona * 4, min(pool_size, BIGKINDS_MAX_RETURN_SIZE))
 
     return TimelineRequest(
         date=date,
@@ -242,8 +215,6 @@ def parse_request(event: dict) -> TimelineRequest:
         page_size=page_size,
         include_trend=_parse_bool(pick('include_trend', 'trend', default=False)),
         mode=mode,
-        per_persona=per_persona,
-        pool_size=pool_size,
         issue_count=issue_count,
         per_issue=per_issue,
     )
@@ -262,49 +233,21 @@ def fetch_from_bigkinds(req: TimelineRequest, client: Optional[BigKindsClient] =
     """
     client = client or BigKindsClient()
 
-    # personas 모드는 4버킷으로 갈라야 하므로 하루치를 넉넉히 한 번에 받는다.
-    # (hilight 는 목록에 안 쓰는데 건당 200자씩 붙어 payload 만 키우므로 생략)
-    if req.is_personas:
-        return_from, return_size, hilight = 0, req.pool_size, None
-    else:
-        return_from, return_size, hilight = req.return_from, req.page_size, 200
-
     result = client.search_single_day(
         req.date,
         query=req.query,
         providers=req.providers or None,
         categories=standard_to_bigkinds_categories(req.categories) or None,
-        return_from=return_from,
-        return_size=return_size,
-        hilight=hilight,
+        return_from=req.return_from,
+        return_size=req.page_size,
+        hilight=200,
     )
 
     payload: Dict[str, Any] = {
         'source': 'bigkinds',
         'total_hits': result.total_hits,
+        'articles': [_to_response_article(a) for a in result.articles],
     }
-
-    if req.is_personas:
-        # 버킷팅은 원본 BigKindsArticle(categories_raw 보유) 로 하고,
-        # 응답 직렬화는 그 다음에 한다.
-        curated = curate_by_persona(result.articles, per_persona=req.per_persona)
-        payload['personas'] = {
-            group: {
-                'total': bucket['total'],
-                'articles': [
-                    _to_response_article(p.article, matched_category=p.matched_category)
-                    for p in bucket['picks']
-                ],
-            }
-            for group, bucket in curated.items()
-        }
-        payload['pool_size'] = len(result.articles)
-        # flat 목록도 함께 준다 — 기존 화면/디버깅 호환.
-        payload['articles'] = [
-            _to_response_article(a) for a in result.articles[:req.page_size]
-        ]
-    else:
-        payload['articles'] = [_to_response_article(a) for a in result.articles]
 
     # 키워드 트렌드(§6)는 query 가 필수다. 검색어가 있을 때만 곁들인다.
     if req.include_trend and req.query:
@@ -424,20 +367,13 @@ def _fetch_trend(client: BigKindsClient, req: TimelineRequest) -> Optional[dict]
         return None
 
 
-def _to_response_article(a, matched_category: Optional[str] = None) -> dict:
-    """
-    BigKindsArticle → 프론트엔드 응답 형태.
-
-    `matched_category` 는 personas 모드에서만 채워진다 — 그 에디터에게 배정된
-    근거 분류(`"경제>증권_증시"`)로, 화면에서 "준서 · 증권_증시" 처럼 픽 이유를
-    보여주는 데 쓴다.
-    """
+def _to_response_article(a) -> dict:
+    """BigKindsArticle → 프론트엔드 응답 형태."""
     return {
         'news_id': a.news_id,
         'title': a.title,
         'published_at': a.published_at,
         'category': a.category,
-        'matched_category': matched_category,
         'provider': a.provider,
         'byline': a.byline,
         'original_link': a.original_link,
@@ -466,9 +402,8 @@ def fetch_from_dynamodb(req: TimelineRequest) -> dict:
         # 빅카인즈의 exclusive until 과 같은 하루 범위를 만들기 위해 +1일 한다.
         published_until=exclusive_until(req.date),
         categories=req.categories,
-        page=1 if req.is_personas else req.page,
-        # personas 모드는 4버킷으로 가를 재고가 필요해 하루치를 넓게 받는다.
-        page_size=req.pool_size if req.is_personas else req.page_size,
+        page=req.page,
+        page_size=req.page_size,
     )
 
     articles = [
@@ -483,35 +418,15 @@ def fetch_from_dynamodb(req: TimelineRequest) -> dict:
             'content': a.get('content', ''),
             'image_url': a.get('image_url'),
             'image_path': '',
-            # DynamoDB 에는 표준 카테고리(1레벨)만 있다. 페르소나 배정이 이 값을
-            # 보고 1레벨 폴백으로 동작하도록 리스트에 담아 넘긴다 — 빅카인즈 2레벨
-            # 기반보다 훨씬 거칠어서 버킷이 한쪽으로 쏠린다(경제→ST). 의도된 열화다.
-            'categories_raw': [a.get('category')] if a.get('category') else [],
         }
         for a in response.articles
     ]
 
-    payload: Dict[str, Any] = {
+    return {
         'source': 'dynamodb',
         'total_hits': response.total_hits,
         'articles': articles,
     }
-
-    if req.is_personas:
-        curated = curate_by_persona(articles, per_persona=req.per_persona)
-        payload['personas'] = {
-            group: {
-                'total': bucket['total'],
-                'articles': [
-                    {**p.article, 'matched_category': p.matched_category}
-                    for p in bucket['picks']
-                ],
-            }
-            for group, bucket in curated.items()
-        }
-        payload['pool_size'] = len(articles)
-
-    return payload
 
 
 # =============================================================================
@@ -556,12 +471,9 @@ def build_timeline(req: TimelineRequest, client: Optional[BigKindsClient] = None
         'total_pages': math.ceil(total_hits / req.page_size) if total_hits else 0,
         'mode': req.mode,
     })
-    if req.is_personas:
-        payload['per_persona'] = req.per_persona
     if req.is_issues:
         payload['per_issue'] = req.per_issue
     payload.setdefault('trend', None)
-    payload.setdefault('personas', None)
     # issues 모드에서 DynamoDB 로 폴백하면 이슈를 만들 수 없다 — 빅카인즈
     # `/issue_ranking` 에만 있는 클러스터링이라 대체 소스가 없다.
     payload.setdefault('issues', None)

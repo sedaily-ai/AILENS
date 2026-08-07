@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { adminApi } from "@/lib/adminClient";
 import { EmptyState, ErrorNote } from "@/components/Feedback";
+import { DateRangeCalendar, type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost, CmsStatus } from "@/lib/types";
 
 const STATUS_LABEL: Record<CmsStatus, string> = {
@@ -40,15 +41,57 @@ const SECTION_LABEL: Record<string, string> = {
   column: "인기 칼럼",
 };
 
-// channels 하나로는 "경제 이슈"/"인기 칼럼" 태그가 안 보여서 옆에 같이 표시한다
-// — trend_card 채널 글뿐 아니라, letters 채널에 태그만 붙인 글도 해당.
+// CHANNEL_FILTERS 필터 알약과 같은 한글 라벨 — 목록 표에는 raw 값("letters"
+// 등 영문)이 그대로 나와서 필터 라벨(레터/웹툰/영상)과 안 맞아 보인다는
+// 지적(2026-08-07)으로 통일. trend_card 채널 자체는 안 쓰지만(letters +
+// section 태그로 통합) 혹시 남아있는 레코드 대비 매핑은 유지.
+const CHANNEL_LABEL: Record<string, string> = {
+  letters: "레터",
+  trend_card: "트렌드·칼럼",
+  webtoon: "웹툰",
+  video: "영상",
+  paper: "지면",
+  feed: "피드",
+};
+
+// section 태그가 붙은 letters 글은 실질적으로 "트렌드·칼럼" 취급이라(채널
+// 필터 알약도 이 기준으로 갈린다) 구체적인 종류(경제 이슈/인기 칼럼)만
+// 보여준다 — "트렌드·칼럼 · 인기 칼럼"처럼 "칼럼"이 겹치는 겹말이 됐던
+// 문제(2026-08-07 지적)로 정리.
 function channelLabel(p: CmsPost): string {
   if (!p.channels.length) return "-";
-  const base = p.channels.join(", ");
   if (p.body_inline.section) {
-    return `${base} · ${SECTION_LABEL[p.body_inline.section] ?? p.body_inline.section}`;
+    return SECTION_LABEL[p.body_inline.section] ?? p.body_inline.section;
   }
-  return base;
+  return p.channels.map((c) => CHANNEL_LABEL[c] ?? c).join(", ");
+}
+
+// "레터"/"트렌드·칼럼" 둘 다 DB에서는 channels: ["letters"]로 저장되고
+// body_inline.section 유무로만 갈린다(trend_card 채널 값 자체는 이제 안 씀).
+// 그래서 채널 필터를 서버 파라미터로 그냥 넘기면 "레터"를 눌러도 트렌드·칼럼
+// 글까지 같이 나온다 — 이 함수로 클라이언트에서 최종적으로 한 번 더 걸러야
+// 필터 알약 이름과 실제 결과가 일치한다(2026-08-07, "채널 눌렀는데 왜
+// 필터링이 안되지" 버그 리포트).
+function matchesChannelFilter(p: CmsPost, channel: string): boolean {
+  if (!channel) return true;
+  const isTrendOrColumn = Boolean(p.body_inline.section);
+  if (channel === "trend_card") {
+    return p.channels.includes("trend_card") || isTrendOrColumn;
+  }
+  if (channel === "letters") {
+    return p.channels.includes("letters") && !isTrendOrColumn;
+  }
+  return (p.channels as string[]).includes(channel);
+}
+
+// 발행일 범위 필터 — from/to 둘 다 없으면 전체 통과, from만 있으면 그 이후
+// 전체(끝을 아직 안 고른 중), 둘 다 있으면 [from, to] 포함 범위.
+function inDateRange(publishDate: string | null | undefined, range: DateRange): boolean {
+  if (!range.from) return true;
+  const d = publishDate ?? "";
+  if (d < range.from) return false;
+  if (range.to && d > range.to) return false;
+  return true;
 }
 
 const PAGE_SIZE = 15;
@@ -58,32 +101,34 @@ export default function PostsPage() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [channel, setChannel] = useState("");
-  const [date, setDate] = useState("");
+  // 발행일 단일값 → 범위(시작~끝)로 변경(2026-08-07, "시작일부터 끝일까지
+  // 필터링" 요청). 백엔드 list_posts 는 정확히 일치하는 date= 하나만 지원해서
+  // 범위 필터는 서버 파라미터로 못 넘긴다 — 항상 전체를 받아서 클라이언트에서
+  // from~to 사이인지로 거른다(channel 필터와 같은 이유·같은 패턴).
+  const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
   const [page, setPage] = useState(1);
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
   // 필터를 바꿔도 이전 목록을 유지하다가 새 응답이 오면 교체 — 깜빡임도 없다.
   useEffect(() => {
     let cancelled = false;
-    const params: { status?: string; channel?: string; date?: string; limit?: number } = {
+    const params: { status?: string; channel?: string; limit?: number } = {
       limit: 200,
     };
     if (status) params.status = status;
-    if (date) params.date = date;
-    // "트렌드·칼럼" 필터는 trend_card 채널뿐 아니라, letters 채널에 태그만 붙인
-    // 글(PostForm mode="post" 의 /letters 태그 selector)도 잡아야 한다 —
-    // channel 서버 필터로는 안 갈리니 여기선 안 넘기고 클라이언트에서 거른다.
-    if (channel && channel !== "trend_card") params.channel = channel;
+    // "레터"/"트렌드·칼럼"은 서버 channel 파라미터로는 못 갈린다 — 둘 다
+    // channels: ["letters"]라 서버가 letters로만 걸러주면 태그 유무 상관없이
+    // 섞여 나온다. 그래서 서버 필터는 webtoon/video처럼 애매하지 않은 채널만
+    // 쓰고, letters/trend_card는 일단 다 받아서 matchesChannelFilter로
+    // 클라이언트에서 최종 확정한다.
+    if (channel && channel !== "trend_card" && channel !== "letters") params.channel = channel;
     adminApi
       .listPosts(params)
       .then((r) => {
         if (cancelled) return;
-        const filtered =
-          channel === "trend_card"
-            ? r.posts.filter(
-                (p) => p.channels.includes("trend_card") || Boolean(p.body_inline.section),
-              )
-            : r.posts;
+        const filtered = r.posts.filter(
+          (p) => matchesChannelFilter(p, channel) && inDateRange(p.publish_date, dateRange),
+        );
         setPosts(filtered);
         setError(null);
       })
@@ -93,7 +138,7 @@ export default function PostsPage() {
     return () => {
       cancelled = true;
     };
-  }, [status, channel, date]);
+  }, [status, channel, dateRange]);
 
   // 필터가 바뀌면 이전 필터 기준 페이지 번호가 새 목록 범위를 벗어날 수 있다
   // (예: 3페이지 보다가 필터링해서 1페이지 분량만 남는 경우) — state 를 별도로
@@ -172,31 +217,13 @@ export default function PostsPage() {
 
         <span className="h-4 w-px bg-gray-200" />
 
-        <label className="flex items-center gap-1.5 text-[13px] text-gray-400">
-          발행일
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setPage(1);
-            }}
-            className="border-0 bg-transparent font-medium text-gray-700 outline-none cursor-pointer"
-          />
-          {date && (
-            <button
-              type="button"
-              onClick={() => {
-                setDate("");
-                setPage(1);
-              }}
-              className="text-gray-400 hover:text-gray-700 cursor-pointer"
-              aria-label="발행일 필터 지우기"
-            >
-              ✕
-            </button>
-          )}
-        </label>
+        <DateRangeCalendar
+          value={dateRange}
+          onChange={(r) => {
+            setDateRange(r);
+            setPage(1);
+          }}
+        />
       </div>
 
       {error && <ErrorNote message={error} />}

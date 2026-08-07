@@ -2,25 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 
 /**
  * 카드 → 레터 이동 사이에 잠깐 끼는 만화풍 트랜지션.
  * 스피너/지렁이 없음 — 캐릭터가 "펑" 등장 + 집중선 + 말풍선.
  * prefers-reduced-motion이면 모션을 죽이고 정적 표시.
+ *
+ * 단일 명의(AI LENS) 체계(2026-08-07) 이후로는 페르소나별 캐릭터가 없어
+ * 고정된 단일 브랜드 아이덴티티를 쓴다 (현재 이 컴포넌트를 부르는 곳은 없다 —
+ * 죽은 코드지만 export 는 유지, 다음 세션에서 재도입될 수 있어 삭제하지 않음).
  */
 
-type Persona = { char: string; name: string; color: string; line: string };
+const BRAND = { char: '/lens.png', name: 'AI LENS', color: '#111827', line: '오늘의 한 통을 펼치는 중이에요' };
 
-const PERSONA: Record<MbtiGroupId, Persona> = {
-  NT: { char: '/editors/intj.webp', name: '민철', color: '#7c3aed', line: '핵심만 정리해서 가져올게요' },
-  NF: { char: '/editors/infp.webp', name: '하은', color: '#e11d48', line: '숨은 이야기까지 챙겨갈게요' },
-  ST: { char: '/editors/istj.webp', name: '준서', color: '#059669', line: '바로 쓸 정보만 추려올게요' },
-  SF: { char: '/editors/esfp.webp', name: '소율', color: '#d97706', line: '가볍고 재미있게 펼쳐드릴게요' },
-};
-
-export function LetterTransition({ group }: { group: MbtiGroupId }) {
-  const p = PERSONA[group];
+export function LetterTransition() {
+  const p = BRAND;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

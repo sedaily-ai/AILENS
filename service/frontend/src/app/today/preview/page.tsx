@@ -63,10 +63,10 @@ export default function TodayLettersPreviewPage() {
   return (
     <main style={styles.container}>
       <header style={styles.header}>
-        <p style={styles.dateLabel}>{data.date} · 4 letter · mode {data.mode}</p>
+        <p style={styles.dateLabel}>{data.date} · {data.letters.length} letter · mode {data.mode}</p>
         <h1 style={styles.h1}>오늘의 letter</h1>
         <p style={styles.subtle}>
-          서울경제 그날 기사 풀에서 4명의 AI 에디터가 각자 자기 색깔로 골라 쓴 letter.
+          서울경제 그날 기사 풀에서 AI 가 골라 쓴 letter.
         </p>
       </header>
 
@@ -84,7 +84,7 @@ function LetterCard({ letter }: { letter: DisplayLetter }) {
     <article style={{ ...styles.card, borderTopColor: letter.accent }}>
       <header style={styles.cardHeader}>
         <div style={{ ...styles.editorChip, background: letter.accentBg, color: letter.accent }}>
-          {letter.mbti_group} · {letter.editorName}
+          {letter.editorName}
         </div>
         {letter.archetype && <p style={styles.archetype}>{letter.archetype}</p>}
       </header>

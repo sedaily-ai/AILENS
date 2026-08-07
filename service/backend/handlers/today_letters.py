@@ -9,7 +9,7 @@ Response shape (matches frontend mockTodayFeed expectations):
   "mode": "A",
   "letters": [
     {
-      "id": "...", "editor_id": "NT-min", "mbti_group": "NT",
+      "id": "...", "editor_id": "NT-min",
       "article_id": "...", "archetype": "...", "theme": "...",
       "headline": "...", "subtitle": "...", "closing_line": "...",
       "body": [...], "key_points": [...], "keywords": [...],
@@ -146,7 +146,6 @@ def shape_letter_response(row: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": row["id"],
         "editor_id": row["editor_id"],
-        "mbti_group": row["mbti_group"],
         "article_id": row["article_id"],
         "secondary_article_ids": row.get("secondary_article_ids") or [],
         "archetype": row.get("archetype"),

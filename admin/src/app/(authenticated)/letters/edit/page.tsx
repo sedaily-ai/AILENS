@@ -134,7 +134,7 @@ function LetterEditPage() {
           </h1>
           {letter && (
             <p className="mt-1 text-xs text-gray-500">
-              {letter.letter_date} · {letter.mbti_group} · {letter.editor_id}
+              {letter.letter_date} · {letter.editor_id}
             </p>
           )}
         </div>

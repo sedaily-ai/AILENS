@@ -78,13 +78,13 @@ def _put(table, **overrides) -> dict:
     return item
 
 
-def test_get_daily_letters_orders_by_mbti_group(ddb_table) -> None:
-    _put(ddb_table, editor_id="소율", mbti_group="SF")
-    _put(ddb_table, editor_id="민철", mbti_group="NT")
-    _put(ddb_table, editor_id="준서", mbti_group="ST")
-    _put(ddb_table, editor_id="하은", mbti_group="NF")
+def test_get_daily_letters_orders_by_created_at(ddb_table) -> None:
+    _put(ddb_table, editor_id="d", created_at="2026-08-04T04:00:00+00:00")
+    _put(ddb_table, editor_id="a", created_at="2026-08-04T01:00:00+00:00")
+    _put(ddb_table, editor_id="c", created_at="2026-08-04T03:00:00+00:00")
+    _put(ddb_table, editor_id="b", created_at="2026-08-04T02:00:00+00:00")
     out = letters_client.get_daily_letters("2026-08-04")
-    assert [r["mbti_group"] for r in out] == ["NT", "NF", "ST", "SF"]
+    assert [r["editor_id"] for r in out] == ["a", "b", "c", "d"]
 
 
 def test_get_daily_letters_filters_other_dates(ddb_table) -> None:

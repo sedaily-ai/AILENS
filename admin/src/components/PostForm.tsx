@@ -10,20 +10,11 @@ import type {
   CmsKeyword,
   CmsPostBody,
   CmsPostInput,
-  MbtiGroup,
 } from "@/lib/types";
 
 // 노출 채널 선택 UI는 뺐다 — "오늘의 1면"/"기사 피드"는 프론트가 아직 CMS 글을
 // 안 읽어서 실제로 아무 효과가 없었다(2026-08-04 확인). 모든 글은 유일하게
 // 작동하는 "letters" 채널로 고정 발행한다. posts/edit/page.tsx 의 기본값 참조.
-
-// 정본 4인 (CLAUDE.md — 민철/하은/준서/소율). 비우면 'AI LENS 편집팀' 명의.
-const EDITORS: Array<{ id: string; group: MbtiGroup; label: string }> = [
-  { id: "민철", group: "NT", label: "민철 (NT · 전략 분석)" },
-  { id: "하은", group: "NF", label: "하은 (NF · 오피니언)" },
-  { id: "준서", group: "ST", label: "준서 (ST · 팩트 큐레이션)" },
-  { id: "소율", group: "SF", label: "소율 (SF · 트렌드)" },
-];
 
 const LABEL = "block text-xs font-semibold text-gray-700 mb-1.5";
 
@@ -367,28 +358,6 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
                 onChange={(e) => patch({ publish_date: e.target.value })}
                 className="border-0 bg-transparent font-medium text-gray-700 outline-none"
               />
-            </label>
-            <span className="h-3.5 w-px bg-gray-300" />
-            <label className="flex items-center gap-1.5 text-gray-400">
-              에디터
-              <select
-                value={value.editor_id ?? ""}
-                onChange={(e) => {
-                  const ed = EDITORS.find((x) => x.id === e.target.value);
-                  patch({
-                    editor_id: e.target.value || null,
-                    mbti_group: ed ? ed.group : null,
-                  });
-                }}
-                className="cursor-pointer border-0 bg-transparent font-medium text-gray-700 outline-none"
-              >
-                <option value="">편집팀</option>
-                {EDITORS.map((ed) => (
-                  <option key={ed.id} value={ed.id}>
-                    {ed.label}
-                  </option>
-                ))}
-              </select>
             </label>
             <span className="h-3.5 w-px bg-gray-300" />
             <label className="flex items-center gap-1.5 text-gray-400">

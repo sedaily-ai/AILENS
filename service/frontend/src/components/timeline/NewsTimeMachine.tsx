@@ -1,23 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { API_URL } from '@/shared/config/api';
-import { PERSONA_META } from '@/shared/lib/todayLettersApi';
 
 /**
  * 뉴스 타임머신 — 날짜를 입력하면 '서울경제' 신문이 그 날짜로 되감기는
  * 모션 그래픽이 재생되고, 해당 일자의 기사가 펼쳐진다.
  * 톤: 활자·신문지 — 미색 종이, 세리프 제호, 절제.
  *
- * 그날 지면을 **4 에디터가 각자 고른 묶음**으로 갈라서 보여준다 — AI LENS 의
- * "같은 사건 앞에서 네 사람이 어떻게 다르게 보는지" 를 과거 지면에 적용한 것.
- * 배정은 빅카인즈 통합분류체계 2레벨 ↔ 에디터 시그니처 분야 매핑으로 하며
- * LLM 을 쓰지 않는다 (`service/backend/services/persona_curation_service.py`).
+ * 예전엔 그날 지면을 4 에디터(MBTI 페르소나)가 각자 고른 묶음으로 갈라 보여줬다
+ * (`mode: 'personas'`, `service/backend/services/persona_curation_service.py`).
+ * MBTI 페르소나 개념 폐기(2026-08-07)로 백엔드 `/api/timeline` 이 이제
+ * `flat`/`issues` 두 모드만 받는다 — `personas` 는 400 이 난다. 에디터별 탭은
+ * 제거하고, 기본 목록(flat) + '그날의 이슈' 전환만 남긴다.
  */
 
-/** 에디터별로 보여줄 기사 수 — 백엔드 per_persona 와 같은 값. */
-const PER_PERSONA = 6;
 /** 그날의 이슈 카드 수 / 이슈별 기사 수. */
 const ISSUE_COUNT = 8;
 const PER_ISSUE = 3;
@@ -29,8 +26,6 @@ interface Article {
   category: string;
   original_link: string;
   provider?: string;
-  /** 이 에디터에게 배정된 근거 분류 (`"경제>증권_증시"`). personas 모드에서만 채워진다. */
-  matched_category?: string;
 }
 
 /** 백엔드에서 오는 원본 기사 — 필드가 빠져 올 수 있어 전부 optional. */
@@ -41,19 +36,7 @@ interface RawArticle {
   category?: string;
   original_link?: string;
   provider?: string;
-  matched_category?: string | null;
 }
-
-/** 에디터 한 명의 그날 픽. `total` 은 자르기 전 전체 건수. */
-interface PersonaBucket {
-  total: number;
-  articles: Article[];
-}
-
-/** 4 에디터 버킷. 백엔드는 `unassigned` 도 주지만 화면에서는 쓰지 않는다. */
-type PersonaBuckets = Record<MbtiGroupId, PersonaBucket>;
-
-const GROUP_ORDER: MbtiGroupId[] = ['NT', 'NF', 'ST', 'SF'];
 
 /** 그날의 이슈 한 건 (빅카인즈 `/issue_ranking` 클러스터). */
 interface Issue {
@@ -84,8 +67,8 @@ interface Indicator {
   has_number: boolean;
 }
 
-/** 결과 화면의 보기 방식 — 에디터별(A안) / 그날의 이슈(B안). */
-type View = 'editors' | 'issues';
+/** 결과 화면의 보기 방식 — 전체 기사(flat) / 그날의 이슈(issues). */
+type View = 'flat' | 'issues';
 
 type Phase = 'input' | 'rewinding' | 'result';
 
@@ -123,23 +106,7 @@ function toArticles(raw: unknown): Article[] {
       category: a.category ?? '',
       original_link: a.original_link ?? '',
       provider: a.provider,
-      matched_category: a.matched_category ?? undefined,
     }));
-}
-
-/** 응답의 personas 를 4그룹 버킷으로 정규화. 형태가 안 맞으면 null. */
-function toPersonaBuckets(raw: unknown): PersonaBuckets | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const src = raw as Record<string, { total?: number; articles?: unknown }>;
-  const out = {} as PersonaBuckets;
-  let any = false;
-  for (const group of GROUP_ORDER) {
-    const bucket = src[group];
-    const articles = toArticles(bucket?.articles);
-    out[group] = { total: bucket?.total ?? articles.length, articles };
-    if (articles.length) any = true;
-  }
-  return any ? out : null;
 }
 
 /**
@@ -152,13 +119,10 @@ function toPersonaBuckets(raw: unknown): PersonaBuckets | null {
  */
 interface DayResult {
   list: Article[];
-  personas: PersonaBuckets | null;
   source: Source;
   /**
-   * `/api/timeline` 을 못 써서 구 `/api/search` 로 내려앉은 사유.
-   *
-   * 이게 채워지면 에디터별 보기가 불가능하다(페르소나 데이터가 없다). 예전에는
-   * 이 상황을 **아무 표시 없이** 옛 목록으로 렌더해서, 화면만 보고는 기능이
+   * `/api/timeline` 을 못 써서 구 `/api/search` 로 내려앉은 사유. 예전엔 이
+   * 상황을 **아무 표시 없이** 옛 목록으로 렌더해서, 화면만 보고는 기능이
    * 깨진 건지 원래 그런 건지 구분할 수 없었다. 대표적 원인:
    *   · 운영 API Gateway 에 `/api/timeline` 라우트가 아직 없다 (404)
    *   · `NEXT_PUBLIC_API_URL` 은 **빌드 타임에 번들로 인라인**되므로,
@@ -175,8 +139,7 @@ async function fetchDayArticles(target: string): Promise<DayResult> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date: target,
-        mode: 'personas',
-        per_persona: PER_PERSONA,
+        mode: 'flat',
         page_size: 30,
       }),
     });
@@ -186,7 +149,6 @@ async function fetchDayArticles(target: string): Promise<DayResult> {
       if (list.length) {
         return {
           list,
-          personas: toPersonaBuckets(data?.personas),
           source: data?.source === 'bigkinds' ? 'bigkinds' : 'dynamodb',
         };
       }
@@ -224,7 +186,6 @@ async function fetchDayArticles(target: string): Promise<DayResult> {
   const data = await res.json();
   return {
     list: toArticles(data?.articles),
-    personas: null,
     source: 'dynamodb',
     degraded: degraded || '타임라인 API를 쓸 수 없어요.',
   };
@@ -285,16 +246,12 @@ async function fetchIssues(target: string): Promise<{ issues: Issue[]; indicator
   return { issues, indicators };
 }
 
-/**
- * 기사 목록 — 에디터 탭 안에서도, 페르소나 없는 폴백에서도 같은 모양으로 쓴다.
- * 캡션은 `matched_category`(그 에디터에게 배정된 근거 분류) 를 우선 보여줘
- * "왜 이 사람이 골랐는지"가 읽히게 한다. 없으면 표준 카테고리로 내려앉는다.
- */
-function ArticleList({ items, accent }: { items: Article[]; accent?: string }) {
+/** 그 날짜의 기사 목록 — flat 모드 단일 리스트. */
+function ArticleList({ items }: { items: Article[] }) {
   if (items.length === 0) {
     return (
       <p style={{ fontSize: 13, color: '#8a8378', textAlign: 'center', padding: '40px 0' }}>
-        다른 에디터의 탭을 열어보세요.
+        그 날은 보관된 기사가 없어요.
       </p>
     );
   }
@@ -313,8 +270,7 @@ function ArticleList({ items, accent }: { items: Article[]; accent?: string }) {
                 fontFamily: '"Noto Serif KR", serif',
                 fontSize: 15,
                 fontWeight: 700,
-                color: accent ?? '#c4b48f',
-                opacity: accent ? 0.55 : 1,
+                color: '#c4b48f',
                 minWidth: 26,
                 fontVariantNumeric: 'tabular-nums',
               }}
@@ -322,8 +278,8 @@ function ArticleList({ items, accent }: { items: Article[]; accent?: string }) {
               {String(i + 1).padStart(2, '0')}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 11, color: accent ?? '#b08d57', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 5 }}>
-                {a.matched_category || a.category || '뉴스'}
+              <p style={{ fontSize: 11, color: '#b08d57', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 5 }}>
+                {a.category || '뉴스'}
                 {a.provider && a.provider !== '서울경제' && ` · ${a.provider}`}
               </p>
               <p
@@ -547,20 +503,17 @@ function IssueCard({ issue, index }: { issue: Issue; index: number }) {
   );
 }
 
-export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
+export function NewsTimeMachine() {
   const today = ymd(new Date());
   const [phase, setPhase] = useState<Phase>('input');
   const [date, setDate] = useState('');
   const [target, setTarget] = useState('');
   const [tick, setTick] = useState(today); // 되감기 중 표시되는 날짜
   const [articles, setArticles] = useState<Article[]>([]);
-  const [personas, setPersonas] = useState<PersonaBuckets | null>(null);
-  // 내 MBTI 그룹 담당 에디터를 기본으로 연다.
-  const [activeGroup, setActiveGroup] = useState<MbtiGroupId>(userGroup);
   const [offline, setOffline] = useState(false);
   const [source, setSource] = useState<Source>('dynamodb');
   const [degraded, setDegraded] = useState('');
-  const [view, setView] = useState<View>('editors');
+  const [view, setView] = useState<View>('flat');
   // 날짜를 함께 담아둔다 — 되감기로 날짜가 바뀐 뒤 늦게 도착한 응답을
   // 새 날짜의 결과로 오인하지 않게 한다.
   const [issues, setIssues] = useState<
@@ -628,7 +581,6 @@ export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
       } catch {
         return {
           list: MOCK_FALLBACK.map(a => ({ ...a, published_at: target })),
-          personas: null,
           source: 'mock' as Source,
           offline: true,
         };
@@ -642,26 +594,18 @@ export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
       if (p < 1) {
         rafRef.current = requestAnimationFrame(step);
       } else {
-        fetchPromise.then(({ list, personas: buckets, source: src, offline, degraded: why }) => {
+        fetchPromise.then(({ list, source: src, offline, degraded: why }) => {
           setArticles(list);
-          setPersonas(buckets);
           setSource(src);
           setOffline(offline);
           setDegraded(why ?? '');
-          // 내 그룹 담당 에디터가 그날 아무것도 안 골랐으면 픽이 있는 첫 탭으로.
-          if (buckets && buckets[userGroup].articles.length === 0) {
-            const filled = GROUP_ORDER.find(g => buckets[g].articles.length > 0);
-            if (filled) setActiveGroup(filled);
-          }
           setPhase('result');
         });
       }
     };
     rafRef.current = requestAnimationFrame(step);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-    // userGroup 은 마운트 시 localStorage 에서 한 번 정해지고 바뀌지 않는다 —
-    // 기본으로 열 에디터 탭을 고르는 데만 쓴다.
-  }, [phase, target, today, userGroup]);
+  }, [phase, target, today]);
 
   const reset = () => {
     setPhase('input');
@@ -669,12 +613,10 @@ export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
     // 잘못 매칭될 수 있다 (currentIssues 가 target 으로 판정한다).
     setTarget('');
     setArticles([]);
-    setPersonas(null);
-    setActiveGroup(userGroup);
     setOffline(false);
     setSource('dynamodb');
     setDegraded('');
-    setView('editors');
+    setView('flat');
     setIssues(null);
     setIssuesError(false);
   };
@@ -865,43 +807,40 @@ export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
                     }}
                   >
                     <p style={{ fontSize: 12, color: '#8a7040', lineHeight: 1.6 }}>
-                      에디터별 보기를 불러오지 못해 기본 목록을 보여주고 있어요. — {degraded}
+                      타임라인 보관본을 불러오지 못해 기본 목록을 보여주고 있어요. — {degraded}
                     </p>
                   </div>
                 )}
 
-                {/* 보기 전환 — 에디터별 / 그날의 이슈.
-                    personas 가 없어도 '그날의 이슈' 는 별도 요청이라 열 수 있게 둔다. */}
-                {(personas || !degraded) && (
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 22 }}>
-                    {([
-                      ['editors', '에디터별'],
-                      ['issues', '그날의 이슈'],
-                    ] as [View, string][]).map(([key, label]) => {
-                      const isOn = view === key;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => (key === 'issues' ? openIssues() : setView('editors'))}
-                          aria-pressed={isOn}
-                          style={{
-                            padding: '7px 16px',
-                            borderRadius: 9999,
-                            border: `1px solid ${isOn ? '#2a2622' : '#e6e0d4'}`,
-                            background: isOn ? '#2a2622' : 'transparent',
-                            color: isOn ? '#fff' : '#8a8378',
-                            fontSize: 12.5,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                          }}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                {/* 보기 전환 — 전체 기사 / 그날의 이슈 */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 22 }}>
+                  {([
+                    ['flat', '전체 기사'],
+                    ['issues', '그날의 이슈'],
+                  ] as [View, string][]).map(([key, label]) => {
+                    const isOn = view === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => (key === 'issues' ? openIssues() : setView('flat'))}
+                        aria-pressed={isOn}
+                        style={{
+                          padding: '7px 16px',
+                          borderRadius: 9999,
+                          border: `1px solid ${isOn ? '#2a2622' : '#e6e0d4'}`,
+                          background: isOn ? '#2a2622' : 'transparent',
+                          color: isOn ? '#fff' : '#8a8378',
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
 
                 {view === 'issues' ? (
                   <>
@@ -915,7 +854,7 @@ export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
                     )}
                     {issuesError && (
                       <p style={{ fontSize: 13, color: '#8a8378', textAlign: 'center', padding: '40px 0' }}>
-                        이슈를 가져오지 못했어요. 에디터별 보기로 확인해 주세요.
+                        이슈를 가져오지 못했어요. 전체 기사 보기로 확인해 주세요.
                       </p>
                     )}
                     {!issuesLoading && !issuesError && currentIssues?.length === 0 && (
@@ -933,85 +872,6 @@ export function NewsTimeMachine({ userGroup }: { userGroup: MbtiGroupId }) {
                         ))}
                       </ol>
                     )}
-                  </>
-                ) : personas ? (
-                  <>
-                    {/* 에디터 탭 — 4명이 같은 날짜를 각자 어떻게 골랐나 */}
-                    <div
-                      role="tablist"
-                      aria-label="에디터별 그날의 픽"
-                      style={{
-                        display: 'flex',
-                        gap: 4,
-                        borderBottom: '1px solid #e6e0d4',
-                        marginBottom: 24,
-                        overflowX: 'auto',
-                      }}
-                    >
-                      {GROUP_ORDER.map((group) => {
-                        const meta = PERSONA_META[group];
-                        const bucket = personas[group];
-                        const isActive = group === activeGroup;
-                        return (
-                          <button
-                            key={group}
-                            role="tab"
-                            aria-selected={isActive}
-                            onClick={() => setActiveGroup(group)}
-                            style={{
-                              flex: '1 0 auto',
-                              padding: '10px 12px 12px',
-                              border: 'none',
-                              background: 'transparent',
-                              borderBottom: `2px solid ${isActive ? meta.accent : 'transparent'}`,
-                              color: isActive ? meta.accent : '#8a8378',
-                              fontSize: 13.5,
-                              fontWeight: isActive ? 700 : 500,
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                              fontFamily: 'inherit',
-                              transition: 'color .15s, border-color .15s',
-                            }}
-                          >
-                            {meta.editorName}
-                            <span style={{ fontSize: 11, marginLeft: 5, fontVariantNumeric: 'tabular-nums', opacity: 0.75 }}>
-                              {bucket.total}
-                            </span>
-                            {group === userGroup && (
-                              <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.9 }}>·나</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* 선택된 에디터 소개 */}
-                    <div style={{ marginBottom: 20 }}>
-                      <p
-                        style={{
-                          fontFamily: '"Noto Serif KR", serif',
-                          fontSize: 17,
-                          fontWeight: 700,
-                          color: '#2a2622',
-                          marginBottom: 4,
-                        }}
-                      >
-                        {PERSONA_META[activeGroup].editorName}
-                        <span style={{ fontSize: 12.5, fontWeight: 500, color: '#8a8378', marginLeft: 8, fontFamily: 'system-ui, sans-serif' }}>
-                          {PERSONA_META[activeGroup].editorRole}
-                        </span>
-                      </p>
-                      <p style={{ fontSize: 12.5, color: '#8a8378' }}>
-                        {personas[activeGroup].total > 0
-                          ? `그 날 이 분야에서 ${personas[activeGroup].total}건 — 그중 ${personas[activeGroup].articles.length}건`
-                          : '그 날은 이 분야 기사가 없었어요'}
-                      </p>
-                    </div>
-
-                    <ArticleList
-                      items={personas[activeGroup].articles}
-                      accent={PERSONA_META[activeGroup].accent}
-                    />
                   </>
                 ) : (
                   <ArticleList items={articles} />

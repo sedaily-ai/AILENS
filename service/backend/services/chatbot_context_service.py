@@ -5,9 +5,14 @@
 
 ⚠️ `get_cached_briefing`은 `clients/dynamodb_client.py`의 `DynamoDBClient`를
 쓰지 않고 boto3를 직접 호출한다. `handlers/briefing_handler.py`가 쓰는
-`DynamoDBClient.save_news_briefing()`과 짝을 이루는 읽기지만, staleness 체크와
-`briefing_{mbti_group}` 키 추출 로직이 달라 단순 클라이언트 교체가 아니다 —
-그대로 둔다.
+`DynamoDBClient.save_news_briefing()`과 짝을 이루는 읽기지만, staleness 체크
+로직이 달라 단순 클라이언트 교체가 아니다 — 그대로 둔다.
+
+2026-08-07: MBTI 페르소나 제거로 그룹별 브리핑 선택 로직은 없앴다. 다만
+`services/briefing_generator.py`(이번 정리 범위 밖)는 아직 DDB 아이템에
+`briefing_NT`/`briefing_NF`/`briefing_ST`/`briefing_SF` 4개 키로 쓰고 있어,
+`get_cached_briefing`은 과도기적으로 그중 채워진 첫 값을 그대로 가져온다 —
+generator 가 단일 키로 정리되면 이 fallback 목록도 함께 정리할 것.
 """
 import logging
 import boto3
@@ -24,9 +29,15 @@ from config.constants import (
 logger = logging.getLogger(__name__)
 
 
-def get_cached_briefing(mbti_group: str) -> Optional[str]:
-    """Fetch the cached news briefing for the given MBTI group.
-    Returns the briefing text if fresh, or None to fall back to article query."""
+def get_cached_briefing(mbti_group: str = None) -> Optional[str]:
+    """Fetch the cached news briefing.
+    Returns the briefing text if fresh, or None to fall back to article query.
+
+    ``mbti_group`` is accepted-but-unused for backward compat — `main.py`
+    (local dev FastAPI server, out of this cleanup's scope) still calls this
+    positionally with a group value. MBTI personas were removed site-wide, so
+    the lookup no longer branches on it (see module docstring for the
+    transitional multi-key fallback this uses instead)."""
     try:
         dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
         table = dynamodb.Table(DYNAMODB_TABLE_ARTICLES_DEV)
@@ -52,10 +63,16 @@ def get_cached_briefing(mbti_group: str) -> Optional[str]:
                 logger.warning(f"Briefing is stale ({age_hours:.1f}h old), falling back to article query")
                 return None
 
-        briefing_key = f'briefing_{mbti_group}'
-        briefing = item.get(briefing_key)
+        # Transitional: briefing_generator.py still writes 4 persona-keyed
+        # fields instead of one default key. No personas left to pick by, so
+        # just take whichever is populated (see module docstring).
+        briefing = None
+        for key in ('briefing_default', 'briefing_NT', 'briefing_NF', 'briefing_ST', 'briefing_SF'):
+            briefing = item.get(key)
+            if briefing:
+                break
         if briefing:
-            logger.info(f"Using cached briefing for {mbti_group} (generated: {generated_at})")
+            logger.info(f"Using cached briefing (generated: {generated_at})")
         return briefing
 
     except Exception as e:

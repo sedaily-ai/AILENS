@@ -14,15 +14,6 @@ function todayKST(): string {
   ).padStart(2, "0")}`;
 }
 
-// 그룹 색은 사용자 사이트의 페르소나 accent 와 맞춘다 (민철=violet, 하은=rose,
-// 준서=emerald, 소율=amber — todayLettersApi PERSONA_META 기준).
-const GROUP_STYLE: Record<string, string> = {
-  NT: "bg-violet-50 text-violet-700",
-  NF: "bg-rose-50 text-rose-700",
-  ST: "bg-emerald-50 text-emerald-700",
-  SF: "bg-amber-50 text-amber-700",
-};
-
 export default function LettersPage() {
   const [date, setDate] = useState(todayKST());
   const [letters, setLetters] = useState<AiLetter[] | null>(null);
@@ -85,13 +76,6 @@ export default function LettersPage() {
               className="ui-card ui-card-interactive ui-enter rounded-xl p-4 cursor-pointer block"
             >
               <div className="flex items-center gap-2">
-                <span
-                  className={`rounded px-2 py-0.5 text-xs font-bold ${
-                    GROUP_STYLE[l.mbti_group] ?? "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {l.mbti_group}
-                </span>
                 <span className="text-xs text-gray-600">{l.editor_id}</span>
               </div>
               <p className="font-display mt-2.5 text-[15px] font-bold leading-snug text-[var(--text-primary)]">

@@ -57,13 +57,12 @@ async def setup_demo_user():
         user_id=DEMO_USER,
         email='demo@sedaily.com',
         name='데모 사용자',
-        mbti_group='NT',
         temperature=68.5,
         badges=['first_login', 'reader_10', 'reader_50', 'streak_7', 'weekly_5'],
         title='분석의 달인',
     )
     await repo.save_user_profile(profile)
-    print(f'    Profile: {DEMO_USER} ({profile.mbti_group}, temp={profile.temperature})')
+    print(f'    Profile: {DEMO_USER} (temp={profile.temperature})')
 
 
 async def setup_reading_history():

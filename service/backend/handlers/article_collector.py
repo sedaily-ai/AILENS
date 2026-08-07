@@ -1,29 +1,18 @@
 """
-MBTI Article Collector Lambda Function
+Article Collector Lambda Function
 Collects Seoul Economic articles from S3 XML and saves them to DynamoDB.
 
 Data Source: S3 XML (s3://sedaily-news-xml-storage/daily-xml/)
 Storage: DynamoDB (sedaily-mbti-articles-dev)
-
-PHASE 73: Smart Article Filtering
-- Articles are filtered by category to exclude unsuitable content
-- Exclusion criteria: 속보, 사건/사고, 인사발령, 부고, 반복성 기사
-- Only quality articles are transformed with MBTI
-
-MBTI transformation is applied to filtered TOP articles per category.
 """
 import logging
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
-from collections import defaultdict
 
 from clients.s3_xml_client import S3XMLClient
 from clients.dynamodb_client import DynamoDBClient
-from clients.mbti_transform_service import MbtiTransformService
-from services.article_filter_service import ArticleFilterService
 from config import settings
-from config.constants import CATEGORIES_KOREAN
 from utils.hash_utils import hash_content, content_changed
 
 logger = logging.getLogger(__name__)
@@ -31,21 +20,6 @@ logger.setLevel(logging.INFO)
 
 # Batch size for saving articles
 BATCH_SIZE = 50
-
-# Number of articles to transform with MBTI per category
-TRANSFORM_PER_CATEGORY = {
-    '경제': 3,
-    'IT_과학': 2,
-    '정치': 1,
-    '사회': 2,
-    '문화': 1,
-    '스포츠': 1,
-    '국제': 1,
-}
-# Total: 11 articles max
-
-# Legacy limit (fallback)
-TRANSFORM_LIMIT = 10
 
 
 async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any]:
@@ -55,11 +29,9 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
     Flow:
     1. Fetch today's XML from S3
     2. Filter new/updated articles
-    3. Transform TOP 10 articles with MBTI styles
-    4. Save all articles (transformed + original only) to DynamoDB
+    3. Save all articles to DynamoDB
     """
     dynamodb_client = None
-    transform_service = None
 
     try:
         # Initialize clients
@@ -73,8 +45,6 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
             table_name=settings.dynamodb_table_articles,
             region=settings.region
         )
-
-        transform_service = MbtiTransformService(region=settings.region)
 
         # ==================== Process Articles ====================
         # event.target_date (YYYYMMDD)로 특정 날짜 백필 지원; 없으면 오늘 KST 기준
@@ -148,55 +118,10 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                 "mode": "on-demand"
             }
 
-        # ==================== PHASE 73: Smart Article Filtering ====================
-        # Group articles by category
-        articles_by_category = defaultdict(list)
-        for article in articles_to_save:
-            category = article.main_category or 'news'
-            articles_by_category[category].append(article)
-
-        logger.info(f"Articles by category: {dict((k, len(v)) for k, v in articles_by_category.items())}")
-
-        # Filter and select articles for transformation
-        filter_service = ArticleFilterService()
-        articles_to_transform = []
-        filter_stats = {"total_before": 0, "total_after": 0, "excluded": 0}
-
-        for category, cat_articles in articles_by_category.items():
-            filter_stats["total_before"] += len(cat_articles)
-
-            # Filter articles for this category
-            filtered_articles, filter_results = await filter_service.filter_articles(
-                cat_articles, category
-            )
-
-            # Get transform limit for this category
-            transform_limit = TRANSFORM_PER_CATEGORY.get(category, 1)
-
-            # Select top articles from filtered list (by recency)
-            selected = filtered_articles[:transform_limit]
-            articles_to_transform.extend(selected)
-
-            filter_stats["total_after"] += len(filtered_articles)
-            filter_stats["excluded"] += len(cat_articles) - len(filtered_articles)
-
-            logger.info(
-                f"Category '{category}': {len(cat_articles)} -> {len(filtered_articles)} filtered -> {len(selected)} selected for transform"
-            )
-
-        logger.info(f"Filter stats: {filter_stats}")
-        logger.info(f"Total articles to transform: {len(articles_to_transform)}")
-
-        # Create set of articles to transform for quick lookup
-        transform_ids = set(a.nsid for a in articles_to_transform)
-
-        # ==================== End PHASE 73 ====================
-
         # Counters
         new_articles_count = 0
         updated_articles_count = 0
         failed_articles = 0
-        transformed_count = 0
         article_details = []
         updated_ids_set = set(a.nsid for a in updated_articles_xml)
 
@@ -211,7 +136,7 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
 
                 category = article.main_category or 'news'
 
-                # Build article data for DynamoDB (WITHOUT MBTI versions)
+                # Build article data for DynamoDB
                 article_data = {
                     # IDs
                     'news_id': article.nsid,
@@ -224,9 +149,6 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                     'sub_title_ko': article.sub_title or '',
                     'content_ko': article.content_clean,
                     'content_raw': article.content_raw,
-
-                    # MBTI versions - empty, will be filled on-demand
-                    # version_NT, version_NF, version_ST, version_SF will be added when user views
 
                     # Author
                     'author': article.author,
@@ -292,34 +214,6 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                     'collected_at': datetime.now().isoformat(),
                 }
 
-                # PHASE 73: Transform only filtered & selected articles
-                if article.nsid in transform_ids and transform_service:
-                    try:
-                        logger.info(f"Transforming filtered article [{category}]: {article.nsid}")
-                        result = await transform_service.transform_article(
-                            title=article.title,
-                            subtitle=article.sub_title or '',
-                            content=article.content_clean,
-                            category=category,
-                        )
-                        versions = result['versions']
-                        usage = result['usage']
-
-                        # Add MBTI versions to article data
-                        article_data['version_NT'] = versions.get('NT', {})
-                        article_data['version_NF'] = versions.get('NF', {})
-                        article_data['version_ST'] = versions.get('ST', {})
-                        article_data['version_SF'] = versions.get('SF', {})
-                        article_data['transformed_at'] = datetime.now().isoformat()
-                        article_data['transform_usage'] = usage
-
-                        transformed_count += 1
-                        logger.info(f"Transformed article {article.nsid} successfully")
-
-                    except Exception as transform_error:
-                        logger.warning(f"Transform failed for {article.nsid}: {transform_error}")
-                        # Continue without transformation - article will be saved without MBTI versions
-
                 # Save to DynamoDB
                 saved = await dynamodb_client.save_article(article_data)
 
@@ -340,7 +234,7 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                             'action': 'new',
                             'category': category
                         })
-                    logger.info(f"Saved article {article.nsid} (on-demand transform pending)")
+                    logger.info(f"Saved article {article.nsid}")
                 else:
                     failed_articles += 1
                     article_details.append({
@@ -365,13 +259,10 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
 
         result = {
             "status": "success",
-            "mode": "smart-filter-transform",
+            "mode": "collect",
             "total_found": total_found,
             "new_articles": new_articles_count,
             "updated_articles": updated_articles_count,
-            "transformed_articles": transformed_count,
-            "filter_stats": filter_stats,
-            "transform_per_category": TRANSFORM_PER_CATEGORY,
             "skipped_unchanged": skipped_unchanged_count,
             "cached_articles": len(existing_ids),
             "failed_articles": failed_articles,
@@ -379,7 +270,6 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
             "batch_size": BATCH_SIZE,
             "collection_time": datetime.now().isoformat(),
             "article_details": article_details,
-            "note": "Smart filtered: excluded 속보/사건/인사/부고, selected quality articles per category"
         }
 
         # Save collection log

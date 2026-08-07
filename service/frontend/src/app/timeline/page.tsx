@@ -6,11 +6,9 @@ import Link from 'next/link';
 import { NewsTimeMachine } from '@/components/timeline/NewsTimeMachine';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
 import { UserMenu } from '@/features/auth';
-import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 
 export default function TimelinePage() {
-  const [userGroup] = useMbtiGroup('SF');
   const [showSearch, setShowSearch] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -33,10 +31,10 @@ export default function TimelinePage() {
         frosted
       />
 
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} selectedGroup={userGroup} />
+      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main>
-        <NewsTimeMachine userGroup={userGroup} />
+        <NewsTimeMachine />
       </main>
     </div>
   );

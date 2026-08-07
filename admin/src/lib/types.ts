@@ -78,7 +78,6 @@ export interface AuditResponse {
 
 export interface NewsletterSubscriber {
   email: string; // masked (e.g., t****2@naver.com)
-  mbti_group: string | null;
   status: string | null;
   created_at: string | null;
 }
@@ -88,7 +87,6 @@ export interface NewsletterSubscriber {
 export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video";
 export type CmsCardSection = "trend" | "column";
 export type CmsStatus = "draft" | "published" | "archived";
-export type MbtiGroup = "NT" | "NF" | "ST" | "SF";
 
 export interface CmsKeyword {
   term: string;
@@ -124,7 +122,6 @@ export interface CmsPost {
   status: CmsStatus;
   channels: CmsChannel[];
   publish_date: string;
-  mbti_group: MbtiGroup | null;
   editor_id: string | null;
   headline: string;
   subtitle: string | null;
@@ -144,7 +141,6 @@ export interface CmsPostInput {
   closing_line?: string | null;
   publish_date?: string;
   channels?: CmsChannel[];
-  mbti_group?: MbtiGroup | null;
   editor_id?: string | null;
   body_inline?: CmsPostBody;
   cover_image_url?: string | null;
@@ -163,7 +159,6 @@ export interface AiLetter {
   id: string;
   letter_date: string;
   editor_id: string;
-  mbti_group: MbtiGroup;
   headline: string;
   subtitle: string | null;
   closing_line: string | null;
@@ -175,7 +170,7 @@ export interface AiLetter {
   podcast_audio_url?: string | null;
 }
 
-/** 레터 수정 payload — 정체성 필드(editor_id·mbti_group·letter_date)는 없다. */
+/** 레터 수정 payload — 정체성 필드(editor_id·letter_date)는 없다. */
 export interface AiLetterInput {
   headline?: string;
   subtitle?: string | null;
@@ -189,7 +184,6 @@ export interface NewsletterStatsResponse {
   subscribers: {
     total: number;
     active: number;
-    by_group: Record<"NT" | "NF" | "ST" | "SF", number>;
     recent: NewsletterSubscriber[];
   };
   metrics: {

@@ -32,44 +32,38 @@ function recentDatesISO(days: number): string[] {
   return out;
 }
 
-const EDITOR_INFO: Record<string, { name: string; archetype: string; mbti: string }> = {
-  NT: { name: '민철', archetype: '전략 분석가', mbti: 'INTJ' },
-  NF: { name: '하은', archetype: '가치 탐색가', mbti: 'INFP' },
-  ST: { name: '준서', archetype: '실용 큐레이터', mbti: 'ISTJ' },
-  SF: { name: '소율', archetype: '공감 캐스터', mbti: 'ESFP' },
-};
+// 단일 명의 — MBTI 4-페르소나 에디터 체계 폐지(2026-08-07) 이후 모든 레터의
+// 저작자 표시는 이 하나로 고정. todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.
+const DEFAULT_AUTHOR = { name: 'AI LENS', archetype: 'AI LENS 편집팀' };
 
 // 정적 export — 최근 SEED_DAYS 일의 라이브 발행 레터를 prerender (빌드타임 fetch).
 export async function generateStaticParams() {
   const ids = new Set<string>();
   for (const date of recentDatesISO(SEED_DAYS)) {
     const letters = await fetchLettersForDate(date);
-    // mbti_group 없는 CMS 글은 이 id 스킴(group-date)에 안 들어가서 여기선 스킵 —
-    // /letters/view 라우트로 접근한다.
+    // 모든 레터가 자기 자신의 id 를 갖는다 (그룹-날짜 합성 id 스킴 폐지, 2026-08-07).
     for (const l of letters) {
-      if (l.mbti_group) ids.add(`${l.mbti_group.toLowerCase()}-${date}`);
+      ids.add(l.id);
     }
   }
   // output:'export' 는 동적 라우트에 param 이 0개면 빌드 자체를 실패시킨다.
   // daily_letters 가 전부 비어있는 기간(현재 — RDS 삭제로 Editor Pick 자동생성
   // 중단) 에도 빌드가 죽지 않도록 최소 1개는 확보한다. 실존하지 않는 id 라
   // findLetter() 가 null 반환 → "레터를 찾을 수 없어요" 로 정상 degrade.
-  if (ids.size === 0) ids.add('nt-1970-01-01');
+  if (ids.size === 0) ids.add('placeholder-1970-01-01');
   return [...ids].map((id) => ({ id }));
 }
 
-function parseLetterId(id: string): { group: string; date: string } | null {
-  const m = id.match(/^(nt|nf|st|sf)-(\d{4}-\d{2}-\d{2})$/i);
-  if (!m) return null;
-  return { group: m[1].toUpperCase(), date: m[2] };
-}
-
+// id 에 더 이상 날짜가 인코딩돼있지 않아(그룹-날짜 합성 id 스킴 폐지), 최근
+// SEED_DAYS 일을 훑으며 .id 가 일치하는 레터를 찾는다. 빌드타임(prerender)과
+// generateMetadata 에서만 호출되는 저빈도 함수라 순차 스캔으로 충분하다.
 async function findLetter(id: string): Promise<(ApiLetter & { date: string }) | null> {
-  const parsed = parseLetterId(id);
-  if (!parsed) return null;
-  const letters = await fetchLettersForDate(parsed.date);
-  const l = letters.find((x) => x.mbti_group === parsed.group);
-  return l ? { ...l, date: parsed.date } : null;
+  for (const date of recentDatesISO(SEED_DAYS)) {
+    const letters = await fetchLettersForDate(date);
+    const l = letters.find((x) => x.id === id);
+    if (l) return { ...l, date };
+  }
+  return null;
 }
 
 // 검색결과 줄임표 방지를 위한 description 트리밍 (Google 기준 ~160자).
@@ -90,18 +84,16 @@ export async function generateMetadata({
   if (!letter) {
     return { title: '레터를 찾을 수 없어요', robots: { index: false } };
   }
-  const ed = EDITOR_INFO[letter.mbti_group ?? ''] ?? { name: '에디터', archetype: '', mbti: '' };
-  const title = `${letter.headline} — ${ed.name} (${ed.archetype})`;
+  const ed = DEFAULT_AUTHOR;
+  const title = `${letter.headline} — ${ed.name}`;
   const rawDesc = letter.subtitle ?? `${ed.name}이 풀어낸 ${letter.date} 한 통.`;
   const description = trimDescription(rawDesc);
   const url = `${SITE_URL}/letters/${id}`;
-  // letter 자체의 5개 keyword (term) + 페르소나·발행처 — 검색엔진과 SNS 양쪽에 노출.
+  // letter 자체의 5개 keyword (term) + 발행처 — 검색엔진과 SNS 양쪽에 노출.
   // ApiLetter 외 fallback letter 는 keywords 가 없을 수 있어 옵셔널.
   const letterKeywords =
     (letter as { keywords?: Array<{ term: string }> }).keywords?.map((k) => k.term).filter(Boolean) ?? [];
-  const baseTags = [ed.archetype, 'AI LENS', '서울경제', `${letter.mbti_group} 에디터`, '경제 뉴스레터'].filter(
-    Boolean,
-  );
+  const baseTags = [ed.archetype, 'AI LENS', '서울경제', '경제 뉴스레터'].filter(Boolean);
   const allKeywords = [...letterKeywords, ...baseTags];
   // letter 에 대표 이미지가 있으면 OG 에 우선 사용 (SNS 미리보기 톤 차별화). 없으면 기본 og.
   const heroImg = (letter as { images?: Array<{ url: string; alt?: string }> }).images?.[0];
@@ -139,7 +131,7 @@ export async function generateMetadata({
 async function buildArticleJsonLd(id: string) {
   const letter = await findLetter(id);
   if (!letter) return null;
-  const ed = EDITOR_INFO[letter.mbti_group ?? ''] ?? { name: '에디터', archetype: '', mbti: '' };
+  const ed = DEFAULT_AUTHOR;
   const url = `${SITE_URL}/letters/${id}`;
   const published = `${letter.date}T07:00:00+09:00`;
   const abstract = letter.subtitle ?? (letter.body[0] ?? '').slice(0, 200);

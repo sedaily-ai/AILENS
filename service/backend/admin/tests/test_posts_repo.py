@@ -72,7 +72,6 @@ def _create(ddb_table, **overrides) -> dict:
         "channels": ["letters"],
         "subtitle": "부제",
         "closing_line": "닫는 줄",
-        "mbti_group": "NF",
         "editor_id": "하은",
         "body_inline": {"body": ["문단1"]},
     }
@@ -156,7 +155,6 @@ def test_update_only_touches_provided_keys(ddb_table) -> None:
     assert out is not None
     assert out["subtitle"] == "새 부제"
     # 보내지 않은 필드는 원래 값 그대로 — 유실되면 안 된다.
-    assert out["mbti_group"] == "NF"
     assert out["editor_id"] == "하은"
     assert out["headline"] == "제목"
     assert out["closing_line"] == "닫는 줄"

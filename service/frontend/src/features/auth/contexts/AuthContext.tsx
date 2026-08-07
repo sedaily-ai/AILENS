@@ -16,7 +16,6 @@ import { Hub } from 'aws-amplify/utils';
 import { authConfig } from '@/shared/config/auth';
 import { API_URL } from '@/shared/config/api';
 import { authFetch } from '@/shared/lib/authFetch';
-import { getSavedMbtiGroup } from '@/shared/lib/mbtiGroupStorage';
 
 // Configure Amplify
 Amplify.configure(authConfig as any);
@@ -61,7 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // earlier pipelines that read the JSON body still see a stable value.
   const syncUserProfile = async (userData: User) => {
     try {
-      const mbtiGroup = getSavedMbtiGroup() || 'SF';
       await authFetch(`${API_URL}/api/user/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,7 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: userData.email,
           name: userData.name,
           picture: userData.picture,
-          mbti_group: mbtiGroup,
         }),
       });
     } catch (error) {

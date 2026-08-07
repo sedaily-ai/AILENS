@@ -194,20 +194,6 @@ def search_dynamodb_optimized(
             elif isinstance(images, str) and images:
                 image_url = images.split('\n')[0].strip()
 
-        # Build MBTI version summaries (title + subtitle for cards)
-        versions = {}
-        for group in ['NT', 'NF', 'ST', 'SF']:
-            v = item.get(f'version_{group}')
-            if v and isinstance(v, dict):
-                versions[group] = {
-                    'title': v.get('title', ''),
-                    'subtitle': v.get('subtitle', ''),
-                    'body': v.get('body', []),
-                    'key_points': v.get('key_points', []),
-                    'closing_line': v.get('closing_line', ''),
-                    'tone': v.get('tone', ''),
-                }
-
         articles.append({
             'news_id': item.get('news_id'),
             'title': item.get('title_ko', ''),
@@ -220,7 +206,6 @@ def search_dynamodb_optimized(
             'content': content_preview,
             'byline': item.get('byline', '서울경제'),
             'image_url': image_url,
-            'versions': versions,
         })
 
     result = SearchResponse(

@@ -24,7 +24,6 @@ def _post(**over) -> dict:
         "status": "draft",
         "channels": ["letters"],
         "publish_date": "2026-07-27",
-        "mbti_group": "NF",
         "editor_id": "하은",
         "headline": "제목",
         "subtitle": "부제",
@@ -57,13 +56,6 @@ def test_create_rejects_unknown_channel() -> None:
     )
     assert resp["statusCode"] == 400
     assert "channel" in json.loads(resp["body"])["error"]
-
-
-def test_create_rejects_invalid_mbti_group() -> None:
-    resp = posts.handle_create(
-        {"headline": "제목", "publish_date": "2026-07-27", "mbti_group": "XX"}, {}, {}
-    )
-    assert resp["statusCode"] == 400
 
 
 def test_create_returns_201(monkeypatch) -> None:

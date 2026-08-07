@@ -6,8 +6,7 @@ GET /admin/newsletter/stats?days=7
 {
   "subscribers": {
     "total": int, "active": int,
-    "by_group": {"NT": int, "NF": int, "ST": int, "SF": int},
-    "recent": [{email(masked), mbti_group, status, created_at}]  // 최근 10건
+    "recent": [{email(masked), status, created_at}]  // 최근 10건
   },
   "metrics": {
     "days": int,
@@ -16,11 +15,14 @@ GET /admin/newsletter/stats?days=7
     "open_rate": float, "click_rate": float
   }
 }
+
+2026-08: MBTI 페르소나 개념 폐기로 그룹별(by_group) 집계는 제거했다 — 이제
+구독자는 그룹을 갖지 않는다. 기존 저장분에 남아있는 mbti_group 값은 그대로
+두되(마이그레이션 없음), 이 대시보드는 더 이상 그 필드를 읽지 않는다.
 """
 import datetime as dt
 import logging
 import os
-from collections import Counter
 
 import boto3
 
@@ -83,7 +85,7 @@ def handle_stats(body, path_params, query_params):
     last_key: dict | None = None
     while True:
         kwargs: dict = {
-            "ProjectionExpression": "email, mbti_group, #s, created_at",
+            "ProjectionExpression": "email, #s, created_at",
             "ExpressionAttributeNames": {"#s": "status"},
         }
         if last_key:
@@ -99,12 +101,10 @@ def handle_stats(body, path_params, query_params):
             break
 
     active = [i for i in items if i.get("status") == "active"]
-    by_group_active = Counter(i.get("mbti_group", "?") for i in active)
     recent = sorted(items, key=lambda i: i.get("created_at") or "", reverse=True)[:10]
     recent_payload = [
         {
             "email": _mask_email(r.get("email", "")),
-            "mbti_group": r.get("mbti_group"),
             "status": r.get("status"),
             "created_at": r.get("created_at"),
         }
@@ -136,7 +136,6 @@ def handle_stats(body, path_params, query_params):
             "subscribers": {
                 "total": len(items),
                 "active": len(active),
-                "by_group": {g: by_group_active.get(g, 0) for g in ["NT", "NF", "ST", "SF"]},
                 "recent": recent_payload,
             },
             "metrics": metrics,

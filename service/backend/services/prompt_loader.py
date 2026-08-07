@@ -16,7 +16,6 @@ DDB schema (Admin-1 import):
 
 Caller API:
     load_prompt(category, name)        — canonical
-    load_transform_prompt(group)       — wrapper for prompts/transform/{nt,nf,st,sf}
     load_chatbot_prompt(group)         — wrapper for prompts/chatbot/{nt,nf,st,sf}
 
 IAM: any Lambda invoking load_prompt needs `dynamodb:GetItem` on
@@ -98,11 +97,6 @@ def load_prompt(category: str, name: str) -> str:
 
     _cache[key] = (content, now)
     return content
-
-
-def load_transform_prompt(group: str) -> str:
-    """MBTI transform prompt: prompts/transform/{nt,nf,st,sf}.md."""
-    return load_prompt("transform", group.lower())
 
 
 def load_chatbot_prompt(group: str) -> str:

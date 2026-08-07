@@ -5,9 +5,9 @@ WebSocket sendMessage 핸들러.
 {
     "action": "sendMessage",
     "message": "...",
-    "mbti_group": "NT" | "NF" | "ST" | "SF",
     "conversation_history": [{role, content}, ...]   // 선택
 }
+(구 프론트가 "mbti_group" 을 실어 보내도 무시한다 — 2026-08-07 MBTI 페르소나 제거.)
 
 전송 이벤트:
 - {"type": "ai_start", "timestamp": ...}
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 import boto3
 
-from config.constants import MBTI_GROUPS, DYNAMODB_TABLE_WS_CONNECTIONS_DEV
+from config.constants import DYNAMODB_TABLE_WS_CONNECTIONS_DEV
 from services.chatbot_engine import generate_chat_response_stream
 
 logger = logging.getLogger(__name__)
@@ -81,9 +81,6 @@ def lambda_handler(event, context):
         return {'statusCode': 400, 'body': 'unknown action'}
 
     user_message = (body.get('message') or '').strip()
-    mbti_group = (body.get('mbti_group') or 'SF').upper()
-    if mbti_group not in MBTI_GROUPS:
-        mbti_group = 'SF'
     conversation_history = body.get('conversation_history') or []
 
     if not user_message:
@@ -91,7 +88,7 @@ def lambda_handler(event, context):
         return {'statusCode': 400, 'body': 'empty message'}
 
     # ai_start
-    if not _send(apigw, connection_id, {'type': 'ai_start', 'mbti_group': mbti_group, 'timestamp': _now_iso()}):
+    if not _send(apigw, connection_id, {'type': 'ai_start', 'timestamp': _now_iso()}):
         return {'statusCode': 200, 'body': 'connection gone'}
 
     chunk_index = 0
@@ -99,7 +96,6 @@ def lambda_handler(event, context):
     try:
         for chunk in generate_chat_response_stream(
             user_message=user_message,
-            mbti_group=mbti_group,
             conversation_history=conversation_history,
         ):
             if not chunk:
@@ -121,11 +117,10 @@ def lambda_handler(event, context):
 
     _send(apigw, connection_id, {
         'type': 'chat_end',
-        'mbti_group': mbti_group,
         'total_chunks': chunk_index,
         'response_length': len(total_response),
         'timestamp': _now_iso(),
     })
 
-    logger.info(f"WS chat done: connection={connection_id} mbti={mbti_group} chunks={chunk_index} len={len(total_response)}")
+    logger.info(f"WS chat done: connection={connection_id} chunks={chunk_index} len={len(total_response)}")
     return {'statusCode': 200, 'body': 'ok'}

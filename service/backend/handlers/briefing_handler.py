@@ -1,6 +1,6 @@
 """
 News Briefing Generator Lambda Function
-Generates MBTI-styled daily news briefings and caches them for the chatbot.
+Generates a daily news briefing and caches it for the chatbot.
 
 Runs independently from article_collector — can be triggered by:
   - EventBridge schedule (e.g., every 1-2 hours)
@@ -8,8 +8,8 @@ Runs independently from article_collector — can be triggered by:
   - Manual invocation
 
 Reads the latest transformed articles from DynamoDB across ALL categories,
-generates 4 MBTI-styled briefings via Claude Haiku, and stores them as a
-single cached item (news_briefing_latest) for the chatbot to read.
+generates a single briefing via Claude Haiku, and stores it as a single
+cached item (news_briefing_latest) for the chatbot to read.
 """
 import logging
 import json
@@ -50,7 +50,7 @@ def _fetch_s3_body(s3_body_uri: str) -> dict:
 def fetch_recent_transformed_articles(limit_per_category: int = 3) -> list:
     """
     Fetch recent articles from DynamoDB, enriched with S3 body content.
-    Includes articles that have content_ko or MBTI versions in S3.
+    Includes articles that have content_ko in S3.
     """
     dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
     table = dynamodb.Table(DYNAMODB_TABLE_ARTICLES_DEV)
@@ -80,10 +80,6 @@ def fetch_recent_transformed_articles(limit_per_category: int = 3) -> list:
                     if s3_uri:
                         body = _fetch_s3_body(s3_uri)
                         item['content_ko'] = body.get('content_ko', '')[:500]
-                        for g in ['NT', 'NF', 'ST', 'SF']:
-                            ver = body.get(f'version_{g}')
-                            if isinstance(ver, dict):
-                                item[f'version_{g}'] = ver
 
                     if not item.get('content_ko') and not item.get('title_ko'):
                         continue

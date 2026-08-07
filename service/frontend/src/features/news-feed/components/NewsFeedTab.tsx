@@ -29,58 +29,6 @@ interface Props {
   onArticleClick: (article: MbtiArticle) => void;
 }
 
-// MBTI 유형별 스타일 정보 (제갈량·유비·관우·이태백 — V1 활성 4명)
-const typeInfo = {
-  NT: {
-    name: "제갈량",
-    names: ["제갈량", "사마의", "노자"],
-    nickname: "전략가",
-    color: "bg-purple-500",
-    textColor: "text-purple-600",
-    ringColor: "ring-purple-200",
-    shadowColor: "shadow-purple-200/50",
-    avatar: "/editors/intj.webp",
-    tagline: "데이터로 본질을 짚어드립니다",
-    pickMessage: "오늘 시장의 핵심 변수와 시나리오를 골랐어요."
-  },
-  NF: {
-    name: "유비",
-    names: ["유비", "공자", "맹자"],
-    nickname: "이야기꾼",
-    color: "bg-rose-500",
-    textColor: "text-rose-600",
-    ringColor: "ring-rose-200",
-    shadowColor: "shadow-rose-200/50",
-    avatar: "/editors/infp.webp",
-    tagline: "숫자 뒤의 사람 이야기를 함께 읽어요",
-    pickMessage: "마음이 움직였던 한 편, 당신도 같이 느껴봐요."
-  },
-  ST: {
-    name: "관우",
-    names: ["관우", "조조", "한비자"],
-    nickname: "실용주의자",
-    color: "bg-emerald-500",
-    textColor: "text-emerald-700",
-    ringColor: "ring-emerald-200",
-    shadowColor: "shadow-emerald-200/50",
-    avatar: "/editors/istj.webp",
-    tagline: "결론부터. 원칙은 변하지 않아요",
-    pickMessage: "핵심만 딱, 바로 써먹을 수 있는 한 편."
-  },
-  SF: {
-    name: "이태백",
-    names: ["이태백", "조자룡", "방통"],
-    nickname: "감성 캐스터",
-    color: "bg-amber-500",
-    textColor: "text-amber-700",
-    ringColor: "ring-amber-200",
-    shadowColor: "shadow-amber-200/50",
-    avatar: "/editors/esfp.webp",
-    tagline: "한 잔 술에 천하가 담겨요 🍷",
-    pickMessage: "오늘 하루, 시 한 수처럼 가볍게 만나요."
-  },
-};
-
 export function NewsFeedTab({
   selectedDate,
   setSelectedDate,
@@ -159,7 +107,7 @@ export function NewsFeedTab({
               미니헤드라인(가장 실험적인 기능이라 맨 뒤) 순서로. */}
           <WordsPreviewSection />
 
-          <FollowingFeed selectedGroup={selectedGroup} />
+          <FollowingFeed />
 
           {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제 콘텐츠처럼
               안 보인다"는 피드백으로 트렌드·칼럼과 같은 카드형으로 교체

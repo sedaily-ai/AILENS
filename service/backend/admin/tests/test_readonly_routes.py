@@ -215,8 +215,8 @@ class _FakeDdb:
 
 
 _SUBS = [
-    {"email": "abcd@x.com", "mbti_group": "NT", "status": "active", "created_at": "2026-07-01"},
-    {"email": "ef@y.com", "mbti_group": "NF", "status": "unsubscribed", "created_at": "2026-06-01"},
+    {"email": "abcd@x.com", "status": "active", "created_at": "2026-07-01"},
+    {"email": "ef@y.com", "status": "unsubscribed", "created_at": "2026-06-01"},
 ]
 
 # 지표마다 값을 다르게 둔다. 전부 같은 값이면 open_rate/click_rate/delivery_rate
@@ -224,7 +224,8 @@ _SUBS = [
 _SES = {"Send": 100, "Delivery": 90, "Open": 50, "Click": 10, "Bounce": 5, "Complaint": 2}
 
 
-def test_newsletter_stats_shape_and_active_only_grouping(monkeypatch) -> None:
+def test_newsletter_stats_shape_and_active_count(monkeypatch) -> None:
+    # MBTI 페르소나 폐기(2026-08) 이후 by_group 집계는 없다 — 구독자는 그룹을 갖지 않는다.
     monkeypatch.setattr(nl_route, "_ddb", _FakeDdb(_FakeScanTable(_SUBS)))
     monkeypatch.setattr(nl_route, "_ses_sum", lambda metric, days: 100)
 
@@ -233,11 +234,9 @@ def test_newsletter_stats_shape_and_active_only_grouping(monkeypatch) -> None:
     body = json.loads(resp["body"])
     assert set(body) == {"subscribers", "metrics"}
     subs = body["subscribers"]
-    assert set(subs) == {"total", "active", "by_group", "recent"}
+    assert set(subs) == {"total", "active", "recent"}
     assert subs["total"] == 2
     assert subs["active"] == 1
-    # by_group 은 active 만 센다. 4개 그룹 키가 항상 존재한다.
-    assert subs["by_group"] == {"NT": 1, "NF": 0, "ST": 0, "SF": 0}
     assert_no_cors(resp)
 
 

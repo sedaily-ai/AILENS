@@ -5,7 +5,6 @@
 
 export type HeaderTabKey =
   | 'feed'
-  | 'editors'
   | 'fortune'
   | 'timeline'
   | 'games'
@@ -53,8 +52,8 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // (Header.tsx가 core→extra 전환 지점에 구분선을 자동으로 그려준다).
     //
     // '에디터' 탭 제거(2026-08-06) — extra 티어 강등을 거쳐 최종적으로 뺐다.
-    // 페이지(/editors)·구독 펀널은 그대로 살아있고, 온보딩 플로우
-    // (TodayLensClient)에서 계속 링크되니 완전히 고아가 되진 않는다.
+    // 이후 MBTI 페르소나 컨셉 전면 삭제 결정으로 /editors 페이지 자체도
+    // 제거됨 — TodayLensClient 등의 잔여 링크도 함께 정리했다.
     { key: 'fortune', label: '사주', href: '/fortune', active: active === 'fortune', tier: 'extra' },
     // 2026-08-05 까지 `/timemachine` 을 가리키고 있었다 — `/timeline` 에 들어왔다가
     // 다른 탭에 다녀온 뒤 이 탭을 누르면 구 페이지로 빠지는 문제의 원인.

@@ -39,7 +39,6 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": post["slug"],
         "editor_id": post.get("editor_id") or _DEFAULT_EDITOR,
-        "mbti_group": post.get("mbti_group"),
         "article_id": "",
         "secondary_article_ids": [],
         "archetype": None,

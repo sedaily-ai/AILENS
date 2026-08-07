@@ -533,7 +533,7 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
         ]}
       />
 
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} selectedGroup={selectedGroup} />
+      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* 메인 콘텐츠 */}
       <style>{`

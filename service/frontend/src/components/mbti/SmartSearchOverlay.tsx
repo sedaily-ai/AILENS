@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { chatbotWs } from '@/shared/lib/chatbotWs';
 import {
   createRecognizer,
@@ -70,7 +69,6 @@ const mdComponents = {
 interface Props {
   open: boolean;
   onClose: () => void;
-  selectedGroup: MbtiGroupId;
 }
 
 interface ChatMessage {
@@ -79,27 +77,25 @@ interface ChatMessage {
   content: string;
 }
 
-const editorAvatars: Record<MbtiGroupId, { name: string; role: string; avatar: string; tagline: string; accent: string; ring: string }> = {
-  NT: { name: '민철', role: '한 걸음 더 파고들기', avatar: '/editors/intj.webp', tagline: '데이터·논리로 단정적이고 간결하게', accent: 'from-blue-50/80 via-white to-indigo-50/60', ring: 'ring-blue-200/70' },
-  NF: { name: '하은', role: '내 생각은 이래요', avatar: '/editors/infp.webp', tagline: '의미와 본질을 함께 사유하는 톤', accent: 'from-rose-50/80 via-white to-pink-50/60', ring: 'ring-rose-200/70' },
-  ST: { name: '준서', role: '팩트만 딱딱 정리', avatar: '/editors/istj.webp', tagline: '군더더기 없이 필요한 정보만', accent: 'from-emerald-50/80 via-white to-teal-50/60', ring: 'ring-emerald-200/70' },
-  SF: { name: '소율', role: '가볍게 짚어주는 트렌드', avatar: '/editors/esfp.webp', tagline: '친구에게 설명하듯 편한 대화체', accent: 'from-amber-50/80 via-white to-orange-50/60', ring: 'ring-amber-200/70' },
+// 단일 AI 에디터 — MBTI 4-페르소나 선택 UI 폐지(2026-08-07) 이후 하나의
+// 고정 아이덴티티. shared/lib/todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.
+const EDITOR = {
+  name: 'AI LENS',
+  role: '오늘의 뉴스를 정리해드려요',
+  avatar: '/lens.png',
+  tagline: '궁금한 걸 편하게 물어보세요',
 };
 
-const personaOrder: MbtiGroupId[] = ['NT', 'NF', 'ST', 'SF'];
+const AI_SUGGESTIONS = [
+  '오늘 가장 주목할 만한 뉴스는?',
+  '오늘 장 마감 핵심만 정리해줘',
+  '요즘 화제되는 이슈 알려줘',
+];
 
-const aiSuggestions: Record<MbtiGroupId, string[]> = {
-  NT: ['오늘 가장 주목할 만한 거시지표는?', '반도체 사이클 현재 단계 분석해줘', '연준 금리 결정 시나리오별 영향'],
-  NF: ['요즘 사람들 어떤 이야기에 마음 쓰고 있어?', '세대 갈등 관련 뉴스 정리해줘', '오늘 가장 따뜻한 뉴스 알려줘'],
-  ST: ['오늘 장 마감 핵심만 정리', '이번 주 실적 발표 일정', '환율 오늘 어떻게 움직였어?'],
-  SF: ['요즘 핫한 트렌드 뭐 있어?', '오늘 단톡방 화제될 뉴스', 'MZ가 좋아할 만한 브랜드 소식'],
-};
-
-export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
+export function SmartSearchOverlay({ open, onClose }: Props) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activePersona, setActivePersona] = useState<MbtiGroupId>(selectedGroup);
   // 기본 진입 = 음성 통화 모드 (베이스). 공공장소 등에선 텍스트 모드로 전환.
   const [mode, setMode] = useState<'text' | 'voice'>('voice');
   // 텍스트 모드도 응답을 TTS 로 재생 (페르소나가 채팅 출력한 거 말해줌).
@@ -119,10 +115,6 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
     handsFreeRef.current = handsFree;
   }, [handsFree]);
 
-  useEffect(() => {
-    setActivePersona(selectedGroup);
-  }, [selectedGroup]);
-
   // 텍스트 모드 mute 상태 localStorage 복원/저장
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -140,14 +132,8 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
     if (open) setMode('text');
   }, [open]);
 
-  const editor = editorAvatars[activePersona];
-  const suggestions = aiSuggestions[activePersona];
-
-  const handleSelectPersona = (group: MbtiGroupId) => {
-    if (group === activePersona) return;
-    setActivePersona(group);
-    if (messages.length > 0) setMessages([]);
-  };
+  const editor = EDITOR;
+  const suggestions = AI_SUGGESTIONS;
 
   useEffect(() => {
     if (open) {
@@ -273,7 +259,7 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
         if (!clean) return;
         hadAnySentence = true;
         // 즉시 fetch (parallel) — 결과 mp3 URL Promise 만 queue 에 넣음
-        const urlP = synthesizeSpeech(clean, activePersona).catch((e) => {
+        const urlP = synthesizeSpeech(clean).catch((e) => {
           console.warn('synthesizeSpeech fail', e);
           throw e;
         });
@@ -285,7 +271,6 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
       try {
         await chatbotWs.sendMessage({
           message: trimmed,
-          mbti_group: activePersona,
           conversation_history: history,
           onChunk: (chunk) => {
             if (turnAbortedRef.current) return;
@@ -332,7 +317,7 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
     },
     // startListening 은 아래에서 선언되므로 의도적으로 deps 에서 제외
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activePersona, messages]
+    [messages]
   );
 
   // HTMLAudioElement autoplay 정책 우회 — 사용자 user-gesture (마이크 클릭) 안에서
@@ -462,7 +447,7 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
       if (!clean) return;
       ttsTask = ttsTask.then(async () => {
         try {
-          const url = await synthesizeSpeech(clean, activePersona);
+          const url = await synthesizeSpeech(clean);
           await playAudioUrl(url);
         } catch (e) {
           console.warn('streaming TTS fail', e);
@@ -474,7 +459,6 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
     try {
       await chatbotWs.sendMessage({
         message: text.trim(),
-        mbti_group: activePersona,
         conversation_history: history,
         onStart: () => setIsLoading(false),
         onChunk: (chunk) => {
@@ -607,60 +591,13 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
           {!hasMessages ? (
             <div className="pt-8">
               {/* 헤드라인 */}
-              <div className="text-center mb-8">
-                <p className="text-[11px] tracking-[0.25em] uppercase text-gray-400 mb-3">PICK YOUR EDITOR</p>
-                <h1 className="text-[22px] font-semibold text-gray-900">누구와 이야기할까요?</h1>
-                <p className="text-[13px] text-gray-500 mt-1.5">에디터마다 같은 뉴스도 다르게 풀어드려요</p>
-              </div>
-
-              {/* 페르소나 4 카드 — 활성 카드는 그라데이션 배경 + ring + 살짝 떠오름 */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-12">
-                {personaOrder.map((g) => {
-                  const p = editorAvatars[g];
-                  const isActive = g === activePersona;
-                  return (
-                    <button
-                      key={g}
-                      onClick={() => handleSelectPersona(g)}
-                      aria-pressed={isActive}
-                      className={`group relative flex flex-col items-center px-3 py-5 rounded-2xl transition-all ${
-                        isActive
-                          ? `bg-gradient-to-b ${p.accent} ring-1 ${p.ring} shadow-[0_8px_24px_-12px_rgba(0,0,0,0.18)] -translate-y-0.5`
-                          : 'bg-gray-50/70 hover:bg-white hover:shadow-[0_4px_14px_-8px_rgba(0,0,0,0.12)] hover:-translate-y-0.5'
-                      }`}
-                    >
-                      <div className="relative mb-3">
-                        <img loading="lazy"
-                          src={p.avatar}
-                          alt={p.name}
-                          className={`w-16 h-16 rounded-full object-cover transition-transform ${
-                            isActive ? 'scale-105' : 'group-hover:scale-105'
-                          }`}
-                        />
-                        {isActive && (
-                          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
-                            <svg className="w-3 h-3 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </span>
-                        )}
-                      </div>
-                      <span className={`text-[14px] font-semibold ${isActive ? 'text-gray-900' : 'text-gray-700'}`}>
-                        {p.name}
-                      </span>
-                      <span className="mt-0.5 text-[10.5px] tracking-[0.12em] text-gray-400">{g}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 활성 페르소나 캡션 */}
-              <div className="text-center mb-6" style={{ animation: 'pop 0.25s ease-out' }} key={activePersona}>
-                <p className="text-[13px] text-gray-500">{editor.role}</p>
-                <p className="text-[17px] font-semibold text-gray-900 mt-1">
-                  {editor.name}이 답해드릴게요
-                </p>
-                <p className="text-[13px] text-gray-500 mt-1.5">{editor.tagline}</p>
+              <div className="text-center mb-10" style={{ animation: 'pop 0.25s ease-out' }}>
+                <p className="text-[11px] tracking-[0.25em] uppercase text-gray-400 mb-3">ASK AI LENS</p>
+                <div className="flex flex-col items-center gap-3">
+                  <img loading="lazy" src={editor.avatar} alt={editor.name} className="w-16 h-16 rounded-full object-cover" />
+                  <h1 className="text-[22px] font-semibold text-gray-900">{editor.role}</h1>
+                  <p className="text-[13px] text-gray-500">{editor.tagline}</p>
+                </div>
               </div>
 
               {/* 추천 질문 */}
@@ -727,30 +664,6 @@ export function SmartSearchOverlay({ open, onClose, selectedGroup }: Props) {
       {/* 하단 입력바 — ChatGPT 식. 항상 노출, 테두리 없음, 그림자만 */}
       <footer className="sticky bottom-0 bg-gradient-to-t from-white via-white to-white/0 pt-8 pb-5">
         <div className="mx-auto w-full max-w-[760px] px-5">
-          {/* 채팅 진행 중에도 페르소나 전환 가능한 작은 칩 */}
-          {hasMessages && (
-            <div className="mb-3 flex items-center justify-center gap-1.5">
-              {personaOrder.map((g) => {
-                const p = editorAvatars[g];
-                const isActive = g === activePersona;
-                return (
-                  <button
-                    key={g}
-                    onClick={() => handleSelectPersona(g)}
-                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] transition ${
-                      isActive
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200/80'
-                    }`}
-                  >
-                    <img loading="lazy" src={p.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
-                    <span className="font-medium">{p.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           {mode === 'text' ? (
             <form onSubmit={handleSubmit}>
               <div className="flex items-end gap-2 rounded-3xl bg-gray-100/80 px-4 py-2.5 shadow-[0_2px_12px_-6px_rgba(0,0,0,0.1)] transition-all focus-within:bg-white focus-within:shadow-[0_8px_24px_-10px_rgba(0,0,0,0.14)]">

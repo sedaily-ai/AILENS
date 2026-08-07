@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
-import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
-import { toLetterIdFromApi } from '@/shared/lib/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 
 // 레터마다 본문 하단에 있던 "단어" 목록을 전부 모아 보여준다 — 새 데이터 구조
@@ -51,7 +49,6 @@ const ACCENT_PALETTE = [
 ];
 
 export default function WordsPage() {
-  const [userGroup] = useMbtiGroup('SF');
   const [showSearch, setShowSearch] = useState(false);
   const [terms, setTerms] = useState<Term[] | null>(null);
   const [query, setQuery] = useState('');
@@ -61,8 +58,7 @@ export default function WordsPage() {
     fetchCmsPosts('letters', undefined, 100).then((letters) => {
       if (cancelled) return;
       const all = letters.flatMap((l) => {
-        const id = l.mbti_group ? toLetterIdFromApi(l.mbti_group, l.publish_date ?? '') : l.id;
-        const href = letterHref(id);
+        const href = letterHref(l.id);
         return (l.keywords ?? []).map((k) => ({ ...k, href }));
       });
       setTerms(dedupeTerms(all));
@@ -82,7 +78,7 @@ export default function WordsPage() {
   return (
     <div className="min-h-screen" style={{ background: '#fdfcfa' }}>
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('feed')} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} selectedGroup={userGroup} />
+      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* 진입 임팩트 — 제목만 달랑 있던 걸 컬러 그라데이션 배경 + 아이콘으로.
           "이 페이지가 뭘 하는 곳인지" 1초 안에 보이도록. */}

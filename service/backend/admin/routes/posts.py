@@ -1,6 +1,10 @@
 """CMS posts CRUD (CMS spec §5.1).
 
 SQL 은 repo.posts_repo 가 전담한다. 여기서는 검증과 HTTP 매핑만 한다.
+
+2026-08: MBTI 페르소나 개념 폐기로 mbti_group 필드 자체를 posts_repo 에서
+제거했다(더 이상 저장/반환하지 않는다) — 이 라우트 계층도 그 값을 검증하거나
+분기하지 않는다.
 """
 from __future__ import annotations
 
@@ -12,7 +16,6 @@ from shared import audit, response
 logger = logging.getLogger(__name__)
 
 _VALID_CHANNELS = {"letters", "paper", "feed", "trend_card", "webtoon", "video"}
-_VALID_GROUPS = {"NT", "NF", "ST", "SF"}
 # JWT 는 handler.py 가 이미 검증했다. 단일 관리자 계정이라 작성자는 고정값.
 _ACTOR = "admin"
 
@@ -32,10 +35,6 @@ def _validate(body: dict, *, require_all: bool) -> str | None:
         bad = [c for c in channels if c not in _VALID_CHANNELS]
         if bad:
             return f"unknown channel: {', '.join(map(str, bad))}"
-
-    group = body.get("mbti_group")
-    if group not in (None, "") and group not in _VALID_GROUPS:
-        return f"invalid mbti_group: {group}"
 
     return None
 

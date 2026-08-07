@@ -23,19 +23,18 @@ _TABLE_NAME = os.environ.get("DAILY_LETTERS_TABLE", "sedaily-mbti-daily-letters-
 _REGION = os.environ.get("AWS_REGION", "us-east-1")
 _resource = boto3.resource("dynamodb", region_name=_REGION)
 
-_MBTI_ORDER = {"NT": 1, "NF": 2, "ST": 3, "SF": 4}
-
-
 def _table():
     return _resource.Table(_TABLE_NAME)
 
 
 def get_daily_letters(letter_date: str) -> List[Dict[str, Any]]:
-    """Today Letters API 의 read 경로. 그날의 letter row (최대 4, NT/NF/ST/SF 순)."""
+    """Today Letters API 의 read 경로. 그날의 letter row (created_at 순 — MBTI 페르소나
+    폐지 이후 4-persona 고정 순서는 더 이상 없다. admin/repo/letters_repo.py 의
+    list_by_date 와 같은 정렬 기준으로 맞춘다)."""
     resp = _table().query(
         IndexName="letter_date-index",
         KeyConditionExpression=Key("letter_date").eq(letter_date),
     )
     items = [i for i in resp.get("Items", []) if not i.get("deleted_at")]
-    items.sort(key=lambda i: _MBTI_ORDER.get(i.get("mbti_group"), 99))
+    items.sort(key=lambda i: i.get("created_at", ""))
     return items

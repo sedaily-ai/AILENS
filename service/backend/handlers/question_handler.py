@@ -170,7 +170,6 @@ def _generate_questions(titles: List[str]) -> list:
                 'id': f'opt_{qi}_{j+1}',
                 'label': opt.get('label', ''),
                 'desc': opt.get('desc', ''),
-                'mbti': opt.get('mbti', ['NT', 'NF', 'ST', 'SF'][j]),
             })
         valid.append(normalized)
 
@@ -234,7 +233,6 @@ def lambda_handler(event: dict, context) -> dict:
             user_id = body.get('user_id', '')
             question_id = body.get('question_id', '')
             option_id = body.get('option_id', '')
-            mbti = body.get('mbti', '')
 
             if not user_id or not question_id:
                 return _cors(400, {'error': 'user_id and question_id are required'})
@@ -246,7 +244,6 @@ def lambda_handler(event: dict, context) -> dict:
                 'sk': f'ANSWER#{date_str}#{question_id}',
                 'question_id': question_id,
                 'option_id': option_id,
-                'mbti': mbti,
                 'answered_at': datetime.now(KST).isoformat(),
             })
 

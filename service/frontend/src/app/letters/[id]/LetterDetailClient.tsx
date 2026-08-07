@@ -13,32 +13,45 @@ import { trackArticleRead } from '@/shared/lib/readingTracker';
 import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
 import { UserMenu, useAuth } from '@/features/auth';
 import { letterPodcastUrl } from '@/shared/lib/audioPlayer';
-import { letterHref } from '@/shared/lib/letterHref';
 import { LETTER_PODCASTS } from '@/features/news-feed/data/letterPodcasts';
-import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
-import { useMbtiGroup } from '@/shared/hooks/useMbtiGroup';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
 import {
   fetchTodayLetters,
-  parseLetterId,
   withDisplayMeta,
   type ApiLetter,
   type DisplayLetter,
   type LetterChart,
 } from '@/shared/lib/todayLettersApi';
 
+// 다른 날짜 letter 를 스캔할 때 훑는 최근 일수 — app/letters/[id]/page.tsx 의
+// SEED_DAYS 와 같은 값(그룹-날짜 합성 id 스킴 폐지 이후 findLetter 와 동일 패턴).
+const LOOKBACK_DAYS = 14;
+
 interface Props {
   letterId: string;
+}
+
+// "YYYY-MM-DD" 최근 n 일 (오늘 포함, 내림차순) — app/letters/[id]/page.tsx 의
+// 동명 헬퍼와 동일 로직. findLetter 가 빌드타임에 쓰는 것과 달리 여기는
+// 클라이언트에서 letterId 로 날짜를 스캔해 찾는 용도로 쓴다.
+function recentDatesISO(days: number): string[] {
+  const out: string[] = [];
+  const t = new Date();
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(t);
+    d.setDate(d.getDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
 }
 
 export function LetterDetailClient({ letterId }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [selectedGroupForSearch] = useMbtiGroup('SF');
 
   const [letter, setLetter] = useState<DisplayLetter | null>(null);
-  // 그날 다른 group letter 3편 — Another Lens 섹션에 전달.
+  // 오늘 함께 발행된, 지금 보고 있는 레터를 제외한 다른 레터들 — Another Lens 섹션에 전달.
   const [otherLetters, setOtherLetters] = useState<ApiLetter[]>([]);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>(
     'loading',
@@ -68,58 +81,48 @@ export function LetterDetailClient({ letterId }: Props) {
   }, [loadState, letterId]);
 
   useEffect(() => {
-    const parsed = parseLetterId(letterId);
-    if (!parsed) {
-      // mbti_group 없이 발행된 CMS 글 — letterHref 가 slug 를 그대로 id 로 써서
-      // nt|nf|st|sf-YYYY-MM-DD 패턴에 안 걸린다. 날짜/그룹 목록 조회 대신 slug로 직접 조회.
-      let cancelled = false;
-      fetchCmsPostBySlug('letters', letterId)
-        .then((post) => {
-          if (cancelled) return;
-          if (post) {
-            setLetter(withDisplayMeta(post));
-            setOtherLetters([]);
-            setLoadState('ready');
-            trackArticleRead(letterId);
-          } else {
-            setLoadState('not-found');
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setLoadState('error');
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
     let cancelled = false;
-    fetchTodayLetters(parsed.date)
-      .then((res) => {
+    (async () => {
+      // 1) CMS 글(admin 이 slug 로 발행) 먼저 시도 — 기존 동작 그대로.
+      try {
+        const post = await fetchCmsPostBySlug('letters', letterId);
         if (cancelled) return;
-        const target = res.letters.find((l) => l.mbti_group === parsed.group);
-        if (target) {
-          setLetter(withDisplayMeta(target));
-          setOtherLetters(res.letters.filter((l) => l.mbti_group !== parsed.group));
+        if (post) {
+          setLetter(withDisplayMeta(post));
+          setOtherLetters([]);
           setLoadState('ready');
-          // 읽기 streak 카운트 — letterId 단위 dedup, 일별 누적
           trackArticleRead(letterId);
-        } else {
-          setLoadState('not-found');
+          return;
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setLoadState('error');
-      });
-    // 인접 날짜 letter 풀 prefetch — 같은 페르소나 prev/next 또는 다른 letter 진입 시 즉시 캐시 hit.
-    // fetchTodayLetters 의 내장 Promise 캐시가 중복 호출 방지.
-    const [y, m, d] = parsed.date.split('-').map((s) => parseInt(s, 10));
-    const shiftIso = (days: number) => {
-      const dt = new Date(Date.UTC(y, m - 1, d));
-      dt.setUTCDate(dt.getUTCDate() + days);
-      return dt.toISOString().slice(0, 10);
-    };
-    void fetchTodayLetters(shiftIso(-1));
-    void fetchTodayLetters(shiftIso(1));
+        return;
+      }
+
+      // 2) CMS 에 없으면 AI 레터 — id 에 더 이상 날짜가 인코딩돼있지 않아
+      //    (그룹-날짜 합성 id 스킴 폐지, 2026-08-07) 최근 LOOKBACK_DAYS 일을
+      //    훑으며 .id 가 일치하는 레터를 찾는다. 개별 날짜 fetch 실패는 건너뛰고
+      //    계속 스캔 — 하나가 실패했다고 전체를 에러로 처리하지 않는다.
+      for (const date of recentDatesISO(LOOKBACK_DAYS)) {
+        if (cancelled) return;
+        try {
+          const res = await fetchTodayLetters(date);
+          if (cancelled) return;
+          const target = res.letters.find((l) => l.id === letterId);
+          if (target) {
+            setLetter(withDisplayMeta(target));
+            setOtherLetters(res.letters.filter((l) => l.id !== letterId));
+            setLoadState('ready');
+            // 읽기 streak 카운트 — letterId 단위 dedup, 일별 누적
+            trackArticleRead(letterId);
+            return;
+          }
+        } catch {
+          // 이 날짜만 실패 — 다음 날짜로 계속.
+        }
+      }
+      if (!cancelled) setLoadState('not-found');
+    })();
     return () => {
       cancelled = true;
     };
@@ -152,7 +155,7 @@ export function LetterDetailClient({ letterId }: Props) {
         tabs={buildHeaderTabs('feed')}
       />
 
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} selectedGroup={selectedGroupForSearch} />
+      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main>
         {/* 홈과 동일한 사이드바(요즘 많이 읽힌 글 + 사주 위젯)를 레터 본문 옆에도 —
@@ -174,12 +177,9 @@ export function LetterDetailClient({ letterId }: Props) {
         </div>
 
         <div id="letter-other-lens" style={{ scrollMarginTop: 80 }}>
-          <EditorCommentsSection
-            otherLetters={otherLetters}
-            letterDate={parseLetterId(letterId)?.date ?? ''}
-          />
+          <EditorCommentsSection otherLetters={otherLetters} />
         </div>
-        <CompletionCheer selectedGroup={letter.mbti_group ?? 'SF'} />
+        <CompletionCheer />
       </main>
 
       <div className="h-24" />
@@ -275,7 +275,7 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
             marginBottom: 16,
           }}
         >
-          {letter.mbti_group} · {letter.editorName}
+          {letter.editorName}
         </div>
         {letter.archetype && (
           <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 8px', fontStyle: 'italic' }}>
@@ -524,14 +524,16 @@ function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 이미 구독 중이면 미리 채워둠 (localStorage 캐시)
+  // 이미 구독 중이면 미리 채워둠 (localStorage 캐시). 페르소나별 그룹 목록 대신
+  // 단일 명의(2026-08-07 MBTI 페르소나 폐지) 이므로 이메일 저장 여부만 본다.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem('newsletter-email');
-    if (saved) setEmail(saved);
-    const groups = localStorage.getItem('newsletter-groups');
-    if (letter.mbti_group && groups?.includes(letter.mbti_group)) setState('done');
-  }, [letter.mbti_group]);
+    if (saved) {
+      setEmail(saved);
+      setState('done');
+    }
+  }, []);
 
   const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && consent && state !== 'sending';
 
@@ -547,7 +549,6 @@ function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: email.trim().toLowerCase(),
-            mbti_group: letter.mbti_group,
             consent: true,
             // 즉시 첫 메일 발송용 — 백엔드가 받아 SES 로 보냄
             letter: {
@@ -570,13 +571,8 @@ function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
       // 성공 — localStorage 캐시 업데이트 (재방문 시 즉시 done 상태)
       if (typeof window !== 'undefined') {
         localStorage.setItem('newsletter-email', email.trim());
-        const existing = (localStorage.getItem('newsletter-groups') || '')
-          .split(',')
-          .filter(Boolean);
-        if (letter.mbti_group && !existing.includes(letter.mbti_group)) existing.push(letter.mbti_group);
-        localStorage.setItem('newsletter-groups', existing.join(','));
       }
-      trackEvent('newsletter_subscribe', { mbti_group: letter.mbti_group, editor: letter.editorName });
+      trackEvent('newsletter_subscribe', { editor: letter.editorName });
       setState('done');
     } catch (e) {
       console.warn('subscribe failed', e);
@@ -839,7 +835,7 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
   // ② PoC 정적 녹음 8편(2026-05-18/22, LETTER_PODCASTS 에 있을 때만) ③ 실시간 생성.
   const manualUrl = letter.podcast_audio_url || null;
   const staticUrl = manualUrl ?? (LETTER_PODCASTS[letter.id] ? letterPodcastUrl(letter.id) : null);
-  const canGenerate = !!letter.mbti_group && !!letter.article_id;
+  const canGenerate = !!letter.article_id;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -850,23 +846,25 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(staticUrl);
 
   const accent = letter.accent;
-  // 정적 녹음도 없고 실시간 생성에 필요한 article_id/mbti_group 도 없는 레터 —
+  // 정적 녹음도 없고 실시간 생성에 필요한 article_id 도 없는 레터 —
   // 아이콘은 항상 노출하되(요청사항) 클릭해도 할 수 있는 게 없어 안내만.
   const notReady = !staticUrl && !canGenerate;
 
   // 이미 있으면 재사용, 없으면(로그인 유저만 도달) 생성 요청 후 완료까지 폴링.
+  // mbti_group 파라미터는 폐지(2026-08-07) — 이제 페르소나가 하나뿐이라
+  // podcastApi.ts 시그니처는 그대로 두고 고정 리터럴 'default' 를 넘긴다.
   const resolveUrl = async (): Promise<string> => {
     if (resolvedUrl) return resolvedUrl;
 
     const { getArticlePodcast, getPodcast, generatePodcast, waitForPodcast } =
       await import('@/shared/lib/podcastApi');
 
-    let podcast = await getArticlePodcast(letter.article_id, letter.mbti_group!);
+    let podcast = await getArticlePodcast(letter.article_id, 'default');
     if (podcast && !podcast.audio_url) {
       podcast = await getPodcast(podcast.podcast_id);
     }
     if (!podcast?.audio_url) {
-      const generated = await generatePodcast(letter.article_id, letter.mbti_group!);
+      const generated = await generatePodcast(letter.article_id, 'default');
       podcast = await waitForPodcast(generated.podcast_id);
     }
     if (!podcast?.audio_url) throw new Error('podcast unavailable');
@@ -1423,7 +1421,6 @@ function LetterFeedback({ letter }: { letter: DisplayLetter }) {
     setAnswers((prev) => ({ ...prev, [current.id]: val }));
     trackEvent('letter_feedback_answer', {
       letter_id: letter.id,
-      mbti_group: letter.mbti_group,
       question_id: current.id,
       answer: typeof val === 'string' || typeof val === 'number' ? val : JSON.stringify(val),
     });
@@ -1436,7 +1433,6 @@ function LetterFeedback({ letter }: { letter: DisplayLetter }) {
     }
     trackEvent('letter_feedback_complete', {
       letter_id: letter.id,
-      mbti_group: letter.mbti_group,
       editor: letter.editorName,
       answered_count: Object.keys(final).length,
       total_questions: total,
