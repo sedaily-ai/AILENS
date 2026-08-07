@@ -91,6 +91,38 @@ get_pg_password`로 **`service/backend/common/`**(v1/v2/admin이 공유하는 �
   확인(실제 pip install·AWS 배포는 안 돌림 — 그건 사용자가 실제 배포할 때 자연히 검증됨).
 - `mbti-admin.sedaily.ai` curl 연결 실패, `lensdb.sedaily.ai` 200 확인.
 
+### 4. AI 퀴즈 위젯 `data` null 크래시
+
+사용자가 `lensdb.sedaily.ai/posts/edit?id=c9308686-78cf-4f7a-9485-f5892e95f39b`에서
+`Cannot read properties of null (reading 'icon')` 크래시를 리포트. 원인을
+`aiQuizExtension.tsx`의 `AiQuizNodeView`가 `node.attrs.data`를 null 방어 없이 바로
+`data.icon`으로 읽는 데서 특정.
+
+**근본 원인**(DynamoDB `sedaily-mbti-cms-posts-dev`의 해당 글 `body_inline.body_html`을
+바이트 단위로 직접 확인해 확정): 저장된 마크업이 `<div data-ai-quiz='{...}'></div>`처럼
+속성을 홑따옴표(`'`)로 감싸는데, 그 안 JSON의 `question` 값에 한국어 인용에 흔한
+홑따옴표(`'우리는 안 하겠다'`)가 그대로 들어있었다. HTML 파서가 속성값을 그 내부
+홑따옴표에서 조기 종료시켜 attribute가 잘리고, 잘린 문자열이 `JSON.parse`에서
+throw → `parseHTML`이 `null` 반환 → NodeView가 크래시. 같은 글의 두 번째 퀴즈
+위젯은 내부에 홑따옴표가 없어 정상 파싱됨(원인이 이 특정 글자 조합에 있다는 걸
+교차 확인). 퀴즈/투표 문구에 홑따옴표 인용이 들어가면 다른 글에서도 재발 가능한
+구조적 버그 — 정확히 어느 경로(에디터 저장 vs AI 초안 생성)가 이 홑따옴표
+delimiter를 만들어내는지는 이번 세션에서 결론 못 냄(스코프 밖으로 판단, 아래
+"다음" 참조).
+
+수정: `AiQuizModal.tsx`에서 `EMPTY`(빈 퀴즈 기본값)를 export, `aiQuizExtension.tsx`가
+`node.attrs.data`를 `(data as AiQuizData | null) ?? EMPTY_AI_QUIZ_DATA`로 읽도록 방어
+추가. 크래시는 막지만 손상된 그 퀴즈의 원본 문구는 파싱이 안 되므로 에디터에서 빈
+위젯으로 뜬다 — 편집자가 다시 채워 넣어야 함.
+
+커밋 `9c71ed4`, 배포 완료. `curl`로 해당 URL 200 확인.
+
+## 검증 (4번 관련)
+
+- `npm run build`(admin/frontend) — 13 라우트 정상 생성.
+- 배포 후 `curl -o /dev/null -w '%{http_code}' https://lensdb.sedaily.ai/posts/edit?id=...`
+  → 200.
+
 ## 다음
 
 - `admin/backend/deploy-admin-api.sh`를 실제로 한 번 돌려서(진짜 배포) 새 경로 기준
@@ -98,3 +130,9 @@ get_pg_password`로 **`service/backend/common/`**(v1/v2/admin이 공유하는 �
   실제 zip 빌드·업로드·`update-function-code`는 안 돌렸다.
 - Cognito User Pool `us-east-1_ZS8PgF3iX`가 `ResourceNotFoundException`을 반환했던 것
   (전날 worklog에 기록) — 아직 안 파봄, 로그인 기능 자체가 깨져있을 가능성 있음.
+- AI 퀴즈 `data-ai-quiz` 속성이 홑따옴표로 저장되는 정확한 코드 경로 — 정상적인
+  에디터 저장(`editor.getHTML()`, `RichTextEditor.tsx:349`)은 브라우저 네이티브
+  직렬화라 항상 쌍따옴표+이스케이프를 쓰므로 이 문제가 안 생겨야 정상인데, 실제
+  저장된 값은 그렇지 않았다 — AI 초안 생성 등 다른 경로가 원본 HTML 문자열을
+  그대로 저장하는 게 아닌지 확인 필요. 확인되면 근본 수정(HTML 이스케이프)도
+  추가로 필요.
