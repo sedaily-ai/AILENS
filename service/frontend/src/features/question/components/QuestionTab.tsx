@@ -22,7 +22,7 @@ interface Props {
 }
 
 // 단일 명의 — 4 페르소나 에디터(민철/하은/준서/소율) 대신 하나의 브랜드 목소리로.
-const EDITOR = { name: 'AI LENS', avatar: '/lens.png' };
+const EDITOR = { name: 'AI LENS', avatar: '/icon-512.png' };
 
 const GREETING = '오늘의 브리핑,\n핵심만 추렸습니다.';
 

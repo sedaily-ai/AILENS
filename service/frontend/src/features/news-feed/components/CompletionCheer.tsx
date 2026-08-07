@@ -5,7 +5,7 @@
 // 유일한 호출부(LetterDetailClient.tsx)가 그룹 정보를 넘길 수 없어 prop 자체를
 // 없애고 톤을 합친 메시지 하나로 통일했다.
 const CHEER = {
-  avatar: '/lens.png',
+  avatar: '/icon-512.png',
   accent: '#111827',
   soft: '#f3f4f6',
   message: '오늘도 함께 챙겨봤네요! 내일 또 새로운 이야기를 가져올게요.',

@@ -80,7 +80,7 @@ export interface DisplayLetter extends ApiLetter {
 const DEFAULT_META: Omit<DisplayLetter, keyof ApiLetter> = {
   editorName: 'AI LENS',
   editorRole: '팀이 함께 정리했어요',
-  editorAvatar: '/lens.png',
+  editorAvatar: '/icon-512.png',
   accent: '#111827',
   accentBg: '#f3f4f6',
 };

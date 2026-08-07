@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom';
  * 죽은 코드지만 export 는 유지, 다음 세션에서 재도입될 수 있어 삭제하지 않음).
  */
 
-const BRAND = { char: '/lens.png', name: 'AI LENS', color: '#111827', line: '오늘의 한 통을 펼치는 중이에요' };
+const BRAND = { char: '/icon-512.png', name: 'AI LENS', color: '#111827', line: '오늘의 한 통을 펼치는 중이에요' };
 
 export function LetterTransition() {
   const p = BRAND;

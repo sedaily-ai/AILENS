@@ -82,7 +82,7 @@ interface ChatMessage {
 const EDITOR = {
   name: 'AI LENS',
   role: '오늘의 뉴스를 정리해드려요',
-  avatar: '/lens.png',
+  avatar: '/icon-512.png',
   tagline: '궁금한 걸 편하게 물어보세요',
 };
 
