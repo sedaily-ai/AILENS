@@ -30,6 +30,12 @@ const LOOKBACK_DAYS = 14;
 
 interface Props {
   letterId: string;
+  // 서버(빌드타임)에서 findLetter()로 이미 가져온 글 — SSG 결과물 HTML에 실제
+  // 본문이 바로 박히게(크롤러가 JS 없이도 볼 수 있게) 초기 상태를 이걸로
+  // 채운다. 이후 useEffect는 그대로 재검증용으로 다시 돈다(2026-08-07,
+  // JSON-LD/OG 태그는 있는데 정작 화면 본문은 client fetch 전까지 비어있던
+  // 문제 — /letters/[id]/page.tsx 의 findLetter 결과를 그대로 내려받는다).
+  initialLetter?: DisplayLetter | null;
 }
 
 // "YYYY-MM-DD" 최근 n 일 (오늘 포함, 내림차순) — app/letters/[id]/page.tsx 의
@@ -46,15 +52,15 @@ function recentDatesISO(days: number): string[] {
   return out;
 }
 
-export function LetterDetailClient({ letterId }: Props) {
+export function LetterDetailClient({ letterId, initialLetter = null }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  const [letter, setLetter] = useState<DisplayLetter | null>(null);
+  const [letter, setLetter] = useState<DisplayLetter | null>(initialLetter);
   // 오늘 함께 발행된, 지금 보고 있는 레터를 제외한 다른 레터들 — Another Lens 섹션에 전달.
   const [otherLetters, setOtherLetters] = useState<ApiLetter[]>([]);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>(
-    'loading',
+    initialLetter ? 'ready' : 'loading',
   );
 
   useEffect(() => {
@@ -143,7 +149,11 @@ export function LetterDetailClient({ letterId }: Props) {
     );
   }
 
-  if (loadState === 'loading' || !letter || !mounted) {
+  // !mounted 만으로 게이트하면 빌드타임(SSG) 렌더는 항상 mounted=false라 이
+  // 블록에 걸려 빈 <div>만 출력된다 — initialLetter로 이미 검증된 데이터가
+  // 있는 경우엔 mount를 기다리지 않고 바로 렌더한다(2026-08-07, 크롤러가
+  // JS 없이 받는 정적 HTML에 실제 본문이 비어있던 원인).
+  if (loadState === 'loading' || !letter || (!mounted && !initialLetter)) {
     return <div className="min-h-screen bg-white" />;
   }
 

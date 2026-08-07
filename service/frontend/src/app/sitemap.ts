@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { fetchWebtoons } from '@/shared/lib/cmsPostsApi';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 // 정적 export 모드 — 빌드 시점에 sitemap.xml 이 /out 루트에 생성.
@@ -20,6 +21,9 @@ interface SeedLetter {
   date: string;
 }
 
+// today-letters(구 AI 파이프라인)는 2026-08-04 RDS 삭제로 영구히 빈 응답만
+// 반환한다 — CMS posts API(channel=letters)로 교체(2026-08-07,
+// letters/[id]/page.tsx와 동일 원인·동일 수정).
 async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
   const seen = new Set<string>();
   const out: SeedLetter[] = [];
@@ -29,10 +33,10 @@ async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
     d.setDate(d.getDate() - i);
     const iso = d.toISOString().slice(0, 10);
     try {
-      const res = await fetch(`${API_BASE}/api/v2/today-letters?date=${iso}`);
+      const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${iso}`);
       if (!res.ok) continue;
-      const data = (await res.json()) as { letters?: Array<{ id: string }> };
-      for (const l of data.letters ?? []) {
+      const data = (await res.json()) as { posts?: Array<{ id: string }> };
+      for (const l of data.posts ?? []) {
         if (!l.id || seen.has(l.id)) continue;
         seen.add(l.id);
         out.push({ id: l.id, date: iso });
@@ -97,6 +101,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'never',
       priority: freshnessPriority(daysOld),
     });
+  }
+
+  // 웹툰 — 경로 기반 전환(2026-08-07) 이후 sitemap에도 추가.
+  try {
+    const webtoons = await fetchWebtoons();
+    for (const w of webtoons) {
+      const daysOld = daysBetween(w.date);
+      entries.push({
+        url: `${BASE}/webtoon/${w.id}`,
+        lastModified: new Date(w.date + 'T07:00:00+09:00'),
+        changeFrequency: 'never',
+        priority: freshnessPriority(daysOld),
+      });
+    }
+  } catch {
+    /* 웹툰 API 불통이면 생략 — sitemap 나머지는 그대로 반환 */
   }
 
   return entries;

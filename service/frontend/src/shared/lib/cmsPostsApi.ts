@@ -165,7 +165,16 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`, { cache: 'no-store' });
+      // cache: 'no-store'였다가 제거(2026-08-07) — 빌드 시 이 함수를 부르는
+      // generateStaticParams/generateMetadata 등이 워커 여러 개에서 동시에
+      // 같은 URL을 fetch하는데, no-store는 Next의 빌드타임 요청 중복제거
+      // (Data Cache)까지 꺼버려서 동시 요청이 전부 개별 네트워크 호출이 되고
+      // 그중 일부가 실패했다(/webtoon/[slug] 정적 생성이 간헐적으로
+      // "찾을 수 없어요"로 떨어지던 원인). 기본값(요청 중복제거)이면 같은
+      // 빌드 내 동일 URL 호출은 하나로 묶여 훨씬 안정적이다 — 클라이언트
+      // 런타임에서도 이 함수 자체가 cached() 로 5분 캐시를 이미 감싸고 있어
+      // 신선도에 실질적 차이는 없다.
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`);
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
       return data.posts ?? [];

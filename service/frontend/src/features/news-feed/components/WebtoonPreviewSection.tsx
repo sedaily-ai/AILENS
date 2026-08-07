@@ -244,7 +244,7 @@ export function WebtoonPreviewSection() {
           ) : (
             <Link
               key={w.id}
-              href={`/webtoon/view?id=${encodeURIComponent(w.id)}`}
+              href={`/webtoon/${encodeURIComponent(w.id)}`}
               prefetch
               className="group relative"
               style={cardStyle}

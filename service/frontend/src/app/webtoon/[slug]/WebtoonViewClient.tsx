@@ -2,30 +2,39 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 
 /**
- * 쿼리 파라미터(`?id=`)로 웹툰 상세를 여는 정적 라우트의 클라이언트 본체.
- * /letters/view 와 동일 패턴 — LetterViewClient.tsx 참조.
- * 세로 스크롤 하나로 컷을 이어 보여주는 게 전부라 레터 상세보다 훨씬 단순하다.
+ * 경로 기반(`/webtoon/[slug]`) 웹툰 상세의 클라이언트 본체(2026-08-07, 쿼리스트링
+ * `?id=`에서 전환). 세로 스크롤 하나로 컷을 이어 보여주는 게 전부라 레터
+ * 상세보다 훨씬 단순하다.
+ *
+ * initialWebtoon은 서버(빌드타임)에서 findWebtoon()으로 이미 가져온 값 —
+ * SSG 결과물 HTML에 실제 컷·캡션이 바로 박히게(크롤러가 JS 없이도 볼 수 있게)
+ * 초기 상태를 이걸로 채운다. letters 쪽과 달리 이 컴포넌트엔 애초에 mount를
+ * 기다리는 게이트가 없어서 initialWebtoon만 내려주면 바로 반영된다.
  */
-export function WebtoonViewClient() {
-  const id = useSearchParams().get('id') ?? '';
-  const [webtoon, setWebtoon] = useState<CmsWebtoon | null | undefined>(undefined);
+export function WebtoonViewClient({
+  slug,
+  initialWebtoon = undefined,
+}: {
+  slug: string;
+  initialWebtoon?: CmsWebtoon | null;
+}) {
+  const [webtoon, setWebtoon] = useState<CmsWebtoon | null | undefined>(initialWebtoon);
 
   useEffect(() => {
-    if (!id) return;
+    if (!slug || initialWebtoon) return; // 빌드타임에 이미 찾았으면 재조회 불필요.
     let cancelled = false;
-    fetchWebtoonBySlug(id).then((w) => {
+    fetchWebtoonBySlug(slug).then((w) => {
       if (!cancelled) setWebtoon(w);
     });
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [slug, initialWebtoon]);
 
-  if (!id || webtoon === null) {
+  if (!slug || webtoon === null) {
     return (
       <div className="min-h-screen bg-white">
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center text-neutral-500">

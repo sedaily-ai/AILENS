@@ -1,21 +1,25 @@
 import type { Metadata } from 'next';
-import type { ApiLetter, ApiTodayLettersResponse } from '@/shared/lib/todayLettersApi';
+import type { ApiLetter } from '@/shared/lib/todayLettersApi';
+import { withDisplayMeta } from '@/shared/lib/todayLettersApi';
 import { LetterDetailClient } from './LetterDetailClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
 
-// 빌드타임 라이브 seed — mock 레터 제거(2026-07-24) 후 prerender·메타데이터는
-// 최근 발행 레터를 today-letters API 에서 직접 가져온다. 빌드 시 API 가 닿지
-// 않으면 각 함수가 빈 결과로 degrade(클라이언트 이동은 /letters/view 로 동작).
+// 빌드타임 라이브 seed — prerender·메타데이터는 CMS 글(channel=letters) API 에서
+// 직접 가져온다. today-letters(구 AI 파이프라인 daily_letters)는 2026-08-04
+// RDS pgvector-v2 삭제로 영구히 빈 응답만 반환한다(CLAUDE.md 참조) — 그 뒤로
+// 이 페이지가 계속 placeholder 하나만 prerender 하고 있었다(2026-08-07 발견).
+// 실제 콘텐츠는 전부 CMS(DynamoDB) 경로로 발행되고 있어 거기서 가져온다.
+// 빌드 시 API 가 닿지 않으면 빈 결과로 degrade(클라이언트 이동은 /letters/view 로 동작).
 const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
 const SEED_DAYS = 14;
 
 async function fetchLettersForDate(date: string): Promise<ApiLetter[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/v2/today-letters?date=${date}`);
+    const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${date}`);
     if (!res.ok) return [];
-    const data = (await res.json()) as ApiTodayLettersResponse;
-    return data.letters ?? [];
+    const data = (await res.json()) as { posts?: ApiLetter[] };
+    return data.posts ?? [];
   } catch {
     return [];
   }
@@ -79,7 +83,12 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  // Next가 정적 export 시 이 동적 세그먼트의 params.id를 URL-encode된 채로
+  // 넘긴다(한글 슬러그라 %EC%8B%A0... 형태) — decode 안 하면 findLetter가
+  // 항상 못 찾아서 모든 레터 상세가 "찾을 수 없어요"로만 떴다(2026-08-07
+  // 발견 — today-letters 데드 API 뒤에 가려 있던 두 번째 버그).
+  const { id: rawId } = await params;
+  const id = decodeURIComponent(rawId);
   const letter = await findLetter(id);
   if (!letter) {
     return { title: '레터를 찾을 수 없어요', robots: { index: false } };
@@ -128,14 +137,20 @@ export async function generateMetadata({
   };
 }
 
-async function buildArticleJsonLd(id: string) {
-  const letter = await findLetter(id);
-  if (!letter) return null;
+// admin PostForm "post" 모드로 발행된 CMS 글은 body_html 만 있고 body[] 는
+// 비어있다(2026-08-07 확인 — /letters/[id] 정적 생성이 today-letters 대신
+// CMS API 를 보게 바꾸면서 body_html 기반 글이 대부분이 됨). JSON-LD 의
+// articleBody 가 비어버리는 걸 막기 위해 HTML 태그를 벗겨 평문으로 대체.
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
   const ed = DEFAULT_AUTHOR;
-  const url = `${SITE_URL}/letters/${id}`;
+  const url = `${SITE_URL}/letters/${letter.id}`;
   const published = `${letter.date}T07:00:00+09:00`;
-  const abstract = letter.subtitle ?? (letter.body[0] ?? '').slice(0, 200);
-  const bodyJoined = (letter.body ?? []).join('\n\n');
+  const bodyJoined = letter.body?.length ? letter.body.join('\n\n') : stripHtml(letter.body_html ?? '');
+  const abstract = letter.subtitle ?? bodyJoined.slice(0, 200);
   // letter 의 5개 키워드 → 검색엔진이 본문 핵심을 인식하는 1순위 신호.
   const letterKeywords =
     (letter as { keywords?: Array<{ term: string }> }).keywords?.map((k) => k.term).filter(Boolean) ?? [];
@@ -192,8 +207,10 @@ export default async function LetterDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const jsonLd = await buildArticleJsonLd(id);
+  const { id: rawId } = await params;
+  const id = decodeURIComponent(rawId);
+  const letter = await findLetter(id);
+  const jsonLd = letter ? buildArticleJsonLd(letter) : null;
   return (
     <>
       {jsonLd && (
@@ -202,7 +219,7 @@ export default async function LetterDetailPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <LetterDetailClient letterId={id} />
+      <LetterDetailClient letterId={id} initialLetter={letter ? withDisplayMeta(letter) : null} />
     </>
   );
 }

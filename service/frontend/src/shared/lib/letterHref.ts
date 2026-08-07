@@ -1,15 +1,17 @@
 /**
  * 레터 상세로의 클라이언트 내비게이션 href.
  *
- * 정적 export 는 `/letters/[id]` 를 **빌드 시점의 고정 id 만** prerender 한다
- * (mock 5/18~5/25). 라이브(오늘자) letterId 로 클라이언트 라우팅하면 RSC payload
- * (`/letters/{id}.txt`) 자리에 CloudFront SPA fallback HTML 이 와서 라우터가
- * 파싱하지 못하고 전환이 멈춘다(상단 진행바가 85%에서 정지).
- *
- * `/letters/view?id=` 는 동적 세그먼트가 없는 **정적 페이지 1개**라 어떤 id 로도
- * 안전하게 이동된다. prerender 된 `/letters/[id]` 페이지는 SEO·직접 진입용으로
- * 그대로 유지(sitemap·JSON-LD canonical).
+ * 한때 `/letters/view?id=` 워크어라운드를 썼다 — 정적 export에서 prerender
+ * 안 된 id로 `/letters/[id]`에 RSC 클라이언트 네비게이션하면, `_rsc` 세그먼트
+ * 캐시 미스 폴백 요청이 CloudFront에서 SPA fallback HTML을 받아 라우터가
+ * 파싱을 못 하고 멈추는 버그가 있었다(상단 진행바 85%에서 정지). 원인은
+ * CloudFront Function(`sedaily-mbti-letter-html-rewrite`)이 `_rsc` 쿼리가
+ * 있어도 `.html`을 반환하고 있던 것 — 2026-08-07 `.txt`(RSC 페이로드)로
+ * 분기하게 고쳐서 근본 해결됐다(경위:
+ * docs/worklog/2026-08/2026-08-07-cloudfront-rsc-navigation-bug.md). 이제
+ * prerender 여부와 무관하게 `/letters/[id]`로 바로 이동해도 안전하다 —
+ * 경로 기반 URL이 SEO에도 맞다(같은 날 논의: 쿼리스트링 대신 경로).
  */
 export function letterHref(letterId: string): string {
-  return `/letters/view?id=${encodeURIComponent(letterId)}`;
+  return `/letters/${encodeURIComponent(letterId)}`;
 }

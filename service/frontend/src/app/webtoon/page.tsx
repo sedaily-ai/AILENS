@@ -67,7 +67,7 @@ export default function WebtoonListPage() {
             {items.map((w) => (
               <Link
                 key={w.id}
-                href={`/webtoon/view?id=${encodeURIComponent(w.id)}`}
+                href={`/webtoon/${encodeURIComponent(w.id)}`}
                 prefetch
                 className="group"
                 style={{
