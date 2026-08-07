@@ -77,14 +77,20 @@ export function FollowingFeed({ selectedGroup }: Props) {
     fetchTodayLetters(selectedDate)
       .then((res) => {
         if (cancelled) return;
-        if (!res.letters || res.letters.length === 0) {
+        // 이 카드 행은 4명의 MBTI 에디터 레터 전용 — CMS(편집팀 명의, mbti_group
+        // 없음) 글이 섞이면 5장이 되어 4열 한 줄이 깨진다. 여기서 제외.
+        //
+        // "비었는지" 판단도 이 mbti 필터링 이후 기준으로 해야 한다 — trend_card/
+        // column 태그만 붙은 CMS letters 글(mbti_group 없음)이 그날 있으면
+        // res.letters.length 는 0이 아니게 되는데, 그 상태로 폴백을 멈춰버리면
+        // MBTI 4편은 하나도 없이 빈 화면만 남는다(2026-08-07 실제 발생 — 오늘
+        // 인기 칼럼 글이 있어서 어제 발행된 진짜 4편까지 못 내려갔다).
+        const mbtiOnly = (res.letters ?? []).filter((l) => l.mbti_group);
+        if (mbtiOnly.length === 0) {
           stepBackOrEmpty();
           return;
         }
         autoFallback.current = false; // 발행본 찾음 — 폴백 종료
-        // 이 카드 행은 4명의 MBTI 에디터 레터 전용 — CMS(편집팀 명의, mbti_group
-        // 없음) 글이 섞이면 5장이 되어 4열 한 줄이 깨진다. 여기서 제외.
-        const mbtiOnly = res.letters.filter((l) => l.mbti_group);
         const mapped = mbtiOnly.map((l) => toTodayLetterCard(l, res.date));
         setLetters(orderByMain(mapped, selectedGroup));
         setLoading(false);
