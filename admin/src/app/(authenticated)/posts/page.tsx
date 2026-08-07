@@ -276,11 +276,6 @@ export default function PostsPage() {
                     >
                       {p.headline}
                     </Link>
-                    {p.editor_id && (
-                      <span className="ml-2 text-xs text-gray-500">
-                        {p.editor_id}
-                      </span>
-                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`ui-badge ${STATUS_STYLE[p.status]}`}>

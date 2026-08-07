@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   fetchTodayLetters,
@@ -13,6 +13,13 @@ import { letterHref } from '@/shared/lib/letterHref';
 // (mbti_group 필터 + 4개 고정), 단일 명의 체계(2026-08-07) 이후로는 그날 letter가
 // 0~N편 어디든 나올 수 있다. 레이아웃이 무너지지 않게 상한만 둔다.
 const MAX_DISPLAY = 4;
+
+// 채울 카드를 찾아 거슬러 올라갈 최대 일수. 예전엔 "오늘 발행분 없으면 그 전날로"
+// 딱 한 번만 폴백했는데(하루에 4편이 항상 보장되던 시절 기준), 이제는 하루에
+// 0~1편만 나오는 날이 흔해서 오늘 1편만 있어도 거기서 멈춰버리면 카드가 휑하게
+// 남는다(2026-08-07 실제 발생 — 어제 발행된 4편이 묻혀서 안 보였다). 그래서
+// "오늘 있으면 끝"이 아니라 MAX_DISPLAY 편을 채울 때까지 여러 날짜를 계속 모은다.
+const MAX_LOOKBACK_DAYS = 14;
 
 // KST 기준 오늘. Intl 로 timezone 안정 처리 — en-CA 로케일이 YYYY-MM-DD 형식 반환.
 function todayKST(): string {
@@ -29,64 +36,48 @@ function shiftDate(isoDate: string, days: number): string {
 
 export function FollowingFeed() {
   const today = useMemo(() => todayKST(), []);
-  const [selectedDate, setSelectedDate] = useState<string>(today);
 
   // 라이브 단일 소스 — 첫 응답 전까지 로딩(mock 즉시렌더 제거 2026-07-24).
   const [letters, setLetters] = useState<TodayLetterCardLike[]>([]);
   const [empty, setEmpty] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 오늘 발행 전이면 자동으로 직전 발행일까지 거슬러 찾아 보여준다.
-  // 사용자가 화살표로 직접 이동하면 자동 폴백을 멈춘다(사용자 의도 우선).
-  const autoFallback = useRef(true);
-  const lookback = useRef(0);
-  const MAX_LOOKBACK = 14;
-
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 새 날짜 조회 시작 시 빈 상태 리셋(정당한 케이스)
+    setLoading(true);
     setEmpty(false);
-    // 이 날짜가 비었거나 실패하면 직전 발행일까지 거슬러 찾는다(공통 처리).
-    const stepBackOrEmpty = () => {
-      if (autoFallback.current && lookback.current < MAX_LOOKBACK) {
-        lookback.current += 1;
-        setSelectedDate((d) => shiftDate(d, -1));
-        return;
-      }
-      setEmpty(true);
-      setLetters([]);
-      setLoading(false);
-    };
-    fetchTodayLetters(selectedDate)
-      .then((res) => {
-        if (cancelled) return;
-        // 이 카드 행은 "이슈 톡톡"(일반 letters) 전용 — 트렌드/칼럼으로 이미
-        // 따로 태그된 글(TrendingEconomySection/ColumnPreviewSection이 각자
-        // 표시)은 여기서 또 보여주면 중복이라 제외한다.
-        //
-        // "비었는지" 판단도 이 필터링 이후 기준으로 해야 한다 — trend/column
-        // 태그만 붙은 글이 그날 있으면 res.letters.length는 0이 아니게 되는데,
-        // 그 상태로 폴백을 멈춰버리면 일반 letter는 하나도 없이 빈 화면만
-        // 남는다(2026-08-07 실제 발생 — 오늘 인기 칼럼 글이 있어서 어제 발행된
-        // 진짜 letters까지 못 내려갔다).
-        const general = (res.letters ?? []).filter((l) => l.section !== 'trend' && l.section !== 'column');
-        if (general.length === 0) {
-          stepBackOrEmpty();
-          return;
+
+    (async () => {
+      const collected: TodayLetterCardLike[] = [];
+      let date = today;
+      for (let daysBack = 0; daysBack <= MAX_LOOKBACK_DAYS && collected.length < MAX_DISPLAY; daysBack += 1) {
+        try {
+          const res = await fetchTodayLetters(date);
+          // "이슈 톡톡"은 admin이 실제 에디터 이름(예: 소율/준서/하은/민철)으로
+          // editor_id를 태깅해 발행한 레터 전용이다(2026-08-07 사용자 확인) —
+          // editor_id가 비어있거나 기본 명의("AI LENS")인 일반 레터는 여기 안
+          // 보여준다(그건 "이번 주 인기 칼럼" 쪽으로 옮겨간다). 트렌드/칼럼으로
+          // 이미 별도 태그된 글(TrendingEconomySection/ColumnPreviewSection이
+          // 각자 표시)도 여기서 또 보여주면 중복이라 제외한다.
+          const general = (res.letters ?? []).filter(
+            (l) => l.section !== 'trend' && l.section !== 'column' && l.editor_id && l.editor_id !== 'AI LENS',
+          );
+          collected.push(...general.map((l) => toTodayLetterCard(l, res.date)));
+        } catch {
+          // 이 날짜 조회 실패 — 조용히 다음 날짜로 계속 (라이브 단일 소스, mock 폴백 없음)
         }
-        autoFallback.current = false; // 발행본 찾음 — 폴백 종료
-        const mapped = general.map((l) => toTodayLetterCard(l, res.date)).slice(0, MAX_DISPLAY);
-        setLetters(mapped);
-        setLoading(false);
-      })
-      .catch(() => {
-        // API 실패 → mock 없이 직전 발행일 탐색(라이브 단일 소스)
-        if (!cancelled) stepBackOrEmpty();
-      });
+        date = shiftDate(date, -1);
+      }
+      if (cancelled) return;
+      setLetters(collected.slice(0, MAX_DISPLAY));
+      setEmpty(collected.length === 0);
+      setLoading(false);
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [selectedDate]);
+  }, [today]);
 
   return (
     <section
@@ -155,16 +146,20 @@ export function FollowingFeed() {
         </div>
       )}
 
-      {/* 열 수를 카드 개수에 맞춤(최대 MAX_DISPLAY) — 예전엔 MBTI 4편이 항상
-          보장돼 고정 4열이었지만, 이제는 그날 letter가 1~N편일 수 있어 개수가
-          적을 때 빈 칸이 남지 않게 동적으로 잡는다. */}
+      {/* 카드 폭은 항상 고정 상한(minmax) — letter 개수로 열 수를 직접 계산하면
+          (예전엔 MBTI 4편이 보장돼 4열 고정) 1편만 있는 날 카드 하나가 섹션
+          전체 폭으로 늘어나 썸네일까지 거대해지는 문제가 있었다(2026-08-07
+          실제 발생). TrendingEconomySection과 같은 auto-fill(160~240px) 패턴으로
+          맞춰 카드 폭을 통일 — 채울 카드가 없으면 그냥 빈 트랙으로 남고 카드는
+          늘어나지 않는다. */}
       <ol
         className="grid"
         style={{
           listStyle: 'none',
           padding: 0,
           margin: 0,
-          gridTemplateColumns: `repeat(${Math.min(Math.max(letters.length, 1), MAX_DISPLAY)}, minmax(0, 1fr))`,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 240px))',
+          justifyContent: 'start',
           gap: 'clamp(6px, 1.5vw, 10px)',
         }}
       >

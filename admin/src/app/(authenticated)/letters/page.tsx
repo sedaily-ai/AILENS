@@ -75,10 +75,7 @@ export default function LettersPage() {
               href={`/letters/edit?id=${encodeURIComponent(l.id)}`}
               className="ui-card ui-card-interactive ui-enter rounded-xl p-4 cursor-pointer block"
             >
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-600">{l.editor_id}</span>
-              </div>
-              <p className="font-display mt-2.5 text-[15px] font-bold leading-snug text-[var(--text-primary)]">
+              <p className="font-display text-[15px] font-bold leading-snug text-[var(--text-primary)]">
                 {l.headline}
               </p>
               {l.subtitle && (

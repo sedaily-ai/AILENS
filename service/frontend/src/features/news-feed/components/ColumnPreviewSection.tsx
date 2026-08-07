@@ -57,8 +57,14 @@ export function ColumnPreviewSection() {
       fetchCmsPosts('letters', undefined, 100),
     ]).then(([cards, letters]) => {
       if (cancelled) return;
+      // "칼럼" 태그(section:'column')가 명시된 글뿐 아니라, editor_id가 없거나
+      // 기본 명의("AI LENS")인 일반 레터도 여기로 편입한다 — "이슈 톡톡"은
+      // admin이 실제 이름으로 태깅한 레터 전용으로 좁혔으니(FollowingFeed.tsx
+      // 참조, 2026-08-07 사용자 확인), 태그 없는 일반 레터의 자리가 여기다.
       const tagged: ColumnItem[] = letters
-        .filter((l) => l.section === 'column')
+        .filter(
+          (l) => l.section === 'column' || (!l.section && (!l.editor_id || l.editor_id === 'AI LENS')),
+        )
         .map((l) => ({
           id: l.id,
           section: 'column' as const,
