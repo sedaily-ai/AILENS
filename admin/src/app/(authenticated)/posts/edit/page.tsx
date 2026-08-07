@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
@@ -56,6 +56,21 @@ function PostEditPage() {
   const [saved, setSaved] = useState<CmsPost | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // RichTextEditor의 글쓰기 도구 툴바가 이 헤더 바로 아래에 sticky로 붙는다.
+  // 헤더는 "발행됨 · slug" 줄 유무·좁은 화면 줄바꿈으로 높이가 바뀌는데,
+  // 툴바 쪽에 고정 픽셀(top-20)을 박아뒀더니 실제 헤더보다 낮게 잡혀 헤더에
+  // 가려지는 문제가 있었다(2026-08-07). 실측 높이를 CSS 변수로 넘겨준다.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const sync = () => document.documentElement.style.setProperty("--post-header-h", `${el.offsetHeight}px`);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // 새 글일 때만 고를 수 있다 — 저장된 글의 종류를 나중에 바꾸면 이미 발행된
   // 카드/레터가 엉뚱한 채널로 옮겨간다. 기존 글은 draft.channels 로 그대로 추론.
   const [newKind, setNewKind] = useState<"letters" | "trend_card" | "webtoon" | "video">("letters");
@@ -205,6 +220,7 @@ function PostEditPage() {
   };
 
   const remove = async () => {
+    if (!window.confirm(`"${draft.headline || "이 글"}"을(를) 삭제할까요? 되돌릴 수 없습니다.`)) return;
     setBusy(true);
     try {
       await adminApi.deletePost(id);
@@ -230,7 +246,15 @@ function PostEditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-baseline justify-between flex-wrap gap-2">
+      {/* sticky — 컷이 많은 웹툰 글은 스크롤이 길어져서, 저장 버튼을 보려고
+          매번 맨 위로 스크롤해야 하는 게 불편하다는 지적(2026-08-07)으로
+          고정. layout.tsx의 바깥 여백(px-4 lg:px-8)을 상쇄하는 음수 마진 +
+          동일 패딩으로, 고정됐을 때 좌우 끝까지 배경이 이어지게 한다. */}
+      <div
+        ref={headerRef}
+        className="sticky top-0 z-20 -mx-4 lg:-mx-8 px-4 lg:px-8 py-3 border-b border-gray-100 flex items-baseline justify-between flex-wrap gap-2"
+        style={{ background: "var(--surface-page)" }}
+      >
         <div>
           <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
             ← 목록

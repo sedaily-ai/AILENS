@@ -277,14 +277,22 @@ body {
 }
 
 /* 진입 — 목록·카드가 스르륵 자리잡는다. --i 로 순차 지연(최대 6칸까지만
-   주고 그 뒤는 동시 등장 — 긴 목록에서 마지막 항목까지 기다리게 하면 답답하다). */
+   주고 그 뒤는 동시 등장 — 긴 목록에서 마지막 항목까지 기다리게 하면 답답하다).
+   fill-mode는 both가 아니라 backwards만 쓴다 — both(=forwards+backwards)는
+   애니메이션이 끝난 뒤에도 도착 상태(transform: none)를 "여전히 적용 중"으로
+   붙들고 있어서, computed transform이 identity matrix로 남아 그 아래 모든
+   position:fixed 자손의 containing block을 뷰포트가 아닌 이 요소로 영구히
+   바꿔버린다 — .ui-enter로 감싼 글 수정 폼 안 퀴즈 위젯 모달이 화면 밖
+   엉뚱한 좌표에 렌더링되던 원인이었다(2026-08-07, "클릭하면 안개끼듯이"
+   리포트로 발견). 도착 상태가 어차피 무-애니메이션 기본값과 같아서
+   backwards만으로도(시작 전 깜빡임 방지) 시각적으로는 완전히 동일하다. */
 .ui-enter {
-  animation: ui-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(min(var(--i, 0), 6) * 40ms);
 }
 
 .ui-toast {
-  animation: ui-toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* 스켈레톤 — '로드 중...' 텍스트보다 체감 속도가 빠르다. */

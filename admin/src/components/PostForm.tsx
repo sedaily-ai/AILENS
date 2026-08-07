@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { CoverImageField } from "@/components/CoverImageField";
+import { DatePickerField } from "@/components/DatePickerField";
+import { CustomSelect } from "@/components/CustomSelect";
 import { uploadImage, ImageUploadError } from "@/lib/uploadImage";
 import { useToast } from "@/components/Toast";
 import type {
@@ -66,6 +68,24 @@ function WebtoonPanelsEditor({
 }) {
   const toast = useToast();
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  // 컷 위로 이미지를 끌어다 놓으면 교체, 하단 추가 영역에 놓으면 새 컷으로
+  // 추가된다(2026-08-07, "던지면 교체되게" 요청) — CoverImageField.tsx의
+  // 드래그앤드롭 패턴과 동일. -1 은 "컷 추가" 드롭존.
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  // 컷 순서 재배열 — "↑ 위로/↓ 아래로" 버튼만으로는 컷이 많을 때(8~10컷)
+  // 너무 느리다는 지적(2026-08-07)으로 드래그 정렬을 추가했다. 왼쪽 손잡이
+  // (⠿)를 끌어 다른 컷 위에 놓으면 그 자리로 순서가 바뀐다 — 이미지
+  // 영역(파일 드롭 = 교체)과 겹치지 않게 손잡이만 draggable로 뒀다. 버튼은
+  // 키보드/스크린리더 접근성을 위해 그대로 남겨둔다(드래그는 대체 불가능).
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
+  const reorder = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...panels];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange(next);
+  };
 
   const doUpload = async (file: File): Promise<string | null> => {
     try {
@@ -90,7 +110,10 @@ function WebtoonPanelsEditor({
     setUploadingIndex(null);
   };
 
-  const removePanel = (index: number) => onChange(panels.filter((_, i) => i !== index));
+  const removePanel = (index: number) => {
+    if (!window.confirm(`컷 ${index + 1}을(를) 삭제할까요?`)) return;
+    onChange(panels.filter((_, i) => i !== index));
+  };
 
   const move = (index: number, dir: -1 | 1) => {
     const target = index + dir;
@@ -106,12 +129,59 @@ function WebtoonPanelsEditor({
   return (
     <div className="space-y-3">
       {panels.map((p, i) => (
-        <div key={i} className="ui-card rounded-xl p-3 flex gap-3">
-          <div className="shrink-0 text-center">
+        <div
+          key={i}
+          className={`ui-card rounded-xl p-3 flex gap-3 transition-shadow ${
+            draggingIndex !== null && draggingIndex !== i ? "ring-1 ring-blue-200" : ""
+          } ${draggingIndex === i ? "opacity-40" : ""}`}
+          // 카드 전체가 재배열 드롭 타겟 — 손잡이(⠿)를 끌어 이 카드 위에
+          // 놓으면 그 자리로 옮겨간다. 이미지 위 파일 드롭(교체)과는 별개 영역.
+          onDragOver={(e) => {
+            if (draggingIndex === null) return;
+            e.preventDefault();
+          }}
+          onDrop={(e) => {
+            if (draggingIndex === null) return;
+            e.preventDefault();
+            reorder(draggingIndex, i);
+            setDraggingIndex(null);
+          }}
+        >
+          <div
+            draggable
+            onDragStart={(e) => {
+              setDraggingIndex(i);
+              e.dataTransfer.effectAllowed = "move";
+            }}
+            onDragEnd={() => setDraggingIndex(null)}
+            className="flex shrink-0 cursor-grab items-center self-stretch px-0.5 text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+            aria-label={`컷 ${i + 1} 끌어서 순서 바꾸기`}
+            title="끌어서 순서 바꾸기"
+          >
+            ⠿
+          </div>
+          <div
+            className={`shrink-0 text-center rounded-lg transition-colors ${
+              dragOverIndex === i ? "ring-2 ring-blue-400 bg-blue-50/40" : ""
+            }`}
+            onDragOver={(e) => {
+              if (draggingIndex !== null) return; // 컷 재배열 중 — 교체 드롭존이 아니라 카드 전체가 타겟
+              e.preventDefault();
+              setDragOverIndex(i);
+            }}
+            onDragLeave={() => setDragOverIndex((cur) => (cur === i ? null : cur))}
+            onDrop={(e) => {
+              if (draggingIndex !== null) return;
+              e.preventDefault();
+              setDragOverIndex(null);
+              const file = e.dataTransfer.files?.[0];
+              if (file) void replacePanel(i, file);
+            }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본 URL */}
-            <img src={p.url} alt="" className="h-28 w-28 rounded-lg object-cover bg-gray-100" />
+            <img src={p.url} alt="" className="h-28 w-28 rounded-lg object-cover bg-gray-100 pointer-events-none" />
             <label className="mt-1 block text-[11px] font-medium text-blue-700 cursor-pointer">
-              {uploadingIndex === i ? "업로드 중..." : "교체"}
+              {uploadingIndex === i ? "업로드 중..." : dragOverIndex === i ? "여기에 놓으세요" : "교체 (끌어놓기 가능)"}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
@@ -147,8 +217,29 @@ function WebtoonPanelsEditor({
         </div>
       ))}
 
-      <label className="flex items-center justify-center rounded-xl border border-dashed border-gray-300 py-6 text-sm text-gray-500 cursor-pointer hover:bg-gray-50">
-        {uploadingIndex === panels.length ? "업로드 중..." : "+ 컷 추가 (이미지 업로드)"}
+      <label
+        className={`flex items-center justify-center rounded-xl border border-dashed py-6 text-sm cursor-pointer transition-colors ${
+          dragOverIndex === -1
+            ? "border-blue-400 bg-blue-50/40 text-blue-600"
+            : "border-gray-300 text-gray-500 hover:bg-gray-50"
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOverIndex(-1);
+        }}
+        onDragLeave={() => setDragOverIndex((cur) => (cur === -1 ? null : cur))}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOverIndex(null);
+          const file = e.dataTransfer.files?.[0];
+          if (file) void addPanel(file);
+        }}
+      >
+        {uploadingIndex === panels.length
+          ? "업로드 중..."
+          : dragOverIndex === -1
+          ? "여기에 놓으세요"
+          : "+ 컷 추가 (이미지 업로드 또는 끌어놓기)"}
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif"
@@ -160,6 +251,87 @@ function WebtoonPanelsEditor({
           }}
         />
       </label>
+    </div>
+  );
+}
+
+// 실시간 미리보기(2026-08-07, "오른쪽 빈 공간에 실제로 어떻게 보이는지
+// 보여달라" 요청) — 실제 공개 페이지(app/webtoon/view/WebtoonViewClient.tsx)
+// 와 같은 마크업·톤을 축소판으로 재현한다. 컷을 카드별로 따로 편집하다 보면
+// 전체 흐름이 한눈에 안 들어온다는 문제를 같이 푼다. 스크린샷이 아니라 실제
+// React 렌더라 타이핑하는 대로 즉시 갱신된다.
+function WebtoonLivePreview({
+  title,
+  excerpt,
+  panels,
+}: {
+  title: string;
+  excerpt: string;
+  panels: CmsImage[];
+}) {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden ring-1 ring-gray-200"
+      style={{ background: "#f5f5f4" }}
+    >
+      <div className="px-4 py-2.5 text-[11px] font-semibold text-gray-500 bg-white border-b border-gray-100">
+        미리보기 — 실제 화면과 동일한 순서·톤으로 보여줍니다
+      </div>
+      <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
+        <div style={{ padding: "20px 18px 12px", textAlign: "center" }}>
+          <h1
+            style={{
+              fontFamily: '"Noto Serif KR", serif',
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#111827",
+              marginBottom: 6,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {title || "제목을 입력하세요"}
+          </h1>
+          {excerpt && (
+            <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>{excerpt}</p>
+          )}
+        </div>
+
+        {panels.length === 0 && (
+          <p className="text-center text-[13px] text-gray-400 py-10 px-5">
+            컷을 추가하면 여기에 순서대로 나타납니다.
+          </p>
+        )}
+
+        <div className="flex flex-col">
+          {panels.map((p, i) => (
+            <div key={i} style={{ background: "#fff" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본, 컷마다 비율이 달라 next/image 불가 */}
+              <img
+                src={p.url}
+                alt={`컷 ${i + 1}`}
+                style={{ display: "block", width: "100%", height: "auto" }}
+              />
+              {p.caption && (
+                <p
+                  style={{
+                    margin: 0,
+                    padding: "10px 16px",
+                    fontSize: 12,
+                    lineHeight: 1.6,
+                    color: "#374151",
+                    textAlign: "center",
+                    background: "#fafaf9",
+                    borderTop: "1px solid #f0f0ef",
+                    borderBottom: "1px solid #f0f0ef",
+                  }}
+                >
+                  {p.caption}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -332,9 +504,16 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
         <CoverImageField
           value={value.cover_image_url ?? null}
           onChange={(url) => patch({ cover_image_url: url })}
+          fallbackHint="AI LENS 기본 로고가 대신 나갑니다."
         />
-        <div className="ui-card rounded-2xl overflow-hidden">
-          <div className="px-6 pt-6 pb-3">
+        {/* overflow-hidden 이었다가 제거 — 카드 안에 스크롤 시 고정되는 글쓰기
+            도구 툴바가 들어있는데, overflow가 visible이 아닌 조상이 하나라도
+            있으면 그 안의 position:sticky가 전부 무력화된다(2026-08-07,
+            "스크롤 내려도 글쓰기 도구는 고정" 요청이 안 먹히던 원인). 카드
+            테두리 자체는 각 진 배경을 칠하는 자식이 없어 클리핑 없이도
+            둥근 모서리가 그대로 유지된다. */}
+        <div className="ui-card rounded-2xl">
+          <div className="rounded-t-2xl px-6 pt-6 pb-3">
             <input
               value={value.headline ?? ""}
               onChange={(e) => patch({ headline: e.target.value })}
@@ -349,29 +528,29 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-gray-100 bg-gray-50/70 px-6 py-2.5 text-[13px]">
-            <label className="flex items-center gap-1.5 text-gray-400">
+          {/* 회색 배경 띠였던 걸 지웠다 — 옅은 구분선 하나로만, 폼처럼
+              보이지 않고 미디엄/노션의 "속성 줄"처럼 본문에 곁들이는
+              정도로(2026-08-07 "깔끔하고 모던하게" 요청). */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 px-6 py-2 text-[12.5px] text-gray-400">
+            <label className="flex items-center gap-1.5">
               발행일
-              <input
-                type="date"
+              <DatePickerField
                 value={value.publish_date ?? ""}
-                onChange={(e) => patch({ publish_date: e.target.value })}
-                className="border-0 bg-transparent font-medium text-gray-700 outline-none"
+                onChange={(v) => patch({ publish_date: v })}
               />
             </label>
-            <span className="h-3.5 w-px bg-gray-300" />
-            <label className="flex items-center gap-1.5 text-gray-400">
-              /letters 태그
-              <span className="ml-0.5 font-normal text-gray-300">(선택)</span>
-              <select
+            <span className="h-3 w-px bg-gray-200" />
+            <label className="flex items-center gap-1.5">
+              분류
+              <CustomSelect
                 value={body.section ?? ""}
-                onChange={(e) => patchBody({ section: (e.target.value || undefined) as "trend" | "column" | undefined })}
-                className="cursor-pointer border-0 bg-transparent font-medium text-gray-700 outline-none"
-              >
-                <option value="">일반 레터</option>
-                <option value="trend">트렌드</option>
-                <option value="column">인기 칼럼</option>
-              </select>
+                onChange={(v) => patchBody({ section: (v || undefined) as "trend" | "column" | undefined })}
+                options={[
+                  { value: "", label: "일반 레터" },
+                  { value: "trend", label: "트렌드" },
+                  { value: "column", label: "인기 칼럼" },
+                ]}
+              />
             </label>
             {/* 트렌드/인기 칼럼으로 태그하면 홈 화면 카드 상단 라벨(예: "증시",
                 "투자 인사이트")도 admin이 직접 정할 수 있어야 한다 — 안 정하면
@@ -379,14 +558,14 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
                 (2026-08-07 확인, mode="trend_card" 쪽 카테고리 입력과 동일 필드). */}
             {(body.section === "trend" || body.section === "column") && (
               <>
-                <span className="h-3.5 w-px bg-gray-300" />
-                <label className="flex items-center gap-1.5 text-gray-400">
+                <span className="h-3 w-px bg-gray-200" />
+                <label className="flex items-center gap-1.5">
                   {body.section === "trend" ? "카테고리" : "연재명"}
                   <input
                     value={body.category ?? ""}
                     onChange={(e) => patchBody({ category: e.target.value })}
                     placeholder={body.section === "trend" ? "예: 증시, 환율·금리" : "예: 투자 인사이트"}
-                    className="w-28 border-0 bg-transparent font-medium text-gray-700 outline-none placeholder-gray-300"
+                    className="w-28 border-0 bg-transparent font-medium text-gray-600 outline-none placeholder-gray-300"
                   />
                 </label>
               </>
@@ -491,52 +670,63 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
   // 업로드만 하면 된다.
   if (mode === "webtoon") {
     return (
-      <div className="max-w-[640px] mx-auto space-y-4">
-        <div className="ui-card rounded-2xl p-5 space-y-4">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
-            <label className="flex items-center gap-1.5 text-gray-400">
-              발행일
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,640px)_1fr] gap-8 items-start">
+        <div className="space-y-4">
+          <div className="ui-card rounded-2xl p-5 space-y-4">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+              <label className="flex items-center gap-1.5 text-gray-400">
+                발행일
+                <input
+                  type="date"
+                  value={value.publish_date ?? ""}
+                  onChange={(e) => patch({ publish_date: e.target.value })}
+                  className="border-0 bg-transparent font-medium text-gray-700 outline-none"
+                />
+              </label>
+            </div>
+
+            <div>
+              <label className={LABEL}>제목 *</label>
               <input
-                type="date"
-                value={value.publish_date ?? ""}
-                onChange={(e) => patch({ publish_date: e.target.value })}
-                className="border-0 bg-transparent font-medium text-gray-700 outline-none"
+                value={value.headline ?? ""}
+                onChange={(e) => patch({ headline: e.target.value })}
+                placeholder="예: 관세전쟁 1화 — 협상 테이블의 그 남자"
+                className="ui-input w-full rounded-lg px-3 py-2 text-sm"
               />
+            </div>
+
+            <div>
+              <label className={LABEL}>줄거리 요약</label>
+              <textarea
+                value={value.subtitle ?? ""}
+                onChange={(e) => patch({ subtitle: e.target.value })}
+                rows={2}
+                placeholder="목록 카드에 들어갈 한두 문장"
+                className="ui-input w-full rounded-lg px-3 py-2.5 text-sm leading-relaxed"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={LABEL}>
+              컷
+              <span className="ml-2 font-normal text-gray-500">
+                위에서 아래로 순서대로 보여집니다. 컷마다 캡션(대사)을 달 수 있어요.
+              </span>
             </label>
-          </div>
-
-          <div>
-            <label className={LABEL}>제목 *</label>
-            <input
-              value={value.headline ?? ""}
-              onChange={(e) => patch({ headline: e.target.value })}
-              placeholder="예: 관세전쟁 1화 — 협상 테이블의 그 남자"
-              className="ui-input w-full rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className={LABEL}>줄거리 요약</label>
-            <textarea
-              value={value.subtitle ?? ""}
-              onChange={(e) => patch({ subtitle: e.target.value })}
-              rows={2}
-              placeholder="목록 카드에 들어갈 한두 문장"
-              className="ui-input w-full rounded-lg px-3 py-2.5 text-sm leading-relaxed"
+            <WebtoonPanelsEditor
+              panels={body.images}
+              onChange={(v) => patchBody({ images: v })}
             />
           </div>
         </div>
 
-        <div>
-          <label className={LABEL}>
-            컷
-            <span className="ml-2 font-normal text-gray-500">
-              위에서 아래로 순서대로 보여집니다. 컷마다 캡션(대사)을 달 수 있어요.
-            </span>
-          </label>
-          <WebtoonPanelsEditor
+        {/* 데스크톱에서만 나란히 — 좁은 화면은 폼 아래로 자연스럽게 스택. */}
+        <div className="hidden lg:block sticky top-20">
+          <WebtoonLivePreview
+            title={value.headline ?? ""}
+            excerpt={value.subtitle ?? ""}
             panels={body.images}
-            onChange={(v) => patchBody({ images: v })}
           />
         </div>
       </div>
@@ -595,17 +785,6 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
           </div>
 
           <div>
-            <label className={LABEL}>설명</label>
-            <textarea
-              value={value.subtitle ?? ""}
-              onChange={(e) => patch({ subtitle: e.target.value })}
-              rows={2}
-              placeholder="카드에 들어갈 한두 문장"
-              className="ui-input w-full rounded-lg px-3 py-2.5 text-sm leading-relaxed"
-            />
-          </div>
-
-          <div>
             <label className={LABEL}>
               커버 이미지
               <span className="ml-2 font-normal text-gray-500">비워두면 YouTube 썸네일을 자동으로 씁니다</span>
@@ -613,6 +792,7 @@ export function PostForm({ value, onChange, mode = "post" }: Props) {
             <CoverImageField
               value={value.cover_image_url ?? null}
               onChange={(url) => patch({ cover_image_url: url })}
+              fallbackHint="유튜브 원본 썸네일이 자동으로 쓰입니다."
             />
           </div>
         </div>
