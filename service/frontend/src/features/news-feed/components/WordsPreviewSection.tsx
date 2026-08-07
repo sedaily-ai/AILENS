@@ -2,29 +2,28 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
 import { GoodJobStampIcon } from './icons/HandDrawnIcons';
+import { dedupeTerms, fetchFollowingWordTerms, type Term } from '../lib/wordsTerms';
 
-interface Term {
-  term: string;
-  explain: string;
+// Math.random() 대신 seed로 결정되는 PRNG(mulberry32) — 빌드타임 서버 렌더와
+// 클라이언트 최초 hydration이 같은 seed로 정확히 같은 순서를 내야 hydration
+// mismatch가 안 난다(2026-08-07, 홈 SSG 감사로 initialTerms 서버 프리페치를
+// 추가하며 발견). qIndex(질문 자체는 날짜로 이미 결정됨)를 seed로 쓴다.
+function seededRandom(seed: number): () => number {
+  let t = seed;
+  return () => {
+    t = (t + 0x6d2b79f5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-function dedupeTerms(all: Term[], limit: number): Term[] {
-  const seen = new Map<string, Term>();
-  for (const t of all) {
-    const key = t.term.trim();
-    if (!key || seen.has(key)) continue;
-    seen.set(key, { term: key, explain: t.explain.trim() });
-    if (seen.size >= limit) break;
-  }
-  return [...seen.values()];
-}
-
-function shuffle<T>(arr: T[]): T[] {
+function shuffle<T>(arr: T[], seed: number): T[] {
+  const rand = seededRandom(seed);
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -43,16 +42,21 @@ const FALLBACK: Term[] = [
   { term: 'CPI', explain: '소비자물가지수. 물가 상승률을 가늠하는 대표 지표로, 금리 결정에 큰 영향을 준다.' },
 ];
 
-export function WordsPreviewSection() {
-  const [terms, setTerms] = useState<Term[] | null>(null);
+interface Props {
+  // 빌드타임(app/page.tsx)에 fetchCmsPosts('letters', undefined, 50)에서 뽑은
+  // 키워드 목록 — 정적 HTML에 실제 퀴즈가 바로 박히게 한다(2026-08-07, 홈 SSG
+  // 감사). shuffle을 seed 기반으로 바꿔 hydration mismatch를 막았다(위 참조).
+  initialTerms?: Term[];
+}
+
+export function WordsPreviewSection({ initialTerms }: Props) {
+  const [terms, setTerms] = useState<Term[] | null>(initialTerms ?? null);
   const [picked, setPicked] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchCmsPosts('letters', undefined, 50).then((letters) => {
-      if (cancelled) return;
-      const all = letters.flatMap((l) => l.keywords ?? []).filter((k) => k.term?.trim() && k.explain?.trim());
-      setTerms(dedupeTerms(all, 8));
+    fetchFollowingWordTerms().then((deduped) => {
+      if (!cancelled) setTerms(deduped);
     });
     return () => {
       cancelled = true;
@@ -71,8 +75,8 @@ export function WordsPreviewSection() {
     if (!pool || pool.list.length === 0) return null;
     const qIndex = new Date().getDate() % pool.list.length;
     const answer = pool.list[qIndex];
-    const distractors = shuffle(pool.list.filter((_, i) => i !== qIndex)).slice(0, 3);
-    return { answer, choices: shuffle([answer, ...distractors]) };
+    const distractors = shuffle(pool.list.filter((_, i) => i !== qIndex), qIndex + 1).slice(0, 3);
+    return { answer, choices: shuffle([answer, ...distractors], qIndex + 2) };
   }, [pool]);
 
   if (pool === null || !quiz) return null; // 로딩 중엔 자리 안 차지

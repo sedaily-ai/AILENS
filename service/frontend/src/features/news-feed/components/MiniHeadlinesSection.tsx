@@ -213,8 +213,14 @@ function TopicBundleCard({ label, count }: { label: string; count: number }) {
   );
 }
 
-export function MiniHeadlinesSection() {
-  const [letters, setLetters] = useState<CmsLetter[] | null>(null);
+interface Props {
+  // 빌드타임(app/page.tsx)에 fetchCmsPosts('letters', undefined, 50)으로 미리
+  // 가져온 값 — 정적 HTML에 무료 번들이 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
+  initialLetters?: CmsLetter[];
+}
+
+export function MiniHeadlinesSection({ initialLetters }: Props) {
+  const [letters, setLetters] = useState<CmsLetter[] | null>(initialLetters ?? null);
 
   useEffect(() => {
     let cancelled = false;

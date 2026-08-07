@@ -1,9 +1,9 @@
 'use client';
 
-import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { MbtiArticle } from "@/shared/types/mbti";
-import { getWeekDays, isSameDay } from "@/shared/utils/dateUtils";
+import type { CmsLetter, CmsVideo, CmsWebtoon } from "@/shared/lib/cmsPostsApi";
+import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
+import type { Term } from "../lib/wordsTerms";
 import { FollowingFeed } from "./FollowingFeed";
 import { SideRail } from "./SideRail";
 import { TrendingEconomySection } from "./TrendingEconomySection";
@@ -22,11 +22,15 @@ interface Props {
   setCalendarMonth: (date: Date) => void;
   showCalendar: boolean;
   setShowCalendar: (show: boolean) => void;
-  articles: MbtiArticle[];
-  loading: boolean;
   selectedGroup: MbtiGroupId;
   onMbtiChange?: (group: MbtiGroupId) => void;
-  onArticleClick: (article: MbtiArticle) => void;
+  // 빌드타임(app/page.tsx) 서버 프리페치 값 — 각 섹션에 그대로 하향 전달
+  // (2026-08-07, 홈 SSG 감사). 없으면 각 섹션이 기존처럼 클라이언트에서 로드.
+  initialFollowingLetters?: TodayLetterCardLike[];
+  initialWebtoons?: CmsWebtoon[];
+  initialVideos?: CmsVideo[];
+  initialWordTerms?: Term[];
+  initialCmsLetters?: CmsLetter[];
 }
 
 export function NewsFeedTab({
@@ -36,13 +40,14 @@ export function NewsFeedTab({
   setCalendarMonth,
   showCalendar,
   setShowCalendar,
-  articles,
-  loading,
   selectedGroup,
   onMbtiChange,
-  onArticleClick,
+  initialFollowingLetters,
+  initialWebtoons,
+  initialVideos,
+  initialWordTerms,
+  initialCmsLetters,
 }: Props) {
-  const filteredArticles = articles;
   return (
     <div className="min-h-screen bg-white">
       {/* Noto Serif KR 로딩은 layout.tsx <head>의 <link> 하나로 통합했다
@@ -105,14 +110,14 @@ export function NewsFeedTab({
               맨 아래로 묻히면 아깝다"는 재피드백(같은 날)으로 다시 조정 —
               퀴즈(5초짜리 습관 훅) → 본편 → 웹툰(재미 요소) → 트렌드/칼럼 →
               미니헤드라인(가장 실험적인 기능이라 맨 뒤) 순서로. */}
-          <WordsPreviewSection />
+          <WordsPreviewSection initialTerms={initialWordTerms} />
 
-          <FollowingFeed />
+          <FollowingFeed initialLetters={initialFollowingLetters} />
 
           {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제 콘텐츠처럼
               안 보인다"는 피드백으로 트렌드·칼럼과 같은 카드형으로 교체
               (WebtoonPreviewSection.tsx). */}
-          <WebtoonPreviewSection />
+          <WebtoonPreviewSection initialItems={initialWebtoons} />
 
           {/* 어피티/뉴닉처럼 홈에 경제 콘텐츠 섹션을 더 — 아직 실제 데이터 없어서
               목업(TrendingEconomySection/ColumnPreviewSection 파일 상단 참고). */}
@@ -122,12 +127,12 @@ export function NewsFeedTab({
           {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
               뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를
               숨긴다 — 트렌드/칼럼처럼 목업으로 안 채운다. */}
-          <VideoPreviewSection />
+          <VideoPreviewSection initialVideos={initialVideos} />
 
           {/* 미니보험식 헤드라인 패키징(2026-08-06) — 무료 묶음은 실제로 작동,
               유료 묶음(200원)은 PG 연동 전이라 잠금 UI로 컨셉만
               (MiniHeadlinesSection.tsx). */}
-          <MiniHeadlinesSection />
+          <MiniHeadlinesSection initialLetters={initialCmsLetters} />
         </div>
         <div className="order-2 lg:order-2" style={{ paddingTop: 'clamp(18px, 3vw, 34px)' }}>
           <SideRail selectedGroup={selectedGroup} />

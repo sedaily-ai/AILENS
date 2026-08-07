@@ -135,9 +135,13 @@ export async function fetchCmsPosts(
       const qs = new URLSearchParams({ channel });
       if (date) qs.set('date', date);
       if (limit) qs.set('limit', String(limit));
-      // API 응답의 Cache-Control(max-age=300)을 브라우저가 그대로 따르면 admin
-      // 발행/수정/삭제가 최대 5분간 안 보인다 — no-store 로 우회.
-      const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, { cache: 'no-store' });
+      // cache: 'no-store'였다가 제거(2026-08-07, fetchWebtoons와 동일 이유) —
+      // 빌드 시 여러 워커가 동시에 같은 URL을 fetch할 때 Next의 요청
+      // 중복제거까지 꺼버려서 간헐적 실패를 유발했다. API 응답의
+      // Cache-Control(max-age=300)을 그대로 따르면 admin 발행/수정/삭제가
+      // 최대 5분간 안 보이는 문제는, 이 함수 자체가 이미 cached()로 5분
+      // TTL을 걸고 있어 실질적 차이가 없다 — 그 TTL이 실제 신선도 계약이다.
+      const res = await fetch(`${API_URL}/api/v2/posts?${qs}`);
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLetter[] };
       return data.posts ?? [];
@@ -152,7 +156,7 @@ export async function fetchCmsPosts(
 export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
   return cached('trend_card', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, { cache: 'no-store' });
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`); // no-store 제거 이유는 fetchCmsPosts 참조
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsTrendCard[] };
       return data.posts ?? [];
@@ -200,7 +204,7 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
 export async function fetchVideos(): Promise<CmsVideo[]> {
   return cached('video', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=video`, { cache: 'no-store' });
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=video`); // no-store 제거 이유는 fetchCmsPosts 참조
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
       return data.posts ?? [];

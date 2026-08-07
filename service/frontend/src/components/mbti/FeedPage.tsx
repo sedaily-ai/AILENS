@@ -1,82 +1,36 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { MbtiVersion } from "@/shared/types/mbti";
-import { API_URL } from "@/shared/config/api";
+import type { CmsLetter, CmsVideo, CmsWebtoon } from "@/shared/lib/cmsPostsApi";
+import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
-import { ArticleView } from "./ArticleView";
 import { SmartSearchOverlay } from "./SmartSearchOverlay";
 import { useAuth } from "@/features/auth";
 import { Header } from "@/widgets/Header";
-import { mockArticles } from "@/shared/data/mockArticles";
 import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";
 
 // Feature Tab Components
 import { QuestionTab, dailyQuestions } from "@/features/question";
-import { NewsFeedTab } from "@/features/news-feed";
+import { NewsFeedTab, type Term } from "@/features/news-feed";
 import { ArchiveTab } from "@/features/archive";
 import { TIMELINE_HREF } from "@/shared/lib/headerTabs";
 
-// 프리페칭 캐시
-const prefetchCache = new Map<string, Article>();
-// 날짜별 기사 목록 캐시
-const articleListCache = new Map<string, Article[]>();
-
-interface Article {
-  news_id: string;
-  title: string;
-  sub_title: string;
-  published_at: string;
-  category: string;
-  provider: string;
-  byline: string;
-  image_url: string | null;
-  content: string;
-  original_link: string;
-  versions?: Record<string, MbtiVersion>;
-}
-
-// ─── v2 → v1 shape 어댑터 (TASK-7) ─────────────────────────────────────
-// v2 Feed API 응답 (items[]) 을 기존 컴포넌트들이 기대하는 v1-shape Article로
-// 매핑. v1 필드명 일부가 v2에서 rename됐고, 일부 필드는 v2에 없음:
-//   provider     ← v2.press
-//   original_link ← v2.url
-//   content      ← v2.body_preview (200자, ArticleView에서 전체 본문 fetch)
-//   image_url    ← v2엔 없음 (Collector v2 미수집). null 두면 ArticleCard가
-//                  ImagePlaceholder로 자동 fallback (코드 변경 0).
-//   versions     ← v2엔 없음 (Article API 4-parallel fetch가 채움)
-//
-// sub_title은 v2에서 raw HTML <br/> 포함 가능. 카드는 첫 줄만 보이므로
-// 첫 <br/> 이전까지 자름 (XSS 안전, 데모 시각 임팩트 보존).
-function adaptV2FeedItem(v2: Record<string, unknown>): Article {
-  const subTitleRaw = (v2.sub_title as string | null) || '';
-  const subTitleClean = subTitleRaw.split(/<br\s*\/?>/i)[0] || '';
-  const bodyPreview = (v2.body_preview as string | null) || '';
-
-  return {
-    news_id: v2.news_id as string,
-    title: (v2.title as string) || '',
-    sub_title: subTitleClean,
-    published_at: (v2.published_at as string) || '',
-    category: (v2.category as string) || '',
-    provider: (v2.press as string) || '',
-    byline: (v2.byline as string) || '',
-    image_url: (v2.image_url as string) || null,
-    content: bodyPreview,
-    original_link: (v2.url as string) || '',
-    versions: undefined,
-  };
-}
-
 interface Props {
   selectedGroup: MbtiGroupId;
-  onChangeGroup: () => void;
+  onChangeGroup?: () => void;
   onSwitchToStory?: () => void;
   onMbtiChange?: (group: MbtiGroupId) => void;
+  // 빌드타임(app/page.tsx) 서버 프리페치 값 — NewsFeedTab까지 그대로 하향
+  // 전달(2026-08-07, 홈 SSG 감사).
+  initialFollowingLetters?: TodayLetterCardLike[];
+  initialWebtoons?: CmsWebtoon[];
+  initialVideos?: CmsVideo[];
+  initialWordTerms?: Term[];
+  initialCmsLetters?: CmsLetter[];
 }
 
 // 아카이빙된 문장 타입
@@ -117,24 +71,18 @@ const getMonthDays = (year: number, month: number): (Date | null)[] => {
 };
 
 
-export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
+export function FeedPage({
+  selectedGroup,
+  onMbtiChange,
+  initialFollowingLetters,
+  initialWebtoons,
+  initialVideos,
+  initialWordTerms,
+  initialCmsLetters,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { user } = useAuth();
-
-  // URL에서 초기 탭 상태 읽기
-  const getInitialTab = useCallback(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam && ['question', 'feed', 'archive', 'dna'].includes(tabParam)) {
-      return tabParam as "question" | "feed" | "archive" | "dna";
-    }
-    return "feed";
-  }, [searchParams]);
-
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [viewArticle, setViewArticle] = useState<Article | null>(null);
 
   // 날짜 관련 상태
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -226,19 +174,24 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
     ];
   });
   // 탭 상태 - URL에서 초기값 읽기
-  const [activeTab, setActiveTabState] = useState<"question" | "feed" | "archive" | "dna">(getInitialTab);
+  // 정적 export에서 useSearchParams()는 CSR bailout을 유발해 이 컴포넌트 트리
+  // 전체가 정적 HTML에서 Suspense fallback으로만 구워진다(2026-08-07, 홈 SSG
+  // 감사에서 발견 — /timemachine과 같은 원인). 초기값은 항상 "feed"로 고정해
+  // 서버/클라이언트 첫 렌더를 일치시키고, ?tab=... 반영은 아래 mount effect가
+  // window.location.search를 직접 읽어 처리한다.
+  const [activeTab, setActiveTabState] = useState<"question" | "feed" | "archive" | "dna">("feed");
 
   // 탭 변경 함수 - URL도 함께 업데이트 (replaceState로 히스토리에 안 쌓임)
   const setActiveTab = useCallback((tab: "question" | "feed" | "archive" | "dna") => {
     setActiveTabState(tab);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(window.location.search);
     params.set('tab', tab);
     window.history.replaceState(
       { ...window.history.state, tab },
       "",
       `${pathname}?${params.toString()}${window.location.hash}`
     );
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   // 펼친 기사 상태
   const [expandedArticles, setExpandedArticles] = useState<Set<string>>(new Set());
@@ -322,21 +275,8 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
     fetchDailyQuestions(dateStr).then(qs => setAiQuestions(qs));
   }, [selectedDate]);
 
-  const openArticle = useCallback((article: Article) => {
-    const cachedArticle = prefetchCache.get(article.news_id);
-    setViewArticle(cachedArticle || article);
-    // 현재 URL 파라미터 유지하면서 기사 해시 추가
-    const currentUrl = new URL(window.location.href);
-    currentUrl.hash = `article-${article.news_id}`;
-    window.history.pushState({ articleId: article.news_id, tab: activeTab }, "", currentUrl.toString());
-  }, [activeTab]);
-
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      // 기사 보기 상태 처리
-      if (viewArticle && !event.state?.articleId) {
-        setViewArticle(null);
-      }
       // URL에서 탭 상태 복원
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
@@ -346,91 +286,18 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [viewArticle]);
+  }, []);
 
-  // /editors 등 다른 라우트에서 ?tab=... 로 진입했을 때 초기 반영
-  // (useState 초기값이 prerender 시점의 빈 searchParams를 캡처할 수 있어 별도 동기화 필요)
+  // /editors 등 다른 라우트에서 ?tab=... 로 진입했을 때 초기 반영 — 마운트 시
+  // 1회, window.location.search를 직접 읽는다(useSearchParams() 대신 — 위 참조).
+  // 다른 라우트에서 오는 진입은 항상 이 컴포넌트의 새 마운트라 1회 실행으로 충분.
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
     if (tabParam && ['question', 'feed', 'archive', 'dna'].includes(tabParam)) {
       setActiveTabState(tabParam as typeof activeTab);
     }
-  }, [searchParams]);
-
-  const handleCloseArticle = useCallback(() => {
-    if (viewArticle) window.history.back();
-  }, [viewArticle]);
-
-  // 기사 로드 (TASK-7) — v2 단일 endpoint /api/v2/feed.
-  // 3-tier fallback (v1 articles/s3-articles/search)은 제거. v2 백엔드는
-  // Selector + Transform이 자동 fire 중이라 안정적이고, 빈 응답은 "오늘
-  // 선정된 기사 없음" empty state로 graceful 처리.
-  // selectedDate는 NewsFeedTab가 hide된 지금 의미가 없으므로 since 파라미터로
-  // 매핑하지 않고 기본값(서버: 오늘 KST - 7일)에 맡김. selectedDate 의존성은
-  // 유지해서 향후 picker 부활 시 재연결 쉬움.
-  useEffect(() => {
-    const dateStr = formatDateStr(selectedDate);
-    const mbtiKey = (typeof window !== "undefined" ? localStorage.getItem("mbti-type") : null) || selectedGroup;
-    const cacheKey = `${dateStr}|${mbtiKey}|${user?.userId ?? "anon"}`;
-    const cached = articleListCache.get(cacheKey);
-    if (cached) {
-      setArticles(cached);
-      setLoading(false);
-      return;
-    }
-
-    async function fetchArticles() {
-      try {
-        setLoading(true);
-        // Round 5-E wire-up: include user_id when the user is logged in so
-        // the backend can route to the personalized path. Frontend currently
-        // sends the 2-char MBTI group only — the lazy profile-create on the
-        // backend requires the 4-char form (INTJ/ENFP/...) which a separate
-        // round will collect via an MBTI quiz. Until then, all calls land
-        // on the cold path (Phase 2.5 selection feed unchanged), but
-        // user_interactions still accumulates from ArticleView so the
-        // Consolidation Lambda has data ready when profiles arrive.
-        // Round 5-G: prefer the 4-char MBTI from localStorage when present —
-        // backend's _extract_full_mbti recognizes it and triggers the lazy
-        // profile-create / EWMA path. Fall back to the 2-char selectedGroup
-        // for users whose localStorage hasn't been migrated yet (the
-        // backfill in app/page.tsx covers them on next mount, but the
-        // first feed call after R5-G deploy may still fire with group only).
-        const mbtiParam = (typeof window !== "undefined"
-          ? localStorage.getItem("mbti-type")
-          : null) || selectedGroup;
-        const userIdParam = user?.userId
-          ? `&user_id=${encodeURIComponent(user.userId)}`
-          : "";
-        const url = `${API_URL}/api/v2/feed?mbti=${mbtiParam}&limit=30${userIdParam}`;
-        const res = await fetch(url);
-        if (!res.ok) {
-          console.warn(`v2 feed returned ${res.status} — falling back to mock`);
-          const fallback = mockArticles as unknown as Article[];
-          articleListCache.set(cacheKey, fallback);
-          setArticles(fallback);
-          return;
-        }
-        const data = await res.json();
-        const items = Array.isArray(data?.items) ? data.items : [];
-        let mapped: Article[];
-        if (items.length === 0) {
-          console.info('v2 feed returned 0 items — using mock for UI preview');
-          mapped = mockArticles as unknown as Article[];
-        } else {
-          mapped = items.map(adaptV2FeedItem);
-        }
-        articleListCache.set(cacheKey, mapped);
-        setArticles(mapped);
-      } catch (err) {
-        console.warn('v2 feed fetch failed — falling back to mock', err);
-        setArticles(mockArticles as unknown as Article[]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchArticles();
-  }, [selectedDate, selectedGroup, user?.userId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 질문 답변 선택
   const activeQuestionsList = aiQuestions.length > 0 ? aiQuestions : dailyQuestions;
@@ -456,44 +323,6 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
       setTimeout(() => {
         setActiveTab("feed");
       }, 500);
-    }
-  };
-
-  // 문장 아카이빙 — logged-in: server API, anonymous: local state
-  const archiveSentence = async (text: string, articleId: string, articleTitle: string, articlePublishedAt?: string) => {
-    const newSentence: ArchivedSentence = {
-      id: `${articleId}-${Date.now()}`,
-      text,
-      articleId,
-      articleTitle,
-      articlePublishedAt,
-      createdAt: new Date(),
-    };
-
-    // Optimistic: add to local state immediately
-    setArchivedSentences(prev => [newSentence, ...prev]);
-
-    // If logged in, also save to server
-    if (user?.userId) {
-      try {
-        const { saveArchiveSentence } = await import('@/shared/lib/archiveApi');
-        const result = await saveArchiveSentence({
-          user_id: user.userId,
-          text,
-          article_id: articleId,
-          article_title: articleTitle,
-          article_published_at: articlePublishedAt,
-        });
-        // Replace local ID with server ID
-        setArchivedSentences(prev =>
-          prev.map(s => s.id === newSentence.id
-            ? { ...s, id: result.sentence.id, createdAt: new Date(result.sentence.created_at) }
-            : s
-          )
-        );
-      } catch (err) {
-        console.warn('Server archive save failed (local save kept):', err);
-      }
     }
   };
 
@@ -567,11 +396,13 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
             setCalendarMonth={setCalendarMonth}
             showCalendar={showCalendar}
             setShowCalendar={setShowCalendar}
-            articles={articles}
-            loading={loading}
             selectedGroup={selectedGroup}
             onMbtiChange={onMbtiChange}
-            onArticleClick={openArticle}
+            initialFollowingLetters={initialFollowingLetters}
+            initialWebtoons={initialWebtoons}
+            initialVideos={initialVideos}
+            initialWordTerms={initialWordTerms}
+            initialCmsLetters={initialCmsLetters}
           />
         )}
 
@@ -584,7 +415,7 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
             setArchivedSentences={setArchivedSentences}
             setActiveTab={setActiveTab}
             setExpandedArticles={setExpandedArticles}
-            articles={articles}
+            articles={[]}
             showToast={showToast}
             setShowCalendar={setShowCalendar}
           />
@@ -725,17 +556,6 @@ export function FeedPage({ selectedGroup, onMbtiChange }: Props) {
             )}
           </div>
         </div>
-      )}
-
-      {/* Article View */}
-      {viewArticle && (
-        <ArticleView
-          article={viewArticle}
-          currentGroup={selectedGroup}
-          onClose={handleCloseArticle}
-          onChangeGroup={() => {}}
-          onArchiveSentence={archiveSentence}
-        />
       )}
 
     </div>

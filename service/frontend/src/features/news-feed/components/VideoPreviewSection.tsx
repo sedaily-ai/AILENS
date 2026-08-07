@@ -16,8 +16,14 @@ import { extractYouTubeId, youtubeThumbnailUrl, youtubeEmbedUrl } from '@/shared
 // 자동으로 나타난다(비어있으면 링크 자체가 렌더되지 않는다).
 const CHANNEL_URL = '';
 
-export function VideoPreviewSection() {
-  const [videos, setVideos] = useState<CmsVideo[] | null>(null);
+interface Props {
+  // 빌드타임(app/page.tsx)에 fetchVideos()로 미리 가져온 값 — 정적 HTML에
+  // 실제 영상 목록이 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
+  initialVideos?: CmsVideo[];
+}
+
+export function VideoPreviewSection({ initialVideos }: Props) {
+  const [videos, setVideos] = useState<CmsVideo[] | null>(initialVideos ?? null);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {

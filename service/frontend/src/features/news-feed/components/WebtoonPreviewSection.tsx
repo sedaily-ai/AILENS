@@ -63,8 +63,14 @@ const TILTS = [-1.6, 1.2, -1, 1.8];
 const ACCENTS = ['#fde047', '#5eead4', '#fca5a5', '#c4b5fd'];
 const SKETCH_ACCENT = '#a8a29e';
 
-export function WebtoonPreviewSection() {
-  const [items, setItems] = useState<CmsWebtoon[] | null>(null);
+interface Props {
+  // 빌드타임(app/page.tsx)에 fetchWebtoons()로 미리 가져온 값 — 정적 HTML에
+  // 실제 카드가 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
+  initialItems?: CmsWebtoon[];
+}
+
+export function WebtoonPreviewSection({ initialItems }: Props) {
+  const [items, setItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
 
   useEffect(() => {
     let cancelled = false;

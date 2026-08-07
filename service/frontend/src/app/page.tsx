@@ -1,7 +1,11 @@
-'use client';
-
 import { Suspense } from "react";
 import { FeedPage } from "@/components/mbti/FeedPage";
+import { fetchCmsPosts, fetchVideos, fetchWebtoons } from "@/shared/lib/cmsPostsApi";
+import { fetchFollowingLetters } from "@/shared/lib/todayLettersApi";
+import { fetchFollowingWordTerms } from "@/features/news-feed";
+import type { CmsLetter, CmsVideo, CmsWebtoon } from "@/shared/lib/cmsPostsApi";
+import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
+import type { Term } from "@/features/news-feed";
 
 // MBTI 페르소나 체계 폐지(2026-08-07) — 이전에는 여기서 viewMode
 // ("feed" | "editor-select" | "briefing" | "story")를 useMbtiGroup 에 저장된
@@ -13,14 +17,59 @@ import { FeedPage } from "@/components/mbti/FeedPage";
 // 거의 안 쓴다 — 고정 상수만 넘기고 이 페이지에서는 더 이상 저장/변경하지 않는다.
 const DEFAULT_GROUP = "SF";
 
-function HomeContent() {
-  return <FeedPage selectedGroup={DEFAULT_GROUP} onChangeGroup={() => {}} />;
+interface HomeContentProps {
+  initialFollowingLetters: TodayLetterCardLike[];
+  initialWebtoons: CmsWebtoon[];
+  initialVideos: CmsVideo[];
+  initialWordTerms: Term[];
+  initialCmsLetters: CmsLetter[];
 }
 
-export default function HomePage() {
+function HomeContent({
+  initialFollowingLetters,
+  initialWebtoons,
+  initialVideos,
+  initialWordTerms,
+  initialCmsLetters,
+}: HomeContentProps) {
+  return (
+    <FeedPage
+      selectedGroup={DEFAULT_GROUP}
+      initialFollowingLetters={initialFollowingLetters}
+      initialWebtoons={initialWebtoons}
+      initialVideos={initialVideos}
+      initialWordTerms={initialWordTerms}
+      initialCmsLetters={initialCmsLetters}
+    />
+  );
+}
+
+// 서버 컴포넌트로 전환(2026-08-07, 홈 SSG 감사) — 이전엔 페이지 전체가
+// 'use client'라 정적 HTML에 nav/footer(192자)뿐이었다. 홈 피드가 실제로
+// 렌더하는 5개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
+// WordsPreviewSection/MiniHeadlinesSection)의 데이터를 빌드타임에 미리 가져와
+// FeedPage → NewsFeedTab → 각 섹션까지 initialX prop으로 내려준다. 나머지
+// 섹션(TimelinePreviewSection/TrendingEconomySection/ColumnPreviewSection 등)은
+// 의도된 mock/placeholder라 그대로 둔다.
+export default async function HomePage() {
+  const [initialFollowingLetters, initialWebtoons, initialVideos, initialWordTerms, initialCmsLetters] =
+    await Promise.all([
+      fetchFollowingLetters(),
+      fetchWebtoons(),
+      fetchVideos(),
+      fetchFollowingWordTerms(),
+      fetchCmsPosts('letters', undefined, 50),
+    ]);
+
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50"></div></div>}>
-      <HomeContent />
+      <HomeContent
+        initialFollowingLetters={initialFollowingLetters}
+        initialWebtoons={initialWebtoons}
+        initialVideos={initialVideos}
+        initialWordTerms={initialWordTerms}
+        initialCmsLetters={initialCmsLetters}
+      />
     </Suspense>
   );
 }

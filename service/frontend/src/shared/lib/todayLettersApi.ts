@@ -3,9 +3,7 @@
  *
  * GET /api/v2/today-letters?date=YYYY-MM-DD
  *
- * 호출하는 곳:
- *   - app/today/preview/page.tsx (검증 페이지)
- *   - app/today/TodayLensClient (추후 통합)
+ * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts } from './cmsPostsApi';
 
@@ -157,11 +155,12 @@ async function fetchTodayLettersLive(date: string | undefined, expiresAt: number
     // CMS 수동 글을 함께 부른다. 순차가 되지 않게 Promise.all 로 묶는다.
     // fetchCmsPosts 는 실패해도 throw 하지 않고 [] 를 주므로, CMS 가 죽어도
     // 기존 레터는 그대로 렌더된다 (spec §8 fail-open).
-    // API 응답의 Cache-Control(max-age=300)을 브라우저가 그대로 따르면 새로고침해도
-    // 최대 5분간 옛 응답이 보인다 — no-store 로 우회. 인메모리 캐시(위 CACHE_TTL_MS)는
-    // 페이지 재로드 시 어차피 초기화되니 그대로 둔다.
+    // cache: 'no-store'였다가 제거(2026-08-07, cmsPostsApi.ts와 동일 이유) —
+    // 빌드타임에 이 함수를 여러 워커가 동시에 같은 URL로 호출할 때 Next의
+    // 요청 중복제거(Data Cache)까지 꺼버려 일부가 실패했다. 인메모리 캐시(위
+    // CACHE_TTL_MS)·sessionStorage가 이미 신선도를 보장하므로 실질적 차이 없다.
     const [res, cmsPosts] = await Promise.all([
-      fetch(`${API_BASE}/api/v2/today-letters${qs}`, { cache: 'no-store' }),
+      fetch(`${API_BASE}/api/v2/today-letters${qs}`),
       fetchCmsPosts('letters', date),
     ]);
 
@@ -322,4 +321,49 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
     dateLabel: formatDateLabel(letterDate),
     newsId: letter.article_id,
   };
+}
+
+// "이슈 톡톡"(FollowingFeed) 카드 목록 — 서버(app/page.tsx 빌드타임 프리페치)와
+// 클라이언트(FollowingFeed.tsx 갱신 effect) 양쪽이 똑같은 로직을 쓰도록 공유
+// 함수로 뽑았다(2026-08-07, 홈 SSG 감사). 오늘부터 최대 MAX_LOOKBACK_DAYS일
+// 역순 조회, MAX_DISPLAY편을 채우면 멈춘다 — 하루에 0~1편만 나오는 날이 흔해
+// "오늘 있으면 끝"으로는 카드가 휑하게 남는 문제가 있었다(2026-08-07 실제 발생).
+const FOLLOWING_MAX_DISPLAY = 4;
+const FOLLOWING_MAX_LOOKBACK_DAYS = 14;
+
+function todayKST(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+}
+
+function shiftDate(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split('-').map((s) => parseInt(s, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+export async function fetchFollowingLetters(): Promise<TodayLetterCardLike[]> {
+  const collected: TodayLetterCardLike[] = [];
+  let date = todayKST();
+  for (
+    let daysBack = 0;
+    daysBack <= FOLLOWING_MAX_LOOKBACK_DAYS && collected.length < FOLLOWING_MAX_DISPLAY;
+    daysBack += 1
+  ) {
+    try {
+      const res = await fetchTodayLetters(date);
+      // "이슈 톡톡"은 admin이 실제 에디터 이름으로 editor_id를 태깅해 발행한
+      // 레터 전용이다(2026-08-07 사용자 확인) — editor_id가 비어있거나 기본
+      // 명의("AI LENS")인 일반 레터는 여기 안 보여준다(그건 "이번 주 인기
+      // 칼럼" 쪽으로 옮겨간다). 트렌드/칼럼으로 이미 별도 태그된 글도 제외.
+      const general = (res.letters ?? []).filter(
+        (l) => l.section !== 'trend' && l.section !== 'column' && l.editor_id && l.editor_id !== 'AI LENS',
+      );
+      collected.push(...general.map((l) => toTodayLetterCard(l, res.date)));
+    } catch {
+      // 이 날짜 조회 실패 — 조용히 다음 날짜로 계속 (라이브 단일 소스, mock 폴백 없음)
+    }
+    date = shiftDate(date, -1);
+  }
+  return collected.slice(0, FOLLOWING_MAX_DISPLAY);
 }
