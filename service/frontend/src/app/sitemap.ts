@@ -2,14 +2,18 @@ import type { MetadataRoute } from 'next';
 import { fetchWebtoons } from '@/shared/lib/cmsPostsApi';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
-// 정적 export 모드 — 빌드 시점에 sitemap.xml 이 /out 루트에 생성.
-export const dynamic = 'force-static';
+// SSR(2026-08-08) — 요청마다 동적 생성돼 admin 발행이 재빌드 없이 즉시
+// sitemap 에 반영된다(force-static 이었던 이전엔 빌드 시점에 고정됐음).
+// force-dynamic 명시 필수 — 그냥 force-static만 지우면 내부 fetch()에 캐시
+// 옵션이 없어 Next가 기본값(정적 캐시 가능)으로 추론해버려 빌드 시점에
+// 다시 고정된다(직접 확인함, 2026-08-08).
+export const dynamic = 'force-dynamic';
 
 const BASE = 'https://ailens.sedaily.ai';
 
-// 빌드타임 라이브 seed — mock 제거(2026-07-24) 후 최근 발행 레터를 API 에서
-// 가져온다. prerender(generateStaticParams) 와 같은 SEED_DAYS 로 맞춰 sitemap 에
-// prerender 안 된 URL 이 실리지 않게 한다. 빌드 시 API 불통이면 레터 URL 생략.
+// mock 제거(2026-07-24) 후 최근 발행 레터를 API 에서 가져온다. 최근 SEED_DAYS
+// 일로 조회 범위를 제한(sitemap 크기·응답시간 관리 목적). API 불통이면 레터
+// URL 생략.
 const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
 const SEED_DAYS = 14;
 

@@ -100,7 +100,12 @@ export function withDisplayMeta(letter: ApiLetter): DisplayLetter {
 // (lookback), in-memory 캐시만으로는 페이지를 새로고침하거나 다른 페이지
 // 갔다 오면 이 lookback 전체가 매번 처음부터 다시 돈다 — "그때그때 로딩하는
 // 것 같다"는 피드백(같은 날)의 핵심 원인. cmsPostsApi.ts 의 동일 패턴 참조.
-const CACHE_TTL_MS = 5 * 60 * 1000;
+//
+// TTL 20초 — SSR 전환(2026-08-08) 이후 `lettersCache`(모듈스코프 Map)는 EC2
+// Node 프로세스가 떠있는 내내 전체 방문자가 공유하는 서버 캐시가 된다
+// (정적 export 시절엔 빌드 1회성). admin 발행 즉시 반영 요구로 짧게 잡음 —
+// cmsPostsApi.ts의 REQUEST_CACHE_TTL_MS와 동일 근거.
+const CACHE_TTL_MS = 20 * 1000;
 const SESSION_PREFIX = 'ailens-letters-cache:';
 const lettersCache = new Map<string, { promise: Promise<ApiTodayLettersResponse>; expiresAt: number }>();
 

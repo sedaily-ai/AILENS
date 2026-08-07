@@ -4,16 +4,10 @@ import { WebtoonViewClient } from './WebtoonViewClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
 
-// 경로 기반으로 전환(2026-08-07) — 예전엔 /webtoon/view?id= 로 클라이언트에서만
-// 식별했는데(정적 export + Next 클라이언트 라우팅 불일치가 그날의 CloudFront
-// _rsc 버그 원인), 이제 슬러그를 실제 경로 세그먼트로 써서 빌드타임에 완성된
-// HTML을 굽는다. /letters/[id] 와 동일 패턴 — 실제 데이터로 정적 생성 +
-// generateMetadata 로 OG 태그까지 채운다(이번엔 처음부터 body 텍스트를
-// initialWebtoon prop 으로 내려서 letters 쪽에서 겪은 "mounted 게이트가
-// SSG 출력을 비워버리는" 문제를 재현하지 않는다).
-// 빌드 시 워커 여러 개(9개)가 같은 API에 동시에 fetch 를 쏘다 보니 개별 호출이
-// 가끔 실패하는 걸 실측 확인(2026-08-07) — 재시도 없이 빈 배열로 죽으면 그
-// 페이지만 "찾을 수 없어요"로 정적 생성돼버린다. 가벼운 재시도로 방지.
+// 경로 기반(2026-08-07) 그대로, SSR(2026-08-08)로 렌더링만 요청 시점으로 바뀜 —
+// generateStaticParams 없음, 매 요청 서버가 findWebtoon()을 호출한다.
+// fetchWebtoons() 단발 실패(API Gateway/Lambda 콜드스타트 등)에 바로
+// "찾을 수 없어요"로 떨어지지 않도록 가벼운 재시도를 유지한다.
 async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -25,16 +19,6 @@ async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
     if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
   }
   return [];
-}
-
-export async function generateStaticParams() {
-  const webtoons = await fetchAllWebtoons();
-  // output:'export'는 동적 라우트에 param이 0개면 빌드 자체를 실패시킨다
-  // (letters/[id]/page.tsx와 동일 이슈) — 웹툰이 하나도 없는 기간에도 빌드가
-  // 죽지 않게 최소 1개는 확보한다. 실존하지 않는 slug라 findWebtoon()이 null
-  // 반환 → "웹툰을 찾을 수 없어요"로 정상 degrade.
-  if (webtoons.length === 0) return [{ slug: 'placeholder' }];
-  return webtoons.map((w) => ({ slug: w.id }));
 }
 
 async function findWebtoon(slug: string): Promise<CmsWebtoon | null> {

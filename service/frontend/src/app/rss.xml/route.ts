@@ -3,9 +3,8 @@ import { letterHref } from '@/shared/lib/letterHref';
 
 // AI LENS RSS 2.0 피드 — en.sedaily.com/rss/newsall 패턴 참고(2026-08-07).
 // AI 크롤러/뉴스 애그리게이터가 sitemap 외에 RSS로도 신규 콘텐츠를 빠르게
-// 발견할 수 있게 한다. 정적 export이므로 빌드타임에 한 번 생성되는 정적
-// Route Handler — 요청별 동적 데이터에 의존하지 않는다(request 미사용).
-export const dynamic = 'force-static';
+// 발견할 수 있게 한다. SSR(2026-08-08)로 요청마다 동적 생성 — admin 발행이
+// 재빌드 없이 바로 반영된다(force-static 이었던 이전엔 빌드 시점에 고정됐음).
 
 const BASE = 'https://ailens.sedaily.ai';
 const FEED_LIMIT = 30;

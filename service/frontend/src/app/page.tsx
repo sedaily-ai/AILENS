@@ -47,10 +47,15 @@ function HomeContent({
 // 서버 컴포넌트로 전환(2026-08-07, 홈 SSG 감사) — 이전엔 페이지 전체가
 // 'use client'라 정적 HTML에 nav/footer(192자)뿐이었다. 홈 피드가 실제로
 // 렌더하는 5개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
-// WordsPreviewSection/MiniHeadlinesSection)의 데이터를 빌드타임에 미리 가져와
-// FeedPage → NewsFeedTab → 각 섹션까지 initialX prop으로 내려준다. 나머지
-// 섹션(TimelinePreviewSection/TrendingEconomySection/ColumnPreviewSection 등)은
+// WordsPreviewSection/MiniHeadlinesSection)의 데이터를 미리 가져와 FeedPage →
+// NewsFeedTab → 각 섹션까지 initialX prop으로 내려준다. 나머지 섹션
+// (TimelinePreviewSection/TrendingEconomySection/ColumnPreviewSection 등)은
 // 의도된 mock/placeholder라 그대로 둔다.
+// force-dynamic(SSR, 2026-08-08) — webtoon/page.tsx, letters/page.tsx와 동일
+// 이유. 홈은 특히 방문 빈도가 가장 높아 이 설정이 없으면 신규 발행 콘텐츠가
+// 가장 눈에 띄게 안 보이는 페이지가 된다.
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const [initialFollowingLetters, initialWebtoons, initialVideos, initialWordTerms, initialCmsLetters] =
     await Promise.all([

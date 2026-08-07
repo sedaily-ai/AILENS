@@ -1,5 +1,14 @@
 # 2026-08-07 렌더링 전략 결정 — SSG + 발행 시 재빌드 (서버 없음)
 
+⚠️ **2026-08-08 뒤집힘.** 이 문서의 결정("SSG + 발행 시 재빌드", 서버 없음)은 더 이상
+유효하지 않다 — 실제로는 여기서 채택한 "발행 시 자동 CodeBuild 재빌드"조차 구현되지 않은
+채 방치돼 있었고(결정만 되고 실행이 안 됨), 그 상태에서 admin 발행이 반영 안 되는 문제가
+실제로 발생해 사용자가 진짜 실시간(서버 있음, SSR)을 요구했다. 아래 §2("SSR + On-Demand
+ISR")에서 기각했던 방향으로 실제 전환했다 — EC2 + Next.js SSR + PM2 + nginx, en.sedaily.com
+패턴을 그대로 따름. 경위·구현 상세는
+[`docs/worklog/2026-08/2026-08-08-frontend-ssr-migration.md`](../worklog/2026-08/2026-08-08-frontend-ssr-migration.md)
+참조. 이 문서는 "그 시점에 왜 SSG를 택했었는지"의 역사적 기록으로 남긴다.
+
 작성: Claude Code (사용자와의 논의 결과 기록)
 관련: `docs/worklog/2026-08/2026-08-07-cloudfront-rsc-navigation-bug.md`(이 논의의 발단이 된
 버그), 계획 파일 `~/.claude/plans/cozy-squishing-balloon.md`

@@ -5,12 +5,12 @@ import { LetterDetailClient } from './LetterDetailClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
 
-// 빌드타임 라이브 seed — prerender·메타데이터는 CMS 글(channel=letters) API 에서
-// 직접 가져온다. today-letters(구 AI 파이프라인 daily_letters)는 2026-08-04
-// RDS pgvector-v2 삭제로 영구히 빈 응답만 반환한다(CLAUDE.md 참조) — 그 뒤로
-// 이 페이지가 계속 placeholder 하나만 prerender 하고 있었다(2026-08-07 발견).
-// 실제 콘텐츠는 전부 CMS(DynamoDB) 경로로 발행되고 있어 거기서 가져온다.
-// 빌드 시 API 가 닿지 않으면 빈 결과로 degrade(클라이언트 이동은 /letters/view 로 동작).
+// 콘텐츠·메타데이터는 CMS 글(channel=letters) API 에서 요청마다 직접 가져온다
+// (SSR, 2026-08-08 — 재빌드 없이 admin 발행이 즉시 반영되게 하려고 전환).
+// today-letters(구 AI 파이프라인 daily_letters)는 2026-08-04 RDS pgvector-v2
+// 삭제로 영구히 빈 응답만 반환한다(CLAUDE.md 참조) — 실제 콘텐츠는 전부
+// CMS(DynamoDB) 경로로 발행되고 있어 거기서 가져온다. API 가 안 닿으면 빈
+// 결과로 degrade(클라이언트 이동은 /letters/view 로 동작).
 const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
 const SEED_DAYS = 14;
 
@@ -40,32 +40,18 @@ function recentDatesISO(days: number): string[] {
 // 저작자 표시는 이 하나로 고정. todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.
 const DEFAULT_AUTHOR = { name: 'AI LENS', archetype: 'AI LENS 편집팀' };
 
-// 정적 export — 최근 SEED_DAYS 일의 라이브 발행 레터를 prerender (빌드타임 fetch).
-export async function generateStaticParams() {
-  const ids = new Set<string>();
-  for (const date of recentDatesISO(SEED_DAYS)) {
-    const letters = await fetchLettersForDate(date);
-    // 모든 레터가 자기 자신의 id 를 갖는다 (그룹-날짜 합성 id 스킴 폐지, 2026-08-07).
-    for (const l of letters) {
-      ids.add(l.id);
-    }
-  }
-  // output:'export' 는 동적 라우트에 param 이 0개면 빌드 자체를 실패시킨다.
-  // daily_letters 가 전부 비어있는 기간(현재 — RDS 삭제로 Editor Pick 자동생성
-  // 중단) 에도 빌드가 죽지 않도록 최소 1개는 확보한다. 실존하지 않는 id 라
-  // findLetter() 가 null 반환 → "레터를 찾을 수 없어요" 로 정상 degrade.
-  if (ids.size === 0) ids.add('placeholder-1970-01-01');
-  return [...ids].map((id) => ({ id }));
-}
-
+// SSR(2026-08-08) — generateStaticParams 없음, 요청마다 서버가 렌더링한다.
 // id 에 더 이상 날짜가 인코딩돼있지 않아(그룹-날짜 합성 id 스킴 폐지), 최근
-// SEED_DAYS 일을 훑으며 .id 가 일치하는 레터를 찾는다. 빌드타임(prerender)과
-// generateMetadata 에서만 호출되는 저빈도 함수라 순차 스캔으로 충분하다.
+// SEED_DAYS 일을 훑어 .id 가 일치하는 레터를 찾는다. 정적 export 시절엔
+// 빌드타임 1회성이라 순차 스캔이었지만, 요청마다 도는 지금은 오래된 레터일수록
+// 레이턴시가 쌓이므로 병렬로 가져와 찾는다. id 는 전역 유일이라 날짜 간
+// 충돌 걱정 없이 안전하게 병렬화할 수 있다.
 async function findLetter(id: string): Promise<(ApiLetter & { date: string }) | null> {
-  for (const date of recentDatesISO(SEED_DAYS)) {
-    const letters = await fetchLettersForDate(date);
-    const l = letters.find((x) => x.id === id);
-    if (l) return { ...l, date };
+  const dates = recentDatesISO(SEED_DAYS);
+  const results = await Promise.all(dates.map((date) => fetchLettersForDate(date)));
+  for (let i = 0; i < dates.length; i += 1) {
+    const l = results[i].find((x) => x.id === id);
+    if (l) return { ...l, date: dates[i] };
   }
   return null;
 }

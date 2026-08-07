@@ -73,10 +73,15 @@ export interface CmsVideo {
 // sessionStorage 에도 같이 적어서 같은 탭 세션 안에서는 재방문·새로고침해도
 // 캐시 히트로 즉시 렌더되게 한다(stale-while-revalidate: 캐시가 있으면 그걸
 // 먼저 돌려주고, 동시에 백그라운드로 새로 받아와 다음 번을 위해 갱신).
-// TTL 3분 — 백엔드 응답 자체의 Cache-Control(max-age=300)보다 짧게 잡아
-// admin 발행 반영이 과하게 늦어지지 않게 한다. 새 탭/새 세션은 항상 새로
-// 받아온다(sessionStorage 특성상 세션이 다르면 캐시 자체가 없음).
-const REQUEST_CACHE_TTL_MS = 3 * 60 * 1000;
+// TTL 20초 — SSR 전환(2026-08-08) 이후 이 모듈스코프 Map은 브라우저 세션이
+// 아니라 EC2 위 Node 프로세스가 떠있는 내내 "전체 방문자가 공유하는 서버
+// 캐시"로 의미가 바뀐다(정적 export 시절엔 빌드 1회성 dedup 용도였음).
+// admin 발행이 재빌드 없이 거의 즉시 반영돼야 한다는 요구 때문에 짧게 잡되,
+// 완전히 0으로는 안 둔다 — 같은 페이지에 동시 접속이 몰릴 때 API Gateway/
+// Lambda로 나가는 중복 요청을 여전히 줄여준다(공개 콘텐츠라 사용자 간
+// 캐시 공유는 안전). 새 탭/새 세션은 sessionStorage 캐시가 없어 항상 새로
+// 받아온다.
+const REQUEST_CACHE_TTL_MS = 20 * 1000;
 const SESSION_PREFIX = 'ailens-cms-cache:';
 const requestCache = new Map<string, { promise: Promise<unknown>; expiresAt: number }>();
 
