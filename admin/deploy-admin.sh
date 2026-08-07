@@ -91,5 +91,5 @@ aws cloudfront wait invalidation-completed \
 
 echo ""
 echo "=== 배포 완료 (무효화 전파까지 확인됨) ==="
-echo "URL: https://mbti-admin.sedaily.ai"
+echo "URL: https://lensdb.sedaily.ai"
 echo "Distribution: https://$CF_DIST_ID.cloudfront.net (also reachable)"

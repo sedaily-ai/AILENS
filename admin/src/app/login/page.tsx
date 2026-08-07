@@ -45,7 +45,7 @@ export default function LoginPage() {
       >
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            mbti-admin.sedaily.ai
+            lensdb.sedaily.ai
           </h1>
           <p className="text-sm text-gray-700">관리자 비밀번호 입력</p>
         </div>

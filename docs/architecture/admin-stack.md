@@ -101,7 +101,13 @@ SSM SecureString reader for v1 / v2 / admin Lambdas, replacing plaintext passwor
 
 ### Admin Frontend (Admin-4)
 
-`admin/` is a **second Next.js app** alongside `service/frontend/`, dedicated to the admin console targeting `mbti-admin.sedaily.ai`. Built by Admin-4 in commit `bb0c900` and **not yet deployed** — Admin-5 covers the AWS-side work. The two frontends share **zero source code and zero state**; they are independently versioned, built, and (eventually) hosted.
+⚠️ **도메인 변경(2026-08-08)**: `mbti-admin.sedaily.ai`는 완전히 폐기됐다 — CloudFront
+alias·Route53 A/AAAA 레코드·API Gateway CORS 전부 제거. 관리자 콘솔의 실제 도메인은
+이제 `lensdb.sedaily.ai`(그리고 `ailens-admin.sedaily.ai`도 병행 유지). 아래 본문에
+남아있는 `mbti-admin.sedaily.ai` 언급은 Admin-4/5 당시 기록이라 역사적 맥락으로만
+유효하고, 현재 실제 도메인이 아니다.
+
+`admin/` is a **second Next.js app** alongside `service/frontend/`, dedicated to the admin console (originally targeting `mbti-admin.sedaily.ai`, now `lensdb.sedaily.ai` — see note above). Built by Admin-4 in commit `bb0c900` and **not yet deployed** — Admin-5 covers the AWS-side work. The two frontends share **zero source code and zero state**; they are independently versioned, built, and (eventually) hosted.
 
 - **Stack consistency with `frontend`**: Next.js 16.2.4 + React 19.2.4 + Tailwind v4 + TypeScript 5. Generated via `create-next-app@latest --app --src-dir --tailwind --typescript --eslint`. The lockfile and `node_modules` are independent — keep dependency versions intentionally in sync when bumping either app, but do not symlink.
 - **Output**: `next.config.ts` sets `output: "export"` + `images: { unoptimized: true }`. `npm run build` writes static HTML/JS/CSS to `admin/out/` — eight routes: `/`, `/login`, `/cost`, `/drivers`, `/prompts`, `/prompts/edit`, `/settings`, `/_not-found`. Admin-5 will `aws s3 sync out/ s3://...` this directory.
