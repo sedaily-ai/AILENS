@@ -64,23 +64,65 @@ export interface CmsVideo {
   is_cms: true;
 }
 
-// 요청 단위 in-flight 캐시 — 홈 화면 섹션 다수(트렌드/칼럼/단어퀴즈/미니헤드라인
-// 등)가 같은 파라미터로 fetchCmsPosts/fetchTrendCards 를 각자 따로 불러서,
-// 동일한 응답을 기다리는 중복 요청이 여러 개 동시에 나가고 있었다(2026-08-07,
-// "섹션들이 한번에 안 뜨고 딜레이 있다" 피드백 — 원인은 캐시 부재로 인한
-// 중복 fetch였다). 정확히 같은 파라미터 호출은 진행 중인 Promise 를 공유해
-// 실제 네트워크 요청 수를 줄인다. TTL 은 짧게(30초) — admin 발행 직후 반영이
-// 너무 늦어지면 안 되고, 어차피 페이지를 새로고침하면 캐시는 초기화된다.
-const REQUEST_CACHE_TTL_MS = 30 * 1000;
+// 요청 단위 캐시 — 홈 화면 섹션 다수(트렌드/칼럼/단어퀴즈/미니헤드라인 등)가
+// 같은 파라미터로 fetchCmsPosts/fetchTrendCards 를 각자 따로 불러서, 동일한
+// 응답을 기다리는 중복 요청이 여러 개 동시에 나가고 있었다(2026-08-07,
+// "섹션들이 한번에 안 뜨고 딜레이 있다" 피드백). in-memory 캐시로 그건
+// 고쳤지만, in-memory 는 페이지를 새로고침하거나 다른 페이지 갔다 오면
+// 초기화돼서 "그때그때 또 로딩한다"는 재피드백(같은 날)으로 이어졌다 —
+// sessionStorage 에도 같이 적어서 같은 탭 세션 안에서는 재방문·새로고침해도
+// 캐시 히트로 즉시 렌더되게 한다(stale-while-revalidate: 캐시가 있으면 그걸
+// 먼저 돌려주고, 동시에 백그라운드로 새로 받아와 다음 번을 위해 갱신).
+// TTL 3분 — 백엔드 응답 자체의 Cache-Control(max-age=300)보다 짧게 잡아
+// admin 발행 반영이 과하게 늦어지지 않게 한다. 새 탭/새 세션은 항상 새로
+// 받아온다(sessionStorage 특성상 세션이 다르면 캐시 자체가 없음).
+const REQUEST_CACHE_TTL_MS = 3 * 60 * 1000;
+const SESSION_PREFIX = 'ailens-cms-cache:';
 const requestCache = new Map<string, { promise: Promise<unknown>; expiresAt: number }>();
 
+function readSession<T>(key: string): { value: T; expiresAt: number } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { value: T; expiresAt: number };
+    if (typeof parsed.expiresAt !== 'number' || parsed.expiresAt < Date.now()) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: unknown, expiresAt: number) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(SESSION_PREFIX + key, JSON.stringify({ value, expiresAt }));
+  } catch {
+    // 세션스토리지 용량 초과 등 — 캐시는 그냥 최적화라 실패해도 무시.
+  }
+}
+
 function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
-  const hit = requestCache.get(key);
-  if (hit && hit.expiresAt > Date.now()) return hit.promise as Promise<T>;
-  const promise = run();
-  promise.catch(() => requestCache.delete(key));
-  requestCache.set(key, { promise, expiresAt: Date.now() + REQUEST_CACHE_TTL_MS });
-  return promise;
+  const memHit = requestCache.get(key);
+  if (memHit && memHit.expiresAt > Date.now()) return memHit.promise as Promise<T>;
+
+  const expiresAt = Date.now() + REQUEST_CACHE_TTL_MS;
+  const store = (p: Promise<T>) => {
+    requestCache.set(key, { promise: p, expiresAt });
+    p.then((v) => writeSession(key, v, expiresAt)).catch(() => requestCache.delete(key));
+    return p;
+  };
+
+  const sessionHit = readSession<T>(key);
+  if (sessionHit) {
+    // 캐시 즉시 반환 + 다음 호출을 위해 백그라운드에서 조용히 갱신(결과를
+    // 기다리는 현재 호출자에게는 옛 값을 그대로 준다 — 화면이 있다가 없다가
+    // 하는 깜빡임 없이, 새로고침 한 번 더 하면 최신값이 보이는 정도로 충분).
+    store(run());
+    return Promise.resolve(sessionHit.value);
+  }
+
+  return store(run());
 }
 
 export async function fetchCmsPosts(

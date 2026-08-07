@@ -112,14 +112,59 @@ export function withDisplayMeta(letter: ApiLetter): DisplayLetter {
 // Promise 자체를 캐시해 동시 호출(병렬 4편 prefetch)이 같은 fetch 를 공유.
 // TTL 로 만료시켜, 세션을 오래 열어둔 사용자가 CMS 수정분·신규 발행을
 // 하드 리프레시 없이도 받아보게 한다 (당일 캐시가 무기한 박제되던 버그 수정).
+//
+// 2026-08-07: sessionStorage 에도 같이 적는다 — FollowingFeed(이슈 톡톡)는
+// 오늘자가 비어 있으면 전날·전전날로 직접 날짜를 거슬러 여러 번 fetch 하는데
+// (lookback), in-memory 캐시만으로는 페이지를 새로고침하거나 다른 페이지
+// 갔다 오면 이 lookback 전체가 매번 처음부터 다시 돈다 — "그때그때 로딩하는
+// 것 같다"는 피드백(같은 날)의 핵심 원인. cmsPostsApi.ts 의 동일 패턴 참조.
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const SESSION_PREFIX = 'ailens-letters-cache:';
 const lettersCache = new Map<string, { promise: Promise<ApiTodayLettersResponse>; expiresAt: number }>();
+
+function readSession(key: string): { value: ApiTodayLettersResponse; expiresAt: number } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { value: ApiTodayLettersResponse; expiresAt: number };
+    if (typeof parsed.expiresAt !== 'number' || parsed.expiresAt < Date.now()) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: ApiTodayLettersResponse, expiresAt: number) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(SESSION_PREFIX + key, JSON.stringify({ value, expiresAt }));
+  } catch {
+    // 세션스토리지 용량 초과 등 — 캐시는 최적화일 뿐이라 실패해도 무시.
+  }
+}
 
 export async function fetchTodayLetters(date?: string): Promise<ApiTodayLettersResponse> {
   const key = date ?? '__today__';
   const cached = lettersCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.promise;
 
+  const expiresAt = Date.now() + CACHE_TTL_MS;
+  const sessionHit = readSession(key);
+  if (sessionHit) {
+    // 캐시 즉시 반환 + 백그라운드로 조용히 갱신(다음 호출을 위해).
+    const bg = fetchTodayLettersLive(date, expiresAt);
+    lettersCache.set(key, { promise: bg, expiresAt });
+    return sessionHit.value;
+  }
+
+  const promise = fetchTodayLettersLive(date, expiresAt);
+  lettersCache.set(key, { promise, expiresAt });
+  return promise;
+}
+
+async function fetchTodayLettersLive(date: string | undefined, expiresAt: number): Promise<ApiTodayLettersResponse> {
+  const key = date ?? '__today__';
   const promise = (async () => {
     // 라이브 단일 소스 (mock fallback 제거 2026-07-24). 해당 날짜에 레터가
     // 없으면 API 가 letters:[] 를 반환 — 호출측이 빈 상태/직전일 lookback 처리.
@@ -147,9 +192,9 @@ export async function fetchTodayLetters(date?: string): Promise<ApiTodayLettersR
       : data;
   })();
 
-  // 실패 시 다음 호출에서 재시도되도록 cache 에서 제거.
-  promise.catch(() => lettersCache.delete(key));
-  lettersCache.set(key, { promise, expiresAt: Date.now() + CACHE_TTL_MS });
+  // 실패 시 다음 호출에서 재시도되도록 cache 에서 제거. 성공하면 다음
+  // 세션/새로고침에서 즉시 히트하도록 sessionStorage 에도 적는다.
+  promise.then((v) => writeSession(key, v, expiresAt)).catch(() => lettersCache.delete(key));
   return promise;
 }
 
