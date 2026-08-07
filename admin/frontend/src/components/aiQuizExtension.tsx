@@ -3,14 +3,19 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 import { useState } from "react";
-import { AiQuizModal, type AiQuizData } from "./AiQuizModal";
+import { AiQuizModal, EMPTY as EMPTY_AI_QUIZ_DATA, type AiQuizData } from "./AiQuizModal";
 
 // 본문 중 퀴즈/투표 위젯 — 저장 시 <div data-ai-quiz='{...}'></div> 로 직렬화된다.
 // 퍼블릭 프론트(LetterDetailClient.tsx RichBodyWithInteractiveBlocks)가 이
 // data-ai-quiz 속성을 읽어 InteractiveBlock 컴포넌트로 바꿔 렌더한다 — 그
 // 컴포넌트가 기대하는 모양(AiQuizData)과 여기 데이터가 1:1로 맞아야 한다.
 function AiQuizNodeView({ node, updateAttributes, deleteNode, selected, editor, getPos }: ReactNodeViewProps) {
-  const data = node.attrs.data as AiQuizData;
+  // node.attrs.data 가 null 일 수 있다(default: null, parseHTML 이 data-ai-quiz
+  // 속성 누락·JSON 파싱 실패 시 null 반환) — 방어 없이 바로 data.icon 등을 읽으면
+  // 저장된 글에 손상된 퀴즈 노드가 하나만 있어도 에디터 전체가 크래시한다
+  // (2026-08-08, 사용자가 실제로 겪은 "Cannot read properties of null (reading
+  // 'icon')" 크래시 리포트로 발견).
+  const data = (node.attrs.data as AiQuizData | null) ?? EMPTY_AI_QUIZ_DATA;
   const [editing, setEditing] = useState(false);
 
   // 네이티브 HTML5 드래그(끌어서 이동)는 draggable=true 등 속성은 다 맞게

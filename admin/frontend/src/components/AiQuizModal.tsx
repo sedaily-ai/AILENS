@@ -14,7 +14,9 @@ export interface AiQuizData {
   explanation?: string;
 }
 
-const EMPTY: AiQuizData = {
+// aiQuizExtension.tsx(에디터 노드뷰)도 data 가 null 인 저장된 콘텐츠를 만나면
+// 이 기본값으로 폴백한다 — export 해서 두 곳이 같은 빈 모양을 쓰게 한다.
+export const EMPTY: AiQuizData = {
   mode: "quiz",
   icon: "",
   title: "",
