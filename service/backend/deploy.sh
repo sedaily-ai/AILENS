@@ -17,7 +17,7 @@
 #   ./deploy.sh           — Deploy all functions (= api, 현재는 동의어)
 #   ./deploy.sh api       — Deploy API functions only
 
-set -e
+set -euo pipefail
 
 DEPLOY_TARGET="${1:-all}"
 
@@ -232,6 +232,25 @@ done
 
 echo ""
 echo "[DONE] Deployment complete! ($SUCCESS_COUNT updated, $FAIL_COUNT skipped)"
+echo ""
+
+# ============================================
+# Step 4: Health Check
+# ============================================
+# 21개 함수가 같은 zip을 공유하는 구조라, 이 zip 자체가 깨졌으면(의존성 누락 등)
+# 전부 같이 죽는다 — 그 케이스를 잡기 위해 대표로 하나만 호출해본다. 이 함수를
+# 고른 이유: CMS 공개 조회라 인증 없이 바로 확인 가능하고, 오늘 세션에서 가장
+# 최근에 손댄 핸들러라 회귀에 가장 민감하다.
+echo "Health check (sedaily-mbti-v2-posts-dev)..."
+sleep 2
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+  "https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev/api/v2/posts?channel=letters&limit=1")
+echo "  GET /api/v2/posts?channel=letters&limit=1 -> $HTTP_CODE"
+if [ "$HTTP_CODE" != "200" ]; then
+  echo "  [WARN] 200이 아님 — CloudWatch 로그로 확인 필요 (배포된 21개 함수 중 하나가" >&2
+  echo "         이 결과만으로 전부 정상/비정상이라 단정할 수는 없음)." >&2
+fi
+
 echo ""
 echo "Monitoring commands:"
 echo "  -> Article Collector:"
