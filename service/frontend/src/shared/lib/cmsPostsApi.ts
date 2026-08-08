@@ -89,9 +89,11 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
 // 태그로 캐시해서 Next <Link> 프리페치가 살아있게 하고(no-store였을 땐 캐시할
 // 게 없어서 프리페치가 무력화돼 있었다), admin이 글을 쓰면 POST /api/revalidate
 // (src/app/api/revalidate/route.ts)가 같은 태그를 revalidateTag()로 깬다.
-// revalidate:60(상한)도 같이 걸어서 webhook을 놓쳐도(오늘 아침 "삭제한 글이
-// 안 사라짐" 사고처럼) 최악 60초 안엔 스스로 회복한다 — 태그만 걸고 캐시
+// revalidate:5(상한)도 같이 걸어서 webhook을 놓쳐도(오늘 아침 "삭제한 글이
+// 안 사라짐" 사고처럼) 최악 5초 안엔 스스로 회복한다 — 태그만 걸고 캐시
 // 옵션을 안 주면 Next 15+ 기본값(fetch 무캐시)이라 캐싱 자체가 안 켜진다.
+// (2026-08-09: 60초→5초로 재단축 — SSE 실시간 push를 걷어내면서, "요청-응답
+// 기반 최신성만으로 충분"이라는 방향에 맞춰 자연 회복 상한 자체를 좁혔다.)
 function tag(channel: CmsChannel): string {
   return `posts:${channel}`;
 }
@@ -108,7 +110,7 @@ export async function fetchCmsPosts(
       if (limit) qs.set('limit', String(limit));
       const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, {
         cache: 'force-cache',
-        next: { tags: [tag(channel)], revalidate: 60 },
+        next: { tags: [tag(channel)], revalidate: 5 },
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLetter[] };
@@ -126,7 +128,7 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
     try {
       const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, {
         cache: 'force-cache',
-        next: { tags: [tag('trend_card')], revalidate: 60 },
+        next: { tags: [tag('trend_card')], revalidate: 5 },
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsTrendCard[] };
@@ -142,7 +144,7 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
     try {
       const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`, {
         cache: 'force-cache',
-        next: { tags: [tag('webtoon')], revalidate: 60 },
+        next: { tags: [tag('webtoon')], revalidate: 5 },
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
@@ -157,7 +159,7 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
   try {
     const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, {
       cache: 'force-cache',
-      next: { tags: [tag('webtoon')], revalidate: 60 },
+      next: { tags: [tag('webtoon')], revalidate: 5 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsWebtoon };
@@ -172,7 +174,7 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
     try {
       const res = await fetch(`${API_URL}/api/v2/posts?channel=video`, {
         cache: 'force-cache',
-        next: { tags: [tag('video')], revalidate: 60 },
+        next: { tags: [tag('video')], revalidate: 5 },
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
@@ -192,7 +194,7 @@ export async function fetchCmsPostBySlug(
   try {
     const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, {
       cache: 'force-cache',
-      next: { tags: [tag(channel)], revalidate: 60 },
+      next: { tags: [tag(channel)], revalidate: 5 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsLetter };

@@ -31,9 +31,17 @@ from typing import Any
 
 from common import http
 
+# 기자 본인이 방금 수정한 내용을 새로고침 시 즉시 봐야 하는 admin 콘솔용
+# 응답이라 브라우저/중간 캐시가 절대 붙잡지 않게 no-store를 못박는다
+# (2026-08-09). common.http는 v1/v2 공개 콘텐츠 API도 같이 쓰는 CORS 중립
+# 모듈이라 거기 DEFAULT_HEADERS에 얹으면 안 된다 — 공개 콘텐츠 API는 반대로
+# 캐시가 돼야 하므로(cmsPostsApi.ts의 revalidate:5), admin 전용인 이 파일에서만
+# headers로 얹어 admin 응답에만 스코프한다.
+_ADMIN_HEADERS = {"Cache-Control": "no-store"}
+
 
 def ok(body: Any, status: int = 200) -> dict:
-    return http.success(body, status)
+    return http.success(body, status, headers=_ADMIN_HEADERS)
 
 
 def err(message: str, status: int = 400, **extra: Any) -> dict:
@@ -42,4 +50,4 @@ def err(message: str, status: int = 400, **extra: Any) -> dict:
     이전에는 body 최상위에 펼쳤다. 넘기는 곳은 auth.py 의 retry_after_seconds
     한 곳뿐이고, 프런트는 status 423 만 보고 그 필드를 읽지 않는다.
     """
-    return http.error(message, status, details=extra or None)
+    return http.error(message, status, details=extra or None, headers=_ADMIN_HEADERS)

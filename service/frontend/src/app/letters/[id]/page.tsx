@@ -20,7 +20,7 @@ async function fetchLettersForDate(date: string): Promise<ApiLetter[]> {
     // 태그를 revalidateTag() 로 깬다(cmsPostsApi.ts 와 동일 정책).
     const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${date}`, {
       cache: 'force-cache',
-      next: { tags: ['posts:letters'], revalidate: 60 },
+      next: { tags: ['posts:letters'], revalidate: 5 },
     });
     if (!res.ok) return [];
     const data = (await res.json()) as { posts?: ApiLetter[] };

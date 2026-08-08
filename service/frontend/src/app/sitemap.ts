@@ -38,7 +38,7 @@ async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
     try {
       const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${iso}`, {
         cache: 'force-cache',
-        next: { tags: ['posts:letters'], revalidate: 60 },
+        next: { tags: ['posts:letters'], revalidate: 5 },
       });
       if (!res.ok) continue;
       const data = (await res.json()) as { posts?: Array<{ id: string }> };
