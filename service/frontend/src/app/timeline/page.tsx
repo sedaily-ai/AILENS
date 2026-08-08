@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Header } from "@/widgets/Header";
 import Link from 'next/link';
-import { NewsTimeMachine } from '@/components/timeline/NewsTimeMachine';
+import { NewsTimeMachine } from '@/features/timeline';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { UserMenu } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
