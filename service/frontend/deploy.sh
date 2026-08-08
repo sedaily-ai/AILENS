@@ -1,107 +1,137 @@
 #!/usr/bin/env bash
-# frontend (MBTI 메인, ailens.sedaily.ai) 배포 — npm build + S3 sync + CloudFront invalidation.
-# 백엔드는 service/backend/deploy.sh 로 별도. 본 스크립트는 프런트만.
+# frontend (AI LENS, ailens.sedaily.ai) SSR 배포 — EC2 + PM2.
+#
+# 2026-08-08 SSR 전환(EC2+PM2+nginx) 이후 정적 export(S3+CloudFront) 배포는
+# 더 이상 안 쓴다. 옛 버전(S3 sync + CloudFront invalidation)은 git 히스토리
+# 참조. 이 스크립트는 2026-08-09에 새로 작성 — 그 전까지는 매번 수동으로
+# build→tar.gz→S3→SSM extract→symlink→pm2 restart 과정을 재현했다
+# (docs/worklog/2026-08/2026-08-09-cache-ttl-tighten-sse-removal.md 참조).
 #
 # 사용:
 #   cd service/frontend
 #   ./deploy.sh
 #
 # 전제:
-#   - 정적 export (next.config: output 'export') → out/ 생성
-#   - AWS CLI credential 유효 (aws sts get-caller-identity 로 회사 ai_nova 확인 권장)
-#   - region 은 각 명령에 --region 명시 (default region 무관)
+#   - output: "standalone" (next.config.ts) → .next/standalone/ 생성
+#   - AWS CLI credential 유효, EC2에 SSM 세션 매니저로 명령 실행 가능
+#     (SSH 인바운드 없음 — ailens-ssr-ec2-role 이 AmazonSSMManagedInstanceCore)
+#   - EC2의 .env.production.local(REVALIDATE_SECRET 등)은 새 릴리스로 그대로
+#     복사한다 — 이 스크립트가 시크릿 자체를 새로 쓰지는 않는다. 시크릿 값
+#     자체를 바꿔야 하면 SSM Parameter Store 갱신 + EC2에서 수동으로
+#     .env.production.local 갱신이 별도 필요(이 스크립트 범위 밖).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-S3_BUCKET="sedaily-mbti-frontend-dev"
-S3_REGION="us-east-1"
-CF_DIST_ID="E1QS7PY350VHF6"
+S3_RELEASES_BUCKET="ailens-ssr-releases"
+AWS_REGION="us-east-1"
+EC2_INSTANCE_ID="i-077eb96afcc2597d4"
+PM2_PROCESS="ailens-frontend"
 
-echo "=== frontend 빌드 (정적 export) ==="
+echo "=== 1/5 빌드 (standalone) ==="
 npm run build
 
-if [ ! -d out ]; then
-  echo "ERROR: out/ 없음 — 정적 export 실패. 배포 중단." >&2
+if [ ! -f .next/standalone/server.js ]; then
+  echo "ERROR: .next/standalone/server.js 없음 — standalone 빌드 실패. 배포 중단." >&2
   exit 1
 fi
 
 echo ""
-echo "=== S3 sync — 해시 에셋 장기 캐시 (1년, immutable) ==="
-aws s3 cp out/_next/ "s3://$S3_BUCKET/_next/" \
-  --recursive \
-  --cache-control "public,max-age=31536000,immutable" \
-  --region "$S3_REGION" \
+echo "=== 2/5 릴리스 패키징 ==="
+TS="$(date -u +%Y%m%d-%H%M%S)"
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT
+
+# standalone 산출물은 client 정적 에셋(.next/static)과 public/을 자체적으로
+# 포함하지 않는다 — Next 문서대로 별도 복사해야 server.js가 정상 서빙한다.
+cp -r .next/standalone/. "$BUILD_DIR/"
+mkdir -p "$BUILD_DIR/.next"
+cp -r .next/static "$BUILD_DIR/.next/static"
+cp -r public "$BUILD_DIR/public"
+
+TARBALL="/tmp/ailens-release-${TS}.tar.gz"
+(cd "$BUILD_DIR" && tar -czf "$TARBALL" .)
+echo "  [OK] $(du -h "$TARBALL" | cut -f1) — ${TS}"
+
+echo ""
+echo "=== 3/5 S3 업로드 ==="
+aws s3 cp "$TARBALL" "s3://${S3_RELEASES_BUCKET}/releases/${TS}.tar.gz" \
+  --region "$AWS_REGION" \
   --no-progress
+rm -f "$TARBALL"
 
 echo ""
-echo "=== S3 sync — 엔트리 파일 (매 요청 재검증) ==="
-# max-age=300 이었다가 no-cache로 바꿨다(2026-08-07) — "5분간 무조건 캐시 신뢰"가
-# 배포 직후 정확히 이 문제를 냈다: 라우트 전환 시 next/link가 fetch하는
-# __next.*.txt 페이로드(엔트리 HTML과 동일 캐시 정책)를 배포 5분 전후에 한 번이라도
-# 받은 브라우저는, 새 탭을 열어도 같은 프로필이면 그 캐시를 그대로 써서 옛 빌드의
-# 페이로드를 받는다 — Next 라우터가 이걸 조용히 못 쓰고 네비게이션이 멈춘다(URL
-# 안 바뀜, 에러도 안 뜸). no-cache(=must-revalidate와 동일 동작)는 매번 서버에 재검증
-# 요청을 보내되 ETag가 안 바뀌었으면 304로 저렴하게 끝나 — "5분 캐시로 롤백 빠르게"
-# 라는 원래 의도(빠른 재배포로 롤백)는 그대로 유지하면서, 빌드 버전이 뒤섞이는
-# 경우를 근본적으로 없앤다.
-aws s3 cp out/ "s3://$S3_BUCKET/" \
-  --recursive \
-  --exclude "_next/*" \
-  --exclude "*.txt" \
-  --cache-control "no-cache, must-revalidate" \
-  --region "$S3_REGION" \
-  --no-progress
+echo "=== 4/5 EC2 릴리스 전환 (SSM Run Command) ==="
+# .env.production.local은 새로 안 만든다 — 현재 release(current 심볼릭 링크가
+# 가리키는 디렉터리)에서 그대로 복사해온다. REVALIDATE_SECRET 등은 배포마다
+# 안 바뀌는 값이라 이렇게 이어받는 게 맞다(값 자체를 바꾸는 건 이 스크립트
+# 범위 밖 — 위 주석 참조).
+SSM_COMMANDS=$(python3 -c "
+import json
+ts = '${TS}'
+bucket = '${S3_RELEASES_BUCKET}'
+process = '${PM2_PROCESS}'
+cmds = [
+    'set -e',
+    f'REL=/opt/ailens/releases/{ts}',
+    'mkdir -p \$REL',
+    f'aws s3 cp s3://{bucket}/releases/{ts}.tar.gz /tmp/{ts}.tar.gz --region ${AWS_REGION}',
+    f'tar -xzf /tmp/{ts}.tar.gz -C \$REL',
+    'cp /opt/ailens/current/.env.production.local \$REL/.env.production.local',
+    'ln -sfn \$REL /opt/ailens/current',
+    f'cd /opt/ailens/current && pm2 restart {process} --update-env',
+    'sleep 2',
+    'pm2 list',
+    \"curl -s -o /dev/null -w 'local_status=%{http_code}\n' http://localhost:3000/\",
+    f'rm -f /tmp/{ts}.tar.gz',
+]
+print(json.dumps({'commands': cmds}))
+")
 
-echo ""
-echo "=== S3 sync — RSC 페이로드 .txt (Content-Type 명시) ==="
-# aws s3 cp는 확장자만 보고 .txt -> text/plain 을 자동으로 붙이는데, 이 .txt
-# 파일들은 사실 next/link 클라이언트 라우팅이 fetch하는 RSC(flight) 페이로드다.
-# 로컬 dev 서버가 같은 요청에 실제로 내려주는 Content-Type은 text/x-component
-# (2026-08-07, curl로 직접 대조 확인). 이게 안 맞으면 Next 라우터가 응답을
-# 200으로 받고도 유효한 네비게이션 페이로드로 인식하지 못해 조용히 무시한다 —
-# 콘솔 에러도 없이 클릭해도 URL이 안 바뀌는 현상(웹툰·레터 카드 전부)의 진짜
-# 원인이었다.
-aws s3 cp out/ "s3://$S3_BUCKET/" \
-  --recursive \
-  --exclude "*" \
-  --include "*.txt" \
-  --exclude "_next/*" \
-  --cache-control "no-cache, must-revalidate" \
-  --content-type "text/x-component" \
-  --region "$S3_REGION" \
-  --no-progress
-
-echo ""
-echo "=== Stale 파일 정리 ==="
-# _next/static/* 는 --delete 대상에서 뺀다 — 이름이 콘텐츠 해시라 절대
-# 충돌하지 않고, 배포 순간에 이미 열려있던 탭이 옛 청크 파일을 그대로
-# 참조 중이면(클라이언트 사이드 네비게이션 시) 그 파일이 바로 지워져서
-# 요청이 걸리고 라우터가 멈춘다("무한 로딩", 새로고침해야 풀림) — 용량은
-# immutable 캐시라 무해하게 쌓이니 지울 이유가 없다.
-aws s3 sync out/ "s3://$S3_BUCKET/" --delete --exclude "_next/static/*" --region "$S3_REGION" --no-progress
-
-echo ""
-echo "=== CloudFront 무효화 (/* — 전체) ==="
-INVALIDATION_ID=$(aws cloudfront create-invalidation \
-  --distribution-id "$CF_DIST_ID" \
-  --paths "/*" \
-  --query 'Invalidation.Id' \
+COMMAND_ID=$(aws ssm send-command \
+  --region "$AWS_REGION" \
+  --instance-ids "$EC2_INSTANCE_ID" \
+  --document-name "AWS-RunShellScript" \
+  --parameters "$SSM_COMMANDS" \
+  --query "Command.CommandId" \
   --output text)
-echo "Invalidation ID: $INVALIDATION_ID"
+echo "  Command ID: $COMMAND_ID — 실행 대기..."
+
+aws ssm wait command-executed \
+  --region "$AWS_REGION" \
+  --command-id "$COMMAND_ID" \
+  --instance-id "$EC2_INSTANCE_ID" 2>/dev/null || true
+
+STATUS=$(aws ssm get-command-invocation \
+  --region "$AWS_REGION" \
+  --command-id "$COMMAND_ID" \
+  --instance-id "$EC2_INSTANCE_ID" \
+  --query "Status" \
+  --output text)
+
+if [ "$STATUS" != "Success" ]; then
+  echo "ERROR: EC2 배포 명령 실패 (Status=$STATUS)" >&2
+  aws ssm get-command-invocation \
+    --region "$AWS_REGION" \
+    --command-id "$COMMAND_ID" \
+    --instance-id "$EC2_INSTANCE_ID" \
+    --query "StandardErrorContent" \
+    --output text >&2
+  exit 1
+fi
+echo "  [OK] release ${TS} 적용, PM2 재시작 완료 (fork/1-instance라 수백ms~1초 blip 있음)"
 
 echo ""
-echo "=== 무효화 전파 대기 (전 세계 엣지에 퍼질 때까지) ==="
-# create-invalidation은 비동기라 바로 리턴한다 — 이걸 안 기다리고 "배포 완료"를
-# 찍으면, 그 직후 테스트하는 사람이 리전에 따라 몇 분간 옛 캐시를 계속 받을 수
-# 있다(2026-08-07, 웹툰/레터 카드 클릭이 라우팅 안 되는 문제의 재현 조건 중 하나로
-# 의심됨). 완료까지 보통 1~5분 걸린다.
-aws cloudfront wait invalidation-completed \
-  --distribution-id "$CF_DIST_ID" \
-  --id "$INVALIDATION_ID"
+echo "=== 5/5 헬스체크 (실도메인) ==="
+sleep 2
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://ailens.sedaily.ai/)
+echo "  https://ailens.sedaily.ai/ → $HTTP_CODE"
+if [ "$HTTP_CODE" != "200" ]; then
+  echo "WARNING: 헬스체크가 200이 아님 — 수동 확인 필요." >&2
+fi
 
 echo ""
-echo "=== 배포 완료 (무효화 전파까지 확인됨) ==="
+echo "=== 배포 완료 ==="
+echo "Release: ${TS}"
 echo "URL: https://ailens.sedaily.ai"
-echo "Distribution: $CF_DIST_ID"
