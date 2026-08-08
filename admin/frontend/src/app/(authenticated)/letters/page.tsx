@@ -35,11 +35,27 @@ function LettersPage() {
   const [date, setDateState] = useState(() => searchParams.get("date") || todayKST());
   const [letters, setLetters] = useState<AiLetter[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 글 수정/삭제 → "← 목록"(router.back()) 흐름에서 이 페이지가 라우터
+  // 캐시에 남아 재마운트가 안 되면 목록이 stale해지는 문제(posts/page.tsx
+  // 와 동일 원인·동일 수정, 2026-08-08 리포트) — reloadKey를 올려 강제 재조회.
+  const [reloadKey, setReloadKey] = useState(0);
 
   const setDate = (next: string) => {
     setDateState(next);
     router.replace(`/letters?date=${next}`, { scroll: false });
   };
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setReloadKey((k) => k + 1);
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
   useEffect(() => {
@@ -57,7 +73,7 @@ function LettersPage() {
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, reloadKey]);
 
   return (
     <div className="space-y-6">
