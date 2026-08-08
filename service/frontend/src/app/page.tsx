@@ -51,10 +51,10 @@ function HomeContent({
 // NewsFeedTab → 각 섹션까지 initialX prop으로 내려준다. 나머지 섹션
 // (TimelinePreviewSection/TrendingEconomySection/ColumnPreviewSection 등)은
 // 의도된 mock/placeholder라 그대로 둔다.
-// force-dynamic(SSR, 2026-08-08) — webtoon/page.tsx, letters/page.tsx와 동일
-// 이유. 홈은 특히 방문 빈도가 가장 높아 이 설정이 없으면 신규 발행 콘텐츠가
-// 가장 눈에 띄게 안 보이는 페이지가 된다.
-export const dynamic = 'force-dynamic';
+// force-dynamic을 걸었다가(SSR 전환 직후) 다시 뺐다(2026-08-08) — 아래 fetch들이
+// posts:* 태그로 캐시되므로, 매 요청 강제 재렌더링보다 Next가 이 라우트를
+// 정적/캐시로 취급하고 admin 발행 시 POST /api/revalidate 가 revalidateTag()
+// 로 정확히 무효화하는 쪽이 "클릭 즉시 이동" 요구에 맞다.
 
 export default async function HomePage() {
   const [initialFollowingLetters, initialWebtoons, initialVideos, initialWordTerms, initialCmsLetters] =

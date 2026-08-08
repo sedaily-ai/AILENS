@@ -11,11 +11,11 @@ export const metadata: Metadata = {
 // 정적 HTML에 목록 스켈레톤만 구워지고 실제 웹툰 목록·링크는 하나도
 // 없었다(SSG 감사 중 발견). fetchWebtoons()로 가져온 값을 initialItems로
 // 클라이언트 컴포넌트에 내려서 HTML에 실제 목록이 바로 박히게 한다.
-// force-dynamic(SSR, 2026-08-08) — 새 웹툰을 발행했는데도 이 목록 페이지가
-// 안 바뀌는 문제(재빌드해도 Next 자체 캐시 때문에 재발)를 겪은 뒤 확정한
-// 설정. 명시 안 하면 fetch()에 캐시 옵션이 없어 Next가 빌드/최초 요청 시점
-// 결과를 정적으로 캐싱해버린다.
-export const dynamic = 'force-dynamic';
+// force-dynamic을 걸었다가(새 웹툰이 목록에 안 보이는 문제를 겪은 뒤) 다시
+// 뺐다(2026-08-08) — fetchWebtoons()가 이제 posts:webtoon 태그로 캐시되고,
+// admin 발행 시 POST /api/revalidate 가 그 태그를 revalidateTag() 로 정확히
+// 깬다. force-dynamic으로 매 요청 강제 재렌더링하면 <Link> 프리페치가
+// 무력화돼 "클릭 즉시 이동" 요구와 충돌한다.
 
 export default async function WebtoonListPage() {
   const items = await fetchWebtoons();

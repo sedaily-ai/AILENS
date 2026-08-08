@@ -165,13 +165,104 @@ strategy-decision.md`), AWS를 직접 확인해보니 그 자동화(CodeBuild �
 - in-flight coalescing(TTL 없음)은 유지 — 이건 신선도를 절대 희생하지 않으면서(다음 호출은
   무조건 새 요청) 동시 다발 요청만 줄여주는, 순수하게 이득만 있는 최적화라 제거할 이유가 없음.
 
+## 후속 2 — SSE 기반 캐시 무효화 ("클릭 즉시 이동" + "CRUD 1초 반영" 동시 달성)
+
+위 "후속 1"(캐시 완전 제거)로 삭제/발행 즉시 반영은 확실히 됐지만, 대신 **모든 페이지
+이동이 매번 서버 왕복을 기다려야 해서 느려졌다** — 사용자가 "글 목록·전체 페이지 이동이
+클릭 즉시(0.1초) 돼야 하고, 동시에 admin CRUD도 1초 내 반영돼야 한다"고 요구. 둘 다
+동시에 만족하려면 "평소엔 캐시로 빠르게, admin이 쓰기 작업을 한 그 순간에만 정확히
+캐시를 깨는" push 기반 구조(webhook + SSE)가 필요하다고 판단 — Plan agent 검증까지
+거쳐 확정한 설계는 `~/.claude/plans/cozy-squishing-balloon.md`(2번째 버전)에 있다.
+
+### 한 것
+
+- **콘텐츠 fetch 캐시 정책 전환**: `cmsPostsApi.ts`/`todayLettersApi.ts`/
+  `letters/[id]/page.tsx`/`sitemap.ts`의 `cache:'no-store'`를 `{ cache: 'force-cache',
+  next: { tags: ['posts:<channel>'], revalidate: 60 } }`로 전환. 태그는 채널당 1개
+  (`posts:letters`/`posts:webtoon`/`posts:trend_card`/`posts:video`) — 정밀하게 어느
+  글이 바뀌었는지 안 따지고 admin이 뭘 쓰든 4개 전부 무효화하는 단순한 방식.
+  `revalidate: 60`을 태그와 함께 반드시 병행 — webhook이 실패해도 최악 60초 안엔
+  스스로 회복(오늘 아침 "삭제 반영 안 됨" 사고의 안전장치).
+- **`page.tsx`/`letters/page.tsx`/`webtoon/page.tsx`/`sitemap.ts`의 `force-dynamic`
+  제거** — 태그 캐시로 가면 Next가 이 라우트를 정적으로 취급하고 `revalidateTag()`가
+  Full Route Cache까지 무효화해주는 게 맞는 방향이라, 매 요청 강제 재렌더링은 오히려
+  손해.
+- **`letters/[id]/page.tsx`, `webtoon/[slug]/page.tsx`에 `generateStaticParams`
+  재도입**(SSR 전환 때 뺐던 것) — 없으면 Next가 이 라우트를 통째로 `ƒ Dynamic` 취급해서
+  `<Link>` 프리페치가 안 붙는다는 걸 **직접 빌드해서 발견**(카드 클릭의 실제 목적지가
+  바로 이 두 라우트라 가장 중요한 부분이었음). 다시 넣은 뒤론 `●`(SSG)로 잡히고
+  `Revalidate: 1m`까지 확인. 정적 export 시절의 "params 0개면 빌드 실패" 제약은 SSR엔
+  없으므로 그 우회 코드(placeholder) 없이 순수하게 최근 데이터만 반환.
+- **신규 API 라우트 2개**: `POST /api/revalidate`(공유 시크릿 인증, `crypto.
+  timingSafeEqual`로 비교, 4개 태그 `revalidateTag()` + SSE 브로드캐스트), `GET
+  /api/events`(SSE, `ReadableStream`, 15초 heartbeat, `X-Accel-Buffering: no`).
+  `src/shared/lib/sseHub.ts`(모듈스코프 연결 관리)를 공유.
+- **클라이언트 리스너**: `src/widgets/LiveRevalidateListener`(`providers.tsx`에 마운트)
+  — `EventSource('/api/events')` 구독, `onopen`·`onmessage` 둘 다에서
+  `router.refresh()`(재연결 시에도 "혹시 놓친 이벤트 있을 수 있으니 새로고침"으로
+  안전하게 커버).
+- **`ecosystem.config.js`를 `instances: 2, cluster` → `instances: 1, fork`로 전환** —
+  cluster 멀티프로세스면 `revalidateTag()`도 SSE 브로드캐스트용 인메모리 상태도
+  워커 프로세스마다 독립돼 있어 일부 클라이언트/캐시만 갱신되는 정합성 문제가 생긴다.
+  Redis 등 외부 pub/sub 대신 단일 프로세스로 단순화(대가: zero-downtime reload 포기,
+  배포 시 수백ms 재시작 blip).
+- **시크릿 관리**: 신규 SSM Parameter `/sedaily-mbti/ssr-revalidate-secret`
+  (SecureString) 1회 생성. admin은 기존 `common.secrets.get_secret()` 재사용
+  (`admin/backend/shared/notify.py` 신설 — `urllib.request`로 fire-and-forget POST,
+  2초 타임아웃 + 1회 재시도, 실패해도 admin 응답을 절대 막지 않음, `posts.py` 4곳 +
+  `letters.py` 2곳에서 호출). 프론트(EC2)는 배포 스크립트가 릴리스마다 SSM에서 같은
+  값을 읽어 `.env.production.local`에 써서 Next 서버가 기동 시 자동 로드.
+- **AWS 리소스**: EC2 IAM role에 신규 S3 버킷(`ailens-ssr-releases`, 배포 아티팩트
+  전용) 읽기 권한 + 이 SSM 시크릿 읽기 권한 추가. admin Lambda role에도 같은 시크릿
+  읽기 권한 추가(신규 인라인 정책 `AdminSsrRevalidateSecretRead`) — 기존 `AdminApiAccess`
+  정책의 SSM 허용 범위가 `/sedaily-mbti/admin/*`와 `/v2/pg-password`뿐이라 이 새
+  파라미터는 별도 추가가 필요했다(배포 후 발견, 로컬 재현 테스트로 확인).
+- **CloudFront 설정 변경**(2번의 update-distribution): ① default behavior에
+  Origin Request Policy `Managed-AllViewer` 추가(admin webhook의 커스텀 헤더가
+  오리진까지 전달되게) + `/api/events` 전용 캐시 비헤이비어 신규(`Compress: false`,
+  스트림 버퍼링 방지). ② **배포 후 실도메인 테스트 중 `/api/revalidate`가 404로
+  막히는 걸 발견** — default behavior의 `AllowedMethods`가 S3 정적 호스팅 시절
+  값(GET/HEAD만) 그대로 남아있었다(SSR 컷오버 때 안 건드렸던 부분). POST/PUT/PATCH/
+  DELETE/OPTIONS까지 확장해서 해결.
+
+### 검증
+
+- 로컬: `npm run build` → 홈/레터목록/웹툰목록/sitemap `○ Static, Revalidate: 1m`,
+  레터·웹툰 상세 `● SSG`(prerender된 slug 목록까지 확인) 전부 기대한 대로 잡힘.
+  standalone 서버로 `/api/revalidate`(정상 시크릿 200 / 오류 401) + `/api/events`
+  (heartbeat 스트림) 직접 확인.
+- EC2 배포 후(CloudFront 반영 전) EIP+Host 헤더로 재확인 — 동일 통과, PM2가
+  `fork` 모드 단일 인스턴스로 뜨는 것 확인.
+- CloudFront 컷오버 후 실도메인(`https://ailens.sedaily.ai`)에서 `/api/revalidate`
+  인증 없음→401, 오류 시크릿→401, 정상 시크릿→200(태그 4개 정상 응답), `/api/events`
+  SSE 스트림 정상.
+- `admin/backend/shared/notify.py`를 로컬에서 직접 호출(같은 저장소 안에서 import)해
+  실제로 프로덕션 webhook까지 왕복 성공 확인(WARNING 로그 없음 = 1차 시도 성공).
+- **미완료**: 실제 admin UI(로그인 필요)를 통한 진짜 발행/삭제 → 1초 내 두 브라우저
+  탭 갱신 + 카드 클릭 즉시 이동, 이 두 가지의 진짜 end-to-end 리허설은 이번 세션
+  에이전트가 admin 로그인 세션이 없어 직접 못 해봤다 — 사용자가 실제로 한 번 확인
+  필요.
+
+### 결정
+
+- 4개 태그 전부 무효화(정밀 채널별 무효화 안 함) — 이 규모에서 과다 무효화 비용은
+  무시할 수준, admin 쪽에서 "어느 채널이 바뀐 건지" 정확히 실어보내야 하는 결합도를
+  없애는 게 더 안전하다고 판단.
+  `today_letters`(today-letters API)는 2026-08-04 RDS 삭제로 영구 죽은 경로라 무효화
+  대상에서 제외.
+- PM2 instances:1(fork) — Redis 등 외부 pub/sub보다 단순함 우선, zero-downtime
+  reload는 포기(트래픽 늘면 재검토).
+- CloudFront Origin Group(S3 failover), 정밀 채널별 태그, nginx rate limit은 이번
+  스코프 밖(계획 문서에 명시) — 안정화 후 별도 세션.
+
 ## 다음
 
-- **admin 발행 → EC2 반영 실제 왕복 테스트**: 이번엔 이미 발행돼 있던 두 웹툰이 재빌드
-  없이 뜨는 것으로 간접 검증했지만, admin에서 새 글을 발행→20~30초 내 반영→unpublish까지
-  직접 왕복 테스트는 아직 안 해봄.
+- **admin UI를 통한 진짜 E2E 리허설(최우선)**: "후속 2" 검증 항목 참조 — 실제 로그인
+  세션으로 발행/삭제 → 1초 내 반영 + 카드 클릭 즉시 이동, 사용자가 직접 확인 필요.
 - **PM2 재부팅 복구 실제 검증**: `pm2 startup systemd` + `pm2 save`는 해뒀지만 실제
-  인스턴스 재부팅으로 복구되는지는 아직 안 해봄.
+  인스턴스 재부팅으로 복구되는지는 아직 안 해봄(instances:1로 바뀌었으니 재검증 겸).
+- **nginx rate limit**: 계획엔 있었는데 `/api/revalidate`가 시크릿 인증이라 필수는
+  아니라고 판단해 이번엔 스킵 — 저비용이라 다음에 추가해도 됨.
 - **CloudWatch 모니터링**: PM2/nginx 로그를 CloudWatch Agent로 보내는 것, EC2 status check
   실패 자동복구 알람 — 계획에는 있었지만 이번 세션에서 실행은 안 함.
 - **CloudFront Origin Group failover**: 위 "결정" 참조, 안정화 후 별도 세션.

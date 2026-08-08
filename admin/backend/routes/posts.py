@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from repo import posts_repo
-from shared import audit, response
+from shared import audit, notify, response
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ def handle_create(body: dict, path_params: dict, query_params: dict) -> dict:
     post = posts_repo.create(body, created_by=_ACTOR)
     logger.info(f"cms post created: {post['id']} slug={post['slug']}")
     audit.log("post-create", {"id": post["id"], "slug": post["slug"]})
+    notify.notify_content_changed()
     return response.ok({"post": post}, 201)
 
 
@@ -74,6 +75,7 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
     if not post:
         return response.err("post not found", 404)
     audit.log("post-update", {"id": post["id"]})
+    notify.notify_content_changed()
     return response.ok({"post": post})
 
 
@@ -83,6 +85,7 @@ def _set_status(path_params: dict, status: str, action: str) -> dict:
         return response.err("post not found", 404)
     logger.info(f"cms post {post['id']} -> {status}")
     audit.log(action, {"id": post["id"], "slug": post["slug"]})
+    notify.notify_content_changed()
     return response.ok({"post": post})
 
 
@@ -99,4 +102,5 @@ def handle_delete(body: dict, path_params: dict, query_params: dict) -> dict:
     if not posts_repo.soft_delete(post_id):
         return response.err("post not found", 404)
     audit.log("post-delete", {"id": post_id})
+    notify.notify_content_changed()
     return response.ok({"ok": True})

@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { AuthProvider } from '@/features/auth';
 import { NavProgress } from '@/widgets/NavProgress';
+import { LiveRevalidateListener } from '@/widgets/LiveRevalidateListener';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <NavProgress />
       </Suspense>
+      <LiveRevalidateListener />
       {children}
     </AuthProvider>
   );

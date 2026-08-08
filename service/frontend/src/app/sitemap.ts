@@ -2,12 +2,11 @@ import type { MetadataRoute } from 'next';
 import { fetchWebtoons } from '@/shared/lib/cmsPostsApi';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
-// SSR(2026-08-08) — 요청마다 동적 생성돼 admin 발행이 재빌드 없이 즉시
-// sitemap 에 반영된다(force-static 이었던 이전엔 빌드 시점에 고정됐음).
-// force-dynamic 명시 필수 — 그냥 force-static만 지우면 내부 fetch()에 캐시
-// 옵션이 없어 Next가 기본값(정적 캐시 가능)으로 추론해버려 빌드 시점에
-// 다시 고정된다(직접 확인함, 2026-08-08).
-export const dynamic = 'force-dynamic';
+// posts:letters 태그로 캐시(2026-08-08) — admin 발행 시 POST /api/revalidate
+// 가 이 태그를 깨서 sitemap도 같이 갱신된다. force-dynamic은 일부러 안 쓴다
+// — 태그 캐시로 가면 Next가 이 라우트를 Full Route Cache 대상으로 취급해
+// revalidateTag() 가 라우트 자체까지 무효화해주는 게 맞는 방향이라, 매 요청
+// 강제 재생성(force-dynamic)은 오히려 손해다.
 
 const BASE = 'https://ailens.sedaily.ai';
 
@@ -37,7 +36,10 @@ async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
     d.setDate(d.getDate() - i);
     const iso = d.toISOString().slice(0, 10);
     try {
-      const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${iso}`);
+      const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${iso}`, {
+        cache: 'force-cache',
+        next: { tags: ['posts:letters'], revalidate: 60 },
+      });
       if (!res.ok) continue;
       const data = (await res.json()) as { posts?: Array<{ id: string }> };
       for (const l of data.posts ?? []) {

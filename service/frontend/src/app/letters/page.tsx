@@ -12,9 +12,8 @@ export const metadata: Metadata = {
 // 정적 HTML에 목록 스켈레톤만 구워지고 실제 아카이브 목록은 하나도
 // 없었다(SSG 감사 중 발견). 가져온 값을 initialItems로 클라이언트
 // 컴포넌트에 내려서 HTML에 실제 목록·링크가 바로 박히게 한다.
-// force-dynamic(SSR, 2026-08-08) — webtoon/page.tsx와 동일 이유, 명시 안
-// 하면 Next가 이 fetch 결과를 정적으로 캐싱해 발행이 반영 안 된다.
-export const dynamic = 'force-dynamic';
+// force-dynamic을 걸었다가(SSR 전환 직후) 다시 뺐다(2026-08-08) — page.tsx
+// 상단 주석과 동일 이유(posts:* 태그 캐시 + webhook revalidateTag로 전환).
 
 export default async function LettersArchivePage() {
   const [letters, cards, videos] = await Promise.all([

@@ -16,7 +16,12 @@ const SEED_DAYS = 14;
 
 async function fetchLettersForDate(date: string): Promise<ApiLetter[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${date}`);
+    // posts:letters 태그로 캐시 — admin 발행 시 POST /api/revalidate 가 이
+    // 태그를 revalidateTag() 로 깬다(cmsPostsApi.ts 와 동일 정책).
+    const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${date}`, {
+      cache: 'force-cache',
+      next: { tags: ['posts:letters'], revalidate: 60 },
+    });
     if (!res.ok) return [];
     const data = (await res.json()) as { posts?: ApiLetter[] };
     return data.posts ?? [];
@@ -40,12 +45,27 @@ function recentDatesISO(days: number): string[] {
 // 저작자 표시는 이 하나로 고정. todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.
 const DEFAULT_AUTHOR = { name: 'AI LENS', archetype: 'AI LENS 편집팀' };
 
-// SSR(2026-08-08) — generateStaticParams 없음, 요청마다 서버가 렌더링한다.
+// generateStaticParams 를 다시 붙인다(2026-08-08) — SSR 전환 때 "매 요청
+// 서버가 렌더링" 방향으로 아예 뺐었는데, 그러면 Next가 이 라우트를 통째로
+// ƒ Dynamic 취급해서 <Link> 프리페치가 안 붙는다(직접 빌드해서 확인함 —
+// "클릭 즉시 이동" 요구와 충돌). 정적 export 시절의 "params 0개면 빌드
+// 실패" 제약은 SSR에선 없으므로 그 우회 코드는 없이, 최근 SEED_DAYS 일의
+// 실제 id만 돌려준다 — 여기 없는(더 오래된) id는 dynamicParams 기본값
+// (true)에 따라 요청 시점에 온디맨드 렌더링 후 캐시된다.
+export async function generateStaticParams() {
+  const dates = recentDatesISO(SEED_DAYS);
+  const results = await Promise.all(dates.map((date) => fetchLettersForDate(date)));
+  const ids = new Set<string>();
+  for (const letters of results) {
+    for (const l of letters) ids.add(l.id);
+  }
+  return [...ids].map((id) => ({ id }));
+}
+
 // id 에 더 이상 날짜가 인코딩돼있지 않아(그룹-날짜 합성 id 스킴 폐지), 최근
-// SEED_DAYS 일을 훑어 .id 가 일치하는 레터를 찾는다. 정적 export 시절엔
-// 빌드타임 1회성이라 순차 스캔이었지만, 요청마다 도는 지금은 오래된 레터일수록
-// 레이턴시가 쌓이므로 병렬로 가져와 찾는다. id 는 전역 유일이라 날짜 간
-// 충돌 걱정 없이 안전하게 병렬화할 수 있다.
+// SEED_DAYS 일을 훑어 .id 가 일치하는 레터를 찾는다. id 는 전역 유일이라
+// 날짜 간 충돌 걱정 없이 병렬로 가져와 찾는다(순차 스캔이면 오래된 레터일수록
+// 레이턴시가 쌓임).
 async function findLetter(id: string): Promise<(ApiLetter & { date: string }) | null> {
   const dates = recentDatesISO(SEED_DAYS);
   const results = await Promise.all(dates.map((date) => fetchLettersForDate(date)));

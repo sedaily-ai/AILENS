@@ -4,10 +4,9 @@ import { WebtoonViewClient } from './WebtoonViewClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
 
-// 경로 기반(2026-08-07) 그대로, SSR(2026-08-08)로 렌더링만 요청 시점으로 바뀜 —
-// generateStaticParams 없음, 매 요청 서버가 findWebtoon()을 호출한다.
-// fetchWebtoons() 단발 실패(API Gateway/Lambda 콜드스타트 등)에 바로
-// "찾을 수 없어요"로 떨어지지 않도록 가벼운 재시도를 유지한다.
+// 경로 기반(2026-08-07) 그대로. fetchWebtoons() 단발 실패(API Gateway/Lambda
+// 콜드스타트 등)에 바로 "찾을 수 없어요"로 떨어지지 않도록 가벼운 재시도를
+// 유지한다.
 async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -19,6 +18,14 @@ async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
     if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
   }
   return [];
+}
+
+// generateStaticParams 를 다시 붙인다(2026-08-08) — letters/[id]/page.tsx와
+// 동일 이유: 이게 없으면 Next가 이 라우트를 ƒ Dynamic 취급해서 <Link>
+// 프리페치가 안 붙는다("클릭 즉시 이동" 요구와 충돌, 직접 빌드해서 확인함).
+export async function generateStaticParams() {
+  const webtoons = await fetchAllWebtoons();
+  return webtoons.map((w) => ({ slug: w.id }));
 }
 
 async function findWebtoon(slug: string): Promise<CmsWebtoon | null> {

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 
 from repo import letters_repo
-from shared import audit, response
+from shared import audit, notify, response
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
         return response.err("letter not found", 404)
     logger.info(f"ai letter edited: {letter['id']}")
     audit.log("letter-update", {"id": letter["id"]})
+    notify.notify_content_changed()
     return response.ok({"letter": letter})
 
 
@@ -41,4 +42,5 @@ def handle_delete(body: dict, path_params: dict, query_params: dict) -> dict:
     if not letters_repo.soft_delete(letter_id):
         return response.err("letter not found", 404)
     audit.log("letter-delete", {"id": letter_id})
+    notify.notify_content_changed()
     return response.ok({"ok": True})

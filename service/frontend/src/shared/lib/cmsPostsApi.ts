@@ -85,6 +85,17 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
   return p;
 }
 
+// 캐시 정책(2026-08-08, "클릭 즉시 이동 + admin CRUD 1초 반영" 요구) — 평소엔
+// 태그로 캐시해서 Next <Link> 프리페치가 살아있게 하고(no-store였을 땐 캐시할
+// 게 없어서 프리페치가 무력화돼 있었다), admin이 글을 쓰면 POST /api/revalidate
+// (src/app/api/revalidate/route.ts)가 같은 태그를 revalidateTag()로 깬다.
+// revalidate:60(상한)도 같이 걸어서 webhook을 놓쳐도(오늘 아침 "삭제한 글이
+// 안 사라짐" 사고처럼) 최악 60초 안엔 스스로 회복한다 — 태그만 걸고 캐시
+// 옵션을 안 주면 Next 15+ 기본값(fetch 무캐시)이라 캐싱 자체가 안 켜진다.
+function tag(channel: CmsChannel): string {
+  return `posts:${channel}`;
+}
+
 export async function fetchCmsPosts(
   channel: CmsChannel,
   date?: string,
@@ -95,13 +106,10 @@ export async function fetchCmsPosts(
       const qs = new URLSearchParams({ channel });
       if (date) qs.set('date', date);
       if (limit) qs.set('limit', String(limit));
-      // cache:'no-store' 필수 — 없으면 Next의 fetch 캐시가 이 응답을 계속
-      // 재사용해 admin 발행/수정/삭제가 반영 안 된다(2026-08-08, sitemap.ts
-      // force-dynamic 미적용 때 겪은 것과 같은 종류의 문제 — SSR 전환 후
-      // "무조건 실시간성" 요구로 확정). 예전에 "빌드 시 워커 여러 개가 동시
-      // fetch해서 실패"한다며 이걸 뺐던 적이 있는데, 그건 정적 export
-      // 빌드타임 전용 문제라 지금(SSR)은 해당 없음.
-      const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, { cache: 'no-store' });
+      const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, {
+        cache: 'force-cache',
+        next: { tags: [tag(channel)], revalidate: 60 },
+      });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLetter[] };
       return data.posts ?? [];
@@ -116,7 +124,10 @@ export async function fetchCmsPosts(
 export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
   return cached('trend_card', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, { cache: 'no-store' }); // no-store 이유는 fetchCmsPosts 참조
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, {
+        cache: 'force-cache',
+        next: { tags: [tag('trend_card')], revalidate: 60 },
+      });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsTrendCard[] };
       return data.posts ?? [];
@@ -129,11 +140,10 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
-      // no-store 이유는 fetchCmsPosts 참조. (예전엔 정적 export 빌드타임에
-      // generateStaticParams 워커 여러 개가 동시 fetch하다 실패하는 문제로
-      // 뺐었는데, SSR인 지금은 해당 없음 — 오히려 admin 발행 즉시반영을 위해
-      // 필수.)
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`, { cache: 'no-store' });
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`, {
+        cache: 'force-cache',
+        next: { tags: [tag('webtoon')], revalidate: 60 },
+      });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
       return data.posts ?? [];
@@ -146,7 +156,8 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
 export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | null> {
   try {
     const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, {
-      cache: 'no-store',
+      cache: 'force-cache',
+      next: { tags: [tag('webtoon')], revalidate: 60 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsWebtoon };
@@ -159,7 +170,10 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
 export async function fetchVideos(): Promise<CmsVideo[]> {
   return cached('video', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=video`, { cache: 'no-store' }); // no-store 이유는 fetchCmsPosts 참조
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=video`, {
+        cache: 'force-cache',
+        next: { tags: [tag('video')], revalidate: 60 },
+      });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
       return data.posts ?? [];
@@ -177,7 +191,8 @@ export async function fetchCmsPostBySlug(
 ): Promise<CmsLetter | null> {
   try {
     const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, {
-      cache: 'no-store',
+      cache: 'force-cache',
+      next: { tags: [tag(channel)], revalidate: 60 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsLetter };
