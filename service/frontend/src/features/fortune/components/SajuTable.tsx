@@ -1,6 +1,6 @@
 'use client';
 
-import { sipsung, unsung, CG_OH, JJG, OH_HJ, type Pillar } from '../lib/engine';
+import { sipsung, unsung, CG_OH, JJG, OH_HJ, type Pillar } from '@/entities/saju';
 import { OhaengBars, type OhaengKey } from './OhaengBars';
 
 const EL = {

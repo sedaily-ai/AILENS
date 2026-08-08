@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { REGION_OPTIONS } from '../lib/engine';
+import { REGION_OPTIONS } from '@/entities/saju';
 import { personaMeta } from '../lib/personaVoice';
 import { trackEvent } from '@/shared/lib/trackEvent';
 

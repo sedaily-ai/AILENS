@@ -8,14 +8,14 @@
  *  4. 배우자성 보완 (여: 관성 / 남: 재성) — 성별 있을 때만
  */
 
-import type { Pillar } from '@/features/fortune/lib/engine';
-import { CG_OH, JJ_OH, calculateElementDistribution } from '@/features/fortune/lib/engine';
 import {
+  type Pillar,
+  CG_OH, JJ_OH, calculateElementDistribution,
   STEM_PERSONA, BRANCH_PERSONA, FIT_MATRIX, OH_TO_STEMS,
   STEM_HAP, BRANCH_SAMHAP, BRANCH_YUKHAP, BRANCH_CHUNG,
   OH_GEUK, OH_GEUK_REV,
   type Oh,
-} from './personaDictionary';
+} from '@/entities/saju';
 import type { IdealMatch, ReasonCode } from '../types';
 
 export type Gender = '남' | '여' | '';

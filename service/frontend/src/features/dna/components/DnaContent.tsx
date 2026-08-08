@@ -1,6 +1,6 @@
 'use client';
 
-import { useCountUp } from '@/features/news-feed';
+import { useCountUp } from '@/shared/lib/useCountUp';
 import { MOCK_DNA_STATS } from '../data/mockDna';
 
 // 이 화면의 강조색 — 단일 명의(AI LENS) 체계(2026-08-07) 이전엔 "내가 가장 많이

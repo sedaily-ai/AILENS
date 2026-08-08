@@ -8,7 +8,7 @@ import {
   buildChongun, buildTodayFortune, calcDaeun, calcYeonun, calcWolun,
   matchSijin, REGION_OPTIONS,
   type Pillar, type ChongunResult, type TodayFortuneResult, type DaeunEntry, type YeonunEntry, type WolunEntry,
-} from '../lib/engine';
+} from '@/entities/saju';
 import { SajuTable } from './SajuTable';
 import { FortuneResult } from './FortuneResult';
 import { SajuHero } from './SajuHero';

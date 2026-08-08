@@ -1,6 +1,6 @@
 
 
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "@/entities/user";
 
 export function LoginButton() {
   const { user, isLoading, isAuthenticated, signInWithGoogle, logout } = useAuth();

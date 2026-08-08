@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { getGapja, CG_OH, JJ_OH, JJG, sipsung, unsung } from '../lib/engine';
+import { getGapja, CG_OH, JJ_OH, JJG, sipsung, unsung } from '@/entities/saju';
 import { V3_TOKENS } from '../lib/ohaeng';
 
 const EL_COLORS: Record<string, string> = {

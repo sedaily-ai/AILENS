@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
-import { calculateSaju, CG_OH } from '@/features/fortune/lib/engine';
+import { calculateSaju, CG_OH } from '@/entities/saju';
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { useLatestLetters } from '@/shared/lib/useLatestLetters';
 import { letterHref } from '@/shared/lib/letterHref';

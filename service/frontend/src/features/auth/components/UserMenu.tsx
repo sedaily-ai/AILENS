@@ -1,7 +1,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "@/entities/user";
 
 export function UserMenu() {
   const router = useRouter();

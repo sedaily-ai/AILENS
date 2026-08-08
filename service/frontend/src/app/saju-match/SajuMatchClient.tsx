@@ -10,7 +10,7 @@ import {
   parsePillar,
   REGION_OPTIONS,
   type Pillar,
-} from '@/features/fortune/lib/engine';
+} from '@/entities/saju';
 import { IdealMatchSection } from '@/features/ideal-match';
 import { CoupleMatchSection } from '@/features/couple-match';
 import type { PersonInput } from '@/features/couple-match/lib/coupleEngine';

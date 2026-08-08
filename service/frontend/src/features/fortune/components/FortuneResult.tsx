@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { isBeforeLichun, getSajuMonth } from '@fullstackfamily/manseryeok';
-import { CG_OH, JJ_OH, OH_HJ, JJG, sipsung, unsung, buildStructureAnalysis, detectDayHapChung, evaluateForYongsin, generateDailyInsights, type Pillar, type ChongunResult, type TodayFortuneResult, type DaeunEntry, type YeonunEntry, type WolunEntry, type YongsinRating } from '../lib/engine';
+import { CG_OH, JJ_OH, OH_HJ, JJG, sipsung, unsung, buildStructureAnalysis, detectDayHapChung, evaluateForYongsin, generateDailyInsights, type Pillar, type ChongunResult, type TodayFortuneResult, type DaeunEntry, type YeonunEntry, type WolunEntry, type YongsinRating } from '@/entities/saju';
 import { OHAENG_SETS, V3_TOKENS, type Ohaeng } from '../lib/ohaeng';
 import { SajuTable } from './SajuTable';
 import { DailyCalendar } from './DailyCalendar';

@@ -15,13 +15,11 @@ import {
   CG_OH, JJ_OH,
   calculateElementDistribution,
   type Pillar,
-} from '@/features/fortune/lib/engine';
-import {
   STEM_HAP, BRANCH_SAMHAP, BRANCH_YUKHAP, BRANCH_CHUNG,
   OH_SAENG, OH_GEUK, OH_GEUK_REV,
   FIT_MATRIX,
   type Oh,
-} from '@/features/ideal-match/lib/personaDictionary';
+} from '@/entities/saju';
 
 export type Gender = '남' | '여' | '';
 

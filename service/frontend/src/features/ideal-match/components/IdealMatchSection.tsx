@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { useLang } from '@/shared/lib/LangContext';
-import type { Pillar } from '@/features/fortune/lib/engine';
+import type { Pillar } from '@/entities/saju';
 import { computeIdealMatch, type Gender, type MatchMode } from '../lib/matchEngine';
 import { ShareCard } from './ShareCard';
 import { ReasonChip, REASON_EXPLAIN } from './ReasonChip';

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import type { ArchivedSentence, MbtiArticle, TabType } from "@/shared/types/mbti";
 import { getWeekDays, isSameDay, getMonthDays } from "@/shared/utils/dateUtils";
-import { useAuth } from "@/features/auth";
+import { useAuth } from "@/entities/user";
 import {
   listArchiveSentences,
   deleteArchiveSentence,
