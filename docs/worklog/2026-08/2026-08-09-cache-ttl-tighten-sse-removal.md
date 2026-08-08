@@ -68,3 +68,31 @@ CloudFront `E1QS7PY350VHF6` 비헤이비어 정리
 - 알림(webhook 실패 시 Slack/CloudWatch)은 이번에 스킵했다 — 필요해지면
   `cost_monitoring.sh`의 CloudWatch Alarm→SNS 패턴을 재사용할 수 있다는 조사 결과를
   남겨둔다.
+
+## 후속 (같은 날) — 백엔드 API 자체의 5분 Cache-Control 누락 발견·수정
+
+사용자가 삭제한 글("222" 시리즈, `2026-08-08-2222`)이 홈 화면 "이번 주 인기 칼럼" 카드에
+계속 옛 헤드라인으로 떠 있다고 리포트해서 재조사했다. DynamoDB엔 이미 `deleted_at`이
+찍혀 정상 soft-delete 상태였고 공개 API(`/api/v2/posts`)도 정상적으로 그 글을 빼고
+있었다 — 그런데도 화면엔 남아있었다.
+
+**원인**: `service/backend/handlers/cms_posts_public.py:26`의 `_CACHE_CONTROL =
+"public, max-age=300"`(5분)이 오늘 손본 프론트 SSR 캐시(Next `revalidateTag`, 5초)와는
+완전히 별개 계층이었다. `ColumnPreviewSection.tsx`를 비롯해 `'use client'` 컴포넌트
+12곳(`TrendingEconomySection`/`MiniHeadlinesSection`/`LettersArchiveClient`/
+`WebtoonListClient` 등)이 이 API를 **브라우저에서 직접** 호출하는데, 이 경로는 Next의
+fetch 옵션(`cache`/`next.tags`/`next.revalidate`)이 전혀 적용되지 않고 브라우저가
+API 응답의 Cache-Control 헤더를 그대로 따른다 — `revalidateTag()`는 서버 캐시만
+지우므로 이 브라우저 캐시엔 손을 못 댄다.
+
+**수정**: `_CACHE_CONTROL`을 `"public, max-age=5, stale-while-revalidate=30"`으로
+변경(`service/backend/tests/test_cms_posts_public.py`의 대응 테스트도 갱신), 프론트
+SSR 캐시와 정책을 통일. `./deploy.sh api`로 배포(21개 함수, 공유 zip 구조라 전체
+갱신이 정상 경로) — 실측으로 헤더 변경과 삭제된 글 미노출 재확인. 커밋 `cbe9db2`.
+
+**교훈**: 오늘 초반 "지침서 vs 실제 스택" 감사 때 프론트(Next fetch 옵션)만 보고
+백엔드 Lambda 자신이 얹는 Cache-Control 헤더는 안 봤다 — SSR 경로(서버가 fetch)와
+클라이언트 직접 호출 경로(브라우저가 fetch)가 같은 API를 쓰더라도 캐시 계층이
+완전히 다르다는 걸 놓쳤다. 다음에 캐시 정책을 감사할 땐 프론트 fetch 옵션뿐 아니라
+백엔드 응답 헤더까지, 그리고 그 API를 부르는 컴포넌트가 서버/클라이언트 중 어느 쪽인지
+같이 확인해야 한다.
