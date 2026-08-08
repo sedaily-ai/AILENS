@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
+import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { EmptyState, ErrorNote } from "@/components/Feedback";
 import { DateRangeCalendar, type DateRange } from "@/components/DateRangeCalendar";
@@ -183,29 +184,12 @@ function PostsPage() {
     });
   };
   // 일괄 선택/작업(2026-08-07, "체크 가능하게 해서 일괄 삭제·이동·카테고리
-  // 변경" 요청). reloadKey 를 올리면 아래 목록 fetch effect 가 다시 돈다 —
+  // 변경" 요청). bulkReloadKey 를 올리면 아래 목록 fetch effect 가 다시 돈다 —
   // 일괄 작업 성공 후 최신 상태를 다시 받아오는 용도.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  // 목록 → 글 수정 → 삭제 → "← 목록"(router.back()) 흐름에서, 이 페이지가
-  // Next 라우터 캐시에 그대로 남아있어 재마운트가 안 되면 이 useEffect가
-  // 다시 안 돌아서 방금 삭제한 글이 목록에 계속 보이는 문제(2026-08-08
-  // 리포트 — 백엔드는 정상 삭제됐는데 목록만 stale). 탭/창이 다시 보이게
-  // 될 때마다(뒤로가기 포함, back navigation도 visibilitychange를 발생시킴)
-  // 최신 목록을 다시 받아오게 한다.
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") setReloadKey((k) => k + 1);
-    };
-    window.addEventListener("focus", onVisible);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("focus", onVisible);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
+  const [bulkReloadKey, setBulkReloadKey] = useState(0);
+  const visibleReloadKey = useReloadOnVisible();
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
   // 필터를 바꿔도 이전 목록을 유지하다가 새 응답이 오면 교체 — 깜빡임도 없다.
@@ -237,7 +221,7 @@ function PostsPage() {
     return () => {
       cancelled = true;
     };
-  }, [status, channel, dateRange, reloadKey]);
+  }, [status, channel, dateRange, visibleReloadKey, bulkReloadKey]);
 
   // 필터가 바뀌면 화면에 보이던 선택 대상 자체가 통째로 바뀌는 셈이라(다른
   // 글이 그 자리에 보임) 이전 선택을 그대로 들고 가면 헷갈린다 — 필터 변경
@@ -280,7 +264,7 @@ function PostsPage() {
   const finishBulk = (okCount: number, failCount: number, verb: string) => {
     setBulkBusy(false);
     setSelected(new Set());
-    setReloadKey((k) => k + 1);
+    setBulkReloadKey((k) => k + 1);
     if (failCount === 0) {
       toast.show(`${okCount}건 ${verb}했습니다`, "success");
     } else {
