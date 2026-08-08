@@ -139,3 +139,25 @@ CDN 엣지-TTL 구조를 가져올 필요가 없다고 판단(오버엔지니어
 build→tar.gz→S3(`ailens-ssr-releases`)→SSM extract→symlink→pm2 restart→헬스체크를
 스크립트 하나로 묶었다(옛 정적 export 배포용 `deploy.sh`는 전면 교체). 실제 배포로
 검증 완료(release `20260808-230129`). 커밋 `8f8a661`.
+
+## 후속 4 (같은 날) — 나머지 배포 스크립트 3개도 같은 패턴으로 정리
+
+사용자 요청으로 저장소 내 남은 배포 스크립트(`admin/backend/deploy-admin-api.sh`,
+`admin/frontend/deploy-admin.sh`, `service/backend/deploy.sh` — grep으로 전수
+확인, 이 4개가 전부)에도 새 `service/frontend/deploy.sh`가 세운 패턴(배포 후
+헬스체크, `set -euo pipefail`)을 적용. 이 3개는 위와 달리 이미 정상 동작하고
+있었어서 전면 교체가 아니라 최소 추가만 했다:
+
+- `deploy-admin-api.sh`: `set -e`→`set -euo pipefail`, 무인증 `GET /admin/posts`
+  호출로 5xx만 실패 취급(401은 정상). 커밋 `4ae603e`.
+- `deploy-admin.sh`: CloudFront 무효화 대기 후 `lensdb.sedaily.ai` 200 확인,
+  최종 안내에 빠져있던 `ailens-admin.sedaily.ai` alias도 추가. 커밋 `4ae603e`.
+- `service/backend/deploy.sh`(v1/v2 API Lambda 21개 공유 zip 배포): `set -e`→
+  `set -euo pipefail`, 대표 함수(`sedaily-mbti-v2-posts-dev`) 헬스체크 추가.
+  `set -e` 적용 전 "`((SUCCESS_COUNT++))`가 카운터 0일 때 exit 1을 반환해
+  set -e를 조기 종료시키는" 유명한 bash 함정이 있는지 직접 재현 테스트로
+  확인했는데, 이 bash(3.2.57, macOS 기본)에서는 실제로 발동하지 않아 손 안 댐.
+  커밋 `163c70e`.
+
+4개 전부 실제로 재실행해 배포+헬스체크 통과까지 검증(멱등적이라 안전 —
+코드가 안 바뀐 재배포).
