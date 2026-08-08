@@ -120,15 +120,35 @@ def list_posts(
 ) -> list[dict]:
     table = posts_table()
     if status:
-        resp = table.query(
-            IndexName="status-publish_date-index",
-            KeyConditionExpression=Key("status").eq(status),
-            ScanIndexForward=False,  # publish_date DESC
-        )
-        items = resp.get("Items", [])
+        items = []
+        kwargs: dict = {
+            "IndexName": "status-publish_date-index",
+            "KeyConditionExpression": Key("status").eq(status),
+            "ScanIndexForward": False,  # publish_date DESC
+        }
+        while True:
+            resp = table.query(**kwargs)
+            items.extend(resp.get("Items", []))
+            last_key = resp.get("LastEvaluatedKey")
+            if not last_key:
+                break
+            kwargs["ExclusiveStartKey"] = last_key
     else:
-        # status 미지정 — 전체 조회(드문 어드민 케이스). 볼륨이 작아 Scan 으로 처리.
-        items = table.scan().get("Items", [])
+        # status 미지정 — 전체 조회(드문 어드민 케이스).
+        # Scan/Query 는 1MB 를 넘으면 LastEvaluatedKey 로 다음 페이지를 알려준다 —
+        # 이걸 안 따라가면 리치텍스트 본문(body_inline.body_html)이 큰 글이
+        # 많아질수록 뒷페이지 글이 "DB엔 있는데 목록엔 안 보이는" 상태로
+        # 조용히 잘려나간다(2026-08-08, 실제로 발행된 글이 admin 목록에
+        # 안 보이는 리포트로 발견 — Scan 이 첫 페이지만 읽고 있었다).
+        items = []
+        scan_kwargs: dict = {}
+        while True:
+            resp = table.scan(**scan_kwargs)
+            items.extend(resp.get("Items", []))
+            last_key = resp.get("LastEvaluatedKey")
+            if not last_key:
+                break
+            scan_kwargs["ExclusiveStartKey"] = last_key
 
     items = [i for i in items if not i.get("deleted_at")]
     if channel:

@@ -255,6 +255,48 @@ strategy-decision.md`), AWS를 직접 확인해보니 그 자동화(CodeBuild �
 - CloudFront Origin Group(S3 failover), 정밀 채널별 태그, nginx rate limit은 이번
   스코프 밖(계획 문서에 명시) — 안정화 후 별도 세션.
 
+## 후속 3 — admin 목록/뒤로가기 캐시 버그 + DynamoDB 페이지네이션 누락 버그
+
+SSE 리허설 요청에 사용자가 응하는 과정에서 두 가지를 발견·수정.
+
+### 1. admin 목록 stale (뒤로가기)
+
+"삭제했는데 admin 목록에 계속 보인다" 리포트 → CloudWatch 로그로 실제 DELETE
+호출은 169ms에 정상 처리된 것 확인(백엔드는 정상). 원인은 `posts/page.tsx`,
+`letters/page.tsx`의 목록 fetch가 `useEffect([필터들])`로만 도는데, "← 목록"
+(`router.back()`)으로 돌아오면 Next 라우터 캐시에 페이지가 남아 재마운트가
+안 돼 이 effect가 안 돌았던 것 — 오늘 이전 세션에서 고친 "뒤로가기 필터 유지"
+작업의 부작용에 가까움(페이지가 안 죽어있으니 필터는 유지되는데, 데이터
+fetch도 같이 안 돎). 두 페이지에 `focus`/`visibilitychange` 리스너를 추가해
+탭이 다시 보일 때마다(뒤로가기 포함) 강제 재조회하도록 수정, 배포.
+
+### 2. DynamoDB Scan/Query 페이지네이션 누락 (더 근본적인 버그)
+
+위 수정 배포 후에도 "222"라는 제목의 테스트 글이 공개 사이트에 계속 보인다는
+리포트 — DynamoDB를 직접 스캔해 실제로 `published` 상태인 글이 **3개**
+(전부 "222"/"222222222", 서로 다른 id) 존재하는 걸 확인, 사용자가 그중
+하나만 지웠던 것으로 파악. 이 과정에서 별개로 **`admin/backend/repo/
+posts_repo.py::list_posts()`가 DynamoDB Scan/Query 결과를 페이지네이션 없이
+첫 페이지만 읽고 있던 버그**를 발견 — `resp.get("Items", [])`만 쓰고
+`LastEvaluatedKey`를 안 따라갔다. 1MB 페이지 한도를 넘으면(리치텍스트
+본문이 큰 글이 누적될수록 가능성 커짐) 뒷페이지 글이 admin 목록에서
+조용히 사라진다. 같은 패턴이 **공개 API가 쓰는
+`service/backend/clients/cms_posts_ddb_client.py::list_published_posts()`**
+에도 있어 같이 고침(영향 범위가 admin뿐 아니라 공개 사이트 목록까지였음).
+`admin/backend/repo/letters_repo.py::list_by_date()`도 하루 단위 조회라
+리스크는 낮지만 예방적으로 같이 고침.
+
+세 곳 다 `while` 루프로 `ExclusiveStartKey`를 따라가도록 수정. `service/
+backend/tests/test_cms_posts_ddb_client.py`(moto 기반 유닛 테스트, 8개)와
+`admin/backend/tests`(135개) 전부 통과 확인 후 `service/backend/deploy.sh api`
+(21개 함수, `sedaily-mbti-v2-posts-dev` 포함)와 `admin/backend/deploy-admin-api.sh`
+둘 다 배포.
+
+**교훈**: DynamoDB `scan()`/`query()`는 기본적으로 1페이지(최대 1MB)만
+반환한다 — 결과가 작을 거라고 가정하고 짠 초기 코드가 콘텐츠 누적에 따라
+조용히 깨지는 전형적인 패턴. 이후 새 Scan/Query 코드를 짤 때 페이지네이션
+필요 여부를 반드시 검토할 것.
+
 ## 다음
 
 - **admin UI를 통한 진짜 E2E 리허설(최우선)**: "후속 2" 검증 항목 참조 — 실제 로그인

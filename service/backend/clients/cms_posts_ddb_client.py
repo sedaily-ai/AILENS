@@ -27,12 +27,24 @@ def list_published_posts(
     channel: str, date: Optional[str], limit: int = 20
 ) -> List[Dict[str, Any]]:
     """발행된 CMS 글. 삭제분(deleted_at)과 초안은 제외한다."""
-    resp = _table().query(
-        IndexName="status-publish_date-index",
-        KeyConditionExpression=Key("status").eq("published"),
-        ScanIndexForward=False,
-    )
-    items = [i for i in resp.get("Items", []) if not i.get("deleted_at")]
+    # Query 결과가 1MB 를 넘으면 DynamoDB 가 LastEvaluatedKey 로 다음 페이지를
+    # 알려준다 — 안 따라가면 발행된 글이 많아질수록(리치텍스트 본문이 큰 글
+    # 포함) 뒷페이지 글이 조용히 잘려나간다(2026-08-08, admin/repo/posts_repo.py
+    # 와 동일 버그를 여기서도 발견 — 공개 사이트 목록에 영향).
+    items: List[Dict[str, Any]] = []
+    kwargs: Dict[str, Any] = {
+        "IndexName": "status-publish_date-index",
+        "KeyConditionExpression": Key("status").eq("published"),
+        "ScanIndexForward": False,
+    }
+    while True:
+        resp = _table().query(**kwargs)
+        items.extend(resp.get("Items", []))
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    items = [i for i in items if not i.get("deleted_at")]
     items = [i for i in items if channel in (i.get("channels") or [])]
     if date:
         items = [i for i in items if i.get("publish_date") == date]

@@ -57,11 +57,22 @@ def _to_dict(item: dict) -> dict:
 
 
 def list_by_date(date: str) -> list[dict]:
-    resp = letters_table().query(
-        IndexName="letter_date-index",
-        KeyConditionExpression=Key("letter_date").eq(date),
-    )
-    items = [i for i in resp.get("Items", []) if not i.get("deleted_at")]
+    # 하루치 레터라 1MB 페이지 한도에 걸릴 가능성은 낮지만, posts_repo.py 에서
+    # 실제로 겪은 것과 같은 종류의 버그(Scan/Query 결과를 페이지네이션 없이
+    # 한 번만 읽어 뒷페이지가 조용히 잘림)를 예방적으로 같이 고친다.
+    items = []
+    kwargs: dict = {
+        "IndexName": "letter_date-index",
+        "KeyConditionExpression": Key("letter_date").eq(date),
+    }
+    while True:
+        resp = letters_table().query(**kwargs)
+        items.extend(resp.get("Items", []))
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    items = [i for i in items if not i.get("deleted_at")]
     items.sort(key=lambda i: i.get("created_at") or "")
     return [_to_dict(i) for i in items]
 
