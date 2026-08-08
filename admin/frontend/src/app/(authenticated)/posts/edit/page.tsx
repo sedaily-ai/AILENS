@@ -6,6 +6,7 @@ import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { PostForm, splitRichBody } from "@/components/PostForm";
 import { ErrorNote } from "@/components/Feedback";
+import { publicPostUrl } from "@/lib/publicUrl";
 import type { CmsPost, CmsPostInput } from "@/lib/types";
 
 function todayKST(): string {
@@ -262,8 +263,20 @@ function PostEditPage() {
             {isNew ? "새 글" : "글 수정"}
           </h1>
           {saved && (
-            <p className="mt-1 text-xs text-gray-500">
-              {saved.status === "published" ? "발행됨" : "초안"} · {saved.slug}
+            <p className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+              <span>
+                {saved.status === "published" ? "발행됨" : "초안"} · {saved.slug}
+              </span>
+              {saved.status === "published" && publicPostUrl(saved) && (
+                <a
+                  href={publicPostUrl(saved)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--accent)] hover:underline font-medium"
+                >
+                  발행 보기 ↗
+                </a>
+              )}
             </p>
           )}
         </div>

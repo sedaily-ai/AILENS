@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import { PostForm, cleanPostBody, cleanClosingLine } from "@/components/PostForm";
 import { ErrorNote, FormSkeleton } from "@/components/Feedback";
 import { PodcastUploadField } from "@/components/PodcastUploadField";
+import { publicLetterUrl } from "@/lib/publicUrl";
 import type { AiLetter, CmsPostInput } from "@/lib/types";
 
 // useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수.
@@ -133,8 +134,16 @@ function LetterEditPage() {
             AI 레터 수정
           </h1>
           {letter && (
-            <p className="mt-1 text-xs text-gray-500">
-              {letter.letter_date}
+            <p className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+              <span>{letter.letter_date}</span>
+              <a
+                href={publicLetterUrl(letter.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--accent)] hover:underline font-medium"
+              >
+                발행 보기 ↗
+              </a>
             </p>
           )}
         </div>
