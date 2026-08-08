@@ -90,6 +90,17 @@ aws cloudfront wait invalidation-completed \
   --id "$INVALIDATION_ID"
 
 echo ""
+echo "=== 헬스체크 ==="
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://lensdb.sedaily.ai/)
+echo "  https://lensdb.sedaily.ai/ → $HTTP_CODE"
+if [ "$HTTP_CODE" != "200" ]; then
+  echo "WARNING: 헬스체크가 200이 아님 — 수동 확인 필요." >&2
+fi
+
+echo ""
 echo "=== 배포 완료 (무효화 전파까지 확인됨) ==="
+# 이 distribution은 lensdb.sedaily.ai / ailens-admin.sedaily.ai 둘 다 alias로
+# 물려있다(2026-08 도메인 재구성) — 아래 둘 다 같은 배포로 갱신됨.
 echo "URL: https://lensdb.sedaily.ai"
+echo "URL(alias): https://ailens-admin.sedaily.ai"
 echo "Distribution: https://$CF_DIST_ID.cloudfront.net (also reachable)"

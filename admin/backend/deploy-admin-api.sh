@@ -18,7 +18,7 @@
 # 실행 (어느 위치에서든 가능 — 스크립트 자신의 위치를 기준으로 경로를 계산한다):
 #   ./admin/backend/deploy-admin-api.sh
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -91,4 +91,19 @@ else
 fi
 
 rm -rf "$BUILD_DIR" "$PACKAGE_FILE"
+
+echo "[5/5] Health check..."
+# 인증 없이 부르니 401이 정상(핸들러가 실제로 실행돼 요청을 처리했다는 뜻) —
+# 여기서 확인하려는 건 그게 아니라 5xx(콜드스타트 크래시, import 실패 등
+# 배포 자체가 깨진 경우)가 안 뜨는지다.
+sleep 2
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+  "https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev/admin/posts")
+echo "  GET /dev/admin/posts (무인증) → $HTTP_CODE"
+if [ "$HTTP_CODE" -ge 500 ]; then
+  echo "  [FAIL] 5xx — 배포가 깨졌을 수 있다. CloudWatch 로그 확인 필요." >&2
+  exit 1
+fi
+echo "  [OK] 함수가 정상 응답 중"
+
 echo "Done."
