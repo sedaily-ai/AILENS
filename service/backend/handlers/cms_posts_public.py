@@ -23,14 +23,17 @@ logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
 _VALID_CHANNELS = ("letters", "paper", "feed", "trend_card", "webtoon", "video")
-# 2026-08-09: 300초(5분) → 5초. 이 헤더는 프론트 SSR의 Next 캐시(revalidateTag,
-# 5초 — service/frontend/src/shared/lib/cmsPostsApi.ts)와는 별개로, 클라이언트
-# 컴포넌트(TrendingEconomySection 등 12곳, 'use client')가 이 API를 브라우저에서
-# 직접 호출할 때 그 브라우저 캐시를 그대로 지배한다 — revalidateTag()는 서버
-# 캐시만 지우고 이미 브라우저에 저장된 응답엔 손을 못 대므로, 예전 5분 값
-# 때문에 admin에서 삭제·수정한 글이 이 경로들에서만 최대 5분간 안 바뀐 것처럼
-# 보이는 사고가 있었다(홈 "이번 주 인기 칼럼" 카드).
-_CACHE_CONTROL = "public, max-age=5, stale-while-revalidate=30"
+# 2026-08-09: 300초(5분) → 5초 → no-store. 이 헤더는 프론트 SSR의 Next 캐시
+# (revalidateTag, 5초 — service/frontend/src/shared/lib/cmsPostsApi.ts)와는
+# 별개로, 클라이언트 컴포넌트(TrendingEconomySection 등 12곳, 'use client')가
+# 이 API를 브라우저에서 직접 호출할 때 그 브라우저 캐시를 그대로 지배한다 —
+# revalidateTag()는 서버 캐시만 지우고 이미 브라우저에 저장된 응답엔 손을 못
+# 댄다. max-age=5로 줄여도 "저장 직전에 그 페이지를 이미 봤던 브라우저"는
+# 5초 창 안에 새로고침하면 여전히 옛 응답을 그대로 쓰는 잔여 갭이 있었다 —
+# "새로고침하면 언제나 최신"을 보장하려면 이 계열 자체를 무캐시로 만드는
+# 수밖에 없다(트래픽 규모상 성능 손해는 무시 가능). SSR 쪽은 Next가 이
+# 헤더를 안 보고 자기 next.revalidate/tags 설정만 따르므로 영향 없다.
+_CACHE_CONTROL = "no-store"
 # editor_id 가 NULL 인 글의 표시 명의 (spec §5.1.1) — "편집팀"처럼 딱딱한
 # 직함 대신 짧게. 프론트 todayLettersApi.ts DEFAULT_META.editorName 과 맞춘다.
 _DEFAULT_EDITOR = "AI LENS"

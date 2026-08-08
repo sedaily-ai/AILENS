@@ -131,4 +131,4 @@ def test_slug_lookup_returns_post(monkeypatch) -> None:
 def test_cache_control_header_on_success(monkeypatch) -> None:
     _install(monkeypatch, _FakePosts([]))
     resp = lambda_handler(_get({"channel": "letters"}), None)
-    assert resp["headers"]["Cache-Control"] == "public, max-age=5, stale-while-revalidate=30"
+    assert resp["headers"]["Cache-Control"] == "no-store"
