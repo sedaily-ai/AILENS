@@ -117,3 +117,25 @@ API에 시간 기반 캐시(`max-age`)를 어떤 값으로 걸든 이론상 항�
 생긴다. 이 요구사항이 확정이면 애초에 캐시를 안 거는 게 맞고, "짧은 TTL"은 그
 요구사항이 "거의 항상 최신이면 충분"일 때만 유효한 절충이라는 걸 이번에 다시
 확인했다.
+
+## 후속 3 (같은 날) — 영문사이트 아키텍처 비교 + EC2 배포 스크립트 커밋
+
+사용자가 서울경제 영문사이트(en.sedaily.com, 별도 저장소 `sedaily-ai/AI-GLOBE-ensedaily`,
+완전히 분리된 인프라)는 이런 문제를 어떻게 다루는지 궁금해해서 클론해 조사했다.
+거의 같은 스택(Next.js SSR on EC2/PM2 + Lambda API + DynamoDB)이지만 Redis(ElastiCache)
+가 한 겹 더 있고, 캐시 TTL 자체는 훨씬 길다(기사 상세 3600초) — 대신 `middleware.ts`로
+CDN 엣지에만 별도 3초짜리 TTL을 얹어 "무효화 신호 없이도 최악 3초 안엔 반영"되게
+해뒀다. 백엔드 Lambda 코드 주석에 우리가 오늘 진단한 것과 거의 같은 문장("ISR
+재검증은 엣지 캐시를 안 지운다 — 지연의 주범은 엣지가 아니라 오리진 캐시다")이
+그대로 있었고, `docs/reports/2026-07-20-retranslate-revalidation-missing.md`에는
+우리 "222" 사고와 같은 유형(무효화 신호 누락 → 최대 TTL만큼 스테일)의 사고
+기록도 있었다 — 이 캐시 계층 문제가 이 아키텍처 패턴에서는 흔히 반복되는 유형임을
+확인.
+
+결론: 지금 AI LENS 트래픽 규모(30일 API 호출 수백 건)에서는 영문사이트의 Redis+
+CDN 엣지-TTL 구조를 가져올 필요가 없다고 판단(오버엔지니어링) — `no-store`가 지금
+규모엔 맞는 절충. 대신 가져올 만한 것 하나만 반영: 영문사이트는 `frontend/deploy.sh`
+가 저장소에 커밋돼 있는데 우리는 없었다 — `service/frontend/deploy.sh`를 신설해
+build→tar.gz→S3(`ailens-ssr-releases`)→SSM extract→symlink→pm2 restart→헬스체크를
+스크립트 하나로 묶었다(옛 정적 export 배포용 `deploy.sh`는 전면 교체). 실제 배포로
+검증 완료(release `20260808-230129`). 커밋 `8f8a661`.
