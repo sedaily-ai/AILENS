@@ -132,6 +132,39 @@ strategy-decision.md`), AWS를 직접 확인해보니 그 자동화(CodeBuild �
 - CloudFront Origin Group(EC2 장애 시 S3로 자동 failover)도 이번엔 안 만듦 — 안정화 후
   별도 제안.
 
+## 후속 — 캐시 완전 제거 ("무조건 실시간성")
+
+컷오버 직후 실사용 테스트 중 admin에서 삭제한 글("222")이 홈 두 섹션("요즘 가장 많이 읽힌
+글" — `SideRail.tsx`, "이번 주 인기 칼럼" — `ColumnPreviewSection.tsx`)에 계속 남아있는
+문제를 사용자가 발견. DynamoDB·API(`/api/v2/posts`, `/api/v2/today-letters`) 전부 확인한
+결과 백엔드는 완전히 깨끗했고, 원인은 브라우저 sessionStorage에 남아있던 캐시(배포 전 코드가
+3~5분 TTL로 써둔 값)였다.
+
+사용자가 "디시인사이드처럼 CRUD가 무조건 실시간이어야 한다"고 명확히 요구 — 논의 결과
+"admin이 다른 사용자의 브라우저 캐시를 지울 방법은 없다(웹소켓 등 실시간 푸시 인프라 없이는)"
+는 점을 설명하고, 대신 **애초에 클라이언트에 지속 캐시를 두지 않는** 방향으로 확정:
+
+- `cmsPostsApi.ts`, `todayLettersApi.ts`: `readSession`/`writeSession`(sessionStorage) 완전
+  삭제. 모듈스코프 `Map` 캐시도 TTL 기반에서 **진행 중 요청만 묶는 in-flight coalescing**으로
+  교체(응답이 오는 즉시 캐시에서 제거 — 같은 페이지 안에서 동시에 여러 섹션이 같은 API를
+  부를 때만 중복 요청을 줄이고, 그 다음 호출은 항상 새 네트워크 요청).
+- 두 파일의 raw `fetch()` 호출 6곳에 `cache: 'no-store'`를 다시 추가 — 이것들은 원래
+  2026-08-07(정적 export 시절)에 "빌드 시 워커 여러 개가 동시에 같은 URL을 fetch하다 실패"
+  하는 문제 때문에 뺐던 건데, SSR인 지금은 그 문제 자체가 없다(빌드타임 다중워커 프리렌더가
+  없음). 없으면 Next의 자체 fetch 캐시가 응답을 재사용해버릴 위험이 있다(`sitemap.ts`의
+  `force-dynamic` 미적용 때 겪은 것과 같은 종류의 문제).
+- 로컬 빌드 검증(라우트 dynamic 마킹 동일) → EC2에 릴리스 재배포(S3 업로드 → release
+  디렉터리 → `pm2 reload`, 무중단) → 실도메인에서 홈/레터목록 200 + `today-letters` API로
+  "222" 완전히 사라진 것 재확인.
+
+### 결정 (후속)
+
+- 진짜 실시간(웹소켓/SSE로 admin 액션을 다른 사용자 브라우저에 즉시 push)은 이번엔 안 함 —
+  이 서비스 규모에 과한 인프라라고 판단, "클라이언트 캐시를 아예 없애 매 로드가 항상 서버를
+  다시 묻게 한다"만으로 사용자가 원하는 "체감 실시간"은 충분히 달성됨.
+- in-flight coalescing(TTL 없음)은 유지 — 이건 신선도를 절대 희생하지 않으면서(다음 호출은
+  무조건 새 요청) 동시 다발 요청만 줄여주는, 순수하게 이득만 있는 최적화라 제거할 이유가 없음.
+
 ## 다음
 
 - **admin 발행 → EC2 반영 실제 왕복 테스트**: 이번엔 이미 발행돼 있던 두 웹툰이 재빌드
@@ -145,6 +178,11 @@ strategy-decision.md`), AWS를 직접 확인해보니 그 자동화(CodeBuild �
 - **S3 구정적 콘텐츠 정리 시점**: 롤백 안전망으로 당분간 유지, 안정화되면(1~2주?) 별도
   worklog 남기고 정리할지 결정.
 - **비용 실측**: 예상 순증분 월 $17~20(t3.small+EBS)이었는데, 실제 청구서로 확인은 아직.
-- **`docs/architecture/2026-08-07-rendering-strategy-decision.md` 갱신**: 그 문서가 SSR을
-  기각한 채로 남아있어 지금 아키텍처와 어긋난다 — 이 worklog를 참조하도록 상단에 정정 노트
-  추가가 필요(이번 세션에서는 안 함).
+- ~~`docs/architecture/2026-08-07-rendering-strategy-decision.md` 갱신~~ — 완료(위 "후속"
+  섹션 작업 중 상단에 정정 노트 추가함).
+- **admin 이미지 업로드 실패 리포트(미해결)**: 사용자가 웹툰 컷 2번째 이미지 업로드가
+  실패했다고 리포트했으나 원인 미확정 상태로 다른 이슈(삭제 반영 안 됨)로 넘어감. admin
+  Lambda 로그(`sedaily-mbti-admin-api-dev`)엔 해당 시간대 presign 요청이 1건(성공)뿐이라
+  두 번째 업로드는 서버까지 요청이 안 간 것으로 보임 — `admin/frontend/src/lib/uploadImage.ts`
+  의 클라이언트 사이드 10MB 용량 체크(presign 호출 전에 막음)가 유력 후보. 실제 에러 토스트
+  문구·재현 필요.

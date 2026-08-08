@@ -90,100 +90,51 @@ export function withDisplayMeta(letter: ApiLetter): DisplayLetter {
   return { ...letter, ...DEFAULT_META };
 }
 
-// 날짜별 응답 캐시 — 같은 date 의 4편 사이 이동 / 페이지네이션 즉시화.
-// Promise 자체를 캐시해 동시 호출(병렬 4편 prefetch)이 같은 fetch 를 공유.
-// TTL 로 만료시켜, 세션을 오래 열어둔 사용자가 CMS 수정분·신규 발행을
-// 하드 리프레시 없이도 받아보게 한다 (당일 캐시가 무기한 박제되던 버그 수정).
-//
-// 2026-08-07: sessionStorage 에도 같이 적는다 — FollowingFeed(이슈 톡톡)는
-// 오늘자가 비어 있으면 전날·전전날로 직접 날짜를 거슬러 여러 번 fetch 하는데
-// (lookback), in-memory 캐시만으로는 페이지를 새로고침하거나 다른 페이지
-// 갔다 오면 이 lookback 전체가 매번 처음부터 다시 돈다 — "그때그때 로딩하는
-// 것 같다"는 피드백(같은 날)의 핵심 원인. cmsPostsApi.ts 의 동일 패턴 참조.
-//
-// TTL 20초 — SSR 전환(2026-08-08) 이후 `lettersCache`(모듈스코프 Map)는 EC2
-// Node 프로세스가 떠있는 내내 전체 방문자가 공유하는 서버 캐시가 된다
-// (정적 export 시절엔 빌드 1회성). admin 발행 즉시 반영 요구로 짧게 잡음 —
-// cmsPostsApi.ts의 REQUEST_CACHE_TTL_MS와 동일 근거.
-const CACHE_TTL_MS = 20 * 1000;
-const SESSION_PREFIX = 'ailens-letters-cache:';
-const lettersCache = new Map<string, { promise: Promise<ApiTodayLettersResponse>; expiresAt: number }>();
-
-function readSession(key: string): { value: ApiTodayLettersResponse; expiresAt: number } | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(SESSION_PREFIX + key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { value: ApiTodayLettersResponse; expiresAt: number };
-    if (typeof parsed.expiresAt !== 'number' || parsed.expiresAt < Date.now()) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeSession(key: string, value: ApiTodayLettersResponse, expiresAt: number) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(SESSION_PREFIX + key, JSON.stringify({ value, expiresAt }));
-  } catch {
-    // 세션스토리지 용량 초과 등 — 캐시는 최적화일 뿐이라 실패해도 무시.
-  }
-}
+// 진행 중 요청 묶기(in-flight coalescing) — 같은 date 를 여러 곳(FollowingFeed
+// lookback, SideRail, NewsletterCTA 등)이 동시에 부를 때 fetch 를 하나로
+// 공유한다. **시간 기반 캐시가 아니다** — 응답이 오는 즉시 지운다. 다음
+// 호출은 항상 새 네트워크 요청이라 admin 발행/수정/삭제가 즉시 반영된다
+// (2026-08-08, "무조건 실시간성" 요구 — sessionStorage 에 결과를 남겨뒀던
+// 이전 버전은 탭을 새로고침해도 옛 값이 몇 분간 남아있어 삭제한 글이 계속
+// 보이는 문제가 있었다. cmsPostsApi.ts 의 동일 패턴 참조).
+const lettersCache = new Map<string, Promise<ApiTodayLettersResponse>>();
 
 export async function fetchTodayLetters(date?: string): Promise<ApiTodayLettersResponse> {
   const key = date ?? '__today__';
-  const cached = lettersCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  const inFlight = lettersCache.get(key);
+  if (inFlight) return inFlight;
 
-  const expiresAt = Date.now() + CACHE_TTL_MS;
-  const sessionHit = readSession(key);
-  if (sessionHit) {
-    // 캐시 즉시 반환 + 백그라운드로 조용히 갱신(다음 호출을 위해).
-    const bg = fetchTodayLettersLive(date, expiresAt);
-    lettersCache.set(key, { promise: bg, expiresAt });
-    return sessionHit.value;
-  }
-
-  const promise = fetchTodayLettersLive(date, expiresAt);
-  lettersCache.set(key, { promise, expiresAt });
+  const promise = fetchTodayLettersLive(date);
+  lettersCache.set(key, promise);
+  promise.finally(() => lettersCache.delete(key));
   return promise;
 }
 
-async function fetchTodayLettersLive(date: string | undefined, expiresAt: number): Promise<ApiTodayLettersResponse> {
-  const key = date ?? '__today__';
-  const promise = (async () => {
-    // 라이브 단일 소스 (mock fallback 제거 2026-07-24). 해당 날짜에 레터가
-    // 없으면 API 가 letters:[] 를 반환 — 호출측이 빈 상태/직전일 lookback 처리.
-    const qs = date ? `?date=${date}` : '';
+async function fetchTodayLettersLive(date: string | undefined): Promise<ApiTodayLettersResponse> {
+  // 라이브 단일 소스 (mock fallback 제거 2026-07-24). 해당 날짜에 레터가
+  // 없으면 API 가 letters:[] 를 반환 — 호출측이 빈 상태/직전일 lookback 처리.
+  const qs = date ? `?date=${date}` : '';
 
-    // CMS 수동 글을 함께 부른다. 순차가 되지 않게 Promise.all 로 묶는다.
-    // fetchCmsPosts 는 실패해도 throw 하지 않고 [] 를 주므로, CMS 가 죽어도
-    // 기존 레터는 그대로 렌더된다 (spec §8 fail-open).
-    // cache: 'no-store'였다가 제거(2026-08-07, cmsPostsApi.ts와 동일 이유) —
-    // 빌드타임에 이 함수를 여러 워커가 동시에 같은 URL로 호출할 때 Next의
-    // 요청 중복제거(Data Cache)까지 꺼버려 일부가 실패했다. 인메모리 캐시(위
-    // CACHE_TTL_MS)·sessionStorage가 이미 신선도를 보장하므로 실질적 차이 없다.
-    const [res, cmsPosts] = await Promise.all([
-      fetch(`${API_BASE}/api/v2/today-letters${qs}`),
-      fetchCmsPosts('letters', date),
-    ]);
+  // CMS 수동 글을 함께 부른다. 순차가 되지 않게 Promise.all 로 묶는다.
+  // fetchCmsPosts 는 실패해도 throw 하지 않고 [] 를 주므로, CMS 가 죽어도
+  // 기존 레터는 그대로 렌더된다 (spec §8 fail-open).
+  // cache:'no-store' 필수 — 없으면 Next의 fetch 캐시가 계속 재사용해 admin
+  // 발행/수정/삭제가 반영 안 된다. 예전엔 정적 export 빌드타임에 워커 여러
+  // 개가 동시 fetch해서 실패하는 문제로 뺐었는데 SSR인 지금은 해당 없음.
+  const [res, cmsPosts] = await Promise.all([
+    fetch(`${API_BASE}/api/v2/today-letters${qs}`, { cache: 'no-store' }),
+    fetchCmsPosts('letters', date),
+  ]);
 
-    if (!res.ok) {
-      throw new Error(`today-letters API ${res.status}`);
-    }
-    const data = (await res.json()) as ApiTodayLettersResponse;
+  if (!res.ok) {
+    throw new Error(`today-letters API ${res.status}`);
+  }
+  const data = (await res.json()) as ApiTodayLettersResponse;
 
-    // 관리자가 쓴 글을 앞에 배치 — 편집 의도가 AI 레터보다 우선한다.
-    return cmsPosts.length
-      ? { ...data, letters: [...cmsPosts, ...data.letters] }
-      : data;
-  })();
-
-  // 실패 시 다음 호출에서 재시도되도록 cache 에서 제거. 성공하면 다음
-  // 세션/새로고침에서 즉시 히트하도록 sessionStorage 에도 적는다.
-  promise.then((v) => writeSession(key, v, expiresAt)).catch(() => lettersCache.delete(key));
-  return promise;
+  // 관리자가 쓴 글을 앞에 배치 — 편집 의도가 AI 레터보다 우선한다.
+  return cmsPosts.length
+    ? { ...data, letters: [...cmsPosts, ...data.letters] }
+    : data;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
