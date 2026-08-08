@@ -67,8 +67,10 @@ const eslintConfig = defineConfig([
             { from: { type: "app" }, allow: { to: { type: ["pages", "widgets", "features", "entities", "shared", "components"] } } },
             // pages can import from widgets, features, entities, shared
             { from: { type: "pages" }, allow: { to: { type: ["widgets", "features", "entities", "shared"] } } },
-            // widgets can import from features, entities, shared
-            { from: { type: "widgets" }, allow: { to: { type: ["features", "entities", "shared"] } } },
+            // widgets can import from other widgets(Header 같은 전역 chrome을
+            // FeedPage/StaticPageShell 등 페이지 단위 widget이 재사용하는 패턴,
+            // 2026-08-08), features, entities, shared
+            { from: { type: "widgets" }, allow: { to: { type: ["widgets", "features", "entities", "shared"] } } },
             // features can import from entities, shared (다른 features는 금지 — lateral import)
             { from: { type: "features" }, allow: { to: { type: ["entities", "shared"] } } },
             // entities can import from shared only

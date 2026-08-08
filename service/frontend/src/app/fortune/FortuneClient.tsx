@@ -5,7 +5,7 @@ import { Header } from "@/widgets/Header";
 import Link from 'next/link';
 import { FortuneTab } from '@/features/fortune';
 import { FortuneBackdrop } from '@/features/fortune/components/FortuneBackdrop';
-import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { UserMenu } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 

@@ -10,7 +10,7 @@ import { SideRail } from '@/features/news-feed/components/SideRail';
 import { InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed/components/InteractiveBlock';
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { trackArticleRead } from '@/shared/lib/readingTracker';
-import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { UserMenu, useAuth } from '@/features/auth';
 import { letterPodcastUrl } from '@/shared/lib/audioPlayer';
 import { LETTER_PODCASTS } from '@/features/news-feed/data/letterPodcasts';

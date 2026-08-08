@@ -8,7 +8,7 @@ import type { CmsLetter, CmsVideo, CmsWebtoon } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
-import { SmartSearchOverlay } from "./SmartSearchOverlay";
+import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
 import { useAuth } from "@/features/auth";
 import { Header } from "@/widgets/Header";
 import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { StaticPageShell } from '@/shared/ui/StaticPageShell';
+import { StaticPageShell } from '@/widgets/StaticPageShell';
 
 export const metadata: Metadata = {
   title: '문의',

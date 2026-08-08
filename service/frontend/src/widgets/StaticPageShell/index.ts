@@ -1,0 +1,1 @@
+export { StaticPageShell } from './StaticPageShell';

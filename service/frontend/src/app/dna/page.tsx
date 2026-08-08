@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Header } from "@/widgets/Header";
 import Link from 'next/link';
-import { SmartSearchOverlay } from '@/components/mbti/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { UserMenu } from '@/features/auth';
 import { DnaContent } from '@/features/dna';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';

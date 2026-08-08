@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { FeedPage } from "@/components/mbti/FeedPage";
+import { FeedPage } from "@/widgets/FeedPage";
 import { fetchCmsPosts, fetchVideos, fetchWebtoons } from "@/shared/lib/cmsPostsApi";
 import { fetchFollowingLetters } from "@/shared/lib/todayLettersApi";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
