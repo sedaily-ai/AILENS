@@ -161,3 +161,45 @@ build→tar.gz→S3(`ailens-ssr-releases`)→SSM extract→symlink→pm2 restart
 
 4개 전부 실제로 재실행해 배포+헬스체크 통과까지 검증(멱등적이라 안전 —
 코드가 안 바뀐 재배포).
+
+## 후속 5 (같은 날) — revalidateTag(tag, 'max')가 실제론 "30일 캐시 재고정"이었다
+
+인프라 감사 도중 사용자가 `/webtoon`이 `s-maxage=31536000`(1년)으로 뜬다고
+리포트. `node_modules/next/cache.d.ts`의 `cacheLife()` 프로파일 문서 주석을
+확인한 결과, Next가 내장한 `'max'` 프로파일의 정의는:
+
+```
+stale:      300 seconds (5분)
+revalidate: 2592000 seconds (30일)
+expire:     never
+```
+
+즉 오늘 아침 `/api/revalidate/route.ts`에 적어둔 "'max' = 즉시·완전 무효화"
+(da4cfb4 커밋 당시 판단)는 **완전히 틀렸다** — 반대로 admin이 webhook을 한 번
+쏘면 그 태그가 걸린 라우트가 최대 30일짜리 캐시 프로파일로 재고정된다. 홈/레터가
+정상으로 보였던 건 우연히 5초 자연 주기로 재생성됐기 때문이고, webtoon은
+revalidateTag 트리거로 재생성되면서 이 프로파일에 걸려 1년 캐시로 고정된
+상태였다 — "새로고침해도 예외 없이 즉시 반영"이라는 오늘의 확정 요구사항과
+정면으로 충돌하는 버그였다.
+
+**수정**: Next의 cache-life 프로파일 의미론에 다시 기대는 대신 캐시 자체를
+없앴다. `cmsPostsApi.ts` 6곳 + `letters/[id]/page.tsx` + `sitemap.ts`를
+`cache:'force-cache'+tags+revalidate:5` → `cache:'no-store'`로 전환,
+`api/revalidate/route.ts`의 `revalidateTag()` 루프 제거(admin webhook
+호환을 위해 엔드포인트 자체는 인증+200 no-op으로 유지). 빌드 확인 결과
+콘텐츠 라우트 전부(`/`, `/letters`, `/letters/[id]`, `/webtoon`,
+`/webtoon/[slug]`, `/sitemap.xml`) ○/●(정적)→ƒ(매 요청 동적)로 전환.
+
+**실측 검증**: DynamoDB에 테스트 글을 직접 put-item(admin/webhook 완전히
+건너뛰고) → 공개 API·레터 아카이브·상세 페이지 세 곳 모두 즉시 노출 확인 →
+soft-delete → 세 곳 모두 즉시 사라짐 확인. webhook 성공 여부와 무관하게
+항상 최신이라는 걸 가장 강하게 증명하는 방식으로 검증했다. 커밋 `c8b42ca`,
+배포 release `20260809-005923`.
+
+**교훈**: Next 16의 `revalidateTag(tag, profile)` 2번째 인자는 "얼마나
+강하게 무효화할지"가 아니라 "무효화 이후 이 태그를 어떤 캐시 정책으로 다시
+채울지"를 정하는 인자다 — 이름만 보고 의미를 추측하면 안 되고
+(`'max'`="가장 오래 캐시하는 프로파일"이지 "가장 강력한 무효화"가 아니었다),
+공식 타입 정의/문서 주석을 직접 읽어야 한다. 트래픽이 이 정도로 낮은
+서비스에서는 애초에 이런 세밀한 캐시 정책보다 무캐시가 더 안전한
+기본값이라는 것도 재확인.
