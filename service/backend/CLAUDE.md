@@ -275,8 +275,10 @@ services/           → Business logic: article_filter, prompt_loader,
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
                      `article_filter_service.py`의 `get_filter_service()` 싱글턴도 같은 날
-                     삭제(호출자 0) — `article_collector.py`는 이 getter 없이 직접 인스턴스화함,
-                     나머지(`FilterResult`, `ArticleFilterService` 본체)는 살아있음.
+                     삭제(호출자 0) — 당시엔 "`article_collector.py`가 getter 없이 직접
+                     인스턴스화한다"고 판단해 본체(`FilterResult`, `ArticleFilterService`)는
+                     남겨뒀는데, 2026-08-08 재확인 결과 `article_collector.py`가 필터링
+                     자체를 호출하지 않아 본체도 호출자 0이었다 — 파일 전체 삭제.
                      ⚠️ `prompt_loader.py`의 `load_prompt_by_path`/`invalidate`도 호출자 0이라
                      2026-08-05 삭제 — 살아있는 `load_prompt`/`load_transform_prompt`/
                      `load_chatbot_prompt`는 그대로.
