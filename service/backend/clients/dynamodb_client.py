@@ -134,14 +134,26 @@ class DynamoDBClient:
 
         def _query_category(category: str) -> list:
             try:
-                response = self.table.query(
-                    IndexName='category-published_at-index',
-                    KeyConditionExpression=(
+                items = []
+                kwargs = {
+                    'IndexName': 'category-published_at-index',
+                    'KeyConditionExpression': (
                         Key('category').eq(category)
                         & Key('published_at').between(start, end)
                     ),
-                )
-                return response.get('Items', [])
+                }
+                # Query 는 1MB 를 넘으면 LastEvaluatedKey 로 다음 페이지를 알려준다 —
+                # 안 따라가면 결과가 많은 카테고리/날짜일수록 뒷부분이 조용히
+                # 잘려나간다(admin posts_repo.py 에서 실제로 겪은 버그와 같은 유형,
+                # 2026-08-09 이식).
+                while True:
+                    response = self.table.query(**kwargs)
+                    items.extend(response.get('Items', []))
+                    last_key = response.get('LastEvaluatedKey')
+                    if not last_key:
+                        break
+                    kwargs['ExclusiveStartKey'] = last_key
+                return items
             except Exception as e:
                 logger.warning(
                     f"Failed to query category '{category}' for {date_str}: {e}"

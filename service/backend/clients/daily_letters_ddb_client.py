@@ -31,10 +31,21 @@ def get_daily_letters(letter_date: str) -> List[Dict[str, Any]]:
     """Today Letters API 의 read 경로. 그날의 letter row (created_at 순 — MBTI 페르소나
     폐지 이후 4-persona 고정 순서는 더 이상 없다. admin/repo/letters_repo.py 의
     list_by_date 와 같은 정렬 기준으로 맞춘다)."""
-    resp = _table().query(
-        IndexName="letter_date-index",
-        KeyConditionExpression=Key("letter_date").eq(letter_date),
-    )
-    items = [i for i in resp.get("Items", []) if not i.get("deleted_at")]
+    # admin/repo/letters_repo.py:list_by_date 와 동일한 페이지네이션 루프
+    # (2026-08-09 이식) — 안 따라가면 하루치 레터가 1MB 페이지 한도를 넘는
+    # 날에 뒷부분이 조용히 잘린다.
+    items: List[Dict[str, Any]] = []
+    kwargs: Dict[str, Any] = {
+        "IndexName": "letter_date-index",
+        "KeyConditionExpression": Key("letter_date").eq(letter_date),
+    }
+    while True:
+        resp = _table().query(**kwargs)
+        items.extend(resp.get("Items", []))
+        last_key = resp.get("LastEvaluatedKey")
+        if not last_key:
+            break
+        kwargs["ExclusiveStartKey"] = last_key
+    items = [i for i in items if not i.get("deleted_at")]
     items.sort(key=lambda i: i.get("created_at", ""))
     return items
