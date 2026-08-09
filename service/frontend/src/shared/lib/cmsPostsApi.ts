@@ -85,18 +85,16 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
   return p;
 }
 
-// 캐시 정책(2026-08-08, "클릭 즉시 이동 + admin CRUD 1초 반영" 요구) — 평소엔
-// 태그로 캐시해서 Next <Link> 프리페치가 살아있게 하고(no-store였을 땐 캐시할
-// 게 없어서 프리페치가 무력화돼 있었다), admin이 글을 쓰면 POST /api/revalidate
-// (src/app/api/revalidate/route.ts)가 같은 태그를 revalidateTag()로 깬다.
-// revalidate:5(상한)도 같이 걸어서 webhook을 놓쳐도(오늘 아침 "삭제한 글이
-// 안 사라짐" 사고처럼) 최악 5초 안엔 스스로 회복한다 — 태그만 걸고 캐시
-// 옵션을 안 주면 Next 15+ 기본값(fetch 무캐시)이라 캐싱 자체가 안 켜진다.
-// (2026-08-09: 60초→5초로 재단축 — SSE 실시간 push를 걷어내면서, "요청-응답
-// 기반 최신성만으로 충분"이라는 방향에 맞춰 자연 회복 상한 자체를 좁혔다.)
-function tag(channel: CmsChannel): string {
-  return `posts:${channel}`;
-}
+// 캐시 정책(2026-08-09, "새로고침하면 예외 없이 즉시 반영" 요구로 전면 재검토) —
+// 태그+revalidate:5 캐싱을 썼었는데, /api/revalidate 가 부르는
+// revalidateTag(tag, 'max')의 'max'가 "즉시·완전 무효화"가 아니라 Next 내장
+// cache-life 프로파일(stale:5분/revalidate:30일/expire:영구)이라는 걸 뒤늦게
+// 확인했다(node_modules/next/cache.d.ts 문서 주석 참조) — admin이 webhook을
+// 한 번이라도 쏘고 나면 그 태그가 걸린 라우트가 최대 30일짜리 캐시로 재고정되는
+// 심각한 버그였다(실측: /webtoon 이 s-maxage=31536000으로 나온 원인). Next의
+// 캐시-라이프 프로파일 의미론에 다시 기대는 대신 캐시 자체를 껐다 — Link
+// 프리페치 이점은 잃지만("클릭 즉시 이동"과 "새로고침하면 예외 없이 최신"이
+// 충돌할 때 후자를 우선), 이 트래픽 규모에서 성능 비용은 무시할 수준이다.
 
 export async function fetchCmsPosts(
   channel: CmsChannel,
@@ -109,8 +107,7 @@ export async function fetchCmsPosts(
       if (date) qs.set('date', date);
       if (limit) qs.set('limit', String(limit));
       const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, {
-        cache: 'force-cache',
-        next: { tags: [tag(channel)], revalidate: 5 },
+        cache: 'no-store',
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLetter[] };
@@ -127,8 +124,7 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
   return cached('trend_card', async () => {
     try {
       const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, {
-        cache: 'force-cache',
-        next: { tags: [tag('trend_card')], revalidate: 5 },
+        cache: 'no-store',
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsTrendCard[] };
@@ -143,8 +139,7 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
       const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`, {
-        cache: 'force-cache',
-        next: { tags: [tag('webtoon')], revalidate: 5 },
+        cache: 'no-store',
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
@@ -158,8 +153,7 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
 export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | null> {
   try {
     const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, {
-      cache: 'force-cache',
-      next: { tags: [tag('webtoon')], revalidate: 5 },
+      cache: 'no-store',
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsWebtoon };
@@ -173,8 +167,7 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
   return cached('video', async () => {
     try {
       const res = await fetch(`${API_URL}/api/v2/posts?channel=video`, {
-        cache: 'force-cache',
-        next: { tags: [tag('video')], revalidate: 5 },
+        cache: 'no-store',
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
@@ -193,8 +186,7 @@ export async function fetchCmsPostBySlug(
 ): Promise<CmsLetter | null> {
   try {
     const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, {
-      cache: 'force-cache',
-      next: { tags: [tag(channel)], revalidate: 5 },
+      cache: 'no-store',
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsLetter };

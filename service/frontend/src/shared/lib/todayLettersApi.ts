@@ -117,11 +117,10 @@ async function fetchTodayLettersLive(date: string | undefined): Promise<ApiToday
 
   // CMS 수동 글을 함께 부른다. 순차가 되지 않게 Promise.all 로 묶는다.
   // fetchCmsPosts 는 실패해도 throw 하지 않고 [] 를 주므로, CMS 가 죽어도
-  // 기존 레터는 그대로 렌더된다 (spec §8 fail-open, cmsPostsApi.ts 가 이미
-  // posts:letters 태그로 캐시+webhook 무효화를 처리).
+  // 기존 레터는 그대로 렌더된다 (spec §8 fail-open, cmsPostsApi.ts 는 무캐시
+  // — 2026-08-09, cmsPostsApi.ts 상단 주석 참조).
   // today-letters API는 2026-08-04 RDS 삭제로 영구히 빈 응답만 주는 죽은
-  // 경로(CLAUDE.md 참조) — admin 쓰기 경로가 없어 태그를 걸 이유가 없다.
-  // 그래도 캐시는 60초로 걸어둔다(일관성, 언젠가 되살아나도 자연스럽게 동작).
+  // 경로(CLAUDE.md 참조) — 죽은 경로라 캐시 정책을 굳이 안 건드린다.
   const [res, cmsPosts] = await Promise.all([
     fetch(`${API_BASE}/api/v2/today-letters${qs}`, { cache: 'force-cache', next: { revalidate: 60 } }),
     fetchCmsPosts('letters', date),

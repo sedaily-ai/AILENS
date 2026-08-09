@@ -16,11 +16,11 @@ const SEED_DAYS = 14;
 
 async function fetchLettersForDate(date: string): Promise<ApiLetter[]> {
   try {
-    // posts:letters 태그로 캐시 — admin 발행 시 POST /api/revalidate 가 이
-    // 태그를 revalidateTag() 로 깬다(cmsPostsApi.ts 와 동일 정책).
+    // 무캐시(2026-08-09, cmsPostsApi.ts와 동일 정책 — revalidateTag(tag,'max')
+    // 가 실제로는 "30일 캐시 프로파일 재고정"이라는 걸 확인한 뒤 태그 캐싱
+    // 자체를 뺐다. 상세 경위는 cmsPostsApi.ts 상단 주석 참조).
     const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${date}`, {
-      cache: 'force-cache',
-      next: { tags: ['posts:letters'], revalidate: 5 },
+      cache: 'no-store',
     });
     if (!res.ok) return [];
     const data = (await res.json()) as { posts?: ApiLetter[] };

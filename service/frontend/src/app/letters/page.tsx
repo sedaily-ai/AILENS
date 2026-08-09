@@ -12,8 +12,9 @@ export const metadata: Metadata = {
 // 정적 HTML에 목록 스켈레톤만 구워지고 실제 아카이브 목록은 하나도
 // 없었다(SSG 감사 중 발견). 가져온 값을 initialItems로 클라이언트
 // 컴포넌트에 내려서 HTML에 실제 목록·링크가 바로 박히게 한다.
-// force-dynamic을 걸었다가(SSR 전환 직후) 다시 뺐다(2026-08-08) — page.tsx
-// 상단 주석과 동일 이유(posts:* 태그 캐시 + webhook revalidateTag로 전환).
+// force-dynamic을 걸었다가(SSR 전환 직후) 다시 뺐다(2026-08-08). 지금은
+// cmsPostsApi.ts 쪽이 무캐시(2026-08-09)라 force-dynamic 여부와 무관하게
+// 항상 최신 데이터를 받는다 — 상세 경위는 cmsPostsApi.ts 상단 주석 참조.
 
 export default async function LettersArchivePage() {
   const [letters, cards, videos] = await Promise.all([
