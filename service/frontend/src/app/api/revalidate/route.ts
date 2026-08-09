@@ -11,7 +11,8 @@ import { timingSafeEqual } from 'node:crypto';
 // cache:'no-store'로 바꿔서 애초에 무효화할 캐시가 없다(cmsPostsApi.ts 등
 // 상단 주석 참조) — 이 라우트는 이제 순수 no-op이지만, admin/backend/shared/
 // notify.py가 여전히 이 경로를 호출하므로 엔드포인트 자체는 유지해 200을
-// 준다(admin 쪽 코드를 안 건드리기 위함).
+// 준다(admin 쪽 코드를 안 건드리기 위함). 사고 경위 전체:
+// docs/worklog/2026-08/2026-08-09-cache-ttl-tighten-sse-removal.md "후속 5".
 function isAuthorized(request: Request): boolean {
   const provided = request.headers.get('x-revalidate-secret') ?? '';
   const expected = process.env.REVALIDATE_SECRET ?? '';
@@ -22,6 +23,9 @@ function isAuthorized(request: Request): boolean {
   return timingSafeEqual(a, b);
 }
 
+// ⚠️ no-op — 캐시가 없어서 지울 것도 없다. 200을 준다고 "무효화가 됐다"는
+// 뜻이 아니다(위 2026-08-09 주석 참조). 캐시를 재도입하기 전엔 이 핸들러를
+// "동작하는 무효화 로직"으로 오해하지 말 것.
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
     return Response.json({ error: 'unauthorized' }, { status: 401 });
