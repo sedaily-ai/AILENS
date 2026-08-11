@@ -138,7 +138,10 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon`, {
+      // limit=100 명시(2026-08-11) — 안 넘기면 백엔드 기본값(20)에서 조용히
+      // 잘려서, 21화가 올라가는 순간 가장 오래된 화가 목록에서 사라지는
+      // 버그가 있었다(cms_posts_public.py 의 limit 기본값 확인 후 발견).
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon&limit=100`, {
         cache: 'no-store',
       });
       if (!res.ok) return [];
@@ -166,7 +169,9 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
 export async function fetchVideos(): Promise<CmsVideo[]> {
   return cached('video', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=video`, {
+      // limit=100 명시(2026-08-11) — fetchWebtoons()와 같은 이유. 안 넘기면
+      // 백엔드 기본값(20)에서 조용히 잘려 오래된 영상이 목록에서 사라진다.
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=video&limit=100`, {
         cache: 'no-store',
       });
       if (!res.ok) return [];
@@ -176,6 +181,19 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
       return [];
     }
   });
+}
+
+export async function fetchVideoBySlug(slug: string): Promise<CmsVideo | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=video`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { post?: CmsVideo };
+    return data.post ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // mbti_group 없이 발행된 CMS 글(letterHref 가 slug 를 그대로 id 로 씀)을

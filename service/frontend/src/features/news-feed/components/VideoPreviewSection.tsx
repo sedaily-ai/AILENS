@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/cmsPostsApi';
-import { extractYouTubeId, youtubeThumbnailUrl, youtubeEmbedUrl } from '@/shared/lib/videoEmbed';
+import { resolveVideo } from '@/shared/lib/videoEmbed';
 
 // 영상 콘텐츠 섹션(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
 // 여기 자동으로 뜬다. "매거진 고급짐" 톤(TrendingEconomySection과 동일 원칙)
@@ -61,11 +61,12 @@ export function VideoPreviewSection({ initialVideos }: Props) {
           </h2>
         </div>
         <div className="flex items-center flex-shrink-0" style={{ gap: 14 }}>
-          {/* "더보기" — /letters 아카이브 '영상' 필터로. 다른 섹션들과 동일한
-              패턴(2026-08-07, "영상 섹션도 더보기 있어야 할 듯" 피드백) —
-              CHANNEL_URL(실제 유튜브 채널)과는 별개다, 채널이 생겨도 이건 유지. */}
+          {/* "더보기" — 전용 /video 목록으로(2026-08-11, 영상마다 검색엔진이
+              찾을 수 있는 URL이 없던 문제로 /video, /video/[id] 신설하며 함께
+              변경 — 예전엔 /letters 아카이브로 보냈었다). CHANNEL_URL(실제
+              유튜브 채널)과는 별개다, 채널이 생겨도 이건 유지. */}
           <Link
-            href="/letters"
+            href="/video"
             className="text-gray-500 hover:text-gray-900"
             style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
@@ -100,8 +101,8 @@ export function VideoPreviewSection({ initialVideos }: Props) {
         }}
       >
         {videos.map((v) => {
-          const videoId = extractYouTubeId(v.video_url);
-          const thumb = v.thumbnail_url || (videoId ? youtubeThumbnailUrl(videoId) : null);
+          const resolved = resolveVideo(v.video_url);
+          const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
           const isPlaying = playingId === v.id;
           const cardStyle = {
             borderRadius: 8,
@@ -113,9 +114,9 @@ export function VideoPreviewSection({ initialVideos }: Props) {
           return (
             <article key={v.id} style={cardStyle}>
               <div className="aspect-video relative overflow-hidden" style={{ background: '#111827' }}>
-                {isPlaying && videoId ? (
+                {isPlaying && resolved ? (
                   <iframe
-                    src={youtubeEmbedUrl(videoId)}
+                    src={resolved.embedUrl}
                     title={v.title}
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -166,13 +167,23 @@ export function VideoPreviewSection({ initialVideos }: Props) {
                     fontSize: 14,
                     lineHeight: 1.45,
                     letterSpacing: '-0.02em',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
                   }}
                 >
-                  {v.title}
+                  <Link
+                    href={`/video/${encodeURIComponent(v.id)}`}
+                    prefetch
+                    className="hover:opacity-70 transition-opacity"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                    }}
+                  >
+                    {v.title}
+                  </Link>
                 </h3>
               </div>
             </article>

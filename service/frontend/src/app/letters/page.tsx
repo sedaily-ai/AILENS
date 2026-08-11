@@ -3,9 +3,29 @@ import { fetchCmsPosts, fetchTrendCards, fetchVideos } from '@/shared/lib/cmsPos
 import { LettersArchiveClient } from './LettersArchiveClient';
 import { buildArchiveItems, PAGE_SIZE } from './archiveItems';
 
+const SITE_URL = 'https://ailens.sedaily.ai';
+const TITLE = '지금까지의 모든 콘텐츠';
+const DESCRIPTION = 'AI LENS가 정리한 레터·트렌드·칼럼·영상을 한 곳에서 모아봅니다.';
+
 export const metadata: Metadata = {
-  title: '지금까지의 모든 콘텐츠',
-  description: 'AI LENS가 정리한 레터·트렌드·칼럼·영상을 한 곳에서 모아봅니다.',
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/letters` },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: `${SITE_URL}/letters`,
+    type: 'website',
+    images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: 'AI LENS' }],
+    locale: 'ko_KR',
+    siteName: 'AI LENS — 서울경제',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [`${SITE_URL}/og-image.png`],
+  },
 };
 
 // 서버 컴포넌트로 전환(2026-08-07) — 이전엔 페이지 전체가 'use client'라

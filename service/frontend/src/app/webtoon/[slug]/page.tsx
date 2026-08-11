@@ -33,6 +33,23 @@ async function findWebtoon(slug: string): Promise<CmsWebtoon | null> {
   return webtoons.find((w) => w.id === slug) ?? null;
 }
 
+// 목록은 최신순(desc)으로 내려온다 — index-1이 더 최신 화("다음 화"),
+// index+1이 더 과거 화("이전 화").
+async function findNeighbors(slug: string): Promise<{
+  episodeLabel: string | undefined;
+  next: CmsWebtoon | null;
+  prev: CmsWebtoon | null;
+}> {
+  const webtoons = await fetchAllWebtoons();
+  const idx = webtoons.findIndex((w) => w.id === slug);
+  if (idx === -1) return { episodeLabel: undefined, next: null, prev: null };
+  return {
+    episodeLabel: `${webtoons.length - idx}화`,
+    next: webtoons[idx - 1] ?? null,
+    prev: webtoons[idx + 1] ?? null,
+  };
+}
+
 function trimDescription(s: string, max = 160): string {
   if (s.length <= max) return s;
   const cut = s.slice(0, max);
@@ -113,6 +130,9 @@ export default async function WebtoonViewPage({
   const slug = decodeURIComponent(rawSlug);
   const webtoon = await findWebtoon(slug);
   const jsonLd = webtoon ? buildJsonLd(webtoon, slug) : null;
+  const { episodeLabel, next, prev } = webtoon
+    ? await findNeighbors(slug)
+    : { episodeLabel: undefined, next: null, prev: null };
   return (
     <>
       {jsonLd && (
@@ -121,7 +141,13 @@ export default async function WebtoonViewPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <WebtoonViewClient slug={slug} initialWebtoon={webtoon} />
+      <WebtoonViewClient
+        slug={slug}
+        initialWebtoon={webtoon}
+        episodeLabel={episodeLabel}
+        nextEpisode={next}
+        prevEpisode={prev}
+      />
     </>
   );
 }

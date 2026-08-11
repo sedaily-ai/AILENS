@@ -1,10 +1,32 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons } from '@/shared/lib/cmsPostsApi';
+import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 import { WebtoonListClient } from './WebtoonListClient';
 
+const SITE_URL = 'https://ailens.sedaily.ai';
+const TITLE = '웹툰 — 이슈를 컷으로';
+const DESCRIPTION =
+  '서울경제 AI LENS가 요즘 경제·사회 이슈를 흑백 펜화 웹툰으로 옮깁니다. 성과급 갈등, 세제개편, AI 데이터센터 같은 뉴스를 컷으로 이어 보여드려요.';
+
 export const metadata: Metadata = {
-  title: '웹툰',
-  description: '요즘 이슈를 컷으로 이어 보여드려요.',
+  title: TITLE,
+  description: DESCRIPTION,
+  keywords: ['웹툰', '뉴스 웹툰', '시사 웹툰', '경제 웹툰', 'AI LENS', '서울경제'],
+  alternates: { canonical: `${SITE_URL}/webtoon` },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: `${SITE_URL}/webtoon`,
+    type: 'website',
+    images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: 'AI LENS 웹툰' }],
+    locale: 'ko_KR',
+    siteName: 'AI LENS — 서울경제',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [`${SITE_URL}/og-image.png`],
+  },
 };
 
 // 서버 컴포넌트로 전환(2026-08-07) — 이전엔 페이지 전체가 'use client'라
@@ -16,8 +38,43 @@ export const metadata: Metadata = {
 // cmsPostsApi.ts 상단 주석 참조 — 태그 캐시가 revalidateTag(tag,'max')의
 // 오해로 최대 30일 스테일을 낼 수 있는 버그였다)라 force-dynamic 여부와
 // 무관하게 항상 최신 데이터를 받는다.
+//
+// SEO 감사(2026-08-11) — 목록 페이지 메타데이터가 title/description 두 줄뿐
+// 이라 상세 페이지([slug]/page.tsx)에 비해 크게 부실했다. canonical·OG·
+// Twitter·CollectionPage JSON-LD를 상세 페이지와 같은 수준으로 채웠다.
+function buildJsonLd(items: CmsWebtoon[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    '@id': `${SITE_URL}/webtoon#collection`,
+    url: `${SITE_URL}/webtoon`,
+    name: TITLE,
+    description: DESCRIPTION,
+    inLanguage: 'ko-KR',
+    isPartOf: { '@id': `${SITE_URL}/#website` },
+    publisher: { '@id': `${SITE_URL}/#organization` },
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: items.slice(0, 20).map((w, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `${SITE_URL}/webtoon/${w.id}`,
+        name: w.title,
+      })),
+    },
+  };
+}
 
 export default async function WebtoonListPage() {
   const items = await fetchWebtoons();
-  return <WebtoonListClient initialItems={items} />;
+  const jsonLd = buildJsonLd(items);
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <WebtoonListClient initialItems={items} />
+    </>
+  );
 }

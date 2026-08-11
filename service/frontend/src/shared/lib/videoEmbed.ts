@@ -18,3 +18,43 @@ export function youtubeThumbnailUrl(videoId: string): string {
 export function youtubeEmbedUrl(videoId: string): string {
   return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 }
+
+/**
+ * 네이버TV 지원 추가(2026-08-11) — admin에서 tv.naver.com 링크를 붙여넣어도
+ * 이 파일이 유튜브만 파싱해서 재생 버튼이 아무 반응 없던 버그를 발견하고
+ * 고쳤다. tv.naver.com/v/{id} 또는 /embed/{id} 형태에서 숫자 id를 뽑는다.
+ * 네이버TV는 유튜브처럼 정적 썸네일 URL 규칙이 없어(oEmbed API 호출이
+ * 필요) — admin이 직접 넣은 thumbnail_url에 의존한다(admin UI에도 이미
+ * 안내돼 있음).
+ */
+export function extractNaverTvId(url: string): string | null {
+  const m = url.match(/tv\.naver\.com\/(?:v|embed)\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+export function naverTvEmbedUrl(videoId: string): string {
+  return `https://tv.naver.com/embed/${videoId}`;
+}
+
+export type VideoPlatform = 'youtube' | 'navertv';
+
+export interface ResolvedVideo {
+  platform: VideoPlatform;
+  videoId: string;
+  embedUrl: string;
+  /** 유튜브만 URL 규칙으로 자동 추출 가능 — 네이버TV는 null(admin 제공 썸네일에 의존). */
+  autoThumbnailUrl: string | null;
+}
+
+/** video_url 하나로 플랫폼을 판별해 재생·썸네일에 필요한 값을 한 번에 계산. */
+export function resolveVideo(url: string): ResolvedVideo | null {
+  const ytId = extractYouTubeId(url);
+  if (ytId) {
+    return { platform: 'youtube', videoId: ytId, embedUrl: youtubeEmbedUrl(ytId), autoThumbnailUrl: youtubeThumbnailUrl(ytId) };
+  }
+  const naverId = extractNaverTvId(url);
+  if (naverId) {
+    return { platform: 'navertv', videoId: naverId, embedUrl: naverTvEmbedUrl(naverId), autoThumbnailUrl: null };
+  }
+  return null;
+}

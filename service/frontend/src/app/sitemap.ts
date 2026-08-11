@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
-import { fetchWebtoons } from '@/shared/lib/cmsPostsApi';
+import { fetchWebtoons, fetchVideos } from '@/shared/lib/cmsPostsApi';
+import { GAMES } from './games/play/[slug]/page';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 // 무캐시(2026-08-09) — posts:letters 태그 캐시를 쓰다가, revalidateTag(tag,
@@ -56,6 +57,8 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/',             priority: 1.0, changeFrequency: 'hourly'  }, // 메인 피드 — 매일 갱신
   { path: '/letters',      priority: 0.9, changeFrequency: 'daily'   }, // 레터 전체 아카이브
   { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily'   }, // 웹툰 목록
+  { path: '/video',        priority: 0.7, changeFrequency: 'daily'   }, // 영상 목록(2026-08-11 신설)
+  { path: '/games',        priority: 0.5, changeFrequency: 'monthly' }, // SEO 감사(2026-08-11) 전엔 sitemap 누락
   { path: '/words',        priority: 0.6, changeFrequency: 'daily'   }, // 단어장 — 레터 키워드 기반, 매일 갱신
   { path: '/style',        priority: 0.3, changeFrequency: 'monthly' },
   // '/fortune', '/saju-match'는 2026-08-09 제거 — 사주는 이제 CloudFront
@@ -129,6 +132,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {
     /* 웹툰 API 불통이면 생략 — sitemap 나머지는 그대로 반환 */
+  }
+
+  // 영상 — 웹툰과 같은 이유로 개별 URL을 sitemap에 추가(2026-08-11).
+  try {
+    const videos = await fetchVideos();
+    for (const v of videos) {
+      const daysOld = daysBetween(v.date);
+      entries.push({
+        url: `${BASE}/video/${v.id}`,
+        lastModified: new Date(v.date + 'T07:00:00+09:00'),
+        changeFrequency: 'never',
+        priority: freshnessPriority(daysOld),
+      });
+    }
+  } catch {
+    /* 영상 API 불통이면 생략 */
+  }
+
+  // 게임 상세 — 정적 슬러그 2개, games/play/[slug]/page.tsx의 GAMES를 그대로 재사용.
+  for (const slug of Object.keys(GAMES)) {
+    entries.push({
+      url: `${BASE}/games/play/${slug}`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    });
   }
 
   return entries;
