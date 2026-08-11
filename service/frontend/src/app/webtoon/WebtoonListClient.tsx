@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 
@@ -127,15 +126,19 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
       {/* 입구 포스터 — 화면 꽉 채운 풀블리드 배너(2026-08-11, "액자처럼 작게"가
           아니라 "이렇게 크게 꽉차게"라는 피드백으로 컨테이너 밖으로 뺐다).
           미드저니로 만든 흑백 펜화 4컷, 아래쪽은 페이지 배경색으로 자연스럽게
-          녹아들게 그라데이션을 얹었다. */}
+          녹아들게 그라데이션을 얹었다.
+          next/image 대신 일반 img(2026-08-11, 성능 점검 중 발견) — 이 SSR
+          배포엔 sharp가 없어 /_next/image 최적화 파이프라인이 리사이즈·포맷
+          변환 없이 원본 PNG(1.4MB)를 그대로 통과시키고 있었다. cwebp로 미리
+          압축한 WebP(171KB, 88% 감소, 육안 손실 없음)를 정적 파일로 직접
+          서빙 — 이 사이트의 다른 콘텐츠 이미지들과 같은 패턴(raw img 사용,
+          CmsWebtoon/CmsVideo 카드 등 참조). */}
       <div style={{ position: 'relative', width: '100%', height: 'clamp(280px, 46vh, 460px)', overflow: 'hidden' }}>
-        <Image
-          src="/webtoon/poster-daily-life.png"
+        {/* eslint-disable-next-line @next/next/no-img-element -- 위 주석 참조, sharp 미설치로 next/image가 원본을 그대로 통과시켜 정적 img로 전환 */}
+        <img
+          src="/webtoon/poster-daily-life.webp"
           alt="AI LENS 웹툰 — 서울 사람들의 하루"
-          fill
-          sizes="100vw"
-          priority
-          style={{ objectFit: 'cover', objectPosition: 'center 35%' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 35%' }}
         />
         <div
           aria-hidden
