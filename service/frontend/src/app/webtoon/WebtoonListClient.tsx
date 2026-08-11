@@ -387,7 +387,7 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-center" style={{ gap: 6, marginTop: 20 }}>
+              <div className="flex items-center justify-center" style={{ gap: 6, marginTop: 20, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}

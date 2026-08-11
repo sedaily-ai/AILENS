@@ -38,6 +38,12 @@ export function VideoPreviewSection({ initialVideos }: Props) {
 
   if (!videos || videos.length === 0) return null;
 
+  // 홈은 최신 4개만 티저로 — 다른 홈 섹션들과 개수 통일(2026-08-11).
+  // fetchVideos()가 /video 전용 목록 페이지를 위해 limit=100까지 받아오게
+  // 바뀌면서(2026-08-11), 이 슬라이스가 없으면 홈에 영상이 전부 다 쌓여
+  // 나오는 회귀가 있었다.
+  const shown = videos.slice(0, 4);
+
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <header
@@ -100,7 +106,7 @@ export function VideoPreviewSection({ initialVideos }: Props) {
           gap: 'clamp(10px, 2vw, 16px)',
         }}
       >
-        {videos.map((v) => {
+        {shown.map((v) => {
           const resolved = resolveVideo(v.video_url);
           const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
           const isPlaying = playingId === v.id;

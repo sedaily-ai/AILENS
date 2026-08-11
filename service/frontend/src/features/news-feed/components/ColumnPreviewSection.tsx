@@ -45,6 +45,15 @@ const FALLBACK: ColumnItem[] = [
     excerpt: '역대 정부의 규제와 무엇이 다른지, 공급 대책의 실행 가능성까지 짚어야 진짜 그림이 보인다.',
     is_cms: true,
   },
+  {
+    id: 'col-4',
+    section: 'column',
+    category: '오늘의 시선',
+    title: '금리 인하 시작되면 내 월급은 어떻게 달라질까',
+    date: '2026-08-02',
+    excerpt: '기준금리 하락기, 예적금·대출이자·전세자금까지 실생활에서 체감되는 변화를 순서대로 짚었다.',
+    is_cms: true,
+  },
 ];
 
 export function ColumnPreviewSection() {
@@ -86,9 +95,10 @@ export function ColumnPreviewSection() {
     };
   }, []);
 
-  // 홈은 최신 3개만 티저로 — 전체는 '더보기'로 이동하는 /letters 아카이브에서.
-  // (전체를 다 보여주면 '더보기' 링크 자체가 무의미해진다.)
-  const cards = (cmsCards && cmsCards.length > 0 ? cmsCards : FALLBACK).slice(0, 3);
+  // 홈은 최신 4개만 티저로 — 전체는 '더보기'로 이동하는 /letters 아카이브에서.
+  // (전체를 다 보여주면 '더보기' 링크 자체가 무의미해진다.) 다른 홈 섹션들
+  // (TrendingEconomySection·FollowingFeed 등)과 개수를 4개로 통일(2026-08-11).
+  const cards = (cmsCards && cmsCards.length > 0 ? cmsCards : FALLBACK).slice(0, 4);
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
