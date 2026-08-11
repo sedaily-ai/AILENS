@@ -1,9 +1,9 @@
 "use client";
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node as TiptapNode, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
-import { useState } from "react";
-import { AiQuizModal, EMPTY as EMPTY_AI_QUIZ_DATA, type AiQuizData } from "./AiQuizModal";
+import { useEffect, useRef, useState } from "react";
+import { AiQuizFields, EMPTY as EMPTY_AI_QUIZ_DATA, isEmptyQuizData, type AiQuizData } from "./AiQuizFields";
 
 // 본문 중 퀴즈/투표 위젯 — 저장 시 <div data-ai-quiz='{...}'></div> 로 직렬화된다.
 // 퍼블릭 프론트(LetterDetailClient.tsx RichBodyWithInteractiveBlocks)가 이
@@ -16,7 +16,24 @@ function AiQuizNodeView({ node, updateAttributes, deleteNode, selected, editor, 
   // (2026-08-08, 사용자가 실제로 겪은 "Cannot read properties of null (reading
   // 'icon')" 크래시 리포트로 발견).
   const data = (node.attrs.data as AiQuizData | null) ?? EMPTY_AI_QUIZ_DATA;
-  const [editing, setEditing] = useState(false);
+  // 2026-08-09 — 화면 중앙 팝업(AiQuizModal) 대신 카드 안에서 바로 펼쳐지는
+  // 인라인 편집으로 바꿨다("모달이 뜰 이유가 있나요, 노션처럼 그 자리에서
+  // 바로 편집" 요청). 방금 새로 삽입한(아직 아무것도 안 채운) 카드는 굳이
+  // 클릭을 기다리지 않고 처음부터 편집 상태로 연다 — "삽입 → 팝업에서
+  // 채우기"였던 흐름이 "삽입 → 바로 그 자리에서 타이핑"이 되게.
+  const [editing, setEditing] = useState(() => isEmptyQuizData(data));
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // 편집 중 카드 바깥을 클릭하면 미리보기로 접힌다 — 노션의 인라인 편집이
+  // 닫히는 방식과 동일. "완료" 버튼도 따로 두지만(발견성), 이게 기본 동작.
+  useEffect(() => {
+    if (!editing) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setEditing(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [editing]);
 
   // 네이티브 HTML5 드래그(끌어서 이동)는 draggable=true 등 속성은 다 맞게
   // 잡혀 있는데도 트랙패드·브라우저에 따라 드래그 자체가 아예 시작되지
@@ -49,10 +66,11 @@ function AiQuizNodeView({ node, updateAttributes, deleteNode, selected, editor, 
 
   return (
     <NodeViewWrapper
-      className={`group my-4 rounded-2xl border p-4 cursor-pointer transition-colors ${
-        selected ? "border-blue-400 bg-blue-50/40" : "border-gray-200 bg-gray-50"
-      }`}
-      onClick={() => setEditing(true)}
+      ref={wrapperRef}
+      className={`group my-4 rounded-2xl border p-4 transition-colors ${
+        editing ? "cursor-default" : "cursor-pointer"
+      } ${selected ? "border-blue-400 bg-blue-50/40" : editing ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-gray-200 bg-gray-50"}`}
+      onClick={() => !editing && setEditing(true)}
       contentEditable={false}
     >
       <div className="flex items-center justify-between mb-2">
@@ -72,7 +90,7 @@ function AiQuizNodeView({ node, updateAttributes, deleteNode, selected, editor, 
           {data.mode === "quiz" ? "퀴즈" : "투표"} 위젯
         </span>
         <span className="flex items-center gap-2">
-          <span className="flex items-center overflow-hidden rounded-md border border-gray-200 opacity-0 transition-opacity group-hover:opacity-100">
+          <span className={`flex items-center overflow-hidden rounded-md border border-gray-200 transition-opacity ${editing ? "" : "opacity-0 group-hover:opacity-100"}`}>
             <button
               type="button"
               onClick={(e) => {
@@ -99,45 +117,64 @@ function AiQuizNodeView({ node, updateAttributes, deleteNode, selected, editor, 
               ↓
             </button>
           </span>
-          <span className="text-[12px] text-blue-600 font-medium">클릭해서 수정</span>
+          {editing ? (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteNode();
+                }}
+                className="cursor-pointer text-[12px] font-medium text-red-600 hover:underline"
+              >
+                삭제
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditing(false);
+                }}
+                className="cursor-pointer text-[12px] font-semibold hover:underline"
+                style={{ color: "var(--accent)" }}
+              >
+                완료
+              </button>
+            </>
+          ) : (
+            <span className="text-[12px] text-blue-600 font-medium">클릭해서 수정</span>
+          )}
         </span>
       </div>
-      <p className="text-[13px] font-bold text-gray-900 mb-1">{data.title || "(제목 없음)"}</p>
-      <p className="text-[13px] text-gray-700 mb-2">{data.question || "(질문 없음)"}</p>
-      <div className="flex flex-col gap-1">
-        {(data.options ?? []).map((opt, i) => (
-          <span
-            key={i}
-            className={`text-[12px] px-2 py-1 rounded-md border ${
-              data.mode === "quiz" && data.correctIndex === i
-                ? "border-emerald-400 bg-emerald-50 text-emerald-700 font-semibold"
-                : "border-gray-200 bg-white text-gray-600"
-            }`}
-          >
-            {opt}
-            {data.mode === "quiz" && data.correctIndex === i ? " ✓" : ""}
-          </span>
-        ))}
-      </div>
 
-      <AiQuizModal
-        open={editing}
-        initial={data}
-        onClose={() => setEditing(false)}
-        onSubmit={(next) => {
-          updateAttributes({ data: next });
-          setEditing(false);
-        }}
-        onDelete={() => {
-          deleteNode();
-          setEditing(false);
-        }}
-      />
+      {editing ? (
+        <AiQuizFields value={data} onChange={(next) => updateAttributes({ data: next })} />
+      ) : (
+        <>
+          <p className="text-[13px] font-bold text-gray-900 mb-1">{data.title || "(제목 없음)"}</p>
+          <p className="text-[13px] text-gray-700 mb-2">{data.question || "(질문 없음)"}</p>
+          <div className="flex flex-col gap-1">
+            {(data.options ?? []).map((opt, i) => (
+              <span
+                key={i}
+                className={`text-[12px] px-2 py-1 rounded-md border ${
+                  data.mode === "quiz" && data.correctIndex === i
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-700 font-semibold"
+                    : "border-gray-200 bg-white text-gray-600"
+                }`}
+              >
+                {opt}
+                {data.mode === "quiz" && data.correctIndex === i ? " ✓" : ""}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
     </NodeViewWrapper>
   );
 }
 
-export const AiQuiz = Node.create({
+export const AiQuiz = TiptapNode.create({
   name: "aiQuiz",
   group: "block",
   atom: true,

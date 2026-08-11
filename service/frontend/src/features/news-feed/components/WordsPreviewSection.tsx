@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { GoodJobStampIcon } from './icons/HandDrawnIcons';
-import { dedupeTerms, fetchFollowingWordTerms, type Term } from '../lib/wordsTerms';
+import { fetchFollowingWordTerms, type Term } from '../lib/wordsTerms';
+import { fetchActiveQuizzes, postQuizAttempt, type TodayQuiz } from '@/shared/lib/quizApi';
 
 // Math.random() 대신 seed로 결정되는 PRNG(mulberry32) — 빌드타임 서버 렌더와
 // 클라이언트 최초 hydration이 같은 seed로 정확히 같은 순서를 내야 hydration
@@ -29,60 +30,71 @@ function shuffle<T>(arr: T[], seed: number): T[] {
   return a;
 }
 
-// 카드 4개를 그냥 나열하는 건 "그냥 정보"라 심심하다는 피드백(2026-08-06) —
-// 빈칸 채우기 퀴즈로 바꿨다. 처음엔 색이 탁하고(vintage 종이톤) 정적이라
-// "듀오링고처럼 친근하고 트렌디해 보이나"는 재차 피드백 — 듀오링고 실제
-// 패턴(단일 채도 높은 브랜드 컬러, 아래쪽이 두꺼운 눌리는 버튼, 클릭마다
-// 바운스/흔들림 모션)을 참고해 채도를 올리고 버튼에 눌리는 3D 엣지 +
-// 정답/오답 모션을 더했다.
-const FALLBACK: Term[] = [
-  { term: '기준금리', explain: '중앙은행이 결정하는 정책금리. 시중 금리·환율·자산가격에 두루 영향을 준다.' },
-  { term: 'PER', explain: '주가수익비율. 주가를 주당순이익으로 나눈 값으로, 낮을수록 저평가로 본다.' },
-  { term: '환헤지', explain: '환율 변동으로 인한 손실 위험을 미리 없애두는 것. 해외 투자 시 자주 등장한다.' },
-  { term: 'CPI', explain: '소비자물가지수. 물가 상승률을 가늠하는 대표 지표로, 금리 결정에 큰 영향을 준다.' },
-];
+interface QuizCardData {
+  answer: Term;
+  choices: Term[];
+  quizId: string | null;
+}
 
 interface Props {
   // 빌드타임(app/page.tsx)에 fetchCmsPosts('letters', undefined, 50)에서 뽑은
   // 키워드 목록 — 정적 HTML에 실제 퀴즈가 바로 박히게 한다(2026-08-07, 홈 SSG
-  // 감사). shuffle을 seed 기반으로 바꿔 hydration mismatch를 막았다(위 참조).
+  // 감사). shuffle을 seed 기반으로 쓴다(위 참조, hydration mismatch 방지).
   initialTerms?: Term[];
 }
 
+// 카드 4개를 그냥 나열하는 건 "그냥 정보"라 심심하다는 피드백(2026-08-06) —
+// 빈칸 채우기 퀴즈로 바꿨다. 듀오링고 실제 패턴(단일 채도 높은 브랜드 컬러,
+// 아래쪽이 두꺼운 눌리는 버튼, 클릭마다 바운스/흔들림 모션)을 참고했다.
+//
+// 2026-08-09 — 두 가지를 바꿨다: (1) 오답을 레터 키워드 풀에서 자동으로
+// 뽑던 걸 없애고 관리자가 직접 쓰게 했다("보기는 어떻게 넣는거죠" — 무관한
+// 용어가 섞여 학습 효과가 없다는 지적). (2) 발행일이 오늘과 정확히 일치하는
+// 문제 하나만 내려주던 걸, 발행된 것 전부(최대 4개)를 동시에 보여주도록
+// 바꿨다("여러 개 노출하고 싶다, 발행/내리기가 곧 노출 체크박스" 요청) —
+// 새 필드 없이 기존 발행 상태를 그대로 "노출 여부"로 쓴다.
 export function WordsPreviewSection({ initialTerms }: Props) {
   const [terms, setTerms] = useState<Term[] | null>(initialTerms ?? null);
-  const [picked, setPicked] = useState<string | null>(null);
+  // undefined = 아직 응답 안 옴, [] = CMS 퀴즈 없음(정상 — 자동생성으로 대체).
+  const [cmsQuizzes, setCmsQuizzes] = useState<TodayQuiz[] | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
-    fetchFollowingWordTerms().then((deduped) => {
-      if (!cancelled) setTerms(deduped);
+    // 둘 다 온 뒤에 카드를 확정한다 — CMS 응답을 기다리지 않고 자동생성
+    // 카드부터 보여줬다가 뒤늦게 CMS 카드로 바뀌면, 그 사이 이미 답을 고른
+    // 사용자 입장에선 문제가 손 밑에서 바뀌는 셈이라 피한다.
+    Promise.all([fetchFollowingWordTerms(), fetchActiveQuizzes()]).then(([deduped, quizzes]) => {
+      if (cancelled) return;
+      setTerms(deduped);
+      setCmsQuizzes(quizzes);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const pool = useMemo(() => {
-    if (terms === null) return null;
-    const isMock = terms.length < 4;
-    const list = isMock ? dedupeTerms([...terms, ...FALLBACK], 8) : terms;
-    return { list, isMock };
-  }, [terms]);
+  // 오답 3개를 뽑을 풀이 최소 4개는 있어야 한다 — 그 아래로는 자동생성 카드를
+  // 아예 안 만든다(무관한 용어를 억지로 채우지 않는다).
+  const pool = terms !== null && terms.length >= 4 ? terms : null;
 
-  // 날짜 기준으로 문제를 고정 — 새로고침해도 같은 문제, 다음 날엔 다른 문제.
-  const quiz = useMemo(() => {
-    if (!pool || pool.list.length === 0) return null;
-    const qIndex = new Date().getDate() % pool.list.length;
-    const answer = pool.list[qIndex];
-    const distractors = shuffle(pool.list.filter((_, i) => i !== qIndex), qIndex + 1).slice(0, 3);
-    return { answer, choices: shuffle([answer, ...distractors], qIndex + 2) };
-  }, [pool]);
+  const cards = useMemo((): QuizCardData[] | undefined => {
+    if (cmsQuizzes === undefined) return undefined; // 아직 로딩 중
+    const fromCms = cmsQuizzes
+      .filter((q) => q.options.length >= 3)
+      .map((q, i): QuizCardData => {
+        const answer: Term = { term: q.term, explain: q.explain };
+        const distractors = q.options.slice(0, 3).map((term) => ({ term, explain: '' }));
+        return { answer, choices: shuffle([answer, ...distractors], i * 2 + 9), quizId: q.id };
+      });
+    if (fromCms.length > 0) return fromCms;
+    if (!pool) return [];
+    const qIndex = new Date().getDate() % pool.length;
+    const answer = pool[qIndex];
+    const distractors = shuffle(pool.filter((_, i) => i !== qIndex), qIndex + 1).slice(0, 3);
+    return [{ answer, choices: shuffle([answer, ...distractors], qIndex + 2), quizId: null }];
+  }, [cmsQuizzes, pool]);
 
-  if (pool === null || !quiz) return null; // 로딩 중엔 자리 안 차지
-
-  const answered = picked !== null;
-  const correct = picked === quiz.answer.term;
+  if (terms === null || cards === undefined || cards.length === 0) return null; // 로딩 중이거나 낼 문제가 없으면 자리 안 차지
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
@@ -104,6 +116,10 @@ export function WordsPreviewSection({ initialTerms }: Props) {
         .wq-btn { transition: transform 0.08s ease, border-bottom-width 0.08s ease, background 0.15s ease, border-color 0.15s ease; }
         .wq-btn:not(:disabled):hover { filter: brightness(0.98); }
         .wq-btn:not(:disabled):active { transform: translateY(3px); border-bottom-width: 2px !important; }
+        .wq-arrow { transition: background 0.15s ease, transform 0.08s ease; }
+        .wq-arrow:not(:disabled):hover { background: #fbe6ae; }
+        .wq-arrow:not(:disabled):active { transform: scale(0.9); }
+        .wq-dot { transition: background 0.15s ease, width 0.15s ease; }
       `}</style>
 
       <header style={{ marginBottom: 14 }}>
@@ -124,97 +140,209 @@ export function WordsPreviewSection({ initialTerms }: Props) {
             className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors"
             style={{ fontSize: 13, fontWeight: 500 }}
           >
-            단어장 전체 보기 →
+            용어 해설 전체 보기 →
           </Link>
         </div>
       </header>
 
-      <div style={{ borderRadius: 18, background: '#fef3d7', padding: 'clamp(16px, 3vw, 22px)' }}>
-        <p style={{ fontSize: 12.5, fontWeight: 800, color: '#c2660a', marginBottom: 8, letterSpacing: '-0.005em' }}>
-          다음 설명에 맞는 단어는?
-        </p>
-        <p
-          style={{
-            fontSize: 15.5,
-            fontWeight: 700,
-            color: '#6b3d0a',
-            lineHeight: 1.6,
-            marginBottom: 18,
-          }}
-        >
-          &ldquo;{quiz.answer.explain}&rdquo;
-        </p>
+      <QuizCarousel cards={cards} />
+    </section>
+  );
+}
 
-        <div className="grid grid-cols-2" style={{ gap: 10, marginBottom: answered ? 16 : 0 }}>
-          {quiz.choices.map((c) => {
-            const isAnswer = c.term === quiz.answer.term;
-            const isPicked = picked === c.term;
-            let bg = '#fff';
-            let border = '#f4c95d';
-            let borderBottom = '#f0b433';
-            let color = '#7c4a03';
-            if (answered && isAnswer) {
-              bg = '#ecfdf3';
-              border = '#5fce7e';
-              borderBottom = '#22a34a';
-              color = '#166a33';
-            } else if (answered && isPicked && !isAnswer) {
-              bg = '#fef0ef';
-              border = '#f3958f';
-              borderBottom = '#e0554d';
-              color = '#a63a32';
-            }
-            const wrongPicked = answered && isPicked && !isAnswer;
-            return (
+// 여러 문제를 한 번에 다 펼치지 않고 화살표로 하나씩 넘겨 본다(2026-08-09,
+// "화살표로 넘기듯이 해야죠, 한번에 펼쳐서 보여주지 말고" 요청). 답을 고른
+// 상태는 문제(카드 key)별로 부모가 들고 있다 — 뒤로 넘겨서 이미 푼 문제로
+// 돌아가도 정답 표시가 그대로 남아있게.
+function QuizCarousel({ cards }: { cards: QuizCardData[] }) {
+  const [index, setIndex] = useState(0);
+  const [pickedByKey, setPickedByKey] = useState<Record<string, string>>({});
+  const total = cards.length;
+  const safeIndex = Math.min(index, total - 1);
+  const card = cards[safeIndex];
+  const key = card.quizId ?? `auto-${safeIndex}`;
+
+  return (
+    <div>
+      <QuizCard card={card} picked={pickedByKey[key] ?? null} onPick={(term) => setPickedByKey((p) => ({ ...p, [key]: term }))} />
+
+      {total > 1 && (
+        <div className="flex items-center justify-center" style={{ gap: 10, marginTop: 12 }}>
+          <button
+            type="button"
+            aria-label="이전 문제"
+            disabled={safeIndex === 0}
+            onClick={() => setIndex((i) => Math.max(0, i - 1))}
+            className="wq-arrow flex items-center justify-center flex-shrink-0"
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'transparent',
+              color: '#c2660a',
+              cursor: safeIndex === 0 ? 'default' : 'pointer',
+              opacity: safeIndex === 0 ? 0.3 : 1,
+              pointerEvents: safeIndex === 0 ? 'none' : 'auto',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
+
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#c2660a', fontVariantNumeric: 'tabular-nums' }}>
+            {safeIndex + 1}/{total}
+          </span>
+
+          <div className="flex items-center" style={{ gap: 6 }}>
+            {cards.map((c, i) => (
               <button
-                key={c.term}
+                key={c.quizId ?? `auto-${i}`}
                 type="button"
-                disabled={answered}
-                onClick={() => setPicked(c.term)}
-                className={`wq-btn${wrongPicked ? ' wq-shake' : ''}`}
+                aria-label={`${i + 1}번째 문제로 이동`}
+                onClick={() => setIndex(i)}
+                className="wq-dot"
                 style={{
-                  fontFamily: 'inherit',
-                  fontSize: 14,
-                  fontWeight: 800,
-                  color,
-                  textAlign: 'left',
-                  background: bg,
-                  border: `2px solid ${border}`,
-                  borderBottom: `4px solid ${borderBottom}`,
-                  borderRadius: 12,
-                  padding: '12px 14px',
-                  cursor: answered ? 'default' : 'pointer',
+                  width: i === safeIndex ? 18 : 6,
+                  height: 6,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: i === safeIndex ? '#e79c1a' : '#f0dca8',
+                  cursor: 'pointer',
                 }}
-              >
-                {c.term}
-              </button>
-            );
-          })}
-        </div>
-
-        {answered && (
-          <div className="flex items-center" style={{ gap: 8 }}>
-            {correct ? (
-              <div key={quiz.answer.term} className="flex items-center wq-pop" style={{ gap: 8 }}>
-                <GoodJobStampIcon accent="#ea9b0e" className="w-8 h-8 flex-shrink-0" />
-                <span style={{ fontSize: 14, fontWeight: 800, color: '#a3580a' }}>
-                  잘했어요! 정답은 {quiz.answer.term}이에요.
-                </span>
-              </div>
-            ) : (
-              <span style={{ fontSize: 13, color: '#8a5a1a' }}>
-                아쉬워요, 정답은 <b>{quiz.answer.term}</b>이었어요.
-              </span>
-            )}
+              />
+            ))}
           </div>
-        )}
+
+          <button
+            type="button"
+            aria-label="다음 문제"
+            disabled={safeIndex === total - 1}
+            onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
+            className="wq-arrow flex items-center justify-center flex-shrink-0"
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'transparent',
+              color: '#c2660a',
+              cursor: safeIndex === total - 1 ? 'default' : 'pointer',
+              opacity: safeIndex === total - 1 ? 0.3 : 1,
+              pointerEvents: safeIndex === total - 1 ? 'none' : 'auto',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuizCard({
+  card,
+  picked,
+  onPick,
+}: {
+  card: QuizCardData;
+  picked: string | null;
+  onPick: (term: string) => void;
+}) {
+  const answered = picked !== null;
+  const correct = picked === card.answer.term;
+
+  return (
+    <div style={{ borderRadius: 18, background: '#fef3d7', padding: 'clamp(16px, 3vw, 22px)' }}>
+      <p style={{ fontSize: 12.5, fontWeight: 800, color: '#c2660a', marginBottom: 8, letterSpacing: '-0.005em' }}>
+        다음 설명에 맞는 단어는?
+      </p>
+      <p
+        style={{
+          fontSize: 15.5,
+          fontWeight: 700,
+          color: '#6b3d0a',
+          lineHeight: 1.6,
+          marginBottom: 18,
+        }}
+      >
+        &ldquo;{card.answer.explain}&rdquo;
+      </p>
+
+      <div className="grid grid-cols-2" style={{ gap: 10, marginBottom: answered ? 16 : 0 }}>
+        {card.choices.map((c) => {
+          const isAnswer = c.term === card.answer.term;
+          const isPicked = picked === c.term;
+          let bg = '#fff';
+          let border = '#f4c95d';
+          let borderBottom = '#f0b433';
+          let color = '#7c4a03';
+          if (answered && isAnswer) {
+            bg = '#ecfdf3';
+            border = '#5fce7e';
+            borderBottom = '#22a34a';
+            color = '#166a33';
+          } else if (answered && isPicked && !isAnswer) {
+            bg = '#fef0ef';
+            border = '#f3958f';
+            borderBottom = '#e0554d';
+            color = '#a63a32';
+          }
+          const wrongPicked = answered && isPicked && !isAnswer;
+          return (
+            <button
+              key={c.term}
+              type="button"
+              disabled={answered}
+              onClick={() => {
+                onPick(c.term);
+                // CMS가 낸 문제일 때만 응답을 집계한다 — 자동생성 문제는
+                // 저장된 id가 없어 집계 대상이 아니다. 실패해도 UI엔 영향
+                // 없음(fire-and-forget).
+                if (card.quizId) {
+                  void postQuizAttempt(card.quizId, c.term === card.answer.term);
+                }
+              }}
+              className={`wq-btn${wrongPicked ? ' wq-shake' : ''}`}
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 14,
+                fontWeight: 800,
+                color,
+                textAlign: 'left',
+                background: bg,
+                border: `2px solid ${border}`,
+                borderBottom: `4px solid ${borderBottom}`,
+                borderRadius: 12,
+                padding: '12px 14px',
+                cursor: answered ? 'default' : 'pointer',
+              }}
+            >
+              {c.term}
+            </button>
+          );
+        })}
       </div>
 
-      {pool.isMock && (
-        <p style={{ fontSize: 11, color: '#c9b088', marginTop: 8 }}>
-          레터에 쌓이는 실제 용어가 늘면 문제도 그만큼 다양해져요.
-        </p>
+      {answered && (
+        <div className="flex items-center" style={{ gap: 8 }}>
+          {correct ? (
+            <div key={card.answer.term} className="flex items-center wq-pop" style={{ gap: 8 }}>
+              <GoodJobStampIcon accent="#ea9b0e" className="w-8 h-8 flex-shrink-0" />
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#a3580a' }}>
+                잘했어요! 정답은 {card.answer.term}이에요.
+              </span>
+            </div>
+          ) : (
+            <span style={{ fontSize: 13, color: '#8a5a1a' }}>
+              아쉬워요, 정답은 <b>{card.answer.term}</b>이었어요.
+            </span>
+          )}
+        </div>
       )}
-    </section>
+    </div>
   );
 }

@@ -64,18 +64,24 @@ export function DatePickerField({ value, onChange }: Props) {
 
   return (
     <div className="relative inline-block" ref={rootRef}>
+      {/* 분류(CustomSelect) 옆엔 ▾가 있어 "누를 수 있다"가 바로 읽히는데
+          여긴 텍스트뿐이라 고정값처럼 보인다는 지적(2026-08-09) — 같은
+          쉐브론을 붙여서 두 컨트롤이 같은 신호를 쓰게 맞췄다. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="cursor-pointer text-[12.5px] font-medium outline-none"
+        className="inline-flex cursor-pointer items-center gap-1 text-[12.5px] font-medium outline-none"
         style={{ color: value ? "var(--text-primary)" : "var(--text-muted)" }}
       >
         {label}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
 
       {open && (
         <div
-          className="absolute z-20 mt-2 rounded-2xl border p-4"
+          className="absolute z-20 mt-2 rounded-xl border p-4"
           style={{
             width: 240,
             background: "var(--surface-card)",

@@ -21,6 +21,7 @@ from routes import (
     newsletter,
     posts,
     prompts,
+    quiz,
 )
 from shared import audit, response
 
@@ -56,6 +57,14 @@ HANDLERS: dict[str, tuple] = {
     "DELETE /admin/letters/{id}": (letters.handle_delete, True),
     # 이미지 업로드 presign (2026-07-28)
     "POST /admin/media/presign": (media.handle_presign, True),
+    # 용어 퀴즈 (2026-08-09)
+    "POST /admin/quiz": (quiz.handle_create, True),
+    "GET /admin/quiz": (quiz.handle_list, True),
+    "GET /admin/quiz/{id}": (quiz.handle_get, True),
+    "PUT /admin/quiz/{id}": (quiz.handle_update, True),
+    "POST /admin/quiz/{id}/publish": (quiz.handle_publish, True),
+    "POST /admin/quiz/{id}/unpublish": (quiz.handle_unpublish, True),
+    "DELETE /admin/quiz/{id}": (quiz.handle_delete, True),
 }
 
 

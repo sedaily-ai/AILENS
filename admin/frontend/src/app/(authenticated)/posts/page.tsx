@@ -6,104 +6,64 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { adminApi } from "@/lib/adminClient";
 import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
-import { EmptyState, ErrorNote } from "@/components/Feedback";
-import { DateRangeCalendar, type DateRange } from "@/components/DateRangeCalendar";
-import type { CmsPost, CmsStatus } from "@/lib/types";
+import { ErrorNote } from "@/components/Feedback";
+import { ContentTable } from "@/components/ContentTable";
+import { PromptEditModal } from "@/components/PromptEditModal";
+import { type DateRange } from "@/components/DateRangeCalendar";
+import type { CmsPost } from "@/lib/types";
 
 // 일괄 "분류 변경" 대상 — channels 자체(레터↔웹툰/영상)는 PostForm에서도
 // 생성 후엔 못 바꾸게 막아뒀다(엉뚱한 채널로 이미 발행된 글이 옮겨가는 사고
 // 방지) — 그래서 일괄 이동도 같은 channels:["letters"] 안에서 section만
-// 바꾸는 레터/경제 이슈/인기 칼럼 세 곳으로만 한정한다.
-const BULK_MOVE_TARGETS: Array<{ section: "" | "trend" | "column"; label: string }> = [
-  { section: "", label: "레터" },
-  { section: "trend", label: "경제 이슈" },
-  { section: "column", label: "인기 칼럼" },
-];
-
-const STATUS_LABEL: Record<CmsStatus, string> = {
-  draft: "초안",
-  published: "발행",
-  archived: "보관",
-};
-
-const STATUS_STYLE: Record<CmsStatus, string> = {
-  draft: "ui-badge-draft",
-  published: "ui-badge-published",
-  archived: "ui-badge-archived",
-};
-
-const FILTERS: Array<{ key: string; label: string }> = [
-  { key: "", label: "전체" },
-  { key: "draft", label: "초안" },
-  { key: "published", label: "발행" },
+// 바꾸는 오늘의 이슈/머니 트렌드/깊은 이야기 세 곳으로만 한정한다. 워딩은
+// PostMode.tsx의 분류 드롭다운과 동일(2026-08-09 정리).
+const BULK_MOVE_TARGETS: Array<{ section: "" | "trend" | "column" | "glossary"; label: string }> = [
+  { section: "", label: "오늘의 이슈" },
+  { section: "trend", label: "머니 트렌드" },
+  { section: "column", label: "깊은 이야기" },
+  { section: "glossary", label: "용어 해설" },
 ];
 
 // channels 는 글 하나가 여러 개 가질 수 있는 배열이지만(letters/paper/feed 등
 // 스펙상 허용), 실제 발행 흐름은 항상 단일 채널로 고정한다(PostForm 참조) —
 // 필터도 그 전제로 단순하게 간다.
 //
-// 탭 라벨은 사용자 화면 섹션(FollowingFeed="이슈 톡톡", TrendingEconomySection=
-// "요즘 화제의 경제 이슈", ColumnPreviewSection="이번 주 인기 칼럼",
-// WebtoonPreviewSection="이슈를 웹툰으로", VideoPreviewSection="영상으로 보는
-// 이슈")과 짝이 맞는 짧은 이름으로(2026-08-07, 전체 제목은 탭 알약엔 너무
-// 길다는 지적으로 축약). "레터"만 예외로 이름을 그대로 뒀다 — "이슈 톡톡"은
-// 이제 admin이 실제 이름(editor_id)으로 태깅한 레터만 가리키는 더 좁은
-// 개념이라(FollowingFeed.tsx 참조), channels:["letters"] 전체를 "이슈 톡톡"
-// 이라 부르면 오히려 헷갈린다. "트렌드·칼럼"은 하나였던 탭을 실제 공개
-// 화면처럼 두 섹션으로 분리했다.
+// 탭 라벨은 공개 사이트 섹션 워딩과 동일하게 맞춘다(2026-08-09 정리 —
+// 오늘의 이슈/머니 트렌드/깊은 이야기, PostMode.tsx 분류 드롭다운과 짝).
+//
+// 웹툰/영상은 2026-08-09에 이 목록으로 잠깐 합쳤다가 같은 날 다시 뺐다 —
+// 합쳐두니 "새 글 쓰기"를 누를 때마다 종류를 또 골라야 해서 오히려
+// 불편하다는 지적("독립성을 주고 따로 빼라"). 각자 별도 사이드바 메뉴
+// (/webtoon, /video)와 자기 목록·자기 "새 글 쓰기"를 갖는다 — 이 화면은
+// 다시 레터 전용. (표 자체는 ContentTable로 세 화면이 공유한다.)
 const CHANNEL_FILTERS: Array<{ key: string; label: string }> = [
   { key: "", label: "전체" },
-  { key: "letters", label: "레터" },
-  { key: "trend", label: "경제 이슈" },
-  { key: "column", label: "인기 칼럼" },
-  { key: "webtoon", label: "웹툰" },
-  { key: "video", label: "영상" },
+  { key: "letters", label: "오늘의 이슈" },
+  { key: "trend", label: "머니 트렌드" },
+  { key: "column", label: "깊은 이야기" },
+  { key: "glossary", label: "용어 해설" },
 ];
 
-const SECTION_LABEL: Record<string, string> = {
-  trend: "경제 이슈",
-  column: "인기 칼럼",
-};
-
-// CHANNEL_FILTERS 필터 알약과 같은 한글 라벨 — 목록 표에는 raw 값("letters"
-// 등 영문)이 그대로 나와서 필터 라벨(레터/웹툰/영상)과 안 맞아 보인다는
-// 지적(2026-08-07)으로 통일. trend_card 채널 자체는 안 쓰지만(letters +
-// section 태그로 통합) 혹시 남아있는 레코드 대비 매핑은 유지.
-const CHANNEL_LABEL: Record<string, string> = {
-  letters: "레터",
-  trend_card: "트렌드·칼럼",
-  webtoon: "웹툰",
-  video: "영상",
-  paper: "지면",
-  feed: "피드",
-};
-
-// section 태그가 붙은 letters 글은 실질적으로 "트렌드·칼럼" 취급이라(채널
-// 필터 알약도 이 기준으로 갈린다) 구체적인 종류(경제 이슈/인기 칼럼)만
-// 보여준다 — "트렌드·칼럼 · 인기 칼럼"처럼 "칼럼"이 겹치는 겹말이 됐던
-// 문제(2026-08-07 지적)로 정리.
-function channelLabel(p: CmsPost): string {
-  if (!p.channels.length) return "-";
-  if (p.body_inline.section) {
-    return SECTION_LABEL[p.body_inline.section] ?? p.body_inline.section;
-  }
-  return p.channels.map((c) => CHANNEL_LABEL[c] ?? c).join(", ");
-}
 
 // "레터"/"트렌드"/"칼럼" 셋 다 DB에서는 channels: ["letters"]로 저장되고
 // body_inline.section 값("trend"/"column"/없음)으로만 갈린다(trend_card 채널
 // 값 자체는 이제 안 쓰지만, 예전에 그 채널로 저장된 레코드가 남아있을 수
-// 있어 폴백으로 계속 인식한다). 그래서 채널 필터를 서버 파라미터로 그냥
-// 넘기면 "레터"를 눌러도 트렌드·칼럼 글까지 같이 나온다 — 이 함수로 클라이언트에서
-// 최종적으로 한 번 더 걸러야 필터 알약 이름과 실제 결과가 일치한다
-// (2026-08-07, "채널 눌렀는데 왜 필터링이 안되지" 버그 리포트).
-function matchesChannelFilter(p: CmsPost, channel: string): boolean {
-  if (!channel) return true;
+// 있어 폴백으로 계속 인식한다).
+function matchesSingleChannelFilter(p: CmsPost, channel: string): boolean {
   const section = p.body_inline.section ?? (p.channels.includes("trend_card") ? "trend" : null);
   if (channel === "trend") return section === "trend";
   if (channel === "column") return section === "column";
+  if (channel === "glossary") return section === "glossary";
   if (channel === "letters") return p.channels.includes("letters") && !section;
   return (p.channels as string[]).includes(channel);
+}
+
+// 2026-08-09 — "오늘의 이슈, 머니 트렌드 이렇게 동시에 체크해서 필터"
+// 요청으로 채널 필터가 단일 선택 → 다중 선택(Set)이 됐다. 빈 Set = 전체
+// (필터 없음), 그 외엔 선택된 채널 중 하나라도 맞으면 통과(합집합).
+function matchesChannelFilter(p: CmsPost, channels: Set<string>): boolean {
+  if (channels.size === 0) return true;
+  return [...channels].some((c) => matchesSingleChannelFilter(p, c));
 }
 
 // 발행일 범위 필터 — from/to 둘 다 없으면 전체 통과, from만 있으면 그 이후
@@ -115,8 +75,6 @@ function inDateRange(publishDate: string | null | undefined, range: DateRange): 
   if (range.to && d > range.to) return false;
   return true;
 }
-
-const PAGE_SIZE = 15;
 
 // useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수
 // (posts/edit 와 동일 패턴).
@@ -139,7 +97,9 @@ function PostsPage() {
   // 문제(2026-08-08 사용자 리포트). 초기값은 URL에서 읽고, 바뀔 때마다
   // router.replace로 URL도 같이 갱신해 뒤로가기가 그 상태로 돌아오게 한다.
   const [status, setStatusState] = useState(() => searchParams.get("status") ?? "");
-  const [channel, setChannelState] = useState(() => searchParams.get("channel") ?? "");
+  const [channel, setChannelState] = useState<Set<string>>(
+    () => new Set((searchParams.get("channel") ?? "").split(",").filter(Boolean)),
+  );
   // 발행일 단일값 → 범위(시작~끝)로 변경(2026-08-07, "시작일부터 끝일까지
   // 필터링" 요청). 백엔드 list_posts 는 정확히 일치하는 date= 하나만 지원해서
   // 범위 필터는 서버 파라미터로 못 넘긴다 — 항상 전체를 받아서 클라이언트에서
@@ -152,13 +112,23 @@ function PostsPage() {
     const p = parseInt(searchParams.get("page") ?? "1", 10);
     return Number.isFinite(p) && p > 0 ? p : 1;
   });
+  // 발행일 정렬 방향 — 목록은 기본적으로 최신순(desc, 서버가 원래 이 순서로
+  // 준다). 헤더 클릭으로 뒤집을 수 있다.
+  const [sortDir, setSortDirState] = useState<"asc" | "desc">(
+    () => (searchParams.get("sort") === "asc" ? "asc" : "desc")
+  );
+  // 제목 검색 — 서버 재조회 없이 이미 받아온 목록을 렌더 시점에 한 번 더
+  // 거른다(ContentTable 내부, channel/dateRange와 같은 패턴).
+  const [search, setSearchState] = useState(() => searchParams.get("q") ?? "");
 
-  const syncUrl = (next: { status: string; channel: string; dateRange: DateRange; page: number }) => {
+  const syncUrl = (next: { status: string; channel: Set<string>; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
     const params = new URLSearchParams();
     if (next.status) params.set("status", next.status);
-    if (next.channel) params.set("channel", next.channel);
+    if (next.channel.size > 0) params.set("channel", [...next.channel].join(","));
     if (next.dateRange.from) params.set("from", next.dateRange.from);
     if (next.dateRange.to) params.set("to", next.dateRange.to);
+    if (next.sortDir === "asc") params.set("sort", "asc");
+    if (next.search) params.set("q", next.search);
     if (next.page > 1) params.set("page", String(next.page));
     const qs = params.toString();
     router.replace(qs ? `/posts?${qs}` : "/posts", { scroll: false });
@@ -166,20 +136,29 @@ function PostsPage() {
 
   const setStatus = (next: string) => {
     setStatusState(next);
-    syncUrl({ status: next, channel, dateRange, page: 1 });
+    syncUrl({ status: next, channel, dateRange, sortDir, search, page: 1 });
   };
-  const setChannel = (next: string) => {
+  const setChannel = (next: Set<string>) => {
     setChannelState(next);
-    syncUrl({ status, channel: next, dateRange, page: 1 });
+    syncUrl({ status, channel: next, dateRange, sortDir, search, page: 1 });
   };
   const setDateRange = (next: DateRange) => {
     setDateRangeState(next);
-    syncUrl({ status, channel, dateRange: next, page: 1 });
+    syncUrl({ status, channel, dateRange: next, sortDir, search, page: 1 });
+  };
+  const toggleSortDir = () => {
+    const next = sortDir === "desc" ? "asc" : "desc";
+    setSortDirState(next);
+    syncUrl({ status, channel, dateRange, sortDir: next, search, page: 1 });
+  };
+  const setSearch = (next: string) => {
+    setSearchState(next);
+    syncUrl({ status, channel, dateRange, sortDir, search: next, page: 1 });
   };
   const setPage = (updater: number | ((prev: number) => number)) => {
     setPageState((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      syncUrl({ status, channel, dateRange, page: next });
+      syncUrl({ status, channel, dateRange, sortDir, search, page: next });
       return next;
     });
   };
@@ -189,28 +168,34 @@ function PostsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkReloadKey, setBulkReloadKey] = useState(0);
+  const [promptOpen, setPromptOpen] = useState(false);
   const visibleReloadKey = useReloadOnVisible();
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
   // 필터를 바꿔도 이전 목록을 유지하다가 새 응답이 오면 교체 — 깜빡임도 없다.
   useEffect(() => {
     let cancelled = false;
-    const params: { status?: string; channel?: string; limit?: number } = {
+    const params: { status?: string; limit?: number } = {
       limit: 200,
     };
     if (status) params.status = status;
-    // "레터"/"트렌드"/"칼럼"은 서버 channel 파라미터로는 못 갈린다 — 셋 다
-    // channels: ["letters"]라 서버가 letters로만 걸러주면 태그 유무 상관없이
-    // 섞여 나온다. 그래서 서버 필터는 webtoon/video처럼 애매하지 않은 채널만
-    // 쓰고, letters/trend/column은 일단 다 받아서 matchesChannelFilter로
-    // 클라이언트에서 최종 확정한다.
-    if (channel && channel !== "trend" && channel !== "column" && channel !== "letters") params.channel = channel;
+    // 채널이 letters/trend/column 뿐이라(웹툰/영상은 아래서 항상 제외) 서버
+    // channel 파라미터로는 애초에 못 갈린다 — 셋 다 channels: ["letters"]로
+    // 저장되고 body_inline.section 으로만 구분되기 때문. 그래서 서버는
+    // status만 넘기고, 채널은 항상 전체를 받아 matchesChannelFilter로
+    // 클라이언트에서 걸러낸다(다중 선택도 여기서 처리, 위 함수 참조).
     adminApi
       .listPosts(params)
       .then((r) => {
         if (cancelled) return;
+        // 웹툰/영상은 별도 화면(/webtoon, /video)에서 관리한다 — "전체" 필터를
+        // 골라도 이 목록엔 안 섞이게 항상 제외한다.
         const filtered = r.posts.filter(
-          (p) => matchesChannelFilter(p, channel) && inDateRange(p.publish_date, dateRange),
+          (p) =>
+            !p.channels.includes("webtoon") &&
+            !p.channels.includes("video") &&
+            matchesChannelFilter(p, channel) &&
+            inDateRange(p.publish_date, dateRange),
         );
         setPosts(filtered);
         setError(null);
@@ -230,14 +215,16 @@ function PostsPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 필터 변경 시 선택 초기화(정당한 케이스)
     setSelected(new Set());
-  }, [status, channel, dateRange]);
+  }, [status, channel, dateRange, search]);
 
-  // 필터가 바뀌면 이전 필터 기준 페이지 번호가 새 목록 범위를 벗어날 수 있다
-  // (예: 3페이지 보다가 필터링해서 1페이지 분량만 남는 경우) — state 를 별도로
-  // 리셋하는 effect 대신 렌더 시점에 유효 범위로 클램프해서 보여준다.
-  const pageCount = posts ? Math.max(1, Math.ceil(posts.length / PAGE_SIZE)) : 1;
-  const effectivePage = Math.min(page, pageCount);
-  const pageItems = posts ? posts.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE) : [];
+  // h1 배지 숫자 — ContentTable이 내부에서 search까지 적용한 최종 개수를
+  // 갖고 있어서, 여기선 같은 필터를 가볍게 한 번 더 계산한다(표 쪽 로직을
+  // 그대로 끌어올 만큼 크지 않다).
+  const visibleCount = posts
+    ? search.trim()
+      ? posts.filter((p) => p.headline.toLowerCase().includes(search.trim().toLowerCase())).length
+      : posts.length
+    : null;
 
   const toggleOne = (id: string) => {
     setSelected((prev) => {
@@ -247,15 +234,14 @@ function PostsPage() {
       return next;
     });
   };
-
-  const pageAllSelected = pageItems.length > 0 && pageItems.every((p) => selected.has(p.id));
-  const togglePageAll = () => {
+  const togglePageAll = (pageIds: string[]) => {
     setSelected((prev) => {
+      const allSelected = pageIds.length > 0 && pageIds.every((id) => prev.has(id));
       const next = new Set(prev);
-      if (pageAllSelected) {
-        for (const p of pageItems) next.delete(p.id);
+      if (allSelected) {
+        for (const id of pageIds) next.delete(id);
       } else {
-        for (const p of pageItems) next.add(p.id);
+        for (const id of pageIds) next.add(id);
       }
       return next;
     });
@@ -287,7 +273,7 @@ function PostsPage() {
   // 아니라 통째로 교체하기 때문(admin/repo/posts_repo.py 참조). 그래서 반드시
   // 최신 글 전체를 먼저 받아 body_inline 을 펼친 다음 바뀌는 필드만 덮어써서
   // 통째로 다시 보내야 한다 — PostForm 저장 흐름(posts/edit/page.tsx)과 동일 패턴.
-  const bulkMove = async (section: "" | "trend" | "column") => {
+  const bulkMove = async (section: "" | "trend" | "column" | "glossary") => {
     if (selected.size === 0) return;
     setBulkBusy(true);
     const ids = [...selected];
@@ -321,204 +307,85 @@ function PostsPage() {
     <div className="space-y-6">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
         <h1 className="font-display text-[26px] font-bold text-[var(--text-primary)]">
-          콘텐츠{" "}
-          {posts && (
-            <span className="text-[var(--text-muted)] font-normal text-lg">
-              ({posts.length})
-            </span>
+          글 관리{" "}
+          {visibleCount !== null && (
+            <span className="text-[var(--text-muted)] font-normal text-lg">({visibleCount})</span>
           )}
         </h1>
-        <Link
-          href="/posts/edit"
-          className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold"
-        >
-          새 글 쓰기
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <div className="flex gap-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => {
-                setStatus(f.key);
-                setPage(1);
-              }}
-              className={`text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                status === f.key ? "font-semibold" : "hover:bg-[var(--surface-sunken)]"
-              }`}
-              style={{
-                background: status === f.key ? "var(--accent-soft)" : undefined,
-                color:
-                  status === f.key ? "var(--accent)" : "var(--text-secondary)",
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* 콘텐츠 유형별 프롬프트 관리 진입점(2026-08-09, "새 글 쓰기 옆에
+              프롬프트 버튼, 누르면 화면 정중앙에 모달로" 요청) — 지금은
+              프론트 배선만이다. category/name 조합(letters/main)이 DDB에
+              아직 없으면 모달 안에 에러 메시지가 뜬다 — 실제 레터 생성엔
+              AI 프롬프트가 없어서(전부 수동 작성 콘텐츠) 백엔드에 이
+              카테고리를 만드는 건 별도 작업으로 미뤘다("나중에 다 유형별로
+              둘 거라서요"). */}
+          <button
+            type="button"
+            onClick={() => setPromptOpen(true)}
+            className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
+            </svg>
+            프롬프트
+          </button>
+          <Link
+            href="/posts/edit"
+            className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold"
+          >
+            새 글 쓰기
+          </Link>
         </div>
-
-        <span className="h-4 w-px bg-gray-200" />
-
-        <div className="flex gap-1">
-          {CHANNEL_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => {
-                setChannel(f.key);
-                setPage(1);
-              }}
-              className={`text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                channel === f.key ? "font-semibold" : "hover:bg-[var(--surface-sunken)]"
-              }`}
-              style={{
-                background: channel === f.key ? "var(--accent-soft)" : undefined,
-                color:
-                  channel === f.key ? "var(--accent)" : "var(--text-secondary)",
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <span className="h-4 w-px bg-gray-200" />
-
-        <DateRangeCalendar
-          value={dateRange}
-          onChange={(r) => {
-            setDateRange(r);
-            setPage(1);
-          }}
-        />
       </div>
-
-      {selected.size > 0 && (
-        <BulkActionBar
-          count={selected.size}
-          busy={bulkBusy}
-          onMove={bulkMove}
-          onSetCategory={bulkSetCategory}
-          onDelete={bulkDelete}
-          onClear={() => setSelected(new Set())}
-        />
-      )}
 
       {error && <ErrorNote message={error} />}
 
-      {posts && posts.length === 0 && (
-        <EmptyState
-          title="아직 글이 없습니다"
-          hint="첫 글을 쓰면 사용자 화면에 바로 반영됩니다."
-          action={
-            <Link
-              href="/posts/edit"
-              className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold"
-            >
-              새 글 쓰기
-            </Link>
-          }
-        />
-      )}
+      <ContentTable
+        posts={posts}
+        editHref={(p) => `/posts/edit?id=${encodeURIComponent(p.id)}`}
+        newHref="/posts/edit"
+        newLabel="새 글 쓰기"
+        emptyTitle="아직 글이 없습니다"
+        emptyHint="첫 글을 쓰면 사용자 화면에 바로 반영됩니다."
+        status={status}
+        onStatusChange={setStatus}
+        search={search}
+        onSearchChange={setSearch}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        sortDir={sortDir}
+        onToggleSort={toggleSortDir}
+        page={page}
+        onPageChange={setPage}
+        selected={selected}
+        onToggleOne={toggleOne}
+        onTogglePageAll={togglePageAll}
+        channelColumn={{
+          values: channel,
+          onChange: setChannel,
+          options: CHANNEL_FILTERS,
+        }}
+        thumbnail={(p) => p.cover_image_url || null}
+      />
 
-      {posts && posts.length > 0 && (
-        <div className="ui-card rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="ui-thead">
-              <tr>
-                <th className="w-10 px-4 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={pageAllSelected}
-                    onChange={togglePageAll}
-                    aria-label="이 페이지 전체 선택"
-                    className="cursor-pointer"
-                  />
-                </th>
-                <th className="text-left px-4 py-2.5">
-                  제목
-                </th>
-                <th className="text-left px-4 py-2.5">
-                  상태
-                </th>
-                <th className="text-left px-4 py-2.5">
-                  채널
-                </th>
-                <th className="text-left px-4 py-2.5">
-                  발행일
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageItems.map((p, i) => (
-                <tr
-                  key={p.id}
-                  className="border-b ui-divider last:border-0 ui-row-hover ui-enter"
-                  style={{ ["--i" as string]: i }}
-                >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(p.id)}
-                      onChange={() => toggleOne(p.id)}
-                      aria-label={`${p.headline} 선택`}
-                      className="cursor-pointer"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/posts/edit?id=${encodeURIComponent(p.id)}`}
-                      className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] hover:underline underline-offset-2"
-                    >
-                      {p.headline}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`ui-badge ${STATUS_STYLE[p.status]}`}>
-                      {STATUS_LABEL[p.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-[var(--text-muted)]">
-                    {channelLabel(p)}
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-[var(--text-muted)] tabular-nums">
-                    {p.publish_date}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {pageCount > 1 && (
-            <div className="flex items-center justify-between border-t ui-divider px-4 py-3">
-              <span className="text-[13px] text-[var(--text-muted)]">
-                {effectivePage} / {pageCount} 페이지 · 총 {posts.length}건
-              </span>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={effectivePage <= 1}
-                  className="text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer disabled:cursor-default disabled:opacity-40 hover:bg-[var(--surface-sunken)] text-[var(--text-secondary)]"
-                >
-                  이전
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                  disabled={effectivePage >= pageCount}
-                  className="text-[13px] font-medium px-3 py-1.5 rounded-lg cursor-pointer disabled:cursor-default disabled:opacity-40 hover:bg-[var(--surface-sunken)] text-[var(--text-secondary)]"
-                >
-                  다음
-                </button>
-              </div>
-            </div>
-          )}
+      {/* 선택 시 표 위에 끼어들면 표 위치가 왔다갔다해서(2026-08-09 지적),
+          표 흐름 밖에 떠 있는 하단 고정 바로 뺐다 — 체크박스는 위→아래로
+          누르니 방해 없이 바로 아래 나타났다 사라진다. */}
+      {selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-10 z-30 flex justify-center px-4 lg:pl-[240px]">
+          <BulkActionBar
+            count={selected.size}
+            busy={bulkBusy}
+            onMove={bulkMove}
+            onSetCategory={bulkSetCategory}
+            onDelete={bulkDelete}
+            onClear={() => setSelected(new Set())}
+          />
         </div>
       )}
+
+      {promptOpen && <PromptEditModal id="letters/main" onClose={() => setPromptOpen(false)} />}
     </div>
   );
 }
@@ -533,7 +400,7 @@ function BulkActionBar({
 }: {
   count: number;
   busy: boolean;
-  onMove: (section: "" | "trend" | "column") => void;
+  onMove: (section: "" | "trend" | "column" | "glossary") => void;
   onSetCategory: (category: string) => void;
   onDelete: () => void;
   onClear: () => void;
@@ -542,16 +409,16 @@ function BulkActionBar({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-4 py-3"
-      style={{ background: "var(--accent-soft)" }}
+      className="ui-toast flex max-w-full items-center gap-5 overflow-x-auto rounded-xl px-5 py-3.5"
+      style={{ background: "var(--accent-soft)", boxShadow: "var(--shadow-md)" }}
     >
-      <span className="text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+      <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>
         {count}건 선택됨
       </span>
 
-      <span className="h-4 w-px bg-black/10" />
+      <span className="h-5 w-px shrink-0 bg-black/10" />
 
-      <div className="flex items-center gap-1.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+      <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm" style={{ color: "var(--text-secondary)" }}>
         분류 변경
         {BULK_MOVE_TARGETS.map((t) => (
           <button
@@ -559,17 +426,17 @@ function BulkActionBar({
             type="button"
             disabled={busy}
             onClick={() => onMove(t.section)}
-            className="rounded-md px-2.5 py-1 font-medium cursor-pointer bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
+            className="shrink-0 rounded-md px-3 py-1.5 font-medium cursor-pointer bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      <span className="h-4 w-px bg-black/10" />
+      <span className="h-5 w-px shrink-0 bg-black/10" />
 
       <form
-        className="flex items-center gap-1.5"
+        className="flex shrink-0 items-center gap-1.5"
         onSubmit={(e) => {
           e.preventDefault();
           if (category.trim()) onSetCategory(category.trim());
@@ -580,24 +447,24 @@ function BulkActionBar({
           onChange={(e) => setCategory(e.target.value)}
           placeholder="카테고리 일괄 입력"
           disabled={busy}
-          className="rounded-md px-2.5 py-1 text-[13px] bg-white outline-none w-32 disabled:opacity-50"
+          className="rounded-md px-3 py-1.5 text-sm bg-white outline-none w-36 disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={busy || !category.trim()}
-          className="rounded-md px-2.5 py-1 text-[13px] font-medium cursor-pointer bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
+          className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium cursor-pointer bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
         >
           적용
         </button>
       </form>
 
-      <span className="ml-auto h-4 w-px bg-black/10" />
+      <span className="h-5 w-px shrink-0 bg-black/10" />
 
       <button
         type="button"
         disabled={busy}
         onClick={onDelete}
-        className="rounded-md px-2.5 py-1 text-[13px] font-semibold cursor-pointer text-red-600 bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
+        className="shrink-0 rounded-md px-3 py-1.5 text-sm font-semibold cursor-pointer text-red-600 bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
       >
         삭제
       </button>
@@ -605,7 +472,7 @@ function BulkActionBar({
         type="button"
         disabled={busy}
         onClick={onClear}
-        className="text-[13px] font-medium cursor-pointer disabled:cursor-default disabled:opacity-50"
+        className="shrink-0 whitespace-nowrap text-sm font-medium cursor-pointer disabled:cursor-default disabled:opacity-50"
         style={{ color: "var(--text-secondary)" }}
       >
         선택 해제

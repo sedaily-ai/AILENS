@@ -298,12 +298,15 @@ function shiftDate(isoDate: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-export async function fetchFollowingLetters(): Promise<TodayLetterCardLike[]> {
+// limit 파라미터화(2026-08-10) — 홈 "이슈 톡톡" 섹션은 4개, 사이드바 "요즘
+// 가장 많이 읽힌 글"은 같은 이슈 톡톡 분류를 5개까지 보여달라는 요청으로
+// 상한을 호출부가 고를 수 있게 뺐다. 기본값은 기존 FollowingFeed 동작 유지.
+export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLAY): Promise<TodayLetterCardLike[]> {
   const collected: TodayLetterCardLike[] = [];
   let date = todayKST();
   for (
     let daysBack = 0;
-    daysBack <= FOLLOWING_MAX_LOOKBACK_DAYS && collected.length < FOLLOWING_MAX_DISPLAY;
+    daysBack <= FOLLOWING_MAX_LOOKBACK_DAYS && collected.length < limit;
     daysBack += 1
   ) {
     try {
@@ -321,5 +324,5 @@ export async function fetchFollowingLetters(): Promise<TodayLetterCardLike[]> {
     }
     date = shiftDate(date, -1);
   }
-  return collected.slice(0, FOLLOWING_MAX_DISPLAY);
+  return collected.slice(0, limit);
 }

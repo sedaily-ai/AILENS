@@ -11,6 +11,9 @@ CMS_POSTS_TABLE = os.environ.get("CMS_POSTS_TABLE", "sedaily-mbti-cms-posts-dev"
 DAILY_LETTERS_TABLE = os.environ.get(
     "DAILY_LETTERS_TABLE", "sedaily-mbti-daily-letters-dev"
 )
+QUIZ_QUESTIONS_TABLE = os.environ.get(
+    "QUIZ_QUESTIONS_TABLE", "sedaily-mbti-quiz-questions-dev"
+)
 
 _resource = boto3.resource("dynamodb", region_name=REGION)
 
@@ -29,3 +32,7 @@ def posts_table():
 
 def letters_table():
     return _resource.Table(DAILY_LETTERS_TABLE)
+
+
+def quiz_questions_table():
+    return _resource.Table(QUIZ_QUESTIONS_TABLE)

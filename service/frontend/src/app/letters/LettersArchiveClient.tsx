@@ -132,25 +132,52 @@ export function LettersArchiveClient({ initialItems }: { initialItems: ArchiveIt
                 : item.kind === 'column' ? LightbulbIcon
                 : item.kind === 'video' ? VideoPlayIcon
                 : LetterMailIcon;
+              // 2026-08-09 — 종류별 아이콘뿐이던 자리에 실제 썸네일(레터
+              // cover_image_url, 영상 thumbnail_url)이 있으면 그걸 쓰고,
+              // 트렌드/칼럼처럼 원본 데이터에 이미지가 없는 경우만 기존
+              // 아이콘 배지로 폴백한다(archiveItems.ts avatarUrl 참조).
+              // 제목 아래에 1줄 발췌(excerpt)도 추가 — "본문 몇 자는 보여주는
+              // 게 일반적이지 않나" 피드백.
               const inner = (
                 <>
-                  <span
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      flexShrink: 0,
-                      background: `${item.accent}14`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Icon accent={item.accent} className="w-7 h-7" />
-                  </span>
+                  {item.avatarUrl ? (
+                    <span
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 12,
+                        flexShrink: 0,
+                        overflow: 'hidden',
+                        background: '#f3f4f6',
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 외부 CMS 원본 URL, 사이즈 다양해 next/image 최적화 대상 아님 */}
+                      <img
+                        src={item.avatarUrl}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 12,
+                        flexShrink: 0,
+                        background: `${item.accent}14`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Icon accent={item.accent} className="w-7 h-7" />
+                    </span>
+                  )}
                   <div style={{ minWidth: 0, flex: 1 }}>
+                    {/* 카테고리/역할 배지 제거(2026-08-09) — archiveItems.ts 주석 참조,
+                        "모든 카테고리가 같은 조건"으로 날짜만 남긴다. */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: item.accent }}>{item.badgeLabel}</span>
                       <span style={{ fontSize: 11, color: '#9ca3af' }}>{item.date ? dateLabel(item.date) : ''}</span>
                     </div>
                     <p
@@ -167,6 +194,21 @@ export function LettersArchiveClient({ initialItems }: { initialItems: ArchiveIt
                     >
                       {item.title}
                     </p>
+                    {item.excerpt && (
+                      <p
+                        style={{
+                          fontSize: 13,
+                          color: '#9ca3af',
+                          lineHeight: 1.5,
+                          marginTop: 3,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {item.excerpt}
+                      </p>
+                    )}
                   </div>
                 </>
               );

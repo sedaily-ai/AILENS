@@ -58,8 +58,9 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily'   }, // 웹툰 목록
   { path: '/words',        priority: 0.6, changeFrequency: 'daily'   }, // 단어장 — 레터 키워드 기반, 매일 갱신
   { path: '/style',        priority: 0.3, changeFrequency: 'monthly' },
-  { path: '/fortune',      priority: 0.9, changeFrequency: 'daily'   }, // 일진 매일 바뀜
-  { path: '/saju-match',   priority: 0.8, changeFrequency: 'weekly'  },
+  // '/fortune', '/saju-match'는 2026-08-09 제거 — 사주는 이제 CloudFront
+  // 경로 라우팅(/saju*)으로 외부 AI-saju 서비스가 직접 서빙한다. 이 Next.js
+  // 앱의 라우트가 아니라서 이 sitemap에 안 들어간다(그쪽 자체 sitemap이 따로 있음).
   { path: '/timemachine',  priority: 0.7, changeFrequency: 'weekly'  },
   { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly'  },
   { path: '/about',        priority: 0.3, changeFrequency: 'yearly'  },

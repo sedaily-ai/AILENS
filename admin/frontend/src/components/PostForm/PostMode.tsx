@@ -1,100 +1,85 @@
-import { RichTextEditor } from "@/components/RichTextEditor";
-import { CoverImageField } from "@/components/CoverImageField";
+import type { Editor } from "@tiptap/react";
+import { EditorBody } from "@/components/RichTextEditor";
 import { DatePickerField } from "@/components/DatePickerField";
 import { CustomSelect } from "@/components/CustomSelect";
+import { PostFormShell } from "./PostFormShell";
+import { MetaField, MetaDivider } from "./MetaField";
 import type { ModeProps } from "./shared";
 
-// mode="post": Medium/Notion 식 — 제목이 문서 맨 위에 크게, 메타정보(발행일·
-// 에디터·채널)는 얇은 한 줄로 축소, 본문 에디터가 화면 대부분을 차지한다.
-// 카드 3개로 쪼개져 있던 옛 레이아웃(제목 카드 / 본문 카드 / 이미지 카드)을
-// 하나의 이어진 문서로 합쳐서 "폼 작성" 느낌을 줄였다.
-export function PostMode({ value, body, patch, patchBody }: ModeProps) {
-  return (
-    <div className="max-w-[760px] mx-auto space-y-3">
-      <CoverImageField
-        value={value.cover_image_url ?? null}
-        onChange={(url) => patch({ cover_image_url: url })}
-        fallbackHint="AI LENS 기본 로고가 대신 나갑니다."
-      />
-      {/* overflow-hidden 이었다가 제거 — 카드 안에 스크롤 시 고정되는 글쓰기
-          도구 툴바가 들어있는데, overflow가 visible이 아닌 조상이 하나라도
-          있으면 그 안의 position:sticky가 전부 무력화된다(2026-08-07,
-          "스크롤 내려도 글쓰기 도구는 고정" 요청이 안 먹히던 원인). 카드
-          테두리 자체는 각 진 배경을 칠하는 자식이 없어 클리핑 없이도
-          둥근 모서리가 그대로 유지된다. */}
-      <div className="ui-card rounded-2xl">
-        <div className="rounded-t-2xl px-6 pt-6 pb-3">
-          <input
-            value={value.headline ?? ""}
-            onChange={(e) => patch({ headline: e.target.value })}
-            placeholder="제목을 입력하세요"
-            className="font-display w-full border-0 outline-none bg-transparent text-[28px] font-bold leading-tight text-gray-900 placeholder-gray-300"
-          />
-          <input
-            value={value.subtitle ?? ""}
-            onChange={(e) => patch({ subtitle: e.target.value })}
-            placeholder="부제 (선택)"
-            className="mt-2 w-full border-0 outline-none bg-transparent text-[15px] text-gray-500 placeholder-gray-300"
-          />
-        </div>
+interface Props extends ModeProps {
+  // 리치텍스트 에디터 인스턴스 — 툴바를 페이지 최상단에 따로 두려고
+  // (2026-08-09) 페이지(posts/edit/page.tsx)가 useRichTextEditor로 만들어
+  // 내려준다. 이 컴포넌트는 본문 영역(EditorBody)만 그린다.
+  editor: Editor;
+  uploadError?: string | null;
+}
 
-        {/* 회색 배경 띠였던 걸 지웠다 — 옅은 구분선 하나로만, 폼처럼
-            보이지 않고 미디엄/노션의 "속성 줄"처럼 본문에 곁들이는
-            정도로(2026-08-07 "깔끔하고 모던하게" 요청). */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 px-6 py-2 text-[12.5px] text-gray-400">
-          <label className="flex items-center gap-1.5">
-            발행일
+// mode="post": 4개 탭의 기준 디자인이었다가(2026-08-07 "미디엄/노션 식",
+// 2026-08-09 PostFormShell로 통일) 지금은 레터 글 전용 화면이다. "트렌드·칼럼
+// 카드"라는 별도 진입점은 없앴다 — 분류를 머니 트렌드/깊은 이야기로 두고
+// 본문을 비워두면 저장 시점에 자동으로 카드 전용 글이 된다(posts/edit/page.tsx
+// save() 참조). 그래서 이 컴포넌트엔 더 이상 "카드냐 레터냐"를 고르는 UI가
+// 없다 — 쓰고 안 쓰고만 있으면 된다.
+export function PostMode({ value, body, patch, patchBody, editor, uploadError }: Props) {
+  return (
+    <PostFormShell
+      // 본문 최소 높이를 줄였더니(RichTextEditor.tsx 참조, 540→180px) 카드가
+      // 화면 위쪽에서 짧게 끝나고 그 아래 회색 페이지 여백이 크게 남아
+      // "본문 창이 다 안 보이고 허전하다"는 지적을 받았다(2026-08-09) — 카드
+      // 자체가 뷰포트 대부분을 채우도록 최소 높이를 준다. 짧은 글은 카드
+      // 안쪽에 여백으로 남고, 긴 글은 자연스럽게 넘친다.
+      cardClassName="min-h-[70vh]"
+      coverImage={{
+        value: value.cover_image_url ?? null,
+        onChange: (url) => patch({ cover_image_url: url }),
+        fallbackHint: "AI LENS 기본 로고가 대신 나갑니다.",
+      }}
+      headline={value.headline ?? ""}
+      onHeadlineChange={(v) => patch({ headline: v })}
+      subtitle={value.subtitle ?? ""}
+      onSubtitleChange={(v) => patch({ subtitle: v })}
+      subtitlePlaceholder="부제 (선택)"
+      metaRow={
+        <>
+          <MetaField label="발행일">
             <DatePickerField
               value={value.publish_date ?? ""}
               onChange={(v) => patch({ publish_date: v })}
             />
-          </label>
-          <span className="h-3 w-px bg-gray-200" />
-          <label className="flex items-center gap-1.5">
-            분류
+          </MetaField>
+          <MetaDivider />
+          <MetaField label="분류">
             <CustomSelect
               value={body.section ?? ""}
-              onChange={(v) => patchBody({ section: (v || undefined) as "trend" | "column" | undefined })}
+              onChange={(v) => patchBody({ section: (v || undefined) as "trend" | "column" | "glossary" | undefined })}
               options={[
-                { value: "", label: "일반 레터" },
-                { value: "trend", label: "트렌드" },
-                { value: "column", label: "인기 칼럼" },
+                { value: "", label: "오늘의 이슈" },
+                { value: "trend", label: "머니 트렌드" },
+                { value: "column", label: "깊은 이야기" },
+                { value: "glossary", label: "용어 해설" },
               ]}
             />
-          </label>
-          {/* 트렌드/인기 칼럼으로 태그하면 홈 화면 카드 상단 라벨(예: "증시",
-              "투자 인사이트")도 admin이 직접 정할 수 있어야 한다 — 안 정하면
-              이 값이 비어 카드에 기본값("AI LENS")이 그대로 노출된다
-              (2026-08-07 확인, mode="trend_card" 쪽 카테고리 입력과 동일 필드). */}
-          {(body.section === "trend" || body.section === "column") && (
-            <>
-              <span className="h-3 w-px bg-gray-200" />
-              <label className="flex items-center gap-1.5">
-                {body.section === "trend" ? "카테고리" : "연재명"}
-                <input
-                  value={body.category ?? ""}
-                  onChange={(e) => patchBody({ category: e.target.value })}
-                  placeholder={body.section === "trend" ? "예: 증시, 환율·금리" : "예: 투자 인사이트"}
-                  className="w-28 border-0 bg-transparent font-medium text-gray-600 outline-none placeholder-gray-300"
-                />
-              </label>
-            </>
-          )}
-        </div>
-
-        <div className="border-t border-gray-100">
-          <RichTextEditor
-            value={body.body_html ?? ""}
-            onChange={(html) => patchBody({ body_html: html })}
-            placeholder="본문을 써보세요. 이미지는 끌어놓거나 붙여넣으면 그 자리에 들어갑니다."
-          />
-        </div>
-      </div>
-
-      <p className="px-1 text-xs text-gray-400">
-        핵심 정리·키워드·닫는 줄은 본문에 <b className="mr-1 text-gray-500">H2</b>소제목으로
-        &ldquo;핵심 정리&rdquo; / &ldquo;키워드&rdquo; / &ldquo;닫는 줄&rdquo;이라고 쓰면 저장 시 자동으로 나뉩니다.
-      </p>
-    </div>
+          </MetaField>
+        </>
+      }
+      // "핵심 정리/키워드/닫는 줄" 안내는 항상 떠 있던 문장이었다가 툴바 끝의
+      // 아이콘(hover 툴팁)으로 옮겼다(2026-08-09, "본문 한 글자도 안 썼는데
+      // 계속 떠 있다" 지적) — EditorToolbar 참조. 여기 footer엔 지금 상태에서
+      // 실제로 의미가 바뀌는 것(카드 전용 발행 여부)만 조건부로 남긴다.
+      footer={
+        (body.section === "trend" || body.section === "column") && (
+          <p className="px-1 text-xs text-gray-400">
+            본문을 비워두고 저장하면 상세 페이지 없이 홈 화면 카드로만 발행됩니다 —
+            나중에 본문을 채워서 저장하면 정식 글로 바뀝니다.
+          </p>
+        )
+      }
+    >
+      <EditorBody
+        editor={editor}
+        placeholder="본문을 써보세요. 이미지는 끌어놓거나 붙여넣으면 그 자리에 들어갑니다."
+        uploadError={uploadError}
+      />
+    </PostFormShell>
   );
 }

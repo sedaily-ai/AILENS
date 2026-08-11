@@ -85,7 +85,8 @@ export interface NewsletterSubscriber {
 // --- CMS posts (backend/admin/routes/posts.py 와 1:1) ---
 
 export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video";
-export type CmsCardSection = "trend" | "column";
+// "용어 해설" — 오늘의 이슈/머니 트렌드/깊은 이야기와 같은 방식의 분류.
+export type CmsCardSection = "trend" | "column" | "glossary";
 export type CmsStatus = "draft" | "published" | "archived";
 
 export interface CmsKeyword {
@@ -144,6 +145,33 @@ export interface CmsPostInput {
   editor_id?: string | null;
   body_inline?: CmsPostBody;
   cover_image_url?: string | null;
+}
+
+// --- 용어 퀴즈 (backend/admin/repo/quiz_repo.py 와 1:1) ---
+// 레터 안 "퀴즈·투표" 위젯(AiQuizData)과 다르다 — 홈 화면 "오늘의 단어 퀴즈"
+// 전용 독립 콘텐츠. options/correctIndex 없이 term/explain만 저장하고, 오답
+// 선택지는 공개 화면(WordsPreviewSection.tsx)이 다른 용어 풀에서 그때그때 뽑는다.
+
+export interface Quiz {
+  id: string;
+  term: string;
+  explain: string;
+  /** 오답 3개 — 홈 화면에 정답(term)과 섞여 보기로 나간다. 발행하려면 3개 다 채워야 한다. */
+  options: string[];
+  status: "draft" | "published";
+  publish_date: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+}
+
+/** 생성·수정 payload — 부분 수정이므로 전부 선택적. */
+export interface QuizInput {
+  term?: string;
+  explain?: string;
+  options?: string[];
+  publish_date?: string | null;
 }
 
 export interface PresignResponse {

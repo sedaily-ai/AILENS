@@ -130,7 +130,7 @@ export function HomeHeroCarousel() {
 
       {/* 슬라이드 3 — 사주 */}
       <Link
-        href="/fortune"
+        href="/saju"
         className="items-center transition-transform duration-200 hover:-translate-y-0.5"
         style={{
           ...slideBase,

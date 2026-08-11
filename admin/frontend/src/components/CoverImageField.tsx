@@ -120,29 +120,38 @@ export function CoverImageField({
     );
   }
 
+  // 빈 상태는 작은 유틸리티 버튼 하나로 — 예전엔 py-8짜리 큰 점선 박스라
+  // 제목보다 먼저 눈에 띄는 빈 회색 덩어리로 보였다(2026-08-09, 풀스크린
+  // 캔버스로 바꾸면서 카드 테두리가 없어지자 더 두드러져 보인다는 지적).
+  // 이미지를 실제로 넣으면 아래 배너 형태(위 if(value) 분기)로 커진다 —
+  // "안 넣으면 조용히, 넣으면 크게"가 목표.
+  //
+  // 버튼 라벨(클릭 대상)과 안내문(디스클레이머)을 같은 줄·같은 무게로 붙여
+  // 뒀더니 뭐가 버튼이고 뭐가 설명인지 안 갈린다는 지적(2026-08-09) — 버튼엔
+  // 액션 텍스트만 남기고, 안내문은 아래 별도 줄로 작게 뗐다.
   return (
-    <button
-      type="button"
-      onClick={pick}
-      disabled={uploading}
-      className={`flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed py-8 transition-colors ${
-        dragActive ? "border-blue-400 bg-blue-50/40" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-      }`}
-      {...dragHandlers}
-    >
-      <span
-        className={`flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none ${
-          dragActive ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"
+    <div className="inline-flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={pick}
+        disabled={uploading}
+        className={`inline-flex items-center gap-2 rounded-full border border-dashed px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+          dragActive ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
         }`}
-        aria-hidden="true"
+        {...dragHandlers}
       >
-        +
-      </span>
-      <span className="text-[13px] font-medium text-gray-500">
-        {uploading ? "업로드 중..." : dragActive ? "여기에 놓으세요" : "대표 이미지 추가"}
-      </span>
-      <span className="text-[12px] text-gray-400">없으면 {fallbackHint}</span>
-      {fileInput}
-    </button>
+        <span
+          className={`flex h-4 w-4 items-center justify-center rounded-full text-[13px] leading-none ${
+            dragActive ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-gray-100 text-gray-400"
+          }`}
+          aria-hidden="true"
+        >
+          +
+        </span>
+        <span>{uploading ? "업로드 중..." : dragActive ? "여기에 놓으세요" : "대표 이미지 추가 (끌어놓기 가능)"}</span>
+        {fileInput}
+      </button>
+      <p className="px-1 text-[11px] text-gray-400">없으면 {fallbackHint}</p>
+    </div>
   );
 }

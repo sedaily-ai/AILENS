@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { API_URL } from '@/shared/config/api';
 
 // 타임라인 홈 티저(2026-08-07) — 최상단(단어 퀴즈 위) 배치.
 //
@@ -15,78 +16,90 @@ import { useRouter } from 'next/navigation';
 // 이동해서 그 날짜로 바로 되감기가 시작된다(NewsTimeMachine.tsx 쪽에
 // ?date= 쿼리를 읽어 자동 시작하는 useEffect 추가 완료).
 //
-// 아래 뉴스 목록은 지금은 프론트 목업만 두고, 실시간 데이터 연결(폴링
-// 주기 포함)은 백엔드 담당 팀원이 이어서 작업하기로 결정. 각 줄은 실제
-// 기사로 개별 링크되는 형태로 만들어뒀다(href는 아직 비어 있음 —
-// 실데이터 연결 시 NewsTimeMachine.tsx 의 Article.original_link 를 그대로).
+// 실데이터 연결(2026-08-10) — NewsTimeMachine.tsx가 의존하는 /api/timeline은
+// 아직 Lambda 자체가 없어(404) 매번 /api/search로 폴백하는 구조라, 여기서는
+// 대신 이미 살아있는 공개 GET /s3-articles?date=YYYYMMDD(지면 원문 피드,
+// 인증 불필요)를 직접 붙였다 — "그 날의 서울경제로 돌아간다"는 컨셉과도
+// 더 맞는 실제 지면 데이터.
 interface TimelineItem {
   id: string;
   time: string;
   title: string;
-  /** 실제 기사 URL. 목업 단계라 비어 있음 — 실데이터 연결 시 original_link로 채운다. */
   href: string | null;
 }
 
-interface DateOption {
-  key: string;
-  label: string;
-  items: TimelineItem[];
+interface S3ArticleListItem {
+  news_id: string;
+  title: string;
+  published_at: string;
+  original_link?: string;
 }
-
-// TODO(팀원): 실데이터 연결 — /api/timeline(빅카인즈, 배포 전) 또는
-// /api/search 폴백(NewsTimeMachine.tsx 의 fetchDayArticles 참고)으로 교체.
-const DATE_OPTIONS: DateOption[] = [
-  {
-    key: 'today',
-    label: '오늘',
-    items: [
-      { id: 'mock-t1', time: '09:12', title: '코스피, 외국인 순매수에 6,600선 회복', href: null },
-      { id: 'mock-t2', time: '10:40', title: '한은, 8월 금통위서 기준금리 동결', href: null },
-      { id: 'mock-t3', time: '13:05', title: '반도체 수출 3개월 연속 증가세', href: null },
-      { id: 'mock-t4', time: '15:30', title: '원·달러 환율 1,320원대 등락', href: null },
-      { id: 'mock-t5', time: '17:20', title: '정부, 5만 가구 추가 공급대책 발표', href: null },
-    ],
-  },
-  {
-    key: 'yesterday',
-    label: '어제',
-    items: [
-      { id: 'mock-y1', time: '08:50', title: '美 증시 혼조, 빅테크 실적 발표 앞두고 관망세', href: null },
-      { id: 'mock-y2', time: '11:15', title: '수출입은행, 3분기 경기전망지수 발표', href: null },
-      { id: 'mock-y3', time: '14:02', title: '2차전지株 반등, 유럽 판매 회복 기대감', href: null },
-      { id: 'mock-y4', time: '16:45', title: '금융위, 가계부채 관리방안 발표', href: null },
-    ],
-  },
-  {
-    key: 'grace',
-    label: '그제',
-    items: [
-      { id: 'mock-g1', time: '09:30', title: '연준 위원 발언에 국채 금리 소폭 상승', href: null },
-      { id: 'mock-g2', time: '12:20', title: '중국 제조업 PMI, 경기 확장 국면 지속', href: null },
-      { id: 'mock-g3', time: '18:00', title: '서울 아파트 거래량 두 달 연속 증가', href: null },
-    ],
-  },
-];
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// 고른 날짜와 오늘의 일수 차이로 목업 3종(오늘/어제/그제) 중 하나에 매핑한다.
-// 실데이터 연결 전까지는 날짜를 아무리 다양하게 골라도 준비된 3일치 안에서만
-// 보여줄 수밖에 없다 — 팀원이 fetchDayArticles(date) 로 교체하면 이 매핑은
-// 통째로 필요 없어진다.
-function bucketForDate(dateStr: string): DateOption {
-  const diffDays = Math.round((new Date(todayStr()).getTime() - new Date(dateStr).getTime()) / 86_400_000);
-  if (diffDays <= 0) return DATE_OPTIONS[0];
-  if (diffDays === 1) return DATE_OPTIONS[1];
-  return DATE_OPTIONS[2];
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '--:--';
+  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' });
 }
+
+async function fetchDayArticles(dateStr: string): Promise<TimelineItem[]> {
+  const res = await fetch(`${API_URL}/s3-articles?date=${dateStr.replaceAll('-', '')}&limit=30`);
+  if (!res.ok) throw new Error(`s3-articles ${res.status}`);
+  const data: { articles?: S3ArticleListItem[] } = await res.json();
+  const list = data.articles ?? [];
+  return list
+    .slice()
+    // '시그널' 유료 IB/M&A 코너 기사 제외 — 지면 시간대(06:00) 태그가 같아 최신순
+    // 정렬 시 상위를 통째로 차지해버리는 문제(2026-08-10 발견). '마켓시그널'처럼
+    // 다른 이름의 코너는 그대로 둔다 — 정확히 "[시그널]" 태그만 걸러낸다.
+    .filter((a) => !a.title.includes('[시그널]'))
+    .sort((a, b) => b.published_at.localeCompare(a.published_at))
+    .slice(0, 8)
+    .map((a) => ({
+      id: a.news_id,
+      time: formatTime(a.published_at),
+      title: a.title,
+      href: a.original_link ?? null,
+    }));
+}
+
+const QUICK_PICKS = ['오늘', '어제', '그제'];
 
 export function TimelinePreviewSection() {
   const router = useRouter();
   const [pickedDate, setPickedDate] = useState(todayStr());
-  const selected = bucketForDate(pickedDate);
+  const [items, setItems] = useState<TimelineItem[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setItems(null);
+    const load = (silent: boolean) => {
+      fetchDayArticles(pickedDate)
+        .then((rows) => {
+          if (!cancelled) setItems(rows);
+        })
+        .catch(() => {
+          if (!cancelled && !silent) setItems([]);
+        });
+    };
+    load(false);
+
+    // '실시간 News' 이름값대로, 오늘 날짜를 보는 동안엔 3분마다 조용히
+    // 다시 불러온다(2026-08-10) — 과거 날짜는 지면이 안 바뀌니 폴링 불필요.
+    // silent=true라 폴링 중 에러가 나도 이미 떠 있는 목록을 비우지 않는다.
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    if (pickedDate === todayStr()) {
+      intervalId = setInterval(() => load(true), 3 * 60 * 1000);
+    }
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [pickedDate]);
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
@@ -195,17 +208,16 @@ export function TimelinePreviewSection() {
           </button>
         </div>
         <div className="flex justify-center" style={{ gap: 6, marginTop: 12 }}>
-          {DATE_OPTIONS.map((d, i) => {
-            const active = bucketForDate(pickedDate).key === d.key;
+          {QUICK_PICKS.map((label, i) => {
+            const t = new Date();
+            t.setDate(t.getDate() - i);
+            const dateForPick = t.toISOString().slice(0, 10);
+            const active = pickedDate === dateForPick;
             return (
               <button
-                key={d.key}
+                key={label}
                 type="button"
-                onClick={() => {
-                  const t = new Date();
-                  t.setDate(t.getDate() - i);
-                  setPickedDate(t.toISOString().slice(0, 10));
-                }}
+                onClick={() => setPickedDate(dateForPick)}
                 style={{
                   padding: '5px 14px',
                   borderRadius: 999,
@@ -218,25 +230,32 @@ export function TimelinePreviewSection() {
                   transition: 'background .15s, color .15s',
                 }}
               >
-                {d.label}
+                {label}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 고른 날짜의 미리보기 목록 — 지금은 목업 3종(오늘/어제/그제) 중 매핑. */}
-      <div
-        style={{
-          borderRadius: 14,
-          background: '#fff',
-          border: '1px solid #f1efe9',
-          boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
-          padding: 'clamp(14px, 3vw, 20px)',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {selected.items.map((item) => {
+      {/* 고른 날짜의 미리보기 목록 — /s3-articles?date=... 실데이터. 로딩 중엔
+          자리 안 차지(스켈레톤 제거 방침, WebtoonPreviewSection과 동일). */}
+      {items !== null && (
+        <div
+          style={{
+            borderRadius: 14,
+            background: '#fff',
+            border: '1px solid #f1efe9',
+            boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
+            padding: 'clamp(14px, 3vw, 20px)',
+          }}
+        >
+          {items.length === 0 && (
+            <p style={{ textAlign: 'center', padding: '20px 8px', fontSize: 13, color: '#a8a29e' }}>
+              이 날은 보관된 기사가 없어요.
+            </p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {items.map((item) => {
             const row = (
               <>
                 <span
@@ -283,8 +302,9 @@ export function TimelinePreviewSection() {
               </div>
             );
           })}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

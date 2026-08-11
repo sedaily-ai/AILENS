@@ -4,7 +4,7 @@
 /** 표 형태 로딩 — 실제 표와 같은 골격이라 데이터가 들어와도 레이아웃이 안 튄다. */
 export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
-    <div className="ui-card rounded-2xl overflow-hidden" aria-busy="true" aria-live="polite">
+    <div className="ui-card rounded-xl overflow-hidden" aria-busy="true" aria-live="polite">
       <div className="ui-thead flex gap-4 px-4 py-3">
         {Array.from({ length: cols }).map((_, i) => (
           <div
@@ -58,13 +58,13 @@ export function CardSkeleton({ count = 4 }: { count?: number }) {
 export function FormSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-live="polite">
-      <div className="ui-card rounded-2xl p-5 space-y-4 ui-enter">
+      <div className="ui-card rounded-xl p-5 space-y-4 ui-enter">
         <div className="ui-skeleton h-3 w-16" />
         <div className="ui-skeleton h-9 w-full" />
         <div className="ui-skeleton h-3 w-16" />
         <div className="ui-skeleton h-9 w-full" />
       </div>
-      <div className="ui-card rounded-2xl p-5 space-y-3 ui-enter" style={{ ["--i" as string]: 1 }}>
+      <div className="ui-card rounded-xl p-5 space-y-3 ui-enter" style={{ ["--i" as string]: 1 }}>
         <div className="ui-skeleton h-3 w-20" />
         <div className="ui-skeleton h-20 w-full" />
         <div className="ui-skeleton h-20 w-full" />
@@ -85,7 +85,7 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="ui-card rounded-2xl px-6 py-16 text-center ui-enter">
+    <div className="ui-card rounded-xl px-6 py-16 text-center ui-enter">
       <div
         className="mx-auto w-11 h-11 rounded-xl flex items-center justify-center"
         style={{ background: "var(--surface-sunken)" }}

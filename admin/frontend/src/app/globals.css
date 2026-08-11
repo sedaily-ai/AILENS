@@ -7,8 +7,9 @@
  * 본문·수치는 산세리프로 밀도 있게.
  *
  * 색: 회색을 살짝 따뜻하게(stone 계열) 깔아 화면이 차갑지 않게 하고,
- * 주 버튼은 잉크(near-black)로 둔다. 파랑은 '현재 위치·링크'에만 써서
- * 흔한 파란 버튼 관리자 화면과 결을 다르게 했다.
+ * 로고·주 버튼·필터 active·링크는 전부 서울경제 로고의 스틸블루
+ * (--accent, 2026-08-09) 하나로 통일했다 — 상위 브랜드와 톤을 맞추면서도
+ * 표준 SaaS 파랑(#1d4ed8)보다 채도를 낮춰 결을 다르게 했다.
  */
 
 :root {
@@ -22,19 +23,33 @@
   --text-muted: #57534e; /* 7.2:1 — 메타·타임스탬프 */
   --text-faint: #a8a29e; /* placeholder 전용, 본문 금지 */
 
-  /* 표면 — 살짝 따뜻한 중립 */
-  --surface-page: #faf9f7;
+  /* 표면. 2026-08-09 두 번째 조정 — 캔버스(--surface-page)를 카드(--surface-card)와
+     같은 순백으로 통일했다. 표 목록 화면(글 관리)은 카드 테두리 자체를 없앤
+     플랫 구조라, 그 위에서 미묘하게 다른 톤의 캔버스는 "의도"로 안 읽히고
+     "덜 채워진 흰색"처럼 애매하게 보였다("이게 순백이 맞나?" 질문) — 카드가
+     실제로 테두리+그림자로 떠 있는 화면(웹툰/영상/레터 카드 그리드)은
+     순백 캔버스 위에서도 카드가 충분히 도드라져 문제 없다. */
+  --surface-page: #ffffff;
   --surface-card: #ffffff;
   --surface-sunken: #f5f5f4;
+  /* 사이드바 전용 — 본문(순백)과 아주 살짝만 다르게(2026-08-09, "경계
+     구분되게, 근데 차이 별로 안 나게"). --surface-sunken(#f5f5f4)은
+     hover 배경이라 그보다 눈에 띈다 — 그 절반쯤 되는 톤. */
+  --surface-sidebar: #faf9f8;
 
   --border-hairline: #eceae7;
   --border-input: #dcd9d4;
 
-  /* 액센트 — 위치·링크에만 */
-  --accent: #1d4ed8;
-  --accent-hover: #1e40af;
-  --accent-soft: #eff4ff;
-  --accent-ring: rgba(29, 78, 216, 0.16);
+  /* 액센트 — 로고·주 버튼·필터 active·링크·선택 상태 전부 이 하나(제목 등
+     본문 텍스트에는 안 씀). 2026-08-09 네 번째 조정 — 표준 파란 링크색
+     (#1d4ed8)→ 와인톤 → 서울경제 로고(물결 리본 "S" 마크) 스틸블루 →
+     그 스틸블루가 "올드해 보인다"는 피드백으로 채도·명도를 올려 좀 더
+     선명한 블루로. 로고 색과 맞춘다는 방향은 유지하되, 톤 자체는 로고보다
+     한 단계 밝게. */
+  --accent: #2f6fe0;
+  --accent-hover: #1f4fb0;
+  --accent-soft: #eaf1fe;
+  --accent-ring: rgba(47, 111, 224, 0.16);
 
   /* 상태 */
   --ok: #15803d;
@@ -200,14 +215,20 @@ body {
   transform: translateY(1px);
 }
 
-/* 주 버튼 — 잉크. 흔한 파란 버튼 대신. 위쪽 안쪽 하이라이트로 살짝 볼록하게. */
+/* 주 버튼 — 브랜드 액센트(서울경제 로고 계열 블루). 2026-08-09 조정:
+   잉크(검정, "올드해 보인다")→ 와인 → 서울경제 로고 블루로. 로고 마크
+   (Sidebar.tsx)도 같은 색으로 맞춰서, 필터 active·선택 상태·링크까지 이미
+   이 색을 쓰던 것과 합쳐 "브랜드 색은 어디서든 이 하나"로 일관되게 갔다 —
+   큰 표면(로고·버튼)과 작은 신호(active·링크)가 같은 색이면 색이 흩어지는
+   대신 오히려 더 뚜렷한 정체성으로 읽힌다(Stripe 인디고·Linear 퍼플처럼
+   단일 액센트 시스템). 위쪽 안쪽 하이라이트로 살짝 볼록하게. */
 .ui-btn-primary {
-  background: var(--ink);
+  background: var(--accent);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), var(--shadow-sm);
 }
 .ui-btn-primary:hover:not(:disabled) {
-  background: var(--ink-soft);
+  background: var(--accent-hover);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--shadow-md);
 }
 .ui-btn-primary:active:not(:disabled) {
@@ -234,6 +255,28 @@ body {
   color: var(--danger);
   border-color: #f0c2c2;
   background: var(--danger-soft);
+}
+
+/* 상태 전환(발행/내리기) — 2026-08-09, "저장(파랑)·발행(초록)·내리기(주황)가
+   전부 꽉 채운 색이라 나란히 있으면 시선이 분산된다" 지적. 저장만 진짜
+   주 버튼(.ui-btn-primary)으로 남기고, 이 둘은 상태 배지(.ui-badge-published/
+   -archived)와 같은 옅은 배경+색 텍스트 조합으로 낮췄다 — 의미(초록=발행,
+   주황=비발행)는 그대로 전달하면서 화면에서 덜 소리친다. */
+.ui-btn-ok-soft {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.ui-btn-ok-soft:hover:not(:disabled) {
+  background: var(--ok);
+  color: #fff;
+}
+.ui-btn-warn-soft {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.ui-btn-warn-soft:hover:not(:disabled) {
+  background: var(--warn);
+  color: #fff;
 }
 
 /* ---------- 모션 ----------

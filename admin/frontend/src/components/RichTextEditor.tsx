@@ -3,19 +3,19 @@
 import { useEffect, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import Youtube from "@tiptap/extension-youtube";
 import { uploadImage } from "@/lib/uploadImage";
+import { ResizableImage } from "./resizableImageExtension";
 import { AiQuiz } from "./aiQuizExtension";
-import { AiQuizModal, type AiQuizData } from "./AiQuizModal";
+import { EMPTY as EMPTY_AI_QUIZ_DATA } from "./AiQuizFields";
 
-interface Props {
-  /** Tiptap HTML — 미디엄/네이버 블로그처럼 굵게·글머리·이미지가 그 위치에
-   * 그대로 저장된다. AI 레터(body[] + 마커 방식)와는 별개 경로. */
-  value: string;
-  onChange: (html: string) => void;
-  placeholder?: string;
-}
+// 2026-08-09 — 툴바를 페이지 최상단(발행일·분류 메타줄보다 위)으로 옮기면서
+// 훅 + 툴바 컴포넌트 + 본문 컴포넌트 세 조각으로 쪼갰다(티스토리 등 다른
+// 에디터가 서식 도구모음을 카테고리보다 위에 고정해두는 것과 같은 구조로
+// 맞춰달라는 요청). editor 인스턴스는 페이지(posts/edit/page.tsx)가
+// useRichTextEditor로 만들어 위쪽엔 <EditorToolbar>, 본문 자리엔
+// <EditorBody>를 각각 내려준다 — Tiptap의 Editor는 순수 JS 인스턴스라
+// DOM 위치와 무관하게 어디서든 같은 걸 참조할 수 있다.
 
 function insertImage(editor: Editor, url: string) {
   editor.chain().focus().setImage({ src: url }).run();
@@ -130,6 +130,13 @@ const Icon = {
       <circle cx="12" cy="12" r="3.5" />
     </svg>
   ),
+  Info: () => (
+    <svg {...ICON_PROPS}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.3v.01" strokeWidth={2.6} />
+    </svg>
+  ),
 };
 
 function ToolbarButton({
@@ -160,7 +167,13 @@ function ToolbarButton({
   );
 }
 
-function Toolbar({
+/** 페이지 최상단에 고정되는 서식 도구모음 — editor 인스턴스만 있으면 어디서든
+ * 렌더 가능(Tiptap Editor는 DOM 위치와 무관한 JS 인스턴스). 이미지 자체의
+ * 정렬·교체·ALT·삭제는 여기가 아니라 이미지 옆에 붙는 컨텍스트 툴바
+ * (resizableImageExtension.tsx)가 담당한다 — 처음엔 이 상단 툴바로
+ * 옮겨봤지만 "이미지 쪽에 있어야지, 위쪽 말고" 피드백으로 되돌렸다
+ * (2026-08-09). */
+export function EditorToolbar({
   editor,
   uploading,
   onPickImage,
@@ -172,16 +185,7 @@ function Toolbar({
   onInsertQuiz: () => void;
 }) {
   return (
-    // sticky — 페이지 헤더(posts/edit/page.tsx, top-0으로 고정)와 겹치지
-    // 않게 그 아래에 붙인다. 헤더 높이는 "발행됨 · slug" 줄 유무 등으로
-    // 바뀌어서 고정 px(top-20)로는 헤더에 가려지는 문제가 있었다
-    // (2026-08-07) — 헤더가 실측해 넣어주는 --post-header-h를 그대로 쓴다.
-    // 배경은 반투명 블러 대신 불투명 흰색으로 — 스크롤 중 본문 텍스트가
-    // 아이콘 사이로 비치는 게 지저분해 보였다(2026-08-07 "깔끔하게" 요청).
-    <div
-      className="sticky z-10 flex flex-wrap items-center gap-0.5 border-b border-gray-100 bg-white px-4 py-2"
-      style={{ top: "var(--post-header-h, 64px)" }}
-    >
+    <div className="flex flex-wrap items-center gap-1 px-6 py-2.5">
       <ToolbarButton
         label="굵게"
         active={editor.isActive("bold")}
@@ -245,25 +249,72 @@ function Toolbar({
         {uploading ? <span className="ui-spinner w-3.5 h-3.5" /> : <Icon.Image />}
       </ToolbarButton>
       <span className="mx-1 h-5 w-px bg-gray-200" />
-      {/* 색+라벨로 서식 버튼들과 구분되는 "글쓰기 도구"로 눈에 띄게 했다
-          (2026-08-07) — 본문 아무 데나 커서를 두고 누르면 그 자리에 바로
-          삽입되고, 넣은 뒤엔 끌어서 옮길 수 있다(aiQuizExtension.tsx 참조). */}
+      {/* 라벨(아이콘+글자)로 다른 서식 버튼과 구분했다 — 색은 뺐다(2026-08-09,
+          "화면에 색이 여기 하나뿐이라 부가 기능인데도 시선이 여기로 먼저
+          간다"는 피드백). 저장/발행처럼 진짜 주요 액션에만 색을 남기고,
+          툴바 안에서는 다른 아이콘 버튼과 같은 중립 톤 — 라벨 텍스트만으로도
+          충분히 구분된다. */}
       <button
         type="button"
         onClick={onInsertQuiz}
-        className="ml-0.5 flex h-8 items-center gap-1.5 rounded-md bg-violet-50 px-2.5 text-[13px] font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+        className="ml-0.5 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
       >
         <Icon.Widget />
         퀴즈·투표
       </button>
+      {/* 예전엔 카드 아래 항상 떠 있는 문장이었다 — 본문을 한 글자도 안 쓴
+          상태에서도 늘 보여서 화면이 조용하지 않았다(2026-08-09 지적).
+          아이콘 하나로 줄이고 필요할 때만 hover로 보게 했다.
+          2026-08-09 — ml-auto로 반대쪽 끝에 혼자 떨어뜨려 뒀더니 "도구모음
+          정렬·균형이 안 맞아 보인다"는 지적 — 나머지 아이콘들과 같은 왼쪽
+          그룹 안으로 옮겼다(구분선만 하나 두고 이어붙임). 툴바 전체가
+          한 덩어리로 왼쪽에 모여 있는 게, 좌우로 억지로 벌려놓은 것보다
+          더 차분하고 정돈돼 보인다. */}
+      <span className="mx-1 h-5 w-px bg-gray-200" />
+      <span
+        title={'핵심 정리·키워드·닫는 줄은 본문에 H2 소제목으로 "핵심 정리" / "키워드" / "닫는 줄"이라고 쓰면 저장 시 자동으로 나뉩니다.'}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-gray-300 hover:bg-gray-100 hover:text-gray-500 cursor-help"
+      >
+        <Icon.Info />
+      </span>
     </div>
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder }: Props) {
+/** 실제 Tiptap 편집 영역. 툴바와 분리돼 있어 페이지 아래쪽(제목·메타줄 다음)에 둔다. */
+export function EditorBody({
+  editor,
+  placeholder,
+  uploadError,
+}: {
+  editor: Editor;
+  placeholder?: string;
+  uploadError?: string | null;
+}) {
+  const isEmpty = editor.isEmpty;
+  return (
+    <div className="relative">
+      <EditorContent editor={editor} />
+      {isEmpty && placeholder && (
+        <p className="pointer-events-none absolute left-6 top-5 text-[15.5px] text-gray-300">
+          {placeholder}
+        </p>
+      )}
+      {uploadError && <p className="px-6 pb-4 text-xs text-red-600">이미지 업로드 실패: {uploadError}</p>}
+    </div>
+  );
+}
+
+interface UseRichTextEditorArgs {
+  /** Tiptap HTML — 미디엄/네이버 블로그처럼 굵게·글머리·이미지가 그 위치에
+   * 그대로 저장된다. AI 레터(body[] + 마커 방식)와는 별개 경로. */
+  value: string;
+  onChange: (html: string) => void;
+}
+
+export function useRichTextEditor({ value, onChange }: UseRichTextEditorArgs) {
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [insertingQuiz, setInsertingQuiz] = useState(false);
 
   // 드래그드롭·붙여넣기·툴바 버튼 셋 다 여기로 모은다 — 실패를 조용히
   // 삼키면(예전 버그) 아무 반응 없이 그냥 안 들어간 것처럼 보인다.
@@ -300,7 +351,10 @@ export function RichTextEditor({ value, onChange, placeholder }: Props) {
           },
         },
       }),
-      Image.configure({ HTMLAttributes: { class: "rounded-xl w-full" } }),
+      // 2026-08-09 — 기본 Image 대신 크기 조절·정렬·alt·삭제 버튼이 있는
+      // ResizableImage로 교체("네이버는 그런 기능이 있잖아요" 요청).
+      // 클래스 대신 노드뷰 자체가 스타일을 다 들고 있다.
+      ResizableImage,
       // 유튜브 링크를 단독 줄로 붙여넣으면 자동으로 영상 임베드로 바뀐다
       // (미디엄 붙여넣기 임베드와 동일한 동작 — 확장 자체의 붙여넣기 규칙).
       Youtube.configure({
@@ -317,7 +371,10 @@ export function RichTextEditor({ value, onChange, placeholder }: Props) {
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: "px-6 py-5 text-[15.5px] leading-[1.85] min-h-[540px] focus:outline-none prose-editor",
+        // min-height 540px는 새 글일 때 카드 하단까지 텅 빈 공백이 크게
+        // 남아 "빈 백지"가 부담스러워 보였다(2026-08-09 지적) — 클릭 영역은
+        // 충분히 확보하되 내용에 따라 자라나도록 대폭 줄였다.
+        class: "px-6 py-5 text-[15.5px] leading-[1.85] min-h-[180px] focus:outline-none prose-editor",
       },
       handleDrop(view, event, _slice, moved) {
         if (moved) return false; // 에디터 내부에서 옮기는 건 기본 동작에 맡긴다.
@@ -352,18 +409,25 @@ export function RichTextEditor({ value, onChange, placeholder }: Props) {
   // value 가 "외부에서" 바뀌었을 때(기존 글 로딩)만 동기화한다 — 매 타이핑마다
   // onUpdate → 부모 setState → 이 prop 이 도는데, 그때마다 setContent 하면
   // 커서가 맨 앞으로 튄다. 에디터가 지금 들고 있는 값과 다를 때만 맞춘다.
+  //
+  // setContent를 이 effect 안에서 그대로 동기 호출하면, 본문에 이미지 노드가
+  // 있을 때 그 노드뷰(ResizableImageView)를 마운트하며 Tiptap이 내부적으로
+  // ReactDOM.flushSync를 부르는데 — 그 시점이 아직 React가 이 effect를
+  // 커밋하는 도중이라 "flushSync was called from inside a lifecycle method"
+  // 콘솔 에러로 이어진다(2026-08-09, 이미지 업로드 후 실제로 발생 확인).
+  // 마이크로태스크로 한 틱 미뤄서 React의 커밋이 끝난 뒤에 실행되게 한다.
   useEffect(() => {
     if (!editor) return;
     if (value !== editor.getHTML()) {
-      editor.commands.setContent(stripBrokenYoutubeEmbeds(value || ""), { emitUpdate: false });
+      queueMicrotask(() => {
+        if (editor.isDestroyed || value === editor.getHTML()) return;
+        editor.commands.setContent(stripBrokenYoutubeEmbeds(value || ""), { emitUpdate: false });
+      });
     }
   }, [editor, value]);
 
-  if (!editor) {
-    return <div className="px-6 py-5 text-[15.5px] text-gray-300 min-h-[540px]">에디터 불러오는 중…</div>;
-  }
-
   const pickImage = () => {
+    if (!editor) return;
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/jpeg,image/png,image/webp,image/gif";
@@ -374,37 +438,20 @@ export function RichTextEditor({ value, onChange, placeholder }: Props) {
     input.click();
   };
 
-  const isEmpty = editor.isEmpty;
-
-  const insertQuiz = (data: AiQuizData) => {
-    editor.chain().focus().insertContent({ type: "aiQuiz", attrs: { data } }).run();
-    setInsertingQuiz(false);
+  // 2026-08-09 — "퀴즈·투표" 툴바 버튼이 팝업 모달을 먼저 열어서 내용을
+  // 다 채우게 하던 흐름을 없앴다. 이제 빈 카드를 바로 삽입한다 — 그 카드는
+  // 새로 삽입된(= 빈) 상태라 노드뷰(aiQuizExtension.tsx)가 자동으로 편집
+  // 모드로 열어서, 삽입 즉시 그 자리에서 채워 넣을 수 있다.
+  const insertQuiz = () => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({ type: "aiQuiz", attrs: { data: EMPTY_AI_QUIZ_DATA } }).run();
   };
 
-  return (
-    <div className="relative">
-      <Toolbar
-        editor={editor}
-        uploading={uploading}
-        onPickImage={pickImage}
-        onInsertQuiz={() => setInsertingQuiz(true)}
-      />
-      <div className="relative">
-        <EditorContent editor={editor} />
-        {isEmpty && placeholder && (
-          <p className="pointer-events-none absolute left-6 top-5 text-[15.5px] text-gray-300">
-            {placeholder}
-          </p>
-        )}
-      </div>
-      {err && <p className="px-6 pb-4 text-xs text-red-600">이미지 업로드 실패: {err}</p>}
-
-      <AiQuizModal
-        open={insertingQuiz}
-        initial={null}
-        onClose={() => setInsertingQuiz(false)}
-        onSubmit={insertQuiz}
-      />
-    </div>
-  );
+  return {
+    editor,
+    uploading,
+    uploadError: err,
+    pickImage,
+    insertQuiz,
+  };
 }

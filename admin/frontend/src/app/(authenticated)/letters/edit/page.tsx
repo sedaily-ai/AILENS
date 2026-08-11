@@ -112,7 +112,7 @@ function LetterEditPage() {
       <div className="space-y-3">
         <h1 className="font-display text-[26px] font-bold text-[var(--text-primary)]">AI 레터</h1>
         <ErrorNote message={error} />
-        <button type="button" onClick={() => router.back()} className="text-sm text-blue-700 hover:underline cursor-pointer">
+        <button type="button" onClick={() => router.back()} className="text-sm text-[var(--accent)] hover:underline cursor-pointer">
           ← 목록
         </button>
       </div>
@@ -130,7 +130,7 @@ function LetterEditPage() {
           >
             ← 목록
           </button>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 mt-1">
+          <h1 className="font-display text-[26px] font-bold text-[var(--text-primary)] mt-1">
             AI 레터 수정
           </h1>
           {letter && (
@@ -160,7 +160,7 @@ function LetterEditPage() {
             type="button"
             disabled={busy}
             onClick={remove}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 ring-1 ring-gray-300 hover:text-red-600 hover:ring-red-300 disabled:opacity-50"
+            className="ui-btn ui-btn-ghost ui-btn-danger rounded-lg px-4 py-2 text-sm font-semibold"
           >
             내리기
           </button>

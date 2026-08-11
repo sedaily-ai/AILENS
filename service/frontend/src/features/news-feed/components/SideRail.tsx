@@ -5,10 +5,13 @@ import Link from 'next/link';
 import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { calculateSaju, CG_OH } from '@/entities/saju';
 import { trackEvent } from '@/shared/lib/trackEvent';
-import { useLatestLetters } from '@/shared/lib/useLatestLetters';
+import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 
-// 사주 × 짝꿍 미리보기 — 띠 × 성별 조합으로 살짝만 보여주고 진짜 풀이는 /saju-match 로 유도.
+// 사주 × 짝꿍 미리보기 — 띠 × 성별 조합으로 살짝만 보여주고 진짜 풀이는 /saju/compatibility
+// (진짜 사주 서비스, CloudFront /saju* 마운트)로 유도. 자체 미니 페이지였던
+// /saju-match는 2026-08-09 제거 — 딱 같은 기능(상대 없이 내게 맞는 사주)을
+// 실제 서비스가 이미 갖고 있어서 그쪽으로 넘긴다.
 // 실제 풀이는 사용자 사주 기반 — 여기는 띠 오행 + 성별로 4명 에디터 중 매칭 + 점수 generate.
 type Zodiac =
   | 'rat' | 'ox' | 'tiger' | 'rabbit' | 'dragon' | 'snake'
@@ -413,24 +416,25 @@ function recentBirthYears(zodiac: Zodiac): number[] {
   return years.slice(-3); // 최근 3개
 }
 
-interface HotLetter {
-  letterId: string;
-  editorName: string;
-  archetype: string;
-  accent: string;
-  shortTitle: string;
-}
+const HOT_LETTERS_LIMIT = 5;
 
 export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: MbtiGroupId }) {
-  // "요즘 가장 많이 읽힌 글" — 최신 발행 레터(라이브 훅)의 카드를 그대로 매핑.
-  const { cards } = useLatestLetters();
-  const hotLetters: HotLetter[] = cards.map((c) => ({
-    letterId: c.letterId,
-    editorName: c.editorName,
-    archetype: c.archetype,
-    accent: c.accent,
-    shortTitle: c.title,
-  }));
+  // 2026-08-10 — "요즘 가장 많이 읽힌 글"의 데이터 소스를 useLatestLetters
+  // (하루치 전체 레터, 개수 상한 없음)에서 fetchFollowingLetters(=홈
+  // "이슈 톡톡"과 같은 분류: 실제 에디터 이름으로 태깅된 레터만)로 교체.
+  // 상한도 5개로 맞춤(fetchFollowingLetters 두 번째 인자, todayLettersApi.ts
+  // 참조 — 홈 "이슈 톡톡" 자체는 4개 그대로 두고 사이드바만 5개).
+  const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFollowingLetters(HOT_LETTERS_LIMIT).then((cards) => {
+      if (!cancelled) setHotLetters(cards);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // 생년월일 통합 입력 — YYYYMMDD 8자리. 4자리 (연) 만 입력해도 띠 매핑 동작.
   const [birth, setBirth] = useState('');
   const [gender, setGender] = useState<Gender>('male');
@@ -540,7 +544,25 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
                 >
                   {String(idx + 1).padStart(2, '0')}
                 </span>
+                {/* 썸네일 추가(2026-08-10) — 텍스트뿐이던 행에 이슈 톡톡 카드와
+                    같은 이미지를 붙여 시각적 밀도를 맞췄다. CMS 지정 썸네일 >
+                    기본 아바타 폴백(FollowingFeed.tsx와 동일 패턴). */}
+                <span
+                  className="flex-shrink-0"
+                  style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: '#f3f4f6' }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    loading="lazy"
+                    src={l.thumbnailUrl ?? l.editorAvatar}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </span>
                 <div className="flex-1 min-w-0">
+                  {/* 작가/역할 라벨(archetype) 제거(2026-08-10) — 다른 섹션들과
+                      같은 원칙("모든 카테고리가 같은 조건"으로 제목만 표출,
+                      2026-08-09 archiveItems.ts 등 참조)으로 통일. */}
                   <p
                     className="text-gray-900 font-medium group-hover:opacity-70 transition-opacity"
                     style={{
@@ -552,13 +574,9 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
-                      marginBottom: 4,
                     }}
                   >
-                    {l.shortTitle}
-                  </p>
-                  <p className="text-gray-400" style={{ fontSize: 11, letterSpacing: '-0.005em' }}>
-                    <span style={{ color: l.accent, fontWeight: 500 }}>{l.archetype}</span>
+                    {l.title}
                   </p>
                 </div>
               </Link>
@@ -567,7 +585,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
         </ol>
       </section>
 
-      {/* 나의 결 × 짝꿍 미리보기 — 생일 + 성별 → 살짝만 보고 본 풀이는 /saju-match */}
+      {/* 나의 결 × 짝꿍 미리보기 — 생일 + 성별 → 살짝만 보고 본 풀이는 /saju/compatibility */}
       <section>
         <header className="mb-1">
           <h3
@@ -829,7 +847,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
                         >
                           <p style={{ margin: 0 }}>{m.detail}</p>
                           <Link
-                            href="/saju-match"
+                            href="/saju/compatibility"
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -853,7 +871,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
             </div>
 
             <Link
-              href="/saju-match"
+              href="/saju/compatibility"
               style={{
                 display: 'block',
                 textAlign: 'center',

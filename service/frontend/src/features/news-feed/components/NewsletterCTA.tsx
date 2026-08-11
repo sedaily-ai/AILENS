@@ -121,9 +121,8 @@ export function NewsletterCTA() {
             <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>
               {sampleLetter.editorName}
             </span>
-            <span style={{ fontSize: 11.5, color: sampleLetter.accent, fontWeight: 600 }}>
-              {sampleLetter.editorRole}
-            </span>
+            {/* 역할 라벨("팀이 함께 정리했어요") 제거(2026-08-09) — 다른 카드
+                섹션들과 동일하게, 이름 옆 부가 라벨 없이 이름만. */}
             <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 'auto' }}>
               {(date ?? '').replace(/-/g, '.')} 발행
             </span>

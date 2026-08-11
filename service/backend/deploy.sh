@@ -142,6 +142,7 @@ API_V2_FUNCTIONS=(
   # 그때 다시 설계. AWS Lambda 함수/API Gateway 라우트 자체는 수동 정리 전까지
   # 남아있을 수 있음(더 이상 이 배포 대상에서 코드 업데이트 안 됨).
   "sedaily-mbti-v2-posts-dev"          # CMS 글 공개 조회 (handlers/cms_posts_public.py)
+  "sedaily-mbti-v2-quiz-dev"           # 용어 퀴즈 공개 조회/응답 (handlers/quiz_public.py, 2026-08-09 신규)
 )
 
 # --- Pipeline Functions ---

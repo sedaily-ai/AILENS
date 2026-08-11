@@ -3,7 +3,7 @@
 // 에러. 순수 함수·타입만 이 파일로 분리해서 서버·클라이언트 양쪽에서 같이
 // import 한다(2026-08-07, 목록 페이지 SSG 전환 중 발견).
 import { letterHref } from '@/shared/lib/letterHref';
-import { withDisplayMeta } from '@/shared/lib/todayLettersApi';
+import { withDisplayMeta, toTodayLetterCard } from '@/shared/lib/todayLettersApi';
 import type { CmsLetter, CmsTrendCard, CmsVideo } from '@/shared/lib/cmsPostsApi';
 
 export const PAGE_SIZE = 100;
@@ -21,7 +21,6 @@ export interface ArchiveItem {
   /** true면 외부 링크(target=_blank) — 지금은 video만 해당(원본 유튜브 URL). */
   external?: boolean;
   avatarUrl: string | null;
-  badgeLabel: string;
 }
 
 export const TREND_ACCENT = '#dc2626';
@@ -31,6 +30,11 @@ export const VIDEO_ACCENT = '#7c3aed';
 // 서버(빌드타임)와 클라이언트(재검증 fetch) 양쪽에서 같은 원본 데이터를 같은
 // 규칙으로 합치기 위한 순수 함수 — SSG 초기 렌더와 이후 client refresh가
 // 서로 다른 결과를 만들지 않게 한다(2026-08-07, 목록 페이지 SSG 감사).
+//
+// badgeLabel(작가 역할/카테고리 킥커) 필드는 2026-08-09에 없앴다 — letters
+// 항목은 항상 고정 문구("팀이 함께 정리했어요")만 떴고, trend/column 항목은
+// admin이 카테고리를 안 채우면 "경제 이슈"/"칼럼" 같은 의미 없는 기본값만
+// 떴다. "모든 카테고리가 같은 조건으로 제목만 표출" 결정에 따라 전부 걷어냈다.
 export function buildArchiveItems(
   letters: CmsLetter[],
   cards: CmsTrendCard[],
@@ -41,16 +45,19 @@ export function buildArchiveItems(
     const date = letter.publish_date ?? '';
     const id = letter.id;
     const kind: Kind = letter.section === 'trend' || letter.section === 'column' ? letter.section : 'letter';
+    // 2026-08-09 — 썸네일·발췌 둘 다 카드용으로 이미 계산해주는 toTodayLetterCard
+    // (FollowingFeed 등이 쓰는 것과 같은 로직: subtitle 없으면 본문 첫 줄로
+    // 폴백, cover_image_url 없으면 썸네일 없음)를 그대로 재사용 — 로직 중복 방지.
+    const card = toTodayLetterCard(letter, date);
     return {
       key: `letter-${letter.id}`,
       kind,
       title: letter.headline,
-      excerpt: letter.subtitle ?? '',
+      excerpt: card.excerpt,
       date,
       accent: meta.accent,
       href: letterHref(id),
-      avatarUrl: null,
-      badgeLabel: meta.editorRole,
+      avatarUrl: card.thumbnailUrl,
     };
   });
 
@@ -63,7 +70,6 @@ export function buildArchiveItems(
     accent: c.section === 'trend' ? TREND_ACCENT : COLUMN_ACCENT,
     href: null,
     avatarUrl: null,
-    badgeLabel: c.category || (c.section === 'trend' ? '경제 이슈' : '칼럼'),
   }));
 
   const videoItems: ArchiveItem[] = videos.map((v) => ({
@@ -75,8 +81,7 @@ export function buildArchiveItems(
     accent: VIDEO_ACCENT,
     href: v.video_url || null,
     external: true,
-    avatarUrl: null,
-    badgeLabel: '영상',
+    avatarUrl: v.thumbnail_url || null,
   }));
 
   return [...letterItems, ...cardItems, ...videoItems].sort((a, b) => b.date.localeCompare(a.date));

@@ -15,6 +15,8 @@ import type {
   AiLetter,
   AiLetterInput,
   PresignResponse,
+  Quiz,
+  QuizInput,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -227,6 +229,39 @@ export const adminApi = {
     }),
   deletePost: (id: string) =>
     request<{ ok: boolean }>(`/admin/posts/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+
+  // 용어 퀴즈 — posts.* 와 같은 모양(list/get/create/update/publish/unpublish/delete).
+  listQuiz: (params?: { status?: string; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return request<{ quiz: Quiz[]; count: number }>(`/admin/quiz${suffix}`);
+  },
+  getQuiz: (id: string) =>
+    request<{ quiz: Quiz }>(`/admin/quiz/${encodeURIComponent(id)}`),
+  createQuiz: (input: QuizInput) =>
+    request<{ quiz: Quiz }>("/admin/quiz", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateQuiz: (id: string, input: QuizInput) =>
+    request<{ quiz: Quiz }>(`/admin/quiz/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+  publishQuiz: (id: string) =>
+    request<{ quiz: Quiz }>(`/admin/quiz/${encodeURIComponent(id)}/publish`, {
+      method: "POST",
+    }),
+  unpublishQuiz: (id: string) =>
+    request<{ quiz: Quiz }>(`/admin/quiz/${encodeURIComponent(id)}/unpublish`, {
+      method: "POST",
+    }),
+  deleteQuiz: (id: string) =>
+    request<{ ok: boolean }>(`/admin/quiz/${encodeURIComponent(id)}`, {
       method: "DELETE",
     }),
 

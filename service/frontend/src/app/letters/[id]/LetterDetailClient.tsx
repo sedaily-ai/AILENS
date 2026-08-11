@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { EditorCommentsSection } from '@/features/news-feed/components/EditorCommentsSection';
-import { CompletionCheer } from '@/features/news-feed/components/CompletionCheer';
 import { SideRail } from '@/features/news-feed/components/SideRail';
 import { InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed/components/InteractiveBlock';
 import { trackEvent } from '@/shared/lib/trackEvent';
@@ -182,14 +181,9 @@ export function LetterDetailClient({ letterId, initialLetter = null }: Props) {
           </div>
         </div>
 
-        <div id="letter-feedback" style={{ scrollMarginTop: 80 }}>
-          <LetterFeedback letter={letter} />
-        </div>
-
         <div id="letter-other-lens" style={{ scrollMarginTop: 80 }}>
           <EditorCommentsSection otherLetters={otherLetters} />
         </div>
-        <CompletionCheer />
       </main>
 
       <div className="h-24" />
@@ -214,6 +208,33 @@ function decodeHtmlEntities(s: string): string {
   const ta = document.createElement('textarea');
   ta.innerHTML = s;
   return ta.value;
+}
+
+// admin 에디터가 저장하는 이미지는 <img alt="..."> 한 줄뿐이다(에디터
+// 재로딩 시 스키마 불일치를 피하려고 저장 형태 자체는 손대지 않음 —
+// admin/frontend/src/components/resizableImageExtension.tsx 참고). alt를
+// 실제로 사진 밑 캡션처럼 보여주는 건 "읽는 화면"의 몫이라, alt가 있는
+// 이미지를 렌더 시점에만 <figure>+<figcaption>으로 감싼다(네이버 블로그
+// 참고 — admin 미리보기 모달과 같은 방식).
+function injectImageCaptions(html: string): string {
+  if (typeof document === 'undefined' || !html) return html;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('img[alt]').forEach((img) => {
+    const alt = img.getAttribute('alt');
+    if (!alt?.trim() || img.parentElement?.tagName === 'FIGURE') return;
+    const figure = doc.createElement('figure');
+    figure.setAttribute('style', 'margin:0;');
+    img.replaceWith(figure);
+    figure.appendChild(img);
+    const caption = doc.createElement('figcaption');
+    caption.textContent = alt;
+    caption.setAttribute(
+      'style',
+      'margin-top:8px;font-size:12.5px;font-style:italic;color:#9ca3af;text-align:center;',
+    );
+    figure.appendChild(caption);
+  });
+  return doc.body.innerHTML;
 }
 
 function splitBodyHtml(html: string): BodyHtmlPart[] {
@@ -287,11 +308,8 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
         >
           {letter.editorName}
         </div>
-        {letter.archetype && (
-          <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 8px', fontStyle: 'italic' }}>
-            {letter.archetype}
-          </p>
-        )}
+        {/* 역할 라벨(archetype) 제거(2026-08-09) — "모든 카테고리가 같은 조건"으로
+            에디터 이름 배지 아래 부가 설명 없이 바로 제목. */}
         <h1
           style={{
             fontFamily: '"Noto Serif KR", serif',
@@ -329,7 +347,7 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
                 <div
                   key={`h-${i}`}
                   className="prose prose-neutral max-w-none prose-headings:font-bold prose-img:rounded-2xl prose-p:leading-[1.9]"
-                  dangerouslySetInnerHTML={{ __html: part.content }}
+                  dangerouslySetInnerHTML={{ __html: injectImageCaptions(part.content) }}
                 />
               ) : (
                 <InteractiveBlock key={`q-${i}`} data={part.data} />
@@ -806,7 +824,7 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
               단어
             </p>
             <Link href="/words" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>
-              전체 단어장 보기 →
+              전체 용어 해설 보기 →
             </Link>
           </div>
           {letter.keywords.map((kw, i) => (
@@ -1354,500 +1372,6 @@ function LetterBlock({
     >
       {wrap(t)}
     </p>
-  );
-}
-
-// ── 한 통 피드백 카드 캐러셀 ────────────────────────────────────────
-// 본문 다음에 표시 — 6개 질문을 카드뉴스 패턴으로 넘겨가며 답함.
-// 각 답변 즉시 GA4 letter_feedback_answer 이벤트, 완료 시 letter_feedback_complete.
-// localStorage 로 letter 별 완료 상태 기억 (다시 응답하기 링크로 재제출 가능).
-
-type FeedbackQuestion =
-  | { type: 'star'; id: string; prompt: string }
-  | { type: 'choice'; id: string; prompt: string; options: string[] }
-  | { type: 'multi'; id: string; prompt: string; options: string[] }
-  | { type: 'nps'; id: string; prompt: string; lowLabel: string; highLabel: string }
-  | { type: 'text'; id: string; prompt: string; placeholder: string };
-
-const FEEDBACK_QUESTIONS: FeedbackQuestion[] = [
-  { type: 'star', id: 'satisfaction', prompt: '이번 한 통, 어떠셨어요?' },
-  { type: 'choice', id: 'length', prompt: '길이는 어땠나요?', options: ['짧아요', '딱 적당해요', '길어요'] },
-  { type: 'choice', id: 'difficulty', prompt: '내용 난이도는?', options: ['쉬워요', '딱 적당해요', '어려워요'] },
-  {
-    type: 'multi',
-    id: 'useful_section',
-    prompt: '가장 유익했던 부분은? (여러 개 가능)',
-    options: ['헤드라인', '본문 해설', '핵심 정리', 'Q&A FAQ', '닫는 줄', '용어 툴팁'],
-  },
-  {
-    type: 'nps',
-    id: 'nps',
-    prompt: '친구에게 추천할 의향은?',
-    lowLabel: '전혀 X',
-    highLabel: '꼭 추천',
-  },
-  {
-    type: 'text',
-    id: 'free',
-    prompt: '한 줄 의견이 있다면?',
-    placeholder: '편하게 적어주세요. 여러분의 한 줄이 다음 한 통을 만듭니다.',
-  },
-];
-
-function LetterFeedback({ letter }: { letter: DisplayLetter }) {
-  const STORAGE_KEY = `letter-feedback-${letter.id}`;
-  const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as { answers?: Record<string, unknown> };
-      if (parsed.answers) {
-        setAnswers(parsed.answers);
-        setDone(true);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [STORAGE_KEY]);
-
-  const total = FEEDBACK_QUESTIONS.length;
-  const current = FEEDBACK_QUESTIONS[step];
-  const lastStep = step === total - 1;
-  const currentAnswer = answers[current.id];
-  const hasAnswer = (() => {
-    if (currentAnswer === undefined || currentAnswer === null) return false;
-    if (typeof currentAnswer === 'string') return currentAnswer.length > 0;
-    if (Array.isArray(currentAnswer)) return currentAnswer.length > 0;
-    if (typeof currentAnswer === 'number') return true;
-    return true;
-  })();
-
-  const setAnswer = (val: unknown) => {
-    setAnswers((prev) => ({ ...prev, [current.id]: val }));
-    trackEvent('letter_feedback_answer', {
-      letter_id: letter.id,
-      question_id: current.id,
-      answer: typeof val === 'string' || typeof val === 'number' ? val : JSON.stringify(val),
-    });
-  };
-
-  const submit = (final: Record<string, unknown>) => {
-    const flat: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(final)) {
-      flat[`a_${k}`] = typeof v === 'string' || typeof v === 'number' ? v : JSON.stringify(v);
-    }
-    trackEvent('letter_feedback_complete', {
-      letter_id: letter.id,
-      editor: letter.editorName,
-      answered_count: Object.keys(final).length,
-      total_questions: total,
-      ...flat,
-    });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers: final, ts: Date.now() }));
-    }
-    setDone(true);
-  };
-
-  const goNext = () => {
-    if (!lastStep) setStep(step + 1);
-    else submit(answers);
-  };
-  const goBack = () => {
-    if (step > 0) setStep(step - 1);
-  };
-  const skip = () => {
-    if (!lastStep) setStep(step + 1);
-    else submit(answers);
-  };
-
-  const reset = () => {
-    if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY);
-    setAnswers({});
-    setStep(0);
-    setDone(false);
-  };
-
-  if (done) {
-    return (
-      <section
-        aria-labelledby={`feedback-${letter.id}`}
-        style={{ maxWidth: 720, margin: '32px auto 0', padding: '0 clamp(22px, 5vw, 32px)' }}
-      >
-        <div
-          style={{
-            padding: 'clamp(24px, 4vw, 32px) clamp(22px, 4vw, 28px)',
-            background: '#fafafa',
-            borderRadius: 16,
-            textAlign: 'center',
-          }}
-        >
-          <p
-            id={`feedback-${letter.id}`}
-            style={{
-              fontFamily: '"Noto Serif KR", serif',
-              fontSize: 17,
-              fontWeight: 700,
-              color: '#111827',
-              margin: '0 0 8px',
-            }}
-          >
-            감사합니다. 다음 한 통을 더 단단하게 만들겠습니다.
-          </p>
-          <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
-            {Object.keys(answers).length}개 응답이 기록됐어요.
-          </p>
-          <button
-            type="button"
-            onClick={reset}
-            style={{
-              marginTop: 12,
-              background: 'transparent',
-              border: 'none',
-              color: '#6b7280',
-              fontSize: 12,
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              padding: 0,
-            }}
-          >
-            다시 응답하기
-          </button>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section
-      aria-labelledby={`feedback-${letter.id}`}
-      style={{ maxWidth: 720, margin: '32px auto 0', padding: '0 clamp(22px, 5vw, 32px)' }}
-    >
-      <div
-        style={{
-          padding: 'clamp(22px, 4vw, 28px) clamp(20px, 4vw, 28px) clamp(18px, 3vw, 22px)',
-          background: '#fafafa',
-          borderRadius: 16,
-        }}
-      >
-        {/* 진행 도트 + 카운터 */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 18,
-          }}
-        >
-          <div style={{ display: 'flex', gap: 6 }}>
-            {FEEDBACK_QUESTIONS.map((_, i) => (
-              <span
-                key={i}
-                aria-hidden
-                style={{
-                  width: i === step ? 18 : 6,
-                  height: 6,
-                  borderRadius: 3,
-                  background: i <= step ? letter.accent : '#e5e7eb',
-                  transition: 'width 0.18s, background 0.18s',
-                }}
-              />
-            ))}
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>
-            {step + 1} / {total}
-          </span>
-        </div>
-
-        {/* 질문 본문 */}
-        <div style={{ minHeight: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <p
-            id={`feedback-${letter.id}`}
-            style={{
-              fontFamily: '"Noto Serif KR", serif',
-              fontSize: 'clamp(17px, 3.2vw, 19px)',
-              fontWeight: 700,
-              color: '#111827',
-              textAlign: 'center',
-              margin: '0 0 18px',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {current.prompt}
-          </p>
-          <QuestionAnswer
-            question={current}
-            answer={currentAnswer}
-            onAnswer={setAnswer}
-            accent={letter.accent}
-          />
-        </div>
-
-        {/* 네비게이션 */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: 20,
-          }}
-        >
-          <button
-            type="button"
-            onClick={goBack}
-            disabled={step === 0}
-            aria-label="이전"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '8px 10px',
-              cursor: step === 0 ? 'default' : 'pointer',
-              color: step === 0 ? '#e5e7eb' : '#6b7280',
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            ← 이전
-          </button>
-          <button
-            type="button"
-            onClick={skip}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '8px 10px',
-              cursor: 'pointer',
-              color: '#9ca3af',
-              fontSize: 12,
-              fontWeight: 500,
-            }}
-          >
-            건너뛰기
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={!hasAnswer && !lastStep && current.type !== 'text'}
-            style={{
-              background: hasAnswer || current.type === 'text' ? letter.accent : '#d1d5db',
-              color: '#fff',
-              border: 'none',
-              padding: '9px 18px',
-              borderRadius: 10,
-              cursor: hasAnswer || current.type === 'text' ? 'pointer' : 'default',
-              fontSize: 13,
-              fontWeight: 700,
-              transition: 'background 0.15s',
-            }}
-          >
-            {lastStep ? '보내기 ✓' : '다음 →'}
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function QuestionAnswer({
-  question,
-  answer,
-  onAnswer,
-  accent,
-}: {
-  question: FeedbackQuestion;
-  answer: unknown;
-  onAnswer: (v: unknown) => void;
-  accent: string;
-}) {
-  if (question.type === 'star') {
-    const value = (answer as number) ?? 0;
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <button
-            key={i}
-            type="button"
-            aria-label={`${i}점`}
-            onClick={() => onAnswer(i)}
-            style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer' }}
-          >
-            <Star filled={i <= value} accent={accent} size={32} />
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  if (question.type === 'choice') {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {question.options.map((opt) => {
-          const on = answer === opt;
-          return (
-            <button
-              key={opt}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onAnswer(opt)}
-              style={{
-                background: on ? accent : '#fff',
-                color: on ? '#fff' : '#374151',
-                border: `1px solid ${on ? accent : '#e5e7eb'}`,
-                padding: '10px 18px',
-                borderRadius: 999,
-                cursor: 'pointer',
-                fontSize: 13.5,
-                fontWeight: on ? 700 : 500,
-                transition: 'all 0.15s',
-              }}
-            >
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
-  if (question.type === 'multi') {
-    const arr = (answer as string[]) ?? [];
-    const toggle = (opt: string) => {
-      onAnswer(arr.includes(opt) ? arr.filter((x) => x !== opt) : [...arr, opt]);
-    };
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {question.options.map((opt) => {
-          const on = arr.includes(opt);
-          return (
-            <button
-              key={opt}
-              type="button"
-              aria-pressed={on}
-              onClick={() => toggle(opt)}
-              style={{
-                background: on ? accent : '#fff',
-                color: on ? '#fff' : '#374151',
-                border: `1px solid ${on ? accent : '#e5e7eb'}`,
-                padding: '8px 14px',
-                borderRadius: 999,
-                cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: on ? 700 : 500,
-                transition: 'all 0.15s',
-              }}
-            >
-              {on ? '✓ ' : ''}
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
-  if (question.type === 'nps') {
-    const value = (answer as number) ?? -1;
-    return (
-      <div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(11, 1fr)',
-            gap: 4,
-            maxWidth: 440,
-            margin: '0 auto',
-          }}
-        >
-          {Array.from({ length: 11 }, (_, i) => {
-            const on = i === value;
-            return (
-              <button
-                key={i}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onAnswer(i)}
-                style={{
-                  aspectRatio: '1',
-                  background: on ? accent : '#fff',
-                  color: on ? '#fff' : '#374151',
-                  border: `1px solid ${on ? accent : '#e5e7eb'}`,
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: on ? 700 : 500,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {i}
-              </button>
-            );
-          })}
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            maxWidth: 440,
-            margin: '8px auto 0',
-            fontSize: 11,
-            color: '#9ca3af',
-          }}
-        >
-          <span>0 — {question.lowLabel}</span>
-          <span>{question.highLabel} — 10</span>
-        </div>
-      </div>
-    );
-  }
-
-  // text
-  return (
-    <textarea
-      value={(answer as string) ?? ''}
-      onChange={(e) => onAnswer(e.target.value)}
-      placeholder={question.placeholder}
-      maxLength={200}
-      rows={3}
-      style={{
-        width: '100%',
-        maxWidth: 440,
-        margin: '0 auto',
-        display: 'block',
-        padding: '12px 14px',
-        fontSize: 13.5,
-        color: '#111827',
-        background: '#fff',
-        border: '1px solid #e5e7eb',
-        borderRadius: 10,
-        outline: 'none',
-        resize: 'none',
-        lineHeight: 1.6,
-        boxSizing: 'border-box',
-        fontFamily: 'inherit',
-      }}
-    />
-  );
-}
-
-function Star({ filled, accent, size = 20 }: { filled: boolean; accent: string; size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={filled ? accent : 'none'}
-      stroke={filled ? accent : '#d1d5db'}
-      strokeWidth={1.6}
-      strokeLinejoin="round"
-      style={{ transition: 'fill 0.12s, stroke 0.12s' }}
-    >
-      <path d="M12 2.5l2.95 6.5 7.05.75-5.3 4.85 1.55 6.9L12 17.9 5.75 21.5l1.55-6.9-5.3-4.85 7.05-.75L12 2.5z" />
-    </svg>
   );
 }
 

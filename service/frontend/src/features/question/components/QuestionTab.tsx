@@ -278,7 +278,7 @@ export function QuestionTab({ onSkip }: Props) {
           </Reveal>
           <Reveal delay={100}>
             <Link
-              href="/fortune"
+              href="/saju"
               className="block max-w-[520px] mx-auto group"
             >
               <div className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-amber-50 p-6 md:p-7 transition-all hover:shadow-[0_12px_40px_rgba(139,92,246,0.15)] hover:-translate-y-1">

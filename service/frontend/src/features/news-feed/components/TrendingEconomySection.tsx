@@ -142,7 +142,11 @@ export function TrendingEconomySection() {
         className="grid"
         style={{
           gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 240px))',
-          justifyContent: 'start',
+          // 2026-08-09 — 'start'였을 때 카드가 여러 개 꽉 차는 날에도 컨테이너
+          // 폭이 240px 배수가 아니면 오른쪽에 빈 여백이 그대로 남는 문제가
+          // 있었다(카드 1개일 때 안 커지게 하려던 240px 상한은 그대로 두고,
+          // 남는 폭만 카드 사이 간격으로 흡수해 마지막 카드가 끝까지 붙게 함).
+          justifyContent: 'space-between',
           gap: 'clamp(8px, 2vw, 14px)',
         }}
       >
