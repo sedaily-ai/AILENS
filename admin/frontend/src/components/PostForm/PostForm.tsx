@@ -6,6 +6,7 @@ import { PostMode } from "./PostMode";
 import { WebtoonMode } from "./WebtoonMode";
 import { VideoMode } from "./VideoMode";
 import { LetterMode } from "./LetterMode";
+import { LensMode } from "./LensMode";
 
 // 노출 채널 선택 UI는 뺐다 — "오늘의 1면"/"기사 피드"는 프론트가 아직 CMS 글을
 // 안 읽어서 실제로 아무 효과가 없었다(2026-08-04 확인). 모든 글은 유일하게
@@ -29,7 +30,7 @@ const EMPTY_BODY: CmsPostBody = {
 interface Props {
   value: CmsPostInput;
   onChange: (v: CmsPostInput) => void;
-  mode?: "post" | "letter" | "webtoon" | "video";
+  mode?: "post" | "letter" | "webtoon" | "video" | "lens";
   /** mode="post" 전용 — 리치텍스트 에디터 인스턴스. 툴바를 페이지 최상단에
    * 따로 두려고(2026-08-09) 페이지가 useRichTextEditor로 만들어 내려준다.
    * Tiptap의 useEditor는 초기화 전 null을 준다. */
@@ -51,5 +52,6 @@ export function PostForm({ value, onChange, mode = "post", editor, uploadError }
   }
   if (mode === "webtoon") return <WebtoonMode {...modeProps} />;
   if (mode === "video") return <VideoMode {...modeProps} />;
+  if (mode === "lens") return <LensMode {...modeProps} />;
   return <LetterMode {...modeProps} />;
 }

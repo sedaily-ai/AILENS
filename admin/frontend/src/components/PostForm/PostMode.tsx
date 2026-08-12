@@ -52,10 +52,12 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
             <CustomSelect
               value={body.section ?? ""}
               onChange={(v) => patchBody({ section: (v || undefined) as "trend" | "column" | "glossary" | undefined })}
+              // 워딩은 공개 사이트 나브 라벨과 동일하게 맞춘다(2026-08-12,
+              // posts/page.tsx CHANNEL_FILTERS 주석 참조).
               options={[
                 { value: "", label: "오늘의 이슈" },
-                { value: "trend", label: "머니 트렌드" },
-                { value: "column", label: "깊은 이야기" },
+                { value: "trend", label: "딥다이브" },
+                { value: "column", label: "인사이트" },
                 { value: "glossary", label: "용어 해설" },
               ]}
             />

@@ -15,12 +15,12 @@ import type { CmsPost } from "@/lib/types";
 // 일괄 "분류 변경" 대상 — channels 자체(레터↔웹툰/영상)는 PostForm에서도
 // 생성 후엔 못 바꾸게 막아뒀다(엉뚱한 채널로 이미 발행된 글이 옮겨가는 사고
 // 방지) — 그래서 일괄 이동도 같은 channels:["letters"] 안에서 section만
-// 바꾸는 오늘의 이슈/머니 트렌드/깊은 이야기 세 곳으로만 한정한다. 워딩은
-// PostMode.tsx의 분류 드롭다운과 동일(2026-08-09 정리).
+// 바꾸는 오늘의 이슈/딥다이브/인사이트 세 곳으로만 한정한다. 워딩은
+// PostMode.tsx의 분류 드롭다운과 동일(2026-08-12 갱신, 아래 참조).
 const BULK_MOVE_TARGETS: Array<{ section: "" | "trend" | "column" | "glossary"; label: string }> = [
   { section: "", label: "오늘의 이슈" },
-  { section: "trend", label: "머니 트렌드" },
-  { section: "column", label: "깊은 이야기" },
+  { section: "trend", label: "딥다이브" },
+  { section: "column", label: "인사이트" },
   { section: "glossary", label: "용어 해설" },
 ];
 
@@ -28,8 +28,11 @@ const BULK_MOVE_TARGETS: Array<{ section: "" | "trend" | "column" | "glossary"; 
 // 스펙상 허용), 실제 발행 흐름은 항상 단일 채널로 고정한다(PostForm 참조) —
 // 필터도 그 전제로 단순하게 간다.
 //
-// 탭 라벨은 공개 사이트 섹션 워딩과 동일하게 맞춘다(2026-08-09 정리 —
-// 오늘의 이슈/머니 트렌드/깊은 이야기, PostMode.tsx 분류 드롭다운과 짝).
+// 탭 라벨은 공개 사이트 섹션 워딩과 동일하게 맞춘다(2026-08-12 갱신 —
+// 공개 사이트 나브가 레터/트렌드/칼럼 → 브리핑/딥다이브/인사이트로
+// 바뀌면서, channel=letters 기본값(section 없음)에 대응하는 "오늘의 이슈"는
+// 그대로 두고 트렌드/칼럼만 딥다이브/인사이트로 교체. PostMode.tsx
+// 분류 드롭다운과 짝 — headerTabs.ts 주석에 전체 경위 있음).
 //
 // 웹툰/영상은 2026-08-09에 이 목록으로 잠깐 합쳤다가 같은 날 다시 뺐다 —
 // 합쳐두니 "새 글 쓰기"를 누를 때마다 종류를 또 골라야 해서 오히려
@@ -39,8 +42,8 @@ const BULK_MOVE_TARGETS: Array<{ section: "" | "trend" | "column" | "glossary"; 
 const CHANNEL_FILTERS: Array<{ key: string; label: string }> = [
   { key: "", label: "전체" },
   { key: "letters", label: "오늘의 이슈" },
-  { key: "trend", label: "머니 트렌드" },
-  { key: "column", label: "깊은 이야기" },
+  { key: "trend", label: "딥다이브" },
+  { key: "column", label: "인사이트" },
   { key: "glossary", label: "용어 해설" },
 ];
 

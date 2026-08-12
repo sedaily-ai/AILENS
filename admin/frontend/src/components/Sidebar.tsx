@@ -57,6 +57,13 @@ const IconVideo = svg(
     <path d="m22 8-6 4 6 4Z" />
   </>
 );
+const IconLens = svg(
+  <>
+    <circle cx="12" cy="12" r="7" />
+    <circle cx="12" cy="12" r="2.6" />
+    <path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21" />
+  </>
+);
 const IconQuiz = svg(
   <>
     <circle cx="12" cy="12" r="9" />
@@ -116,6 +123,9 @@ const MENU_GROUPS: MenuGroup[] = [
       // 캔버스에 끼워둘 이유도 없었다(2026-08-09 최초 분리 때의 이유).
       { label: "웹툰", href: "/webtoon", Icon: IconWebtoon },
       { label: "영상", href: "/video", Icon: IconVideo },
+      // "오늘의 이슈, 4가지 시선"(2026-08-12) — Instagram @ailens 카드뉴스
+      // 포맷을 웹으로. 웹툰/영상과 같은 이유로 독립 메뉴.
+      { label: "4가지 시선", href: "/lens", Icon: IconLens },
       // 홈 화면 "오늘의 단어 퀴즈" CMS 직접 출제(2026-08-09) — 별도 독립
       // 콘텐츠 타입(term/explain만, CmsPost 아님).
       { label: "퀴즈", href: "/quiz", Icon: IconQuiz },

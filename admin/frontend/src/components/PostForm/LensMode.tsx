@@ -1,0 +1,93 @@
+"use client";
+
+import { DatePickerField } from "@/components/DatePickerField";
+import { PostFormShell } from "./PostFormShell";
+import { MetaField } from "./MetaField";
+import { LABEL, type ModeProps } from "./shared";
+import { LineList } from "./LineList";
+import type { CmsLensItem } from "@/lib/types";
+
+// mode="lens" — "오늘의 이슈, 4가지 시선"(2026-08-12). Instagram @ailens
+// 카드뉴스 포맷(다크톤, "시선 ①~④" 고정 라벨 + Q&A + 불릿) 그대로 웹에
+// 옮긴다. 관리자가 직접 작성(퀴즈와 같은 이유로 AI 반자동화 없음) — 하루
+// 하나의 이슈를 원인이 궁금한 사람/사람이 먼저 보이는 사람/내 일이 걱정되는
+// 사람/숫자부터 찾는 사람, 4개 고정 렌즈로 훑는다. 라벨·순서는 고정이라
+// 관리자가 매번 새로 짓지 않고 질문+불릿만 채우면 된다.
+export const LENS_LABELS = [
+  "시선 ① — 원인이 궁금한 사람",
+  "시선 ② — 사람이 먼저 보이는 사람",
+  "시선 ③ — 내 일이 걱정되는 사람",
+  "시선 ④ — 숫자부터 찾는 사람",
+] as const;
+
+export const EMPTY_LENSES: CmsLensItem[] = LENS_LABELS.map((label) => ({
+  label,
+  question: "",
+  bullets: [],
+}));
+
+export function LensMode({ value, body, patch, patchBody }: ModeProps) {
+  const lenses = body.lenses && body.lenses.length === 4 ? body.lenses : EMPTY_LENSES;
+
+  const patchLens = (i: number, p: Partial<CmsLensItem>) => {
+    const next = lenses.map((l, idx) => (idx === i ? { ...l, ...p } : l));
+    patchBody({ lenses: next });
+  };
+
+  return (
+    <PostFormShell
+      className="space-y-3"
+      coverImage={{
+        value: value.cover_image_url ?? null,
+        onChange: (url) => patch({ cover_image_url: url }),
+        fallbackHint: "표지·시선 카드 배경으로 함께 쓰입니다.",
+      }}
+      headline={value.headline ?? ""}
+      onHeadlineChange={(v) => patch({ headline: v })}
+      headlinePlaceholder="예: 카카오뱅크 주담대 접수가 마감되기까지 걸린 시간"
+      subtitle={value.subtitle ?? ""}
+      onSubtitleChange={(v) => patch({ subtitle: v })}
+      subtitlePlaceholder="핵심요약 — 무슨 일이 있었는지 2~3문장으로"
+      subtitleRows={4}
+      metaRow={
+        <MetaField label="발행일">
+          <DatePickerField
+            value={value.publish_date ?? ""}
+            onChange={(v) => patch({ publish_date: v })}
+          />
+        </MetaField>
+      }
+    >
+      <div className="space-y-5 px-6 py-5">
+        <p className={LABEL}>
+          4가지 시선
+          <span className="ml-2 font-normal text-gray-500">
+            라벨·순서는 고정 — 질문(따옴표 안 문장)과 사실 불릿만 채우면 됩니다.
+          </span>
+        </p>
+        {lenses.map((lens, i) => (
+          <div key={lens.label} className="rounded-xl border border-gray-200 p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-900">{lens.label}</p>
+            <div>
+              <label className={LABEL}>질문</label>
+              <input
+                value={lens.question}
+                onChange={(e) => patchLens(i, { question: e.target.value })}
+                placeholder={i === 0 ? '예: "왜 갑자기 대출이 막혔지?"' : "그 시선이 궁금해할 질문 한 줄"}
+                className="ui-input w-full rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <LineList
+              label="사실 불릿"
+              hint="한 줄에 한 항목, 보통 3~4개"
+              items={lens.bullets}
+              onChange={(v) => patchLens(i, { bullets: v })}
+              rows={4}
+              placeholder={"1) 사실 하나\n2) 사실 둘"}
+            />
+          </div>
+        ))}
+      </div>
+    </PostFormShell>
+  );
+}

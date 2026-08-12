@@ -15,7 +15,7 @@ from shared import audit, notify, response
 
 logger = logging.getLogger(__name__)
 
-_VALID_CHANNELS = {"letters", "paper", "feed", "trend_card", "webtoon", "video"}
+_VALID_CHANNELS = {"letters", "paper", "feed", "trend_card", "webtoon", "video", "lens"}
 # JWT 는 handler.py 가 이미 검증했다. 단일 관리자 계정이라 작성자는 고정값.
 _ACTOR = "admin"
 

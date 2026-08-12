@@ -84,7 +84,7 @@ export interface NewsletterSubscriber {
 
 // --- CMS posts (backend/admin/routes/posts.py 와 1:1) ---
 
-export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video";
+export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video" | "lens";
 // "용어 해설" — 오늘의 이슈/머니 트렌드/깊은 이야기와 같은 방식의 분류.
 export type CmsCardSection = "trend" | "column" | "glossary";
 export type CmsStatus = "draft" | "published" | "archived";
@@ -115,6 +115,17 @@ export interface CmsPostBody {
   category?: string;
   // channels: ["video"] 글만 씀 — YouTube 등 외부 임베드 URL 원문 그대로.
   video_url?: string;
+  // channels: ["lens"] 글만 씀 — "오늘의 이슈, 4가지 시선"(2026-08-12).
+  // 하루 한 이슈를 원인/사람/내 일/숫자, 4개 고정 렌즈로 훑는다. 핵심요약은
+  // 별도 필드 없이 기존 subtitle(모든 채널 공용 "요약" 필드)을 그대로 쓴다 —
+  // lenses는 항상 4개(LENS_LABELS 순서 고정).
+  lenses?: CmsLensItem[];
+}
+
+export interface CmsLensItem {
+  label: string;
+  question: string;
+  bullets: string[];
 }
 
 export interface CmsPost {
