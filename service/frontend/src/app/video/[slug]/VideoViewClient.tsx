@@ -38,7 +38,7 @@ export function VideoViewClient({
   if (!slug || video === null) {
     return (
       <div className="min-h-screen bg-white">
-        <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
+        <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('video')} frosted />
         <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center text-neutral-500">
           <p>영상을 찾을 수 없어요.</p>
@@ -54,7 +54,7 @@ export function VideoViewClient({
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
+      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('video')} frosted />
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {video === undefined && (

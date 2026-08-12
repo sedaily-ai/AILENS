@@ -113,7 +113,11 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
     inLanguage: 'ko-KR',
     author: {
       '@type': 'Organization',
-      name: 'AI LENS',
+      name: 'AI LENS 편집팀',
+      description:
+        '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+      url: `${SITE_URL}/about`,
+      parentOrganization: { '@id': `${SITE_URL}/#organization` },
     },
     publisher: { '@id': `${SITE_URL}/#organization` },
     image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },

@@ -29,7 +29,7 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
+      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('video')} frosted />
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main style={{ maxWidth: 960, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 80px' }}>

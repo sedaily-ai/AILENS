@@ -5,6 +5,9 @@
 
 export type HeaderTabKey =
   | 'feed'
+  | 'trend'
+  | 'column'
+  | 'video'
   | 'fortune'
   | 'timeline'
   | 'games'
@@ -40,7 +43,18 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 홈(오늘의 피드)이 아니라 전체 레터 모음(/letters)으로 간다 — 2026-08-06
     // 이전엔 '/'였는데, 사용자가 "레터 탭 = 레터들이 모인 곳"으로 기대해서 바꿨다.
     // 홈으로 돌아가는 길은 로고 클릭.
-    { key: 'feed', label: '레터', href: '/letters', active: active === 'feed' },
+    //
+    // 라벨 워딩 개편(2026-08-12) — "레터/트렌드/칼럼"이 서로 다른 축(형식 vs
+    // 장르)으로 이름 붙어 있어 나란히 두면 뭐가 다른지 헷갈린다는 지적.
+    // "브리핑/딥다이브/인사이트"로 통일 — 셋 다 "이 글이 어떤 성격인지"를
+    // 말하는 축(빠른 요약/깊은 분석/개인 관점)으로 맞췄고, 폴인·어피티 같은
+    // 경제 콘텐츠 플랫폼에서 이미 통용되는 단어라 가볍지 않으면서 트렌디함도
+    // 챙긴다. URL(key/href)은 그대로 — SEO(캐노니컬·sitemap)에 영향 없음,
+    // 화면에 보이는 한글 라벨만 바뀐다.
+    { key: 'feed', label: '브리핑', href: '/letters', active: active === 'feed' },
+    { key: 'trend', label: '딥다이브', href: '/trend', active: active === 'trend', tier: 'extra' },
+    { key: 'column', label: '인사이트', href: '/column', active: active === 'column', tier: 'extra' },
+    { key: 'video', label: '영상', href: '/video', active: active === 'video', tier: 'extra' },
     // '내 서랍' 탭도 네비게이션에서 제거(2026-08-06) — 커뮤니티 대체로
     // "오늘의 한 문장 + 다른 사람들이 담은 문장 + 내 문장" 3단 구조까지
     // 만들었지만, 워딩(서랍→스크랩) 논의 끝에 상시 탭으로 노출하기보다

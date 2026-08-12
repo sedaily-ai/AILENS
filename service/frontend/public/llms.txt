@@ -11,22 +11,31 @@
 
 ## 콘텐츠 형식
 
-- 레터(오늘의 한 통): 원본 기사를 AI가 정리·재구성한 경제 브리핑. 텍스트/팟캐스트(오디오) 둘 다 제공.
-- 트렌드 카드, 인기 칼럼: 가벼운 요약 카드.
-- 웹툰: 그날의 경제 이슈를 컷으로 정리.
-- 단어장: 레터에 나온 경제 용어 모음 + 퀴즈.
-- 사주: 명리학 기반 오늘의 운세·궁합(재미/참고용 — 뉴스 콘텐츠와 별개).
+- 브리핑(레터, /letters): 원본 기사를 AI가 정리·재구성한 매일자 경제 브리핑 한 통.
+- 딥다이브(/trend): 같은 사실 하나를 놓고 네 가지 관점으로 깊이 파고드는 경제 이슈 분석.
+- 인사이트(/column): 관점 있는 시선으로 짚는 경제 오피니언·칼럼.
+- 영상(/video): 경제·사회 이슈를 짧은 영상으로 정리.
+- 웹툰(/webtoon): 그날의 경제 이슈를 흑백 펜화 컷으로 정리.
+- 단어장(/words): 브리핑에 나온 경제 용어 모음 + 퀴즈.
+- 게임(/games): 가볍게 즐기는 H5 미니게임.
+- 사주(/saju): 명리학 기반 오늘의 운세·궁합(재미/참고용 — 뉴스 콘텐츠와 별개, 외부 서비스 CDN 마운트).
 
 ## 주요 페이지
 
 - 메인 피드: https://ailens.sedaily.ai/
-- 레터 아카이브(전체 목록): https://ailens.sedaily.ai/letters
-- 레터 상세: https://ailens.sedaily.ai/letters/{slug} (슬러그는 발행일+제목, 예: /letters/2026-08-07-신용점수-700점대인데-왜-대부업-문을-두드릴까요)
+- 서비스 소개: https://ailens.sedaily.ai/onboarding
+- 브리핑(레터) 아카이브: https://ailens.sedaily.ai/letters
+- 브리핑 상세: https://ailens.sedaily.ai/letters/{slug} (슬러그는 발행일+제목, 예: /letters/2026-08-07-신용점수-700점대인데-왜-대부업-문을-두드릴까요)
+- 딥다이브 아카이브: https://ailens.sedaily.ai/trend
+- 인사이트 아카이브: https://ailens.sedaily.ai/column
+- 영상 목록: https://ailens.sedaily.ai/video
+- 영상 상세: https://ailens.sedaily.ai/video/{id}
+- 전체 콘텐츠(브리핑+딥다이브+인사이트+영상 통합): https://ailens.sedaily.ai/archive
 - 웹툰 목록: https://ailens.sedaily.ai/webtoon
 - 웹툰 상세: https://ailens.sedaily.ai/webtoon/{slug}
 - 단어장: https://ailens.sedaily.ai/words
-- 사주 풀이: https://ailens.sedaily.ai/fortune
-- 사주 궁합(이상형 역산 + 커플 궁합): https://ailens.sedaily.ai/saju-match
+- 게임: https://ailens.sedaily.ai/games
+- 사주 풀이(외부 서비스 마운트): https://ailens.sedaily.ai/saju
 - 타임머신(과거 그날의 신문): https://ailens.sedaily.ai/timemachine
 - 실시간 뉴스 타임라인: https://ailens.sedaily.ai/timeline
 - 회사소개: https://ailens.sedaily.ai/about
@@ -34,7 +43,7 @@
 
 ## 뉴스레터
 
-레터 상세 페이지 하단에서 이메일만 입력하면 바로 구독할 수 있다(별도 구독 전용 페이지 없음).
+브리핑(레터) 상세 페이지 하단에서 이메일만 입력하면 바로 구독할 수 있다(별도 구독 전용 페이지 없음).
 
 ## RSS
 
@@ -45,6 +54,7 @@
 - 서울경제신문은 1960년 창간된 한국 최초의 경제 전문지 (사업자등록번호 208-81-10310)
 - WAN-IFRA Digital Media Awards APAC 2026 — Best AI-driven News Product 부문 Gold(AI LENS)
 - AI가 생성한 콘텐츠임을 명시하고, 명리학과 결합한 사주 서비스도 같은 방식으로 고지
+- 모든 브리핑·딥다이브·인사이트·영상·웹툰은 서울경제신문 기자가 취재한 원본 기사를 바탕으로 AI가 초안을 작성하고 편집팀이 검수해 발행
 - 상세: https://ailens.sedaily.ai/about
 
 ## 연락

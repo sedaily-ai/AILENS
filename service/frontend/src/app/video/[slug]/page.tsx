@@ -87,6 +87,14 @@ function buildJsonLd(video: CmsVideo, slug: string) {
     uploadDate: published,
     inLanguage: 'ko-KR',
     embedUrl: resolved?.embedUrl,
+    author: {
+      '@type': 'Organization',
+      name: 'AI LENS 편집팀',
+      description:
+        '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+      url: `${SITE_URL}/about`,
+      parentOrganization: { '@id': `${SITE_URL}/#organization` },
+    },
     publisher: { '@id': `${SITE_URL}/#organization` },
     isFamilyFriendly: true,
   };

@@ -5,12 +5,13 @@ import { VideoListClient } from './VideoListClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
 const TITLE = '영상으로 보는 이슈';
-const DESCRIPTION = '서울경제 AI LENS가 요즘 경제·사회 이슈를 짧은 영상으로 정리해드려요.';
+const DESCRIPTION = '서울경제 AI LENS가 요즘 경제·사회 이슈를 짧은 영상으로 정리해드려요. 글로 읽기 부담스러운 경제 뉴스도 영상 한 편이면 충분합니다.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  keywords: ['영상', '뉴스 영상', '경제 뉴스 영상', 'AI LENS', '서울경제'],
+  // GEO 감사(2026-08-12, letters/page.tsx 주석 참조) — 키워드 커버리지 확장.
+  keywords: ['영상', '뉴스 영상', '경제 뉴스 영상', '숏폼 뉴스', '경제 유튜브', '시사 영상', 'AI LENS', '서울경제'],
   alternates: { canonical: `${SITE_URL}/video` },
   openGraph: {
     title: TITLE,
@@ -41,9 +42,17 @@ function buildJsonLd(items: CmsVideo[]) {
     url: `${SITE_URL}/video`,
     name: TITLE,
     description: DESCRIPTION,
+    keywords: '영상, 뉴스 영상, 경제 뉴스 영상, 숏폼 뉴스, 경제 유튜브, 시사 영상, 서울경제',
     inLanguage: 'ko-KR',
     isPartOf: { '@id': `${SITE_URL}/#website` },
     publisher: { '@id': `${SITE_URL}/#organization` },
+    author: {
+      '@type': 'Organization',
+      name: 'AI LENS 편집팀',
+      description: '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+      url: `${SITE_URL}/about`,
+      parentOrganization: { '@id': `${SITE_URL}/#organization` },
+    },
     mainEntity: {
       '@type': 'ItemList',
       itemListElement: items.slice(0, 20).map((v, i) => {

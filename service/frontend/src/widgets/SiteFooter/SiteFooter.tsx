@@ -15,8 +15,11 @@
 // 실제 보이는 링크로도 노출(E-E-A-T).
 const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
   {
+    // AI LENS 자체 계정(2026-08-11) — 이전엔 서울경제 부계정(머니컷)이 걸려
+    // 있었는데, 이 푸터는 AI LENS 제품 페이지용이라 방문자와 가장 관련
+    // 있는 계정 하나만 보여주는 게 맞다(sameAs에는 머니컷도 그대로 남아있음).
     label: 'Instagram',
-    href: 'https://www.instagram.com/moneycut_._/',
+    href: 'https://www.instagram.com/ailens.sedaily/',
     icon: (
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="3" y="3" width="18" height="18" rx="5" />
@@ -89,11 +92,31 @@ const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
   },
 ];
 
+// '서비스 소개'(/onboarding, "AI가 매일 아침 그날의 경제 뉴스를 정리해 한 통으로
+// 전합니다")는 헤더 상시 노출은 2026-08-06에 의도적으로 뺐지만(위 Header.tsx
+// 주석 참조 — 참고 서비스 7곳 중 헤더에 상시 노출하는 곳이 없었음) 사이트
+// 어딘가엔 있어야 한다는 지적(2026-08-11)에 따라 푸터에 추가. '회사소개'
+// (/about, 발행처·E-E-A-T 공시)와는 다른 페이지 — 실제 "이 서비스가 뭐하는
+// 곳인지" 소개는 /onboarding, "누가 만들고 어떻게 운영하는지"는 /about.
 const NAV: { label: string; href: string }[] = [
+  { label: '서비스 소개', href: '/onboarding' },
   { label: '회사소개', href: '/about' },
   { label: '문의', href: '/contact' },
   { label: '이용약관', href: '/terms' },
   { label: '개인정보처리방침', href: '/privacy' },
+];
+
+// 콘텐츠 허브 링크(2026-08-12) — 모든 페이지 하단에 5개 콘텐츠 타입 페이지로
+// 가는 링크를 심어서, 크롤러가 어느 글에서 출발하든 몇 클릭 안에 전체
+// 콘텐츠 구조를 발견할 수 있게 한다(사이트맵과는 별개로 "실제 보이는
+// 링크"가 있어야 크롤 우선순위·내부 링크 가중치에 더 잘 잡힌다는 지적).
+const CONTENT_LINKS: { label: string; href: string }[] = [
+  { label: '브리핑', href: '/letters' },
+  { label: '딥다이브', href: '/trend' },
+  { label: '인사이트', href: '/column' },
+  { label: '영상', href: '/video' },
+  { label: '웹툰', href: '/webtoon' },
+  { label: '전체 콘텐츠', href: '/archive' },
 ];
 
 export function SiteFooter() {
@@ -139,6 +162,23 @@ export function SiteFooter() {
             ))}
           </div>
         </div>
+
+        {/* 콘텐츠 허브 링크 — 크롤러·독자가 어느 글에서 시작하든 전체 콘텐츠
+            구조를 몇 클릭 안에 발견할 수 있게(2026-08-12). */}
+        <nav
+          className="flex flex-wrap"
+          style={{ gap: '6px 16px', paddingBottom: 14, marginBottom: 14 }}
+        >
+          {CONTENT_LINKS.map((n) => (
+            <a
+              key={n.href}
+              href={n.href}
+              style={{ fontSize: 13, fontWeight: 600, color: '#374151', textDecoration: 'none' }}
+            >
+              {n.label}
+            </a>
+          ))}
+        </nav>
 
         {/* 정책/회사 링크 — en.sedaily.com footer와 동일 구성(About/Contact/Terms/Privacy) */}
         <nav

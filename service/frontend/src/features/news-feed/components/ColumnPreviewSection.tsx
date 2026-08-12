@@ -121,13 +121,15 @@ export function ColumnPreviewSection() {
           {/* 섹션 제목 타이포 통일(2026-08-06) — 홈 화면 섹션 제목을 전부
               Pretendard Bold로(웹툰만 튀어 보이던 문제). */}
           <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            이번 주 인기 칼럼
+            {/* 라벨 워딩 개편(2026-08-12) — "칼럼" → "인사이트", headerTabs.ts 주석 참조 */}
+            이번 주 인사이트
           </h2>
         </div>
         {/* "더보기 →" — 예전엔 경제 캘린더로 잘못 연결됐던 링크(위 파일 상단
-            주석 참조). /letters 전체 아카이브 페이지가 이미 있어 거기로. */}
+            주석 참조), 그 다음엔 통합 /letters 아카이브로. 콘텐츠 타입별
+            페이지 분리(2026-08-11)로 칼럼 전용 /column이 생겨 거기로. */}
         <Link
-          href="/letters"
+          href="/column"
           className="text-gray-500 hover:text-gray-900"
           style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >

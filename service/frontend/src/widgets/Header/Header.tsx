@@ -225,21 +225,13 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
             </Link>
           )}
 
-          {/* 데스크탑 탭 — core/extra 사이에 옅은 구분선 하나(2026-08-06,
-              탭이 많아 보인다는 피드백 — 드롭다운으로 숨기지 않고 무게로만 구분). */}
+          {/* 데스크탑 탭 — core/extra 구분선은 뺐다(2026-08-11) — 탭이 8개로
+              늘면서 "|" 하나로는 굳이 안 나눠도 된다는 피드백, 무게(굵기·색)
+              차이만으로 core/extra 구분은 그대로 유지. */}
           <nav className="hidden md:flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab, i) => {
-              const prevTier = tabs[i - 1]?.tier ?? 'core';
-              const showDivider = i > 0 && prevTier !== 'extra' && tab.tier === 'extra';
-              return (
-                <div key={tab.key} className="flex items-center">
-                  {showDivider && (
-                    <span aria-hidden className="mx-1.5 h-4 w-px bg-gray-200 flex-shrink-0" />
-                  )}
-                  <DesktopTab tab={tab} />
-                </div>
-              );
-            })}
+            {tabs.map((tab) => (
+              <DesktopTab key={tab.key} tab={tab} />
+            ))}
           </nav>
 
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">

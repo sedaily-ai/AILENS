@@ -200,11 +200,18 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
         datePublished: published,
         dateModified: published,
         inLanguage: 'ko-KR',
+        // ed.name('AI LENS')은 개인이 아니라 팀이라 Person이 아니라
+        // Organization으로 표시한다(GEO 감사 2026-08-11 — Person 타입에
+        // 팀 이름을 넣으면 지식그래프가 실존 인물로 오인). description·url은
+        // /about의 "AI가 돕고, 사람이 검수" 공개 문구와 동일하게 맞춰서
+        // AI 크롤러가 편집 프로세스를 정확히 인용할 수 있게 한다.
         author: {
-          '@type': 'Person',
-          name: ed.name,
-          jobTitle: ed.archetype,
-          worksFor: { '@type': 'Organization', name: '서울경제신문 AI LENS' },
+          '@type': 'Organization',
+          name: ed.archetype,
+          description:
+            '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+          url: `${SITE_URL}/about`,
+          parentOrganization: { '@id': `${SITE_URL}/#organization` },
         },
         publisher: { '@id': `${SITE_URL}/#organization` },
         image: imageObj,
@@ -218,7 +225,7 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '레터', item: `${SITE_URL}/letters` },
+          { '@type': 'ListItem', position: 2, name: '브리핑', item: `${SITE_URL}/letters` },
           { '@type': 'ListItem', position: 3, name: letter.headline, item: url },
         ],
       },

@@ -348,14 +348,24 @@ export function FeedPage({
           // 전체 레터 모음(/letters)으로 실제 이동 — 예전엔 in-page 탭 전환(버튼)이라
           // 눌러도 화면이 안 바뀌는 것처럼 보였다. 홈 피드로 돌아오는 길은 로고 클릭
           // (onLogo → setActiveTab("feed"))으로 그대로 유지.
-          { key: "feed", label: "레터", href: "/letters" },
+          { key: "feed", label: "브리핑", href: "/letters" },
+          // 콘텐츠 타입별 페이지 분리(2026-08-11, headerTabs.ts와 동일 항목) —
+          // 이 배열이 headerTabs.ts의 사본이라 거기 추가한 딥다이브/인사이트/영상도
+          // 여기 안 넣으면 홈에서만 안 보이는 불일치가 생긴다(바로 아래 사주
+          // 탭이 /fortune 옛 경로를 들고 있던 것도 같은 이유의 드리프트였음 —
+          // 겸사겸사 /saju로 바로잡음, 리다이렉트를 거치긴 하지만 정본이 아니었다).
+          // 라벨 워딩 개편(2026-08-12, headerTabs.ts 주석 참조) — 레터/트렌드/
+          // 칼럼 → 브리핑/딥다이브/인사이트로 통일, URL은 그대로.
+          { key: "trend", label: "딥다이브", href: "/trend", tier: "extra" },
+          { key: "column", label: "인사이트", href: "/column", tier: "extra" },
+          { key: "video", label: "영상", href: "/video", tier: "extra" },
           // '내 서랍' 탭 제거(2026-08-06, headerTabs.ts 주석 참조) — 페이지/저장
           // 기능 자체는 살아있고 activeTab === "archive" 렌더 분기도 그대로 둔다.
           // 탭이 많아 보인다는 피드백(2026-08-06) — 드롭다운 대신 tier:'extra'로
           // 무게만 낮춰 "본체 vs 덤" 구분(headerTabs.ts와 동일 원칙, 상세 주석 참조).
           // '에디터' 탭 제거(2026-08-06) — 페이지/구독 펀널은 그대로 살아있고
           // 온보딩 플로우에서 계속 링크된다(headerTabs.ts 주석 참조).
-          { key: "fortune", label: "사주", href: "/fortune", tier: "extra" },
+          { key: "fortune", label: "사주", href: "/saju", tier: "extra" },
           { key: "timeline", label: "타임라인", href: TIMELINE_HREF, tier: "extra" },
           { key: "games", label: "게임", href: "/games", tier: "extra" },
           { key: "webtoon", label: "웹툰", href: "/webtoon", tier: "extra" },
