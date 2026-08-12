@@ -10,7 +10,7 @@
 import { API_URL } from '@/shared/config/api';
 import type { ApiLetter } from './todayLettersApi';
 
-export type CmsChannel = 'letters' | 'paper' | 'feed' | 'trend_card' | 'webtoon' | 'video';
+export type CmsChannel = 'letters' | 'paper' | 'feed' | 'trend_card' | 'webtoon' | 'video' | 'lens';
 
 /** letters/feed 채널 응답은 ApiLetter 와 같은 모양 + is_cms 표식. */
 export type CmsLetter = ApiLetter & { is_cms: true };
@@ -190,6 +190,58 @@ export async function fetchVideoBySlug(slug: string): Promise<CmsVideo | null> {
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsVideo };
+    return data.post ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * lens 채널 응답 — "오늘의 이슈, 4가지 시선"(2026-08-12). 하루 하나의 이슈를
+ * 원인/사람/내 일/숫자, 4개 고정 렌즈로 훑는 포맷. Instagram @ailens
+ * 카드뉴스를 그대로 웹으로 옮긴다 (backend cms_posts_public.py _shape_lens 와 1:1).
+ */
+export interface CmsLensItem {
+  label: string;
+  question: string;
+  bullets: string[];
+}
+
+export interface CmsLens {
+  id: string;
+  editor_id: string;
+  headline: string;
+  context: string;
+  date: string;
+  cover_image_url: string | null;
+  lenses: CmsLensItem[];
+  is_cms: true;
+}
+
+export async function fetchLensPosts(): Promise<CmsLens[]> {
+  return cached('lens', async () => {
+    try {
+      // limit=100 명시(2026-08-12) — webtoon/video 와 같은 이유. 안 넘기면
+      // 백엔드 기본값(20)에서 조용히 잘려 오래된 글이 목록에서 사라진다.
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=100`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { posts?: CmsLens[] };
+      return data.posts ?? [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+export async function fetchLensBySlug(slug: string): Promise<CmsLens | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=lens`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { post?: CmsLens };
     return data.post ?? null;
   } catch {
     return null;

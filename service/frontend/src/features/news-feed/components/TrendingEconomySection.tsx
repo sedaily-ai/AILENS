@@ -121,10 +121,10 @@ export function TrendingEconomySection() {
             요즘 화제의 경제 이슈
           </h2>
         </div>
-        {/* "더보기 →" — ColumnPreviewSection엔 있는데 여긴 빠져있었다(2026-08-07
-            발견). /letters 아카이브에서 '트렌드' 필터로 전체를 볼 수 있다. */}
+        {/* "더보기 →" — 콘텐츠 타입별 페이지 분리(2026-08-11)로 트렌드 전용
+            /trend가 생겨 거기로(예전엔 /letters 통합 아카이브였음). */}
         <Link
-          href="/letters"
+          href="/trend"
           className="text-gray-500 hover:text-gray-900"
           style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
@@ -135,18 +135,15 @@ export function TrendingEconomySection() {
         </Link>
       </header>
 
-      {/* 고정 4열 그리드는 카드가 1~2개뿐일 때 텅 빈 칸이 그대로 남아 어색해
-          보였다(2026-08-06 스크린샷에서 확인) — 카드 개수만큼만 열이 생기고
-          남는 폭은 그리드 밖으로 빠지도록 auto-fill로 교체. */}
+      {/* 모바일 2열·데스크톱 4열 고정(2026-08-12) — FollowingFeed.tsx와 같은
+          이유로 auto-fill(minmax 160~240px)을 걷어냈다: 실제 모바일 폭에서
+          2열이 겨우 들어맞는 수준이라 패딩·스크롤바 오차로 1열로 허물어지는
+          문제가 실제로 있었다(웹툰 섹션과 그리드 통일 요청, 사용자 스크린샷
+          확인). 카드 1~2개뿐일 때 남는 칸은 빈 트랙으로 두되(옛 우려), 열
+          수를 고정하는 쪽이 실제 렌더 안정성에서 더 낫다고 판단. */}
       <div
-        className="grid"
+        className="grid grid-cols-2 sm:grid-cols-4"
         style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 240px))',
-          // 2026-08-09 — 'start'였을 때 카드가 여러 개 꽉 차는 날에도 컨테이너
-          // 폭이 240px 배수가 아니면 오른쪽에 빈 여백이 그대로 남는 문제가
-          // 있었다(카드 1개일 때 안 커지게 하려던 240px 상한은 그대로 두고,
-          // 남는 폭만 카드 사이 간격으로 흡수해 마지막 카드가 끝까지 붙게 함).
-          justifyContent: 'space-between',
           gap: 'clamp(8px, 2vw, 14px)',
         }}
       >

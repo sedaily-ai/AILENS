@@ -14,6 +14,7 @@ import { HomeHeroCarousel } from "./HomeHeroCarousel";
 import { MiniHeadlinesSection } from "./MiniHeadlinesSection";
 import { VideoPreviewSection } from "./VideoPreviewSection";
 import { TimelinePreviewSection } from "./TimelinePreviewSection";
+import { LensPreviewSection } from "./LensPreviewSection";
 
 interface Props {
   selectedDate: Date;
@@ -111,6 +112,13 @@ export function NewsFeedTab({
               퀴즈(5초짜리 습관 훅) → 본편 → 웹툰(재미 요소) → 트렌드/칼럼 →
               미니헤드라인(가장 실험적인 기능이라 맨 뒤) 순서로. */}
           <WordsPreviewSection initialTerms={initialWordTerms} />
+
+          {/* "오늘의 이슈, 4가지 시선" 홈 티저(2026-08-12) — 가벼운 습관형
+              훅(타임라인·단어퀴즈) 다음, 본편(오늘의 레터) 바로 앞에 배치.
+              하루 한 건만 크게 보여주는 게 컨셉이라(다른 섹션의 "4개씩
+              나열"과 대비), 본편 앞자리에서 "오늘 진짜 중요한 거 하나"라는
+              신호로 쓴다. LensPreviewSection.tsx 참조. */}
+          <LensPreviewSection />
 
           <FollowingFeed initialLetters={initialFollowingLetters} />
 

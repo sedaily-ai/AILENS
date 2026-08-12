@@ -97,24 +97,18 @@ export function FollowingFeed({ initialLetters }: Props) {
         </div>
       )}
 
-      {/* 카드 폭은 항상 고정 상한(minmax) — letter 개수로 열 수를 직접 계산하면
-          (예전엔 MBTI 4편이 보장돼 4열 고정) 1편만 있는 날 카드 하나가 섹션
-          전체 폭으로 늘어나 썸네일까지 거대해지는 문제가 있었다(2026-08-07
-          실제 발생). TrendingEconomySection과 같은 auto-fill(160~240px) 패턴으로
-          맞춰 카드 폭을 통일 — 채울 카드가 없으면 그냥 빈 트랙으로 남고 카드는
-          늘어나지 않는다. */}
+      {/* 모바일 2열·데스크톱 4열 고정(2026-08-12) — 웹툰 섹션(WebtoonPreviewSection)과
+          그리드를 통일. 예전엔 auto-fill(minmax 160~240px)로 카드 개수에 맞춰
+          열 수가 자동으로 정해지게 했는데, 실제 모바일 폭(~330px, 좌우 패딩
+          제외)에서는 2열이 겨우 들어맞는 수준이라 패딩·스크롤바 오차로 1열로
+          허물어지는 경우가 실제로 있었다(사용자 스크린샷으로 확인) — 웹툰처럼
+          열 수를 아예 고정해 이 문제를 원천 차단. */}
       <ol
-        className="grid"
+        className="grid grid-cols-2 sm:grid-cols-4"
         style={{
           listStyle: 'none',
           padding: 0,
           margin: 0,
-          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 240px))',
-          // 2026-08-09 — 'start'였을 때 카드가 여러 개 꽉 차는 날에도 컨테이너
-          // 폭이 240px 배수가 아니면 오른쪽에 빈 여백이 그대로 남는 문제가
-          // 있었다(카드 1개일 때 안 커지게 하려던 240px 상한은 그대로 두고,
-          // 남는 폭만 카드 사이 간격으로 흡수해 마지막 카드가 끝까지 붙게 함).
-          justifyContent: 'space-between',
           gap: 'clamp(6px, 1.5vw, 10px)',
         }}
       >

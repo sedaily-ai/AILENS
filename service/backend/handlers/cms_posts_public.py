@@ -22,7 +22,7 @@ from clients import cms_posts_ddb_client as posts_client
 logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
-_VALID_CHANNELS = ("letters", "paper", "feed", "trend_card", "webtoon", "video")
+_VALID_CHANNELS = ("letters", "paper", "feed", "trend_card", "webtoon", "video", "lens")
 # 2026-08-09: 300초(5분) → 5초 → no-store. 이 헤더는 프론트 SSR의 Next 캐시
 # (revalidateTag, 5초 — service/frontend/src/shared/lib/cmsPostsApi.ts)와는
 # 별개로, 클라이언트 컴포넌트(TrendingEconomySection 등 12곳, 'use client')가
@@ -166,6 +166,33 @@ def _shape_video(post: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
+    """"오늘의 이슈, 4가지 시선" — 원인/사람/내 일/숫자, 4개 고정 렌즈로 하루
+    하나의 이슈를 훑는 포맷(2026-08-12). Instagram @ailens 카드뉴스(다크톤,
+    "시선 ①~④" 라벨 + Q&A 블록)를 그대로 웹으로 옮긴다 — admin이 직접
+    작성(퀴즈와 같은 이유로 AI 반자동화 없음, body_inline.lenses 4개를 그대로
+    저장)."""
+    b = post.get("body_inline") or {}
+    lenses = [
+        {
+            "label": item.get("label") or "",
+            "question": item.get("question") or "",
+            "bullets": [x for x in (item.get("bullets") or []) if x],
+        }
+        for item in (b.get("lenses") or [])
+    ]
+    return {
+        "id": post["slug"],
+        "editor_id": post.get("editor_id") or _DEFAULT_EDITOR,
+        "headline": post.get("headline") or "",
+        "context": post.get("subtitle") or "",
+        "date": post.get("publish_date") or "",
+        "cover_image_url": post.get("cover_image_url") or None,
+        "lenses": lenses,
+        "is_cms": True,
+    }
+
+
 _SHAPERS = {
     "letters": _shape_letter,
     "paper": _shape_paper,
@@ -175,6 +202,7 @@ _SHAPERS = {
     "trend_card": _shape_trend_card,
     "webtoon": _shape_webtoon,
     "video": _shape_video,
+    "lens": _shape_lens,
 }
 
 

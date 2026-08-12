@@ -98,11 +98,13 @@ export function VideoPreviewSection({ initialVideos }: Props) {
         </div>
       </header>
 
+      {/* 모바일 2열·데스크톱 4열 고정(2026-08-12) — FollowingFeed·TrendingEconomySection과
+          같은 이유로 auto-fill(minmax 210px)을 걷어냈다: 실제 모바일 폭에서는
+          아예 1열로만 잡히던 문제(210px×2가 모바일 콘텐츠 폭보다 큼)가 있었다
+          — 웹툰 섹션과 그리드 통일. */}
       <div
-        className="grid"
+        className="grid grid-cols-2 sm:grid-cols-4"
         style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
-          justifyContent: 'start',
           gap: 'clamp(10px, 2vw, 16px)',
         }}
       >
