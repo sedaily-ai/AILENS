@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { API_URL } from '@/shared/config/api';
+import { kstTodayStr } from '@/shared/lib/date';
 
 // 타임라인 홈 티저(2026-08-07) — 최상단(단어 퀴즈 위) 배치.
 //
@@ -35,9 +36,10 @@ interface S3ArticleListItem {
   original_link?: string;
 }
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+// KST 기준으로 계산한다(2026-08-12) — UTC 기준이던 예전 버전은 서버(보통
+// UTC 타임존)에서 자정~오전 9시 KST 사이에 "오늘"을 하루 전으로 계산해,
+// sitemap.ts·NewsTimeMachine.tsx와 날짜가 어긋났다(shared/lib/date.ts 참조).
+const todayStr = kstTodayStr;
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -124,7 +126,7 @@ export function TimelinePreviewSection() {
           </h2>
         </div>
         <Link
-          href="/timeline"
+          href={`/timeline/${todayStr()}`}
           className="text-gray-500 hover:text-gray-900"
           style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
@@ -191,7 +193,7 @@ export function TimelinePreviewSection() {
           />
           <button
             type="button"
-            onClick={() => router.push(`/timeline?date=${pickedDate}`)}
+            onClick={() => router.push(`/timeline/${pickedDate}`)}
             style={{
               padding: '9px 18px',
               borderRadius: 9999,
@@ -209,9 +211,11 @@ export function TimelinePreviewSection() {
         </div>
         <div className="flex justify-center" style={{ gap: 6, marginTop: 12 }}>
           {QUICK_PICKS.map((label, i) => {
-            const t = new Date();
-            t.setDate(t.getDate() - i);
-            const dateForPick = t.toISOString().slice(0, 10);
+            // KST 달력 날짜에서 순수하게 i일 뺀다(2026-08-12) — 예전엔
+            // Date#toISOString()으로 다시 포맷해서 자정~오전 9시 KST 사이엔
+            // "어제"가 이미 하루 더 밀려있었다(todayStr 위 주석 참조).
+            const [ty, tm, td] = todayStr().split('-').map((s) => parseInt(s, 10));
+            const dateForPick = new Date(Date.UTC(ty, tm - 1, td - i)).toISOString().slice(0, 10);
             const active = pickedDate === dateForPick;
             return (
               <button
