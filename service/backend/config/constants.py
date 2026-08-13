@@ -45,7 +45,7 @@ S3_BODY_FIELDS = [
 # =============================================================================
 
 HTTP_TIMEOUT_SHORT = 10      # For quick operations (revalidation, health checks)
-HTTP_TIMEOUT_MEDIUM = 30     # For API calls (BigKinds, search)
+HTTP_TIMEOUT_MEDIUM = 30     # For API calls (search, etc.)
 HTTP_TIMEOUT_LONG = 60       # For heavy operations (translation)
 HTTP_TIMEOUT_SCRAPER = 10    # For web scraping (byline, time)
 
@@ -65,7 +65,6 @@ REDIS_SOCKET_TIMEOUT = 2            # seconds
 FRONTEND_URL_DEFAULT = 'https://mbti.sedaily.com'
 
 # External APIs
-BIGKINDS_API_URL_DEFAULT = 'https://tools.kinds.or.kr'
 ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 
 # Default Video URL
@@ -196,97 +195,6 @@ CATEGORY_SEARCH_ALIASES = {
     '국제': ['국제'],
 }
 
-# =============================================================================
-# BigKinds OpenAPI (한국언론진흥재단 뉴스 빅데이터 분석 시스템)
-# =============================================================================
-# 출처: `빅카인즈api지침서.pdf` — "OpenAPI 사용자 지침서 V1.49" (최종개정 2024-12-10)
-#
-# 연계 방식 (지침서 §1.1):
-#   - HTTPS POST 만 지원. GET 은 없다.
-#   - 요청/응답 모두 UTF-8 JSON. 인증키는 헤더가 아니라 **본문 최상위 `access_key`** 필드다.
-#   - 본문 형태: {"access_key": "<UUID>", "argument": {...}}
-#
-# 응답 규약: 성공은 `result == 0`, 실패는 `result == -1` + `reason` 문자열.
-#   HTTP status 는 실패해도 200 이므로 status 만 보고 성공 판정하면 안 된다.
-#   (실측 2026-08-04: 미등록 키 → 200 + {"result": -1, "reason": "Invalid Access Key!:..."},
-#    빈 키 → 200 + {"result": -1, "reason": "Blank Access Key!:"})
-
-# 엔드포인트 경로 — base 는 settings.bigkinds_api_url (BIGKINDS_API_URL_DEFAULT)
-BIGKINDS_ENDPOINT_SEARCH = '/search/news'        # §2 뉴스 검색 / §3 뉴스 상세 조회
-BIGKINDS_ENDPOINT_ISSUE_RANKING = '/issue_ranking'  # §4 오늘의 이슈 (구 이슈랭킹)
-BIGKINDS_ENDPOINT_WORD_CLOUD = '/word_cloud'     # §5 연관어 분석 (구 워드클라우드)
-BIGKINDS_ENDPOINT_TIME_LINE = '/time_line'       # §6 키워드 트렌드 (구 뉴스 타임라인)
-BIGKINDS_ENDPOINT_QUERY_RANK = '/query_rank'     # §7 인기검색어
-
-# 언론사 (지침서 §13.1 코드 테이블)
-BIGKINDS_PROVIDER_SEDAILY = '서울경제'
-BIGKINDS_PROVIDER_CODE_SEDAILY = '02100311'
-
-# return_from / return_size 상한 (지침서 §2.2)
-BIGKINDS_MAX_RETURN_FROM = 20000
-BIGKINDS_MAX_RETURN_SIZE = 10000
-# hilight 최대 글자수 (지침서 §2.2)
-BIGKINDS_MAX_HILIGHT = 200
-
-# 뉴스 검색에서 기본으로 요청할 필드.
-# ※ `fields` 는 비어있어도 배열을 넣어야 하고, 지정하지 않은 필드는 반환되지 않는다 (§2.2).
-BIGKINDS_DEFAULT_FIELDS = [
-    'news_id',
-    'title',
-    'published_at',
-    'dateline',
-    'provider',
-    'category',
-    'category_incident',
-    'byline',
-    'hilight',
-    'images',
-    'provider_link_page',
-    'printing_page',
-]
-
-# =============================================================================
-# 그 무렵의 지표 (타임라인 '그날의 이슈' 보조 카드)
-# =============================================================================
-# "그때 물가·금리는 어땠나" 를 보여주는 데 쓰는 경제지표 목록.
-#
-# ⚠️ 설계 원칙: **숫자를 우리가 만들지 않는다.**
-#   물가·최저임금·주가를 임의 날짜에 대해 채우려면 별도 시계열 데이터가 필요한데,
-#   그게 없는 상태에서 값을 적어 넣으면 1960년 창간 경제지 지면에 출처 없는
-#   숫자를 싣는 셈이 된다. 그래서 **그 무렵 실제로 보도된 기사 제목**을 그대로
-#   보여주고 원문으로 링크한다. 제목에 이미 숫자가 들어 있다
-#   (예: "7월 소비자물가 2.8% 상승", "코스피 지수 1500선 붕괴").
-#
-# `terms` 는 빅카인즈 검색 질의어이자 제목 매칭 키워드로 함께 쓰인다.
-TIMELINE_INDICATORS = [
-    {'key': 'rate', 'label': '기준금리', 'terms': ['기준금리', '금통위']},
-    {'key': 'cpi', 'label': '소비자물가', 'terms': ['소비자물가', '물가상승률']},
-    {'key': 'wage', 'label': '최저임금', 'terms': ['최저임금']},
-    {'key': 'fx', 'label': '환율', 'terms': ['원·달러', '원달러', '환율']},
-    {'key': 'kospi', 'label': '코스피', 'terms': ['코스피']},
-    {'key': 'oil', 'label': '국제유가', 'terms': ['국제유가', 'WTI']},
-]
-
-# 지표를 찾는 검색 창(대상일에서 며칠 전까지).
-# 최저임금처럼 연 1회 결정되는 지표는 좁은 창에서 안 잡히는 게 정상이다 —
-# 없으면 그냥 빼고 보여준다(추정치로 메우지 않는다).
-TIMELINE_INDICATOR_WINDOW_DAYS = 7
-
-# =============================================================================
-# 뉴스 통합 분류체계 1레벨 (지침서 §13.2) → 이 프로젝트의 표준 7개 카테고리.
-# BigKinds 분류는 `"경제>부동산"` 처럼 `>` 로 구분된 계층 문자열이라 1레벨만 잘라 쓴다.
-# 8개 중 7개가 CATEGORIES_KOREAN 과 이름까지 그대로 일치하고, '지역' 만
-# CATEGORY_SEARCH_ALIASES 의 '사회': ['사회', '지역'] 규칙에 맞춰 '사회'로 접는다.
-BIGKINDS_CATEGORY_TO_STANDARD = {
-    '정치': '정치',      # 001000000
-    '경제': '경제',      # 002000000
-    '사회': '사회',      # 003000000
-    '문화': '문화',      # 004000000
-    '국제': '국제',      # 005000000
-    '지역': '사회',      # 006000000 — 표준 카테고리에 '지역'이 없어 '사회'로 통합
-    '스포츠': '스포츠',  # 007000000
-    'IT_과학': 'IT_과학',  # 008000000
-}
 
 # =============================================================================
 # Pagination

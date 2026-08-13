@@ -9,7 +9,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   fetchIssues, kdate,
-  type Article, type Issue, type Indicator, type Source, type View,
+  type Article, type Issue, type Indicator, type View,
 } from '../lib/timelineApi';
 
 function ArticleList({ items }: { items: Article[] }) {
@@ -194,14 +194,10 @@ function IssueCard({ issue, index }: { issue: Issue; index: number }) {
 export function TimelineResultView({
   date,
   initialArticles,
-  initialSource,
-  initialDegraded,
   initialOffline = false,
 }: {
   date: string;
   initialArticles: Article[];
-  initialSource: Source;
-  initialDegraded?: string;
   initialOffline?: boolean;
 }) {
   const [view, setView] = useState<View>('flat');
@@ -227,7 +223,7 @@ export function TimelineResultView({
         <div style={{ animation: 'tmPaper .5s ease' }}>
           <div style={{ textAlign: 'center', borderBottom: '2px solid #2a2622', paddingBottom: 16, marginBottom: 28 }}>
             <p style={{ fontSize: 11, letterSpacing: '0.2em', color: '#b08d57', marginBottom: 8 }}>
-              SEOUL ECONOMIC DAILY · {initialSource === 'bigkinds' ? '빅카인즈 보관본' : '보관본'}
+              SEOUL ECONOMIC DAILY · 보관본
             </p>
             <h1
               style={{
@@ -262,14 +258,6 @@ export function TimelineResultView({
                   (오프라인 미리보기 — 실제 보관본은 연결 시 표시됩니다)
                 </p>
               )}
-              {initialDegraded && (
-                <div style={{ border: '1px solid #e6d9b8', background: '#fdfaf0', borderRadius: 6, padding: '10px 14px', marginBottom: 20 }}>
-                  <p style={{ fontSize: 12, color: '#8a7040', lineHeight: 1.6 }}>
-                    타임라인 보관본을 불러오지 못해 기본 목록을 보여주고 있어요. — {initialDegraded}
-                  </p>
-                </div>
-              )}
-
               <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 22 }}>
                 {([
                   ['flat', '전체 기사'],

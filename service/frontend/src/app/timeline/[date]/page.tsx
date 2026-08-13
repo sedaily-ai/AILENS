@@ -94,7 +94,7 @@ export default async function TimelineDayPage({
   const { date } = await params;
   if (!DATE_RE.test(date)) notFound();
 
-  const { list, source, degraded } = await fetchDayArticles(date);
+  const { list } = await fetchDayArticles(date);
   const jsonLd = buildJsonLd(date, list);
 
   return (
@@ -103,7 +103,7 @@ export default async function TimelineDayPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <TimelineDayClient date={date} initialArticles={list} initialSource={source} initialDegraded={degraded} />
+      <TimelineDayClient date={date} initialArticles={list} />
     </>
   );
 }

@@ -5,21 +5,29 @@ Timeline Handler Lambda Function
     POST /api/timeline   { "date": "2026-07-31", ... }
     GET  /api/timeline?date=2026-07-31
 
-데이터 소스는 2단계다.
+데이터 소스는 S3(`sedaily-news-xml-storage/daily-xml/{YYYYMMDD}.xml`) 단일이다
+— 서울경제 원본 수집 피드. `handlers/s3_articles_handler.py`가 이미 같은
+버킷·같은 파서로 배포돼 살아있는 걸 확인하고(2026-08-13) 그 로직을 그대로
+재사용한다.
 
-    1순위  빅카인즈 OpenAPI (`clients/bigkinds_client.py`)
-           — 언론진흥재단 뉴스 아카이브. 서울경제뿐 아니라 전체 언론사 지면을
-             과거까지 거슬러 조회할 수 있어 "타임머신" 에 맞는 소스다.
-    2순위  DynamoDB (`handlers/search_handler.search_dynamodb_optimized`)
-           — 기존 `/api/search` 가 쓰던 경로. 서울경제 기사만 있고, 파이프라인이
-             수집한 시점 이후 날짜만 존재한다.
+⚠️ 2026-08-13, 빅카인즈(언론진흥재단 OpenAPI) + DynamoDB 폴백 2단계 구조를
+걷어내고 이 소스 하나로 단순화했다.
+  - 빅카인즈: Lambda(`sedaily-mbti-timeline-dev`)조차 배포된 적이 없어(API
+    Gateway 라우트도 없음) 이 엔드포인트 자체가 늘 404였다("타임라인 API
+    응답 404"로 프론트에 노출). 실질적으로 한 번도 쓰인 적 없는 코드였다.
+  - DynamoDB 폴백: S3 XML은 파이프라인 인덱싱을 기다리지 않고 그날 발행된
+    기사가 실시간으로 반영돼(실측: 8/13 당일 기사가 S3 XML엔 있는데
+    DynamoDB 검색엔 아직 없었음) 폴백이 필요한 상황 자체가 드물고, 폴백이
+    "불러오지 못해 기본 목록을 보여주고 있어요"라는 오해 소지 있는 배너로
+    이어지던 문제도 있었다 — 사용자 판단으로 폴백 없이 단일 소스로 정리.
 
-빅카인즈가 실패하거나(키 미설정·인증 실패·타임아웃) 0건이면 DynamoDB 로 내려간다.
-즉 이 엔드포인트는 기존 타임라인 동작을 깎지 않는다. 응답의 `source` 로 실제로
-어느 쪽이 답했는지 항상 알 수 있고, 폴백한 경우 `fallback_reason` 에 사유가 담긴다.
+여러 언론사를 넘나드는 빅카인즈와 달리 서울경제 단일 매체 피드라, "그날의
+이슈"(다매체 클러스터링) 모드는 이 소스로 재현할 수 없다 — `mode=issues`
+요청은 항상 빈 `issues`를 반환한다(요청 파라미터 계약은 유지해 400을 피한다).
 
-프론트엔드: service/frontend/src/components/timeline/NewsTimeMachine.tsx
+프론트엔드: service/frontend/src/features/timeline/lib/timelineApi.ts
 """
+import asyncio
 import json
 import logging
 import math
@@ -27,23 +35,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from clients.bigkinds_client import (
-    BigKindsClient,
-    BigKindsError,
-    exclusive_until,
-    standard_to_bigkinds_categories,
-)
-from config.constants import (
-    BIGKINDS_PROVIDER_SEDAILY,
-    CORS_HEADERS,
-    MAX_PAGE_SIZE,
-    TIMELINE_INDICATOR_WINDOW_DAYS,
-)
-from services.day_indicator_service import (
-    build_indicator_query,
-    pick_indicator_headlines,
-)
-from services.issue_digest_service import build_issue_digest
+from clients.s3_xml_client import S3XMLClient
+from config.constants import CORS_HEADERS, MAX_PAGE_SIZE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -52,25 +45,24 @@ KST = timezone(timedelta(hours=9))
 DATE_FORMAT = '%Y-%m-%d'
 
 DEFAULT_PAGE_SIZE = 30
-# 키워드 트렌드 스파크라인에 쓸 구간 (대상일 기준 최근 30일)
-TREND_WINDOW_DAYS = 30
 
-# ── issues 모드 ─────────────────────────────────────────────────────────────
-# 화면에 띄울 이슈 카드 수. 빅카인즈는 하루 30개를 주지만(지침서는 10개라고 하나
-# 실측 30개) 상위 몇 개가 실제 '그날의 이슈'다.
+# issues 모드 파라미터 — 클러스터링을 만들어낼 소스가 없어(위 docstring 참조)
+# 항상 빈 issues 를 반환하지만, 요청 파싱/검증 계약은 그대로 유지한다
+# (프론트가 이 파라미터들을 계속 보내도 400 이 나지 않게).
 DEFAULT_ISSUE_COUNT = 8
 MAX_ISSUE_COUNT = 30
-# 이슈 카드 하나에 실을 기사 수
 DEFAULT_PER_ISSUE = 4
 MAX_PER_ISSUE = 20
-# 이슈 하나에서 상세 조회할 기사 수 상한.
-# 큰 이슈는 클러스터가 227건까지 간다(2020-03-19 코로나). 전부 조회하면 응답이
-# 느려지고 UI 에 쓰지도 않는다 — **보도량 숫자는 클러스터 크기(article_count)로
-# 정확히** 내보내고, 제목·언론사 분포는 이 상한만큼의 표본으로 만든다.
-# 그래서 응답의 provider 분포는 `resolved_count` 기준임을 명시한다.
-MAX_IDS_PER_ISSUE = 30
-# 상세 조회 배치 전체 상한 (실측: 300건 요청 → 283건 수신 OK)
-MAX_DETAIL_IDS = 240
+
+_s3_xml_client: Optional[S3XMLClient] = None
+
+
+def _get_s3_xml_client() -> S3XMLClient:
+    """Lambda 컨테이너당 한 번만 생성 (s3_articles_handler.py와 같은 패턴)."""
+    global _s3_xml_client
+    if _s3_xml_client is None:
+        _s3_xml_client = S3XMLClient()
+    return _s3_xml_client
 
 
 class BadRequest(Exception):
@@ -86,12 +78,10 @@ class TimelineRequest:
     date: str
     query: Optional[str] = None
     categories: List[str] = field(default_factory=list)
-    providers: List[str] = field(default_factory=list)
     page: int = 1
     page_size: int = DEFAULT_PAGE_SIZE
-    include_trend: bool = False
     # 'flat'   — 그날 기사를 최신순 한 줄로 (기본, 기존 동작)
-    # 'issues' — 그날 언론이 가장 많이 다룬 이슈 + 언론사별 보도 분포 (B안)
+    # 'issues' — 다매체 클러스터링. 소스가 없어 항상 빈 값(위 docstring 참조).
     mode: str = 'flat'
     issue_count: int = DEFAULT_ISSUE_COUNT
     per_issue: int = DEFAULT_PER_ISSUE
@@ -178,17 +168,8 @@ def parse_request(event: dict) -> TimelineRequest:
     query = pick('query', default=None)
     query = str(query).strip() if query else None
     # 프론트엔드가 `/api/search` 관례를 따라 '*' 를 "전체" 의미로 보낸다.
-    # 빅카인즈에서 '*' 는 그냥 검색어라 0건이 나오므로 검색어 없음으로 바꾼다.
     if query in ('*', ''):
         query = None
-
-    all_press = _parse_bool(pick('all_press', 'all_providers', default=False))
-    providers = _parse_list(pick('providers', 'provider', default=None))
-    if not providers and not all_press:
-        # 지면 브랜딩(서울경제 보관본) 유지를 위한 기본값.
-        providers = [BIGKINDS_PROVIDER_SEDAILY]
-    if all_press:
-        providers = []  # provider 미지정 = 전체 언론사
 
     page = max(1, _parse_int(pick('page', default=1), 1))
     page_size = _parse_int(pick('page_size', 'pageSize', default=DEFAULT_PAGE_SIZE), DEFAULT_PAGE_SIZE)
@@ -210,10 +191,8 @@ def parse_request(event: dict) -> TimelineRequest:
         date=date,
         query=query,
         categories=_parse_list(pick('categories', 'category', default=None)),
-        providers=providers,
         page=page,
         page_size=page_size,
-        include_trend=_parse_bool(pick('include_trend', 'trend', default=False)),
         mode=mode,
         issue_count=issue_count,
         per_issue=per_issue,
@@ -221,211 +200,66 @@ def parse_request(event: dict) -> TimelineRequest:
 
 
 # =============================================================================
-# Source 1 — 빅카인즈
+# S3 XML (서울경제 원본 피드)
 # =============================================================================
 
-def fetch_from_bigkinds(req: TimelineRequest, client: Optional[BigKindsClient] = None) -> dict:
+def fetch_from_s3_xml(req: TimelineRequest) -> dict:
     """
-    빅카인즈에서 해당 일자 기사를 가져온다.
-
-    Raises:
-        BigKindsError: 키 미설정·인증 실패·전송 실패 등 (호출자가 폴백 판단)
+    S3(`sedaily-news-xml-storage/daily-xml/{YYYYMMDD}.xml`)에서 해당 일자
+    기사를 가져온다. 로직은 `handlers/s3_articles_handler.get_articles_list`와
+    동일 — 그 핸들러가 이미 배포·검증된 상태라 여기서도 같은 패턴을 쓴다.
+    그 날짜 파일이 없거나 기사가 0건이면 articles=[] 를 그대로 반환한다
+    (프론트가 "아직 보관되지 않았어요" 빈 상태를 표시).
     """
-    client = client or BigKindsClient()
+    client = _get_s3_xml_client()
+    date_str = req.date.replace('-', '')  # S3XMLClient는 YYYYMMDD 키를 쓴다
+    articles = asyncio.run(client.get_articles_by_date(date_str))
 
-    result = client.search_single_day(
-        req.date,
-        query=req.query,
-        providers=req.providers or None,
-        categories=standard_to_bigkinds_categories(req.categories) or None,
-        return_from=req.return_from,
-        return_size=req.page_size,
-        hilight=200,
-    )
+    # 삭제(action='D') 항목 제외 — s3_articles_handler.py와 동일 규칙.
+    articles = [a for a in articles if a.action != 'D']
 
-    payload: Dict[str, Any] = {
-        'source': 'bigkinds',
-        'total_hits': result.total_hits,
-        'articles': [_to_response_article(a) for a in result.articles],
-    }
+    if req.categories:
+        articles = [a for a in articles if a.main_category in req.categories]
 
-    # 키워드 트렌드(§6)는 query 가 필수다. 검색어가 있을 때만 곁들인다.
-    if req.include_trend and req.query:
-        payload['trend'] = _fetch_trend(client, req)
+    # query 는 제목/본문 부분 문자열 매칭으로 처리한다 (S3 XML엔 검색 엔진이 없음).
+    if req.query:
+        q = req.query.lower()
+        articles = [
+            a for a in articles
+            if q in a.title.lower() or q in (a.content_clean or '').lower()
+        ]
 
-    return payload
+    articles.sort(key=lambda a: a.published_at, reverse=True)
+    total_hits = len(articles)
 
-
-def fetch_issues_from_bigkinds(
-    req: TimelineRequest,
-    client: Optional[BigKindsClient] = None,
-) -> dict:
-    """
-    그날의 이슈 (B안) — 빅카인즈 호출 **2회**로 만든다.
-
-      1) `/issue_ranking` — 하루 이슈를 보도량 내림차순으로. 각 이슈에 기사 id 묶음.
-      2) `/search/news` (news_ids 배치) — 상위 이슈들의 기사 제목·언론사를 한 번에.
-
-    이슈는 "여러 매체가 같이 다뤘다"는 사실 자체가 정의라서 **언론사 필터를 걸지
-    않는다**(providers 무시). 대신 각 이슈에서 서울경제 기사를 따로 뽑아
-    (`sedaily`) 지면 정체성과 이어붙인다.
-
-    Raises:
-        BigKindsError: 호출자가 폴백 판단
-    """
-    client = client or BigKindsClient()
-
-    topics = client.issue_ranking(req.date)
-    topics = topics[:req.issue_count]
-    if not topics:
-        return {'source': 'bigkinds', 'issues': [], 'total_hits': 0, 'articles': []}
-
-    # 상위 이슈들의 기사 id 를 모아 한 번에 상세 조회.
-    # 이슈별 상한을 먼저 걸어 큰 이슈 하나가 배치를 다 먹지 않게 한다
-    # (2020-03-19 '코로나19' 클러스터가 227건이라 그냥 모으면 나머지 이슈가 밀린다).
-    ids: List[str] = []
-    seen = set()
-    for topic in topics:
-        for news_id in topic.news_ids[:MAX_IDS_PER_ISSUE]:
-            if news_id not in seen:
-                seen.add(news_id)
-                ids.append(news_id)
-    truncated = len(ids) > MAX_DETAIL_IDS
-    ids = ids[:MAX_DETAIL_IDS]
-
-    details = client.get_news_detail(ids, fields=[
-        'news_id', 'title', 'published_at', 'provider', 'category',
-        'provider_link_page',
-    ])
-    articles_by_id = {a.news_id: a for a in details}
-    if truncated:
-        logger.info('상세 조회 id 상한 적용: %s → %s건', len(seen), MAX_DETAIL_IDS)
-
-    issues = build_issue_digest(
-        topics, articles_by_id, per_issue=req.per_issue
-    )
+    start = req.return_from
+    page_articles = articles[start:start + req.page_size]
 
     return {
-        'source': 'bigkinds',
-        'issues': issues,
-        'indicators': _fetch_indicators(client, req),
-        # 이슈 모드의 total_hits 는 "상위 이슈들의 보도량 합"으로 읽는다.
-        'total_hits': sum(i['article_count'] for i in issues),
-        # flat 목록도 채워둔다 — 프론트의 빈-결과 판정과 폴백 로직이 이걸 본다.
-        'articles': [
-            _to_response_article(a) for a in list(articles_by_id.values())[:req.page_size]
-        ],
+        'source': 's3_xml',
+        'total_hits': total_hits,
+        'articles': [_s3_article_to_response(a) for a in page_articles],
     }
 
 
-def _fetch_indicators(client: BigKindsClient, req: TimelineRequest) -> List[dict]:
-    """
-    그 무렵의 경제지표 — 지표별 대표 기사 한 건씩. 빅카인즈 **1회 추가 호출**.
+def _s3_article_to_response(a) -> dict:
+    """S3Article → 프론트엔드 응답 형태 (s3_articles_handler.py의 매핑과 동일)."""
+    image_url = None
+    if a.images:
+        image_url = a.images[0].url
+    elif a.content_images:
+        image_url = a.content_images[0].url
 
-    숫자를 우리가 만들지 않고 그 무렵 보도된 제목을 그대로 쓴다 (사유는
-    `services/day_indicator_service.py` 독스트링 참조).
-
-    실패해도 이슈 목록을 깨지 않는다 — 보조 카드다.
-    """
-    try:
-        start = (
-            datetime.strptime(req.date, DATE_FORMAT)
-            - timedelta(days=TIMELINE_INDICATOR_WINDOW_DAYS - 1)
-        ).strftime(DATE_FORMAT)
-        result = client.search_news(
-            query=build_indicator_query(),
-            date_from=start,
-            date_until=exclusive_until(req.date),
-            sort={'date': 'desc'},
-            return_size=100,
-            fields=['news_id', 'title', 'published_at', 'provider',
-                    'category', 'provider_link_page'],
-        )
-        return pick_indicator_headlines(result.articles)
-    except BigKindsError as e:
-        logger.warning('그 무렵 지표 조회 실패 (이슈 목록은 유지): %s', e)
-        return []
-
-
-def _fetch_trend(client: BigKindsClient, req: TimelineRequest) -> Optional[dict]:
-    """대상일 기준 최근 30일 일별 보도량. 실패해도 본문 조회를 깨지 않는다."""
-    try:
-        start = (
-            datetime.strptime(req.date, DATE_FORMAT) - timedelta(days=TREND_WINDOW_DAYS - 1)
-        ).strftime(DATE_FORMAT)
-        trend = client.keyword_trend(
-            query=req.query,
-            date_from=start,
-            date_until=exclusive_until(req.date),
-            interval='day',
-            providers=req.providers or None,
-            categories=standard_to_bigkinds_categories(req.categories) or None,
-        )
-        return trend.to_dict()
-    except BigKindsError as e:
-        logger.warning('키워드 트렌드 조회 실패 (본문 조회는 유지): %s', e)
-        return None
-
-
-def _to_response_article(a) -> dict:
-    """BigKindsArticle → 프론트엔드 응답 형태."""
     return {
-        'news_id': a.news_id,
+        'news_id': a.nsid,
         'title': a.title,
         'published_at': a.published_at,
-        'category': a.category,
-        'provider': a.provider,
-        'byline': a.byline,
-        'original_link': a.original_link,
-        'content': a.hilight,
-        'image_url': None,  # 빅카인즈는 공개 이미지 URL 을 주지 않는다 (경로 조각만)
-        'image_path': a.image_path,
-    }
-
-
-# =============================================================================
-# Source 2 — DynamoDB 폴백
-# =============================================================================
-
-def fetch_from_dynamodb(req: TimelineRequest) -> dict:
-    """
-    기존 `/api/search` 경로를 그대로 재사용한다. 빅카인즈가 못 답할 때의 안전망.
-    `search_handler` 를 지연 import 해서 빅카인즈 경로가 성공하는 동안에는
-    boto3/DynamoDB 를 건드리지 않는다.
-    """
-    from handlers.search_handler import search_dynamodb_optimized
-
-    response = search_dynamodb_optimized(
-        query=req.query or '',
-        published_from=req.date,
-        # search_dynamodb_optimized 는 published_at BETWEEN 이라 경계가 inclusive 다.
-        # 빅카인즈의 exclusive until 과 같은 하루 범위를 만들기 위해 +1일 한다.
-        published_until=exclusive_until(req.date),
-        categories=req.categories,
-        page=req.page,
-        page_size=req.page_size,
-    )
-
-    articles = [
-        {
-            'news_id': a.get('news_id'),
-            'title': a.get('title', ''),
-            'published_at': a.get('published_at'),
-            'category': a.get('category', ''),
-            'provider': a.get('provider', BIGKINDS_PROVIDER_SEDAILY),
-            'byline': a.get('byline', ''),
-            'original_link': a.get('original_link') or '',
-            'content': a.get('content', ''),
-            'image_url': a.get('image_url'),
-            'image_path': '',
-        }
-        for a in response.articles
-    ]
-
-    return {
-        'source': 'dynamodb',
-        'total_hits': response.total_hits,
-        'articles': articles,
+        'category': a.main_category,
+        'provider': a.press,
+        'byline': a.author_name,
+        'original_link': a.url,
+        'content': a.content_clean[:2000] if a.content_clean else '',
+        'image_url': image_url,
     }
 
 
@@ -433,38 +267,20 @@ def fetch_from_dynamodb(req: TimelineRequest) -> dict:
 # Orchestration
 # =============================================================================
 
-def build_timeline(req: TimelineRequest, client: Optional[BigKindsClient] = None) -> dict:
-    """빅카인즈 우선, 실패/0건이면 DynamoDB. 어느 쪽이 답했는지 응답에 남긴다."""
-    payload: Optional[dict] = None
-    fallback_reason: Optional[str] = None
-
-    try:
-        payload = (
-            fetch_issues_from_bigkinds(req, client=client)
-            if req.is_issues
-            else fetch_from_bigkinds(req, client=client)
-        )
-        if not payload['articles']:
-            fallback_reason = '빅카인즈에 해당 일자 기사가 없습니다.'
-            logger.info('빅카인즈 0건 (date=%s) → DynamoDB 폴백', req.date)
-            payload = None
-    except BigKindsError as e:
-        # 키 미설정/인증 실패/타임아웃 모두 여기로 온다. 서비스는 계속돼야 한다.
-        fallback_reason = str(e)
-        logger.warning('빅카인즈 조회 실패 → DynamoDB 폴백: %s', e)
-    except Exception as e:  # noqa: BLE001 — 예상 못한 오류도 폴백으로 흡수
-        fallback_reason = f'빅카인즈 조회 중 예기치 못한 오류: {e}'
-        logger.error('빅카인즈 조회 예외 → DynamoDB 폴백: %s', e, exc_info=True)
-
-    if payload is None:
-        payload = fetch_from_dynamodb(req)
-        payload['fallback_reason'] = fallback_reason
+def build_timeline(req: TimelineRequest) -> dict:
+    """
+    issues 모드는 클러스터링 소스가 없어 조회 자체를 건너뛰고 빈 값을 반환한다
+    (위 모듈 docstring 참조). flat 모드는 S3 XML을 그대로 돌려준다 — 폴백 없음.
+    """
+    if req.is_issues:
+        payload: Dict[str, Any] = {'source': 's3_xml', 'total_hits': 0, 'articles': []}
+    else:
+        payload = fetch_from_s3_xml(req)
 
     total_hits = payload.get('total_hits') or 0
     payload.update({
         'date': req.date,
         'query': req.query,
-        'providers': req.providers,
         'categories': req.categories,
         'page': req.page,
         'page_size': req.page_size,
@@ -473,11 +289,7 @@ def build_timeline(req: TimelineRequest, client: Optional[BigKindsClient] = None
     })
     if req.is_issues:
         payload['per_issue'] = req.per_issue
-    payload.setdefault('trend', None)
-    # issues 모드에서 DynamoDB 로 폴백하면 이슈를 만들 수 없다 — 빅카인즈
-    # `/issue_ranking` 에만 있는 클러스터링이라 대체 소스가 없다.
     payload.setdefault('issues', None)
-    payload.setdefault('indicators', [])
     return payload
 
 

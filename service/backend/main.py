@@ -153,10 +153,9 @@ async def time_machine(date: str):
     return result
 
 
-# ── /api/timeline — 빅카인즈 기반 타임라인 ──────────────────────────────────
+# ── /api/timeline — S3 XML(서울경제 원본 피드) 기반 타임라인 ─────────────────
 # 운영과 **완전히 같은 코드**를 타도록 Lambda 핸들러를 그대로 호출한다.
 # (로컬에서만 통하는 별도 구현을 두면 로컬 검증이 운영을 보증하지 못한다.)
-# 필요 환경변수: BIGKINDS_API_KEY — service/backend/.env 에 넣으면 위에서 로드된다.
 
 def _invoke_timeline(event: dict) -> JSONResponse:
     """Lambda 핸들러 응답(statusCode/body)을 FastAPI 응답으로 되돌린다."""
