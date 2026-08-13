@@ -26,7 +26,8 @@ interface SeedLetter {
 
 // today-letters(구 AI 파이프라인)는 2026-08-04 RDS 삭제로 영구히 빈 응답만
 // 반환한다 — CMS posts API(channel=letters)로 교체(2026-08-07,
-// letters/[id]/page.tsx와 동일 원인·동일 수정).
+// letters/[id]/page.tsx와 동일 원인·동일 수정). "이슈 톡톡"은 letters 채널의
+// 분류(section)일 뿐이라(2026-08-12, 재작업) 별도 채널 조회가 필요 없다.
 async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
   const seen = new Set<string>();
   const out: SeedLetter[] = [];
@@ -65,6 +66,7 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // /trend·/column·/archive(전체 모아보기) 신설. en.sedaily.com처럼 타입별
   // 진짜 URL을 줘서 카테고리 단위 검색 노출을 노린다.
   { path: '/letters',      priority: 0.9, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 레터 전용 아카이브
+  { path: '/issue-talk',   priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 이슈 톡톡 전용 아카이브
   { path: '/trend',        priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 트렌드 전용 아카이브
   { path: '/column',       priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 인기 칼럼 전용 아카이브
   { path: '/archive',      priority: 0.5, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 전체 모아보기

@@ -7,6 +7,7 @@ export type HeaderTabKey =
   | 'feed'
   | 'trend'
   | 'column'
+  | 'lens'
   | 'video'
   | 'fortune'
   | 'timeline'
@@ -54,6 +55,9 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     { key: 'feed', label: '브리핑', href: '/letters', active: active === 'feed' },
     { key: 'trend', label: '딥다이브', href: '/trend', active: active === 'trend', tier: 'extra' },
     { key: 'column', label: '인사이트', href: '/column', active: active === 'column', tier: 'extra' },
+    // 2026-08-13 추가 — "4가지 시선"이 홈 티저 링크로만 도달 가능해서 SEO상
+    // 사이트 전역 내비게이션에서 발견이 안 되는 문제(사용자 확인 후 추가).
+    { key: 'lens', label: '시선', href: '/lens', active: active === 'lens', tier: 'extra' },
     { key: 'video', label: '영상', href: '/video', active: active === 'video', tier: 'extra' },
     // '내 서랍' 탭도 네비게이션에서 제거(2026-08-06) — 커뮤니티 대체로
     // "오늘의 한 문장 + 다른 사람들이 담은 문장 + 내 문장" 3단 구조까지

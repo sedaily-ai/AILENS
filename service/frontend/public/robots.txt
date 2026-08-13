@@ -59,3 +59,6 @@ Allow: /
 
 # ── 사이트맵 ──────────────────────────────────────────────
 Sitemap: https://ailens.sedaily.ai/sitemap.xml
+# Google News sitemap — 최근 2일 발행 기사만(스펙 요구사항), 실시간 뉴스
+# 노출 속도용. 일반 sitemap.xml과 별개 채널(News/Top Stories/Discover).
+Sitemap: https://ailens.sedaily.ai/news-sitemap.xml

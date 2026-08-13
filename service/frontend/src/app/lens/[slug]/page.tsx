@@ -79,46 +79,70 @@ export async function generateMetadata({
   };
 }
 
+// Article → NewsArticle 전환(2026-08-13, GEO 감사) — lens는 브리핑(letters)과
+// 똑같이 매일 발행되는 실제 뉴스 해설 콘텐츠인데 더 일반적인 Article 타입을
+// 쓰고 있었다. schema.org "가장 구체적인 타입을 쓰라"는 원칙에 맞춰
+// letters/[id]/page.tsx의 NewsArticle 패턴(articleSection·wordCount·
+// BreadcrumbList)과 동일하게 맞춘다.
 function buildJsonLd(lens: CmsLens, slug: string) {
   const url = `${SITE_URL}/lens/${slug}`;
   const published = `${lens.date}T07:00:00+09:00`;
   const image = lens.cover_image_url || `${SITE_URL}/og-image.png`;
+  const bodyJoined = [
+    lens.context,
+    ...lens.lenses.flatMap((l) => [l.question, ...l.bullets]),
+  ].join(' ');
   return {
     '@context': 'https://schema.org',
-    '@type': 'Article',
-    '@id': `${url}#article`,
-    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-    headline: lens.headline,
-    description: lens.context,
-    datePublished: published,
-    dateModified: published,
-    inLanguage: 'ko-KR',
-    author: {
-      '@type': 'Organization',
-      name: 'AI LENS 편집팀',
-      description:
-        '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
-      url: `${SITE_URL}/about`,
-      parentOrganization: { '@id': `${SITE_URL}/#organization` },
-    },
-    publisher: { '@id': `${SITE_URL}/#organization` },
-    image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },
-    // 본문 4개 시선을 FAQPage 유사 구조 대신 mainEntity ItemList로 노출 —
-    // 각 시선이 질문(question)+답(bullets)인 Q&A 형태라 GEO에 유리하다.
-    mainEntity: {
-      '@type': 'ItemList',
-      itemListElement: lens.lenses.map((l, i) => ({
-        '@type': 'ListItem',
-        position: i + 1,
-        name: l.label,
-        item: {
-          '@type': 'Question',
-          name: l.question,
-          acceptedAnswer: { '@type': 'Answer', text: l.bullets.join(' ') },
+    '@graph': [
+      {
+        '@type': 'NewsArticle',
+        '@id': `${url}#article`,
+        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        headline: lens.headline,
+        description: lens.context,
+        articleBody: bodyJoined,
+        articleSection: '경제',
+        wordCount: bodyJoined.length,
+        datePublished: published,
+        dateModified: published,
+        inLanguage: 'ko-KR',
+        author: {
+          '@type': 'Organization',
+          name: 'AI LENS 편집팀',
+          description:
+            '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+          url: `${SITE_URL}/about`,
+          parentOrganization: { '@id': `${SITE_URL}/#organization` },
         },
-      })),
-    },
-    isAccessibleForFree: true,
+        publisher: { '@id': `${SITE_URL}/#organization` },
+        image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },
+        // 본문 4개 시선을 FAQPage 유사 구조 대신 mainEntity ItemList로 노출 —
+        // 각 시선이 질문(question)+답(bullets)인 Q&A 형태라 GEO에 유리하다.
+        mainEntity: {
+          '@type': 'ItemList',
+          itemListElement: lens.lenses.map((l, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: l.label,
+            item: {
+              '@type': 'Question',
+              name: l.question,
+              acceptedAnswer: { '@type': 'Answer', text: l.bullets.join(' ') },
+            },
+          })),
+        },
+        isAccessibleForFree: true,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: '시선', item: `${SITE_URL}/lens` },
+          { '@type': 'ListItem', position: 3, name: lens.headline, item: url },
+        ],
+      },
+    ],
   };
 }
 
