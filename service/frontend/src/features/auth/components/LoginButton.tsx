@@ -1,25 +1,20 @@
 
 
+import Image from "next/image";
 import { useAuth } from "@/entities/user";
 
 export function LoginButton() {
   const { user, isLoading, isAuthenticated, signInWithGoogle, logout } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="h-9 w-20 bg-gray-100 rounded animate-pulse" />
-    );
+    return <div className="h-9 w-20" />;
   }
 
   if (isAuthenticated && user) {
     return (
       <div className="flex items-center gap-3">
         {user.picture && (
-          <img loading="lazy"
-            src={user.picture}
-            alt=""
-            className="w-8 h-8 rounded-full"
-          />
+          <Image src={user.picture} alt="" width={32} height={32} className="rounded-full" />
         )}
         <span className="text-[13px] text-gray-700 hidden md:block">
           {user.name || user.email}

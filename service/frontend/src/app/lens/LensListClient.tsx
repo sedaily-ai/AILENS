@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
 
 // "오늘의 이슈, 4가지 시선" 목록 — 화이트 "매거진 고급짐" 톤으로 전환
@@ -118,11 +119,13 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
           >
             <div className="relative overflow-hidden" style={{ aspectRatio: '4 / 3', background: '#f3f4f6' }}>
               {latest.cover_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element -- 다른 CMS 카드 이미지와 같은 패턴(raw img, 원격 URL이라 next/image 불필요)
-                <img
+                <Image
                   src={latest.cover_image_url}
                   alt={latest.headline}
-                  className="w-full h-full transition-transform duration-500 group-hover:scale-[1.04]"
+                  fill
+                  sizes="(min-width: 768px) 640px, 100vw"
+                  priority
+                  className="transition-transform duration-500 group-hover:scale-[1.04]"
                   style={{ objectFit: 'cover' }}
                 />
               ) : (
@@ -200,8 +203,7 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                 >
                   <div style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f3f4f6' }}>
                     {l.cover_image_url && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={l.cover_image_url} alt={l.headline} className="w-full h-full" style={{ objectFit: 'cover' }} />
+                      <Image src={l.cover_image_url} alt={l.headline} width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     )}
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>

@@ -7,6 +7,7 @@
 // 슬쩍 어긋날 수 있어 단일 출처를 그대로 참조하는 쪽을 택했다 — boundaries
 // 규칙은 warn이라 빌드는 안 막힌다).
 import Link from 'next/link';
+import Image from 'next/image';
 import { LetterMailIcon, StockBullIcon, LightbulbIcon } from '@/features/news-feed/components/icons/HandDrawnIcons';
 import type { ArchiveItem } from '@/shared/lib/archiveItems';
 
@@ -57,10 +58,11 @@ export function ArchiveList({ items, emptyLabel }: { items: ArchiveItem[]; empty
                   background: '#f3f4f6',
                 }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- 외부 CMS 원본 URL, 사이즈 다양해 next/image 최적화 대상 아님 */}
-                <img
+                <Image
                   src={item.avatarUrl}
                   alt=""
+                  width={56}
+                  height={56}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </span>

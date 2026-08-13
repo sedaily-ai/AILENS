@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 
 /**
@@ -211,8 +212,7 @@ export function WebtoonViewClient({
               >
                 {nextEpisode.cover_image_url && (
                   <div style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(253,224,71,0.4)' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={nextEpisode.cover_image_url} alt={nextEpisode.title} className="w-full h-full transition-transform duration-300 group-hover:scale-[1.06]" style={{ objectFit: 'cover', objectPosition: 'top' }} />
+                    <Image src={nextEpisode.cover_image_url} alt={nextEpisode.title} width={56} height={56} className="transition-transform duration-300 group-hover:scale-[1.06]" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
                   </div>
                 )}
                 <div style={{ minWidth: 0, flex: 1 }}>

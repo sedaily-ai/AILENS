@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { StockBullIcon, CoinExchangeIcon, ServerRobotIcon, PiggyBankIcon } from './icons/HandDrawnIcons';
 import { fetchTrendCards, fetchCmsPosts, type CmsTrendCard } from '@/shared/lib/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
@@ -168,12 +169,11 @@ export function TrendingEconomySection() {
               {/* 상단 컬러 바를 시도했다가 카드마다 다른 원색이 나란히 있으니 무지개
                   줄무늬처럼 촌스러워 보였다(2026-08-06 피드백) — 뺐다. */}
               <div
-                className="aspect-square flex items-center justify-center overflow-hidden"
+                className="aspect-square relative flex items-center justify-center overflow-hidden"
                 style={{ background: accentBg }}
               >
                 {a.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.imageUrl} alt={a.title} className="w-full h-full" style={{ objectFit: 'cover' }} />
+                  <Image src={a.imageUrl} alt={a.title} fill sizes="(min-width: 640px) 25vw, 50vw" style={{ objectFit: 'cover' }} />
                 ) : (
                   <Icon accent={accent} className="w-2/5 h-2/5" />
                 )}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { ArchivedSentence, MbtiArticle, TabType } from "@/shared/types/mbti";
 import { getWeekDays, isSameDay, getMonthDays } from "@/shared/utils/dateUtils";
 import { useAuth } from "@/entities/user";
@@ -340,9 +341,9 @@ export function ArchiveTab({
             "다들 이런 걸 저장하는구나"가 첫 저장의 동기가 되도록. */}
         <PopularHighlightsSection />
 
-        {/* Loading skeleton */}
+        {/* Loading placeholder */}
         {isLoading && (
-          <div className="space-y-4 animate-pulse">
+          <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-gray-100 rounded-2xl h-28" />
             ))}
@@ -597,7 +598,7 @@ function TodaysSentenceSection() {
       </div>
 
       {loading || !letter ? (
-        <div className="bg-gray-100 rounded-2xl h-[96px] animate-pulse" />
+        <div className="bg-gray-100 rounded-2xl h-[96px]" />
       ) : (
         <Link
           href={letterHref(letter.letterId)}
@@ -606,8 +607,7 @@ function TodaysSentenceSection() {
         >
           <p className="text-[15px] font-medium leading-relaxed mb-3 text-gray-800">&quot;{sentence}&quot;</p>
           <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={letter.editorAvatar} alt={letter.editorName} className="w-5 h-5 rounded-full object-cover" />
+            <Image src={letter.editorAvatar} alt={letter.editorName} width={20} height={20} className="rounded-full object-cover" />
             <span className="text-[12px] font-semibold" style={{ color: letter.accent }}>{letter.editorName}</span>
             <span className="text-[11px] text-gray-400 truncate">· {letter.title}</span>
           </div>
@@ -659,7 +659,7 @@ function PopularHighlightsSection() {
       </div>
 
       {loading ? (
-        <div className="space-y-2 animate-pulse">
+        <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-gray-100 rounded-2xl h-[72px]" />
           ))}

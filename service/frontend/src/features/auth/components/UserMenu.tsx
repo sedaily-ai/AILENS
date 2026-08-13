@@ -1,6 +1,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAuth } from "@/entities/user";
 
 export function UserMenu() {
@@ -21,9 +22,7 @@ export function UserMenu() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="w-8 h-8 bg-gray-100 rounded-full animate-pulse" />
-    );
+    return <div className="w-8 h-8" />;
   }
 
   // Not logged in - show login button
@@ -50,11 +49,7 @@ export function UserMenu() {
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
         {user.picture ? (
-          <img loading="lazy"
-            src={user.picture}
-            alt=""
-            className="w-8 h-8 rounded-full border border-gray-200"
-          />
+          <Image src={user.picture} alt="" width={32} height={32} className="rounded-full border border-gray-200" />
         ) : (
           <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
             <span className="text-[12px] font-medium text-gray-600">

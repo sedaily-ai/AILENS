@@ -12,6 +12,7 @@
  * 교체했다. `todayLettersApi.ts` 의 DEFAULT_META 와 같은 톤.
  */
 import Link from 'next/link';
+import Image from 'next/image';
 import { ScrollReveal } from '@/shared/ui/ScrollReveal';
 import { NewsletterCTA } from '@/features/news-feed/components/NewsletterCTA';
 import { useLatestLetters } from '@/shared/lib/useLatestLetters';
@@ -417,10 +418,11 @@ function SampleLetterSection() {
             <header
               style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy"
+              <Image
                 src={sample.editorAvatar}
                 alt=""
+                width={36}
+                height={36}
                 style={{
                   width: 36,
                   height: 36,

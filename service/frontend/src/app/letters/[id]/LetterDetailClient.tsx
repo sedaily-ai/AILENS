@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -655,13 +656,12 @@ function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={letter.editorAvatar}
           alt={letter.editorName}
+          width={52}
+          height={52}
           style={{
-            width: 52,
-            height: 52,
             borderRadius: '50%',
             objectFit: 'cover',
             boxShadow: `0 0 0 1px ${letter.accent}22`,
@@ -962,14 +962,13 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
     >
       {/* 페르소나 캐릭터 */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={letter.editorAvatar}
           alt={letter.editorName}
+          width={60}
+          height={60}
           className={notReady ? '' : 'transition-transform duration-200 group-hover:scale-105'}
           style={{
-            width: 60,
-            height: 60,
             borderRadius: 16,
             objectFit: 'cover',
             background: letter.accentBg,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { chatbotWs } from '@/shared/lib/chatbotWs';
@@ -594,7 +595,7 @@ export function SmartSearchOverlay({ open, onClose }: Props) {
               <div className="text-center mb-10" style={{ animation: 'pop 0.25s ease-out' }}>
                 <p className="text-[11px] tracking-[0.25em] uppercase text-gray-400 mb-3">ASK AI LENS</p>
                 <div className="flex flex-col items-center gap-3">
-                  <img loading="lazy" src={editor.avatar} alt={editor.name} className="w-16 h-16 rounded-full object-cover" />
+                  <Image src={editor.avatar} alt={editor.name} width={64} height={64} className="rounded-full object-cover" />
                   <h1 className="text-[22px] font-semibold text-gray-900">{editor.role}</h1>
                   <p className="text-[13px] text-gray-500">{editor.tagline}</p>
                 </div>
@@ -626,10 +627,12 @@ export function SmartSearchOverlay({ open, onClose }: Props) {
                   className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {m.role === 'assistant' && (
-                    <img loading="lazy"
+                    <Image
                       src={editor.avatar}
                       alt={editor.name}
-                      className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-1"
+                      width={32}
+                      height={32}
+                      className="rounded-full object-cover flex-shrink-0 mt-1"
                     />
                   )}
                   <div
@@ -667,10 +670,12 @@ export function SmartSearchOverlay({ open, onClose }: Props) {
           {mode === 'text' ? (
             <form onSubmit={handleSubmit}>
               <div className="flex items-end gap-2 rounded-3xl bg-gray-100/80 px-4 py-2.5 shadow-[0_2px_12px_-6px_rgba(0,0,0,0.1)] transition-all focus-within:bg-white focus-within:shadow-[0_8px_24px_-10px_rgba(0,0,0,0.14)]">
-                <img loading="lazy"
+                <Image
                   src={editor.avatar}
                   alt={editor.name}
-                  className="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-1"
+                  width={28}
+                  height={28}
+                  className="rounded-full object-cover flex-shrink-0 mb-1"
                 />
                 <textarea
                   ref={inputRef}

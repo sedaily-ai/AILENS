@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
 
 // "오늘의 이슈, 4가지 시선" 홈 티저 — 화이트 "매거진 고급짐" 톤으로 전환
@@ -79,11 +80,13 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
       <Link href={`/lens/${encodeURIComponent(current.id)}`} prefetch className="group relative" style={CARD}>
         <div className="relative overflow-hidden" style={{ aspectRatio: '16 / 9', background: '#f3f4f6' }}>
           {current.cover_image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element -- 원격 CMS 이미지, 다른 홈 섹션 카드와 같은 패턴
-            <img
+            <Image
               src={current.cover_image_url}
               alt={current.headline}
-              className="w-full h-full transition-transform duration-500 group-hover:scale-[1.03]"
+              fill
+              sizes="(min-width: 768px) 640px, 100vw"
+              priority
+              className="transition-transform duration-500 group-hover:scale-[1.03]"
               style={{ objectFit: 'cover' }}
             />
           ) : (

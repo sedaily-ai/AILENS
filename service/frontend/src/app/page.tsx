@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { FeedPage } from "@/widgets/FeedPage";
 import { fetchCmsPosts, fetchVideos, fetchWebtoons, fetchLensPosts } from "@/shared/lib/cmsPostsApi";
 import { fetchFollowingLetters } from "@/shared/lib/todayLettersApi";
@@ -77,15 +76,13 @@ export default async function HomePage() {
     ]);
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50"></div></div>}>
-      <HomeContent
-        initialFollowingLetters={initialFollowingLetters}
-        initialWebtoons={initialWebtoons}
-        initialVideos={initialVideos}
-        initialWordTerms={initialWordTerms}
-        initialCmsLetters={initialCmsLetters}
-        initialLensPosts={initialLensPosts}
-      />
-    </Suspense>
+    <HomeContent
+      initialFollowingLetters={initialFollowingLetters}
+      initialWebtoons={initialWebtoons}
+      initialVideos={initialVideos}
+      initialWordTerms={initialWordTerms}
+      initialCmsLetters={initialCmsLetters}
+      initialLensPosts={initialLensPosts}
+    />
   );
 }

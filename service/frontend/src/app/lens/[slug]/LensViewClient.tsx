@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/cmsPostsApi';
 
 // "오늘의 이슈, 4가지 시선" 상세 — 화이트 "매거진 고급짐" 톤으로 전환
@@ -86,11 +87,13 @@ export function LensViewClient({
           본문 영역으로 자연스럽게 이어지도록 그라데이션이 #fff로 끝난다. */}
       <div style={{ position: 'relative', width: '100%', minHeight: '58vh', overflow: 'hidden', background: '#f3f4f6' }}>
         {lens.cover_image_url && (
-          // eslint-disable-next-line @next/next/no-img-element -- 원격 CMS 이미지, 다른 CmsPost 카드와 같은 패턴
-          <img
+          <Image
             src={lens.cover_image_url}
             alt={lens.headline}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            fill
+            sizes="100vw"
+            priority
+            style={{ objectFit: 'cover' }}
           />
         )}
         <div

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 
@@ -138,11 +139,12 @@ export function VideoPreviewSection({ initialVideos }: Props) {
                     aria-label={`${v.title} 재생`}
                   >
                     {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         src={thumb}
                         alt={v.title}
-                        className="w-full h-full transition-transform duration-300 group-hover:scale-[1.04]"
+                        fill
+                        sizes="(min-width: 640px) 25vw, 50vw"
+                        className="transition-transform duration-300 group-hover:scale-[1.04]"
                         style={{ objectFit: 'cover' }}
                       />
                     ) : (

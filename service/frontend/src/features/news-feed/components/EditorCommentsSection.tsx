@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { letterHref } from '@/shared/lib/letterHref';
 import type { ApiLetter } from '@/shared/lib/todayLettersApi';
 
@@ -80,8 +81,7 @@ export function EditorCommentsSection({ otherLetters }: Props) {
                     boxShadow: `0 2px 8px ${ACCENT}22`,
                   }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img loading="lazy" src={ltr.cover_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <Image src={ltr.cover_image_url} alt="" width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               </header>
             )}
