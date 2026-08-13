@@ -73,6 +73,7 @@ function LensEditPage() {
               : EMPTY_LENSES,
           },
           cover_image_url: post.cover_image_url || null,
+          source_url: post.source_url || null,
         });
       })
       .catch((err) => {

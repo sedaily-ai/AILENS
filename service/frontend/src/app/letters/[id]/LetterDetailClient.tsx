@@ -817,6 +817,19 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
         )
       )}
 
+      {letter.source_url && (
+        <p style={{ fontSize: 13, marginBottom: 24 }}>
+          <a
+            href={letter.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: letter.accent, fontWeight: 600, textDecoration: 'none' }}
+          >
+            원문 보기 — 서울경제 →
+          </a>
+        </p>
+      )}
+
       {letter.keywords.length > 0 && (
         <section style={{ borderTop: '1px solid #f3f4f6', paddingTop: 24, marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>

@@ -117,6 +117,9 @@ function buildJsonLd(lens: CmsLens, slug: string) {
         },
         publisher: { '@id': `${SITE_URL}/#organization` },
         image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },
+        // 원문 기사 인용(2026-08-13, SEO/GEO/AEO 감사) — admin이 원문 URL을
+        // 안 채운 글은 이 필드 자체가 빠진다.
+        ...(lens.source_url ? { citation: lens.source_url } : {}),
         // 본문 4개 시선을 FAQPage 유사 구조 대신 mainEntity ItemList로 노출 —
         // 각 시선이 질문(question)+답(bullets)인 Q&A 형태라 GEO에 유리하다.
         mainEntity: {

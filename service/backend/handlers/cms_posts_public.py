@@ -73,6 +73,9 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # 피드 카드 썸네일 — admin에서 지정 안 하면 None, 프론트가 에디터
         # 아바타로 폴백한다 (todayLettersApi.ts::toTodayLetterCard).
         "cover_image_url": post.get("cover_image_url") or None,
+        # 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO
+        # 감사). admin이 안 채우면 None, 프론트는 있을 때만 "원문 보기" 노출.
+        "source_url": post.get("source_url") or None,
         # 전체 레터라도 /letters 아카이브에서 "트렌드"/"인기 칼럼" 필터에 걸리고
         # 싶을 수 있다 — channel 을 trend_card 로 바꾸면 본문·퀴즈가 요약 카드로
         # 축소되니, 대신 가벼운 태그만 얹는다(글 자체는 여전히 상세 페이지 그대로).
@@ -188,6 +191,7 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         "context": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
         "cover_image_url": post.get("cover_image_url") or None,
+        "source_url": post.get("source_url") or None,
         "lenses": lenses,
         "is_cms": True,
     }

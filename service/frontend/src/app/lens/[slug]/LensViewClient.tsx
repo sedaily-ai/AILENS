@@ -193,6 +193,19 @@ export function LensViewClient({
           </section>
         ))}
 
+        {lens.source_url && (
+          <p style={{ textAlign: 'center', fontSize: 13, marginBottom: 4 }}>
+            <a
+              href={lens.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: ACCENT, fontWeight: 700, textDecoration: 'none' }}
+            >
+              원문 보기 — 서울경제 →
+            </a>
+          </p>
+        )}
+
         {/* 클로징 — 브랜드 스테이트먼트 + 인스타 연결(원본 출처). */}
         <section style={{ textAlign: 'center', padding: 'clamp(40px, 6vw, 56px) 0 8px' }}>
           <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', marginBottom: 32 }} />
