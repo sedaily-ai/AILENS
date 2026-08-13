@@ -60,7 +60,7 @@ export function VideoPreviewSection({ initialVideos }: Props) {
             className="text-gray-400"
             style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
           >
-            Video
+            영상
           </p>
           <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
             영상으로 보는 이슈

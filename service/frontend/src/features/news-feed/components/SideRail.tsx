@@ -423,7 +423,9 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
   // (하루치 전체 레터, 개수 상한 없음)에서 fetchFollowingLetters(=홈
   // "이슈 톡톡"과 같은 분류: 실제 에디터 이름으로 태깅된 레터만)로 교체.
   // 상한도 5개로 맞춤(fetchFollowingLetters 두 번째 인자, todayLettersApi.ts
-  // 참조 — 홈 "이슈 톡톡" 자체는 4개 그대로 두고 사이드바만 5개).
+  // 참조 — 홈 "이슈 톡톡" 자체는 4개 그대로 두고 사이드바만 5개). 2026-08-12,
+  // 이슈 톡톡 전체 삭제로 잠깐 useLatestLetters로 되돌렸다가 같은 날 이슈
+  // 톡톡이 다시 부활하면서 이 원래 로직도 함께 복귀.
   const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>([]);
 
   useEffect(() => {

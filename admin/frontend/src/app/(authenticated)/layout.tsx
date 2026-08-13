@@ -7,6 +7,8 @@ import { Sidebar } from "@/components/Sidebar";
 // 새 글 쓰기(/posts/edit)는 티스토리식 풀스크린 캔버스로 쓴다(2026-08-09) —
 // 사이드바·본문 폭 제한을 이 경로에서만 건너뛴다. 상단 바·캔버스 폭은
 // posts/edit/page.tsx와 PostFormShell.tsx가 각자 알아서 책임진다.
+// (한때 /issue-talk/edit도 있었지만 "이슈 톡톡"이 독립 채널에서 글 관리의
+// 분류로 되돌아가며 2026-08-12에 제거됨.)
 const FOCUS_MODE_PREFIXES = ["/posts/edit"];
 
 export default function AuthenticatedLayout({

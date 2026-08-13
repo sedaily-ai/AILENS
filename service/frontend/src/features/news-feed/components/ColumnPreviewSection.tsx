@@ -66,14 +66,12 @@ export function ColumnPreviewSection() {
       fetchCmsPosts('letters', undefined, 100),
     ]).then(([cards, letters]) => {
       if (cancelled) return;
-      // "칼럼" 태그(section:'column')가 명시된 글뿐 아니라, editor_id가 없거나
-      // 기본 명의("AI LENS")인 일반 레터도 여기로 편입한다 — "이슈 톡톡"은
-      // admin이 실제 이름으로 태깅한 레터 전용으로 좁혔으니(FollowingFeed.tsx
-      // 참조, 2026-08-07 사용자 확인), 태그 없는 일반 레터의 자리가 여기다.
+      // "칼럼"(section:'column') 태그가 명시된 글만 — 예전엔 태그 없는 일반
+      // 레터도 여기로 편입시켰는데, "오늘의 이슈"(분류 없음)가 이슈 톡톡
+      // 전용 아카이빙으로 재정의되면서(2026-08-12) 그 편입 로직을 걷어냈다.
+      // 태그 없는 레터는 이제 인사이트가 아니라 이슈 톡톡(FollowingFeed) 쪽이다.
       const tagged: ColumnItem[] = letters
-        .filter(
-          (l) => l.section === 'column' || (!l.section && (!l.editor_id || l.editor_id === 'AI LENS')),
-        )
+        .filter((l) => l.section === 'column')
         .map((l) => ({
           id: l.id,
           section: 'column' as const,
@@ -116,7 +114,7 @@ export function ColumnPreviewSection() {
             className="text-gray-400"
             style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
           >
-            Column
+            인사이트
           </p>
           {/* 섹션 제목 타이포 통일(2026-08-06) — 홈 화면 섹션 제목을 전부
               Pretendard Bold로(웹툰만 튀어 보이던 문제). */}

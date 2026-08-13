@@ -51,15 +51,38 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
           <MetaField label="분류">
             <CustomSelect
               value={body.section ?? ""}
-              onChange={(v) => patchBody({ section: (v || undefined) as "trend" | "column" | "glossary" | undefined })}
+              onChange={(v) =>
+                patchBody({ section: (v || undefined) as "trend" | "column" | "issue_talk" | undefined })
+              }
               // 워딩은 공개 사이트 나브 라벨과 동일하게 맞춘다(2026-08-12,
-              // posts/page.tsx CHANNEL_FILTERS 주석 참조).
+              // posts/page.tsx CHANNEL_FILTERS 주석 참조). "용어 해설"(glossary)
+              // 옵션은 뺐다 — 프론트/백엔드 어디서도 이 값을 읽지 않는 죽은
+              // 선택지였다.
+              //
+              // "오늘의 이슈"(기본값, 분류 안 고름) = "이슈 톡톡"으로 재정의
+              // (2026-08-12) — "인사이트에서 이슈 톡톡으로 옮기려는데 안 된다"는
+              // 피드백으로, 별도 issue_talk 옵션을 두는 대신 기본값 자체를
+              // 이슈 톡톡 전용 아카이빙으로 쓰기로 했다. 분류를 안 고르면
+              // 자동으로 이슈 톡톡(홈 위젯 + /issue-talk)에 쌓이고, 딥다이브·
+              // 인사이트를 명시로 고른 글만 각자 아카이브로 빠진다.
               options={[
-                { value: "", label: "오늘의 이슈" },
+                { value: "", label: "이슈 톡톡" },
                 { value: "trend", label: "딥다이브" },
                 { value: "column", label: "인사이트" },
-                { value: "glossary", label: "용어 해설" },
               ]}
+            />
+          </MetaField>
+          <MetaDivider />
+          {/* 작성자 — "이슈 톡톡"의 정체성(실명 에디터가 쓴 글)을 위해
+              추가. 분류와 무관하게 항상 입력 가능 — 다른 분류 글에도 실명
+              저작자를 남기고 싶을 수 있어 굳이 안 막는다. */}
+          <MetaField label="작성자">
+            <input
+              value={value.editor_id ?? ""}
+              onChange={(e) => patch({ editor_id: e.target.value || null })}
+              placeholder="예: 김민준 기자"
+              className="ui-input rounded-lg px-2 py-0.5 text-[12.5px]"
+              style={{ width: 110 }}
             />
           </MetaField>
         </>

@@ -74,10 +74,19 @@ export function TimelinePreviewSection() {
   const router = useRouter();
   const [pickedDate, setPickedDate] = useState(todayStr());
   const [items, setItems] = useState<TimelineItem[] | null>(null);
+  // pickedDate가 바뀌면 렌더 중 동기 조정으로 이전 목록을 지운다(React 공식
+  // "Adjusting state when a prop changes" 패턴) — effect 안에서 곧장
+  // setState를 부르면 불필요한 리렌더 캐스케이드를 유발한다는
+  // react-hooks/set-state-in-effect 경고를 여기로 옮겨 해결
+  // (TimeMachineClient.tsx의 DatePicker와 동일한 처리).
+  const [prevPickedDate, setPrevPickedDate] = useState(pickedDate);
+  if (pickedDate !== prevPickedDate) {
+    setPrevPickedDate(pickedDate);
+    setItems(null);
+  }
 
   useEffect(() => {
     let cancelled = false;
-    setItems(null);
     const load = (silent: boolean) => {
       fetchDayArticles(pickedDate)
         .then((rows) => {
@@ -119,7 +128,7 @@ export function TimelinePreviewSection() {
             className="text-gray-400"
             style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
           >
-            Timeline
+            타임라인
           </p>
           <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
             실시간 News

@@ -49,7 +49,7 @@ export function FollowingFeed({ initialLetters }: Props) {
             marginBottom: 4,
           }}
         >
-          Letter
+          이슈 톡톡
         </p>
         <div className="flex items-center justify-between" style={{ gap: 8 }}>
           {/* "OO월 OO일의 한 통 N편" + "발행분" 날짜 표기를 뺐다 — 매일 새로
@@ -69,10 +69,11 @@ export function FollowingFeed({ initialLetters }: Props) {
           >
             이슈 톡톡
           </h2>
-          {/* 지금까지 발행된 전체 레터 목록 — 경제 캘린더로 잘못 연결돼 있던 걸
-              2026-08-06 수정(캘린더 페이지 자체를 폐기). */}
+          {/* 이슈 톡톡 전용 아카이브(2026-08-12) — 예전엔 /letters로 갔는데
+              그 아카이브는 channel=letters만 조회해서 이 채널(issue_talk)
+              글이 하나도 안 보이는 버그였다(사용자 확인 후 /issue-talk 신설). */}
           <Link
-            href="/letters"
+            href="/issue-talk"
             className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors"
             style={{ fontSize: 13, fontWeight: 500 }}
           >

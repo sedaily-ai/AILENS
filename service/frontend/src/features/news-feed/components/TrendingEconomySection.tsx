@@ -113,7 +113,7 @@ export function TrendingEconomySection() {
             className="text-gray-400"
             style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
           >
-            Trend
+            딥다이브
           </p>
           {/* 섹션 제목 타이포 통일(2026-08-06) — 웹툰만 굵은 산세리프라 튀어
               보인다는 지적으로, 홈 화면 섹션 제목을 전부 Pretendard Bold로. */}

@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import { FeedPage } from "@/widgets/FeedPage";
-import { fetchCmsPosts, fetchVideos, fetchWebtoons } from "@/shared/lib/cmsPostsApi";
+import { fetchCmsPosts, fetchVideos, fetchWebtoons, fetchLensPosts } from "@/shared/lib/cmsPostsApi";
 import { fetchFollowingLetters } from "@/shared/lib/todayLettersApi";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
-import type { CmsLetter, CmsVideo, CmsWebtoon } from "@/shared/lib/cmsPostsApi";
+import type { CmsLetter, CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import type { Term } from "@/features/news-feed";
 
@@ -23,6 +23,7 @@ interface HomeContentProps {
   initialVideos: CmsVideo[];
   initialWordTerms: Term[];
   initialCmsLetters: CmsLetter[];
+  initialLensPosts: CmsLens[];
 }
 
 function HomeContent({
@@ -31,6 +32,7 @@ function HomeContent({
   initialVideos,
   initialWordTerms,
   initialCmsLetters,
+  initialLensPosts,
 }: HomeContentProps) {
   return (
     <FeedPage
@@ -40,30 +42,38 @@ function HomeContent({
       initialVideos={initialVideos}
       initialWordTerms={initialWordTerms}
       initialCmsLetters={initialCmsLetters}
+      initialLensPosts={initialLensPosts}
     />
   );
 }
 
 // 서버 컴포넌트로 전환(2026-08-07, 홈 SSG 감사) — 이전엔 페이지 전체가
 // 'use client'라 정적 HTML에 nav/footer(192자)뿐이었다. 홈 피드가 실제로
-// 렌더하는 5개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
-// WordsPreviewSection/MiniHeadlinesSection)의 데이터를 미리 가져와 FeedPage →
-// NewsFeedTab → 각 섹션까지 initialX prop으로 내려준다. 나머지 섹션
-// (TimelinePreviewSection/TrendingEconomySection/ColumnPreviewSection 등)은
-// 의도된 mock/placeholder라 그대로 둔다.
+// 렌더하는 6개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
+// WordsPreviewSection/MiniHeadlinesSection/LensPreviewSection)의 데이터를
+// 미리 가져와 FeedPage → NewsFeedTab → 각 섹션까지 initialX prop으로
+// 내려준다. 나머지 섹션(TimelinePreviewSection/TrendingEconomySection/
+// ColumnPreviewSection 등)은 의도된 mock/placeholder라 그대로 둔다.
+// LensPreviewSection은 2026-08-12에 추가(신설 당시 프리페치를 빠뜨려서
+// 클라이언트 useEffect fetch만 있었다 — 실제 lens 글을 발행해 curl로
+// 검증하던 중 첫 페인트에 아무것도 안 보이는 걸 발견, 다른 5개 섹션과
+// 통일).
+// "이슈 톡톡"(FollowingFeed) 전체 삭제했다가(2026-08-12) 같은 날 사용자가
+// 다시 부활 요청 — 프리페치도 원복.
 // force-dynamic을 걸었다가(SSR 전환 직후) 다시 뺐다(2026-08-08) — 아래 fetch들이
 // posts:* 태그로 캐시되므로, 매 요청 강제 재렌더링보다 Next가 이 라우트를
 // 정적/캐시로 취급하고 admin 발행 시 POST /api/revalidate 가 revalidateTag()
 // 로 정확히 무효화하는 쪽이 "클릭 즉시 이동" 요구에 맞다.
 
 export default async function HomePage() {
-  const [initialFollowingLetters, initialWebtoons, initialVideos, initialWordTerms, initialCmsLetters] =
+  const [initialFollowingLetters, initialWebtoons, initialVideos, initialWordTerms, initialCmsLetters, initialLensPosts] =
     await Promise.all([
       fetchFollowingLetters(),
       fetchWebtoons(),
       fetchVideos(),
       fetchFollowingWordTerms(),
       fetchCmsPosts('letters', undefined, 50),
+      fetchLensPosts(),
     ]);
 
   return (
@@ -74,6 +84,7 @@ export default async function HomePage() {
         initialVideos={initialVideos}
         initialWordTerms={initialWordTerms}
         initialCmsLetters={initialCmsLetters}
+        initialLensPosts={initialLensPosts}
       />
     </Suspense>
   );

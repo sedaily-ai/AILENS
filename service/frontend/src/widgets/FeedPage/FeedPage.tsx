@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsLetter, CmsVideo, CmsWebtoon } from "@/shared/lib/cmsPostsApi";
+import type { CmsLetter, CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
@@ -31,6 +31,7 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialCmsLetters?: CmsLetter[];
+  initialLensPosts?: CmsLens[];
 }
 
 // 아카이빙된 문장 타입
@@ -79,6 +80,7 @@ export function FeedPage({
   initialVideos,
   initialWordTerms,
   initialCmsLetters,
+  initialLensPosts,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -358,6 +360,7 @@ export function FeedPage({
           // 칼럼 → 브리핑/딥다이브/인사이트로 통일, URL은 그대로.
           { key: "trend", label: "딥다이브", href: "/trend", tier: "extra" },
           { key: "column", label: "인사이트", href: "/column", tier: "extra" },
+          { key: "lens", label: "시선", href: "/lens", tier: "extra" },
           { key: "video", label: "영상", href: "/video", tier: "extra" },
           // '내 서랍' 탭 제거(2026-08-06, headerTabs.ts 주석 참조) — 페이지/저장
           // 기능 자체는 살아있고 activeTab === "archive" 렌더 분기도 그대로 둔다.
@@ -413,6 +416,7 @@ export function FeedPage({
             initialVideos={initialVideos}
             initialWordTerms={initialWordTerms}
             initialCmsLetters={initialCmsLetters}
+            initialLensPosts={initialLensPosts}
           />
         )}
 

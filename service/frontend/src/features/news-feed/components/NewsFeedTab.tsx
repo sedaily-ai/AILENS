@@ -1,7 +1,7 @@
 'use client';
 
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsLetter, CmsVideo, CmsWebtoon } from "@/shared/lib/cmsPostsApi";
+import type { CmsLetter, CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import type { Term } from "../lib/wordsTerms";
 import { FollowingFeed } from "./FollowingFeed";
@@ -32,6 +32,7 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialCmsLetters?: CmsLetter[];
+  initialLensPosts?: CmsLens[];
 }
 
 export function NewsFeedTab({
@@ -48,6 +49,7 @@ export function NewsFeedTab({
   initialVideos,
   initialWordTerms,
   initialCmsLetters,
+  initialLensPosts,
 }: Props) {
   return (
     <div className="min-h-screen bg-white">
@@ -118,7 +120,7 @@ export function NewsFeedTab({
               하루 한 건만 크게 보여주는 게 컨셉이라(다른 섹션의 "4개씩
               나열"과 대비), 본편 앞자리에서 "오늘 진짜 중요한 거 하나"라는
               신호로 쓴다. LensPreviewSection.tsx 참조. */}
-          <LensPreviewSection />
+          <LensPreviewSection initialItems={initialLensPosts} />
 
           <FollowingFeed initialLetters={initialFollowingLetters} />
 

@@ -85,8 +85,10 @@ export interface NewsletterSubscriber {
 // --- CMS posts (backend/admin/routes/posts.py 와 1:1) ---
 
 export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video" | "lens";
-// "용어 해설" — 오늘의 이슈/머니 트렌드/깊은 이야기와 같은 방식의 분류.
-export type CmsCardSection = "trend" | "column" | "glossary";
+// "용어 해설"/"이슈 톡톡" — 오늘의 이슈/머니 트렌드/깊은 이야기와 같은
+// 방식의 분류(2026-08-12, 이슈 톡톡을 별도 채널에서 되돌렸다가 삭제 후
+// 다시 부활).
+export type CmsCardSection = "trend" | "column" | "glossary" | "issue_talk";
 export type CmsStatus = "draft" | "published" | "archived";
 
 export interface CmsKeyword {

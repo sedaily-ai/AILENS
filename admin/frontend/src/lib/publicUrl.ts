@@ -8,6 +8,8 @@ export function publicPostUrl(post: { slug: string; channels: string[] }): strin
   if (post.channels.includes("webtoon")) return `${PUBLIC_SITE}/webtoon/${encodeURIComponent(post.slug)}`;
   if (post.channels.includes("lens")) return `${PUBLIC_SITE}/lens/${encodeURIComponent(post.slug)}`;
   if (post.channels.includes("trend_card") || post.channels.includes("video")) return null;
+  // "이슈 톡톡"(분류=issue_talk)도 channels는 그냥 letters라 별도 분기 없이
+  // 여기로 떨어진다 — 딥다이브·인사이트와 동일.
   return `${PUBLIC_SITE}/letters/${encodeURIComponent(post.slug)}`;
 }
 

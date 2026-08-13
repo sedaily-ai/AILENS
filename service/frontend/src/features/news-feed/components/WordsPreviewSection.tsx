@@ -127,7 +127,7 @@ export function WordsPreviewSection({ initialTerms }: Props) {
           className="text-gray-400"
           style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
         >
-          Glossary
+          단어 퀴즈
         </p>
         <div className="flex items-center justify-between" style={{ gap: 8 }}>
           {/* 섹션 제목 타이포 통일(2026-08-06) — 홈 화면 섹션 제목을 전부

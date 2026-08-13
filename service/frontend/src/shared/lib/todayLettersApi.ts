@@ -54,8 +54,10 @@ export interface ApiLetter {
   // fetchTodayLetters(date) 호출부는 이미 date 를 알고 있어 안 씀.
   publish_date?: string | null;
   // /letters 아카이브 필터용 가벼운 태그 — channel(letters)은 그대로 두고
-  // "트렌드"/"인기 칼럼"으로도 분류하고 싶을 때만 admin 이 지정.
-  section?: 'trend' | 'column' | null;
+  // "트렌드"/"인기 칼럼"/"이슈 톡톡"으로도 분류하고 싶을 때만 admin 이 지정
+  // (issue_talk 은 2026-08-12 재작업 — 별도 채널에서 이 분류값으로 되돌림,
+  // 2026-08-12 재부활).
+  section?: 'trend' | 'column' | 'issue_talk' | null;
   // section 이 trend/column 일 때 홈 카드 상단 라벨(예: "증시", "투자 인사이트").
   // admin PostForm이 지정하지 않으면 null — 호출측이 editor_id 등으로 폴백.
   category?: string | null;
@@ -310,15 +312,14 @@ export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLA
     daysBack += 1
   ) {
     try {
+      // "오늘의 이슈"(분류 없음, 기본값)를 이슈 톡톡 전용 아카이빙으로 쓰기로
+      // 재정의(2026-08-12) — "인사이트에서 이슈 톡톡으로 옮기려는데 안 된다"는
+      // 피드백으로, 명시적으로 issue_talk 태그된 글뿐 아니라 분류를 아예
+      // 안 고른 글(section 없음)도 여기 포함시킨다. 딥다이브(trend)·
+      // 인사이트(column)로 명시 분류된 글만 제외.
       const res = await fetchTodayLetters(date);
-      // "이슈 톡톡"은 admin이 실제 에디터 이름으로 editor_id를 태깅해 발행한
-      // 레터 전용이다(2026-08-07 사용자 확인) — editor_id가 비어있거나 기본
-      // 명의("AI LENS")인 일반 레터는 여기 안 보여준다(그건 "이번 주 인기
-      // 칼럼" 쪽으로 옮겨간다). 트렌드/칼럼으로 이미 별도 태그된 글도 제외.
-      const general = (res.letters ?? []).filter(
-        (l) => l.section !== 'trend' && l.section !== 'column' && l.editor_id && l.editor_id !== 'AI LENS',
-      );
-      collected.push(...general.map((l) => toTodayLetterCard(l, res.date)));
+      const posts = (res.letters ?? []).filter((l) => !l.section || l.section === 'issue_talk');
+      collected.push(...posts.map((l) => toTodayLetterCard(l, res.date)));
     } catch {
       // 이 날짜 조회 실패 — 조용히 다음 날짜로 계속 (라이브 단일 소스, mock 폴백 없음)
     }
@@ -326,3 +327,4 @@ export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLA
   }
   return collected.slice(0, limit);
 }
+

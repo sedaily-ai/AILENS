@@ -8,7 +8,7 @@ import type { CmsLetter, CmsTrendCard, CmsVideo } from '@/shared/lib/cmsPostsApi
 
 export const PAGE_SIZE = 100;
 
-export type Kind = 'letter' | 'trend' | 'column' | 'video';
+export type Kind = 'letter' | 'trend' | 'column' | 'video' | 'issue_talk';
 
 export interface ArchiveItem {
   key: string;
@@ -26,6 +26,7 @@ export interface ArchiveItem {
 export const TREND_ACCENT = '#dc2626';
 export const COLUMN_ACCENT = '#059669';
 export const VIDEO_ACCENT = '#7c3aed';
+export const ISSUE_TALK_ACCENT = '#0891b2';
 
 // 서버(빌드타임)와 클라이언트(재검증 fetch) 양쪽에서 같은 원본 데이터를 같은
 // 규칙으로 합치기 위한 순수 함수 — SSG 초기 렌더와 이후 client refresh가
@@ -44,7 +45,14 @@ export function buildArchiveItems(
     const meta = withDisplayMeta(letter);
     const date = letter.publish_date ?? '';
     const id = letter.id;
-    const kind: Kind = letter.section === 'trend' || letter.section === 'column' ? letter.section : 'letter';
+    // "오늘의 이슈"(분류 없음)를 이슈 톡톡 전용 아카이빙으로 재정의(2026-08-12,
+    // 사용자 요청 — "브리핑에서는 빠지고 이슈 톡톡 전용으로"). 딥다이브·인사이트로
+    // 명시 분류된 글만 그 아카이브로, 나머지는 전부 이슈 톡톡('letter' kind는
+    // 이제 아무 글도 안 나오지만 ArchiveList 등에서 참조할 수 있어 타입은 유지).
+    const kind: Kind =
+      letter.section === 'trend' || letter.section === 'column'
+        ? letter.section
+        : 'issue_talk';
     // 2026-08-09 — 썸네일·발췌 둘 다 카드용으로 이미 계산해주는 toTodayLetterCard
     // (FollowingFeed 등이 쓰는 것과 같은 로직: subtitle 없으면 본문 첫 줄로
     // 폴백, cover_image_url 없으면 썸네일 없음)를 그대로 재사용 — 로직 중복 방지.
