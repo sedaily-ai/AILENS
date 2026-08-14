@@ -1,0 +1,200 @@
+import { GraduationCap, Briefcase, Store, TrendingUp, type LucideIcon } from 'lucide-react';
+
+/**
+ * "오늘의 이슈, 4가지 시선"(lens) 공용 토큰 — 2026-08-13.
+ *
+ * 원래 ACCENT/CARD_SHADOW/CARD_BORDER 세 값이 LensPreviewSection·LensViewClient·
+ * LensListClient 세 파일에 각각 하드코딩돼 있었다(같은 값 손으로 세 번). 홈 티저와
+ * 상세를 시선별 색·아이콘 체계로 재설계하면서 한 곳으로 모은다.
+ *
+ * ⚠️ 시선별 메타데이터는 반드시 **인덱스 기준**으로 찾는다. 라벨 문자열
+ * ("시선 ① — 원인이 궁금한 사람")은 admin이 저장한 값이 그대로 내려오고
+ * (admin/frontend/src/components/PostForm/LensMode.tsx:16-27 의 LENS_LABELS),
+ * 서비스 프런트엔드는 그 taxonomy를 모른다. 문자열 매칭은 admin에서 문구를
+ * 한 글자만 고쳐도 조용히 깨진다. 순서는 admin 폼이 LENS_LABELS를 map 해서
+ * 만들기 때문에 원인 → 사람 → 내 일 → 숫자로 고정이다.
+ *
+ * ⚠️ 다만 `lenses` 배열이 항상 4개라는 보장은 타입에도 백엔드에도 없다
+ * (backend _shape_lens 가 패딩하지 않음 — 빈 배열이거나 question/bullets가
+ * 빈 문자열일 수 있다). 그래서 lensPerspectiveAt() 은 범위를 벗어난 인덱스에도
+ * 항상 뭔가를 돌려준다.
+ */
+
+export const LENS_ACCENT = '#3b82f6';
+export const LENS_CARD_BORDER = '1px solid rgba(0,0,0,0.06)';
+export const LENS_CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)';
+
+export interface LensPerspective {
+  /** 화면에 크게 박는 서수. */
+  ordinal: string;
+  /** 칩·탭처럼 좁은 자리에 쓰는 역할 이름. */
+  short: string;
+  /** 카드 헤더 등 넓은 자리에 쓰는 역할 이름(부가 설명 포함). */
+  full: string;
+  /** "이 역할에게 뭘 주는가" — 덱의 payoff 캡션에 해당. */
+  tagline: string;
+  /**
+   * 역할 캐릭터 일러스트(2026-08-14). 기획 덱의 PRISM 라인아트를 인물별로
+   * 크롭한 것. **선택된 시선을 크게 보여주는 자리에만** 쓴다(상세 카드 헤더,
+   * 전체 비교 모드) — 홈 4칸에는 넣지 않는다: 기사 사진과 주인공이 충돌하고,
+   * 375px 2×2 그리드에서 밀도가 무너지며, 기사가 바뀌어도 그림은 그대로여서
+   * 정보 가치가 없다.
+   *
+   * 흰 배경 PNG 라서 tint 배경 위에서는 CSS `mix-blend-mode: multiply` 로
+   * 흰색을 날려 쓴다(알파 채널 없이 해결).
+   */
+  illustration: string;
+  /** 일러스트를 못 쓰는 작은 자리(레일·홈 칩)용 아이콘. */
+  icon: LucideIcon;
+  color: string;
+  tint: string;
+  border: string;
+}
+
+// 독자 역할 4종(2026-08-13, 안 1 확정) — 사회초년생·직장인·자영업자·투자자.
+// 경제 뉴스는 같은 사건이 역할에 따라 실제 의미가 갈리므로("금리 인하"가
+// 학생에겐 학자금, 투자자에겐 포트폴리오) 역할이 곧 "나에게 무슨 의미"를
+// 가르는 축이 된다. 각 역할이 자연히 다른 읽기 포맷을 끌고 온다(사회초년생→
+// 쉬운 설명, 직장인→실용 체크, 자영업자→사업 영향, 투자자→숫자·시장).
+//
+// ⚠️ 색·아이콘·역할명은 반드시 **인덱스 기준**. 저장된 라벨 문자열은
+// 아직 질문 축(원인/사람/내 일/숫자)이라 여기 역할과 다르다 — 콘텐츠가
+// 역할에 맞물리는 건 편집·admin 마이그레이션 이후다. 지금은 역할 프레임을
+// 인덱스로 덮어씌우는 프로토타입 단계.
+//
+// 팔레트는 기획 덱(2.5/1.3)의 navy/purple/teal/orange 를 역할에 맞게 배정.
+export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
+  {
+    ordinal: '①',
+    short: '사회초년생',
+    full: '사회초년생·학생',
+    tagline: '어려운 말 없이 기본부터',
+    illustration: '/lens/role-1-newcomer.png',
+    icon: GraduationCap,
+    color: '#0d9488',
+    tint: '#f0fdfa',
+    border: '#99f6e4',
+  },
+  {
+    ordinal: '②',
+    short: '직장인',
+    full: '직장인',
+    tagline: '내 지갑·커리어에 뭐가 달라지나',
+    illustration: '/lens/role-2-worker.png',
+    icon: Briefcase,
+    color: '#1e40af',
+    tint: '#eef2ff',
+    border: '#c7d2fe',
+  },
+  {
+    ordinal: '③',
+    short: '자영업자',
+    full: '자영업자·소상공인',
+    tagline: '내 사업·비용에 미치는 영향',
+    illustration: '/lens/role-3-owner.png',
+    icon: Store,
+    color: '#ea580c',
+    tint: '#fff7ed',
+    border: '#fed7aa',
+  },
+  {
+    ordinal: '④',
+    short: '투자자',
+    full: '투자자',
+    tagline: '숫자와 시장 반응 중심',
+    illustration: '/lens/role-4-investor.png',
+    icon: TrendingUp,
+    color: '#7c3aed',
+    tint: '#f5f3ff',
+    border: '#ddd6fe',
+  },
+] as const;
+
+/** 범위를 벗어나도 안전 — lenses 길이가 4가 아닐 수 있다. */
+export function lensPerspectiveAt(i: number): LensPerspective {
+  return LENS_PERSPECTIVES[i] ?? LENS_PERSPECTIVES[i % LENS_PERSPECTIVES.length] ?? LENS_PERSPECTIVES[0];
+}
+
+/** 홈 티저 칩 → 상세 딥링크(/lens/{id}#lens-2)에서 쓰는 앵커 id. */
+export function lensPanelId(i: number): string {
+  return `lens-${i + 1}`;
+}
+
+export function lensTabId(i: number): string {
+  return `lens-tab-${i + 1}`;
+}
+
+/**
+ * 딥링크 파라미터 "?v=2" → 1 (0-based). 못 읽으면 null.
+ *
+ * 해시(#lens-N) 대신 쿼리를 쓴다(2026-08-13) — 해시를 쓰면 브라우저가 같은
+ * id 요소(패널)로 자동 스크롤해서 상세가 히어로를 건너뛰고 중간부터 보인다.
+ * 쿼리는 스크롤을 유발하지 않으므로 어느 시선으로 들어와도 항상 최상단부터
+ * 랜딩하면서 해당 탭만 선택된다.
+ */
+export function parseLensView(search: string): number | null {
+  const m = /[?&]v=(\d+)/.exec(search);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return n - 1;
+}
+
+/**
+ * "사진 칸"에 넣을 이미지를 고른다 — 텍스트 없는 순수 사진만 허용.
+ *
+ * cover_image_url 은 인스타 카드뉴스 완성형 그래픽이라 헤드라인·날짜·"lens"
+ * 라벨이 이미지 픽셀에 박혀 있다(실측: 1080x1350, 광고 문구나 인포그래픽 표가
+ * 사진 영역에까지 들어간 커버도 있었다). 그래서 사진 칸의 폴백으로 쓰지 않는다 —
+ * 쓰면 우리 HTML 헤드라인과 글자가 중복되고, "사진 칸엔 사진만" 원칙도 깨진다.
+ *
+ * 카드 위쪽만 잘라 쓰는 방법도 검토했지만, 사진 영역 높이가 글마다 다르고
+ * (54%~72%) 그 안에도 텍스트가 있어서 신뢰할 수 있는 크롭 규칙이 없다.
+ *
+ * 따라서 photo_image_url 이 없으면 null 을 돌려주고, 호출부는 사진 칸을 아예
+ * 렌더하지 않는다(텍스트만으로도 카드가 성립하도록 설계돼 있다).
+ */
+export function pickLensPhoto(lens: {
+  photo_image_url?: string | null;
+  id?: string;
+}): string | null {
+  const photo = (lens.photo_image_url ?? '').trim();
+  if (photo) return photo;
+
+  // ── 개발 환경 전용 미리보기 ────────────────────────────────────────────
+  // photo_image_url 은 방금 신설한 필드라 발행된 글 전부가 비어 있다. 사진
+  // 배치를 눈으로 검토할 수 있도록 로컬(dev)에서만 실제 기사 사진(letters
+  // 채널 커버 — 텍스트가 박히지 않은 순수 사진)을 샘플로 물린다.
+  // production 빌드에서는 이 분기가 실행되지 않으므로 운영에는 영향이 없다.
+  // 글 id 로 결정되어 같은 글은 항상 같은 사진이 나온다(깜빡임·하이드레이션
+  // 불일치 없음). admin 에서 실제 사진을 채우면 이 분기는 자연히 안 쓰인다.
+  if (process.env.NODE_ENV === 'development' && lens.id) {
+    // 글과 실제로 맞는 사진이 있으면 그걸 먼저 쓴다. 무작위 샘플이 붙으면
+    // "기사 사진이 잘못 들어갔다"고 읽히기 때문(테슬라 기사에 오토바이 사진).
+    const exact = DEV_EXACT_PHOTOS[lens.id];
+    if (exact) return exact;
+    const seed = [...lens.id].reduce((a, c) => a + c.charCodeAt(0), 0);
+    return DEV_SAMPLE_PHOTOS[seed % DEV_SAMPLE_PHOTOS.length];
+  }
+  return null;
+}
+
+/**
+ * 개발 환경에서 글별로 실제 사진을 지정하는 임시 맵.
+ * 카드 그래픽(cover_image_url)의 사진 영역에서 텍스트가 없는 부분만 잘라
+ * public/lens/ 에 넣은 것이다. admin 이 photo_image_url 을 채우면 불필요해진다.
+ */
+const DEV_EXACT_PHOTOS: Record<string, string> = {
+  '2026-08-14-쏘카-테슬라-800대-더-늘린다-전기차-비중-14-로': '/lens/sample-socar-tesla.jpg',
+};
+
+const DEV_SAMPLE_PHOTOS = [
+  'https://sedaily-mbti-cms-media-dev.s3.us-east-1.amazonaws.com/media/2026/08/7508d7943ac7-rcv.yna.20260729.pyh2026072910290005700-p1.jpg',
+  'https://sedaily-mbti-cms-media-dev.s3.us-east-1.amazonaws.com/media/2026/08/ce73962a4a18-news-p.v1.20260117.5ed23c7c1187459082f72ed48fb2070b-p1.jpg',
+  'https://sedaily-mbti-cms-media-dev.s3.us-east-1.amazonaws.com/media/2026/08/d466cfa8159b-news-p.v1.20260811.7333b418f0b5460cb29b753baccfcaee-p1.png',
+];
+
+// 역할 체계로 전환하면서(2026-08-13, 안 1) 저장된 라벨에서 짧은 이름을
+// 뽑던 stripLensLabel/shortLensLabel 은 제거했다 — 이제 탭·칩·헤더의
+// 역할명은 전부 인덱스 기준 고정값(LENS_PERSPECTIVES[i].short/full)을 쓴다.
+// 저장된 label(질문 축)은 화면에 노출하지 않는다.

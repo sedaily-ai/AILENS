@@ -188,6 +188,18 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         "context": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
         "cover_image_url": post.get("cover_image_url") or None,
+        # 텍스트가 없는 순수 기사 사진(2026-08-14 신설). cover_image_url 은
+        # 인스타 카드뉴스용 완성형 그래픽(1080x1350)이라 헤드라인·날짜·"lens"
+        # 라벨이 픽셀에 박혀 있다 — 웹 카드의 사진 칸에 그걸 쓰면 우리 HTML
+        # 헤드라인과 텍스트가 중복되고, 광고 문구·인포그래픽까지 같이 노출된다.
+        # 그래서 카드 그래픽과 별개로 "사진만" 있는 이미지를 따로 받는다.
+        # 최상위 스키마를 건드리지 않도록 body_inline 에 담는다.
+        "photo_image_url": b.get("photo_image_url") or None,
+        # 원문 기사 링크(2026-08-14). 실측상 배포된 람다는 이미 이 값을 내려주고
+        # 있었지만(48건 중 47건) 이 체크아웃의 셰이퍼에는 빠져 있었다 — 여기서
+        # 배포하면 프런트의 "원문 보기" 버튼이 조용히 사라진다. 명시적으로 추가해
+        # 코드와 실제 응답을 일치시킨다.
+        "source_url": post.get("source_url") or b.get("source_url") or None,
         "lenses": lenses,
         "is_cms": True,
     }
