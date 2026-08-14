@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
-import { PromptEditModal } from "@/components/PromptEditModal";
+import { PromptDrawer } from "@/components/PromptDrawer";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -218,7 +218,7 @@ function WebtoonPage() {
         </div>
       )}
 
-      {promptOpen && <PromptEditModal id="webtoon/main" onClose={() => setPromptOpen(false)} />}
+      <PromptDrawer channel="webtoon" open={promptOpen} onClose={() => setPromptOpen(false)} />
     </div>
   );
 }

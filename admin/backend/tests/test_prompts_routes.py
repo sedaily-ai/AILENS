@@ -126,10 +126,22 @@ def test_update_requires_content(wired) -> None:
     assert_no_cors(resp)
 
 
-def test_update_missing_prompt_is_404(wired) -> None:
-    resp = prompts.handle_update({"content": "x"}, {"category": "nope", "name": "y"}, {})
-    assert resp["statusCode"] == 404
-    assert json.loads(resp["body"])["error"] == "prompt not found: nope/y"
+def test_update_creates_prompt_when_latest_missing(wired) -> None:
+    """2026-08-14 동작 변경: LATEST 부재는 404 가 아니라 v#1 생성(upsert)이다.
+
+    이전에는 404 였다. 그래서 관리자 화면이 참조하는 id(``letters/draft`` 등)를
+    API 로 만들 방법이 없었다 — create 라우트도 없어서 DDB 를 직접 시드해야
+    했고, 실제로 글 관리의 프롬프트 버튼은 열면 에러만 떴다. 새 프롬프트를
+    화면에서 바로 만들 수 있어야 하므로 의도적으로 바꿨다.
+    """
+    resp = prompts.handle_update({"content": "첫 저장"}, {"category": "letters", "name": "draft"}, {})
+    assert resp["statusCode"] == 200
+    assert json.loads(resp["body"]) == {"ok": True, "new_version": 1, "created": True}
+    # v#1 행 + LATEST 포인터가 함께 생긴다. update_item 의 SET 은 아이템이
+    # 없으면 만들어 주므로 LATEST 쓰기는 기존 코드 그대로다.
+    assert wired.put_calls[0]["pk"] == "PROMPT#letters/draft"
+    assert wired.put_calls[0]["sk"] == "v#1"
+    assert len(wired.update_calls) == 1
     assert_no_cors(resp)
 
 
@@ -137,11 +149,115 @@ def test_update_bumps_version_and_writes_both_rows(wired) -> None:
     resp = prompts.handle_update({"content": "본문 v4"}, {"category": "transform", "name": "nt"}, {})
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])
-    assert body == {"ok": True, "new_version": 4}
+    assert body == {"ok": True, "new_version": 4, "created": False}
     assert wired.put_calls[0]["sk"] == "v#4"
     assert wired.put_calls[0]["content"] == "본문 v4"
+    # sections 를 안 보내면 그 속성 자체가 없어야 한다 — 옛 행과 모양이 같다.
+    assert "sections_json" not in wired.put_calls[0]
     assert len(wired.update_calls) == 1
     assert_no_cors(resp)
+
+
+# ---------------------------------------------------------------------------
+# sections — 편집기용 구조 (content 는 모델이 읽는 산문으로 유지)
+# ---------------------------------------------------------------------------
+
+_SECTIONS = {
+    "description": {"text": "1면 요약용", "format": "text", "attachments": []},
+    "structure": {"text": "1. 헤드라인", "format": "markdown", "attachments": []},
+    "guidelines": {
+        "text": "- 간결하게",
+        "format": "markdown",
+        "attachments": [
+            {"name": "tone.md", "size": 12, "format": "markdown", "content": "담담하게"}
+        ],
+    },
+}
+
+
+def test_update_stores_sections_as_json_string(wired) -> None:
+    resp = prompts.handle_update(
+        {"content": "## 설명\n1면 요약용", "sections": _SECTIONS},
+        {"category": "transform", "name": "nt"},
+        {},
+    )
+    assert resp["statusCode"] == 200
+    row = wired.put_calls[0]
+    # content 는 산문 그대로 — 구조가 섞이면 Bedrock 에 JSON 이 흘러간다.
+    assert row["content"] == "## 설명\n1면 요약용"
+    assert json.loads(row["sections_json"]) == _SECTIONS
+    # 한글이 \uXXXX 로 이스케이프되면 바이트가 불어난다(ensure_ascii=False 확인).
+    assert "1면 요약용" in row["sections_json"]
+
+
+def test_update_rejects_non_object_sections(wired) -> None:
+    resp = prompts.handle_update(
+        {"content": "x", "sections": "not an object"},
+        {"category": "transform", "name": "nt"},
+        {},
+    )
+    assert resp["statusCode"] == 400
+    assert json.loads(resp["body"])["error"] == "sections must be an object"
+    assert wired.put_calls == []
+    assert_no_cors(resp)
+
+
+def test_update_rejects_oversized_payload(wired) -> None:
+    """DDB 아이템 한계(400KB)를 넘기기 전에 400 으로 막는다.
+
+    한글은 UTF-8 에서 3바이트다 — 글자 수로 재면 3배를 놓친다. 12만 자면
+    360KB 로 한계(340KB)를 넘어야 한다.
+    """
+    resp = prompts.handle_update(
+        {"content": "가" * 120_000},
+        {"category": "transform", "name": "nt"},
+        {},
+    )
+    assert resp["statusCode"] == 400
+    assert "prompt too large" in json.loads(resp["body"])["error"]
+    assert wired.put_calls == []
+    assert_no_cors(resp)
+
+
+def test_get_returns_sections_when_present(monkeypatch) -> None:
+    table = FakeTable(
+        items=[{"pk": _PK, "sk": "v#1", "created_at": "2026-08-14T00:00:00Z", "actor": "admin"}],
+        get_map={
+            (_PK, "LATEST"): {"pk": _PK, "sk": "LATEST", "active_version": 1},
+            (_PK, "v#1"): {
+                "pk": _PK,
+                "sk": "v#1",
+                "content": "## 설명\n1면 요약용",
+                "sections_json": json.dumps(_SECTIONS, ensure_ascii=False),
+            },
+        },
+    )
+    monkeypatch.setattr(ddb_client, "prompts_table", lambda: table)
+
+    body = json.loads(prompts.handle_get({}, {"category": "transform", "name": "nt"}, {})["body"])
+    assert body["sections"] == _SECTIONS
+    # 기존 필드는 그대로 — /prompts/edit 의 평문 편집기가 계속 동작해야 한다.
+    assert body["active_content"] == "## 설명\n1면 요약용"
+    assert body["active_version"] == 1
+
+
+def test_get_ignores_broken_sections_json(monkeypatch) -> None:
+    """깨진 JSON 은 500 이 아니라 '구조 없음'으로 취급한다 — 편집기가
+    active_content 를 한 섹션으로 열어 복구할 수 있어야 한다."""
+    table = FakeTable(
+        items=[{"pk": _PK, "sk": "v#1", "created_at": "2026-08-14T00:00:00Z", "actor": "admin"}],
+        get_map={
+            (_PK, "LATEST"): {"pk": _PK, "sk": "LATEST", "active_version": 1},
+            (_PK, "v#1"): {"pk": _PK, "sk": "v#1", "content": "본문", "sections_json": "{깨짐"},
+        },
+    )
+    monkeypatch.setattr(ddb_client, "prompts_table", lambda: table)
+
+    resp = prompts.handle_get({}, {"category": "transform", "name": "nt"}, {})
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert "sections" not in body
+    assert body["active_content"] == "본문"
 
 
 def test_update_writes_audit_row(wired) -> None:

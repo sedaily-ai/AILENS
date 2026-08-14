@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable } from "@/components/ContentTable";
-import { PromptEditModal } from "@/components/PromptEditModal";
+import { PromptDrawer } from "@/components/PromptDrawer";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -317,13 +317,13 @@ function PostsPage() {
           )}
         </h1>
         <div className="flex items-center gap-2">
-          {/* 콘텐츠 유형별 프롬프트 관리 진입점(2026-08-09, "새 글 쓰기 옆에
-              프롬프트 버튼, 누르면 화면 정중앙에 모달로" 요청) — 지금은
-              프론트 배선만이다. category/name 조합(letters/main)이 DDB에
-              아직 없으면 모달 안에 에러 메시지가 뜬다 — 실제 레터 생성엔
-              AI 프롬프트가 없어서(전부 수동 작성 콘텐츠) 백엔드에 이
-              카테고리를 만드는 건 별도 작업으로 미뤘다("나중에 다 유형별로
-              둘 거라서요"). */}
+          {/* 콘텐츠 유형별 프롬프트 관리 진입점(2026-08-09 정중앙 모달 →
+              2026-08-14 우측 슬라이드 드로어로 교체). 드로어가 상태별로
+              프롬프트를 따로 들고, 프롬프트 id 는 <channel>/<scope> 다
+              (letters/draft · letters/published). 예전 letters/main 은
+              DDB 에 없어서 열면 에러만 떴는데, 이제 백엔드 handle_update 가
+              LATEST 부재 시 v#1 로 만들어 주므로(upsert) 화면에서 바로
+              만들 수 있다. */}
           <button
             type="button"
             onClick={() => setPromptOpen(true)}
@@ -389,7 +389,12 @@ function PostsPage() {
         </div>
       )}
 
-      {promptOpen && <PromptEditModal id="letters/main" onClose={() => setPromptOpen(false)} />}
+      <PromptDrawer
+        channel="letters"
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+      />
+
     </div>
   );
 }
