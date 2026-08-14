@@ -849,7 +849,9 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
                           }}
                         >
                           <p style={{ margin: 0 }}>{m.detail}</p>
-                          <Link
+                          {/* /saju/*는 다른 Next.js 앱(zone)으로 rewrite되는
+                              경로라 일반 <a>로 하드 내비게이션(headerTabs.ts 참조) */}
+                          <a
                             href="/saju/compatibility"
                             style={{
                               display: 'inline-flex',
@@ -864,7 +866,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
                           >
                             풀이에서 자세히
                             <span aria-hidden>→</span>
-                          </Link>
+                          </a>
                         </div>
                       )}
                     </div>
@@ -873,7 +875,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
               })()}
             </div>
 
-            <Link
+            <a
               href="/saju/compatibility"
               style={{
                 display: 'block',
@@ -889,7 +891,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
               }}
             >
               내 짝꿍 풀어보기 →
-            </Link>
+            </a>
           </div>
         )}
       </section>

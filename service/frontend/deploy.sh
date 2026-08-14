@@ -32,15 +32,13 @@ PM2_PROCESS="ailens-frontend"
 echo "=== 1/5 빌드 (standalone) ==="
 npm run build
 
-# next.config.ts의 outputFileTracingRoot(2026-08-14, saju/frontend 모노레포
-# 트레이싱용)가 레포 루트라, standalone 산출물이 .next/standalone/server.js가
-# 아니라 .next/standalone/service/frontend/server.js에 생긴다(트레이싱 루트
-# 기준 상대 경로를 그대로 미러링). EC2의 ecosystem.config.js는 여전히
-# cwd=/opt/ailens/current, script=server.js(루트 기준)를 그대로 기대하므로,
-# 아래에서 service/frontend/ 안쪽만 릴리스 루트로 평평하게 편다.
-# (.next/standalone/node_modules는 service/frontend/node_modules로의
-# 심볼릭 링크뿐이라 버려도 안전 — 2026-08-14 확인.)
-STANDALONE_APP_DIR=".next/standalone/service/frontend"
+# 2026-08-14에 outputFileTracingRoot를 레포 루트로 넓혔다가(saju/frontend
+# 모노레포 트레이싱용) standalone 산출물이 .next/standalone/service/frontend/
+# 로 한 단계 깊어져서 이 스크립트가 그 경로를 하드코딩했었는데, 2026-08-15에
+# saju/frontend를 완전 독립 앱으로 분리하며 outputFileTracingRoot 자체를
+# 제거했다 — 이제 standalone 산출물은 다시 기본 위치인 .next/standalone/
+# (server.js가 바로 그 안)로 돌아온다.
+STANDALONE_APP_DIR=".next/standalone"
 
 if [ ! -f "$STANDALONE_APP_DIR/server.js" ]; then
   echo "ERROR: $STANDALONE_APP_DIR/server.js 없음 — standalone 빌드 실패. 배포 중단." >&2

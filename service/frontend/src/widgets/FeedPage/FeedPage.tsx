@@ -368,7 +368,9 @@ export function FeedPage({
           // 무게만 낮춰 "본체 vs 덤" 구분(headerTabs.ts와 동일 원칙, 상세 주석 참조).
           // '에디터' 탭 제거(2026-08-06) — 페이지/구독 펀널은 그대로 살아있고
           // 온보딩 플로우에서 계속 링크된다(headerTabs.ts 주석 참조).
-          { key: "fortune", label: "사주", href: "/saju", tier: "extra" },
+          // hardNav: true — /saju는 다른 Next.js 앱(zone)으로 rewrite되는 경로라
+          // next/link 소프트 내비게이션이 안 먹는다(headerTabs.ts 주석 참조).
+          { key: "fortune", label: "사주", href: "/saju", tier: "extra", hardNav: true },
           { key: "timeline", label: "타임라인", href: TIMELINE_HREF, tier: "extra" },
           { key: "games", label: "게임", href: "/games", tier: "extra" },
           { key: "webtoon", label: "웹툰", href: "/webtoon", tier: "extra" },

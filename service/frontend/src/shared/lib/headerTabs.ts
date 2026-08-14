@@ -21,6 +21,10 @@ export interface HeaderTab {
   href: string;
   active?: boolean;
   tier?: 'core' | 'extra';
+  /** true면 next/link 소프트 내비게이션 대신 일반 <a> 하드 내비게이션을 쓴다 —
+   *  이 탭이 별도 Next.js 앱(다른 zone)으로 rewrite되는 경로라, 클라이언트
+   *  라우터가 자기 앱의 RSC 포맷으로 잘못 읽으려다 화면이 안 바뀌는 문제 방지. */
+  hardNav?: boolean;
 }
 
 /**
@@ -75,9 +79,13 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 2026-08-09 — 자체 미니 사주 위젯을 걷어내고 진짜 사주 서비스(AI-saju
     // 별도 레포, saju.sedaily.ai)를 CloudFront 경로 라우팅(/saju*)으로 마운트.
     // en.sedaily.com이 /atlas*를 별도 레포로 라우팅하는 것과 같은 패턴 —
-    // 이 경로는 AILENS Next.js 라우터를 거치지 않고 CDN 단에서 바로 다른
-    // origin으로 넘어간다(app/fortune 페이지 자체는 더 이상 없음).
-    { key: 'fortune', label: '사주', href: '/saju', active: active === 'fortune', tier: 'extra' },
+    // 프로덕션은 이 경로가 AILENS Next.js 라우터를 거치지 않고 CDN 단에서
+    // 바로 다른 origin으로 넘어간다(app/fortune 페이지 자체는 더 이상 없음).
+    // 로컬 dev(2026-08-15, saju 완전 분리 이후)에선 SAJU_ORIGIN rewrite로
+    // 같은 걸 흉내내는데, 이건 완전히 다른 Next.js 앱(zone)이라 next/link
+    // 소프트 내비게이션이 안 먹는다(RSC 포맷이 앱마다 달라서) — hardNav로
+    // 일반 <a> 내비게이션을 쓰게 한다.
+    { key: 'fortune', label: '사주', href: '/saju', active: active === 'fortune', tier: 'extra', hardNav: true },
     // 2026-08-05 까지 `/timemachine` 을 가리키고 있었다 — `/timeline` 에 들어왔다가
     // 다른 탭에 다녀온 뒤 이 탭을 누르면 구 페이지로 빠지는 문제의 원인.
     // `/timemachine`(유명인·투자 시뮬레이션 4탭) 은 직접 URL 로 남겨둔다.

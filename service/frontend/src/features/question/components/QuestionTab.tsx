@@ -278,7 +278,9 @@ export function QuestionTab({ onSkip }: Props) {
             </h3>
           </Reveal>
           <Reveal delay={100}>
-            <Link
+            {/* /saju는 다른 Next.js 앱(zone)으로 rewrite되는 경로라 일반 <a>로
+                하드 내비게이션(headerTabs.ts 주석 참조) */}
+            <a
               href="/saju"
               className="block max-w-[520px] mx-auto group"
             >
@@ -309,7 +311,7 @@ export function QuestionTab({ onSkip }: Props) {
                   </div>
                 </div>
               </div>
-            </Link>
+            </a>
           </Reveal>
         </section>
 

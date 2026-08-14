@@ -128,8 +128,9 @@ export function HomeHeroCarousel() {
         </div>
       </Link>
 
-      {/* 슬라이드 3 — 사주 */}
-      <Link
+      {/* 슬라이드 3 — 사주. /saju는 다른 Next.js 앱(zone)으로 rewrite되는
+          경로라 next/link 대신 일반 <a>로 하드 내비게이션(headerTabs.ts 참조) */}
+      <a
         href="/saju"
         className="items-center transition-transform duration-200 hover:-translate-y-0.5"
         style={{
@@ -171,7 +172,7 @@ export function HomeHeroCarousel() {
             </svg>
           </div>
         </div>
-      </Link>
+      </a>
       </div>
 
       {/* 화살표를 슬라이드 위에 얹었더니 제목 글자랑 겹쳐서(2026-08-06 피드백),

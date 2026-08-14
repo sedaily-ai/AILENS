@@ -26,6 +26,9 @@ export type HeaderTab = {
   // 줄이지 않고 무게(굵기·크기·색)만 낮춰서 "본체 vs 덤"을 구분한다
   // (2026-08-06). 생략하면 기본값 'core'.
   tier?: 'core' | 'extra';
+  /** true면 next/link 대신 일반 <a> 하드 내비게이션 — 다른 Next.js 앱(zone)으로
+   *  rewrite되는 경로용 (shared/lib/headerTabs.ts의 HeaderTab과 동일 필드). */
+  hardNav?: boolean;
 };
 
 interface HeaderProps {
@@ -68,6 +71,17 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
   const cls = `${base} ${tab.active ? TAB_ACTIVE : idle}`;
   if (tab.href) {
     const href = tab.href;
+    // hardNav 탭(다른 zone으로 rewrite되는 경로)은 next/link 소프트
+    // 내비게이션을 쓰면 안 된다 — 클라이언트 라우터가 이 앱의 RSC 포맷으로
+    // 응답을 해석하려다 화면이 안 바뀌는 채로 URL만 바뀌는 문제가 생긴다.
+    // 일반 <a>로 풀 페이지 로드를 강제해서 대상 zone이 처음부터 새로 뜨게 한다.
+    if (tab.hardNav) {
+      return (
+        <a href={href} className={cls}>
+          <TabLabel tab={tab} />
+        </a>
+      );
+    }
     // hover/touch 시점에 router.prefetch — viewport 자동 prefetch 위에
     // 강한 의도 신호로 청크/RSC 가 더 빨리 따뜻해진다.
     const warm = () => {
@@ -171,6 +185,13 @@ function MobileDrawer({
               deferClose();
             };
             if (tab.href) {
+              if (tab.hardNav) {
+                return (
+                  <a key={tab.key} href={tab.href} onClick={deferClose} className={cls}>
+                    <TabLabel tab={tab} />
+                  </a>
+                );
+              }
               return (
                 <Link key={tab.key} href={tab.href} onClick={deferClose} className={cls}>
                   <TabLabel tab={tab} />
