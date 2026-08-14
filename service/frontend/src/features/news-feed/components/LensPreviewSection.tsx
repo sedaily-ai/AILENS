@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
@@ -128,6 +129,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
             <span
               className="flex-shrink-0"
               style={{
+                position: 'relative',
                 width: 'clamp(92px, 17vw, 132px)',
                 aspectRatio: '3 / 2',
                 borderRadius: 8,
@@ -136,12 +138,15 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                 boxShadow: 'inset 0 0 0 1px rgba(17,24,39,0.07)',
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element -- 원격 CMS 이미지 */}
-              <img
+              {/* next/image (2026-08-13 성능 커밋의 방침). priority 는 일부러
+                  빼둔다 — 이전 버전은 16:9 풀블리드 히어로였지만 지금은 최대
+                  132px 썸네일이라, 프리로드 예산을 여기 쓰면 손해다. */}
+              <Image
                 src={photo}
                 alt=""
-                loading="lazy"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+                fill
+                sizes="132px"
+                style={{ objectFit: 'cover', objectPosition: 'center' }}
               />
             </span>
           )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/cmsPostsApi';
 import {
@@ -210,19 +211,21 @@ export function LensViewClient({
             좌우가 본문 가이드라인과 정확히 일치). 라운드·테두리를 없애 기사
             사진처럼 판면에 얹힌 느낌으로 뒀다. */}
         {/* 사진 — 세로가 길어지는 문제를 두 겹으로 막는다.
-            (1) 본문 컬럼(.lc, 748px) 안에 두어 폭을 제한한다. 전체 폭이면
+            (1) 본문 컬럼(.lw, 880px) 안에 두어 폭을 제한한다. 전체 폭이면
                 거의 정사각인 사진이 700px 넘게 높아진다.
-            (2) 3:2 컨테이너 + cover 로 높이를 확정한다. 원본을 1.39:1 로 다시
-                잘라뒀기 때문에 cover 가 잘라내는 양이 7% 정도로 미미하다.
+            (2) 2:1 컨테이너 + cover 로 높이를 확정한다(약 412px). 원본을 2:1 로
+                다시 잘라뒀기 때문에 cover 가 잘라내는 양이 거의 없다.
             aspect-ratio 라 자리를 미리 잡아 레이아웃 이동(CLS)도 없다. */}
         {photo && (
           <div className="lw">
-            <div style={{ width: '100%', aspectRatio: '2 / 1', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- 원격 CMS 이미지 */}
-              <img
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '2 / 1', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
+              <Image
                 src={photo}
                 alt={lens.headline}
-                style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+                fill
+                sizes="(min-width: 920px) 880px, 100vw"
+                priority
+                style={{ objectFit: 'cover', objectPosition: 'center' }}
               />
             </div>
           </div>

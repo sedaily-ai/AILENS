@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
@@ -205,13 +206,15 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                 style={{ display: 'block', textDecoration: 'none' }}
               >
                 {heroPhoto && (
-                  <div style={{ width: '100%', aspectRatio: '2 / 1', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- 원격 CMS 이미지 */}
-                    <img
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '2 / 1', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
+                    <Image
                       src={heroPhoto}
                       alt=""
+                      fill
+                      sizes="(min-width: 920px) 880px, 100vw"
+                      priority
                       className="transition-transform duration-500 group-hover:scale-[1.03]"
-                      style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{ objectFit: 'cover' }}
                     />
                   </div>
                 )}
@@ -362,8 +365,7 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                           style={{ width: 72, height: 72, borderRadius: 10, overflow: 'hidden', background: '#f3f4f6', boxShadow: 'inset 0 0 0 1px rgba(17,24,39,0.07)' }}
                         >
                           {thumb ? (
-                            // eslint-disable-next-line @next/next/no-img-element -- 원격 CMS 이미지
-                            <img src={thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <Image src={thumb} alt="" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             <span className="flex items-center justify-center w-full h-full" style={{ fontSize: 13, color: '#9ca3af', fontWeight: 700 }}>
                               시선
