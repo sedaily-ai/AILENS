@@ -48,6 +48,9 @@ export interface PromptDetail {
   active_content: string;
   active_version: number;
   history: PromptHistoryEntry[];
+  /** 섹션 편집기(PromptDrawer)가 저장한 구조. 옛 버전·평문 저장에는 없다.
+   *  신뢰할 수 없는 경계값이라 unknown 으로 두고 lib/prompt.ts 가 검증한다. */
+  sections?: unknown;
 }
 
 export interface CostEntry {

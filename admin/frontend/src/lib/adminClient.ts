@@ -182,10 +182,21 @@ export const adminApi = {
     request<PromptDetail>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}`
     ),
-  updatePrompt: (category: string, name: string, content: string) =>
-    request<{ ok: boolean; new_version: number }>(
+  // sections 는 optional — 평문 편집기(/prompts/edit)는 안 보내고, 섹션
+  // 편집기(PromptDrawer)만 보낸다. 백엔드는 content 를 그대로 Bedrock 에
+  // 넘기므로 content 에는 항상 산문만, 구조는 sections 로 따로 간다.
+  updatePrompt: (
+    category: string,
+    name: string,
+    content: string,
+    sections?: unknown
+  ) =>
+    request<{ ok: boolean; new_version: number; created?: boolean }>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}`,
-      { method: "POST", body: JSON.stringify({ content }) }
+      {
+        method: "POST",
+        body: JSON.stringify(sections === undefined ? { content } : { content, sections }),
+      }
     ),
 
   // Cost & Audit
