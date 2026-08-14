@@ -87,6 +87,12 @@ function buildJsonLd(video: CmsVideo, slug: string) {
     uploadDate: published,
     inLanguage: 'ko-KR',
     embedUrl: resolved?.embedUrl,
+    // contentUrl 보강(2026-08-14, GEO 감사) — embedUrl은 유튜브/네이버TV만
+    // resolveVideo()가 채워주는데, 그 외 플랫폼이면 둘 다 비어 구글이 최소
+    // 요구하는 "재생 가능 URL" 신호가 아예 없었다. video_url은 admin이 항상
+    // 입력하는 필드라 무조건 채울 수 있다 — duration은 정확한 값을 얻을
+    // 소스가 없어(YouTube Data API 키 연동 필요) 추측값을 넣지 않는다.
+    contentUrl: video.video_url,
     author: {
       '@type': 'Organization',
       name: 'AI LENS 편집팀',

@@ -54,7 +54,7 @@ export async function generateMetadata({
   const title = `${lens.headline} — 4가지 시선`;
   const description = trimDescription(lens.context || '오늘의 이슈를 4가지 시선으로 짚어드려요.');
   const url = `${SITE_URL}/lens/${slug}`;
-  const image = lens.cover_image_url || `${SITE_URL}/og-image.png`;
+  const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
   return {
     title,
     description,
@@ -87,7 +87,7 @@ export async function generateMetadata({
 function buildJsonLd(lens: CmsLens, slug: string) {
   const url = `${SITE_URL}/lens/${slug}`;
   const published = `${lens.date}T07:00:00+09:00`;
-  const image = lens.cover_image_url || `${SITE_URL}/og-image.png`;
+  const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
   const bodyJoined = [
     lens.context,
     ...lens.lenses.flatMap((l) => [l.question, ...l.bullets]),
@@ -120,6 +120,15 @@ function buildJsonLd(lens: CmsLens, slug: string) {
         // 원문 기사 인용(2026-08-13, SEO/GEO/AEO 감사) — admin이 원문 URL을
         // 안 채운 글은 이 필드 자체가 빠진다.
         ...(lens.source_url ? { citation: lens.source_url } : {}),
+        // Speakable(2026-08-14, GEO 감사) — 원래 Google Assistant TTS용으로
+        // 나온 스펙이지만, 2026년 기준 Perplexity/ChatGPT/AI Overviews가
+        // "우선순위로 읽을 콘텐츠"를 고르는 신호로도 쓴다(리서치 확인).
+        // headline·핵심요약·시선 4개 Q&A 블록을 data-speakable 속성으로
+        // 표시해두고 그 CSS selector를 그대로 가리킨다.
+        speakable: {
+          '@type': 'SpeakableSpecification',
+          cssSelector: ['[data-speakable="headline"]', '[data-speakable="summary"]', '[data-speakable="qa"]'],
+        },
         // 본문 4개 시선을 FAQPage 유사 구조 대신 mainEntity ItemList로 노출 —
         // 각 시선이 질문(question)+답(bullets)인 Q&A 형태라 GEO에 유리하다.
         mainEntity: {

@@ -52,6 +52,41 @@ export async function generateMetadata({
   };
 }
 
+const SITE_URL = 'https://ailens.sedaily.ai';
+
+// VideoGame + BreadcrumbList(2026-08-14, SEO 감사 — 이 라우트만 JSON-LD가
+// 없던 걸 발견). 브라우저에서 바로 도는 H5 게임이라 applicationCategory를
+// Game으로, operatingSystem을 "Any"로 명시 — 설치가 아니라 웹에서 즉시
+// 플레이한다는 신호.
+function buildJsonLd(slug: string, title: string) {
+  const url = `${SITE_URL}/games/play/${slug}`;
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'VideoGame',
+        '@id': `${url}#game`,
+        name: title,
+        url,
+        applicationCategory: 'Game',
+        operatingSystem: 'Any (웹브라우저)',
+        genre: 'Casual',
+        publisher: { '@id': `${SITE_URL}/#organization` },
+        isAccessibleForFree: true,
+        image: `${SITE_URL}/og-image.png`,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: '게임', item: `${SITE_URL}/games` },
+          { '@type': 'ListItem', position: 3, name: title, item: url },
+        ],
+      },
+    ],
+  };
+}
+
 export default async function GamePlayPage({
   params,
 }: {
@@ -66,5 +101,14 @@ export default async function GamePlayPage({
       </div>
     );
   }
-  return <GamePlayClient slug={slug} title={g.title} src={g.src} />;
+  const jsonLd = buildJsonLd(slug, g.title);
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <GamePlayClient slug={slug} title={g.title} src={g.src} />
+    </>
+  );
 }

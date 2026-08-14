@@ -1,4 +1,4 @@
-import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
 
 // AI LENS RSS 2.0 피드 — en.sedaily.com/rss/newsall 패턴 참고(2026-08-07).
@@ -28,22 +28,46 @@ function toRfc822(dateStr: string | null | undefined): string {
 }
 
 export async function GET() {
-  const letters = await fetchCmsPosts('letters', undefined, FEED_LIMIT);
+  // lens("오늘의 시선") 채널도 포함(2026-08-14, GEO 감사) — 예전엔 letters만
+  // 실어서 RSS를 보는 뉴스 애그리게이터/AI 크롤러가 최근 생긴 채널의 신규
+  // 발행물을 못 봤다. 두 채널을 날짜 기준으로 합쳐 최신 FEED_LIMIT개만 노출.
+  const [letters, lensPosts] = await Promise.all([
+    fetchCmsPosts('letters', undefined, FEED_LIMIT),
+    fetchLensPosts(),
+  ]);
 
-  const items = letters
-    .map((l) => {
-      const url = `${BASE}${letterHref(l.id)}`;
-      const description =
-        l.subtitle?.trim() ||
-        (l.body_html ? stripHtml(l.body_html) : (l.body ?? []).join(' ')).slice(0, 300);
-      return `  <item>
-    <title>${escapeXml(l.headline)}</title>
-    <link>${url}</link>
-    <guid isPermaLink="true">${url}</guid>
-    <pubDate>${toRfc822(l.publish_date)}</pubDate>
-    <description>${escapeXml(description)}</description>
-  </item>`;
-    })
+  type FeedEntry = { title: string; url: string; date: string | null | undefined; description: string };
+
+  const letterEntries: FeedEntry[] = letters.map((l) => ({
+    title: l.headline,
+    url: `${BASE}${letterHref(l.id)}`,
+    date: l.publish_date,
+    description:
+      l.subtitle?.trim() ||
+      (l.body_html ? stripHtml(l.body_html) : (l.body ?? []).join(' ')).slice(0, 300),
+  }));
+
+  const lensEntries: FeedEntry[] = lensPosts.map((l) => ({
+    title: `${l.headline} — 4가지 시선`,
+    url: `${BASE}/lens/${encodeURIComponent(l.id)}`,
+    date: l.date,
+    description: l.context,
+  }));
+
+  const merged = [...letterEntries, ...lensEntries]
+    .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
+    .slice(0, FEED_LIMIT);
+
+  const items = merged
+    .map(
+      (e) => `  <item>
+    <title>${escapeXml(e.title)}</title>
+    <link>${e.url}</link>
+    <guid isPermaLink="true">${e.url}</guid>
+    <pubDate>${toRfc822(e.date)}</pubDate>
+    <description>${escapeXml(e.description)}</description>
+  </item>`
+    )
     .join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

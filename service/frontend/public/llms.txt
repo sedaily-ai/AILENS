@@ -11,6 +11,8 @@
 
 ## 콘텐츠 형식
 
+- 오늘의 시선(/lens): 하루 한 이슈를 원인·사람·내 일·숫자 네 갈래 질문-답변(Q&A) 구조로 짚는 카드 포맷. 각 글에 원문 기사 인용 링크(source_url) 포함.
+- 이슈 톡톡(/issue-talk): 브리핑(레터) 채널 안의 짧은 호흡 이슈 정리 — 가벼운 대화체로 하루 화제를 요약.
 - 브리핑(레터, /letters): 원본 기사를 AI가 정리·재구성한 매일자 경제 브리핑 한 통.
 - 딥다이브(/trend): 같은 사실 하나를 놓고 네 가지 관점으로 깊이 파고드는 경제 이슈 분석.
 - 인사이트(/column): 관점 있는 시선으로 짚는 경제 오피니언·칼럼.
@@ -24,6 +26,9 @@
 
 - 메인 피드: https://ailens.sedaily.ai/
 - 서비스 소개: https://ailens.sedaily.ai/onboarding
+- 오늘의 시선 목록: https://ailens.sedaily.ai/lens
+- 오늘의 시선 상세: https://ailens.sedaily.ai/lens/{slug} (슬러그는 발행일+제목, 예: /lens/2026-08-14-쏘카-테슬라-800대-더-늘린다-전기차-비중-14-로)
+- 이슈 톡톡 아카이브: https://ailens.sedaily.ai/issue-talk
 - 브리핑(레터) 아카이브: https://ailens.sedaily.ai/letters
 - 브리핑 상세: https://ailens.sedaily.ai/letters/{slug} (슬러그는 발행일+제목, 예: /letters/2026-08-07-신용점수-700점대인데-왜-대부업-문을-두드릴까요)
 - 딥다이브 아카이브: https://ailens.sedaily.ai/trend
@@ -54,7 +59,7 @@
 - 서울경제신문은 1960년 창간된 한국 최초의 경제 전문지 (사업자등록번호 208-81-10310)
 - WAN-IFRA Digital Media Awards APAC 2026 — Best AI-driven News Product 부문 Gold(AI LENS)
 - AI가 생성한 콘텐츠임을 명시하고, 명리학과 결합한 사주 서비스도 같은 방식으로 고지
-- 모든 브리핑·딥다이브·인사이트·영상·웹툰은 서울경제신문 기자가 취재한 원본 기사를 바탕으로 AI가 초안을 작성하고 편집팀이 검수해 발행
+- 모든 오늘의 시선·이슈 톡톡·브리핑·딥다이브·인사이트·영상·웹툰은 서울경제신문 기자가 취재한 원본 기사를 바탕으로 AI가 초안을 작성하고 편집팀이 검수해 발행
 - 상세: https://ailens.sedaily.ai/about
 
 ## 연락

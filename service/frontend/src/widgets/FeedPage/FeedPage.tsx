@@ -386,6 +386,12 @@ export function FeedPage({
         .tab-fade-in { animation: tabFadeIn 0.25s ease-out both; }
       `}</style>
       <main className="flex-1">
+        {/* 홈(/) h1 부재(2026-08-14, GEO 감사) — widgets/FeedPage, features/news-feed
+            전체에 h1이 0개였다(각 섹션은 h2부터 시작, 의도적으로 동등 weight
+            유지 중이라 그중 하나를 h1으로 승격시키면 시각적 위계가 깨진다).
+            시각 디자인은 그대로 두고 sr-only h1로 페이지 주제 신호만 추가 —
+            title/og:title과 동일 문구, 접근성(스크린리더)에도 도움. */}
+        <h1 className="sr-only">AI LENS — 서울경제신문의 AI 경제 뉴스</h1>
         <div key={activeTab} className="tab-fade-in">
         {/* 질문 모드 - QuestionTab 컴포넌트 */}
         {activeTab === "question" && (

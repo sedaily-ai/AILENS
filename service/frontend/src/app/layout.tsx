@@ -5,6 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { ConditionalFooter } from "@/widgets/SiteFooter";
 import { AnnouncementBar } from "@/widgets/AnnouncementBar";
+import { TodayNewsPlayer } from "@/widgets/TodayNewsPlayer";
 
 // GA4 Measurement ID — ailens.sedaily.ai 전용 속성.
 const GA_ID = "G-BJZ09B6PB6";
@@ -223,6 +224,7 @@ export default function RootLayout({
           <AnnouncementBar />
           {children}
           <ConditionalFooter />
+          <TodayNewsPlayer />
         </Providers>
       </body>
     </html>

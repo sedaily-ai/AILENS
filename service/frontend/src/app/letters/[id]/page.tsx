@@ -224,6 +224,14 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
         // 라는 주장을 실제로 검증 가능하게 만드는 링크(2026-08-13, SEO/GEO/AEO
         // 감사). admin이 원문 URL을 안 채운 글은 이 필드 자체가 빠진다.
         ...(letter.source_url ? { citation: letter.source_url } : {}),
+        // Speakable(2026-08-14, GEO 감사) — lens/[slug]/page.tsx와 동일 이유.
+        // 헤드라인·부제·핵심 정리 블록을 data-speakable 속성으로 표시해두고
+        // 그 selector를 가리킨다(LetterDetailClient.tsx 참조). key_points가
+        // 없는 레터는 마지막 selector가 그냥 매치 안 되고 넘어간다.
+        speakable: {
+          '@type': 'SpeakableSpecification',
+          cssSelector: ['[data-speakable="headline"]', '[data-speakable="summary"]', '[data-speakable="qa"]'],
+        },
       },
       {
         '@type': 'BreadcrumbList',

@@ -1,11 +1,29 @@
 import type { Metadata } from 'next';
 import { StaticPageShell } from '@/widgets/StaticPageShell';
 
+const SITE_URL = 'https://ailens.sedaily.ai';
+
 export const metadata: Metadata = {
   title: '회사소개',
   description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스, AI LENS를 소개합니다.',
-  alternates: { canonical: 'https://ailens.sedaily.ai/about' },
+  alternates: { canonical: `${SITE_URL}/about` },
   robots: { index: true, follow: true },
+};
+
+// AboutPage(2026-08-14, SEO 감사 — 이 라우트만 JSON-LD가 없던 걸 발견).
+// Organization을 새로 안 만들고 루트 layout.tsx가 이미 정의한
+// NewsMediaOrganization(#organization)을 mainEntity로 참조 — 같은 실체를
+// 페이지마다 중복 정의하지 않는 게 원칙(lens/letters의 publisher 참조와 동일).
+const JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'AboutPage',
+  '@id': `${SITE_URL}/about#page`,
+  url: `${SITE_URL}/about`,
+  name: '회사소개',
+  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스, AI LENS를 소개합니다.',
+  inLanguage: 'ko-KR',
+  isPartOf: { '@id': `${SITE_URL}/#website` },
+  mainEntity: { '@id': `${SITE_URL}/#organization` },
 };
 
 const h2: React.CSSProperties = {
@@ -40,6 +58,11 @@ const categoryGrid: React.CSSProperties = {
 
 export default function AboutPage() {
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+    />
     <StaticPageShell title="회사소개">
       <p>
         AI LENS는 1960년 창간한 대한민국 최초의 경제 전문지 <strong>서울경제신문</strong>이
@@ -159,5 +182,6 @@ export default function AboutPage() {
         {' (English)'}
       </p>
     </StaticPageShell>
+    </>
   );
 }

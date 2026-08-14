@@ -312,6 +312,7 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
         {/* 역할 라벨(archetype) 제거(2026-08-09) — "모든 카테고리가 같은 조건"으로
             에디터 이름 배지 아래 부가 설명 없이 바로 제목. */}
         <h1
+          data-speakable="headline"
           style={{
             fontFamily: '"Noto Serif KR", serif',
             fontSize: 'clamp(24px, 4.5vw, 32px)',
@@ -325,7 +326,7 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
           {letter.headline}
         </h1>
         {letter.subtitle && (
-          <p style={{ fontSize: 15, color: '#6b7280', margin: 0, lineHeight: 1.6 }}>{letter.subtitle}</p>
+          <p data-speakable="summary" style={{ fontSize: 15, color: '#6b7280', margin: 0, lineHeight: 1.6 }}>{letter.subtitle}</p>
         )}
 
         {/* 팟캐스트 — 워싱턴포스트 기사 상단 메타줄(헤드셋 아이콘) 참고,
@@ -762,7 +763,7 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
   return (
     <>
       {letter.key_points.length > 0 && (
-        <div style={{ background: '#f9fafb', borderRadius: 12, padding: '20px 24px', marginBottom: 24 }}>
+        <div data-speakable="qa" style={{ background: '#f9fafb', borderRadius: 12, padding: '20px 24px', marginBottom: 24 }}>
           <p style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: 1.2, margin: '0 0 12px', textTransform: 'uppercase' }}>
             핵심 정리
           </p>

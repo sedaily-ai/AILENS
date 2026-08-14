@@ -33,12 +33,16 @@ const PAGE_SIZE = 12;
 const BG = '#0b0b0d';
 const SURFACE = '#18181b';
 
-export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[] }) {
+export function WebtoonListClient({ initialItems, initialPage }: { initialItems: CmsWebtoon[]; initialPage: number }) {
   const [items, setItems] = useState<CmsWebtoon[]>(initialItems);
   // 지난 화 페이지네이션(1, 2, 3…) — fetchWebtoons()가 이미 전체를 한 번에
   // 받아오므로(백엔드가 커서 페이지네이션을 안 지원 — cmsPostsApi.ts 주석
   // 참조) 추가 네트워크 요청 없이 화면에 보여주는 페이지만 자른다.
-  const [page, setPage] = useState(1);
+  //
+  // initialPage는 page.tsx가 searchParams에서 읽어 내려준다(2026-08-14, GEO
+  // 감사) — 예전엔 onClick+useState라 서버 첫 HTML에 최신화+12개만 링크로
+  // 존재하고 2페이지 이후는 크롤러가 못 밟았다. 페이지 버튼도 아래에서
+  // <Link href="/webtoon?page=N">로 바꿔 각 페이지가 고유 URL이 되게 한다.
   const [intro, setIntro] = useState(true);
 
   useEffect(() => {
@@ -58,7 +62,7 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
 
   const [latest, ...rest] = items;
   const totalPages = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = Math.min(initialPage, totalPages);
   const visibleRest = rest.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
@@ -391,12 +395,15 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center" style={{ gap: 6, marginTop: 20, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                <Link
+                  href={`/webtoon${currentPage - 1 > 1 ? `?page=${currentPage - 1}` : ''}`}
                   aria-label="이전 페이지"
+                  aria-disabled={currentPage === 1}
+                  tabIndex={currentPage === 1 ? -1 : undefined}
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     width: 32,
                     height: 32,
                     borderRadius: 8,
@@ -405,20 +412,23 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
                     fontSize: 13,
                     fontWeight: 700,
                     color: currentPage === 1 ? '#3f3f46' : '#e4e4e7',
-                    cursor: currentPage === 1 ? 'default' : 'pointer',
+                    pointerEvents: currentPage === 1 ? 'none' : undefined,
+                    textDecoration: 'none',
                   }}
                 >
                   ‹
-                </button>
+                </Link>
                 {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((n) => {
                   const active = n === currentPage;
                   return (
-                    <button
+                    <Link
                       key={n}
-                      type="button"
-                      onClick={() => setPage(n)}
+                      href={`/webtoon${n > 1 ? `?page=${n}` : ''}`}
                       aria-current={active ? 'page' : undefined}
                       style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         width: 32,
                         height: 32,
                         borderRadius: 8,
@@ -427,21 +437,25 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
                         fontSize: 13,
                         fontWeight: 700,
                         color: active ? '#111827' : '#e4e4e7',
-                        cursor: active ? 'default' : 'pointer',
+                        pointerEvents: active ? 'none' : undefined,
+                        textDecoration: 'none',
                         fontVariantNumeric: 'tabular-nums',
                         boxShadow: active ? '0 0 18px rgba(253,224,71,0.5)' : 'none',
                       }}
                     >
                       {n}
-                    </button>
+                    </Link>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
+                <Link
+                  href={`/webtoon${currentPage + 1 <= totalPages ? `?page=${currentPage + 1}` : `?page=${totalPages}`}`}
                   aria-label="다음 페이지"
+                  aria-disabled={currentPage === totalPages}
+                  tabIndex={currentPage === totalPages ? -1 : undefined}
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     width: 32,
                     height: 32,
                     borderRadius: 8,
@@ -450,11 +464,12 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
                     fontSize: 13,
                     fontWeight: 700,
                     color: currentPage === totalPages ? '#3f3f46' : '#e4e4e7',
-                    cursor: currentPage === totalPages ? 'default' : 'pointer',
+                    pointerEvents: currentPage === totalPages ? 'none' : undefined,
+                    textDecoration: 'none',
                   }}
                 >
                   ›
-                </button>
+                </Link>
               </div>
             )}
           </>

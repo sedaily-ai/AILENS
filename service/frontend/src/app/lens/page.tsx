@@ -62,16 +62,27 @@ function buildJsonLd(items: CmsLens[]) {
   };
 }
 
-export default async function LensListPage() {
+// 페이지네이션을 진짜 URL로(2026-08-14, GEO 감사) — 이전엔 onClick+useState라
+// 서버가 내려주는 첫 HTML에 최신글 포함 9개만 <a href> 링크로 존재하고 나머지는
+// 크롤러가 못 밟는 상태였다. searchParams.page를 서버에서 읽어 currentPage를
+// 계산해 내려주고, 클라이언트 쪽 페이지 버튼도 <Link href="/lens?page=N">로
+// 바꿔서 각 페이지가 고유 크롤 가능 URL이 되도록 한다.
+export default async function LensListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page } = await searchParams;
   const items = await fetchLensPosts();
   const jsonLd = buildJsonLd(items);
+  const initialPage = Math.max(1, parseInt(page ?? '1', 10) || 1);
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <LensListClient initialItems={items} />
+      <LensListClient initialItems={items} initialPage={initialPage} />
     </>
   );
 }

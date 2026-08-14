@@ -1,10 +1,19 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   // SSR 전환(2026-08-08, EC2+PM2+nginx) — admin 발행이 재빌드 없이 즉시
   // 반영되려면 매 요청마다 서버가 렌더링해야 한다. 정적 export였던 이전
   // 방식은 docs/archive/ 또는 git 히스토리에서 output:"export" 커밋 참조.
   output: "standalone",
+  // /saju 라우트의 실제 코드(features/shared/widgets)는 이 프로젝트 밖
+  // ../../saju/frontend/ 에 산다(2026-08-14, 모노레포 스타일 정리 —
+  // service/frontend/src/app/saju/ 안에는 라우트 파일만 남기고, 실제 로직은
+  // saju/backend/ 와 나란히 최상위 saju/frontend/ 에 둠). output:"standalone"
+  // 빌드가 파일 트레이싱할 때 프로젝트 루트 밖 파일도 포함하도록 트레이싱
+  // 루트를 dev2 레포 루트로 넓힌다 — 안 하면 EC2 standalone 산출물에
+  // saju/frontend/ 코드가 안 들어가 런타임에 모듈을 못 찾는다.
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },

@@ -86,24 +86,20 @@ export function LensViewClient({
       {/* 커버 — 사진 배경 + lens 태그 + 헤드라인 + 날짜. 이미지 하단이 흰
           본문 영역으로 자연스럽게 이어지도록 그라데이션이 #fff로 끝난다. */}
       <div style={{ position: 'relative', width: '100%', minHeight: '58vh', overflow: 'hidden', background: '#f3f4f6' }}>
-        {lens.cover_image_url && (
-          <Image
-            src={lens.cover_image_url}
-            alt={lens.headline}
-            fill
-            sizes="100vw"
-            priority
-            style={{ objectFit: 'cover' }}
-          />
-        )}
+        <Image
+          src={lens.cover_image_url || '/lens/default-cover.webp'}
+          alt={lens.headline}
+          fill
+          sizes="100vw"
+          priority
+          style={{ objectFit: 'cover' }}
+        />
         <div
           aria-hidden
           style={{
             position: 'absolute',
             inset: 0,
-            background: lens.cover_image_url
-              ? 'linear-gradient(180deg, rgba(17,24,39,0.1) 0%, rgba(17,24,39,0.4) 55%, #fff 98%)'
-              : 'none',
+            background: 'linear-gradient(180deg, rgba(17,24,39,0.1) 0%, rgba(17,24,39,0.4) 55%, #fff 98%)',
           }}
         />
         <div style={{ position: 'relative', maxWidth: 760, margin: '0 auto', padding: 'clamp(96px, 16vw, 140px) clamp(20px, 5vw, 32px) clamp(28px, 5vw, 40px)' }}>
@@ -122,19 +118,20 @@ export function LensViewClient({
             lens
           </span>
           <h1
+            data-speakable="headline"
             style={{
-              color: lens.cover_image_url ? '#fff' : '#111827',
+              color: '#fff',
               fontSize: 'clamp(26px, 6vw, 40px)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               lineHeight: 1.28,
               marginBottom: 14,
-              textShadow: lens.cover_image_url ? '0 2px 20px rgba(0,0,0,0.45)' : 'none',
+              textShadow: '0 2px 20px rgba(0,0,0,0.45)',
             }}
           >
             {lens.headline}
           </h1>
-          <p style={{ fontSize: 13, color: lens.cover_image_url ? 'rgba(255,255,255,0.85)' : '#6b7280', fontWeight: 600 }}>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
             {lens.date.replaceAll('-', '.')}
           </p>
         </div>
@@ -146,7 +143,7 @@ export function LensViewClient({
           <section style={{ background: SURFACE, borderRadius: 16, padding: 'clamp(22px, 4vw, 30px)', marginBottom: 20, boxShadow: CARD_SHADOW, border: CARD_BORDER }}>
             <p style={{ fontSize: 18, fontWeight: 800, color: '#111827', marginBottom: 12 }}>핵심요약</p>
             <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', marginBottom: 18 }} />
-            <p style={{ fontSize: 15.5, lineHeight: 1.75, color: '#374151', whiteSpace: 'pre-line' }}>{lens.context}</p>
+            <p data-speakable="summary" style={{ fontSize: 15.5, lineHeight: 1.75, color: '#374151', whiteSpace: 'pre-line' }}>{lens.context}</p>
           </section>
         )}
 
@@ -154,6 +151,7 @@ export function LensViewClient({
         {lens.lenses.map((l, i) => (
           <section
             key={i}
+            data-speakable="qa"
             style={{ background: SURFACE, borderRadius: 16, padding: 'clamp(22px, 4vw, 30px)', marginBottom: 20, boxShadow: CARD_SHADOW, border: CARD_BORDER }}
           >
             <p style={{ fontSize: 17, fontWeight: 800, color: '#111827', marginBottom: 12, letterSpacing: '-0.01em' }}>{l.label}</p>

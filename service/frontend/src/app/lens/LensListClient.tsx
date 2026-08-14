@@ -18,14 +18,19 @@ import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
 //
 // initialItems는 서버가 fetchLensPosts()로 미리 가져온 값 — 첫 페인트부터
 // 실제 목록이 박힌다(SSR 원칙, page.tsx 참조).
+//
+// 페이지 버튼을 진짜 URL로(2026-08-14, GEO 감사) — onClick+useState였을 때는
+// 서버 첫 HTML에 최신글+8개(9개)만 <a href> 링크로 존재하고 2페이지 이후는
+// 크롤러가 버튼을 눌러야만(즉 못) 도달했다. initialPage를 page.tsx가
+// searchParams에서 읽어 내려주고, 페이지 버튼도 <Link href="/lens?page=N">로
+// 바꿔 각 페이지가 고유 크롤 가능 URL이 되도록 한다.
 const ACCENT = '#3b82f6';
 const CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)';
 const CARD_BORDER = '1px solid rgba(0,0,0,0.06)';
 const PAGE_SIZE = 8;
 
-export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
+export function LensListClient({ initialItems, initialPage }: { initialItems: CmsLens[]; initialPage: number }) {
   const [items, setItems] = useState<CmsLens[]>(initialItems);
-  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +44,7 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
 
   const [latest, ...rest] = items;
   const totalPages = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = Math.min(initialPage, totalPages);
   const pageItems = rest.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
@@ -118,29 +123,21 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
             }}
           >
             <div className="relative overflow-hidden" style={{ aspectRatio: '4 / 3', background: '#f3f4f6' }}>
-              {latest.cover_image_url ? (
-                <Image
-                  src={latest.cover_image_url}
-                  alt={latest.headline}
-                  fill
-                  sizes="(min-width: 768px) 640px, 100vw"
-                  priority
-                  className="transition-transform duration-500 group-hover:scale-[1.04]"
-                  style={{ objectFit: 'cover' }}
-                />
-              ) : (
-                <div className="flex items-center justify-center w-full h-full" style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>
-                  4가지 시선
-                </div>
-              )}
+              <Image
+                src={latest.cover_image_url || '/lens/default-cover.webp'}
+                alt={latest.headline}
+                fill
+                sizes="(min-width: 768px) 640px, 100vw"
+                priority
+                className="transition-transform duration-500 group-hover:scale-[1.04]"
+                style={{ objectFit: 'cover' }}
+              />
               <div
                 aria-hidden
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: latest.cover_image_url
-                    ? 'linear-gradient(180deg, rgba(17,24,39,0) 40%, rgba(17,24,39,0.78) 80%, rgba(17,24,39,0.94) 100%)'
-                    : 'none',
+                  background: 'linear-gradient(180deg, rgba(17,24,39,0) 40%, rgba(17,24,39,0.78) 80%, rgba(17,24,39,0.94) 100%)',
                 }}
               />
               <span
@@ -159,17 +156,17 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                 오늘의 시선
               </span>
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 'clamp(18px, 3.4vw, 26px)' }}>
-                <p style={{ fontSize: 11, color: latest.cover_image_url ? 'rgba(255,255,255,0.7)' : '#9ca3af', marginBottom: 6, fontWeight: 600 }}>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 6, fontWeight: 600 }}>
                   {latest.date.replaceAll('-', '.')}
                 </p>
                 <h2
                   style={{
-                    color: latest.cover_image_url ? '#fff' : '#111827',
+                    color: '#fff',
                     fontSize: 'clamp(19px, 3.8vw, 24px)',
                     fontWeight: 800,
                     letterSpacing: '-0.01em',
                     lineHeight: 1.32,
-                    textShadow: latest.cover_image_url ? '0 2px 16px rgba(0,0,0,0.45)' : 'none',
+                    textShadow: '0 2px 16px rgba(0,0,0,0.45)',
                   }}
                 >
                   {latest.headline}
@@ -202,9 +199,13 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                   }}
                 >
                   <div style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f3f4f6' }}>
-                    {l.cover_image_url && (
-                      <Image src={l.cover_image_url} alt={l.headline} width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    )}
+                    <Image
+                      src={l.cover_image_url || '/lens/default-cover.webp'}
+                      alt={l.headline}
+                      width={64}
+                      height={64}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4, fontWeight: 600 }}>{l.date.replaceAll('-', '.')}</p>
@@ -230,12 +231,15 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center" style={{ gap: 6, marginTop: 28, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                <Link
+                  href={`/lens${currentPage - 1 > 1 ? `?page=${currentPage - 1}` : ''}`}
                   aria-label="이전 페이지"
+                  aria-disabled={currentPage === 1}
+                  tabIndex={currentPage === 1 ? -1 : undefined}
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     width: 32,
                     height: 32,
                     borderRadius: 8,
@@ -244,20 +248,23 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                     fontSize: 13,
                     fontWeight: 700,
                     color: currentPage === 1 ? '#d1d5db' : '#374151',
-                    cursor: currentPage === 1 ? 'default' : 'pointer',
+                    pointerEvents: currentPage === 1 ? 'none' : undefined,
+                    textDecoration: 'none',
                   }}
                 >
                   ‹
-                </button>
+                </Link>
                 {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((n) => {
                   const active = n === currentPage;
                   return (
-                    <button
+                    <Link
                       key={n}
-                      type="button"
-                      onClick={() => setPage(n)}
+                      href={`/lens${n > 1 ? `?page=${n}` : ''}`}
                       aria-current={active ? 'page' : undefined}
                       style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         width: 32,
                         height: 32,
                         borderRadius: 8,
@@ -266,20 +273,24 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                         fontSize: 13,
                         fontWeight: 700,
                         color: active ? '#fff' : '#374151',
-                        cursor: active ? 'default' : 'pointer',
+                        pointerEvents: active ? 'none' : undefined,
+                        textDecoration: 'none',
                         fontVariantNumeric: 'tabular-nums',
                       }}
                     >
                       {n}
-                    </button>
+                    </Link>
                   );
                 })}
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
+                <Link
+                  href={`/lens${currentPage + 1 <= totalPages ? `?page=${currentPage + 1}` : `?page=${totalPages}`}`}
                   aria-label="다음 페이지"
+                  aria-disabled={currentPage === totalPages}
+                  tabIndex={currentPage === totalPages ? -1 : undefined}
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     width: 32,
                     height: 32,
                     borderRadius: 8,
@@ -288,11 +299,12 @@ export function LensListClient({ initialItems }: { initialItems: CmsLens[] }) {
                     fontSize: 13,
                     fontWeight: 700,
                     color: currentPage === totalPages ? '#d1d5db' : '#374151',
-                    cursor: currentPage === totalPages ? 'default' : 'pointer',
+                    pointerEvents: currentPage === totalPages ? 'none' : undefined,
+                    textDecoration: 'none',
                   }}
                 >
                   ›
-                </button>
+                </Link>
               </div>
             )}
           </>

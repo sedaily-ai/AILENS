@@ -79,29 +79,21 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
 
       <Link href={`/lens/${encodeURIComponent(current.id)}`} prefetch className="group relative" style={CARD}>
         <div className="relative overflow-hidden" style={{ aspectRatio: '16 / 9', background: '#f3f4f6' }}>
-          {current.cover_image_url ? (
-            <Image
-              src={current.cover_image_url}
-              alt={current.headline}
-              fill
-              sizes="(min-width: 768px) 640px, 100vw"
-              priority
-              className="transition-transform duration-500 group-hover:scale-[1.03]"
-              style={{ objectFit: 'cover' }}
-            />
-          ) : (
-            <div className="flex items-center justify-center w-full h-full" style={{ color: '#9ca3af', fontSize: 13, fontWeight: 600 }}>
-              4가지 시선
-            </div>
-          )}
+          <Image
+            src={current.cover_image_url || '/lens/default-cover.webp'}
+            alt={current.headline}
+            fill
+            sizes="(min-width: 768px) 640px, 100vw"
+            priority
+            className="transition-transform duration-500 group-hover:scale-[1.03]"
+            style={{ objectFit: 'cover' }}
+          />
           <div
             aria-hidden
             style={{
               position: 'absolute',
               inset: 0,
-              background: current.cover_image_url
-                ? 'linear-gradient(180deg, rgba(17,24,39,0) 35%, rgba(17,24,39,0.72) 75%, rgba(17,24,39,0.92) 100%)'
-                : 'none',
+              background: 'linear-gradient(180deg, rgba(17,24,39,0) 35%, rgba(17,24,39,0.72) 75%, rgba(17,24,39,0.92) 100%)',
             }}
           />
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 'clamp(20px, 4vw, 32px)' }}>
@@ -121,18 +113,18 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
             </span>
             <h3
               style={{
-                color: current.cover_image_url ? '#fff' : '#111827',
+                color: '#fff',
                 fontSize: 'clamp(19px, 3.8vw, 25px)',
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
                 lineHeight: 1.32,
                 marginBottom: 10,
-                textShadow: current.cover_image_url ? '0 2px 16px rgba(0,0,0,0.5)' : 'none',
+                textShadow: '0 2px 16px rgba(0,0,0,0.5)',
               }}
             >
               {current.headline}
             </h3>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: current.cover_image_url ? '#93c5fd' : ACCENT }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#93c5fd' }}>
               원인·사람·내 일·숫자, 네 갈래로 보기 →
             </span>
           </div>

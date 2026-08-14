@@ -72,16 +72,25 @@ function buildJsonLd(items: CmsWebtoon[]) {
   };
 }
 
-export default async function WebtoonListPage() {
+// 페이지네이션을 진짜 URL로(2026-08-14, GEO 감사) — /lens와 동일 원인·동일
+// 수정: onClick+useState라 서버 첫 HTML엔 최신화+12개만 <a href>로 존재하고
+// 나머지는 크롤러가 못 밟았다.
+export default async function WebtoonListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page } = await searchParams;
   const items = await fetchWebtoons();
   const jsonLd = buildJsonLd(items);
+  const initialPage = Math.max(1, parseInt(page ?? '1', 10) || 1);
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <WebtoonListClient initialItems={items} />
+      <WebtoonListClient initialItems={items} initialPage={initialPage} />
     </>
   );
 }
