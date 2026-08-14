@@ -107,10 +107,9 @@ docs/worklog/2026-08/2026-08-09-saju-cdn-mount.md
 
 ## 결정
 
-- 프로덕션 배포(S3/CloudFront/PM2/nginx)는 이번 세션에서 건드리지 않았다 — 프로덕션은
-  기존 CDN 마운트로 이미 완전히 격리돼 있어 위험이 없고, dev2의 `saju/frontend` 사본을
-  실제 배포 소스로 승격할지는 원본 `sedaily-ai/AI-saju` 레포와의 관계까지 얽힌 별도의
-  큰 결정이라 범위 밖으로 뒀다.
+- 프로덕션 배포(S3/CloudFront/PM2/nginx)는 **이 시점까지는** 건드리지 않았다 —
+  이후 같은 세션에서 사용자가 명시적으로 실배포를 요청해 진행함, 아래 "실제 배포
+  완료" 섹션 참조.
 - `saju/frontend`의 `node_modules`/`.next`는 각자 자체 `.gitignore`로 커밋 제외(레포
   루트 `.gitignore`엔 범용 패턴이 없어서 앱마다 따로 필요 — `admin/frontend`도 동일).
 
@@ -130,10 +129,74 @@ cd service/frontend && SAJU_ORIGIN=http://localhost:3010 npm run dev
 안 켜면(터미널 2만 그냥 `npm run dev`) `/saju`는 404 — 사주를 안 건드리는 세션에선
 이렇게 본체만 켜면 된다.
 
+## 추가: 실제 배포 완료 — saju/frontend + service/frontend (같은 세션 이어서)
+
+### 배경
+
+로컬 검증 후 사용자가 실제 프로덕션 배포까지 명시적으로 요청. `saju/frontend`를
+"실제 배포"한다는 게 무슨 뜻인지 모호해서(새 인프라로 테스트 vs 지금 살아있는
+`ailens.sedaily.ai/saju` 경로를 덮어쓰기) 먼저 확인 — 사용자가 **지금 살아있는
+경로를 dev2 사본으로 그대로 덮어쓰는 것**을 명확히 원한다고 확인 후 진행.
+
+### 한 것
+
+- **사전 확인**: `aws sts get-caller-identity`로 계정(887078546492) 일치 확인,
+  `dev`(하이픈 없는 옛 체크아웃) 최근 커밋이 2026-08-07로 오래돼 최근 배포 충돌
+  위험 없음 확인(CLAUDE.md의 dev/dev2 이중 체크아웃 경고에 따른 사전 점검).
+- **service/frontend/deploy.sh 수정 필요성 발견**: `outputFileTracingRoot`를 오늘
+  앞서 제거했는데, 스크립트가 옛 산출물 경로(`.next/standalone/service/frontend/`)를
+  하드코딩하고 있어서 그대로 배포했으면 빌드 검증 단계에서 실패했을 것 — 배포 전에
+  실제로 `npm run build`해서 `.next/standalone/server.js`가 (중첩 없이) 바로 그
+  자리에 생기는 걸 확인하고 스크립트를 고쳤다.
+- **saju/frontend/deploy-saju.sh 신설**: `admin/frontend/deploy-admin.sh`의
+  S3 sync + CloudFront invalidation 패턴을 그대로 가져와 대상만 바꿈 —
+  `s3://saju-oracle-frontend-887078546492/ailens-mount/saju/` 프리픽스로만 쓰고,
+  그 버킷 **루트(saju.sedaily.ai 자체 독립 배포)는 절대 안 건드리게** 프리픽스를
+  스크립트에 하드코딩. 실행 전 `aws s3 ls`로 기존 프리픽스 내용(2026-08-11,
+  원본 AI-saju 레포의 마지막 배포)과 버킷 루트를 먼저 확인, `aws s3 sync --dryrun`으로
+  실제 업로드/삭제 대상을 미리 훑어본 뒤 실행.
+- **1차 배포 후 발견한 문제**: `/saju/`(루트)는 200인데 `/saju/saju`, `/saju/blog`
+  등 중첩 라우트가 전부 404. 원인 추적 — AILENS CloudFront가 재사용 중인
+  CloudFront Function `sedaily-rewrite-subdir-index`의 코드를
+  `aws cloudfront get-function`으로 직접 받아 읽어보니, 확장자 없는 경로를 무조건
+  `<path>/index.html`로 재작성하는 로직이었다. 이건 Next `trailingSlash: true` 빌드
+  (라우트마다 `route/index.html` 디렉터리 구조)를 전제로 만들어진 함수인데,
+  `saju/frontend/next.config.ts`에 그 옵션이 없어서 기본값(`route.html` 플랫 파일)로
+  export됐던 것 — 로컬 `next dev`/export 서버는 이 CDN 함수를 안 거치니 로컬
+  테스트에서는 전혀 안 걸렸다. `trailingSlash: true` 추가 → 재빌드(`out/` 구조가
+  `saju/index.html`, `saju/chart/index.html` 식으로 바뀐 것 확인) → 재배포 →
+  트레일링 슬래시 있음/없음 양쪽 다 200 확인.
+- **service/frontend 배포**: `./deploy.sh` 실행 — 빌드 → S3(`ailens-ssr-releases`)
+  업로드 → SSM으로 EC2 릴리스 전환 → PM2 재시작 → 헬스체크(200) 전부 성공.
+
+### 검증 (실도메인)
+
+- `https://ailens.sedaily.ai/saju`, `/saju/saju`, `/saju/saju/chart`, `/saju/blog`,
+  `/saju/en/blog`, `/saju/career`, `/saju/compatibility` — 트레일링 슬래시 있음/없음
+  전부 200.
+- `https://ailens.sedaily.ai/saju/saju/my-saju.png` 등 정적 자산도 200.
+- AILENS 본체 핵심 라우트(`/`, `/letters`, `/timeline`, `/lens`) 전부 정상.
+- 홈페이지 HTML을 직접 curl해서 "사주" 탭·홈 캐러셀 슬라이드가 실제로
+  `<a href="/saju">`(하드 내비게이션)로 렌더되는 것까지 확인 — hardNav 수정이
+  프로덕션에 제대로 반영됨.
+
+### 결정
+
+- 이 배포로 `ailens-mount/saju/` 프리픽스의 소스가 원본 `sedaily-ai/AI-saju` 레포
+  자체 파이프라인에서 **dev2의 `saju/frontend` 사본으로 완전히 바뀌었다** — 앞으로
+  이 경로를 업데이트하려면 dev2에서 `saju/frontend/deploy-saju.sh`를 써야 하고,
+  원본 AI-saju 레포 쪽에서 배포해도 더 이상 이 경로에 반영 안 됨(원본 레포는
+  `saju.sedaily.ai` 자체 배포만 계속 담당). 이 사실을 원본 레포 관리자/팀에도
+  공유가 필요할 수 있음 — 이번 세션에서는 안 함.
+- 버킷 루트(`saju.sedaily.ai` 자체)는 이번 배포에서 전혀 건드리지 않았다 —
+  `deploy-saju.sh`가 프리픽스로만 쓰기 때문에 구조적으로 안전.
+
 ## 다음
 
-- `saju/frontend`를 실제 배포 파이프라인에 연결할지(S3/CloudFront 또는 별도 EC2+PM2)는
-  별도 세션에서 원본 AI-saju 레포와의 관계를 먼저 정리한 뒤 결정.
+- `ailens-mount/saju/` 소스가 이제 dev2로 넘어왔다는 걸 원본 AI-saju 레포
+  관리자에게 알릴지, 그 레포의 배포 스크립트에서 이 프리픽스 업로드 부분을
+  빼야 할지 검토 필요(안 빼면 다음에 그쪽에서 배포할 때 다시 덮어써서 오늘
+  고친 게 되돌아갈 수 있음).
 - `public/saju/hero-character.png` 404는 여전히 미해결(원본 AI-saju 레포에도 없던
   파일 — 오늘 만든 회귀 아님, 2026-08-14 worklog에서도 동일하게 기록됨).
 - `.saju-scope` CSS 스코핑은 이제 AILENS와 변수/클래스명이 겹칠 일이 없어서 굳이
