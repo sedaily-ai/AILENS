@@ -44,7 +44,6 @@ export const SCOPE_KIND_LABEL: Record<PromptScopeKind, string> = { status: "상�
 
 export const DEFAULT_SCOPE_ID = "draft";
 
-/** 스코프 + 채널 → 백엔드 프롬프트 id (`category/name`). */
 export function promptIdFor(channel: string, scopeId: string): string {
   return `${channel}/${scopeId}`;
 }
@@ -53,16 +52,12 @@ export function scopeLabel(id: string): string {
   return PROMPT_SCOPES.find((s) => s.id === id)?.label ?? id;
 }
 
-/** kind 별로 묶은 스코프 목록. 지금은 상태 한 줄뿐이지만 토픽이 추가되면
- *  탭이 줄을 나눠 렌더할 수 있게 모양을 맞춰 둔다. */
 export function scopeGroups(): Array<{ kind: PromptScopeKind; scopes: PromptScope[] }> {
   const kinds: PromptScopeKind[] = ["status"];
   return kinds
     .map((kind) => ({ kind, scopes: PROMPT_SCOPES.filter((s) => s.kind === kind) }))
     .filter((g) => g.scopes.length > 0);
 }
-
-/* ---------- 형식 ---------- */
 
 export type PromptFormat = "markdown" | "text" | "code";
 
@@ -103,36 +98,27 @@ function normalizeLanguage(v: unknown): string | undefined {
     : undefined;
 }
 
-/* ---------- 문서 모양 ---------- */
-
 export interface PromptAttachment {
   name: string;
   size: number;
   type: string;
   format: PromptFormat;
-  /** format === "code" 일 때 코드펜스에 붙는 언어. */
   language?: string;
-  /** 파일 본문. 프롬프트 조립에 그대로 들어간다. */
   content: string;
-  /** 텍스트가 아니어서 변환을 거친 경우의 원본 종류. */
   extractedFrom?: "pdf";
-  /** PDF 쪽수. */
   pages?: number;
-  /** 길이 상한에 걸려 뒷부분이 잘렸는지. */
   truncated?: boolean;
 }
 
 export interface PromptSection {
   text: string;
   format: PromptFormat;
-  /** format === "code" 일 때만 의미가 있다. 형식을 되돌릴 때 쓰려고 남겨둔다. */
   language?: string;
   attachments: PromptAttachment[];
 }
 
 export type PromptSectionKey = "description" | "structure" | "guidelines";
 
-/** 프롬프트 한 벌 = 3섹션. 버전·저장시각은 백엔드가 관리하므로 여기 없다. */
 export type PromptPreset = Record<PromptSectionKey, PromptSection>;
 
 export const SECTION_DEFS: Array<{
@@ -181,14 +167,6 @@ export function emptyPreset(): PromptPreset {
   };
 }
 
-/* ---------- 첨부 읽기 ----------
-   프롬프트에 넣을 수 있는 건 결국 텍스트다. 텍스트 파일은 확장자로 형식을
-   추론해 그대로 읽고, PDF 는 pdf.js 로 텍스트를 뽑아 넣는다(lib/pdfText.ts).
-   docx·xlsx 같은 나머지 바이너리는 파서가 없으면 의미 있는 텍스트가 안 나오니
-   아예 거절한다 — 조용히 빈 첨부로 들어가는 게 더 나쁘다. */
-
-// pdf.js 자체는 pdfText 안에서 동적 import 한다 — 이 모듈을 정적으로 들고 있어도
-// 1.2MB 파서가 메인 번들에 들어오지 않는다(PDF 를 실제로 첨부할 때만 받는다).
 import { PdfExtractError, extractPdfText } from "./pdfText";
 
 const EXT_FORMAT: Record<string, { format: PromptFormat; language?: string }> = {
@@ -231,11 +209,8 @@ const EXT_FORMAT: Record<string, { format: PromptFormat; language?: string }> = 
 export const TEXT_EXTENSIONS = Object.keys(EXT_FORMAT);
 export const SUPPORTED_EXTENSIONS = [...TEXT_EXTENSIONS, "pdf"];
 
-/** `<input type="file" accept>` 값. */
 export const ATTACHMENT_ACCEPT = SUPPORTED_EXTENSIONS.map((e) => `.${e}`).join(",");
 
-/** 텍스트 파일 크기 상한. DDB 아이템 한계(400KB)에 content·sections 양쪽으로
- *  들어가므로 예전 512KB 보다 훨씬 낮게 잡는다. */
 export const MAX_ATTACHMENT_BYTES = 100 * 1024;
 
 export { MAX_EXTRACTED_CHARS, MAX_PDF_BYTES } from "./pdfText";
@@ -257,14 +232,12 @@ export function detectFormat(
   return EXT_FORMAT[extensionOf(filename)] ?? null;
 }
 
-/** 첨부 목록·미리보기에 붙는 짧은 배지 문자열. */
 export function shortFormatLabel(a: PromptAttachment): string {
   if (a.extractedFrom === "pdf") return "PDF";
   if (a.format === "code") return (a.language ?? "code").toUpperCase();
   return a.format === "markdown" ? "MD" : "TXT";
 }
 
-/** 첨부 목록에 붙는 부가 설명 (없으면 null). */
 export function attachmentNote(a: PromptAttachment): string | null {
   if (a.extractedFrom !== "pdf") return null;
   const pages = a.pages ? `${a.pages}쪽` : null;
@@ -284,7 +257,6 @@ async function readPdfAttachment(file: File): Promise<PromptAttachment> {
   try {
     extracted = await extractPdfText(file);
   } catch (err) {
-    // PdfExtractError 의 메시지는 그대로 사용자에게 보여줄 수 있게 써 뒀다.
     throw new PromptFileError(
       err instanceof PdfExtractError
         ? err.message
@@ -296,7 +268,7 @@ async function readPdfAttachment(file: File): Promise<PromptAttachment> {
     name: file.name,
     size: file.size,
     type: file.type || "application/pdf",
-    format: "text", // 추출 결과는 서식 없는 평문이다.
+    format: "text",
     content: extracted.text,
     extractedFrom: "pdf",
     pages: extracted.pages,
@@ -340,8 +312,6 @@ export async function readAttachment(file: File): Promise<PromptAttachment> {
   };
 }
 
-/* ---------- 집계 · 비교 ---------- */
-
 export function sectionCharCount(s: PromptSection): number {
   return s.text.length + s.attachments.reduce((sum, a) => sum + a.content.length, 0);
 }
@@ -356,12 +326,6 @@ export function presetHasContent(p: PromptPreset): boolean {
   );
 }
 
-/* 키를 고정 순서로 펼친다 — JSON.stringify 비교는 **키 삽입 순서**에 민감하다.
-   그냥 stringify 하면 이런 오탐이 난다: 새 프롬프트(emptySection 은 language
-   키가 없다)에서 형식을 코드로 바꾸면 language 가 맨 뒤에 붙는데, 저장 후
-   서버에서 되읽으면 toSection 이 language 를 중간에 놓는다. 내용이 같아도
-   문자열이 달라져 저장 직후에도 계속 "저장 안 됨"으로 보인다.
-   undefined 와 키 없음도 여기서 같이 흡수한다. */
 function canonicalSection(s: PromptSection) {
   return {
     text: s.text,
@@ -391,9 +355,6 @@ export function clonePreset(p: PromptPreset): PromptPreset {
   return structuredClone(p);
 }
 
-/* ---------- 조립 (→ content) ---------- */
-
-/** 코드펜스 길이를 본문의 백틱보다 길게 잡는다 — 안에 ``` 이 있어도 안 깨진다. */
 function fence(content: string): string {
   const runs = content.match(/`{3,}/g);
   const width = runs ? Math.max(...runs.map((r) => r.length)) + 1 : 3;
@@ -405,13 +366,6 @@ function wrap(content: string, language: string): string {
   return `${f}${language}\n${content}\n${f}`;
 }
 
-/**
- * 3섹션 + 첨부를 모델이 읽을 하나의 산문으로 조립한다 — 이 결과가 백엔드
- * `content` 가 되고 그대로 Bedrock 에 들어간다.
- *
- * 첨부는 항상 코드펜스로 감싼다 — 본문과 경계가 흐려지면 모델이 지침과
- * 참고자료를 구분하지 못한다.
- */
 export function buildPromptText(p: PromptPreset): string {
   const blocks: string[] = [];
 
@@ -428,8 +382,6 @@ export function buildPromptText(p: PromptPreset): string {
       );
     }
     for (const a of attachments) {
-      // PDF 는 추출본이라는 사실을 명시한다 — 표·다단이 흐트러졌을 수 있다는
-      // 걸 모델이 알아야 그대로 인용하지 않는다.
       const origin =
         a.extractedFrom === "pdf"
           ? ` (PDF${a.pages ? ` ${a.pages}쪽` : ""} 텍스트 추출${
@@ -450,17 +402,12 @@ export function buildPromptText(p: PromptPreset): string {
   return blocks.join("\n\n");
 }
 
-/* ---------- 백엔드 왕복 ---------- */
-
-/** DDB 아이템 한계(400KB)에 맞춘 상한. 백엔드 _MAX_PAYLOAD_BYTES 와 같은 값이라
- *  프런트에서 먼저 막아 400 을 안 보게 한다. */
 export const PROMPT_PAYLOAD_LIMIT_BYTES = 340 * 1024;
 
 function utf8Bytes(s: string): number {
   return new TextEncoder().encode(s).length;
 }
 
-/** 백엔드 `sections` 로 보낼 구조. content 와 달리 모델이 읽지 않는다. */
 export function sectionsPayload(p: PromptPreset): Record<string, PromptSection> {
   return {
     description: p.description,
@@ -469,8 +416,6 @@ export function sectionsPayload(p: PromptPreset): Record<string, PromptSection> 
   };
 }
 
-/** 저장 시 실제로 DDB 아이템에 들어갈 바이트 수 (content + sections_json).
- *  한글은 UTF-8 에서 3바이트라 글자 수로 재면 3배를 놓친다. */
 export function payloadBytes(p: PromptPreset): number {
   return (
     utf8Bytes(buildPromptText(p)) + utf8Bytes(JSON.stringify(sectionsPayload(p)))
@@ -508,11 +453,9 @@ function toSection(v: unknown, fallback: PromptFormat): PromptSection {
   };
 }
 
-/** 백엔드 `sections` (unknown) → 프리셋. 모양이 아니면 null. */
 export function presetFromSections(raw: unknown): PromptPreset | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  // 세 키 중 하나라도 섹션 모양이면 구조가 있는 것으로 본다.
   const known = SECTION_DEFS.some((d) => r[d.key] && typeof r[d.key] === "object");
   if (!known) return null;
   return {
@@ -528,13 +471,6 @@ const HEADING_BY_LABEL: Record<string, PromptSectionKey> = {
   지침: "guidelines",
 };
 
-/**
- * sections 가 없는 프롬프트(옛 버전 · /prompts/edit 평문 저장 · 시드 .md)를
- * 최대한 섹션으로 되돌린다. `## 설명` / `## 구조` / `## 지침` 헤딩만 인식하고,
- * 하나도 없으면 전체를 지침에 넣는다 — 내용을 잃지 않는 게 우선이다.
- *
- * ⚠️ sections 가 있으면 그게 정본이다. 이건 폴백 전용이다.
- */
 export function presetFromProse(content: string): PromptPreset {
   const preset = emptyPreset();
   const lines = content.split("\n");
@@ -564,7 +500,6 @@ export function presetFromProse(content: string): PromptPreset {
     const body = buckets[def.key];
     if (body) preset[def.key].text = body.join("\n").trim();
   }
-  // 첫 헤딩 앞에 있던 내용은 버리지 않고 설명 앞에 붙인다.
   const lead = preamble.join("\n").trim();
   if (lead) {
     preset.description.text = [lead, preset.description.text]
@@ -574,7 +509,6 @@ export function presetFromProse(content: string): PromptPreset {
   return preset;
 }
 
-/** 백엔드 상세 응답 → 편집용 프리셋. sections 우선, 없으면 content 에서 복원. */
 export function presetFromDetail(detail: {
   active_content: string;
   sections?: unknown;
