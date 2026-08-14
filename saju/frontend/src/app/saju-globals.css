@@ -1,10 +1,13 @@
-/* AI-saju(사주매칭) 원본 globals.css를 AILENS 안에 병합하면서 스코핑한 버전.
-   원본은 `:root`/`.dark`/`html`/`body`/`@theme inline`/여러 유틸 클래스(.skip-link,
-   .max-w-container, .scrollbar-hide 등)를 전역 선택자로 썼는데, AILENS 루트
-   globals.css가 같은 변수명(--color-primary 등)과 같은 클래스명을 이미 쓰고
-   있어서 그대로 두면 사이트 전체 톤이 깨진다. 그래서 전부 `.saju-scope` 아래로
-   스코핑했다 — Tailwind 재-import/@theme/다크모드(원본에서도 죽은 기능,
-   "점신 톤은 라이트 단일" 주석 참고)는 통째로 뺐다. */
+/* AI-saju(사주매칭) 원본 globals.css를 AILENS 안에 병합하면서 스코핑했던 버전
+   (2026-08-14 vendoring). 이제 saju/frontend가 완전히 독립된 Next 앱이 돼서
+   더는 AILENS 루트 globals.css와 변수명(--color-primary 등)·클래스명이 겹칠
+   일이 없지만, `.saju-scope` 스코핑 자체는 그대로 둔다(제거해도 이득 없고
+   건드릴수록 회귀 위험만 커짐) — Tailwind 재-import만 되살린다(vendoring 때는
+   AILENS 루트 globals.css가 이미 import하고 있어서 여기선 뺐었다).
+   @theme/다크모드는 원본에서도 죽은 기능이라("점신 톤은 라이트 단일" 주석 참고)
+   그대로 뺀 채 유지. */
+
+@import "tailwindcss";
 
 .saju-scope {
   --color-bg: #ffffff;

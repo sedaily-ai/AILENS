@@ -19,7 +19,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@saju/*": ["./*"]
     }
   },
   "include": [
@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "src/legacy/**/*"]
+  "exclude": ["node_modules"]
 }

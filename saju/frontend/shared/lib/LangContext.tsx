@@ -26,25 +26,20 @@ interface LangContextValue {
   setLang: (next: Lang) => void;
   t: (ko: string, en: string) => string;
   g: (term: string) => string;
-  /** Localize a path: '/saju' → '/saju/en/saju' when lang === 'en' (AILENS-mounted, /saju prefix always added) */
+  /** Localize a path: '/blog' → '/en/blog' when lang === 'en' (basePath는 next/link·router가 자동으로 붙임) */
   localePath: (path: string) => string;
 }
 
-// AILENS 내 마운트 경로 — 이 vendored 앱은 항상 /saju 아래에서만 렌더된다
-// (독립 배포 saju.sedaily.ai 였을 때의 basePath 역할을 여기서 대신함).
-const MOUNT_PREFIX = '/saju';
-
-/** usePathname()이 돌려주는 실제 브라우저 경로에서 /saju 마운트 프리픽스를 제거 */
-function stripMount(pathname: string): string {
-  if (pathname === MOUNT_PREFIX) return '/';
-  if (pathname.startsWith(`${MOUNT_PREFIX}/`)) return pathname.slice(MOUNT_PREFIX.length) || '/';
-  return pathname;
-}
+// 2026-08-15, 완전 독립 앱으로 분리하며 next.config.ts의 basePath: "/saju"를
+// 되살렸다 — usePathname()/router.push()/next/link가 이제 /saju 프리픽스를
+// 자동으로 붙이고 떼주므로(Next.js 공식 동작), 여기서 수동으로 /saju를
+// 붙이거나 떼는 로직(예전 MOUNT_PREFIX/stripMount)은 제거했다. 수동으로
+// 남겨야 하는 건 next/image src나 fetch() URL처럼 Next가 basePath를
+// 자동 처리하지 않는 곳뿐(그런 곳은 shared/lib/basePath.ts의 withBasePath 사용).
 
 function deriveLang(pathname: string | null): Lang {
   if (!pathname) return 'ko';
-  const bare = stripMount(pathname);
-  if (bare === '/en' || bare.startsWith('/en/')) return 'en';
+  if (pathname === '/en' || pathname.startsWith('/en/')) return 'en';
   return 'ko';
 }
 
@@ -56,9 +51,9 @@ function stripLocale(pathname: string): string {
 
 function withLocale(pathname: string, lang: Lang): string {
   const bare = stripLocale(pathname);
-  if (lang === 'ko') return `${MOUNT_PREFIX}${bare === '/' ? '' : bare}` || MOUNT_PREFIX;
-  if (bare === '/') return `${MOUNT_PREFIX}/en`;
-  return `${MOUNT_PREFIX}/en${bare}`;
+  if (lang === 'ko') return bare;
+  if (bare === '/') return '/en';
+  return `/en${bare}`;
 }
 
 const LangContext = createContext<LangContextValue | null>(null);
@@ -92,7 +87,7 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
 
   const setLang = useCallback((next: Lang) => {
     if (next === lang) return;
-    const target = withLocale(stripMount(pathname || '/'), next);
+    const target = withLocale(pathname || '/', next);
     router.push(target);
   }, [lang, pathname, router]);
 

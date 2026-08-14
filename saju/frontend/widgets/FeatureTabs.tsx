@@ -22,8 +22,9 @@ const TABS: { id: TabId; href: string; ko: string; en: string }[] = [
 
 function resolveActive(pathname: string | null): TabId | null {
   if (!pathname) return null;
-  const mounted = pathname.startsWith('/saju/') ? pathname.slice(5) || '/' : pathname === '/saju' ? '/' : pathname;
-  const bare = mounted.startsWith('/en/') ? mounted.slice(3) : mounted === '/en' ? '/' : mounted;
+  // 2026-08-15: basePath("/saju") 복원 — usePathname()이 이미 그 프리픽스를
+  // 뗀 값을 돌려주므로(TopNav.tsx의 isActive와 동일한 이유) 수동 스트립 제거.
+  const bare = pathname.startsWith('/en/') ? pathname.slice(3) : pathname === '/en' ? '/' : pathname;
   if (bare.startsWith('/today')) return 'today';
   if (bare.startsWith('/chaeun')) return 'chaeun';
   if (bare.startsWith('/career')) return 'career';
