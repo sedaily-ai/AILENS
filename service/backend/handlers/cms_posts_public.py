@@ -191,6 +191,13 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         "context": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
         "cover_image_url": post.get("cover_image_url") or None,
+        # 텍스트가 없는 순수 기사 사진(2026-08-14 신설). cover_image_url 은
+        # 인스타 카드뉴스용 완성형 그래픽(1080x1350)이라 헤드라인·날짜·"lens"
+        # 라벨이 픽셀에 박혀 있다 — 웹 카드의 사진 칸에 그걸 쓰면 우리 HTML
+        # 헤드라인과 텍스트가 중복되고, 광고 문구·인포그래픽까지 같이 노출된다.
+        # 그래서 카드 그래픽과 별개로 "사진만" 있는 이미지를 따로 받는다.
+        # 최상위 스키마를 건드리지 않도록 body_inline 에 담는다.
+        "photo_image_url": b.get("photo_image_url") or None,
         "source_url": post.get("source_url") or None,
         "lenses": lenses,
         "is_cms": True,

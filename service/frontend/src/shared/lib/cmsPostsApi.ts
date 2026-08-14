@@ -213,7 +213,19 @@ export interface CmsLens {
   headline: string;
   context: string;
   date: string;
+  /**
+   * 인스타 카드뉴스용 완성형 그래픽(1080x1350) — 사진 위에 "lens" 라벨,
+   * 헤드라인, 날짜가 **픽셀로 박혀** 있다. 웹 카드의 사진 칸에 쓰면 우리 HTML
+   * 헤드라인과 텍스트가 중복되고, 원본에 있던 광고 문구·인포그래픽 표까지
+   * 같이 노출된다. 카드 전체를 통으로 보여주는 용도에만 쓸 것.
+   */
   cover_image_url: string | null;
+  /**
+   * 텍스트가 없는 순수 기사 사진(2026-08-14 신설, backend _shape_lens 가
+   * body_inline.photo_image_url 을 그대로 내려준다). 웹의 "사진 칸"은 이 값만
+   * 쓴다 — pickLensPhoto() 참조.
+   */
+  photo_image_url?: string | null;
   /** 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO 감사). */
   source_url: string | null;
   lenses: CmsLensItem[];

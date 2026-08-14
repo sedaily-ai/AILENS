@@ -122,6 +122,12 @@ export interface CmsPostBody {
   // 별도 필드 없이 기존 subtitle(모든 채널 공용 "요약" 필드)을 그대로 쓴다 —
   // lenses는 항상 4개(LENS_LABELS 순서 고정).
   lenses?: CmsLensItem[];
+  // channels: ["lens"] 전용 — 텍스트가 박히지 않은 "순수 기사 사진"(2026-08-14).
+  // cover_image_url 은 인스타 카드뉴스 완성형 그래픽이라 헤드라인·날짜가 이미
+  // 이미지 안에 그려져 있어서, 웹 카드의 사진 칸에 쓰면 텍스트가 중복된다.
+  // 이 필드가 채워지면 서비스 프런트가 사진 칸에 이걸 쓴다(없으면 사진 칸을
+  // 아예 비운다 — service/frontend pickLensPhoto 참조).
+  photo_image_url?: string | null;
 }
 
 export interface CmsLensItem {

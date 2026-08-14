@@ -1,6 +1,7 @@
 "use client";
 
 import { DatePickerField } from "@/components/DatePickerField";
+import { CoverImageField } from "@/components/CoverImageField";
 import { PostFormShell } from "./PostFormShell";
 import { MetaField, MetaDivider } from "./MetaField";
 import { LABEL, type ModeProps } from "./shared";
@@ -74,6 +75,25 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
       }
     >
       <div className="space-y-5 px-6 py-5">
+        {/* 순수 기사 사진(2026-08-14 신설) — 위 표지(cover_image_url)는 인스타
+            카드뉴스 완성형 그래픽이라 헤드라인·날짜가 이미지 안에 그려져 있다.
+            웹 홈·목록·상세의 "사진 칸"에 그걸 쓰면 우리 HTML 헤드라인과 글자가
+            중복되고 광고 문구까지 노출돼서, 텍스트 없는 사진을 따로 받는다.
+            비워두면 웹에서는 사진 칸을 아예 표시하지 않는다(중복 노출 방지). */}
+        <div>
+          <p className={LABEL}>
+            기사 사진 (텍스트 없는 원본)
+            <span className="ml-2 font-normal text-gray-500">
+              웹 카드의 사진 칸에 쓰입니다. 글자·로고가 없는 사진을 넣어주세요. 비우면 사진 없이 텍스트만 나갑니다.
+            </span>
+          </p>
+          <CoverImageField
+            value={body.photo_image_url ?? null}
+            onChange={(url) => patchBody({ photo_image_url: url })}
+            fallbackHint="비워두면 웹에서 사진 칸 없이 텍스트만 노출됩니다."
+          />
+        </div>
+
         <p className={LABEL}>
           4가지 시선
           <span className="ml-2 font-normal text-gray-500">
