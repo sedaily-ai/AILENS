@@ -27,6 +27,7 @@ _VALID_STATUS = ("draft", "published", "archived")
 _UPDATABLE = (
     "channels", "publish_date", "editor_id",
     "headline", "subtitle", "closing_line", "body_inline", "cover_image_url",
+    "source_url",
 )
 
 
@@ -49,6 +50,11 @@ def _to_dict(item: dict) -> dict:
         "closing_line": item.get("closing_line"),
         "body_inline": item.get("body_inline") or {},
         "cover_image_url": item.get("cover_image_url") or "",
+        # 원문 기사 URL — 서울경제 원본 취재 기사로 되돌아가는 링크. 콘텐츠가
+        # "취재된 원본을 바탕으로 AI가 재구성"한다는 걸 실제로 검증 가능하게
+        # 만든다(2026-08-13, SEO/GEO/AEO 감사 — 신뢰 신호 없이 그 주장만
+        # JSON-LD에 있던 문제). admin이 채널 상관없이 자유롭게 채운다.
+        "source_url": item.get("source_url") or "",
         "created_by": item.get("created_by"),
         "created_at": item.get("created_at"),
         "updated_at": item.get("updated_at"),
@@ -95,6 +101,7 @@ def create(data: dict, created_by: str) -> dict:
         "closing_line": data.get("closing_line"),
         "body_inline": data.get("body_inline") or {},
         "cover_image_url": data.get("cover_image_url"),
+        "source_url": data.get("source_url"),
         "created_by": created_by,
         "created_at": now,
         "updated_at": now,

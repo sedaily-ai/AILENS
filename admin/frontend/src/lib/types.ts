@@ -148,6 +148,9 @@ export interface CmsPost {
   closing_line: string | null;
   body_inline: CmsPostBody;
   cover_image_url: string;
+  /** 원문 기사 URL — 서울경제 원본 취재 기사 링크. SEO/GEO/AEO 신뢰 신호
+   * (2026-08-13). 채널 무관하게 채울 수 있다. */
+  source_url: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -164,6 +167,7 @@ export interface CmsPostInput {
   editor_id?: string | null;
   body_inline?: CmsPostBody;
   cover_image_url?: string | null;
+  source_url?: string | null;
 }
 
 // --- 용어 퀴즈 (backend/admin/repo/quiz_repo.py 와 1:1) ---

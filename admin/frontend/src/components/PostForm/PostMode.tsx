@@ -85,6 +85,20 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
               style={{ width: 110 }}
             />
           </MetaField>
+          <MetaDivider />
+          {/* 원문 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO
+              감사 — "취재된 원본을 바탕으로" 라는 JSON-LD 소개가 검증 가능한
+              링크 없이 있던 문제). 없어도 발행은 된다 — 있으면 상세 페이지에
+              "원문 보기" 링크와 JSON-LD citation으로 노출된다. */}
+          <MetaField label="원문 URL">
+            <input
+              value={value.source_url ?? ""}
+              onChange={(e) => patch({ source_url: e.target.value || null })}
+              placeholder="https://www.sedaily.com/..."
+              className="ui-input rounded-lg px-2 py-0.5 text-[12.5px]"
+              style={{ width: 220 }}
+            />
+          </MetaField>
         </>
       }
       // "핵심 정리/키워드/닫는 줄" 안내는 항상 떠 있던 문장이었다가 툴바 끝의

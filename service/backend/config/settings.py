@@ -21,7 +21,6 @@ from .constants import (
     BEDROCK_MODEL_ID_OPUS,
     BEDROCK_MODEL_ID_NOVA_LITE,
     BEDROCK_EMBEDDING_MODEL_ID,
-    BIGKINDS_API_URL_DEFAULT,
     CACHE_TTL_DEFAULT,
 )
 
@@ -29,10 +28,6 @@ from .constants import (
 @dataclass
 class Settings:
     """Application settings loaded from environment variables."""
-
-    # BigKinds API
-    bigkinds_api_key: str = ''
-    bigkinds_api_url: str = BIGKINDS_API_URL_DEFAULT
 
     # Anthropic API (legacy direct API — prefer Bedrock)
     anthropic_api_key: str = ''
@@ -100,10 +95,6 @@ class Settings:
     def from_env(cls) -> 'Settings':
         """Create Settings instance from environment variables."""
         return cls(
-            # BigKinds
-            bigkinds_api_key=os.getenv('BIGKINDS_API_KEY', ''),
-            bigkinds_api_url=os.getenv('BIGKINDS_API_URL', BIGKINDS_API_URL_DEFAULT),
-
             # Anthropic (legacy)
             anthropic_api_key=os.getenv('ANTHROPIC_API_KEY', ''),
             anthropic_model_id=os.getenv('ANTHROPIC_MODEL_ID', BEDROCK_MODEL_ID_DEFAULT),

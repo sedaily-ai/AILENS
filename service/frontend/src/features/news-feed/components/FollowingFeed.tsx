@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 
@@ -141,14 +142,15 @@ export function FollowingFeed({ initialLetters }: Props) {
 
               {/* 썸네일 — CMS 지정 썸네일 > 기본 아바타 폴백 */}
               <div
-                className="aspect-square overflow-hidden"
+                className="aspect-square relative overflow-hidden"
                 style={{ background: l.accentBg }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img loading="lazy"
+                <Image
                   src={l.thumbnailUrl ?? l.editorAvatar}
                   alt={l.title}
-                  className="w-full h-full transition-transform duration-300 group-hover:scale-[1.04]"
+                  fill
+                  sizes="(min-width: 640px) 25vw, 50vw"
+                  className="transition-transform duration-300 group-hover:scale-[1.04]"
                   style={{ objectFit: 'cover' }}
                 />
               </div>

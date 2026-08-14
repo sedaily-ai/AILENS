@@ -659,6 +659,7 @@ export function TimeMachineDayClient({
                         const displayImage = upscaleWikiImg(raw);
                         return (
                           <figure key={i}>
+                            {/* eslint-disable-next-line @next/next/no-img-element -- Wikipedia 원본, onError로 고해상도 실패 시 원본 URL로 즉시 재시도해야 해서 next/image의 제어된 src로는 이 폴백을 표현할 수 없다 */}
                             <img
                               src={displayImage}
                               alt={ev.title}

@@ -8,6 +8,18 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  // next/image 컴포넌트 도입(2026-08-13, 속도 개선) — 단 서버 측 리사이즈/포맷
+  // 변환(/​_next/image, sharp 필요)은 켜지 않는다: 이 앱은 로컬(macOS)에서
+  // standalone 빌드해 EC2(Linux)로 그대로 올리는 구조라 node_modules/sharp가
+  // sharp-darwin-arm64 바이너리로 트레이싱돼 EC2에서 로드가 안 된다 — 이미
+  // WebtoonListClient.tsx 포스터 이미지에서 2026-08-11에 같은 문제로 next/image를
+  // 포기하고 정적 webp로 대체한 전례가 있다(SSM으로 재확인, 2026-08-13). 대신
+  // unoptimized: true로 sharp 없이도 next/image의 다른 이점(명시적 width/height로
+  // CLS 방지, priority로 LCP 이미지 preload)만 취한다 — 리사이즈/차세대 포맷
+  // 변환은 이 배포 구조를 CI 기반으로 바꾸기 전까진 보류.
+  images: {
+    unoptimized: true,
+  },
   // 사주 기능이 외부 CDN 마운트(/saju*, AI-saju 별도 서비스)로 옮겨간 뒤
   // (2026-05, 2026-08-09) /fortune·/saju-match는 이 Next.js 앱에 더는 없는
   // 라우트다 — 옛 링크·북마크로 들어온 사람이 404를 만나던 걸 발견(2026-08-11)

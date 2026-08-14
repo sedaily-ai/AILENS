@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { DailyQuestionItem } from "@/shared/types/question";
 
@@ -121,7 +122,7 @@ export function QuestionTab({ onSkip }: Props) {
 
           <Reveal delay={250}>
             <div className="flex items-center gap-3 mt-8">
-              <img loading="lazy" src={EDITOR.avatar} alt={EDITOR.name} className="w-10 h-10 rounded-full object-cover shadow-lg" />
+              <Image src={EDITOR.avatar} alt={EDITOR.name} width={40} height={40} className="rounded-full object-cover shadow-lg" />
               <div>
                 <p className="text-[14px] font-medium text-gray-800">{EDITOR.name}</p>
                 <p className="text-[12px] text-gray-400">오늘의 브리핑</p>
@@ -315,7 +316,7 @@ export function QuestionTab({ onSkip }: Props) {
         {/* ── CTA ── */}
         <section className="py-20 flex flex-col items-center">
           <Reveal>
-            <img loading="lazy" src={EDITOR.avatar} alt={EDITOR.name} className="w-20 h-20 rounded-full object-cover shadow-2xl mb-6" />
+            <Image src={EDITOR.avatar} alt={EDITOR.name} width={80} height={80} className="rounded-full object-cover shadow-2xl mb-6" />
           </Reveal>
           <Reveal delay={100}>
             <p className="text-[14px] text-gray-400 mb-8">{EDITOR.name}이(가) 준비한 뉴스피드로 이동해요.</p>

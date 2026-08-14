@@ -226,11 +226,8 @@ export interface CmsLens {
    * 쓴다 — pickLensPhoto() 참조.
    */
   photo_image_url?: string | null;
-  /**
-   * 원본 기사(sedaily.com) 링크. 발행된 글 대부분에 들어있다(48건 중 47건).
-   * 뉴스 서비스에서 원문 출처는 신뢰의 핵심이라 상세 화면에 노출한다.
-   */
-  source_url?: string | null;
+  /** 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO 감사). */
+  source_url: string | null;
   lenses: CmsLensItem[];
   is_cms: true;
 }

@@ -220,6 +220,10 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
           ...(letter.key_points ?? []).slice(0, 3).map((k) => ({ '@type': 'Thing', name: k })),
         ],
         isAccessibleForFree: true,
+        // 원문 기사 인용 — author.description의 "취재한 원본 기사를 바탕으로"
+        // 라는 주장을 실제로 검증 가능하게 만드는 링크(2026-08-13, SEO/GEO/AEO
+        // 감사). admin이 원문 URL을 안 채운 글은 이 필드 자체가 빠진다.
+        ...(letter.source_url ? { citation: letter.source_url } : {}),
       },
       {
         '@type': 'BreadcrumbList',

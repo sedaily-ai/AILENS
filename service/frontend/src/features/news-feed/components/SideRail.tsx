@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { calculateSaju, CG_OH } from '@/entities/saju';
 import { trackEvent } from '@/shared/lib/trackEvent';
@@ -553,11 +554,11 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
                   className="flex-shrink-0"
                   style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: '#f3f4f6' }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    loading="lazy"
+                  <Image
                     src={l.thumbnailUrl ?? l.editorAvatar}
                     alt=""
+                    width={40}
+                    height={40}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </span>

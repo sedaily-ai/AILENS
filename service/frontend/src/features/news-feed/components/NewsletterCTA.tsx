@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { NewsletterEmailField, type SubscribeLetterPayload } from '@/shared/ui/NewsletterEmailField';
 import { useLatestLetters } from '@/shared/lib/useLatestLetters';
 import { letterHref } from '@/shared/lib/letterHref';
@@ -106,13 +107,12 @@ export function NewsletterCTA() {
           }}
         >
           <header style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img loading="lazy"
+            <Image
               src={sampleLetter.editorAvatar}
               alt=""
+              width={24}
+              height={24}
               style={{
-                width: 24,
-                height: 24,
                 borderRadius: '50%',
                 objectFit: 'cover',
                 background: '#f3f4f6',

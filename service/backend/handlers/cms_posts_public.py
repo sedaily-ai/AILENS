@@ -73,6 +73,9 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # 피드 카드 썸네일 — admin에서 지정 안 하면 None, 프론트가 에디터
         # 아바타로 폴백한다 (todayLettersApi.ts::toTodayLetterCard).
         "cover_image_url": post.get("cover_image_url") or None,
+        # 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO
+        # 감사). admin이 안 채우면 None, 프론트는 있을 때만 "원문 보기" 노출.
+        "source_url": post.get("source_url") or None,
         # 전체 레터라도 /letters 아카이브에서 "트렌드"/"인기 칼럼" 필터에 걸리고
         # 싶을 수 있다 — channel 을 trend_card 로 바꾸면 본문·퀴즈가 요약 카드로
         # 축소되니, 대신 가벼운 태그만 얹는다(글 자체는 여전히 상세 페이지 그대로).
@@ -195,11 +198,7 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         # 그래서 카드 그래픽과 별개로 "사진만" 있는 이미지를 따로 받는다.
         # 최상위 스키마를 건드리지 않도록 body_inline 에 담는다.
         "photo_image_url": b.get("photo_image_url") or None,
-        # 원문 기사 링크(2026-08-14). 실측상 배포된 람다는 이미 이 값을 내려주고
-        # 있었지만(48건 중 47건) 이 체크아웃의 셰이퍼에는 빠져 있었다 — 여기서
-        # 배포하면 프런트의 "원문 보기" 버튼이 조용히 사라진다. 명시적으로 추가해
-        # 코드와 실제 응답을 일치시킨다.
-        "source_url": post.get("source_url") or b.get("source_url") or None,
+        "source_url": post.get("source_url") or None,
         "lenses": lenses,
         "is_cms": True,
     }

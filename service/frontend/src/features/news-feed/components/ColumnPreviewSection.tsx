@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { LightbulbIcon, CoinJarIcon, HouseSunIcon } from './icons/HandDrawnIcons';
 import { fetchTrendCards, fetchCmsPosts, type CmsTrendCard } from '@/shared/lib/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
@@ -163,8 +164,7 @@ export function ColumnPreviewSection() {
                 style={{ width: 80, height: 80, borderRadius: 8, background: '#f5f5f4' }}
               >
                 {c.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.imageUrl} alt={c.title} className="w-full h-full" style={{ objectFit: 'cover' }} />
+                  <Image src={c.imageUrl} alt={c.title} width={80} height={80} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <Icon accent={accent} className="w-1/2 h-1/2" />
                 )}

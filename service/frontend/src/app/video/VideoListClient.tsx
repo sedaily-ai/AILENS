@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
@@ -82,12 +83,12 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
                 >
                   <div className="aspect-video relative overflow-hidden" style={{ background: '#111827' }}>
                     {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        loading="lazy"
+                      <Image
                         src={thumb}
                         alt={v.title}
-                        className="w-full h-full transition-transform duration-300 group-hover:scale-[1.04]"
+                        fill
+                        sizes="(min-width: 640px) 33vw, 100vw"
+                        className="transition-transform duration-300 group-hover:scale-[1.04]"
                         style={{ objectFit: 'cover' }}
                       />
                     ) : (

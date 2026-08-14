@@ -50,6 +50,10 @@ export interface ApiLetter {
   podcast_audio_url?: string | null;
   // 피드 카드 썸네일 (CMS 글 전용 — admin에서 지정 안 하면 null, 에디터 아바타로 폴백).
   cover_image_url?: string | null;
+  // 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO 감사 —
+  // "취재된 원본을 바탕으로" 라는 JSON-LD 소개를 실제로 검증 가능하게 만든다).
+  // admin이 안 채우면 null.
+  source_url?: string | null;
   // 채널 목록 조회(fetchCmsPosts)로 여러 날짜가 섞여 나올 때만 필요 —
   // fetchTodayLetters(date) 호출부는 이미 date 를 알고 있어 안 씀.
   publish_date?: string | null;

@@ -46,17 +46,10 @@ export interface Indicator {
 }
 
 export type View = 'flat' | 'issues';
-export type Source = 'bigkinds' | 'dynamodb' | 'mock';
+export type Source = 's3_xml';
 
 export const ISSUE_COUNT = 8;
 export const PER_ISSUE = 3;
-
-export const MOCK_FALLBACK: Article[] = [
-  { news_id: 'm1', title: '한국은행, 기준금리 0.25%p 인하 결정', published_at: '', category: '경제', original_link: '#' },
-  { news_id: 'm2', title: '반도체 수출 48%↑…회복 흐름 속 고용은 16개월 만 최저', published_at: '', category: '경제', original_link: '#' },
-  { news_id: 'm3', title: '국고채 3년물 3.766%…정부 구두개입에도 약세', published_at: '', category: '경제', original_link: '#' },
-  { news_id: 'm4', title: '서울 아파트값 0.28% 상승…강남 12주 만에 플러스', published_at: '', category: '부동산', original_link: '#' },
-];
 
 export function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -83,16 +76,16 @@ function toArticles(raw: unknown): Article[] {
 export interface DayResult {
   list: Article[];
   source: Source;
-  degraded?: string;
 }
 
 /**
  * 그 날짜 지면을 가져온다 — 서버(SSR)·클라이언트(되감기 애니메이션) 양쪽에서
- * 호출 가능한 순수 fetch. 1순위 `/api/timeline`(빅카인즈), 실패 시 `/api/search`
- * 로 폴백(기존 NewsTimeMachine.tsx 동작 그대로 보존).
+ * 호출 가능한 순수 fetch. `/api/timeline`은 S3 XML(서울경제 원본 피드) 단일
+ * 소스라 폴백이 필요 없다 — 그 날짜에 기사가 없으면 빈 배열을 그대로
+ * 반환하고, 화면은 "아직 보관되지 않았어요" 빈 상태로 처리한다
+ * (2026-08-13, 빅카인즈+DynamoDB 2단계 폴백 구조 제거).
  */
 export async function fetchDayArticles(target: string): Promise<DayResult> {
-  let degraded = '';
   try {
     const res = await fetch(`${API_URL}/api/timeline`, {
       method: 'POST',
@@ -100,38 +93,11 @@ export async function fetchDayArticles(target: string): Promise<DayResult> {
       body: JSON.stringify({ date: target, mode: 'flat', page_size: 30 }),
       cache: 'no-store',
     });
-    if (res.ok) {
-      const data = await res.json();
-      const list = toArticles(data?.articles);
-      if (list.length) {
-        return { list, source: data?.source === 'bigkinds' ? 'bigkinds' : 'dynamodb' };
-      }
-      degraded = '타임라인 API가 그 날짜에 기사를 주지 않았어요.';
-    } else {
-      degraded = `타임라인 API 응답 ${res.status}`;
-    }
-  } catch (e) {
-    degraded = `타임라인 API에 연결하지 못했어요 (${e instanceof Error ? e.message : '네트워크'})`;
-  }
-
-  const next = new Date(target);
-  next.setDate(next.getDate() + 1);
-  try {
-    const res = await fetch(`${API_URL}/api/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: '*',
-        filters: { published_from: target, published_until: ymd(next) },
-        page: 1,
-        page_size: 30,
-      }),
-      cache: 'no-store',
-    });
+    if (!res.ok) return { list: [], source: 's3_xml' };
     const data = await res.json();
-    return { list: toArticles(data?.articles), source: 'dynamodb', degraded: degraded || '타임라인 API를 쓸 수 없어요.' };
+    return { list: toArticles(data?.articles), source: 's3_xml' };
   } catch {
-    return { list: [], source: 'dynamodb', degraded: degraded || '타임라인 API를 쓸 수 없어요.' };
+    return { list: [], source: 's3_xml' };
   }
 }
 

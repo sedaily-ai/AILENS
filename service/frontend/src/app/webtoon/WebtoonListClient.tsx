@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 
 // 연재 웹툰 파일럿(2026-08-06) — 이슈를 텍스트 레터가 아니라 컷(이미지+캡션)
@@ -214,11 +215,13 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
           >
             <div className="relative overflow-hidden" style={{ aspectRatio: '16 / 9', background: '#111114' }}>
               {latest.cover_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={latest.cover_image_url}
                   alt={latest.title}
-                  className="w-full h-full transition-transform duration-500 group-hover:scale-[1.04]"
+                  fill
+                  sizes="(min-width: 768px) 640px, 100vw"
+                  priority
+                  className="transition-transform duration-500 group-hover:scale-[1.04]"
                   style={{ objectFit: 'cover' }}
                 />
               ) : (
@@ -316,12 +319,12 @@ export function WebtoonListClient({ initialItems }: { initialItems: CmsWebtoon[]
                   >
                     <div className="relative overflow-hidden" style={{ aspectRatio: '4 / 3', background: '#111114' }}>
                       {w.cover_image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- 커버 하단에 캡션 박스가 박혀 있어 정사각에 가까운 크롭 시 objectPosition을 위로 둬 캡션 대신 주 피사체가 남게 한다
-                        <img
-                          loading="lazy"
+                        <Image
                           src={w.cover_image_url}
                           alt={w.title}
-                          className="w-full h-full transition-transform duration-300 group-hover:scale-[1.06]"
+                          fill
+                          sizes="(min-width: 640px) 50vw, 100vw"
+                          className="transition-transform duration-300 group-hover:scale-[1.06]"
                           style={{ objectFit: 'cover', objectPosition: 'top' }}
                         />
                       ) : (

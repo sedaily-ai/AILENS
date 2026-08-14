@@ -3,7 +3,7 @@
 import { DatePickerField } from "@/components/DatePickerField";
 import { CoverImageField } from "@/components/CoverImageField";
 import { PostFormShell } from "./PostFormShell";
-import { MetaField } from "./MetaField";
+import { MetaField, MetaDivider } from "./MetaField";
 import { LABEL, type ModeProps } from "./shared";
 import { LineList } from "./LineList";
 import type { CmsLensItem } from "@/lib/types";
@@ -51,12 +51,27 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
       subtitlePlaceholder="핵심요약 — 무슨 일이 있었는지 2~3문장으로"
       subtitleRows={4}
       metaRow={
-        <MetaField label="발행일">
-          <DatePickerField
-            value={value.publish_date ?? ""}
-            onChange={(v) => patch({ publish_date: v })}
-          />
-        </MetaField>
+        <>
+          <MetaField label="발행일">
+            <DatePickerField
+              value={value.publish_date ?? ""}
+              onChange={(v) => patch({ publish_date: v })}
+            />
+          </MetaField>
+          <MetaDivider />
+          {/* 원문 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO
+              감사). 없어도 발행은 된다 — 있으면 상세 페이지에 "원문 보기"
+              링크와 JSON-LD citation으로 노출된다. */}
+          <MetaField label="원문 URL">
+            <input
+              value={value.source_url ?? ""}
+              onChange={(e) => patch({ source_url: e.target.value || null })}
+              placeholder="https://www.sedaily.com/..."
+              className="ui-input rounded-lg px-2 py-0.5 text-[12.5px]"
+              style={{ width: 220 }}
+            />
+          </MetaField>
+        </>
       }
     >
       <div className="space-y-5 px-6 py-5">

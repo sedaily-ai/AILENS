@@ -147,6 +147,7 @@ function PostEditPage() {
           editor_id: post.editor_id,
           body_inline: post.body_inline,
           cover_image_url: post.cover_image_url || null,
+          source_url: post.source_url || null,
         });
       })
       .catch((err) => {

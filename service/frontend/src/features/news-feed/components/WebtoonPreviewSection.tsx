@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { WebtoonWindIllustration } from './icons/HandDrawnIcons';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 
@@ -153,12 +154,12 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
             <>
               <div className="relative overflow-hidden" style={{ aspectRatio: '3 / 2', borderRadius: '7px 7px 0 0' }}>
                 {w.cover_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    loading="lazy"
+                  <Image
                     src={w.cover_image_url}
                     alt={w.title}
-                    className="w-full h-full transition-transform duration-300 group-hover:scale-[1.05]"
+                    fill
+                    sizes="(min-width: 640px) 25vw, 50vw"
+                    className="transition-transform duration-300 group-hover:scale-[1.05]"
                     style={{ objectFit: 'cover' }}
                   />
                 ) : (

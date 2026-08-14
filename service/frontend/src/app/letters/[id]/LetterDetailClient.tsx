@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -655,13 +656,12 @@ function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={letter.editorAvatar}
           alt={letter.editorName}
+          width={52}
+          height={52}
           style={{
-            width: 52,
-            height: 52,
             borderRadius: '50%',
             objectFit: 'cover',
             boxShadow: `0 0 0 1px ${letter.accent}22`,
@@ -817,6 +817,19 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
         )
       )}
 
+      {letter.source_url && (
+        <p style={{ fontSize: 13, marginBottom: 24 }}>
+          <a
+            href={letter.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: letter.accent, fontWeight: 600, textDecoration: 'none' }}
+          >
+            원문 보기 — 서울경제 →
+          </a>
+        </p>
+      )}
+
       {letter.keywords.length > 0 && (
         <section style={{ borderTop: '1px solid #f3f4f6', paddingTop: 24, marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -962,14 +975,13 @@ function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
     >
       {/* 페르소나 캐릭터 */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={letter.editorAvatar}
           alt={letter.editorName}
+          width={60}
+          height={60}
           className={notReady ? '' : 'transition-transform duration-200 group-hover:scale-105'}
           style={{
-            width: 60,
-            height: 60,
             borderRadius: 16,
             objectFit: 'cover',
             background: letter.accentBg,
