@@ -38,9 +38,11 @@ import {
 export function LensViewClient({
   slug,
   initialLens = undefined,
+  otherLens = [],
 }: {
   slug: string;
   initialLens?: CmsLens | null;
+  otherLens?: CmsLens[];
 }) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
   const [active, setActive] = useState(0);
@@ -490,10 +492,75 @@ export function LensViewClient({
         <div className="lw" style={{ paddingTop: 'clamp(44px, 6vw, 64px)', paddingBottom: 100 }}>
         <div>
           <div className="rule" />
+
+          {/* "다른 시선" 미리보기(2026-08-16) — 마감부가 문구 한 줄 + 링크
+              하나뿐이라 "허전하다"는 피드백. page.tsx가 fetchAllLens()
+              in-flight 캐시에 편승해 이미 가져온 값 중 현재 글만 뺀 3개를
+              넘겨준다(추가 API 호출 없음). */}
+          {otherLens.length > 0 && (
+            <div style={{ margin: '28px 0 8px' }}>
+              <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 4 }}>
+                다른 시선
+              </p>
+              <div>
+                {otherLens.map((l) => {
+                  const photo = pickLensPhoto(l);
+                  return (
+                    <Link
+                      key={l.id}
+                      href={`/lens/${encodeURIComponent(l.id)}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 14,
+                        padding: '14px 0',
+                        textDecoration: 'none',
+                        borderTop: '1px solid rgba(17,24,39,0.07)',
+                      }}
+                    >
+                      {photo && (
+                        <span
+                          className="flex-shrink-0"
+                          style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', background: '#f3f4f6' }}
+                        >
+                          <Image src={photo} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
+                        </span>
+                      )}
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 3 }}>
+                          {l.date.replaceAll('-', '.')}
+                        </span>
+                        <span
+                          style={{
+                            display: '-webkit-box',
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: '#111827',
+                            lineHeight: 1.4,
+                            letterSpacing: '-0.01em',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'keep-all',
+                          }}
+                        >
+                          {l.headline}
+                        </span>
+                      </span>
+                      <span aria-hidden className="flex-shrink-0" style={{ color: '#c0c5cc', fontSize: 16 }}>
+                        ›
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '28px 0 4px', lineHeight: 1.5 }}>
             일상 속의 모든 소식, 신속하고 정확한 전달
           </p>
-          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>통찰력 있는 이야기 · 인스타그램 @ailens</p>
+          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>통찰력 있는 이야기 · 인스타그램 @lens.sedaily</p>
           <Link
             href="/lens"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, fontSize: 14, fontWeight: 700, color: LENS_ACCENT, textDecoration: 'none' }}

@@ -32,6 +32,15 @@ async function findLens(slug: string): Promise<CmsLens | null> {
   return items.find((l) => l.id === slug) ?? null;
 }
 
+// 상세 페이지 마감부에 보여줄 "다른 시선" 3개 — 별도 API 호출 없이
+// fetchAllLens()의 in-flight coalescing(cmsPostsApi.ts의 cached() 참조)에
+// 편승한다. 2026-08-16 — 마감부가 문구 한 줄 + 링크 하나뿐이라 "허전하다"는
+// 피드백으로 신설.
+async function findOtherLens(slug: string, limit = 3): Promise<CmsLens[]> {
+  const items = await fetchAllLens();
+  return items.filter((l) => l.id !== slug).slice(0, limit);
+}
+
 function trimDescription(s: string, max = 160): string {
   if (s.length <= max) return s;
   const cut = s.slice(0, max);
@@ -165,7 +174,7 @@ export default async function LensViewPage({
 }) {
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
-  const lens = await findLens(slug);
+  const [lens, otherLens] = await Promise.all([findLens(slug), findOtherLens(slug)]);
   const jsonLd = lens ? buildJsonLd(lens, slug) : null;
   return (
     <>
@@ -175,7 +184,7 @@ export default async function LensViewPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <LensViewClient slug={slug} initialLens={lens} />
+      <LensViewClient slug={slug} initialLens={lens} otherLens={otherLens} />
     </>
   );
 }
