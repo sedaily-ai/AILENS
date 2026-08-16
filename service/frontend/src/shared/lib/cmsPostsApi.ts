@@ -85,16 +85,29 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
   return p;
 }
 
-// 캐시 정책(2026-08-09, "새로고침하면 예외 없이 즉시 반영" 요구로 전면 재검토) —
-// 태그+revalidate:5 캐싱을 썼었는데, /api/revalidate 가 부르는
-// revalidateTag(tag, 'max')의 'max'가 "즉시·완전 무효화"가 아니라 Next 내장
-// cache-life 프로파일(stale:5분/revalidate:30일/expire:영구)이라는 걸 뒤늦게
-// 확인했다(node_modules/next/cache.d.ts 문서 주석 참조) — admin이 webhook을
-// 한 번이라도 쏘고 나면 그 태그가 걸린 라우트가 최대 30일짜리 캐시로 재고정되는
-// 심각한 버그였다(실측: /webtoon 이 s-maxage=31536000으로 나온 원인). Next의
-// 캐시-라이프 프로파일 의미론에 다시 기대는 대신 캐시 자체를 껐다 — Link
-// 프리페치 이점은 잃지만("클릭 즉시 이동"과 "새로고침하면 예외 없이 최신"이
-// 충돌할 때 후자를 우선), 이 트래픽 규모에서 성능 비용은 무시할 수준이다.
+// 캐시 정책 v2(2026-08-16, "홈 속도가 느리다" 피드백으로 재도입) — 2026-08-09에
+// 태그 캐시를 완전히 껐던 이유는 캐싱 자체가 문제가 아니라 무효화 호출 한 줄이
+// 버그였다: revalidateTag(tag, 'max')의 'max'는 "즉시·완전 무효화"가 아니라
+// Next 내장 cache-life 프로파일(stale:5분/revalidate:30일/expire:영구) 이름이라
+// admin이 webhook을 한 번만 쏴도 그 태그 캐시가 최대 30일짜리로 재고정되는
+// 사고였다(node_modules/next/cache.d.ts 참조, 실측: /webtoon 이
+// s-maxage=31536000으로 나옴). "그때부터 admin 발행이 반영 안 됨" 재발을 막으려
+// 아예 캐시를 껐던 건데, 그 대가로 매 방문마다 EC2→API(us-east-1) 왕복을
+// 그대로 겪어 홈 TTFB가 1.5~1.7초까지 늘어났다(2026-08-16 실측, CloudWatch
+// 확인 결과 Lambda 실행 자체는 150~300ms로 빠름 — 병목은 no-store로 캐시가
+// 아예 없다는 것 자체).
+// 이번엔 두 번째 인자('max') 없이 revalidateTag(tag)만 호출한다(service/frontend/
+// src/app/api/revalidate/route.ts) — 이건 Next 표준 on-demand 무효화로, 프로파일을
+// 재설정하는 게 아니라 그 태그가 걸린 캐시 항목을 즉시 stale 처리한다. admin이
+// 글을 발행/수정/삭제/발행취소할 때마다(admin/backend/shared/notify.py →
+// admin/backend/routes/posts.py 4곳) 이 webhook이 호출되므로 "즉시 반영"은
+// 캐시를 껐을 때와 동일하게 유지되고, 그 사이 방문자들은 캐시된 응답을 받아
+// EC2→API 왕복 없이 즉시 렌더링된다.
+const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤엔 자동 갱신(안전망).
+
+function cacheOpts(tag: string): { cache: RequestCache; next: { tags: string[]; revalidate: number } } {
+  return { cache: 'force-cache', next: { tags: [tag], revalidate: CACHE_TTL_FALLBACK_SECONDS } };
+}
 
 export async function fetchCmsPosts(
   channel: CmsChannel,
@@ -106,9 +119,7 @@ export async function fetchCmsPosts(
       const qs = new URLSearchParams({ channel });
       if (date) qs.set('date', date);
       if (limit) qs.set('limit', String(limit));
-      const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, cacheOpts(`posts:${channel}`));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLetter[] };
       return data.posts ?? [];
@@ -123,9 +134,7 @@ export async function fetchCmsPosts(
 export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
   return cached('trend_card', async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, cacheOpts('posts:trend_card'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsTrendCard[] };
       return data.posts ?? [];
@@ -141,9 +150,7 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
       // limit=100 명시(2026-08-11) — 안 넘기면 백엔드 기본값(20)에서 조용히
       // 잘려서, 21화가 올라가는 순간 가장 오래된 화가 목록에서 사라지는
       // 버그가 있었다(cms_posts_public.py 의 limit 기본값 확인 후 발견).
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon&limit=100`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon&limit=100`, cacheOpts('posts:webtoon'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
       return data.posts ?? [];
@@ -155,9 +162,7 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
 
 export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, {
-      cache: 'no-store',
-    });
+    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, cacheOpts('posts:webtoon'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsWebtoon };
     return data.post ?? null;
@@ -171,9 +176,7 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
     try {
       // limit=100 명시(2026-08-11) — fetchWebtoons()와 같은 이유. 안 넘기면
       // 백엔드 기본값(20)에서 조용히 잘려 오래된 영상이 목록에서 사라진다.
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=video&limit=100`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=video&limit=100`, cacheOpts('posts:video'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
       return data.posts ?? [];
@@ -185,9 +188,7 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
 
 export async function fetchVideoBySlug(slug: string): Promise<CmsVideo | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=video`, {
-      cache: 'no-store',
-    });
+    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=video`, cacheOpts('posts:video'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsVideo };
     return data.post ?? null;
@@ -237,9 +238,7 @@ export async function fetchLensPosts(): Promise<CmsLens[]> {
     try {
       // limit=100 명시(2026-08-12) — webtoon/video 와 같은 이유. 안 넘기면
       // 백엔드 기본값(20)에서 조용히 잘려 오래된 글이 목록에서 사라진다.
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=100`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=100`, cacheOpts('posts:lens'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLens[] };
       return data.posts ?? [];
@@ -251,9 +250,7 @@ export async function fetchLensPosts(): Promise<CmsLens[]> {
 
 export async function fetchLensBySlug(slug: string): Promise<CmsLens | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=lens`, {
-      cache: 'no-store',
-    });
+    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=lens`, cacheOpts('posts:lens'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsLens };
     return data.post ?? null;
@@ -269,9 +266,7 @@ export async function fetchCmsPostBySlug(
   slug: string,
 ): Promise<CmsLetter | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, {
-      cache: 'no-store',
-    });
+    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, cacheOpts(`posts:${channel}`));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsLetter };
     return data.post ?? null;
