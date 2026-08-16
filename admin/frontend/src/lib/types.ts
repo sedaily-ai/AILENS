@@ -87,7 +87,7 @@ export interface NewsletterSubscriber {
 
 // --- CMS posts (backend/admin/routes/posts.py 와 1:1) ---
 
-export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video" | "lens";
+export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video" | "lens" | "home_player";
 // "용어 해설"/"이슈 톡톡" — 오늘의 이슈/머니 트렌드/깊은 이야기와 같은
 // 방식의 분류(2026-08-12, 이슈 톡톡을 별도 채널에서 되돌렸다가 삭제 후
 // 다시 부활).
@@ -156,6 +156,8 @@ export interface CmsPost {
   source_url: string;
   /** 유튜브 등 웹 링크 — 있으면 홈 하단 플레이어가 TTS 대신 이걸 임베드 재생. */
   media_embed_url: string | null;
+  /** channels:["home_player"] 항목의 재생 순서(오름차순). 다른 채널은 안 씀. */
+  display_order: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -174,6 +176,7 @@ export interface CmsPostInput {
   cover_image_url?: string | null;
   source_url?: string | null;
   media_embed_url?: string | null;
+  display_order?: number | null;
 }
 
 // --- 용어 퀴즈 (backend/admin/repo/quiz_repo.py 와 1:1) ---

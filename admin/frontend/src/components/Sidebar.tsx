@@ -45,6 +45,13 @@ const IconSend = svg(
     <path d="M22 2 11 13" />
   </>
 );
+const IconMusic = svg(
+  <>
+    <path d="M9 18V5l12-2v13" />
+    <circle cx="6" cy="18" r="3" />
+    <circle cx="18" cy="16" r="3" />
+  </>
+);
 const IconWebtoon = svg(
   <>
     <rect x="4" y="3" width="13" height="13" rx="2" />
@@ -135,6 +142,10 @@ const MENU_GROUPS: MenuGroup[] = [
       // 콘텐츠 타입(term/explain만, CmsPost 아님).
       { label: "퀴즈", href: "/quiz", Icon: IconQuiz },
       { label: "뉴스레터", href: "/newsletter", Icon: IconSend },
+      // 홈 화면 하단 플레이 카드가 재생할 배경 음악(유튜브 링크) 전용 관리
+      // 화면(2026-08-16) — 레터 안의 "팟캐스트"(레터 상세 페이지 mp3 업로드,
+      // PodcastUploadField)와는 다른 기능이라 별도 탭으로 분리.
+      { label: "홈 플레이어", href: "/home-player", Icon: IconMusic },
     ],
   },
   {

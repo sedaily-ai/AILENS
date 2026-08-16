@@ -1,26 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
-import { letterHref } from '@/shared/lib/letterHref';
-import { synthesizeSpeech, sanitizeForTTS } from '@/shared/lib/voiceChat';
+import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/homePlayerApi';
 
-// 사이트 하단 고정 오디오 플레이어 — "오늘의 핵심 뉴스"를 벅스뮤직 재생바처럼
-// 상시 도킹해 듣는다(2026-08-14, 사용자 레퍼런스: 벅스뮤직 앱 하단 미니플레이어).
-// 오늘 발행된 레터 상위 N편을 재생목록으로 삼고, 트랙을 재생할 때 그 자리에서
-// TTS(Polly, /api/voice/tts)를 호출해 음성을 만든다 — 별도 팟캐스트 생성
-// 파이프라인을 새로 짓지 않고 이미 배포된 챗봇 음성 TTS를 재사용한다(챗봇
-// 음성통화용으로 만들어졌지만 임의 텍스트를 다 받는다). 한 번 만든 음성은
-// 트랙별로 캐시해 다시 재생할 때 재합성하지 않는다.
-const PLAYLIST_SIZE = 5;
+// 사이트 하단 고정 오디오 플레이어 — 벅스뮤직 재생바처럼 상시 도킹해 듣는다
+// (2026-08-14, 사용자 레퍼런스: 벅스뮤직 앱 하단 미니플레이어).
+//
+// 2026-08-16: 처음엔 "오늘의 핵심 뉴스"(발행된 레터)를 그 자리에서 TTS로
+// 읽어주는 방식이었는데, admin이 기사와 무관하게 직접 만드는 "제목+유튜브
+// 링크" 재생목록(홈 플레이어 관리 화면)으로 완전히 대체했다 — TTS 합성
+// 로직은 그래서 제거. 유튜브 IFrame Player API를 화면엔 안 보이는 1x1
+// 컨테이너로 띄워서 재생/일시정지/진행률을 제어한다.
 const ACCENT = '#3b82f6';
 
-// 2026-08-16 — admin이 레터마다 유튜브 링크(media_embed_url)를 붙이면 TTS 합성
-// 대신 유튜브 IFrame Player API로 그 영상을 재생한다(화면엔 안 보이게 1x1로
-// 깔고 소리만 낸다). 링크가 없는 레터는 기존 TTS 흐름 그대로. 네이버TV는 IFrame
-// 재생 제어 API가 유튜브만큼 안정적으로 문서화돼 있지 않아 이번엔 유튜브만
-// 지원 — admin 필드 안내 문구에도 명시.
 function extractYoutubeVideoId(url: string | null): string | null {
   if (!url) return null;
   try {
@@ -85,16 +77,13 @@ function loadYouTubeIframeApi(): Promise<void> {
 }
 
 export function TodayNewsPlayer() {
-  const [items, setItems] = useState<TodayLetterCardLike[] | null>(null);
+  const [items, setItems] = useState<HomePlayerItem[] | null>(null);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0); // 0~1
   const [closed, setClosed] = useState(false);
   const [error, setError] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const cacheRef = useRef<Map<string, string>>(new Map()); // letterId -> blob URL
   const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const ytPlayerRef = useRef<YTPlayer | null>(null);
   const ytLoadedVideoIdRef = useRef<string | null>(null);
@@ -102,7 +91,7 @@ export function TodayNewsPlayer() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchFollowingLetters(PLAYLIST_SIZE).then((data) => {
+    fetchHomePlayerPlaylist().then((data) => {
       if (!cancelled) setItems(data);
     });
     return () => {
@@ -110,30 +99,7 @@ export function TodayNewsPlayer() {
     };
   }, []);
 
-  // 언마운트 시 캐시해둔 blob URL 정리 — 메모리 누수 방지.
-  useEffect(() => {
-    return () => {
-      cacheRef.current.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
-
   const current = items && items.length > 0 ? items[Math.min(index, items.length - 1)] : null;
-
-  const ensureAudio = () => {
-    if (!audioRef.current) {
-      const el = new Audio();
-      el.addEventListener('timeupdate', () => {
-        if (el.duration) setProgress(el.currentTime / el.duration);
-      });
-      el.addEventListener('ended', () => {
-        setPlaying(false);
-        setProgress(0);
-        setIndex((i) => (items && i + 1 < items.length ? i + 1 : 0));
-      });
-      audioRef.current = el;
-    }
-    return audioRef.current;
-  };
 
   function stopYtProgressPolling() {
     if (ytProgressTimerRef.current) {
@@ -183,45 +149,17 @@ export function TodayNewsPlayer() {
     }, 250);
   }
 
-  async function play() {
+  function play() {
     if (!current) return;
     const videoId = extractYoutubeVideoId(current.mediaEmbedUrl);
-    if (videoId) return playYoutube(videoId);
-
-    setError(false);
-    const el = ensureAudio();
-
-    let url = cacheRef.current.get(current.letterId);
-    if (!url) {
-      setGenerating(true);
-      try {
-        const text = sanitizeForTTS(`${current.title}. ${current.excerpt}`);
-        url = await synthesizeSpeech(text);
-        cacheRef.current.set(current.letterId, url);
-      } catch (e) {
-        console.warn('오늘의 핵심 뉴스 TTS 실패', e);
-        setError(true);
-        setGenerating(false);
-        return;
-      }
-      setGenerating(false);
-    }
-
-    if (el.src !== url) {
-      el.src = url;
-      setProgress(0);
-    }
-    try {
-      await el.play();
-      setPlaying(true);
-    } catch (e) {
-      console.warn('오디오 재생 실패', e);
+    if (!videoId) {
       setError(true);
+      return;
     }
+    void playYoutube(videoId);
   }
 
   function pause() {
-    audioRef.current?.pause();
     ytPlayerRef.current?.pauseVideo();
     stopYtProgressPolling();
     setPlaying(false);
@@ -235,13 +173,10 @@ export function TodayNewsPlayer() {
     };
   }, []);
 
-  // 트랙이 바뀌면 재생 중이던 오디오는 멈춘다 — 다음 트랙은 버튼을 다시
+  // 트랙이 바뀌면 재생 중이던 영상은 멈춘다 — 다음 트랙은 버튼을 다시
   // 눌러야 재생(자동 넘어감은 ended 이벤트에서만, 사용자가 prev/next를
   // 누른 경우는 명시적으로 다시 재생해야 자연스럽다).
   useEffect(() => {
-    if (audioRef.current && !audioRef.current.paused) {
-      audioRef.current.pause();
-    }
     ytPlayerRef.current?.pauseVideo();
     stopYtProgressPolling();
     setPlaying(false);
@@ -266,10 +201,9 @@ export function TodayNewsPlayer() {
         boxShadow: '0 -2px 16px rgba(17,24,39,0.08)',
       }}
     >
-      {/* 유튜브 플레이어 컨테이너 — media_embed_url이 있는 레터를 처음 재생할 때
-          여기에 IFrame이 생긴다. 화면엔 안 보이지만 IFrame API가 실제 엘리먼트를
-          요구해서 1x1로 깔아둔다(display:none은 유튜브가 재생을 멈추게 할 수 있어
-          크기로만 숨김). 어떤 트랙에 링크가 있을지 몰라 항상 마운트해둔다. */}
+      {/* 유튜브 플레이어 컨테이너 — 화면엔 안 보이지만 IFrame API가 실제
+          엘리먼트를 요구해서 1x1로 깔아둔다(display:none은 유튜브가 재생을
+          멈추게 할 수 있어 크기로만 숨김). */}
       <div ref={ytContainerRef} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }} />
 
       {/* 진행바 — 상단 얇은 줄 */}
@@ -302,11 +236,7 @@ export function TodayNewsPlayer() {
         </div>
 
         {/* 트랙 정보 */}
-        <Link
-          href={letterHref(current.letterId)}
-          className="min-w-0 flex-1 hover:opacity-70 transition-opacity"
-          style={{ textDecoration: 'none' }}
-        >
+        <div className="min-w-0 flex-1">
           <p style={{ fontSize: 10.5, fontWeight: 700, color: ACCENT, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
             오늘의 핵심 뉴스 {total > 1 ? `· ${index + 1}/${total}` : ''}
           </p>
@@ -320,9 +250,9 @@ export function TodayNewsPlayer() {
               textOverflow: 'ellipsis',
             }}
           >
-            {error ? '음성을 만들지 못했어요 — 다시 시도해주세요' : current.title}
+            {error ? '재생할 수 없어요 — 다시 시도해주세요' : current.title}
           </p>
-        </Link>
+        </div>
 
         {/* 컨트롤 */}
         <div className="flex items-center flex-shrink-0" style={{ gap: 4 }}>
@@ -342,7 +272,6 @@ export function TodayNewsPlayer() {
             type="button"
             aria-label={playing ? '일시정지' : '재생'}
             onClick={() => (playing ? pause() : play())}
-            disabled={generating}
             className="flex items-center justify-center"
             style={{
               width: 38,
@@ -351,23 +280,10 @@ export function TodayNewsPlayer() {
               border: 'none',
               background: '#111827',
               color: '#fff',
-              cursor: generating ? 'default' : 'pointer',
-              opacity: generating ? 0.6 : 1,
+              cursor: 'pointer',
             }}
           >
-            {generating ? (
-              <span
-                aria-hidden
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: '50%',
-                  border: '2px solid rgba(255,255,255,0.35)',
-                  borderTopColor: '#fff',
-                  animation: 'tnp-spin 0.7s linear infinite',
-                }}
-              />
-            ) : playing ? (
+            {playing ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
             ) : (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 2 }}><path d="M8 5v14l11-7z" /></svg>
@@ -402,7 +318,6 @@ export function TodayNewsPlayer() {
           </button>
         </div>
       </div>
-      <style>{`@keyframes tnp-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

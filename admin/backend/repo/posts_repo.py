@@ -24,15 +24,17 @@ from shared.slug import slugify
 _VALID_STATUS = ("draft", "published", "archived")
 
 # update() 가 건드릴 수 있는 필드. status/published_at 은 set_status() 전담.
-# media_embed_url(2026-08-16): 유튜브/네이버TV 등 웹 링크 — 있으면 홈 하단
-# 플레이어(TodayNewsPlayer)가 TTS 대신 이걸 임베드 재생한다. daily_letters
-# 쪽(letters_repo.py)에도 같은 이름 필드가 있지만 그 테이블은 죽은 파이프라인
-# 전용이라 실제로는 이 cms_posts 테이블이 홈 플레이어의 진짜 소스다
-# (todayLettersApi.ts의 fetchTodayLettersLive 주석 참조).
+# media_embed_url(2026-08-16): 유튜브 등 웹 링크. 원래 letters 채널 글에
+# 붙이는 용도로 만들었는데, 실제로는 channels:["home_player"] 전용 콘텐츠
+# (관리자가 기사와 무관하게 직접 만드는 "제목+링크" 재생목록 항목,
+# admin/frontend home-player 화면)의 핵심 필드로 쓰인다.
+# display_order(2026-08-16): home_player 항목의 재생 순서(오름차순) — 다른
+# 채널은 안 쓰지만 필드를 채널별로 나누지 않고 공용 스키마에 얹는 기존
+# 패턴(source_url 등)을 그대로 따른다.
 _UPDATABLE = (
     "channels", "publish_date", "editor_id",
     "headline", "subtitle", "closing_line", "body_inline", "cover_image_url",
-    "source_url", "media_embed_url",
+    "source_url", "media_embed_url", "display_order",
 )
 
 
@@ -61,6 +63,7 @@ def _to_dict(item: dict) -> dict:
         # JSON-LD에 있던 문제). admin이 채널 상관없이 자유롭게 채운다.
         "source_url": item.get("source_url") or "",
         "media_embed_url": item.get("media_embed_url"),
+        "display_order": item.get("display_order"),
         "created_by": item.get("created_by"),
         "created_at": item.get("created_at"),
         "updated_at": item.get("updated_at"),
@@ -108,6 +111,8 @@ def create(data: dict, created_by: str) -> dict:
         "body_inline": data.get("body_inline") or {},
         "cover_image_url": data.get("cover_image_url"),
         "source_url": data.get("source_url"),
+        "media_embed_url": data.get("media_embed_url"),
+        "display_order": data.get("display_order"),
         "created_by": created_by,
         "created_at": now,
         "updated_at": now,
