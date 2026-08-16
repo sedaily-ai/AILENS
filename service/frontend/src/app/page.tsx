@@ -1,8 +1,8 @@
 import { FeedPage } from "@/widgets/FeedPage";
-import { fetchCmsPosts, fetchVideos, fetchWebtoons, fetchLensPosts } from "@/shared/lib/cmsPostsApi";
+import { fetchVideos, fetchWebtoons, fetchLensPosts } from "@/shared/lib/cmsPostsApi";
 import { fetchFollowingLetters } from "@/shared/lib/todayLettersApi";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
-import type { CmsLetter, CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import type { Term } from "@/features/news-feed";
 
@@ -21,7 +21,6 @@ interface HomeContentProps {
   initialWebtoons: CmsWebtoon[];
   initialVideos: CmsVideo[];
   initialWordTerms: Term[];
-  initialCmsLetters: CmsLetter[];
   initialLensPosts: CmsLens[];
 }
 
@@ -30,7 +29,6 @@ function HomeContent({
   initialWebtoons,
   initialVideos,
   initialWordTerms,
-  initialCmsLetters,
   initialLensPosts,
 }: HomeContentProps) {
   return (
@@ -40,7 +38,6 @@ function HomeContent({
       initialWebtoons={initialWebtoons}
       initialVideos={initialVideos}
       initialWordTerms={initialWordTerms}
-      initialCmsLetters={initialCmsLetters}
       initialLensPosts={initialLensPosts}
     />
   );
@@ -48,11 +45,13 @@ function HomeContent({
 
 // 서버 컴포넌트로 전환(2026-08-07, 홈 SSG 감사) — 이전엔 페이지 전체가
 // 'use client'라 정적 HTML에 nav/footer(192자)뿐이었다. 홈 피드가 실제로
-// 렌더하는 6개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
-// WordsPreviewSection/MiniHeadlinesSection/LensPreviewSection)의 데이터를
+// 렌더하는 5개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
+// WordsPreviewSection/LensPreviewSection)의 데이터를
 // 미리 가져와 FeedPage → NewsFeedTab → 각 섹션까지 initialX prop으로
 // 내려준다. 나머지 섹션(TimelinePreviewSection/TrendingEconomySection/
 // ColumnPreviewSection 등)은 의도된 mock/placeholder라 그대로 둔다.
+// 미니 헤드라인 섹션(MiniHeadlinesSection)은 2026-08-16 삭제됨 — PG 연동
+// 전 유료 잠금 UI 컨셉만 있던 상태였는데 통째로 뺐다.
 // LensPreviewSection은 2026-08-12에 추가(신설 당시 프리페치를 빠뜨려서
 // 클라이언트 useEffect fetch만 있었다 — 실제 lens 글을 발행해 curl로
 // 검증하던 중 첫 페인트에 아무것도 안 보이는 걸 발견, 다른 5개 섹션과
@@ -65,13 +64,12 @@ function HomeContent({
 // 로 정확히 무효화하는 쪽이 "클릭 즉시 이동" 요구에 맞다.
 
 export default async function HomePage() {
-  const [initialFollowingLetters, initialWebtoons, initialVideos, initialWordTerms, initialCmsLetters, initialLensPosts] =
+  const [initialFollowingLetters, initialWebtoons, initialVideos, initialWordTerms, initialLensPosts] =
     await Promise.all([
       fetchFollowingLetters(),
       fetchWebtoons(),
       fetchVideos(),
       fetchFollowingWordTerms(),
-      fetchCmsPosts('letters', undefined, 50),
       fetchLensPosts(),
     ]);
 
@@ -81,7 +79,6 @@ export default async function HomePage() {
       initialWebtoons={initialWebtoons}
       initialVideos={initialVideos}
       initialWordTerms={initialWordTerms}
-      initialCmsLetters={initialCmsLetters}
       initialLensPosts={initialLensPosts}
     />
   );

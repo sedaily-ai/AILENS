@@ -1,7 +1,7 @@
 'use client';
 
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsLetter, CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import type { Term } from "../lib/wordsTerms";
 import { FollowingFeed } from "./FollowingFeed";
@@ -11,7 +11,6 @@ import { ColumnPreviewSection } from "./ColumnPreviewSection";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";
-import { MiniHeadlinesSection } from "./MiniHeadlinesSection";
 import { VideoPreviewSection } from "./VideoPreviewSection";
 import { TimelinePreviewSection } from "./TimelinePreviewSection";
 import { LensPreviewSection } from "./LensPreviewSection";
@@ -31,7 +30,6 @@ interface Props {
   initialWebtoons?: CmsWebtoon[];
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
-  initialCmsLetters?: CmsLetter[];
   initialLensPosts?: CmsLens[];
 }
 
@@ -48,7 +46,6 @@ export function NewsFeedTab({
   initialWebtoons,
   initialVideos,
   initialWordTerms,
-  initialCmsLetters,
   initialLensPosts,
 }: Props) {
   return (
@@ -138,11 +135,6 @@ export function NewsFeedTab({
               뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를
               숨긴다 — 트렌드/칼럼처럼 목업으로 안 채운다. */}
           <VideoPreviewSection initialVideos={initialVideos} />
-
-          {/* 미니보험식 헤드라인 패키징(2026-08-06) — 무료 묶음은 실제로 작동,
-              유료 묶음(200원)은 PG 연동 전이라 잠금 UI로 컨셉만
-              (MiniHeadlinesSection.tsx). */}
-          <MiniHeadlinesSection initialLetters={initialCmsLetters} />
         </div>
         <div className="order-2 lg:order-2" style={{ paddingTop: 'clamp(18px, 3vw, 34px)' }}>
           <SideRail selectedGroup={selectedGroup} />

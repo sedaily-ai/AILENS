@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsLetter, CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
@@ -30,7 +30,6 @@ interface Props {
   initialWebtoons?: CmsWebtoon[];
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
-  initialCmsLetters?: CmsLetter[];
   initialLensPosts?: CmsLens[];
 }
 
@@ -79,7 +78,6 @@ export function FeedPage({
   initialWebtoons,
   initialVideos,
   initialWordTerms,
-  initialCmsLetters,
   initialLensPosts,
 }: Props) {
   const router = useRouter();
@@ -423,7 +421,6 @@ export function FeedPage({
             initialWebtoons={initialWebtoons}
             initialVideos={initialVideos}
             initialWordTerms={initialWordTerms}
-            initialCmsLetters={initialCmsLetters}
             initialLensPosts={initialLensPosts}
           />
         )}
