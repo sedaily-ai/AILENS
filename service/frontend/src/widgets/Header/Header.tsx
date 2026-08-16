@@ -42,24 +42,75 @@ interface HeaderProps {
 // 폰트 크기(2026-08-06 확대) — 컬리/밑미/밑미도구상점 등 레퍼런스 대비
 // 기존 12~14px가 위축돼 보인다는 지적. 코어 탭은 15~16px대로 키워
 // 존재감을 준다(레퍼런스들도 탭 텍스트가 다 큼직하고 자신감 있음).
+//
+// 회색 알약(bg-gray-100) active 표시 → 밑줄로 교체(2026-08-16, 사용자 확인) —
+// 에디토리얼 매체 레퍼런스 리서치 결과 "배경을 채우기보다 절제된 밑줄이
+// 매거진 무드에 더 맞는다"는 판단. 액센트 컬러는 로고 옆 BETA 배지와 동일한
+// 파랑(#1d4ed8)으로 통일 — 챗봇 아이콘의 보라(violet-500)와 섞이지 않게
+// 탭 액센트는 이 하나로만 쓴다. 밑줄은 TabUnderline이 그린다(group-hover로
+// 슬라이드인).
+const TAB_ACCENT = '#1d4ed8';
 const TAB_BASE =
-  'px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] font-semibold rounded-lg transition-colors duration-200 whitespace-nowrap flex-shrink-0';
-const TAB_ACTIVE = 'bg-gray-100 text-gray-900';
-const TAB_IDLE = 'text-gray-600 hover:text-gray-900 hover:bg-gray-50';
+  'group relative px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] font-semibold transition-colors duration-200 whitespace-nowrap flex-shrink-0';
+const TAB_ACTIVE = 'text-gray-900';
+const TAB_IDLE = 'text-gray-600 hover:text-gray-900';
 // tier: 'extra' — 코어보다는 작고 옅지만, 이전만큼 위축되진 않게(11px는
 // 레퍼런스 대비 너무 작았다). 뉴닉의 얇은 텍스트 목차 톤 참고(2026-08-06).
+// letter-spacing을 살짝 벌려(0.01em) 빽빽함 완화(2026-08-16).
 const TAB_EXTRA_BASE =
-  'px-2 lg:px-3 py-2 text-[12.5px] lg:text-[14px] font-normal rounded-lg transition-colors duration-200 whitespace-nowrap flex-shrink-0';
-const TAB_EXTRA_IDLE = 'text-gray-400 hover:text-gray-600 hover:bg-gray-50';
+  'group relative px-2 lg:px-3 py-2 text-[12.5px] lg:text-[14px] font-normal tracking-[0.01em] transition-colors duration-200 whitespace-nowrap flex-shrink-0';
+const TAB_EXTRA_IDLE = 'text-gray-400 hover:text-gray-600';
+
+// active 탭 밑에 항상, idle 탭은 호버 시에만 슬라이드인 되는 밑줄.
+// 부모(DesktopTab의 a/Link/button/span)가 TAB_BASE의 `group relative`를
+// 가지고 있어야 group-hover가 동작한다.
+function TabUnderline({ active }: { active?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute inset-x-2 lg:inset-x-3 -bottom-px h-[2px] origin-left rounded-full transition-transform duration-200 ${
+        active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+      }`}
+      style={{ background: TAB_ACCENT }}
+    />
+  );
+}
+
+// "시선" 전용 손그림 눈 아이콘 — 점 액센트로는 부족하다는 사용자 피드백
+// (2026-08-16)으로 교체. 9개 탭 전부를 아이콘화하는 대신 서비스 핵심
+// 차별화 탭 하나에만 일러스트 포인트를 준다. features/news-feed의
+// HandDrawnIcons(카드 썸네일용, 96x96·디테일 많음)와 같은 스트로크 톤
+// (검정 라인 + accent 포인트, 그라데이션 없음)을 쓰되, 13~15px 텍스트
+// 옆에 인라인으로 들어가는 크기라 디테일을 최소화해 24x24로 새로 그렸다
+// — 그 아이콘들을 그대로 축소하면 이 크기에서 뭉개져 안 읽힌다.
+function LensEyeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M2 12 Q12 3.5 22 12 Q12 20.5 2 12 Z"
+        stroke="#1a1a1a"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="12" r="3.4" stroke={TAB_ACCENT} strokeWidth={1.5} />
+      <circle cx="12.9" cy="10.9" r="1" fill={TAB_ACCENT} />
+    </svg>
+  );
+}
 
 function TabLabel({ tab }: { tab: HeaderTab }) {
-  if (!tab.soon) return <>{tab.label}</>;
+  // "시선"만 텍스트 앞에 작은 손그림 눈 아이콘 — 위 LensEyeIcon 참조.
+  const isFlagship = tab.key === 'lens';
   return (
-    <span className="flex items-center gap-1">
+    <span className="inline-flex items-center gap-1.5">
+      {isFlagship && <LensEyeIcon className="w-[15px] h-[15px] flex-shrink-0 -mt-px" />}
       {tab.label}
-      <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-semibold rounded-full tracking-wide">
-        SOON
-      </span>
+      {tab.soon && (
+        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-semibold rounded-full tracking-wide">
+          SOON
+        </span>
+      )}
     </span>
   );
 }
@@ -79,6 +130,7 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
       return (
         <a href={href} className={cls}>
           <TabLabel tab={tab} />
+          <TabUnderline active={tab.active} />
         </a>
       );
     }
@@ -96,6 +148,7 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
         onTouchStart={warm}
       >
         <TabLabel tab={tab} />
+        <TabUnderline active={tab.active} />
       </Link>
     );
   }
@@ -103,12 +156,14 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
     return (
       <button onClick={tab.onClick} className={cls}>
         <TabLabel tab={tab} />
+        <TabUnderline active={tab.active} />
       </button>
     );
   }
   return (
     <span className={cls}>
       <TabLabel tab={tab} />
+      <TabUnderline active={tab.active} />
     </span>
   );
 }
@@ -249,7 +304,7 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
           {/* 데스크탑 탭 — core/extra 구분선은 뺐다(2026-08-11) — 탭이 8개로
               늘면서 "|" 하나로는 굳이 안 나눠도 된다는 피드백, 무게(굵기·색)
               차이만으로 core/extra 구분은 그대로 유지. */}
-          <nav className="hidden md:flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-hide">
+          <nav className="hidden md:flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
               <DesktopTab key={tab.key} tab={tab} />
             ))}

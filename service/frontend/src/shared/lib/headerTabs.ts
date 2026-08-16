@@ -56,12 +56,16 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 경제 콘텐츠 플랫폼에서 이미 통용되는 단어라 가볍지 않으면서 트렌디함도
     // 챙긴다. URL(key/href)은 그대로 — SEO(캐노니컬·sitemap)에 영향 없음,
     // 화면에 보이는 한글 라벨만 바뀐다.
+    // 2026-08-16 — "시선"(4가지 시선)이 서비스의 핵심 차별화 포인트라는 판단으로
+    // 탭 최상단으로 이동(사용자 확인). 2026-08-13에는 SEO 발견성 문제로 전역
+    // 내비게이션에 처음 추가됐었다.
+    { key: 'lens', label: '시선', href: '/lens', active: active === 'lens', tier: 'extra' },
     { key: 'feed', label: '브리핑', href: '/letters', active: active === 'feed' },
     { key: 'trend', label: '딥다이브', href: '/trend', active: active === 'trend', tier: 'extra' },
     { key: 'column', label: '인사이트', href: '/column', active: active === 'column', tier: 'extra' },
-    // 2026-08-13 추가 — "4가지 시선"이 홈 티저 링크로만 도달 가능해서 SEO상
-    // 사이트 전역 내비게이션에서 발견이 안 되는 문제(사용자 확인 후 추가).
-    { key: 'lens', label: '시선', href: '/lens', active: active === 'lens', tier: 'extra' },
+    // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
+    // 앞으로 당김(사용자 확인) — "오락성들보다도 뒤에 있으면 안 된다".
+    { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'extra' },
     { key: 'video', label: '영상', href: '/video', active: active === 'video', tier: 'extra' },
     // '내 서랍' 탭도 네비게이션에서 제거(2026-08-06) — 커뮤니티 대체로
     // "오늘의 한 문장 + 다른 사람들이 담은 문장 + 내 문장" 3단 구조까지
@@ -91,6 +95,5 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // `/timemachine`(유명인·투자 시뮬레이션 4탭) 은 직접 URL 로 남겨둔다.
     { key: 'timeline', label: '타임라인', href: TIMELINE_HREF, active: active === 'timeline', tier: 'extra' },
     { key: 'games', label: '게임', href: '/games', active: active === 'games', tier: 'extra' },
-    { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'extra' },
   ];
 }

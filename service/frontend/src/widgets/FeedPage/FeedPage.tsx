@@ -345,6 +345,9 @@ export function FeedPage({
         onLogo={() => setActiveTab("feed")}
         onSearch={() => setShowSearch(true)}
         tabs={[
+          // 2026-08-16 — "시선"을 탭 최상단으로 이동(headerTabs.ts와 동일,
+          // 사용자 확인 — 서비스 핵심 차별화 포인트라는 판단).
+          { key: "lens", label: "시선", href: "/lens", tier: "extra" },
           // 전체 레터 모음(/letters)으로 실제 이동 — 예전엔 in-page 탭 전환(버튼)이라
           // 눌러도 화면이 안 바뀌는 것처럼 보였다. 홈 피드로 돌아오는 길은 로고 클릭
           // (onLogo → setActiveTab("feed"))으로 그대로 유지.
@@ -358,7 +361,9 @@ export function FeedPage({
           // 칼럼 → 브리핑/딥다이브/인사이트로 통일, URL은 그대로.
           { key: "trend", label: "딥다이브", href: "/trend", tier: "extra" },
           { key: "column", label: "인사이트", href: "/column", tier: "extra" },
-          { key: "lens", label: "시선", href: "/lens", tier: "extra" },
+          // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
+          // 앞으로 당김(headerTabs.ts와 동일, 사용자 확인).
+          { key: "webtoon", label: "웹툰", href: "/webtoon", tier: "extra" },
           { key: "video", label: "영상", href: "/video", tier: "extra" },
           // '내 서랍' 탭 제거(2026-08-06, headerTabs.ts 주석 참조) — 페이지/저장
           // 기능 자체는 살아있고 activeTab === "archive" 렌더 분기도 그대로 둔다.
@@ -371,7 +376,6 @@ export function FeedPage({
           { key: "fortune", label: "사주", href: "/saju", tier: "extra", hardNav: true },
           { key: "timeline", label: "타임라인", href: TIMELINE_HREF, tier: "extra" },
           { key: "games", label: "게임", href: "/games", tier: "extra" },
-          { key: "webtoon", label: "웹툰", href: "/webtoon", tier: "extra" },
         ]}
       />
 
