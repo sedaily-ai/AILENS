@@ -105,7 +105,20 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
 // EC2→API 왕복 없이 즉시 렌더링된다.
 const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤엔 자동 갱신(안전망).
 
-function cacheOpts(tag: string): { cache: RequestCache; next: { tags: string[]; revalidate: number } } {
+// 이 파일의 함수들은 서버 컴포넌트(app/page.tsx의 SSR Promise.all)뿐 아니라
+// TrendingEconomySection/ColumnPreviewSection 등 다수의 'use client' 컴포넌트가
+// useEffect로 브라우저에서 직접 호출한다(2026-08-16, "요즘 화제의 경제 이슈
+// 이미지가 항상 늦게 최신화" 피드백으로 발견). cache:'force-cache' + next.tags는
+// Next.js가 SSR 중에만 해석하는 확장 옵션이고, 브라우저의 fetch()에서는
+// `next.tags`를 그냥 무시하고 표준 RequestCache 값인 `cache:'force-cache'`만
+// 살아남아 **브라우저 자체 HTTP 캐시**를 켜버린다 — 이건 /api/revalidate가
+// 전혀 손댈 수 없는 별개의 캐시라, admin이 발행해도 그 브라우저에서는 계속
+// 옛 응답이 나온다. 그래서 브라우저에서 호출될 때는 예전처럼 no-store로
+// 완전히 캐시를 끄고, 서버(SSR)에서 호출될 때만 태그 캐시를 쓴다.
+function cacheOpts(tag: string): RequestInit {
+  if (typeof window !== 'undefined') {
+    return { cache: 'no-store' };
+  }
   return { cache: 'force-cache', next: { tags: [tag], revalidate: CACHE_TTL_FALLBACK_SECONDS } };
 }
 
