@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { LightbulbIcon, CoinJarIcon, HouseSunIcon } from './icons/HandDrawnIcons';
-import { fetchTrendCards, fetchCmsPosts, type CmsTrendCard } from '@/shared/lib/cmsPostsApi';
-import { letterHref } from '@/shared/lib/letterHref';
+import { fetchSectionCards, type CmsSectionCard } from '@/shared/lib/cmsPostsApi';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
-type ColumnItem = CmsTrendCard & { href?: string | null; imageUrl?: string | null };
+// fetch+merge 로직은 TrendingEconomySection과 공유(fetchSectionCards,
+// shared/lib/cmsPostsApi.ts 참조).
+type ColumnItem = CmsSectionCard;
 
 // 리스트형으로 톤을 바꿔서 위 TrendingEconomySection 카드 그리드와 시각적
 // 리듬을 다르게 줌(UPPITY 의 칼럼/머니레터처럼 섹션마다 레이아웃이 미묘하게
@@ -57,36 +58,24 @@ const FALLBACK: ColumnItem[] = [
   },
 ];
 
-export function ColumnPreviewSection() {
-  const [cmsCards, setCmsCards] = useState<ColumnItem[] | null>(null);
+interface Props {
+  // 빌드타임(app/page.tsx) 서버 프리페치 값 — TrendingEconomySection과 같은
+  // 이유(2026-08-16 "이미지가 늦게 최신화" 피드백 — 초기 마운트 시 FALLBACK
+  // 목업이 먼저 보였다가 실제 데이터로 바뀌는 깜빡임을 없앤다).
+  initialItems?: ColumnItem[];
+}
+
+export function ColumnPreviewSection({ initialItems }: Props) {
+  const [cmsCards, setCmsCards] = useState<ColumnItem[] | null>(initialItems ?? null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetchTrendCards(),
-      fetchCmsPosts('letters', undefined, 100),
-    ]).then(([cards, letters]) => {
+    // "칼럼"(section:'column') 태그가 명시된 글만 — 예전엔 태그 없는 일반
+    // 레터도 여기로 편입시켰는데, "오늘의 이슈"(분류 없음)가 이슈 톡톡
+    // 전용 아카이빙으로 재정의되면서(2026-08-12) 그 편입 로직을 걷어냈다.
+    // 태그 없는 레터는 이제 인사이트가 아니라 이슈 톡톡(FollowingFeed) 쪽이다.
+    fetchSectionCards('column').then((merged) => {
       if (cancelled) return;
-      // "칼럼"(section:'column') 태그가 명시된 글만 — 예전엔 태그 없는 일반
-      // 레터도 여기로 편입시켰는데, "오늘의 이슈"(분류 없음)가 이슈 톡톡
-      // 전용 아카이빙으로 재정의되면서(2026-08-12) 그 편입 로직을 걷어냈다.
-      // 태그 없는 레터는 이제 인사이트가 아니라 이슈 톡톡(FollowingFeed) 쪽이다.
-      const tagged: ColumnItem[] = letters
-        .filter((l) => l.section === 'column')
-        .map((l) => ({
-          id: l.id,
-          section: 'column' as const,
-          category: l.category || l.editor_id || 'AI LENS',
-          title: l.headline,
-          excerpt: l.subtitle ?? '',
-          date: l.publish_date ?? '',
-          is_cms: true as const,
-          href: letterHref(l.id),
-          imageUrl: l.cover_image_url || null,
-        }));
-      const merged = [...tagged, ...cards.filter((c) => c.section === 'column')].sort((a, b) =>
-        b.date.localeCompare(a.date),
-      );
       setCmsCards(merged);
     });
     return () => {

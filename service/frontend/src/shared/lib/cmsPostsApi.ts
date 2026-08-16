@@ -9,6 +9,7 @@
  */
 import { API_URL } from '@/shared/config/api';
 import type { ApiLetter } from './todayLettersApi';
+import { letterHref } from './letterHref';
 
 export type CmsChannel = 'letters' | 'paper' | 'feed' | 'trend_card' | 'webtoon' | 'video' | 'lens';
 
@@ -155,6 +156,35 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
       return [];
     }
   });
+}
+
+export type CmsSectionCard = CmsTrendCard & { href?: string | null; imageUrl?: string | null };
+
+// TrendingEconomySection("요즘 화제의 경제 이슈")/ColumnPreviewSection("이번 주
+// 인사이트")가 각자 컴포넌트 안에 똑같은 fetch+merge 로직을 복붙해 두고 있었다
+// — trend_card 채널 카드 + "trend"/"column" 태그가 붙은 실제 레터를 합쳐서
+// 보여주는 로직. 그 두 컴포넌트는 원래 'use client'라 useEffect로만 데이터를
+// 가져왔는데, 그러면 마운트 직후엔 FALLBACK 목업이 먼저 보이고 ~1초 뒤에야
+// 실제 카드로 바뀌는 깜빡임이 있었다(2026-08-16 피드백). app/page.tsx가 다른
+// 섹션(웹툰/영상/시선)처럼 서버에서 미리 이 함수를 호출해 initialItems로
+// 내려주면 첫 페인트부터 바로 실제 데이터가 보인다 — 그래서 두 컴포넌트가
+// 공유할 수 있게 여기(shared/lib)로 뺐다.
+export async function fetchSectionCards(section: 'trend' | 'column'): Promise<CmsSectionCard[]> {
+  const [cards, letters] = await Promise.all([fetchTrendCards(), fetchCmsPosts('letters', undefined, 100)]);
+  const tagged: CmsSectionCard[] = letters
+    .filter((l) => l.section === section)
+    .map((l) => ({
+      id: l.id,
+      section,
+      category: l.category || l.editor_id || 'AI LENS',
+      title: l.headline,
+      excerpt: l.subtitle ?? '',
+      date: l.publish_date ?? '',
+      is_cms: true as const,
+      href: letterHref(l.id),
+      imageUrl: l.cover_image_url || null,
+    }));
+  return [...tagged, ...cards.filter((c) => c.section === section)].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {

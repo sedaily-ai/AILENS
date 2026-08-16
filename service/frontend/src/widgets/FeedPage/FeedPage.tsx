@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import type { CmsVideo, CmsWebtoon, CmsLens, CmsSectionCard } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
@@ -31,6 +31,8 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
+  initialTrendItems?: CmsSectionCard[];
+  initialColumnItems?: CmsSectionCard[];
 }
 
 // 아카이빙된 문장 타입
@@ -79,6 +81,8 @@ export function FeedPage({
   initialVideos,
   initialWordTerms,
   initialLensPosts,
+  initialTrendItems,
+  initialColumnItems,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -426,6 +430,8 @@ export function FeedPage({
             initialVideos={initialVideos}
             initialWordTerms={initialWordTerms}
             initialLensPosts={initialLensPosts}
+            initialTrendItems={initialTrendItems}
+            initialColumnItems={initialColumnItems}
           />
         )}
 

@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { StockBullIcon, CoinExchangeIcon, ServerRobotIcon, PiggyBankIcon } from './icons/HandDrawnIcons';
-import { fetchTrendCards, fetchCmsPosts, type CmsTrendCard } from '@/shared/lib/cmsPostsApi';
-import { letterHref } from '@/shared/lib/letterHref';
+import { fetchSectionCards, type CmsSectionCard } from '@/shared/lib/cmsPostsApi';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
 // trend_card 채널 카드(요약뿐, 상세 없음) + "트렌드" 태그를 단 실제 레터
 // (channel=letters, body_inline.section) 를 합쳐서 보여준다 — 태그만 있고
 // 홈에 안 뜨면 admin 입장에서 "표출"이 안 되는 것처럼 보이는 문제가 있었다.
-type TrendItem = CmsTrendCard & { href?: string | null; imageUrl?: string | null };
+// fetch+merge 로직 자체는 ColumnPreviewSection과 공유(fetchSectionCards,
+// shared/lib/cmsPostsApi.ts 참조).
+type TrendItem = CmsSectionCard;
 
 // 아이콘은 admin 이 입력하는 값이 아니라 카드 순서로 순환 배정 — 사진 대신
 // 손그림 라인아트 아이콘을 쓰는 이유와 같다(실제 없는 기사에 엉뚱한 사진을
@@ -61,32 +62,22 @@ const FALLBACK: TrendItem[] = [
   },
 ];
 
-export function TrendingEconomySection() {
-  const [cmsCards, setCmsCards] = useState<TrendItem[] | null>(null);
+interface Props {
+  // 빌드타임(app/page.tsx) 서버 프리페치 값 — 다른 홈 섹션(웹툰/영상/시선)과
+  // 같은 이유(2026-08-07 홈 SSG 감사). 없으면 마운트 후 클라이언트에서
+  // fetchSectionCards로 로드하는 동안 FALLBACK 목업이 먼저 보였다가 실제
+  // 데이터로 바뀌는 깜빡임이 있었다(2026-08-16 피드백) — initialItems가 있으면
+  // 첫 페인트부터 바로 실제 데이터.
+  initialItems?: TrendItem[];
+}
+
+export function TrendingEconomySection({ initialItems }: Props) {
+  const [cmsCards, setCmsCards] = useState<TrendItem[] | null>(initialItems ?? null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetchTrendCards(),
-      fetchCmsPosts('letters', undefined, 100),
-    ]).then(([cards, letters]) => {
+    fetchSectionCards('trend').then((merged) => {
       if (cancelled) return;
-      const tagged: TrendItem[] = letters
-        .filter((l) => l.section === 'trend')
-        .map((l) => ({
-          id: l.id,
-          section: 'trend' as const,
-          category: l.category || l.editor_id || 'AI LENS',
-          title: l.headline,
-          excerpt: l.subtitle ?? '',
-          date: l.publish_date ?? '',
-          is_cms: true as const,
-          href: letterHref(l.id),
-          imageUrl: l.cover_image_url || null,
-        }));
-      const merged = [...tagged, ...cards.filter((c) => c.section === 'trend')].sort((a, b) =>
-        b.date.localeCompare(a.date),
-      );
       setCmsCards(merged);
     });
     return () => {

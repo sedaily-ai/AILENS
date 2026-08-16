@@ -1,7 +1,7 @@
 'use client';
 
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import type { CmsVideo, CmsWebtoon, CmsLens, CmsSectionCard } from "@/shared/lib/cmsPostsApi";
 import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import type { Term } from "../lib/wordsTerms";
 import { FollowingFeed } from "./FollowingFeed";
@@ -31,6 +31,8 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
+  initialTrendItems?: CmsSectionCard[];
+  initialColumnItems?: CmsSectionCard[];
 }
 
 export function NewsFeedTab({
@@ -47,6 +49,8 @@ export function NewsFeedTab({
   initialVideos,
   initialWordTerms,
   initialLensPosts,
+  initialTrendItems,
+  initialColumnItems,
 }: Props) {
   return (
     <div className="min-h-screen bg-white">
@@ -128,8 +132,8 @@ export function NewsFeedTab({
 
           {/* 어피티/뉴닉처럼 홈에 경제 콘텐츠 섹션을 더 — 아직 실제 데이터 없어서
               목업(TrendingEconomySection/ColumnPreviewSection 파일 상단 참고). */}
-          <TrendingEconomySection />
-          <ColumnPreviewSection />
+          <TrendingEconomySection initialItems={initialTrendItems} />
+          <ColumnPreviewSection initialItems={initialColumnItems} />
 
           {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
               뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를
