@@ -133,7 +133,7 @@ const SITE_JSONLD = {
         "https://en.sedaily.com",
         "https://www.instagram.com/seoul_economic/",
         "https://www.instagram.com/moneycut_._/",
-        "https://www.instagram.com/ailens.sedaily/",
+        "https://www.instagram.com/lens.sedaily/",
         "https://www.youtube.com/@서울경제신문",
         "https://tv.naver.com/sed.thumb",
         "https://www.facebook.com/seouleconomydaily/",

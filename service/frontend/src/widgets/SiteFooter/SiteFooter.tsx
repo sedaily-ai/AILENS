@@ -19,7 +19,7 @@ const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
     // 있었는데, 이 푸터는 AI LENS 제품 페이지용이라 방문자와 가장 관련
     // 있는 계정 하나만 보여주는 게 맞다(sameAs에는 머니컷도 그대로 남아있음).
     label: 'Instagram',
-    href: 'https://www.instagram.com/ailens.sedaily/',
+    href: 'https://www.instagram.com/lens.sedaily/',
     icon: (
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="3" y="3" width="18" height="18" rx="5" />
