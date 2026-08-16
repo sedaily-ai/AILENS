@@ -80,9 +80,17 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // 순수 소개 랜딩으로 바뀌었는데 그 뒤로도 계속 막혀 있었다. 이제 푸터
   // "서비스 소개" 링크의 대상이라 색인돼야 한다.
   { path: '/onboarding',   priority: 0.4, changeFrequency: 'yearly',  lastModified: '2026-08-07' },
-  // '/fortune', '/saju-match'는 2026-08-09 제거 — 사주는 이제 CloudFront
-  // 경로 라우팅(/saju*)으로 외부 AI-saju 서비스가 직접 서빙한다. 이 Next.js
-  // 앱의 라우트가 아니라서 이 sitemap에 안 들어간다(그쪽 자체 sitemap이 따로 있음).
+  // '/fortune', '/saju-match'는 2026-08-09 제거 — 사주는 CloudFront 경로
+  // 라우팅(/saju*)으로 외부 AI-saju 서비스가 직접 서빙하고, 이 Next.js 앱의
+  // 라우트가 아니다(그쪽 자체 sitemap이 따로 있음 — saju.sedaily.ai/sitemap.xml).
+  // 그래도 2026-08-16부터 이 sitemap에 /saju 자체는 추가한다 — "AI LENS로
+  // 검색하면 사주도 하위 카테고리로 나와야 한다"는 요구로, 이 URL이 AI LENS
+  // 사이트 구조의 일부라는 신호를 구글에 준다. 단 canonical 태그
+  // (ailens.sedaily.ai/saju 응답 HTML 자체, sedaily-ai/AI-saju 저장소 소관 —
+  // 이 레포 밖)는 여전히 saju.sedaily.ai를 가리키고 있어 구글이 실제로 이
+  // URL을 AI LENS 소속으로 색인할지는 별개 문제 — sitemap 등재는 필요조건일
+  // 뿐 충분조건은 아니다.
+  { path: '/saju',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-16' }, // 사주매칭 (외부 AI-saju, CDN 경로 마운트)
   // 입력 화면 — 실제 콘텐츠는 /timemachine/{date}(2026-08-12, SSR 분리). /timeline과
   // 달리 여기 날짜는 "최근 N일"이 아니라 생일 등 임의의 과거 날짜(1990~어제)라 어떤
   // 날짜가 실제로 방문될지 신호가 없다 — 홈에도 특정 날짜를 링크하는 티저가 없어서
