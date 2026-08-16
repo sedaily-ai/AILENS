@@ -24,10 +24,15 @@ from shared.slug import slugify
 _VALID_STATUS = ("draft", "published", "archived")
 
 # update() 가 건드릴 수 있는 필드. status/published_at 은 set_status() 전담.
+# media_embed_url(2026-08-16): 유튜브/네이버TV 등 웹 링크 — 있으면 홈 하단
+# 플레이어(TodayNewsPlayer)가 TTS 대신 이걸 임베드 재생한다. daily_letters
+# 쪽(letters_repo.py)에도 같은 이름 필드가 있지만 그 테이블은 죽은 파이프라인
+# 전용이라 실제로는 이 cms_posts 테이블이 홈 플레이어의 진짜 소스다
+# (todayLettersApi.ts의 fetchTodayLettersLive 주석 참조).
 _UPDATABLE = (
     "channels", "publish_date", "editor_id",
     "headline", "subtitle", "closing_line", "body_inline", "cover_image_url",
-    "source_url",
+    "source_url", "media_embed_url",
 )
 
 
@@ -55,6 +60,7 @@ def _to_dict(item: dict) -> dict:
         # 만든다(2026-08-13, SEO/GEO/AEO 감사 — 신뢰 신호 없이 그 주장만
         # JSON-LD에 있던 문제). admin이 채널 상관없이 자유롭게 채운다.
         "source_url": item.get("source_url") or "",
+        "media_embed_url": item.get("media_embed_url"),
         "created_by": item.get("created_by"),
         "created_at": item.get("created_at"),
         "updated_at": item.get("updated_at"),

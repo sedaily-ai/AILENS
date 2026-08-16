@@ -154,6 +154,8 @@ export interface CmsPost {
   /** 원문 기사 URL — 서울경제 원본 취재 기사 링크. SEO/GEO/AEO 신뢰 신호
    * (2026-08-13). 채널 무관하게 채울 수 있다. */
   source_url: string;
+  /** 유튜브 등 웹 링크 — 있으면 홈 하단 플레이어가 TTS 대신 이걸 임베드 재생. */
+  media_embed_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -171,6 +173,7 @@ export interface CmsPostInput {
   body_inline?: CmsPostBody;
   cover_image_url?: string | null;
   source_url?: string | null;
+  media_embed_url?: string | null;
 }
 
 // --- 용어 퀴즈 (backend/admin/repo/quiz_repo.py 와 1:1) ---

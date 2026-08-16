@@ -148,6 +148,7 @@ function PostEditPage() {
           body_inline: post.body_inline,
           cover_image_url: post.cover_image_url || null,
           source_url: post.source_url || null,
+          media_embed_url: post.media_embed_url || null,
         });
       })
       .catch((err) => {

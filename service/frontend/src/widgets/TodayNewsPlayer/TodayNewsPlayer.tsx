@@ -16,6 +16,74 @@ import { synthesizeSpeech, sanitizeForTTS } from '@/shared/lib/voiceChat';
 const PLAYLIST_SIZE = 5;
 const ACCENT = '#3b82f6';
 
+// 2026-08-16 — admin이 레터마다 유튜브 링크(media_embed_url)를 붙이면 TTS 합성
+// 대신 유튜브 IFrame Player API로 그 영상을 재생한다(화면엔 안 보이게 1x1로
+// 깔고 소리만 낸다). 링크가 없는 레터는 기존 TTS 흐름 그대로. 네이버TV는 IFrame
+// 재생 제어 API가 유튜브만큼 안정적으로 문서화돼 있지 않아 이번엔 유튜브만
+// 지원 — admin 필드 안내 문구에도 명시.
+function extractYoutubeVideoId(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'youtu.be') {
+      return u.pathname.slice(1).split('/')[0] || null;
+    }
+    if (!u.hostname.endsWith('youtube.com')) return null;
+    if (u.pathname === '/watch') return u.searchParams.get('v');
+    const m = u.pathname.match(/^\/(embed|shorts)\/([^/]+)/);
+    return m ? m[2] : null;
+  } catch {
+    return null;
+  }
+}
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        el: HTMLElement,
+        opts: {
+          videoId: string;
+          playerVars?: Record<string, number>;
+          events?: {
+            onReady?: () => void;
+            onStateChange?: (e: { data: number }) => void;
+          };
+        },
+      ) => YTPlayer;
+      PlayerState: { ENDED: number; PLAYING: number };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+interface YTPlayer {
+  playVideo(): void;
+  pauseVideo(): void;
+  loadVideoById(videoId: string): void;
+  getCurrentTime(): number;
+  getDuration(): number;
+  destroy(): void;
+}
+
+let youtubeApiPromise: Promise<void> | null = null;
+function loadYouTubeIframeApi(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (window.YT) return Promise.resolve();
+  if (youtubeApiPromise) return youtubeApiPromise;
+  youtubeApiPromise = new Promise((resolve) => {
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      prev?.();
+      resolve();
+    };
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(script);
+  });
+  return youtubeApiPromise;
+}
+
 export function TodayNewsPlayer() {
   const [items, setItems] = useState<TodayLetterCardLike[] | null>(null);
   const [index, setIndex] = useState(0);
@@ -27,6 +95,10 @@ export function TodayNewsPlayer() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cacheRef = useRef<Map<string, string>>(new Map()); // letterId -> blob URL
+  const ytContainerRef = useRef<HTMLDivElement | null>(null);
+  const ytPlayerRef = useRef<YTPlayer | null>(null);
+  const ytLoadedVideoIdRef = useRef<string | null>(null);
+  const ytProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,8 +135,59 @@ export function TodayNewsPlayer() {
     return audioRef.current;
   };
 
+  function stopYtProgressPolling() {
+    if (ytProgressTimerRef.current) {
+      clearInterval(ytProgressTimerRef.current);
+      ytProgressTimerRef.current = null;
+    }
+  }
+
+  async function playYoutube(videoId: string) {
+    setError(false);
+    await loadYouTubeIframeApi();
+    if (!window.YT || !ytContainerRef.current) {
+      setError(true);
+      return;
+    }
+    if (!ytPlayerRef.current) {
+      await new Promise<void>((resolve) => {
+        ytPlayerRef.current = new window.YT!.Player(ytContainerRef.current!, {
+          videoId,
+          playerVars: { autoplay: 0, controls: 0 },
+          events: {
+            onReady: () => resolve(),
+            onStateChange: (e) => {
+              if (e.data === window.YT!.PlayerState.ENDED) {
+                stopYtProgressPolling();
+                setPlaying(false);
+                setProgress(0);
+                setIndex((i) => (items && i + 1 < items.length ? i + 1 : 0));
+              }
+            },
+          },
+        });
+      });
+      ytLoadedVideoIdRef.current = videoId;
+    } else if (ytLoadedVideoIdRef.current !== videoId) {
+      ytPlayerRef.current.loadVideoById(videoId);
+      ytLoadedVideoIdRef.current = videoId;
+    }
+    ytPlayerRef.current?.playVideo();
+    setPlaying(true);
+    setProgress(0);
+    stopYtProgressPolling();
+    ytProgressTimerRef.current = setInterval(() => {
+      const p = ytPlayerRef.current;
+      const duration = p?.getDuration();
+      if (p && duration) setProgress(p.getCurrentTime() / duration);
+    }, 250);
+  }
+
   async function play() {
     if (!current) return;
+    const videoId = extractYoutubeVideoId(current.mediaEmbedUrl);
+    if (videoId) return playYoutube(videoId);
+
     setError(false);
     const el = ensureAudio();
 
@@ -99,8 +222,18 @@ export function TodayNewsPlayer() {
 
   function pause() {
     audioRef.current?.pause();
+    ytPlayerRef.current?.pauseVideo();
+    stopYtProgressPolling();
     setPlaying(false);
   }
+
+  // 언마운트 시 유튜브 플레이어·폴링 정리.
+  useEffect(() => {
+    return () => {
+      stopYtProgressPolling();
+      ytPlayerRef.current?.destroy();
+    };
+  }, []);
 
   // 트랙이 바뀌면 재생 중이던 오디오는 멈춘다 — 다음 트랙은 버튼을 다시
   // 눌러야 재생(자동 넘어감은 ended 이벤트에서만, 사용자가 prev/next를
@@ -109,6 +242,8 @@ export function TodayNewsPlayer() {
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
     }
+    ytPlayerRef.current?.pauseVideo();
+    stopYtProgressPolling();
     setPlaying(false);
     setProgress(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- index 변경 시에만
@@ -131,6 +266,12 @@ export function TodayNewsPlayer() {
         boxShadow: '0 -2px 16px rgba(17,24,39,0.08)',
       }}
     >
+      {/* 유튜브 플레이어 컨테이너 — media_embed_url이 있는 레터를 처음 재생할 때
+          여기에 IFrame이 생긴다. 화면엔 안 보이지만 IFrame API가 실제 엘리먼트를
+          요구해서 1x1로 깔아둔다(display:none은 유튜브가 재생을 멈추게 할 수 있어
+          크기로만 숨김). 어떤 트랙에 링크가 있을지 몰라 항상 마운트해둔다. */}
+      <div ref={ytContainerRef} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }} />
+
       {/* 진행바 — 상단 얇은 줄 */}
       <div style={{ height: 3, background: '#f0f0ef' }}>
         <div
@@ -251,7 +392,7 @@ export function TodayNewsPlayer() {
             type="button"
             aria-label="닫기"
             onClick={() => {
-              audioRef.current?.pause();
+              pause();
               setClosed(true);
             }}
             className="flex items-center justify-center"

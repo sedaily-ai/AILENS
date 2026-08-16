@@ -76,6 +76,9 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO
         # 감사). admin이 안 채우면 None, 프론트는 있을 때만 "원문 보기" 노출.
         "source_url": post.get("source_url") or None,
+        # 유튜브 등 웹 링크 — 있으면 홈 하단 플레이어가 TTS 대신 이걸 임베드
+        # 재생한다(2026-08-16, shared/lib/todayLettersApi.ts::toTodayLetterCard).
+        "media_embed_url": post.get("media_embed_url") or None,
         # 전체 레터라도 /letters 아카이브에서 "트렌드"/"인기 칼럼" 필터에 걸리고
         # 싶을 수 있다 — channel 을 trend_card 로 바꾸면 본문·퀴즈가 요약 카드로
         # 축소되니, 대신 가벼운 태그만 얹는다(글 자체는 여전히 상세 페이지 그대로).

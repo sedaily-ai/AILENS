@@ -48,6 +48,8 @@ export interface ApiLetter {
   images?: LetterImage[]; // 본문 중간 실 이미지 (옵션, chart 보다 우선)
   // article_id 기반 자동 생성이 안 되는 레터를 위해 admin 이 수동 업로드한 팟캐스트 URL.
   podcast_audio_url?: string | null;
+  // 유튜브/네이버TV 등 웹 링크 — 있으면 TodayNewsPlayer가 TTS 대신 이걸 임베드 재생.
+  media_embed_url?: string | null;
   // 피드 카드 썸네일 (CMS 글 전용 — admin에서 지정 안 하면 null, 에디터 아바타로 폴백).
   cover_image_url?: string | null;
   // 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO 감사 —
@@ -257,6 +259,8 @@ export interface TodayLetterCardLike {
   deliveryHint: string;
   dateLabel: string;
   newsId: string;
+  // 유튜브/네이버TV 등 웹 링크 — 있으면 TodayNewsPlayer가 TTS 대신 이걸 임베드 재생.
+  mediaEmbedUrl: string | null;
 }
 
 export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayLetterCardLike {
@@ -282,6 +286,7 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
     deliveryHint: '오늘 발행',
     dateLabel: formatDateLabel(letterDate),
     newsId: letter.article_id,
+    mediaEmbedUrl: letter.media_embed_url || null,
   };
 }
 

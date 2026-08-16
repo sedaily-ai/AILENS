@@ -99,6 +99,20 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
               style={{ width: 220 }}
             />
           </MetaField>
+          <MetaDivider />
+          {/* 배경 음악 링크 — 유튜브 URL(2026-08-16). 있으면 홈 하단 플레이어
+              ("오늘의 핵심 뉴스")가 TTS 낭독 대신 이 영상의 소리를 재생한다.
+              지금은 유튜브만 지원(TodayNewsPlayer.tsx 참조). */}
+          <MetaField label="배경 음악">
+            <input
+              type="url"
+              value={value.media_embed_url ?? ""}
+              onChange={(e) => patch({ media_embed_url: e.target.value || null })}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="ui-input rounded-lg px-2 py-0.5 text-[12.5px]"
+              style={{ width: 220 }}
+            />
+          </MetaField>
         </>
       }
       // "핵심 정리/키워드/닫는 줄" 안내는 항상 떠 있던 문장이었다가 툴바 끝의
