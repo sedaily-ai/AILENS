@@ -6,7 +6,6 @@
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 
 export type HeaderTabKey =
-  | 'lens'
   | 'markets'
   | 'property'
   | 'industry'
@@ -53,13 +52,13 @@ export const TIMELINE_HREF = '/timeline';
  */
 export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
   return [
-    // 2026-08-16 — "시선"(4가지 시선)이 서비스의 핵심 차별화 포인트라는 판단으로
-    // 탭 최상단으로 이동(사용자 확인). 2026-08-13에는 SEO 발견성 문제로 전역
-    // 내비게이션에 처음 추가됐었다. 2026-08-17 — 유일한 core 티어 탭으로 승격
-    // (아래 참조) — 다른 모든 탭이 extra로 내려가면서 시선만 남는 게 아니라,
-    // "형식(브리핑/인사이트)보다 이 기능 자체가 상단에서 도드라져야 한다"는
-    // 판단(사용자 확인)에 따른 의도적 배치.
-    { key: 'lens', label: '시선', href: '/lens', active: active === 'lens' },
+    // "시선"(4가지 시선) 탭은 2026-08-17에 상단 nav에서 제거했다 — 2026-08-16엔
+    // "서비스 핵심 차별화 포인트"라는 판단으로 유일한 core 탭까지 승격시켰는데,
+    // 바로 다음 라운드에서 "카테고리로서 애매하다"는 사용자 피드백으로 뒤집혔다.
+    // /lens 페이지·홈 화면 "오늘의 이슈, 4가지 시선" 섹션은 그대로 유지 —
+    // nav 진입점만 없앤 것("브리핑"/"인사이트"를 letters/column 페이지는
+    // 남기고 nav에서만 뺀 것과 같은 처리).
+    //
     // 상단 탭 구조 개편(2026-08-17) — "브리핑"/"인사이트"(형식 기준: 빠른
     // 요약/개인 관점)를 걷어내고 주제 기준 6개로 교체했다. "독자가 형식
     // 차이를 구분하기 어렵다"는 판단 + 서울경제 영문사이트(Markets/Property/
@@ -74,14 +73,16 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 없앤 것과는 다른 처리 — letters/column은 여전히 실제 콘텐츠 아카이브라
     // 링크가 죽을 이유가 없다).
     //
-    // 전부 tier:'extra' — 시선 하나만 core로 남기고, 나머지 11개(카테고리
-    // 6 + 웹툰/영상/사주/타임라인/게임)는 무게를 낮춘다(사용자 확인).
+    // tier:'core' — 시선이 빠지면서 유일한 core 탭이 없어졌는데, 카테고리
+    // 6개가 이제 사실상 1차 콘텐츠 내비게이션이라 core로 승격했다(사용자가
+    // 명시로 요청한 건 아니지만, core 탭이 하나도 없는 상태보다 자연스럽다
+    // — 시선처럼 다시 이상하면 되돌리기 쉬운 판단).
     ...ECON_CATEGORIES.map((c) => ({
       key: c.slug as HeaderTabKey,
       label: c.label,
       href: `/${c.slug}`,
       active: active === c.slug,
-      tier: 'extra' as const,
+      tier: 'core' as const,
     })),
     // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
     // 앞으로 당김(사용자 확인) — "오락성들보다도 뒤에 있으면 안 된다".

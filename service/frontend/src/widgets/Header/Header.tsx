@@ -414,14 +414,20 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
                 SmartSearchOverlay가 뜬다 — "펼쳐지는" 지점이 인라인 입력창이
                 아니라 오버레이로 옮겨갔을 뿐, 기능 손실은 없다. title로 용도
                 힌트는 유지. */}
+            {/* 아이콘을 별(AI 신호)에서 돋보기로 교체(2026-08-17, 사용자 피드백
+                — "검색 돋보기가 낫지 않으려나요") — 아이콘만 보고는 별 모양이
+                뭘 누르는 건지 더 헷갈린다는 지적, 돋보기가 훨씬 직관적. 다만
+                이게 실제로는 검색이 아니라 AI 챗봇이라는 신호는 violet 색으로만
+                남긴다. */}
             <button
               onClick={onSearch}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
               aria-label="이슈에 대해 물어보세요"
               title="이슈에 대해 물어보세요 (⌘K)"
             >
-              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
-                <path className="text-violet-500" d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" />
+              <svg className="w-[18px] h-[18px] text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="7" />
+                <path strokeLinecap="round" d="M21 21l-4.3-4.3" />
               </svg>
             </button>
             {/* '둘러보기'(서비스 소개) 상시 링크 제거(2026-08-06) — 레퍼런스 7곳
