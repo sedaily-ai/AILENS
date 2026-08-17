@@ -12,6 +12,7 @@ import {
   parseLensView,
   pickLensPhoto,
 } from '@/shared/constants/lensPerspectives';
+import { HomeSideBar } from '@/features/news-feed';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -171,6 +172,17 @@ export function LensViewClient({
         }
       `}</style>
 
+      {/* 우측 사이드바(2026-08-17, 사용자 확인: "홈페이지와 동일 — 인기글+사주")
+          — 홈(NewsFeedTab.tsx)과 같은 HomeSideBar를 재사용. 이 페이지는
+          원래 .lw(880px) 하나만 중앙 정렬하는 단일 컬럼이었는데("양옆이
+          허전하다"는 피드백), 그 .lw 블록들을 감싸는 그리드를 새로 씌워
+          왼쪽 칸(본문)+오른쪽 칸(사이드바) 2열로 바꿨다. .lw 자체는
+          이 파일 곳곳에서 그대로 재사용되므로 손 안 댔다 — 이제 왼쪽 칸
+          (본문 폭, sidebar 없을 때보다 좁음) 안에서 여전히 margin:0 auto로
+          중앙 정렬된다. lg 미만에서는 사이드바가 아예 안 뜬다. */}
+      <div className="mx-auto" style={{ maxWidth: 1320, padding: '0 clamp(20px, 4vw, 28px)' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
+          <div style={{ gridColumn: 1, minWidth: 0 }}>
       <div className="lw" style={{ paddingTop: 'clamp(12px, 2.4vw, 18px)' }}>
         <Link href="/lens" className="back" aria-label="시선 목록으로">
           ◀ 시선
@@ -570,6 +582,11 @@ export function LensViewClient({
         </div>
         </div>
       </main>
+          </div>
+
+          <HomeSideBar className="hidden lg:block" />
+        </div>
+      </div>
     </div>
   );
 }
