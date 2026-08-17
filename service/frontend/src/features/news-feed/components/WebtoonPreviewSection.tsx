@@ -3,7 +3,7 @@
 import { useEffect, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { WebtoonWindIllustration } from './icons/HandDrawnIcons';
+import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
 
 // 홈 상단의 슬림 텍스트 배너로는 "실제 콘텐츠"처럼 안 느껴진다는 피드백

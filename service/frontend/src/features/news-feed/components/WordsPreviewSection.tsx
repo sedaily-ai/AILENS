@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { GoodJobStampIcon } from './icons/HandDrawnIcons';
+import { GoodJobStampIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchFollowingWordTerms, type Term } from '../lib/wordsTerms';
 import { fetchActiveQuizzes, postQuizAttempt, type TodayQuiz } from '@/shared/lib/quizApi';
 

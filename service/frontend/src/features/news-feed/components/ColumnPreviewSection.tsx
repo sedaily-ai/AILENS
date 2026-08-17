@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LightbulbIcon, CoinJarIcon, HouseSunIcon } from './icons/HandDrawnIcons';
+import { LightbulbIcon, CoinJarIcon, HouseSunIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchSectionCards, type CmsSectionCard } from '@/shared/lib/cmsPostsApi';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 

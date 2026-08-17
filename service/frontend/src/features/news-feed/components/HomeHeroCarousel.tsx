@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { StyleBenchIllustration } from './StyleBenchIllustration';
-import { WebtoonWindIllustration } from './icons/HandDrawnIcons';
+import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
 
 // "About 배너처럼 존재감 있게" → "점박이(캐러셀 도트) 있어야 배너답다, 3개
 // 정도 두고 웹툰·사주도 소개하자"는 요청(2026-08-06)으로, 단일

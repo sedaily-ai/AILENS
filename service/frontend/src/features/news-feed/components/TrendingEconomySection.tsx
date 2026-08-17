@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { StockBullIcon, CoinExchangeIcon, ServerRobotIcon, PiggyBankIcon } from './icons/HandDrawnIcons';
+import { StockBullIcon, CoinExchangeIcon, ServerRobotIcon, PiggyBankIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchSectionCards, type CmsSectionCard } from '@/shared/lib/cmsPostsApi';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 

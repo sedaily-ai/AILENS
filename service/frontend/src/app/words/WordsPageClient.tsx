@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { LightbulbIcon } from '@/features/news-feed/components/icons/HandDrawnIcons';
+import { LightbulbIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import type { Term } from './words';
 
 // 2026-08-09 — 행마다 무의미하게 순환하던 무지개색 왼쪽 테두리를 걷어내고,

@@ -2,13 +2,13 @@
 
 // 콘텐츠 타입별 전용 페이지(레터/트렌드/칼럼/영상/전체) 공통 리스트 렌더러 —
 // 2026-08-11, /letters 안에 있던 카드 렌더링을 4개 라우트가 같이 쓸 수 있게
-// 분리. 아이콘만 features/news-feed/icons에서 그대로 가져온다(shared는
-// features를 못 부르는 게 원칙이지만, 아이콘을 여기 복제하면 원본이 바뀔 때
-// 슬쩍 어긋날 수 있어 단일 출처를 그대로 참조하는 쪽을 택했다 — boundaries
-// 규칙은 warn이라 빌드는 안 막힌다).
+// 분리. 아이콘은 원래 features/news-feed/components/icons에 있어서 shared가
+// features를 부르는 역방향 의존이었다(단일 출처 유지를 위해 의도적으로
+// 감수한 트레이드오프였음) — 2026-08 리팩토링에서 HandDrawnIcons 자체를
+// shared/ui/icons로 승격해 레이어링 위반과 복제 위험을 동시에 해소했다.
 import Link from 'next/link';
 import Image from 'next/image';
-import { LetterMailIcon, StockBullIcon, LightbulbIcon } from '@/features/news-feed/components/icons/HandDrawnIcons';
+import { LetterMailIcon, StockBullIcon, LightbulbIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import type { ArchiveItem } from '@/shared/lib/archiveItems';
 
 function VideoPlayIcon({ accent, className }: { accent: string; className?: string }) {
