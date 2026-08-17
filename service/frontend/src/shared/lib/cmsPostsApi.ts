@@ -244,6 +244,8 @@ export interface CmsLens {
   photo_image_url?: string | null;
   /** 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO 감사). */
   source_url: string | null;
+  /** 마지막 수정 시각(ISO, 2026-08-18 공개 API에 추가) — JSON-LD dateModified용. */
+  updated_at?: string | null;
   lenses: CmsLensItem[];
   is_cms: true;
 }

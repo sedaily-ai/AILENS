@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/buildPageTitle';
+import { clampModifiedIso } from '@/shared/lib/date';
 import { LensViewClient } from './LensViewClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
@@ -119,7 +120,7 @@ function buildJsonLd(lens: CmsLens, slug: string) {
         articleSection: '경제',
         wordCount: bodyJoined.length,
         datePublished: published,
-        dateModified: published,
+        dateModified: clampModifiedIso(lens.updated_at, published),
         inLanguage: 'ko-KR',
         author: {
           '@type': 'Organization',

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ApiLetter } from '@/shared/lib/todayLettersApi';
 import { withDisplayMeta } from '@/shared/lib/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/buildPageTitle';
+import { clampModifiedIso } from '@/shared/lib/date';
 import { LetterDetailClient } from './LetterDetailClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
@@ -204,7 +205,7 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
         wordCount: bodyJoined.length,
         keywords: letterKeywords.join(', '),
         datePublished: published,
-        dateModified: published,
+        dateModified: clampModifiedIso(letter.updated_at, published),
         inLanguage: 'ko-KR',
         // ed.name('AI LENS')은 개인이 아니라 팀이라 Person이 아니라
         // Organization으로 표시한다(GEO 감사 2026-08-11 — Person 타입에

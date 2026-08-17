@@ -63,6 +63,12 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # 는 호출자가 이미 date 를 알고 있어 안 쓰지만, 채널 조회는 여러 날짜가
         # 섞여 나오므로 각 글에 날짜가 실려 있어야 한다.
         "publish_date": post.get("publish_date"),
+        # 마지막 수정 시각(2026-08-18, GEO 점검 — en.sedaily.com 대비
+        # dateModified가 항상 datePublished와 같은 값이던 문제) — DDB
+        # item엔 admin repo가 생성·수정마다 이미 채워온 필드가 있었다
+        # (admin/backend/repo/posts_repo.py create()/update() 참조), 공개
+        # 응답에만 안 실려 있었을 뿐이라 그대로 통과시킨다.
+        "updated_at": post.get("updated_at"),
         "body": _body_paragraphs(post),
         # Tiptap 리치텍스트 결과 — 있으면 프론트가 body[] 대신 이걸 렌더한다
         # (admin PostForm 이 "post" 모드에서 이 필드만 채운다. AI 레터는 없음).
@@ -177,6 +183,7 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         "headline": post.get("headline") or "",
         "context": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
+        "updated_at": post.get("updated_at"),
         "cover_image_url": post.get("cover_image_url") or None,
         # 텍스트가 없는 순수 기사 사진(2026-08-14 신설). cover_image_url 은
         # 인스타 카드뉴스용 완성형 그래픽(1080x1350)이라 헤드라인·날짜·"lens"
@@ -246,7 +253,13 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
         date = qs.get("date")
         try:
-            limit = max(1, min(int(qs.get("limit", 20)), 100))
+            # 100 → 1000(2026-08-18, GEO 점검 — sitemap이 발행 14일 지난
+            # 레터를 전부 잃는 문제의 원인). list_published_posts()는 limit과
+            # 무관하게 DynamoDB status-publish_date-index를 항상 끝까지
+            # 페이지네이션해서 다 읽은 뒤 마지막에만 슬라이스하므로(clients/
+            # cms_posts_ddb_client.py 참조), 이 상한을 올려도 DB 읽기 비용은
+            # 그대로다 — 응답 payload 크기만 커진다.
+            limit = max(1, min(int(qs.get("limit", 20)), 1000))
         except (TypeError, ValueError):
             limit = 20
         rows = posts_client.list_published_posts(channel, date, limit=limit)

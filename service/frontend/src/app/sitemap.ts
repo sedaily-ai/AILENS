@@ -1,58 +1,23 @@
 import type { MetadataRoute } from 'next';
-import { fetchWebtoons, fetchVideos, fetchLensPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
 import { kstTodayStr } from '@/shared/lib/date';
 import { GAMES } from './games/play/[slug]/page';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
-// 무캐시(2026-08-09) — posts:letters 태그 캐시를 쓰다가, revalidateTag(tag,
-// 'max')가 실제로는 "30일 캐시 프로파일 재고정"이라는 걸 확인하고 뺐다
-// (cmsPostsApi.ts 상단 주석 참조).
 
 const BASE = 'https://ailens.sedaily.ai';
 
-// mock 제거(2026-07-24) 후 최근 발행 레터를 API 에서 가져온다. 최근 SEED_DAYS
-// 일로 조회 범위를 제한(sitemap 크기·응답시간 관리 목적). API 불통이면 레터
-// URL 생략.
-const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
-const SEED_DAYS = 14;
-
-// 단일 명의(AI LENS) 체계(2026-08-07) 이후 letter id 는 `{group}-{date}` 가 아니라
-// API가 주는 letter.id 그대로다 — 날짜를 id에서 역산할 수 없으니 조회한 시점의
-// iso 날짜를 같이 들고 다닌다.
-interface SeedLetter {
-  id: string;
-  date: string;
-}
-
-// today-letters(구 AI 파이프라인)는 2026-08-04 RDS 삭제로 영구히 빈 응답만
-// 반환한다 — CMS posts API(channel=letters)로 교체(2026-08-07,
-// letters/[id]/page.tsx와 동일 원인·동일 수정). "이슈 톡톡"은 letters 채널의
-// 분류(section)일 뿐이라(2026-08-12, 재작업) 별도 채널 조회가 필요 없다.
-async function fetchLettersRecent(days: number): Promise<SeedLetter[]> {
-  const seen = new Set<string>();
-  const out: SeedLetter[] = [];
-  const t = new Date();
-  for (let i = 0; i < days; i += 1) {
-    const d = new Date(t);
-    d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0, 10);
-    try {
-      const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${iso}`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) continue;
-      const data = (await res.json()) as { posts?: Array<{ id: string }> };
-      for (const l of data.posts ?? []) {
-        if (!l.id || seen.has(l.id)) continue;
-        seen.add(l.id);
-        out.push({ id: l.id, date: iso });
-      }
-    } catch {
-      /* 이 날짜 skip */
-    }
-  }
-  return out;
-}
+// 예전엔 최근 14일(SEED_DAYS)만 date=YYYY-MM-DD로 하루씩 14번 조회해서 그
+// 이전에 발행된 레터는 사이트맵에서 통째로 빠졌다(2026-08-18, GEO 점검 —
+// en.sedaily.com은 월별 sitemap을 계속 이어붙여 발행분이 영원히 안 빠지는데
+// 저희만 14일 지나면 사라짐을 확인). date를 안 주면 백엔드가 전체 발행
+// 이력을 최신순으로 정렬해 돌려주므로(cms_posts_ddb_client.py — limit과
+// 무관하게 항상 전체를 읽은 뒤 마지막에만 자른다) 하루씩 훑을 필요가 아예
+// 없다 — 한 번의 요청으로 교체. limit 상한도 2026-08-18에 100→1000으로
+// 올렸다(handlers/cms_posts_public.py).
+// fetchCmsPosts()의 캐시(태그 기반, admin 발행 시 즉시 무효화 + 5분 안전망
+// — cmsPostsApi.ts 참조)로 충분해서 여기 전용 no-store 우회는 더 안 쓴다.
+const LETTERS_FETCH_LIMIT = 1000;
 
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 // lastModified는 각 라우트 파일의 최근 git 커밋 날짜(2026-08-11 GEO 감사에서
@@ -144,16 +109,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  // 레터 상세 — 최근 SEED_DAYS 일의 라이브 발행 레터 (빌드타임 fetch).
-  const letters = await fetchLettersRecent(SEED_DAYS);
+  // 레터 상세 — 전체 발행 이력(2026-08-18부터 14일 제한 없음, 위 주석 참조).
+  const letters = await fetchCmsPosts('letters', undefined, LETTERS_FETCH_LIMIT);
 
-  for (const { id, date } of letters) {
-    const daysOld = daysBetween(date);
+  for (const letter of letters) {
+    if (!letter.id || !letter.publish_date) continue;
+    const daysOld = daysBetween(letter.publish_date);
+    // updated_at이 있으면(=admin이 발행 후 수정한 적 있으면) 그걸,
+    // 없으면 발행일을 lastModified로 — "발행 후 절대 안 바뀐다"는 가정을
+    // 안 하게 됐다(admin이 실제로 발행 후 수정 가능, posts_repo.py 참조).
+    const lastModifiedIso = letter.updated_at || `${letter.publish_date}T07:00:00+09:00`;
     entries.push({
-      url: `${BASE}/letters/${id}`,
-      // 발행일 = lastModified. 레터는 발행 후 수정 안 함.
-      lastModified: new Date(date + 'T07:00:00+09:00'),
-      // 기사는 발행 후 변하지 않음 — AI 크롤러에 명확히 시그널
+      url: `${BASE}/letters/${letter.id}`,
+      lastModified: new Date(lastModifiedIso),
       changeFrequency: 'never',
       priority: freshnessPriority(daysOld),
     });

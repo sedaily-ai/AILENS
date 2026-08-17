@@ -65,6 +65,11 @@ export interface ApiLetter {
   // section 이 trend/column 일 때 홈 카드 상단 라벨(예: "증시", "투자 인사이트").
   // admin PostForm이 지정하지 않으면 null — 호출측이 editor_id 등으로 폴백.
   category?: string | null;
+  // 마지막 수정 시각(ISO, 2026-08-18 공개 API에 추가) — JSON-LD dateModified가
+  // 항상 datePublished와 같은 값이던 문제를 고치려고 노출. admin이 글을
+  // 만들 때부터 항상 채워지는 필드라(admin/backend/repo/posts_repo.py) CMS
+  // 글이면 사실상 항상 존재한다.
+  updated_at?: string | null;
 }
 
 export interface ApiTodayLettersResponse {
