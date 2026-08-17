@@ -33,7 +33,11 @@ except ImportError:
 
 from config import settings  # noqa: E402  (.env 로드 이후여야 함)
 from clients.s3_xml_client import S3XMLClient  # noqa: E402
-from handlers.time_machine_handler import get_time_machine_data  # noqa: E402
+from handlers.time_machine_handler import (  # noqa: E402
+    BadRequest as TimeMachineBadRequest,
+    get_time_machine_data,
+    _validate_date as validate_time_machine_date,
+)
 from handlers.timeline_handler import lambda_handler as timeline_lambda_handler  # noqa: E402
 from services.chatbot_engine import (  # noqa: E402
     generate_chat_response, generate_chat_response_stream,
@@ -146,11 +150,16 @@ async def chat_stream(request: Request):
 
 @app.get("/time-machine")
 async def time_machine(date: str):
-    """타임머신 날짜별 뉴스 크롤링 엔드포인트"""
-    result = get_time_machine_data(date, region=settings.region)
-    if "error" in result:
-        return JSONResponse(status_code=400, content=result)
-    return result
+    """빅카인즈 issue_ranking 기반 "그날의 이슈" 엔드포인트."""
+    try:
+        normalized = validate_time_machine_date(date)
+    except TimeMachineBadRequest as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+    try:
+        return get_time_machine_data(normalized)
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"error": f"빅카인즈 데이터를 가져오지 못했습니다: {e}"})
 
 
 # ── /api/timeline — S3 XML(서울경제 원본 피드) 기반 타임라인 ─────────────────
