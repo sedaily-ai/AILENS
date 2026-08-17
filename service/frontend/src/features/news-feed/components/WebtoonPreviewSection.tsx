@@ -90,8 +90,21 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
   const cards = [...items, ...mockFillers].slice(0, 4);
   const hasMock = mockFillers.length > 0;
 
+  // 주변 흰 배경 섹션들과 구분되는 "하이라이트 밴드"로 감쌌다(2026-08-17,
+  // 사용자 피드백: 퍼블리 "프리미엄 아티클" 섹션처럼 배경색 있는 카드로
+  // 구획을 나눠달라는 참고 스크린샷 — "이렇게 섹션 구분해보시죠"). 색은
+  // WordsPreviewSection의 단어 퀴즈 카드와 같은 크림(#fef3d7)을 써서 홈에서
+  // "재미 콘텐츠"로 묶이는 두 섹션(웹툰·단어퀴즈)이 같은 톤을 공유하게 했다.
   return (
-    <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 clamp(28px, 4vw, 40px)' }}>
+    <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
+      <div
+        style={{
+          borderRadius: 20,
+          background: '#fef3d7',
+          boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
+          padding: 'clamp(20px, 3.5vw, 28px)',
+        }}
+      >
       <header style={{ marginBottom: 18 }}>
         <span
           className="inline-flex items-center"
@@ -261,6 +274,7 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
             </Link>
           );
         })}
+      </div>
       </div>
     </section>
   );
