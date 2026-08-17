@@ -65,7 +65,7 @@ export function TimelineBigkindsView({
   };
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 56px)', background: '#faf8f3' }}>
+    <div style={{ minHeight: '100vh', background: '#faf8f3' }}>
       <style>{`
         @keyframes tmPaper { from { opacity:0; transform: translateY(20px) scale(.985);} to {opacity:1; transform:none;} }
         @keyframes tmExpand { from { opacity:0; transform: translateY(-4px);} to {opacity:1; transform:none;} }

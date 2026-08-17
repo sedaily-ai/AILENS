@@ -51,7 +51,7 @@ export function NewsTimeMachine() {
   }, []);
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 56px)', background: '#faf8f3' }}>
+    <div style={{ minHeight: '100vh', background: '#faf8f3' }}>
       <style>{`
         @keyframes tmRise { from { opacity:0; transform: translateY(14px);} to {opacity:1; transform:none;} }
       `}</style>
