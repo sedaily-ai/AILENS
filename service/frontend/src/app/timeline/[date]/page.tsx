@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ARCHIVE_MIN_DATE, fetchBigkindsArticles, fetchDayArticles, kdate } from '@/features/timeline';
+import { ARCHIVE_MIN_DATE, fetchBigkindsDay, fetchDayArticles, kdate } from '@/features/timeline';
 import { TimelineDayClient } from './TimelineDayClient';
 
 // 날짜별 고유 URL(2026-08-12, GEO 감사) — 예전엔 /timeline이 입력창 하나만
@@ -35,7 +35,7 @@ export async function generateMetadata({
 
   const indexable = isRecent
     ? (await fetchDayArticles(date)).list.length > 0
-    : (await fetchBigkindsArticles(date)).length > 0;
+    : (await fetchBigkindsDay(date)).articles.length > 0;
 
   return {
     title,
@@ -107,7 +107,7 @@ export default async function TimelineDayPage({
   if (!DATE_RE.test(date)) notFound();
 
   if (date < ARCHIVE_MIN_DATE) {
-    const articles = await fetchBigkindsArticles(date);
+    const { articles, investments } = await fetchBigkindsDay(date);
     const jsonLd = buildJsonLd(date, articles);
     return (
       <>
@@ -115,7 +115,7 @@ export default async function TimelineDayPage({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <TimelineDayClient date={date} initialBigkindsArticles={articles} />
+        <TimelineDayClient date={date} initialBigkindsArticles={articles} initialInvestments={investments} />
       </>
     );
   }

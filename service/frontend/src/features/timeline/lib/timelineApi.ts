@@ -66,18 +66,43 @@ export interface BigKindsArticle {
 }
 
 /**
+ * "그날 이걸 샀다면" 카드 — handlers/config/investment_scenarios.py가 실제
+ * 조사한 코스피·비트코인·로또·커피값 시계열로 그 자리에서 계산해 돌려준다
+ * (외부 API 호출 없는 순수 계산이라 캐시와 무관하게 매번 최신). 데이터가
+ * 없는 구간(예: 1994년 이전 코스피)은 그 카드 자체가 배열에서 빠진다 —
+ * 추정치로 채우지 않는다.
+ */
+export interface InvestmentScenario {
+  id: string;
+  emoji: string;
+  label: string;
+  description: string;
+  result: string;
+  story: string | null;
+  source_label: string;
+}
+
+interface BigKindsDayData {
+  articles: BigKindsArticle[];
+  investments: InvestmentScenario[];
+}
+
+/**
  * 2026-02-01 이전 날짜의 "그날의 서울경제" — handlers/time_machine_handler.py가
  * SSM에 보관된 키로 빅카인즈 뉴스 검색(날짜 범위 + provider=서울경제)을 직접
  * 호출해 돌려준다(1990-01-01~). 발행 "시각"은 이 API가 안 줘서 항상 비어있다.
  */
-export async function fetchBigkindsArticles(target: string): Promise<BigKindsArticle[]> {
+export async function fetchBigkindsDay(target: string): Promise<BigKindsDayData> {
   try {
     const res = await fetch(`${API_URL}/time-machine?date=${target}`, { cache: 'no-store' });
-    if (!res.ok) return [];
+    if (!res.ok) return { articles: [], investments: [] };
     const data = await res.json();
-    return Array.isArray(data?.articles) ? data.articles : [];
+    return {
+      articles: Array.isArray(data?.articles) ? data.articles : [],
+      investments: Array.isArray(data?.investments) ? data.investments : [],
+    };
   } catch {
-    return [];
+    return { articles: [], investments: [] };
   }
 }
 

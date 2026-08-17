@@ -1,3 +1,5 @@
+'use client';
+
 // 2026-02-01 이전 날짜의 "펼치기" 결과 화면 — S3 지면 아카이브가 없는 구간이라
 // TimelineResultView(발행 시각 있는 최근 지면 전용)를 그대로 못 쓴다. 빅카인즈
 // 뉴스 검색(날짜 범위 + provider=서울경제)으로 제목·본문 스니펫·바이라인·원본
@@ -7,20 +9,52 @@
 // 발행 "시각"은 이 API가 어느 시대 기사든 항상 자정 고정이라 안 줘서, 시간 대신
 // 순번(01, 02...)으로 표시한다 — TimelineResultView의 ArticleList와 같은 패턴.
 //
-// 상위 5건만 보여준다(2026-08-17 피드백: "30개를 다 보여주면 좀 아까울듯요") —
-// 본문 스니펫은 빅카인즈 API 자체가 200자로 제한해서 주는 값이라(전체 본문은
-// 이 API로 원천적으로 불가능) 자르지 않고 그대로 다 보여준다.
+// 화면 설계(2026-08-17, 실사용 피드백 반영):
+// - 착지 직후엔 헤드라인(제목+카테고리+기자명)만 훑을 수 있게 — 점진적 노출.
+//   본문은 그대로 다 보여주면 정보량이 너무 많아서, 행으로 클릭해야 펼쳐지는
+//   아코디언으로 바꿨다(여러 개 동시에 펼쳐도 됨 — 신문 여러 기사 펼쳐놓고
+//   보는 느낌).
+// - 상위 5건만 보여준다("30개를 다 보여주면 좀 아까울듯요" 피드백).
+// - 본문 미리보기는 백엔드가 150자로 다듬어서 내려준다(서명·입력시각 꼬리 정리
+//   포함, config/investment_scenarios.py의 이웃 로직 아님 — time_machine_handler.py
+//   쪽 _clean_content_preview 참조).
+// - "그날 이걸 샀다면"(코스피/비트코인/로또/커피) 카드는 뉴스(팩트)와 성격이
+//   달라 별도 섹션(InvestmentScenarioCards, 크림톤 배경)으로 뒤에 배치.
+import { useState } from 'react';
 import Link from 'next/link';
-import type { BigKindsArticle } from '../lib/timelineApi';
+import type { BigKindsArticle, InvestmentScenario } from '../lib/timelineApi';
 import { kdate } from '../lib/timelineApi';
+import { InvestmentScenarioCards } from './InvestmentScenarioCards';
 
 const MAX_SHOWN = 5;
 
-export function TimelineBigkindsView({ date, articles }: { date: string; articles: BigKindsArticle[] }) {
+export function TimelineBigkindsView({
+  date,
+  articles,
+  investments,
+}: {
+  date: string;
+  articles: BigKindsArticle[];
+  investments: InvestmentScenario[];
+}) {
   const shown = articles.slice(0, MAX_SHOWN);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggle = (key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   return (
     <div style={{ minHeight: 'calc(100vh - 56px)', background: '#faf8f3' }}>
-      <style>{`@keyframes tmPaper { from { opacity:0; transform: translateY(20px) scale(.985);} to {opacity:1; transform:none;} }`}</style>
+      <style>{`
+        @keyframes tmPaper { from { opacity:0; transform: translateY(20px) scale(.985);} to {opacity:1; transform:none;} }
+        @keyframes tmExpand { from { opacity:0; transform: translateY(-4px);} to {opacity:1; transform:none;} }
+      `}</style>
       <div style={{ maxWidth: 760, margin: '0 auto', padding: 'clamp(40px, 8vw, 88px) clamp(20px, 5vw, 32px)' }}>
         <div style={{ animation: 'tmPaper .5s ease' }}>
           <div style={{ textAlign: 'center', borderBottom: '2px solid #2a2622', paddingBottom: 16, marginBottom: 12 }}>
@@ -60,60 +94,88 @@ export function TimelineBigkindsView({ date, articles }: { date: string; article
             </div>
           ) : (
             <>
+              <p style={{ fontSize: 11.5, color: '#a8a29e', textAlign: 'center', marginBottom: 4 }}>
+                제목을 누르면 본문 미리보기가 펼쳐져요
+              </p>
               <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {shown.map((a, i) => {
-                  const row = (
-                    <>
-                      <span
+                  const key = a.news_id || `${i}`;
+                  const isOpen = expanded.has(key);
+                  return (
+                    <li key={key} style={{ borderTop: i === 0 ? 'none' : '1px solid #ece6d9' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(key)}
+                        aria-expanded={isOpen}
                         style={{
-                          fontFamily: '"Noto Serif KR", serif', fontSize: 15, fontWeight: 700,
-                          color: '#c4b48f', minWidth: 26, fontVariantNumeric: 'tabular-nums',
+                          display: 'flex', width: '100%', gap: 16, padding: '18px 4px',
+                          background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', alignItems: 'baseline',
                         }}
                       >
-                        {String(i + 1).padStart(2, '0')}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {a.category && (
-                          <p style={{ fontSize: 11, color: '#b08d57', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 5 }}>
-                            {a.category}
-                          </p>
-                        )}
-                        <p
+                        <span
                           style={{
-                            fontFamily: '"Noto Serif KR", serif',
-                            fontSize: 'clamp(16px, 3.4vw, 18px)',
-                            fontWeight: 600,
-                            color: '#2a2622',
-                            lineHeight: 1.5,
-                            letterSpacing: '-0.015em',
-                            marginBottom: 6,
+                            fontFamily: '"Noto Serif KR", serif', fontSize: 15, fontWeight: 700,
+                            color: '#c4b48f', minWidth: 26, fontVariantNumeric: 'tabular-nums',
                           }}
                         >
-                          {a.title}
-                        </p>
-                        {a.content && (
-                          <p style={{ fontSize: 13.5, color: '#6b6459', lineHeight: 1.65, marginBottom: 4, whiteSpace: 'pre-line' }}>
-                            {a.content}
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {a.category && (
+                            <p style={{ fontSize: 11, color: '#b08d57', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 5 }}>
+                              {a.category}
+                            </p>
+                          )}
+                          <p
+                            style={{
+                              fontFamily: '"Noto Serif KR", serif',
+                              fontSize: 'clamp(16px, 3.4vw, 18px)',
+                              fontWeight: 600,
+                              color: '#2a2622',
+                              lineHeight: 1.5,
+                              letterSpacing: '-0.015em',
+                            }}
+                          >
+                            {a.title}
                           </p>
-                        )}
-                        {a.byline && (
-                          <p style={{ fontSize: 11.5, color: '#a8a29e' }}>{a.byline} 기자</p>
-                        )}
-                      </div>
-                    </>
-                  );
-                  const rowStyle = { display: 'flex', gap: 16, padding: '18px 4px', textDecoration: 'none', color: 'inherit', alignItems: 'baseline' as const };
-                  return (
-                    <li key={a.news_id || `${i}`} style={{ borderTop: i === 0 ? 'none' : '1px solid #ece6d9' }}>
-                      {a.original_link ? (
-                        <a href={a.original_link} target="_blank" rel="noreferrer" style={rowStyle}>{row}</a>
-                      ) : (
-                        <div style={rowStyle}>{row}</div>
+                          {a.byline && !isOpen && (
+                            <p style={{ fontSize: 11.5, color: '#a8a29e', marginTop: 4 }}>{a.byline} 기자</p>
+                          )}
+                        </div>
+                        <span aria-hidden style={{ fontSize: 13, color: '#c4b48f', flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }}>
+                          ▾
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div style={{ padding: '0 4px 18px 42px', animation: 'tmExpand .2s ease' }}>
+                          {a.content && (
+                            <p style={{ fontSize: 13.5, color: '#6b6459', lineHeight: 1.65, marginBottom: 8 }}>
+                              {a.content}
+                            </p>
+                          )}
+                          <div className="flex items-center" style={{ gap: 12, flexWrap: 'wrap' }}>
+                            {a.byline && (
+                              <span style={{ fontSize: 11.5, color: '#a8a29e' }}>{a.byline} 기자</span>
+                            )}
+                            {a.original_link && (
+                              <a
+                                href={a.original_link}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ fontSize: 12, fontWeight: 700, color: '#8a6d3f', textDecoration: 'none' }}
+                              >
+                                원문 보기 →
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </li>
                   );
                 })}
               </ol>
+
+              <InvestmentScenarioCards scenarios={investments} />
 
               <div style={{ textAlign: 'center', marginTop: 36 }}>
                 <Link
