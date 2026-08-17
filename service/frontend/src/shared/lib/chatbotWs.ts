@@ -12,7 +12,7 @@
  *
  * 한 번에 한 turn 만 보냄. 다음 turn 보낼 때는 같은 연결 재사용.
  */
-import { WS_URL } from '@/shared/config/api';
+import { WS_URL } from '@/shared/config/apiClient';
 
 export type WsChatEvent =
   | { type: 'ai_start'; timestamp: string }

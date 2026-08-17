@@ -7,7 +7,7 @@
  * 실패해도 throw 하지 않는다 — 이 API 가 죽어도 기존 레터는 그대로 보여야 한다
  * (spec §8 fail-open). 호출부는 빈 배열만 다루면 된다.
  */
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 import type { ApiLetter } from './todayLettersApi';
 import { letterHref } from './letterHref';
 

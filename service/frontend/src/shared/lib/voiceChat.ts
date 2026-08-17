@@ -15,7 +15,7 @@
  * 3) 핸즈프리 — onresult 의 final 결과를 받자마자 자동 send + onaudioend 시
  *    다시 recognition 시작. 사용자가 종료 누르기 전까지 자동 루프.
  */
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 import { TranscribeStreamRecognizer } from '@/shared/lib/transcribeStream';
 
 // Web Speech API — webkit prefix 호환을 위해 동적으로 가져옴.

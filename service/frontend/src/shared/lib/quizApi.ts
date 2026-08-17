@@ -5,7 +5,7 @@
 // 2026-08-09 — 발행일이 오늘과 정확히 일치하는 것 하나만 내려주던 걸,
 // "여러 개를 동시에 노출하고 싶다, 발행/내리기가 곧 노출 체크박스"
 // 요청으로 바꿨다 — 발행된 것 전부(최대 4개)를 배열로 받는다.
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 
 export interface TodayQuiz {
   id: string;

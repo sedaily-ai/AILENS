@@ -5,7 +5,7 @@
  * and presigned S3 URL playback.
  */
 
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/authFetch';
 
 export interface PodcastInfo {

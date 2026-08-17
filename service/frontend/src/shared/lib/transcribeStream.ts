@@ -15,7 +15,7 @@
  *
  * 한 인스턴스 = 한 마이크 세션. 반복 사용 시 새 인스턴스.
  */
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 import { AudioCapture } from '@/shared/lib/audioCapture';
 import {
   encodeAudioEvent,

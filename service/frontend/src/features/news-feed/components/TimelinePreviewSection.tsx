@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 import { kstTodayStr } from '@/shared/lib/date';
 
 // 타임라인 홈 티저(2026-08-07) — 최상단(단어 퀴즈 위) 배치.

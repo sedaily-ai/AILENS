@@ -14,7 +14,7 @@ import {
 } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 import { authConfig } from '@/shared/config/auth';
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/authFetch';
 
 // Configure Amplify

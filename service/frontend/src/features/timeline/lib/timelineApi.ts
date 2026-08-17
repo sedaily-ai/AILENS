@@ -4,7 +4,7 @@
 // "날짜별 고유 URL이 있어야 검색엔진이 하루하루를 색인할 수 있다"는 GEO
 // 감사 결론 — 서버 컴포넌트에서도 같은 fetch 로직을 재사용해야 해서 순수
 // 함수·타입만 여기로 뺐다, letters의 archiveItems.ts와 같은 이유).
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 export { kstTodayStr } from '@/shared/lib/date';
 
 export interface Article {

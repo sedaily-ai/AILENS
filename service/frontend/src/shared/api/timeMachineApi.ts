@@ -1,4 +1,4 @@
-import { API_URL } from "@/shared/config/api";
+import { API_URL } from "@/shared/config/apiClient";
 import type { DayNews, HistoricalEvent, TimeMachineData } from "@/shared/types/timeMachine";
 
 // ─── Fallback dummy data (API 연동 전까지 사용) ───────────────────────────────

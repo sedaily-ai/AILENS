@@ -5,7 +5,7 @@
  * admin/frontend home-player 화면, shaping: service/backend/handlers/
  * cms_posts_public.py::_shape_home_player_item).
  */
-import { API_URL } from '@/shared/config/api';
+import { API_URL } from '@/shared/config/apiClient';
 
 export interface HomePlayerItem {
   id: string;
