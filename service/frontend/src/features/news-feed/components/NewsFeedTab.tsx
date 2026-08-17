@@ -25,6 +25,31 @@ const CATEGORY_PAIRS: readonly [string, string][] = [
   ['international', 'investing'],
 ];
 
+function CategoryPairRow({
+  pair,
+  archiveItems,
+  first,
+}: {
+  pair: readonly [string, string];
+  archiveItems: ArchiveItem[];
+  first: boolean;
+}) {
+  const [wideSlug, narrowSlug] = pair;
+  const wideCfg = ECON_CATEGORIES.find((c) => c.slug === wideSlug)!;
+  const narrowCfg = ECON_CATEGORIES.find((c) => c.slug === narrowSlug)!;
+  const wideItems = archiveItems.filter((it) => it.category === wideCfg.label);
+  const narrowItems = archiveItems.filter((it) => it.category === narrowCfg.label);
+  if (wideItems.length === 0 && narrowItems.length === 0) return null;
+  return (
+    <div style={{ borderTop: first ? 'none' : '2px solid #111827', paddingTop: first ? 0 : 32 }}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginTop: 32, marginBottom: 32 }}>
+        <CategoryFeatureSection config={wideCfg} items={wideItems} span="wide" />
+        <CategoryFeatureSection config={narrowCfg} items={narrowItems} span="narrow" />
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   selectedDate: Date;
   setSelectedDate: (date: Date) => void;
@@ -108,22 +133,12 @@ export function NewsFeedTab({
             봄) 큰 히어로+작은 리스트 조합으로 "신문 지면"처럼 배치한다
             (CategoryFeatureSection.tsx 참조). 2개씩 짝지어 2/3+1/3 한 줄에
             배치, 얇은 가로선으로 구분 — 콘텐츠 없는 카테고리는 자동으로
-            숨는다. */}
-        {CATEGORY_PAIRS.map(([wideSlug, narrowSlug], i) => {
-          const wideCfg = ECON_CATEGORIES.find((c) => c.slug === wideSlug)!;
-          const narrowCfg = ECON_CATEGORIES.find((c) => c.slug === narrowSlug)!;
-          const wideItems = archiveItems.filter((it) => it.category === wideCfg.label);
-          const narrowItems = archiveItems.filter((it) => it.category === narrowCfg.label);
-          if (wideItems.length === 0 && narrowItems.length === 0) return null;
-          return (
-            <div key={wideSlug} style={{ borderTop: i === 0 ? 'none' : '2px solid #111827', paddingTop: i === 0 ? 0 : 32 }}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginTop: 32, marginBottom: 32 }}>
-                <CategoryFeatureSection config={wideCfg} items={wideItems} span="wide" />
-                <CategoryFeatureSection config={narrowCfg} items={narrowItems} span="narrow" />
-              </div>
-            </div>
-          );
-        })}
+            숨는다.
+            첫 번째 짝(증시+부동산)만 여기서 먼저 그리고, 타임머신 섹션을
+            그 바로 아래 끼워 넣은 뒤 나머지 짝(산업+금융정책, 국제+재테크)을
+            잇는다(2026-08-17, 사용자 확인: "타임라인 이거 산업 부분 위쪽에
+            끼어 넣어주시죠"). */}
+        <CategoryPairRow pair={CATEGORY_PAIRS[0]} archiveItems={archiveItems} first />
 
         {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
             뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
@@ -131,8 +146,14 @@ export function NewsFeedTab({
             (BirthdayTimeMachineSection)이 따로 있었는데 "통합해야죠, 두
             개 다 있으면 안 됩니다"(같은 날) 피드백으로 하나로 합쳤다 —
             최근 날짜는 실시간 S3 지면, 그 이전은 빅카인즈 예시.
-            NewsTimeMachineSection.tsx 상단 주석 참조. */}
+            NewsTimeMachineSection.tsx 상단 주석 참조.
+            위치: 카테고리 섹션 첫 짝(증시+부동산) 바로 아래, 산업 짝 바로
+            위(2026-08-17, 사용자 확인). */}
         <NewsTimeMachineSection />
+
+        {CATEGORY_PAIRS.slice(1).map((pair) => (
+          <CategoryPairRow key={pair[0]} pair={pair} archiveItems={archiveItems} first={false} />
+        ))}
 
         {/* 섹션 재정렬(2026-08-06) — "단어 퀴즈는 문제 하나뿐이라 자리를
             많이 안 차지하니 가볍게 매일 훑는 습관을 만들고 싶다"는 피드백. */}
