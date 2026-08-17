@@ -93,6 +93,14 @@ cmds = [
     'pm2 list',
     \"curl -s -o /dev/null -w 'local_status=%{http_code}\n' http://localhost:3000/\",
     f'rm -f /tmp/{ts}.tar.gz',
+    # 옛 릴리스 정리(2026-08-17) — 이 스텝이 없어서 배포할 때마다 쌓이기만
+    # 하다가 72개·4GB까지 차서 루트 디스크(8GB)가 100% 꽉 찼다. 디스크가
+    # 꽉 차니 SSM 에이전트도 PM2도 자기 상태 파일을 못 써서 둘 다 멎었고,
+    # reboot/stop-start로도 안 풀렸다(디스크는 그대로 꽉 차 있으니까) —
+    # 결국 SSH로 직접 들어가 릴리스를 지워서야 풀렸다. 최신 5개만 남기고
+    # 나머지는 배포 직후 바로 정리해 재발을 막는다.
+    'ls -1 /opt/ailens/releases | sort -r | tail -n +6 | xargs -r -I{} rm -rf /opt/ailens/releases/{}',
+    'df -h / | tail -1',
 ]
 print(json.dumps({'commands': cmds}))
 ")
