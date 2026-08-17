@@ -9,8 +9,12 @@ import type { TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
 // 아예 렌더하지 않는다(NewsFeedTab.tsx에서 className="hidden lg:block").
 export function HomeSideBar({ className, initialHotLetters }: { className?: string; initialHotLetters?: TodayLetterCardLike[] }) {
   return (
-    <aside className={className} style={{ position: 'sticky', top: 88, alignSelf: 'start', display: 'flex', flexDirection: 'column', gap: 36 }}>
+    <aside className={className} style={{ position: 'sticky', top: 88, alignSelf: 'start', display: 'flex', flexDirection: 'column', gap: 28 }}>
       <HotLettersRail initialItems={initialHotLetters} />
+      {/* 성격이 다른 두 섹션(인기글 랭킹 vs 사주 미니앱)이 구분선 없이
+          바로 붙어 있으면 하나로 뭉쳐 보인다는 피드백(2026-08-17, "분리
+          같은거 하거나... 어떻게 해야하지") — 얇은 구분선 추가. */}
+      <div style={{ borderTop: '1px solid #f3f4f6' }} aria-hidden />
       <SajuMiniRail />
     </aside>
   );

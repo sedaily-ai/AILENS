@@ -136,7 +136,13 @@ export function SiteFooter() {
         marginTop: 48,
         borderTop: '1px solid #f1f3f5',
         background: '#fafbfc',
-        padding: 'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 32px) clamp(28px, 4vw, 40px)',
+        // 하단 패딩에 TodayNewsPlayer.tsx의 고정 높이(진행바 3px + 본문
+        // 60px = 63px)를 더했다(2026-08-17, 사용자 피드백: "하단 오디오
+        // 플레이백 떄문에 서울경제 all right reserved 안보여요" — 플레이어가
+        // position:fixed bottom:0이라 원래 패딩만으로는 저작권 줄이 항상
+        // 가려졌다). 플레이어가 안 뜨는 페이지에서는 그만큼 빈 여백이
+        // 남지만, 저작권 표기가 가려지는 것보다는 안전한 트레이드오프.
+        padding: 'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 32px) calc(clamp(28px, 4vw, 40px) + 64px)',
       }}
     >
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
