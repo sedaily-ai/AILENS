@@ -5,15 +5,12 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { EditorCommentsSection } from '@/features/news-feed/components/EditorCommentsSection';
-import { SideRail } from '@/features/news-feed/components/SideRail';
-import { InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed/components/InteractiveBlock';
+import { EditorCommentsSection, SideRail, InteractiveBlock, type InteractiveBlockData, LETTER_PODCASTS } from '@/features/news-feed';
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { trackArticleRead } from '@/shared/lib/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { UserMenu, useAuth } from '@/features/auth';
 import { letterPodcastUrl } from '@/shared/lib/audioPlayer';
-import { LETTER_PODCASTS } from '@/features/news-feed/data/letterPodcasts';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
 import {
