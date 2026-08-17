@@ -205,6 +205,25 @@ export function WebtoonWindIllustration({
   );
 }
 
+// 지면 아카이브(홈 "그날의 지면" — NEWS TIME MACHINE 박스, 2026-08-17) —
+// 회중시계. "그 날로 돌아간다"는 시간여행 컨셉에 맞춰 다른 캐릭터
+// 아이콘들과 달리 얼굴 없이 빈티지 오브젝트 하나로 — 크림·세리프·먹색
+// 톤의 옛 신문 박스에 캐릭터가 섞이면 톤이 흐트러진다고 판단.
+export function PocketWatchIcon({ accent, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 96 96" fill="none" className={className}>
+      <path d="M48 10 L48 17" stroke="#1a1a1a" strokeWidth={3} strokeLinecap="round" />
+      <circle cx="48" cy="8" r="4.2" stroke="#1a1a1a" strokeWidth={2.4} />
+      <circle cx="48" cy="53" r="30" stroke="#1a1a1a" strokeWidth={3} />
+      <circle cx="48" cy="53" r="23.5" stroke={accent} strokeWidth={2} />
+      <path d="M48 53 L48 37 M48 53 L60 59" stroke="#1a1a1a" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="48" cy="53" r="2.6" fill={accent} />
+      <path d="M48 25 L48 29 M76 53 L72 53 M48 81 L48 77 M20 53 L24 53" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" />
+      <path d="M74 20 L76.4 26.6 L83 29 L76.4 31.4 L74 38 L71.6 31.4 L65 29 L71.6 26.6 Z" fill={accent} opacity={0.85} />
+    </svg>
+  );
+}
+
 // 오늘의 시선 — 작은 집과 해 (부동산/도시 이슈)
 export function HouseSunIcon({ accent, className }: IconProps) {
   return (

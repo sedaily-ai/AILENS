@@ -55,7 +55,7 @@ function HomeContent({
 // WordsPreviewSection/LensPreviewSection/TrendingEconomySection/
 // ColumnPreviewSection)의 데이터를 미리 가져와 FeedPage → NewsFeedTab →
 // 각 섹션까지 initialX prop으로 내려준다. 나머지 섹션
-// (TimelinePreviewSection 등)은 의도된 mock/placeholder라 그대로 둔다.
+// (NewsTimeMachineSection 등)은 의도된 mock/placeholder라 그대로 둔다.
 // 미니 헤드라인 섹션(MiniHeadlinesSection)은 2026-08-16 삭제됨 — PG 연동
 // 전 유료 잠금 UI 컨셉만 있던 상태였는데 통째로 뺐다.
 // LensPreviewSection은 2026-08-12에 추가(신설 당시 프리페치를 빠뜨려서
