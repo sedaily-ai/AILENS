@@ -13,12 +13,12 @@ import { PocketWatchIcon } from '@/shared/ui/icons/HandDrawnIcons';
 // 둘 다 "날짜 고르면 그날 뉴스" 패턴이 똑같아 보여서(사용자 확인:
 // "통합해야죠. 두 개 다 있으면 안 됩니다") 하나로 합쳤다.
 //
-// 병합 원칙: 아무 값도 새로 지어내지 않는다 — 최근 날짜(2026-02-01~오늘)는
-// 이미 검증된 실시간 S3 지면 데이터(fetchDayArticles, 3분 자동 폴링 포함,
-// TimelinePreviewSection.tsx에서 그대로 가져옴)를 쓰고, 그 이전 날짜는
-// 빅카인즈 issue_ranking 실 응답 캡처(FALLBACK_TOPICS, 1995-03-15 실제
-// 조회 결과) 예시를 보여준다 — 백엔드 연결(2단계) 전까지는 예시라는 걸
-// 명확히 안내한다.
+// 데이터 소스 분기: 최근 날짜(2026-02-01~오늘)는 실시간 S3 지면
+// (fetchDayArticles, 3분 자동 폴링), 그 이전(1990-01-01~)은 백엔드
+// (handlers/time_machine_handler.py, sedaily-mbti-time-machine-dev Lambda)가
+// SSM에 보관된 키로 빅카인즈 issue_ranking을 직접 호출해 돌려주는 실 데이터
+// (fetchBigkindsTopics) — 2026-08-17 2단계(백엔드 연동) 완료, 더 이상 정적
+// 예시가 아니다.
 interface TimelineItem {
   id: string;
   time: string;
@@ -64,6 +64,13 @@ async function fetchDayArticles(dateStr: string): Promise<TimelineItem[]> {
     }));
 }
 
+async function fetchBigkindsTopics(dateStr: string): Promise<BigKindsTopic[]> {
+  const res = await fetch(`${API_URL}/time-machine?date=${dateStr}`);
+  if (!res.ok) throw new Error(`time-machine ${res.status}`);
+  const data: { topics?: BigKindsTopic[] } = await res.json();
+  return data.topics ?? [];
+}
+
 const QUICK_PICKS = ['오늘', '어제', '그제'];
 
 // S3 지면 아카이브가 실제로 커버하는 최소 날짜(2026-08-17 실측). 이보다
@@ -73,20 +80,9 @@ const ARCHIVE_MIN_DATE = '2026-02-01';
 // V1.5 §4 "제공되는 조회일자는 1990-01-01부터").
 const BIGKINDS_MIN_DATE = '1990-01-01';
 
-const SAMPLE_DATE = '1995-03-15';
-const FALLBACK_TOPICS: BigKindsTopic[] = [
-  { topic: '기초 선거 공천 협상 타결', keywords: ['여야 벼랑 대치', '통합선거법 극적 타결', '무혈승리'] },
-  { topic: '대통령 수행 순방 결산 간담', keywords: ['통일 대비', '세일즈 외교', '순방 결산'] },
-  { topic: '연립 여당 방북 논의', keywords: ['자민', '연립', '방북 연기'] },
-  { topic: '세계화 인재 양성 간담회', keywords: ['교육개혁', '핵합의 파기 대응책'] },
-];
-
-// 2단계(백엔드 연결) 전까지는 과거 구간이 전부 동일한 FALLBACK_TOPICS 샘플이라,
-// 빅카인즈 전체 범위(1990~)에서 뽑으면 거의 항상 똑같은 화면만 나와 "고장난
-// 것처럼" 보인다(2026-08-17 실사용 확인) — 그래서 지금은 실데이터가 있는
-// 아카이브 구간으로 한정한다. 실 연동 후엔 BIGKINDS_MIN_DATE로 다시 넓힐 것.
+// 랜덤 범위는 빅카인즈 백엔드가 실제로 지원하는 전체 구간(1990-01-01~오늘).
 function randomDateInRange(): string {
-  const start = new Date(ARCHIVE_MIN_DATE).getTime();
+  const start = new Date(BIGKINDS_MIN_DATE).getTime();
   const end = Date.now();
   const picked = new Date(start + Math.random() * (end - start));
   const y = picked.getFullYear();
@@ -99,6 +95,7 @@ export function NewsTimeMachineSection() {
   const router = useRouter();
   const [pickedDate, setPickedDate] = useState(todayStr());
   const [items, setItems] = useState<TimelineItem[] | null>(null);
+  const [topics, setTopics] = useState<BigKindsTopic[] | null>(null);
 
   const isRecent = pickedDate >= ARCHIVE_MIN_DATE;
   const isLive = pickedDate === todayStr();
@@ -109,30 +106,43 @@ export function NewsTimeMachineSection() {
   if (pickedDate !== prevPickedDate) {
     setPrevPickedDate(pickedDate);
     setItems(null);
+    setTopics(null);
   }
 
   useEffect(() => {
-    if (!isRecent) return; // 과거 구간은 빅카인즈 예시라 fetch 불필요
     let cancelled = false;
-    const load = (silent: boolean) => {
-      fetchDayArticles(pickedDate)
-        .then((rows) => {
-          if (!cancelled) setItems(rows);
-        })
-        .catch(() => {
-          if (!cancelled && !silent) setItems([]);
-        });
-    };
-    load(false);
 
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-    if (isLive) {
-      intervalId = setInterval(() => load(true), 3 * 60 * 1000);
+    if (isRecent) {
+      const load = (silent: boolean) => {
+        fetchDayArticles(pickedDate)
+          .then((rows) => {
+            if (!cancelled) setItems(rows);
+          })
+          .catch(() => {
+            if (!cancelled && !silent) setItems([]);
+          });
+      };
+      load(false);
+
+      let intervalId: ReturnType<typeof setInterval> | undefined;
+      if (isLive) {
+        intervalId = setInterval(() => load(true), 3 * 60 * 1000);
+      }
+      return () => {
+        cancelled = true;
+        if (intervalId) clearInterval(intervalId);
+      };
     }
 
+    fetchBigkindsTopics(pickedDate)
+      .then((rows) => {
+        if (!cancelled) setTopics(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setTopics([]);
+      });
     return () => {
       cancelled = true;
-      if (intervalId) clearInterval(intervalId);
     };
   }, [pickedDate, isRecent, isLive]);
 
@@ -284,7 +294,7 @@ export function NewsTimeMachineSection() {
             <button
               type="button"
               disabled={!isRecent}
-              title={isRecent ? undefined : '아직 예시 데이터라 펼쳐볼 지면이 없어요'}
+              title={isRecent ? undefined : '이 날짜는 지면 아카이브에 없어요 (2026-02-01 이전)'}
               onClick={() => isRecent && router.push(`/timeline/${pickedDate}`)}
               style={{
                 padding: '6px 12px',
@@ -383,27 +393,29 @@ export function NewsTimeMachineSection() {
             </div>
           )
         ) : (
-          // 2단계(백엔드 연결) 전 — 빅카인즈 issue_ranking 실 응답 캡처
-          // (1995-03-15). 어떤 과거 날짜를 골라도 지금은 이 예시가 뜨고,
-          // 실제 그 날짜로 안 바뀐다는 걸 명확히 안내한다.
-          <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
-            <div className="flex items-center justify-between" style={{ marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: '#78716c' }}>
-                {pickedDate} (예정 — 아직 예시 데이터예요)
-              </span>
-              <span style={{ fontSize: 11, color: '#a8a29e' }}>빅카인즈 뉴스빅데이터 제공 · 예시: {SAMPLE_DATE}</span>
+          topics !== null && (
+            <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#78716c' }}>{pickedDate}의 주요 이슈</span>
+                <span style={{ fontSize: 11, color: '#a8a29e' }}>빅카인즈 뉴스빅데이터 제공</span>
+              </div>
+              {topics.length === 0 && (
+                <p style={{ textAlign: 'center', padding: '20px 8px', fontSize: 13, color: '#a8a29e' }}>
+                  이 날은 집계된 이슈가 없어요.
+                </p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {topics.map((t, i) => (
+                  <div key={t.topic} style={{ padding: '12px 4px', borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)' }}>
+                    <p className="text-gray-900" style={{ fontSize: 14.5, fontWeight: 700, marginBottom: 4, letterSpacing: '-0.01em' }}>
+                      {t.topic}
+                    </p>
+                    <p style={{ fontSize: 12.5, color: '#96876f' }}>{t.keywords.join(' · ')}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {FALLBACK_TOPICS.map((t, i) => (
-                <div key={t.topic} style={{ padding: '12px 4px', borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)' }}>
-                  <p className="text-gray-900" style={{ fontSize: 14.5, fontWeight: 700, marginBottom: 4, letterSpacing: '-0.01em' }}>
-                    {t.topic}
-                  </p>
-                  <p style={{ fontSize: 12.5, color: '#96876f' }}>{t.keywords.join(' · ')}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          )
         )}
       </div>
     </section>
