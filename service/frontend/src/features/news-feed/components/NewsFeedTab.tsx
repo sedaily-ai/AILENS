@@ -11,6 +11,19 @@ import { VideoPreviewSection } from "./VideoPreviewSection";
 import { LensPreviewSection } from "./LensPreviewSection";
 import { NewsTimeMachineSection } from "./NewsTimeMachineSection";
 import { LatestGridSection } from "./LatestGridSection";
+import { CategoryFeatureSection } from "./CategoryFeatureSection";
+import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
+
+// 카테고리 2개씩 짝지어 한 줄(2/3+1/3)로 배치(2026-08-17, 본지 en.sedaily.com
+// 참고 — 로컬 경로 1_ailink/globe/dev/frontend/src/components/home/HeroSection.tsx
+// 의 Markets+Property, Politics+Society, Culture+International 페어링과 동일
+// 원칙). 순서는 ECON_CATEGORIES 정의 순서(증시/부동산/산업/금융·정책/국제/재테크)를
+// 그대로 2개씩 묶는다.
+const CATEGORY_PAIRS: readonly [string, string][] = [
+  ['markets', 'property'],
+  ['industry', 'finance'],
+  ['international', 'investing'],
+];
 
 interface Props {
   selectedDate: Date;
@@ -81,20 +94,36 @@ export function NewsFeedTab({
             예전엔 형식 기준으로 "이슈 톡톡"(FollowingFeed)과 "인사이트"
             (ColumnPreviewSection) 두 섹션이 따로 있었는데, 상단 탭을
             형식(브리핑/인사이트)에서 주제(증시/부동산/...) 기준으로 갈아
-            엎은 김에 홈도 맞췄다.
-            카테고리 레일 6개(증시/부동산/...)를 따로 두는 안도 만들어봤는데
-            바로 뺐다 — 뉴닉의 "코스피/주식" 레일은 "경제" 태그가 붙은
-            카드들을 모은 상위 이슈 클러스터라 레일 헤더와 카드 태그가
-            서로 다른 말인데, 우리는 레일 헤더("증시")와 카드 메타 태그
-            ("증시")가 완전히 같은 단어라 그대로 베끼면 순수 중복이었다
-            (사용자 지적). 카드마다 이미 카테고리 태그(ArticleCard.tsx의
-            CardMeta)가 붙어 있어 이 그리드 하나로 "주제별로 훑어보기"가
-            충분히 된다 — 특정 주제만 몰아보고 싶으면 상단 탭(카테고리
-            아카이브 페이지)으로. */}
+            엎은 김에 홈도 맞췄다. */}
         <LatestGridSection
           items={archiveItems}
           heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} /> : undefined}
         />
+
+        {/* 카테고리 섹션(2026-08-17, 본지 en.sedaily.com 스타일 참고 — 사용자
+            확인: "본지형식대로 해보시죠"). 한때 카테고리 레일(그리드형)로
+            만들었다가 "레일 헤더와 카드 태그가 완전히 같은 단어라 순수
+            중복"이라는 지적으로 뺐었는데, 본지 스타일은 그 문제가 없다 —
+            카드마다 카테고리 태그를 다시 안 붙이고(헤더 하나로 충분하다고
+            봄) 큰 히어로+작은 리스트 조합으로 "신문 지면"처럼 배치한다
+            (CategoryFeatureSection.tsx 참조). 2개씩 짝지어 2/3+1/3 한 줄에
+            배치, 얇은 가로선으로 구분 — 콘텐츠 없는 카테고리는 자동으로
+            숨는다. */}
+        {CATEGORY_PAIRS.map(([wideSlug, narrowSlug], i) => {
+          const wideCfg = ECON_CATEGORIES.find((c) => c.slug === wideSlug)!;
+          const narrowCfg = ECON_CATEGORIES.find((c) => c.slug === narrowSlug)!;
+          const wideItems = archiveItems.filter((it) => it.category === wideCfg.label);
+          const narrowItems = archiveItems.filter((it) => it.category === narrowCfg.label);
+          if (wideItems.length === 0 && narrowItems.length === 0) return null;
+          return (
+            <div key={wideSlug} style={{ borderTop: i === 0 ? 'none' : '2px solid #111827', paddingTop: i === 0 ? 0 : 32 }}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginTop: 32, marginBottom: 32 }}>
+                <CategoryFeatureSection config={wideCfg} items={wideItems} span="wide" />
+                <CategoryFeatureSection config={narrowCfg} items={narrowItems} span="narrow" />
+              </div>
+            </div>
+          );
+        })}
 
         {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
             뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
