@@ -52,7 +52,7 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
             <CustomSelect
               value={body.section ?? ""}
               onChange={(v) =>
-                patchBody({ section: (v || undefined) as "trend" | "column" | "issue_talk" | undefined })
+                patchBody({ section: (v || undefined) as "column" | "issue_talk" | undefined })
               }
               // 워딩은 공개 사이트 나브 라벨과 동일하게 맞춘다(2026-08-12,
               // posts/page.tsx CHANNEL_FILTERS 주석 참조). "용어 해설"(glossary)
@@ -63,11 +63,17 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
               // (2026-08-12) — "인사이트에서 이슈 톡톡으로 옮기려는데 안 된다"는
               // 피드백으로, 별도 issue_talk 옵션을 두는 대신 기본값 자체를
               // 이슈 톡톡 전용 아카이빙으로 쓰기로 했다. 분류를 안 고르면
-              // 자동으로 이슈 톡톡(홈 위젯 + /issue-talk)에 쌓이고, 딥다이브·
-              // 인사이트를 명시로 고른 글만 각자 아카이브로 빠진다.
+              // 자동으로 이슈 톡톡(홈 위젯 + /issue-talk)에 쌓이고, 인사이트를
+              // 명시로 고른 글만 그쪽 아카이브로 빠진다.
+              //
+              // "딥다이브"(trend) 옵션은 2026-08-17 제거 — "이슈 톡톡"과
+              // "요즘 화제의 경제 이슈"가 독자 입장에서 구분이 안 된다는 판단
+              // 으로 홈 섹션 자체를 통합했다(NewsFeedTab.tsx 참조). 기존에
+              // trend로 분류돼 있던 글 6건도 DB에서 태그를 지워 이슈 톡톡
+              // 기본값으로 옮겨뒀다 — 앞으로 이 값을 고를 수 있는 UI 자체가
+              // 없으니 새 글이 다시 갈리지 않는다.
               options={[
                 { value: "", label: "이슈 톡톡" },
-                { value: "trend", label: "딥다이브" },
                 { value: "column", label: "인사이트" },
               ]}
             />
@@ -120,7 +126,7 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
       // 계속 떠 있다" 지적) — EditorToolbar 참조. 여기 footer엔 지금 상태에서
       // 실제로 의미가 바뀌는 것(카드 전용 발행 여부)만 조건부로 남긴다.
       footer={
-        (body.section === "trend" || body.section === "column") && (
+        body.section === "column" && (
           <p className="px-1 text-xs text-gray-400">
             본문을 비워두고 저장하면 상세 페이지 없이 홈 화면 카드로만 발행됩니다 —
             나중에 본문을 채워서 저장하면 정식 글로 바뀝니다.

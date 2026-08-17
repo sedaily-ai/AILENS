@@ -12,10 +12,12 @@ import { LensMode } from "./LensMode";
 // 안 읽어서 실제로 아무 효과가 없었다(2026-08-04 확인). 모든 글은 유일하게
 // 작동하는 "letters" 채널로 고정 발행한다. posts/edit/page.tsx 의 기본값 참조.
 //
-// mode="trend_card"는 2026-08-09부로 없다 — "트렌드·칼럼 카드"라는 별도
-// 진입점 자체가 mode="post"(레터 글)에 흡수됐다. 분류를 머니 트렌드/깊은
-// 이야기로 두고 본문을 비워서 저장하면 posts/edit/page.tsx의 save()가 알아서
-// channels:["trend_card"]로 쓴다 — 관리자 입장에선 "쓸지 말지"만 고르면 된다.
+// mode="trend_card"는 2026-08-09부로 없다 — "칼럼 카드"라는 별도 진입점
+// 자체가 mode="post"(레터 글)에 흡수됐다. 분류를 인사이트로 두고 본문을
+// 비워서 저장하면 posts/edit/page.tsx의 save()가 알아서 본문 필드만 비운
+// channels:["letters"] 글로 쓴다(2026-08-17부터 — trend_card 채널 자체를
+// 폐기해 예전처럼 별도 채널로 빼지 않는다) — 관리자 입장에선 "쓸지 말지"만
+// 고르면 된다.
 // mode="webtoon"/"video"도 같은 날 별도 사이드바 메뉴(/webtoon, /video)로
 // 옮겨갔지만, value→body/patch/patchBody 파생 로직을 중복시키지 않으려고 그
 // 화면들도 이 컴포넌트를 계속 쓴다.

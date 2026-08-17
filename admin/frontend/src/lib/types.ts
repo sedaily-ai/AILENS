@@ -87,11 +87,15 @@ export interface NewsletterSubscriber {
 
 // --- CMS posts (backend/admin/routes/posts.py 와 1:1) ---
 
-export type CmsChannel = "letters" | "paper" | "feed" | "trend_card" | "webtoon" | "video" | "lens" | "home_player";
-// "용어 해설"/"이슈 톡톡" — 오늘의 이슈/머니 트렌드/깊은 이야기와 같은
-// 방식의 분류(2026-08-12, 이슈 톡톡을 별도 채널에서 되돌렸다가 삭제 후
-// 다시 부활).
-export type CmsCardSection = "trend" | "column" | "glossary" | "issue_talk";
+// trend_card 채널은 2026-08-17 폐기(admin/backend/routes/posts.py,
+// service/backend cms_posts_public.py 둘 다 _VALID_CHANNELS에서 제거) —
+// "요즘 화제의 경제 이슈" 홈 섹션을 "이슈 톡톡"에 흡수 통합하면서, 실사용
+// 데이터 0건이던 이 채널도 함께 정리했다.
+export type CmsChannel = "letters" | "paper" | "feed" | "webtoon" | "video" | "lens" | "home_player";
+// "용어 해설"/"이슈 톡톡" — 오늘의 이슈/깊은 이야기와 같은 방식의 분류
+// (2026-08-12, 이슈 톡톡을 별도 채널에서 되돌렸다가 삭제 후 다시 부활).
+// "trend"(딥다이브)는 2026-08-17 제거 — 이슈 톡톡에 흡수 통합.
+export type CmsCardSection = "column" | "glossary" | "issue_talk";
 export type CmsStatus = "draft" | "published" | "archived";
 
 export interface CmsKeyword {
@@ -113,9 +117,9 @@ export interface CmsPostBody {
   key_points: string[];
   keywords: CmsKeyword[];
   images: CmsImage[];
-  // channels: ["trend_card"] 글만 씀 — "요즘 화제의 경제 이슈"/"이번 주 인기
-  // 칼럼" 두 섹션을 채널 하나로 묶고 이 값으로 가른다(v2/handlers/cms_posts_public.py
-  // _shape_trend_card 참조). category 는 카드에 붙는 짧은 라벨(예: 증시, 투자 인사이트).
+  // channels: ["letters"] 글의 분류 태그 — "이슈 톡톡"(기본값)과 "인사이트"
+  // (section: "column")를 가른다. category 는 카드에 붙는 짧은 라벨
+  // (예: 증시, 투자 인사이트).
   section?: CmsCardSection;
   category?: string;
   // channels: ["video"] 글만 씀 — YouTube 등 외부 임베드 URL 원문 그대로.

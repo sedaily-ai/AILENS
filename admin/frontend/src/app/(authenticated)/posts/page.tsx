@@ -15,11 +15,10 @@ import type { CmsPost } from "@/lib/types";
 // 일괄 "분류 변경" 대상 — channels 자체(레터↔웹툰/영상)는 PostForm에서도
 // 생성 후엔 못 바꾸게 막아뒀다(엉뚱한 채널로 이미 발행된 글이 옮겨가는 사고
 // 방지) — 그래서 일괄 이동도 같은 channels:["letters"] 안에서 section만
-// 바꾸는 이슈 톡톡/딥다이브/인사이트 세 곳으로만 한정한다. 워딩은
-// PostMode.tsx의 분류 드롭다운과 동일(2026-08-12 갱신, 아래 참조).
-const BULK_MOVE_TARGETS: Array<{ section: "" | "trend" | "column" | "glossary"; label: string }> = [
+// 바꾸는 이슈 톡톡/인사이트 두 곳으로만 한정한다(2026-08-17, 딥다이브 폐기
+// — NewsFeedTab.tsx 참조). 워딩은 PostMode.tsx의 분류 드롭다운과 동일.
+const BULK_MOVE_TARGETS: Array<{ section: "" | "column" | "glossary"; label: string }> = [
   { section: "", label: "이슈 톡톡" },
-  { section: "trend", label: "딥다이브" },
   { section: "column", label: "인사이트" },
   { section: "glossary", label: "용어 해설" },
 ];
@@ -41,21 +40,20 @@ const BULK_MOVE_TARGETS: Array<{ section: "" | "trend" | "column" | "glossary"; 
 const CHANNEL_FILTERS: Array<{ key: string; label: string }> = [
   { key: "", label: "전체" },
   { key: "letters", label: "이슈 톡톡" },
-  { key: "trend", label: "딥다이브" },
   { key: "column", label: "인사이트" },
   { key: "glossary", label: "용어 해설" },
 ];
 
 
-// "레터"/"트렌드"/"칼럼" 셋 다 DB에서는 channels: ["letters"]로 저장되고
-// body_inline.section 값("trend"/"column"/없음)으로만 갈린다(trend_card 채널
-// 값 자체는 이제 안 쓰지만, 예전에 그 채널로 저장된 레코드가 남아있을 수
-// 있어 폴백으로 계속 인식한다). "letters" 필터(=이슈 톡톡)는 section 없는
-// 글뿐 아니라 과거에 명시로 issue_talk 태그된 글도 같이 잡는다 — 사용자
-// 입장에선 둘 다 "이슈 톡톡"이라 구분할 이유가 없다.
+// "레터"/"칼럼" 둘 다 DB에서는 channels: ["letters"]로 저장되고
+// body_inline.section 값("column"/없음)으로만 갈린다. "딥다이브"(trend)
+// 분류·trend_card 채널은 2026-08-17 폐기(NewsFeedTab.tsx 참조) — 그 채널로
+// 저장된 레코드는 실사용 0건이었어서 폴백 인식 로직도 같이 뺐다. "letters"
+// 필터(=이슈 톡톡)는 section 없는 글뿐 아니라 과거에 명시로 issue_talk
+// 태그된 글도 같이 잡는다 — 사용자 입장에선 둘 다 "이슈 톡톡"이라 구분할
+// 이유가 없다.
 function matchesSingleChannelFilter(p: CmsPost, channel: string): boolean {
-  const section = p.body_inline.section ?? (p.channels.includes("trend_card") ? "trend" : null);
-  if (channel === "trend") return section === "trend";
+  const section = p.body_inline.section ?? null;
   if (channel === "column") return section === "column";
   if (channel === "glossary") return section === "glossary";
   if (channel === "letters") return p.channels.includes("letters") && (!section || section === "issue_talk");
@@ -277,7 +275,7 @@ function PostsPage() {
   // 아니라 통째로 교체하기 때문(admin/repo/posts_repo.py 참조). 그래서 반드시
   // 최신 글 전체를 먼저 받아 body_inline 을 펼친 다음 바뀌는 필드만 덮어써서
   // 통째로 다시 보내야 한다 — PostForm 저장 흐름(posts/edit/page.tsx)과 동일 패턴.
-  const bulkMove = async (section: "" | "trend" | "column" | "glossary") => {
+  const bulkMove = async (section: "" | "column" | "glossary") => {
     if (selected.size === 0) return;
     setBulkBusy(true);
     const ids = [...selected];
@@ -409,7 +407,7 @@ function BulkActionBar({
 }: {
   count: number;
   busy: boolean;
-  onMove: (section: "" | "trend" | "column" | "glossary") => void;
+  onMove: (section: "" | "column" | "glossary") => void;
   onSetCategory: (category: string) => void;
   onDelete: () => void;
   onClear: () => void;

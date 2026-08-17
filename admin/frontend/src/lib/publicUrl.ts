@@ -1,15 +1,17 @@
 const PUBLIC_SITE = "https://ailens.sedaily.ai";
 
 // letters/webtoon/lens만 공개 사이트에 상세 페이지가 있다(service/frontend/src/app/
-// {letters,webtoon,lens}/[.../]page.tsx) — trend_card/video는 홈 화면 카드로만
-// 노출되고 개별 URL이 없다(2026-08-09 확인, ColumnPreviewSection.tsx가
-// trend_card 채널 항목엔 href를 아예 안 붙이는 것과 동일 결론).
+// {letters,webtoon,lens}/[.../]page.tsx) — video는 홈 화면 카드로만 노출되고
+// 개별 URL이 없다. trend_card 채널(과거 "카드 전용 글"용)은 2026-08-17
+// 폐기 — "카드 전용" 글도 이제 channels:["letters"]로 저장되고(본문만
+// 비어있는 얇은 상세 페이지), 여기 else 분기로 정상적으로 떨어진다
+// (posts/edit/page.tsx save() 참조).
 export function publicPostUrl(post: { slug: string; channels: string[] }): string | null {
   if (post.channels.includes("webtoon")) return `${PUBLIC_SITE}/webtoon/${encodeURIComponent(post.slug)}`;
   if (post.channels.includes("lens")) return `${PUBLIC_SITE}/lens/${encodeURIComponent(post.slug)}`;
-  if (post.channels.includes("trend_card") || post.channels.includes("video")) return null;
+  if (post.channels.includes("video")) return null;
   // "이슈 톡톡"(분류=issue_talk)도 channels는 그냥 letters라 별도 분기 없이
-  // 여기로 떨어진다 — 딥다이브·인사이트와 동일.
+  // 여기로 떨어진다 — 인사이트와 동일.
   return `${PUBLIC_SITE}/letters/${encodeURIComponent(post.slug)}`;
 }
 

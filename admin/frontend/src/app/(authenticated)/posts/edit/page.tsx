@@ -118,10 +118,10 @@ function PostEditPage() {
   const [busy, setBusy] = useState(false);
 
   // 2026-08-09 — "웹툰"/"영상"은 사이드바 별도 메뉴(/webtoon, /video)로
-  // 옮겨갔고, "트렌드·칼럼 카드"는 분류(머니 트렌드/깊은 이야기) + 본문
-  // 비움으로 흡수됐다(save() 참조) — 그래서 이 화면은 이제 레터 글 전용이라
-  // 종류를 고르는 UI 자체가 없다. channels는 항상 letters로 저장 요청하고,
-  // 본문이 실제로 비어있으면 save()가 trend_card로 대신 쓴다.
+  // 옮겨갔고, "칼럼 카드"는 분류(인사이트) + 본문 비움으로 흡수됐다(save()
+  // 참조) — 그래서 이 화면은 이제 레터 글 전용이라 종류를 고르는 UI 자체가
+  // 없다. channels는 항상 letters로 저장한다(2026-08-17부터 카드 전용이어도
+  // 동일 — trend_card 채널 폐기, save() 주석 참조).
   const editorState = useRichTextEditor({
     value: draft.body_inline?.body_html ?? "",
     onChange: (html) =>
@@ -173,19 +173,27 @@ function PostEditPage() {
     }
     setBusy(true);
     // "핵심 정리"/"키워드"/"닫는 줄" 소제목으로 나눠 쓴 본문을 여기서 실제
-    // 필드로 갈라낸다. 분류가 머니 트렌드/깊은 이야기인데 갈라내고 남은
-    // 본문이 비어있으면 — 상세 페이지 없는 카드 전용 글(trend_card)로
-    // 저장한다(2026-08-09, "근본적으로 해결" — 예전엔 별도 탭이었다).
-    // "오늘의 이슈"(분류 미지정)는 대응하는 카드 형태가 없어 이 규칙에서
-    // 제외 — 본문 없이 저장해도 그냥 빈 본문의 레터로 남는다.
+    // 필드로 갈라낸다. 분류가 인사이트인데 갈라내고 남은 본문이 비어있으면
+    // — 본문 필드를 싹 비운 카드 전용 글로 저장한다(2026-08-09, "근본적으로
+    // 해결" — 예전엔 별도 탭이었다). "오늘의 이슈"(분류 미지정)는 대응하는
+    // 카드 형태가 없어 이 규칙에서 제외 — 본문 없이 저장해도 그냥 빈 본문의
+    // 레터로 남는다.
+    //
+    // channels는 2026-08-17부터 카드 전용이어도 항상 ["letters"] — 예전엔
+    // 별도 trend_card 채널로 저장해 공개 사이트에 상세 페이지가 아예 안
+    // 생기게 했었는데(publicUrl.ts 참조), 그 채널을 "이슈 톡톡"/"요즘 화제의
+    // 경제 이슈" 통합과 함께 완전히 폐기했다(백엔드 _shape_trend_card 삭제
+    // — 이제 그 채널로 저장해봐야 공개 API가 읽지도 못한다). 카드 전용
+    // 글도 이제 letters 채널의 "본문이 비어있는 얇은 상세 페이지"가 된다 —
+    // 홈/아카이브 카드 노출 방식(fetchSectionCards)은 동일하다.
     const split = splitRichBody(draft.body_inline?.body_html ?? "");
     const section = draft.body_inline?.section;
-    const isCardOnly = (section === "trend" || section === "column") && isHtmlEmpty(split.body_html ?? "");
+    const isCardOnly = section === "column" && isHtmlEmpty(split.body_html ?? "");
 
     const payload: CmsPostInput = isCardOnly
       ? {
           ...draft,
-          channels: ["trend_card"],
+          channels: ["letters"],
           body_inline: {
             body: [],
             key_points: [],

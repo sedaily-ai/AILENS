@@ -25,7 +25,7 @@ const EMPTY: CmsPostInput = {
 // 2026-08-09 — 영상 전용 편집 화면. webtoon/edit/page.tsx와 같은 패턴
 // (표준 레이아웃, letters/edit 식 헤더). channels는 항상 ["video"] 고정.
 // video_url/cover_image_url만 있으면 되는 가장 가벼운 폼이라 상세 페이지
-// 링크는 없다(publicUrl.ts — trend_card/video는 개별 URL이 없음).
+// 링크는 없다(publicUrl.ts — video는 개별 URL이 없음).
 export default function VideoEditPageWrapper() {
   return (
     <Suspense
