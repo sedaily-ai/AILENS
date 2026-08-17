@@ -43,7 +43,13 @@ export async function generateMetadata({
     // 기사가 없는 날은 색인에서 뺀다 — 얇은 페이지가 검색결과에 잡히는 걸
     // 막는다(letters/page.tsx 등 다른 페이지의 "가짜 신선도 금지" 원칙과
     // 같은 이유, sitemap.ts 주석 참조).
-    robots: indexable ? undefined : { index: false },
+    //
+    // indexable일 때 robots 키를 아예 안 넣는다 — `robots: undefined`를
+    // 리턴하면 상위 layout.tsx의 robots(index:true, googleBot 옵션 포함)를
+    // "물려받는" 게 아니라 그대로 덮어써서 robots 메타태그 자체가 통째로
+    // 사라졌다(2026-08-17 발견, curl로 직접 확인). 키를 안 넣어야 실제로
+    // 상속된다.
+    ...(indexable ? {} : { robots: { index: false } }),
     keywords: ['뉴스 타임라인', '경제 뉴스 아카이브', `${label} 뉴스`, '서울경제', 'AI LENS'],
     alternates: { canonical: `${SITE_URL}/timeline/${date}` },
     openGraph: {

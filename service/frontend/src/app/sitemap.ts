@@ -198,11 +198,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     /* 영상 API 불통이면 생략 */
   }
 
-  // 타임라인 날짜별 페이지(2026-08-12, GEO 감사) — /timeline/{date}가 실제
-  // 존재하는지 확인 안 된 과거 날짜까지 통째로 추정해 넣진 않는다(빈
-  // 페이지가 sitemap에 잡히면 역효과). 최근 7일은 전국 경제 뉴스가 아예
-  // 없었을 가능성이 사실상 없어 안전하게 시딩 — 그보다 오래된 날은
-  // 페이지 자체는 동작하지만(직접 방문·공유 가능) sitemap엔 안 올린다.
+  // 타임라인 날짜별 페이지(2026-08-12, GEO 감사) — 처음엔 최근 7일만
+  // 시딩했다. 그땐 과거 날짜가 실제 존재하는지 확인이 안 된 상태라(빈
+  // 페이지가 sitemap에 잡히면 역효과) 과거 날짜 전체를 추정해 넣지
+  // 않았었다.
+  //
+  // 2026-08-17 확장 — 그사이 빅카인즈 날짜범위검색으로 2026-02-01 이전
+  // 구간도 실제 기사 데이터가 확인됐고(features/timeline), 페이지 자체에
+  // 이미 자기방어 장치가 있다: [date]/page.tsx의 generateMetadata가 매
+  // 요청마다 그 날짜에 기사가 있는지 직접 fetch해서 없으면
+  // `robots:{index:false}`로 스스로 빼버린다. 그래서 sitemap이 존재를
+  // 보장할 필요가 없다 — sitemap은 "발견 경로"만 주고, 색인 여부의 최종
+  // 판단은 페이지가 각자 한다. 이 안전장치를 믿고 최근 24개월로 확장한다.
+  // 1990년까지 전체(13,000+일)를 다 넣진 않는다 — "얇은 페이지 다수"
+  // 리스크와 sitemap 생성 자체가 느려지는 문제(사용자 확인, 2026-08-17).
+  // 그 밖 오래된 날짜는 여전히 직접 방문·공유 링크로만 접근 가능.
   //
   // 날짜는 KST 기준(shared/lib/date.ts) — SSR 서버가 보통 UTC 타임존이라
   // `new Date().toISOString()`으로 그냥 계산하면 자정~오전 9시 KST 사이엔
@@ -211,9 +221,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 피한다 — kstTodayStr()로 얻은 "오늘"의 연/월/일 숫자만 가져다 UTC
   // 타임스탬프를 만들면, 그 뒤 toISOString()이 다시 타임존을 끼워넣을
   // 여지가 없다.
+  const TIMELINE_SITEMAP_DAYS = 730; // 최근 24개월
   const todayIso = kstTodayStr();
   const [ty, tm, td] = todayIso.split('-').map((s) => parseInt(s, 10));
-  for (let i = 0; i < 7; i += 1) {
+  for (let i = 0; i < TIMELINE_SITEMAP_DAYS; i += 1) {
     const iso = new Date(Date.UTC(ty, tm - 1, td - i)).toISOString().slice(0, 10);
     entries.push({
       url: `${BASE}/timeline/${iso}`,
