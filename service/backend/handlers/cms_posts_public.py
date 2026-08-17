@@ -22,7 +22,10 @@ from clients import cms_posts_ddb_client as posts_client
 logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
-_VALID_CHANNELS = ("letters", "paper", "feed", "trend_card", "webtoon", "video", "lens", "home_player")
+# trend_card 채널 폐기(2026-08-17) — "요즘 화제의 경제 이슈" 섹션을 "이슈
+# 톡톡"에 흡수 통합. 실사용 데이터 0건 확인 후 제거(letters 채널 +
+# section='trend' 태그로 이미 오래전에 대체돼 있었다).
+_VALID_CHANNELS = ("letters", "paper", "feed", "webtoon", "video", "lens", "home_player")
 # 2026-08-09: 300초(5분) → 5초 → no-store. 이 헤더는 프론트 SSR의 Next 캐시
 # (revalidateTag, 5초 — service/frontend/src/shared/lib/cmsPostsApi.ts)와는
 # 별개로, 클라이언트 컴포넌트(TrendingEconomySection 등 12곳, 'use client')가
@@ -111,25 +114,6 @@ def _shape_paper(post: Dict[str, Any]) -> Dict[str, Any]:
         "is_top": False,
         "content": "\n\n".join(paras),
         "content_blocks": blocks,
-        "is_cms": True,
-    }
-
-
-def _shape_trend_card(post: Dict[str, Any]) -> Dict[str, Any]:
-    """홈 피드 "요즘 화제의 경제 이슈"/"이번 주 인기 칼럼" 카드 모양
-    (TrendingEconomySection/ColumnPreviewSection 의 MockArticle/MockColumn 과 1:1).
-
-    letters/paper 와 달리 리치텍스트 본문이 없다 — 제목+짧은 요약뿐인 카드라
-    body_inline 에 section/category 만 얹는다 (admin PostForm mode="trend_card").
-    """
-    b = post.get("body_inline") or {}
-    return {
-        "id": post["slug"],
-        "section": b.get("section") or "trend",
-        "category": b.get("category") or "",
-        "title": post.get("headline") or "",
-        "excerpt": post.get("subtitle") or "",
-        "date": post.get("publish_date") or "",
         "is_cms": True,
     }
 
@@ -226,7 +210,6 @@ _SHAPERS = {
     # feed 는 개인화 랭킹 대상이 아니라 상단 고정 카드로 쓰인다 (spec §2.4).
     # 모양은 letters 와 같게 두고 프론트가 고정 배치한다.
     "feed": _shape_letter,
-    "trend_card": _shape_trend_card,
     "webtoon": _shape_webtoon,
     "video": _shape_video,
     "lens": _shape_lens,

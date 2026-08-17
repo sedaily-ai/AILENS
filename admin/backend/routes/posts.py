@@ -15,7 +15,11 @@ from shared import audit, notify, response
 
 logger = logging.getLogger(__name__)
 
-_VALID_CHANNELS = {"letters", "paper", "feed", "trend_card", "webtoon", "video", "lens", "home_player"}
+# trend_card 채널 폐기(2026-08-17) — "요즘 화제의 경제 이슈" 섹션을 "이슈
+# 톡톡"에 흡수 통합하면서, 이 채널로 카드를 직접 만드는 진입점도 없앤다
+# (실사용 데이터도 0건이었다 — 이미 letters 채널 + section='trend' 태그로
+# 대체된 지 오래).
+_VALID_CHANNELS = {"letters", "paper", "feed", "webtoon", "video", "lens", "home_player"}
 # JWT 는 handler.py 가 이미 검증했다. 단일 관리자 계정이라 작성자는 고정값.
 _ACTOR = "admin"
 
