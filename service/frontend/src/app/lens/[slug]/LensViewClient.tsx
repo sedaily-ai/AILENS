@@ -13,6 +13,9 @@ import {
   pickLensPhoto,
 } from '@/shared/constants/lensPerspectives';
 import { HomeSideBar } from '@/features/news-feed';
+import { Header } from '@/widgets/Header';
+import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -47,6 +50,7 @@ export function LensViewClient({
 }) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
   const [active, setActive] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
@@ -100,6 +104,8 @@ export function LensViewClient({
   if (!slug || lens === null) {
     return (
       <div className="min-h-screen bg-white">
+        <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
+        <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center" style={{ color: '#6b7280' }}>
           <p>이슈를 찾을 수 없어요.</p>
           <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4" style={{ color: '#6b7280' }}>
@@ -110,7 +116,13 @@ export function LensViewClient({
     );
   }
 
-  if (!lens) return <div className="min-h-screen bg-white" />;
+  if (!lens) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
+      </div>
+    );
+  }
 
   const photo = pickLensPhoto(lens);
   const lenses = lens.lenses ?? [];
@@ -171,6 +183,17 @@ export function LensViewClient({
           @keyframes swap { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
         }
       `}</style>
+
+      {/* 글로벌 헤더(2026-08-17) — 이 페이지엔 원래 헤더가 아예 없었다
+          ("박스 걷어내고 타이포·여백·헤어라인으로만 구조를 만든다"는
+          읽기 전용 설계 원칙, 위 주석 참조). 사용자가 본지(en.sedaily.com)
+          스크린샷을 직접 보여주며 "영문사이트는 기사 상세 들어가도
+          네비게이션이나 헤더는 다 유지하거든요, 저희도 그렇게 하면
+          좋겠어요"라고 확인 — 뒤로가기 말고는 다른 곳으로 이동할 방법이
+          없어 "뒤로가기가 이상하다"고 느꼈던 것도 이걸로 같이 해결된다.
+          LetterDetailClient.tsx가 이미 쓰는 것과 같은 패턴. */}
+      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
+      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* 우측 사이드바(2026-08-17, 사용자 확인: "홈페이지와 동일 — 인기글+사주")
           — 홈(NewsFeedTab.tsx)과 같은 HomeSideBar를 재사용. 이 페이지는
