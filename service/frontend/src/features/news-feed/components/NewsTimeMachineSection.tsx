@@ -293,8 +293,7 @@ export function NewsTimeMachineSection() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '3px 3px 3px 10px',
+              padding: '6px 10px',
               background: '#fff',
               border: '1px solid #e6e0d4',
               borderRadius: 9999,
@@ -318,28 +317,18 @@ export function NewsTimeMachineSection() {
                 fontVariantNumeric: 'tabular-nums',
               }}
             />
-            <button
-              type="button"
-              disabled={!typedDate}
-              onClick={() => typedDate && setPickedDate(typedDate)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 9999,
-                border: 'none',
-                background: typedDate ? '#2a2622' : '#e6e0d4',
-                color: typedDate ? '#fff' : '#a8a29e',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: typedDate ? 'pointer' : 'default',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              이동
-            </button>
           </div>
+          {/* 이전엔 "이동"으로 날짜를 확정한 뒤에야 "펼치기"가 그 날짜를 썼는데,
+              두 번 눌러야 하는 게 헷갈린다는 실사용 피드백(2026-08-17: "19991117
+              누르고 펼치기 눌렀는데 오늘 날짜가 나온다")으로 하나로 합쳤다 —
+              입력창에 유효한 날짜가 타이핑돼 있으면 그걸 바로 쓰고, 없으면
+              퀵픽/랜덤으로 골라둔 날짜를 쓴다. */}
           <button
             type="button"
-            onClick={() => setRewinding(true)}
+            onClick={() => {
+              if (typedDate) setPickedDate(typedDate);
+              setRewinding(true);
+            }}
             style={{
               padding: '6px 12px',
               borderRadius: 9999,
