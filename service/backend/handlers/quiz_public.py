@@ -20,6 +20,8 @@ from botocore.exceptions import ClientError
 
 from clients.quiz_questions_ddb_client import list_published_quizzes
 from config.constants import CORS_HEADERS, DYNAMODB_TABLE_ENGAGEMENT_DEV
+from core.decorators import lambda_handler as handler_decorator
+from core.response import error_response, success_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -37,10 +39,6 @@ def _get_engagement_table():
     return _engagement_table
 
 
-def _resp(status: int, body: dict) -> dict:
-    return {"statusCode": status, "headers": CORS_HEADERS, "body": json.dumps(body, ensure_ascii=False)}
-
-
 def _handle_today() -> dict:
     quizzes = []
     for q in list_published_quizzes(limit=_MAX_QUIZZES):
@@ -52,13 +50,13 @@ def _handle_today() -> dict:
         quizzes.append(
             {"id": q.get("id"), "term": q.get("term"), "explain": q.get("explain"), "options": options[:3]}
         )
-    return _resp(200, {"quizzes": quizzes})
+    return success_response({"quizzes": quizzes})
 
 
 def _handle_attempt(body: dict) -> dict:
     quiz_id = (body.get("quiz_id") or "").strip()
     if not quiz_id:
-        return _resp(400, {"error": "quiz_id required"})
+        return error_response("quiz_id required", status_code=400)
     correct = bool(body.get("correct"))
     try:
         _get_engagement_table().update_item(
@@ -68,10 +66,11 @@ def _handle_attempt(body: dict) -> dict:
         )
     except ClientError as e:
         logger.exception(f"quiz attempt write fail: {e}")
-        return _resp(500, {"error": "attempt write failed"})
-    return _resp(200, {"ok": True})
+        return error_response("attempt write failed", status_code=500)
+    return success_response({"ok": True})
 
 
+@handler_decorator
 def lambda_handler(event: dict, context) -> dict:
     method = event.get("httpMethod") or (event.get("requestContext") or {}).get("http", {}).get("method", "GET")
     if method == "OPTIONS":
@@ -85,6 +84,6 @@ def lambda_handler(event: dict, context) -> dict:
             body = json.loads(event.get("body") or "{}")
             return _handle_attempt(body)
     except json.JSONDecodeError:
-        return _resp(400, {"error": "invalid JSON body"})
+        return error_response("invalid JSON body", status_code=400)
 
-    return _resp(404, {"error": "not found"})
+    return error_response("not found", status_code=404)

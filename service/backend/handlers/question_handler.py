@@ -11,7 +11,7 @@ Storage: Personal DB (sedaily-mbti-personal-dev)
 import json
 import logging
 import asyncio
-from typing import Dict, Any, List
+from typing import List
 from datetime import datetime, timezone, timedelta
 
 import boto3
@@ -20,12 +20,13 @@ from botocore.config import Config
 
 from config import settings
 from config.constants import (
-    CORS_HEADERS,
     BEDROCK_MODEL_ID_HAIKU,
     DYNAMODB_TABLE_ARTICLES_DEV,
 )
 from services.prompt_loader import load_prompt
 from common.feature_flag import is_enabled
+from core.decorators import lambda_handler as handler_decorator
+from core.response import error_response, success_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -34,14 +35,6 @@ KST = timezone(timedelta(hours=9))
 BEDROCK_CONFIG = Config(read_timeout=60, connect_timeout=10, retries={'max_attempts': 2})
 
 QUESTIONS_USER_ID = '__questions__'
-
-
-def _cors(status_code: int, body: Any) -> dict:
-    return {
-        'statusCode': status_code,
-        'headers': CORS_HEADERS,
-        'body': json.dumps(body, ensure_ascii=False, default=str),
-    }
 
 
 # ── Personal DB access ──────────────────────────────────────────────────────
@@ -178,6 +171,7 @@ def _generate_questions(titles: List[str]) -> list:
 
 # ── Lambda entry point ───────────────────────────────────────────────────────
 
+@handler_decorator
 def lambda_handler(event: dict, context) -> dict:
     """
     Routes:
@@ -185,72 +179,63 @@ def lambda_handler(event: dict, context) -> dict:
         POST /api/questions                — Save user answer
         OPTIONS                            — CORS preflight
     """
-    try:
-        if event.get('source') == 'aws.events' or event.get('warmup'):
-            return _cors(200, {'status': 'warm'})
+    if event.get('source') == 'aws.events' or event.get('warmup'):
+        return success_response({'status': 'warm'})
 
-        rc = event.get('requestContext', {})
-        if 'http' in rc:
-            method = rc['http'].get('method', 'GET')
-        else:
-            method = event.get('httpMethod', 'GET')
+    rc = event.get('requestContext', {})
+    if 'http' in rc:
+        method = rc['http'].get('method', 'GET')
+    else:
+        method = event.get('httpMethod', 'GET')
 
-        params = event.get('queryStringParameters') or {}
+    params = event.get('queryStringParameters') or {}
 
-        if method == 'OPTIONS':
-            return _cors(200, {'message': 'OK'})
+    if method == 'OPTIONS':
+        return success_response({'message': 'OK'})
 
-        if not is_enabled("question"):
-            return {
-                "statusCode": 503,
-                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-                "body": json.dumps({"error": "question disabled by admin"}),
-            }
+    if not is_enabled("question"):
+        return error_response("question disabled by admin", status_code=503)
 
-        # GET /api/questions?date=YYYYMMDD
-        if method == 'GET':
-            date_str = params.get('date', datetime.now(KST).strftime('%Y%m%d'))
+    # GET /api/questions?date=YYYYMMDD
+    if method == 'GET':
+        date_str = params.get('date', datetime.now(KST).strftime('%Y%m%d'))
 
-            # Check cache
-            cached = _get_cached_questions(date_str)
-            if cached:
-                return _cors(200, {'questions': cached, 'source': 'cache'})
+        # Check cache
+        cached = _get_cached_questions(date_str)
+        if cached:
+            return success_response({'questions': cached, 'source': 'cache'})
 
-            # Generate from today's articles
-            titles = _fetch_article_titles(date_str)
-            if not titles:
-                return _cors(200, {'questions': [], 'source': 'no_articles'})
+        # Generate from today's articles
+        titles = _fetch_article_titles(date_str)
+        if not titles:
+            return success_response({'questions': [], 'source': 'no_articles'})
 
-            questions = _generate_questions(titles)
-            if questions:
-                _save_questions(date_str, questions)
+        questions = _generate_questions(titles)
+        if questions:
+            _save_questions(date_str, questions)
 
-            return _cors(200, {'questions': questions, 'source': 'generated'})
+        return success_response({'questions': questions, 'source': 'generated'})
 
-        # POST /api/questions — save answer
-        if method == 'POST':
-            body = json.loads(event.get('body', '{}'))
-            user_id = body.get('user_id', '')
-            question_id = body.get('question_id', '')
-            option_id = body.get('option_id', '')
+    # POST /api/questions — save answer
+    if method == 'POST':
+        body = json.loads(event.get('body', '{}'))
+        user_id = body.get('user_id', '')
+        question_id = body.get('question_id', '')
+        option_id = body.get('option_id', '')
 
-            if not user_id or not question_id:
-                return _cors(400, {'error': 'user_id and question_id are required'})
+        if not user_id or not question_id:
+            return error_response("user_id and question_id are required", status_code=400)
 
-            # Store in personal DB
-            date_str = datetime.now(KST).strftime('%Y%m%d')
-            _get_personal_table().put_item(Item={
-                'user_id': user_id,
-                'sk': f'ANSWER#{date_str}#{question_id}',
-                'question_id': question_id,
-                'option_id': option_id,
-                'answered_at': datetime.now(KST).isoformat(),
-            })
+        # Store in personal DB
+        date_str = datetime.now(KST).strftime('%Y%m%d')
+        _get_personal_table().put_item(Item={
+            'user_id': user_id,
+            'sk': f'ANSWER#{date_str}#{question_id}',
+            'question_id': question_id,
+            'option_id': option_id,
+            'answered_at': datetime.now(KST).isoformat(),
+        })
 
-            return _cors(200, {'saved': True})
+        return success_response({'saved': True})
 
-        return _cors(405, {'error': 'Method not allowed'})
-
-    except Exception as e:
-        logger.error(f"Question handler error: {e}", exc_info=True)
-        return _cors(500, {'error': 'Internal server error'})
+    return error_response("Method not allowed", status_code=405)

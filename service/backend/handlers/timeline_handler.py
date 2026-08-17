@@ -36,7 +36,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from clients.s3_xml_client import S3XMLClient
-from config.constants import CORS_HEADERS, MAX_PAGE_SIZE
+from config.constants import MAX_PAGE_SIZE
+from core.decorators import lambda_handler as handler_decorator
+from core.response import error_response, no_content_response, success_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -297,6 +299,7 @@ def build_timeline(req: TimelineRequest) -> dict:
 # Lambda entry point
 # =============================================================================
 
+@handler_decorator
 def lambda_handler(event: dict, context) -> dict:
     """AWS Lambda / API Gateway 핸들러."""
     method = (
@@ -305,12 +308,12 @@ def lambda_handler(event: dict, context) -> dict:
         or ''
     ).upper()
     if method == 'OPTIONS':
-        return _response(204, {})
+        return no_content_response()
 
     try:
         req = parse_request(event)
     except BadRequest as e:
-        return _response(400, {'error': {'code': 'BAD_REQUEST', 'message': str(e)}})
+        return error_response(str(e), status_code=400, code='BAD_REQUEST')
 
     try:
         payload = build_timeline(req)
@@ -319,15 +322,7 @@ def lambda_handler(event: dict, context) -> dict:
             payload.get('date'), payload.get('source'),
             payload.get('total_hits'), len(payload.get('articles', [])),
         )
-        return _response(200, payload)
+        return success_response(payload)
     except Exception as e:  # noqa: BLE001
         logger.error('timeline 오류: %s', e, exc_info=True)
-        return _response(500, {'error': {'code': 'TIMELINE_ERROR', 'message': str(e)}})
-
-
-def _response(status: int, body: dict) -> dict:
-    return {
-        'statusCode': status,
-        'headers': {**CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8'},
-        'body': json.dumps(body, ensure_ascii=False, default=str),
-    }
+        return error_response(str(e), status_code=500, code='TIMELINE_ERROR')
