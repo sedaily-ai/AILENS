@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { HotLettersRail } from './HotLettersRail';
 import { SajuMiniRail } from './SajuMiniRail';
 import type { TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
@@ -14,9 +15,21 @@ import type { TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
 // 위쪽에 고정된 채 본문만 스크롤되는 것처럼 보였는데, 그게 "따로 논다"는
 // 인상을 줬다. 이제 본문·사이드바 둘 다 그냥 일반 문서 흐름대로 같이
 // 스크롤된다.
-export function HomeSideBar({ className, initialHotLetters }: { className?: string; initialHotLetters?: TodayLetterCardLike[] }) {
+export function HomeSideBar({
+  className,
+  style,
+  initialHotLetters,
+}: {
+  className?: string;
+  /** 페이지마다 본문 칼럼의 상단 여백이 달라(예: lens 상세는 헤더 아래
+   *  paddingTop을 따로 줌) 사이드바도 그 값에 맞춰야 두 칼럼의 시작선이
+   *  나란해진다(2026-08-18, "헤더에 너무 붙은거 아닌가?") — 호출부가
+   *  필요하면 넘긴다. */
+  style?: CSSProperties;
+  initialHotLetters?: TodayLetterCardLike[];
+}) {
   return (
-    <aside className={className} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+    <aside className={className} style={{ display: 'flex', flexDirection: 'column', gap: 28, ...style }}>
       <HotLettersRail initialItems={initialHotLetters} />
       {/* 성격이 다른 두 섹션(인기글 랭킹 vs 사주 미니앱)이 구분선 없이
           바로 붙어 있으면 하나로 뭉쳐 보인다는 피드백(2026-08-17, "분리

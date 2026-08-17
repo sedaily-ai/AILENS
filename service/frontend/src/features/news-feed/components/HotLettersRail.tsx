@@ -89,11 +89,19 @@ export function HotLettersRail({ initialItems }: { initialItems?: TodayLetterCar
                 />
               </span>
               <div className="flex-1 min-w-0">
+                {/* 5개 항목의 제목 굵기가 서로 다르게 보인다는 피드백
+                    (2026-08-18, "그 볼드를 누군 주고 안주고 하지말고
+                    동일하게") — 코드상 조건 분기는 없이 전부 같은
+                    font-medium 클래스였지만, Tailwind 클래스 대신
+                    fontWeight를 인라인 숫자로 못박아 다섯 항목이 정확히
+                    같은 값을 쓰도록 확정했다(브라우저·폰트 렌더링 차이로
+                    클래스 적용이 흔들릴 여지를 아예 없앤다). */}
                 <p
-                  className="text-gray-900 font-medium group-hover:opacity-70 transition-opacity"
+                  className="text-gray-900 group-hover:opacity-70 transition-opacity"
                   style={{
                     fontFamily: '"Noto Serif KR", serif',
                     fontSize: 13,
+                    fontWeight: 500,
                     lineHeight: 1.45,
                     letterSpacing: '-0.015em',
                     display: '-webkit-box',
