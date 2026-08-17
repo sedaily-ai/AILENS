@@ -115,6 +115,7 @@ def build_investment_scenarios(date: str) -> List[Dict[str, Any]]:
                 'label': '코스피',
                 'description': f'{base_year}년 말 코스피({base:,}p)에 100만원을 넣었다면',
                 'result': f'지금은 약 {_fmt_won(now_value)} (코스피 {KOSPI_CURRENT_LABEL} {KOSPI_CURRENT:,.0f}p 기준, {multiple:.1f}배)',
+                'highlight': f'{multiple:.1f}배',
                 'story': KOSPI_YEAR_STORY.get(base_year),
                 'source_label': f'코스피 {base_year}년 말 종가 {base:,}p, {KOSPI_CURRENT_LABEL} {KOSPI_CURRENT:,.0f}p — 실측치',
             })
@@ -133,6 +134,7 @@ def build_investment_scenarios(date: str) -> List[Dict[str, Any]]:
                 'label': '비트코인',
                 'description': f'{base_year}년 말 비트코인(개당 ${base:,.1f})에 100만원어치를 사뒀다면',
                 'result': f'지금은 약 {_fmt_won(now_value)} (비트코인 {BTC_CURRENT_LABEL} ${BTC_CURRENT_USD:,.0f} 기준, {multiple:,.1f}배)',
+                'highlight': f'{multiple:,.1f}배',
                 'story': BTC_YEAR_STORY.get(base_year),
                 'source_label': f'비트코인 {base_year}년 말 시세 ${base:,.1f}, {BTC_CURRENT_LABEL} ${BTC_CURRENT_USD:,.0f} — 실측치',
             })
@@ -152,6 +154,7 @@ def build_investment_scenarios(date: str) -> List[Dict[str, Any]]:
             'label': '로또 6/45',
             'description': f'그날 로또 한 장({ticket_price:,}원)을 샀다면',
             'result': f'1등 당첨 확률은 1/{LOTTO_ODDS_DENOM:,} — 역대 평균 1등 당첨금은 {_fmt_won(LOTTO_AVG_JACKPOT)}이었어요.',
+            'highlight': f'1/{LOTTO_ODDS_DENOM:,}',
             'story': kospi_note,
             'source_label': '동행복권 공식 통계(1등 확률·역대 평균 당첨금) — 실측치',
         })
@@ -171,6 +174,7 @@ def build_investment_scenarios(date: str) -> List[Dict[str, Any]]:
                     'label': '커피값 아꼈다면',
                     'description': f'그날 스타벅스 아메리카노(톨, {price:,}원) 한 잔 값을 안 쓰고 코스피에 넣었다면',
                     'result': f'지금은 약 {_fmt_won(now_value)} ({multiple:.1f}배)',
+                    'highlight': f'{multiple:.1f}배',
                     'story': None,
                     'source_label': f'스타벅스 아메리카노 톨 {coffee_year}년 가격 {price:,}원 — 실측치, 코스피 수익률과 결합',
                 })
