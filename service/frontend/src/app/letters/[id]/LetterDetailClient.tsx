@@ -9,7 +9,7 @@ import { EditorCommentsSection, SideRail, InteractiveBlock, type InteractiveBloc
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { trackArticleRead } from '@/shared/lib/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
-import { UserMenu, useAuth } from '@/features/auth';
+import { useAuth } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
 import { Calendar, Check, Link as LinkIcon, Printer } from 'lucide-react';

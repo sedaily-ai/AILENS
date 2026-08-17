@@ -94,7 +94,14 @@ const STALE_SUBTITLES = new Set(['같은 사실, 네 가지 관점으로']);
 
 function usableSubtitle(subtitle: string | null | undefined): string | null {
   if (!subtitle) return null;
-  const trimmed = subtitle.trim();
+  // 일부 subtitle에 본문 마커 문법("■", "[태그]")이 그대로 들어있어(2026-08-18,
+  // LetterDetailClient.tsx의 cleanSubtitle과 같은 문제) 안 걷어내면 검색결과
+  // 스니펫·OG/Twitter 미리보기·JSON-LD description·abstract 에 마커가 그대로
+  // 노출된다 — 화면 표시용 cleanSubtitle과 동일한 규칙을 여기서도 적용.
+  const trimmed = subtitle
+    .replace(/^■\s*/, '')
+    .replace(/^\[[^\]]*\]\s*/, '')
+    .trim();
   if (!trimmed || STALE_SUBTITLES.has(trimmed)) return null;
   return trimmed;
 }
