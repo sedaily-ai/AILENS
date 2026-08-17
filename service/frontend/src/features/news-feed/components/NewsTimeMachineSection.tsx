@@ -341,18 +341,16 @@ export function NewsTimeMachineSection() {
           </div>
           <button
             type="button"
-            disabled={!isRecent}
-            title={isRecent ? undefined : '이 날짜는 지면 아카이브에 없어요 (2026-02-01 이전)'}
-            onClick={() => isRecent && router.push(`/timeline/${pickedDate}`)}
+            onClick={() => router.push(`/timeline/${pickedDate}`)}
             style={{
               padding: '6px 12px',
               borderRadius: 9999,
               border: 'none',
               background: '#f3f0e8',
-              color: isRecent ? '#78716c' : '#c4bdad',
+              color: '#78716c',
               fontSize: 12,
               fontWeight: 600,
-              cursor: isRecent ? 'pointer' : 'not-allowed',
+              cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}
           >
@@ -378,7 +376,8 @@ export function NewsTimeMachineSection() {
         </div>
 
         {/* 결과 — 최근 구간(2026-02-01~오늘)은 실시간 S3 지면, 그 이전은
-            빅카인즈 예시. */}
+            빅카인즈 issue_ranking 실 데이터. 홈은 미리보기라 상위 8개만 —
+            전체는 "펼치기"(/timeline/{날짜})에서. */}
         {isRecent ? (
           items !== null && (
             <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
@@ -452,7 +451,7 @@ export function NewsTimeMachineSection() {
                 </p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {topics.map((t, i) => (
+                {topics.slice(0, 8).map((t, i) => (
                   <div key={t.topic} style={{ padding: '12px 4px', borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)' }}>
                     <p className="text-gray-900" style={{ fontSize: 14.5, fontWeight: 700, marginBottom: 4, letterSpacing: '-0.01em' }}>
                       {t.topic}

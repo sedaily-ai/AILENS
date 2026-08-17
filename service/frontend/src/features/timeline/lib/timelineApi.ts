@@ -51,6 +51,31 @@ export type Source = 's3_xml';
 export const ISSUE_COUNT = 8;
 export const PER_ISSUE = 3;
 
+// S3 지면 아카이브가 실제로 커버하는 최소 날짜(2026-08-17 실측). 이보다 이전은
+// 빅카인즈 issue_ranking으로 대체한다. features/news-feed의 NewsTimeMachineSection.tsx
+// 에도 같은 값이 있다 — FSD 레이어 간 import 금지 규칙 때문에 의도적으로 중복.
+export const ARCHIVE_MIN_DATE = '2026-02-01';
+
+export interface BigKindsTopic {
+  topic: string;
+  keywords: string[];
+}
+
+/**
+ * 2026-02-01 이전 날짜의 "그날 이슈" — handlers/time_machine_handler.py가
+ * SSM에 보관된 키로 빅카인즈 issue_ranking을 직접 호출해 돌려준다(1990-01-01~).
+ */
+export async function fetchBigkindsTopics(target: string): Promise<BigKindsTopic[]> {
+  try {
+    const res = await fetch(`${API_URL}/time-machine?date=${target}`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.topics) ? data.topics : [];
+  } catch {
+    return [];
+  }
+}
+
 export function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
