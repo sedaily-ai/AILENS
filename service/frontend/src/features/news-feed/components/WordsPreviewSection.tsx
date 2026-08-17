@@ -267,16 +267,22 @@ function QuizCard({
   // 스럽게요... 있는듯 없는듯"이라는 되돌림 피드백 — 타임머신 카드
   // (NewsTimeMachineSection)가 쓰는 것과 같은, 거의 안 보이는 옅은 2단
   // 블러 그림자로 바꿨다. 테두리 없이 그림자만.
+  //
+  // 배경을 크림(#fef3d7)에서 옅은 라벤더(#f3f0fb)로 바꿨다(2026-08-17,
+  // "저희 서비스에 맞는 톤앤매너로" 피드백 — WebtoonPreviewSection.tsx
+  // 참조: 크림은 빌려온 색이고 보라는 검색 아이콘·국제 카테고리가 이미
+  // 쓰는 이 서비스의 "AI" 신호라 그쪽으로 맞췄다). 배경이 바뀌어 웜톤으로
+  // 맞춰뒀던 버튼 테두리·라벨 색도 라벤더에 맞는 톤으로 다시 조정.
   return (
     <div
       style={{
         borderRadius: 18,
-        background: '#fef3d7',
+        background: '#f3f0fb',
         boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
         padding: 'clamp(16px, 3vw, 22px)',
       }}
     >
-      <p style={{ fontSize: 12.5, fontWeight: 800, color: '#8a7a5e', marginBottom: 8, letterSpacing: '-0.005em' }}>
+      <p style={{ fontSize: 12.5, fontWeight: 800, color: '#8b85a8', marginBottom: 8, letterSpacing: '-0.005em' }}>
         다음 설명에 맞는 단어는?
       </p>
       <p
@@ -295,14 +301,13 @@ function QuizCard({
         {card.choices.map((c) => {
           const isAnswer = c.term === card.answer.term;
           const isPicked = picked === c.term;
-          // 카드 배경이 크림/앰버라 순수 쿨그레이(#e5e7eb 등) 테두리는
-          // 노란 배경 위에서 푸르스름한 얼룩/그림자처럼 보였다(2026-08-17,
-          // 사용자 피드백: "테두리는 음... 그림자?? 봐주시죠" — 색조가
-          // 안 맞아서 생긴 문제). 카드 배경과 같은 계열의 톤 다운된 웜그레이로
-          // 맞춰 이질감을 없앴다.
+          // 카드 배경 톤(크림→라벤더)에 맞춰 테두리도 다시 조정했다 —
+          // 순수 쿨그레이는 크림 배경에선 얼룩처럼 보였지만(2026-08-17,
+          // "테두리는 음... 그림자?? 봐주시죠"), 지금은 배경 자체가
+          // 라벤더라 같은 계열의 옅은 바이올렛그레이로 맞춘다.
           let bg = '#fff';
-          let border = '#e6dcc3';
-          let borderBottom = '#d9cba6';
+          let border = '#e2ddf0';
+          let borderBottom = '#d3cbe8';
           let color = '#111827';
           if (answered && isAnswer) {
             bg = '#ecfdf3';

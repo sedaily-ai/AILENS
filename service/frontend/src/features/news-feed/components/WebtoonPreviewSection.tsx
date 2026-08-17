@@ -97,14 +97,21 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
   // 밴드를 원한 것이었다). 카드 안에 넣었던 첫 시도는 되돌리고, 표준
   // full-bleed 기법(`calc(50% - 50vw)` 좌우 마진)으로 배경만 뷰포트 끝까지
   // 채우고, 내부 콘텐츠(헤더+카드)는 나머지 섹션과 같은 1000px 폭/좌우
-  // 패딩으로 다시 가운데 정렬한다. 색은 WordsPreviewSection의 단어 퀴즈
-  // 카드와 같은 크림(#fef3d7) — 홈에서 "재미 콘텐츠"로 묶이는 두 섹션이
-  // 같은 톤을 공유한다.
+  // 패딩으로 다시 가운데 정렬한다.
+  //
+  // 색은 크림(#fef3d7)에서 옅은 라벤더(#f3f0fb)로 바꿨다(2026-08-17, 사용자
+  // 피드백: "색상은 이게 좋나요? 저희 서비스에 맞는 톤앤매너로 구성해도
+  // 좋고" — 크림은 퍼블리류 "프리미엄 아티클" 관례를 그대로 빌려온 색이라
+  // AI LENS 고유 신호와는 무관했다. 반면 보라(violet)는 검색 아이콘
+  // (Header.tsx, "AI지 그냥 검색 아님" 신호)과 국제 카테고리 accent에 이미
+  // 쓰이고 있는, 이 서비스가 실제로 갖고 있던 "AI" 톤이라 그걸 옅게 끌어와
+  // 브랜드와 더 맞물리게 했다. WordsPreviewSection의 단어 퀴즈 카드도 같은
+  // 톤으로 맞췄다(재미 콘텐츠 두 섹션이 같은 색을 공유).
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <div
         style={{
-          background: '#fef3d7',
+          background: '#f3f0fb',
           marginLeft: 'calc(50% - 50vw)',
           marginRight: 'calc(50% - 50vw)',
           width: '100vw',
@@ -154,7 +161,7 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
       </header>
 
       {hasMock && (
-        <p style={{ fontSize: 11.5, color: '#a8a29e', marginBottom: 16, fontWeight: 600 }}>
+        <p style={{ fontSize: 11.5, color: '#8b85a8', marginBottom: 16, fontWeight: 600 }}>
           연필 스케치는 아직 구상 중인 편이에요 — 실제로 나오면 컬러 표지로 바뀌어요.
         </p>
       )}
