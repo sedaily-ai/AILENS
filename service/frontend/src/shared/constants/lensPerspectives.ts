@@ -51,24 +51,29 @@ export interface LensPerspective {
   border: string;
 }
 
-// 독자 역할 4종(2026-08-13, 안 1 확정) — 사회초년생·직장인·자영업자·투자자.
-// 경제 뉴스는 같은 사건이 역할에 따라 실제 의미가 갈리므로("금리 인하"가
-// 학생에겐 학자금, 투자자에겐 포트폴리오) 역할이 곧 "나에게 무슨 의미"를
-// 가르는 축이 된다. 각 역할이 자연히 다른 읽기 포맷을 끌고 온다(사회초년생→
-// 쉬운 설명, 직장인→실용 체크, 자영업자→사업 영향, 투자자→숫자·시장).
+// 관심축 4종(2026-08-17 워딩 개편) — 원인·공감·실무·숫자.
+// 이전엔 사회초년생·직장인·자영업자·투자자 같은 "직업/생애단계" 역할로
+// 라벨링했었는데(2026-08-13, 안 1) 그건 실제 편집팀이 admin에서 매 기사마다
+// 채우는 축(admin/frontend/src/components/PostForm/LensMode.tsx의
+// LENS_LABELS — 원인이 궁금한 사람/사람이 먼저 보이는 사람/내 일이 걱정되는
+// 사람/숫자부터 찾는 사람)과 맞지 않는 임의 라벨이었다. "관심사가 뭔지"로
+// 축을 바꿔서 편집팀 라벨과 실제로 정렬시켰다 — full은 그 admin 라벨을
+// 그대로 옮긴 것.
 //
-// ⚠️ 색·아이콘·역할명은 반드시 **인덱스 기준**. 저장된 라벨 문자열은
-// 아직 질문 축(원인/사람/내 일/숫자)이라 여기 역할과 다르다 — 콘텐츠가
-// 역할에 맞물리는 건 편집·admin 마이그레이션 이후다. 지금은 역할 프레임을
-// 인덱스로 덮어씌우는 프로토타입 단계.
+// short는 "~파" 접미사 없이 키워드만 — 접미사를 붙이면 무리/집단(파벌)
+// 느낌이 나서(사용자 피드백) 뺐다. MBTI 유형 코드(NT/NF/ST/SF)도 쓰지
+// 않는다 — 올드하다는 판단(사용자 피드백, 2026-08-17).
 //
-// 팔레트는 기획 덱(2.5/1.3)의 navy/purple/teal/orange 를 역할에 맞게 배정.
+// ⚠️ 색·아이콘·순서는 여전히 **인덱스 기준**(admin이 LENS_LABELS를 고정
+// 순서로 저장하므로).
+//
+// 팔레트는 기획 덱(2.5/1.3)의 navy/purple/teal/orange 배정을 그대로 유지.
 export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
   {
     ordinal: '①',
-    short: '사회초년생',
-    full: '사회초년생·학생',
-    tagline: '어려운 말 없이 기본부터',
+    short: '원인',
+    full: '원인이 궁금한 사람',
+    tagline: '왜 이렇게 됐을까',
     illustration: '/lens/role-1-newcomer.png',
     icon: GraduationCap,
     color: '#0d9488',
@@ -77,9 +82,9 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
   },
   {
     ordinal: '②',
-    short: '직장인',
-    full: '직장인',
-    tagline: '내 지갑·커리어에 뭐가 달라지나',
+    short: '공감',
+    full: '사람이 먼저 보이는 사람',
+    tagline: '그래서 누가 어떻게 됐을까',
     illustration: '/lens/role-2-worker.png',
     icon: Briefcase,
     color: '#1e40af',
@@ -88,9 +93,9 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
   },
   {
     ordinal: '③',
-    short: '자영업자',
-    full: '자영업자·소상공인',
-    tagline: '내 사업·비용에 미치는 영향',
+    short: '실무',
+    full: '내 일이 걱정되는 사람',
+    tagline: '그래서 나는 뭘 해야 할까',
     illustration: '/lens/role-3-owner.png',
     icon: Store,
     color: '#ea580c',
@@ -99,9 +104,9 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
   },
   {
     ordinal: '④',
-    short: '투자자',
-    full: '투자자',
-    tagline: '숫자와 시장 반응 중심',
+    short: '숫자',
+    full: '숫자부터 찾는 사람',
+    tagline: '그래서 숫자로 보면',
     illustration: '/lens/role-4-investor.png',
     icon: TrendingUp,
     color: '#7c3aed',
