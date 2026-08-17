@@ -3,7 +3,18 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TimeMachineRewind } from '@/shared/ui/TimeMachineRewind';
+import { VintageCalendar } from './VintageCalendar';
 import { kstTodayStr } from '../lib/timelineApi';
+
+// 빅카인즈가 공식 지원하는 최소 날짜(OpenAPI 사용자지침서 V1.5 §4) —
+// NewsTimeMachineSection.tsx(홈 위젯)에도 같은 값이 있다. FSD 레이어 간
+// import 금지 규칙 때문에 의도적으로 중복.
+const MIN_DATE = '1990-01-01';
+
+function kdateLabel(ymd: string): string {
+  const [y, m, d] = ymd.split('-');
+  return `${y}년 ${parseInt(m, 10)}월 ${parseInt(d, 10)}일`;
+}
 
 /**
  * 뉴스 타임머신 — 날짜를 입력하면 '서울경제' 신문이 그 날짜로 되감기는
@@ -27,6 +38,8 @@ export function NewsTimeMachine() {
   const [phase, setPhase] = useState<Phase>('input');
   const [date, setDate] = useState('');
   const [target, setTarget] = useState('');
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => new Date());
 
   function start() {
     if (!date) return;
@@ -81,51 +94,69 @@ export function NewsTimeMachine() {
               날짜를 고르면 그 날 신문이 그대로 펼쳐져요.
             </p>
 
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '8px 8px 8px 20px',
-                background: '#fff',
-                border: '1px solid #e6e0d4',
-                borderRadius: 9999,
-                boxShadow: '0 1px 2px rgba(80,60,30,0.04)',
-              }}
-            >
-              <input
-                type="date"
-                value={date}
-                max={today}
-                onChange={(e) => setDate(e.target.value)}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <div
                 style={{
-                  border: 'none',
-                  outline: 'none',
-                  background: 'transparent',
-                  fontSize: 15,
-                  color: '#2a2622',
-                  fontFamily: 'inherit',
-                  width: 'clamp(140px, 40vw, 180px)',
-                }}
-              />
-              <button
-                onClick={start}
-                disabled={!date}
-                style={{
-                  padding: '10px 22px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 8px 8px 20px',
+                  background: '#fff',
+                  border: '1px solid #e6e0d4',
                   borderRadius: 9999,
-                  border: 'none',
-                  background: date ? '#2a2622' : '#d9d3c6',
-                  color: '#fff',
-                  fontSize: 13.5,
-                  fontWeight: 700,
-                  cursor: date ? 'pointer' : 'default',
-                  transition: 'background .2s',
-                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 2px rgba(80,60,30,0.04)',
                 }}
               >
-                그 날 신문 펼치기
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCalendar((v) => !v)}
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: 15,
+                    color: date ? '#2a2622' : '#a8a29e',
+                    fontFamily: 'inherit',
+                    minWidth: 'clamp(140px, 40vw, 180px)',
+                    textAlign: 'left',
+                  }}
+                >
+                  {date ? kdateLabel(date) : '날짜 선택'}
+                </button>
+                <button
+                  onClick={start}
+                  disabled={!date}
+                  style={{
+                    padding: '10px 22px',
+                    borderRadius: 9999,
+                    border: 'none',
+                    background: date ? '#2a2622' : '#d9d3c6',
+                    color: '#fff',
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    cursor: date ? 'pointer' : 'default',
+                    transition: 'background .2s',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  그 날 신문 펼치기
+                </button>
+              </div>
+              {showCalendar && (
+                <VintageCalendar
+                  value={date}
+                  min={MIN_DATE}
+                  max={today}
+                  viewMonth={viewMonth}
+                  onViewMonthChange={setViewMonth}
+                  onSelect={(ymd) => {
+                    setDate(ymd);
+                    setShowCalendar(false);
+                  }}
+                  onClose={() => setShowCalendar(false)}
+                />
+              )}
             </div>
           </div>
         )}
