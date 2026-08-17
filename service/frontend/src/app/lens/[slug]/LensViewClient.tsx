@@ -148,11 +148,6 @@ export function LensViewClient({
            넘는다. 정렬 일관성을 우선한 선택이다. */
         .lm { max-width: 100%; }
         .rule { height: 1px; background: rgba(17,24,39,0.1); }
-
-        .back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
-          color: #6b7280; font-size: 13px; font-weight: 700; text-decoration: none;
-          letter-spacing: 0.02em; }
-        .back:hover { color: #111827; }
         .back:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
 
         /* 원문 링크 — 테두리 없는 텍스트 링크. 요약 아래 우측에 붙는다.
@@ -206,11 +201,12 @@ export function LensViewClient({
       <div className="mx-auto" style={{ maxWidth: 1320, padding: '0 clamp(20px, 4vw, 28px)' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
           <div style={{ gridColumn: 1, minWidth: 0 }}>
-      <div className="lw" style={{ paddingTop: 'clamp(12px, 2.4vw, 18px)' }}>
-        <Link href="/lens" className="back" aria-label="시선 목록으로">
-          ◀ 시선
-        </Link>
-      </div>
+      {/* "◀ 시선" 뒤로가기 링크는 걷어냈다(2026-08-17, 사용자 피드백:
+          "시선 화살표... 저거는 빼면 어떨까요, 디자인이 구린듯" — 바로
+          위에 전역 헤더가 새로 생겨서 그 아래 또 있는 텍스트 뒤로가기
+          링크가 중복 내비게이션처럼 보였다). "4가지 시선" 카테고리
+          라벨(아래 <main> 첫 줄)은 다른 섹션들과 같은 관례(예: "타임머신"
+          위 "그날로 떠나요")라 그대로 유지. */}
 
       <main id="main-content">
         {/* ── 기사 머리 ── 위계: 아이브로우 13 → 헤드라인 40 → 메타 13 */}
