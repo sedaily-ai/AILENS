@@ -25,8 +25,10 @@ import Link from 'next/link';
 import type { BigKindsArticle, InvestmentScenario } from '../lib/timelineApi';
 import { kdate } from '../lib/timelineApi';
 import { InvestmentScenarioCards } from './InvestmentScenarioCards';
+import { ShareBar } from './ShareBar';
 
 const MAX_SHOWN = 5;
+const SITE_URL = 'https://ailens.sedaily.ai';
 
 export function TimelineBigkindsView({
   date,
@@ -39,6 +41,19 @@ export function TimelineBigkindsView({
 }) {
   const shown = articles.slice(0, MAX_SHOWN);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // 공유 카드는 코스피를 최우선으로(가장 널리 이해되는 비교 기준), 없으면
+  // 있는 첫 시나리오, 그것도 없으면(예: 1994년 이전) 헤드라인만으로 구성.
+  const heroScenario = investments.find((s) => s.id === 'kospi') ?? investments[0];
+  const shareCardData = {
+    date,
+    dateLabel: kdate(date),
+    heroLabel: heroScenario?.description,
+    heroValue: heroScenario?.highlight,
+    story: heroScenario?.story,
+    headline: shown[0]?.title,
+    url: `${SITE_URL}/timeline/${date}`,
+  };
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -176,6 +191,8 @@ export function TimelineBigkindsView({
               </ol>
 
               <InvestmentScenarioCards scenarios={investments} />
+
+              <ShareBar cardData={shareCardData} />
 
               <div style={{ textAlign: 'center', marginTop: 36 }}>
                 <Link

@@ -78,6 +78,7 @@ export interface InvestmentScenario {
   label: string;
   description: string;
   result: string;
+  highlight: string;
   story: string | null;
   source_label: string;
 }
