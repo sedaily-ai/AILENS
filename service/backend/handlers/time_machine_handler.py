@@ -21,6 +21,7 @@ API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽는다 
 프론트/로그 어디에도 노출하지 않는다.
 """
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -48,6 +49,26 @@ MAX_ARTICLES = 30
 # '[시그널]' 제외 규칙, 옛 time_machine_handler(위키/스크래핑판)의 EXCLUDE_TAGS와
 # 같은 취지.
 EXCLUDE_TITLE_MARKERS = ('[부고]', '[인사]', '[사설]', '[마켓아이]', '[시론]', '[발언대]')
+
+# content는 문서상 "200자 제한"이라고 돼 있지만 실측 결과 최대 1,500자 넘는
+# 전체(또는 거의 전체) 본문이 그대로 온다(2026-08-17 확인) — 리스트에 그대로
+# 노출하면 한 줄이 너무 길어져 오히려 안 친절해 보인다는 피드백으로, 여기서
+# 미리보기 길이로 직접 잘라 내려준다(전체는 original_link로).
+CONTENT_PREVIEW_LEN = 150
+# 본문 끝에 흔히 붙는 "이름+기자+이메일" 서명과 "입력시간 : ..." 꼬리 — byline
+# 필드로 이미 따로 내려주고 있어 미리보기에서는 지저분하기만 하다.
+_BYLINE_TAIL_RE = re.compile(r'[가-힣]{2,4}\s*기자\S*@\S+\.(?:CO\.KR|COM)\s*$', re.IGNORECASE)
+_INPUT_TIME_TAIL_RE = re.compile(r'입력시간\s*:\s*\d{4}/\d{2}/\d{2}\s*\d{1,2}:\d{2}\s*$')
+
+
+def _clean_content_preview(raw: str) -> str:
+    text = raw.strip()
+    text = _BYLINE_TAIL_RE.sub('', text).strip()
+    text = _INPUT_TIME_TAIL_RE.sub('', text).strip()
+    text = re.sub(r'\s+', ' ', text)  # 문단 줄바꿈을 미리보기 한 덩어리로
+    if len(text) > CONTENT_PREVIEW_LEN:
+        text = text[:CONTENT_PREVIEW_LEN].rstrip() + '…'
+    return text
 
 # 캐시 테이블 — 옛 위키/스크래핑판 캐시와 같은 테이블 재사용. 키 접두사를
 # timemachine_articles_로 바꿔서(이전 issue_ranking 토픽판 캐시와도 안 섞이게)
@@ -164,7 +185,7 @@ def _fetch_sedaily_articles(date: str) -> List[Dict[str, Any]]:
         articles.append({
             'news_id': d.get('news_id', ''),
             'title': title,
-            'content': (d.get('content') or '').strip(),
+            'content': _clean_content_preview(d.get('content') or ''),
             'byline': (d.get('byline') or '').strip(),
             'category': category,
             'original_link': d.get('provider_link_page') or None,
