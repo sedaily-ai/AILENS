@@ -21,12 +21,22 @@ export function LatestGridSection({ items, heroSlot }: { items: ArchiveItem[]; h
   const grid = (heroSlot ? items : items.slice(1)).slice(0, 8);
 
   return (
-    <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
-      <header style={{ marginBottom: 20 }}>
-        <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-          최신 뉴스
-        </h2>
-      </header>
+    <section style={{ padding: heroSlot ? 0 : 'clamp(28px, 4vw, 40px) 0 0' }}>
+      {/* heroSlot이 있을 땐 "최신 뉴스" 제목을 안 그린다(2026-08-17,
+          사용자 피드백: "헤더가 두 번 겹쳐 보인다") — heroSlot으로 넘어온
+          컴포넌트(LensPreviewSection)가 이미 자기 헤더("오늘의 이슈,
+          4가지 시선")를 갖고 있어서, 둘 다 그리면 제목이 위아래로
+          두 개 붙어 보이고 그 사이 여백도 이중으로 벌어졌다(각 섹션이
+          자기 몫의 top padding을 따로 갖고 있어서). heroSlot이 없을
+          때(시선 미발행일)만 이 컴포넌트가 스스로 "최신 뉴스" 제목을
+          맡는다. */}
+      {!heroSlot && (
+        <header style={{ marginBottom: 20 }}>
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            최신 뉴스
+          </h2>
+        </header>
+      )}
 
       {heroSlot ?? (hero && <ArticleHeroCard item={hero} />)}
 
