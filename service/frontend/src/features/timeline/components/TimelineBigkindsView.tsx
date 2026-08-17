@@ -6,11 +6,18 @@
 // 섞여 나옴, 당일 날짜조차 그랬음) 날짜 범위 직접 검색으로 교체했다(2026-08-17).
 // 발행 "시각"은 이 API가 어느 시대 기사든 항상 자정 고정이라 안 줘서, 시간 대신
 // 순번(01, 02...)으로 표시한다 — TimelineResultView의 ArticleList와 같은 패턴.
+//
+// 상위 5건만 보여준다(2026-08-17 피드백: "30개를 다 보여주면 좀 아까울듯요") —
+// 본문 스니펫은 빅카인즈 API 자체가 200자로 제한해서 주는 값이라(전체 본문은
+// 이 API로 원천적으로 불가능) 자르지 않고 그대로 다 보여준다.
 import Link from 'next/link';
 import type { BigKindsArticle } from '../lib/timelineApi';
 import { kdate } from '../lib/timelineApi';
 
+const MAX_SHOWN = 5;
+
 export function TimelineBigkindsView({ date, articles }: { date: string; articles: BigKindsArticle[] }) {
+  const shown = articles.slice(0, MAX_SHOWN);
   return (
     <div style={{ minHeight: 'calc(100vh - 56px)', background: '#faf8f3' }}>
       <style>{`@keyframes tmPaper { from { opacity:0; transform: translateY(20px) scale(.985);} to {opacity:1; transform:none;} }`}</style>
@@ -28,9 +35,14 @@ export function TimelineBigkindsView({ date, articles }: { date: string; article
             >
               {kdate(date)}자 서울경제
             </h1>
+            {articles.length > MAX_SHOWN && (
+              <p style={{ fontSize: 12, color: '#a8a29e', marginTop: 8 }}>
+                이 날 보관된 기사 {articles.length}건 중 {MAX_SHOWN}건을 골라 보여드려요
+              </p>
+            )}
           </div>
 
-          {articles.length === 0 ? (
+          {shown.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 18, fontWeight: 700, color: '#2a2622', marginBottom: 8 }}>
                 이 날은 보관된 기사가 없어요
@@ -49,7 +61,7 @@ export function TimelineBigkindsView({ date, articles }: { date: string; article
           ) : (
             <>
               <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {articles.map((a, i) => {
+                {shown.map((a, i) => {
                   const row = (
                     <>
                       <span
@@ -61,6 +73,11 @@ export function TimelineBigkindsView({ date, articles }: { date: string; article
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
+                        {a.category && (
+                          <p style={{ fontSize: 11, color: '#b08d57', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 5 }}>
+                            {a.category}
+                          </p>
+                        )}
                         <p
                           style={{
                             fontFamily: '"Noto Serif KR", serif',
@@ -75,12 +92,7 @@ export function TimelineBigkindsView({ date, articles }: { date: string; article
                           {a.title}
                         </p>
                         {a.content && (
-                          <p
-                            style={{
-                              fontSize: 13.5, color: '#6b6459', lineHeight: 1.6, marginBottom: 4,
-                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                            }}
-                          >
+                          <p style={{ fontSize: 13.5, color: '#6b6459', lineHeight: 1.65, marginBottom: 4, whiteSpace: 'pre-line' }}>
                             {a.content}
                           </p>
                         )}

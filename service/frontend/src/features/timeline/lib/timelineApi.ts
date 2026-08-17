@@ -61,6 +61,7 @@ export interface BigKindsArticle {
   title: string;
   content: string;
   byline: string;
+  category: string;
   original_link: string | null;
 }
 

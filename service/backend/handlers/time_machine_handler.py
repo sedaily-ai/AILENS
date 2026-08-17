@@ -140,7 +140,7 @@ def _fetch_sedaily_articles(date: str) -> List[Dict[str, Any]]:
             'sort': {'date': 'desc'},
             'return_from': 0,
             'return_size': MAX_ARTICLES,
-            'fields': ['title', 'content', 'byline', 'provider_link_page'],
+            'fields': ['title', 'content', 'byline', 'category', 'provider_link_page'],
         },
     }
     res = requests.post(BIGKINDS_SEARCH_URL, json=payload, timeout=BIGKINDS_TIMEOUT_SECONDS)
@@ -157,11 +157,16 @@ def _fetch_sedaily_articles(date: str) -> List[Dict[str, Any]]:
         title = (d.get('title') or '').strip()
         if not title or any(marker in title for marker in EXCLUDE_TITLE_MARKERS):
             continue
+        # category는 "경제>산업_기업" 같은 전체 경로 배열 — 배지로 쓸 대분류(맨
+        # 앞 세그먼트)만 뽑는다.
+        raw_categories = d.get('category') or []
+        category = raw_categories[0].split('>')[0] if raw_categories else ''
         articles.append({
             'news_id': d.get('news_id', ''),
             'title': title,
             'content': (d.get('content') or '').strip(),
             'byline': (d.get('byline') or '').strip(),
+            'category': category,
             'original_link': d.get('provider_link_page') or None,
         })
 
