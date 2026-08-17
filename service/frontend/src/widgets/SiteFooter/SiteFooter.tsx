@@ -110,9 +110,13 @@ const NAV: { label: string; href: string }[] = [
 // 가는 링크를 심어서, 크롤러가 어느 글에서 출발하든 몇 클릭 안에 전체
 // 콘텐츠 구조를 발견할 수 있게 한다(사이트맵과는 별개로 "실제 보이는
 // 링크"가 있어야 크롤 우선순위·내부 링크 가중치에 더 잘 잡힌다는 지적).
+// '딥다이브'(/trend)는 2026-08-17 폐기 — headerTabs.ts 주석 참조. 이 배열이
+// headerTabs.ts/FeedPage.tsx와 별도로 관리되는 세 번째 사본이라는 걸
+// 뒤늦게 발견 — 앞의 둘만 고치고 배포했다가 라이브에서 이 푸터 링크만
+// 남아있는 걸 확인하고 뒤이어 고쳤다.
 const CONTENT_LINKS: { label: string; href: string }[] = [
   { label: '브리핑', href: '/letters' },
-  { label: '딥다이브', href: '/trend' },
+  { label: '이슈 톡톡', href: '/issue-talk' },
   { label: '인사이트', href: '/column' },
   { label: '영상', href: '/video' },
   { label: '웹툰', href: '/webtoon' },
