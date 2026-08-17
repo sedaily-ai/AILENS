@@ -70,26 +70,15 @@ export function NewsFeedTab({
             피드백으로 3슬라이드 캐러셀(HomeHeroCarousel.tsx)로 확장. */}
         <HomeHeroCarousel />
 
-        {/* "오늘의 이슈, 4가지 시선" — 배너 바로 아래로 이동(2026-08-17,
-            사용자 확인). 기존 디자인(히어로+"같은 이슈, 네 사람은
-            이렇게 읽습니다" 4행 비교)은 그대로 두고 위치만 옮긴 것 —
-            삭제·병합 아님. 하루 한 건만 크게 보여주는 게 컨셉이라(다른
-            섹션의 "여러 개 나열"과 대비) 배너 다음 첫 콘텐츠 섹션으로
-            올려서 "오늘 진짜 중요한 거 하나"라는 신호를 가장 먼저 준다.
-            LensPreviewSection.tsx 참조. */}
-        <LensPreviewSection initialItems={initialLensPosts} />
-
-        {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
-            뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
-            "그날의 지면"(TimelinePreviewSection)과 "생일 뉴스 타임머신"
-            (BirthdayTimeMachineSection)이 따로 있었는데 "통합해야죠, 두
-            개 다 있으면 안 됩니다"(같은 날) 피드백으로 하나로 합쳤다 —
-            최근 날짜는 실시간 S3 지면, 그 이전은 빅카인즈 예시.
-            NewsTimeMachineSection.tsx 상단 주석 참조. */}
-        <NewsTimeMachineSection />
-
-        {/* "최신 뉴스" 히어로+그리드+전체보기(2026-08-17 신설) — 예전엔
-            형식 기준으로 "이슈 톡톡"(FollowingFeed)과 "인사이트"
+        {/* "최신 뉴스" 히어로 자리+그리드+전체보기(2026-08-17, 배너 바로
+            아래 — 사용자가 스크린샷으로 히어로 위치를 정확히 짚어 확인).
+            히어로 자리는 오늘의 "4가지 시선" 이슈로 고정(heroSlot에
+            <LensPreviewSection/>을 그대로 넘김 — 카드로 축약하지 않고
+            원래 디자인 그대로, 삭제·병합 아님). 별도 섹션으로 또 나열
+            하면 같은 이슈가 두 번 보이는 중복이라 여기 히어로 자리
+            하나로 합쳤다. 시선 발행이 없는 날은 heroSlot이 undefined가
+            되어 예전처럼 최신 글이 히어로가 된다.
+            예전엔 형식 기준으로 "이슈 톡톡"(FollowingFeed)과 "인사이트"
             (ColumnPreviewSection) 두 섹션이 따로 있었는데, 상단 탭을
             형식(브리핑/인사이트)에서 주제(증시/부동산/...) 기준으로 갈아
             엎은 김에 홈도 맞췄다.
@@ -102,7 +91,19 @@ export function NewsFeedTab({
             CardMeta)가 붙어 있어 이 그리드 하나로 "주제별로 훑어보기"가
             충분히 된다 — 특정 주제만 몰아보고 싶으면 상단 탭(카테고리
             아카이브 페이지)으로. */}
-        <LatestGridSection items={archiveItems} />
+        <LatestGridSection
+          items={archiveItems}
+          heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} /> : undefined}
+        />
+
+        {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
+            뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
+            "그날의 지면"(TimelinePreviewSection)과 "생일 뉴스 타임머신"
+            (BirthdayTimeMachineSection)이 따로 있었는데 "통합해야죠, 두
+            개 다 있으면 안 됩니다"(같은 날) 피드백으로 하나로 합쳤다 —
+            최근 날짜는 실시간 S3 지면, 그 이전은 빅카인즈 예시.
+            NewsTimeMachineSection.tsx 상단 주석 참조. */}
+        <NewsTimeMachineSection />
 
         {/* 섹션 재정렬(2026-08-06) — "단어 퀴즈는 문제 하나뿐이라 자리를
             많이 안 차지하니 가볍게 매일 훑는 습관을 만들고 싶다"는 피드백. */}
