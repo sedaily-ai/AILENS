@@ -156,17 +156,19 @@ export function NewsFeedTab({
             위(2026-08-17, 사용자 확인). */}
         <NewsTimeMachineSection />
 
-        {CATEGORY_PAIRS.slice(1).map((pair) => (
-          <CategoryPairRow key={pair[0]} pair={pair} archiveItems={archiveItems} first={false} />
-        ))}
+        <CategoryPairRow pair={CATEGORY_PAIRS[1]} archiveItems={archiveItems} first={false} />
+
+        {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제 콘텐츠처럼
+            안 보인다"는 피드백으로 카드형으로 교체(WebtoonPreviewSection.tsx).
+            위치: 국제+재테크 짝(카테고리 마지막 줄) 바로 위(2026-08-17,
+            사용자 확인: "웹툰 부분은... 국제.. 재테크 바로 위쪽으로"). */}
+        <WebtoonPreviewSection initialItems={initialWebtoons} />
+
+        <CategoryPairRow pair={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
 
         {/* 섹션 재정렬(2026-08-06) — "단어 퀴즈는 문제 하나뿐이라 자리를
             많이 안 차지하니 가볍게 매일 훑는 습관을 만들고 싶다"는 피드백. */}
         <WordsPreviewSection initialTerms={initialWordTerms} />
-
-        {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제 콘텐츠처럼
-            안 보인다"는 피드백으로 카드형으로 교체(WebtoonPreviewSection.tsx). */}
-        <WebtoonPreviewSection initialItems={initialWebtoons} />
 
         {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
             뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를

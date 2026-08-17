@@ -261,8 +261,21 @@ function QuizCard({
   // 노란색 배경은 괜찮지 않나요?"라는 재피드백으로 되돌렸다 — 버튼·화살표·
   // 점 등 인터랙션 요소는 중립 톤 유지, 카드 바탕만 원래 크림 유지.
   // 정답(초록)/오답(빨강) 피드백 색은 퀴즈 UI의 표준 관례라 그대로 유지.
+  // 카드에 그림자를 얹었다(2026-08-17, 사용자 피드백: "그림자 효과 두면
+  // 좀 예쁠 것 같지 않나요"). 웹툰 카드의 진한 하드엣지 오프셋 그림자
+  // (검정 테두리 + `5px 5px 0`)를 그대로 옮겨봤더니 "너무 심하고... 자연
+  // 스럽게요... 있는듯 없는듯"이라는 되돌림 피드백 — 타임머신 카드
+  // (NewsTimeMachineSection)가 쓰는 것과 같은, 거의 안 보이는 옅은 2단
+  // 블러 그림자로 바꿨다. 테두리 없이 그림자만.
   return (
-    <div style={{ borderRadius: 18, background: '#fef3d7', padding: 'clamp(16px, 3vw, 22px)' }}>
+    <div
+      style={{
+        borderRadius: 18,
+        background: '#fef3d7',
+        boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
+        padding: 'clamp(16px, 3vw, 22px)',
+      }}
+    >
       <p style={{ fontSize: 12.5, fontWeight: 800, color: '#8a7a5e', marginBottom: 8, letterSpacing: '-0.005em' }}>
         다음 설명에 맞는 단어는?
       </p>
