@@ -91,18 +91,31 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
   const hasMock = mockFillers.length > 0;
 
   // 주변 흰 배경 섹션들과 구분되는 "하이라이트 밴드"로 감쌌다(2026-08-17,
-  // 사용자 피드백: 퍼블리 "프리미엄 아티클" 섹션처럼 배경색 있는 카드로
-  // 구획을 나눠달라는 참고 스크린샷 — "이렇게 섹션 구분해보시죠"). 색은
-  // WordsPreviewSection의 단어 퀴즈 카드와 같은 크림(#fef3d7)을 써서 홈에서
-  // "재미 콘텐츠"로 묶이는 두 섹션(웹툰·단어퀴즈)이 같은 톤을 공유하게 했다.
+  // 사용자 피드백: 퍼블리 "프리미엄 아티클" 섹션·뉴닉 참고 스크린샷 —
+  // "옆쪽 끝모서리까지 색상 채우는 거 말한거긴 한데" → 컨테이너 안에 갇힌
+  // 둥근 카드가 아니라, 뷰포트 좌우 끝까지 배경색이 번지는 진짜 full-bleed
+  // 밴드를 원한 것이었다). 카드 안에 넣었던 첫 시도는 되돌리고, 표준
+  // full-bleed 기법(`calc(50% - 50vw)` 좌우 마진)으로 배경만 뷰포트 끝까지
+  // 채우고, 내부 콘텐츠(헤더+카드)는 나머지 섹션과 같은 1000px 폭/좌우
+  // 패딩으로 다시 가운데 정렬한다. 색은 WordsPreviewSection의 단어 퀴즈
+  // 카드와 같은 크림(#fef3d7) — 홈에서 "재미 콘텐츠"로 묶이는 두 섹션이
+  // 같은 톤을 공유한다.
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <div
         style={{
-          borderRadius: 20,
           background: '#fef3d7',
-          boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
-          padding: 'clamp(20px, 3.5vw, 28px)',
+          marginLeft: 'calc(50% - 50vw)',
+          marginRight: 'calc(50% - 50vw)',
+          width: '100vw',
+          padding: 'clamp(24px, 4vw, 36px) 0',
+        }}
+      >
+      <div
+        style={{
+          maxWidth: 1000,
+          margin: '0 auto',
+          padding: '0 clamp(24px, 3.5vw, 44px)',
         }}
       >
       <header style={{ marginBottom: 18 }}>
@@ -274,6 +287,7 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
             </Link>
           );
         })}
+      </div>
       </div>
       </div>
     </section>
