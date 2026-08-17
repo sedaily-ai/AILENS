@@ -1,9 +1,10 @@
 """뉴스레터 Phase 1 — 오프라인 단위 테스트 (AWS 미접속).
 
 render / subscribers / sender(dry-run) 의 핵심 계약만 검증.
-핸들러 전체는 v1 데코레이터 의존이라 syntax-only 로 확인.
+핸들러 syntax-only 테스트는 제거됨 — handlers/newsletter.py는
+handlers/newsletter/(패키지)에 항상 가려져 자기 모듈 경로로 영원히
+도달 불가능했고(2026-07-30 폐기된 Lambda), 리팩토링 세션에서 삭제됨.
 """
-import ast
 import os
 import sys
 
@@ -54,8 +55,3 @@ def test_sender_dry_run_does_not_call_ses():
     r = send("a@b.com", "subj", "<html></html>", "https://x/unsub")
     assert r["status"] == "dry_run"
     assert r["to"] == "a@b.com"
-
-
-def test_handler_syntax_ok():
-    path = os.path.join(BACKEND, "handlers", "newsletter.py")
-    ast.parse(open(path, encoding="utf-8").read())
