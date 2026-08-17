@@ -6,7 +6,6 @@ import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import type { Term } from "../lib/wordsTerms";
 import { FollowingFeed } from "./FollowingFeed";
 import { SideRail } from "./SideRail";
-import { TrendingEconomySection } from "./TrendingEconomySection";
 import { ColumnPreviewSection } from "./ColumnPreviewSection";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
@@ -31,7 +30,6 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
-  initialTrendItems?: CmsSectionCard[];
   initialColumnItems?: CmsSectionCard[];
 }
 
@@ -49,7 +47,6 @@ export function NewsFeedTab({
   initialVideos,
   initialWordTerms,
   initialLensPosts,
-  initialTrendItems,
   initialColumnItems,
 }: Props) {
   return (
@@ -134,8 +131,11 @@ export function NewsFeedTab({
           <WebtoonPreviewSection initialItems={initialWebtoons} />
 
           {/* 어피티/뉴닉처럼 홈에 경제 콘텐츠 섹션을 더 — 아직 실제 데이터 없어서
-              목업(TrendingEconomySection/ColumnPreviewSection 파일 상단 참고). */}
-          <TrendingEconomySection initialItems={initialTrendItems} />
+              목업(ColumnPreviewSection 파일 상단 참고). "요즘 화제의 경제 이슈"
+              (TrendingEconomySection)는 2026-08-17 삭제 — "이슈 톡톡"과 독자
+              입장에서 구분이 안 된다는 판단으로 FollowingFeed(이슈 톡톡)에
+              흡수 통합했다(section='trend' 레터는 DB에서 태그를 지워 같은
+              버킷으로 옮김, todayLettersApi.ts::fetchFollowingLetters 참조). */}
           <ColumnPreviewSection initialItems={initialColumnItems} />
 
           {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면

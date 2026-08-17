@@ -31,7 +31,6 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
-  initialTrendItems?: CmsSectionCard[];
   initialColumnItems?: CmsSectionCard[];
 }
 
@@ -81,7 +80,6 @@ export function FeedPage({
   initialVideos,
   initialWordTerms,
   initialLensPosts,
-  initialTrendItems,
   initialColumnItems,
 }: Props) {
   const router = useRouter();
@@ -357,13 +355,13 @@ export function FeedPage({
           // (onLogo → setActiveTab("feed"))으로 그대로 유지.
           { key: "feed", label: "브리핑", href: "/letters" },
           // 콘텐츠 타입별 페이지 분리(2026-08-11, headerTabs.ts와 동일 항목) —
-          // 이 배열이 headerTabs.ts의 사본이라 거기 추가한 딥다이브/인사이트/영상도
+          // 이 배열이 headerTabs.ts의 사본이라 거기 추가한 인사이트/영상도
           // 여기 안 넣으면 홈에서만 안 보이는 불일치가 생긴다(바로 아래 사주
           // 탭이 /fortune 옛 경로를 들고 있던 것도 같은 이유의 드리프트였음 —
           // 겸사겸사 /saju로 바로잡음, 리다이렉트를 거치긴 하지만 정본이 아니었다).
-          // 라벨 워딩 개편(2026-08-12, headerTabs.ts 주석 참조) — 레터/트렌드/
-          // 칼럼 → 브리핑/딥다이브/인사이트로 통일, URL은 그대로.
-          { key: "trend", label: "딥다이브", href: "/trend", tier: "extra" },
+          // 라벨 워딩 개편(2026-08-12, headerTabs.ts 주석 참조) — 레터/칼럼 →
+          // 브리핑/인사이트로 통일, URL은 그대로.
+          // '딥다이브'(/trend) 탭은 2026-08-17 제거 — headerTabs.ts 주석 참조.
           { key: "column", label: "인사이트", href: "/column", tier: "extra" },
           // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
           // 앞으로 당김(headerTabs.ts와 동일, 사용자 확인).
@@ -430,7 +428,6 @@ export function FeedPage({
             initialVideos={initialVideos}
             initialWordTerms={initialWordTerms}
             initialLensPosts={initialLensPosts}
-            initialTrendItems={initialTrendItems}
             initialColumnItems={initialColumnItems}
           />
         )}

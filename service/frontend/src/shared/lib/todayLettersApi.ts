@@ -319,8 +319,14 @@ export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLA
       // "오늘의 이슈"(분류 없음, 기본값)를 이슈 톡톡 전용 아카이빙으로 쓰기로
       // 재정의(2026-08-12) — "인사이트에서 이슈 톡톡으로 옮기려는데 안 된다"는
       // 피드백으로, 명시적으로 issue_talk 태그된 글뿐 아니라 분류를 아예
-      // 안 고른 글(section 없음)도 여기 포함시킨다. 딥다이브(trend)·
-      // 인사이트(column)로 명시 분류된 글만 제외.
+      // 안 고른 글(section 없음)도 여기 포함시킨다. 인사이트(column)로 명시
+      // 분류된 글만 제외.
+      //
+      // "딥다이브"(section='trend') 분류는 2026-08-17에 폐기했다 — "이슈 톡톡"과
+      // "요즘 화제의 경제 이슈"가 독자 입장에서 구분이 안 된다는 판단으로
+      // 홈 섹션을 통합(TrendingEconomySection 삭제)하면서, 기존 section='trend'
+      // 레터 6건도 DB에서 태그를 지워 이 기본 버킷으로 합쳤다 — 이제 trend
+      // 값을 가진 살아있는 글이 없어 필터에 별도로 안 넣어도 된다.
       const res = await fetchTodayLetters(date);
       const posts = (res.letters ?? []).filter((l) => !l.section || l.section === 'issue_talk');
       collected.push(...posts.map((l) => toTodayLetterCard(l, res.date)));

@@ -65,9 +65,10 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // 콘텐츠 타입별 페이지 분리(2026-08-11) — /letters가 레터 전용이 되고,
   // /trend·/column·/archive(전체 모아보기) 신설. en.sedaily.com처럼 타입별
   // 진짜 URL을 줘서 카테고리 단위 검색 노출을 노린다.
+  // /trend는 2026-08-17 폐기(next.config.ts에서 /issue-talk로 영구 리다이렉트)
+  // — "이슈 톡톡"과 독자 입장에서 구분이 안 된다는 판단으로 통합.
   { path: '/letters',      priority: 0.9, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 레터 전용 아카이브
   { path: '/issue-talk',   priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 이슈 톡톡 전용 아카이브
-  { path: '/trend',        priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 트렌드 전용 아카이브
   { path: '/column',       priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 인기 칼럼 전용 아카이브
   { path: '/archive',      priority: 0.5, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 전체 모아보기
   { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 웹툰 목록

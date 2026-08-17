@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
       { source: "/fortune/:path*", destination: "/saju", permanent: true },
       { source: "/saju-match", destination: "/saju", permanent: true },
       { source: "/saju-match/:path*", destination: "/saju", permanent: true },
+      // "딥다이브"(/trend) 아카이브 폐기(2026-08-17) — "이슈 톡톡"과 독자
+      // 입장에서 구분이 안 된다는 판단으로 홈 섹션·아카이브를 통합했다.
+      // 검색엔진에 이미 색인된 /trend URL·기존 북마크/공유 링크가 404를
+      // 만나지 않도록 영구 리다이렉트.
+      { source: "/trend", destination: "/issue-talk", permanent: true },
+      { source: "/trend/:path*", destination: "/issue-talk", permanent: true },
     ];
     if (process.env.SAJU_ORIGIN) {
       const origin = process.env.SAJU_ORIGIN;

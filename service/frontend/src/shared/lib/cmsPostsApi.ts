@@ -11,15 +11,16 @@ import { API_URL } from '@/shared/config/apiClient';
 import type { ApiLetter } from './todayLettersApi';
 import { letterHref } from './letterHref';
 
-export type CmsChannel = 'letters' | 'paper' | 'feed' | 'trend_card' | 'webtoon' | 'video' | 'lens';
+export type CmsChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens';
 
 /** letters/feed 채널 응답은 ApiLetter 와 같은 모양 + is_cms 표식. */
 export type CmsLetter = ApiLetter & { is_cms: true };
 
 /**
- * trend_card 채널 응답 — 홈 피드 "요즘 화제의 경제 이슈"/"이번 주 인기 칼럼"
- * 카드. letters 와 달리 리치텍스트 본문이 없는 가벼운 카드라 모양이 다르다
- * (backend/v2/handlers/cms_posts_public.py _shape_trend_card 와 1:1).
+ * "trend"/"column" 태그 카드 모양 — letters 와 달리 리치텍스트 본문이 없는
+ * 가벼운 카드. 원래는 별도 trend_card 채널(2026-08-17 폐기, 실사용 0건)
+ * 응답 모양이었는데, fetchSectionCards()가 letters+section 태그를 이
+ * 모양으로 변환해서 계속 쓴다 — 타입 이름은 레거시지만 계약 자체는 유효.
  */
 export interface CmsTrendCard {
   id: string;
@@ -143,34 +144,24 @@ export async function fetchCmsPosts(
   });
 }
 
-// trend_card 는 letters 와 모양이 달라 fetchCmsPosts 의 CmsLetter[] 반환 타입을
-// 못 쓴다 — 같은 엔드포인트를 별도 함수로 감싼다.
+// trend_card 채널 폐기(2026-08-17) — "요즘 화제의 경제 이슈" 섹션을 "이슈
+// 톡톡"에 흡수 통합하면서, 백엔드 _VALID_CHANNELS에서도 trend_card를 뺐다
+// (실사용 데이터 0건 확인됨). 이 함수를 호출하는 6곳(archive/column/trend
+// 아카이브 페이지들)은 여전히 CmsTrendCard[] 모양을 기대하므로 시그니처는
+// 남기고 몸통만 즉시 빈 배열 — 이제 존재하지 않는 채널로 매 방문마다 400을
+// 받는 대신, 애초에 요청을 보내지 않는다.
 export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
-  return cached('trend_card', async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=trend_card`, cacheOpts('posts:trend_card'));
-      if (!res.ok) return [];
-      const data = (await res.json()) as { posts?: CmsTrendCard[] };
-      return data.posts ?? [];
-    } catch {
-      return [];
-    }
-  });
+  return [];
 }
 
 export type CmsSectionCard = CmsTrendCard & { href?: string | null; imageUrl?: string | null };
 
-// TrendingEconomySection("요즘 화제의 경제 이슈")/ColumnPreviewSection("이번 주
-// 인사이트")가 각자 컴포넌트 안에 똑같은 fetch+merge 로직을 복붙해 두고 있었다
-// — trend_card 채널 카드 + "trend"/"column" 태그가 붙은 실제 레터를 합쳐서
-// 보여주는 로직. 그 두 컴포넌트는 원래 'use client'라 useEffect로만 데이터를
-// 가져왔는데, 그러면 마운트 직후엔 FALLBACK 목업이 먼저 보이고 ~1초 뒤에야
-// 실제 카드로 바뀌는 깜빡임이 있었다(2026-08-16 피드백). app/page.tsx가 다른
-// 섹션(웹툰/영상/시선)처럼 서버에서 미리 이 함수를 호출해 initialItems로
-// 내려주면 첫 페인트부터 바로 실제 데이터가 보인다 — 그래서 두 컴포넌트가
-// 공유할 수 있게 여기(shared/lib)로 뺐다.
-export async function fetchSectionCards(section: 'trend' | 'column'): Promise<CmsSectionCard[]> {
-  const [cards, letters] = await Promise.all([fetchTrendCards(), fetchCmsPosts('letters', undefined, 100)]);
+// ColumnPreviewSection("이번 주 인사이트")이 쓰던 fetch 로직 — "trend" 섹션도
+// 같이 지원했었으나(TrendingEconomySection) 그 섹션 자체가 2026-08-17
+// "이슈 톡톡"에 흡수 통합되며 삭제됐다. section 파라미터를 'column' 하나로
+// 좁힌다 — 원래도 trend_card 채널 병합은 실사용 데이터 0건이라 순수 오버헤드였다.
+export async function fetchSectionCards(section: 'column'): Promise<CmsSectionCard[]> {
+  const letters = await fetchCmsPosts('letters', undefined, 100);
   const tagged: CmsSectionCard[] = letters
     .filter((l) => l.section === section)
     .map((l) => ({
@@ -184,7 +175,7 @@ export async function fetchSectionCards(section: 'trend' | 'column'): Promise<Cm
       href: letterHref(l.id),
       imageUrl: l.cover_image_url || null,
     }));
-  return [...tagged, ...cards.filter((c) => c.section === section)].sort((a, b) => b.date.localeCompare(a.date));
+  return tagged.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {

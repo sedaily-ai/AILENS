@@ -22,7 +22,6 @@ interface HomeContentProps {
   initialVideos: CmsVideo[];
   initialWordTerms: Term[];
   initialLensPosts: CmsLens[];
-  initialTrendItems: CmsSectionCard[];
   initialColumnItems: CmsSectionCard[];
 }
 
@@ -32,7 +31,6 @@ function HomeContent({
   initialVideos,
   initialWordTerms,
   initialLensPosts,
-  initialTrendItems,
   initialColumnItems,
 }: HomeContentProps) {
   return (
@@ -43,7 +41,6 @@ function HomeContent({
       initialVideos={initialVideos}
       initialWordTerms={initialWordTerms}
       initialLensPosts={initialLensPosts}
-      initialTrendItems={initialTrendItems}
       initialColumnItems={initialColumnItems}
     />
   );
@@ -51,10 +48,10 @@ function HomeContent({
 
 // 서버 컴포넌트로 전환(2026-08-07, 홈 SSG 감사) — 이전엔 페이지 전체가
 // 'use client'라 정적 HTML에 nav/footer(192자)뿐이었다. 홈 피드가 실제로
-// 렌더하는 7개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
-// WordsPreviewSection/LensPreviewSection/TrendingEconomySection/
-// ColumnPreviewSection)의 데이터를 미리 가져와 FeedPage → NewsFeedTab →
-// 각 섹션까지 initialX prop으로 내려준다. 나머지 섹션
+// 렌더하는 6개 섹션(FollowingFeed/WebtoonPreviewSection/VideoPreviewSection/
+// WordsPreviewSection/LensPreviewSection/ColumnPreviewSection)의 데이터를
+// 미리 가져와 FeedPage → NewsFeedTab → 각 섹션까지 initialX prop으로
+// 내려준다. 나머지 섹션
 // (NewsTimeMachineSection 등)은 의도된 mock/placeholder라 그대로 둔다.
 // 미니 헤드라인 섹션(MiniHeadlinesSection)은 2026-08-16 삭제됨 — PG 연동
 // 전 유료 잠금 UI 컨셉만 있던 상태였는데 통째로 뺐다.
@@ -62,13 +59,15 @@ function HomeContent({
 // 클라이언트 useEffect fetch만 있었다 — 실제 lens 글을 발행해 curl로
 // 검증하던 중 첫 페인트에 아무것도 안 보이는 걸 발견, 다른 5개 섹션과
 // 통일).
-// TrendingEconomySection/ColumnPreviewSection도 2026-08-16에 같은 이유로
-// 프리페치 추가 — 원래 client useEffect만 있어서 마운트 직후 FALLBACK
-// 목업이 먼저 보였다가 ~1초 뒤 실제 데이터로 바뀌는 깜빡임이 있었다
-// ("이미지가 늦게 최신화" 피드백). fetch+merge 로직은 두 섹션이 공유하는
-// fetchSectionCards(shared/lib/cmsPostsApi.ts)로 뺐다.
+// ColumnPreviewSection도 2026-08-16에 같은 이유로 프리페치 추가 — 원래 client
+// useEffect만 있어서 마운트 직후 FALLBACK 목업이 먼저 보였다가 ~1초 뒤 실제
+// 데이터로 바뀌는 깜빡임이 있었다("이미지가 늦게 최신화" 피드백). fetch 로직은
+// fetchSectionCards(shared/lib/cmsPostsApi.ts).
 // "이슈 톡톡"(FollowingFeed) 전체 삭제했다가(2026-08-12) 같은 날 사용자가
 // 다시 부활 요청 — 프리페치도 원복.
+// "요즘 화제의 경제 이슈"(TrendingEconomySection, fetchSectionCards('trend'))는
+// 2026-08-17 삭제 — "이슈 톡톡"과 독자 입장에서 구분이 안 된다는 판단으로
+// FollowingFeed(이슈 톡톡)에 흡수 통합했다.
 // force-dynamic을 걸었다가(SSR 전환 직후) 다시 뺐다(2026-08-08) — 아래 fetch들이
 // posts:* 태그로 캐시되므로, 매 요청 강제 재렌더링보다 Next가 이 라우트를
 // 정적/캐시로 취급하고 admin 발행 시 POST /api/revalidate 가 revalidateTag()
@@ -81,7 +80,6 @@ export default async function HomePage() {
     initialVideos,
     initialWordTerms,
     initialLensPosts,
-    initialTrendItems,
     initialColumnItems,
   ] = await Promise.all([
     fetchFollowingLetters(),
@@ -89,7 +87,6 @@ export default async function HomePage() {
     fetchVideos(),
     fetchFollowingWordTerms(),
     fetchLensPosts(),
-    fetchSectionCards('trend'),
     fetchSectionCards('column'),
   ]);
 
@@ -100,7 +97,6 @@ export default async function HomePage() {
       initialVideos={initialVideos}
       initialWordTerms={initialWordTerms}
       initialLensPosts={initialLensPosts}
-      initialTrendItems={initialTrendItems}
       initialColumnItems={initialColumnItems}
     />
   );

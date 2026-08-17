@@ -5,7 +5,6 @@
 
 export type HeaderTabKey =
   | 'feed'
-  | 'trend'
   | 'column'
   | 'lens'
   | 'video'
@@ -61,7 +60,10 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 내비게이션에 처음 추가됐었다.
     { key: 'lens', label: '시선', href: '/lens', active: active === 'lens', tier: 'extra' },
     { key: 'feed', label: '브리핑', href: '/letters', active: active === 'feed' },
-    { key: 'trend', label: '딥다이브', href: '/trend', active: active === 'trend', tier: 'extra' },
+    // '딥다이브'(/trend) 탭은 2026-08-17 제거 — "이슈 톡톡"과 독자 입장에서
+    // 구분이 안 된다는 판단으로 홈 섹션·아카이브를 통합했다(/trend는
+    // /issue-talk로 리다이렉트). "이슈 톡톡" 자체는 별도 상단 탭이 아니라
+    // 홈 화면 섹션 + /issue-talk 아카이브로만 존재(기존과 동일).
     { key: 'column', label: '인사이트', href: '/column', active: active === 'column', tier: 'extra' },
     // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
     // 앞으로 당김(사용자 확인) — "오락성들보다도 뒤에 있으면 안 된다".
