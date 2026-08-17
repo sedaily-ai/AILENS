@@ -2,9 +2,11 @@ import { FeedPage } from "@/widgets/FeedPage";
 import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts } from "@/shared/lib/cmsPostsApi";
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
+import { fetchFollowingLetters } from "@/shared/lib/todayLettersApi";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "@/features/news-feed";
+import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 
 // MBTI 페르소나 체계 폐지(2026-08-07) — 이전에는 여기서 viewMode
 // ("feed" | "editor-select" | "briefing" | "story")를 useMbtiGroup 에 저장된
@@ -22,6 +24,7 @@ interface HomeContentProps {
   initialWordTerms: Term[];
   initialLensPosts: CmsLens[];
   initialArchiveItems: ArchiveItem[];
+  initialHotLetters: TodayLetterCardLike[];
 }
 
 function HomeContent({
@@ -30,6 +33,7 @@ function HomeContent({
   initialWordTerms,
   initialLensPosts,
   initialArchiveItems,
+  initialHotLetters,
 }: HomeContentProps) {
   return (
     <FeedPage
@@ -39,6 +43,7 @@ function HomeContent({
       initialWordTerms={initialWordTerms}
       initialLensPosts={initialLensPosts}
       initialArchiveItems={initialArchiveItems}
+      initialHotLetters={initialHotLetters}
     />
   );
 }
@@ -73,12 +78,21 @@ export default async function HomePage() {
     initialWordTerms,
     initialLensPosts,
     letters,
+    initialHotLetters,
   ] = await Promise.all([
     fetchWebtoons(),
     fetchVideos(),
     fetchFollowingWordTerms(),
     fetchLensPosts(),
     fetchCmsPosts('letters', undefined, 100),
+    // "요즘 가장 많이 읽힌 글"(HotLettersRail) 서버 프리페치(2026-08-17,
+    // 사용자 피드백: "왜 항상 늦게 나타나지, 빨리 뜨도록 하는거 안하고
+    // 있나요") — 나머지 홈 섹션과 달리 이 사이드바만 initialItems 없이
+    // 클라이언트 useEffect로만 불러와서 항상 빈 화면 → 딜레이 후 팝인이었다.
+    // fetchFollowingLetters는 이미 "서버(app/page.tsx)와 클라이언트 양쪽이
+    // 같은 로직을 쓰도록" 설계된 함수(todayLettersApi.ts 주석 참조)라 여기
+    // 그대로 재사용.
+    fetchFollowingLetters(5),
   ]);
   const initialArchiveItems = buildArchiveItems(letters, [], []);
 
@@ -89,6 +103,7 @@ export default async function HomePage() {
       initialWordTerms={initialWordTerms}
       initialLensPosts={initialLensPosts}
       initialArchiveItems={initialArchiveItems}
+      initialHotLetters={initialHotLetters}
     />
   );
 }

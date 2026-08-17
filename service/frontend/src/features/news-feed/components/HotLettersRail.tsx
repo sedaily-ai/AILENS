@@ -13,8 +13,15 @@ const HOT_LETTERS_LIMIT = 5;
 // 재사용. 사주 궁합 파트는 별도로 SajuMiniRail.tsx로 뽑아 톤(violet)만
 // 다시 입혔다 — 둘 다 HomeSideBar.tsx가 하나의 sticky 컨테이너로 묶는다
 // (이 컴포넌트 자체는 sticky를 갖지 않는 평범한 <section>).
-export function HotLettersRail() {
-  const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>([]);
+//
+// initialItems — 처음엔 이 값 없이 client useEffect로만 불러와서 항상
+// 빈 화면 → 딜레이 후 팝인이었다(2026-08-17, 사용자 피드백: "왜 항상
+// 늦게 나타나지, 빨리 뜨도록 하는거 안하고 있나요"). 홈의 다른 섹션들처럼
+// app/page.tsx 빌드타임 프리페치 값을 받아 초기 렌더부터 채운다 — effect는
+// 여전히 돌려 최신 데이터로 갱신(다른 initial* prop 패턴과 동일, 예:
+// WebtoonPreviewSection.tsx).
+export function HotLettersRail({ initialItems }: { initialItems?: TodayLetterCardLike[] }) {
+  const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>(initialItems ?? []);
 
   useEffect(() => {
     let cancelled = false;

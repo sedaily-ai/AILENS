@@ -173,17 +173,33 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
 
 // "더보기" 드롭다운(2026-08-17) — 웹툰/영상/사주/타임라인/게임처럼
 // 콘텐츠 브라우징이 아닌 부가 기능들을 1차 줄에서 걷어내 한 항목으로
-// 묶는다. UserMenu.tsx와 같은 패턴(absolute + mousedown 클릭 아웃사이드)을
-// 그대로 재사용 — 이 헤더에 이미 있는 드롭다운 스타일과 통일.
+// 묶는다.
+//
+// 버그였던 것(2026-08-17, 실사용 확인 — "더보기는 지금 눌러도 안나와요"):
+// position:absolute 드롭다운을 UserMenu.tsx 패턴 그대로 따라 만들었는데,
+// UserMenu는 overflow 없는 컨테이너 안에 있는 반면 이 버튼은
+// `<nav className="... overflow-x-auto ...">`(탭이 넘칠 때 가로 스크롤
+// 되게 하는 컨테이너) 안에 있다 — CSS 스펙상 overflow-x를 visible이
+// 아닌 값으로 주면 overflow-y도 (명시 안 해도) auto로 계산돼, nav가
+// 사실상 양쪽 축 다 스크롤 컨테이너가 된다. 그 안의 absolute 드롭다운은
+// nav의 얕은 높이(56px) 밖으로 나가는 순간 페이지 위에 떠 보이는 대신
+// 그냥 잘려서 안 보인다. 모바일 드로어(MobileDrawer, 바로 아래)가 이미
+// 쓰던 createPortal(document.body로 포털) 패턴을 그대로 가져와 해결 —
+// 포털된 요소는 버튼의 로컬 상대 위치를 못 쓰므로 getBoundingClientRect로
+// 화면 좌표를 직접 계산해 position:fixed로 배치한다.
 function MoreTabsMenu({ tabs }: { tabs: HeaderTab[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target)) return;
+      if (menuRef.current && !menuRef.current.contains(target)) setOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -192,10 +208,19 @@ function MoreTabsMenu({ tabs }: { tabs: HeaderTab[] }) {
   if (tabs.length === 0) return null;
   const hasActive = tabs.some((t) => t.active);
 
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left });
+    }
+    setOpen((v) => !v);
+  };
+
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         className={`${TAB_EXTRA_BASE} inline-flex items-center gap-1 ${hasActive ? TAB_ACTIVE : TAB_EXTRA_IDLE}`}
       >
         더보기
@@ -210,8 +235,12 @@ function MoreTabsMenu({ tabs }: { tabs: HeaderTab[] }) {
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute left-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1.5 z-[100]">
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 176, zIndex: 200 }}
+          className="bg-white rounded-lg shadow-lg border border-gray-200 py-1.5"
+        >
           {tabs.map((tab) => {
             const cls = `w-full px-4 py-2 text-left text-[13.5px] flex items-center gap-2 ${
               tab.active ? 'text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-50'
@@ -252,7 +281,8 @@ function MoreTabsMenu({ tabs }: { tabs: HeaderTab[] }) {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

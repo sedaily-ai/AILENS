@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
+import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
 import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
@@ -31,6 +32,7 @@ interface Props {
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
   initialArchiveItems?: ArchiveItem[];
+  initialHotLetters?: TodayLetterCardLike[];
 }
 
 // 아카이빙된 문장 타입
@@ -79,6 +81,7 @@ export function FeedPage({
   initialWordTerms,
   initialLensPosts,
   initialArchiveItems,
+  initialHotLetters,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -403,6 +406,7 @@ export function FeedPage({
             initialWordTerms={initialWordTerms}
             initialLensPosts={initialLensPosts}
             initialArchiveItems={initialArchiveItems}
+            initialHotLetters={initialHotLetters}
           />
         )}
 

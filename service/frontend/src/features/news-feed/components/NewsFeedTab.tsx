@@ -4,6 +4,7 @@ import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "../lib/wordsTerms";
+import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";
@@ -75,6 +76,8 @@ interface Props {
   // 홈 구조 개편) — 한 번만 fetch해서 최신순 슬라이스와 카테고리별 필터
   // 양쪽에 다 쓴다(app/page.tsx 참조).
   initialArchiveItems?: ArchiveItem[];
+  // "요즘 가장 많이 읽힌 글"(HomeSideBar → HotLettersRail) 서버 프리페치.
+  initialHotLetters?: TodayLetterCardLike[];
 }
 
 export function NewsFeedTab({
@@ -83,6 +86,7 @@ export function NewsFeedTab({
   initialWordTerms,
   initialLensPosts,
   initialArchiveItems,
+  initialHotLetters,
 }: Props) {
   const archiveItems = initialArchiveItems ?? [];
 
@@ -196,7 +200,7 @@ export function NewsFeedTab({
             <VideoPreviewSection initialVideos={initialVideos} />
           </div>
 
-          <HomeSideBar className="hidden lg:block" />
+          <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
         </div>
       </div>
 
