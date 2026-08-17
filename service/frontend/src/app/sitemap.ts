@@ -91,12 +91,11 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // URL을 AI LENS 소속으로 색인할지는 별개 문제 — sitemap 등재는 필요조건일
   // 뿐 충분조건은 아니다.
   { path: '/saju',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-16' }, // 사주매칭 (외부 AI-saju, CDN 경로 마운트)
-  // 입력 화면 — 실제 콘텐츠는 /timemachine/{date}(2026-08-12, SSR 분리). /timeline과
-  // 달리 여기 날짜는 "최근 N일"이 아니라 생일 등 임의의 과거 날짜(1990~어제)라 어떤
-  // 날짜가 실제로 방문될지 신호가 없다 — 홈에도 특정 날짜를 링크하는 티저가 없어서
-  // (grep 확인) 무작위로 사전 시딩하면 아무도 안 볼 얇은 페이지만 늘어난다. 개별
-  // 날짜 페이지는 직접 방문·공유로는 그대로 색인 가능.
-  { path: '/timemachine',  priority: 0.7, changeFrequency: 'weekly',  lastModified: '2026-08-12' },
+  // /timemachine 라우트는 2026-08-17 삭제 — 네비게이션 어디서도 링크되지
+  // 않는 죽은 기능이었고, 핵심 콘텐츠("그 날짜의 역사적 사건")가 실제
+  // 데이터가 아니라 대부분 알고리즘이 지어낸 가짜였다(진짜 데이터가 있는
+  // 날짜는 4개뿐). famousBirthdays.ts/economicSnapshots.ts/
+  // investmentScenarios.ts/timeMachineApi.ts도 이 라우트 전용이라 같이 삭제.
   { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly',  lastModified: '2026-08-12' }, // 입력 화면 — 실제 콘텐츠는 /timeline/{date}
   { path: '/about',        priority: 0.3, changeFrequency: 'yearly',  lastModified: '2026-08-11' },
   { path: '/contact',      priority: 0.3, changeFrequency: 'yearly',  lastModified: '2026-08-08' },
@@ -219,7 +218,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entries.push({
       url: `${BASE}/timeline/${iso}`,
       lastModified: iso,
-      // 오늘 날짜만 하루 동안 계속 갱신된다(TimelinePreviewSection의 3분
+      // 오늘 날짜만 하루 동안 계속 갱신된다(NewsTimeMachineSection의 3분
       // 폴링과 같은 이유) — 지난 날짜는 지면이 이미 확정돼 다시 안 바뀐다.
       changeFrequency: iso === todayIso ? 'hourly' : 'never',
       priority: freshnessPriority(i),
