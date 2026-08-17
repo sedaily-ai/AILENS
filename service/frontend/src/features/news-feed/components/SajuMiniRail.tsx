@@ -463,8 +463,13 @@ export function SajuMiniRail() {
             두 서비스가 같은 걸 쓰고 있어 손댈 게 없었고, 컴포넌트는 완전히
             분리된 별개 Next.js 앱(레포)이라 진짜 재사용은 불가능해 색만
             맞춰 다시 구현했지만, 이 마스코트 이미지 한 장은 정적 에셋이라
-            그대로 복사해 브랜드 연속성을 준다. */}
-        <Image src="/saju-mascot.png" alt="" width={28} height={28} style={{ flexShrink: 0 }} />
+            그대로 복사해 브랜드 연속성을 준다.
+            파일명 saju-mascot.png → ailens-saju-mascot.png로 개명(2026-08-18) —
+            CloudFront가 "/saju*" 패턴을 별도 사주 서비스 S3 오리진으로 보내는
+            라우팅 규칙을 갖고 있어(saju.sedaily.ai CDN 마운트용, 인프라
+            소관이라 여기서 못 건드림), 이 파일도 "saju"로 시작한다는 이유만
+            으로 그 규칙에 걸려 엉뚱한 오리진으로 가서 계속 404였다. */}
+        <Image src="/ailens-saju-mascot.png" alt="" width={28} height={28} style={{ flexShrink: 0 }} />
         <h3
           className="font-medium text-gray-900"
           style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 15, letterSpacing: '-0.015em' }}
