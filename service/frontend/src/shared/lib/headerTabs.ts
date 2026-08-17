@@ -25,7 +25,10 @@ export interface HeaderTab {
   label: string;
   href: string;
   active?: boolean;
-  tier?: 'core' | 'extra';
+  // 'more' — 콘텐츠 브라우징이 아닌 부가 기능(웹툰/영상/사주/타임라인/게임).
+  // 카테고리 6개가 추가되며 1차 줄이 12개로 늘어 잘리는 문제가 생겨(2026-08-17,
+  // 사용자 확인), Header.tsx가 이 값을 가진 탭만 "더보기" 드롭다운으로 묶는다.
+  tier?: 'core' | 'extra' | 'more';
   /** true면 next/link 소프트 내비게이션 대신 일반 <a> 하드 내비게이션을 쓴다 —
    *  이 탭이 별도 Next.js 앱(다른 zone)으로 rewrite되는 경로라, 클라이언트
    *  라우터가 자기 앱의 RSC 포맷으로 잘못 읽으려다 화면이 안 바뀌는 문제 방지. */
@@ -82,8 +85,10 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     })),
     // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
     // 앞으로 당김(사용자 확인) — "오락성들보다도 뒤에 있으면 안 된다".
-    { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'extra' },
-    { key: 'video', label: '영상', href: '/video', active: active === 'video', tier: 'extra' },
+    // 2026-08-17 — tier를 'extra'에서 'more'로: 카테고리 6개가 추가되며
+    // 1차 줄이 12개까지 늘어 "더보기" 드롭다운으로 옮겼다(Header.tsx 참조).
+    { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'more' },
+    { key: 'video', label: '영상', href: '/video', active: active === 'video', tier: 'more' },
     // '내 서랍' 탭도 네비게이션에서 제거(2026-08-06) — 커뮤니티 대체로
     // "오늘의 한 문장 + 다른 사람들이 담은 문장 + 내 문장" 3단 구조까지
     // 만들었지만, 워딩(서랍→스크랩) 논의 끝에 상시 탭으로 노출하기보다
@@ -106,11 +111,11 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 같은 걸 흉내내는데, 이건 완전히 다른 Next.js 앱(zone)이라 next/link
     // 소프트 내비게이션이 안 먹는다(RSC 포맷이 앱마다 달라서) — hardNav로
     // 일반 <a> 내비게이션을 쓰게 한다.
-    { key: 'fortune', label: '사주', href: '/saju', active: active === 'fortune', tier: 'extra', hardNav: true },
+    { key: 'fortune', label: '사주', href: '/saju', active: active === 'fortune', tier: 'more', hardNav: true },
     // 2026-08-05 까지 `/timemachine` 을 가리키고 있었다 — `/timeline` 에 들어왔다가
     // 다른 탭에 다녀온 뒤 이 탭을 누르면 구 페이지로 빠지는 문제의 원인.
     // `/timemachine`(유명인·투자 시뮬레이션 4탭) 은 직접 URL 로 남겨둔다.
-    { key: 'timeline', label: '타임라인', href: TIMELINE_HREF, active: active === 'timeline', tier: 'extra' },
-    { key: 'games', label: '게임', href: '/games', active: active === 'games', tier: 'extra' },
+    { key: 'timeline', label: '타임라인', href: TIMELINE_HREF, active: active === 'timeline', tier: 'more' },
+    { key: 'games', label: '게임', href: '/games', active: active === 'games', tier: 'more' },
   ];
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -21,11 +21,14 @@ export type HeaderTab = {
   soon?: boolean;
   href?: string;
   onClick?: () => void;
-  // 'extra' — 사주·타임라인·게임·웹툰처럼 "덤" 성격의 탭. 드롭다운으로
-  // 숨기는 대신(클릭 한 번 더 필요해서 덜 "효율적"), 뉴닉 참고 — 개수를
-  // 줄이지 않고 무게(굵기·크기·색)만 낮춰서 "본체 vs 덤"을 구분한다
-  // (2026-08-06). 생략하면 기본값 'core'.
-  tier?: 'core' | 'extra';
+  // 'extra' — 무게(굵기·크기·색)만 낮춰서 1차 줄에 그대로 노출(카테고리
+  // 6개가 여기 해당, 2026-08-17). 'more' — 웹툰·영상·사주·타임라인·게임처럼
+  // 콘텐츠 브라우징이 아닌 부가 기능들 — 카테고리 6개가 추가되며 1차 줄이
+  // 12개까지 늘어나 잘리는 문제가 생겨(사용자 확인), "더보기" 드롭다운으로
+  // 옮겼다(2026-08-17, 이전엔 'extra'로 인라인 유지 — 뉴닉 참고해 무게만
+  // 낮추는 전략이었는데 카테고리 탭까지 겹치자 더는 안 버텼다). 생략하면
+  // 기본값 'core'.
+  tier?: 'core' | 'extra' | 'more';
   /** true면 next/link 대신 일반 <a> 하드 내비게이션 — 다른 Next.js 앱(zone)으로
    *  rewrite되는 경로용 (shared/lib/headerTabs.ts의 HeaderTab과 동일 필드). */
   hardNav?: boolean;
@@ -168,6 +171,93 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
   );
 }
 
+// "더보기" 드롭다운(2026-08-17) — 웹툰/영상/사주/타임라인/게임처럼
+// 콘텐츠 브라우징이 아닌 부가 기능들을 1차 줄에서 걷어내 한 항목으로
+// 묶는다. UserMenu.tsx와 같은 패턴(absolute + mousedown 클릭 아웃사이드)을
+// 그대로 재사용 — 이 헤더에 이미 있는 드롭다운 스타일과 통일.
+function MoreTabsMenu({ tabs }: { tabs: HeaderTab[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  if (tabs.length === 0) return null;
+  const hasActive = tabs.some((t) => t.active);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`${TAB_EXTRA_BASE} inline-flex items-center gap-1 ${hasActive ? TAB_ACTIVE : TAB_EXTRA_IDLE}`}
+      >
+        더보기
+        <svg
+          className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1.5 z-[100]">
+          {tabs.map((tab) => {
+            const cls = `w-full px-4 py-2 text-left text-[13.5px] flex items-center gap-2 ${
+              tab.active ? 'text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+            }`;
+            const close = () => setOpen(false);
+            if (tab.href) {
+              if (tab.hardNav) {
+                return (
+                  <a key={tab.key} href={tab.href} onClick={close} className={cls}>
+                    <TabLabel tab={tab} />
+                  </a>
+                );
+              }
+              return (
+                <Link
+                  key={tab.key}
+                  href={tab.href}
+                  onClick={close}
+                  onMouseEnter={() => {
+                    try { router.prefetch(tab.href!); } catch { /* noop */ }
+                  }}
+                  className={cls}
+                >
+                  <TabLabel tab={tab} />
+                </Link>
+              );
+            }
+            return (
+              <button
+                key={tab.key}
+                onClick={() => {
+                  tab.onClick?.();
+                  close();
+                }}
+                className={cls}
+              >
+                <TabLabel tab={tab} />
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MobileDrawer({
   tabs,
   onClose,
@@ -268,6 +358,11 @@ function MobileDrawer({
 
 export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // 1차 줄(핵심+카테고리) vs "더보기" 드롭다운(부가 기능) — tier:'more'
+  // 참조(shared/lib/headerTabs.ts). 모바일 드로어는 그대로 전체 목록을
+  // 보여준다(세로 스크롤이라 굳이 또 접을 이유가 없음).
+  const primaryTabs = tabs.filter((t) => t.tier !== 'more');
+  const moreTabs = tabs.filter((t) => t.tier === 'more');
 
   const logoCls =
     'text-[20px] font-bold tracking-tight flex-shrink-0 transition-colors duration-200 text-gray-900 hover:text-blue-600 inline-flex items-center gap-2';
@@ -305,30 +400,25 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
               늘면서 "|" 하나로는 굳이 안 나눠도 된다는 피드백, 무게(굵기·색)
               차이만으로 core/extra 구분은 그대로 유지. */}
           <nav className="hidden md:flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
+            {primaryTabs.map((tab) => (
               <DesktopTab key={tab.key} tab={tab} />
             ))}
+            <MoreTabsMenu tabs={moreTabs} />
           </nav>
 
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            {/* 검색창처럼 생긴 입력 바로 재설계(2026-08-06) — 실제로는 음성·마크다운
-                지원 AI 챗봇인데, 겉모습은 별 아이콘 + "대화" 라벨뿐이라 뭘 누르는
-                건지 애매하다는 지적. Notion/Linear류 "Search or ask AI" 패턴처럼
-                placeholder 문구가 있는 입력창 모양으로 바꿔 용도를 바로 읽히게 했다. */}
+            {/* 검색창처럼 생긴 입력 바(2026-08-06 설계, Notion/Linear류 "Search or
+                ask AI" 패턴)를 아이콘 전용으로 축소(2026-08-17) — 카테고리 탭
+                6개가 늘면서 1차 줄이 좁아져(사용자 확인), 모바일에서 이미 쓰던
+                아이콘 버튼을 데스크탑까지 확장했다. 클릭하면 여전히 같은
+                SmartSearchOverlay가 뜬다 — "펼쳐지는" 지점이 인라인 입력창이
+                아니라 오버레이로 옮겨갔을 뿐, 기능 손실은 없다. title로 용도
+                힌트는 유지. */}
             <button
               onClick={onSearch}
-              className="hidden md:flex items-center gap-2 pl-3.5 pr-3 py-1.5 min-w-[176px] lg:min-w-[208px] bg-gray-50 hover:bg-gray-100 border border-gray-200/70 rounded-full transition-colors text-[13px] text-gray-400 group"
-            >
-              <svg className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" />
-              </svg>
-              <span className="flex-1 text-left truncate group-hover:text-gray-600">이슈에 대해 물어보세요</span>
-              <span className="hidden lg:inline text-gray-300 flex-shrink-0">⌘K</span>
-            </button>
-            <button
-              onClick={onSearch}
-              className="md:hidden p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-              aria-label="대화"
+              className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              aria-label="이슈에 대해 물어보세요"
+              title="이슈에 대해 물어보세요 (⌘K)"
             >
               <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
                 <path className="text-violet-500" d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" />
