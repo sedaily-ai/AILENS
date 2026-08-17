@@ -10,7 +10,7 @@ import { letterHref } from '@/shared/lib/letterHref';
 // 추가 — 용어가 어느 레터에서 왔는지 원래는 버려지던 정보를 href로 살려둔다.
 // 용어 하나가 여러 레터에 등장하면(중복 dedupe) 그중 설명이 더 긴 쪽의 출처를 쓴다.
 //
-// page.tsx(서버)/WordsPageClient.tsx(클라이언트) 양쪽이 Term 타입을 같이 써서
+// app/words/page.tsx(서버)/WordsPage.tsx(클라이언트) 양쪽이 Term 타입을 같이 써서
 // 여기 분리했다(2026-08-12, SSR 분리 — /timeline의 timelineApi.ts와 같은 이유).
 export interface Term {
   term: string;

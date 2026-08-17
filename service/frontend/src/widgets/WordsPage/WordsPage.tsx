@@ -19,7 +19,12 @@ const ACCENT = '#d97706';
 // terms를 useEffect+fetch로 채우고 첫 페인트엔 스켈레톤 8개만 보여줬다(크롤러엔
 // 빈 페이지). 이제 page.tsx(서버)가 미리 가져온 initialTerms를 받아 처음부터
 // 실제 목록을 렌더한다 — 검색 인터랙션(입력·필터링)만 이 컴포넌트가 담당.
-export function WordsPageClient({ initialTerms }: { initialTerms: Term[] }) {
+//
+// widgets/WordsPage/로 승격(2026-08 리팩토링) — app/words/ 아래
+// WordsPageClient.tsx로 직접 있던 걸 widgets/FeedPage/FeedPage.tsx와
+// 같은 형태(page.tsx는 라우팅·메타데이터·서버 데이터 페칭만, 실제 구현은
+// widgets/로)로 옮겼다. URL(/words)은 그대로다.
+export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
 

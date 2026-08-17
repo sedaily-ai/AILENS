@@ -1,5 +1,4 @@
-import { fetchTerms } from './words';
-import { WordsPageClient } from './WordsPageClient';
+import { fetchTerms, WordsPage } from '@/widgets/WordsPage';
 
 // SSR 분리(2026-08-12, "다른 페이지들도 이 패턴으로 검토해주시죠" GEO 감사) —
 // /timeline과 같은 원인·같은 수정: 예전엔 이 페이지 전체가 'use client'라
@@ -9,7 +8,7 @@ import { WordsPageClient } from './WordsPageClient';
 // 돌려 실제 목록을 첫 HTML에 박아 넣는다.
 const SITE_URL = 'https://ailens.sedaily.ai';
 
-export default async function WordsPage() {
+export default async function WordsGlossaryPage() {
   const terms = await fetchTerms();
 
   // DefinedTermSet — 용어 해설이라는 콘텐츠 성격에 정확히 맞는 schema.org
@@ -44,7 +43,7 @@ export default async function WordsPage() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <WordsPageClient initialTerms={terms} />
+      <WordsPage initialTerms={terms} />
     </>
   );
 }
