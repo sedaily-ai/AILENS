@@ -62,7 +62,7 @@ async function fetchDayArticles(dateStr: string): Promise<TimelineItem[]> {
     .slice()
     .filter((a) => !a.title.includes('[시그널]'))
     .sort((a, b) => b.published_at.localeCompare(a.published_at))
-    .slice(0, 8)
+    .slice(0, 5)
     .map((a) => ({
       id: a.news_id,
       time: formatTime(a.published_at),
@@ -364,7 +364,9 @@ export function NewsTimeMachineSection() {
 
         {/* 결과 — 최근 구간(2026-02-01~오늘)은 실시간 S3 지면, 그 이전은
             빅카인즈 뉴스 검색(날짜 범위) 실 데이터. 홈은 미리보기라 상위
-            8개만 — 전체는 "펼치기"(/timeline/{날짜})에서. */}
+            5개만(2026-08-17, 사용자 피드백: "실시간 뉴스들 너무 많이
+            표출" — 8개는 텍스트만 쭉 나열돼 스캔하기 지치는 "로그창"
+            느낌이라 줄였다) — 전체는 "펼치기"(/timeline/{날짜})에서. */}
         {!rewinding && (isRecent ? (
           items !== null && (
             <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
@@ -384,7 +386,7 @@ export function NewsTimeMachineSection() {
                         {item.time}
                       </span>
                       <p
-                        className="text-gray-800"
+                        className="text-gray-800 group-hover:text-blue-700 transition-colors"
                         style={{
                           fontSize: 14,
                           lineHeight: 1.5,
@@ -411,7 +413,7 @@ export function NewsTimeMachineSection() {
                       href={item.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-baseline transition-colors hover:bg-gray-50"
+                      className="flex items-baseline group"
                       style={rowStyle}
                     >
                       {row}
@@ -438,7 +440,7 @@ export function NewsTimeMachineSection() {
                 </p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {articles.slice(0, 8).map((a, i) => {
+                {articles.slice(0, 5).map((a, i) => {
                   const row = (
                     <>
                       <span
@@ -449,7 +451,7 @@ export function NewsTimeMachineSection() {
                       </span>
                       <div style={{ minWidth: 0 }}>
                         <p
-                          className="text-gray-800"
+                          className="text-gray-800 group-hover:text-blue-700 transition-colors"
                           style={{
                             fontSize: 14,
                             fontWeight: 600,
@@ -496,7 +498,7 @@ export function NewsTimeMachineSection() {
                       href={a.original_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-baseline transition-colors hover:bg-gray-50"
+                      className="flex items-baseline group"
                       style={rowStyle}
                     >
                       {row}
