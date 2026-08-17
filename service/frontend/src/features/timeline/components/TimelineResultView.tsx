@@ -11,6 +11,7 @@ import {
   fetchIssues, kdate,
   type Article, type Issue, type Indicator, type View,
 } from '../lib/timelineApi';
+import { SajuFunnelCard } from './SajuFunnelCard';
 
 function ArticleList({ items }: { items: Article[] }) {
   if (items.length === 0) {
@@ -315,6 +316,8 @@ export function TimelineResultView({
               ) : (
                 <ArticleList items={initialArticles} />
               )}
+
+              <SajuFunnelCard />
 
               <div style={{ textAlign: 'center', marginTop: 36 }}>
                 <Link

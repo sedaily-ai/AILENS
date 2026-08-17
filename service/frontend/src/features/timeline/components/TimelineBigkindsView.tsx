@@ -26,6 +26,7 @@ import type { BigKindsArticle, InvestmentScenario } from '../lib/timelineApi';
 import { kdate } from '../lib/timelineApi';
 import { InvestmentScenarioCards } from './InvestmentScenarioCards';
 import { ShareBar } from './ShareBar';
+import { SajuFunnelCard } from './SajuFunnelCard';
 
 const MAX_SHOWN = 5;
 const SITE_URL = 'https://ailens.sedaily.ai';
@@ -193,6 +194,8 @@ export function TimelineBigkindsView({
               <InvestmentScenarioCards scenarios={investments} />
 
               <ShareBar cardData={shareCardData} />
+
+              <SajuFunnelCard />
 
               <div style={{ textAlign: 'center', marginTop: 36 }}>
                 <Link
