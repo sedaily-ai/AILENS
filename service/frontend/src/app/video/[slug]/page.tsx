@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { fetchVideos, fetchVideoBySlug, type CmsVideo } from '@/shared/lib/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { buildPageTitle } from '@/shared/lib/buildPageTitle';
 import { VideoViewClient } from './VideoViewClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
@@ -43,8 +44,7 @@ export async function generateMetadata({
   if (!video) {
     return { title: '영상을 찾을 수 없어요', robots: { index: false } };
   }
-  // layout.tsx의 title.template("%s | AI LENS")이 브랜드명을 자동으로 붙인다.
-  const title = `${video.title} — 영상`;
+  const title = buildPageTitle(video.title, '영상');
   const description = trimDescription(video.excerpt || '서울경제 AI LENS가 정리한 이슈 영상입니다.');
   const url = `${SITE_URL}/video/${slug}`;
   const resolved = resolveVideo(video.video_url);

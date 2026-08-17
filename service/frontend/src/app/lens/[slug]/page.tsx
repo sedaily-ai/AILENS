@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
+import { buildPageTitle } from '@/shared/lib/buildPageTitle';
 import { LensViewClient } from './LensViewClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
@@ -59,8 +60,7 @@ export async function generateMetadata({
   if (!lens) {
     return { title: '이슈를 찾을 수 없어요', robots: { index: false } };
   }
-  // layout.tsx의 title.template("%s | AI LENS")이 자동으로 브랜드명을 붙인다.
-  const title = `${lens.headline} — 4가지 시선`;
+  const title = buildPageTitle(lens.headline, '4가지 시선');
   const description = trimDescription(lens.context || '오늘의 이슈를 4가지 시선으로 짚어드려요.');
   const url = `${SITE_URL}/lens/${slug}`;
   const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;

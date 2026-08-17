@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ApiLetter } from '@/shared/lib/todayLettersApi';
 import { withDisplayMeta } from '@/shared/lib/todayLettersApi';
+import { buildPageTitle } from '@/shared/lib/buildPageTitle';
 import { LetterDetailClient } from './LetterDetailClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
@@ -114,9 +115,7 @@ export async function generateMetadata({
     return { title: '레터를 찾을 수 없어요', robots: { index: false } };
   }
   const ed = DEFAULT_AUTHOR;
-  // layout.tsx의 title.template("%s | AI LENS")이 자동으로 브랜드명을 붙인다 —
-  // 여기서 또 붙이면 "...— AI LENS | AI LENS"로 중복된다(2026-08-08 발견).
-  const title = letter.headline;
+  const title = buildPageTitle(letter.headline);
   const bodyExcerpt = letter.body?.length ? letter.body.join(' ') : stripHtml(letter.body_html ?? '');
   const rawDesc = usableSubtitle(letter.subtitle) ?? (bodyExcerpt || `${ed.name}이 풀어낸 ${letter.date} 한 통.`);
   const description = trimDescription(rawDesc);
