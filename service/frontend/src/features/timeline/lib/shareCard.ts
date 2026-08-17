@@ -5,6 +5,14 @@
 // 더 정교하게 제어할 수 있다. 폰트는 layout.tsx가 이미 로드해둔 "Noto Serif KR"
 // 웹폰트를 그대로 쓰되, 캔버스는 document.fonts가 준비될 때까지 기다려야
 // 텍스트가 시스템 폰트로 깨져 그려지는 걸 막을 수 있다.
+//
+// 2026-08-17 레이아웃 재작성 — 처음 버전은 baseline(문자 밑선) 기준으로
+// cursorY를 손으로 더해가며 배치했는데, 168px 같은 큰 폰트는 밑선 위로
+// 글자가 훨씬 많이 올라와서(어센트) 바로 위 줄과 겹쳤다("3.6배"가 설명
+// 문구를 덮어버림, 실사용 확인). textBaseline을 'top'으로 통일해 "이
+// Y좌표부터 글자가 시작한다"로 단순화하고, 전체 중간 콘텐츠 블록의 높이를
+// 먼저 계산한 뒤 위/아래 고정 블록 사이 여백 안에서 세로 중앙 정렬한다 —
+// 콘텐츠 길이가 짧을 때 아래쪽에 큰 빈 공간이 남던 문제도 같이 해결.
 export interface ShareCardData {
   date: string; // YYYY-MM-DD
   dateLabel: string; // "1997년 11월 21일"
@@ -17,14 +25,21 @@ export interface ShareCardData {
 
 const W = 1080;
 const H = 1920;
+const CONTENT_WIDTH = W - 220;
+
+const ACCENT = '#8a6d3f';
+const INK = '#2a2622';
+const MUTED = '#96876f';
+const CREAM = '#fdfcf9';
 
 async function ensureFontsReady(): Promise<void> {
   if (typeof document === 'undefined' || !('fonts' in document)) return;
   try {
     await Promise.all([
-      document.fonts.load('700 100px "Noto Serif KR"'),
-      document.fonts.load('600 44px "Noto Serif KR"'),
-      document.fonts.load('500 32px "Noto Serif KR"'),
+      document.fonts.load('700 160px "Noto Serif KR"'),
+      document.fonts.load('600 56px "Noto Serif KR"'),
+      document.fonts.load('500 34px "Noto Serif KR"'),
+      document.fonts.load('400 28px "Noto Serif KR"'),
       document.fonts.ready,
     ]);
   } catch {
@@ -49,6 +64,31 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return lines;
 }
 
+/** 지정한 너비 안에 한 줄로 들어올 때까지 폰트 크기를 줄인다 — "1/8,145,060"
+ * 처럼 긴 하이라이트 값이 168px에서 카드 밖으로 삐져나가는 걸 막는다. */
+function fitFontSize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, startSize: number, weight: number, minSize = 72): number {
+  let size = startSize;
+  while (size > minSize) {
+    ctx.font = `${weight} ${size}px "Noto Serif KR", serif`;
+    if (ctx.measureText(text).width <= maxWidth) break;
+    size -= 6;
+  }
+  return size;
+}
+
+interface Paragraph {
+  lines: string[];
+  fontSize: number;
+  weight: number;
+  color: string;
+  lineHeight: number;
+  marginTopBefore: number;
+}
+
+function paragraphHeight(p: Paragraph): number {
+  return p.marginTopBefore + p.lines.length * p.fontSize * p.lineHeight;
+}
+
 export async function generateShareCardBlob(data: ShareCardData): Promise<Blob | null> {
   await ensureFontsReady();
 
@@ -58,10 +98,9 @@ export async function generateShareCardBlob(data: ShareCardData): Promise<Blob |
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  const ACCENT = '#8a6d3f';
-  const INK = '#2a2622';
-  const MUTED = '#96876f';
-  const CREAM = '#fdfcf9';
+  const centerX = W / 2;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
 
   // 배경
   ctx.fillStyle = CREAM;
@@ -72,78 +111,95 @@ export async function generateShareCardBlob(data: ShareCardData): Promise<Blob |
   ctx.lineWidth = 2;
   ctx.strokeRect(56, 56, W - 112, H - 112);
 
-  const centerX = W / 2;
-
-  // 마스트헤드 — AI LENS / 타임머신
-  ctx.textAlign = 'center';
+  // ── 상단 고정 블록: 마스트헤드 + 날짜 + 룰 ──────────────────────────
   ctx.fillStyle = ACCENT;
   ctx.font = '700 30px "Noto Serif KR", serif';
-  ctx.fillText('AI LENS · 타임머신', centerX, 200);
+  ctx.fillText('AI LENS · 타임머신', centerX, 170);
 
-  // 날짜
   ctx.fillStyle = INK;
   ctx.font = '600 56px "Noto Serif KR", serif';
-  ctx.fillText(data.dateLabel, centerX, 300);
+  ctx.fillText(data.dateLabel, centerX, 232);
 
-  // 짧은 액센트 룰
+  const topRuleY = 340;
   ctx.strokeStyle = ACCENT;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(centerX - 40, 340);
-  ctx.lineTo(centerX + 40, 340);
+  ctx.moveTo(centerX - 40, topRuleY);
+  ctx.lineTo(centerX + 40, topRuleY);
   ctx.stroke();
 
-  let cursorY = 470;
-
-  if (data.heroLabel && data.heroValue) {
-    ctx.fillStyle = MUTED;
-    ctx.font = '500 36px "Noto Serif KR", serif';
-    const labelLines = wrapLines(ctx, data.heroLabel, W - 220);
-    for (const line of labelLines) {
-      ctx.fillText(line, centerX, cursorY);
-      cursorY += 50;
-    }
-
-    cursorY += 60;
-    ctx.fillStyle = INK;
-    ctx.font = '700 168px "Noto Serif KR", serif';
-    ctx.fillText(data.heroValue, centerX, cursorY);
-    cursorY += 110;
-
-    if (data.story) {
-      ctx.fillStyle = MUTED;
-      ctx.font = '400 30px "Noto Serif KR", serif';
-      const storyLines = wrapLines(ctx, data.story, W - 260);
-      for (const line of storyLines) {
-        ctx.fillText(line, centerX, cursorY);
-        cursorY += 44;
-      }
-    }
-  } else if (data.headline) {
-    ctx.fillStyle = INK;
-    ctx.font = '600 44px "Noto Serif KR", serif';
-    const lines = wrapLines(ctx, data.headline, W - 220);
-    for (const line of lines) {
-      ctx.fillText(line, centerX, cursorY);
-      cursorY += 62;
-    }
-  }
-
-  // 하단 서명 — 얇은 룰 + URL
-  ctx.strokeStyle = '#ede4d0';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(centerX - 100, H - 220);
-  ctx.lineTo(centerX + 100, H - 220);
-  ctx.stroke();
-
+  // ── 하단 고정 블록: 룰 + URL + 서명 ─────────────────────────────────
+  const bottomRuleY = H - 280;
   ctx.fillStyle = MUTED;
   ctx.font = '500 28px "Noto Serif KR", serif';
-  ctx.fillText(data.url, centerX, H - 160);
-
+  ctx.fillText(data.url, centerX, H - 214);
   ctx.fillStyle = ACCENT;
   ctx.font = '700 26px "Noto Serif KR", serif';
-  ctx.fillText('서울경제 · AI LENS', centerX, H - 116);
+  ctx.fillText('서울경제 · AI LENS', centerX, H - 160);
+
+  // ── 중간 콘텐츠: 먼저 문단들을 계산하고, 위/아래 고정 블록 사이에서
+  //    세로 중앙 정렬한다 ────────────────────────────────────────────
+  const middleTop = topRuleY + 60;
+  const middleBottom = bottomRuleY - 50;
+  const paragraphs: Paragraph[] = [];
+
+  if (data.heroLabel && data.heroValue) {
+    ctx.font = '500 34px "Noto Serif KR", serif';
+    paragraphs.push({
+      lines: wrapLines(ctx, data.heroLabel, CONTENT_WIDTH),
+      fontSize: 34,
+      weight: 500,
+      color: MUTED,
+      lineHeight: 1.45,
+      marginTopBefore: 0,
+    });
+
+    const heroFontSize = fitFontSize(ctx, data.heroValue, CONTENT_WIDTH, 168, 700);
+    paragraphs.push({
+      lines: [data.heroValue],
+      fontSize: heroFontSize,
+      weight: 700,
+      color: INK,
+      lineHeight: 1.15,
+      marginTopBefore: 56,
+    });
+
+    if (data.story) {
+      ctx.font = '400 28px "Noto Serif KR", serif';
+      paragraphs.push({
+        lines: wrapLines(ctx, data.story, CONTENT_WIDTH - 40),
+        fontSize: 28,
+        weight: 400,
+        color: MUTED,
+        lineHeight: 1.55,
+        marginTopBefore: 56,
+      });
+    }
+  } else if (data.headline) {
+    ctx.font = '600 44px "Noto Serif KR", serif';
+    paragraphs.push({
+      lines: wrapLines(ctx, data.headline, CONTENT_WIDTH),
+      fontSize: 44,
+      weight: 600,
+      color: INK,
+      lineHeight: 1.5,
+      marginTopBefore: 0,
+    });
+  }
+
+  const totalHeight = paragraphs.reduce((sum, p) => sum + paragraphHeight(p), 0);
+  const available = Math.max(0, middleBottom - middleTop);
+  let y = middleTop + Math.max(0, (available - totalHeight) / 2);
+
+  for (const p of paragraphs) {
+    y += p.marginTopBefore;
+    ctx.fillStyle = p.color;
+    ctx.font = `${p.weight} ${p.fontSize}px "Noto Serif KR", serif`;
+    for (const line of p.lines) {
+      ctx.fillText(line, centerX, y);
+      y += p.fontSize * p.lineHeight;
+    }
+  }
 
   return new Promise((resolve) => {
     canvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
