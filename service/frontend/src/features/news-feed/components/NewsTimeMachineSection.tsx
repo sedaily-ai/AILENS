@@ -80,6 +80,30 @@ const ARCHIVE_MIN_DATE = '2026-02-01';
 // V1.5 §4 "제공되는 조회일자는 1990-01-01부터").
 const BIGKINDS_MIN_DATE = '1990-01-01';
 
+// 숫자만 쭉 입력해도 "YYYY / MM / DD"로 보이게 포맷 — 네이티브 <input type="date">는
+// 브라우저/로케일마다 필드 순서(월/일/년 vs 년/월/일)가 달라 "19991117"처럼 8자리를
+// 그대로 입력하면 엉뚱한 날짜로 조합되는 문제가 있었다(2026-08-17 실사용 확인:
+// 사용자가 "19991117 했는데 안 나온다"). SideRail 사주 궁합 위젯과 같은 패턴으로
+// 교체해 입력 순서를 항상 년→월→일로 고정한다.
+function formatDateDigits(digits: string): string {
+  if (digits.length < 5) return digits;
+  return `${digits.slice(0, 4)} / ${digits.slice(4, 6)}${digits.length >= 7 ? ` / ${digits.slice(6)}` : ''}`;
+}
+
+// 8자리가 실제 존재하는 달력 날짜인지(윤년·31일 없는 달 등) 확인하고, 서비스가
+// 지원하는 범위(1990-01-01~오늘) 안인지까지 확인한 뒤에만 날짜 문자열을 돌려준다.
+function digitsToValidDate(digits: string): string | null {
+  if (digits.length !== 8) return null;
+  const y = parseInt(digits.slice(0, 4), 10);
+  const m = parseInt(digits.slice(4, 6), 10);
+  const d = parseInt(digits.slice(6, 8), 10);
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  const candidate = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  if (candidate < BIGKINDS_MIN_DATE || candidate > todayStr()) return null;
+  return candidate;
+}
+
 // 랜덤 범위는 빅카인즈 백엔드가 실제로 지원하는 전체 구간(1990-01-01~오늘).
 function randomDateInRange(): string {
   const start = new Date(BIGKINDS_MIN_DATE).getTime();
@@ -96,6 +120,8 @@ export function NewsTimeMachineSection() {
   const [pickedDate, setPickedDate] = useState(todayStr());
   const [items, setItems] = useState<TimelineItem[] | null>(null);
   const [topics, setTopics] = useState<BigKindsTopic[] | null>(null);
+  const [dateDigits, setDateDigits] = useState('');
+  const typedDate = digitsToValidDate(dateDigits);
 
   const isRecent = pickedDate >= ARCHIVE_MIN_DATE;
   const isLive = pickedDate === todayStr();
@@ -277,11 +303,12 @@ export function NewsTimeMachineSection() {
             }}
           >
             <input
-              type="date"
-              value={pickedDate}
-              min={BIGKINDS_MIN_DATE}
-              max={todayStr()}
-              onChange={(e) => e.target.value && setPickedDate(e.target.value)}
+              type="text"
+              inputMode="numeric"
+              value={formatDateDigits(dateDigits)}
+              onChange={(e) => setDateDigits(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
+              placeholder="1999 / 11 / 17"
+              maxLength={14}
               style={{
                 border: 'none',
                 outline: 'none',
@@ -289,28 +316,48 @@ export function NewsTimeMachineSection() {
                 fontSize: 12.5,
                 color: '#2a2622',
                 fontFamily: 'inherit',
+                width: 108,
+                fontVariantNumeric: 'tabular-nums',
               }}
             />
             <button
               type="button"
-              disabled={!isRecent}
-              title={isRecent ? undefined : '이 날짜는 지면 아카이브에 없어요 (2026-02-01 이전)'}
-              onClick={() => isRecent && router.push(`/timeline/${pickedDate}`)}
+              disabled={!typedDate}
+              onClick={() => typedDate && setPickedDate(typedDate)}
               style={{
                 padding: '6px 12px',
                 borderRadius: 9999,
                 border: 'none',
-                background: isRecent ? '#2a2622' : '#e6e0d4',
-                color: isRecent ? '#fff' : '#a8a29e',
+                background: typedDate ? '#2a2622' : '#e6e0d4',
+                color: typedDate ? '#fff' : '#a8a29e',
                 fontSize: 12,
                 fontWeight: 700,
-                cursor: isRecent ? 'pointer' : 'not-allowed',
+                cursor: typedDate ? 'pointer' : 'default',
                 whiteSpace: 'nowrap',
               }}
             >
-              펼치기
+              이동
             </button>
           </div>
+          <button
+            type="button"
+            disabled={!isRecent}
+            title={isRecent ? undefined : '이 날짜는 지면 아카이브에 없어요 (2026-02-01 이전)'}
+            onClick={() => isRecent && router.push(`/timeline/${pickedDate}`)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 9999,
+              border: 'none',
+              background: '#f3f0e8',
+              color: isRecent ? '#78716c' : '#c4bdad',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: isRecent ? 'pointer' : 'not-allowed',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            펼치기
+          </button>
           {/* "생일이 기억 안 나거나 그냥 궁금해서" 눌러보는 진입점
               (2026-08-17 피드백) — 빅카인즈가 실제 지원하는 범위 전체에서 뽑는다. */}
           <button
