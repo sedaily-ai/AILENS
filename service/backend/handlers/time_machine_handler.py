@@ -37,7 +37,11 @@ BIGKINDS_MIN_DATE = '1990-01-01'
 BIGKINDS_ISSUE_RANKING_URL = 'https://tools.kinds.or.kr/issue_ranking'
 BIGKINDS_KEY_SSM_PARAM = '/sedaily-mbti/bigkinds-api-key'
 BIGKINDS_TIMEOUT_SECONDS = 10
-MAX_TOPICS = 8
+# 빅카인즈가 하루에 실제로 주는 토픽 수(1999-11-17 실측 30개) 그대로 — 홈 미리보기는
+# 프론트에서 앞 8개만 자르고, "펼치기"(/timeline/{date})는 전체를 보여준다. 응답
+# 하나를 그대로 캐싱해 두 화면이 같은 캐시를 나눠 쓴다(2026-08-17, 8개로 잘라
+# 캐싱했더니 "펼치기"가 볼 게 없던 문제 수정).
+MAX_TOPICS = 30
 MAX_KEYWORDS_PER_TOPIC = 5
 
 # 캐시 테이블 — 기존 위키/서울경제 캐시가 쓰던 테이블 재사용, 키 접두사만
