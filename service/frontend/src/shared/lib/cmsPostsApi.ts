@@ -9,7 +9,6 @@
  */
 import { API_URL } from '@/shared/config/apiClient';
 import type { ApiLetter } from './todayLettersApi';
-import { letterHref } from './letterHref';
 
 export type CmsChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens';
 
@@ -154,29 +153,11 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
   return [];
 }
 
-export type CmsSectionCard = CmsTrendCard & { href?: string | null; imageUrl?: string | null };
-
-// ColumnPreviewSection("이번 주 인사이트")이 쓰던 fetch 로직 — "trend" 섹션도
-// 같이 지원했었으나(TrendingEconomySection) 그 섹션 자체가 2026-08-17
-// "이슈 톡톡"에 흡수 통합되며 삭제됐다. section 파라미터를 'column' 하나로
-// 좁힌다 — 원래도 trend_card 채널 병합은 실사용 데이터 0건이라 순수 오버헤드였다.
-export async function fetchSectionCards(section: 'column'): Promise<CmsSectionCard[]> {
-  const letters = await fetchCmsPosts('letters', undefined, 100);
-  const tagged: CmsSectionCard[] = letters
-    .filter((l) => l.section === section)
-    .map((l) => ({
-      id: l.id,
-      section,
-      category: l.category || l.editor_id || 'AI LENS',
-      title: l.headline,
-      excerpt: l.subtitle ?? '',
-      date: l.publish_date ?? '',
-      is_cms: true as const,
-      href: letterHref(l.id),
-      imageUrl: l.cover_image_url || null,
-    }));
-  return tagged.sort((a, b) => b.date.localeCompare(a.date));
-}
+// fetchSectionCards()/CmsSectionCard — ColumnPreviewSection("이번 주 인사이트"
+// 홈 섹션)이 쓰던 fetch 로직이었는데, 2026-08-17 홈 구조 개편(LatestGridSection
+// + CategoryRailSection x6, 뉴닉 홈 참고)으로 그 섹션 자체가 삭제되며 호출자가
+// 0이 됐다 — 같이 삭제(archive/column 아카이브 페이지들은 buildArchiveItems를
+// 직접 쓰지 이 함수를 거치지 않았다).
 
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {

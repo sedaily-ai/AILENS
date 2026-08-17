@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsVideo, CmsWebtoon, CmsLens, CmsSectionCard } from "@/shared/lib/cmsPostsApi";
-import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
+import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
 import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
@@ -26,12 +26,11 @@ interface Props {
   onMbtiChange?: (group: MbtiGroupId) => void;
   // 빌드타임(app/page.tsx) 서버 프리페치 값 — NewsFeedTab까지 그대로 하향
   // 전달(2026-08-07, 홈 SSG 감사).
-  initialFollowingLetters?: TodayLetterCardLike[];
   initialWebtoons?: CmsWebtoon[];
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
-  initialColumnItems?: CmsSectionCard[];
+  initialArchiveItems?: ArchiveItem[];
 }
 
 // 아카이빙된 문장 타입
@@ -75,12 +74,11 @@ const getMonthDays = (year: number, month: number): (Date | null)[] => {
 export function FeedPage({
   selectedGroup,
   onMbtiChange,
-  initialFollowingLetters,
   initialWebtoons,
   initialVideos,
   initialWordTerms,
   initialLensPosts,
-  initialColumnItems,
+  initialArchiveItems,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -400,12 +398,11 @@ export function FeedPage({
             setShowCalendar={setShowCalendar}
             selectedGroup={selectedGroup}
             onMbtiChange={onMbtiChange}
-            initialFollowingLetters={initialFollowingLetters}
             initialWebtoons={initialWebtoons}
             initialVideos={initialVideos}
             initialWordTerms={initialWordTerms}
             initialLensPosts={initialLensPosts}
-            initialColumnItems={initialColumnItems}
+            initialArchiveItems={initialArchiveItems}
           />
         )}
 
