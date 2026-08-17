@@ -5,9 +5,9 @@ import { ArticleHeroCard, ArticleGridCard } from './ArticleCard';
 // "최신 뉴스" — 히어로 1건 + 4열 그리드 8건 + 전체보기(2026-08-17, 뉴닉 홈
 // 구조 참고). 예전엔 형식 기준 섹션("이슈 톡톡" FollowingFeed, "인사이트"
 // ColumnPreviewSection)이 따로 있었는데, 그 둘을 여기 하나로 합쳤다 —
-// 어차피 지금은 letters 전체가 category 태그로 분류돼 있어서, 형식(이슈
-// 톡톡/인사이트) 대신 최신순으로 한 번에 보여주고 주제별로는 아래
-// CategoryRailSection들이 담당한다.
+// 카테고리별 레일 섹션도 따로 만들어봤지만 카드마다 이미 붙는 카테고리
+// 태그(ArticleCard.tsx)와 순수 중복이라 바로 뺐다(사용자 지적) — 주제별로
+// 몰아보고 싶으면 상단 탭(카테고리 아카이브 페이지)으로.
 export function LatestGridSection({ items }: { items: ArchiveItem[] }) {
   if (items.length === 0) return null;
   const [hero, ...rest] = items;

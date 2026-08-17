@@ -45,18 +45,21 @@ function HomeContent({
 
 // 서버 컴포넌트로 전환(2026-08-07, 홈 SSG 감사) — 이전엔 페이지 전체가
 // 'use client'라 정적 HTML에 nav/footer(192자)뿐이었다. 홈 피드가 실제로
-// 렌더하는 섹션들(LatestGridSection/CategoryRailSection x6/WebtoonPreviewSection/
-// VideoPreviewSection/WordsPreviewSection/LensPreviewSection)의 데이터를 미리
-// 가져와 FeedPage → NewsFeedTab → 각 섹션까지 initialX prop으로 내려준다.
-// 나머지 섹션(NewsTimeMachineSection 등)은 의도된 mock/placeholder라 그대로 둔다.
+// 렌더하는 섹션들(LatestGridSection/WebtoonPreviewSection/VideoPreviewSection/
+// WordsPreviewSection)의 데이터를 미리 가져와 FeedPage → NewsFeedTab →
+// 각 섹션까지 initialX prop으로 내려준다. 나머지 섹션(NewsTimeMachineSection
+// 등)은 의도된 mock/placeholder라 그대로 둔다.
 //
 // 홈 구조 개편(2026-08-17, 뉴닉 홈 참고) — "이슈 톡톡"(FollowingFeed)과
 // "인사이트"(ColumnPreviewSection) 형식 기준 섹션 2개를 "최신 뉴스"
-// 히어로+그리드(LatestGridSection) + 카테고리 레일 6개(CategoryRailSection)로
-// 교체했다. 그 둘이 각자 다른 API를 부르던 걸 letters 전체 fetch 한 번
-// (fetchCmsPosts('letters', ...) + buildArchiveItems)으로 합쳐서, 최신순
-// 슬라이스와 카테고리별 필터 양쪽에 재사용한다 — 네트워크 요청도 줄고
-// "형식별로 따로 캐시가 어긋나는" 문제도 없어진다.
+// 히어로+그리드(LatestGridSection)로 교체했다. 카테고리 레일 6개
+// (증시/부동산/...)도 만들어봤지만 카드마다 이미 붙는 카테고리 태그와
+// 순수 중복이라 바로 뺐다(사용자 지적) — LatestGridSection.tsx 참조.
+// fetchCmsPosts('letters', ...) + buildArchiveItems 한 번으로 최신순
+// 슬라이스를 만든다. initialLensPosts(fetchLensPosts())는 이제
+// LensPreviewSection 대신 이 히어로의 원본 데이터로 쓰인다
+// (NewsFeedTab.tsx의 lensToHeroItem 참조) — 별도 섹션이 아니라 최신
+// 뉴스 히어로 한 자리로 흡수됐다.
 //
 // force-dynamic을 걸었다가(SSR 전환 직후) 다시 뺐다(2026-08-08) — 아래 fetch들이
 // posts:* 태그로 캐시되므로, 매 요청 강제 재렌더링보다 Next가 이 라우트를

@@ -4,7 +4,6 @@ import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "../lib/wordsTerms";
-import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";
@@ -12,7 +11,6 @@ import { VideoPreviewSection } from "./VideoPreviewSection";
 import { LensPreviewSection } from "./LensPreviewSection";
 import { NewsTimeMachineSection } from "./NewsTimeMachineSection";
 import { LatestGridSection } from "./LatestGridSection";
-import { CategoryRailSection } from "./CategoryRailSection";
 
 interface Props {
   selectedDate: Date;
@@ -72,6 +70,15 @@ export function NewsFeedTab({
             피드백으로 3슬라이드 캐러셀(HomeHeroCarousel.tsx)로 확장. */}
         <HomeHeroCarousel />
 
+        {/* "오늘의 이슈, 4가지 시선" — 배너 바로 아래로 이동(2026-08-17,
+            사용자 확인). 기존 디자인(히어로+"같은 이슈, 네 사람은
+            이렇게 읽습니다" 4행 비교)은 그대로 두고 위치만 옮긴 것 —
+            삭제·병합 아님. 하루 한 건만 크게 보여주는 게 컨셉이라(다른
+            섹션의 "여러 개 나열"과 대비) 배너 다음 첫 콘텐츠 섹션으로
+            올려서 "오늘 진짜 중요한 거 하나"라는 신호를 가장 먼저 준다.
+            LensPreviewSection.tsx 참조. */}
+        <LensPreviewSection initialItems={initialLensPosts} />
+
         {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
             뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
             "그날의 지면"(TimelinePreviewSection)과 "생일 뉴스 타임머신"
@@ -85,29 +92,21 @@ export function NewsFeedTab({
             형식 기준으로 "이슈 톡톡"(FollowingFeed)과 "인사이트"
             (ColumnPreviewSection) 두 섹션이 따로 있었는데, 상단 탭을
             형식(브리핑/인사이트)에서 주제(증시/부동산/...) 기준으로 갈아
-            엎은 김에 홈도 맞췄다 — 형식 구분 없이 최신순으로 한 번에
-            보여주고, 주제별 정리는 바로 아래 카테고리 레일들이 담당한다. */}
+            엎은 김에 홈도 맞췄다.
+            카테고리 레일 6개(증시/부동산/...)를 따로 두는 안도 만들어봤는데
+            바로 뺐다 — 뉴닉의 "코스피/주식" 레일은 "경제" 태그가 붙은
+            카드들을 모은 상위 이슈 클러스터라 레일 헤더와 카드 태그가
+            서로 다른 말인데, 우리는 레일 헤더("증시")와 카드 메타 태그
+            ("증시")가 완전히 같은 단어라 그대로 베끼면 순수 중복이었다
+            (사용자 지적). 카드마다 이미 카테고리 태그(ArticleCard.tsx의
+            CardMeta)가 붙어 있어 이 그리드 하나로 "주제별로 훑어보기"가
+            충분히 된다 — 특정 주제만 몰아보고 싶으면 상단 탭(카테고리
+            아카이브 페이지)으로. */}
         <LatestGridSection items={archiveItems} />
-
-        {/* 카테고리 레일 6개(2026-08-17) — 증시/부동산/산업/금융·정책/
-            국제/재테크. 콘텐츠 없는 카테고리는 섹션 자체가 안 뜬다
-            (CategoryRailSection 참조). */}
-        {ECON_CATEGORIES.map((c) => (
-          <CategoryRailSection
-            key={c.slug}
-            config={c}
-            items={archiveItems.filter((it) => it.category === c.label)}
-          />
-        ))}
 
         {/* 섹션 재정렬(2026-08-06) — "단어 퀴즈는 문제 하나뿐이라 자리를
             많이 안 차지하니 가볍게 매일 훑는 습관을 만들고 싶다"는 피드백. */}
         <WordsPreviewSection initialTerms={initialWordTerms} />
-
-        {/* "오늘의 이슈, 4가지 시선" 홈 티저(2026-08-12) — 하루 한 건만
-            크게 보여주는 게 컨셉이라(다른 섹션의 "여러 개 나열"과 대비)
-            독립 섹션으로 유지. LensPreviewSection.tsx 참조. */}
-        <LensPreviewSection initialItems={initialLensPosts} />
 
         {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제 콘텐츠처럼
             안 보인다"는 피드백으로 카드형으로 교체(WebtoonPreviewSection.tsx). */}
