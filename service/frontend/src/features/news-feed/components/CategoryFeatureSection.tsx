@@ -36,7 +36,6 @@ function HeroArticle({ item, large }: { item: ArchiveItem; large: boolean }) {
       <h3
         className="font-bold leading-snug text-gray-900 group-hover:text-blue-700 transition-colors mb-2"
         style={{
-          fontFamily: '"Noto Serif KR", serif',
           fontSize: large ? 'clamp(20px, 2.6vw, 26px)' : 'clamp(17px, 2vw, 20px)',
           letterSpacing: '-0.02em',
           display: '-webkit-box',
@@ -74,7 +73,6 @@ function ListArticle({ item }: { item: ArchiveItem }) {
       <h4
         className="font-bold leading-snug text-gray-900 group-hover:text-blue-700 transition-colors mb-1.5"
         style={{
-          fontFamily: '"Noto Serif KR", serif',
           fontSize: 15.5,
           letterSpacing: '-0.015em',
           display: '-webkit-box',
@@ -105,8 +103,8 @@ export function CategoryFeatureSection({
 
   return (
     <div className={span === 'wide' ? 'md:col-span-2' : 'md:col-span-1'}>
-      <header className="flex items-center justify-between mb-4" style={{ borderBottom: `2px solid ${config.accent}`, paddingBottom: 8 }}>
-        <h2 className="font-bold" style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 17, color: config.accent }}>
+      <header className="flex items-center justify-between mb-4" style={{ borderBottom: '2px solid #111827', paddingBottom: 8 }}>
+        <h2 className="font-bold text-gray-900" style={{ fontSize: 17 }}>
           {config.label}
         </h2>
         <Link href={`/${config.slug}`} className="text-gray-400 hover:text-gray-900 transition-colors" style={{ fontSize: 13, fontWeight: 600 }}>
