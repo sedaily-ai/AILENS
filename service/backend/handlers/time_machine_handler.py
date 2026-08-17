@@ -29,6 +29,7 @@ import boto3
 import requests
 
 from common.secrets import get_secret
+from config.investment_scenarios import build_investment_scenarios
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, no_content_response, success_response
 
@@ -195,15 +196,19 @@ def _fetch_sedaily_articles(date: str) -> List[Dict[str, Any]]:
 
 
 def get_time_machine_data(date: str) -> dict:
+    # investments는 순수 로컬 계산(실측 시세 테이블 조회 + 산술)이라 외부 API를
+    # 안 타서 캐시할 필요가 없다 — 캐시 히트/미스와 무관하게 매번 새로 계산.
+    investments = build_investment_scenarios(date)
+
     cached = _get_cached(date)
     if cached is not None:
-        return {**cached, 'cached': True}
+        return {**cached, 'investments': investments, 'cached': True}
 
     articles = _fetch_sedaily_articles(date)
     result = {'date': date, 'articles': articles}
     if articles:
         _save_cache(date, result)
-    return {**result, 'cached': False}
+    return {**result, 'investments': investments, 'cached': False}
 
 
 # ─── Lambda entry point ─────────────────────────────────────────────────────
