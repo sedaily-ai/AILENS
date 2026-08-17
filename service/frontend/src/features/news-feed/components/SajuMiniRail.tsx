@@ -213,11 +213,36 @@ function DemoPreview() {
         overflow: 'hidden',
       }}
     >
-      <div className="flex items-center gap-1.5 mb-3">
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: BRAND, animation: 'demo-pulse 1.6s ease-in-out infinite' }} aria-hidden />
-        <span style={{ fontSize: 10, color: BRAND, fontWeight: 700, letterSpacing: '0.1em' }}>
-          이렇게 나와요
-        </span>
+      <div className="flex items-center justify-between mb-3">
+        {/* "(예시)"를 덧붙이고 화살표를 추가했다(2026-08-17, 사용자 피드백:
+            "이게 실제 내 결과인지 예시인지 헷갈린다" + "화살표로 움직인다
+            거나... 뭐라도 주면 좋겠는데" — 자동 순환 2.4초 간격만으로는
+            직접 넘겨보고 싶어도 방법이 없었다). */}
+        <div className="flex items-center gap-1.5">
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: BRAND, animation: 'demo-pulse 1.6s ease-in-out infinite' }} aria-hidden />
+          <span style={{ fontSize: 10, color: BRAND, fontWeight: 700, letterSpacing: '0.1em' }}>
+            이렇게 나와요 (예시)
+          </span>
+        </div>
+        <div className="flex items-center" style={{ gap: 4 }}>
+          <button
+            type="button"
+            aria-label="이전 예시"
+            onClick={() => setIdx((i) => (i - 1 + DEMO_SAMPLES.length) % DEMO_SAMPLES.length)}
+            style={{ width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'none', color: '#9ca3af', cursor: 'pointer' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
+          <span style={{ fontSize: 10, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{idx + 1}/{DEMO_SAMPLES.length}</span>
+          <button
+            type="button"
+            aria-label="다음 예시"
+            onClick={() => setIdx((i) => (i + 1) % DEMO_SAMPLES.length)}
+            style={{ width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'none', color: '#9ca3af', cursor: 'pointer' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
+        </div>
       </div>
 
       <div
@@ -379,7 +404,12 @@ function yearToZodiac(year: number): Zodiac | null {
 export function SajuMiniRail() {
   const [birth, setBirth] = useState('');
   const [gender, setGender] = useState<Gender>('male');
-  const [openModule, setOpenModule] = useState<'face' | 'trait' | 'zodiac' | 'month' | null>('face');
+  // 기본으로 하나 펼쳐두던 걸(첫 로드부터 '외모' 상세가 열려 있었음) 다 닫힌
+  // 상태로 바꿨다(2026-08-17, 사용자 피드백: "사주 부분 결과값이 너무
+  // 길어서 사이드바 아닌 곳 하단까지 내려가야 보인다" — 사이드바가 sticky
+  // 라 본문 칼럼보다 길어지면 그만큼 페이지 아래로 삐져나온다. 펼침 카드
+  // 하나가 꽤 큰 비중을 차지해 기본을 접어두는 것만으로 눈에 띄게 짧아짐).
+  const [openModule, setOpenModule] = useState<'face' | 'trait' | 'zodiac' | null>(null);
 
   const birthYear = birth.length >= 4 ? parseInt(birth.slice(0, 4)) : NaN;
   const birthMonth = birth.length >= 6 ? parseInt(birth.slice(4, 6)) : NaN;
@@ -594,15 +624,20 @@ export function SajuMiniRail() {
           <p style={{ fontSize: 10.5, color: '#9ca3af', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>
             풀이 미리보기
           </p>
+          {/* 4개 → 3개로 줄였다("추천 생월" 제거) — 사이드바가 sticky라
+              본문 칼럼보다 세로로 길어지면 페이지 아래로 삐져나온다는
+              피드백(2026-08-17, "결과값이 너무 길어서 사이드바 아닌 곳
+              하단까지 내려가야 보인다")에 대응한 두 번째 트림. 남은
+              3개(외모·성향·추천 띠)가 궁합 미리보기의 핵심에 더 가깝다고
+              판단. */}
           <div className="flex flex-col gap-1.5 mb-5">
             {(() => {
               const preview = MODULE_PREVIEW[pair.recommendElement];
               const ink = BRAND;
-              const modules: { id: 'face' | 'trait' | 'zodiac' | 'month'; label: string; preview: string; detail: string; Icon: ({ color }: { color: string }) => React.ReactElement }[] = [
+              const modules: { id: 'face' | 'trait' | 'zodiac'; label: string; preview: string; detail: string; Icon: ({ color }: { color: string }) => React.ReactElement }[] = [
                 { id: 'face', label: '외모·분위기', preview: preview.face, detail: '첫인상의 결, 눈빛과 이목구비의 흐름, 자세 톤까지 짚어드려요.', Icon: IconFace },
                 { id: 'trait', label: '성향·언어', preview: preview.trait, detail: '말투의 결, 갈등을 풀어가는 방식, 함께 있을 때의 호흡까지 짚어드려요.', Icon: IconBrush },
                 { id: 'zodiac', label: '추천 띠', preview: `${preview.zodiacs.join('·')}띠와 결이 맞아요`, detail: '삼합·육합·반합 — 띠 차원의 궁합 구조를 짚어드려요.', Icon: IconZodiac },
-                { id: 'month', label: '추천 생월', preview: preview.months.join(' · '), detail: '계절·절기 기운으로 본 가장 잘 맞는 출생월을 알려드려요.', Icon: IconCalendar },
               ];
               return modules.map((m) => {
                 const open = openModule === m.id;
@@ -669,23 +704,27 @@ export function SajuMiniRail() {
           >
             내 짝꿍 풀어보기 →
           </a>
-
-          {/* 짝꿍 궁합 말고도 오늘의 운세·총운도 궁금할 수 있다는 피드백
-              (2026-08-17, "총운.. 오늘의 운세.. 그런것도 볼 수 있을텐데")
-              — 각각을 이 사이드바 안에서 다시 계산해 보여주진 않는다(별도
-              앱의 엔진을 가져와야 해서 범위가 커진다). 대신 실제 서비스의
-              해당 페이지로 바로 가는 링크만 가볍게 추가. */}
-          <div className="flex items-center justify-center" style={{ gap: 14, marginTop: 10 }}>
-            <a href="/saju/today" style={{ fontSize: 11.5, fontWeight: 600, color: '#9ca3af', textDecoration: 'none' }}>
-              오늘의 운세
-            </a>
-            <span style={{ width: 1, height: 10, background: '#e5e7eb' }} aria-hidden />
-            <a href="/saju/chaeun" style={{ fontSize: 11.5, fontWeight: 600, color: '#9ca3af', textDecoration: 'none' }}>
-              총운 보기
-            </a>
-          </div>
         </div>
       )}
+
+      {/* 짝꿍 궁합 말고도 오늘의 운세·총운도 궁금할 수 있다는 피드백
+          (2026-08-17, "총운.. 오늘의 운세.. 그런것도 볼 수 있을텐데") —
+          각각을 이 사이드바 안에서 다시 계산해 보여주진 않는다(별도 앱의
+          엔진을 가져와야 해서 범위가 커진다). 대신 실제 서비스의 해당
+          페이지로 바로 가는 링크만 가볍게 추가. 처음엔 실제 결과(생일
+          입력 후) 카드 안에만 넣었는데, 그러면 아직 생일을 안 넣어 데모
+          미리보기만 보고 있는 사람 눈에는 이 링크가 아예 안 보였다 —
+          위 ternary 밖으로 빼서 데모/실제 결과 어느 쪽이든 항상 보이게
+          했다. */}
+      <div className="flex items-center justify-center" style={{ gap: 14, marginTop: 12 }}>
+        <a href="/saju/today" style={{ fontSize: 11.5, fontWeight: 600, color: '#9ca3af', textDecoration: 'none' }}>
+          오늘의 운세
+        </a>
+        <span style={{ width: 1, height: 10, background: '#e5e7eb' }} aria-hidden />
+        <a href="/saju/chaeun" style={{ fontSize: 11.5, fontWeight: 600, color: '#9ca3af', textDecoration: 'none' }}>
+          총운 보기
+        </a>
+      </div>
     </section>
   );
 }
