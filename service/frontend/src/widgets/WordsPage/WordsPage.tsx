@@ -36,7 +36,9 @@ export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
 
   return (
     <div className="min-h-screen" style={{ background: '#fdfcfa' }}>
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('feed')} frosted />
+      {/* 'feed' 탭은 2026-08-17 상단 탭 개편으로 nav에서 빠졌다(headerTabs.ts
+          참조) — 이 페이지 자체는 남아있지만 강조할 대응 탭이 더 없다. */}
+      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* /letters 아카이브와 같은 헤더 톤 — 그라데이션 배경·그림자 아이콘박스 없이

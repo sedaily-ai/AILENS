@@ -3,10 +3,16 @@
  * 새 탭 추가/순서 변경 시 이 파일 한 곳만 수정.
  */
 
+import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+
 export type HeaderTabKey =
-  | 'feed'
-  | 'column'
   | 'lens'
+  | 'markets'
+  | 'property'
+  | 'industry'
+  | 'finance'
+  | 'international'
+  | 'investing'
   | 'video'
   | 'fortune'
   | 'timeline'
@@ -44,27 +50,36 @@ export const TIMELINE_HREF = '/timeline';
  */
 export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
   return [
-    // 홈(오늘의 피드)이 아니라 전체 레터 모음(/letters)으로 간다 — 2026-08-06
-    // 이전엔 '/'였는데, 사용자가 "레터 탭 = 레터들이 모인 곳"으로 기대해서 바꿨다.
-    // 홈으로 돌아가는 길은 로고 클릭.
-    //
-    // 라벨 워딩 개편(2026-08-12) — "레터/트렌드/칼럼"이 서로 다른 축(형식 vs
-    // 장르)으로 이름 붙어 있어 나란히 두면 뭐가 다른지 헷갈린다는 지적.
-    // "브리핑/딥다이브/인사이트"로 통일 — 셋 다 "이 글이 어떤 성격인지"를
-    // 말하는 축(빠른 요약/깊은 분석/개인 관점)으로 맞췄고, 폴인·어피티 같은
-    // 경제 콘텐츠 플랫폼에서 이미 통용되는 단어라 가볍지 않으면서 트렌디함도
-    // 챙긴다. URL(key/href)은 그대로 — SEO(캐노니컬·sitemap)에 영향 없음,
-    // 화면에 보이는 한글 라벨만 바뀐다.
     // 2026-08-16 — "시선"(4가지 시선)이 서비스의 핵심 차별화 포인트라는 판단으로
     // 탭 최상단으로 이동(사용자 확인). 2026-08-13에는 SEO 발견성 문제로 전역
-    // 내비게이션에 처음 추가됐었다.
-    { key: 'lens', label: '시선', href: '/lens', active: active === 'lens', tier: 'extra' },
-    { key: 'feed', label: '브리핑', href: '/letters', active: active === 'feed' },
-    // '딥다이브'(/trend) 탭은 2026-08-17 제거 — "이슈 톡톡"과 독자 입장에서
-    // 구분이 안 된다는 판단으로 홈 섹션·아카이브를 통합했다(/trend는
-    // /issue-talk로 리다이렉트). "이슈 톡톡" 자체는 별도 상단 탭이 아니라
-    // 홈 화면 섹션 + /issue-talk 아카이브로만 존재(기존과 동일).
-    { key: 'column', label: '인사이트', href: '/column', active: active === 'column', tier: 'extra' },
+    // 내비게이션에 처음 추가됐었다. 2026-08-17 — 유일한 core 티어 탭으로 승격
+    // (아래 참조) — 다른 모든 탭이 extra로 내려가면서 시선만 남는 게 아니라,
+    // "형식(브리핑/인사이트)보다 이 기능 자체가 상단에서 도드라져야 한다"는
+    // 판단(사용자 확인)에 따른 의도적 배치.
+    { key: 'lens', label: '시선', href: '/lens', active: active === 'lens' },
+    // 상단 탭 구조 개편(2026-08-17) — "브리핑"/"인사이트"(형식 기준: 빠른
+    // 요약/개인 관점)를 걷어내고 주제 기준 6개로 교체했다. "독자가 형식
+    // 차이를 구분하기 어렵다"는 판단 + 서울경제 영문사이트(Markets/Property/
+    // Business/Finance/International) 구조를 참고 — 같은 발행사 브랜드 체계와
+    // 맞춘다. "재테크"만 본지엔 없는 섹션인데 AI LENS 자체 차별점(개인 관점
+    // 리라이팅)이라 남겼다. 카테고리 정의는 shared/constants/econCategories.ts
+    // 한 곳 — admin/frontend의 ECON_CATEGORIES(lib/types.ts)와 같은 목록이지만
+    // 별도 Next.js 앱이라 의도적으로 중복.
+    //
+    // 기존 /letters, /column 페이지 자체는 안 지웠다 — 색인된 URL 보존,
+    // 다만 이 nav에서는 빠진다("딥다이브"/trend를 완전히 리다이렉트로
+    // 없앤 것과는 다른 처리 — letters/column은 여전히 실제 콘텐츠 아카이브라
+    // 링크가 죽을 이유가 없다).
+    //
+    // 전부 tier:'extra' — 시선 하나만 core로 남기고, 나머지 11개(카테고리
+    // 6 + 웹툰/영상/사주/타임라인/게임)는 무게를 낮춘다(사용자 확인).
+    ...ECON_CATEGORIES.map((c) => ({
+      key: c.slug as HeaderTabKey,
+      label: c.label,
+      href: `/${c.slug}`,
+      active: active === c.slug,
+      tier: 'extra' as const,
+    })),
     // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
     // 앞으로 당김(사용자 확인) — "오락성들보다도 뒤에 있으면 안 된다".
     { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'extra' },

@@ -1,6 +1,8 @@
 // 전역 푸터 — SEO/E-E-A-T 신호 + 발행처 + 소셜.
 // 모든 페이지 하단에 마운트 (app/layout.tsx). 클라이언트 인터랙션 없음 → 서버 컴포넌트.
 //
+import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+//
 // 2026-08-07: en.sedaily.com 실제 footer(About/Contact/Terms/Privacy 링크 +
 // 사업자정보 + Copyright)와 대조해 같은 구조로 보강 — 여긴 JSON-LD(구조화
 // 데이터)에만 있던 발행처 관계·사업자정보를 화면에 보이는 텍스트로도 노출해야
@@ -106,16 +108,19 @@ const NAV: { label: string; href: string }[] = [
   { label: '개인정보처리방침', href: '/privacy' },
 ];
 
-// 콘텐츠 허브 링크(2026-08-12) — 모든 페이지 하단에 5개 콘텐츠 타입 페이지로
-// 가는 링크를 심어서, 크롤러가 어느 글에서 출발하든 몇 클릭 안에 전체
-// 콘텐츠 구조를 발견할 수 있게 한다(사이트맵과는 별개로 "실제 보이는
+// 콘텐츠 허브 링크(2026-08-12) — 모든 페이지 하단에 콘텐츠 타입/카테고리
+// 페이지로 가는 링크를 심어서, 크롤러가 어느 글에서 출발하든 몇 클릭 안에
+// 전체 콘텐츠 구조를 발견할 수 있게 한다(사이트맵과는 별개로 "실제 보이는
 // 링크"가 있어야 크롤 우선순위·내부 링크 가중치에 더 잘 잡힌다는 지적).
+//
 // '딥다이브'(/trend)는 2026-08-17 폐기 — headerTabs.ts 주석 참조. 이 배열이
 // headerTabs.ts/FeedPage.tsx와 별도로 관리되는 세 번째 사본이라는 걸
-// 뒤늦게 발견 — 앞의 둘만 고치고 배포했다가 라이브에서 이 푸터 링크만
-// 남아있는 걸 확인하고 뒤이어 고쳤다.
+// 그때 뒤늦게 발견했다(앞의 둘만 고치고 배포했다가 라이브에서 이 푸터
+// 링크만 남아있는 걸 확인). 같은 사고를 또 내지 않도록, 상단 탭 개편
+// (브리핑/인사이트 → 주제 6개)에 맞춰 여기도 ECON_CATEGORIES에서 직접
+// 생성한다 — 손으로 옮겨 적지 않는다.
 const CONTENT_LINKS: { label: string; href: string }[] = [
-  { label: '브리핑', href: '/letters' },
+  ...ECON_CATEGORIES.map((c) => ({ label: c.label, href: `/${c.slug}` })),
   { label: '이슈 톡톡', href: '/issue-talk' },
   { label: '인사이트', href: '/column' },
   { label: '영상', href: '/video' },

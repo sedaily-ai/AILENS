@@ -17,7 +17,7 @@ import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";
 import { QuestionTab, dailyQuestions } from "@/features/question";
 import { NewsFeedTab, type Term } from "@/features/news-feed";
 import { ArchiveTab } from "@/features/archive";
-import { TIMELINE_HREF } from "@/shared/lib/headerTabs";
+import { buildHeaderTabs } from "@/shared/lib/headerTabs";
 
 interface Props {
   selectedGroup: MbtiGroupId;
@@ -343,42 +343,19 @@ export function FeedPage({
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
       {/* Header - 1단 통합 */}
+      {/* 탭 배열을 여기 따로 하드코딩하지 않고 headerTabs.ts의 buildHeaderTabs()를
+          그대로 쓴다(2026-08-17 근본 수정) — 원래 "FeedPage는 in-page 탭
+          전환이라 buildHeaderTabs()를 못 쓴다"는 이유로 손으로 복제해왔는데,
+          실제로 이 배열의 각 항목은 전부 href 실이동일 뿐 onClick 전환이
+          하나도 없었다(순수 드리프트 위험만 있고 얻는 게 없는 중복). 상단
+          탭 개편(딥다이브 제거, 카테고리 6개 추가) 때마다 이 사본을 깜빡해서
+          라이브에 옛 링크가 남는 사고가 이미 한 번 있었다(SiteFooter.tsx
+          CONTENT_LINKS에서도 같은 사고 발견 — 거기는 여전히 별도 사본이라
+          주의). 홈 화면에서는 어차피 활성 탭이 없어 active 인자도 필요 없다. */}
       <Header
         onLogo={() => setActiveTab("feed")}
         onSearch={() => setShowSearch(true)}
-        tabs={[
-          // 2026-08-16 — "시선"을 탭 최상단으로 이동(headerTabs.ts와 동일,
-          // 사용자 확인 — 서비스 핵심 차별화 포인트라는 판단).
-          { key: "lens", label: "시선", href: "/lens", tier: "extra" },
-          // 전체 레터 모음(/letters)으로 실제 이동 — 예전엔 in-page 탭 전환(버튼)이라
-          // 눌러도 화면이 안 바뀌는 것처럼 보였다. 홈 피드로 돌아오는 길은 로고 클릭
-          // (onLogo → setActiveTab("feed"))으로 그대로 유지.
-          { key: "feed", label: "브리핑", href: "/letters" },
-          // 콘텐츠 타입별 페이지 분리(2026-08-11, headerTabs.ts와 동일 항목) —
-          // 이 배열이 headerTabs.ts의 사본이라 거기 추가한 인사이트/영상도
-          // 여기 안 넣으면 홈에서만 안 보이는 불일치가 생긴다(바로 아래 사주
-          // 탭이 /fortune 옛 경로를 들고 있던 것도 같은 이유의 드리프트였음 —
-          // 겸사겸사 /saju로 바로잡음, 리다이렉트를 거치긴 하지만 정본이 아니었다).
-          // 라벨 워딩 개편(2026-08-12, headerTabs.ts 주석 참조) — 레터/칼럼 →
-          // 브리핑/인사이트로 통일, URL은 그대로.
-          // '딥다이브'(/trend) 탭은 2026-08-17 제거 — headerTabs.ts 주석 참조.
-          { key: "column", label: "인사이트", href: "/column", tier: "extra" },
-          // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
-          // 앞으로 당김(headerTabs.ts와 동일, 사용자 확인).
-          { key: "webtoon", label: "웹툰", href: "/webtoon", tier: "extra" },
-          { key: "video", label: "영상", href: "/video", tier: "extra" },
-          // '내 서랍' 탭 제거(2026-08-06, headerTabs.ts 주석 참조) — 페이지/저장
-          // 기능 자체는 살아있고 activeTab === "archive" 렌더 분기도 그대로 둔다.
-          // 탭이 많아 보인다는 피드백(2026-08-06) — 드롭다운 대신 tier:'extra'로
-          // 무게만 낮춰 "본체 vs 덤" 구분(headerTabs.ts와 동일 원칙, 상세 주석 참조).
-          // '에디터' 탭 제거(2026-08-06) — 페이지/구독 펀널은 그대로 살아있고
-          // 온보딩 플로우에서 계속 링크된다(headerTabs.ts 주석 참조).
-          // hardNav: true — /saju는 다른 Next.js 앱(zone)으로 rewrite되는 경로라
-          // next/link 소프트 내비게이션이 안 먹는다(headerTabs.ts 주석 참조).
-          { key: "fortune", label: "사주", href: "/saju", tier: "extra", hardNav: true },
-          { key: "timeline", label: "타임라인", href: TIMELINE_HREF, tier: "extra" },
-          { key: "games", label: "게임", href: "/games", tier: "extra" },
-        ]}
+        tabs={buildHeaderTabs()}
       />
 
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />

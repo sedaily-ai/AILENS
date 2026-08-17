@@ -156,10 +156,12 @@ export function LetterDetailClient({ letterId, initialLetter = null }: Props) {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* 글로벌 헤더 — /editors 페이지와 동일한 마크업 (전체 페이지에서 고정) */}
+      {/* 글로벌 헤더 — /editors 페이지와 동일한 마크업 (전체 페이지에서 고정).
+          'feed' 탭은 2026-08-17 상단 탭 개편으로 nav에서 빠졌다(headerTabs.ts
+          참조) — 강조할 대응 탭이 더 없다. */}
       <Header
         onSearch={() => setShowSearch(true)}
-        tabs={buildHeaderTabs('feed')}
+        tabs={buildHeaderTabs()}
       />
 
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
