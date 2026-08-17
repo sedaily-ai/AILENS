@@ -106,7 +106,11 @@ export function CategoryFeatureSection({
 
   return (
     <div className={span === 'wide' ? 'md:col-span-2' : 'md:col-span-1'}>
-      <header className="flex items-center justify-between mb-4" style={{ borderBottom: '2px solid #111827', paddingBottom: 8 }}>
+      {/* 헤더 밑줄을 2px 검정에서 1px 연회색으로 낮췄다(2026-08-17, 사용자
+          피드백: "영문사이트처럼 선 색깔을 그레이로 하면 좋지 않으려나...
+          진한 느낌이 없고 디자인적으로 깔끔한, 모던한 느낌" — 본지
+          en.sedaily.com 영문판 참고 스크린샷 대비). */}
+      <header className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid #d1d5db', paddingBottom: 8 }}>
         <h2 className="font-bold text-gray-900" style={{ fontSize: 17 }}>
           {config.label}
         </h2>
