@@ -5,6 +5,7 @@ import { CustomSelect } from "@/components/CustomSelect";
 import { PostFormShell } from "./PostFormShell";
 import { MetaField, MetaDivider } from "./MetaField";
 import type { ModeProps } from "./shared";
+import { ECON_CATEGORIES } from "@/lib/types";
 
 interface Props extends ModeProps {
   // 리치텍스트 에디터 인스턴스 — 툴바를 페이지 최상단에 따로 두려고
@@ -75,6 +76,25 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
               options={[
                 { value: "", label: "이슈 톡톡" },
                 { value: "column", label: "인사이트" },
+              ]}
+            />
+          </MetaField>
+          <MetaDivider />
+          {/* 경제 버티컬 카테고리(2026-08-17 신설) — "분류"(형식: 이슈톡톡/
+              인사이트)와는 다른 축, "무슨 주제인가"(증시/부동산/산업/금융·정책/
+              국제/재테크). 원래 category 필드는 있었는데 이 화면엔 입력 UI
+              자체가 없어서(posts/page.tsx의 "카테고리 일괄 입력" 자유 텍스트
+              도구로만 채워졌었다) 51건 중 23건이 비어있고 나머지도 표기가
+              제각각이었다 — ECON_CATEGORIES 확정 후 고정 6종 선택으로 막는다
+              (lib/types.ts 주석 참조). 선택 안 하면 미분류로 저장(빈 문자열
+              대신 undefined — CustomSelect의 빈 옵션이 곧 "선택 안 함"). */}
+          <MetaField label="카테고리">
+            <CustomSelect
+              value={body.category ?? ""}
+              onChange={(v) => patchBody({ category: v || undefined })}
+              options={[
+                { value: "", label: "미분류" },
+                ...ECON_CATEGORIES.map((c) => ({ value: c, label: c })),
               ]}
             />
           </MetaField>

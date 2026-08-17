@@ -98,6 +98,19 @@ export type CmsChannel = "letters" | "paper" | "feed" | "webtoon" | "video" | "l
 export type CmsCardSection = "column" | "glossary" | "issue_talk";
 export type CmsStatus = "draft" | "published" | "archived";
 
+// 경제 버티컬 카테고리(2026-08-17) — 발행된 51건을 실제로 다시 읽고 분류하며
+// 확정. 처음엔 "글로벌"이었다가 "그거 금융 아닌가요?" 피드백으로 축 정리를
+// 고민했는데, 서울경제 영문사이트(Markets/Property/Finance/Business/
+// Technology/International)도 International을 금융·마켓과 별도 섹션으로
+// 두고 있어(실제 신문사들의 일반적 관행 — 외신 소재면 국제, 국내 영향이
+// 중심이면 금융/마켓/산업) "국제"로 이름만 맞추고 유지하기로 확정. "재테크"는
+// 서울경제 본지엔 없는 섹션 — 개인 관점 리라이팅이라는 AI LENS 자체
+// 차별점(사업계획서 "인지양식 기반 리라이팅")이라 남겨둔다. 정치/사회/문화/
+// 스포츠는 뺐다 — 지금 발행 콘텐츠가 100% 경제/비즈니스라 그 탭들은 계속
+// 비어있게 된다(뉴닉·서울경제 전체 구조를 그대로 못 가져오는 이유).
+export const ECON_CATEGORIES = ["증시", "부동산", "산업", "금융·정책", "국제", "재테크"] as const;
+export type EconCategory = (typeof ECON_CATEGORIES)[number];
+
 export interface CmsKeyword {
   term: string;
   explain: string;

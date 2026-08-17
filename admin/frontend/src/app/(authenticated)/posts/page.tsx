@@ -11,6 +11,7 @@ import { ContentTable } from "@/components/ContentTable";
 import { PromptDrawer } from "@/components/PromptDrawer";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
+import { ECON_CATEGORIES, type EconCategory } from "@/lib/types";
 
 // 일괄 "분류 변경" 대상 — channels 자체(레터↔웹툰/영상)는 PostForm에서도
 // 생성 후엔 못 바꾸게 막아뒀다(엉뚱한 채널로 이미 발행된 글이 옮겨가는 사고
@@ -291,7 +292,7 @@ function PostsPage() {
     finishBulk(ids.length - failCount, failCount, "이동");
   };
 
-  const bulkSetCategory = async (category: string) => {
+  const bulkSetCategory = async (category: EconCategory) => {
     if (selected.size === 0) return;
     setBulkBusy(true);
     const ids = [...selected];
@@ -408,12 +409,10 @@ function BulkActionBar({
   count: number;
   busy: boolean;
   onMove: (section: "" | "column" | "glossary") => void;
-  onSetCategory: (category: string) => void;
+  onSetCategory: (category: EconCategory) => void;
   onDelete: () => void;
   onClear: () => void;
 }) {
-  const [category, setCategory] = useState("");
-
   return (
     <div
       className="ui-toast flex max-w-full items-center gap-5 overflow-x-auto rounded-xl px-5 py-3.5"
@@ -442,28 +441,24 @@ function BulkActionBar({
 
       <span className="h-5 w-px shrink-0 bg-black/10" />
 
-      <form
-        className="flex shrink-0 items-center gap-1.5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (category.trim()) onSetCategory(category.trim());
-        }}
-      >
-        <input
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="카테고리 일괄 입력"
-          disabled={busy}
-          className="rounded-md px-3 py-1.5 text-sm bg-white outline-none w-36 disabled:opacity-50"
-        />
-        <button
-          type="submit"
-          disabled={busy || !category.trim()}
-          className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium cursor-pointer bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
-        >
-          적용
-        </button>
-      </form>
+      {/* 카테고리 일괄 입력(자유 텍스트) → 고정 6종 버튼으로 교체(2026-08-17) —
+          자유 입력 탓에 "산업 인사이트"/"산업·글로벌"/"IT·플랫폼"처럼 겹치는데
+          표기만 다른 값들이 쌓였던 걸 발견하고 근본 원인부터 막는다
+          (ECON_CATEGORIES 확정 경위는 lib/types.ts 주석 참조). */}
+      <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm" style={{ color: "var(--text-secondary)" }}>
+        카테고리
+        {ECON_CATEGORIES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            disabled={busy}
+            onClick={() => onSetCategory(c)}
+            className="shrink-0 rounded-md px-3 py-1.5 font-medium cursor-pointer bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
+          >
+            {c}
+          </button>
+        ))}
+      </div>
 
       <span className="h-5 w-px shrink-0 bg-black/10" />
 
