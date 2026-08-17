@@ -62,7 +62,7 @@ async function fetchDayArticles(dateStr: string): Promise<TimelineItem[]> {
     .slice()
     .filter((a) => !a.title.includes('[시그널]'))
     .sort((a, b) => b.published_at.localeCompare(a.published_at))
-    .slice(0, 5)
+    .slice(0, 10)
     .map((a) => ({
       id: a.news_id,
       time: formatTime(a.published_at),
@@ -129,6 +129,12 @@ export function NewsTimeMachineSection() {
   const [articles, setArticles] = useState<BigKindsArticle[] | null>(null);
   const [dateDigits, setDateDigits] = useState('');
   const [rewinding, setRewinding] = useState(false);
+  // 기본 5개만 보여주고 "더보기"로 나머지를 펼친다(2026-08-17, 사용자
+  // 피드백: "더보기 누르게 하시죠, 한 5개만 보여주고" — 개수를 아예 줄이는
+  // 대신 펼침 방식으로 바꿔 목록 전체를 잃지 않으면서도 기본 화면은 짧게
+  // 유지한다).
+  const VISIBLE_COUNT = 5;
+  const [expanded, setExpanded] = useState(false);
   const typedDate = digitsToValidDate(dateDigits);
 
   const isRecent = pickedDate >= ARCHIVE_MIN_DATE;
@@ -141,6 +147,7 @@ export function NewsTimeMachineSection() {
     setPrevPickedDate(pickedDate);
     setItems(null);
     setArticles(null);
+    setExpanded(false);
   }
 
   useEffect(() => {
@@ -203,13 +210,13 @@ export function NewsTimeMachineSection() {
           <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
             그날로 떠나요
           </h2>
+          {/* "실시간 업데이트 중" 텍스트 라벨 제거(2026-08-17, 사용자 피드백:
+              "실시간 업데이트 중도 굳이? AI 티나요, 자연스럽지 않은 톤") —
+              시각(19:42 등)이 이미 최신순으로 찍혀 있어 텍스트로 또 설명할
+              필요가 없었고, 시스템 상태 메시지 톤이 바로 위 에디토리얼
+              카피와 부딪혔다. 점 애니메이션만 남긴다. */}
           {isLive && (
-            <span className="inline-flex items-center" style={{ gap: 5 }}>
-              <span aria-hidden className="ntm-livedot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#8a6d3f', flexShrink: 0 }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#8a6d3f', letterSpacing: '0.02em' }}>
-                실시간 업데이트 중
-              </span>
-            </span>
+            <span aria-hidden className="ntm-livedot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#111827', flexShrink: 0 }} />
           )}
         </div>
       </header>
@@ -218,7 +225,7 @@ export function NewsTimeMachineSection() {
         style={{
           borderRadius: 14,
           background: '#fff',
-          border: '1px solid #f1efe9',
+          border: '1px solid #e5e7eb',
           boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
           overflow: 'hidden',
         }}
@@ -233,17 +240,19 @@ export function NewsTimeMachineSection() {
           </div>
         )}
 
-        {/* 인트로 — "오늘 뭐 있었지"와 "내 생일엔 뭐 있었지"를 한 카피로. */}
-        <div style={{ display: rewinding ? 'none' : undefined, textAlign: 'center', padding: 'clamp(20px, 4vw, 28px) clamp(16px, 4vw, 24px) 4px', background: '#fdfcf9' }}>
-          <div className="flex justify-center" style={{ marginBottom: 8 }}>
-            <PocketWatchIcon accent="#8a6d3f" className="w-8 h-8" />
+        {/* 인트로 — "오늘 뭐 있었지"와 "내 생일엔 뭐 있었지"를 한 카피로.
+            상하 패딩을 좁혔다(2026-08-17, 사용자 피드백: "자리를 많이
+            차지하네" — 카드 전체 세로 길이를 줄이는 데 기여). */}
+        <div style={{ display: rewinding ? 'none' : undefined, textAlign: 'center', padding: 'clamp(14px, 2.5vw, 18px) clamp(16px, 4vw, 24px) 4px', background: '#f9fafb' }}>
+          <div className="flex justify-center" style={{ marginBottom: 6 }}>
+            <PocketWatchIcon accent="#6b7280" className="w-6 h-6" />
           </div>
           <p
             style={{
               fontFamily: '"Noto Serif KR", serif',
               fontSize: 'clamp(16px, 3.2vw, 19px)',
               fontWeight: 700,
-              color: '#2a2622',
+              color: '#111827',
               letterSpacing: '-0.02em',
             }}
           >
@@ -259,9 +268,9 @@ export function NewsTimeMachineSection() {
             justifyContent: 'center',
             flexWrap: 'wrap',
             gap: 6,
-            padding: '14px clamp(14px, 3vw, 20px)',
-            background: '#fdfcf9',
-            borderBottom: '1px solid #f1efe9',
+            padding: '10px clamp(14px, 3vw, 20px)',
+            background: '#f9fafb',
+            borderBottom: '1px solid #e5e7eb',
           }}
         >
           {QUICK_PICKS.map((label, i) => {
@@ -279,8 +288,8 @@ export function NewsTimeMachineSection() {
                   fontSize: 12,
                   fontWeight: 600,
                   border: 'none',
-                  background: active ? '#2a2622' : '#f3f0e8',
-                  color: active ? '#fff' : '#78716c',
+                  background: active ? '#111827' : '#f3f4f6',
+                  color: active ? '#fff' : '#6b7280',
                   cursor: 'pointer',
                   transition: 'background .15s, color .15s',
                 }}
@@ -295,7 +304,7 @@ export function NewsTimeMachineSection() {
               alignItems: 'center',
               padding: '6px 10px',
               background: '#fff',
-              border: '1px solid #e6e0d4',
+              border: '1px solid #e5e7eb',
               borderRadius: 9999,
             }}
           >
@@ -311,7 +320,7 @@ export function NewsTimeMachineSection() {
                 outline: 'none',
                 background: 'transparent',
                 fontSize: 12.5,
-                color: '#2a2622',
+                color: '#111827',
                 fontFamily: 'inherit',
                 width: 108,
                 fontVariantNumeric: 'tabular-nums',
@@ -333,8 +342,8 @@ export function NewsTimeMachineSection() {
               padding: '6px 12px',
               borderRadius: 9999,
               border: 'none',
-              background: '#f3f0e8',
-              color: '#78716c',
+              background: '#f3f4f6',
+              color: '#6b7280',
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
@@ -344,7 +353,9 @@ export function NewsTimeMachineSection() {
             펼치기
           </button>
           {/* "생일이 기억 안 나거나 그냥 궁금해서" 눌러보는 진입점
-              (2026-08-17 피드백) — 빅카인즈가 실제 지원하는 범위 전체에서 뽑는다. */}
+              (2026-08-17 피드백) — 빅카인즈가 실제 지원하는 범위 전체에서 뽑는다.
+              🎲 이모지는 뺐다(2026-08-17, 사용자 피드백 — 홈 전체에서 유일한
+              이모지라 톤이 튀었다). */}
           <button
             type="button"
             onClick={() => setPickedDate(randomDateInRange())}
@@ -354,41 +365,44 @@ export function NewsTimeMachineSection() {
               cursor: 'pointer',
               fontSize: 12,
               fontWeight: 600,
-              color: '#96876f',
+              color: '#6b7280',
               padding: '5px 6px',
             }}
           >
-            🎲 아무 날이나
+            아무 날이나
           </button>
         </div>
 
         {/* 결과 — 최근 구간(2026-02-01~오늘)은 실시간 S3 지면, 그 이전은
-            빅카인즈 뉴스 검색(날짜 범위) 실 데이터. 홈은 미리보기라 상위
-            5개만(2026-08-17, 사용자 피드백: "실시간 뉴스들 너무 많이
-            표출" — 8개는 텍스트만 쭉 나열돼 스캔하기 지치는 "로그창"
-            느낌이라 줄였다) — 전체는 "펼치기"(/timeline/{날짜})에서. */}
+            빅카인즈 뉴스 검색(날짜 범위) 실 데이터. 기본은 5개만 보여주고
+            "더보기"/"접기" 토글로 펼치고 접는다(2026-08-17, 사용자 피드백:
+            "실시간 뉴스들 너무 많이 표출" → "더보기 누르게 하시죠, 한 5개만
+            보여주고" → "접는 거는 안되나?") — 전체는 여전히
+            "펼치기"(/timeline/{날짜})에서도 볼 수 있다. 첫 항목만 살짝
+            굵게/크게 해 위계를 준다(2026-08-17, "리스트가 밋밋하다" 피드백). */}
         {!rewinding && (isRecent ? (
           items !== null && (
             <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
               {items.length === 0 && (
-                <p style={{ textAlign: 'center', padding: '20px 8px', fontSize: 13, color: '#a8a29e' }}>
+                <p style={{ textAlign: 'center', padding: '20px 8px', fontSize: 13, color: '#9ca3af' }}>
                   이 날은 보관된 기사가 없어요.
                 </p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {items.map((item, i) => {
+                {(expanded ? items : items.slice(0, VISIBLE_COUNT)).map((item, i) => {
                   const row = (
                     <>
                       <span
                         className="flex-shrink-0"
-                        style={{ width: 44, fontSize: 11.5, fontWeight: 700, color: '#96876f', fontVariantNumeric: 'tabular-nums' }}
+                        style={{ width: 44, fontSize: 11.5, fontWeight: 700, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}
                       >
                         {item.time}
                       </span>
                       <p
                         className="text-gray-800 group-hover:text-blue-700 transition-colors"
                         style={{
-                          fontSize: 14,
+                          fontSize: i === 0 ? 15 : 14,
+                          fontWeight: i === 0 ? 700 : 400,
                           lineHeight: 1.5,
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
@@ -403,7 +417,7 @@ export function NewsTimeMachineSection() {
                   );
                   const rowStyle = {
                     gap: 12,
-                    padding: '10px 6px',
+                    padding: '8px 6px',
                     borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)',
                     cursor: item.href ? ('pointer' as const) : ('default' as const),
                   };
@@ -425,27 +439,49 @@ export function NewsTimeMachineSection() {
                   );
                 })}
               </div>
+              {items.length > VISIBLE_COUNT && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'center',
+                    marginTop: 6,
+                    padding: '8px 6px 0',
+                    background: 'none',
+                    border: 'none',
+                    borderTop: '1px solid rgba(0,0,0,0.06)',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {expanded ? '접기' : '더보기'}
+                </button>
+              )}
             </div>
           )
         ) : (
           articles !== null && (
             <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
               <div className="flex items-center justify-between" style={{ marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#78716c' }}>{pickedDate}자 서울경제</span>
-                <span style={{ fontSize: 11, color: '#a8a29e' }}>빅카인즈 뉴스빅데이터 제공 · 발행 시각 정보 없음</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#6b7280' }}>{pickedDate}자 서울경제</span>
+                <span style={{ fontSize: 11, color: '#9ca3af' }}>빅카인즈 뉴스빅데이터 제공 · 발행 시각 정보 없음</span>
               </div>
               {articles.length === 0 && (
-                <p style={{ textAlign: 'center', padding: '20px 8px', fontSize: 13, color: '#a8a29e' }}>
+                <p style={{ textAlign: 'center', padding: '20px 8px', fontSize: 13, color: '#9ca3af' }}>
                   이 날은 보관된 기사가 없어요.
                 </p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {articles.slice(0, 5).map((a, i) => {
+                {(expanded ? articles : articles.slice(0, VISIBLE_COUNT)).map((a, i) => {
                   const row = (
                     <>
                       <span
                         className="flex-shrink-0"
-                        style={{ width: 22, fontSize: 11.5, fontWeight: 700, color: '#c4b48f', fontVariantNumeric: 'tabular-nums' }}
+                        style={{ width: 22, fontSize: 11.5, fontWeight: 700, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}
                       >
                         {String(i + 1).padStart(2, '0')}
                       </span>
@@ -453,8 +489,8 @@ export function NewsTimeMachineSection() {
                         <p
                           className="text-gray-800 group-hover:text-blue-700 transition-colors"
                           style={{
-                            fontSize: 14,
-                            fontWeight: 600,
+                            fontSize: i === 0 ? 15 : 14,
+                            fontWeight: i === 0 ? 700 : 500,
                             lineHeight: 1.5,
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
@@ -468,7 +504,7 @@ export function NewsTimeMachineSection() {
                           <p
                             style={{
                               fontSize: 12,
-                              color: '#96876f',
+                              color: '#6b7280',
                               marginTop: 3,
                               lineHeight: 1.5,
                               display: '-webkit-box',
@@ -481,14 +517,14 @@ export function NewsTimeMachineSection() {
                           </p>
                         )}
                         {a.byline && (
-                          <p style={{ fontSize: 11, color: '#b3aa99', marginTop: 3 }}>{a.byline} 기자</p>
+                          <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 3 }}>{a.byline} 기자</p>
                         )}
                       </div>
                     </>
                   );
                   const rowStyle = {
                     gap: 10,
-                    padding: '10px 6px',
+                    padding: '8px 6px',
                     borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)',
                     cursor: a.original_link ? ('pointer' as const) : ('default' as const),
                   };
@@ -510,6 +546,28 @@ export function NewsTimeMachineSection() {
                   );
                 })}
               </div>
+              {articles.length > VISIBLE_COUNT && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'center',
+                    marginTop: 6,
+                    padding: '8px 6px 0',
+                    background: 'none',
+                    border: 'none',
+                    borderTop: '1px solid rgba(0,0,0,0.06)',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {expanded ? '접기' : '더보기'}
+                </button>
+              )}
             </div>
           )
         ))}

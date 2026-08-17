@@ -22,8 +22,11 @@ function dateLabel(iso: string): string {
 function HeroArticle({ item, large }: { item: ArchiveItem; large: boolean }) {
   return (
     <Link href={item.href ?? '#'} className="block group">
+      {/* rounded-sm(2px)이던 걸 10px로 맞췄다(2026-08-17, 사용자 피드백:
+          "round는 어때요 전체적으로?" — ArticleCard.tsx의 ArticleThumb,
+          ArchiveList.tsx 썸네일이 전부 10px라 이 카드만 각지게 보였다). */}
       {item.avatarUrl && (
-        <div className="relative w-full aspect-video overflow-hidden rounded-sm mb-3" style={{ background: '#f3f4f6' }}>
+        <div className="relative w-full aspect-video overflow-hidden rounded-[10px] mb-3" style={{ background: '#f3f4f6' }}>
           <Image
             src={item.avatarUrl}
             alt=""

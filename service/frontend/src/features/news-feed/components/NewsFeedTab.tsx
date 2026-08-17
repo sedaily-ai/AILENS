@@ -40,8 +40,13 @@ function CategoryPairRow({
   const wideItems = archiveItems.filter((it) => it.category === wideCfg.label);
   const narrowItems = archiveItems.filter((it) => it.category === narrowCfg.label);
   if (wideItems.length === 0 && narrowItems.length === 0) return null;
+  // 행 사이 구분선을 2px 검정에서 1px 연회색으로 낮췄다(2026-08-17, 사용자
+  // 피드백: "하단에 선도 좀 어색하지 않나요, 검정색 선이요" — 본지의 굵은
+  // "지면 구분선"을 그대로 따라했는데, 우리 페이지 나머지 구분선(카테고리
+  // 섹션 내부 리스트, 최신 뉴스 등)은 전부 옅은 회색이라 이 진한 검정선만
+  // 튀었다).
   return (
-    <div style={{ borderTop: first ? 'none' : '2px solid #111827', paddingTop: first ? 0 : 32 }}>
+    <div style={{ borderTop: first ? 'none' : '1px solid #e5e7eb', paddingTop: first ? 0 : 32 }}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginTop: 32, marginBottom: 32 }}>
         <CategoryFeatureSection config={wideCfg} items={wideItems} span="wide" />
         <CategoryFeatureSection config={narrowCfg} items={narrowItems} span="narrow" />

@@ -117,7 +117,7 @@ export function WordsPreviewSection({ initialTerms }: Props) {
         .wq-btn:not(:disabled):hover { filter: brightness(0.98); }
         .wq-btn:not(:disabled):active { transform: translateY(3px); border-bottom-width: 2px !important; }
         .wq-arrow { transition: background 0.15s ease, transform 0.08s ease; }
-        .wq-arrow:not(:disabled):hover { background: #fbe6ae; }
+        .wq-arrow:not(:disabled):hover { background: #f3f4f6; }
         .wq-arrow:not(:disabled):active { transform: scale(0.9); }
         .wq-dot { transition: background 0.15s ease, width 0.15s ease; }
       `}</style>
@@ -180,7 +180,7 @@ function QuizCarousel({ cards }: { cards: QuizCardData[] }) {
               borderRadius: '50%',
               border: 'none',
               background: 'transparent',
-              color: '#c2660a',
+              color: '#6b7280',
               cursor: safeIndex === 0 ? 'default' : 'pointer',
               opacity: safeIndex === 0 ? 0.3 : 1,
               pointerEvents: safeIndex === 0 ? 'none' : 'auto',
@@ -191,7 +191,7 @@ function QuizCarousel({ cards }: { cards: QuizCardData[] }) {
             </svg>
           </button>
 
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#c2660a', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6b7280', fontVariantNumeric: 'tabular-nums' }}>
             {safeIndex + 1}/{total}
           </span>
 
@@ -208,7 +208,7 @@ function QuizCarousel({ cards }: { cards: QuizCardData[] }) {
                   height: 6,
                   borderRadius: 999,
                   border: 'none',
-                  background: i === safeIndex ? '#e79c1a' : '#f0dca8',
+                  background: i === safeIndex ? '#111827' : '#d1d5db',
                   cursor: 'pointer',
                 }}
               />
@@ -227,7 +227,7 @@ function QuizCarousel({ cards }: { cards: QuizCardData[] }) {
               borderRadius: '50%',
               border: 'none',
               background: 'transparent',
-              color: '#c2660a',
+              color: '#6b7280',
               cursor: safeIndex === total - 1 ? 'default' : 'pointer',
               opacity: safeIndex === total - 1 ? 0.3 : 1,
               pointerEvents: safeIndex === total - 1 ? 'none' : 'auto',
@@ -255,16 +255,22 @@ function QuizCard({
   const answered = picked !== null;
   const correct = picked === card.answer.term;
 
+  // 평상시(아직 안 누른) 상태 색을 앰버 계열에서 사이트 기본 흑백/회색
+  // 톤으로 낮췄다(2026-08-17, 사용자 피드백: "오늘의 단어 퀴즈쪽은요?").
+  // 카드 배경(크림/앰버)만은 흰색으로 바꿔봤다가 "배경색 없어지니 이상한데,
+  // 노란색 배경은 괜찮지 않나요?"라는 재피드백으로 되돌렸다 — 버튼·화살표·
+  // 점 등 인터랙션 요소는 중립 톤 유지, 카드 바탕만 원래 크림 유지.
+  // 정답(초록)/오답(빨강) 피드백 색은 퀴즈 UI의 표준 관례라 그대로 유지.
   return (
     <div style={{ borderRadius: 18, background: '#fef3d7', padding: 'clamp(16px, 3vw, 22px)' }}>
-      <p style={{ fontSize: 12.5, fontWeight: 800, color: '#c2660a', marginBottom: 8, letterSpacing: '-0.005em' }}>
+      <p style={{ fontSize: 12.5, fontWeight: 800, color: '#8a7a5e', marginBottom: 8, letterSpacing: '-0.005em' }}>
         다음 설명에 맞는 단어는?
       </p>
       <p
         style={{
           fontSize: 15.5,
           fontWeight: 700,
-          color: '#6b3d0a',
+          color: '#111827',
           lineHeight: 1.6,
           marginBottom: 18,
         }}
@@ -276,10 +282,15 @@ function QuizCard({
         {card.choices.map((c) => {
           const isAnswer = c.term === card.answer.term;
           const isPicked = picked === c.term;
+          // 카드 배경이 크림/앰버라 순수 쿨그레이(#e5e7eb 등) 테두리는
+          // 노란 배경 위에서 푸르스름한 얼룩/그림자처럼 보였다(2026-08-17,
+          // 사용자 피드백: "테두리는 음... 그림자?? 봐주시죠" — 색조가
+          // 안 맞아서 생긴 문제). 카드 배경과 같은 계열의 톤 다운된 웜그레이로
+          // 맞춰 이질감을 없앴다.
           let bg = '#fff';
-          let border = '#f4c95d';
-          let borderBottom = '#f0b433';
-          let color = '#7c4a03';
+          let border = '#e6dcc3';
+          let borderBottom = '#d9cba6';
+          let color = '#111827';
           if (answered && isAnswer) {
             bg = '#ecfdf3';
             border = '#5fce7e';
