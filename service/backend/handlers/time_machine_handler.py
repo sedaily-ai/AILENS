@@ -1,17 +1,21 @@
 """
-Time Machine Handler — 빅카인즈 이슈랭킹 기반 "그날의 이슈"
+Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경제"
 
 GET /time-machine?date=YYYY-MM-DD
-Response: { "date": "...", "topics": [{"topic": "...", "keywords": [...]}], "cached": bool }
+Response: { "date": "...", "articles": [{"news_id","title","content","byline","original_link"}], "cached": bool }
 
-2026-08-17: 원래는 위키피디아 "On This Day" + 서울경제 아카이브 스크래핑으로
-`/timemachine` 프론트를 받쳤는데, 그 프론트가 "그날의 역사적 사건"이 대부분
-알고리즘이 지어낸 가짜 데이터였던 문제로 삭제되며 이 핸들러도 소비자가 없어졌다.
-새 "그날로 떠나요"(홈, NewsTimeMachineSection.tsx)가 같은 "날짜 → 그날 이슈"
-형태를 요구해서, 이미 배포돼 API Gateway 라우트까지 살아있는 이 Lambda
-(sedaily-mbti-time-machine-dev)를 빅카인즈 issue_ranking(한국언론진흥재단
-뉴스빅데이터, 1990-01-01~ 공식 지원, OpenAPI 사용자지침서 V1.5 §4) 연동으로
-갈아끼웠다 — 새 Lambda/API Gateway 라우트를 만들지 않고 기존 걸 재사용.
+2026-08-17: 처음엔 issue_ranking(오늘의 이슈 API)으로 토픽+키워드만 보여줬는데,
+그 API의 news_cluster(관련 기사 ID 목록)로 기사 상세를 조회하면 같은 ID인데도
+0건/서버오류(E03)가 섞여 나와 신뢰도가 낮았다(2026-08-17 저녁 재확인 — 심지어
+당일 날짜조차 0건이 나옴). 대신 뉴스 검색 API(`/search/news`)를 ID 조회가 아니라
+날짜 범위 검색(published_at + provider=서울경제)으로 직접 호출하니 1999년 기사도
+본문·바이라인·원본 링크(구 도메인 sednews.com 포함)까지 안정적으로 나와서
+이 방식으로 교체했다 — 다만 발행 "시각"은 어느 시대 기사든 항상 자정(T00:00:00)
+고정이라 제공되지 않는다(프론트에서 시간 대신 순번으로 표시).
+
+/timemachine 프론트(위키피디아+서울경제 스크래핑, "그날의 역사적 사건"이 대부분
+지어낸 가짜 데이터였던 문제로 삭제)가 쓰던 이 Lambda(sedaily-mbti-time-machine-dev)
+를 새 Lambda/API Gateway 라우트 생성 없이 재사용 중.
 
 API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽는다 —
 프론트/로그 어디에도 노출하지 않는다.
@@ -34,20 +38,22 @@ KST = timezone(timedelta(hours=9))
 DATE_FORMAT = '%Y-%m-%d'
 
 BIGKINDS_MIN_DATE = '1990-01-01'
-BIGKINDS_ISSUE_RANKING_URL = 'https://tools.kinds.or.kr/issue_ranking'
+BIGKINDS_SEARCH_URL = 'https://tools.kinds.or.kr/search/news'
 BIGKINDS_KEY_SSM_PARAM = '/sedaily-mbti/bigkinds-api-key'
-BIGKINDS_TIMEOUT_SECONDS = 10
-# 빅카인즈가 하루에 실제로 주는 토픽 수(1999-11-17 실측 30개) 그대로 — 홈 미리보기는
-# 프론트에서 앞 8개만 자르고, "펼치기"(/timeline/{date})는 전체를 보여준다. 응답
-# 하나를 그대로 캐싱해 두 화면이 같은 캐시를 나눠 쓴다(2026-08-17, 8개로 잘라
-# 캐싱했더니 "펼치기"가 볼 게 없던 문제 수정).
-MAX_TOPICS = 30
-MAX_KEYWORDS_PER_TOPIC = 5
+BIGKINDS_TIMEOUT_SECONDS = 15
+BIGKINDS_PROVIDER = '서울경제'
+MAX_ARTICLES = 30
 
-# 캐시 테이블 — 기존 위키/서울경제 캐시가 쓰던 테이블 재사용, 키 접두사만
-# 다르게 둬서(timemachine_ → timemachine_bigkinds_) 옛 형식 캐시와 안 섞이게 한다.
+# 검색 결과에 자주 섞여 나오는 저가치 코너 — S3 지면 아카이브(fetchDayArticles)의
+# '[시그널]' 제외 규칙, 옛 time_machine_handler(위키/스크래핑판)의 EXCLUDE_TAGS와
+# 같은 취지.
+EXCLUDE_TITLE_MARKERS = ('[부고]', '[인사]', '[사설]', '[마켓아이]', '[시론]', '[발언대]')
+
+# 캐시 테이블 — 옛 위키/스크래핑판 캐시와 같은 테이블 재사용. 키 접두사를
+# timemachine_articles_로 바꿔서(이전 issue_ranking 토픽판 캐시와도 안 섞이게)
+# 응답 스키마가 바뀔 때마다 옛 캐시를 일일이 안 지워도 되게 했다.
 CACHE_TABLE = 'sedaily-mbti-articles-dev'
-CACHE_TTL_DAYS = 3650  # 과거 이슈는 영구히 안 바뀐다 — 사실상 무기한 캐시.
+CACHE_TTL_DAYS = 3650  # 과거 지면은 영구히 안 바뀐다 — 사실상 무기한 캐시.
 
 
 class BadRequest(Exception):
@@ -89,7 +95,7 @@ def _get_table():
 
 
 def _cache_key(date: str) -> str:
-    return f'timemachine_bigkinds_{date}'
+    return f'timemachine_articles_{date}'
 
 
 def _get_cached(date: str) -> Optional[dict]:
@@ -109,7 +115,7 @@ def _save_cache(date: str, data: dict) -> None:
         now = datetime.now(KST)
         _get_table().put_item(Item={
             'news_id': _cache_key(date),
-            'item_type': 'timemachine_bigkinds_cache',
+            'item_type': 'timemachine_articles_cache',
             'date': date,
             'data': data,
             'cached_at': now.isoformat(),
@@ -120,35 +126,46 @@ def _save_cache(date: str, data: dict) -> None:
         logger.warning('캐시 저장 실패(%s): %s', date, e)
 
 
-# ─── 빅카인즈 issue_ranking ─────────────────────────────────────────────────
+# ─── 빅카인즈 뉴스 검색(날짜 범위) ───────────────────────────────────────────
 
-def _fetch_bigkinds_topics(date: str) -> List[Dict[str, Any]]:
+def _fetch_sedaily_articles(date: str) -> List[Dict[str, Any]]:
     access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
+    next_day = (datetime.strptime(date, DATE_FORMAT) + timedelta(days=1)).strftime(DATE_FORMAT)
     payload = {
         'access_key': access_key,
-        'argument': {'date': date, 'provider': []},
+        'argument': {
+            'query': '',
+            'published_at': {'from': date, 'until': next_day},
+            'provider': [BIGKINDS_PROVIDER],
+            'sort': {'date': 'desc'},
+            'return_from': 0,
+            'return_size': MAX_ARTICLES,
+            'fields': ['title', 'content', 'byline', 'provider_link_page'],
+        },
     }
-    res = requests.post(BIGKINDS_ISSUE_RANKING_URL, json=payload, timeout=BIGKINDS_TIMEOUT_SECONDS)
+    res = requests.post(BIGKINDS_SEARCH_URL, json=payload, timeout=BIGKINDS_TIMEOUT_SECONDS)
     res.raise_for_status()
     body = res.json()
 
     if body.get('result') != 0:
-        raise RuntimeError(f"빅카인즈 issue_ranking 오류: {body.get('reason', '알 수 없는 오류')}")
+        raise RuntimeError(f"빅카인즈 search/news 오류: {body.get('reason', '알 수 없는 오류')}")
 
-    raw_topics = (body.get('return_object') or {}).get('topics') or []
-    raw_topics.sort(key=lambda t: t.get('topic_rank', 999))
+    docs = (body.get('return_object') or {}).get('documents') or []
 
-    topics = []
-    for t in raw_topics[:MAX_TOPICS]:
-        topic = (t.get('topic') or '').strip()
-        if not topic:
+    articles = []
+    for d in docs:
+        title = (d.get('title') or '').strip()
+        if not title or any(marker in title for marker in EXCLUDE_TITLE_MARKERS):
             continue
-        keywords = [
-            kw.strip() for kw in (t.get('topic_keyword') or '').split(',') if kw.strip()
-        ][:MAX_KEYWORDS_PER_TOPIC]
-        topics.append({'topic': topic, 'keywords': keywords})
+        articles.append({
+            'news_id': d.get('news_id', ''),
+            'title': title,
+            'content': (d.get('content') or '').strip(),
+            'byline': (d.get('byline') or '').strip(),
+            'original_link': d.get('provider_link_page') or None,
+        })
 
-    return topics
+    return articles
 
 
 def get_time_machine_data(date: str) -> dict:
@@ -156,9 +173,9 @@ def get_time_machine_data(date: str) -> dict:
     if cached is not None:
         return {**cached, 'cached': True}
 
-    topics = _fetch_bigkinds_topics(date)
-    result = {'date': date, 'topics': topics}
-    if topics:
+    articles = _fetch_sedaily_articles(date)
+    result = {'date': date, 'articles': articles}
+    if articles:
         _save_cache(date, result)
     return {**result, 'cached': False}
 
@@ -185,8 +202,8 @@ def lambda_handler(event: dict, context) -> dict:
     try:
         result = get_time_machine_data(date)
         logger.info(
-            'time-machine 응답: date=%s, topics=%s, cached=%s',
-            result.get('date'), len(result.get('topics', [])), result.get('cached'),
+            'time-machine 응답: date=%s, articles=%s, cached=%s',
+            result.get('date'), len(result.get('articles', [])), result.get('cached'),
         )
         return success_response(result)
     except Exception as e:  # noqa: BLE001
