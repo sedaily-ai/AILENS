@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ymd, kdate, kstTodayStr } from '../lib/timelineApi';
+import { TimeMachineRewind } from '@/shared/ui/TimeMachineRewind';
+import { kstTodayStr } from '../lib/timelineApi';
 
 /**
  * 뉴스 타임머신 — 날짜를 입력하면 '서울경제' 신문이 그 날짜로 되감기는
@@ -26,8 +27,6 @@ export function NewsTimeMachine() {
   const [phase, setPhase] = useState<Phase>('input');
   const [date, setDate] = useState('');
   const [target, setTarget] = useState('');
-  const [tick, setTick] = useState(today); // 되감기 중 표시되는 날짜
-  const rafRef = useRef<number | null>(null);
 
   function start() {
     if (!date) return;
@@ -51,36 +50,9 @@ export function NewsTimeMachine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
   }, []);
 
-  // 되감기 모션 — 오늘 → 목표일까지 날짜를 거꾸로 흘린 뒤 결과 페이지로 이동.
-  useEffect(() => {
-    if (phase !== 'rewinding' || !target) return;
-    const from = new Date(today).getTime();
-    const to = new Date(target).getTime();
-    const DUR = 2200;
-    const t0 = performance.now();
-
-    const step = (now: number) => {
-      const p = Math.min(1, (now - t0) / DUR);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setTick(ymd(new Date(from + (to - from) * eased)));
-      if (p < 1) {
-        rafRef.current = requestAnimationFrame(step);
-      } else {
-        router.push(`/timeline/${target}`);
-      }
-    };
-    rafRef.current = requestAnimationFrame(step);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [phase, target, today, router]);
-
   return (
     <div style={{ minHeight: 'calc(100vh - 56px)', background: '#faf8f3' }}>
       <style>{`
-        @keyframes tmSheet {
-          0%   { opacity: 0; transform: translateY(40px) rotate(.6deg) scale(1); }
-          12%  { opacity: 1; }
-          100% { opacity: 0; transform: translateY(-120%) rotate(-7deg) scale(.92); }
-        }
         @keyframes tmRise { from { opacity:0; transform: translateY(14px);} to {opacity:1; transform:none;} }
       `}</style>
 
@@ -160,52 +132,7 @@ export function NewsTimeMachine() {
 
         {/* ── 되감기 모션 ───────────────────────────── */}
         {phase === 'rewinding' && (
-          <div style={{ textAlign: 'center', position: 'relative', minHeight: 360 }}>
-            <div style={{ position: 'relative', height: 240, marginBottom: 28 }}>
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    margin: '0 auto',
-                    width: 'min(320px, 80%)',
-                    height: 220,
-                    background: '#fffdf7',
-                    border: '1px solid #e6e0d4',
-                    borderRadius: 6,
-                    boxShadow: '0 10px 30px rgba(80,60,30,0.10)',
-                    animation: `tmSheet 1.5s cubic-bezier(.5,0,.7,.4) ${i * 0.28}s infinite`,
-                  }}
-                >
-                  <div style={{ padding: '18px 22px', textAlign: 'left' }}>
-                    <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 15, fontWeight: 800, color: '#2a2622', letterSpacing: '-0.02em' }}>
-                      서울經濟
-                    </p>
-                    <div style={{ height: 1, background: '#e6e0d4', margin: '10px 0' }} />
-                    {[88, 70, 80].map((w, k) => (
-                      <div key={k} style={{ height: 7, width: `${w}%`, background: '#eee7d8', borderRadius: 2, marginBottom: 7 }} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: 12, letterSpacing: '0.18em', color: '#b08d57', marginBottom: 8 }}>
-              REWINDING
-            </p>
-            <p
-              style={{
-                fontFamily: '"Noto Serif KR", serif',
-                fontSize: 'clamp(22px, 5vw, 30px)',
-                fontWeight: 700,
-                color: '#2a2622',
-                fontVariantNumeric: 'tabular-nums',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {kdate(tick)}
-            </p>
-          </div>
+          <TimeMachineRewind fromDate={today} toDate={target} onComplete={() => router.push(`/timeline/${target}`)} />
         )}
       </div>
     </div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { API_URL } from '@/shared/config/apiClient';
 import { kstTodayStr } from '@/shared/lib/date';
 import { PocketWatchIcon } from '@/shared/ui/icons/HandDrawnIcons';
+import { TimeMachineRewind } from '@/shared/ui/TimeMachineRewind';
 
 // 통합 타임머신 섹션(2026-08-17) — 원래 "그날의 지면"(TimelinePreviewSection,
 // 최근 몇 달치 서울경제 실시간 지면)과 "생일 뉴스 타임머신"
@@ -15,9 +16,13 @@ import { PocketWatchIcon } from '@/shared/ui/icons/HandDrawnIcons';
 // 데이터 소스 분기: 최근 날짜(2026-02-01~오늘)는 실시간 S3 지면
 // (fetchDayArticles, 3분 자동 폴링), 그 이전(1990-01-01~)은 백엔드
 // (handlers/time_machine_handler.py, sedaily-mbti-time-machine-dev Lambda)가
-// SSM에 보관된 키로 빅카인즈 issue_ranking을 직접 호출해 돌려주는 실 데이터
-// (fetchBigkindsTopics) — 2026-08-17 2단계(백엔드 연동) 완료, 더 이상 정적
-// 예시가 아니다.
+// SSM에 보관된 키로 빅카인즈 뉴스 검색(날짜 범위 + provider=서울경제)을
+// 호출해 돌려주는 실제 기사(제목·본문 스니펫·원본 링크) — 처음엔
+// issue_ranking(토픽+키워드만)을 썼는데, 그 API의 news_cluster로 기사
+// 상세를 찾으면 신뢰도가 낮아서(같은 ID인데도 0건/서버오류가 섞여 나옴,
+// 심지어 당일 날짜조차 그랬음) 날짜 범위 직접 검색으로 교체했다(2026-08-17).
+// 다만 발행 "시각"은 이 API가 어느 시대 기사든 항상 자정 고정이라 주지
+// 않아서, 시간 대신 순번으로 표시한다.
 interface TimelineItem {
   id: string;
   time: string;
@@ -32,9 +37,12 @@ interface S3ArticleListItem {
   original_link?: string;
 }
 
-interface BigKindsTopic {
-  topic: string;
-  keywords: string[];
+interface BigKindsArticle {
+  news_id: string;
+  title: string;
+  content: string;
+  byline: string;
+  original_link: string | null;
 }
 
 const todayStr = kstTodayStr;
@@ -63,11 +71,11 @@ async function fetchDayArticles(dateStr: string): Promise<TimelineItem[]> {
     }));
 }
 
-async function fetchBigkindsTopics(dateStr: string): Promise<BigKindsTopic[]> {
+async function fetchBigkindsArticles(dateStr: string): Promise<BigKindsArticle[]> {
   const res = await fetch(`${API_URL}/time-machine?date=${dateStr}`);
   if (!res.ok) throw new Error(`time-machine ${res.status}`);
-  const data: { topics?: BigKindsTopic[] } = await res.json();
-  return data.topics ?? [];
+  const data: { articles?: BigKindsArticle[] } = await res.json();
+  return data.articles ?? [];
 }
 
 const QUICK_PICKS = ['오늘', '어제', '그제'];
@@ -118,8 +126,9 @@ export function NewsTimeMachineSection() {
   const router = useRouter();
   const [pickedDate, setPickedDate] = useState(todayStr());
   const [items, setItems] = useState<TimelineItem[] | null>(null);
-  const [topics, setTopics] = useState<BigKindsTopic[] | null>(null);
+  const [articles, setArticles] = useState<BigKindsArticle[] | null>(null);
   const [dateDigits, setDateDigits] = useState('');
+  const [rewinding, setRewinding] = useState(false);
   const typedDate = digitsToValidDate(dateDigits);
 
   const isRecent = pickedDate >= ARCHIVE_MIN_DATE;
@@ -131,7 +140,7 @@ export function NewsTimeMachineSection() {
   if (pickedDate !== prevPickedDate) {
     setPrevPickedDate(pickedDate);
     setItems(null);
-    setTopics(null);
+    setArticles(null);
   }
 
   useEffect(() => {
@@ -159,12 +168,12 @@ export function NewsTimeMachineSection() {
       };
     }
 
-    fetchBigkindsTopics(pickedDate)
+    fetchBigkindsArticles(pickedDate)
       .then((rows) => {
-        if (!cancelled) setTopics(rows);
+        if (!cancelled) setArticles(rows);
       })
       .catch(() => {
-        if (!cancelled) setTopics([]);
+        if (!cancelled) setArticles([]);
       });
     return () => {
       cancelled = true;
@@ -214,8 +223,18 @@ export function NewsTimeMachineSection() {
           overflow: 'hidden',
         }}
       >
+        {rewinding && (
+          <div style={{ padding: 'clamp(24px, 5vw, 40px) 20px' }}>
+            <TimeMachineRewind
+              fromDate={todayStr()}
+              toDate={pickedDate}
+              onComplete={() => router.push(`/timeline/${pickedDate}`)}
+            />
+          </div>
+        )}
+
         {/* 인트로 — "오늘 뭐 있었지"와 "내 생일엔 뭐 있었지"를 한 카피로. */}
-        <div style={{ textAlign: 'center', padding: 'clamp(20px, 4vw, 28px) clamp(16px, 4vw, 24px) 4px', background: '#fdfcf9' }}>
+        <div style={{ display: rewinding ? 'none' : undefined, textAlign: 'center', padding: 'clamp(20px, 4vw, 28px) clamp(16px, 4vw, 24px) 4px', background: '#fdfcf9' }}>
           <div className="flex justify-center" style={{ marginBottom: 8 }}>
             <PocketWatchIcon accent="#8a6d3f" className="w-8 h-8" />
           </div>
@@ -235,7 +254,7 @@ export function NewsTimeMachineSection() {
         {/* 날짜 컨트롤 툴바 */}
         <div
           style={{
-            display: 'flex',
+            display: rewinding ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexWrap: 'wrap',
@@ -320,7 +339,7 @@ export function NewsTimeMachineSection() {
           </div>
           <button
             type="button"
-            onClick={() => router.push(`/timeline/${pickedDate}`)}
+            onClick={() => setRewinding(true)}
             style={{
               padding: '6px 12px',
               borderRadius: 9999,
@@ -355,9 +374,9 @@ export function NewsTimeMachineSection() {
         </div>
 
         {/* 결과 — 최근 구간(2026-02-01~오늘)은 실시간 S3 지면, 그 이전은
-            빅카인즈 issue_ranking 실 데이터. 홈은 미리보기라 상위 8개만 —
-            전체는 "펼치기"(/timeline/{날짜})에서. */}
-        {isRecent ? (
+            빅카인즈 뉴스 검색(날짜 범위) 실 데이터. 홈은 미리보기라 상위
+            8개만 — 전체는 "펼치기"(/timeline/{날짜})에서. */}
+        {!rewinding && (isRecent ? (
           items !== null && (
             <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
               {items.length === 0 && (
@@ -418,30 +437,91 @@ export function NewsTimeMachineSection() {
             </div>
           )
         ) : (
-          topics !== null && (
+          articles !== null && (
             <div key={pickedDate} className="ntm-pageturn" style={{ padding: 'clamp(14px, 3vw, 20px)' }}>
               <div className="flex items-center justify-between" style={{ marginBottom: 14, flexWrap: 'wrap', gap: 6 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#78716c' }}>{pickedDate}의 주요 이슈</span>
-                <span style={{ fontSize: 11, color: '#a8a29e' }}>빅카인즈 뉴스빅데이터 제공</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#78716c' }}>{pickedDate}자 서울경제</span>
+                <span style={{ fontSize: 11, color: '#a8a29e' }}>빅카인즈 뉴스빅데이터 제공 · 발행 시각 정보 없음</span>
               </div>
-              {topics.length === 0 && (
+              {articles.length === 0 && (
                 <p style={{ textAlign: 'center', padding: '20px 8px', fontSize: 13, color: '#a8a29e' }}>
-                  이 날은 집계된 이슈가 없어요.
+                  이 날은 보관된 기사가 없어요.
                 </p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {topics.slice(0, 8).map((t, i) => (
-                  <div key={t.topic} style={{ padding: '12px 4px', borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)' }}>
-                    <p className="text-gray-900" style={{ fontSize: 14.5, fontWeight: 700, marginBottom: 4, letterSpacing: '-0.01em' }}>
-                      {t.topic}
-                    </p>
-                    <p style={{ fontSize: 12.5, color: '#96876f' }}>{t.keywords.join(' · ')}</p>
-                  </div>
-                ))}
+                {articles.slice(0, 8).map((a, i) => {
+                  const row = (
+                    <>
+                      <span
+                        className="flex-shrink-0"
+                        style={{ width: 22, fontSize: 11.5, fontWeight: 700, color: '#c4b48f', fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <p
+                          className="text-gray-800"
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 600,
+                            lineHeight: 1.5,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {a.title}
+                        </p>
+                        {a.content && (
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: '#96876f',
+                              marginTop: 3,
+                              lineHeight: 1.5,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {a.content}
+                          </p>
+                        )}
+                        {a.byline && (
+                          <p style={{ fontSize: 11, color: '#b3aa99', marginTop: 3 }}>{a.byline} 기자</p>
+                        )}
+                      </div>
+                    </>
+                  );
+                  const rowStyle = {
+                    gap: 10,
+                    padding: '10px 6px',
+                    borderTop: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.06)',
+                    cursor: a.original_link ? ('pointer' as const) : ('default' as const),
+                  };
+                  return a.original_link ? (
+                    <a
+                      key={a.news_id}
+                      href={a.original_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-baseline transition-colors hover:bg-gray-50"
+                      style={rowStyle}
+                    >
+                      {row}
+                    </a>
+                  ) : (
+                    <div key={a.news_id} className="flex items-baseline" style={rowStyle}>
+                      {row}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )
-        )}
+        ))}
       </div>
     </section>
   );

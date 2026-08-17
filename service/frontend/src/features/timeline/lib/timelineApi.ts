@@ -56,21 +56,25 @@ export const PER_ISSUE = 3;
 // 에도 같은 값이 있다 — FSD 레이어 간 import 금지 규칙 때문에 의도적으로 중복.
 export const ARCHIVE_MIN_DATE = '2026-02-01';
 
-export interface BigKindsTopic {
-  topic: string;
-  keywords: string[];
+export interface BigKindsArticle {
+  news_id: string;
+  title: string;
+  content: string;
+  byline: string;
+  original_link: string | null;
 }
 
 /**
- * 2026-02-01 이전 날짜의 "그날 이슈" — handlers/time_machine_handler.py가
- * SSM에 보관된 키로 빅카인즈 issue_ranking을 직접 호출해 돌려준다(1990-01-01~).
+ * 2026-02-01 이전 날짜의 "그날의 서울경제" — handlers/time_machine_handler.py가
+ * SSM에 보관된 키로 빅카인즈 뉴스 검색(날짜 범위 + provider=서울경제)을 직접
+ * 호출해 돌려준다(1990-01-01~). 발행 "시각"은 이 API가 안 줘서 항상 비어있다.
  */
-export async function fetchBigkindsTopics(target: string): Promise<BigKindsTopic[]> {
+export async function fetchBigkindsArticles(target: string): Promise<BigKindsArticle[]> {
   try {
     const res = await fetch(`${API_URL}/time-machine?date=${target}`, { cache: 'no-store' });
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data?.topics) ? data.topics : [];
+    return Array.isArray(data?.articles) ? data.articles : [];
   } catch {
     return [];
   }

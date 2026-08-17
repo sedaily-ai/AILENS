@@ -4,21 +4,21 @@ import { useState } from 'react';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { TimelineResultView, TimelineTopicsView, type Article, type BigKindsTopic } from '@/features/timeline';
+import { TimelineResultView, TimelineBigkindsView, type Article, type BigKindsArticle } from '@/features/timeline';
 
 type Props =
-  | { date: string; initialArticles: Article[]; initialTopics?: undefined }
-  | { date: string; initialArticles?: undefined; initialTopics: BigKindsTopic[] };
+  | { date: string; initialArticles: Article[]; initialBigkindsArticles?: undefined }
+  | { date: string; initialArticles?: undefined; initialBigkindsArticles: BigKindsArticle[] };
 
-export function TimelineDayClient({ date, initialArticles, initialTopics }: Props) {
+export function TimelineDayClient({ date, initialArticles, initialBigkindsArticles }: Props) {
   const [showSearch, setShowSearch] = useState(false);
 
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('timeline')} frosted />
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
-      {initialTopics ? (
-        <TimelineTopicsView date={date} topics={initialTopics} />
+      {initialBigkindsArticles ? (
+        <TimelineBigkindsView date={date} articles={initialBigkindsArticles} />
       ) : (
         <TimelineResultView date={date} initialArticles={initialArticles} />
       )}
