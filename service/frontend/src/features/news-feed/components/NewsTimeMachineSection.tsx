@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { API_URL } from '@/shared/config/apiClient';
 import { kstTodayStr } from '@/shared/lib/date';
@@ -184,46 +183,26 @@ export function NewsTimeMachineSection() {
         .ntm-pageturn { animation: ntm-pageturn 260ms ease-out; }
       `}</style>
 
-      <header
-        style={{
-          marginBottom: 14,
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 12,
-        }}
-      >
-        <div>
-          <p
-            className="text-gray-400"
-            style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
-          >
-            타임머신
-          </p>
-          <div className="flex items-center" style={{ gap: 8 }}>
-            <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-              그날로 떠나요
-            </h2>
-            {isLive && (
-              <span className="inline-flex items-center" style={{ gap: 5 }}>
-                <span aria-hidden className="ntm-livedot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#8a6d3f', flexShrink: 0 }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#8a6d3f', letterSpacing: '0.02em' }}>
-                  실시간 업데이트 중
-                </span>
-              </span>
-            )}
-          </div>
-        </div>
-        <Link
-          href={`/timeline/${todayStr()}`}
-          className="text-gray-500 hover:text-gray-900"
-          style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+      <header style={{ marginBottom: 14 }}>
+        <p
+          className="text-gray-400"
+          style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
         >
-          타임라인 보기
-          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
-          </svg>
-        </Link>
+          타임머신
+        </p>
+        <div className="flex items-center" style={{ gap: 8 }}>
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            그날로 떠나요
+          </h2>
+          {isLive && (
+            <span className="inline-flex items-center" style={{ gap: 5 }}>
+              <span aria-hidden className="ntm-livedot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#8a6d3f', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#8a6d3f', letterSpacing: '0.02em' }}>
+                실시간 업데이트 중
+              </span>
+            </span>
+          )}
+        </div>
       </header>
 
       <div
