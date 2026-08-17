@@ -1,35 +1,49 @@
 'use client';
 
-// 공유 바 — "인스타/카카오톡에 바이럴 공유" 요청(2026-08-17). 카카오톡은
-// SDK 키(Kakao Developers 발급, 계정·도메인 등록 필요)가 없어 링크 복사로
-// 대체하기로 사용자와 확정. 인스타그램은 웹에서 피드/스토리에 직접 올리는
-// API가 없어서(모바일 앱 인텐트만 가능) 카드 이미지를 다운로드해 수동으로
-// 올리는 방식이 현실적인 최선 — "복사하면, 혹은 다운로드하면 친구들에게
-// 공유가 가능하도록" 요청과도 맞는다.
+// 공유 바 — "인스타/카카오톡에 바이럴 공유" 요청(2026-08-17), 이어서 "카카오톡·
+// 인스타그램 아이콘은 있어야 한다"는 후속 요청 반영. 카카오톡은 SDK 키(Kakao
+// Developers 발급, 계정·도메인 등록 필요)가 없어 링크 복사로 대체하기로
+// 사용자와 확정. 인스타그램은 웹에서 피드/스토리에 직접 올리는 API가 없어서
+// (모바일 앱 인텐트만 가능) 카드 이미지를 다운로드해 수동으로 올리는 방식이
+// 현실적인 최선 — 각 버튼을 눌렀을 때의 동작은 다르지만(링크 복사 vs 이미지
+// 저장), 아이콘으로 "이걸 누르면 이 앱에 공유하기 좋다"는 의도를 명확히 준다.
 //
-// 디자인: "토스나 나이키, 일본의 장인 감성" 요청 — 이상한 이모지 대신 얇은
-// 스트로크 라인아이콘, 절제된 여백, 모노톤 + 액센트 하나. 이 코드베이스의
-// "손그림 캐릭터 아이콘"(HandDrawnIcons)과는 다른 카테고리 — 저건 기능
-// 브랜딩용, 이건 툴바 액션용이라 의도적으로 더 간결한 라인아이콘을 쓴다.
+// PDF 대신 PNG를 유지한다 — 인스타 스토리·카카오톡 사진 전송은 이미지만
+// 되고 PDF는 안 된다(2026-08-17 확인, 사용자도 PNG 유지로 확정).
+//
+// 디자인: "토스나 나이키, 일본의 장인 감성" — 카카오톡·인스타그램만 각자
+// 브랜드 색(노란 원, 인스타 그라디언트)을 쓰고, 그 외(공유하기)는 절제된
+// 모노톤 라인아이콘으로 남겨 튀지 않게 했다. 이상한 이모지는 안 씀.
 import { useState } from 'react';
 import { generateShareCardBlob, type ShareCardData } from '../lib/shareCard';
 
-function DownloadIcon() {
+function KakaoIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v12" />
-      <path d="M7 10l5 5 5-5" />
-      <path d="M4 19h16" />
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="12" fill="#FEE500" />
+      <path
+        d="M12 6.2c-3.6 0-6.5 2.3-6.5 5.2 0 1.85 1.22 3.47 3.06 4.4-.13.47-.5 1.8-.57 2.08-.09.35.13.34.27.25.11-.07 1.78-1.2 2.5-1.7.4.06.82.09 1.24.09 3.6 0 6.5-2.32 6.5-5.12s-2.9-5.22-6.5-5.22z"
+        fill="#391B1B"
+      />
     </svg>
   );
 }
 
-function LinkIcon() {
+function InstagramIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9.5 14.5l5-5" />
-      <path d="M8 16.5l-1.8 1.8a3.5 3.5 0 0 1-5-5L3 11.5a3.5 3.5 0 0 1 5-5" />
-      <path d="M16 7.5l1.8-1.8a3.5 3.5 0 0 1 5 5L21 12.5a3.5 3.5 0 0 1-5 5" />
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="igGrad" x1="0" y1="24" x2="24" y2="0">
+          <stop offset="0" stopColor="#FFD776" />
+          <stop offset="0.35" stopColor="#F6635C" />
+          <stop offset="0.68" stopColor="#CC2A9F" />
+          <stop offset="1" stopColor="#7B3FE4" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="24" height="24" rx="7" fill="url(#igGrad)" />
+      <rect x="6" y="6" width="12" height="12" rx="3.4" stroke="#fff" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="3.2" stroke="#fff" strokeWidth="1.5" />
+      <circle cx="16.1" cy="7.9" r="0.9" fill="#fff" />
     </svg>
   );
 }
@@ -51,11 +65,14 @@ function ShareBarButton({
   label,
   feedback,
   onClick,
+  bare,
 }: {
   icon: React.ReactNode;
   label: string;
   feedback: string | null;
   onClick: () => void;
+  /** 카카오톡·인스타그램처럼 아이콘 자체가 이미 원형 배지라 회색 테두리 원을 또 안 씌운다. */
+  bare?: boolean;
 }) {
   return (
     <button
@@ -74,20 +91,23 @@ function ShareBarButton({
         minWidth: 72,
       }}
     >
-      <span
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: '50%',
-          border: '1px solid #e6e0d4',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'border-color .15s, background .15s',
-        }}
-      >
-        {icon}
-      </span>
+      {bare ? (
+        icon
+      ) : (
+        <span
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            border: '1px solid #e6e0d4',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {icon}
+        </span>
+      )}
       <span style={{ fontSize: 11.5, color: '#78716c', fontWeight: 500, whiteSpace: 'nowrap' }}>
         {feedback ?? label}
       </span>
@@ -96,8 +116,8 @@ function ShareBarButton({
 }
 
 export function ShareBar({ cardData }: { cardData: ShareCardData }) {
-  const [downloadFeedback, setDownloadFeedback] = useState<string | null>(null);
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [kakaoFeedback, setKakaoFeedback] = useState<string | null>(null);
+  const [igFeedback, setIgFeedback] = useState<string | null>(null);
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   const flash = (setter: (v: string | null) => void, text: string) => {
@@ -105,11 +125,20 @@ export function ShareBar({ cardData }: { cardData: ShareCardData }) {
     setTimeout(() => setter(null), 1800);
   };
 
-  const handleDownload = async () => {
-    setDownloadFeedback('만드는 중…');
+  const handleKakao = async () => {
+    try {
+      await navigator.clipboard.writeText(cardData.url);
+      flash(setKakaoFeedback, '링크 복사됨');
+    } catch {
+      flash(setKakaoFeedback, '실패했어요');
+    }
+  };
+
+  const handleInstagram = async () => {
+    setIgFeedback('만드는 중…');
     const blob = await generateShareCardBlob(cardData);
     if (!blob) {
-      flash(setDownloadFeedback, '실패했어요');
+      flash(setIgFeedback, '실패했어요');
       return;
     }
     const objectUrl = URL.createObjectURL(blob);
@@ -120,16 +149,7 @@ export function ShareBar({ cardData }: { cardData: ShareCardData }) {
     a.click();
     a.remove();
     URL.revokeObjectURL(objectUrl);
-    flash(setDownloadFeedback, '저장됐어요');
-  };
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(cardData.url);
-      flash(setCopyFeedback, '복사됐어요');
-    } catch {
-      flash(setCopyFeedback, '실패했어요');
-    }
+    flash(setIgFeedback, '이미지 저장됨');
   };
 
   const handleNativeShare = async () => {
@@ -163,10 +183,10 @@ export function ShareBar({ cardData }: { cardData: ShareCardData }) {
         borderTop: '1px solid #ece6d9',
       }}
     >
-      <ShareBarButton icon={<DownloadIcon />} label="이미지 저장" feedback={downloadFeedback} onClick={handleDownload} />
-      <ShareBarButton icon={<LinkIcon />} label="링크 복사" feedback={copyFeedback} onClick={handleCopyLink} />
+      <ShareBarButton bare icon={<KakaoIcon />} label="카카오톡" feedback={kakaoFeedback} onClick={handleKakao} />
+      <ShareBarButton bare icon={<InstagramIcon />} label="인스타그램" feedback={igFeedback} onClick={handleInstagram} />
       {canNativeShare && (
-        <ShareBarButton icon={<ShareIcon />} label="공유하기" feedback={null} onClick={handleNativeShare} />
+        <ShareBarButton icon={<ShareIcon />} label="더보기" feedback={null} onClick={handleNativeShare} />
       )}
     </div>
   );
