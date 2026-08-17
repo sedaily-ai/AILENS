@@ -4,15 +4,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { EditorCommentsSection, SideRail, InteractiveBlock, type InteractiveBlockData, LETTER_PODCASTS } from '@/features/news-feed';
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { EditorCommentsSection, SideRail, InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed';
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { trackArticleRead } from '@/shared/lib/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { UserMenu, useAuth } from '@/features/auth';
-import { letterPodcastUrl } from '@/shared/lib/audioPlayer';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
+import { Calendar, Check, Link as LinkIcon, Printer } from 'lucide-react';
 import {
   fetchTodayLetters,
   withDisplayMeta,
@@ -24,6 +24,200 @@ import {
 // 다른 날짜 letter 를 스캔할 때 훑는 최근 일수 — app/letters/[id]/page.tsx 의
 // SEED_DAYS 와 같은 값(그룹-날짜 합성 id 스킴 폐지 이후 findLetter 와 동일 패턴).
 const LOOKBACK_DAYS = 14;
+
+// 헤더 메타줄·공유 아이콘 — /lens/[slug]/LensViewClient.tsx에서 먼저 만든 걸
+// 그대로 로컬 복제(2026-08-18, "헤더부분? 공유버튼? 발행일? 카테고리? ...
+// 이거 전체 글들에 동일하게 적용되어야합니다"). FSD상 app/ 아래 두 라우트가
+// 서로를 직접 import하는 것도 이상해서, lens 파일이 이미 FB/Twitter/LinkedIn을
+// 로컬 복제해 둔 것과 같은 방식을 따른다. 카카오톡·인스타그램은 SDK/웹
+// 공유 API가 없어 링크 복사로 대체(레터·렌즈 공통 결정).
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 18 18" aria-hidden>
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" />
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+    </svg>
+  );
+}
+function FacebookIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
+function TwitterIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
+    </svg>
+  );
+}
+function LinkedinIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+      <rect width="4" height="12" x="2" y="9" />
+      <circle cx="4" cy="4" r="2" />
+    </svg>
+  );
+}
+function KakaoIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 4C6.5 4 3 7.5 3 11.5c0 2.6 1.6 4.9 4 6.2l-.9 3.3c-.1.4.3.7.7.5l3.9-2.3c.4.05.85.08 1.3.08 5.5 0 9-3.5 9-7.8S17.5 4 12 4z" />
+    </svg>
+  );
+}
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <circle cx="12" cy="12" r="4" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
+function ShareButtons({ title, url }: { title: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+  const [kakaoCopied, setKakaoCopied] = useState(false);
+  const [igCopied, setIgCopied] = useState(false);
+
+  const copyTo = useCallback(async (setter: (v: boolean) => void) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setter(true);
+      setTimeout(() => setter(false), 2000);
+    } catch {
+      // 클립보드 권한이 막힌 브라우저 — 조용히 무시.
+    }
+  }, [url]);
+
+  const handleCopyLink = useCallback(() => copyTo(setCopied), [copyTo]);
+  const handleKakao = useCallback(() => copyTo(setKakaoCopied), [copyTo]);
+  const handleInstagram = useCallback(() => copyTo(setIgCopied), [copyTo]);
+
+  const handleShare = useCallback((platform: 'facebook' | 'twitter' | 'linkedin') => {
+    const encodedUrl = encodeURIComponent(url);
+    const encodedTitle = encodeURIComponent(title);
+    const shareUrl =
+      platform === 'facebook' ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}` :
+      platform === 'twitter' ? `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}` :
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
+    window.open(shareUrl, '_blank', 'width=600,height=400');
+  }, [url, title]);
+
+  const btnCls = 'text-gray-400 hover:text-gray-900 transition-colors';
+
+  return (
+    <div className="flex items-center" style={{ gap: 12 }}>
+      <button type="button" onClick={handleKakao} className={kakaoCopied ? 'transition-colors' : btnCls} style={kakaoCopied ? { color: '#059669' } : undefined} aria-label="카카오톡 공유 (링크 복사)" title={kakaoCopied ? '복사됨' : '카카오톡 (링크 복사)'}>
+        {kakaoCopied ? <Check className="w-4 h-4" /> : <KakaoIcon className="w-4 h-4" />}
+      </button>
+      <button type="button" onClick={handleInstagram} className={igCopied ? 'transition-colors' : btnCls} style={igCopied ? { color: '#059669' } : undefined} aria-label="인스타그램 공유 (링크 복사)" title={igCopied ? '복사됨' : '인스타그램 (링크 복사)'}>
+        {igCopied ? <Check className="w-4 h-4" /> : <InstagramIcon className="w-4 h-4" />}
+      </button>
+      <button type="button" onClick={() => handleShare('facebook')} className={btnCls} aria-label="페이스북에 공유" title="Facebook">
+        <FacebookIcon className="w-4 h-4" />
+      </button>
+      <button type="button" onClick={() => handleShare('twitter')} className={btnCls} aria-label="X(트위터)에 공유" title="Twitter">
+        <TwitterIcon className="w-4 h-4" />
+      </button>
+      <button type="button" onClick={() => handleShare('linkedin')} className={btnCls} aria-label="링크드인에 공유" title="LinkedIn">
+        <LinkedinIcon className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={handleCopyLink}
+        className={copied ? 'transition-colors' : btnCls}
+        style={copied ? { color: '#059669' } : undefined}
+        aria-label="링크 복사"
+        title={copied ? '복사됨' : '링크 복사'}
+      >
+        {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
+function PrintButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => window.print()}
+      className="text-gray-400 hover:text-gray-900 transition-colors"
+      style={{ padding: 8 }}
+      aria-label="기사 인쇄"
+      title="인쇄"
+    >
+      <Printer className="w-4 h-4" />
+    </button>
+  );
+}
+
+// 글자 크기 조절 — lens 상세페이지 FontSizeControl과 같은 컴포넌트, CSS
+// 변수 이름만 이 페이지 전용(--letter-font-scale)으로 분리(2026-08-18,
+// "동일한 컴포넌트 쓰시면 됩니다" — 툴바 구성 자체를 lens와 똑같이 맞춘다).
+// 레터 본문(LetterBlock)은 이미지 캡션/■섹션헤더/Q라벨/번호헤딩처럼
+// "구조"에 해당하는 fontSize는 그대로 두고, 실제로 읽는 프로즈(리드
+// 문단·불릿·콜아웃 본문·A 답변·기본 문단)만 calc(var())로 바꿔 스케일에
+// 반응하게 했다 — lens가 리드 문단·근거 불릿 2곳만 스케일한 것과 같은
+// 선택 기준.
+type LetterFontSize = 'small' | 'medium' | 'large';
+const LETTER_FONT_SCALE: Record<LetterFontSize, string> = { small: '0.9', medium: '1', large: '1.15' };
+
+function FontSizeControl() {
+  const [size, setSize] = useState<LetterFontSize>('medium');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('letter-font-size') as LetterFontSize | null;
+      if (saved && saved in LETTER_FONT_SCALE) {
+        setSize(saved);
+        document.documentElement.style.setProperty('--letter-font-scale', LETTER_FONT_SCALE[saved]);
+      }
+    } catch {
+      // 시크릿 모드 등 localStorage 접근 불가 — 기본값(medium)으로 둔다.
+    }
+    return () => {
+      document.documentElement.style.removeProperty('--letter-font-scale');
+    };
+  }, []);
+
+  const change = (next: LetterFontSize) => {
+    setSize(next);
+    document.documentElement.style.setProperty('--letter-font-scale', LETTER_FONT_SCALE[next]);
+    try {
+      localStorage.setItem('letter-font-size', next);
+    } catch {
+      // 무시 — 저장 안 돼도 이번 방문 중엔 정상 동작.
+    }
+  };
+
+  const opt = (key: LetterFontSize, label: string, px: number) => (
+    <button
+      type="button"
+      onClick={() => change(key)}
+      className={`px-2 py-1 font-medium transition-colors ${size === key ? 'text-gray-900' : 'text-gray-400 hover:text-gray-900'}`}
+      style={{ fontSize: px }}
+      aria-label={`${label} 글자 크기`}
+      title={label}
+    >
+      A
+    </button>
+  );
+
+  return (
+    <div className="flex items-center" style={{ gap: 2, padding: 2 }}>
+      {opt('small', '작게', 12)}
+      {opt('medium', '보통', 14)}
+      {opt('large', '크게', 16)}
+    </div>
+  );
+}
 
 interface Props {
   letterId: string;
@@ -261,6 +455,33 @@ function splitBodyHtml(html: string): BodyHtmlPart[] {
   return parts;
 }
 
+// 부제(letter.subtitle) 정제(2026-08-18, "크기나 레이아웃 개선해쥣죠") —
+// 일부 레터는 subtitle 필드에 본문 마커 문법(■ 섹션헤더, [라벨] 태그)이
+// 그대로 들어있다("■AI 프리즘 [신입 직장인 뉴스] ..."). 헤드라인 바로
+// 아래 노출되는 자리라 마커가 그대로 보이면 파싱 안 된 원본이 새어나온
+// 것처럼 읽힌다 — 데이터 자체는 안 건드리고 표시 시점에만 앞쪽 마커를
+// 걷어낸다.
+function cleanSubtitle(raw: string): string {
+  return raw
+    .replace(/^■\s*/, '')
+    .replace(/^\[[^\]]*\]\s*/, '')
+    .trim();
+}
+
+// 헤더 배지 라벨(2026-08-18, "이거 카테고리 뭔가요?") — letter.editorName은
+// MBTI 4-페르소나 폐지(2026-08-07) 이후 모든 레터가 항상 "AI LENS" 한
+// 값이라 카테고리 정보가 전혀 없고, 사이트 로고와 텍스트가 겹쳐 거슬렸다.
+// 실제 분류 필드(category → section)로 교체 — 둘 다 없으면 lens의
+// "4가지 시선"처럼 이 콘텐츠 형식 자체를 가리키는 "AI 레터"로 폴백.
+const SECTION_LABEL: Record<NonNullable<ApiLetter['section']>, string> = {
+  trend: '트렌드',
+  column: '칼럼',
+  issue_talk: '이슈 브리핑',
+};
+function letterCategoryLabel(letter: DisplayLetter): string {
+  return letter.category?.trim() || (letter.section ? SECTION_LABEL[letter.section] : null) || 'AI 레터';
+}
+
 // production letter inline 렌더
 // - 4개 채널 탭 폐기. 한 페이지에서 자연스러운 흐름으로 통합:
 //     헤더 → (있으면) 팟캐스트 미니 플레이어 → 본문 → 핵심 정리/닫는 줄/단어 → 구독
@@ -272,6 +493,13 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
   // letter.id 'l-YYYYMMDD-XX' 에서 날짜 추출 → lexical 비교.
   const dateStr = letter.id.match(/l-(\d{8})/)?.[1] ?? '';
   const isModern = dateStr >= '20260523';
+  // 헤더 메타줄 발행일 표시(2026-08-18) — ApiLetter엔 개별 date 필드가 없다
+  // (date는 배치 응답 ApiTodayLettersResponse 쪽에만 있음, 확인됨). id의
+  // 'l-YYYYMMDD-XX' 패턴에서 이미 뽑아둔 dateStr을 그대로 재사용하고,
+  // 이 패턴을 안 쓰는 CMS 글은 publish_date로 폴백한다.
+  const displayDate = dateStr.length === 8
+    ? `${dateStr.slice(0, 4)}.${dateStr.slice(4, 6)}.${dateStr.slice(6, 8)}`
+    : letter.publish_date?.replaceAll('-', '.') ?? null;
   // 본문에서 어떤 키워드 단어들을 underline + tooltip 으로 감쌀지.
   // explain 가 비어있으면 적용 안 함 (구버전 letter 자동 제외).
   const glossary = isModern
@@ -293,21 +521,6 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
       <SentenceSelectionPopover letter={letter} />
 
       <header style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            display: 'inline-block',
-            padding: '4px 12px',
-            borderRadius: 999,
-            background: letter.accentBg,
-            color: letter.accent,
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: 0.3,
-            marginBottom: 16,
-          }}
-        >
-          {letter.editorName}
-        </div>
         {/* 역할 라벨(archetype) 제거(2026-08-09) — "모든 카테고리가 같은 조건"으로
             에디터 이름 배지 아래 부가 설명 없이 바로 제목. */}
         <h1
@@ -317,7 +530,7 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
             fontSize: 'clamp(24px, 4.5vw, 32px)',
             fontWeight: 600,
             color: '#111827',
-            margin: '4px 0 12px',
+            margin: '0 0 12px',
             lineHeight: 1.35,
             letterSpacing: '-0.02em',
           }}
@@ -325,16 +538,81 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
           {letter.headline}
         </h1>
         {letter.subtitle && (
-          <p data-speakable="summary" style={{ fontSize: 15, color: '#6b7280', margin: 0, lineHeight: 1.6 }}>{letter.subtitle}</p>
+          <p
+            data-speakable="summary"
+            style={{
+              fontSize: 14,
+              color: '#6b7280',
+              margin: '0 0 16px',
+              lineHeight: 1.55,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {cleanSubtitle(letter.subtitle)}
+          </p>
         )}
 
-        {/* 팟캐스트 — 워싱턴포스트 기사 상단 메타줄(헤드셋 아이콘) 참고,
-            헤드라인/부제 바로 아래 작은 아이콘+텍스트 한 줄로. article_id 가
-            없어 실제 생성이 불가능한 레터도 아이콘 자체는 항상 노출(요청사항) —
-            그 경우 클릭 시 LetterPodcastPlayer 내부에서 "준비 중" 안내로 처리. */}
-        <div style={{ marginTop: 14 }}>
-          <LetterPodcastPlayer letter={letter} />
+        {/* 배지·발행일·구글 선호 출처 링크 + 공유·글자크기·인쇄 툴바 —
+            lens 상세페이지와 정확히 같은 구성·순서로 맞췄다(2026-08-18,
+            "제목 아래에.. 두 요소가 붙어있어야죠... 기존것처럼" — 처음엔
+            이 메타줄을 제목 "위"에 두고, 그 사이에 부제·팟캐스트 플레이어가
+            끼어들어 공유 툴바가 메타줄과 뚝 떨어져 보였다. lens처럼
+            제목 바로 아래에 메타줄 → 공유 툴바가 붙어서 나오도록 순서를
+            바꾸고, 원래 있던 부제·팟캐스트 플레이어는 툴바 아래로 옮겼다. */}
+        <div className="flex items-center flex-wrap" style={{ gap: 12, marginBottom: 16 }}>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '4px 12px',
+              borderRadius: 999,
+              background: letter.accentBg,
+              color: letter.accent,
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: 0.3,
+            }}
+          >
+            {letterCategoryLabel(letter)}
+          </span>
+          {displayDate && (
+            <p className="flex items-center" style={{ gap: 5, fontSize: 13, color: '#6b7280', fontWeight: 600, margin: 0 }}>
+              <Calendar className="w-4 h-4" aria-hidden />
+              입력 {displayDate}
+            </p>
+          )}
+          <a
+            href="https://www.google.com/preferences/source?q=ailens.sedaily.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center"
+            style={{ gap: 5, fontSize: 11.5, color: '#9ca3af', textDecoration: 'none' }}
+          >
+            <GoogleIcon className="w-3 h-3" />
+            구글 검색 선호 출처로 추가
+          </a>
         </div>
+        <div
+          className="flex items-center justify-between flex-wrap"
+          style={{ gap: 12, padding: '10px 0', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}
+        >
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
+            <ShareButtons title={letter.headline} url={`https://ailens.sedaily.ai/letters/${letter.id}`} />
+          </div>
+          <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
+            <FontSizeControl />
+            <div style={{ width: 1, alignSelf: 'stretch', background: '#e5e7eb' }} aria-hidden />
+            <PrintButton />
+          </div>
+        </div>
+
+        {/* 팟캐스트 미니 플레이어 제거(2026-08-18, "저거 요소 삭제" — 대부분의
+            레터가 오디오가 없어 "아직 준비 중이에요"만 뜨는 회색 카드로
+            보였다). 이 카드만 쓰던 LetterPodcastPlayer/fmtTime도 같이 삭제 —
+            남겨두면 아무 데서도 안 부르는 죽은 코드가 된다. */}
       </header>
 
       {/* 본문 — 한 흐름. CMS 글(body_html 있음)은 Tiptap 리치텍스트를 그대로
@@ -342,7 +620,7 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
           AI 레터는 body_html 이 없어 기존 ■/[라벨]/Q.A./![]() 마커 파싱으로. */}
       <div style={{ marginBottom: 28 }}>
         {letter.body_html ? (
-          <div style={{ fontSize: 16, color: '#374151' }}>
+          <div style={{ fontSize: 'calc(16px * var(--letter-font-scale, 1))', color: '#374151' }}>
             {splitBodyHtml(letter.body_html).map((part, i) =>
               part.type === 'html' ? (
                 <div
@@ -862,271 +1140,6 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
 // 하단 동영상 채널(LetterVideoChannel, 실제 mp4 재생 + mock placeholder)도
 // 2026-08-05 제거 — 실사용 없이 "동영상 준비 중" mock 만 노출되고 있었음.
 
-function fmtTime(s: number): string {
-  if (!isFinite(s) || s < 0) return '0:00';
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, '0')}`;
-}
-
-// 스포티파이식 팟캐스트 플레이어 카드 — 캐릭터 이미지 + 큰 원형 재생 +
-// 진행 바/시간 + 시킹. 자체 <audio> 엘리먼트로 진행률·탐색 제어.
-function LetterPodcastPlayer({ letter }: { letter: DisplayLetter }) {
-  // 우선순위: ① admin 수동 업로드(podcast_audio_url) — article_id 없어도 항상 신뢰
-  // ② PoC 정적 녹음 8편(2026-05-18/22, LETTER_PODCASTS 에 있을 때만) ③ 실시간 생성.
-  const manualUrl = letter.podcast_audio_url || null;
-  const staticUrl = manualUrl ?? (LETTER_PODCASTS[letter.id] ? letterPodcastUrl(letter.id) : null);
-  const canGenerate = !!letter.article_id;
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [cur, setCur] = useState(0);
-  const [dur, setDur] = useState(0);
-  const [err, setErr] = useState(false);
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(staticUrl);
-
-  const accent = letter.accent;
-  // 정적 녹음도 없고 실시간 생성에 필요한 article_id 도 없는 레터 —
-  // 아이콘은 항상 노출하되(요청사항) 클릭해도 할 수 있는 게 없어 안내만.
-  const notReady = !staticUrl && !canGenerate;
-
-  // 이미 있으면 재사용, 없으면(로그인 유저만 도달) 생성 요청 후 완료까지 폴링.
-  // mbti_group 파라미터는 폐지(2026-08-07) — 이제 페르소나가 하나뿐이라
-  // podcastApi.ts 시그니처는 그대로 두고 고정 리터럴 'default' 를 넘긴다.
-  const resolveUrl = async (): Promise<string> => {
-    if (resolvedUrl) return resolvedUrl;
-
-    const { getArticlePodcast, getPodcast, generatePodcast, waitForPodcast } =
-      await import('@/shared/lib/podcastApi');
-
-    let podcast = await getArticlePodcast(letter.article_id, 'default');
-    if (podcast && !podcast.audio_url) {
-      podcast = await getPodcast(podcast.podcast_id);
-    }
-    if (!podcast?.audio_url) {
-      const generated = await generatePodcast(letter.article_id, 'default');
-      podcast = await waitForPodcast(generated.podcast_id);
-    }
-    if (!podcast?.audio_url) throw new Error('podcast unavailable');
-
-    setResolvedUrl(podcast.audio_url);
-    return podcast.audio_url;
-  };
-
-  const toggle = async () => {
-    if (notReady) return;
-    const a = audioRef.current;
-    if (!a) return;
-
-    if (playing) {
-      a.pause();
-      return;
-    }
-
-    setErr(false);
-    setLoading(true);
-    try {
-      const url = await resolveUrl();
-      if (a.getAttribute('src') !== url) {
-        a.src = url;
-        a.load();
-      }
-      await a.play();
-    } catch {
-      setErr(true);
-      setLoading(false);
-    }
-  };
-
-  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
-    const a = audioRef.current;
-    if (!a || !dur) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    a.currentTime = ((e.clientX - r.left) / r.width) * dur;
-  };
-
-  const pct = dur > 0 ? (cur / dur) * 100 : 0;
-
-  const label = notReady
-    ? '아직 준비 중이에요'
-    : err
-      ? '재생 실패 · 다시 시도'
-      : loading && !playing
-        ? '오디오 만드는 중...'
-        : '오늘의 한 통, 귀로 듣기';
-
-  const timeLabel = notReady ? '' : `${fmtTime(cur)} / ${dur ? fmtTime(dur) : '--:--'}`;
-
-  return (
-    <div
-      className={notReady ? '' : 'group transition-all duration-200 hover:-translate-y-0.5'}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        padding: 14,
-        borderRadius: 20,
-        background: notReady ? '#fafafa' : `linear-gradient(135deg, ${letter.accentBg} 0%, #ffffff 65%)`,
-        border: `1px solid ${notReady ? '#f1f1f0' : `${accent}1f`}`,
-        boxShadow: notReady ? 'none' : '0 1px 2px rgba(17,24,39,0.04), 0 10px 28px -8px rgba(17,24,39,0.10)',
-        opacity: notReady ? 0.75 : 1,
-      }}
-    >
-      {/* 페르소나 캐릭터 */}
-      <div style={{ position: 'relative', flexShrink: 0 }}>
-        <Image
-          src={letter.editorAvatar}
-          alt={letter.editorName}
-          width={60}
-          height={60}
-          className={notReady ? '' : 'transition-transform duration-200 group-hover:scale-105'}
-          style={{
-            borderRadius: 16,
-            objectFit: 'cover',
-            background: letter.accentBg,
-            boxShadow: notReady ? 'none' : `0 0 0 1px ${accent}33`,
-            filter: notReady ? 'grayscale(0.5)' : 'none',
-          }}
-        />
-        {playing && (
-          <span
-            style={{
-              position: 'absolute',
-              right: -4,
-              bottom: -4,
-              width: 20,
-              height: 20,
-              borderRadius: '50%',
-              background: accent,
-              border: '2px solid #fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <span style={{ display: 'flex', gap: 1.5, alignItems: 'flex-end', height: 8 }}>
-              <i style={{ width: 2, background: '#fff', animation: 'eq 0.9s ease-in-out infinite', height: '40%' }} />
-              <i style={{ width: 2, background: '#fff', animation: 'eq 0.9s ease-in-out infinite 0.2s', height: '90%' }} />
-              <i style={{ width: 2, background: '#fff', animation: 'eq 0.9s ease-in-out infinite 0.4s', height: '60%' }} />
-            </span>
-          </span>
-        )}
-      </div>
-
-      {/* 정보 + 진행바 — 처음부터 음악 플레이어처럼 보이도록 항상 표시 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p
-          style={{
-            fontSize: 10.5,
-            fontWeight: 700,
-            color: notReady ? '#9ca3af' : accent,
-            letterSpacing: '0.06em',
-            margin: '0 0 3px',
-          }}
-        >
-          AI 팟캐스트 · {letter.editorName} 에디터가 들려줘요
-        </p>
-        <p
-          className="text-gray-900"
-          style={{
-            fontSize: 14.5,
-            fontWeight: 700,
-            margin: '0 0 9px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {label}
-        </p>
-        <div
-          onClick={notReady ? undefined : seek}
-          style={{
-            height: 5,
-            borderRadius: 999,
-            background: '#ececec',
-            cursor: notReady ? 'default' : 'pointer',
-            position: 'relative',
-          }}
-        >
-          <div style={{ position: 'absolute', inset: 0, width: `${pct}%`, background: notReady ? '#d1d5db' : accent, borderRadius: 999, transition: 'width 0.15s linear' }} />
-        </div>
-        {!notReady && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
-            <span style={{ fontSize: 10.5, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{timeLabel}</span>
-          </div>
-        )}
-      </div>
-
-      {/* 원형 재생 버튼 */}
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={notReady}
-        aria-label={playing ? '일시정지' : '재생'}
-        style={{
-          flexShrink: 0,
-          width: 48,
-          height: 48,
-          borderRadius: '50%',
-          border: 'none',
-          cursor: notReady ? 'default' : 'pointer',
-          background: notReady ? '#e5e7eb' : accent,
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: notReady ? 'none' : `0 6px 16px ${accent}55`,
-          transition: 'transform 0.12s',
-        }}
-        onMouseDown={(e) => !notReady && (e.currentTarget.style.transform = 'scale(0.92)')}
-        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-      >
-        {loading && !playing ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} style={{ animation: 'spin 0.8s linear infinite' }}>
-            <path strokeLinecap="round" d="M12 3a9 9 0 1 0 9 9" />
-          </svg>
-        ) : playing ? (
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="5" width="4.5" height="14" rx="1.2" />
-            <rect x="13.5" y="5" width="4.5" height="14" rx="1.2" />
-          </svg>
-        ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.78-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z" />
-          </svg>
-        )}
-      </button>
-
-      <audio
-        ref={audioRef}
-        preload="metadata"
-        onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
-        onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
-        onPlaying={() => {
-          setPlaying(true);
-          setLoading(false);
-          setErr(false);
-        }}
-        onWaiting={() => setLoading(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => {
-          setPlaying(false);
-          setCur(0);
-        }}
-        onError={() => {
-          setErr(true);
-          setLoading(false);
-          setPlaying(false);
-        }}
-      />
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes eq{0%,100%{height:30%}50%{height:100%}}`}</style>
-    </div>
-  );
-}
-
 // ── 데이터 차트 (2026-08-07) ─────────────────────────────────────────
 // CMS 글이 배경자료(edragon 등)에 있던 수치 인포그래픽을 재구성해 넣을 때
 // 쓰는 블록. 원본 이미지·캐릭터를 그대로 가져오지 않고, 수치만 가져와
@@ -1278,7 +1291,7 @@ function LetterBlock({
         >
           {label}
         </p>
-        <p style={{ fontSize: 14.5, lineHeight: 1.75, color: '#374151', margin: 0 }}>
+        <p style={{ fontSize: 'calc(14.5px * var(--letter-font-scale, 1))', lineHeight: 1.75, color: '#374151', margin: 0 }}>
           {wrap(rest)}
         </p>
       </div>
@@ -1303,7 +1316,7 @@ function LetterBlock({
         </p>
         <p
           style={{
-            fontSize: 14.5,
+            fontSize: 'calc(14.5px * var(--letter-font-scale, 1))',
             lineHeight: 1.8,
             color: '#4b5563',
             margin: 0,
@@ -1341,7 +1354,7 @@ function LetterBlock({
           <p
             style={{
               fontFamily: SERIF,
-              fontSize: 16,
+              fontSize: 'calc(16px * var(--letter-font-scale, 1))',
               lineHeight: 1.9,
               color: '#374151',
               margin: 0,
@@ -1359,7 +1372,7 @@ function LetterBlock({
     return (
       <p
         style={{
-          fontSize: 15.5,
+          fontSize: 'calc(15.5px * var(--letter-font-scale, 1))',
           fontWeight: 600,
           color: '#1f2937',
           lineHeight: 1.7,
@@ -1376,7 +1389,7 @@ function LetterBlock({
     <p
       style={{
         fontFamily: SERIF,
-        fontSize: 16,
+        fontSize: 'calc(16px * var(--letter-font-scale, 1))',
         lineHeight: 1.9,
         color: '#374151',
         margin: '0 0 18px',
