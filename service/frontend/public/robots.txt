@@ -1,6 +1,14 @@
 # AI LENS (ailens.sedaily.ai) — robots policy
 # en.sedaily.com 의 AEO 보고서 기준: AI 검색엔진(ChatGPT/Perplexity/Claude/Gemini)이
 # 트래픽의 49% 차지. AI 크롤러를 명시적으로 환영하는 정책.
+#
+# 2026-08-18: 이름 있는 User-agent 그룹(Yeti/ChatGPT-User/GPTBot 등)이
+# Disallow 없이 "Allow: /"만 갖고 있던 걸 발견해 고쳤다 — robots.txt 스펙상
+# 봇에 이름이 명시된 그룹이 있으면 그 봇은 "User-agent: *" 그룹을 완전히
+# 무시하고 자기 이름 그룹만 따른다. 즉 그동안 아래 모든 이름 있는 봇들은
+# */_next/·/login 을 그대로 긁을 수 있는 상태였다(en.sedaily.com의
+# robots.ts가 모든 그룹에 같은 Disallow를 반복하는 것과 같은 이유로,
+# 여기도 모든 그룹에 동일하게 반복한다).
 
 # ── 전통 검색엔진 (Google, Bing, ...) ───────────────────────
 User-agent: *
@@ -12,50 +20,95 @@ Disallow: /login
 # ── 한국 검색엔진 ──────────────────────────────────────────
 User-agent: Yeti
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: Daumoa
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 # ── AI 검색 (사용자 질의 응답용 — 우리 콘텐츠 노출에 유리) ────
 User-agent: ChatGPT-User
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: OAI-SearchBot
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: Claude-Web
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: ClaudeBot
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: PerplexityBot
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: Perplexity-User
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: Google-Extended
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: GoogleOther
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 # ── AI 학습 크롤러 (모델 학습에 콘텐츠 포함되는 것 허용) ─────
 User-agent: GPTBot
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: anthropic-ai
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: CCBot
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: cohere-ai
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 User-agent: Bytespider
 Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
 
 # ── 사이트맵 ──────────────────────────────────────────────
 Sitemap: https://ailens.sedaily.ai/sitemap.xml

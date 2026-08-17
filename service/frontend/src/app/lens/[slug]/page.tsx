@@ -75,6 +75,11 @@ export async function generateMetadata({
       url,
       type: 'article',
       publishedTime: `${lens.date}T07:00:00+09:00`,
+      // letters/[id]/page.tsx는 이미 authors/section/tags를 채우고 있는데
+      // 여기는 빠져 있었다(2026-08-18 GEO 점검 중 발견) — 같은 값으로 맞춤.
+      authors: ['AI LENS 편집팀'],
+      section: '경제',
+      tags: ['오늘의 이슈', '4가지 시선', '뉴스 해설', 'AI LENS', '서울경제'],
       images: [{ url: image, width: 1200, height: 800, alt: lens.headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',

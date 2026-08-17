@@ -146,6 +146,13 @@ const SITE_JSONLD = {
         telephone: "+82-2-724-8600",
         availableLanguage: ["Korean"],
       },
+      // en.sedaily.com(참고 사이트)의 NewsMediaOrganization과 비교해 빠져있던
+      // 두 필드(2026-08-18 GEO 점검) — /about이 "AI가 초안, 편집팀이 검수"
+      // 운영방식을 이미 설명하고 있어 그 페이지를 그대로 가리킨다. 별도
+      // 정정보도 페이지가 없어 correctionsPolicy는 추가하지 않음(있지도
+      // 않은 페이지를 가리키면 오히려 신뢰 신호가 아니라 깨진 링크가 된다).
+      publishingPrinciples: `${SITE_URL}/about`,
+      ethicsPolicy: `${SITE_URL}/about`,
     },
   ],
 };
