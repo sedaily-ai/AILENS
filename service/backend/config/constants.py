@@ -13,6 +13,9 @@ DYNAMODB_TABLE_ARTICLES_PROD = 'sedaily-mbti-articles'
 DYNAMODB_TABLE_PERSONAL_DEV = 'sedaily-mbti-personal-dev'
 DYNAMODB_TABLE_PODCAST_DEV = 'sedaily-mbti-podcast-dev'
 DYNAMODB_TABLE_WS_CONNECTIONS_DEV = 'sedaily-mbti-ws-connections-dev'
+# post_handler.py(커뮤니티 게시글 투표/댓글 집계)·quiz_public.py(퀴즈 응답
+# 집계) 둘 다 각자 하드코딩하고 있던 값 — 2026-08 리팩토링에서 통합.
+DYNAMODB_TABLE_ENGAGEMENT_DEV = 'sedaily-mbti-engagement-dev'
 
 # S3 Article Body Storage (separated from DynamoDB for large text)
 S3_ARTICLE_BODY_BUCKET_DEV = 'sedaily-mbti-article-body-dev'

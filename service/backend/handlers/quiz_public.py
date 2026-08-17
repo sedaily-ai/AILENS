@@ -19,12 +19,12 @@ import boto3
 from botocore.exceptions import ClientError
 
 from clients.quiz_questions_ddb_client import list_published_quizzes
-from config.constants import CORS_HEADERS
+from config.constants import CORS_HEADERS, DYNAMODB_TABLE_ENGAGEMENT_DEV
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-ENGAGEMENT_TABLE = "sedaily-mbti-engagement-dev"
+ENGAGEMENT_TABLE = DYNAMODB_TABLE_ENGAGEMENT_DEV
 _MAX_QUIZZES = 4
 
 _engagement_table = None

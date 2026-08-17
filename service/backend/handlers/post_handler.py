@@ -19,12 +19,13 @@ from boto3.dynamodb.conditions import Key, Attr
 
 from core.auth import get_authenticated_user_id
 from core.exceptions import AuthenticationError
+from config.constants import DYNAMODB_TABLE_ENGAGEMENT_DEV
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 KST = timezone(timedelta(hours=9))
-ENGAGEMENT_TABLE = 'sedaily-mbti-engagement-dev'
+ENGAGEMENT_TABLE = DYNAMODB_TABLE_ENGAGEMENT_DEV
 
 _table = None
 
