@@ -20,5 +20,7 @@ export function ConditionalFooter() {
   if (HIDE_FOOTER_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return null;
   }
-  return <SiteFooter />;
+  // ConditionalTodayNewsPlayer.tsx가 메인 피드('/')에서만 플레이어를 띄우므로
+  // (2026-08-19), 그 여백도 같은 조건으로만 예약한다.
+  return <SiteFooter reservePlayerSpace={pathname === '/'} />;
 }
