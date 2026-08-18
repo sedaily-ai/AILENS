@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
-import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { EditorCommentsSection, SideRail, InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed';
 import { trackEvent } from '@/shared/lib/trackEvent';
 import { trackArticleRead } from '@/shared/lib/readingTracker';
@@ -12,7 +12,11 @@ import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { useAuth } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
-import { Calendar, Check, Link as LinkIcon, Printer } from 'lucide-react';
+import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
+import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
+import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
+import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
+import { Calendar } from 'lucide-react';
 import {
   fetchTodayLetters,
   withDisplayMeta,
@@ -25,200 +29,13 @@ import {
 // SEED_DAYS 와 같은 값(그룹-날짜 합성 id 스킴 폐지 이후 findLetter 와 동일 패턴).
 const LOOKBACK_DAYS = 14;
 
-// 헤더 메타줄·공유 아이콘 — /lens/[slug]/LensViewClient.tsx에서 먼저 만든 걸
-// 그대로 로컬 복제(2026-08-18, "헤더부분? 공유버튼? 발행일? 카테고리? ...
-// 이거 전체 글들에 동일하게 적용되어야합니다"). FSD상 app/ 아래 두 라우트가
-// 서로를 직접 import하는 것도 이상해서, lens 파일이 이미 FB/Twitter/LinkedIn을
-// 로컬 복제해 둔 것과 같은 방식을 따른다. 카카오톡·인스타그램은 SDK/웹
-// 공유 API가 없어 링크 복사로 대체(레터·렌즈 공통 결정).
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 18 18" aria-hidden>
-      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
-      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
-      <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" />
-      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
-    </svg>
-  );
-}
-function FacebookIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-    </svg>
-  );
-}
-function TwitterIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
-    </svg>
-  );
-}
-function LinkedinIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-      <rect width="4" height="12" x="2" y="9" />
-      <circle cx="4" cy="4" r="2" />
-    </svg>
-  );
-}
-function KakaoIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 4C6.5 4 3 7.5 3 11.5c0 2.6 1.6 4.9 4 6.2l-.9 3.3c-.1.4.3.7.7.5l3.9-2.3c.4.05.85.08 1.3.08 5.5 0 9-3.5 9-7.8S17.5 4 12 4z" />
-    </svg>
-  );
-}
-function InstagramIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-      <circle cx="12" cy="12" r="4" />
-      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-    </svg>
-  );
-}
-
-function ShareButtons({ title, url }: { title: string; url: string }) {
-  const [copied, setCopied] = useState(false);
-  const [kakaoCopied, setKakaoCopied] = useState(false);
-  const [igCopied, setIgCopied] = useState(false);
-
-  const copyTo = useCallback(async (setter: (v: boolean) => void) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setter(true);
-      setTimeout(() => setter(false), 2000);
-    } catch {
-      // 클립보드 권한이 막힌 브라우저 — 조용히 무시.
-    }
-  }, [url]);
-
-  const handleCopyLink = useCallback(() => copyTo(setCopied), [copyTo]);
-  const handleKakao = useCallback(() => copyTo(setKakaoCopied), [copyTo]);
-  const handleInstagram = useCallback(() => copyTo(setIgCopied), [copyTo]);
-
-  const handleShare = useCallback((platform: 'facebook' | 'twitter' | 'linkedin') => {
-    const encodedUrl = encodeURIComponent(url);
-    const encodedTitle = encodeURIComponent(title);
-    const shareUrl =
-      platform === 'facebook' ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}` :
-      platform === 'twitter' ? `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}` :
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
-    window.open(shareUrl, '_blank', 'width=600,height=400');
-  }, [url, title]);
-
-  const btnCls = 'text-gray-400 hover:text-gray-900 transition-colors';
-
-  return (
-    <div className="flex items-center" style={{ gap: 12 }}>
-      <button type="button" onClick={handleKakao} className={kakaoCopied ? 'transition-colors' : btnCls} style={kakaoCopied ? { color: '#059669' } : undefined} aria-label="카카오톡 공유 (링크 복사)" title={kakaoCopied ? '복사됨' : '카카오톡 (링크 복사)'}>
-        {kakaoCopied ? <Check className="w-4 h-4" /> : <KakaoIcon className="w-4 h-4" />}
-      </button>
-      <button type="button" onClick={handleInstagram} className={igCopied ? 'transition-colors' : btnCls} style={igCopied ? { color: '#059669' } : undefined} aria-label="인스타그램 공유 (링크 복사)" title={igCopied ? '복사됨' : '인스타그램 (링크 복사)'}>
-        {igCopied ? <Check className="w-4 h-4" /> : <InstagramIcon className="w-4 h-4" />}
-      </button>
-      <button type="button" onClick={() => handleShare('facebook')} className={btnCls} aria-label="페이스북에 공유" title="Facebook">
-        <FacebookIcon className="w-4 h-4" />
-      </button>
-      <button type="button" onClick={() => handleShare('twitter')} className={btnCls} aria-label="X(트위터)에 공유" title="Twitter">
-        <TwitterIcon className="w-4 h-4" />
-      </button>
-      <button type="button" onClick={() => handleShare('linkedin')} className={btnCls} aria-label="링크드인에 공유" title="LinkedIn">
-        <LinkedinIcon className="w-4 h-4" />
-      </button>
-      <button
-        type="button"
-        onClick={handleCopyLink}
-        className={copied ? 'transition-colors' : btnCls}
-        style={copied ? { color: '#059669' } : undefined}
-        aria-label="링크 복사"
-        title={copied ? '복사됨' : '링크 복사'}
-      >
-        {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
-      </button>
-    </div>
-  );
-}
-
-function PrintButton() {
-  return (
-    <button
-      type="button"
-      onClick={() => window.print()}
-      className="text-gray-400 hover:text-gray-900 transition-colors"
-      style={{ padding: 8 }}
-      aria-label="기사 인쇄"
-      title="인쇄"
-    >
-      <Printer className="w-4 h-4" />
-    </button>
-  );
-}
-
-// 글자 크기 조절 — lens 상세페이지 FontSizeControl과 같은 컴포넌트, CSS
-// 변수 이름만 이 페이지 전용(--letter-font-scale)으로 분리(2026-08-18,
-// "동일한 컴포넌트 쓰시면 됩니다" — 툴바 구성 자체를 lens와 똑같이 맞춘다).
-// 레터 본문(LetterBlock)은 이미지 캡션/■섹션헤더/Q라벨/번호헤딩처럼
-// "구조"에 해당하는 fontSize는 그대로 두고, 실제로 읽는 프로즈(리드
-// 문단·불릿·콜아웃 본문·A 답변·기본 문단)만 calc(var())로 바꿔 스케일에
-// 반응하게 했다 — lens가 리드 문단·근거 불릿 2곳만 스케일한 것과 같은
-// 선택 기준.
-type LetterFontSize = 'small' | 'medium' | 'large';
-const LETTER_FONT_SCALE: Record<LetterFontSize, string> = { small: '0.9', medium: '1', large: '1.15' };
-
-function FontSizeControl() {
-  const [size, setSize] = useState<LetterFontSize>('medium');
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('letter-font-size') as LetterFontSize | null;
-      if (saved && saved in LETTER_FONT_SCALE) {
-        setSize(saved);
-        document.documentElement.style.setProperty('--letter-font-scale', LETTER_FONT_SCALE[saved]);
-      }
-    } catch {
-      // 시크릿 모드 등 localStorage 접근 불가 — 기본값(medium)으로 둔다.
-    }
-    return () => {
-      document.documentElement.style.removeProperty('--letter-font-scale');
-    };
-  }, []);
-
-  const change = (next: LetterFontSize) => {
-    setSize(next);
-    document.documentElement.style.setProperty('--letter-font-scale', LETTER_FONT_SCALE[next]);
-    try {
-      localStorage.setItem('letter-font-size', next);
-    } catch {
-      // 무시 — 저장 안 돼도 이번 방문 중엔 정상 동작.
-    }
-  };
-
-  const opt = (key: LetterFontSize, label: string, px: number) => (
-    <button
-      type="button"
-      onClick={() => change(key)}
-      className={`px-2 py-1 font-medium transition-colors ${size === key ? 'text-gray-900' : 'text-gray-400 hover:text-gray-900'}`}
-      style={{ fontSize: px }}
-      aria-label={`${label} 글자 크기`}
-      title={label}
-    >
-      A
-    </button>
-  );
-
-  return (
-    <div className="flex items-center" style={{ gap: 2, padding: 2 }}>
-      {opt('small', '작게', 12)}
-      {opt('medium', '보통', 14)}
-      {opt('large', '크게', 16)}
-    </div>
-  );
-}
-
+// 헤더 메타줄·공유 아이콘 — 처음엔 /lens/[slug]/LensViewClient.tsx에서 만든
+// 걸 이 파일도 로컬 복제해 뒀었는데(2026-08-18, "헤더부분? 공유버튼?
+// 발행일? 카테고리? ... 이거 전체 글들에 동일하게 적용되어야합니다"), 두
+// 페이지가 완전히 동일한 ~150줄을 각자 들고 있는 게 유지보수 부담이라
+// shared/ui로 추출해 합쳤다(같은 날 후속). 글자크기만 CSS 변수·
+// localStorage 키를 페이지별로 다르게 넘긴다 — 본문 fontSize를
+// calc(var())로 배선하는 지점(LetterBlock 여러 분기)이 lens와 달라서.
 interface Props {
   letterId: string;
   // 서버(빌드타임)에서 findLetter()로 이미 가져온 글 — SSG 결과물 HTML에 실제
@@ -600,12 +417,12 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
         >
           <div className="flex items-center" style={{ gap: 8 }}>
             <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-            <ShareButtons title={letter.headline} url={`https://ailens.sedaily.ai/letters/${letter.id}`} />
+            <ArticleShareButtons title={letter.headline} url={`https://ailens.sedaily.ai/letters/${letter.id}`} />
           </div>
           <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
-            <FontSizeControl />
+            <ArticleFontSizeControl cssVar="--letter-font-scale" storageKey="letter-font-size" />
             <div style={{ width: 1, alignSelf: 'stretch', background: '#e5e7eb' }} aria-hidden />
-            <PrintButton />
+            <ArticlePrintButton />
           </div>
         </div>
 

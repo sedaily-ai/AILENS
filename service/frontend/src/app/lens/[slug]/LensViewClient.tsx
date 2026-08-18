@@ -19,7 +19,11 @@ import { HomeSideBar } from '@/features/news-feed';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { Link as LinkIcon, Check, Printer, Calendar, Play, Headphones, Images, Video, Zap, ArrowRight, type LucideIcon } from 'lucide-react';
+import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
+import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
+import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
+import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
+import { Check, Calendar, Play, Headphones, Images, Video, Zap, ArrowRight, type LucideIcon } from 'lucide-react';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -41,222 +45,6 @@ import { Link as LinkIcon, Check, Printer, Calendar, Play, Headphones, Images, V
 // ⚠️ SEO — 비활성 시선도 DOM 에는 항상 렌더하고 hidden 으로만 감춘다.
 // 조건부 렌더로 3개를 빼면 page.tsx 의 NewsArticle articleBody / mainEntity
 // (Question+acceptedAnswer 4쌍)와 실제 본문이 어긋난다.
-
-// Facebook/Twitter(X)/LinkedIn — 우리 lucide-react 버전(^1.7.0)엔 브랜드
-// 로고 아이콘이 빠져 있어(정책상 제거됨) 사용자가 붙여준 실제 렌더 마크업의
-// SVG path를 그대로 복사했다 — 참고 사이트가 쓰는 lucide 아이콘과 픽셀
-// 단위로 동일.
-function FacebookIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-    </svg>
-  );
-}
-function TwitterIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
-    </svg>
-  );
-}
-function LinkedinIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-      <rect width="4" height="12" x="2" y="9" />
-      <circle cx="4" cy="4" r="2" />
-    </svg>
-  );
-}
-
-// 카카오톡/인스타그램 아이콘 — 처음엔 features/timeline/components/
-// ShareBar.tsx의 색이 든 브랜드 배지(카카오 노란 원, 인스타 그라디언트)를
-// 그대로 재사용했는데, 이 줄의 나머지 아이콘(Facebook/Twitter/LinkedIn)이
-// 전부 회색 선 아이콘(stroke=currentColor)이라 둘만 튀어 보였다(2026-08-18,
-// "아이콘 톤앤매너 일치시키죠.. 스케치로"). 같은 줄의 다른 아이콘과 동일한
-// 스펙(viewBox 24x24, fill=none, stroke=currentColor, strokeWidth=2, round
-// cap/join)으로 다시 그렸다 — 카카오는 말풍선, 인스타그램은 카메라 렌즈+
-// 플래시라는 각 앱의 실루엣만 선으로 남기고 브랜드 고유색은 뺐다.
-function KakaoIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 4C6.5 4 3 7.5 3 11.5c0 2.6 1.6 4.9 4 6.2l-.9 3.3c-.1.4.3.7.7.5l3.9-2.3c.4.05.85.08 1.3.08 5.5 0 9-3.5 9-7.8S17.5 4 12 4z" />
-    </svg>
-  );
-}
-function InstagramIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-      <circle cx="12" cy="12" r="4" />
-      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-    </svg>
-  );
-}
-
-// Google 공식 4색 "G" 로고마크 — "구글 검색 선호 출처로 추가" 링크가 어떤
-// 서비스로 연결되는지 아이콘만 보고도 알 수 있도록(2026-08-18, "아이콘도
-// 있어야하지 않나"). Google 브랜드 가이드라인이 공개한 표준 마크 그대로.
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 18 18" aria-hidden>
-      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
-      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
-      <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" />
-      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
-    </svg>
-  );
-}
-
-// 공유 버튼 행(2026-08-17) — 로컬 참고 경로
-// 1_ailink/globe/dev/frontend/src/components/article/ShareButtons/ShareButtons.tsx
-// 를 그대로 이식(사용자 확인: "이거는 영문 사이트 컴포넌트 활용해주시죠",
-// 실제 마크업까지 붙여줌). 로직·공유 URL 구성 방식이 원본과 동일 — 색만
-// 우리 사이트의 회색/검정 호버 관례(text-gray-400 hover:text-gray-900)로
-// 맞췄다(원본은 --color-accent 커스텀 프로퍼티 사용, 우리는 그런 변수가 없음).
-function ShareButtons({ title, url }: { title: string; url: string }) {
-  const [copied, setCopied] = useState(false);
-  const [kakaoCopied, setKakaoCopied] = useState(false);
-  const [igCopied, setIgCopied] = useState(false);
-
-  const copyTo = useCallback(async (setter: (v: boolean) => void) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setter(true);
-      setTimeout(() => setter(false), 2000);
-    } catch {
-      // 클립보드 권한이 막힌 브라우저 — 조용히 무시.
-    }
-  }, [url]);
-
-  const handleCopyLink = useCallback(() => copyTo(setCopied), [copyTo]);
-  const handleKakao = useCallback(() => copyTo(setKakaoCopied), [copyTo]);
-  const handleInstagram = useCallback(() => copyTo(setIgCopied), [copyTo]);
-
-  const handleShare = useCallback((platform: 'facebook' | 'twitter' | 'linkedin') => {
-    const encodedUrl = encodeURIComponent(url);
-    const encodedTitle = encodeURIComponent(title);
-    const shareUrl =
-      platform === 'facebook' ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}` :
-      platform === 'twitter' ? `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}` :
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
-    window.open(shareUrl, '_blank', 'width=600,height=400');
-  }, [url, title]);
-
-  const btnCls = 'text-gray-400 hover:text-gray-900 transition-colors';
-
-  return (
-    <div className="flex items-center" style={{ gap: 12 }}>
-      {/* 카카오톡·인스타그램(2026-08-18, "공유허ㅏ기에.. 인스타그램..
-          카카오톡도 넣으시죠") — 아이콘이 나머지와 같은 회색 선 스타일로
-          바뀐 뒤엔("아이콘 톤앤매너 일치시키죠.. 스케치로") btnCls를
-          그대로 같이 쓴다. 클릭하면 링크 복사(위 "카카오톡/인스타그램은
-          SDK·API가 없어 복사로 대체" 참고), 복사되면 체크 표시로 바뀐다. */}
-      <button type="button" onClick={handleKakao} className={kakaoCopied ? 'transition-colors' : btnCls} style={kakaoCopied ? { color: '#059669' } : undefined} aria-label="카카오톡 공유 (링크 복사)" title={kakaoCopied ? '복사됨' : '카카오톡 (링크 복사)'}>
-        {kakaoCopied ? <Check className="w-4 h-4" /> : <KakaoIcon className="w-4 h-4" />}
-      </button>
-      <button type="button" onClick={handleInstagram} className={igCopied ? 'transition-colors' : btnCls} style={igCopied ? { color: '#059669' } : undefined} aria-label="인스타그램 공유 (링크 복사)" title={igCopied ? '복사됨' : '인스타그램 (링크 복사)'}>
-        {igCopied ? <Check className="w-4 h-4" /> : <InstagramIcon className="w-4 h-4" />}
-      </button>
-      <button type="button" onClick={() => handleShare('facebook')} className={btnCls} aria-label="페이스북에 공유" title="Facebook">
-        <FacebookIcon className="w-4 h-4" />
-      </button>
-      <button type="button" onClick={() => handleShare('twitter')} className={btnCls} aria-label="X(트위터)에 공유" title="Twitter">
-        <TwitterIcon className="w-4 h-4" />
-      </button>
-      <button type="button" onClick={() => handleShare('linkedin')} className={btnCls} aria-label="링크드인에 공유" title="LinkedIn">
-        <LinkedinIcon className="w-4 h-4" />
-      </button>
-      <button
-        type="button"
-        onClick={handleCopyLink}
-        className={copied ? 'transition-colors' : btnCls}
-        style={copied ? { color: '#059669' } : undefined}
-        aria-label="링크 복사"
-        title={copied ? '복사됨' : '링크 복사'}
-      >
-        {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
-      </button>
-    </div>
-  );
-}
-
-// 글자 크기 조절(2026-08-17, "글자 크기랑 인쇄는?") — 원본
-// (FontSizeControl.tsx)은 Tailwind text-sm/base/lg 클래스를 .article-content
-// 에 토글하는데, 우리 본문(리드 문단·시선 근거 목록)은 인라인 px로 크기를
-// 줘서(위 "위계는 크기로" 원칙 참조) 클래스 토글이 안 먹는다. 대신 CSS
-// 변수(--lens-font-scale)를 document.documentElement에 심고, 본문 fontSize를
-// calc(Npx * var(--lens-font-scale, 1))로 바꿔 실제로 커지게 했다(리드 문단
-// 18px, 시선 근거 16px — 아래 렌더 코드 참조). localStorage 기억도 원본과
-// 동일하게 유지.
-type LensFontSize = 'small' | 'medium' | 'large';
-const LENS_FONT_SCALE: Record<LensFontSize, string> = { small: '0.9', medium: '1', large: '1.15' };
-
-function FontSizeControl() {
-  const [size, setSize] = useState<LensFontSize>('medium');
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('lens-font-size') as LensFontSize | null;
-      if (saved && saved in LENS_FONT_SCALE) {
-        setSize(saved);
-        document.documentElement.style.setProperty('--lens-font-scale', LENS_FONT_SCALE[saved]);
-      }
-    } catch {
-      // 시크릿 모드 등 localStorage 접근 불가 — 기본값(medium)으로 둔다.
-    }
-    return () => {
-      document.documentElement.style.removeProperty('--lens-font-scale');
-    };
-  }, []);
-
-  const change = (next: LensFontSize) => {
-    setSize(next);
-    document.documentElement.style.setProperty('--lens-font-scale', LENS_FONT_SCALE[next]);
-    try {
-      localStorage.setItem('lens-font-size', next);
-    } catch {
-      // 무시 — 저장 안 돼도 이번 방문 중엔 정상 동작.
-    }
-  };
-
-  const opt = (key: LensFontSize, label: string, px: number) => (
-    <button
-      type="button"
-      onClick={() => change(key)}
-      className={`px-2 py-1 font-medium transition-colors ${size === key ? 'text-gray-900' : 'text-gray-400 hover:text-gray-900'}`}
-      style={{ fontSize: px }}
-      aria-label={`${label} 글자 크기`}
-      title={label}
-    >
-      A
-    </button>
-  );
-
-  return (
-    <div className="flex items-center" style={{ gap: 2, padding: 2 }}>
-      {opt('small', '작게', 12)}
-      {opt('medium', '보통', 14)}
-      {opt('large', '크게', 16)}
-    </div>
-  );
-}
-
-function PrintButton() {
-  return (
-    <button
-      type="button"
-      onClick={() => window.print()}
-      className="text-gray-400 hover:text-gray-900 transition-colors"
-      style={{ padding: 8 }}
-      aria-label="기사 인쇄"
-      title="인쇄"
-    >
-      <Printer className="w-4 h-4" />
-    </button>
-  );
-}
 
 /**
  * 팟캐스트·영상 목업의 길이 표기 — 고정값("약 1분 30초", "0:45") 대신 실제
@@ -877,7 +665,7 @@ export function LensViewClient({
           >
             <div className="flex items-center" style={{ gap: 8 }}>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-              <ShareButtons title={lens.headline} url={`https://ailens.sedaily.ai/lens/${slug}`} />
+              <ArticleShareButtons title={lens.headline} url={`https://ailens.sedaily.ai/lens/${slug}`} />
             </div>
             {/* 글자크기(알약 모양)와 인쇄(각진 정사각) 버튼이 각자
                 테두리를 갖고 있어 8px 간격을 두고 붙어 있으니 "한 세트"가
@@ -886,9 +674,9 @@ export function LensViewClient({
                 개별 border를 빼고, 여기서 테두리 하나로 감싸 얇은 구분선만
                 중간에 넣어 하나의 컨트롤 그룹으로 통일했다. */}
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
-              <FontSizeControl />
+              <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
               <div style={{ width: 1, alignSelf: 'stretch', background: '#e5e7eb' }} aria-hidden />
-              <PrintButton />
+              <ArticlePrintButton />
             </div>
           </div>
         </div>
