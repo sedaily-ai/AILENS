@@ -1,11 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type TouchEvent as ReactTouchEvent } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/cmsPostsApi';
 import {
   LENS_ACCENT,
+  LENS_CARD_BORDER,
+  LENS_CARD_SHADOW,
+  lensFormatAt,
   lensPanelId,
   lensPerspectiveAt,
   lensTabId,
@@ -16,7 +19,7 @@ import { HomeSideBar } from '@/features/news-feed';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { Link as LinkIcon, Check, Printer, Calendar } from 'lucide-react';
+import { Link as LinkIcon, Check, Printer, Calendar, Play, Headphones, Images, Video, Zap, ArrowRight, type LucideIcon } from 'lucide-react';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -255,6 +258,346 @@ function PrintButton() {
   );
 }
 
+/**
+ * 팟캐스트·영상 목업의 길이 표기 — 고정값("약 1분 30초", "0:45") 대신 실제
+ * 불릿 개수에 비례해 계산한다(2026-08-18, "내용이 부실해서 데이터 잘
+ * 맞춰서 채워달라" 요청). 인트로 15초 + 사실 1건당 18초 내레이션 가정 —
+ * 실측치가 아니라 "그럴듯한 추정"이지만, 불릿이 3개면 4개짜리보다 항상
+ * 짧게 나와서 최소한 내용량과 방향이 어긋나지는 않는다.
+ */
+function mockDuration(bulletCount: number): string {
+  const totalSec = 15 + bulletCount * 18;
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * 완성감 있는 데모 샘플(2026-08-18, "원소스를 프롬프트로 멀티 포맷 변환하는
+ * 게 목적" — 카드뉴스·영상·팟캐스트·레터 각각에 맞는 각본으로 바꾸고, 상단에
+ * 핵심 요약도 두라는 요청). 이전엔 CMS 4렌즈 불릿(짧은 카드뉴스 문장)만
+ * 재활용했는데, 사용자가 원본 기사 전문(김태영 기자, 2026-08-14 06:40 입력)을
+ * 직접 붙여줘서 그 전문의 사실을 근거로 포맷별로 다시 썼다 — 원문에는 있지만
+ * CMS 4렌즈 불릿에는 없던 사실(500대+300대 순차 도입, 20종 라인업, 제주 제외
+ * 지역 조건, 종목코드 403550 등)까지 포함해 밀도를 올렸다. 변조 없이 원문
+ * 사실만 재구성. `DEV_EXACT_PHOTOS`와 같은 패턴의 dev 전용 기사별
+ * 오버라이드 — `lens.id`(기사 slug) 기준, 프로덕션 빌드에는 영향 없음
+ * (`NODE_ENV === 'development'`에서만 탄다). 오버라이드가 없는 기사는
+ * 지금처럼 CMS 데이터를 그대로 쓴다.
+ */
+const DEV_FORMAT_OVERRIDES: Record<
+  string,
+  {
+    summary?: string[];
+    letter?: string[];
+    cardnewsHeadline?: string;
+    cardnews?: string[];
+    podcast?: string[];
+    video?: string[];
+    // 시선 간 연결 문구(2026-08-18, "네 개가 따로 떨어졌다는 느낌" 지적) —
+    // 각 포맷 끝에서 다음 시선으로 자연스럽게 넘어가는 한 줄. 마지막
+    // 포맷(video)은 다음이 없어 안 씀.
+    bridge?: { letter?: string; cardnews?: string; podcast?: string };
+  }
+> = {
+  '2026-08-14-쏘카-테슬라-800대-더-늘린다-전기차-비중-14-로': {
+    // 상단 "핵심 요약" — AI LENS 편집장 프롬프트의 "⚡ 30초 핵심"에 해당.
+    summary: [
+      '쏘카가 연말까지 전기차 비중을 14%로 끌어올려요 — 테슬라 모델Y 800여대와 BYD 아토3 100여대를 9월 말까지 추가해요.',
+      '전기차 운영 대수는 지난해보다 59% 늘었고, 대당 수익성도 내연기관차보다 53% 높아요.',
+      '이달 28일까지 모델Y 24시간 이상 대여 시 70% 할인, 한 달 전 예약하면 얼리버드 혜택도 있어요.',
+    ],
+    // 레터(원인) — "왜 이렇게 됐을까"에 맞춰 이용 데이터 중심 서사.
+    letter: [
+      '쏘카가 전기차를, 그중에서도 테슬라를 이렇게까지 늘리는 이유는 이용 데이터에 있어요. 올해 2분기 전기차 예약은 한 번 빌리면 평균 27시간을 썼는데, 이건 내연기관차의 두 배예요.',
+      '게다가 전기차로 다닌 거리의 84%가 100km를 넘었고, 차 한 대 유지관리비도 내연기관차보다 34% 낮았어요. 대당 수익성은 오히려 53% 더 높았고요.',
+      '쏘카는 올해 기아 EV3·EV4 롱레인지, 현대차 아이오닉9, 테슬라 모델S·모델X까지 들이며 운영하는 전기차 종류를 20종으로 늘려왔어요. 오래, 멀리, 싸게, 그리고 다양하게 쓰인다는 뜻이니 쏘카 입장에선 늘릴 이유가 충분한 셈이죠.',
+    ],
+    // 카드뉴스(공감) — "그래서 누가 어떻게 됐을까"는 사람·선택지 중심이어야
+    // 하는데, 처음 버전은 물량·일정 숫자만 나열해 "숫자" 페르소나와 다를 게
+    // 없었다(2026-08-18, 품질 체크에서 지적). 물량·일정은 영상이 이미
+    // 다루니, 카드뉴스는 "그래서 나는 뭘 타게 되나"로 완전히 바꿔 겹침을
+    // 없앴다.
+    cardnewsHeadline: '그래서 누가 이 차를 타게 될까',
+    cardnews: [
+      '예산 넉넉하게 쓰고 싶다면 — 새로 늘어난 모델Y·모델S·모델X, 프리미엄 \'블랙라벨\'로 예약할 수 있어요.',
+      '실속 있게 타고 싶다면 — 기아 EV3, 현대 아이오닉9 같은 실속형·SUV까지 골라 탈 수 있어요.',
+      '쏘카가 굴리는 전기차만 20종 — 세단부터 SUV까지, 원하는 대로 골라 타는 시대가 됐어요.',
+    ],
+    // 팟캐스트(실무) — "그래서 나는 뭘 해야 할까", 이용자 행동 중심 대본.
+    podcast: [
+      '이번 혜택은 테슬라 모델Y 한정이고, 이달 28일까지 약 3주간 진행돼요. 제주 지역은 빠져요.',
+      '그 기간엔 매일 선착순 500명에게, 24시간 이상 빌리면 대여료를 70% 할인해드려요.',
+      '여유가 있다면 한 달 전에 모델Y나 아이오닉9, EV9 같은 프리미엄 전기차를 예약해보세요. 2일권을 18만 9000원부터 살 수 있는 얼리버드 혜택이 있어요.',
+      '안동화 쏘카 카셰어링본부장은 "예산과 목적에 따라 원하는 전기차를 이용할 수 있도록 증차를 추진했다"고 밝혔어요.',
+    ],
+    // 영상(숫자) — "그래서 숫자로 보면", 규모·비율 수치 중심 타임라인.
+    video: [
+      '이번에 늘리는 전기차, 모델Y 800여대에 BYD 아토3 100여대까지 총 900여대예요.',
+      '이달 말까지 500대, 다음 달 말까지 300여대로 나눠 들어와요.',
+      '기존 차량까지 합치면 쏘카가 굴리는 테슬라만 약 1000대가 돼요.',
+      '전기차 운영 대수는 지난해 같은 기간보다 59% 늘었고요.',
+      '대당 수익성은 내연기관차보다 53% 높았어요. 쏘카가 잡은 연말 목표는 전기차 비중 14%예요.',
+    ],
+    bridge: {
+      letter: '그럼 이 전기차, 실제로 누가 타게 될까요?',
+      cardnews: '그럼 나는 지금 뭘 하면 좋을까요?',
+      podcast: '이 변화, 숫자로 정리하면 어떨까요?',
+    },
+  },
+};
+
+function devFormatOverride(
+  lensId: string,
+  format: 'letter' | 'cardnews' | 'podcast' | 'video',
+): string[] | null {
+  if (process.env.NODE_ENV !== 'development') return null;
+  return DEV_FORMAT_OVERRIDES[lensId]?.[format] ?? null;
+}
+
+function devSummaryOverride(lensId: string): string[] | null {
+  if (process.env.NODE_ENV !== 'development') return null;
+  return DEV_FORMAT_OVERRIDES[lensId]?.summary ?? null;
+}
+
+function devBridgeOverride(lensId: string, format: 'letter' | 'cardnews' | 'podcast'): string | null {
+  if (process.env.NODE_ENV !== 'development') return null;
+  return DEV_FORMAT_OVERRIDES[lensId]?.bridge?.[format] ?? null;
+}
+
+/**
+ * 카드뉴스 목업 — 인스타 카드뉴스처럼 한 장씩 크게 보여주고 화살표(또는
+ * 스와이프)로 넘긴다(2026-08-18, "가로 스크롤 필름스트립은 촌스럽다,
+ * 인스타처럼 화살표 누르면 안 되냐" 지적 — 실제로 /design 캔버스로 방향을
+ * 먼저 스케치해서 승인받은 뒤 반영). 카드마다 자기 useState가 필요해서
+ * 별도 컴포넌트로 뺐다 — 시선 패널은 하나만 보이므로(다른 시선은 hidden)
+ * 이 컴포넌트도 사실상 한 인스턴스만 활성 상태로 존재한다.
+ */
+function CardnewsCarousel({
+  photo,
+  coverHeadline,
+  ordinal,
+  full,
+  cards,
+  color,
+  tint,
+  Icon,
+}: {
+  photo: string | null;
+  coverHeadline: string;
+  ordinal: string;
+  full: string;
+  cards: { hook: string | null; caption: string }[];
+  color: string;
+  tint: string;
+  Icon: LucideIcon;
+}) {
+  const [index, setIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const total = cards.length + 1;
+  const onPhoto = index === 0;
+
+  const go = useCallback(
+    (delta: number) => {
+      setIndex((i) => Math.min(total - 1, Math.max(0, i + delta)));
+    },
+    [total],
+  );
+
+  const onTouchStart = (e: ReactTouchEvent) => {
+    touchStartX.current = e.touches[0]?.clientX ?? null;
+  };
+  const onTouchEnd = (e: ReactTouchEvent) => {
+    if (touchStartX.current === null) return;
+    const dx = (e.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(dx) < 32) return;
+    go(dx < 0 ? 1 : -1);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <div style={{ position: 'relative', width: '100%', maxWidth: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button
+          type="button"
+          aria-label="이전 카드"
+          disabled={index === 0}
+          onClick={() => go(-1)}
+          className="flex items-center justify-center flex-shrink-0"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 999,
+            border: LENS_CARD_BORDER,
+            background: '#fff',
+            boxShadow: LENS_CARD_SHADOW,
+            marginRight: 10,
+            cursor: index === 0 ? 'default' : 'pointer',
+            opacity: index === 0 ? 0.35 : 1,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+
+        <div
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+          style={{
+            position: 'relative',
+            width: 240,
+            aspectRatio: '4/5',
+            borderRadius: 14,
+            overflow: 'hidden',
+            flexShrink: 0,
+            background: onPhoto ? (photo ? '#111827' : tint) : '#fff',
+            border: onPhoto ? undefined : LENS_CARD_BORDER,
+            boxShadow: LENS_CARD_SHADOW,
+            boxSizing: 'border-box',
+            padding: onPhoto ? 0 : 18,
+          }}
+        >
+          {/* 상단 진행바 — 사진 배경 위에서는 흰 톤, 흰 카드 위에서는 persona
+              색 톤으로 대비를 맞춘다(스토리 세그먼트 관습). */}
+          <div
+            style={{
+              position: onPhoto ? 'absolute' : 'static',
+              top: onPhoto ? 14 : undefined,
+              left: onPhoto ? 14 : undefined,
+              right: onPhoto ? 14 : undefined,
+              display: 'flex',
+              gap: 5,
+            }}
+          >
+            {Array.from({ length: total }).map((_, si) => (
+              <div
+                key={si}
+                style={{
+                  flex: 1,
+                  height: 3,
+                  borderRadius: 999,
+                  background: onPhoto
+                    ? si <= index
+                      ? 'rgba(255,255,255,0.92)'
+                      : 'rgba(255,255,255,0.32)'
+                    : si <= index
+                      ? color
+                      : 'rgba(17,24,39,0.10)',
+                }}
+              />
+            ))}
+          </div>
+
+          {index === 0 ? (
+            <>
+              {photo && (
+                <>
+                  <Image src={photo} alt="" fill sizes="240px" style={{ objectFit: 'cover' }} />
+                  <span
+                    aria-hidden
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.15) 45%, transparent 78%)',
+                    }}
+                  />
+                </>
+              )}
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 26,
+                  left: 14,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                  color: photo ? 'rgba(255,255,255,0.78)' : 'rgba(17,24,39,0.5)',
+                }}
+              >
+                AI LENS
+              </span>
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '18px 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', color: photo ? 'rgba(255,255,255,0.7)' : '#6b7280' }}>
+                  시선 {ordinal} · {full}
+                </span>
+                <span
+                  style={{
+                    fontFamily: '"Noto Serif KR", serif',
+                    fontSize: 21,
+                    fontWeight: 700,
+                    lineHeight: 1.4,
+                    letterSpacing: '-0.01em',
+                    color: photo ? '#fff' : '#111827',
+                    wordBreak: 'keep-all',
+                  }}
+                >
+                  {coverHeadline || '표지'}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <span
+                aria-hidden
+                className="flex items-center justify-center flex-shrink-0"
+                style={{ width: 32, height: 32, borderRadius: 999, background: tint, color, marginTop: 14 }}
+              >
+                <Icon size={15} />
+              </span>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
+                {cards[index - 1]?.hook && (
+                  <p
+                    style={{
+                      fontFamily: '"Noto Serif KR", serif',
+                      fontSize: 19,
+                      fontWeight: 700,
+                      color: '#111827',
+                      lineHeight: 1.4,
+                      letterSpacing: '-0.01em',
+                      wordBreak: 'keep-all',
+                      margin: 0,
+                    }}
+                  >
+                    {cards[index - 1]?.hook}
+                  </p>
+                )}
+                <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, wordBreak: 'keep-all', margin: 0 }}>{cards[index - 1]?.caption}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          aria-label="다음 카드"
+          disabled={index === total - 1}
+          onClick={() => go(1)}
+          className="flex items-center justify-center flex-shrink-0"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 999,
+            border: LENS_CARD_BORDER,
+            background: '#fff',
+            boxShadow: LENS_CARD_SHADOW,
+            marginLeft: 10,
+            cursor: index === total - 1 ? 'default' : 'pointer',
+            opacity: index === total - 1 ? 0.35 : 1,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: '#9ca3af' }}>
+        {index + 1} / {total}
+      </p>
+    </div>
+  );
+}
+
 export function LensViewClient({
   slug,
   initialLens = undefined,
@@ -292,12 +635,24 @@ export function LensViewClient({
     return () => cancelAnimationFrame(raf);
   }, [count]);
 
+  // 클릭 직후 아래 내용이 바뀐 걸 못 느낀다는 피드백(2026-08-18, "클릭했는데
+  // 화면이 안 바뀐 것처럼 느낄 수 있다")으로 스크롤 보정을 뒀었으나, 배경을
+  // 잠깐 물들이는 클릭 피드백은 같은 날 "그 배경색 없애달라"는 요청으로
+  // 뺐다 — 위 타일 선택 상태(색 테두리+그림자+체크)만으로도 선택은 이미
+  // 충분히 보인다. 딥링크(?v=N) 최초 진입은 여전히 select()가 아니라
+  // setActive()를 직접 불러서(위 useEffect) 이 스크롤이 안 걸린다 —
+  // "항상 최상단부터 랜딩" 원칙은 그대로 유지.
   const select = useCallback((i: number) => {
     setActive(i);
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.set('v', String(i + 1));
       window.history.replaceState(null, '', url);
+      // block:'nearest' — 패널이 이미 화면 안에 있으면(대부분의 경우, 타일
+      // 바로 아래라) 아예 스크롤하지 않고, 화면 밖으로 밀려나 있을 때만
+      // 최소한으로 당겨온다. 'start'를 쓰면 매번 패널을 뷰포트 맨 위로
+      // 붙여서 방금 누른 타일까지 화면 밖으로 밀려나 버린다.
+      document.getElementById(lensPanelId(i))?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, []);
 
@@ -615,6 +970,37 @@ export function LensViewClient({
         {count > 0 && (
           <div className="lw" style={{ paddingTop: 'clamp(28px, 4.4vw, 40px)' }}>
           <div>
+            {/* 핵심 요약("30초 핵심") — 완성감 데모(2026-08-18, "상단에 핵심
+                내용이 있어야 한다" 요청). AI LENS 편집장 프롬프트의 "⚡ 30초
+                핵심" 섹션에 해당 — 네 시선을 고르기 전에 기사 전체의 핵심을
+                먼저 준다. 지금은 이 데모 기사에만 있는 dev 전용 오버라이드,
+                실제 서비스에 태울지는 별도 결정. */}
+            {devSummaryOverride(lens.id) && (
+              <div
+                style={{
+                  border: LENS_CARD_BORDER,
+                  borderRadius: 16,
+                  padding: 18,
+                  background: '#fff',
+                  boxShadow: LENS_CARD_SHADOW,
+                  marginBottom: 'clamp(24px, 3.4vw, 32px)',
+                }}
+              >
+                <p className="flex items-center" style={{ gap: 6, fontSize: 13, fontWeight: 800, color: LENS_ACCENT, marginBottom: 12 }}>
+                  <Zap size={14} fill="currentColor" aria-hidden />
+                  30초 핵심
+                </p>
+                <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
+                  {devSummaryOverride(lens.id)!.map((s, si) => (
+                    <li key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14.5, lineHeight: 1.6, color: '#1f2937', wordBreak: 'keep-all' }}>
+                      <Check size={15} style={{ flexShrink: 0, marginTop: 3, color: LENS_ACCENT }} aria-hidden />
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="rule" />
 
             {/* ── 시선 선택 ──
@@ -654,8 +1040,13 @@ export function LensViewClient({
                     onKeyDown={(e) => onTabKeyDown(e, i)}
                     className="pick"
                     style={{
+                      // 선택 시 타일 전체를 tint로 채우던 걸 뺐다(2026-08-18,
+                      // "유형 누르면 뜨는 배경색 없애달라") — 테두리 색 +
+                      // 그림자 + 체크 배지 3중 표시로도 선택 상태는 충분히
+                      // 드러나고, 배경까지 채우면 특히 진한 색(로즈·앰버
+                      // 등)에서 과해 보였다.
                       borderColor: on ? p.color : 'rgba(17,24,39,0.12)',
-                      background: on ? p.tint : '#fff',
+                      background: '#fff',
                       boxShadow: on ? `inset 0 0 0 1px ${p.color}` : 'none',
                     }}
                   >
@@ -709,6 +1100,22 @@ export function LensViewClient({
             {lenses.map((l, i) => {
               const p = lensPerspectiveAt(i);
               const on = i === active;
+              const format = lensFormatAt(i);
+              // 카드뉴스·팟캐스트·영상은 완성감 있는 데모 스크립트가 있으면
+              // 그걸 쓰고, 없는 기사는 지금처럼 CMS 불릿을 그대로 쓴다.
+              const scriptBullets =
+                format === 'cardnews' || format === 'podcast' || format === 'video'
+                  ? devFormatOverride(lens.id, format) ?? l.bullets
+                  : l.bullets;
+              // 레터 본문 — 데모 오버라이드가 있으면 자연스러운 문단으로,
+              // 없으면 지금처럼 카드뉴스와 같은 CMS 불릿 목록을 그대로 쓴다.
+              const letterParagraphs = format === 'letter' ? devFormatOverride(lens.id, 'letter') : null;
+              // 카드뉴스 표지 헤드라인 — 오버라이드가 있으면 그 표지 문구를,
+              // 없으면 CMS 질문(l.question)을 그대로 쓴다.
+              const cardnewsHeadline =
+                format === 'cardnews' && process.env.NODE_ENV === 'development'
+                  ? DEV_FORMAT_OVERRIDES[lens.id]?.cardnewsHeadline ?? l.question
+                  : l.question;
               return (
                 <section
                   key={i}
@@ -720,10 +1127,12 @@ export function LensViewClient({
                   className={on ? 'panel' : undefined}
                   style={{
                     marginTop: 'clamp(22px, 3.4vw, 30px)',
-                    // 선택한 타일의 색을 본문 왼쪽 규칙선으로 이어줘서
-                    // "이 내용이 위에서 고른 그 사람의 읽기"라는 연결을 만든다.
-                    borderLeft: `3px solid ${p.color}`,
-                    paddingLeft: 'clamp(16px, 2.4vw, 24px)',
+                    // 왼쪽 규칙선(레일)도, 선택 직후 잠깐 배경을 물들이던
+                    // 클릭 피드백도 뺐다(2026-08-18, "유형 누르면 뜨는 배경색
+                    // 없애달라"). 위 타일 선택 상태 자체가 이미 색+테두리+
+                    // 그림자+체크 4중으로 표시되고 있어서, 본문까지 색을
+                    // 끌고 오지 않아도 "누구의 시선인지"는 위 타일과 "시선
+                    // {ordinal} · {full}" 텍스트로 충분히 전달된다.
                   }}
                 >
                   {/* 역할 머리 — 압축했다. 52px 일러스트와 액센트 바를 뺀 이유는
@@ -743,9 +1152,26 @@ export function LensViewClient({
                     </p>
                   </div>
 
+                  {/* 포맷 목업 배지 — 텍스트 외 세 포맷은 아직 개념 단계라
+                      "무엇을 보고 있는지" 먼저 밝힌다. letter는 지금 실제
+                      운영 중인 형태라 배지 없이 그대로 둔다. */}
+                  {format !== 'letter' && (
+                    <p
+                      className="flex items-center"
+                      style={{ gap: 6, fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 14 }}
+                    >
+                      {format === 'cardnews' && <Images size={13} aria-hidden />}
+                      {format === 'podcast' && <Headphones size={13} aria-hidden />}
+                      {format === 'video' && <Video size={13} aria-hidden />}
+                      {format === 'cardnews' && '카드뉴스 형식 목업 · 아직 생성 파이프라인 미연결'}
+                      {format === 'podcast' && '팟캐스트 형식 목업 · 아직 생성 파이프라인 미연결'}
+                      {format === 'video' && '영상 형식 목업 · 아직 생성 파이프라인 미연결'}
+                    </p>
+                  )}
+
                   {/* 질문 — 카드 안 시각적 정점(32). 장식 없이 세리프 크기만으로
                       끌어올린다. */}
-                  {l.question && (
+                  {format === 'letter' && l.question && (
                     <p
                       className="lm"
                       style={{
@@ -763,11 +1189,36 @@ export function LensViewClient({
                     </p>
                   )}
 
+                  {/* 레터 본문 — 데모 오버라이드가 있는 기사는 뉴스레터
+                      문단으로(2026-08-18, "카드뉴스 거 그대로 가져온거라서"
+                      지적 — 레터가 카드뉴스와 같은 불릿 목록을 그대로 쓰고
+                      있던 걸 고침). AI LENS 편집장 프롬프트의 문체 가이드
+                      (친근한 -했어요체, 문단당 2~3문장)를 따른다. */}
+                  {format === 'letter' && letterParagraphs && (
+                    <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {letterParagraphs.map((para, pi) => (
+                        <p
+                          key={pi}
+                          style={{
+                            fontSize: 'calc(16px * var(--lens-font-scale, 1))',
+                            lineHeight: 1.8,
+                            color: '#374151',
+                            wordBreak: 'keep-all',
+                          }}
+                        >
+                          {para}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
                   {/* 불릿에 라벨을 붙여 질문과의 관계를 명시한다 — 앞서는 큰
                       질문 다음에 사실이 그냥 나열돼서 둘이 Q&A 한 쌍이라는 게
                       드러나지 않았고, 그래서 구획이 끝났는지도 애매했다.
-                      개수를 함께 보여주면 얼마나 읽어야 하는지도 예측된다. */}
-                  {l.bullets.length > 0 && (
+                      개수를 함께 보여주면 얼마나 읽어야 하는지도 예측된다.
+                      데모 문단 오버라이드가 없는 기사(대부분)는 지금처럼
+                      CMS 불릿을 그대로 쓴다. */}
+                  {format === 'letter' && !letterParagraphs && l.bullets.length > 0 && (
                     <>
                       <p
                         style={{
@@ -795,8 +1246,240 @@ export function LensViewClient({
                     </>
                   )}
 
-                  {!l.question && l.bullets.length === 0 && (
+                  {format === 'letter' && !letterParagraphs && !l.question && l.bullets.length === 0 && (
                     <p style={{ fontSize: 14, color: '#6b7280' }}>이 시선은 아직 준비 중이에요.</p>
+                  )}
+
+                  {/* 카드뉴스 목업 — 인스타 카드뉴스처럼 한 번에 한 장만
+                      크게 보여주고 화살표(또는 스와이프)로 넘긴다
+                      (2026-08-18, "가로 스크롤 필름스트립은 촌스럽다" 지적
+                      → /design 캔버스로 방향 스케치 후 승인받고 반영).
+                      실제 카드뉴스 규격(8컷, 비주얼시스템)은 볼트
+                      01_카드뉴스_제작템플릿.md 참조 — 여기선 개수·구조
+                      컨셉만 보여준다. */}
+                  {format === 'cardnews' && (
+                    <CardnewsCarousel
+                      photo={photo}
+                      coverHeadline={cardnewsHeadline || ''}
+                      ordinal={p.ordinal}
+                      full={p.full}
+                      color={p.color}
+                      tint={p.tint}
+                      Icon={p.icon}
+                      cards={scriptBullets.map((b) => {
+                        const parts = b.split(' — ');
+                        return parts.length === 2
+                          ? { hook: parts[0], caption: parts[1] }
+                          : { hook: null, caption: b };
+                      })}
+                    />
+                  )}
+
+                  {/* 팟캐스트 목업 — 재생 버튼·진행바는 정적 장식(실제 오디오
+                      없음). 오늘(2026-08-18) 레터 상세에서 "대부분 오디오가
+                      없어 빈 회색 카드로 보인다"는 이유로 미니 플레이어를
+                      뺐던 것과 같은 함정을 피하려고, 여기서도 실제 재생 상태를
+                      흉내내지 않고 컨셉만 고정 표시한다.
+                      디자인(2026-08-18 다듬기): tint 채움 카드 → 흰 바탕 +
+                      공용 그림자·테두리 토큰. 챕터 라벨을 굵은 인라인 텍스트
+                      대신 알약 배지로 바꿔 목록이 표처럼 정렬되게 했다. */}
+                  {format === 'podcast' && (
+                    <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
+                      <div className="flex items-center" style={{ gap: 14 }}>
+                        <span
+                          aria-hidden
+                          className="flex items-center justify-center flex-shrink-0"
+                          style={{ width: 46, height: 46, borderRadius: 999, background: p.color, color: '#fff' }}
+                        >
+                          <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p
+                            style={{
+                              fontFamily: '"Noto Serif KR", serif',
+                              fontSize: 16,
+                              fontWeight: 700,
+                              color: '#111827',
+                              letterSpacing: '-0.01em',
+                              wordBreak: 'keep-all',
+                              marginBottom: 4,
+                            }}
+                          >
+                            {l.question || '오늘의 브리핑'}
+                          </p>
+                          <p style={{ fontSize: 12.5, color: '#9ca3af' }}>약 {mockDuration(scriptBullets.length)} · AI 음성 브리핑</p>
+                        </div>
+                      </div>
+                      <div style={{ height: 5, borderRadius: 999, background: 'rgba(17,24,39,0.07)', margin: '18px 0 16px', overflow: 'hidden' }}>
+                        <div style={{ width: '18%', height: '100%', borderRadius: 999, background: p.color }} />
+                      </div>
+                      {scriptBullets.length > 0 && (
+                        <>
+                          <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
+                            이 브리핑이 다루는 것 {scriptBullets.length}
+                          </p>
+                          <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
+                          {scriptBullets.map((b, bi) => (
+                            <li key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, color: '#374151', wordBreak: 'keep-all' }}>
+                              <span
+                                style={{
+                                  flexShrink: 0,
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: p.color,
+                                  background: p.tint,
+                                  borderRadius: 999,
+                                  padding: '2px 8px',
+                                  marginTop: 1,
+                                }}
+                              >
+                                챕터 {bi + 1}
+                              </span>
+                              <span style={{ lineHeight: 1.6 }}>{b}</span>
+                            </li>
+                          ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 영상 목업 — 기사 사진을 썸네일로 재사용, 실제 영상 파일은
+                      없어 재생 버튼 오버레이만 정적으로 얹는다.
+                      디자인(2026-08-18 다듬기): 플레이어 아래 캡션·타임라인을
+                      팟캐스트 챕터와 같은 알약 배지 톤으로 맞춰 두 오디오/영상
+                      포맷이 한 세트로 읽히게 했고, 카드 전체에 공용 그림자를
+                      둘러 다른 포맷 카드들과 무게감을 맞췄다. */}
+                  {format === 'video' && (
+                    <div style={{ borderRadius: 16, background: '#fff', boxShadow: LENS_CARD_SHADOW, padding: 14 }}>
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: '100%',
+                          aspectRatio: '16/9',
+                          borderRadius: 12,
+                          overflow: 'hidden',
+                          background: '#111827',
+                        }}
+                      >
+                        {photo && (
+                          <Image src={photo} alt="" fill sizes="640px" style={{ objectFit: 'cover', opacity: 0.65 }} />
+                        )}
+                        <span aria-hidden style={{ position: 'absolute', inset: 0, background: 'rgba(17,24,39,0.15)' }} />
+                        <span
+                          aria-hidden
+                          className="flex items-center justify-center"
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            margin: 'auto',
+                            width: 58,
+                            height: 58,
+                            borderRadius: 999,
+                            background: '#fff',
+                            color: p.color,
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+                          }}
+                        >
+                          <Play size={22} fill="currentColor" style={{ marginLeft: 3 }} />
+                        </span>
+                        <span
+                          style={{
+                            position: 'absolute',
+                            right: 10,
+                            bottom: 10,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            fontVariantNumeric: 'tabular-nums',
+                            color: '#fff',
+                            background: 'rgba(0,0,0,0.6)',
+                            borderRadius: 4,
+                            padding: '2px 7px',
+                          }}
+                        >
+                          {mockDuration(scriptBullets.length)}
+                        </span>
+                      </div>
+                      {l.question && (
+                        <p
+                          style={{
+                            fontFamily: '"Noto Serif KR", serif',
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color: '#111827',
+                            letterSpacing: '-0.01em',
+                            margin: '14px 0 10px',
+                            wordBreak: 'keep-all',
+                          }}
+                        >
+                          {l.question}
+                        </p>
+                      )}
+                      {scriptBullets.length > 0 && (
+                        <>
+                          <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
+                            이 영상이 다루는 것 {scriptBullets.length}
+                          </p>
+                          <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
+                          {scriptBullets.map((b, bi) => (
+                            <li key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, color: '#374151', wordBreak: 'keep-all' }}>
+                              <span
+                                style={{
+                                  flexShrink: 0,
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  fontVariantNumeric: 'tabular-nums',
+                                  color: p.color,
+                                  background: p.tint,
+                                  borderRadius: 999,
+                                  padding: '2px 8px',
+                                  marginTop: 1,
+                                }}
+                              >
+                                0:{String((bi + 1) * 12).padStart(2, '0')}
+                              </span>
+                              <span style={{ lineHeight: 1.6 }}>{b}</span>
+                            </li>
+                          ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 시선 간 연결 — 네 포맷이 따로 떨어져 보인다는 지적
+                      (2026-08-18, "이 4개의 순서가... 연결점, 스토리텔링이
+                      자연스러우면 좋겠다" — 전화영어 서비스 레슨 플로우처럼)
+                      에 따라, 마지막(video)만 빼고 각 포맷 끝에 다음 시선으로
+                      넘어가는 한 줄을 둔다. 데모 문구가 없는 기사·포맷은
+                      다음 시선의 role명으로 자동 생성해 어떤 기사에도 동작. */}
+                  {format !== 'video' && i + 1 < count && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        select(i + 1);
+                        tabRefs.current[i + 1]?.focus();
+                      }}
+                      className="flex items-center"
+                      style={{
+                        gap: 6,
+                        marginTop: 20,
+                        paddingTop: 16,
+                        width: '100%',
+                        background: 'none',
+                        border: 'none',
+                        borderTop: '1px solid rgba(17,24,39,0.08)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: 13.5,
+                        fontWeight: 700,
+                        color: lensPerspectiveAt(i + 1).color,
+                        wordBreak: 'keep-all',
+                      }}
+                    >
+                      <span>{devBridgeOverride(lens.id, format) ?? `다음 시선 — ${lensPerspectiveAt(i + 1).full}`}</span>
+                      <ArrowRight size={14} aria-hidden />
+                    </button>
                   )}
                 </section>
               );

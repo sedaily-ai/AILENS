@@ -1,4 +1,5 @@
 import { GraduationCap, Briefcase, Store, TrendingUp, type LucideIcon } from 'lucide-react';
+import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
 /**
  * "오늘의 이슈, 4가지 시선"(lens) 공용 토큰 — 2026-08-13.
@@ -67,7 +68,18 @@ export interface LensPerspective {
 // ⚠️ 색·아이콘·순서는 여전히 **인덱스 기준**(admin이 LENS_LABELS를 고정
 // 순서로 저장하므로).
 //
-// 팔레트는 기획 덱(2.5/1.3)의 navy/purple/teal/orange 배정을 그대로 유지.
+// 팔레트: 원래 기획 덱(2.5/1.3)의 navy/purple/teal/orange 자체 배정이었으나
+// 2026-08-18 디자인 감사에서 사이트 전역 페르소나 브랜드 컬러
+// (BRAND_ACCENTS — 민철·하은·준서·소율 = NT/NF/ST/SF, 2026-08-06 감사로
+// 확정)와 따로 놀고 있다는 게 드러났다. "이 뉴스, 누구의 눈으로 볼까요?"도
+// 개념적으로 같은 "네 가지 관점"인데 색만 겉돌았던 것 — BRAND_ACCENTS를
+// 새로 만들 때 잡으려던 바로 그 문제(섹션마다 색을 즉흥적으로 짓는 것)를
+// 이 기능만 비껴가 있었다. 하드코딩 대신 BRAND_ACCENTS를 인덱스 순서로
+// 직접 참조해 두 시스템이 다시 벌어질 수 없게 했다 — border만 BRAND_ACCENTS에
+// 없는 필드라 각 색상군의 Tailwind 200 셰이드로 유지(현재 소비처 없음,
+// 향후 대비 값).
+const LENS_BORDER_TINTS = ['#ddd6fe', '#fecdd3', '#a7f3d0', '#fde68a'] as const;
+
 export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
   {
     ordinal: '①',
@@ -76,20 +88,24 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     tagline: '왜 이렇게 됐을까',
     illustration: '/lens/role-1-newcomer.png',
     icon: GraduationCap,
-    color: '#0d9488',
-    tint: '#f0fdfa',
-    border: '#99f6e4',
+    color: BRAND_ACCENTS[0].accent,
+    tint: BRAND_ACCENTS[0].soft,
+    border: LENS_BORDER_TINTS[0],
   },
   {
     ordinal: '②',
-    short: '공감',
+    // "공감"→"당사자"(2026-08-18) — 부제("그래서 누가 어떻게 됐을까")가
+    // "누가 영향을 받았나"를 가리키는데 "공감"은 감정적 반응 쪽으로 읽혀
+    // 라벨과 부제 사이에 거리가 있다는 피드백. "당사자"는 admin의 원래
+    // 축("사람이 먼저 보이는 사람")과 부제 둘 다에 직접 붙는다.
+    short: '당사자',
     full: '사람이 먼저 보이는 사람',
     tagline: '그래서 누가 어떻게 됐을까',
     illustration: '/lens/role-2-worker.png',
     icon: Briefcase,
-    color: '#1e40af',
-    tint: '#eef2ff',
-    border: '#c7d2fe',
+    color: BRAND_ACCENTS[1].accent,
+    tint: BRAND_ACCENTS[1].soft,
+    border: LENS_BORDER_TINTS[1],
   },
   {
     ordinal: '③',
@@ -98,9 +114,9 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     tagline: '그래서 나는 뭘 해야 할까',
     illustration: '/lens/role-3-owner.png',
     icon: Store,
-    color: '#ea580c',
-    tint: '#fff7ed',
-    border: '#fed7aa',
+    color: BRAND_ACCENTS[2].accent,
+    tint: BRAND_ACCENTS[2].soft,
+    border: LENS_BORDER_TINTS[2],
   },
   {
     ordinal: '④',
@@ -109,11 +125,32 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     tagline: '그래서 숫자로 보면',
     illustration: '/lens/role-4-investor.png',
     icon: TrendingUp,
-    color: '#7c3aed',
-    tint: '#f5f3ff',
-    border: '#ddd6fe',
+    color: BRAND_ACCENTS[3].accent,
+    tint: BRAND_ACCENTS[3].soft,
+    border: LENS_BORDER_TINTS[3],
   },
 ] as const;
+
+/**
+ * 시선별 출력 포맷 목업(2026-08-18, 국장님 지시 — "네 시선을 텍스트만이
+ * 아니라 레터·카드뉴스·팟캐스트·영상 네 형식으로 나오게 하라").
+ *
+ * 아직 실제 생성 파이프라인과 연결되지 않은 **개념 목업**이다 — 카드뉴스는
+ * 이 서비스 프론트엔드에 라우트/컴포넌트가 아예 없고, 팟캐스트는 API
+ * 클라이언트(shared/lib/podcastApi.ts)만 있고 UI는 오늘(2026-08-18) 레터
+ * 상세에서 제거됐다("대부분 오디오가 없어 빈 회색 카드로 보임" — 동일한
+ * 함정을 여기서도 반복하지 않도록, 실제 데이터가 없을 때도 항상 완성된
+ * 형태로 보이는 정적 목업으로만 그린다). 인덱스 순서는 LENS_PERSPECTIVES와
+ * 동일 기준(원인→공감→실무→숫자)으로 고정.
+ */
+export type LensFormat = 'letter' | 'cardnews' | 'podcast' | 'video';
+
+export const LENS_FORMATS: readonly LensFormat[] = ['letter', 'cardnews', 'podcast', 'video'] as const;
+
+/** 범위를 벗어나도 안전 — 시선 개수만큼 순환. */
+export function lensFormatAt(i: number): LensFormat {
+  return LENS_FORMATS[i % LENS_FORMATS.length];
+}
 
 /** 범위를 벗어나도 안전 — lenses 길이가 4가 아닐 수 있다. */
 export function lensPerspectiveAt(i: number): LensPerspective {
