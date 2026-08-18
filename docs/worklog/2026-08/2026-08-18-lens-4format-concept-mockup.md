@@ -149,8 +149,70 @@ EV3·아이오닉9 실속형 vs 20종 라인업)로 전면 교체해 영상과 �
   필드라(소비처도 없는 죽은 필드로 확인됨) 각 색상군의 Tailwind 200
   셰이드로 유지.
 
-### 검증
+### 검증(색상)
 
 `npx tsc --noEmit` 통과. `curl`로 `/lens/[slug]`(테슬라 기사)·`/lens`
 리스트·홈(`/`, LensPreviewSection) 세 곳 SSR HTML에서 새 hex 4종
+등장·옛 hex 3종 완전 소멸 확인.
+
+## 이어서 (같은 날) — 클릭 피드백 제거 + 프로덕션 노출 전환 + 배포
+
+### 타일 선택 배경색·클릭 플래시 제거
+
+스크린샷 지적 두 건, 순서대로 처리:
+1. "유형 누르면 뜨는 배경색"(선택된 페르소나 타일 자체가 `p.tint`로 통째
+   채워지던 것) 제거 — 테두리+그림자+체크 3중 표시만 남기고 `background:
+   '#fff'` 고정.
+2. 이어서 확인해보니 클릭 직후 **패널 전체**(포맷 카드 포함 아래 콘텐츠
+   블록)를 0.9초간 persona 색으로 물들였다 빼는 클릭 피드백 효과
+   (`justSelectedIdx` state, 커밋 `2c54f50`에서 같은 날 앞서 추가된 것)가
+   따로 있었다 — 스크린샷의 넓은 초록 배경 원인이 이것. `justSelectedIdx`
+   state·`setTimeout` 로직·`section` 배경 스타일 전부 제거.
+
+### 프로덕션 노출 전환
+
+데모 콘텐츠(`DEV_FORMAT_OVERRIDES` → 이 시점에 `ARTICLE_FORMAT_SAMPLES`로
+개명)와 테슬라 사진 exact-match가 전부 `NODE_ENV === 'development'`에서만
+켜지도록 짜여 있어(원래 안전장치) 배포해도 프로덕션엔 안 보였다. "국장님
+회의에서 실제 URL로 보여줄 것" 확인 후 요청으로 게이트 제거:
+- `articleFormatSample`/`articleSummarySample`/`articleBridgeSample`
+  (개명 전 `devFormatOverride` 등) 3개 함수 + `cardnewsHeadline` 계산부의
+  `NODE_ENV` 체크 전부 제거. 식별자도 `DEV_` 접두어를 떼 `ARTICLE_FORMAT_
+  SAMPLES` 등으로 리네임(더 이상 dev 전용이 아니라 이름이 오해를 줬음).
+- `pickLensPhoto()`의 사진 폴백은 둘로 나뉘어 있었다 — `DEV_EXACT_PHOTOS`
+  (기사별로 정확히 지정한 사진, 이 데모 기사 전용)는 게이트 제거해 dev/prod
+  둘 다 노출, `DEV_SAMPLE_PHOTOS`(무작위 매칭)는 실제 발행 글에 엉뚱한
+  사진이 붙을 위험이 있어 dev 전용으로 그대로 남김 — 두 폴백을 다르게
+  취급한 것이 이번 변경의 핵심 판단.
+- 이 변경은 `lens.id`(기사 slug) 키로 스코프가 좁혀져 있어 테슬라 기사
+  1건에만 실질적 영향 — 다른 발행 기사는 전과 동일하게 CMS 데이터만 씀.
+
+### 검증(프로덕션 노출)
+
+`npx tsc --noEmit` 통과. `npm run build`(프로덕션 빌드) 직후 SSG 프리렌더된
+`.next/server/app/lens/2026-08-14-쏘카-테슬라-.../....html` 파일을 직접 읽어
+"30초 핵심"·"그래서 누가 이 차를 타게 될까"·`sample-socar-tesla.jpg` 전부
+포함 확인(서버 기동 없이 파일 검증) — 이후 실제 배포 후 `curl
+https://ailens.sedaily.ai/lens/...`로도 재확인, 전부 일치.
+
+### 배포
+
+`service/frontend/deploy.sh`로 오늘 세션 중 총 3회 배포(EC2+PM2, SSR):
+1. `20260818-083336` — 4포맷 목업 + 카드뉴스 캐러셀 + 색상 통합 1차분
+2. `20260818-084220` — PR #5(타임머신 톤 통일, 아래 참조) 머지 반영
+3. `20260818-090507` — 프로덕션 노출 전환(위 내용) 반영, 최종
+
+매 배포 전 `dev`(구버전, 하이픈 있는 체크아웃) 쪽 최근 커밋 시각을 확인해
+2026-08-06 이후 조용한 것 재확인 — CLAUDE.md의 dev/dev2 이중 체크아웃
+경고(2026-08-06 사고) 재발 방지 절차 그대로 따름. 매 배포 후
+`https://ailens.sedaily.ai/` 헬스체크 200 확인.
+
+### 겸사겸사 — PR #5 머지 (별건, 같은 세션)
+
+`#5 feat(frontend): 타임머신 홈 톤 통일 + 종이비행기 전환 연출 재작업`
+(작성 kiimijyy, 오늘 오전) — 오늘 작업한 lens 파일과 겹치는 파일 없음,
+`mergeStateStatus: CLEAN`. 지정 리뷰어(1282saa)의 리뷰가 아직 없는 상태였음을
+먼저 알리고, 사용자 확인 후 스쿼시 머지 + 브랜치 삭제. `#2
+chore(timeline): Lambda + API Gateway 라우트 프로비저닝 스크립트`(8/6,
+12일째 리뷰 대기)는 보류 — 사용자 판단 대기 중, 아직 처리 안 함.
 등장·옛 hex 3종 완전 소멸 확인.
