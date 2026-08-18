@@ -1,47 +1,12 @@
 import type { Metadata } from 'next';
 import type { ApiLetter } from '@/shared/lib/todayLettersApi';
 import { withDisplayMeta } from '@/shared/lib/todayLettersApi';
+import { fetchCmsPosts, fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/buildPageTitle';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LetterDetailClient } from './LetterDetailClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
-
-// 콘텐츠·메타데이터는 CMS 글(channel=letters) API 에서 요청마다 직접 가져온다
-// (SSR, 2026-08-08 — 재빌드 없이 admin 발행이 즉시 반영되게 하려고 전환).
-// today-letters(구 AI 파이프라인 daily_letters)는 2026-08-04 RDS pgvector-v2
-// 삭제로 영구히 빈 응답만 반환한다(CLAUDE.md 참조) — 실제 콘텐츠는 전부
-// CMS(DynamoDB) 경로로 발행되고 있어 거기서 가져온다. API 가 안 닿으면 빈
-// 결과로 degrade(클라이언트 이동은 /letters/view 로 동작).
-const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
-const SEED_DAYS = 14;
-
-async function fetchLettersForDate(date: string): Promise<ApiLetter[]> {
-  try {
-    // 무캐시(2026-08-09, cmsPostsApi.ts와 동일 정책 — revalidateTag(tag,'max')
-    // 가 실제로는 "30일 캐시 프로파일 재고정"이라는 걸 확인한 뒤 태그 캐싱
-    // 자체를 뺐다. 상세 경위는 cmsPostsApi.ts 상단 주석 참조).
-    const res = await fetch(`${API_BASE}/api/v2/posts?channel=letters&date=${date}`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as { posts?: ApiLetter[] };
-    return data.posts ?? [];
-  } catch {
-    return [];
-  }
-}
-
-function recentDatesISO(days: number): string[] {
-  const out: string[] = [];
-  const t = new Date();
-  for (let i = 0; i < days; i += 1) {
-    const d = new Date(t);
-    d.setDate(d.getDate() - i);
-    out.push(d.toISOString().slice(0, 10));
-  }
-  return out;
-}
 
 // 단일 명의 — MBTI 4-페르소나 에디터 체계 폐지(2026-08-07) 이후 모든 레터의
 // 저작자 표시는 이 하나로 고정. todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.
@@ -51,31 +16,27 @@ const DEFAULT_AUTHOR = { name: 'AI LENS', archetype: 'AI LENS 편집팀' };
 // 서버가 렌더링" 방향으로 아예 뺐었는데, 그러면 Next가 이 라우트를 통째로
 // ƒ Dynamic 취급해서 <Link> 프리페치가 안 붙는다(직접 빌드해서 확인함 —
 // "클릭 즉시 이동" 요구와 충돌). 정적 export 시절의 "params 0개면 빌드
-// 실패" 제약은 SSR에선 없으므로 그 우회 코드는 없이, 최근 SEED_DAYS 일의
-// 실제 id만 돌려준다 — 여기 없는(더 오래된) id는 dynamicParams 기본값
-// (true)에 따라 요청 시점에 온디맨드 렌더링 후 캐시된다.
+// 실패" 제약은 SSR에선 없으므로 그 우회 코드는 없이, 최근 발행분의 실제
+// id만 돌려준다 — 여기 없는(더 오래된) id는 dynamicParams 기본값(true)에
+// 따라 요청 시점에 온디맨드 렌더링 후 캐시된다(findLetter가 이제 날짜
+// 스캔이 아니라 slug 단건 조회라 "여기 없으면 영영 못 찾는" 문제는 없다
+// — 아래 findLetter 주석 참조).
 export async function generateStaticParams() {
-  const dates = recentDatesISO(SEED_DAYS);
-  const results = await Promise.all(dates.map((date) => fetchLettersForDate(date)));
-  const ids = new Set<string>();
-  for (const letters of results) {
-    for (const l of letters) ids.add(l.id);
-  }
-  return [...ids].map((id) => ({ id }));
+  const letters = await fetchCmsPosts('letters', undefined, 100);
+  return letters.filter((l) => l.id).map((l) => ({ id: l.id }));
 }
 
-// id 에 더 이상 날짜가 인코딩돼있지 않아(그룹-날짜 합성 id 스킴 폐지), 최근
-// SEED_DAYS 일을 훑어 .id 가 일치하는 레터를 찾는다. id 는 전역 유일이라
-// 날짜 간 충돌 걱정 없이 병렬로 가져와 찾는다(순차 스캔이면 오래된 레터일수록
-// 레이턴시가 쌓임).
+// id 에 더 이상 날짜가 인코딩돼있지 않아(그룹-날짜 합성 id 스킴 폐지) 예전엔
+// 최근 14일(SEED_DAYS)을 하루씩 14번 조회해 .id가 일치하는 레터를 찾았다 —
+// 그보다 오래전에 발행된 레터는 직접 URL로 들어와도 "찾을 수 없어요"로
+// 떴다(2026-08-18, GEO 점검 중 발견 — 사이트맵 14일 제한과 같은 근본 원인).
+// slug(=letter.id)로 바로 단건 조회하는 API(`GET /api/v2/posts/{slug}`,
+// DynamoDB slug-index GSI 단건 쿼리)가 이미 있었는데 이 페이지만 안 쓰고
+// 있었다 — 그걸로 교체해 날짜 무관하게 한 번의 요청으로 찾는다.
 async function findLetter(id: string): Promise<(ApiLetter & { date: string }) | null> {
-  const dates = recentDatesISO(SEED_DAYS);
-  const results = await Promise.all(dates.map((date) => fetchLettersForDate(date)));
-  for (let i = 0; i < dates.length; i += 1) {
-    const l = results[i].find((x) => x.id === id);
-    if (l) return { ...l, date: dates[i] };
-  }
-  return null;
+  const post = await fetchCmsPostBySlug('letters', id);
+  if (!post || !post.publish_date) return null;
+  return { ...post, date: post.publish_date };
 }
 
 // 검색결과 줄임표 방지를 위한 description 트리밍 (Google 기준 ~160자).
