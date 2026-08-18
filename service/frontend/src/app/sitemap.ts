@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 import { kstTodayStr } from '@/shared/lib/date';
-import { GAMES } from './games/play/[slug]/page';
+import { GAMES } from './(content)/games/play/[slug]/page';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
