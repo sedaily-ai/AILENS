@@ -122,7 +122,6 @@ const NAV: { label: string; href: string }[] = [
 const CONTENT_LINKS: { label: string; href: string }[] = [
   ...ECON_CATEGORIES.map((c) => ({ label: c.label, href: `/${c.slug}` })),
   { label: '이슈 톡톡', href: '/issue-talk' },
-  { label: '인사이트', href: '/column' },
   { label: '영상', href: '/video' },
   { label: '웹툰', href: '/webtoon' },
   { label: '전체 콘텐츠', href: '/archive' },

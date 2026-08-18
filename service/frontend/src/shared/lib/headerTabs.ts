@@ -68,10 +68,13 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 한 곳 — admin/frontend의 ECON_CATEGORIES(lib/types.ts)와 같은 목록이지만
     // 별도 Next.js 앱이라 의도적으로 중복.
     //
-    // 기존 /letters, /column 페이지 자체는 안 지웠다 — 색인된 URL 보존,
-    // 다만 이 nav에서는 빠진다("딥다이브"/trend를 완전히 리다이렉트로
-    // 없앤 것과는 다른 처리 — letters/column은 여전히 실제 콘텐츠 아카이브라
-    // 링크가 죽을 이유가 없다).
+    // /letters, /column 아카이브 목록 페이지는 2026-08-18에 완전히 정리했다
+    // — 처음엔 "색인된 URL 보존" 목적으로 nav에서만 빼고 페이지는 남겨뒀지만,
+    // 카테고리 6개 체계로 완전히 넘어가기로 확정되며 두 페이지 다 사이트 안
+    // 어디서도 도달 불가능한 상태였다("전체 모아보기" 역할은 /archive가 이미
+    // 이어받음). 지금은 "딥다이브"/trend와 동일하게 /archive로 영구
+    // 리다이렉트(next.config.ts) — /letters/[id]·/letters/view 같은 개별
+    // 상세 라우트는 그대로 살아있다.
     //
     // tier:'core' — 시선이 빠지면서 유일한 core 탭이 없어졌는데, 카테고리
     // 6개가 이제 사실상 1차 콘텐츠 내비게이션이라 core로 승격했다(사용자가

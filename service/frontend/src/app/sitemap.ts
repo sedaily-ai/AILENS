@@ -32,9 +32,11 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // 진짜 URL을 줘서 카테고리 단위 검색 노출을 노린다.
   // /trend는 2026-08-17 폐기(next.config.ts에서 /issue-talk로 영구 리다이렉트)
   // — "이슈 톡톡"과 독자 입장에서 구분이 안 된다는 판단으로 통합.
-  { path: '/letters',      priority: 0.9, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 레터 전용 아카이브(nav에서는 빠졌지만 URL 보존)
   { path: '/issue-talk',   priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 이슈 톡톡 전용 아카이브
-  { path: '/column',       priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 인기 칼럼 전용 아카이브(nav에서는 빠졌지만 URL 보존)
+  // /letters, /column 아카이브 목록 페이지는 2026-08-18에 폐기하고 /archive로
+  // 영구 리다이렉트(next.config.ts) — 상단 탭이 형식(브리핑/인사이트) 기준에서
+  // 아래 6개 경제 카테고리 기준으로 개편된 뒤 nav 진입점이 아예 없어졌다.
+  // sitemap에도 더 이상 별도 URL로 올리지 않는다(/trend를 뺀 것과 같은 처리).
   // 경제 버티컬 카테고리 6개(2026-08-17, 상단 탭 개편) — /letters, /column을
   // 대체해 새 nav 1군이 됐다. shared/constants/econCategories.ts와 슬러그가
   // 반드시 일치해야 한다(수동 나열 — 이 배열 자체가 priority/changeFrequency

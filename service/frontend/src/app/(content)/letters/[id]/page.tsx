@@ -205,7 +205,10 @@ function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '브리핑', item: `${SITE_URL}/letters` },
+          // /letters 아카이브 목록 페이지 폐기(2026-08-18, /archive로 리다이렉트)
+          // — breadcrumb는 최종 목적지를 바로 가리켜야 크롤러가 리다이렉트를
+          // 한 번 더 안 타도 된다.
+          { '@type': 'ListItem', position: 2, name: '전체 모아보기', item: `${SITE_URL}/archive` },
           { '@type': 'ListItem', position: 3, name: letter.headline, item: url },
         ],
       },

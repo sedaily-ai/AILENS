@@ -13,8 +13,8 @@
 
 - 오늘의 시선(/lens): 하루 한 이슈를 원인·사람·내 일·숫자 네 갈래 질문-답변(Q&A) 구조로 짚는 카드 포맷. 각 글에 원문 기사 인용 링크(source_url) 포함.
 - 이슈 톡톡(/issue-talk): 브리핑(레터) 채널 안의 짧은 호흡 이슈 정리 — 가벼운 대화체로 하루 화제를 요약.
-- 브리핑(레터, /letters): 원본 기사를 AI가 정리·재구성한 매일자 경제 브리핑 한 통.
-- 인사이트(/column): 관점 있는 시선으로 짚는 경제 오피니언·칼럼.
+- 브리핑(레터, /letters/{slug}): 원본 기사를 AI가 정리·재구성한 매일자 경제 브리핑 한 통. 증시·부동산·산업·금융·국제·재테크 6개 카테고리로 나눠 모아본다(아래 참조).
+- 인사이트(/letters/{slug}, section=column): 관점 있는 시선으로 짚는 경제 오피니언·칼럼. 브리핑과 같은 채널의 콘텐츠.
 - 영상(/video): 경제·사회 이슈를 짧은 영상으로 정리.
 - 웹툰(/webtoon): 그날의 경제 이슈를 흑백 펜화 컷으로 정리.
 - 단어장(/words): 브리핑에 나온 경제 용어 모음 + 퀴즈.
@@ -28,9 +28,8 @@
 - 오늘의 시선 목록: https://ailens.sedaily.ai/lens
 - 오늘의 시선 상세: https://ailens.sedaily.ai/lens/{slug} (슬러그는 발행일+제목, 예: /lens/2026-08-14-쏘카-테슬라-800대-더-늘린다-전기차-비중-14-로)
 - 이슈 톡톡 아카이브: https://ailens.sedaily.ai/issue-talk
-- 브리핑(레터) 아카이브: https://ailens.sedaily.ai/letters
 - 브리핑 상세: https://ailens.sedaily.ai/letters/{slug} (슬러그는 발행일+제목, 예: /letters/2026-08-07-신용점수-700점대인데-왜-대부업-문을-두드릴까요)
-- 인사이트 아카이브: https://ailens.sedaily.ai/column
+- 브리핑·인사이트 카테고리별 아카이브: 아래 "경제 카테고리" 참조(/markets, /property 등)
 - 영상 목록: https://ailens.sedaily.ai/video
 - 영상 상세: https://ailens.sedaily.ai/video/{id}
 - 전체 콘텐츠(브리핑+인사이트+영상 통합): https://ailens.sedaily.ai/archive
@@ -45,7 +44,7 @@
 
 ## 경제 카테고리(2026-08-17 상단 탭 개편)
 
-브리핑(레터)을 6개 경제 버티컬로도 모아볼 수 있다:
+브리핑(레터)·인사이트(칼럼)를 6개 경제 버티컬로 모아볼 수 있다(2026-08-18부로 상단 nav의 1군 진입점, 옛 /letters·/column 아카이브 목록 페이지는 이 카테고리로 대체돼 폐기됨):
 
 - 증시: https://ailens.sedaily.ai/markets
 - 부동산: https://ailens.sedaily.ai/property
