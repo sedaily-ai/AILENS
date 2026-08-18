@@ -203,18 +203,25 @@ export function pickLensPhoto(lens: {
   const photo = (lens.photo_image_url ?? '').trim();
   if (photo) return photo;
 
+  // 글과 실제로 맞는 사진(직접 큐레이션한 것)이 있으면 dev/prod 가리지
+  // 않고 쓴다(2026-08-18, "테슬라도 [프로덕션에] 풀어달라" 요청 — 데모
+  // 기사 하나만 정확히 지정된 사진이라 무작위 샘플과 달리 프로덕션 노출
+  // 리스크가 없다). 무작위 샘플은 아래에서 여전히 dev 전용으로 남긴다.
+  if (lens.id) {
+    const exact = DEV_EXACT_PHOTOS[lens.id];
+    if (exact) return exact;
+  }
+
   // ── 개발 환경 전용 미리보기 ────────────────────────────────────────────
   // photo_image_url 은 방금 신설한 필드라 발행된 글 전부가 비어 있다. 사진
   // 배치를 눈으로 검토할 수 있도록 로컬(dev)에서만 실제 기사 사진(letters
-  // 채널 커버 — 텍스트가 박히지 않은 순수 사진)을 샘플로 물린다.
-  // production 빌드에서는 이 분기가 실행되지 않으므로 운영에는 영향이 없다.
+  // 채널 커버 — 텍스트가 박히지 않은 순수 사진)을 무작위로 물린다.
+  // production 빌드에서는 이 분기가 실행되지 않으므로 운영에는 영향이 없다
+  // — 무작위 매칭이라 실제 발행 글에 엉뚱한 사진이 붙을 수 있어서(예:
+  // 테슬라 기사에 오토바이 사진) 위 exact 매칭과 달리 그대로 dev 전용 유지.
   // 글 id 로 결정되어 같은 글은 항상 같은 사진이 나온다(깜빡임·하이드레이션
   // 불일치 없음). admin 에서 실제 사진을 채우면 이 분기는 자연히 안 쓰인다.
   if (process.env.NODE_ENV === 'development' && lens.id) {
-    // 글과 실제로 맞는 사진이 있으면 그걸 먼저 쓴다. 무작위 샘플이 붙으면
-    // "기사 사진이 잘못 들어갔다"고 읽히기 때문(테슬라 기사에 오토바이 사진).
-    const exact = DEV_EXACT_PHOTOS[lens.id];
-    if (exact) return exact;
     const seed = [...lens.id].reduce((a, c) => a + c.charCodeAt(0), 0);
     return DEV_SAMPLE_PHOTOS[seed % DEV_SAMPLE_PHOTOS.length];
   }

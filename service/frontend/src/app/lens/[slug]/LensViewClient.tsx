@@ -280,12 +280,13 @@ function mockDuration(bulletCount: number): string {
  * 직접 붙여줘서 그 전문의 사실을 근거로 포맷별로 다시 썼다 — 원문에는 있지만
  * CMS 4렌즈 불릿에는 없던 사실(500대+300대 순차 도입, 20종 라인업, 제주 제외
  * 지역 조건, 종목코드 403550 등)까지 포함해 밀도를 올렸다. 변조 없이 원문
- * 사실만 재구성. `DEV_EXACT_PHOTOS`와 같은 패턴의 dev 전용 기사별
- * 오버라이드 — `lens.id`(기사 slug) 기준, 프로덕션 빌드에는 영향 없음
- * (`NODE_ENV === 'development'`에서만 탄다). 오버라이드가 없는 기사는
- * 지금처럼 CMS 데이터를 그대로 쓴다.
+ * 사실만 재구성. `lens.id`(기사 slug) 키 기준 — 이 특정 기사에만 적용되고
+ * 나머지 기사는 지금처럼 CMS 데이터를 그대로 쓴다. 원래는 로컬 dev에서만
+ * 켜지는 목업이었으나(2026-08-18 국장님 회의용 실제 프로덕션 노출로 전환
+ * — "풀어달라" 요청, `NODE_ENV` 게이트 제거) 지금은 프로덕션에도 그대로
+ * 노출된다.
  */
-const DEV_FORMAT_OVERRIDES: Record<
+const ARTICLE_FORMAT_SAMPLES: Record<
   string,
   {
     summary?: string[];
@@ -347,22 +348,19 @@ const DEV_FORMAT_OVERRIDES: Record<
   },
 };
 
-function devFormatOverride(
+function articleFormatSample(
   lensId: string,
   format: 'letter' | 'cardnews' | 'podcast' | 'video',
 ): string[] | null {
-  if (process.env.NODE_ENV !== 'development') return null;
-  return DEV_FORMAT_OVERRIDES[lensId]?.[format] ?? null;
+  return ARTICLE_FORMAT_SAMPLES[lensId]?.[format] ?? null;
 }
 
-function devSummaryOverride(lensId: string): string[] | null {
-  if (process.env.NODE_ENV !== 'development') return null;
-  return DEV_FORMAT_OVERRIDES[lensId]?.summary ?? null;
+function articleSummarySample(lensId: string): string[] | null {
+  return ARTICLE_FORMAT_SAMPLES[lensId]?.summary ?? null;
 }
 
-function devBridgeOverride(lensId: string, format: 'letter' | 'cardnews' | 'podcast'): string | null {
-  if (process.env.NODE_ENV !== 'development') return null;
-  return DEV_FORMAT_OVERRIDES[lensId]?.bridge?.[format] ?? null;
+function articleBridgeSample(lensId: string, format: 'letter' | 'cardnews' | 'podcast'): string | null {
+  return ARTICLE_FORMAT_SAMPLES[lensId]?.bridge?.[format] ?? null;
 }
 
 /**
@@ -975,7 +973,7 @@ export function LensViewClient({
                 핵심" 섹션에 해당 — 네 시선을 고르기 전에 기사 전체의 핵심을
                 먼저 준다. 지금은 이 데모 기사에만 있는 dev 전용 오버라이드,
                 실제 서비스에 태울지는 별도 결정. */}
-            {devSummaryOverride(lens.id) && (
+            {articleSummarySample(lens.id) && (
               <div
                 style={{
                   border: LENS_CARD_BORDER,
@@ -991,7 +989,7 @@ export function LensViewClient({
                   30초 핵심
                 </p>
                 <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
-                  {devSummaryOverride(lens.id)!.map((s, si) => (
+                  {articleSummarySample(lens.id)!.map((s, si) => (
                     <li key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14.5, lineHeight: 1.6, color: '#1f2937', wordBreak: 'keep-all' }}>
                       <Check size={15} style={{ flexShrink: 0, marginTop: 3, color: LENS_ACCENT }} aria-hidden />
                       <span>{s}</span>
@@ -1105,17 +1103,15 @@ export function LensViewClient({
               // 그걸 쓰고, 없는 기사는 지금처럼 CMS 불릿을 그대로 쓴다.
               const scriptBullets =
                 format === 'cardnews' || format === 'podcast' || format === 'video'
-                  ? devFormatOverride(lens.id, format) ?? l.bullets
+                  ? articleFormatSample(lens.id, format) ?? l.bullets
                   : l.bullets;
               // 레터 본문 — 데모 오버라이드가 있으면 자연스러운 문단으로,
               // 없으면 지금처럼 카드뉴스와 같은 CMS 불릿 목록을 그대로 쓴다.
-              const letterParagraphs = format === 'letter' ? devFormatOverride(lens.id, 'letter') : null;
+              const letterParagraphs = format === 'letter' ? articleFormatSample(lens.id, 'letter') : null;
               // 카드뉴스 표지 헤드라인 — 오버라이드가 있으면 그 표지 문구를,
               // 없으면 CMS 질문(l.question)을 그대로 쓴다.
               const cardnewsHeadline =
-                format === 'cardnews' && process.env.NODE_ENV === 'development'
-                  ? DEV_FORMAT_OVERRIDES[lens.id]?.cardnewsHeadline ?? l.question
-                  : l.question;
+                format === 'cardnews' ? ARTICLE_FORMAT_SAMPLES[lens.id]?.cardnewsHeadline ?? l.question : l.question;
               return (
                 <section
                   key={i}
@@ -1477,7 +1473,7 @@ export function LensViewClient({
                         wordBreak: 'keep-all',
                       }}
                     >
-                      <span>{devBridgeOverride(lens.id, format) ?? `다음 시선 — ${lensPerspectiveAt(i + 1).full}`}</span>
+                      <span>{articleBridgeSample(lens.id, format) ?? `다음 시선 — ${lensPerspectiveAt(i + 1).full}`}</span>
                       <ArrowRight size={14} aria-hidden />
                     </button>
                   )}
