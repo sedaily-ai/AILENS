@@ -161,9 +161,18 @@ export function NewsTimeMachine() {
           </div>
         )}
 
-        {/* ── 되감기 모션 ───────────────────────────── */}
+        {/* ── 전환 연출 ── 종이비행기가 활강 곡선을 타고 오른쪽 끝에서 왼쪽
+            끝까지 날아가, 경로 아래 고정된 연도 눈금을 하나씩 켜며 그날에
+            앉는다. 홈 섹션과 같은 연출을 써야 "같은 기능"으로 읽힌다.
+            (라벨·날짜·건너뛰기는 컴포넌트가 직접 그린다.) */}
         {phase === 'rewinding' && (
-          <TimeMachineRewind fromDate={today} toDate={target} onComplete={() => router.push(`/timeline/${target}`)} />
+          <div style={{ padding: 'clamp(28px, 6vw, 48px) 20px' }}>
+            <TimeMachineRewind
+              fromDate={today}
+              toDate={target}
+              onComplete={() => router.push(`/timeline/${target}`)}
+            />
+          </div>
         )}
       </div>
     </div>
