@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
+import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { WebtoonListClient } from './WebtoonListClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';

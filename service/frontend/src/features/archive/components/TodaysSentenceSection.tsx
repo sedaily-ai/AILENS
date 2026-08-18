@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { fetchTodayLetters, toTodayLetterCard, type TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
+import { fetchTodayLetters, toTodayLetterCard, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 
 // ── 오늘의 한 문장 ────────────────────────────────────────────────

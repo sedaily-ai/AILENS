@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { Press_Start_2P } from 'next/font/google';
-import { trackEvent } from '@/shared/lib/trackEvent';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
 interface Props {
   slug: string;

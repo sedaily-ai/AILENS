@@ -8,7 +8,7 @@
  * (service/backend/handlers/newsletter/subscribe.py 참조).
  */
 import { useEffect, useState } from 'react';
-import { trackEvent } from '@/shared/lib/trackEvent';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
 const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
 

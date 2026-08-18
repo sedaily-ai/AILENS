@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { fetchVideos, type CmsVideo } from '@/shared/lib/cmsPostsApi';
+import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 
 // 영상 전용 목록 페이지(2026-08-11) — 그동안 홈 화면 미리보기 섹션

@@ -1,10 +1,10 @@
 'use client';
 
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "../lib/wordsTerms";
-import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
+import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";

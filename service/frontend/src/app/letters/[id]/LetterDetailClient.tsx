@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { EditorCommentsSection, SideRail, InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed';
-import { trackEvent } from '@/shared/lib/trackEvent';
-import { trackArticleRead } from '@/shared/lib/readingTracker';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
+import { trackArticleRead } from '@/shared/lib/tracking/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { useAuth } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
@@ -23,7 +23,7 @@ import {
   type ApiLetter,
   type DisplayLetter,
   type LetterChart,
-} from '@/shared/lib/todayLettersApi';
+} from '@/shared/lib/api/todayLettersApi';
 
 // 다른 날짜 letter 를 스캔할 때 훑는 최근 일수 — app/letters/[id]/page.tsx 의
 // SEED_DAYS 와 같은 값(그룹-날짜 합성 id 스킴 폐지 이후 findLetter 와 동일 패턴).
@@ -537,7 +537,7 @@ function SentenceSelectionPopover({ letter }: { letter: DisplayLetter }) {
     }
     setSaving(true);
     try {
-      const { saveArchiveSentence } = await import('@/shared/lib/archiveApi');
+      const { saveArchiveSentence } = await import('@/shared/lib/api/archiveApi');
       const dm = letter.id.match(/^l-(\d{4})(\d{2})(\d{2})/);
       const publishedAt = dm ? `${dm[1]}-${dm[2]}-${dm[3]}T07:00:00+09:00` : new Date().toISOString();
       await saveArchiveSentence({

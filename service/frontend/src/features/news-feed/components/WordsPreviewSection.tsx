@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { GoodJobStampIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchFollowingWordTerms, type Term } from '../lib/wordsTerms';
-import { fetchActiveQuizzes, postQuizAttempt, type TodayQuiz } from '@/shared/lib/quizApi';
+import { fetchActiveQuizzes, postQuizAttempt, type TodayQuiz } from '@/shared/lib/api/quizApi';
 
 // Math.random() 대신 seed로 결정되는 PRNG(mulberry32) — 빌드타임 서버 렌더와
 // 클라이언트 최초 hydration이 같은 seed로 정확히 같은 순서를 내야 hydration

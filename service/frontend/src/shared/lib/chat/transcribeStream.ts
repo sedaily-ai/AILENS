@@ -16,14 +16,14 @@
  * 한 인스턴스 = 한 마이크 세션. 반복 사용 시 새 인스턴스.
  */
 import { API_URL } from '@/shared/config/apiClient';
-import { AudioCapture } from '@/shared/lib/audioCapture';
+import { AudioCapture } from '@/shared/lib/chat/audioCapture';
 import {
   encodeAudioEvent,
   decodeMessage,
   parseTranscriptEvent,
   getExceptionMessage,
   type TranscribeResult,
-} from '@/shared/lib/transcribeEventStream';
+} from '@/shared/lib/chat/transcribeEventStream';
 
 export interface TranscribeRecognizerOptions {
   onPartial: (text: string) => void;

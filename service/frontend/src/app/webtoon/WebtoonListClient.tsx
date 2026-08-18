@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/cmsPostsApi';
+import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 
 // 연재 웹툰 파일럿(2026-08-06) — 이슈를 텍스트 레터가 아니라 컷(이미지+캡션)
 // 나열로 보여준다. 그림은 admin에서 GPT 등으로 미리 만들어 올린다.

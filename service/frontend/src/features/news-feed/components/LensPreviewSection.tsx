@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
+import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 
 // "오늘의 이슈, 4가지 시선" 홈 티저.

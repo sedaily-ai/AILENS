@@ -3,8 +3,8 @@
 // 에러. 순수 함수·타입만 이 파일로 분리해서 서버·클라이언트 양쪽에서 같이
 // import 한다(2026-08-07, 목록 페이지 SSG 전환 중 발견).
 import { letterHref } from '@/shared/lib/letterHref';
-import { withDisplayMeta, toTodayLetterCard } from '@/shared/lib/todayLettersApi';
-import type { CmsLetter, CmsTrendCard, CmsVideo } from '@/shared/lib/cmsPostsApi';
+import { withDisplayMeta, toTodayLetterCard } from '@/shared/lib/api/todayLettersApi';
+import type { CmsLetter, CmsTrendCard, CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 
 export const PAGE_SIZE = 100;
 

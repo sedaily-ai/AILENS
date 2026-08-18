@@ -6,7 +6,7 @@ import {
   toTodayLetterCard,
   type ApiLetter,
   type TodayLetterCardLike,
-} from './todayLettersApi';
+} from '@/shared/lib/api/todayLettersApi';
 
 /**
  * 최신 발행 레터 4편(라이브 today-letters API).

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { calculateSaju, CG_OH } from '@/entities/saju';
-import { trackEvent } from '@/shared/lib/trackEvent';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
 // 사주 × 짝꿍 미리보기(2026-08-17) — SideRail.tsx의 같은 섹션을 홈 사이드바용으로
 // 떼어냈다. 원본이 쓰던 토스 블루(#3182F6)는 아래 BRAND 상수 설명 참조해

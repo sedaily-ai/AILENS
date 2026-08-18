@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type TouchEvent as ReactTouchEvent } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { fetchLensBySlug, type CmsLens } from '@/shared/lib/cmsPostsApi';
+import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import {
   LENS_ACCENT,
   LENS_CARD_BORDER,

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import { fetchVideos, fetchVideoBySlug, type CmsVideo } from '@/shared/lib/cmsPostsApi';
+import { fetchVideos, fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
-import { buildPageTitle } from '@/shared/lib/buildPageTitle';
+import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { VideoViewClient } from './VideoViewClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';

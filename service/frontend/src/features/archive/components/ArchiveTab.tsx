@@ -7,7 +7,7 @@ import { useAuth } from "@/entities/user";
 import {
   listArchiveSentences,
   type ArchiveSentenceResponse,
-} from "@/shared/lib/archiveApi";
+} from "@/shared/lib/api/archiveApi";
 import { ArchiveLoginCta } from './ArchiveLoginCta';
 import { ArchiveDateNav } from './ArchiveDateNav';
 import { ArchiveCalendarModal } from './ArchiveCalendarModal';

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { letterHref } from '@/shared/lib/letterHref';
-import type { ApiLetter } from '@/shared/lib/todayLettersApi';
+import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 
 interface Props {
   // 오늘 함께 발행된, 지금 보고 있는 레터를 제외한 다른 레터들. MBTI 4-페르소나

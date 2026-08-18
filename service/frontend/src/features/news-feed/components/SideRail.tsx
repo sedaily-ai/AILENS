@@ -5,8 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
 import { calculateSaju, CG_OH } from '@/entities/saju';
-import { trackEvent } from '@/shared/lib/trackEvent';
-import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/todayLettersApi';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
+import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { letterHref } from '@/shared/lib/letterHref';
 
 // 사주 × 짝꿍 미리보기 — 띠 × 성별 조합으로 살짝만 보여주고 진짜 풀이는 /saju/compatibility

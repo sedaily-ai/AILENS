@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import type { ApiLetter } from '@/shared/lib/todayLettersApi';
-import { withDisplayMeta } from '@/shared/lib/todayLettersApi';
-import { fetchCmsPosts, fetchCmsPostBySlug } from '@/shared/lib/cmsPostsApi';
-import { buildPageTitle } from '@/shared/lib/buildPageTitle';
+import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
+import { withDisplayMeta } from '@/shared/lib/api/todayLettersApi';
+import { fetchCmsPosts, fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
+import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LetterDetailClient } from './LetterDetailClient';
 

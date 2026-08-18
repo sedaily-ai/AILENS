@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { chatbotWs } from '@/shared/lib/chatbotWs';
+import { chatbotWs } from '@/shared/lib/chat/chatbotWs';
 import {
   createRecognizer,
   type VoiceRecognizerOptions,
@@ -13,7 +13,7 @@ import {
   stopVoiceAudio,
   sanitizeForTTS,
   makeSentenceFlusher,
-} from '@/shared/lib/voiceChat';
+} from '@/shared/lib/chat/voiceChat';
 
 // 챗봇 응답 마크다운 → 자연스러운 본문 렌더.
 // 디자인 톤: 부드러운 위계, 헤더/볼드는 톤만 살짝 다르게.

@@ -15,7 +15,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ScrollReveal } from '@/shared/ui/ScrollReveal';
 import { NewsletterCTA } from '@/features/news-feed';
-import { useLatestLetters } from '@/shared/lib/useLatestLetters';
+import { useLatestLetters } from '@/shared/hooks/useLatestLetters';
 import { letterHref } from '@/shared/lib/letterHref';
 
 const STEPS = [

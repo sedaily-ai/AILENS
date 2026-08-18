@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchPopularArchiveSentences, type PopularHighlight } from '@/shared/lib/archiveApi';
+import { fetchPopularArchiveSentences, type PopularHighlight } from '@/shared/lib/api/archiveApi';
 
 // ── 다른 사람들이 담은 문장 ────────────────────────────────────────
 // 커뮤니티 탭(업다운보트·댓글·"내 문장 공유하기" 글쓰기) 대체(2026-08-06) —

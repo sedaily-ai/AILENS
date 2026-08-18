@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/archiveItems';
-import { buildCategoryMetadata, buildCategoryJsonLd } from '@/shared/lib/buildCategoryPageMeta';
+import { buildCategoryMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
 import { CategoryArchiveClient } from '@/shared/ui/CategoryArchiveClient';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 

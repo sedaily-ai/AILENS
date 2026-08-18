@@ -16,7 +16,7 @@
  *    다시 recognition 시작. 사용자가 종료 누르기 전까지 자동 루프.
  */
 import { API_URL } from '@/shared/config/apiClient';
-import { TranscribeStreamRecognizer } from '@/shared/lib/transcribeStream';
+import { TranscribeStreamRecognizer } from '@/shared/lib/chat/transcribeStream';
 
 // Web Speech API — webkit prefix 호환을 위해 동적으로 가져옴.
 // TS DOM lib에 SpeechRecognition 타입이 있지만 webkit prefix는 없으므로 any 로 다룬다.

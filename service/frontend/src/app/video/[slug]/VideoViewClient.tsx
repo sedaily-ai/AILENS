@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { fetchVideoBySlug, type CmsVideo } from '@/shared/lib/cmsPostsApi';
+import { fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 
 /**

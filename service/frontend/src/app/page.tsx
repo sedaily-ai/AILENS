@@ -1,12 +1,12 @@
 import { FeedPage } from "@/widgets/FeedPage";
-import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts } from "@/shared/lib/cmsPostsApi";
+import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts } from "@/shared/lib/api/cmsPostsApi";
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
-import { fetchFollowingLetters } from "@/shared/lib/todayLettersApi";
-import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/cmsPostsApi";
+import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
+import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "@/features/news-feed";
-import type { TodayLetterCardLike } from "@/shared/lib/todayLettersApi";
+import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
 
 // MBTI 페르소나 체계 폐지(2026-08-07) — 이전에는 여기서 viewMode
 // ("feed" | "editor-select" | "briefing" | "story")를 useMbtiGroup 에 저장된

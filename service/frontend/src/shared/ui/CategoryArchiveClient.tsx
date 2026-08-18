@@ -13,7 +13,7 @@ import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { ArchiveHeader } from '@/shared/ui/ArchiveHeader';
 import { ArchiveList } from '@/shared/ui/ArchiveList';
 import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
-import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
 

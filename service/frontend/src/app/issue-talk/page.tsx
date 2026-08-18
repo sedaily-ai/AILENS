@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
 import { IssueTalkListClient } from './IssueTalkListClient';
 

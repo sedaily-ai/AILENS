@@ -1,7 +1,7 @@
 // WordsPreviewSection이 'use client'라 서버 컴포넌트(app/page.tsx)에서 직접
 // import해 부를 수 없다 — 순수 로직만 이 파일로 분리(archiveItems.ts와 동일
 // 패턴, 2026-08-07 홈 SSG 감사).
-import { fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 
 export interface Term {
   term: string;

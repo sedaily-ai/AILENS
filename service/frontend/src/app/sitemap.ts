@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 import { kstTodayStr } from '@/shared/lib/date';
 import { GAMES } from './games/play/[slug]/page';
 

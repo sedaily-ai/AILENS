@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { ArchivedSentence } from '@/shared/types/mbti';
-import { searchArticlesByKeywords, type KeywordArticle } from '@/shared/lib/archiveApi';
+import { searchArticlesByKeywords, type KeywordArticle } from '@/shared/lib/api/archiveApi';
 
 // ── 관심사 기반 추천 ──────────────────────────────────────────────
 // 저장한 문장 텍스트 → 토큰화 + stopword 제거 + 빈도 정렬 → top 20 키워드 추출

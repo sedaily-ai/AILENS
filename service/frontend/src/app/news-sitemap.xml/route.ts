@@ -1,4 +1,4 @@
-import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
 import { kstTodayStr } from '@/shared/lib/date';
 

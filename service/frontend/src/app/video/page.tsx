@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchVideos, type CmsVideo } from '@/shared/lib/cmsPostsApi';
+import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { VideoListClient } from './VideoListClient';
 

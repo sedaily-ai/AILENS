@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/homePlayerApi';
+import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 
 // 사이트 하단 고정 오디오 플레이어 — 벅스뮤직 재생바처럼 상시 도킹해 듣는다
 // (2026-08-14, 사용자 레퍼런스: 벅스뮤직 앱 하단 미니플레이어).

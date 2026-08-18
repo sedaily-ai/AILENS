@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
+import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { LensListClient } from './LensListClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';

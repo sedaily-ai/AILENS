@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { fetchLensPosts, type CmsLens } from '@/shared/lib/cmsPostsApi';
-import { buildPageTitle } from '@/shared/lib/buildPageTitle';
+import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LensViewClient } from './LensViewClient';
 

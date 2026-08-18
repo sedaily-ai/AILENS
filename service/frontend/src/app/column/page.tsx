@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchCmsPosts, fetchTrendCards } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts, fetchTrendCards } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
 import { ColumnListClient } from './ColumnListClient';
 

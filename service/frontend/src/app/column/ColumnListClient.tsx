@@ -6,7 +6,7 @@ import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { ArchiveHeader } from '@/shared/ui/ArchiveHeader';
 import { ArchiveList } from '@/shared/ui/ArchiveList';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { fetchCmsPosts, fetchTrendCards } from '@/shared/lib/cmsPostsApi';
+import { fetchCmsPosts, fetchTrendCards } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, COLUMN_ACCENT, type ArchiveItem } from '@/shared/lib/archiveItems';
 
 export function ColumnListClient({ initialItems }: { initialItems: ArchiveItem[] }) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { trackEvent } from '@/shared/lib/trackEvent';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
 export interface InteractiveBlockData {
   mode: 'quiz' | 'poll';
