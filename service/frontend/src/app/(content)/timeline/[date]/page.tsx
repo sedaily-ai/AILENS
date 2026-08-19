@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ARCHIVE_MIN_DATE, fetchBigkindsDay, fetchDayArticles, kdate } from '@/features/timeline';
+import { ARCHIVE_MIN_DATE, fetchBigkindsDay, fetchDayArticles, kdate, isReadableOriginal } from '@/features/timeline';
 import { TimelineDayClient } from './TimelineDayClient';
 
 // 날짜별 고유 URL(2026-08-12, GEO 감사) — 예전엔 /timeline이 입력창 하나만
@@ -91,15 +91,21 @@ function buildJsonLd(date: string, articles: { title: string; original_link: str
     },
     mainEntity: {
       '@type': 'ItemList',
-      itemListElement: articles
-        .filter((a) => a.original_link && a.original_link !== '#')
-        .slice(0, 30)
-        .map((a, i) => ({
-          '@type': 'ListItem',
-          position: i + 1,
-          url: a.original_link,
-          name: a.title,
-        })),
+      // url 은 **실제로 기사에 닿는 것만** 넣는다(isReadableOriginal). 예전엔
+      // "빈 값이 아니면" 통과였는데, 빅카인즈가 2015년 이전 기사에 주는
+      // sednews.com 주소는 지금 기사가 아니라 서울경제 홈으로 리다이렉트된다
+      // (2026-08-19 실측). 그걸 구조화 데이터에 실으면 크롤러에게 "이 기사는
+      // 여기 있다"고 죽은 주소를 알려주는 셈이다.
+      //
+      // 다만 항목 자체를 빼지는 않는다. 그날 그 제목의 기사가 지면에 있었다는
+      // 건 사실이고, schema.org 의 ListItem 은 url 없이 name 만으로도 유효하다.
+      // 링크만 지우고 제목은 남기면 크롤러가 "무엇이 있었나"는 알 수 있다.
+      itemListElement: articles.slice(0, 30).map((a, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: a.title,
+        ...(isReadableOriginal(a.original_link) ? { url: a.original_link } : {}),
+      })),
     },
   };
 }

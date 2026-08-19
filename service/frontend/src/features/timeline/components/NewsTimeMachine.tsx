@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TimeMachineRewind } from '@/shared/ui/TimeMachineRewind';
+import {
+  SURFACE, SURFACE_CHIP, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT, ACCENT_HOVER,
+  BORDER_CONTROL, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN, CONTAINER_MAX,
+} from '../lib/tone';
 import { VintageCalendar } from './VintageCalendar';
 import { kstTodayStr } from '../lib/timelineApi';
 
@@ -64,34 +68,67 @@ export function NewsTimeMachine() {
   }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#faf8f3' }}>
+    <div style={{ minHeight: '100vh', background: SURFACE }}>
       <style>{`
         @keyframes tmRise { from { opacity:0; transform: translateY(14px);} to {opacity:1; transform:none;} }
+        .tm-rise { animation: tmRise .4s ease both; }
+        /* 날짜를 고르는 버튼 — 겉보기는 인풋이라 포커스가 보여야 한다.
+           이전에는 outline:none 만 있고 대체 스타일이 없어서 키보드로
+           오면 어디에 있는지 알 수 없었다. */
+        .tm-datefield { border:none; background:transparent; cursor:pointer;
+          font-family:inherit; text-align:left; border-radius:${RADIUS.pill}px;
+          min-height:${TOUCH_MIN}px; padding:0 ${SPACE.sm}px; }
+        .tm-datefield:focus-visible { outline:2px solid ${ACCENT}; outline-offset:2px; }
+        .tm-go { display:inline-flex; align-items:center; justify-content:center;
+          min-height:${TOUCH_MIN}px; padding:0 ${SPACE.xl}px; border:none;
+          border-radius:${RADIUS.pill}px; background:${ACCENT}; color:#fff;
+          font-size:${FONT.meta}px; font-weight:700; font-family:inherit;
+          cursor:pointer; white-space:nowrap; transition: background .15s ease; }
+        .tm-go:hover:not(:disabled) { background:${ACCENT_HOVER}; }
+        .tm-go:disabled { background:${SURFACE_CHIP}; color:${TEXT_MUTED}; cursor:default; }
+        @media (prefers-reduced-motion: reduce) {
+          .tm-rise { animation: none; }
+          .tm-go { transition: none; }
+        }
       `}</style>
 
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: 'clamp(40px, 8vw, 88px) clamp(20px, 5vw, 32px)' }}>
+      <div style={{ maxWidth: CONTAINER_MAX, margin: '0 auto', padding: 'clamp(40px, 8vw, 88px) clamp(20px, 5vw, 32px)' }}>
 
         {/* ── 입력 ───────────────────────────── */}
         {phase === 'input' && (
-          <div style={{ textAlign: 'center', animation: 'tmRise .4s ease' }}>
-            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.22em', color: '#b08d57', marginBottom: 18 }}>
+          <div className="tm-rise" style={{ textAlign: 'center' }}>
+            <p
+              style={{
+                fontSize: FONT.caption,
+                fontWeight: 700,
+                letterSpacing: '0.18em',
+                color: TEXT_MUTED,
+                marginBottom: SPACE.md,
+              }}
+            >
               NEWS TIME MACHINE
             </p>
             <h1
               style={{
-                fontFamily: '"Noto Serif KR", serif',
-                fontSize: 'clamp(26px, 6vw, 38px)',
-                fontWeight: 700,
-                color: '#2a2622',
-                letterSpacing: '-0.025em',
-                lineHeight: 1.3,
-                marginBottom: 12,
+                fontSize: `clamp(${FONT.pageTitle}px, 6vw, ${FONT.pageTitleLg}px)`,
+                fontWeight: 800,
+                color: TEXT_STRONG,
+                letterSpacing: '-0.03em',
+                lineHeight: LEADING.tight,
+                marginBottom: SPACE.md,
               }}
             >
-              그 날의 서울경제로 돌아갑니다
+              그날의 서울경제로 돌아갑니다
             </h1>
-            <p style={{ fontSize: 14, color: '#8a8378', marginBottom: 38, lineHeight: 1.7 }}>
-              날짜를 고르면 그 날 신문이 그대로 펼쳐져요.
+            <p
+              style={{
+                fontSize: FONT.body,
+                color: TEXT_BODY,
+                marginBottom: SPACE.xxl,
+                lineHeight: LEADING.body,
+              }}
+            >
+              1990년부터 오늘까지, 날짜를 고르면 그날 지면을 그대로 펼쳐드려요.
             </p>
 
             <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -99,50 +136,55 @@ export function NewsTimeMachine() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 10,
-                  padding: '8px 8px 8px 20px',
-                  background: '#fff',
-                  border: '1px solid #e6e0d4',
-                  borderRadius: 9999,
-                  boxShadow: '0 1px 2px rgba(80,60,30,0.04)',
+                  gap: SPACE.sm,
+                  padding: SPACE.sm,
+                  paddingLeft: SPACE.md,
+                  background: SURFACE,
+                  border: `1px solid ${BORDER_CONTROL}`,
+                  borderRadius: RADIUS.pill,
                 }}
               >
                 <button
                   type="button"
+                  className="tm-datefield"
+                  aria-haspopup="dialog"
+                  aria-expanded={showCalendar}
                   onClick={() => setShowCalendar((v) => !v)}
                   style={{
-                    border: 'none',
-                    outline: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    fontSize: 15,
-                    color: date ? '#2a2622' : '#a8a29e',
-                    fontFamily: 'inherit',
+                    fontSize: FONT.body,
+                    fontWeight: date ? 700 : 500,
+                    // 빈 상태 글자도 4.5:1 을 넘겨야 한다(이전 #a8a29e 는 2.38:1).
+                    color: date ? TEXT_STRONG : TEXT_MUTED,
                     minWidth: 'clamp(140px, 40vw, 180px)',
-                    textAlign: 'left',
                   }}
                 >
                   {date ? kdateLabel(date) : '날짜 선택'}
                 </button>
                 <button
+                  type="button"
+                  className="tm-go tl-focus"
                   onClick={start}
                   disabled={!date}
-                  style={{
-                    padding: '10px 22px',
-                    borderRadius: 9999,
-                    border: 'none',
-                    background: date ? '#2a2622' : '#d9d3c6',
-                    color: '#fff',
-                    fontSize: 13.5,
-                    fontWeight: 700,
-                    cursor: date ? 'pointer' : 'default',
-                    transition: 'background .2s',
-                    whiteSpace: 'nowrap',
-                  }}
+                  // 왜 비활성인지 알려준다 — 눌러보고 아무 일이 없으면
+                  // 다음부터 다른 버튼도 믿지 않는다.
+                  aria-describedby={!date ? 'tm-go-hint' : undefined}
                 >
-                  그 날 신문 펼치기
+                  그날로 떠나기
                 </button>
               </div>
+              {!date && (
+                <p
+                  id="tm-go-hint"
+                  style={{
+                    fontSize: FONT.caption,
+                    color: TEXT_MUTED,
+                    marginTop: SPACE.sm,
+                    lineHeight: LEADING.body,
+                  }}
+                >
+                  먼저 날짜를 골라주세요
+                </p>
+              )}
               {showCalendar && (
                 <VintageCalendar
                   value={date}

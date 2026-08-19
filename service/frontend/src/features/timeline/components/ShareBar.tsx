@@ -16,6 +16,7 @@
 // 모노톤 라인아이콘으로 남겨 튀지 않게 했다. 이상한 이모지는 안 씀.
 import { useState } from 'react';
 import { generateShareCardBlob, type ShareCardData } from '../lib/shareCard';
+import { TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '../lib/tone';
 
 function KakaoIcon() {
   return (
@@ -86,8 +87,10 @@ function ShareBarButton({
         background: 'none',
         border: 'none',
         cursor: 'pointer',
-        padding: '4px 8px',
-        color: '#2a2622',
+        // 아이콘 24px 뿐이라 히트 영역을 패딩으로 44px 까지 넓힌다.
+        minHeight: TOUCH_MIN,
+        padding: `${SPACE.sm}px ${SPACE.sm}px`,
+        color: TEXT_STRONG,
         minWidth: 72,
       }}
     >
@@ -96,10 +99,11 @@ function ShareBarButton({
       ) : (
         <span
           style={{
-            width: 44,
-            height: 44,
+            width: TOUCH_MIN,
+            height: TOUCH_MIN,
             borderRadius: '50%',
-            border: '1px solid #e6e0d4',
+            // 컨트롤 경계는 3:1 을 넘겨야 한다 — 기존 #e6e0d4 는 1.24:1 이었다.
+            border: `1px solid ${BORDER_CONTROL}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -108,7 +112,8 @@ function ShareBarButton({
           {icon}
         </span>
       )}
-      <span style={{ fontSize: 11.5, color: '#78716c', fontWeight: 500, whiteSpace: 'nowrap' }}>
+      {/* 기존 #78716c 11.5px → 4.83:1 통과하는 회색 + 스케일 안의 13px. */}
+      <span style={{ fontSize: FONT.caption, color: TEXT_MUTED, fontWeight: 600, whiteSpace: 'nowrap' }}>
         {feedback ?? label}
       </span>
     </button>
@@ -177,10 +182,10 @@ export function ShareBar({ cardData }: { cardData: ShareCardData }) {
       style={{
         display: 'flex',
         justifyContent: 'center',
-        gap: 28,
-        marginTop: 36,
-        paddingTop: 28,
-        borderTop: '1px solid #ece6d9',
+        gap: SPACE.xl,
+        marginTop: SPACE.xxl,
+        paddingTop: SPACE.xl,
+        borderTop: `1px solid ${BORDER_HAIRLINE}`,
       }}
     >
       <ShareBarButton bare icon={<KakaoIcon />} label="카카오톡" feedback={kakaoFeedback} onClick={handleKakao} />
