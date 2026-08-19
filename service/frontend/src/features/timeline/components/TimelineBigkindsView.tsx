@@ -1,35 +1,159 @@
 'use client';
 
-// 2026-02-01 이전 날짜의 "펼치기" 결과 화면 — S3 지면 아카이브가 없는 구간이라
+// 2026-02-01 이전 날짜의 도착 화면 — S3 지면 아카이브가 없는 구간이라
 // TimelineResultView(발행 시각 있는 최근 지면 전용)를 그대로 못 쓴다. 빅카인즈
 // 뉴스 검색(날짜 범위 + provider=서울경제)으로 제목·본문 스니펫·바이라인·원본
-// 링크까지 가져온다 — 처음엔 issue_ranking(토픽+키워드만)을 썼는데 그 API의
-// news_cluster로 기사 상세를 찾으면 신뢰도가 낮아서(같은 ID인데도 0건/서버오류가
-// 섞여 나옴, 당일 날짜조차 그랬음) 날짜 범위 직접 검색으로 교체했다(2026-08-17).
-// 발행 "시각"은 이 API가 어느 시대 기사든 항상 자정 고정이라 안 줘서, 시간 대신
-// 순번(01, 02...)으로 표시한다 — TimelineResultView의 ArticleList와 같은 패턴.
+// 링크까지 가져온다. 발행 "시각"은 이 API 가 어느 시대 기사든 항상 자정 고정이라
+// 안 준다.
 //
-// 화면 설계(2026-08-17, 실사용 피드백 반영):
-// - 착지 직후엔 헤드라인(제목+카테고리+기자명)만 훑을 수 있게 — 점진적 노출.
-//   본문은 그대로 다 보여주면 정보량이 너무 많아서, 행으로 클릭해야 펼쳐지는
-//   아코디언으로 바꿨다(여러 개 동시에 펼쳐도 됨 — 신문 여러 기사 펼쳐놓고
-//   보는 느낌).
-// - 상위 5건만 보여준다("30개를 다 보여주면 좀 아까울듯요" 피드백).
-// - 본문 미리보기는 백엔드가 150자로 다듬어서 내려준다(서명·입력시각 꼬리 정리
-//   포함, config/investment_scenarios.py의 이웃 로직 아님 — time_machine_handler.py
-//   쪽 _clean_content_preview 참조).
-// - "그날 이걸 샀다면"(코스피/비트코인/로또/커피) 카드는 뉴스(팩트)와 성격이
-//   달라 별도 섹션(InvestmentScenarioCards, 크림톤 배경)으로 뒤에 배치.
-import { useState } from 'react';
+// ══ 2026-08-19 재설계 ══
+// 데이터·분기 로직은 그대로 두고 표현만 바꿨다.
+//
+// ── (A) 톤 ──
+// 크림 배경(#faf8f3) + 갈색(#8a6d3f·#b08d57·#c4b48f) + Noto Serif KR 이었다.
+// 홈 형제 섹션 중 세리프를 쓰는 곳은 하나도 없고, 홈 타임머신 섹션의 갈색은
+// 이미 걷어낸 상태라 **그 버튼을 눌러 도착하는 이 페이지만 갈색**이었다.
+// 종이비행기 전환(회색·파랑)에서 크림 페이지로 착지하니 톤이 튀었다.
+// lib/tone.ts 의 토큰으로 통일했다.
+//
+// ── (B) 가시성 ──
+// 대비 실측 결과 본문·컨트롤 11건이 미달이었다. 기사 순번 1.93:1,
+// 카테고리 2.91:1, 바이라인 2.38:1, EXIT 필 테두리 1.24:1. 카테고리는 이
+// 화면의 유일한 분류 정보인데 안 읽혔다. 폰트도 스케일 밖 값이 9종
+// (10.5·11·11.5·12.5·13.5·14.5·15·17·34).
+//
+// ── (C) 균일한 5행 나열을 분야별 지면으로 ──
+// 30건 중 앞 5건만 API 순서대로 잘라 아코디언으로 보여줬다. 문제가 둘.
+//
+//   1) **두 번째 항목이 부고였다** ("金炳柱씨(…) 빙부상"). API 순서에 의미가
+//      없어서다 — news_id 뒷부분은 2016년 디지털화 시각이다(lib/rankArticles.ts
+//      주석 참조). 30건 중 7건이 부고·인사·공시 토막이었다.
+//   2) 그날의 큰 기사와 부고가 **똑같은 크기·똑같은 행 모양**이었다.
+//
+// 이 서비스에 오는 사람은 기사 30건을 읽으러 오지 않는다. 생일이나 기념일,
+// "그때 무슨 일이 있었나"가 궁금해서 와서 **그날의 감을 잡고 공유**한다
+// (홈 퀵픽이 "10년 전 오늘/20년 전/30년 전"이고, 뒤에 사주 퍼널과 공유바가
+// 붙어 있는 이유). 그래서 화면이 답해야 할 질문은 "무엇을 먼저 읽어야 하나"가
+// 아니라 **"그날은 어떤 날이었나"** 다.
+//
+// 그 질문에는 분야별 묶음이 답한다 — "경제는 이랬고, 정치는 이랬다".
+// 신문 지면 자체가 섹션으로 조직돼 있어 현실의 모델과도 맞고, 순서가 고정이라
+// (rankArticles.ts BEAT_ORDER) 날마다 같은 자리에 같은 분야가 온다.
+//
+//   · 분야 섹션 — 제목 18px + 건수. 순서 고정
+//   · 각 분야 첫 기사 — 제목 굵게 + 본문 미리보기 2줄 + 바이라인
+//   · 나머지 — 제목만
+//   · 맨 아래 접힘 — 부고·인사·공시
+//
+// **크기로 서열을 매기지 않는다.** 처음엔 분량 상위 2건을 큰 카드로 올렸는데,
+// 2008-09-16(리먼 파산 다음 날)에서 자동차 기획기사가 금융위기 기사를
+// 앞질렀다. 제목이 길어서다. 크게 만드는 것 자체가 "이게 제일 중요하다"는
+// 주장인데 쓸 수 있는 필드 다섯 개로는 뒷받침할 수 없었다
+// (자세한 근거는 rankArticles.ts buildDayLayout 주석).
+// 밀도는 미리보기 유무로만 벌린다.
+//
+// ── (D) 한 요소는 한 가지 일만 ──
+// 제목을 누르면 본문이 펼쳐지고, 원문은 그 안의 또 다른 링크였다. 같은 행에
+// "펼치기"와 "원문 보기"가 겹쳐 무엇을 누르는지 예측이 안 됐다. 아코디언을
+// 없애고 **제목 = 기사 링크**로 통일했다.
+//
+// 섹션 제목도 고쳤다. "그날 지면 더 보기"는 이름 자리에 동작을 써서 눌러보게
+// 만들었다(사용자 리포트). 지금은 분야 이름만 쓴다.
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { BigKindsArticle, InvestmentScenario } from '../lib/timelineApi';
-import { kdate } from '../lib/timelineApi';
+import { kdate, isReadableOriginal, resolveArticleLink } from '../lib/timelineApi';
+import { buildDayLayout } from '../lib/rankArticles';
+import {
+  SURFACE, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT,
+  BORDER_HAIRLINE, BORDER_STRONG, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN,
+  CONTAINER_MAX, PROSE_MAX, SR_ONLY, yearsAgoLabel,
+} from '../lib/tone';
 import { InvestmentScenarioCards } from './InvestmentScenarioCards';
 import { ShareBar } from './ShareBar';
 import { SajuFunnelCard } from './SajuFunnelCard';
 
-const MAX_SHOWN = 5;
 const SITE_URL = 'https://ailens.sedaily.ai';
+
+/**
+ * 기사 한 행 — 제목 + 본문 미리보기 + 바이라인. 모든 행이 같은 모양이다.
+ *
+ * 처음엔 분야의 첫 기사에만 미리보기를 붙였다. 그게 틀렸다(사용자 리포트:
+ * "메인만 서브 글이 있어서 더 헷갈려").
+ *
+ *   · 왜 저것만 글이 있는지 설명이 없다 → 고장처럼 보인다
+ *   · 동시에 "이게 더 중요하다"는 주장은 여전히 하고 있었다 —
+ *     없애려던 것을 약하게 유지한 셈이라 일관성도 중립성도 잃었다
+ *
+ * 그리고 **20년 전 제목은 그 자체로 해독이 안 된다.** "5.37%올라 상승률 올
+ * 최고"는 무엇이 올랐는지 알 수 없고, "악사천리(惡事千里)" "저승보다는
+ * 이승이"도 그렇다. 의미는 미리보기에 있다 — 제목만 나열하면 이 화면이
+ * 답해야 할 "그날은 어떤 날이었나"에 답하지 못한다.
+ *
+ * 그래서 전부 붙인다. 벽이 되는 것은 분야 섹션 헤딩이 몇 행마다 끊어준다.
+ */
+function ArticleRow({ article }: { article: BigKindsArticle }) {
+  const href = resolveArticleLink(article)?.href;
+  const Wrapper = href ? 'a' : 'div';
+  return (
+    <li style={{ borderTop: `1px solid ${BORDER_HAIRLINE}` }}>
+      <Wrapper
+        {...(href ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}
+        className={href ? 'tl-row tl-focus' : undefined}
+        style={{
+          display: 'block',
+          padding: `${SPACE.md}px ${SPACE.sm}px`,
+          minHeight: TOUCH_MIN,
+          textDecoration: 'none',
+          color: 'inherit',
+        }}
+      >
+        <p
+          className="tl-row-title tl-clamp2"
+          style={{
+            fontSize: FONT.body,
+            fontWeight: 600,
+            color: TEXT_STRONG,
+            lineHeight: LEADING.title,
+            letterSpacing: '-0.01em',
+            wordBreak: 'keep-all',
+            transition: 'color .14s ease',
+          }}
+        >
+          {article.title}
+          {href && (
+            <>
+              {/* 외부 링크 표시. 목적지 설명은 화면 위에 한 번만 두고, 행에는
+                  글리프만 붙인다 — "빅카인즈에서 보기"를 23번 반복하면 그게
+                  노이즈다. */}
+              <span aria-hidden style={{ color: ACCENT, marginLeft: SPACE.xs, fontWeight: 700 }}>↗</span>
+              <span style={SR_ONLY}>새 창에서 열립니다</span>
+            </>
+          )}
+        </p>
+        {article.content && (
+          <p
+            className="tl-clamp2"
+            style={{
+              marginTop: SPACE.xs,
+              maxWidth: PROSE_MAX,
+              fontSize: FONT.meta,
+              color: TEXT_BODY,
+              lineHeight: LEADING.body,
+              wordBreak: 'keep-all',
+            }}
+          >
+            {article.content}
+          </p>
+        )}
+        {/* 바이라인은 행에 넣지 않는다. 두세 단어에 한 줄을 쓰는데 그만큼
+            미리보기와 경쟁하고, 목록에서 기자명을 보여주는 뉴스 사이트도 없다
+            (기사 페이지의 정보다). 출처 신뢰는 지면 머리의 "빅카인즈 보관본"
+            이 담당한다. 375px 에서 행 평균 155px → 125px 로 줄었다. */}
+      </Wrapper>
+    </li>
+  );
+}
 
 export function TimelineBigkindsView({
   date,
@@ -40,8 +164,20 @@ export function TimelineBigkindsView({
   articles: BigKindsArticle[];
   investments: InvestmentScenario[];
 }) {
-  const shown = articles.slice(0, MAX_SHOWN);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const layout = useMemo(() => buildDayLayout(articles), [articles]);
+  const [fillerOpen, setFillerOpen] = useState(false);
+
+  const yearsAgo = yearsAgoLabel(date);
+  const total = articles.length;
+
+  // 빅카인즈는 오래된 기사에 폐기된 sednews.com 주소를 준다 — 지금은 기사가
+  // 아니라 서울경제 홈으로 리다이렉트된다(isReadableOriginal 주석의 실측 참조).
+  // 그런 날은 링크가 빅카인즈 상세로 향하므로, 목적지가 서울경제가 아니라는
+  // 것을 미리 밝힌다. 눌러서 알게 되면 속은 기분이 든다.
+  const noOriginals = useMemo(
+    () => total > 0 && !articles.some((a) => isReadableOriginal(a.original_link)),
+    [articles, total],
+  );
 
   // 공유 카드는 코스피를 최우선으로(가장 널리 이해되는 비교 기준), 없으면
   // 있는 첫 시나리오, 그것도 없으면(예: 1994년 이전) 헤드라인만으로 구성.
@@ -52,144 +188,199 @@ export function TimelineBigkindsView({
     heroLabel: heroScenario?.description,
     heroValue: heroScenario?.highlight,
     story: heroScenario?.story,
-    headline: shown[0]?.title,
+    headline: layout.sections[0]?.items[0]?.title,
     url: `${SITE_URL}/timeline/${date}`,
   };
 
-  const toggle = (key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
   return (
-    <div style={{ minHeight: '100vh', background: '#faf8f3' }}>
-      <style>{`
-        @keyframes tmPaper { from { opacity:0; transform: translateY(20px) scale(.985);} to {opacity:1; transform:none;} }
-        @keyframes tmExpand { from { opacity:0; transform: translateY(-4px);} to {opacity:1; transform:none;} }
-      `}</style>
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: 'clamp(40px, 8vw, 88px) clamp(20px, 5vw, 32px)' }}>
-        <div style={{ animation: 'tmPaper .5s ease' }}>
-          <div style={{ textAlign: 'center', borderBottom: '2px solid #2a2622', paddingBottom: 16, marginBottom: 12 }}>
-            <p style={{ fontSize: 11, letterSpacing: '0.2em', color: '#b08d57', marginBottom: 8 }}>
-              빅카인즈 뉴스빅데이터 · 발행 시각 정보 없음
+    <div style={{ minHeight: '100vh', background: SURFACE }}>
+      <div
+        style={{
+          maxWidth: CONTAINER_MAX,
+          margin: '0 auto',
+          padding: 'clamp(32px, 7vw, 72px) clamp(20px, 5vw, 32px) clamp(48px, 8vw, 80px)',
+        }}
+      >
+        <div className="tl-enter">
+          {/* ── 지면 머리 ── 굵은 밑줄은 신문 제호의 구조를 남긴 것. 세리프와
+              갈색은 걷었지만 이 선은 페이지에 정체성을 준다. */}
+          <header
+            style={{
+              textAlign: 'center',
+              borderBottom: `2px solid ${BORDER_STRONG}`,
+              paddingBottom: SPACE.lg,
+              marginBottom: SPACE.xl,
+            }}
+          >
+            <p
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: SPACE.sm,
+                fontSize: FONT.caption,
+                fontWeight: 600,
+                color: TEXT_MUTED,
+                marginBottom: SPACE.sm,
+                flexWrap: 'wrap',
+              }}
+            >
+              {yearsAgo && (
+                <span
+                  style={{
+                    background: TEXT_STRONG,
+                    color: SURFACE,
+                    borderRadius: RADIUS.pill,
+                    padding: '3px 10px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {yearsAgo}
+                </span>
+              )}
+              <span>빅카인즈 보관본 · 발행 시각 정보 없음</span>
             </p>
             <h1
               style={{
-                fontFamily: '"Noto Serif KR", serif', fontSize: 'clamp(24px, 5.4vw, 34px)',
-                fontWeight: 800, color: '#2a2622', letterSpacing: '-0.02em',
+                fontSize: `clamp(${FONT.pageTitle}px, 5.4vw, ${FONT.pageTitleLg}px)`,
+                fontWeight: 800,
+                color: TEXT_STRONG,
+                letterSpacing: '-0.03em',
+                lineHeight: LEADING.tight,
               }}
             >
               {kdate(date)}자 서울경제
             </h1>
-            {articles.length > MAX_SHOWN && (
-              <p style={{ fontSize: 12, color: '#a8a29e', marginTop: 8 }}>
-                이 날 보관된 기사 {articles.length}건 중 {MAX_SHOWN}건을 골라 보여드려요
+            {total > 0 && (
+              <p style={{ fontSize: FONT.meta, color: TEXT_MUTED, marginTop: SPACE.sm, lineHeight: LEADING.body }}>
+                그날 지면에서 {total}건을 찾았어요
               </p>
             )}
-          </div>
+          </header>
 
-          {shown.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 18, fontWeight: 700, color: '#2a2622', marginBottom: 8 }}>
+          {total === 0 ? (
+            /* ── 빈 상태 ── 왜 비었는지 + 무엇을 하면 되는지. */
+            <div style={{ textAlign: 'center', padding: '56px 0' }}>
+              <p style={{ fontSize: FONT.sectionTitle, fontWeight: 700, color: TEXT_STRONG, marginBottom: SPACE.sm }}>
                 이 날은 보관된 기사가 없어요
               </p>
-              <p style={{ fontSize: 13, color: '#8a8378', marginBottom: 22 }}>다른 날짜로 다시 돌려볼까요?</p>
-              <Link
-                href="/timeline"
-                style={{
-                  display: 'inline-block', padding: '10px 22px', borderRadius: 9999, border: '1px solid #2a2622',
-                  background: 'transparent', color: '#2a2622', fontSize: 13, fontWeight: 700, textDecoration: 'none',
-                }}
-              >
+              <p style={{ fontSize: FONT.meta, color: TEXT_MUTED, marginBottom: SPACE.xl, lineHeight: LEADING.body }}>
+                빅카인즈 아카이브가 1990년부터라, 그 사이에도 비어 있는 날이 있어요.
+                <br />
+                다른 날짜로 다시 떠나볼까요?
+              </p>
+              <Link href="/timeline" className="tl-btn tl-focus">
                 다른 날짜 고르기
               </Link>
             </div>
           ) : (
             <>
-              <p style={{ fontSize: 11.5, color: '#a8a29e', textAlign: 'center', marginBottom: 4 }}>
-                제목을 누르면 본문 미리보기가 펼쳐져요
+              {/* ── 분야별 지면 ── 신문이 섹션으로 조직돼 있으니 그 모델을
+                  그대로 쓴다. 순서는 고정(BEAT_ORDER)이라 날마다 같은 자리에
+                  같은 분야가 온다. 분야마다 첫 기사에만 미리보기를 붙여
+                  "그날 경제는 이랬고 정치는 이랬다"를 훑을 수 있게 한다. */}
+              {/* 조작 안내와 목적지 안내를 한 덩어리로 둔다. 행마다 "빅카인즈
+                  에서 보기"를 반복하는 대신 여기서 한 번 말하고, 행에는 ↗ 만
+                  붙인다. 링크가 어디로 가는지 미리 알려야 눌러서 알게 되는
+                  일이 없다. */}
+              <p
+                style={{
+                  fontSize: FONT.caption,
+                  color: TEXT_MUTED,
+                  marginBottom: SPACE.lg,
+                  lineHeight: LEADING.body,
+                }}
+              >
+                제목을 누르면 기사로 이동해요
+                {noOriginals && (
+                  <>
+                    {' '}— 이 시기는 서울경제 원문 주소가 끊겨서 뉴스 아카이브(빅카인즈)로 연결됩니다
+                  </>
+                )}
               </p>
-              <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {shown.map((a, i) => {
-                  const key = a.news_id || `${i}`;
-                  const isOpen = expanded.has(key);
-                  return (
-                    <li key={key} style={{ borderTop: i === 0 ? 'none' : '1px solid #ece6d9' }}>
-                      <button
-                        type="button"
-                        onClick={() => toggle(key)}
-                        aria-expanded={isOpen}
-                        style={{
-                          display: 'flex', width: '100%', gap: 16, padding: '18px 4px',
-                          background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', alignItems: 'baseline',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: '"Noto Serif KR", serif', fontSize: 15, fontWeight: 700,
-                            color: '#c4b48f', minWidth: 26, fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {String(i + 1).padStart(2, '0')}
-                        </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          {a.category && (
-                            <p style={{ fontSize: 11, color: '#b08d57', fontWeight: 600, letterSpacing: '0.04em', marginBottom: 5 }}>
-                              {a.category}
-                            </p>
-                          )}
-                          <p
-                            style={{
-                              fontFamily: '"Noto Serif KR", serif',
-                              fontSize: 'clamp(16px, 3.4vw, 18px)',
-                              fontWeight: 600,
-                              color: '#2a2622',
-                              lineHeight: 1.5,
-                              letterSpacing: '-0.015em',
-                            }}
-                          >
-                            {a.title}
-                          </p>
-                          {a.byline && !isOpen && (
-                            <p style={{ fontSize: 11.5, color: '#a8a29e', marginTop: 4 }}>{a.byline} 기자</p>
-                          )}
-                        </div>
-                        <span aria-hidden style={{ fontSize: 13, color: '#c4b48f', flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }}>
-                          ▾
-                        </span>
-                      </button>
-                      {isOpen && (
-                        <div style={{ padding: '0 4px 18px 42px', animation: 'tmExpand .2s ease' }}>
-                          {a.content && (
-                            <p style={{ fontSize: 13.5, color: '#6b6459', lineHeight: 1.65, marginBottom: 8 }}>
-                              {a.content}
-                            </p>
-                          )}
-                          <div className="flex items-center" style={{ gap: 12, flexWrap: 'wrap' }}>
-                            {a.byline && (
-                              <span style={{ fontSize: 11.5, color: '#a8a29e' }}>{a.byline} 기자</span>
-                            )}
-                            {a.original_link && (
-                              <a
-                                href={a.original_link}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ fontSize: 12, fontWeight: 700, color: '#8a6d3f', textDecoration: 'none' }}
-                              >
-                                원문 보기 →
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
+
+              {layout.sections.map((section) => (
+                <section
+                  key={section.label}
+                  aria-labelledby={`tl-beat-${section.label}`}
+                  style={{ marginBottom: SPACE.xl }}
+                >
+                  <h2
+                    id={`tl-beat-${section.label}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: SPACE.sm,
+                      fontSize: FONT.sectionTitle,
+                      fontWeight: 700,
+                      color: TEXT_STRONG,
+                      letterSpacing: '-0.02em',
+                      paddingBottom: SPACE.sm,
+                    }}
+                  >
+                    {section.label}
+                    {/* 건수는 제목이 아니라 보조 정보 — 무게를 낮춘다. */}
+                    <span style={{ fontSize: FONT.caption, fontWeight: 600, color: TEXT_MUTED }}>
+                      {section.items.length}건
+                    </span>
+                  </h2>
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    {section.items.map((a, i) => (
+                      <ArticleRow key={a.news_id || `${section.label}-${i}`} article={a} />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+
+              {/* ── 부고·인사·공시 ── 무엇인지 라벨에 그대로 쓴다.
+                  버리지 않는다 — 부고를 찾아오는 사람도 있다. */}
+              {layout.filler.length > 0 && (
+                <section style={{ marginBottom: SPACE.xxl }}>
+                  <button
+                    type="button"
+                    className="tl-btn tl-focus"
+                    aria-expanded={fillerOpen}
+                    aria-controls="tl-filler"
+                    onClick={() => setFillerOpen((v) => !v)}
+                    style={{ width: '100%' }}
+                  >
+                    부고 · 인사 · 공시 {layout.filler.length}건
+                    <span aria-hidden style={{ transform: fillerOpen ? 'rotate(180deg)' : undefined, transition: 'transform .2s ease' }}>
+                      ▾
+                    </span>
+                  </button>
+                  {fillerOpen && (
+                    <ul id="tl-filler" style={{ listStyle: 'none', margin: `${SPACE.md}px 0 0`, padding: 0 }}>
+                      {layout.filler.map((a, i) => {
+                        const href = resolveArticleLink(a)?.href;
+                        const Wrapper = href ? 'a' : 'div';
+                        return (
+                          <li key={a.news_id || `filler-${i}`} style={{ borderTop: `1px solid ${BORDER_HAIRLINE}` }}>
+                            <Wrapper
+                              {...(href ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}
+                              className={href ? 'tl-row tl-focus' : undefined}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                minHeight: TOUCH_MIN,
+                                padding: `${SPACE.sm}px`,
+                                fontSize: FONT.meta,
+                                color: TEXT_BODY,
+                                lineHeight: LEADING.title,
+                                textDecoration: 'none',
+                                wordBreak: 'keep-all',
+                              }}
+                            >
+                              {a.title}
+                              {href && <span style={SR_ONLY}>새 창에서 열립니다</span>}
+                            </Wrapper>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+              )}
 
               <InvestmentScenarioCards scenarios={investments} />
 
@@ -197,15 +388,9 @@ export function TimelineBigkindsView({
 
               <SajuFunnelCard />
 
-              <div style={{ textAlign: 'center', marginTop: 36 }}>
-                <Link
-                  href="/timeline"
-                  style={{
-                    display: 'inline-block', padding: '10px 22px', borderRadius: 9999, border: '1px solid #2a2622',
-                    background: 'transparent', color: '#2a2622', fontSize: 13, fontWeight: 700, textDecoration: 'none',
-                  }}
-                >
-                  다른 날짜로 또 돌아가기
+              <div style={{ textAlign: 'center', marginTop: SPACE.xxl }}>
+                <Link href="/timeline" className="tl-btn tl-focus">
+                  다른 날짜로 또 떠나기
                 </Link>
               </div>
             </>
