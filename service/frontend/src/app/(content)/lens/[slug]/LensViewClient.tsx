@@ -1072,8 +1072,15 @@ export function LensViewClient({
                     <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                       {realWebtoonCuts.map((cut, ci) => (
                         <figure key={ci} style={{ margin: 0 }}>
-                          <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 14, overflow: 'hidden', background: '#f3f4f6' }}>
-                            <Image src={cut.url} alt={cut.caption || ''} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'cover' }} />
+                          {/* webtoon-pipeline이 실제로 만드는 컷은 1536x1024(3:2
+                              가로) — 예전 인스타 카드뉴스(4:5 세로) 전제로 aspect-ratio
+                              4/5 + cover를 썼더니 좌우가 크게 잘려서, 말풍선이 화면
+                              가장자리에 있으면(BUBBLE_RULES가 "상단·측면 배치"를
+                              지시함) 통째로 잘려 보이는 문제가 있었다(2026-08-20
+                              사용자 리포트). contain으로 바꿔 잘림 없이 전체를
+                              보여준다 — 비율이 정확히 3:2면 레터박스도 안 생긴다. */}
+                          <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', borderRadius: 14, overflow: 'hidden', background: '#f3f4f6' }}>
+                            <Image src={cut.url} alt={cut.caption || ''} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'contain' }} />
                           </div>
                           {cut.caption && (
                             <figcaption style={{ marginTop: 8, fontSize: 13.5, color: '#374151', lineHeight: 1.6, wordBreak: 'keep-all' }}>
