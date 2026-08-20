@@ -108,7 +108,7 @@ export type CmsStatus = "draft" | "published" | "archived";
 // 차별점(사업계획서 "인지양식 기반 리라이팅")이라 남겨둔다. 정치/사회/문화/
 // 스포츠는 뺐다 — 지금 발행 콘텐츠가 100% 경제/비즈니스라 그 탭들은 계속
 // 비어있게 된다(뉴닉·서울경제 전체 구조를 그대로 못 가져오는 이유).
-export const ECON_CATEGORIES = ["증시", "부동산", "산업", "금융·정책", "국제", "재테크"] as const;
+export const ECON_CATEGORIES = ["증시", "부동산", "산업", "금융·정책", "국제", "재테크", "문화"] as const;
 export type EconCategory = (typeof ECON_CATEGORIES)[number];
 
 export interface CmsKeyword {

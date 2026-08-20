@@ -16,6 +16,10 @@ export interface EconCategoryConfig {
   description: string;
   /** ArchiveHeader kicker·리스트 강조색 — archiveItems.ts의 TREND_ACCENT류와 같은 역할. */
   accent: string;
+  /** buildCategoryPageMeta의 title 접미사("{label} — {metaSuffix}"). 안 주면
+   *  '경제 뉴스'(경제/비즈니스 6개 카테고리의 기존 기본값). 문화처럼 경제
+   *  범주가 아닌 카테고리를 위해 2026-08-20 추가. */
+  metaSuffix?: string;
 }
 
 export const ECON_CATEGORIES: readonly EconCategoryConfig[] = [
@@ -25,6 +29,11 @@ export const ECON_CATEGORIES: readonly EconCategoryConfig[] = [
   { slug: 'finance', label: '금융·정책', description: '금리, 세제, 연금까지 — 경제의 룰을 바꾸는 정책 이야기.', accent: '#059669' },
   { slug: 'international', label: '국제', description: '미국·중국·일본, 해외에서 시작해 우리 경제로 번지는 이슈.', accent: '#7c3aed' },
   { slug: 'investing', label: '재테크', description: '예금, ETF, 대출까지 — 내 지갑에 바로 쓸 수 있는 투자 상식.', accent: '#0891b2' },
+  // 2026-08-20 추가 — 본지(서울경제)에도 문화 섹션이 있고, 여행·트렌드·
+  // 라이프스타일처럼 나머지 6개 경제 카테고리 어디에도 안 맞는 lens 글이
+  // 실제로 생겨서(빵지순례) 신설. economy 그룹 폴더 안에 있지만 성격은
+  // 경제가 아니다 — 아래 metaSuffix로 "경제 뉴스" 대신 다르게 표기한다.
+  { slug: 'culture', label: '문화', description: '여행, 트렌드, 라이프스타일 — 일상에 스며든 문화 이슈.', accent: '#db2777', metaSuffix: '문화 뉴스' },
 ] as const;
 
 export type EconCategoryLabel = (typeof ECON_CATEGORIES)[number]['label'];

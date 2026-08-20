@@ -8,12 +8,13 @@ import type { ArchiveItem } from '@/shared/lib/archiveItems';
 const SITE_URL = 'https://ailens.sedaily.ai';
 
 export function buildCategoryMetadata(config: EconCategoryConfig): Metadata {
-  const title = `${config.label} — 경제 뉴스`;
+  const suffix = config.metaSuffix ?? '경제 뉴스';
+  const title = `${config.label} — ${suffix}`;
   const url = `${SITE_URL}/${config.slug}`;
   return {
     title,
     description: config.description,
-    keywords: [config.label, `${config.label} 뉴스`, 'AI LENS', '서울경제', '경제 뉴스'],
+    keywords: [config.label, `${config.label} 뉴스`, 'AI LENS', '서울경제', suffix],
     alternates: { canonical: url },
     openGraph: {
       title,
@@ -40,7 +41,7 @@ export function buildCategoryJsonLd(config: EconCategoryConfig, items: ArchiveIt
     '@type': 'CollectionPage',
     '@id': `${url}#collection`,
     url,
-    name: `${config.label} — 경제 뉴스`,
+    name: `${config.label} — ${config.metaSuffix ?? '경제 뉴스'}`,
     description: config.description,
     inLanguage: 'ko-KR',
     isPartOf: { '@id': `${SITE_URL}/#website` },

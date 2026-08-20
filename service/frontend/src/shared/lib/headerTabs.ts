@@ -12,6 +12,7 @@ export type HeaderTabKey =
   | 'finance'
   | 'international'
   | 'investing'
+  | 'culture'
   | 'video'
   | 'fortune'
   | 'timeline'
