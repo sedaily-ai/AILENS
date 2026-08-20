@@ -7,12 +7,14 @@
 각 단계는 중간 결과(JSON)를 파일로 저장하므로, 중간에 끊겨도 재실행하면
 이미 끝난 단계는 건너뛰고 이어서 진행한다(resume).
 """
-import os, json, base64, time
+import os, sys, json, base64, time
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-import ddb_prompt
+sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
+import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
+
 import prompts
 from stitch import stitch
 

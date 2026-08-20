@@ -1,4 +1,5 @@
-"""admin 프롬프트 DDB에서 webtoon 프롬프트를 읽어온다.
+"""admin 프롬프트 DDB에서 4포맷(letters/webtoon/podcast/video) 프롬프트를
+읽어온다 — `pipelines/` 아래 모든 파이프라인이 공용으로 쓰는 모듈.
 
 `service/backend/services/prompt_loader.py`와 같은 스키마·같은 fallback
 순서를 쓴다(그 파일의 docstring 참고) — 다만 이건 배포된 Lambda가 아니라
@@ -10,14 +11,16 @@ DDB 스키마:
     sk = 'LATEST'  → {active_version}
     sk = 'v#<int>' → {content}
 
-admin 화면(`/lens` → 프롬프트 드로어 → 웹툰 탭)에서 저장한 내용이 여기로
-그대로 들어온다 — 이 파일이 DDB를 못 읽으면(자격 증명 없음, 오프라인 등)
-`../service/backend/prompts/webtoon/published.md`(admin이 저장할 때마다
-같이 갱신하는 파일시스템 사본)로 떨어진다. 두 경로 다 실패하면 명확한
-에러를 낸다 — 예전처럼 이 파일 안에 낡은 프롬프트 사본을 하드코딩해두고
-그게 조용히 쓰이는 상황(2026-08-20에 실제로 발견된 문제 — admin에서
-프롬프트를 고쳐도 이 파이프라인의 결과물엔 반영이 안 되고 있었다)을
-막기 위함.
+admin 화면(`/lens` → 프롬프트 드로어 → 각 포맷 탭)에서 저장한 내용이
+여기로 그대로 들어온다 — 이 파일이 DDB를 못 읽으면(자격 증명 없음,
+오프라인 등) `../../service/backend/prompts/<category>/published.md`
+(admin이 저장할 때마다 같이 갱신하는 파일시스템 사본)로 떨어진다. 두
+경로 다 실패하면 명확한 에러를 낸다 — 예전처럼 각 파이프라인 안에 낡은
+프롬프트 사본을 하드코딩해두고 그게 조용히 쓰이는 상황(2026-08-20에
+webtoon-pipeline에서 실제로 발견된 문제 — admin에서 프롬프트를 고쳐도
+결과물엔 반영이 안 되고 있었다)을 막기 위함. 원래 webtoon 전용
+모듈이었다가, letters/podcast 파이프라인이 생기며 공용으로 옮겼다
+(2026-08-20).
 """
 import os
 from pathlib import Path

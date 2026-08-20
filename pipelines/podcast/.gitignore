@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+
+# 생성된 산출물(대본 텍스트는 몰라도 mp3는 바이너리) — S3에 올리고 여기엔
+# 안 둔다(4format-samples 관례와 동일).
+output/
+article*.txt

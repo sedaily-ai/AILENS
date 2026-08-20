@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+
+# 생성된 산출물 — 텍스트라 커밋해도 되지만(4format-samples 관례) 기본은
+# 로컬 실험용으로 취급. 정말 남길 샘플은 docs/product/4format-samples/로
+# 손으로 복사한다.
+output/
+article*.txt

@@ -57,7 +57,8 @@ cp .env.example .env
 
 1·2단계 프롬프트를 읽어오려면 DDB(`sedaily-mbti-admin-prompts-dev`,
 us-east-1) 읽기 권한이 있는 AWS 자격 증명도 필요하다 — 로컬에서는
-`AWS_PROFILE=yeonggwang` 환경변수로 지정(`ddb_prompt.py` 참고). 자격
+`AWS_PROFILE=yeonggwang` 환경변수로 지정(`../common/ddb_prompt.py` 참고,
+2026-08-20부터 letters/podcast와 공용). 자격
 증명이 없거나 DDB 접근이 실패해도 파일시스템 폴백으로 계속 동작한다.
 
 **실제 운영 키는 AWS Secrets Manager에 있음** — `sedaily-mbti/openai-api-key`
