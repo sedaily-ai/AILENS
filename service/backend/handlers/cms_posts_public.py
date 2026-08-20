@@ -163,17 +163,32 @@ def _shape_video(post: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
-    """"오늘의 이슈, 4가지 시선" — 원인/사람/내 일/숫자, 4개 고정 렌즈로 하루
-    하나의 이슈를 훑는 포맷(2026-08-12). Instagram @ailens 카드뉴스(다크톤,
-    "시선 ①~④" 라벨 + Q&A 블록)를 그대로 웹으로 옮긴다 — admin이 직접
-    작성(퀴즈와 같은 이유로 AI 반자동화 없음, body_inline.lenses 4개를 그대로
-    저장)."""
+    """"오늘의 이슈, 4가지 시선" 슬롯 — 2026-08-19부터 실제로는 4개 출력
+    포맷(레터/웹툰/팟캐스트/영상, admin/frontend LensMode.tsx 참조)을 담는
+    자리다. admin이 직접 작성(AI 생성은 프롬프트 테스트 실행 보조 — CmsPost
+    자체는 여전히 수동 저장, body_inline.lenses 4개를 그대로 저장)."""
     b = post.get("body_inline") or {}
     lenses = [
         {
             "label": item.get("label") or "",
             "question": item.get("question") or "",
             "bullets": [x for x in (item.get("bullets") or []) if x],
+            # "레터" 포맷 전용 문단 산문(2026-08-19) — 나머지 세 포맷은
+            # bullets만 쓰므로 대개 빈 배열.
+            "paragraphs": [x for x in (item.get("paragraphs") or []) if x],
+            # "웹툰" 포맷 전용 컷(이미지+캡션, 2026-08-19) — webtoon 채널
+            # 글의 body_inline.images와 같은 모양({url, caption}), 저장
+            # 위치만 이 슬롯.
+            "images": [
+                {"url": img.get("url") or "", "caption": img.get("caption") or ""}
+                for img in (item.get("images") or [])
+                if img.get("url")
+            ],
+            # "영상" 포맷 전용 YouTube 등 임베드 URL(2026-08-19).
+            "video_url": item.get("video_url") or None,
+            # "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — home_player
+            # 채널의 media_embed_url과 같은 성격, 저장 위치만 이 슬롯.
+            "media_url": item.get("media_url") or None,
         }
         for item in (b.get("lenses") or [])
     ]

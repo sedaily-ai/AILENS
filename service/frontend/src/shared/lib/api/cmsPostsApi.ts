@@ -221,6 +221,18 @@ export interface CmsLensItem {
   label: string;
   question: string;
   bullets: string[];
+  /** "레터" 포맷 전용 문단 산문(2026-08-19) — 비어있으면 question+bullets로
+   *  폴백한다(LensViewClient.tsx). */
+  paragraphs?: string[];
+  /** "웹툰" 포맷 전용 컷(이미지+캡션, 2026-08-19) — 비어있으면 기존
+   *  카드뉴스형 목업(불릿 기반)으로 폴백한다. */
+  images?: CmsWebtoonPanel[];
+  /** "영상" 포맷 전용 YouTube 등 임베드 URL(2026-08-19) — 있으면 실제
+   *  임베드, 없으면 정적 목업으로 폴백한다. */
+  video_url?: string | null;
+  /** "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — 있으면 실제
+   *  임베드, 없으면 정적 목업으로 폴백한다. */
+  media_url?: string | null;
 }
 
 export interface CmsLens {

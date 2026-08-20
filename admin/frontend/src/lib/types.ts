@@ -130,9 +130,9 @@ export interface CmsPostBody {
   key_points: string[];
   keywords: CmsKeyword[];
   images: CmsImage[];
-  // channels: ["letters"] 글의 분류 태그 — "이슈 톡톡"(기본값)과 "인사이트"
-  // (section: "column")를 가른다. category 는 카드에 붙는 짧은 라벨
-  // (예: 증시, 투자 인사이트).
+  // 레거시 필드 — "분류"(이슈 톡톡/인사이트/용어해설) 축은 2026-08-19
+  // 카테고리로 완전히 대체됐다. 관리자 UI 어디서도 더 이상 쓰거나 읽지
+  // 않는다. 과거 발행 글에 남아있는 값을 깨뜨리지 않으려고 타입만 유지.
   section?: CmsCardSection;
   category?: string;
   // channels: ["video"] 글만 씀 — YouTube 등 외부 임베드 URL 원문 그대로.
@@ -154,6 +154,20 @@ export interface CmsLensItem {
   label: string;
   question: string;
   bullets: string[];
+  /** "레터" 포맷 전용 — 실제 문단 산문(2026-08-19). 비어있으면 서비스
+   *  프런트가 question+bullets로 폴백한다(LensViewClient.tsx). */
+  paragraphs?: string[];
+  /** "웹툰" 포맷 전용(2026-08-19) — 컷(이미지+캡션) 목록. WebtoonMode.tsx의
+   *  WebtoonPanelsEditor와 같은 컴포넌트를 재사용하되, 저장 위치는 이 슬롯
+   *  (channels:["webtoon"] 글의 body_inline.images와는 별개)이다. */
+  images?: CmsImage[];
+  /** "영상" 포맷 전용(2026-08-19) — YouTube 등 외부 임베드 URL.
+   *  VideoMode.tsx(body.video_url)와 같은 입력 패턴, 저장 위치만 이 슬롯. */
+  video_url?: string;
+  /** "팟캐스트" 포맷 전용(2026-08-19) — YouTube 등 외부 오디오/영상 링크.
+   *  home-player(media_embed_url)와 같은 "제목+링크" 패턴, 저장 위치만
+   *  이 슬롯. */
+  media_url?: string;
 }
 
 export interface CmsPost {

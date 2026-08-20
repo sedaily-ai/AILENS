@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { resolveVideo } from '@/shared/lib/videoEmbed';
 import {
   LENS_ACCENT,
   LENS_CARD_BORDER,
@@ -79,14 +80,14 @@ const ARTICLE_FORMAT_SAMPLES: Record<
   {
     summary?: string[];
     letter?: string[];
-    cardnewsHeadline?: string;
-    cardnews?: string[];
+    webtoonHeadline?: string;
+    webtoon?: string[];
     podcast?: string[];
     video?: string[];
     // 시선 간 연결 문구(2026-08-18, "네 개가 따로 떨어졌다는 느낌" 지적) —
     // 각 포맷 끝에서 다음 시선으로 자연스럽게 넘어가는 한 줄. 마지막
     // 포맷(video)은 다음이 없어 안 씀.
-    bridge?: { letter?: string; cardnews?: string; podcast?: string };
+    bridge?: { letter?: string; webtoon?: string; podcast?: string };
   }
 > = {
   '2026-08-14-쏘카-테슬라-800대-더-늘린다-전기차-비중-14-로': {
@@ -107,8 +108,8 @@ const ARTICLE_FORMAT_SAMPLES: Record<
     // 없었다(2026-08-18, 품질 체크에서 지적). 물량·일정은 영상이 이미
     // 다루니, 카드뉴스는 "그래서 나는 뭘 타게 되나"로 완전히 바꿔 겹침을
     // 없앴다.
-    cardnewsHeadline: '그래서 누가 이 차를 타게 될까',
-    cardnews: [
+    webtoonHeadline: '그래서 누가 이 차를 타게 될까',
+    webtoon: [
       '예산 넉넉하게 쓰고 싶다면 — 새로 늘어난 모델Y·모델S·모델X, 프리미엄 \'블랙라벨\'로 예약할 수 있어요.',
       '실속 있게 타고 싶다면 — 기아 EV3, 현대 아이오닉9 같은 실속형·SUV까지 골라 탈 수 있어요.',
       '쏘카가 굴리는 전기차만 20종 — 세단부터 SUV까지, 원하는 대로 골라 타는 시대가 됐어요.',
@@ -130,7 +131,7 @@ const ARTICLE_FORMAT_SAMPLES: Record<
     ],
     bridge: {
       letter: '그럼 이 전기차, 실제로 누가 타게 될까요?',
-      cardnews: '그럼 나는 지금 뭘 하면 좋을까요?',
+      webtoon: '그럼 나는 지금 뭘 하면 좋을까요?',
       podcast: '이 변화, 숫자로 정리하면 어떨까요?',
     },
   },
@@ -138,7 +139,7 @@ const ARTICLE_FORMAT_SAMPLES: Record<
 
 function articleFormatSample(
   lensId: string,
-  format: 'letter' | 'cardnews' | 'podcast' | 'video',
+  format: 'letter' | 'webtoon' | 'podcast' | 'video',
 ): string[] | null {
   return ARTICLE_FORMAT_SAMPLES[lensId]?.[format] ?? null;
 }
@@ -147,7 +148,7 @@ function articleSummarySample(lensId: string): string[] | null {
   return ARTICLE_FORMAT_SAMPLES[lensId]?.summary ?? null;
 }
 
-function articleBridgeSample(lensId: string, format: 'letter' | 'cardnews' | 'podcast'): string | null {
+function articleBridgeSample(lensId: string, format: 'letter' | 'webtoon' | 'podcast'): string | null {
   return ARTICLE_FORMAT_SAMPLES[lensId]?.bridge?.[format] ?? null;
 }
 
@@ -887,19 +888,35 @@ export function LensViewClient({
               const p = lensPerspectiveAt(i);
               const on = i === active;
               const format = lensFormatAt(i);
-              // 카드뉴스·팟캐스트·영상은 완성감 있는 데모 스크립트가 있으면
-              // 그걸 쓰고, 없는 기사는 지금처럼 CMS 불릿을 그대로 쓴다.
+              // 웹툰·팟캐스트·영상은 완성감 있는 데모 스크립트(딱 한 기사에만
+              // 있는 하드코딩 오버라이드)가 있으면 그걸 쓰고, 없는 기사는
+              // admin이 실제로 채운 CMS 불릿을 그대로 쓴다(2026-08-19부터
+              // LensMode.tsx 4개 포맷 탭이 슬롯마다 다른 내용을 넣을 수 있어
+              // 이 폴백이 비로소 의미가 생겼다 — 그 전엔 모든 슬롯이 같은
+              // question+bullets를 공유했다).
               const scriptBullets =
-                format === 'cardnews' || format === 'podcast' || format === 'video'
+                format === 'webtoon' || format === 'podcast' || format === 'video'
                   ? articleFormatSample(lens.id, format) ?? l.bullets
                   : l.bullets;
-              // 레터 본문 — 데모 오버라이드가 있으면 자연스러운 문단으로,
-              // 없으면 지금처럼 카드뉴스와 같은 CMS 불릿 목록을 그대로 쓴다.
-              const letterParagraphs = format === 'letter' ? articleFormatSample(lens.id, 'letter') : null;
-              // 카드뉴스 표지 헤드라인 — 오버라이드가 있으면 그 표지 문구를,
+              // 레터 본문 — 데모 오버라이드 → 없으면 admin이 채운 실제
+              // paragraphs(2026-08-19 신설 필드) → 그것도 없으면 아래
+              // 불릿 목록으로 폴백(letterParagraphs가 null인 경우).
+              const letterParagraphs =
+                format === 'letter'
+                  ? (articleFormatSample(lens.id, 'letter') ??
+                     (l.paragraphs && l.paragraphs.length > 0 ? l.paragraphs : null))
+                  : null;
+              // 웹툰 표지 헤드라인 — 오버라이드가 있으면 그 표지 문구를,
               // 없으면 CMS 질문(l.question)을 그대로 쓴다.
-              const cardnewsHeadline =
-                format === 'cardnews' ? ARTICLE_FORMAT_SAMPLES[lens.id]?.cardnewsHeadline ?? l.question : l.question;
+              const webtoonHeadline =
+                format === 'webtoon' ? ARTICLE_FORMAT_SAMPLES[lens.id]?.webtoonHeadline ?? l.question : l.question;
+              // 실제 미디어 보유 여부(2026-08-19, LensMode.tsx 4개 포맷 탭에서
+              // 실제로 채운 경우) — 있으면 정적 목업 대신 진짜 콘텐츠를 그린다.
+              // 유튜브·네이버TV 판별은 /video 페이지와 같은 유틸(resolveVideo)을
+              // 재사용한다.
+              const realWebtoonCuts = format === 'webtoon' && l.images && l.images.length > 0 ? l.images : null;
+              const realVideo = format === 'video' && l.video_url ? resolveVideo(l.video_url) : null;
+              const realPodcast = format === 'podcast' && l.media_url ? resolveVideo(l.media_url) : null;
               return (
                 <section
                   key={i}
@@ -936,20 +953,21 @@ export function LensViewClient({
                     </p>
                   </div>
 
-                  {/* 포맷 목업 배지 — 텍스트 외 세 포맷은 아직 개념 단계라
-                      "무엇을 보고 있는지" 먼저 밝힌다. letter는 지금 실제
-                      운영 중인 형태라 배지 없이 그대로 둔다. */}
+                  {/* 포맷 배지 — 실제 미디어(2026-08-19, LensMode.tsx 4개
+                      포맷 탭에서 admin이 채운 것)가 있으면 "목업" 문구를
+                      뺀다. letter는 지금 실제 운영 중인 형태라 배지 없이
+                      그대로 둔다. */}
                   {format !== 'letter' && (
                     <p
                       className="flex items-center"
                       style={{ gap: 6, fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 14 }}
                     >
-                      {format === 'cardnews' && <Images size={13} aria-hidden />}
+                      {format === 'webtoon' && <Images size={13} aria-hidden />}
                       {format === 'podcast' && <Headphones size={13} aria-hidden />}
                       {format === 'video' && <Video size={13} aria-hidden />}
-                      {format === 'cardnews' && '카드뉴스 형식 목업 · 아직 생성 파이프라인 미연결'}
-                      {format === 'podcast' && '팟캐스트 형식 목업 · 아직 생성 파이프라인 미연결'}
-                      {format === 'video' && '영상 형식 목업 · 아직 생성 파이프라인 미연결'}
+                      {format === 'webtoon' && (realWebtoonCuts ? '웹툰' : '웹툰 형식 목업 · 아직 생성 파이프라인 미연결')}
+                      {format === 'podcast' && (realPodcast ? '팟캐스트' : '팟캐스트 형식 목업 · 아직 생성 파이프라인 미연결')}
+                      {format === 'video' && (realVideo ? '영상' : '영상 형식 목업 · 아직 생성 파이프라인 미연결')}
                     </p>
                   )}
 
@@ -1041,10 +1059,35 @@ export function LensViewClient({
                       실제 카드뉴스 규격(8컷, 비주얼시스템)은 볼트
                       01_카드뉴스_제작템플릿.md 참조 — 여기선 개수·구조
                       컨셉만 보여준다. */}
-                  {format === 'cardnews' && (
+                  {/* 실제 웹툰 컷(2026-08-19) — admin이 LensMode.tsx 웹툰
+                      탭에서 WebtoonPanelsEditor로 올린 이미지+캡션이 있으면
+                      아래 목업 캐러셀 대신 실제 컷을 순서대로 보여준다. */}
+                  {format === 'webtoon' && realWebtoonCuts && (
+                    <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                      {realWebtoonCuts.map((cut, ci) => (
+                        <figure key={ci} style={{ margin: 0 }}>
+                          <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 14, overflow: 'hidden', background: '#f3f4f6' }}>
+                            <Image src={cut.url} alt={cut.caption || ''} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'cover' }} />
+                          </div>
+                          {cut.caption && (
+                            <figcaption style={{ marginTop: 8, fontSize: 13.5, color: '#374151', lineHeight: 1.6, wordBreak: 'keep-all' }}>
+                              {cut.caption}
+                            </figcaption>
+                          )}
+                        </figure>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 카드뉴스형 목업 — 실제 컷이 없을 때만(위 realWebtoonCuts
+                      분기 참조). 인스타 카드뉴스처럼 한 번에 한 장만 크게
+                      보여주고 화살표(또는 스와이프)로 넘긴다(2026-08-18,
+                      "가로 스크롤 필름스트립은 촌스럽다" 지적 → /design
+                      캔버스로 방향 스케치 후 승인받고 반영). */}
+                  {format === 'webtoon' && !realWebtoonCuts && (
                     <CardnewsCarousel
                       photo={photo}
-                      coverHeadline={cardnewsHeadline || ''}
+                      coverHeadline={webtoonHeadline || ''}
                       ordinal={p.ordinal}
                       full={p.full}
                       color={p.color}
@@ -1059,7 +1102,23 @@ export function LensViewClient({
                     />
                   )}
 
-                  {/* 팟캐스트 목업 — 재생 버튼·진행바는 정적 장식(실제 오디오
+                  {/* 실제 팟캐스트 미디어(2026-08-19) — admin이 LensMode.tsx
+                      팟캐스트 탭에서 YouTube 등 링크를 채운 경우 실제 플레이어를
+                      임베드한다(/video 페이지와 같은 resolveVideo 유틸). */}
+                  {format === 'podcast' && realPodcast && (
+                    <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
+                      <iframe
+                        src={realPodcast.embedUrl}
+                        title={l.question || '팟캐스트'}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
+
+                  {/* 팟캐스트 목업 — 실제 미디어가 없을 때만(위 realPodcast
+                      분기 참조). 재생 버튼·진행바는 정적 장식(실제 오디오
                       없음). 오늘(2026-08-18) 레터 상세에서 "대부분 오디오가
                       없어 빈 회색 카드로 보인다"는 이유로 미니 플레이어를
                       뺐던 것과 같은 함정을 피하려고, 여기서도 실제 재생 상태를
@@ -1067,7 +1126,7 @@ export function LensViewClient({
                       디자인(2026-08-18 다듬기): tint 채움 카드 → 흰 바탕 +
                       공용 그림자·테두리 토큰. 챕터 라벨을 굵은 인라인 텍스트
                       대신 알약 배지로 바꿔 목록이 표처럼 정렬되게 했다. */}
-                  {format === 'podcast' && (
+                  {format === 'podcast' && !realPodcast && (
                     <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
                       <div className="flex items-center" style={{ gap: 14 }}>
                         <span
@@ -1128,13 +1187,29 @@ export function LensViewClient({
                     </div>
                   )}
 
-                  {/* 영상 목업 — 기사 사진을 썸네일로 재사용, 실제 영상 파일은
-                      없어 재생 버튼 오버레이만 정적으로 얹는다.
+                  {/* 실제 영상(2026-08-19) — admin이 LensMode.tsx 영상 탭에서
+                      YouTube 등 링크를 채운 경우 실제 플레이어를 임베드한다
+                      (/video 페이지와 같은 resolveVideo 유틸). */}
+                  {format === 'video' && realVideo && (
+                    <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
+                      <iframe
+                        src={realVideo.embedUrl}
+                        title={l.question || '영상'}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
+
+                  {/* 영상 목업 — 실제 영상이 없을 때만(위 realVideo 분기
+                      참조). 기사 사진을 썸네일로 재사용, 재생 버튼 오버레이만
+                      정적으로 얹는다.
                       디자인(2026-08-18 다듬기): 플레이어 아래 캡션·타임라인을
                       팟캐스트 챕터와 같은 알약 배지 톤으로 맞춰 두 오디오/영상
                       포맷이 한 세트로 읽히게 했고, 카드 전체에 공용 그림자를
                       둘러 다른 포맷 카드들과 무게감을 맞췄다. */}
-                  {format === 'video' && (
+                  {format === 'video' && !realVideo && (
                     <div style={{ borderRadius: 16, background: '#fff', boxShadow: LENS_CARD_SHADOW, padding: 14 }}>
                       <div
                         style={{

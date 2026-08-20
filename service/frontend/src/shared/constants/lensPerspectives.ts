@@ -132,20 +132,25 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
 ] as const;
 
 /**
- * 시선별 출력 포맷 목업(2026-08-18, 국장님 지시 — "네 시선을 텍스트만이
- * 아니라 레터·카드뉴스·팟캐스트·영상 네 형식으로 나오게 하라").
+ * 시선별 출력 포맷(2026-08-18, 국장님 지시 — "네 시선을 텍스트만이 아니라
+ * 레터·카드뉴스·팟캐스트·영상 네 형식으로 나오게 하라" — 처음엔 "카드뉴스"
+ * 였다가 2026-08-19 admin 개편(LensMode.tsx)에서 실제 파이프라인 이름인
+ * "웹툰"으로 통일. admin/frontend/src/lib/prompt.ts 의 프롬프트
+ * 카테고리(letters/webtoon/podcast/video)와도 이제 이름이 일치한다).
  *
- * 아직 실제 생성 파이프라인과 연결되지 않은 **개념 목업**이다 — 카드뉴스는
- * 이 서비스 프론트엔드에 라우트/컴포넌트가 아예 없고, 팟캐스트는 API
- * 클라이언트(shared/lib/podcastApi.ts)만 있고 UI는 오늘(2026-08-18) 레터
+ * 실제 생성 파이프라인(웹툰 이미지 생성·팟캐스트 TTS·영상 렌더)과는 아직
+ * 연결되지 않았다 — 텍스트(question/bullets/paragraphs, admin이 직접 쓰거나
+ * "AI로 생성"으로 초안을 받아 채운다)만 실 데이터다. 웹툰은 이 서비스
+ * 프론트엔드에 실제 8컷 이미지를 그릴 라우트/컴포넌트가 아직 없고, 팟캐스트는
+ * API 클라이언트(shared/lib/podcastApi.ts)만 있고 UI는 2026-08-18 레터
  * 상세에서 제거됐다("대부분 오디오가 없어 빈 회색 카드로 보임" — 동일한
- * 함정을 여기서도 반복하지 않도록, 실제 데이터가 없을 때도 항상 완성된
- * 형태로 보이는 정적 목업으로만 그린다). 인덱스 순서는 LENS_PERSPECTIVES와
- * 동일 기준(원인→공감→실무→숫자)으로 고정.
+ * 함정을 여기서도 반복하지 않도록, 실제 음성·영상 파일이 없을 때도 항상
+ * 완성된 형태로 보이는 정적 목업으로 그린다). 인덱스 순서는
+ * LENS_PERSPECTIVES와 동일 기준(원인→공감→실무→숫자)으로 고정.
  */
-export type LensFormat = 'letter' | 'cardnews' | 'podcast' | 'video';
+export type LensFormat = 'letter' | 'webtoon' | 'podcast' | 'video';
 
-export const LENS_FORMATS: readonly LensFormat[] = ['letter', 'cardnews', 'podcast', 'video'] as const;
+export const LENS_FORMATS: readonly LensFormat[] = ['letter', 'webtoon', 'podcast', 'video'] as const;
 
 /** 범위를 벗어나도 안전 — 시선 개수만큼 순환. */
 export function lensFormatAt(i: number): LensFormat {

@@ -98,6 +98,16 @@ function LensEditPage() {
       label: l.label,
       question: l.question.trim(),
       bullets: l.bullets.map((b) => b.trim()).filter(Boolean),
+      // "레터" 포맷 전용 문단 산문(2026-08-19, LensMode.tsx 참조) — 빈
+      // 배열이면 그냥 빈 배열로 둔다(undefined로 굳이 안 바꿔도 서비스
+      // 프런트가 length 0을 폴백 조건으로 이미 처리).
+      paragraphs: (l.paragraphs ?? []).map((p) => p.trim()).filter(Boolean),
+      // "웹툰"/"영상"/"팟캐스트" 포맷 전용 실제 미디어(2026-08-19) —
+      // WebtoonPanelsEditor·VideoMode·home-player와 같은 입력 패턴, 저장
+      // 위치만 이 슬롯.
+      images: l.images ?? [],
+      video_url: (l.video_url ?? "").trim() || undefined,
+      media_url: (l.media_url ?? "").trim() || undefined,
     }));
     const payload: CmsPostInput = {
       ...draft,
