@@ -74,67 +74,76 @@ export function AudioPreviewSection({ initialItems }: Props) {
         </Link>
       </header>
 
-      {/* 워싱턴포스트 오피니언 섹션 참고(2026-08-21, 사용자가 스크린샷으로
-          레퍼런스 제시 — "요런 느낌 어떨까요? 캐릭터는 기존거 사용하고").
-          작은 캡션 줄(날짜·포맷) 위, 굵은 세리프 제목이 아래에서 시각적
-          무게중심이 되는 구성 + 얇은 구분선 + 행마다 원형 캐릭터. 다만
-          레퍼런스의 다크 배경은 이 서비스의 밝은 톤(부드러운 그림자·여백,
-          feedback_frontend_design_tone)과 안 맞아 그대로 가져오지 않고
-          라이트 톤은 유지했다. 캐릭터는 신규 제작 대신 기존
-          ListeningHeadphoneIllustration(TodayNewsPlayer 미니바 아이콘과
-          동일)을 재사용 — 사용자 지목대로 "새 인물 아바타"가 아니라 이
-          섹션 고유의 리스닝 캐릭터를 반복 노출해 브랜드 일관성을 준다. */}
-      <div>
-        {shown.map((it, i) => {
+      {/* 세로 카드형 그리드로 재설계(2026-08-21, 사용자 요청 — "오디오
+          부분... 세로 카드형으로... 깔끔한 모던 디자인으로"). 이전 가로
+          행 리스트(워싱턴포스트 레퍼런스 1차 적용분)에서, 캐릭터가 매
+          행 오른쪽에 반복돼 리스트처럼 보이던 것을 카드마다 위쪽에
+          중앙 배치해 하나의 완결된 카드로 바꿨다. 장식(회전·그림자 과다)
+          없이 얇은 테두리 + 은은한 그림자만 쓰는 미니멀 톤
+          (feedback_frontend_design_tone: 과한 그라데이션·굵은 테두리 금지). */}
+      <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap: 'clamp(12px, 2vw, 18px)' }}>
+        {shown.map((it) => {
           const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
           return (
             <Link
               key={it.id}
               href={`/listen/${encodeURIComponent(it.id)}`}
               prefetch
-              className="group flex items-center justify-between hover:bg-gray-50 transition-colors"
+              className="group flex flex-col"
               style={{
-                gap: 16,
-                padding: 'clamp(16px, 2.6vw, 22px) 4px',
+                borderRadius: 14,
+                border: '1px solid rgba(17,24,39,0.08)',
+                background: '#fff',
+                boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 2px 8px rgba(17,24,39,0.04)',
+                padding: 'clamp(18px, 2.6vw, 24px) clamp(14px, 2.2vw, 18px)',
                 textDecoration: 'none',
-                borderBottom: i < shown.length - 1 ? '1px solid rgba(17,24,39,0.08)' : 'none',
+                transition: 'transform .18s ease, box-shadow .18s ease, border-color .18s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 10px 22px rgba(17,24,39,0.09)';
+                e.currentTarget.style.borderColor = 'rgba(59,130,246,0.28)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 2px rgba(17,24,39,0.03), 0 2px 8px rgba(17,24,39,0.04)';
+                e.currentTarget.style.borderColor = 'rgba(17,24,39,0.08)';
               }}
             >
-              <span className="min-w-0 flex-1">
-                <span style={{ display: 'block', fontSize: 11.5, color: '#9ca3af', marginBottom: 6, fontWeight: 700, letterSpacing: '0.01em' }}>
-                  {isAudio ? '팟캐스트' : '영상'}
-                  {it.date && <> · {it.date.replaceAll('-', '.')}</>}
-                </span>
-                <span
-                  className="block text-gray-900 group-hover:underline"
-                  style={{
-                    fontFamily: '"Noto Serif KR", serif',
-                    fontSize: 'clamp(17px, 2.6vw, 20px)',
-                    fontWeight: 700,
-                    lineHeight: 1.4,
-                    letterSpacing: '-0.015em',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {it.title}
-                </span>
-              </span>
-
               <span
                 className="flex items-center justify-center flex-shrink-0"
-                style={{ width: 56, height: 56, borderRadius: '50%', background: '#fff', overflow: 'hidden' }}
+                style={{ width: 52, height: 52, borderRadius: '50%', background: '#f3f6fb', overflow: 'hidden', marginBottom: 14 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, LensViewClient.tsx와 동일 패턴 */}
                 <img
                   src={PODCAST_PERSPECTIVE.illustration}
                   alt=""
-                  width={56}
-                  height={56}
+                  width={52}
+                  height={52}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
                 />
+              </span>
+
+              <span style={{ fontSize: 11, color: '#9ca3af', marginBottom: 7, fontWeight: 700, letterSpacing: '0.01em' }}>
+                {isAudio ? '팟캐스트' : '영상'}
+                {it.date && <> · {it.date.replaceAll('-', '.')}</>}
+              </span>
+
+              <span
+                className="text-gray-900 group-hover:text-blue-700 transition-colors"
+                style={{
+                  fontFamily: '"Noto Serif KR", serif',
+                  fontSize: 'clamp(14.5px, 2vw, 15.5px)',
+                  fontWeight: 700,
+                  lineHeight: 1.42,
+                  letterSpacing: '-0.01em',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {it.title}
               </span>
             </Link>
           );
