@@ -5,15 +5,16 @@ import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
+import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
 
 // 카드 4개가 전부 "팟캐스트" 캐릭터 하나만 반복돼 단조로워 보인다는
 // 지적(2026-08-21, "캐릭터들이 다 동일하네? 서로 다르게 해야하지
 // 않을까요?") — 카드 인덱스로 /lens 형식 선택 UI의 4개 라인아트(레터/
-// 웹툰/팟캐스트/영상)를 순환시켜 매 카드가 다른 캐릭터·다른 브랜드
-// 색(LENS_PERSPECTIVES의 color/tint)을 갖게 했다. 실제 포맷(팟캐스트/
-// 영상)과 캐릭터가 1:1로 안 맞을 수 있지만, 이 섹션은 "오디오 콘텐츠
-// 모아보기"용 장식이지 포맷 표시는 별도 캡션 줄(아래)이 이미 맡고
-// 있어 문제 없다는 판단.
+// 웹툰/팟캐스트/영상)를 순환시켜 매 카드가 다른 캐릭터를 갖게 했다.
+// 처음엔 캐릭터별 브랜드 색(tint/color)까지 입혔는데, "캐릭터는
+// 흑백친구들로 하시죠"라는 후속 피드백으로 아바타·재생 배지 색은
+// 다시 중립 톤으로 되돌리고 캐릭터 종류만 다르게 유지한다.
+const NEUTRAL_ACCENT = '#3b82f6';
 
 // 오디오 섹션(2026-08-21, 사용자 요청 — "오디오 섹션도 메인 페이지에 걸어주시죠",
 // 위치는 "문화 섹션 위에"). TodayNewsPlayer.tsx(하단 고정 미니 플레이어)에만
@@ -108,9 +109,9 @@ export function AudioPreviewSection({ initialItems }: Props) {
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
                 e.currentTarget.style.boxShadow = '0 10px 22px rgba(17,24,39,0.1)';
-                e.currentTarget.style.borderColor = p.color;
+                e.currentTarget.style.borderColor = NEUTRAL_ACCENT;
                 const title = e.currentTarget.querySelector<HTMLElement>('[data-title]');
-                if (title) title.style.color = p.color;
+                if (title) title.style.color = NEUTRAL_ACCENT;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
@@ -123,7 +124,7 @@ export function AudioPreviewSection({ initialItems }: Props) {
               <span className="relative flex-shrink-0" style={{ width: 68, height: 68, marginBottom: 18 }}>
                 <span
                   className="flex items-center justify-center"
-                  style={{ width: 68, height: 68, borderRadius: '50%', background: p.tint, overflow: 'hidden' }}
+                  style={{ width: 68, height: 68, borderRadius: '50%', background: '#f3f4f6', overflow: 'hidden' }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, LensViewClient.tsx와 동일 패턴 */}
                   <img
@@ -134,22 +135,40 @@ export function AudioPreviewSection({ initialItems }: Props) {
                     style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
                   />
                 </span>
-                {/* 재생 버튼 배지 — 아바타 원 위에 흰 테두리로 떠 있어 "재생
-                    가능한 오디오"라는 걸 아이콘만으로 바로 알 수 있게.
-                    캐릭터별 브랜드 색(p.color)을 그대로 써서 아바타·배지가
-                    한 세트처럼 보이게 한다. */}
+                {/* 재생 버튼 배지 — 클릭하면 카드가 가리키는 /listen 상세로
+                    이동하는 대신, 하단 고정 플레이어(TodayNewsPlayer)에서
+                    바로 재생을 시작한다(2026-08-21, "재생버튼 누르면 바
+                    흘러가게, 해당 페이지로 리다이렉트말구"). <a> 안에
+                    실제 <button>을 못 넣어(중첩 인터랙티브 엘리먼트) role=
+                    button span + 키보드 핸들러로 대체. stopPropagation으로
+                    부모 Link 네비게이션을 막는다. */}
                 <span
-                  aria-hidden
+                  role="button"
+                  tabIndex={0}
+                  aria-label="재생"
                   className="absolute flex items-center justify-center"
                   style={{
                     width: 26,
                     height: 26,
                     borderRadius: '50%',
-                    background: p.color,
+                    background: NEUTRAL_ACCENT,
                     border: '2.5px solid #fff',
                     bottom: -3,
                     right: -3,
-                    boxShadow: `0 2px 5px ${p.color}59`,
+                    boxShadow: `0 2px 5px ${NEUTRAL_ACCENT}59`,
+                    cursor: 'pointer',
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    requestPlayHomePlayerItem(it.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      requestPlayHomePlayerItem(it.id);
+                    }
                   }}
                 >
                   <svg width={10} height={10} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>

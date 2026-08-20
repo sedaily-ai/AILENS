@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';
 import { ListeningHeadphoneIllustration } from '@/shared/ui/icons/HandDrawnIcons';
+import { onPlayHomePlayerItemRequest } from '@/shared/lib/audioPlayerBus';
 
 // 북마크는 로그인한 사람만 쓸 수 있다(2026-08-21, 사용자 요청 — "로그인하면
 // 북마크 가능하게"). 지금은 클라이언트 localStorage에만 저장한다 — 이
@@ -234,6 +235,30 @@ export function TodayNewsPlayer() {
     setPlaying(false);
   }
 
+  // 외부(AudioPreviewSection의 카드 재생 버튼)에서 특정 항목을 바로 재생
+  // 요청할 때 쓴다(2026-08-21). setIndex()는 비동기 배치라 바로 이어서
+  // play()를 부르면 아직 갱신 안 된 `current`(이전 index 기준)를 읽는
+  // 경쟁 상태가 생긴다 — autoPlayOnIndexRef에 "이 index로 바뀌면 자동
+  // 재생해라" 표시만 남기고, 아래 트랙 전환 effect가 실제 재생을 맡는다.
+  const autoPlayOnIndexRef = useRef(false);
+
+  function playItemById(id: string) {
+    if (!items) return;
+    const i = items.findIndex((it) => it.id === id);
+    if (i < 0) return;
+    setClosed(false);
+    setError(false);
+    if (i === index) {
+      // 이미 선택돼 있던 트랙 — index effect가 안 도니 바로 재생.
+      play();
+      return;
+    }
+    autoPlayOnIndexRef.current = true;
+    setIndex(i);
+  }
+
+  useEffect(() => onPlayHomePlayerItemRequest(playItemById), [items, index]);
+
   // <audio> 진행률·종료 이벤트 — 유튜브처럼 폴링 대신 네이티브 이벤트로.
   useEffect(() => {
     const audio = audioRef.current;
@@ -264,13 +289,27 @@ export function TodayNewsPlayer() {
 
   // 트랙이 바뀌면 재생 중이던 영상은 멈춘다 — 다음 트랙은 버튼을 다시
   // 눌러야 재생(자동 넘어감은 ended 이벤트에서만, 사용자가 prev/next를
-  // 누른 경우는 명시적으로 다시 재생해야 자연스럽다).
+  // 누른 경우는 명시적으로 다시 재생해야 자연스럽다). 다만
+  // autoPlayOnIndexRef가 서 있으면(playItemById 경유) 멈춘 직후 바로
+  // 새 트랙을 재생한다 — 홈 오디오 카드 재생 버튼용.
   useEffect(() => {
     ytPlayerRef.current?.pauseVideo();
     audioRef.current?.pause();
     stopYtProgressPolling();
     setPlaying(false);
     setProgress(0);
+    if (autoPlayOnIndexRef.current) {
+      autoPlayOnIndexRef.current = false;
+      const target = items && items.length > 0 ? items[Math.min(index, items.length - 1)] : null;
+      if (target) {
+        if (DIRECT_AUDIO_RE.test(target.mediaEmbedUrl)) {
+          void playDirectAudio(target.mediaEmbedUrl);
+        } else {
+          const videoId = extractYoutubeVideoId(target.mediaEmbedUrl);
+          if (videoId) void playYoutube(videoId);
+        }
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- index 변경 시에만
   }, [index]);
 
