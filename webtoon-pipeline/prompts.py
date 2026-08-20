@@ -61,7 +61,14 @@ STYLE = (
     "desk-lamp amber, crisp window light — editorial documentary mood.\n\n"
     "Anonymous generic characters only — do NOT render the specific "
     "likeness of any real public figure; faces should read as illustrated "
-    "original characters, not a portrait of someone identifiable."
+    "original characters, not a portrait of someone identifiable.\n\n"
+    "Any readable text inside a prop (document, poster, screen, chart, "
+    "sign, table) must come ONLY from the text explicitly given in this "
+    "prompt's [SCENE]/[CAPTION BOX]/[NARRATION]/speech bubble content. "
+    "Never invent additional readable text — no invented company names, "
+    "prices, dates, phone numbers, or stats. If a prop would otherwise "
+    "need text that wasn't given, render it blank, blurred, or angled "
+    "away from camera instead of inventing content."
 )
 
 BUBBLE_RULES = (
@@ -92,3 +99,20 @@ def bubbles(*pairs):
 def caption(text):
     """캡션 박스 렌더링 지시문."""
     return f"\n\n[CAPTION BOX]\nSmall caption box text: 「{text}」"
+
+
+# 2026-08-20: 컷1·컷8의 narration이 "컨텍스트로만 쓰고 말풍선으로 렌더하지
+# 말라"는 지시만 있고 "그럼 어떻게 보여줄지"가 없어서, 실제로는 화면에
+# 전혀 안 보이는 버그가 있었다(1단계 스크립트엔 있는데 이미지엔 텍스트가
+# 없음). caption()처럼 명시적으로 화면에 그리라는 지시를 준다 — 다만
+# 캡션(작은 수치 박스)과는 다른 자리·다른 스타일(다큐 타이틀 카드 느낌)로.
+def narration(text):
+    """내레이션(컷1·컷8) 렌더링 지시문 — 다큐 톤 타이틀 카드처럼 화면에 표시."""
+    return (
+        "\n\n[NARRATION TEXT — CRITICAL]\n"
+        "This is NOT a speech bubble. Render it as a documentary-style "
+        "title card: clean sans-serif Korean text, no bubble outline, "
+        "placed in a calm empty area of the frame (e.g. lower third or "
+        "upper third), subtle dark scrim behind it for legibility. "
+        f"Render the Korean text EXACTLY as given: 「{text}」"
+    )

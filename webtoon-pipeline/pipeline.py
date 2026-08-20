@@ -43,7 +43,7 @@ def build_image_prompt(camera: str, scene: str, cut: dict) -> str:
     style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
     parts = [style, f"\n\n[SCENE]\n{scene}"]
     if cut.get("narration"):
-        parts.append(f"\n\n[CONTEXT NARRATION — do not render as bubble]\n{cut['narration']}")
+        parts.append(prompts.narration(cut["narration"]))
     if cut.get("caption"):
         parts.append(prompts.caption(cut["caption"]))
     if cut.get("dialogue"):

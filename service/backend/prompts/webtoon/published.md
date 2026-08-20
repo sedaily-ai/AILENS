@@ -67,6 +67,14 @@
 5. 스크립트에 없는 사건·수치를 장면에 만들지 않는다.
 6. 실존 인물의 얼굴·외형을 지정하지 않는다.
 7. 실제 기업 로고, 상표, 기관 표식을 그리지 않는다.
+8. 인서트로 서류·포스터·화면·표 같은 "읽을 수 있는 텍스트가 있는 소품"을
+   넣을 때는, 그 안에 들어갈 구체적 텍스트(제목·수치·업체명·날짜·연락처
+   등)까지 장면 묘사에 명시한다. "빵집 목록이 적힌 서류" 처럼 뭉뚱그려
+   묘사하면 이미지 생성 단계에서 그 안의 텍스트를 마음대로 지어낸다 —
+   실제로 라운드3에서 원문에 없는 가짜 업체명 3개와 가짜 매장 사진이
+   담긴 문서를 통째로 만들어낸 적이 있다. 소품에 텍스트를 넣고 싶은데
+   구체적으로 정할 게 없으면, 텍스트 없는 소품(빈 문서, 흐릿한 화면)으로
+   바꾸거나 아예 넣지 않는다.
 
 ### 절대 원칙 (모든 포맷 공통)
 
@@ -178,7 +186,14 @@ STYLE = (
     "accents, crisp natural light. Documentary mood.\n\n"
     "Anonymous original characters only — never render the likeness of "
     "any real public figure. No real corporate logos, trademarks, or "
-    "institutional insignia anywhere in frame."
+    "institutional insignia anywhere in frame.\n\n"
+    "Any readable text inside a prop (document, poster, screen, chart, "
+    "sign, table) must come ONLY from the text explicitly given in this "
+    "prompt's [SCENE]/[CAPTION BOX]/speech bubble content. Never invent "
+    "additional readable text — no invented company names, prices, "
+    "dates, phone numbers, or stats. If a prop would otherwise need "
+    "text that wasn't given, render it blank, blurred, or angled away "
+    "from camera instead of inventing content."
 )
 
 BUBBLE_RULES = (

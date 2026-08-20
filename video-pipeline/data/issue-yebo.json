@@ -1,0 +1,99 @@
+{
+  "title": "은행권, 예보료 9000억 더낸다",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 6,
+      "narration": "예금보험료율 인상, 금융업계에 어떤 영향을 줄까요?",
+      "caption": "예금보험료율 인상, 금융업계 영향은?",
+      "data": { "icon": "landmark" }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "은행권은 연간 9000억 원 이상의 추가 부담을 예상하고 있어요.",
+      "caption": "추가 부담: 9000억 원 이상",
+      "data": { "value": 9000, "unit": "억 원", "label": "은행권 연간 추가 부담", "sourceNote": "자료: 서울경제신문" }
+    },
+    {
+      "type": "diagram",
+      "duration": 10,
+      "narration": "예보료율이 0.08%에서 0.13%로 인상되면 62.5% 증가하는 셈입니다.",
+      "caption": "예보료율 0.08% → 0.13% (62.5%↑)",
+      "data": {
+        "nodes": [
+          { "kind": "node", "icon": "coins", "label": "0.08%" },
+          { "kind": "connector", "variant": "arrow" },
+          { "kind": "node", "icon": "coins", "label": "0.13%" }
+        ],
+        "sourceNote": "자료: 서울경제신문"
+      }
+    },
+    {
+      "type": "chart",
+      "duration": 12,
+      "narration": "손해보험 업계는 현행보다 3.3배 높은 0.5%를 제안받았어요.",
+      "caption": "손해보험 예보료율: 0.15% → 0.5%",
+      "data": {
+        "chartType": "bar",
+        "points": [
+          { "label": "현재", "value": 0.15 },
+          { "label": "제안", "value": 0.5 }
+        ],
+        "unit": "%",
+        "sourceNote": "자료: 서울경제신문(연구용역 중간 결과)"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "보험료율 상한이 내년 말 일몰될 예정이라 논의가 필요하죠.",
+      "caption": [
+        { "text": "보험료율 상한 " },
+        { "text": "내년 말 일몰", "emphasis": true }
+      ],
+      "data": {}
+    },
+    {
+      "type": "highlight",
+      "duration": 14,
+      "narration": "예보료 인상이 소비자 혜택 축소로 이어질 수 있다는 우려도 있습니다.",
+      "caption": [
+        { "text": "소비자 혜택 " },
+        { "text": "축소 우려", "emphasis": true }
+      ],
+      "data": {}
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "하지만 금융시장의 안정을 위해 인상은 불가피하다고 합니다.",
+      "caption": "금융시장 안정 위해 불가피",
+      "data": {
+        "nodes": [
+          { "kind": "node", "icon": "scale", "label": "금융시장 안정" },
+          { "kind": "connector", "variant": "arrow" },
+          { "kind": "node", "icon": "trending-up", "label": "예보료 인상" }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 12,
+      "narration": "은행권은 전체 예보료의 약 60%를 부담하고 있어요.",
+      "caption": "전체 부담의 60%",
+      "data": { "value": 60, "unit": "%", "label": "은행권의 전체 예보료 부담 비중", "sourceNote": "자료: 서울경제신문" }
+    },
+    {
+      "type": "closing",
+      "duration": 8,
+      "narration": "예보료 인상, 소비자에게 어떤 영향을 줄까요?",
+      "caption": "예보료 인상, 소비자 영향은?",
+      "data": {}
+    }
+  ],
+  "source": "자료: 서울경제신문",
+  "disclaimer": ""
+}
