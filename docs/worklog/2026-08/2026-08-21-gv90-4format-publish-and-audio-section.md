@@ -297,6 +297,27 @@ containing-block 버그를 다시 겪지 않기 위함.
 크기를 바꾸기 쉬운 시각 요소를 담는 박스는 `minHeight`를 기본으로
 쓰고, `height`는 정말 잘라내도(overflow:hidden) 되는 자리에만 쓸 것.
 
+### 11. 기사 하단 AI 생성 콘텐츠 고지(면책조항) 박스
+
+"기사 하단에... 사진처럼... 면책조항 걸어주세요"라며 서울경제 영문
+CMS(en.sedaily.com)의 "AI-translated from Korean... Quotes from foreign
+sources are based on Korean-language reports... View Korean original ↗
+· Translation Policy" 박스 스크린샷을 레퍼런스로 제시.
+
+- `AiDisclaimer.tsx` 신설 — 파란 좌측 보더 + ⓘ 아이콘 + 2줄 고지문
+  (①"서울경제신문 원문 기사를 AI가 레터·웹툰·팟캐스트·영상 형식으로
+  재구성" ②"AI 생성 과정에서 표현·세부 내용이 원문과 다를 수 있음,
+  투자 등 중요 판단 전 원문 확인 권장") + "원문 기사 보기 ↗"(source_url
+  있을 때만) + "이용 정책" 링크.
+- 문구는 기존 이용약관 제6조(콘텐츠에 대한 면책)와 같은 취지로 맞췄고,
+  "이용 정책" 링크가 그 조항으로 바로 스크롤되도록 `terms/page.tsx`의
+  해당 `<h2>`에 `id="content-disclaimer"` 추가
+  (`/terms#content-disclaimer`).
+- `LensViewClient.tsx`·`LetterDetailClient.tsx` 기사 하단에 공통
+  적용 — 기존에 각자 따로 있던 "원문 기사"/"원문 보기 — 서울경제 →"
+  단독 링크는 이 박스 안 링크로 흡수해 중복 제거.
+- 라이브에서 lens·letters 양쪽 기사 페이지 + `/terms` 앵커 전부 확인.
+
 ## 결정
 
 - 파이프라인이 만드는 영상 스크립트 JSON은 사람 검수 없이 그대로 렌더에
