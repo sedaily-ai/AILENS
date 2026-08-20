@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchVideos, type CmsVideo, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
@@ -284,14 +285,27 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
 
 /** 재생 모달 — ArchiveCalendarModal.tsx와 같은 관례(fixed inset-0 flex
  *  items-center justify-center, 배경 클릭으로 닫기, transform 정렬 안 씀).
- *  영상 콘텐츠라 배경은 카드보다 더 어둡게(black/80). */
+ *  영상 콘텐츠라 배경은 카드보다 더 어둡게(black/80).
+ *
+ *  document.body에 포털로 띄운다(2026-08-20, 실사용 버그 — 헤더·하단
+ *  오디오 플레이어가 안 가려지고 영상도 화면에 안 보이는 걸 사용자가
+ *  스크린샷으로 발견). 원인: FeedPage.tsx의 탭 전환 애니메이션이
+ *  `.tab-fade-in { animation: ... translateY(0) ... both }`으로 main
+ *  콘텐츠 래퍼에 transform을 남겨두는데, transform이 있는 조상은(값이
+ *  translateY(0)이라도) position:fixed 자손의 containing block이
+ *  된다 — 그러면 이 모달의 "fixed"가 뷰포트가 아니라 그 래퍼(문서 전체
+ *  높이) 기준으로 계산돼, 어둡게 덮는 배경은 넓어서 눈에 보이지만
+ *  가운데 정렬된 실제 내용(닫기 버튼·영상)은 문서 중간 어딘가로 밀려나
+ *  현재 스크롤 위치 밖으로 사라진다. 헤더·오디오바는 그 래퍼 밖(더
+ *  상위)에 있어 이 문제를 안 겪고 그대로 위에 뜬다. createPortal로
+ *  body 최상위에 붙이면 어떤 조상의 transform과도 무관해진다. */
 function VideoLightbox({ video, onClose }: { video: CmsVideo; onClose: () => void }) {
   const resolved = resolveVideo(video.video_url);
   const isDirectFile = !resolved && DIRECT_FILE_RE.test(video.video_url);
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-      style={{ padding: 'clamp(16px, 4vw, 40px)' }}
+      className="fixed inset-0 flex items-center justify-center bg-black/80"
+      style={{ padding: 'clamp(16px, 4vw, 40px)', zIndex: 200 }}
       onClick={onClose}
     >
       <div
@@ -330,6 +344,7 @@ function VideoLightbox({ video, onClose }: { video: CmsVideo; onClose: () => voi
           {video.title}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
