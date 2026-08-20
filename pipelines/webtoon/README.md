@@ -6,7 +6,7 @@
 
 기존에 `2_ailens/마스터DB/03_개발·프롬프트/뉴스웹툰_파이프라인`(dev2 바깥,
 게다가 홈 디렉터리 전체가 git 루트로 잡혀 있어 커밋이 안 되던 위치)에
-있던 걸 2026-08-20에 이 저장소로 옮겼다 — `video-pipeline/`을 옮긴 것과
+있던 걸 2026-08-20에 이 저장소로 옮겼다 — `pipelines/video/`를 옮긴 것과
 같은 이유.
 
 ## 아키텍처 — 3단계
@@ -49,7 +49,7 @@ admin에서 프롬프트를 고쳐도 실제 이미지엔 반영이 안 되는 �
 ## 셋업
 
 ```bash
-cd webtoon-pipeline
+cd pipelines/webtoon
 pip install -r requirements.txt
 cp .env.example .env
 # .env 안의 OPENAI_API_KEY를 실제 키로 교체

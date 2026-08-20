@@ -1072,7 +1072,7 @@ export function LensViewClient({
                     <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                       {realWebtoonCuts.map((cut, ci) => (
                         <figure key={ci} style={{ margin: 0 }}>
-                          {/* webtoon-pipeline이 실제로 만드는 컷은 1536x1024(3:2
+                          {/* pipelines/webtoon이 실제로 만드는 컷은 1536x1024(3:2
                               가로) — 예전 인스타 카드뉴스(4:5 세로) 전제로 aspect-ratio
                               4/5 + cover를 썼더니 좌우가 크게 잘려서, 말풍선이 화면
                               가장자리에 있으면(BUBBLE_RULES가 "상단·측면 배치"를

@@ -29,7 +29,7 @@ _REGION = os.environ.get("AWS_REGION", "us-east-1")
 _AWS_PROFILE = os.environ.get("AWS_PROFILE")  # 로컬 실행용, Lambda에선 안 씀
 
 _FILESYSTEM_FALLBACK = (
-    Path(__file__).parent.parent / "service" / "backend" / "prompts"
+    Path(__file__).parent.parent.parent / "service" / "backend" / "prompts"
 )
 
 _table = None

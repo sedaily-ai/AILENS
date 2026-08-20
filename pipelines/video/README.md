@@ -1,4 +1,4 @@
-# video-pipeline — AI LENS 영상 포맷 렌더러
+# pipelines/video — AI LENS 영상 포맷 렌더러
 
 기사 원문에서 나온 영상 각본 JSON(`admin/frontend`의 프롬프트 드로어 →
 "영상" 채널로 생성)을 실제 mp4로 렌더링하는 독립 Remotion 프로젝트.
