@@ -5,21 +5,21 @@
     {
       "type": "opening",
       "duration": 7,
-      "narration": "요즘 여행은 빵을 먹으러 떠나는 '빵지순례'로 뜨고 있습니다.",
+      "narration": "빵을 먹으러 여행을 떠나는 '빵지순례', 요즘 진짜 뜨고 있거든요.",
       "caption": "빵지순례, 새로운 여행 트렌드",
       "data": { "icon": "croissant" }
     },
     {
       "type": "stat",
       "duration": 10,
-      "narration": "아고다에 따르면, 고양의 숙소 검색량이 22% 늘었습니다.",
+      "narration": "아고다 조사를 보니, 고양의 숙소 검색량이 22%나 늘었더라고요.",
       "caption": "고양 숙소 검색량 22%↑",
       "data": { "value": 22, "unit": "%", "label": "고양 숙소 검색량 증가율(전년 동기 대비)", "sourceNote": "자료: 아고다" }
     },
     {
       "type": "chart",
       "duration": 11,
-      "narration": "그런데 이건 고양만의 일이 아닙니다. 대전도 18% 늘었습니다.",
+      "narration": "근데 이게 고양만의 얘기가 아니에요. 대전도 18%나 늘었던데요.",
       "caption": "고양 22%↑ · 대전 18%↑",
       "data": {
         "chartType": "bar",
@@ -34,7 +34,7 @@
     {
       "type": "diagram",
       "duration": 12,
-      "narration": "대전은 성심당 하나가 아니라, '빵택시'로 지역 빵집을 통째로 소개합니다.",
+      "narration": "대전은 성심당 하나로 안 끝나요. '빵택시' 타면 동네 빵집까지 싹 돌아볼 수 있죠.",
       "caption": "대전 빵택시 → 지역 빵집",
       "data": {
         "nodes": [
@@ -48,7 +48,7 @@
     {
       "type": "highlight",
       "duration": 11,
-      "narration": "정선은 아예 달리면서 빵을 먹는 '빵트레일런'을 엽니다.",
+      "narration": "정선은 아예 달리면서 빵을 먹는 '빵트레일런'까지 열어요.",
       "caption": [
         { "text": "정선 " },
         { "text": "'빵트레일런'", "emphasis": true }
@@ -58,7 +58,7 @@
     {
       "type": "diagram",
       "duration": 12,
-      "narration": "수원과 서울도 커피·디저트 축제로 이 흐름에 올라탔습니다.",
+      "narration": "수원이랑 서울도 커피·디저트 축제로 이 흐름에 올라탔고요.",
       "caption": "수원·서울: 디저트 축제",
       "data": {
         "nodes": [
@@ -72,14 +72,14 @@
     {
       "type": "stat",
       "duration": 11,
-      "narration": "5개 도시 중 가장 적게 늘어난 서울도 11%였습니다.",
+      "narration": "5개 도시 중에 제일 적게 늘어난 서울도 11%였어요.",
       "caption": "서울 11%↑ · 5곳 모두 증가",
       "data": { "value": 11, "unit": "%", "label": "서울 숙소 검색량 증가율(전년 동기 대비)", "sourceNote": "자료: 아고다" }
     },
     {
       "type": "highlight",
       "duration": 11,
-      "narration": "성심당조차 신제품 하나로 화제가 되는 시대, 빵집 자체가 여행지가 됐습니다.",
+      "narration": "성심당은 신제품 하나 낸 것만으로 화제가 되고요. 빵집 자체가 이제 여행지가 된 거죠.",
       "caption": [
         { "text": "빵집이 " },
         { "text": "여행지가 되다", "emphasis": true }
