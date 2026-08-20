@@ -153,6 +153,15 @@ export function NewsFeedTab({
               heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} /> : undefined}
             />
 
+            {/* 단어 퀴즈를 "최신 뉴스" 바로 아래로 올렸다(2026-08-20, 사용자
+                확인 — 원래 위치는 카테고리 레일 세 짝을 다 지나서야 나와서
+                스크롤 이탈 전에 못 보고 지나치는 사람이 많았다). 퀴즈는
+                클릭 한 번으로 "맞다/틀렸다"가 바로 나오는 인터랙션이라 지식
+                충족감을 즉시 주는 포맷 — 이탈 전에 걸리는 게 핵심이라 히어로
+                바로 다음 자리로 옮긴다. 영상 섹션은 이미 썸네일이 시각적으로
+                스캔되기 쉬운 포맷이라 원래 자리(카테고리 레일 다음) 유지. */}
+            <WordsPreviewSection initialTerms={initialWordTerms} />
+
             {/* 카테고리 섹션(2026-08-17, 본지 en.sedaily.com 스타일 참고 — 사용자
                 확인: "본지형식대로 해보시죠"). 한때 카테고리 레일(그리드형)로
                 만들었다가 "레일 헤더와 카드 태그가 완전히 같은 단어라 순수
@@ -189,10 +198,6 @@ export function NewsFeedTab({
             <WebtoonPreviewSection initialItems={initialWebtoons} />
 
             <CategoryPairRow pair={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
-
-            {/* 섹션 재정렬(2026-08-06) — "단어 퀴즈는 문제 하나뿐이라 자리를
-                많이 안 차지하니 가볍게 매일 훑는 습관을 만들고 싶다"는 피드백. */}
-            <WordsPreviewSection initialTerms={initialWordTerms} />
 
             {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
                 뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를
