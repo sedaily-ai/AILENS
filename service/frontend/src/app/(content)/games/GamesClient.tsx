@@ -4,39 +4,15 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Press_Start_2P } from 'next/font/google';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
+import { GAMES } from '@/shared/data/games';
 
 // next/font로 이 라우트 청크에만 번들 — 예전엔 globals.css 최상단 @import라
 // /games를 안 쓰는 페이지까지 매번 googleapis.com 왕복을 렌더 블로킹으로 물고
 // 있었다.
 const arcadeFont = Press_Start_2P({ weight: '400', subsets: ['latin'], display: 'swap' });
 
-interface Game {
-  slug: string;
-  title: string;
-  tagline: string;
-  thumb: string;
-  bg: string;
-  neon: string;
-}
-
-const GAMES: Game[] = [
-  {
-    slug: 'cat-blanket',
-    title: '고양이 이불 덮어주기',
-    tagline: '추운 겨울밤, 박스 위 떨고 있는 길고양이에게 신문지 이불을',
-    thumb: '/games/cat-thumb.svg',
-    bg: 'linear-gradient(135deg, #1a1a3e 0%, #2d3a5a 100%)',
-    neon: '#f5a623', // 따뜻한 가로등 골드
-  },
-  {
-    slug: 'protect-newspaper',
-    title: '내일 신문을 지켜라!',
-    tagline: '비둘기 천국 광장에서 쏟아지는 배설물을 신문 한 장으로',
-    thumb: '/games/poop-thumb.svg',
-    bg: 'linear-gradient(135deg, #b0c4de 0%, #d3d3d3 100%)',
-    neon: '#4a6cf7', // 신문 블루
-  },
-];
+// GAMES 배열은 shared/data/games.ts로 이동(2026-08-21, 홈 게임 미리보기
+// 섹션과 공유 — GamesPreviewSection.tsx 참조).
 
 const ARCADE_FONT = `${arcadeFont.style.fontFamily}, "Courier New", monospace`;
 

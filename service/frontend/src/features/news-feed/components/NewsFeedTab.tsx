@@ -10,6 +10,7 @@ import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";
 import { VideoPreviewSection } from "./VideoPreviewSection";
+import { GamesPreviewSection } from "./GamesPreviewSection";
 import { AudioPreviewSection } from "./AudioPreviewSection";
 import { LensPreviewSection } from "./LensPreviewSection";
 import { NewsTimeMachineSection } from "./NewsTimeMachineSection";
@@ -238,6 +239,18 @@ export function NewsFeedTab({
                 있는 걸 직접 발견). 콘텐츠가 없는 날은 CategoryFeatureSection
                 이 알아서 숨는다. */}
             <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} first={false} />
+
+            {/* 게임 섹션(2026-08-21, 사용자 요청 — "게임도 섹션을... 메인에다가...
+                웹툰은 트렌디하게 잘 만들어진 것 같은데... 약간 재밌는 게임
+                느낌나도록", 위치는 "맨하단에"). 처음엔 웹툰·영상 옆에 붙여
+                "재밌는 비주얼 콘텐츠" 블록으로 묶으려 했으나, 사용자가
+                맨 아래로 옮겨달라고 재요청 — 본문 콘텐츠(카테고리 레일까지)를
+                다 본 뒤 마지막에 만나는 "쉬어가기" 자리로. 톤은 사이트
+                전역의 밝은 에디토리얼과 의도적으로 다르다 — /games 라우트
+                (GamesClient.tsx) 자체가 이미 다크+네온 아케이드 톤이라
+                그대로 가져왔다(GamesPreviewSection.tsx 상단 주석 참조,
+                GAMES 데이터는 shared/data/games.ts 공유). */}
+            <GamesPreviewSection />
           </div>
 
           <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
