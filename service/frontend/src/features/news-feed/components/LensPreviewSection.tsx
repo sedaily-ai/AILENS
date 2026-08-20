@@ -263,7 +263,6 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                 <div style={{ borderTop: '1px solid rgba(17,24,39,0.09)' }}>
                   {rows.map((l, i) => {
                     const p = lensPerspectiveAt(i);
-                    const rowPreview = (l.bullets ?? []).find((b) => b && b.trim()) ?? '';
                     return (
                       <Link key={i} href={`${href}?v=${i + 1}`} prefetch className="lz-row">
                         <span
@@ -311,25 +310,34 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                             >
                               {l.question || p.tagline}
                             </span>
-                            {rowPreview && (
-                              <span
-                                style={{
-                                  display: '-webkit-box',
-                                  marginTop: 3,
-                                  fontSize: 13,
-                                  fontWeight: 400,
-                                  color: '#6b7280',
-                                  lineHeight: 1.55,
-                                  letterSpacing: '-0.005em',
-                                  WebkitLineClamp: 1,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  wordBreak: 'keep-all',
-                                }}
-                              >
-                                {rowPreview}
-                              </span>
-                            )}
+                            {/* 부가설명을 태그라인으로 통일(2026-08-21, 사용자
+                                지적) — 원래는 기사별 불릿(bullets[0])을 썼는데,
+                                이 필드가 팟캐스트·영상 서브포맷에만 채워지는
+                                경우가 많아 레터·웹툰 행만 설명 없이 휑해
+                                보였다("팟캐스트랑 영상부분만 달려있는데").
+                                /lens 상세 페이지의 형식 선택 카드가 쓰는
+                                p.tagline("구조와 흐름까지 제대로 알고
+                                싶다면" 등, lensPerspectives.ts에 고정 정의)로
+                                바꿔 4행 전부 항상 같은 수준의 설명이 붙게
+                                한다 — 처음 보는 사람도 형식 4개가 각각
+                                뭔지 바로 이해할 수 있어야 한다는 요구. */}
+                            <span
+                              style={{
+                                display: '-webkit-box',
+                                marginTop: 3,
+                                fontSize: 13,
+                                fontWeight: 400,
+                                color: '#6b7280',
+                                lineHeight: 1.55,
+                                letterSpacing: '-0.005em',
+                                WebkitLineClamp: 1,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                wordBreak: 'keep-all',
+                              }}
+                            >
+                              {p.tagline}
+                            </span>
                           </span>
                         </span>
 
