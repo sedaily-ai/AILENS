@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
+import { fetchVideos, type CmsVideo, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { buildLensVideoItems, mergeByDateDesc } from '@/shared/lib/lensMediaFeed';
+
+// lens 영상은 YouTube/네이버TV 임베드가 아니라 S3에 올린 mp4 원본 파일이라
+// resolveVideo()가 못 알아본다(둘 다 URL 패턴 기반 판별). iframe 대신 그냥
+// <video> 태그로 재생 — 직접 파일 URL 전반에 쓸 수 있는 범용 분기(2026-08-20).
+const DIRECT_FILE_RE = /\.(mp4|webm|mov|m4v)(\?|$)/i;
 
 // 영상 콘텐츠 섹션(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
 // 여기 자동으로 뜬다. "매거진 고급짐" 톤(TrendingEconomySection과 동일 원칙)
@@ -21,21 +27,31 @@ interface Props {
   // 빌드타임(app/page.tsx)에 fetchVideos()로 미리 가져온 값 — 정적 HTML에
   // 실제 영상 목록이 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
   initialVideos?: CmsVideo[];
+  // lens("4가지 시선")의 영상 서브포맷도 이 섹션에 섞는다(2026-08-20, 사용자
+  // 요청 — shared/lib/lensMediaFeed.ts 참조). video 채널 발행이 뜸해져도
+  // 이 섹션이 계속 쌓이도록.
+  initialLensPosts?: CmsLens[];
 }
 
-export function VideoPreviewSection({ initialVideos }: Props) {
-  const [videos, setVideos] = useState<CmsVideo[] | null>(initialVideos ?? null);
+export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) {
+  const [channelVideos, setChannelVideos] = useState<CmsVideo[] | null>(initialVideos ?? null);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     fetchVideos().then((data) => {
-      if (!cancelled) setVideos(data);
+      if (!cancelled) setChannelVideos(data);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const videos = useMemo(() => {
+    if (channelVideos === null) return null;
+    const lensVideos = buildLensVideoItems(initialLensPosts ?? []);
+    return mergeByDateDesc(channelVideos, lensVideos);
+  }, [channelVideos, initialLensPosts]);
 
   if (!videos || videos.length === 0) return null;
 
@@ -111,6 +127,7 @@ export function VideoPreviewSection({ initialVideos }: Props) {
       >
         {shown.map((v) => {
           const resolved = resolveVideo(v.video_url);
+          const isDirectFile = !resolved && DIRECT_FILE_RE.test(v.video_url);
           const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
           const isPlaying = playingId === v.id;
           const cardStyle = {
@@ -130,6 +147,14 @@ export function VideoPreviewSection({ initialVideos }: Props) {
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
+                  />
+                ) : isPlaying && isDirectFile ? (
+                  <video
+                    src={v.video_url}
+                    controls
+                    autoPlay
+                    className="w-full h-full"
+                    style={{ objectFit: 'cover' }}
                   />
                 ) : (
                   <button
@@ -180,7 +205,7 @@ export function VideoPreviewSection({ initialVideos }: Props) {
                   }}
                 >
                   <Link
-                    href={`/video/${encodeURIComponent(v.id)}`}
+                    href={v.href ?? `/video/${encodeURIComponent(v.id)}`}
                     prefetch
                     className="hover:opacity-70 transition-opacity"
                     style={{

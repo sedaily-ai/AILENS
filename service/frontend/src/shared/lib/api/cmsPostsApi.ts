@@ -49,6 +49,10 @@ export interface CmsWebtoon {
   cover_image_url: string | null;
   panels: CmsWebtoonPanel[];
   is_cms: true;
+  /** lens("4가지 시선")의 웹툰 포맷에서 파생된 카드일 때만 채워짐(2026-08-20,
+   *  shared/lib/lensMediaFeed.ts) — 기본 `/webtoon/{id}` 대신 이 경로로
+   *  링크한다. 실제 webtoon 채널 글은 이 필드가 없다. */
+  href?: string;
 }
 
 /**
@@ -63,6 +67,10 @@ export interface CmsVideo {
   video_url: string;
   thumbnail_url: string | null;
   is_cms: true;
+  /** lens("4가지 시선")의 영상 포맷에서 파생된 카드일 때만 채워짐(2026-08-20,
+   *  shared/lib/lensMediaFeed.ts) — 기본 `/video/{id}` 대신 이 경로로
+   *  링크한다. 실제 video 채널 글은 이 필드가 없다. */
+  href?: string;
 }
 
 // 진행 중 요청 묶기(in-flight coalescing) — 홈 화면 섹션 다수(트렌드/칼럼/

@@ -200,7 +200,7 @@ export function NewsFeedTab({
                 (WebtoonPreviewSection.tsx). 위치: 국제+재테크 짝(카테고리
                 마지막 줄) 바로 위(2026-08-17, 사용자 확인: "웹툰 부분은...
                 국제.. 재테크 바로 위쪽으로"). */}
-            <WebtoonPreviewSection initialItems={initialWebtoons} />
+            <WebtoonPreviewSection initialItems={initialWebtoons} initialLensPosts={initialLensPosts} />
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
 
@@ -214,7 +214,7 @@ export function NewsFeedTab({
             {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
                 뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를
                 숨긴다 — 목업으로 안 채운다. */}
-            <VideoPreviewSection initialVideos={initialVideos} />
+            <VideoPreviewSection initialVideos={initialVideos} initialLensPosts={initialLensPosts} />
           </div>
 
           <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />

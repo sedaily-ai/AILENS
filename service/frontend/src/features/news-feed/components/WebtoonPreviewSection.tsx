@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
-import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, type CmsWebtoon, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { buildLensWebtoonItems, mergeByDateDesc } from '@/shared/lib/lensMediaFeed';
 
 // 홈 상단의 슬림 텍스트 배너로는 "실제 콘텐츠"처럼 안 느껴진다는 피드백
 // (2026-08-06) — 4등분 카드 그리드(두꺼운 테두리·하드 섀도·기울기)로 정착.
@@ -68,20 +69,30 @@ interface Props {
   // 빌드타임(app/page.tsx)에 fetchWebtoons()로 미리 가져온 값 — 정적 HTML에
   // 실제 카드가 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
   initialItems?: CmsWebtoon[];
+  // lens("4가지 시선")의 웹툰 서브포맷도 이 섹션에 섞는다(2026-08-20, 사용자
+  // 요청 — shared/lib/lensMediaFeed.ts 참조). webtoon 채널 발행이 뜸해져도
+  // 이 섹션이 계속 쌓이도록.
+  initialLensPosts?: CmsLens[];
 }
 
-export function WebtoonPreviewSection({ initialItems }: Props) {
-  const [items, setItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
+export function WebtoonPreviewSection({ initialItems, initialLensPosts }: Props) {
+  const [channelItems, setChannelItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
 
   useEffect(() => {
     let cancelled = false;
     fetchWebtoons().then((rows) => {
-      if (!cancelled) setItems(rows);
+      if (!cancelled) setChannelItems(rows);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const items = useMemo(() => {
+    if (channelItems === null) return null;
+    const lensItems = buildLensWebtoonItems(initialLensPosts ?? []);
+    return mergeByDateDesc(channelItems, lensItems);
+  }, [channelItems, initialLensPosts]);
 
   if (items === null) return null; // 로딩 중엔 자리 안 차지(스켈레톤 제거 방침과 동일)
 
@@ -258,7 +269,7 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
           ) : (
             <Link
               key={w.id}
-              href={`/webtoon/${encodeURIComponent(w.id)}`}
+              href={w.href ?? `/webtoon/${encodeURIComponent(w.id)}`}
               prefetch
               className="group relative"
               style={cardStyle}
