@@ -74,12 +74,14 @@ export function AudioPreviewSection({ initialItems }: Props) {
         </Link>
       </header>
 
-      {/* 세로 카드형 그리드로 재설계(2026-08-21, 사용자 요청 — "오디오
-          부분... 세로 카드형으로... 깔끔한 모던 디자인으로"). 이전 가로
-          행 리스트(워싱턴포스트 레퍼런스 1차 적용분)에서, 캐릭터가 매
-          행 오른쪽에 반복돼 리스트처럼 보이던 것을 카드마다 위쪽에
-          중앙 배치해 하나의 완결된 카드로 바꿨다. 장식(회전·그림자 과다)
-          없이 얇은 테두리 + 은은한 그림자만 쓰는 미니멀 톤
+      {/* 세로 카드형 그리드(2026-08-21, 사용자 요청 — "세로 카드형으로...
+          깔끔한 모던 디자인으로"). 1차 카드형에 대해 "세로가 좀 더
+          길게, 오디오 느낌 나게, 재생버튼 있으면 더 예쁘지 않을까"라는
+          후속 피드백 반영 — minHeight로 카드를 더 세로로 늘리고, 캐릭터
+          원형 아바타 오른쪽 아래에 재생 버튼 배지를 겹쳐 "재생 가능한
+          오디오 카드"라는 게 한눈에 보이게 했다(흰 테두리로 아바타 위에
+          떠 있는 느낌, Spotify/Apple Music류 관례). 장식(회전·그림자
+          과다) 없이 얇은 테두리 + 은은한 그림자만 쓰는 미니멀 톤
           (feedback_frontend_design_tone: 과한 그라데이션·굵은 테두리 금지). */}
       <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap: 'clamp(12px, 2vw, 18px)' }}>
         {shown.map((it) => {
@@ -91,11 +93,12 @@ export function AudioPreviewSection({ initialItems }: Props) {
               prefetch
               className="group flex flex-col"
               style={{
-                borderRadius: 14,
+                borderRadius: 16,
                 border: '1px solid rgba(17,24,39,0.08)',
                 background: '#fff',
                 boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 2px 8px rgba(17,24,39,0.04)',
-                padding: 'clamp(18px, 2.6vw, 24px) clamp(14px, 2.2vw, 18px)',
+                padding: 'clamp(22px, 3vw, 28px) clamp(16px, 2.4vw, 20px) clamp(20px, 2.6vw, 24px)',
+                minHeight: 'clamp(210px, 26vw, 248px)',
                 textDecoration: 'none',
                 transition: 'transform .18s ease, box-shadow .18s ease, border-color .18s ease',
               }}
@@ -110,18 +113,40 @@ export function AudioPreviewSection({ initialItems }: Props) {
                 e.currentTarget.style.borderColor = 'rgba(17,24,39,0.08)';
               }}
             >
-              <span
-                className="flex items-center justify-center flex-shrink-0"
-                style={{ width: 52, height: 52, borderRadius: '50%', background: '#f3f6fb', overflow: 'hidden', marginBottom: 14 }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, LensViewClient.tsx와 동일 패턴 */}
-                <img
-                  src={PODCAST_PERSPECTIVE.illustration}
-                  alt=""
-                  width={52}
-                  height={52}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
-                />
+              <span className="relative flex-shrink-0" style={{ width: 68, height: 68, marginBottom: 18 }}>
+                <span
+                  className="flex items-center justify-center"
+                  style={{ width: 68, height: 68, borderRadius: '50%', background: '#f3f6fb', overflow: 'hidden' }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, LensViewClient.tsx와 동일 패턴 */}
+                  <img
+                    src={PODCAST_PERSPECTIVE.illustration}
+                    alt=""
+                    width={68}
+                    height={68}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
+                  />
+                </span>
+                {/* 재생 버튼 배지 — 아바타 원 위에 흰 테두리로 떠 있어 "재생
+                    가능한 오디오"라는 걸 아이콘만으로 바로 알 수 있게. */}
+                <span
+                  aria-hidden
+                  className="absolute flex items-center justify-center"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    background: '#3b82f6',
+                    border: '2.5px solid #fff',
+                    bottom: -3,
+                    right: -3,
+                    boxShadow: '0 2px 5px rgba(59,130,246,0.35)',
+                  }}
+                >
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
               </span>
 
               <span style={{ fontSize: 11, color: '#9ca3af', marginBottom: 7, fontWeight: 700, letterSpacing: '0.01em' }}>
