@@ -258,6 +258,10 @@ export interface CmsLens {
   source_url: string | null;
   /** 마지막 수정 시각(ISO, 2026-08-18 공개 API에 추가) — JSON-LD dateModified용. */
   updated_at?: string | null;
+  /** 경제 카테고리 라벨(증시/부동산/산업/금융·정책/국제/재테크) — letters와 같은
+   * 6개 값. 2026-08-20 추가, /markets 등 카테고리 페이지에 lens 글도 같이
+   * 노출하기 위함. 없으면(미분류) 어느 카테고리 페이지에도 안 뜬다. */
+  category?: string | null;
   lenses: CmsLensItem[];
   is_cms: true;
 }

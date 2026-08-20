@@ -41,6 +41,7 @@ const KIND_LABEL: Record<Kind, string> = {
   column: '인사이트',
   video: '영상',
   trend: '딥다이브',
+  lens: '4가지 시선',
 };
 
 function labelFor(item: ArchiveItem): string {

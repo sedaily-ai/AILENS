@@ -13,7 +13,7 @@ import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { ArchiveHeader } from '@/shared/ui/ArchiveHeader';
 import { ArchiveList } from '@/shared/ui/ArchiveList';
 import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
-import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
 
@@ -31,11 +31,15 @@ export function CategoryArchiveClient({
 
   useEffect(() => {
     let cancelled = false;
-    fetchCmsPosts('letters', undefined, PAGE_SIZE).then((letters) => {
-      if (cancelled) return;
-      const all = buildArchiveItems(letters, [], []).filter((it) => it.category === config.label);
-      if (all.length > 0) setItems(all);
-    });
+    Promise.all([fetchCmsPosts('letters', undefined, PAGE_SIZE), fetchLensPosts()]).then(
+      ([letters, lens]) => {
+        if (cancelled) return;
+        const all = buildArchiveItems(letters, [], [], lens).filter(
+          (it) => it.category === config.label,
+        );
+        if (all.length > 0) setItems(all);
+      },
+    );
     return () => {
       cancelled = true;
     };

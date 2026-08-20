@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/archiveItems';
 import { buildCategoryMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
 import { CategoryArchiveClient } from '@/shared/ui/CategoryArchiveClient';
@@ -13,8 +13,11 @@ const CONFIG = ECON_CATEGORIES.find((c) => c.slug === 'markets')!;
 export const metadata: Metadata = buildCategoryMetadata(CONFIG);
 
 export default async function MarketsPage() {
-  const letters = await fetchCmsPosts('letters', undefined, PAGE_SIZE);
-  const items = buildArchiveItems(letters, [], []).filter((it) => it.category === CONFIG.label);
+  const [letters, lens] = await Promise.all([
+    fetchCmsPosts('letters', undefined, PAGE_SIZE),
+    fetchLensPosts(),
+  ]);
+  const items = buildArchiveItems(letters, [], [], lens).filter((it) => it.category === CONFIG.label);
   const jsonLd = buildCategoryJsonLd(CONFIG, items);
   return (
     <>

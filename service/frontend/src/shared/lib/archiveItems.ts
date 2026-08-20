@@ -4,11 +4,12 @@
 // import 한다(2026-08-07, 목록 페이지 SSG 전환 중 발견).
 import { letterHref } from '@/shared/lib/letterHref';
 import { withDisplayMeta, toTodayLetterCard } from '@/shared/lib/api/todayLettersApi';
-import type { CmsLetter, CmsTrendCard, CmsVideo } from '@/shared/lib/api/cmsPostsApi';
+import type { CmsLetter, CmsTrendCard, CmsVideo, CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
 
 export const PAGE_SIZE = 100;
 
-export type Kind = 'letter' | 'trend' | 'column' | 'video' | 'issue_talk';
+export type Kind = 'letter' | 'trend' | 'column' | 'video' | 'issue_talk' | 'lens';
 
 export interface ArchiveItem {
   key: string;
@@ -45,6 +46,10 @@ export function buildArchiveItems(
   letters: CmsLetter[],
   cards: CmsTrendCard[],
   videos: CmsVideo[],
+  // 2026-08-20 추가 — lens("4가지 시선") 글을 카테고리 페이지(/markets 등)에
+  // letters와 함께 노출하기 위함. 기존 호출부(archive 허브, 홈)는 인자를
+  // 안 넘기면 그대로 빈 배열이라 동작이 안 바뀐다.
+  lens: CmsLens[] = [],
 ): ArchiveItem[] {
   const letterItems: ArchiveItem[] = letters.map((letter) => {
     const meta = withDisplayMeta(letter);
@@ -98,5 +103,19 @@ export function buildArchiveItems(
     avatarUrl: v.thumbnail_url || null,
   }));
 
-  return [...letterItems, ...cardItems, ...videoItems].sort((a, b) => b.date.localeCompare(a.date));
+  const lensItems: ArchiveItem[] = lens.map((l) => ({
+    key: `lens-${l.id}`,
+    kind: 'lens' as const,
+    title: l.headline,
+    excerpt: l.context,
+    date: l.date,
+    accent: LENS_ACCENT,
+    href: `/lens/${encodeURIComponent(l.id)}`,
+    avatarUrl: l.photo_image_url || l.cover_image_url || null,
+    category: l.category ?? null,
+  }));
+
+  return [...letterItems, ...cardItems, ...videoItems, ...lensItems].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  );
 }

@@ -208,6 +208,10 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         # 최상위 스키마를 건드리지 않도록 body_inline 에 담는다.
         "photo_image_url": b.get("photo_image_url") or None,
         "source_url": post.get("source_url") or None,
+        # letters와 같은 저장 위치(body_inline.category, 6개 경제 카테고리
+        # 라벨 문자열)를 그대로 읽는다 — lens 글도 /markets 등 카테고리별
+        # 페이지에 letters와 함께 노출하기 위해 2026-08-20 추가.
+        "category": b.get("category") or None,
         "lenses": lenses,
         "is_cms": True,
     }

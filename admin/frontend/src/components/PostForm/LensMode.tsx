@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DatePickerField } from "@/components/DatePickerField";
 import { CoverImageField } from "@/components/CoverImageField";
+import { CustomSelect } from "@/components/CustomSelect";
 import { PostFormShell } from "./PostFormShell";
 import { MetaField, MetaDivider } from "./MetaField";
 import { LABEL, type ModeProps } from "./shared";
@@ -10,7 +11,7 @@ import { LineList } from "./LineList";
 import { WebtoonPanelsEditor } from "./WebtoonPanelsEditor";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
-import type { CmsLensItem } from "@/lib/types";
+import { ECON_CATEGORIES, type CmsLensItem } from "@/lib/types";
 
 // YouTube 링크 → 영상 ID(VideoMode.tsx와 동일 로직, admin/frontend 안에서도
 // 중복 — 서비스 프런트와의 중복(shared/lib/videoEmbed.ts)과 같은 이유로
@@ -140,6 +141,22 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
               placeholder="https://www.sedaily.com/..."
               className="ui-input rounded-lg px-2 py-0.5 text-[12.5px]"
               style={{ width: 220 }}
+            />
+          </MetaField>
+          <MetaDivider />
+          {/* 카테고리 — letters(PostMode.tsx)와 같은 값·같은 저장 위치
+              (body.category). 2026-08-20 추가: lens 글도 /markets 등
+              카테고리 페이지에 같이 노출하려면 필요. 안 채우면(미분류)
+              어느 카테고리 페이지에도 안 뜨고 /lens 안에서만 보인다 —
+              에러는 아니다. */}
+          <MetaField label="카테고리">
+            <CustomSelect
+              value={body.category ?? ""}
+              onChange={(v) => patchBody({ category: v || undefined })}
+              options={[
+                { value: "", label: "미분류" },
+                ...ECON_CATEGORIES.map((c) => ({ value: c, label: c })),
+              ]}
             />
           </MetaField>
         </>
