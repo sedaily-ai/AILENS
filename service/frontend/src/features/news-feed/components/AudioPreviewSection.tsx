@@ -138,24 +138,27 @@ export function AudioPreviewSection({ initialItems }: Props) {
                 {/* 재생 버튼 배지 — 클릭하면 카드가 가리키는 /listen 상세로
                     이동하는 대신, 하단 고정 플레이어(TodayNewsPlayer)에서
                     바로 재생을 시작한다(2026-08-21, "재생버튼 누르면 바
-                    흘러가게, 해당 페이지로 리다이렉트말구"). <a> 안에
-                    실제 <button>을 못 넣어(중첩 인터랙티브 엘리먼트) role=
-                    button span + 키보드 핸들러로 대체. stopPropagation으로
-                    부모 Link 네비게이션을 막는다. */}
+                    흘러가게, 해당 페이지로 리다이렉트말구"). 크기를
+                    26px→36px로 키우고 세모(재생) 아이콘도 같이 키워
+                    "더 크고 직관적으로" 피드백 반영 — 눈에 바로 띄는
+                    1차 액션임을 명확히 한다. <a> 안에 실제 <button>을
+                    못 넣어(중첩 인터랙티브 엘리먼트) role=button span +
+                    키보드 핸들러로 대체. stopPropagation으로 부모 Link
+                    네비게이션을 막는다. */}
                 <span
                   role="button"
                   tabIndex={0}
                   aria-label="재생"
                   className="absolute flex items-center justify-center"
                   style={{
-                    width: 26,
-                    height: 26,
+                    width: 36,
+                    height: 36,
                     borderRadius: '50%',
                     background: NEUTRAL_ACCENT,
-                    border: '2.5px solid #fff',
-                    bottom: -3,
-                    right: -3,
-                    boxShadow: `0 2px 5px ${NEUTRAL_ACCENT}59`,
+                    border: '3px solid #fff',
+                    bottom: -6,
+                    right: -6,
+                    boxShadow: `0 3px 8px ${NEUTRAL_ACCENT}66`,
                     cursor: 'pointer',
                   }}
                   onClick={(e) => {
@@ -171,14 +174,14 @@ export function AudioPreviewSection({ initialItems }: Props) {
                     }
                   }}
                 >
-                  <svg width={10} height={10} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 2 }}>
                     <path d="M8 5v14l11-7z" />
                   </svg>
                 </span>
               </span>
 
               <span style={{ fontSize: 11, color: '#9ca3af', marginBottom: 7, fontWeight: 700, letterSpacing: '0.01em' }}>
-                {isAudio ? '팟캐스트' : '영상'}
+                {it.category ?? (isAudio ? '팟캐스트' : '영상')}
                 {it.date && <> · {it.date.replaceAll('-', '.')}</>}
               </span>
 

@@ -22,6 +22,11 @@ export interface HomePlayerItem {
 export interface HomePlayerPost extends HomePlayerItem {
   date: string;
   excerpt: string;
+  /** 경제 카테고리(ECON_CATEGORIES) — 2026-08-21 추가. admin/frontend
+   * home-player 화면에서 선택, 없으면(미분류) null. 홈 오디오 섹션 카드가
+   * 포맷(팟캐스트/영상)만 보여주고 실제 내용 분류가 없다는 지적으로
+   * 도입 — lens/letters와 같은 body_inline.category 저장 위치 재사용. */
+  category: string | null;
 }
 
 interface ApiHomePlayerItem {
@@ -31,6 +36,7 @@ interface ApiHomePlayerItem {
   date?: string;
   media_embed_url: string;
   display_order: number;
+  category?: string | null;
 }
 
 function toItem(i: ApiHomePlayerItem): HomePlayerPost {
@@ -41,6 +47,7 @@ function toItem(i: ApiHomePlayerItem): HomePlayerPost {
     date: i.date ?? '',
     mediaEmbedUrl: i.media_embed_url,
     order: i.display_order ?? 0,
+    category: i.category ?? null,
   };
 }
 

@@ -233,7 +233,13 @@ def _shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
 
     date/excerpt 추가(2026-08-21) — 전용 목록/상세 페이지(/listen) 신설로
     검색엔진에 노출시키면서 다른 채널 shaper(_shape_video 등)와 필드를
-    맞췄다. 지금까지 이 채널은 홈 위젯 전용이라 발행일이 필요 없었다."""
+    맞췄다. 지금까지 이 채널은 홈 위젯 전용이라 발행일이 필요 없었다.
+
+    category 추가(2026-08-21) — 홈 오디오 섹션 카드에 "팟캐스트"/"영상"
+    (미디어 형식)만 뜨고 실제 내용 분류가 없다는 지적. lens/letters와
+    같은 저장 위치(body_inline.category, ECON_CATEGORIES 값)를 그대로
+    재사용 — 새 필드·새 admin 화면 없이 admin/frontend home-player
+    페이지에 카테고리 선택만 추가하면 끝나는 구조."""
     return {
         "id": post["slug"],
         "title": post.get("headline") or "",
@@ -241,6 +247,7 @@ def _shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
         "date": post.get("publish_date") or "",
         "media_embed_url": post.get("media_embed_url") or "",
         "display_order": post.get("display_order") if post.get("display_order") is not None else 0,
+        "category": (post.get("body_inline") or {}).get("category") or None,
     }
 
 

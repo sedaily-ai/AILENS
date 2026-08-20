@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { CardSkeleton, EmptyState, ErrorNote } from "@/components/Feedback";
-import type { CmsPost } from "@/lib/types";
+import { CustomSelect } from "@/components/CustomSelect";
+import { ECON_CATEGORIES, type CmsPost } from "@/lib/types";
+
+// 카테고리 선택지(2026-08-21) — 홈 오디오 섹션 카드가 "팟캐스트"/"영상"
+// (미디어 형식)만 보여주고 실제 내용 분류가 없다는 지적으로 추가. lens/
+// letters와 같은 저장 위치(body_inline.category)를 재사용한다 —
+// LensMode.tsx의 카테고리 선택 패턴과 동일.
+const CATEGORY_OPTIONS = [{ value: "", label: "미분류" }, ...ECON_CATEGORIES.map((c) => ({ value: c, label: c }))];
 
 // 홈 메인 화면 하단 플레이 카드("오늘의 핵심 뉴스")의 재생목록 전용 관리
 // 화면(2026-08-16). 기사(letters)와 무관하게 관리자가 직접 "제목 + 유튜브
@@ -34,6 +41,7 @@ function NewItemForm({ nextDefaultOrder, onCreated }: { nextDefaultOrder: number
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [order, setOrder] = useState(nextDefaultOrder);
+  const [category, setCategory] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setOrder(nextDefaultOrder), [nextDefaultOrder]);
@@ -51,6 +59,7 @@ function NewItemForm({ nextDefaultOrder, onCreated }: { nextDefaultOrder: number
         publish_date: todayKST(),
         media_embed_url: url.trim(),
         display_order: order,
+        body_inline: category ? { body: [], key_points: [], keywords: [], images: [], category } : undefined,
       });
       // 새로 만든 항목은 바로 홈에 나가도록 즉시 발행 — 이 화면의 용도 자체가
       // "링크 붙이면 바로 재생목록에 반영"이라 별도 초안 단계를 안 둔다.
@@ -58,6 +67,7 @@ function NewItemForm({ nextDefaultOrder, onCreated }: { nextDefaultOrder: number
       toast.show("추가했습니다", "success");
       setTitle("");
       setUrl("");
+      setCategory("");
       onCreated();
     } catch (err) {
       toast.show((err as Error).message, "error");
@@ -92,6 +102,7 @@ function NewItemForm({ nextDefaultOrder, onCreated }: { nextDefaultOrder: number
           title="재생 순서 (작을수록 먼저 재생)"
           className="ui-input w-20 rounded-lg px-2 py-1.5 text-[13px]"
         />
+        <CustomSelect value={category} options={CATEGORY_OPTIONS} onChange={setCategory} placeholder="카테고리" />
         <button
           type="button"
           disabled={busy}
@@ -110,14 +121,24 @@ function Row({ post, onChanged }: { post: CmsPost; onChanged: () => void }) {
   const [title, setTitle] = useState(post.headline);
   const [url, setUrl] = useState(post.media_embed_url ?? "");
   const [order, setOrder] = useState(post.display_order ?? 0);
+  const [category, setCategory] = useState(post.body_inline?.category ?? "");
   const [busy, setBusy] = useState(false);
-  const dirty = title !== post.headline || url !== (post.media_embed_url ?? "") || order !== (post.display_order ?? 0);
+  const dirty =
+    title !== post.headline ||
+    url !== (post.media_embed_url ?? "") ||
+    order !== (post.display_order ?? 0) ||
+    category !== (post.body_inline?.category ?? "");
   const published = post.status === "published";
 
   const save = async () => {
     setBusy(true);
     try {
-      await adminApi.updatePost(post.id, { headline: title.trim(), media_embed_url: url.trim() || null, display_order: order });
+      await adminApi.updatePost(post.id, {
+        headline: title.trim(),
+        media_embed_url: url.trim() || null,
+        display_order: order,
+        body_inline: { ...post.body_inline, category: category || undefined },
+      });
       toast.show("저장했습니다", "success");
       onChanged();
     } catch (err) {
@@ -176,6 +197,7 @@ function Row({ post, onChanged }: { post: CmsPost; onChanged: () => void }) {
         title="재생 순서 (작을수록 먼저 재생)"
         className="ui-input w-20 rounded-lg px-2 py-1.5 text-[13px]"
       />
+      <CustomSelect value={category} options={CATEGORY_OPTIONS} onChange={setCategory} placeholder="카테고리" />
       <button
         type="button"
         disabled={!dirty || busy}

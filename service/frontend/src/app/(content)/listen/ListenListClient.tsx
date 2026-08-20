@@ -108,7 +108,7 @@ export function ListenListClient({ initialItems }: { initialItems: HomePlayerPos
                     </span>
                     {it.date && (
                       <span style={{ display: 'block', fontSize: 11.5, color: '#9ca3af', marginTop: 3, fontWeight: 600 }}>
-                        {it.date.replaceAll('-', '.')} · {isAudio ? '팟캐스트' : '영상'}
+                        {it.date.replaceAll('-', '.')} · {it.category ?? (isAudio ? '팟캐스트' : '영상')}
                       </span>
                     )}
                   </span>
