@@ -7,6 +7,7 @@ import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
+import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/api/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
 import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
@@ -33,6 +34,7 @@ interface Props {
   initialLensPosts?: CmsLens[];
   initialArchiveItems?: ArchiveItem[];
   initialHotLetters?: TodayLetterCardLike[];
+  initialHomePlayerPosts?: HomePlayerPost[];
 }
 
 // 아카이빙된 문장 타입
@@ -82,6 +84,7 @@ export function FeedPage({
   initialLensPosts,
   initialArchiveItems,
   initialHotLetters,
+  initialHomePlayerPosts,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -407,6 +410,7 @@ export function FeedPage({
             initialLensPosts={initialLensPosts}
             initialArchiveItems={initialArchiveItems}
             initialHotLetters={initialHotLetters}
+            initialHomePlayerPosts={initialHomePlayerPosts}
           />
         )}
 

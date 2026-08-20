@@ -5,10 +5,12 @@ import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "../lib/wordsTerms";
 import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
+import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";
 import { VideoPreviewSection } from "./VideoPreviewSection";
+import { AudioPreviewSection } from "./AudioPreviewSection";
 import { LensPreviewSection } from "./LensPreviewSection";
 import { NewsTimeMachineSection } from "./NewsTimeMachineSection";
 import { LatestGridSection } from "./LatestGridSection";
@@ -83,6 +85,9 @@ interface Props {
   initialArchiveItems?: ArchiveItem[];
   // "요즘 가장 많이 읽힌 글"(HomeSideBar → HotLettersRail) 서버 프리페치.
   initialHotLetters?: TodayLetterCardLike[];
+  // 오디오 섹션(AudioPreviewSection) 서버 프리페치 — home_player 채널
+  // (TodayNewsPlayer.tsx와 같은 소스, 2026-08-21).
+  initialHomePlayerPosts?: HomePlayerPost[];
 }
 
 export function NewsFeedTab({
@@ -92,6 +97,7 @@ export function NewsFeedTab({
   initialLensPosts,
   initialArchiveItems,
   initialHotLetters,
+  initialHomePlayerPosts,
 }: Props) {
   const archiveItems = initialArchiveItems ?? [];
 
@@ -217,6 +223,14 @@ export function NewsFeedTab({
             <VideoPreviewSection initialVideos={initialVideos} initialLensPosts={initialLensPosts} />
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
+
+            {/* 오디오 섹션(2026-08-21, 사용자 요청 — "오디오 섹션도 메인
+                페이지에 걸어주시죠", 위치는 "문화 섹션 위에"). 기존엔
+                TodayNewsPlayer.tsx(하단 고정 미니 플레이어)에만 재생목록이
+                있어서 스크롤되는 본문 콘텐츠 목록엔 전혀 안 걸려있었다 —
+                /listen 목록과 같은 home_player 데이터를 텍스트 리스트로
+                보여준다(AudioPreviewSection.tsx). */}
+            <AudioPreviewSection initialItems={initialHomePlayerPosts} />
 
             {/* 문화(culture) — 경제 카테고리 6개 짝(3줄)을 다 채운 뒤에 생긴
                 7번째 카테고리라 파트너가 없다. 단독 1개짜리 줄로 마지막에

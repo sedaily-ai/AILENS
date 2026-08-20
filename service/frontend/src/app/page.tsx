@@ -3,10 +3,12 @@ import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts } from "@/sha
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
+import { fetchHomePlayerPosts } from "@/shared/lib/api/homePlayerApi";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "@/features/news-feed";
 import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
+import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 
 // MBTI 페르소나 체계 폐지(2026-08-07) — 이전에는 여기서 viewMode
 // ("feed" | "editor-select" | "briefing" | "story")를 useMbtiGroup 에 저장된
@@ -25,6 +27,7 @@ interface HomeContentProps {
   initialLensPosts: CmsLens[];
   initialArchiveItems: ArchiveItem[];
   initialHotLetters: TodayLetterCardLike[];
+  initialHomePlayerPosts: HomePlayerPost[];
 }
 
 function HomeContent({
@@ -34,6 +37,7 @@ function HomeContent({
   initialLensPosts,
   initialArchiveItems,
   initialHotLetters,
+  initialHomePlayerPosts,
 }: HomeContentProps) {
   return (
     <FeedPage
@@ -44,6 +48,7 @@ function HomeContent({
       initialLensPosts={initialLensPosts}
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
+      initialHomePlayerPosts={initialHomePlayerPosts}
     />
   );
 }
@@ -79,6 +84,7 @@ export default async function HomePage() {
     initialLensPosts,
     letters,
     initialHotLetters,
+    initialHomePlayerPosts,
   ] = await Promise.all([
     fetchWebtoons(),
     fetchVideos(),
@@ -93,6 +99,8 @@ export default async function HomePage() {
     // 같은 로직을 쓰도록" 설계된 함수(todayLettersApi.ts 주석 참조)라 여기
     // 그대로 재사용.
     fetchFollowingLetters(5),
+    // 오디오 섹션(AudioPreviewSection) 서버 프리페치(2026-08-21).
+    fetchHomePlayerPosts(),
   ]);
   // "최신 뉴스" 그리드에도 lens("4가지 시선") 글을 섞는다(2026-08-20, 사용자
   // 요청 — 앞으로 발행되는 글은 전부 이 4포맷 톤으로 나가는데, 그리드는 여전히
@@ -121,6 +129,7 @@ export default async function HomePage() {
       initialLensPosts={initialLensPosts}
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
+      initialHomePlayerPosts={initialHomePlayerPosts}
     />
   );
 }

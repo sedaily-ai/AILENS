@@ -1,0 +1,150 @@
+{
+  "title": "제네시스 GV90 글로벌 첫 공개",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 8,
+      "narration": "제네시스가 새로운 럭셔리 전기 SUV, GV90을 공개했습니다.",
+      "caption": "제네시스 GV90 글로벌 첫 공개",
+      "data": {
+        "icon": "car"
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "이번 GV90은 럭셔리를 가격이 아닌 가치로 평가합니다.",
+      "caption": "럭셔리, 가격 아닌 가치",
+      "data": {
+        "value": 0,
+        "unit": "",
+        "label": "럭셔리 = 가치",
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "GV90 네오룬은 독립개폐형 코치도어와 루프 에어백을 갖추고 있습니다.",
+      "caption": "GV90 네오룬의 혁신적 기능",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "car",
+            "label": "코치도어"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "shield-alert",
+            "label": "루프 에어백"
+          }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 10,
+      "narration": "1회 충전으로 최대 500㎞를 주행할 수 있어요.",
+      "caption": [
+        {
+          "text": "1회 충전, "
+        },
+        {
+          "text": "500㎞ 주행",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "최고 출력 490㎾, 최대 토크 800Nm로 최고 성능을 자랑합니다.",
+      "caption": "최고 출력 490㎾, 최대 토크 800Nm",
+      "data": {
+        "value": 490,
+        "unit": "㎾",
+        "label": "최고 출력",
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "조선 시대 백자 달항아리에서 영감을 받은 디자인이 특징이죠.",
+      "caption": "절제된 조형미",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "landmark",
+            "label": "백자 달항아리"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "car",
+            "label": "GV90 디자인"
+          }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "chart",
+      "duration": 12,
+      "narration": "GV90은 전장 5285㎜, 축간 거리 3245㎜로 넉넉한 실내 공간을 제공합니다.",
+      "caption": "넉넉한 실내 공간",
+      "data": {
+        "chartType": "bar",
+        "points": [
+          {
+            "label": "전장",
+            "value": 5285
+          },
+          {
+            "label": "축간 거리",
+            "value": 3245
+          }
+        ],
+        "unit": "㎜",
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "이것이 바로 제네시스가 말하는 럭셔리 모빌리티의 새 기준입니다.",
+      "caption": [
+        {
+          "text": "럭셔리 모빌리티의 ",
+          "emphasis": false
+        },
+        {
+          "text": "새 기준",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "closing",
+      "duration": 8,
+      "narration": "앞으로 제네시스가 펼쳐나갈 럭셔리 여정을 기대해 보세요.",
+      "caption": "제네시스의 미래",
+      "data": {}
+    }
+  ],
+  "source": "자료: 샌프란시스코=유민환 기자",
+  "disclaimer": ""
+}
