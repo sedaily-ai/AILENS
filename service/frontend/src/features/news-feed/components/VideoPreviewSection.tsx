@@ -53,7 +53,22 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
     return mergeByDateDesc(channelVideos, lensVideos);
   }, [channelVideos, initialLensPosts]);
 
+  // 재생을 카드 안(작은 16:9)이 아니라 모달로 키운다(2026-08-20, 사용자
+  // 피드백: "여기서 플레이 되면 좀 작아 보이잖아요, 모달로 커지면 안
+  // 되냐"). ArchiveCalendarModal.tsx와 같은 관례(fixed inset-0 flex
+  // items-center justify-center, 배경 클릭·Esc로 닫기)를 그대로 따른다.
+  useEffect(() => {
+    if (!playingId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPlayingId(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [playingId]);
+
   if (!videos || videos.length === 0) return null;
+
+  const activeVideo = videos.find((v) => v.id === playingId) ?? null;
 
   // 홈은 최신 4개만 티저로 — 다른 홈 섹션들과 개수 통일(2026-08-11).
   // fetchVideos()가 /video 전용 목록 페이지를 위해 limit=100까지 받아오게
@@ -127,9 +142,7 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
       >
         {shown.map((v) => {
           const resolved = resolveVideo(v.video_url);
-          const isDirectFile = !resolved && DIRECT_FILE_RE.test(v.video_url);
           const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
-          const isPlaying = playingId === v.id;
           const href = v.href ?? `/video/${encodeURIComponent(v.id)}`;
           return (
             <article
@@ -155,134 +168,168 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
               {/* 재디자인(2026-08-20) — 예전엔 썸네일+재생버튼, 그 아래 회색
                   캡션 한 줄이 전부라 "재밌는 콘텐츠"치고 너무 밋밋하다는
                   피드백. 유튜브/넷플릭스류 카드처럼 제목을 썸네일 위에
-                  그라데이션 스크림과 함께 얹고, 재생 버튼도 accent 컬러
-                  글로우로 키워 존재감을 준다. 제목(하단 스트립)과 재생
-                  버튼(전체 영역)이 각자 독립된 클릭 영역이라 <button> 안에
-                  <Link>를 중첩하지 않는다(접근성) — 형제 요소로 겹쳐 쌓고
-                  제목 스트립만 자기 영역에서 클릭을 가로챈다. */}
+                  그라데이션 스크림과 함께 얹는다. 재생 버튼은 화면 가운데를
+                  가리는 큰 글로우 링(촌스럽다는 피드백) 대신 우상단의 작은
+                  플랫 아이콘으로 — 클릭하면 카드 안(16:9라 작아 보인다는
+                  지적)이 아니라 모달로 크게 재생한다(아래 참조). 제목(하단
+                  스트립)과 재생 버튼(전체 영역)이 각자 독립된 클릭 영역이라
+                  <button> 안에 <Link>를 중첩하지 않는다(접근성) — 형제
+                  요소로 겹쳐 쌓고 제목 스트립만 자기 영역에서 클릭을
+                  가로챈다. */}
               <div className="aspect-video relative overflow-hidden" style={{ background: '#111827' }}>
-                {isPlaying && resolved ? (
-                  <iframe
-                    src={resolved.embedUrl}
-                    title={v.title}
-                    className="w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : isPlaying && isDirectFile ? (
-                  <video
-                    src={v.video_url}
-                    controls
-                    autoPlay
-                    className="w-full h-full"
-                    style={{ objectFit: 'cover' }}
-                  />
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setPlayingId(v.id)}
-                      className="absolute inset-0 w-full h-full flex items-center justify-center"
-                      aria-label={`${v.title} 재생`}
-                    >
-                      {thumb ? (
-                        <Image
-                          src={thumb}
-                          alt=""
-                          fill
-                          sizes="(min-width: 640px) 25vw, 50vw"
-                          className="transition-transform duration-300 group-hover:scale-[1.06]"
-                          style={{ objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div className="w-full h-full" style={{ background: '#1f2937' }} />
-                      )}
-                      {/* 재생 아이콘 재조정(2026-08-20, 사용자 피드백: "가운데 큰
-                          글로우 링 버튼이 촌스럽다") — 화면 가운데를 가리는 큰
-                          버튼 대신, 썸네일은 그대로 보여주고 우상단에 작은
-                          아이콘만 살짝 얹는다(넷플릭스·릴스류 카드 패턴). 컬러
-                          글로우 링도 걷어내 배지들과 톤을 맞춘 플랫한 스타일로. */}
-                      <span
-                        aria-hidden
-                        className="absolute flex items-center justify-center transition-transform group-hover:scale-110"
-                        style={{
-                          top: 8,
-                          right: 8,
-                          width: 30,
-                          height: 30,
-                          borderRadius: '50%',
-                          background: 'rgba(17,24,39,0.55)',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                        }}
-                      >
-                        <svg width={12} height={12} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </span>
-                    </button>
-
-                    {/* "영상" 배지 — 이 카드가 재생 가능한 영상이라는 걸 스캔만으로
-                        알 수 있게(웹툰 섹션의 배지 패턴과 통일). */}
-                    <span
-                      aria-hidden
-                      className="absolute"
-                      style={{
-                        top: 8,
-                        left: 8,
-                        fontSize: 10.5,
-                        fontWeight: 800,
-                        color: '#fff',
-                        background: 'rgba(17,24,39,0.55)',
-                        padding: '3px 8px',
-                        borderRadius: 999,
-                        letterSpacing: '0.02em',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      영상
-                    </span>
-
-                    {/* 하단 그라데이션 스크림 + 제목 오버레이. 스크림은 장식이라
-                        클릭을 안 가로채고(pointerEvents:none), 제목 Link만 자기
-                        영역(하단 스트립)에서 클릭을 받는다. */}
-                    <div
-                      aria-hidden
-                      className="absolute inset-x-0 bottom-0"
-                      style={{
-                        height: '62%',
-                        background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0) 100%)',
-                        pointerEvents: 'none',
-                      }}
+                <button
+                  type="button"
+                  onClick={() => setPlayingId(v.id)}
+                  className="absolute inset-0 w-full h-full flex items-center justify-center"
+                  aria-label={`${v.title} 재생`}
+                >
+                  {thumb ? (
+                    <Image
+                      src={thumb}
+                      alt=""
+                      fill
+                      sizes="(min-width: 640px) 25vw, 50vw"
+                      className="transition-transform duration-300 group-hover:scale-[1.06]"
+                      style={{ objectFit: 'cover' }}
                     />
-                    <Link
-                      href={href}
-                      prefetch
-                      className="absolute inset-x-0 bottom-0 hover:opacity-80 transition-opacity"
-                      style={{ padding: 'clamp(10px, 2vw, 14px)', textDecoration: 'none' }}
-                    >
-                      <h3
-                        className="font-bold text-white"
-                        style={{
-                          fontFamily: '"Noto Serif KR", serif',
-                          fontSize: 14.5,
-                          lineHeight: 1.4,
-                          letterSpacing: '-0.01em',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {v.title}
-                      </h3>
-                    </Link>
-                  </>
-                )}
+                  ) : (
+                    <div className="w-full h-full" style={{ background: '#1f2937' }} />
+                  )}
+                  <span
+                    aria-hidden
+                    className="absolute flex items-center justify-center transition-transform group-hover:scale-110"
+                    style={{
+                      top: 8,
+                      right: 8,
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      background: 'rgba(17,24,39,0.55)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                    }}
+                  >
+                    <svg width={12} height={12} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                </button>
+
+                {/* "영상" 배지 — 이 카드가 재생 가능한 영상이라는 걸 스캔만으로
+                    알 수 있게(웹툰 섹션의 배지 패턴과 통일). */}
+                <span
+                  aria-hidden
+                  className="absolute"
+                  style={{
+                    top: 8,
+                    left: 8,
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    color: '#fff',
+                    background: 'rgba(17,24,39,0.55)',
+                    padding: '3px 8px',
+                    borderRadius: 999,
+                    letterSpacing: '0.02em',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  영상
+                </span>
+
+                {/* 하단 그라데이션 스크림 + 제목 오버레이. 스크림은 장식이라
+                    클릭을 안 가로채고(pointerEvents:none), 제목 Link만 자기
+                    영역(하단 스트립)에서 클릭을 받는다. */}
+                <div
+                  aria-hidden
+                  className="absolute inset-x-0 bottom-0"
+                  style={{
+                    height: '62%',
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0) 100%)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <Link
+                  href={href}
+                  prefetch
+                  className="absolute inset-x-0 bottom-0 hover:opacity-80 transition-opacity"
+                  style={{ padding: 'clamp(10px, 2vw, 14px)', textDecoration: 'none' }}
+                >
+                  <h3
+                    className="font-bold text-white"
+                    style={{
+                      fontFamily: '"Noto Serif KR", serif',
+                      fontSize: 14.5,
+                      lineHeight: 1.4,
+                      letterSpacing: '-0.01em',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {v.title}
+                  </h3>
+                </Link>
               </div>
             </article>
           );
         })}
       </div>
+
+      {activeVideo && (
+        <VideoLightbox video={activeVideo} onClose={() => setPlayingId(null)} />
+      )}
     </section>
+  );
+}
+
+/** 재생 모달 — ArchiveCalendarModal.tsx와 같은 관례(fixed inset-0 flex
+ *  items-center justify-center, 배경 클릭으로 닫기, transform 정렬 안 씀).
+ *  영상 콘텐츠라 배경은 카드보다 더 어둡게(black/80). */
+function VideoLightbox({ video, onClose }: { video: CmsVideo; onClose: () => void }) {
+  const resolved = resolveVideo(video.video_url);
+  const isDirectFile = !resolved && DIRECT_FILE_RE.test(video.video_url);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      style={{ padding: 'clamp(16px, 4vw, 40px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full"
+        style={{ maxWidth: 960 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="닫기"
+          className="absolute flex items-center justify-center hover:bg-white/10 transition-colors"
+          style={{ top: -44, right: 0, width: 36, height: 36, borderRadius: '50%', color: '#fff' }}
+        >
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+        <div className="aspect-video w-full overflow-hidden" style={{ borderRadius: 12, background: '#000' }}>
+          {resolved ? (
+            <iframe
+              src={resolved.embedUrl}
+              title={video.title}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : isDirectFile ? (
+            <video src={video.video_url} controls autoPlay className="w-full h-full" style={{ objectFit: 'contain' }} />
+          ) : null}
+        </div>
+        <p
+          className="text-white"
+          style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 16, fontWeight: 700, marginTop: 14, lineHeight: 1.45 }}
+        >
+          {video.title}
+        </p>
+      </div>
+    </div>
   );
 }
