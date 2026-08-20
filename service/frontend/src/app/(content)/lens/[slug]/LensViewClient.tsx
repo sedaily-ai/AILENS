@@ -144,8 +144,19 @@ function articleFormatSample(
   return ARTICLE_FORMAT_SAMPLES[lensId]?.[format] ?? null;
 }
 
-function articleSummarySample(lensId: string): string[] | null {
-  return ARTICLE_FORMAT_SAMPLES[lensId]?.summary ?? null;
+// "핵심 요약" 불릿 — 실제 lens 데이터 기반(2026-08-20, GEO 개선 — 사용자
+// 요청: 인용하기 쉬운 리스트·통계가 상단에 있으면 AI 답변엔진 노출에
+// 유리하다는 리서치 결과 반영). 팟캐스트 불릿이 사실·수치 위주로 쓰이도록
+// 설계돼 있어 1순위, 없으면 영상→웹툰→레터 순으로 폴백(LENS_FORMATS 인덱스
+// 기준: 팟캐스트=2, 영상=3, 웹툰=1, 레터=0).
+const SUMMARY_BULLET_FORMAT_ORDER = [2, 3, 1, 0];
+
+function coreSummaryBullets(lens: CmsLens): string[] {
+  for (const i of SUMMARY_BULLET_FORMAT_ORDER) {
+    const bullets = (lens.lenses ?? [])[i]?.bullets?.filter((b) => b && b.trim());
+    if (bullets && bullets.length > 0) return bullets.slice(0, 4);
+  }
+  return [];
 }
 
 function articleBridgeSample(lensId: string, format: 'letter' | 'webtoon' | 'podcast'): string | null {
@@ -757,13 +768,15 @@ export function LensViewClient({
         {count > 0 && (
           <div className="lw" style={{ paddingTop: 'clamp(28px, 4.4vw, 40px)' }}>
           <div>
-            {/* 핵심 요약("30초 핵심") — 완성감 데모(2026-08-18, "상단에 핵심
-                내용이 있어야 한다" 요청). AI LENS 편집장 프롬프트의 "⚡ 30초
-                핵심" 섹션에 해당 — 네 시선을 고르기 전에 기사 전체의 핵심을
-                먼저 준다. 지금은 이 데모 기사에만 있는 dev 전용 오버라이드,
-                실제 서비스에 태울지는 별도 결정. */}
-            {articleSummarySample(lens.id) && (
+            {/* 핵심 요약("30초 핵심") — 실 데이터 기반(2026-08-20, GEO 개선).
+                이전엔 데모 기사 하나에만 하드코딩된 오버라이드였는데,
+                coreSummaryBullets()로 교체해 실제 발행된 모든 lens 글에서
+                동작한다. 네 시선을 고르기 전에 기사 전체의 핵심(수치·사실
+                위주)을 먼저 준다 — data-speakable="summary"를 붙여 위
+                리드 문단과 함께 "인용하기 쉬운 요약 블록"으로 묶는다. */}
+            {coreSummaryBullets(lens).length > 0 && (
               <div
+                data-speakable="summary"
                 style={{
                   border: LENS_CARD_BORDER,
                   borderRadius: 16,
@@ -778,7 +791,7 @@ export function LensViewClient({
                   30초 핵심
                 </p>
                 <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
-                  {articleSummarySample(lens.id)!.map((s, si) => (
+                  {coreSummaryBullets(lens).map((s, si) => (
                     <li key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14.5, lineHeight: 1.6, color: '#1f2937', wordBreak: 'keep-all' }}>
                       <Check size={15} style={{ flexShrink: 0, marginTop: 3, color: LENS_ACCENT }} aria-hidden />
                       <span>{s}</span>
