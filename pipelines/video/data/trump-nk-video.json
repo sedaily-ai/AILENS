@@ -1,0 +1,143 @@
+{
+  "title": "트럼프 \"北 핵무기 57개 보유\"…비핵화 언급은 회피",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 7,
+      "narration": "북한은 몇 개의 핵무기를 보유하고 있을까요?",
+      "caption": "북한 핵무기 보유 수",
+      "data": {
+        "icon": "shield-alert"
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "도널드 트럼프 대통령은 북한이 57개의 강력한 핵무기를 갖고 있다고 밝혔습니다.",
+      "caption": "북한 핵무기: 57개",
+      "data": {
+        "value": 57,
+        "unit": "개",
+        "label": "북한 핵무기 보유 수",
+        "sourceNote": "트럼프 대통령 발언"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 10,
+      "narration": "하지만 비핵화에 대한 언급은 회피했죠.",
+      "caption": [
+        {
+          "text": "비핵화 언급 "
+        },
+        {
+          "text": "회피",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "미국은 북핵 동결을 전제로 협상을 추진할 것으로 보입니다.",
+      "caption": "북핵 동결 전제 협상",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "landmark",
+            "label": "미국"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "shield-alert",
+            "label": "북핵 동결"
+          }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 11,
+      "narration": "트럼프는 북한을 '핵보유 세력'으로도 지칭했어요.",
+      "caption": [
+        {
+          "text": "'핵보유 세력' ",
+          "emphasis": true
+        },
+        {
+          "text": "지칭"
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "이 발언은 북미 정상회담을 위한 포석일까요?",
+      "caption": "북미 정상회담 추진",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "landmark",
+            "label": "북한"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "landmark",
+            "label": "미국"
+          }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 13,
+      "narration": "같은 날, 북한은 미상의 발사체를 동해상으로 발사했습니다.",
+      "caption": "북한, 미상 발사체 발사",
+      "data": {
+        "value": 1,
+        "unit": "회",
+        "label": "미상 발사체 발사",
+        "sourceNote": "합동참모본부 발표"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 10,
+      "narration": "북핵 문제는 여전히 해결되지 않았습니다.",
+      "caption": [
+        {
+          "text": "북핵 문제 "
+        },
+        {
+          "text": "미해결",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "closing",
+      "duration": 9,
+      "narration": "북핵 문제, 어떻게 풀어야 할까요?",
+      "caption": "북핵 문제, 해결 방안은?",
+      "data": {}
+    }
+  ],
+  "source": "자료: 트럼프 대통령 발언, 합동참모본부 발표",
+  "disclaimer": ""
+}
