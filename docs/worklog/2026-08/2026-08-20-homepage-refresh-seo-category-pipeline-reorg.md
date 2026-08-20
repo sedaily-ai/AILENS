@@ -161,6 +161,53 @@ slug 하나만 넘기는 5줄짜리 wrapper(`buildEconomyCategoryMetadata(slug)`
 팟캐스트 대본+mp3 생성 확인. webtoon도 새 import 경로에서 DDB fetch
 재확인(v#5 정상 로드).
 
+### 11. 형식 선택 UI 문구 정정 — "누구의 눈으로" → "어떤 형식으로"
+
+2026-08-18에 lens 콘텐츠가 "역할 축"(사회초년생·직장인·자영업자·투자자)에서
+"형식 축"(레터·웹툰·팟캐스트·영상)으로 확정된 뒤에도, `lensPerspectives.ts`의
+`LENS_PERSPECTIVES`(선택 카드가 읽는 UI 메타데이터, `LENS_FORMATS`와 완전히
+분리된 별도 배열)는 옛 역할 축 라벨·태그라인·아이콘 그대로였다. 사용자가
+실제 발행 글 스크린샷에서 직접 발견(2026-08-20) — "이 뉴스, 누구의 눈으로
+볼까요?" 헤더 아래 4개 카드가 실제로는 레터/웹툰/팟캐스트/영상인데 라벨은
+여전히 옛 역할명이었다.
+
+수정한 파일:
+- `lensPerspectives.ts` — `LENS_PERSPECTIVES` 4개 항목 전면 재작성
+  (아이콘 GraduationCap/Briefcase/Store/TrendingUp → BookOpen/Image/
+  Headphones/Video, 태그라인도 형식에 맞게)
+- `LensViewClient.tsx` — "이 뉴스, 누구의 눈으로 볼까요?" → "이 뉴스, 어떤
+  형식으로 볼까요?", `aria-label`도 동일 취지로 수정
+- `LensListClient.tsx` — 5곳("네 사람의 눈으로", "사회초년생·직장인·
+  자영업자·투자자에게...", "네 사람의 시선" 등) 전부 형식 축 문구로 교체
+- `LensPreviewSection.tsx`(홈페이지 위젯), `lens/page.tsx`(메타 description)
+  동일 패턴 적용
+
+`npx tsc --noEmit` 통과 확인 후 커밋(`1720ef8`), 배포·라이브 확인.
+
+### 12. 가계대출 웹툰 마무리 — 이미지 모양 오류로 lens 채널 전체 500 사고 → 즉시 수정
+
+§10에서 신설한 파이프라인으로 처음 실제 발행까지 간 "은행 가계대출 기준,
+올해만 73번 바꿨다" 기사의 웹툰 8컷 생성이 완료된 뒤, S3 업로드까지는
+정상이었으나 DynamoDB에 이미지 URL을 **문자열 배열**로 그대로 넣은 게
+문제였다. `service/backend/handlers/cms_posts_public.py`의 `_shape_lens`는
+`item.get("images")`의 각 원소를 `img.get("url")`로 접근하는 dict 형태
+(`{url, caption}`, webtoon 채널의 `body_inline.images`와 동일 규격)를
+기대하므로, 문자열이 들어가자 `AttributeError: 'str' object has no
+attribute 'get'`로 **lens 채널 목록/개별 조회 API 전체가 500**을 뱉기
+시작했다(이 글 하나가 아니라 `/lens` 전체가 죽음).
+
+CloudWatch Logs(`/aws/lambda/sedaily-mbti-v2-posts-dev`)로 즉시 원인
+특정 → 해당 글의 `images`를 `{url, caption}` dict 배열로 재작성 →
+`/api/v2/posts?channel=lens` 200 복구 확인 → revalidate 웹훅 호출 →
+라이브 페이지("이슈를 찾을 수 없어요" 폴백에서 정상 렌더로) 확인.
+같은 실수를 다른 곳에서도 했는지 lens 채널 52건 전체를 스캔해 추가
+피해 없음 확인.
+
+**교훈**: DynamoDB 직접 write로 `lenses[].images`를 채울 때는 반드시
+`[{"url": ..., "caption": ...}, ...]` 형태를 지킬 것 — webtoon 채널의
+`body_inline.images`와 규격이 같다는 걸 매번 확인해야 한다(스크래치패드
+스크립트 재사용 시 특히 주의).
+
 ## 결정
 
 - **3단계(웹툰 이미지 생성) 스타일은 여전히 코드로 유지** — DB에 저장된
