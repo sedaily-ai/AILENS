@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
 import { kstTodayStr } from '@/shared/lib/date';
 import { GAMES } from './(content)/games/play/[slug]/page';
 
@@ -50,6 +51,7 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 웹툰 목록
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
   { path: '/video',        priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 영상 목록
+  { path: '/listen',       priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-21' }, // 오디오 목록
   { path: '/games',        priority: 0.5, changeFrequency: 'monthly', lastModified: '2026-08-11' },
   { path: '/words',        priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 단어장 — 레터 키워드 기반, 매일 갱신
   { path: '/style',        priority: 0.3, changeFrequency: 'monthly', lastModified: '2026-08-08' },
@@ -176,6 +178,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {
     /* 영상 API 불통이면 생략 */
+  }
+
+  // 오디오 — 영상과 같은 이유로 개별 URL을 sitemap에 추가(2026-08-21,
+  // /listen 신설). date가 빈 문자열인 항목(옛 home_player 데이터, 백엔드
+  // 필드 확장 전)은 lastModified를 못 정하니 건너뛴다.
+  try {
+    const listen = await fetchHomePlayerPosts();
+    for (const it of listen) {
+      if (!it.date) continue;
+      const daysOld = daysBetween(it.date);
+      entries.push({
+        url: `${BASE}/listen/${it.id}`,
+        lastModified: new Date(it.date + 'T07:00:00+09:00'),
+        changeFrequency: 'never',
+        priority: freshnessPriority(daysOld),
+      });
+    }
+  } catch {
+    /* 오디오 API 불통이면 생략 */
   }
 
   // 타임라인 날짜별 페이지(2026-08-12, GEO 감사) — 처음엔 최근 7일만

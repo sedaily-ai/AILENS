@@ -58,3 +58,15 @@ export function resolveVideo(url: string): ResolvedVideo | null {
   }
   return null;
 }
+
+/**
+ * mp3 등 오디오 파일 직접 URL 판별(2026-08-21, /listen 페이지 신설과 함께
+ * 추가) — resolveVideo()가 못 읽는 S3 원본 오디오 파일(YouTube/네이버TV가
+ * 아닌)을 구분한다. TodayNewsPlayer.tsx·VideoLightbox.tsx도 같은 성격의
+ * 정규식을 각자 로컬로 갖고 있다(DIRECT_AUDIO_RE/DIRECT_FILE_RE) — 지금
+ * 당장 셋을 하나로 합치진 않았고(이미 배포된 코드 손대는 리스크 대비 이득이
+ * 작음), 새로 만드는 코드부터 이 공용 함수를 쓴다.
+ */
+export function isDirectAudioUrl(url: string): boolean {
+  return /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url);
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';
 import { ListeningHeadphoneIllustration } from '@/shared/ui/icons/HandDrawnIcons';
@@ -435,6 +436,15 @@ export function TodayNewsPlayer() {
               <br />
               귀로 들어보세요
             </p>
+            {/* /listen 전용 페이지로(2026-08-21 신설) — 이 미니 플레이어는
+                고유 URL이 없어 검색엔진에 안 걸리니, 실제 콘텐츠 URL로 가는
+                링크를 심어둔다(내부 링크 신호 + 페이지 발견 경로 둘 다). */}
+            <Link
+              href="/listen"
+              style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: ACCENT, textDecoration: 'none' }}
+            >
+              전체 목록 보기 →
+            </Link>
           </div>
         </div>
       )}
@@ -463,18 +473,21 @@ export function TodayNewsPlayer() {
         className="mx-auto flex items-center"
         style={{ maxWidth: 1080, height: 60, padding: '0 clamp(12px, 3vw, 24px)', gap: 12 }}
       >
-        {/* 아이콘 배지 */}
-        <div
-          className="flex items-center justify-center flex-shrink-0"
+        {/* 아이콘 배지 — /listen 바로가기로(2026-08-21, 사용자 요청 —
+            "플레이북 쪽에도 바로가기 놔주시죠, 일러스트 아이콘으로"). 접힌
+            미니바 상태에서도 전용 페이지로 넘어갈 진입점이 있어야 발견성이
+            생긴다(패널을 펼쳐야만 보이던 §21의 "전체 목록 보기" 링크와
+            별개 경로). 음표 라인아트 대신 패널과 같은 헤드폰 캐릭터
+            일러스트로 통일 — 접힌 상태·펼친 상태가 같은 아이콘을 쓰면
+            "같은 기능"이라는 인식이 자연스럽다. */}
+        <Link
+          href="/listen"
+          aria-label="전체 오디오 목록 보기"
+          className="flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105"
           style={{ width: 36, height: 36, borderRadius: 10, background: '#eff6ff' }}
-          aria-hidden
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 18V5l12-2v13" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="18" cy="16" r="3" />
-          </svg>
-        </div>
+          <ListeningHeadphoneIllustration accent={ACCENT} className="w-6 h-6" />
+        </Link>
 
         {/* 트랙 정보 */}
         <div className="min-w-0 flex-1">

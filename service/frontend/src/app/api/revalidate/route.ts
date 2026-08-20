@@ -32,7 +32,10 @@ import { revalidateTag } from 'next/cache';
 // 무시할 수준이고, 특정 채널만 골라 무효화하려다 하나 빠뜨리는 게(오늘 낮에
 // admin/backend/routes/posts.py의 _VALID_CHANNELS 를 빠뜨렸던 것과 같은 종류의
 // 실수) 훨씬 위험하다.
-const CONTENT_TAGS = ['posts:letters', 'posts:paper', 'posts:feed', 'posts:trend_card', 'posts:webtoon', 'posts:video', 'posts:lens'];
+// 'posts:home_player' 추가(2026-08-21) — /listen 목록·상세 페이지 신설로
+// 이 채널도 이제 SSR 캐시(force-cache + tags)를 쓴다(homePlayerApi.ts
+// ssrCacheOpts 참조). 안 넣으면 admin 발행이 5분 안전망 TTL까지 지연됨.
+const CONTENT_TAGS = ['posts:letters', 'posts:paper', 'posts:feed', 'posts:trend_card', 'posts:webtoon', 'posts:video', 'posts:lens', 'posts:home_player'];
 
 function isAuthorized(request: Request): boolean {
   const provided = request.headers.get('x-revalidate-secret') ?? '';

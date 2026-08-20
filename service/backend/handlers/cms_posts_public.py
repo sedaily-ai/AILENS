@@ -229,10 +229,16 @@ def _shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
     """홈 화면 하단 플레이 카드("오늘의 핵심 뉴스") 재생목록 항목(2026-08-16).
     기사와 무관하게 관리자가 직접 "제목 + 유튜브 링크"로 만드는 독립
     콘텐츠 — admin/frontend home-player 화면 전용, TodayNewsPlayer.tsx가
-    display_order 오름차순으로 재생한다."""
+    display_order 오름차순으로 재생한다.
+
+    date/excerpt 추가(2026-08-21) — 전용 목록/상세 페이지(/listen) 신설로
+    검색엔진에 노출시키면서 다른 채널 shaper(_shape_video 등)와 필드를
+    맞췄다. 지금까지 이 채널은 홈 위젯 전용이라 발행일이 필요 없었다."""
     return {
         "id": post["slug"],
         "title": post.get("headline") or "",
+        "excerpt": post.get("subtitle") or "",
+        "date": post.get("publish_date") or "",
         "media_embed_url": post.get("media_embed_url") or "",
         "display_order": post.get("display_order") if post.get("display_order") is not None else 0,
     }
