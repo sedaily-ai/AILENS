@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { fetchVideos, type CmsVideo, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { buildLensVideoItems, mergeByDateDesc } from '@/shared/lib/lensMediaFeed';
+import { VIDEO_ACCENT } from '@/shared/lib/archiveItems';
 
 // lens 영상은 YouTube/네이버TV 임베드가 아니라 S3에 올린 mp4 원본 파일이라
 // resolveVideo()가 못 알아본다(둘 다 URL 패턴 기반 판별). iframe 대신 그냥
@@ -130,15 +131,36 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
           const isDirectFile = !resolved && DIRECT_FILE_RE.test(v.video_url);
           const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
           const isPlaying = playingId === v.id;
-          const cardStyle = {
-            borderRadius: 8,
-            background: '#fff',
-            boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)',
-            border: '1px solid rgba(0,0,0,0.06)',
-            overflow: 'hidden' as const,
-          };
+          const href = v.href ?? `/video/${encodeURIComponent(v.id)}`;
           return (
-            <article key={v.id} style={cardStyle}>
+            <article
+              key={v.id}
+              className="group"
+              style={{
+                borderRadius: 10,
+                background: '#fff',
+                boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 3px 10px rgba(17,24,39,0.05)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                overflow: 'hidden',
+                transition: 'transform .18s ease, box-shadow .18s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 8px 22px rgba(17,24,39,0.14)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 2px rgba(17,24,39,0.04), 0 3px 10px rgba(17,24,39,0.05)';
+              }}
+            >
+              {/* 재디자인(2026-08-20) — 예전엔 썸네일+재생버튼, 그 아래 회색
+                  캡션 한 줄이 전부라 "재밌는 콘텐츠"치고 너무 밋밋하다는
+                  피드백. 유튜브/넷플릭스류 카드처럼 제목을 썸네일 위에
+                  그라데이션 스크림과 함께 얹고, 재생 버튼도 accent 컬러
+                  글로우로 키워 존재감을 준다. 제목(하단 스트립)과 재생
+                  버튼(전체 영역)이 각자 독립된 클릭 영역이라 <button> 안에
+                  <Link>를 중첩하지 않는다(접근성) — 형제 요소로 겹쳐 쌓고
+                  제목 스트립만 자기 영역에서 클릭을 가로챈다. */}
               <div className="aspect-video relative overflow-hidden" style={{ background: '#111827' }}>
                 {isPlaying && resolved ? (
                   <iframe
@@ -157,69 +179,99 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
                     style={{ objectFit: 'cover' }}
                   />
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPlayingId(v.id)}
-                    className="w-full h-full flex items-center justify-center group"
-                    aria-label={`${v.title} 재생`}
-                  >
-                    {thumb ? (
-                      <Image
-                        src={thumb}
-                        alt={v.title}
-                        fill
-                        sizes="(min-width: 640px) 25vw, 50vw"
-                        className="transition-transform duration-300 group-hover:scale-[1.04]"
-                        style={{ objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div className="w-full h-full" style={{ background: '#1f2937' }} />
-                    )}
-                    <span
-                      aria-hidden
-                      className="absolute inset-0 flex items-center justify-center"
-                      style={{ background: 'rgba(0,0,0,0.15)' }}
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPlayingId(v.id)}
+                      className="absolute inset-0 w-full h-full flex items-center justify-center"
+                      aria-label={`${v.title} 재생`}
                     >
+                      {thumb ? (
+                        <Image
+                          src={thumb}
+                          alt=""
+                          fill
+                          sizes="(min-width: 640px) 25vw, 50vw"
+                          className="transition-transform duration-300 group-hover:scale-[1.06]"
+                          style={{ objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div className="w-full h-full" style={{ background: '#1f2937' }} />
+                      )}
                       <span
-                        className="flex items-center justify-center transition-transform group-hover:scale-110"
-                        style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.92)' }}
+                        aria-hidden
+                        className="absolute flex items-center justify-center transition-transform group-hover:scale-110"
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: '50%',
+                          background: '#fff',
+                          boxShadow: `0 0 0 5px ${VIDEO_ACCENT}40, 0 6px 18px rgba(0,0,0,0.4)`,
+                        }}
                       >
-                        <svg width={16} height={16} viewBox="0 0 24 24" fill="#111827">
+                        <svg width={18} height={18} viewBox="0 0 24 24" fill={VIDEO_ACCENT} style={{ marginLeft: 2 }}>
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </span>
+                    </button>
+
+                    {/* "영상" 배지 — 이 카드가 재생 가능한 영상이라는 걸 스캔만으로
+                        알 수 있게(웹툰 섹션의 배지 패턴과 통일). */}
+                    <span
+                      aria-hidden
+                      className="absolute"
+                      style={{
+                        top: 8,
+                        left: 8,
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        color: '#fff',
+                        background: 'rgba(17,24,39,0.55)',
+                        padding: '3px 8px',
+                        borderRadius: 999,
+                        letterSpacing: '0.02em',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      영상
                     </span>
-                  </button>
+
+                    {/* 하단 그라데이션 스크림 + 제목 오버레이. 스크림은 장식이라
+                        클릭을 안 가로채고(pointerEvents:none), 제목 Link만 자기
+                        영역(하단 스트립)에서 클릭을 받는다. */}
+                    <div
+                      aria-hidden
+                      className="absolute inset-x-0 bottom-0"
+                      style={{
+                        height: '62%',
+                        background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0) 100%)',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                    <Link
+                      href={href}
+                      prefetch
+                      className="absolute inset-x-0 bottom-0 hover:opacity-80 transition-opacity"
+                      style={{ padding: 'clamp(10px, 2vw, 14px)', textDecoration: 'none' }}
+                    >
+                      <h3
+                        className="font-bold text-white"
+                        style={{
+                          fontFamily: '"Noto Serif KR", serif',
+                          fontSize: 14.5,
+                          lineHeight: 1.4,
+                          letterSpacing: '-0.01em',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {v.title}
+                      </h3>
+                    </Link>
+                  </>
                 )}
-              </div>
-              {/* 캡션은 썸네일 아래 중앙 정렬 — 요약문 없이 제목(최대 2줄)만
-                  둬서 그리드가 촘촘한 영상 목록처럼 보이게 한다. */}
-              <div style={{ padding: 'clamp(10px, 2.2vw, 14px)', textAlign: 'center' }}>
-                <h3
-                  className="font-medium text-gray-900"
-                  style={{
-                    fontFamily: '"Noto Serif KR", serif',
-                    fontSize: 14,
-                    lineHeight: 1.45,
-                    letterSpacing: '-0.02em',
-                  }}
-                >
-                  <Link
-                    href={v.href ?? `/video/${encodeURIComponent(v.id)}`}
-                    prefetch
-                    className="hover:opacity-70 transition-opacity"
-                    style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                    }}
-                  >
-                    {v.title}
-                  </Link>
-                </h3>
               </div>
             </article>
           );

@@ -199,8 +199,17 @@ export function NewsFeedTab({
                 콘텐츠처럼 안 보인다"는 피드백으로 카드형으로 교체
                 (WebtoonPreviewSection.tsx). 위치: 국제+재테크 짝(카테고리
                 마지막 줄) 바로 위(2026-08-17, 사용자 확인: "웹툰 부분은...
-                국제.. 재테크 바로 위쪽으로"). */}
+                국제.. 재테크 바로 위쪽으로").
+                영상 섹션을 바로 옆에 붙였다(2026-08-20, 사용자 확인 —
+                "영상이 재밌는 콘텐츠인데 맨 아래 있으니 애매하다"). 웹툰과
+                영상 둘 다 "재밌게 훑는 비주얼 콘텐츠"라는 같은 성격인데,
+                영상만 카테고리 레일 3줄을 전부 지나 맨 밑바닥(문화 다음)에
+                떨어져 있어서 단어 퀴즈(§ 오늘 앞서 옮김)와 같은 문제를
+                겪고 있었다 — 웹툰 옆으로 옮겨 "비주얼 콘텐츠" 블록으로
+                묶는다. */}
             <WebtoonPreviewSection initialItems={initialWebtoons} initialLensPosts={initialLensPosts} />
+
+            <VideoPreviewSection initialVideos={initialVideos} initialLensPosts={initialLensPosts} />
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
 
@@ -210,11 +219,6 @@ export function NewsFeedTab({
                 있는 걸 직접 발견). 콘텐츠가 없는 날은 CategoryFeatureSection
                 이 알아서 숨는다. */}
             <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} first={false} />
-
-            {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
-                뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를
-                숨긴다 — 목업으로 안 채운다. */}
-            <VideoPreviewSection initialVideos={initialVideos} initialLensPosts={initialLensPosts} />
           </div>
 
           <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
