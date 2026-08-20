@@ -49,45 +49,15 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
             />
           </MetaField>
           <MetaDivider />
-          <MetaField label="분류">
-            <CustomSelect
-              value={body.section ?? ""}
-              onChange={(v) =>
-                patchBody({ section: (v || undefined) as "column" | "issue_talk" | undefined })
-              }
-              // 워딩은 공개 사이트 나브 라벨과 동일하게 맞춘다(2026-08-12,
-              // posts/page.tsx CHANNEL_FILTERS 주석 참조). "용어 해설"(glossary)
-              // 옵션은 뺐다 — 프론트/백엔드 어디서도 이 값을 읽지 않는 죽은
-              // 선택지였다.
-              //
-              // "오늘의 이슈"(기본값, 분류 안 고름) = "이슈 톡톡"으로 재정의
-              // (2026-08-12) — "인사이트에서 이슈 톡톡으로 옮기려는데 안 된다"는
-              // 피드백으로, 별도 issue_talk 옵션을 두는 대신 기본값 자체를
-              // 이슈 톡톡 전용 아카이빙으로 쓰기로 했다. 분류를 안 고르면
-              // 자동으로 이슈 톡톡(홈 위젯 + /issue-talk)에 쌓이고, 인사이트를
-              // 명시로 고른 글만 그쪽 아카이브로 빠진다.
-              //
-              // "딥다이브"(trend) 옵션은 2026-08-17 제거 — "이슈 톡톡"과
-              // "요즘 화제의 경제 이슈"가 독자 입장에서 구분이 안 된다는 판단
-              // 으로 홈 섹션 자체를 통합했다(NewsFeedTab.tsx 참조). 기존에
-              // trend로 분류돼 있던 글 6건도 DB에서 태그를 지워 이슈 톡톡
-              // 기본값으로 옮겨뒀다 — 앞으로 이 값을 고를 수 있는 UI 자체가
-              // 없으니 새 글이 다시 갈리지 않는다.
-              options={[
-                { value: "", label: "이슈 톡톡" },
-                { value: "column", label: "인사이트" },
-              ]}
-            />
-          </MetaField>
-          <MetaDivider />
-          {/* 경제 버티컬 카테고리(2026-08-17 신설) — "분류"(형식: 이슈톡톡/
-              인사이트)와는 다른 축, "무슨 주제인가"(증시/부동산/산업/금융·정책/
-              국제/재테크). 원래 category 필드는 있었는데 이 화면엔 입력 UI
-              자체가 없어서(posts/page.tsx의 "카테고리 일괄 입력" 자유 텍스트
-              도구로만 채워졌었다) 51건 중 23건이 비어있고 나머지도 표기가
-              제각각이었다 — ECON_CATEGORIES 확정 후 고정 6종 선택으로 막는다
-              (lib/types.ts 주석 참조). 선택 안 하면 미분류로 저장(빈 문자열
-              대신 undefined — CustomSelect의 빈 옵션이 곧 "선택 안 함"). */}
+          {/* "분류"(형식: 이슈톡톡/인사이트/용어해설)는 2026-08-19 완전
+              폐기 — "카테고리"(무슨 주제인가) 하나로 통합했다. 예전엔 형식
+              축과 주제 축이 따로 있어서 독자에게도 관리자에게도 구분이
+              헷갈렸다("인사이트에서 이슈 톡톡으로 옮기려는데 안 된다" 류
+              피드백 반복). 이제 글은 오직 카테고리로만 분류된다 — 증시/
+              부동산/산업/금융·정책/국제/재테크(ECON_CATEGORIES, 2026-08-17
+              확정). "카드 전용 발행"(본문 비우면 상세페이지 없이 홈 카드로만
+              나가는 것)은 더 이상 section==="column" 조건이 아니라 "본문이
+              비어있는가" 하나로 단순화했다(posts/edit/page.tsx save() 참조). */}
           <MetaField label="카테고리">
             <CustomSelect
               value={body.category ?? ""}
@@ -146,12 +116,10 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
       // 계속 떠 있다" 지적) — EditorToolbar 참조. 여기 footer엔 지금 상태에서
       // 실제로 의미가 바뀌는 것(카드 전용 발행 여부)만 조건부로 남긴다.
       footer={
-        body.section === "column" && (
-          <p className="px-1 text-xs text-gray-400">
-            본문을 비워두고 저장하면 상세 페이지 없이 홈 화면 카드로만 발행됩니다 —
-            나중에 본문을 채워서 저장하면 정식 글로 바뀝니다.
-          </p>
-        )
+        <p className="px-1 text-xs text-gray-400">
+          본문을 비워두고 저장하면 상세 페이지 없이 홈 화면 카드로만 발행됩니다 —
+          나중에 본문을 채워서 저장하면 정식 글로 바뀝니다.
+        </p>
       }
     >
       <EditorBody

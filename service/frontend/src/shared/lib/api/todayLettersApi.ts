@@ -290,11 +290,15 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
   };
 }
 
-// "이슈 톡톡"(FollowingFeed) 카드 목록 — 서버(app/page.tsx 빌드타임 프리페치)와
-// 클라이언트(FollowingFeed.tsx 갱신 effect) 양쪽이 똑같은 로직을 쓰도록 공유
-// 함수로 뽑았다(2026-08-07, 홈 SSG 감사). 오늘부터 최대 MAX_LOOKBACK_DAYS일
-// 역순 조회, MAX_DISPLAY편을 채우면 멈춘다 — 하루에 0~1편만 나오는 날이 흔해
-// "오늘 있으면 끝"으로는 카드가 휑하게 남는 문제가 있었다(2026-08-07 실제 발생).
+// 최신 레터 카드 목록 — 지금은 HotLettersRail("요즘 가장 많이 읽힌 글") 하나만
+// 쓴다. 원래 이름·주석은 홈 "이슈 톡톡"(FollowingFeed) 섹션 전용이던 시절
+// 것인데, 그 섹션은 2026-08-17 홈 개편으로 카테고리 기반 구조에 흡수됐다
+// (NewsFeedTab.tsx 참조) — 함수 자체는 그대로 재사용 중이라 이름은 남겨둔다.
+// 서버(app/page.tsx 빌드타임 프리페치)와 클라이언트(HotLettersRail.tsx 갱신
+// effect) 양쪽이 똑같은 로직을 쓰도록 공유 함수로 뽑았다(2026-08-07, 홈 SSG
+// 감사). 오늘부터 최대 MAX_LOOKBACK_DAYS일 역순 조회, MAX_DISPLAY편을 채우면
+// 멈춘다 — 하루에 0~1편만 나오는 날이 흔해 "오늘 있으면 끝"으로는 카드가
+// 휑하게 남는 문제가 있었다(2026-08-07 실제 발생).
 const FOLLOWING_MAX_DISPLAY = 4;
 const FOLLOWING_MAX_LOOKBACK_DAYS = 14;
 
@@ -321,19 +325,11 @@ export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLA
     daysBack += 1
   ) {
     try {
-      // "오늘의 이슈"(분류 없음, 기본값)를 이슈 톡톡 전용 아카이빙으로 쓰기로
-      // 재정의(2026-08-12) — "인사이트에서 이슈 톡톡으로 옮기려는데 안 된다"는
-      // 피드백으로, 명시적으로 issue_talk 태그된 글뿐 아니라 분류를 아예
-      // 안 고른 글(section 없음)도 여기 포함시킨다. 인사이트(column)로 명시
-      // 분류된 글만 제외.
-      //
-      // "딥다이브"(section='trend') 분류는 2026-08-17에 폐기했다 — "이슈 톡톡"과
-      // "요즘 화제의 경제 이슈"가 독자 입장에서 구분이 안 된다는 판단으로
-      // 홈 섹션을 통합(TrendingEconomySection 삭제)하면서, 기존 section='trend'
-      // 레터 6건도 DB에서 태그를 지워 이 기본 버킷으로 합쳤다 — 이제 trend
-      // 값을 가진 살아있는 글이 없어 필터에 별도로 안 넣어도 된다.
+      // "분류"(형식: 이슈 톡톡/인사이트/용어해설) 축은 2026-08-19 카테고리로
+      // 완전히 대체됐다 — section 기준 제외 필터(예전엔 인사이트만 뺐다)도
+      // 그와 함께 폐기. 이제 레터는 형식 무관하게 전부 대상이다.
       const res = await fetchTodayLetters(date);
-      const posts = (res.letters ?? []).filter((l) => !l.section || l.section === 'issue_talk');
+      const posts = res.letters ?? [];
       collected.push(...posts.map((l) => toTodayLetterCard(l, res.date)));
     } catch {
       // 이 날짜 조회 실패 — 조용히 다음 날짜로 계속 (라이브 단일 소스, mock 폴백 없음)

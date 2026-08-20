@@ -28,6 +28,13 @@ function VideoPlayIcon({ accent, className }: { accent: string; className?: stri
 // 날짜 헤더 대신 각 항목 메타 줄에 붙는 "발행 주체" 라벨 — 뉴닉의 바이라인
 // (뉴닉/솔티라이프 등 채널명) 자리에 해당. 우리는 필진명 대신 콘텐츠
 // 종류를 쓴다(개별 저자 정보가 없는 항목이 대부분이라).
+//
+// "분류"(이슈 톡톡/인사이트/딥다이브) 축이 2026-08-19 카테고리로 대체된
+// 뒤로는 letter 항목의 kind가 사실상 전부 issue_talk로 고정돼(admin이 더
+// 이상 section을 고를 수 없다, PostMode.tsx 참조) 이 맵만 쓰면 모든 새 글이
+// "이슈 톡톡"으로 찍힌다 — LetterDetailClient.tsx와 같은 패턴으로 category를
+// 우선하고, category가 없는 옛 글에서만 이 kind 라벨로 폴백한다(아래
+// labelFor 참조).
 const KIND_LABEL: Record<Kind, string> = {
   letter: '레터',
   issue_talk: '이슈 톡톡',
@@ -35,6 +42,10 @@ const KIND_LABEL: Record<Kind, string> = {
   video: '영상',
   trend: '딥다이브',
 };
+
+function labelFor(item: ArchiveItem): string {
+  return item.category?.trim() || KIND_LABEL[item.kind];
+}
 
 function dateHeaderLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
@@ -96,7 +107,7 @@ function ArchiveRow({ item }: { item: ArchiveItem }) {
           </p>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: item.accent }}>{KIND_LABEL[item.kind]}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: item.accent }}>{labelFor(item)}</span>
         </div>
       </div>
       {item.avatarUrl ? (

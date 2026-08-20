@@ -47,23 +47,24 @@ const nextConfig: NextConfig = {
       { source: "/fortune/:path*", destination: "/saju", permanent: true },
       { source: "/saju-match", destination: "/saju", permanent: true },
       { source: "/saju-match/:path*", destination: "/saju", permanent: true },
-      // "딥다이브"(/trend) 아카이브 폐기(2026-08-17) — "이슈 톡톡"과 독자
-      // 입장에서 구분이 안 된다는 판단으로 홈 섹션·아카이브를 통합했다.
-      // 검색엔진에 이미 색인된 /trend URL·기존 북마크/공유 링크가 404를
-      // 만나지 않도록 영구 리다이렉트.
-      { source: "/trend", destination: "/issue-talk", permanent: true },
-      { source: "/trend/:path*", destination: "/issue-talk", permanent: true },
-      // /letters, /column 아카이브 목록 페이지 폐기(2026-08-18) — 2026-08-17
-      // 상단 탭 개편 이후 형식(브리핑/인사이트) 기준 대신 주제(증시/부동산/
-      // 산업 등 6개 경제 카테고리) 기준으로 가기로 확정, 이 두 페이지는 그
-      // 뒤로 사이트 안 어디서도 링크되지 않는 채로 URL만 살아있었다(헤더
-      // 나브에서 뺀 홈 섹션 ColumnPreviewSection도 이미 삭제됨 — 실제로
-      // 도달 경로가 전혀 없었다). "전체 모아보기"(/archive)가 애초에 이
-      // 두 페이지의 후속 역할로 만들어진 페이지라 그리로 리다이렉트.
+      // "딥다이브"(/trend) 아카이브 폐기(2026-08-17) — 처음엔 "이슈 톡톡"
+      // 하나로 흡수해 /issue-talk로 보냈는데, 2026-08-19에 "분류"(형식) 축
+      // 자체가 카테고리(주제)로 완전히 대체되면서 /issue-talk도 같이
+      // 퇴역했다 — 최종 목적지를 /archive로 다시 정리.
+      { source: "/trend", destination: "/archive", permanent: true },
+      { source: "/trend/:path*", destination: "/archive", permanent: true },
+      // /letters, /column, /issue-talk 아카이브 목록 페이지 전부 폐기
+      // (마지막으로 남아있던 /issue-talk은 2026-08-19) — 2026-08-17 상단
+      // 탭 개편 이후 형식(브리핑/인사이트/이슈톡톡) 기준 대신 주제(증시/
+      // 부동산/산업 등 6개 경제 카테고리) 기준으로 완전히 넘어갔다. 세
+      // 페이지 다 그 뒤로 사이트 안 어디서도 링크되지 않는 채로 URL만
+      // 살아있었다. "전체 모아보기"(/archive)가 애초에 이 페이지들의
+      // 후속 역할로 만들어진 페이지라 그리로 리다이렉트.
       // ⚠️ /letters/:path* 는 만들지 않는다 — /letters/{id}(개별 레터
       // 상세)·/letters/view 는 지금도 정상 사용 중인 라우트라 그대로 둔다.
       { source: "/letters", destination: "/archive", permanent: true },
       { source: "/column", destination: "/archive", permanent: true },
+      { source: "/issue-talk", destination: "/archive", permanent: true },
     ];
     if (process.env.SAJU_ORIGIN) {
       const origin = process.env.SAJU_ORIGIN;

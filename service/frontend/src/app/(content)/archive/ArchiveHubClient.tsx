@@ -41,7 +41,7 @@ export function ArchiveHubClient({ initialItems }: { initialItems: ArchiveItem[]
           kicker="Archive"
           title="지금까지의 모든 콘텐츠"
           accentColor="#111827"
-          description="경제 브리핑·이슈 톡톡·인사이트·영상을 한 곳에서 모아봅니다."
+          description="증시·부동산·산업·금융/정책·국제·재테크 뉴스와 영상을 한 곳에서 모아봅니다."
         />
         <p style={{ fontSize: 12.5, color: '#9ca3af', marginBottom: 14 }}>총 {items.length}개</p>
         <ArchiveList items={items} />

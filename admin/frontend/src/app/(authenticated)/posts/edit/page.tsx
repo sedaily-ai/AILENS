@@ -173,11 +173,12 @@ function PostEditPage() {
     }
     setBusy(true);
     // "핵심 정리"/"키워드"/"닫는 줄" 소제목으로 나눠 쓴 본문을 여기서 실제
-    // 필드로 갈라낸다. 분류가 인사이트인데 갈라내고 남은 본문이 비어있으면
-    // — 본문 필드를 싹 비운 카드 전용 글로 저장한다(2026-08-09, "근본적으로
-    // 해결" — 예전엔 별도 탭이었다). "오늘의 이슈"(분류 미지정)는 대응하는
-    // 카드 형태가 없어 이 규칙에서 제외 — 본문 없이 저장해도 그냥 빈 본문의
-    // 레터로 남는다.
+    // 필드로 갈라낸다. 본문이 비어있으면 — 본문 필드를 싹 비운 카드 전용
+    // 글로 저장한다(2026-08-09, "근본적으로 해결" — 예전엔 별도 탭이었다).
+    // 예전엔 "분류가 인사이트일 때만" 이 규칙이 적용됐는데, 분류(이슈톡톡/
+    // 인사이트/용어해설) 축 자체를 2026-08-19에 카테고리로 통합하면서
+    // "본문이 비어있는가" 하나로 조건을 단순화했다 — 어느 카테고리든 본문을
+    // 비워두고 저장하면 카드 전용으로 나간다.
     //
     // channels는 2026-08-17부터 카드 전용이어도 항상 ["letters"] — 예전엔
     // 별도 trend_card 채널로 저장해 공개 사이트에 상세 페이지가 아예 안
@@ -187,8 +188,7 @@ function PostEditPage() {
     // 글도 이제 letters 채널의 "본문이 비어있는 얇은 상세 페이지"가 된다 —
     // 홈/아카이브 카드 노출 방식(fetchSectionCards)은 동일하다.
     const split = splitRichBody(draft.body_inline?.body_html ?? "");
-    const section = draft.body_inline?.section;
-    const isCardOnly = section === "column" && isHtmlEmpty(split.body_html ?? "");
+    const isCardOnly = isHtmlEmpty(split.body_html ?? "");
 
     const payload: CmsPostInput = isCardOnly
       ? {
@@ -199,7 +199,6 @@ function PostEditPage() {
             key_points: [],
             keywords: [],
             images: [],
-            section,
             category: draft.body_inline?.category ?? "",
           },
         }
@@ -212,11 +211,8 @@ function PostEditPage() {
             key_points: split.key_points,
             keywords: split.keywords,
             images: draft.body_inline?.images ?? [],
-            // /letters 아카이브 필터 태그(트렌드/인기 칼럼).
-            section: draft.body_inline?.section,
-            // section이 trend/column일 때 홈 카드 상단 라벨 — 안 넘기면
-            // 저장 시 계속 빠져서 카드에 기본값("AI LENS")만 노출된다
-            // (2026-08-07 확인).
+            // 카드 상단 라벨 — 안 넘기면 저장 시 계속 빠져서 카드에 기본값
+            // ("AI LENS")만 노출된다(2026-08-07 확인).
             category: draft.body_inline?.category,
           },
           closing_line: split.closing_line || draft.closing_line,

@@ -13,60 +13,28 @@ import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 import { ECON_CATEGORIES, type EconCategory } from "@/lib/types";
 
-// 일괄 "분류 변경" 대상 — channels 자체(레터↔웹툰/영상)는 PostForm에서도
-// 생성 후엔 못 바꾸게 막아뒀다(엉뚱한 채널로 이미 발행된 글이 옮겨가는 사고
-// 방지) — 그래서 일괄 이동도 같은 channels:["letters"] 안에서 section만
-// 바꾸는 이슈 톡톡/인사이트 두 곳으로만 한정한다(2026-08-17, 딥다이브 폐기
-// — NewsFeedTab.tsx 참조). 워딩은 PostMode.tsx의 분류 드롭다운과 동일.
-const BULK_MOVE_TARGETS: Array<{ section: "" | "column" | "glossary"; label: string }> = [
-  { section: "", label: "이슈 톡톡" },
-  { section: "column", label: "인사이트" },
-  { section: "glossary", label: "용어 해설" },
-];
-
-// channels 는 글 하나가 여러 개 가질 수 있는 배열이지만(letters/paper/feed 등
-// 스펙상 허용), 실제 발행 흐름은 항상 단일 채널로 고정한다(PostForm 참조) —
-// 필터도 그 전제로 단순하게 간다.
-//
-// "오늘의 이슈"(기본값, section 없음) = "이슈 톡톡"으로 재정의(2026-08-12,
-// PostMode.tsx 분류 드롭다운과 짝) — "인사이트에서 이슈 톡톡으로 옮기려는데
-// 안 된다"는 피드백으로, 별도 issue_talk 필터 키를 두는 대신 letters 기본
-// 필터 자체가 이슈 톡톡을 가리키게 통합했다. 라벨도 "이슈 톡톡"으로.
+// "분류"(형식: 이슈 톡톡/인사이트/용어해설) 축은 2026-08-19 완전 폐기 —
+// "카테고리"(무슨 주제인가) 하나로 통합했다(PostMode.tsx 참조). 필터도
+// 그에 맞춰 카테고리 기준으로 다시 짠다.
 //
 // 웹툰/영상은 2026-08-09에 이 목록으로 잠깐 합쳤다가 같은 날 다시 뺐다 —
 // 합쳐두니 "새 글 쓰기"를 누를 때마다 종류를 또 골라야 해서 오히려
 // 불편하다는 지적("독립성을 주고 따로 빼라"). 각자 별도 사이드바 메뉴
 // (/webtoon, /video)와 자기 목록·자기 "새 글 쓰기"를 갖는다 — 이 화면은
 // 다시 레터 전용. (표 자체는 ContentTable로 세 화면이 공유한다.)
-const CHANNEL_FILTERS: Array<{ key: string; label: string }> = [
+const CATEGORY_FILTERS: Array<{ key: string; label: string }> = [
   { key: "", label: "전체" },
-  { key: "letters", label: "이슈 톡톡" },
-  { key: "column", label: "인사이트" },
-  { key: "glossary", label: "용어 해설" },
+  ...ECON_CATEGORIES.map((c) => ({ key: c, label: c })),
+  { key: "__uncategorized", label: "미분류" },
 ];
 
-
-// "레터"/"칼럼" 둘 다 DB에서는 channels: ["letters"]로 저장되고
-// body_inline.section 값("column"/없음)으로만 갈린다. "딥다이브"(trend)
-// 분류·trend_card 채널은 2026-08-17 폐기(NewsFeedTab.tsx 참조) — 그 채널로
-// 저장된 레코드는 실사용 0건이었어서 폴백 인식 로직도 같이 뺐다. "letters"
-// 필터(=이슈 톡톡)는 section 없는 글뿐 아니라 과거에 명시로 issue_talk
-// 태그된 글도 같이 잡는다 — 사용자 입장에선 둘 다 "이슈 톡톡"이라 구분할
-// 이유가 없다.
-function matchesSingleChannelFilter(p: CmsPost, channel: string): boolean {
-  const section = p.body_inline.section ?? null;
-  if (channel === "column") return section === "column";
-  if (channel === "glossary") return section === "glossary";
-  if (channel === "letters") return p.channels.includes("letters") && (!section || section === "issue_talk");
-  return (p.channels as string[]).includes(channel);
-}
-
 // 2026-08-09 — "오늘의 이슈, 머니 트렌드 이렇게 동시에 체크해서 필터"
-// 요청으로 채널 필터가 단일 선택 → 다중 선택(Set)이 됐다. 빈 Set = 전체
-// (필터 없음), 그 외엔 선택된 채널 중 하나라도 맞으면 통과(합집합).
-function matchesChannelFilter(p: CmsPost, channels: Set<string>): boolean {
-  if (channels.size === 0) return true;
-  return [...channels].some((c) => matchesSingleChannelFilter(p, c));
+// 요청으로 필터가 단일 선택 → 다중 선택(Set)이 됐다. 빈 Set = 전체
+// (필터 없음), 그 외엔 선택된 카테고리 중 하나라도 맞으면 통과(합집합).
+function matchesCategoryFilter(p: CmsPost, categories: Set<string>): boolean {
+  if (categories.size === 0) return true;
+  const category = p.body_inline.category || null;
+  return [...categories].some((c) => (c === "__uncategorized" ? !category : category === c));
 }
 
 // 발행일 범위 필터 — from/to 둘 다 없으면 전체 통과, from만 있으면 그 이후
@@ -182,11 +150,10 @@ function PostsPage() {
       limit: 200,
     };
     if (status) params.status = status;
-    // 채널이 letters/trend/column 뿐이라(웹툰/영상은 아래서 항상 제외) 서버
-    // channel 파라미터로는 애초에 못 갈린다 — 셋 다 channels: ["letters"]로
-    // 저장되고 body_inline.section 으로만 구분되기 때문. 그래서 서버는
-    // status만 넘기고, 채널은 항상 전체를 받아 matchesChannelFilter로
-    // 클라이언트에서 걸러낸다(다중 선택도 여기서 처리, 위 함수 참조).
+    // 카테고리는 서버 파라미터로 못 갈린다(body_inline.category 는 서버
+    // list_posts 쿼리 대상이 아님) — status만 넘기고, 나머지는 항상 전체를
+    // 받아 matchesCategoryFilter로 클라이언트에서 걸러낸다(다중 선택도
+    // 여기서 처리, 위 함수 참조).
     adminApi
       .listPosts(params)
       .then((r) => {
@@ -197,7 +164,7 @@ function PostsPage() {
           (p) =>
             !p.channels.includes("webtoon") &&
             !p.channels.includes("video") &&
-            matchesChannelFilter(p, channel) &&
+            matchesCategoryFilter(p, channel) &&
             inDateRange(p.publish_date, dateRange),
         );
         setPosts(filtered);
@@ -271,27 +238,11 @@ function PostsPage() {
     finishBulk(ids.length - failCount, failCount, "삭제");
   };
 
-  // section 만 바꿔서 저장하면 body_inline 의 나머지 필드(본문·키워드·썸네일
+  // category 만 바꿔서 저장하면 body_inline 의 나머지 필드(본문·키워드·썸네일
   // 등)까지 통째로 날아간다 — 백엔드 update() 가 body_inline 을 부분 병합이
   // 아니라 통째로 교체하기 때문(admin/repo/posts_repo.py 참조). 그래서 반드시
   // 최신 글 전체를 먼저 받아 body_inline 을 펼친 다음 바뀌는 필드만 덮어써서
   // 통째로 다시 보내야 한다 — PostForm 저장 흐름(posts/edit/page.tsx)과 동일 패턴.
-  const bulkMove = async (section: "" | "column" | "glossary") => {
-    if (selected.size === 0) return;
-    setBulkBusy(true);
-    const ids = [...selected];
-    const results = await Promise.allSettled(
-      ids.map(async (id) => {
-        const { post } = await adminApi.getPost(id);
-        return adminApi.updatePost(id, {
-          body_inline: { ...post.body_inline, section: section || undefined },
-        });
-      }),
-    );
-    const failCount = results.filter((r) => r.status === "rejected").length;
-    finishBulk(ids.length - failCount, failCount, "이동");
-  };
-
   const bulkSetCategory = async (category: EconCategory) => {
     if (selected.size === 0) return;
     setBulkBusy(true);
@@ -367,7 +318,7 @@ function PostsPage() {
         channelColumn={{
           values: channel,
           onChange: setChannel,
-          options: CHANNEL_FILTERS,
+          options: CATEGORY_FILTERS,
         }}
         thumbnail={(p) => p.cover_image_url || null}
       />
@@ -380,7 +331,6 @@ function PostsPage() {
           <BulkActionBar
             count={selected.size}
             busy={bulkBusy}
-            onMove={bulkMove}
             onSetCategory={bulkSetCategory}
             onDelete={bulkDelete}
             onClear={() => setSelected(new Set())}
@@ -401,14 +351,12 @@ function PostsPage() {
 function BulkActionBar({
   count,
   busy,
-  onMove,
   onSetCategory,
   onDelete,
   onClear,
 }: {
   count: number;
   busy: boolean;
-  onMove: (section: "" | "column" | "glossary") => void;
   onSetCategory: (category: EconCategory) => void;
   onDelete: () => void;
   onClear: () => void;
@@ -421,23 +369,6 @@ function BulkActionBar({
       <span className="shrink-0 text-sm font-semibold" style={{ color: "var(--accent)" }}>
         {count}건 선택됨
       </span>
-
-      <span className="h-5 w-px shrink-0 bg-black/10" />
-
-      <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm" style={{ color: "var(--text-secondary)" }}>
-        분류 변경
-        {BULK_MOVE_TARGETS.map((t) => (
-          <button
-            key={t.label}
-            type="button"
-            disabled={busy}
-            onClick={() => onMove(t.section)}
-            className="shrink-0 rounded-md px-3 py-1.5 font-medium cursor-pointer bg-white hover:brightness-95 disabled:cursor-default disabled:opacity-50"
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
 
       <span className="h-5 w-px shrink-0 bg-black/10" />
 

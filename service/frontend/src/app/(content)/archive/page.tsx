@@ -8,15 +8,15 @@ import { ArchiveHubClient } from './ArchiveHubClient';
 // 그대로 이어받는다(레터+트렌드+칼럼+영상 통합 리스트).
 const SITE_URL = 'https://ailens.sedaily.ai';
 const TITLE = '지금까지의 모든 콘텐츠';
-const DESCRIPTION = 'AI LENS가 정리한 경제 브리핑·이슈 톡톡·인사이트·영상을 한 곳에서 모아봅니다. 서울경제신문이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 경제 뉴스 아카이브.';
+const DESCRIPTION = 'AI LENS가 정리한 증시·부동산·산업·금융/정책·국제·재테크 뉴스와 영상을 한 곳에서 모아봅니다. 서울경제신문이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 경제 뉴스 아카이브.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   // GEO 감사(2026-08-12, letters/page.tsx 주석 참조) — 키워드 커버리지 확장.
-  // "딥다이브"는 2026-08-17 폐기(이슈 톡톡에 흡수 통합)로 빼고 그 자리에
-  // "이슈 톡톡"을 넣었다.
-  keywords: ['AI LENS', '서울경제', '경제 뉴스 모음', 'AI 경제 뉴스', '경제 브리핑', '이슈 톡톡', '경제 인사이트'],
+  // "딥다이브"/"이슈 톡톡"/"인사이트"(형식 기준 분류) 전부 2026-08-19까지
+  // 순차 폐기 — 카테고리(주제) 기준 키워드로 교체.
+  keywords: ['AI LENS', '서울경제', '경제 뉴스 모음', 'AI 경제 뉴스', '증시', '부동산', '산업', '금융·정책', '국제', '재테크'],
   alternates: { canonical: `${SITE_URL}/archive` },
   openGraph: {
     title: TITLE,
@@ -43,7 +43,7 @@ function buildJsonLd(items: ArchiveItem[]) {
     url: `${SITE_URL}/archive`,
     name: TITLE,
     description: DESCRIPTION,
-    keywords: 'AI LENS, 서울경제, 경제 뉴스 모음, AI 경제 뉴스, 경제 브리핑, 이슈 톡톡, 경제 인사이트',
+    keywords: 'AI LENS, 서울경제, 경제 뉴스 모음, AI 경제 뉴스, 증시, 부동산, 산업, 금융·정책, 국제, 재테크',
     inLanguage: 'ko-KR',
     isPartOf: { '@id': `${SITE_URL}/#website` },
     publisher: { '@id': `${SITE_URL}/#organization` },

@@ -113,15 +113,15 @@ const NAV: { label: string; href: string }[] = [
 // 전체 콘텐츠 구조를 발견할 수 있게 한다(사이트맵과는 별개로 "실제 보이는
 // 링크"가 있어야 크롤 우선순위·내부 링크 가중치에 더 잘 잡힌다는 지적).
 //
-// '딥다이브'(/trend)는 2026-08-17 폐기 — headerTabs.ts 주석 참조. 이 배열이
-// headerTabs.ts/FeedPage.tsx와 별도로 관리되는 세 번째 사본이라는 걸
-// 그때 뒤늦게 발견했다(앞의 둘만 고치고 배포했다가 라이브에서 이 푸터
-// 링크만 남아있는 걸 확인). 같은 사고를 또 내지 않도록, 상단 탭 개편
-// (브리핑/인사이트 → 주제 6개)에 맞춰 여기도 ECON_CATEGORIES에서 직접
-// 생성한다 — 손으로 옮겨 적지 않는다.
+// '딥다이브'(/trend)는 2026-08-17 폐기, '이슈 톡톡'(/issue-talk)은
+// 2026-08-19 폐기 — headerTabs.ts 주석 참조. 이 배열이 headerTabs.ts/
+// FeedPage.tsx와 별도로 관리되는 세 번째 사본이라는 걸 /trend 때 뒤늦게
+// 발견했다(앞의 둘만 고치고 배포했다가 라이브에서 이 푸터 링크만 남아있는
+// 걸 확인) — 같은 사고를 또 내지 않도록, 상단 탭 개편(브리핑/인사이트/
+// 이슈톡톡 → 주제 6개)에 맞춰 여기도 ECON_CATEGORIES에서 직접 생성한다 —
+// 손으로 옮겨 적지 않는다.
 const CONTENT_LINKS: { label: string; href: string }[] = [
   ...ECON_CATEGORIES.map((c) => ({ label: c.label, href: `/${c.slug}` })),
-  { label: '이슈 톡톡', href: '/issue-talk' },
   { label: '영상', href: '/video' },
   { label: '웹툰', href: '/webtoon' },
   { label: '전체 콘텐츠', href: '/archive' },
