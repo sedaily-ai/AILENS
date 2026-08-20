@@ -134,6 +134,33 @@ slug 하나만 넘기는 5줄짜리 wrapper(`buildEconomyCategoryMetadata(slug)`
 `parent.parent.parent`로 수정, 새 위치에서 DDB fetch·폴백 경로 둘 다
 재확인 완료.
 
+### 10. letters·podcast 영속 파이프라인 신설
+
+사용자가 "레터·팟캐스트도 정리해달라"고 명시 요청 — §9에서 언급한
+"letters/podcast는 매번 스크래치패드 1회성 스크립트" 비대칭을 해소.
+
+- `pipelines/letters/pipeline.py` — 기사 → GPT-4o 1회 호출 → 레터 텍스트.
+  4포맷 중 가장 단순(webtoon 같은 다단계 없음)
+- `pipelines/podcast/pipeline.py` — 기사 → GPT-4o 대본 → AWS Polly
+  음성(Seoyeon/generative), webtoon과 같은 resume 관례
+- `pipelines/common/` 신설 — `ddb_prompt.py`를 webtoon 전용에서 공용으로
+  승격(내용은 원래도 100% 범용이었음, webtoon 이름만 붙어있었을 뿐).
+  `openai_client.py`·`text_utils.py` 신설 — 이 세션 내내 스크래치패드
+  스크립트마다 매번 새로 썼던 "Secrets Manager에서 키 fetch + GPT
+  chat.completions 호출", "GPT가 감싸주는 ``` 코드블록 벗기기"
+  보일러플레이트를 뽑아냄
+- `pipelines/webtoon/pipeline.py`는 이제 `pipelines/common`의
+  `ddb_prompt`를 import(로컬 사본 삭제, `sys.path.insert`로 상대 경로
+  연결)
+- `pipelines/README.md` 신설 — 4개 폴더 전체를 한눈에 보는 지도, video만
+  Node인 이유, video의 "각본 생성" 단계가 아직 영속 코드 없다는 남은
+  비대칭을 명시적으로 기록(다음에 볼 것으로 남김)
+
+**검증**: 빵지순례 원문으로 두 파이프라인 다 실제 end-to-end 스모크
+테스트 — 레터 텍스트 생성 확인(`pipeline.py smoketest test_article.txt`),
+팟캐스트 대본+mp3 생성 확인. webtoon도 새 import 경로에서 DDB fetch
+재확인(v#5 정상 로드).
+
 ## 결정
 
 - **3단계(웹툰 이미지 생성) 스타일은 여전히 코드로 유지** — DB에 저장된
@@ -158,8 +185,14 @@ slug 하나만 넘기는 5줄짜리 wrapper(`buildEconomyCategoryMetadata(slug)`
   — 사후 자동 검증(정규식 스캔) 파이프라인 검토
 - 영상 전환 브릿지가 본론 구간에서 약함, 영상 길이가 목표(60~120초)에
   못 미침(현재 40초대)
-- letters/podcast도 video/webtoon처럼 `pipelines/`에 영속 코드로 만들지
-  결정
+- ~~letters/podcast도 video/webtoon처럼 `pipelines/`에 영속 코드로 만들지
+  결정~~ → 같은 날 처리 완료. `pipelines/letters/`, `pipelines/podcast/`
+  신설(GPT-4o 1회 호출 / GPT-4o+Polly 2단계), `pipelines/common/`으로
+  `ddb_prompt.py`(webtoon 전용→공용 승격)·`openai_client.py`·
+  `text_utils.py` 뽑아냄. 둘 다 실제 기사로 end-to-end 스모크 테스트
+  완료. 남은 비대칭: `pipelines/video/`는 여전히 렌더(2·3단계)만 있고
+  "각본 생성"(1단계) 영속 코드가 없음(Node 프로젝트라 Python 스크립트
+  넣기 애매해서 보류 — `pipelines/README.md` 참고)
 - 4포맷 전환 이전 방식("원인/당사자/실무/숫자")으로 만들어진 다른 lens
   글들이 여전히 남아있음 — 개별 재작업 여부 결정 대기
 - 4개 포맷 "독립 완결" vs "브릿지 문구로 연결" 방향 아직 미정
