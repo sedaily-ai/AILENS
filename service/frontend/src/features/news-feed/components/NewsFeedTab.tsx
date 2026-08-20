@@ -143,19 +143,20 @@ export function NewsFeedTab({
 
             {/* "최신 뉴스" 히어로 자리+그리드+전체보기(2026-08-17, 배너 바로
                 아래 — 사용자가 스크린샷으로 히어로 위치를 정확히 짚어 확인).
-                히어로 자리는 오늘의 "4가지 시선" 이슈로 고정(heroSlot에
-                <LensPreviewSection/>을 그대로 넘김 — 카드로 축약하지 않고
-                원래 디자인 그대로, 삭제·병합 아님). 별도 섹션으로 또 나열
-                하면 같은 이슈가 두 번 보이는 중복이라 여기 히어로 자리
-                하나로 합쳤다. 시선 발행이 없는 날은 heroSlot이 undefined가
-                되어 예전처럼 최신 글이 히어로가 된다.
                 예전엔 형식 기준으로 "이슈 톡톡"(FollowingFeed)과 "인사이트"
                 (ColumnPreviewSection) 두 섹션이 따로 있었는데, 상단 탭을
                 형식(브리핑/인사이트)에서 주제(증시/부동산/...) 기준으로 갈아
-                엎은 김에 홈도 맞췄다. */}
+                엎은 김에 홈도 맞췄다.
+                히어로 자리는 "4가지 시선"(기사 하나→4형식)에서 "지면
+                특별 코너"(전체/증권/산업/시그널 4개 지면 탭, 각각 기사
+                4개)로 개편(2026-08-21, 사용자 요청). LensPreviewSection이
+                이제 lens 전용이 아니라 archiveItems(letters+lens 병합)를
+                직접 받아 category로 필터링한다 — 그래서 게이트 조건도
+                initialLensPosts.length에서 archiveItems.length로 바뀜
+                (lens 발행이 없어도 letters만으로 지면이 채워질 수 있음). */}
             <LatestGridSection
               items={archiveItems}
-              heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} /> : undefined}
+              heroSlot={archiveItems.length ? <LensPreviewSection archiveItems={archiveItems} /> : undefined}
             />
 
             {/* 단어 퀴즈를 "최신 뉴스" 바로 아래로 올렸다(2026-08-20, 사용자
