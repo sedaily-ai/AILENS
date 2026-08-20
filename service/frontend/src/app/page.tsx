@@ -3,7 +3,6 @@ import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts } from "@/sha
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
-import { LENS_HOME_HERO_COUNT } from "@/shared/constants/lensPerspectives";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "@/features/news-feed";
@@ -98,14 +97,20 @@ export default async function HomePage() {
   // "최신 뉴스" 그리드에도 lens("4가지 시선") 글을 섞는다(2026-08-20, 사용자
   // 요청 — 앞으로 발행되는 글은 전부 이 4포맷 톤으로 나가는데, 그리드는 여전히
   // letters 채널만 봐서 letters 발행이 뜸해지면 그리드가 계속 낡은 채로 남는다).
-  // 히어로 캐러셀(LensPreviewSection)이 이미 최신 LENS_HOME_HERO_COUNT개를
-  // 위에서 보여주므로, 그리드에는 그 뒤 항목부터만 넘겨 같은 이슈가 히어로·
-  // 그리드 두 곳에 중복 노출되는 걸 막는다.
+  //
+  // 처음엔 히어로 캐러셀의 슬라이드 개수(LENS_HOME_HERO_COUNT=5)만큼 통째로
+  // 뺐는데, 그러면 하루에 신규 lens 글이 5건 미만이면(보통 그렇다) 전부
+  // 그리드에서 숨어버려 "새 글 올려도 그리드가 안 쌓인다"는 문제가 됐다
+  // (2026-08-20, 사용자가 실제로 겪고 지적). 캐러셀은 화살표를 눌러야 2번째
+  // 슬라이드부터 보이므로, 화면에 항상 동시에 보이는 건 1번째(가장 최신) 슬라이드
+  // 뿐이다 — `/lens` 목록 페이지(LensListClient.tsx)도 같은 이유로 "가장 새로운
+  // 이슈" 히어로엔 딱 1건만 빼고 나머지는 바로 "다른 이슈"에 쌓는다. 그 관례를
+  // 그대로 따라 여기서도 1건만 제외한다.
   const initialArchiveItems = buildArchiveItems(
     letters,
     [],
     [],
-    initialLensPosts.slice(LENS_HOME_HERO_COUNT),
+    initialLensPosts.slice(1),
   );
 
   return (

@@ -29,10 +29,11 @@ export const LENS_CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(
 
 /**
  * 홈 히어로(LensPreviewSection)가 캐러셀로 보여주는 최신 lens 글 개수(2026-08-20).
- * app/page.tsx가 "최신 뉴스" 그리드(LatestGridSection)에 lens 글을 섞을 때
- * 이 개수만큼은 제외해야 한다 — 안 그러면 히어로에 이미 뜬 이슈가 바로 아래
- * 그리드에도 다시 뜬다(NewsFeedTab.tsx 히어로 자리 주석의 "같은 이슈가 두 번
- * 보이는 중복" 원칙과 동일).
+ *
+ * app/page.tsx의 "최신 뉴스" 그리드는 이 개수 전부가 아니라 딱 1건(가장 최신)만
+ * 제외한다 — 캐러셀은 화살표를 눌러야 2번째 슬라이드부터 보이므로 화면에 항상
+ * 동시에 보이는 건 1번째뿐이라, 5건을 통째로 빼면 신규 lens 글이 그날 5건 미만일
+ * 때 그리드가 하나도 안 쌓이는 문제가 났다(2026-08-20, 사용자 지적으로 수정).
  */
 export const LENS_HOME_HERO_COUNT = 5;
 
