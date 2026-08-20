@@ -186,6 +186,14 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
             ],
             # "영상" 포맷 전용 YouTube 등 임베드 URL(2026-08-19).
             "video_url": item.get("video_url") or None,
+            # "영상" 포맷 전용 썸네일(2026-08-20) — YouTube 링크는
+            # resolveVideo()가 자동으로 썸네일을 뽑아주지만, 우리 파이프라인이
+            # 렌더링해 S3에 올린 mp4 원본은 그 자동 추출이 안 된다(URL 패턴
+            # 기반 판별이라). 렌더된 영상 자체에서 프레임을 떠서 미리
+            # 채워두는 필드 — 없으면 프론트가 기사 사진으로 폴백한다(사용자
+            # 지적: "영상 목록에 기사 사진 말고 영상 프레임 같은 썸네일이
+            # 있어야죠").
+            "thumbnail_url": item.get("thumbnail_url") or None,
             # "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — home_player
             # 채널의 media_embed_url과 같은 성격, 저장 위치만 이 슬롯.
             "media_url": item.get("media_url") or None,

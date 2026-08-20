@@ -238,6 +238,10 @@ export interface CmsLensItem {
   /** "영상" 포맷 전용 YouTube 등 임베드 URL(2026-08-19) — 있으면 실제
    *  임베드, 없으면 정적 목업으로 폴백한다. */
   video_url?: string | null;
+  /** "영상" 포맷 전용 썸네일(2026-08-20) — 렌더된 영상 자체에서 뜬 프레임.
+   *  YouTube 링크는 resolveVideo()가 자동으로 뽑아주지만 우리가 렌더링해
+   *  올린 mp4 원본은 그게 안 돼서 별도로 채운다(lensMediaFeed.ts 참조). */
+  thumbnail_url?: string | null;
   /** "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — 있으면 실제
    *  임베드, 없으면 정적 목업으로 폴백한다. */
   media_url?: string | null;

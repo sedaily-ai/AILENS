@@ -54,9 +54,12 @@ export function buildLensVideoItems(lens: CmsLens[]): CmsVideo[] {
       excerpt: firstBullet(item.bullets),
       date: l.date,
       video_url: url,
-      // 실사진(photo_image_url)이 있으면 우선, 없으면 웹툰 컷 등이 이미 박힌
-      // cover_image_url로 폴백 — 영상 카드 재생 전 썸네일(poster) 용도.
-      thumbnail_url: l.photo_image_url || l.cover_image_url || null,
+      // 영상 프레임(item.thumbnail_url)을 최우선으로 — YouTube 채널 영상은
+      // 자동으로 영상 프레임 썸네일이 뜨는데(resolveVideo), lens 영상만 기사
+      // 사진(photo_image_url)으로 떠서 "영상 콘텐츠인데 기사 사진이 뜬다"는
+      // 지적을 받았다(2026-08-20). 프레임을 아직 못 뽑은 글만 기사 사진 →
+      // cover_image_url 순으로 폴백.
+      thumbnail_url: item.thumbnail_url || l.photo_image_url || l.cover_image_url || null,
       is_cms: true,
       href: `/lens/${encodeURIComponent(l.id)}?v=${VIDEO_INDEX + 1}`,
     });
