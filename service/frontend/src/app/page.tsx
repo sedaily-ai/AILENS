@@ -3,6 +3,7 @@ import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts } from "@/sha
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
+import { LENS_HOME_HERO_COUNT } from "@/shared/constants/lensPerspectives";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "@/features/news-feed";
@@ -94,7 +95,18 @@ export default async function HomePage() {
     // 그대로 재사용.
     fetchFollowingLetters(5),
   ]);
-  const initialArchiveItems = buildArchiveItems(letters, [], []);
+  // "최신 뉴스" 그리드에도 lens("4가지 시선") 글을 섞는다(2026-08-20, 사용자
+  // 요청 — 앞으로 발행되는 글은 전부 이 4포맷 톤으로 나가는데, 그리드는 여전히
+  // letters 채널만 봐서 letters 발행이 뜸해지면 그리드가 계속 낡은 채로 남는다).
+  // 히어로 캐러셀(LensPreviewSection)이 이미 최신 LENS_HOME_HERO_COUNT개를
+  // 위에서 보여주므로, 그리드에는 그 뒤 항목부터만 넘겨 같은 이슈가 히어로·
+  // 그리드 두 곳에 중복 노출되는 걸 막는다.
+  const initialArchiveItems = buildArchiveItems(
+    letters,
+    [],
+    [],
+    initialLensPosts.slice(LENS_HOME_HERO_COUNT),
+  );
 
   return (
     <HomeContent

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { LENS_ACCENT, LENS_HOME_HERO_COUNT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 
 // "오늘의 이슈, 4가지 시선" 홈 티저.
 //
@@ -25,7 +25,12 @@ import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constant
 //
 // 각 행은 /lens/{id}?v=N 으로 연결돼, 고른 시선이 상세에서 열린 채 착지한다
 // (해시 대신 쿼리 — 해시는 브라우저 자동 스크롤을 일으켜 히어로를 건너뛴다).
-const MAX_PREVIEW = 5;
+//
+// 캐러셀에 보여줄 개수는 shared/constants/lensPerspectives.ts의
+// LENS_HOME_HERO_COUNT — app/page.tsx가 "최신 뉴스" 그리드에서 같은 개수를
+// 제외하고 lens 글을 섞으므로(중복 노출 방지), 값을 한 곳에서만 바꾸도록
+// 로컬 상수 대신 그 export를 그대로 쓴다.
+const MAX_PREVIEW = LENS_HOME_HERO_COUNT;
 
 export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] }) {
   const [items, setItems] = useState<CmsLens[] | null>(initialItems ?? null);

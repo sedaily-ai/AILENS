@@ -27,6 +27,15 @@ export const LENS_ACCENT = '#3b82f6';
 export const LENS_CARD_BORDER = '1px solid rgba(0,0,0,0.06)';
 export const LENS_CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)';
 
+/**
+ * 홈 히어로(LensPreviewSection)가 캐러셀로 보여주는 최신 lens 글 개수(2026-08-20).
+ * app/page.tsx가 "최신 뉴스" 그리드(LatestGridSection)에 lens 글을 섞을 때
+ * 이 개수만큼은 제외해야 한다 — 안 그러면 히어로에 이미 뜬 이슈가 바로 아래
+ * 그리드에도 다시 뜬다(NewsFeedTab.tsx 히어로 자리 주석의 "같은 이슈가 두 번
+ * 보이는 중복" 원칙과 동일).
+ */
+export const LENS_HOME_HERO_COUNT = 5;
+
 export interface LensPerspective {
   /** 화면에 크게 박는 서수. */
   ordinal: string;
