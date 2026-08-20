@@ -9,7 +9,9 @@
 `service/frontend/src/widgets/TodayNewsPlayer/TodayNewsPlayer.tsx`,
 `service/backend/handlers/cms_posts_public.py`,
 `admin/frontend/src/app/(authenticated)/home-player/page.tsx`,
-`service/frontend/src/shared/lib/api/homePlayerApi.ts`
+`service/frontend/src/shared/lib/api/homePlayerApi.ts`,
+`service/frontend/src/features/news-feed/components/GamesPreviewSection.tsx`,
+`service/frontend/src/shared/data/games.ts`
 
 ## 배경
 
@@ -196,6 +198,35 @@ caption을 빈 문자열로 만들어 zod 스키마(`min(1)` 문자열)에 걸�
 - 3개 배포(`service/backend`, `admin/frontend`, `service/frontend`) +
   `revalidate` 웹훅 호출 후 라이브에서 36px 재생버튼과 카테고리 라벨
   전부 확인.
+
+### 9. 홈 게임 미리보기 섹션 신설
+
+"게임도 섹션을 추가할까요?"라는 사용자 질문에 — `/games` 페이지·헤더
+탭은 이미 있지만 홈 피드 안 미리보기 섹션은 없다는 걸 확인하고, "게임
+2종뿐이라 4열 그리드보다 작은 배너형 카드로 가볍게 시작하는 게
+어떨까요"라고 역제안. 사용자가 "게임섹션은.. 트렌디한 깔끔 디자인으로
+넣어주시져.메인에다가... 웹툰은 트렌디하게 잘 만들어진 것 같은데...
+약간 재밌는 게임 느낌나도록"으로 확정 → 실제 게임이 2개뿐이지만 둘 다
+플레이 가능한 완성 콘텐츠라 숨길 이유가 없어 배너 1개 대신 카드 2장을
+나란히(auto-fit grid) 노출하는 쪽으로 최종 결정.
+
+- `shared/data/games.ts` 신설 — `GamesClient.tsx`(`/games`)에 하드코딩돼
+  있던 `Game` 인터페이스·`GAMES` 배열(고양이 이불 덮어주기/내일 신문을
+  지켜라!)을 뽑아 `GamesPreviewSection.tsx`와 공유. 새 게임을 추가하면
+  두 곳 다 자동 반영.
+- `GamesPreviewSection.tsx` 신설 — 사이트 전역의 밝은 에디토리얼 톤과
+  의도적으로 다른, `/games` 라우트가 이미 확립한 다크(`#0a0a18`)+네온
+  아케이드 톤을 그대로 재사용(게임별 `neon` 색 유리 글로우 테두리,
+  `Press_Start_2P` 아케이드 폰트로 "PLAY ▸" 배지, 호버 시 썸네일
+  확대+네온 강조). "웹툰은 트렌디한데 게임은 재밌는 느낌으로"라는
+  요구를 색·톤 차별화로 반영 — 웹툰(에디토리얼 화이트카드)과 대비되는
+  아케이드 톤이 오히려 "여기 게임 있다"는 신호를 더 잘 전달한다고 판단.
+- **위치 재조정**: 처음엔 "웹툰·영상 옆(같은 '재밌는 비주얼 콘텐츠'
+  블록)"에 넣었으나, 사용자가 "게임 섹션은 맨하단에"로 재요청 —
+  카테고리 레일(문화)까지 본문을 다 지난 뒤 만나는 마지막 "쉬어가기"
+  자리로 이동(`NewsFeedTab.tsx` 최하단, `HomeSideBar` 앞).
+- 배포 후 라이브에서 위치(오디오 섹션 다음, 최하단)와 `/games` 페이지
+  정상 동작(공유 데이터 추출 후 리그레션 없음) 확인.
 
 ## 결정
 
