@@ -131,146 +131,152 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
         </div>
       </header>
 
-      {/* 모바일 2열·데스크톱 4열 고정(2026-08-12) — FollowingFeed·TrendingEconomySection과
-          같은 이유로 auto-fill(minmax 210px)을 걷어냈다: 실제 모바일 폭에서는
-          아예 1열로만 잡히던 문제(210px×2가 모바일 콘텐츠 폭보다 큼)가 있었다
-          — 웹툰 섹션과 그리드 통일. */}
+      {/* 2×2로 확대(2026-08-20, 사용자 요청 — "영상은 좀 더 진지하게 보는
+          콘텐츠니까 카드를 키우자"). 예전엔 웹툰과 그리드 폭을 맞추려고
+          4열이었는데, 카드 전체가 클릭 영역이 되면서(아래 참조) 작은
+          카드에서는 시네마틱한 톤이 잘 안 살아서 2열로 확 키웠다. */}
       <div
-        className="grid grid-cols-2 sm:grid-cols-4"
+        className="grid grid-cols-2"
         style={{
-          gap: 'clamp(10px, 2vw, 16px)',
+          gap: 'clamp(12px, 2.4vw, 20px)',
         }}
       >
         {shown.map((v) => {
           const resolved = resolveVideo(v.video_url);
           const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
-          const href = v.href ?? `/video/${encodeURIComponent(v.id)}`;
           return (
             <article
               key={v.id}
               className="group"
               style={{
-                borderRadius: 10,
-                background: '#fff',
+                borderRadius: 12,
+                background: '#000',
                 boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 3px 10px rgba(17,24,39,0.05)',
-                border: '1px solid rgba(0,0,0,0.06)',
                 overflow: 'hidden',
-                transition: 'transform .18s ease, box-shadow .18s ease',
+                transition: 'transform .2s ease, box-shadow .2s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 8px 22px rgba(17,24,39,0.14)';
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 12px 28px rgba(17,24,39,0.22)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = '0 1px 2px rgba(17,24,39,0.04), 0 3px 10px rgba(17,24,39,0.05)';
               }}
             >
-              {/* 재디자인(2026-08-20) — 예전엔 썸네일+재생버튼, 그 아래 회색
-                  캡션 한 줄이 전부라 "재밌는 콘텐츠"치고 너무 밋밋하다는
-                  피드백. 유튜브/넷플릭스류 카드처럼 제목을 썸네일 위에
-                  그라데이션 스크림과 함께 얹는다. 재생 버튼은 화면 가운데를
-                  가리는 큰 글로우 링(촌스럽다는 피드백) 대신 우상단의 작은
-                  플랫 아이콘으로 — 클릭하면 카드 안(16:9라 작아 보인다는
-                  지적)이 아니라 모달로 크게 재생한다(아래 참조). 제목(하단
-                  스트립)과 재생 버튼(전체 영역)이 각자 독립된 클릭 영역이라
-                  <button> 안에 <Link>를 중첩하지 않는다(접근성) — 형제
-                  요소로 겹쳐 쌓고 제목 스트립만 자기 영역에서 클릭을
-                  가로챈다. */}
-              <div className="aspect-video relative overflow-hidden" style={{ background: '#111827' }}>
-                <button
-                  type="button"
-                  onClick={() => setPlayingId(v.id)}
-                  className="absolute inset-0 w-full h-full flex items-center justify-center"
-                  aria-label={`${v.title} 재생`}
-                >
+              {/* 재디자인(2026-08-20) — 카드 전체가 클릭 영역(사용자 요청:
+                  "재생버튼만 말고 카드 누르면 전부 모달 뜨게"). 상세 페이지로
+                  리다이렉트하는 대신 항상 모달로 크게 재생 — 그래서 이제
+                  <Link>가 아니라 <button> 하나가 카드 전체를 덮는다.
+                  시네마틱 톤: 가장자리를 살짝 어둡게 죽이는 비네트, 호버 시
+                  글래스모피즘 재생 버튼이 페이드인, 카드가 커진 만큼 제목도
+                  키움. */}
+              <button
+                type="button"
+                onClick={() => setPlayingId(v.id)}
+                className="relative block w-full text-left"
+                aria-label={`${v.title} 재생`}
+              >
+                <div className="aspect-video relative overflow-hidden" style={{ background: '#111827' }}>
                   {thumb ? (
                     <Image
                       src={thumb}
                       alt=""
                       fill
-                      sizes="(min-width: 640px) 25vw, 50vw"
-                      className="transition-transform duration-300 group-hover:scale-[1.06]"
+                      sizes="(min-width: 640px) 45vw, 50vw"
+                      className="transition-transform duration-500 group-hover:scale-[1.05]"
                       style={{ objectFit: 'cover' }}
                     />
                   ) : (
                     <div className="w-full h-full" style={{ background: '#1f2937' }} />
                   )}
+
+                  {/* 비네트 — 가장자리를 살짝 어둡게 죽여서 시네마틱한 톤. */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      background: 'radial-gradient(120% 130% at 50% 42%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.5) 100%)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+
+                  {/* "영상" 배지 — 이 카드가 재생 가능한 영상이라는 걸 스캔만으로
+                      알 수 있게(웹툰 섹션의 배지 패턴과 통일). */}
                   <span
                     aria-hidden
-                    className="absolute flex items-center justify-center transition-transform group-hover:scale-110"
+                    className="absolute"
                     style={{
-                      top: 8,
-                      right: 8,
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
+                      top: 10,
+                      left: 10,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: '#fff',
                       background: 'rgba(17,24,39,0.55)',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                      padding: '4px 9px',
+                      borderRadius: 999,
+                      letterSpacing: '0.02em',
+                      pointerEvents: 'none',
                     }}
                   >
-                    <svg width={12} height={12} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
+                    영상
                   </span>
-                </button>
 
-                {/* "영상" 배지 — 이 카드가 재생 가능한 영상이라는 걸 스캔만으로
-                    알 수 있게(웹툰 섹션의 배지 패턴과 통일). */}
-                <span
-                  aria-hidden
-                  className="absolute"
-                  style={{
-                    top: 8,
-                    left: 8,
-                    fontSize: 10.5,
-                    fontWeight: 800,
-                    color: '#fff',
-                    background: 'rgba(17,24,39,0.55)',
-                    padding: '3px 8px',
-                    borderRadius: 999,
-                    letterSpacing: '0.02em',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  영상
-                </span>
-
-                {/* 하단 그라데이션 스크림 + 제목 오버레이. 스크림은 장식이라
-                    클릭을 안 가로채고(pointerEvents:none), 제목 Link만 자기
-                    영역(하단 스트립)에서 클릭을 받는다. */}
-                <div
-                  aria-hidden
-                  className="absolute inset-x-0 bottom-0"
-                  style={{
-                    height: '62%',
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0) 100%)',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <Link
-                  href={href}
-                  prefetch
-                  className="absolute inset-x-0 bottom-0 hover:opacity-80 transition-opacity"
-                  style={{ padding: 'clamp(10px, 2vw, 14px)', textDecoration: 'none' }}
-                >
-                  <h3
-                    className="font-bold text-white"
-                    style={{
-                      fontFamily: '"Noto Serif KR", serif',
-                      fontSize: 14.5,
-                      lineHeight: 1.4,
-                      letterSpacing: '-0.01em',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
+                  {/* 가운데 재생 아이콘 — 평소엔 숨겨두고 호버 때만 은은하게
+                      뜬다(글래스모피즘, 촌스러운 고정 글로우 링 대신). */}
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ pointerEvents: 'none' }}
                   >
-                    {v.title}
-                  </h3>
-                </Link>
-              </div>
+                    <span
+                      className="flex items-center justify-center transition-transform duration-300 group-hover:scale-105"
+                      style={{
+                        width: 'clamp(44px, 8vw, 60px)',
+                        height: 'clamp(44px, 8vw, 60px)',
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.14)',
+                        backdropFilter: 'blur(6px)',
+                        WebkitBackdropFilter: 'blur(6px)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
+                      }}
+                    >
+                      <svg width={18} height={18} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 2 }}>
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </span>
+                  </span>
+
+                  {/* 하단 그라데이션 스크림 + 제목 오버레이. */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-x-0 bottom-0"
+                    style={{
+                      height: '58%',
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0) 100%)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <div className="absolute inset-x-0 bottom-0" style={{ padding: 'clamp(14px, 2.6vw, 20px)' }}>
+                    <h3
+                      className="font-bold text-white"
+                      style={{
+                        fontFamily: '"Noto Serif KR", serif',
+                        fontSize: 'clamp(16px, 2.2vw, 20px)',
+                        lineHeight: 1.35,
+                        letterSpacing: '-0.015em',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {v.title}
+                    </h3>
+                  </div>
+                </div>
+              </button>
             </article>
           );
         })}
