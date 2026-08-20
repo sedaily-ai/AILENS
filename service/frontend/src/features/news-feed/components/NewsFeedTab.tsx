@@ -21,27 +21,32 @@ import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 // 의 Markets+Property, Politics+Society, Culture+International 페어링과 동일
 // 원칙). 순서는 ECON_CATEGORIES 정의 순서(증시/부동산/산업/금융·정책/국제/재테크)를
 // 그대로 2개씩 묶는다.
-const CATEGORY_PAIRS: readonly [string, string][] = [
+//
+// "문화"는 2026-08-20에 7번째 카테고리로 신설됐지만(경제 카테고리 6개 짝을
+// 다 채운 뒤라) 이 배열에 못 들어가 홈 카테고리 레일에서 통째로 빠져있었다
+// — 상단 nav·푸터·자기 카테고리 페이지(/culture)엔 있는데 홈에만 없는
+// 상태(사용자가 직접 확인 요청). 남는 파트너가 없으니 마지막 줄만 단독
+// (1개짜리) 행으로 추가 — CategoryPairRow가 slugs 1~2개를 모두 받도록
+// 확장했다.
+const CATEGORY_PAIRS: readonly (readonly string[])[] = [
   ['markets', 'property'],
   ['industry', 'finance'],
   ['international', 'investing'],
+  ['culture'],
 ];
 
 function CategoryPairRow({
-  pair,
+  slugs,
   archiveItems,
   first,
 }: {
-  pair: readonly [string, string];
+  slugs: readonly string[];
   archiveItems: ArchiveItem[];
   first: boolean;
 }) {
-  const [wideSlug, narrowSlug] = pair;
-  const wideCfg = ECON_CATEGORIES.find((c) => c.slug === wideSlug)!;
-  const narrowCfg = ECON_CATEGORIES.find((c) => c.slug === narrowSlug)!;
-  const wideItems = archiveItems.filter((it) => it.category === wideCfg.label);
-  const narrowItems = archiveItems.filter((it) => it.category === narrowCfg.label);
-  if (wideItems.length === 0 && narrowItems.length === 0) return null;
+  const configs = slugs.map((slug) => ECON_CATEGORIES.find((c) => c.slug === slug)!);
+  const itemsBySlug = configs.map((cfg) => archiveItems.filter((it) => it.category === cfg.label));
+  if (itemsBySlug.every((items) => items.length === 0)) return null;
   // 행 사이 구분선을 2px 검정에서 1px 연회색으로 낮췄다(2026-08-17, 사용자
   // 피드백: "하단에 선도 좀 어색하지 않나요, 검정색 선이요" — 본지의 굵은
   // "지면 구분선"을 그대로 따라했는데, 우리 페이지 나머지 구분선(카테고리
@@ -50,8 +55,8 @@ function CategoryPairRow({
   return (
     <div style={{ borderTop: first ? 'none' : '1px solid #e5e7eb', paddingTop: first ? 0 : 32 }}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginTop: 32, marginBottom: 32 }}>
-        <CategoryFeatureSection config={wideCfg} items={wideItems} span="wide" />
-        <CategoryFeatureSection config={narrowCfg} items={narrowItems} span="narrow" />
+        <CategoryFeatureSection config={configs[0]} items={itemsBySlug[0]} span="wide" />
+        {configs[1] && <CategoryFeatureSection config={configs[1]} items={itemsBySlug[1]} span="narrow" />}
       </div>
     </div>
   );
@@ -175,7 +180,7 @@ export function NewsFeedTab({
                 그 바로 아래 끼워 넣은 뒤 나머지 짝(산업+금융정책, 국제+재테크)을
                 잇는다(2026-08-17, 사용자 확인: "타임라인 이거 산업 부분 위쪽에
                 끼어 넣어주시죠"). */}
-            <CategoryPairRow pair={CATEGORY_PAIRS[0]} archiveItems={archiveItems} first />
+            <CategoryPairRow slugs={CATEGORY_PAIRS[0]} archiveItems={archiveItems} first />
 
             {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
                 뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
@@ -188,7 +193,7 @@ export function NewsFeedTab({
                 위(2026-08-17, 사용자 확인). */}
             <NewsTimeMachineSection />
 
-            <CategoryPairRow pair={CATEGORY_PAIRS[1]} archiveItems={archiveItems} first={false} />
+            <CategoryPairRow slugs={CATEGORY_PAIRS[1]} archiveItems={archiveItems} first={false} />
 
             {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제
                 콘텐츠처럼 안 보인다"는 피드백으로 카드형으로 교체
@@ -197,7 +202,14 @@ export function NewsFeedTab({
                 국제.. 재테크 바로 위쪽으로"). */}
             <WebtoonPreviewSection initialItems={initialWebtoons} />
 
-            <CategoryPairRow pair={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
+            <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
+
+            {/* 문화(culture) — 경제 카테고리 6개 짝(3줄)을 다 채운 뒤에 생긴
+                7번째 카테고리라 파트너가 없다. 단독 1개짜리 줄로 마지막에
+                추가(2026-08-20, 사용자 확인 — 홈에 문화 카테고리가 안 걸려
+                있는 걸 직접 발견). 콘텐츠가 없는 날은 CategoryFeatureSection
+                이 알아서 숨는다. */}
+            <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} first={false} />
 
             {/* 영상 콘텐츠(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
                 뜬다(VideoPreviewSection.tsx). 실제 영상이 없으면 섹션 자체를
