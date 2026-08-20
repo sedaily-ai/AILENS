@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { fetchVideos, type CmsVideo, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { buildLensVideoItems, mergeByDateDesc } from '@/shared/lib/lensMediaFeed';
-import { VIDEO_ACCENT } from '@/shared/lib/archiveItems';
 
 // lens 영상은 YouTube/네이버TV 임베드가 아니라 S3에 올린 mp4 원본 파일이라
 // resolveVideo()가 못 알아본다(둘 다 URL 패턴 기반 판별). iframe 대신 그냥
@@ -198,18 +197,25 @@ export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) 
                       ) : (
                         <div className="w-full h-full" style={{ background: '#1f2937' }} />
                       )}
+                      {/* 재생 아이콘 재조정(2026-08-20, 사용자 피드백: "가운데 큰
+                          글로우 링 버튼이 촌스럽다") — 화면 가운데를 가리는 큰
+                          버튼 대신, 썸네일은 그대로 보여주고 우상단에 작은
+                          아이콘만 살짝 얹는다(넷플릭스·릴스류 카드 패턴). 컬러
+                          글로우 링도 걷어내 배지들과 톤을 맞춘 플랫한 스타일로. */}
                       <span
                         aria-hidden
                         className="absolute flex items-center justify-center transition-transform group-hover:scale-110"
                         style={{
-                          width: 52,
-                          height: 52,
+                          top: 8,
+                          right: 8,
+                          width: 30,
+                          height: 30,
                           borderRadius: '50%',
-                          background: '#fff',
-                          boxShadow: `0 0 0 5px ${VIDEO_ACCENT}40, 0 6px 18px rgba(0,0,0,0.4)`,
+                          background: 'rgba(17,24,39,0.55)',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
                         }}
                       >
-                        <svg width={18} height={18} viewBox="0 0 24 24" fill={VIDEO_ACCENT} style={{ marginLeft: 2 }}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </span>
