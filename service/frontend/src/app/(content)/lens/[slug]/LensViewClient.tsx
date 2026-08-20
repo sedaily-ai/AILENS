@@ -24,6 +24,7 @@ import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
+import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { Check, Calendar, Play, Headphones, Images, Video, Zap, ArrowRight, type LucideIcon } from 'lucide-react';
 
 // "오늘의 이슈, 4가지 시선" 상세.
@@ -1419,24 +1420,17 @@ export function LensViewClient({
                 color: '#6b7280',
                 lineHeight: 1.6,
                 wordBreak: 'keep-all',
+                marginBottom: 16,
               }}
             >
               네 시선 모두 같은 기사를 바탕으로 정리했어요.
-              {lens.source_url && (
-                <>
-                  {' '}
-                  <a
-                    href={lens.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: '#374151', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 3 }}
-                  >
-                    원문 기사
-                  </a>
-                  에서 전체 내용을 확인할 수 있어요.
-                </>
-              )}
             </p>
+
+            {/* AI 생성 콘텐츠 고지(2026-08-21, 사용자 요청 — 서울경제 영문
+                CMS의 "AI-translated from Korean..." 박스를 레퍼런스로
+                "면책조항 걸어주세요"). 원문 링크는 이 박스 안으로 흡수 —
+                위 문단에 있던 "원문 기사" 인라인 링크는 중복이라 뺐다. */}
+            <AiDisclaimer sourceUrl={lens.source_url} />
           </div>
           </div>
         )}

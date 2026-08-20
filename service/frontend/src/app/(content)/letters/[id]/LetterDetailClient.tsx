@@ -16,6 +16,7 @@ import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
+import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { Calendar } from 'lucide-react';
 import {
   fetchTodayLetters,
@@ -912,18 +913,13 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
         )
       )}
 
-      {letter.source_url && (
-        <p style={{ fontSize: 13, marginBottom: 24 }}>
-          <a
-            href={letter.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: letter.accent, fontWeight: 600, textDecoration: 'none' }}
-          >
-            원문 보기 — 서울경제 →
-          </a>
-        </p>
-      )}
+      {/* AI 생성 콘텐츠 고지(2026-08-21, 사용자 요청 — 서울경제 영문
+          CMS의 "AI-translated from Korean..." 박스를 레퍼런스로 "면책조항
+          걸어주세요"). 기존 "원문 보기 — 서울경제 →" 링크는 이 박스 안
+          "원문 기사 보기" 링크로 흡수. */}
+      <div style={{ marginBottom: 24 }}>
+        <AiDisclaimer sourceUrl={letter.source_url} />
+      </div>
 
       {letter.keywords.length > 0 && (
         <section style={{ borderTop: '1px solid #f3f4f6', paddingTop: 24, marginBottom: 24 }}>
