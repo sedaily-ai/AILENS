@@ -6,7 +6,10 @@
 `service/frontend/src/features/news-feed/components/LensPreviewSection.tsx`,
 `service/frontend/src/shared/constants/lensPerspectives.ts`,
 `service/frontend/src/shared/lib/audioPlayerBus.ts`,
-`service/frontend/src/widgets/TodayNewsPlayer/TodayNewsPlayer.tsx`
+`service/frontend/src/widgets/TodayNewsPlayer/TodayNewsPlayer.tsx`,
+`service/backend/handlers/cms_posts_public.py`,
+`admin/frontend/src/app/(authenticated)/home-player/page.tsx`,
+`service/frontend/src/shared/lib/api/homePlayerApi.ts`
 
 ## 배경
 
@@ -168,6 +171,31 @@ caption을 빈 문자열로 만들어 zod 스키마(`min(1)` 문자열)에 걸�
   부모 `Link`의 `/listen` 이동을 막는다. 카드의 나머지 영역(아바타·
   제목) 클릭은 기존대로 `/listen` 상세로 이동 — "재생만 바로, 더 읽고
   싶으면 상세로"라는 두 동선을 한 카드 안에 공존시켰다.
+
+### 8. 오디오 카드 재생버튼 확대 + 카테고리 표기
+
+"재생버튼 좀 더... 크게? 직관적으로 해야할 것 같네요"와 "카테고리를
+입력하시죠.. 지금 팟캐스트, 영상 이렇게 카테고리가 되었는데"(포맷만
+뜨고 실제 내용 분류가 없다는 지적) 두 피드백을 한 라운드로 처리:
+
+- 재생 버튼 배지 26px→36px, 아이콘도 같이 키움.
+- `service/backend/handlers/cms_posts_public.py`의
+  `_shape_home_player_item`에 `category` 필드 추가 —
+  `body_inline.category`(lens/letters와 같은 저장 위치, ECON_CATEGORIES
+  값)를 그대로 재사용해 새 필드·새 테이블 없이 해결.
+- `admin/frontend`의 "홈 플레이어" 화면(새 항목 추가/기존 항목 수정)에
+  카테고리 `CustomSelect` 추가 — `LensMode.tsx`의 카테고리 선택 패턴과
+  동일.
+- `service/frontend`: `HomePlayerPost` 타입에 `category` 추가,
+  `AudioPreviewSection`·`ListenListClient`가 카테고리가 있으면 포맷
+  대신 카테고리를 1순위로 보여주도록 변경(`it.category ?? (isAudio ?
+  '팟캐스트' : '영상')`).
+- 기존 홈 플레이어 항목 5건(가계대출→금융·정책, 호남반도체→산업,
+  예보료→금융·정책, Korea Post Halves Household Lending→금융·정책,
+  Seoul Adds 100,000 Homes→부동산)에 카테고리 직접 백필.
+- 3개 배포(`service/backend`, `admin/frontend`, `service/frontend`) +
+  `revalidate` 웹훅 호출 후 라이브에서 36px 재생버튼과 카테고리 라벨
+  전부 확인.
 
 ## 결정
 
