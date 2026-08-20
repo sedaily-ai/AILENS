@@ -31,7 +31,7 @@
       "cut": 1,
       "narration": "",
       "caption": "",
-      "dialogue": [{ "speaker": "A", "line": "" }],
+      "dialogue": [{ "speaker": "A", "line": "", "tone": "보통" }],
       "fact_ids": [8]
     }
   ]
@@ -39,6 +39,12 @@
 ```
 인물 없는 소재는 characters를 null, dialogue를 빈 배열로. fact_ids는 이
 컷이 담은 facts.json의 id 배열.
+
+`tone`은 "보통" 또는 "격앙"만 쓴다. "격앙"은 놀람·충격·흥분처럼 목소리가
+커지는 대사에만 붙인다(예: "60년을 그냥 둔 거네?!"). 이 값이 2단계·3단계로
+그대로 넘어가 말풍선 모양을 바꾼다 — 아래 "말풍선 톤" 참고. 한 컷 안의
+두 대사를 전부 "격앙"으로 두지 않는다(§대사 규칙 1의 기능 대비와 같은
+이유 — 둘 다 흥분하면 대비가 안 산다).
 
 **2단계 출력 — 반드시 JSON**
 ```json
@@ -110,6 +116,12 @@
    빵을 나눠준대요. 그러니 부담 없이 나가는 거죠."
    같은 이유로 "~네요/~군요/~죠"로만 끝나는 리액션이 3컷 이상 연속되면
    안 된다 — 매 컷 반응 어미가 겹치는지 스스로 확인한다.
+10. A·B의 말투 격식도 대비시킨다. 기능이 다르면(1번 규칙) 말투도 다르게
+    들려야 자연스럽다 — 한쪽만 감탄사·느낌표가 많은 리액션형이면, 다른
+    쪽은 짧고 단정적인 진술형으로 쓴다.
+    예: A(리액션형) "헐, 60년을?!" / B(단정형) "네. 그냥 방치된 거예요."
+    두 사람 다 같은 어조·같은 문장 길이로 말하면 그림이 달라도 목소리가
+    안 들린다.
 
 **출력 전 자가 점검(필수)**: 초안을 다 쓴 뒤, 문서 맨 아래 체크리스트
 전 항목에 컷별로 대조한다. 위반한 컷이 있으면 그 컷만 다시 써서
@@ -171,12 +183,18 @@ STYLE = (
 
 BUBBLE_RULES = (
     "\n\n[SPEECH BUBBLES — CRITICAL]\n"
-    "Korean manhwa style: crisp white fill, clean 3px black outline, "
-    "smooth rounded edges, tail pointing precisely at the speaker's mouth. "
-    "Bold Korean gothic font, high contrast black text, fully legible. "
-    "Render the Korean text EXACTLY as given — do not paraphrase, "
-    "do not alter any character or number. "
-    "Position in upper or side areas — never cover faces or key action.\n"
+    "Korean manhwa style, bold Korean gothic font, high contrast black "
+    "text, fully legible. Render the Korean text EXACTLY as given — do "
+    "not paraphrase, do not alter any character or number. Position in "
+    "upper or side areas — never cover faces or key action.\n"
+    "Bubble shape depends on tone (1단계 JSON의 dialogue[].tone):\n"
+    "  - 보통 (default): crisp white fill, clean 3px black outline, "
+    "smooth rounded oval edges, tail pointing precisely at the "
+    "speaker's mouth.\n"
+    "  - 격앙: jagged spiky burst outline (explosion-shape, like a "
+    "shout bubble), same white fill and bold text, tail still pointing "
+    "at the speaker's mouth. Use only when tone is 격앙 — never make "
+    "every bubble in a cut spiky.\n"
 )
 
 CAPTION_RULES = (
@@ -212,3 +230,6 @@ FORMAT = (
 - 인서트 컷이 있는가
 - "~네요/~군요/~죠" 리액션이 3컷 이상 연속되지 않는가
 - 상대 대사를 요약해서 되읽기만 하는 대사가 없는가
+- A·B 말투 격식이 대비되는가(둘 다 같은 톤으로 말하지 않는가)
+- tone: 격앙을 남발하지 않았는가(한 컷 안에서 둘 다 격앙이 아닌가, 전체
+  8컷 중 격앙이 1~2개를 크게 넘지 않는가 — 전부 소리치면 대비가 안 산다)
