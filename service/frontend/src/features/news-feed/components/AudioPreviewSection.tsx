@@ -4,14 +4,16 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
-import { LENS_PERSPECTIVES } from '@/shared/constants/lensPerspectives';
+import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 
-// "팟캐스트" 시선 캐릭터(/lens 형식 선택 UI와 동일한 라인아트) — 사용자가
-// 워싱턴포스트 레퍼런스를 짚으며 "캐릭터는 기존거 사용"이라 한 건 이걸
-// 가리켰다(처음엔 TodayNewsPlayer의 헤드폰 일러스트로 오인해 잘못 넣었음,
-// 2026-08-21). 새 캐릭터를 만들지 않고 /lens 상세의 형식 선택 카드가 이미
-// 쓰는 4개 라인아트 중 오디오에 해당하는 것(index 2)을 그대로 재사용한다.
-const PODCAST_PERSPECTIVE = LENS_PERSPECTIVES[2];
+// 카드 4개가 전부 "팟캐스트" 캐릭터 하나만 반복돼 단조로워 보인다는
+// 지적(2026-08-21, "캐릭터들이 다 동일하네? 서로 다르게 해야하지
+// 않을까요?") — 카드 인덱스로 /lens 형식 선택 UI의 4개 라인아트(레터/
+// 웹툰/팟캐스트/영상)를 순환시켜 매 카드가 다른 캐릭터·다른 브랜드
+// 색(LENS_PERSPECTIVES의 color/tint)을 갖게 했다. 실제 포맷(팟캐스트/
+// 영상)과 캐릭터가 1:1로 안 맞을 수 있지만, 이 섹션은 "오디오 콘텐츠
+// 모아보기"용 장식이지 포맷 표시는 별도 캡션 줄(아래)이 이미 맡고
+// 있어 문제 없다는 판단.
 
 // 오디오 섹션(2026-08-21, 사용자 요청 — "오디오 섹션도 메인 페이지에 걸어주시죠",
 // 위치는 "문화 섹션 위에"). TodayNewsPlayer.tsx(하단 고정 미니 플레이어)에만
@@ -84,8 +86,9 @@ export function AudioPreviewSection({ initialItems }: Props) {
           과다) 없이 얇은 테두리 + 은은한 그림자만 쓰는 미니멀 톤
           (feedback_frontend_design_tone: 과한 그라데이션·굵은 테두리 금지). */}
       <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap: 'clamp(12px, 2vw, 18px)' }}>
-        {shown.map((it) => {
+        {shown.map((it, i) => {
           const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
+          const p = lensPerspectiveAt(i);
           return (
             <Link
               key={it.id}
@@ -94,7 +97,7 @@ export function AudioPreviewSection({ initialItems }: Props) {
               className="group flex flex-col"
               style={{
                 borderRadius: 16,
-                border: '1px solid rgba(17,24,39,0.08)',
+                border: '1px solid rgba(17,24,39,0.07)',
                 background: '#fff',
                 boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 2px 8px rgba(17,24,39,0.04)',
                 padding: 'clamp(22px, 3vw, 28px) clamp(16px, 2.4vw, 20px) clamp(20px, 2.6vw, 24px)',
@@ -104,23 +107,27 @@ export function AudioPreviewSection({ initialItems }: Props) {
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 10px 22px rgba(17,24,39,0.09)';
-                e.currentTarget.style.borderColor = 'rgba(59,130,246,0.28)';
+                e.currentTarget.style.boxShadow = '0 10px 22px rgba(17,24,39,0.1)';
+                e.currentTarget.style.borderColor = p.color;
+                const title = e.currentTarget.querySelector<HTMLElement>('[data-title]');
+                if (title) title.style.color = p.color;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = '0 1px 2px rgba(17,24,39,0.03), 0 2px 8px rgba(17,24,39,0.04)';
-                e.currentTarget.style.borderColor = 'rgba(17,24,39,0.08)';
+                e.currentTarget.style.borderColor = 'rgba(17,24,39,0.07)';
+                const title = e.currentTarget.querySelector<HTMLElement>('[data-title]');
+                if (title) title.style.color = '';
               }}
             >
               <span className="relative flex-shrink-0" style={{ width: 68, height: 68, marginBottom: 18 }}>
                 <span
                   className="flex items-center justify-center"
-                  style={{ width: 68, height: 68, borderRadius: '50%', background: '#f3f6fb', overflow: 'hidden' }}
+                  style={{ width: 68, height: 68, borderRadius: '50%', background: p.tint, overflow: 'hidden' }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, LensViewClient.tsx와 동일 패턴 */}
                   <img
-                    src={PODCAST_PERSPECTIVE.illustration}
+                    src={p.illustration}
                     alt=""
                     width={68}
                     height={68}
@@ -128,7 +135,9 @@ export function AudioPreviewSection({ initialItems }: Props) {
                   />
                 </span>
                 {/* 재생 버튼 배지 — 아바타 원 위에 흰 테두리로 떠 있어 "재생
-                    가능한 오디오"라는 걸 아이콘만으로 바로 알 수 있게. */}
+                    가능한 오디오"라는 걸 아이콘만으로 바로 알 수 있게.
+                    캐릭터별 브랜드 색(p.color)을 그대로 써서 아바타·배지가
+                    한 세트처럼 보이게 한다. */}
                 <span
                   aria-hidden
                   className="absolute flex items-center justify-center"
@@ -136,11 +145,11 @@ export function AudioPreviewSection({ initialItems }: Props) {
                     width: 26,
                     height: 26,
                     borderRadius: '50%',
-                    background: '#3b82f6',
+                    background: p.color,
                     border: '2.5px solid #fff',
                     bottom: -3,
                     right: -3,
-                    boxShadow: '0 2px 5px rgba(59,130,246,0.35)',
+                    boxShadow: `0 2px 5px ${p.color}59`,
                   }}
                 >
                   <svg width={10} height={10} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
@@ -155,7 +164,8 @@ export function AudioPreviewSection({ initialItems }: Props) {
               </span>
 
               <span
-                className="text-gray-900 group-hover:text-blue-700 transition-colors"
+                data-title
+                className="text-gray-900 transition-colors"
                 style={{
                   fontFamily: '"Noto Serif KR", serif',
                   fontSize: 'clamp(14.5px, 2vw, 15.5px)',
