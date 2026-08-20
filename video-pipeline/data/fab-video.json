@@ -1,0 +1,97 @@
+{
+  "title": "호남 반도체 팹, 2기 더 짓는다",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 7,
+      "narration": "호남에 반도체 팹이 더 늘어납니다. 그 이유와 영향은 무엇일까요?",
+      "caption": "호남 반도체 팹, 2기 더 짓는다",
+      "data": { "icon": "building" }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "국내 전력 수요가 2040년까지 최대 165GW로 예상됩니다.",
+      "caption": "국내 전력 수요 최대 165GW",
+      "data": { "value": 165, "unit": "GW", "label": "2040년 국내 전력 수요 전망", "sourceNote": "자료: 기후에너지환경부" }
+    },
+    {
+      "type": "diagram",
+      "duration": 10,
+      "narration": "삼성전자와 SK하이닉스가 호남에 반도체 팹을 2기 더 짓기로 했어요.",
+      "caption": "호남 반도체 팹 2기 추가 건설",
+      "data": {
+        "nodes": [
+          { "kind": "node", "icon": "building", "label": "반도체 팹" },
+          { "kind": "connector", "variant": "arrow" },
+          { "kind": "node", "icon": "trending-up", "label": "2기 추가" }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "chart",
+      "duration": 12,
+      "narration": "호남 팹 발표 후 전력 수요 전망이 20% 증가했거든요.",
+      "caption": "최대 전력수요 전망: 138.2GW → 165GW",
+      "data": {
+        "chartType": "line",
+        "points": [{ "label": "4월 발표", "value": 138.2 }, { "label": "현재", "value": 165 }],
+        "unit": "GW",
+        "sourceNote": "자료: 기후에너지환경부"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 10,
+      "narration": "전력 수요 증가분은 반도체 부문에서 20.6GW 더 늘어난 결과입니다.",
+      "caption": [
+        { "text": "반도체 부문", "emphasis": true },
+        { "text": "에서 20.6GW 증가" }
+      ],
+      "data": {}
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "전력 수요를 감당하려면 원전 19개를 추가 가동해야 해요.",
+      "caption": [
+        { "text": "원전 19개", "emphasis": true },
+        { "text": " 추가 가동 필요" }
+      ],
+      "data": {}
+    },
+    {
+      "type": "chart",
+      "duration": 12,
+      "narration": "2040년 전력 발전량은 15년 만에 49%나 증가할 전망입니다.",
+      "caption": "전력 발전량: 596TWh → 885.1TWh",
+      "data": {
+        "chartType": "line",
+        "points": [{ "label": "2025", "value": 596 }, { "label": "2040", "value": 885.1 }],
+        "unit": "TWh",
+        "sourceNote": "자료: 기후에너지환경부"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "석탄발전소 전환 부담도 있죠. 무탄소 발전원 옵션이 필요합니다.",
+      "caption": [
+        { "text": "무탄소 발전원", "emphasis": true },
+        { "text": " 옵션 필요" }
+      ],
+      "data": {}
+    },
+    {
+      "type": "closing",
+      "duration": 8,
+      "narration": "앞으로의 에너지 정책, 어떤 방향으로 나아가야 할까요?",
+      "caption": "에너지 정책의 미래는?",
+      "data": {}
+    }
+  ],
+  "source": "자료: 서울경제신문",
+  "disclaimer": ""
+}
