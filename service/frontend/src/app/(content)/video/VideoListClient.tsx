@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { VideoLightbox } from '@/shared/ui/VideoLightbox';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
@@ -17,6 +17,7 @@ import { resolveVideo } from '@/shared/lib/videoEmbed';
 export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) {
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<CmsVideo[]>(initialItems);
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +28,20 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
       cancelled = true;
     };
   }, []);
+
+  // 홈 섹션과 동일하게 카드를 눌러도 상세 페이지로 안 보내고 모달로 바로
+  // 재생한다(2026-08-20, 사용자 요청 — "영상 카테고리 페이지 안에서도
+  // 동일하게 모달 뜨도록"). Esc로 닫기.
+  useEffect(() => {
+    if (!playingId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPlayingId(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [playingId]);
+
+  const activeVideo = items.find((v) => v.id === playingId) ?? null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -67,17 +82,17 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
               const resolved = resolveVideo(v.video_url);
               const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
               return (
-                <Link
+                <button
                   key={v.id}
-                  href={`/video/${encodeURIComponent(v.id)}`}
-                  prefetch
-                  className="group"
+                  type="button"
+                  onClick={() => setPlayingId(v.id)}
+                  className="group text-left"
+                  aria-label={`${v.title} 재생`}
                   style={{
                     display: 'block',
                     borderRadius: 12,
                     overflow: 'hidden',
                     border: '1px solid #f1f1f0',
-                    textDecoration: 'none',
                     boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 6px 18px rgba(17,24,39,0.05)',
                   }}
                 >
@@ -128,12 +143,16 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
                       {v.title}
                     </h2>
                   </div>
-                </Link>
+                </button>
               );
             })}
           </div>
         )}
       </main>
+
+      {activeVideo && (
+        <VideoLightbox video={activeVideo} onClose={() => setPlayingId(null)} />
+      )}
     </div>
   );
 }
