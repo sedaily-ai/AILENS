@@ -917,6 +917,12 @@ export function LensViewClient({
               const realWebtoonCuts = format === 'webtoon' && l.images && l.images.length > 0 ? l.images : null;
               const realVideo = format === 'video' && l.video_url ? resolveVideo(l.video_url) : null;
               const realPodcast = format === 'podcast' && l.media_url ? resolveVideo(l.media_url) : null;
+              // 유튜브·네이버TV가 아닌 직링크(S3 등에 직접 올린 mp4/mp3) —
+              // resolveVideo()는 그 두 플랫폼만 인식해 null을 돌려주므로,
+              // URL 자체는 있는데 매칭이 안 될 때만 <video>/<audio> 태그로
+              // 직접 재생한다(2026-08-20, 실제 샘플 파일 업로드 대응).
+              const directVideoUrl = format === 'video' && l.video_url && !realVideo ? l.video_url : null;
+              const directPodcastUrl = format === 'podcast' && l.media_url && !realPodcast ? l.media_url : null;
               return (
                 <section
                   key={i}
@@ -966,8 +972,8 @@ export function LensViewClient({
                       {format === 'podcast' && <Headphones size={13} aria-hidden />}
                       {format === 'video' && <Video size={13} aria-hidden />}
                       {format === 'webtoon' && (realWebtoonCuts ? '웹툰' : '웹툰 형식 목업 · 아직 생성 파이프라인 미연결')}
-                      {format === 'podcast' && (realPodcast ? '팟캐스트' : '팟캐스트 형식 목업 · 아직 생성 파이프라인 미연결')}
-                      {format === 'video' && (realVideo ? '영상' : '영상 형식 목업 · 아직 생성 파이프라인 미연결')}
+                      {format === 'podcast' && (realPodcast || directPodcastUrl ? '팟캐스트' : '팟캐스트 형식 목업 · 아직 생성 파이프라인 미연결')}
+                      {format === 'video' && (realVideo || directVideoUrl ? '영상' : '영상 형식 목업 · 아직 생성 파이프라인 미연결')}
                     </p>
                   )}
 
@@ -1117,7 +1123,28 @@ export function LensViewClient({
                     </div>
                   )}
 
-                  {/* 팟캐스트 목업 — 실제 미디어가 없을 때만(위 realPodcast
+                  {/* 직링크 오디오(2026-08-20) — S3 등에 직접 올린 mp3. 유튜브가
+                      아니라 iframe 임베드가 안 되므로 네이티브 <audio>로 재생. */}
+                  {format === 'podcast' && directPodcastUrl && (
+                    <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
+                      <p
+                        style={{
+                          fontFamily: '"Noto Serif KR", serif',
+                          fontSize: 16,
+                          fontWeight: 700,
+                          color: '#111827',
+                          letterSpacing: '-0.01em',
+                          wordBreak: 'keep-all',
+                          marginBottom: 12,
+                        }}
+                      >
+                        {l.question || '오늘의 브리핑'}
+                      </p>
+                      <audio controls preload="none" src={directPodcastUrl} style={{ width: '100%' }} />
+                    </div>
+                  )}
+
+                  {/* 팟캐스트 목업 — 실제 미디어가 없을 때만(위 realPodcast/
                       분기 참조). 재생 버튼·진행바는 정적 장식(실제 오디오
                       없음). 오늘(2026-08-18) 레터 상세에서 "대부분 오디오가
                       없어 빈 회색 카드로 보인다"는 이유로 미니 플레이어를
@@ -1126,7 +1153,7 @@ export function LensViewClient({
                       디자인(2026-08-18 다듬기): tint 채움 카드 → 흰 바탕 +
                       공용 그림자·테두리 토큰. 챕터 라벨을 굵은 인라인 텍스트
                       대신 알약 배지로 바꿔 목록이 표처럼 정렬되게 했다. */}
-                  {format === 'podcast' && !realPodcast && (
+                  {format === 'podcast' && !realPodcast && !directPodcastUrl && (
                     <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
                       <div className="flex items-center" style={{ gap: 14 }}>
                         <span
@@ -1202,14 +1229,23 @@ export function LensViewClient({
                     </div>
                   )}
 
-                  {/* 영상 목업 — 실제 영상이 없을 때만(위 realVideo 분기
-                      참조). 기사 사진을 썸네일로 재사용, 재생 버튼 오버레이만
-                      정적으로 얹는다.
+                  {/* 직링크 영상(2026-08-20) — S3 등에 직접 올린 mp4(예: Remotion
+                      렌더 결과). 유튜브가 아니라 iframe 임베드가 안 되므로
+                      네이티브 <video>로 재생. */}
+                  {format === 'video' && directVideoUrl && (
+                    <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
+                      <video controls preload="none" src={directVideoUrl} className="w-full h-full" style={{ objectFit: 'contain' }} />
+                    </div>
+                  )}
+
+                  {/* 영상 목업 — 실제 영상이 없을 때만(위 realVideo/
+                      directVideoUrl 분기 참조). 기사 사진을 썸네일로 재사용,
+                      재생 버튼 오버레이만 정적으로 얹는다.
                       디자인(2026-08-18 다듬기): 플레이어 아래 캡션·타임라인을
                       팟캐스트 챕터와 같은 알약 배지 톤으로 맞춰 두 오디오/영상
                       포맷이 한 세트로 읽히게 했고, 카드 전체에 공용 그림자를
                       둘러 다른 포맷 카드들과 무게감을 맞췄다. */}
-                  {format === 'video' && !realVideo && (
+                  {format === 'video' && !realVideo && !directVideoUrl && (
                     <div style={{ borderRadius: 16, background: '#fff', boxShadow: LENS_CARD_SHADOW, padding: 14 }}>
                       <div
                         style={{
