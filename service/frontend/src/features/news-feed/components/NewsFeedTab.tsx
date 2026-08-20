@@ -147,16 +147,20 @@ export function NewsFeedTab({
                 (ColumnPreviewSection) 두 섹션이 따로 있었는데, 상단 탭을
                 형식(브리핑/인사이트)에서 주제(증시/부동산/...) 기준으로 갈아
                 엎은 김에 홈도 맞췄다.
-                히어로 자리는 "4가지 시선"(기사 하나→4형식)에서 "지면
-                특별 코너"(전체/증권/산업/시그널 4개 지면 탭, 각각 기사
-                4개)로 개편(2026-08-21, 사용자 요청). LensPreviewSection이
-                이제 lens 전용이 아니라 archiveItems(letters+lens 병합)를
-                직접 받아 category로 필터링한다 — 그래서 게이트 조건도
-                initialLensPosts.length에서 archiveItems.length로 바뀜
-                (lens 발행이 없어도 letters만으로 지면이 채워질 수 있음). */}
+                히어로 자리는 지면 특별 코너로 개편(2026-08-21, 사용자 요청:
+                "전체/증권/산업/시그널 지면 탭") — 단, 시각 구조는 그대로다.
+                처음엔 박스 자체를 "지면 4개 × 기사 4개 리스트"로 완전히
+                새로 만들었다가, 사용자가 스크린샷으로 "이렇게 보이는건
+                유지하는거고"(사진+헤드라인 이슈 하나 + 레터/웹툰/팟캐스트/
+                영상 4행)라고 확인해 되돌렸다 — 실제로 바뀐 건 화살표가
+                넘기는 대상뿐, "최신 lens 5개"에서 "지면 4개 각각의 대표
+                이슈"로. LensPreviewSection.tsx 상단 주석 참조. 그래서
+                넘기는 데이터도 lens 전용 그대로(initialLensPosts) —
+                지면별 캐릭터 4행을 보여주려면 CmsLens.lenses가 필요해서
+                범용 archiveItems로는 불가능하다. */}
             <LatestGridSection
               items={archiveItems}
-              heroSlot={archiveItems.length ? <LensPreviewSection archiveItems={archiveItems} /> : undefined}
+              heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} /> : undefined}
             />
 
             {/* 단어 퀴즈를 "최신 뉴스" 바로 아래로 올렸다(2026-08-20, 사용자

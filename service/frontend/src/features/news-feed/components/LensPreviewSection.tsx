@@ -1,61 +1,112 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
-import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
+import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 
-// "오늘의 이슈, 4가지 시선" → 지면 특별 코너로 개편(2026-08-21, 사용자
-// 요청 — "전체 지면 1면, 증권면 1면, 산업면 1면, 시그널 1면 이렇게
+// "오늘의 이슈, 4가지 시선" 홈 티저 — 지면 특별 코너로 개편(2026-08-21,
+// 사용자 요청: "전체 지면 1면, 증권면 1면, 산업면 1면, 시그널 1면 이렇게
 // 구성하고, 해당 중요한 기사들을 넣는 탭으로 만들겁니다").
 //
-// 이전 버전은 "기사 하나 → 레터/웹툰/팟캐스트/영상 네 형식"을 보여주는
-// 박스였다. 그 역할은 /lens 상세 페이지에 그대로 남아있고, 이 홈 박스는
-// "전체/증권/산업/시그널" 4개 지면 탭으로 성격이 완전히 바뀐다 — 탭마다
-// 그 지면에 해당하는 기사 4개를 보여준다(상단 nav에 새 탭을 만드는 게
-// 아니라 이 박스 안의 지면 탭이다).
+// 2단 구조다(세 번째 시도 만에 정리 — 앞선 두 번은 사용자가 스크린샷으로
+// 직접 고쳐줬다):
+//  1. **탭**(전체/증권/산업/시그널) — 지면을 고른다. 탭마다 최대 4개의
+//     기사가 있다("각 유형별로 기사 4개를 뽑아줄거니까").
+//  2. **화살표** — 고른 탭 "안의" 기사 4개를 좌우로 넘긴다("이 화살표
+//     부분 좌우 누르면 그 유형 안에 있는 기사를 움직인다는거죠"). 탭을
+//     바꾸는 게 아니라, 같은 탭 안에서 기사 위치만 바뀐다.
+//  각 기사는 예전과 동일한 레이아웃(사진+헤드라인 + 레터/웹툰/팟캐스트/
+//  영상 4형식 캐릭터 행)으로 보여준다 — 이 시각 구조 자체는 안 바뀐다.
 //
-// 데이터는 새 API 호출 없이 NewsFeedTab.tsx가 이미 계산해둔 archiveItems
-// (letters+lens 병합, category 필드 포함)를 그대로 받아 category로 필터링
-// 한다 — "증권" 탭은 우리 카테고리 체계의 "증시" 라벨에 대응, "산업"은
-// 그대로 "산업" 라벨. "시그널"은 아직 이 카테고리 체계에 없는 값이라
-// (서울경제 본지의 자본시장 전문 버티컬 — 콘텐츠 소스 별도 결정 대기)
-// 탭은 만들어두되 빈 상태로 둔다.
-interface Section {
+// 지면별 기사는 lens.category 필드로 고른다(증권→"증시" 라벨, 산업→
+// "산업" 라벨). "시그널"은 아직 이 카테고리 체계에 없는 값이라(서울경제
+// 본지의 자본시장 전문 버티컬 — 콘텐츠 소스 별도 결정 대기) 항상 비어서
+// "준비 중" 상태로 보여준다 — 탭 자체는 미리 만들어둔다.
+interface SectionSlot {
   key: string;
   label: string;
-  categoryLabel: string | null; // null = 전체(필터 없음)
+  categoryLabel: string | null; // null = 전체(카테고리 무관 최신순)
 }
 
-const SECTIONS: Section[] = [
+const SECTIONS: SectionSlot[] = [
   { key: 'all', label: '전체', categoryLabel: null },
   { key: 'markets', label: '증권', categoryLabel: '증시' },
   { key: 'industry', label: '산업', categoryLabel: '산업' },
-  // 시그널 콘텐츠 소스 미정 — 존재하지 않는 카테고리 라벨을 넣어 항상
-  // 빈 배열이 되게 한다(탭은 보이되 "준비 중" 안내로 자연히 빠짐).
   { key: 'signal', label: '시그널', categoryLabel: '__PENDING__' },
 ];
 
-const ITEMS_PER_SECTION = 4;
+const ARTICLES_PER_SECTION = 4;
 
-export function LensPreviewSection({ archiveItems }: { archiveItems?: ArchiveItem[] }) {
-  const [activeIdx, setActiveIdx] = useState(0);
+export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] }) {
+  const [items, setItems] = useState<CmsLens[] | null>(initialItems ?? null);
+  const [activeTab, setActiveTab] = useState(0);
+  const [articleIndex, setArticleIndex] = useState(0);
 
-  if (!archiveItems || archiveItems.length === 0) return null;
+  useEffect(() => {
+    let cancelled = false;
+    fetchLensPosts().then((data) => {
+      // 빈 응답으로 SSR 프리페치 결과를 덮지 않는다.
+      if (!cancelled && data.length > 0) setItems(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const active = SECTIONS[activeIdx];
-  const items = active.categoryLabel === null
-    ? archiveItems.slice(0, ITEMS_PER_SECTION)
-    : archiveItems.filter((it) => it.category === active.categoryLabel).slice(0, ITEMS_PER_SECTION);
+  if (!items || items.length === 0) return null;
+
+  function selectTab(i: number) {
+    setActiveTab(i);
+    setArticleIndex(0); // 탭을 바꾸면 그 탭의 첫 기사부터.
+  }
+
+  const activeSection = SECTIONS[activeTab];
+  const sectionArticles =
+    activeSection.categoryLabel === null
+      ? items.slice(0, ARTICLES_PER_SECTION)
+      : items.filter((l) => l.category === activeSection.categoryLabel).slice(0, ARTICLES_PER_SECTION);
+  const total = sectionArticles.length;
+  const safeArticleIndex = total > 0 ? Math.min(articleIndex, total - 1) : 0;
+  const current = total > 0 ? sectionArticles[safeArticleIndex] : null;
+  const href = current ? `/lens/${encodeURIComponent(current.id)}` : null;
+  const photo = current ? pickLensPhoto(current) : null;
+  const rows = current ? (current.lenses ?? []).slice(0, 4) : [];
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <style>{`
         .lz-tab { transition: background .15s ease, color .15s ease; }
-        .lz-row2:hover { background: #fafbfc; }
-        .lz-row2:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -2px; }
-        .lz-row2 + .lz-row2 { border-top: 1px solid rgba(17,24,39,0.07); }
+        .lz-arrow { transition: background .15s ease, transform .08s ease; }
+        .lz-arrow:not(:disabled):hover { background: #dbeafe; }
+        .lz-arrow:not(:disabled):active { transform: scale(.9); }
+        .lz-dot { transition: background .15s ease, width .15s ease; }
+
+        .lz-issue:hover .lz-h { text-decoration: underline; text-underline-offset: 3px; }
+
+        /* 비교 행 — 모바일은 [일러스트][역할명+질문][›] 3열,
+           640px 이상에서는 .lz-t 를 display:contents 로 풀어 역할명과 질문이
+           각각 독립 열이 된다. 그러면 네 행의 질문이 정확히 같은 x 에서
+           시작해 아래로 훑는 것만으로 비교가 된다. */
+        .lz-row { display: grid; grid-template-columns: 44px minmax(0,1fr) 14px;
+          gap: 12px; align-items: start; min-height: 56px;
+          padding: 14px clamp(12px, 2.4vw, 18px); text-decoration: none;
+          transition: background .14s ease; }
+        .lz-row:hover { background: #fafbfc; }
+        .lz-row:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -2px; }
+        .lz-row + .lz-row { border-top: 1px solid rgba(17,24,39,0.07); }
+        .lz-t { min-width: 0; }
+        .lz-q { display: block; }
+        .lz-qw { display: block; min-width: 0; }
+        .lz-name { margin-bottom: 3px; }
+        @media (min-width: 640px) { .lz-name { margin-bottom: 0; } }
+        .lz-ch { padding-top: 4px; }
+        @media (min-width: 640px) {
+          .lz-row { grid-template-columns: 44px 116px minmax(0,1fr) 14px; gap: 14px; }
+          .lz-t { display: contents; }
+          .lz-name { padding-top: 1px; }
+        }
       `}</style>
 
       <header style={{ marginBottom: 14 }}>
@@ -64,14 +115,14 @@ export function LensPreviewSection({ archiveItems }: { archiveItems?: ArchiveIte
         </p>
         <div className="flex items-center justify-between" style={{ gap: 8 }}>
           <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            지면으로 보는 오늘
+            오늘의 이슈, 4가지 시선
           </h2>
           <Link href="/lens" className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors" style={{ fontSize: 14, fontWeight: 600 }}>
             전체 보기 →
           </Link>
         </div>
         <p style={{ fontSize: 14, color: '#6b7280', marginTop: 4, wordBreak: 'keep-all' }}>
-          지면별 주요 기사를 모아봤어요 — 탭을 눌러 오늘의 지면을 넘겨보세요.
+          지면을 고르고, 화살표로 그 지면의 기사를 넘겨보세요.
         </p>
       </header>
 
@@ -84,25 +135,24 @@ export function LensPreviewSection({ archiveItems }: { archiveItems?: ArchiveIte
           boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 10px 30px rgba(17,24,39,0.05)',
         }}
       >
-        {/* 지면 탭 — "1~5 이슈 캐러셀"을 "1~4 지면 탭"으로 교체(사용자
-            요청). 화살표 대신 실제 지면 이름이 보이는 라벨형 탭이 "탭"
-            이라는 표현과 더 맞는다고 판단. */}
+        {/* 지면 탭 — 1단계 선택. 화살표(아래)와 역할이 다르다: 탭은 지면을
+            바꾸고, 화살표는 고른 지면 "안의" 기사를 넘긴다. */}
         <div className="flex" style={{ borderBottom: '1px solid rgba(17,24,39,0.09)' }}>
           {SECTIONS.map((s, i) => (
             <button
               key={s.key}
               type="button"
-              onClick={() => setActiveIdx(i)}
+              onClick={() => selectTab(i)}
               className="lz-tab flex-1"
               style={{
                 padding: '13px 8px',
                 fontSize: 14,
                 fontWeight: 800,
                 border: 'none',
-                borderBottom: i === activeIdx ? `2px solid ${LENS_ACCENT}` : '2px solid transparent',
+                borderBottom: i === activeTab ? `2px solid ${LENS_ACCENT}` : '2px solid transparent',
                 marginBottom: -1,
                 background: 'transparent',
-                color: i === activeIdx ? LENS_ACCENT : '#9ca3af',
+                color: i === activeTab ? LENS_ACCENT : '#9ca3af',
                 cursor: 'pointer',
               }}
             >
@@ -111,70 +161,266 @@ export function LensPreviewSection({ archiveItems }: { archiveItems?: ArchiveIte
           ))}
         </div>
 
-        {items.length === 0 ? (
+        {!current ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
             <p style={{ fontSize: 14, color: '#9ca3af', fontWeight: 600 }}>
-              {active.label} 지면을 준비하고 있어요.
+              {activeSection.label} 지면을 준비하고 있어요.
             </p>
           </div>
         ) : (
-          <div>
-            {items.map((it) => (
-              <Link
-                key={it.key}
-                href={it.href ?? '#'}
-                prefetch
-                className="lz-row2 flex items-center"
-                style={{ gap: 14, padding: '14px clamp(12px, 2.4vw, 18px)', textDecoration: 'none' }}
-              >
+          <>
+            {/* ── 하나의 이슈 ── 네 시선이 공유하는 원본. 사진 + 헤드라인 + 요약. */}
+            <Link
+              href={href!}
+              prefetch
+              className="lz-issue flex"
+              style={{ gap: 'clamp(12px, 2.4vw, 18px)', padding: 'clamp(14px, 2.4vw, 18px)', textDecoration: 'none', alignItems: 'center' }}
+            >
+              {photo && (
                 <span
                   className="flex-shrink-0"
                   style={{
                     position: 'relative',
-                    width: 64,
-                    height: 64,
-                    borderRadius: 10,
+                    width: 'clamp(92px, 17vw, 132px)',
+                    aspectRatio: '3 / 2',
+                    borderRadius: 8,
                     overflow: 'hidden',
-                    background: it.avatarUrl ? '#f3f4f6' : `${it.accent}14`,
+                    background: '#f3f4f6',
+                    boxShadow: 'inset 0 0 0 1px rgba(17,24,39,0.07)',
                   }}
                 >
-                  {it.avatarUrl && (
-                    <Image src={it.avatarUrl} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
-                  )}
+                  <Image
+                    src={photo}
+                    alt=""
+                    fill
+                    sizes="132px"
+                    style={{ objectFit: 'cover', objectPosition: 'center' }}
+                  />
                 </span>
+              )}
 
-                <span className="min-w-0 flex-1">
-                  {it.category && (
-                    <span style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: LENS_ACCENT, marginBottom: 2 }}>
-                      {it.category}
-                    </span>
-                  )}
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span className="flex items-center" style={{ gap: 7, marginBottom: 5 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: LENS_ACCENT, letterSpacing: '0.04em' }}>
+                    {activeSection.label} 지면
+                  </span>
+                  <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>{current.date.replaceAll('-', '.')}</span>
+                </span>
+                <span
+                  className="lz-h"
+                  style={{
+                    display: '-webkit-box',
+                    fontSize: 'clamp(16px, 2.4vw, 20px)',
+                    fontWeight: 800,
+                    color: '#111827',
+                    letterSpacing: '-0.025em',
+                    lineHeight: 1.35,
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    wordBreak: 'keep-all',
+                  }}
+                >
+                  {current.headline}
+                </span>
+                {current.context && (
                   <span
+                    className="hidden sm:block"
                     style={{
+                      marginTop: 5,
+                      fontSize: 14,
+                      color: '#6b7280',
+                      lineHeight: 1.6,
                       display: '-webkit-box',
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: '#111827',
-                      letterSpacing: '-0.015em',
-                      lineHeight: 1.4,
-                      WebkitLineClamp: 2,
+                      WebkitLineClamp: 1,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                       wordBreak: 'keep-all',
                     }}
                   >
-                    {it.title}
+                    {current.context}
                   </span>
-                </span>
+                )}
+              </span>
+            </Link>
 
-                <span aria-hidden style={{ color: '#c0c5cc', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>
-                  ›
-                </span>
-              </Link>
-            ))}
-          </div>
+            {rows.length > 0 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: '#9ca3af',
+                    letterSpacing: '0.02em',
+                    padding: '10px clamp(12px, 2.4vw, 18px)',
+                    borderTop: '1px solid rgba(17,24,39,0.09)',
+                    background: '#fcfcfd',
+                  }}
+                >
+                  같은 이슈, 네 형식으로 이렇게 담았습니다
+                </p>
+
+                <div style={{ borderTop: '1px solid rgba(17,24,39,0.09)' }}>
+                  {rows.map((l, i) => {
+                    const p = lensPerspectiveAt(i);
+                    const rowPreview = (l.bullets ?? []).find((b) => b && b.trim()) ?? '';
+                    return (
+                      <Link key={i} href={`${href}?v=${i + 1}`} prefetch className="lz-row">
+                        <span
+                          className="flex items-center justify-center flex-shrink-0"
+                          style={{ width: 44, height: 44, borderRadius: 999, background: p.tint, overflow: 'hidden' }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트 */}
+                          <img
+                            src={p.illustration}
+                            alt=""
+                            width={44}
+                            height={44}
+                            loading="lazy"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
+                          />
+                        </span>
+
+                        <span className="lz-t">
+                          <span
+                            className="lz-name"
+                            style={{
+                              display: 'block',
+                              fontSize: 13,
+                              fontWeight: 800,
+                              color: p.color,
+                              letterSpacing: '-0.01em',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {p.short}
+                          </span>
+                          <span className="lz-qw">
+                            <span
+                              className="lz-q"
+                              style={{
+                                fontSize: 16,
+                                fontWeight: 600,
+                                color: '#374151',
+                                lineHeight: 1.5,
+                                letterSpacing: '-0.015em',
+                                wordBreak: 'keep-all',
+                              }}
+                            >
+                              {l.question || p.tagline}
+                            </span>
+                            {rowPreview && (
+                              <span
+                                style={{
+                                  display: '-webkit-box',
+                                  marginTop: 3,
+                                  fontSize: 13,
+                                  fontWeight: 400,
+                                  color: '#6b7280',
+                                  lineHeight: 1.55,
+                                  letterSpacing: '-0.005em',
+                                  WebkitLineClamp: 1,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  wordBreak: 'keep-all',
+                                }}
+                              >
+                                {rowPreview}
+                              </span>
+                            )}
+                          </span>
+                        </span>
+
+                        <span aria-hidden className="lz-ch" style={{ color: '#c0c5cc', fontSize: 16, lineHeight: 1, textAlign: 'right' }}>
+                          ›
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </>
         )}
       </div>
+
+      {/* 화살표+점 — 2단계, 고른 탭 "안의" 기사 넘기기(탭 자체를 바꾸지
+          않는다). 기사가 1건 이하인 지면은 넘길 게 없어 숨긴다. */}
+      {total > 1 && (
+        <div className="flex items-center justify-center" style={{ gap: 10, marginTop: 14 }}>
+          <button
+            type="button"
+            aria-label="이전 기사"
+            disabled={safeArticleIndex === 0}
+            onClick={() => setArticleIndex((i) => Math.max(0, i - 1))}
+            className="lz-arrow flex items-center justify-center flex-shrink-0"
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'transparent',
+              color: LENS_ACCENT,
+              cursor: safeArticleIndex === 0 ? 'default' : 'pointer',
+              opacity: safeArticleIndex === 0 ? 0.3 : 1,
+              pointerEvents: safeArticleIndex === 0 ? 'none' : 'auto',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
+
+          <span style={{ fontSize: 13, fontWeight: 700, color: LENS_ACCENT, fontVariantNumeric: 'tabular-nums' }}>
+            {activeSection.label} · {safeArticleIndex + 1}/{total}
+          </span>
+
+          <div className="flex items-center" style={{ gap: 6 }}>
+            {sectionArticles.map((l, i) => (
+              <button
+                key={l.id}
+                type="button"
+                aria-label={`${i + 1}번째 기사로 이동`}
+                onClick={() => setArticleIndex(i)}
+                className="lz-dot"
+                style={{
+                  width: i === safeArticleIndex ? 18 : 6,
+                  height: 6,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: i === safeArticleIndex ? LENS_ACCENT : '#dbeafe',
+                  cursor: 'pointer',
+                }}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            aria-label="다음 기사"
+            disabled={safeArticleIndex === total - 1}
+            onClick={() => setArticleIndex((i) => Math.min(total - 1, i + 1))}
+            className="lz-arrow flex items-center justify-center flex-shrink-0"
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'transparent',
+              color: LENS_ACCENT,
+              cursor: safeArticleIndex === total - 1 ? 'default' : 'pointer',
+              opacity: safeArticleIndex === total - 1 ? 0.3 : 1,
+              pointerEvents: safeArticleIndex === total - 1 ? 'none' : 'auto',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      )}
     </section>
   );
 }
