@@ -145,11 +145,11 @@ export function LensListClient({ initialItems, initialPage }: { initialItems: Cm
             4가지 시선
           </p>
           <h1 style={{ fontSize: 'clamp(26px, 3.4vw, 36px)', fontWeight: 800, color: '#111827', letterSpacing: '-0.03em', lineHeight: 1.25, marginBottom: 12, wordBreak: 'keep-all' }}>
-            하나의 이슈, 네 사람의 눈으로
+            하나의 이슈, 네 가지 형식으로
           </h1>
           <p style={{ fontSize: 16, color: '#374151', lineHeight: 1.7, maxWidth: 680, wordBreak: 'keep-all' }}>
-            같은 뉴스도 사회초년생·직장인·자영업자·투자자에게 각각 다른 의미가 됩니다.
-            매일 올라오는 이슈를 네 사람의 입장에서 나눠 정리해 드려요.
+            같은 뉴스도 레터로 읽을 때와 웹툰으로 볼 때, 팟캐스트로 들을 때가 다르게 다가옵니다.
+            매일 올라오는 이슈를 네 형식으로 나눠 담아드려요.
           </p>
           {items.length > 0 && (
             <p style={{ fontSize: 13, color: '#6b7280', marginTop: 10, fontVariantNumeric: 'tabular-nums' }}>
@@ -162,7 +162,7 @@ export function LensListClient({ initialItems, initialPage }: { initialItems: Cm
           <div style={{ padding: '64px 24px', textAlign: 'center', background: '#f9fafb', borderRadius: 16 }}>
             <p style={{ fontSize: 16, color: '#374151', fontWeight: 600, marginBottom: 6 }}>아직 발행된 이슈가 없어요.</p>
             <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>
-              새로운 이슈가 올라오면 네 사람의 시선으로 정리해 드려요.
+              새로운 이슈가 올라오면 네 가지 형식으로 정리해 드려요.
             </p>
             <Link
               href="/"
@@ -250,7 +250,7 @@ export function LensListClient({ initialItems, initialPage }: { initialItems: Cm
                       background: '#fcfcfd',
                     }}
                   >
-                    같은 이슈, 네 사람은 이렇게 읽습니다
+                    같은 이슈, 네 형식으로 이렇게 담았습니다
                   </p>
                   <div style={{ borderTop: '1px solid rgba(17,24,39,0.1)' }}>
                     {heroRows.map((l, i) => {
@@ -331,7 +331,7 @@ export function LensListClient({ initialItems, initialPage }: { initialItems: Cm
               </span>
             </div>
             <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 14 }}>
-              날짜별로 모아뒀어요. 어느 이슈든 네 사람의 시선이 모두 담겨 있어요.
+              날짜별로 모아뒀어요. 어느 이슈든 네 형식이 모두 담겨 있어요.
             </p>
             <div className="rule" />
 

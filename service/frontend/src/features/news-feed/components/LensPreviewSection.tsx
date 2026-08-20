@@ -105,7 +105,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
           </Link>
         </div>
         <p style={{ fontSize: 14, color: '#6b7280', marginTop: 4, wordBreak: 'keep-all' }}>
-          기사 하나를 네 사람의 눈으로 — 궁금한 쪽을 골라 읽으세요.
+          기사 하나를 레터·웹툰·팟캐스트·영상 네 형식으로 — 편한 쪽을 골라 보세요.
         </p>
       </header>
 
@@ -209,7 +209,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                 background: '#fcfcfd',
               }}
             >
-              같은 이슈, 네 사람은 이렇게 읽습니다
+              같은 이슈, 네 형식으로 이렇게 담았습니다
             </p>
 
             <div style={{ borderTop: '1px solid rgba(17,24,39,0.09)' }}>

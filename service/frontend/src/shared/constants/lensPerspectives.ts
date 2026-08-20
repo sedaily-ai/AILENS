@@ -1,4 +1,4 @@
-import { GraduationCap, Briefcase, Store, TrendingUp, type LucideIcon } from 'lucide-react';
+import { BookOpen, Image, Headphones, Video, type LucideIcon } from 'lucide-react';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
 /**
@@ -8,12 +8,14 @@ import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
  * LensListClient 세 파일에 각각 하드코딩돼 있었다(같은 값 손으로 세 번). 홈 티저와
  * 상세를 시선별 색·아이콘 체계로 재설계하면서 한 곳으로 모은다.
  *
- * ⚠️ 시선별 메타데이터는 반드시 **인덱스 기준**으로 찾는다. 라벨 문자열
- * ("시선 ① — 원인이 궁금한 사람")은 admin이 저장한 값이 그대로 내려오고
- * (admin/frontend/src/components/PostForm/LensMode.tsx:16-27 의 LENS_LABELS),
- * 서비스 프런트엔드는 그 taxonomy를 모른다. 문자열 매칭은 admin에서 문구를
- * 한 글자만 고쳐도 조용히 깨진다. 순서는 admin 폼이 LENS_LABELS를 map 해서
- * 만들기 때문에 원인 → 사람 → 내 일 → 숫자로 고정이다.
+ * ⚠️ 시선별 메타데이터는 반드시 **인덱스 기준**으로 찾는다. 라벨 문자열은
+ * admin이 저장한 값이 그대로 내려오고(admin/frontend/src/components/
+ * PostForm/LensMode.tsx의 LENS_LABELS), 서비스 프런트엔드는 그 taxonomy를
+ * 모른다. 문자열 매칭은 admin에서 문구를 한 글자만 고쳐도 조용히 깨진다.
+ * 순서는 admin 폼이 LENS_LABELS를 map 해서 만들기 때문에 레터 → 웹툰 →
+ * 팟캐스트 → 영상으로 고정이다(2026-08-19 admin 개편 이후 — 그 전엔
+ * "원인/당사자/실무/숫자"라는 독자-관점 축이었다, 아래 §LENS_PERSPECTIVES
+ * 히스토리 참고).
  *
  * ⚠️ 다만 `lenses` 배열이 항상 4개라는 보장은 타입에도 백엔드에도 없다
  * (backend _shape_lens 가 패딩하지 않음 — 빈 배열이거나 question/bullets가
@@ -52,18 +54,25 @@ export interface LensPerspective {
   border: string;
 }
 
-// 관심축 4종(2026-08-17 워딩 개편) — 원인·공감·실무·숫자.
-// 이전엔 사회초년생·직장인·자영업자·투자자 같은 "직업/생애단계" 역할로
-// 라벨링했었는데(2026-08-13, 안 1) 그건 실제 편집팀이 admin에서 매 기사마다
-// 채우는 축(admin/frontend/src/components/PostForm/LensMode.tsx의
-// LENS_LABELS — 원인이 궁금한 사람/사람이 먼저 보이는 사람/내 일이 걱정되는
-// 사람/숫자부터 찾는 사람)과 맞지 않는 임의 라벨이었다. "관심사가 뭔지"로
-// 축을 바꿔서 편집팀 라벨과 실제로 정렬시켰다 — full은 그 admin 라벨을
-// 그대로 옮긴 것.
+// 4포맷 라벨(2026-08-20 개편) — 레터·웹툰·팟캐스트·영상.
 //
-// short는 "~파" 접미사 없이 키워드만 — 접미사를 붙이면 무리/집단(파벌)
-// 느낌이 나서(사용자 피드백) 뺐다. MBTI 유형 코드(NT/NF/ST/SF)도 쓰지
-// 않는다 — 올드하다는 판단(사용자 피드백, 2026-08-17).
+// 히스토리: 처음엔 사회초년생·직장인·자영업자·투자자 같은 "직업/생애단계"
+// 역할이었다가(2026-08-13, 안 1), "원인/당사자/실무/숫자"라는 독자
+// 관심축으로 한 번 바뀌었다(2026-08-17). 그런데 2026-08-18 "국장님 지시"로
+// 네 시선의 실제 산출물이 텍스트 한 종류가 아니라 레터·웹툰·팟캐스트·영상
+// 네 "형식"으로 나오게 되면서, admin의 실제 편집 축(LensMode.tsx의
+// LENS_LABELS)도 2026-08-19에 형식 이름으로 통일됐다 — 그런데 이 파일(선택
+// UI가 보여주는 라벨·질문·태그라인)은 그 개편에서 빠져서, "이 뉴스, 누구의
+// 눈으로 볼까요?"라며 여전히 사람을 고르는 것처럼 물으면서 정작 내용은
+// 형식이 다른, 프레이밍 불일치가 있었다(2026-08-20, 사용자가 실제 발행
+// 글에서 직접 발견). 이번에 형식 축으로 다시 맞췄다 — LENS_FORMATS와
+// 이제 이름·순서가 완전히 같다(레터→웹툰→팟캐스트→영상).
+//
+// 태그라인은 "어떤 상황에서 이 형식을 고르는가"(docs/product/
+// 4format-persona-system.md의 소비 맥락 근거)를 한 줄로 압축한 것 — 레터는
+// 집중해서 읽을 시간이 있을 때, 웹툰은 스와이프하며 감정으로 받아들이고
+// 싶을 때, 팟캐스트는 이동 중이라 화면을 못 볼 때, 영상은 3초 안에 훑고
+// 싶을 때.
 //
 // ⚠️ 색·아이콘·순서는 여전히 **인덱스 기준**(admin이 LENS_LABELS를 고정
 // 순서로 저장하므로).
@@ -71,60 +80,54 @@ export interface LensPerspective {
 // 팔레트: 원래 기획 덱(2.5/1.3)의 navy/purple/teal/orange 자체 배정이었으나
 // 2026-08-18 디자인 감사에서 사이트 전역 페르소나 브랜드 컬러
 // (BRAND_ACCENTS — 민철·하은·준서·소율 = NT/NF/ST/SF, 2026-08-06 감사로
-// 확정)와 따로 놀고 있다는 게 드러났다. "이 뉴스, 누구의 눈으로 볼까요?"도
-// 개념적으로 같은 "네 가지 관점"인데 색만 겉돌았던 것 — BRAND_ACCENTS를
-// 새로 만들 때 잡으려던 바로 그 문제(섹션마다 색을 즉흥적으로 짓는 것)를
-// 이 기능만 비껴가 있었다. 하드코딩 대신 BRAND_ACCENTS를 인덱스 순서로
-// 직접 참조해 두 시스템이 다시 벌어질 수 없게 했다 — border만 BRAND_ACCENTS에
-// 없는 필드라 각 색상군의 Tailwind 200 셰이드로 유지(현재 소비처 없음,
-// 향후 대비 값).
+// 확정)와 따로 놀고 있다는 게 드러났다. 하드코딩 대신 BRAND_ACCENTS를
+// 인덱스 순서로 직접 참조해 두 시스템이 다시 벌어질 수 없게 했다 —
+// border만 BRAND_ACCENTS에 없는 필드라 각 색상군의 Tailwind 200 셰이드로
+// 유지(현재 소비처 없음, 향후 대비 값). 이 부분은 형식 축으로 바뀌어도
+// 그대로 유효해 안 건드렸다.
 const LENS_BORDER_TINTS = ['#ddd6fe', '#fecdd3', '#a7f3d0', '#fde68a'] as const;
 
 export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
   {
     ordinal: '①',
-    short: '원인',
-    full: '원인이 궁금한 사람',
-    tagline: '왜 이렇게 됐을까',
+    short: '레터',
+    full: '차분히 읽고 싶은 사람',
+    tagline: '구조와 흐름까지 제대로 알고 싶다면',
     illustration: '/lens/role-1-newcomer.png',
-    icon: GraduationCap,
+    icon: BookOpen,
     color: BRAND_ACCENTS[0].accent,
     tint: BRAND_ACCENTS[0].soft,
     border: LENS_BORDER_TINTS[0],
   },
   {
     ordinal: '②',
-    // "공감"→"당사자"(2026-08-18) — 부제("그래서 누가 어떻게 됐을까")가
-    // "누가 영향을 받았나"를 가리키는데 "공감"은 감정적 반응 쪽으로 읽혀
-    // 라벨과 부제 사이에 거리가 있다는 피드백. "당사자"는 admin의 원래
-    // 축("사람이 먼저 보이는 사람")과 부제 둘 다에 직접 붙는다.
-    short: '당사자',
-    full: '사람이 먼저 보이는 사람',
-    tagline: '그래서 누가 어떻게 됐을까',
+    short: '웹툰',
+    full: '그림으로 가볍게 보고 싶은 사람',
+    tagline: '이야기로 스르륵 넘겨보고 싶다면',
     illustration: '/lens/role-2-worker.png',
-    icon: Briefcase,
+    icon: Image,
     color: BRAND_ACCENTS[1].accent,
     tint: BRAND_ACCENTS[1].soft,
     border: LENS_BORDER_TINTS[1],
   },
   {
     ordinal: '③',
-    short: '실무',
-    full: '내 일이 걱정되는 사람',
-    tagline: '그래서 나는 뭘 해야 할까',
+    short: '팟캐스트',
+    full: '귀로 듣고 싶은 사람',
+    tagline: '이동 중이라 화면 볼 여유가 없다면',
     illustration: '/lens/role-3-owner.png',
-    icon: Store,
+    icon: Headphones,
     color: BRAND_ACCENTS[2].accent,
     tint: BRAND_ACCENTS[2].soft,
     border: LENS_BORDER_TINTS[2],
   },
   {
     ordinal: '④',
-    short: '숫자',
-    full: '숫자부터 찾는 사람',
-    tagline: '그래서 숫자로 보면',
+    short: '영상',
+    full: '빠르게 훑고 싶은 사람',
+    tagline: '3초 안에 무슨 일인지 알고 싶다면',
     illustration: '/lens/role-4-investor.png',
-    icon: TrendingUp,
+    icon: Video,
     color: BRAND_ACCENTS[3].accent,
     tint: BRAND_ACCENTS[3].soft,
     border: LENS_BORDER_TINTS[3],
@@ -138,15 +141,13 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
  * "웹툰"으로 통일. admin/frontend/src/lib/prompt.ts 의 프롬프트
  * 카테고리(letters/webtoon/podcast/video)와도 이제 이름이 일치한다).
  *
- * 실제 생성 파이프라인(웹툰 이미지 생성·팟캐스트 TTS·영상 렌더)과는 아직
- * 연결되지 않았다 — 텍스트(question/bullets/paragraphs, admin이 직접 쓰거나
- * "AI로 생성"으로 초안을 받아 채운다)만 실 데이터다. 웹툰은 이 서비스
- * 프론트엔드에 실제 8컷 이미지를 그릴 라우트/컴포넌트가 아직 없고, 팟캐스트는
- * API 클라이언트(shared/lib/podcastApi.ts)만 있고 UI는 2026-08-18 레터
- * 상세에서 제거됐다("대부분 오디오가 없어 빈 회색 카드로 보임" — 동일한
- * 함정을 여기서도 반복하지 않도록, 실제 음성·영상 파일이 없을 때도 항상
- * 완성된 형태로 보이는 정적 목업으로 그린다). 인덱스 순서는
- * LENS_PERSPECTIVES와 동일 기준(원인→공감→실무→숫자)으로 고정.
+ * 2026-08-20 기준 갱신 — 실제 생성 파이프라인(pipelines/webtoon,
+ * pipelines/podcast, pipelines/video)까지 연결돼 실 데이터가 나온다.
+ * `LensViewClient.tsx`가 `l.images`/`l.media_url`/`l.video_url`이 있으면
+ * 실제 웹툰 컷·오디오 플레이어·비디오를 그리고, 없으면(아직 생성 안 한
+ * 옛 글) 이전처럼 정적 목업으로 폴백한다 — 실제 파일이 없을 때도 항상
+ * 완성된 형태로 보이게 하려던 원래 설계 의도는 유지. 인덱스 순서는
+ * LENS_PERSPECTIVES와 동일 기준(레터→웹툰→팟캐스트→영상)으로 고정.
  */
 export type LensFormat = 'letter' | 'webtoon' | 'podcast' | 'video';
 
