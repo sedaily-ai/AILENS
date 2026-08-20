@@ -30,11 +30,16 @@ interface SectionSlot {
   categoryLabel: string | null; // null = 전체(카테고리 무관 최신순)
 }
 
+// 탭 라벨 자체에 "1면"까지 표기(2026-08-21, 사용자 확인 — 처음엔 탭은
+// 짧게 두고 "1면"을 배지 쪽으로 뺐었는데, 스크린샷으로 "지면 1면/증권
+// 1면/산업 1면/시그널 1면 이라고 표기해주시죠"라고 재요청해 탭 라벨을
+// 그대로 "OO 1면"으로 확정. 배지·빈 상태 문구는 label을 그대로 쓰므로
+// 별도로 "1면"을 덧붙이지 않는다(중복 방지, 아래 참조).
 const SECTIONS: SectionSlot[] = [
-  { key: 'all', label: '전체', categoryLabel: null },
-  { key: 'markets', label: '증권', categoryLabel: '증시' },
-  { key: 'industry', label: '산업', categoryLabel: '산업' },
-  { key: 'signal', label: '시그널', categoryLabel: '__PENDING__' },
+  { key: 'all', label: '지면 1면', categoryLabel: null },
+  { key: 'markets', label: '증권 1면', categoryLabel: '증시' },
+  { key: 'industry', label: '산업 1면', categoryLabel: '산업' },
+  { key: 'signal', label: '시그널 1면', categoryLabel: '__PENDING__' },
 ];
 
 const ARTICLES_PER_SECTION = 4;
@@ -164,7 +169,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
         {!current ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
             <p style={{ fontSize: 14, color: '#9ca3af', fontWeight: 600 }}>
-              {activeSection.label} 지면을 준비하고 있어요.
+              {activeSection.label}을 준비하고 있어요.
             </p>
           </div>
         ) : (
@@ -202,7 +207,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span className="flex items-center" style={{ gap: 7, marginBottom: 5 }}>
                   <span style={{ fontSize: 13, fontWeight: 800, color: LENS_ACCENT, letterSpacing: '0.04em' }}>
-                    {activeSection.label} 지면
+                    {activeSection.label}
                   </span>
                   <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>{current.date.replaceAll('-', '.')}</span>
                 </span>
