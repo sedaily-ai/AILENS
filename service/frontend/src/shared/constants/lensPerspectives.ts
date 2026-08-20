@@ -46,6 +46,10 @@ export interface LensPerspective {
   full: string;
   /** "이 역할에게 뭘 주는가" — 덱의 payoff 캡션에 해당. */
   tagline: string;
+  /** 실제로 뭐가 담겨 있는지(2026-08-21, 첫 방문자용 가이드
+   * LensFormatGuide.tsx 전용) — tagline이 "언제 고르는가"라면 이건
+   * "고르면 뭘 보게 되는가". */
+  content: string;
   /**
    * 역할 캐릭터 일러스트(2026-08-14). 기획 덱의 PRISM 라인아트를 인물별로
    * 크롭한 것. **선택된 시선을 크게 보여주는 자리에만** 쓴다(상세 카드 헤더,
@@ -103,6 +107,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '레터',
     full: '차분히 읽고 싶은 사람',
     tagline: '구조와 흐름까지 제대로 알고 싶다면',
+    content: '기승전결 갖춘 글 한 편 — 배경부터 전망까지 순서대로 읽어요',
     illustration: '/lens/role-1-newcomer.png',
     icon: BookOpen,
     color: BRAND_ACCENTS[0].accent,
@@ -114,6 +119,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '웹툰',
     full: '그림으로 가볍게 보고 싶은 사람',
     tagline: '이야기로 스르륵 넘겨보고 싶다면',
+    content: '8컷 만화 — 등장인물 대화로 상황을 재구성해서 보여줘요',
     illustration: '/lens/role-2-worker.png',
     icon: Image,
     color: BRAND_ACCENTS[1].accent,
@@ -125,6 +131,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '팟캐스트',
     full: '귀로 듣고 싶은 사람',
     tagline: '이동 중이라 화면 볼 여유가 없다면',
+    content: '음성 브리핑 — 내레이션으로 핵심을 차분히 풀어서 읽어줘요',
     illustration: '/lens/role-3-owner.png',
     icon: Headphones,
     color: BRAND_ACCENTS[2].accent,
@@ -136,6 +143,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '영상',
     full: '빠르게 훑고 싶은 사람',
     tagline: '3초 안에 무슨 일인지 알고 싶다면',
+    content: '숏폼 영상 — 자막·그래픽과 함께 컷별로 핵심 수치를 보여줘요',
     illustration: '/lens/role-4-investor.png',
     icon: Video,
     color: BRAND_ACCENTS[3].accent,

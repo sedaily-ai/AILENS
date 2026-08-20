@@ -5,6 +5,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { LensFormatGuide } from './LensFormatGuide';
+
+// 첫 방문자에게 가이드를 자동으로 한 번만 띄운다(2026-08-21, 사용자
+// 요청 — "처음 온 사람들이... 왜 그렇게 봐야하고 각 유형은 어떤 내용을
+// 담고있는지"). localStorage 플래그 하나로 "이미 봤음"을 기기에 남긴다
+// — 서버 저장 없이 충분(재방문마다 다시 뜨면 오히려 방해).
+const GUIDE_SEEN_KEY = 'ailens-lens-format-guide-seen';
 
 // "오늘의 이슈, 4가지 시선" 홈 티저 — 지면 특별 코너로 개편(2026-08-21,
 // 사용자 요청: "전체 지면 1면, 증권면 1면, 산업면 1면, 시그널 1면 이렇게
@@ -48,6 +55,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   const [items, setItems] = useState<CmsLens[] | null>(initialItems ?? null);
   const [activeTab, setActiveTab] = useState(0);
   const [articleIndex, setArticleIndex] = useState(0);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +67,34 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
+    } catch {
+      // localStorage 접근 불가(시크릿 모드 등) — 자동으로는 안 띄우고,
+      // ⓘ 버튼으로는 여전히 열 수 있다.
+    }
+  }, []);
+
+  function closeGuide() {
+    setShowGuide(false);
+    try {
+      window.localStorage.setItem(GUIDE_SEEN_KEY, '1');
+    } catch {
+      // 저장 실패해도 이번 세션 내 UI 상태는 유지.
+    }
+  }
+
+  useEffect(() => {
+    if (!showGuide) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeGuide();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- closeGuide는 매 렌더 재생성되지만 로직은 고정
+  }, [showGuide]);
 
   if (!items || items.length === 0) return null;
 
@@ -119,9 +155,22 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
           오늘의 지면
         </p>
         <div className="flex items-center justify-between" style={{ gap: 8 }}>
-          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            오늘의 이슈, 4가지 시선
-          </h2>
+          <div className="flex items-center" style={{ gap: 6 }}>
+            <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+              오늘의 이슈, 4가지 시선
+            </h2>
+            {/* 가이드 트리거 — 첫 방문자에겐 자동으로 뜨고, 재방문자는
+                이 버튼으로 다시 볼 수 있다(LensFormatGuide.tsx 참조). */}
+            <button
+              type="button"
+              onClick={() => setShowGuide(true)}
+              aria-label="4가지 형식 안내 보기"
+              className="flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              style={{ width: 22, height: 22, borderRadius: '50%', background: 'none', border: '1.5px solid currentColor', cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 700, lineHeight: 1 }}>i</span>
+            </button>
+          </div>
           <Link href="/lens" className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors" style={{ fontSize: 14, fontWeight: 600 }}>
             전체 보기 →
           </Link>
@@ -434,6 +483,8 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
           </button>
         </div>
       )}
+
+      {showGuide && <LensFormatGuide onClose={closeGuide} />}
     </section>
   );
 }
