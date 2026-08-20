@@ -103,9 +103,9 @@ export function LensFormatGuide({ onClose }: { onClose: () => void }) {
                     <span className="text-gray-900" style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em' }}>
                       {p.short}
                     </span>
-                    <span style={{ fontSize: 12, color: p.color, fontWeight: 600 }}>{p.tagline}</span>
+                    <span style={{ fontSize: 12, color: p.color, fontWeight: 600, wordBreak: 'keep-all' }}>{p.tagline}</span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>{p.content}</p>
+                  <p style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.5, wordBreak: 'keep-all' }}>{p.content}</p>
                 </div>
               </div>
             ))}
