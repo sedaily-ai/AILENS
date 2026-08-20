@@ -130,7 +130,13 @@ export interface PromptSection {
   attachments: PromptAttachment[];
 }
 
-export type PromptSectionKey = "description" | "structure" | "guidelines";
+// "구조"(structure)는 2026-08-20 없앴다 — "지침"과 경계가 흐릿해(출력 틀도
+// 결국 지켜야 할 규칙 중 하나) 실제로는 거의 항상 같이 채워졌다. 대신 그
+// 자리에 "파일"(attachments) 섹션을 뒀다 — 참고 문서(레퍼런스 프롬프트
+// 원본 .md, 예시 산출물 등)를 첨부 전용으로 붙이는 자리. PromptSection이
+// 이미 attachments를 들고 있어 다른 두 섹션과 같은 컴포넌트(PromptField)를
+// 그대로 재사용한다 — 텍스트 칸도 있지만 보통 비워두고 첨부만 쓴다.
+export type PromptSectionKey = "description" | "guidelines" | "attachments";
 
 /** 프롬프트 한 벌 = 3섹션. 버전·저장시각은 백엔드가 관리하므로 여기 없다. */
 export type PromptPreset = Record<PromptSectionKey, PromptSection>;
@@ -152,20 +158,20 @@ export const SECTION_DEFS: Array<{
     placeholder: "예) 오늘의 1면 요약 기사를 만들 때 쓰는 프롬프트",
   },
   {
-    key: "structure",
-    label: "구조",
-    hint: "출력이 따라야 할 틀 · 순서",
-    rows: 7,
-    defaultFormat: "markdown",
-    placeholder: "예)\n1. 헤드라인\n2. 3문단 요약\n3. 핵심 키워드 3개",
-  },
-  {
     key: "guidelines",
     label: "지침",
-    hint: "지켜야 할 규칙 · 톤 · 제약",
-    rows: 7,
+    hint: "출력 틀 · 지켜야 할 규칙 · 톤 · 제약",
+    rows: 10,
     defaultFormat: "markdown",
-    placeholder: "예)\n- 문장은 간결하게\n- 추측성 표현 금지\n- 숫자는 출처와 함께",
+    placeholder: "예)\n1. 헤드라인\n2. 3문단 요약\n3. 핵심 키워드 3개\n\n- 문장은 간결하게\n- 추측성 표현 금지\n- 숫자는 출처와 함께",
+  },
+  {
+    key: "attachments",
+    label: "파일",
+    hint: "참고 문서 첨부 (본문은 비워둬도 됩니다)",
+    rows: 3,
+    defaultFormat: "text",
+    placeholder: "본문 없이 첨부 파일만 붙여도 됩니다.",
   },
 ];
 
@@ -176,8 +182,8 @@ export function emptySection(format: PromptFormat): PromptSection {
 export function emptyPreset(): PromptPreset {
   return {
     description: emptySection("text"),
-    structure: emptySection("markdown"),
     guidelines: emptySection("markdown"),
+    attachments: emptySection("text"),
   };
 }
 
@@ -464,8 +470,8 @@ function utf8Bytes(s: string): number {
 export function sectionsPayload(p: PromptPreset): Record<string, PromptSection> {
   return {
     description: p.description,
-    structure: p.structure,
     guidelines: p.guidelines,
+    attachments: p.attachments,
   };
 }
 
@@ -517,21 +523,23 @@ export function presetFromSections(raw: unknown): PromptPreset | null {
   if (!known) return null;
   return {
     description: toSection(r.description, "text"),
-    structure: toSection(r.structure, "markdown"),
     guidelines: toSection(r.guidelines, "markdown"),
+    attachments: toSection(r.attachments, "text"),
   };
 }
 
 const HEADING_BY_LABEL: Record<string, PromptSectionKey> = {
   설명: "description",
-  구조: "structure",
   지침: "guidelines",
+  파일: "attachments",
 };
 
 /**
  * sections 가 없는 프롬프트(옛 버전 · /prompts/edit 평문 저장 · 시드 .md)를
- * 최대한 섹션으로 되돌린다. `## 설명` / `## 구조` / `## 지침` 헤딩만 인식하고,
- * 하나도 없으면 전체를 지침에 넣는다 — 내용을 잃지 않는 게 우선이다.
+ * 최대한 섹션으로 되돌린다. `## 설명` / `## 지침` / `## 파일` 헤딩만 인식하고,
+ * 하나도 없으면 전체를 지침에 넣는다 — 내용을 잃지 않는 게 우선이다. 옛
+ * `## 구조` 헤딩(2026-08-20 폐기)은 더 이상 안 잡힌다 — 그 아래 내용은
+ * 헤딩 자체가 일반 텍스트로 취급되어 직전 섹션(대개 설명)에 그대로 붙는다.
  *
  * ⚠️ sections 가 있으면 그게 정본이다. 이건 폴백 전용이다.
  */
@@ -544,7 +552,7 @@ export function presetFromProse(content: string): PromptPreset {
   let current: PromptSectionKey | null = null;
 
   for (const line of lines) {
-    const m = /^##\s+(설명|구조|지침)\s*$/.exec(line.trim());
+    const m = /^##\s+(설명|지침|파일)\s*$/.exec(line.trim());
     if (m) {
       current = HEADING_BY_LABEL[m[1]];
       buckets[current] = buckets[current] ?? [];

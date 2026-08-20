@@ -198,6 +198,13 @@ export const adminApi = {
         body: JSON.stringify(sections === undefined ? { content } : { content, sections }),
       }
     ),
+  // LLMOps 테스트 실행(2026-08-19) — 저장 여부와 무관하게 지금 편집 중인
+  // content를 기사 원문과 함께 GPT에 넘겨 실제 산출물을 받는다.
+  testPrompt: (category: string, name: string, content: string, article: string) =>
+    request<{ output: string }>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/test`,
+      { method: "POST", body: JSON.stringify({ content, article }) }
+    ),
 
   // Cost & Audit
   getCost: () => cachedGet("cost", () => request<CostResponse>("/admin/cost")),

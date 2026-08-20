@@ -27,6 +27,7 @@ import {
 import type { PromptHistoryEntry } from "@/lib/types";
 import { Icon, ICON } from "./Icons";
 import { ScopeTabs } from "./ScopeTabs";
+import { ChannelTabs } from "./ChannelTabs";
 import { PromptField } from "./PromptField";
 
 /* 콘텐츠 목록 화면(글 관리·영상·웹툰)의 "프롬프트" 버튼이 여는 우측 슬라이드 패널.
@@ -66,39 +67,65 @@ const emptyScopeState = (): ScopeState => ({
 });
 
 interface Props {
-  /** 콘텐츠 채널 — 프롬프트 id 의 category 가 된다 (letters · video · webtoon). */
-  channel: string;
+  /** 콘텐츠 채널 — 프롬프트 id 의 category 가 된다 (letters · video · webtoon).
+   *  channels 를 안 쓰는 단일 채널 화면(글 관리·웹툰·영상·팟캐스트)은 이걸 쓴다. */
+  channel?: string;
+  /** 채널이 여러 개인 화면(2026-08-20, "4가지 시선") 전용 — 채널 탭이 위에
+   *  하나 더 뜬다. channel 대신 이걸 주면 된다. 예: 레터/웹툰/팟캐스트/영상
+   *  4개 포맷 프롬프트를 한 드로어에서 오간다(LensMode.tsx 4개 포맷 탭과
+   *  같은 채널 id·순서 — letters/webtoon/podcast/video). */
+  channels?: Array<{ id: string; label: string }>;
   open: boolean;
   onClose: () => void;
 }
 
-export function PromptDrawer({ channel, open, onClose }: Props) {
+/** states 맵의 키 — 채널×스코프 조합 하나당 서버 상태 하나. */
+function stateKey(channel: string, scope: string): string {
+  return `${channel}::${scope}`;
+}
+
+export function PromptDrawer({ channel, channels, open, onClose }: Props) {
   const toast = useToast();
+  // 단일 채널(channel)이면 그 하나짜리 목록으로, 여러 채널(channels)이면
+  // 그대로 — 아래 로직은 항상 이 배열 하나만 본다.
+  const channelList = channels ?? (channel ? [{ id: channel, label: channel }] : []);
+  const [activeChannel, setActiveChannel] = useState<string>(channelList[0]?.id ?? "");
   const [scopeId, setScopeId] = useState<string>(DEFAULT_SCOPE_ID);
   const [states, setStates] = useState<Record<string, ScopeState>>({});
   const [saving, setSaving] = useState(false);
   const firstFieldRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
-  const state = states[scopeId];
+  // LLMOps 테스트 실행(2026-08-19) — 저장 여부와 무관하게 "지금 편집 중인"
+  // 프롬프트를 기사 원문과 함께 GPT에 던져 실제 산출물을 바로 보여준다.
+  // 기사 원문은 스코프(초안/발행)를 넘나들며 같은 걸로 비교해보고 싶을
+  // 때가 많아 스코프 공용 상태로 둔다 — 탭을 바꿔도 article은 유지.
+  const [testArticle, setTestArticle] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testOutput, setTestOutput] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  const key = stateKey(activeChannel, scopeId);
+  const state = states[key];
   const preset = state?.draft ?? emptyPreset();
 
   const load = useCallback(
-    async (scope: string, { silent = false } = {}) => {
-      const promptId = promptIdFor(channel, scope);
+    async (targetChannel: string, scope: string, { silent = false } = {}) => {
+      const promptId = promptIdFor(targetChannel, scope);
       const slash = promptId.indexOf("/");
       const category = promptId.slice(0, slash);
       const name = promptId.slice(slash + 1);
+      const k = stateKey(targetChannel, scope);
 
       if (!silent) {
-        setStates((s) => ({ ...s, [scope]: s[scope] ?? emptyScopeState() }));
+        setStates((s) => ({ ...s, [k]: s[k] ?? emptyScopeState() }));
       }
       try {
         const detail = await adminApi.getPrompt(category, name);
         const loaded = presetFromDetail(detail);
         setStates((s) => ({
           ...s,
-          [scope]: {
+          [k]: {
             saved: loaded,
             // 편집 중인 내용은 지키지 않는다 — 저장 직후 재조회 경로라 draft==saved 가 맞다.
             draft: structuredClone(loaded),
@@ -114,7 +141,7 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
         const notFound = err instanceof AdminApiError && err.status === 404;
         setStates((s) => ({
           ...s,
-          [scope]: {
+          [k]: {
             saved: emptyPreset(),
             draft: emptyPreset(),
             version: 0,
@@ -129,17 +156,32 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
         }));
       }
     },
-    [channel]
+    []
   );
 
-  // 열릴 때 모든 스코프를 한 번에 받아 둔다 — 탭을 눌렀을 때 기다리지 않게,
-  // 그리고 어느 상태에 프롬프트가 있는지 점으로 바로 보여주려면 필요하다.
+  // 이미 요청을 보낸 (채널,스코프) 조합 — setStates 안에서 side effect를
+  // 실행하는 반패턴을 피하려고 렌더와 무관한 ref로 따로 추적한다. 열 때마다
+  // 비워서(아래 effect) "다시 열면 서버 최신값으로 새로고침"하던 기존
+  // 동작을 유지한다 — 채널 탭 전환 중 같은 채널을 반복 방문할 때만 중복
+  // 요청을 막는 용도.
+  const requestedKeysRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!open) return;
+    if (open) requestedKeysRef.current = new Set();
+  }, [open]);
+
+  // 열릴 때, 그리고 채널 탭을 바꿀 때마다 그 채널의 스코프 두 개를 받아
+  // 둔다(2026-08-20, 채널이 여러 개인 화면 대응 — 매번 전부 다시 받지
+  // 않고 아직 안 불러온 채널만). 탭을 눌렀을 때 기다리지 않게, 그리고
+  // 어느 상태에 프롬프트가 있는지 점으로 바로 보여주려면 필요하다.
+  useEffect(() => {
+    if (!open || !activeChannel) return;
     for (const scope of scopeGroups().flatMap((g) => g.scopes)) {
-      void load(scope.id);
+      const k = stateKey(activeChannel, scope.id);
+      if (requestedKeysRef.current.has(k)) continue;
+      requestedKeysRef.current.add(k);
+      void load(activeChannel, scope.id);
     }
-  }, [open, load]);
+  }, [open, activeChannel, load]);
 
   // 배경 스크롤 잠금 + 첫 입력칸 포커스 — open 이 바뀔 때만.
   useEffect(() => {
@@ -157,20 +199,64 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
     bodyRef.current?.scrollTo({ top: 0 });
   }, [scopeId]);
 
-  const dirtyIds = Object.keys(states).filter(
-    (id) => !states[id].loading && !samePresetContent(states[id].saved, states[id].draft)
-  );
-  const filledIds = Object.keys(states).filter(
-    (id) => !states[id].loading && presetHasContent(states[id].saved)
-  );
+  // ScopeTabs(초안·발행)용 — 지금 보고 있는 채널(activeChannel) 기준.
+  const dirtyIds = scopeGroups()
+    .flatMap((g) => g.scopes)
+    .map((s) => s.id)
+    .filter((scope) => {
+      const st = states[stateKey(activeChannel, scope)];
+      return st && !st.loading && !samePresetContent(st.saved, st.draft);
+    });
+  const filledIds = scopeGroups()
+    .flatMap((g) => g.scopes)
+    .map((s) => s.id)
+    .filter((scope) => {
+      const st = states[stateKey(activeChannel, scope)];
+      return st && !st.loading && presetHasContent(st.saved);
+    });
+  // ChannelTabs용(2026-08-20) — 채널 하나당 스코프 두 개 중 하나라도
+  // 해당하면 그 채널 탭에 점을 찍는다. channelList가 1개뿐인 화면(단일
+  // channel prop 사용처)은 ChannelTabs 자체를 안 그리니 계산해도 무해하다.
+  const dirtyChannelIds = channelList
+    .map((c) => c.id)
+    .filter((cid) =>
+      scopeGroups()
+        .flatMap((g) => g.scopes)
+        .some((s) => {
+          const st = states[stateKey(cid, s.id)];
+          return st && !st.loading && !samePresetContent(st.saved, st.draft);
+        })
+    );
+  const filledChannelIds = channelList
+    .map((c) => c.id)
+    .filter((cid) =>
+      scopeGroups()
+        .flatMap((g) => g.scopes)
+        .some((s) => {
+          const st = states[stateKey(cid, s.id)];
+          return st && !st.loading && presetHasContent(st.saved);
+        })
+    );
   const dirty = state ? dirtyIds.includes(scopeId) : false;
   const filled = presetHasContent(preset);
   const bytes = payloadBytes(preset);
   const overBudget = bytes > PROMPT_PAYLOAD_LIMIT_BYTES;
 
   const handleClose = () => {
-    if (dirtyIds.length > 0) {
-      const labels = dirtyIds.map(scopeLabel).join(" · ");
+    // 채널이 여러 개면(2026-08-20) 지금 안 보고 있는 채널의 미저장 변경도
+    // 놓치지 않게 전체를 훑는다 — dirtyIds는 activeChannel 하나만 본다.
+    const allDirtyKeys = Object.keys(states).filter((k) => {
+      const st = states[k];
+      return st && !st.loading && !samePresetContent(st.saved, st.draft);
+    });
+    if (allDirtyKeys.length > 0) {
+      const labels = allDirtyKeys
+        .map((k) => {
+          const [ch, sc] = k.split("::");
+          const chLabel = channelList.find((c) => c.id === ch)?.label ?? ch;
+          return channelList.length > 1 ? `${chLabel}/${scopeLabel(sc)}` : scopeLabel(sc);
+        })
+        .join(" · ");
       if (!window.confirm(`저장하지 않은 변경이 있습니다 (${labels}). 닫을까요?`)) {
         return;
       }
@@ -190,11 +276,11 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const patchSection = (key: PromptSectionKey, next: PromptSection) =>
+  const patchSection = (sectionKey: PromptSectionKey, next: PromptSection) =>
     setStates((s) => {
-      const cur = s[scopeId];
+      const cur = s[key];
       if (!cur) return s;
-      return { ...s, [scopeId]: { ...cur, draft: { ...cur.draft, [key]: next } } };
+      return { ...s, [key]: { ...cur, draft: { ...cur.draft, [sectionKey]: next } } };
     });
 
   const handleSave = async () => {
@@ -213,7 +299,7 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
       return;
     }
 
-    const promptId = promptIdFor(channel, scopeId);
+    const promptId = promptIdFor(activeChannel, scopeId);
     const slash = promptId.indexOf("/");
     const category = promptId.slice(0, slash);
     const name = promptId.slice(slash + 1);
@@ -232,7 +318,7 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
           : `${scopeLabel(scopeId)} v${r.new_version} 저장 — 5분 안에 반영`,
         "success"
       );
-      await load(scopeId, { silent: true });
+      await load(activeChannel, scopeId, { silent: true });
     } catch (err) {
       toast.show(
         `저장 실패: ${err instanceof AdminApiError ? err.message : "알 수 없는 오류"}`,
@@ -243,11 +329,41 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
     }
   };
 
+  const handleTest = async () => {
+    if (!state || testing) return;
+    if (!testArticle.trim()) {
+      toast.show("테스트할 기사 원문을 붙여넣어 주세요", "error");
+      return;
+    }
+    const text = buildPromptText(preset);
+    if (!text.trim()) {
+      toast.show("설명·구조·지침 중 하나는 입력해 주세요", "error");
+      return;
+    }
+
+    const promptId = promptIdFor(activeChannel, scopeId);
+    const slash = promptId.indexOf("/");
+    const category = promptId.slice(0, slash);
+    const name = promptId.slice(slash + 1);
+
+    setTesting(true);
+    setTestError(null);
+    setTestOutput(null);
+    try {
+      const r = await adminApi.testPrompt(category, name, text, testArticle);
+      setTestOutput(r.output);
+    } catch (err) {
+      setTestError(err instanceof AdminApiError ? err.message : "알 수 없는 오류");
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const handleReset = () => {
     if (!state) return;
     setStates((s) => ({
       ...s,
-      [scopeId]: { ...s[scopeId], draft: structuredClone(s[scopeId].saved) },
+      [key]: { ...s[key], draft: structuredClone(s[key].saved) },
     }));
   };
 
@@ -299,7 +415,7 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
                 프롬프트
               </h2>
               <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
-                <span className="font-mono">{promptIdFor(channel, scopeId)}</span>
+                <span className="font-mono">{promptIdFor(activeChannel, scopeId)}</span>
                 {state && !state.loading && (
                   <>
                     {" · "}
@@ -321,6 +437,18 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
               <Icon d={ICON.close} className="h-5 w-5" />
             </button>
           </div>
+
+          {/* 채널 탭 — channels prop을 받은 화면(2026-08-20, "4가지 시선")만
+              뜬다. 단일 channel 화면은 channelList.length === 1이라 안 뜬다. */}
+          {channelList.length > 1 && (
+            <ChannelTabs
+              channels={channelList}
+              activeId={activeChannel}
+              dirtyChannelIds={dirtyChannelIds}
+              filledChannelIds={filledChannelIds}
+              onSelect={setActiveChannel}
+            />
+          )}
 
           <ScopeTabs
             activeId={scopeId}
@@ -366,6 +494,54 @@ export function PromptDrawer({ channel, open, onClose }: Props) {
                   textareaRef={i === 0 ? firstFieldRef : undefined}
                 />
               ))}
+
+              <section className="ui-divider space-y-2.5 rounded-xl border p-4">
+                <div>
+                  <h3
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    테스트 실행
+                  </h3>
+                  <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+                    저장 여부와 상관없이 지금 편집 중인 내용을 기사 원문에
+                    바로 적용해 봅니다 (GPT-4o).
+                  </p>
+                </div>
+                <textarea
+                  value={testArticle}
+                  onChange={(e) => setTestArticle(e.target.value)}
+                  placeholder="테스트할 기사 원문을 붙여넣으세요"
+                  rows={6}
+                  className="ui-input w-full resize-y rounded-lg px-3 py-2 text-[13px]"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-[var(--text-faint)]">
+                    {testArticle.length.toLocaleString("ko-KR")}자
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void handleTest()}
+                    disabled={testing}
+                    className="ui-btn ui-btn-primary rounded-lg px-3.5 py-1.5 text-sm font-semibold"
+                  >
+                    {testing ? "실행 중..." : "테스트 실행"}
+                  </button>
+                </div>
+                {testError && (
+                  <p className="text-sm" style={{ color: "var(--danger)" }}>
+                    {testError}
+                  </p>
+                )}
+                {testOutput && (
+                  <div
+                    className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg p-3 text-[13px] leading-relaxed"
+                    style={{ background: "var(--surface-sunken)" }}
+                  >
+                    {testOutput}
+                  </div>
+                )}
+              </section>
 
               <div className="space-y-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
                 <p>

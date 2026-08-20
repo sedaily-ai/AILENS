@@ -8,12 +8,26 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
+import { PromptDrawer } from "@/components/PromptDrawer";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
 // 2026-08-12 — "오늘의 이슈, 4가지 시선" 목록. webtoon/page.tsx와 완전히 같은
-// 패턴(독립 메뉴, 독립 "새로 쓰기", 표는 공통 ContentTable) — AI 반자동화가
-// 없어 프롬프트 편집 버튼은 없다(관리자가 직접 쓰는 채널, LensMode.tsx 참조).
+// 패턴(독립 메뉴, 독립 "새로 쓰기", 표는 공통 ContentTable). 프롬프트 편집
+// 버튼은 원래 "AI 반자동화가 없다"는 이유로 뺐었는데(관리자가 직접 쓰는
+// 채널), 2026-08-19 사용자 요청으로 webtoon/video와 동일하게 추가.
+//
+// 2026-08-20 — "프롬프트가 4가지 시선 쪽에 있어야 하는데, 탭별로 구분되면
+// 좋겠다"는 지적으로 channel="lens"(빈 채널, 아무도 안 씀) 대신 channels
+// 배열을 준다. LensMode.tsx가 실제로 "AI로 생성" 버튼에서 읽는 프롬프트는
+// letters/webtoon/podcast/video 4개이지 lens가 아니었다 — 그 4개를 그대로
+// 탭으로 노출해야 편집 화면(4개 포맷 탭)과 프롬프트 화면이 일치한다.
+const LENS_PROMPT_CHANNELS = [
+  { id: "letters", label: "레터" },
+  { id: "webtoon", label: "웹툰" },
+  { id: "podcast", label: "팟캐스트" },
+  { id: "video", label: "영상" },
+];
 
 export default function LensPageWrapper() {
   return (
@@ -45,6 +59,7 @@ function LensPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkReloadKey, setBulkReloadKey] = useState(0);
+  const [promptOpen, setPromptOpen] = useState(false);
   const visibleReloadKey = useReloadOnVisible();
 
   const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
@@ -164,9 +179,21 @@ function LensPage() {
             <span className="text-[var(--text-muted)] font-normal text-lg">({visibleCount})</span>
           )}
         </h1>
-        <Link href="/lens/edit" className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
-          새로 쓰기
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPromptOpen(true)}
+            className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
+            </svg>
+            프롬프트
+          </button>
+          <Link href="/lens/edit" className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
+            새로 쓰기
+          </Link>
+        </div>
       </div>
 
       {error && <ErrorNote message={error} />}
@@ -199,6 +226,8 @@ function LensPage() {
           <SimpleBulkBar count={selected.size} busy={bulkBusy} onDelete={bulkDelete} onClear={() => setSelected(new Set())} />
         </div>
       )}
+
+      <PromptDrawer channels={LENS_PROMPT_CHANNELS} open={promptOpen} onClose={() => setPromptOpen(false)} />
     </div>
   );
 }

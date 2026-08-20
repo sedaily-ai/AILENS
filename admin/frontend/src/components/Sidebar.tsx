@@ -52,6 +52,14 @@ const IconMusic = svg(
     <circle cx="18" cy="16" r="3" />
   </>
 );
+const IconMic = svg(
+  <>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 10a7 7 0 0 0 14 0" />
+    <path d="M12 19v3" />
+    <path d="M8 22h8" />
+  </>
+);
 const IconWebtoon = svg(
   <>
     <rect x="4" y="3" width="13" height="13" rx="2" />
@@ -138,6 +146,12 @@ const MENU_GROUPS: MenuGroup[] = [
       // "오늘의 이슈, 4가지 시선"(2026-08-12) — Instagram @ailens 카드뉴스
       // 포맷을 웹으로. 웹툰/영상과 같은 이유로 독립 메뉴.
       { label: "4가지 시선", href: "/lens", Icon: IconLens },
+      // 4포맷 파이프라인(레터/웹툰/영상/팟캐스트) 중 팟캐스트만 관리 화면이
+      // 없었다(2026-08-19) — 자동 생성 파이프라인(ElevenLabs 등)이 아직
+      // 없어 콘텐츠 목록·"새로 쓰기"는 없이 프롬프트 편집만 가능한 화면.
+      // 레터 상세의 "팟캐스트"(PodcastUploadField, mp3 수동 업로드)와는
+      // 다른 기능 — 헷갈리지 않게 별도 메뉴로 둔다.
+      { label: "팟캐스트", href: "/podcast", Icon: IconMic },
       // 홈 화면 "오늘의 단어 퀴즈" CMS 직접 출제(2026-08-09) — 별도 독립
       // 콘텐츠 타입(term/explain만, CmsPost 아님).
       { label: "퀴즈", href: "/quiz", Icon: IconQuiz },
