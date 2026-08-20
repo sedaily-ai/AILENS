@@ -1,0 +1,86 @@
+```json
+{
+  "core_question": "왜 빵이 여행의 주요 목적이 되었을까?",
+  "characters": {
+    "A": "30대, 여성, 캐주얼 복장, 호기심 많은 인상",
+    "B": "40대, 남성, 안경을 쓴, 차분한 인상",
+    "setting": "카페 내부, 테이블에 앉아 있는 두 사람"
+  },
+  "cuts": [
+    {
+      "cut": 1,
+      "narration": "빵을 먹기 위해 떠나는 여행, '빵지순례'가 뜨고 있다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [1]
+    },
+    {
+      "cut": 2,
+      "narration": "",
+      "caption": "대전: 빵의 도시",
+      "dialogue": [
+        { "speaker": "A", "line": "대전은 원래 빵으로 유명했죠?" },
+        { "speaker": "B", "line": "맞아요, 성심당 덕분에요." }
+      ],
+      "fact_ids": [8, 11]
+    },
+    {
+      "cut": 3,
+      "narration": "",
+      "caption": "고양: 검색량 1위 증가율",
+      "dialogue": [
+        { "speaker": "A", "line": "고양도 요즘 뜨고 있다면서요?" },
+        { "speaker": "B", "line": "10월에 카페&베이커리페어가 열리거든요." }
+      ],
+      "fact_ids": [3, 6]
+    },
+    {
+      "cut": 4,
+      "narration": "",
+      "caption": "정선: 빵트레일런",
+      "dialogue": [
+        { "speaker": "A", "line": "정선에서는 빵트레일런도 한다고요." },
+        { "speaker": "B", "line": "체크포인트마다 빵을 나눠준대요." }
+      ],
+      "fact_ids": [13, 14]
+    },
+    {
+      "cut": 5,
+      "narration": "",
+      "caption": "수원: 커피&디저트 페스티벌",
+      "dialogue": [
+        { "speaker": "A", "line": "수원에서는 어떤 행사가 있나요?" },
+        { "speaker": "B", "line": "12월에 커피&디저트 페스티벌이요." }
+      ],
+      "fact_ids": [18]
+    },
+    {
+      "cut": 6,
+      "narration": "",
+      "caption": "서울: 빵 여행의 중심",
+      "dialogue": [
+        { "speaker": "A", "line": "서울도 빵지순례에서 빠질 수 없죠." },
+        { "speaker": "B", "line": "8월에 베이커리페어도 열린다네요." }
+      ],
+      "fact_ids": [19, 21]
+    },
+    {
+      "cut": 7,
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        { "speaker": "A", "line": "왜 이렇게 빵이 인기가 많을까요?" },
+        { "speaker": "B", "line": "베이커리가 여행의 새로운 목적이 되었으니까요." }
+      ],
+      "fact_ids": [24]
+    },
+    {
+      "cut": 8,
+      "narration": "빵은 이제 단순한 먹거리를 넘어 여행의 중심이 되었다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [25]
+    }
+  ]
+}
+```
