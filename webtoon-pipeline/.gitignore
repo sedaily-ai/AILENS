@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+
+# 생성된 이미지·중간 산출물 — S3에 올리고 여기엔 안 둔다(라운드기록.md 참고)
+output/
+article.txt
+*.log
+run_round3.py

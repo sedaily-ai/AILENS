@@ -1,0 +1,155 @@
+{
+  "core_question": "왜 요즘 사람들이 빵을 먹으러 여행을 떠날까?",
+  "characters": {
+    "A": "30대 여성, 캐주얼 복장, 활기찬 인상",
+    "B": "40대 남성, 정장 차림, 차분한 인상",
+    "setting": "카페 테이블"
+  },
+  "cuts": [
+    {
+      "cut": 1,
+      "narration": "빵지순례가 새로운 여행 트렌드로 떠오르고 있다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [
+        1,
+        2
+      ]
+    },
+    {
+      "cut": 2,
+      "narration": "",
+      "caption": "고양 검색량 22% 증가",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "고양이 요즘 빵 때문에 인기래요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "맞아요, 카페&베이커리페어가 열리니까요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        3,
+        4
+      ]
+    },
+    {
+      "cut": 3,
+      "narration": "",
+      "caption": "대전 검색량 18% 증가",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "대전은 성심당 덕분에 유명하죠.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "빵택시 같은 관광 상품도 있다네요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        5,
+        6
+      ]
+    },
+    {
+      "cut": 4,
+      "narration": "",
+      "caption": "정선 검색량 17% 증가",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "정선에선 빵트레일런도 한다면서요?",
+          "tone": "격앙"
+        },
+        {
+          "speaker": "B",
+          "line": "네, 다양한 디저트를 즐길 수 있는 행사죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        7,
+        8
+      ]
+    },
+    {
+      "cut": 5,
+      "narration": "",
+      "caption": "수원 검색량 15% 증가",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "수원에서도 페스티벌이 열리네요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "커피와 디저트를 함께 즐길 수 있죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        9,
+        10
+      ]
+    },
+    {
+      "cut": 6,
+      "narration": "",
+      "caption": "서울 검색량 11% 증가",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "서울은 빵집이 워낙 많아서요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "행사도 많아져서 여행지로 각광받고 있죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        11,
+        12
+      ]
+    },
+    {
+      "cut": 7,
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "그럼 빵이 여행의 목적이 되는 거네요?",
+          "tone": "격앙"
+        },
+        {
+          "speaker": "B",
+          "line": "네, 단순한 먹거리를 넘어서요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        13,
+        14
+      ]
+    },
+    {
+      "cut": 8,
+      "narration": "베이커리가 여행의 중심이 되는 시대, 더 많은 사람들이 빵을 찾아 떠난다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [
+        15
+      ]
+    }
+  ]
+}
