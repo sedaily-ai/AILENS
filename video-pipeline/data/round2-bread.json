@@ -1,0 +1,99 @@
+{
+  "title": "빵지순례, 새로운 여행 트렌드",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 7,
+      "narration": "요즘 여행은 빵을 먹으러 떠나는 '빵지순례'로 뜨고 있습니다.",
+      "caption": "빵지순례, 새로운 여행 트렌드",
+      "data": { "icon": "croissant" }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "아고다에 따르면, 고양의 숙소 검색량이 22% 늘었습니다.",
+      "caption": "고양 숙소 검색량 22%↑",
+      "data": { "value": 22, "unit": "%", "label": "고양 숙소 검색량 증가율(전년 동기 대비)", "sourceNote": "자료: 아고다" }
+    },
+    {
+      "type": "chart",
+      "duration": 11,
+      "narration": "그런데 이건 고양만의 일이 아닙니다. 대전도 18% 늘었습니다.",
+      "caption": "고양 22%↑ · 대전 18%↑",
+      "data": {
+        "chartType": "bar",
+        "points": [
+          { "label": "고양", "value": 22 },
+          { "label": "대전", "value": 18 }
+        ],
+        "unit": "%",
+        "sourceNote": "자료: 아고다(전년 동기 대비)"
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "대전은 성심당 하나가 아니라, '빵택시'로 지역 빵집을 통째로 소개합니다.",
+      "caption": "대전 빵택시 → 지역 빵집",
+      "data": {
+        "nodes": [
+          { "kind": "node", "icon": "car", "label": "빵택시" },
+          { "kind": "connector", "variant": "arrow" },
+          { "kind": "node", "icon": "croissant", "label": "지역 빵집" }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 11,
+      "narration": "정선은 아예 달리면서 빵을 먹는 '빵트레일런'을 엽니다.",
+      "caption": [
+        { "text": "정선 " },
+        { "text": "'빵트레일런'", "emphasis": true }
+      ],
+      "data": {}
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "수원과 서울도 커피·디저트 축제로 이 흐름에 올라탔습니다.",
+      "caption": "수원·서울: 디저트 축제",
+      "data": {
+        "nodes": [
+          { "kind": "node", "icon": "map-pin", "label": "수원" },
+          { "kind": "connector", "variant": "arrow" },
+          { "kind": "node", "icon": "map-pin", "label": "서울" }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 11,
+      "narration": "5개 도시 중 가장 적게 늘어난 서울도 11%였습니다.",
+      "caption": "서울 11%↑ · 5곳 모두 증가",
+      "data": { "value": 11, "unit": "%", "label": "서울 숙소 검색량 증가율(전년 동기 대비)", "sourceNote": "자료: 아고다" }
+    },
+    {
+      "type": "highlight",
+      "duration": 11,
+      "narration": "성심당조차 신제품 하나로 화제가 되는 시대, 빵집 자체가 여행지가 됐습니다.",
+      "caption": [
+        { "text": "빵집이 " },
+        { "text": "여행지가 되다", "emphasis": true }
+      ],
+      "data": {}
+    },
+    {
+      "type": "closing",
+      "duration": 8,
+      "narration": "다음 여행, 어디로 먹으러 떠나시겠어요?",
+      "caption": "다음 여행지는, 어디의 빵집인가요?",
+      "data": {}
+    }
+  ],
+  "source": "자료: 서울경제신문",
+  "disclaimer": ""
+}

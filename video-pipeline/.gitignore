@@ -1,0 +1,9 @@
+node_modules
+out
+dist
+.remotion
+*.log
+
+# TTS로 생성되는 캐시/산출물 — scripts/resolve-audio.ts로 재생성 가능
+public/audio/
+data/*.resolved.json

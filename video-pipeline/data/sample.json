@@ -1,0 +1,76 @@
+{
+  "title": "진화하는 불법 사금융",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 6,
+      "narration": "휴대폰을 개통하면 현금을 준다는 말, 들어보셨나요?",
+      "caption": "진화하는 불법 사금융",
+      "data": { "icon": "smartphone" }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "2026년 상반기에만 피해 신고가 1만 건을 넘었습니다.",
+      "caption": "상반기 신고 1만 37건",
+      "data": {
+        "value": 10037,
+        "unit": "건",
+        "label": "2026년 상반기 피해 신고",
+        "sourceNote": "자료: 금융감독원"
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 10,
+      "narration": "업자가 휴대폰을 헐값에 가져가서 팔고, 일부만 현금으로 돌려줍니다.",
+      "caption": "단말기 처분 → 일부만 현금 지급",
+      "data": {
+        "nodes": [
+          { "kind": "node", "icon": "smartphone", "label": "고가 단말기" },
+          { "kind": "connector", "variant": "arrow" },
+          { "kind": "node", "icon": "coin", "label": "일부 현금" }
+        ]
+      }
+    },
+    {
+      "type": "chart",
+      "duration": 12,
+      "narration": "2021년 74.7%였던 검거율이 올 상반기엔 51.2%까지 떨어졌어요.",
+      "caption": "검거율 74.7% → 51.2%",
+      "data": {
+        "chartType": "line",
+        "points": [
+          { "label": "2021", "value": 74.7 },
+          { "label": "2022", "value": 65.5 },
+          { "label": "2023", "value": 65.9 },
+          { "label": "2024", "value": 58.2 },
+          { "label": "2025", "value": 61.0 },
+          { "label": "2026 상반기", "value": 51.2 }
+        ],
+        "unit": "%",
+        "sourceNote": "자료: 경찰청"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "연 60%가 넘는 이자를 요구하는 계약은 원금과 이자가 법적으로 무효입니다.",
+      "caption": [
+        { "text": "연 60% 초과 계약 = " },
+        { "text": "원리금 무효", "emphasis": true }
+      ],
+      "data": {}
+    },
+    {
+      "type": "closing",
+      "duration": 10,
+      "narration": "피해는 금융감독원 불법사금융 피해신고센터에 신고하실 수 있습니다.",
+      "caption": "금융감독원 불법사금융 피해신고센터",
+      "data": {}
+    }
+  ],
+  "source": "자료: 금융감독원, 경찰청, 서울경제신문",
+  "disclaimer": "본 영상은 정보 제공 목적이며, 개별 계약의 법적 효력은 사안에 따라 다를 수 있습니다."
+}
