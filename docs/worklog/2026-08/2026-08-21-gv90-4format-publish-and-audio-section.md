@@ -727,6 +727,34 @@ fork에는 "이 정리 작업 외의 다른 기능 제안이나 구현은 하지
   의도대로 렌더링되는 것 확인. `npx tsc --noEmit`·eslint도 클린.
 - dev 서버는 확인 후 종료.
 
+### 27. 우선순위 5번 — `TodayNewsPlayer`/`AudioPreviewSection` 이중 fetch 레이스 컨디션 수정
+
+두 컴포넌트가 같은 `home_player` API를 각자 다른 방식(TodayNewsPlayer는
+클라이언트 `useEffect` fetch, AudioPreviewSection은 서버 프리페치 +
+클라이언트 재검증)으로 독립 호출한다. 실제 버그: `TodayNewsPlayer.
+tsx`의 `playItemById(id)`가 `if (!items) return;`으로 시작해서, 카드
+재생 버튼을 누른 시점에 TodayNewsPlayer 쪽 fetch가 아직 안 끝났으면
+(느린 네트워크 등) 재생 요청 자체가 조용히 버려졌다.
+
+- `pendingPlayIdRef` 추가 — `items`가 아직 `null`이면 재생 요청을
+  버리는 대신 이 ref에 저장. `items` 로드 완료를 구독하는 새
+  `useEffect([items])`가 대기 중인 요청이 있으면 그 시점의(새 items를
+  담은) `playItemById`를 다시 호출해 이어서 재생한다.
+- 기존 `onPlayHomePlayerItemRequest` 구독 effect와 같은 이유로
+  `playItemById`를 deps에서 제외(같은 `eslint-disable-next-line
+  react-hooks/exhaustive-deps` 패턴) — 다만 처음엔 이 주석을
+  `useEffect(() => {` 여는 줄 앞에 잘못 둬서 "unused eslint-disable"
+  경고가 나는 걸 발견, 실제 경고가 찍히는 위치(`}, [items]);` 닫는
+  줄 바로 앞)로 옮겨 해결 — `eslint-disable-next-line`은 정확히 다음
+  한 줄만 가리키므로 멀티라인 `useEffect`에선 위치를 신경 써야 한다.
+- 검증: `npx tsc --noEmit`·eslint 클린. 실제 느린 네트워크에서 경쟁
+  상태를 인위로 재현하는 테스트는 안 함(스로틀링 셋업 대비 이득이
+  작다고 판단) — 코드 리뷰로 로직 정확성만 확인.
+- "로딩 상태 처리는 아직 없음"(원래 다음 항목 문구)은 의도적으로
+  범위 밖에 남김 — 이번 수정으로 요청이 유실되지는 않지만, 재생
+  버튼을 누른 직후 로딩 중이라는 시각적 피드백(스피너 등)은 아직
+  없다. 별도 UX 개선 항목으로 남겨둠.
+
 ## 다음
 
 - (§23에서 해소) ~~video 파이프라인 1단계 스크래치패드·스키마 자동
@@ -737,10 +765,9 @@ fork에는 "이 정리 작업 외의 다른 기능 제안이나 구현은 하지
   비교 대상 최소 2개" 같은 제약을 더 명시하는 것도 고려.
 - (§26에서 해소) ~~`/listen` 목록 페이지 시각적 일관성~~ — 캐릭터·
   재생버튼 통일 완료. 배포는 아직.
-- `TodayNewsPlayer`의 `items`(자체 fetch)와 `AudioPreviewSection`의
-  `items`(서버 프리페치)가 같은 API를 각자 따로 호출한다 — `playItemById`
-  호출 시점에 `TodayNewsPlayer`쪽 fetch가 아직 안 끝났으면(드물지만 가능)
-  재생 버튼이 조용히 아무 반응 없다. 로딩 상태 처리는 아직 없음.
+- (§27에서 해소) ~~`TodayNewsPlayer`/`AudioPreviewSection` 이중 fetch
+  레이스 컨디션~~ — pendingPlayIdRef로 요청 유실 방지. 재생 버튼 클릭
+  시 로딩 스피너 같은 시각 피드백은 여전히 없음(별도 UX 개선 항목).
 - (§24에서 해소) ~~`published_at` 수동 정렬 → `display_order`~~ —
   코드는 준비됐지만 아직 배포 전. 배포 후 실제 발행 스크립트에서
   `display_order`를 채워보는 첫 실사용 검증이 남음.

@@ -242,9 +242,20 @@ export function TodayNewsPlayer() {
   // 경쟁 상태가 생긴다 — autoPlayOnIndexRef에 "이 index로 바뀌면 자동
   // 재생해라" 표시만 남기고, 아래 트랙 전환 effect가 실제 재생을 맡는다.
   const autoPlayOnIndexRef = useRef(false);
+  // TodayNewsPlayer(여기)와 AudioPreviewSection이 같은 home_player API를
+  // 각자 따로 fetch한다(별도 useEffect, 서버 프리페치 vs 클라이언트
+  // fetch) — 카드 재생 버튼을 누른 시점에 이쪽 fetch가 아직 안 끝났으면
+  // items가 null이라 재생 요청이 조용히 무시되던 경쟁 상태가 있었다
+  // (2026-08-21 발견, 드물지만 느린 네트워크에서 재현 가능). items가
+  // null인 동안 들어온 요청은 여기 담아뒀다가, 아래 effect가 items 로드
+  // 완료 시점에 이어서 처리한다.
+  const pendingPlayIdRef = useRef<string | null>(null);
 
   function playItemById(id: string) {
-    if (!items) return;
+    if (!items) {
+      pendingPlayIdRef.current = id;
+      return;
+    }
     const i = items.findIndex((it) => it.id === id);
     if (i < 0) return;
     setClosed(false);
@@ -263,6 +274,19 @@ export function TodayNewsPlayer() {
   // 넣을 필요가 없다(넣으면 매 렌더 재구독만 늘어난다).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => onPlayHomePlayerItemRequest(playItemById), [items, index]);
+
+  // items가 막 로드됐는데 그 사이 재생 요청이 대기 중이었으면 이어서
+  // 처리 — 위와 같은 이유로 playItemById를 deps에 안 넣는다(items가
+  // 바뀔 때 재구독되는 함수라, 이 시점의 playItemById는 이미 새
+  // items를 담고 있다).
+  useEffect(() => {
+    if (items && pendingPlayIdRef.current) {
+      const id = pendingPlayIdRef.current;
+      pendingPlayIdRef.current = null;
+      playItemById(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   // <audio> 진행률·종료 이벤트 — 유튜브처럼 폴링 대신 네이티브 이벤트로.
   useEffect(() => {
