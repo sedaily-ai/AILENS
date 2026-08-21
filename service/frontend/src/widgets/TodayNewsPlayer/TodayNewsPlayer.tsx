@@ -258,6 +258,10 @@ export function TodayNewsPlayer() {
     setIndex(i);
   }
 
+  // playItemById는 매 렌더 재생성되지만 클로저가 담는 items/index는 이미
+  // deps에 있다 — 그 값이 바뀔 때마다 재구독되므로 함수 자체를 deps에
+  // 넣을 필요가 없다(넣으면 매 렌더 재구독만 늘어난다).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => onPlayHomePlayerItemRequest(playItemById), [items, index]);
 
   // <audio> 진행률·종료 이벤트 — 유튜브처럼 폴링 대신 네이티브 이벤트로.

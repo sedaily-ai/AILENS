@@ -40,9 +40,8 @@ const GUIDE_SEEN_KEY = 'ailens-lens-format-guide-seen';
 // "시그널" 중 하나를 명시적으로 값으로 가진 글만 이 코너에 뜨고,
 // category(증시/산업 등)와는 이제 아무 관계가 없다. 즉 어떤 글이
 // 지면 특별 코너 어디에도 안 뜨는 게 기본값 — 사람이 명시적으로
-// paper_section을 찍어줘야 노출된다. "시그널"은 아직 콘텐츠 소스가
-// 없어(서울경제 본지의 자본시장 전문 버티컬, 별도 결정 대기) 항상
-// 비어서 "준비 중" 상태로 보여준다 — 탭 자체는 미리 만들어둔다.
+// paper_section을 찍어줘야 노출된다. 기사가 없는 지면은 아래 "준비
+// 중" 빈 상태로 보여준다.
 interface SectionSlot {
   key: string;
   label: string;
@@ -105,7 +104,6 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- closeGuide는 매 렌더 재생성되지만 로직은 고정
   }, [showGuide]);
 
   if (!items || items.length === 0) return null;

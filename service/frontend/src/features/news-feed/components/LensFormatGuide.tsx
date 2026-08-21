@@ -73,7 +73,7 @@ export function LensFormatGuide({ onClose }: { onClose: () => void }) {
           <LensGuideAnimation />
 
           <div className="space-y-3">
-            {LENS_PERSPECTIVES.map((p, i) => (
+            {LENS_PERSPECTIVES.map((p) => (
               <div
                 key={p.short}
                 className="flex items-start"
