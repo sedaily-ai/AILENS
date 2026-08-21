@@ -764,13 +764,15 @@ tsx`의 `playItemById(id)`가 `if (!items) return;`으로 시작해서, 카드
   프롬프트 자체(admin 프롬프트 드로어)에 "stat엔 unit 필수, chart엔
   비교 대상 최소 2개" 같은 제약을 더 명시하는 것도 고려.
 - (§26에서 해소) ~~`/listen` 목록 페이지 시각적 일관성~~ — 캐릭터·
-  재생버튼 통일 완료. 배포는 아직.
+  재생버튼 통일 완료, 배포 완료(2026-08-21 오후, service/backend+
+  frontend 배포 라운드에 같이 나감).
 - (§27에서 해소) ~~`TodayNewsPlayer`/`AudioPreviewSection` 이중 fetch
   레이스 컨디션~~ — pendingPlayIdRef로 요청 유실 방지. 재생 버튼 클릭
   시 로딩 스피너 같은 시각 피드백은 여전히 없음(별도 UX 개선 항목).
 - (§24에서 해소) ~~`published_at` 수동 정렬 → `display_order`~~ —
-  코드는 준비됐지만 아직 배포 전. 배포 후 실제 발행 스크립트에서
-  `display_order`를 채워보는 첫 실사용 검증이 남음.
+  배포 완료, 라이브 API에 필드 노출 확인(기존 글은 전부 `None`이
+  정상). 실제 발행 스크립트에서 `display_order`를 채워보는 첫 실사용
+  검증은 아직 남음(다음 지면 콘텐츠 발행 때).
 - (§25에서 해소) ~~`LensPreviewSection.tsx`의
   `react-hooks/set-state-in-effect`~~ — eslint-disable 주석으로 처리
   (기존 3곳과 같은 컨벤션).
