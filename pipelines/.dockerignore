@@ -1,0 +1,7 @@
+**/node_modules
+**/__pycache__
+**/*.pyc
+video/out
+video/public/audio
+output
+output_root

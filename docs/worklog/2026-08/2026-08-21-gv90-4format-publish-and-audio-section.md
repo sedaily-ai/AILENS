@@ -876,6 +876,52 @@ $270+/월 사고보다 훨씬 작은 규모).
 — 로컬 실행 검증까지만 끝났고, 다음 단계로 컨테이너화 + Fargate
 스케줄 태스크 구축이 남음.
 
+### 31. 지면 1면 자동 발행 — AWS 인프라 구축 + Fargate 실제 검증 + EventBridge 가동
+
+§30에서 로컬 검증까지 끝난 파이프라인을 실제로 매일 자동 실행되도록
+인프라를 만들었다. "이벤트브릿지 써서 자동으로 하도록 하는게 좋죠"
+확인 후, Fargate 비용(컴퓨팅 자체는 월 $1~2, 실비용은 여전히 콘텐츠
+생성 API 월 $120~225)을 먼저 안내하고 승인받은 뒤 진행.
+
+- **Dockerfile**(`pipelines/frontpage_auto/Dockerfile`): `node:20-
+  bookworm` 베이스에 ffmpeg + Remotion 헤드리스 Chromium 의존성
+  (Remotion 공식 문서 목록) + Python 3.11 venv. 빌드 시점에 `npx
+  remotion browser ensure`로 헤드리스 브라우저를 미리 받아둬서 매일
+  실행마다 새로 받는 지연·실패 위험을 없앰.
+- **빌드 중 실수 발견·수정**: `.dockerignore`에서 `video/data`를
+  "테스트용 샘플"로 오판해 제외했다가, 실제로는 `Root.tsx`가
+  `../data/sample.json`을 정적 import해서 Remotion 번들링 자체가
+  실패했다(모든 렌더가, 스튜디오 모드뿐 아니라). 제외 목록에서 뺴서
+  해결.
+- **로컬 Docker 컨테이너 실사용 검증 2회**: (1) discovery+중복방지
+  경로 — 오늘 이미 발행된 5건이 컨테이너 안에서도 정확히 스킵되는지
+  확인(비용 없음). (2) Remotion 렌더 경로 — 기존에 만들어둔 실제
+  script.json(코스닥 급락 영상)으로 컨테이너 안에서 `npm run render`
+  직접 실행, 4.4MB mp4 정상 생성 확인(ffmpeg+헤드리스 Chromium 둘 다
+  컨테이너 안에서 실제로 동작).
+- **AWS 리소스**(전부 `aws cli` 직접 프로비저닝, CloudFormation/CDK
+  없음 — 회사 컨벤션): ECR 리포지토리 push → IAM 역할 3개(태스크
+  실행/앱 권한 — S3 news-xml 읽기·cms-media 쓰기·cms-posts
+  읽기쓰기·admin-prompts 읽기·OpenAI+ElevenLabs 시크릿 읽기·revalidate
+  SSM 파라미터 읽기로 최소 스코프/EventBridge가 ECS RunTask 호출용) →
+  CloudWatch 로그그룹(30일 보관) → ECS 클러스터 → 태스크 정의(ARM64,
+  2vCPU/4GB, 기본 VPC의 public 서브넷 + default 보안그룹, NAT 게이트웨이
+  불필요) → **수동 `run-task`로 실제 Fargate에서 1회 검증**(exit
+  code 0, CloudWatch 로그에서 오늘 5건 전부 정확히 스킵 확인) →
+  EventBridge 규칙(`cron(0 22 * * ? *)` = 매일 07:00 KST, 지면 마감이
+  전날 저녁이라 여유 있게) + 타겟(태스크 정의를 family로만 참조해서
+  새 리비전 등록해도 규칙 수정 불필요).
+- 프로비저닝 순서를 `provision.sh` + 실제 사용한 JSON 정책/설정
+  파일들(`trust-policy-*.json`, `task-policy.json`,
+  `eventbridge-runtask-policy.json`, `taskdef.json`,
+  `eventbridge-target.json`)로 남기고, 코드 변경 후 이미지만 갱신하는
+  `deploy.sh`도 같이 작성(태스크 정의 재등록까지만, 규칙 자체는 안 건드림).
+
+**다음 트리거는 내일(2026-08-22) 07:00 KST** — 그날 아침 실제로 새
+1면 기사가 있으면(오늘은 5건 다 발행됨) 처음으로 완전 무인 발행이
+일어난다. 결과는 CloudWatch 로그그룹 `/ecs/sedaily-mbti-frontpage-auto`
+과 라이브 `/?tab=feed` "지면 1면" 탭에서 확인 가능.
+
 ## 다음
 
 - (§23에서 해소) ~~video 파이프라인 1단계 스크래치패드·스키마 자동

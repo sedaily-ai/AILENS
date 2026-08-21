@@ -1,0 +1,19 @@
+[
+  {
+    "Id": "frontpage-auto-fargate-task",
+    "Arn": "arn:aws:ecs:us-east-1:887078546492:cluster/sedaily-mbti-frontpage-auto",
+    "RoleArn": "arn:aws:iam::887078546492:role/sedaily-mbti-frontpage-auto-eventbridge-role",
+    "EcsParameters": {
+      "TaskDefinitionArn": "arn:aws:ecs:us-east-1:887078546492:task-definition/sedaily-mbti-frontpage-auto",
+      "TaskCount": 1,
+      "LaunchType": "FARGATE",
+      "NetworkConfiguration": {
+        "awsvpcConfiguration": {
+          "Subnets": ["subnet-0b5a146ca8ed1ddfe"],
+          "SecurityGroups": ["sg-05cb5f7bc29891cf8"],
+          "AssignPublicIp": "ENABLED"
+        }
+      }
+    }
+  }
+]
