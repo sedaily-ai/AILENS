@@ -220,6 +220,19 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         # 라벨 문자열)를 그대로 읽는다 — lens 글도 /markets 등 카테고리별
         # 페이지에 letters와 함께 노출하기 위해 2026-08-20 추가.
         "category": b.get("category") or None,
+        # "지면 특별 코너"(LensPreviewSection.tsx) 전용 배치 필드(2026-08-21
+        # 신설) — 위 category와 완전히 별개다. 처음엔 지면 특별 코너의
+        # "전체" 탭이 category 무관 최신순이었는데, 이후 발행된 산업/증권
+        # 카테고리 글이 전부 "전체"에도 같이 떠버리는 문제가 생겼다(사용자
+        # 지적: "산업 1면에만 올라가야 하는데 지면 1면에도 들어갔네요...
+        # 지면 1면은 지면 1면 기사만 들어가는 겁니다. '전체'가 아니예요").
+        # 원인은 category 필드 하나를 (a) /markets·/industry 같은 일반
+        # 경제 카테고리 페이지, (b) 지면 특별 코너 4탭(전체/증권/산업/시그널)
+        # 배치 — 서로 다른 두 목적에 같이 써서 겹친 것. 값은 "전체"/"증권"/
+        # "산업"/"시그널" 중 하나(사람이 명시적으로 골라야 지면 특별
+        # 코너에 뜬다 — 없으면 그 코너엔 아예 안 뜨고 카테고리 페이지에만
+        # 남는다).
+        "paper_section": b.get("paper_section") or None,
         "lenses": lenses,
         "is_cms": True,
     }

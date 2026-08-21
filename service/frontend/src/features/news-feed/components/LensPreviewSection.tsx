@@ -27,14 +27,26 @@ const GUIDE_SEEN_KEY = 'ailens-lens-format-guide-seen';
 //  각 기사는 예전과 동일한 레이아웃(사진+헤드라인 + 레터/웹툰/팟캐스트/
 //  영상 4형식 캐릭터 행)으로 보여준다 — 이 시각 구조 자체는 안 바뀐다.
 //
-// 지면별 기사는 lens.category 필드로 고른다(증권→"증시" 라벨, 산업→
-// "산업" 라벨). "시그널"은 아직 이 카테고리 체계에 없는 값이라(서울경제
-// 본지의 자본시장 전문 버티컬 — 콘텐츠 소스 별도 결정 대기) 항상 비어서
-// "준비 중" 상태로 보여준다 — 탭 자체는 미리 만들어둔다.
+// 지면별 기사는 lens.paper_section 필드로 고른다(2026-08-21, 데이터 모델
+// 수정 — 처음엔 lens.category(/markets 등 일반 카테고리 페이지가 쓰는
+// 같은 필드, 증시/산업/... 7개 값)를 재사용해서 "전체" 탭은 category
+// 무관 최신순으로 구현했었다. 그런데 그러면 산업/증권 카테고리로 새
+// 글을 발행할 때마다 그 글이 "전체" 탭에도 자동으로 같이 떠버리는
+// 문제가 생겼다(사용자 지적: "산업 1면에만 올라가야 하는데 지면
+// 1면에도 들어갔네요... 지면 1면은 지면 1면 기사만 들어가는 겁니다.
+// '전체'가 아니예요"). 한 필드를 두 목적(일반 카테고리 페이지 배치 +
+// 지면 특별 코너 배치)에 같이 쓴 게 근본 원인이라, 지면 특별 코너
+// 전용 필드(paper_section)를 완전히 분리했다 — "전체"/"증권"/"산업"/
+// "시그널" 중 하나를 명시적으로 값으로 가진 글만 이 코너에 뜨고,
+// category(증시/산업 등)와는 이제 아무 관계가 없다. 즉 어떤 글이
+// 지면 특별 코너 어디에도 안 뜨는 게 기본값 — 사람이 명시적으로
+// paper_section을 찍어줘야 노출된다. "시그널"은 아직 콘텐츠 소스가
+// 없어(서울경제 본지의 자본시장 전문 버티컬, 별도 결정 대기) 항상
+// 비어서 "준비 중" 상태로 보여준다 — 탭 자체는 미리 만들어둔다.
 interface SectionSlot {
   key: string;
   label: string;
-  categoryLabel: string | null; // null = 전체(카테고리 무관 최신순)
+  paperSection: string; // lens.paper_section과 매칭 — SECTIONS[0]은 "전체"
 }
 
 // 탭 라벨 자체에 "1면"까지 표기(2026-08-21, 사용자 확인 — 처음엔 탭은
@@ -43,10 +55,10 @@ interface SectionSlot {
 // 그대로 "OO 1면"으로 확정. 배지·빈 상태 문구는 label을 그대로 쓰므로
 // 별도로 "1면"을 덧붙이지 않는다(중복 방지, 아래 참조).
 const SECTIONS: SectionSlot[] = [
-  { key: 'all', label: '지면 1면', categoryLabel: null },
-  { key: 'markets', label: '증권 1면', categoryLabel: '증시' },
-  { key: 'industry', label: '산업 1면', categoryLabel: '산업' },
-  { key: 'signal', label: '시그널 1면', categoryLabel: '__PENDING__' },
+  { key: 'all', label: '지면 1면', paperSection: '전체' },
+  { key: 'markets', label: '증권 1면', paperSection: '증권' },
+  { key: 'industry', label: '산업 1면', paperSection: '산업' },
+  { key: 'signal', label: '시그널 1면', paperSection: '시그널' },
 ];
 
 const ARTICLES_PER_SECTION = 4;
@@ -104,10 +116,9 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   }
 
   const activeSection = SECTIONS[activeTab];
-  const sectionArticles =
-    activeSection.categoryLabel === null
-      ? items.slice(0, ARTICLES_PER_SECTION)
-      : items.filter((l) => l.category === activeSection.categoryLabel).slice(0, ARTICLES_PER_SECTION);
+  const sectionArticles = items
+    .filter((l) => l.paper_section === activeSection.paperSection)
+    .slice(0, ARTICLES_PER_SECTION);
   const total = sectionArticles.length;
   const safeArticleIndex = total > 0 ? Math.min(articleIndex, total - 1) : 0;
   const current = total > 0 ? sectionArticles[safeArticleIndex] : null;

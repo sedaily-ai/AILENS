@@ -274,6 +274,13 @@ export interface CmsLens {
    * 6개 값. 2026-08-20 추가, /markets 등 카테고리 페이지에 lens 글도 같이
    * 노출하기 위함. 없으면(미분류) 어느 카테고리 페이지에도 안 뜬다. */
   category?: string | null;
+  /** "지면 특별 코너" 전용 배치 필드(2026-08-21) — 위 category와 별개.
+   * "전체"/"증권"/"산업"/"시그널" 중 하나여야 LensPreviewSection의 해당
+   * 탭에 뜬다. 없으면 지면 특별 코너엔 아예 안 뜨고 category 기반
+   * 일반 카테고리 페이지에만 남는다(LensPreviewSection.tsx 상단 주석
+   * 참조 — category 필드를 두 용도로 겹쳐 쓰다 생긴 버그를 이 필드
+   * 분리로 해결). */
+  paper_section?: string | null;
   lenses: CmsLensItem[];
   is_cms: true;
 }

@@ -1,0 +1,151 @@
+{
+  "title": "SK하이닉스, 자사주 매입으로 주주가치 제고",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 7,
+      "narration": "SK하이닉스가 자사주 매입으로 주주가치를 높이고 있습니다.",
+      "caption": "SK하이닉스, 자사주 매입으로 주주가치 제고",
+      "data": {
+        "icon": "trending-up"
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "올해 성과급 지급을 위해 약 10조 원 규모의 자사주가 추가로 필요합니다.",
+      "caption": "10조 원 자사주 추가 매입",
+      "data": {
+        "value": 10,
+        "unit": "조 원",
+        "label": "자사주 추가 매입",
+        "sourceNote": "자료: SK하이닉스"
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "노사 합의로 초과이익의 60%가 자사주로 지급됩니다.",
+      "caption": "초과이익 60% 자사주 지급",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "coins",
+            "label": "초과이익"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "trending-up",
+            "label": "자사주 60%"
+          }
+        ],
+        "sourceNote": "자료: SK하이닉스"
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "예상 영업이익이 250조 원일 경우, PS 재원은 25조 원입니다.",
+      "caption": "PS 재원 25조 원",
+      "data": {
+        "value": 25,
+        "unit": "조 원",
+        "label": "PS 재원",
+        "sourceNote": "자료: SK하이닉스"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 10,
+      "narration": "지급받은 자사주는 임직원이 즉시 매도할 수 있어요.",
+      "caption": [
+        {
+          "text": "임직원 ",
+          "emphasis": false
+        },
+        {
+          "text": "즉시 매도 가능",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "SK하이닉스는 대규모 현금 유출을 줄이면서 주가를 부양할 수 있어요.",
+      "caption": "현금 유출 줄이고 주가 부양",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "trending-down",
+            "label": "현금 유출 감소"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "trending-up",
+            "label": "주가 부양"
+          }
+        ],
+        "sourceNote": "자료: SK하이닉스"
+      }
+    },
+    {
+      "type": "chart",
+      "duration": 12,
+      "narration": "임금 인상률도 6.3%로, 지난해보다 0.3%포인트 높아졌습니다.",
+      "caption": "임금 인상률 6.3%",
+      "data": {
+        "chartType": "bar",
+        "points": [
+          {
+            "label": "지난해",
+            "value": 6.0
+          },
+          {
+            "label": "올해",
+            "value": 6.3
+          }
+        ],
+        "unit": "%",
+        "sourceNote": "자료: SK하이닉스"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "주가 변동에 따른 임직원 불이익을 줄이기 위한 장치도 마련했어요.",
+      "caption": [
+        {
+          "text": "주가 변동 ",
+          "emphasis": false
+        },
+        {
+          "text": "불이익 방지",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "closing",
+      "duration": 9,
+      "narration": "다른 대기업에도 영향을 줄 수 있을까요?",
+      "caption": "다른 대기업에 영향 가능성?",
+      "data": {}
+    }
+  ],
+  "source": "자료: SK하이닉스",
+  "disclaimer": ""
+}

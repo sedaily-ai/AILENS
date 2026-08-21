@@ -1,0 +1,149 @@
+{
+  "title": "반도체 팹 증설과 전력 수요 변화",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 7,
+      "narration": "반도체 팹 증설이 전력 수요를 어떻게 변화시킬까요?",
+      "caption": "반도체 팹 증설과 전력 수요 변화",
+      "data": {
+        "icon": "building"
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "2040년까지 최대 전력 수요가 165GW에 이를 것으로 예상됩니다.",
+      "caption": "2040년 전력 수요 최대 165GW",
+      "data": {
+        "value": 165,
+        "unit": "GW",
+        "label": "",
+        "sourceNote": "기후에너지환경부"
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "이는 기존 최대 전력 수요보다 20% 증가한 수치입니다.",
+      "caption": "기존 대비 20% 증가",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "trending-down",
+            "label": "기존 수요"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "trending-up",
+            "label": "증가 수요"
+          }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "반도체와 AI 데이터센터가 주요 원인입니다.",
+      "caption": [
+        {
+          "text": "주요 원인: "
+        },
+        {
+          "text": "반도체, AI 데이터센터",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "chart",
+      "duration": 14,
+      "narration": "2040년 첨단산업 전력 소비는 348.5TWh로 예상됩니다.",
+      "caption": "첨단산업 전력 소비 348.5TWh",
+      "data": {
+        "chartType": "bar",
+        "points": [
+          {
+            "label": "모델 수요",
+            "value": 253.4
+          },
+          {
+            "label": "실제 소비량",
+            "value": 348.5
+          }
+        ],
+        "unit": "TWh",
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "재생에너지로는 감당하기 어렵습니다.",
+      "caption": [
+        {
+          "text": "재생에너지로는 "
+        },
+        {
+          "text": "감당 불가",
+          "emphasis": true
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "stat",
+      "duration": 13,
+      "narration": "19개의 원전을 추가 가동해야 할 수준입니다.",
+      "caption": "원전 19기 추가 필요",
+      "data": {
+        "value": 19,
+        "unit": "기",
+        "label": "원전",
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "LNG 발전소의 역할이 중요해질 것입니다.",
+      "caption": "LNG 발전소의 중요성",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "building",
+            "label": "LNG"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "trending-up",
+            "label": "전력"
+          }
+        ],
+        "sourceNote": ""
+      }
+    },
+    {
+      "type": "closing",
+      "duration": 9,
+      "narration": "전력 수요 증가, 해결책은 무엇일까요?",
+      "caption": "전력 수요 증가, 해결책은?",
+      "data": {}
+    }
+  ],
+  "source": "자료: 주재현, 조윤진 기자",
+  "disclaimer": ""
+}
