@@ -1,0 +1,177 @@
+{
+  "title": "코스닥 '급브레이크'…5%대 급락에 800선 내줘",
+  "brand": "같은 뉴스, 네 가지 시선 | AILENS",
+  "cuts": [
+    {
+      "type": "opening",
+      "duration": 8,
+      "narration": "코스닥 지수가 5% 넘게 급락했습니다. 무슨 일이 있었던 걸까요?",
+      "caption": "코스닥 지수 급락",
+      "data": {
+        "icon": "alert-triangle"
+      }
+    },
+    {
+      "type": "stat",
+      "duration": 10,
+      "narration": "코스닥 지수는 5.31% 하락해 796.22를 기록했습니다.",
+      "caption": "5.31% 하락, 796.22 기록",
+      "data": {
+        "value": 5.31,
+        "unit": "%",
+        "label": "하락",
+        "sourceNote": "자료: 한국거래소"
+      }
+    },
+    {
+      "type": "diagram",
+      "duration": 10,
+      "narration": "바이오주와 반도체 소부장주에서 차익실현 매물이 쏟아졌습니다.",
+      "caption": "바이오주, 반도체 소부장주 매물 출회",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "trending-down",
+            "label": "바이오주"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "building",
+            "label": "반도체 소부장주"
+          }
+        ],
+        "sourceNote": "자료: 한국거래소"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "외국인과 기관이 각각 1882억 원과 1498억 원을 순매도했습니다.",
+      "caption": [
+        {
+          "text": "외국인 "
+        },
+        {
+          "text": "1882억 원",
+          "emphasis": true
+        },
+        {
+          "text": " 순매도, 기관 "
+        },
+        {
+          "text": "1498억 원",
+          "emphasis": true
+        },
+        {
+          "text": " 순매도"
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "highlight",
+      "duration": 10,
+      "narration": "개인은 3395억 원을 순매수하며 물량을 받아내고 있습니다.",
+      "caption": [
+        {
+          "text": "개인 "
+        },
+        {
+          "text": "3395억 원",
+          "emphasis": true
+        },
+        {
+          "text": " 순매수"
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "chart",
+      "duration": 12,
+      "narration": "바이오주와 반도체 소부장주 모두 큰 폭으로 하락했습니다.",
+      "caption": "바이오주, 반도체 소부장주 하락",
+      "data": {
+        "chartType": "bar",
+        "points": [
+          {
+            "label": "바이오주",
+            "value": -8
+          },
+          {
+            "label": "반도체 소부장주",
+            "value": -7
+          }
+        ],
+        "unit": "%",
+        "sourceNote": "자료: 한국거래소"
+      }
+    },
+    {
+      "type": "highlight",
+      "duration": 12,
+      "narration": "미국 장기 국채금리가 4.70%로 상승해 코스닥에 부담을 주고 있습니다.",
+      "caption": [
+        {
+          "text": "미국 장기 국채금리 "
+        },
+        {
+          "text": "4.70%",
+          "emphasis": true
+        },
+        {
+          "text": " 상승"
+        }
+      ],
+      "data": {}
+    },
+    {
+      "type": "diagram",
+      "duration": 12,
+      "narration": "고금리와 차익실현 수요가 코스닥 변동성을 키우고 있죠.",
+      "caption": "고금리, 차익실현 수요 → 코스닥 변동성 확대",
+      "data": {
+        "nodes": [
+          {
+            "kind": "node",
+            "icon": "trending-up",
+            "label": "고금리"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "arrow-right",
+            "label": "차익실현 수요"
+          },
+          {
+            "kind": "connector",
+            "variant": "arrow"
+          },
+          {
+            "kind": "node",
+            "icon": "trending-down",
+            "label": "코스닥 변동성"
+          }
+        ],
+        "sourceNote": "자료: 한국거래소"
+      }
+    },
+    {
+      "type": "closing",
+      "duration": 8,
+      "narration": "다음 주 코스닥은 어떤 방향으로 움직일까요?",
+      "caption": "다음 주 코스닥은?",
+      "data": {}
+    }
+  ],
+  "source": "자료: 한국거래소",
+  "disclaimer": ""
+}
