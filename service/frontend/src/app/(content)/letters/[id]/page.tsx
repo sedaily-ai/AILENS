@@ -39,6 +39,25 @@ async function findLetter(id: string): Promise<(ApiLetter & { date: string }) | 
   return { ...post, date: post.publish_date };
 }
 
+// 이전/다음 레터 내비게이션(2026-08-21, GEO 재감사 — 레터가 발행량이 가장
+// 많은 콘텐츠인데 상세 페이지에 다른 레터로 가는 내부 링크가 전혀 없어
+// 크롤링상 막다른 골목이었다. 옛 MBTI 페르소나 체계(l-YYYYMMDD-XX id,
+// mbti_group 필드) 기반 구현은 그 체계 폐지로 이미 죽어있었음 — 지금 단일
+// 저자 체계에 맞게 새로 짠다. webtoon/[slug]/page.tsx의 findNeighbors와
+// 같은 패턴: fetchCmsPosts가 최신순(desc)으로 내려오므로 index-1이 더
+// 최신, index+1이 더 과거.
+async function findNeighbors(id: string): Promise<{
+  next: { id: string; headline: string; date: string } | null;
+  prev: { id: string; headline: string; date: string } | null;
+}> {
+  const letters = await fetchCmsPosts('letters', undefined, 100);
+  const idx = letters.findIndex((l) => l.id === id);
+  if (idx === -1) return { next: null, prev: null };
+  const toNeighbor = (l: (typeof letters)[number] | undefined) =>
+    l && l.publish_date ? { id: l.id, headline: l.headline, date: l.publish_date } : null;
+  return { next: toNeighbor(letters[idx - 1]), prev: toNeighbor(letters[idx + 1]) };
+}
+
 // 검색결과 줄임표 방지를 위한 description 트리밍 (Google 기준 ~160자).
 function trimDescription(s: string, max = 160): string {
   if (s.length <= max) return s;
@@ -225,6 +244,7 @@ export default async function LetterDetailPage({
   const id = decodeURIComponent(rawId);
   const letter = await findLetter(id);
   const jsonLd = letter ? buildArticleJsonLd(letter) : null;
+  const { next, prev } = letter ? await findNeighbors(id) : { next: null, prev: null };
   return (
     <>
       {jsonLd && (
@@ -233,7 +253,12 @@ export default async function LetterDetailPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <LetterDetailClient letterId={id} initialLetter={letter ? withDisplayMeta(letter) : null} />
+      <LetterDetailClient
+        letterId={id}
+        initialLetter={letter ? withDisplayMeta(letter) : null}
+        nextLetter={next}
+        prevLetter={prev}
+      />
     </>
   );
 }

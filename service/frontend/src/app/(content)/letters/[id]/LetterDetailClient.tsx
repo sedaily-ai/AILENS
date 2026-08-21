@@ -11,6 +11,7 @@ import { trackArticleRead } from '@/shared/lib/tracking/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { useAuth } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
+import { letterHref } from '@/shared/lib/letterHref';
 import { fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
@@ -45,6 +46,16 @@ interface Props {
   // JSON-LD/OG 태그는 있는데 정작 화면 본문은 client fetch 전까지 비어있던
   // 문제 — /letters/[id]/page.tsx 의 findLetter 결과를 그대로 내려받는다).
   initialLetter?: DisplayLetter | null;
+  // 이전/다음 레터 내비게이션용(2026-08-21, GEO 재감사) — 서버(page.tsx)가
+  // findNeighbors()로 미리 조회해 내려준다.
+  nextLetter?: NeighborLetter | null;
+  prevLetter?: NeighborLetter | null;
+}
+
+interface NeighborLetter {
+  id: string;
+  headline: string;
+  date: string;
 }
 
 // "YYYY-MM-DD" 최근 n 일 (오늘 포함, 내림차순) — app/letters/[id]/page.tsx 의
@@ -61,7 +72,7 @@ function recentDatesISO(days: number): string[] {
   return out;
 }
 
-export function LetterDetailClient({ letterId, initialLetter = null }: Props) {
+export function LetterDetailClient({ letterId, initialLetter = null, nextLetter = null, prevLetter = null }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -73,6 +84,7 @@ export function LetterDetailClient({ letterId, initialLetter = null }: Props) {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회, 클라이언트 hydration 완료 플래그
     setMounted(true);
   }, []);
 
@@ -186,7 +198,7 @@ export function LetterDetailClient({ letterId, initialLetter = null }: Props) {
           style={{ maxWidth: 1040, padding: '0 clamp(16px, 3vw, 24px)' }}
         >
           <div style={{ minWidth: 0 }}>
-            <LetterBody letter={letter} />
+            <LetterBody letter={letter} nextLetter={nextLetter} prevLetter={prevLetter} />
           </div>
           <div style={{ paddingTop: 'clamp(28px, 5vw, 56px)' }}>
             <SideRail />
@@ -303,7 +315,15 @@ function letterCategoryLabel(letter: DisplayLetter): string {
 // production letter inline 렌더
 // - 4개 채널 탭 폐기. 한 페이지에서 자연스러운 흐름으로 통합:
 //     헤더 → (있으면) 팟캐스트 미니 플레이어 → 본문 → 핵심 정리/닫는 줄/단어 → 구독
-function LetterBody({ letter }: { letter: DisplayLetter }) {
+function LetterBody({
+  letter,
+  nextLetter,
+  prevLetter,
+}: {
+  letter: DisplayLetter;
+  nextLetter?: NeighborLetter | null;
+  prevLetter?: NeighborLetter | null;
+}) {
   // 본문은 한 흐름으로 렌더 — 중간 mock 이미지는 제거. 하단 4컷 카드가 대체.
   const body = letter.body;
 
@@ -465,7 +485,7 @@ function LetterBody({ letter }: { letter: DisplayLetter }) {
 
       {/* 핵심 정리 / 닫는 줄 / 단어 */}
       <div id="letter-extras" style={{ scrollMarginTop: 80 }}>
-        <LetterTextExtras letter={letter} modern={isModern} />
+        <LetterTextExtras letter={letter} modern={isModern} nextLetter={nextLetter} prevLetter={prevLetter} />
       </div>
 
       {/* 뉴스레터 구독 — 그 페르소나로 고정, 메일받기 인라인 */}
@@ -854,7 +874,17 @@ function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
 }
 
 // ── 본문 본체 이후 — 핵심 정리 + 닫는 줄 + 단어 (LetterBody 가 직접 호출) ──
-function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: boolean }) {
+function LetterTextExtras({
+  letter,
+  modern,
+  nextLetter,
+  prevLetter,
+}: {
+  letter: DisplayLetter;
+  modern?: boolean;
+  nextLetter?: NeighborLetter | null;
+  prevLetter?: NeighborLetter | null;
+}) {
   return (
     <>
       {letter.key_points.length > 0 && (
@@ -940,6 +970,10 @@ function LetterTextExtras({ letter, modern }: { letter: DisplayLetter; modern?: 
             </div>
           ))}
         </section>
+      )}
+
+      {(nextLetter || prevLetter) && (
+        <PrevNextLetterNav next={nextLetter} prev={prevLetter} accent={letter.accent} accentBg={letter.accentBg} />
       )}
     </>
   );
@@ -1213,83 +1247,41 @@ function LetterBlock({
   );
 }
 
-// (구) 이전/다음 letter 네비게이션 — UI 정리 일환으로 제거됨.
-// PrevNextLetterNav + PrevNextCard 정의 모두 삭제.
-/* function PrevNextLetterNav({ letter }: { letter: DisplayLetter }) {
-  const [prev, setPrev] = useState<{ date: string; headline: string } | null>(null);
-  const [next, setNext] = useState<{ date: string; headline: string } | null>(null);
-
-  // letter.id = 'l-YYYYMMDD-XX' → date / group
-  const parsed = letter.id.match(/^l-(\d{4})(\d{2})(\d{2})-([A-Z]{2})$/);
-  const date = parsed ? `${parsed[1]}-${parsed[2]}-${parsed[3]}` : '';
-  const group = letter.mbti_group;
-
-  useEffect(() => {
-    if (!date) return;
-    const shift = (days: number): string => {
-      const [y, m, d] = date.split('-').map((s) => parseInt(s, 10));
-      const dt = new Date(Date.UTC(y, m - 1, d));
-      dt.setUTCDate(dt.getUTCDate() + days);
-      return dt.toISOString().slice(0, 10);
-    };
-    let cancelled = false;
-    const tryFetch = async (
-      targetDate: string,
-      setter: (v: { date: string; headline: string } | null) => void,
-    ) => {
-      try {
-        const res = await fetchTodayLetters(targetDate);
-        if (cancelled) return;
-        const found = res.letters.find((l) => l.mbti_group === group);
-        setter(found ? { date: targetDate, headline: found.headline } : null);
-      } catch {
-        if (!cancelled) setter(null);
-      }
-    };
-    void tryFetch(shift(-1), setPrev);
-    void tryFetch(shift(1), setNext);
-    return () => {
-      cancelled = true;
-    };
-  }, [date, group]);
-
-  if (!prev && !next) return null;
-
+// 이전/다음 레터 내비게이션(2026-08-21, GEO 재감사에서 새로 구현). 예전
+// 버전(MBTI 페르소나 체계 — l-YYYYMMDD-XX id 파싱 + mbti_group 매칭, 아래
+// 참고용으로 잠깐 흔적만 남겨뒀다가 삭제)은 그 체계 폐지로 이미 죽어있었다
+// — page.tsx의 findNeighbors()가 서버에서 미리 조회해 내려준 데이터를
+// 그대로 그리기만 하면 돼서 클라이언트 fetch/useEffect 자체가 필요 없다.
+function PrevNextLetterNav({
+  next,
+  prev,
+  accent,
+  accentBg,
+}: {
+  next?: NeighborLetter | null;
+  prev?: NeighborLetter | null;
+  accent: string;
+  accentBg: string;
+}) {
   return (
     <nav
-      aria-label={`${letter.editorName} 에디터 이전/다음 한 통`}
+      aria-label="이전·다음 레터"
       style={{
-        maxWidth: 720,
-        margin: '24px auto 0',
-        padding: '0 clamp(20px, 5vw, 32px)',
+        marginTop: 24,
+        paddingTop: 24,
+        borderTop: '1px solid #f3f4f6',
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: 12,
       }}
     >
       {prev ? (
-        <PrevNextCard
-          direction="prev"
-          targetDate={prev.date}
-          headline={prev.headline}
-          editorName={letter.editorName}
-          group={group}
-          accent={letter.accent}
-          accentBg={letter.accentBg}
-        />
+        <PrevNextCard direction="prev" letter={prev} accent={accent} accentBg={accentBg} />
       ) : (
         <div />
       )}
       {next ? (
-        <PrevNextCard
-          direction="next"
-          targetDate={next.date}
-          headline={next.headline}
-          editorName={letter.editorName}
-          group={group}
-          accent={letter.accent}
-          accentBg={letter.accentBg}
-        />
+        <PrevNextCard direction="next" letter={next} accent={accent} accentBg={accentBg} />
       ) : (
         <div />
       )}
@@ -1299,32 +1291,26 @@ function LetterBlock({
 
 function PrevNextCard({
   direction,
-  targetDate,
-  headline,
-  editorName,
-  group,
+  letter,
   accent,
   accentBg,
 }: {
   direction: 'prev' | 'next';
-  targetDate: string;
-  headline: string;
-  editorName: string;
-  group: MbtiGroupId;
+  letter: NeighborLetter;
   accent: string;
   accentBg: string;
 }) {
   const isPrev = direction === 'prev';
-  const href = letterHref(`${group.toLowerCase()}-${targetDate}`);
-  const label = isPrev ? '이전 한 통' : '다음 한 통';
-  const [y, m, d] = targetDate.split('-').map((s) => parseInt(s, 10));
+  const label = isPrev ? '이전 레터' : '다음 레터';
+  const [y, m, d] = letter.date.split('-').map((s) => parseInt(s, 10));
   const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
   const dow = DOW_KO[new Date(y, m - 1, d).getDay()];
   const dateLabel = `${m}월 ${d}일 ${dow}요일`;
 
   return (
     <Link
-      href={href}
+      href={letterHref(letter.id)}
+      prefetch
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -1368,9 +1354,7 @@ function PrevNextCard({
         {label}
         {!isPrev && <span aria-hidden>→</span>}
       </span>
-      <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>
-        {editorName} · {dateLabel}
-      </span>
+      <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>{dateLabel}</span>
       <span
         style={{
           fontFamily: '"Noto Serif KR", serif',
@@ -1385,7 +1369,6 @@ function PrevNextCard({
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           marginTop: 2,
-          // 한 줄 단어 강조용 accent — 살짝 비추는 배경
           background: accentBg,
           padding: '2px 6px',
           borderRadius: 4,
@@ -1393,11 +1376,11 @@ function PrevNextCard({
           maxWidth: '100%',
         }}
       >
-        {headline}
+        {letter.headline}
       </span>
     </Link>
   );
-} */
+}
 
 // ── 용어 툴팁 ────────────────────────────────────────────────────────
 // 본문 안에서 glossary 의 단어들을 dotted underline + 호버 툴팁(term+explain)으로 감싼다.

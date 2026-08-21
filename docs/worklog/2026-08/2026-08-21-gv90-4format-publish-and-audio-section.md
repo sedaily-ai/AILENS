@@ -1003,6 +1003,54 @@ PodcastEpisode/VideoObject 두 분기를 공유하던 `base` 스프레드 구조
 동일한 완성도로 맞춰짐 — 3차 감사에서 더 나올 게 있을지는 미지수지만,
 현재로선 진짜 갭이 소진된 상태.
 
+### 34. GEO/SEO 3차 재감사 — 사이트 전체 페이지/탭 누락 + 레터 크롤링 심층 점검
+
+사용자가 "빠진 페이지나 탭 없는지 체크... 매번 올라가는 레터들이 검색
+엔진에 잘 걸려야 하는데... 페이지 깊게 파보시져"라고 재요청 — 발행량이
+가장 많은 콘텐츠 타입(레터)에 초점을 맞춰 (1) 사이트 전체 라우트/네비
+인벤토리, (2) 레터 크롤링 가능성 심층 점검 두 파트로 재감사.
+
+**Part 1 — 사이트 전체 라우트 인벤토리**: 고아 페이지·깨진 nav 링크
+0건. `/archive`(헤더 nav엔 없지만 홈/공지배너/푸터에서 링크되는
+의도된 배치), `/letters/view`(레거시 쿼리스트링 별칭, `noindex`
+의도적), `/onboarding`(푸터 전용) 전부 확인 — 문제 없음.
+
+**Part 2 — 레터 크롤링 심층 점검, 실제 갭 1건 발견**: 레터 상세
+페이지(`LetterDetailClient.tsx`)에 다른 레터로 가는 내부 링크가
+**하나도 없었다** — 웹툰/영상은 이미 있던 "이전/다음 화" 내비게이션이
+레터만 빠져있었다. 원인: 옛 MBTI 페르소나 체계(`l-YYYYMMDD-XX` id +
+`mbti_group` 필드) 기반 `PrevNextLetterNav`/`PrevNextCard` 구현이
+그 체계 폐지로 죽어서 통째로 주석 처리돼 있었음(재사용 불가능한
+데이터 모델). 지금은 총 49건뿐이라 `/archive`(`PAGE_SIZE=100`)가
+전부를 링크하고 있어 당장 크롤링 공백은 아니지만, 레터 발행 속도
+(~일 3건)로 6~7주 내 100건을 넘기면 오래된 레터부터 내부 링크
+경로가 사라지고 사이트맵 신호에만 의존하게 될 예정이었다 — 지금
+고치는 게 맞다고 판단.
+
+**수정**: `letters/[id]/page.tsx`에 `findNeighbors()` 신설(webtoon의
+같은 이름 함수와 동일 패턴 — `fetchCmsPosts` 최신순 내림차순 가정,
+index-1=최신/index+1=과거) → `LetterDetailClient`에 `nextLetter`/
+`prevLetter` prop으로 전달 → `LetterBody` → `LetterTextExtras`까지
+스레딩 → 키워드 섹션 바로 아래에 `PrevNextLetterNav` 렌더링. 옛
+`PrevNextCard`의 시각 스타일(카드 레이아웃·호버 효과)은 그대로
+재사용하되 MBTI 그룹 의존 로직은 다 걷어내고 새 데이터 모델(id/
+headline/date)로 재작성. 죽어있던 옛 구현(라인 ~1250-1566, useState/
+useEffect로 클라이언트에서 매번 다시 조회하던 방식)은 완전히
+삭제 — 서버(page.tsx)가 이미 조회해 내려준 데이터를 그대로 그리기만
+하면 돼서 그 복잡도 자체가 필요 없어짐.
+
+**부수 발견**: 같은 파일에 무관한 pre-existing eslint 이슈
+(`react-hooks/set-state-in-effect`, mounted 플래그 mount effect)를
+발견 — 이번 세션에 이미 여러 번 반복된 정당한 패턴(SSR 하이드레이션
+가드)이라 같은 컨벤션(`eslint-disable-next-line` + 이유 주석)으로
+같이 정리.
+
+**검증**: `tsc --noEmit`·eslint 클린. 로컬 dev 서버 + 실제 레터
+슬러그로 HTML fetch해 "이전 레터"/"다음 레터" 텍스트와 `/letters/`
+링크 14개(레이아웃 상 다른 레터 카드 포함) 정상 출력 확인. 스크린샷은
+헤드리스 Chrome이 강제로 늘린 뷰포트에서 지연 로딩 콘텐츠가 안
+그려지는 문제로 생략, HTML 레벨 검증으로 대체.
+
 ## 다음
 
 - (§23에서 해소) ~~video 파이프라인 1단계 스크래치패드·스키마 자동
