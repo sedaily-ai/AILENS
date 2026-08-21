@@ -7,7 +7,17 @@ import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
-import { ACCENT } from './accent';
+import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
+import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
+
+// 홈 오디오 섹션(AudioPreviewSection.tsx)과 캐릭터·재생버튼 시각 언어를
+// 통일(2026-08-21, 우선순위 4번 — "/listen 목록 페이지와 시각적 일관성을
+// 맞출지는 아직 안 건드림"). 레이아웃 자체(세로 카드 vs 가로 리스트 행)는
+// 이 페이지의 목적(빠르게 훑는 목록)에 맞게 그대로 두고, 행마다 있던
+// 범용 헤드폰/재생 아이콘 원을 캐릭터 아바타 + 재생 버튼 배지로 교체해
+// "어디서 봐도 같은 것"이라는 인상을 준다. 재생 버튼은 홈 카드와 같은
+// 이벤트버스(requestPlayHomePlayerItem)로 하단 플레이어를 바로 재생.
+const NEUTRAL_ACCENT = '#3b82f6';
 
 // 오디오 전용 목록 페이지(2026-08-21) — /video 목록 페이지와 같은 이유로
 // 신설: 홈 하단 미니 플레이어(TodayNewsPlayer.tsx)에만 있던 재생목록이
@@ -61,8 +71,9 @@ export function ListenListClient({ initialItems }: { initialItems: HomePlayerPos
 
         {items.length > 0 && (
           <div>
-            {items.map((it) => {
+            {items.map((it, i) => {
               const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
+              const p = lensPerspectiveAt(i);
               return (
                 <Link
                   key={it.id}
@@ -71,22 +82,53 @@ export function ListenListClient({ initialItems }: { initialItems: HomePlayerPos
                   className="group flex items-center hover:bg-gray-50 transition-colors"
                   style={{ gap: 14, padding: '16px 8px', borderRadius: 10, textDecoration: 'none', borderBottom: '1px solid #f1f1f0' }}
                 >
-                  <span
-                    className="flex items-center justify-center flex-shrink-0"
-                    style={{ width: 40, height: 40, borderRadius: '50%', background: '#eff6ff', color: ACCENT }}
-                  >
-                    {isAudio ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M4 13a8 8 0 0 1 16 0" />
-                        <rect x="2.5" y="13" width="4" height="6" rx="1.5" />
-                        <rect x="17.5" y="13" width="4" height="6" rx="1.5" />
+                  <span className="relative flex-shrink-0" style={{ width: 44, height: 44 }}>
+                    <span
+                      className="flex items-center justify-center"
+                      style={{ width: 44, height: 44, borderRadius: '50%', background: '#f3f4f6', overflow: 'hidden' }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, AudioPreviewSection.tsx와 동일 패턴 */}
+                      <img
+                        src={p.illustration}
+                        alt=""
+                        width={44}
+                        height={44}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
+                      />
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="재생"
+                      className="absolute flex items-center justify-center"
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        background: NEUTRAL_ACCENT,
+                        border: '2px solid #fff',
+                        bottom: -4,
+                        right: -4,
+                        boxShadow: `0 2px 6px ${NEUTRAL_ACCENT}66`,
+                        cursor: 'pointer',
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        requestPlayHomePlayerItem(it.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          requestPlayHomePlayerItem(it.id);
+                        }
+                      }}
+                    >
+                      <svg width={9} height={9} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 1.5 }}>
+                        <path d="M8 5v14l11-7z" />
                       </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
-                        <path d="M10 9.5 15 12l-5 2.5z" fill="currentColor" stroke="none" />
-                      </svg>
-                    )}
+                    </span>
                   </span>
 
                   <span className="min-w-0 flex-1">
