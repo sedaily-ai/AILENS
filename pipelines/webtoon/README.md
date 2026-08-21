@@ -51,20 +51,18 @@ admin에서 프롬프트를 고쳐도 실제 이미지엔 반영이 안 되는 �
 ```bash
 cd pipelines/webtoon
 pip install -r requirements.txt
-cp .env.example .env
-# .env 안의 OPENAI_API_KEY를 실제 키로 교체
 ```
 
-1·2단계 프롬프트를 읽어오려면 DDB(`sedaily-mbti-admin-prompts-dev`,
-us-east-1) 읽기 권한이 있는 AWS 자격 증명도 필요하다 — 로컬에서는
-`AWS_PROFILE=yeonggwang` 환경변수로 지정(`../common/ddb_prompt.py` 참고,
-2026-08-20부터 letters/podcast와 공용). 자격
-증명이 없거나 DDB 접근이 실패해도 파일시스템 폴백으로 계속 동작한다.
+로컬 `.env`는 더 이상 안 쓴다(2026-08-21 — `../common/openai_client.py`로
+통일). OpenAI API 키는 AWS Secrets Manager `sedaily-mbti/openai-api-key`
+(계정 887078546492, us-east-1)에서 실행 시점에 자동으로 가져온다 —
+letters/podcast/video 파이프라인과 동일한 방식.
 
-**실제 운영 키는 AWS Secrets Manager에 있음** — `sedaily-mbti/openai-api-key`
-(계정 887078546492, us-east-1). 로컬 `.env`는 테스트용으로만 쓰고, 실제
-서비스에 붙일 땐 여기서 꺼내 쓸 것. 로컬 `.env` 파일을 절대 git에 커밋하거나
-공유 드라이브에 평문으로 오래 남겨두지 말 것.
+DDB(`sedaily-mbti-admin-prompts-dev`, us-east-1) 읽기 권한이 있는 AWS
+자격 증명이 필요하다 — 로컬에서는 `AWS_PROFILE=yeonggwang` 환경변수로
+지정(`../common/ddb_prompt.py` 참고). 같은 자격 증명으로 위 Secrets
+Manager 시크릿도 조회하므로 별도 설정은 필요 없다. DDB 접근이 실패해도
+프롬프트는 파일시스템 폴백으로 계속 동작한다.
 
 ## 사용법
 

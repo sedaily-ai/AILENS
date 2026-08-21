@@ -537,6 +537,34 @@ OG/Twitter), `NewsArticle`+`BreadcrumbList`+`speakable` JSON-LD(2026-
 HTML에서 바로 콘텐츠를 읽음 — 전부 정상. 오늘 발행한 코스닥 급락
 기사도 라이브에서 반영 확인. 코드 변경 없음(조사만).
 
+### 21. webtoon 파이프라인의 로컬 `.env` 제거 — Secrets Manager로 통일
+
+사용자 질의: "env 파일에 잘 모아져있나요?" 점검 결과 `pipelines/webtoon`
+하나만 2026-08-10 도입 당시 방식(로컬 `.env`에 `OPENAI_API_KEY` 평문 +
+`load_dotenv()`)을 그대로 쓰고 있었다 — letters/podcast/video 3개는
+2026-08-20에 만든 공용 `common/openai_client.py`를 거쳐 Secrets Manager
+`sedaily-mbti/openai-api-key`에서 자동 조회하도록 이미 통일돼 있었는데
+webtoon만 빠져 있었음. 실제로는 로컬에 `.env` 파일 자체가 없어서(README
+셋업 안내는 있었지만), 이번 세션 내내(GV90부터 코스닥 급락까지 5회) 매번
+스크래치패드 텍스트 파일에서 키를 읽어 환경변수로 수동 주입하는 임시방편을
+반복해왔다 — webtoon/README.md에도 "로컬 .env는 테스트용, 실제 서비스에
+붙일 땐 Secrets Manager에서 꺼내 쓸 것"이라고 이미 적혀 있던 미완 과제였다.
+
+- `common/openai_client.py`에 `get_client()` 추가(raw `OpenAI` 인스턴스가
+  필요한 image_generation 등 Responses API 호출용 — `call_text()`로 못
+  덮는 경우 전용).
+- `webtoon/pipeline.py`: `load_dotenv()` + `os.environ.get("OPENAI_API_KEY")`
+  제거, `from openai_client import get_client` 로 교체. `os` import도
+  더는 안 써서 제거.
+- `webtoon/.env.example` 삭제, `requirements.txt`에서 `python-dotenv`
+  제거, `README.md` 셋업 섹션을 Secrets Manager 자동 조회로 갱신.
+- 검증: `AWS_PROFILE=yeonggwang`만으로(로컬 `.env` 없이) `pipeline.py`의
+  `client` 객체가 정상 생성되고 실제 키(`sk-proj-...`)를 담고 있는지 확인.
+
+이제 4개 콘텐츠 파이프라인(letters/podcast/webtoon/video) 전부 로컬
+시크릿 파일 없이 Secrets Manager만으로 동작 — 다음 세션부터는 웹툰
+생성 전에 스크래치패드 키 파일을 매번 준비할 필요가 없다.
+
 ## 결정
 
 - 파이프라인이 만드는 영상 스크립트 JSON은 사람 검수 없이 그대로 렌더에

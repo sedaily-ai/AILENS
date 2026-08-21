@@ -7,19 +7,17 @@
 각 단계는 중간 결과(JSON)를 파일로 저장하므로, 중간에 끊겨도 재실행하면
 이미 끝난 단계는 건너뛰고 이어서 진행한다(resume).
 """
-import os, sys, json, base64, time
+import sys, json, base64, time
 from pathlib import Path
-from dotenv import load_dotenv
-from openai import OpenAI
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
+from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거
 
 import prompts
 from stitch import stitch
 
-load_dotenv(Path(__file__).parent / ".env")
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+client = get_client()
 
 SCRIPT_MODEL = "gpt-4o"          # 스크립트·장면연출용 텍스트 모델
 IMAGE_MODEL = "gpt-5.5"          # 이미지 생성 모델 (Responses API의 image_generation 툴)

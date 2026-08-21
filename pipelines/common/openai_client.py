@@ -4,6 +4,13 @@ API 키는 AWS Secrets Manager `sedaily-mbti/openai-api-key`에서 가져온다
 (마스터DB 뉴스웹툰 파이프라인과 같은 시크릿 재사용 — 신규 키 발급 없음).
 이 세션 동안 스크래치패드에서 매번 손으로 다시 썼던 "시크릿 fetch + GPT
 호출" 보일러플레이트를 여기 하나로 뽑았다(2026-08-20).
+
+get_client()는 2026-08-21 추가 — pipelines/webtoon만 이 공용 모듈이 생기기
+전(2026-08-10) 방식 그대로 로컬 `.env`(OPENAI_API_KEY 평문)를 썼다. 이미지
+생성(Responses API) 등 call_text()로 못 덮는 raw client 호출이 필요해서
+직접 OpenAI() 인스턴스를 만들던 걸, 여기서 만든 인스턴스를 그대로 받아
+쓰도록 통일했다 — letters/podcast/video와 동일하게 로컬 .env 없이 Secrets
+Manager만으로 동작한다.
 """
 import json
 import os
@@ -30,6 +37,12 @@ def _get_api_key() -> str:
         secret = json.loads(sm.get_secret_value(SecretId=_SECRET_ID)["SecretString"])
         _api_key = secret["OPENAI_API_KEY"]
     return _api_key
+
+
+def get_client() -> OpenAI:
+    """raw OpenAI 클라이언트가 필요한 호출부용(예: image_generation 툴을
+    쓰는 Responses API) — call_text()로 못 덮는 경우에만 이걸 직접 쓴다."""
+    return OpenAI(api_key=_get_api_key())
 
 
 def call_text(
