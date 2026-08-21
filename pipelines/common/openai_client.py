@@ -65,5 +65,10 @@ def call_text(
         ],
         max_tokens=max_tokens,
         temperature=temperature,
+        # 2026-08-21 — webtoon 이미지 생성 호출에서 타임아웃 없이 20분+
+        # 무한 대기하는 걸 실사용 테스트로 발견한 뒤 전체 pipelines/common
+        # 호출에 방어적으로 추가. 텍스트 생성은 원래도 몇 초~수십 초면
+        # 끝나야 정상이라 넉넉히 잡아도 문제없음 — 진짜 hang만 걸러낸다.
+        timeout=180,
     )
     return resp.choices[0].message.content

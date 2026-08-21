@@ -96,9 +96,19 @@ def _parse_item(item: ET.Element) -> dict | None:
 
     return {
         "nsid": (item.find("nsid").text or "").strip() if item.find("nsid") is not None else "",
+        # `key`는 sedaily.com/article/{key} URL에 그대로 쓰이는 공개
+        # 기사 번호(nsid와 다름 — nsid는 내부 영숫자 코드). 발행 후
+        # 중복 방지 체크는 이 값으로 해야 한다 — `url`에는 종종
+        # `?ref=sedailyEng` 같은 쿼리스트링이 붙어서 문자열 완전일치로
+        # 비교하면 같은 기사인데도 다르다고 잘못 판단한다.
+        "key": (item.find("key").text or "").strip() if item.find("key") is not None else "",
         "title": title_el.text.strip(),
         "sub_title": _strip_html(sub_title_el.text or "") if sub_title_el is not None else "",
         "top_category": top_category,
+        # 4포맷 파이프라인(letters 등)에 그대로 넘길 원문 — discovery는
+        # "분류"만 한다는 원칙은 유지하되, 후속 자동 발행 단계가 다시
+        # 원문을 가져올 필요 없도록 여기서 한 번에 담아둔다.
+        "content": content_text,
         "content_len": len(content_text),
         "has_photo": image_el is not None,
         "photo_url": image_el.attrib.get("href") if image_el is not None else None,

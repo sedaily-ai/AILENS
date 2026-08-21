@@ -52,6 +52,17 @@ def build_image_prompt(camera: str, scene: str, cut: dict) -> str:
     return "".join(parts)
 
 
+# 2026-08-21 자동 발행 파이프라인(pipelines/frontpage_auto) 실사용 테스트 중
+# 발견 — 이 호출에 타임아웃이 없어서, 응답이 그냥 안 오면(서버 쪽 hang으로
+# 추정, 재현은 못 함) 아래 재시도 로직이 있으나 마나 하게 무한정 대기했다
+# (한 컷에서 20분+ 멈춰서 결국 프로세스를 강제 종료해야 했음). 컷5처럼
+# 정상적으로도 ~10분 걸리는 경우가 있어(느리지만 진짜 진행 중) 너무 짧게
+# 잡으면 멀쩡한 호출을 오탐으로 죽인다 — 9분으로 넉넉히 잡아 진짜 hang만
+# 걸러낸다. Fargate에서 무인 실행할 때 이게 없으면 태스크 하나가 영원히
+# 안 끝나 그날 자동 발행 전체가 막힌다.
+_IMAGE_TIMEOUT_SECONDS = 540
+
+
 def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
     """이미지 1장 생성. 실패 시 최대 retries회 재시도(지수 백오프)."""
     for attempt in range(retries):
@@ -65,6 +76,7 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
                     "size": IMAGE_SIZE,
                     "output_format": "png",
                 }],
+                timeout=_IMAGE_TIMEOUT_SECONDS,
             )
             for output in resp.output:
                 if getattr(output, "type", "") == "image_generation_call":
