@@ -379,6 +379,39 @@ Polly mp3 URL을 서빙 — `revalidateTag('posts:lens', { expire: 0 })`
   "revalidateTag가 안 먹는" 문제 재발 없음, 원인 불명인 채로 남아있는
   버그라 재현성 자체가 낮은 것으로 보임).
 
+### 14. TodayNewsPlayer 재생목록 패널 — insertBefore 크래시 수정
+
+사용자가 실사용 중 재현: 하단 오디오 플레이어에서 재생을 시작한 뒤
+재생목록 패널을 열고 닫으면 브라우저 탭이 죽음("This page couldn't
+load"). 콘솔에 `Uncaught NotFoundError: Failed to execute 'insertBefore'
+on 'Node'...`. 처음엔 콘솔 로그에 "Typed content script is ready!"
+(우리 코드 어디에도 없는 문구, grep으로 확인)가 같이 찍혀 있어서 브라우저
+확장 프로그램 충돌로 오판 — 사용자가 재현성을 다시 확인해줘서 코드를
+직접 파봄.
+
+**진짜 원인**: 유튜브 IFrame API가 `new YT.Player(el, ...)`를 호출하면
+대상 엘리먼트를 실제 `<iframe>`으로 통째로 바꿔치기한다(innerHTML만
+채우는 게 아니라 엘리먼트 자체를 교체) — 그런데 이 유튜브 컨테이너
+`<div ref={ytContainerRef}>`가 재생목록 패널(`{expanded && (...)}`)의
+바로 다음 형제 노드로 같은 부모(`position:fixed` 하단 바 컨테이너) 밑에
+있었다. 재생을 시작해 그 div가 이미 iframe으로 바뀐 뒤 `expanded`를
+토글하면, React는 여전히 "원래 그 div가 거기 있다"고 믿고 그 앞뒤로
+패널 노드를 끼워넣거나 빼려다가 실제로는 사라진 노드를 참조해서
+크래시 — 이 세션 초반 VideoLightbox.tsx에서 겪은 tab-fade-in
+containing-block 버그와는 다른 문제지만, "React가 관리하지 않는
+DOM 변형과 형제 트리 reconcile이 충돌"한다는 계열은 같다.
+
+**수정**: 유튜브 컨테이너를 `createPortal(..., document.body)`로 완전히
+분리 — 재생목록 패널을 여닫아도 이 컨테이너와의 형제 관계 자체가
+없어져 React가 그 주변을 reconcile할 일이 없다. tsc 통과 확인 후
+배포, 라이브 정상 로드 확인(로컬 dev 서버가 이때 3000번 포트에 안
+떠 있어서 로컬 재현 검증은 생략하고 바로 배포 후 라이브로 확인).
+
+**교훈**: YouTube IFrame API·유사 서드파티 위젯처럼 "React가 렌더한
+엘리먼트를 자기 마음대로 교체하는" 라이브러리를 쓸 땐, 그 컨테이너를
+절대 조건부 렌더링되는 형제와 같은 부모에 두면 안 된다 — 포털로
+격리하는 게 기본값이어야 한다.
+
 ## 결정
 
 - 파이프라인이 만드는 영상 스크립트 JSON은 사람 검수 없이 그대로 렌더에
