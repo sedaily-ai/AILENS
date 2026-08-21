@@ -11,7 +11,27 @@ DDB에 저장한 프롬프트를 그대로 읽어서 쓴다 — 프롬프트를 
 | `podcast/` | Python | 텍스트 + mp3 | GPT-4o + AWS Polly |
 | `webtoon/` | Python | 이미지 8장 | GPT-4o(대사) + gpt-5.5 image_generation |
 | `video/` | Node(렌더)+Python(각본) | mp4 | `generate_script.py`(1단계, 각본 JSON) → `npm run render`(2·3단계, TTS+렌더) |
-| `common/` | Python | — | `ddb_prompt.py`(프롬프트 로드), `openai_client.py`(GPT 호출), `text_utils.py`(코드블록 벗기기). letters/podcast/webtoon/video가 공용으로 씀 |
+| `discovery/` | Python | 분류 JSON | 4포맷 생성 이전 단계 — GPT 호출 없이 그날 기사 XML을 지면 특별 코너 후보로 분류만(아래 참고) |
+| `common/` | Python | — | `ddb_prompt.py`(프롬프트 로드), `openai_client.py`(GPT 호출), `text_utils.py`(코드블록 벗기기). letters/podcast/webtoon/video가 공용으로 씀. discovery/는 GPT를 안 써서 미사용 |
+
+## discovery/ — 지면 특별 코너 후보 분류
+
+나머지 4개와 달리 admin 프롬프트를 안 읽는다 — "어떤 기사로 콘텐츠를
+만들지" 고르는 단계라, letters/podcast/webtoon/video보다 앞선
+단계다. `s3://sedaily-news-xml-storage/daily-xml/YYYYMMDD.xml`(서울
+경제 일일 기사 XML, `service/backend/clients/s3_xml_client.py`가 쓰는
+것과 같은 버킷)을 읽어 4개 지면(전체/증권/산업/시그널) 후보로 분류만
+하고 로컬 JSON으로 저장한다 — S3 업로드도 DDB write도 안 함(생성까지만
+하는 다른 파이프라인들과 같은 원칙). "전체"(지면 1면)는 실제 인쇄판
+지면 배치 데이터(`<paper><editingInfo><paperNumber>`)로 판별 — 규칙
+기반 추정이 아니라 편집팀이 실제로 그렇게 배치한 기사 그대로다.
+
+```
+python3 discovery/pipeline.py 20260821
+```
+
+지면 편집이 그날 아직 안 끝났으면(이른 시간) "전체" 후보가 0건일 수
+있다 — 정상 동작, 다음날 재확인.
 
 ## 왜 언어가 섞여 있나
 
