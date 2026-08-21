@@ -83,7 +83,6 @@ function buildJsonLd(item: HomePlayerPost, slug: string) {
     parentOrganization: { '@id': `${SITE_URL}/#organization` },
   };
   const base = {
-    '@context': 'https://schema.org',
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
     name: item.title,
     description: item.excerpt || item.title,
@@ -91,25 +90,40 @@ function buildJsonLd(item: HomePlayerPost, slug: string) {
     author,
     publisher: { '@id': `${SITE_URL}/#organization` },
   };
-  if (isAudio) {
-    return {
-      ...base,
-      '@type': 'PodcastEpisode',
-      '@id': `${url}#episode`,
-      datePublished: published,
-      associatedMedia: { '@type': 'MediaObject', contentUrl: item.mediaEmbedUrl },
-      partOfSeries: { '@type': 'PodcastSeries', name: 'AI LENS 오디오 뉴스', url: `${SITE_URL}/listen` },
-    };
-  }
+  const mainNode = isAudio
+    ? {
+        ...base,
+        '@type': 'PodcastEpisode',
+        '@id': `${url}#episode`,
+        datePublished: published,
+        associatedMedia: { '@type': 'MediaObject', contentUrl: item.mediaEmbedUrl },
+        partOfSeries: { '@type': 'PodcastSeries', name: 'AI LENS 오디오 뉴스', url: `${SITE_URL}/listen` },
+      }
+    : {
+        ...base,
+        '@type': 'VideoObject',
+        '@id': `${url}#video`,
+        uploadDate: published,
+        thumbnailUrl: resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`,
+        embedUrl: resolved?.embedUrl,
+        contentUrl: item.mediaEmbedUrl,
+        isFamilyFriendly: true,
+      };
   return {
-    ...base,
-    '@type': 'VideoObject',
-    '@id': `${url}#video`,
-    uploadDate: published,
-    thumbnailUrl: resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`,
-    embedUrl: resolved?.embedUrl,
-    contentUrl: item.mediaEmbedUrl,
-    isFamilyFriendly: true,
+    '@context': 'https://schema.org',
+    '@graph': [
+      mainNode,
+      // 2026-08-21 GEO 재감사 — letters/lens는 이미 있던 BreadcrumbList가
+      // webtoon/video/listen엔 빠져있던 것을 발견해 같은 패턴으로 보강.
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: '오디오', item: `${SITE_URL}/listen` },
+          { '@type': 'ListItem', position: 3, name: item.title, item: url },
+        ],
+      },
+    ],
   };
 }
 

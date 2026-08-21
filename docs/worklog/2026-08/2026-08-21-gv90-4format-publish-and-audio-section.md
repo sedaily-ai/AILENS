@@ -960,6 +960,49 @@ disclaimer`에만 링크하던 걸 `/about`(편집 프로세스 설명 페이지
 임베드라 동영상 전문 사이트가 아님), llms.txt(Google이 명시적으로
 무시한다고 밝힘).
 
+### 33. GEO/SEO 2차(더 넓은) 재감사 — lens 외 다른 포맷 페이지까지
+
+사용자가 "그래도 더 꼼꼼하게 봐주시져"라고 재요청 — §32가 lens
+상세페이지만 두 번 반복 점검한 셈이라, 이번엔 범위를 넓혀 letters/
+webtoon/video/listen 4개 상세 페이지 전부·이미지 alt 텍스트·
+sitemap.xml 전체 커버리지·캐노니컬/중복콘텐츠·next/image 적용·
+Search Console 인증·hreflang 7개 항목으로 재점검.
+
+**결과: 6개 항목은 이미 충분, 1건만 진짜 격차 발견**:
+- letters/lens는 `BreadcrumbList`가 있는데 **webtoon/video/listen
+  상세 페이지엔 빠져있었음** — 유일한 실제 갭.
+- 이미지 alt: 캐릭터 아이콘의 `alt=""`는 의도된 장식 패턴(인접 텍스트
+  라벨 있음), 실제 콘텐츠 사진·웹툰 컷은 이미 `alt`에 헤드라인/캡션
+  들어감 — 문제 없음.
+- `sitemap.xml`: 이미 정적 라우트+6개 카테고리+레터 전체 이력+웹툰+
+  lens+영상+오디오+타임라인 730일치+게임까지 전부 포함 — 누락 없음.
+- 캐노니컬: 상세 페이지 전부 `alternates.canonical` 설정, 목록
+  페이지는 요약(`context`)만 보여줘서 본문 중복 경쟁 없음.
+- `next/image`: 20개 파일이 사용 중, 나머지 11개의 `<img>`는 전부
+  이유를 명시한 eslint-disable 주석과 함께(webtoon 컷 가변 비율 등
+  의도된 예외) — 방치가 아님.
+- Search Console 인증: `google-site-verification` meta 태그는 없지만
+  `public/google7727df7e42139b6d.html` 파일 인증이 이미 돼있음(동일
+  효력의 다른 방식) — 문제 없음.
+- hreflang: 한국어 단일 사이트라 원래 없어야 정상 — 없음 확인, 문제
+  없음.
+
+**실제 수정**: `webtoon/[slug]/page.tsx`·`video/[slug]/page.tsx`·
+`listen/[slug]/page.tsx` 3개 파일의 `buildJsonLd()`를 단일 객체에서
+letters/lens와 같은 `@graph` 배열 구조로 바꾸고 `BreadcrumbList`
+노드(AI LENS → 웹툰/영상/오디오 목록 → 해당 글) 추가. listen은
+PodcastEpisode/VideoObject 두 분기를 공유하던 `base` 스프레드 구조를
+`mainNode` 변수로 먼저 확정한 뒉 `@graph`로 감싸도록 리팩터.
+
+**검증**: `tsc --noEmit`·eslint 클린. 로컬 dev 서버 + 실제 라이브
+슬러그 3건(웹툰 SK하이닉스 편, 영상 변압기 편, 오디오 가계대출 편)으로
+직접 fetch해 JSON-LD 파싱 → `BreadcrumbList` 노드가 정확한 라벨
+(`AI LENS`/`웹툰`/`영상`/`오디오`/글 제목)로 렌더링되는 것 확인.
+
+이제 SEO/GEO는 4개 콘텐츠 타입(레터/시선/웹툰/영상/오디오) 전부
+동일한 완성도로 맞춰짐 — 3차 감사에서 더 나올 게 있을지는 미지수지만,
+현재로선 진짜 갭이 소진된 상태.
+
 ## 다음
 
 - (§23에서 해소) ~~video 파이프라인 1단계 스크래치패드·스키마 자동

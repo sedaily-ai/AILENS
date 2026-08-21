@@ -102,25 +102,39 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
   const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
   return {
     '@context': 'https://schema.org',
-    '@type': 'Article',
-    '@id': `${url}#article`,
-    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-    headline: webtoon.title,
-    description: webtoon.excerpt,
-    datePublished: published,
-    dateModified: published,
-    inLanguage: 'ko-KR',
-    author: {
-      '@type': 'Organization',
-      name: 'AI LENS 편집팀',
-      description:
-        '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
-      url: `${SITE_URL}/about`,
-      parentOrganization: { '@id': `${SITE_URL}/#organization` },
-    },
-    publisher: { '@id': `${SITE_URL}/#organization` },
-    image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },
-    isAccessibleForFree: true,
+    '@graph': [
+      {
+        '@type': 'Article',
+        '@id': `${url}#article`,
+        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        headline: webtoon.title,
+        description: webtoon.excerpt,
+        datePublished: published,
+        dateModified: published,
+        inLanguage: 'ko-KR',
+        author: {
+          '@type': 'Organization',
+          name: 'AI LENS 편집팀',
+          description:
+            '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+          url: `${SITE_URL}/about`,
+          parentOrganization: { '@id': `${SITE_URL}/#organization` },
+        },
+        publisher: { '@id': `${SITE_URL}/#organization` },
+        image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },
+        isAccessibleForFree: true,
+      },
+      // 2026-08-21 GEO 재감사 — letters/lens는 이미 있던 BreadcrumbList가
+      // webtoon/video/listen엔 빠져있던 것을 발견해 같은 패턴으로 보강.
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: '웹툰', item: `${SITE_URL}/webtoon` },
+          { '@type': 'ListItem', position: 3, name: webtoon.title, item: url },
+        ],
+      },
+    ],
   };
 }
 

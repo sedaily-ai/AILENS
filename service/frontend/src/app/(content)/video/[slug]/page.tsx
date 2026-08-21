@@ -78,31 +78,45 @@ function buildJsonLd(video: CmsVideo, slug: string) {
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
   return {
     '@context': 'https://schema.org',
-    '@type': 'VideoObject',
-    '@id': `${url}#video`,
-    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-    name: video.title,
-    description: video.excerpt || video.title,
-    thumbnailUrl: image,
-    uploadDate: published,
-    inLanguage: 'ko-KR',
-    embedUrl: resolved?.embedUrl,
-    // contentUrl 보강(2026-08-14, GEO 감사) — embedUrl은 유튜브/네이버TV만
-    // resolveVideo()가 채워주는데, 그 외 플랫폼이면 둘 다 비어 구글이 최소
-    // 요구하는 "재생 가능 URL" 신호가 아예 없었다. video_url은 admin이 항상
-    // 입력하는 필드라 무조건 채울 수 있다 — duration은 정확한 값을 얻을
-    // 소스가 없어(YouTube Data API 키 연동 필요) 추측값을 넣지 않는다.
-    contentUrl: video.video_url,
-    author: {
-      '@type': 'Organization',
-      name: 'AI LENS 편집팀',
-      description:
-        '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
-      url: `${SITE_URL}/about`,
-      parentOrganization: { '@id': `${SITE_URL}/#organization` },
-    },
-    publisher: { '@id': `${SITE_URL}/#organization` },
-    isFamilyFriendly: true,
+    '@graph': [
+      {
+        '@type': 'VideoObject',
+        '@id': `${url}#video`,
+        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        name: video.title,
+        description: video.excerpt || video.title,
+        thumbnailUrl: image,
+        uploadDate: published,
+        inLanguage: 'ko-KR',
+        embedUrl: resolved?.embedUrl,
+        // contentUrl 보강(2026-08-14, GEO 감사) — embedUrl은 유튜브/네이버TV만
+        // resolveVideo()가 채워주는데, 그 외 플랫폼이면 둘 다 비어 구글이 최소
+        // 요구하는 "재생 가능 URL" 신호가 아예 없었다. video_url은 admin이 항상
+        // 입력하는 필드라 무조건 채울 수 있다 — duration은 정확한 값을 얻을
+        // 소스가 없어(YouTube Data API 키 연동 필요) 추측값을 넣지 않는다.
+        contentUrl: video.video_url,
+        author: {
+          '@type': 'Organization',
+          name: 'AI LENS 편집팀',
+          description:
+            '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+          url: `${SITE_URL}/about`,
+          parentOrganization: { '@id': `${SITE_URL}/#organization` },
+        },
+        publisher: { '@id': `${SITE_URL}/#organization` },
+        isFamilyFriendly: true,
+      },
+      // 2026-08-21 GEO 재감사 — letters/lens는 이미 있던 BreadcrumbList가
+      // webtoon/video/listen엔 빠져있던 것을 발견해 같은 패턴으로 보강.
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: '영상', item: `${SITE_URL}/video` },
+          { '@type': 'ListItem', position: 3, name: video.title, item: url },
+        ],
+      },
+    ],
   };
 }
 
