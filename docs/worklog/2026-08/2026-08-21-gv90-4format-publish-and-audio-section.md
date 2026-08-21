@@ -527,6 +527,16 @@ Polly Seoyeon 대신 ElevenLabs Juan 보이스로 생성된다.
   파이프라인 전체(`run_article`) 재실행 스모크테스트(2.8MB mp3, 대본
   생성부터 mp3까지 정상) 통과.
 
+### 20. 시선(lens) SEO 점검 — 이상 없음 확인
+
+사용자 질의: "seo 작업은 잘된건가요? 시선부분에 대해서요." 감사 결과
+문제 없음 — `generateMetadata`(title/description/keywords/canonical/
+OG/Twitter), `NewsArticle`+`BreadcrumbList`+`speakable` JSON-LD(2026-
+08-13 GEO 보강 때 다른 포맷보다 더 상세하게 갖춰짐), `sitemap.xml`·
+`news-sitemap.xml` 등록, `generateStaticParams` SSG로 크롤러가 초기
+HTML에서 바로 콘텐츠를 읽음 — 전부 정상. 오늘 발행한 코스닥 급락
+기사도 라이브에서 반영 확인. 코드 변경 없음(조사만).
+
 ## 결정
 
 - 파이프라인이 만드는 영상 스크립트 JSON은 사람 검수 없이 그대로 렌더에
