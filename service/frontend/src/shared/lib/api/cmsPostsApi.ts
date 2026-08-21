@@ -281,6 +281,12 @@ export interface CmsLens {
    * 참조 — category 필드를 두 용도로 겹쳐 쓰다 생긴 버그를 이 필드
    * 분리로 해결). */
   paper_section?: string | null;
+  /** 지면 특별 코너 내 명시적 정렬 키(2026-08-21, home_player 채널의
+   * display_order와 같은 패턴). 값이 있으면 오름차순으로 우선 배치되고,
+   * 없으면(대부분의 기존 글) publish_date/published_at 정렬을 그대로
+   * 따른다 — published_at을 정렬 키인 척 수동 재기록하던 임시방편을
+   * 대체한다(LensPreviewSection.tsx 참조). */
+  display_order?: number | null;
   lenses: CmsLensItem[];
   is_cms: true;
 }

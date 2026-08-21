@@ -116,6 +116,20 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   const activeSection = SECTIONS[activeTab];
   const sectionArticles = items
     .filter((l) => l.paper_section === activeSection.paperSection)
+    // display_order가 있는 글은 오름차순으로 우선 배치(1번 자리에 실을
+    // 글을 명시적으로 고르는 용도) — 없는 글은 items가 이미 정렬해 온
+    // publish_date/published_at 내림차순을 그대로 따른다(정렬 안정성
+    // 덕분에 순서 유지). published_at을 정렬 키인 척 수동 재기록하던
+    // 임시방편(2026-08-21 이전 지면 4건 전부 이렇게 처리)을 대체한다.
+    .slice()
+    .sort((a, b) => {
+      const orderA = a.display_order;
+      const orderB = b.display_order;
+      if (orderA != null && orderB != null) return orderA - orderB;
+      if (orderA != null) return -1;
+      if (orderB != null) return 1;
+      return 0;
+    })
     .slice(0, ARTICLES_PER_SECTION);
   const total = sectionArticles.length;
   const safeArticleIndex = total > 0 ? Math.min(articleIndex, total - 1) : 0;

@@ -233,6 +233,16 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         # 코너에 뜬다 — 없으면 그 코너엔 아예 안 뜨고 카테고리 페이지에만
         # 남는다).
         "paper_section": b.get("paper_section") or None,
+        # 지면 특별 코너 내 명시적 정렬 키(2026-08-21) — home_player 채널의
+        # display_order와 같은 최상위 필드(posts_repo.py의 범용 _UPDATABLE
+        # 목록에 이미 있어 쓰기 경로는 공용, body_inline이 아니라 post 최상위에
+        # 저장). 그 전까지는 지면 순서를 맞추려면 published_at을 정렬 키인
+        # 척 수동으로 재기록해야 했다(§2 등에서 4번 반복). home_player와
+        # 달리 기본값을 0으로 채우지 않는다 — None을 그대로 넘겨서 프론트가
+        # "명시적으로 순서를 지정한 글"과 "아직 지정 안 해서 기존
+        # publish_date/published_at 정렬을 그대로 따라야 하는 글"을 구분할
+        # 수 있게 한다(LensPreviewSection.tsx).
+        "display_order": post.get("display_order"),
         "lenses": lenses,
         "is_cms": True,
     }

@@ -658,6 +658,34 @@ fork에는 "이 정리 작업 외의 다른 기능 제안이나 구현은 하지
 - `pipelines/README.md`의 "아직 없는 것" 섹션을 이 스크립트 사용법과
   자동 수정 범위 설명으로 교체.
 
+### 24. 우선순위 2번 — `display_order` 필드를 lens 채널에 도입
+
+`published_at`을 정렬 키인 척 수동 재기록하던 임시방편(호남반도체/
+가계대출/GV90/트럼프北핵, §2에서 4번 반복)을 대체. home_player
+채널이 이미 쓰던 것과 같은 패턴 — 리서치 결과 쓰기 경로는
+`admin/backend/repo/posts_repo.py`의 범용 `_UPDATABLE` 목록에
+`display_order`가 이미 있어 채널 무관하게 공용으로 동작(최상위 post
+필드, body_inline 아님) — 백엔드 쓰기 코드 추가 불필요, 읽기 경로
+(`_shape_lens`)와 프론트 필터·정렬 로직만 추가하면 됐다.
+
+- `_shape_lens`에 `"display_order": post.get("display_order")` 추가 —
+  home_player와 달리 기본값 0으로 채우지 않고 `None`을 그대로 넘김(값이
+  있는 글과 없는 글을 프론트가 구분해야 해서).
+- `CmsLens` 타입(`cmsPostsApi.ts`)에 `display_order?: number | null;` 추가.
+- `LensPreviewSection.tsx`의 `sectionArticles` — `paper_section` 필터
+  뒤에 정렬 단계 추가: `display_order`가 있는 글은 오름차순 우선
+  배치, 없는 글은 기존 `items`가 이미 정렬해 온 publish_date/
+  published_at 내림차순을 안정 정렬로 그대로 유지.
+- 검증: `npx tsc --noEmit`·해당 두 파일 eslint 클린(다른 pre-existing
+  경고 1건은 §25에서 별도 처리), 백엔드 `py_compile` 통과.
+- **아직 admin UI 없음**: lens 글 자체를 편집하는 admin 화면이 원래
+  없다(발행이 전부 일회성 스크립트의 직접 DDB write) — `display_order`도
+  당장은 그 발행 스크립트에서 `"display_order": N`을 top-level에 넣는
+  식으로만 쓸 수 있다. home-player처럼 admin에 숫자 입력 UI를 만드는
+  건 lens 편집 화면 자체가 생길 때(별도 스코프) 같이 고려.
+- 백엔드 응답 스키마가 바뀌었지만(신규 필드 추가뿐이라 하위호환)
+  아직 배포는 안 함 — 커밋만.
+
 ## 다음
 
 - (§23에서 해소) ~~video 파이프라인 1단계 스크래치패드·스키마 자동
@@ -672,7 +700,10 @@ fork에는 "이 정리 작업 외의 다른 기능 제안이나 구현은 하지
   `items`(서버 프리페치)가 같은 API를 각자 따로 호출한다 — `playItemById`
   호출 시점에 `TodayNewsPlayer`쪽 fetch가 아직 안 끝났으면(드물지만 가능)
   재생 버튼이 조용히 아무 반응 없다. 로딩 상태 처리는 아직 없음.
-- `published_at`을 정렬 키로 수동 재기록하는 방식이 이제 4건째 반복 중
-  (호남반도체/가계대출/GV90/트럼프北핵) — 지면 개수가 늘어날수록 매번
-  수동 계산이 번거로워진다. `display_order` 필드를 lens 채널에도
-  확장하는 근본 해법을 다음에 검토.
+- (§24에서 해소) ~~`published_at` 수동 정렬 → `display_order`~~ —
+  코드는 준비됐지만 아직 배포 전. 배포 후 실제 발행 스크립트에서
+  `display_order`를 채워보는 첫 실사용 검증이 남음.
+- eslint pre-existing 이슈: `LensPreviewSection.tsx`의
+  `react-hooks/set-state-in-effect`(§10에서 추가된 포맷 가이드 첫방문
+  자동노출 로직, localStorage 체크 mount effect에서 setState 직접
+  호출) — 우선순위 3번, 다음 작업 대상.
