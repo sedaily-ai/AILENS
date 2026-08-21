@@ -318,6 +318,25 @@ sources are based on Korean-language reports... View Korean original ↗
   단독 링크는 이 박스 안 링크로 흡수해 중복 제거.
 - 라이브에서 lens·letters 양쪽 기사 페이지 + `/terms` 앵커 전부 확인.
 
+### 12. 호남 반도체 팹 기사 팟캐스트 — 일레븐랩스 Juan 보이스 테스트 교체
+
+동료들이 일레븐랩스 보이스 라이브러리에서 남녀 2개씩(Juan/Dong, Salang/
+Jini) 후보를 골라온 것을 계기로, 실제 발행 글 하나를 대상으로 AWS
+Polly(Seoyeon) → 일레븐랩스로 바꿔보는 테스트 진행. 사용자가 4개 중
+"Juan - Deep & Rich Storyteller"(`voice_id: 8lidWTlnwgjObqCImnE2`) 선택.
+
+- Secrets Manager에 이미 있던 `ElevenLabs/ApiKey`(voices_read 권한 포함,
+  `ai-labs/elevenlabs`는 권한 제한으로 목록 조회 불가— 두 시크릿이 각자
+  다른 용도/권한으로 존재)로 `GET /v1/voices` 조회해 4개 후보의 실제
+  voice_id 확인.
+- 대본은 새로 안 만들고 이전 세션 파이프라인 산출물(스크래치패드에 남아
+  있던 `fab_podcast_output.txt`, Polly 버전과 동일 스크립트)을 그대로
+  재사용 — 목소리만 바꾸는 테스트라 내용을 흔들 이유가 없음.
+- `eleven_multilingual_v2` 모델로 TTS 생성(2.7MB mp3) → S3 업로드
+  (`lens-fab-podcast-elevenlabs-juan.mp3`, 기존 파일은 안 지우고 새
+  키로 추가) → DDB lens 아이템의 팟캐스트 서브아이템 `media_url`만
+  교체 → revalidate → 라이브 확인.
+
 ## 결정
 
 - 파이프라인이 만드는 영상 스크립트 JSON은 사람 검수 없이 그대로 렌더에
