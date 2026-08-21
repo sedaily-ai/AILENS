@@ -10,24 +10,35 @@ DDB에 저장한 프롬프트를 그대로 읽어서 쓴다 — 프롬프트를 
 | `letters/` | Python | 텍스트 | GPT-4o 1회 호출 |
 | `podcast/` | Python | 텍스트 + mp3 | GPT-4o + AWS Polly |
 | `webtoon/` | Python | 이미지 8장 | GPT-4o(대사) + gpt-5.5 image_generation |
-| `video/` | Node/Remotion | mp4 | 렌더만 담당 — 각본 JSON은 별도 생성 필요(아래 참고) |
-| `common/` | Python | — | `ddb_prompt.py`(프롬프트 로드), `openai_client.py`(GPT 호출), `text_utils.py`(코드블록 벗기기). letters/podcast/webtoon이 공용으로 씀 |
+| `video/` | Node(렌더)+Python(각본) | mp4 | `generate_script.py`(1단계, 각본 JSON) → `npm run render`(2·3단계, TTS+렌더) |
+| `common/` | Python | — | `ddb_prompt.py`(프롬프트 로드), `openai_client.py`(GPT 호출), `text_utils.py`(코드블록 벗기기). letters/podcast/webtoon/video가 공용으로 씀 |
 
 ## 왜 언어가 섞여 있나
 
-`video/`만 Node/Remotion이다 — 실제 렌더링(TTS 합성 + 프레임 합성)에
-Remotion(React 기반 비디오 프레임워크)을 쓰기 때문에 어쩔 수 없다. 억지로
-Python으로 통일하지 않았다 — 도구에 맞는 언어를 쓰는 게 "폴더 이름
-일관성"보다 우선.
+`video/`만 렌더링에 Node/Remotion(React 기반 비디오 프레임워크)을 쓴다 —
+어쩔 수 없는 부분. 억지로 Python으로 통일하지 않았다 — 도구에 맞는
+언어를 쓰는 게 "폴더 이름 일관성"보다 우선. 다만 1단계(기사 → 각본
+JSON, GPT 호출)는 Python으로 남겨뒀다 — `common/`을 그대로 재사용할 수
+있고, letters/podcast/webtoon과 같은 패턴을 유지할 수 있어서다. 같은
+`video/` 폴더 안에 언어가 섞여 있는 게 어색해 보일 수 있지만, 1단계와
+2·3단계는 실행 시점도 책임도 완전히 분리돼 있어(각본 확정 → 그 JSON을
+렌더에 넘김) 실질적인 결합은 없다.
 
-## 아직 없는 것
+## video 1단계 — `generate_script.py`
 
-`video/`는 렌더(2·3단계)만 있고, "기사 → 각본 JSON"(1단계, GPT 호출)은
-아직 스크래치패드 1회성 스크립트로 만든다 — letters/podcast/webtoon과
-달리 영속 코드가 없다. Node 프로젝트 안에 Python 스크립트를 넣는 게
-어색해서 미루고 있다(TypeScript로 다시 쓰거나, `common/`을 그대로
-재사용하는 작은 Python 스크립트를 `video/` 옆에 두는 두 가지 안 중 결정
-안 됨) — 다음에 손볼 것.
+```
+python3 generate_script.py <name> <article_path> --output-root output
+npm run render -- --input output/<name>/script.json --format horizontal --output out/<name>.mp4
+```
+
+2026-08-21까지 GV90·트럼프北핵·전력망·SK하이닉스·코스닥급락 5건 전부
+GPT가 만든 각본 JSON이 스키마를 위반해(빈 `data` 필드, 화이트리스트
+밖 아이콘) 사람이 매번 즉석 스크립트로 후처리해야 했다. `fix_script()`가
+장식성 결함(아이콘 화이트리스트 치환, `highlight`/`closing`의 빈
+`data`, 나레이션 없는 `closing` 컷 제거)만 자동으로 고친다 —
+`stat`/`diagram`/`chart` 컷에 실제 수치·정보가 빠진 경우는 임의로
+채우지 않고 `validate_script()`가 명확한 에러로 멈춘다(뉴스 콘텐츠라
+없는 통계를 지어내지 않는다는 원칙).
 
 ## 배경
 
