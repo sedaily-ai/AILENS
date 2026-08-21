@@ -922,6 +922,44 @@ $270+/월 사고보다 훨씬 작은 규모).
 일어난다. 결과는 CloudWatch 로그그룹 `/ecs/sedaily-mbti-frontpage-auto`
 과 라이브 `/?tab=feed` "지면 1면" 탭에서 확인 가능.
 
+### 32. GEO/SEO 심층 재감사 — Google Search Central 공식 문서 대조
+
+사용자가 Google Search Central의 SEO 기본 가이드·생성형 AI(GEO) 최적화
+가이드·뉴스 사이트맵 스펙·E-E-A-T 가이드·robots meta 태그 문서 등을
+통째로 붙여넣고 "더 디벨롭할 것 있는지 체크, 꼼꼼하게 봐주시고 전부
+작업해주셔야 합니다"라고 요청 — 이전(8/13·8/14·8/18) GEO 감사보다
+더 구체적인 5개 항목(뉴스 사이트맵 정확한 스펙, E-E-A-T 바이라인/소개
+페이지, 에이전트 친화적 시맨틱 HTML, 구조화 데이터 완전성, robots.txt)
+으로 재점검.
+
+**결과: 5개 항목 전부 이미 충족 상태** — 억지로 일감을 만들지 않고
+있는 그대로 보고:
+- 뉴스 사이트맵(`news-sitemap.xml/route.ts`): 2일 윈도우·`news:language
+  =ko`·`news:name="AI LENS"` 전부 스펙대로. 라이브 fetch로 9건, 전부
+  최근 2일치 확인.
+- E-E-A-T: `/about` 페이지가 이미 발행사·편집 프로세스("AI 초안 →
+  사람 검수")·수상 이력까지 공개, `NewsMediaOrganization` JSON-LD에
+  `logo`/`founder`/`sameAs` 포함, 기사 `author`가 `/about`으로 링크.
+- 구조화 데이터: `NewsArticle`에 `author`/`publisher`/`image`(치수 포함)/
+  `articleSection`/`wordCount`/`dateModified`/`citation`/`speakable`/
+  `mainEntity` Q&A까지 이미 완비 — 추가할 필드 없음.
+- robots.txt: `/lens` 전부 허용, `/api/` 차단(크롤트랩 아님), named
+  bot(GPTBot 등) 그룹도 2026-08-18에 이미 의도적으로 고쳐져 있었음.
+- 시맨틱 HTML/접근성: `<main>`/`<nav>`/`<header>`/`role="tabpanel"`/
+  `aria-label` 27개 확인, 막히는 지점 없음.
+
+**유일하게 실제로 개선한 것**: `AiDisclaimer.tsx`가 `/terms#content-
+disclaimer`에만 링크하던 걸 `/about`(편집 프로세스 설명 페이지) 링크도
+같이 추가 — E-E-A-T의 "저자 페이지 링크" 권장사항을 더 확실히
+충족(사소한 폴리싱, 컴플라이언스 갭은 아니었음). 로컬 dev 서버로 실제
+렌더링 확인(HTML에 두 링크 정상 출력, 레이아웃 안 깨짐).
+
+**스코프 밖으로 명시적으로 제외**(가이드 자체가 해당 없다고 명시하거나
+이 프로젝트 성격과 안 맞음): 로컬 비즈니스/이커머스 전용 기능(판매자
+센터·Google 비즈니스 프로필), 전용 동영상 사이트맵(기사 내 mp4
+임베드라 동영상 전문 사이트가 아님), llms.txt(Google이 명시적으로
+무시한다고 밝힘).
+
 ## 다음
 
 - (§23에서 해소) ~~video 파이프라인 1단계 스크래치패드·스키마 자동

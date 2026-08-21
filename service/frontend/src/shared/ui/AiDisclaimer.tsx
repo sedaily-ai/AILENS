@@ -52,6 +52,13 @@ export function AiDisclaimer({ sourceUrl }: { sourceUrl?: string | null }) {
           <Link href="/terms#content-disclaimer" style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7280', textDecoration: 'underline', textUnderlineOffset: 2 }}>
             이용 정책
           </Link>
+          {/* 2026-08-21 GEO 감사 — E-E-A-T "저자 페이지 링크" 권장사항
+              (Google Search Central) 보강. 약관 조항뿐 아니라 편집 프로세스
+              (AI 초안 → 사람 검수)를 설명하는 /about 페이지도 같이 안내해
+              "누가·어떻게 만들었는지"를 더 명확히 공개한다. */}
+          <Link href="/about" style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7280', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            AI LENS 소개
+          </Link>
         </div>
       </div>
     </div>
