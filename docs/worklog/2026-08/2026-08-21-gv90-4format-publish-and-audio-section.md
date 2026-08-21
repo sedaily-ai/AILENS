@@ -431,6 +431,47 @@ DOM 변형과 형제 트리 reconcile이 충돌"한다는 계열은 같다.
 - revalidate 후 라이브에서 category="산업" 확인, 전체 목록 최신 1위로
   노출, 상세 페이지 200 확인.
 
+### 16. 지면 특별 코너 — category와 겹치던 배치 로직을 paper_section으로 분리
+
+§13·§15 발행 직후 사용자가 스크린샷으로 지적: "sk 올라간건 산업
+1면에만 올라가야하는데 지면 1면에도 들어갔네요... 지면 1면은 지면
+1면 기사만 들어가는겁니다. '전체'가 아니예요." — "전력망 기사도
+증권 1면에 있어야 하는데 지면 1면에 있다"고 후속 확인.
+
+**근본 원인**: `LensPreviewSection.tsx`가 "지면 1면"(SECTIONS[0])
+탭을 `categoryLabel === null`(카테고리 무관 최신 4건)으로 구현해뒀는데,
+이건 애초에 요구사항과 안 맞았다 — 사용자의 최초 스펙("전체 지면 1면,
+증권면 1면, 산업면 1면, 시그널 1면")은 "전체"가 아니라 "지면 1면"이라는
+**독립된 지면 하나**를 뜻했다(신문의 실제 1면처럼, 그 지면에 실릴
+기사를 직접 고르는 것과 같은 개념). 게다가 `category` 필드 자체를
+(a) `/markets`·`/industry` 같은 일반 경제 카테고리 페이지, (b) 지면
+특별 코너 4탭 배치 — 서로 다른 두 목적에 같이 쓰고 있어서, 산업/증권
+카테고리로 새 lens 글을 발행할 때마다 자동으로 "지면 1면"에도 같이
+떠버렸다.
+
+**수정**: `category`와 완전히 분리된 `paper_section` 필드 신설.
+- `service/backend/handlers/cms_posts_public.py`의 `_shape_lens`에
+  `paper_section` 패스스루 추가.
+- `service/frontend`의 `CmsLens` 타입에 `paper_section` 추가.
+- `LensPreviewSection.tsx`: `SectionSlot.categoryLabel` →
+  `SectionSlot.paperSection`으로 전면 교체, 4개 탭 전부
+  `l.paper_section === activeSection.paperSection`으로 필터(더 이상
+  "카테고리 무관 최신순" 분기 없음 — "전체" 탭도 이제 명시적으로
+  `paper_section: '전체'`인 글만 보여준다).
+- 기존 6건 `paper_section` 백필: 호남반도체·가계대출·GV90·트럼프北핵
+  → `전체`, 전력망 기사 → `증권`, SK하이닉스 자사주 → `산업`. 예보료
+  등 나머지 lens 글은 `paper_section` 없음 — 지면 특별 코너엔 안 뜨고
+  기존 카테고리 페이지(`/finance` 등)에만 계속 노출.
+- 배포 순서: 백엔드 → 프론트엔드 병렬 배포, 백엔드 배포 완료 직후
+  라이브 API에서 `paper_section` 필드 등장 확인 → revalidate →
+  `/?tab=feed`에서 "지면 1면" 탭이 정확히 4건(호남반도체 1번째)만,
+  "증권 1면"·"산업 1면"이 각각 1건씩만 보여주는 것 확인.
+
+**앞으로 새 lens 글 발행 시**: `category`(증시/산업/... — 카테고리
+페이지용)와 `paper_section`(전체/증권/산업/시그널 — 지면 특별 코너용)
+둘 다 필요에 맞게 채울 것. 지면 특별 코너에 안 띄우고 싶으면
+`paper_section`을 아예 비워두면 된다.
+
 ## 결정
 
 - 파이프라인이 만드는 영상 스크립트 JSON은 사람 검수 없이 그대로 렌더에
