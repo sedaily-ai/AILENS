@@ -498,6 +498,35 @@ webtoon(8컷)/video 4포맷 파이프라인 실행 → `category="증시"`,
 콘텐츠를 갖추게 됨 — §16 이전 워크로그에서 "시그널 지면 탭 콘텐츠
 소스 미정"으로 남아있던 항목이 해소됨.
 
+### 18. PR #8 머지 — 타임머신 전환 연출 재작업 (`redesign/2026-08-21`)
+
+동료(kiimijyy)가 올린 PR #8("그날로 떠나는" TimeMachineRewind 전환
+애니메이션 — 연도 눈금 붕괴·비행기 어긋남 등을 실측으로 수정, 헤드리스
+Chrome 프레임 단위 QA 12항목 통과)을 사용자 승인 받아 병합. 단일 파일
+(`service/frontend/src/shared/ui/TimeMachineRewind.tsx`, +307/-132)
+변경. `gh pr merge 8 --merge`(merge commit 방식, 기존 PR #6·#7과 동일
+컨벤션) → 로컬 main과 origin/main이 갈라져 있어 `git merge origin/main`
+후 push → `service/frontend` 배포(release `20260821-063651`, 헬스체크
+200, `/timeline` 200 확인).
+
+### 19. 팟캐스트 파이프라인 기본 음성 엔진 — AWS Polly → ElevenLabs 전환
+
+사용자 요청: "기본을 일레븐랩스로 합니다." §12에서 호남 반도체 팹
+기사 1건만 수동으로 교체했던 ElevenLabs 음성(Juan - Deep & Rich
+Storyteller, `voice_id: 8lidWTlnwgjObqCImnE2`)을 `pipelines/podcast/
+pipeline.py`의 기본값으로 승격 — 이제 신규 발행되는 모든 팟캐스트가
+Polly Seoyeon 대신 ElevenLabs Juan 보이스로 생성된다.
+
+- API 키는 Secrets Manager `ElevenLabs/ApiKey`에서 런타임에 조회(하드
+  코딩 없음), `eleven_multilingual_v2` 모델·`stability=0.5/
+  similarity_boost=0.75` 고정값 사용(§12에서 검증된 것과 동일 설정).
+  Polly 클라이언트·관련 코드는 완전히 제거(fallback 없음 — 요청이
+  "기본을 일레븐랩스로"였지 이중화가 아니었음).
+- `requests` 의존성 추가(`pipelines/podcast/requirements.txt`).
+- 검증: 함수 단위 합성 테스트(51KB mp3) → 코스닥 급락 기사 원문으로
+  파이프라인 전체(`run_article`) 재실행 스모크테스트(2.8MB mp3, 대본
+  생성부터 mp3까지 정상) 통과.
+
 ## 결정
 
 - 파이프라인이 만드는 영상 스크립트 JSON은 사람 검수 없이 그대로 렌더에

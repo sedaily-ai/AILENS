@@ -1,11 +1,13 @@
 """팟캐스트 파이프라인 — 기사 1건 → 대본 + mp3.
 
-1단계 대본(GPT-4o) → 2단계 음성 합성(AWS Polly, 한국어 Seoyeon/generative
-— 별도 API 키 발급 없이 이미 있는 AWS 자격 증명만 있으면 된다). 중간
-결과(대본 텍스트)를 파일로 남겨서 재실행 시 이미 끝난 단계는 건너뛴다
-(pipelines/webtoon과 같은 resume 관례).
+1단계 대본(GPT-4o) → 2단계 음성 합성(ElevenLabs, Juan - Deep & Rich
+Storyteller 보이스). API 키는 Secrets Manager `ElevenLabs/ApiKey`에서
+읽는다. 중간 결과(대본 텍스트)를 파일로 남겨서 재실행 시 이미 끝난
+단계는 건너뛴다(pipelines/webtoon과 같은 resume 관례).
 
 2026-08-20 신설 — pipelines/letters와 같은 이유(비대칭 해소).
+2026-08-21 기본 음성 엔진을 AWS Polly → ElevenLabs로 변경(호남 반도체
+팹 기사에서 수동 교체 검증된 Juan 보이스를 파이프라인 기본값으로 승격).
 """
 import sys
 from pathlib import Path
@@ -17,25 +19,48 @@ from text_utils import strip_code_fence
 
 import boto3
 import os
+import requests
 
 _AWS_PROFILE = os.environ.get("AWS_PROFILE")
 _REGION = os.environ.get("AWS_REGION", "us-east-1")
-_VOICE_ID = "Seoyeon"
-_ENGINE = "generative"
+_ELEVENLABS_VOICE_ID = "8lidWTlnwgjObqCImnE2"  # Juan - Deep & Rich Storyteller
+_ELEVENLABS_MODEL_ID = "eleven_multilingual_v2"
+_ELEVENLABS_SECRET_NAME = "ElevenLabs/ApiKey"
 
-_polly = None
+_elevenlabs_api_key = None
 
 
-def _polly_client():
-    global _polly
-    if _polly is None:
+def _elevenlabs_key() -> str:
+    global _elevenlabs_api_key
+    if _elevenlabs_api_key is None:
         session = (
             boto3.Session(profile_name=_AWS_PROFILE)
             if _AWS_PROFILE
             else boto3.Session()
         )
-        _polly = session.client("polly", region_name=_REGION)
-    return _polly
+        client = session.client("secretsmanager", region_name=_REGION)
+        _elevenlabs_api_key = client.get_secret_value(
+            SecretId=_ELEVENLABS_SECRET_NAME
+        )["SecretString"]
+    return _elevenlabs_api_key
+
+
+def _synthesize_elevenlabs(text: str) -> bytes:
+    resp = requests.post(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{_ELEVENLABS_VOICE_ID}",
+        headers={
+            "xi-api-key": _elevenlabs_key(),
+            "Content-Type": "application/json",
+        },
+        json={
+            "text": text,
+            "model_id": _ELEVENLABS_MODEL_ID,
+            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+        },
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.content
 
 
 def run_article(
@@ -63,16 +88,10 @@ def run_article(
     if resume and mp3_path.exists():
         print(f"{tag} 음성 재사용")
     else:
-        print(f"{tag} Polly 음성 합성 중...")
+        print(f"{tag} ElevenLabs 음성 합성 중...")
         text = strip_code_fence(script)
-        resp = _polly_client().synthesize_speech(
-            Text=text,
-            OutputFormat="mp3",
-            VoiceId=_VOICE_ID,
-            Engine=_ENGINE,
-            LanguageCode="ko-KR",
-        )
-        mp3_path.write_bytes(resp["AudioStream"].read())
+        audio = _synthesize_elevenlabs(text)
+        mp3_path.write_bytes(audio)
 
     print(f"{tag} 완료 — {script_path}, {mp3_path}")
     return mp3_path
