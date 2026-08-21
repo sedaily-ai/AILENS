@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';
@@ -318,18 +319,40 @@ export function TodayNewsPlayer() {
   const total = items.length;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 70,
-        background: '#fff',
-        borderTop: '1px solid rgba(0,0,0,0.08)',
-        boxShadow: '0 -2px 16px rgba(17,24,39,0.08)',
-      }}
-    >
+    <>
+      {/* 유튜브 플레이어 컨테이너 — 별도 포털로 body에 직접 붙인다
+          (2026-08-21, 실사용 버그 — 재생 시작 후 재생목록 패널을 열고
+          닫으면 "insertBefore ... not a child of this node"로 페이지가
+          죽는 걸 사용자가 재현해서 발견). 원인: 유튜브 IFrame API가
+          `new YT.Player(el, ...)`를 부르면 대상 엘리먼트를 실제 <iframe>
+          으로 통째로 바꿔치기한다(innerHTML만 채우는 게 아니라 엘리먼트
+          자체를 교체) — 그런데 이 컨테이너 div가 재생목록 패널
+          (`{expanded && (...)}`)의 바로 다음 형제 노드로 같은 부모 밑에
+          있었다. 재생을 시작해 div가 이미 iframe으로 바뀐 상태에서
+          `expanded`를 토글하면, React는 여전히 "원래 그 div가 거기
+          있다"고 믿고 그 앞뒤로 패널 노드를 끼워넣거나 빼려다가 실제로는
+          사라진 노드를 참조해 크래시. VideoLightbox.tsx와 같은 이유로
+          같은 해법(createPortal → document.body) — 포털로 완전히
+          분리하면 패널을 여닫아도 이 컨테이너의 형제 관계 자체가 없어져
+          React가 그 주변을 reconcile할 일이 없다. */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <div ref={ytContainerRef} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }} />,
+          document.body,
+        )}
+
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 70,
+          background: '#fff',
+          borderTop: '1px solid rgba(0,0,0,0.08)',
+          boxShadow: '0 -2px 16px rgba(17,24,39,0.08)',
+        }}
+      >
       {/* 재생목록 패널(2026-08-21, 사용자 요청 — "플레이리스트처럼 누르면
           쭉 나오고, 우측에 일러스트로"). 별도 fixed 레이어 대신 이 미니바와
           같은 컨테이너(bottom:0 고정) 안에 위쪽 형제로 넣는다 — 컨테이너
@@ -488,10 +511,6 @@ export function TodayNewsPlayer() {
         </div>
       )}
 
-      {/* 유튜브 플레이어 컨테이너 — 화면엔 안 보이지만 IFrame API가 실제
-          엘리먼트를 요구해서 1x1로 깔아둔다(display:none은 유튜브가 재생을
-          멈추게 할 수 있어 크기로만 숨김). */}
-      <div ref={ytContainerRef} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }} />
       {/* mp3 등 직접 파일용 — 화면엔 안 보임, controls도 안 붙임(재생은
           이 컴포넌트의 커스텀 컨트롤 버튼으로만). */}
       <audio ref={audioRef} style={{ display: 'none' }} />
@@ -640,5 +659,6 @@ export function TodayNewsPlayer() {
         </div>
       </div>
     </div>
+    </>
   );
 }
