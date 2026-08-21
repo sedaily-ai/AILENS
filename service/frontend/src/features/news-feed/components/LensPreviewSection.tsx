@@ -81,7 +81,10 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
 
   useEffect(() => {
     try {
-      if (!window.localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
+      if (!window.localStorage.getItem(GUIDE_SEEN_KEY)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회, localStorage(SSR 불가) 확인 후 노출
+        setShowGuide(true);
+      }
     } catch {
       // localStorage 접근 불가(시크릿 모드 등) — 자동으로는 안 띄우고,
       // ⓘ 버튼으로는 여전히 열 수 있다.

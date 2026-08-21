@@ -686,6 +686,19 @@ fork에는 "이 정리 작업 외의 다른 기능 제안이나 구현은 하지
 - 백엔드 응답 스키마가 바뀌었지만(신규 필드 추가뿐이라 하위호환)
   아직 배포는 안 함 — 커밋만.
 
+### 25. 우선순위 3번 — `LensPreviewSection.tsx` eslint 이슈 정리
+
+`react-hooks/set-state-in-effect`(§10에서 추가된 포맷 가이드 첫방문
+자동노출 로직, localStorage 체크 mount effect에서 setState 직접 호출)
+— 실제로는 SSR 환경에서 localStorage에 접근할 수 없어 마운트 후
+클라이언트에서만 확인 가능한, 정당한 "마운트 시 1회" 패턴이다(초기
+렌더를 `showGuide=false`로 두지 않으면 서버/클라이언트 첫 렌더가
+달라져 하이드레이션 불일치가 남). 이 저장소에 이미 같은 상황을 처리한
+선례 3곳(`timeline/page.tsx`, `NewsTimeMachine.tsx`, `Header.tsx`)이
+전부 `// eslint-disable-next-line react-hooks/set-state-in-effect --
+<이유>`로 처리하고 있어 같은 컨벤션을 그대로 따름(새 패턴 발명 안 함).
+검증: 해당 파일 eslint·tsc 클린.
+
 ## 다음
 
 - (§23에서 해소) ~~video 파이프라인 1단계 스크래치패드·스키마 자동
@@ -703,7 +716,6 @@ fork에는 "이 정리 작업 외의 다른 기능 제안이나 구현은 하지
 - (§24에서 해소) ~~`published_at` 수동 정렬 → `display_order`~~ —
   코드는 준비됐지만 아직 배포 전. 배포 후 실제 발행 스크립트에서
   `display_order`를 채워보는 첫 실사용 검증이 남음.
-- eslint pre-existing 이슈: `LensPreviewSection.tsx`의
-  `react-hooks/set-state-in-effect`(§10에서 추가된 포맷 가이드 첫방문
-  자동노출 로직, localStorage 체크 mount effect에서 setState 직접
-  호출) — 우선순위 3번, 다음 작업 대상.
+- (§25에서 해소) ~~`LensPreviewSection.tsx`의
+  `react-hooks/set-state-in-effect`~~ — eslint-disable 주석으로 처리
+  (기존 3곳과 같은 컨벤션).
