@@ -192,12 +192,50 @@ def generate_script(
         print(f"{tag} [자동수정] {line}")
 
     errors = validate_script(script)
+
+    # 2026-08-22 — 지면 1면 자동화 첫 실행에서 오늘 5건 중 4건이 이 에러로
+    # 멈췄는데, 실제로 원문에 수치가 없어서가 아니라 GPT가 "산업 전반에
+    # 어떤 영향을 미칠까요?" 같은 정성적 문장에 stat 타입(숫자 하나)을
+    # 잘못 배정한 경우였다(value가 "?"·"상시 추경"·1처럼 숫자가 아닌
+    # 걸 넣어놓은 게 증거). 팩트를 지어내라는 요청이 아니라 "컷 타입을
+    # 원문에 맞게 다시 고르라"는 재요청이라 §23 원칙(수치를 지어내지
+    # 않는다)과 충돌하지 않는다 — 여전히 재시도 후에도 진짜 수치 누락이면
+    # 그대로 에러로 멈춘다.
+    if errors:
+        print(f"{tag} 검증 실패 {len(errors)}건, 1회 재요청 시도...")
+        error_text = "\n".join(f"  - {e}" for e in errors)
+        retry_message = (
+            f"방금 만든 아래 각본 JSON에 문제가 있습니다:\n{error_text}\n\n"
+            "이 문제는 대부분 정성적인 문장(수치가 아닌 서술)에 stat이나 chart "
+            "타입을 잘못 배정해서 생깁니다. 문제가 된 컷만 고쳐서 전체 JSON을 "
+            "다시 주세요 — 원문에 실제 수치가 있으면 그 값을 정확히 채우고, "
+            "원문에 애초에 수치가 없는 정성적 내용이면 stat/chart 대신 "
+            "highlight나 closing처럼 수치가 필요 없는 타입으로 바꿔주세요. "
+            "없는 수치를 지어내지는 마세요.\n\n"
+            f"[원문]\n{article}\n\n[방금 만든 JSON]\n{json.dumps(script, ensure_ascii=False)}"
+        )
+        try:
+            retry_raw = call_text(guide, retry_message, max_tokens=4000)
+            retry_script = extract_json_block(retry_raw)
+            retry_script, retry_applied = fix_script(retry_script)
+            for line in retry_applied:
+                print(f"{tag} [자동수정·재시도] {line}")
+            retry_errors = validate_script(retry_script)
+            if not retry_errors:
+                print(f"{tag} 재시도로 해결됨")
+                script, errors = retry_script, []
+            else:
+                print(f"{tag} 재시도해도 {len(retry_errors)}건 남음 — 사람 확인 필요")
+                errors = retry_errors
+        except Exception as e:
+            print(f"{tag} 재시도 자체가 실패({e}) — 원래 에러로 처리")
+
     json_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if errors:
         error_text = "\n".join(f"  - {e}" for e in errors)
         raise ValueError(
-            f"{tag} 자동 수정 후에도 사람 확인이 필요한 문제 {len(errors)}건:\n{error_text}\n"
+            f"{tag} 자동 수정+재시도 후에도 사람 확인이 필요한 문제 {len(errors)}건:\n{error_text}\n"
             f"(JSON은 일단 {json_path}에 저장됨 — 직접 고친 뒤 다시 render 하면 됨)"
         )
 
