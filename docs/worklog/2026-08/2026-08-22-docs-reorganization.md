@@ -60,7 +60,22 @@ history.md` 등).
   전용으로 통일 — `history/`가 갖고 있던 "종결된 프로젝트 기록"이라는
   느슨한 정의를 흡수했다.
 
+## 추가 정리 (같은 날 이어서)
+
+"더 깔끔하게 할 수 있나" 질문에 다시 훑어보다가 3가지 더 발견:
+`docs/.DS_Store`(맥OS 잡파일, gitignore 확인), `docs/prompt-mbti-v2.zip`
+(루트에 붕 떠있던 백업 zip), `architecture/2026-08-07-rendering-strategy-
+decision.md`(문서 자체에 "8/8에 뒤집혔고 역사적 기록으로만 남긴다"고
+적혀있어 `architecture/`보다 `archive/`가 맞음 — 같은 패턴이 다른 문서에
+더 있는지 grep으로 확인했으나 이 파일이 유일했음).
+
+정리 도중 `docs/archive/`가 통째로 다시 사라져서(방금 커밋했는데) 외부
+프로세스가 지우는 줄 알고 조사했으나, 사용자가 Finder에서 직접 지운
+것이었다("다른쪽에 저장된게 있어서") — 그 삭제도 별도 커밋으로 반영하고,
+zip·rendering-decision 문서는 새로 만든 `archive/`에 옮겨 넣었다.
+README의 "정본 문서 빠른 링크"에서 이제 없는 `v2-phase-history.md` 링크도
+제거.
+
 ## 다음
 
-- `docs/prompt-mbti-v2.zip`(루트에 있는 백업 압축파일)을 archive/ 안의
-  적절한 위치로 옮길지, 그대로 둘지는 이번 작업 범위 밖으로 남겨둠.
+- 없음 — 이번 라운드로 docs/ 정리 완료.
