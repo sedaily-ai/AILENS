@@ -44,7 +44,7 @@ S3 업로드나 CMS(`sedaily-mbti-cms-posts-dev`) 반영은 이 파이프라인 
 
 ## 배경
 
-`docs/product/4format-samples/2026-08-11-빵지순례/라운드기록.md`,
+`docs/evaluation/4format-samples/2026-08-11-빵지순례/라운드기록.md`,
 `docs/worklog/2026-08/2026-08-20-homepage-refresh-seo-category-pipeline-reorg.md`
 참고 — 2026-08-20 이전엔 레터가 매번 스크래치패드 1회성 스크립트로 만들어져
 webtoon/video와 비대칭이었다.

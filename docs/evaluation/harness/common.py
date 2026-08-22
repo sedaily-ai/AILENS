@@ -2,8 +2,8 @@
 import os, json, glob, time, boto3
 from botocore.config import Config
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # docs/prompt-eval/
-REPO = os.path.dirname(os.path.dirname(ROOT))   # repo root (docs/prompt-eval 기준 2단계 상위)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # docs/evaluation/
+REPO = os.path.dirname(os.path.dirname(ROOT))   # repo root (docs/evaluation 기준 2단계 상위)
 ACCT, REGION = "887078546492", "us-east-1"
 GEN_ARN   = f"arn:aws:bedrock:{REGION}:{ACCT}:application-inference-profile/ymxbqn4lqro1"  # mbti-eval-sonnet-46
 JUDGE_ARN = f"arn:aws:bedrock:{REGION}:{ACCT}:application-inference-profile/7pr9ue3os1ro"  # mbti-eval-opus-47

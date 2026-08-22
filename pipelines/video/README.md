@@ -2,7 +2,7 @@
 
 기사 원문에서 나온 영상 각본 JSON(`admin/frontend`의 프롬프트 드로어 →
 "영상" 채널로 생성)을 실제 mp4로 렌더링하는 독립 Remotion 프로젝트.
-`docs/product/4format-samples/`의 각 샘플 폴더가 이 도구로 만든 영상을
+`docs/evaluation/4format-samples/`의 각 샘플 폴더가 이 도구로 만든 영상을
 가리킨다(예: `2026-08-11-빵지순례/라운드2_산출물/영상_각본.md`).
 
 기존에 `~/Documents/회사/서울경제신문/콘텐츠/프로젝트/ailens/video`(dev2
@@ -56,5 +56,5 @@ highlight/closing)과 각 타입별 `data` 필드는 admin 쪽 video 프롬프�
 ## 배경
 
 `docs/product/4format-persona-system.md`(영상 포맷의 소비 맥락·페르소나
-근거), `docs/product/4format-evaluation-system.md`(영상 rubric),
-`docs/product/4format-samples/README.md`(샘플 라운드 기록 방식) 참고.
+근거), `docs/evaluation/4format-evaluation-system.md`(영상 rubric),
+`docs/evaluation/4format-samples/README.md`(샘플 라운드 기록 방식) 참고.

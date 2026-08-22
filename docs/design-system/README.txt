@@ -1,5 +1,14 @@
-AI LENS (mbti.sedaily.ai) — 디자이너 전달용 소스/스펙 아카이브
-아카이빙: 2026-05-17 / 출처: frontend-next (Next.js 16, Tailwind v4)
+AI LENS (mbti.sedaily.ai) — 디자인 시스템 소스/스펙
+최초 정리: 2026-05-17 / 2026-08-22 "디자이너 전달용 아카이브"에서
+"살아있는 디자인 시스템 참조"로 재정의 / 출처: service/frontend (Next.js 16, Tailwind v4)
+
+⚠️ 2026-08-22 이전엔 이 폴더가 "한 번 전달하고 끝난 아카이브"처럼
+프레이밍돼 있었는데, 실제로는 아니다 — 캐릭터 색·이름(예: 민철,
+accent #7c3aed)이 `SideRail.tsx`(콘텐츠 성향 매칭 카드)에 지금도
+그대로 렌더링된다. 폴더명을 `design-handoff` → `design-system`으로
+바꾼 이유도 이거다: 여기 있는 스펙은 "예전에 넘긴 것"이 아니라
+"지금 사이트가 실제로 쓰는 것"이다. 새 캐릭터·색을 추가/변경할 때
+이 폴더도 같이 갱신할 것.
 
 [목적]
 현재 라이브 사이트에 올라간 4 페르소나 캐릭터, 디자인 토큰(색·폰트·레이아웃),
@@ -9,7 +18,8 @@ AI LENS (mbti.sedaily.ai) — 디자이너 전달용 소스/스펙 아카이브
   characters/
     images/            실제 사이트에 올라간 리드 캐릭터 PNG 4종 (1024x1024)
     spec_characters.txt 4 캐릭터 정체성·역할·톤·시그니처
-  design-system/
+  tokens/              (2026-08-22 이전 이름: design-system/ — 상위 폴더와
+                         이름이 겹쳐서 개명)
     spec_colors.txt    그룹 색/accent + 전역 컬러 토큰 (※ 두 팔레트 공존 주의)
     spec_fonts.txt     폰트 스택·용도·라이선스·다운로드 출처 (폰트 파일 미번들)
     spec_layout.txt    컨테이너·거터·spacing 토큰
@@ -25,4 +35,4 @@ notes/spec_known_issues.txt — 색 팔레트 2종 공존, 캐릭터 4/12만 실
 
 [캐릭터 이미지 파일명 규칙]
 {그룹}_{이름}_{대표MBTI}.png  예: NT_민철_intj.png
-사이트 원본 경로: frontend-next/public/editors/{intj,infp,istj,esfp}.png
+사이트 원본 경로: service/frontend/public/editors/{intj,infp,istj,esfp}.webp

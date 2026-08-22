@@ -21,7 +21,7 @@ profiles:
     note: Opus 4.7 는 inferenceConfig.temperature 미지원 — 호출 시 제외
 
 # 고정 입력 (소재 효과 통제)
-clusters_dir: docs/prompt-eval/clusters       # 5세트 동결, 인덱스=clusters.json
+clusters_dir: docs/evaluation/clusters       # 5세트 동결, 인덱스=clusters.json
 prompt_versions_dir: docs/prompt-mbti-v2 # 평가 대상 프롬프트 버전 루트 (nt/nf/st/sf)
 
 # 평가 방법론 (2026 보편 + 우리 보정)
@@ -39,4 +39,4 @@ method:
   human_alignment_threshold: 0.7     # 영광님 골든셋 vs Judge Pearson r 하한
   golden_set_size: 30                # 동결 인간 라벨 쌍 (드리프트 감시용)
 
-runs_dir: docs/prompt-eval/runs     # 실행별 산출물/평가/리포트 (대용량 — git 제외 권장)
+runs_dir: docs/evaluation/runs     # 실행별 산출물/평가/리포트 (대용량 — git 제외 권장)

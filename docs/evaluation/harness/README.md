@@ -15,7 +15,7 @@
 ## 디렉터리
 
 ```
-docs/prompt-eval/
+docs/evaluation/
   clusters/        5세트 동결 (clusters.json = 인덱스)
                    C1 거시정책 / C2 증권실적 / C3 부동산정책 /
                    C4 산업인프라 / C5 스트레스(의도적 약결합)

@@ -67,6 +67,6 @@ GPT가 만든 각본 JSON이 스키마를 위반해(빈 `data` 필드, 화이트
 
 ## 배경
 
-`docs/product/4format-samples/2026-08-11-빵지순례/라운드기록.md`(각 프롬프트
+`docs/evaluation/4format-samples/2026-08-11-빵지순례/라운드기록.md`(각 프롬프트
 버전·문제/솔루션 이력), `docs/worklog/2026-08/2026-08-20-homepage-refresh-seo-category-pipeline-reorg.md`
 (이 폴더 구조가 왜 이렇게 됐는지) 참고.
