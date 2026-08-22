@@ -39,6 +39,18 @@
       "Effect": "Allow",
       "Action": ["ssm:GetParameter"],
       "Resource": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-mbti/ssr-revalidate-secret"
+    },
+    {
+      "Sid": "VideoScriptBedrockInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yeypch70w7ej",
+        "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6"
+      ]
     }
   ]
 }

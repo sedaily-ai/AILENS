@@ -2,16 +2,24 @@
 
 `pipelines/README.md`의 "아직 없는 것" 항목("기사 → 각본 JSON"이 스크래치
 패드 1회성 스크립트로만 존재)을 해소한다 — letters/podcast/webtoon과
-같은 방식으로 `pipelines/common`(ddb_prompt, openai_client)을 재사용하는
+같은 방식으로 `pipelines/common`(ddb_prompt, bedrock_client)을 재사용하는
 Python 스크립트로 승격했다. Node 프로젝트(video/) 안에 있지만 렌더
-(scripts/render.ts)와는 별개 실행 — GPT 호출은 Python이 더 자연스럽고
-common/을 그대로 쓸 수 있어서 언어를 억지로 맞추지 않았다
+(scripts/render.ts)와는 별개 실행 — 텍스트 생성 호출은 Python이 더
+자연스럽고 common/을 그대로 쓸 수 있어서 언어를 억지로 맞추지 않았다
 (pipelines/README.md의 "왜 언어가 섞여 있나"와 같은 이유).
 
 2026-08-21 신설. 같은 날 세션에서 GV90·트럼프北핵·전력망·SK하이닉스·
 코스닥급락 5건 전부 GPT가 만든 JSON이 스키마를 위반해(빈 `data` 필드,
 화이트리스트 밖 아이콘) 사람이 매번 스크래치패드에서 즉석으로 고쳐야
 했던 걸 자동화한 것 — `fix_script()`가 그 후처리를 코드로 흡수한다.
+
+2026-08-22: 각본 생성 모델을 GPT-4o에서 Bedrock Claude Sonnet 4.6
+(application inference profile `mbti-video-sonnet-46`)로 이관 — GPT는
+webtoon의 이미지 생성 전용으로만 쓰기로 정책이 바뀌었다. 실제 실패했던
+기사 3건으로 비교한 결과 stat/chart 컷 타입 오배정 자체가 거의
+사라졌다(재요청 없이 1회 통과) — 다만 Claude는 문자열 안에 따옴표를
+이스케이프 없이 쓰는 새로운 실패 유형이 있어(JSON 파싱 단계에서 깨짐)
+그쪽에도 별도 1회 재요청을 추가했다.
 
 **의도적으로 안 고치는 것**: `stat`/`diagram`/`chart` 컷의 `data`가
 비어있거나 `chart.points`가 2개 미만인 경우는 자동으로 채우지 않고
@@ -27,7 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
-from openai_client import call_text
+from bedrock_client import call_text  # 2026-08-22: GPT -> Bedrock Claude 이관 (GPT는 이미지 생성 전용)
 
 # src/components/Icon.tsx의 ICON_MAP과 반드시 같이 갱신할 것 — 여기 없는
 # 키는 렌더 시 HelpCircle(물음표)로 조용히 폴백되어 화면이 부실해진다.
@@ -186,7 +194,28 @@ def generate_script(
     raw = call_text(guide, f"다음 기사 원문으로 영상 각본 + 렌더용 JSON을 만들어주세요.\n\n{article}", max_tokens=4000)
     (out / "raw_response.txt").write_text(raw, encoding="utf-8")
 
-    script = extract_json_block(raw)
+    # 2026-08-22 — GPT에서 Bedrock Claude로 각본 생성 모델을 바꾸며 새로 나온
+    # 실패 유형: 문자열 값 안에 따옴표를 이스케이프 없이 그대로 써서
+    # (` vs 정부 "법적 근거에 따라 집행"" `) JSON 자체가 깨지는 경우 —
+    # 이건 아래 validate_script() 이전, JSON 파싱 단계에서 나는 에러라 별도로
+    # 1회 재요청한다. 내용을 다시 지어내라는 게 아니라 형식만 고쳐 달라는
+    # 요청이라 §23 원칙과 무관.
+    try:
+        script = extract_json_block(raw)
+    except (ValueError, json.JSONDecodeError) as e:
+        print(f"{tag} JSON 파싱 실패({e}), 형식만 고쳐서 1회 재요청 시도...")
+        retry_raw = call_text(
+            guide,
+            "방금 만든 아래 응답이 유효한 JSON이 아니었습니다"
+            f"(파싱 에러: {e}). 내용은 그대로 두고 형식만 고쳐서 다시 주세요 — "
+            "특히 문자열 값 안에 큰따옴표를 그대로 쓰지 말고, 꼭 필요하면 "
+            "작은따옴표를 쓰거나 백슬래시로 이스케이프하세요.\n\n"
+            f"[방금 만든 응답]\n{raw}",
+            max_tokens=4000,
+        )
+        (out / "raw_response_retry.txt").write_text(retry_raw, encoding="utf-8")
+        script = extract_json_block(retry_raw)
+
     script, applied = fix_script(script)
     for line in applied:
         print(f"{tag} [자동수정] {line}")
