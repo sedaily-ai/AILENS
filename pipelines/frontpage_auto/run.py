@@ -26,8 +26,17 @@ import subprocess
 import sys
 import traceback
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# 2026-08-22 실사용 첫 자동 실행에서 발견된 버그 — Fargate 컨테이너는 시스템
+# 시간대가 UTC라, `datetime.now()`가 "오늘"을 UTC 기준으로 계산했다.
+# EventBridge는 07:00 KST(=22:00 UTC 전날)에 트리거되므로, 이 시각의 UTC
+# 날짜는 아직 전날 — "오늘 지면 1면"을 어제 걸로 잘못 조회해 이미 발행된
+# 5건만 다시 확인하고 아무것도 안 했다(로그상 정상 종료라 겉보기엔
+# 성공처럼 보여서 더 위험했다). 대한민국은 서머타임이 없어 고정
+# UTC+9 오프셋이면 충분 — zoneinfo(IANA tzdata) 의존성 없이 안전하게 처리.
+KST = timezone(timedelta(hours=9))
 
 import importlib.util
 
@@ -191,7 +200,7 @@ def _generate_video(name: str, article_path: Path, out_dir: Path) -> dict | None
     return {"mp4_path": mp4_path, "thumb_path": thumb_path if thumb_path.exists() else None}
 
 
-def process_article(article: dict, out_dir: Path, s3, table) -> str:
+def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> str:
     """반환값: "published" | "published_no_video" | "skipped_duplicate" | "failed" """
     source_url = article["url"]
     if not source_url:
@@ -247,14 +256,17 @@ def process_article(article: dict, out_dir: Path, s3, table) -> str:
          "pending": video_url is None},
     ]
 
-    slug = _slugify(datetime.now(timezone.utc).strftime("%Y-%m-%d"), article["title"])
+    publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
+    slug = _slugify(publish_date_iso, article["title"])
     now = datetime.now(timezone.utc).isoformat()
     item = {
         "id": str(uuid.uuid4()),
         "slug": slug,
         "status": "published",
         "channels": ["lens"],
-        "publish_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        # UTC 타임스탬프(now)가 아니라 지면 날짜(today_kst, discovery가 조회한
+        # 바로 그 날짜)를 쓴다 — 위 KST 상수 도입 배경과 같은 이유.
+        "publish_date": publish_date_iso,
         "editor_id": "AI LENS",
         "headline": article["title"],
         "subtitle": article["sub_title"],
@@ -287,7 +299,7 @@ def main():
     s3 = session.client("s3")
     table = session.resource("dynamodb").Table(TABLE)
 
-    today = datetime.now().strftime("%Y%m%d")
+    today = datetime.now(KST).strftime("%Y%m%d")
     candidates = discovery.fetch_front_page(today)
     print(f"[frontpage-auto] 오늘({today}) 1면 후보 {len(candidates)}건")
 
@@ -298,7 +310,7 @@ def main():
     for i, article in enumerate(candidates):
         article["_display_order"] = i
         try:
-            status = process_article(article, out_dir, s3, table)
+            status = process_article(article, out_dir, s3, table, today)
         except Exception:
             print(f"[frontpage-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵하고 계속\n{traceback.format_exc()}")
             status = "failed"
