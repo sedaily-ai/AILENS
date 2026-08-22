@@ -1,28 +1,40 @@
 # docs — AI LENS 문서 체계
 
-갱신: 2026-08-03. 이 파일이 docs/ 의 지도다. 새 문서를 만들기 전에 아래 배치 규칙을 보고, 작업을 마쳤으면 worklog 를 남긴다.
+갱신: 2026-08-22. 이 파일이 docs/ 의 지도다. 새 문서를 만들기 전에 아래 배치 규칙을 보고, 작업을 마쳤으면 worklog 를 남긴다.
+
+**2026-08-22 재구성**: 예전엔 날짜가 들어간 기록이 `worklog/`(진행형) ·
+`history/`(종결된 프로젝트 단위 기록) · `superpowers/`(기능 설계+계획)
+세 곳으로 갈라져 있었다. 셋 다 결국 "특정 시점의 작업 기록"이라는 점은
+같은데 폴더만 다른 게 오히려 어디서 뭘 찾아야 할지 헷갈리게 만들어서,
+날짜가 있는 건 전부 `worklog/YYYY-MM/`로 통합하고(옛 `superpowers/plans`
+는 파일명에 `-plan`, `superpowers/specs`는 원래 이름 그대로 `-design`류
+접미사 유지), 종결되어 더 이상 현행과 안 맞는 건 `archive/`로 옮겼다
+(옛 `history/` 전체). 자세한 경위는
+`worklog/2026-08/2026-08-22-docs-reorganization.md` 참조.
 
 ## 폴더 구조
 
 ```
 docs/
 ├── README.md           ← 이 파일 (지도 + 규칙)
-├── worklog/            ← 작업 기록. YYYY-MM/YYYY-MM-DD-주제.md (아래 규칙 참조)
+├── worklog/            ← 작업 기록 전체(진행형+완료 계획/스펙 전부).
+│                          YYYY-MM/YYYY-MM-DD-주제[-plan|-design].md
 ├── architecture/       ← 시스템 구조 정본 (파이프라인·AWS 인벤토리·어드민·음성)
-├── product/            ← 프로덕트 설계 정본 (레터 평가·뉴스레터)
-├── history/            ← 지난 기록 (phase 히스토리·회의록·스프린트 추적·완료 todo)
-├── superpowers/        ← 기능 단위 설계 문서 (specs/) + 구현 계획 (plans/), 날짜 접두
+├── product/            ← 프로덕트 설계 정본 (레터 평가·뉴스레터·선별 파이프라인)
 ├── design-handoff/     ← 디자인 스펙 (캐릭터·컬러·폰트·레이아웃)
 ├── prompt-eval/        ← 프롬프트 평가 하네스 (코드 포함, README 별도)
-└── archive/            ← 더 이상 안 맞는 옛 문서 (참고용으로만)
+└── archive/            ← 종결되어 현행과 안 맞는 옛 문서 (참고용으로만) —
+                           옛 history/ 전체 + MBTI 페르소나 폐기 이전 정본들
 ```
 
 ## 배치 규칙
 
 - 시스템이 어떻게 생겼는지 설명하는 문서 → `architecture/`. 코드가 바뀌면 문서도 같이 고친다.
 - 서비스가 무엇이어야 하는지 정의하는 문서 → `product/`.
-- 특정 날짜의 작업·결정·회의 기록 → `worklog/` (진행형) 또는 `history/` (종결된 프로젝트 단위 기록).
-- 낡아서 현행과 어긋난 문서는 지우지 말고 `archive/` 로 옮기고, 옮긴 이유를 worklog 에 한 줄 남긴다.
+- 특정 날짜의 작업·결정·회의·계획·스펙 기록은 전부 → `worklog/YYYY-MM/`.
+  진행 중이든 완료된 계획이든 구분하지 않는다 — 날짜와 주제로 찾는다.
+- 낡아서 현행과 어긋난 문서(더 이상 안 쓰는 기능·폐기된 아키텍처)는
+  지우지 말고 `archive/` 로 옮기고, 옮긴 이유를 worklog 에 한 줄 남긴다.
 - 날짜가 들어가는 파일명은 전부 `YYYY-MM-DD` (또는 파일명 맨 앞 `YYMMDD`) 형식.
 
 ## worklog 규칙 (팀 공통)
@@ -45,7 +57,8 @@ docs/
 | 음성 대화 아키텍처 | `architecture/voice-conversation-architecture.md` |
 | 레터 품질 평가 체계 | `product/letter-evaluation-system.md` |
 | 뉴스레터 SES 발송 계획 | `product/newsletter-ses-plan.md` |
-| v2 개발 히스토리 | `history/v2-phase-history.md` |
+| 뉴스 선별 파이프라인 설계(Step1+지면특별코너) | `product/news-selection-pipeline-20260822.pdf` |
+| v2 개발 히스토리(종결, 참고용) | `archive/v2-phase-history.md` |
 
 MBTI 4-페르소나(민철/하은/준서/소율) 체계와 그걸 생성하던 v1 Step Functions 파이프라인은
 2026-08 폐지됐다(root `CLAUDE.md` 참조). 그 시절 정본이던 `architecture/ARTICLE_PIPELINE.md`,

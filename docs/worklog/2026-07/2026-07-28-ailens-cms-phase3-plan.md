@@ -12,7 +12,7 @@
 **Tech Stack:** Python 3.11 Lambda(pg8000), Next.js 16 정적 export, S3 presigned PUT.
 
 스펙: [`docs/superpowers/specs/2026-07-27-ailens-cms-design.md`](../specs/2026-07-27-ailens-cms-design.md)
-선행: [phase0-1](2026-07-27-ailens-cms-phase0-1.md) · [phase2](2026-07-28-ailens-cms-phase2.md)
+선행: [phase0-1](2026-07-27-ailens-cms-phase0-1-plan.md) · [phase2](2026-07-28-ailens-cms-phase2-plan.md)
 
 ## Global Constraints
 

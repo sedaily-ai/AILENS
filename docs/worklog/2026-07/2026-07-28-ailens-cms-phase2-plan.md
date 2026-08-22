@@ -13,7 +13,7 @@
 정적 export.
 
 스펙: [`docs/superpowers/specs/2026-07-27-ailens-cms-design.md`](../specs/2026-07-27-ailens-cms-design.md)
-선행: [`2026-07-27-ailens-cms-phase0-1.md`](2026-07-27-ailens-cms-phase0-1.md) (백엔드 API 완료)
+선행: [`2026-07-27-ailens-cms-phase0-1-plan.md`](2026-07-27-ailens-cms-phase0-1-plan.md) (백엔드 API 완료)
 
 ## Global Constraints
 
