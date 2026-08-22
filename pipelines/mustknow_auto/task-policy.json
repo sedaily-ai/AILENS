@@ -1,0 +1,74 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadNewsXml",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::sedaily-news-xml-storage/daily-xml/*"
+    },
+    {
+      "Sid": "MediaBucketReadWrite",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev/*"
+    },
+    {
+      "Sid": "CmsPostsReadWrite",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Scan", "dynamodb:Query"],
+      "Resource": "arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-cms-posts-dev"
+    },
+    {
+      "Sid": "AdminPromptsRead",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem"],
+      "Resource": "arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-admin-prompts-dev"
+    },
+    {
+      "Sid": "MustknowSeenReadWrite",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
+      "Resource": "arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-mustknow-seen-dev"
+    },
+    {
+      "Sid": "SecretsRead",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:sedaily-mbti/openai-api-key-*",
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ElevenLabs/ApiKey-*"
+      ]
+    },
+    {
+      "Sid": "RevalidateSecretRead",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter"],
+      "Resource": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-mbti/ssr-revalidate-secret"
+    },
+    {
+      "Sid": "MustknowClassifyBedrockInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/bevq2226yzcq",
+        "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-5",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-5",
+        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-5",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-5"
+      ]
+    },
+    {
+      "Sid": "VideoScriptBedrockInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yeypch70w7ej",
+        "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6"
+      ]
+    }
+  ]
+}

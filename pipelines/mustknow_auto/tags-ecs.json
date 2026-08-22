@@ -1,0 +1,9 @@
+[
+  {"key": "Project", "value": "Sedaily-MBTI"},
+  {"key": "CostCenter", "value": "sedaily-ai"},
+  {"key": "ServiceName", "value": "Sedaily-MBTI"},
+  {"key": "Environment", "value": "dev"},
+  {"key": "Service", "value": "mbti"},
+  {"key": "Workload", "value": "mustknow-auto"},
+  {"key": "WorkItem", "value": "atlas-4444"}
+]

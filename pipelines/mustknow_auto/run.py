@@ -1,0 +1,450 @@
+"""필수뉴스 자동 발행(Step1+Step2 통합) — EventBridge(하루 6회, 08/12/15/18/
+21/23시 KST)가 깨우는 Fargate 태스크의 진입점.
+
+흐름: discovery.fetch_articles(오늘)로 그 시점까지 누적된 하루치 후보를
+받는다 → seen 테이블(`sedaily-mbti-mustknow-seen-dev`, key GetItem)로 이미
+처리한 기사를 제외한 델타만 남긴다 → 규칙 기반 사전필터(중복게재 탐지,
+최소 길이) → ① 지면특별코너 4탭(전체·증권·산업·시그널, 탭당 최대 4건) →
+② 그 외 일반 필수뉴스(종합점수 ≥7.0, 캡 없음) 순서로 처리한다. 매 회차
+"이번에 채점한 기사는 선정 여부와 무관하게" seen에 기록해 같은 기사가
+다음 회차에 다시 채점되지 않게 한다(단, Bedrock 응답 파싱 자체가 실패한
+기사는 seen에 안 남겨 다음 회차에 재시도되게 둔다 — classify.py 참조).
+
+**frontpage_auto와의 관계**: 지면1면은 이미 `pipelines/frontpage_auto`가
+1일 1회(07:00 KST) 처리 중이다. 이번 파이프라인을 그걸 대체할지는 아직
+결정 안 됐다(2026-08-22 설계 노트의 "이슈 B") — 그래서 frontpage_auto는
+건드리지 않고, 대신 이 파이프라인이 발행 직전 `_already_published_elsewhere()`
+로 frontpage_auto가 이미 발행한 기사인지 한 번 더 확인해 중복 발행을
+막는다. `_publish()`·`_generate_video()`·`_upload()` 등은 frontpage_auto/
+run.py에서 그대로 복사해왔다(import 아님 — frontpage_auto는 스크립트라
+import 시 부작용이 있고, 프로덕션 코드를 이번 작업으로 건드리는 리스크도
+피하기 위함). 두 파이프라인의 공용화는 "이슈 B" 결정 이후 별도 작업.
+
+**영상 예외 처리**·**팩트 원칙**은 frontpage_auto와 동일(§23) — video
+각본 생성이 실패하면 그 기사는 3/4 포맷만 발행하고 `needs_video: true`로
+표시한다.
+"""
+import difflib
+import json
+import mimetypes
+import re
+from decimal import Decimal
+import subprocess
+import sys
+import traceback
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+KST = timezone(timedelta(hours=9))
+
+import importlib.util
+
+_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(_ROOT / "common"))
+sys.path.insert(0, str(_ROOT / "video"))
+sys.path.insert(0, str(Path(__file__).parent))
+
+import boto3
+import requests
+
+import ddb_prompt
+import classify
+
+
+def _load_module(name: str, file_path: Path):
+    """frontpage_auto/run.py와 동일한 이유로 동일하게 필요 — letters/podcast/
+    webtoon이 전부 `pipeline.py`라는 같은 파일명을 쓴다."""
+    folder = str(file_path.parent)
+    if folder not in sys.path:
+        sys.path.insert(0, folder)
+    spec = importlib.util.spec_from_file_location(name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+discovery = _load_module("mustknow_auto_discovery", _ROOT / "discovery" / "pipeline.py")
+_letters_mod = _load_module("mustknow_auto_letters", _ROOT / "letters" / "pipeline.py")
+_podcast_mod = _load_module("mustknow_auto_podcast", _ROOT / "podcast" / "pipeline.py")
+_webtoon_mod = _load_module("mustknow_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
+
+REGION = "us-east-1"
+TABLE = "sedaily-mbti-cms-posts-dev"
+BUCKET = "sedaily-mbti-cms-media-dev"
+SEEN_TABLE = "sedaily-mbti-mustknow-seen-dev"
+VIDEO_DIR = _ROOT / "video"
+
+_NON_SLUG = re.compile(r"[^0-9A-Za-z가-힣]+")
+_BRACKET_RE = re.compile(r"\[[^\]]*\]")
+
+_CATEGORY_MAP = {
+    "증권": "증시",
+    "부동산": "부동산",
+    "산업": "산업",
+    "금융": "금융·정책",
+    "국제": "국제",
+    "문화·라이프": "문화",
+}
+
+# 지면특별코너 4탭 — 전체(지면1면)는 점수 없이 TOP 배치 우선(discovery가
+# 이미 편집 데이터로 정렬해서 줌). 증권/산업/시그널은 8.0 넘는 순서대로
+# 먼저 온 것부터 채운다(재순위 없음 — 라이브 콘텐츠를 나중에 더 좋은
+# 기사로 대체하지 않는다는 v1 결정, 2026-08-22 설계 노트 "이슈 A" 해소).
+_TAB_CATEGORY = {"증권": "증권", "산업": "산업", "시그널": "Signal"}
+_TAB_THRESHOLD = 8.0
+_GENERAL_THRESHOLD = 7.0
+_TAB_CAP = 4
+_MIN_CONTENT_LEN = 300
+_DUP_TITLE_RATIO = 0.72
+
+
+def _slugify(publish_date: str, headline: str) -> str:
+    tail = _NON_SLUG.sub("-", (headline or "").strip()).strip("-")
+    base = f"{publish_date}-{tail}" if tail else publish_date
+    return base[:80].rstrip("-")
+
+
+def _upload(s3, local_path: Path, key: str) -> str:
+    ctype = mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
+    s3.upload_file(str(local_path), BUCKET, key, ExtraArgs={"ContentType": ctype})
+    return f"https://{BUCKET}.s3.us-east-1.amazonaws.com/{key}"
+
+
+def _parse_letters(raw_md: str) -> list[str]:
+    """frontpage_auto/run.py의 동명 함수와 동일 — 레터 산출물(마크다운)에서
+    본문 문단만 뽑는다."""
+    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
+    lines = [l.strip() for l in body.split("\n") if l.strip()]
+    paragraphs, buf, skipping = [], [], False
+
+    def flush():
+        if buf:
+            t = " ".join(buf)
+            if t:
+                paragraphs.append(t)
+        buf.clear()
+
+    for line in lines:
+        if line.startswith("[제목]"):
+            skipping = True
+            continue
+        if line.startswith("[리드]"):
+            skipping = False
+            flush()
+            continue
+        if line.startswith("◾"):
+            skipping = False
+            flush()
+            continue
+        if line.startswith("자료:") or line == "—":
+            skipping = False
+            flush()
+            continue
+        if skipping:
+            continue
+        buf.append(line)
+    flush()
+    return paragraphs
+
+
+def _already_published_elsewhere(table, article_key: str) -> bool:
+    """frontpage_auto/run.py의 _already_published()와 동일한 쿼리 — 그
+    파이프라인이 이미 발행한 기사(지면1면)와 겹치지 않는지 확인하는
+    유일한 수단이다(신규 seen 테이블엔 frontpage_auto의 발행 기록이
+    안 남으므로). source_url 완전일치가 아니라 contains로 본다 —
+    쿼리스트링·수동발행 케이스 때문에 완전일치는 놓친다(frontpage_auto
+    에서 실제로 겪은 문제, 그대로 승계)."""
+    if not article_key:
+        return False
+    resp = table.scan(
+        FilterExpression="contains(source_url, :k)",
+        ExpressionAttributeValues={":k": f"article/{article_key}"},
+        ProjectionExpression="id",
+    )
+    return len(resp.get("Items", [])) > 0
+
+
+def _is_seen(seen_table, article_key: str) -> bool:
+    if not article_key:
+        return True  # key 없는 기사는 애초에 발행 불가 대상 — 취급 안 함
+    resp = seen_table.get_item(Key={"article_key": article_key})
+    return "Item" in resp
+
+
+def _mark_seen(seen_table, article_key: str, **meta):
+    # boto3 DynamoDB 리소스는 네이티브 float를 안 받는다(Decimal만) — 실제
+    # 실행에서 score=7.2 같은 float를 그대로 넣었다가 TypeError로 파이프라인
+    # 전체가 죽었다(그 시점까지의 발행 결과가 하나도 안 남고 그냥 예외 전파).
+    meta = {k: (Decimal(str(v)) if isinstance(v, float) else v) for k, v in meta.items()}
+    item = {"article_key": article_key, "seen_at": datetime.now(timezone.utc).isoformat()}
+    item.update(meta)
+    seen_table.put_item(Item=item)
+
+
+def _normalize_title(title: str) -> str:
+    t = _BRACKET_RE.sub("", title or "")
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _dedupe_near_identical(articles: list[dict]) -> list[dict]:
+    """같은 사안을 다른 각도로 반복 게재한 기사 제거 — 정보량 많은(본문
+    긴) 것만 남긴다. 8/21 실측 사례 근거: 박세리·쏘버디 골프채 신제품
+    홍보가 문구만 바꿔 4번 게재된 것을 발견."""
+    kept: list[dict] = []
+    for a in sorted(articles, key=lambda x: -x["content_len"]):
+        norm = _normalize_title(a["title"])
+        if any(
+            difflib.SequenceMatcher(None, norm, _normalize_title(k["title"])).ratio() >= _DUP_TITLE_RATIO
+            for k in kept
+        ):
+            continue
+        kept.append(a)
+    return kept
+
+
+def _generate_video(name: str, article_path: Path, out_dir: Path) -> dict | None:
+    """frontpage_auto/run.py의 동명 함수와 동일 — 성공하면
+    {"mp4_path": Path, "thumb_path": Path|None} 반환, 팩트 누락으로 실패하면
+    None(그 기사는 영상 없이 3/4 포맷만 발행)."""
+    from generate_script import generate_script  # pipelines/video/generate_script.py
+
+    try:
+        script_path = generate_script(name, str(article_path), output_root=out_dir)
+    except ValueError as e:
+        print(f"[mustknow-auto] {name} 영상 각본 생성 실패(사람 확인 필요) — {e}")
+        return None
+    except Exception:
+        print(f"[mustknow-auto] {name} 영상 각본 생성 중 예상 못한 오류:\n{traceback.format_exc()}")
+        return None
+
+    mp4_path = out_dir / name / "video.mp4"
+    try:
+        result = subprocess.run(
+            [
+                "npm", "run", "render", "--",
+                "--input", str(script_path.resolve()),
+                "--format", "horizontal",
+                "--output", str(mp4_path.resolve()),
+            ],
+            cwd=str(VIDEO_DIR),
+            capture_output=True,
+            text=True,
+        )
+    except OSError as e:
+        print(f"[mustknow-auto] {name} 영상 렌더 실행 자체 실패(npm/ffmpeg 없음?) — {e}")
+        return None
+    if result.returncode != 0:
+        print(f"[mustknow-auto] {name} 영상 렌더 실패:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
+        return None
+
+    thumb_path = out_dir / name / "thumb.jpg"
+    subprocess.run(
+        ["ffmpeg", "-y", "-ss", "2", "-i", str(mp4_path), "-frames:v", "1", str(thumb_path)],
+        capture_output=True,
+    )
+    return {"mp4_path": mp4_path, "thumb_path": thumb_path if thumb_path.exists() else None}
+
+
+def _publish(
+    article: dict,
+    out_dir: Path,
+    s3,
+    table,
+    today_kst: str,
+    *,
+    paper_section: str | None,
+    display_order: int | None,
+) -> str:
+    """반환값: "published" | "published_no_video" | "failed"
+    frontpage_auto/run.py의 process_article() 중 4포맷 생성+업로드+DDB
+    write 부분만 그대로 가져왔다 — 발행 여부 판단(중복확인·임계값)은
+    호출부(main)의 책임이라 여기선 안 한다."""
+    name = article["key"]
+    article_path = out_dir / f"{name}_article.txt"
+    article_path.write_text(article["content"], encoding="utf-8")
+
+    letters_path = _letters_mod.run_article(name, str(article_path), out_dir)
+    paragraphs = _parse_letters(letters_path.read_text(encoding="utf-8"))
+
+    podcast_mp3 = _podcast_mod.run_article(name, str(article_path), out_dir)
+
+    _webtoon_mod.run_article(name, str(article_path), out_dir)
+
+    webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+    webtoon_bullets, webtoon_images = [], []
+    for cut in webtoon_script["cuts"]:
+        caption = cut.get("narration") or (
+            " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
+        ) or cut.get("caption", "")
+        webtoon_bullets.append(caption)
+        n = cut["cut"]
+        cut_path = out_dir / name / f"컷{n}.png"
+        key = f"media/mustknow-auto/{name}-webtoon-cut{n:03d}.png"
+        webtoon_images.append({"url": _upload(s3, cut_path, key), "caption": caption})
+
+    podcast_url = _upload(s3, podcast_mp3, f"media/podcast/mustknow-auto/{name}-podcast.mp3")
+
+    video = _generate_video(name, article_path, out_dir)
+    video_url = thumb_url = None
+    status = "published"
+    if video:
+        video_url = _upload(s3, video["mp4_path"], f"media/video/mustknow-auto/{name}-video.mp4")
+        if video["thumb_path"]:
+            thumb_url = _upload(s3, video["thumb_path"], f"media/video/mustknow-auto/{name}-thumb.jpg")
+    else:
+        status = "published_no_video"
+
+    lenses = [
+        {"label": "레터", "question": article["title"], "bullets": [], "paragraphs": paragraphs,
+         "images": [], "video_url": None, "media_url": None},
+        {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
+         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None},
+        {"label": "팟캐스트", "question": article["title"], "bullets": [], "paragraphs": [],
+         "images": [], "video_url": None, "media_url": podcast_url},
+        {"label": "영상", "question": article["title"], "bullets": [], "paragraphs": [],
+         "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
+         "pending": video_url is None},
+    ]
+
+    publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
+    slug = _slugify(publish_date_iso, article["title"])
+    now = datetime.now(timezone.utc).isoformat()
+    item = {
+        "id": str(uuid.uuid4()),
+        "slug": slug,
+        "status": "published",
+        "channels": ["lens"],
+        "publish_date": publish_date_iso,
+        "editor_id": "AI LENS",
+        "headline": article["title"],
+        "subtitle": article["sub_title"],
+        "closing_line": None,
+        "body_inline": {
+            "body": [], "key_points": [], "keywords": [], "images": [],
+            "lenses": lenses,
+            "photo_image_url": article["photo_url"],
+            "category": _CATEGORY_MAP.get(article["top_category"]),
+            "paper_section": paper_section,
+            "display_order": display_order,
+            "needs_video": video is None,
+        },
+        "cover_image_url": webtoon_images[0]["url"] if webtoon_images else None,
+        "source_url": (article["url"] or "").split("?")[0],
+        "media_embed_url": None,
+        "display_order": None,
+        "created_by": "mustknow-auto",
+        "created_at": now,
+        "updated_at": now,
+        "published_at": now,
+    }
+    table.put_item(Item=item)
+    print(f"[mustknow-auto] 발행 완료 — {slug} (section={paper_section}, {status})")
+    return status
+
+
+def main():
+    session = boto3.Session(region_name=REGION)
+    s3 = session.client("s3")
+    table = session.resource("dynamodb").Table(TABLE)
+    seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
+
+    today = datetime.now(KST).strftime("%Y%m%d")
+    all_articles = discovery.fetch_articles(today)
+    front_page = discovery.fetch_front_page(today)
+    print(f"[mustknow-auto] 오늘({today}) 전체 후보 {len(all_articles)}건, 지면1면 후보 {len(front_page)}건")
+
+    fresh = [a for a in all_articles if a["key"] and not _is_seen(seen_table, a["key"])]
+    fresh = _dedupe_near_identical(fresh)
+    fresh = [a for a in fresh if a["content_len"] >= _MIN_CONTENT_LEN]
+    print(f"[mustknow-auto] seen 제외 + 사전필터 후 {len(fresh)}건 남음")
+
+    out_dir = Path("/tmp/mustknow_auto_out")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    results = {"published": 0, "published_no_video": 0, "failed": 0, "skipped_duplicate": 0}
+    selected_keys: set[str] = set()
+    tab_counts = {"전체": 0, "증권": 0, "산업": 0, "시그널": 0, "일반": 0}
+
+    def _try_publish(article, paper_section, display_order):
+        if _already_published_elsewhere(table, article["key"]):
+            print(f"[mustknow-auto] frontpage_auto 등에 이미 발행됨, 스킵 — {article['title']}")
+            results["skipped_duplicate"] += 1
+            return
+        try:
+            status = _publish(article, out_dir, s3, table, today, paper_section=paper_section, display_order=display_order)
+        except Exception:
+            print(f"[mustknow-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵\n{traceback.format_exc()}")
+            status = "failed"
+        results[status] = results.get(status, 0) + 1
+
+    # 1) 전체(지면1면) — 점수 불필요, TOP 배치 우선(discovery가 이미 정렬해서 줌)
+    for a in front_page:
+        if a["key"] and _is_seen(seen_table, a["key"]):
+            continue
+        if tab_counts["전체"] >= _TAB_CAP:
+            break
+        _mark_seen(seen_table, a["key"], tab="전체")
+        selected_keys.add(a["key"])
+        _try_publish(a, "전체", tab_counts["전체"])
+        tab_counts["전체"] += 1
+
+    # 2) Sonnet 5 배치 채점 — fresh 전체(전체 탭 후보 제외한 나머지)
+    scorable = [a for a in fresh if a["key"] not in selected_keys]
+    guide = ddb_prompt.load_prompt("mustknow")
+    scores = classify.score_articles(guide, scorable) if scorable else {}
+    print(f"[mustknow-auto] 채점 완료 {len(scores)}/{len(scorable)}건")
+
+    # 채점된 기사는 선정 여부와 무관하게 전부 seen 기록(재채점 방지) —
+    # 파싱 실패로 scores에 없는 기사만 다음 회차 재시도 대상으로 남긴다.
+    for a in scorable:
+        row = scores.get(a["key"])
+        if row is not None:
+            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+
+    # 3) 증권/산업/시그널 — 8.0 넘는 순서대로 먼저 온 것부터, 탭당 4건
+    for tab, cat in _TAB_CATEGORY.items():
+        pool = [a for a in scorable if a["top_category"] == cat]
+        for a in pool:
+            if tab_counts[tab] >= _TAB_CAP:
+                break
+            row = scores.get(a["key"])
+            if not row or (row.get("total") or 0) < _TAB_THRESHOLD:
+                continue
+            selected_keys.add(a["key"])
+            _try_publish(a, tab, tab_counts[tab])
+            tab_counts[tab] += 1
+
+    # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게
+    #    7.0 넘으면 전부(캡 없음) — 증권/산업/시그널 중 탭 정원을 못 채운
+    #    기사도 여기서 일반 카테고리로는 발행될 수 있다(정보 손실 방지).
+    for a in scorable:
+        if a["key"] in selected_keys:
+            continue
+        row = scores.get(a["key"])
+        if not row or (row.get("total") or 0) < _GENERAL_THRESHOLD:
+            continue
+        selected_keys.add(a["key"])
+        _try_publish(a, None, None)
+        tab_counts["일반"] += 1
+
+    print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
+
+    if results["published"] or results["published_no_video"]:
+        try:
+            secret = session.client("ssm").get_parameter(
+                Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
+            )["Parameter"]["Value"]
+            requests.post(
+                "https://ailens.sedaily.ai/api/revalidate",
+                headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
+                json={},
+                timeout=30,
+            )
+        except Exception:
+            print(f"[mustknow-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
+
+
+if __name__ == "__main__":
+    main()

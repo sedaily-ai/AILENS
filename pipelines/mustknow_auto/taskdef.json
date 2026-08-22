@@ -1,0 +1,32 @@
+{
+  "family": "sedaily-mbti-mustknow-auto",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "2048",
+  "memory": "4096",
+  "runtimePlatform": {
+    "cpuArchitecture": "ARM64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::887078546492:role/sedaily-mbti-frontpage-auto-execution-role",
+  "taskRoleArn": "arn:aws:iam::887078546492:role/sedaily-mbti-mustknow-auto-task-role",
+  "containerDefinitions": [
+    {
+      "name": "mustknow-auto",
+      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-mbti-frontpage-auto:latest",
+      "workingDirectory": "/app/pipelines/mustknow_auto",
+      "essential": true,
+      "environment": [
+        {"name": "AWS_REGION", "value": "us-east-1"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sedaily-mbti-mustknow-auto",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "run"
+        }
+      }
+    }
+  ]
+}
