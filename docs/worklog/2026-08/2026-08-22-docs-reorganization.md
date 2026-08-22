@@ -76,6 +76,52 @@ zip·rendering-decision 문서는 새로 만든 `archive/`에 옮겨 넣었다.
 README의 "정본 문서 빠른 링크"에서 이제 없는 `v2-phase-history.md` 링크도
 제거.
 
+## 3차: 내용 감사 (같은 날 이어서)
+
+"파일 내용 꼼꼼하게 다 읽어봤나"는 질문에 — 그때까진 헤더 몇 줄만 보고
+구조만 옮긴 거지 내용을 검증한 건 아니었다. fork 하나로 `architecture/
+product/design-handoff/prompt-eval/resources/edragon`(worklog·archive
+제외) 전체를 실제로 읽고, 실제 코드(현재 DynamoDB 테이블, 프론트엔드
+import) 대조까지 시켰다.
+
+**삭제**: `architecture/AWS_BACKEND_ARCHITECTURE.md`(자칭 "v1 production
+snapshot, 2026-04-15" — Step Functions·OpenSearch·pgvector 등 이미 다
+폐기된 인프라만 다룸, 지금 진실과 맞는 게 하나도 없음), `product/
+newsletter-ses-plan.md`(v2 Lambda 기반 계획서, 실제 라이브 코드
+`service/backend/newsletter/subscribers.py`와 아키텍처가 완전히 다름).
+
+**archive 이동**: `product/letter-eval-baseline-20260523.md`(MBTI 페르소나
+레터 ID 기준 평가 스냅샷, 역사적 가치만).
+
+**최신화(삭제 아님)**: `architecture/admin-stack.md`(v2 Postgres/Secrets
+섹션에 ⚠️ 무효 경고 추가 — v2 Lambda 자체가 삭제됨), `product/letter-
+evaluation-system.md`(존재한 적 없는 `scripts/eval_letters.py`를 실행
+가능한 것처럼 적어놨던 걸 "설계 초안" 경고로 수정, `launch-sprint-
+tracking.md` 참조 경로도 archive로 이동한 새 경로로 수정).
+
+**삭제 취소된 것 — 반드시 코드 확인 후 판단**: `design-handoff/`(민철/
+하은/준서/소율 캐릭터·컬러 스펙)는 처음엔 MBTI 폐기로 죽은 문서처럼
+보였지만, `SideRail.tsx`(콘텐츠 성향 매칭 카드)에 `name: '민철',
+accent: '#7c3aed', avatar: '/editors/intj.webp'`가 그대로 살아서
+렌더링되고 있는 걸 실제로 확인했다 — 문서 카테고리(MBTI)만 보고
+지웠으면 실사용 자산을 날릴 뻔했다.
+
+**손 안 댄 것**: `architecture/voice-conversation-architecture.md`의
+Bedrock 모델 ID(Haiku 4.5)는 fork가 낡았을 수 있다고 의심했지만, 이
+세션에서 직접 `constants.py`를 읽어 확인한 적이 있어 실제로는 최신값이
+맞다고 판단 — 잘못된 "최신화"를 피함. `prompt-eval/`(8/5 이후 미사용,
+죽었는지 불확실)과 `resources/edragon/`(코드가 프로그램적으로 읽진
+않지만 `LetterDetailClient.tsx` 주석에서 편집자 참고자료로 언급됨,
+유지 권장)은 그대로 둠.
+
+## 4차: 폴더별 README (같은 날 이어서)
+
+"정석대로 규칙을 폴더별로 쪼개서 가지면" 요청 — 루트 `README.md` 하나가
+전체 배치 규칙을 다 떠안던 걸, 각 폴더(`worklog/architecture/product/
+resources/archive`, `design-handoff/prompt-eval`은 이미 자체 README
+있었음)에 자기 규칙을 담은 README.md를 만들고, 루트는 전체 지도 + 요약만
+남기게 축소.
+
 ## 다음
 
-- 없음 — 이번 라운드로 docs/ 정리 완료.
+- 없음 — 이번 세션의 docs/ 정리는 여기까지.

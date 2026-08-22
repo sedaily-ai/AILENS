@@ -12,10 +12,12 @@
 | **B. 가상 독자 평가** | 5 reader × rubric 10 → 점수 + 코멘트 | 발행 후 또는 후향 | Bedrock 1회 호출/조합 |
 | **C. 실증 데이터** | GA `letter_complete` 완독률·체류·공유 | 발행 1주일 후 | 무료 (이미 박힘) |
 
-본 문서는 **B 계층**(가상 독자 평가)에 집중. C 는 `launch-sprint-tracking.md` 참조.
-⚠️ A 계층이 참조하던 `persona-voice-cards.md`(레터 에디터 4-페르소나 카드)는 MBTI
-페르소나 폐지(2026-08)로 `docs/archive/`로 옮겼다 — A 계층 자체가 지금 유효한지도
-다음에 별도 확인 필요(§4 "페르소나별" 문항도 같은 이유로 낡았을 수 있음).
+본 문서는 **B 계층**(가상 독자 평가)에 집중. C 는 `docs/archive/launch-
+sprint-tracking.md` 참조(2026-08-22 archive로 이동).
+⚠️ A 계층이 참조하던 `persona-voice-cards.md`(레터 에디터 4-페르소나 카드)는
+MBTI 페르소나 폐지(2026-08)로 폐기됐고, 2026-08-22에 완전히 삭제됐다(zip
+백업만 `docs/archive/prompt-mbti-v2.zip`에 존재) — A 계층 자체가 지금
+유효한지도 다음에 별도 확인 필요(§4 "페르소나별" 문항도 같은 이유로 낡았을 수 있음).
 
 ---
 
@@ -180,9 +182,14 @@
 
 ## 6. 실행 스크립트
 
-`scripts/eval_letters.py` — Bedrock Claude Sonnet 4.6 호출, 결과 JSON + 마크다운 리포트.
+⚠️ **`scripts/eval_letters.py`는 실제로 존재한 적이 없다** — 아래는 "이렇게
+만들 계획이었다"는 설계 초안이지 실행 가능한 스크립트가 아니다(2026-08-22
+확인, 저장소 전체 grep 0건). 이 방식으로 평가를 실행하려면 먼저 스크립트를
+새로 작성해야 한다.
 
-**사용**:
+계획: Bedrock Claude Sonnet 4.6 호출, 결과 JSON + 마크다운 리포트.
+
+**사용(가상)**:
 ```bash
 cd service/backend
 python3 ../../scripts/eval_letters.py --output ../../docs/letter-eval-baseline-$(date +%Y%m%d).md

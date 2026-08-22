@@ -96,6 +96,15 @@ DDB-backed prompt storage with 5-minute TTL cache and filesystem fallback. Patte
 
 ### Secrets (Admin-2c)
 
+⚠️ **v2 Postgres/pgvector 폐기(2026-08-06) 이후 아래 4개 항목 무효**: v2
+Lambda(collector/selector/transform/consolidate) 자체가 삭제됐고 v1/v2
+pgvector RDS도 둘 다 계정에서 삭제됐다(경위: `worklog/2026-08/2026-08-06-*`).
+`get_pg_password()`/`PG_PASSWORD_SSM_PARAM`/`sedaily-mbti-v2-collector-dev-
+role-nbf99tic` 전부 지금 아무도 안 쓴다. `common.secrets` 모듈(SSM
+SecureString 읽기, 5분 TTL 캐시, fail-closed 패턴) 자체는 여전히 살아있고
+다른 시크릿(OpenAI/ElevenLabs API 키 등, `pipelines/common`)에서 같은
+패턴을 쓴다 — 죽은 건 "v2 Postgres 비밀번호"라는 특정 사용처뿐이다.
+
 SSM SecureString reader for v1 / v2 / admin Lambdas, replacing plaintext password env vars. Pattern established for the v2 Postgres password in commit `61b7177` (Admin-2c — `PG_V2_PASSWORD` env var → `/sedaily-mbti/v2/pg-password`). Same module-level 5-min TTL cache shape as `feature_flag.py`, but **opposite failure mode** — see contrast below.
 
 - **Storage**: SSM Parameter Store SecureString, Standard tier, AWS-managed KMS key (`alias/aws/ssm`). Tagged `Project=sedaily-mbti, Component=backend-v2, Phase=admin-2c, ManagedBy=claude-code` (+ Subsystem / Environment / Owner). The admin SSM params from Admin-1 (`/sedaily-mbti/admin/password-hash`, `/sedaily-mbti/admin/jwt-secret`) are the same shape, predating this module — they're read directly via boto3 inside the admin Lambda and not yet routed through `common.secrets`.
