@@ -398,6 +398,29 @@ function CardnewsCarousel({
   );
 }
 
+// 4개 포맷(레터/웹툰/팟캐스트/영상) 섹션이 전부 hidden={!on}(CSS로만
+// 숨김, 실제 언마운트 아님)으로 한 페이지에 동시에 존재한다(아래
+// lenses.map() 참조) — 그래서 <video autoPlay>를 그냥 쓰면 "영상" 탭이
+// 숨겨져 있어도 마운트되는 즉시 재생을 시작해버린다(2026-08-23, 사용자
+// 발견 — "레터 페이지 들어가기만 해도 자동으로 영상이 재생되네").
+// active(=on)가 실제로 true가 될 때만 play()를 부르는 방식으로 고친다 —
+// hooks는 반복문(.map()) 안에서 못 쓰므로 별도 컴포넌트로 뺀다.
+function AutoPlayVideo({ src, active }: { src: string; active: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (active) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+    }
+  }, [active]);
+  return (
+    <video ref={ref} controls preload="auto" src={src} className="w-full h-full" style={{ objectFit: 'contain' }} />
+  );
+}
+
 export function LensViewClient({
   slug,
   initialLens = undefined,
@@ -1153,8 +1176,12 @@ export function LensViewClient({
                       임베드한다(/video 페이지와 같은 resolveVideo 유틸). */}
                   {format === 'podcast' && realPodcast && (
                     <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
+                      {/* embedUrl에 autoplay=1이 박혀 있어(videoEmbed.ts), 이
+                          섹션이 실제로 안 보일 때(on=false)도 src를 그대로
+                          넣으면 숨은 채로 재생된다 — on일 때만 src를 준다
+                          (2026-08-23, 아래 AutoPlayVideo 주석과 같은 이유). */}
                       <iframe
-                        src={realPodcast.embedUrl}
+                        src={on ? realPodcast.embedUrl : undefined}
                         title={l.question || '팟캐스트'}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -1274,8 +1301,9 @@ export function LensViewClient({
                       (/video 페이지와 같은 resolveVideo 유틸). */}
                   {format === 'video' && realVideo && (
                     <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
+                      {/* on일 때만 src — 팟캐스트 iframe과 같은 이유. */}
                       <iframe
-                        src={realVideo.embedUrl}
+                        src={on ? realVideo.embedUrl : undefined}
                         title={l.question || '영상'}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -1289,13 +1317,14 @@ export function LensViewClient({
                       네이티브 <video>로 재생. */}
                   {format === 'video' && directVideoUrl && (
                     <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
-                      {/* 영상 탭을 클릭하는 행위 자체가 사용자 제스처라 자동재생이
-                          막히지 않는다(2026-08-23, 사용자 요청 — "누르기 귀찮").
-                          realVideo(유튜브 등 iframe embed) 쪽은 videoEmbed.ts의
-                          embedUrl에 이미 autoplay=1이 박혀 있어 그대로 뒀다 —
-                          여기 직링크 <video>만 빠져 있었다. preload도 none→auto로
-                          바꿔 자동재생 시작이 안 늦게 한다. */}
-                      <video autoPlay controls preload="auto" src={directVideoUrl} className="w-full h-full" style={{ objectFit: 'contain' }} />
+                      {/* 자동재생(2026-08-23, 사용자 요청 — "누르기 귀찮"),
+                          단 실제로 이 섹션이 보일 때(on)만 — 4개 포맷 섹션이
+                          전부 hidden 속성으로만 숨겨진 채 동시에 마운트돼 있어서
+                          그냥 autoPlay를 쓰면 안 보이는 탭에서도 재생되는 버그가
+                          났었다(위 AutoPlayVideo 주석 참조). realVideo(유튜브
+                          등 iframe embed) 쪽은 videoEmbed.ts의 embedUrl에
+                          이미 autoplay=1이 박혀 있어 그대로 뒀다. */}
+                      <AutoPlayVideo src={directVideoUrl} active={on} />
                     </div>
                   )}
 
