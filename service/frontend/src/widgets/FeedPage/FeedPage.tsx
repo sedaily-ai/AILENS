@@ -12,6 +12,7 @@ import type { DailyQuestionItem } from "@/features/question";
 import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
 import { useAuth } from "@/features/auth";
 import { Header } from "@/widgets/Header";
+import { HomeSideBar } from "@/widgets/HomeSideBar";
 import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";
 
 // Feature Tab Components
@@ -344,8 +345,10 @@ export function FeedPage({
             initialWordTerms={initialWordTerms}
             initialLensPosts={initialLensPosts}
             initialArchiveItems={initialArchiveItems}
-            initialHotLetters={initialHotLetters}
             initialHomePlayerPosts={initialHomePlayerPosts}
+            sidebar={
+              <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
+            }
           />
         )}
 

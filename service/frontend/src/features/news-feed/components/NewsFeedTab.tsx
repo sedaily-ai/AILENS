@@ -4,7 +4,6 @@ import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "../lib/wordsTerms";
-import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { WordsPreviewSection } from "./WordsPreviewSection";
@@ -16,7 +15,7 @@ import { LensPreviewSection } from "./LensPreviewSection";
 import { NewsTimeMachineSection } from "./NewsTimeMachineSection";
 import { LatestGridSection } from "./LatestGridSection";
 import { CategoryFeatureSection } from "./CategoryFeatureSection";
-import { HomeSideBar } from "@/widgets/HomeSideBar";
+import type { ReactNode } from "react";
 import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 
 // 카테고리 2개씩 짝지어 한 줄(2/3+1/3)로 배치(2026-08-17, 본지 en.sedaily.com
@@ -84,8 +83,12 @@ interface Props {
   // 홈 구조 개편) — 한 번만 fetch해서 최신순 슬라이스와 카테고리별 필터
   // 양쪽에 다 쓴다(app/page.tsx 참조).
   initialArchiveItems?: ArchiveItem[];
-  // "요즘 가장 많이 읽힌 글"(HomeSideBar → HotLettersRail) 서버 프리페치.
-  initialHotLetters?: TodayLetterCardLike[];
+  // 우측 사이드바(HomeSideBar) — features 레이어에서 widgets를 직접 import할
+  // 수 없어(FSD 단방향 규칙, 2026-08-24 boundaries lint로 발견) 렌더된
+  // 엘리먼트를 그대로 받는다. 호출부(widgets/FeedPage/FeedPage.tsx)가
+  // initialHotLetters까지 포함해 조립 — 이 컴포넌트는 더 이상 그 데이터를
+  // 직접 안 다룬다.
+  sidebar?: ReactNode;
   // 오디오 섹션(AudioPreviewSection) 서버 프리페치 — home_player 채널
   // (TodayNewsPlayer.tsx와 같은 소스, 2026-08-21).
   initialHomePlayerPosts?: HomePlayerPost[];
@@ -97,8 +100,8 @@ export function NewsFeedTab({
   initialWordTerms,
   initialLensPosts,
   initialArchiveItems,
-  initialHotLetters,
   initialHomePlayerPosts,
+  sidebar,
 }: Props) {
   const archiveItems = initialArchiveItems ?? [];
 
@@ -127,11 +130,15 @@ export function NewsFeedTab({
           maxWidth를 1000→1320으로 넓히고 CSS Grid 2열(본문 1fr + 사이드바
           280px)로 바꿨다 — lg 미만에서는 사이드바가 아예 안 뜬다(HomeSideBar
           의 className="hidden lg:block").
-          2026-08-23 — 카테고리 아카이브 페이지(CategoryArchiveClient.tsx,
-          shared/ui)에도 이 사이드바를 그대로 붙이면서 HomeSideBar/
-          HotLettersRail/SajuMiniRail을 features/news-feed에서 shared/ui로
-          승격했다(둘 다 shared/entities에만 의존해 feature 결합이 없었음 —
-          shared→features 역방향 의존을 피하려면 이 방향이 FSD 규칙에 맞다).
+          2026-08-23 — 카테고리 아카이브 페이지에도 이 사이드바를 그대로
+          붙이면서 HomeSideBar/HotLettersRail/SajuMiniRail을
+          features/news-feed에서 shared/ui로 승격했다. 2026-08-24 —
+          SajuMiniRail이 entities/saju(도메인 로직)를 참조해 shared→entities
+          역방향 의존이었던 게 boundaries lint로 드러나, HomeSideBar+
+          SajuMiniRail을 widgets/HomeSideBar/로 다시 이전(HotLettersRail은
+          엔티티 결합 없어 shared/ui에 유지). 이 컴포넌트(features 레이어)는
+          widgets를 직접 import할 수 없어 렌더된 사이드바를 `sidebar` prop으로
+          받는 구조로 바꿨다 — 조립은 widgets/FeedPage/FeedPage.tsx가 한다.
           웹툰 섹션은 처음엔 뷰포트 끝까지 번지는 진짜 full-bleed였는데,
           그러려면 그리드 두 칼럼을 가로질러야 했고(gridColumn:'1 / -1') 그
           과정에서 grid-template-rows를 명시 안 해 사이드바의 gridRow:'1/-1'
@@ -258,7 +265,7 @@ export function NewsFeedTab({
             <GamesPreviewSection />
           </div>
 
-          <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
+          {sidebar}
         </div>
       </div>
 
