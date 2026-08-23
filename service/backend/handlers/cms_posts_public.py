@@ -291,6 +291,12 @@ def _shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
         "media_embed_url": post.get("media_embed_url") or "",
         "display_order": post.get("display_order") if post.get("display_order") is not None else 0,
         "category": (post.get("body_inline") or {}).get("category") or None,
+        # 팟캐스트 전체 대본(2026-08-23, 사용자 지적 — "들어갈 때 이것만
+        # 있으니까 너무 허전한데, 텍스트 스크립트 표출하면 어떰?"). lens
+        # 글의 팟캐스트 포맷이 이미 갖고 있던 접근성용 transcript를 이
+        # 채널로 복제할 때 같이 옮겨온다(mustknow_auto/frontpage_auto
+        # run.py 참조) — 청각장애인 접근성 겸 빈 화면 보완.
+        "transcript": (post.get("body_inline") or {}).get("transcript") or None,
     }
 
 

@@ -145,6 +145,31 @@ export function ListenViewClient({
           {item.excerpt && (
             <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.65, marginTop: 20 }}>{item.excerpt}</p>
           )}
+
+          {/* 전체 대본(2026-08-23, 사용자 지적 — "들어갈 때 이것만 있으니까
+              너무 허전한데, 텍스트 스크립트 표출하면 어떰?"). 플레이어 +
+              한 줄 요약뿐이던 페이지가 실제로 아래가 텅 비어 있었다 —
+              lens 팟캐스트 포맷이 이미 갖고 있던 접근성용 transcript를
+              그대로 보여준다(타임스탬프 동기화는 없음, LensViewClient.tsx
+              와 같은 패턴). */}
+          {item.transcript && (
+            <div
+              style={{
+                marginTop: 28,
+                padding: 'clamp(18px, 3vw, 24px)',
+                borderRadius: 16,
+                background: '#f8fafc',
+                border: '1px solid rgba(0,0,0,0.06)',
+              }}
+            >
+              <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 12 }}>
+                스크립트 (본문 텍스트)
+              </p>
+              <div style={{ fontSize: 15, lineHeight: 1.85, color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+                {item.transcript}
+              </div>
+            </div>
+          )}
         </main>
       )}
     </div>

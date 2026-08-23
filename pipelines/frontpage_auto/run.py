@@ -387,7 +387,7 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
             "headline": lenses[2]["question"] or article["title"],
             "subtitle": article["sub_title"],
             "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": _display_category(article)},
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": _display_category(article), "transcript": podcast_transcript},
             "cover_image_url": article["photo_url"],
             "source_url": source_url.split("?")[0],
             "media_embed_url": podcast_url,
