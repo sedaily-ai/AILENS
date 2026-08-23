@@ -217,20 +217,25 @@ features/[feature-name]/
   마운트-감지/포맷-전환 로직과 4개 형식(레터/웹툰/팟캐스트/영상) 렌더
   분기를 각각의 하위 컴포넌트로 더 쪼개는 것 — 이번 라운드에서는 여기까지.
 
-### `LetterDetailClient.tsx` 1521→1129줄
-- (2026-08-24) 순수 HTML 가공 유틸(`decodeHtmlEntities`/`injectImageCaptions`/
-  `splitBodyHtml`/`cleanSubtitle`/`letterCategoryLabel`, `BodyHtmlPart` 타입)을
-  `letterHtmlUtils.ts`로, 용어 툴팁(`TermTooltip`+`wrapWithTerms`)을
-  `TermTooltip.tsx`로, 이전/다음 레터 내비게이션(`PrevNextLetterNav`+
-  `PrevNextCard`, `NeighborLetter` 타입 포함)을 `PrevNextLetterNav.tsx`로,
-  수치 인포그래픽(`LetterChartBlock`)을 `LetterChartBlock.tsx`로 각각
-  분리(모두 `letters/[id]/` 같은 폴더의 형제 파일 — 다른 페이지가 쓸
-  일 없는 레터 상세 전용 조각이라 `shared/`가 아니라 co-locate).
-  본체는 `LetterBody`(185줄)/`SentenceSelectionPopover`(164줄)/
-  `LetterSubscribeSection`(211줄)/`LetterTextExtras`(117줄)/`LetterBlock`
-  (214줄) 5개가 남아있음 — 서로 상태·핸들러를 더 많이 공유해서 이번
-  라운드는 순수 유틸/독립 UI만 먼저 뗐다. 다음 라운드 후보.
-  검증: tsc/eslint(미사용 import 6개 정리 포함)/build 통과 + 로컬
-  프로덕션 빌드로 실제 레터 상세 페이지 SSR 출력 확인(이전/다음 레터
-  내비게이션 마크업 정상 렌더, 200). Chrome 확장 미연결로 실제 인터랙션
-  (문장 선택 팝오버, 용어 툴팁 호버 등)까지의 브라우저 확인은 못함.
+### `LetterDetailClient.tsx` 1521→214줄 — `letters/[id]/components/`로 전면 분해
+- (2026-08-24, 1차) 순수 HTML 가공 유틸(`decodeHtmlEntities`/`injectImageCaptions`/
+  `splitBodyHtml`/`cleanSubtitle`/`letterCategoryLabel`, `BodyHtmlPart` 타입),
+  용어 툴팁(`TermTooltip`+`wrapWithTerms`), 이전/다음 레터 내비게이션
+  (`PrevNextLetterNav`+`PrevNextCard`, `NeighborLetter` 타입), 수치
+  인포그래픽(`LetterChartBlock`)을 먼저 분리 — 처음엔 `letters/[id]/` 바로
+  아래 형제 파일이었다가, "폴더>폴더 계층형으로" 요청에 따라 즉시
+  `letters/[id]/components/`로 재배치 + 배럴(`index.ts`) 신설.
+- (2026-08-24, 2차) 남아있던 5개 — `LetterBody`/`SentenceSelectionPopover`/
+  `LetterSubscribeSection`/`LetterTextExtras`/`LetterBlock` — 도 전부 같은
+  `components/`로 분리. 실제로는 서로 상태를 공유하지 않고 props로만
+  엮여있어서(1차 때 우려했던 것보다 결합이 약함) 전부 뗄 수 있었다 —
+  `LetterDetailClient.tsx`엔 이제 데이터 로딩/헤더/사이드바 배치만 남고
+  실제 렌더는 `<LetterBody letter={...} nextLetter={...} prevLetter={...} />`
+  한 줄로 위임. 다른 페이지가 쓸 일 없는 레터 상세 전용 조각들이라
+  `shared/`가 아니라 co-locate 유지.
+  검증: tsc/eslint(미사용 import 다수 정리 포함, 특히 `trackEvent` 삭제
+  했다가 실제로 본체에서 아직 쓰고 있는 걸 lint로 잡아 즉시 복구)/build
+  통과. 로컬 프로덕션 빌드로 실제 레터 상세 페이지 SSR 출력 확인(구독
+  섹션·이전/다음 레터 내비게이션 마크업 정상 렌더, 200). Chrome 확장
+  미연결로 실제 인터랙션(문장 선택 팝오버, 용어 툴팁 호버 등)까지의
+  브라우저 확인은 못함.
