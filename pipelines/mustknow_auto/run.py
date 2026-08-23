@@ -384,6 +384,39 @@ def _publish(
         "published_at": now,
     }
     table.put_item(Item=item)
+
+    # 2026-08-23, 사용자 지적 — 홈 "이슈를 웹툰으로" 카드를 누르면 렌즈(4유형)
+    # 페이지로 가는데, 웹툰만 보는 전용 페이지(/webtoon/[slug], 다크 테마
+    # 세로스크롤 뷰어)로 가면 좋겠다고 함. 그리고 "만화방"(/webtoon 목록)에도
+    # 렌즈로 발행된 웹툰이 안 올라온다고 지적 — 지금까지는 웹툰 컷이 lens
+    # 글의 body_inline.lenses[1] 안에만 있어서 channel=webtoon 목록 쿼리에
+    # 안 잡혔다. lens 글은 그대로 두고(4유형 페이지는 계속 필요), 웹툰
+    # 채널에도 독립된 글을 하나 더 써서 두 화면 모두에서 보이게 한다 —
+    # 슬러그는 충돌 방지로 "-webtoon" 접미사(slug는 GSI로 유일해야 함,
+    # cms_posts_ddb_client.py get_published_post_by_slug 참조).
+    if webtoon_images:
+        webtoon_item = {
+            "id": str(uuid.uuid4()),
+            "slug": f"{slug}-webtoon",
+            "status": "published",
+            "channels": ["webtoon"],
+            "publish_date": publish_date_iso,
+            "editor_id": "AI LENS",
+            "headline": webtoon_script.get("core_question") or article["title"],
+            "subtitle": article["sub_title"],
+            "closing_line": None,
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": webtoon_images},
+            "cover_image_url": webtoon_images[0]["url"],
+            "source_url": (article["url"] or "").split("?")[0],
+            "media_embed_url": None,
+            "display_order": None,
+            "created_by": "mustknow-auto",
+            "created_at": now,
+            "updated_at": now,
+            "published_at": now,
+        }
+        table.put_item(Item=webtoon_item)
+
     print(f"[mustknow-auto] 발행 완료 — {slug} (section={paper_section}, {status})")
     return status
 

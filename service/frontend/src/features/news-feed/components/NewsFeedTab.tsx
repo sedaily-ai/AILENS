@@ -224,7 +224,7 @@ export function NewsFeedTab({
                 떨어져 있어서 단어 퀴즈(§ 오늘 앞서 옮김)와 같은 문제를
                 겪고 있었다 — 웹툰 옆으로 옮겨 "비주얼 콘텐츠" 블록으로
                 묶는다. */}
-            <WebtoonPreviewSection initialItems={initialWebtoons} initialLensPosts={initialLensPosts} />
+            <WebtoonPreviewSection initialItems={initialWebtoons} />
 
             <VideoPreviewSection initialVideos={initialVideos} initialLensPosts={initialLensPosts} />
 

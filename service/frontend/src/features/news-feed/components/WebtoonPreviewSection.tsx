@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
-import { fetchWebtoons, type CmsWebtoon, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { buildLensWebtoonItems, mergeByDateDesc } from '@/shared/lib/lensMediaFeed';
+import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 
 // 홈 상단의 슬림 텍스트 배너로는 "실제 콘텐츠"처럼 안 느껴진다는 피드백
 // (2026-08-06) — 4등분 카드 그리드(두꺼운 테두리·하드 섀도·기울기)로 정착.
@@ -69,30 +68,32 @@ interface Props {
   // 빌드타임(app/page.tsx)에 fetchWebtoons()로 미리 가져온 값 — 정적 HTML에
   // 실제 카드가 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
   initialItems?: CmsWebtoon[];
-  // lens("4가지 시선")의 웹툰 서브포맷도 이 섹션에 섞는다(2026-08-20, 사용자
-  // 요청 — shared/lib/lensMediaFeed.ts 참조). webtoon 채널 발행이 뜸해져도
-  // 이 섹션이 계속 쌓이도록.
-  initialLensPosts?: CmsLens[];
 }
 
-export function WebtoonPreviewSection({ initialItems, initialLensPosts }: Props) {
-  const [channelItems, setChannelItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
+// 2026-08-20엔 lens("4가지 시선") 글의 웹툰 서브포맷을 buildLensWebtoonItems로
+// 이 섹션에 섞어 넣었다(당시 webtoon 채널 발행이 뜸해질 것으로 예상해서).
+// 2026-08-23 — mustknow_auto/frontpage_auto가 이제 웹툰 생성 시 webtoon
+// 채널에도 독립 글을 같이 쓰도록 바뀌면서(사용자 지적: "웹툰 카드 누르면
+// 렌즈 4유형 페이지로 가지 말고 웹툰 전용 페이지로 가면 좋겠다" + "만화방에
+// 렌즈발 웹툰이 안 올라온다"), fetchWebtoons() 하나만으로 전부 커버된다 —
+// lens에서 파생해서 섞으면 오늘부터는 같은 기사가 두 장으로 중복 표시된다.
+// 과거 lens 글도 백필 스크립트로 webtoon 채널 글을 만들어뒀다
+// (docs/worklog 2026-08-23 웹툰 채널 분리 참조) — buildLensWebtoonItems는
+// 더 이상 이 섹션에서 쓰지 않는다(lensMediaFeed.ts에 그대로 남아 있지만
+// video 파생 쪽은 아직 이 정리가 안 됐다 — 별개 사안, 2026-08-20 결정
+// 그대로 유지 중).
+export function WebtoonPreviewSection({ initialItems }: Props) {
+  const [items, setItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
 
   useEffect(() => {
     let cancelled = false;
     fetchWebtoons().then((rows) => {
-      if (!cancelled) setChannelItems(rows);
+      if (!cancelled) setItems(rows);
     });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  const items = useMemo(() => {
-    if (channelItems === null) return null;
-    const lensItems = buildLensWebtoonItems(initialLensPosts ?? []);
-    return mergeByDateDesc(channelItems, lensItems);
-  }, [channelItems, initialLensPosts]);
 
   if (items === null) return null; // 로딩 중엔 자리 안 차지(스켈레톤 제거 방침과 동일)
 

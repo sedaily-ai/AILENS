@@ -321,6 +321,35 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
         "published_at": now,
     }
     table.put_item(Item=item)
+
+    # 2026-08-23 — mustknow_auto/run.py와 같은 이유·같은 패턴(사용자 지적:
+    # 홈 "이슈를 웹툰으로" 카드가 렌즈 4유형 페이지로 가지 말고 웹툰 전용
+    # 페이지로 가면 좋겠다 + "만화방"(/webtoon 목록)에 렌즈발 웹툰이
+    # 안 올라온다). lens 글은 그대로 두고 웹툰 채널에도 독립 글을 하나 더
+    # 쓴다 — 슬러그 충돌 방지로 "-webtoon" 접미사.
+    if webtoon_images:
+        webtoon_item = {
+            "id": str(uuid.uuid4()),
+            "slug": f"{slug}-webtoon",
+            "status": "published",
+            "channels": ["webtoon"],
+            "publish_date": publish_date_iso,
+            "editor_id": "AI LENS",
+            "headline": webtoon_script.get("core_question") or article["title"],
+            "subtitle": article["sub_title"],
+            "closing_line": None,
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": webtoon_images},
+            "cover_image_url": webtoon_images[0]["url"],
+            "source_url": source_url.split("?")[0],
+            "media_embed_url": None,
+            "display_order": None,
+            "created_by": "frontpage-auto",
+            "created_at": now,
+            "updated_at": now,
+            "published_at": now,
+        }
+        table.put_item(Item=webtoon_item)
+
     print(f"[frontpage-auto] 발행 완료 — {slug} ({status})")
     return status
 
