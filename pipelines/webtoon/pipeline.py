@@ -130,10 +130,32 @@ def _extract_json_block(text: str) -> dict:
 _SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 
 
-def call_json(prompt: str) -> dict:
-    """Bedrock Claude에 JSON 응답을 요청한다. (스크립트/장면연출 공용)"""
-    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=2000, temperature=0.7)
-    return _extract_json_block(raw)
+def call_json(prompt: str, debug_path: Path | None = None) -> dict:
+    """Bedrock Claude에 JSON 응답을 요청한다. (스크립트/장면연출 공용)
+
+    2026-08-23 — max_tokens을 2000→4000으로 올렸다. 1·2단계가 같은 한도를
+    공유하는데, 2단계(장면 연출)는 8컷 각각의 카메라 앵글+장면 묘사를
+    전부 써야 해서 1단계(대사/캡션)보다 원래 더 길어진다 — 실운영 중
+    2단계에서만 "Bedrock 응답에서 JSON을 찾지 못했습니다" 실패가 반복
+    발생한 게 이 한도 때문일 가능성이 커서(응답이 문장 중간에 잘리면
+    닫는 '}'가 아예 없어 4단계 폴백 전부 실패), video 파이프라인이
+    비슷한 분량(8~9컷)에 쓰는 max_tokens=4000과 맞췄다.
+
+    debug_path — 파싱 실패 시 원문 응답을 저장해서 원인을 사후에 볼 수
+    있게 한다(이게 없어서 오늘 실패 원인을 추정만 하고 확인은 못 했다).
+    성공하면 안 남긴다(디스크 낭비 방지)."""
+    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=4000, temperature=0.7)
+    try:
+        return _extract_json_block(raw)
+    except ValueError:
+        # 파일 저장은 같은 컨테이너 생애주기 안에서만 유효(Fargate 태스크가
+        # 끝나면 /tmp도 같이 사라짐) — 실제 사후 확인은 CloudWatch 로그로
+        # 하게 되니 원문도 같이 찍는다(길면 로그가 너무 커져서 2000자로 컷).
+        if debug_path is not None:
+            debug_path.parent.mkdir(parents=True, exist_ok=True)
+            debug_path.write_text(raw, encoding="utf-8")
+        print(f"    [call_json] 파싱 실패 원문(최대 2000자):\n{raw[:2000]}")
+        raise
 
 
 def build_image_prompt(camera: str, scene: str, cut: dict) -> str:
@@ -249,7 +271,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             " JSON 객체 하나만 응답한다(설명 문구 없이).\n\n[입력 기사]\n"
             + article
         )
-        script = call_json(script_prompt)
+        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt")
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # 2단계: 장면 연출
@@ -268,7 +290,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             + "\n\n[1단계 스크립트 결과]\n"
             + json.dumps(script, ensure_ascii=False)
         )
-        scenes = call_json(scene_prompt)
+        scenes = call_json(scene_prompt, debug_path=out / "2_raw_response.txt")
         scenes_path.write_text(json.dumps(scenes, ensure_ascii=False, indent=2), encoding="utf-8")
 
     scene_map = {s["cut"]: s for s in scenes["scenes"]}
