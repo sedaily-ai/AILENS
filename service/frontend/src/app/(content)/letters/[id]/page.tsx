@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
-import { withDisplayMeta } from '@/shared/lib/api/todayLettersApi';
+import { withDisplayMeta, fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { fetchCmsPosts, fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { clampModifiedIso } from '@/shared/lib/date';
@@ -242,7 +242,11 @@ export default async function LetterDetailPage({
 }) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId);
-  const letter = await findLetter(id);
+  // 우측 사이드바(SideRail) "요즘 가장 많이 읽힌 글" 서버 프리페치
+  // (2026-08-23) — 없으면 클라이언트 fetch가 끝날 때까지 안 보여서
+  // 실사용자가 "느리게 나타난다"고 느낀다(사용자가 프로덕션에서 직접
+  // 발견, "letters도 모든 부분 마찬가지").
+  const [letter, hotLetters] = await Promise.all([findLetter(id), fetchFollowingLetters(5)]);
   const jsonLd = letter ? buildArticleJsonLd(letter) : null;
   const { next, prev } = letter ? await findNeighbors(id) : { next: null, prev: null };
   return (
@@ -258,6 +262,7 @@ export default async function LetterDetailPage({
         initialLetter={letter ? withDisplayMeta(letter) : null}
         nextLetter={next}
         prevLetter={prev}
+        initialHotLetters={hotLetters}
       />
     </>
   );

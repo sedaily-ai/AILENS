@@ -419,7 +419,19 @@ function recentBirthYears(zodiac: Zodiac): number[] {
 
 const HOT_LETTERS_LIMIT = 5;
 
-export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: MbtiGroupId }) {
+export function SideRail({
+  selectedGroup: _selectedGroup,
+  initialHotLetters,
+}: {
+  selectedGroup?: MbtiGroupId;
+  // 서버 프리페치(2026-08-23) — HomeSideBar/HotLettersRail과 같은 이유.
+  // 없으면 이 컴포넌트를 쓰는 모든 페이지(letters 상세 등)에서 "요즘
+  // 가장 많이 읽힌 글"이 클라이언트 fetch가 끝날 때까지 안 보여서
+  // 실사용자가 "느리게 나타난다"고 느낀다(사용자가 프로덕션에서 직접
+  // 발견, "모든 부분 마찬가지"). 호출부가 안 넘기면 기존과 동일하게
+  // 빈 배열로 시작(하위 호환).
+  initialHotLetters?: TodayLetterCardLike[];
+}) {
   // 2026-08-10 — "요즘 가장 많이 읽힌 글"의 데이터 소스를 useLatestLetters
   // (하루치 전체 레터, 개수 상한 없음)에서 fetchFollowingLetters(=홈
   // "이슈 톡톡"과 같은 분류: 실제 에디터 이름으로 태깅된 레터만)로 교체.
@@ -427,7 +439,7 @@ export function SideRail({ selectedGroup: _selectedGroup }: { selectedGroup?: Mb
   // 참조 — 홈 "이슈 톡톡" 자체는 4개 그대로 두고 사이드바만 5개). 2026-08-12,
   // 이슈 톡톡 전체 삭제로 잠깐 useLatestLetters로 되돌렸다가 같은 날 이슈
   // 톡톡이 다시 부활하면서 이 원래 로직도 함께 복귀.
-  const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>([]);
+  const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>(initialHotLetters ?? []);
 
   useEffect(() => {
     let cancelled = false;

@@ -25,6 +25,7 @@ import {
   type ApiLetter,
   type DisplayLetter,
   type LetterChart,
+  type TodayLetterCardLike,
 } from '@/shared/lib/api/todayLettersApi';
 
 // 다른 날짜 letter 를 스캔할 때 훑는 최근 일수 — app/letters/[id]/page.tsx 의
@@ -50,6 +51,9 @@ interface Props {
   // findNeighbors()로 미리 조회해 내려준다.
   nextLetter?: NeighborLetter | null;
   prevLetter?: NeighborLetter | null;
+  // 우측 사이드바 "요즘 가장 많이 읽힌 글" 서버 프리페치(2026-08-23) —
+  // SideRail.tsx 참조.
+  initialHotLetters?: TodayLetterCardLike[];
 }
 
 interface NeighborLetter {
@@ -72,7 +76,7 @@ function recentDatesISO(days: number): string[] {
   return out;
 }
 
-export function LetterDetailClient({ letterId, initialLetter = null, nextLetter = null, prevLetter = null }: Props) {
+export function LetterDetailClient({ letterId, initialLetter = null, nextLetter = null, prevLetter = null, initialHotLetters }: Props) {
   const [mounted, setMounted] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -201,7 +205,7 @@ export function LetterDetailClient({ letterId, initialLetter = null, nextLetter 
             <LetterBody letter={letter} nextLetter={nextLetter} prevLetter={prevLetter} />
           </div>
           <div style={{ paddingTop: 'clamp(28px, 5vw, 56px)' }}>
-            <SideRail />
+            <SideRail initialHotLetters={initialHotLetters} />
           </div>
         </div>
 
