@@ -302,6 +302,16 @@ services/           → Business logic: article_filter, prompt_loader,
                      없음). 검증: OPTIONS·인증 없는 요청 401 스모크 테스트(둘 다 AWS 호출
                      없음, 상태코드·바디 모양 리팩토링 전후 동일 확인) + 전체 스위트 재확인
                      (104 passed, 기존 무관 에러 6건 동일).
+                     2026-08-24 후속4: `handlers/search_handler.py`(345줄, GSI 쿼리·
+                     카테고리 별칭 확장·중복제거·페이지네이션·warm-container 인메모리
+                     캐시가 전부 핸들러 파일에 있던 것)를 `search_service.py`
+                     (search_dynamodb_optimized/query_by_category_and_date/get_cached/
+                     set_cached/SearchResponse)로 분리. 345→77줄. `query_by_category_and_date`의
+                     `LastEvaluatedKey` 루프는 항목 10에서 이미 "다른 파일들과 달리
+                     error-partial-results 의미가 달라 공용 헬퍼로 안 옮긴다"고 결정된
+                     대로 그대로 유지(순수 파일 이동만). 검증: 잘못된 JSON body → 500
+                     SEARCH_ERROR 스모크 테스트(AWS 호출 없음, 상태코드·에러코드 리팩토링
+                     전후 동일 확인) + 전체 스위트 재확인(104 passed, 기존 무관 에러 6건 동일).
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
