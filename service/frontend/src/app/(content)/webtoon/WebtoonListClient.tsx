@@ -65,6 +65,9 @@ export function WebtoonListClient({ initialItems, initialPage }: { initialItems:
   const totalPages = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
   const currentPage = Math.min(initialPage, totalPages);
   const visibleRest = rest.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // 쿼리스트링(?page=N) → 경로(/webtoon/page/N) 전환(2026-08-23, page.tsx 상단
+  // 주석 참조) — 1페이지만 /webtoon 자체를 가리킨다.
+  const webtoonPageHref = (n: number) => (n <= 1 ? '/webtoon' : `/webtoon/page/${n}`);
 
   return (
     <div
@@ -397,7 +400,7 @@ export function WebtoonListClient({ initialItems, initialPage }: { initialItems:
             {totalPages > 1 && (
               <div className="flex items-center justify-center" style={{ gap: 6, marginTop: 20, flexWrap: 'wrap' }}>
                 <Link
-                  href={`/webtoon${currentPage - 1 > 1 ? `?page=${currentPage - 1}` : ''}`}
+                  href={webtoonPageHref(currentPage - 1)}
                   aria-label="이전 페이지"
                   aria-disabled={currentPage === 1}
                   tabIndex={currentPage === 1 ? -1 : undefined}
@@ -424,7 +427,7 @@ export function WebtoonListClient({ initialItems, initialPage }: { initialItems:
                   return (
                     <Link
                       key={n}
-                      href={`/webtoon${n > 1 ? `?page=${n}` : ''}`}
+                      href={webtoonPageHref(n)}
                       aria-current={active ? 'page' : undefined}
                       style={{
                         display: 'flex',
@@ -449,7 +452,7 @@ export function WebtoonListClient({ initialItems, initialPage }: { initialItems:
                   );
                 })}
                 <Link
-                  href={`/webtoon${currentPage + 1 <= totalPages ? `?page=${currentPage + 1}` : `?page=${totalPages}`}`}
+                  href={webtoonPageHref(Math.min(currentPage + 1, totalPages))}
                   aria-label="다음 페이지"
                   aria-disabled={currentPage === totalPages}
                   tabIndex={currentPage === totalPages ? -1 : undefined}

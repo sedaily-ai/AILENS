@@ -79,6 +79,15 @@ Disallow: /api/
 Disallow: /_next/
 Disallow: /login
 
+# Bingbot(전통 검색)은 이름 있는 그룹이 없으면 위 "*" 그룹을 그대로 따르지만,
+# Copilot(빙 AI 답변)도 결국 Bingbot 크롤 결과를 쓰므로 명시적으로 한 번 더
+# 확인(2026-08-23, "빙도 잘 들어오게" 요청).
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
+
 # ── AI 학습 크롤러 (모델 학습에 콘텐츠 포함되는 것 허용) ─────
 User-agent: GPTBot
 Allow: /
@@ -105,6 +114,41 @@ Disallow: /_next/
 Disallow: /login
 
 User-agent: Bytespider
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
+
+# Apple Intelligence/Siri 검색(Applebot-Extended는 학습용, Applebot은 검색
+# 인덱싱용 — 2026-08-23 추가).
+User-agent: Applebot
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
+
+# Meta AI(2026-08-23 추가).
+User-agent: meta-externalagent
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
+
+# Amazon(Rufus/Alexa+, 2026-08-23 추가).
+User-agent: Amazonbot
+Allow: /
+Disallow: /api/
+Disallow: /_next/
+Disallow: /login
+
+# DuckDuckGo AI 답변(2026-08-23 추가).
+User-agent: DuckAssistBot
 Allow: /
 Disallow: /api/
 Disallow: /_next/

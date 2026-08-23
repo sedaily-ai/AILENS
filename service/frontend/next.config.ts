@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
     optimizePackageImports: ["lucide-react"],
+    // 2026-08-23, "바로바로 이동되면 좋겠다" 요청 — [slug] page.tsx들이
+    // generateStaticParams로 <Link> 프리페치는 이미 켜뒀는데, staleTimes를
+    // 안 정해두면 Next 기본값이 보수적이라 프리페치해둔 데이터를 두고도
+    // 클릭 시 재요청하는 경우가 있다. 이 값만큼은 "이미 받아둔 걸 그냥
+    // 써도 되는 시간"으로 인정 — admin 발행 즉시반영은 서버 쪽 fetch
+    // revalidate(60~300초)·CloudFront 60초 캐시가 별도로 담당하므로
+    // 이 값과 무관하다(이건 브라우저 세션 내 클라이언트 캐시일 뿐).
+    staleTimes: { dynamic: 30, static: 180 },
   },
   // 사주(saju/frontend)를 완전히 독립된 Next 앱으로 분리(2026-08-15) —
   // 프로덕션에선 CloudFront가 엣지에서 /saju*를 별도 origin으로 바로
@@ -42,6 +50,10 @@ const nextConfig: NextConfig = {
   // 건너뛰고 외부 origin으로 바로 보내므로, 여기서 만든 리다이렉트 응답도
   // 브라우저가 다시 /saju로 요청하면 정상적으로 그쪽에서 처리된다.
   async redirects() {
+    // /lens?page=N, /webtoon?page=N 옛 링크 정리는 여기(has+쿼리) 대신
+    // src/middleware.ts에서 한다 — Next의 redirects()+has 조합은 destination
+    // 에 캡처값을 써도 원본 쿼리스트링을 지우지 못해 "/lens/page/2?page=2"
+    // 처럼 지저분한 URL이 됐다(미들웨어 파일 상단 주석 참조).
     const rules: Array<{ source: string; destination: string; permanent: boolean }> = [
       { source: "/fortune", destination: "/saju", permanent: true },
       { source: "/fortune/:path*", destination: "/saju", permanent: true },

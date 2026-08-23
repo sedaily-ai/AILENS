@@ -1,8 +1,7 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { useEffect } from 'react';
 import { AuthProvider } from '@/features/auth';
-import { NavProgress } from '@/widgets/NavProgress';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { reportWebVitals } from '@/shared/lib/tracking/webVitals';
 
@@ -41,10 +40,11 @@ function SessionSourceTracker() {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      {/* useSearchParams 사용 — 정적 export 빌드에서 Suspense 경계 필수 */}
-      <Suspense fallback={null}>
-        <NavProgress />
-      </Suspense>
+      {/* 상단 진행 바(NavProgress)는 2026-08-23 제거 — "바로바로 이동" 요청과
+          충돌: 실제 전환이 끝나도 최소 460ms짜리 페이드아웃 애니메이션을
+          강제로 재생해서, prefetch+staleTimes로 진짜 빨라진 전환을 오히려
+          더 느리게 느껴지게 만들었다(컴포넌트 자체는 widgets/NavProgress에
+          남겨둠 — 필요해지면 되돌릴 수 있게). */}
       <SessionSourceTracker />
       <WebVitalsTracker />
       {children}

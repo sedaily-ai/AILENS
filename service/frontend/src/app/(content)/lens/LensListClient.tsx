@@ -84,6 +84,9 @@ export function LensListClient({
   const [latest, ...rest] = items;
   const totalPages = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
   const currentPage = Math.min(initialPage, totalPages);
+  // 쿼리스트링(?page=N) → 경로(/lens/page/N) 전환(2026-08-23, page.tsx 상단
+  // 주석 참조) — 1페이지만 /lens 자체를 가리킨다.
+  const lensPageHref = (n: number) => (n <= 1 ? '/lens' : `/lens/page/${n}`);
   const pageItems = rest.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const heroPhoto = latest ? pickLensPhoto(latest) : null;
   const heroRows = (latest?.lenses ?? []).slice(0, 4);
@@ -481,7 +484,7 @@ export function LensListClient({
             {totalPages > 1 && (
               <div className="flex items-center justify-center" style={{ gap: 6, marginTop: 28, flexWrap: 'wrap' }}>
                 <Link
-                  href={`/lens${currentPage - 1 > 1 ? `?page=${currentPage - 1}` : ''}`}
+                  href={lensPageHref(currentPage - 1)}
                   aria-label="이전 페이지"
                   aria-disabled={currentPage === 1}
                   className="pg"
@@ -497,7 +500,7 @@ export function LensListClient({
                   return (
                     <Link
                       key={n}
-                      href={`/lens${n > 1 ? `?page=${n}` : ''}`}
+                      href={lensPageHref(n)}
                       aria-current={on ? 'page' : undefined}
                       aria-label={`${n}페이지`}
                       className="pg"
@@ -513,7 +516,7 @@ export function LensListClient({
                   );
                 })}
                 <Link
-                  href={`/lens${currentPage + 1 <= totalPages ? `?page=${currentPage + 1}` : `?page=${totalPages}`}`}
+                  href={lensPageHref(Math.min(currentPage + 1, totalPages))}
                   aria-label="다음 페이지"
                   aria-disabled={currentPage === totalPages}
                   className="pg"
