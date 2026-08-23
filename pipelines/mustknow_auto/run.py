@@ -428,16 +428,19 @@ def main():
     tab_counts = {"전체": 0, "증권": 0, "산업": 0, "시그널": 0, "일반": 0}
 
     def _try_publish(article, paper_section, display_order):
+        """반환값을 호출부가 반드시 확인해야 한다 — "failed"면 seen을
+        마킹하면 안 된다(아래 버그 설명 참조)."""
         if _already_published_elsewhere(table, article["key"]):
             print(f"[mustknow-auto] frontpage_auto 등에 이미 발행됨, 스킵 — {article['title']}")
             results["skipped_duplicate"] += 1
-            return
+            return "skipped_duplicate"
         try:
             status = _publish(article, out_dir, s3, table, today, paper_section=paper_section, display_order=display_order)
         except Exception:
             print(f"[mustknow-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵\n{traceback.format_exc()}")
             status = "failed"
         results[status] = results.get(status, 0) + 1
+        return status
 
     # 1) 전체(지면1면) — 점수 불필요, TOP 배치 우선(discovery가 이미 정렬해서 줌)
     #
@@ -449,6 +452,14 @@ def main():
     # 이 상태에 빠져 DDB를 직접 조회해 수동 복구했다). 이제는 발행 시도가
     # 실제로 끝난(성공/처리된 실패/중복스킵) 뒤에만 seen을 기록해서,
     # 시도 자체가 안 끝나고 죽은 기사는 자동으로 다음 실행에서 재시도된다.
+    #
+    # 2026-08-23 버그5-b: 위 수정에도 "처리된 실패"(예외를 잡아서 우아하게
+    # failed로 끝난 경우 — 웹툰 JSON 파싱 실패 등)는 여전히 무조건 seen을
+    # 찍고 있었다. 이러면 그날 실제로 코드 버그 때문에 실패한 기사가
+    # 그 버그를 고친 뒤에도 영원히 재시도 안 된다(실제로 발생 — 20082215/
+    # 20082229가 웹툰 JSON 버그로 실패했는데 seen에 박혀서, 그 버그를
+    # 고친 뒤 재실행해도 두 기사는 다시 안 걸렸다). status가 "failed"면
+    # seen을 안 찍어서 다음 회차에 다시 시도되게 한다.
     if not is_sunday:
         for a in front_page:
             if a["key"] and _is_seen(seen_table, a["key"]):
@@ -456,8 +467,9 @@ def main():
             if tab_counts["전체"] >= _TAB_CAP:
                 break
             selected_keys.add(a["key"])
-            _try_publish(a, "전체", tab_counts["전체"])
-            _mark_seen(seen_table, a["key"], tab="전체")
+            status = _try_publish(a, "전체", tab_counts["전체"])
+            if status != "failed":
+                _mark_seen(seen_table, a["key"], tab="전체")
             tab_counts["전체"] += 1
 
     # 2) Sonnet 5 배치 채점 — fresh 전체(전체 탭 후보 제외한 나머지)
@@ -490,8 +502,9 @@ def main():
                 if not row or (row.get("total") or 0) < _TAB_THRESHOLD:
                     continue
                 selected_keys.add(a["key"])
-                _try_publish(a, tab, tab_counts[tab])
-                _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+                status = _try_publish(a, tab, tab_counts[tab])
+                if status != "failed":
+                    _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
                 tab_counts[tab] += 1
 
     # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게
@@ -504,8 +517,9 @@ def main():
         if not row or (row.get("total") or 0) < _GENERAL_THRESHOLD:
             continue
         selected_keys.add(a["key"])
-        _try_publish(a, None, None)
-        _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+        status = _try_publish(a, None, None)
+        if status != "failed":
+            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
         tab_counts["일반"] += 1
 
     print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
