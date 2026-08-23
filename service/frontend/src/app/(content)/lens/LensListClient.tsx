@@ -114,7 +114,7 @@ export function LensListClient({
 
         /* 목록 행 */
         .prow { display: grid; grid-template-columns: 72px minmax(0,1fr) auto;
-          gap: 14px; align-items: center; padding: 14px clamp(4px, 1.2vw, 8px);
+          gap: 14px; align-items: start; padding: 14px clamp(4px, 1.2vw, 8px);
           text-decoration: none; border-radius: 12px; transition: background .14s ease; }
         .prow:hover { background: #fafbfc; }
         .prow:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -2px; }
@@ -393,28 +393,51 @@ export function LensListClient({
                           )}
                         </span>
 
-                        {/* 날짜는 묶음 머리로 올라갔다 — 제목이 행 폭을 다 쓴다. */}
-                        <span
-                          style={{
-                            display: '-webkit-box',
-                            minWidth: 0,
-                            fontSize: 16,
-                            fontWeight: 700,
-                            color: '#111827',
-                            lineHeight: 1.45,
-                            letterSpacing: '-0.02em',
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            wordBreak: 'keep-all',
-                          }}
-                        >
-                          {l.headline}
+                        {/* 날짜는 묶음 머리로 올라갔다 — 제목이 행 폭을 다 쓴다.
+                            2026-08-23, 사용자 지적 — "제목만 있음 좀 아쉬우니
+                            본문 미리보기 좀". context(기사 부제)를 제목 아래
+                            1줄만 덧붙인다 — 히어로 카드가 이미 context를
+                            2줄까지 보여주는데, 이 목록 행은 훨씬 좁아서 1줄로
+                            줄였다(3줄 제목 + 2줄 본문이면 행이 과하게 길어짐). */}
+                        <span style={{ display: 'block', minWidth: 0 }}>
+                          <span
+                            style={{
+                              display: '-webkit-box',
+                              fontSize: 16,
+                              fontWeight: 700,
+                              color: '#111827',
+                              lineHeight: 1.45,
+                              letterSpacing: '-0.02em',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              wordBreak: 'keep-all',
+                            }}
+                          >
+                            {l.headline}
+                          </span>
+                          {l.context && (
+                            <span
+                              style={{
+                                display: '-webkit-box',
+                                marginTop: 4,
+                                fontSize: 13.5,
+                                color: '#6b7280',
+                                lineHeight: 1.55,
+                                WebkitLineClamp: 1,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                wordBreak: 'keep-all',
+                              }}
+                            >
+                              {l.context}
+                            </span>
+                          )}
                         </span>
 
                         {/* 네 인물 아바타 — 이 항목도 네 시선을 품고 있다는 신호.
                             제목만 있으면 일반 기사 목록과 구별되지 않는다. */}
-                        <span className="pav items-center flex-shrink-0" aria-hidden>
+                        <span className="pav items-center flex-shrink-0" aria-hidden style={{ alignSelf: 'center' }}>
                           {Array.from({ length: Math.min(n, 4) }, (_, i) => {
                             const p = lensPerspectiveAt(i);
                             return (
