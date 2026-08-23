@@ -5,14 +5,13 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import { EditorCommentsSection, InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed';
+import { EditorCommentsSection, InteractiveBlock } from '@/features/news-feed';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { trackArticleRead } from '@/shared/lib/tracking/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { useAuth } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { letterHref } from '@/shared/lib/letterHref';
 import { fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { API_URL } from '@/shared/config/apiClient';
 import { kstDateTimeLabel } from '@/shared/lib/date';
@@ -27,9 +26,17 @@ import {
   withDisplayMeta,
   type ApiLetter,
   type DisplayLetter,
-  type LetterChart,
   type TodayLetterCardLike,
 } from '@/shared/lib/api/todayLettersApi';
+import {
+  injectImageCaptions,
+  splitBodyHtml,
+  cleanSubtitle,
+  letterCategoryLabel,
+} from './letterHtmlUtils';
+import { wrapWithTerms } from './TermTooltip';
+import { PrevNextLetterNav, type NeighborLetter } from './PrevNextLetterNav';
+import { LetterChartBlock } from './LetterChartBlock';
 
 // 다른 날짜 letter 를 스캔할 때 훑는 최근 일수 — app/letters/[id]/page.tsx 의
 // SEED_DAYS 와 같은 값(그룹-날짜 합성 id 스킴 폐지 이후 findLetter 와 동일 패턴).
@@ -57,12 +64,6 @@ interface Props {
   // 우측 사이드바 "요즘 가장 많이 읽힌 글" 서버 프리페치(2026-08-23) —
   // SideRail.tsx 참조.
   initialHotLetters?: TodayLetterCardLike[];
-}
-
-interface NeighborLetter {
-  id: string;
-  headline: string;
-  date: string;
 }
 
 // "YYYY-MM-DD" 최근 n 일 (오늘 포함, 내림차순) — app/letters/[id]/page.tsx 의
@@ -228,103 +229,6 @@ export function LetterDetailClient({ letterId, initialLetter = null, nextLetter 
       <div className="h-24" />
     </div>
   );
-}
-
-// CMS body_html 안 퀴즈/투표 마커를 기준으로 HTML 조각과 실제 인터랙티브
-// 컴포넌트를 번갈아 배치하기 위한 분리. 마커 두 형식을 함께 지원한다:
-//   1) <!--AI_QUIZ:{...}-->            — 초기에 DB에 직접 심었던 구형 마커
-//   2) <div data-ai-quiz="{...}"></div> — admin PostForm 퀴즈 위젯(Tiptap
-//      aiQuiz 노드)이 저장하는 신형 마커. 브라우저가 속성값을 HTML 엔티티로
-//      이스케이프해서 내보내므로 파싱 전에 디코딩한다.
-// 마커 안 JSON이 깨져 있으면(수기 편집 실수 등) 조용히 건너뛰고 나머지
-// HTML은 그대로 렌더.
-type BodyHtmlPart =
-  | { type: 'html'; content: string }
-  | { type: 'interactive'; data: InteractiveBlockData };
-
-function decodeHtmlEntities(s: string): string {
-  if (typeof document === 'undefined') return s;
-  const ta = document.createElement('textarea');
-  ta.innerHTML = s;
-  return ta.value;
-}
-
-// admin 에디터가 저장하는 이미지는 <img alt="..."> 한 줄뿐이다(에디터
-// 재로딩 시 스키마 불일치를 피하려고 저장 형태 자체는 손대지 않음 —
-// admin/frontend/src/components/resizableImageExtension.tsx 참고). alt를
-// 실제로 사진 밑 캡션처럼 보여주는 건 "읽는 화면"의 몫이라, alt가 있는
-// 이미지를 렌더 시점에만 <figure>+<figcaption>으로 감싼다(네이버 블로그
-// 참고 — admin 미리보기 모달과 같은 방식).
-function injectImageCaptions(html: string): string {
-  if (typeof document === 'undefined' || !html) return html;
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  doc.querySelectorAll('img[alt]').forEach((img) => {
-    const alt = img.getAttribute('alt');
-    if (!alt?.trim() || img.parentElement?.tagName === 'FIGURE') return;
-    const figure = doc.createElement('figure');
-    figure.setAttribute('style', 'margin:0;');
-    img.replaceWith(figure);
-    figure.appendChild(img);
-    const caption = doc.createElement('figcaption');
-    caption.textContent = alt;
-    caption.setAttribute(
-      'style',
-      'margin-top:8px;font-size:12.5px;font-style:italic;color:#9ca3af;text-align:center;',
-    );
-    figure.appendChild(caption);
-  });
-  return doc.body.innerHTML;
-}
-
-function splitBodyHtml(html: string): BodyHtmlPart[] {
-  const parts: BodyHtmlPart[] = [];
-  const markerRe = /<!--AI_QUIZ:([\s\S]*?)-->|<div data-ai-quiz="([^"]*)"[^>]*>\s*<\/div>/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = markerRe.exec(html))) {
-    if (match.index > lastIndex) {
-      parts.push({ type: 'html', content: html.slice(lastIndex, match.index) });
-    }
-    const raw = match[1] ?? decodeHtmlEntities(match[2] ?? '');
-    try {
-      parts.push({ type: 'interactive', data: JSON.parse(raw) });
-    } catch {
-      // 마커가 깨졌으면 원본 그대로 유지(눈에는 안 보이거나 빈 div, 데이터 손실 없음)
-      parts.push({ type: 'html', content: match[0] });
-    }
-    lastIndex = markerRe.lastIndex;
-  }
-  if (lastIndex < html.length) {
-    parts.push({ type: 'html', content: html.slice(lastIndex) });
-  }
-  return parts;
-}
-
-// 부제(letter.subtitle) 정제(2026-08-18, "크기나 레이아웃 개선해쥣죠") —
-// 일부 레터는 subtitle 필드에 본문 마커 문법(■ 섹션헤더, [라벨] 태그)이
-// 그대로 들어있다("■AI 프리즘 [신입 직장인 뉴스] ..."). 헤드라인 바로
-// 아래 노출되는 자리라 마커가 그대로 보이면 파싱 안 된 원본이 새어나온
-// 것처럼 읽힌다 — 데이터 자체는 안 건드리고 표시 시점에만 앞쪽 마커를
-// 걷어낸다.
-function cleanSubtitle(raw: string): string {
-  return raw
-    .replace(/^■\s*/, '')
-    .replace(/^\[[^\]]*\]\s*/, '')
-    .trim();
-}
-
-// 헤더 배지 라벨(2026-08-18, "이거 카테고리 뭔가요?") — letter.editorName은
-// MBTI 4-페르소나 폐지(2026-08-07) 이후 모든 레터가 항상 "AI LENS" 한
-// 값이라 카테고리 정보가 전혀 없고, 사이트 로고와 텍스트가 겹쳐 거슬렸다.
-// 실제 분류 필드(category → section)로 교체 — 둘 다 없으면 lens의
-// "4가지 시선"처럼 이 콘텐츠 형식 자체를 가리키는 "AI 레터"로 폴백.
-const SECTION_LABEL: Record<NonNullable<ApiLetter['section']>, string> = {
-  trend: '트렌드',
-  column: '칼럼',
-  issue_talk: '이슈 브리핑',
-};
-function letterCategoryLabel(letter: DisplayLetter): string {
-  return letter.category?.trim() || (letter.section ? SECTION_LABEL[letter.section] : null) || 'AI 레터';
 }
 
 // production letter inline 렌더
@@ -1004,50 +908,6 @@ function LetterTextExtras({
 // 2026-08-05 제거 — 실사용 없이 "동영상 준비 중" mock 만 노출되고 있었음.
 
 // ── 데이터 차트 (2026-08-07) ─────────────────────────────────────────
-// CMS 글이 배경자료(edragon 등)에 있던 수치 인포그래픽을 재구성해 넣을 때
-// 쓰는 블록. 원본 이미지·캐릭터를 그대로 가져오지 않고, 수치만 가져와
-// AI LENS 자체 톤(세리프 라벨 없는 담백한 가로 막대)으로 새로 그린다.
-function LetterChartBlock({ chart, accent }: { chart: LetterChart; accent: string }) {
-  const max = Math.max(...chart.series.map((s) => Math.abs(s.value)), 1);
-  return (
-    <div
-      style={{
-        margin: '28px 0',
-        padding: 'clamp(16px, 3vw, 22px)',
-        borderRadius: 14,
-        background: '#fafaf9',
-        border: '1px solid #f0efe9',
-      }}
-    >
-      <p style={{ fontSize: 12.5, fontWeight: 700, color: '#78716c', marginBottom: 16, letterSpacing: '-0.005em' }}>
-        {chart.title}
-        {chart.unit ? ` (${chart.unit})` : ''}
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-        {chart.series.map((s) => (
-          <div key={s.label} className="flex items-center" style={{ gap: 10 }}>
-            <span style={{ width: 64, flexShrink: 0, fontSize: 12.5, color: '#57534e', fontWeight: 600 }}>{s.label}</span>
-            <div style={{ flex: 1, background: '#efece4', borderRadius: 6, height: 20, overflow: 'hidden' }}>
-              <div
-                style={{
-                  width: `${Math.max(4, (Math.abs(s.value) / max) * 100)}%`,
-                  height: '100%',
-                  background: accent,
-                  borderRadius: 6,
-                  transition: 'width 0.4s ease',
-                }}
-              />
-            </div>
-            <span style={{ width: 48, flexShrink: 0, textAlign: 'right', fontSize: 12.5, fontWeight: 700, color: '#292524' }}>
-              {s.value}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── 본문 블록 위계 렌더 ───────────────────────────────────────────────
 // body 는 구조가 텍스트 약속으로만 인코딩된 string[] 이라, 한 줄을
 // 분류해 섹션 헤더 / 소제목 / 인사이트 콜아웃 / 아젠다 / Q&A / 본문으로
@@ -1263,259 +1123,3 @@ function LetterBlock({
   );
 }
 
-// 이전/다음 레터 내비게이션(2026-08-21, GEO 재감사에서 새로 구현). 예전
-// 버전(MBTI 페르소나 체계 — l-YYYYMMDD-XX id 파싱 + mbti_group 매칭, 아래
-// 참고용으로 잠깐 흔적만 남겨뒀다가 삭제)은 그 체계 폐지로 이미 죽어있었다
-// — page.tsx의 findNeighbors()가 서버에서 미리 조회해 내려준 데이터를
-// 그대로 그리기만 하면 돼서 클라이언트 fetch/useEffect 자체가 필요 없다.
-function PrevNextLetterNav({
-  next,
-  prev,
-  accent,
-  accentBg,
-}: {
-  next?: NeighborLetter | null;
-  prev?: NeighborLetter | null;
-  accent: string;
-  accentBg: string;
-}) {
-  return (
-    <nav
-      aria-label="이전·다음 레터"
-      style={{
-        marginTop: 24,
-        paddingTop: 24,
-        borderTop: '1px solid #f3f4f6',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 12,
-      }}
-    >
-      {prev ? (
-        <PrevNextCard direction="prev" letter={prev} accent={accent} accentBg={accentBg} />
-      ) : (
-        <div />
-      )}
-      {next ? (
-        <PrevNextCard direction="next" letter={next} accent={accent} accentBg={accentBg} />
-      ) : (
-        <div />
-      )}
-    </nav>
-  );
-}
-
-function PrevNextCard({
-  direction,
-  letter,
-  accent,
-  accentBg,
-}: {
-  direction: 'prev' | 'next';
-  letter: NeighborLetter;
-  accent: string;
-  accentBg: string;
-}) {
-  const isPrev = direction === 'prev';
-  const label = isPrev ? '이전 레터' : '다음 레터';
-  const [y, m, d] = letter.date.split('-').map((s) => parseInt(s, 10));
-  const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
-  const dow = DOW_KO[new Date(y, m - 1, d).getDay()];
-  const dateLabel = `${m}월 ${d}일 ${dow}요일`;
-
-  return (
-    <Link
-      href={letterHref(letter.id)}
-      prefetch
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-        padding: '16px 18px',
-        background: '#fff',
-        border: '1px solid #f1f1f0',
-        borderRadius: 14,
-        textDecoration: 'none',
-        color: 'inherit',
-        transition: 'box-shadow 0.18s, transform 0.18s, border-color 0.18s',
-        boxShadow: '0 1px 2px rgba(17,24,39,0.03)',
-        textAlign: isPrev ? 'left' : 'right',
-        minHeight: 84,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = `0 6px 18px ${accent}22`;
-        e.currentTarget.style.transform = 'translateY(-1px)';
-        e.currentTarget.style.borderColor = `${accent}55`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = '0 1px 2px rgba(17,24,39,0.03)';
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.borderColor = '#f1f1f0';
-      }}
-    >
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: accent,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-          justifyContent: isPrev ? 'flex-start' : 'flex-end',
-        }}
-      >
-        {isPrev && <span aria-hidden>←</span>}
-        {label}
-        {!isPrev && <span aria-hidden>→</span>}
-      </span>
-      <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>{dateLabel}</span>
-      <span
-        style={{
-          fontFamily: '"Noto Serif KR", serif',
-          fontSize: 14.5,
-          fontWeight: 600,
-          color: '#1f2937',
-          lineHeight: 1.45,
-          letterSpacing: '-0.01em',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          marginTop: 2,
-          background: accentBg,
-          padding: '2px 6px',
-          borderRadius: 4,
-          alignSelf: isPrev ? 'flex-start' : 'flex-end',
-          maxWidth: '100%',
-        }}
-      >
-        {letter.headline}
-      </span>
-    </Link>
-  );
-}
-
-// ── 용어 툴팁 ────────────────────────────────────────────────────────
-// 본문 안에서 glossary 의 단어들을 dotted underline + 호버 툴팁(term+explain)으로 감싼다.
-// 같은 단락 안의 모든 등장에 적용. 가장 긴 단어 먼저 매칭해 substring 충돌 방지.
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function wrapWithTerms(
-  text: string,
-  glossary: Array<{ term: string; explain: string }>,
-): ReactNode {
-  const sorted = [...glossary].sort((a, b) => b.term.length - a.term.length);
-  const pattern = new RegExp(sorted.map((t) => escapeRegex(t.term)).join('|'), 'g');
-  const lookup = new Map(glossary.map((g) => [g.term, g.explain]));
-
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let i = 0;
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-    const m = match[0];
-    nodes.push(
-      <TermTooltip key={`tt-${i++}-${match.index}`} term={m} explain={lookup.get(m) ?? ''}>
-        {m}
-      </TermTooltip>,
-    );
-    lastIndex = match.index + m.length;
-  }
-  if (lastIndex === 0) return text;
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return <>{nodes}</>;
-}
-
-function TermTooltip({
-  term,
-  explain,
-  children,
-}: {
-  term: string;
-  explain: string;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span
-      role="button"
-      tabIndex={0}
-      aria-label={`용어 해설: ${term}`}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-      onClick={(e) => {
-        e.preventDefault();
-        setOpen((o) => !o);
-      }}
-      style={{
-        position: 'relative',
-        display: 'inline',
-        cursor: 'help',
-        outline: 'none',
-      }}
-    >
-      <span
-        style={{
-          borderBottom: '1px dotted #9ca3af',
-          paddingBottom: 1,
-        }}
-      >
-        {children}
-      </span>
-      {open && (
-        <span
-          role="tooltip"
-          style={{
-            position: 'absolute',
-            bottom: 'calc(100% + 8px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            padding: '10px 14px',
-            background: '#111827',
-            color: '#fff',
-            fontSize: 12.5,
-            fontWeight: 400,
-            lineHeight: 1.55,
-            borderRadius: 8,
-            minWidth: 200,
-            maxWidth: 'min(320px, 80vw)',
-            width: 'max-content',
-            whiteSpace: 'normal',
-            zIndex: 20,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-            textAlign: 'left',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif',
-            letterSpacing: '-0.005em',
-          }}
-        >
-          <span style={{ fontWeight: 700, color: '#fbbf24', display: 'block', marginBottom: 4 }}>
-            {term}
-          </span>
-          {explain}
-          <span
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderTop: '6px solid #111827',
-            }}
-          />
-        </span>
-      )}
-    </span>
-  );
-}

@@ -216,4 +216,21 @@ features/[feature-name]/
 - 남은 것: `LensViewClient.tsx`가 여전히 1612줄로 가장 큰 파일. 다음 후보는
   마운트-감지/포맷-전환 로직과 4개 형식(레터/웹툰/팟캐스트/영상) 렌더
   분기를 각각의 하위 컴포넌트로 더 쪼개는 것 — 이번 라운드에서는 여기까지.
-  `LetterDetailClient.tsx`(1521줄, 12개+ 인라인 컴포넌트)는 아직 미착수.
+
+### `LetterDetailClient.tsx` 1521→1129줄
+- (2026-08-24) 순수 HTML 가공 유틸(`decodeHtmlEntities`/`injectImageCaptions`/
+  `splitBodyHtml`/`cleanSubtitle`/`letterCategoryLabel`, `BodyHtmlPart` 타입)을
+  `letterHtmlUtils.ts`로, 용어 툴팁(`TermTooltip`+`wrapWithTerms`)을
+  `TermTooltip.tsx`로, 이전/다음 레터 내비게이션(`PrevNextLetterNav`+
+  `PrevNextCard`, `NeighborLetter` 타입 포함)을 `PrevNextLetterNav.tsx`로,
+  수치 인포그래픽(`LetterChartBlock`)을 `LetterChartBlock.tsx`로 각각
+  분리(모두 `letters/[id]/` 같은 폴더의 형제 파일 — 다른 페이지가 쓸
+  일 없는 레터 상세 전용 조각이라 `shared/`가 아니라 co-locate).
+  본체는 `LetterBody`(185줄)/`SentenceSelectionPopover`(164줄)/
+  `LetterSubscribeSection`(211줄)/`LetterTextExtras`(117줄)/`LetterBlock`
+  (214줄) 5개가 남아있음 — 서로 상태·핸들러를 더 많이 공유해서 이번
+  라운드는 순수 유틸/독립 UI만 먼저 뗐다. 다음 라운드 후보.
+  검증: tsc/eslint(미사용 import 6개 정리 포함)/build 통과 + 로컬
+  프로덕션 빌드로 실제 레터 상세 페이지 SSR 출력 확인(이전/다음 레터
+  내비게이션 마크업 정상 렌더, 200). Chrome 확장 미연결로 실제 인터랙션
+  (문장 선택 팝오버, 용어 툴팁 호버 등)까지의 브라우저 확인은 못함.
