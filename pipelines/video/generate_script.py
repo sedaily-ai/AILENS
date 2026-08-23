@@ -154,6 +154,16 @@ def fix_script(script: dict) -> tuple[dict, list[str]]:
                     fixed = _fix_icon(node["icon"])
                     applied.append(f"{tag}: 노드 아이콘 '{node['icon']}' → '{fixed}'(화이트리스트 밖)")
                     node["icon"] = fixed
+                # 2026-08-23 — 스키마상 connector.variant는 'arrow' 하나뿐인데
+                # (schema.ts z.enum(['arrow'])) Claude가 가끔 'divider' 같은
+                # 지원 안 하는 값을 씀 — 아이콘 화이트리스트와 같은 이유로
+                # 장식성 필드라 안전하게 자동 보정한다. 이게 없으면 스키마
+                # 검증에서 렌더 자체가 통째로 실패해 영상이 아예 안 나온다
+                # (실제로 20082229 재생성 중 발견 — "Invalid input: expected
+                # 'arrow'").
+                elif node.get("kind") == "connector" and node.get("variant") != "arrow":
+                    applied.append(f"{tag}: 커넥터 variant '{node.get('variant')}' → 'arrow'(스키마상 유일 허용값)")
+                    node["variant"] = "arrow"
 
         fixed_cuts.append(cut)
 
