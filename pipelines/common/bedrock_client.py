@@ -26,10 +26,24 @@ MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile
 # 넉넉히 늘린다(진짜 hang만 걸러내려는 목적, 정상 완료를 막으면 안 됨).
 #
 # 2026-08-23 — 실제 Fargate에서 첫 검증 실행했더니 이번엔 Read가 아니라
-# Connect timeout(10초)으로 전부 실패했다. 네트워크 설정(퍼블릭 서브넷+
-# IGW 라우트+아웃바운드 전체 허용)은 정상으로 확인됐고, 태스크 시작
-# 직후 첫 아웃바운드 호출이라 ENI 붙고 DNS 붙는 콜드스타트 지연이
-# 10초 안에 안 끝났을 가능성이 커서 30초로 늘린다.
+# Connect timeout(10초)으로 전부 실패했다. 30초로 늘려도 똑같이 실패해서
+# 콜드스타트 지연이 아니라는 걸 확인 — 진단해보니 원인은 완전히 다른
+# 문제였다: 이 VPC에 다른 프로젝트(nx-tt)가 만든 bedrock-runtime VPC
+# 인터페이스 엔드포인트가 Private DNS 활성화 상태로 떠있어서,
+# bedrock-runtime.us-east-1.amazonaws.com을 조회하면 무조건 그 엔드포인트의
+# 사설 IP로 응답이 갔다(공용 인터넷·S3는 정상이었던 이유 — 그것들은
+# 이 엔드포인트를 안 거침). 근데 그 엔드포인트 보안그룹(nx-tt 소유)이
+# 우리 태스크 보안그룹의 접근을 안 허용해서 거기서 막혀 타임아웃이 났다.
+# 남 리소스를 건드리는 대신, AI LENS 전용 엔드포인트를 새로 만들었다
+# (`sedaily-mbti-lens-bedrock-runtime-vpce`, vpce-0a3db42bd30a484d1) —
+# 같은 VPC에서 같은 서비스에 Private DNS를 "켠" 엔드포인트는 하나만
+# 가능해서(이미 nx-tt 게 켜져 있음) 이건 Private DNS 없이 만들고, 대신
+# 이 엔드포인트의 전용 DNS 이름을 boto3 클라이언트에 명시적으로 지정해서
+# 표준 호스트명(=nx-tt 엔드포인트로 가로채짐) 대신 우리 엔드포인트로
+# 바로 가게 한다. 로컬 개발 환경(이 VPC 밖)에서는 이 환경변수가 없으니
+# 평소처럼 공개 엔드포인트로 나간다 — ECS 태스크 정의에만 설정.
+_ENDPOINT_URL = os.environ.get("BEDROCK_ENDPOINT_URL")
+
 _CONFIG = Config(read_timeout=300, connect_timeout=30, retries={"max_attempts": 3})
 
 _client = None
@@ -38,7 +52,10 @@ _client = None
 def _get_client():
     global _client
     if _client is None:
-        _client = boto3.client("bedrock-runtime", region_name=REGION, config=_CONFIG)
+        kwargs = {"region_name": REGION, "config": _CONFIG}
+        if _ENDPOINT_URL:
+            kwargs["endpoint_url"] = _ENDPOINT_URL
+        _client = boto3.client("bedrock-runtime", **kwargs)
     return _client
 
 

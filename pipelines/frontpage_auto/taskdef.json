@@ -16,7 +16,8 @@
       "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-mbti-frontpage-auto:latest",
       "essential": true,
       "environment": [
-        {"name": "AWS_REGION", "value": "us-east-1"}
+        {"name": "AWS_REGION", "value": "us-east-1"},
+        {"name": "BEDROCK_ENDPOINT_URL", "value": "https://vpce-0a3db42bd30a484d1-aqh61lqy.bedrock-runtime.us-east-1.vpce.amazonaws.com"}
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
