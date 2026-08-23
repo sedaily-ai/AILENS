@@ -13,6 +13,10 @@ export function useCountUp(target: number, durationMs = 900, startDelayMs = 200)
     if (typeof window === 'undefined') return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduced || target === 0) {
+      // matchMedia는 브라우저 전용이라 렌더 중(SSR)엔 못 읽는다 — 이 분기
+      // 자체가 마운트 후에만 판단 가능해 effect가 맞는 자리(2026-08-23,
+      // set-state-in-effect 확인).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(target);
       return;
     }

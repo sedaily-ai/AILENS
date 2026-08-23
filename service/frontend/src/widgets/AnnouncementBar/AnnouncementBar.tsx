@@ -31,6 +31,10 @@ export function AnnouncementBar() {
 
   useEffect(() => {
     if (localStorage.getItem(DISMISS_KEY) !== '1') {
+      // localStorage는 SSR에서 못 읽는다 — 기본값 true(숨김)로 그리고
+      // 마운트 후 effect에서 실제로 보여줄지 정하는 게 의도된 동작
+      // (깜빡임 방지, 2026-08-23 set-state-in-effect 확인).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDismissed(false);
     }
   }, []);

@@ -54,6 +54,10 @@ export function ArchiveRecommendations({
   // 키워드 변경 시 백엔드 호출 — XML 버킷에서 최근 7일분 매칭 검색.
   useEffect(() => {
     if (keywords.length === 0) {
+      // 이전 keywords로 가져온 결과가 남아있으면 지운다(2026-08-23, 죽은
+      // 코드 감사 중 set-state-in-effect 확인 — prop이 async fetch 대상
+      // 자체이므로 렌더 중 파생값으로 못 바꾸고 effect에서 리셋해야 함).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([]);
       setFetchedKeywords([]);
       return;

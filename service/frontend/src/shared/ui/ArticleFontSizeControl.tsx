@@ -19,6 +19,9 @@ export function ArticleFontSizeControl({ cssVar, storageKey }: { cssVar: string;
     try {
       const saved = localStorage.getItem(storageKey) as ArticleFontSize | null;
       if (saved && saved in FONT_SCALE) {
+        // localStorage는 SSR에서 못 읽는다 — 저장된 값 복원은 마운트 후
+        // effect가 맞는 자리(2026-08-23, set-state-in-effect 확인).
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSize(saved);
         document.documentElement.style.setProperty(cssVar, FONT_SCALE[saved]);
       }
