@@ -1289,7 +1289,13 @@ export function LensViewClient({
                       네이티브 <video>로 재생. */}
                   {format === 'video' && directVideoUrl && (
                     <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
-                      <video controls preload="none" src={directVideoUrl} className="w-full h-full" style={{ objectFit: 'contain' }} />
+                      {/* 영상 탭을 클릭하는 행위 자체가 사용자 제스처라 자동재생이
+                          막히지 않는다(2026-08-23, 사용자 요청 — "누르기 귀찮").
+                          realVideo(유튜브 등 iframe embed) 쪽은 videoEmbed.ts의
+                          embedUrl에 이미 autoplay=1이 박혀 있어 그대로 뒀다 —
+                          여기 직링크 <video>만 빠져 있었다. preload도 none→auto로
+                          바꿔 자동재생 시작이 안 늦게 한다. */}
+                      <video autoPlay controls preload="auto" src={directVideoUrl} className="w-full h-full" style={{ objectFit: 'contain' }} />
                     </div>
                   )}
 
