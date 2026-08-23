@@ -83,6 +83,14 @@
         "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6"
       ]
+    },
+    {
+      "Sid": "WebtoonBackgroundImageBedrockInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-image-core-v1:1"
+      ]
     }
   ]
 }
