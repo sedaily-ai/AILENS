@@ -571,8 +571,10 @@ export function LensViewClient({
       {/* 좌우 패딩을 홈(NewsFeedTab.tsx)과 동일한 clamp(24px,3.5vw,44px)로
           맞췄다(2026-08-23) — 원래 clamp(20px,4vw,28px)였는데, 카테고리
           페이지에 사이드바를 새로 붙이며 같은 문제(사이드바가 홈보다
-          오른쪽으로 밀려 보임)를 발견해 이 페이지도 같이 정정한다. */}
-      <div className="mx-auto" style={{ maxWidth: 1320, padding: '0 clamp(24px, 3.5vw, 44px)' }}>
+          오른쪽으로 밀려 보임)를 발견해 이 페이지도 같이 정정한다.
+          위쪽 패딩도 홈과 같은 clamp(8px,2vw,16px)를 추가했다 — 아래
+          사이드바 쪽 주석 참조. */}
+      <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
           <div style={{ gridColumn: 1, minWidth: 0 }}>
       {/* "◀ 시선" 뒤로가기 링크는 걷어냈다(2026-08-17, 사용자 피드백:
@@ -1522,12 +1524,17 @@ export function LensViewClient({
       </main>
           </div>
 
-          {/* 본문 칼럼은 안쪽 .lw div가 paddingTop:clamp(28px,4.5vw,40px)로
-              헤더와 헤드라인 사이 여백을 갖는데, 사이드바는 그리드의 맨 위
-              에 그대로 붙어 있어 헤더에 바짝 붙어 보였다(2026-08-18, "저거,
-              헤더에 너무 붙은거 아닌가?"). 본문과 같은 값으로 맞춰 두 칼럼의
-              시작선을 나란히 맞춘다. */}
-          <HomeSideBar className="hidden lg:block" style={{ paddingTop: 'clamp(28px, 4.5vw, 40px)' }} />
+          {/* 2026-08-18엔 본문 칼럼 안쪽 .lw div의 paddingTop(clamp(28px,
+              4.5vw,40px), 헤드라인 전용 여백)을 사이드바에도 그대로
+              줬었다("사이드바가 헤더에 바짝 붙어 보인다" 피드백) — 그런데
+              2026-08-23에 사용자가 이번엔 반대로 "홈에 비해 사이드바가
+              아래로 쏠려 보인다"고 지적했다. 비교 기준이 이 페이지 안의
+              본문이 아니라 홈의 사이드바 위치였던 것 — 그래서 바깥 grid
+              wrapper에 홈과 같은 clamp(8px,2vw,16px) 위 패딩을 추가하고
+              (위 주석 참조), 사이드바 자체의 paddingTop 오버라이드는
+              없앤다. 본문 헤드라인의 28~40px 여백은 그대로 유지 — 헤더와
+              헤드라인 사이 간격 자체는 2026-08-17에 확정한 의도적인 값. */}
+          <HomeSideBar className="hidden lg:block" />
         </div>
       </div>
     </div>
