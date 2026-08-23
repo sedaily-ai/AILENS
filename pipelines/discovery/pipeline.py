@@ -43,6 +43,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import os
+
 import boto3
 
 BUCKET = "sedaily-news-xml-storage"
@@ -58,7 +60,11 @@ def _strip_html(raw: str) -> str:
 
 def _s3_client(profile: str | None):
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
-    return session.client("s3", region_name="us-east-1")
+    # discovery/는 common/의 어느 것도 안 쓰는 게 문서화된 설계(admin
+    # 프롬프트·Bedrock을 안 건드리는 사전 생성 단계) — common/config.py를
+    # 새로 의존하는 대신 같은 os.environ.get 패턴만 여기서 직접 씀
+    # (2026-08-23 코드 리팩토링 감사).
+    return session.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 
 
 def _download_root(s3, date: str) -> ET.Element | None:

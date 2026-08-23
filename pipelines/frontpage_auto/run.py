@@ -46,6 +46,7 @@ sys.path.insert(0, str(_ROOT / "video"))
 
 import boto3
 import requests
+from config import AWS_REGION, CMS_POSTS_TABLE, CMS_MEDIA_BUCKET
 from text_utils import strip_code_fence
 
 
@@ -72,9 +73,9 @@ _letters_mod = _load_module("frontpage_auto_letters", _ROOT / "letters" / "pipel
 _podcast_mod = _load_module("frontpage_auto_podcast", _ROOT / "podcast" / "pipeline.py")
 _webtoon_mod = _load_module("frontpage_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
 
-REGION = "us-east-1"
-TABLE = "sedaily-mbti-cms-posts-dev"
-BUCKET = "sedaily-mbti-cms-media-dev"
+REGION = AWS_REGION
+TABLE = CMS_POSTS_TABLE
+BUCKET = CMS_MEDIA_BUCKET
 VIDEO_DIR = _ROOT / "video"
 
 _NON_SLUG = re.compile(r"[^0-9A-Za-z가-힣]+")
