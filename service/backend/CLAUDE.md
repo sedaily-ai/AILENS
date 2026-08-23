@@ -324,8 +324,18 @@ services/           → Business logic: article_filter, prompt_loader,
                      이로써 Track B에서 식별된 God 핸들러 6개 전부(post_handler·
                      s3_articles_handler·cms_posts_public·user_handler·
                      search_handler·archive_handler) handler=라우팅/service=로직
-                     분리 완료. `article_handler.py`(371줄)는 Track A에서 CORS
-                     버그 수정만 했고 이 구조 분리는 아직 안 함 — 필요시 별도 진행.
+                     분리 완료.
+                     2026-08-24 후속6: `handlers/article_handler.py`(371줄, Track A에선
+                     CORS 헤더 버그만 고치고 구조 분리는 미룸)도 같은 패턴으로
+                     `article_service.py`(ArticleDetailResponse/ArticleHandlerError/
+                     ArticleHandler 클래스, list_articles, get_article_detail,
+                     _transform_article_for_list/_extract_image_url)로 분리.
+                     371→150줄. `list_handler`/`_async_handler`(라우팅+응답조립)는
+                     핸들러에 남기고 DynamoDB/S3 클라이언트 구성·조회·shaping만
+                     서비스로 이동. 검증: OPTIONS 200, article_id 누락 시 400
+                     MISSING_ARTICLE_ID(CORS_HEADERS 4개 필드 전부 포함 — Track A에서
+                     고친 버그가 그대로 유지됐는지까지 확인) 스모크 테스트(AWS 호출
+                     없음) + 전체 스위트 재확인(104 passed, 기존 무관 에러 6건 동일).
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).

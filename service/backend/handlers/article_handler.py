@@ -2,172 +2,21 @@
 ArticleHandler Lambda Function
 Handles article detail retrieval.
 
-When user views an article:
-1. Fetch from DynamoDB
-2. Return the article's original content
+2026-08-24 — 실제 조회 로직(DynamoDB+S3 병합, 리스트 응답 shaping,
+ArticleHandler/ArticleDetailResponse)은 services/article_service.py로
+뺐다(코드 리팩토링 감사 Track B, God 파일 분해). 이 파일은 이제 HTTP
+라우팅과 응답 조립만 담당한다.
 """
+import asyncio
+import json
 import logging
-from typing import Optional
-from dataclasses import dataclass
 
-from clients.dynamodb_client import DynamoDBClient
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import success_response
-from utils.date_utils import get_kst_today
+from services.article_service import ArticleHandlerError, get_article_detail, list_articles
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ArticleDetailResponse:
-    """Article detail response"""
-    news_id: str
-    title_ko: str
-    content_ko: str
-    published_at: str
-    provider: str
-    category: str
-    updated_at: Optional[str] = None
-    byline: Optional[str] = None
-    original_link: Optional[str] = None
-    image_url: Optional[str] = None
-    images: list = None
-    images_caption: list = None
-    content_blocks: list = None
-    keywords: Optional[str] = None
-    hashtags: Optional[str] = None
-    transformed_at: Optional[str] = None
-
-    def __post_init__(self):
-        if self.images is None:
-            self.images = []
-        if self.images_caption is None:
-            self.images_caption = []
-        if self.content_blocks is None:
-            self.content_blocks = []
-        # Extract first image URL if not already set
-        if self.image_url is None and self.images:
-            if isinstance(self.images, list) and len(self.images) > 0:
-                first_img = self.images[0]
-                if isinstance(first_img, dict):
-                    self.image_url = first_img.get('url', '')
-                elif isinstance(first_img, str):
-                    self.image_url = first_img
-
-
-class ArticleHandlerError(Exception):
-    """Base exception for ArticleHandler errors"""
-    pass
-
-
-class ArticleHandler:
-    """
-    Handles article detail retrieval from DynamoDB
-    """
-
-    def __init__(self, dynamodb_client: DynamoDBClient):
-        """
-        Initialize ArticleHandler with DynamoDB client
-
-        Args:
-            dynamodb_client: Client for DynamoDB storage
-        """
-        self.dynamodb_client = dynamodb_client
-    
-    async def handle_article_detail(
-        self,
-        article_id: str
-    ) -> ArticleDetailResponse:
-        """
-        Handle article detail request.
-
-        Returns the article's original content.
-
-        Args:
-            article_id: Article ID (news_id)
-
-        Returns:
-            ArticleDetailResponse
-
-        Raises:
-            ArticleHandlerError: If retrieval fails
-        """
-        try:
-            # Validate article_id
-            if not article_id or not article_id.strip():
-                raise ArticleHandlerError("Article ID is required")
-
-            # Retrieve from DynamoDB
-            cached_article = await self.dynamodb_client.get_article(article_id)
-            if not cached_article:
-                logger.warning(f"Article {article_id} not found in DynamoDB")
-                raise ArticleHandlerError(
-                    "Article not found. This article has not been processed yet."
-                )
-
-            logger.info(f"Retrieved article {article_id} from DynamoDB")
-
-            return ArticleDetailResponse(
-                news_id=cached_article['news_id'],
-                title_ko=cached_article.get('title_ko', ''),
-                content_ko=cached_article.get('content_ko', ''),
-                published_at=cached_article.get('published_at', ''),
-                provider=cached_article.get('press', '서울경제'),
-                category=cached_article.get('category', 'news'),
-                updated_at=cached_article.get('updated_at'),
-                byline=cached_article.get('byline', '서울경제'),
-                original_link=cached_article.get('original_link'),
-                images=cached_article.get('images', []),
-                images_caption=cached_article.get('images_caption', []),
-                content_blocks=cached_article.get('content_blocks', []),
-                keywords=cached_article.get('keywords', ''),
-                hashtags=cached_article.get('hashtags', ''),
-                transformed_at=cached_article.get('transformed_at'),
-            )
-
-        except ArticleHandlerError:
-            # Re-raise our own errors
-            raise
-        except Exception as e:
-            # Catch-all for unexpected errors
-            logger.error(f"Unexpected error in article handler: {e}", exc_info=True)
-            raise ArticleHandlerError(
-                "An unexpected error occurred. Please try again later."
-            )
-
-
-def _extract_image_url(images) -> Optional[str]:
-    """Extract first image URL from an article's images field.
-
-    Images can be a list of dicts ({'url': ..., 'caption': ...}) or plain strings.
-    Returns None if nothing usable is present.
-    """
-    if not images or not isinstance(images, list) or len(images) == 0:
-        return None
-    first = images[0]
-    if isinstance(first, dict):
-        return first.get('url') or None
-    if isinstance(first, str):
-        return first
-    return None
-
-
-def _transform_article_for_list(article: dict) -> dict:
-    """Shape a DynamoDB+S3-merged article into the /api/articles list item format."""
-    content_ko = article.get('content_ko') or ''
-    return {
-        'news_id': article.get('news_id', ''),
-        'title': article.get('title_ko', ''),
-        'sub_title': article.get('sub_title_ko', ''),
-        'published_at': article.get('published_at', ''),
-        'category': article.get('category', ''),
-        'provider': article.get('press', '서울경제'),
-        'byline': article.get('byline', ''),
-        'image_url': _extract_image_url(article.get('images')),
-        'content': content_ko[:500],
-        'original_link': article.get('original_link', ''),
-    }
 
 
 @handler_decorator
@@ -175,47 +24,13 @@ async def list_handler(event: dict, context) -> dict:
     """
     GET /api/articles?date=YYYYMMDD&limit=30
 
-    List articles for a given date. Reads from the Article DB (DynamoDB
-    metadata + S3 body), filtering to articles that have been through the
-    pipeline (those with an s3_body_uri pointer).
-
-    Defaults: date = today (KST), limit = 30.
+    List articles for a given date. Defaults: date = today (KST), limit = 30.
     """
-    from config import settings
-    from clients.s3_article_client import S3ArticleClient
-
     query_params = event.get("queryStringParameters") or {}
-
-    date_str = (query_params.get("date") or "").strip() or get_kst_today()
-
-    try:
-        limit = int(query_params.get("limit", 30))
-    except (ValueError, TypeError):
-        limit = 30
-    limit = max(1, min(limit, 200))
-
-    s3_article_client = S3ArticleClient(
-        bucket_name=settings.s3_article_body_bucket,
-        region=settings.s3_article_body_region,
+    response_data = await list_articles(
+        query_params.get("date"),
+        query_params.get("limit", 30),
     )
-    dynamodb_client = DynamoDBClient(
-        table_name=settings.dynamodb_table_articles,
-        region=settings.region,
-        s3_article_client=s3_article_client,
-    )
-
-    articles = await dynamodb_client.get_transformed_articles_by_date(
-        date_str, limit,
-    )
-
-    result_articles = [_transform_article_for_list(a) for a in articles] if articles else []
-
-    response_data = {
-        "date": date_str,
-        "total": len(result_articles),
-        "articles": result_articles,
-    }
-
     return success_response(response_data)
 
 
@@ -231,8 +46,6 @@ def lambda_handler(event: dict, context) -> dict:
     Supports both HTTP API v2 (payload 2.0, no top-level path/httpMethod — uses
     routeKey and requestContext.http.*) and REST API v1 (top-level path/httpMethod).
     """
-    import asyncio
-
     route_key = event.get("routeKey") or ""
     rc = event.get("requestContext") or {}
     http_ctx = rc.get("http") if isinstance(rc, dict) else None
@@ -276,15 +89,12 @@ async def _async_handler(event: dict, context) -> dict:
     """
     Async implementation of Lambda handler
     """
-    from config import settings
-    
     try:
         # Parse request
         path_parameters = event.get("pathParameters", {})
         article_id = path_parameters.get("article_id", "")
-        
+
         if not article_id:
-            import json
             return {
                 "statusCode": 400,
                 # 이 응답만 CORS_HEADERS 대신 인라인 딕트를 써서
@@ -300,25 +110,10 @@ async def _async_handler(event: dict, context) -> dict:
                     }
                 })
             }
-        
-        # Initialize services with S3 body retrieval
-        from clients.s3_article_client import S3ArticleClient
-        s3_article_client = S3ArticleClient(
-            bucket_name=settings.s3_article_body_bucket,
-            region=settings.s3_article_body_region,
-        )
-        dynamodb_client = DynamoDBClient(
-            table_name=settings.dynamodb_table_articles,
-            region=settings.region,
-            s3_article_client=s3_article_client,
-        )
 
-        # Create handler and process request
-        handler = ArticleHandler(dynamodb_client=dynamodb_client)
-        response = await handler.handle_article_detail(article_id)
-        
+        response = await get_article_detail(article_id)
+
         # Return success response
-        import json
         return {
             "statusCode": 200,
             "headers": CORS_HEADERS,
@@ -340,9 +135,8 @@ async def _async_handler(event: dict, context) -> dict:
                 "transformed_at": response.transformed_at,
             })
         }
-    
+
     except ArticleHandlerError as e:
-        import json
         return {
             "statusCode": 400,
             "headers": CORS_HEADERS,
@@ -354,10 +148,9 @@ async def _async_handler(event: dict, context) -> dict:
                 }
             })
         }
-    
+
     except Exception as e:
         logger.error(f"Lambda handler error: {e}", exc_info=True)
-        import json
         return {
             "statusCode": 500,
             "headers": CORS_HEADERS,
