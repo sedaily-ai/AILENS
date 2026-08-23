@@ -50,6 +50,7 @@ import requests
 
 import ddb_prompt
 import classify
+from text_utils import strip_code_fence
 
 
 def _load_module(name: str, file_path: Path):
@@ -310,13 +311,32 @@ def _publish(
 
     podcast_url = _upload(s3, podcast_mp3, f"media/podcast/mustknow-auto/{name}-podcast.mp3")
 
+    # 팟캐스트/영상 스크립트를 청각장애인 접근성용 텍스트로 같이 저장한다
+    # (2026-08-23, 사용자 요청 — "청각장애인 분들을 위해서 본문도 넣어두면
+    # 좋을듯", 타임스탬프 동기화 없이 그냥 전체 텍스트만). 팟캐스트는
+    # podcast/pipeline.py가 저장해둔 대본.md를 그대로 읽는다(TTS 입력과
+    # 달리 코드펜스가 안 벗겨진 원본이라 여기서 한 번 더 벗긴다). 영상은
+    # generate_script.py가 저장한 script.json의 컷별 narration을 이어붙인다.
+    podcast_script_path = out_dir / name / "대본.md"
+    podcast_transcript = (
+        strip_code_fence(podcast_script_path.read_text(encoding="utf-8"))
+        if podcast_script_path.exists() else None
+    ) or None
+
     video = _generate_video(name, article_path, out_dir)
     video_url = thumb_url = None
+    video_transcript = None
     status = "published"
     if video:
         video_url = _upload(s3, video["mp4_path"], f"media/video/mustknow-auto/{name}-video.mp4")
         if video["thumb_path"]:
             thumb_url = _upload(s3, video["thumb_path"], f"media/video/mustknow-auto/{name}-thumb.jpg")
+        video_script_path = out_dir / name / "script.json"
+        if video_script_path.exists():
+            video_script_data = json.loads(video_script_path.read_text(encoding="utf-8"))
+            video_transcript = "\n\n".join(
+                cut["narration"] for cut in video_script_data.get("cuts", []) if cut.get("narration")
+            ) or None
     else:
         status = "published_no_video"
 
@@ -326,10 +346,10 @@ def _publish(
         {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
          "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None},
         {"label": "팟캐스트", "question": article["title"], "bullets": [], "paragraphs": [],
-         "images": [], "video_url": None, "media_url": podcast_url},
+         "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
         {"label": "영상", "question": article["title"], "bullets": [], "paragraphs": [],
          "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
-         "pending": video_url is None},
+         "pending": video_url is None, "transcript": video_transcript},
     ]
 
     publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"

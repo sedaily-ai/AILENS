@@ -197,6 +197,12 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
             # "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — home_player
             # 채널의 media_embed_url과 같은 성격, 저장 위치만 이 슬롯.
             "media_url": item.get("media_url") or None,
+            # "팟캐스트"·"영상" 포맷 전용 전체 대본 텍스트(2026-08-23, 사용자
+            # 요청 — 청각장애인 접근성용, 타임스탬프 동기화 없이 그냥 본문만).
+            # mustknow_auto/frontpage_auto run.py가 발행 시 채운다 — 레터는
+            # 이미 paragraphs가 그 역할을 하고, 웹툰은 images[].caption이
+            # 컷별 대사를 이미 담고 있어서 별도로 안 채움.
+            "transcript": item.get("transcript") or None,
         }
         for item in (b.get("lenses") or [])
     ]

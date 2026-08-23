@@ -1193,6 +1193,21 @@ export function LensViewClient({
                       디자인(2026-08-18 다듬기): tint 채움 카드 → 흰 바탕 +
                       공용 그림자·테두리 토큰. 챕터 라벨을 굵은 인라인 텍스트
                       대신 알약 배지로 바꿔 목록이 표처럼 정렬되게 했다. */}
+                  {/* 스크립트 전문(2026-08-23, 사용자 요청 — "청각장애인 분들을
+                      위해서 본문도 넣어두면 좋을듯", 타임스탬프 동기화 없이
+                      그냥 텍스트만). 파이프라인이 채워준 값이 있을 때만 뜬다 —
+                      admin 수동 작성 글이나 목업엔 없어서 자연히 안 보인다. */}
+                  {format === 'podcast' && l.transcript && (
+                    <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
+                      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
+                        스크립트 (본문 텍스트)
+                      </p>
+                      <div style={{ fontSize: 15, lineHeight: 1.85, color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+                        {l.transcript}
+                      </div>
+                    </div>
+                  )}
+
                   {format === 'podcast' && !realPodcast && !directPodcastUrl && (
                     <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
                       <div className="flex items-center" style={{ gap: 14 }}>
@@ -1285,6 +1300,18 @@ export function LensViewClient({
                       팟캐스트 챕터와 같은 알약 배지 톤으로 맞춰 두 오디오/영상
                       포맷이 한 세트로 읽히게 했고, 카드 전체에 공용 그림자를
                       둘러 다른 포맷 카드들과 무게감을 맞췄다. */}
+                  {/* 스크립트 전문(2026-08-23) — 팟캐스트와 같은 이유. */}
+                  {format === 'video' && l.transcript && (
+                    <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
+                      <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
+                        스크립트 (본문 텍스트)
+                      </p>
+                      <div style={{ fontSize: 15, lineHeight: 1.85, color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+                        {l.transcript}
+                      </div>
+                    </div>
+                  )}
+
                   {format === 'video' && !realVideo && !directVideoUrl && (
                     <div style={{ borderRadius: 16, background: '#fff', boxShadow: LENS_CARD_SHADOW, padding: 14 }}>
                       <div

@@ -245,6 +245,10 @@ export interface CmsLensItem {
   /** "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — 있으면 실제
    *  임베드, 없으면 정적 목업으로 폴백한다. */
   media_url?: string | null;
+  /** "팟캐스트"·"영상" 포맷 전용 전체 대본 텍스트(2026-08-23, 사용자 요청 —
+   *  청각장애인 접근성용). 타임스탬프 동기화는 없고 그냥 플레이어 아래에
+   *  전체 텍스트로 보여준다. */
+  transcript?: string | null;
 }
 
 export interface CmsLens {
