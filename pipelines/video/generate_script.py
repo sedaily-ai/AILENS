@@ -36,6 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text  # 2026-08-22: GPT -> Bedrock Claude 이관 (GPT는 이미지 생성 전용)
+from json_extract import extract_fenced_json_text  # 2026-08-23 공용화
 
 # src/components/Icon.tsx의 ICON_MAP과 반드시 같이 갱신할 것 — 여기 없는
 # 키는 렌더 시 HelpCircle(물음표)로 조용히 폴백되어 화면이 부실해진다.
@@ -93,16 +94,12 @@ def extract_json_block(text: str) -> dict:
     2026-08-23 — webtoon/pipeline.py의 같은 이름 함수와 같은 이유로 폴백을
     추가(실운영 중 Claude가 코드블록 지침을 안 따르는 사례를 webtoon에서
     확인). 여기는 원래도 실패 시 "영상 없이 3/4 포맷" 폴백이 있어 블라스트
-    반경이 작았지만, 불필요한 영상 누락을 줄이기 위해 같이 강화한다."""
-    match = re.search(r"```json\s*\n(.*?)```", text, re.DOTALL)
-    if match:
-        return json.loads(match.group(1))
-
-    # 언어 태그 없이 ``` 만 쓴 마지막 코드블록을 시도
-    blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
-    json_blocks = [b for b in blocks if b.strip().startswith("{")]
-    if json_blocks:
-        return json.loads(json_blocks[-1])
+    반경이 작았지만, 불필요한 영상 누락을 줄이기 위해 같이 강화한다.
+    코드블록 추출 단계는 webtoon/pipeline.py·mustknow_auto/classify.py와
+    공용(common/json_extract.py, 같은 날 공용화)."""
+    fenced = extract_fenced_json_text(text, opener="{")
+    if fenced is not None:
+        return json.loads(fenced)
 
     # 코드블록이 아예 없는 경우 — 원문 전체를 그대로 JSON으로 시도
     stripped = text.strip()

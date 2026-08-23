@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
 from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
 from bedrock_client import call_text  # 2026-08-23 — 스크립트/장면연출 텍스트 전용
+from json_extract import extract_fenced_json_text  # pipelines/common/ — 2026-08-23 공용화
 
 import prompts
 import compose_text
@@ -101,15 +102,12 @@ def _extract_json_block(text: str) -> dict:
     텍스트만 반환하는 경우를 확인(기사 2건 발행 실패, "Bedrock 응답에서
     JSON 코드블록을 찾지 못했습니다"). 코드블록 우선으로 찾되, 없으면
     원문 전체 → 첫 '{'~마지막 '}' 구간 순으로 폴백해서 실제로 유효한
-    JSON이면 형식과 무관하게 파싱되게 한다."""
-    match = re.search(r"```json\s*\n(.*?)```", text, re.DOTALL)
-    if match:
-        return json.loads(match.group(1))
-
-    blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
-    json_blocks = [b for b in blocks if b.strip().startswith("{")]
-    if json_blocks:
-        return json.loads(json_blocks[-1])
+    JSON이면 형식과 무관하게 파싱되게 한다. 코드블록 추출 단계는
+    video/generate_script.py·mustknow_auto/classify.py와 공용
+    (common/json_extract.py, 같은 날 공용화)."""
+    fenced = extract_fenced_json_text(text, opener="{")
+    if fenced is not None:
+        return json.loads(fenced)
 
     stripped = text.strip()
     try:

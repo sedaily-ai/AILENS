@@ -17,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 from bedrock_client import call_text
+from json_extract import extract_fenced_json_text  # 2026-08-23 공용화
 
 MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/zmdham3vkj89"  # lens-mustknow-sonnet-5
 
@@ -63,15 +64,13 @@ def _salvage_truncated_array(text: str) -> list[dict]:
 
 def _extract_json_array(text: str) -> list[dict]:
     """generate_script.py의 extract_json_block과 같은 톤 — 배열용으로 새로 작성.
-    한 함수로 합치기엔 단일 객체 vs 배열이라 반환 형태가 달라 그대로 분리."""
-    match = re.search(r"```json\s*\n(.*?)```", text, re.DOTALL)
-    if match is not None:
-        return json.loads(match.group(1))
-
-    blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
-    array_blocks = [b for b in blocks if b.strip().startswith("[")]
-    if array_blocks:
-        return json.loads(array_blocks[-1])
+    한 함수로 합치기엔 단일 객체 vs 배열이라 반환 형태가 달라 그대로 분리.
+    코드블록 추출 단계(앞 두 단계)만 webtoon/pipeline.py·
+    video/generate_script.py와 공용(common/json_extract.py, 2026-08-23) —
+    그 뒤 배열 살리기 로직은 이 파일만의 것이라 계속 분리해서 둔다."""
+    fenced = extract_fenced_json_text(text, opener="[")
+    if fenced is not None:
+        return json.loads(fenced)
 
     # 닫는 fence 자체가 없음(응답이 잘렸을 가능성) — 여는 fence 뒤부터라도 건진다.
     open_match = re.search(r"```json\s*\n", text)
