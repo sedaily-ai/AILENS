@@ -31,8 +31,10 @@ RUN cd video && npx remotion browser ensure
 COPY . .
 
 # 파이썬 의존성 — pipelines/*/requirements.txt 전부 한 venv에(common/은
-# requirements.txt가 없다 — letters/podcast/webtoon/discovery/
-# frontpage_auto가 공통으로 요구하는 boto3/requests/openai로 이미 커버됨).
+# requirements.txt가 없다 — 필요한 boto3/requests는 아래 6개 파일이 이미
+# 요구하고 있어 커버됨). mustknow_auto/requirements.txt는 2026-08-23 코드
+# 리팩토링 감사 전까지 여기 안 걸려 있었다 — mustknow_auto/run.py가 쓰는
+# requests가 다른 5개 파일 설치분에 얹혀가서 우연히 동작하던 상태였다.
 RUN python3.11 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir \
@@ -40,7 +42,8 @@ RUN pip install --no-cache-dir \
     -r podcast/requirements.txt \
     -r webtoon/requirements.txt \
     -r discovery/requirements.txt \
-    -r frontpage_auto/requirements.txt
+    -r frontpage_auto/requirements.txt \
+    -r mustknow_auto/requirements.txt
 
 WORKDIR /app/pipelines/frontpage_auto
 ENTRYPOINT ["python3.11", "run.py"]
