@@ -271,6 +271,15 @@ services/           → Business logic: article_filter, prompt_loader,
                      (2026-08-05 후속, 순수 추출·응답 내용 변경 없음 — 직접 만든 요청/실행 output을
                      old-style 인라인 코드와 비교해 바이트 단위로 검증). 스트리밍 특유의 증분
                      yield 흐름은 성격이 달라 그대로 둠.
+                     2026-08-24: `handlers/post_handler.py`(396줄, CORS 빌더+DynamoDB 직접
+                     접근+비즈니스 로직이 한 파일에 섞여있던 것 — 코드 리팩토링 감사 Track B)를
+                     같은 handler=라우팅/service=로직 패턴으로 분리 — `community_post_service.py`
+                     (DynamoDB 접근·투표/댓글 카운터 갱신·응답 shaping 전부)로 뺐다.
+                     `post_handler.py`는 96줄로 축소, HTTP 메서드/경로 판별과 인증만 담당.
+                     검증: OPTIONS/warmup/잘못된 JSON 경로 스모크 테스트로 DynamoDB 없이도
+                     확인 가능한 부분 재확인 + 전체 테스트 스위트 104 passed(기존 무관 에러
+                     6건 동일) — 실제 DynamoDB 쓰기 경로(생성/투표/댓글)는 이 프로젝트에
+                     해당 핸들러 전용 테스트가 원래 없어서 별도 검증 없이 순수 이동만 확인.
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
