@@ -5,6 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { HomeSideBar } from '@/shared/ui/HomeSideBar';
+import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
 // "오늘의 이슈, 4가지 시선" 목록.
 //
@@ -53,7 +55,15 @@ function groupByDate(rows: CmsLens[]): { date: string; rows: CmsLens[] }[] {
   return groups;
 }
 
-export function LensListClient({ initialItems, initialPage }: { initialItems: CmsLens[]; initialPage: number }) {
+export function LensListClient({
+  initialItems,
+  initialPage,
+  initialHotLetters,
+}: {
+  initialItems: CmsLens[];
+  initialPage: number;
+  initialHotLetters?: TodayLetterCardLike[];
+}) {
   const [items, setItems] = useState<CmsLens[]>(initialItems);
 
   useEffect(() => {
@@ -78,7 +88,7 @@ export function LensListClient({ initialItems, initialPage }: { initialItems: Cm
   return (
     <div className="min-h-screen bg-white">
       <style>{`
-        .lw { max-width: 880px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px); }
+        .lw { max-width: 1320px; margin: 0 auto; padding: 0 clamp(24px, 3.5vw, 44px); }
         .rule { height: 1px; background: rgba(17,24,39,0.1); }
 
         .back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
@@ -136,9 +146,22 @@ export function LensListClient({ initialItems, initialPage }: { initialItems: Cm
         </Link>
       </div>
 
+      {/* 우측 사이드바(HomeSideBar) 추가(2026-08-23, 사용자 요청 — 홈·카테고리
+          페이지와 동일하게). 본문은 원래 .lw 클래스(max-width:880, mx-auto)를
+          그대로 썼는데, 사이드바를 붙이려면 더 넓은 grid 컨테이너(1320) 안에
+          둬야 해서 본문을 그 grid의 1열에 넣고 maxWidth:880만 유지한다(auto
+          margin은 뺀다 — 그리드 칼럼 안에서 가운데 정렬하면 사이드바 쪽으로
+          치우쳐 보인다, CategoryArchiveClient.tsx와 같은 이유).
+          .lw도 max-width를 1320으로, 좌우 패딩도 이 아래 wrapper와 정확히
+          같은 값(clamp(24px,3.5vw,44px), 홈=NewsFeedTab.tsx 기준)으로
+          맞췄다 — 안 그러면 뒤로가기 버튼 줄과 본문 줄의 왼쪽 시작선이
+          어긋난다(사용자 지적: "우측 사이드 쪽이 오른쪽으로 밀리는
+          느낌"). */}
+      <div className="mx-auto" style={{ maxWidth: 1320, padding: '0 clamp(24px, 3.5vw, 44px)' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
       {/* 레이아웃의 스킵 링크(<a href="#main-content">본문 바로가기</a>) 대상.
           이 id 가 없으면 키보드/스크린리더 사용자의 첫 탭이 아무 데도 가지 않는다. */}
-      <main id="main-content" className="lw" style={{ paddingBottom: 100 }}>
+      <main id="main-content" style={{ maxWidth: 880, paddingBottom: 100 }}>
         {/* ── 채널 머리 ── 무엇을 보는 곳인지 한 번에 설명한다. */}
         <header style={{ paddingTop: 'clamp(10px, 2vw, 16px)', marginBottom: 'clamp(28px, 4vw, 40px)' }}>
           <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.12em', color: LENS_ACCENT, marginBottom: 10 }}>
@@ -472,6 +495,10 @@ export function LensListClient({ initialItems, initialPage }: { initialItems: Cm
           </section>
         )}
       </main>
+
+          <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
+        </div>
+      </div>
     </div>
   );
 }

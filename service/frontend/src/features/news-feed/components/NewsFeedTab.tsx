@@ -16,7 +16,7 @@ import { LensPreviewSection } from "./LensPreviewSection";
 import { NewsTimeMachineSection } from "./NewsTimeMachineSection";
 import { LatestGridSection } from "./LatestGridSection";
 import { CategoryFeatureSection } from "./CategoryFeatureSection";
-import { HomeSideBar } from "./HomeSideBar";
+import { HomeSideBar } from "@/shared/ui/HomeSideBar";
 import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 
 // 카테고리 2개씩 짝지어 한 줄(2/3+1/3)로 배치(2026-08-17, 본지 en.sedaily.com
@@ -127,6 +127,11 @@ export function NewsFeedTab({
           maxWidth를 1000→1320으로 넓히고 CSS Grid 2열(본문 1fr + 사이드바
           280px)로 바꿨다 — lg 미만에서는 사이드바가 아예 안 뜬다(HomeSideBar
           의 className="hidden lg:block").
+          2026-08-23 — 카테고리 아카이브 페이지(CategoryArchiveClient.tsx,
+          shared/ui)에도 이 사이드바를 그대로 붙이면서 HomeSideBar/
+          HotLettersRail/SajuMiniRail을 features/news-feed에서 shared/ui로
+          승격했다(둘 다 shared/entities에만 의존해 feature 결합이 없었음 —
+          shared→features 역방향 의존을 피하려면 이 방향이 FSD 규칙에 맞다).
           웹툰 섹션은 처음엔 뷰포트 끝까지 번지는 진짜 full-bleed였는데,
           그러려면 그리드 두 칼럼을 가로질러야 했고(gridColumn:'1 / -1') 그
           과정에서 grid-template-rows를 명시 안 해 사이드바의 gridRow:'1/-1'

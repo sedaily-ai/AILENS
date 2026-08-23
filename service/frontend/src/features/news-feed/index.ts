@@ -10,4 +10,3 @@ export { SideRail } from './components/SideRail';
 export { InteractiveBlock } from './components/InteractiveBlock';
 export type { InteractiveBlockData } from './components/InteractiveBlock';
 export { NewsletterCTA } from './components/NewsletterCTA';
-export { HomeSideBar } from './components/HomeSideBar';

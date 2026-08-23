@@ -16,7 +16,7 @@ import {
   parseLensView,
   pickLensPhoto,
 } from '@/shared/constants/lensPerspectives';
-import { HomeSideBar } from '@/features/news-feed';
+import { HomeSideBar } from '@/shared/ui/HomeSideBar';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
@@ -568,7 +568,11 @@ export function LensViewClient({
           이 파일 곳곳에서 그대로 재사용되므로 손 안 댔다 — 이제 왼쪽 칸
           (본문 폭, sidebar 없을 때보다 좁음) 안에서 여전히 margin:0 auto로
           중앙 정렬된다. lg 미만에서는 사이드바가 아예 안 뜬다. */}
-      <div className="mx-auto" style={{ maxWidth: 1320, padding: '0 clamp(20px, 4vw, 28px)' }}>
+      {/* 좌우 패딩을 홈(NewsFeedTab.tsx)과 동일한 clamp(24px,3.5vw,44px)로
+          맞췄다(2026-08-23) — 원래 clamp(20px,4vw,28px)였는데, 카테고리
+          페이지에 사이드바를 새로 붙이며 같은 문제(사이드바가 홈보다
+          오른쪽으로 밀려 보임)를 발견해 이 페이지도 같이 정정한다. */}
+      <div className="mx-auto" style={{ maxWidth: 1320, padding: '0 clamp(24px, 3.5vw, 44px)' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
           <div style={{ gridColumn: 1, minWidth: 0 }}>
       {/* "◀ 시선" 뒤로가기 링크는 걷어냈다(2026-08-17, 사용자 피드백:

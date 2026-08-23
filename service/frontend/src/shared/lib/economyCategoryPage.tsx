@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/archiveItems';
 import { buildCategoryMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
 import { CategoryArchiveClient } from '@/shared/ui/CategoryArchiveClient';
@@ -25,9 +26,13 @@ export function buildEconomyCategoryMetadata(slug: string): Metadata {
 
 export async function EconomyCategoryPage({ slug }: { slug: string }) {
   const config = configFor(slug);
-  const [letters, lens] = await Promise.all([
+  // 우측 사이드바 "요즘 가장 많이 읽힌 글" 서버 프리페치(2026-08-23) —
+  // app/page.tsx(홈)와 같은 이유: 이거 없이 클라이언트 fetch만 쓰면
+  // 첫 페인트에 섹션 자체가 안 보여서 "없어진 것"처럼 보인다.
+  const [letters, lens, hotLetters] = await Promise.all([
     fetchCmsPosts('letters', undefined, PAGE_SIZE),
     fetchLensPosts(),
+    fetchFollowingLetters(5),
   ]);
   const items = buildArchiveItems(letters, [], [], lens).filter((it) => it.category === config.label);
   const jsonLd = buildCategoryJsonLd(config, items);
@@ -37,7 +42,12 @@ export async function EconomyCategoryPage({ slug }: { slug: string }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <CategoryArchiveClient config={config} tabKey={slug as HeaderTabKey} initialItems={items} />
+      <CategoryArchiveClient
+        config={config}
+        tabKey={slug as HeaderTabKey}
+        initialItems={items}
+        initialHotLetters={hotLetters}
+      />
     </>
   );
 }

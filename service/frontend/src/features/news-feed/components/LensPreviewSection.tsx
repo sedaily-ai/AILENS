@@ -341,7 +341,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                 </p>
 
                 <div style={{ borderTop: '1px solid rgba(17,24,39,0.09)' }}>
-                  {rows.map((l, i) => {
+                  {rows.map((_l, i) => {
                     const p = lensPerspectiveAt(i);
                     return (
                       <Link key={i} href={`${href}?v=${i + 1}`} prefetch className="lz-row">
@@ -376,48 +376,28 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                           >
                             {p.short}
                           </span>
-                          <span className="lz-qw">
-                            <span
-                              className="lz-q"
-                              style={{
-                                fontSize: 16,
-                                fontWeight: 600,
-                                color: '#374151',
-                                lineHeight: 1.5,
-                                letterSpacing: '-0.015em',
-                                wordBreak: 'keep-all',
-                              }}
-                            >
-                              {l.question || p.tagline}
-                            </span>
-                            {/* 부가설명을 태그라인으로 통일(2026-08-21, 사용자
-                                지적) — 원래는 기사별 불릿(bullets[0])을 썼는데,
-                                이 필드가 팟캐스트·영상 서브포맷에만 채워지는
-                                경우가 많아 레터·웹툰 행만 설명 없이 휑해
-                                보였다("팟캐스트랑 영상부분만 달려있는데").
-                                /lens 상세 페이지의 형식 선택 카드가 쓰는
-                                p.tagline("구조와 흐름까지 제대로 알고
-                                싶다면" 등, lensPerspectives.ts에 고정 정의)로
-                                바꿔 4행 전부 항상 같은 수준의 설명이 붙게
-                                한다 — 처음 보는 사람도 형식 4개가 각각
-                                뭔지 바로 이해할 수 있어야 한다는 요구. */}
-                            <span
-                              style={{
-                                display: '-webkit-box',
-                                marginTop: 3,
-                                fontSize: 13,
-                                fontWeight: 400,
-                                color: '#6b7280',
-                                lineHeight: 1.55,
-                                letterSpacing: '-0.005em',
-                                WebkitLineClamp: 1,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                                wordBreak: 'keep-all',
-                              }}
-                            >
-                              {p.tagline}
-                            </span>
+                          {/* 2026-08-23, 사용자 지적 — l.question이 레터·팟캐스트·
+                              영상 행에선 웹툰(core_question 생성)과 달리 헤드라인과
+                              동일한 값이라(각 파이프라인이 별도 "훅 질문"을 안 만듦)
+                              위에서 이미 보여준 헤드라인을 그대로 3번 반복해 보였다.
+                              중복 줄을 없애고 태그라인 한 줄만 남긴다(형식 4개가
+                              각각 뭔지는 이 한 줄로도 충분히 설명됨). */}
+                          <span
+                            className="lz-qw"
+                            style={{
+                              display: '-webkit-box',
+                              fontSize: 15,
+                              fontWeight: 600,
+                              color: '#374151',
+                              lineHeight: 1.5,
+                              letterSpacing: '-0.01em',
+                              WebkitLineClamp: 1,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              wordBreak: 'keep-all',
+                            }}
+                          >
+                            {p.tagline}
                           </span>
                         </span>
 

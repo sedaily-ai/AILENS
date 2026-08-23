@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { LensListClient } from './LensListClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
@@ -83,7 +84,9 @@ export default async function LensListPage({
   searchParams: Promise<{ page?: string }>;
 }) {
   const { page } = await searchParams;
-  const items = await fetchLensPosts();
+  // 우측 사이드바(HomeSideBar) 서버 프리페치(2026-08-23) — 홈/카테고리
+  // 페이지와 같은 이유(economyCategoryPage.tsx 참조).
+  const [items, hotLetters] = await Promise.all([fetchLensPosts(), fetchFollowingLetters(5)]);
   const jsonLd = buildJsonLd(items);
   const initialPage = Math.max(1, parseInt(page ?? '1', 10) || 1);
   return (
@@ -92,7 +95,7 @@ export default async function LensListPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <LensListClient initialItems={items} initialPage={initialPage} />
+      <LensListClient initialItems={items} initialPage={initialPage} initialHotLetters={hotLetters} />
     </>
   );
 }
