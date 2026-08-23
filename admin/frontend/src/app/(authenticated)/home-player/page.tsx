@@ -40,11 +40,19 @@ function NewItemForm({ nextDefaultOrder, onCreated }: { nextDefaultOrder: number
   const toast = useToast();
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
+  // nextDefaultOrder가 바뀌면(항목 추가로 카운터가 오른 경우 등) order를
+  // 리셋한다 — drivers/page.tsx의 ThresholdRow와 같은 "seed 추적 후 렌더
+  // 중 동기 재설정" 패턴으로 useEffect+setState 없이 처리(2026-08-23,
+  // set-state-in-effect 린트 정리 — CLAUDE.md가 새 예외 추가 전 근본
+  // 수정을 먼저 시도하라고 명시).
+  const [orderSeed, setOrderSeed] = useState(nextDefaultOrder);
   const [order, setOrder] = useState(nextDefaultOrder);
+  if (orderSeed !== nextDefaultOrder) {
+    setOrderSeed(nextDefaultOrder);
+    setOrder(nextDefaultOrder);
+  }
   const [category, setCategory] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => setOrder(nextDefaultOrder), [nextDefaultOrder]);
 
   const add = async () => {
     if (!title.trim() || !url.trim()) {
@@ -256,7 +264,7 @@ export default function HomePlayerPage() {
       <div>
         <h1 className="font-display text-[26px] font-bold text-[var(--text-primary)]">홈 플레이어</h1>
         <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-          홈 화면 하단 플레이 카드("오늘의 핵심 뉴스")의 재생목록입니다. 기사와 무관하게 제목·유튜브 링크로 항목을 직접 만들고, 순서(오름차순)로 재생됩니다. "공개"인 항목만 홈에 나갑니다.
+          홈 화면 하단 플레이 카드(&quot;오늘의 핵심 뉴스&quot;)의 재생목록입니다. 기사와 무관하게 제목·유튜브 링크로 항목을 직접 만들고, 순서(오름차순)로 재생됩니다. &quot;공개&quot;인 항목만 홈에 나갑니다.
         </p>
       </div>
 

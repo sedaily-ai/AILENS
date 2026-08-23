@@ -26,7 +26,7 @@ Build outputs **13 routes** under `out/`: `/`, `/login`, `/posts`, `/posts/edit`
 - **API client** — single fetch wrapper in `src/lib/adminClient.ts` (`adminApi.login` / `getDrivers` / `updatePrompt` / `getCost` / `getAudit` 등 9 endpoints). `AdminApiError` carries the HTTP status. Base URL from `NEXT_PUBLIC_ADMIN_API_BASE_URL` env var.
 - **Routing — query params, not dynamic segments** — `/prompts/edit?id=<category>/<name>` instead of `/prompts/[category]/[name]`. Reason: `output: "export"` requires `generateStaticParams` for dynamic routes; query params keep the route count fixed at 8 and stay static-export friendly. Wrap any `useSearchParams` page in `<Suspense>` (see `prompts/edit/page.tsx`).
 - **Zero-new-dependency policy** — only what `create-next-app --tailwind --typescript --eslint` brought in. Custom impl preferred over deps unless saved code > ~100 lines (e.g. `ToastProvider` is 30 lines, diff preview is line-by-line).
-- **`set-state-in-effect` exemptions** — `AuthGuard.tsx` (mount-detection flag) + `drivers/page.tsx` (initial async fetch) only. Both annotated. Don't add new exemptions without justifying.
+- **`set-state-in-effect` exemptions** — `AuthGuard.tsx` (mount-detection flag), `drivers/page.tsx` + `newsletter/page.tsx` (initial async fetch), `DatePickerField.tsx` (popover-open interaction trigger). All annotated. `home-player/page.tsx`'s `NewItemForm` (order reset on prop change) was fixed at the root instead — same render-time seed-adjustment pattern as `drivers/page.tsx`'s `ThresholdRow`, no effect/exemption needed (2026-08-23, code refactoring audit). Don't add new exemptions without justifying.
 
 ## Deploy
 

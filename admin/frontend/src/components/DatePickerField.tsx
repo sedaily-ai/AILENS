@@ -51,8 +51,13 @@ export function DatePickerField({ value, onChange }: Props) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
-  // 팝오버를 열 때마다 현재 선택된 날짜가 있는 달을 보여준다.
+  // 팝오버를 열 때마다 현재 선택된 날짜가 있는 달을 보여준다 — "열림"이라는
+  // 상호작용 이벤트에 반응하는 것이라 prop 변화 렌더 중 동기 조정 패턴으로
+  // 옮기기 어색해서(값 자체가 아니라 "open으로 전환되는 순간"이 트리거)
+  // effect로 유지, CLAUDE.md의 AuthGuard.tsx 예외와 같은 근거로 명시
+  // (2026-08-23 set-state-in-effect 린트 정리).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open && value) setViewDate(parseYmd(value));
   }, [open, value]);
 

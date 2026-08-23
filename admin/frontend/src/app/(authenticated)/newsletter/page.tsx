@@ -48,6 +48,11 @@ export default function NewsletterPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // drivers/page.tsx의 초기 로드 effect와 같은 이유 — setLoading/setError는
+    // await 이전(동기)에 걸리지만 실제 데이터 setData는 await 이후에 걸려서
+    // "마운트/day 변경 시 fetch" 정석 패턴이지 cascading-render 안티패턴이
+    // 아니다(2026-08-23, CLAUDE.md의 기존 예외와 같은 근거로 추가).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     adminApi
