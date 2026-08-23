@@ -226,7 +226,7 @@ export function NewsFeedTab({
                 묶는다. */}
             <WebtoonPreviewSection initialItems={initialWebtoons} />
 
-            <VideoPreviewSection initialVideos={initialVideos} initialLensPosts={initialLensPosts} />
+            <VideoPreviewSection initialVideos={initialVideos} />
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
 

@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { fetchVideos, type CmsVideo, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
-import { buildLensVideoItems, mergeByDateDesc } from '@/shared/lib/lensMediaFeed';
 import { VideoLightbox } from '@/shared/ui/VideoLightbox';
 
 // 영상 콘텐츠 섹션(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
@@ -23,31 +22,27 @@ interface Props {
   // 빌드타임(app/page.tsx)에 fetchVideos()로 미리 가져온 값 — 정적 HTML에
   // 실제 영상 목록이 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
   initialVideos?: CmsVideo[];
-  // lens("4가지 시선")의 영상 서브포맷도 이 섹션에 섞는다(2026-08-20, 사용자
-  // 요청 — shared/lib/lensMediaFeed.ts 참조). video 채널 발행이 뜸해져도
-  // 이 섹션이 계속 쌓이도록.
-  initialLensPosts?: CmsLens[];
 }
 
-export function VideoPreviewSection({ initialVideos, initialLensPosts }: Props) {
-  const [channelVideos, setChannelVideos] = useState<CmsVideo[] | null>(initialVideos ?? null);
+// 2026-08-20엔 lens("4가지 시선") 글의 영상 서브포맷을 buildLensVideoItems로
+// 이 섹션에 섞어 넣었다. 2026-08-23 — mustknow_auto/frontpage_auto가 이제
+// 영상 생성 시 video 채널에도 독립 글을 같이 쓰도록 바뀌면서(웹툰과 같은
+// 이유·같은 패턴, WebtoonPreviewSection.tsx 참조), fetchVideos() 하나만으로
+// 전부 커버된다 — lens에서 파생해서 섞으면 중복 표시된다. 과거 lens 글도
+// 백필 스크립트로 video 채널 글을 만들어뒀다.
+export function VideoPreviewSection({ initialVideos }: Props) {
+  const [videos, setVideos] = useState<CmsVideo[] | null>(initialVideos ?? null);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     fetchVideos().then((data) => {
-      if (!cancelled) setChannelVideos(data);
+      if (!cancelled) setVideos(data);
     });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  const videos = useMemo(() => {
-    if (channelVideos === null) return null;
-    const lensVideos = buildLensVideoItems(initialLensPosts ?? []);
-    return mergeByDateDesc(channelVideos, lensVideos);
-  }, [channelVideos, initialLensPosts]);
 
   // 재생을 카드 안(작은 16:9)이 아니라 모달로 키운다(2026-08-20, 사용자
   // 피드백: "여기서 플레이 되면 좀 작아 보이잖아요, 모달로 커지면 안

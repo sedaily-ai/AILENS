@@ -350,6 +350,55 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
         }
         table.put_item(Item=webtoon_item)
 
+    # 2026-08-23, 같은 요청의 연장(mustknow_auto/run.py와 동일) — 영상은
+    # video 채널, 팟캐스트는 home_player 채널(/listen이 보는 채널)에도
+    # 독립 글을 하나 더 쓴다.
+    if video_url:
+        video_item = {
+            "id": str(uuid.uuid4()),
+            "slug": f"{slug}-video",
+            "status": "published",
+            "channels": ["video"],
+            "publish_date": publish_date_iso,
+            "editor_id": "AI LENS",
+            "headline": lenses[3]["question"] or article["title"],
+            "subtitle": article["sub_title"],
+            "closing_line": None,
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "video_url": video_url},
+            "cover_image_url": thumb_url or article["photo_url"],
+            "source_url": source_url.split("?")[0],
+            "media_embed_url": None,
+            "display_order": None,
+            "created_by": "frontpage-auto",
+            "created_at": now,
+            "updated_at": now,
+            "published_at": now,
+        }
+        table.put_item(Item=video_item)
+
+    if podcast_url:
+        podcast_item = {
+            "id": str(uuid.uuid4()),
+            "slug": f"{slug}-podcast",
+            "status": "published",
+            "channels": ["home_player"],
+            "publish_date": publish_date_iso,
+            "editor_id": "AI LENS",
+            "headline": lenses[2]["question"] or article["title"],
+            "subtitle": article["sub_title"],
+            "closing_line": None,
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": _display_category(article)},
+            "cover_image_url": article["photo_url"],
+            "source_url": source_url.split("?")[0],
+            "media_embed_url": podcast_url,
+            "display_order": 0,
+            "created_by": "frontpage-auto",
+            "created_at": now,
+            "updated_at": now,
+            "published_at": now,
+        }
+        table.put_item(Item=podcast_item)
+
     print(f"[frontpage-auto] 발행 완료 — {slug} ({status})")
     return status
 
