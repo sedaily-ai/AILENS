@@ -3,7 +3,7 @@ import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/archiveItems';
 import { buildCategoryMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
-import { CategoryArchiveClient } from '@/shared/ui/CategoryArchiveClient';
+import { CategoryArchiveClient } from './CategoryArchiveClient';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { HeaderTabKey } from '@/shared/lib/headerTabs';
 
