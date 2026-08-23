@@ -6,8 +6,7 @@
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts } from './cmsPostsApi';
-
-const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
+import { API_URL as API_BASE } from '@/shared/config/apiClient';
 
 // 이미지 채널 — 코드 렌더용 차트 데이터 (레터 실수치, AI 생성 아님).
 export interface LetterChart {

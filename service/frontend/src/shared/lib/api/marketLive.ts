@@ -5,7 +5,9 @@
  *
  * Timemachine 'Then vs Now' 의 Now 쪽 + 다른 곳에서 재사용 가능.
  */
-const API = 'https://7w5nco7xn4.execute-api.us-east-1.amazonaws.com/dev/api/market/dashboard';
+import { MARKET_API_URL } from '@/shared/config/apiClient';
+
+const API = `${MARKET_API_URL}/api/market/dashboard`;
 
 export interface LiveMarket {
   kospi: number | null;

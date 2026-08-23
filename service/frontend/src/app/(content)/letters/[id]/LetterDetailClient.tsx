@@ -14,6 +14,7 @@ import { useAuth } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { letterHref } from '@/shared/lib/letterHref';
 import { fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
+import { API_URL } from '@/shared/config/apiClient';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
@@ -703,7 +704,7 @@ function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
     setErrorMsg('');
     try {
       const res = await fetch(
-        'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev/api/newsletter/subscribe',
+        `${API_URL}/api/newsletter/subscribe`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

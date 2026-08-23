@@ -9,8 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-
-const API_BASE = 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
+import { API_URL as API_BASE } from '@/shared/config/apiClient';
 
 // 구독 즉시 최신 letter 한 통을 메일로 함께 발송하고 싶을 때 호출자가 넘긴다.
 // 백엔드가 letter.headline 있으면 발송.
