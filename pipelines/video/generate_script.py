@@ -88,18 +88,38 @@ def _fix_icon(name: str) -> str:
 
 
 def extract_json_block(text: str) -> dict:
-    """GPT 응답(각본 텍스트 + ```json 렌더용 JSON``` 두 블록)에서 JSON만 뽑는다."""
+    """Bedrock 응답(각본 텍스트 + ```json 렌더용 JSON``` 두 블록)에서 JSON만 뽑는다.
+
+    2026-08-23 — webtoon/pipeline.py의 같은 이름 함수와 같은 이유로 폴백을
+    추가(실운영 중 Claude가 코드블록 지침을 안 따르는 사례를 webtoon에서
+    확인). 여기는 원래도 실패 시 "영상 없이 3/4 포맷" 폴백이 있어 블라스트
+    반경이 작았지만, 불필요한 영상 누락을 줄이기 위해 같이 강화한다."""
     match = re.search(r"```json\s*\n(.*?)```", text, re.DOTALL)
-    if match is None:
-        # 언어 태그 없이 ``` 만 쓴 마지막 코드블록을 시도
-        blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
-        json_blocks = [b for b in blocks if b.strip().startswith("{")]
-        if not json_blocks:
-            raise ValueError("GPT 응답에서 JSON 코드블록을 찾지 못했습니다")
-        match_text = json_blocks[-1]
-    else:
-        match_text = match.group(1)
-    return json.loads(match_text)
+    if match:
+        return json.loads(match.group(1))
+
+    # 언어 태그 없이 ``` 만 쓴 마지막 코드블록을 시도
+    blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
+    json_blocks = [b for b in blocks if b.strip().startswith("{")]
+    if json_blocks:
+        return json.loads(json_blocks[-1])
+
+    # 코드블록이 아예 없는 경우 — 원문 전체를 그대로 JSON으로 시도
+    stripped = text.strip()
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    # 앞뒤에 설명 문구가 섞여 있는 경우 — 첫 '{'~마지막 '}' 구간만 추출
+    start, end = stripped.find("{"), stripped.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(stripped[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError("Bedrock 응답에서 JSON을 찾지 못했습니다")
 
 
 def fix_script(script: dict) -> tuple[dict, list[str]]:

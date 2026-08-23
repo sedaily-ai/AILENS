@@ -42,16 +42,37 @@ _JSON_INSTRUCTION = (
 
 
 def _extract_json_block(text: str) -> dict:
+    """Bedrock 응답에서 JSON 객체를 뽑는다.
+
+    2026-08-23 — 실운영(mustknow_auto 자동 파이프라인) 중 2단계(장면연출)
+    프롬프트에서 Claude가 ```json 코드블록 지침을 안 따르고 순수 JSON
+    텍스트만 반환하는 경우를 확인(기사 2건 발행 실패, "Bedrock 응답에서
+    JSON 코드블록을 찾지 못했습니다"). 코드블록 우선으로 찾되, 없으면
+    원문 전체 → 첫 '{'~마지막 '}' 구간 순으로 폴백해서 실제로 유효한
+    JSON이면 형식과 무관하게 파싱되게 한다."""
     match = re.search(r"```json\s*\n(.*?)```", text, re.DOTALL)
-    if match is None:
-        blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
-        json_blocks = [b for b in blocks if b.strip().startswith("{")]
-        if not json_blocks:
-            raise ValueError("Bedrock 응답에서 JSON 코드블록을 찾지 못했습니다")
-        match_text = json_blocks[-1]
-    else:
-        match_text = match.group(1)
-    return json.loads(match_text)
+    if match:
+        return json.loads(match.group(1))
+
+    blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
+    json_blocks = [b for b in blocks if b.strip().startswith("{")]
+    if json_blocks:
+        return json.loads(json_blocks[-1])
+
+    stripped = text.strip()
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    start, end = stripped.find("{"), stripped.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(stripped[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError("Bedrock 응답에서 JSON을 찾지 못했습니다")
 
 
 _SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
