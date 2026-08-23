@@ -111,7 +111,15 @@ export function CategoryFeatureSection({
 }) {
   if (items.length === 0) return null;
   const [hero, ...rest] = items;
-  const listItems = span === 'wide' ? rest.slice(0, 2) : [];
+  // wide: 히어로 1개(큼) + 텍스트만 있는 목록 최대 2개. narrow: 원래 히어로
+  // 1개만 두고 그 아래를 통째로 비웠는데(2026-08-17 최초 구현), 사용자가
+  // "우측에 2개 충분히 들어가는 크기 아닌가요" — 실제로 히어로 아래
+  // 빈 공간이 카드 하나가 더 들어갈 만큼 남아 있었다. narrow도 이미지가
+  // 있는 카드(HeroArticle, large=false) 하나를 추가로 채운다 — wide처럼
+  // 글자만 있는 ListArticle이 아니라 hero와 같은 카드 톤으로 맞춰야
+  // "2개 카드"로 보인다는 사용자 의도에 맞다.
+  const wideListItems = span === 'wide' ? rest.slice(0, 2) : [];
+  const narrowSecond = span === 'narrow' ? rest[0] : null;
 
   return (
     <div className={span === 'wide' ? 'md:col-span-2' : 'md:col-span-1'}>
@@ -130,13 +138,19 @@ export function CategoryFeatureSection({
 
       <HeroArticle item={hero} large={span === 'wide'} />
 
-      {listItems.length > 0 && (
+      {wideListItems.length > 0 && (
         <div className="mt-5 space-y-4">
-          {listItems.map((item) => (
+          {wideListItems.map((item) => (
             <div key={item.key} className="pt-4" style={{ borderTop: '1px solid #e5e7eb' }}>
               <ListArticle item={item} />
             </div>
           ))}
+        </div>
+      )}
+
+      {narrowSecond && (
+        <div className="mt-5 pt-5" style={{ borderTop: '1px solid #e5e7eb' }}>
+          <HeroArticle item={narrowSecond} large={false} />
         </div>
       )}
     </div>
