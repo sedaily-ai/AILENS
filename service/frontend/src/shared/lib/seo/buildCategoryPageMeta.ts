@@ -5,7 +5,7 @@ import type { ArchiveItem } from '@/shared/lib/archiveItems';
 // 6개 카테고리 아카이브 페이지(/markets 등)가 구조는 완전히 같고 설정값만
 // 달라서, column/page.tsx·trend/page.tsx가 각자 손으로 쓰던 metadata/JSON-LD
 // 빌더를 여기 하나로 합쳐 재사용한다(2026-08-17).
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 export function buildCategoryMetadata(config: EconCategoryConfig): Metadata {
   const suffix = config.metaSuffix ?? '경제 뉴스';

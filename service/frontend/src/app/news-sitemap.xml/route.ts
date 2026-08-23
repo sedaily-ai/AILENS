@@ -15,7 +15,7 @@ import { kstTodayStr } from '@/shared/lib/date';
 // lens를 Article→NewsArticle로 전환하며 함께 포함)만 대상 — webtoon/video는
 // 여전히 VideoObject/오락 콘텐츠라 뉴스 sitemap 성격이 아니다.
 
-const BASE = 'https://ailens.sedaily.ai';
+import { SITE_URL as BASE } from '@/shared/constants/site';
 const NEWS_NS = 'http://www.google.com/schemas/sitemap-news/0.9';
 const PUBLICATION_NAME = 'AI LENS';
 

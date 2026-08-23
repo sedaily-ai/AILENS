@@ -6,7 +6,7 @@ import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LetterDetailClient } from './LetterDetailClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 // 단일 명의 — MBTI 4-페르소나 에디터 체계 폐지(2026-08-07) 이후 모든 레터의
 // 저작자 표시는 이 하나로 고정. todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.

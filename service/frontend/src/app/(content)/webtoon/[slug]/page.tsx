@@ -3,7 +3,7 @@ import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { WebtoonViewClient } from './WebtoonViewClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 // 경로 기반(2026-08-07) 그대로. fetchWebtoons() 단발 실패(API Gateway/Lambda
 // 콜드스타트 등)에 바로 "찾을 수 없어요"로 떨어지지 않도록 가벼운 재시도를

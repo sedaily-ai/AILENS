@@ -17,7 +17,7 @@ import { TimelineDayClient } from './TimelineDayClient';
 // news_cluster로 기사 상세를 찾으면 신뢰도가 낮아서(같은 news_id에 0건/서버
 // 오류가 섞여 나옴, 당일 날짜조차 그랬음) 날짜 범위 직접 검색으로 교체 —
 // 제목·본문 스니펫·바이라인·원본 링크까지 나온다(발행 시각만 없음).
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function generateMetadata({

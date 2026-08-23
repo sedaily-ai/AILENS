@@ -4,7 +4,7 @@ import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { VideoViewClient } from './VideoViewClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 // webtoon/[slug]/page.tsx와 같은 이유의 가벼운 재시도 — fetchVideos() 단발
 // 실패(콜드스타트 등)에 바로 "찾을 수 없어요"로 떨어지지 않게.

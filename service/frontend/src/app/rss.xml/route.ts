@@ -6,7 +6,7 @@ import { letterHref } from '@/shared/lib/letterHref';
 // 발견할 수 있게 한다. SSR(2026-08-08)로 요청마다 동적 생성 — admin 발행이
 // 재빌드 없이 바로 반영된다(force-static 이었던 이전엔 빌드 시점에 고정됐음).
 
-const BASE = 'https://ailens.sedaily.ai';
+import { SITE_URL as BASE } from '@/shared/constants/site';
 const FEED_LIMIT = 30;
 
 function escapeXml(s: string): string {

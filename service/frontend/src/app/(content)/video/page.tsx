@@ -3,7 +3,7 @@ import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { VideoListClient } from './VideoListClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 const TITLE = '영상으로 보는 이슈';
 const DESCRIPTION = '서울경제 AI LENS가 요즘 경제·사회 이슈를 짧은 영상으로 정리해드려요. 글로 읽기 부담스러운 경제 뉴스도 영상 한 편이면 충분합니다.';
 

@@ -7,7 +7,7 @@ import { ArchiveHubClient } from './ArchiveHubClient';
 // 콘텐츠 타입별 페이지 분리(2026-08-11)로 /letters가 레터 전용이 되면서,
 // "전체 모아보기"가 갈 곳이 필요해 새로 만든 라우트 — 예전 /letters의 역할을
 // 그대로 이어받는다(레터+트렌드+칼럼+영상 통합 리스트).
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 const TITLE = '지금까지의 모든 콘텐츠';
 const DESCRIPTION = 'AI LENS가 정리한 증시·부동산·산업·금융/정책·국제·재테크 뉴스와 영상을 한 곳에서 모아봅니다. 서울경제신문이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 경제 뉴스 아카이브.';
 

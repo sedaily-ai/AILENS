@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { StaticPageShell } from '@/widgets/StaticPageShell';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '회사소개',

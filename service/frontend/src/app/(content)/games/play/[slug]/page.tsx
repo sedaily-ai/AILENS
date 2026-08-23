@@ -52,7 +52,7 @@ export async function generateMetadata({
   };
 }
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 // VideoGame + BreadcrumbList(2026-08-14, SEO 감사 — 이 라우트만 JSON-LD가
 // 없던 걸 발견). 브라우저에서 바로 도는 H5 게임이라 applicationCategory를

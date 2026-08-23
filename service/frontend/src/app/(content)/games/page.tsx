@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import GamesClient from './GamesClient';
 import { GAMES } from './play/[slug]/page';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 const TITLE = 'AI LENS 게임 — 가볍게 한 판';
 const DESCRIPTION = 'AI LENS 가 직접 만든 서울경제 H5 게임. 출근길·점심·잠들기 전 가볍게 한 판.';
 

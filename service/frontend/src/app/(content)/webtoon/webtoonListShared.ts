@@ -1,9 +1,11 @@
 import type { CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { SITE_URL } from '@/shared/constants/site';
+
+export { SITE_URL };
 
 // /webtoon, /webtoon/page/[n] 공용(2026-08-23, 쿼리스트링→경로 페이지네이션
 // 전환) — lens/lensListShared.ts와 같은 이유. PAGE_SIZE는
 // WebtoonListClient.tsx의 값과 반드시 일치해야 한다.
-export const SITE_URL = 'https://ailens.sedaily.ai';
 export const WEBTOON_LIST_TITLE = '웹툰 — 이슈를 컷으로';
 export const WEBTOON_LIST_DESCRIPTION =
   '서울경제 AI LENS가 요즘 경제·사회 이슈를 흑백 펜화 웹툰으로 옮깁니다. 성과급 갈등, 세제개편, AI 데이터센터 같은 뉴스를 컷으로 이어 보여드려요.';

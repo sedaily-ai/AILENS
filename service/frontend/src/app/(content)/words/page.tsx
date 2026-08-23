@@ -6,7 +6,7 @@ import { fetchTerms, WordsPage } from '@/widgets/WordsPage';
 // 스켈레톤 8개뿐이었다. 메타데이터는 words/layout.tsx가 이미 담당하고 있어서
 // (2026-08-11 SEO 감사) 그대로 두고, 이 파일만 서버에서 미리 fetchTerms()를
 // 돌려 실제 목록을 첫 HTML에 박아 넣는다.
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 export default async function WordsGlossaryPage() {
   const terms = await fetchTerms();

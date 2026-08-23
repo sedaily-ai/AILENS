@@ -4,7 +4,7 @@ import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { ListenViewClient } from './ListenViewClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 // video/[slug]/page.tsx와 같은 이유의 가벼운 재시도.
 async function fetchAllListen(): Promise<HomePlayerPost[]> {

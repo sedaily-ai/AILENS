@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 // 대신 채운다 — timemachine/layout.tsx와 같은 패턴
 // (SEO 감사 2026-08-11, 페이지가 아예 메타데이터 없이 루트 layout.tsx
 // 기본값만 상속하던 걸 발견).
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 const TITLE = '용어 해설 — 경제 용어 사전';
 const DESCRIPTION = 'AI LENS 레터에 나온 경제·시사 용어를 모아뒀어요. 궁금할 때마다 하나씩 찾아보세요.';
 

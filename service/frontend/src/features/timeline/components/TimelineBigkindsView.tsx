@@ -73,7 +73,7 @@ import { InvestmentScenarioCards } from './InvestmentScenarioCards';
 import { ShareBar } from './ShareBar';
 import { SajuFunnelCard } from './SajuFunnelCard';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 /**
  * 기사 한 행 — 제목 + 본문 미리보기 + 바이라인. 모든 행이 같은 모양이다.

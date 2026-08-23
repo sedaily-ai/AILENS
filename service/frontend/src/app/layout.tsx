@@ -29,7 +29,7 @@ const pretendard = localFont({
   display: "swap",
 });
 
-const SITE_URL = "https://ailens.sedaily.ai";
+import { SITE_URL } from "@/shared/constants/site";
 const SITE_TITLE = "AI LENS — 서울경제신문의 AI 경제 뉴스";
 const SITE_DESC = "서울경제신문이 만드는 AI 경제 뉴스 서비스. 그날의 핵심 경제 이슈를 매일 정리해 전합니다.";
 

@@ -5,7 +5,7 @@ import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LensViewClient } from './LensViewClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 
 // 경로 기반(2026-08-12, webtoon/[slug]/page.tsx와 같은 패턴). fetchLensPosts()
 // 단발 실패(API Gateway/Lambda 콜드스타트 등)에 바로 "찾을 수 없어요"로

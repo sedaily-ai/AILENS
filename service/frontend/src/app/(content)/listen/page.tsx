@@ -3,7 +3,7 @@ import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/home
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { ListenListClient } from './ListenListClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+import { SITE_URL } from '@/shared/constants/site';
 const TITLE = '오늘의 뉴스를 귀로';
 const DESCRIPTION = '서울경제 AI LENS가 정리한 오늘의 경제 이슈를 오디오로 들어보세요. 팟캐스트와 영상을 한 재생목록으로 모았습니다.';
 

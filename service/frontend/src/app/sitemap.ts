@@ -6,7 +6,7 @@ import { GAMES } from './(content)/games/play/[slug]/page';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
-const BASE = 'https://ailens.sedaily.ai';
+import { SITE_URL as BASE } from '@/shared/constants/site';
 
 // 예전엔 최근 14일(SEED_DAYS)만 date=YYYY-MM-DD로 하루씩 14번 조회해서 그
 // 이전에 발행된 레터는 사이트맵에서 통째로 빠졌다(2026-08-18, GEO 점검 —
