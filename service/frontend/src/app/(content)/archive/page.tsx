@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { fetchCmsPosts, fetchTrendCards, fetchVideos } from '@/shared/lib/api/cmsPostsApi';
+import { fetchCmsPosts, fetchTrendCards, fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
 import { ArchiveHubClient } from './ArchiveHubClient';
 
@@ -73,12 +74,20 @@ function buildJsonLd(items: ArchiveItem[]) {
 }
 
 export default async function ArchiveHubPage() {
-  const [letters, cards, videos] = await Promise.all([
+  // lens("4가지 시선") 글도 포함(2026-08-23, 사용자 지적 — "여기에 lens도
+  // 있어야 하는데"). buildArchiveItems의 lens 인자는 2026-08-20에 카테고리
+  // 페이지용으로 추가됐지만 이 허브(모든 콘텐츠를 모으는 곳)엔 그때
+  // 안 넘겨서 빠져 있었다 — ArchiveList.tsx의 KIND_LABEL엔 이미
+  // '4가지 시선' 라벨까지 정의돼 있어서 인자만 넘기면 그대로 뜬다.
+  // 우측 사이드바 서버 프리페치도 카테고리 페이지와 동일하게 추가.
+  const [letters, cards, videos, lens, hotLetters] = await Promise.all([
     fetchCmsPosts('letters', undefined, PAGE_SIZE),
     fetchTrendCards(),
     fetchVideos(),
+    fetchLensPosts(),
+    fetchFollowingLetters(5),
   ]);
-  const initialItems = buildArchiveItems(letters, cards, videos);
+  const initialItems = buildArchiveItems(letters, cards, videos, lens);
   const jsonLd = buildJsonLd(initialItems);
   return (
     <>
@@ -86,7 +95,7 @@ export default async function ArchiveHubPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ArchiveHubClient initialItems={initialItems} />
+      <ArchiveHubClient initialItems={initialItems} initialHotLetters={hotLetters} />
     </>
   );
 }
