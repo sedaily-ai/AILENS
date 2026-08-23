@@ -7,11 +7,19 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ArchiveItem } from '@/shared/lib/archiveItems';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 
 function dateLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
   if (!y || !m || !d) return iso;
   return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')}`;
+}
+
+// 2026-08-23 — lens 항목은 published_at(시:분 포함)이 있어서 이 카드에서도
+// "2026.08.22"가 아니라 "2026.08.22 16:37"까지 보여줄 수 있다. 다른 kind는
+// publishedAt이 없어(archiveItems.ts 참조) 자동으로 날짜만 폴백된다.
+function dateTimeLabel(item: ArchiveItem): string {
+  return kstDateTimeLabel(item.publishedAt) ?? (item.date ? dateLabel(item.date) : '');
 }
 
 export function ArticleThumb({ item, aspectRatio = '16 / 9' }: { item: ArchiveItem; aspectRatio?: string }) {
@@ -46,7 +54,7 @@ function CardMeta({ item }: { item: ArchiveItem }) {
       {item.category && (
         <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>{item.category}</span>
       )}
-      <span style={{ fontSize: 12, color: '#9ca3af' }}>{item.date ? dateLabel(item.date) : ''}</span>
+      <span style={{ fontSize: 12, color: '#9ca3af' }}>{dateTimeLabel(item)}</span>
     </div>
   );
 }

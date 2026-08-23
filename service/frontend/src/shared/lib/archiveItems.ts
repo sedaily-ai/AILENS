@@ -27,6 +27,12 @@ export interface ArchiveItem {
    *  주제 기반으로 바뀌면서, 카테고리 아카이브 페이지가 kind와 무관하게
    *  이 값으로 필터링한다(shared/constants/econCategories.ts 참조). */
   category?: string | null;
+  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, lens 항목만 채운다(mustknow_auto/
+   *  frontpage_auto가 기록하는 published_at이 있어서). letter/trend/column/
+   *  video는 아직 이 정밀도의 필드가 API에 없어 비워둔다 — ArticleCard가
+   *  없으면 날짜만(date) 표시로 자연스럽게 폴백한다(shared/lib/date.ts
+   *  kstDateTimeLabel). */
+  publishedAt?: string | null;
 }
 
 export const TREND_ACCENT = '#dc2626';
@@ -113,6 +119,7 @@ export function buildArchiveItems(
     href: `/lens/${encodeURIComponent(l.id)}`,
     avatarUrl: l.photo_image_url || l.cover_image_url || null,
     category: l.category ?? null,
+    publishedAt: l.published_at ?? null,
   }));
 
   return [...letterItems, ...cardItems, ...videoItems, ...lensItems].sort((a, b) =>

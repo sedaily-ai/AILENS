@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { ArchiveItem } from '@/shared/lib/archiveItems';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 
 // 본지(en.sedaily.com, 로컬 참고 경로:
 // 1_ailink/globe/dev/frontend/src/components/home/HeroSection/HeroSection.tsx)
@@ -17,6 +18,14 @@ function dateLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
   if (!y || !m || !d) return iso;
   return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')}`;
+}
+
+// 2026-08-23 — lens 항목은 published_at(시:분 포함)이 있어서 이 레일
+// 카드에서도 날짜만이 아니라 시:분까지 보여줄 수 있다(ArticleCard.tsx의
+// dateTimeLabel과 같은 패턴 — 이 파일이 독립적으로 자기 dateLabel을 갖고
+// 있어서 그쪽 수정이 자동으로 여기 반영되지 않았다, 사용자 지적으로 확인).
+function dateTimeLabel(item: ArchiveItem): string {
+  return kstDateTimeLabel(item.publishedAt) ?? (item.date ? dateLabel(item.date) : '');
 }
 
 function HeroArticle({ item, large }: { item: ArchiveItem; large: boolean }) {
@@ -65,7 +74,7 @@ function HeroArticle({ item, large }: { item: ArchiveItem; large: boolean }) {
           {item.excerpt}
         </p>
       )}
-      {item.date && <time className="text-xs text-gray-400">{dateLabel(item.date)}</time>}
+      {item.date && <time className="text-xs text-gray-400">{dateTimeLabel(item)}</time>}
     </Link>
   );
 }
@@ -86,7 +95,7 @@ function ListArticle({ item }: { item: ArchiveItem }) {
       >
         {item.title}
       </h4>
-      {item.date && <time className="text-xs text-gray-400">{dateLabel(item.date)}</time>}
+      {item.date && <time className="text-xs text-gray-400">{dateTimeLabel(item)}</time>}
     </Link>
   );
 }

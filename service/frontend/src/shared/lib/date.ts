@@ -21,3 +21,26 @@ export function clampModifiedIso(updatedAt: string | null | undefined, published
   if (updated.getTime() > Date.now()) return publishedIso;
   return updated.toISOString();
 }
+
+// "YYYY.MM.DD HH:MM"(KST) — 2026-08-23, lens 콘텐츠는 published_at(UTC ISO,
+// mustknow_auto/frontpage_auto가 발행 완료 시각을 초 단위로 기록)이 있어서
+// 날짜만이 아니라 시:분까지 보여줄 수 있다("입력 2026.08.14"까지만 표기
+// 가능하던 기존 한계 — LensViewClient.tsx 옛 주석 참조 — 를 published_at
+// 노출로 해소). isoUtc가 없거나 파싱 실패하면 null을 돌려주고, 호출부가
+// 날짜만 있는 fallbackDate(YYYY-MM-DD)로 대체한다.
+export function kstDateTimeLabel(isoUtc: string | null | undefined): string | null {
+  if (!isoUtc) return null;
+  const d = new Date(isoUtc);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}.${get('month')}.${get('day')} ${get('hour')}:${get('minute')}`;
+}

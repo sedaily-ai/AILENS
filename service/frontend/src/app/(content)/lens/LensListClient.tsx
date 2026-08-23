@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { HomeSideBar } from '@/shared/ui/HomeSideBar';
 import { Header } from '@/widgets/Header';
@@ -238,7 +239,7 @@ export function LensListClient({
                 )}
                 <div style={{ padding: 'clamp(16px, 3vw, 22px)' }}>
                   <p style={{ fontSize: 13, color: '#6b7280', fontWeight: 600, marginBottom: 6 }}>
-                    {latest.date.replaceAll('-', '.')} · 서울경제
+                    {kstDateTimeLabel(latest.published_at) ?? latest.date.replaceAll('-', '.')} · 서울경제
                   </p>
                   <h2
                     className="group-hover:underline"

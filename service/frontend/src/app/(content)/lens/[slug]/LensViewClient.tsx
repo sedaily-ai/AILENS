@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import {
   LENS_ACCENT,
@@ -665,13 +666,16 @@ export function LensViewClient({
               순위가 저절로 읽힌다. */}
           {/* 날짜 앞에 "입력" 라벨을 붙였다(2026-08-18, "발행일 인지, 입력인지
               수정인지.. 그런거 표기하면 좋겠고" — sedaily.com 실제 화면의
-              "입력 2026-08-17 17:32" 표기를 참고. 단, CmsLens 데이터엔
-              날짜만 있고 시:분은 없어(백엔드 필드 자체가 없음, 확인됨)
-              "입력 2026.08.14"까지만 표기 가능 — 수정 시각은 별도 필드가
-              생기기 전엔 표기할 수 없다). "· 서울경제"는 뺐다(2026-08-18,
-              "서울경제 라는 키워드는 빼는게 어떤가요" — 바로 앞 사진
-              캡션에도 "사진 · 서울경제"가 있고 페이지 전체가 이미 서울경제
-              브랜드라 매 줄마다 반복할 필요가 없다는 판단에 동의). */}
+              "입력 2026-08-17 17:32" 표기를 참고). 2026-08-23까지는 CmsLens
+              데이터에 날짜만 있고 시:분이 없어 "입력 2026.08.14"까지만
+              표기했는데, 사용자가 "여기는 날짜만 나와서"라고 다시 지적 —
+              백엔드가 published_at(발행 완료 시각, ISO)을 내려주도록 고쳐서
+              이제 시:분까지 표기한다(kstDateTimeLabel). 옛 글처럼
+              published_at이 없는 경우만 날짜만 표기로 폴백. "· 서울경제"는
+              뺐다(2026-08-18, "서울경제 라는 키워드는 빼는게 어떤가요" —
+              바로 앞 사진 캡션에도 "사진 · 서울경제"가 있고 페이지 전체가
+              이미 서울경제 브랜드라 매 줄마다 반복할 필요가 없다는 판단에
+              동의). */}
           <div className="flex items-center flex-wrap" style={{ gap: 12, marginBottom: 10 }}>
             <span
               style={{
@@ -687,7 +691,7 @@ export function LensViewClient({
             </span>
             <p className="flex items-center" style={{ gap: 5, fontSize: 13, color: '#6b7280', fontWeight: 600, margin: 0 }}>
               <Calendar className="w-4 h-4" aria-hidden />
-              입력 {lens.date.replaceAll('-', '.')}
+              입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
             </p>
             <a
               href="https://www.google.com/preferences/source?q=ailens.sedaily.ai"
@@ -1549,7 +1553,7 @@ export function LensViewClient({
                       )}
                       <span style={{ minWidth: 0, flex: 1 }}>
                         <span style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 3 }}>
-                          {l.date.replaceAll('-', '.')}
+                          {kstDateTimeLabel(l.published_at) ?? l.date.replaceAll('-', '.')}
                         </span>
                         <span
                           style={{

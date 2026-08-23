@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensFormatGuide } from './LensFormatGuide';
 
@@ -284,7 +285,9 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                   <span style={{ fontSize: 13, fontWeight: 800, color: LENS_ACCENT, letterSpacing: '0.04em' }}>
                     {activeSection.label}
                   </span>
-                  <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>{current.date.replaceAll('-', '.')}</span>
+                  <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>
+                    {kstDateTimeLabel(current.published_at) ?? current.date.replaceAll('-', '.')}
+                  </span>
                 </span>
                 <span
                   className="lz-h"

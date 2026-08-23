@@ -213,6 +213,13 @@ def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         "context": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
         "updated_at": post.get("updated_at"),
+        # 발행 완료 시각(ISO, UTC, 초 단위 — 2026-08-23, 사용자 지적: "날짜만
+        # 나와서" — 지면 1면 그리드·상세 페이지 둘 다 날짜만 있고 시:분이
+        # 없었다). mustknow_auto/frontpage_auto가 실제 발행 완료 시점에
+        # 기록하는 published_at을 그대로 내려준다 — 프론트가 KST로 변환해
+        # "입력 2026.08.23 16:37" 형태로 표기(shared/lib/date.ts
+        # kstDateTimeLabel). 옛 글은 이 필드가 없을 수 있어 옵셔널.
+        "published_at": post.get("published_at"),
         "cover_image_url": post.get("cover_image_url") or None,
         # 텍스트가 없는 순수 기사 사진(2026-08-14 신설). cover_image_url 은
         # 인스타 카드뉴스용 완성형 그래픽(1080x1350)이라 헤드라인·날짜·"lens"
