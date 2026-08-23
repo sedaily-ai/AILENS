@@ -308,8 +308,13 @@ export function LensListClient({
                               {p.short}
                             </span>
                             <span style={{ display: 'block', minWidth: 0 }}>
+                              {/* l.question 대신 p.tagline만 쓴다(2026-08-23, 사용자
+                                  지적 — LensPreviewSection.tsx와 같은 버그: 웹툰만
+                                  core_question을 따로 생성하고 레터·팟캐스트·영상은
+                                  question이 헤드라인과 동일해서 위 히어로 헤드라인을
+                                  그대로 반복해 보였다). */}
                               <span style={{ display: 'block', fontSize: 16, fontWeight: 600, color: '#374151', lineHeight: 1.5, letterSpacing: '-0.015em', wordBreak: 'keep-all' }}>
-                                {l.question || p.tagline}
+                                {p.tagline}
                               </span>
                               {preview && (
                                 <span
