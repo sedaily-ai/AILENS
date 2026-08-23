@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
+import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
@@ -86,7 +85,6 @@ export function FeedPage({
   initialHotLetters,
   initialHomePlayerPosts,
 }: Props) {
-  const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
 
@@ -199,79 +197,23 @@ export function FeedPage({
     );
   }, [pathname]);
 
-  // 펼친 기사 상태
-  const [expandedArticles, setExpandedArticles] = useState<Set<string>>(new Set());
+  // 펼친 기사 상태 — 값은 아무도 안 읽지만(렌더에 영향 없음) setter는 자식에
+  // 계속 넘겨주고 있어(423줄) 값 바인딩만 제거(2026-08-23 죽은 코드 정리).
+  const [, setExpandedArticles] = useState<Set<string>>(new Set());
 
   // 내 서랍 날짜 필터
   const [archiveDate, setArchiveDate] = useState<Date>(new Date()); // 오늘부터 시작
 
-  // 선택된 문장 상태 (아카이빙용)
-  const [selectedSentence, setSelectedSentence] = useState<{
-    text: string;
-    articleId: string;
-    articleTitle: string;
-  } | null>(null);
-
-  // 저장 완료 토스트
-  const [showSaveToast, setShowSaveToast] = useState(false);
+  // 저장 완료 토스트 — 값(showSaveToast)을 실제로 렌더에 쓰는 곳이 없어져서
+  // (2026-08-23 죽은 코드 정리) setter만 유지, showToast() 호출부(자식으로
+  // 전달)는 그대로 둠.
+  const [, setShowSaveToast] = useState(false);
 
   // 토스트 표시 함수
   const showToast = () => {
     setShowSaveToast(true);
     setTimeout(() => setShowSaveToast(false), 2500);
   };
-
-  // 텍스트 선택 상태 (플로팅 버튼용)
-  const [textSelection, setTextSelection] = useState<{
-    text: string;
-    articleId: string;
-    articleTitle: string;
-    articlePublishedAt?: string;
-    position: { x: number; y: number };
-  } | null>(null);
-
-  // 텍스트 선택 감지
-  const handleTextSelect = (articleId: string, articleTitle: string, articlePublishedAt?: string) => {
-    const selection = window.getSelection();
-    const selectedText = selection?.toString().trim();
-
-    if (selectedText && selectedText.length > 5) {
-      const range = selection?.getRangeAt(0);
-      const rect = range?.getBoundingClientRect();
-
-      if (rect) {
-        setTextSelection({
-          text: selectedText,
-          articleId,
-          articleTitle,
-          articlePublishedAt,
-          position: {
-            x: rect.left + rect.width / 2,
-            y: rect.top - 10
-          }
-        });
-      }
-    }
-  };
-
-  // 선택 해제 감지
-  useEffect(() => {
-    const handleSelectionChange = () => {
-      const selection = window.getSelection();
-      if (!selection || selection.toString().trim().length === 0) {
-        // 약간의 딜레이를 주어 버튼 클릭이 가능하도록
-        setTimeout(() => {
-          const currentSelection = window.getSelection();
-          if (!currentSelection || currentSelection.toString().trim().length === 0) {
-            setTextSelection(null);
-          }
-        }, 200);
-      }
-    };
-
-    document.addEventListener('selectionchange', handleSelectionChange);
-    return () => document.removeEventListener('selectionchange', handleSelectionChange);
-  }, []);
 
   const [showSearch, setShowSearch] = useState(false);
 
@@ -282,7 +224,7 @@ export function FeedPage({
   }, [selectedDate]);
 
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = () => {
       // URL에서 탭 상태 복원
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
@@ -297,12 +239,17 @@ export function FeedPage({
   // /editors 등 다른 라우트에서 ?tab=... 로 진입했을 때 초기 반영 — 마운트 시
   // 1회, window.location.search를 직접 읽는다(useSearchParams() 대신 — 위 참조).
   // 다른 라우트에서 오는 진입은 항상 이 컴포넌트의 새 마운트라 1회 실행으로 충분.
+  // useState 지연 초기화로 옮기지 않는 이유(2026-08-23, 죽은 코드 정리 중
+  // set-state-in-effect 린트를 만나 재확인) — 서버 렌더 시점엔 window가 없어
+  // 초기값을 URL 기준으로 계산하면 서버가 그린 HTML과 클라이언트 첫 렌더가
+  // 달라지는 하이드레이션 불일치가 생긴다. "일단 feed로 그리고 마운트 후
+  // 전환"이 의도된 동작.
   useEffect(() => {
     const tabParam = new URLSearchParams(window.location.search).get('tab');
     if (tabParam && ['question', 'feed', 'archive', 'dna'].includes(tabParam)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTabState(tabParam as typeof activeTab);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 질문 답변 선택
@@ -330,18 +277,6 @@ export function FeedPage({
         setActiveTab("feed");
       }, 500);
     }
-  };
-
-  const currentQuestion = activeQuestionsList[Math.min(currentQuestionIndex, activeQuestionsList.length - 1)];
-
-  // 뉴스 DNA 데이터 (예시)
-  const newsDNA = {
-    economy: 75,
-    tech: 60,
-    world: 40,
-    society: 30,
-    culture: 20,
-    politics: 45,
   };
 
   return (
