@@ -4,6 +4,20 @@ import { Suspense, useEffect } from 'react';
 import { AuthProvider } from '@/features/auth';
 import { NavProgress } from '@/widgets/NavProgress';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
+import { reportWebVitals } from '@/shared/lib/tracking/webVitals';
+
+// 속도 KPI 계측(2026-08-23, "전체적으로 더 빠르게 하려면?" 대화의 연장).
+// web-vitals는 브라우저 Navigation/Paint API를 직접 관찰하는 방식이라
+// 실제 문서 로드(하드 리프레시/첫 진입) 1회에 대해서만 의미가 있다 —
+// Next.js 클라이언트 사이드 라우팅(<Link> 이동)은 이 지표들이 다시
+// 재발생하는 게 아니라서, SessionSourceTracker와 같은 패턴으로 앱 루트
+// 마운트 시 1회만 리스너를 건다.
+function WebVitalsTracker() {
+  useEffect(() => {
+    reportWebVitals();
+  }, []);
+  return null;
+}
 
 // KPI 계측(2026-08-23) — "습관 재방문" 축. 알림 클릭으로 온 세션과 스스로
 // 돌아온(직접/즐겨찾기/검색 등) 세션을 구분한다. 지금은 AI LENS에 푸시
@@ -32,6 +46,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <NavProgress />
       </Suspense>
       <SessionSourceTracker />
+      <WebVitalsTracker />
       {children}
     </AuthProvider>
   );
