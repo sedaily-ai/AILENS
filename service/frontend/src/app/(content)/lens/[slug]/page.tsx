@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LensViewClient } from './LensViewClient';
@@ -180,7 +181,16 @@ export default async function LensViewPage({
 }) {
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
-  const [lens, otherLens] = await Promise.all([findLens(slug), findOtherLens(slug)]);
+  // 우측 사이드바(HomeSideBar) "요즘 가장 많이 읽힌 글" 서버 프리페치
+  // (2026-08-23) — 홈/카테고리/lens 목록 페이지엔 이미 있었는데 이
+  // 상세 페이지만 빠져 있었다. 없으면 HotLettersRail이 클라이언트
+  // fetch가 끝날 때까지 아무것도 안 그려서 실사용자가 "느리게
+  // 나타난다"고 느낀다(프로덕션에서 사용자가 직접 확인).
+  const [lens, otherLens, hotLetters] = await Promise.all([
+    findLens(slug),
+    findOtherLens(slug),
+    fetchFollowingLetters(5),
+  ]);
   const jsonLd = lens ? buildJsonLd(lens, slug) : null;
   return (
     <>
@@ -190,7 +200,7 @@ export default async function LensViewPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <LensViewClient slug={slug} initialLens={lens} otherLens={otherLens} />
+      <LensViewClient slug={slug} initialLens={lens} otherLens={otherLens} initialHotLetters={hotLetters} />
     </>
   );
 }

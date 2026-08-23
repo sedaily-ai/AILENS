@@ -17,6 +17,7 @@ import {
   pickLensPhoto,
 } from '@/shared/constants/lensPerspectives';
 import { HomeSideBar } from '@/shared/ui/HomeSideBar';
+import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
@@ -401,10 +402,12 @@ export function LensViewClient({
   slug,
   initialLens = undefined,
   otherLens = [],
+  initialHotLetters,
 }: {
   slug: string;
   initialLens?: CmsLens | null;
   otherLens?: CmsLens[];
+  initialHotLetters?: TodayLetterCardLike[];
 }) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
   const [active, setActive] = useState(0);
@@ -1534,7 +1537,7 @@ export function LensViewClient({
               (위 주석 참조), 사이드바 자체의 paddingTop 오버라이드는
               없앤다. 본문 헤드라인의 28~40px 여백은 그대로 유지 — 헤더와
               헤드라인 사이 간격 자체는 2026-08-17에 확정한 의도적인 값. */}
-          <HomeSideBar className="hidden lg:block" />
+          <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
         </div>
       </div>
     </div>
