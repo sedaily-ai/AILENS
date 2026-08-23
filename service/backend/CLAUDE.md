@@ -293,6 +293,15 @@ services/           → Business logic: article_filter, prompt_loader,
                      91줄로 축소. 검증: 전용 테스트 tests/test_cms_posts_public.py 8/8
                      통과(letters/paper 채널 shaping, slug 조회, CORS, 404, cache-control
                      헤더까지 커버) + 전체 스위트 재확인.
+                     2026-08-24 후속3: `handlers/user_handler.py`(356줄, 프로필 생성/조회·읽기
+                     기록·통계·뱃지 계산이 전부 핸들러 파일에 있던 것)를 `user_service.py`
+                     (get_or_create_user/record_article_read/get_reading_history/
+                     get_user_stats/_calculate_streak/_check_and_award_badges +
+                     success_response/error_response)로 분리. 356→117줄. 부수 정리: 원본에
+                     대입만 되고 이후 안 쓰이던 `query_params` 죽은 코드 1줄 제거(동작 영향
+                     없음). 검증: OPTIONS·인증 없는 요청 401 스모크 테스트(둘 다 AWS 호출
+                     없음, 상태코드·바디 모양 리팩토링 전후 동일 확인) + 전체 스위트 재확인
+                     (104 passed, 기존 무관 에러 6건 동일).
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
