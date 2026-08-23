@@ -29,7 +29,7 @@
       "Sid": "MustknowSeenReadWrite",
       "Effect": "Allow",
       "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
-      "Resource": "arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-mustknow-seen-dev"
+      "Resource": "arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-lens-mustknow-seen-dev"
     },
     {
       "Sid": "SecretsRead",
@@ -51,7 +51,7 @@
       "Effect": "Allow",
       "Action": ["bedrock:InvokeModel"],
       "Resource": [
-        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/bevq2226yzcq",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/zmdham3vkj89",
         "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-5",
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-5",
         "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-5",
@@ -63,7 +63,7 @@
       "Effect": "Allow",
       "Action": ["bedrock:InvokeModel"],
       "Resource": [
-        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yeypch70w7ej",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/r9n8dvqc1t0r",
         "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",

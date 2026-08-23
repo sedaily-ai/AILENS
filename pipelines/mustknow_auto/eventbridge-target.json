@@ -1,10 +1,10 @@
 [
   {
     "Id": "mustknow-auto-fargate-task",
-    "Arn": "arn:aws:ecs:us-east-1:887078546492:cluster/sedaily-mbti-frontpage-auto",
-    "RoleArn": "arn:aws:iam::887078546492:role/sedaily-mbti-mustknow-auto-eventbridge-role",
+    "Arn": "arn:aws:ecs:us-east-1:887078546492:cluster/sedaily-lens-frontpage-auto",
+    "RoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-mustknow-auto-eventbridge-role",
     "EcsParameters": {
-      "TaskDefinitionArn": "arn:aws:ecs:us-east-1:887078546492:task-definition/sedaily-mbti-mustknow-auto",
+      "TaskDefinitionArn": "arn:aws:ecs:us-east-1:887078546492:task-definition/sedaily-lens-mustknow-auto",
       "TaskCount": 1,
       "LaunchType": "FARGATE",
       "NetworkConfiguration": {

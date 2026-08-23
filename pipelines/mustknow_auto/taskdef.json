@@ -1,5 +1,5 @@
 {
-  "family": "sedaily-mbti-mustknow-auto",
+  "family": "sedaily-lens-mustknow-auto",
   "requiresCompatibilities": ["FARGATE"],
   "networkMode": "awsvpc",
   "cpu": "2048",
@@ -8,12 +8,12 @@
     "cpuArchitecture": "ARM64",
     "operatingSystemFamily": "LINUX"
   },
-  "executionRoleArn": "arn:aws:iam::887078546492:role/sedaily-mbti-frontpage-auto-execution-role",
-  "taskRoleArn": "arn:aws:iam::887078546492:role/sedaily-mbti-mustknow-auto-task-role",
+  "executionRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-execution-role",
+  "taskRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-mustknow-auto-task-role",
   "containerDefinitions": [
     {
       "name": "mustknow-auto",
-      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-mbti-frontpage-auto:latest",
+      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-lens-frontpage-auto:latest",
       "workingDirectory": "/app/pipelines/mustknow_auto",
       "essential": true,
       "environment": [
@@ -23,7 +23,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/sedaily-mbti-mustknow-auto",
+          "awslogs-group": "/ecs/sedaily-lens-mustknow-auto",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "run"
         }

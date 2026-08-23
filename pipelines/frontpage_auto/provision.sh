@@ -11,31 +11,35 @@
 # 이미 만들어진 리소스라 재실행하면 대부분 "already exists" 에러가
 # 난다 — 이건 최초 셋업 기록용이지, 매번 돌리는 배포 스크립트가
 # 아니다(이미지만 갱신하려면 deploy.sh 참고).
+#
+# 2026-08-23 — 리소스명에서 "mbti"를 걷어내는 작업으로 sedaily-mbti-* →
+# sedaily-lens-*로 전부 재생성했다(구 리소스는 데이터 유실 감수하고 삭제 —
+# 아직 프로토타입 단계라 다운타임/데이터 손실 허용된 상태에서 진행).
 set -euo pipefail
 
 REGION="us-east-1"
 ACCOUNT_ID="887078546492"
-CLUSTER="sedaily-mbti-frontpage-auto"
-REPO="sedaily-mbti-frontpage-auto"
+CLUSTER="sedaily-lens-frontpage-auto"
+REPO="sedaily-lens-frontpage-auto"
 
 echo "=== 1/7 ECR 리포지토리 ==="
 aws ecr create-repository --repository-name "$REPO" --region "$REGION" \
   --image-scanning-configuration scanOnPush=true
 
 echo "=== 2/7 IAM 역할 3개 (태스크 실행 / 앱 권한 / EventBridge 호출) ==="
-aws iam create-role --role-name sedaily-mbti-frontpage-auto-task-role \
+aws iam create-role --role-name sedaily-lens-frontpage-auto-task-role \
   --assume-role-policy-document file://trust-policy-ecs-tasks.json
-aws iam put-role-policy --role-name sedaily-mbti-frontpage-auto-task-role \
+aws iam put-role-policy --role-name sedaily-lens-frontpage-auto-task-role \
   --policy-name FrontpageAutoAccess --policy-document file://task-policy.json
 
-aws iam create-role --role-name sedaily-mbti-frontpage-auto-execution-role \
+aws iam create-role --role-name sedaily-lens-frontpage-auto-execution-role \
   --assume-role-policy-document file://trust-policy-ecs-tasks.json
-aws iam attach-role-policy --role-name sedaily-mbti-frontpage-auto-execution-role \
+aws iam attach-role-policy --role-name sedaily-lens-frontpage-auto-execution-role \
   --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
-aws iam create-role --role-name sedaily-mbti-frontpage-auto-eventbridge-role \
+aws iam create-role --role-name sedaily-lens-frontpage-auto-eventbridge-role \
   --assume-role-policy-document file://trust-policy-events.json
-aws iam put-role-policy --role-name sedaily-mbti-frontpage-auto-eventbridge-role \
+aws iam put-role-policy --role-name sedaily-lens-frontpage-auto-eventbridge-role \
   --policy-name RunFrontpageAutoTask --policy-document file://eventbridge-runtask-policy.json
 
 echo "=== 3/7 CloudWatch 로그그룹 (30일 보관) ==="

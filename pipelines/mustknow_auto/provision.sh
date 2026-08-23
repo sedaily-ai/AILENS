@@ -9,35 +9,42 @@
 # 재사용한다 — Dockerfile이 pipelines/ 전체를 COPY하므로 이 폴더도 이미
 # 이미지 안에 있고, taskdef.json의 workingDirectory 오버라이드로 같은
 # 이미지·다른 진입점으로 실행한다. Bedrock inference profile
-# (mbti-mustknow-sonnet-5)과 DynamoDB seen 테이블(sedaily-mbti-mustknow-
+# (lens-mustknow-sonnet-5)과 DynamoDB seen 테이블(sedaily-lens-mustknow-
 # seen-dev)은 이미 콘솔/CLI로 별도 생성 완료(2026-08-22).
+#
+# 2026-08-23 — 리소스명에서 "mbti"를 걷어내는 작업으로 sedaily-mbti-* →
+# sedaily-lens-*로 전부 재생성했다(구 리소스는 데이터 유실 감수하고 삭제 —
+# 아직 프로토타입 단계라 다운타임/데이터 손실 허용된 상태에서 진행).
+# 이 스크립트도 그 새 이름 기준으로 갱신 — 실제로는 이미 만들어진
+# 리소스라 재실행하면 대부분 "already exists" 에러가 난다(최초 셋업
+# 기록용, deploy.sh 참고는 이미지 갱신용).
 set -euo pipefail
 
 REGION="us-east-1"
 ACCOUNT_ID="887078546492"
-CLUSTER="sedaily-mbti-frontpage-auto"  # 재사용, 새로 안 만듦
-FAMILY="sedaily-mbti-mustknow-auto"
+CLUSTER="sedaily-lens-frontpage-auto"  # 재사용, 새로 안 만듦
+FAMILY="sedaily-lens-mustknow-auto"
 
 # 태그는 CLI마다 형식이 달라 따로 둔다 — 값은 전부 동일. ECS
 # register-task-definition은 소문자 key/value 셸 shorthand로 넣으면
 # "Second instance of key value encountered" 파싱 에러가 나서(실제로
 # 겪음) tags-ecs.json 파일로 대신 넣는다.
-TAGS_KV="Key=Project,Value=Sedaily-MBTI Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-MBTI Key=Environment,Value=dev Key=Service,Value=mbti Key=Workload,Value=mustknow-auto Key=WorkItem,Value=atlas-4444"  # iam (대문자 Key/Value)
-TAGS_EQ="Project=Sedaily-MBTI,CostCenter=sedaily-ai,ServiceName=Sedaily-MBTI,Environment=dev,Service=mbti,Workload=mustknow-auto,WorkItem=atlas-4444"  # logs
-TAGS_JSON='[{"Key":"Project","Value":"Sedaily-MBTI"},{"Key":"CostCenter","Value":"sedaily-ai"},{"Key":"ServiceName","Value":"Sedaily-MBTI"},{"Key":"Environment","Value":"dev"},{"Key":"Service","Value":"mbti"},{"Key":"Workload","Value":"mustknow-auto"},{"Key":"WorkItem","Value":"atlas-4444"}]'  # events (--region 명시 필수 — 안 그러면 "Cross-region api call is not allowed" 에러)
+TAGS_KV="Key=Project,Value=Sedaily-LENS Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-LENS Key=Environment,Value=dev Key=Service,Value=lens Key=Workload,Value=mustknow-auto Key=WorkItem,Value=atlas-4444"  # iam (대문자 Key/Value)
+TAGS_EQ="Project=Sedaily-LENS,CostCenter=sedaily-ai,ServiceName=Sedaily-LENS,Environment=dev,Service=lens,Workload=mustknow-auto,WorkItem=atlas-4444"  # logs
+TAGS_JSON='[{"Key":"Project","Value":"Sedaily-LENS"},{"Key":"CostCenter","Value":"sedaily-ai"},{"Key":"ServiceName","Value":"Sedaily-LENS"},{"Key":"Environment","Value":"dev"},{"Key":"Service","Value":"lens"},{"Key":"Workload","Value":"mustknow-auto"},{"Key":"WorkItem","Value":"atlas-4444"}]'  # events (--region 명시 필수 — 안 그러면 "Cross-region api call is not allowed" 에러)
 
 echo "=== 1/5 IAM 역할 2개 (태스크 앱 권한 / EventBridge 호출) ==="
 echo "    (execution-role은 frontpage_auto 것 재사용 — 범용 ECS 실행 권한이라 서비스별 구분 불필요)"
-aws iam create-role --role-name sedaily-mbti-mustknow-auto-task-role \
+aws iam create-role --role-name sedaily-lens-mustknow-auto-task-role \
   --assume-role-policy-document file://trust-policy-ecs-tasks.json \
   --tags $TAGS_KV
-aws iam put-role-policy --role-name sedaily-mbti-mustknow-auto-task-role \
+aws iam put-role-policy --role-name sedaily-lens-mustknow-auto-task-role \
   --policy-name MustknowAutoAccess --policy-document file://task-policy.json
 
-aws iam create-role --role-name sedaily-mbti-mustknow-auto-eventbridge-role \
+aws iam create-role --role-name sedaily-lens-mustknow-auto-eventbridge-role \
   --assume-role-policy-document file://trust-policy-events.json \
   --tags $TAGS_KV
-aws iam put-role-policy --role-name sedaily-mbti-mustknow-auto-eventbridge-role \
+aws iam put-role-policy --role-name sedaily-lens-mustknow-auto-eventbridge-role \
   --policy-name RunMustknowAutoTask --policy-document file://eventbridge-runtask-policy.json
 
 echo "=== 2/5 CloudWatch 로그그룹 (30일 보관) ==="

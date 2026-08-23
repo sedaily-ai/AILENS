@@ -2,7 +2,7 @@
 21/23시 KST)가 깨우는 Fargate 태스크의 진입점.
 
 흐름: discovery.fetch_articles(오늘)로 그 시점까지 누적된 하루치 후보를
-받는다 → seen 테이블(`sedaily-mbti-mustknow-seen-dev`, key GetItem)로 이미
+받는다 → seen 테이블(`sedaily-lens-mustknow-seen-dev`, key GetItem)로 이미
 처리한 기사를 제외한 델타만 남긴다 → 규칙 기반 사전필터(중복게재 탐지,
 최소 길이) → ① 지면특별코너 4탭(전체·증권·산업·시그널, 탭당 최대 4건) →
 ② 그 외 일반 필수뉴스(종합점수 ≥7.0, 캡 없음) 순서로 처리한다. 매 회차
@@ -73,7 +73,7 @@ _webtoon_mod = _load_module("mustknow_auto_webtoon", _ROOT / "webtoon" / "pipeli
 REGION = "us-east-1"
 TABLE = "sedaily-mbti-cms-posts-dev"
 BUCKET = "sedaily-mbti-cms-media-dev"
-SEEN_TABLE = "sedaily-mbti-mustknow-seen-dev"
+SEEN_TABLE = "sedaily-lens-mustknow-seen-dev"
 VIDEO_DIR = _ROOT / "video"
 
 _NON_SLUG = re.compile(r"[^0-9A-Za-z가-힣]+")

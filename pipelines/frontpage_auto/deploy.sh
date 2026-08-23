@@ -8,7 +8,7 @@ set -euo pipefail
 
 REGION="us-east-1"
 ACCOUNT_ID="887078546492"
-REPO="sedaily-mbti-frontpage-auto"
+REPO="sedaily-lens-frontpage-auto"
 ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
 
 echo "=== 1/3 이미지 빌드 (linux/arm64 — Fargate 태스크 정의와 일치) ==="
@@ -24,4 +24,4 @@ aws ecs register-task-definition --cli-input-json file://frontpage_auto/taskdef.
   --query "taskDefinition.{Family:family,Revision:revision}" --output json
 
 echo "완료 — 다음 EventBridge 트리거(매일 07:00 KST)부터 새 이미지로 실행됨."
-echo "지금 바로 확인하려면: aws ecs run-task --cluster sedaily-mbti-frontpage-auto --task-definition sedaily-mbti-frontpage-auto --launch-type FARGATE --network-configuration '{\"awsvpcConfiguration\":{\"subnets\":[\"subnet-0b5a146ca8ed1ddfe\"],\"securityGroups\":[\"sg-05cb5f7bc29891cf8\"],\"assignPublicIp\":\"ENABLED\"}}' --region us-east-1"
+echo "지금 바로 확인하려면: aws ecs run-task --cluster sedaily-lens-frontpage-auto --task-definition sedaily-lens-frontpage-auto --launch-type FARGATE --network-configuration '{\"awsvpcConfiguration\":{\"subnets\":[\"subnet-0b5a146ca8ed1ddfe\"],\"securityGroups\":[\"sg-05cb5f7bc29891cf8\"],\"assignPublicIp\":\"ENABLED\"}}' --region us-east-1"

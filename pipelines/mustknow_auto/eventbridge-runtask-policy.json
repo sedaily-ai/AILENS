@@ -4,17 +4,17 @@
     {
       "Effect": "Allow",
       "Action": "ecs:RunTask",
-      "Resource": "arn:aws:ecs:us-east-1:887078546492:task-definition/sedaily-mbti-mustknow-auto:*",
+      "Resource": "arn:aws:ecs:us-east-1:887078546492:task-definition/sedaily-lens-mustknow-auto:*",
       "Condition": {
-        "ArnLike": {"ecs:cluster": "arn:aws:ecs:us-east-1:887078546492:cluster/sedaily-mbti-frontpage-auto"}
+        "ArnLike": {"ecs:cluster": "arn:aws:ecs:us-east-1:887078546492:cluster/sedaily-lens-frontpage-auto"}
       }
     },
     {
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": [
-        "arn:aws:iam::887078546492:role/sedaily-mbti-mustknow-auto-task-role",
-        "arn:aws:iam::887078546492:role/sedaily-mbti-frontpage-auto-execution-role"
+        "arn:aws:iam::887078546492:role/sedaily-lens-mustknow-auto-task-role",
+        "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-execution-role"
       ]
     }
   ]

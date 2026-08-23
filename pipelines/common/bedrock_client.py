@@ -7,10 +7,14 @@ Bedrock Claude로 이관하며 신설. `openai_client.call_text()`와 동일한
 그대로 openai_client에 남는다).
 
 전용 application inference profile `mbti-video-sonnet-46`
-(arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yeypch70w7ej,
-Sonnet 4.6, Service=mbti·Workload=video-script 태그)을 새로 만들어 썼다 —
+(arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/r9n8dvqc1t0r,
+Sonnet 4.6, Service=lens·Workload=video-script 태그)을 새로 만들어 썼다 —
 기존 `mbti-sonnet-46`은 Workload=chatbot으로 이미 태깅돼 있어서, 그걸
 그대로 재사용하면 비용 추적이 챗봇 사용량과 섞인다.
+
+2026-08-23 — 리소스명에서 "mbti"를 걷어내는 작업 중 이 프로파일도
+`lens-video-sonnet-46`(위 ARN)으로 재생성했다. 옛 `mbti-video-sonnet-46`
+(yeypch70w7ej)은 삭제 예정.
 """
 import os
 
@@ -18,7 +22,7 @@ import boto3
 from botocore.config import Config
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
-MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yeypch70w7ej"  # mbti-video-sonnet-46
+MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/r9n8dvqc1t0r"  # lens-video-sonnet-46
 
 # 2026-08-22 — mustknow_auto가 60건 배치(추론 오버헤드 있는 Sonnet 5)를
 # 넣었더니 boto3 기본 read timeout(60초)을 넘겨 Read timeout으로 전부

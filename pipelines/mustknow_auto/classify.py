@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 from bedrock_client import call_text
 
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/bevq2226yzcq"  # mbti-mustknow-sonnet-5
+MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/zmdham3vkj89"  # lens-mustknow-sonnet-5
 
 # 한 콜에 넣는 후보 수 상한. 원래 60→30으로 줄여도 실제로는 max_tokens=9000
 # 안에서 응답이 중간에 잘려 JSON을 완성 못했다(실측: 30건 배치 응답이 4330자
