@@ -280,6 +280,11 @@ services/           → Business logic: article_filter, prompt_loader,
                      확인 가능한 부분 재확인 + 전체 테스트 스위트 104 passed(기존 무관 에러
                      6건 동일) — 실제 DynamoDB 쓰기 경로(생성/투표/댓글)는 이 프로젝트에
                      해당 핸들러 전용 테스트가 원래 없어서 별도 검증 없이 순수 이동만 확인.
+                     2026-08-24 후속: `handlers/s3_articles_handler.py`(378줄)도 같은 패턴으로
+                     `s3_articles_service.py`(S3 XML 조회·키워드 매칭·응답 shaping)로 분리 —
+                     이 파일은 원래도 async 함수로 로직이 어느 정도 분리돼 있었어서(handler=
+                     라우팅은 이미 지켜지고 있었음) 파일만 나눴다. 99줄로 축소. 검증: OPTIONS·
+                     keywords 누락 400 스모크 테스트(둘 다 AWS 호출 없음) + 전체 스위트 재확인.
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
