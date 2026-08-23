@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Amplify } from 'aws-amplify';
+import { Amplify, type ResourcesConfig } from 'aws-amplify';
 import {
   signInWithRedirect,
   signOut,
@@ -20,7 +20,7 @@ import { authFetch } from '@/shared/lib/authFetch';
 import { PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/passwordPolicy';
 
 // Configure Amplify
-Amplify.configure(authConfig as any);
+Amplify.configure(authConfig as ResourcesConfig);
 
 interface User {
   userId: string;
@@ -173,20 +173,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { success: false, error: '로그인에 실패했습니다.' };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error('Email sign in error:', error);
 
-      if (error.name === 'UserNotConfirmedException') {
+      if (err.name === 'UserNotConfirmedException') {
         return { success: false, error: UNCONFIRMED_LOGIN_MESSAGE };
       }
-      if (error.name === 'NotAuthorizedException') {
+      if (err.name === 'NotAuthorizedException') {
         return { success: false, error: '이메일 또는 비밀번호가 올바르지 않습니다.' };
       }
-      if (error.name === 'UserNotFoundException') {
+      if (err.name === 'UserNotFoundException') {
         return { success: false, error: '등록되지 않은 이메일입니다.' };
       }
 
-      return { success: false, error: error.message || '로그인에 실패했습니다.' };
+      return { success: false, error: err.message || '로그인에 실패했습니다.' };
     }
   };
 
@@ -219,17 +220,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error('Sign up error:', error);
 
-      if (error.name === 'UsernameExistsException') {
+      if (err.name === 'UsernameExistsException') {
         return { success: false, error: '이미 등록된 이메일입니다.' };
       }
-      if (error.name === 'InvalidPasswordException') {
+      if (err.name === 'InvalidPasswordException') {
         return { success: false, error: PASSWORD_REQUIREMENT_MESSAGE };
       }
 
-      return { success: false, error: error.message || '회원가입에 실패했습니다.' };
+      return { success: false, error: err.message || '회원가입에 실패했습니다.' };
     }
   };
 
@@ -259,17 +261,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { success: false, error: '인증에 실패했습니다.' };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error('Confirm sign up error:', error);
 
-      if (error.name === 'CodeMismatchException') {
+      if (err.name === 'CodeMismatchException') {
         return { success: false, error: '인증 코드가 올바르지 않습니다.' };
       }
-      if (error.name === 'ExpiredCodeException') {
+      if (err.name === 'ExpiredCodeException') {
         return { success: false, error: '인증 코드가 만료되었습니다. 다시 요청해주세요.' };
       }
 
-      return { success: false, error: error.message || '인증에 실패했습니다.' };
+      return { success: false, error: err.message || '인증에 실패했습니다.' };
     }
   };
 
@@ -278,9 +281,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await resendSignUpCode({ username: email });
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error('Resend code error:', error);
-      return { success: false, error: error.message || '코드 재전송에 실패했습니다.' };
+      return { success: false, error: err.message || '코드 재전송에 실패했습니다.' };
     }
   };
 
@@ -289,14 +293,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await resetPassword({ username: email });
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error('Forgot password error:', error);
 
-      if (error.name === 'UserNotFoundException') {
+      if (err.name === 'UserNotFoundException') {
         return { success: false, error: '등록되지 않은 이메일입니다.' };
       }
 
-      return { success: false, error: error.message || '비밀번호 재설정 요청에 실패했습니다.' };
+      return { success: false, error: err.message || '비밀번호 재설정 요청에 실패했습니다.' };
     }
   };
 
@@ -309,24 +314,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         newPassword,
       });
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error('Confirm forgot password error:', error);
 
-      if (error.name === 'CodeMismatchException') {
+      if (err.name === 'CodeMismatchException') {
         return { success: false, codeInvalid: true, error: '인증 코드가 올바르지 않습니다.' };
       }
-      if (error.name === 'ExpiredCodeException') {
+      if (err.name === 'ExpiredCodeException') {
         return {
           success: false,
           codeInvalid: true,
           error: '인증 코드가 만료되었습니다. 코드를 다시 받아주세요.',
         };
       }
-      if (error.name === 'InvalidPasswordException') {
+      if (err.name === 'InvalidPasswordException') {
         return { success: false, error: PASSWORD_REQUIREMENT_MESSAGE };
       }
 
-      return { success: false, error: error.message || '비밀번호 재설정에 실패했습니다.' };
+      return { success: false, error: err.message || '비밀번호 재설정에 실패했습니다.' };
     }
   };
 
