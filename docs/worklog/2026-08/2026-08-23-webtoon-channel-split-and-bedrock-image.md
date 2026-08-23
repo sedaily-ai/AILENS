@@ -84,6 +84,22 @@ service/frontend/src/features/news-feed, service/backend/handlers/cms_posts_publ
 - video 파생 쪽(`buildLensVideoItems`)은 이번 범위 밖 — 아직 독립 채널
   분리 요청이 없었음, 그대로 유지.
 
+### 5. 영상·팟캐스트도 웹툰과 같은 방식으로 독립 채널 분리
+- 사용자: "웹툰처럼 영상 부분에 대한 탭도 그렇게 해야 하고, 오디오 부분도
+  마찬가지 — 오디오는 팟캐스트 부분 가져오라는 것" (4번 항목의 연장).
+- `mustknow_auto`/`frontpage_auto`의 `_publish()`가 영상이 있으면 `video`
+  채널에, 팟캐스트가 있으면 `home_player` 채널(`/listen`이 보는 채널)에도
+  독립 글을 하나씩 더 씀 — 웹툰과 동일 패턴(슬러그 `-video`/`-podcast`).
+- 기존 lens 글(76건) 백필: video 22건, home_player(팟캐스트) 28건.
+- `VideoPreviewSection.tsx`도 `buildLensVideoItems` 파생 병합 제거(웹툰과
+  같은 이유 — 실제 video 채널 글이 이제 다 커버해서 안 지우면 중복).
+  `AudioPreviewSection.tsx`는 원래도 lens를 안 섞고 home_player 채널만
+  봐서 코드 변경 없이 데이터만 채워지면 자동 반영.
+- 참고: 홈 화면 영상 카드는 2026-08-20 결정으로 클릭 시 페이지 이동이
+  아니라 모달 재생(`VideoLightbox`)이라 "누르면 렌즈로 간다"는 문제 자체가
+  이미 없었음 — 이번 수정의 실익은 `/video` 목록 페이지 누락 보완과 홈
+  카드 중복 제거.
+
 ## 결정
 
 - Bedrock 이미지 모델은 텍스트 렌더링을 못 믿어서 "배경만 Bedrock, 텍스트는
