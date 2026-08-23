@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { NewsTimeMachine } from '@/features/timeline';
-import { ExitPill } from '@/features/timeline/components/ExitPill';
-import { SURFACE, GLOBAL_CSS } from '@/features/timeline/lib/tone';
+import { NewsTimeMachine, ExitPill, SURFACE, GLOBAL_CSS } from '@/features/timeline';
 
 // 공용 Header 대신 좌상단 EXIT 필 — /timeline/[date](TimelineDayClient.tsx)와
 // 같은 이유·같은 톤(2026-08-17, "완전 몰입형 공간" 취급을 /timeline 전체로

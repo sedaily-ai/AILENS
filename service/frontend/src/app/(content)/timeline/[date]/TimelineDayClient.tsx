@@ -1,11 +1,9 @@
 'use client';
 
 import {
-  TimelineResultView, TimelineBigkindsView,
+  TimelineResultView, TimelineBigkindsView, ExitPill, SURFACE, GLOBAL_CSS,
   type Article, type BigKindsArticle, type InvestmentScenario,
 } from '@/features/timeline';
-import { ExitPill } from '@/features/timeline/components/ExitPill';
-import { SURFACE, GLOBAL_CSS } from '@/features/timeline/lib/tone';
 
 type Props =
   | { date: string; initialArticles: Article[]; initialBigkindsArticles?: undefined; initialInvestments?: undefined }
