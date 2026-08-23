@@ -6,9 +6,10 @@ import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { useMediaProgress } from '@/shared/lib/tracking/useMediaProgress';
-import { useCutViewTracking } from '@/shared/lib/tracking/useCutViewTracking';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { AutoPlayVideo } from '@/shared/ui/AutoPlayVideo';
+import { TrackedAudio } from '@/shared/ui/TrackedAudio';
+import { WebtoonCutGallery } from '@/shared/ui/WebtoonCutGallery';
 import {
   LENS_ACCENT,
   LENS_CARD_BORDER,
@@ -409,61 +410,6 @@ function CardnewsCarousel({
 // 발견 — "레터 페이지 들어가기만 해도 자동으로 영상이 재생되네").
 // active(=on)가 실제로 true가 될 때만 play()를 부르는 방식으로 고친다 —
 // hooks는 반복문(.map()) 안에서 못 쓰므로 별도 컴포넌트로 뺀다.
-function AutoPlayVideo({ src, active, articleId }: { src: string; active: boolean; articleId?: string | null }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (active) {
-      el.play().catch(() => {});
-    } else {
-      el.pause();
-    }
-  }, [active]);
-  useMediaProgress(ref, articleId, 'video');
-  return (
-    <video ref={ref} controls preload="auto" src={src} className="w-full h-full" style={{ objectFit: 'contain' }} />
-  );
-}
-
-// KPI 계측(2026-08-23) — 팟캐스트 완주율. AutoPlayVideo와 같은 이유로
-// 별도 컴포넌트로 뺀다(hooks는 .map() 루프 안에서 못 씀).
-function TrackedAudio({ src, articleId }: { src: string; articleId?: string | null }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  useMediaProgress(ref, articleId, 'podcast');
-  return <audio ref={ref} controls preload="none" src={src} style={{ width: '100%' }} />;
-}
-
-// KPI 계측(2026-08-23) — 웹툰 완주율("컷 몇까지 봤는가"). 컷 목록을 감싸는
-// 컨테이너에 ref를 걸고 IntersectionObserver로 컷별 노출을 잡는다 — 역시
-// hooks는 .map() 루프 안에서 못 써서 별도 컴포넌트로 뺐다.
-function WebtoonCutGallery({
-  cuts,
-  articleId,
-}: {
-  cuts: { url: string; caption?: string }[];
-  articleId?: string | null;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  useCutViewTracking(containerRef, articleId, cuts.length);
-  return (
-    <div ref={containerRef} className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {cuts.map((cut, ci) => (
-        <figure key={ci} data-cut-index={ci + 1} style={{ margin: 0 }}>
-          <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', borderRadius: 14, overflow: 'hidden', background: '#f3f4f6' }}>
-            <Image src={cut.url} alt={cut.caption || ''} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'contain' }} />
-          </div>
-          {cut.caption && (
-            <figcaption style={{ marginTop: 8, fontSize: 13.5, color: '#374151', lineHeight: 1.6, wordBreak: 'keep-all' }}>
-              {cut.caption}
-            </figcaption>
-          )}
-        </figure>
-      ))}
-    </div>
-  );
-}
-
 export function LensViewClient({
   slug,
   initialLens = undefined,

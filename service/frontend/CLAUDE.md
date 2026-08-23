@@ -200,3 +200,20 @@ features/[feature-name]/
   중앙화, API Gateway URL 재하드코딩 3건 → `apiClient.ts` 경유로 통일,
   `features/timeline` deep-import 2건 수정, `set-state-in-effect` 안티패턴
   6곳 정리, `AuthContext.tsx`의 `any` 7곳 → `unknown`+타입가드 교체.
+
+### God 파일 분해 (Track B, 착수) — `LensViewClient.tsx` 1666→1612줄
+- (2026-08-24) `AutoPlayVideo`/`TrackedAudio`/`WebtoonCutGallery` 3개
+  컴포넌트가 `LensViewClient.tsx` 안에 갇혀있어서 `VideoViewClient.tsx`가
+  영상 재생을 직접 재구현해야 했던 문제(코드 리팩토링 감사에서 발견) —
+  `shared/ui/`로 추출. `LensViewClient.tsx`는 import로 교체.
+  `VideoViewClient.tsx`는 이번엔 그대로 둠 — `AutoPlayVideo`의 `active`
+  prop이 탭 전환 시 자동 재생/정지를 위한 것이라, 탭 개념이 없는 단일
+  영상 페이지에 `active=true`로 고정하면 페이지 로드 즉시 `play()` 시도가
+  붙어 지금과 다른 동작이 될 위험이 있어 "동작 변경 없음" 원칙상 보류.
+  검증: tsc/eslint/build 통과 + 로컬 프로덕션 빌드 SSR 출력 확인(웹툰 컷
+  마크업·video 태그 정상 렌더, 200). Chrome 확장 미연결로 실제 탭
+  전환·재생 인터랙션까지의 브라우저 확인은 못함 — 필요시 재확인 요망.
+- 남은 것: `LensViewClient.tsx`가 여전히 1612줄로 가장 큰 파일. 다음 후보는
+  마운트-감지/포맷-전환 로직과 4개 형식(레터/웹툰/팟캐스트/영상) 렌더
+  분기를 각각의 하위 컴포넌트로 더 쪼개는 것 — 이번 라운드에서는 여기까지.
+  `LetterDetailClient.tsx`(1521줄, 12개+ 인라인 컴포넌트)는 아직 미착수.
