@@ -24,7 +24,13 @@ MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile
 # 넣었더니 boto3 기본 read timeout(60초)을 넘겨 Read timeout으로 전부
 # 실패했다. 배치가 클수록 생성 시간이 길어지는 게 정상 동작이라 타임아웃을
 # 넉넉히 늘린다(진짜 hang만 걸러내려는 목적, 정상 완료를 막으면 안 됨).
-_CONFIG = Config(read_timeout=300, connect_timeout=10, retries={"max_attempts": 2})
+#
+# 2026-08-23 — 실제 Fargate에서 첫 검증 실행했더니 이번엔 Read가 아니라
+# Connect timeout(10초)으로 전부 실패했다. 네트워크 설정(퍼블릭 서브넷+
+# IGW 라우트+아웃바운드 전체 허용)은 정상으로 확인됐고, 태스크 시작
+# 직후 첫 아웃바운드 호출이라 ENI 붙고 DNS 붙는 콜드스타트 지연이
+# 10초 안에 안 끝났을 가능성이 커서 30초로 늘린다.
+_CONFIG = Config(read_timeout=300, connect_timeout=30, retries={"max_attempts": 3})
 
 _client = None
 
