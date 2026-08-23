@@ -5,7 +5,8 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
-import { EditorCommentsSection, SideRail, InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed';
+import { EditorCommentsSection, InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed';
+import { HomeSideBar } from '@/shared/ui/HomeSideBar';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { trackArticleRead } from '@/shared/lib/tracking/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
@@ -195,17 +196,25 @@ export function LetterDetailClient({ letterId, initialLetter = null, nextLetter 
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main>
-        {/* 홈과 동일한 사이드바(요즘 많이 읽힌 글 + 사주 위젯)를 레터 본문 옆에도 —
-            본문은 720 고정폭 유지(가독성), 전체 그리드만 720+사이드바 폭으로 센터. */}
+        {/* 우측 사이드바를 홈/카테고리/lens 페이지와 완전히 동일한 그리드로
+            통일했다(2026-08-23, 사용자 지적 — "사이드바 들어가는 모든 경로의
+            위치가 x, y 그리고 포지션도 동일한 위치였으면"). 예전엔 이 페이지만
+            별도 폭(1040)·별도 컬럼비(720/260)·별도 사이드바 컴포넌트
+            (SideRail.tsx — HomeSideBar와 별개로 존재하던 구현체, lg:sticky
+            까지 걸려있어 다른 페이지와 스크롤 동작 자체가 달랐다)를 썼다.
+            이제 HomeSideBar를 그대로 쓰고, 바깥 grid도 다른 페이지와 같은
+            maxWidth 1320 + clamp(24px,3.5vw,44px) 좌우 패딩 +
+            clamp(8px,2vw,16px) 위 패딩을 쓴다 — 본문 가독성 폭(720)은 안쪽
+            div에서만 유지한다. */}
         <div
-          className="mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,720px)_minmax(220px,260px)] lg:gap-10 justify-center"
-          style={{ maxWidth: 1040, padding: '0 clamp(16px, 3vw, 24px)' }}
+          className="mx-auto"
+          style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}
         >
-          <div style={{ minWidth: 0 }}>
-            <LetterBody letter={letter} nextLetter={nextLetter} prevLetter={prevLetter} />
-          </div>
-          <div style={{ paddingTop: 'clamp(28px, 5vw, 56px)' }}>
-            <SideRail initialHotLetters={initialHotLetters} />
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
+            <div style={{ maxWidth: 720, minWidth: 0 }}>
+              <LetterBody letter={letter} nextLetter={nextLetter} prevLetter={prevLetter} />
+            </div>
+            <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
           </div>
         </div>
 

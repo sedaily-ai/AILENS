@@ -158,8 +158,11 @@ export function LensListClient({
           이 wrapper와 정확히 같은 값(clamp(24px,3.5vw,44px), 홈=
           NewsFeedTab.tsx 기준)을 쓴다 — 안 그러면 본문 줄의 왼쪽 시작선이
           어긋난다(사용자 지적: "우측 사이드 쪽이 오른쪽으로 밀리는
-          느낌"). */}
-      <div className="mx-auto" style={{ maxWidth: 1320, padding: '0 clamp(24px, 3.5vw, 44px)' }}>
+          느낌"). 위 패딩도 clamp(8px,2vw,16px) 추가(2026-08-23) — 뒤로가기
+          텍스트 링크를 Header로 바꾸며 그 위 패딩을 안 옮겼더니 이 페이지만
+          사이드바 Y가 다른 페이지보다 위에서 시작했다(사용자 지적: "사이드바
+          들어가는 모든 경로의 위치가... 동일한 위치였으면"). */}
+      <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
       {/* 레이아웃의 스킵 링크(<a href="#main-content">본문 바로가기</a>) 대상.
           이 id 가 없으면 키보드/스크린리더 사용자의 첫 탭이 아무 데도 가지 않는다. */}
