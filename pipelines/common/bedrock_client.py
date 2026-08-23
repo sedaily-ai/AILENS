@@ -14,7 +14,13 @@ Sonnet 4.6, Service=lens·Workload=video-script 태그)을 새로 만들어 썼�
 
 2026-08-23 — 리소스명에서 "mbti"를 걷어내는 작업 중 이 프로파일도
 `lens-video-sonnet-46`(위 ARN)으로 재생성했다. 옛 `mbti-video-sonnet-46`
-(yeypch70w7ej)은 삭제 예정.
+(yeypch70w7ej)은 삭제 완료.
+
+같은 날 — letters/podcast/webtoon(스크립트)도 GPT에서 이 모듈로 이관해
+텍스트 생성을 전부 Bedrock으로 통일했다(GPT는 webtoon 이미지 생성
+전용으로만 남음). 각 파이프라인은 자기 전용 inference profile을
+`model=` 인자로 넘겨서 쓴다(mustknow_auto/classify.py와 같은 패턴) —
+`openai_client.call_text()`는 더 쓰는 곳이 없어져 삭제했다.
 """
 import os
 

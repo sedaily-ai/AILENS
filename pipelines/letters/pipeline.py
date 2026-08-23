@@ -7,13 +7,21 @@
 2026-08-20 신설 — 그 전까지 레터는 매번 스크래치패드에 1회성 스크립트를
 새로 써서 생성했다(webtoon/video는 재사용 가능한 파이프라인이 있었는데
 레터·팟캐스트만 없는 비대칭이 있었음).
+
+2026-08-23 — GPT-4o에서 Bedrock Claude로 이관(video와 같은 이유: 텍스트
+생성은 전부 Bedrock으로 통일하고 GPT는 웹툰 이미지 생성 전용으로만
+남긴다). 전용 inference profile `lens-letters-sonnet-46`
+(arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k)
+사용 — 다른 워크로드와 비용 추적이 섞이지 않도록.
 """
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
-from openai_client import call_text
+from bedrock_client import call_text
+
+MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"  # lens-letters-sonnet-46
 
 
 def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> Path:
@@ -27,7 +35,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> 
     guide = ddb_prompt.load_prompt("letters")
 
     print(f"{tag} 레터 생성 중...")
-    output = call_text(guide, f"다음 기사 원문으로 레터를 만들어주세요.\n\n{article}")
+    output = call_text(guide, f"다음 기사 원문으로 레터를 만들어주세요.\n\n{article}", model=MODEL)
     out_path.write_text(output, encoding="utf-8")
 
     print(f"{tag} 완료 — {out_path}")

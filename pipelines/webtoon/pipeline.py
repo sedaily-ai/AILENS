@@ -6,36 +6,61 @@
 흐름: 1단계 스크립트 생성 → 2단계 장면 연출 → 3단계 이미지 생성 → 스티칭
 각 단계는 중간 결과(JSON)를 파일로 저장하므로, 중간에 끊겨도 재실행하면
 이미 끝난 단계는 건너뛰고 이어서 진행한다(resume).
+
+2026-08-23 — 1·2단계(스크립트/장면연출) 텍스트 생성을 GPT-4o에서 Bedrock
+Claude로 이관(letters/podcast/video와 같은 이유: 텍스트 생성은 전부
+Bedrock으로 통일하고 GPT는 3단계 이미지 생성 전용으로만 남긴다). 전용
+inference profile `lens-webtoon-script-sonnet-46`
+(arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7)
+사용. OpenAI의 `response_format=json_object`(JSON 강제)에 해당하는 기능이
+Bedrock converse API엔 없어서, 프롬프트에 "```json 코드블록 하나로만
+응답" 지침을 명시하고 video/generate_script.py와 같은 방식으로 코드블록을
+파싱한다.
 """
-import sys, json, base64, time
+import sys, json, base64, time, re
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
-from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거
+from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
+from bedrock_client import call_text  # 2026-08-23 — 스크립트/장면연출 텍스트 전용
 
 import prompts
 from stitch import stitch
 
 client = get_client()
 
-SCRIPT_MODEL = "gpt-4o"          # 스크립트·장면연출용 텍스트 모델
+SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
 IMAGE_MODEL = "gpt-5.5"          # 이미지 생성 모델 (Responses API의 image_generation 툴)
 IMAGE_SIZE = "1536x1024"         # 3:2 가로. 컷당 $0.165 (2026-08 기준, high quality)
 IMAGE_QUALITY = "high"
 N_CUTS = 8
 
+_JSON_INSTRUCTION = (
+    "\n\n[응답 형식]\n다른 설명 없이 ```json 코드블록 하나 안에 JSON 객체만 담아 응답한다."
+)
+
+
+def _extract_json_block(text: str) -> dict:
+    match = re.search(r"```json\s*\n(.*?)```", text, re.DOTALL)
+    if match is None:
+        blocks = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
+        json_blocks = [b for b in blocks if b.strip().startswith("{")]
+        if not json_blocks:
+            raise ValueError("Bedrock 응답에서 JSON 코드블록을 찾지 못했습니다")
+        match_text = json_blocks[-1]
+    else:
+        match_text = match.group(1)
+    return json.loads(match_text)
+
+
+_SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
+
 
 def call_json(prompt: str) -> dict:
-    """GPT-4o에 JSON 형식 강제 응답을 요청한다. (스크립트/장면연출 공용)"""
-    resp = client.chat.completions.create(
-        model=SCRIPT_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-        temperature=0.7,
-        max_tokens=2000,
-    )
-    return json.loads(resp.choices[0].message.content)
+    """Bedrock Claude에 JSON 응답을 요청한다. (스크립트/장면연출 공용)"""
+    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=2000, temperature=0.7)
+    return _extract_json_block(raw)
 
 
 def build_image_prompt(camera: str, scene: str, cut: dict) -> str:
