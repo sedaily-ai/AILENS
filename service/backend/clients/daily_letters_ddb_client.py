@@ -19,6 +19,8 @@ from typing import Any, Dict, List
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from clients.dynamodb_client import drain_query
+
 _TABLE_NAME = os.environ.get("DAILY_LETTERS_TABLE", "sedaily-mbti-daily-letters-dev")
 _REGION = os.environ.get("AWS_REGION", "us-east-1")
 _resource = boto3.resource("dynamodb", region_name=_REGION)
@@ -34,18 +36,11 @@ def get_daily_letters(letter_date: str) -> List[Dict[str, Any]]:
     # admin/repo/letters_repo.py:list_by_date 와 동일한 페이지네이션 루프
     # (2026-08-09 이식) — 안 따라가면 하루치 레터가 1MB 페이지 한도를 넘는
     # 날에 뒷부분이 조용히 잘린다.
-    items: List[Dict[str, Any]] = []
     kwargs: Dict[str, Any] = {
         "IndexName": "letter_date-index",
         "KeyConditionExpression": Key("letter_date").eq(letter_date),
     }
-    while True:
-        resp = _table().query(**kwargs)
-        items.extend(resp.get("Items", []))
-        last_key = resp.get("LastEvaluatedKey")
-        if not last_key:
-            break
-        kwargs["ExclusiveStartKey"] = last_key
+    items = drain_query(_table(), **kwargs)
     items = [i for i in items if not i.get("deleted_at")]
     items.sort(key=lambda i: i.get("created_at", ""))
     return items

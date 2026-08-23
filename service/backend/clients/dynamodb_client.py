@@ -11,7 +11,7 @@ Legacy articles (no s3_body_uri) still have body fields in DynamoDB and are read
 import asyncio
 import boto3
 import logging
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 from decimal import Decimal
 
@@ -21,6 +21,25 @@ if TYPE_CHECKING:
     from clients.s3_article_client import S3ArticleClient
 
 logger = logging.getLogger(__name__)
+
+
+def drain_query(table, **kwargs) -> List[Dict[str, Any]]:
+    """DynamoDB query()가 1MB 페이지 한도로 나눠 주는 결과를 LastEvaluatedKey를
+    따라가며 전부 모은다 — 안 따라가면 결과가 많을수록 뒷페이지가 조용히
+    잘려나간다. cms_posts_ddb_client.py/daily_letters_ddb_client.py/
+    search_handler.py/이 파일 자체의 _query_category()에 거의 동일한 루프가
+    각자 복사돼 있던 걸 공용화(2026-08-23 코드 리팩토링 감사). limit/필터를
+    루프 중간에 적용하는 personal_db_client.py·quiz_questions_ddb_client.py는
+    제어 흐름이 달라 이 헬퍼로 옮기지 않았다 — 그대로 둠."""
+    items: List[Dict[str, Any]] = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get('Items', []))
+        last_key = resp.get('LastEvaluatedKey')
+        if not last_key:
+            break
+        kwargs['ExclusiveStartKey'] = last_key
+    return items
 
 
 def _sanitize_for_dynamodb(obj):
@@ -134,7 +153,6 @@ class DynamoDBClient:
 
         def _query_category(category: str) -> list:
             try:
-                items = []
                 kwargs = {
                     'IndexName': 'category-published_at-index',
                     'KeyConditionExpression': (
@@ -142,18 +160,7 @@ class DynamoDBClient:
                         & Key('published_at').between(start, end)
                     ),
                 }
-                # Query 는 1MB 를 넘으면 LastEvaluatedKey 로 다음 페이지를 알려준다 —
-                # 안 따라가면 결과가 많은 카테고리/날짜일수록 뒷부분이 조용히
-                # 잘려나간다(admin posts_repo.py 에서 실제로 겪은 버그와 같은 유형,
-                # 2026-08-09 이식).
-                while True:
-                    response = self.table.query(**kwargs)
-                    items.extend(response.get('Items', []))
-                    last_key = response.get('LastEvaluatedKey')
-                    if not last_key:
-                        break
-                    kwargs['ExclusiveStartKey'] = last_key
-                return items
+                return drain_query(self.table, **kwargs)
             except Exception as e:
                 logger.warning(
                     f"Failed to query category '{category}' for {date_str}: {e}"
