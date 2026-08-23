@@ -20,7 +20,7 @@ import {
   parseLensView,
   pickLensPhoto,
 } from '@/shared/constants/lensPerspectives';
-import { HomeSideBar } from '@/shared/ui/HomeSideBar';
+import { HomeSideBar } from '@/widgets/HomeSideBar';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';

@@ -1,7 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { HotLettersRail } from './HotLettersRail';
+import { HotLettersRail } from '@/shared/ui/HotLettersRail';
 import { SajuMiniRail } from './SajuMiniRail';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 

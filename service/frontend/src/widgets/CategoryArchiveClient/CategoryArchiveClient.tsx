@@ -12,7 +12,7 @@ import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { ArchiveHeader } from '@/shared/ui/ArchiveHeader';
 import { ArchiveList } from '@/shared/ui/ArchiveList';
-import { HomeSideBar } from '@/shared/ui/HomeSideBar';
+import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';

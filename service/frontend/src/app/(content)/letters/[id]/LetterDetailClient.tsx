@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Header } from "@/widgets/Header";
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { EditorCommentsSection, InteractiveBlock, type InteractiveBlockData } from '@/features/news-feed';
-import { HomeSideBar } from '@/shared/ui/HomeSideBar';
+import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { trackArticleRead } from '@/shared/lib/tracking/readingTracker';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';

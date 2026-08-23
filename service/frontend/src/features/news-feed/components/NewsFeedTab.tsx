@@ -16,7 +16,7 @@ import { LensPreviewSection } from "./LensPreviewSection";
 import { NewsTimeMachineSection } from "./NewsTimeMachineSection";
 import { LatestGridSection } from "./LatestGridSection";
 import { CategoryFeatureSection } from "./CategoryFeatureSection";
-import { HomeSideBar } from "@/shared/ui/HomeSideBar";
+import { HomeSideBar } from "@/widgets/HomeSideBar";
 import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 
 // 카테고리 2개씩 짝지어 한 줄(2/3+1/3)로 배치(2026-08-17, 본지 en.sedaily.com

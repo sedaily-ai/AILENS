@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { HomeSideBar } from '@/shared/ui/HomeSideBar';
+import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';

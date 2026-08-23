@@ -169,12 +169,19 @@ features/[feature-name]/
   `page.tsx`/`TimelineDayClient.tsx`가 직접 import)도 배럴 경유로 수정 완료.
 - `features/dna → features/news-feed` lateral import — `features/dna` 자체가
   없어져서 더는 해당 없음.
-- `shared → widgets` 역방향 의존성 1건(해소됨) — `shared/ui/CategoryArchiveClient.tsx`가
-  `widgets/Header`를 import하고 있었다. 페이지 조합 로직이 `shared/ui`에
-  잘못 놓인 것이었다는 판단대로, `economyCategoryPage.tsx`(같은 성격, 서버
-  데이터 페칭+메타데이터+렌더 조합)와 함께 `widgets/CategoryArchiveClient/`로
-  이전(2026-08-24, 배럴 신설·소비자 8곳 import 경로 수정, `EconomyCategoryPage`로
-  개명).
+- `shared → widgets`/`shared → entities` 역방향 의존성 2건(해소됨):
+  - `shared/ui/CategoryArchiveClient.tsx`가 `widgets/Header`를 import —
+    페이지 조합 로직이 `shared/ui`에 잘못 놓인 것. `economyCategoryPage.tsx`
+    (같은 성격, 서버 데이터 페칭+메타데이터+렌더 조합)와 함께
+    `widgets/CategoryArchiveClient/`로 이전(2026-08-24, 배럴 신설·소비자
+    8곳 import 경로 수정, `EconomyCategoryPage`로 개명).
+  - `shared/ui/SajuMiniRail.tsx`가 `entities/saju`(도메인 계산 로직)를
+    import — 도메인 결합된 위젯이 shared에 있던 것. 유일한 소비자였던
+    `shared/ui/HomeSideBar.tsx`(HotLettersRail+SajuMiniRail 조합, 이것도
+    같은 성격)와 함께 `widgets/HomeSideBar/`로 이전(2026-08-24, 배럴 신설·
+    소비자 6곳 — `features/news-feed/NewsFeedTab.tsx` 포함 — import 경로
+    수정). `HotLettersRail.tsx`는 엔티티 결합이 없어 `shared/ui`에 그대로
+    둠(HomeSideBar가 절대경로로 import).
 
 ### 2026-08-05 정리 라운드 1 + 2026-08-23 정리 라운드 2 완료 내역
 - (2026-08-05) `FeedPage.tsx` 죽은 코드 제거 1차: 도달 불가능한 팟캐스트
