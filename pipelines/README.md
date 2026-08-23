@@ -1,18 +1,30 @@
-# pipelines/ — 4포맷 생성 파이프라인
+# pipelines/ — 4포맷 생성 파이프라인 + 자동 발행
 
 AI LENS "4가지 시선"(레터/웹툰/팟캐스트/영상) 각 포맷을 실제로 생성하는
-독립 실행 스크립트 모음. 전부 admin 프롬프트 드로어(`/lens` → 프롬프트)가
-DDB에 저장한 프롬프트를 그대로 읽어서 쓴다 — 프롬프트를 admin에서 고치면
-다음 실행부터 바로 반영된다(`pipelines/common/ddb_prompt.py`).
+스크립트 모음 + 그걸 무인으로 매일 돌리는 자동 발행 파이프라인
+(`frontpage_auto/`, `mustknow_auto/`). 포맷 생성 쪽은 전부 admin 프롬프트
+드로어(`/lens` → 프롬프트)가 DDB에 저장한 프롬프트를 그대로 읽어서 쓴다 —
+프롬프트를 admin에서 고치면 다음 실행부터 바로 반영된다
+(`pipelines/common/ddb_prompt.py`).
+
+**2026-08-23 — 텍스트 생성을 GPT에서 Bedrock Claude로 전면 이관했다**
+(letters/podcast/webtoon 스크립트/video 각본 전부). GPT는 웹툰 3단계
+이미지 생성에서만 남아있었는데, 그마저도 OpenAI 크레딧 소진 사고 이후
+Bedrock 이미지 모델(배경) + PIL(텍스트 합성) 조합으로 기본값이 바뀌었다
+— GPT 경로는 `webtoon/pipeline.py`의 `IMAGE_PROVIDER` 플래그로 전환
+가능한 채 코드에 남아있다(자세한 경위는
+`docs/worklog/2026-08/2026-08-23-webtoon-channel-split-and-bedrock-image.md`).
 
 | 폴더 | 언어 | 산출물 | 비고 |
 |---|---|---|---|
-| `letters/` | Python | 텍스트 | GPT-4o 1회 호출 |
-| `podcast/` | Python | 텍스트 + mp3 | GPT-4o + AWS Polly |
-| `webtoon/` | Python | 이미지 8장 | GPT-4o(대사) + gpt-5.5 image_generation |
-| `video/` | Node(렌더)+Python(각본) | mp4 | `generate_script.py`(1단계, 각본 JSON) → `npm run render`(2·3단계, TTS+렌더) |
-| `discovery/` | Python | 분류 JSON | 4포맷 생성 이전 단계 — GPT 호출 없이 그날 기사 XML을 지면 특별 코너 후보로 분류만(아래 참고) |
-| `common/` | Python | — | `ddb_prompt.py`(프롬프트 로드), `openai_client.py`(GPT 호출), `text_utils.py`(코드블록 벗기기). letters/podcast/webtoon/video가 공용으로 씀. discovery/는 GPT를 안 써서 미사용 |
+| `letters/` | Python | 텍스트 | Bedrock Claude 1회 호출 |
+| `podcast/` | Python | 텍스트 + mp3 | Bedrock Claude(대본) + ElevenLabs(음성, Google TTS 대체) |
+| `webtoon/` | Python | 이미지 8장 | Bedrock Claude(1·2단계 스크립트/장면연출) + Bedrock Stability Stable Image Core(3단계 배경) + PIL(말풍선·캡션 텍스트 합성). `IMAGE_PROVIDER="openai"`로 바꾸면 GPT-5.5 경로로 원복 가능 |
+| `video/` | Node(렌더)+Python(각본) | mp4 | `generate_script.py`(1단계, Bedrock Claude 각본 JSON) → `npm run render`(2·3단계, ElevenLabs TTS + Remotion 렌더) |
+| `discovery/` | Python | 분류 JSON | 포맷 생성 이전 단계 — 그날 기사 XML을 후보로 분류만(아래 참고) |
+| `frontpage_auto/` | Python(엔트리) | DDB write + S3 미디어 | **실가동 중** — 지면 1면 기사를 매일 07:00 KST 1회 자동으로 4포맷 발행(EventBridge). letters/podcast/webtoon/video의 `run_article()`을 그대로 호출 |
+| `mustknow_auto/` | Python(엔트리) | DDB write + S3 미디어 | **실가동 중** — 지면특별코너 4탭(전체/증권/산업/시그널) + 일반 필수뉴스를 하루 6회(08/12/15/18/21/23시 KST) 자동 채점·발행. `classify.py`가 Bedrock Sonnet 5로 배치 채점(20건씩), 임계값(일반 7.0/특별탭 8.0) 넘는 기사만 발행 |
+| `common/` | Python | — | `ddb_prompt.py`(프롬프트 로드), `bedrock_client.py`(Bedrock Claude 호출, 2026-08-22 신설), `openai_client.py`(웹툰 이미지 생성 전용으로 축소), `text_utils.py`(코드블록 벗기기) |
 
 ## discovery/ — 지면 특별 코너 후보 분류
 
@@ -65,8 +77,49 @@ GPT가 만든 각본 JSON이 스키마를 위반해(빈 `data` 필드, 화이트
 채우지 않고 `validate_script()`가 명확한 에러로 멈춘다(뉴스 콘텐츠라
 없는 통계를 지어내지 않는다는 원칙).
 
+## 배포 — `frontpage_auto/deploy.sh` (공유 Docker 이미지)
+
+```bash
+cd pipelines
+./frontpage_auto/deploy.sh
+```
+
+`frontpage_auto/`·`mustknow_auto/` 둘 다 **같은 Docker 이미지**를 쓴다
+(`Dockerfile`이 `pipelines/` 전체를 `COPY . .`로 담아서 letters/podcast/
+webtoon/video/discovery/common 코드가 이미 다 이미지 안에 있음 —
+`mustknow_auto`의 ECS 태스크 정의는 `workingDirectory`만 다르게 잡아
+같은 이미지의 다른 진입점을 실행). 그래서 **어느 하나의 코드만 고쳐도
+이 스크립트 하나로 둘 다 갱신된다**.
+
+1. `docker build --platform linux/arm64`(Fargate 태스크 정의와 아키텍처 일치)
+2. ECR(`sedaily-lens-frontpage-auto`) push
+3. `aws ecs register-task-definition`으로 `frontpage_auto` 새 리비전 등록
+
+`mustknow_auto`의 태스크 정의는 이미지를 `:latest` 태그로 참조하므로,
+위 3번(리비전 등록)은 `frontpage_auto`만 해도 된다 — `mustknow_auto`는
+다음 실행부터 자동으로 새 이미지를 pull한다. 지금 바로 검증하려면
+(다음 EventBridge 스케줄까지 안 기다리고):
+
+```bash
+# frontpage_auto
+aws ecs run-task --cluster sedaily-lens-frontpage-auto \
+  --task-definition sedaily-lens-frontpage-auto --launch-type FARGATE \
+  --network-configuration '{"awsvpcConfiguration":{"subnets":["subnet-0b5a146ca8ed1ddfe"],"securityGroups":["sg-05cb5f7bc29891cf8"],"assignPublicIp":"ENABLED"}}' \
+  --region us-east-1
+
+# mustknow_auto — 같은 클러스터, 태스크 정의만 다름
+aws ecs run-task --cluster sedaily-lens-frontpage-auto \
+  --task-definition sedaily-lens-mustknow-auto --launch-type FARGATE \
+  --network-configuration '{"awsvpcConfiguration":{"subnets":["subnet-0b5a146ca8ed1ddfe"],"securityGroups":["sg-05cb5f7bc29891cf8"],"assignPublicIp":"ENABLED"}}' \
+  --region us-east-1
+```
+
+로그는 CloudWatch `/ecs/sedaily-lens-frontpage-auto`,
+`/ecs/sedaily-lens-mustknow-auto`.
+
 ## 배경
 
 `docs/evaluation/4format-samples/2026-08-11-빵지순례/라운드기록.md`(각 프롬프트
 버전·문제/솔루션 이력), `docs/worklog/2026-08/2026-08-20-homepage-refresh-seo-category-pipeline-reorg.md`
-(이 폴더 구조가 왜 이렇게 됐는지) 참고.
+(이 폴더 구조가 왜 이렇게 됐는지), `docs/worklog/2026-08/2026-08-23-*`
+(GPT→Bedrock 이관, mbti→lens 리네이밍, 자동 발행 실가동 경위) 참고.

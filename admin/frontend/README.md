@@ -1,36 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# admin/frontend — AI LENS 관리자 콘솔
 
-## Getting Started
+Next.js — 프롬프트 드로어, CMS 글 수동 업로드/발행 등 운영자용 화면.
 
-First, run the development server:
+## 개발
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 배포 — `./deploy-admin.sh`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd admin/frontend
+./deploy-admin.sh
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+정적 export → S3 sync → CloudFront invalidation.
 
-## Learn More
+1. `npm run build`
+2. S3(`sedaily-mbti-admin-frontend-dev`)에 sync
+3. CloudFront(`E1MITYI58DB9UW`) invalidation
 
-To learn more about Next.js, take a look at the following resources:
+전제: `.env.local`(또는 `.env.production`)에
+`NEXT_PUBLIC_ADMIN_API_BASE_URL` 설정, AWS credential 유효(각 명령이
+`--region`을 명시해서 default region은 무관).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+백엔드(admin API Lambda)는 별도 스크립트 —
+`admin/backend/deploy-admin-api.sh` 참조.
