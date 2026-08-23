@@ -5,12 +5,16 @@
 없어서(cms_posts_ddb_client.py와 같은 이유). 스키마를 바꾸면 두 곳
 (admin/backend/repo/quiz_repo.py, 여기) 다 고칠 것.
 """
+import os
 from typing import Any, Dict, List
 
 import boto3
 from boto3.dynamodb.conditions import Key
 
-_TABLE_NAME = "sedaily-mbti-quiz-questions-dev"
+# admin 쪽(admin/backend/shared/ddb_client.py)은 이미 QUIZ_QUESTIONS_TABLE
+# env override가 가능한데 이 클라이언트만 하드코딩이었다(2026-08-23 코드
+# 리팩토링 감사에서 발견) — 같은 env var 이름으로 맞춤.
+_TABLE_NAME = os.environ.get("QUIZ_QUESTIONS_TABLE", "sedaily-mbti-quiz-questions-dev")
 _dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
 
 

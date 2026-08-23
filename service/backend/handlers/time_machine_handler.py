@@ -30,6 +30,7 @@ import requests
 
 from common.secrets import get_secret
 from config.investment_scenarios import build_investment_scenarios
+from config.settings import settings
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, no_content_response, success_response
 
@@ -74,7 +75,10 @@ def _clean_content_preview(raw: str) -> str:
 # 캐시 테이블 — 옛 위키/스크래핑판 캐시와 같은 테이블 재사용. 키 접두사를
 # timemachine_articles_로 바꿔서(이전 issue_ranking 토픽판 캐시와도 안 섞이게)
 # 응답 스키마가 바뀔 때마다 옛 캐시를 일일이 안 지워도 되게 했다.
-CACHE_TABLE = 'sedaily-mbti-articles-dev'
+# CACHE_TABLE을 하드코딩해두고 있었는데(2026-08-23 코드 리팩토링 감사에서
+# 발견) settings.dynamodb_table_articles와 완전히 같은 테이블이라 그대로
+# 재사용 — config.settings를 거치지 않는 유일한 예외였다.
+CACHE_TABLE = settings.dynamodb_table_articles
 CACHE_TTL_DAYS = 3650  # 과거 지면은 영구히 안 바뀐다 — 사실상 무기한 캐시.
 
 

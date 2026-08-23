@@ -44,7 +44,7 @@ from config.constants import CORS_HEADERS
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-_TABLE_NAME = 'sedaily-mbti-newsletter-subscribers-dev'
+_TABLE_NAME = os.environ.get('SUBSCRIBERS_TABLE', 'sedaily-mbti-newsletter-subscribers-dev')
 _dynamodb = boto3.resource('dynamodb')
 _ses = boto3.client('sesv2', region_name='us-east-1')
 _EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
