@@ -27,10 +27,11 @@ export interface ArchiveItem {
    *  주제 기반으로 바뀌면서, 카테고리 아카이브 페이지가 kind와 무관하게
    *  이 값으로 필터링한다(shared/constants/econCategories.ts 참조). */
   category?: string | null;
-  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, lens 항목만 채운다(mustknow_auto/
-   *  frontpage_auto가 기록하는 published_at이 있어서). letter/trend/column/
-   *  video는 아직 이 정밀도의 필드가 API에 없어 비워둔다 — ArticleCard가
-   *  없으면 날짜만(date) 표시로 자연스럽게 폴백한다(shared/lib/date.ts
+  /** 발행 완료 시각(ISO, UTC) — 2026-08-23 lens부터 시작해서 같은 날 letter/
+   *  video까지 백엔드가 노출하도록 넓혔다("이 서비스에 있는 건 날짜만
+   *  말고 시간/분도 있어야 함" — 사용자 요청). trend/column(cardItems,
+   *  옛 trend_card 채널 변환분)만 아직 없다 — ArticleCard가 없으면
+   *  날짜만(date) 표시로 자연스럽게 폴백한다(shared/lib/date.ts
    *  kstDateTimeLabel). */
   publishedAt?: string | null;
 }
@@ -83,6 +84,7 @@ export function buildArchiveItems(
       href: letterHref(id),
       avatarUrl: card.thumbnailUrl,
       category: letter.category ?? null,
+      publishedAt: letter.published_at ?? null,
     };
   });
 
@@ -107,6 +109,7 @@ export function buildArchiveItems(
     href: v.video_url || null,
     external: true,
     avatarUrl: v.thumbnail_url || null,
+    publishedAt: v.published_at ?? null,
   }));
 
   const lensItems: ArchiveItem[] = lens.map((l) => ({

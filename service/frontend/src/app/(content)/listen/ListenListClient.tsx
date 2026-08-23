@@ -6,6 +6,7 @@ import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
@@ -150,7 +151,7 @@ export function ListenListClient({ initialItems }: { initialItems: HomePlayerPos
                     </span>
                     {it.date && (
                       <span style={{ display: 'block', fontSize: 11.5, color: '#9ca3af', marginTop: 3, fontWeight: 600 }}>
-                        {it.date.replaceAll('-', '.')} · {it.category ?? (isAudio ? '팟캐스트' : '영상')}
+                        {kstDateTimeLabel(it.publishedAt) ?? it.date.replaceAll('-', '.')} · {it.category ?? (isAudio ? '팟캐스트' : '영상')}
                       </span>
                     )}
                   </span>

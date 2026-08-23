@@ -6,6 +6,7 @@ import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 
 /**
@@ -90,7 +91,7 @@ export function VideoViewClient({
           </div>
 
           <div style={{ padding: '20px 4px 0' }}>
-            <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6, fontWeight: 600 }}>{video.date.replaceAll('-', '.')}</p>
+            <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6, fontWeight: 600 }}>{kstDateTimeLabel(video.published_at) ?? video.date.replaceAll('-', '.')}</p>
             <h1
               style={{
                 fontFamily: '"Noto Serif KR", serif',

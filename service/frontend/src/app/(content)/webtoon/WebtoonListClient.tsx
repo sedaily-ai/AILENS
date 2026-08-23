@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 
 // 연재 웹툰 파일럿(2026-08-06) — 이슈를 텍스트 레터가 아니라 컷(이미지+캡션)
 // 나열로 보여준다. 그림은 admin에서 GPT 등으로 미리 만들어 올린다.
@@ -259,7 +260,7 @@ export function WebtoonListClient({ initialItems, initialPage }: { initialItems:
               </span>
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 'clamp(18px, 3.4vw, 26px)' }}>
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6, fontWeight: 600 }}>
-                  {latest.date.replaceAll('-', '.')}
+                  {kstDateTimeLabel(latest.published_at) ?? latest.date.replaceAll('-', '.')}
                 </p>
                 <h2
                   style={{
@@ -386,7 +387,7 @@ export function WebtoonListClient({ initialItems, initialPage }: { initialItems:
                           {w.excerpt}
                         </p>
                       )}
-                      <p style={{ fontSize: 11.5, color: '#52525b', fontWeight: 600 }}>{w.date.replaceAll('-', '.')}</p>
+                      <p style={{ fontSize: 11.5, color: '#52525b', fontWeight: 600 }}>{kstDateTimeLabel(w.published_at) ?? w.date.replaceAll('-', '.')}</p>
                     </div>
                   </Link>
                 );

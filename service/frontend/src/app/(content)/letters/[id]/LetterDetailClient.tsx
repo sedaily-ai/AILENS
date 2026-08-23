@@ -14,6 +14,7 @@ import { useAuth } from '@/features/auth';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { letterHref } from '@/shared/lib/letterHref';
 import { fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
@@ -347,10 +348,11 @@ function LetterBody({
   // 헤더 메타줄 발행일 표시(2026-08-18) — ApiLetter엔 개별 date 필드가 없다
   // (date는 배치 응답 ApiTodayLettersResponse 쪽에만 있음, 확인됨). id의
   // 'l-YYYYMMDD-XX' 패턴에서 이미 뽑아둔 dateStr을 그대로 재사용하고,
-  // 이 패턴을 안 쓰는 CMS 글은 publish_date로 폴백한다.
+  // 이 패턴을 안 쓰는 CMS 글은 published_at(시:분까지, 2026-08-23 추가)
+  // → publish_date(날짜만) 순으로 폴백한다.
   const displayDate = dateStr.length === 8
     ? `${dateStr.slice(0, 4)}.${dateStr.slice(4, 6)}.${dateStr.slice(6, 8)}`
-    : letter.publish_date?.replaceAll('-', '.') ?? null;
+    : kstDateTimeLabel(letter.published_at) ?? letter.publish_date?.replaceAll('-', '.') ?? null;
   // 본문에서 어떤 키워드 단어들을 underline + tooltip 으로 감쌀지.
   // explain 가 비어있으면 적용 안 함 (구버전 letter 자동 제외).
   const glossary = isModern

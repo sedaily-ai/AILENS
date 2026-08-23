@@ -69,6 +69,10 @@ def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # (admin/backend/repo/posts_repo.py create()/update() 참조), 공개
         # 응답에만 안 실려 있었을 뿐이라 그대로 통과시킨다.
         "updated_at": post.get("updated_at"),
+        # 발행 완료 시각(ISO, UTC, 초 단위) — 2026-08-23, 사용자 요청: "이
+        # 서비스에 있는 건 날짜만 말고 시간/분도 있어야 함". lens와 같은
+        # 이유·같은 패턴(shared/lib/date.ts kstDateTimeLabel).
+        "published_at": post.get("published_at"),
         "body": _body_paragraphs(post),
         # Tiptap 리치텍스트 결과 — 있으면 프론트가 body[] 대신 이걸 렌더한다
         # (admin PostForm 이 "post" 모드에서 이 필드만 채운다. AI 레터는 없음).
@@ -140,6 +144,7 @@ def _shape_webtoon(post: Dict[str, Any]) -> Dict[str, Any]:
         "title": post.get("headline") or "",
         "excerpt": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
+        "published_at": post.get("published_at"),
         "cover_image_url": post.get("cover_image_url") or (panels[0]["url"] if panels else None),
         "panels": panels,
         "is_cms": True,
@@ -156,6 +161,7 @@ def _shape_video(post: Dict[str, Any]) -> Dict[str, Any]:
         "title": post.get("headline") or "",
         "excerpt": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
+        "published_at": post.get("published_at"),
         "video_url": b.get("video_url") or "",
         "thumbnail_url": post.get("cover_image_url") or None,
         "is_cms": True,
@@ -281,6 +287,7 @@ def _shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
         "title": post.get("headline") or "",
         "excerpt": post.get("subtitle") or "",
         "date": post.get("publish_date") or "",
+        "published_at": post.get("published_at"),
         "media_embed_url": post.get("media_embed_url") or "",
         "display_order": post.get("display_order") if post.get("display_order") is not None else 0,
         "category": (post.get("body_inline") or {}).get("category") or None,

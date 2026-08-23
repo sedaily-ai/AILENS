@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
@@ -182,7 +183,7 @@ export function AudioPreviewSection({ initialItems }: Props) {
 
               <span style={{ fontSize: 11, color: '#9ca3af', marginBottom: 7, fontWeight: 700, letterSpacing: '0.01em' }}>
                 {it.category ?? (isAudio ? '팟캐스트' : '영상')}
-                {it.date && <> · {it.date.replaceAll('-', '.')}</>}
+                {it.date && <> · {kstDateTimeLabel(it.publishedAt) ?? it.date.replaceAll('-', '.')}</>}
               </span>
 
               <span

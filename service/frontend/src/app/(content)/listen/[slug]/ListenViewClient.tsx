@@ -6,6 +6,7 @@ import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchHomePlayerBySlug, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { ACCENT } from '../accent';
 
@@ -79,7 +80,7 @@ export function ListenViewClient({
           <div style={{ padding: '4px 0 0' }}>
             {item.date && (
               <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8, fontWeight: 600 }}>
-                {item.date.replaceAll('-', '.')} · {isAudio ? '팟캐스트' : '영상'}
+                {kstDateTimeLabel(item.publishedAt) ?? item.date.replaceAll('-', '.')} · {isAudio ? '팟캐스트' : '영상'}
               </p>
             )}
             <h1

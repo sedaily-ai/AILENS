@@ -7,6 +7,7 @@ import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { VideoLightbox } from '@/shared/ui/VideoLightbox';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 
 // 영상 전용 목록 페이지(2026-08-11) — 그동안 홈 화면 미리보기 섹션
@@ -125,7 +126,7 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
                     </span>
                   </div>
                   <div style={{ padding: '12px 14px' }}>
-                    <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{v.date.replaceAll('-', '.')}</p>
+                    <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{kstDateTimeLabel(v.published_at) ?? v.date.replaceAll('-', '.')}</p>
                     <h2
                       className="text-gray-900"
                       style={{

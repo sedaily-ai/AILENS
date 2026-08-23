@@ -21,6 +21,9 @@ export interface HomePlayerItem {
  */
 export interface HomePlayerPost extends HomePlayerItem {
   date: string;
+  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, kstDateTimeLabel()로 시:분까지
+   *  표기. 없으면(옛 글) date만 폴백. */
+  publishedAt?: string | null;
   excerpt: string;
   /** 경제 카테고리(ECON_CATEGORIES) — 2026-08-21 추가. admin/frontend
    * home-player 화면에서 선택, 없으면(미분류) null. 홈 오디오 섹션 카드가
@@ -37,6 +40,7 @@ interface ApiHomePlayerItem {
   media_embed_url: string;
   display_order: number;
   category?: string | null;
+  published_at?: string | null;
 }
 
 function toItem(i: ApiHomePlayerItem): HomePlayerPost {
@@ -45,6 +49,7 @@ function toItem(i: ApiHomePlayerItem): HomePlayerPost {
     title: i.title,
     excerpt: i.excerpt ?? '',
     date: i.date ?? '',
+    publishedAt: i.published_at ?? null,
     mediaEmbedUrl: i.media_embed_url,
     order: i.display_order ?? 0,
     category: i.category ?? null,

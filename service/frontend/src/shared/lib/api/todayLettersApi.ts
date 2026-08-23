@@ -70,6 +70,9 @@ export interface ApiLetter {
   // 만들 때부터 항상 채워지는 필드라(admin/backend/repo/posts_repo.py) CMS
   // 글이면 사실상 항상 존재한다.
   updated_at?: string | null;
+  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, kstDateTimeLabel()로 시:분까지
+   *  표기. 없으면(옛 글) publish_date만 폴백. */
+  published_at?: string | null;
 }
 
 export interface ApiTodayLettersResponse {

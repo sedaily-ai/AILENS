@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 
 // 홈 상단의 슬림 텍스트 배너로는 "실제 콘텐츠"처럼 안 느껴진다는 피드백
 // (2026-08-06) — 4등분 카드 그리드(두꺼운 테두리·하드 섀도·기울기)로 정착.
@@ -217,7 +218,7 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
 
               <div style={{ padding: 'clamp(10px, 2.2vw, 14px)' }}>
                 <p style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4, fontWeight: 600 }}>
-                  {mock ? '구상 중' : w.date.replaceAll('-', '.')}
+                  {mock ? '구상 중' : kstDateTimeLabel(w.published_at) ?? w.date.replaceAll('-', '.')}
                 </p>
                 <h3
                   className={mock ? 'text-gray-500' : 'text-gray-900'}

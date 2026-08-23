@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { kstDateTimeLabel } from '@/shared/lib/date';
 
 /**
  * 경로 기반(`/webtoon/[slug]`) 웹툰 상세의 클라이언트 본체(2026-08-07, 쿼리스트링
@@ -152,7 +153,7 @@ export function WebtoonViewClient({
             >
               ✦ WEBTOON PILOT
             </span>
-            <p style={{ fontSize: 11, color: '#71717a', marginBottom: 6, fontWeight: 600 }}>{webtoon.date.replaceAll('-', '.')}</p>
+            <p style={{ fontSize: 11, color: '#71717a', marginBottom: 6, fontWeight: 600 }}>{kstDateTimeLabel(webtoon.published_at) ?? webtoon.date.replaceAll('-', '.')}</p>
             <h1
               style={{
                 fontSize: 'clamp(22px, 5vw, 28px)',

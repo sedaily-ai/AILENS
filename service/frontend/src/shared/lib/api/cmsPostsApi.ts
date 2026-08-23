@@ -46,6 +46,9 @@ export interface CmsWebtoon {
   title: string;
   excerpt: string;
   date: string;
+  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, kstDateTimeLabel()로 시:분까지
+   *  표기. 없으면(옛 글) date만 폴백. */
+  published_at?: string | null;
   cover_image_url: string | null;
   panels: CmsWebtoonPanel[];
   is_cms: true;
@@ -64,6 +67,9 @@ export interface CmsVideo {
   title: string;
   excerpt: string;
   date: string;
+  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, kstDateTimeLabel()로 시:분까지
+   *  표기. 없으면(옛 글) date만 폴백. */
+  published_at?: string | null;
   video_url: string;
   thumbnail_url: string | null;
   is_cms: true;
