@@ -76,6 +76,19 @@ def _parse_item(item: ET.Element) -> dict | None:
         return None
     cats = item.findall("category")
     top_category = cats[0].attrib.get("name", "").split(",")[0] if cats else ""
+    # 기사 하나에 category 태그가 여러 개 붙는 경우가 흔하다(예: 삼성전자
+    # 주주환원 기사가 "경제,사회,금융,증권,산업,국제" 6개를 동시에 달고
+    # 있는데 top_category는 그중 XML에 가장 먼저 나온 "경제" 하나만 본다).
+    # 2026-08-23 — mustknow_auto/frontpage_auto가 category(사이트 6개
+    # 경제 카테고리 라벨) 표시에 top_category만 쓰다 보니, 실제로는
+    # "증권"·"산업" 태그를 갖고 있는 기사인데도 첫 태그가 "경제"/"정치"
+    # 라서 카테고리 없이 발행되는 버그를 발견(사용자가 /archive에서
+    # "4가지 시선"이라는 가짜 카테고리로 뜨는 걸 지적). top_category는
+    # 지면특별코너 4탭 선정(증권/산업/시그널 매칭)이 이미 이 값 기준으로
+    # 검증된 로직이라 그대로 두고, 표시용으로만 전체 카테고리 태그를
+    # 별도 필드에 담아 호출부가 그중 사이트 카테고리와 일치하는 걸
+    # 골라 쓰게 한다.
+    categories = [c.attrib.get("name", "").split(",")[0] for c in cats]
     content_el = item.find("content")
     content_text = _strip_html(content_el.text or "") if content_el is not None else ""
     image_el = item.find("image")
@@ -105,6 +118,7 @@ def _parse_item(item: ET.Element) -> dict | None:
         "title": title_el.text.strip(),
         "sub_title": _strip_html(sub_title_el.text or "") if sub_title_el is not None else "",
         "top_category": top_category,
+        "categories": categories,
         # 4포맷 파이프라인(letters 등)에 그대로 넘길 원문 — discovery는
         # "분류"만 한다는 원칙은 유지하되, 후속 자동 발행 단계가 다시
         # 원문을 가져올 필요 없도록 여기서 한 번에 담아둔다.

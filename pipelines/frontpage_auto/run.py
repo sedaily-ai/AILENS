@@ -88,6 +88,21 @@ _CATEGORY_MAP = {
 }
 
 
+def _display_category(article: dict) -> str | None:
+    """발행 시 body_inline.category에 넣을 사이트 카테고리 라벨.
+
+    mustknow_auto/run.py의 같은 이름 함수와 동일한 이유(2026-08-23) —
+    top_category는 XML의 첫 번째 category 태그만 보는데, 기사 하나가
+    태그를 여러 개 다는 경우가 흔해 실제로는 증권/산업 기사인데도
+    맨 앞 태그가 "경제"/"정치"라서 카테고리 없이 발행되는 버그가 있었다.
+    전체 category 태그를 순서대로 훑어 사이트 6개 카테고리와 일치하는
+    첫 값을 쓴다."""
+    for c in article.get("categories") or [article.get("top_category", "")]:
+        if c in _CATEGORY_MAP:
+            return _CATEGORY_MAP[c]
+    return None
+
+
 def _slugify(publish_date: str, headline: str) -> str:
     tail = _NON_SLUG.sub("-", (headline or "").strip()).strip("-")
     base = f"{publish_date}-{tail}" if tail else publish_date
@@ -275,7 +290,7 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
             "body": [], "key_points": [], "keywords": [], "images": [],
             "lenses": lenses,
             "photo_image_url": article["photo_url"],
-            "category": _CATEGORY_MAP.get(article["top_category"]),
+            "category": _display_category(article),
             "paper_section": "전체",
             "display_order": article["_display_order"],
             "needs_video": video is None,

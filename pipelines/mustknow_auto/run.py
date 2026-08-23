@@ -88,6 +88,30 @@ _CATEGORY_MAP = {
     "문화·라이프": "문화",
 }
 
+
+def _display_category(article: dict) -> str | None:
+    """발행 시 body_inline.category에 넣을 사이트 카테고리 라벨.
+
+    2026-08-23 — 기존엔 `_CATEGORY_MAP.get(article["top_category"])`만
+    썼는데, top_category는 XML에서 그 기사의 **첫 번째** category 태그만
+    본다(discovery/pipeline.py). 기사 하나가 category 태그를 여러 개
+    달고 있는 경우가 흔해서(예: 삼성전자 주주환원 기사가 "경제,사회,
+    금융,증권,산업,국제" 6개를 동시에 달았는데 top_category는 그중
+    맨 앞의 "경제"만 봄), 실제로는 증권/산업 기사인데도 카테고리 없이
+    발행되는 버그가 있었다(사용자가 /archive에서 "4가지 시선"이라는
+    가짜 카테고리로 뜨는 걸 발견). 그 기사의 전체 category 태그
+    (`article["categories"]`)를 순서대로 훑어 사이트 6개 카테고리 중
+    하나와 일치하는 첫 값을 쓴다 — top_category 자체는 지면특별코너
+    4탭 선정(증권/산업/시그널 매칭)에 이미 검증된 채 쓰이고 있어 그대로
+    둔다. 정치·사회·오피니언처럼 애초에 경제 카테고리 태그가 전혀
+    없는 기사는 이 함수도 None을 돌려준다 — 사이트에 대응 카테고리
+    페이지가 없는 게 맞기 때문에 억지로 하나 붙이지 않는다."""
+    for c in article.get("categories") or [article.get("top_category", "")]:
+        if c in _CATEGORY_MAP:
+            return _CATEGORY_MAP[c]
+    return None
+
+
 # 지면특별코너 4탭 — 전체(지면1면)는 점수 없이 TOP 배치 우선(discovery가
 # 이미 편집 데이터로 정렬해서 줌). 증권/산업/시그널은 8.0 넘는 순서대로
 # 먼저 온 것부터 채운다(재순위 없음 — 라이브 콘텐츠를 나중에 더 좋은
@@ -325,7 +349,7 @@ def _publish(
             "body": [], "key_points": [], "keywords": [], "images": [],
             "lenses": lenses,
             "photo_image_url": article["photo_url"],
-            "category": _CATEGORY_MAP.get(article["top_category"]),
+            "category": _display_category(article),
             "paper_section": paper_section,
             "display_order": display_order,
             "needs_video": video is None,
