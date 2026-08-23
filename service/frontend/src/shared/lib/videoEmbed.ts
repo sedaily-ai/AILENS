@@ -70,3 +70,16 @@ export function resolveVideo(url: string): ResolvedVideo | null {
 export function isDirectAudioUrl(url: string): boolean {
   return /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url);
 }
+
+/**
+ * mp4 등 영상 파일 직접 URL 판별(2026-08-23) — resolveVideo()는 유튜브/
+ * 네이버TV만 읽고, mustknow_auto/frontpage_auto가 자체 렌더링해서 S3에
+ * 올리는 mp4(video 채널 독립 글, 오늘 신설)는 못 읽는다. /video/[slug]
+ * (VideoViewClient.tsx)가 resolveVideo()만 보고 실패하면 무조건 "영상을
+ * 준비 중이에요"만 띄우고 있었다 — 렌즈 4유형 페이지(AutoPlayVideo)는
+ * 이미 이 경로를 따로 처리해서 정상 재생됐는데, 독립 video 채널 상세
+ * 페이지만 이 분기가 없어서 실제로는 있는 영상을 못 보여주고 있었다.
+ */
+export function isDirectVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov)(\?|$)/i.test(url);
+}

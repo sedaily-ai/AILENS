@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
-import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { resolveVideo, isDirectVideoUrl } from '@/shared/lib/videoEmbed';
+import { useMediaProgress } from '@/shared/lib/tracking/useMediaProgress';
 
 /**
  * 영상 상세(2026-08-11) — webtoon/[slug]/WebtoonViewClient.tsx와 같은
@@ -36,6 +37,12 @@ export function VideoViewClient({
     };
   }, [slug, initialVideo]);
 
+  // hooks는 아래 early return보다 위에서 무조건 불러야 한다(Rules of
+  // Hooks) — video가 아직 null이어도 useMediaProgress 내부가 articleId
+  // undefined를 안전하게 처리한다.
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useMediaProgress(videoRef, video?.id, 'video');
+
   if (!slug || video === null) {
     return (
       <div className="min-h-screen bg-white">
@@ -52,6 +59,7 @@ export function VideoViewClient({
   }
 
   const resolved = video ? resolveVideo(video.video_url) : null;
+  const directVideoUrl = video && !resolved && isDirectVideoUrl(video.video_url) ? video.video_url : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -83,6 +91,13 @@ export function VideoViewClient({
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
+            ) : directVideoUrl ? (
+              // 2026-08-23 — 유튜브/네이버TV(resolveVideo)만 처리하던 분기라
+              // mustknow_auto/frontpage_auto가 자체 렌더링해 S3에 올리는
+              // mp4(video 채널 독립 글)는 이 페이지에서 못 틀고 있었다 —
+              // 렌즈 4유형 페이지(AutoPlayVideo)는 이미 되는데 여기만
+              // 안 됐던 것.
+              <video ref={videoRef} controls preload="auto" src={directVideoUrl} className="w-full h-full" style={{ objectFit: 'contain' }} />
             ) : (
               <div className="w-full h-full flex items-center justify-center" style={{ color: '#9ca3af', fontSize: 13 }}>
                 영상을 준비 중이에요.

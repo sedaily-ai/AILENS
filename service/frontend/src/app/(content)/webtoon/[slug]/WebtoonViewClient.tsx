@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
+import { useCutViewTracking } from '@/shared/lib/tracking/useCutViewTracking';
 
 /**
  * 경로 기반(`/webtoon/[slug]`) 웹툰 상세의 클라이언트 본체(2026-08-07, 쿼리스트링
@@ -47,6 +48,10 @@ export function WebtoonViewClient({
       cancelled = true;
     };
   }, [slug, initialWebtoon]);
+
+  // hooks는 아래 early return보다 위에서 무조건 불러야 한다(Rules of Hooks).
+  const cutsContainerRef = useRef<HTMLDivElement>(null);
+  useCutViewTracking(cutsContainerRef, webtoon?.id, webtoon?.panels.length ?? 0);
 
   if (!slug || webtoon === null) {
     return (
@@ -178,9 +183,9 @@ export function WebtoonViewClient({
 
           {/* 컷을 위에서 아래로 쭉 이어붙인다 — 세로 스크롤 하나로 읽는 웹툰 UX.
               어두운 배경 위에 컷만 도드라지게, 캡션은 조명 받은 필름 캡션처럼. */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div ref={cutsContainerRef} style={{ display: 'flex', flexDirection: 'column' }}>
             {webtoon.panels.map((p, i) => (
-              <div key={i}>
+              <div key={i} data-cut-index={i + 1}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본, 컷마다 비율이 달라 next/image 불가 */}
                 <img src={p.url} alt={`${webtoon.title} 컷 ${i + 1}`} style={{ display: 'block', width: '100%', height: 'auto' }} />
                 {p.caption && (

@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchHomePlayerBySlug, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
+import { useMediaProgress } from '@/shared/lib/tracking/useMediaProgress';
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { ACCENT } from '../accent';
 
@@ -37,6 +38,10 @@ export function ListenViewClient({
       cancelled = true;
     };
   }, [slug, initialItem]);
+
+  // hooks는 아래 early return보다 위에서 무조건 불러야 한다(Rules of Hooks).
+  const audioRef = useRef<HTMLAudioElement>(null);
+  useMediaProgress(audioRef, item?.id, 'podcast');
 
   if (!slug || item === null) {
     return (
@@ -121,7 +126,7 @@ export function ListenViewClient({
                   <rect x="17.5" y="13" width="4" height="6" rx="1.5" />
                 </svg>
               </span>
-              <audio controls src={item.mediaEmbedUrl} style={{ flex: 1, minWidth: 0, height: 40 }} />
+              <audio ref={audioRef} controls src={item.mediaEmbedUrl} style={{ flex: 1, minWidth: 0, height: 40 }} />
             </div>
           ) : resolved ? (
             <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 12, background: '#111827' }}>

@@ -5,6 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
+import { useMediaProgress } from '@/shared/lib/tracking/useMediaProgress';
+import { useCutViewTracking } from '@/shared/lib/tracking/useCutViewTracking';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import {
   LENS_ACCENT,
@@ -406,7 +409,7 @@ function CardnewsCarousel({
 // 발견 — "레터 페이지 들어가기만 해도 자동으로 영상이 재생되네").
 // active(=on)가 실제로 true가 될 때만 play()를 부르는 방식으로 고친다 —
 // hooks는 반복문(.map()) 안에서 못 쓰므로 별도 컴포넌트로 뺀다.
-function AutoPlayVideo({ src, active }: { src: string; active: boolean }) {
+function AutoPlayVideo({ src, active, articleId }: { src: string; active: boolean; articleId?: string | null }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -417,8 +420,47 @@ function AutoPlayVideo({ src, active }: { src: string; active: boolean }) {
       el.pause();
     }
   }, [active]);
+  useMediaProgress(ref, articleId, 'video');
   return (
     <video ref={ref} controls preload="auto" src={src} className="w-full h-full" style={{ objectFit: 'contain' }} />
+  );
+}
+
+// KPI 계측(2026-08-23) — 팟캐스트 완주율. AutoPlayVideo와 같은 이유로
+// 별도 컴포넌트로 뺀다(hooks는 .map() 루프 안에서 못 씀).
+function TrackedAudio({ src, articleId }: { src: string; articleId?: string | null }) {
+  const ref = useRef<HTMLAudioElement>(null);
+  useMediaProgress(ref, articleId, 'podcast');
+  return <audio ref={ref} controls preload="none" src={src} style={{ width: '100%' }} />;
+}
+
+// KPI 계측(2026-08-23) — 웹툰 완주율("컷 몇까지 봤는가"). 컷 목록을 감싸는
+// 컨테이너에 ref를 걸고 IntersectionObserver로 컷별 노출을 잡는다 — 역시
+// hooks는 .map() 루프 안에서 못 써서 별도 컴포넌트로 뺐다.
+function WebtoonCutGallery({
+  cuts,
+  articleId,
+}: {
+  cuts: { url: string; caption?: string }[];
+  articleId?: string | null;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useCutViewTracking(containerRef, articleId, cuts.length);
+  return (
+    <div ref={containerRef} className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {cuts.map((cut, ci) => (
+        <figure key={ci} data-cut-index={ci + 1} style={{ margin: 0 }}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', borderRadius: 14, overflow: 'hidden', background: '#f3f4f6' }}>
+            <Image src={cut.url} alt={cut.caption || ''} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'contain' }} />
+          </div>
+          {cut.caption && (
+            <figcaption style={{ marginTop: 8, fontSize: 13.5, color: '#374151', lineHeight: 1.6, wordBreak: 'keep-all' }}>
+              {cut.caption}
+            </figcaption>
+          )}
+        </figure>
+      ))}
+    </div>
   );
 }
 
@@ -468,8 +510,22 @@ export function LensViewClient({
   // 충분히 보인다. 딥링크(?v=N) 최초 진입은 여전히 select()가 아니라
   // setActive()를 직접 불러서(위 useEffect) 이 스크롤이 안 걸린다 —
   // "항상 최상단부터 랜딩" 원칙은 그대로 유지.
+  // KPI 계측(2026-08-23, "포맷 전환율" — 빠른 포맷으로 훑고 깊은 포맷으로
+  // 돌아오는지가 4유형 설계 자체의 가설 검증 지표). setActive를 함수형
+  // 업데이트로 불러서 직전 active 값을 deps 없이 읽는다 — select 자체를
+  // useCallback([])로 유지해야 위 onTabKeyDown 등 다른 곳에서 참조가 안
+  // 깨진다.
   const select = useCallback((i: number) => {
-    setActive(i);
+    setActive((prev) => {
+      if (prev !== i && lens) {
+        trackEvent('format_switch', {
+          article_id: lens.id,
+          from_format: lensFormatAt(prev),
+          to_format: lensFormatAt(i),
+        });
+      }
+      return i;
+    });
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.set('v', String(i + 1));
@@ -480,7 +536,7 @@ export function LensViewClient({
       // 붙여서 방금 누른 타일까지 화면 밖으로 밀려나 버린다.
       document.getElementById(lensPanelId(i))?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, []);
+  }, [lens]);
 
   const onTabKeyDown = useCallback(
     (e: ReactKeyboardEvent, i: number) => {
@@ -791,7 +847,13 @@ export function LensViewClient({
 
           {lens.source_url && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-              <a href={lens.source_url} target="_blank" rel="noopener noreferrer" className="src">
+              <a
+                href={lens.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="src"
+                onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: lensFormatAt(active) })}
+              >
                 기사 원문 보기
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M7 17 17 7" />
@@ -1128,28 +1190,17 @@ export function LensViewClient({
                   {/* 실제 웹툰 컷(2026-08-19) — admin이 LensMode.tsx 웹툰
                       탭에서 WebtoonPanelsEditor로 올린 이미지+캡션이 있으면
                       아래 목업 캐러셀 대신 실제 컷을 순서대로 보여준다. */}
+                  {/* pipelines/webtoon이 실제로 만드는 컷은 1536x1024(3:2 가로) —
+                      예전 인스타 카드뉴스(4:5 세로) 전제로 aspect-ratio 4/5 +
+                      cover를 썼더니 좌우가 크게 잘려서, 말풍선이 화면 가장자리에
+                      있으면(BUBBLE_RULES가 "상단·측면 배치"를 지시함) 통째로
+                      잘려 보이는 문제가 있었다(2026-08-20 사용자 리포트). contain
+                      으로 바꿔 잘림 없이 전체를 보여준다 — 비율이 정확히 3:2면
+                      레터박스도 안 생긴다. 렌더링은 WebtoonCutGallery로 뺐다 —
+                      완주율 계측(useCutViewTracking)이 hooks라 .map() 루프
+                      안에선 못 써서. */}
                   {format === 'webtoon' && realWebtoonCuts && (
-                    <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                      {realWebtoonCuts.map((cut, ci) => (
-                        <figure key={ci} style={{ margin: 0 }}>
-                          {/* pipelines/webtoon이 실제로 만드는 컷은 1536x1024(3:2
-                              가로) — 예전 인스타 카드뉴스(4:5 세로) 전제로 aspect-ratio
-                              4/5 + cover를 썼더니 좌우가 크게 잘려서, 말풍선이 화면
-                              가장자리에 있으면(BUBBLE_RULES가 "상단·측면 배치"를
-                              지시함) 통째로 잘려 보이는 문제가 있었다(2026-08-20
-                              사용자 리포트). contain으로 바꿔 잘림 없이 전체를
-                              보여준다 — 비율이 정확히 3:2면 레터박스도 안 생긴다. */}
-                          <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', borderRadius: 14, overflow: 'hidden', background: '#f3f4f6' }}>
-                            <Image src={cut.url} alt={cut.caption || ''} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'contain' }} />
-                          </div>
-                          {cut.caption && (
-                            <figcaption style={{ marginTop: 8, fontSize: 13.5, color: '#374151', lineHeight: 1.6, wordBreak: 'keep-all' }}>
-                              {cut.caption}
-                            </figcaption>
-                          )}
-                        </figure>
-                      ))}
-                    </div>
+                    <WebtoonCutGallery cuts={realWebtoonCuts} articleId={lens.id} />
                   )}
 
                   {/* 카드뉴스형 목업 — 실제 컷이 없을 때만(위 realWebtoonCuts
@@ -1211,7 +1262,7 @@ export function LensViewClient({
                       >
                         {l.question || '오늘의 브리핑'}
                       </p>
-                      <audio controls preload="none" src={directPodcastUrl} style={{ width: '100%' }} />
+                      <TrackedAudio src={directPodcastUrl} articleId={lens.id} />
                     </div>
                   )}
 
@@ -1328,7 +1379,7 @@ export function LensViewClient({
                           났었다(위 AutoPlayVideo 주석 참조). realVideo(유튜브
                           등 iframe embed) 쪽은 videoEmbed.ts의 embedUrl에
                           이미 autoplay=1이 박혀 있어 그대로 뒀다. */}
-                      <AutoPlayVideo src={directVideoUrl} active={on} />
+                      <AutoPlayVideo src={directVideoUrl} active={on} articleId={lens.id} />
                     </div>
                   )}
 
@@ -1509,7 +1560,7 @@ export function LensViewClient({
                 CMS의 "AI-translated from Korean..." 박스를 레퍼런스로
                 "면책조항 걸어주세요"). 원문 링크는 이 박스 안으로 흡수 —
                 위 문단에 있던 "원문 기사" 인라인 링크는 중복이라 뺐다. */}
-            <AiDisclaimer sourceUrl={lens.source_url} />
+            <AiDisclaimer sourceUrl={lens.source_url} articleId={lens.id} format={lensFormatAt(active)} />
           </div>
           </div>
         )}

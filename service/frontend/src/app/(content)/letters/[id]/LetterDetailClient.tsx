@@ -963,7 +963,7 @@ function LetterTextExtras({
           걸어주세요"). 기존 "원문 보기 — 서울경제 →" 링크는 이 박스 안
           "원문 기사 보기" 링크로 흡수. */}
       <div style={{ marginBottom: 24 }}>
-        <AiDisclaimer sourceUrl={letter.source_url} />
+        <AiDisclaimer sourceUrl={letter.source_url} articleId={letter.id} format="letter" />
       </div>
 
       {letter.keywords.length > 0 && (

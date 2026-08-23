@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
 /**
  * 기사 하단 AI 생성 콘텐츠 고지 박스(2026-08-21, 사용자 요청 — 서울경제
@@ -12,8 +13,25 @@ import Link from 'next/link';
  * lens(`LensViewClient.tsx`)·letters(`LetterDetailClient.tsx`) 둘 다
  * 기사 하단에 있던 "원문 보기" 링크 한 줄을 이 박스가 대체 —
  * source_url이 있으면 이 박스 안 링크로 충분해서 별도로 남겨두지 않는다.
+ *
+ * KPI 계측(2026-08-23) — "신뢰" 축. articleId/format을 넘기면 클릭 시
+ * source_link_click을 쏜다. 이 클릭이 "AI 요약이 부실해서 원문 갔다"인지
+ * "AI 요약이 맘에 들어 검증하러 갔다"인지는 이 이벤트 하나로는 못 가른다
+ * — 그건 별도 정성 신호(1탭 피드백 등)가 필요하다는 걸 KPI 메모에도
+ * 명시해뒀다. 지금은 일단 "얼마나 자주 원문으로 이탈하는가"부터 잡는다.
  */
-export function AiDisclaimer({ sourceUrl }: { sourceUrl?: string | null }) {
+export function AiDisclaimer({
+  sourceUrl,
+  articleId,
+  format,
+}: {
+  sourceUrl?: string | null;
+  articleId?: string;
+  format?: string;
+}) {
+  const handleSourceClick = () => {
+    if (articleId) trackEvent('source_link_click', { article_id: articleId, format: format ?? null });
+  };
   return (
     <div
       style={{
@@ -44,6 +62,7 @@ export function AiDisclaimer({ sourceUrl }: { sourceUrl?: string | null }) {
               href={sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleSourceClick}
               style={{ fontSize: 12.5, fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}
             >
               원문 기사 보기 ↗
