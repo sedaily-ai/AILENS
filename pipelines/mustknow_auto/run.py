@@ -402,6 +402,14 @@ def main():
     fresh = [a for a in all_articles if a["key"] and not _is_seen(seen_table, a["key"])]
     fresh = _dedupe_near_identical(fresh)
     fresh = [a for a in fresh if a["content_len"] >= _MIN_CONTENT_LEN]
+    # "AI 프리즘"은 서울경제 자체 AI 큐레이션 다이제스트 칼럼(관련 기사 여러 건을
+    # 한데 모아 요약)이지 단일 이슈를 다루는 기사가 아니다 — subTitle이
+    # "■AI 프리즘 [카테고리]"로 시작한다(2026-08-23, 사용자 지적: "프리즘
+    # 기사는 변환에 사용 안 하는 기사입니다", 실제로 이미 발행된 사례에서
+    # 카테고리 미분류 버그와 겹쳐 발견됨). 이미 AI가 만든 콘텐츠를 다시 AI로
+    # 4포맷 변환하는 게 맞지 않고, 다이제스트라 "하나의 이슈"라는 lens
+    # 컨셉과도 안 맞아서 후보에서 아예 뺀다.
+    fresh = [a for a in fresh if "AI 프리즘" not in a["sub_title"]]
     print(f"[mustknow-auto] seen 제외 + 사전필터 후 {len(fresh)}건 남음")
 
     out_dir = Path("/tmp/mustknow_auto_out")
