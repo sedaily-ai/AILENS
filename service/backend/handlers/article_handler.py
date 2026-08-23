@@ -287,10 +287,11 @@ async def _async_handler(event: dict, context) -> dict:
             import json
             return {
                 "statusCode": 400,
-                "headers": {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*"
-                },
+                # 이 응답만 CORS_HEADERS 대신 인라인 딕트를 써서
+                # Access-Control-Allow-Methods/Headers가 빠져 있었다(같은 파일의
+                # 다른 응답 4곳은 전부 CORS_HEADERS를 씀 — 2026-08-23 코드
+                # 리팩토링 감사에서 발견, 통일).
+                "headers": CORS_HEADERS,
                 "body": json.dumps({
                     "error": {
                         "code": "MISSING_ARTICLE_ID",
