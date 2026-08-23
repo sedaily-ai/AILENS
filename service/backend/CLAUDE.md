@@ -285,6 +285,14 @@ services/           → Business logic: article_filter, prompt_loader,
                      이 파일은 원래도 async 함수로 로직이 어느 정도 분리돼 있었어서(handler=
                      라우팅은 이미 지켜지고 있었음) 파일만 나눴다. 99줄로 축소. 검증: OPTIONS·
                      keywords 누락 400 스모크 테스트(둘 다 AWS 호출 없음) + 전체 스위트 재확인.
+                     2026-08-24 후속2: `handlers/cms_posts_public.py`(363줄, 채널별 응답
+                     shaping 함수 6개가 핸들러 파일에 다 있던 것)를 `cms_posts_shaping.py`
+                     (shape_letter/shape_paper/shape_webtoon/shape_video/shape_lens/
+                     shape_home_player_item + SHAPERS dict)로 분리. 이 파일은 core.response/
+                     core.decorators를 이미 쓰고 있어(CORS 중복 문제 없음) 순수 구조 분리만.
+                     91줄로 축소. 검증: 전용 테스트 tests/test_cms_posts_public.py 8/8
+                     통과(letters/paper 채널 shaping, slug 조회, CORS, 404, cache-control
+                     헤더까지 커버) + 전체 스위트 재확인.
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).

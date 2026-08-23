@@ -1,23 +1,25 @@
 """GET /api/v2/posts — 관리자가 작성한 글의 공개 조회 API (CMS spec §5.1.1).
 
-채널별로 응답 모양이 다르다. 프론트가 기존 응답과 머지할 수 있도록,
-'letters' 는 ApiLetter 모양으로, 'paper' 는 front-page article 모양으로 shaping 한다.
-
 Query: ?channel=letters|paper|feed (기본 letters) &date=YYYY-MM-DD (옵션)
 Path : /api/v2/posts/{slug}
 
 응답에 envelope 은 없다 (today-letters·front-page 와 동일 규약).
+
+2026-08-24 — 채널별 응답 shaping(_shape_letter 등 6개 함수)은
+services/cms_posts_shaping.py로 뺐다(코드 리팩토링 감사 Track B, God
+파일 분해). 이 파일은 이제 HTTP 라우팅만 담당한다.
 """
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
 
 from clients import cms_posts_ddb_client as posts_client
+from services.cms_posts_shaping import SHAPERS, shape_letter
 
 logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
@@ -37,280 +39,6 @@ _VALID_CHANNELS = ("letters", "paper", "feed", "webtoon", "video", "lens", "home
 # 수밖에 없다(트래픽 규모상 성능 손해는 무시 가능). SSR 쪽은 Next가 이
 # 헤더를 안 보고 자기 next.revalidate/tags 설정만 따르므로 영향 없다.
 _CACHE_CONTROL = "no-store"
-# editor_id 가 NULL 인 글의 표시 명의 (spec §5.1.1) — "편집팀"처럼 딱딱한
-# 직함 대신 짧게. 프론트 todayLettersApi.ts DEFAULT_META.editorName 과 맞춘다.
-_DEFAULT_EDITOR = "AI LENS"
-
-
-def _body_paragraphs(post: Dict[str, Any]) -> List[str]:
-    return [p for p in (post.get("body_inline") or {}).get("body", []) if p]
-
-
-def _shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
-    """ApiLetter 모양 (shared/lib/todayLettersApi.ts 와 1:1)."""
-    b = post.get("body_inline") or {}
-    return {
-        "id": post["slug"],
-        "editor_id": post.get("editor_id") or _DEFAULT_EDITOR,
-        "article_id": "",
-        "secondary_article_ids": [],
-        "archetype": None,
-        "theme": None,
-        "headline": post.get("headline") or "",
-        "subtitle": post.get("subtitle"),
-        "closing_line": post.get("closing_line"),
-        # 전체 레터 목록(/letters)이 날짜별로 묶어 보여주려면 필요 — today-letters
-        # 는 호출자가 이미 date 를 알고 있어 안 쓰지만, 채널 조회는 여러 날짜가
-        # 섞여 나오므로 각 글에 날짜가 실려 있어야 한다.
-        "publish_date": post.get("publish_date"),
-        # 마지막 수정 시각(2026-08-18, GEO 점검 — en.sedaily.com 대비
-        # dateModified가 항상 datePublished와 같은 값이던 문제) — DDB
-        # item엔 admin repo가 생성·수정마다 이미 채워온 필드가 있었다
-        # (admin/backend/repo/posts_repo.py create()/update() 참조), 공개
-        # 응답에만 안 실려 있었을 뿐이라 그대로 통과시킨다.
-        "updated_at": post.get("updated_at"),
-        # 발행 완료 시각(ISO, UTC, 초 단위) — 2026-08-23, 사용자 요청: "이
-        # 서비스에 있는 건 날짜만 말고 시간/분도 있어야 함". lens와 같은
-        # 이유·같은 패턴(shared/lib/date.ts kstDateTimeLabel).
-        "published_at": post.get("published_at"),
-        "body": _body_paragraphs(post),
-        # Tiptap 리치텍스트 결과 — 있으면 프론트가 body[] 대신 이걸 렌더한다
-        # (admin PostForm 이 "post" 모드에서 이 필드만 채운다. AI 레터는 없음).
-        "body_html": b.get("body_html"),
-        "key_points": b.get("key_points") or [],
-        "keywords": b.get("keywords") or [],
-        # 배경자료의 수치 인포그래픽을 AI LENS 자체 스타일로 재구성할 때 씀
-        # (LetterChartBlock, frontend). 원본 이미지가 아니라 데이터만 가져온다.
-        "chart": b.get("chart"),
-        "images": b.get("images") or [],
-        # 피드 카드 썸네일 — admin에서 지정 안 하면 None, 프론트가 에디터
-        # 아바타로 폴백한다 (todayLettersApi.ts::toTodayLetterCard).
-        "cover_image_url": post.get("cover_image_url") or None,
-        # 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO
-        # 감사). admin이 안 채우면 None, 프론트는 있을 때만 "원문 보기" 노출.
-        "source_url": post.get("source_url") or None,
-        # 유튜브 등 웹 링크 — 있으면 홈 하단 플레이어가 TTS 대신 이걸 임베드
-        # 재생한다(2026-08-16, shared/lib/todayLettersApi.ts::toTodayLetterCard).
-        "media_embed_url": post.get("media_embed_url") or None,
-        # 전체 레터라도 /letters 아카이브에서 "트렌드"/"인기 칼럼" 필터에 걸리고
-        # 싶을 수 있다 — channel 을 trend_card 로 바꾸면 본문·퀴즈가 요약 카드로
-        # 축소되니, 대신 가벼운 태그만 얹는다(글 자체는 여전히 상세 페이지 그대로).
-        "section": b.get("section"),
-        # section 이 trend/column 일 때 홈 카드 상단 라벨(예: "증시", "투자
-        # 인사이트") — admin PostForm 이 "post" 모드에서도 이제 이 값을 받는다
-        # (mode="trend_card" 의 category 필드와 동일 규약, 2026-08-07).
-        "category": b.get("category") or None,
-        "is_cms": True,
-    }
-
-
-def _shape_paper(post: Dict[str, Any]) -> Dict[str, Any]:
-    """front-page article 모양 (v2/handlers/front_page.py 와 1:1)."""
-    paras = _body_paragraphs(post)
-    blocks: List[Dict[str, Any]] = [{"type": "text", "text_ko": p} for p in paras]
-    for img in (post.get("body_inline") or {}).get("images", []):
-        url = (img or {}).get("url")
-        if url:
-            blocks.append({"type": "image", "url": url})
-    return {
-        "news_id": post["slug"],
-        "title": post.get("headline") or "",
-        "sub_title": post.get("subtitle") or "",
-        "category": "",
-        "author_name": post.get("editor_id") or _DEFAULT_EDITOR,
-        "published_at": post.get("published_at"),
-        "url": "",
-        "image_url": post.get("cover_image_url") or "",
-        "is_top": False,
-        "content": "\n\n".join(paras),
-        "content_blocks": blocks,
-        "is_cms": True,
-    }
-
-
-def _shape_webtoon(post: Dict[str, Any]) -> Dict[str, Any]:
-    """연재 웹툰 파일럿(2026-08-06) — 컷(이미지+캡션) 나열뿐인 가벼운 포맷이라
-    새 필드를 만들지 않고 기존 body_inline.images(url+caption)를 컷 목록으로
-    그대로 쓴다. 그림은 admin에서 외부 생성(GPT 등) 후 업로드만 한다."""
-    b = post.get("body_inline") or {}
-    panels = [
-        {"url": img.get("url"), "caption": (img.get("caption") or "").strip()}
-        for img in (b.get("images") or [])
-        if img.get("url")
-    ]
-    return {
-        "id": post["slug"],
-        "editor_id": post.get("editor_id") or _DEFAULT_EDITOR,
-        "title": post.get("headline") or "",
-        "excerpt": post.get("subtitle") or "",
-        "date": post.get("publish_date") or "",
-        "published_at": post.get("published_at"),
-        "cover_image_url": post.get("cover_image_url") or (panels[0]["url"] if panels else None),
-        "panels": panels,
-        "is_cms": True,
-    }
-
-
-def _shape_video(post: Dict[str, Any]) -> Dict[str, Any]:
-    """영상 콘텐츠(2026-08-06) — 외부(YouTube 등) 임베드 URL 하나만 있으면
-    되는 가벼운 포맷. admin이 body_inline.video_url 을 채운다. 썸네일은
-    admin이 직접 지정 안 하면 프론트가 YouTube URL에서 자동 추출한다."""
-    b = post.get("body_inline") or {}
-    return {
-        "id": post["slug"],
-        "title": post.get("headline") or "",
-        "excerpt": post.get("subtitle") or "",
-        "date": post.get("publish_date") or "",
-        "published_at": post.get("published_at"),
-        "video_url": b.get("video_url") or "",
-        "thumbnail_url": post.get("cover_image_url") or None,
-        "is_cms": True,
-    }
-
-
-def _shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
-    """"오늘의 이슈, 4가지 시선" 슬롯 — 2026-08-19부터 실제로는 4개 출력
-    포맷(레터/웹툰/팟캐스트/영상, admin/frontend LensMode.tsx 참조)을 담는
-    자리다. admin이 직접 작성(AI 생성은 프롬프트 테스트 실행 보조 — CmsPost
-    자체는 여전히 수동 저장, body_inline.lenses 4개를 그대로 저장)."""
-    b = post.get("body_inline") or {}
-    lenses = [
-        {
-            "label": item.get("label") or "",
-            "question": item.get("question") or "",
-            "bullets": [x for x in (item.get("bullets") or []) if x],
-            # "레터" 포맷 전용 문단 산문(2026-08-19) — 나머지 세 포맷은
-            # bullets만 쓰므로 대개 빈 배열.
-            "paragraphs": [x for x in (item.get("paragraphs") or []) if x],
-            # "웹툰" 포맷 전용 컷(이미지+캡션, 2026-08-19) — webtoon 채널
-            # 글의 body_inline.images와 같은 모양({url, caption}), 저장
-            # 위치만 이 슬롯.
-            "images": [
-                {"url": img.get("url") or "", "caption": img.get("caption") or ""}
-                for img in (item.get("images") or [])
-                if img.get("url")
-            ],
-            # "영상" 포맷 전용 YouTube 등 임베드 URL(2026-08-19).
-            "video_url": item.get("video_url") or None,
-            # "영상" 포맷 전용 썸네일(2026-08-20) — YouTube 링크는
-            # resolveVideo()가 자동으로 썸네일을 뽑아주지만, 우리 파이프라인이
-            # 렌더링해 S3에 올린 mp4 원본은 그 자동 추출이 안 된다(URL 패턴
-            # 기반 판별이라). 렌더된 영상 자체에서 프레임을 떠서 미리
-            # 채워두는 필드 — 없으면 프론트가 기사 사진으로 폴백한다(사용자
-            # 지적: "영상 목록에 기사 사진 말고 영상 프레임 같은 썸네일이
-            # 있어야죠").
-            "thumbnail_url": item.get("thumbnail_url") or None,
-            # "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — home_player
-            # 채널의 media_embed_url과 같은 성격, 저장 위치만 이 슬롯.
-            "media_url": item.get("media_url") or None,
-            # "팟캐스트"·"영상" 포맷 전용 전체 대본 텍스트(2026-08-23, 사용자
-            # 요청 — 청각장애인 접근성용, 타임스탬프 동기화 없이 그냥 본문만).
-            # mustknow_auto/frontpage_auto run.py가 발행 시 채운다 — 레터는
-            # 이미 paragraphs가 그 역할을 하고, 웹툰은 images[].caption이
-            # 컷별 대사를 이미 담고 있어서 별도로 안 채움.
-            "transcript": item.get("transcript") or None,
-        }
-        for item in (b.get("lenses") or [])
-    ]
-    return {
-        "id": post["slug"],
-        "editor_id": post.get("editor_id") or _DEFAULT_EDITOR,
-        "headline": post.get("headline") or "",
-        "context": post.get("subtitle") or "",
-        "date": post.get("publish_date") or "",
-        "updated_at": post.get("updated_at"),
-        # 발행 완료 시각(ISO, UTC, 초 단위 — 2026-08-23, 사용자 지적: "날짜만
-        # 나와서" — 지면 1면 그리드·상세 페이지 둘 다 날짜만 있고 시:분이
-        # 없었다). mustknow_auto/frontpage_auto가 실제 발행 완료 시점에
-        # 기록하는 published_at을 그대로 내려준다 — 프론트가 KST로 변환해
-        # "입력 2026.08.23 16:37" 형태로 표기(shared/lib/date.ts
-        # kstDateTimeLabel). 옛 글은 이 필드가 없을 수 있어 옵셔널.
-        "published_at": post.get("published_at"),
-        "cover_image_url": post.get("cover_image_url") or None,
-        # 텍스트가 없는 순수 기사 사진(2026-08-14 신설). cover_image_url 은
-        # 인스타 카드뉴스용 완성형 그래픽(1080x1350)이라 헤드라인·날짜·"lens"
-        # 라벨이 픽셀에 박혀 있다 — 웹 카드의 사진 칸에 그걸 쓰면 우리 HTML
-        # 헤드라인과 텍스트가 중복되고, 광고 문구·인포그래픽까지 같이 노출된다.
-        # 그래서 카드 그래픽과 별개로 "사진만" 있는 이미지를 따로 받는다.
-        # 최상위 스키마를 건드리지 않도록 body_inline 에 담는다.
-        "photo_image_url": b.get("photo_image_url") or None,
-        "source_url": post.get("source_url") or None,
-        # letters와 같은 저장 위치(body_inline.category, 6개 경제 카테고리
-        # 라벨 문자열)를 그대로 읽는다 — lens 글도 /markets 등 카테고리별
-        # 페이지에 letters와 함께 노출하기 위해 2026-08-20 추가.
-        "category": b.get("category") or None,
-        # "지면 특별 코너"(LensPreviewSection.tsx) 전용 배치 필드(2026-08-21
-        # 신설) — 위 category와 완전히 별개다. 처음엔 지면 특별 코너의
-        # "전체" 탭이 category 무관 최신순이었는데, 이후 발행된 산업/증권
-        # 카테고리 글이 전부 "전체"에도 같이 떠버리는 문제가 생겼다(사용자
-        # 지적: "산업 1면에만 올라가야 하는데 지면 1면에도 들어갔네요...
-        # 지면 1면은 지면 1면 기사만 들어가는 겁니다. '전체'가 아니예요").
-        # 원인은 category 필드 하나를 (a) /markets·/industry 같은 일반
-        # 경제 카테고리 페이지, (b) 지면 특별 코너 4탭(전체/증권/산업/시그널)
-        # 배치 — 서로 다른 두 목적에 같이 써서 겹친 것. 값은 "전체"/"증권"/
-        # "산업"/"시그널" 중 하나(사람이 명시적으로 골라야 지면 특별
-        # 코너에 뜬다 — 없으면 그 코너엔 아예 안 뜨고 카테고리 페이지에만
-        # 남는다).
-        "paper_section": b.get("paper_section") or None,
-        # 지면 특별 코너 내 명시적 정렬 키(2026-08-21) — home_player 채널의
-        # display_order와 같은 최상위 필드(posts_repo.py의 범용 _UPDATABLE
-        # 목록에 이미 있어 쓰기 경로는 공용, body_inline이 아니라 post 최상위에
-        # 저장). 그 전까지는 지면 순서를 맞추려면 published_at을 정렬 키인
-        # 척 수동으로 재기록해야 했다(§2 등에서 4번 반복). home_player와
-        # 달리 기본값을 0으로 채우지 않는다 — None을 그대로 넘겨서 프론트가
-        # "명시적으로 순서를 지정한 글"과 "아직 지정 안 해서 기존
-        # publish_date/published_at 정렬을 그대로 따라야 하는 글"을 구분할
-        # 수 있게 한다(LensPreviewSection.tsx).
-        "display_order": post.get("display_order"),
-        "lenses": lenses,
-        "is_cms": True,
-    }
-
-
-def _shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
-    """홈 화면 하단 플레이 카드("오늘의 핵심 뉴스") 재생목록 항목(2026-08-16).
-    기사와 무관하게 관리자가 직접 "제목 + 유튜브 링크"로 만드는 독립
-    콘텐츠 — admin/frontend home-player 화면 전용, TodayNewsPlayer.tsx가
-    display_order 오름차순으로 재생한다.
-
-    date/excerpt 추가(2026-08-21) — 전용 목록/상세 페이지(/listen) 신설로
-    검색엔진에 노출시키면서 다른 채널 shaper(_shape_video 등)와 필드를
-    맞췄다. 지금까지 이 채널은 홈 위젯 전용이라 발행일이 필요 없었다.
-
-    category 추가(2026-08-21) — 홈 오디오 섹션 카드에 "팟캐스트"/"영상"
-    (미디어 형식)만 뜨고 실제 내용 분류가 없다는 지적. lens/letters와
-    같은 저장 위치(body_inline.category, ECON_CATEGORIES 값)를 그대로
-    재사용 — 새 필드·새 admin 화면 없이 admin/frontend home-player
-    페이지에 카테고리 선택만 추가하면 끝나는 구조."""
-    return {
-        "id": post["slug"],
-        "title": post.get("headline") or "",
-        "excerpt": post.get("subtitle") or "",
-        "date": post.get("publish_date") or "",
-        "published_at": post.get("published_at"),
-        "media_embed_url": post.get("media_embed_url") or "",
-        "display_order": post.get("display_order") if post.get("display_order") is not None else 0,
-        "category": (post.get("body_inline") or {}).get("category") or None,
-        # 팟캐스트 전체 대본(2026-08-23, 사용자 지적 — "들어갈 때 이것만
-        # 있으니까 너무 허전한데, 텍스트 스크립트 표출하면 어떰?"). lens
-        # 글의 팟캐스트 포맷이 이미 갖고 있던 접근성용 transcript를 이
-        # 채널로 복제할 때 같이 옮겨온다(mustknow_auto/frontpage_auto
-        # run.py 참조) — 청각장애인 접근성 겸 빈 화면 보완.
-        "transcript": (post.get("body_inline") or {}).get("transcript") or None,
-    }
-
-
-_SHAPERS = {
-    "letters": _shape_letter,
-    "paper": _shape_paper,
-    # feed 는 개인화 랭킹 대상이 아니라 상단 고정 카드로 쓰인다 (spec §2.4).
-    # 모양은 letters 와 같게 두고 프론트가 고정 배치한다.
-    "feed": _shape_letter,
-    "webtoon": _shape_webtoon,
-    "video": _shape_video,
-    "lens": _shape_lens,
-    "home_player": _shape_home_player_item,
-}
 
 
 @handler_decorator
@@ -332,7 +60,7 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not post:
             return error_response("post not found", status_code=404, code="NOT_FOUND")
         channel = (post.get("channels") or ["letters"])[0]
-        shaper = _SHAPERS.get(channel, _shape_letter)
+        shaper = SHAPERS.get(channel, shape_letter)
         payload: Dict[str, Any] = {"post": shaper(post)}
     else:
         channel = qs.get("channel") or "letters"
@@ -355,7 +83,7 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         payload = {
             "channel": channel,
             "date": date,
-            "posts": [_SHAPERS[channel](r) for r in rows],
+            "posts": [SHAPERS[channel](r) for r in rows],
         }
 
     resp = success_response(payload)
