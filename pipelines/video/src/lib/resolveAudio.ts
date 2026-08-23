@@ -5,13 +5,12 @@ import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { Cut, NewsScript } from './schema';
 import { DEFAULT_VOICE, synthesizeSpeech, TtsVoiceConfig } from './tts';
-import { buildSsml } from './ssml';
 
 const AUDIO_DIR = path.join(process.cwd(), 'public', 'audio');
 
-function cacheKey(ssml: string, voice: TtsVoiceConfig): string {
+function cacheKey(text: string, voice: TtsVoiceConfig): string {
   return createHash('sha256')
-    .update(JSON.stringify({ ssml, voice }))
+    .update(JSON.stringify({ text, voice }))
     .digest('hex')
     .slice(0, 24);
 }
@@ -20,15 +19,15 @@ async function ensureAudioForCut(
   cut: Cut,
   voice: TtsVoiceConfig
 ): Promise<{ audioFile: string; duration: number; cached: boolean }> {
-  const ssml = buildSsml(cut.narration);
-  const key = cacheKey(ssml, voice);
+  const text = cut.narration.trim();
+  const key = cacheKey(text, voice);
   const fileName = `${key}.mp3`;
   const filePath = path.join(AUDIO_DIR, fileName);
 
   const cached = existsSync(filePath);
   if (!cached) {
     await mkdir(AUDIO_DIR, { recursive: true });
-    const audioBuffer = await synthesizeSpeech(ssml, voice);
+    const audioBuffer = await synthesizeSpeech(text, voice);
     await writeFile(filePath, audioBuffer);
   }
 

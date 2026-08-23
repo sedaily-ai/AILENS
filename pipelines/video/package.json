@@ -7,14 +7,13 @@
     "dev": "remotion studio src/index.ts",
     "render": "tsx scripts/render.ts",
     "still": "remotion still src/index.ts",
-    "tts:voices": "tsx scripts/list-voices.ts",
     "tts:resolve": "tsx scripts/resolve-audio.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/text-to-speech": "^7.0.0",
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
     "@remotion/bundler": "^4.0.513",
     "@remotion/cli": "^4.0.513",
     "@remotion/renderer": "^4.0.513",

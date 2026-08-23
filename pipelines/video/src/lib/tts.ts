@@ -1,77 +1,77 @@
-import { TextToSpeechClient, protos } from '@google-cloud/text-to-speech';
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 export type TtsVoiceConfig = {
-  languageCode: string;
-  name: string;
-  speakingRate?: number;
-  pitch?: number;
+  name: string; // ElevenLabs voice ID
+  modelId?: string;
+  stability?: number;
+  similarityBoost?: number;
 };
 
-// `npm run tts:voices`로 seodaily-eng-reporting 프로젝트에서 직접 확인한 ko-KR 보이스 41개 중
-// Chirp3-HD(최신 고품질 모델, SSML <break> 지원)를 기본값으로 사용. 다른 보이스로 바꾸려면
-// TTS_VOICE_NAME 환경변수를 쓰거나 이 값을 바꾸면 된다.
+// 2026-08-23 — Google Cloud TTS(Chirp3-HD)에서 ElevenLabs로 전환.
+// 개인 gcloud 계정 OAuth(ADC)로 인증하던 방식이라 Fargate에서 못 쓰고,
+// 프로젝트가 AWS 위주인데 TTS만 별도 벤더(GCP)를 쓸 이유가 없어졌다.
+// 팟캐스트 파이프라인(pipelines/podcast/pipeline.py)이 이미 검증해 쓰고
+// 있는 동일 보이스(Juan - Deep & Rich Storyteller)를 그대로 재사용 —
+// Secrets Manager `ElevenLabs/ApiKey`도, 태스크 IAM 권한도 이미 있다.
 export const DEFAULT_VOICE: TtsVoiceConfig = {
-  languageCode: 'ko-KR',
-  name: process.env.TTS_VOICE_NAME ?? 'ko-KR-Chirp3-HD-Kore',
-  speakingRate: 1.0,
-  pitch: 0,
+  name: process.env.TTS_VOICE_ID ?? '8lidWTlnwgjObqCImnE2',
+  modelId: 'eleven_multilingual_v2',
 };
 
-let cachedClient: TextToSpeechClient | null = null;
+const REGION = process.env.AWS_REGION ?? 'us-east-1';
+const SECRET_NAME = 'ElevenLabs/ApiKey';
 
-function getClient(): TextToSpeechClient {
-  if (!cachedClient) {
-    cachedClient = new TextToSpeechClient();
+let cachedApiKey: string | null = null;
+
+async function getApiKey(): Promise<string> {
+  if (cachedApiKey) return cachedApiKey;
+  const client = new SecretsManagerClient({ region: REGION });
+  const resp = await client.send(new GetSecretValueCommand({ SecretId: SECRET_NAME }));
+  if (!resp.SecretString) {
+    throw new Error(`Secrets Manager에 ${SECRET_NAME} 값이 없습니다.`);
   }
-  return cachedClient;
+  cachedApiKey = resp.SecretString;
+  return cachedApiKey;
 }
 
+// text는 평문 그대로 넘긴다 — ElevenLabs는 임의 SSML을 지원하지 않고,
+// 문장부호(. ? !) 기준 자연스러운 쉼을 모델이 알아서 넣어준다(팟캐스트
+// 파이프라인에서 이미 검증됨).
 export async function synthesizeSpeech(
-  ssml: string,
+  text: string,
   voice: TtsVoiceConfig = DEFAULT_VOICE
 ): Promise<Buffer> {
-  const client = getClient();
+  const apiKey = await getApiKey();
 
-  let response: protos.google.cloud.texttospeech.v1.ISynthesizeSpeechResponse;
+  let res: Response;
   try {
-    [response] = await client.synthesizeSpeech({
-      input: { ssml },
-      voice: { languageCode: voice.languageCode, name: voice.name },
-      audioConfig: {
-        audioEncoding: 'MP3',
-        speakingRate: voice.speakingRate,
-        pitch: voice.pitch,
+    res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice.name}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        text,
+        model_id: voice.modelId ?? 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: voice.stability ?? 0.5,
+          similarity_boost: voice.similarityBoost ?? 0.75,
+        },
+      }),
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`ElevenLabs TTS 요청 실패(voice: ${voice.name}): ${reason}`);
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
     throw new Error(
-      `Google Cloud TTS 요청 실패 (voice: ${voice.name}): ${reason}\n` +
-        '  - GOOGLE_APPLICATION_CREDENTIALS 환경변수 또는 `gcloud auth application-default login`이 되어 있는지 확인하세요.\n' +
-        '  - 대상 GCP 프로젝트에서 Cloud Text-to-Speech API가 활성화되어 있는지 확인하세요.\n' +
-        '  - `npm run tts:voices`로 voice 이름이 실제로 존재하는지 확인하세요.'
+      `ElevenLabs TTS 요청 실패 (voice: ${voice.name}, status: ${res.status}): ${detail}`
     );
   }
 
-  if (!response.audioContent) {
-    throw new Error('TTS 응답에 오디오 데이터(audioContent)가 없습니다.');
-  }
-
-  return Buffer.from(response.audioContent as Uint8Array);
-}
-
-export async function listKoreanVoices() {
-  const client = getClient();
-  try {
-    const [result] = await client.listVoices({ languageCode: 'ko-KR' });
-    return result.voices ?? [];
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Google Cloud TTS 인증/연결 실패: ${reason}\n` +
-        '  - `gcloud auth application-default login`으로 ADC를 다시 발급받으세요.\n' +
-        '  - 또는 서비스 계정 키 파일 경로를 GOOGLE_APPLICATION_CREDENTIALS 환경변수로 지정하세요.\n' +
-        '  - 대상 GCP 프로젝트에서 Cloud Text-to-Speech API가 활성화되어 있는지도 확인하세요.'
-    );
-  }
+  const audioContent = await res.arrayBuffer();
+  return Buffer.from(audioContent);
 }
