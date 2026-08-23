@@ -312,6 +312,20 @@ services/           → Business logic: article_filter, prompt_loader,
                      대로 그대로 유지(순수 파일 이동만). 검증: 잘못된 JSON body → 500
                      SEARCH_ERROR 스모크 테스트(AWS 호출 없음, 상태코드·에러코드 리팩토링
                      전후 동일 확인) + 전체 스위트 재확인(104 passed, 기존 무관 에러 6건 동일).
+                     2026-08-24 후속5(Track B God 파일 분해 마지막): `handlers/
+                     archive_handler.py`(319줄)의 라우트 핸들러 4개(handle_save/
+                     handle_list/handle_popular/handle_delete)와 응답 헬퍼
+                     (success/error)를 `archive_service.py`로 분리. 이 파일은 원래도
+                     `_handle_*`/`_parse_event`로 어느 정도 나뉘어 있었어서(handler=
+                     라우팅+인증, 나머지=로직 구분이 이미 관례상 지켜지고 있었음)
+                     경계만 파일로 승격했다. 319→127줄. 검증: OPTIONS 200, POST
+                     인증없음 401(에러 메시지까지 동일) 스모크 테스트(둘 다 AWS 호출
+                     없음) + 전체 스위트 재확인(104 passed, 기존 무관 에러 6건 동일).
+                     이로써 Track B에서 식별된 God 핸들러 6개 전부(post_handler·
+                     s3_articles_handler·cms_posts_public·user_handler·
+                     search_handler·archive_handler) handler=라우팅/service=로직
+                     분리 완료. `article_handler.py`(371줄)는 Track A에서 CORS
+                     버그 수정만 했고 이 구조 분리는 아직 안 함 — 필요시 별도 진행.
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
