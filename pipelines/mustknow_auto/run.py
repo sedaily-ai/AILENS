@@ -51,6 +51,7 @@ import requests
 import ddb_prompt
 import classify
 from config import AWS_REGION, CMS_POSTS_TABLE, CMS_MEDIA_BUCKET
+from s3_utils import upload_media
 from text_utils import strip_code_fence
 
 
@@ -133,9 +134,9 @@ def _slugify(publish_date: str, headline: str) -> str:
 
 
 def _upload(s3, local_path: Path, key: str) -> str:
-    ctype = mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
-    s3.upload_file(str(local_path), BUCKET, key, ExtraArgs={"ContentType": ctype})
-    return f"https://{BUCKET}.s3.us-east-1.amazonaws.com/{key}"
+    # common/s3_utils.py로 공용화(frontpage_auto/run.py와 바이트 단위로
+    # 동일했음, 2026-08-23).
+    return upload_media(s3, local_path, key, BUCKET)
 
 
 def _parse_letters(raw_md: str) -> list[str]:
