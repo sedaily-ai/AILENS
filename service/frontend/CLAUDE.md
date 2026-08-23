@@ -201,21 +201,39 @@ features/[feature-name]/
   `features/timeline` deep-import 2건 수정, `set-state-in-effect` 안티패턴
   6곳 정리, `AuthContext.tsx`의 `any` 7곳 → `unknown`+타입가드 교체.
 
-### God 파일 분해 (Track B, 착수) — `LensViewClient.tsx` 1666→1612줄
-- (2026-08-24) `AutoPlayVideo`/`TrackedAudio`/`WebtoonCutGallery` 3개
+### `LensViewClient.tsx` 1666→657줄 — `lens/[slug]/components/`로 전면 분해
+- (2026-08-24, 1차) `AutoPlayVideo`/`TrackedAudio`/`WebtoonCutGallery` 3개
   컴포넌트가 `LensViewClient.tsx` 안에 갇혀있어서 `VideoViewClient.tsx`가
   영상 재생을 직접 재구현해야 했던 문제(코드 리팩토링 감사에서 발견) —
-  `shared/ui/`로 추출. `LensViewClient.tsx`는 import로 교체.
-  `VideoViewClient.tsx`는 이번엔 그대로 둠 — `AutoPlayVideo`의 `active`
-  prop이 탭 전환 시 자동 재생/정지를 위한 것이라, 탭 개념이 없는 단일
-  영상 페이지에 `active=true`로 고정하면 페이지 로드 즉시 `play()` 시도가
-  붙어 지금과 다른 동작이 될 위험이 있어 "동작 변경 없음" 원칙상 보류.
-  검증: tsc/eslint/build 통과 + 로컬 프로덕션 빌드 SSR 출력 확인(웹툰 컷
-  마크업·video 태그 정상 렌더, 200). Chrome 확장 미연결로 실제 탭
-  전환·재생 인터랙션까지의 브라우저 확인은 못함 — 필요시 재확인 요망.
-- 남은 것: `LensViewClient.tsx`가 여전히 1612줄로 가장 큰 파일. 다음 후보는
-  마운트-감지/포맷-전환 로직과 4개 형식(레터/웹툰/팟캐스트/영상) 렌더
-  분기를 각각의 하위 컴포넌트로 더 쪼개는 것 — 이번 라운드에서는 여기까지.
+  `shared/ui/`로 추출(다른 페이지도 재사용할 여지가 있어 `letters/`
+  컴포넌트들과 달리 co-locate 대신 shared 선택). `VideoViewClient.tsx`는
+  이번엔 그대로 둠 — `AutoPlayVideo`의 `active` prop이 탭 전환 시 자동
+  재생/정지를 위한 것이라, 탭 개념이 없는 단일 영상 페이지에 `active=true`로
+  고정하면 페이지 로드 즉시 `play()` 시도가 붙어 지금과 다른 동작이 될
+  위험이 있어 "동작 변경 없음" 원칙상 보류.
+- (2026-08-24, 2차 — "폴더>폴더 계층형으로 과감하게 쪼개기" 요청) 남은
+  1612줄을 `lens/[slug]/components/`로 전면 분해:
+  - `lensSamples.ts` — 데모 각본 하드코딩(`ARTICLE_FORMAT_SAMPLES`)과
+    `mockDuration`/`articleFormatSample`/`coreSummaryBullets`/
+    `articleBridgeSample` 순수 함수.
+  - `CardnewsCarousel.tsx` — 인스타 카드뉴스 스타일 캐러셀(자기 `useState`
+    보유, 독립 컴포넌트).
+  - `FormatPicker.tsx` — 4개 포맷 타일 선택기(`lenses.map()`의 첫 번째
+    루프, ~75줄).
+  - `LensFormatPanel.tsx`(576줄) — 가장 큰 조각. `lenses.map()`의 두 번째
+    루프(레터/웹툰/팟캐스트/영상 4갈래 렌더 분기 전체, 원래 530줄)를
+    통째로 컴포넌트화 — 계산 로직(`scriptBullets`/`letterParagraphs`/
+    `realWebtoonCuts` 등)까지 그대로 이동, 로직 변경 없음.
+  `LensViewClient.tsx`엔 이제 state(active/lens/showSearch)·데이터
+  로딩·헤더·`<FormatPicker/>`+`{lenses.map(...→<LensFormatPanel/>)}`
+  배치만 남음.
+  검증: tsc/eslint(불필요해진 import 다수 정리, `Calendar` 아이콘을
+  헤더 부분에서 아직 쓰는 걸 tsc 에러로 잡아 즉시 복구)/build 통과.
+  로컬 프로덕션 빌드 SSR 출력에서 `role="tabpanel"` 4개·`role="tab"`
+  4개 전부 확인(SEO 요구사항 — 4개 포맷을 항상 DOM에 렌더하고 hidden
+  으로만 감추는 것이 이 페이지의 핵심 전제라 개수까지 세어 재확인),
+  200. Chrome 확장 미연결로 실제 탭 전환·영상 자동재생 등 인터랙션까지의
+  브라우저 확인은 못함 — 필요시 재확인 요망.
 
 ### `LetterDetailClient.tsx` 1521→214줄 — `letters/[id]/components/`로 전면 분해
 - (2026-08-24, 1차) 순수 HTML 가공 유틸(`decodeHtmlEntities`/`injectImageCaptions`/
