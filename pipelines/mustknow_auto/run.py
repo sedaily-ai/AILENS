@@ -380,14 +380,23 @@ def main():
         results[status] = results.get(status, 0) + 1
 
     # 1) 전체(지면1면) — 점수 불필요, TOP 배치 우선(discovery가 이미 정렬해서 줌)
+    #
+    # 2026-08-23 버그5 수정: seen 마킹을 _try_publish() *이후*로 옮겼다.
+    # 원래는 발행 시도 전에 마킹했는데, 그 상태에서 프로세스가 죽으면
+    # (정상 예외가 아니라 kill 등) 그 기사가 seen엔 있지만 실제로는
+    # 발행이 안 된 상태로 영원히 남아 다음 실행에서도 재시도가 안 됐다
+    # (실제로 2026-08-22 로컬 검증에서 발생 — 점수 통과한 기사 2건이
+    # 이 상태에 빠져 DDB를 직접 조회해 수동 복구했다). 이제는 발행 시도가
+    # 실제로 끝난(성공/처리된 실패/중복스킵) 뒤에만 seen을 기록해서,
+    # 시도 자체가 안 끝나고 죽은 기사는 자동으로 다음 실행에서 재시도된다.
     for a in front_page:
         if a["key"] and _is_seen(seen_table, a["key"]):
             continue
         if tab_counts["전체"] >= _TAB_CAP:
             break
-        _mark_seen(seen_table, a["key"], tab="전체")
         selected_keys.add(a["key"])
         _try_publish(a, "전체", tab_counts["전체"])
+        _mark_seen(seen_table, a["key"], tab="전체")
         tab_counts["전체"] += 1
 
     # 2) Sonnet 5 배치 채점 — fresh 전체(전체 탭 후보 제외한 나머지)
@@ -396,11 +405,16 @@ def main():
     scores = classify.score_articles(guide, scorable) if scorable else {}
     print(f"[mustknow-auto] 채점 완료 {len(scores)}/{len(scorable)}건")
 
-    # 채점된 기사는 선정 여부와 무관하게 전부 seen 기록(재채점 방지) —
-    # 파싱 실패로 scores에 없는 기사만 다음 회차 재시도 대상으로 남긴다.
+    # 일반 임계값(7.0)이 전체 경로 중 가장 낮은 바다 — 이걸 못 넘으면
+    # 증권/산업/시그널(8.0)도 당연히 못 넘으므로 그 어떤 경로로도 발행될
+    # 일이 없다. 이런 기사만 지금 바로 확정으로 seen 기록한다(재시도해도
+    # 결과가 똑같이 나올 게 뻔하니 낭비 방지). ≥7.0인 기사는 아직 발행
+    # 시도 전이라 여기서 마킹하지 않는다 — 아래 3)/4)에서 실제 시도 후에
+    # 마킹된다. 파싱 실패로 scores에 아예 없는 기사도 마찬가지로 여기서
+    # 마킹 안 함(다음 회차 재시도 대상).
     for a in scorable:
         row = scores.get(a["key"])
-        if row is not None:
+        if row is not None and (row.get("total") or 0) < _GENERAL_THRESHOLD:
             _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
 
     # 3) 증권/산업/시그널 — 8.0 넘는 순서대로 먼저 온 것부터, 탭당 4건
@@ -414,6 +428,7 @@ def main():
                 continue
             selected_keys.add(a["key"])
             _try_publish(a, tab, tab_counts[tab])
+            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
             tab_counts[tab] += 1
 
     # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게
@@ -427,6 +442,7 @@ def main():
             continue
         selected_keys.add(a["key"])
         _try_publish(a, None, None)
+        _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
         tab_counts["일반"] += 1
 
     print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
