@@ -336,6 +336,34 @@ services/           → Business logic: article_filter, prompt_loader,
                      MISSING_ARTICLE_ID(CORS_HEADERS 4개 필드 전부 포함 — Track A에서
                      고친 버그가 그대로 유지됐는지까지 확인) 스모크 테스트(AWS 호출
                      없음) + 전체 스위트 재확인(104 passed, 기존 무관 에러 6건 동일).
+                     2026-08-24 후속7: 위 정리 후 handlers/ 재점검에서 새로 300줄을
+                     넘긴 2개도 마저 분리(사용자 요청 "둘 다 마저 정리해주세요").
+                     `timeline_handler.py`(328줄, S3 XML fetch·응답 shaping·
+                     orchestration이 요청 파싱과 한 파일에 섞여있던 것)를
+                     `timeline_service.py`(TimelineRequest, fetch_from_s3_xml,
+                     _s3_article_to_response, build_timeline)로 분리 — 요청 파싱
+                     (parse_request/_validate_date 등)과 BadRequest, lambda_handler는
+                     HTTP 라우팅 성격이라 핸들러에 남김. 328→196줄. 부수 정리: 파일
+                     안에 정의만 되고 어디서도 호출되지 않던 `_parse_bool` 죽은 코드
+                     제거(동작 영향 없음). 검증: OPTIONS 204, date 누락/형식오류/
+                     mode 오류 3종 400 스모크(AWS 호출 없음, 에러 메시지까지 리팩토링
+                     전후 동일 확인) + mode=issues 200 전체 응답 바디 스모크(S3 호출을
+                     건너뛰는 유일한 성공 경로라 AWS 없이도 orchestration 전체를
+                     검증 가능 — payload 필드 10개 전부 리팩토링 전후 동일) + 전체
+                     스위트 재확인(104 passed, 기존 무관 에러 6건 동일).
+                     `article_collector.py`(314줄, EventBridge 스케줄 트리거 — HTTP
+                     핸들러가 아니라 `collect_articles` 단일 함수가 God이었던 케이스)를
+                     `article_collection_service.py`(collect_articles + 신규 추출
+                     `_build_article_data` 헬퍼)로 분리. 원래 `collect_articles` 본문
+                     중 DynamoDB 저장용 딕셔너리를 조립하는 75줄짜리 인라인 블록을
+                     별도 함수로도 뽑아 가독성 개선(SOLID 단일책임 관점 — 순수 추출,
+                     로직 변경 없음). `lambda_handler`는 원래도 7줄짜리 얇은
+                     위임이라 거의 그대로 유지, import만 서비스 모듈로 교체.
+                     314→33줄. 이 파일은 EventBridge 트리거 전용이라 OPTIONS/AWS-
+                     없는 분기가 없음 — 대신 `_build_article_data`를 가짜 article
+                     객체(SimpleNamespace)로 직접 호출해 출력 딕셔너리가 원본 인라인
+                     코드와 동일한 26개 키·값을 만드는지 별도 검증 + 전체 스위트
+                     재확인(104 passed, 기존 무관 에러 6건 동일).
                      ⚠️ `metrics_service.py`(`MetricsService`, "demo dashboard용" — 자체 docstring)는
                      2026-08-05 삭제됨 — 2026-07-30 폐기된 `metrics` 핸들러의 백엔드 로직,
                      사용처 0 (수동 perf 스크립트 한 곳뿐이었음).
