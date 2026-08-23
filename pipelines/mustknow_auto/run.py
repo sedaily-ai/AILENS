@@ -395,9 +395,17 @@ def main():
     seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
 
     today = datetime.now(KST).strftime("%Y%m%d")
+    # 일요일은 지면(인쇄판) 자체가 안 나온다(사용자 확인, 2026-08-23 —
+    # "오늘은 일요일이라 지면 안 나오거든... 일요일은 일반기사만 돌려야함").
+    # 지면특별코너 4탭(전체/증권/산업/시그널)은 전부 "오늘의 지면"을 그대로
+    # 옮긴다는 게 전제인 기능이라, 지면이 없는 날 억지로 채우면 실제로는
+    # 없는 지면을 있는 것처럼 보여주게 된다 — 그래서 일요일엔 이 4탭을
+    # 전부 건너뛰고 일반 카테고리(임계값 7.0, 캡 없음)만 처리한다.
+    is_sunday = datetime.now(KST).weekday() == 6
     all_articles = discovery.fetch_articles(today)
-    front_page = discovery.fetch_front_page(today)
-    print(f"[mustknow-auto] 오늘({today}) 전체 후보 {len(all_articles)}건, 지면1면 후보 {len(front_page)}건")
+    front_page = [] if is_sunday else discovery.fetch_front_page(today)
+    sunday_note = " (일요일 — 지면특별코너 4탭 전부 스킵, 일반만 처리)" if is_sunday else ""
+    print(f"[mustknow-auto] 오늘({today}) 전체 후보 {len(all_articles)}건, 지면1면 후보 {len(front_page)}건{sunday_note}")
 
     fresh = [a for a in all_articles if a["key"] and not _is_seen(seen_table, a["key"])]
     fresh = _dedupe_near_identical(fresh)
@@ -441,15 +449,16 @@ def main():
     # 이 상태에 빠져 DDB를 직접 조회해 수동 복구했다). 이제는 발행 시도가
     # 실제로 끝난(성공/처리된 실패/중복스킵) 뒤에만 seen을 기록해서,
     # 시도 자체가 안 끝나고 죽은 기사는 자동으로 다음 실행에서 재시도된다.
-    for a in front_page:
-        if a["key"] and _is_seen(seen_table, a["key"]):
-            continue
-        if tab_counts["전체"] >= _TAB_CAP:
-            break
-        selected_keys.add(a["key"])
-        _try_publish(a, "전체", tab_counts["전체"])
-        _mark_seen(seen_table, a["key"], tab="전체")
-        tab_counts["전체"] += 1
+    if not is_sunday:
+        for a in front_page:
+            if a["key"] and _is_seen(seen_table, a["key"]):
+                continue
+            if tab_counts["전체"] >= _TAB_CAP:
+                break
+            selected_keys.add(a["key"])
+            _try_publish(a, "전체", tab_counts["전체"])
+            _mark_seen(seen_table, a["key"], tab="전체")
+            tab_counts["전체"] += 1
 
     # 2) Sonnet 5 배치 채점 — fresh 전체(전체 탭 후보 제외한 나머지)
     scorable = [a for a in fresh if a["key"] not in selected_keys]
@@ -470,18 +479,20 @@ def main():
             _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
 
     # 3) 증권/산업/시그널 — 8.0 넘는 순서대로 먼저 온 것부터, 탭당 4건
-    for tab, cat in _TAB_CATEGORY.items():
-        pool = [a for a in scorable if a["top_category"] == cat]
-        for a in pool:
-            if tab_counts[tab] >= _TAB_CAP:
-                break
-            row = scores.get(a["key"])
-            if not row or (row.get("total") or 0) < _TAB_THRESHOLD:
-                continue
-            selected_keys.add(a["key"])
-            _try_publish(a, tab, tab_counts[tab])
-            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
-            tab_counts[tab] += 1
+    #    (일요일엔 스킵 — 위 is_sunday 주석 참조)
+    if not is_sunday:
+        for tab, cat in _TAB_CATEGORY.items():
+            pool = [a for a in scorable if a["top_category"] == cat]
+            for a in pool:
+                if tab_counts[tab] >= _TAB_CAP:
+                    break
+                row = scores.get(a["key"])
+                if not row or (row.get("total") or 0) < _TAB_THRESHOLD:
+                    continue
+                selected_keys.add(a["key"])
+                _try_publish(a, tab, tab_counts[tab])
+                _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+                tab_counts[tab] += 1
 
     # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게
     #    7.0 넘으면 전부(캡 없음) — 증권/산업/시그널 중 탭 정원을 못 채운
