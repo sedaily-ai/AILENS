@@ -43,8 +43,6 @@ export function HomeSideBar({
         position: 'sticky',
         top: 80,
         alignSelf: 'start',
-        maxHeight: 'calc(100vh - 100px)',
-        overflowY: 'auto',
         ...style,
       }}
     >
