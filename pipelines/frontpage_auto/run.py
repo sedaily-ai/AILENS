@@ -48,7 +48,7 @@ import boto3
 import requests
 from config import AWS_REGION, CMS_POSTS_TABLE, CMS_MEDIA_BUCKET
 from s3_utils import upload_media
-from text_utils import strip_code_fence
+from text_utils import extract_fact_ids, strip_code_fence
 
 
 def _load_module(name: str, file_path: Path):
@@ -121,6 +121,10 @@ def _upload(s3, local_path: Path, key: str) -> str:
 def _parse_letters(raw_md: str) -> list[str]:
     """레터 파이프라인 산출물(마크다운)에서 본문 문단만 뽑는다 —
     create_kosdaq_post.py 등에서 반복됐던 파싱을 이쪽으로 승격."""
+    # 2026-08-24 — FACT_IDS 트레일러를 먼저 떼어낸다. 이 함수엔 본문 종료
+    # 조건이 없어서(자료: 뒤로도 계속 buf 에 쌓는다) 안 떼면 커버리지 줄이
+    # 그대로 발행 본문 문단이 된다.
+    raw_md, _ = extract_fact_ids(raw_md)
     body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
     lines = [l.strip() for l in body.split("\n") if l.strip()]
     paragraphs, buf, skipping = [], [], False
