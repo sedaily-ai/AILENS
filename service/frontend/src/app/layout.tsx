@@ -198,7 +198,7 @@ export default function RootLayout({
             gtag('config', '${GA_ID}');
           `}
         </Script>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         {process.env.NODE_ENV === 'development' && (
           <>
             <meta httpEquiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
