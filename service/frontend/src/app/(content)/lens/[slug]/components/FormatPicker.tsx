@@ -1,8 +1,9 @@
 'use client';
 
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject } from 'react';
-import { lensPerspectiveAt, lensPanelId, lensTabId } from '@/shared/constants/lensPerspectives';
+import { lensFormatAt, lensPerspectiveAt, lensPanelId, lensTabId } from '@/shared/constants/lensPerspectives';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { LensFormatArt } from '@/shared/ui/icons/LensFormatArt';
 import { formatAmount } from './lensSamples';
 
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해).
@@ -70,7 +71,6 @@ export function FormatPicker({
         {(lenses ?? []).map((l, i) => {
           const p = lensPerspectiveAt(i);
           const on = i === active;
-          const Icon = p.icon;
           const amt = formatAmount(lens, i, mediaDur[i]);
           return (
             <button
@@ -99,7 +99,9 @@ export function FormatPicker({
                   오면 "약 2분"이 읽는 시간인지 듣는 시간인지도
                   아이콘이 구분해준다. */}
               <span className="fmt-amt">
-                <Icon size={13} aria-hidden style={{ flexShrink: 0 }} />
+                <span aria-hidden className="fmt-art">
+                  <LensFormatArt format={lensFormatAt(i)} size={22} />
+                </span>
                 {amt.text}
               </span>
             </button>

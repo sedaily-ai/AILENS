@@ -1,6 +1,6 @@
 'use client';
 
-import type { TouchEvent as ReactTouchEvent } from 'react';
+import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
@@ -158,16 +158,20 @@ export function LensFormatPanel({
           문단 간격 24px). AI LENS 편집장 프롬프트의 문체 가이드(친근한
           -했어요체, 문단당 2~3문장)를 따른다. */}
       {format === 'letter' && letterParagraphs && (
-        <div className="lread">
+        <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
           {letterParagraphs.map((para, pi) => (
             <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
               {para}
             </p>
           ))}
-          {/* 마감 부호 — 기사가 끝났다는 신호. */}
-          <p aria-hidden className="lread-end" style={{ color: p.color }}>
-            ■
-          </p>
+          {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
+              "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
+              신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +
+              발신인 라벨로 뉴스레터 서명처럼 닫는다. */}
+          <div aria-hidden className="lread-sign">
+            <span className="lread-sign-mark" style={{ background: p.color }} />
+            <span className="lread-sign-name">AI LENS 레터</span>
+          </div>
         </div>
       )}
 

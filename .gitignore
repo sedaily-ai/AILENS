@@ -22,3 +22,7 @@ lambda-build-admin/
 lambda_package.zip
 lambda_package_v2.zip
 lambda_package_admin.zip
+
+# Android TWA (mobile/) — 서명 키스토어(비밀값) + Gradle/빌드 산출물.
+# 전체 디렉터리를 통째로 제외한다(bubblewrap 생성물이라 재현 가능, 커밋 불필요).
+mobile/

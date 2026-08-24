@@ -164,9 +164,20 @@ export const GLOBAL_CSS = `
     text-decoration:none; transition: background .15s ease, color .15s ease; }
   .tl-btn:hover { background:${SURFACE_SUNKEN}; color:${TEXT_STRONG}; }
 
+  /* 목록 안 "더 보기" — 테두리 없는 텍스트+화살표(2026-08-24). 분야마다
+     하나씩 붙는 보조 동작이라 .tl-btn 알약이 여러 개 쌓이면 목록보다 버튼이
+     더 눈에 띈다. 테두리만 걷고 터치 타겟(44px)은 패딩으로 확보한다 —
+     시각적 크기가 작아도 히트 영역은 유지해야 한다. */
+  .tl-more { display:inline-flex; align-items:center; gap:${SPACE.xs}px;
+    min-height:${TOUCH_MIN}px; padding:0 ${SPACE.sm}px; margin-left:-${SPACE.sm}px;
+    border:none; background:transparent; color:${TEXT_MUTED};
+    font-size:${FONT.meta}px; font-weight:700; font-family:inherit; cursor:pointer;
+    text-decoration:none; transition: color .15s ease; }
+  .tl-more:hover { color:${TEXT_STRONG}; text-decoration:underline; text-underline-offset:3px; }
+
   @media (prefers-reduced-motion: reduce) {
     .tl-enter { animation: none; }
-    .tl-row, .tl-chip, .tl-btn, .tl-exit { transition: none; }
+    .tl-row, .tl-chip, .tl-btn, .tl-more, .tl-exit { transition: none; }
   }
 `;
 

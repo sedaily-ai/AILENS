@@ -151,7 +151,10 @@ export function ArticleAudioPlayer({
   const [failed, setFailed] = useState(false);
   const [looping, setLooping] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
-  const [tab, setTab] = useState<TabKey | null>(chapters && chapters.length > 0 ? 'script' : null);
+  // 대본은 접힌 상태로 시작한다(2026-08-24, 사용자 요청) — 팟캐스트는
+  // "읽기 대신 듣기" 모드라 대본이 처음부터 펼쳐져 있으면 플레이어보다
+  // 텍스트가 더 커 보인다. 필요할 때 탭으로 펼친다.
+  const [tab, setTab] = useState<TabKey | null>(null);
   // 배속 메뉴 열림 여부 — 2026-08-21, UIUX 감사 반영. 이전엔 버튼 하나를
   // 반복 클릭해 순환시키는 방식이라(0.75→1→1.25→1.5→2→0.75…) "2배로
   // 가려면 몇 번 눌러야 하나"를 기억해야 했다(회상 요구, 닐슨 휴리스틱
@@ -509,7 +512,10 @@ export function ArticleAudioPlayer({
            가는 선들의 다발로 보인다. */
         .aap-wave { position: relative; display: grid; grid-template-columns: repeat(${WAVE_BAR_COUNT}, 1fr);
           align-items: center; gap: 1px; height: 40px; padding: 0; cursor: pointer; }
-        .aap-wave-bar { width: 100%; border-radius: 1px;
+        /* 막대 굵기 — 2026-08-24, "훨씬 더 얇게" 요청. 이전엔 1fr 칸 전체
+           폭(width:100%)을 채워 5~6px로 굵었다. 2px 고정 폭 + 칸 안 가운데
+           정렬로, 칸 간격은 그대로 두고 막대만 가늘게 만든다. */
+        .aap-wave-bar { width: 2px; justify-self: center; border-radius: 999px;
           background: rgba(255,255,255,0.22); transition: background-color .2s ease; }
         .aap-wave-bar[data-played='true'] { background: color-mix(in srgb, var(--aap-c) 85%, #ffffff); }
         /* 재생 중 아주 미세한 진폭만 — 과하면 시선을 뺏는다는 스펙 요청. */
