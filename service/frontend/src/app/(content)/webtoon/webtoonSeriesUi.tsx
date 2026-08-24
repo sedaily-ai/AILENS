@@ -267,9 +267,19 @@ export function SeriesCard({
   sizes: string;
   eager?: boolean;
 }) {
+  // series_title 백필 전에는 모든 시리즈가 1화짜리다(seriesKey()가
+  // series_title 없는 편을 자기 자신 id로 묶는다, webtoonSeries.ts 참조).
+  // 그 상태에서 시리즈 상세로 보내면 "카드 클릭 → 1화만 있는 시리즈
+  // 목록 → 다시 클릭 → 실제 컷" 이라는 의미 없는 중간 단계가 생긴다
+  // (2026-08-24, 사용자 지적). 편이 정말 여러 개로 묶인 시리즈만 시리즈
+  // 상세로 보내고, 1화짜리는 그 편으로 바로 이동한다.
+  const href =
+    series.episodes.length > 1
+      ? `/webtoon/series/${encodeURIComponent(series.slug)}`
+      : `/webtoon/${encodeURIComponent(series.episodes[0].id)}`;
   return (
     <Link
-      href={`/webtoon/series/${encodeURIComponent(series.slug)}`}
+      href={href}
       prefetch={false}
       className="wt-card"
       aria-label={`${series.title} ${series.latestEpisodeNumber}화`}
