@@ -1,19 +1,84 @@
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { lensFormatAt } from '@/shared/constants/lensPerspectives';
 
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해).
+// 2026-08-24(웹툰 릴론치 PR #10 반영) — mockDuration/bridge 제거, 실측
+// 재생시간 계산(clock/readMinutes/formatAmount) 추가. 아래 주석 참조.
 
 /**
- * 팟캐스트·영상 목업의 길이 표기 — 고정값("약 1분 30초", "0:45") 대신 실제
- * 불릿 개수에 비례해 계산한다(2026-08-18, "내용이 부실해서 데이터 잘
- * 맞춰서 채워달라" 요청). 인트로 15초 + 사실 1건당 18초 내레이션 가정 —
- * 실측치가 아니라 "그럴듯한 추정"이지만, 불릿이 3개면 4개짜리보다 항상
- * 짧게 나와서 최소한 내용량과 방향이 어긋나지는 않는다.
+ * 재생 길이 표기 — 2026-08-21부터 **실측값만** 쓴다.
+ *
+ * 이전엔 mockDuration(불릿 개수 × 18초 + 15초)으로 "그럴듯한 추정치"를
+ * 만들어 붙였다. 실제 오디오·영상이 붙은 뒤에도 그 추정치가 그대로
+ * 노출돼서, 화면에 적힌 "1:33"과 플레이어가 재생하는 실제 길이가 서로
+ * 달랐다 — 뉴스 서비스에서 지어낸 숫자를 화면에 박아두면 안 된다.
+ * 이제 <audio>/<video>의 loadedmetadata에서 받은 duration만 표시하고,
+ * 아직 모르면 길이 자리를 비워둔다(포맷 이름만 보여준다).
  */
-export function mockDuration(bulletCount: number): string {
-  const totalSec = 15 + bulletCount * 18;
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
+export function clock(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * 레터 예상 읽기 시간. 한글 묵독 속도를 분당 500자로 잡는다(보수적 추정 —
+ * 통상 600~700자로 보지만 경제 기사엔 수치·고유명사가 많아 느려진다).
+ * 이건 추정임을 문구에서도 "약 N분"으로 밝힌다.
+ */
+export function readMinutes(chars: number): number {
+  return Math.max(1, Math.round(chars / 500));
+}
+
+/**
+ * 형식 탭에 붙는 **실제 분량** — 이 기사를 이 형식으로 보면 얼마나 되는지
+ * (약 2분 / 8컷 / 3:24 / 준비 중).
+ *
+ * 2026-08-21에 추가했다. 그 전 탭은 아이콘 + 이름뿐이라 넷 중 무엇을 고를
+ * 근거가 화면에 없었고, 결국 하나씩 눌러 확인해야 했다. 그런데 이 서비스가
+ * 다른 데서 못 보여주는 것이 바로 "같은 기사 = 네 가지 분량"이다 — 그걸
+ * 선택 시점에 나란히 놓는다.
+ *
+ * 동시에 "준비 중"을 결정 시점으로 끌어올린다. 앞서는 형식을 고른 **뒤에야**
+ * 음성이 없다는 걸 알렸는데, 고르기 전에 알려주는 게 맞다.
+ *
+ * 오디오·영상 길이는 loadedmetadata가 오기 전까지는 모르므로 그때까지
+ * "음성"/"영상"이라고만 쓴다. 지어낸 길이는 쓰지 않는다(clock() 주석 참조).
+ */
+export function formatAmount(
+  lens: CmsLens,
+  i: number,
+  durSec: number | undefined,
+): { text: string; spoken: string } {
+  const l = (lens.lenses ?? [])[i];
+  const nope = { text: '준비 중', spoken: '준비 중' };
+  if (!l) return nope;
+  const format = lensFormatAt(i);
+
+  if (format === 'letter') {
+    const paras =
+      articleFormatSample(lens.id, 'letter') ?? (l.paragraphs && l.paragraphs.length > 0 ? l.paragraphs : null);
+    const chars = (paras ?? l.bullets).join('').length;
+    if (chars === 0) return nope;
+    const m = readMinutes(chars);
+    return { text: `약 ${m}분`, spoken: `약 ${m}분 분량` };
+  }
+
+  if (format === 'webtoon') {
+    const cuts = l.images?.length ?? 0;
+    return cuts > 0 ? { text: `${cuts}컷`, spoken: `${cuts}컷` } : nope;
+  }
+
+  // 오디오·영상은 파일에서 길이를 읽어야 안다. 아직 안 왔으면 "⋯"만 둔다 —
+  // 형식 이름을 한 번 더 쓰면("영상 · 영상") 중복이고, "--:--"는 있지도 않은
+  // 플레이어 상태를 흉내내는 것이고, 지어낸 길이는 애초에 금지다.
+  // 스크린리더에는 "길이 확인 중"으로 또박또박 읽힌다.
+  const url = format === 'podcast' ? l.media_url : l.video_url;
+  if (!url) return nope;
+  if (!durSec) return { text: '⋯', spoken: '길이 확인 중' };
+  const m = Math.floor(durSec / 60);
+  const s = durSec % 60;
+  return { text: clock(durSec), spoken: s === 0 ? `${m}분` : `${m}분 ${s}초` };
 }
 
 /**
@@ -29,6 +94,9 @@ export function mockDuration(bulletCount: number): string {
  * 켜지는 목업이었으나(2026-08-18 국장님 회의용 실제 프로덕션 노출로 전환
  * — "풀어달라" 요청, `NODE_ENV` 게이트 제거) 지금은 프로덕션에도 그대로
  * 노출된다.
+ *
+ * bridge(포맷 간 연결 문구)는 2026-08-21에 걷어냈다("다음 시선" 버튼 자체가
+ * 빠졌다 — LensFormatPanel.tsx 주석 참조) — 이 상수에서도 제거.
  */
 export const ARTICLE_FORMAT_SAMPLES: Record<
   string,
@@ -39,10 +107,6 @@ export const ARTICLE_FORMAT_SAMPLES: Record<
     webtoon?: string[];
     podcast?: string[];
     video?: string[];
-    // 시선 간 연결 문구(2026-08-18, "네 개가 따로 떨어졌다는 느낌" 지적) —
-    // 각 포맷 끝에서 다음 시선으로 자연스럽게 넘어가는 한 줄. 마지막
-    // 포맷(video)은 다음이 없어 안 씀.
-    bridge?: { letter?: string; webtoon?: string; podcast?: string };
   }
 > = {
   '2026-08-14-쏘카-테슬라-800대-더-늘린다-전기차-비중-14-로': {
@@ -84,11 +148,6 @@ export const ARTICLE_FORMAT_SAMPLES: Record<
       '전기차 운영 대수는 지난해 같은 기간보다 59% 늘었고요.',
       '대당 수익성은 내연기관차보다 53% 높았어요. 쏘카가 잡은 연말 목표는 전기차 비중 14%예요.',
     ],
-    bridge: {
-      letter: '그럼 이 전기차, 실제로 누가 타게 될까요?',
-      webtoon: '그럼 나는 지금 뭘 하면 좋을까요?',
-      podcast: '이 변화, 숫자로 정리하면 어떨까요?',
-    },
   },
 };
 
@@ -112,8 +171,4 @@ export function coreSummaryBullets(lens: CmsLens): string[] {
     if (bullets && bullets.length > 0) return bullets.slice(0, 4);
   }
   return [];
-}
-
-export function articleBridgeSample(lensId: string, format: 'letter' | 'webtoon' | 'podcast'): string | null {
-  return ARTICLE_FORMAT_SAMPLES[lensId]?.bridge?.[format] ?? null;
 }

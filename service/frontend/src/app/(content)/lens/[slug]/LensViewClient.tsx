@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type TouchEvent as ReactTouchEvent,
+} from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
@@ -8,10 +16,9 @@ import { kstDateTimeLabel } from '@/shared/lib/date';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import {
   LENS_ACCENT,
-  LENS_CARD_BORDER,
-  LENS_CARD_SHADOW,
   lensFormatAt,
   lensPanelId,
+  lensPerspectiveAt,
   parseLensView,
   pickLensPhoto,
 } from '@/shared/constants/lensPerspectives';
@@ -25,7 +32,7 @@ import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
 import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
-import { Check, Zap, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 
 // "오늘의 이슈, 4가지 시선" 상세.
@@ -33,6 +40,27 @@ import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components'
 // 2026-08-14 재설계(3차) — 박스를 걷어내고 타이포·여백·헤어라인으로 구조를
 // 만든다. 직전 버전은 한 카드에 테두리 + 그림자 + 컬러 tint 밴드 + 4px 상단선
 // 네 가지 틀이 겹쳐 있어서 기사가 아니라 앱 UI 컴포넌트처럼 보였다.
+//
+// 2026-08-24 — 웹툰 릴론치 PR #10(kiimijyy)을 반영해 형식 선택기·시선
+// 패널을 다시 한 번 재설계했다. PR #10은 2026-08-21 시점 main에서 갈라져
+// 로컬에서 열흘치 작업을 쌓은 뒤 커밋 1개로 올라와, 그 사이 main에서
+// 독립적으로 진행된 KPI 계측·AI 고지·다른 시선 미리보기·발행시각 표기·
+// 오늘의 God 파일 분해와 정면으로 충돌했다 — 병합 시 어느 한쪽만 남기지
+// 않고, 두 갈래 각각의 의도된 변경을 전부 살렸다(자세한 판단은 각 위치의
+// 주석 참조). 핵심 판단만 요약:
+//  · 형식 선택기: PR #10의 sticky 세그먼트 탭 + 실측 분량 표기로 교체
+//    (기존 인물 타일보다 최근 결정, 탭이 sticky라 스크롤 중에도 항상 닿음).
+//  · 오디오·영상: PR #10의 ArticleAudioPlayer/ArticleVideoPlayer(실측
+//    길이·탐색·배속)로 교체하되, main이 2026-08-23에 추가한 대본 전문
+//    표시(l.transcript, 청각장애인 접근성)는 그대로 유지.
+//  · 웹툰 컷: PR #10이 고친 "이어붙인 한 줄기" 레이아웃을 shared/ui/
+//    WebtoonCutGallery.tsx 자체에 반영해, main의 완주율 계측
+//    (useCutViewTracking)은 그대로 유지.
+//  · "다음 시선" 버튼: PR #10에서 사용자가 명시적으로 삭제 요청한 것이라
+//    존중해 제거.
+//  · KPI 계측(trackEvent)·AiDisclaimer·"다른 시선" 미리보기·실제 발행시각
+//    표기(kstDateTimeLabel)는 PR #10이 갈라져 나간 이후 main에 추가된
+//    것들이라 PR #10엔 없었다 — 전부 유지.
 //
 // 바뀐 원칙:
 //  · 구조는 **위계**로 만든다 — 헤드라인 40 > 질문 32 > 역할명 24 > 리드 18 >
@@ -42,20 +70,11 @@ import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components'
 //    채우면 읽는 데 방해가 되고 "강조는 하나만" 원칙도 깨진다.
 //  · 구획은 **헤어라인**으로 나눈다. 그림자 카드를 반복하면 스티어링 §4의
 //    "카드 반복의 함정"에 걸린다.
-//  · 탭은 알약 칩 대신 **밑줄 탭**(신문 섹션 내비게이션 관습). 칩 안에 이미지를
-//    넣으면 선택 컨트롤이 과하게 무거워진다 — 캐릭터는 카드 안에서만 쓴다.
 //
 // ⚠️ SEO — 비활성 시선도 DOM 에는 항상 렌더하고 hidden 으로만 감춘다.
 // 조건부 렌더로 3개를 빼면 page.tsx 의 NewsArticle articleBody / mainEntity
 // (Question+acceptedAnswer 4쌍)와 실제 본문이 어긋난다.
 
-/**
- * 팟캐스트·영상 목업의 길이 표기 — 고정값("약 1분 30초", "0:45") 대신 실제
- * 불릿 개수에 비례해 계산한다(2026-08-18, "내용이 부실해서 데이터 잘
- * 맞춰서 채워달라" 요청). 인트로 15초 + 사실 1건당 18초 내레이션 가정 —
- * 실측치가 아니라 "그럴듯한 추정"이지만, 불릿이 3개면 4개짜리보다 항상
- * 짧게 나와서 최소한 내용량과 방향이 어긋나지는 않는다.
- */
 export function LensViewClient({
   slug,
   initialLens = undefined,
@@ -70,7 +89,30 @@ export function LensViewClient({
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
   const [active, setActive] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
+  // 실제 오디오·영상 길이(초). loadedmetadata에서만 채운다 — 지어낸 길이를
+  // 쓰지 않기 위해서다(lensSamples.ts의 clock() 주석 참조).
+  const [mediaDur, setMediaDur] = useState<Record<number, number>>({});
+  // 방금 어느 방향으로 이동했는지(-1 왼쪽 / 0 없음 / +1 오른쪽). 인디케이터가
+  // 움직인 방향과 본문이 들어오는 방향을 맞추는 데만 쓴다.
+  const [dir, setDir] = useState(0);
+  // 형식 설명(.fmt-toast) 표시 여부 — 2026-08-21, 사용자 요청("팟캐스트
+  // 클릭했을 때 보였으면 좋겠어, 항상 본문에 있는게 아니라"). 한 번 뜨면
+  // 다음에 다른 탭을 고르기 전까지 계속 떠 있는다 — 저절로 사라지지
+  // 않으니 저절로 화면이 움직일 일도 없다.
+  const [showDesc, setShowDesc] = useState(false);
+  // 웹툰 대사 전문 펼침 — 형식별로 나누지 않는다: 한 번에 한 패널만
+  // 보이므로 상태 하나로 충분하다.
+  const [showScript, setShowScript] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // 패널 가로 스와이프 시작점. 세로 스크롤·텍스트 선택과 다투지 않게
+  // 가로 우세를 확실히 요구한다(onPanelTouchEnd 참조).
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+
+  const noteDur = useCallback((i: number, raw: number) => {
+    if (!Number.isFinite(raw) || raw <= 0) return;
+    const sec = Math.round(raw);
+    setMediaDur((cur) => (cur[i] === sec ? cur : { ...cur, [i]: sec }));
+  }, []);
 
   useEffect(() => {
     if (!slug || initialLens) return;
@@ -93,20 +135,15 @@ export function LensViewClient({
     if (i === null || i >= count) return;
     const raf = requestAnimationFrame(() => setActive(i));
     return () => cancelAnimationFrame(raf);
+    // 딥링크 진입은 설명(showDesc)을 안 띄운다 — 최초 진입은 항상
+    // 최상단부터 보여야 하고, 사용자가 탭을 직접 누르면(select()) 그때 뜬다.
   }, [count]);
 
-  // 클릭 직후 아래 내용이 바뀐 걸 못 느낀다는 피드백(2026-08-18, "클릭했는데
-  // 화면이 안 바뀐 것처럼 느낄 수 있다")으로 스크롤 보정을 뒀었으나, 배경을
-  // 잠깐 물들이는 클릭 피드백은 같은 날 "그 배경색 없애달라"는 요청으로
-  // 뺐다 — 위 타일 선택 상태(색 테두리+그림자+체크)만으로도 선택은 이미
-  // 충분히 보인다. 딥링크(?v=N) 최초 진입은 여전히 select()가 아니라
-  // setActive()를 직접 불러서(위 useEffect) 이 스크롤이 안 걸린다 —
-  // "항상 최상단부터 랜딩" 원칙은 그대로 유지.
   // KPI 계측(2026-08-23, "포맷 전환율" — 빠른 포맷으로 훑고 깊은 포맷으로
-  // 돌아오는지가 4유형 설계 자체의 가설 검증 지표). setActive를 함수형
-  // 업데이트로 불러서 직전 active 값을 deps 없이 읽는다 — select 자체를
-  // useCallback([])로 유지해야 위 onTabKeyDown 등 다른 곳에서 참조가 안
-  // 깨진다.
+  // 돌아오는지가 4유형 설계 자체의 가설 검증 지표) + 방향성 전환·형식
+  // 설명 토스트(2026-08-21, PR #10). setActive를 함수형 업데이트로 불러
+  // 직전 active 값을 deps 없이 읽는다 — select 자체를 useCallback([])로
+  // 유지해야 tabRefs 등 다른 곳에서 참조가 안 깨진다.
   const select = useCallback((i: number) => {
     setActive((prev) => {
       if (prev !== i && lens) {
@@ -116,19 +153,66 @@ export function LensViewClient({
           to_format: lensFormatAt(i),
         });
       }
+      setDir(i > prev ? 1 : i < prev ? -1 : 0);
       return i;
     });
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('v', String(i + 1));
-      window.history.replaceState(null, '', url);
-      // block:'nearest' — 패널이 이미 화면 안에 있으면(대부분의 경우, 타일
-      // 바로 아래라) 아예 스크롤하지 않고, 화면 밖으로 밀려나 있을 때만
-      // 최소한으로 당겨온다. 'start'를 쓰면 매번 패널을 뷰포트 맨 위로
-      // 붙여서 방금 누른 타일까지 화면 밖으로 밀려나 버린다.
-      document.getElementById(lensPanelId(i))?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    setShowDesc(true);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', String(i + 1));
+    window.history.replaceState(null, '', url);
+    // ⚠️ rAF 안에서 스크롤한다. setActive() 직후 같은 tick에 scrollIntoView를
+    // 부르면 그 시점의 대상 패널은 아직 hidden이라 브라우저가 스크롤을
+    // 아예 하지 않는다.
+    //
+    // 스크롤 목적지 = 형식 설명(#lens-desc), 패널 자체(lens-N)가 아니다
+    // (2026-08-21 변경) — "레터, 약 2분 분량"을 눌렀는데 화면이 리드
+    // 이유가 여기 있었다. 목적지가 본문 패널이면 그 패널 상단(=질문·리드
+    // 첫 줄)까지만 당겨오고, 방금 누른 탭 바로 아래에 뜨는 설명 문구는
+    // 화면 밖에 남을 수 있었다. block:'nearest' — 이미 화면 안에 있으면
+    // 움직이지 않고, 밖으로 밀려나 있을 때만 최소한으로 당겨온다.
+    requestAnimationFrame(() => {
+      const el = document.getElementById('lens-desc') ?? document.getElementById(lensPanelId(i));
+      if (!el) return;
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+    });
   }, [lens]);
+
+  /**
+   * 패널 가로 스와이프로 형식 넘기기(2026-08-21, PR #10) — 이 서비스는
+   * "출퇴근길에 한 손으로"가 기본 사용 맥락인데, 앞서는 형식을 바꿀
+   * 방법이 탭 하나뿐이었다. 탭은 그대로 남는다 — 스와이프는 발견 가능한
+   * 조작이 아니므로 유일한 수단이 되면 안 된다.
+   */
+  const onPanelTouchStart = useCallback((e: ReactTouchEvent) => {
+    const t = e.touches[0];
+    // 오디오 스크러버·임베드·자체 스와이프를 가진 캐러셀 위에서는 안 잡는다.
+    if (!t || (e.target as HTMLElement).closest?.('audio, video, iframe, [data-own-swipe]')) {
+      swipe.current = null;
+      return;
+    }
+    swipe.current = { x: t.clientX, y: t.clientY };
+  }, []);
+
+  const onPanelTouchEnd = useCallback(
+    (e: ReactTouchEvent, i: number) => {
+      const start = swipe.current;
+      swipe.current = null;
+      if (!start || count < 2) return;
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      // 56px 이상 + 세로 이동의 1.6배 이상 — 세로 스크롤 중의 손떨림이나
+      // 텍스트 드래그가 형식 전환으로 오인되지 않는 최소 조건.
+      if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+      const next = dx < 0 ? i + 1 : i - 1;
+      if (next < 0 || next >= count) return;
+      select(next);
+    },
+    [count, select],
+  );
 
   const onTabKeyDown = useCallback(
     (e: ReactKeyboardEvent, i: number) => {
@@ -171,112 +255,140 @@ export function LensViewClient({
 
   const photo = pickLensPhoto(lens);
   const lenses = lens.lenses ?? [];
+  // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
+  const activeP = lensPerspectiveAt(active);
+  const ActiveIcon = activeP.icon;
 
   return (
     <div style={{ minHeight: '100vh', background: '#fff' }}>
+      {/* ⚠️ 아래 <style> 안의 주석은 CSS 문자열이라 HTML 응답에 그대로
+          실려 나간다(SSR 페이지라 매 요청마다) — 그래서 한 줄짜리 힌트만
+          남긴다. 설계 근거는 이 파일과 components/의 JSX 주석에 있다. */}
       <style>{`
-        /* 폭을 하나로 통일한다(2026-08-14 최종).
-           앞서 헤드라인용 넓은 폭(1080)과 본문용 좁은 폭(748)을 나눴는데,
-           두 값을 어떻게 배치해도 문제가 났다 — 형제로 두고 각자 중앙 정렬하면
-           좌측선이 166px 어긋나고, 자식으로 중첩하고 마진을 없애면 본문이 넓은
-           영역의 왼쪽 끝에 붙어 화면 전체가 왼쪽으로 쏠렸다.
-           해결: 컬럼은 하나(.lw)만 두고 모든 블록을 그 안에서 **대칭으로**
-           중앙 배치한다. 좌우 여백이 같아지므로 "왼쪽으로 쏠린" 느낌이 없다.
-           읽기 폭이 필요한 문단만 .lm 으로 좁히되, 그것도 margin:0 auto 로
-           중앙에 둬서 양쪽 여백을 대칭으로 유지한다. */
         .lw { max-width: 880px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px); }
-        /* 본문 폭 = 사진 폭(2026-08-14 요청). 예전엔 읽기 편한 줄 길이를 위해
-           680px 로 좁혔는데, 그러면 사진(컬럼 전체 824px)보다 좁아 좌우가 어긋나
-           보였다. 이제 컬럼 폭을 그대로 써서 사진·요약·질문·근거의 좌우선이
-           완전히 일치한다.
-           트레이드오프: 16px 기준 한 줄이 약 50자가 되어 스티어링 권장(25~40자)을
-           넘는다. 정렬 일관성을 우선한 선택이다. */
         .lm { max-width: 100%; }
         .rule { height: 1px; background: rgba(17,24,39,0.1); }
         .back:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
 
-        /* 원문 링크 — 테두리 없는 텍스트 링크. 요약 아래 우측에 붙는다.
-           보조 동작이라 시각적 무게를 최소로 두되 밑줄로 링크임을 명확히 한다. */
-        .src { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
-          color: #6b7280; font-size: 14px; font-weight: 600; text-decoration: underline;
-          text-underline-offset: 3px; text-decoration-color: rgba(17,24,39,0.25); }
-        .src:hover { color: #111827; text-decoration-color: currentColor; }
-        .src:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
+        /* ── 이 페이지의 공통 문법 3개 ───────────────────────────────────
+           1. .ovl  구역 이름표. 크기로 소리치지 않고 자간·굵기로만 구분한다.
+           2. .rule 구역 경계. 이게 유일한 구분 장치다(카드·컬러 룰 없음).
+           3. .lnk  보조 링크. 위치·크기·밑줄이 전부 같아서 서로 경쟁하지 않는다. */
+        .ovl { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; color: #111827; }
+        .lnk { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+          border: none; background: none; cursor: pointer;
+          color: #4b5563; font-size: 14px; font-weight: 600; text-decoration: underline;
+          text-underline-offset: 3px; text-decoration-color: rgba(17,24,39,0.28); }
+        .lnk:hover { color: #111827; text-decoration-color: currentColor; }
+        .lnk:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
 
-        /* 사람 타일 선택기 — 모바일 2열, 480px 이상 4열.
-           네 칸이 완전히 같은 크기·형태라 "넷 중 하나를 고른다"가 즉시 읽힌다. */
-        .picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        @media (min-width: 480px) { .picks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-        .pick { position: relative; display: flex; flex-direction: column; align-items: center;
-          gap: 6px; padding: 16px 12px 14px; border-radius: 14px; border: 1px solid;
-          cursor: pointer; min-height: 148px; text-align: center;
-          transition: background .16s ease, border-color .16s ease, transform .12s ease; }
-        .pick:hover { transform: translateY(-2px); }
-        .pick:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
-        .pick-on { position: absolute; top: 8px; right: 8px; width: 18px; height: 18px;
-          border-radius: 999px; display: flex; align-items: center; justify-content: center; }
+        /* padding-bottom 3px = thumb 아래 컬러 룰 두께. */
+        .fmt-bar { position: sticky; top: 56px; z-index: 20; background: #fff;
+          padding: 8px 0 3px; border-bottom: 1px solid rgba(17,24,39,0.12); }
+        .fmt-row { position: relative; display: grid; gap: 8px;
+          grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
 
+        .fmt-thumb { position: absolute; inset: 0 auto 0 0; pointer-events: none;
+          width: calc((100% - (var(--n) - 1) * 8px) / var(--n));
+          transform: translateX(calc(var(--ai) * (100% + 8px)));
+          border-radius: 10px 10px 0 0;
+          background: var(--t);
+          background: color-mix(in srgb, var(--c) 10%, #ffffff);
+          transition: transform .28s cubic-bezier(.22,.85,.2,1), background-color .28s ease; }
+        .fmt-thumb::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px;
+          height: 3px; border-radius: 2px 2px 0 0; background: var(--c); }
 
+        .fmt { position: relative; z-index: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 4px;
+          min-height: 56px; padding: 8px 4px; border: none; background: none;
+          border-radius: 10px 10px 0 0; cursor: pointer; }
+        .fmt-name { font-size: 14px; font-weight: 600; color: #6b7280;
+          letter-spacing: -0.01em; white-space: nowrap; transition: color .2s ease; }
+        .fmt-amt { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #6b7280;
+          font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .2s ease; }
+        .fmt[aria-selected='true'] .fmt-name { color: #111827; font-weight: 800; }
+        .fmt[aria-selected='true'] .fmt-amt { color: #4b5563; }
+        .fmt[aria-selected='false']:hover .fmt-name,
+        .fmt[aria-selected='false']:hover .fmt-amt { color: #111827; }
+        .fmt:focus-visible { outline: 2px solid #111827; outline-offset: -2px; }
+        @media (max-width: 359px) {
+          .fmt { padding: 8px 2px; }
+          .fmt-amt { font-size: 13px; gap: 2px; }
+        }
+
+        .fmt-toast { display: flex; align-items: flex-start; gap: 8px;
+          margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+          background: color-mix(in srgb, var(--c) 8%, #ffffff);
+          font-size: 15px; line-height: 1.6; color: #374151; word-break: keep-all; }
+        @media (prefers-reduced-motion: no-preference) {
+          .fmt-toast { animation: toast-in .22s ease-out; }
+          @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+        }
+
+        .fmt-note { margin-bottom: clamp(16px, 2.4vw, 24px); font-size: 16px; line-height: 1.6;
+          color: #6b7280; word-break: keep-all; }
+
+        .fmt-lede { font-family: "Noto Serif KR", serif;
+          font-size: clamp(20px, 2.6vw, 24px); font-weight: 700; color: #111827;
+          line-height: 1.5; letter-spacing: -0.02em; word-break: keep-all;
+          max-width: 620px; margin-bottom: 24px; }
+
+        .lread { max-width: 620px; }
+        .lread > p { font-size: calc(16px * var(--lens-font-scale, 1));
+          line-height: 1.85; color: #374151; word-break: keep-all; }
+        .lread > p + p { margin-top: 24px; }
+        .lread > p.lread-lead { font-size: calc(18px * var(--lens-font-scale, 1));
+          line-height: 1.8; color: #1f2937; }
+        .lread-end { margin-top: 24px; font-size: 13px; line-height: 1; }
+
+        .hang { display: flex; flex-direction: column; gap: 20px;
+          list-style: none; padding: 0; margin: 0; }
+        .hang > li { display: flex; align-items: baseline; gap: 14px; word-break: keep-all;
+          font-size: calc(16px * var(--lens-font-scale, 1)); line-height: 1.8; color: #374151; }
+        .hang-n { flex-shrink: 0; width: 22px; font-size: 14px; font-weight: 800;
+          color: #6b7280; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+
+        .fmt-arrow { display: flex; align-items: center; justify-content: center;
+          width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px;
+          border: 1px solid #949494; background: #fff; cursor: pointer; }
+        .fmt-arrow:disabled { cursor: default; opacity: .4; }
+        .fmt-arrow:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
+
+        /* sticky 헤더(56px) + 형식 바(72px) + 여유 6px. */
+        .lens-panel { scroll-margin-top: 134px; }
 
         @media (prefers-reduced-motion: no-preference) {
-          .panel { animation: swap .22s ease-out; }
-          @keyframes swap { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+          .panel[data-dir='1'] { animation: swap-fwd .24s cubic-bezier(.22,.85,.2,1); }
+          .panel[data-dir='-1'] { animation: swap-back .24s cubic-bezier(.22,.85,.2,1); }
+          .panel[data-dir='0'] { animation: swap-in .22s ease-out; }
+          @keyframes swap-fwd { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+          @keyframes swap-back { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+          @keyframes swap-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fmt-name, .fmt-amt, .lnk { transition: none; }
+          .fmt-thumb { transition: none; }
         }
       `}</style>
 
-      {/* 글로벌 헤더(2026-08-17) — 이 페이지엔 원래 헤더가 아예 없었다
-          ("박스 걷어내고 타이포·여백·헤어라인으로만 구조를 만든다"는
-          읽기 전용 설계 원칙, 위 주석 참조). 사용자가 본지(en.sedaily.com)
-          스크린샷을 직접 보여주며 "영문사이트는 기사 상세 들어가도
-          네비게이션이나 헤더는 다 유지하거든요, 저희도 그렇게 하면
-          좋겠어요"라고 확인 — 뒤로가기 말고는 다른 곳으로 이동할 방법이
-          없어 "뒤로가기가 이상하다"고 느꼈던 것도 이걸로 같이 해결된다.
-          LetterDetailClient.tsx가 이미 쓰는 것과 같은 패턴. */}
+      {/* 글로벌 헤더(2026-08-17) — 사용자가 본지(en.sedaily.com) 스크린샷을
+          직접 보여주며 "영문사이트는 기사 상세 들어가도 네비게이션이나
+          헤더는 다 유지하거든요"라고 확인. LetterDetailClient.tsx가 이미
+          쓰는 것과 같은 패턴. */}
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* 우측 사이드바(2026-08-17, 사용자 확인: "홈페이지와 동일 — 인기글+사주")
-          — 홈(NewsFeedTab.tsx)과 같은 HomeSideBar를 재사용. 이 페이지는
-          원래 .lw(880px) 하나만 중앙 정렬하는 단일 컬럼이었는데("양옆이
-          허전하다"는 피드백), 그 .lw 블록들을 감싸는 그리드를 새로 씌워
-          왼쪽 칸(본문)+오른쪽 칸(사이드바) 2열로 바꿨다. .lw 자체는
-          이 파일 곳곳에서 그대로 재사용되므로 손 안 댔다 — 이제 왼쪽 칸
-          (본문 폭, sidebar 없을 때보다 좁음) 안에서 여전히 margin:0 auto로
-          중앙 정렬된다. lg 미만에서는 사이드바가 아예 안 뜬다. */}
-      {/* 좌우 패딩을 홈(NewsFeedTab.tsx)과 동일한 clamp(24px,3.5vw,44px)로
-          맞췄다(2026-08-23) — 원래 clamp(20px,4vw,28px)였는데, 카테고리
-          페이지에 사이드바를 새로 붙이며 같은 문제(사이드바가 홈보다
-          오른쪽으로 밀려 보임)를 발견해 이 페이지도 같이 정정한다.
-          위쪽 패딩도 홈과 같은 clamp(8px,2vw,16px)를 추가했다 — 아래
-          사이드바 쪽 주석 참조. */}
+          — 홈(NewsFeedTab.tsx)과 같은 HomeSideBar를 재사용. 좌우 패딩·위
+          패딩을 홈과 동일한 값으로 맞췄다(2026-08-23, "사이드바가 홈보다
+          아래로 쏠려 보인다" 지적 — 본문에만 있던 헤드라인 전용 여백을
+          빼고 바깥 wrapper 패딩 하나로 통일). */}
       <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
           <div style={{ gridColumn: 1, minWidth: 0 }}>
-      {/* "◀ 시선" 뒤로가기 링크는 걷어냈다(2026-08-17, 사용자 피드백:
-          "시선 화살표... 저거는 빼면 어떨까요, 디자인이 구린듯" — 바로
-          위에 전역 헤더가 새로 생겨서 그 아래 또 있는 텍스트 뒤로가기
-          링크가 중복 내비게이션처럼 보였다). "4가지 시선" 카테고리
-          라벨(아래 <main> 첫 줄)은 다른 섹션들과 같은 관례(예: "타임머신"
-          위 "그날로 떠나요")라 그대로 유지. */}
-
       <main id="main-content">
         {/* ── 기사 머리 ── 위계: 아이브로우 13 → 헤드라인 40 → 메타 13 */}
-        {/* 2026-08-17엔 헤더 바로 아래 여백을 clamp(28px,4.5vw,40px)로 넓혔었다
-            ("헤더랑 타이틀이 좀 너무 달라붙은 느낌"). 그런데 2026-08-23,
-            사용자가 사이드바 위치를 모든 페이지에서 동일하게 맞춰달라고
-            요청 — 본문에만 이 추가 여백이 있으면 사이드바(그리드 맨 위,
-            바깥 wrapper의 clamp(8px,2vw,16px)만 적용)와 시작선이 어긋난다.
-            바깥 wrapper의 여백만 쓰도록 이 추가 paddingTop을 뺀다 —
-            홈(NewsFeedTab.tsx)도 같은 바깥 여백 하나만 쓰고 안쪽에 따로
-            안 준다. */}
         <div className="lw">
-          {/* 헤드라인 — 한 줄에 들어가도록 넓은 폭(.lw)을 쓰고 크기를 38px로
-              한 단계 낮췄다. 다만 이 서비스의 헤드라인 길이는 편차가 커서
-              (실측 최장 40자 이상) 긴 제목은 결국 줄바꿈된다. 그때 한 줄만
-              길고 다음 줄이 짧아지는 어색한 모양을 막으려고 text-wrap: balance
-              를 준다. */}
-          {/* 컬럼을 880px 로 통일했으므로 가용 폭이 824px 다. 이 기사 제목의
-              예상 폭이 38px 에서 856px 였으므로 36px 로 낮춰 한 줄을 유지한다. */}
           <h1
             data-speakable="headline"
             style={{
@@ -292,38 +404,6 @@ export function LensViewClient({
           >
             {lens.headline}
           </h1>
-          {/* 달력 아이콘(2026-08-17, "달력 일러스트? 그거는?") — 원본
-              헤더의 <Calendar/> 아이콘도 그대로 이식. 원본은 이 옆에
-              <User/> 아이콘 + 기자 바이라인도 있지만, 이 콘텐츠는 특정
-              기자 바이라인이 없는 형식이라 그 부분은 스킵.
-              "4가지 시선" 배지를 헤드라인 위 별도 줄에서 이 메타 줄
-              오른쪽으로 옮겼다가(2026-08-17, "4가지 시선을... 서울경제..
-              날짜 오른쪽이랑 교체하면 안되나"), 다시 왼쪽으로 되돌렸다
-              (2026-08-18, "카테고링 위치... 좌측으로 가면안되나" — 카테고리
-              태그는 독자 시선이 가장 먼저 닿는 좌상단에 있어야 "이게 무슨
-              분류의 글인지"가 헤드라인보다 먼저 읽힌다, justify-between으로
-              멀리 떨어뜨려 놓으면 그 신호가 늦게 눈에 띈다). */}
-          {/* "구글 검색 선호 출처로 추가"를 오른쪽 끝에 따로 뒀더니(2026-08-18
-              첫 시도) 배지·날짜와 시선이 끊겨 "따로 논다"는 인상을 줬다
-              (2026-08-18, "이것도 좌측으로 몰면 깔끔하지 않을까?"). 배지→
-              날짜→구글 링크 세 요소를 전부 한 줄, 왼쪽 시작점에 나란히
-              둬서 "이 글의 성격(배지) → 언제·어디서(날짜) → 부가 기능
-              (구글 링크)" 순으로 시선이 한 방향으로만 흐르게 정리했다.
-              중요도가 진한 배지 → 중간 톤 날짜 → 가장 옅은 회색 링크 순으로
-              색 무게도 같이 옅어져서, 굳이 위치를 나누지 않아도 셋의 우선
-              순위가 저절로 읽힌다. */}
-          {/* 날짜 앞에 "입력" 라벨을 붙였다(2026-08-18, "발행일 인지, 입력인지
-              수정인지.. 그런거 표기하면 좋겠고" — sedaily.com 실제 화면의
-              "입력 2026-08-17 17:32" 표기를 참고). 2026-08-23까지는 CmsLens
-              데이터에 날짜만 있고 시:분이 없어 "입력 2026.08.14"까지만
-              표기했는데, 사용자가 "여기는 날짜만 나와서"라고 다시 지적 —
-              백엔드가 published_at(발행 완료 시각, ISO)을 내려주도록 고쳐서
-              이제 시:분까지 표기한다(kstDateTimeLabel). 옛 글처럼
-              published_at이 없는 경우만 날짜만 표기로 폴백. "· 서울경제"는
-              뺐다(2026-08-18, "서울경제 라는 키워드는 빼는게 어떤가요" —
-              바로 앞 사진 캡션에도 "사진 · 서울경제"가 있고 페이지 전체가
-              이미 서울경제 브랜드라 매 줄마다 반복할 필요가 없다는 판단에
-              동의). */}
           <div className="flex items-center flex-wrap" style={{ gap: 12, marginBottom: 10 }}>
             <span
               style={{
@@ -353,13 +433,6 @@ export function LensViewClient({
             </a>
           </div>
 
-          {/* 기사 툴바 — 로컬 참고 경로 1_ailink/globe/dev/frontend/src의
-              article-toolbar 마크업(border-y 구분선 + 아이콘 행)을 그대로
-              가져왔다(2026-08-17, 사용자가 실제 마크업을 붙여주며 "영문
-              사이트 컴포넌트 활용해주시죠", 이어서 "글자 크기랑 인쇄는?").
-              원본의 AI 요약·저장은 스킵(로그인 저장 기능 없음, 이미 AI로
-              재구성된 콘텐츠라 별도 AI 요약 불필요) — 공유·글자크기·인쇄만
-              이식. */}
           <div
             className="flex items-center justify-between flex-wrap"
             style={{ marginTop: 'clamp(14px, 2.4vw, 20px)', marginBottom: 'clamp(18px, 3vw, 24px)', gap: 12, padding: '10px 0', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}
@@ -368,12 +441,6 @@ export function LensViewClient({
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
               <ArticleShareButtons title={lens.headline} url={`https://ailens.sedaily.ai/lens/${slug}`} />
             </div>
-            {/* 글자크기(알약 모양)와 인쇄(각진 정사각) 버튼이 각자
-                테두리를 갖고 있어 8px 간격을 두고 붙어 있으니 "한 세트"가
-                아니라 "따로 붙은 두 부품"처럼 보였다(2026-08-18, "각 요소들
-                배치가 어때요?" 리뷰 후 "넵 개선하세요"). 두 컴포넌트의
-                개별 border를 빼고, 여기서 테두리 하나로 감싸 얇은 구분선만
-                중간에 넣어 하나의 컨트롤 그룹으로 통일했다. */}
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
               <div style={{ width: 1, alignSelf: 'stretch', background: '#e5e7eb' }} aria-hidden />
@@ -382,15 +449,6 @@ export function LensViewClient({
           </div>
         </div>
 
-        {/* 사진 — 컬럼 폭을 꽉 채우고 높이는 사진이 정한다(레터박스 없음,
-            좌우가 본문 가이드라인과 정확히 일치). 라운드·테두리를 없애 기사
-            사진처럼 판면에 얹힌 느낌으로 뒀다. */}
-        {/* 사진 — 세로가 길어지는 문제를 두 겹으로 막는다.
-            (1) 본문 컬럼(.lw, 880px) 안에 두어 폭을 제한한다. 전체 폭이면
-                거의 정사각인 사진이 700px 넘게 높아진다.
-            (2) 2:1 컨테이너 + cover 로 높이를 확정한다(약 412px). 원본을 2:1 로
-                다시 잘라뒀기 때문에 cover 가 잘라내는 양이 거의 없다.
-            aspect-ratio 라 자리를 미리 잡아 레이아웃 이동(CLS)도 없다. */}
         {photo && (
           <div className="lw">
             <div style={{ position: 'relative', width: '100%', aspectRatio: '2 / 1', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
@@ -403,12 +461,6 @@ export function LensViewClient({
                 style={{ objectFit: 'cover', objectPosition: 'center' }}
               />
             </div>
-            {/* 사진 출처 캡션 — 실제 뉴스 사이트는 사진 밑에 거의 예외
-                없이 이 한 줄이 붙는데 우리는 없어서 "미완성" 인상을
-                가장 크게 줬다(2026-08-17 피드백, 워싱턴포스트 비교).
-                기사별 캡션 텍스트는 CmsLens에 아직 없는 데이터라(백엔드
-                확장 필요) 지어내지 않고, 원문 링크가 있으면 그쪽으로
-                출처를 붙인다. */}
             <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 8 }}>
               {lens.source_url ? (
                 <>
@@ -424,7 +476,16 @@ export function LensViewClient({
           </div>
         )}
 
-        {/* ── 리드 + 원문 링크 ── 사진과 같은 .lc 폭이라 좌우선이 맞는다. */}
+        {/* ── 리드 + 원문 링크 + 30초 핵심 ──
+            2026-08-21(PR #10) — "30초 핵심" 카드를 count > 0 게이트 밖(리드와
+            같은 .lw 블록)으로 옮겼다. 원문 링크가 그 게이트 안에 들어가면
+            lenses가 빈 글에서 페이지 안 원문 링크가 하나도 안 남는다(위
+            AiDisclaimer도 마찬가지 이유로 게이트 안에 남겨뒀다 — 그건 "이
+            시선들"에 대한 고지라 lenses가 있을 때만 의미가 있다). 카드
+            자체는 coreSummaryBullets()가 lenses를 읽으므로 lenses가 비면
+            여전히 안 그려진다 — 동작 변화 없음.
+            카드(테두리+그림자)를 걷어냈다 — 이 페이지의 "박스 없이 헤어라인
+            으로만 구조를 만든다" 원칙에서 유일한 예외였다. */}
         <div className="lw" style={{ paddingTop: 'clamp(20px, 3.4vw, 28px)' }}>
         <div>
           {lens.context && (
@@ -438,12 +499,12 @@ export function LensViewClient({
           )}
 
           {lens.source_url && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <a
                 href={lens.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="src"
+                className="lnk"
                 onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: lensFormatAt(active) })}
               >
                 기사 원문 보기
@@ -457,100 +518,93 @@ export function LensViewClient({
               </a>
             </div>
           )}
+
+          {coreSummaryBullets(lens).length > 0 && (
+            <div data-speakable="summary" style={{ marginTop: 24 }}>
+              <div className="rule" />
+              <p className="ovl" style={{ margin: '32px 0 16px' }}>
+                30초 핵심
+              </p>
+              <ol style={{ display: 'flex', flexDirection: 'column', gap: 16, listStyle: 'none', padding: 0, margin: 0 }}>
+                {coreSummaryBullets(lens).map((s, si) => (
+                  <li key={si} style={{ display: 'flex', alignItems: 'baseline', gap: 14, wordBreak: 'keep-all' }}>
+                    <span
+                      aria-hidden
+                      style={{ flexShrink: 0, width: 20, fontSize: 14, fontWeight: 800, color: '#6b7280', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.02em' }}
+                    >
+                      {String(si + 1).padStart(2, '0')}
+                    </span>
+                    <span style={{ fontSize: 'calc(16px * var(--lens-font-scale, 1))', lineHeight: 1.7, color: '#1f2937' }}>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
         </div>
 
         {count > 0 && (
-          <div className="lw" style={{ paddingTop: 'clamp(28px, 4.4vw, 40px)' }}>
+          <div className="lw" style={{ paddingTop: 32 }}>
           <div>
-            {/* 핵심 요약("30초 핵심") — 실 데이터 기반(2026-08-20, GEO 개선).
-                이전엔 데모 기사 하나에만 하드코딩된 오버라이드였는데,
-                coreSummaryBullets()로 교체해 실제 발행된 모든 lens 글에서
-                동작한다. 네 시선을 고르기 전에 기사 전체의 핵심(수치·사실
-                위주)을 먼저 준다 — data-speakable="summary"를 붙여 위
-                리드 문단과 함께 "인용하기 쉬운 요약 블록"으로 묶는다. */}
-            {coreSummaryBullets(lens).length > 0 && (
-              <div
-                data-speakable="summary"
-                style={{
-                  border: LENS_CARD_BORDER,
-                  borderRadius: 16,
-                  padding: 18,
-                  background: '#fff',
-                  boxShadow: LENS_CARD_SHADOW,
-                  marginBottom: 'clamp(24px, 3.4vw, 32px)',
-                }}
-              >
-                <p className="flex items-center" style={{ gap: 6, fontSize: 13, fontWeight: 800, color: LENS_ACCENT, marginBottom: 12 }}>
-                  <Zap size={14} fill="currentColor" aria-hidden />
-                  30초 핵심
-                </p>
-                <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
-                  {coreSummaryBullets(lens).map((s, si) => (
-                    <li key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14.5, lineHeight: 1.6, color: '#1f2937', wordBreak: 'keep-all' }}>
-                      <Check size={15} style={{ flexShrink: 0, marginTop: 3, color: LENS_ACCENT }} aria-hidden />
-                      <span>{s}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             <div className="rule" />
 
-            {/* ── 형식 선택 ──
-                밑줄 텍스트 탭에서 **타일**로 되돌렸다(2026-08-14).
-                이 페이지의 핵심 동작이 "어떤 형식으로 볼지 고르기"인데, 앞선
-                버전은 그 컨트롤을 회색 16px 텍스트로 낮춰서 화면에서 가장 약한
-                요소가 됐다(눈에 안 들어온다는 피드백). 게다가 선택하는 순간에
-                형식을 표시하는 요소가 없어서 "넷 중 고른다"는 것이 직관적으로
-                전달되지 않았다.
-                네 타일을 같은 크기로 나란히 놓으면 선택지가 넷이라는 사실과
-                각자가 무슨 형식인지가 한눈에 오고, 선택 상태는 색 채움 + 테두리 +
-                체크 3중으로 표시해 색만으로 구분하지 않는다.
-                2026-08-20 — 문구를 "누구의 눈으로"(인물 선택)에서 "어떤
-                형식으로"(포맷 선택)로 고쳤다. 2026-08-18에 산출물이 4가지
-                형식(레터/웹툰/팟캐스트/영상)으로 확정된 뒤에도 이 문구만
-                옛 "독자 관점 선택" 프레이밍에 남아있어서, 실제로 고르는 것과
-                질문이 어긋나 있었다(사용자가 실제 발행 글에서 직접 발견) —
-                아래 lensPerspectives.ts의 LENS_PERSPECTIVES도 같이 고쳤다. */}
-            <h2 style={{ fontSize: 24, fontWeight: 800, color: '#111827', letterSpacing: '-0.025em', margin: 'clamp(24px, 3.4vw, 32px) 0 6px' }}>
-              이 뉴스, 어떤 형식으로 볼까요?
+            {/* ── 형식 선택 ── 2026-08-21 재설계(PR #10) — sticky 세그먼트
+                탭 + 실측 분량. 자세한 히스토리는 FormatPicker.tsx 주석 참조.
+                "형식 차이 보기"(LensFormatGuide 모달)는 이 페이지에서 뺐다 —
+                탭이 실제 분량을 직접 보여주고, 바로 아래 설명줄이 고른
+                형식이 뭘 주는지 보여주면서 모달이 하는 말과 겹쳤다(모달
+                자체는 홈 티저 LensPreviewSection에서 계속 쓰인다 — 거기는
+                기사를 고르기 전이라 분량을 보여줄 수 없다). */}
+            <h2 className="ovl" style={{ margin: '32px 0 16px' }}>
+              어떻게 볼까요
             </h2>
-            <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 'clamp(14px, 2.2vw, 18px)', wordBreak: 'keep-all' }}>
-              고르면 아래 내용이 그 형식으로 바뀝니다.
-            </p>
 
-            <FormatPicker lenses={lenses} active={active} select={select} onTabKeyDown={onTabKeyDown} tabRefs={tabRefs} />
+            <FormatPicker lens={lens} lenses={lenses} active={active} mediaDur={mediaDur} select={select} onTabKeyDown={onTabKeyDown} tabRefs={tabRefs} />
+
+            {/* 형식 설명 — 탭을 누른 순간에만 나타나 다음 탭을 고르기 전까지
+                계속 떠 있는다(2026-08-21, "팟캐스트 클릭했을 때 보였으면
+                좋겠어, 항상 본문에 있는게 아니라"). 처음엔 자동 소멸
+                타이머가 있었는데, 그게 끝나 블록이 사라지며 아래 본문이
+                당겨져 "화면이 리셋되며 위아래로 움직인다"는 문제가 났다 —
+                지금은 안 사라지니 안 움직인다. */}
+            {showDesc && (
+              <p key={active} id="lens-desc" role="status" className="fmt-toast" style={{ '--c': activeP.color } as CSSProperties}>
+                <ActiveIcon size={16} aria-hidden style={{ flexShrink: 0, marginTop: 2, color: activeP.color }} />
+                <span>{activeP.content}</span>
+              </p>
+            )}
 
             {/* ── 선택된 시선 ── 박스 없이 위계로만 구성 */}
             {lenses.map((l, i) => (
-              <LensFormatPanel key={i} lens={lens} l={l} i={i} active={active} count={count} photo={photo} select={select} tabRefs={tabRefs} />
+              <LensFormatPanel
+                key={i}
+                lens={lens}
+                l={l}
+                i={i}
+                active={active}
+                photo={photo}
+                dir={dir}
+                onPanelTouchStart={onPanelTouchStart}
+                onPanelTouchEnd={onPanelTouchEnd}
+                showScript={showScript}
+                setShowScript={setShowScript}
+                noteDur={noteDur}
+              />
             ))}
 
-            {/* 구획 마감 — 본문이 끝났는데 아무 표시가 없어 브랜드 문구로 바로
-                넘어가는 게 갑작스러웠다. 출처 한 줄로 닫는다: 뉴스에서 "이 사실이
-                어디서 왔는지"는 신뢰의 마지막 조각이고, 네 시선이 모두 같은
-                기사에서 나왔다는 것도 여기서 확인된다. */}
-            <p
-              style={{
-                marginTop: 'clamp(28px, 4vw, 38px)',
-                paddingTop: 16,
-                borderTop: '1px solid rgba(17,24,39,0.09)',
-                fontSize: 13,
-                color: '#6b7280',
-                lineHeight: 1.6,
-                wordBreak: 'keep-all',
-                marginBottom: 16,
-              }}
-            >
-              네 시선 모두 같은 기사를 바탕으로 정리했어요.
-            </p>
+            {/* 구획 마감 — 출처 한 줄로 닫는다: 네 시선이 모두 같은 기사에서
+                나왔다는 것도 여기서 확인된다. */}
+            <div style={{ marginTop: 32 }}>
+              <div className="rule" />
+              <p style={{ marginTop: 32, fontSize: 14, color: '#4b5563', lineHeight: 1.65, wordBreak: 'keep-all' }}>
+                네 형식 모두 같은 기사를 바탕으로 만들었어요. 위에서 형식을 바꿔도 다루는 사실은 같습니다.
+              </p>
+            </div>
 
             {/* AI 생성 콘텐츠 고지(2026-08-21, 사용자 요청 — 서울경제 영문
                 CMS의 "AI-translated from Korean..." 박스를 레퍼런스로
-                "면책조항 걸어주세요"). 원문 링크는 이 박스 안으로 흡수 —
-                위 문단에 있던 "원문 기사" 인라인 링크는 중복이라 뺐다. */}
+                "면책조항 걸어주세요"). PR #10이 갈라져 나간 뒤 main에 추가된
+                기능이라 그 브랜치엔 없었다 — 유지. */}
             <AiDisclaimer sourceUrl={lens.source_url} articleId={lens.id} format={lensFormatAt(active)} />
           </div>
           </div>
@@ -563,7 +617,8 @@ export function LensViewClient({
           {/* "다른 시선" 미리보기(2026-08-16) — 마감부가 문구 한 줄 + 링크
               하나뿐이라 "허전하다"는 피드백. page.tsx가 fetchAllLens()
               in-flight 캐시에 편승해 이미 가져온 값 중 현재 글만 뺀 3개를
-              넘겨준다(추가 API 호출 없음). */}
+              넘겨준다(추가 API 호출 없음). PR #10이 갈라져 나간 뒤 main에
+              추가된 기능이라 그 브랜치엔 없었다 — 유지. */}
           {otherLens.length > 0 && (
             <div style={{ margin: '28px 0 8px' }}>
               <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 4 }}>
@@ -571,7 +626,7 @@ export function LensViewClient({
               </p>
               <div>
                 {otherLens.map((l) => {
-                  const photo = pickLensPhoto(l);
+                  const otherPhoto = pickLensPhoto(l);
                   return (
                     <Link
                       key={l.id}
@@ -585,12 +640,12 @@ export function LensViewClient({
                         borderTop: '1px solid rgba(17,24,39,0.07)',
                       }}
                     >
-                      {photo && (
+                      {otherPhoto && (
                         <span
                           className="flex-shrink-0"
                           style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', background: '#f3f4f6' }}
                         >
-                          <Image src={photo} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
+                          <Image src={otherPhoto} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
                         </span>
                       )}
                       <span style={{ minWidth: 0, flex: 1 }}>
@@ -639,16 +694,6 @@ export function LensViewClient({
       </main>
           </div>
 
-          {/* 2026-08-18엔 본문 칼럼 안쪽 .lw div의 paddingTop(clamp(28px,
-              4.5vw,40px), 헤드라인 전용 여백)을 사이드바에도 그대로
-              줬었다("사이드바가 헤더에 바짝 붙어 보인다" 피드백) — 그런데
-              2026-08-23에 사용자가 이번엔 반대로 "홈에 비해 사이드바가
-              아래로 쏠려 보인다"고 지적했다. 비교 기준이 이 페이지 안의
-              본문이 아니라 홈의 사이드바 위치였던 것 — 그래서 바깥 grid
-              wrapper에 홈과 같은 clamp(8px,2vw,16px) 위 패딩을 추가하고
-              (위 주석 참조), 사이드바 자체의 paddingTop 오버라이드는
-              없앤다. 본문 헤드라인의 28~40px 여백은 그대로 유지 — 헤더와
-              헤드라인 사이 간격 자체는 2026-08-17에 확정한 의도적인 값. */}
           <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
         </div>
       </div>

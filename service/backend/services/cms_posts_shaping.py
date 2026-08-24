@@ -118,6 +118,36 @@ def shape_webtoon(post: Dict[str, Any]) -> Dict[str, Any]:
         "published_at": post.get("published_at"),
         "cover_image_url": post.get("cover_image_url") or (panels[0]["url"] if panels else None),
         "panels": panels,
+        # 시리즈 제목(2026-08-21) — "여러 개의 독립된 웹툰 시리즈"로 재구조화
+        # (사용자 요청: 화수 나열이 아니라 카카오페이지식 시리즈 진열대).
+        # 시리즈 마스터 테이블을 새로 만들지 않고, 매 편(=post)에 자유 텍스트
+        # 시리즈명을 중복 저장하는 가장 얕은 방법을 택했다 — category와 같은
+        # 저장 위치(body_inline)를 재사용해 새 최상위 컬럼·새 GSI를 만들지
+        # 않는다. 프론트는 이 문자열로 편들을 그룹핑한다(같은 문자열 = 같은
+        # 시리즈). 비어 있으면(과거 발행분) 편 자체를 제목으로 쓰는 "단편"
+        # 시리즈로 프론트가 폴백한다.
+        "series_title": (b.get("series_title") or "").strip() or None,
+        # category 추가(2026-08-21) — 발행량이 매일 단위로 늘어날 예정이라
+        # /webtoon 목록에 카테고리로 골라보는 길이 필요해졌다. letters/lens/
+        # home_player 와 같은 저장 위치(body_inline.category, ECON_CATEGORIES
+        # 값)를 그대로 재사용한다 — 새 필드도, 새 GSI도 만들지 않고 admin
+        # WebtoonMode 에 카테고리 선택만 추가하면 끝나는 구조.
+        # 기존 발행분은 값이 없다(None) — 프론트는 실제로 값이 있는 카테고리만
+        # 칩으로 그리므로 백필 전에는 칩 바가 아예 안 나온다.
+        "category": b.get("category") or None,
+        # display_order 추가(2026-08-21) — /webtoon 목록의 "편집국 추천" 순서.
+        #
+        # 요청은 "인기 소식" 섹션이었지만 인기를 계산할 지표가 시스템에 하나도
+        # 없다(GA4는 trackEvent.ts 단방향 전송이라 다시 읽어올 경로가 없고,
+        # 조회수 카운터·좋아요도 없다). 그 상태로 최신순에 "인기" 라벨을 붙이면
+        # 홈의 "요즘 가장 많이 읽힌 글"(HotLettersRail, 실제로는 최신순)과 같은
+        # 문제를 하나 더 만드는 것이다. 그래서 지표 대신 **편집자가 직접 고른
+        # 순서**를 쓴다 — 근거를 설명할 수 있는 순위다.
+        #
+        # 새 필드를 만들지 않았다: display_order 는 이미 최상위 스키마에 있고
+        # _UPDATABLE 에도 들어 있다(admin/backend/repo/posts_repo.py, 원래
+        # home_player 재생 순서용). 오름차순이 앞자리다.
+        "display_order": post.get("display_order"),
         "is_cms": True,
     }
 

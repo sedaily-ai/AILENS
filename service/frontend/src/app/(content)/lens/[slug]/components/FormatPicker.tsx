@@ -1,108 +1,111 @@
 'use client';
 
-import type { KeyboardEvent as ReactKeyboardEvent, MutableRefObject } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject } from 'react';
 import { lensPerspectiveAt, lensPanelId, lensTabId } from '@/shared/constants/lensPerspectives';
-import type { CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
+import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { formatAmount } from './lensSamples';
 
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해).
-// ── 형식 선택 ──
-// 밑줄 텍스트 탭에서 **타일**로 되돌렸다(2026-08-14).
-// 이 페이지의 핵심 동작이 "어떤 형식으로 볼지 고르기"인데, 앞선
-// 버전은 그 컨트롤을 회색 16px 텍스트로 낮춰서 화면에서 가장 약한
-// 요소가 됐다(눈에 안 들어온다는 피드백). 게다가 선택하는 순간에
-// 형식을 표시하는 요소가 없어서 "넷 중 고른다"는 것이 직관적으로
-// 전달되지 않았다.
-// 네 타일을 같은 크기로 나란히 놓으면 선택지가 넷이라는 사실과
-// 각자가 무슨 형식인지가 한눈에 오고, 선택 상태는 색 채움 + 테두리 +
-// 체크 3중으로 표시해 색만으로 구분하지 않는다.
+//
+// ── 형식 선택기 — 2026-08-21 재설계(웹툰 릴론치 PR #10 반영) ──
+// 직전 버전은 인물 일러스트가 들어간 148px 타일 2×2(모바일)였다. 첫
+// 사용자가 이 페이지를 이해하지 못하는 원인이 대부분 이 컨트롤에 있었다:
+//
+//  1. 선택기가 스크롤과 함께 사라졌다. sticky로 고정한다 — 이 페이지에서
+//     유일하게 항상 닿아야 하는 컨트롤이다.
+//  2. 일러스트가 형식을 설명하지 않았다. 형식을 뜻하는 아이콘(BookOpen/
+//     Image/Headphones/Video)으로 바꿨다.
+//  3. 타일이 세로로 320px을 먹었다. 태그라인은 선택기에서 빼고, 고른
+//     형식의 설명은 탭 직후 잠깐 뜨는 토스트(LensViewClient의 #lens-desc)로
+//     보여준다.
+//
+// 2차 개선("너무 일차원적" 피드백):
+//  a. 분량을 탭 안으로 — formatAmount()가 이 기사를 그 형식으로 보면
+//     얼마나 되는지 보여준다(약 2분 / 8컷 / 3:24 / 준비 중).
+//  b. 슬라이딩 인디케이터(.fmt-thumb) — 알약 배경 on/off 대신 하나가
+//     옆으로 미끄러져 형식 간 인접 관계를 나른다.
+//  c. 가로 스와이프(부모의 onPanelTouchStart/End) + 방향성 전환.
 export function FormatPicker({
+  lens,
   lenses,
   active,
+  mediaDur,
   select,
   onTabKeyDown,
   tabRefs,
 }: {
-  lenses: CmsLensItem[];
+  lens: CmsLens;
+  lenses: CmsLens['lenses'];
   active: number;
+  /** 실제 오디오·영상 길이(초). loadedmetadata에서만 채운다. */
+  mediaDur: Record<number, number>;
   select: (i: number) => void;
   onTabKeyDown: (e: ReactKeyboardEvent, i: number) => void;
   tabRefs: MutableRefObject<(HTMLButtonElement | null)[]>;
 }) {
+  const count = lenses?.length ?? 0;
+  const activeP = lensPerspectiveAt(active);
+
   return (
-    <div role="tablist" aria-label="형식별 시선" className="picks">
-      {lenses.map((_l, i) => {
-        const p = lensPerspectiveAt(i);
-        const on = i === active;
-        return (
-          <button
-            key={i}
-            ref={(el) => {
-              tabRefs.current[i] = el;
-            }}
-            type="button"
-            role="tab"
-            id={lensTabId(i)}
-            aria-selected={on}
-            aria-controls={lensPanelId(i)}
-            tabIndex={on ? 0 : -1}
-            onClick={() => select(i)}
-            onKeyDown={(e) => onTabKeyDown(e, i)}
-            className="pick"
-            style={{
-              // 선택 시 타일 전체를 tint로 채우던 걸 뺐다(2026-08-18,
-              // "유형 누르면 뜨는 배경색 없애달라") — 테두리 색 +
-              // 그림자 + 체크 배지 3중 표시로도 선택 상태는 충분히
-              // 드러나고, 배경까지 채우면 특히 진한 색(로즈·앰버
-              // 등)에서 과해 보였다.
-              borderColor: on ? p.color : 'rgba(17,24,39,0.12)',
-              background: '#fff',
-              boxShadow: on ? `inset 0 0 0 1px ${p.color}` : 'none',
-            }}
-          >
-            <span
-              className="flex items-center justify-center flex-shrink-0"
-              style={{ width: 48, height: 48, borderRadius: 999, background: '#fff', overflow: 'hidden' }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트 */}
-              <img
-                src={p.illustration}
-                alt=""
-                width={48}
-                height={48}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
-              />
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: on ? p.color : '#4b5563', letterSpacing: '-0.01em', wordBreak: 'keep-all' }}>
-              {p.short}
-            </span>
-            {/* 이 시선이 무엇을 주는지 — 타일에 역할명만 있으면 무엇을
-                고르는지 모르고 골라야 한다. tagline 을 여기로 올려서
-                선택 전에 판단할 근거를 준다(선택 후 본문에서는 중복이라
-                제거했다). */}
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: on ? p.color : '#6b7280',
-                opacity: on ? 0.9 : 1,
-                lineHeight: 1.45,
-                textAlign: 'center',
-                wordBreak: 'keep-all',
+    <div className="fmt-bar">
+      <div
+        role="tablist"
+        aria-label="이 뉴스를 볼 형식"
+        aria-orientation="horizontal"
+        className="fmt-row"
+        style={
+          {
+            '--n': count,
+            '--ai': active,
+            '--c': activeP.color,
+            '--t': activeP.tint,
+          } as CSSProperties
+        }
+      >
+        {/* 슬라이딩 인디케이터 — 탭 뒤에서 움직인다. 형식 색으로 물들며
+            옮겨가므로 "몇 칸 옆으로 갔는지"와 "지금 무슨 형식인지"를
+            한 요소가 같이 말한다. 정보는 이름·분량 텍스트가 나르고
+            이건 관계만 나르므로 aria에서 감춘다. */}
+        <span className="fmt-thumb" aria-hidden />
+        {(lenses ?? []).map((l, i) => {
+          const p = lensPerspectiveAt(i);
+          const on = i === active;
+          const Icon = p.icon;
+          const amt = formatAmount(lens, i, mediaDur[i]);
+          return (
+            <button
+              key={i}
+              ref={(el) => {
+                tabRefs.current[i] = el;
               }}
+              type="button"
+              role="tab"
+              id={lensTabId(i)}
+              aria-selected={on}
+              aria-controls={lensPanelId(i)}
+              tabIndex={on ? 0 : -1}
+              onClick={() => select(i)}
+              onKeyDown={(e) => onTabKeyDown(e, i)}
+              className="fmt"
+              // 분량 텍스트가 "⋯"이나 "8컷"처럼 짧은 기호·단위라
+              // 그대로 읽히면 뜻이 안 통한다. 이름과 분량을 붙여 한
+              // 문장으로 읽어준다.
+              aria-label={`${p.short}, ${amt.spoken}`}
             >
-              {p.tagline}
-            </span>
-            {/* 선택 표시 — 색 외에 형태 신호도 함께 준다. */}
-            {on && (
-              <span aria-hidden className="pick-on" style={{ background: p.color }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
+              <span className="fmt-name">{p.short}</span>
+              {/* 분량 — 아이콘을 이 줄에 붙였다. 1행에 아이콘+이름을
+                  같이 넣으면 375px 칸(69.75px)에 "팟캐스트"(56px) +
+                  아이콘(18) + 간격이 안 들어간다. 아이콘이 분량 옆에
+                  오면 "약 2분"이 읽는 시간인지 듣는 시간인지도
+                  아이콘이 구분해준다. */}
+              <span className="fmt-amt">
+                <Icon size={13} aria-hidden style={{ flexShrink: 0 }} />
+                {amt.text}
               </span>
-            )}
-          </button>
-        );
-      })}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

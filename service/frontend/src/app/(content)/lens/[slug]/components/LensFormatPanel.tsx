@@ -1,22 +1,18 @@
 'use client';
 
-import type { MutableRefObject } from 'react';
-import Image from 'next/image';
-import { Play, Headphones, Images, Video, ArrowRight } from 'lucide-react';
+import type { TouchEvent as ReactTouchEvent } from 'react';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
-import { AutoPlayVideo } from '@/shared/ui/AutoPlayVideo';
-import { TrackedAudio } from '@/shared/ui/TrackedAudio';
+import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
+import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
 import { WebtoonCutGallery } from '@/shared/ui/WebtoonCutGallery';
 import {
-  LENS_CARD_BORDER,
-  LENS_CARD_SHADOW,
   lensFormatAt,
   lensPanelId,
   lensPerspectiveAt,
   lensTabId,
 } from '@/shared/constants/lensPerspectives';
 import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
-import { ARTICLE_FORMAT_SAMPLES, articleFormatSample, articleBridgeSample, mockDuration } from './lensSamples';
+import { ARTICLE_FORMAT_SAMPLES, articleFormatSample } from './lensSamples';
 import { CardnewsCarousel } from './CardnewsCarousel';
 
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해) — 4개 포맷(레터/
@@ -24,27 +20,47 @@ import { CardnewsCarousel } from './CardnewsCarousel';
 // 그대로 컴포넌트로 옮긴 것 — 계산 로직·렌더 분기 전부 원본과 동일, 순수
 // 이동. 4개 패널이 전부 hidden={!on}(CSS로만 숨김, 실제 언마운트 아님)으로
 // 한 페이지에 동시에 존재하는 이유는 SEO 때문(page.tsx의 NewsArticle
-// articleBody/mainEntity가 4개 시선 전체를 인용해야 함) — 아래 AutoPlayVideo
-// 처리도 이 전제 위에 있다(안 보이는 탭에서 영상이 재생되는 걸 막기 위해
-// on일 때만 실제 재생 트리거를 건다).
+// articleBody/mainEntity가 4개 시선 전체를 인용해야 함) — 오디오·영상
+// 플레이어가 hidden 여부와 무관하게 항상 렌더되는 이유도 같다: 탭 바
+// (FormatPicker)가 "이 기사를 이 형식으로 보면 얼마나 되는지"를 4개
+// 전부 미리 보여줘야 해서, 안 보이는 패널의 플레이어도 메타데이터(길이)만
+// 조용히 읽어와 onDuration으로 보고한다(preload="metadata", 실제 재생은
+// 사용자가 눌러야 시작됨).
+//
+// 2026-08-24(웹툰 릴론치 PR #10 반영) — 네이티브 <audio>/<video> 대신 실측
+// 재생시간·탐색바·배속을 갖춘 ArticleAudioPlayer/ArticleVideoPlayer로 교체.
+// "다음 시선" 버튼은 걷어냈다(2026-08-21, 사용자 요청 — "다 지워줘". 형식
+// 탭이 sticky로 항상 떠 있고 이미 진행 인디케이터를 보여주므로 본문 끝마다
+// 같은 안내를 반복할 필요가 없다는 판단, 게다가 항상 다음 인덱스 하나만
+// 가리켜서 탭을 건너뛰어 온 사용자에겐 안내가 틀렸었다).
 export function LensFormatPanel({
   lens,
   l,
   i,
   active,
-  count,
   photo,
-  select,
-  tabRefs,
+  dir,
+  onPanelTouchStart,
+  onPanelTouchEnd,
+  showScript,
+  setShowScript,
+  noteDur,
 }: {
   lens: CmsLens;
   l: CmsLensItem;
   i: number;
   active: number;
-  count: number;
   photo: string | null;
-  select: (i: number) => void;
-  tabRefs: MutableRefObject<(HTMLButtonElement | null)[]>;
+  /** 방금 어느 방향으로 이동했는지(-1/0/+1) — 인디케이터 이동 방향과
+   *  본문 진입 방향(swap-fwd/swap-back)을 맞추는 데만 쓴다. */
+  dir: number;
+  onPanelTouchStart: (e: ReactTouchEvent) => void;
+  onPanelTouchEnd: (e: ReactTouchEvent, i: number) => void;
+  /** 웹툰 대사 전문 펼침 — 한 번에 한 패널만 보이므로 상태 하나를 공유한다. */
+  showScript: boolean;
+  setShowScript: (updater: (v: boolean) => boolean) => void;
+  /** 실측 오디오·영상 길이(초) 보고 — 부모가 FormatPicker의 분량 표기에 쓴다. */
+  noteDur: (i: number, sec: number) => void;
 }) {
   const p = lensPerspectiveAt(i);
   const on = i === active;
@@ -59,6 +75,21 @@ export function LensFormatPanel({
     format === 'webtoon' || format === 'podcast' || format === 'video'
       ? articleFormatSample(lens.id, format) ?? l.bullets
       : l.bullets;
+  // 팟캐스트 대본 전문 — CMS의 팟캐스트 슬롯(l.bullets)엔 짧은 핵심 요약
+  // 3~5줄만 저장된다(admin LensMode.tsx에서 이 필드 라벨 자체가 "챕터").
+  // 실제 음성으로 녹음된 8~12분 전체 원고는 텍스트로 저장되지 않는다 —
+  // 오디오 파일(media_url)만 있고 그걸 만든 대본 텍스트는 시스템에 없다.
+  // 없는 문장을 새로 지어내면 "원문에 없는 것은 만들지 않는다" 원칙에
+  // 걸리므로, 같은 기사에 이미 있는 가장 긴 완결된 산문 — 레터 포맷의
+  // 전체 문단(lenses[0], 보통 6~7개 문단)을 대신 보여준다. 지어낸 글이
+  // 아니라 같은 기사의 실제 CMS 데이터다.
+  const letterFullText =
+    articleFormatSample(lens.id, 'letter') ??
+    ((lens.lenses ?? [])[0]?.paragraphs && (lens.lenses ?? [])[0].paragraphs!.length > 0
+      ? (lens.lenses ?? [])[0].paragraphs
+      : null);
+  const podcastScript =
+    format === 'podcast' && letterFullText && letterFullText.length > 0 ? letterFullText : scriptBullets;
   // 레터 본문 — 데모 오버라이드 → 없으면 admin이 채운 실제
   // paragraphs(2026-08-19 신설 필드) → 그것도 없으면 아래
   // 불릿 목록으로 폴백(letterParagraphs가 null인 경우).
@@ -80,178 +111,149 @@ export function LensFormatPanel({
   const realPodcast = format === 'podcast' && l.media_url ? resolveVideo(l.media_url) : null;
   // 유튜브·네이버TV가 아닌 직링크(S3 등에 직접 올린 mp4/mp3) —
   // resolveVideo()는 그 두 플랫폼만 인식해 null을 돌려주므로,
-  // URL 자체는 있는데 매칭이 안 될 때만 <video>/<audio> 태그로
-  // 직접 재생한다(2026-08-20, 실제 샘플 파일 업로드 대응).
+  // URL 자체는 있는데 매칭이 안 될 때만 실제 플레이어로 직접 재생한다
+  // (2026-08-20, 실제 샘플 파일 업로드 대응).
   const directVideoUrl = format === 'video' && l.video_url && !realVideo ? l.video_url : null;
   const directPodcastUrl = format === 'podcast' && l.media_url && !realPodcast ? l.media_url : null;
+  const hasPodcast = Boolean(realPodcast || directPodcastUrl);
+  const hasVideo = Boolean(realVideo || directVideoUrl);
+
+  // 준비 안 된 형식의 안내 — 탭의 "준비 중"이 고르기 전에 알리고,
+  // 이 줄이 그래서 대신 뭐가 있는지 말한다. 형식 이름·분량을 다시
+  // 쓰지 않는다(탭에 이미 있다).
+  const note =
+    format === 'webtoon' && !realWebtoonCuts
+      ? '웹툰 컷은 아직 준비 중이에요. 아래는 컷에 들어갈 대사예요.'
+      : format === 'podcast' && !hasPodcast
+        ? '음성 파일은 아직 준비 중이에요. 아래는 브리핑에 들어갈 대본이에요.'
+        : format === 'video' && !hasVideo
+          ? '영상은 아직 준비 중이에요. 아래는 영상에 들어갈 대본이에요.'
+          : null;
+
   return (
     <section
+      key={i}
       id={lensPanelId(i)}
       role="tabpanel"
       aria-labelledby={lensTabId(i)}
       data-speakable="qa"
       hidden={!on}
-      className={on ? 'panel' : undefined}
-      style={{
-        marginTop: 'clamp(22px, 3.4vw, 30px)',
-        // 왼쪽 규칙선(레일)도, 선택 직후 잠깐 배경을 물들이던
-        // 클릭 피드백도 뺐다(2026-08-18, "유형 누르면 뜨는 배경색
-        // 없애달라"). 위 타일 선택 상태 자체가 이미 색+테두리+
-        // 그림자+체크 4중으로 표시되고 있어서, 본문까지 색을
-        // 끌고 오지 않아도 "누구의 시선인지"는 위 타일과 "시선
-        // {ordinal} · {full}" 텍스트로 충분히 전달된다.
-      }}
+      className={on ? 'lens-panel panel' : 'lens-panel'}
+      data-dir={on ? dir : undefined}
+      onTouchStart={onPanelTouchStart}
+      onTouchEnd={(e) => onPanelTouchEnd(e, i)}
+      style={{ marginTop: 'clamp(24px, 3.4vw, 32px)' }}
     >
-      {/* 역할 머리 — 압축했다. 52px 일러스트와 액센트 바를 뺀 이유는
-          위 선택 타일에 이미 같은 인물이 강조된 채로 있어서 중복이고,
-          그만큼 질문(이 화면의 실제 보상)이 아래로 밀렸기 때문이다.
-          정체성은 컬러 서수 + 역할명 한 줄로 충분하다. */}
-      {/* tagline 은 위 타일로 옮겼다 — 선택 전에 필요한 정보이고,
-          여기서 반복하면 질문이 아래로 밀린다. 대신 몇 번째 시선인지
-          전체 개수와 함께 보여준다(내가 넷 중 어디에 있는지). */}
-      <div className="flex items-center" style={{ gap: 8, marginBottom: 'clamp(14px, 2.2vw, 18px)' }}>
-        <p style={{ fontSize: 14, fontWeight: 800, color: p.color, letterSpacing: '-0.01em', wordBreak: 'keep-all' }}>
-          시선 {p.ordinal} · {p.full}
-        </p>
-        <span aria-hidden style={{ width: 1, height: 12, background: 'rgba(17,24,39,0.15)' }} />
-        <p style={{ fontSize: 13, color: '#6b7280', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-          {i + 1} / {count}
-        </p>
-      </div>
+      {/* 패널 제목줄(형식 이름 + 분량)은 걷어냈다 — 그 정보가 탭 안으로
+          올라갔고, 탭은 sticky라 항상 화면에 있다. 같은 말을 두 번 하지
+          않는다. 남은 건 "준비 중"일 때의 안내 한 줄뿐이다. */}
+      {note && <p className="fmt-note">{note}</p>}
 
-      {/* 포맷 배지 — 실제 미디어(2026-08-19, LensMode.tsx 4개
-          포맷 탭에서 admin이 채운 것)가 있으면 "목업" 문구를
-          뺀다. letter는 지금 실제 운영 중인 형태라 배지 없이
-          그대로 둔다. */}
-      {format !== 'letter' && (
-        <p
-          className="flex items-center"
-          style={{ gap: 6, fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 14 }}
-        >
-          {format === 'webtoon' && <Images size={13} aria-hidden />}
-          {format === 'podcast' && <Headphones size={13} aria-hidden />}
-          {format === 'video' && <Video size={13} aria-hidden />}
-          {format === 'webtoon' && (realWebtoonCuts ? '웹툰' : '웹툰 형식 목업 · 아직 생성 파이프라인 미연결')}
-          {format === 'podcast' && (realPodcast || directPodcastUrl ? '팟캐스트' : '팟캐스트 형식 목업 · 아직 생성 파이프라인 미연결')}
-          {format === 'video' && (realVideo || directVideoUrl ? '영상' : '영상 형식 목업 · 아직 생성 파이프라인 미연결')}
-        </p>
-      )}
+      {/* 질문 — 카드 안 시각적 정점. 네 형식의 첫 줄 무게를 하나로 맞춘다 —
+          탭을 옮길 때마다 첫 줄 크기가 뛰면 "같은 대상의 다른 표면"이
+          아니라 "다른 페이지"로 느껴진다. */}
+      {format === 'letter' && l.question && <p className="fmt-lede">{l.question}</p>}
 
-      {/* 질문 — 카드 안 시각적 정점(32). 장식 없이 세리프 크기만으로
-          끌어올린다. */}
-      {format === 'letter' && l.question && (
-        <p
-          className="lm"
-          style={{
-            fontFamily: '"Noto Serif KR", serif',
-            fontSize: 'clamp(24px, 3vw, 32px)',
-            fontWeight: 700,
-            color: '#111827',
-            lineHeight: 1.45,
-            letterSpacing: '-0.03em',
-            marginBottom: 'clamp(22px, 3.4vw, 28px)',
-            wordBreak: 'keep-all',
-          }}
-        >
-          {l.question}
-        </p>
-      )}
-
-      {/* 레터 본문 — 데모 오버라이드가 있는 기사는 뉴스레터
-          문단으로(2026-08-18, "카드뉴스 거 그대로 가져온거라서"
-          지적 — 레터가 카드뉴스와 같은 불릿 목록을 그대로 쓰고
-          있던 걸 고침). AI LENS 편집장 프롬프트의 문체 가이드
-          (친근한 -했어요체, 문단당 2~3문장)를 따른다. */}
+      {/* 레터 본문 — 편집 지면 톤(읽기 폭 620px 상한 + 첫 문단 리드인 +
+          문단 간격 24px). AI LENS 편집장 프롬프트의 문체 가이드(친근한
+          -했어요체, 문단당 2~3문장)를 따른다. */}
       {format === 'letter' && letterParagraphs && (
-        <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="lread">
           {letterParagraphs.map((para, pi) => (
-            <p
-              key={pi}
-              style={{
-                fontSize: 'calc(16px * var(--lens-font-scale, 1))',
-                lineHeight: 1.8,
-                color: '#374151',
-                wordBreak: 'keep-all',
-              }}
-            >
+            <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
               {para}
             </p>
           ))}
+          {/* 마감 부호 — 기사가 끝났다는 신호. */}
+          <p aria-hidden className="lread-end" style={{ color: p.color }}>
+            ■
+          </p>
         </div>
       )}
 
-      {/* 불릿에 라벨을 붙여 질문과의 관계를 명시한다 — 앞서는 큰
-          질문 다음에 사실이 그냥 나열돼서 둘이 Q&A 한 쌍이라는 게
-          드러나지 않았고, 그래서 구획이 끝났는지도 애매했다.
-          개수를 함께 보여주면 얼마나 읽어야 하는지도 예측된다.
-          데모 문단 오버라이드가 없는 기사(대부분)는 지금처럼
-          CMS 불릿을 그대로 쓴다. */}
+      {/* 불릿에 라벨을 붙여 질문과의 관계를 명시한다 — 데모 문단
+          오버라이드가 없는 기사(대부분)는 지금처럼 CMS 불릿을 그대로 쓴다. */}
       {format === 'letter' && !letterParagraphs && l.bullets.length > 0 && (
         <>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-              color: '#6b7280',
-              marginBottom: 14,
-            }}
-          >
+          <p className="ovl" style={{ marginBottom: 16 }}>
             이 질문에 답하는 사실 {l.bullets.length}
           </p>
-          <ul className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 14, listStyle: 'none', padding: 0, margin: 0 }}>
+          <ol className="hang lread">
             {l.bullets.map((b, bi) => (
-              <li key={bi} style={{ display: 'flex', gap: 12, fontSize: 'calc(16px * var(--lens-font-scale, 1))', lineHeight: 1.75, color: '#374151', wordBreak: 'keep-all' }}>
-                <span
-                  aria-hidden
-                  className="flex-shrink-0"
-                  style={{ width: 5, height: 5, marginTop: 11, borderRadius: 999, background: p.color }}
-                />
+              <li key={bi}>
+                <span aria-hidden className="hang-n">
+                  {String(bi + 1).padStart(2, '0')}
+                </span>
                 <span>{b}</span>
               </li>
             ))}
-          </ul>
+          </ol>
         </>
       )}
 
+      {/* 빈 상태 — "왜 비었는지 + 무엇을 하면 되는지"를 쓴다. */}
       {format === 'letter' && !letterParagraphs && !l.question && l.bullets.length === 0 && (
-        <p style={{ fontSize: 14, color: '#6b7280' }}>이 시선은 아직 준비 중이에요.</p>
+        <div style={{ fontSize: 16, lineHeight: 1.7, color: '#374151', wordBreak: 'keep-all' }}>
+          <p>이 기사의 레터는 아직 만들지 않았어요.</p>
+          <p style={{ marginTop: 8, color: '#6b7280' }}>
+            위에서 다른 형식을 골라보거나, 아래 원문 기사에서 전체 내용을 확인할 수 있어요.
+          </p>
+        </div>
       )}
 
-      {/* 카드뉴스 목업 — 인스타 카드뉴스처럼 한 번에 한 장만
-          크게 보여주고 화살표(또는 스와이프)로 넘긴다
-          (2026-08-18, "가로 스크롤 필름스트립은 촌스럽다" 지적
-          → /design 캔버스로 방향 스케치 후 승인받고 반영).
-          실제 카드뉴스 규격(8컷, 비주얼시스템)은 볼트
-          01_카드뉴스_제작템플릿.md 참조 — 여기선 개수·구조
-          컨셉만 보여준다. */}
-      {/* 실제 웹툰 컷(2026-08-19) — admin이 LensMode.tsx 웹툰
-          탭에서 WebtoonPanelsEditor로 올린 이미지+캡션이 있으면
-          아래 목업 캐러셀 대신 실제 컷을 순서대로 보여준다. */}
-      {/* pipelines/webtoon이 실제로 만드는 컷은 1536x1024(3:2 가로) —
-          예전 인스타 카드뉴스(4:5 세로) 전제로 aspect-ratio 4/5 +
-          cover를 썼더니 좌우가 크게 잘려서, 말풍선이 화면 가장자리에
-          있으면(BUBBLE_RULES가 "상단·측면 배치"를 지시함) 통째로
-          잘려 보이는 문제가 있었다(2026-08-20 사용자 리포트). contain
-          으로 바꿔 잘림 없이 전체를 보여준다 — 비율이 정확히 3:2면
-          레터박스도 안 생긴다. 렌더링은 WebtoonCutGallery로 뺐다 —
-          완주율 계측(useCutViewTracking)이 hooks라 .map() 루프
-          안에선 못 써서. */}
-      {format === 'webtoon' && realWebtoonCuts && (
-        <WebtoonCutGallery cuts={realWebtoonCuts} articleId={lens.id} />
+      {/* 실제 웹툰 컷(2026-08-19) — admin이 LensMode.tsx 웹툰 탭에서
+          WebtoonPanelsEditor로 올린 이미지+캡션이 있으면 아래 목업 캐러셀
+          대신 실제 컷을 순서대로 보여준다. 컷을 이어 붙인 한 줄기로
+          렌더하는 것과 완주율 계측은 WebtoonCutGallery가 담당한다. */}
+      {format === 'webtoon' && realWebtoonCuts && <WebtoonCutGallery cuts={realWebtoonCuts} articleId={lens.id} />}
+
+      {/* 대사 전문 — 컷 안 말풍선에 이미 있는 대사를 여기서 한 번 더
+          접어서 보여준다(소리를 못 듣거나 이미지가 안 뜨거나, 인용하려는
+          경우). hidden으로만 감춰서 DOM에는 항상 있다. */}
+      {format === 'webtoon' && realWebtoonCuts && realWebtoonCuts.some((c) => c.caption) && (
+        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
+          <button
+            type="button"
+            className="lnk"
+            aria-expanded={showScript}
+            aria-controls={`${lensPanelId(i)}-script`}
+            onClick={() => setShowScript((v) => !v)}
+          >
+            대사로 읽기 {realWebtoonCuts.length}컷
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              style={{ transform: showScript ? 'rotate(180deg)' : 'none', transition: 'transform .2s ease' }}
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <ol id={`${lensPanelId(i)}-script`} hidden={!showScript} className="hang lread" style={{ marginTop: 16 }}>
+            {realWebtoonCuts.map((cut, ci) => (
+              <li key={ci}>
+                <span aria-hidden className="hang-n">
+                  {String(ci + 1).padStart(2, '0')}
+                </span>
+                <span>{cut.caption || '(대사 없음)'}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
-      {/* 카드뉴스형 목업 — 실제 컷이 없을 때만(위 realWebtoonCuts
-          분기 참조). 인스타 카드뉴스처럼 한 번에 한 장만 크게
-          보여주고 화살표(또는 스와이프)로 넘긴다(2026-08-18,
-          "가로 스크롤 필름스트립은 촌스럽다" 지적 → /design
-          캔버스로 방향 스케치 후 승인받고 반영). */}
+      {/* 카드뉴스형 목업 — 실제 컷이 없을 때만. */}
       {format === 'webtoon' && !realWebtoonCuts && (
         <CardnewsCarousel
           photo={photo}
           coverHeadline={webtoonHeadline || ''}
-          ordinal={p.ordinal}
-          full={p.full}
+          formatName={p.short}
           color={p.color}
           tint={p.tint}
           Icon={p.icon}
@@ -264,17 +266,12 @@ export function LensFormatPanel({
         />
       )}
 
-      {/* 실제 팟캐스트 미디어(2026-08-19) — admin이 LensMode.tsx
-          팟캐스트 탭에서 YouTube 등 링크를 채운 경우 실제 플레이어를
-          임베드한다(/video 페이지와 같은 resolveVideo 유틸). */}
+      {/* 실제 팟캐스트 미디어(2026-08-19) — admin이 YouTube 등 링크를
+          채운 경우 실제 플레이어를 임베드한다. */}
       {format === 'podcast' && realPodcast && (
         <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
-          {/* embedUrl에 autoplay=1이 박혀 있어(videoEmbed.ts), 이
-              섹션이 실제로 안 보일 때(on=false)도 src를 그대로
-              넣으면 숨은 채로 재생된다 — on일 때만 src를 준다
-              (2026-08-23, 아래 AutoPlayVideo 주석과 같은 이유). */}
           <iframe
-            src={on ? realPodcast.embedUrl : undefined}
+            src={realPodcast.embedUrl}
             title={l.question || '팟캐스트'}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -283,293 +280,132 @@ export function LensFormatPanel({
         </div>
       )}
 
-      {/* 직링크 오디오(2026-08-20) — S3 등에 직접 올린 mp3. 유튜브가
-          아니라 iframe 임베드가 안 되므로 네이티브 <audio>로 재생. */}
+      {/* 직링크 오디오(2026-08-20) — S3 등에 직접 올린 mp3.
+          ArticleAudioPlayer(2026-08-21 재설계 — 네이티브 <audio controls>는
+          브라우저마다 생김새가 달라 "여기만 남의 UI"로 보였다): 탐색 가능한
+          진행바, 현재/전체 길이, 15초 뒤로, 배속. chapters는 실측 타임코드가
+          없어 seek 불가능한 "읽는 대본"으로만 전달한다. */}
       {format === 'podcast' && directPodcastUrl && (
-        <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
-          <p
-            style={{
-              fontFamily: '"Noto Serif KR", serif',
-              fontSize: 16,
-              fontWeight: 700,
-              color: '#111827',
-              letterSpacing: '-0.01em',
-              wordBreak: 'keep-all',
-              marginBottom: 12,
-            }}
-          >
-            {l.question || '오늘의 브리핑'}
-          </p>
-          <TrackedAudio src={directPodcastUrl} articleId={lens.id} />
+        <ArticleAudioPlayer
+          src={directPodcastUrl}
+          accent={p.color}
+          label={p.short}
+          kicker="AI 음성 브리핑"
+          title={l.question || '오늘의 브리핑'}
+          coverImage={photo}
+          byline={lens.source_url ? '서울경제 원문 기사' : null}
+          bylineHref={lens.source_url}
+          chapters={podcastScript.length > 0 ? podcastScript.map((text) => ({ text })) : undefined}
+          onDuration={(sec) => noteDur(i, sec)}
+        />
+      )}
+
+      {/* 음성이 아직 없는 기사 — 가짜 재생 버튼·가짜 진행바·가짜 길이를
+          걷어내고, 실제로 존재하는 것(대본)만 밝혀 보여준다. */}
+      {format === 'podcast' && !hasPodcast && (
+        <div>
+          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {scriptBullets.length > 0 && (
+            <ol className="hang lread">
+              {scriptBullets.map((b, bi) => (
+                <li key={bi}>
+                  <span aria-hidden className="hang-n">
+                    {String(bi + 1).padStart(2, '0')}
+                  </span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       )}
 
-      {/* 팟캐스트 목업 — 실제 미디어가 없을 때만(위 realPodcast/
-          분기 참조). 재생 버튼·진행바는 정적 장식(실제 오디오
-          없음). 오늘(2026-08-18) 레터 상세에서 "대부분 오디오가
-          없어 빈 회색 카드로 보인다"는 이유로 미니 플레이어를
-          뺐던 것과 같은 함정을 피하려고, 여기서도 실제 재생 상태를
-          흉내내지 않고 컨셉만 고정 표시한다.
-          디자인(2026-08-18 다듬기): tint 채움 카드 → 흰 바탕 +
-          공용 그림자·테두리 토큰. 챕터 라벨을 굵은 인라인 텍스트
-          대신 알약 배지로 바꿔 목록이 표처럼 정렬되게 했다. */}
-      {/* 스크립트 전문(2026-08-23, 사용자 요청 — "청각장애인 분들을
-          위해서 본문도 넣어두면 좋을듯", 타임스탬프 동기화 없이
-          그냥 텍스트만). 파이프라인이 채워준 값이 있을 때만 뜬다 —
-          admin 수동 작성 글이나 목업엔 없어서 자연히 안 보인다. */}
+      {/* 스크립트 전문(2026-08-23, 사용자 요청 — "청각장애인 분들을 위해서
+          본문도 넣어두면 좋을듯", 타임스탬프 동기화 없이 그냥 텍스트만).
+          파이프라인이 채워준 값이 있을 때만 뜬다 — admin 수동 작성 글이나
+          목업엔 없어서 자연히 안 보인다. ArticleAudioPlayer의 chapters는
+          짧은 요약 3~5줄뿐이라, 전체 원고가 필요한 접근성 용도로는
+          별도로 둔다. */}
       {format === 'podcast' && l.transcript && (
-        <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
-          <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
+        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
+          <p className="ovl" style={{ marginBottom: 16 }}>
             스크립트 (본문 텍스트)
           </p>
-          <div style={{ fontSize: 15, lineHeight: 1.85, color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+          <div className="lread" style={{ whiteSpace: 'pre-wrap' }}>
             {l.transcript}
           </div>
         </div>
       )}
 
-      {format === 'podcast' && !realPodcast && !directPodcastUrl && (
-        <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
-          <div className="flex items-center" style={{ gap: 14 }}>
-            <span
-              aria-hidden
-              className="flex items-center justify-center flex-shrink-0"
-              style={{ width: 46, height: 46, borderRadius: 999, background: p.color, color: '#fff' }}
-            >
-              <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
-            </span>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <p
-                style={{
-                  fontFamily: '"Noto Serif KR", serif',
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: '#111827',
-                  letterSpacing: '-0.01em',
-                  wordBreak: 'keep-all',
-                  marginBottom: 4,
-                }}
-              >
-                {l.question || '오늘의 브리핑'}
-              </p>
-              <p style={{ fontSize: 12.5, color: '#9ca3af' }}>약 {mockDuration(scriptBullets.length)} · AI 음성 브리핑</p>
-            </div>
-          </div>
-          <div style={{ height: 5, borderRadius: 999, background: 'rgba(17,24,39,0.07)', margin: '18px 0 16px', overflow: 'hidden' }}>
-            <div style={{ width: '18%', height: '100%', borderRadius: 999, background: p.color }} />
-          </div>
-          {scriptBullets.length > 0 && (
-            <>
-              <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
-                이 브리핑이 다루는 것 {scriptBullets.length}
-              </p>
-              <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
-              {scriptBullets.map((b, bi) => (
-                <li key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, color: '#374151', wordBreak: 'keep-all' }}>
-                  <span
-                    style={{
-                      flexShrink: 0,
-                      fontSize: 11,
-                      fontWeight: 800,
-                      color: p.color,
-                      background: p.tint,
-                      borderRadius: 999,
-                      padding: '2px 8px',
-                      marginTop: 1,
-                    }}
-                  >
-                    챕터 {bi + 1}
-                  </span>
-                  <span style={{ lineHeight: 1.6 }}>{b}</span>
-                </li>
-              ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* 실제 영상(2026-08-19) — admin이 LensMode.tsx 영상 탭에서
-          YouTube 등 링크를 채운 경우 실제 플레이어를 임베드한다
-          (/video 페이지와 같은 resolveVideo 유틸). */}
+      {/* 실제 영상(2026-08-19) — admin이 YouTube 등 링크를 채운 경우 실제
+          플레이어를 임베드한다. */}
       {format === 'video' && realVideo && (
-        <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
-          {/* on일 때만 src — 팟캐스트 iframe과 같은 이유. */}
-          <iframe
-            src={on ? realVideo.embedUrl : undefined}
-            title={l.question || '영상'}
-            className="w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+        <div>
+          {l.question && <p className="fmt-lede">{l.question}</p>}
+          <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 14, background: '#111827' }}>
+            <iframe
+              src={realVideo.embedUrl}
+              title={l.question || '영상'}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
         </div>
       )}
 
-      {/* 직링크 영상(2026-08-20) — S3 등에 직접 올린 mp4(예: Remotion
-          렌더 결과). 유튜브가 아니라 iframe 임베드가 안 되므로
-          네이티브 <video>로 재생. */}
+      {/* 직링크 영상(2026-08-20) — S3 등에 직접 올린 mp4(예: Remotion 렌더
+          결과). ArticleVideoPlayer(2026-08-21 재설계): 재생/탐색/±5초/반복/
+          배속/북마크/음소거/전체화면 전부 실제로 동작한다. 자막 버튼만
+          disabled로 남겼다 — 이 파이프라인은 자막 데이터를 만들지 않는다.
+          대본 패널은 넣지 않는다(2026-08-21, "대본 기능은 빼줘" 요청) —
+          영상은 이미 화면을 보고 있는 상태라 같은 정보를 텍스트로 한 번
+          더 보여줄 필요가 없다는 판단(단, 접근성용 스크립트 전문은
+          l.transcript가 있을 때 아래에서 별도로 보여준다). */}
       {format === 'video' && directVideoUrl && (
-        <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
-          {/* 자동재생(2026-08-23, 사용자 요청 — "누르기 귀찮"),
-              단 실제로 이 섹션이 보일 때(on)만 — 4개 포맷 섹션이
-              전부 hidden 속성으로만 숨겨진 채 동시에 마운트돼 있어서
-              그냥 autoPlay를 쓰면 안 보이는 탭에서도 재생되는 버그가
-              났었다(위 AutoPlayVideo 주석 참조). realVideo(유튜브
-              등 iframe embed) 쪽은 videoEmbed.ts의 embedUrl에
-              이미 autoplay=1이 박혀 있어 그대로 뒀다. */}
-          <AutoPlayVideo src={directVideoUrl} active={on} articleId={lens.id} />
+        <ArticleVideoPlayer
+          src={directVideoUrl}
+          poster={l.thumbnail_url}
+          accent={p.color}
+          label={p.short}
+          kicker="AI 영상 브리핑"
+          title={l.question || '오늘의 영상'}
+          byline={lens.source_url ? '서울경제 원문 기사' : null}
+          bylineHref={lens.source_url}
+          onDuration={(sec) => noteDur(i, sec)}
+        />
+      )}
+
+      {/* 영상이 아직 없는 기사 — 팟캐스트와 같은 이유로 가짜 플레이어를
+          걷어냈다. 남긴 것: 실제로 있는 대본. */}
+      {format === 'video' && !hasVideo && (
+        <div>
+          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {scriptBullets.length > 0 && (
+            <ol className="hang lread">
+              {scriptBullets.map((b, bi) => (
+                <li key={bi}>
+                  <span aria-hidden className="hang-n">
+                    {String(bi + 1).padStart(2, '0')}
+                  </span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       )}
 
-      {/* 영상 목업 — 실제 영상이 없을 때만(위 realVideo/
-          directVideoUrl 분기 참조). 기사 사진을 썸네일로 재사용,
-          재생 버튼 오버레이만 정적으로 얹는다.
-          디자인(2026-08-18 다듬기): 플레이어 아래 캡션·타임라인을
-          팟캐스트 챕터와 같은 알약 배지 톤으로 맞춰 두 오디오/영상
-          포맷이 한 세트로 읽히게 했고, 카드 전체에 공용 그림자를
-          둘러 다른 포맷 카드들과 무게감을 맞췄다. */}
-      {/* 스크립트 전문(2026-08-23) — 팟캐스트와 같은 이유. */}
+      {/* 스크립트 전문(2026-08-23) — 팟캐스트와 같은 이유(접근성). */}
       {format === 'video' && l.transcript && (
-        <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
-          <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
+        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
+          <p className="ovl" style={{ marginBottom: 16 }}>
             스크립트 (본문 텍스트)
           </p>
-          <div style={{ fontSize: 15, lineHeight: 1.85, color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'keep-all' }}>
+          <div className="lread" style={{ whiteSpace: 'pre-wrap' }}>
             {l.transcript}
           </div>
         </div>
-      )}
-
-      {format === 'video' && !realVideo && !directVideoUrl && (
-        <div style={{ borderRadius: 16, background: '#fff', boxShadow: LENS_CARD_SHADOW, padding: 14 }}>
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              aspectRatio: '16/9',
-              borderRadius: 12,
-              overflow: 'hidden',
-              background: '#111827',
-            }}
-          >
-            {photo && (
-              <Image src={photo} alt="" fill sizes="640px" style={{ objectFit: 'cover', opacity: 0.65 }} />
-            )}
-            <span aria-hidden style={{ position: 'absolute', inset: 0, background: 'rgba(17,24,39,0.15)' }} />
-            <span
-              aria-hidden
-              className="flex items-center justify-center"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                margin: 'auto',
-                width: 58,
-                height: 58,
-                borderRadius: 999,
-                background: '#fff',
-                color: p.color,
-                boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-              }}
-            >
-              <Play size={22} fill="currentColor" style={{ marginLeft: 3 }} />
-            </span>
-            <span
-              style={{
-                position: 'absolute',
-                right: 10,
-                bottom: 10,
-                fontSize: 11,
-                fontWeight: 700,
-                fontVariantNumeric: 'tabular-nums',
-                color: '#fff',
-                background: 'rgba(0,0,0,0.6)',
-                borderRadius: 4,
-                padding: '2px 7px',
-              }}
-            >
-              {mockDuration(scriptBullets.length)}
-            </span>
-          </div>
-          {l.question && (
-            <p
-              style={{
-                fontFamily: '"Noto Serif KR", serif',
-                fontSize: 16,
-                fontWeight: 700,
-                color: '#111827',
-                letterSpacing: '-0.01em',
-                margin: '14px 0 10px',
-                wordBreak: 'keep-all',
-              }}
-            >
-              {l.question}
-            </p>
-          )}
-          {scriptBullets.length > 0 && (
-            <>
-              <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
-                이 영상이 다루는 것 {scriptBullets.length}
-              </p>
-              <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
-              {scriptBullets.map((b, bi) => (
-                <li key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, color: '#374151', wordBreak: 'keep-all' }}>
-                  <span
-                    style={{
-                      flexShrink: 0,
-                      fontSize: 11,
-                      fontWeight: 800,
-                      fontVariantNumeric: 'tabular-nums',
-                      color: p.color,
-                      background: p.tint,
-                      borderRadius: 999,
-                      padding: '2px 8px',
-                      marginTop: 1,
-                    }}
-                  >
-                    0:{String((bi + 1) * 12).padStart(2, '0')}
-                  </span>
-                  <span style={{ lineHeight: 1.6 }}>{b}</span>
-                </li>
-              ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* 시선 간 연결 — 네 포맷이 따로 떨어져 보인다는 지적
-          (2026-08-18, "이 4개의 순서가... 연결점, 스토리텔링이
-          자연스러우면 좋겠다" — 전화영어 서비스 레슨 플로우처럼)
-          에 따라, 마지막(video)만 빼고 각 포맷 끝에 다음 시선으로
-          넘어가는 한 줄을 둔다. 데모 문구가 없는 기사·포맷은
-          다음 시선의 role명으로 자동 생성해 어떤 기사에도 동작. */}
-      {format !== 'video' && i + 1 < count && (
-        <button
-          type="button"
-          onClick={() => {
-            select(i + 1);
-            tabRefs.current[i + 1]?.focus();
-          }}
-          className="flex items-center"
-          style={{
-            gap: 6,
-            marginTop: 20,
-            paddingTop: 16,
-            width: '100%',
-            background: 'none',
-            border: 'none',
-            borderTop: '1px solid rgba(17,24,39,0.08)',
-            cursor: 'pointer',
-            textAlign: 'left',
-            fontSize: 13.5,
-            fontWeight: 700,
-            color: lensPerspectiveAt(i + 1).color,
-            wordBreak: 'keep-all',
-          }}
-        >
-          <span>{articleBridgeSample(lens.id, format) ?? `다음 시선 — ${lensPerspectiveAt(i + 1).full}`}</span>
-          <ArrowRight size={14} aria-hidden />
-        </button>
       )}
     </section>
   );
