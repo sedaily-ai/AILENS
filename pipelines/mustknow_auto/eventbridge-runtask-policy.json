@@ -16,6 +16,15 @@
         "arn:aws:iam::887078546492:role/sedaily-lens-mustknow-auto-task-role",
         "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-execution-role"
       ]
+    },
+    {
+      "Sid": "TagOnRunTask",
+      "Effect": "Allow",
+      "Action": "ecs:TagResource",
+      "Resource": "arn:aws:ecs:us-east-1:887078546492:task/sedaily-lens-frontpage-auto/*",
+      "Condition": {
+        "StringEquals": {"ecs:CreateAction": "RunTask"}
+      }
     }
   ]
 }
