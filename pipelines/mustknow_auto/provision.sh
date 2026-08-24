@@ -29,9 +29,19 @@ FAMILY="sedaily-lens-mustknow-auto"
 # register-task-definition은 소문자 key/value 셸 shorthand로 넣으면
 # "Second instance of key value encountered" 파싱 에러가 나서(실제로
 # 겪음) tags-ecs.json 파일로 대신 넣는다.
-TAGS_KV="Key=Project,Value=Sedaily-LENS Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-LENS Key=Environment,Value=dev Key=Service,Value=lens Key=Workload,Value=mustknow-auto Key=WorkItem,Value=atlas-4444"  # iam (대문자 Key/Value)
-TAGS_EQ="Project=Sedaily-LENS,CostCenter=sedaily-ai,ServiceName=Sedaily-LENS,Environment=dev,Service=lens,Workload=mustknow-auto,WorkItem=atlas-4444"  # logs
-TAGS_JSON='[{"Key":"Project","Value":"Sedaily-LENS"},{"Key":"CostCenter","Value":"sedaily-ai"},{"Key":"ServiceName","Value":"Sedaily-LENS"},{"Key":"Environment","Value":"dev"},{"Key":"Service","Value":"lens"},{"Key":"Workload","Value":"mustknow-auto"},{"Key":"WorkItem","Value":"atlas-4444"}]'  # events (--region 명시 필수 — 안 그러면 "Cross-region api call is not allowed" 에러)
+#
+# 2026-08-24 — Service 태그를 lens → atlas4 로 변경. 미래전략부 Atlas 크레딧
+# 지원(8~9월) 집계는 활성 비용할당 태그인 Service 키를 읽고, atlas* 접두어가
+# Atlas 작업으로 집계된다. mustknow 체인은 lane 4다. WorkItem=atlas-4444 는
+# 담당자 내부 마커로 유지하지만, WorkItem 키는 payer 비용할당 태그로 활성화돼
+# 있지 않아 청구 데이터에 나타나지 않는다 — 집계에 실제로 잡히는 것은 Service 뿐.
+# ⚠ 크레딧 지원 종료일 2026-09-30 에 SERVICE_TAG 를 "lens" 로 되돌릴 것.
+#    되돌릴 때 tags-ecs.json 의 Service 값도 함께 바꿔야 한다.
+SERVICE_TAG="atlas4"  # 9/30 이후 "lens"
+
+TAGS_KV="Key=Project,Value=Sedaily-LENS Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-LENS Key=Environment,Value=dev Key=Service,Value=${SERVICE_TAG} Key=Workload,Value=mustknow-auto Key=WorkItem,Value=atlas-4444"  # iam (대문자 Key/Value)
+TAGS_EQ="Project=Sedaily-LENS,CostCenter=sedaily-ai,ServiceName=Sedaily-LENS,Environment=dev,Service=${SERVICE_TAG},Workload=mustknow-auto,WorkItem=atlas-4444"  # logs
+TAGS_JSON="[{\"Key\":\"Project\",\"Value\":\"Sedaily-LENS\"},{\"Key\":\"CostCenter\",\"Value\":\"sedaily-ai\"},{\"Key\":\"ServiceName\",\"Value\":\"Sedaily-LENS\"},{\"Key\":\"Environment\",\"Value\":\"dev\"},{\"Key\":\"Service\",\"Value\":\"${SERVICE_TAG}\"},{\"Key\":\"Workload\",\"Value\":\"mustknow-auto\"},{\"Key\":\"WorkItem\",\"Value\":\"atlas-4444\"}]"  # events (--region 명시 필수 — 안 그러면 "Cross-region api call is not allowed" 에러)
 
 echo "=== 1/5 IAM 역할 2개 (태스크 앱 권한 / EventBridge 호출) ==="
 echo "    (execution-role은 frontpage_auto 것 재사용 — 범용 ECS 실행 권한이라 서비스별 구분 불필요)"
@@ -44,8 +54,15 @@ aws iam put-role-policy --role-name sedaily-lens-mustknow-auto-task-role \
 aws iam create-role --role-name sedaily-lens-mustknow-auto-eventbridge-role \
   --assume-role-policy-document file://trust-policy-events.json \
   --tags $TAGS_KV
+# 정책 이름은 라이브와 일치시킨다 — 2026-08-24 확인 시 AWS 에는 "eventbridge-runtask" 로
+# 붙어 있었고 이 스크립트만 "RunMustknowAutoTask" 였다. 그대로 재실행하면 같은 내용의
+# 정책이 두 개(이름만 다르게) 붙어 권한 감사 때 혼란이 생긴다.
+#
+# 이 정책에는 ecs:TagResource 가 필요하다. EventBridge 타깃에
+# PropagateTags=TASK_DEFINITION 을 쓰면 RunTask 가 태스크에 태그를 붙이는데, 그 권한이
+# 없으면 RunTask 자체가 실패한다. 권한을 먼저 넣고 그 다음에 put-targets 를 적용할 것.
 aws iam put-role-policy --role-name sedaily-lens-mustknow-auto-eventbridge-role \
-  --policy-name RunMustknowAutoTask --policy-document file://eventbridge-runtask-policy.json
+  --policy-name eventbridge-runtask --policy-document file://eventbridge-runtask-policy.json
 
 echo "=== 2/5 CloudWatch 로그그룹 (30일 보관) ==="
 aws logs create-log-group --log-group-name "/ecs/$FAMILY" --region "$REGION" --tags "$TAGS_EQ"
@@ -63,6 +80,16 @@ aws events put-rule --name "${FAMILY}-6x-daily" \
 aws events tag-resource --resource-arn "arn:aws:events:${REGION}:${ACCOUNT_ID}:rule/${FAMILY}-6x-daily" --tags "$TAGS_JSON" --region "$REGION"
 
 echo "=== 5/5 EventBridge 타겟(위 태스크 정의 연결) ==="
+# eventbridge-target.json 의 PropagateTags=TASK_DEFINITION 는 필수다. 이게 없으면
+# RunTask 로 뜨는 Fargate 태스크에 태그가 하나도 안 붙어서 컴퓨트 비용이 전부
+# 미태깅(Not Applicable)으로 샌다 — task definition 을 태깅해도 실행 태스크는
+# 별개다. 2026-08-24 에 실제로 이 상태였던 것을 확인하고 추가했다.
+#
+# ⚠ 순서 의존: 위 1/5 의 ecs:TagResource 권한이 먼저 들어가 있어야 한다. 권한 없이
+# PropagateTags 를 적용하면 RunTask 가 실패해 6x-daily 배치가 멈춘다.
+# 적용 후에는 다음 실행에서 실제 태스크에 태그가 붙었는지 확인할 것:
+#   aws ecs list-tags-for-resource --resource-arn <실행된 task ARN> --region us-east-1
+# put-targets 성공만으로 판정하지 않는다.
 aws events put-targets --rule "${FAMILY}-6x-daily" --targets file://eventbridge-target.json --region "$REGION"
 
 echo "완료 — 규칙은 DISABLED 상태로 생성됨. 수동 run-task로 충분히 검증한 뒤"

@@ -3,7 +3,7 @@
   {"key": "CostCenter", "value": "sedaily-ai"},
   {"key": "ServiceName", "value": "Sedaily-LENS"},
   {"key": "Environment", "value": "dev"},
-  {"key": "Service", "value": "lens"},
+  {"key": "Service", "value": "atlas4"},
   {"key": "Workload", "value": "mustknow-auto"},
   {"key": "WorkItem", "value": "atlas-4444"}
 ]
