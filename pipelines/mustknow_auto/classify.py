@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 from bedrock_client import call_text
-from json_extract import extract_fenced_json_text  # 2026-08-23 공용화
+from json_extract import extract_fenced_json_text, loads_lenient  # 2026-08-23 공용화
 
 MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/zmdham3vkj89"  # lens-mustknow-sonnet-5
 
@@ -59,7 +59,7 @@ def _salvage_truncated_array(text: str) -> list[dict]:
     candidate = text[: last_close + 1].rstrip()
     if candidate.endswith(","):
         candidate = candidate[:-1]
-    return json.loads(candidate + "\n]")
+    return loads_lenient(candidate + "\n]")
 
 
 def _extract_json_array(text: str) -> list[dict]:
@@ -70,7 +70,13 @@ def _extract_json_array(text: str) -> list[dict]:
     그 뒤 배열 살리기 로직은 이 파일만의 것이라 계속 분리해서 둔다."""
     fenced = extract_fenced_json_text(text, opener="[")
     if fenced is not None:
-        return json.loads(fenced)
+        # 2026-08-24 — 펜스를 찾아도 그 안이 깨져 있을 수 있다(모델이 \' 처럼
+        # JSON 에 없는 이스케이프를 쓰는 경우). 예전엔 여기서 바로 예외가 나
+        # 아래 폴백들이 아예 실행되지 않았다.
+        try:
+            return loads_lenient(fenced)
+        except json.JSONDecodeError:
+            pass
 
     # 닫는 fence 자체가 없음(응답이 잘렸을 가능성) — 여는 fence 뒤부터라도 건진다.
     open_match = re.search(r"```json\s*\n", text)

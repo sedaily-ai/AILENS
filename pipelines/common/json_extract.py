@@ -8,8 +8,9 @@ webtoon/pipeline.py, video/generate_script.py, mustknow_auto/classify.py
 공용화하지 않고 각 파일에 그대로 둔다 — 이 함수는 텍스트만 반환하고
 json.loads()는 호출부 책임이다.
 """
+import json
 import re
-from typing import Optional
+from typing import Any, Optional
 
 
 def extract_fenced_json_text(text: str, *, opener: str) -> Optional[str]:
@@ -26,3 +27,67 @@ def extract_fenced_json_text(text: str, *, opener: str) -> Optional[str]:
         return candidates[-1]
 
     return None
+
+
+# JSON 이 허용하는 이스케이프 문자. 이 밖의 \X 는 전부 문법 오류다.
+_VALID_ESCAPE_CHARS = '"\\/bfnrtu'
+
+
+def repair_invalid_escapes(text: str) -> str:
+    r"""JSON 문법에 없는 역슬래시 이스케이프를 리터럴 문자로 되돌린다.
+
+    2026-08-24 — 실운영에서 기사가 통째로 스킵되는 실패의 원인. 장면연출
+    프롬프트 출력은 한국어 지문 안에 작은따옴표 문자열을 많이 담는데
+    (캡션 박스 'D+20일'), Claude 가 이걸 종종 \' 로 이스케이프한다.
+    JSON 이 허용하는 건 " \ / b f n r t u 뿐이라 \' 는 파싱 실패다
+    (08-24 08:20 런: Invalid \escape ... char 2550, 기사 1건 유실).
+
+    모델이 \' 를 쓸 때 의도한 건 언제나 따옴표 문자 자체이므로 역슬래시만
+    떼어낸다. 정상 이스케이프(\n, \", 가 …)와 리터럴 역슬래시(\\)는
+    그대로 둔다 — \\ 를 \ 로 줄여버리면 경로 문자열이 깨진다.
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch != "\\":
+            out.append(ch)
+            i += 1
+            continue
+        if i + 1 >= n:
+            i += 1  # 끝에 홀로 남은 역슬래시 — 버린다
+            continue
+
+        nxt = text[i + 1]
+        if nxt == "u":
+            # \uXXXX 는 16진수 4자리가 따라올 때만 유효한 이스케이프다.
+            if re.fullmatch(r"[0-9a-fA-F]{4}", text[i + 2:i + 6] or ""):
+                out.append(text[i:i + 6])
+                i += 6
+            else:
+                out.append("u")
+                i += 2
+            continue
+        if nxt in _VALID_ESCAPE_CHARS:
+            # \\ 도 여기서 통째로 소비된다 — 두 번째 역슬래시를 다시 읽지 않는다.
+            out.append(ch)
+            out.append(nxt)
+            i += 2
+            continue
+
+        out.append(nxt)  # 잘못된 이스케이프 — 역슬래시만 제거
+        i += 2
+
+    return "".join(out)
+
+
+def loads_lenient(text: str) -> Any:
+    """json.loads() 를 시도하고, 문법 오류면 이스케이프를 수리해 한 번 더 시도한다.
+
+    수리 후에도 실패하면 JSONDecodeError 를 그대로 올린다 — 호출부의 기존
+    폴백 사슬이 계속 동작해야 하기 때문이다.
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return json.loads(repair_invalid_escapes(text))

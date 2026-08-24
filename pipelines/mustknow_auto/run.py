@@ -283,6 +283,7 @@ def _publish(
     *,
     paper_section: str | None,
     display_order: int | None,
+    results: dict | None = None,
 ) -> str:
     """반환값: "published" | "published_no_video" | "failed"
     frontpage_auto/run.py의 process_article() 중 4포맷 생성+업로드+DDB
@@ -297,19 +298,34 @@ def _publish(
 
     podcast_mp3 = _podcast_mod.run_article(name, str(article_path), out_dir)
 
-    _webtoon_mod.run_article(name, str(article_path), out_dir)
-
-    webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+    # 2026-08-24 — 웹툰은 영상과 달리 폴백이 없었다. 이미지 생성이 실패하면
+    # (08-23 실측: OpenAI 크레딧 소진 → 컷N.png 미생성 → _upload 에서
+    # FileNotFoundError) 이미 성공한 레터·팟캐스트까지 통째로 버려지고
+    # 기사가 failed 로 집계됐다. 영상과 같은 방식으로 "웹툰 없이 발행"까지는
+    # 살린다. status 는 계속 영상 기준으로만 정한다 — 호출부의 결과 집계와
+    # revalidate 웹훅 분기가 그 값에 걸려 있어서, 여기에 새 status 를 끼우면
+    # 웹툰만 빠진 기사가 SSR 재검증을 조용히 건너뛴다.
+    webtoon_script: dict = {}
     webtoon_bullets, webtoon_images = [], []
-    for cut in webtoon_script["cuts"]:
-        caption = cut.get("narration") or (
-            " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
-        ) or cut.get("caption", "")
-        webtoon_bullets.append(caption)
-        n = cut["cut"]
-        cut_path = out_dir / name / f"컷{n}.png"
-        key = f"media/mustknow-auto/{name}-webtoon-cut{n:03d}.png"
-        webtoon_images.append({"url": _upload(s3, cut_path, key), "caption": caption})
+    try:
+        _webtoon_mod.run_article(name, str(article_path), out_dir)
+        webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+        for cut in webtoon_script["cuts"]:
+            caption = cut.get("narration") or (
+                " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
+            ) or cut.get("caption", "")
+            webtoon_bullets.append(caption)
+            n = cut["cut"]
+            cut_path = out_dir / name / f"컷{n}.png"
+            key = f"media/mustknow-auto/{name}-webtoon-cut{n:03d}.png"
+            webtoon_images.append({"url": _upload(s3, cut_path, key), "caption": caption})
+    except Exception:
+        # 부분 성공(예: 3컷까지만 업로드)도 버린다 — 중간에 끊긴 웹툰을
+        # 내보내느니 웹툰 탭을 pending 으로 두는 편이 낫다.
+        webtoon_script, webtoon_bullets, webtoon_images = {}, [], []
+        if results is not None:
+            results["degraded_no_webtoon"] = results.get("degraded_no_webtoon", 0) + 1
+        print(f"[mustknow-auto] {name} 웹툰 실패 — 웹툰 없이 발행\n{traceback.format_exc()}")
 
     podcast_url = _upload(s3, podcast_mp3, f"media/podcast/mustknow-auto/{name}-podcast.mp3")
 
@@ -346,7 +362,8 @@ def _publish(
         {"label": "레터", "question": article["title"], "bullets": [], "paragraphs": paragraphs,
          "images": [], "video_url": None, "media_url": None},
         {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
-         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None},
+         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
+         "pending": not webtoon_images},
         {"label": "팟캐스트", "question": article["title"], "bullets": [], "paragraphs": [],
          "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
         {"label": "영상", "question": article["title"], "bullets": [], "paragraphs": [],
@@ -508,7 +525,7 @@ def main():
     out_dir = Path("/tmp/mustknow_auto_out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    results = {"published": 0, "published_no_video": 0, "failed": 0, "skipped_duplicate": 0}
+    results = {"published": 0, "published_no_video": 0, "degraded_no_webtoon": 0, "failed": 0, "skipped_duplicate": 0}
     selected_keys: set[str] = set()
     tab_counts = {"전체": 0, "증권": 0, "산업": 0, "시그널": 0, "일반": 0}
 
@@ -520,7 +537,7 @@ def main():
             results["skipped_duplicate"] += 1
             return "skipped_duplicate"
         try:
-            status = _publish(article, out_dir, s3, table, today, paper_section=paper_section, display_order=display_order)
+            status = _publish(article, out_dir, s3, table, today, paper_section=paper_section, display_order=display_order, results=results)
         except Exception:
             print(f"[mustknow-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵\n{traceback.format_exc()}")
             status = "failed"
