@@ -85,7 +85,15 @@ export function UserMenu() {
             <button
               onClick={() => {
                 setIsOpen(false);
-                router.push("/?tab=archive");
+                // router.push는 이미 "/"에 있을 때(홈에서 이 버튼을 누르는
+                // 흔한 경우) 쿼리스트링만 바뀌는 소프트 네비게이션이라 아무
+                // 효과가 없었다 — FeedPage.tsx의 URL→탭 동기화 effect가
+                // 하이드레이션 불일치 방지 때문에 마운트 시 1회만 읽도록
+                // 의도적으로 설계돼 있어(정적 export 대응), 페이지 안에
+                // 머문 채로는 재실행되지 않는다(2026-08-24, 사용자가 "눌러도
+                // 아무것도 안 나온다"고 지적). 하드 네비게이션으로 항상 새
+                // 마운트를 강제한다.
+                window.location.href = "/?tab=archive";
               }}
               className="w-full px-4 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-3"
             >
