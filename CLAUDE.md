@@ -50,6 +50,23 @@ CloudFront(`E1QS7PY350VHF6`, `E1MITYI58DB9UW`), 같은 Lambda 함수 이름
 
 전체 아키텍처 문서를 dev2 기준으로 새로 정리하는 작업은 별도 세션에서 진행할 것.
 
+## AWS 리소스·Bedrock 을 건드리기 전에 — 비용태깅 규칙
+
+[`docs/architecture/비용태깅_규칙.md`](docs/architecture/비용태깅_규칙.md) 를 먼저 읽는다.
+**리소스를 만들거나 Bedrock 을 호출하는 작업이면 예외 없이 해당된다.**
+
+요약만 적어두면:
+
+- **`modelId` 에 베어 모델 ID(`us.anthropic.*` · `anthropic.claude-*` · `amazon.nova-*`)를
+  넣지 않는다.** 태그가 붙을 자리가 없어 100% 미태깅으로 샌다. application inference profile
+  ARN 을 경유한다. 이 레포는 이 문제로 **W22 에 주당 약 $1,156 을 미지정으로 흘린 전례**가 있고
+  (`constants.py` `BEDROCK_MODEL_ID_OPUS` 주석), Opus 만 고쳐져 Haiku·Sonnet·Nova·챗봇 경로는
+  아직 베어다.
+- **`Service` 기본값은 `lens`.** mustknow 만 `atlas4`(2026-08~09 Atlas 크레딧, 9/30 원복).
+  **AI LENS 본업을 `atlas*` 로 옮기지 않는다** — 크레딧 증빙 위조가 된다. 애매하면 `lens` 붙이고 상의.
+- **태그는 소급되지 않는다.** 일회성·단발 작업은 기회가 한 번뿐이므로 **착수 전에** 붙인다.
+- 태그 값을 스크립트 사본마다 하드코딩하지 않는다 — 변수 한 곳으로 뺀다. 배포가 덮어쓴 전례가 있다.
+
 ## worklog는 요청 없이도 기본으로 남긴다
 
 `docs/README.md`의 worklog 규칙(경로 `docs/worklog/YYYY-MM/YYYY-MM-DD-주제.md`,
