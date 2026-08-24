@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ai.sedaily.lens",
+      "sha256_cert_fingerprints": [
+        "D6:1C:13:03:5A:8A:A6:9C:48:FD:85:55:D2:93:F0:22:9D:1B:93:6A:9E:39:3E:3C:E2:95:EE:4B:B0:D0:53:D8"
+      ]
+    }
+  }
+]
