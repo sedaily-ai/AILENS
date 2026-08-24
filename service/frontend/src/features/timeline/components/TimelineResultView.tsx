@@ -18,14 +18,64 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  fetchIssues, kdate,
+  fetchIssues, kdate, kstTimeLabel,
   type Article, type Issue, type Indicator, type View,
 } from '../lib/timelineApi';
 import {
   SURFACE, SURFACE_SUNKEN, SURFACE_CHIP, TEXT_STRONG, TEXT_BODY, TEXT_MUTED,
-  BORDER_HAIRLINE, BORDER_CONTROL, BORDER_STRONG, FONT, SPACE,
+  BORDER_HAIRLINE, BORDER_CONTROL, BORDER_STRONG, FONT, SPACE, LEADING, SR_ONLY,
 } from '../lib/tone';
 import { SajuFunnelCard } from './SajuFunnelCard';
+
+/**
+ * 제목 아래 꼬리줄 — "09:23 · 이현호 기자".
+ *
+ * 2026-08-24 추가. 백엔드는 published_at(초 단위)과 byline 을 처음부터 보내고
+ * 있었는데 화면이 안 쓰고 있었다(byline 은 타입에 없어서 toArticles 가 버렸다).
+ *
+ * ── 왜 날짜 없이 시각만인가 ──────────────────────────────────────
+ * 이 페이지 h1 이 "2026년 8월 24일자 서울경제"고, 목록은 그 날짜 기사만
+ * 나온다(S3 는 하루치 파일 단위). 행마다 "2026-08-24"를 붙이면 최대 30번
+ * 같은 값을 반복하는 셈이고, 그 줄에서 새로운 정보는 시:분뿐이다.
+ *
+ * 카테고리는 제목 위에 그대로 둔다 — 분야는 훑을 때 걸러내는 기준이라 제목보다
+ * 먼저 읽혀야 하고, 시각·기자는 그 기사를 고른 다음에 확인하는 정보다.
+ *
+ * 시각과 기자를 각각 다른 줄에 두지 않고 ` · ` 로 묶은 이유: 13px 두 단어에
+ * 한 줄을 더 쓰면 375px 에서 행이 그만큼 길어진다(빅카인즈 화면에서 바이라인을
+ * 뺐던 것과 같은 판단 — TimelineBigkindsView.ArticleRow 주석 참조).
+ */
+function ArticleMeta({ article }: { article: Article }) {
+  const time = kstTimeLabel(article.published_at);
+  // byline 에 "기자"가 이미 붙어 있다(S3Article.author_name) — 덧붙이지 않는다.
+  const byline = article.byline?.trim();
+  if (!time && !byline) return null;
+
+  return (
+    <p
+      style={{
+        marginTop: SPACE.xs,
+        fontSize: FONT.caption,
+        color: TEXT_MUTED,
+        lineHeight: LEADING.tight,
+        wordBreak: 'keep-all',
+      }}
+    >
+      {time && (
+        <>
+          {/* 맨 숫자만 읽히면 무슨 시각인지 알 수 없다. <time> 으로 기계가 읽을
+              값을 주고, 보조기기에는 무엇의 시각인지 말해준다. */}
+          <span style={SR_ONLY}>발행 </span>
+          <time dateTime={article.published_at} style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {time}
+          </time>
+        </>
+      )}
+      {time && byline && ' · '}
+      {byline}
+    </p>
+  );
+}
 
 function ArticleList({ items }: { items: Article[] }) {
   if (items.length === 0) {
@@ -72,6 +122,7 @@ function ArticleList({ items }: { items: Article[] }) {
               >
                 {a.title}
               </p>
+              <ArticleMeta article={a} />
             </div>
           </a>
         </li>

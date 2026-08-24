@@ -5,7 +5,7 @@
 // 감사 결론 — 서버 컴포넌트에서도 같은 fetch 로직을 재사용해야 해서 순수
 // 함수·타입만 여기로 뺐다, letters의 archiveItems.ts와 같은 이유).
 import { API_URL } from '@/shared/config/apiClient';
-export { kstTodayStr } from '@/shared/lib/date';
+export { kstTodayStr, kstTimeLabel } from '@/shared/lib/date';
 
 export interface Article {
   news_id: string;
@@ -14,6 +14,17 @@ export interface Article {
   category: string;
   original_link: string;
   provider?: string;
+  /**
+   * 취재 기자 — 백엔드 `services/timeline_service._s3_article_to_response`가
+   * S3Article.author_name 을 그대로 내려준다. **"기자"가 이미 붙어 있다**
+   * ("이현호 기자"). 렌더할 때 "기자"를 덧붙이면 "이현호 기자 기자"가 된다 —
+   * features/news-feed의 NewsTimeMachineSection이 `{a.byline} 기자`로 쓰는 건
+   * 그쪽 소스(빅카인즈)가 접미사 없는 맨이름을 주기 때문이다.
+   *
+   * 백엔드는 처음부터 이 필드를 보내고 있었는데 여기 타입에 없어서 toArticles가
+   * 조용히 버리고 있었다(2026-08-24 추가).
+   */
+  byline?: string;
 }
 
 interface RawArticle {
@@ -23,6 +34,7 @@ interface RawArticle {
   category?: string;
   original_link?: string;
   provider?: string;
+  byline?: string;
 }
 
 export interface Issue {
@@ -211,6 +223,7 @@ function toArticles(raw: unknown): Article[] {
       category: a.category ?? '',
       original_link: a.original_link ?? '',
       provider: a.provider,
+      byline: a.byline,
     }));
 }
 
