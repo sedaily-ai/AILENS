@@ -349,6 +349,14 @@ function MobileDrawer({
             </svg>
           </button>
         </div>
+        {/* 로그인 — 데스크톱은 헤더 우측 UserMenu가 상시 보이지만, 모바일은
+            그 자리가 통째로 숨겨져 있어(md:flex) 로그인으로 갈 방법이 "내
+            서랍" 탭 안 CTA뿐이었다(2026-08-24, 사용자 지적). 드로어 최상단에
+            같은 UserMenu를 그대로 재사용 — 로그인 여부에 따른 버튼/드롭다운
+            분기를 새로 만들 필요 없이 기존 컴포넌트 그대로 끌어왔다. */}
+        <div className="px-5 py-3 border-b border-gray-100">
+          <UserMenu />
+        </div>
         <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
           {tabs.map((tab) => {
             const cls = `${rowCls} ${tab.active ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`;
