@@ -75,6 +75,9 @@ import { SajuFunnelCard } from './SajuFunnelCard';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
 
+/** 분야마다 처음 펼쳐 둘 기사 수 — 나머지는 "더 보기"로 접힌다. */
+const PREVIEW_PER_SECTION = 3;
+
 /**
  * 기사 한 행 — 제목 + 본문 미리보기 + 바이라인. 모든 행이 같은 모양이다.
  *
@@ -166,6 +169,14 @@ export function TimelineBigkindsView({
 }) {
   const layout = useMemo(() => buildDayLayout(articles), [articles]);
   const [fillerOpen, setFillerOpen] = useState(false);
+  // 분야별로 처음 몇 건만 펼쳐 둔다(2026-08-24, "기사들이 너무 길어서 몇 개만
+  // 보여주고 접어놓아야 될 것 같다"). 실측: 이 화면은 분야 7개에 23행이고
+  // 행마다 제목 2줄 + 미리보기 2줄이라 스크롤이 아주 길었다. 분야 자체를
+  // 접지는 않는다 — 이 페이지가 답해야 할 질문이 "그날은 어떤 날이었나"라서
+  // 분야 목록(경제는 이랬고 정치는 이랬다)은 한눈에 남아 있어야 한다.
+  // 대신 각 분야의 뒷부분만 접고, 접힘 UI는 아래 부고·인사·공시와 같은
+  // 관례(.tl-btn + ▾)를 그대로 쓴다.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const yearsAgo = yearsAgoLabel(date);
   const total = articles.length;
@@ -299,38 +310,70 @@ export function TimelineBigkindsView({
                 )}
               </p>
 
-              {layout.sections.map((section) => (
-                <section
-                  key={section.label}
-                  aria-labelledby={`tl-beat-${section.label}`}
-                  style={{ marginBottom: SPACE.xl }}
-                >
-                  <h2
-                    id={`tl-beat-${section.label}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      gap: SPACE.sm,
-                      fontSize: FONT.sectionTitle,
-                      fontWeight: 700,
-                      color: TEXT_STRONG,
-                      letterSpacing: '-0.02em',
-                      paddingBottom: SPACE.sm,
-                    }}
+              {layout.sections.map((section) => {
+                const isOpen = !!openSections[section.label];
+                const restCount = section.items.length - PREVIEW_PER_SECTION;
+                const shown = isOpen ? section.items : section.items.slice(0, PREVIEW_PER_SECTION);
+                const listId = `tl-beat-list-${section.label}`;
+                return (
+                  <section
+                    key={section.label}
+                    aria-labelledby={`tl-beat-${section.label}`}
+                    style={{ marginBottom: SPACE.xl }}
                   >
-                    {section.label}
-                    {/* 건수는 제목이 아니라 보조 정보 — 무게를 낮춘다. */}
-                    <span style={{ fontSize: FONT.caption, fontWeight: 600, color: TEXT_MUTED }}>
-                      {section.items.length}건
-                    </span>
-                  </h2>
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                    {section.items.map((a, i) => (
-                      <ArticleRow key={a.news_id || `${section.label}-${i}`} article={a} />
-                    ))}
-                  </ul>
-                </section>
-              ))}
+                    <h2
+                      id={`tl-beat-${section.label}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: SPACE.sm,
+                        fontSize: FONT.sectionTitle,
+                        fontWeight: 700,
+                        color: TEXT_STRONG,
+                        letterSpacing: '-0.02em',
+                        paddingBottom: SPACE.sm,
+                      }}
+                    >
+                      {section.label}
+                      {/* 건수는 제목이 아니라 보조 정보 — 무게를 낮춘다.
+                          접힌 동안에도 전체 건수를 그대로 보여준다: 지금 몇
+                          개가 안 보이는지 알아야 아래 "더 보기"가 예측된다. */}
+                      <span style={{ fontSize: FONT.caption, fontWeight: 600, color: TEXT_MUTED }}>
+                        {section.items.length}건
+                      </span>
+                    </h2>
+                    <ul id={listId} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                      {shown.map((a, i) => (
+                        <ArticleRow key={a.news_id || `${section.label}-${i}`} article={a} />
+                      ))}
+                    </ul>
+                    {/* 테두리 알약(.tl-btn) 대신 텍스트 + 화살표만
+                        (2026-08-24 요청). 분야마다 하나씩 붙는 보조 동작이라
+                        알약이 4~5개 쌓이면 목록보다 버튼이 더 눈에 띈다.
+                        시각적 테두리는 없애되 터치 타겟(44px)은 패딩으로
+                        확보하고, 포커스 링(.tl-focus)은 그대로 둔다. */}
+                    {restCount > 0 && (
+                      <button
+                        type="button"
+                        className="tl-more tl-focus"
+                        aria-expanded={isOpen}
+                        aria-controls={listId}
+                        onClick={() =>
+                          setOpenSections((s) => ({ ...s, [section.label]: !s[section.label] }))
+                        }
+                      >
+                        {isOpen ? '접기' : `${restCount}건 더 보기`}
+                        <span
+                          aria-hidden
+                          style={{ transform: isOpen ? 'rotate(180deg)' : undefined, transition: 'transform .2s ease' }}
+                        >
+                          ▾
+                        </span>
+                      </button>
+                    )}
+                  </section>
+                );
+              })}
 
               {/* ── 부고·인사·공시 ── 무엇인지 라벨에 그대로 쓴다.
                   버리지 않는다 — 부고를 찾아오는 사람도 있다. */}

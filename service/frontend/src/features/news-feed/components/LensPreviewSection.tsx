@@ -13,6 +13,13 @@ import { LensFormatGuide } from './LensFormatGuide';
 // — 서버 저장 없이 충분(재방문마다 다시 뜨면 오히려 방해).
 const GUIDE_SEEN_KEY = 'ailens-lens-format-guide-seen';
 
+// 활성 탭 텍스트 전용 accent(2026-08-24). LENS_ACCENT(#3b82f6)를 14px 텍스트에
+// 그대로 쓰면 흰 배경 대비 3.68:1로 WCAG AA(4.5:1) 미달이라, 같은 계열의 한 단계
+// 진한 셰이드(blue-600)로 5.17:1을 확보한다. 인디케이터 바·배경 틴트는 장식/대형
+// 요소라 LENS_ACCENT를 그대로 쓴다. ⚠️ 임시 로컬 상수 — 다른 화면에서도 "AA용
+// 진한 accent"가 필요해지면 lensPerspectives.ts의 공용 토큰으로 승격할 것.
+const LENS_ACCENT_STRONG = '#2563eb';
+
 // "오늘의 이슈, 4가지 시선" 홈 티저 — 지면 특별 코너로 개편(2026-08-21,
 // 사용자 요청: "전체 지면 1면, 증권면 1면, 산업면 1면, 시그널 1면 이렇게
 // 구성하고, 해당 중요한 기사들을 넣는 탭으로 만들겁니다").
@@ -112,7 +119,19 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <style>{`
-        .lz-tab { transition: background .15s ease, color .15s ease; }
+        /* 지면 탭 — 언더라인 관례는 유지하되, 선택을 색 하나가 아니라
+           [연한 배경 틴트 + 미끄러지는 인디케이터 + 굵기]로 함께 설명한다. */
+        .lz-tabs { position: relative; display: flex; }
+        .lz-tab { position: relative; transition: background .15s ease, color .15s ease; }
+        .lz-tab:not(.is-active):hover { background: #f4f6f8; color: #374151; }
+        .lz-tab:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -3px; border-radius: 8px; }
+        /* 인디케이터: 활성 탭 폭(=1/탭수)만큼만 그리고, translateX로 그 자리로
+           미끄러진다. 탭이 모두 flex-1(균등폭)이라 활성 인덱스 × 100%면 정확히
+           해당 탭 아래에 선다. */
+        .lz-tab-ind { position: absolute; bottom: -1px; left: 0; height: 2.5px;
+          border-radius: 2px; background: ${LENS_ACCENT}; pointer-events: none;
+          transition: transform .28s cubic-bezier(.4, 0, .2, 1); will-change: transform; }
+        @media (prefers-reduced-motion: reduce) { .lz-tab-ind { transition: none; } }
         .lz-arrow { transition: background .15s ease, transform .08s ease; }
         .lz-arrow:not(:disabled):hover { background: #dbeafe; }
         .lz-arrow:not(:disabled):active { transform: scale(.9); }
@@ -129,28 +148,50 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
 
         .lz-issue:hover .lz-h { text-decoration: underline; text-underline-offset: 3px; }
 
-        /* 비교 행 — 모바일은 [일러스트][역할명+질문][›] 3열,
-           640px 이상에서는 .lz-t 를 display:contents 로 풀어 역할명과 질문이
-           각각 독립 열이 된다. 그러면 네 행의 질문이 정확히 같은 x 에서
-           시작해 아래로 훑는 것만으로 비교가 된다. */
-        .lz-row { display: grid; grid-template-columns: 44px minmax(0,1fr) 14px;
-          gap: 12px; align-items: start; min-height: 56px;
-          padding: 14px clamp(12px, 2.4vw, 18px); text-decoration: none;
+        /* ── 형식 4칸 ── 2026-08-24 재구조화.
+           이전엔 [일러스트][역할명][질문+태그라인][›] 세로 4행이었다. 문제가
+           둘: (a) 행마다 두 줄씩 ~290px를 먹어서, 이 섹션의 주인공(오늘의
+           이슈)보다 형식 목록이 화면을 더 차지했다 — 위계가 뒤집혔다.
+           (b) 네 행이 거의 같은 텍스처의 반복이었고, 그 안의 태그라인은
+           기사와 무관한 고정 문구라 매일 같은 말이 4줄 반복됐다(스티어링
+           §4 "카드 반복의 함정").
+           지금은 그리드 타일이다 — 모바일 2×2, 720px↑ 4열. 높이가 절반
+           이하로 줄고 "네 개가 한 세트의 선택지"로 읽힌다. 1px 간격 +
+           바탕색으로 헤어라인 격자를 만들어 별도 테두리를 안 쓴다. */
+        /* 칸 구분선 — gap+바탕색 대신 셀 border로 그린다(2026-08-24, "세로
+           선을 칸 끝까지" 요청). gap 방식은 선이 그리드 트랙에만 그려져
+           칸보다 짧게 끊겨 보였다. border는 셀 박스 높이를 그대로 따라가므로
+           위아래 끝까지 이어진다. 칸이 항상 4개라 nth-child로 마지막 열·행의
+           선만 뺀다. align-items: stretch(기본)라 네 칸의 높이가 같아져
+           세로선 길이도 서로 어긋나지 않는다. */
+        .lz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+          align-items: stretch; }
+        .lz-cell { display: flex; flex-direction: column; gap: 9px; min-height: 104px; height: 100%;
+          padding: 14px clamp(12px, 1.8vw, 16px); background: #fff; text-decoration: none;
+          border-right: 1px solid rgba(17,24,39,0.1);
+          border-bottom: 1px solid rgba(17,24,39,0.1);
           transition: background .14s ease; }
-        .lz-row:hover { background: #fafbfc; }
-        .lz-row:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -2px; }
-        .lz-row + .lz-row { border-top: 1px solid rgba(17,24,39,0.07); }
-        .lz-t { min-width: 0; }
-        .lz-q { display: block; }
-        .lz-qw { display: block; min-width: 0; }
-        .lz-name { margin-bottom: 3px; }
-        @media (min-width: 640px) { .lz-name { margin-bottom: 0; } }
-        .lz-ch { padding-top: 4px; }
-        @media (min-width: 640px) {
-          .lz-row { grid-template-columns: 44px 116px minmax(0,1fr) 14px; gap: 14px; }
-          .lz-t { display: contents; }
-          .lz-name { padding-top: 1px; }
+        /* 모바일 2×2 — 오른쪽 열(2,4) 우측선 없음, 아래 행(3,4) 하단선 없음. */
+        .lz-cell:nth-child(2n) { border-right: none; }
+        .lz-cell:nth-child(n + 3) { border-bottom: none; }
+        @media (min-width: 720px) {
+          .lz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+          /* 4열 한 줄 — 하단선 전부 없음, 마지막 칸만 우측선 없음. */
+          .lz-cell { border-bottom: none; }
+          .lz-cell:nth-child(2n) { border-right: 1px solid rgba(17,24,39,0.1); }
+          .lz-cell:last-child { border-right: none; }
         }
+        .lz-cell:hover { background: #f7f9fc; }
+        .lz-cell:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -2px; }
+        .lz-cell:hover .lz-cq { color: #111827; }
+        .lz-cq { transition: color .14s ease; }
+        .lz-avatar { box-shadow: inset 0 0 0 1px rgba(17,24,39,0.06); }
+
+        /* 페이저 — 카드 안, 히어로 바로 아래로 옮겼다(2026-08-24). 이전엔
+           카드 **밖** 아래에 있어서, 카드 안 내용을 바꾸는 컨트롤이 카드
+           밖에 떠 있었다(무엇을 조작하는지 안 읽힘). */
+        .lz-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+          padding: 9px clamp(12px, 2.4vw, 18px); border-top: 1px solid rgba(17,24,39,0.06); }
       `}</style>
 
       <header style={{ marginBottom: 14 }}>
@@ -178,44 +219,57 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
             전체 보기 →
           </Link>
         </div>
+        {/* 사용법 설명을 줄였다(2026-08-24) — 탭·화살표·형식 타일이 각자
+            생김새로 이미 역할을 말한다. 이 줄은 "왜 네 형식인가"만 말한다. */}
         <p style={{ fontSize: 14, color: '#6b7280', marginTop: 4, wordBreak: 'keep-all' }}>
-          지면을 고르고, 화살표로 그 지면의 기사를 넘겨보세요.
+          같은 기사를 네 가지 형식으로 담았어요. 원하는 방식으로 보세요.
         </p>
       </header>
 
       <div
         style={{
-          borderRadius: 16,
+          borderRadius: 18,
           overflow: 'hidden',
           background: '#fff',
-          border: '1px solid rgba(17,24,39,0.09)',
-          boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 10px 30px rgba(17,24,39,0.05)',
+          border: '1px solid rgba(17,24,39,0.07)',
+          boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 14px 36px -10px rgba(17,24,39,0.09)',
         }}
       >
         {/* 지면 탭 — 1단계 선택. 화살표(아래)와 역할이 다르다: 탭은 지면을
             바꾸고, 화살표는 고른 지면 "안의" 기사를 넘긴다. */}
-        <div className="flex" style={{ borderBottom: '1px solid rgba(17,24,39,0.09)' }}>
-          {SECTIONS.map((s, i) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => selectTab(i)}
-              className="lz-tab flex-1"
-              style={{
-                padding: '13px 8px',
-                fontSize: 14,
-                fontWeight: 800,
-                border: 'none',
-                borderBottom: i === activeTab ? `2px solid ${LENS_ACCENT}` : '2px solid transparent',
-                marginBottom: -1,
-                background: 'transparent',
-                color: i === activeTab ? LENS_ACCENT : '#9ca3af',
-                cursor: 'pointer',
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
+        <div className="lz-tabs" style={{ borderBottom: '1px solid rgba(17,24,39,0.09)' }}>
+          {SECTIONS.map((s, i) => {
+            const isActive = i === activeTab;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => selectTab(i)}
+                aria-pressed={isActive}
+                className={`lz-tab flex-1${isActive ? ' is-active' : ''}`}
+                style={{
+                  minHeight: 48,
+                  padding: '15px 6px',
+                  fontSize: 14,
+                  fontWeight: isActive ? 800 : 700,
+                  letterSpacing: '-0.01em',
+                  border: 'none',
+                  background: isActive ? 'rgba(59,130,246,0.07)' : 'transparent',
+                  // 비활성 #5b6472 ≈ 6:1, 활성 #2563eb ≈ 5.2:1 — 둘 다 AA 통과.
+                  color: isActive ? LENS_ACCENT_STRONG : '#5b6472',
+                  cursor: 'pointer',
+                }}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+          {/* 활성 위치로 미끄러지는 하단 인디케이터 — 색 대신 움직임/위치로 선택을 설명. */}
+          <span
+            aria-hidden
+            className="lz-tab-ind"
+            style={{ width: `${100 / SECTIONS.length}%`, transform: `translateX(${activeTab * 100}%)` }}
+          />
         </div>
 
         {!current ? (
@@ -238,9 +292,9 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                   className="flex-shrink-0"
                   style={{
                     position: 'relative',
-                    width: 'clamp(92px, 17vw, 132px)',
+                    width: 'clamp(112px, 22vw, 168px)',
                     aspectRatio: '3 / 2',
-                    borderRadius: 8,
+                    borderRadius: 10,
                     overflow: 'hidden',
                     background: '#f3f4f6',
                     boxShadow: 'inset 0 0 0 1px rgba(17,24,39,0.07)',
@@ -250,7 +304,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                     src={photo}
                     alt=""
                     fill
-                    sizes="132px"
+                    sizes="168px"
                     style={{ objectFit: 'cover', objectPosition: 'center' }}
                   />
                 </span>
@@ -258,7 +312,17 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
 
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span className="flex items-center" style={{ gap: 7, marginBottom: 5 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: LENS_ACCENT, letterSpacing: '0.04em' }}>
+                  <span
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: LENS_ACCENT_STRONG,
+                      letterSpacing: '0.02em',
+                      background: 'rgba(37,99,235,0.08)',
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                    }}
+                  >
                     {activeSection.label}
                   </span>
                   <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>{current.date.replaceAll('-', '.')}</span>
@@ -305,43 +369,43 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
               <>
                 <p
                   style={{
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: 700,
                     color: '#9ca3af',
-                    letterSpacing: '0.02em',
-                    padding: '10px clamp(12px, 2.4vw, 18px)',
-                    borderTop: '1px solid rgba(17,24,39,0.09)',
-                    background: '#fcfcfd',
+                    letterSpacing: '0.01em',
+                    padding: '13px clamp(12px, 2.4vw, 18px) 10px',
+                    borderTop: '1px solid rgba(17,24,39,0.06)',
                   }}
                 >
-                  같은 이슈, 네 형식으로 이렇게 담았습니다
+                  어떤 형식으로 볼까요
                 </p>
 
-                <div style={{ borderTop: '1px solid rgba(17,24,39,0.09)' }}>
+                {/* 형식 타일 — 매일 같은 태그라인 대신 기사별 질문(실제
+                    내용)만 남긴다. 형식이 뭔지에 대한 설명은 제목 옆 ⓘ
+                    가이드(LensFormatGuide)가 담당한다 — 홈 티저에서 네 번
+                    반복할 정보가 아니다. */}
+                <div className="lz-grid">
                   {rows.map((l, i) => {
                     const p = lensPerspectiveAt(i);
                     return (
-                      <Link key={i} href={`${href}?v=${i + 1}`} prefetch className="lz-row">
-                        <span
-                          className="flex items-center justify-center flex-shrink-0"
-                          style={{ width: 44, height: 44, borderRadius: 999, background: p.tint, overflow: 'hidden' }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트 */}
-                          <img
-                            src={p.illustration}
-                            alt=""
-                            width={44}
-                            height={44}
-                            loading="lazy"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
-                          />
-                        </span>
-
-                        <span className="lz-t">
+                      <Link key={i} href={`${href}?v=${i + 1}`} prefetch className="lz-cell">
+                        <span className="flex items-center" style={{ gap: 8 }}>
                           <span
-                            className="lz-name"
+                            className="lz-avatar flex items-center justify-center flex-shrink-0"
+                            style={{ width: 34, height: 34, borderRadius: 999, background: p.tint, overflow: 'hidden' }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트 */}
+                            <img
+                              src={p.illustration}
+                              alt=""
+                              width={34}
+                              height={34}
+                              loading="lazy"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
+                            />
+                          </span>
+                          <span
                             style={{
-                              display: 'block',
                               fontSize: 13,
                               fontWeight: 800,
                               color: p.color,
@@ -353,53 +417,23 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                           >
                             {p.short}
                           </span>
-                          <span className="lz-qw">
-                            <span
-                              className="lz-q"
-                              style={{
-                                fontSize: 16,
-                                fontWeight: 600,
-                                color: '#374151',
-                                lineHeight: 1.5,
-                                letterSpacing: '-0.015em',
-                                wordBreak: 'keep-all',
-                              }}
-                            >
-                              {l.question || p.tagline}
-                            </span>
-                            {/* 부가설명을 태그라인으로 통일(2026-08-21, 사용자
-                                지적) — 원래는 기사별 불릿(bullets[0])을 썼는데,
-                                이 필드가 팟캐스트·영상 서브포맷에만 채워지는
-                                경우가 많아 레터·웹툰 행만 설명 없이 휑해
-                                보였다("팟캐스트랑 영상부분만 달려있는데").
-                                /lens 상세 페이지의 형식 선택 카드가 쓰는
-                                p.tagline("구조와 흐름까지 제대로 알고
-                                싶다면" 등, lensPerspectives.ts에 고정 정의)로
-                                바꿔 4행 전부 항상 같은 수준의 설명이 붙게
-                                한다 — 처음 보는 사람도 형식 4개가 각각
-                                뭔지 바로 이해할 수 있어야 한다는 요구. */}
-                            <span
-                              style={{
-                                display: '-webkit-box',
-                                marginTop: 3,
-                                fontSize: 13,
-                                fontWeight: 400,
-                                color: '#6b7280',
-                                lineHeight: 1.55,
-                                letterSpacing: '-0.005em',
-                                WebkitLineClamp: 1,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                                wordBreak: 'keep-all',
-                              }}
-                            >
-                              {p.tagline}
-                            </span>
-                          </span>
                         </span>
-
-                        <span aria-hidden className="lz-ch" style={{ color: '#c0c5cc', fontSize: 16, lineHeight: 1, textAlign: 'right' }}>
-                          ›
+                        <span
+                          className="lz-cq"
+                          style={{
+                            display: '-webkit-box',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: '#374151',
+                            lineHeight: 1.5,
+                            letterSpacing: '-0.015em',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'keep-all',
+                          }}
+                        >
+                          {l.question || p.tagline}
                         </span>
                       </Link>
                     );
@@ -407,85 +441,85 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                 </div>
               </>
             )}
+
+            {/* ── 이 지면의 다른 기사 ── 카드 맨 아래(2026-08-24, 위치
+                교체 요청). 히어로와 형식 4칸은 "같은 기사"에 속하므로 붙여
+                두고, 기사 자체를 바꾸는 컨트롤은 그 묶음 밖 맨 아래에
+                둔다. 라벨로 무엇이 바뀌는지 명시한다(형식 타일이 아니라
+                위 히어로). 기사가 1건이면 넘길 게 없어 숨긴다. */}
+            {total > 1 && (
+              <div className="lz-pager">
+                <span style={{ marginRight: 'auto', fontSize: 12.5, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.01em' }}>
+                  이 지면의 다른 기사
+                </span>
+                <button
+                  type="button"
+                  aria-label="이전 기사"
+                  disabled={safeArticleIndex === 0}
+                  onClick={() => setArticleIndex((i) => Math.max(0, i - 1))}
+                  className="lz-arrow flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: 'transparent',
+                    color: LENS_ACCENT_STRONG,
+                    cursor: safeArticleIndex === 0 ? 'default' : 'pointer',
+                    opacity: safeArticleIndex === 0 ? 0.3 : 1,
+                    pointerEvents: safeArticleIndex === 0 ? 'none' : 'auto',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 6l-6 6 6 6" />
+                  </svg>
+                </button>
+                <div className="flex items-center" style={{ gap: 5 }}>
+                  {sectionArticles.map((l, i) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      aria-label={`${i + 1}번째 기사로 이동`}
+                      onClick={() => setArticleIndex(i)}
+                      className="lz-dot"
+                      style={{
+                        width: i === safeArticleIndex ? 16 : 6,
+                        height: 6,
+                        borderRadius: 999,
+                        border: 'none',
+                        background: i === safeArticleIndex ? LENS_ACCENT : '#dbeafe',
+                        cursor: 'pointer',
+                      }}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  aria-label="다음 기사"
+                  disabled={safeArticleIndex === total - 1}
+                  onClick={() => setArticleIndex((i) => Math.min(total - 1, i + 1))}
+                  className="lz-arrow flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: 'transparent',
+                    color: LENS_ACCENT_STRONG,
+                    cursor: safeArticleIndex === total - 1 ? 'default' : 'pointer',
+                    opacity: safeArticleIndex === total - 1 ? 0.3 : 1,
+                    pointerEvents: safeArticleIndex === total - 1 ? 'none' : 'auto',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
-
-      {/* 화살표+점 — 2단계, 고른 탭 "안의" 기사 넘기기(탭 자체를 바꾸지
-          않는다). 기사가 1건 이하인 지면은 넘길 게 없어 숨긴다. */}
-      {total > 1 && (
-        <div className="flex items-center justify-center" style={{ gap: 10, marginTop: 14 }}>
-          <button
-            type="button"
-            aria-label="이전 기사"
-            disabled={safeArticleIndex === 0}
-            onClick={() => setArticleIndex((i) => Math.max(0, i - 1))}
-            className="lz-arrow flex items-center justify-center flex-shrink-0"
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: '50%',
-              border: 'none',
-              background: 'transparent',
-              color: LENS_ACCENT,
-              cursor: safeArticleIndex === 0 ? 'default' : 'pointer',
-              opacity: safeArticleIndex === 0 ? 0.3 : 1,
-              pointerEvents: safeArticleIndex === 0 ? 'none' : 'auto',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </button>
-
-          <span style={{ fontSize: 13, fontWeight: 700, color: LENS_ACCENT, fontVariantNumeric: 'tabular-nums' }}>
-            {activeSection.label} · {safeArticleIndex + 1}/{total}
-          </span>
-
-          <div className="flex items-center" style={{ gap: 6 }}>
-            {sectionArticles.map((l, i) => (
-              <button
-                key={l.id}
-                type="button"
-                aria-label={`${i + 1}번째 기사로 이동`}
-                onClick={() => setArticleIndex(i)}
-                className="lz-dot"
-                style={{
-                  width: i === safeArticleIndex ? 18 : 6,
-                  height: 6,
-                  borderRadius: 999,
-                  border: 'none',
-                  background: i === safeArticleIndex ? LENS_ACCENT : '#dbeafe',
-                  cursor: 'pointer',
-                }}
-              />
-            ))}
-          </div>
-
-          <button
-            type="button"
-            aria-label="다음 기사"
-            disabled={safeArticleIndex === total - 1}
-            onClick={() => setArticleIndex((i) => Math.min(total - 1, i + 1))}
-            className="lz-arrow flex items-center justify-center flex-shrink-0"
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: '50%',
-              border: 'none',
-              background: 'transparent',
-              color: LENS_ACCENT,
-              cursor: safeArticleIndex === total - 1 ? 'default' : 'pointer',
-              opacity: safeArticleIndex === total - 1 ? 0.3 : 1,
-              pointerEvents: safeArticleIndex === total - 1 ? 'none' : 'auto',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
-        </div>
-      )}
 
       {showGuide && <LensFormatGuide onClose={closeGuide} />}
     </section>

@@ -34,6 +34,7 @@ import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
+import { LensFormatArt } from '@/shared/ui/icons/LensFormatArt';
 import { Calendar, type LucideIcon } from 'lucide-react';
 
 // "오늘의 이슈, 4가지 시선" 상세.
@@ -752,11 +753,13 @@ export function LensViewClient({
         .lnk:hover { color: #111827; text-decoration-color: currentColor; }
         .lnk:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
 
-        /* padding-bottom 3px = thumb 아래 컬러 룰 두께. 이게 없으면 룰이 바
+        /* padding-bottom 2px = thumb 아래 컬러 룰 두께. 이게 없으면 룰이 바
            밖으로 삐져나와 아래 본문 위에 얹힌다.
-           바 높이 = 8(위 패딩) + 60(탭: 8+20+4+20+8) + 3(룰) + 1(경계선) = 72px. */
+           2026-08-24 — 룰을 3 → 2px로 얇혔다(사용자 요청: "스트록이 좀 더
+           얇아져야"). 대비는 색 기준이라 두께와 무관(앰버 3.19:1 유지).
+           바 높이 = 8(위 패딩) + 60(탭: 8+20+4+20+8) + 2(룰) + 1(경계선) = 71px. */
         .fmt-bar { position: sticky; top: 56px; z-index: 20; background: #fff;
-          padding: 8px 0 3px; border-bottom: 1px solid rgba(17,24,39,0.12); }
+          padding: 8px 0 2px; border-bottom: 1px solid rgba(17,24,39,0.12); }
         .fmt-row { position: relative; display: grid; gap: 8px;
           grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
 
@@ -766,17 +769,28 @@ export function LensViewClient({
           width: calc((100% - (var(--n) - 1) * 8px) / var(--n));
           transform: translateX(calc(var(--ai) * (100% + 8px)));
           border-radius: 10px 10px 0 0;
-          /* BRAND_ACCENTS의 soft 틴트는 형식마다 밝기 편차가 커서(#e6f4ef 는
-             거의 흰색) 채움이 있는지 없는지 안 보이는 칸이 생겼다. 같은 토큰
-             (--c)에서 10% 워시를 만들어 네 형식의 존재감을 균일하게 맞춘다.
+          /* 2026-08-24 (재조정) — 탭 칸 전체를 틴트로 채우던 방식은 "칠한
+             사각형"처럼 무거워 보였다(사용자: "이상해, 더 세련되고 고급지게").
+             편집형 지면의 고급 세그먼트 탭처럼 채움을 거의 없애고, 밑줄에서
+             아주 은은하게 피어오르는 바텀 글로우만 남긴다 — 위쪽 55%는 완전
+             투명, 맨 아래만 형식 색 9% 워시라 "칠한 블록"이 아니라 "밑줄에서
+             배어나온 빛"으로 읽힌다. 활성 라벨(#111827)은 투명 구간에 놓여
+             대비가 흰 배경 그대로다.
              color-mix 미지원 브라우저는 앞 줄의 soft 틴트로 폴백. */
           background: var(--t);
-          background: color-mix(in srgb, var(--c) 10%, #ffffff);
-          transition: transform .28s cubic-bezier(.22,.85,.2,1), background-color .28s ease; }
-        /* 컬러 룰은 thumb 아래(흰 배경 위)에 둔다 — tint 위에 얹으면 앰버가
-           2.81:1로 UI 요소 기준(3:1)을 못 넘긴다. 흰 배경 위에서는 3.19:1. */
-        .fmt-thumb::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px;
-          height: 3px; border-radius: 2px 2px 0 0; background: var(--c); }
+          background: linear-gradient(180deg,
+            transparent 0%, transparent 48%,
+            color-mix(in srgb, var(--c) 14%, #ffffff) 100%);
+          transition: transform .3s cubic-bezier(.22,.85,.2,1); }
+        /* 컬러 룰 — 2026-08-24, 원색이 쨍해서 흰색을 섞어 파스텔로 낮췄다
+           (사용자: "색이 더 파스텔 톤이여도 될 것 같아"). 파스텔이라 밑줄
+           단독 대비는 3:1 아래로 내려가지만, 선택 상태는 굵은 잉크 라벨(800)
+           + 바텀 글로우 채움으로도 함께 전달돼 색에만 의존하지 않는다.
+           2px + 파스텔 색의 부드러운 글로우로 은은하게 떠 보이게 한다. */
+        .fmt-thumb::after { content: ''; position: absolute; left: 0; right: 0; bottom: -2px;
+          height: 2px; border-radius: 2px 2px 0 0;
+          background: color-mix(in srgb, var(--c) 62%, #ffffff);
+          box-shadow: 0 1px 9px -1px color-mix(in srgb, var(--c) 34%, transparent); }
 
         .fmt { position: relative; z-index: 1; display: flex; flex-direction: column;
           align-items: center; justify-content: center; gap: 4px;
@@ -794,7 +808,17 @@ export function LensViewClient({
           letter-spacing: -0.01em; white-space: nowrap; transition: color .2s ease; }
         .fmt-amt { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #6b7280;
           font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .2s ease; }
-        .fmt[aria-selected='true'] .fmt-name { color: #111827; font-weight: 800; }
+        /* 형식 손그림 아이콘(LensFormatArt) — 2026-08-24, 이모지 대체.
+           currentColor를 따르므로 비활성은 아래 .fmt-amt 회색, 활성은
+           형식 색으로 물든다(아래 규칙). */
+        .fmt-art { display: inline-flex; flex-shrink: 0; color: #9ca3af; }
+        .fmt[aria-selected='true'] .fmt-art { color: var(--c); }
+        .fmt[aria-selected='false']:hover .fmt-art { color: #6b7280; }
+        /* 선택된 형식은 이름이 그 형식 색으로 물든다(2026-08-24, 사용자 요청:
+           "레터 누르면 레터 텍스트가 보라색으로"). --c는 활성 형식 색이고
+           활성 탭만 aria-selected=true라 정확히 그 탭에만 적용된다. 볼드(800)
+           14px라 3:1 기준 대상 — 네 브랜드 색 모두 흰 배경에서 통과한다. */
+        .fmt[aria-selected='true'] .fmt-name { color: var(--c); font-weight: 800; }
         .fmt[aria-selected='true'] .fmt-amt { color: #4b5563; }
         .fmt[aria-selected='false']:hover .fmt-name,
         .fmt[aria-selected='false']:hover .fmt-amt { color: #111827; }
@@ -845,21 +869,33 @@ export function LensViewClient({
         .fmt-lede { font-family: "Noto Serif KR", serif;
           font-size: clamp(20px, 2.6vw, 24px); font-weight: 700; color: #111827;
           line-height: 1.5; letter-spacing: -0.02em; word-break: keep-all;
-          max-width: 620px; margin-bottom: 24px; }
+          max-width: 720px; margin-bottom: 24px; }
 
         /* ── 읽기 지면 ──────────────────────────────────────────────────
-           620px ≈ 한글 38자. 스티어링 권장(25~40자) 안이다. margin-left를
-           주지 않으므로 왼쪽 기준선은 헤드라인·사진·요약과 계속 일치하고,
-           좁아지는 건 오른쪽 끝뿐이다(.lm의 "정렬을 위해 폭 100%" 결정이
-           산문에서는 약 50자가 되어 줄을 놓치게 했다). */
-        .lread { max-width: 620px; }
+           2026-08-24 — 620px → 720px(사용자 요청). 카테고리 탭·상단 요약이
+           전체 폭(~824px)이라 620px 본문이 좁아 보였는데, 720px(≈한글 44자)로
+           올려 폭 차이를 크게 줄이면서도 긴 산문 가독성(스티어링 25~40자
+           권장에 근접)을 지킨다. 왼쪽 기준선은 그대로라 위 요소들과 시작선이
+           일치하고, 넓어진 줄은 행간 1.85로 받친다. */
+        .lread { max-width: 720px; }
         .lread > p { font-size: calc(16px * var(--lens-font-scale, 1));
           line-height: 1.85; color: #374151; word-break: keep-all; }
         .lread > p + p { margin-top: 24px; }
         /* 리드인 — 첫 문단만 한 단계 크게. 눈이 어디서 시작할지 정해준다. */
         .lread > p.lread-lead { font-size: calc(18px * var(--lens-font-scale, 1));
           line-height: 1.8; color: #1f2937; }
-        .lread-end { margin-top: 24px; font-size: 13px; line-height: 1; }
+        /* 드롭캡(2026-08-24) — 편지·칼럼의 오프닝 관례. 첫 글자를 세리프로
+           크게 흘려 "읽는 편지"의 문을 연다. 형식 색(레터=보라, --lc는
+           .lread에 인라인으로 주입)으로 물들여 탭·인디케이터와 한 색으로
+           묶는다. ::first-letter는 부모의 커스텀 속성을 상속받는다. */
+        .lread > p.lread-lead::first-letter { float: left; font-family: "Noto Serif KR", serif;
+          font-size: 3em; line-height: 0.84; font-weight: 700;
+          color: var(--lc, #111827); margin: 6px 12px 0 0; }
+        /* 레터 사인오프 — 편지 서명. 형식 색 마크 + 발신인 + 위 얇은 룰. */
+        .lread-sign { display: flex; align-items: center; gap: 10px;
+          margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(17,24,39,0.1); }
+        .lread-sign-mark { flex-shrink: 0; width: 22px; height: 3px; border-radius: 999px; }
+        .lread-sign-name { font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: #6b7280; }
 
         /* 웹툰 — 컷을 붙여 세로로 이어 붙인다. 컷마다 radius를 주면 조각난
            카드 8장이 되므로 위아래 끝만 둥글게 깎고 사이는 2px로 붙인다. */
@@ -1268,7 +1304,6 @@ export function LensViewClient({
                 {lenses.map((l, i) => {
                   const p = lensPerspectiveAt(i);
                   const on = i === active;
-                  const Icon = p.icon;
                   const amt = formatAmount(lens, i, mediaDur[i]);
                   return (
                     <button
@@ -1297,7 +1332,9 @@ export function LensViewClient({
                           오면 "약 2분"이 읽는 시간인지 듣는 시간인지도
                           아이콘이 구분해준다. */}
                       <span className="fmt-amt">
-                        <Icon size={13} aria-hidden style={{ flexShrink: 0 }} />
+                        <span aria-hidden className="fmt-art">
+                          <LensFormatArt format={lensFormatAt(i)} size={22} />
+                        </span>
                         {amt.text}
                       </span>
                     </button>
@@ -1455,18 +1492,22 @@ export function LensViewClient({
                           관례이고, 눈이 어디서 시작할지 정해준다.
                        3. **문단 간격 16 → 24px.** 문단이 덩어리로 분리된다. */}
                   {format === 'letter' && letterParagraphs && (
-                    <div className="lread">
+                    <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
                       {letterParagraphs.map((para, pi) => (
                         <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
                           {para}
                         </p>
                       ))}
-                      {/* 마감 부호 — 기사가 끝났다는 신호. 이게 없으면 아래
-                          "이어서 웹툰으로 보기"가 본문의 연장처럼 읽힌다.
-                          신문·잡지가 오래 쓰는 장치이고, 색 대신 형태로만 말한다. */}
-                      <p aria-hidden className="lread-end" style={{ color: p.color }}>
-                        ■
-                      </p>
+                      {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자
+                          요청: "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■
+                          하나는 "기사 끝" 신호일 뿐 편지 느낌을 주지 못했다.
+                          얇은 룰 + 형식 색 마크 + 발신인 라벨로 뉴스레터
+                          서명처럼 닫는다 — 사이트의 헤어라인·자간 오버라인과
+                          같은 체계(13px, 자간). 장식이라 aria-hidden. */}
+                      <div aria-hidden className="lread-sign">
+                        <span className="lread-sign-mark" style={{ background: p.color }} />
+                        <span className="lread-sign-name">AI LENS 레터</span>
+                      </div>
                     </div>
                   )}
 
