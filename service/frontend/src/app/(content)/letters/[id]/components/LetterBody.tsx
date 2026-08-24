@@ -15,7 +15,7 @@ import {
   LetterChartBlock,
   type NeighborLetter,
 } from '.';
-import { SentenceSelectionPopover } from './SentenceSelectionPopover';
+import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import { LetterBlock } from './LetterBlock';
 import { LetterTextExtras } from './LetterTextExtras';
 import { LetterSubscribeSection } from './LetterSubscribeSection';

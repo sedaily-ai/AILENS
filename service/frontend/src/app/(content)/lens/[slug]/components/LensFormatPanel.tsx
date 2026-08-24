@@ -5,6 +5,7 @@ import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
 import { WebtoonCutGallery } from '@/shared/ui/WebtoonCutGallery';
+import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import {
   lensFormatAt,
   lensPanelId,
@@ -156,29 +157,36 @@ export function LensFormatPanel({
 
       {/* 레터 본문 — 편집 지면 톤(읽기 폭 620px 상한 + 첫 문단 리드인 +
           문단 간격 24px). AI LENS 편집장 프롬프트의 문체 가이드(친근한
-          -했어요체, 문단당 2~3문장)를 따른다. */}
+          -했어요체, 문단당 2~3문장)를 따른다.
+          article[data-letter-body]로 감싸는 이유 — SentenceSelectionPopover가
+          이 안에서만 selection을 인정한다(letters/[id] 페이지와 동일 관례).
+          2026-08-24, 사용자 지적: 이 lens 페이지엔 이 컴포넌트 자체가 안
+          붙어있어서 문장을 긁어도 서랍에 담는 버튼이 안 떴다. */}
       {format === 'letter' && letterParagraphs && (
-        <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
-          {letterParagraphs.map((para, pi) => (
-            <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
-              {para}
-            </p>
-          ))}
-          {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
-              "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
-              신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +
-              발신인 라벨로 뉴스레터 서명처럼 닫는다. */}
-          <div aria-hidden className="lread-sign">
-            <span className="lread-sign-mark" style={{ background: p.color }} />
-            <span className="lread-sign-name">AI LENS 레터</span>
+        <article data-letter-body>
+          <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
+            {letterParagraphs.map((para, pi) => (
+              <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
+                {para}
+              </p>
+            ))}
+            {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
+                "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
+                신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +
+                발신인 라벨로 뉴스레터 서명처럼 닫는다. */}
+            <div aria-hidden className="lread-sign">
+              <span className="lread-sign-mark" style={{ background: p.color }} />
+              <span className="lread-sign-name">AI LENS 레터</span>
+            </div>
           </div>
-        </div>
+          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}
+        </article>
       )}
 
       {/* 불릿에 라벨을 붙여 질문과의 관계를 명시한다 — 데모 문단
           오버라이드가 없는 기사(대부분)는 지금처럼 CMS 불릿을 그대로 쓴다. */}
       {format === 'letter' && !letterParagraphs && l.bullets.length > 0 && (
-        <>
+        <article data-letter-body>
           <p className="ovl" style={{ marginBottom: 16 }}>
             이 질문에 답하는 사실 {l.bullets.length}
           </p>
@@ -192,7 +200,8 @@ export function LensFormatPanel({
               </li>
             ))}
           </ol>
-        </>
+          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}
+        </article>
       )}
 
       {/* 빈 상태 — "왜 비었는지 + 무엇을 하면 되는지"를 쓴다. */}

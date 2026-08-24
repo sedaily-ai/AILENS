@@ -2,17 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/features/auth';
+import { useAuth } from '@/entities/user';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
 
-// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드).
+// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드),
+// letters/[id]/components/에서 shared/ui/로 재이전(같은 날, 사용자 지적
+// — /lens/[slug] 레터 포맷 패널엔 이 컴포넌트 자체가 안 붙어있어서 문장을
+// 긁어도 아무것도 안 떴다). letter 프롭을 DisplayLetter 전용에서
+// {id, headline, publishedAt?} 최소 구조로 넓혀 두 페이지가 같이 쓴다.
 // ── 문장 선택 → 서랍 담기 플로팅 버튼 ────────────────────────────────
-// 사용자가 letter 본문에서 텍스트를 드래그하면 selection 위에 작은 버튼이 뜸.
+// 사용자가 본문에서 텍스트를 드래그하면 selection 위에 작은 버튼이 뜸.
 // - 로그인: 즉시 /api/archive 로 서버 저장 (saveArchiveSentence)
 // - 비로그인: /login 으로 안내
 // scoping: article[data-letter-body] 내부 selection 만 인정.
-export function SentenceSelectionPopover({ letter }: { letter: DisplayLetter }) {
+export function SentenceSelectionPopover({
+  letter,
+}: {
+  letter: { id: string; headline: string; publishedAt?: string };
+}) {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [pos, setPos] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -72,8 +79,11 @@ export function SentenceSelectionPopover({ letter }: { letter: DisplayLetter }) 
     setSaving(true);
     try {
       const { saveArchiveSentence } = await import('@/shared/lib/api/archiveApi');
+      // lens 페이지는 CmsLens.date를 그대로 넘겨준다 — letters 페이지의
+      // "l-YYYYMMDD..." id 규칙은 lens 쪽 id(날짜 슬러그)엔 안 맞아서 fallback.
       const dm = letter.id.match(/^l-(\d{4})(\d{2})(\d{2})/);
-      const publishedAt = dm ? `${dm[1]}-${dm[2]}-${dm[3]}T07:00:00+09:00` : new Date().toISOString();
+      const publishedAt =
+        letter.publishedAt ?? (dm ? `${dm[1]}-${dm[2]}-${dm[3]}T07:00:00+09:00` : new Date().toISOString());
       await saveArchiveSentence({
         user_id: user.userId,
         text: pos.text,
