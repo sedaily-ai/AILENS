@@ -85,6 +85,18 @@ export function UserMenu() {
             <button
               onClick={() => {
                 setIsOpen(false);
+                router.push("/?tab=archive");
+              }}
+              className="w-full px-4 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+            >
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              내 서랍
+            </button>
+            <button
+              onClick={() => {
+                setIsOpen(false);
                 logout();
               }}
               className="w-full px-4 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-3"

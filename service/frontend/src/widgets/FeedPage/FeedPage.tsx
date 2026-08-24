@@ -99,85 +99,12 @@ export function FeedPage({
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [aiQuestions, setAiQuestions] = useState<DailyQuestionItem[]>([]);
 
-  // 아카이빙 관련 상태 - 목업 데이터
-  const [archivedSentences, setArchivedSentences] = useState<ArchivedSentence[]>(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today.getTime() - 86400000);
-    const twoDaysAgo = new Date(today.getTime() - 2 * 86400000);
-    const threeDaysAgo = new Date(today.getTime() - 3 * 86400000);
-
-    return [
-      // 오늘 저장한 문장들
-      {
-        id: 'mock-1',
-        text: '인공지능이 인간의 창의성을 대체하는 것이 아니라, 인간의 창의성을 증폭시키는 도구로 활용될 때 가장 큰 가치를 발휘한다.',
-        articleId: 'article-001',
-        articleTitle: 'AI 시대, 인간 창의성의 새로운 가능성',
-        articlePublishedAt: today.toISOString(),
-        createdAt: new Date(today.getTime() + 10 * 3600000), // 오늘 오전 10시
-      },
-      {
-        id: 'mock-2',
-        text: '주식시장에서 가장 위험한 말은 "이번엔 다르다"이다. 역사는 반복되지 않지만, 운율은 맞춘다.',
-        articleId: 'article-002',
-        articleTitle: '2024년 글로벌 증시 전망과 투자 전략',
-        articlePublishedAt: today.toISOString(),
-        createdAt: new Date(today.getTime() + 14 * 3600000), // 오늘 오후 2시
-      },
-      // 어제 저장한 문장들
-      {
-        id: 'mock-3',
-        text: '반도체 산업의 핵심은 더 이상 칩의 크기가 아니라, 에너지 효율성과 특화된 아키텍처에 있다.',
-        articleId: 'article-003',
-        articleTitle: '차세대 반도체 전쟁, 승자는 누구인가',
-        articlePublishedAt: yesterday.toISOString(),
-        createdAt: new Date(yesterday.getTime() + 9 * 3600000), // 어제 오전 9시
-      },
-      {
-        id: 'mock-4',
-        text: '스타트업의 성공은 아이디어가 아니라 실행력에서 결정된다. 좋은 아이디어는 넘쳐나지만, 끝까지 실행하는 팀은 드물다.',
-        articleId: 'article-004',
-        articleTitle: '유니콘 기업의 공통점: 실행력의 비밀',
-        articlePublishedAt: yesterday.toISOString(),
-        createdAt: new Date(yesterday.getTime() + 16 * 3600000), // 어제 오후 4시
-      },
-      {
-        id: 'mock-5',
-        text: '기후 변화 대응은 선택이 아닌 필수가 되었고, ESG는 기업의 생존 전략으로 자리잡았다.',
-        articleId: 'article-005',
-        articleTitle: 'ESG 경영, 지속가능한 성장의 열쇠',
-        articlePublishedAt: yesterday.toISOString(),
-        createdAt: new Date(yesterday.getTime() + 11 * 3600000), // 어제 오전 11시
-      },
-      // 2일 전
-      {
-        id: 'mock-6',
-        text: '금리 인상 사이클의 끝이 보이기 시작했다. 이제 투자자들은 피벗 이후의 시장을 준비해야 한다.',
-        articleId: 'article-006',
-        articleTitle: '중앙은행의 피벗, 시장은 어떻게 반응할까',
-        articlePublishedAt: twoDaysAgo.toISOString(),
-        createdAt: new Date(twoDaysAgo.getTime() + 13 * 3600000),
-      },
-      // 3일 전
-      {
-        id: 'mock-7',
-        text: '원격 근무가 일상이 된 시대, 기업 문화는 물리적 공간이 아닌 공유된 가치와 신뢰로 구축된다.',
-        articleId: 'article-007',
-        articleTitle: '하이브리드 워크 시대의 조직 문화',
-        articlePublishedAt: threeDaysAgo.toISOString(),
-        createdAt: new Date(threeDaysAgo.getTime() + 15 * 3600000),
-      },
-      {
-        id: 'mock-8',
-        text: '데이터는 21세기의 석유라고 불리지만, 정제되지 않은 데이터는 그저 소음에 불과하다.',
-        articleId: 'article-008',
-        articleTitle: '빅데이터 시대, 진짜 가치는 어디에',
-        articlePublishedAt: threeDaysAgo.toISOString(),
-        createdAt: new Date(threeDaysAgo.getTime() + 10 * 3600000),
-      },
-    ];
-  });
+  // "내 서랍" — 로그인 사용자는 ArchiveTab의 useEffect가 마운트 시
+  // /api/archive에서 실제 서버 데이터로 덮어쓴다(비로그인은 그대로 빈 배열,
+  // ArchiveLoginCta가 로그인을 유도). 이전엔 여기 목업 문장 8개가 하드코딩돼
+  // 있어서, 비로그인 방문자에게도 실제 저장된 것처럼 보이는 가짜 콘텐츠가
+  // 나갔다(2026-08-24, 사용자 지적).
+  const [archivedSentences, setArchivedSentences] = useState<ArchivedSentence[]>([]);
   // 탭 상태 - URL에서 초기값 읽기
   // 정적 export에서 useSearchParams()는 CSR bailout을 유발해 이 컴포넌트 트리
   // 전체가 정적 HTML에서 Suspense fallback으로만 구워진다(2026-08-07, 홈 SSG

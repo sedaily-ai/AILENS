@@ -6,6 +6,7 @@ import { isSameDay } from "@/shared/utils/dateUtils";
 import { useAuth } from "@/entities/user";
 import {
   listArchiveSentences,
+  deleteArchiveSentence,
   type ArchiveSentenceResponse,
 } from "@/shared/lib/api/archiveApi";
 import { ArchiveLoginCta } from './ArchiveLoginCta';
@@ -78,6 +79,21 @@ export function ArchiveTab({
     setCopiedId(sentence.id);
     showToast();
     setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  // 삭제 버튼이 로컬 state만 지우고 서버엔 요청을 보낸 적이 없어서, 새로고침하면
+  // "삭제한" 문장이 되살아났다(2026-08-24, 사용자 지적) — 낙관적으로 먼저 지우고
+  // 실제 DELETE 호출, 실패하면 되돌린다.
+  const handleDelete = async (sentence: ArchivedSentence) => {
+    setArchivedSentences(prev => prev.filter(s => s.id !== sentence.id));
+    if (!isAuthenticated || !user?.userId) return;
+    try {
+      await deleteArchiveSentence(sentence.id, user.userId);
+    } catch (err) {
+      console.warn('Archive delete failed, restoring:', err);
+      setArchivedSentences(prev => [...prev, sentence]);
+      setError('삭제에 실패했어요. 다시 시도해주세요.');
+    }
   };
 
   // Loading/error state
@@ -272,7 +288,7 @@ export function ArchiveTab({
                     index={idx}
                     isCopied={copiedId === sentence.id}
                     onCopy={() => handleCopy(sentence)}
-                    onDelete={() => setArchivedSentences(prev => prev.filter(s => s.id !== sentence.id))}
+                    onDelete={() => handleDelete(sentence)}
                     onNavigate={() => {
                       const article = articles.find(a => a.news_id === sentence.articleId);
                       if (article) {
