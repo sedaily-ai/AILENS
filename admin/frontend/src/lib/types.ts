@@ -111,6 +111,15 @@ export type CmsStatus = "draft" | "published" | "archived";
 export const ECON_CATEGORIES = ["증시", "부동산", "산업", "금융·정책", "국제", "재테크", "문화"] as const;
 export type EconCategory = (typeof ECON_CATEGORIES)[number];
 
+// 웹툰 전용 카테고리 — 2026-08-21에 "경제/금융/기업/정치/사회/국제/문화" 7개로
+// 독립시켰다가, 같은 날 사용자가 "경제 레터(ECON_CATEGORIES)와 같은 라벨
+// 세트로 통일해 달라"고 확정을 뒤집어 ECON_CATEGORIES와 동일한 7개
+// (증시/부동산/산업/금융·정책/국제/재테크/문화)로 되돌렸다. 값은 서로 같지만
+// 타입을 분리해 둔 이유는 이후 웹툰만 다른 카테고리가 필요해지면 이 한 곳만
+// 바꾸면 되게 하기 위해서다.
+export const WEBTOON_CATEGORIES = ["증시", "부동산", "산업", "금융·정책", "국제", "재테크", "문화"] as const;
+export type WebtoonCategory = (typeof WEBTOON_CATEGORIES)[number];
+
 export interface CmsKeyword {
   term: string;
   explain: string;
@@ -148,6 +157,11 @@ export interface CmsPostBody {
   // 이 필드가 채워지면 서비스 프런트가 사진 칸에 이걸 쓴다(없으면 사진 칸을
   // 아예 비운다 — service/frontend pickLensPhoto 참조).
   photo_image_url?: string | null;
+  // channels: ["webtoon"] 전용 — 시리즈 제목(2026-08-21). 같은 문자열을 쓴
+  // 편들이 하나의 시리즈로 묶인다. 시리즈 마스터 테이블 없이 매 편에 자유
+  // 텍스트로 중복 저장하는 가장 얕은 방법 — WebtoonMode.tsx가 기존 시리즈
+  // 제목을 datalist로 자동완성해서 오타로 시리즈가 갈라지는 걸 줄인다.
+  series_title?: string;
 }
 
 export interface CmsLensItem {

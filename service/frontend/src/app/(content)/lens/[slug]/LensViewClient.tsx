@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type TouchEvent as ReactTouchEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type TouchEvent as ReactTouchEvent,
+} from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
@@ -24,8 +32,9 @@ import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
-import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
-import { Check, Calendar, Play, Headphones, Images, Video, Zap, ArrowRight, type LucideIcon } from 'lucide-react';
+import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
+import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
+import { Calendar, type LucideIcon } from 'lucide-react';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -49,17 +58,79 @@ import { Check, Calendar, Play, Headphones, Images, Video, Zap, ArrowRight, type
 // (Question+acceptedAnswer 4쌍)와 실제 본문이 어긋난다.
 
 /**
- * 팟캐스트·영상 목업의 길이 표기 — 고정값("약 1분 30초", "0:45") 대신 실제
- * 불릿 개수에 비례해 계산한다(2026-08-18, "내용이 부실해서 데이터 잘
- * 맞춰서 채워달라" 요청). 인트로 15초 + 사실 1건당 18초 내레이션 가정 —
- * 실측치가 아니라 "그럴듯한 추정"이지만, 불릿이 3개면 4개짜리보다 항상
- * 짧게 나와서 최소한 내용량과 방향이 어긋나지는 않는다.
+ * 재생 길이 표기 — 2026-08-21부터 **실측값만** 쓴다.
+ *
+ * 이전엔 mockDuration(불릿 개수 × 18초 + 15초)으로 "그럴듯한 추정치"를
+ * 만들어 붙였다. 실제 오디오·영상이 붙은 뒤에도 그 추정치가 그대로
+ * 노출돼서, 화면에 적힌 "1:33"과 플레이어가 재생하는 실제 길이가 서로
+ * 달랐다 — 뉴스 서비스에서 지어낸 숫자를 화면에 박아두면 안 된다.
+ * 이제 <audio>/<video>의 loadedmetadata에서 받은 duration만 표시하고,
+ * 아직 모르면 길이 자리를 비워둔다(포맷 이름만 보여준다).
  */
-function mockDuration(bulletCount: number): string {
-  const totalSec = 15 + bulletCount * 18;
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
+function clock(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * 레터 예상 읽기 시간. 한글 묵독 속도를 분당 500자로 잡는다(보수적 추정 —
+ * 통상 600~700자로 보지만 경제 기사엔 수치·고유명사가 많아 느려진다).
+ * 이건 추정임을 문구에서도 "약 N분"으로 밝힌다.
+ */
+function readMinutes(chars: number): number {
+  return Math.max(1, Math.round(chars / 500));
+}
+
+/**
+ * 형식 탭에 붙는 **실제 분량** — 이 기사를 이 형식으로 보면 얼마나 되는지
+ * (약 2분 / 8컷 / 3:24 / 준비 중).
+ *
+ * 2026-08-21에 추가했다. 그 전 탭은 아이콘 + 이름뿐이라 넷 중 무엇을 고를
+ * 근거가 화면에 없었고, 결국 하나씩 눌러 확인해야 했다. 그런데 이 서비스가
+ * 다른 데서 못 보여주는 것이 바로 "같은 기사 = 네 가지 분량"이다 — 그걸
+ * 선택 시점에 나란히 놓는다.
+ *
+ * 동시에 "준비 중"을 결정 시점으로 끌어올린다. 앞서는 형식을 고른 **뒤에야**
+ * 음성이 없다는 걸 알렸는데, 고르기 전에 알려주는 게 맞다.
+ *
+ * 오디오·영상 길이는 loadedmetadata가 오기 전까지는 모르므로 그때까지
+ * "음성"/"영상"이라고만 쓴다. 지어낸 길이는 쓰지 않는다(clock() 주석 참조).
+ */
+function formatAmount(
+  lens: CmsLens,
+  i: number,
+  durSec: number | undefined,
+): { text: string; spoken: string } {
+  const l = (lens.lenses ?? [])[i];
+  const nope = { text: '준비 중', spoken: '준비 중' };
+  if (!l) return nope;
+  const format = lensFormatAt(i);
+
+  if (format === 'letter') {
+    const paras =
+      articleFormatSample(lens.id, 'letter') ?? (l.paragraphs && l.paragraphs.length > 0 ? l.paragraphs : null);
+    const chars = (paras ?? l.bullets).join('').length;
+    if (chars === 0) return nope;
+    const m = readMinutes(chars);
+    return { text: `약 ${m}분`, spoken: `약 ${m}분 분량` };
+  }
+
+  if (format === 'webtoon') {
+    const cuts = l.images?.length ?? 0;
+    return cuts > 0 ? { text: `${cuts}컷`, spoken: `${cuts}컷` } : nope;
+  }
+
+  // 오디오·영상은 파일에서 길이를 읽어야 안다. 아직 안 왔으면 "⋯"만 둔다 —
+  // 형식 이름을 한 번 더 쓰면("영상 · 영상") 중복이고, "--:--"는 있지도 않은
+  // 플레이어 상태를 흉내내는 것이고, 지어낸 길이는 애초에 금지다.
+  // 스크린리더에는 "길이 확인 중"으로 또박또박 읽힌다.
+  const url = format === 'podcast' ? l.media_url : l.video_url;
+  if (!url) return nope;
+  if (!durSec) return { text: '⋯', spoken: '길이 확인 중' };
+  const m = Math.floor(durSec / 60);
+  const s = durSec % 60;
+  return { text: clock(durSec), spoken: s === 0 ? `${m}분` : `${m}분 ${s}초` };
 }
 
 /**
@@ -85,10 +156,6 @@ const ARTICLE_FORMAT_SAMPLES: Record<
     webtoon?: string[];
     podcast?: string[];
     video?: string[];
-    // 시선 간 연결 문구(2026-08-18, "네 개가 따로 떨어졌다는 느낌" 지적) —
-    // 각 포맷 끝에서 다음 시선으로 자연스럽게 넘어가는 한 줄. 마지막
-    // 포맷(video)은 다음이 없어 안 씀.
-    bridge?: { letter?: string; webtoon?: string; podcast?: string };
   }
 > = {
   '2026-08-14-쏘카-테슬라-800대-더-늘린다-전기차-비중-14-로': {
@@ -130,11 +197,6 @@ const ARTICLE_FORMAT_SAMPLES: Record<
       '전기차 운영 대수는 지난해 같은 기간보다 59% 늘었고요.',
       '대당 수익성은 내연기관차보다 53% 높았어요. 쏘카가 잡은 연말 목표는 전기차 비중 14%예요.',
     ],
-    bridge: {
-      letter: '그럼 이 전기차, 실제로 누가 타게 될까요?',
-      webtoon: '그럼 나는 지금 뭘 하면 좋을까요?',
-      podcast: '이 변화, 숫자로 정리하면 어떨까요?',
-    },
   },
 };
 
@@ -160,10 +222,6 @@ function coreSummaryBullets(lens: CmsLens): string[] {
   return [];
 }
 
-function articleBridgeSample(lensId: string, format: 'letter' | 'webtoon' | 'podcast'): string | null {
-  return ARTICLE_FORMAT_SAMPLES[lensId]?.bridge?.[format] ?? null;
-}
-
 /**
  * 카드뉴스 목업 — 인스타 카드뉴스처럼 한 장씩 크게 보여주고 화살표(또는
  * 스와이프)로 넘긴다(2026-08-18, "가로 스크롤 필름스트립은 촌스럽다,
@@ -175,8 +233,7 @@ function articleBridgeSample(lensId: string, format: 'letter' | 'webtoon' | 'pod
 function CardnewsCarousel({
   photo,
   coverHeadline,
-  ordinal,
-  full,
+  formatName,
   cards,
   color,
   tint,
@@ -184,8 +241,11 @@ function CardnewsCarousel({
 }: {
   photo: string | null;
   coverHeadline: string;
-  ordinal: string;
-  full: string;
+  /** 형식 이름("웹툰") — 예전엔 인물 설명(full, "그림으로 가볍게 보고 싶은
+   *  사람")과 서수(②)를 표지에 박았는데, 같은 것을 페이지 다른 곳에서는
+   *  "웹툰"이라고 불러서 이름이 둘로 갈렸다. 서수는 이제 화면 어디에도
+   *  안 쓰므로(선택기가 위치를 보여준다) 여기서도 뺐다(2026-08-21). */
+  formatName: string;
   cards: { hook: string | null; caption: string }[];
   color: string;
   tint: string;
@@ -203,10 +263,16 @@ function CardnewsCarousel({
     [total],
   );
 
+  // ⚠️ stopPropagation 필수 — 2026-08-21에 패널 전체에도 가로 스와이프(형식
+  // 전환)가 붙었다. 여기서 막지 않으면 컷을 넘기려는 스와이프가 형식 전환까지
+  // 같이 발동해 웹툰에서 팟캐스트로 튄다. 컨테이너에 data-own-swipe도 달아
+  // 두었으니(아래) 두 겹으로 막힌다.
   const onTouchStart = (e: ReactTouchEvent) => {
+    e.stopPropagation();
     touchStartX.current = e.touches[0]?.clientX ?? null;
   };
   const onTouchEnd = (e: ReactTouchEvent) => {
+    e.stopPropagation();
     if (touchStartX.current === null) return;
     const dx = (e.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
     touchStartX.current = null;
@@ -215,25 +281,18 @@ function CardnewsCarousel({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+    <div data-own-swipe style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
       <div style={{ position: 'relative', width: '100%', maxWidth: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* 36×36 → 44×44(.fmt-arrow). 터치 타겟 최소치를 못 넘겼고, 테두리도
+            흰 배경 대비 1.1:1(rgba(0,0,0,0.06))이라 "누를 수 있는 것"으로
+            보이지 않았다. 2026-08-21. */}
         <button
           type="button"
-          aria-label="이전 카드"
+          aria-label="이전 컷"
           disabled={index === 0}
           onClick={() => go(-1)}
-          className="flex items-center justify-center flex-shrink-0"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 999,
-            border: LENS_CARD_BORDER,
-            background: '#fff',
-            boxShadow: LENS_CARD_SHADOW,
-            marginRight: 10,
-            cursor: index === 0 ? 'default' : 'pointer',
-            opacity: index === 0 ? 0.35 : 1,
-          }}
+          className="fmt-arrow"
+          style={{ marginRight: 8 }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M15 18l-6-6 6-6" />
@@ -308,7 +367,7 @@ function CardnewsCarousel({
                   position: 'absolute',
                   top: 26,
                   left: 14,
-                  fontSize: 10,
+                  fontSize: 13,
                   fontWeight: 800,
                   letterSpacing: '0.12em',
                   color: photo ? 'rgba(255,255,255,0.78)' : 'rgba(17,24,39,0.5)',
@@ -317,13 +376,17 @@ function CardnewsCarousel({
                 AI LENS
               </span>
               <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '18px 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', color: photo ? 'rgba(255,255,255,0.7)' : '#6b7280' }}>
-                  시선 {ordinal} · {full}
+                {/* 10.5 → 13px, 흰 글자 불투명도 0.7 → 0.86. 사진 위 작은
+                    글자는 원래도 읽기 어려운 조건인데 최소 캡션 크기(13px)
+                    아래였다. 인물명(full) 대신 형식 이름을 쓴다 — 페이지의
+                    다른 곳과 이름을 하나로 통일했다. */}
+                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.04em', color: photo ? 'rgba(255,255,255,0.86)' : '#6b7280' }}>
+                  {formatName}
                 </span>
                 <span
                   style={{
                     fontFamily: '"Noto Serif KR", serif',
-                    fontSize: 21,
+                    fontSize: 20,
                     fontWeight: 700,
                     lineHeight: 1.4,
                     letterSpacing: '-0.01em',
@@ -349,7 +412,7 @@ function CardnewsCarousel({
                   <p
                     style={{
                       fontFamily: '"Noto Serif KR", serif',
-                      fontSize: 19,
+                      fontSize: 20,
                       fontWeight: 700,
                       color: '#111827',
                       lineHeight: 1.4,
@@ -361,7 +424,7 @@ function CardnewsCarousel({
                     {cards[index - 1]?.hook}
                   </p>
                 )}
-                <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, wordBreak: 'keep-all', margin: 0 }}>{cards[index - 1]?.caption}</p>
+                <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.65, wordBreak: 'keep-all', margin: 0 }}>{cards[index - 1]?.caption}</p>
               </div>
             </div>
           )}
@@ -369,28 +432,20 @@ function CardnewsCarousel({
 
         <button
           type="button"
-          aria-label="다음 카드"
+          aria-label="다음 컷"
           disabled={index === total - 1}
           onClick={() => go(1)}
-          className="flex items-center justify-center flex-shrink-0"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 999,
-            border: LENS_CARD_BORDER,
-            background: '#fff',
-            boxShadow: LENS_CARD_SHADOW,
-            marginLeft: 10,
-            cursor: index === total - 1 ? 'default' : 'pointer',
-            opacity: index === total - 1 ? 0.35 : 1,
-          }}
+          className="fmt-arrow"
+          style={{ marginLeft: 8 }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M9 18l6-6-6-6" />
           </svg>
         </button>
       </div>
-      <p style={{ fontSize: 12, color: '#9ca3af' }}>
+      {/* #9ca3af(2.54:1) → #6b7280(4.87:1). 진행 위치는 보조 정보라도
+          읽혀야 하는 정보다. */}
+      <p style={{ fontSize: 14, color: '#4b5563', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }} aria-live="polite">
         {index + 1} / {total}
       </p>
     </div>
@@ -400,16 +455,41 @@ function CardnewsCarousel({
 export function LensViewClient({
   slug,
   initialLens = undefined,
-  otherLens = [],
 }: {
   slug: string;
   initialLens?: CmsLens | null;
-  otherLens?: CmsLens[];
 }) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
   const [active, setActive] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
+  // 실제 오디오·영상 길이(초). loadedmetadata에서만 채운다 — 지어낸 길이를
+  // 쓰지 않기 위해서다(clock() 주석 참조).
+  const [mediaDur, setMediaDur] = useState<Record<number, number>>({});
+  // 방금 어느 방향으로 이동했는지(-1 왼쪽 / 0 없음 / +1 오른쪽). 인디케이터가
+  // 움직인 방향과 본문이 들어오는 방향을 맞추는 데만 쓴다.
+  const [dir, setDir] = useState(0);
+  // 형식 설명(.fmt-toast) 표시 여부 — 2026-08-21, 사용자 요청("팟캐스트
+  // 클릭했을 때 보였으면 좋겠어, 항상 본문에 있는게 아니라"). 처음엔 탭을
+  // 고른 순간에만 나타나 2.6초 뒤 스스로 사라지게 만들었는데, 그 자동 소멸이
+  // 문제였다 — 사용자가 아무것도 안 눌러도 타이머가 끝나면 이 블록이 DOM에서
+  // 빠지면서 아래 본문이 위로 당겨졌다("화면이 리셋되며 위아래로 움직인다"
+  // 리포트의 원인). 지금은 한 번 탭을 고르면 다음에 다른 탭을 고르기 전까지
+  // 계속 떠 있는다 — 저절로 사라지지 않으니 저절로 화면이 움직일 일도 없다. */
+  const [showDesc, setShowDesc] = useState(false);
+  // 웹툰 대사 전문 펼침 — 컷 아래 캡션을 걷어내고 전문을 접힌 목록으로
+  // 옮겼다(아래 .strip 주석 참조). 형식별로 나누지 않는다: 한 번에 한
+  // 패널만 보이므로 상태 하나로 충분하다.
+  const [showScript, setShowScript] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // 패널 가로 스와이프 시작점. 세로 스크롤·텍스트 선택과 다투지 않게
+  // 가로 우세를 확실히 요구한다(onPanelTouchEnd 참조).
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+
+  const noteDur = useCallback((i: number, raw: number) => {
+    if (!Number.isFinite(raw) || raw <= 0) return;
+    const sec = Math.round(raw);
+    setMediaDur((cur) => (cur[i] === sec ? cur : { ...cur, [i]: sec }));
+  }, []);
 
   useEffect(() => {
     if (!slug || initialLens) return;
@@ -432,6 +512,9 @@ export function LensViewClient({
     if (i === null || i >= count) return;
     const raf = requestAnimationFrame(() => setActive(i));
     return () => cancelAnimationFrame(raf);
+    // 딥링크 진입은 설명(showDesc)을 안 띄운다 — 최초 진입은 항상
+    // 최상단부터 보여야 하고(주석대로), 설명 문구까지 열려 있으면 그
+    // 원칙과 부딫힌다. 사용자가 탭을 직접 누르면(select()) 그때 뜬다.
   }, [count]);
 
   // 클릭 직후 아래 내용이 바뀐 걸 못 느낀다는 피드백(2026-08-18, "클릭했는데
@@ -442,18 +525,74 @@ export function LensViewClient({
   // setActive()를 직접 불러서(위 useEffect) 이 스크롤이 안 걸린다 —
   // "항상 최상단부터 랜딩" 원칙은 그대로 유지.
   const select = useCallback((i: number) => {
+    setDir(i > active ? 1 : i < active ? -1 : 0);
     setActive(i);
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('v', String(i + 1));
-      window.history.replaceState(null, '', url);
-      // block:'nearest' — 패널이 이미 화면 안에 있으면(대부분의 경우, 타일
-      // 바로 아래라) 아예 스크롤하지 않고, 화면 밖으로 밀려나 있을 때만
-      // 최소한으로 당겨온다. 'start'를 쓰면 매번 패널을 뷰포트 맨 위로
-      // 붙여서 방금 누른 타일까지 화면 밖으로 밀려나 버린다.
-      document.getElementById(lensPanelId(i))?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setShowDesc(true);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', String(i + 1));
+    window.history.replaceState(null, '', url);
+    // ⚠️ rAF 안에서 스크롤한다. 앞선 버전은 setActive() 직후 같은 tick에
+    // scrollIntoView를 불렀는데, 그 시점의 대상 패널은 아직 hidden(=박스가
+    // 없는 상태)이라 브라우저가 스크롤을 아예 하지 않았다 — 보정이 있는
+    // 것처럼 보였지만 실제로는 동작하지 않았다. 특히 긴 레터를 읽다가 짧은
+    // 포맷으로 바꾸면 문서 높이가 줄면서 스크롤이 하단으로 클램프돼 마감부에
+    // 떨어지는 문제가 있었다.
+    //
+    // 스크롤 목적지 = 형식 설명(#lens-desc), 패널 자체(lens-N)가 아니다
+    // (2026-08-21 변경). "레터, 약 2분 분량"을 눌렀는데 화면이 리드 이유가
+    // 여기 있었다 — 목적지가 본문 패널이면 그 패널 상단(=질문·리드 첫
+    // 줄)까지만 당겨오고, 방금 누른 탭 바로 아래에 뜨는 설명 문구는 화면
+    // 밖에 남을 수 있었다. 이제 "레터를 누르면 그 설명이 보이는 지점"을
+    // 목적지로 잡는다 — 설명 문구가 곧 그 탭을 누른 결과이기 때문이다.
+    // block:'nearest' — 이미 화면 안에 있으면 움직이지 않고, 밖으로
+    // 밀려나 있을 때만 최소한으로 당겨온다. 상단 오프셋은 CSS
+    // scroll-margin-top(.lens-panel)이 sticky 헤더+형식 바 높이만큼 잡아준다.
+    requestAnimationFrame(() => {
+      const el = document.getElementById('lens-desc') ?? document.getElementById(lensPanelId(i));
+      if (!el) return;
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+    });
+  }, [active]);
+
+  /**
+   * 패널 가로 스와이프로 형식 넘기기 — 이 서비스는 "출퇴근길에 한 손으로"가
+   * 기본 사용 맥락인데, 앞서는 형식을 바꿀 방법이 탭 하나뿐이었다. 스와이프를
+   * 붙이면 네 형식이 "나란히 놓인 페이지"로 느껴져서, 인디케이터가 옆으로
+   * 미끄러지는 것과 조작 감각이 일치한다.
+   *
+   * 탭은 그대로 남는다 — 스와이프는 발견 가능한 조작이 아니므로 유일한
+   * 수단이 되면 안 된다(스와이프만 아는 사람은 없다).
+   */
+  const onPanelTouchStart = useCallback((e: ReactTouchEvent) => {
+    const t = e.touches[0];
+    // 오디오 스크러버·임베드·자체 스와이프를 가진 캐러셀 위에서는 안 잡는다.
+    if (!t || (e.target as HTMLElement).closest?.('audio, video, iframe, [data-own-swipe]')) {
+      swipe.current = null;
+      return;
     }
+    swipe.current = { x: t.clientX, y: t.clientY };
   }, []);
+
+  const onPanelTouchEnd = useCallback(
+    (e: ReactTouchEvent, i: number) => {
+      const start = swipe.current;
+      swipe.current = null;
+      if (!start || count < 2) return;
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      // 56px 이상 + 세로 이동의 1.6배 이상 — 세로 스크롤 중의 손떨림이나
+      // 텍스트 드래그가 형식 전환으로 오인되지 않는 최소 조건.
+      if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+      const next = dx < 0 ? i + 1 : i - 1;
+      if (next < 0 || next >= count) return;
+      select(next);
+    },
+    [count, select],
+  );
 
   const onTabKeyDown = useCallback(
     (e: ReactKeyboardEvent, i: number) => {
@@ -496,56 +635,271 @@ export function LensViewClient({
 
   const photo = pickLensPhoto(lens);
   const lenses = lens.lenses ?? [];
+  // 지금 고른 형식 — 슬라이딩 인디케이터 색(--c/--t)과 설명 토스트가 쓴다.
+  const activeP = lensPerspectiveAt(active);
+  const ActiveIcon = activeP.icon;
 
   return (
     <div style={{ minHeight: '100vh', background: '#fff' }}>
+      {/* ⚠️ 아래 <style> 안의 주석은 CSS 문자열이라 **HTML 응답에 그대로
+          실려 나간다**(SSR 페이지라 매 요청마다). 그래서 설계 근거는 전부
+          여기 JSX 주석에 둔다 — 이건 빌드 때 사라진다. CSS 블록 안에는
+          한 줄짜리 힌트만 남긴다. 2026-08-21에 이 규칙을 정하기 전까지는
+          약 4.5KB의 주석이 매 요청 함께 나가고 있었다.
+
+          ── 레이아웃(.lw / .lm) ──
+          폭을 하나로 통일한다(2026-08-14 최종). 앞서 헤드라인용 넓은 폭(1080)과
+          본문용 좁은 폭(748)을 나눴는데, 두 값을 어떻게 배치해도 문제가 났다 —
+          형제로 두고 각자 중앙 정렬하면 좌측선이 166px 어긋나고, 자식으로
+          중첩하고 마진을 없애면 본문이 넓은 영역의 왼쪽 끝에 붙어 화면 전체가
+          왼쪽으로 쏠렸다. 해결: 컬럼은 하나(.lw)만 두고 모든 블록을 그 안에서
+          대칭으로 중앙 배치한다.
+          .lm 은 원래 읽기 폭(680px)을 위한 것이었는데 2026-08-14에 "본문 폭 =
+          사진 폭" 요청으로 100%가 됐다. 트레이드오프: 16px 기준 한 줄이 약
+          50자가 되어 스티어링 권장(25~40자)을 넘는다 — 정렬 일관성을 우선한
+          선택이고, 지금도 유효하다.
+
+          ── 형식 선택기(.fmt-*) — 2026-08-21 재설계 ──
+          직전 버전은 인물 일러스트가 들어간 148px 타일 2×2(모바일)였다. 첫
+          사용자가 이 페이지를 이해하지 못하는 원인이 대부분 이 컨트롤에 있었다:
+
+           1. 선택기가 스크롤과 함께 사라졌다. 한 번 본문으로 들어가면 "지금
+              무슨 형식을 보고 있는지"도, "다른 형식으로 바꾸는 방법"도 화면에
+              없다. 그래서 sticky로 고정한다 — 이 페이지에서 유일하게 항상
+              닿아야 하는 컨트롤이다.
+           2. 일러스트가 형식을 설명하지 않았다. /lens/role-1-newcomer.png 라는
+              파일명 그대로, 옛 "사회초년생·직장인·자영업자·투자자" 페르소나 축에서
+              남은 인물 그림이다. 넷 다 같은 톤의 회색 라인아트라 "레터"와
+              "팟캐스트"를 구별해주지 못한다. 형식을 뜻하는 아이콘(BookOpen/
+              Image/Headphones/Video)으로 바꿨다 — 이미 lensPerspectives.ts에
+              있는데 여태 작은 배지에만 쓰고 있었다.
+           3. 타일이 세로로 320px을 먹었다. 375px에서 태그라인("구조와 흐름까지
+              제대로 알고 싶다면")이 4줄로 감겨서, 아무 내용도 안 읽기 전에 화면
+              절반을 선택지가 차지했다. 태그라인은 선택기에서 빼고, 고른 형식의
+              설명을 탭 직후 잠깐 뜨는 토스트(.fmt-toast, 2026-08-21부터)로
+              보여준다 — 상시 노출 줄이었다가, 항상 화면에 붙어 있지 않고
+              "누른 순간에만" 뜨도록 바꿨다(사용자 요청).
+
+          ── 2차(같은 날) — "너무 일차원적" 피드백 반영 ──
+          1차 결과는 아이콘 + 이름만 든 검은 알약 4개였다. 규칙은 다 지켰지만
+          정보가 없었다. 세 가지를 더했다:
+
+           a. **분량을 탭 안으로.** 각 탭이 이 기사를 그 형식으로 보면 얼마나
+              되는지 함께 보여준다(약 2분 / 8컷 / 3:24 / 준비 중,
+              formatAmount()). 이건 이 서비스만 보여줄 수 있는 정보다 — 같은
+              기사의 네 가지 분량. 덕분에 (1) 고르기 전에 판단 근거가 생기고,
+              (2) "준비 중"이 고른 뒤가 아니라 고르기 전에 밝혀진다.
+              1행 이름 / 2행 아이콘+분량 2단 구성인 이유: 375px 칸 안쪽이
+              69.75px인데 1행에 아이콘(18)+"팟캐스트"(56)를 같이 넣으면 넘친다.
+              아이콘이 분량 옆에 오면 "약 2분"이 읽는 시간인지 듣는 시간인지도
+              같이 구분해준다.
+
+           b. **슬라이딩 인디케이터(.fmt-thumb).** 알약마다 배경을 켜고 끄면
+              전환이 "깜빡임"이지만, 하나가 옆으로 미끄러지면 넷이 나란히 놓인
+              하나의 대상이 된다 — 형식 간 인접 관계를 나르는 유일한 요소다.
+              색도 그 형식 색으로 물들어서 아래 설명 토스트(.fmt-toast)와
+              소속이 이어진다.
+              라벨은 절대 흰색으로 반전시키지 않는다 — 반전시키면 thumb가
+              지나가는 180ms 동안 흰 글자가 흰 배경 위에 놓여 사라진다.
+              대신 채움(10% 워시) + 컬러 룰 3px + 굵기(600→800) + 색
+              (#6b7280→#111827) 네 겹으로 표시한다. 색 없이도(굵기·명도·룰 위치)
+              구별되므로 색각 이상에서도 동일하게 읽힌다.
+              컬러 룰은 thumb 아래, 흰 배경 위에 둔다 — tint 위에 얹으면
+              앰버(#d97706)가 2.81:1로 UI 요소 기준(3:1)을 못 넘긴다.
+
+           c. **가로 스와이프(onPanelTouchStart/End) + 방향성 전환.** 출퇴근길
+              한 손 사용이 기본 맥락인데 형식을 바꿀 방법이 탭 하나뿐이었다.
+              스와이프한 방향 = 인디케이터가 미끄러지는 방향 = 새 본문이
+              들어오는 방향(swap-fwd/swap-back)으로 셋을 일치시킨다.
+              웹툰 컷 캐러셀은 자기 스와이프를 갖고 있어 stopPropagation +
+              data-own-swipe 로 두 겹 차단한다.
+
+          패널 제목줄(.fmt-head, "레터 · 약 2분 읽기")은 없앴다 — 그 정보가
+          탭으로 올라갔고 탭은 sticky라 항상 보인다. 같은 말을 두 번 하지 않는다.
+
+          "이어서 웹툰으로 보기" 같은 다음 형식 이동 버튼(.fmt-next)은
+          2026-08-21에 완전히 뺐다(사용자 요청) — 근거는 각 패널 마지막의
+          JSX 주석 참조. 그 CSS 규칙도 함께 지웠다. */}
       <style>{`
-        /* 폭을 하나로 통일한다(2026-08-14 최종).
-           앞서 헤드라인용 넓은 폭(1080)과 본문용 좁은 폭(748)을 나눴는데,
-           두 값을 어떻게 배치해도 문제가 났다 — 형제로 두고 각자 중앙 정렬하면
-           좌측선이 166px 어긋나고, 자식으로 중첩하고 마진을 없애면 본문이 넓은
-           영역의 왼쪽 끝에 붙어 화면 전체가 왼쪽으로 쏠렸다.
-           해결: 컬럼은 하나(.lw)만 두고 모든 블록을 그 안에서 **대칭으로**
-           중앙 배치한다. 좌우 여백이 같아지므로 "왼쪽으로 쏠린" 느낌이 없다.
-           읽기 폭이 필요한 문단만 .lm 으로 좁히되, 그것도 margin:0 auto 로
-           중앙에 둬서 양쪽 여백을 대칭으로 유지한다. */
         .lw { max-width: 880px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px); }
-        /* 본문 폭 = 사진 폭(2026-08-14 요청). 예전엔 읽기 편한 줄 길이를 위해
-           680px 로 좁혔는데, 그러면 사진(컬럼 전체 824px)보다 좁아 좌우가 어긋나
-           보였다. 이제 컬럼 폭을 그대로 써서 사진·요약·질문·근거의 좌우선이
-           완전히 일치한다.
-           트레이드오프: 16px 기준 한 줄이 약 50자가 되어 스티어링 권장(25~40자)을
-           넘는다. 정렬 일관성을 우선한 선택이다. */
         .lm { max-width: 100%; }
         .rule { height: 1px; background: rgba(17,24,39,0.1); }
         .back:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
 
-        /* 원문 링크 — 테두리 없는 텍스트 링크. 요약 아래 우측에 붙는다.
-           보조 동작이라 시각적 무게를 최소로 두되 밑줄로 링크임을 명확히 한다. */
-        .src { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
-          color: #6b7280; font-size: 14px; font-weight: 600; text-decoration: underline;
-          text-underline-offset: 3px; text-decoration-color: rgba(17,24,39,0.25); }
-        .src:hover { color: #111827; text-decoration-color: currentColor; }
-        .src:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
+        /* ── 이 페이지의 공통 문법 3개 ───────────────────────────────────
+           1. .ovl  구역 이름표. 크기로 소리치지 않고 자간·굵기로만 구분한다.
+           2. .rule 구역 경계. 이게 **유일한** 구분 장치다(카드·컬러 룰 없음).
+           3. .lnk  보조 링크. 위치·크기·밑줄이 전부 같아서 서로 경쟁하지 않는다.
+           2026-08-21에 이 셋으로 통일했다 — 그 전엔 카드 테두리+그림자,
+           전폭 헤어라인, 3px 컬러 왼쪽 룰이 섞여 있어서 어디까지가 한 덩어리인지
+           읽히지 않았다("너무 분산돼 보인다"). */
+        /* 13 → 18px(2026-08-21). 13px 자간 0.06em 오버라인은 "세련되지만
+           안 읽히는" 쪽이었다 — 구역 이름은 스크롤하며 훑을 때 가장 먼저
+           잡혀야 하는 글자다. 넓은 자간도 뺐다: 18px 한글에 0.06em을 주면
+           글자가 흩어져 오히려 덩어리로 안 읽힌다. h1(26~36px)과는 여전히
+           명확히 차이 나므로 위계는 유지된다. */
+        .ovl { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; color: #111827; }
+        /* 크기 이력: 14 → 16 → 14px. 가시성 개선으로 한 번 올렸는데(구역
+           이름표·탭과 같이 키움) 16px은 본문과 같은 크기라 "기사 원문 보기"가
+           리드 문단만큼 무거워졌다 — 이건 페이지를 떠나는 보조 동작이고
+           주인공이 아니다. 14px로 되돌린다(캡션 최소치 13px보다 위, 대비
+           7.56:1). 히트 영역은 min-height 44px로 그대로 유지하므로 글자만
+           작아지고 누르기 쉬운 정도는 안 변한다. */
+        .lnk { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+          border: none; background: none; cursor: pointer;
+          color: #4b5563; font-size: 14px; font-weight: 600; text-decoration: underline;
+          text-underline-offset: 3px; text-decoration-color: rgba(17,24,39,0.28); }
+        .lnk:hover { color: #111827; text-decoration-color: currentColor; }
+        .lnk:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
 
-        /* 사람 타일 선택기 — 모바일 2열, 480px 이상 4열.
-           네 칸이 완전히 같은 크기·형태라 "넷 중 하나를 고른다"가 즉시 읽힌다. */
-        .picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        @media (min-width: 480px) { .picks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-        .pick { position: relative; display: flex; flex-direction: column; align-items: center;
-          gap: 6px; padding: 16px 12px 14px; border-radius: 14px; border: 1px solid;
-          cursor: pointer; min-height: 148px; text-align: center;
-          transition: background .16s ease, border-color .16s ease, transform .12s ease; }
-        .pick:hover { transform: translateY(-2px); }
-        .pick:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
-        .pick-on { position: absolute; top: 8px; right: 8px; width: 18px; height: 18px;
-          border-radius: 999px; display: flex; align-items: center; justify-content: center; }
+        /* padding-bottom 3px = thumb 아래 컬러 룰 두께. 이게 없으면 룰이 바
+           밖으로 삐져나와 아래 본문 위에 얹힌다.
+           바 높이 = 8(위 패딩) + 60(탭: 8+20+4+20+8) + 3(룰) + 1(경계선) = 72px. */
+        .fmt-bar { position: sticky; top: 56px; z-index: 20; background: #fff;
+          padding: 8px 0 3px; border-bottom: 1px solid rgba(17,24,39,0.12); }
+        .fmt-row { position: relative; display: grid; gap: 8px;
+          grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+
+        /* 슬라이딩 인디케이터. 형식 간 "인접 관계"를 나르는 유일한 요소다 —
+           칸을 하나 건너뛰면 두 칸을 지나가고, 색도 그 형식 색으로 물든다. */
+        .fmt-thumb { position: absolute; inset: 0 auto 0 0; pointer-events: none;
+          width: calc((100% - (var(--n) - 1) * 8px) / var(--n));
+          transform: translateX(calc(var(--ai) * (100% + 8px)));
+          border-radius: 10px 10px 0 0;
+          /* BRAND_ACCENTS의 soft 틴트는 형식마다 밝기 편차가 커서(#e6f4ef 는
+             거의 흰색) 채움이 있는지 없는지 안 보이는 칸이 생겼다. 같은 토큰
+             (--c)에서 10% 워시를 만들어 네 형식의 존재감을 균일하게 맞춘다.
+             color-mix 미지원 브라우저는 앞 줄의 soft 틴트로 폴백. */
+          background: var(--t);
+          background: color-mix(in srgb, var(--c) 10%, #ffffff);
+          transition: transform .28s cubic-bezier(.22,.85,.2,1), background-color .28s ease; }
+        /* 컬러 룰은 thumb 아래(흰 배경 위)에 둔다 — tint 위에 얹으면 앰버가
+           2.81:1로 UI 요소 기준(3:1)을 못 넘긴다. 흰 배경 위에서는 3.19:1. */
+        .fmt-thumb::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px;
+          height: 3px; border-radius: 2px 2px 0 0; background: var(--c); }
+
+        .fmt { position: relative; z-index: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 4px;
+          min-height: 56px; padding: 8px 4px; border: none; background: none;
+          border-radius: 10px 10px 0 0; cursor: pointer; }
+        /* font-weight 는 트랜지션에 넣지 않는다 — 가변 폰트라 보간은 되지만
+           글자 폭이 함께 변해 라벨이 미세하게 흔들린다. 굵기는 즉시 바뀌고
+           색만 부드럽게 따라간다.
+           크기 이력: 14 → 16 → 14px. 가시성 개선으로 한 번 16px까지 올렸는데
+           이름 4개가 본문과 같은 크기로 나란히 서니 sticky 바가 무거워졌다
+           (바 높이도 64 → 76px까지 늘었다). 분량 표기(14px)와 한 단계 차이만
+           두고 되돌린다 — 굵기(선택 시 800)와 슬라이딩 인디케이터가 이미
+           존재감을 내고 있어서 크기까지 키울 필요가 없다. */
+        .fmt-name { font-size: 14px; font-weight: 600; color: #6b7280;
+          letter-spacing: -0.01em; white-space: nowrap; transition: color .2s ease; }
+        .fmt-amt { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #6b7280;
+          font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .2s ease; }
+        .fmt[aria-selected='true'] .fmt-name { color: #111827; font-weight: 800; }
+        .fmt[aria-selected='true'] .fmt-amt { color: #4b5563; }
+        .fmt[aria-selected='false']:hover .fmt-name,
+        .fmt[aria-selected='false']:hover .fmt-amt { color: #111827; }
+        .fmt:focus-visible { outline: 2px solid #111827; outline-offset: -2px; }
+        /* 폭 계산(이름 14px 기준)
+           375px: 칸 77.75px, 안쪽 69.75px. 1행 "팟캐스트" 14px/800 ≈ 56px,
+                  2행 아이콘 14 + 간격 4 + "준비 중" 14px 46px = 64px. 여유 있다.
+           320px: 칸 64px, 안쪽 56px — 56px이 딱 닿는다. 좌우 패딩을 4 → 2px로
+                  줄여 안쪽 60px을 확보하고 분량만 한 단계 내린다.
+           칸 간격 8px은 어느 폭에서도 줄이지 않는다(인접 타겟 최소 간격). */
+        @media (max-width: 359px) {
+          .fmt { padding: 8px 2px; }
+          .fmt-amt { font-size: 13px; gap: 2px; }
+        }
+
+        /* 형식 설명 — 탭을 누를 때마다 갈아끼워지는 자리. 3px 컬러 왼쪽 룰을
+           걷어냈다(2026-08-21): 이것만 15px 들여쓰여서 위아래 블록과 왼쪽
+           시작선이 어긋났고, 헤어라인과 다른 세 번째 구분 문법이었다. 형식과의
+           연결은 바로 위 인디케이터(같은 색)와의 거리, 그리고 바뀔 때마다
+           다시 도는 슬라이드-인이 담당한다.
+
+           2026-08-21 — 상시 노출 줄(.fmt-desc)에서 "누른 순간에 뜨는 설명"
+           (.fmt-toast)으로 바꿨다(사용자 요청: "팟캐스트 클릭했을 때 보였으면
+           좋겠어, 항상 본문에 있는게 아니라"). 한 번 뜨면 다른 탭을 고르기
+           전까지 계속 떠 있는다 — 자동으로 사라지는 타이머는 없다(있었더니
+           타이머가 끝날 때 레이아웃이 갑자기 줄어 화면이 움직였다). 탭 바로
+           아래, 탭과 같은 폭에서 뜨게 해 "이 탭에서 나온 설명"으로 읽히도록
+           했다 — 본문 칼럼(.lread, 620px)에 붙이면 탭과 시각적으로 끊어진다. */
+        .fmt-toast { display: flex; align-items: flex-start; gap: 8px;
+          margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+          background: color-mix(in srgb, var(--c) 8%, #ffffff);
+          font-size: 15px; line-height: 1.6; color: #374151; word-break: keep-all; }
+        @media (prefers-reduced-motion: no-preference) {
+          .fmt-toast { animation: toast-in .22s ease-out; }
+          @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+        }
+
+        /* 준비 안 된 형식의 정직한 안내 — 탭의 "준비 중"이 결정 시점에
+           알리고, 이 줄이 그래서 대신 뭐가 있는지 말한다. */
+        .fmt-note { margin-bottom: clamp(16px, 2.4vw, 24px); font-size: 16px; line-height: 1.6;
+          color: #6b7280; word-break: keep-all; }
+
+        /* 형식 본문 첫 줄 — 네 형식이 공유한다. 앞서는 같은 스타일을 세
+           군데(레터 질문 / 팟캐스트 제목 / 영상 제목)에 인라인으로 손으로
+           적어두고 값이 조금씩 어긋나 있었다(letterSpacing -0.03 vs -0.02,
+           marginBottom 16 vs 24 vs clamp). 한 곳으로 모아야 탭을 옮겨도
+           첫 줄이 같은 자리·같은 무게로 앉는다. */
+        .fmt-lede { font-family: "Noto Serif KR", serif;
+          font-size: clamp(20px, 2.6vw, 24px); font-weight: 700; color: #111827;
+          line-height: 1.5; letter-spacing: -0.02em; word-break: keep-all;
+          max-width: 620px; margin-bottom: 24px; }
+
+        /* ── 읽기 지면 ──────────────────────────────────────────────────
+           620px ≈ 한글 38자. 스티어링 권장(25~40자) 안이다. margin-left를
+           주지 않으므로 왼쪽 기준선은 헤드라인·사진·요약과 계속 일치하고,
+           좁아지는 건 오른쪽 끝뿐이다(.lm의 "정렬을 위해 폭 100%" 결정이
+           산문에서는 약 50자가 되어 줄을 놓치게 했다). */
+        .lread { max-width: 620px; }
+        .lread > p { font-size: calc(16px * var(--lens-font-scale, 1));
+          line-height: 1.85; color: #374151; word-break: keep-all; }
+        .lread > p + p { margin-top: 24px; }
+        /* 리드인 — 첫 문단만 한 단계 크게. 눈이 어디서 시작할지 정해준다. */
+        .lread > p.lread-lead { font-size: calc(18px * var(--lens-font-scale, 1));
+          line-height: 1.8; color: #1f2937; }
+        .lread-end { margin-top: 24px; font-size: 13px; line-height: 1; }
+
+        /* 웹툰 — 컷을 붙여 세로로 이어 붙인다. 컷마다 radius를 주면 조각난
+           카드 8장이 되므로 위아래 끝만 둥글게 깎고 사이는 2px로 붙인다. */
+        .strip { display: flex; flex-direction: column; gap: 2px;
+          border-radius: 14px; overflow: hidden; background: #f3f4f6; }
+
+        /* 걸어둔 번호 목록 — 30초 핵심과 같은 장치. 번호 열이 왼쪽에 정렬돼
+           목록이 표처럼 안정되고, 알약 배지 같은 추가 장치를 안 쓴다. */
+        .hang { display: flex; flex-direction: column; gap: 20px;
+          list-style: none; padding: 0; margin: 0; }
+        .hang > li { display: flex; align-items: baseline; gap: 14px; word-break: keep-all;
+          font-size: calc(16px * var(--lens-font-scale, 1)); line-height: 1.8; color: #374151; }
+        .hang-n { flex-shrink: 0; width: 22px; font-size: 14px; font-weight: 800;
+          color: #6b7280; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 
 
+        .fmt-arrow { display: flex; align-items: center; justify-content: center;
+          width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px;
+          border: 1px solid #949494; background: #fff; cursor: pointer; }
+        .fmt-arrow:disabled { cursor: default; opacity: .4; }
+        .fmt-arrow:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
+
+        /* sticky 헤더(56px) + 형식 바(72px) + 여유 6px. */
+        .lens-panel { scroll-margin-top: 134px; }
 
         @media (prefers-reduced-motion: no-preference) {
-          .panel { animation: swap .22s ease-out; }
-          @keyframes swap { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+          /* 방향성 전환 — 오른쪽 형식으로 갔으면 새 내용이 오른쪽에서 들어온다.
+             인디케이터가 움직인 방향과 본문이 들어온 방향이 같아서, 넷이 나란히
+             놓인 하나의 대상이라는 게 몸으로 읽힌다. 12px 이상 밀지 않는다 —
+             .lw 좌우 여백(최소 20px) 안에 있어야 가로 스크롤바가 생기지 않는다. */
+          .panel[data-dir='1'] { animation: swap-fwd .24s cubic-bezier(.22,.85,.2,1); }
+          .panel[data-dir='-1'] { animation: swap-back .24s cubic-bezier(.22,.85,.2,1); }
+          .panel[data-dir='0'] { animation: swap-in .22s ease-out; }
+          @keyframes swap-fwd { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+          @keyframes swap-back { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+          @keyframes swap-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fmt-name, .fmt-amt, .lnk { transition: none; }
+          .fmt-thumb { transition: none; }
         }
       `}</style>
 
@@ -639,9 +993,9 @@ export function LensViewClient({
           <div className="flex items-center flex-wrap" style={{ gap: 12, marginBottom: 10 }}>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 700,
-                padding: '3px 10px',
+                padding: '4px 10px',
                 borderRadius: 999,
                 background: `${LENS_ACCENT}14`,
                 color: LENS_ACCENT,
@@ -649,7 +1003,7 @@ export function LensViewClient({
             >
               4가지 시선
             </span>
-            <p className="flex items-center" style={{ gap: 5, fontSize: 13, color: '#6b7280', fontWeight: 600, margin: 0 }}>
+            <p className="flex items-center" style={{ gap: 6, fontSize: 14, color: '#4b5563', fontWeight: 600, margin: 0 }}>
               <Calendar className="w-4 h-4" aria-hidden />
               입력 {lens.date.replaceAll('-', '.')}
             </p>
@@ -658,7 +1012,7 @@ export function LensViewClient({
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center"
-              style={{ gap: 5, fontSize: 11.5, color: '#9ca3af', textDecoration: 'none' }}
+              style={{ gap: 6, fontSize: 14, color: '#4b5563', textDecoration: 'none' }}
             >
               <GoogleIcon className="w-3 h-3" />
               구글 검색 선호 출처로 추가
@@ -677,7 +1031,7 @@ export function LensViewClient({
             style={{ marginTop: 'clamp(14px, 2.4vw, 20px)', marginBottom: 'clamp(18px, 3vw, 24px)', gap: 12, padding: '10px 0', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}
           >
             <div className="flex items-center" style={{ gap: 8 }}>
-              <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
+              <span style={{ fontSize: 14, color: '#4b5563', fontWeight: 600 }}>공유하기</span>
               <ArticleShareButtons title={lens.headline} url={`https://ailens.sedaily.ai/lens/${slug}`} />
             </div>
             {/* 글자크기(알약 모양)와 인쇄(각진 정사각) 버튼이 각자
@@ -721,7 +1075,7 @@ export function LensViewClient({
                 기사별 캡션 텍스트는 CmsLens에 아직 없는 데이터라(백엔드
                 확장 필요) 지어내지 않고, 원문 링크가 있으면 그쪽으로
                 출처를 붙인다. */}
-            <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 8 }}>
+            <p style={{ fontSize: 14, color: '#4b5563', marginTop: 8 }}>
               {lens.source_url ? (
                 <>
                   사진 ·{' '}
@@ -749,9 +1103,19 @@ export function LensViewClient({
             </p>
           )}
 
+          {/* 원문 링크 — 리드 문단 오른쪽 아래(2026-08-21 최종 위치).
+              위치 이력: 리드 아래 → 요약 아래 → 다시 리드 아래.
+              오른쪽 끝을 flex-end로 붙이면 이 컨테이너 폭 = .lm(리드) 폭 =
+              바로 아래 .rule(구분선) 폭이라, 링크 오른쪽 끝이 리드 문단
+              오른쪽 끝과 구분선 끝에 정확히 맞는다 — 요청한 "맨 밑줄이랑
+              정렬".
+              marginTop을 안 준다: .lnk 가 터치 타겟용으로 min-height 44px을
+              갖고 있어서 글자가 박스 가운데 오고, 그 여백이 이미 리드와의
+              간격 역할을 한다. 여기에 margin을 더하면 리드에서 떨어져
+              "어디에도 안 붙은 링크"가 된다. */}
           {lens.source_url && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-              <a href={lens.source_url} target="_blank" rel="noopener noreferrer" className="src">
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <a href={lens.source_url} target="_blank" rel="noopener noreferrer" className="lnk">
                 기사 원문 보기
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M7 17 17 7" />
@@ -763,145 +1127,214 @@ export function LensViewClient({
               </a>
             </div>
           )}
+
+          {/* 핵심 요약("30초 핵심") — 실 데이터 기반(2026-08-20, GEO 개선).
+              이전엔 데모 기사 하나에만 하드코딩된 오버라이드였는데,
+              coreSummaryBullets()로 교체해 실제 발행된 모든 lens 글에서
+              동작한다. 네 시선을 고르기 전에 기사 전체의 핵심(수치·사실
+              위주)을 먼저 준다 — data-speakable="summary"를 붙여 위
+              리드 문단과 함께 "인용하기 쉬운 요약 블록"으로 묶는다.
+
+              2026-08-21 — 이 카드와 "기사 원문 보기"의 순서를 한 번 바꿨다가
+              (리드 → 요약 → 링크) 되돌렸다. 최종: 리드 → 링크 → 요약.
+              링크가 리드 문단 오른쪽 아래에 붙어 오른쪽 끝이 리드·구분선과
+              한 줄로 맞는 편이 화면에서 훨씬 정돈돼 보인다는 판단(사용자
+              지정). 요약 전체의 출처라는 의미는 바로 아래 구분선 하나만
+              건너면 되므로 크게 흐려지지 않는다.
+
+              이 카드는 count > 0 게이트 밖(리드와 같은 .lw 블록)에
+              옮겼다. 원문 링크가 그 게이트 안에 들어가면 lenses가 빈 글에서
+              페이지 안 원문 링크가 하나도 안 남는다(AiDisclaimer도 같은
+              게이트 안에 있다). 카드 자체는 coreSummaryBullets()가 lenses를
+              읽으므로 lenses가 비면 여전히 안 그려진다 — 동작 변화 없음. */}
+          {/* 위 원문 링크의 .lnk 박스가 44px(터치 타겟)이라 그 아래 여백이
+              이미 확보돼 있다. 여기에 32를 더하면 구분선이 너무 멀어져
+              리드-요약이 남남처럼 보인다 — 24로 줄여 실제 눈에 보이는
+              간격을 다른 구역 경계와 같게 맞춘다. */}
+          {coreSummaryBullets(lens).length > 0 && (
+            <div data-speakable="summary" style={{ marginTop: 24 }}>
+              <div className="rule" />
+              {/* 카드(테두리 + 그림자 + radius 16 + 안쪽 패딩 16)를 걷어냈다
+                  (2026-08-21). 이 파일의 원래 설계 원칙이 "박스를 걷어내고
+                  타이포·여백·헤어라인으로만 구조를 만든다"인데 이 카드만 예외로
+                  남아 있었고, 그 결과 아래 형식 선택 구역과 다른 문법을 써서
+                  둘이 별개 모듈처럼 보였다. 안쪽 패딩 때문에 본문·헤드라인과
+                  왼쪽 시작선도 16px 어긋나 있었다.
+                  이름표는 아래 "어떻게 볼까요"와 같은 .ovl 하나로 통일 —
+                  두 구역이 형제 관계로 읽힌다. Zap 아이콘은 뺐다(다른 이름표엔
+                  아이콘이 없어서 이것만 다른 종류의 장치였다). */}
+              {/* 리듬 단위를 하나로 고정했다: 32 → 구분선 → 32 → 이름표 →
+                  16 → 내용. 두 구역(30초 핵심 / 어떻게 볼까요)이 같은 간격으로
+                  반복되니 스크롤하면서 "또 같은 구조가 오는구나"가 예측된다.
+                  앞서는 12·4·28~40·0·16·24~32이 섞여 반복 단위가 없었다. */}
+              <p className="ovl" style={{ margin: '32px 0 16px' }}>
+                30초 핵심
+              </p>
+              {/* 체크 아이콘 → 번호. 체크는 "완료된 할 일" 기호라 뉴스 요약과
+                  뜻이 안 맞고, 세 줄이 서로 대등한 사실이라는 관계도 못 나른다.
+                  01·02·03 고정폭 숫자는 신문 키포인트 관례이고, 왼쪽에 정렬된
+                  숫자 열이 생겨 목록이 표처럼 안정된다. */}
+              <ol style={{ display: 'flex', flexDirection: 'column', gap: 16, listStyle: 'none', padding: 0, margin: 0 }}>
+                {coreSummaryBullets(lens).map((s, si) => (
+                  <li key={si} style={{ display: 'flex', alignItems: 'baseline', gap: 14, wordBreak: 'keep-all' }}>
+                    <span
+                      aria-hidden
+                      style={{
+                        flexShrink: 0,
+                        width: 20,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: '#6b7280',
+                        fontVariantNumeric: 'tabular-nums',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      {String(si + 1).padStart(2, '0')}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 'calc(16px * var(--lens-font-scale, 1))',
+                        lineHeight: 1.7,
+                        color: '#1f2937',
+                      }}
+                    >
+                      {s}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
         </div>
         </div>
 
         {count > 0 && (
-          <div className="lw" style={{ paddingTop: 'clamp(28px, 4.4vw, 40px)' }}>
+          <div className="lw" style={{ paddingTop: 32 }}>
           <div>
-            {/* 핵심 요약("30초 핵심") — 실 데이터 기반(2026-08-20, GEO 개선).
-                이전엔 데모 기사 하나에만 하드코딩된 오버라이드였는데,
-                coreSummaryBullets()로 교체해 실제 발행된 모든 lens 글에서
-                동작한다. 네 시선을 고르기 전에 기사 전체의 핵심(수치·사실
-                위주)을 먼저 준다 — data-speakable="summary"를 붙여 위
-                리드 문단과 함께 "인용하기 쉬운 요약 블록"으로 묶는다. */}
-            {coreSummaryBullets(lens).length > 0 && (
-              <div
-                data-speakable="summary"
-                style={{
-                  border: LENS_CARD_BORDER,
-                  borderRadius: 16,
-                  padding: 18,
-                  background: '#fff',
-                  boxShadow: LENS_CARD_SHADOW,
-                  marginBottom: 'clamp(24px, 3.4vw, 32px)',
-                }}
-              >
-                <p className="flex items-center" style={{ gap: 6, fontSize: 13, fontWeight: 800, color: LENS_ACCENT, marginBottom: 12 }}>
-                  <Zap size={14} fill="currentColor" aria-hidden />
-                  30초 핵심
-                </p>
-                <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
-                  {coreSummaryBullets(lens).map((s, si) => (
-                    <li key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14.5, lineHeight: 1.6, color: '#1f2937', wordBreak: 'keep-all' }}>
-                      <Check size={15} style={{ flexShrink: 0, marginTop: 3, color: LENS_ACCENT }} aria-hidden />
-                      <span>{s}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             <div className="rule" />
 
             {/* ── 형식 선택 ──
-                밑줄 텍스트 탭에서 **타일**로 되돌렸다(2026-08-14).
-                이 페이지의 핵심 동작이 "어떤 형식으로 볼지 고르기"인데, 앞선
-                버전은 그 컨트롤을 회색 16px 텍스트로 낮춰서 화면에서 가장 약한
-                요소가 됐다(눈에 안 들어온다는 피드백). 게다가 선택하는 순간에
-                형식을 표시하는 요소가 없어서 "넷 중 고른다"는 것이 직관적으로
-                전달되지 않았다.
-                네 타일을 같은 크기로 나란히 놓으면 선택지가 넷이라는 사실과
-                각자가 무슨 형식인지가 한눈에 오고, 선택 상태는 색 채움 + 테두리 +
-                체크 3중으로 표시해 색만으로 구분하지 않는다.
-                2026-08-20 — 문구를 "누구의 눈으로"(인물 선택)에서 "어떤
-                형식으로"(포맷 선택)로 고쳤다. 2026-08-18에 산출물이 4가지
-                형식(레터/웹툰/팟캐스트/영상)으로 확정된 뒤에도 이 문구만
-                옛 "독자 관점 선택" 프레이밍에 남아있어서, 실제로 고르는 것과
-                질문이 어긋나 있었다(사용자가 실제 발행 글에서 직접 발견) —
-                아래 lensPerspectives.ts의 LENS_PERSPECTIVES도 같이 고쳤다. */}
-            <h2 style={{ fontSize: 24, fontWeight: 800, color: '#111827', letterSpacing: '-0.025em', margin: 'clamp(24px, 3.4vw, 32px) 0 6px' }}>
-              이 뉴스, 어떤 형식으로 볼까요?
-            </h2>
-            <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 'clamp(14px, 2.2vw, 18px)', wordBreak: 'keep-all' }}>
-              고르면 아래 내용이 그 형식으로 바뀝니다.
-            </p>
+                히스토리: 밑줄 텍스트 탭 → 인물 일러스트 타일 2×2(2026-08-14)
+                → 형식 이름으로 문구 정정(2026-08-20) → 지금의 sticky 세그먼트
+                (2026-08-21). 왜 또 바꿨는지는 위 <style> 블록 .fmt-* 주석에
+                항목별로 적어뒀다.
 
-            <div role="tablist" aria-label="형식별 시선" className="picks">
-              {lenses.map((l, i) => {
-                const p = lensPerspectiveAt(i);
-                const on = i === active;
-                return (
-                  <button
-                    key={i}
-                    ref={(el) => {
-                      tabRefs.current[i] = el;
-                    }}
-                    type="button"
-                    role="tab"
-                    id={lensTabId(i)}
-                    aria-selected={on}
-                    aria-controls={lensPanelId(i)}
-                    tabIndex={on ? 0 : -1}
-                    onClick={() => select(i)}
-                    onKeyDown={(e) => onTabKeyDown(e, i)}
-                    className="pick"
-                    style={{
-                      // 선택 시 타일 전체를 tint로 채우던 걸 뺐다(2026-08-18,
-                      // "유형 누르면 뜨는 배경색 없애달라") — 테두리 색 +
-                      // 그림자 + 체크 배지 3중 표시로도 선택 상태는 충분히
-                      // 드러나고, 배경까지 채우면 특히 진한 색(로즈·앰버
-                      // 등)에서 과해 보였다.
-                      borderColor: on ? p.color : 'rgba(17,24,39,0.12)',
-                      background: '#fff',
-                      boxShadow: on ? `inset 0 0 0 1px ${p.color}` : 'none',
-                    }}
-                  >
-                    <span
-                      className="flex items-center justify-center flex-shrink-0"
-                      style={{ width: 48, height: 48, borderRadius: 999, background: '#fff', overflow: 'hidden' }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트 */}
-                      <img
-                        src={p.illustration}
-                        alt=""
-                        width={48}
-                        height={48}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
-                      />
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: on ? p.color : '#4b5563', letterSpacing: '-0.01em', wordBreak: 'keep-all' }}>
-                      {p.short}
-                    </span>
-                    {/* 이 시선이 무엇을 주는지 — 타일에 역할명만 있으면 무엇을
-                        고르는지 모르고 골라야 한다. tagline 을 여기로 올려서
-                        선택 전에 판단할 근거를 준다(선택 후 본문에서는 중복이라
-                        제거했다). */}
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: on ? p.color : '#6b7280',
-                        opacity: on ? 0.9 : 1,
-                        lineHeight: 1.45,
-                        textAlign: 'center',
-                        wordBreak: 'keep-all',
+                제목 크기를 24 → 20 → 13px(.ovl)까지 내렸다(2026-08-21).
+                h1(36px) 아래 20px h2가 오면 주인공이 둘로 갈리고, 무엇보다
+                위 "30초 핵심"과 다른 크기 체계를 쓰는 순간 두 구역이 형제로
+                안 읽힌다. 이제 둘 다 .ovl 하나를 쓴다 — 구역 이름표는 크기로
+                소리치지 않고, 존재감은 바로 아래 탭 바가 낸다.
+                (2026-08-14에 "선택기를 회색 16px 텍스트로 낮췄더니 안 보인다"는
+                피드백이 있었지만, 그때 약했던 건 **컨트롤 자체**였다. 지금
+                컨트롤은 슬라이딩 인디케이터가 달린 탭 바이고 약해진 건
+                이름표뿐이다.)
+                문구도 줄였다: "이 뉴스, 어떻게 볼까요?" → "어떻게 볼까요" —
+                무슨 뉴스인지는 위에서 이미 다 말했다. */}
+            {/* "형식 차이 보기"(LensFormatGuide 모달)를 뺐다 — 2026-08-21.
+                이 버튼은 탭이 아이콘 + 이름뿐이던 시절, 네 형식이 뭔지 알려줄
+                유일한 창구여서 넣은 것이었다. 그 뒤 탭이 이 기사의 실제 분량
+                (약 2분 / 8컷 / 3:24 / 준비 중)을 직접 보여주고, 바로 아래
+                설명줄이 고른 형식이 뭘 주는지 갈아끼워 보여주게 되면서
+                모달이 하는 말과 화면에 이미 있는 말이 겹쳤다. 같은 설명을
+                두 경로로 두면 사용자는 어느 쪽이 최신인지 판단해야 한다.
+                (모달 자체는 홈 티저 LensPreviewSection에서 계속 쓰인다 —
+                거기는 기사를 고르기 전이라 분량을 보여줄 수 없어서 설명이
+                여전히 필요하다.) */}
+            <h2 className="ovl" style={{ margin: '32px 0 16px' }}>
+              어떻게 볼까요
+            </h2>
+
+            <div className="fmt-bar">
+              <div
+                role="tablist"
+                aria-label="이 뉴스를 볼 형식"
+                aria-orientation="horizontal"
+                className="fmt-row"
+                style={
+                  {
+                    '--n': count,
+                    '--ai': active,
+                    '--c': activeP.color,
+                    '--t': activeP.tint,
+                  } as CSSProperties
+                }
+              >
+                {/* 슬라이딩 인디케이터 — 탭 뒤에서 움직인다. 형식 색으로 물들며
+                    옮겨가므로 "몇 칸 옆으로 갔는지"와 "지금 무슨 형식인지"를
+                    한 요소가 같이 말한다. 정보는 이름·분량 텍스트가 나르고
+                    이건 관계만 나르므로 aria에서 감춘다. */}
+                <span className="fmt-thumb" aria-hidden />
+                {lenses.map((l, i) => {
+                  const p = lensPerspectiveAt(i);
+                  const on = i === active;
+                  const Icon = p.icon;
+                  const amt = formatAmount(lens, i, mediaDur[i]);
+                  return (
+                    <button
+                      key={i}
+                      ref={(el) => {
+                        tabRefs.current[i] = el;
                       }}
+                      type="button"
+                      role="tab"
+                      id={lensTabId(i)}
+                      aria-selected={on}
+                      aria-controls={lensPanelId(i)}
+                      tabIndex={on ? 0 : -1}
+                      onClick={() => select(i)}
+                      onKeyDown={(e) => onTabKeyDown(e, i)}
+                      className="fmt"
+                      // 분량 텍스트가 "⋯"이나 "8컷"처럼 짧은 기호·단위라
+                      // 그대로 읽히면 뜻이 안 통한다. 이름과 분량을 붙여 한
+                      // 문장으로 읽어준다.
+                      aria-label={`${p.short}, ${amt.spoken}`}
                     >
-                      {p.tagline}
-                    </span>
-                    {/* 선택 표시 — 색 외에 형태 신호도 함께 준다. */}
-                    {on && (
-                      <span aria-hidden className="pick-on" style={{ background: p.color }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
+                      <span className="fmt-name">{p.short}</span>
+                      {/* 분량 — 아이콘을 이 줄에 붙였다. 1행에 아이콘+이름을
+                          같이 넣으면 375px 칸(69.75px)에 "팟캐스트"(56px) +
+                          아이콘(18) + 간격이 안 들어간다. 아이콘이 분량 옆에
+                          오면 "약 2분"이 읽는 시간인지 듣는 시간인지도
+                          아이콘이 구분해준다. */}
+                      <span className="fmt-amt">
+                        <Icon size={13} aria-hidden style={{ flexShrink: 0 }} />
+                        {amt.text}
                       </span>
-                    )}
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* 형식 설명 — 2026-08-21, 사용자 요청으로 상시 노출 줄에서 "탭을
+                누른 순간에" 나타나는 방식으로 바꿨다. lensPerspectives.ts의
+                content 필드(원래 LensFormatGuide 전용)를 그대로 쓴다.
+                탭 바로 아래, 탭과 같은 폭에서 뜬다 — "지금 누른 그 탭에서 나온
+                말풍선"으로 읽히게 하려면 본문(.lread, 620px)이 아니라 탭 바
+                (전체 폭)에 붙어야 한다.
+                처음엔 2.6초 뒤 스스로 사라지게 했었는데, 그 자동 소멸이 원인이
+                되어 "탭을 눌렀는데 화면이 리셋되며 위아래로 움직인다"는 문제가
+                났다 — 타이머가 끝나 이 블록이 DOM에서 빠지면 아래 본문이 그만큼
+                위로 당겨진다. 지금은 한 번 뜨면 다른 탭을 고르기 전까지 계속
+                떠 있는다(showDesc는 select()에서 true로만 바뀐다, 저절로 꺼지지
+                않음) — 안 사라지니 안 움직인다.
+                id="lens-desc"는 select()의 스크롤 목적지다: "레터를 누르면 이
+                설명이 보이는 지점"까지 오도록, 탭을 누른 결과 그 자체를
+                조준한다. key={active}로 매 선택마다 리마운트해 슬라이드-인이
+                항상 다시 돈다. role="status"는 스크린리더에게 "방금 나타난
+                부가 정보"로 조용히 읽히게 한다(alert처럼 끼어들지 않음). */}
+            {showDesc && (
+              <p
+                key={active}
+                id="lens-desc"
+                role="status"
+                className="fmt-toast"
+                style={{ '--c': activeP.color } as CSSProperties}
+              >
+                <ActiveIcon size={16} aria-hidden style={{ flexShrink: 0, marginTop: 2, color: activeP.color }} />
+                <span>{activeP.content}</span>
+              </p>
+            )}
 
             {/* ── 선택된 시선 ── 박스 없이 위계로만 구성 */}
             {lenses.map((l, i) => {
@@ -918,6 +1351,23 @@ export function LensViewClient({
                 format === 'webtoon' || format === 'podcast' || format === 'video'
                   ? articleFormatSample(lens.id, format) ?? l.bullets
                   : l.bullets;
+              // 팟캐스트 대본 전문 — 2026-08-21, "대본이 요약이다, 전체
+              // full script로 바꿔달라" 요청. CMS의 팟캐스트 슬롯(l.bullets)엔
+              // 짧은 핵심 요약 3~5줄만 저장된다(admin LensMode.tsx에서 이
+              // 필드 라벨 자체가 "챕터"). 실제 음성으로 녹음된 8~12분 전체
+              // 원고는 텍스트로 저장되지 않는다 — 오디오 파일(media_url)만
+              // 있고 그걸 만든 대본 텍스트는 시스템에 없다. 없는 문장을
+              // 새로 지어내면 "원문에 없는 것은 만들지 않는다" 원칙에
+              // 걸리므로, 같은 기사에 이미 있는 가장 긴 완결된 산문 —
+              // 레터 포맷의 전체 문단(lenses[0], 보통 6~7개 문단)을 대신
+              // 보여준다. 지어낸 글이 아니라 같은 기사의 실제 CMS 데이터다.
+              const letterFullText =
+                articleFormatSample(lens.id, 'letter') ??
+                (lenses[0]?.paragraphs && lenses[0].paragraphs.length > 0 ? lenses[0].paragraphs : null);
+              const podcastScript =
+                format === 'podcast' && letterFullText && letterFullText.length > 0
+                  ? letterFullText
+                  : scriptBullets;
               // 레터 본문 — 데모 오버라이드 → 없으면 admin이 채운 실제
               // paragraphs(2026-08-19 신설 필드) → 그것도 없으면 아래
               // 불릿 목록으로 폴백(letterParagraphs가 null인 경우).
@@ -943,6 +1393,20 @@ export function LensViewClient({
               // 직접 재생한다(2026-08-20, 실제 샘플 파일 업로드 대응).
               const directVideoUrl = format === 'video' && l.video_url && !realVideo ? l.video_url : null;
               const directPodcastUrl = format === 'podcast' && l.media_url && !realPodcast ? l.media_url : null;
+              const hasPodcast = Boolean(realPodcast || directPodcastUrl);
+              const hasVideo = Boolean(realVideo || directVideoUrl);
+
+              // 준비 안 된 형식의 안내 — 탭의 "준비 중"이 고르기 전에 알리고,
+              // 이 줄이 그래서 대신 뭐가 있는지 말한다. 형식 이름·분량을 다시
+              // 쓰지 않는다(탭에 이미 있다).
+              const note =
+                format === 'webtoon' && !realWebtoonCuts
+                  ? '웹툰 컷은 아직 준비 중이에요. 아래는 컷에 들어갈 대사예요.'
+                  : format === 'podcast' && !hasPodcast
+                    ? '음성 파일은 아직 준비 중이에요. 아래는 브리핑에 들어갈 대본이에요.'
+                    : format === 'video' && !hasVideo
+                      ? '영상은 아직 준비 중이에요. 아래는 영상에 들어갈 대본이에요.'
+                      : null;
               return (
                 <section
                   key={i}
@@ -951,92 +1415,58 @@ export function LensViewClient({
                   aria-labelledby={lensTabId(i)}
                   data-speakable="qa"
                   hidden={!on}
-                  className={on ? 'panel' : undefined}
-                  style={{
-                    marginTop: 'clamp(22px, 3.4vw, 30px)',
-                    // 왼쪽 규칙선(레일)도, 선택 직후 잠깐 배경을 물들이던
-                    // 클릭 피드백도 뺐다(2026-08-18, "유형 누르면 뜨는 배경색
-                    // 없애달라"). 위 타일 선택 상태 자체가 이미 색+테두리+
-                    // 그림자+체크 4중으로 표시되고 있어서, 본문까지 색을
-                    // 끌고 오지 않아도 "누구의 시선인지"는 위 타일과 "시선
-                    // {ordinal} · {full}" 텍스트로 충분히 전달된다.
-                  }}
+                  className={on ? 'lens-panel panel' : 'lens-panel'}
+                  data-dir={on ? dir : undefined}
+                  onTouchStart={onPanelTouchStart}
+                  onTouchEnd={(e) => onPanelTouchEnd(e, i)}
+                  style={{ marginTop: 'clamp(24px, 3.4vw, 32px)' }}
                 >
-                  {/* 역할 머리 — 압축했다. 52px 일러스트와 액센트 바를 뺀 이유는
-                      위 선택 타일에 이미 같은 인물이 강조된 채로 있어서 중복이고,
-                      그만큼 질문(이 화면의 실제 보상)이 아래로 밀렸기 때문이다.
-                      정체성은 컬러 서수 + 역할명 한 줄로 충분하다. */}
-                  {/* tagline 은 위 타일로 옮겼다 — 선택 전에 필요한 정보이고,
-                      여기서 반복하면 질문이 아래로 밀린다. 대신 몇 번째 시선인지
-                      전체 개수와 함께 보여준다(내가 넷 중 어디에 있는지). */}
-                  <div className="flex items-center" style={{ gap: 8, marginBottom: 'clamp(14px, 2.2vw, 18px)' }}>
-                    <p style={{ fontSize: 14, fontWeight: 800, color: p.color, letterSpacing: '-0.01em', wordBreak: 'keep-all' }}>
-                      시선 {p.ordinal} · {p.full}
-                    </p>
-                    <span aria-hidden style={{ width: 1, height: 12, background: 'rgba(17,24,39,0.15)' }} />
-                    <p style={{ fontSize: 13, color: '#6b7280', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                      {i + 1} / {count}
-                    </p>
-                  </div>
-
-                  {/* 포맷 배지 — 실제 미디어(2026-08-19, LensMode.tsx 4개
-                      포맷 탭에서 admin이 채운 것)가 있으면 "목업" 문구를
-                      뺀다. letter는 지금 실제 운영 중인 형태라 배지 없이
-                      그대로 둔다. */}
-                  {format !== 'letter' && (
-                    <p
-                      className="flex items-center"
-                      style={{ gap: 6, fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 14 }}
-                    >
-                      {format === 'webtoon' && <Images size={13} aria-hidden />}
-                      {format === 'podcast' && <Headphones size={13} aria-hidden />}
-                      {format === 'video' && <Video size={13} aria-hidden />}
-                      {format === 'webtoon' && (realWebtoonCuts ? '웹툰' : '웹툰 형식 목업 · 아직 생성 파이프라인 미연결')}
-                      {format === 'podcast' && (realPodcast || directPodcastUrl ? '팟캐스트' : '팟캐스트 형식 목업 · 아직 생성 파이프라인 미연결')}
-                      {format === 'video' && (realVideo || directVideoUrl ? '영상' : '영상 형식 목업 · 아직 생성 파이프라인 미연결')}
-                    </p>
-                  )}
+                  {/* 패널 제목줄(형식 이름 + 분량)은 걷어냈다 — 그 정보가
+                      2026-08-21에 탭 안으로 올라갔고, 탭은 sticky라 항상
+                      화면에 있다. 같은 말을 두 번 하지 않는다. 남은 건
+                      "준비 중"일 때의 안내 한 줄뿐이다. */}
+                  {note && <p className="fmt-note">{note}</p>}
 
                   {/* 질문 — 카드 안 시각적 정점(32). 장식 없이 세리프 크기만으로
                       끌어올린다. */}
-                  {format === 'letter' && l.question && (
-                    <p
-                      className="lm"
-                      style={{
-                        fontFamily: '"Noto Serif KR", serif',
-                        fontSize: 'clamp(24px, 3vw, 32px)',
-                        fontWeight: 700,
-                        color: '#111827',
-                        lineHeight: 1.45,
-                        letterSpacing: '-0.03em',
-                        marginBottom: 'clamp(22px, 3.4vw, 28px)',
-                        wordBreak: 'keep-all',
-                      }}
-                    >
-                      {l.question}
-                    </p>
-                  )}
+                  {/* 24~32px → 20~24px(2026-08-21). 네 형식의 첫 줄 무게를
+                      하나로 맞춘다 — 탭을 옮길 때마다 첫 줄이 32↔24px로
+                      뛰면 "같은 대상의 다른 표면"이 아니라 "다른 페이지"로
+                      느껴진다. h1(26~36px)과의 위계는 그대로 유지된다.
+                      여백도 clamp 대신 24px 고정 — 위 구역과 같은 리듬 단위. */}
+                  {format === 'letter' && l.question && <p className="fmt-lede">{l.question}</p>}
 
                   {/* 레터 본문 — 데모 오버라이드가 있는 기사는 뉴스레터
                       문단으로(2026-08-18, "카드뉴스 거 그대로 가져온거라서"
                       지적 — 레터가 카드뉴스와 같은 불릿 목록을 그대로 쓰고
                       있던 걸 고침). AI LENS 편집장 프롬프트의 문체 가이드
                       (친근한 -했어요체, 문단당 2~3문장)를 따른다. */}
+                  {/* 2026-08-21 — 레터 본문을 "문단 블록 나열"에서 편집 지면으로
+                      고쳤다. 앞선 형태는 폭 100%에 16px 문단을 16px 간격으로
+                      균일하게 쌓은 것뿐이어서, 어디서 시작해 어디서 끝나는지
+                      리듬이 없는 생성형 답변처럼 읽혔다. 셋을 바꿨다:
+
+                       1. **읽기 폭.** .lread 로 620px 상한을 준다(약 38자).
+                          .lm은 정렬을 위해 폭 100%(약 50자)를 택한 값인데,
+                          긴 산문에서는 줄을 놓치는 폭이다. margin-left를 두지
+                          않아 왼쪽 기준선은 사진·요약과 그대로 일치한다 —
+                          좁아지는 건 오른쪽 끝뿐이다.
+                       2. **첫 문단 리드인.** 첫 문단만 18px. 신문의 리드
+                          관례이고, 눈이 어디서 시작할지 정해준다.
+                       3. **문단 간격 16 → 24px.** 문단이 덩어리로 분리된다. */}
                   {format === 'letter' && letterParagraphs && (
-                    <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div className="lread">
                       {letterParagraphs.map((para, pi) => (
-                        <p
-                          key={pi}
-                          style={{
-                            fontSize: 'calc(16px * var(--lens-font-scale, 1))',
-                            lineHeight: 1.8,
-                            color: '#374151',
-                            wordBreak: 'keep-all',
-                          }}
-                        >
+                        <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
                           {para}
                         </p>
                       ))}
+                      {/* 마감 부호 — 기사가 끝났다는 신호. 이게 없으면 아래
+                          "이어서 웹툰으로 보기"가 본문의 연장처럼 읽힌다.
+                          신문·잡지가 오래 쓰는 장치이고, 색 대신 형태로만 말한다. */}
+                      <p aria-hidden className="lread-end" style={{ color: p.color }}>
+                        ■
+                      </p>
                     </div>
                   )}
 
@@ -1046,36 +1476,39 @@ export function LensViewClient({
                       개수를 함께 보여주면 얼마나 읽어야 하는지도 예측된다.
                       데모 문단 오버라이드가 없는 기사(대부분)는 지금처럼
                       CMS 불릿을 그대로 쓴다. */}
+                  {/* 13px 자간 오버라인("이 질문에 답하는 사실 3")을 .ovl로
+                      올렸다 — 페이지의 다른 구역 이름과 같은 체계여야 한다.
+                      불릿 점은 걸어둔 번호(.hang)로 교체: 위 30초 핵심과 같은
+                      장치를 쓰면 "번호가 걸린 목록 = 사실 나열"이라는 규칙이
+                      페이지 안에서 한 번만 학습된다. */}
                   {format === 'letter' && !letterParagraphs && l.bullets.length > 0 && (
                     <>
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 800,
-                          letterSpacing: '0.06em',
-                          color: '#6b7280',
-                          marginBottom: 14,
-                        }}
-                      >
+                      <p className="ovl" style={{ marginBottom: 16 }}>
                         이 질문에 답하는 사실 {l.bullets.length}
                       </p>
-                      <ul className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 14, listStyle: 'none', padding: 0, margin: 0 }}>
+                      <ol className="hang lread">
                         {l.bullets.map((b, bi) => (
-                          <li key={bi} style={{ display: 'flex', gap: 12, fontSize: 'calc(16px * var(--lens-font-scale, 1))', lineHeight: 1.75, color: '#374151', wordBreak: 'keep-all' }}>
-                            <span
-                              aria-hidden
-                              className="flex-shrink-0"
-                              style={{ width: 5, height: 5, marginTop: 11, borderRadius: 999, background: p.color }}
-                            />
+                          <li key={bi}>
+                            <span aria-hidden className="hang-n">
+                              {String(bi + 1).padStart(2, '0')}
+                            </span>
                             <span>{b}</span>
                           </li>
                         ))}
-                      </ul>
+                      </ol>
                     </>
                   )}
 
+                  {/* 빈 상태 — "왜 비었는지 + 무엇을 하면 되는지"를 쓴다.
+                      앞선 문구("이 시선은 아직 준비 중이에요.")는 앞부분만
+                      말하고 다음 행동을 주지 않아서, 사용자는 여기서 막힌다. */}
                   {format === 'letter' && !letterParagraphs && !l.question && l.bullets.length === 0 && (
-                    <p style={{ fontSize: 14, color: '#6b7280' }}>이 시선은 아직 준비 중이에요.</p>
+                    <div style={{ fontSize: 16, lineHeight: 1.7, color: '#374151', wordBreak: 'keep-all' }}>
+                      <p>이 기사의 레터는 아직 만들지 않았어요.</p>
+                      <p style={{ marginTop: 8, color: '#6b7280' }}>
+                        위에서 다른 형식을 골라보거나, 아래 원문 기사에서 전체 내용을 확인할 수 있어요.
+                      </p>
+                    </div>
                   )}
 
                   {/* 카드뉴스 목업 — 인스타 카드뉴스처럼 한 번에 한 장만
@@ -1088,8 +1521,20 @@ export function LensViewClient({
                   {/* 실제 웹툰 컷(2026-08-19) — admin이 LensMode.tsx 웹툰
                       탭에서 WebtoonPanelsEditor로 올린 이미지+캡션이 있으면
                       아래 목업 캐러셀 대신 실제 컷을 순서대로 보여준다. */}
+                  {/* 2026-08-21 — "이미지 + 그 아래 캡션"을 8번 반복하는 형태를
+                      **이어지는 한 줄기**로 바꿨다.
+                      앞선 형태의 문제: 컷마다 캡션 박스가 끼어들어 18px씩
+                      끊기니 만화를 읽는 게 아니라 그림 목록(figure list)을
+                      스크롤하게 됐다 — 자동 생성 문서에서 가장 흔한 모양이다.
+                      게다가 컷 안의 말풍선 대사와 아래 캡션이 거의 같은 말을
+                      두 번 하고 있었다.
+                      지금: 컷을 2px 간격으로 붙여 세로로 이어 붙인다(웹툰의
+                      기본 읽기 방식). 대사는 (a) 각 이미지 alt에 그대로 남고
+                      (b) 아래 "대사로 읽기" 목록에 전문이 있다 — 화면에서
+                      사라진 게 아니라 자리를 옮긴 것이라 접근성·SEO 손실이
+                      없다(hidden 으로만 감추므로 DOM에 항상 존재). */}
                   {format === 'webtoon' && realWebtoonCuts && (
-                    <div className="lm" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    <div className="strip" data-own-swipe>
                       {realWebtoonCuts.map((cut, ci) => (
                         <figure key={ci} style={{ margin: 0 }}>
                           {/* pipelines/webtoon이 실제로 만드는 컷은 1536x1024(3:2
@@ -1099,16 +1544,59 @@ export function LensViewClient({
                               지시함) 통째로 잘려 보이는 문제가 있었다(2026-08-20
                               사용자 리포트). contain으로 바꿔 잘림 없이 전체를
                               보여준다 — 비율이 정확히 3:2면 레터박스도 안 생긴다. */}
-                          <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', borderRadius: 14, overflow: 'hidden', background: '#f3f4f6' }}>
-                            <Image src={cut.url} alt={cut.caption || ''} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'contain' }} />
+                          <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', background: '#f3f4f6' }}>
+                            <Image src={cut.url} alt={cut.caption || `${ci + 1}번째 컷`} fill sizes="(min-width: 920px) 700px, 100vw" style={{ objectFit: 'contain' }} />
                           </div>
-                          {cut.caption && (
-                            <figcaption style={{ marginTop: 8, fontSize: 13.5, color: '#374151', lineHeight: 1.6, wordBreak: 'keep-all' }}>
-                              {cut.caption}
-                            </figcaption>
-                          )}
                         </figure>
                       ))}
+                    </div>
+                  )}
+
+                  {/* 대사 전문 — 컷 아래에서 사라진 캡션이 여기로 모인다.
+                      기본은 접힘: 대사는 이미 컷 안 말풍선에 있으니 전문은
+                      "필요할 때 펼치는 것"이 맞다(소리를 못 듣거나 이미지가
+                      안 뜨거나, 인용하려는 경우).
+                      hidden 으로만 감춰서 DOM에는 항상 있다 — 검색엔진·
+                      스크린리더는 접힘과 무관하게 읽을 수 있고, 접근성 트리
+                      상태는 aria-expanded/aria-controls가 정확히 말해준다.
+                      <details> 대신 버튼 + hidden 을 쓴 이유: 이 저장소가
+                      이미 쓰는 "더보기/접기" 관례(NewsTimeMachineSection,
+                      NewsletterCTA)와 모양을 맞추기 위해서다. */}
+                  {format === 'webtoon' && realWebtoonCuts && realWebtoonCuts.some((c) => c.caption) && (
+                    <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
+                      <button
+                        type="button"
+                        className="lnk"
+                        aria-expanded={showScript}
+                        aria-controls={`${lensPanelId(i)}-script`}
+                        onClick={() => setShowScript((v) => !v)}
+                      >
+                        대사로 읽기 {realWebtoonCuts.length}컷
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.4}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                          style={{ transform: showScript ? 'rotate(180deg)' : 'none', transition: 'transform .2s ease' }}
+                        >
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </button>
+                      <ol id={`${lensPanelId(i)}-script`} hidden={!showScript} className="hang lread" style={{ marginTop: 16 }}>
+                        {realWebtoonCuts.map((cut, ci) => (
+                          <li key={ci}>
+                            <span aria-hidden className="hang-n">
+                              {String(ci + 1).padStart(2, '0')}
+                            </span>
+                            <span>{cut.caption || '(대사 없음)'}</span>
+                          </li>
+                        ))}
+                      </ol>
                     </div>
                   )}
 
@@ -1121,8 +1609,7 @@ export function LensViewClient({
                     <CardnewsCarousel
                       photo={photo}
                       coverHeadline={webtoonHeadline || ''}
-                      ordinal={p.ordinal}
-                      full={p.full}
+                      formatName={p.short}
                       color={p.color}
                       tint={p.tint}
                       Icon={p.icon}
@@ -1151,92 +1638,83 @@ export function LensViewClient({
                   )}
 
                   {/* 직링크 오디오(2026-08-20) — S3 등에 직접 올린 mp3. 유튜브가
-                      아니라 iframe 임베드가 안 되므로 네이티브 <audio>로 재생. */}
+                      아니라 iframe 임베드가 안 되므로 네이티브 <audio>로 재생.
+                      preload="none" → "metadata"로 올렸다: 재생 길이를 화면에
+                      표시하려면 메타데이터가 필요하다. 지어낸 길이를 쓰지
+                      않기로 했으므로(clock() 주석) 이 요청이 유일한 출처다.
+                      본문(오디오 데이터)은 여전히 안 받아온다. */}
+                  {/* 카드(테두리+그림자)를 걷어냈다(2026-08-21) — 30초 핵심
+                      카드를 없애고 나니 이 구역에서 유일하게 남은 박스라 눈에
+                      걸렸다. <audio> 자체가 이미 뚜렷한 형태를 가진 객체여서
+                      한 번 더 액자에 넣을 필요가 없다. 제목은 다른 형식들의
+                      질문(clamp 20~24 세리프)과 같은 크기로 맞춰, 어느 형식을
+                      골라도 본문 첫 줄의 무게가 같아진다. */}
+                  {/* 2026-08-21 — 네이티브 <audio controls>를 우리 플레이어로
+                      교체했다(shared/ui/ArticleAudioPlayer). 네이티브 컨트롤은
+                      브라우저마다 생김새가 완전히 달라(사파리 둥근 회색 알약 /
+                      크롬 각진 회색 바) 잘 만든 기사 지면에서 "여기만 남의 UI"로
+                      보이는 지점이 정확히 여기였다. 재생 버튼도 20~30px대라
+                      터치 타겟 최소치를 못 넘겼다.
+                      새 플레이어가 더 주는 것: 탐색 가능한 진행바(네이티브가
+                      아니면 이 저장소엔 seek 구현이 아예 없었다), 현재 위치·
+                      전체 길이 표기, 15초 뒤로, 배속(브리핑을 1.5배로 듣는 건
+                      실제 수요다). 강조색은 지금 화면의 유일한 강조색인 이
+                      형식 색을 넘긴다. */}
+                  {/* 2026-08-21(재설계) — 바깥 .fmt-lede(질문)를 뺐다. 새
+                      플레이어 카드가 레퍼런스 구조를 따라 자체 헤더(배지 +
+                      제목 + 바이라인)를 갖게 되면서, 바깥에 같은 질문을
+                      한 번 더 적으면 "기사 제목"이 화면에 두 번 나왔다.
+                      카드 안 title이 그 역할을 대신한다.
+                      cover: 기사 사진(photo, 있으면). byline: 화자 데이터가
+                      없어 원문 출처로 대체(0단계 보고에서 확인한 대로),
+                      있을 때만 렌더하고 source_url이 있으면 외부 링크로
+                      만든다. chapters: 실측 타임코드가 없어(같은 보고서)
+                      seek 불가능한 "읽는 대본"으로만 전달 — time 필드를
+                      비워서 넘기면 컴포넌트가 자동으로 클릭 탐색을 끈다. */}
                   {format === 'podcast' && directPodcastUrl && (
-                    <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
-                      <p
-                        style={{
-                          fontFamily: '"Noto Serif KR", serif',
-                          fontSize: 16,
-                          fontWeight: 700,
-                          color: '#111827',
-                          letterSpacing: '-0.01em',
-                          wordBreak: 'keep-all',
-                          marginBottom: 12,
-                        }}
-                      >
-                        {l.question || '오늘의 브리핑'}
-                      </p>
-                      <audio controls preload="none" src={directPodcastUrl} style={{ width: '100%' }} />
-                    </div>
+                    <ArticleAudioPlayer
+                      src={directPodcastUrl}
+                      accent={p.color}
+                      label={p.short}
+                      kicker="AI 음성 브리핑"
+                      title={l.question || '오늘의 브리핑'}
+                      coverImage={photo}
+                      byline={lens.source_url ? '서울경제 원문 기사' : null}
+                      bylineHref={lens.source_url}
+                      chapters={podcastScript.length > 0 ? podcastScript.map((text) => ({ text })) : undefined}
+                      onDuration={(sec) => noteDur(i, sec)}
+                    />
                   )}
 
-                  {/* 팟캐스트 목업 — 실제 미디어가 없을 때만(위 realPodcast/
-                      분기 참조). 재생 버튼·진행바는 정적 장식(실제 오디오
-                      없음). 오늘(2026-08-18) 레터 상세에서 "대부분 오디오가
-                      없어 빈 회색 카드로 보인다"는 이유로 미니 플레이어를
-                      뺐던 것과 같은 함정을 피하려고, 여기서도 실제 재생 상태를
-                      흉내내지 않고 컨셉만 고정 표시한다.
-                      디자인(2026-08-18 다듬기): tint 채움 카드 → 흰 바탕 +
-                      공용 그림자·테두리 토큰. 챕터 라벨을 굵은 인라인 텍스트
-                      대신 알약 배지로 바꿔 목록이 표처럼 정렬되게 했다. */}
-                  {format === 'podcast' && !realPodcast && !directPodcastUrl && (
-                    <div style={{ border: LENS_CARD_BORDER, borderRadius: 16, padding: 18, background: '#fff', boxShadow: LENS_CARD_SHADOW }}>
-                      <div className="flex items-center" style={{ gap: 14 }}>
-                        <span
-                          aria-hidden
-                          className="flex items-center justify-center flex-shrink-0"
-                          style={{ width: 46, height: 46, borderRadius: 999, background: p.color, color: '#fff' }}
-                        >
-                          <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
-                        </span>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <p
-                            style={{
-                              fontFamily: '"Noto Serif KR", serif',
-                              fontSize: 16,
-                              fontWeight: 700,
-                              color: '#111827',
-                              letterSpacing: '-0.01em',
-                              wordBreak: 'keep-all',
-                              marginBottom: 4,
-                            }}
-                          >
-                            {l.question || '오늘의 브리핑'}
-                          </p>
-                          <p style={{ fontSize: 12.5, color: '#9ca3af' }}>약 {mockDuration(scriptBullets.length)} · AI 음성 브리핑</p>
-                        </div>
-                      </div>
-                      <div style={{ height: 5, borderRadius: 999, background: 'rgba(17,24,39,0.07)', margin: '18px 0 16px', overflow: 'hidden' }}>
-                        <div style={{ width: '18%', height: '100%', borderRadius: 999, background: p.color }} />
-                      </div>
+                  {/* 음성이 아직 없는 기사 — 앞선 버전은 여기에 **가짜
+                      플레이어**를 그렸다: 형식 색으로 채운 46px 재생 버튼,
+                      18%까지 찬 진행바, 불릿 개수로 계산한 가짜 길이("약
+                      1:33"). 눌러도 아무 일이 없다. 한 번 눌러본 사용자는
+                      그 다음부터 이 페이지의 다른 버튼도 믿지 않는다.
+                      가짜 조작부(재생 버튼·진행바·길이)를 걷어내고, 실제로
+                      존재하는 것(대본)만 대본으로 밝혀 보여준다. 상태는
+                      말하고 있으므로 여기서는 반복하지 않는다 — 형식 탭의
+                      "준비 중"과 패널 첫 줄 .fmt-note 가 담당한다. */}
+                  {format === 'podcast' && !hasPodcast && (
+                    <div>
+                      {l.question && <p className="fmt-lede">{l.question}</p>}
+                      {/* 회색 알약 배지 → 걸어둔 번호(.hang, 2026-08-21).
+                          알약은 이 페이지에서 여기밖에 없는 장치였고, 번호를
+                          동그란 칩에 넣으면 "누를 수 있는 것"처럼 보인다.
+                          30초 핵심·레터 사실 목록과 같은 .hang 을 쓰면 번호가
+                          걸린 목록은 전부 "순서 있는 사실 나열"로 한 번만
+                          학습된다. */}
                       {scriptBullets.length > 0 && (
-                        <>
-                          <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
-                            이 브리핑이 다루는 것 {scriptBullets.length}
-                          </p>
-                          <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
+                        <ol className="hang lread">
                           {scriptBullets.map((b, bi) => (
-                            <li key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, color: '#374151', wordBreak: 'keep-all' }}>
-                              <span
-                                style={{
-                                  flexShrink: 0,
-                                  fontSize: 11,
-                                  fontWeight: 800,
-                                  color: p.color,
-                                  background: p.tint,
-                                  borderRadius: 999,
-                                  padding: '2px 8px',
-                                  marginTop: 1,
-                                }}
-                              >
-                                챕터 {bi + 1}
+                            <li key={bi}>
+                              <span aria-hidden className="hang-n">
+                                {String(bi + 1).padStart(2, '0')}
                               </span>
-                              <span style={{ lineHeight: 1.6 }}>{b}</span>
+                              <span>{b}</span>
                             </li>
                           ))}
-                          </ul>
-                        </>
+                        </ol>
                       )}
                     </div>
                   )}
@@ -1245,126 +1723,82 @@ export function LensViewClient({
                       YouTube 등 링크를 채운 경우 실제 플레이어를 임베드한다
                       (/video 페이지와 같은 resolveVideo 유틸). */}
                   {format === 'video' && realVideo && (
-                    <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
-                      <iframe
-                        src={realVideo.embedUrl}
-                        title={l.question || '영상'}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
+                    <div>
+                      {l.question && <p className="fmt-lede">{l.question}</p>}
+                      <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 14, background: '#111827' }}>
+                        <iframe
+                          src={realVideo.embedUrl}
+                          title={l.question || '영상'}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
                     </div>
                   )}
 
                   {/* 직링크 영상(2026-08-20) — S3 등에 직접 올린 mp4(예: Remotion
                       렌더 결과). 유튜브가 아니라 iframe 임베드가 안 되므로
-                      네이티브 <video>로 재생. */}
+                      네이티브 <video>를 우리 플레이어로 감싼다.
+                      2026-08-21(재설계) — 네이티브 <video controls>를
+                      팟캐스트와 같은 톤의 커스텀 플레이어(ArticleVideoPlayer)로
+                      교체했다("영상 페이지도 팟캐스트 페이지와 비슷한
+                      톤앤매너로" 요청). 재생/탐색/±5초/반복/배속/북마크/
+                      음소거/전체화면은 전부 실제로 동작한다 — <video>
+                      엘리먼트만으로 완결되는 조작이라 백엔드 없이도 진짜
+                      기능이다. 자막 버튼만 disabled로 남겼다: 이 파이프라인은
+                      자막 데이터를 아예 만들지 않는다(CmsLensItem에 관련
+                      필드 없음) — "기능 없이 버튼만 지어내기"는 이 파일이
+                      이미 세 번 걷어낸 패턴이라(가짜 재생 버튼·가짜 진행바·
+                      가짜 재생시간, 아래 !hasVideo 블록 주석 참조) 반복하지
+                      않고, 대신 이유를 밝힌 비활성 버튼으로 "나중에 연결할
+                      자리"만 남겼다(스티어링 §4). 대본 패널은 넣지 않았다
+                      (2026-08-21, "대본 기능은 빼줘" 요청) — 영상은 이미
+                      화면을 보고 있는 상태라 같은 정보를 텍스트로 한 번 더
+                      보여줄 필요가 없다는 판단. */}
                   {format === 'video' && directVideoUrl && (
-                    <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
-                      <video controls preload="none" src={directVideoUrl} className="w-full h-full" style={{ objectFit: 'contain' }} />
-                    </div>
+                    <ArticleVideoPlayer
+                      src={directVideoUrl}
+                      poster={l.thumbnail_url}
+                      accent={p.color}
+                      label={p.short}
+                      kicker="AI 영상 브리핑"
+                      title={l.question || '오늘의 영상'}
+                      byline={lens.source_url ? '서울경제 원문 기사' : null}
+                      bylineHref={lens.source_url}
+                      onDuration={(sec) => noteDur(i, sec)}
+                    />
                   )}
 
-                  {/* 영상 목업 — 실제 영상이 없을 때만(위 realVideo/
-                      directVideoUrl 분기 참조). 기사 사진을 썸네일로 재사용,
-                      재생 버튼 오버레이만 정적으로 얹는다.
-                      디자인(2026-08-18 다듬기): 플레이어 아래 캡션·타임라인을
-                      팟캐스트 챕터와 같은 알약 배지 톤으로 맞춰 두 오디오/영상
-                      포맷이 한 세트로 읽히게 했고, 카드 전체에 공용 그림자를
-                      둘러 다른 포맷 카드들과 무게감을 맞췄다. */}
-                  {format === 'video' && !realVideo && !directVideoUrl && (
-                    <div style={{ borderRadius: 16, background: '#fff', boxShadow: LENS_CARD_SHADOW, padding: 14 }}>
-                      <div
-                        style={{
-                          position: 'relative',
-                          width: '100%',
-                          aspectRatio: '16/9',
-                          borderRadius: 12,
-                          overflow: 'hidden',
-                          background: '#111827',
-                        }}
-                      >
-                        {photo && (
-                          <Image src={photo} alt="" fill sizes="640px" style={{ objectFit: 'cover', opacity: 0.65 }} />
-                        )}
-                        <span aria-hidden style={{ position: 'absolute', inset: 0, background: 'rgba(17,24,39,0.15)' }} />
-                        <span
-                          aria-hidden
-                          className="flex items-center justify-center"
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            margin: 'auto',
-                            width: 58,
-                            height: 58,
-                            borderRadius: 999,
-                            background: '#fff',
-                            color: p.color,
-                            boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-                          }}
-                        >
-                          <Play size={22} fill="currentColor" style={{ marginLeft: 3 }} />
-                        </span>
-                        <span
-                          style={{
-                            position: 'absolute',
-                            right: 10,
-                            bottom: 10,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            fontVariantNumeric: 'tabular-nums',
-                            color: '#fff',
-                            background: 'rgba(0,0,0,0.6)',
-                            borderRadius: 4,
-                            padding: '2px 7px',
-                          }}
-                        >
-                          {mockDuration(scriptBullets.length)}
-                        </span>
-                      </div>
-                      {l.question && (
-                        <p
-                          style={{
-                            fontFamily: '"Noto Serif KR", serif',
-                            fontSize: 16,
-                            fontWeight: 700,
-                            color: '#111827',
-                            letterSpacing: '-0.01em',
-                            margin: '14px 0 10px',
-                            wordBreak: 'keep-all',
-                          }}
-                        >
-                          {l.question}
-                        </p>
-                      )}
+                  {/* 영상이 아직 없는 기사 — 팟캐스트와 같은 이유로 가짜
+                      플레이어를 걷어냈다. 앞선 버전은 (a) 기사 사진을 65%
+                      불투명도로 깔고 (b) 그 위에 58px 흰 재생 버튼을 얹고
+                      (c) 오른쪽 아래에 가짜 길이를, (d) 대본 항목마다 가짜
+                      타임코드("0:12", "0:24" — 12초 등차로 생성)를 붙였다.
+                      영상처럼 보이는데 재생되지 않고, 타임코드는 존재하지도
+                      않는 영상의 위치를 가리켰다.
+                      남긴 것: 실제로 있는 대본. 순번은 타임코드가 아니라
+                      그냥 순번으로 표기한다. */}
+                  {format === 'video' && !hasVideo && (
+                    <div>
+                      {l.question && <p className="fmt-lede">{l.question}</p>}
+                      {/* 회색 알약 배지 → 걸어둔 번호(.hang, 2026-08-21).
+                          알약은 이 페이지에서 여기밖에 없는 장치였고, 번호를
+                          동그란 칩에 넣으면 "누를 수 있는 것"처럼 보인다.
+                          30초 핵심·레터 사실 목록과 같은 .hang 을 쓰면 번호가
+                          걸린 목록은 전부 "순서 있는 사실 나열"로 한 번만
+                          학습된다. */}
                       {scriptBullets.length > 0 && (
-                        <>
-                          <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 10 }}>
-                            이 영상이 다루는 것 {scriptBullets.length}
-                          </p>
-                          <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, listStyle: 'none', padding: 0, margin: 0 }}>
+                        <ol className="hang lread">
                           {scriptBullets.map((b, bi) => (
-                            <li key={bi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13.5, color: '#374151', wordBreak: 'keep-all' }}>
-                              <span
-                                style={{
-                                  flexShrink: 0,
-                                  fontSize: 11,
-                                  fontWeight: 800,
-                                  fontVariantNumeric: 'tabular-nums',
-                                  color: p.color,
-                                  background: p.tint,
-                                  borderRadius: 999,
-                                  padding: '2px 8px',
-                                  marginTop: 1,
-                                }}
-                              >
-                                0:{String((bi + 1) * 12).padStart(2, '0')}
+                            <li key={bi}>
+                              <span aria-hidden className="hang-n">
+                                {String(bi + 1).padStart(2, '0')}
                               </span>
-                              <span style={{ lineHeight: 1.6 }}>{b}</span>
+                              <span>{b}</span>
                             </li>
                           ))}
-                          </ul>
-                        </>
+                        </ol>
                       )}
                     </div>
                   )}
@@ -1373,36 +1807,14 @@ export function LensViewClient({
                       (2026-08-18, "이 4개의 순서가... 연결점, 스토리텔링이
                       자연스러우면 좋겠다" — 전화영어 서비스 레슨 플로우처럼)
                       에 따라, 마지막(video)만 빼고 각 포맷 끝에 다음 시선으로
-                      넘어가는 한 줄을 둔다. 데모 문구가 없는 기사·포맷은
-                      다음 시선의 role명으로 자동 생성해 어떤 기사에도 동작. */}
-                  {format !== 'video' && i + 1 < count && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        select(i + 1);
-                        tabRefs.current[i + 1]?.focus();
-                      }}
-                      className="flex items-center"
-                      style={{
-                        gap: 6,
-                        marginTop: 20,
-                        paddingTop: 16,
-                        width: '100%',
-                        background: 'none',
-                        border: 'none',
-                        borderTop: '1px solid rgba(17,24,39,0.08)',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontSize: 13.5,
-                        fontWeight: 700,
-                        color: lensPerspectiveAt(i + 1).color,
-                        wordBreak: 'keep-all',
-                      }}
-                    >
-                      <span>{articleBridgeSample(lens.id, format) ?? `다음 시선 — ${lensPerspectiveAt(i + 1).full}`}</span>
-                      <ArrowRight size={14} aria-hidden />
-                    </button>
-                  )}
+                      넘어가는 한 줄을 두고 있었으나, 2026-08-21에 뺐다(사용자
+                      요청 — "다 지워줘"). 이 페이지의 유일한 이동 컨트롤은
+                      이제 sticky 형식 탭이다. 탭이 항상 화면에 떠 있고 지금
+                      보는 형식을 이미 진행 인디케이터로 보여주고 있어서,
+                      본문 끝마다 "다음 걸로 가라"고 다시 안내하는 건 같은
+                      말을 두 번 하는 것이었다 — 게다가 "이어서 웹툰으로
+                      보기"처럼 문구가 항상 다음 인덱스 하나만 가리켜서, 탭을
+                      건너뛰어 온 사용자에겐 오히려 안내가 틀렸다. */}
                 </section>
               );
             })}
@@ -1411,110 +1823,19 @@ export function LensViewClient({
                 넘어가는 게 갑작스러웠다. 출처 한 줄로 닫는다: 뉴스에서 "이 사실이
                 어디서 왔는지"는 신뢰의 마지막 조각이고, 네 시선이 모두 같은
                 기사에서 나왔다는 것도 여기서 확인된다. */}
-            <p
-              style={{
-                marginTop: 'clamp(28px, 4vw, 38px)',
-                paddingTop: 16,
-                borderTop: '1px solid rgba(17,24,39,0.09)',
-                fontSize: 13,
-                color: '#6b7280',
-                lineHeight: 1.6,
-                wordBreak: 'keep-all',
-                marginBottom: 16,
-              }}
-            >
-              네 시선 모두 같은 기사를 바탕으로 정리했어요.
-            </p>
-
-            {/* AI 생성 콘텐츠 고지(2026-08-21, 사용자 요청 — 서울경제 영문
-                CMS의 "AI-translated from Korean..." 박스를 레퍼런스로
-                "면책조항 걸어주세요"). 원문 링크는 이 박스 안으로 흡수 —
-                위 문단에 있던 "원문 기사" 인라인 링크는 중복이라 뺐다. */}
-            <AiDisclaimer sourceUrl={lens.source_url} />
+            {/* 구획 마감도 같은 문법으로 맞췄다(2026-08-21) — 여기만
+                borderTop: rgba(17,24,39,0.09)을 <p>에 직접 걸어서, 위 구역들이
+                쓰는 .rule(0.1)과 미세하게 다른 네 번째 구분선이 되어 있었다.
+                간격도 32 리듬으로 통일. */}
+            <div style={{ marginTop: 32 }}>
+              <div className="rule" />
+              <p style={{ marginTop: 32, fontSize: 14, color: '#4b5563', lineHeight: 1.65, wordBreak: 'keep-all' }}>
+                네 형식 모두 같은 기사를 바탕으로 만들었어요. 위에서 형식을 바꿔도 다루는 사실은 같습니다.
+              </p>
+            </div>
           </div>
           </div>
         )}
-
-        <div className="lw" style={{ paddingTop: 'clamp(44px, 6vw, 64px)', paddingBottom: 100 }}>
-        <div>
-          <div className="rule" />
-
-          {/* "다른 시선" 미리보기(2026-08-16) — 마감부가 문구 한 줄 + 링크
-              하나뿐이라 "허전하다"는 피드백. page.tsx가 fetchAllLens()
-              in-flight 캐시에 편승해 이미 가져온 값 중 현재 글만 뺀 3개를
-              넘겨준다(추가 API 호출 없음). */}
-          {otherLens.length > 0 && (
-            <div style={{ margin: '28px 0 8px' }}>
-              <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 4 }}>
-                다른 시선
-              </p>
-              <div>
-                {otherLens.map((l) => {
-                  const photo = pickLensPhoto(l);
-                  return (
-                    <Link
-                      key={l.id}
-                      href={`/lens/${encodeURIComponent(l.id)}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 14,
-                        padding: '14px 0',
-                        textDecoration: 'none',
-                        borderTop: '1px solid rgba(17,24,39,0.07)',
-                      }}
-                    >
-                      {photo && (
-                        <span
-                          className="flex-shrink-0"
-                          style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', background: '#f3f4f6' }}
-                        >
-                          <Image src={photo} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
-                        </span>
-                      )}
-                      <span style={{ minWidth: 0, flex: 1 }}>
-                        <span style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 3 }}>
-                          {l.date.replaceAll('-', '.')}
-                        </span>
-                        <span
-                          style={{
-                            display: '-webkit-box',
-                            fontSize: 15,
-                            fontWeight: 700,
-                            color: '#111827',
-                            lineHeight: 1.4,
-                            letterSpacing: '-0.01em',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            wordBreak: 'keep-all',
-                          }}
-                        >
-                          {l.headline}
-                        </span>
-                      </span>
-                      <span aria-hidden className="flex-shrink-0" style={{ color: '#c0c5cc', fontSize: 16 }}>
-                        ›
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '28px 0 4px', lineHeight: 1.5 }}>
-            일상 속의 모든 소식, 신속하고 정확한 전달
-          </p>
-          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>통찰력 있는 이야기 · 인스타그램 @lens.sedaily</p>
-          <Link
-            href="/lens"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, fontSize: 14, fontWeight: 700, color: LENS_ACCENT, textDecoration: 'none' }}
-          >
-            다른 시선 보기 →
-          </Link>
-        </div>
-        </div>
       </main>
           </div>
 

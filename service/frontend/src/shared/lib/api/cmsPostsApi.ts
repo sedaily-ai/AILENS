@@ -49,10 +49,41 @@ export interface CmsWebtoon {
   cover_image_url: string | null;
   panels: CmsWebtoonPanel[];
   is_cms: true;
+  /**
+   * 주제 분류(2026-08-21) — letters/lens 와 같은 저장 위치(body_inline.category,
+   * ECON_CATEGORIES 라벨 문자열)를 그대로 읽는다. /webtoon 목록 상단 카테고리
+   * 칩이 이 값으로 걸러낸다.
+   *
+   * 값이 없는 편이 정상이다 — admin WebtoonMode 에 카테고리 입력이 2026-08-21에
+   * 처음 생겼으므로 그 전에 발행된 편은 비어 있다. 목록은 "데이터에 실제로
+   * 있는 카테고리만" 칩으로 그려서, 전부 비어 있으면 칩 바 자체를 렌더하지
+   * 않는다(눌러도 0건인 칩을 세워두지 않는다).
+   */
+  category?: string | null;
+  /**
+   * 편집국 추천 순서(2026-08-21) — 작을수록 앞이다. admin 이 값을 넣은 편만
+   * /webtoon 목록의 "편집국 추천" 레일에 올라간다.
+   *
+   * "인기순"이 아니다. 조회수·클릭수 같은 지표가 시스템에 없어서(GA4 는
+   * 단방향 전송만 한다) 인기 순위를 만들 방법이 없고, 최신순에 "인기" 라벨을
+   * 붙이는 건 하지 않기로 했다. 대신 편집자가 고른 순서를 쓴다.
+   *
+   * 필드 자체는 원래 home_player 재생 순서용으로 최상위 스키마에 이미 있던
+   * 것을 그대로 재사용한다 — 새 필드도 새 인덱스도 만들지 않았다.
+   */
+  display_order?: number | null;
   /** lens("4가지 시선")의 웹툰 포맷에서 파생된 카드일 때만 채워짐(2026-08-20,
    *  shared/lib/lensMediaFeed.ts) — 기본 `/webtoon/{id}` 대신 이 경로로
    *  링크한다. 실제 webtoon 채널 글은 이 필드가 없다. */
   href?: string;
+  /**
+   * 시리즈 제목(2026-08-21) — "여러 개의 독립된 웹툰 시리즈" 재구조화.
+   * 같은 문자열을 쓴 편들이 하나의 시리즈다(admin WebtoonMode의 자유 텍스트
+   * 입력, 시리즈 마스터 테이블 없음 — cms_posts_public.py _shape_webtoon 참조).
+   * 비어 있으면(과거 발행분·미입력) 그 편 제목 자체를 시리즈명으로 취급하는
+   * "단편" 시리즈로 shared/lib/webtoonSeries.ts가 폴백한다.
+   */
+  series_title?: string | null;
 }
 
 /**

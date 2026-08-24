@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
@@ -70,6 +70,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
 
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 localStorage 1회 읽기(NewsTimeMachine.tsx:62와 같은 관례). 렌더 중에는 읽을 수 없다 — 서버에는 localStorage가 없어 하이드레이션이 깨진다.
       if (!window.localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
     } catch {
       // localStorage 접근 불가(시크릿 모드 등) — 자동으로는 안 띄우고,
@@ -77,24 +78,17 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
     }
   }, []);
 
-  function closeGuide() {
+  // useCallback으로 고정한다 — LensFormatGuide가 이 함수를 ESC 리스너
+  // 의존성으로 쓰기 때문에(2026-08-21 재설계에서 ESC 처리를 모달 안으로
+  // 옮겼다), 매 렌더 재생성되면 리스너가 계속 재구독된다.
+  const closeGuide = useCallback(() => {
     setShowGuide(false);
     try {
       window.localStorage.setItem(GUIDE_SEEN_KEY, '1');
     } catch {
       // 저장 실패해도 이번 세션 내 UI 상태는 유지.
     }
-  }
-
-  useEffect(() => {
-    if (!showGuide) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeGuide();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- closeGuide는 매 렌더 재생성되지만 로직은 고정
-  }, [showGuide]);
+  }, []);
 
   if (!items || items.length === 0) return null;
 
@@ -123,6 +117,15 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
         .lz-arrow:not(:disabled):hover { background: #dbeafe; }
         .lz-arrow:not(:disabled):active { transform: scale(.9); }
         .lz-dot { transition: background .15s ease, width .15s ease; }
+
+        /* 가이드 ⓘ 트리거 — 제목 옆이라 시각 크기는 22px로 작게 두되,
+           ::after로 히트 영역만 44×44로 넓힌다(레이아웃은 그대로).
+           버튼을 실제로 44px로 키우면 h2 옆 여백이 벌어져 제목 정렬이
+           깨진다. */
+        .lz-info { position: relative; }
+        .lz-info::after { content: ''; position: absolute; left: 50%; top: 50%;
+          width: 44px; height: 44px; transform: translate(-50%, -50%); }
+        .lz-info:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 3px; }
 
         .lz-issue:hover .lz-h { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -165,8 +168,8 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
               type="button"
               onClick={() => setShowGuide(true)}
               aria-label="4가지 형식 안내 보기"
-              className="flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-              style={{ width: 22, height: 22, borderRadius: '50%', background: 'none', border: '1.5px solid currentColor', cursor: 'pointer' }}
+              className="lz-info flex items-center justify-center flex-shrink-0 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              style={{ width: 22, height: 22, borderRadius: '50%', background: 'none', border: '1.5px solid currentColor', color: '#6b7280', cursor: 'pointer' }}
             >
               <span style={{ fontSize: 12, fontWeight: 700, lineHeight: 1 }}>i</span>
             </button>

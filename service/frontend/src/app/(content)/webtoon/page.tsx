@@ -1,11 +1,15 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons } from '@/shared/lib/api/cmsPostsApi';
+import { groupIntoSeries, type WebtoonSeries } from '@/shared/lib/webtoonSeries';
 import { WebtoonListClient } from './WebtoonListClient';
 
 const SITE_URL = 'https://ailens.sedaily.ai';
 const TITLE = '웹툰 — 이슈를 컷으로';
+// "흑백 펜화" 를 뺐다(2026-08-19) — 실제 그림은 전부 컬러다. 표지·컷 14장의
+// HSV 채도를 재보니 평균 0.24~0.43, 유채색 픽셀 46~75% 였다. 검색 결과에
+// 노출되는 문장이 콘텐츠와 다르면 톤 문제가 아니라 신뢰 문제다.
 const DESCRIPTION =
-  '서울경제 AI LENS가 요즘 경제·사회 이슈를 흑백 펜화 웹툰으로 옮깁니다. 성과급 갈등, 세제개편, AI 데이터센터 같은 뉴스를 컷으로 이어 보여드려요.';
+  '서울경제 AI LENS가 요즘 경제·사회 이슈를 웹툰으로 옮깁니다. 성과급 갈등, 세제개편, AI 데이터센터 같은 뉴스를 여러 컷으로 이어 보여드려요.';
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -42,7 +46,12 @@ export const metadata: Metadata = {
 // SEO 감사(2026-08-11) — 목록 페이지 메타데이터가 title/description 두 줄뿐
 // 이라 상세 페이지([slug]/page.tsx)에 비해 크게 부실했다. canonical·OG·
 // Twitter·CollectionPage JSON-LD를 상세 페이지와 같은 수준으로 채웠다.
-function buildJsonLd(items: CmsWebtoon[]) {
+//
+// 시리즈 재구조화(2026-08-21) — ItemList가 예전엔 "편"을 나열했는데, 이제
+// 목록 화면 자체가 시리즈 단위라 링크 대상도 시리즈 상세(/webtoon/series/*)
+// 로 맞춘다 — 실제 화면에 보이는 카드와 JSON-LD가 가리키는 URL이 어긋나면
+// 검색엔진이 클릭 후 다른 페이지를 보게 된다.
+function buildJsonLd(series: WebtoonSeries[]) {
   return {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -62,11 +71,11 @@ function buildJsonLd(items: CmsWebtoon[]) {
     },
     mainEntity: {
       '@type': 'ItemList',
-      itemListElement: items.slice(0, 20).map((w, i) => ({
+      itemListElement: series.slice(0, 20).map((s, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        url: `${SITE_URL}/webtoon/${w.id}`,
-        name: w.title,
+        url: `${SITE_URL}/webtoon/series/${encodeURIComponent(s.slug)}`,
+        name: s.title,
       })),
     },
   };
@@ -75,14 +84,18 @@ function buildJsonLd(items: CmsWebtoon[]) {
 // 페이지네이션을 진짜 URL로(2026-08-14, GEO 감사) — /lens와 동일 원인·동일
 // 수정: onClick+useState라 서버 첫 HTML엔 최신화+12개만 <a href>로 존재하고
 // 나머지는 크롤러가 못 밟았다.
+// cat 파라미터(2026-08-21) — 카테고리 칩도 page 와 같은 방식으로 URL 상태다.
+// 클라이언트 useState 로 걸러버리면 (a) 크롤러가 카테고리별 목록을 못 밟고
+// (b) 뒤로가기가 필터를 기억하지 못한다. 값 검증은 클라이언트가 한다 —
+// 데이터에 실제로 존재하는 라벨만 활성 처리하고 나머지는 전체로 떨어진다.
 export default async function WebtoonListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; cat?: string }>;
 }) {
-  const { page } = await searchParams;
+  const { page, cat } = await searchParams;
   const items = await fetchWebtoons();
-  const jsonLd = buildJsonLd(items);
+  const jsonLd = buildJsonLd(groupIntoSeries(items));
   const initialPage = Math.max(1, parseInt(page ?? '1', 10) || 1);
   return (
     <>
@@ -90,7 +103,7 @@ export default async function WebtoonListPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <WebtoonListClient initialItems={items} initialPage={initialPage} />
+      <WebtoonListClient initialItems={items} initialPage={initialPage} initialCategory={cat} />
     </>
   );
 }
