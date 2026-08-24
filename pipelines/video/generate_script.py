@@ -36,7 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text  # 2026-08-22: GPT -> Bedrock Claude 이관 (GPT는 이미지 생성 전용)
-from json_extract import extract_fenced_json_text  # 2026-08-23 공용화
+from json_extract import extract_fenced_json_text, loads_lenient  # 2026-08-23 공용화
 
 # src/components/Icon.tsx의 ICON_MAP과 반드시 같이 갱신할 것 — 여기 없는
 # 키는 렌더 시 HelpCircle(물음표)로 조용히 폴백되어 화면이 부실해진다.
@@ -99,12 +99,18 @@ def extract_json_block(text: str) -> dict:
     공용(common/json_extract.py, 같은 날 공용화)."""
     fenced = extract_fenced_json_text(text, opener="{")
     if fenced is not None:
-        return json.loads(fenced)
+        # 2026-08-24 — 펜스를 찾아도 그 안이 깨져 있을 수 있다(모델이 \' 처럼
+        # JSON 에 없는 이스케이프를 쓰는 경우). 예전엔 여기서 바로 예외가 나
+        # 아래 폴백들이 아예 실행되지 않았다.
+        try:
+            return loads_lenient(fenced)
+        except json.JSONDecodeError:
+            pass
 
     # 코드블록이 아예 없는 경우 — 원문 전체를 그대로 JSON으로 시도
     stripped = text.strip()
     try:
-        return json.loads(stripped)
+        return loads_lenient(stripped)
     except json.JSONDecodeError:
         pass
 
@@ -112,7 +118,7 @@ def extract_json_block(text: str) -> dict:
     start, end = stripped.find("{"), stripped.rfind("}")
     if start != -1 and end > start:
         try:
-            return json.loads(stripped[start:end + 1])
+            return loads_lenient(stripped[start:end + 1])
         except json.JSONDecodeError:
             pass
 

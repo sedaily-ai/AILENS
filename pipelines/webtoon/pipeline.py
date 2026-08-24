@@ -45,7 +45,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
 from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
 from bedrock_client import call_text  # 2026-08-23 — 스크립트/장면연출 텍스트 전용
-from json_extract import extract_fenced_json_text  # pipelines/common/ — 2026-08-23 공용화
+from json_extract import extract_fenced_json_text, loads_lenient  # pipelines/common/ — 2026-08-23 공용화
 
 import prompts
 import compose_text
@@ -107,18 +107,24 @@ def _extract_json_block(text: str) -> dict:
     (common/json_extract.py, 같은 날 공용화)."""
     fenced = extract_fenced_json_text(text, opener="{")
     if fenced is not None:
-        return json.loads(fenced)
+        # 2026-08-24 — 펜스를 찾아도 그 안이 깨져 있을 수 있다(모델이 \' 처럼
+        # JSON 에 없는 이스케이프를 쓰는 경우). 예전엔 여기서 바로 예외가 나
+        # 아래 폴백들이 아예 실행되지 않았다.
+        try:
+            return loads_lenient(fenced)
+        except json.JSONDecodeError:
+            pass
 
     stripped = text.strip()
     try:
-        return json.loads(stripped)
+        return loads_lenient(stripped)
     except json.JSONDecodeError:
         pass
 
     start, end = stripped.find("{"), stripped.rfind("}")
     if start != -1 and end > start:
         try:
-            return json.loads(stripped[start:end + 1])
+            return loads_lenient(stripped[start:end + 1])
         except json.JSONDecodeError:
             pass
 
