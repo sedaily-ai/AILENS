@@ -44,3 +44,29 @@ export function kstDateTimeLabel(isoUtc: string | null | undefined): string | nu
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   return `${get('year')}.${get('month')}.${get('day')} ${get('hour')}:${get('minute')}`;
 }
+
+// "HH:MM"(KST) — 날짜가 이미 화면에 있고 시:분만 필요할 때. 2026-08-24,
+// /timeline/[date] 기사 목록에 발행 시각을 붙이면서 추가했다: 그 페이지는
+// h1이 "2026년 8월 24일자 서울경제"라 목록 30줄에 날짜를 반복하면 이미 아는
+// 정보만 늘어난다 — 그 줄에서 새로운 정보는 시:분뿐이다.
+//
+// features/news-feed의 NewsTimeMachineSection.formatTime이 같은 일을 하는데
+// (같은 published_at을 쓰는 홈 위젯) features 간 lateral import가 금지라
+// 가져다 쓸 수 없어서, 중복을 하나 더 만드는 대신 shared로 올렸다
+// (kstTodayStr이 같은 이유로 여기 있다).
+//
+// 실패 시 '--:--' 같은 자리표시자를 만들지 않고 null을 준다 — 호출부가 그 줄을
+// 아예 빼는 편이 낫다. S3 XML에 <time>이 없으면 백엔드 published_at이
+// "2026-01-10T+09:00" 처럼 파싱 불가한 문자열로 내려올 수 있다
+// (clients/s3_xml_client.py의 strptime 실패 폴백).
+export function kstTimeLabel(isoUtc: string | null | undefined): string | null {
+  if (!isoUtc) return null;
+  const d = new Date(isoUtc);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(d);
+}
