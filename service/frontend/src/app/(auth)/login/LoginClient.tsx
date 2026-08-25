@@ -150,24 +150,35 @@ export function LoginClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  // 로그인 에러가 "가입 도중 이탈(UNCONFIRMED)" 때문일 때만 true — 에러
+  // 문구 아래에 회원가입 화면으로 바로 가는 버튼을 붙인다(이슈 #18, "안내는
+  // 있는데 화면상 가까운 곳에 갈 방법이 없었다"). 이메일은 그대로 유지되므로
+  // (같은 컴포넌트의 email state를 모드 전환에도 공유) 다시 입력할 필요 없다.
+  const [showResignupCta, setShowResignupCta] = useState(false);
 
   const switchMode = (next: AuthMode) => {
     setMode(next);
     setError("");
     setSuccessMessage("");
+    setShowResignupCta(false);
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setShowResignupCta(false);
     setIsLoading(true);
     const result = await signInWithEmail(email, password);
     setIsLoading(false);
     // 로그인은 성공하면 바로 홈, 아니면 이 화면에 에러만 띄운다.
     // 이메일 인증 화면(confirm)으로 넘기는 분기는 의도적으로 없다 — 인증은
     // 회원가입 흐름 전용이다.
-    if (result.success) router.replace("/");
-    else setError(result.error || "로그인에 실패했습니다.");
+    if (result.success) {
+      router.replace("/");
+      return;
+    }
+    setError(result.error || "로그인에 실패했습니다.");
+    setShowResignupCta(!!result.unconfirmedAccount);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -662,6 +673,15 @@ export function LoginClient() {
           {error && (
             <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-lg text-[13px] text-red-700">
               {error}
+              {showResignupCta && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("signup")}
+                  className="block mt-1.5 font-semibold underline underline-offset-4"
+                >
+                  지금 회원가입 이어하기 →
+                </button>
+              )}
             </div>
           )}
           {successMessage && (
