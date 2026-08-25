@@ -1,22 +1,13 @@
 import type { Metadata } from 'next';
 import GamePlayClient from './GamePlayClient';
-
-// sitemap.ts가 이 슬러그 목록을 그대로 재사용한다(SEO 감사 2026-08-11 —
-// /games/play/[slug]가 sitemap에서 빠져있던 걸 발견, GAMES를 export해서
-// 한 곳에서만 관리).
-export const GAMES: Record<string, { title: string; src: string }> = {
-  'cat-blanket': {
-    title: '고양이 이불 덮어주기',
-    src: '/games/cat-blanket/index.html',
-  },
-  'protect-newspaper': {
-    title: '내일 신문을 지켜라!',
-    src: '/games/protect-newspaper/index.html',
-  },
-};
+// 게임 목록은 shared/data/games.ts 가 단일 출처다. 이 파일이 `export const GAMES`
+// 로 들고 있던 걸 옮겼다(2026-08-25) — page 모듈은 Next 가 정한 이름만 export
+// 할 수 있어서 임의 이름 `GAMES` 가 프로덕션 빌드의 타입 검사를 실패시켰다.
+// 자세한 경위는 그 파일 상단 주석 참조.
+import { GAMES, GAMES_BY_SLUG } from '@/shared/data/games';
 
 export function generateStaticParams() {
-  return Object.keys(GAMES).map((slug) => ({ slug }));
+  return GAMES.map((g) => ({ slug: g.slug }));
 }
 
 export async function generateMetadata({
@@ -25,7 +16,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const g = GAMES[slug];
+  const g = GAMES_BY_SLUG[slug];
   if (!g) return { title: '게임을 찾을 수 없어요', robots: { index: false } };
   const title = `${g.title} — 게임`;
   const description = `AI LENS 안에서 바로 플레이하는 ${g.title}.`;
@@ -93,7 +84,7 @@ export default async function GamePlayPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const g = GAMES[slug];
+  const g = GAMES_BY_SLUG[slug];
   if (!g) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">

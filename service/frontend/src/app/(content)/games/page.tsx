@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import GamesClient from './GamesClient';
-import { GAMES } from './play/[slug]/page';
+// 2026-08-25: `./play/[slug]/page` 에서 가져오던 것을 단일 출처로 교체.
+// app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
+// export 자체가 프로덕션 빌드를 막고 있었다(shared/data/games.ts 주석 참조).
+import { GAMES } from '@/shared/data/games';
 
 import { SITE_URL } from '@/shared/constants/site';
 const TITLE = 'AI LENS 게임 — 가볍게 한 판';
@@ -20,10 +23,10 @@ const JSON_LD = {
   publisher: { '@id': `${SITE_URL}/#organization` },
   mainEntity: {
     '@type': 'ItemList',
-    itemListElement: Object.entries(GAMES).map(([slug, g], i) => ({
+    itemListElement: GAMES.map((g, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      url: `${SITE_URL}/games/play/${slug}`,
+      url: `${SITE_URL}/games/play/${g.slug}`,
       name: g.title,
     })),
   },

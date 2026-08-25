@@ -1,7 +1,25 @@
-// /games(GamesClient.tsx)와 홈 게임 미리보기 섹션(GamesPreviewSection.tsx)이
-// 같은 목록을 쓴다 — 2026-08-21, 홈에도 섹션이 생기며 중복 정의 대신
-// 여기로 뽑았다. 새 게임을 추가하려면 이 배열에만 항목을 더하면 두 곳
-// 다 반영된다.
+// H5 게임 목록 **단일 출처**.
+//
+// 2026-08-21: /games(GamesClient.tsx)와 홈 미리보기(GamesPreviewSection.tsx)가
+// 같은 목록을 쓰게 여기로 뽑았다.
+//
+// 2026-08-25: `src`(플레이 진입 HTML)를 여기로 합쳤다. 그전까지 목록이 두 벌
+// 이었다 — 이 파일(카드 표시용)과 `app/(content)/games/play/[slug]/page.tsx`가
+// `export const GAMES` 로 들고 있던 것(라우트용). 후자가 **프로덕션 빌드를
+// 막고 있었다**: Next.js 는 page 모듈이 정해진 이름(default·metadata·
+// generateMetadata·generateStaticParams·revalidate 등)만 export 하도록 강제하는데
+// 임의 이름인 `GAMES` 가 섞여 타입 검사가 이 오류로 실패했다.
+//
+//   Type '...' does not satisfy the constraint '{ [x: string]: never; }'
+//   Property 'GAMES' is incompatible with index signature.
+//
+// 부수적으로 `sitemap.ts`·`games/page.tsx` 가 그 page 모듈에서 import 하고
+// 있었는데, 이건 app → app 참조라 FSD boundaries 규칙 위반이기도 했다
+// (eslint.config.mjs 의 app 은 pages/widgets/features/entities/shared 만 허용).
+//
+// **새 게임을 추가하려면 아래 배열에만 항목을 더한다.** 카드 4곳(/games, 홈
+// 미리보기), 라우트(generateStaticParams·메타데이터·JSON-LD), sitemap 이 전부
+// 이 배열에서 파생된다.
 export interface Game {
   slug: string;
   title: string;
@@ -9,6 +27,8 @@ export interface Game {
   thumb: string;
   bg: string;
   neon: string;
+  /** public/ 아래 게임 진입 HTML. `/games/play/[slug]` 가 iframe src 로 쓴다. */
+  src: string;
 }
 
 export const GAMES: Game[] = [
@@ -19,6 +39,7 @@ export const GAMES: Game[] = [
     thumb: '/games/cat-thumb.svg',
     bg: 'linear-gradient(135deg, #1a1a3e 0%, #2d3a5a 100%)',
     neon: '#f5a623', // 따뜻한 가로등 골드
+    src: '/games/cat-blanket/index.html',
   },
   {
     slug: 'protect-newspaper',
@@ -27,5 +48,15 @@ export const GAMES: Game[] = [
     thumb: '/games/poop-thumb.svg',
     bg: 'linear-gradient(135deg, #b0c4de 0%, #d3d3d3 100%)',
     neon: '#4a6cf7', // 신문 블루
+    src: '/games/protect-newspaper/index.html',
   },
 ];
+
+/**
+ * 슬러그 → 게임. `/games/play/[slug]` 가 O(1) 조회에 쓴다.
+ *
+ * 배열이 정본이고 이건 파생값이다 — 새 게임을 추가할 때 여기는 손대지 않는다.
+ */
+export const GAMES_BY_SLUG: Record<string, Game> = Object.fromEntries(
+  GAMES.map((g) => [g.slug, g]),
+);
