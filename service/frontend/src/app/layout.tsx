@@ -199,6 +199,12 @@ export default function RootLayout({
           `}
         </Script>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* 사이트가 color-scheme을 선언하지 않으면, 시스템이 다크 모드일 때
+            크롬의 "웹 콘텐츠 자동 다크 테마"가 페이지 전체 색을 강제로
+            반전시킨다(2026-08-25, 실기기 캡처로 확인 — 흰 배경 스플래시까지
+            검게 뒤집혔다). 이 사이트는 라이트 전용으로 설계돼 있어 자동
+            다크 반전을 끈다. */}
+        <meta name="color-scheme" content="light" />
         {process.env.NODE_ENV === 'development' && (
           <>
             <meta httpEquiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
