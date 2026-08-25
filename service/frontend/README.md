@@ -12,6 +12,38 @@ npx eslint <files>     # 린트 (next lint 아님 — package.json 참조)
 npm run build          # 프로덕션 빌드(standalone)
 ```
 
+### `dev`·`build`가 `--webpack`을 붙이는 이유
+
+**지우지 말 것.** Next 16의 기본 번들러는 Turbopack인데, **경로에 한글(정확히는
+non-ASCII)이 들어간 환경에서 Rust 패닉으로 죽는다.**
+
+```
+thread 'tokio-runtime-worker' panicked at turbopack-core/src/ident.rs:354:34:
+start byte index 17 is not a char boundary; it is inside '화' (bytes 16..19)
+of `OneDrive_바탕 화면_민영_anbambi_s-e-n_AILENS_service_frontend_src_...`
+```
+
+Turbopack이 경로로 모듈 식별자를 만들 때 문자열을 **바이트 인덱스로 자른다.**
+UTF-8에서 한글은 3바이트라 자르는 위치가 글자 중간에 떨어지면 Rust의 문자열
+슬라이싱이 패닉한다. 특정 파일 문제가 아니라 그 위치에 걸리는 아무 모듈에서나
+난다. 한국에서 Windows를 쓰면 사용자명이 한글인 게 기본값에 가까워서, 새로
+합류한 사람이 클론하고 첫 빌드를 하면 이걸 만난다.
+
+`--webpack`으로 Turbopack을 피하면 정상 통과한다. 같은 이유로 `admin/frontend`,
+`saju/frontend`도 같이 붙였다(세 앱 다 Next 16).
+
+트레이드오프와 되돌릴 조건:
+
+- Turbopack의 빌드 속도 이점을 버린다.
+- `next build --experimental-analyze`는 Turbopack 전용이라 못 쓴다.
+- Next가 webpack 지원을 걷어내면 이 우회가 막힌다. 16.2 시점에는
+  `--webpack`이 `dev`·`build` 양쪽 정식 플래그이고 업그레이드 가이드에 폐기
+  언급이 없다(2026-08-25 확인).
+- **근본 해결은 빌드를 CI(Linux)로 옮기는 것이다.** 경로에 한글이 없으니
+  Turbopack이 정상 동작하고, 로컬 macOS에서 빌드해 EC2(Linux)로 올리기 때문에
+  생기는 네이티브 바이너리 문제(`next.config.ts`의 `images.unoptimized` 주석
+  참조)도 같이 없어진다. 그때 이 플래그를 지우면 된다.
+
 ## 배포 — `./deploy.sh`
 
 ```bash

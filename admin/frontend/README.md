@@ -8,6 +8,11 @@ Next.js — 프롬프트 드로어, CMS 글 수동 업로드/발행 등 운영�
 npm run dev
 ```
 
+`dev`·`build` 스크립트에 `--webpack`이 붙어 있다. **지우지 말 것** — Next 16의
+기본 번들러 Turbopack이 경로에 한글이 있으면 Rust 패닉으로 죽는다. 경위와
+되돌릴 조건은 `service/frontend/README.md`의 같은 항목에 정리해뒀다
+(세 앱이 같은 문제라 근거는 그쪽에 한 번만 적었다).
+
 ## 배포 — `./deploy-admin.sh`
 
 ```bash

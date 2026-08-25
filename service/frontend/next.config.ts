@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -5,6 +6,26 @@ const nextConfig: NextConfig = {
   // 반영되려면 매 요청마다 서버가 렌더링해야 한다. 정적 export였던 이전
   // 방식은 docs/archive/ 또는 git 히스토리에서 output:"export" 커밋 참조.
   output: "standalone",
+  // 트레이싱 루트를 이 앱 폴더로 **고정**한다(2026-08-25). 지우면 배포가 깨진다.
+  //
+  // 이 값이 없으면 Next 가 lockfile 을 찾아 위로 올라가며 워크스페이스 루트를
+  // 추론한다. 이 개발 환경에는 `C:\Users\<사용자>\package-lock.json` 이 있어서
+  // 루트가 **홈 디렉터리**로 잡혔고, standalone 산출물이 그 루트부터의 경로를
+  // 그대로 중첩해서 이렇게 나왔다:
+  //
+  //   .next/standalone/OneDrive/바탕 화면/민영/anbambi/s-e-n/AILENS/service/frontend/server.js
+  //
+  // deploy.sh 는 `.next/standalone/server.js` 를 검사해서 없으면 배포를
+  // 중단하므로(그 스크립트 1/5 단계 직후) 빌드는 성공하는데 배포가 막혔다.
+  // 빌드 로그의 "inferred your workspace root ... may not be correct" 경고가
+  // 바로 이 신호였다.
+  //
+  // 2026-08-14 에 이 값을 **레포 루트**로 넓혔다가 산출물이 한 단계 깊어져
+  // (.next/standalone/service/frontend/) 같은 문제를 겪고 2026-08-15 에 값을
+  // 아예 제거했는데, 제거하면 위처럼 추론에 맡겨져 환경에 따라 달라진다.
+  // 앱 폴더로 고정하는 것이 두 실패를 다 막는다 — 산출물이 평평해지고,
+  // 다른 사람 머신의 lockfile 배치와 무관해진다.
+  outputFileTracingRoot: path.join(__dirname),
   experimental: {
     optimizePackageImports: ["lucide-react"],
     // 2026-08-23, "바로바로 이동되면 좋겠다" 요청 — [slug] page.tsx들이
