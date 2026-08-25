@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider } from '@/features/auth';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { reportWebVitals } from '@/shared/lib/tracking/webVitals';
+import { SplashScreen } from '@/shared/ui/SplashScreen';
 
 // 속도 KPI 계측(2026-08-23, "전체적으로 더 빠르게 하려면?" 대화의 연장).
 // web-vitals는 브라우저 Navigation/Paint API를 직접 관찰하는 방식이라
@@ -37,6 +38,25 @@ function SessionSourceTracker() {
   return null;
 }
 
+// 2026-08-25 신설 — 피그마 핸드오프 스플래시(SplashScreen)를 세션당 1회만
+// 보여준다. NavProgress를 걷어낸 것과 같은 이유로, 클라이언트 사이드
+// 페이지 이동(<Link>)마다 매번 재생하면 "바로바로 이동" 요청과 정면으로
+// 충돌한다 — SessionSourceTracker와 동일한 sessionStorage 1회 패턴을 그대로
+// 재사용해, 진짜 앱을 새로 여는 순간(첫 하드 로드)에만 뜨게 한다.
+function SplashGate() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const KEY = 'ailens_splash_shown';
+    if (sessionStorage.getItem(KEY)) return;
+    sessionStorage.setItem(KEY, '1');
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage는 서버에 없어 마운트 후 1회 판정 필요(SessionSourceTracker와 동일 관례).
+    setShow(true);
+  }, []);
+  if (!show) return null;
+  return <SplashScreen onDone={() => setShow(false)} />;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
@@ -45,6 +65,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           강제로 재생해서, prefetch+staleTimes로 진짜 빨라진 전환을 오히려
           더 느리게 느껴지게 만들었다(컴포넌트 자체는 widgets/NavProgress에
           남겨둠 — 필요해지면 되돌릴 수 있게). */}
+      <SplashGate />
       <SessionSourceTracker />
       <WebVitalsTracker />
       {children}
