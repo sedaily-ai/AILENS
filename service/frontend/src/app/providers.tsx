@@ -43,15 +43,26 @@ function SessionSourceTracker() {
 // 페이지 이동(<Link>)마다 매번 재생하면 "바로바로 이동" 요청과 정면으로
 // 충돌한다 — SessionSourceTracker와 동일한 sessionStorage 1회 패턴을 그대로
 // 재사용해, 진짜 앱을 새로 여는 순간(첫 하드 로드)에만 뜨게 한다.
+//
+// 기본값을 true로 시작한다(2026-08-25, 사용자 지적 — "메인 화면이 먼저
+// 뜨고 스플래시가 나중에 뜨는 경우가 있다"). 처음엔 false로 시작해서
+// effect가 sessionStorage를 확인한 뒤에야 true로 켰는데, 그러면 effect가
+// 도는 그 짧은 순간 동안 메인 콘텐츠(SSR로 이미 완성돼 있음)가 항상 먼저
+// 그려지고 스플래시가 그 위에 뒤늦게 얹히는 순서가 됐다. 서버·클라이언트
+// 첫 렌더 모두 true로 시작하면(하이드레이션 불일치 없음 — 둘 다 같은 값)
+// 스플래시가 항상 먼저 보이고, 이미 이번 세션에 본 적 있으면 effect가
+// 즉시 꺼서 재생 없이 넘어간다.
 function SplashGate() {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const KEY = 'ailens_splash_shown';
-    if (sessionStorage.getItem(KEY)) return;
+    if (sessionStorage.getItem(KEY)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage는 서버에 없어 마운트 후 1회 판정 필요(SessionSourceTracker와 동일 관례).
+      setShow(false);
+      return;
+    }
     sessionStorage.setItem(KEY, '1');
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage는 서버에 없어 마운트 후 1회 판정 필요(SessionSourceTracker와 동일 관례).
-    setShow(true);
   }, []);
   if (!show) return null;
   return <SplashScreen onDone={() => setShow(false)} />;
