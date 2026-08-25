@@ -102,6 +102,27 @@ export function UserMenu() {
               </svg>
               내 서랍
             </button>
+            {/* 구글 로그인 계정은 Cognito에 비밀번호 자체가 없어서 숨긴다
+                (이슈 #17) — 직접 URL로 들어가면 페이지 자체가 안내한다. */}
+            {!user.isFederated && (
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  router.push('/settings/password');
+                }}
+                className="w-full px-4 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+              >
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 10-8 0v4h8z"
+                  />
+                </svg>
+                비밀번호 변경
+              </button>
+            )}
             <button
               onClick={() => {
                 setIsOpen(false);

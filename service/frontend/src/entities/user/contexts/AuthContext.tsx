@@ -12,6 +12,7 @@ import {
   resendSignUpCode,
   resetPassword,
   confirmResetPassword,
+  updatePassword,
 } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 import { authConfig } from '@/shared/config/auth';
@@ -34,6 +35,7 @@ const COGNITO_ERROR = {
   CODE_MISMATCH: 'CodeMismatchException',
   EXPIRED_CODE: 'ExpiredCodeException',
   INVALID_PARAMETER: 'InvalidParameterException',
+  LIMIT_EXCEEDED: 'LimitExceededException',
 } as const;
 
 interface User {
@@ -41,6 +43,14 @@ interface User {
   email?: string;
   name?: string;
   picture?: string;
+  /**
+   * 구글 등 소셜 로그인으로 만들어진 계정인지. 이런 계정은 Cognito에
+   * 비밀번호 자체가 없어서 비밀번호 변경 화면을 보여줄 수 없다(이슈 #17).
+   * ID 토큰의 `identities` 클레임(연동 IdP를 통해 로그인했을 때만 존재)
+   * 유무로 판별한다 — Username이 `Google_...` 형태인 것과 같은 신호지만,
+   * 클레임 쪽이 Amplify 문서가 명시하는 공식 판별 방법이다.
+   */
+  isFederated: boolean;
 }
 
 interface AuthResult {
@@ -81,6 +91,7 @@ interface AuthContextType {
   resendConfirmationCode: (email: string) => Promise<AuthResult>;
   forgotPassword: (email: string) => Promise<AuthResult>;
   confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<AuthResult>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
 }
 
@@ -119,11 +130,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const idToken = session.tokens?.idToken;
 
       if (currentUser && idToken) {
-        const userData = {
+        const userData: User = {
           userId: currentUser.userId,
           email: idToken.payload.email as string,
           name: idToken.payload.name as string,
           picture: idToken.payload.picture as string,
+          // `identities` 클레임은 Google 등 연동 IdP를 거쳐 로그인했을 때만
+          // ID 토큰에 실린다 — 이메일/비밀번호 직접 가입 계정에는 없다.
+          isFederated: Boolean(idToken.payload.identities),
         };
         setUser(userData);
         // Sync with backend
@@ -385,6 +399,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Change Password (logged-in user, knows current password) — 이슈 #17.
+  // "비밀번호 찾기"(이메일 왕복, forgotPassword)와 별개 기능이다. 기존
+  // 비밀번호를 요구하므로 메일이 개입하지 않고, Cognito 하루 발송 한도를
+  // 쓰지 않는다.
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<AuthResult> => {
+    try {
+      await updatePassword({ oldPassword, newPassword });
+      // updatePassword는 기존 세션을 그대로 유지한다 — 재로그인 불필요.
+      return { success: true };
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error('Change password error:', error);
+
+      if (err.name === COGNITO_ERROR.NOT_AUTHORIZED) {
+        return { success: false, error: '현재 비밀번호가 올바르지 않습니다.' };
+      }
+      if (err.name === COGNITO_ERROR.INVALID_PASSWORD) {
+        return { success: false, error: PASSWORD_REQUIREMENT_MESSAGE };
+      }
+      if (err.name === COGNITO_ERROR.LIMIT_EXCEEDED) {
+        return { success: false, error: '시도가 너무 많아요. 잠시 후 다시 시도해주세요.' };
+      }
+
+      return { success: false, error: '비밀번호 변경에 실패했습니다.' };
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut();
@@ -408,6 +449,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resendConfirmationCode,
         forgotPassword,
         confirmForgotPassword,
+        changePassword,
         logout,
       }}
     >

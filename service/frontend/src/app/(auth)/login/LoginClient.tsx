@@ -4,12 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth";
-import {
-  checkPassword,
-  isPasswordValid,
-  PASSWORD_REQUIREMENT_MESSAGE,
-  PASSWORD_SPECIAL_CHARACTERS,
-} from "@/shared/lib/passwordPolicy";
+import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from "@/shared/lib/passwordPolicy";
+import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/PasswordChecklist";
 
 /**
  * 비밀번호 재설정은 세 단계다: forgot(이메일) → resetCode(코드) →
@@ -59,72 +55,6 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
     <label className="block text-[12.5px] font-semibold text-gray-700 mb-2">
       {children}
     </label>
-  );
-}
-
-/**
- * 비밀번호를 새로 정하는 두 곳(회원가입 · 비밀번호 재설정)에서 유저풀 정책
- * 충족 여부를 입력 중 실시간으로 보여준다.
- *
- * 접근성:
- * - 충족/미충족을 색으로만 구분하지 않는다(WCAG 1.4.1) — 아이콘 모양이
- *   빈 원 ↔ 체크로 바뀌고, 스크린리더용 텍스트도 함께 붙는다.
- * - `aria-live`는 쓰지 않는다. 타이핑마다 5개 항목을 재낭독하면 오히려
- *   방해가 되므로, 대신 input의 `aria-describedby`로 연결해 사용자가
- *   원할 때 읽게 한다.
- */
-function PasswordChecklist({ id, password }: { id: string; password: string }) {
-  const results = checkPassword(password);
-  // 어떤 기호가 특수문자로 인정되는지는 Cognito 정책마다 달라서 사용자가
-  // 추측할 수 없다. 그 규칙이 아직 미충족일 때만 목록을 펼쳐 안내한다.
-  const showSpecialCharHint = password.length > 0 && !results.find((r) => r.rule.id === "special")?.passed;
-
-  return (
-    <div id={id}>
-      <ul className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
-        {results.map(({ rule, passed }) => (
-          <li
-            key={rule.id}
-            className={
-              "flex items-center gap-1.5 text-[12px] transition-colors " +
-              (passed ? "text-emerald-600" : "text-gray-400")
-            }
-          >
-            {passed ? (
-              <svg
-                viewBox="0 0 24 24"
-                className="w-3.5 h-3.5 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={3}
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0" aria-hidden="true">
-                <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" strokeWidth={2} />
-              </svg>
-            )}
-            <span>{rule.label}</span>
-            <span className="sr-only">{passed ? " 충족" : " 미충족"}</span>
-          </li>
-        ))}
-      </ul>
-      {showSpecialCharHint && (
-        <p className="mt-2 text-[11.5px] leading-relaxed text-gray-400 break-all">
-          사용 가능한 특수문자 {PASSWORD_SPECIAL_CHARACTERS}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** 비밀번호 확인 필드의 불일치를 제출 전에 알려준다. */
-function PasswordMismatchHint({ password, confirmPassword }: { password: string; confirmPassword: string }) {
-  if (confirmPassword.length === 0 || password === confirmPassword) return null;
-  return (
-    <p className="mt-2 text-[12px] text-red-600">비밀번호가 일치하지 않습니다.</p>
   );
 }
 
