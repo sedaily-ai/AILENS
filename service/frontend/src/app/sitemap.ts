@@ -2,7 +2,10 @@ import type { MetadataRoute } from 'next';
 import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
 import { kstTodayStr } from '@/shared/lib/date';
-import { GAMES } from './(content)/games/play/[slug]/page';
+// 2026-08-25: `./(content)/games/play/[slug]/page` 에서 가져오던 것을 단일 출처로
+// 교체. app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
+// export 자체가 프로덕션 빌드를 막고 있었다(shared/data/games.ts 주석 참조).
+import { GAMES } from '@/shared/data/games';
 
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
@@ -237,8 +240,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  // 게임 상세 — 정적 슬러그 2개, games/play/[slug]/page.tsx의 GAMES를 그대로 재사용.
-  for (const slug of Object.keys(GAMES)) {
+  // 게임 상세 — shared/data/games.ts 의 목록을 그대로 재사용(2026-08-11 SEO
+  // 감사에서 /games/play/[slug]가 sitemap 에서 빠져있던 걸 발견해 추가).
+  for (const { slug } of GAMES) {
     entries.push({
       url: `${BASE}/games/play/${slug}`,
       lastModified: '2026-08-11',
