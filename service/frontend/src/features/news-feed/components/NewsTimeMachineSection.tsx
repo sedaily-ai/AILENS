@@ -364,7 +364,11 @@ export function NewsTimeMachineSection() {
             marginBottom: 4,
           }}
         >
-          타임머신
+          {/* 헤더 메뉴(더보기 > 타임라인)와 같은 이름이어야 한다. 이 섹션이
+              곧 그 기능의 홈 입구인데 여기만 "타임머신"이라 부르면 같은 것을
+              가리키는 이름이 둘이 된다(2026-08-24, 사용자 확인). 파일·컴포넌트
+              이름은 그대로 뒀다 — 화면에 보이는 이름만 정정. */}
+          타임라인
         </p>
         <div className="flex items-center" style={{ gap: 8 }}>
           <h2
