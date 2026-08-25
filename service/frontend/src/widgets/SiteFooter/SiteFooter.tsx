@@ -240,6 +240,16 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
               English Edition
             </a>
           </p>
+          {/* 지원사업 공시(2026-08-25) — AI LENS는 한국언론진흥재단 2026년
+              지원사업으로 개발됐다(사업 계보: docs 참조). 다른 서울경제
+              AI 제품(AI NOVA)의 푸터가 이미 같은 방식으로 재단 지원 사실을
+              밝히고 있어 같은 관례를 따른다. "인지양식 유형별"은 이 제품이
+              애초에 제출된 사업계획서상의 표현(사용자 인지 스타일에 맞춰
+              같은 뉴스를 레터/웹툰/팟캐스트/영상 네 형식으로 재구성)이라
+              그대로 쓴다. */}
+          <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
+            AI LENS는 한국언론진흥재단 지원을 받아 개발한 인지양식 유형별 서비스입니다.
+          </p>
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
             본 서비스는 AI가 생성한 콘텐츠를 제공합니다. 명리학과 결합한 사주 섹션은 재미와 참고용입니다.
           </p>
