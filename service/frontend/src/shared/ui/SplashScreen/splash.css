@@ -1,0 +1,275 @@
+/* ============================================================
+   AI LENS — Splash
+   Source: Figma "AI LENS — Splash" / Page 1 / row A (01 Empty → 08 Handoff)
+   file: 1zZLeqJYPfOdj3yc5Q67aW
+   ------------------------------------------------------------
+   Requires Noto Sans KR (400, 500, 900).
+   Entry runs automatically. Exit is triggered by adding
+   the class `is-leaving` to `.ails`.
+   ============================================================ */
+
+.ails {
+  /* --- color ------------------------------------------------ */
+  --ails-bg:     #ffffff;
+  --ails-blue:   #4285f4; /* Piece 1 TL */
+  --ails-red:    #ea4335; /* Piece 2 TR */
+  --ails-amber:  #f5a623; /* Piece 3 BR */
+  --ails-green:  #4fb27b; /* Piece 4 BL */
+  --ails-ink:    #0b0b0b; /* Wordmark  */
+  --ails-muted:  #6b7380; /* Tagline   */
+  --ails-faint:  #adb2ba; /* Publisher */
+
+  /* --- mark geometry ---------------------------------------- */
+  --ails-mark: 112px;                                           /* Figma: 112 × 112     */
+  --ails-piece: calc(var(--ails-mark) * 0.4821428);             /* 54px @ 112           */
+  --ails-piece-pos: calc(var(--ails-mark) - var(--ails-piece)); /* 58px @ 112 (4px gap) */
+
+  /* --- easing ------------------------------------------------ */
+  --ails-ease-piece:  cubic-bezier(0.22, 1, 0.36, 1);
+  --ails-ease-impact: cubic-bezier(0.34, 1.30, 0.64, 1);
+  --ails-ease-copy:   cubic-bezier(0.20, 0.80, 0.20, 1);
+  --ails-ease-exit:   cubic-bezier(0.40, 0, 1, 1);
+
+  /* --- timeline (ms) ----------------------------------------- */
+  --ails-d-piece: 320ms;   /* per-piece drop-in                 */
+  --ails-t-p1: 100ms;      /* 02 Piece 1 — TL blue              */
+  --ails-t-p2: 220ms;      /* 03 Piece 2 — TR red               */
+  --ails-t-p3: 340ms;      /* 04 Piece 3 — BR amber             */
+  --ails-t-p4: 460ms;      /* 05 impact source — BL green       */
+  --ails-t-impact: 780ms;  /* 05 Impact → 06 Settle             */
+  --ails-d-impact: 360ms;
+  --ails-t-word: 1000ms;   /* 07 Lockup                         */
+  --ails-t-tag:  1100ms;
+  --ails-t-pub:  1200ms;
+  --ails-d-copy: 400ms;
+  --ails-d-exit: 360ms;    /* 08 Handoff                        */
+
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--ails-bg);
+  font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------
+   Lockup stack — mark + wordmark + tagline
+   Figma places the group at y 306–512 in an 844 frame, i.e.
+   13px above the optical centre.
+   ------------------------------------------------------------ */
+.ails__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-13px);
+}
+
+/* ------------------------------------------------------------
+   Mark
+   Two nested layers so the impact pulse and the exit scale
+   never fight over `transform`.
+   ------------------------------------------------------------ */
+.ails__mark-exit {
+  width: var(--ails-mark);
+  height: var(--ails-mark);
+  will-change: transform, opacity;
+}
+
+.ails__mark {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  animation: ails-impact var(--ails-d-impact) var(--ails-ease-impact) var(--ails-t-impact) both;
+  will-change: transform;
+}
+
+.ails__piece {
+  position: absolute;
+  width: var(--ails-piece);
+  height: var(--ails-piece);
+  animation-duration: var(--ails-d-piece);
+  animation-timing-function: var(--ails-ease-piece);
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+}
+
+.ails__piece--tl {
+  top: 0; left: 0;
+  background: var(--ails-blue);
+  border-top-left-radius: var(--ails-piece);
+  box-shadow: -1.555px -1.555px 10px 0 rgba(66, 133, 244, 0.18);
+  animation-name: ails-piece-tl;
+  animation-delay: var(--ails-t-p1);
+}
+
+.ails__piece--tr {
+  top: 0; left: var(--ails-piece-pos);
+  background: var(--ails-red);
+  border-top-right-radius: var(--ails-piece);
+  box-shadow: 1.555px -1.555px 10px 0 rgba(234, 67, 53, 0.18);
+  animation-name: ails-piece-tr;
+  animation-delay: var(--ails-t-p2);
+}
+
+.ails__piece--br {
+  top: var(--ails-piece-pos); left: var(--ails-piece-pos);
+  background: var(--ails-amber);
+  border-bottom-right-radius: var(--ails-piece);
+  box-shadow: 1.555px 1.555px 10px 0 rgba(245, 166, 35, 0.18);
+  animation-name: ails-piece-br;
+  animation-delay: var(--ails-t-p3);
+}
+
+.ails__piece--bl {
+  top: var(--ails-piece-pos); left: 0;
+  background: var(--ails-green);
+  border-bottom-left-radius: var(--ails-piece);
+  box-shadow: -1.555px 1.555px 10px 0 rgba(79, 178, 123, 0.18);
+  animation-name: ails-piece-bl;
+  animation-delay: var(--ails-t-p4);
+}
+
+/* Each piece enters from a direction rotated ~82° off its own
+   diagonal, which reads as an aperture closing rather than a
+   simple converge. Offsets are % of the piece, so the whole
+   mark stays scalable via --ails-mark alone. */
+@keyframes ails-piece-tl {
+  from { opacity: 0; transform: translate(-3.54%, -24.81%) scale(0.852);
+         box-shadow: -4.242px -4.242px 18px 0 rgba(66, 133, 244, 0.34); }
+  to   { opacity: 1; transform: none;
+         box-shadow: -1.555px -1.555px 10px 0 rgba(66, 133, 244, 0.18); }
+}
+
+@keyframes ails-piece-tr {
+  from { opacity: 0; transform: translate(24.81%, -3.54%) scale(0.852);
+         box-shadow: 4.242px -4.242px 18px 0 rgba(234, 67, 53, 0.34); }
+  to   { opacity: 1; transform: none;
+         box-shadow: 1.555px -1.555px 10px 0 rgba(234, 67, 53, 0.18); }
+}
+
+@keyframes ails-piece-br {
+  from { opacity: 0; transform: translate(3.54%, 24.81%) scale(0.852);
+         box-shadow: 4.242px 4.242px 18px 0 rgba(245, 166, 35, 0.34); }
+  to   { opacity: 1; transform: none;
+         box-shadow: 1.555px 1.555px 10px 0 rgba(245, 166, 35, 0.18); }
+}
+
+@keyframes ails-piece-bl {
+  from { opacity: 0; transform: translate(-24.81%, 3.54%) scale(0.852);
+         box-shadow: -4.242px 4.242px 18px 0 rgba(79, 178, 123, 0.34); }
+  to   { opacity: 1; transform: none;
+         box-shadow: -1.555px 1.555px 10px 0 rgba(79, 178, 123, 0.18); }
+}
+
+/* 05 Impact: 112 → 120 → 112, same centre. */
+@keyframes ails-impact {
+  0%   { transform: scale(1); }
+  39%  { transform: scale(1.0714); }
+  100% { transform: scale(1); }
+}
+
+/* ------------------------------------------------------------
+   Copy
+   ------------------------------------------------------------ */
+.ails__copy { text-align: center; }
+
+.ails__wordmark,
+.ails__tagline,
+.ails__publisher {
+  margin: 0;
+  animation-duration: var(--ails-d-copy);
+  animation-timing-function: var(--ails-ease-copy);
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+}
+
+.ails__wordmark {
+  margin-top: 30px;
+  font-weight: 900;
+  font-size: 28px;
+  line-height: 38px;
+  letter-spacing: -0.4px;
+  color: var(--ails-ink);
+  animation-name: ails-rise-8;
+  animation-delay: var(--ails-t-word);
+}
+
+.ails__tagline {
+  margin-top: 6px;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ails-muted);
+  animation-name: ails-rise-8;
+  animation-delay: var(--ails-t-tag);
+}
+
+.ails__publisher-exit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  text-align: center;
+}
+
+.ails__publisher {
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.8px;
+  color: var(--ails-faint);
+  animation-name: ails-rise-6;
+  animation-delay: var(--ails-t-pub);
+}
+
+@keyframes ails-rise-8 {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes ails-rise-6 {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ------------------------------------------------------------
+   08 Handoff — add `is-leaving`, remove the node after
+   --ails-d-exit (or listen for `transitionend`).
+   ------------------------------------------------------------ */
+.ails__mark-exit,
+.ails__copy,
+.ails__publisher-exit {
+  transition: transform var(--ails-d-exit) var(--ails-ease-exit);
+}
+
+.ails {
+  transition: opacity var(--ails-d-exit) var(--ails-ease-exit);
+}
+
+.ails.is-leaving { opacity: 0; pointer-events: none; }
+.ails.is-leaving .ails__mark-exit    { transform: scale(1.3036); } /* 146 / 112 */
+.ails.is-leaving .ails__copy         { transform: translateY(-6px); }
+.ails.is-leaving .ails__publisher-exit { transform: translateY(-4px); }
+
+/* ------------------------------------------------------------
+   Reduced motion — hold the 07 Lockup state, fade only.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .ails__piece,
+  .ails__mark,
+  .ails__wordmark,
+  .ails__tagline,
+  .ails__publisher {
+    animation: none;
+  }
+
+  .ails.is-leaving .ails__mark-exit,
+  .ails.is-leaving .ails__copy,
+  .ails.is-leaving .ails__publisher-exit {
+    transform: none;
+  }
+}
