@@ -1,0 +1,72 @@
+========================================================================
+MODE          : APPLY
+UserPool      : us-east-1_ZS8PgF3iX (mbti)  region=us-east-1
+LastModified  : 2026-08-24 15:52:09.541000+09:00
+backup        : userpool-us-east-1_ZS8PgF3iX-2026-08-24-175151-before.json
+payload       : payload-2026-08-24-175151.json
+========================================================================
+
+UpdateUserPool 이 받는 필드 23개:
+  AccountRecoverySetting, AdminCreateUserConfig, AutoVerifiedAttributes, DeletionProtection, DeviceConfiguration, EmailConfiguration, EmailVerificationMessage, EmailVerificationSubject, IssuerConfiguration, KeyConfiguration, LambdaConfig, MfaConfiguration, Policies, PoolName, SmsAuthenticationMessage, SmsConfiguration, SmsVerificationMessage, UserAttributeUpdateSettings, UserPoolAddOns, UserPoolId, UserPoolTags, UserPoolTier, VerificationMessageTemplate
+
+페이로드에 담은 필드 18개:
+  AccountRecoverySetting, AdminCreateUserConfig, AutoVerifiedAttributes, DeletionProtection, EmailConfiguration, EmailVerificationMessage, EmailVerificationSubject, IssuerConfiguration, KeyConfiguration, LambdaConfig, MfaConfiguration, Policies, PoolName, UserAttributeUpdateSettings, UserPoolId, UserPoolTags, UserPoolTier, VerificationMessageTemplate
+
+처리 메모:
+  - 필드명 매핑: describe.Name -> update.PoolName (값: 'mbti')
+  - describe 에만 있고 update 가 안 받는 필드 (전달 안 함): Arn, CreationDate, Domain, EstimatedNumberOfUsers, Id, LastModifiedDate, SchemaAttributes, UsernameAttributes
+  - 현재 미설정이라 전달 안 하는 필드: DeviceConfiguration, SmsAuthenticationMessage, SmsConfiguration, SmsVerificationMessage, UserPoolAddOns
+  - AdminCreateUserConfig.UnusedAccountValidityDays(7) 제거 — Policies.PasswordPolicy.TemporaryPasswordValidityDays(7) 와 동시 전달 시 ValidationException
+
+의도한 변경:
+  VerificationMessageTemplate.EmailSubject
+    before: '[AI LENS] 인증 코드 {####}'
+    after : '[AI LENS] 이메일 인증 코드를 보냈어요'
+  EmailVerificationSubject (레거시, 동기화)
+    before: '[AI LENS] 인증 코드 {####}'
+    after : '[AI LENS] 이메일 인증 코드를 보냈어요'
+
+본문은 건드리지 않는다:
+  EmailMessage 동일? True
+  EmailMessage 에 {####} 있음? True
+
+보존 검사:
+  [same] PoolName
+  [same] UserPoolTier
+  [same] EmailConfiguration.EmailSendingAccount
+  [same] AutoVerifiedAttributes
+  [same] AccountRecoverySetting
+  [same] Policies
+  [same] MfaConfiguration
+  [same] UserPoolTags (8 -> 8)
+         Component = shared
+         Environment = dev
+         ManagedBy = claude-code
+         Owner = one
+         Phase = shared
+         Project = Sedaily-LENS
+         Service = atlas4
+         Subsystem = auth
+
+검증 통과: 제목 2개 필드 외에 바뀌는 값 없음
+
+적용 완료. after 스냅샷: userpool-us-east-1_ZS8PgF3iX-2026-08-24-175151-after.json
+
+적용 후 재검증:
+  [PASS] 제목에 코드 없음
+  [PASS] 본문에 코드 있음
+  [PASS] 제목 = 의도한 값
+  [PASS] 레거시 제목 = 의도한 값
+  [PASS] 본문 불변
+  [PASS] 태그 불변
+  [PASS] Tier 불변
+  [PASS] Policies 불변
+  [PASS] 복구설정 불변
+  [PASS] 메일발송설정 불변
+  [PASS] PoolName 불변
+  [PASS] AutoVerified 불변
+  [PASS] MFA 불변
+
+  최종 제목: '[AI LENS] 이메일 인증 코드를 보냈어요'
+
+RESULT: APPLIED & VERIFIED
