@@ -26,3 +26,4 @@
 | `AWS_BACKEND_ARCHITECTURE.md` | AWS 리소스 전체 인벤토리 |
 | `admin-stack.md` | 어드민 콘솔 스택 |
 | `voice-conversation-architecture.md` | 음성 대화 아키텍처 |
+| `소스-없는-배포본.md` | AWS 에 살아있지만 소스가 이 레포에 없는 정적 사이트 2개 — 어디서 복원하나 |
