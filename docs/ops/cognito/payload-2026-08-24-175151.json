@@ -1,0 +1,72 @@
+{
+  "UserPoolId": "us-east-1_ZS8PgF3iX",
+  "AccountRecoverySetting": {
+    "RecoveryMechanisms": [
+      {
+        "Priority": 1,
+        "Name": "verified_email"
+      },
+      {
+        "Priority": 2,
+        "Name": "verified_phone_number"
+      }
+    ]
+  },
+  "AdminCreateUserConfig": {
+    "AllowAdminCreateUserOnly": false
+  },
+  "AutoVerifiedAttributes": [
+    "email"
+  ],
+  "DeletionProtection": "INACTIVE",
+  "EmailConfiguration": {
+    "SourceArn": "arn:aws:ses:us-east-1:887078546492:identity/ailens.sedaily.ai",
+    "EmailSendingAccount": "DEVELOPER",
+    "From": "AI LENS <noreply@ailens.sedaily.ai>"
+  },
+  "EmailVerificationMessage": "안녕하세요, AI LENS 입니다.\n\nAI LENS 에서 이메일 인증을 요청했어요.\n아래 6자리 코드를 회원가입 또는 비밀번호 재설정 화면에 입력해주세요.\n\n인증 코드: {####}\n\n회원가입 인증 코드는 24시간, 비밀번호 재설정 코드는 1시간 동안 유효합니다.\n본인이 요청하지 않은 경우 이 메일은 무시해주세요.\n본 메일은 발신 전용이며 회신이 불가능합니다.\n\n— AI LENS · 서울경제\n같은 뉴스를 네 개의 렌즈로\nhttps://ailens.sedaily.ai",
+  "EmailVerificationSubject": "[AI LENS] 이메일 인증 코드를 보냈어요",
+  "IssuerConfiguration": {
+    "Type": "ORIGINAL"
+  },
+  "KeyConfiguration": {
+    "KeyType": "AWS_OWNED_KEY"
+  },
+  "LambdaConfig": {},
+  "MfaConfiguration": "OFF",
+  "Policies": {
+    "PasswordPolicy": {
+      "MinimumLength": 8,
+      "RequireUppercase": true,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireSymbols": true,
+      "TemporaryPasswordValidityDays": 7
+    },
+    "SignInPolicy": {
+      "AllowedFirstAuthFactors": [
+        "PASSWORD"
+      ]
+    }
+  },
+  "PoolName": "mbti",
+  "UserAttributeUpdateSettings": {
+    "AttributesRequireVerificationBeforeUpdate": []
+  },
+  "UserPoolTags": {
+    "Component": "shared",
+    "Environment": "dev",
+    "ManagedBy": "claude-code",
+    "Owner": "one",
+    "Phase": "shared",
+    "Project": "Sedaily-LENS",
+    "Service": "atlas4",
+    "Subsystem": "auth"
+  },
+  "UserPoolTier": "ESSENTIALS",
+  "VerificationMessageTemplate": {
+    "EmailMessage": "안녕하세요, AI LENS 입니다.\n\nAI LENS 에서 이메일 인증을 요청했어요.\n아래 6자리 코드를 회원가입 또는 비밀번호 재설정 화면에 입력해주세요.\n\n인증 코드: {####}\n\n회원가입 인증 코드는 24시간, 비밀번호 재설정 코드는 1시간 동안 유효합니다.\n본인이 요청하지 않은 경우 이 메일은 무시해주세요.\n본 메일은 발신 전용이며 회신이 불가능합니다.\n\n— AI LENS · 서울경제\n같은 뉴스를 네 개의 렌즈로\nhttps://ailens.sedaily.ai",
+    "EmailSubject": "[AI LENS] 이메일 인증 코드를 보냈어요",
+    "DefaultEmailOption": "CONFIRM_WITH_CODE"
+  }
+}

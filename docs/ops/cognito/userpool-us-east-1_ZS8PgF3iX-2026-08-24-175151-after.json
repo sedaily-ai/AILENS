@@ -1,0 +1,304 @@
+{
+  "UserPool": {
+    "Id": "us-east-1_ZS8PgF3iX",
+    "Name": "mbti",
+    "Policies": {
+      "PasswordPolicy": {
+        "MinimumLength": 8,
+        "RequireUppercase": true,
+        "RequireLowercase": true,
+        "RequireNumbers": true,
+        "RequireSymbols": true,
+        "TemporaryPasswordValidityDays": 7
+      },
+      "SignInPolicy": {
+        "AllowedFirstAuthFactors": [
+          "PASSWORD"
+        ]
+      }
+    },
+    "DeletionProtection": "INACTIVE",
+    "LambdaConfig": {},
+    "LastModifiedDate": "2026-08-24 17:51:53.290000+09:00",
+    "CreationDate": "2026-02-03 20:54:56.879000+09:00",
+    "SchemaAttributes": [
+      {
+        "Name": "profile",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "address",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "birthdate",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "10",
+          "MaxLength": "10"
+        }
+      },
+      {
+        "Name": "gender",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "preferred_username",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "updated_at",
+        "AttributeDataType": "Number",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "NumberAttributeConstraints": {
+          "MinValue": "0"
+        }
+      },
+      {
+        "Name": "website",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "picture",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "identities",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {}
+      },
+      {
+        "Name": "sub",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": false,
+        "Required": true,
+        "StringAttributeConstraints": {
+          "MinLength": "1",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "email_verified",
+        "AttributeDataType": "Boolean",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false
+      },
+      {
+        "Name": "phone_number_verified",
+        "AttributeDataType": "Boolean",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false
+      },
+      {
+        "Name": "phone_number",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "zoneinfo",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "locale",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "email",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "given_name",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "family_name",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "middle_name",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "name",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      },
+      {
+        "Name": "nickname",
+        "AttributeDataType": "String",
+        "DeveloperOnlyAttribute": false,
+        "Mutable": true,
+        "Required": false,
+        "StringAttributeConstraints": {
+          "MinLength": "0",
+          "MaxLength": "2048"
+        }
+      }
+    ],
+    "AutoVerifiedAttributes": [
+      "email"
+    ],
+    "UsernameAttributes": [
+      "email"
+    ],
+    "EmailVerificationMessage": "안녕하세요, AI LENS 입니다.\n\nAI LENS 에서 이메일 인증을 요청했어요.\n아래 6자리 코드를 회원가입 또는 비밀번호 재설정 화면에 입력해주세요.\n\n인증 코드: {####}\n\n회원가입 인증 코드는 24시간, 비밀번호 재설정 코드는 1시간 동안 유효합니다.\n본인이 요청하지 않은 경우 이 메일은 무시해주세요.\n본 메일은 발신 전용이며 회신이 불가능합니다.\n\n— AI LENS · 서울경제\n같은 뉴스를 네 개의 렌즈로\nhttps://ailens.sedaily.ai",
+    "EmailVerificationSubject": "[AI LENS] 이메일 인증 코드를 보냈어요",
+    "VerificationMessageTemplate": {
+      "EmailMessage": "안녕하세요, AI LENS 입니다.\n\nAI LENS 에서 이메일 인증을 요청했어요.\n아래 6자리 코드를 회원가입 또는 비밀번호 재설정 화면에 입력해주세요.\n\n인증 코드: {####}\n\n회원가입 인증 코드는 24시간, 비밀번호 재설정 코드는 1시간 동안 유효합니다.\n본인이 요청하지 않은 경우 이 메일은 무시해주세요.\n본 메일은 발신 전용이며 회신이 불가능합니다.\n\n— AI LENS · 서울경제\n같은 뉴스를 네 개의 렌즈로\nhttps://ailens.sedaily.ai",
+      "EmailSubject": "[AI LENS] 이메일 인증 코드를 보냈어요",
+      "DefaultEmailOption": "CONFIRM_WITH_CODE"
+    },
+    "UserAttributeUpdateSettings": {
+      "AttributesRequireVerificationBeforeUpdate": []
+    },
+    "MfaConfiguration": "OFF",
+    "EstimatedNumberOfUsers": 12,
+    "EmailConfiguration": {
+      "SourceArn": "arn:aws:ses:us-east-1:887078546492:identity/ailens.sedaily.ai",
+      "EmailSendingAccount": "DEVELOPER",
+      "From": "AI LENS <noreply@ailens.sedaily.ai>"
+    },
+    "UserPoolTags": {
+      "Component": "shared",
+      "Environment": "dev",
+      "ManagedBy": "claude-code",
+      "Owner": "one",
+      "Phase": "shared",
+      "Project": "Sedaily-LENS",
+      "Service": "atlas4",
+      "Subsystem": "auth"
+    },
+    "Domain": "sedaily-mbti",
+    "AdminCreateUserConfig": {
+      "AllowAdminCreateUserOnly": false,
+      "UnusedAccountValidityDays": 7
+    },
+    "Arn": "arn:aws:cognito-idp:us-east-1:887078546492:userpool/us-east-1_ZS8PgF3iX",
+    "AccountRecoverySetting": {
+      "RecoveryMechanisms": [
+        {
+          "Priority": 1,
+          "Name": "verified_email"
+        },
+        {
+          "Priority": 2,
+          "Name": "verified_phone_number"
+        }
+      ]
+    },
+    "UserPoolTier": "ESSENTIALS",
+    "KeyConfiguration": {
+      "KeyType": "AWS_OWNED_KEY"
+    },
+    "IssuerConfiguration": {
+      "Type": "ORIGINAL"
+    }
+  }
+}
