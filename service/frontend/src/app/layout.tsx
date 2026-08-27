@@ -212,6 +212,10 @@ export default function RootLayout({
             `light only`는 명세상 브라우저의 다크 오버라이드 자체를 막는
             더 강한 선언이라 이걸로 올린다. */}
         <meta name="color-scheme" content="light only" />
+        {/* 앱(TWA) 전용 스플래시용 CSS — 아래 body 첫머리의 정적 마크업이
+            리액트 하이드레이션 이전에 이미 스타일을 받아야 해서 별도
+            정적 파일로 링크한다(원본: shared/ui/SplashScreen/splash.css). */}
+        <link rel="stylesheet" href="/splash.css" />
         {process.env.NODE_ENV === 'development' && (
           <>
             <meta httpEquiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
@@ -237,6 +241,58 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col" suppressHydrationWarning>
+        {/* 앱(TWA) 전용 스플래시 — 2026-08-27, 리액트(Providers의 SplashGate)로
+            구현했던 이전 버전은 SSR HTML에 항상 스플래시가 그려진 채로 나가고
+            "이건 웹이니 끄자" 판정은 하이드레이션이 끝나야 실행돼서, 그 사이
+            간격(번들 로드+실행 시간)만큼 일반 웹 접속에서도 스플래시가 실제로
+            눈에 보였다("웹에서도 뜬다" — 사용자 실측 재확인). 리액트 트리 밖의
+            순수 정적 HTML+동기 스크립트로 바꿔 하이드레이션을 기다리지 않고
+            파싱 도중 즉시 판정하게 한다 — 페인트 전에 붙였다 떼는 게 보장되는
+            표준 FOUC 방지 패턴(다크모드 플래시 방지 스크립트와 같은 원리).
+            TWA 판별은 `document.referrer`가 `android-app://`로 시작하는지로
+            한다(구글 공식 TWA 판별법). 마크업·타이밍(1600ms 최소노출+360ms
+            이탈)은 옛 SplashScreen.tsx/splash.css의 피그마 핸드오프 스펙을
+            그대로 옮긴 것 — 리액트 컴포넌트 자체는 이제 이 소비처가 없어져
+            삭제했다. */}
+        <div
+          dangerouslySetInnerHTML={{
+            __html: `
+              <div id="app-splash" class="ails" role="status" aria-label="AI LENS 시작 중">
+                <div class="ails__stack">
+                  <div class="ails__mark-exit" aria-hidden="true">
+                    <div class="ails__mark">
+                      <span class="ails__piece ails__piece--tl"></span>
+                      <span class="ails__piece ails__piece--tr"></span>
+                      <span class="ails__piece ails__piece--br"></span>
+                      <span class="ails__piece ails__piece--bl"></span>
+                    </div>
+                  </div>
+                  <div class="ails__copy">
+                    <p class="ails__wordmark">AI LENS</p>
+                    <p class="ails__tagline">같은 이슈, 네 가지 시선</p>
+                  </div>
+                </div>
+                <div class="ails__publisher-exit">
+                  <p class="ails__publisher">서울경제신문</p>
+                </div>
+              </div>
+              <script>
+                (function () {
+                  var el = document.getElementById('app-splash');
+                  if (!el) return;
+                  var isTwa = document.referrer.indexOf('android-app://') === 0;
+                  if (!isTwa) { el.remove(); return; }
+                  if (sessionStorage.getItem('ailens_splash_shown')) { el.remove(); return; }
+                  sessionStorage.setItem('ailens_splash_shown', '1');
+                  setTimeout(function () {
+                    el.classList.add('is-leaving');
+                    setTimeout(function () { el.remove(); }, 360);
+                  }, 1600);
+                })();
+              </script>
+            `,
+          }}
+        />
         <Providers>
           <a href="#main-content" className="skip-link">
             본문 바로가기
