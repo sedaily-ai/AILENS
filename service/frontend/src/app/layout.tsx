@@ -203,8 +203,15 @@ export default function RootLayout({
             크롬의 "웹 콘텐츠 자동 다크 테마"가 페이지 전체 색을 강제로
             반전시킨다(2026-08-25, 실기기 캡처로 확인 — 흰 배경 스플래시까지
             검게 뒤집혔다). 이 사이트는 라이트 전용으로 설계돼 있어 자동
-            다크 반전을 끈다. */}
-        <meta name="color-scheme" content="light" />
+            다크 반전을 끈다.
+
+            2026-08-26 — `light`만으로는 TWA(앱) 세션에서 여전히 반전되는
+            게 실기기로 재확인됐다(일반 크롬 탭으로 같은 주소를 열면 정상
+            흰색이라 사이트/서버 문제는 아니고, TWA가 붙이는 Custom Tabs
+            세션이 사이트별로 다크 설정을 따로 기억·적용하는 것으로 보임).
+            `light only`는 명세상 브라우저의 다크 오버라이드 자체를 막는
+            더 강한 선언이라 이걸로 올린다. */}
+        <meta name="color-scheme" content="light only" />
         {process.env.NODE_ENV === 'development' && (
           <>
             <meta httpEquiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />

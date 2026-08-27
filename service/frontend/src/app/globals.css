@@ -4,8 +4,10 @@
 :root {
   /* layout.tsx의 <meta name="color-scheme"> 이중 방어 — 크롬의 웹 콘텐츠
      자동 다크 테마(시스템 다크 모드에서 라이트 전용 페이지를 강제로
-     색반전)를 CSS 레벨에서도 명시적으로 차단한다. */
-  color-scheme: light;
+     색반전)를 CSS 레벨에서도 명시적으로 차단한다.
+     2026-08-26 — TWA(앱) 세션에서 `light`만으론 여전히 반전돼 `light only`로
+     상향(meta 태그 쪽 주석 참조). */
+  color-scheme: light only;
   --color-bg: #ffffff;
   --color-text: #000000;
   --color-text-muted: #6b7280;
