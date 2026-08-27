@@ -116,11 +116,29 @@ def _display_category(article: dict) -> str | None:
 
 
 # 지면특별코너 4탭 — 전체(지면1면)는 점수 없이 TOP 배치 우선(discovery가
-# 이미 편집 데이터로 정렬해서 줌). 증권/산업/시그널은 8.0 넘는 순서대로
-# 먼저 온 것부터 채운다(재순위 없음 — 라이브 콘텐츠를 나중에 더 좋은
-# 기사로 대체하지 않는다는 v1 결정, 2026-08-22 설계 노트 "이슈 A" 해소).
+# 이미 편집 데이터로 정렬해서 줌). 증권/산업/시그널은 점수 높은 순으로
+# 탭당 4건을 채운다(같은 회차 안에서만 점수순 — 이미 발행된 회차를 나중에
+# 더 좋은 기사로 대체하진 않는다는 v1 결정, 2026-08-22 설계 노트
+# "이슈 A" 유지).
+#
+# 2026-08-25 — _TAB_THRESHOLD 8.0→6.5로 하향 + "발행 여부 게이트"에서
+# "정렬 우선순위 참고값"으로 역할 변경(아래 선정 로직 참조, 실제 게이트는
+# 이제 없음). 파이프라인 가동(2026-08-22) 이후 3일간 발행된 249건 전부를
+# 스캔해보니 paper_section이 붙은 건 0건(증권/산업/시그널/전체 전부) —
+# 사용자가 지면 탭에서 8/21자 기사만 계속 보이던 신고(2026-08-25)의 원인.
+# mustknow 채점 프롬프트(v#1, DDB `mustknow/published`)의 5개 지표
+# (파급력/시의성/사실데이터밀도/정책제도변화/이례성) 평균이 종합점수인데,
+# 8~10점대 앵커가 "전국민급 파급력"·"역대 최초/최대"급 서술이라 개별
+# 기업·증시 뉴스는 구조적으로 8.0 평균에 못 미친다 — 실측: 오늘자(8/25)
+# 증권 44건·산업 68건·시그널 7건 후보 중 카테고리별 최대 12건(총 37건)을
+# 실제 score_articles()로 재채점한 결과 최고점이 7.0(산업 1건)뿐, 8.0
+# 이상 0건. 사용자 명시 지침 — "8.0 없으면 그 아래 점수로라도 근사치로라도
+# 4개씩 올리도록 해야합니다" — 에 따라 절대 임계값 미달이어도 그날 최선의
+# 근사치로 정원을 채우도록 아래 3) 선정 로직 자체를 바꿨다. _GENERAL_
+# THRESHOLD(7.0)는 정치·국제·금융정책 등 전 카테고리를 대상으로 하는
+# 별도 풀이라 비교 대상이 아니다.
 _TAB_CATEGORY = {"증권": "증권", "산업": "산업", "시그널": "Signal"}
-_TAB_THRESHOLD = 8.0
+_TAB_THRESHOLD = 6.5
 _GENERAL_THRESHOLD = 7.0
 _TAB_CAP = 4
 _MIN_CONTENT_LEN = 300
@@ -584,29 +602,38 @@ def main():
     scores = classify.score_articles(guide, scorable) if scorable else {}
     print(f"[mustknow-auto] 채점 완료 {len(scores)}/{len(scorable)}건")
 
-    # 일반 임계값(7.0)이 전체 경로 중 가장 낮은 바다 — 이걸 못 넘으면
-    # 증권/산업/시그널(8.0)도 당연히 못 넘으므로 그 어떤 경로로도 발행될
-    # 일이 없다. 이런 기사만 지금 바로 확정으로 seen 기록한다(재시도해도
-    # 결과가 똑같이 나올 게 뻔하니 낭비 방지). ≥7.0인 기사는 아직 발행
-    # 시도 전이라 여기서 마킹하지 않는다 — 아래 3)/4)에서 실제 시도 후에
-    # 마킹된다. 파싱 실패로 scores에 아예 없는 기사도 마찬가지로 여기서
-    # 마킹 안 함(다음 회차 재시도 대상).
+    # 일반 임계값(7.0)이 전체 경로 중 가장 낮은 바닥 — "단, 증권/산업/시그널은
+    # 예외"(2026-08-25). 이 세 카테고리는 바로 아래 3)에서 임계값 미달이어도
+    # 그날 최고점 순으로 탭 정원(4건)을 채우는 근사치 폴백을 타므로, 여기서
+    # 미리 seen 확정하면 그 폴백 후보 자체가 사라진다 — 탭 카테고리는
+    # 건너뛰고, 그 외 카테고리만 기존대로 조기 확정한다.
     for a in scorable:
+        if a["top_category"] in _TAB_CATEGORY.values():
+            continue
         row = scores.get(a["key"])
         if row is not None and (row.get("total") or 0) < _GENERAL_THRESHOLD:
             _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
 
-    # 3) 증권/산업/시그널 — 8.0 넘는 순서대로 먼저 온 것부터, 탭당 4건
-    #    (일요일엔 스킵 — 위 is_sunday 주석 참조)
+    # 3) 증권/산업/시그널 — 점수 있는 후보를 높은 점수 순으로 정렬해 탭당
+    #    4건을 채운다(일요일엔 스킵 — 위 is_sunday 주석 참조).
+    #
+    # 2026-08-25 — 절대 임계값(_TAB_THRESHOLD) 미달이어도 그날 최선의
+    # 근사치로 정원을 채우도록 바꿨다. "8.0 이상만" 고수했더니 파이프라인
+    # 가동 3일간(249건 발행) 이 세 탭에 단 한 건도 배정되지 않은 게
+    # 확인됐고(사용자 신고로 발견), 사용자 명시 지침 — "발행이 안되면
+    # 안됩니다. 8.0 없으면 그 아래 점수로라도 근사치로라도 4개씩 올리도록
+    # 해야합니다." — 에 따라 임계값을 "발행 여부"가 아니라 "정렬 우선순위"
+    # 로만 쓴다. _TAB_THRESHOLD는 그 우선순위를 설명하는 참고값으로 남긴다
+    # (오늘 실측 기준 6.5 이상이 나오면 그게 먼저 채워지고, 없으면 그보다
+    # 낮은 점수라도 채워진다).
     if not is_sunday:
         for tab, cat in _TAB_CATEGORY.items():
-            pool = [a for a in scorable if a["top_category"] == cat]
+            pool = [a for a in scorable if a["top_category"] == cat and scores.get(a["key"])]
+            pool.sort(key=lambda a: scores[a["key"]].get("total") or 0, reverse=True)
             for a in pool:
                 if tab_counts[tab] >= _TAB_CAP:
                     break
-                row = scores.get(a["key"])
-                if not row or (row.get("total") or 0) < _TAB_THRESHOLD:
-                    continue
+                row = scores[a["key"]]
                 selected_keys.add(a["key"])
                 status = _try_publish(a, tab, tab_counts[tab])
                 if status != "failed":
@@ -645,5 +672,61 @@ def main():
             print(f"[mustknow-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
 
 
+def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str]):
+    """2026-08-26 — 사용자 요청으로 신규. 자정을 넘겨 discovery의 "오늘" 후보
+    풀에서 빠져버린 전날(source_ymd) 기사를, 그날 지면이 다음날(target_ymd)
+    아침 지면으로 나가는 실제 신문 발행 관행에 맞춰 수동으로 지정한 순서
+    그대로 발행한다(재채점·재정렬 없음 — 사용자가 이미 스코어 보고 순서를
+    골랐음). main()의 정규 6x/day 스케줄 로직과는 완전히 분리된 일회성
+    경로 — main()의 seen 필터·임계값 선정을 안 거친다."""
+    session = boto3.Session(region_name=REGION)
+    s3 = session.client("s3")
+    table = session.resource("dynamodb").Table(TABLE)
+    seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
+    out_dir = Path("/tmp/mustknow_auto_out")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    all_articles = discovery.fetch_articles(source_ymd)
+    by_key = {a["key"]: a for a in all_articles}
+    published = 0
+    for i, key in enumerate(keys):
+        article = by_key.get(key)
+        if not article:
+            print(f"[mustknow-auto][manual] {key} — {source_ymd} 후보에서 못 찾음, 스킵")
+            continue
+        try:
+            status = _publish(article, out_dir, s3, table, target_ymd, paper_section=tab, display_order=i)
+        except Exception:
+            print(f"[mustknow-auto][manual] {key} 처리 중 예외\n{traceback.format_exc()}")
+            continue
+        if status != "failed":
+            _mark_seen(seen_table, key, tab=tab, manual=True)
+            published += 1
+
+    print(f"[mustknow-auto][manual] 완료 — {published}/{len(keys)}건 {tab} 탭에 발행")
+
+    if published:
+        try:
+            secret = session.client("ssm").get_parameter(
+                Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
+            )["Parameter"]["Value"]
+            requests.post(
+                "https://ailens.sedaily.ai/api/revalidate",
+                headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
+                json={},
+                timeout=30,
+            )
+        except Exception:
+            print(f"[mustknow-auto][manual] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
+
+
 if __name__ == "__main__":
-    main()
+    if "--manual-signal-backfill" in sys.argv:
+        # 뒤에 오는 인자를 그대로 발행 대상 key 목록으로 쓴다(순서=display_order).
+        # 없으면 기본 4건 전체. hang 재현 시 1건씩 격리 재시도하려고 넣었다
+        # (2026-08-26 — 4건 한 번에 돌리다 40분+ 정체돼 격리 필요해짐).
+        idx = sys.argv.index("--manual-signal-backfill")
+        keys = sys.argv[idx + 1:] or ["20082684", "20083221", "20083196", "20083080"]
+        manual_backfill(source_ymd="20260825", target_ymd="20260826", tab="시그널", keys=keys)
+    else:
+        main()
