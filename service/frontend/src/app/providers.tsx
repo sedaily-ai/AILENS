@@ -52,13 +52,28 @@ function SessionSourceTracker() {
 // 첫 렌더 모두 true로 시작하면(하이드레이션 불일치 없음 — 둘 다 같은 값)
 // 스플래시가 항상 먼저 보이고, 이미 이번 세션에 본 적 있으면 effect가
 // 즉시 꺼서 재생 없이 넘어간다.
+//
+// 2026-08-27 — 이 스플래시는 원래 앱(TWA)용으로 만든 것인데 일반 브라우저
+// 접속(ailens.sedaily.ai를 그냥 웹으로 여는 경우)에도 똑같이 떴다("앱용이라"
+// — 사용자 지적). TWA로 열렸는지는 `document.referrer`가
+// `android-app://<패키지>` 형태인지로 구분한다(구글이 공식 문서화한 TWA
+// 판별법 — 오늘 TWA가 항상 Chrome을 쓰도록 provider를 고정해서 이 값이
+// 안정적으로 찍힘). 서버 렌더 시점엔 이 값을 알 수 없어 SSR·첫 클라이언트
+// 렌더는 여전히 true로 시작하지만(하이드레이션 일치 유지), effect가 그
+// 직후 바로 판정해 앱이 아니면 즉시 끈다 — 실제로는 한 프레임도 안 되는
+// 찰나라 웹에서는 사실상 안 보인다.
 function SplashGate() {
   const [show, setShow] = useState(true);
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const isTwa = document.referrer.startsWith('android-app://');
+    if (!isTwa) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- referrer는 서버에 없어 마운트 후 1회 판정 필요(SessionSourceTracker와 동일 관례).
+      setShow(false);
+      return;
+    }
     const KEY = 'ailens_splash_shown';
     if (sessionStorage.getItem(KEY)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage는 서버에 없어 마운트 후 1회 판정 필요(SessionSourceTracker와 동일 관례).
       setShow(false);
       return;
     }
