@@ -1,77 +1,64 @@
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { PollyClient, SynthesizeSpeechCommand, Engine, VoiceId } from '@aws-sdk/client-polly';
 
 export type TtsVoiceConfig = {
-  name: string; // ElevenLabs voice ID
-  modelId?: string;
-  stability?: number;
-  similarityBoost?: number;
+  voiceId: VoiceId;
+  engine?: Engine;
 };
 
 // 2026-08-23 — Google Cloud TTS(Chirp3-HD)에서 ElevenLabs로 전환.
-// 개인 gcloud 계정 OAuth(ADC)로 인증하던 방식이라 Fargate에서 못 쓰고,
-// 프로젝트가 AWS 위주인데 TTS만 별도 벤더(GCP)를 쓸 이유가 없어졌다.
-// 팟캐스트 파이프라인(pipelines/podcast/pipeline.py)이 이미 검증해 쓰고
-// 있는 동일 보이스(Juan - Deep & Rich Storyteller)를 그대로 재사용 —
-// Secrets Manager `ElevenLabs/ApiKey`도, 태스크 IAM 권한도 이미 있다.
+// 2026-08-27 — ElevenLabs에서 AWS Polly로 재전환. 실사용량(월 565K자) 기준
+// ElevenLabs 실비용이 구독료+초과요금 합산 약 $95.81/월인데, 같은 물량을
+// Polly generative 엔진으로 합성하면 약 $17/월(82% 절감) — 같은 대본으로
+// 품질 비교 샘플까지 직접 뽑아 확인 후 결정(pipelines/podcast/pipeline.py와
+// 같은 이유, 그쪽과 동일 보이스로 통일). 별도 API 키·Secrets Manager도
+// 더는 필요 없다 — Fargate 태스크 IAM 롤 권한만으로 호출.
+// 한국어 보이스 중 generative 엔진을 지원하는 건 Seoyeon뿐(Jihye는 neural 전용).
 export const DEFAULT_VOICE: TtsVoiceConfig = {
-  name: process.env.TTS_VOICE_ID ?? '8lidWTlnwgjObqCImnE2',
-  modelId: 'eleven_multilingual_v2',
+  voiceId: (process.env.TTS_VOICE_ID as VoiceId) ?? 'Seoyeon',
+  engine: (process.env.TTS_ENGINE as Engine) ?? 'generative',
 };
 
 const REGION = process.env.AWS_REGION ?? 'us-east-1';
-const SECRET_NAME = 'ElevenLabs/ApiKey';
 
-let cachedApiKey: string | null = null;
+let cachedClient: PollyClient | null = null;
 
-async function getApiKey(): Promise<string> {
-  if (cachedApiKey) return cachedApiKey;
-  const client = new SecretsManagerClient({ region: REGION });
-  const resp = await client.send(new GetSecretValueCommand({ SecretId: SECRET_NAME }));
-  if (!resp.SecretString) {
-    throw new Error(`Secrets Manager에 ${SECRET_NAME} 값이 없습니다.`);
+function getClient(): PollyClient {
+  if (!cachedClient) {
+    cachedClient = new PollyClient({ region: REGION });
   }
-  cachedApiKey = resp.SecretString;
-  return cachedApiKey;
+  return cachedClient;
 }
 
-// text는 평문 그대로 넘긴다 — ElevenLabs는 임의 SSML을 지원하지 않고,
-// 문장부호(. ? !) 기준 자연스러운 쉼을 모델이 알아서 넣어준다(팟캐스트
-// 파이프라인에서 이미 검증됨).
 export async function synthesizeSpeech(
   text: string,
   voice: TtsVoiceConfig = DEFAULT_VOICE
 ): Promise<Buffer> {
-  const apiKey = await getApiKey();
+  const client = getClient();
 
-  let res: Response;
+  let audioStream;
   try {
-    res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice.name}`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text,
-        model_id: voice.modelId ?? 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: voice.stability ?? 0.5,
-          similarity_boost: voice.similarityBoost ?? 0.75,
-        },
-      }),
-    });
+    const resp = await client.send(
+      new SynthesizeSpeechCommand({
+        Text: text,
+        OutputFormat: 'mp3',
+        VoiceId: voice.voiceId,
+        Engine: voice.engine ?? 'generative',
+        LanguageCode: 'ko-KR',
+      })
+    );
+    audioStream = resp.AudioStream;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`ElevenLabs TTS 요청 실패(voice: ${voice.name}): ${reason}`);
+    throw new Error(`Polly TTS 요청 실패(voice: ${voice.voiceId}): ${reason}`);
   }
 
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(
-      `ElevenLabs TTS 요청 실패 (voice: ${voice.name}, status: ${res.status}): ${detail}`
-    );
+  if (!audioStream) {
+    throw new Error(`Polly TTS 응답에 오디오 스트림이 없습니다(voice: ${voice.voiceId})`);
   }
 
-  const audioContent = await res.arrayBuffer();
-  return Buffer.from(audioContent);
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of audioStream as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }

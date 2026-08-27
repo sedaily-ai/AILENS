@@ -18,9 +18,9 @@ Bedrock 이미지 모델(배경) + PIL(텍스트 합성) 조합으로 기본값�
 | 폴더 | 언어 | 산출물 | 비고 |
 |---|---|---|---|
 | `letters/` | Python | 텍스트 | Bedrock Claude 1회 호출 |
-| `podcast/` | Python | 텍스트 + mp3 | Bedrock Claude(대본) + ElevenLabs(음성, Google TTS 대체) |
+| `podcast/` | Python | 텍스트 + mp3 | Bedrock Claude(대본) + AWS Polly(음성, Seoyeon generative) |
 | `webtoon/` | Python | 이미지 8장 | Bedrock Claude(1·2단계 스크립트/장면연출) + Bedrock Stability Stable Image Core(3단계 배경) + PIL(말풍선·캡션 텍스트 합성). `IMAGE_PROVIDER="openai"`로 바꾸면 GPT-5.5 경로로 원복 가능 |
-| `video/` | Node(렌더)+Python(각본) | mp4 | `generate_script.py`(1단계, Bedrock Claude 각본 JSON) → `npm run render`(2·3단계, ElevenLabs TTS + Remotion 렌더) |
+| `video/` | Node(렌더)+Python(각본) | mp4 | `generate_script.py`(1단계, Bedrock Claude 각본 JSON) → `npm run render`(2·3단계, AWS Polly TTS + Remotion 렌더) |
 | `discovery/` | Python | 분류 JSON | 포맷 생성 이전 단계 — 그날 기사 XML을 후보로 분류만(아래 참고) |
 | `frontpage_auto/` | Python(엔트리) | DDB write + S3 미디어 | **실가동 중** — 지면 1면 기사를 매일 07:00 KST 1회 자동으로 4포맷 발행(EventBridge). letters/podcast/webtoon/video의 `run_article()`을 그대로 호출 |
 | `mustknow_auto/` | Python(엔트리) | DDB write + S3 미디어 | **실가동 중** — 지면특별코너 4탭(전체/증권/산업/시그널) + 일반 필수뉴스를 하루 6회(08/12/15/18/21/23시 KST) 자동 채점·발행. `classify.py`가 Bedrock Sonnet 5로 배치 채점(20건씩), 임계값(일반 7.0/특별탭 8.0) 넘는 기사만 발행 |

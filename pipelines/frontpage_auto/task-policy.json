@@ -30,9 +30,14 @@
       "Effect": "Allow",
       "Action": ["secretsmanager:GetSecretValue"],
       "Resource": [
-        "arn:aws:secretsmanager:us-east-1:887078546492:secret:sedaily-mbti/openai-api-key-*",
-        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ElevenLabs/ApiKey-*"
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:sedaily-mbti/openai-api-key-*"
       ]
+    },
+    {
+      "Sid": "PollySynthesizeSpeech",
+      "Effect": "Allow",
+      "Action": ["polly:SynthesizeSpeech"],
+      "Resource": "*"
     },
     {
       "Sid": "RevalidateSecretRead",

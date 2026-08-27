@@ -13,7 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.0.0",
+    "@aws-sdk/client-polly": "^3.0.0",
     "@remotion/bundler": "^4.0.513",
     "@remotion/cli": "^4.0.513",
     "@remotion/renderer": "^4.0.513",

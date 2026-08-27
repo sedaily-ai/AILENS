@@ -4,7 +4,7 @@
 `FACT_IDS: [1, 3, 4]` 를 붙이도록 개정됐다(07_VERIFY 커버리지 대조용).
 이 줄이 본문에 남으면 두 가지가 실제로 깨진다:
   - 레터: _parse_letters 에 종료 조건이 없어 발행 본문 문단이 된다
-  - 팟캐스트: ElevenLabs 가 "FACT_IDS 대괄호 일 쉼표 삼" 을 소리 내어 읽는다
+  - 팟캐스트: Polly 가 "FACT_IDS 대괄호 일 쉼표 삼" 을 소리 내어 읽는다
 """
 import ast
 import sys

@@ -30,7 +30,7 @@ async function main() {
 
   const script = parseNewsScript(json); // 스키마 오류 시 필드별 메시지와 함께 여기서 throw
 
-  console.log(`${script.cuts.length}개 컷 TTS 처리 시작 (voice: ${voice.name})`);
+  console.log(`${script.cuts.length}개 컷 TTS 처리 시작 (voice: ${voice.voiceId})`);
 
   const resolved = await resolveScriptAudio(script, {
     voice,

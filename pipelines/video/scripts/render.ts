@@ -5,6 +5,7 @@ import { renderMedia, selectComposition } from '@remotion/renderer';
 import { parseNewsScript, FORMAT_DIMENSIONS, COMPOSITION_ID, Format } from '../src/lib/schema';
 import { resolveScriptAudio } from '../src/lib/resolveAudio';
 import { DEFAULT_VOICE } from '../src/lib/tts';
+import type { VoiceId } from '@aws-sdk/client-polly';
 import { parseArgs } from '../src/lib/cliArgs';
 
 const USAGE =
@@ -47,9 +48,9 @@ async function main() {
   }
 
   const script = await loadScript(input);
-  const voice = voiceName ? { ...DEFAULT_VOICE, name: voiceName } : DEFAULT_VOICE;
+  const voice = voiceName ? { ...DEFAULT_VOICE, voiceId: voiceName as VoiceId } : DEFAULT_VOICE;
 
-  console.log(`[1/3] TTS 처리 (${script.cuts.length}개 컷, voice: ${voice.name})`);
+  console.log(`[1/3] TTS 처리 (${script.cuts.length}개 컷, voice: ${voice.voiceId})`);
   const resolved = args['skip-tts']
     ? script
     : await resolveScriptAudio(script, {
