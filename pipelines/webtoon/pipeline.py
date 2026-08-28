@@ -64,7 +64,14 @@ N_CUTS = 8
 # "openai"로 바꾸면 됨.
 IMAGE_PROVIDER = "bedrock"
 BEDROCK_IMAGE_REGION = "us-west-2"  # us-east-1엔 살아있는 순수 text-to-image 모델이 없음(Nova Canvas만 있는데 막힘)
-BEDROCK_IMAGE_MODEL_ID = "stability.stable-image-core-v1:1"
+# 2026-08-28 — 베어 모델 ID 직호출을 application inference profile 로 교체했다.
+# 베어(`stability.stable-image-core-v1:1`)로 부르면 비용할당태그가 붙을 자리가 없어
+# 청구 데이터에서 전량 `Not Applicable` 로 샌다(BillingON 실측 8/18~8/26 $33.08,
+# 월 약 $110). 태그는 소급되지 않으므로 지난 발생분은 복구 불가다.
+# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image.
+# 2026-09-30 이후 Service 를 lens 로 원복 — docs/architecture/비용태깅_규칙.md 참고.
+# 되돌릴 때는 아래 상수를 "stability.stable-image-core-v1:1" 로 바꾸면 된다(요금 동일).
+BEDROCK_IMAGE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/5jauvzgplsjx"  # lens-webtoon-image-stable-core → stability.stable-image-core-v1:1
 BEDROCK_ASPECT_RATIO = "3:2"
 
 _bedrock_image_client = None
