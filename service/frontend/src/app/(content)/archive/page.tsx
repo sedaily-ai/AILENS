@@ -1,23 +1,26 @@
 import type { Metadata } from 'next';
-import { fetchCmsPosts, fetchTrendCards, fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
-import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
-import { ArchiveHubClient } from './ArchiveHubClient';
-
-// 콘텐츠 타입별 페이지 분리(2026-08-11)로 /letters가 레터 전용이 되면서,
-// "전체 모아보기"가 갈 곳이 필요해 새로 만든 라우트 — 예전 /letters의 역할을
-// 그대로 이어받는다(레터+트렌드+칼럼+영상 통합 리스트).
+import { ArchiveHubClient, type FormatCardData } from './ArchiveHubClient';
 import { SITE_URL } from '@/shared/constants/site';
+
+// 2026-08-28 재설계 — letters/trend/video/lens를 날짜순으로 뭉쳐 페이지네이션
+// 없이 한 목록에 다 보여주던 이전 버전은 발행량이 하루 100건대로 늘면서
+// 두 가지 문제가 났다: (1) 한 화면에 너무 많다는 지적(사용자: "다 보여주긴
+// 좀 그렇지 않나"), (2) letters/webtoon/video/home_player가 각자 이미
+// /lens, /webtoon, /video, /listen 독립 목록 페이지를 갖고 있어서 여기서
+// 다시 합치는 게 중복이었다. 그래서 이 페이지는 이제 "전체 목록"이 아니라
+// 4개 형식 목록으로 가는 진입 디렉토리다. letters(이슈 톡톡)는 신규 발행이
+// 끊겨서 독립 목록이 없다 — 범위에서 제외(홈/사이트맵/카테고리 페이지
+// 노출은 그대로 유지, 여기서만 안 보임).
 const TITLE = '지금까지의 모든 콘텐츠';
-const DESCRIPTION = 'AI LENS가 정리한 증시·부동산·산업·금융/정책·국제·재테크 뉴스와 영상을 한 곳에서 모아봅니다. 서울경제신문이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 경제 뉴스 아카이브.';
+const DESCRIPTION = 'AI LENS가 매일 만드는 이슈를 레터·웹툰·팟캐스트·영상 네 형식으로 모아봅니다. 형식별로 골라 보세요.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  // GEO 감사(2026-08-12, letters/page.tsx 주석 참조) — 키워드 커버리지 확장.
-  // "딥다이브"/"이슈 톡톡"/"인사이트"(형식 기준 분류) 전부 2026-08-19까지
-  // 순차 폐기 — 카테고리(주제) 기준 키워드로 교체.
-  keywords: ['AI LENS', '서울경제', '경제 뉴스 모음', 'AI 경제 뉴스', '증시', '부동산', '산업', '금융·정책', '국제', '재테크'],
+  keywords: ['AI LENS', '서울경제', '경제 뉴스 모음', 'AI 경제 뉴스', '웹툰', '팟캐스트', '영상'],
   alternates: { canonical: `${SITE_URL}/archive` },
   openGraph: {
     title: TITLE,
@@ -36,7 +39,7 @@ export const metadata: Metadata = {
   },
 };
 
-function buildJsonLd(items: ArchiveItem[]) {
+function buildJsonLd(cards: FormatCardData[]) {
   return {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -44,58 +47,73 @@ function buildJsonLd(items: ArchiveItem[]) {
     url: `${SITE_URL}/archive`,
     name: TITLE,
     description: DESCRIPTION,
-    keywords: 'AI LENS, 서울경제, 경제 뉴스 모음, AI 경제 뉴스, 증시, 부동산, 산업, 금융·정책, 국제, 재테크',
     inLanguage: 'ko-KR',
     isPartOf: { '@id': `${SITE_URL}/#website` },
     publisher: { '@id': `${SITE_URL}/#organization` },
-    // 공신력 신호(2026-08-12) — 목록 페이지도 상세 페이지(letters/[id] 등)와
-    // 같은 author Organization을 명시해 "서울경제신문이 검수한다"는 관계를
-    // 목록 단계에서부터 드러낸다.
-    author: {
-      '@type': 'Organization',
-      name: 'AI LENS 편집팀',
-      description: '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
-      url: `${SITE_URL}/about`,
-      parentOrganization: { '@id': `${SITE_URL}/#organization` },
-    },
     mainEntity: {
       '@type': 'ItemList',
-      itemListElement: items
-        .filter((it) => it.href)
-        .slice(0, 20)
-        .map((it, i) => ({
-          '@type': 'ListItem',
-          position: i + 1,
-          url: it.external ? it.href! : `${SITE_URL}${it.href}`,
-          name: it.title,
-        })),
+      itemListElement: cards.map((c, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `${SITE_URL}${c.href}`,
+        name: c.title,
+      })),
     },
   };
 }
 
 export default async function ArchiveHubPage() {
-  // lens("4가지 시선") 글도 포함(2026-08-23, 사용자 지적 — "여기에 lens도
-  // 있어야 하는데"). buildArchiveItems의 lens 인자는 2026-08-20에 카테고리
-  // 페이지용으로 추가됐지만 이 허브(모든 콘텐츠를 모으는 곳)엔 그때
-  // 안 넘겨서 빠져 있었다 — ArchiveList.tsx의 KIND_LABEL엔 이미
-  // '4가지 시선' 라벨까지 정의돼 있어서 인자만 넘기면 그대로 뜬다.
-  // 우측 사이드바 서버 프리페치도 카테고리 페이지와 동일하게 추가.
-  const [letters, cards, videos, lens, hotLetters] = await Promise.all([
-    fetchCmsPosts('letters', undefined, PAGE_SIZE),
-    fetchTrendCards(),
-    fetchVideos(),
+  const [lens, webtoons, videos, homePlayer, hotLetters] = await Promise.all([
     fetchLensPosts(),
+    fetchWebtoons(),
+    fetchVideos(),
+    fetchHomePlayerPosts(),
     fetchFollowingLetters(5),
   ]);
-  const initialItems = buildArchiveItems(letters, cards, videos, lens);
-  const jsonLd = buildJsonLd(initialItems);
+
+  const cards: FormatCardData[] = [
+    {
+      key: 'lens',
+      href: '/lens',
+      title: '4가지 시선',
+      tagline: '형식 상관없이, 전부 다 보고 싶다면',
+      count: lens.length,
+      latest: lens[0]?.headline ?? null,
+    },
+    {
+      key: 'webtoon',
+      href: '/webtoon',
+      title: '웹툰',
+      tagline: '이야기로 스르륵 넘겨보고 싶다면',
+      count: webtoons.length,
+      latest: webtoons[0]?.title ?? null,
+    },
+    {
+      key: 'podcast',
+      href: '/listen',
+      title: '팟캐스트',
+      tagline: '이동 중이라 화면 볼 여유가 없다면',
+      count: homePlayer.length,
+      latest: homePlayer[0]?.title ?? null,
+    },
+    {
+      key: 'video',
+      href: '/video',
+      title: '영상',
+      tagline: '3초 안에 무슨 일인지 알고 싶다면',
+      count: videos.length,
+      latest: videos[0]?.title ?? null,
+    },
+  ];
+
+  const jsonLd = buildJsonLd(cards);
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ArchiveHubClient initialItems={initialItems} initialHotLetters={hotLetters} />
+      <ArchiveHubClient cards={cards} initialHotLetters={hotLetters} />
     </>
   );
 }
