@@ -10,6 +10,10 @@ import { kstDateTimeLabel } from '@/shared/lib/date';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
+import { ListPagination } from '@/shared/ui/ListPagination';
+import { LISTEN_PAGE_SIZE } from './listenListShared';
+
+const PAGE_SIZE_OPTIONS = [30, 60, 120];
 
 // 홈 오디오 섹션(AudioPreviewSection.tsx)과 캐릭터·재생버튼 시각 언어를
 // 통일(2026-08-21, 우선순위 4번 — "/listen 목록 페이지와 시각적 일관성을
@@ -26,9 +30,22 @@ const NEUTRAL_ACCENT = '#3b82f6';
 // 링크"로 채우는 home_player 채널을 그대로 쓰지만, thumbnail 필드가 없어
 // (해당 콘텐츠 자체가 순수 오디오/짧은 영상이라) 웹툰·영상 목록과 달리
 // 텍스트 위주 리스트로 구성한다.
-export function ListenListClient({ initialItems }: { initialItems: HomePlayerPost[] }) {
+// 페이지네이션 추가(2026-08-28) — fetchHomePlayerPosts()의 limit이
+// 100→1000으로 올라가며(homePlayerApi.ts 참조) 캡이 사실상 없어졌다.
+// 이 페이지엔 원래 페이지네이션이 아예 없어서, 발행량이 늘수록 목록이
+// 한없이 길어지는 문제가 생겨 /lens/page/[n]과 같은 경로 세그먼트
+// 패턴을 붙인다.
+export function ListenListClient({
+  initialItems,
+  initialPage,
+}: {
+  initialItems: HomePlayerPost[];
+  initialPage: number;
+}) {
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<HomePlayerPost[]>(initialItems);
+  const [pageSize, setPageSize] = useState(LISTEN_PAGE_SIZE);
+  const [clientPage, setClientPage] = useState(initialPage);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +56,12 @@ export function ListenListClient({ initialItems }: { initialItems: HomePlayerPos
       cancelled = true;
     };
   }, []);
+
+  const isCustomSize = pageSize !== LISTEN_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(clientPage, totalPages);
+  const pageHref = (n: number) => (n <= 1 ? '/listen' : `/listen/page/${n}`);
+  const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="min-h-screen bg-white">
@@ -72,7 +95,7 @@ export function ListenListClient({ initialItems }: { initialItems: HomePlayerPos
 
         {items.length > 0 && (
           <div>
-            {items.map((it, i) => {
+            {pageItems.map((it, i) => {
               const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
               const p = lensPerspectiveAt(i);
               return (
@@ -163,6 +186,24 @@ export function ListenListClient({ initialItems }: { initialItems: HomePlayerPos
               );
             })}
           </div>
+        )}
+
+        {items.length > 0 && (
+          <ListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageHref={pageHref}
+            isCustomSize={isCustomSize}
+            onPageChange={setClientPage}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={(n) => {
+              setPageSize(n);
+              setClientPage(1);
+            }}
+            accentColor={NEUTRAL_ACCENT}
+            totalCount={items.length}
+          />
         )}
       </main>
     </div>

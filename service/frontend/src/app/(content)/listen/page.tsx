@@ -1,11 +1,7 @@
 import type { Metadata } from 'next';
-import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
-import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
+import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
 import { ListenListClient } from './ListenListClient';
-
-import { SITE_URL } from '@/shared/constants/site';
-const TITLE = '오늘의 뉴스를 귀로';
-const DESCRIPTION = '서울경제 AI LENS가 정리한 오늘의 경제 이슈를 오디오로 들어보세요. 팟캐스트와 영상을 한 재생목록으로 모았습니다.';
+import { SITE_URL, LISTEN_LIST_TITLE as TITLE, LISTEN_LIST_DESCRIPTION as DESCRIPTION, buildListenJsonLd } from './listenListShared';
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -32,68 +28,18 @@ export const metadata: Metadata = {
   },
 };
 
-// video/page.tsx와 같은 이유의 CollectionPage + ItemList JSON-LD. 항목마다
-// mp3 직접 파일(PodcastEpisode)과 YouTube 링크(VideoObject)가 섞여 있어
-// 타입을 하나로 못 고정한다 — 실제 파일 형태를 보고 그때그때 고른다.
-function buildJsonLd(items: HomePlayerPost[]) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    '@id': `${SITE_URL}/listen#collection`,
-    url: `${SITE_URL}/listen`,
-    name: TITLE,
-    description: DESCRIPTION,
-    inLanguage: 'ko-KR',
-    isPartOf: { '@id': `${SITE_URL}/#website` },
-    publisher: { '@id': `${SITE_URL}/#organization` },
-    author: {
-      '@type': 'Organization',
-      name: 'AI LENS 편집팀',
-      description: '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
-      url: `${SITE_URL}/about`,
-      parentOrganization: { '@id': `${SITE_URL}/#organization` },
-    },
-    mainEntity: {
-      '@type': 'ItemList',
-      itemListElement: items.slice(0, 20).map((it, i) => {
-        const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
-        const resolved = resolveVideo(it.mediaEmbedUrl);
-        return {
-          '@type': 'ListItem',
-          position: i + 1,
-          url: `${SITE_URL}/listen/${it.id}`,
-          item: isAudio
-            ? {
-                '@type': 'PodcastEpisode',
-                name: it.title,
-                description: it.excerpt || it.title,
-                datePublished: it.date ? `${it.date}T07:00:00+09:00` : undefined,
-                associatedMedia: { '@type': 'MediaObject', contentUrl: it.mediaEmbedUrl },
-              }
-            : {
-                '@type': 'VideoObject',
-                name: it.title,
-                description: it.excerpt || it.title,
-                uploadDate: it.date ? `${it.date}T07:00:00+09:00` : undefined,
-                embedUrl: resolved?.embedUrl,
-                thumbnailUrl: resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`,
-              },
-        };
-      }),
-    },
-  };
-}
-
+// 페이지네이션을 경로로 옮김(2026-08-28, lens/page.tsx와 같은 이유) — 2페이지
+// 부터는 /listen/page/[n]/page.tsx.
 export default async function ListenListPage() {
   const items = await fetchHomePlayerPosts();
-  const jsonLd = buildJsonLd(items);
+  const jsonLd = buildListenJsonLd(items);
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ListenListClient initialItems={items} />
+      <ListenListClient initialItems={items} initialPage={1} />
     </>
   );
 }
