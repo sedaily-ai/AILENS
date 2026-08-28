@@ -76,6 +76,7 @@
       "Effect": "Allow",
       "Action": ["bedrock:InvokeModel"],
       "Resource": [
+        "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/5jauvzgplsjx",
         "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-image-core-v1:1"
       ]
     }
