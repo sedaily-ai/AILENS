@@ -1,0 +1,33 @@
+erDiagram
+  users {
+    varchar(64) id PK "Cognito sub"
+    varchar(255) email UK "식별자가 아니다"
+    varchar(64) name
+    text image_url
+    varchar(16) status "active · suspended · withdrawn"
+    timestamptz joined_at
+    timestamptz last_login_at
+    timestamptz updated_at
+  }
+  user_identities {
+    varchar(32) provider PK "cognito · google · kakao · naver · apple"
+    varchar(128) provider_uid PK "제공자 측 식별자"
+    varchar(64) user_id FK "NOT NULL · CASCADE"
+    timestamptz linked_at "추정"
+  }
+  anonymous_visitors {
+    varchar(64) id PK "쿠키 값"
+    char(64) ip_hash "SHA-256이므로 64 · MD5 32 아님"
+    timestamptz first_seen_at "추정"
+    timestamptz last_seen_at "추정"
+  }
+
+  users ||--o{ user_identities : "user_id · CASCADE"
+  users ||--o{ user_archives : "CASCADE"
+  users ||--o{ user_readings : "CASCADE"
+  users ||--o{ recommendations : "CASCADE"
+  users ||--o{ chat_conversations : "user_id · CASCADE"
+  users ||--o{ subscriptions : "CASCADE"
+  users ||..o{ view_events : "user_id · FK 없음"
+  anonymous_visitors ||--o{ chat_conversations : "anon_id · CASCADE"
+  anonymous_visitors ||..o{ view_events : "anon_id · FK 없음"

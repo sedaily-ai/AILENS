@@ -1,0 +1,53 @@
+---
+config:
+  flowchart:
+    nodeSpacing: 55
+    rankSpacing: 95
+    curve: basis
+---
+flowchart TB
+  D1["<b>1 · 분류 · 지면</b><br/>sections · categories"]
+  D2["<b>2 · 편집자</b><br/>editors"]
+  D11["<b>11 · 파이프라인 · 운영</b><br/>pipeline_runs · pipeline_run_items<br/>lens_candidates · ai_usage_logs<br/>prompts · prompt_versions<br/>feature_flags · audit_logs · incidents"]
+  D3["<b>3 · 원천 기사</b><br/>articles · article_images<br/>article_related_news · article_categories<br/>article_embeddings · external_archives"]
+  D4["<b>4 · 발행물 · 형식콘텐츠</b><br/>publications · renditions<br/>rendition_blocks · webtoon_panels · media_assets<br/>publication_articles<br/>publication_slug_history · publication_revisions"]
+  D6["<b>6 · 회원</b><br/>users · user_identities<br/>anonymous_visitors"]
+  D5["<b>5 · 부가 콘텐츠</b><br/>glossary_terms · rendition_terms<br/>quizzes · quiz_options"]
+  D7["<b>7 · 내 서랍 · 추천</b><br/>user_archives · sentence_stats<br/>archive_keywords · archive_embeddings<br/>recommendations · user_readings"]
+  D8["<b>8 · 조회수</b><br/>view_events · view_counts<br/>view_adjustments"]
+  D9["<b>9 · 챗봇</b><br/>chat_conversations · chat_messages<br/>chat_message_sources · chat_quota_usage"]
+  D10["<b>10 · 뉴스레터</b><br/>newsletters · subscriptions<br/>newsletter_sends · newsletter_send_items"]
+  D12["<b>12 · 게재용 뷰</b><br/>v_live_renditions"]
+
+  D1 --> D3
+  D1 --> D4
+  D1 --> D10
+  D2 --> D4
+  D2 --> D5
+  D11 --> D4
+  D11 --> D5
+  D3 --> D4
+  D3 --> D7
+  D3 --> D11
+  D4 --> D5
+  D4 --> D7
+  D4 --> D8
+  D4 --> D9
+  D4 --> D12
+  D6 --> D7
+  D6 --> D8
+  D6 --> D9
+  D6 --> D10
+  D9 --> D11
+
+  classDef core fill:#336791,stroke:#1f4a6b,color:#ffffff,stroke-width:1.5px
+  classDef dim fill:#eaf1f7,stroke:#336791,color:#1a1a1a
+  classDef sat fill:#ffffff,stroke:#a8bed2,color:#33415c
+  classDef ops fill:#fef3c7,stroke:#b45309,color:#7c2d12
+  classDef vw fill:#ecfdf5,stroke:#047857,color:#064e3b
+
+  class D3,D4 core
+  class D1,D2,D6 dim
+  class D5,D7,D8,D9,D10 sat
+  class D11 ops
+  class D12 vw

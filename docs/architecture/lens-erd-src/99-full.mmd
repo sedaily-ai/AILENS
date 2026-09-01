@@ -1,0 +1,177 @@
+---
+config:
+  flowchart:
+    nodeSpacing: 26
+    rankSpacing: 52
+    curve: basis
+    padding: 10
+---
+flowchart LR
+  subgraph G1["1 · 분류 · 지면"]
+    direction TB
+    sections
+    categories
+  end
+  subgraph G2["2 · 편집자"]
+    editors
+  end
+  subgraph G11["11 · 파이프라인 · 운영"]
+    direction TB
+    pipeline_runs
+    pipeline_run_items
+    lens_candidates
+    ai_usage_logs
+    prompts
+    prompt_versions
+    feature_flags
+    audit_logs
+    incidents
+  end
+  subgraph G3["3 · 원천 기사"]
+    direction TB
+    articles
+    article_images
+    article_related_news
+    article_categories
+    article_embeddings
+    external_archives
+  end
+  subgraph G4["4 · 발행물 · 형식콘텐츠"]
+    direction TB
+    publications
+    renditions
+    rendition_blocks
+    webtoon_panels
+    media_assets
+    publication_articles
+    publication_slug_history
+    publication_revisions
+  end
+  subgraph G5["5 · 부가 콘텐츠"]
+    direction TB
+    glossary_terms
+    rendition_terms
+    quizzes
+    quiz_options
+  end
+  subgraph G6["6 · 회원"]
+    direction TB
+    users
+    user_identities
+    anonymous_visitors
+  end
+  subgraph G7["7 · 내 서랍 · 추천"]
+    direction TB
+    user_archives
+    sentence_stats
+    archive_keywords
+    archive_embeddings
+    recommendations
+    user_readings
+  end
+  subgraph G8["8 · 조회수"]
+    direction TB
+    view_events
+    view_counts
+    view_adjustments
+  end
+  subgraph G9["9 · 챗봇"]
+    direction TB
+    chat_conversations
+    chat_messages
+    chat_message_sources
+    chat_quota_usage
+  end
+  subgraph G10["10 · 뉴스레터"]
+    direction TB
+    newsletters
+    subscriptions
+    newsletter_sends
+    newsletter_send_items
+  end
+  subgraph G12["12 · 게재용 뷰"]
+    v_live_renditions
+  end
+
+  sections -.-> articles
+  sections -.-> publications
+  sections --> newsletters
+  categories -.-> publications
+  categories -.-> article_categories
+
+  editors -.-> publications
+  editors -.-> publication_revisions
+  editors -.-> glossary_terms
+  editors -.-> quizzes
+  editors -.-> view_adjustments
+  editors -.-> audit_logs
+  editors -.-> prompt_versions
+
+  articles --> article_images
+  articles --> article_related_news
+  articles --> article_categories
+  articles --> article_embeddings
+  articles -.-> publication_articles
+  articles --> recommendations
+  articles -.-> lens_candidates
+
+  publications --> renditions
+  publications --> publication_articles
+  publications --> publication_slug_history
+  publications --> publication_revisions
+  publications --> view_counts
+  publications --> view_adjustments
+  publications --> user_readings
+  publications --> chat_message_sources
+  publications -.-> view_events
+  publications -.-> v_live_renditions
+  renditions --> rendition_blocks
+  renditions --> webtoon_panels
+  renditions --> media_assets
+  renditions --> rendition_terms
+  renditions -.-> user_archives
+  renditions -.-> ai_usage_logs
+  renditions -.-> v_live_renditions
+
+  glossary_terms --> rendition_terms
+  quizzes --> quiz_options
+
+  users --> user_identities
+  users --> user_archives
+  users --> user_readings
+  users --> recommendations
+  users --> chat_conversations
+  users --> subscriptions
+  users -.-> view_events
+  anonymous_visitors --> chat_conversations
+  anonymous_visitors -.-> view_events
+
+  user_archives --> archive_keywords
+  user_archives --> archive_embeddings
+  sentence_stats -.-> user_archives
+
+  chat_conversations --> chat_messages
+  chat_messages --> chat_message_sources
+  chat_messages -.-> ai_usage_logs
+
+  newsletters --> subscriptions
+  newsletters --> newsletter_sends
+  newsletter_sends --> newsletter_send_items
+  subscriptions -.-> newsletter_send_items
+
+  pipeline_runs --> pipeline_run_items
+  pipeline_runs --> lens_candidates
+  pipeline_runs -.-> publications
+  pipeline_runs -.-> glossary_terms
+  pipeline_runs -.-> quizzes
+  prompts --> prompt_versions
+  lens_candidates -.-> ai_usage_logs
+
+  classDef core fill:#336791,stroke:#1f4a6b,color:#ffffff
+  classDef tbl fill:#eaf1f7,stroke:#5a7f9e,color:#1a3a52
+  classDef iso fill:#ffffff,stroke:#c9c9c9,color:#8a8a8a,stroke-dasharray:3 3
+  classDef vw fill:#ecfdf5,stroke:#047857,color:#064e3b
+
+  class articles,publications,renditions core
+  class external_archives,feature_flags,incidents,chat_quota_usage iso
+  class v_live_renditions vw

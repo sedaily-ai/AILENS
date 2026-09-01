@@ -1,0 +1,95 @@
+erDiagram
+  publications {
+    bigserial id PK
+    varchar(255) slug UK "주소 · 변경 시 이력 남김"
+    text source_url UK "중복 발행 방지의 핵심"
+    text title "NOT NULL"
+    text subtitle
+    text question "이슈일 때만 채워짐"
+    text cover_image_url "없으면 기본 로고"
+    text bgm_url "배경 음악 · CMS 입력"
+    smallint section_id FK "RESTRICT"
+    smallint category_id FK "RESTRICT"
+    varchar(32) editor_no FK "SET NULL · 파이프라인 생성물은 NULL"
+    bigint run_id FK "SET NULL · 어느 실행이 만들었나"
+    varchar(16) status "draft · published · archived"
+    timestamptz published_at
+    timestamptz deleted_at "소프트 삭제 · 실제로 지우지 않는다"
+    timestamptz created_at
+    timestamptz updated_at
+    tsvector search_vector "GENERATED · title A / subtitle B / question B"
+  }
+  renditions {
+    bigserial id PK
+    bigint publication_id FK "NOT NULL · CASCADE"
+    varchar(16) format "letter · webtoon · podcast · video"
+    varchar(16) status "pending · generating · ready · failed"
+    text label "약 3분 · 8컷"
+    integer duration_sec "팟캐스트 · 영상"
+    integer sequence_no "웹툰 순번 · 그 외 NULL"
+    integer attempts "재시도 횟수"
+    text last_error
+    timestamptz next_retry_at
+  }
+  rendition_blocks {
+    bigserial id PK
+    bigint rendition_id FK "NOT NULL · CASCADE"
+    smallint position "UNIQUE 짝 · 0-based 렌더 순서"
+    varchar(16) block_type "text · image · quote"
+    text content
+    text image_url
+  }
+  webtoon_panels {
+    bigserial id PK
+    bigint rendition_id FK "NOT NULL · CASCADE"
+    smallint position "UNIQUE 짝"
+    text image_url "NOT NULL"
+    text dialogue "말풍선 · 검색 대상 제외"
+  }
+  media_assets {
+    bigserial id PK
+    bigint rendition_id FK "UNIQUE · CASCADE · 1:1"
+    varchar(16) media_type "audio · video"
+    text file_url "NOT NULL"
+    text thumbnail_url "영상만"
+    text transcript "대본 · 자막 · 검색 대상 포함"
+    tsvector search_vector "GENERATED"
+  }
+  publication_articles {
+    bigint publication_id PK "FK · CASCADE"
+    varchar(32) article_no PK "FK"
+    boolean is_primary "중심 기사"
+    smallint position "순서"
+  }
+  publication_slug_history {
+    varchar(255) old_slug PK "옛 주소 · SEO / SNS 링크 유지"
+    bigint publication_id FK "CASCADE"
+    timestamptz changed_at "추정"
+  }
+  publication_revisions {
+    bigserial id PK
+    bigint publication_id FK "CASCADE"
+    varchar(32) editor_no FK "누가"
+    text change_summary "무엇을 · 추정"
+    timestamptz revised_at "언제 · 추정"
+  }
+
+  publications ||--o{ renditions : "0..4 · UNIQUE 짝 pub+format"
+  publications ||--o{ publication_articles : "CASCADE"
+  publications ||--o{ publication_slug_history : "CASCADE"
+  publications ||--o{ publication_revisions : "CASCADE"
+  publications ||--o| view_counts : "CASCADE · 1:1"
+  publications ||--o{ user_readings : "CASCADE"
+  publications ||--o{ view_adjustments : "CASCADE"
+  publications ||--o{ chat_message_sources : "CASCADE"
+  renditions ||--o{ rendition_blocks : "CASCADE"
+  renditions ||--o{ webtoon_panels : "CASCADE"
+  renditions ||--o| media_assets : "CASCADE · 1:1"
+  renditions ||--o{ rendition_terms : "CASCADE"
+  renditions ||..o{ user_archives : "SET NULL · 문장은 남는다"
+  renditions ||..o{ ai_usage_logs : "생성 비용"
+  sections ||..o{ publications : "section_id · RESTRICT"
+  categories ||..o{ publications : "category_id · RESTRICT"
+  editors ||..o{ publications : "editor_no · SET NULL"
+  pipeline_runs ||..o{ publications : "run_id · SET NULL"
+  articles ||..o{ publication_articles : "article_no"

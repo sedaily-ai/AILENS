@@ -1,0 +1,31 @@
+erDiagram
+  view_events {
+    bigserial id PK "PK 일부"
+    bigint publication_id "NOT NULL · FK 없음"
+    varchar(64) user_id "NULL 허용"
+    varchar(64) anon_id "NULL 허용 · 둘 다 NULL 가능"
+    integer dwell_sec "체류"
+    smallint scroll_pct "0-100"
+    timestamptz occurred_at PK "파티션 키 · 월별 · 90일 보존"
+  }
+  view_counts {
+    bigint publication_id PK "FK · CASCADE"
+    bigint real_count "배치만 갱신 · 기본 0"
+    bigint adjustment "가감분 · 음수 허용 · 기본 0"
+    bigint display_count "GENERATED · real_count + adjustment"
+  }
+  view_adjustments {
+    bigserial id PK
+    bigint publication_id FK "CASCADE"
+    bigint delta "조정량 · 추정"
+    text reason "조정 사유 · 추정"
+    varchar(32) editor_no FK "누가 · 추정"
+    timestamptz adjusted_at "추정"
+  }
+
+  publications ||--o| view_counts : "CASCADE · 1:1"
+  publications ||--o{ view_adjustments : "CASCADE"
+  publications ||..o{ view_events : "적재 후 집계 · FK 없음"
+  users ||..o{ view_events : "user_id"
+  anonymous_visitors ||..o{ view_events : "anon_id"
+  editors ||..o{ view_adjustments : "조정자 · 추정"

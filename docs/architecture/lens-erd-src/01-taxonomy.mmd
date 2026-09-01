@@ -1,0 +1,21 @@
+erDiagram
+  sections {
+    smallserial id PK
+    varchar(64) name UK "지면 1면 · 증권 1면 · 산업 1면 · 시그널 1면"
+    smallint sort_order "탭 노출 순서 · 기본 0"
+    boolean is_active "기본 TRUE"
+    timestamptz created_at "기본 now()"
+  }
+  categories {
+    smallserial id PK
+    varchar(64) name UK "표시명"
+    varchar(64) slug UK "URL용"
+    smallint sort_order "기본 0"
+    boolean is_active "기본 TRUE"
+  }
+
+  sections ||..o{ articles : "section_id · RESTRICT"
+  sections ||..o{ publications : "section_id · RESTRICT"
+  sections ||--o| newsletters : "section_id · UNIQUE"
+  categories ||..o{ publications : "category_id · RESTRICT"
+  categories ||..o{ article_categories : "category_id · RESTRICT"

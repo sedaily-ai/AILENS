@@ -1,0 +1,48 @@
+erDiagram
+  user_archives {
+    bigserial id PK
+    varchar(64) user_id FK "NOT NULL · CASCADE · 회원 전용"
+    bigint rendition_id FK "SET NULL · 어느 글의 문장인가"
+    char(64) sentence_hash "UNIQUE 짝: user_id + sentence_hash"
+    text content "담을 당시 내용 복사 · 의도적 비정규화"
+    timestamptz saved_at "기본 now()"
+  }
+  sentence_stats {
+    char(64) sentence_hash PK
+    text content
+    bigint saved_count "N명이 담았어요 · 부분 인덱스 gt 1"
+  }
+  archive_keywords {
+    bigserial id PK "추정"
+    bigint archive_id FK "CASCADE"
+    varchar(64) keyword "문장에서 추출"
+    numeric weight "가중치"
+  }
+  archive_embeddings {
+    bigint archive_id PK "FK · CASCADE · 1:1"
+    vector(1024) embedding "NOT NULL · HNSW"
+    varchar(128) model_id "필수"
+    timestamptz created_at
+  }
+  recommendations {
+    varchar(64) user_id PK "FK · CASCADE"
+    varchar(32) article_no PK "FK · CASCADE"
+    numeric score "정밀도 5·4 · 화면의 98% 92%"
+    text[] matched_keywords "설명용 · 기본 {}"
+    timestamptz computed_at "기본 now()"
+  }
+  user_readings {
+    varchar(64) user_id PK "FK · CASCADE"
+    bigint publication_id PK "FK · CASCADE"
+    timestamptz read_at "추정"
+  }
+
+  users ||--o{ user_archives : "user_id · CASCADE"
+  user_archives ||--o{ archive_keywords : "archive_id · CASCADE"
+  user_archives ||--o| archive_embeddings : "archive_id · CASCADE"
+  sentence_stats ||..o{ user_archives : "sentence_hash · FK 아님"
+  renditions ||..o{ user_archives : "rendition_id · SET NULL"
+  users ||--o{ recommendations : "user_id · CASCADE"
+  articles ||--o{ recommendations : "article_no · CASCADE"
+  users ||--o{ user_readings : "user_id · CASCADE"
+  publications ||--o{ user_readings : "publication_id · CASCADE"
