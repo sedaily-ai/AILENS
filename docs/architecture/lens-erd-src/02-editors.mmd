@@ -1,0 +1,20 @@
+erDiagram
+  editors {
+    varchar(32) employee_no PK "사번"
+    varchar(255) email UK "NOT NULL"
+    varchar(64) name "NOT NULL"
+    varchar(16) role "admin · editor · 기본 editor"
+    boolean is_active "기본 TRUE"
+    varchar(32) created_by FK "등록한 관리자 · 최초는 NULL"
+    timestamptz created_at
+    timestamptz last_login_at
+  }
+
+  editors ||..o{ editors : "created_by · SET NULL"
+  editors ||..o{ publications : "editor_no · SET NULL"
+  editors ||..o{ publication_revisions : "editor_no"
+  editors ||..o{ glossary_terms : "editor_no · human"
+  editors ||..o{ quizzes : "editor_no · human"
+  editors ||..o{ view_adjustments : "조정자 · 추정"
+  editors ||..o{ audit_logs : "행위자 · 추정"
+  editors ||..o{ prompt_versions : "작성자 · 추정"

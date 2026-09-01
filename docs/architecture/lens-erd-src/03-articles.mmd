@@ -1,0 +1,63 @@
+erDiagram
+  articles {
+    varchar(32) article_no PK "CMS 기사번호"
+    text source_url "원문 링크"
+    text title "NOT NULL"
+    text subtitle
+    text body
+    varchar(64) reporter_name "표시용 · 기자는 독립 엔터티 아님"
+    smallint section_id FK "지면 · 온라인 전용은 NULL"
+    text[] keywords "표시용 · 기본 {}"
+    text[] hashtags "표시용 · 기본 {}"
+    timestamptz published_at "NOT NULL"
+    timestamptz collected_at "기본 now()"
+    timestamptz updated_at "기본 now()"
+    char(64) body_hash "재수집 시 변경 판정"
+    tsvector search_vector "GENERATED · title B / subtitle C / body C"
+  }
+  article_images {
+    bigserial id PK "추정"
+    varchar(32) article_no FK "NOT NULL · CASCADE"
+    smallint position "UNIQUE 짝: article_no + position"
+    text image_url "DDB images 배열 전개"
+    text caption "추정"
+  }
+  article_related_news {
+    bigserial id PK "추정"
+    varchar(32) article_no FK "NOT NULL · CASCADE"
+    smallint position "UNIQUE 짝: article_no + position"
+    text title "DDB related_news 배열 전개"
+    text url "추정"
+  }
+  article_categories {
+    varchar(32) article_no PK "FK · CASCADE"
+    smallint category_id PK "FK · RESTRICT"
+    boolean is_primary "대표 주제 · 기본 FALSE"
+  }
+  article_embeddings {
+    varchar(32) article_no PK "FK · CASCADE · 1:1"
+    vector(1024) embedding "NOT NULL · HNSW 코사인"
+    varchar(128) model_id "모델 변경 시 재생성 대상 식별"
+    timestamptz created_at
+  }
+  external_archives {
+    varchar(32) provider PK "제공사 · 빅카인즈 등"
+    varchar(128) external_id PK "제공사 문서번호"
+    timestamptz published_at "NOT NULL"
+    text title
+    text press
+    varchar(64) reporter_name
+    text summary "본문 전문 아님 · 요약만"
+    text source_url "원문으로 보낸다"
+    timestamptz fetched_at "캐시 성격 · 기본 now()"
+  }
+
+  articles ||--o{ article_images : "article_no · CASCADE"
+  articles ||--o{ article_related_news : "article_no · CASCADE"
+  articles ||--o{ article_categories : "article_no · CASCADE"
+  articles ||--o| article_embeddings : "article_no · CASCADE"
+  articles ||..o{ publication_articles : "article_no"
+  articles ||--o{ recommendations : "article_no · CASCADE"
+  articles ||..o{ lens_candidates : "article_no"
+  sections ||..o{ articles : "section_id · RESTRICT"
+  categories ||..o{ article_categories : "category_id · RESTRICT"

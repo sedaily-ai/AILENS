@@ -26,3 +26,9 @@ lambda_package_admin.zip
 # Android TWA (mobile/) — 서명 키스토어(비밀값) + Gradle/빌드 산출물.
 # 전체 디렉터리를 통째로 제외한다(bubblewrap 생성물이라 재현 가능, 커밋 불필요).
 mobile/
+
+# ERD 다이어그램 이미지 — 커밋하지 않는다.
+# docs/architecture/lens-erd-src/*.mmd 가 소스이고, 이미지는 매번 좌표가 바뀌는
+# 생성물이라 텍스트 diff 가 안 되면서 히스토리에만 수 MB씩 쌓인다.
+# 필요할 때 lens-postgres-erd.html 의 [SVG 저장] · [PNG 저장] 버튼으로 뽑아 쓴다.
+docs/architecture/lens-erd-img/

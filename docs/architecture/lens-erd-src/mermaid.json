@@ -1,0 +1,25 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "'Malgun Gothic','IBM Plex Sans KR','Segoe UI',sans-serif",
+    "fontSize": "14px",
+    "primaryColor": "#eaf1f7",
+    "primaryTextColor": "#1a1a1a",
+    "primaryBorderColor": "#336791",
+    "lineColor": "#5a7f9e",
+    "textColor": "#1a1a1a",
+    "attributeBackgroundColorOdd": "#ffffff",
+    "attributeBackgroundColorEven": "#fafafa"
+  },
+  "er": {
+    "diagramPadding": 16,
+    "entityPadding": 12,
+    "minEntityWidth": 120,
+    "useMaxWidth": false
+  },
+  "flowchart": {
+    "curve": "basis",
+    "useMaxWidth": false,
+    "padding": 12
+  }
+}

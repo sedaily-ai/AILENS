@@ -1,0 +1,38 @@
+erDiagram
+  chat_conversations {
+    uuid id PK
+    varchar(64) user_id FK "CASCADE · 배타"
+    varchar(64) anon_id FK "CASCADE · 배타"
+    varchar(16) tier "anonymous · member · 세션에 고정"
+    text title
+    timestamptz started_at
+    timestamptz updated_at
+  }
+  chat_messages {
+    bigserial id PK
+    uuid conversation_id FK "NOT NULL · CASCADE"
+    varchar(16) role "user · assistant · 추정"
+    text content "추정"
+    timestamptz created_at "추정"
+  }
+  chat_message_sources {
+    bigserial id PK "추정"
+    bigint message_id FK "NOT NULL · CASCADE"
+    smallint footnote_no "UNIQUE 짝 · 각주 1 2 3"
+    bigint publication_id FK "NOT NULL · CASCADE · 기사가 아니라 발행물"
+    integer start_pos "답변 본문 내 위치"
+    integer end_pos
+  }
+  chat_quota_usage {
+    varchar(16) subject_type PK "user · anon · ip"
+    varchar(64) subject_id PK
+    date window_date PK "날짜가 PK · 리셋 불필요"
+    integer used_count "추정"
+  }
+
+  chat_conversations ||--o{ chat_messages : "conversation_id · CASCADE"
+  chat_messages ||--o{ chat_message_sources : "message_id · CASCADE"
+  publications ||--o{ chat_message_sources : "publication_id · CASCADE"
+  users ||--o{ chat_conversations : "user_id · CASCADE"
+  anonymous_visitors ||--o{ chat_conversations : "anon_id · CASCADE"
+  chat_messages ||..o{ ai_usage_logs : "message_id · 대화 비용"

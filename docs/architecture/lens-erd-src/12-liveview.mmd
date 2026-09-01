@@ -1,0 +1,31 @@
+flowchart LR
+  R["<b>renditions</b><br/>r.status = 'ready'"]
+  P["<b>publications</b><br/>p.status = 'published'<br/>p.deleted_at IS NULL"]
+  C["categories<br/><span style='font-size:11px'>LEFT JOIN</span>"]
+  S["sections<br/><span style='font-size:11px'>LEFT JOIN</span>"]
+  VC["view_counts<br/><span style='font-size:11px'>LEFT JOIN · display_count</span>"]
+  V["<b>v_live_renditions</b><br/>게재 조건을 한곳에 모은다<br/>공개 화면은 이 뷰만 읽는다"]
+  F1["레터 페이지<br/>format = 'letter'"]
+  F2["웹툰 페이지<br/>format = 'webtoon'"]
+  F3["팟캐스트 페이지<br/>format = 'podcast'"]
+  F4["영상 페이지<br/>format = 'video'"]
+
+  R -->|JOIN| V
+  P -->|JOIN| V
+  S -.-> V
+  C -.-> V
+  VC -.-> V
+  V --> F1
+  V --> F2
+  V --> F3
+  V --> F4
+
+  classDef src fill:#336791,stroke:#1f4a6b,color:#ffffff,stroke-width:1.5px
+  classDef opt fill:#ffffff,stroke:#a8bed2,color:#33415c
+  classDef vw fill:#ecfdf5,stroke:#047857,color:#064e3b,stroke-width:1.5px
+  classDef page fill:#fafafa,stroke:#d4d4d4,color:#4a4a4a
+
+  class R,P src
+  class C,S,VC opt
+  class V vw
+  class F1,F2,F3,F4 page

@@ -1,0 +1,39 @@
+erDiagram
+  newsletters {
+    smallserial id PK "추정"
+    smallint section_id FK "UNIQUE · 지면당 하나 · 1면만 발송"
+    varchar(64) name "추정"
+    boolean is_active "추정"
+  }
+  subscriptions {
+    bigserial id PK "추정"
+    smallint newsletter_id FK "추정"
+    varchar(64) user_id FK "NULL 허용 · 이메일만 남긴 구독자"
+    varchar(255) email
+    timestamptz started_at "구독 시작"
+    timestamptz cancelled_at "해지 · 부분 인덱스 IS NULL"
+    varchar(64) unsubscribe_token
+  }
+  newsletter_sends {
+    bigserial id PK "발송 회차"
+    smallint newsletter_id FK
+    integer target_count
+    integer success_count
+    integer failure_count
+    timestamptz sent_at "추정"
+  }
+  newsletter_send_items {
+    bigserial id PK "추정"
+    bigint send_id FK "CASCADE"
+    bigint subscription_id FK "SET NULL"
+    varchar(255) email "복사 · 구독이 지워져도 남는다"
+    timestamptz delivered_at
+    timestamptz opened_at "오픈"
+  }
+
+  sections ||--o| newsletters : "section_id · UNIQUE"
+  newsletters ||--o{ subscriptions : "newsletter_id"
+  newsletters ||--o{ newsletter_sends : "newsletter_id"
+  newsletter_sends ||--o{ newsletter_send_items : "send_id · CASCADE"
+  subscriptions ||..o{ newsletter_send_items : "subscription_id · SET NULL"
+  users ||--o{ subscriptions : "user_id · CASCADE"
