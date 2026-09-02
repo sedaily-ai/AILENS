@@ -300,20 +300,14 @@ def generate_image_bedrock(prompt: str, out_path: Path, retries: int = 3) -> boo
 #
 # 같은 호출에서 얼굴 x좌표도 같이 받아온다(말풍선 동적 배치용, compose_text.
 # draw_dialogue 참고) — 검증과 별도 호출로 나누면 비전 모델 호출이 2배가
-# 되니 한 번에 처리.
-_VALIDATE_SYSTEM = (
-    "당신은 뉴스 웹툰 이미지 QA 담당자입니다. 주어진 이미지 하나를 보고 "
-    "아래 JSON 스키마 그대로만 응답하세요(설명 문구 없이 JSON 객체 하나만):\n"
-    '{"sageuk": true|false, "no_people_violated": true|false, '
-    '"faces_left_to_right_x": [0.0~1.0 사이 숫자, ...]}\n\n'
-    "- sageuk: 이미지에 조선시대/사극/한복/전통 한옥 지붕 등 시대극 요소가 "
-    "하나라도 보이면 true.\n"
-    "- no_people_violated: [인물 없음 지시]가 주어졌는데 이미지에 사람이 "
-    "보이면 true. 인물 없음 지시가 없었다면 항상 false.\n"
-    "- faces_left_to_right_x: 이미지에서 뚜렷이 보이는 사람 얼굴들을 "
-    "왼쪽에서 오른쪽 순서로, 각 얼굴의 가로 중심 위치를 이미지 너비 대비 "
-    "0(왼쪽 끝)~1(오른쪽 끝) 사이 소수로 나열. 얼굴이 없으면 빈 배열."
-)
+# 되니 한 번에 처리. 프롬프트 본문(VALIDATE_SYSTEM)은 prompts.py에 있다
+# — 다른 프롬프트 상수들과 위치를 통일했을 뿐, admin 편집·DDB 동기화
+# 대상은 아니다(prompts.py의 해당 섹션 주석 참고).
+
+# QA 호출 자체가 실패했을 때, 그리고 아직 QA를 한 번도 안 돌린 시점의
+# 초기값으로 공유하는 기본값 — 예전엔 두 곳(_validate_and_detect의 except
+# 블록, run_article의 루프 상단)에 리터럴이 그대로 중복돼 있었다.
+_DEFAULT_VERDICT = {"sageuk": False, "no_people_violated": False, "faces_left_to_right_x": []}
 
 
 def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool) -> dict:
@@ -324,11 +318,45 @@ def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool)
         image_bytes = image_path.read_bytes()
         no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
         user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
-        raw = call_vision(_VALIDATE_SYSTEM, user_msg, image_bytes, model=SCRIPT_MODEL, max_tokens=500)
+        raw = call_vision(prompts.VALIDATE_SYSTEM, user_msg, image_bytes, model=SCRIPT_MODEL, max_tokens=500)
         return _extract_json_block(raw)
     except Exception as e:
         print(f"    ⚠️  이미지 QA 검사 실패(통과 처리): {e}")
-        return {"sageuk": False, "no_people_violated": False, "faces_left_to_right_x": []}
+        return dict(_DEFAULT_VERDICT)
+
+
+def _generate_and_qa_cut(prompt: str, img_path: Path, scene: str, tag: str, n: int) -> tuple[bool, dict]:
+    """배경 생성 + QA 검증 + (필요시) 1회 재생성까지 한 컷 분량을 처리한다.
+    run_article()의 3단계 루프가 생성·QA·재시도·합성을 전부 인라인으로
+    떠안고 있어서(2026-09-02 QA 루프 추가 당시) 읽기 어려워진 걸 분리—
+    이 함수는 "이미지 파일을 만든다"까지만 책임지고, 텍스트 합성은
+    호출부(run_article)가 계속 맡는다.
+
+    Bedrock 경로 전용이다 — GPT 경로(IMAGE_PROVIDER="openai", 휴면)는 이
+    QA를 안 거친다. GPT의 image_generation 툴은 배경+말풍선 텍스트를
+    한 번에 완성된 그림으로 만들어서 애초에 "배경만 비전 모델로 검사"하는
+    이 구조 자체가 안 맞고(무엇을 사극/인물오탐 기준으로 잴지도 다름),
+    Bedrock 경로에서 발견된 변동성 문제(같은 프롬프트도 결과가 크게
+    다름)가 GPT 쪽에서도 똑같이 재현되는지 확인된 바가 없다 — 크레딧
+    복구 후 GPT 경로를 다시 쓰게 되면 그때 별도로 검증할 것.
+    """
+    ok = generate_image_bedrock(prompt, img_path)
+    verdict = dict(_DEFAULT_VERDICT)
+    if not ok:
+        return ok, verdict
+
+    no_people_expected = "인물 없음" in scene
+    verdict = _validate_and_detect(img_path, scene, no_people_expected)
+    if verdict.get("sageuk") or verdict.get("no_people_violated"):
+        reason = "사극 오염" if verdict.get("sageuk") else "인물 없음 위반"
+        print(f"{tag} 컷{n} QA 실패({reason}) — 재생성 1회 시도")
+        ok_retry = generate_image_bedrock(prompt, img_path)
+        if ok_retry:
+            verdict = _validate_and_detect(img_path, scene, no_people_expected)
+        # 재생성이 실패해도 첫 시도 결과가 파일로 남아있으니 발행은 계속한다
+        # (QA 실패 < 완전 실패 — 둘 다 막으면 자동 발행이 통째로 멈춘다).
+        ok = ok_retry or ok
+    return ok, verdict
 
 
 def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True):
@@ -394,18 +422,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
         characters = script.get("characters")
         if IMAGE_PROVIDER == "bedrock":
             prompt = build_background_prompt(s["camera"], s["scene"], characters)
-            ok = generate_image_bedrock(prompt, img_path)
-            verdict = {"sageuk": False, "no_people_violated": False, "faces_left_to_right_x": []}
-            if ok:
-                no_people_expected = "인물 없음" in s["scene"]
-                verdict = _validate_and_detect(img_path, s["scene"], no_people_expected)
-                if verdict.get("sageuk") or verdict.get("no_people_violated"):
-                    reason = "사극 오염" if verdict.get("sageuk") else "인물 없음 위반"
-                    print(f"{tag} 컷{n} QA 실패({reason}) — 재생성 1회 시도")
-                    ok_retry = generate_image_bedrock(prompt, img_path)
-                    if ok_retry:
-                        verdict = _validate_and_detect(img_path, s["scene"], no_people_expected)
-                    ok = ok_retry or ok  # 재생성 실패해도 첫 결과는 남아있으니 발행은 계속
+            ok, verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n)
             if ok:
                 face_x = verdict.get("faces_left_to_right_x") or None
                 try:
