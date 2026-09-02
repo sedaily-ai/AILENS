@@ -44,7 +44,7 @@ import boto3
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
 from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
-from bedrock_client import call_text  # 2026-08-23 — 스크립트/장면연출 텍스트 전용
+from bedrock_client import call_text, call_vision  # 2026-08-23 스크립트/장면연출 + 2026-09-02 이미지 QA
 from json_extract import extract_fenced_json_text, loads_lenient  # pipelines/common/ — 2026-08-23 공용화
 
 import prompts
@@ -289,6 +289,48 @@ def generate_image_bedrock(prompt: str, out_path: Path, retries: int = 3) -> boo
     return False
 
 
+# 2026-09-02 — 기자 피드백("컷마다 캐릭터가 다르다", "말풍선이 인물과
+# 연결 안 됨") 대응 3종 세트 중 "생성→검증→재시도" 루프. 실측(같은 날)으로
+# 확인한 근본 원인: Stable Image Core/SD3.5/Ultra 전부 **완전히 동일한
+# 프롬프트**로도 결과가 크게 요동친다(사극 오염 재현율 약 25%, 장면
+# 이행력도 실행마다 딴판). 프롬프트를 아무리 다듬어도 이 변동성 자체는
+# 못 없앤다는 게 오늘의 결론이라, 프롬프트 수정 대신 "결과물을 비전
+# 모델로 검사해서 나쁘면 다시 뽑는" 방식으로 우회한다 — 확률을 낮추는
+# 게 아니라 나쁜 뽑기를 걸러내는 접근.
+#
+# 같은 호출에서 얼굴 x좌표도 같이 받아온다(말풍선 동적 배치용, compose_text.
+# draw_dialogue 참고) — 검증과 별도 호출로 나누면 비전 모델 호출이 2배가
+# 되니 한 번에 처리.
+_VALIDATE_SYSTEM = (
+    "당신은 뉴스 웹툰 이미지 QA 담당자입니다. 주어진 이미지 하나를 보고 "
+    "아래 JSON 스키마 그대로만 응답하세요(설명 문구 없이 JSON 객체 하나만):\n"
+    '{"sageuk": true|false, "no_people_violated": true|false, '
+    '"faces_left_to_right_x": [0.0~1.0 사이 숫자, ...]}\n\n'
+    "- sageuk: 이미지에 조선시대/사극/한복/전통 한옥 지붕 등 시대극 요소가 "
+    "하나라도 보이면 true.\n"
+    "- no_people_violated: [인물 없음 지시]가 주어졌는데 이미지에 사람이 "
+    "보이면 true. 인물 없음 지시가 없었다면 항상 false.\n"
+    "- faces_left_to_right_x: 이미지에서 뚜렷이 보이는 사람 얼굴들을 "
+    "왼쪽에서 오른쪽 순서로, 각 얼굴의 가로 중심 위치를 이미지 너비 대비 "
+    "0(왼쪽 끝)~1(오른쪽 끝) 사이 소수로 나열. 얼굴이 없으면 빈 배열."
+)
+
+
+def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool) -> dict:
+    """생성된 배경 이미지 1장을 비전 모델로 검사. 실패(호출 에러) 시 항상
+    "문제 없음"으로 처리해서 재시도 루프가 무한정 돌지 않게 한다 — QA
+    자체의 실패가 발행을 막으면 안 된다(가용성 우선)."""
+    try:
+        image_bytes = image_path.read_bytes()
+        no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
+        user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
+        raw = call_vision(_VALIDATE_SYSTEM, user_msg, image_bytes, model=SCRIPT_MODEL, max_tokens=500)
+        return _extract_json_block(raw)
+    except Exception as e:
+        print(f"    ⚠️  이미지 QA 검사 실패(통과 처리): {e}")
+        return {"sageuk": False, "no_people_violated": False, "faces_left_to_right_x": []}
+
+
 def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True):
     """기사 1건 → 8컷 웹툰 전체 파이프라인. name은 출력 폴더명."""
     out = output_root / name
@@ -353,9 +395,21 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
         if IMAGE_PROVIDER == "bedrock":
             prompt = build_background_prompt(s["camera"], s["scene"], characters)
             ok = generate_image_bedrock(prompt, img_path)
+            verdict = {"sageuk": False, "no_people_violated": False, "faces_left_to_right_x": []}
             if ok:
+                no_people_expected = "인물 없음" in s["scene"]
+                verdict = _validate_and_detect(img_path, s["scene"], no_people_expected)
+                if verdict.get("sageuk") or verdict.get("no_people_violated"):
+                    reason = "사극 오염" if verdict.get("sageuk") else "인물 없음 위반"
+                    print(f"{tag} 컷{n} QA 실패({reason}) — 재생성 1회 시도")
+                    ok_retry = generate_image_bedrock(prompt, img_path)
+                    if ok_retry:
+                        verdict = _validate_and_detect(img_path, s["scene"], no_people_expected)
+                    ok = ok_retry or ok  # 재생성 실패해도 첫 결과는 남아있으니 발행은 계속
+            if ok:
+                face_x = verdict.get("faces_left_to_right_x") or None
                 try:
-                    compose_text.compose(img_path, cut)
+                    compose_text.compose(img_path, cut, face_x)
                 except Exception as e:
                     print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:

@@ -103,3 +103,34 @@ def call_text(
         if "text" in block:
             return block["text"]
     raise ValueError(f"Bedrock 응답에 text 블록이 없습니다: {resp['output']['message']['content']}")
+
+
+def call_vision(
+    system_prompt: str,
+    user_message: str,
+    image_bytes: bytes,
+    model: str = MODEL_ID,
+    max_tokens: int = 1000,
+    image_format: str = "png",
+) -> str:
+    """이미지 1장 + 텍스트로 Bedrock Claude(비전)를 호출한다(2026-09-02,
+    웹툰 이미지 QA 신설 — call_text()에 이미지 콘텐츠 블록만 추가한 자매
+    함수). converse API의 멀티모달 content는 이미지 블록이 텍스트 블록보다
+    앞에 와야 한다(Anthropic 권장 순서 — 실측으로도 이 순서가 안정적)."""
+    client = _get_client()
+    resp = client.converse(
+        modelId=model,
+        system=[{"text": system_prompt}],
+        messages=[{
+            "role": "user",
+            "content": [
+                {"image": {"format": image_format, "source": {"bytes": image_bytes}}},
+                {"text": user_message},
+            ],
+        }],
+        inferenceConfig={"maxTokens": max_tokens},
+    )
+    for block in resp["output"]["message"]["content"]:
+        if "text" in block:
+            return block["text"]
+    raise ValueError(f"Bedrock 응답에 text 블록이 없습니다: {resp['output']['message']['content']}")
