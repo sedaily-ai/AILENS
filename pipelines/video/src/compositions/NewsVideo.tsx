@@ -31,6 +31,7 @@ export const NewsVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
                 brand={script.brand}
                 source={script.source}
                 disclaimer={script.disclaimer}
+                asOfDate={script.asOfDate}
               />
             </TransitionSeries.Sequence>
             {i < script.cuts.length - 1 ? (

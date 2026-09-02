@@ -113,6 +113,10 @@ export const newsScriptSchema = z.object({
   source: z.string().min(1),
   // 피해·의료·투자 등 민감 소재에서 클로징에 붙는 안내 문구. 없으면 노출 안 함.
   disclaimer: z.string().optional(),
+  // 이 영상이 다루는 사실의 기준 시점(2026-09, 기자 피드백 — "영상에도
+  // 기준 날짜가 필요하다"). 예산안 발표일, 통계 기준월처럼 원문에 명시된
+  // 시점 — 없으면 OpeningCut에 아무것도 안 뜬다(지어내지 않음).
+  asOfDate: z.string().optional(),
 });
 
 export type CaptionSegment = z.infer<typeof captionSegmentSchema>;

@@ -12,7 +12,16 @@ const TITLE_DELAY_SECONDS = 0.25;
 
 // 첫 컷. caption을 제목 카드처럼 크게 노출하므로 하단 CaptionBar는 쓰지 않는다.
 // 아이콘은 0.8→1 스케일업, 타이틀은 살짝 늦게 페이드인.
-export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string }> = ({ cut, brand }) => {
+//
+// asOfDate(2026-09 신설) — "첫 화면에 기준 시점을 표시해달라"는 기자
+// 피드백. 굳이 모든 컷에 상시 노출하지 않고 첫 컷에만 한 번 — 시청자가
+// "이게 언제 기준 정보인지" 아는 게 목적이지 매 컷 화면을 잠식할 필요는
+// 없어서(레터/팟캐스트도 기준일을 한 번만 언급하는 것과 같은 원칙).
+export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string; asOfDate?: string }> = ({
+  cut,
+  brand,
+  asOfDate,
+}) => {
   const scale = useScale();
   const iconProgress = useEnterProgress();
   const iconScale = interpolate(iconProgress, [0, 1], [0.8, 1]);
@@ -48,6 +57,19 @@ export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string }> = ({ c
       >
         <CaptionText value={cut.caption} />
       </div>
+      {asOfDate ? (
+        <div
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontWeight: FONT_WEIGHT.medium,
+            fontSize: 22 * scale,
+            color: COLORS.muted,
+            opacity: titleOpacity,
+          }}
+        >
+          {asOfDate} 기준
+        </div>
+      ) : null}
     </CutLayout>
   );
 };

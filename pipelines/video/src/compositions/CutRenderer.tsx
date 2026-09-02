@@ -12,10 +12,11 @@ export const CutRenderer: React.FC<{
   brand: string;
   source: string;
   disclaimer?: string;
-}> = ({ cut, brand, source, disclaimer }) => {
+  asOfDate?: string;
+}> = ({ cut, brand, source, disclaimer, asOfDate }) => {
   switch (cut.type) {
     case 'opening':
-      return <OpeningCut cut={cut} brand={brand} />;
+      return <OpeningCut cut={cut} brand={brand} asOfDate={asOfDate} />;
     case 'stat':
       return <StatCut cut={cut} brand={brand} />;
     case 'diagram':
