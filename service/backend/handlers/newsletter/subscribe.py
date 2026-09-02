@@ -5,6 +5,10 @@ POST /api/newsletter/subscribe
 body = {
   "email": "...",
   "consent": true,
+  "format": "레터",              // 선택 — 온보딩(/start)에서 고른 포맷
+  "interests": ["증권", "산업"],  // 선택 — 온보딩에서 고른 관심분야(정규화된 값,
+                                  //         ["전체"] 포함 가능. features/onboarding/
+                                  //         lib/resultCopy.ts의 normalizeInterests 참조)
   "letter": {            // 선택 — 있으면 즉시 그 레터를 메일로 발송
     "editor_name": "AI LENS",
     "editor_role": "오늘의 한 통",
@@ -27,6 +31,13 @@ body = {
 보여주고 있던 화면의 레터 내용을 그대로 실어 보낼 수 있다(그룹 무관).
 기존 저장분에 남아있는 mbti_group 값은 그대로 두되(마이그레이션 없음),
 이 핸들러는 더 이상 그 필드를 읽거나 쓰지 않는다.
+
+2026-09: 신규 온보딩(/start, features/onboarding/) Phase 2 — 구독 시 고른
+포맷/관심분야를 선택적으로 같이 저장한다. mbti_group과 달리 발행 로직에
+아직 반영되지 않는다(모든 구독자가 여전히 같은 한 통을 받음) — 지금은
+"누가 어떤 취향을 골랐는지" 기록만 하고, 그 값으로 실제 발송 콘텐츠를
+가르는 건 별도 작업. DynamoDB가 스키마리스라 마이그레이션 없이 필드만
+얹는다 — 두 필드 다 없어도(기존 구독자, 옛 프론트) 그대로 동작한다.
 """
 import json
 import logging
@@ -195,6 +206,18 @@ def lambda_handler(event: dict, context) -> dict:
     if not consent:
         return _resp(400, {'error': '뉴스레터 수신 동의가 필요합니다.'})
 
+    # 온보딩(Phase 2) — 둘 다 선택. 잘못된 타입이 오면 그냥 무시(400으로
+    # 막지 않는다 — 구독 자체가 이 값들보다 중요하다).
+    raw_format = body.get('format')
+    onboarding_format = raw_format.strip() if isinstance(raw_format, str) and raw_format.strip() else None
+
+    raw_interests = body.get('interests')
+    onboarding_interests = (
+        [i.strip() for i in raw_interests if isinstance(i, str) and i.strip()]
+        if isinstance(raw_interests, list)
+        else None
+    ) or None
+
     now = datetime.now(timezone.utc).isoformat()
     table = _dynamodb.Table(_TABLE_NAME)
 
@@ -206,16 +229,24 @@ def lambda_handler(event: dict, context) -> dict:
 
     resubscribed = bool(existing)
     if resubscribed:
-        # 기존 구독자 → status active 복원
+        # 기존 구독자 → status active 복원. format/interests는 이번 요청에
+        # 값이 있을 때만 덮어쓴다 — 옛 프론트로 재구독하면(값 없음) 이전에
+        # 저장된 온보딩 선택을 지우지 않는다.
         token = existing.get('unsubscribe_token') or secrets.token_urlsafe(24)
+        update_parts = ['#s = :a', 'updated_at = :u', 'unsubscribe_token = :t']
+        expr_values: Dict[str, Any] = {':a': 'active', ':u': now, ':t': token}
+        if onboarding_format:
+            update_parts.append('onboarding_format = :f')
+            expr_values[':f'] = onboarding_format
+        if onboarding_interests:
+            update_parts.append('onboarding_interests = :i')
+            expr_values[':i'] = onboarding_interests
         try:
             table.update_item(
                 Key={'email': email},
-                UpdateExpression='SET #s = :a, updated_at = :u, unsubscribe_token = :t',
+                UpdateExpression='SET ' + ', '.join(update_parts),
                 ExpressionAttributeNames={'#s': 'status'},
-                ExpressionAttributeValues={
-                    ':a': 'active', ':u': now, ':t': token,
-                },
+                ExpressionAttributeValues=expr_values,
             )
         except ClientError as e:
             logger.exception(f"ddb update_item fail: {e}")
@@ -223,15 +254,20 @@ def lambda_handler(event: dict, context) -> dict:
     else:
         # 신규 구독
         token = secrets.token_urlsafe(24)
+        item: Dict[str, Any] = {
+            'email': email,
+            'status': 'active',
+            'unsubscribe_token': token,
+            'consent_at': now,
+            'created_at': now,
+            'updated_at': now,
+        }
+        if onboarding_format:
+            item['onboarding_format'] = onboarding_format
+        if onboarding_interests:
+            item['onboarding_interests'] = onboarding_interests
         try:
-            table.put_item(Item={
-                'email': email,
-                'status': 'active',
-                'unsubscribe_token': token,
-                'consent_at': now,
-                'created_at': now,
-                'updated_at': now,
-            })
+            table.put_item(Item=item)
         except ClientError as e:
             logger.exception(f"ddb put_item fail: {e}")
             return _resp(500, {'error': 'subscriber create failed'})

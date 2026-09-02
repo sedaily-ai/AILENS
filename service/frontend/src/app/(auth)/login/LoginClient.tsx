@@ -131,7 +131,10 @@ export function LoginClient() {
       setSuccessMessage("이메일로 인증 코드가 전송되었어요.");
       return;
     }
-    if (result.signedIn) return router.replace("/");
+    // 신규가입은 온보딩(/start)으로 — 순수 로그인(handleEmailLogin)과 갈리는
+    // 지점. 여기서 새 계정이 만들어졌다는 걸 아는 유일한 순간이라 여기서
+    // 분기한다(로그인 후에는 신규/기존 구분 신호가 없음).
+    if (result.signedIn) return router.replace("/start");
     switchMode("login");
     setSuccessMessage("가입이 완료됐어요. 로그인해주세요.");
   };
@@ -147,9 +150,9 @@ export function LoginClient() {
       return;
     }
     setVerificationCode("");
-    // 인증이 끝나면 바로 로그인된 상태로 홈에 들어간다. 비밀번호를 한 번 더
-    // 치게 만들지 않는다.
-    if (result.signedIn) return router.replace("/");
+    // 인증이 끝나면 바로 로그인된 상태로 들어간다. 비밀번호를 한 번 더
+    // 치게 만들지 않는다. 여기도 신규가입 완료 지점이라 /start로.
+    if (result.signedIn) return router.replace("/start");
     // autoSignIn 이 실패한 경우(가입 도중 새로고침 등)만 로그인 폼으로.
     switchMode("login");
     setSuccessMessage("이메일 인증이 완료됐어요. 로그인해주세요.");

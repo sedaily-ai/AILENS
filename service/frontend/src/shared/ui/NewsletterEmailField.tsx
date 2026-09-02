@@ -26,6 +26,11 @@ export interface SubscribeLetterPayload {
 
 interface Props {
   letter?: SubscribeLetterPayload | null;
+  /** 온보딩(/start)에서 고른 포맷/관심분야 — 있으면 구독과 함께 저장된다
+   *  (service/backend/handlers/newsletter/subscribe.py 2026-09 Phase 2).
+   *  발행 로직엔 아직 반영 안 됨 — 기록만. */
+  format?: string;
+  interests?: string[];
   accent?: string;
   buttonLabel?: string;
   disabled?: boolean;
@@ -35,6 +40,8 @@ interface Props {
 
 export function NewsletterEmailField({
   letter,
+  format,
+  interests,
   accent = '#3182F6',
   buttonLabel = '구독하기',
   disabled = false,
@@ -74,6 +81,8 @@ export function NewsletterEmailField({
         consent: true,
       };
       if (letter) payload.letter = letter;
+      if (format) payload.format = format;
+      if (interests && interests.length > 0) payload.interests = interests;
       const res = await fetch(`${API_BASE}/api/newsletter/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
