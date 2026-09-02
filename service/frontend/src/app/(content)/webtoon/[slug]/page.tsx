@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
+import { sanitizeDescription, trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
 
 import { SITE_URL } from '@/shared/constants/site';
@@ -51,13 +52,6 @@ async function findNeighbors(slug: string): Promise<{
   };
 }
 
-function trimDescription(s: string, max = 160): string {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:·\s]+$/, '') + '…';
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -70,7 +64,7 @@ export async function generateMetadata({
     return { title: '웹툰을 찾을 수 없어요', robots: { index: false } };
   }
   const title = buildPageTitle(webtoon.title, '웹툰');
-  const description = trimDescription(webtoon.excerpt || '요즘 이슈를 컷으로 이어 보여드려요.');
+  const description = trimToSnippetLength(sanitizeDescription(webtoon.excerpt) ?? '요즘 이슈를 컷으로 이어 보여드려요.');
   const url = `${SITE_URL}/webtoon/${slug}`;
   const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
   return {

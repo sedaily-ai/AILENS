@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
+import { sanitizeDescription, trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LensViewClient } from './LensViewClient';
 
@@ -44,13 +45,6 @@ async function findOtherLens(slug: string, limit = 3): Promise<CmsLens[]> {
   return items.filter((l) => l.id !== slug).slice(0, limit);
 }
 
-function trimDescription(s: string, max = 160): string {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:·\s]+$/, '') + '…';
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -63,7 +57,7 @@ export async function generateMetadata({
     return { title: '이슈를 찾을 수 없어요', robots: { index: false } };
   }
   const title = buildPageTitle(lens.headline, '4가지 시선');
-  const description = trimDescription(lens.context || '오늘의 이슈를 4가지 시선으로 짚어드려요.');
+  const description = trimToSnippetLength(sanitizeDescription(lens.context) ?? '오늘의 이슈를 4가지 시선으로 짚어드려요.');
   const url = `${SITE_URL}/lens/${slug}`;
   const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
   return {

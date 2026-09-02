@@ -3,6 +3,7 @@ import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 import { withDisplayMeta, fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { fetchCmsPosts, fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
+import { trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { LetterDetailClient } from './LetterDetailClient';
 
@@ -58,14 +59,6 @@ async function findNeighbors(id: string): Promise<{
   return { next: toNeighbor(letters[idx - 1]), prev: toNeighbor(letters[idx + 1]) };
 }
 
-// 검색결과 줄임표 방지를 위한 description 트리밍 (Google 기준 ~160자).
-function trimDescription(s: string, max = 160): string {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:·\s]+$/, '') + '…';
-}
-
 // MBTI 4-페르소나 체계(폐지 f84fd06) 시절 admin 폼의 기본값으로 깔려있던
 // subtitle — 실제 내용 없이 이 문구 그대로 발행된 레터가 다수 있다(2026-08-08
 // 확인, 최근 45편 중 5편). 그대로 두면 검색결과 스니펫·OG 미리보기·JSON-LD
@@ -106,7 +99,7 @@ export async function generateMetadata({
   const title = buildPageTitle(letter.headline);
   const bodyExcerpt = letter.body?.length ? letter.body.join(' ') : stripHtml(letter.body_html ?? '');
   const rawDesc = usableSubtitle(letter.subtitle) ?? (bodyExcerpt || `${ed.name}이 풀어낸 ${letter.date} 한 통.`);
-  const description = trimDescription(rawDesc);
+  const description = trimToSnippetLength(rawDesc, 160);
   const url = `${SITE_URL}/letters/${id}`;
   // letter 자체의 5개 keyword (term) + 발행처 — 검색엔진과 SNS 양쪽에 노출.
   // ApiLetter 외 fallback letter 는 keywords 가 없을 수 있어 옵셔널.

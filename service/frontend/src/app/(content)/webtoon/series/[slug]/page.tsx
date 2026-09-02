@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
+import { sanitizeDescription, trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
 import { groupIntoSeries, findSeriesBySlug, type WebtoonSeries } from '@/shared/lib/webtoonSeries';
 import { SeriesViewClient } from './SeriesViewClient';
 
@@ -35,13 +36,6 @@ async function findSeries(slug: string): Promise<WebtoonSeries | null> {
   return findSeriesBySlug(webtoons, slug);
 }
 
-function trimDescription(s: string, max = 160): string {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:·\s]+$/, '') + '…';
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -54,8 +48,8 @@ export async function generateMetadata({
     return { title: '시리즈를 찾을 수 없어요', robots: { index: false } };
   }
   const title = buildPageTitle(series.title, '웹툰 시리즈');
-  const description = trimDescription(
-    series.episodes[0]?.excerpt || `${series.title} — 총 ${series.episodes.length}화, 요즘 이슈를 컷으로 이어 보여드려요.`,
+  const description = trimToSnippetLength(
+    sanitizeDescription(series.episodes[0]?.excerpt) ?? `${series.title} — 총 ${series.episodes.length}화, 요즘 이슈를 컷으로 이어 보여드려요.`,
   );
   const url = `${SITE_URL}/webtoon/series/${slug}`;
   const image = series.coverImageUrl || `${SITE_URL}/og-image.png`;
