@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { fetchVideos, fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
+import { sanitizeDescription, trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
 import { VideoViewClient } from './VideoViewClient';
 
 import { SITE_URL } from '@/shared/constants/site';
@@ -26,13 +27,6 @@ export async function generateStaticParams() {
   return videos.map((v) => ({ slug: v.id }));
 }
 
-function trimDescription(s: string, max = 160): string {
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:·\s]+$/, '') + '…';
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -45,7 +39,7 @@ export async function generateMetadata({
     return { title: '영상을 찾을 수 없어요', robots: { index: false } };
   }
   const title = buildPageTitle(video.title, '영상');
-  const description = trimDescription(video.excerpt || '서울경제 AI LENS가 정리한 이슈 영상입니다.');
+  const description = trimToSnippetLength(sanitizeDescription(video.excerpt) ?? '서울경제 AI LENS가 정리한 이슈 영상입니다.');
   const url = `${SITE_URL}/video/${slug}`;
   const resolved = resolveVideo(video.video_url);
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
@@ -84,7 +78,7 @@ function buildJsonLd(video: CmsVideo, slug: string) {
         '@id': `${url}#video`,
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
         name: video.title,
-        description: video.excerpt || video.title,
+        description: sanitizeDescription(video.excerpt) ?? video.title,
         thumbnailUrl: image,
         uploadDate: published,
         inLanguage: 'ko-KR',
