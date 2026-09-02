@@ -53,6 +53,7 @@ import classify
 from config import AWS_REGION, CMS_POSTS_TABLE, CMS_MEDIA_BUCKET
 from s3_utils import upload_media
 from text_utils import extract_fact_ids, strip_code_fence
+from facts_extract import extract_facts  # 2026-09 — 0단계 공용 팩트시트
 
 
 def _load_module(name: str, file_path: Path):
@@ -344,7 +345,15 @@ def _publish(
     호출부(main)의 책임이라 여기선 안 한다."""
     name = article["key"]
     article_path = out_dir / f"{name}_article.txt"
-    article_path.write_text(article["content"], encoding="utf-8")
+    # 0단계 — 공용 팩트시트(기준일/핵심 숫자/용어/논지)를 원문 뒤에 이어붙여
+    # 4포맷(레터/웹툰/팟캐스트/영상) 전부가 같은 파일을 읽는다. 각 포맷
+    # pipeline.py는 안 건드려도 된다 — 프롬프트가 이미 "입력은 0단계에서
+    # 만든 facts.json"이라고 전제하고 있었는데 실제로 이 단계가 없었다
+    # (기자 피드백 "포맷마다 설명 범위와 필수 정보가 달라질 가능성"의 원인).
+    # 실패해도 빈 문자열이라 원문만 쓰던 예전 동작으로 자연히 폴백.
+    facts = extract_facts(article["content"])
+    article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
+    article_path.write_text(article_text, encoding="utf-8")
 
     letters_path = _letters_mod.run_article(name, str(article_path), out_dir)
     letters_raw = letters_path.read_text(encoding="utf-8")
