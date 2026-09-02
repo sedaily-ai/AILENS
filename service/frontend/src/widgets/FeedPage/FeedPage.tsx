@@ -259,10 +259,6 @@ export function FeedPage({
 
         {/* 피드 모드 - NewsFeedTab 컴포넌트 */}
         {activeTab === "feed" && (
-          <>
-          <div className="px-4 pt-4 lg:px-6">
-            <DiscoveryBanner loggedIn={!!user} />
-          </div>
           <NewsFeedTab
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
@@ -281,8 +277,8 @@ export function FeedPage({
             sidebar={
               <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
             }
+            topBanner={<DiscoveryBanner loggedIn={!!user} />}
           />
-          </>
         )}
 
         {/* 아카이브 모드 - 내 서랍 */}

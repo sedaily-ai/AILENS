@@ -33,12 +33,13 @@ export function DiscoveryBanner({ loggedIn }: { loggedIn: boolean }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        maxWidth: 680,
-        margin: '0 auto 16px',
+        width: '100%',
+        margin: '0 0 16px',
         padding: '12px 14px',
         borderRadius: 12,
         background: '#eff6ff',
         border: '1px solid #dbeafe',
+        boxSizing: 'border-box',
       }}
     >
       <Sparkles size={16} color="#3182F6" strokeWidth={2} style={{ flexShrink: 0 }} />

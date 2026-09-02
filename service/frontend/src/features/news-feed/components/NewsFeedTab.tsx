@@ -92,6 +92,11 @@ interface Props {
   // 오디오 섹션(AudioPreviewSection) 서버 프리페치 — home_player 채널
   // (TodayNewsPlayer.tsx와 같은 소스, 2026-08-21).
   initialHomePlayerPosts?: HomePlayerPost[];
+  // 본문 칼럼(gridColumn:1) 맨 위, 히어로 캐러셀 위에 얹는 배너 — sidebar와
+  // 같은 이유(features가 다른 feature를 직접 import 못 함)로 렌더된
+  // 엘리먼트를 그대로 받는다. 2026-09, features/onboarding의
+  // DiscoveryBanner용으로 신설 — widgets/FeedPage/FeedPage.tsx가 조립.
+  topBanner?: ReactNode;
 }
 
 export function NewsFeedTab({
@@ -102,6 +107,7 @@ export function NewsFeedTab({
   initialArchiveItems,
   initialHomePlayerPosts,
   sidebar,
+  topBanner,
 }: Props) {
   const archiveItems = initialArchiveItems ?? [];
 
@@ -155,6 +161,7 @@ export function NewsFeedTab({
       <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
           <div style={{ gridColumn: 1 }}>
+            {topBanner}
             {/* 홈 히어로 배너(2026-08-06) — "신문 읽는 스타일" 이벤트 단일 배너였다가
                 "점박이(캐러셀 도트) 있어야 배너답다, 웹툰·사주도 같이 소개하자"는
                 피드백으로 3슬라이드 캐러셀(HomeHeroCarousel.tsx)로 확장. */}
