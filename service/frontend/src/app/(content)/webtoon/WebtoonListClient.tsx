@@ -10,6 +10,7 @@ import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { coverThumb } from '@/shared/lib/webtoonCovers.generated';
 import { groupIntoSeries, type WebtoonSeries } from '@/shared/lib/webtoonSeries';
 import { kstTodayStr } from '@/shared/lib/date';
+import { buildPageItems } from '@/shared/lib/pagination';
 import {
   INK,
   BODY,
@@ -393,15 +394,26 @@ export function WebtoonListClient({
               </ul>
 
               {gridTotalPages > 1 && (
-                <nav aria-label="웹툰 목록 페이지" className="flex items-center justify-center" style={{ gap: 8, marginTop: 32 }}>
+                // flex-wrap 추가(2026-09-02) — 예전엔 총 페이지 수만큼
+                // 무조건 다 렌더링해서(생략 부호 없이) 시리즈가 많아지면
+                // (실측 52페이지) 한 줄로 화면 밖까지 넘쳐 흘렀다.
+                // buildPageItems()로 생략 부호를 넣은 게 근본 수정이고,
+                // wrap은 혹시 남는 케이스에 대한 안전망.
+                <nav aria-label="웹툰 목록 페이지" className="flex items-center justify-center flex-wrap" style={{ gap: 8, marginTop: 32 }}>
                   <PageLink href={href({ page: gridCurrentPage - 1 })} label="이전 페이지" disabled={gridCurrentPage === 1}>
                     ←
                   </PageLink>
-                  {Array.from({ length: gridTotalPages }).map((_, i) => (
-                    <PageLink key={i} href={href({ page: i + 1 })} label={`${i + 1}페이지`} active={gridCurrentPage === i + 1}>
-                      {i + 1}
-                    </PageLink>
-                  ))}
+                  {buildPageItems(gridCurrentPage, gridTotalPages).map((item, i) =>
+                    item === 'ellipsis' ? (
+                      <span key={`ellipsis-${i}`} aria-hidden style={{ width: 44, textAlign: 'center', color: MUTED }}>
+                        …
+                      </span>
+                    ) : (
+                      <PageLink key={item} href={href({ page: item })} label={`${item}페이지`} active={gridCurrentPage === item}>
+                        {item}
+                      </PageLink>
+                    ),
+                  )}
                   <PageLink href={href({ page: gridCurrentPage + 1 })} label="다음 페이지" disabled={gridCurrentPage === gridTotalPages}>
                     →
                   </PageLink>

@@ -7,6 +7,7 @@ import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { groupIntoSeries } from '@/shared/lib/webtoonSeries';
+import { buildPageItems } from '@/shared/lib/pagination';
 import {
   INK,
   BODY,
@@ -147,15 +148,25 @@ export function AllWebtoonsClient({
               </ul>
 
               {totalPages > 1 && (
-                <nav aria-label="웹툰 목록 페이지" className="flex items-center justify-center" style={{ gap: 8, marginTop: 32 }}>
+                // flex-wrap + 생략 부호(2026-09-02) — /webtoon와 같은 버그
+                // (총 페이지 수만큼 무조건 다 렌더링) — /webtoon/all은
+                // 시리즈 전체를 보여주는 페이지라 오히려 더 많이 깨질
+                // 수 있었다.
+                <nav aria-label="웹툰 목록 페이지" className="flex items-center justify-center flex-wrap" style={{ gap: 8, marginTop: 32 }}>
                   <PageLink href={href({ page: currentPage - 1 })} label="이전 페이지" disabled={currentPage === 1}>
                     ←
                   </PageLink>
-                  {Array.from({ length: totalPages }).map((_, i) => (
-                    <PageLink key={i} href={href({ page: i + 1 })} label={`${i + 1}페이지`} active={currentPage === i + 1}>
-                      {i + 1}
-                    </PageLink>
-                  ))}
+                  {buildPageItems(currentPage, totalPages).map((item, i) =>
+                    item === 'ellipsis' ? (
+                      <span key={`ellipsis-${i}`} aria-hidden style={{ width: 44, textAlign: 'center', color: MUTED }}>
+                        …
+                      </span>
+                    ) : (
+                      <PageLink key={item} href={href({ page: item })} label={`${item}페이지`} active={currentPage === item}>
+                        {item}
+                      </PageLink>
+                    ),
+                  )}
                   <PageLink href={href({ page: currentPage + 1 })} label="다음 페이지" disabled={currentPage === totalPages}>
                     →
                   </PageLink>

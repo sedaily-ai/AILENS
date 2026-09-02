@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { buildPageItems } from '@/shared/lib/pagination';
 
 // 목록 페이지(video/listen, 2026-08-28 신설) 공용 페이지네이션 — n개씩
 // 보기 셀렉트 + 페이지 번호. lens(/lens/page/[n])·webtoon(/webtoon?page=)
@@ -53,7 +54,11 @@ export function ListPagination({
   accentColor?: string;
   totalCount: number;
 }) {
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  // 생략 부호 포함(2026-09-02) — 예전엔 총 페이지 수만큼 무조건 버튼을
+  // 다 그려서, 페이지가 많아지면(웹툰에서 실측 52페이지) 버튼이 수십
+  // 개씩 나열됐다. flex-wrap 덕에 화면 밖으로 안 넘치긴 했지만 그것도
+  // 여러 줄로 접힌 버튼 무더기라 UX가 나빴다.
+  const pages = buildPageItems(currentPage, totalPages);
 
   return (
     <div
@@ -97,18 +102,24 @@ export function ListPagination({
               >
                 ‹
               </button>
-              {pages.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => onPageChange(n)}
-                  aria-current={n === currentPage ? 'page' : undefined}
-                  aria-label={`${n}페이지`}
-                  style={PG_STYLE(n === currentPage, false, accentColor)}
-                >
-                  {n}
-                </button>
-              ))}
+              {pages.map((n, i) =>
+                n === 'ellipsis' ? (
+                  <span key={`ellipsis-${i}`} aria-hidden style={{ minWidth: 24, textAlign: 'center', color: '#9ca3af' }}>
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => onPageChange(n)}
+                    aria-current={n === currentPage ? 'page' : undefined}
+                    aria-label={`${n}페이지`}
+                    style={PG_STYLE(n === currentPage, false, accentColor)}
+                  >
+                    {n}
+                  </button>
+                ),
+              )}
               <button
                 type="button"
                 onClick={() => onPageChange(currentPage + 1)}
@@ -129,17 +140,23 @@ export function ListPagination({
               >
                 ‹
               </Link>
-              {pages.map((n) => (
-                <Link
-                  key={n}
-                  href={pageHref(n)}
-                  aria-current={n === currentPage ? 'page' : undefined}
-                  aria-label={`${n}페이지`}
-                  style={PG_STYLE(n === currentPage, false, accentColor)}
-                >
-                  {n}
-                </Link>
-              ))}
+              {pages.map((n, i) =>
+                n === 'ellipsis' ? (
+                  <span key={`ellipsis-${i}`} aria-hidden style={{ minWidth: 24, textAlign: 'center', color: '#9ca3af' }}>
+                    …
+                  </span>
+                ) : (
+                  <Link
+                    key={n}
+                    href={pageHref(n)}
+                    aria-current={n === currentPage ? 'page' : undefined}
+                    aria-label={`${n}페이지`}
+                    style={PG_STYLE(n === currentPage, false, accentColor)}
+                  >
+                    {n}
+                  </Link>
+                ),
+              )}
               <Link
                 href={pageHref(currentPage + 1)}
                 aria-label="다음 페이지"
