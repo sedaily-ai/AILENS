@@ -136,17 +136,28 @@ def _draw_bubble(img: Image.Image, text: str, tone: str, anchor_x: int, top_y: i
     return y1 + 26  # 꼬리 아래 여백 포함, 다음 말풍선이 겹치지 않을 y
 
 
-def draw_dialogue(img: Image.Image, dialogue: list[dict]):
+def draw_dialogue(img: Image.Image, dialogue: list[dict], face_x: list[float] | None = None):
     """dialogue = [{"speaker":..., "line":..., "tone":"보통"|"격앙"}, ...]
-    화자 위치 데이터가 없어서(1·2단계 JSON에 x/y 없음), 상단에 좌→우로
-    순서대로 펼쳐 놓는다. 2명이면 좌/우, 1명이면 중앙, 3명 이상이면
-    균등 분할."""
+
+    2026-09-02 — 원래는 화자 위치 데이터가 없어서(1·2단계 JSON에 x/y 없음)
+    상단에 좌→우로 순서대로 펼쳐 놓는 게 유일한 방법이었다(기자 피드백 —
+    "인물과 연결되지 않은 말풍선이 허공을 가리키는 컷이 있다"). 이제
+    pipeline.py가 생성된 배경 이미지를 비전 모델로 훑어 실제 얼굴 x좌표
+    (0~1 정규화)를 감지해서 넘겨준다 — 개수가 대사 수와 일치하면 그
+    좌표를 그대로 앵커로 쓴다. 개수가 안 맞거나(얼굴 인식 실패, 인물 수
+    불일치 등) face_x가 없으면 기존의 균등 분할 폴백으로 돌아간다 —
+    완벽한 보장은 아니지만(비전 모델의 얼굴 인식 자체도 100%는 아님),
+    "전혀 없던 것"보다는 훨씬 나은 근사치."""
     if not dialogue:
         return
     n = len(dialogue)
     top_y = int(img.height * 0.06)
+    use_face_x = face_x is not None and len(face_x) == n
     for i, d in enumerate(dialogue):
-        anchor_x = int(img.width * (i + 0.5) / n)
+        if use_face_x:
+            anchor_x = int(img.width * face_x[i])
+        else:
+            anchor_x = int(img.width * (i + 0.5) / n)
         tone = d.get("tone", "보통")
         _draw_bubble(img, d["line"], tone, anchor_x, top_y)
 
@@ -188,12 +199,13 @@ def draw_narration(img: Image.Image, text: str):
         ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
 
 
-def compose(img_path: Path, cut: dict):
+def compose(img_path: Path, cut: dict, face_x: list[float] | None = None):
     """배경 이미지(img_path) 위에 cut의 dialogue/caption/narration을 순서대로
-    합성해서 같은 경로에 덮어쓴다."""
+    합성해서 같은 경로에 덮어쓴다. face_x — 비전 검증 단계에서 감지한 얼굴
+    x좌표 목록(draw_dialogue 참고, 없으면 균등 분할 폴백)."""
     img = Image.open(img_path).convert("RGB")
     if cut.get("dialogue"):
-        draw_dialogue(img, cut["dialogue"])
+        draw_dialogue(img, cut["dialogue"], face_x)
     if cut.get("caption"):
         draw_caption(img, cut["caption"])
     if cut.get("narration"):
