@@ -82,6 +82,22 @@ bucket = '${S3_RELEASES_BUCKET}'
 process = '${PM2_PROCESS}'
 cmds = [
     'set -e',
+    # 옛 릴리스 정리(2026-08-17) — 이 스텝이 없어서 배포할 때마다 쌓이기만
+    # 하다가 72개·4GB까지 차서 루트 디스크(8GB)가 100% 꽉 찼다. 디스크가
+    # 꽉 차니 SSM 에이전트도 PM2도 자기 상태 파일을 못 써서 둘 다 멎었고,
+    # reboot/stop-start로도 안 풀렸다(디스크는 그대로 꽉 차 있으니까) —
+    # 결국 SSH로 직접 들어가 릴리스를 지워서야 풀렸다.
+    #
+    # 2026-09-02 — 이 정리를 배포 "끝"(pm2 restart 이후)에 두다 보니,
+    # `set -e` 때문에 중간(S3 다운로드·tar 압축 해제 등)에서 배포가
+    # 실패하면 정리 라인까지 도달을 못 해서 실패한 배포의 잔해가 그대로
+    # 남았다 — 그 잔해(비정상적으로 큰 미완성 디렉터리)가 8GB 디스크를
+    # 다시 채워 같은 장애가 재발했다(사이트 502, 볼륨 20GB로 증설해
+    # 복구). 그래서 정리를 배포 "시작"으로 옮긴다 — 새 릴리스를 받기
+    # 전에 먼저 청소해서, 이번 배포가 도중에 실패하더라도 다음 배포
+    # 시작 시점에 그 잔해가 반드시 청소되게 한다(최신 4개만 남기고
+    # 정리 후 이번 배포로 1개 추가돼 총 5개 유지).
+    'ls -1 /opt/ailens/releases 2>/dev/null | sort -r | tail -n +5 | xargs -r -I{} rm -rf /opt/ailens/releases/{}',
     f'REL=/opt/ailens/releases/{ts}',
     'mkdir -p \$REL',
     f'aws s3 cp s3://{bucket}/releases/{ts}.tar.gz /tmp/{ts}.tar.gz --region ${AWS_REGION}',
@@ -93,13 +109,6 @@ cmds = [
     'pm2 list',
     \"curl -s -o /dev/null -w 'local_status=%{http_code}\n' http://localhost:3000/\",
     f'rm -f /tmp/{ts}.tar.gz',
-    # 옛 릴리스 정리(2026-08-17) — 이 스텝이 없어서 배포할 때마다 쌓이기만
-    # 하다가 72개·4GB까지 차서 루트 디스크(8GB)가 100% 꽉 찼다. 디스크가
-    # 꽉 차니 SSM 에이전트도 PM2도 자기 상태 파일을 못 써서 둘 다 멎었고,
-    # reboot/stop-start로도 안 풀렸다(디스크는 그대로 꽉 차 있으니까) —
-    # 결국 SSH로 직접 들어가 릴리스를 지워서야 풀렸다. 최신 5개만 남기고
-    # 나머지는 배포 직후 바로 정리해 재발을 막는다.
-    'ls -1 /opt/ailens/releases | sort -r | tail -n +6 | xargs -r -I{} rm -rf /opt/ailens/releases/{}',
     'df -h / | tail -1',
 ]
 print(json.dumps({'commands': cmds}))
