@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { getSavedInterests } from '@/shared/lib/onboardingStorage';
 import { LensFormatGuide } from './LensFormatGuide';
 
 // 첫 방문자에게 가이드를 자동으로 한 번만 띄운다(2026-08-21, 사용자
@@ -95,6 +96,20 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
       // localStorage 접근 불가(시크릿 모드 등) — 자동으로는 안 띄우고,
       // ⓘ 버튼으로는 여전히 열 수 있다.
     }
+  }, []);
+
+  // 온보딩(/start)에서 고른 관심분야로 기본 탭을 맞춘다(2026-09) — 지금까지는
+  // 저장만 하고 아무 데도 안 썼다. SECTIONS의 paperSection이 온보딩
+  // InterestStep과 완전히 같은 taxonomy(전체/증권/산업/시그널)라 매핑 없이
+  // 바로 찾는다. 여러 개 골랐으면 SECTIONS 순서상 처음 매칭되는 것 하나만
+  // (탭은 한 번에 하나만 활성화 가능).
+  useEffect(() => {
+    const saved = getSavedInterests();
+    if (saved.length === 0) return;
+    const idx = SECTIONS.findIndex((s) => saved.includes(s.paperSection));
+    if (idx < 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 localStorage 1회 읽기(바로 위 GUIDE_SEEN_KEY effect와 같은 관례).
+    setActiveTab(idx);
   }, []);
 
   // useCallback으로 고정한다 — LensFormatGuide가 이 함수를 ESC 리스너
