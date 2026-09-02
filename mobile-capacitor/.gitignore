@@ -9,6 +9,13 @@ android/captures/
 android/*.iml
 android/.idea/
 
+# 릴리스 서명 — 비밀번호가 평문으로 들어있으니 절대 커밋하지 않는다.
+# 팀원과는 별도 채널(비밀번호 관리자 등)로 keystore.properties와
+# release.keystore 둘 다 공유할 것 — 잃어버리면 Play 스토어에 같은 앱으로
+# 다시 업데이트할 방법이 없다.
+android/keystore.properties
+android/app/release.keystore
+
 # iOS build 산출물 — 프로젝트 파일은 커밋, Pods/파생 산출물만 제외
 ios/App/Pods/
 ios/App/build/
