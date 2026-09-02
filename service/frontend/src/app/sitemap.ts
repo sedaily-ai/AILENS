@@ -134,6 +134,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // 웹툰 — 경로 기반 전환(2026-08-07) 이후 sitemap에도 추가.
+  // images 확장(2026-09-02, SEO/GEO 감사) — 웹툰은 텍스트 기사보다 시각적
+  // 콘텐츠 비중이 커서 구글 이미지 검색 유입 잠재력이 큰데, 그동안 사이트맵이
+  // URL만 알려주고 "이 페이지 안에 이런 이미지들이 있다"는 명시적 신호를
+  // 안 주고 있었다(next의 MetadataRoute.Sitemap이 images 필드로 표준
+  // 이미지 사이트맵 확장을 지원 — Google 이미지 sitemap 문서 참조).
+  // 컷 전부 넣는다 — 어느 컷이 검색에 걸릴지 미리 알 수 없다.
   try {
     const webtoons = await fetchWebtoons();
     for (const w of webtoons) {
@@ -143,6 +149,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(w.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
+        images: w.panels.map((p) => p.url),
       });
     }
   } catch {
