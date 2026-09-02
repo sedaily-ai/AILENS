@@ -9,7 +9,7 @@ import { InterestStep } from './components/InterestStep';
 import { ResultStep } from './components/ResultStep';
 import { SubscribeStep } from './components/SubscribeStep';
 import { DoneStep } from './components/DoneStep';
-import { saveFormat, saveInterests, markOnboardingCompleted } from './lib/onboardingStorage';
+import { saveFormat, saveInterests, markOnboardingCompleted } from '@/shared/lib/onboardingStorage';
 
 type Step = 'goal' | 'format' | 'consume' | 'interest' | 'result' | 'subscribe' | 'done';
 
