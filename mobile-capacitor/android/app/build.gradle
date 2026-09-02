@@ -18,8 +18,11 @@ android {
         applicationId "ai.sedaily.lens"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // 예전 TWA 앱(mobile/)이 이미 versionCode 8로 발행돼 있어서, 그보다
+        // 낮으면 Play Console이 "기존 사용자가 업그레이드 못 함"으로 거부한다
+        // (2026-09-02 확인). 반드시 8보다 큰 값을 유지할 것.
+        versionCode 10
+        versionName "1.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
