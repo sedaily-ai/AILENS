@@ -88,7 +88,10 @@ function ssrCacheOpts(tag: string): RequestInit {
 /** /listen 목록 페이지용 — 발행일 순 정렬. */
 export async function fetchHomePlayerPosts(): Promise<HomePlayerPost[]> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts?channel=home_player&limit=100`, ssrCacheOpts('posts:home_player'));
+    // limit=1000(2026-08-28, 100→1000) — cmsPostsApi.ts의 lens/webtoon/video
+    // 목록 fetch와 같은 이유(발행량 급증으로 100건 상한이 뚫려 오래된 글이
+    // 목록에서 사라짐).
+    const res = await fetch(`${API_URL}/api/v2/posts?channel=home_player&limit=1000`, ssrCacheOpts('posts:home_player'));
     if (!res.ok) return [];
     const data = (await res.json()) as { posts?: ApiHomePlayerItem[] };
     return (data.posts ?? []).filter((i) => i.media_embed_url).map(toItem);

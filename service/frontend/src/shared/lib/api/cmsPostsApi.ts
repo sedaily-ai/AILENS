@@ -207,10 +207,13 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
-      // limit=100 명시(2026-08-11) — 안 넘기면 백엔드 기본값(20)에서 조용히
-      // 잘려서, 21화가 올라가는 순간 가장 오래된 화가 목록에서 사라지는
-      // 버그가 있었다(cms_posts_public.py 의 limit 기본값 확인 후 발견).
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon&limit=100`, cacheOpts('posts:webtoon'));
+      // limit=1000(2026-08-28, 100→1000) — 100은 2026-08-11에 백엔드
+      // 기본값(20) 잘림을 막으려고 넣은 값이었는데, 08-23 웹툰 채널
+      // 분리 이후 발행량이 하루 최대 96건까지 늘면서 100건짜리 상한도
+      // 며칠 만에 다시 뚫려 오래된 화가 목록에서 사라졌다(archive 재설계
+      // 논의 중 발견). 백엔드가 이미 1000까지는 DB 읽기 비용 증가 없이
+      // 지원한다(cms_posts_public.py 참조 — 항상 전체를 읽은 뒤 슬라이스).
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon&limit=1000`, cacheOpts('posts:webtoon'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
       return data.posts ?? [];
@@ -234,9 +237,8 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
 export async function fetchVideos(): Promise<CmsVideo[]> {
   return cached('video', async () => {
     try {
-      // limit=100 명시(2026-08-11) — fetchWebtoons()와 같은 이유. 안 넘기면
-      // 백엔드 기본값(20)에서 조용히 잘려 오래된 영상이 목록에서 사라진다.
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=video&limit=100`, cacheOpts('posts:video'));
+      // limit=1000(2026-08-28, 100→1000) — fetchWebtoons()와 같은 이유.
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=video&limit=1000`, cacheOpts('posts:video'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
       return data.posts ?? [];
@@ -340,9 +342,8 @@ export interface CmsLens {
 export async function fetchLensPosts(): Promise<CmsLens[]> {
   return cached('lens', async () => {
     try {
-      // limit=100 명시(2026-08-12) — webtoon/video 와 같은 이유. 안 넘기면
-      // 백엔드 기본값(20)에서 조용히 잘려 오래된 글이 목록에서 사라진다.
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=100`, cacheOpts('posts:lens'));
+      // limit=1000(2026-08-28, 100→1000) — webtoon/video 와 같은 이유.
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=1000`, cacheOpts('posts:lens'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLens[] };
       return data.posts ?? [];

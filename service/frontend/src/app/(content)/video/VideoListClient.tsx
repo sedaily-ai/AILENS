@@ -5,20 +5,38 @@ import Image from 'next/image';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { VideoLightbox } from '@/shared/ui/VideoLightbox';
+import { ListPagination } from '@/shared/ui/ListPagination';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { VIDEO_PAGE_SIZE } from './videoListShared';
+
+const PAGE_SIZE_OPTIONS = [24, 48, 96];
+const ACCENT = '#3b82f6';
 
 // 영상 전용 목록 페이지(2026-08-11) — 그동안 홈 화면 미리보기 섹션
 // (VideoPreviewSection.tsx)만 있었고, 영상 하나하나가 검색엔진이 찾을 수
 // 있는 자기 URL이 없었다(웹툰 상세처럼). /webtoon 목록과 같은 서버 컴포넌트
 // 패턴 — initialItems를 빌드/요청 시점에 미리 채워 SSG/SSR HTML에 실제
 // 목록이 바로 박히게 한다.
-export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) {
+//
+// 페이지네이션 추가(2026-08-28) — fetchVideos()의 limit이 100→1000으로
+// 올라가며(cmsPostsApi.ts 참조) 캡이 사실상 없어졌다. 이 페이지엔 원래
+// 페이지네이션이 아예 없어서, 발행량이 늘수록 그리드가 한없이 길어지는
+// 문제가 생겨 /lens/page/[n]과 같은 경로 세그먼트 패턴을 붙인다.
+export function VideoListClient({
+  initialItems,
+  initialPage,
+}: {
+  initialItems: CmsVideo[];
+  initialPage: number;
+}) {
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<CmsVideo[]>(initialItems);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState(VIDEO_PAGE_SIZE);
+  const [clientPage, setClientPage] = useState(initialPage);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +61,12 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
   }, [playingId]);
 
   const activeVideo = items.find((v) => v.id === playingId) ?? null;
+
+  const isCustomSize = pageSize !== VIDEO_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(clientPage, totalPages);
+  const pageHref = (n: number) => (n <= 1 ? '/video' : `/video/page/${n}`);
+  const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="min-h-screen bg-white">
@@ -79,7 +103,7 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
             className="grid"
             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'clamp(14px, 2.6vw, 22px)' }}
           >
-            {items.map((v) => {
+            {pageItems.map((v) => {
               const resolved = resolveVideo(v.video_url);
               const thumb = v.thumbnail_url || resolved?.autoThumbnailUrl || null;
               return (
@@ -148,6 +172,24 @@ export function VideoListClient({ initialItems }: { initialItems: CmsVideo[] }) 
               );
             })}
           </div>
+        )}
+
+        {items.length > 0 && (
+          <ListPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageHref={pageHref}
+            isCustomSize={isCustomSize}
+            onPageChange={setClientPage}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={(n) => {
+              setPageSize(n);
+              setClientPage(1);
+            }}
+            accentColor={ACCENT}
+            totalCount={items.length}
+          />
         )}
       </main>
 
