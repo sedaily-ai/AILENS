@@ -56,3 +56,13 @@ export function trimToSnippetLength(s: string, max = 155): string {
   const lastSpace = cut.lastIndexOf(' ');
   return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:·\s]+$/, '') + '…';
 }
+
+/**
+ * `trimToSnippetLength(sanitizeDescription(raw) ?? fallback)` — 상세 페이지
+ * 7곳(letters/webtoon/video/lens/listen 등)이 각자 이 세 줄을 반복하고
+ * 있어서(2026-09-02) 한 곳으로 묶었다. 원본이 정제 후에도 신뢰할 만하면
+ * 그걸, 아니면 fallback을 자른다.
+ */
+export function buildSeoDescription(raw: string | null | undefined, fallback: string, max = 155): string {
+  return trimToSnippetLength(sanitizeDescription(raw) ?? fallback, max);
+}

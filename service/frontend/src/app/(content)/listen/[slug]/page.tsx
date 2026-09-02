@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { fetchHomePlayerPosts, fetchHomePlayerBySlug, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
-import { sanitizeDescription, trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
+import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { ListenViewClient } from './ListenViewClient';
 
 import { SITE_URL } from '@/shared/constants/site';
@@ -38,7 +38,7 @@ export async function generateMetadata({
     return { title: '오디오를 찾을 수 없어요', robots: { index: false } };
   }
   const title = buildPageTitle(item.title, '오디오');
-  const description = trimToSnippetLength(sanitizeDescription(item.excerpt) ?? '서울경제 AI LENS가 정리한 오디오 뉴스입니다.');
+  const description = buildSeoDescription(item.excerpt, '서울경제 AI LENS가 정리한 오디오 뉴스입니다.');
   const url = `${SITE_URL}/listen/${slug}`;
   const resolved = resolveVideo(item.mediaEmbedUrl);
   const image = resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
@@ -79,7 +79,7 @@ function buildJsonLd(item: HomePlayerPost, slug: string) {
   const base = {
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
     name: item.title,
-    description: sanitizeDescription(item.excerpt) ?? item.title,
+    description: buildSeoDescription(item.excerpt, item.title),
     inLanguage: 'ko-KR',
     author,
     publisher: { '@id': `${SITE_URL}/#organization` },
