@@ -152,11 +152,42 @@ def _parse_letters(raw_md: str) -> list[str]:
             skipping = False
             flush()
             continue
+        # 2026-09 — [핵심 요약]("30초 핵심" 전용 불릿) 신설. 이 블록은
+        # _parse_letter_summary_bullets()가 따로 뽑으므로, 여기서는 만나는
+        # 순간부터 끝까지 전부 skip해 본문 문단에 안 섞이게 한다(그 전까지는
+        # "자료:" 뒤를 skip 안 해서, 신설 블록이 트레일러 문단처럼 잘못
+        # 붙었을 것).
+        if line.startswith("[핵심 요약]"):
+            flush()
+            break
         if skipping:
             continue
         buf.append(line)
     flush()
     return paragraphs
+
+
+def _parse_letter_summary_bullets(raw_md: str) -> list[str]:
+    """레터 산출물의 [핵심 요약] 블록에서 "- "로 시작하는 불릿만 뽑는다.
+    "30초 핵심" 카드가 이 불릿을 쓴다(lensSamples.ts의 coreSummaryBullets,
+    2026-09부터 레터를 최우선으로 봄) — 예전엔 이 카드가 웹툰 컷 캡션을
+    재활용해서, 그림 없이 텍스트만 보면 맥락이 빠지는 문제가 있었다(기자
+    피드백). 블록이 없는 옛 프롬프트 결과물이면 빈 리스트를 돌려주고,
+    "30초 핵심"은 기존처럼 다른 포맷으로 폴백한다."""
+    raw_md, _ = extract_fact_ids(raw_md)
+    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
+    lines = [l.strip() for l in body.split("\n") if l.strip()]
+
+    bullets, in_block = [], False
+    for line in lines:
+        if line.startswith("[핵심 요약]"):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        if line.startswith("-"):
+            bullets.append(line.lstrip("-").strip())
+    return bullets
 
 
 def _already_published(table, article_key: str) -> bool:
@@ -236,7 +267,9 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
     article_path.write_text(article["content"], encoding="utf-8")
 
     letters_path = _letters_mod.run_article(name, str(article_path), out_dir)
-    paragraphs = _parse_letters(letters_path.read_text(encoding="utf-8"))
+    letters_raw = letters_path.read_text(encoding="utf-8")
+    paragraphs = _parse_letters(letters_raw)
+    letter_summary_bullets = _parse_letter_summary_bullets(letters_raw)
 
     podcast_mp3 = _podcast_mod.run_article(name, str(article_path), out_dir)
 
@@ -282,7 +315,7 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
         status = "published_no_video"
 
     lenses = [
-        {"label": "레터", "question": article["title"], "bullets": [], "paragraphs": paragraphs,
+        {"label": "레터", "question": article["title"], "bullets": letter_summary_bullets, "paragraphs": paragraphs,
          "images": [], "video_url": None, "media_url": None},
         {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
          "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None},
