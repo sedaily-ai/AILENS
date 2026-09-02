@@ -129,7 +129,7 @@ function HeroSection() {
           }}
         >
           <Link
-            href="/"
+            href="/start"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
