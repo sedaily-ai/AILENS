@@ -10,6 +10,7 @@ import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
+import { buildPageItems } from '@/shared/lib/pagination';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
 // "오늘의 이슈, 4가지 시선" 목록.
@@ -495,7 +496,17 @@ export function LensListClient({
                 >
                   ‹
                 </Link>
-                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((n) => {
+                {/* 생략 부호(2026-09-02) — webtoon과 같은 이유. 여기는
+                    flexWrap이 이미 있어 화면 밖으로 넘치진 않았지만,
+                    페이지가 많아지면 버튼 무더기가 되는 건 마찬가지였다. */}
+                {buildPageItems(currentPage, totalPages).map((n, i) => {
+                  if (n === 'ellipsis') {
+                    return (
+                      <span key={`ellipsis-${i}`} aria-hidden style={{ minWidth: 24, textAlign: 'center', color: '#9ca3af' }}>
+                        …
+                      </span>
+                    );
+                  }
                   const on = n === currentPage;
                   return (
                     <Link
