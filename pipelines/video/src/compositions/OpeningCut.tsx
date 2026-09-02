@@ -17,6 +17,13 @@ const TITLE_DELAY_SECONDS = 0.25;
 // 피드백. 굳이 모든 컷에 상시 노출하지 않고 첫 컷에만 한 번 — 시청자가
 // "이게 언제 기준 정보인지" 아는 게 목적이지 매 컷 화면을 잠식할 필요는
 // 없어서(레터/팟캐스트도 기준일을 한 번만 언급하는 것과 같은 원칙).
+//
+// 2026-09-02 — 실제 발행 영상에서 "...가계부채는 2025년 6월 말 기준)
+// 기준"처럼 "기준"이 중복되는 걸 발견. 원인: DDB 비디오 프롬프트의
+// asOfDate 예시("2027년도 예산안 기준", "2026.9.1 발표")는 이미 완결된
+// 문구인데, 여기서 항상 " 기준"을 덧붙이고 있었다. 모델이 완결된 문구를
+// 쓰도록 프롬프트가 설계돼 있으므로, 프롬프트가 아니라 이 렌더 쪽의
+// 덧붙이기를 제거하는 게 맞는 수정.
 export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string; asOfDate?: string }> = ({
   cut,
   brand,
@@ -67,7 +74,7 @@ export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string; asOfDate
             opacity: titleOpacity,
           }}
         >
-          {asOfDate} 기준
+          {asOfDate}
         </div>
       ) : null}
     </CutLayout>
