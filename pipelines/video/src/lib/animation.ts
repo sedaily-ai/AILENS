@@ -16,7 +16,19 @@ export const useFrames = (seconds: number): number => {
   return Math.round(seconds * fps);
 };
 
-// 컷 진입: 페이드인 + 20px 위로 슬라이드 (spring, overshoot 없음 — 절제된 톤).
+// 2026-09-02 — 톤앤매너 다듬기 3종 세트 중 "모션에 탄력 추가"(사용자 요청
+// — "유튜브 지식 채널 모션그래픽 느낌"). 이전엔 damping:200/stiffness:260/
+// mass:0.9 조합의 감쇠비(ζ = damping / (2·√(mass·stiffness)))가 약 6.5로
+// 심하게 과감쇠(overdamped) 상태라, 스프링을 쓰고 있었는데도 사실상
+// 오버슈트가 전혀 없었다(단순 ease-out과 시각적으로 구분 안 됨). 텍스트
+// 슬라이드(ENTRANCE_SPRING, ζ≈0.75 — 살짝의 탄력만)와 아이콘 스케일업
+// (ICON_POP_SPRING, ζ≈0.5 — 확실히 튀어오르는 "짠!" 느낌)을 다른 감쇠비로
+// 분리해서, 텍스트는 과하지 않게 절제하고 아이콘 같은 포인트 요소만
+// 에너지 있게 튀도록 차등을 뒀다.
+const ENTRANCE_SPRING = { damping: 23, stiffness: 260, mass: 0.9 };
+const ICON_POP_SPRING = { damping: 15, stiffness: 260, mass: 0.9 };
+
+// 컷 진입: 페이드인 + 20px 위로 슬라이드.
 // delaySeconds를 주면 그만큼 늦게 시작한다 (예: 자막의 0.2초 지연).
 export const useEntranceStyle = (delaySeconds = 0): React.CSSProperties => {
   const frame = useCurrentFrame();
@@ -28,7 +40,7 @@ export const useEntranceStyle = (delaySeconds = 0): React.CSSProperties => {
   const progress = spring({
     frame: localFrame,
     fps,
-    config: { damping: 200, stiffness: 260, mass: 0.9 },
+    config: ENTRANCE_SPRING,
   });
   const opacity = active
     ? interpolate(localFrame, [0, Math.round(ENTRANCE_SECONDS * fps * 0.6)], [0, 1], {
@@ -51,7 +63,7 @@ export const useEnterProgress = (delaySeconds = 0, durationSeconds = ENTRANCE_SE
     frame: localFrame,
     fps,
     durationInFrames: Math.round(durationSeconds * fps),
-    config: { damping: 200, stiffness: 260, mass: 0.9 },
+    config: ICON_POP_SPRING,
   });
 };
 
