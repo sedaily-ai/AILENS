@@ -20,8 +20,17 @@ WORKDIR /app/pipelines
 
 # video/ 의 Node 의존성 먼저 설치(레이어 캐시 — package.json이 자주 안
 # 바뀌니 코드 복사보다 먼저 해서 재빌드 시 npm install을 스킵하게).
-COPY video/package.json video/package-lock.json* video/
-RUN cd video && npm install --omit=dev=false
+#
+# 2026-09-02 — npm install → npm ci로 변경(Remotion-인수인계-가이드.pdf
+# 11장 권장). npm install은 package-lock.json이 있어도 package.json의
+# semver 범위(예: 캐럿)에 맞춰 lockfile을 조용히 갱신할 수 있다 —
+# Remotion이 "거의 매일 릴리스"되는 특성상, 재빌드 시점에 remotion과
+# @remotion/* 패키지가 서로 다른 버전으로 갈라져 설치될 위험이 있었다
+# (같은 날 package.json의 캐럿도 제거해 이중으로 막음). npm ci는
+# package-lock.json을 절대 기준으로 삼아 정확히 그 버전만 설치하고,
+# lockfile과 어긋나면 설치 자체를 실패시켜 조용한 버전 이탈을 막는다.
+COPY video/package.json video/package-lock.json video/
+RUN cd video && npm ci
 
 # Remotion 헤드리스 Chromium 바이너리를 빌드 시점에 미리 받아둔다 —
 # 실제 실행(하루 1회) 때마다 매번 새로 받으면 태스크 시작이 느려지고,
