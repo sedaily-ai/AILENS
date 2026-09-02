@@ -342,8 +342,16 @@ export interface CmsLens {
 export async function fetchLensPosts(): Promise<CmsLens[]> {
   return cached('lens', async () => {
     try {
-      // limit=1000(2026-08-28, 100→1000) — webtoon/video 와 같은 이유.
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=1000`, cacheOpts('posts:lens'));
+      // limit=100 유지(2026-09-02) — 2026-08-28에 webtoon/video와 같은
+      // 이유로 1000까지 올렸었는데, lens 채널은 각 글이 4개 포맷(레터·
+      // 웹툰·팟캐스트·영상) 전체 본문을 다 담고 있어 훨씬 무겁다. 실측
+      // 결과 limit=250까지는 되고 300부터 백엔드가 500(Internal Server
+      // Error)을 던진다(2026-09-02 홈페이지 "오늘의 지면" 섹션 실종 장애
+      // 원인 — !res.ok로 조용히 []가 반환되어 섹션이 통째로 안 보였다).
+      // webtoon/video는 1000에서도 정상(실측 659/606건) — lens만 유독 무거워
+      // 낮은 값에서 깨지는 것. 근본 수정(백엔드 lens 채널 대용량 처리)은
+      // 별도 작업 — 지금은 확실히 안전한 100으로 되돌린다.
+      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=100`, cacheOpts('posts:lens'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLens[] };
       return data.posts ?? [];
