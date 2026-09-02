@@ -277,7 +277,7 @@ export function FeedPage({
             sidebar={
               <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
             }
-            topBanner={<DiscoveryBanner loggedIn={!!user} />}
+            topBanner={<DiscoveryBanner />}
           />
         )}
 

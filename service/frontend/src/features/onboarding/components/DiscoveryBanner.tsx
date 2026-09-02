@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { X, Sparkles } from 'lucide-react';
-import { isOnboardingCompleted, isDiscoveryBannerDismissed, dismissDiscoveryBanner } from '../lib/onboardingStorage';
 
 /**
  * 메인 피드 상단 — 온보딩(/start) 발견 배너.
@@ -11,19 +10,17 @@ import { isOnboardingCompleted, isDiscoveryBannerDismissed, dismissDiscoveryBann
  * 배경: /start를 만들었지만 실제 진입 경로가 헤더엔 없고(2026-08-06 결정 —
  * 온보딩 랜딩은 외부 유입 전용, 상시 링크 없음) 푸터의 "서비스 소개" →
  * /onboarding 히어로 CTA를 거쳐야만 닿는 2단계 경로였다 — 기존 방문자는
- * 사실상 발견할 방법이 없었다(신규가입 직후 자동 리다이렉트만 실제 경로).
- * 헤더에 상시 링크를 다시 넣는 대신(그 결정을 뒤집을 근거는 아직 없음)
- * 메인 피드에 조건부 배너를 얹는다 — 로그인 안 한 방문자한테만, 닫으면
- * 다시 안 뜬다.
+ * 사실상 발견할 방법이 없었다.
+ *
+ * 2026-09 — 처음엔 "로그인 안 한 방문자 + 온보딩 미완료"로만 조건부
+ * 노출했는데, 그러면 로그인해서 보는 사람(운영자 포함) 눈엔 아예 안 보여
+ * "안 뜬다"는 오해를 샀다. 지금은 로그인/이전 방문 기록과 무관하게 항상
+ * 뜬다 — X는 이번 페이지 뷰에서만 숨기고(로컬 컴포넌트 state), 새로고침·
+ * 재방문하면 다시 뜬다. 발견 경로 자체가 아직 부실한 단계라 "상시 노출"이
+ * 지금은 맞는 선택.
  */
-export function DiscoveryBanner({ loggedIn }: { loggedIn: boolean }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (loggedIn) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 localStorage 1회 읽기(LensPreviewSection.tsx:93, NewsTimeMachine.tsx:62와 같은 관례). 렌더 중에는 읽을 수 없다 — 서버에는 localStorage가 없어 하이드레이션이 깨진다.
-    if (!isOnboardingCompleted() && !isDiscoveryBannerDismissed()) setVisible(true);
-  }, [loggedIn]);
+export function DiscoveryBanner() {
+  const [visible, setVisible] = useState(true);
 
   if (!visible) return null;
 
@@ -59,10 +56,7 @@ export function DiscoveryBanner({ loggedIn }: { loggedIn: boolean }) {
       <button
         type="button"
         aria-label="배너 닫기"
-        onClick={() => {
-          dismissDiscoveryBanner();
-          setVisible(false);
-        }}
+        onClick={() => setVisible(false)}
         style={{
           display: 'flex',
           alignItems: 'center',
