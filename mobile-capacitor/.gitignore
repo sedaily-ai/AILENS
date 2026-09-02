@@ -1,0 +1,24 @@
+node_modules/
+
+# Android build 산출물 — 프로젝트 파일(android/app/src/, build.gradle 등)은 커밋, 산출물만 제외
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/*.iml
+android/.idea/
+
+# iOS build 산출물 — 프로젝트 파일은 커밋, Pods/파생 산출물만 제외
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/DerivedData/
+ios/*.ipa
+ios/*.dSYM.zip
+ios/*.dSYM
+
+.DS_Store
