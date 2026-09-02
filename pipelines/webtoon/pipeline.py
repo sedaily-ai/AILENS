@@ -84,13 +84,33 @@ def _get_bedrock_image_client():
     return _bedrock_image_client
 
 
-def build_background_prompt(camera: str, scene: str) -> str:
+def _characters_block(characters: dict | None) -> str:
+    """1단계가 정한 인물 묘사(characters: {A, B, setting})를 매 컷 이미지
+    프롬프트 앞에 반복 주입한다(2026-09, 기자 피드백 — "컷마다 캐릭터의
+    얼굴·복장·체형이 달라 동일 인물이 이어지는 서사로 보이지 않는다").
+
+    근본 원인: 프롬프트 지침("스크립트 맨 앞에 인물 묘사를 명시하고 모든
+    컷에서 반복한다")은 1단계(대사·스크립트) 텍스트에 대한 것일 뿐, 실제
+    3단계 이미지 생성 호출(build_background_prompt/build_image_prompt)엔
+    characters 자체가 인자로 전달되지 않았다 — 각 컷의 배경 이미지 생성이
+    인물이 어떻게 생겼는지 전혀 모르는 채로 독립 실행됐던 것. 8컷 모두
+    같은 characters 딕셔너리를 그대로 프롬프트에 넣어 확산 모델이 매번
+    같은 인물 묘사를 참조하게 한다 — 완벽한 동일성 보장은 아니지만(진짜
+    캐릭터 시트·img2img 없이는 확산 모델 특성상 불가능), 아예 정보가
+    없던 것보다는 훨씬 나은 최소 개선."""
+    if not characters:
+        return ""
+    lines = [f"{k}: {v}" for k, v in characters.items()]
+    return "\n\n[CHARACTERS — keep consistent across all cuts]\n" + "\n".join(lines)
+
+
+def build_background_prompt(camera: str, scene: str, characters: dict | None = None) -> str:
     """Bedrock 경로 전용 — 텍스트(말풍선/캡션/내레이션) 지침 없이 스타일+장면만.
     확산 모델이 요청 안 한 글자를 그림에 멋대로 채워넣는 걸 막기 위해 명시적으로
     금지 문구도 붙인다(합성은 compose_text.py가 나중에 한다)."""
     style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
     return (
-        style + f"\n\n[SCENE]\n{scene}"
+        style + _characters_block(characters) + f"\n\n[SCENE]\n{scene}"
         + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
         "or speech bubbles anywhere in this image — pure illustration only, no "
         "readable characters of any kind. Text will be added separately afterward."
@@ -169,10 +189,10 @@ def call_json(prompt: str, debug_path: Path | None = None) -> dict:
         raise
 
 
-def build_image_prompt(camera: str, scene: str, cut: dict) -> str:
+def build_image_prompt(camera: str, scene: str, cut: dict, characters: dict | None = None) -> str:
     """2단계(장면) + 1단계(대사) 결과를 3단계 이미지 프롬프트로 합친다."""
     style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
-    parts = [style, f"\n\n[SCENE]\n{scene}"]
+    parts = [style, _characters_block(characters), f"\n\n[SCENE]\n{scene}"]
     if cut.get("narration"):
         parts.append(prompts.narration(cut["narration"]))
     if cut.get("caption"):
@@ -316,8 +336,9 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             continue
         s = scene_map[n]
         print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
+        characters = script.get("characters")
         if IMAGE_PROVIDER == "bedrock":
-            prompt = build_background_prompt(s["camera"], s["scene"])
+            prompt = build_background_prompt(s["camera"], s["scene"], characters)
             ok = generate_image_bedrock(prompt, img_path)
             if ok:
                 try:
@@ -325,7 +346,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 except Exception as e:
                     print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:
-            prompt = build_image_prompt(s["camera"], s["scene"], cut)
+            prompt = build_image_prompt(s["camera"], s["scene"], cut, characters)
             ok = generate_image(prompt, img_path)
         print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
 
