@@ -36,19 +36,35 @@
 # 겪었던 문제 2: 그래서 "flat cel-shading, 2-3톤만, painterly 금지"로
 #   확 눌렀더니 이번엔 품질이 너무 단순해짐. "실사냐 아니냐"와
 #   "디테일이 많냐 적냐"는 다른 축이라는 걸 여기서 깨달음.
-# 최종 해법: 역사로 프로젝트(마스터DB
+# 최종 해법(당시): 역사로 프로젝트(마스터DB
 #   03_개발·프롬프트/웹툰_이미지생성_참고(역사로)/generate.py, 이 저장소
 #   바깥)의 "Kingdom(킹덤)급 프리미엄 웹툰" 스타일을 참고 — 디테일은
 #   최대로 유지하되 "이건 손으로 그린 일러스트다"라는 지시를 명시해서
 #   실사화를 막았다. 디테일과 실사 여부는 별개 축이라는 게 핵심 교훈.
+#
+# 겪었던 문제 3 (2026-09, 기자 피드백 — 컷마다 배경·인물이 시나리오와
+#   무관하게 나옴): "Kingdom/킹덤" 레퍼런스가 실제로 조선시대 사극 톤(한옥
+#   거리, 전통의상)을 끌어오는 걸 실측으로 확인(같은 [SCENE]으로 그
+#   레퍼런스만 빼고 재생성 → 사극 느낌 소멸). 다만 그 레퍼런스를 빼도
+#   [SCENE] 지문(예: "국무회의장 부감 샷, 정장 차림 인물들")과 무관하게
+#   "번화가에 젊은 남녀 클로즈업 + 군중"이라는 K-웹툰 로맨스물 정형으로
+#   회귀하는 더 근본적인 문제가 남아있었음 — 확산 모델이 길고 복합적인
+#   프롬프트에서 뒤쪽 [SCENE] 지문의 구체적 지시를 스타일 문구의 일반적
+#   톤보다 약하게 반영하는 것으로 추정. 대응: (1) "Kingdom" 고유명사
+#   제거하고 실사화 방지 지시는 그대로 유지, (2) 현대 배경·복장을
+#   명시하고 사극/판타지 금지를 명문화, (3) "[SCENE]에 없는 군중·인물을
+#   추가하지 말라"를 명문화, (4) build_background_prompt/build_image_prompt
+#   에서 [SCENE] 직후에 같은 취지를 한 번 더 짧게 반복(끝부분 재강조).
+#   완전한 해결은 아님 — 확산 모델의 복합 프롬프트 이행력 자체의 한계라
+#   프롬프트만으로 100% 보장은 안 됨.
 
 STYLE = (
-    "Premium Korean webtoon illustration (Kingdom/킹덤-level production "
-    "quality) — ultra-detailed ink linework, rich painterly color fills "
-    "with nuanced shading and texture, cinematic panel composition. This "
-    "is a hand-illustrated artwork — clearly rendered with visible "
-    "brushwork and linework, NOT a photograph, NOT photorealistic, NOT "
-    "camera-captured.\n\n"
+    "Premium Korean webtoon illustration, top-tier professional "
+    "production quality — ultra-detailed ink linework, rich painterly "
+    "color fills with nuanced shading and texture, cinematic panel "
+    "composition. This is a hand-illustrated artwork — clearly rendered "
+    "with visible brushwork and linework, NOT a photograph, NOT "
+    "photorealistic, NOT camera-captured.\n\n"
     "Masterpiece-level illustrated detail: fabric texture on suits, wood "
     "grain on desks, glass/metal reflections — all rendered as painterly "
     "linework and color, not photographic texture. Soft cinematic "
@@ -57,6 +73,15 @@ STYLE = (
     "but professional, restrained faces; natural body language that "
     "reads clearly at a glance (not exaggerated melodrama — this is a "
     "news setting, not battle drama).\n\n"
+    "Contemporary present-day South Korea only — modern office/newsroom "
+    "interiors, business-casual or business-formal wardrobe (suits, "
+    "blouses, cardigans), modern furniture and electronics. Do NOT "
+    "render historical, period (Joseon-era/sageuk), fantasy, or "
+    "traditional hanbok clothing or settings under any circumstance.\n\n"
+    "Render exactly what [SCENE] describes and nothing more — do not "
+    "add extra background crowds, bystanders, or characters beyond what "
+    "[SCENE] and [CHARACTERS] specify. If [SCENE] describes an empty "
+    "room, render it empty with no people.\n\n"
     "Rich, grounded color palette: cool corporate blues/grays, warm "
     "desk-lamp amber, crisp window light — editorial documentary mood.\n\n"
     "Anonymous generic characters only — do NOT render the specific "

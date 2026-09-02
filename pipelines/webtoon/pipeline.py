@@ -104,6 +104,18 @@ def _characters_block(characters: dict | None) -> str:
     return "\n\n[CHARACTERS — keep consistent across all cuts]\n" + "\n".join(lines)
 
 
+# [SCENE] 직후에 짧게 한 번 더 반복 — 프롬프트 앞쪽 STYLE 문구의 일반적
+# 톤(트렌디한 K-웹툰 로맨스 정형)이 뒤쪽 [SCENE]의 구체적 지시를 누르는
+# 경향을 실측으로 확인해서(2026-09, prompts.py STYLE 근처 "겪었던 문제
+# 3" 참고) 넣은 재강조 — [SCENE]에 가장 가까운 위치에서 같은 취지를
+# 한 번 더 짧게 못박는다.
+_SCENE_REINFORCEMENT = (
+    "\n\nSTRICT: Render exactly the scene above — modern present-day "
+    "setting, no historical/period/fantasy clothing, no extra crowds or "
+    "characters beyond what [SCENE]/[CHARACTERS] specify."
+)
+
+
 def build_background_prompt(camera: str, scene: str, characters: dict | None = None) -> str:
     """Bedrock 경로 전용 — 텍스트(말풍선/캡션/내레이션) 지침 없이 스타일+장면만.
     확산 모델이 요청 안 한 글자를 그림에 멋대로 채워넣는 걸 막기 위해 명시적으로
@@ -111,6 +123,7 @@ def build_background_prompt(camera: str, scene: str, characters: dict | None = N
     style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
     return (
         style + _characters_block(characters) + f"\n\n[SCENE]\n{scene}"
+        + _SCENE_REINFORCEMENT
         + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
         "or speech bubbles anywhere in this image — pure illustration only, no "
         "readable characters of any kind. Text will be added separately afterward."
@@ -192,7 +205,7 @@ def call_json(prompt: str, debug_path: Path | None = None) -> dict:
 def build_image_prompt(camera: str, scene: str, cut: dict, characters: dict | None = None) -> str:
     """2단계(장면) + 1단계(대사) 결과를 3단계 이미지 프롬프트로 합친다."""
     style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
-    parts = [style, _characters_block(characters), f"\n\n[SCENE]\n{scene}"]
+    parts = [style, _characters_block(characters), f"\n\n[SCENE]\n{scene}", _SCENE_REINFORCEMENT]
     if cut.get("narration"):
         parts.append(prompts.narration(cut["narration"]))
     if cut.get("caption"):
