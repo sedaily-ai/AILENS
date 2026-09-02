@@ -100,6 +100,26 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
   const url = `${SITE_URL}/webtoon/${slug}`;
   const published = `${webtoon.date}T07:00:00+09:00`;
   const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
+  // SEO/GEO 강화(2026-09-02) — 이전엔 대표 이미지 1장만 image에 담았다.
+  // 실제로는 컷마다 별도 이미지+대사가 있는데 그 구조가 구조화 데이터에
+  // 전혀 안 드러나서, 검색·AI 답변엔진이 이 페이지를 "이미지 1장짜리 기사"
+  // 로만 이해할 수 있었다. panels 전체를 캡션 딸린 ImageObject 배열로,
+  // 캡션을 이어붙인 텍스트를 articleBody로 노출해 실제 스토리 내용을
+  // 구조화 데이터 레벨에서도 읽을 수 있게 한다(페이지 자체엔 이미
+  // panel.caption이 텍스트로 렌더돼 있음 — WebtoonViewClient.tsx 참고,
+  // 이건 그 신호를 JSON-LD에도 반영하는 것).
+  const panelImages = webtoon.panels.length > 0
+    ? webtoon.panels.map((p, i) => ({
+        '@type': 'ImageObject' as const,
+        url: p.url,
+        caption: p.caption || `${webtoon.title} 컷 ${i + 1}`,
+        position: i + 1,
+      }))
+    : [{ '@type': 'ImageObject' as const, url: image, width: 1200, height: 800 }];
+  const articleBody = webtoon.panels
+    .map((p) => p.caption)
+    .filter(Boolean)
+    .join('\n\n');
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -109,6 +129,7 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
         headline: webtoon.title,
         description: webtoon.excerpt,
+        ...(articleBody ? { articleBody } : {}),
         datePublished: published,
         dateModified: published,
         inLanguage: 'ko-KR',
@@ -122,6 +143,7 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
         },
         publisher: { '@id': `${SITE_URL}/#organization` },
         image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },
+        associatedMedia: panelImages,
         isAccessibleForFree: true,
       },
       // 2026-08-21 GEO 재감사 — letters/lens는 이미 있던 BreadcrumbList가
