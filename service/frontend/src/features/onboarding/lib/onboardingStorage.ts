@@ -5,6 +5,7 @@
 const FORMAT_KEY = 'onboarding-format';
 const INTERESTS_KEY = 'onboarding-interests';
 const COMPLETED_KEY = 'onboarding-completed';
+const BANNER_DISMISSED_KEY = 'onboarding-banner-dismissed';
 
 function safeGet(key: string): string | null {
   if (typeof window === 'undefined') return null;
@@ -56,4 +57,16 @@ export function markOnboardingCompleted() {
 
 export function isOnboardingCompleted(): boolean {
   return safeGet(COMPLETED_KEY) === '1';
+}
+
+// 메인 피드 상단 배너(DiscoveryBanner) 전용 — 온보딩을 "완료"하지 않고
+// 그냥 닫기만 해도 다음 방문부터 안 뜨게 한다. completed와 분리한 이유:
+// 안 눌러도 다시 안 나오게 하고 싶은 사람과, 나중에 다시 보고 싶어서
+// 그냥 무시만 한 사람을 같은 취급하면 전자가 짜증나므로 배너 전용 플래그.
+export function dismissDiscoveryBanner() {
+  safeSet(BANNER_DISMISSED_KEY, '1');
+}
+
+export function isDiscoveryBannerDismissed(): boolean {
+  return safeGet(BANNER_DISMISSED_KEY) === '1';
 }

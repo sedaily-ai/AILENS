@@ -11,6 +11,7 @@ import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/api/questi
 import type { DailyQuestionItem } from "@/features/question";
 import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
 import { useAuth } from "@/features/auth";
+import { DiscoveryBanner } from "@/features/onboarding";
 import { Header } from "@/widgets/Header";
 import { HomeSideBar } from "@/widgets/HomeSideBar";
 import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";
@@ -258,6 +259,10 @@ export function FeedPage({
 
         {/* 피드 모드 - NewsFeedTab 컴포넌트 */}
         {activeTab === "feed" && (
+          <>
+          <div className="px-4 pt-4 lg:px-6">
+            <DiscoveryBanner loggedIn={!!user} />
+          </div>
           <NewsFeedTab
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
@@ -277,6 +282,7 @@ export function FeedPage({
               <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
             }
           />
+          </>
         )}
 
         {/* 아카이브 모드 - 내 서랍 */}
