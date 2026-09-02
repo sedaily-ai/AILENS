@@ -1,6 +1,6 @@
 import type { CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
-import { sanitizeDescription } from '@/shared/lib/seo/sanitizeDescription';
+import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { SITE_URL } from '@/shared/constants/site';
 
 export { SITE_URL };
@@ -54,7 +54,7 @@ export function buildVideoJsonLd(items: CmsVideo[]) {
           item: {
             '@type': 'VideoObject',
             name: v.title,
-            description: sanitizeDescription(v.excerpt) ?? v.title,
+            description: buildSeoDescription(v.excerpt, v.title),
             thumbnailUrl: v.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`,
             uploadDate: `${v.date}T07:00:00+09:00`,
             embedUrl: resolved?.embedUrl,

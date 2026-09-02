@@ -1,6 +1,6 @@
 import type { HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
-import { sanitizeDescription } from '@/shared/lib/seo/sanitizeDescription';
+import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { SITE_URL } from '@/shared/constants/site';
 
 export { SITE_URL };
@@ -47,14 +47,14 @@ export function buildListenJsonLd(items: HomePlayerPost[]) {
             ? {
                 '@type': 'PodcastEpisode',
                 name: it.title,
-                description: sanitizeDescription(it.excerpt) ?? it.title,
+                description: buildSeoDescription(it.excerpt, it.title),
                 datePublished: it.date ? `${it.date}T07:00:00+09:00` : undefined,
                 associatedMedia: { '@type': 'MediaObject', contentUrl: it.mediaEmbedUrl },
               }
             : {
                 '@type': 'VideoObject',
                 name: it.title,
-                description: sanitizeDescription(it.excerpt) ?? it.title,
+                description: buildSeoDescription(it.excerpt, it.title),
                 uploadDate: it.date ? `${it.date}T07:00:00+09:00` : undefined,
                 embedUrl: resolved?.embedUrl,
                 thumbnailUrl: resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`,
