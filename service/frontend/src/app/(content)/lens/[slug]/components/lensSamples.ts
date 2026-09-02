@@ -163,7 +163,14 @@ export function articleFormatSample(
 // 유리하다는 리서치 결과 반영). 팟캐스트 불릿이 사실·수치 위주로 쓰이도록
 // 설계돼 있어 1순위, 없으면 영상→웹툰→레터 순으로 폴백(LENS_FORMATS 인덱스
 // 기준: 팟캐스트=2, 영상=3, 웹툰=1, 레터=0).
-const SUMMARY_BULLET_FORMAT_ORDER = [2, 3, 1, 0];
+// 2026-09 — 레터(0)를 최우선으로 바꿨다. [핵심 요약] 블록 신설(레터
+// 프롬프트, DDB PROMPT#letters/published v#4) 전까지는 레터·팟캐스트·영상
+// 전부 bullets가 비어있어서 이 카드가 사실상 항상 웹툰(1) 컷 캡션이었다
+// — 캡션은 그림과 같이 볼 때만 뜻이 완결되는 짧은 대사라, 그림 없이
+// 텍스트만 카드로 떼어놓으면 맥락이 빠진다(기자 피드백: "질문만 던지고
+// 답이 없다"). 레터는 [핵심 요약] 전용 불릿을 새로 만들어서 이 카드
+// 하나만 보고도 이해되게 쓴다 — 웹툰은 레터가 비었을 때만 폴백으로 남김.
+const SUMMARY_BULLET_FORMAT_ORDER = [0, 2, 3, 1];
 
 export function coreSummaryBullets(lens: CmsLens): string[] {
   for (const i of SUMMARY_BULLET_FORMAT_ORDER) {
