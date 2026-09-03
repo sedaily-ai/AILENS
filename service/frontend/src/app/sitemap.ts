@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { kstTodayStr } from '@/shared/lib/date';
@@ -11,18 +11,6 @@ import { GAMES } from '@/shared/data/games';
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
 import { SITE_URL as BASE } from '@/shared/constants/site';
-
-// 예전엔 최근 14일(SEED_DAYS)만 date=YYYY-MM-DD로 하루씩 14번 조회해서 그
-// 이전에 발행된 레터는 사이트맵에서 통째로 빠졌다(2026-08-18, GEO 점검 —
-// en.sedaily.com은 월별 sitemap을 계속 이어붙여 발행분이 영원히 안 빠지는데
-// 저희만 14일 지나면 사라짐을 확인). date를 안 주면 백엔드가 전체 발행
-// 이력을 최신순으로 정렬해 돌려주므로(cms_posts_ddb_client.py — limit과
-// 무관하게 항상 전체를 읽은 뒤 마지막에만 자른다) 하루씩 훑을 필요가 아예
-// 없다 — 한 번의 요청으로 교체. limit 상한도 2026-08-18에 100→1000으로
-// 올렸다(handlers/cms_posts_public.py).
-// fetchCmsPosts()의 캐시(태그 기반, admin 발행 시 즉시 무효화 + 5분 안전망
-// — cmsPostsApi.ts 참조)로 충분해서 여기 전용 no-store 우회는 더 안 쓴다.
-const LETTERS_FETCH_LIMIT = 1000;
 
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 // lastModified는 각 라우트 파일의 최근 git 커밋 날짜(2026-08-11 GEO 감사에서
@@ -116,23 +104,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  // 레터 상세 — 전체 발행 이력(2026-08-18부터 14일 제한 없음, 위 주석 참조).
-  const letters = await fetchCmsPosts('letters', undefined, LETTERS_FETCH_LIMIT);
-
-  for (const letter of letters) {
-    if (!letter.id || !letter.publish_date) continue;
-    const daysOld = daysBetween(letter.publish_date);
-    // updated_at이 있으면(=admin이 발행 후 수정한 적 있으면) 그걸,
-    // 없으면 발행일을 lastModified로 — "발행 후 절대 안 바뀐다"는 가정을
-    // 안 하게 됐다(admin이 실제로 발행 후 수정 가능, posts_repo.py 참조).
-    const lastModifiedIso = letter.updated_at || `${letter.publish_date}T07:00:00+09:00`;
-    entries.push({
-      url: `${BASE}/letters/${letter.id}`,
-      lastModified: new Date(lastModifiedIso),
-      changeFrequency: 'never',
-      priority: freshnessPriority(daysOld),
-    });
-  }
+  // 레터 상세 — sitemap 등재 중단(2026-09-03, SEO/GEO 테스트 중 발견).
+  // letters 채널은 2026-08-12 이후 신규 발행이 없다(lens 4가지 시선
+  // 체계로 흡수됨 — 실제 레터 콘텐츠는 이제 /lens/{id}?v=1로 나간다).
+  // 사이트 어디서도 /letters/[id]로 링크가 안 걸린 고아 페이지인 채로
+  // 계속 sitemap에만 올라가 있었다 — 매번 "여기 콘텐츠 있다"고 구글에
+  // 신호를 주는데 실제로는 3주 넘게 안 바뀌는 채널이라 크롤 예산 낭비이자
+  // 오래된/방치된 사이트라는 신호로 읽힐 수 있다. 페이지 자체는 그대로
+  // 살려둔다(기존 백링크·북마크로 들어오는 사람은 정상적으로 볼 수 있게)
+  // — sitemap 제출만 멈춘다.
 
   // 웹툰 — 경로 기반 전환(2026-08-07) 이후 sitemap에도 추가.
   // images 확장(2026-09-02, SEO/GEO 감사) — 웹툰은 텍스트 기사보다 시각적
