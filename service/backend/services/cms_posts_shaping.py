@@ -268,6 +268,41 @@ def shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def shape_lens_summary(post: Dict[str, Any]) -> Dict[str, Any]:
+    """목록(다건) 응답 전용 축약판(2026-09-03, 사용자 질문 "channel=lens가
+    limit 300 근처에서 500 나는 원인이 뭐냐"로 조사 후 신설).
+
+    원인: lens 글 하나가 4포맷(레터/웹툰/팟캐스트/영상) 전체 —
+    paragraphs·webtoon 컷 이미지 배열·팟캐스트/영상 전체 대본(transcript)
+    까지 — 를 통째로 담아서, webtoon/video 글보다 10~50배 무겁다. 목록
+    API는 이걸 건수만큼 그대로 이어붙여 한 응답으로 돌려주는데, limit이
+    300 근처만 돼도 AWS Lambda 동기 호출의 응답 payload 6MB 하드 리밋
+    (MemorySize/Timeout과 무관하게 고정, 설정으로 못 늘림)을 넘겨서 500이
+    났다 — webtoon/video는 글이 가벼워서 limit=1000에서도 안 넘긴다.
+
+    `limit`이 이 문제를 만든 게 아니다 — DynamoDB 조회 자체는 limit과
+    무관하게 항상 전체를 다 읽은 뒤 마지막에 자르므로(list_published_posts
+    참조), limit을 낮춰도 DB 비용은 안 줄고 응답 크기만 줄어 증상이 가려질
+    뿐이었다.
+
+    그래서 진짜 수정은 응답 자체를 가볍게 만드는 것 — 목록에 필요한
+    필드(label/question/bullets)만 남기고 무거운 필드(paragraphs/images/
+    video_url/thumbnail_url/media_url/transcript)는 뺀다. 프론트 목록
+    소비처(LensPreviewSection.tsx/LensListClient.tsx) 전부 label·question·
+    bullets까지만 쓰는 걸 확인했다 — 4포맷 전체 콘텐츠가 실제로 필요한
+    곳(온보딩 체험 화면, lens 상세 페이지)은 단건 조회
+    (`/api/v2/posts/{id}?channel=lens`, shape_lens 그대로)로 이미 따로
+    받는다(service/frontend의 fetchLensBySlug 참조 — 단건 조회는 이 축약
+    대상이 아니다, cms_posts_public.py의 slug 분기는 여전히 shape_lens를
+    쓴다)."""
+    shaped = shape_lens(post)
+    shaped["lenses"] = [
+        {"label": item["label"], "question": item["question"], "bullets": item["bullets"]}
+        for item in shaped["lenses"]
+    ]
+    return shaped
+
+
 def shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
     """홈 화면 하단 플레이 카드("오늘의 핵심 뉴스") 재생목록 항목(2026-08-16).
     기사와 무관하게 관리자가 직접 "제목 + 유튜브 링크"로 만드는 독립
