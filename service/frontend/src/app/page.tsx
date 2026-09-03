@@ -1,5 +1,5 @@
 import { FeedPage } from "@/widgets/FeedPage";
-import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts, toLensPreviewSummaries } from "@/shared/lib/api/cmsPostsApi";
+import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts, toLensPreviewSummaries, toWebtoonPreviewSummaries, toVideoPreviewSummaries } from "@/shared/lib/api/cmsPostsApi";
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
@@ -135,10 +135,18 @@ export default async function HomePage() {
   // 이 값의 유일한 소비자가 AudioPreviewSection이라 여기서 잘라도 안전.
   const audioPreviewPosts = toAudioPreviewSummaries(initialHomePlayerPosts);
 
+  // 2026-09-03 — 같은 패턴을 웹툰/영상 미리보기에서도 확인(오디오 축소가
+  // 5.43MB→2.9MB로 예상보다 훨씬 커서, 남은 섹션도 전수 점검). 둘 다 상위
+  // 4개만 그리는데 최대 1000건 전체를 넘기고 있었다 — cmsPostsApi.ts의
+  // toWebtoonPreviewSummaries()/toVideoPreviewSummaries() 참조. 이 값들도
+  // 각각 WebtoonPreviewSection/VideoPreviewSection 외 다른 소비자가 없다.
+  const webtoonPreviewItems = toWebtoonPreviewSummaries(initialWebtoons);
+  const videoPreviewItems = toVideoPreviewSummaries(initialVideos);
+
   return (
     <HomeContent
-      initialWebtoons={initialWebtoons}
-      initialVideos={initialVideos}
+      initialWebtoons={webtoonPreviewItems}
+      initialVideos={videoPreviewItems}
       initialWordTerms={initialWordTerms}
       initialLensPosts={lensPreviewPosts}
       initialArchiveItems={initialArchiveItems}

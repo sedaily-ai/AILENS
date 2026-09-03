@@ -204,6 +204,15 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
 // 0이 됐다 — 같이 삭제(archive/column 아카이브 페이지들은 buildArchiveItems를
 // 직접 쓰지 이 함수를 거치지 않았다).
 
+// 홈 웹툰 미리보기(WebtoonPreviewSection) 전용 축약본(2026-09-03, lens/
+// 오디오 축약과 같은 문제) — 그 컴포넌트는 항상 상위 4개만 그리고
+// cover_image_url 하나만 쓰는데(panels는 안 읽음, 컷 갤러리는 상세
+// 페이지 전용), app/page.tsx는 fetchWebtoons()의 최대 1000건 전체
+// (건마다 컷 이미지+캡션 배열 panels 포함)를 그대로 넘기고 있었다.
+export function toWebtoonPreviewSummaries(webtoons: CmsWebtoon[]): CmsWebtoon[] {
+  return webtoons.slice(0, 4).map((w) => ({ ...w, panels: [] }));
+}
+
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
@@ -232,6 +241,13 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
   } catch {
     return null;
   }
+}
+
+// 홈 영상 미리보기(VideoPreviewSection) 전용 축약본(2026-09-03) — 항상
+// 상위 4개만 쓰는데 최대 1000건 전체를 넘기고 있었다. CmsVideo 자체엔
+// 무거운 필드가 없어(대본 등 없음) 개수만 줄여도 충분하다.
+export function toVideoPreviewSummaries(videos: CmsVideo[]): CmsVideo[] {
+  return videos.slice(0, 4);
 }
 
 export async function fetchVideos(): Promise<CmsVideo[]> {
