@@ -4,6 +4,7 @@ import { OpeningCut } from './OpeningCut';
 import { StatCut } from './StatCut';
 import { DiagramCut } from './DiagramCut';
 import { ChartCut } from './ChartCut';
+import { PhotoCut } from './PhotoCut';
 import { HighlightCut } from './HighlightCut';
 import { ClosingCut } from './ClosingCut';
 
@@ -23,6 +24,8 @@ export const CutRenderer: React.FC<{
       return <DiagramCut cut={cut} brand={brand} />;
     case 'chart':
       return <ChartCut cut={cut} brand={brand} />;
+    case 'photo':
+      return <PhotoCut cut={cut} brand={brand} />;
     case 'highlight':
       return <HighlightCut cut={cut} brand={brand} />;
     case 'closing':

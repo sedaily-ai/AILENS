@@ -142,6 +142,14 @@ def _parse_item(item: ET.Element) -> dict | None:
         "content_len": len(content_text),
         "has_photo": image_el is not None,
         "photo_url": image_el.attrib.get("href") if image_el is not None else None,
+        # 영상 포맷의 photo 컷(2026-09-03, 기자 피드백 "원문 사진이 들어가면
+        # 좋겠다")이 캡션까지 참고할 수 있도록 같이 담아둔다 — clients/
+        # s3_xml_client.py의 _parse_image()와 같은 속성명(caption_title/
+        # caption_content). 둘 다 비어있을 수 있어 빈 문자열로 폴백.
+        "photo_caption": (
+            (image_el.attrib.get("caption_title", "") + " " + image_el.attrib.get("caption_content", "")).strip()
+            if image_el is not None else None
+        ) or None,
         "url": url_el.attrib.get("href") if url_el is not None else None,
         "date": (item.find("date").text or "").strip() if item.find("date") is not None else "",
         "time": (item.find("time").text or "").strip() if item.find("time") is not None else "",
