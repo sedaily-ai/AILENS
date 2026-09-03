@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { lensPerspectiveAt, LENS_FORMATS } from '@/shared/constants/lensPerspectives';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { OnboardingHeader } from './OnboardingHeader';
 
 const AUTO_ADVANCE_MS = 5000;
 const DEFAULT_FORMAT_INDEX = 0; // 레터
@@ -13,10 +14,12 @@ export function FormatStep({
   lens,
   onSelect,
   onSkip,
+  onBack,
 }: {
   lens: CmsLens | null;
   onSelect: (index: number) => void;
   onSkip: () => void;
+  onBack?: () => void;
 }) {
   const onSelectRef = useRef(onSelect);
   useEffect(() => {
@@ -30,20 +33,9 @@ export function FormatStep({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 22px 0' }}>
-        <span style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-          AI LENS
-        </span>
-        <button
-          type="button"
-          onClick={onSkip}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#94a3b8' }}
-        >
-          건너뛰기 →
-        </button>
-      </div>
+      <OnboardingHeader currentStep={2} onSkip={onSkip} onBack={onBack} />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 24px', textAlign: 'center', gap: 14, maxWidth: 440, margin: '0 auto', width: '100%' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 24px', textAlign: 'center', gap: 14, maxWidth: 420, margin: '0 auto', width: '100%' }}>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.22em', textTransform: 'uppercase' }}>
           오늘의 1면
         </p>
@@ -90,7 +82,7 @@ export function FormatStep({
       </div>
 
       <div style={{ textAlign: 'center', padding: '0 0 28px' }}>
-        <p style={{ margin: 0, fontSize: 11, color: '#9ca3af' }}>5초 후 레터로 자동 진행</p>
+        <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>5초 후 레터로 자동 진행</p>
       </div>
     </div>
   );
