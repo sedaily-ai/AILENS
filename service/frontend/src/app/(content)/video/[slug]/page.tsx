@@ -22,9 +22,19 @@ async function fetchAllVideos(): Promise<CmsVideo[]> {
   return [];
 }
 
+// 최근 STATIC_PARAMS_LIMIT건만(2026-09-03) — lens/webtoon [slug]/page.tsx와
+// 같은 이유(EC2 디스크풀 실장애로 확인, lens/[slug]/page.tsx 주석 참조).
+// fetchVideos()가 limit=1000이라 그대로 두면 여기서도 전체를 정적
+// 페이지로 미리 빌드한다 — 목록 API의 limit은 그대로, 미리 빌드하는
+// 개수만 최근 것으로 제한. 오래된 영상은 fetchVideoBySlug 단건 조회로
+// 요청 시점에 정상 렌더링(generateMetadata·기본 export 둘 다 이미
+// fetchVideoBySlug를 직접 쓰고 있었음 — lens/webtoon과 달리 처음부터
+// 안전했던 부분).
+const STATIC_PARAMS_LIMIT = 100;
+
 export async function generateStaticParams() {
   const videos = await fetchAllVideos();
-  return videos.map((v) => ({ slug: v.id }));
+  return videos.slice(0, STATIC_PARAMS_LIMIT).map((v) => ({ slug: v.id }));
 }
 
 export async function generateMetadata({

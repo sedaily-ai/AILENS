@@ -26,9 +26,24 @@ async function fetchAllLens(): Promise<CmsLens[]> {
 
 // generateStaticParams — letters/webtoon과 동일 이유: 없으면 Next가 이
 // 라우트를 ƒ Dynamic 취급해서 <Link> 프리페치가 안 붙는다.
+//
+// 최근 STATIC_PARAMS_LIMIT건만(2026-09-03, 실제 EC2 디스크풀 장애로 발견) —
+// fetchLensPosts()의 목록 limit을 오늘 100→1000으로 올리면서 이 함수가
+// 그 1000건(당시 741건 실존)을 전부 정적 페이지로 미리 빌드해버렸다.
+// standalone 산출물이 680MB대에서 897MB로 뛰었고, 그 릴리스를 배포하다
+// EC2 루트 볼륨(20GB)이 100%까지 차서 SSM까지 마비되는 실제 장애로
+// 이어졌다(CloudWatch disk_used_percent로 확인). 목록 API의 limit을
+// 다시 낮출 필요는 없다 — 홈 미리보기·`/lens` 목록이 최근 글을 놓치지
+// 않으려면 1000이 맞다. 문제는 "목록에 몇 건을 보여줄지"와 "몇 건을
+// 미리 빌드할지"가 이 함수 하나로 묶여 있었던 것뿐이다. 최근
+// STATIC_PARAMS_LIMIT건만 빌드 시점에 미리 만들고, 그보다 오래된 글은
+// findLens()의 단건 조회(fetchLensBySlug, 바로 아래)로 요청 시점에
+// 정상 렌더링된다 — 이미 오늘 만든 경로라 새 코드 없이도 안전하다.
+const STATIC_PARAMS_LIMIT = 100;
+
 export async function generateStaticParams() {
   const items = await fetchAllLens();
-  return items.map((l) => ({ slug: l.id }));
+  return items.slice(0, STATIC_PARAMS_LIMIT).map((l) => ({ slug: l.id }));
 }
 
 // 2026-09-03 — 이전엔 fetchAllLens()(최근 100건)에서 .find()로 찾았다.
