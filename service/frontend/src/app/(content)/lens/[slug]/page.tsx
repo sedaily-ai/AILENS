@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { fetchLensPosts, fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
@@ -31,9 +31,23 @@ export async function generateStaticParams() {
   return items.map((l) => ({ slug: l.id }));
 }
 
+// 2026-09-03 — 이전엔 fetchAllLens()(최근 100건)에서 .find()로 찾았다.
+// lens는 하루 수십 건씩 나가는 채널이라 3일 정도만 지나도 그 100건
+// 밖으로 밀려나 실제로 존재하는 글인데도 "이슈를 찾을 수 없어요"로
+// 뜨는 걸 확인(사용자 질문 "오래된 레터들도 SEO 작업 됐나"에 답하려고
+// 실제 3일 전 기사로 재현). generateMetadata·JSON-LD·canonical이 전부
+// 이 함수 결과에 의존해서, 못 찾으면 SEO가 아예 무너진다(robots:
+// noindex까지 박힘) — 클라이언트(LensViewClient.tsx)는 이미
+// fetchLensBySlug()로 단건 조회해 스스로 복구하고 있었는데, 정작 SEO에
+// 쓰이는 서버 렌더링만 이 버그를 안 피하고 있었다. 단건 조회 API로
+// 교체 — 목록에 있든 없든 항상 정확히 찾는다.
 async function findLens(slug: string): Promise<CmsLens | null> {
-  const items = await fetchAllLens();
-  return items.find((l) => l.id === slug) ?? null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const result = await fetchLensBySlug(slug);
+    if (result) return result;
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+  }
+  return null;
 }
 
 // 상세 페이지 마감부에 보여줄 "다른 시선" 3개 — 별도 API 호출 없이

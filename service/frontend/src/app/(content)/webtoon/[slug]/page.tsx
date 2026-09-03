@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
@@ -30,9 +30,21 @@ export async function generateStaticParams() {
   return webtoons.map((w) => ({ slug: w.id }));
 }
 
+// 2026-09-03 — lens/[slug]/page.tsx와 같은 버그를 여기서도 발견(사용자
+// 질문 "오래된 것들도 SEO 됐나"로 재현). fetchAllWebtoons()(현재 limit
+// 1000)에서 .find()로 찾다 보니, 목록 상한을 넘어가는 순간 실제로 있는
+// 화도 "찾을 수 없어요"가 된다 — 이미 한 번 100→1000으로 상한만 올려
+// 땜질한 이력이 있고(위 주석 참조), 최근 발행량(하루 최대 96건)이면
+// 1000건도 열흘 남짓이면 다시 뚫린다. 단건 조회 API(fetchWebtoonBySlug,
+// WebtoonViewClient.tsx도 이미 클라이언트 폴백으로 쓰고 있었음)로
+// 교체 — 목록 상한과 무관하게 항상 정확히 찾는다.
 async function findWebtoon(slug: string): Promise<CmsWebtoon | null> {
-  const webtoons = await fetchAllWebtoons();
-  return webtoons.find((w) => w.id === slug) ?? null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const result = await fetchWebtoonBySlug(slug);
+    if (result) return result;
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+  }
+  return null;
 }
 
 // 목록은 최신순(desc)으로 내려온다 — index-1이 더 최신 화("다음 화"),
