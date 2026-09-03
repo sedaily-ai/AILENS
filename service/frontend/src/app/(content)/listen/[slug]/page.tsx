@@ -21,9 +21,15 @@ async function fetchAllListen(): Promise<HomePlayerPost[]> {
   return [];
 }
 
+// 최근 STATIC_PARAMS_LIMIT건만(2026-09-03) — lens/webtoon/video
+// [slug]/page.tsx와 같은 이유(EC2 디스크풀 실장애로 확인, lens/[slug]/
+// page.tsx 주석 참조). 오래된 오디오는 fetchHomePlayerBySlug 단건
+// 조회로 요청 시점에 정상 렌더링(이미 그렇게 돼 있었음).
+const STATIC_PARAMS_LIMIT = 100;
+
 export async function generateStaticParams() {
   const items = await fetchAllListen();
-  return items.map((it) => ({ slug: it.id }));
+  return items.slice(0, STATIC_PARAMS_LIMIT).map((it) => ({ slug: it.id }));
 }
 
 export async function generateMetadata({

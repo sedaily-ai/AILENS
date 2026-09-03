@@ -25,9 +25,19 @@ async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
 // generateStaticParams 를 다시 붙인다(2026-08-08) — letters/[id]/page.tsx와
 // 동일 이유: 이게 없으면 Next가 이 라우트를 ƒ Dynamic 취급해서 <Link>
 // 프리페치가 안 붙는다("클릭 즉시 이동" 요구와 충돌, 직접 빌드해서 확인함).
+//
+// 최근 STATIC_PARAMS_LIMIT건만(2026-09-03) — lens/[slug]/page.tsx에서
+// 실제 EC2 디스크풀 장애로 확인된 것과 같은 위험: fetchWebtoons()가
+// limit=1000이라 여기서도 706건(실측) 전부를 정적 페이지로 미리
+// 빌드하고 있었다. 목록 API의 limit은 그대로 두고(홈 미리보기·`/webtoon`
+// 목록엔 필요), 빌드 시점에 미리 만드는 개수만 최근 것으로 줄인다 —
+// 오래된 화는 findWebtoon()의 단건 조회(바로 아래)로 요청 시점에
+// 정상 렌더링된다.
+const STATIC_PARAMS_LIMIT = 100;
+
 export async function generateStaticParams() {
   const webtoons = await fetchAllWebtoons();
-  return webtoons.map((w) => ({ slug: w.id }));
+  return webtoons.slice(0, STATIC_PARAMS_LIMIT).map((w) => ({ slug: w.id }));
 }
 
 // 2026-09-03 — lens/[slug]/page.tsx와 같은 버그를 여기서도 발견(사용자
