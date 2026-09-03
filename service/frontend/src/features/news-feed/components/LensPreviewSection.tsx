@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
-import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { LENS_ACCENT, lensFormatCaption, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { getSavedInterests } from '@/shared/lib/onboardingStorage';
 import { LensFormatGuide } from './LensFormatGuide';
 
@@ -422,10 +422,16 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                   어떤 형식으로 볼까요
                 </p>
 
-                {/* 형식 타일 — 매일 같은 태그라인 대신 기사별 질문(실제
-                    내용)만 남긴다. 형식이 뭔지에 대한 설명은 제목 옆 ⓘ
-                    가이드(LensFormatGuide)가 담당한다 — 홈 티저에서 네 번
-                    반복할 정보가 아니다. */}
+                {/* 형식 타일 — 항상 고정 태그라인만 쓴다(lensFormatCaption).
+                    한때 "기사별 질문(실제 내용)을 보여준다"는 의도로
+                    l.question을 썼던 적이 있는데, 실제로는 레터·팟캐스트·
+                    영상의 question이 파이프라인에서 기사 제목을 그대로
+                    복사한 값이라(웹툰만 진짜 별도 core_question을 만듦)
+                    "실제 내용"이 아니라 헤드라인 중복 표시였다 — 2026-08-23
+                    발견 후 고쳤다가 다음날 그리드 재설계로 조용히
+                    재도입됐던 걸 2026-09-03 재발견해 다시 고쳤다. 형식이
+                    뭔지에 대한 설명은 제목 옆 ⓘ 가이드(LensFormatGuide)가
+                    담당한다. */}
                 <div className="lz-grid">
                   {rows.map((l, i) => {
                     const p = lensPerspectiveAt(i);
@@ -475,7 +481,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                             wordBreak: 'keep-all',
                           }}
                         >
-                          {l.question || p.tagline}
+                          {lensFormatCaption(i)}
                         </span>
                       </Link>
                     );

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
-import { LENS_ACCENT, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { LENS_ACCENT, lensFormatCaption, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
@@ -318,13 +318,15 @@ export function LensListClient({
                               {p.short}
                             </span>
                             <span style={{ display: 'block', minWidth: 0 }}>
-                              {/* l.question 대신 p.tagline만 쓴다(2026-08-23, 사용자
-                                  지적 — LensPreviewSection.tsx와 같은 버그: 웹툰만
+                              {/* l.question 대신 lensFormatCaption(i)만 쓴다(2026-08-23,
+                                  사용자 지적 — LensPreviewSection.tsx와 같은 버그: 웹툰만
                                   core_question을 따로 생성하고 레터·팟캐스트·영상은
                                   question이 헤드라인과 동일해서 위 히어로 헤드라인을
-                                  그대로 반복해 보였다). */}
+                                  그대로 반복해 보였다). 2026-09-03 — 홈페이지 쪽에서
+                                  같은 버그가 재발한 걸 발견해, 두 파일이 공용 함수
+                                  하나만 거치도록 lensFormatCaption으로 통합했다. */}
                               <span style={{ display: 'block', fontSize: 16, fontWeight: 600, color: '#374151', lineHeight: 1.5, letterSpacing: '-0.015em', wordBreak: 'keep-all' }}>
-                                {p.tagline}
+                                {lensFormatCaption(i)}
                               </span>
                               {preview && (
                                 <span
