@@ -7,6 +7,7 @@
       "TaskDefinitionArn": "arn:aws:ecs:us-east-1:887078546492:task-definition/sedaily-lens-frontpage-auto",
       "TaskCount": 1,
       "LaunchType": "FARGATE",
+      "PropagateTags": "TASK_DEFINITION",
       "NetworkConfiguration": {
         "awsvpcConfiguration": {
           "Subnets": ["subnet-0b5a146ca8ed1ddfe"],

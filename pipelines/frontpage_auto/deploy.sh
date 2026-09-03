@@ -20,7 +20,14 @@ docker tag "${REPO}:latest" "${ECR_URI}:latest"
 docker push "${ECR_URI}:latest"
 
 echo "=== 3/3 태스크 정의 새 리비전 등록 ==="
+# --tags 추가(2026-09-03, 비용태깅 감사 — mustknow_auto는 tags-ecs.json으로
+# 태깅되는데 frontpage_auto는 provision.sh 때부터 태그가 아예 없었다).
+# 태스크 정의 태그만으로는 부족하다 — 실제 Fargate 실행 태스크(컴퓨트 비용)에
+# 태그가 붙으려면 eventbridge-target.json의 PropagateTags=TASK_DEFINITION과
+# eventbridge-runtask-policy.json의 ecs:TagResource 권한이 같이 있어야 한다
+# (mustknow_auto/provision.sh 83-92행 주석 참조 — 둘 다 이번에 frontpage_auto에도 추가).
 aws ecs register-task-definition --cli-input-json file://frontpage_auto/taskdef.json --region "$REGION" \
+  --tags file://frontpage_auto/tags-ecs.json \
   --query "taskDefinition.{Family:family,Revision:revision}" --output json
 
 echo "완료 — 다음 EventBridge 트리거(매일 07:00 KST)부터 새 이미지로 실행됨."
