@@ -44,7 +44,15 @@ def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> 
     guide = ddb_prompt.load_prompt("letters")
 
     print(f"{tag} 레터 생성 중...")
-    output = call_text(guide, f"다음 기사 원문으로 레터를 만들어주세요.\n\n{article}", model=MODEL)
+    # 2026-09-03 — Opus 5 승급 후 첫 실제 프로덕션 실행(IAM 권한 수정 직후)에서
+    # 전량 실패 발견: 응답에 text 블록 없이 reasoningContent만 있음
+    # (call_text()의 "text 키를 가진 블록을 찾는다" 방어 로직도 못 구함 —
+    # 애초에 text 블록 자체가 없었음). Opus 5가 기본 max_tokens=3000을
+    # reasoning만으로 다 써버리고 실제 답변(2000~2800자 목표라 그 자체로도
+    # 3000~4500 토큰 필요) 생성에 도달하지 못한 것으로 보인다 — Sonnet
+    # 계열에선 안 겪던 문제(추론 트레이스가 훨씬 김). reasoning+출력 둘 다
+    # 여유 있게 max_tokens를 크게 올려서 재발 방지.
+    output = call_text(guide, f"다음 기사 원문으로 레터를 만들어주세요.\n\n{article}", model=MODEL, max_tokens=12000)
     out_path.write_text(output, encoding="utf-8")
 
     print(f"{tag} 완료 — {out_path}")
