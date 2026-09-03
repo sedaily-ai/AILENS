@@ -95,9 +95,26 @@ cmds = [
     # 다시 채워 같은 장애가 재발했다(사이트 502, 볼륨 20GB로 증설해
     # 복구). 그래서 정리를 배포 "시작"으로 옮긴다 — 새 릴리스를 받기
     # 전에 먼저 청소해서, 이번 배포가 도중에 실패하더라도 다음 배포
-    # 시작 시점에 그 잔해가 반드시 청소되게 한다(최신 4개만 남기고
-    # 정리 후 이번 배포로 1개 추가돼 총 5개 유지).
-    'ls -1 /opt/ailens/releases 2>/dev/null | sort -r | tail -n +5 | xargs -r -I{} rm -rf /opt/ailens/releases/{}',
+    # 시작 시점에 그 잔해가 반드시 청소되게 한다.
+    #
+    # 2026-09-03 — 유지 개수 4→2로 낮췄다(최신 2개만 남기고 정리 후
+    # 이번 배포로 1개 추가돼 총 3개 유지). 원인: standalone 산출물은
+    # 압축 전 3~4GB대라(release/[slug] 정적 페이지 수에 비례) 4개+1개를
+    # 들고 있으면 그 자체로 15~20GB를 먹어, "몇 개까지 유지"만으로는
+    # release 크기가 조금만 커져도 다시 디스크풀이 재현되는 걸 실제
+    # 장애로 확인했다(lens generateStaticParams가 100→741건으로 늘며
+    # release가 897MB로 커져서 5개 누적 시 20GB 루트 볼륨이 100%까지
+    # 참 — SSM까지 마비돼 SSH로 직접 복구). 근본 수정은 release 크기
+    # 자체를 줄인 것(lens/webtoon/video/listen [slug]/page.tsx의
+    # STATIC_PARAMS_LIMIT)이고, 이건 그 위에 얹는 보수적 안전마진.
+    'ls -1 /opt/ailens/releases 2>/dev/null | sort -r | tail -n +3 | xargs -r -I{} rm -rf /opt/ailens/releases/{}',
+    # 여유 공간 사전 확인(2026-09-03, 같은 장애 재발 방지) — 정리 후에도
+    # 6GB 미만이면 이번 배포를 아예 시작하지 않는다. 예전엔 이 확인이
+    # 없어서 tar 압축 해제 도중 ENOSPC로 조용히 부분 실패한 릴리스가
+    # 디스크를 마저 채우는 게 실제 장애 원인 중 하나였다 — 여기서 미리
+    # 막으면 최소한 "배포 실패"로 명확히 끝나지, 서버 자체가 마비되는
+    # 데까지는 안 간다.
+    'AVAIL_KB=\$(df --output=avail -k / | tail -1); if [ \$AVAIL_KB -lt 6291456 ]; then echo DEPLOY_ABORT_LOW_DISK avail_kb=\$AVAIL_KB threshold_kb=6291456; df -h /; exit 1; fi',
     f'REL=/opt/ailens/releases/{ts}',
     'mkdir -p \$REL',
     f'aws s3 cp s3://{bucket}/releases/{ts}.tar.gz /tmp/{ts}.tar.gz --region ${AWS_REGION}',
