@@ -1,5 +1,5 @@
 import { FeedPage } from "@/widgets/FeedPage";
-import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts } from "@/shared/lib/api/cmsPostsApi";
+import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts, toLensPreviewSummaries } from "@/shared/lib/api/cmsPostsApi";
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
@@ -121,12 +121,20 @@ export default async function HomePage() {
     initialLensPosts.slice(1),
   );
 
+  // 2026-09-03 — LensPreviewSection(히어로 "오늘의 이슈, 4가지 시선")은
+  // 포맷당 question 한 줄만 쓰는데, 그 앞은 4포맷 전체 본문까지 담긴
+  // initialLensPosts를 그대로 클라이언트로 직렬화하고 있었다(홈 HTML
+  // 6.7MB의 주된 원인 — cmsPostsApi.ts의 toLensPreviewSummaries() 주석
+  // 참조). buildArchiveItems()는 이미 위에서 필요한 필드만 뽑아 별도
+  // ArchiveItem[]로 만들어 두므로, 여기서 축약해도 그 결과엔 영향 없다.
+  const lensPreviewPosts = toLensPreviewSummaries(initialLensPosts);
+
   return (
     <HomeContent
       initialWebtoons={initialWebtoons}
       initialVideos={initialVideos}
       initialWordTerms={initialWordTerms}
-      initialLensPosts={initialLensPosts}
+      initialLensPosts={lensPreviewPosts}
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
       initialHomePlayerPosts={initialHomePlayerPosts}

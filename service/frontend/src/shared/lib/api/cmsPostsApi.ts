@@ -339,6 +339,20 @@ export interface CmsLens {
   is_cms: true;
 }
 
+// 홈 "오늘의 이슈, 4가지 시선"(LensPreviewSection) 전용 축약본(2026-09-03,
+// 페이지 속도 감사) — 그 컴포넌트는 포맷당 question 한 줄만 보여주는데,
+// app/page.tsx가 fetchLensPosts() 결과(최대 100건 × 4포맷의 bullets·
+// paragraphs·transcript 등 본문 전체)를 initialItems prop으로 그대로
+// 클라이언트에 직렬화하고 있었다 — Lighthouse 실측 결과 홈 HTML이
+// 6.7MB(gzip 1.78MB)까지 부푼 주된 원인. buildArchiveItems()는 lenses[]를
+// 아예 안 읽어서 이 축약이 영향 없다(archiveItems.ts 참조).
+export function toLensPreviewSummaries(lenses: CmsLens[]): CmsLens[] {
+  return lenses.map((l) => ({
+    ...l,
+    lenses: (l.lenses ?? []).map((f) => ({ label: f.label, question: f.question, bullets: [] })),
+  }));
+}
+
 export async function fetchLensPosts(): Promise<CmsLens[]> {
   return cached('lens', async () => {
     try {

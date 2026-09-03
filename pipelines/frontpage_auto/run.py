@@ -451,10 +451,33 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
     return status
 
 
+def _get_revalidate_secret(session):
+    try:
+        return session.client("ssm").get_parameter(
+            Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
+        )["Parameter"]["Value"]
+    except Exception:
+        print(f"[frontpage-auto] revalidate secret 조회 실패 — 이번 실행 내내 캐시 무효화 스킵:\n{traceback.format_exc()}")
+        return None
+
+
+def _notify_revalidate(secret):
+    try:
+        requests.post(
+            "https://ailens.sedaily.ai/api/revalidate",
+            headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
+            json={},
+            timeout=30,
+        )
+    except Exception:
+        print(f"[frontpage-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
+
+
 def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
     table = session.resource("dynamodb").Table(TABLE)
+    revalidate_secret = _get_revalidate_secret(session)
 
     today = datetime.now(KST).strftime("%Y%m%d")
     candidates = discovery.fetch_front_page(today)
@@ -472,22 +495,18 @@ def main():
             print(f"[frontpage-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵하고 계속\n{traceback.format_exc()}")
             status = "failed"
         results[status] = results.get(status, 0) + 1
+        # 2026-09-03 — 예전엔 이 웹훅을 후보 전체 루프가 끝난 뒤 한 번만
+        # 불렀다. 뒤에 남은 후보의 영상 생성(수 분 소요)이 안 끝나면 이미
+        # DDB엔 써진 앞선 기사도 그동안 프런트 SSR 캐시(revalidate: 300s)가
+        # 안 갱신돼 "이슈를 찾을 수 없어요"로 뜨는 걸 사용자가 실제로
+        # 클릭해보고 신고해서 발견(홈 "오늘의 이슈, 4가지 시선" 형식 타일
+        # 클릭이 "안 넘어간다"고 느껴짐 — 실제로는 링크는 타는데 목적지
+        # 페이지가 아직 캐시된 옛 목록이라 그 글을 못 찾은 것). 기사 하나가
+        # 끝날 때마다 바로 무효화하면 이 창을 없앨 수 있다.
+        if status in ("published", "published_no_video") and revalidate_secret:
+            _notify_revalidate(revalidate_secret)
 
     print(f"[frontpage-auto] 완료 — {json.dumps(results, ensure_ascii=False)}")
-
-    if results["published"] or results["published_no_video"]:
-        try:
-            secret = session.client("ssm").get_parameter(
-                Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
-            )["Parameter"]["Value"]
-            requests.post(
-                "https://ailens.sedaily.ai/api/revalidate",
-                headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
-                json={},
-                timeout=30,
-            )
-        except Exception:
-            print(f"[frontpage-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
 
     # 전량 실패(0건 성공 + 후보 있었음)면 명시적으로 실패 코드 반환 —
     # ECS 태스크 실패로 잡혀서 CloudWatch 알람이 걸리도록.

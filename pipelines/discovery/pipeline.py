@@ -51,11 +51,21 @@ BUCKET = "sedaily-news-xml-storage"
 PREFIX = "daily-xml"
 
 _TAG_RE = re.compile(r"<[^>]+>")
+_WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _strip_html(raw: str) -> str:
-    text = _TAG_RE.sub("", raw or "")
-    return html.unescape(text).strip()
+    # 2026-09-03 — 태그를 빈 문자열로 지웠더니 원문의 <br/>(부제 줄바꿈 등)
+    # 자리에 아무 구분자도 안 남아 앞뒤 문장이 그대로 붙어버렸다("...수요
+    # 확보<br/>하이닉스 자금..." → "...수요 확보하이닉스 자금...").
+    # 메타디스크립션 감사에서 lens/video/letters 세 채널 전부의 context가
+    # 이 형태로 깨져 있는 걸 발견 — sub_title이 이 함수를 거쳐 저장되고
+    # service/backend/services/cms_posts_shaping.py:220의 context가 그
+    # sub_title을 그대로 쓴다. 태그를 공백으로 바꾸고 공백을 하나로
+    # 접으면 어떤 태그가 구분자였든 최소한 단어가 붙는 사고는 안 난다.
+    text = _TAG_RE.sub(" ", raw or "")
+    text = html.unescape(text)
+    return _WHITESPACE_RE.sub(" ", text).strip()
 
 
 def _s3_client(profile: str | None):
