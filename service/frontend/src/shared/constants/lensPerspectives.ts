@@ -181,6 +181,21 @@ export function lensPerspectiveAt(i: number): LensPerspective {
   return LENS_PERSPECTIVES[i] ?? LENS_PERSPECTIVES[i % LENS_PERSPECTIVES.length] ?? LENS_PERSPECTIVES[0];
 }
 
+/**
+ * 홈·목록 타일에 보여줄 캡션 — 항상 고정 태그라인만 쓴다.
+ *
+ * 아이템의 `question` 필드는 웹툰 외 포맷(레터/팟캐스트/영상)에서 기사
+ * 제목을 그대로 복사한 값이라, 캡션으로 쓰면 헤드라인이 중복 표시된다
+ * (2026-08-23 발견). `LensListClient.tsx`는 그날 바로 `p.tagline`으로
+ * 고쳐 유지됐지만, `LensPreviewSection.tsx`(홈)는 다음날(2026-08-24) 그리드
+ * 레이아웃 재설계 때 `l.question || p.tagline`가 조용히 재도입돼 버그가
+ * 재발했었다(2026-09-03 발견·수정). 두 파일 다 `l.question`을 직접 참조하지
+ * 말고 반드시 이 함수를 거칠 것 — 세 번째 재발을 막기 위한 단일 진입점.
+ */
+export function lensFormatCaption(i: number): string {
+  return lensPerspectiveAt(i).tagline;
+}
+
 /** 홈 티저 칩 → 상세 딥링크(/lens/{id}#lens-2)에서 쓰는 앵커 id. */
 export function lensPanelId(i: number): string {
   return `lens-${i + 1}`;
