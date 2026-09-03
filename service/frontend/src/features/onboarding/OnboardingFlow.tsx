@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { fetchLensPosts, fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { GoalStep, type OnboardingGoal } from './components/GoalStep';
 import { FormatStep } from './components/FormatStep';
 import { ConsumeStep } from './components/ConsumeStep';
@@ -52,10 +52,23 @@ export function OnboardingFlow() {
   const [interests, setInterests] = useState<string[]>([]);
   const [subscribed, setSubscribed] = useState(false);
 
+  // 2026-09-03 — fetchLensPosts()(목록)가 이제 백엔드 축약판(label/
+  // question/bullets만)을 돌려준다(lens 채널 500 근본 수정 — 목록 API가
+  // 4포맷 전체를 다 담아서 무거웠던 게 원인). 온보딩은 실제로 포맷 콘텐츠
+  // 전체(문단·웹툰 컷·대본)를 렌더링해야 하니, 목록에서 "오늘의 1면"을
+  // 고른 뒤 그 한 건만 단건 조회(fetchLensBySlug)로 다시 받는다 — lens/
+  // webtoon 상세 페이지가 오늘 이미 쓰기 시작한 것과 같은 패턴.
   useEffect(() => {
     let cancelled = false;
     fetchLensPosts().then((posts) => {
-      if (!cancelled) setLens(pickTopArticle(posts));
+      const top = pickTopArticle(posts);
+      if (!top) {
+        if (!cancelled) setLens(null);
+        return;
+      }
+      fetchLensBySlug(top.id).then((full) => {
+        if (!cancelled) setLens(full);
+      });
     });
     return () => {
       cancelled = true;
