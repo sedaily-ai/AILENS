@@ -1,6 +1,7 @@
 'use client';
 
 import { Briefcase, TrendingUp, Globe } from 'lucide-react';
+import { OnboardingHeader } from './OnboardingHeader';
 
 // STEP 1 — 목표 질문. 듀오링고식: 가입 없이, 답은 STEP 4(관심분야) 프리체크에만
 // 쓰인다(OnboardingFlow.tsx의 GOAL_TO_INTEREST) — 그 외엔 순수 선택 UX.
@@ -21,18 +22,7 @@ export function GoalStep({
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 22px 0' }}>
-        <span style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-          AI LENS
-        </span>
-        <button
-          type="button"
-          onClick={onSkip}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#94a3b8' }}
-        >
-          건너뛰기 →
-        </button>
-      </div>
+      <OnboardingHeader currentStep={1} onSkip={onSkip} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '8px 24px', gap: 28, maxWidth: 420, margin: '0 auto', width: '100%' }}>
         <div style={{ textAlign: 'center' }}>
@@ -79,7 +69,7 @@ export function GoalStep({
       </div>
 
       <div style={{ textAlign: 'center', padding: '0 0 28px' }}>
-        <p style={{ margin: 0, fontSize: 11, color: '#9ca3af' }}>가입 없이 계속할 수 있어요</p>
+        <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>가입 없이 계속할 수 있어요</p>
       </div>
     </div>
   );

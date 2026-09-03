@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
+import { onboardingPrimaryButtonStyle } from '../lib/onboardingButton';
+import { OnboardingHeader } from './OnboardingHeader';
 
 // STEP 7 — 마무리. 와이어프레임의 "몇 시에 받아보고 싶으세요?" 시간 피커는
 // 뺐다 — frontpage_auto(07:00 KST 고정)/mustknow_auto(08/12/15/18/21/23시
@@ -18,10 +21,13 @@ export function DoneStep({
   subscribed: boolean;
 }) {
   const href = lens ? `/lens/${encodeURIComponent(lens.id)}?v=${formatIndex + 1}` : '/';
+  const p = lensPerspectiveAt(formatIndex);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '40px 0 0' }}>
+      <OnboardingHeader currentStep={7} />
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '28px 0 0' }}>
         {subscribed && (
           <>
             <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#e6f4ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -56,10 +62,7 @@ export function DoneStep({
       <div style={{ flex: 1 }} />
 
       <div style={{ padding: '0 28px 14px', maxWidth: 420, margin: '0 auto', width: '100%' }}>
-        <Link
-          href={href}
-          style={{ display: 'block', width: '100%', textAlign: 'center', padding: 16, borderRadius: 12, background: '#0f172a', color: '#ffffff', fontSize: 15, fontWeight: 700, textDecoration: 'none' }}
-        >
+        <Link href={href} style={onboardingPrimaryButtonStyle(p.color)}>
           오늘 것부터 먼저 보기 →
         </Link>
       </div>

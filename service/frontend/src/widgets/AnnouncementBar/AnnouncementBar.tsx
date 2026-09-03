@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 // 상단 공지 배너 — "우리도 뉴닉/캐릿처럼 상단에 돌아가는 배너 하나 있으면
 // 어떨까" 요청(2026-08-06). 참고한 사례(빙글 등)는 "실제 할인/이벤트" 배너라
@@ -26,6 +27,7 @@ const ANNOUNCEMENTS: Announcement[] = [
 ];
 
 export function AnnouncementBar() {
+  const pathname = usePathname() ?? '';
   const [dismissed, setDismissed] = useState(true); // 기본 숨김 — localStorage 확인 전 깜빡임 방지
   const [index, setIndex] = useState(0);
 
@@ -47,6 +49,12 @@ export function AnnouncementBar() {
     return () => clearInterval(id);
   }, [dismissed]);
 
+  // /start(온보딩)는 완전 몰입형 단일 목적 플로우 — 다른 페이지로 새는
+  // 링크(웹툰/단어장/스타일/아카이브)를 보여주면 흐름이 끊기고, 이 배너의
+  // 높이만큼 문서가 뷰포트를 넘겨 스크롤이 생긴다(2026-09-03, 사용자
+  // 요청 — "스크롤 안하도록 하고 싶은데 깔끔하게"). ConditionalFooter.tsx의
+  // /start 처리와 같은 이유.
+  if (pathname === '/start' || pathname.startsWith('/start/')) return null;
   if (dismissed) return null;
 
   const current = ANNOUNCEMENTS[index];

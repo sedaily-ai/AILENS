@@ -16,7 +16,12 @@ import { SiteFooter } from './SiteFooter';
 // 어두운 톤을 걷어내고 공용 Header + 밝은 톤으로 되돌렸고(WebtoonListClient.tsx
 // (A)(B) 참조), 웹툰은 도구가 아니라 읽고 나면 다른 콘텐츠로 이어가는 읽을
 // 거리다 — 푸터가 없으면 다 본 독자가 사이트에서 고립된다.
-const HIDE_FOOTER_PREFIXES = ['/games', '/timeline'];
+// /start 추가(2026-09-03, 사용자 요청 — "스크롤 안하도록 하고 싶은데
+// 깔끔하게") — 온보딩 각 단계가 minHeight:100dvh로 화면 딱 맞게 설계돼
+// 있는데, 그 아래 SiteFooter가 그대로 붙어 문서 전체 높이가 뷰포트보다
+// 커져서 스크롤이 생겼다. 온보딩도 games/timeline과 같은 완전 몰입형
+// 단일 목적 플로우라 같은 논리가 적용된다.
+const HIDE_FOOTER_PREFIXES = ['/games', '/timeline', '/start'];
 
 export function ConditionalFooter() {
   const pathname = usePathname() ?? '';

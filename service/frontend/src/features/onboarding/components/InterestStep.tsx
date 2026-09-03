@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
+import { onboardingPrimaryButtonStyle } from '../lib/onboardingButton';
+import { OnboardingHeader } from './OnboardingHeader';
 
 // STEP 4 — 관심 분야. "지면 특별 코너" taxonomy(LensPreviewSection.tsx의
 // SECTIONS)와 동일한 4개 값. "전체"는 나머지 3개와 배타적(라디오처럼) —
@@ -11,10 +14,12 @@ export function InterestStep({
   initialSelected,
   onContinue,
   onSkip,
+  onBack,
 }: {
   initialSelected: string[];
   onContinue: (selected: string[]) => void;
   onSkip: () => void;
+  onBack?: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>(initialSelected);
 
@@ -28,10 +33,7 @@ export function InterestStep({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '26px 0 0' }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3182F6' }} />
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#e5e7eb' }} />
-      </div>
+      <OnboardingHeader currentStep={4} onSkip={onSkip} onBack={onBack} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 30px', textAlign: 'center', gap: 12 }}>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.22em', textTransform: 'uppercase' }}>
@@ -56,8 +58,8 @@ export function InterestStep({
                 style={{
                   padding: '10px 18px',
                   borderRadius: 999,
-                  background: on ? '#3182F6' : '#ffffff',
-                  border: `1px solid ${on ? '#3182F6' : '#e5e7eb'}`,
+                  background: on ? LENS_ACCENT : '#ffffff',
+                  border: `1px solid ${on ? LENS_ACCENT : '#e5e7eb'}`,
                   fontSize: 14,
                   fontWeight: on ? 700 : 600,
                   color: on ? '#ffffff' : '#475569',
@@ -71,19 +73,8 @@ export function InterestStep({
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px 26px', borderTop: '1px solid #f1f5f9' }}>
-        <button
-          type="button"
-          onClick={onSkip}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#94a3b8' }}
-        >
-          건너뛰기
-        </button>
-        <button
-          type="button"
-          onClick={() => onContinue(selected)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 22px', borderRadius: 12, background: '#0f172a', border: 'none', color: '#ffffff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-        >
+      <div style={{ padding: '18px 22px 26px', maxWidth: 420, margin: '0 auto', width: '100%' }}>
+        <button type="button" onClick={() => onContinue(selected)} style={onboardingPrimaryButtonStyle()}>
           다음 →
         </button>
       </div>
