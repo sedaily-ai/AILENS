@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { fetchVideos, fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
@@ -30,11 +31,33 @@ async function fetchAllVideos(): Promise<CmsVideo[]> {
 // 요청 시점에 정상 렌더링(generateMetadata·기본 export 둘 다 이미
 // fetchVideoBySlug를 직접 쓰고 있었음 — lens/webtoon과 달리 처음부터
 // 안전했던 부분).
-const STATIC_PARAMS_LIMIT = 100;
+// 2026-09-03 후속(ISR 재설계 감사) — generateMetadata·JSON-LD·사이트맵이
+// 이미 이 함수와 무관하다는 게 확인돼(위 주석 참조) 100은 과하다는 결론
+// — 10으로 더 낮춘다. 0으로 완전히 비우지 않는 건 lens/webtoon과 같은
+// 이유(<Link> 프리페치 유지, 라우트가 ƒ Dynamic으로 바뀌는 것 방지).
+const STATIC_PARAMS_LIMIT = 10;
 
 export async function generateStaticParams() {
   const videos = await fetchAllVideos();
   return videos.slice(0, STATIC_PARAMS_LIMIT).map((v) => ({ slug: v.id }));
+}
+
+export const dynamicParams = true;
+// ⚠️ 리터럴이어야 함(lens/[slug]/page.tsx 주석 참조) — cmsPostsApi.ts의
+// CACHE_TTL_FALLBACK_SECONDS와 값이 반드시 같아야 한다.
+export const revalidate = 300;
+
+// lens/webtoon의 findLens()/findWebtoon()과 동일한 3회 재시도 패턴
+// (2026-09-03, ISR 재설계 감사로 발견 — 여긴 원래 재시도가 없어서 API
+// 콜드스타트 같은 일시적 실패가 그대로 "찾을 수 없어요"로 렌더되고 그게
+// ISR 캐시에 최대 300초간 박제될 위험이 있었다).
+async function findVideo(slug: string): Promise<CmsVideo | null> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const result = await fetchVideoBySlug(slug);
+    if (result) return result;
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+  }
+  return null;
 }
 
 export async function generateMetadata({
@@ -44,7 +67,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
-  const video = await fetchVideoBySlug(slug);
+  const video = await findVideo(slug);
   if (!video) {
     return { title: '영상을 찾을 수 없어요', robots: { index: false } };
   }
@@ -131,8 +154,15 @@ export default async function VideoViewPage({
 }) {
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
-  const video = await fetchVideoBySlug(slug);
-  const jsonLd = video ? buildJsonLd(video, slug) : null;
+  const video = await findVideo(slug);
+  // 2026-09-03(ISR 재설계) — 원래 여긴 못 찾아도 200 + noindex로 렌더하고
+  // 클라이언트(VideoViewClient)의 "찾을 수 없어요" 상태에 맡겼다. 3회
+  // 재시도(findVideo)를 거치고도 없으면 진짜 없는 것으로 보고 실제 404를
+  // 준다 — 크롤러 관점에서 soft-404(noindex)보다 정확한 신호.
+  if (!video) {
+    notFound();
+  }
+  const jsonLd = buildJsonLd(video, slug);
   return (
     <>
       {jsonLd && (

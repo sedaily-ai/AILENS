@@ -33,12 +33,25 @@ async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
 // 목록엔 필요), 빌드 시점에 미리 만드는 개수만 최근 것으로 줄인다 —
 // 오래된 화는 findWebtoon()의 단건 조회(바로 아래)로 요청 시점에
 // 정상 렌더링된다.
-const STATIC_PARAMS_LIMIT = 100;
+//
+// 2026-09-03 후속(ISR 재설계 감사) — generateMetadata·JSON-LD·사이트맵이
+// 전부 이 함수와 무관하다는 게 확인돼(findWebtoon 단건 조회, sitemap.ts도
+// 별도 목록 호출) 100은 여전히 과하다는 결론 — 10으로 더 낮춘다.
+const STATIC_PARAMS_LIMIT = 10;
 
 export async function generateStaticParams() {
   const webtoons = await fetchAllWebtoons();
   return webtoons.slice(0, STATIC_PARAMS_LIMIT).map((w) => ({ slug: w.id }));
 }
+
+// 위 STATIC_PARAMS_LIMIT 밖 글도 항상 정상 렌더되도록 명시(App Router
+// 기본값이 true라 원래도 동작했지만, ISR 재설계 의도를 코드로 남긴다).
+export const dynamicParams = true;
+
+// fetch 레벨(cmsPostsApi.ts의 cacheOpts)에 이미 걸려있던 안전망을 라우트
+// 레벨에도 명문화. ⚠️ 리터럴이어야 함(lens/[slug]/page.tsx 주석 참조) —
+// cmsPostsApi.ts의 CACHE_TTL_FALLBACK_SECONDS와 값이 반드시 같아야 한다.
+export const revalidate = 300;
 
 // 2026-09-03 — lens/[slug]/page.tsx와 같은 버그를 여기서도 발견(사용자
 // 질문 "오래된 것들도 SEO 됐나"로 재현). fetchAllWebtoons()(현재 limit

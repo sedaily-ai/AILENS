@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, toWebtoonSeriesListPayload, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { groupIntoSeries, findSeriesBySlug, type WebtoonSeries } from '@/shared/lib/webtoonSeries';
@@ -25,11 +25,26 @@ async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
 // 그 라우트 자체가 없어서 404였다(2026-08-24 발견) — generateStaticParams로
 // 실제 페이지를 만든다. [slug]/page.tsx와 동일 이유: 이게 없으면 이 라우트가
 // ƒ Dynamic 취급돼 <Link> 프리페치가 안 붙는다.
+//
+// 2026-09-03(ISR 재설계 감사로 발견) — 이 라우트만 2026-09-03 오전의
+// STATIC_PARAMS_LIMIT 수정에서 빠져 있었다. series_title이 없는 편은
+// 전부 자기 자신만의 "단편" 시리즈가 되므로([slug]/page.tsx와 별개로)
+// 사실상 웹툰 편 수만큼 무제한으로 정적 페이지가 쌓이고 있었다(수백 개
+// 추정, 오늘 디스크풀 장애 재현 가능성이 있던 미해결 지점). [slug]/
+// page.tsx와 동일한 상한을 적용 — 최근 갱신된 시리즈 STATIC_PARAMS_LIMIT
+// 개만 미리 빌드, 나머지는 findSeries()의 요청 시점 조회로.
+const STATIC_PARAMS_LIMIT = 10;
+
 export async function generateStaticParams() {
   const webtoons = await fetchAllWebtoons();
   const series = groupIntoSeries(webtoons);
-  return series.map((s) => ({ slug: s.slug }));
+  return series.slice(0, STATIC_PARAMS_LIMIT).map((s) => ({ slug: s.slug }));
 }
+
+export const dynamicParams = true;
+// ⚠️ 리터럴이어야 함(lens/[slug]/page.tsx 주석 참조) — cmsPostsApi.ts의
+// CACHE_TTL_FALLBACK_SECONDS와 값이 반드시 같아야 한다.
+export const revalidate = 300;
 
 async function findSeries(slug: string): Promise<WebtoonSeries | null> {
   const webtoons = await fetchAllWebtoons();
@@ -122,6 +137,12 @@ export default async function WebtoonSeriesPage({
   const slug = decodeURIComponent(rawSlug);
   const [webtoons, series] = await Promise.all([fetchAllWebtoons(), findSeries(slug)]);
   const jsonLd = series ? buildJsonLd(series, slug) : null;
+  // panels(컷 이미지+캡션 배열)는 이 페이지가 안 읽는다 — 표지 썸네일만
+  // 쓴다(SeriesViewClient.tsx 참조). 회차 번호 매김은 전체 목록 개수에
+  // 의존하므로 slice는 안 하고 무거운 필드만 뺀다(toWebtoonSeriesListPayload
+  // 주석 참조) — 이게 최대 1000건짜리 페이지 여러 개(시리즈당 하나)에
+  // 통째로 심기던 오늘 장애급 페이로드 폭증의 실질적 원인이었다.
+  const webtoonsForClient = toWebtoonSeriesListPayload(webtoons);
   return (
     <>
       {jsonLd && (
@@ -130,7 +151,7 @@ export default async function WebtoonSeriesPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <SeriesViewClient slug={slug} initialItems={webtoons} />
+      <SeriesViewClient slug={slug} initialItems={webtoonsForClient} />
     </>
   );
 }
