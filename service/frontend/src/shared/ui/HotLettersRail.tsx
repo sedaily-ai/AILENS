@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
-import { letterHref } from '@/shared/lib/letterHref';
 
 const HOT_LETTERS_LIMIT = 5;
 
@@ -55,7 +54,7 @@ export function HotLettersRail({ initialItems }: { initialItems?: TodayLetterCar
         {hotLetters.map((l, idx) => (
           <li key={l.letterId}>
             <Link
-              href={letterHref(l.letterId)}
+              href={l.href}
               className="group flex items-start transition-opacity"
               style={{
                 gap: 12,

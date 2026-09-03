@@ -16,7 +16,6 @@ import Image from 'next/image';
 import { ScrollReveal } from '@/shared/ui/ScrollReveal';
 import { NewsletterCTA } from '@/features/news-feed';
 import { useLatestLetters } from '@/shared/hooks/useLatestLetters';
-import { letterHref } from '@/shared/lib/letterHref';
 
 const STEPS = [
   {
@@ -362,7 +361,7 @@ function HowItWorksSection() {
 function SampleLetterSection() {
   const { cards } = useLatestLetters();
   const sample = cards[0];
-  const href = sample ? letterHref(sample.letterId) : '/';
+  const href = sample ? sample.href : '/';
 
   return (
     <section
