@@ -3,7 +3,7 @@ import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts, toLensPrevie
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
-import { fetchHomePlayerPosts } from "@/shared/lib/api/homePlayerApi";
+import { fetchHomePlayerPosts, toAudioPreviewSummaries } from "@/shared/lib/api/homePlayerApi";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
 import type { Term } from "@/features/news-feed";
@@ -129,6 +129,12 @@ export default async function HomePage() {
   // ArchiveItem[]로 만들어 두므로, 여기서 축약해도 그 결과엔 영향 없다.
   const lensPreviewPosts = toLensPreviewSummaries(initialLensPosts);
 
+  // 2026-09-03 — 같은 문제를 오디오 섹션에서도 발견. AudioPreviewSection은
+  // 최대 4장만 쓰는데 최대 1000건(각 건 팟캐스트 전체 대본 포함)을 그대로
+  // 넘기고 있었다 — homePlayerApi.ts의 toAudioPreviewSummaries() 참조.
+  // 이 값의 유일한 소비자가 AudioPreviewSection이라 여기서 잘라도 안전.
+  const audioPreviewPosts = toAudioPreviewSummaries(initialHomePlayerPosts);
+
   return (
     <HomeContent
       initialWebtoons={initialWebtoons}
@@ -137,7 +143,7 @@ export default async function HomePage() {
       initialLensPosts={lensPreviewPosts}
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
-      initialHomePlayerPosts={initialHomePlayerPosts}
+      initialHomePlayerPosts={audioPreviewPosts}
     />
   );
 }

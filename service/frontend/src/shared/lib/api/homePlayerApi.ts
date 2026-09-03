@@ -85,6 +85,18 @@ function ssrCacheOpts(tag: string): RequestInit {
   return { cache: 'force-cache', next: { tags: [tag], revalidate: 300 } };
 }
 
+// 홈 "오늘의 뉴스를 귀로" 미리보기(AudioPreviewSection) 전용 축약본
+// (2026-09-03, 페이지 속도 후속 — lens 축약과 같은 문제를 여기서도
+// 발견). 그 컴포넌트는 최대 4장만 보여주고 카드당 id/title/
+// mediaEmbedUrl/category/date만 쓰는데, app/page.tsx는 최대 1000건
+// 전체(각 건마다 팟캐스트 전체 대본 transcript 포함)를 그대로
+// initialItems prop으로 직렬화하고 있었다 — lens와 똑같이 홈 HTML을
+// 불필요하게 부풀리는 원인. 이 섹션의 유일한 소비자(AudioPreviewSection)
+// 라서 서버가 넘기기 전에 미리 4개로 자르고 안 쓰는 필드를 비운다.
+export function toAudioPreviewSummaries(posts: HomePlayerPost[]): HomePlayerPost[] {
+  return posts.slice(0, 4).map((p) => ({ ...p, transcript: null, excerpt: '' }));
+}
+
 /** /listen 목록 페이지용 — 발행일 순 정렬. */
 export async function fetchHomePlayerPosts(): Promise<HomePlayerPost[]> {
   try {
