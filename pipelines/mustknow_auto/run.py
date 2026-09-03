@@ -554,11 +554,34 @@ def _publish(
     return status
 
 
+def _get_revalidate_secret(session):
+    try:
+        return session.client("ssm").get_parameter(
+            Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
+        )["Parameter"]["Value"]
+    except Exception:
+        print(f"[mustknow-auto] revalidate secret 조회 실패 — 이번 실행 내내 캐시 무효화 스킵:\n{traceback.format_exc()}")
+        return None
+
+
+def _notify_revalidate(secret):
+    try:
+        requests.post(
+            "https://ailens.sedaily.ai/api/revalidate",
+            headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
+            json={},
+            timeout=30,
+        )
+    except Exception:
+        print(f"[mustknow-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
+
+
 def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
     table = session.resource("dynamodb").Table(TABLE)
     seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
+    revalidate_secret = _get_revalidate_secret(session)
 
     today = datetime.now(KST).strftime("%Y%m%d")
     # 일요일은 지면(인쇄판) 자체가 안 나온다(사용자 확인, 2026-08-23 —
@@ -606,6 +629,15 @@ def main():
             print(f"[mustknow-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵\n{traceback.format_exc()}")
             status = "failed"
         results[status] = results.get(status, 0) + 1
+        # 2026-09-03 — 이전엔 웹훅을 main() 끝에서 전체 후보 처리가 끝난
+        # 뒤 딱 한 번만 불렀다. 뒤에 남은 후보의 영상 생성(수 분 소요)이
+        # 안 끝나면 이미 DDB엔 써진 앞선 기사도 그동안 프런트 SSR 캐시
+        # (revalidate: 300s)가 안 갱신돼 "이슈를 찾을 수 없어요"로 뜨는 걸
+        # 사용자가 실제로 클릭해보고 신고해서 발견했다(frontpage_auto와
+        # 같은 문제 — run.py의 같은 날짜 수정 참조). 기사 하나가 끝날
+        # 때마다 바로 무효화해서 이 창을 없앤다.
+        if status in ("published", "published_no_video") and revalidate_secret:
+            _notify_revalidate(revalidate_secret)
         return status
 
     # 1) 전체(지면1면) — 점수 불필요, TOP 배치 우선(discovery가 이미 정렬해서 줌)
@@ -699,20 +731,6 @@ def main():
 
     print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
 
-    if results["published"] or results["published_no_video"]:
-        try:
-            secret = session.client("ssm").get_parameter(
-                Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
-            )["Parameter"]["Value"]
-            requests.post(
-                "https://ailens.sedaily.ai/api/revalidate",
-                headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
-                json={},
-                timeout=30,
-            )
-        except Exception:
-            print(f"[mustknow-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
-
 
 def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str]):
     """2026-08-26 — 사용자 요청으로 신규. 자정을 넘겨 discovery의 "오늘" 후보
@@ -725,6 +743,7 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
     s3 = session.client("s3")
     table = session.resource("dynamodb").Table(TABLE)
     seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
+    revalidate_secret = _get_revalidate_secret(session)
     out_dir = Path("/tmp/mustknow_auto_out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -744,22 +763,13 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
         if status != "failed":
             _mark_seen(seen_table, key, tab=tab, manual=True)
             published += 1
+            # main()/_try_publish()와 같은 이유(2026-09-03) — 기사 하나가
+            # 끝날 때마다 바로 무효화해서 나머지 기사 처리를 기다리는 동안
+            # 캐시가 안 갱신되는 창을 없앤다.
+            if revalidate_secret:
+                _notify_revalidate(revalidate_secret)
 
     print(f"[mustknow-auto][manual] 완료 — {published}/{len(keys)}건 {tab} 탭에 발행")
-
-    if published:
-        try:
-            secret = session.client("ssm").get_parameter(
-                Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
-            )["Parameter"]["Value"]
-            requests.post(
-                "https://ailens.sedaily.ai/api/revalidate",
-                headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
-                json={},
-                timeout=30,
-            )
-        except Exception:
-            print(f"[mustknow-auto][manual] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { fetchWebtoons, fetchVideos, fetchLensPosts, fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
+import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { kstTodayStr } from '@/shared/lib/date';
 // 2026-08-25: `./(content)/games/play/[slug]/page` 에서 가져오던 것을 단일 출처로
 // 교체. app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
@@ -175,6 +176,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // 영상 — 웹툰과 같은 이유로 개별 URL을 sitemap에 추가(2026-08-11).
+  // videos 확장(2026-09-03, GEO 감사) — 웹툰의 images 필드와 같은 논리:
+  // sitemap이 URL만 주지 말고 "이 페이지 안에 이런 영상이 있다"는 걸
+  // Google 비디오 sitemap 스펙(next의 MetadataRoute.Sitemap[].videos)으로
+  // 명시한다. video 채널은 항상 자체 렌더링해 S3에 올린 mp4라 video_url을
+  // content_loc(원본 파일 직링크)로 그대로 쓸 수 있다.
   try {
     const videos = await fetchVideos();
     for (const v of videos) {
@@ -184,6 +190,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(v.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
+        videos: [
+          {
+            title: v.title,
+            thumbnail_loc: v.thumbnail_url || `${BASE}/og-image.png`,
+            description: v.excerpt || v.title,
+            content_loc: v.video_url,
+            publication_date: `${v.date}T07:00:00+09:00`,
+            family_friendly: 'yes',
+          },
+        ],
       });
     }
   } catch {
@@ -193,16 +209,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 오디오 — 영상과 같은 이유로 개별 URL을 sitemap에 추가(2026-08-21,
   // /listen 신설). date가 빈 문자열인 항목(옛 home_player 데이터, 백엔드
   // 필드 확장 전)은 lastModified를 못 정하니 건너뛴다.
+  // videos 확장(2026-09-03) — 이 채널은 순수 오디오(mp3 등)와 영상(유튜브/
+  // 네이버TV/자체 mp4)이 섞여 있다. listen/[slug]/page.tsx의 buildJsonLd()가
+  // isDirectAudioUrl()로 이미 이 둘을 나누고 있어 같은 판별을 그대로 쓴다 —
+  // 순수 오디오는 Google 비디오 sitemap 스펙 대상이 아니라서 videos 필드를
+  // 안 채운다(PodcastEpisode로만 노출, JSON-LD는 이미 있음).
   try {
     const listen = await fetchHomePlayerPosts();
     for (const it of listen) {
       if (!it.date) continue;
       const daysOld = daysBetween(it.date);
+      const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
+      const resolved = isAudio ? null : resolveVideo(it.mediaEmbedUrl);
       entries.push({
         url: `${BASE}/listen/${it.id}`,
         lastModified: new Date(it.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
+        ...(isAudio
+          ? {}
+          : {
+              videos: [
+                {
+                  title: it.title,
+                  thumbnail_loc: resolved?.autoThumbnailUrl || `${BASE}/og-image.png`,
+                  description: it.excerpt || it.title,
+                  ...(resolved ? { player_loc: resolved.embedUrl } : { content_loc: it.mediaEmbedUrl }),
+                  publication_date: `${it.date}T07:00:00+09:00`,
+                  family_friendly: 'yes',
+                },
+              ],
+            }),
       });
     }
   } catch {
