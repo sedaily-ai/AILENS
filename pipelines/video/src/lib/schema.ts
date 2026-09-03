@@ -66,6 +66,18 @@ export const diagramCutSchema = z.object({
   }),
 });
 
+// url은 LLM이 직접 쓰지 않는다 — pipelines/video/generate_script.py의
+// fix_script()가 파이프라인이 이미 아는 실제 원문 사진 URL로 항상
+// 덮어쓴다(2026-09-03, 기자 피드백 "원문 사진이 들어가면 좋겠다").
+export const photoCutSchema = z.object({
+  type: z.literal('photo'),
+  ...baseCutFields,
+  data: z.object({
+    url: z.string().min(1),
+    credit: z.string().optional(),
+  }),
+});
+
 export const chartCutSchema = z.object({
   type: z.literal('chart'),
   ...baseCutFields,
@@ -102,6 +114,7 @@ export const cutSchema = z.discriminatedUnion('type', [
   statCutSchema,
   diagramCutSchema,
   chartCutSchema,
+  photoCutSchema,
   highlightCutSchema,
   closingCutSchema,
 ]);
@@ -126,6 +139,7 @@ export type StatCutType = z.infer<typeof statCutSchema>;
 export type DiagramCutType = z.infer<typeof diagramCutSchema>;
 export type DiagramItem = z.infer<typeof diagramItemSchema>;
 export type ChartCutType = z.infer<typeof chartCutSchema>;
+export type PhotoCutType = z.infer<typeof photoCutSchema>;
 export type HighlightCutType = z.infer<typeof highlightCutSchema>;
 export type ClosingCutType = z.infer<typeof closingCutSchema>;
 export type Cut = z.infer<typeof cutSchema>;

@@ -285,14 +285,18 @@ def _dedupe_near_identical(articles: list[dict]) -> list[dict]:
     return kept
 
 
-def _generate_video(name: str, article_path: Path, out_dir: Path) -> dict | None:
+def _generate_video(
+    name: str, article_path: Path, out_dir: Path, *, photo_url: str | None = None, photo_caption: str | None = None
+) -> dict | None:
     """frontpage_auto/run.py의 동명 함수와 동일 — 성공하면
     {"mp4_path": Path, "thumb_path": Path|None} 반환, 팩트 누락으로 실패하면
     None(그 기사는 영상 없이 3/4 포맷만 발행)."""
     from generate_script import generate_script  # pipelines/video/generate_script.py
 
     try:
-        script_path = generate_script(name, str(article_path), output_root=out_dir)
+        script_path = generate_script(
+            name, str(article_path), output_root=out_dir, photo_url=photo_url, photo_caption=photo_caption
+        )
     except ValueError as e:
         print(f"[mustknow-auto] {name} 영상 각본 생성 실패(사람 확인 필요) — {e}")
         return None
@@ -405,7 +409,10 @@ def _publish(
         if podcast_script_path.exists() else None
     ) or None
 
-    video = _generate_video(name, article_path, out_dir)
+    video = _generate_video(
+        name, article_path, out_dir,
+        photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
+    )
     video_url = thumb_url = None
     video_transcript = None
     status = "published"

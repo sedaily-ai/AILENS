@@ -125,7 +125,9 @@ def extract_json_block(text: str) -> dict:
     raise ValueError("Bedrock 응답에서 JSON을 찾지 못했습니다")
 
 
-def fix_script(script: dict) -> tuple[dict, list[str]]:
+def fix_script(
+    script: dict, *, photo_url: str | None = None, photo_caption: str | None = None
+) -> tuple[dict, list[str]]:
     """안전한 결함(장식성 필드)만 자동 수정. 반환: (수정된 script, 적용된 수정 로그)"""
     applied: list[str] = []
     fixed_cuts = []
@@ -140,6 +142,22 @@ def fix_script(script: dict) -> tuple[dict, list[str]]:
         if cut_type in ("highlight", "closing") and "data" not in cut:
             cut["data"] = {}
             applied.append(f"{tag}: 빈 data 필드 추가")
+
+        # 2026-09-03 — photo 컷의 실제 URL은 LLM이 쓰게 두지 않는다(베껴
+        # 쓰다 틀릴 위험) — 파이프라인이 이미 알고 있는 값을 여기서 덮어쓴다.
+        # LLM이 photo_url 없이(=원문에 사진이 없는데도) photo 컷을 만들었으면
+        # highlight로 안전 강등 — 존재하지 않는 사진을 참조한 채 렌더가
+        # 깨지는 것보다 낫다.
+        if cut_type == "photo":
+            if photo_url:
+                cut["data"] = {"url": photo_url}
+                if photo_caption:
+                    cut["data"]["credit"] = photo_caption
+                applied.append(f"{tag}: data.url을 원문 사진 URL로 주입")
+            else:
+                cut["type"] = "highlight"
+                cut["data"] = {}
+                applied.append(f"{tag}: 원문 사진이 없는데 photo 컷을 만듦 → highlight로 강등")
 
         if cut_type == "opening":
             data = cut.setdefault("data", {})
@@ -208,7 +226,13 @@ def validate_script(script: dict) -> list[str]:
 
 
 def generate_script(
-    name: str, article_path: str, output_root: Path = Path("."), resume: bool = True
+    name: str,
+    article_path: str,
+    output_root: Path = Path("."),
+    resume: bool = True,
+    *,
+    photo_url: str | None = None,
+    photo_caption: str | None = None,
 ) -> Path:
     out = output_root / name
     out.mkdir(parents=True, exist_ok=True)
@@ -223,8 +247,17 @@ def generate_script(
     print(f"{tag} video 프롬프트 로드")
     guide = ddb_prompt.load_prompt("video")
 
+    # 2026-09-03 — 원문 사진 여부만 알려준다. URL 문자열 자체는 안 준다
+    # (LLM이 photo 컷을 쓰면 fix_script()가 실제 URL로 덮어쓴다) — letters의
+    # [공용 팩트시트]와 같은 "원문 뒤에 짧게 이어붙이는" 패턴.
+    article_input = article + (
+        f"\n\n---\n[원문 사진]\n있음 — {photo_caption}" if photo_url and photo_caption
+        else "\n\n---\n[원문 사진]\n있음" if photo_url
+        else ""
+    )
+
     print(f"{tag} 각본 생성 중...")
-    raw = call_text(guide, f"다음 기사 원문으로 영상 각본 + 렌더용 JSON을 만들어주세요.\n\n{article}", max_tokens=4000)
+    raw = call_text(guide, f"다음 기사 원문으로 영상 각본 + 렌더용 JSON을 만들어주세요.\n\n{article_input}", max_tokens=4000)
     (out / "raw_response.txt").write_text(raw, encoding="utf-8")
 
     # 2026-08-22 — GPT에서 Bedrock Claude로 각본 생성 모델을 바꾸며 새로 나온
@@ -249,7 +282,7 @@ def generate_script(
         (out / "raw_response_retry.txt").write_text(retry_raw, encoding="utf-8")
         script = extract_json_block(retry_raw)
 
-    script, applied = fix_script(script)
+    script, applied = fix_script(script, photo_url=photo_url, photo_caption=photo_caption)
     for line in applied:
         print(f"{tag} [자동수정] {line}")
 
@@ -274,12 +307,12 @@ def generate_script(
             "원문에 애초에 수치가 없는 정성적 내용이면 stat/chart 대신 "
             "highlight나 closing처럼 수치가 필요 없는 타입으로 바꿔주세요. "
             "없는 수치를 지어내지는 마세요.\n\n"
-            f"[원문]\n{article}\n\n[방금 만든 JSON]\n{json.dumps(script, ensure_ascii=False)}"
+            f"[원문]\n{article_input}\n\n[방금 만든 JSON]\n{json.dumps(script, ensure_ascii=False)}"
         )
         try:
             retry_raw = call_text(guide, retry_message, max_tokens=4000)
             retry_script = extract_json_block(retry_raw)
-            retry_script, retry_applied = fix_script(retry_script)
+            retry_script, retry_applied = fix_script(retry_script, photo_url=photo_url, photo_caption=photo_caption)
             for line in retry_applied:
                 print(f"{tag} [자동수정·재시도] {line}")
             retry_errors = validate_script(retry_script)

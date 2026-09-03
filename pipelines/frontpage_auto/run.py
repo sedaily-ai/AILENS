@@ -207,13 +207,17 @@ def _already_published(table, article_key: str) -> bool:
     return len(resp.get("Items", [])) > 0
 
 
-def _generate_video(name: str, article_path: Path, out_dir: Path) -> dict | None:
+def _generate_video(
+    name: str, article_path: Path, out_dir: Path, *, photo_url: str | None = None, photo_caption: str | None = None
+) -> dict | None:
     """성공하면 {"video_url": Path, "thumbnail_url": Path} 반환, 팩트 누락으로
     실패하면 None(그 기사는 영상 없이 3/4 포맷만 발행)."""
     from generate_script import generate_script  # pipelines/video/generate_script.py
 
     try:
-        script_path = generate_script(name, str(article_path), output_root=out_dir)
+        script_path = generate_script(
+            name, str(article_path), output_root=out_dir, photo_url=photo_url, photo_caption=photo_caption
+        )
     except ValueError as e:
         # validate_script()가 의도적으로 던지는 에러 — 팩트(수치) 누락,
         # 사람이 원문에서 채워야 함(§23).
@@ -306,7 +310,10 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
         if podcast_script_path.exists() else None
     ) or None
 
-    video = _generate_video(name, article_path, out_dir)
+    video = _generate_video(
+        name, article_path, out_dir,
+        photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
+    )
     video_url = thumb_url = None
     video_transcript = None
     status = "published"
