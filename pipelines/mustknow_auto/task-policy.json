@@ -81,6 +81,7 @@
       "Action": ["bedrock:InvokeModel"],
       "Resource": [
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq",
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/kmkagk616y1c",
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7",
         "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-4-6",
