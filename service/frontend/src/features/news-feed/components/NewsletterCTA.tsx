@@ -11,7 +11,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { NewsletterEmailField, type SubscribeLetterPayload } from '@/shared/ui/NewsletterEmailField';
 import { useLatestLetters } from '@/shared/hooks/useLatestLetters';
-import { letterHref } from '@/shared/lib/letterHref';
 
 export function NewsletterCTA() {
   const { cards, date } = useLatestLetters();
@@ -172,7 +171,7 @@ export function NewsletterCTA() {
             {sampleLetter.excerpt}
           </p>
           <Link
-            href={letterHref(sampleLetter.letterId)}
+            href={sampleLetter.href}
             style={{
               fontSize: 12,
               fontWeight: 700,

@@ -5,7 +5,8 @@
  *
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
-import { fetchCmsPosts } from './cmsPostsApi';
+import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
+import { letterHref } from '@/shared/lib/letterHref';
 
 // 이미지 채널 — 코드 렌더용 차트 데이터 (레터 실수치, AI 생성 아님).
 export interface LetterChart {
@@ -239,6 +240,11 @@ function estimateReadMinutes(body: string[], bodyHtml?: string | null): number {
 
 export interface TodayLetterCardLike {
   letterId: string;
+  // 상세로 이동할 링크(2026-09-03, letters→lens 전환) — 소스에 따라
+  // /letters/{id} 또는 /lens/{id}로 갈리므로, 호출부가 letterHref()를
+  // 직접 부르지 않고 이 값을 그대로 쓴다. 어댑터(toTodayLetterCard/
+  // toLensLetterCard)가 채운다.
+  href: string;
   editorId: string;
   editorName: string;
   editorRole: string;
@@ -262,6 +268,7 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
   const meta = DEFAULT_META;
   return {
     letterId: letter.id,
+    href: letterHref(letter.id),
     editorId: letter.editor_id,
     editorName: meta.editorName,
     editorRole: meta.editorRole,
@@ -284,52 +291,57 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
   };
 }
 
+// 2026-09-03(ISR 재설계 감사로 발견) — letters 채널은 2026-08-12 이후
+// 자동 파이프라인 신규 발행이 없다(레터 포맷이 lens.lenses[]로 완전히
+// 흡수됨, frontpage_auto/mustknow_auto 둘 다 channels:["lens"]만 씀).
+// HotLettersRail·NewsletterCTA·온보딩 샘플이 위 toTodayLetterCard 경로로
+// 14일 룩백을 쓰고 있었는데, 22일째 신규 발행이 없어 매번 룩백 초과 —
+// 에러 없이 조용히 빈 화면을 렌더링해왔다. lens(내부 letter 포맷, 항상
+// lenses[0] — LENS_FORMATS 순서)를 대체 소스로 쓴다.
+export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
+  const meta = DEFAULT_META;
+  const letterFormat = lens.lenses?.[0];
+  const subtitle = (lens.context || '').trim();
+  return {
+    letterId: lens.id,
+    href: `/lens/${encodeURIComponent(lens.id)}`,
+    editorId: lens.editor_id,
+    editorName: meta.editorName,
+    editorRole: meta.editorRole,
+    editorAvatar: meta.editorAvatar,
+    thumbnailUrl: lens.photo_image_url || lens.cover_image_url || null,
+    archetype: meta.editorRole,
+    accent: meta.accent,
+    accentBg: meta.accentBg,
+    title: lens.headline,
+    subtitle,
+    excerpt: truncate(subtitle || stripLeadingMarkers(letterFormat?.paragraphs?.[0] || ''), 200),
+    readMinutes: estimateReadMinutes(letterFormat?.paragraphs || []),
+    deliveryHint: '오늘 발행',
+    dateLabel: formatDateLabel(lens.date),
+    newsId: lens.id,
+  };
+}
+
 // 최신 레터 카드 목록 — 지금은 HotLettersRail("요즘 가장 많이 읽힌 글") 하나만
 // 쓴다. 원래 이름·주석은 홈 "이슈 톡톡"(FollowingFeed) 섹션 전용이던 시절
 // 것인데, 그 섹션은 2026-08-17 홈 개편으로 카테고리 기반 구조에 흡수됐다
 // (NewsFeedTab.tsx 참조) — 함수 자체는 그대로 재사용 중이라 이름은 남겨둔다.
-// 서버(app/page.tsx 빌드타임 프리페치)와 클라이언트(HotLettersRail.tsx 갱신
-// effect) 양쪽이 똑같은 로직을 쓰도록 공유 함수로 뽑았다(2026-08-07, 홈 SSG
-// 감사). 오늘부터 최대 MAX_LOOKBACK_DAYS일 역순 조회, MAX_DISPLAY편을 채우면
-// 멈춘다 — 하루에 0~1편만 나오는 날이 흔해 "오늘 있으면 끝"으로는 카드가
-// 휑하게 남는 문제가 있었다(2026-08-07 실제 발생).
 const FOLLOWING_MAX_DISPLAY = 4;
-const FOLLOWING_MAX_LOOKBACK_DAYS = 14;
-
-function todayKST(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
-}
-
-function shiftDate(isoDate: string, days: number): string {
-  const [y, m, d] = isoDate.split('-').map((s) => parseInt(s, 10));
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + days);
-  return dt.toISOString().slice(0, 10);
-}
 
 // limit 파라미터화(2026-08-10) — 홈 "이슈 톡톡" 섹션은 4개, 사이드바 "요즘
 // 가장 많이 읽힌 글"은 같은 이슈 톡톡 분류를 5개까지 보여달라는 요청으로
 // 상한을 호출부가 고를 수 있게 뺐다. 기본값은 기존 FollowingFeed 동작 유지.
+//
+// 2026-09-03 — letters 대신 lens를 소스로 쓴다(toLensLetterCard 주석
+// 참조). fetchLensPosts()가 이미 최신순 정렬로 내려주므로 날짜별
+// 역순 조회 루프 자체가 필요 없어졌다 — 단순 slice.
 export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLAY): Promise<TodayLetterCardLike[]> {
-  const collected: TodayLetterCardLike[] = [];
-  let date = todayKST();
-  for (
-    let daysBack = 0;
-    daysBack <= FOLLOWING_MAX_LOOKBACK_DAYS && collected.length < limit;
-    daysBack += 1
-  ) {
-    try {
-      // "분류"(형식: 이슈 톡톡/인사이트/용어해설) 축은 2026-08-19 카테고리로
-      // 완전히 대체됐다 — section 기준 제외 필터(예전엔 인사이트만 뺐다)도
-      // 그와 함께 폐기. 이제 레터는 형식 무관하게 전부 대상이다.
-      const res = await fetchTodayLetters(date);
-      const posts = res.letters ?? [];
-      collected.push(...posts.map((l) => toTodayLetterCard(l, res.date)));
-    } catch {
-      // 이 날짜 조회 실패 — 조용히 다음 날짜로 계속 (라이브 단일 소스, mock 폴백 없음)
-    }
-    date = shiftDate(date, -1);
+  try {
+    const posts = await fetchLensPosts();
+    return posts.slice(0, limit).map(toLensLetterCard);
+  } catch {
+    return [];
   }
-  return collected.slice(0, limit);
 }
 
