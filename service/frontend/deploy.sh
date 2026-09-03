@@ -51,6 +51,22 @@ TS="$(date -u +%Y%m%d-%H%M%S)"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT
 
+# macOS는 다운로드된 파일에 com.apple.quarantine 등 xattr을 붙이는데, cp -r은
+# COPYFILE_DISABLE=1을 줘도(이 env var는 옛 macOS의 AppleDouble(._*) 사이드카
+# 생성만 막을 뿐, 최신 macOS(Darwin 25+)의 cp -r은 그거와 무관하게 xattr
+# 자체를 계속 그대로 복사한다 — 2026-09-03 실제 배포에서 COPYFILE_DISABLE=1을
+# 먼저 시도했다가 cp 이후에도 xattr이 그대로 붙어있는 걸 직접 확인하고 폐기)
+# 그대로 $BUILD_DIR로 넘어온다. tar -czf가 이 xattr을 AppleDouble/PAX 확장
+# 헤더로 아카이브에 담으면, EC2(GNU tar, Linux)는 이 키워드를 몰라
+# "Ignoring unknown extended header keyword" 경고를 내는데, 이게 tar를
+# 비정상 종료시켜 `set -e`로 배포 4/5 단계가 중단된 적이 있다(2026-09-03,
+# public/의 다운로드된 jpg 2개가 원인 — ln -sfn/pm2 restart 전에 죽어서
+# 프로덕션 자체는 안 건드리고 끝났다). 그래서 소스 쪽을 막는 대신 tar가
+# 아카이브를 "만드는" 시점에 xattr/mac 메타데이터 자체를 안 담게 만드는
+# bsdtar 플래그로 확실히 막는다 — public/에 어떤 파일이 어떻게 들어오든,
+# 그 파일이 xattr을 갖고 있든 말든 재발을 막는다(로컬 재현으로 검증됨).
+NO_MAC_XATTR_TAR_FLAGS=(--no-xattrs --no-mac-metadata --no-acls --no-fflags)
+
 # standalone 산출물은 client 정적 에셋(.next/static)과 public/을 자체적으로
 # 포함하지 않는다 — Next 문서대로 별도 복사해야 server.js가 정상 서빙한다.
 cp -r "$STANDALONE_APP_DIR/." "$BUILD_DIR/"
@@ -59,7 +75,7 @@ cp -r .next/static "$BUILD_DIR/.next/static"
 cp -r public "$BUILD_DIR/public"
 
 TARBALL="/tmp/ailens-release-${TS}.tar.gz"
-(cd "$BUILD_DIR" && tar -czf "$TARBALL" .)
+(cd "$BUILD_DIR" && tar "${NO_MAC_XATTR_TAR_FLAGS[@]}" -czf "$TARBALL" .)
 echo "  [OK] $(du -h "$TARBALL" | cut -f1) — ${TS}"
 
 echo ""
@@ -108,6 +124,15 @@ cmds = [
     # 자체를 줄인 것(lens/webtoon/video/listen [slug]/page.tsx의
     # STATIC_PARAMS_LIMIT)이고, 이건 그 위에 얹는 보수적 안전마진.
     'ls -1 /opt/ailens/releases 2>/dev/null | sort -r | tail -n +3 | xargs -r -I{} rm -rf /opt/ailens/releases/{}',
+    # /tmp의 옛 릴리스 tarball 정리(2026-09-03, 실제 장애로 발견) — 위
+    # releases 정리와 같은 이유·같은 위치(배포 '시작'에 청소)로 하나 더
+    # 필요했다. /tmp는 루트 볼륨이 아니라 별도 tmpfs(RAM 기반, 957MB
+    # 고정 크기)라 위 AVAIL_KB 사전확인('/'만 본다)이 이 문제를 전혀
+    # 못 잡는다 — 이날 실패한 배포 3번이 전부 'rm -f /tmp/{ts}.tar.gz'
+    # (배포 끝부분)까지 못 가고 죽어서 잔해가 쌓였고, 결국 tmpfs가
+    # 100% 차서(949M/957M) 그다음 배포의 S3 다운로드 자체가 ENOSPC로
+    # 실패했다. 새 tarball을 받기 전에 옛것부터 지운다.
+    'rm -f /tmp/*.tar.gz',
     # 여유 공간 사전 확인(2026-09-03, 같은 장애 재발 방지) — 정리 후에도
     # 6GB 미만이면 이번 배포를 아예 시작하지 않는다. 예전엔 이 확인이
     # 없어서 tar 압축 해제 도중 ENOSPC로 조용히 부분 실패한 릴리스가
@@ -127,10 +152,28 @@ cmds = [
     f'tar -xzf /tmp/{ts}.tar.gz -C \$REL',
     'cp /opt/ailens/current/.env.production.local \$REL/.env.production.local',
     'ln -sfn \$REL /opt/ailens/current',
-    f'cd /opt/ailens/current && pm2 restart {process} --update-env',
-    'sleep 2',
+    # pm2 restart는 '이미 등록된 프로세스 정의'를 그대로 재실행할 뿐,
+    # 스크립트 경로를 절대 갱신하지 않는다 — 2026-09-03 실제 장애로 확인:
+    # 이 EC2를 최초 세팅한 오늘 새벽(05:29 릴리스) 이후의 모든 배포가
+    # 'restart'만 반복해왔는데, pm2가 최초 등록 시점에 잡은 절대경로
+    # (/opt/ailens/releases/20260903-052934/server.js)를 그대로 계속
+    # 써서 — current 심볼릭 링크는 매번 최신 릴리스를 가리켜도 실제
+    # 실행 중이던 코드는 계속 그 옛 릴리스였다(이 세션의 과거 '성공한'
+    # 배포들이 실제로는 프로덕션에 반영 안 됐을 가능성이 있다는 뜻).
+    # 그러다 그 옛 릴리스 폴더가 보존정리(최신 2개만 유지)로 삭제되자
+    # pm2가 재시작할 파일을 못 찾아 502가 났다. delete+start로 매
+    # 배포마다 프로세스 정의 자체를 새로 등록해서, current 심볼릭
+    # 링크를 항상 새로 따라가게 고친다.
+    f'pm2 delete {process} 2>/dev/null || true',
+    f'cd /opt/ailens/current && pm2 start server.js --name {process} --cwd /opt/ailens/current --update-env',
+    'pm2 save',
+    # 재시작 직후 고정 2초만 기다리고 curl 1번으로 헬스체크하면, 서버가
+    # 아직 포트 바인딩 전이라 'Connection refused'(curl 자체 종료코드 7)로
+    # 오탐 실패가 나고 set -e가 배포 전체를 죽인다(2026-09-03 실제 발생 —
+    # 이때는 delete+start 자체는 이미 성공한 뒤였는데도 배포는 Failed로
+    # 잘못 보고됐다). 최대 10초까지 1초 간격으로 재시도.
+    'for i in 1 2 3 4 5 6 7 8 9 10; do curl -s -f -o /dev/null http://localhost:3000/ && echo LOCAL_HEALTH_OK && break; sleep 1; done',
     'pm2 list',
-    \"curl -s -o /dev/null -w 'local_status=%{http_code}\n' http://localhost:3000/\",
     f'rm -f /tmp/{ts}.tar.gz',
     'df -h / | tail -1',
 ]

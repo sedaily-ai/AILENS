@@ -6,18 +6,12 @@ import {
   SITE_URL,
   WEBTOON_LIST_TITLE,
   WEBTOON_LIST_DESCRIPTION,
-  WEBTOON_PAGE_SIZE,
   buildWebtoonJsonLd,
 } from '../../webtoonListShared';
 
-// 쿼리스트링(/webtoon?page=N) 페이지네이션을 경로로 옮김(2026-08-23) —
-// ../../page.tsx, lens/page/[n]/page.tsx와 같은 이유·같은 구조.
-export async function generateStaticParams() {
-  const items = await fetchWebtoons();
-  const totalPages = Math.max(1, Math.ceil((items.length - 1) / WEBTOON_PAGE_SIZE));
-  return Array.from({ length: Math.max(0, totalPages - 1) }, (_, i) => ({ n: String(i + 2) }));
-}
-
+// 2026-09-03 — generateStaticParams 제거(SSR 전환, 빌드 시간 감사).
+// /lens/page/[n]과 같은 이유 — 아카이브 뒷장은 실사용자가 거의 안
+// 들어가는데도 빌드 때마다 전부 미리 구워서 낭비였다.
 export async function generateMetadata({
   params,
 }: {

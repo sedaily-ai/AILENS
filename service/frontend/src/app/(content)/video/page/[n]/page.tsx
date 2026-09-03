@@ -6,19 +6,12 @@ import {
   SITE_URL,
   VIDEO_LIST_TITLE,
   VIDEO_LIST_DESCRIPTION,
-  VIDEO_PAGE_SIZE,
   buildVideoJsonLd,
 } from '../../videoListShared';
 
-// /lens/page/[n]과 같은 패턴 — 경로 세그먼트라 generateStaticParams +
-// force-cache 조합으로 캐시가 가능하다(쿼리스트링은 Next가 캐시를 못
-// 건다). 1페이지는 이 라우트에 없다(/video 자체가 1페이지).
-export async function generateStaticParams() {
-  const items = await fetchVideos();
-  const totalPages = Math.max(1, Math.ceil(items.length / VIDEO_PAGE_SIZE));
-  return Array.from({ length: Math.max(0, totalPages - 1) }, (_, i) => ({ n: String(i + 2) }));
-}
-
+// 2026-09-03 — generateStaticParams 제거(SSR 전환, 빌드 시간 감사).
+// /lens/page/[n]과 같은 이유 — 아카이브 뒷장은 실사용자가 거의 안
+// 들어가는데도 빌드 때마다 전부 미리 구워서 낭비였다.
 export async function generateMetadata({
   params,
 }: {
