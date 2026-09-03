@@ -149,7 +149,10 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
 // admin/backend/routes/posts.py 4곳) 이 webhook이 호출되므로 "즉시 반영"은
 // 캐시를 껐을 때와 동일하게 유지되고, 그 사이 방문자들은 캐시된 응답을 받아
 // EC2→API 왕복 없이 즉시 렌더링된다.
-const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤엔 자동 갱신(안전망).
+// 2026-09-03 — ISR 재설계로 [slug] page.tsx들이 `export const revalidate`를
+// 명시할 때 이 값을 그대로 참조하도록 export한다(라우트 레벨 선언과 fetch
+// 레벨 안전망이 서로 다른 숫자로 갈라지는 걸 방지).
+export const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤엔 자동 갱신(안전망).
 
 // 이 파일의 함수들은 서버 컴포넌트(app/page.tsx의 SSR Promise.all)뿐 아니라
 // TrendingEconomySection/ColumnPreviewSection 등 다수의 'use client' 컴포넌트가
@@ -211,6 +214,18 @@ export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
 // (건마다 컷 이미지+캡션 배열 panels 포함)를 그대로 넘기고 있었다.
 export function toWebtoonPreviewSummaries(webtoons: CmsWebtoon[]): CmsWebtoon[] {
   return webtoons.slice(0, 4).map((w) => ({ ...w, panels: [] }));
+}
+
+// 웹툰 시리즈 페이지(webtoon/series/[slug]/page.tsx) 전용 축약본
+// (2026-09-03, ISR 재설계 감사로 발견) — 그 페이지는 groupIntoSeries()가
+// "전체 채널 기준 회차 번호"를 정확히 매기기 위해 웹툰 전체 목록(최대
+// 1000건)을 전달받아야 하지만(단순히 series.episodes만 넘기면 번호가
+// 깨짐), panels(컷 이미지+캡션 배열)는 이 페이지가 전혀 안 읽는다(표지
+// 썸네일만 씀) — 개수는 그대로 두고 무거운 필드만 뺀다. 위
+// toWebtoonPreviewSummaries와 달리 slice(0,4)를 하면 안 되는 게 핵심
+// 차이(번호 매김이 전체 목록에 의존).
+export function toWebtoonSeriesListPayload(webtoons: CmsWebtoon[]): CmsWebtoon[] {
+  return webtoons.map((w) => ({ ...w, panels: [] }));
 }
 
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {

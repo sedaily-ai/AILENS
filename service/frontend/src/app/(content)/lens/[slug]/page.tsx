@@ -25,26 +25,40 @@ async function fetchAllLens(): Promise<CmsLens[]> {
 }
 
 // generateStaticParams — letters/webtoon과 동일 이유: 없으면 Next가 이
-// 라우트를 ƒ Dynamic 취급해서 <Link> 프리페치가 안 붙는다.
+// 라우트를 ƒ Dynamic 취급해서 <Link> 프리페치가 안 붙는다. 그래서 0으로
+// 완전히 비우지 않는다 — 최소한의 개수만 남겨 정적/ISR 분류를 유지한다.
 //
-// 최근 STATIC_PARAMS_LIMIT건만(2026-09-03, 실제 EC2 디스크풀 장애로 발견) —
-// fetchLensPosts()의 목록 limit을 오늘 100→1000으로 올리면서 이 함수가
-// 그 1000건(당시 741건 실존)을 전부 정적 페이지로 미리 빌드해버렸다.
-// standalone 산출물이 680MB대에서 897MB로 뛰었고, 그 릴리스를 배포하다
-// EC2 루트 볼륨(20GB)이 100%까지 차서 SSM까지 마비되는 실제 장애로
-// 이어졌다(CloudWatch disk_used_percent로 확인). 목록 API의 limit을
-// 다시 낮출 필요는 없다 — 홈 미리보기·`/lens` 목록이 최근 글을 놓치지
-// 않으려면 1000이 맞다. 문제는 "목록에 몇 건을 보여줄지"와 "몇 건을
-// 미리 빌드할지"가 이 함수 하나로 묶여 있었던 것뿐이다. 최근
-// STATIC_PARAMS_LIMIT건만 빌드 시점에 미리 만들고, 그보다 오래된 글은
-// findLens()의 단건 조회(fetchLensBySlug, 바로 아래)로 요청 시점에
-// 정상 렌더링된다 — 이미 오늘 만든 경로라 새 코드 없이도 안전하다.
-const STATIC_PARAMS_LIMIT = 100;
+// 2026-09-03 오전 — 목록 API limit을 100→1000으로 올리며 이 함수가 실존
+// 741건을 전부 정적 페이지로 미리 빌드, standalone 산출물이 897MB로
+// 뛰어 EC2 루트 볼륨(20GB) 100%로 SSM까지 마비되는 실제 장애가 났다
+// (CloudWatch disk_used_percent로 확인) — 그 직후 STATIC_PARAMS_LIMIT=100
+// 으로 우선 봉합.
+//
+// 2026-09-03 오후 — "부분 개선 말고 근본적으로"라는 요청으로 ISR
+// 재설계 감사 진행. generateMetadata·JSON-LD·사이트맵이 전부 이미 이
+// 함수와 무관하게 단건/목록 API를 직접 호출한다는 게 조사로 확인돼
+// (아래 findLens 참조, sitemap.ts도 마찬가지) 100은 여전히 과했다는
+// 결론 — 10으로 더 낮춘다. 그보다 오래된 글은 findLens()의 단건 조회로
+// 요청 시점에 정상 렌더링(dynamicParams 기본값 true + revalidate 안전망).
+const STATIC_PARAMS_LIMIT = 10;
 
 export async function generateStaticParams() {
   const items = await fetchAllLens();
   return items.slice(0, STATIC_PARAMS_LIMIT).map((l) => ({ slug: l.id }));
 }
+
+// 위 STATIC_PARAMS_LIMIT 밖 글도 항상 정상 렌더되도록 명시(App Router
+// 기본값이 true라 원래도 동작했지만, ISR 재설계 의도를 코드로 남긴다).
+export const dynamicParams = true;
+
+// fetch 레벨(cmsPostsApi.ts의 cacheOpts)에 이미 걸려있던 안전망을 라우트
+// 레벨에도 명문화 — 웹훅이 유실돼도 이 시간 안엔 자동 갱신된다.
+// ⚠️ Next.js 라우트 세그먼트 config는 빌드 시 정적 분석되므로 리터럴이어야
+// 한다(import한 상수 참조 불가 — "Unknown identifier" 빌드 에러로 실측
+// 확인함, 2026-09-03). cmsPostsApi.ts의 CACHE_TTL_FALLBACK_SECONDS와 값이
+// 반드시 같아야 한다 — 그쪽을 바꾸면 여기 5곳(lens/webtoon/video/listen/
+// webtoon-series [slug])도 같이 바꿀 것.
+export const revalidate = 300;
 
 // 2026-09-03 — 이전엔 fetchAllLens()(최근 100건)에서 .find()로 찾았다.
 // lens는 하루 수십 건씩 나가는 채널이라 3일 정도만 지나도 그 100건

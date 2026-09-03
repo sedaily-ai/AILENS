@@ -6,7 +6,6 @@
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts } from './cmsPostsApi';
-import { API_URL as API_BASE } from '@/shared/config/apiClient';
 
 // 이미지 채널 — 코드 렌더용 차트 데이터 (레터 실수치, AI 생성 아님).
 export interface LetterChart {
@@ -125,24 +124,17 @@ export async function fetchTodayLetters(date?: string): Promise<ApiTodayLettersR
 
 async function fetchTodayLettersLive(date: string | undefined): Promise<ApiTodayLettersResponse> {
   // 라이브 단일 소스 (mock fallback 제거 2026-07-24). 해당 날짜에 레터가
-  // 없으면 API 가 letters:[] 를 반환 — 호출측이 빈 상태/직전일 lookback 처리.
-  const qs = date ? `?date=${date}` : '';
-
-  // CMS 수동 글을 함께 부른다. 순차가 되지 않게 Promise.all 로 묶는다.
-  // fetchCmsPosts 는 실패해도 throw 하지 않고 [] 를 주므로, CMS 가 죽어도
-  // 기존 레터는 그대로 렌더된다 (spec §8 fail-open, cmsPostsApi.ts 는 무캐시
-  // — 2026-08-09, cmsPostsApi.ts 상단 주석 참조).
-  // today-letters API는 2026-08-04 RDS 삭제로 영구히 빈 응답만 주는 죽은
-  // 경로(CLAUDE.md 참조) — 죽은 경로라 캐시 정책을 굳이 안 건드린다.
-  const [res, cmsPosts] = await Promise.all([
-    fetch(`${API_BASE}/api/v2/today-letters${qs}`, { cache: 'force-cache', next: { revalidate: 60 } }),
-    fetchCmsPosts('letters', date),
-  ]);
-
-  if (!res.ok) {
-    throw new Error(`today-letters API ${res.status}`);
-  }
-  const data = (await res.json()) as ApiTodayLettersResponse;
+  // 없으면 letters:[] — 호출측이 빈 상태/직전일 lookback 처리.
+  //
+  // 2026-09-03 — today-letters API 호출 자체를 제거했다. 이 엔드포인트는
+  // 2026-08-04 RDS 삭제로 영구히 빈 응답만 주는 죽은 경로였고(CLAUDE.md
+  // 참조), 태그 없는 `next: { revalidate: 60 }` fetch라 이 함수를 호출하는
+  // 모든 페이지(홈·/lens·/lens/[slug]·/letters/[id]·카테고리)의 실효 ISR
+  // TTL을 조용히 60초로 깔아뭉개고 있었다(ISR 재설계 감사로 발견) — 실제
+  // 콘텐츠는 옆의 태그 달린 fetchCmsPosts('letters', date) 호출이 이미 전부
+  // 담당하므로, 죽은 fetch를 지우고 빈 응답을 로컬에서 바로 구성한다.
+  const cmsPosts = await fetchCmsPosts('letters', date);
+  const data: ApiTodayLettersResponse = { date: date ?? '', mode: null, letters: [] };
 
   // 관리자가 쓴 글을 앞에 배치 — 편집 의도가 AI 레터보다 우선한다.
   return cmsPosts.length
