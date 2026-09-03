@@ -1,0 +1,8 @@
+[
+  {"key": "Project", "value": "Sedaily-LENS"},
+  {"key": "CostCenter", "value": "sedaily-ai"},
+  {"key": "ServiceName", "value": "Sedaily-LENS"},
+  {"key": "Environment", "value": "prod"},
+  {"key": "Service", "value": "atlas4"},
+  {"key": "Workload", "value": "frontend"}
+]
