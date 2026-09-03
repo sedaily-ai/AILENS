@@ -7,21 +7,14 @@ import {
   SITE_URL,
   LENS_LIST_TITLE,
   LENS_LIST_DESCRIPTION,
-  LENS_PAGE_SIZE,
   buildLensJsonLd,
 } from '../../lensListShared';
 
-// 쿼리스트링(/lens?page=N) 페이지네이션을 경로로 옮김(2026-08-23) —
-// ../../page.tsx 상단 주석 참조. 경로 세그먼트는 [slug] 페이지들처럼
-// generateStaticParams + force-cache 조합으로 캐시가 가능하지만, 쿼리
-// 스트링은 Next가 원천적으로 캐시를 못 건다. 1페이지는 이 라우트에 없다
-// (/lens 자체가 1페이지) — n=1 이하나 숫자가 아니면 정규 URL로 보낸다.
-export async function generateStaticParams() {
-  const items = await fetchLensPosts();
-  const totalPages = Math.max(1, Math.ceil((items.length - 1) / LENS_PAGE_SIZE));
-  return Array.from({ length: Math.max(0, totalPages - 1) }, (_, i) => ({ n: String(i + 2) }));
-}
-
+// 2026-09-03 — generateStaticParams 제거(SSR 전환, 빌드 시간 감사).
+// 아카이브 뒷장(예: /lens/page/15)은 실사용자가 거의 안 들어가는데도
+// 빌드 때마다 전부 미리 구워서 빌드 시간·릴리스 용량을 불필요하게
+// 늘리고 있었다 — [slug] 상세 페이지(<Link> 프리페치가 중요한 곳)와
+// 달리 페이지네이션은 그 UX 이득이 미미해 완전 동적 렌더로 바꾼다.
 export async function generateMetadata({
   params,
 }: {
