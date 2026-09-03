@@ -1,0 +1,37 @@
+{
+  "family": "sedaily-lens-frontend",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": {
+    "cpuArchitecture": "ARM64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontend-execution-role",
+  "taskRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontend-task-role",
+  "containerDefinitions": [
+    {
+      "name": "frontend",
+      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-lens-frontend:latest",
+      "essential": true,
+      "portMappings": [
+        {"containerPort": 3000, "protocol": "tcp"}
+      ],
+      "secrets": [
+        {
+          "name": "REVALIDATE_SECRET",
+          "valueFrom": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-mbti/ssr-revalidate-secret"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sedaily-lens-frontend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "run"
+        }
+      }
+    }
+  ]
+}
