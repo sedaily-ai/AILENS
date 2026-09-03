@@ -1,14 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Header } from "@/widgets/Header";
 import { useEffect, useState } from 'react';
 import { EditorCommentsSection } from '@/features/news-feed';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
+import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { trackArticleRead } from '@/shared/lib/tracking/readingTracker';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
-import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
 import {
   fetchTodayLetters,
@@ -63,7 +61,6 @@ function recentDatesISO(days: number): string[] {
 
 export function LetterDetailClient({ letterId, initialLetter = null, nextLetter = null, prevLetter = null, initialHotLetters }: Props) {
   const [mounted, setMounted] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
 
   const [letter, setLetter] = useState<DisplayLetter | null>(initialLetter);
   // 오늘 함께 발행된, 지금 보고 있는 레터를 제외한 다른 레터들 — Another Lens 섹션에 전달.
@@ -167,48 +164,33 @@ export function LetterDetailClient({ letterId, initialLetter = null, nextLetter 
     return <div className="min-h-screen bg-white" />;
   }
 
+  // 우측 사이드바를 홈/카테고리/lens 페이지와 완전히 동일한 그리드로
+  // 통일했다(2026-08-23, 사용자 지적 — "사이드바 들어가는 모든 경로의
+  // 위치가 x, y 그리고 포지션도 동일한 위치였으면"). 예전엔 이 페이지만
+  // 별도 폭(1040)·별도 컬럼비(720/260)·별도 사이드바 컴포넌트
+  // (SideRail.tsx — HomeSideBar와 별개로 존재하던 구현체, lg:sticky
+  // 까지 걸려있어 다른 페이지와 스크롤 동작 자체가 달랐다)를 썼다.
+  // 2026-09-03 — 이 배선 자체(Header+검색 오버레이+그리드+사이드바)가
+  // LensViewClient·LensListClient·NewsFeedTab과 100% 동일한 코드로
+  // 중복돼 있던 걸 ArticlePageShell로 추출(위 2026-08-23 결정 이후 두 번
+  // 더 불일치가 났던 근본 원인 — worklog에 "다음엔 추출" 남겨두고 실제로
+  // 는 안 했었음).
   return (
-    <div className="min-h-screen bg-white">
-      {/* 글로벌 헤더 — /editors 페이지와 동일한 마크업 (전체 페이지에서 고정).
-          'feed' 탭은 2026-08-17 상단 탭 개편으로 nav에서 빠졌다(headerTabs.ts
-          참조) — 강조할 대응 탭이 더 없다. */}
-      <Header
-        onSearch={() => setShowSearch(true)}
-        tabs={buildHeaderTabs()}
-      />
-
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
-
-      <main>
-        {/* 우측 사이드바를 홈/카테고리/lens 페이지와 완전히 동일한 그리드로
-            통일했다(2026-08-23, 사용자 지적 — "사이드바 들어가는 모든 경로의
-            위치가 x, y 그리고 포지션도 동일한 위치였으면"). 예전엔 이 페이지만
-            별도 폭(1040)·별도 컬럼비(720/260)·별도 사이드바 컴포넌트
-            (SideRail.tsx — HomeSideBar와 별개로 존재하던 구현체, lg:sticky
-            까지 걸려있어 다른 페이지와 스크롤 동작 자체가 달랐다)를 썼다.
-            이제 HomeSideBar를 그대로 쓰고, 바깥 grid도 다른 페이지와 같은
-            maxWidth 1320 + clamp(24px,3.5vw,44px) 좌우 패딩 +
-            clamp(8px,2vw,16px) 위 패딩을 쓴다 — 본문 가독성 폭(720)은 안쪽
-            div에서만 유지한다. */}
-        <div
-          className="mx-auto"
-          style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
-            <div style={{ maxWidth: 720, minWidth: 0 }}>
-              <LetterBody letter={letter} nextLetter={nextLetter} prevLetter={prevLetter} />
-            </div>
-            <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
+    <ArticlePageShell
+      sidebar={<HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />}
+      afterContent={
+        <>
+          <div id="letter-other-lens" style={{ scrollMarginTop: 80 }}>
+            <EditorCommentsSection otherLetters={otherLetters} />
           </div>
-        </div>
-
-        <div id="letter-other-lens" style={{ scrollMarginTop: 80 }}>
-          <EditorCommentsSection otherLetters={otherLetters} />
-        </div>
+          <div className="h-24" />
+        </>
+      }
+    >
+      <main style={{ maxWidth: 720, minWidth: 0 }}>
+        <LetterBody letter={letter} nextLetter={nextLetter} prevLetter={prevLetter} />
       </main>
-
-      <div className="h-24" />
-    </div>
+    </ArticlePageShell>
   );
 }
 

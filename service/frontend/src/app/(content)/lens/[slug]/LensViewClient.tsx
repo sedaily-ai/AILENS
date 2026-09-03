@@ -24,9 +24,7 @@ import {
 } from '@/shared/constants/lensPerspectives';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
-import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
-import { buildHeaderTabs } from '@/shared/lib/headerTabs';
+import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
@@ -88,7 +86,6 @@ export function LensViewClient({
 }) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
   const [active, setActive] = useState(0);
-  const [showSearch, setShowSearch] = useState(false);
   // 실제 오디오·영상 길이(초). loadedmetadata에서만 채운다 — 지어낸 길이를
   // 쓰지 않기 위해서다(lensSamples.ts의 clock() 주석 참조).
   const [mediaDur, setMediaDur] = useState<Record<number, number>>({});
@@ -232,25 +229,19 @@ export function LensViewClient({
 
   if (!slug || lens === null) {
     return (
-      <div className="min-h-screen bg-white">
-        <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
-        <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <ArticlePageShell>
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center" style={{ color: '#6b7280' }}>
           <p>이슈를 찾을 수 없어요.</p>
           <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4" style={{ color: '#6b7280' }}>
             시선 목록으로
           </Link>
         </div>
-      </div>
+      </ArticlePageShell>
     );
   }
 
   if (!lens) {
-    return (
-      <div className="min-h-screen bg-white">
-        <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
-      </div>
-    );
+    return <ArticlePageShell>{null}</ArticlePageShell>;
   }
 
   const photo = pickLensPhoto(lens);
@@ -259,8 +250,12 @@ export function LensViewClient({
   const activeP = lensPerspectiveAt(active);
   const ActiveIcon = activeP.icon;
 
+  // 2026-09-03 — Header+검색 오버레이+그리드+사이드바 배선이
+  // LensListClient·LetterDetailClient·NewsFeedTab과 100% 동일한 코드로
+  // 중복돼 있던 걸 ArticlePageShell로 추출(아래 2026-08-17/08-23 결정
+  // 이후에도 계속 각 파일이 따로 복제해왔던 것 — 이제 단일 소스).
   return (
-    <div style={{ minHeight: '100vh', background: '#fff' }}>
+    <ArticlePageShell sidebar={<HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />}>
       {/* ⚠️ 아래 <style> 안의 주석은 CSS 문자열이라 HTML 응답에 그대로
           실려 나간다(SSR 페이지라 매 요청마다) — 그래서 한 줄짜리 힌트만
           남긴다. 설계 근거는 이 파일과 components/의 JSX 주석에 있다. */}
@@ -419,21 +414,6 @@ export function LensViewClient({
         }
       `}</style>
 
-      {/* 글로벌 헤더(2026-08-17) — 사용자가 본지(en.sedaily.com) 스크린샷을
-          직접 보여주며 "영문사이트는 기사 상세 들어가도 네비게이션이나
-          헤더는 다 유지하거든요"라고 확인. LetterDetailClient.tsx가 이미
-          쓰는 것과 같은 패턴. */}
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
-
-      {/* 우측 사이드바(2026-08-17, 사용자 확인: "홈페이지와 동일 — 인기글+사주")
-          — 홈(NewsFeedTab.tsx)과 같은 HomeSideBar를 재사용. 좌우 패딩·위
-          패딩을 홈과 동일한 값으로 맞췄다(2026-08-23, "사이드바가 홈보다
-          아래로 쏠려 보인다" 지적 — 본문에만 있던 헤드라인 전용 여백을
-          빼고 바깥 wrapper 패딩 하나로 통일). */}
-      <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
-          <div style={{ gridColumn: 1, minWidth: 0 }}>
       <main id="main-content">
         {/* ── 기사 머리 ── 위계: 아이브로우 13 → 헤드라인 40 → 메타 13 */}
         <div className="lw">
@@ -740,11 +720,6 @@ export function LensViewClient({
         </div>
         </div>
       </main>
-          </div>
-
-          <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
-        </div>
-      </div>
-    </div>
+    </ArticlePageShell>
   );
 }

@@ -1,0 +1,1 @@
+export { ArticlePageShell } from './ArticlePageShell';
