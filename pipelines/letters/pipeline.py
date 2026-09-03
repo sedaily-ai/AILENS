@@ -13,6 +13,15 @@
 남긴다). 전용 inference profile `lens-letters-sonnet-46`
 (arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k)
 사용 — 다른 워크로드와 비용 추적이 섞이지 않도록.
+
+2026-09-03 — 사용자 요청으로 레터 생성만 Opus 5로 승급. 전용 profile
+`lens-letters-opus-5`(arn:aws:bedrock:us-east-1:887078546492:
+application-inference-profile/iqye2pzreccq, us.anthropic.claude-opus-5
+copyFrom, 태그는 기존 sonnet-46 profile과 동일 스키마)를 새로 만들어
+교체 — 웹툰/팟캐스트/영상/mustknow 분류·공통 팩트추출(facts_extract.py,
+letters profile 재사용 중)은 범위 밖이라 안 건드림. Opus는 Sonnet보다
+토큰당 비용이 훨씬 높다 — 매일 자동 실행되는 파이프라인이라 누적된다는
+점을 사용자에게 명시적으로 확인받고 진행.
 """
 import sys
 from pathlib import Path
@@ -21,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text
 
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"  # lens-letters-sonnet-46
+MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq"  # lens-letters-opus-5
 
 
 def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> Path:
