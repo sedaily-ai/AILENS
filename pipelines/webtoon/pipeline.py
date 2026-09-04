@@ -36,7 +36,7 @@ Nova Canvas든 SD3.5든 확산 모델 계열은 프롬프트로 요청한 한글
 남겨뒀다 — `IMAGE_PROVIDER`를 "openai"로 바꾸면 크레딧 충전 후 바로
 원래 방식으로 되돌릴 수 있다.
 """
-import sys, json, base64, time, re
+import sys, json, base64, time
 from pathlib import Path
 
 import boto3
@@ -45,7 +45,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
 from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
 from bedrock_client import call_text, call_vision  # 2026-08-23 스크립트/장면연출 + 2026-09-02 이미지 QA
-from json_extract import extract_fenced_json_text, loads_lenient  # pipelines/common/ — 2026-08-23 공용화
+from json_extract import extract_json_object  # pipelines/common/ — 2026-08-23 공용화, 2026-09-04 폴백까지 통합
 
 import prompts
 import compose_text
@@ -134,43 +134,6 @@ _JSON_INSTRUCTION = (
 )
 
 
-def _extract_json_block(text: str) -> dict:
-    """Bedrock 응답에서 JSON 객체를 뽑는다.
-
-    2026-08-23 — 실운영(mustknow_auto 자동 파이프라인) 중 2단계(장면연출)
-    프롬프트에서 Claude가 ```json 코드블록 지침을 안 따르고 순수 JSON
-    텍스트만 반환하는 경우를 확인(기사 2건 발행 실패, "Bedrock 응답에서
-    JSON 코드블록을 찾지 못했습니다"). 코드블록 우선으로 찾되, 없으면
-    원문 전체 → 첫 '{'~마지막 '}' 구간 순으로 폴백해서 실제로 유효한
-    JSON이면 형식과 무관하게 파싱되게 한다. 코드블록 추출 단계는
-    video/generate_script.py·mustknow_auto/classify.py와 공용
-    (common/json_extract.py, 같은 날 공용화)."""
-    fenced = extract_fenced_json_text(text, opener="{")
-    if fenced is not None:
-        # 2026-08-24 — 펜스를 찾아도 그 안이 깨져 있을 수 있다(모델이 \' 처럼
-        # JSON 에 없는 이스케이프를 쓰는 경우). 예전엔 여기서 바로 예외가 나
-        # 아래 폴백들이 아예 실행되지 않았다.
-        try:
-            return loads_lenient(fenced)
-        except json.JSONDecodeError:
-            pass
-
-    stripped = text.strip()
-    try:
-        return loads_lenient(stripped)
-    except json.JSONDecodeError:
-        pass
-
-    start, end = stripped.find("{"), stripped.rfind("}")
-    if start != -1 and end > start:
-        try:
-            return loads_lenient(stripped[start:end + 1])
-        except json.JSONDecodeError:
-            pass
-
-    raise ValueError("Bedrock 응답에서 JSON을 찾지 못했습니다")
-
-
 _SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 
 
@@ -190,7 +153,7 @@ def call_json(prompt: str, debug_path: Path | None = None) -> dict:
     성공하면 안 남긴다(디스크 낭비 방지)."""
     raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=4000, temperature=0.7)
     try:
-        return _extract_json_block(raw)
+        return extract_json_object(raw)
     except ValueError:
         # 파일 저장은 같은 컨테이너 생애주기 안에서만 유효(Fargate 태스크가
         # 끝나면 /tmp도 같이 사라짐) — 실제 사후 확인은 CloudWatch 로그로
@@ -319,7 +282,7 @@ def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool)
         no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
         user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
         raw = call_vision(prompts.VALIDATE_SYSTEM, user_msg, image_bytes, model=SCRIPT_MODEL, max_tokens=500)
-        return _extract_json_block(raw)
+        return extract_json_object(raw)
     except Exception as e:
         print(f"    ⚠️  이미지 QA 검사 실패(통과 처리): {e}")
         return dict(_DEFAULT_VERDICT)

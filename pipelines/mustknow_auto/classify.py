@@ -63,11 +63,12 @@ def _salvage_truncated_array(text: str) -> list[dict]:
 
 
 def _extract_json_array(text: str) -> list[dict]:
-    """generate_script.py의 extract_json_block과 같은 톤 — 배열용으로 새로 작성.
-    한 함수로 합치기엔 단일 객체 vs 배열이라 반환 형태가 달라 그대로 분리.
-    코드블록 추출 단계(앞 두 단계)만 webtoon/pipeline.py·
-    video/generate_script.py와 공용(common/json_extract.py, 2026-08-23) —
-    그 뒤 배열 살리기 로직은 이 파일만의 것이라 계속 분리해서 둔다."""
+    """common/json_extract.py의 extract_json_object와 같은 톤 — 배열용으로
+    새로 작성. 한 함수로 합치기엔 단일 객체 vs 배열이라 반환 형태가 달라
+    그대로 분리(2026-09-04 — webtoon/pipeline.py·video/generate_script.py의
+    객체용 버전은 서로 완전히 같아서 그 둘만 extract_json_object로 통합됨,
+    이 파일은 배열 살리기 로직이 이 파일만의 것이라 여전히 분리). 코드블록
+    추출 단계(앞 두 단계)만 공용(common/json_extract.py, 2026-08-23)."""
     fenced = extract_fenced_json_text(text, opener="[")
     if fenced is not None:
         # 2026-08-24 — 펜스를 찾아도 그 안이 깨져 있을 수 있다(모델이 \' 처럼
