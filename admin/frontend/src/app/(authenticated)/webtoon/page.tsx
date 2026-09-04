@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
 import { PromptDrawer } from "@/components/PromptDrawer";
+import { WebtoonImageLab } from "@/components/WebtoonImageLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -51,6 +52,7 @@ function WebtoonPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkReloadKey, setBulkReloadKey] = useState(0);
   const [promptOpen, setPromptOpen] = useState(false);
+  const [imageLabOpen, setImageLabOpen] = useState(false);
   const visibleReloadKey = useReloadOnVisible();
 
   const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
@@ -181,6 +183,18 @@ function WebtoonPage() {
             </svg>
             프롬프트
           </button>
+          <button
+            type="button"
+            onClick={() => setImageLabOpen(true)}
+            className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-5-5L5 21" />
+            </svg>
+            이미지 실험
+          </button>
           <Link href="/webtoon/edit" className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
             새 웹툰
           </Link>
@@ -219,6 +233,7 @@ function WebtoonPage() {
       )}
 
       <PromptDrawer channel="webtoon" open={promptOpen} onClose={() => setPromptOpen(false)} />
+      <WebtoonImageLab open={imageLabOpen} onClose={() => setImageLabOpen(false)} />
     </div>
   );
 }

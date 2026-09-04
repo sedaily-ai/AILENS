@@ -304,3 +304,38 @@ export interface NewsletterStatsResponse {
     delivery_rate: number;
   };
 }
+
+// --- 웹툰 이미지 실험 (backend/admin/routes/webtoon_lab.py 와 1:1, 2026-09-05) ---
+// Bedrock Stable Diffusion 호출이 30초~9분 걸려 API Gateway 통합 타임아웃(30초 고정)을
+// 넘길 수 있으므로 동기 응답이 없다 — job 생성(POST generate) 후 상태(GET {job_id})를
+// 폴링한다.
+
+export interface WebtoonLabGenerateInput {
+  scene: string;
+  camera: string;
+  /** 비워두면 백엔드가 pipelines/common/webtoon_image.py의 기본 STYLE/FIXED_CHARACTERS를 쓴다. */
+  style?: string;
+  char_female?: string;
+  char_male?: string;
+  scene_reinforce?: boolean;
+  char_reinforce?: boolean;
+}
+
+export interface WebtoonLabJob {
+  job_id: string;
+  status: "pending" | "done" | "error";
+  image_url: string | null;
+  error: string | null;
+  scene: string | null;
+  camera: string | null;
+  style: string | null;
+  char_female: string | null;
+  char_male: string | null;
+  scene_reinforce: boolean | null;
+  char_reinforce: boolean | null;
+  prompt_preview: string | null;
+  created_at: string | null;
+}
+
+/** 히스토리 항목 — prompt_preview·error는 목록엔 없음(job_id로 상세 조회해야 함). */
+export type WebtoonLabHistoryItem = Omit<WebtoonLabJob, "error" | "prompt_preview">;
