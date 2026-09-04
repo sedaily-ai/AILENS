@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Repeat, RotateCcw, RotateCw, Bookmark, ChevronDown, Check } from 'lucide-react';
 import { clock, spoken, boldenQuotes, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/lib/mediaPlayerFormat';
+import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/useMediaPlayerControls';
 
 /**
  * 기사 안에 박아 쓰는 오디오 플레이어 — 2026-08-21 신설, 여러 차례 재설계.
@@ -144,25 +145,11 @@ export function ArticleAudioPlayer({
   onDuration?: (sec: number) => void;
 }) {
   const ref = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [cur, setCur] = useState(0);
-  const [dur, setDur] = useState(0);
-  const [rateIdx, setRateIdx] = useState(1); // 1.0×
-  const [failed, setFailed] = useState(false);
   const [looping, setLooping] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
   // 대본은 접힌 상태로 시작한다(2026-08-24, 사용자 요청) — 팟캐스트는
   // "읽기 대신 듣기" 모드라 대본이 처음부터 펼쳐져 있으면 플레이어보다
   // 텍스트가 더 커 보인다. 필요할 때 탭으로 펼친다.
   const [tab, setTab] = useState<TabKey | null>(null);
-  // 배속 메뉴 열림 여부 — 2026-08-21, UIUX 감사 반영. 이전엔 버튼 하나를
-  // 반복 클릭해 순환시키는 방식이라(0.75→1→1.25→1.5→2→0.75…) "2배로
-  // 가려면 몇 번 눌러야 하나"를 기억해야 했다(회상 요구, 닐슨 휴리스틱
-  // "회상보다 인식"). 지금 고를 수 있는 값 5개를 목록으로 펼쳐서 한 번에
-  // 보여주고 원하는 값을 바로 찍게 한다.
-  const [rateMenuOpen, setRateMenuOpen] = useState(false);
-  const rateMenuRef = useRef<HTMLDivElement | null>(null);
-  const rateTriggerRef = useRef<HTMLButtonElement | null>(null);
   // 대본 자동 추적 — 사용자가 리스트를 수동 스크롤하면 잠깐 해제한다(요청:
   // "현재 재생 중 단락 하이라이트 + 자동 스크롤(수동 스크롤 시 일시 해제)").
   const [autoTrack, setAutoTrack] = useState(true);
@@ -174,160 +161,16 @@ export function ArticleAudioPlayer({
   const scriptListRef = useRef<HTMLOListElement | null>(null);
   const autoTrackResumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // onDuration을 ref로 잡는다 — 호출부가 인라인 화살표 함수를 넘기면 매
-  // 렌더마다 새 함수가 와서, deps에 넣으면 리스너를 계속 붙였다 뗀다.
-  // 대입은 렌더 중이 아니라 effect 안에서 한다(react-hooks/refs 규칙).
-  const onDurationRef = useRef(onDuration);
-  useEffect(() => {
-    onDurationRef.current = onDuration;
-  }, [onDuration]);
-
-  // TodayNewsPlayer.tsx의 같은 패턴(로컬 저장 복원)과 동일한 형태다. 다만
-  // 그 파일은 deps가 []("마운트 시 1회")라 react-hooks/set-state-in-effect가
-  // 안 걸리고, 여기는 deps가 [src]다 — 이 카드는 여러 기사에서 재사용되므로
-  // src가 바뀔 때(다른 오디오로 전환) localStorage를 다시 읽어야 한다.
-  // localStorage는 React 상태가 아닌 외부 시스템이라 effect로 동기화하는
-  // 것이 맞는 용도다(브라우저 API 접근은 렌더 중에 할 수 없다).
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
-      if (raw) {
-        const set: string[] = JSON.parse(raw);
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- 외부 저장소(localStorage) 동기화, src 변경 시 재확인 필요
-        setBookmarked(set.includes(src));
-      }
-    } catch {
-      // localStorage 접근 불가(시크릿 모드 등) — 조용히 무시, 기본값(false) 유지.
-    }
-  }, [src]);
-
-  const toggleBookmark = useCallback(() => {
-    setBookmarked((prev) => {
-      const next = !prev;
-      try {
-        const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
-        const set: string[] = raw ? JSON.parse(raw) : [];
-        const updated = next ? [...new Set([...set, src])] : set.filter((s) => s !== src);
-        window.localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(updated));
-      } catch {
-        // 저장 실패해도 이번 세션 내 UI 상태는 유지.
-      }
-      return next;
-    });
-  }, [src]);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onMeta = () => {
-      const d = el.duration;
-      if (!Number.isFinite(d) || d <= 0) return;
-      setDur(d);
-      onDurationRef.current?.(d);
-    };
-    const onTime = () => {
-      setCur(el.currentTime);
-    };
-    const onEnd = () => {
-      if (looping) {
-        el.currentTime = 0;
-        void el.play().catch(() => setFailed(true));
-        return;
-      }
-      setPlaying(false);
-      setCur(0);
-      el.currentTime = 0;
-    };
-    // play/pause는 엘리먼트에서 받는다 — 잠금화면·헤드셋 버튼처럼 우리 UI를
-    // 거치지 않는 조작이 있어도 버튼 모양이 실제 상태와 안 어긋난다.
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onErr = () => {
-      setFailed(true);
-      setPlaying(false);
-    };
-    el.addEventListener('loadedmetadata', onMeta);
-    el.addEventListener('timeupdate', onTime);
-    el.addEventListener('ended', onEnd);
-    el.addEventListener('play', onPlay);
-    el.addEventListener('pause', onPause);
-    el.addEventListener('error', onErr);
-    return () => {
-      el.removeEventListener('loadedmetadata', onMeta);
-      el.removeEventListener('timeupdate', onTime);
-      el.removeEventListener('ended', onEnd);
-      el.removeEventListener('play', onPlay);
-      el.removeEventListener('pause', onPause);
-      el.removeEventListener('error', onErr);
-    };
-  }, [looping]);
-
-  const toggle = useCallback(() => {
-    setFailed(false);
-    const el = ref.current;
-    if (!el) return;
-    if (el.paused) {
-      void el.play().catch(() => setFailed(true));
-    } else {
-      el.pause();
-    }
-  }, []);
-
-  const seekTo = useCallback((sec: number) => {
-    const el = ref.current;
-    if (!el || !Number.isFinite(el.duration)) return;
-    const next = Math.min(el.duration, Math.max(0, sec));
-    el.currentTime = next;
-    setCur(next);
-  }, []);
-
-  const nudge = useCallback(
-    (delta: number) => {
-      const el = ref.current;
-      if (!el) return;
-      seekTo(el.currentTime + delta);
-    },
-    [seekTo],
-  );
-
-  const selectRate = useCallback((idx: number) => {
-    const el = ref.current;
-    setRateIdx(idx);
-    if (el) el.playbackRate = RATES[idx];
-    setRateMenuOpen(false);
-    rateTriggerRef.current?.focus();
-  }, []);
-
-  // 메뉴 바깥 클릭·Escape로 닫는다 — 열려 있는 동안에만 리스너를 붙여
-  // 평소엔 비용이 없다.
-  useEffect(() => {
-    if (!rateMenuOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (rateMenuRef.current && !rateMenuRef.current.contains(e.target as Node)) {
-        setRateMenuOpen(false);
-      }
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setRateMenuOpen(false);
-        rateTriggerRef.current?.focus();
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [rateMenuOpen]);
-
-  const retry = useCallback(() => {
-    setFailed(false);
-    const el = ref.current;
-    if (!el) return;
-    el.load();
-    void el.play().catch(() => setFailed(true));
-  }, []);
+  // 북마크·배속 메뉴·재생 전송(재생/일시정지/탐색/±5초/재시도) 상태 로직은
+  // ArticleVideoPlayer.tsx와 바이트 단위로 같아서 shared/lib/
+  // useMediaPlayerControls.ts로 추출돼 있다(2026-09-04).
+  const { bookmarked, toggleBookmark } = useMediaBookmark(src, BOOKMARK_STORAGE_KEY);
+  const { rateIdx, rateMenuOpen, setRateMenuOpen, selectRate, rateMenuRef, rateTriggerRef } =
+    usePlaybackRateMenu(ref, RATES);
+  const { playing, cur, dur, failed, toggle, seekTo, nudge, retry } = useMediaTransport(ref, {
+    looping,
+    onDuration,
+  });
 
   const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
   const tick = dur >= 120 ? (60 / dur) * 100 : 0;
