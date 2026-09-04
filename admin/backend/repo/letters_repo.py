@@ -24,7 +24,6 @@ v2/clients/daily_letters_ddb_client.py 에 따로 둔다. 스키마를 바꾸면
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
 
 from boto3.dynamodb.conditions import Key
 

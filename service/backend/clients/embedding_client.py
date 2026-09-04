@@ -16,7 +16,7 @@ Model: amazon.titan-embed-text-v2:0
 import json
 import logging
 import math
-from typing import List, Optional
+from typing import List
 
 import boto3
 from botocore.config import Config

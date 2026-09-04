@@ -10,7 +10,6 @@ Storage: Personal DB (sedaily-mbti-personal-dev)
 """
 import json
 import logging
-import asyncio
 from typing import List
 from datetime import datetime, timezone, timedelta
 

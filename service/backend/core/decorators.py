@@ -6,7 +6,7 @@ Provides unified error handling, logging, and response formatting.
 import functools
 import logging
 import asyncio
-from typing import Callable, Any, Optional, Dict
+from typing import Callable, Any, Dict
 
 from core.response import (
     error_response,

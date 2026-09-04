@@ -9,7 +9,7 @@ threshold update (handle_threshold_update): integer value, 1..10000 range. — A
 import datetime as dt
 import logging
 
-from boto3.dynamodb.conditions import Attr, Key
+from boto3.dynamodb.conditions import Key
 
 from shared import audit, ddb_client, eb_client, response
 
