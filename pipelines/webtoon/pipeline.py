@@ -119,6 +119,38 @@ _SCENE_REINFORCEMENT = (
     "characters beyond what [SCENE]/[CHARACTERS] specify."
 )
 
+# 2026-09-05 — FIXED_CHARACTERS 도입 직후 샘플 실측(article.txt, 8컷)에서
+# "겪었던 문제 3"와 정확히 같은 패턴이 [CHARACTERS]에도 나타났다: 안경·
+# 단발 밥컷·배지가 전부 무시되고 매 컷 다른 "K-드라마/아이돌풍 롱헤어
+# 클로즈업" 얼굴로 회귀(컷마다 서로 다른 사람처럼 보임 — 여성도 컷1/2/3이
+# 전부 다른 얼굴, 남성도 롱헤어 아이돌 스타일로 나와 스펙과 무관했음).
+# [CHARACTERS] 블록 자체가 프롬프트 앞쪽(STYLE 바로 뒤)에 있어서 [SCENE]
+# 재강조와 같은 "뒤쪽에 있어야 더 잘 반영된다"는 실측 교훈이 적용 안 되고
+# 있었던 것으로 추정 — _SCENE_REINFORCEMENT와 같은 위치([SCENE] 직후)에
+# 같은 방식(요약 재반복, 원문 그대로 복붙 아님 — 특정 캐릭터 스펙이 바뀌면
+# 여기도 고쳐야 하는 이중관리를 피하려고 일부러 일반적인 문구로 씀)으로
+# 재강조를 하나 더 추가.
+#
+# 재검증 결과(같은 날 후속 샘플): 이 재강조 추가로 남성 캐릭터의 "짧은
+# 머리"는 개선됐지만, 여성 캐릭터의 안경·배지·단발은 여전히 무시됐다.
+# 실패 지점을 더 구체적으로 못박는 3차 시도(대문자 태그 나열 + "이미
+# 무시된 적 있다" 문구)까지 해봤는데 안경/배지/단발은 그래도 안 뚫렸고
+# 오히려 색상이 통째로 사라지는 부작용만 생겨서 되돌렸다(prompts.py의
+# FIXED_CHARACTERS 근처 "겪었던 문제 4" 후속 메모 참고). 안경 같은 작은
+# 액세서리 단위의 완벽한 동일성은 이 모델·구조로는 프롬프트만으론 안
+# 되는 것으로 보고, 지금 이 재강조 수준(일반적 문구, 큰 특징만) 에서
+# 멈춘다 — 완전한 해결 보장은 없다는 게 이미 "겪었던 문제 3"의 결론이었고
+# 이번에도 같았다.
+_CHARACTER_REINFORCEMENT = (
+    "\n\nSTRICT: The two people above are RECURRING hosts, not one-off "
+    "K-drama/idol characters — render them with the EXACT hairstyle, hair "
+    "length, glasses, outfit, and badge described in [CHARACTERS], not a "
+    "generic long-haired romance-webtoon look. Every cut must show the "
+    "SAME two faces/hairstyles/outfits as each other, matching "
+    "[CHARACTERS] exactly — do not substitute, restyle, or omit any "
+    "described feature (glasses, badge, hair length)."
+)
+
 
 def build_background_prompt(camera: str, scene: str, characters: dict | None = None) -> str:
     """Bedrock 경로 전용 — 텍스트(말풍선/캡션/내레이션) 지침 없이 스타일+장면만.
@@ -128,6 +160,7 @@ def build_background_prompt(camera: str, scene: str, characters: dict | None = N
     return (
         style + _characters_block(characters) + f"\n\n[SCENE]\n{scene}"
         + _SCENE_REINFORCEMENT
+        + (_CHARACTER_REINFORCEMENT if characters else "")
         + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
         "or speech bubbles anywhere in this image — pure illustration only, no "
         "readable characters of any kind. Text will be added separately afterward."
@@ -172,7 +205,10 @@ def call_json(prompt: str, debug_path: Path | None = None) -> dict:
 def build_image_prompt(camera: str, scene: str, cut: dict, characters: dict | None = None) -> str:
     """2단계(장면) + 1단계(대사) 결과를 3단계 이미지 프롬프트로 합친다."""
     style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
-    parts = [style, _characters_block(characters), f"\n\n[SCENE]\n{scene}", _SCENE_REINFORCEMENT]
+    parts = [
+        style, _characters_block(characters), f"\n\n[SCENE]\n{scene}", _SCENE_REINFORCEMENT,
+        _CHARACTER_REINFORCEMENT if characters else "",
+    ]
     if cut.get("narration"):
         parts.append(prompts.narration(cut["narration"]))
     if cut.get("caption"):
