@@ -20,6 +20,7 @@ import type {
   WebtoonLabGenerateInput,
   WebtoonLabJob,
   WebtoonLabHistoryItem,
+  WebtoonLabDefaults,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -321,4 +322,6 @@ export const adminApi = {
     request<WebtoonLabJob>(`/admin/webtoon-lab/${encodeURIComponent(jobId)}`),
   getWebtoonImageHistory: () =>
     request<{ items: WebtoonLabHistoryItem[] }>("/admin/webtoon-lab/history"),
+  getWebtoonImageDefaults: () =>
+    request<WebtoonLabDefaults>("/admin/webtoon-lab/defaults"),
 };

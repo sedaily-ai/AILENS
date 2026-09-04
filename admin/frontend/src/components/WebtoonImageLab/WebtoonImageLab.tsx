@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
-import type { WebtoonLabHistoryItem, WebtoonLabJob } from "@/lib/types";
+import type { WebtoonLabDefaults, WebtoonLabHistoryItem, WebtoonLabJob } from "@/lib/types";
 
 /* 웹툰 3단계(이미지 생성) 프롬프트 실험 패널 — 웹툰 목록 화면의 "이미지 실험"
    버튼이 연다(PromptDrawer와 같은 우측 슬라이드 패턴, 다만 이미지 미리보기 +
@@ -51,6 +51,12 @@ export function WebtoonImageLab({ open, onClose }: Props) {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // 기본 STYLE/FIXED_CHARACTERS(백엔드 pipelines/common/webtoon_image.py가 정본) —
+  // "직접 입력" 토글을 켰을 때 빈 칸이 아니라 지금 실제로 쓰이는 프롬프트를
+  // placeholder로 보여준다(2026-09-04 실사용 피드백: 빈 textarea만 있으면
+  // 뭘 기준으로 고쳐야 할지 알 수 없다).
+  const [defaults, setDefaults] = useState<WebtoonLabDefaults | null>(null);
+
   const clearPoll = useCallback(() => {
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current);
@@ -70,6 +76,15 @@ export function WebtoonImageLab({ open, onClose }: Props) {
       .finally(() => setHistoryLoading(false));
   }, []);
 
+  const loadDefaults = useCallback(() => {
+    adminApi
+      .getWebtoonImageDefaults()
+      .then(setDefaults)
+      .catch(() => {
+        /* placeholder 용도라 실패해도 조용히 무시 — generate는 백엔드가 어차피 기본값을 채운다 */
+      });
+  }, []);
+
   useEffect(() => {
     if (!open) {
       clearPoll();
@@ -81,10 +96,16 @@ export function WebtoonImageLab({ open, onClose }: Props) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 패널이 열릴 때 최초 1회 히스토리 fetch(정당한 케이스, admin/frontend/CLAUDE.md의 drivers/page.tsx와 같은 패턴)
       loadHistory();
     }
+    if (defaults === null) {
+      // loadDefaults는 loadHistory와 달리 setState를 .then() 콜백 안에서만 호출해
+      // 이펙트 본문에서 동기적으로 부르는 게 아니라 react-hooks/set-state-in-effect가
+      // 안 걸린다 — disable 주석 불필요.
+      loadDefaults();
+    }
     return () => {
       document.body.style.overflow = prevOverflow;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 열릴 때 1회만: history를 deps에 넣으면 매 갱신마다 재실행된다
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 열릴 때 1회만: history/defaults를 deps에 넣으면 매 갱신마다 재실행된다
   }, [open]);
 
   useEffect(() => clearPoll, [clearPoll]);
@@ -317,8 +338,8 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                   <textarea
                     value={style}
                     onChange={(e) => setStyle(e.target.value)}
-                    placeholder="기본 STYLE 프롬프트를 대체할 텍스트"
-                    rows={4}
+                    placeholder={defaults?.style ?? "불러오는 중..."}
+                    rows={6}
                     className="ui-input w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                   />
                 </ToggleField>
@@ -335,7 +356,8 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                       <textarea
                         value={charFemale}
                         onChange={(e) => setCharFemale(e.target.value)}
-                        rows={3}
+                        placeholder={defaults?.char_female ?? "불러오는 중..."}
+                        rows={4}
                         className="ui-input mt-0.5 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                       />
                     </div>
@@ -344,7 +366,8 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                       <textarea
                         value={charMale}
                         onChange={(e) => setCharMale(e.target.value)}
-                        rows={3}
+                        placeholder={defaults?.char_male ?? "불러오는 중..."}
+                        rows={4}
                         className="ui-input mt-0.5 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                       />
                     </div>

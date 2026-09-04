@@ -119,6 +119,19 @@ def _run_generation(job_id: str, prompt: str) -> None:
         _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
 
 
+def handle_defaults(body: dict, path_params: dict, query_params: dict) -> dict:
+    """프로덕션 기본 STYLE/FIXED_CHARACTERS 조회 — "직접 입력" 토글을 켰을 때
+    빈 칸이 아니라 지금 실제로 쓰이는 프롬프트를 placeholder로 보여주기 위함
+    (2026-09-04, admin 콘솔 실사용 피드백: 빈 textarea만 보여주면 뭘 고쳐야
+    할지 기준이 없다). webtoon_image.py 하나가 정본이고 여기서 값을 복제하지
+    않는다 — 프런트가 매번 이 엔드포인트로 최신값을 받아간다."""
+    return response.ok({
+        "style": webtoon_image.STYLE,
+        "char_female": webtoon_image.FIXED_CHARACTERS["A (여성 기자, 설명자)"],
+        "char_male": webtoon_image.FIXED_CHARACTERS["B (남성 청자)"],
+    })
+
+
 def handle_generate(body: dict, path_params: dict, query_params: dict) -> dict:
     body = body or {}
     scene = (body.get("scene") or "").strip()

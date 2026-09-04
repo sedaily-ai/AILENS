@@ -339,3 +339,10 @@ export interface WebtoonLabJob {
 
 /** 히스토리 항목 — prompt_preview·error는 목록엔 없음(job_id로 상세 조회해야 함). */
 export type WebtoonLabHistoryItem = Omit<WebtoonLabJob, "error" | "prompt_preview">;
+
+/** 프로덕션 기본 STYLE/FIXED_CHARACTERS — "직접 입력" 토글의 placeholder로 쓴다. */
+export interface WebtoonLabDefaults {
+  style: string;
+  char_female: string;
+  char_male: string;
+}
