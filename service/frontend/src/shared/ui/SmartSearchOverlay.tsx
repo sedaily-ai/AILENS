@@ -370,7 +370,7 @@ export function SmartSearchOverlay({ open, onClose }: Props) {
     setVoiceStatus('listening');
     // createRecognizer 가 환경별 sync (Web Speech) or async (Transcribe) 반환
     void recognizer.start();
-  }, [sendAiVoice]);
+  }, [sendAiVoice, unlockAudioPlayback]);
 
   const stopListening = useCallback(() => {
     recognizerRef.current?.stop();

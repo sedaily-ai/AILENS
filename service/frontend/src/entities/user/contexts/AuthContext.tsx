@@ -84,7 +84,6 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithKakao: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<AuthResult>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<AuthResult>;
   confirmSignUpCode: (email: string, code: string) => Promise<AuthResult>;
@@ -176,11 +175,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Google sign in error:', error);
     }
-  };
-
-  const signInWithKakao = async () => {
-    // Kakao will be added later
-    console.log('Kakao login not yet configured');
   };
 
   // 로그인 화면에서는 이메일 인증 단계를 절대 노출하지 않는다.
@@ -442,7 +436,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         signInWithGoogle,
-        signInWithKakao,
         signInWithEmail,
         signUpWithEmail,
         confirmSignUpCode,
