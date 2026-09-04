@@ -79,10 +79,13 @@ interface Props {
 // 렌즈발 웹툰이 안 올라온다"), fetchWebtoons() 하나만으로 전부 커버된다 —
 // lens에서 파생해서 섞으면 오늘부터는 같은 기사가 두 장으로 중복 표시된다.
 // 과거 lens 글도 백필 스크립트로 webtoon 채널 글을 만들어뒀다
-// (docs/worklog 2026-08-23 웹툰 채널 분리 참조) — buildLensWebtoonItems는
-// 더 이상 이 섹션에서 쓰지 않는다(lensMediaFeed.ts에 그대로 남아 있지만
-// video 파생 쪽은 아직 이 정리가 안 됐다 — 별개 사안, 2026-08-20 결정
-// 그대로 유지 중).
+// (docs/worklog 2026-08-23 웹툰 채널 분리 참조).
+//
+// 2026-09-04 — 위 주석이 낡아 있었다: "video 파생 쪽은 아직 정리 안 됐다"고
+// 남겨뒀는데, video 쪽(VideoPreviewSection.tsx)도 이미 2026-08-23에 같은
+// 방식으로 fetchVideos()로 이관 완료돼 있었다(리팩토링 감사로 발견) —
+// lensMediaFeed.ts(buildLensWebtoonItems/buildLensVideoItems 둘 다 호출자
+// 0)는 통째로 삭제.
 export function WebtoonPreviewSection({ initialItems }: Props) {
   const [items, setItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
 

@@ -10,6 +10,7 @@ import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
 import { VIDEO_PAGE_SIZE } from './videoListShared';
 
 const PAGE_SIZE_OPTIONS = [24, 48, 96];
@@ -35,8 +36,6 @@ export function VideoListClient({
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<CmsVideo[]>(initialItems);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [pageSize, setPageSize] = useState(VIDEO_PAGE_SIZE);
-  const [clientPage, setClientPage] = useState(initialPage);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,11 +61,9 @@ export function VideoListClient({
 
   const activeVideo = items.find((v) => v.id === playingId) ?? null;
 
-  const isCustomSize = pageSize !== VIDEO_PAGE_SIZE;
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const currentPage = Math.min(clientPage, totalPages);
-  const pageHref = (n: number) => (n <= 1 ? '/video' : `/video/page/${n}`);
-  const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const {
+    pageItems, currentPage, totalPages, pageHref, isCustomSize, pageSize, onPageChange, onPageSizeChange,
+  } = usePageSizePagination(items, VIDEO_PAGE_SIZE, '/video', initialPage);
 
   return (
     <div className="min-h-screen bg-white">
@@ -180,13 +177,10 @@ export function VideoListClient({
             totalPages={totalPages}
             pageHref={pageHref}
             isCustomSize={isCustomSize}
-            onPageChange={setClientPage}
+            onPageChange={onPageChange}
             pageSize={pageSize}
             pageSizeOptions={PAGE_SIZE_OPTIONS}
-            onPageSizeChange={(n) => {
-              setPageSize(n);
-              setClientPage(1);
-            }}
+            onPageSizeChange={onPageSizeChange}
             accentColor={ACCENT}
             totalCount={items.length}
           />

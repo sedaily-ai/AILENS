@@ -18,15 +18,32 @@
 import { API_URL } from '@/shared/config/apiClient';
 import { TranscribeStreamRecognizer } from '@/shared/lib/chat/transcribeStream';
 
-// Web Speech API — webkit prefix 호환을 위해 동적으로 가져옴.
-// TS DOM lib에 SpeechRecognition 타입이 있지만 webkit prefix는 없으므로 any 로 다룬다.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SpeechRecognitionAny = any;
+// Web Speech API — webkit prefix 호환을 위해 동적으로 가져옴. TS DOM lib에
+// SpeechRecognition 타입이 있지만 webkit prefix는 없다 — 2026-09-04
+// 리팩토링 감사로 `any`(CLAUDE.md 금지 항목) 대신 실제로 접근하는
+// 프로퍼티/메서드만 담은 최소 인터페이스로 교체(unknown+타입가드보다,
+// 이 API 자체는 형태를 이미 알고 있으니 이쪽이 더 정확하다).
+interface MinimalSpeechRecognition {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((ev: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
+  onerror: ((ev: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+type SpeechRecognitionAny = MinimalSpeechRecognition;
+
+interface WindowWithSpeechRecognition {
+  SpeechRecognition?: new () => MinimalSpeechRecognition;
+  webkitSpeechRecognition?: new () => MinimalSpeechRecognition;
+}
 
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionAny) | null {
   if (typeof window === 'undefined') return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w = window as any;
+  const w = window as unknown as WindowWithSpeechRecognition;
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
