@@ -17,7 +17,6 @@ export function trackEvent(name: string, params?: Record<string, unknown>) {
     /* gtag 미로드 환경에선 무시 */
   }
   if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
     console.debug('[trackEvent]', name, params);
   }
 }

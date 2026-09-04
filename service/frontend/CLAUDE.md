@@ -16,53 +16,58 @@
 
 ## 아키텍처: Feature-Sliced Design (FSD)
 
-### 목표 폴더 구조
+### 실제 폴더 구조 (2026-09-04 재확인 — `find src -maxdepth 2 -type d` 결과
+그대로다. 예전 버전은 `(main)/elderly`·`(main)/timemachine`·
+`(main)/subscription`, `features/community`·`news-dna`·`elderly`·
+`timemachine`·`subscription`·`story`·`admin`, `entities/article`·`post`
+같은 존재하지 않는 폴더를 나열하고 있었다 — 전부 사주 앱 분리(2026-08-09)·
+FSD 이행 과정에서 사라졌거나 애초에 계획만 있던 것들. 새 폴더가 생기면
+이 블록을 다시 `find`로 재생성할 것, 손으로 추측해서 늘리지 말 것. 이
+코드블록이 예전엔 닫는 fence 없이 "### 의존성 방향"·"### Feature 모듈
+구조" 절까지 통째로 삼켜서 그 두 절이 마크다운 헤딩이 아니라 코드
+텍스트로 렌더되고 있었다 — 아래에서 제대로 닫는다.)
 ```
-├── app/                         # Next.js 라우팅 전용 (re-export만)
-│   ├── (auth)/login/
-│   ├── (auth)/auth/callback/
-│   ├── (main)/                  # 메인 피드 (기본 경로)
-│   ├── (main)/elderly/
-│   ├── (main)/timeline/
-│   ├── (main)/timemachine/
-│   ├── (main)/subscription/
-│   ├── (main)/listen/
-│   └── layout.tsx
-└── src/
-    ├── app/                     # FSD app 레이어 (providers, global config)
-    ├── pages/                   # FSD pages (features 조합)
-    ├── widgets/                 # Header, BottomNav, AudioPlayer 등
-    ├── features/
-    │   ├── auth/                # 로그인, 콜백, 세션 관리
-    │   ├── news-feed/           # 뉴스 피드 탭 (기사 목록, 날짜 선택, 상세)
-    │   ├── question/            # AI 질문/퀴즈 탭
-    │   ├── community/           # 커뮤니티 탭 (게시글, 댓글, 투표, 랭킹)
-    │   ├── archive/             # 내 서랍 탭 (저장 문장/기사)
-    │   ├── news-dna/            # 뉴스 DNA 탭 (관심 분석, 생일)
-    │   ├── elderly/             # 어르신 모드
-    │   ├── timeline/            # 타임라인 뉴스
-    │   ├── timemachine/         # 과거 날짜 뉴스
-    │   ├── subscription/        # 구독 관리
-    │   ├── onboarding/          # 사용자 온보딩
-    │   ├── story/               # 스토리 뉴스
-    │   └── admin/               # 관리자 기능
-    ├── entities/
-    │   ├── article/             # 기사 도메인 모델
-    │   ├── user/                # 사용자 도메인 모델
-    │   └── post/                # 게시글 도메인 모델
-    └── shared/
-        ├── ui/                  # 공통 UI (LoadingSpinner 등)
-        ├── hooks/               # 공통 훅
-        ├── lib/                 # API 클라이언트, readingTracker 등
-        ├── data/                # mbtiGroups 등 공통 데이터
-        ├── config/              # API config 등
-        ├── types/               # 공통 타입
-        ├── constants/           # 공통 상수
-        └── utils/               # analytics, 유틸 함수
+src/
+├── app/                         # Next.js App Router — 라우팅+메타데이터.
+│   │                            # FSD의 app 레이어를 겸한다(별도 src/pages/
+│   │                            # 라우팅 폴더는 없음 — 아래 "pages 레이어" 참조).
+│   ├── (auth)/                  # 로그인/온보딩 시작/콜백
+│   ├── (company)/               # 문의·약관·개인정보·style 등 정적 페이지
+│   ├── (content)/               # lens/letters/webtoon/video/timeline 등 콘텐츠 라우트
+│   ├── (economy)/               # 경제 카테고리 라우트
+│   ├── api/                     # Route Handlers
+│   ├── start/                   # 온보딩 6단계 위저드 진입 라우트(features/onboarding 참조)
+│   └── layout.tsx / providers.tsx / sitemap.ts / rss.xml
+├── widgets/                     # AnnouncementBar, ArticlePageShell,
+│   │                            # CategoryArchiveClient, FeedPage, Header,
+│   │                            # HomeSideBar, NavProgress, SentenceSelectionPopover,
+│   │                            # SiteFooter, StaticPageShell, TodayNewsPlayer, WordsPage
+│   │                            # — 폴더명이 PascalCase다(예외, "파일 네이밍
+│   │                            # 컨벤션" 참조 — features/entities는 kebab-case 그대로).
+├── features/
+│   ├── archive/                 # 내 서랍 (저장 문장)
+│   ├── auth/                    # 로그인 폼
+│   ├── news-feed/               # 뉴스 피드 탭
+│   ├── onboarding/              # 온보딩 6단계 위저드(Goal/Interest/Format/Consume/Result)
+│   ├── question/                # AI 질문 탭
+│   └── timeline/                # 타임라인 뉴스
+├── entities/
+│   ├── saju/                    # 사주 미니 계산(widgets/HomeSideBar/SajuMiniRail 전용)
+│   └── user/                    # AuthContext 등 사용자 도메인
+└── shared/
+    ├── ui/                      # 공통 UI (ArticleAudioPlayer, ArticleShareButtons 등)
+    ├── hooks/                   # 공통 훅
+    ├── lib/                     # API 클라이언트, mediaPlayerFormat 등
+    ├── data/                    # games 등 공통 데이터
+    ├── config/                  # API config, Cognito auth config
+    ├── types/                   # 공통 타입
+    ├── constants/                # SITE_URL 등 공통 상수
+    └── utils/                   # analytics, 유틸 함수
+```
 
 ### 의존성 방향 (단방향만 허용)
 - app → pages → widgets → features → entities → shared
-- 같은 레이어 간 import 금지 (features/auth → features/community ❌)
+- 같은 레이어 간 import 금지 (features/auth → features/onboarding ❌)
 - 하위에서 상위 import 금지 (shared → features ❌)
 
 ### Feature 모듈 구조

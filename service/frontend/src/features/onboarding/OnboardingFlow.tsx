@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * /start — Goal→Format→Consume→Interest→Result→Subscribe→Done 6단계 온보딩
+ * 위저드(실제 인터랙티브 플로우, 라이브).
+ *
+ * ⚠️ 이름 헷갈림 주의(2026-09-04, 리팩토링 감사에서 발견) — `/onboarding`
+ * 라우트(`app/(auth)/onboarding/OnboardingClient.tsx`)도 "온보딩"이라는
+ * 이름을 쓰지만 이건 서비스 소개용 정적 스크롤 랜딩이고, 이 6단계 위저드와는
+ * 완전히 다른 화면이다. "온보딩 흐름 고쳐줘" 요청을 받으면 둘 중 어느
+ * 화면 얘기인지 먼저 확인할 것.
+ */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchLensPosts, fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';

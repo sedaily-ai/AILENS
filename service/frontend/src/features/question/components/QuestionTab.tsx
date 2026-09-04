@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, type ReactNode } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
-import type { DailyQuestionItem } from "@/shared/types/question";
 
 export const dailyQuestions = [{ id: "q1" }, { id: "q2" }];
 

@@ -58,8 +58,21 @@ const eslintConfig = defineConfig([
       // v6에서 문자열(`allow: ["x"]`)이 아니라 객체(`allow: { to: { type: [...] } }`)
       // 로 바뀌었다 — 처음엔 문자열 그대로 옮겨서 "legacy selector syntax"
       // 경고만 뜨고 실제 검출은 여전히 0건이었음, README 예제로 정정.
+      //
+      // 2026-09-04 — "warn"이라 위반이 있어도 빌드/배포를 막지 못했다(CI 자체가
+      // 없어 warn은 사실상 아무 데도 안 걸림, 리팩토링 감사에서 발견) — "error"로
+      // 올려 실제로 강제되게 한다. 올리기 전 유일하게 걸려 있던 위반 1건
+      // (features/onboarding/ConsumeStep.tsx가 app 레이어의 LensFormatPanel을
+      // import)은 아래 "features → app" 예외로 명시적으로 허용했다 — 그 컴포넌트가
+      // widgets/SentenceSelectionPopover에 의존해서 entities/shared로는 못
+      // 내려가고(entities는 shared만 import 가능), features → widgets도 규칙상
+      // 막혀 있어(widgets는 넓은 조합 레이어라 features가 끌어오면 반대 방향
+      // 의존이 생김) 파일을 옮겨도 근본적으로는 같은 예외가 필요했다. 새로운
+      // features → app import가 또 생기면 이 예외 때문에 안 걸리므로, 리뷰 시
+      // "이것도 LensFormatPanel과 같은 이유인가"를 확인할 것 — 아니라면 이 규칙에
+      // 기대지 말고 컴포넌트를 shared/entities로 내리는 쪽으로 고칠 것.
       "boundaries/dependencies": [
-        "warn",
+        "error",
         {
           default: "disallow",
           rules: [
@@ -71,8 +84,9 @@ const eslintConfig = defineConfig([
             // FeedPage/StaticPageShell 등 페이지 단위 widget이 재사용하는 패턴,
             // 2026-08-08), features, entities, shared
             { from: { type: "widgets" }, allow: { to: { type: ["widgets", "features", "entities", "shared"] } } },
-            // features can import from entities, shared (다른 features는 금지 — lateral import)
-            { from: { type: "features" }, allow: { to: { type: ["entities", "shared"] } } },
+            // features can import from entities, shared (다른 features는 금지 — lateral import),
+            // app(위 2026-09-04 주석 참조 — 딱 하나의 알려진 예외, 새 사례는 검토 필요)
+            { from: { type: "features" }, allow: { to: { type: ["entities", "shared", "app"] } } },
             // entities can import from shared only
             { from: { type: "entities" }, allow: { to: { type: "shared" } } },
             // shared can only import from shared
