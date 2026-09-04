@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Repeat, RotateCcw, RotateCw, Bookmark, ChevronDown, Check, Volume2, VolumeX, Maximize, Captions } from 'lucide-react';
 import { clock, spoken, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/lib/mediaPlayerFormat';
+import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/useMediaPlayerControls';
 
 /**
  * 기사 안에 박아 쓰는 영상 플레이어 — 2026-08-21 신설.
@@ -74,66 +75,33 @@ export function ArticleVideoPlayer({
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [cur, setCur] = useState(0);
-  const [dur, setDur] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [rateIdx, setRateIdx] = useState(1);
-  const [failed, setFailed] = useState(false);
   const [looping, setLooping] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [rateMenuOpen, setRateMenuOpen] = useState(false);
-  const rateMenuRef = useRef<HTMLDivElement | null>(null);
-  const rateTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
 
-  const onDurationRef = useRef(onDuration);
-  useEffect(() => {
-    onDurationRef.current = onDuration;
-  }, [onDuration]);
+  // 북마크·배속 메뉴·재생 전송(재생/일시정지/탐색/±5초/재시도) 상태 로직은
+  // ArticleAudioPlayer.tsx와 바이트 단위로 같아서 shared/lib/
+  // useMediaPlayerControls.ts로 추출돼 있다(2026-09-04). buffered 진행률·
+  // 음소거·전체화면은 영상 전용이라 그대로 이 파일에 남는다.
+  const { bookmarked, toggleBookmark } = useMediaBookmark(src, BOOKMARK_STORAGE_KEY);
+  const { rateIdx, rateMenuOpen, setRateMenuOpen, selectRate, rateMenuRef, rateTriggerRef } =
+    usePlaybackRateMenu(ref, PLAYBACK_RATES);
+  const { playing, cur, dur, failed, toggle, seekTo, nudge, retry } = useMediaTransport(ref, {
+    looping,
+    onDuration,
+  });
 
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
-      if (raw) {
-        const set: string[] = JSON.parse(raw);
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- 외부 저장소(localStorage) 동기화, src 변경 시 재확인 필요
-        setBookmarked(set.includes(src));
-      }
-    } catch {
-      // localStorage 접근 불가(시크릿 모드 등) — 조용히 무시.
-    }
-  }, [src]);
-
-  const toggleBookmark = useCallback(() => {
-    setBookmarked((prev) => {
-      const next = !prev;
-      try {
-        const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
-        const set: string[] = raw ? JSON.parse(raw) : [];
-        const updated = next ? [...new Set([...set, src])] : set.filter((s) => s !== src);
-        window.localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(updated));
-      } catch {
-        // 저장 실패해도 이번 세션 내 UI 상태는 유지.
-      }
-      return next;
-    });
-  }, [src]);
-
+  // buffered 진행률·음소거 추적 — useMediaTransport가 배선하는 6개 공용
+  // 이벤트와 별개로 이 엘리먼트에 추가로 얹는다(같은 엘리먼트에 여러
+  // effect가 addEventListener 해도 서로 무관하게 공존한다). looping에
+  // 의존하지 않으므로 마운트 시 1회만 배선한다.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const onMeta = () => {
-      const d = el.duration;
-      if (!Number.isFinite(d) || d <= 0) return;
-      setDur(d);
-      onDurationRef.current?.(d);
-    };
-    const onTime = () => {
-      setCur(el.currentTime);
+    const onProgress = () => {
       // 실제 buffered 구간(TimeRanges) — 마지막 구간의 끝 값만 쓴다.
       // 스트리밍 중 여러 구간이 생길 수 있지만, 진행바에는 "지금까지
       // 이어서 재생 가능한 지점"만 의미가 있다.
@@ -141,42 +109,16 @@ export function ArticleVideoPlayer({
         setBuffered(el.buffered.end(el.buffered.length - 1));
       }
     };
-    const onEnd = () => {
-      if (looping) {
-        el.currentTime = 0;
-        void el.play().catch(() => setFailed(true));
-        return;
-      }
-      setPlaying(false);
-      setCur(0);
-      el.currentTime = 0;
-    };
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onErr = () => {
-      setFailed(true);
-      setPlaying(false);
-    };
     const onVolume = () => setMuted(el.muted);
-    el.addEventListener('loadedmetadata', onMeta);
-    el.addEventListener('timeupdate', onTime);
-    el.addEventListener('progress', onTime);
-    el.addEventListener('ended', onEnd);
-    el.addEventListener('play', onPlay);
-    el.addEventListener('pause', onPause);
-    el.addEventListener('error', onErr);
+    el.addEventListener('timeupdate', onProgress);
+    el.addEventListener('progress', onProgress);
     el.addEventListener('volumechange', onVolume);
     return () => {
-      el.removeEventListener('loadedmetadata', onMeta);
-      el.removeEventListener('timeupdate', onTime);
-      el.removeEventListener('progress', onTime);
-      el.removeEventListener('ended', onEnd);
-      el.removeEventListener('play', onPlay);
-      el.removeEventListener('pause', onPause);
-      el.removeEventListener('error', onErr);
+      el.removeEventListener('timeupdate', onProgress);
+      el.removeEventListener('progress', onProgress);
       el.removeEventListener('volumechange', onVolume);
     };
-  }, [looping]);
+  }, []);
 
   // 전체화면 상태는 document 이벤트로 추적한다 — Esc 등 우리 버튼을
   // 거치지 않는 종료 경로가 있어도 아이콘이 실제 상태와 어긋나지 않는다.
@@ -185,63 +127,6 @@ export function ArticleVideoPlayer({
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
-
-  const toggle = useCallback(() => {
-    setFailed(false);
-    const el = ref.current;
-    if (!el) return;
-    if (el.paused) {
-      void el.play().catch(() => setFailed(true));
-    } else {
-      el.pause();
-    }
-  }, []);
-
-  const seekTo = useCallback((sec: number) => {
-    const el = ref.current;
-    if (!el || !Number.isFinite(el.duration)) return;
-    const next = Math.min(el.duration, Math.max(0, sec));
-    el.currentTime = next;
-    setCur(next);
-  }, []);
-
-  const nudge = useCallback(
-    (delta: number) => {
-      const el = ref.current;
-      if (!el) return;
-      seekTo(el.currentTime + delta);
-    },
-    [seekTo],
-  );
-
-  const selectRate = useCallback((idx: number) => {
-    const el = ref.current;
-    setRateIdx(idx);
-    if (el) el.playbackRate = PLAYBACK_RATES[idx];
-    setRateMenuOpen(false);
-    rateTriggerRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    if (!rateMenuOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (rateMenuRef.current && !rateMenuRef.current.contains(e.target as Node)) {
-        setRateMenuOpen(false);
-      }
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setRateMenuOpen(false);
-        rateTriggerRef.current?.focus();
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [rateMenuOpen]);
 
   const toggleMute = useCallback(() => {
     const el = ref.current;
@@ -260,14 +145,6 @@ export function ArticleVideoPlayer({
         // 조용히 무시한다, 다른 컨트롤은 여전히 동작한다.
       });
     }
-  }, []);
-
-  const retry = useCallback(() => {
-    setFailed(false);
-    const el = ref.current;
-    if (!el) return;
-    el.load();
-    void el.play().catch(() => setFailed(true));
   }, []);
 
   const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
