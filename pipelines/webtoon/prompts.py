@@ -57,22 +57,49 @@
 #   에서 [SCENE] 직후에 같은 취지를 한 번 더 짧게 반복(끝부분 재강조).
 #   완전한 해결은 아님 — 확산 모델의 복합 프롬프트 이행력 자체의 한계라
 #   프롬프트만으로 100% 보장은 안 됨.
+#
+# 겪었던 문제 4 (2026-09-05, "다른 톤으로 가보면 어떻냐"는 별도 프롬프트
+#   문서 참고 요청): 그 문서는 "이미 그려진 컷 + 스타일 레퍼런스 이미지"를
+#   주고 다시 그리게 하는 img2img 편집 방식이라, 지금 구조(각 컷을 텍스트
+#   설명만으로 처음부터 생성하는 Bedrock 경로)와는 아키텍처 자체가 다르다
+#   — 그대로 옮기려면 OpenAI 이미지 편집 API를 되살려야 하는데 그건 이미
+#   크레딧 문제로 꺼둔 경로다(위 compose_text.py 모듈 docstring 참고).
+#   그 문서의 "그림체" 부분만 골라 반영한다: 흰색/밝은 회색 중심의 정돈된
+#   배경, 남색·하늘색·빨간색 강조 색상, 깔끔한 검은 선화. **단, "겪었던
+#   문제 2"(flat/2-3톤/painterly 금지 → 품질 단순화)를 반복하지 않도록
+#   "부드러운 셀 채색"이지 "명암 없음"은 아니라는 걸 명시했다** — 실제로
+#   그 문서 방식으로 뽑은 예시 결과물(사용자 확인)이 단순하지 않고 품질이
+#   괜찮았어서, 이번엔 디테일을 완전히 죽이지 않는 선에서 반영.
+#   같이 도입: 여성 기자(설명자)·남성 청자 고정 2인 캐릭터(FIXED_CHARACTERS
+#   참조) — 기사마다 인물을 새로 짓던 것에서 "AI Lens 웹툰"이라는 하나의
+#   진행자 듀오가 매번 등장하는 포맷으로 전환. 그 문서의 서울경제 배지도
+#   여성 캐릭터 묘사에 텍스트로 포함(실제 로고 이미지 합성은 안 함 —
+#   확산 모델이 텍스트 지시만으로 그리는 것이라 "S" 모양이 정확하지
+#   않을 수 있음, 완벽 재현은 image-editing 없이는 한계가 있다).
+#   그 문서의 나머지(참조 이미지 편집, 상단 빨간 타이틀바/하단 남색
+#   요약바 레이아웃)는 이번에 반영 안 함 — 전자는 아키텍처 변경, 후자는
+#   compose_text.py에 새 PIL 합성 함수가 필요한 별개 기능이라 범위 밖.
+#
+# ⚠️ 이 파일을 고치면 admin의 DDB "3단계 — 이미지 생성 스타일 (참고용)"
+# 섹션도 반드시 손으로 같이 맞출 것(위 모듈 docstring 참고) — 이번
+# 변경은 아직 그쪽에 반영 안 됨.
 
 STYLE = (
-    "Premium Korean webtoon illustration, top-tier professional "
-    "production quality — ultra-detailed ink linework, rich painterly "
-    "color fills with nuanced shading and texture, cinematic panel "
-    "composition. This is a hand-illustrated artwork — clearly rendered "
-    "with visible brushwork and linework, NOT a photograph, NOT "
-    "photorealistic, NOT camera-captured.\n\n"
-    "Masterpiece-level illustrated detail: fabric texture on suits, wood "
-    "grain on desks, glass/metal reflections — all rendered as painterly "
-    "linework and color, not photographic texture. Soft cinematic "
-    "lighting — directional light with gentle shadow falloff, believable "
-    "depth between foreground/midground/background. Highly expressive "
-    "but professional, restrained faces; natural body language that "
-    "reads clearly at a glance (not exaggerated melodrama — this is a "
-    "news setting, not battle drama).\n\n"
+    "Modern Korean webtoon illustration — clean, crisp black linework "
+    "with confident, uncluttered line weight. Soft cel-shaded coloring "
+    "with gentle, restrained shading (not flat single-tone, not heavy "
+    "painterly texture — controlled shading that reads clearly at a "
+    "glance). This is a hand-illustrated artwork — clearly rendered "
+    "with visible linework, NOT a photograph, NOT photorealistic, NOT "
+    "camera-captured, NOT 3D-rendered.\n\n"
+    "Natural adult character proportions and clear, expressive but NOT "
+    "exaggerated eyes and expressions. Professional, editorial mood — "
+    "restrained faces; natural body language that reads clearly at a "
+    "glance (not exaggerated melodrama — this is a news setting, not "
+    "battle drama). Do NOT render in Studio Ghibli style, watercolor "
+    "style, storybook/fairy-tale illustration style, or Japanese anime "
+    "style. Do NOT render overly young/childlike characters, chibi/SD "
+    "proportions, or 3D-rendered characters.\n\n"
     "Contemporary present-day South Korea only — modern office/newsroom "
     "interiors, business-casual or business-formal wardrobe (suits, "
     "blouses, cardigans), modern furniture and electronics. Do NOT "
@@ -82,8 +109,12 @@ STYLE = (
     "add extra background crowds, bystanders, or characters beyond what "
     "[SCENE] and [CHARACTERS] specify. If [SCENE] describes an empty "
     "room, render it empty with no people.\n\n"
-    "Rich, grounded color palette: cool corporate blues/grays, warm "
-    "desk-lamp amber, crisp window light — editorial documentary mood.\n\n"
+    "Clean, uncluttered backgrounds — white or light-gray tones, tidy "
+    "and orderly, minimal background detail so the characters and any "
+    "infographic elements stay the clear focus. Accent color palette "
+    "centered on navy blue, sky blue, and red for emphasis elements "
+    "(charts, highlights, key colors) — a crisp editorial news-content "
+    "look rather than a moody cinematic one.\n\n"
     "Anonymous generic characters only — do NOT render the specific "
     "likeness of any real public figure; faces should read as illustrated "
     "original characters, not a portrait of someone identifiable.\n\n"
@@ -95,6 +126,38 @@ STYLE = (
     "need text that wasn't given, render it blank, blurred, or angled "
     "away from camera instead of inventing content."
 )
+
+# 2026-09-05 — 고정 진행자 2인("AI Lens 웹툰" 포맷). 기존엔 characters를
+# 1단계 스크립트가 기사마다 새로 지어냈는데(아래 _characters_block
+# 문서 참고 — pipeline.py), 이제 기사 내용과 무관하게 이 두 사람이 항상
+# 등장한다: 여성 기자가 설명하고 남성 청자가 반응하는 고정 포맷.
+# run_article()이 script.get("characters") 대신 이 값을 쓴다.
+# 참고: "서울경제신문 AILens 웹툰 제작 예시.docx"의 인물 스펙을 텍스트
+# 프롬프트용으로 옮김(그 문서의 image-editing 방식 자체는 아키텍처가
+# 달라 채택 안 함 — 위 "겪었던 문제 4" 참고).
+FIXED_CHARACTERS = {
+    "A (여성 기자, 설명자)": (
+        "Korean woman, early-to-mid 30s. Chin-length neat black bob "
+        "haircut, thin round metal-frame glasses. Navy blazer over a "
+        "light sky-blue blouse/shirt. Small white circular enamel badge "
+        "on the left chest of the blazer with a simple blue stylized "
+        "'S' monogram (a news outlet logo badge) — keep the badge small "
+        "and consistent, never oversized, never add any other text or "
+        "logo. Friendly but professional demeanor — actively gestures "
+        "while explaining: pointing at documents/charts, open palm "
+        "gestures, leaning toward materials. Keep face, hairstyle, "
+        "glasses, and outfit IDENTICAL across every cut."
+    ),
+    "B (남성 청자)": (
+        "Korean man, late 20s. Natural short black hair, no glasses. "
+        "White t-shirt under a dark gray cardigan. No badge, no logo of "
+        "any kind. Represents the reader's curiosity — reacts to what's "
+        "being explained: leaning in to look at materials, tilting "
+        "forward, resting chin on hand while thinking, looking "
+        "surprised or curious as the scene calls for. Keep face, "
+        "hairstyle, and outfit IDENTICAL across every cut."
+    ),
+}
 
 BUBBLE_RULES = (
     "\n\n[SPEECH BUBBLES — CRITICAL]\n"
