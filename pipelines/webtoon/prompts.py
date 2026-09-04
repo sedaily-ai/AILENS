@@ -6,20 +6,27 @@
 정본이고, `pipeline.py`가 `ddb_prompt.load_prompt("webtoon")`로 그걸 그대로
 가져다 쓴다.
 
+2026-09-04 — 3단계(STYLE/FIXED_CHARACTERS)도 이제 같은 방식으로 admin이
+관리한다(`PROMPT#webtoon-image/published`, admin "이미지 실험" 패널의
+"발행" 버튼). 아래 `get_style()`/`get_fixed_characters()`가 매 호출마다
+DDB에서 fresh하게 읽는다 — 자세한 내용·안전망 폴백은
+`pipelines/common/webtoon_image.py` 모듈 docstring 참고.
+
 2026-08-20 이전엔 이 파일에 SCRIPT_PROMPT_TEMPLATE/SCENE_PROMPT_TEMPLATE로
 1·2단계 지침이 따로 하드코딩돼 있었다 — admin에서 프롬프트를 아무리
 고쳐도 이 파이프라인이 실제로 이미지를 만들 때는 그 하드코딩된 옛
 버전을 계속 썼다는 뜻(발견 경위: 라운드기록.md 이슈 트래커 #11). 지금은
 지웠다 — 다시 여기 하드코딩하지 말 것, DDB가 유일한 정본이어야 한다.
 
-3단계(이미지 생성 API 호출)만 이 파일에 코드로 남아있는 이유는 다르다 —
-이건 프롬프트 텍스트가 아니라 "말풍선 모양을 tone에 따라 어떻게 분기할지"
-같은 실행 로직이 섞여 있어서, DB에서 문자열 하나로 뽑아 그대로 실행하기
-안전하지 않다(DB에 저장된 임의 텍스트를 코드처럼 해석/실행하는 건 그
-자체로 위험한 패턴이다). 대신 admin의 webtoon 프롬프트 문서 안에도 같은
-내용이 "3단계 — 이미지 생성 스타일 (참고용)" 섹션으로 그대로 적혀 있다 —
-**이 파일을 고치면 그 섹션도 반드시 같이 고칠 것.** 서로 다른 저장소
-(dev2 git vs DDB)에 있어서 자동으로는 안 맞는다.
+3단계 중 아래 BUBBLE_RULES/bubbles()/caption()/narration()만 이 파일에
+코드로 남아있는 이유는 STYLE/FIXED_CHARACTERS와 다르다 — 이건 프롬프트
+텍스트가 아니라 "말풍선 모양을 tone에 따라 어떻게 분기할지" 같은 실행
+로직이 섞여 있어서, DB에서 문자열 하나로 뽑아 그대로 실행하기 안전하지
+않다(DB에 저장된 임의 텍스트를 코드처럼 해석/실행하는 건 그 자체로
+위험한 패턴이다). STYLE/FIXED_CHARACTERS 자체는 위에 적었듯 이제 DDB가
+정본이라 이 경고가 더 이상 해당 안 된다 — "3단계 — 이미지 생성 스타일
+(참고용)" 섹션도 폐기 대상(admin이 DB에서 직접 읽으니 별도 참고 문서가
+필요 없어졌다).
 """
 
 # ─────────────────────────────────────────────────────────────
@@ -93,21 +100,17 @@
 #   필요해지면 프롬프트가 아니라 "겪었던 문제 4"에서 보류한 image-editing
 #   경로(OpenAI)로 가야 한다.
 #
-# ⚠️ 이 파일을 고치면 admin의 DDB "3단계 — 이미지 생성 스타일 (참고용)"
-# 섹션도 반드시 손으로 같이 맞출 것(위 모듈 docstring 참고) — 이번
-# 변경은 아직 그쪽에 반영 안 됨.
-#
-# 2026-09-05 — STYLE/FIXED_CHARACTERS 실제 값은 common/webtoon_image.py로
-# 옮겼다(admin 콘솔의 "이미지 실험" 패널도 같은 값이 필요해져서 —
-# common/webtoon_image.py 모듈 docstring 참고). 여기서는 재export만 해서
-# 이 파일을 import해 쓰던 코드(pipeline.py 등)가 안 바뀌게 한다 — 값
-# 자체를 고칠 땐 common/webtoon_image.py를 고칠 것, 여기 다시 채워넣지
-# 말 것.
-from webtoon_image import STYLE, FIXED_CHARACTERS
+# 2026-09-05 — STYLE/FIXED_CHARACTERS 조립 로직은 common/webtoon_image.py로
+# 옮겼고(admin 콘솔의 "이미지 실험" 패널도 같은 로직이 필요해져서), 2026-
+# 09-04부터는 그 값 자체가 코드 상수가 아니라 admin DB 발행물이 됐다(위
+# 모듈 docstring 참고) — 여기서는 그 조회 함수만 재export해서 이 파일을
+# import해 쓰던 코드(pipeline.py 등)가 `prompts.get_style()`/
+# `prompts.get_fixed_characters()`로 자연스럽게 쓸 수 있게 한다.
+from webtoon_image import get_fixed_characters, get_style
 
 # pyflakes에게 "재export라 이 파일 안에서 안 써도 죽은 게 아니다"를 알려준다
 # (bare pyflakes는 flake8과 달리 `# noqa` 주석을 안 읽는다 — __all__만 본다).
-__all__ = ["STYLE", "FIXED_CHARACTERS"]
+__all__ = ["get_style", "get_fixed_characters"]
 
 BUBBLE_RULES = (
     "\n\n[SPEECH BUBBLES — CRITICAL]\n"

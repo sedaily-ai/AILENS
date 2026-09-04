@@ -116,7 +116,7 @@ def call_json(prompt: str, debug_path: Path | None = None) -> dict:
 
 def build_image_prompt(camera: str, scene: str, cut: dict, characters: dict | None = None) -> str:
     """2단계(장면) + 1단계(대사) 결과를 3단계 이미지 프롬프트로 합친다."""
-    style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
+    style = prompts.get_style() + f"\nCamera: {camera}. 3:2 horizontal."
     parts = [
         style, _characters_block(characters), f"\n\n[SCENE]\n{scene}", _SCENE_REINFORCEMENT,
         _CHARACTER_REINFORCEMENT if characters else "",
@@ -300,6 +300,12 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
 
     # 3단계: 이미지 생성
     print(f"{tag} 3단계 이미지 생성 ({N_CUTS}컷)")
+    # 2026-09-05 — 기사마다 script.get("characters")로 새로 짓던 인물 묘사
+    # 대신, 고정 진행자 2인(prompts.get_fixed_characters())을 항상 쓴다 —
+    # "AI Lens 웹툰" 포맷 도입(prompts.py STYLE 근처 "겪었던 문제 4" 참고).
+    # 2026-09-04부터 이 값은 admin이 발행한 DDB가 정본이라 컷 루프 밖에서
+    # 한 번만 가져온다(fresh하되 같은 기사 안 8컷은 일관되게 같은 값 사용).
+    characters = prompts.get_fixed_characters()
     for cut in script["cuts"]:
         n = cut["cut"]
         img_path = out / f"컷{n}.png"
@@ -308,11 +314,6 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             continue
         s = scene_map[n]
         print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
-        # 2026-09-05 — 기사마다 script.get("characters")로 새로 짓던 인물
-        # 묘사 대신, 고정 진행자 2인(prompts.FIXED_CHARACTERS)을 항상 쓴다
-        # — "AI Lens 웹툰" 포맷 도입(prompts.py STYLE 근처 "겪었던 문제 4"
-        # 참고).
-        characters = prompts.FIXED_CHARACTERS
         if IMAGE_PROVIDER == "bedrock":
             prompt = build_background_prompt(s["camera"], s["scene"], characters)
             ok, verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n)

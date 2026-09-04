@@ -16,10 +16,31 @@ import type { WebtoonLabDefaults, WebtoonLabHistoryItem, WebtoonLabJob } from "@
    백엔드(admin/backend/routes/webtoon_lab.py)는 API Gateway 30초 타임아웃
    때문에 동기 응답이 없다 — POST generate로 job을 만들고 GET {job_id}를
    폴링한다(_POLL_INTERVAL_MS). 완료된 생성은 전부 히스토리에 쌓여
-   공용 갤러리로 남는다(이 admin 계정을 쓰는 모두가 같이 본다). */
+   공용 갤러리로 남는다(이 admin 계정을 쓰는 모두가 같이 본다).
+
+   2026-09-04 — "실험만 하지 말고 여기서 고친 프롬프트가 실제로 서비스에
+   나가게 해달라"는 피드백으로 "발행" 버튼을 추가했다. STYLE/CHARACTERS는
+   이제 admin DDB(`PROMPT#webtoon-image/published`, 1·2단계 프롬프트와
+   완전히 같은 구조)가 정본이라, 여기서 발행하면 새 백엔드 라우트 없이
+   기존 범용 프롬프트 저장 API(`POST /admin/prompts/{category}/{name}`)를
+   그대로 불러 새 버전을 만든다 — pipelines/common/webtoon_image.py가 다음
+   생성부터 바로 그 값을 읽는다(캐시 없음). content 조립 포맷은 백엔드
+   파서(webtoon_image.py의 parse_prompt_doc/_DOC_HEADINGS)와 정확히 맞아야
+   해서 아래 buildImagePromptDoc()에 그 포맷을 그대로 미러링해뒀다. */
 
 const _POLL_INTERVAL_MS = 4000;
 const _MAX_SCENE_CHARS = 1200; // 백엔드 _MAX_SCENE_BYTES(4000바이트)에 여유를 둔 UTF-8 대략치
+
+/** webtoon_image.py::serialize_prompt_doc()과 정확히 같은 포맷이어야 한다
+ *  (## STYLE / ## CHARACTER_FEMALE / ## CHARACTER_MALE 헤딩) — 한쪽만
+ *  고치면 발행한 프롬프트를 파이프라인이 못 읽는다. */
+function buildImagePromptDoc(style: string, charFemale: string, charMale: string): string {
+  return [
+    `## STYLE\n${style.trim()}`,
+    `## CHARACTER_FEMALE\n${charFemale.trim()}`,
+    `## CHARACTER_MALE\n${charMale.trim()}`,
+  ].join("\n\n");
+}
 
 interface Props {
   open: boolean;
@@ -54,6 +75,7 @@ export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
   const [job, setJob] = useState<WebtoonLabJob | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const [history, setHistory] = useState<WebtoonLabHistoryItem[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -199,6 +221,44 @@ export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // "직접 입력"이 꺼져 있으면 지금 화면에 보이는 값 = defaults(발행된 값) 그대로다.
+  const effectiveStyle = customStyle && style.trim() ? style.trim() : (defaults?.style ?? "");
+  const effectiveCharFemale = customChars && charFemale.trim() ? charFemale.trim() : (defaults?.char_female ?? "");
+  const effectiveCharMale = customChars && charMale.trim() ? charMale.trim() : (defaults?.char_male ?? "");
+  const changedFromDefaults =
+    !!defaults &&
+    (effectiveStyle !== defaults.style ||
+      effectiveCharFemale !== defaults.char_female ||
+      effectiveCharMale !== defaults.char_male);
+
+  const handlePublish = async () => {
+    if (publishing || !changedFromDefaults || !defaults) return;
+    if (
+      !window.confirm(
+        "이 설정을 발행하면 다음 실제 웹툰 생성부터 프로덕션에 바로 적용됩니다. 발행할까요?"
+      )
+    ) {
+      return;
+    }
+    setPublishing(true);
+    try {
+      const r = await adminApi.updatePrompt(
+        "webtoon-image",
+        "published",
+        buildImagePromptDoc(effectiveStyle, effectiveCharFemale, effectiveCharMale)
+      );
+      toast.show(`발행했습니다 — v${r.new_version}부터 다음 생성에 적용됩니다`, "success");
+      loadDefaults();
+    } catch (err) {
+      toast.show(
+        `발행 실패: ${err instanceof AdminApiError ? err.message : "알 수 없는 오류"}`,
+        "error"
+      );
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -428,6 +488,34 @@ export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
                       ? "생성 중..."
                       : "이미지 생성"}
                 </button>
+
+                <div
+                  className="space-y-1.5 rounded-xl border p-3"
+                  style={{ borderColor: "var(--border-hairline)" }}
+                >
+                  <p className="text-[11px] leading-relaxed text-[var(--text-faint)]">
+                    &ldquo;이미지 생성&rdquo;은 테스트일 뿐 프로덕션에 영향 없습니다. 위
+                    스타일/캐릭터가 마음에 들면 <strong>발행</strong>을 눌러야
+                    다음 실제 웹툰 생성부터 반영됩니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handlePublish()}
+                    disabled={publishing || !changedFromDefaults}
+                    className="ui-btn w-full rounded-lg px-4 py-2 text-sm font-semibold"
+                    style={
+                      changedFromDefaults
+                        ? { background: "var(--ok)", color: "white" }
+                        : undefined
+                    }
+                  >
+                    {publishing
+                      ? "발행 중..."
+                      : changedFromDefaults
+                        ? "현재 설정 발행 → 프로덕션 반영"
+                        : "발행 (변경 사항 없음)"}
+                  </button>
+                </div>
               </div>
 
               {/* 오른쪽 — 미리보기 */}

@@ -13,25 +13,42 @@ zip에 복사해서 쓴다(`admin/backend/deploy-admin-api.sh` — 이미
 `service/backend/common/`을 같은 방식으로 복사하고 있던 패턴을 그대로
 따름, 다만 이건 `pipelines/common/`이라 별개 복사 라인이 필요하다).
 
-⚠️ STYLE/FIXED_CHARACTERS/재강조 문구를 고치면 admin의 DDB "3단계 —
-이미지 생성 스타일 (참고용)" 섹션도 손으로 같이 맞출 것
-(`pipelines/webtoon/prompts.py` 모듈 docstring 참고 — 이 파일이 그
-경고까지 대신하지는 않는다, 저장소가 또 다르다).
+2026-09-04 — STYLE/FIXED_CHARACTERS를 코드 상수에서 admin DB 발행
+구조로 옮겼다("이미지 실험" 패널에서 "이 설정을 실제로 쓰고 싶다"는
+피드백). 1·2단계 프롬프트(pipelines/common/ddb_prompt.py가 읽는
+`PROMPT#webtoon/published`)와 정확히 같은 패턴 — 여기서는
+`PROMPT#webtoon-image/published`를 읽는다. `get_style()`/
+`get_fixed_characters()`가 매번 DDB에서 fresh하게 가져온다(캐시 없음 —
+admin이 방금 발행한 값을 바로 실험 패널에서도 봐야 하므로 굳이 캐시를
+두지 않았다. DDB 단건 read는 admin 트래픽 규모에서 무시할 수준).
+DDB에 아직 아무것도 없거나(최초 배포 직후) 조회 자체가 실패하면
+`_STYLE_FALLBACK`/`_FIXED_CHARACTERS_FALLBACK`(과거의 하드코딩 값,
+2026-09-05~2026-09-04 프로덕션에서 실제로 쓰였던 것)로 조용히
+떨어진다 — 절대 이 경로 때문에 웹툰 생성 자체가 죽으면 안 된다.
+
+이전엔 "이 STYLE을 고치면 admin DDB의 '3단계 참고용' 섹션도 손으로 같이
+맞출 것"이라는 경고가 있었다(두 저장소가 따로 있어서 어긋나기 쉬웠다,
+실제로 여러 번 반영이 누락됨) — 이제 admin이 곧 정본(DDB)이라 그 문제
+자체가 없어졌다. 코드를 고치고 싶으면 `_STYLE_FALLBACK`/
+`_FIXED_CHARACTERS_FALLBACK`(안전망 값)만 바꾸면 되고, **실제 프로덕션
+동작을 바꾸려면 admin "이미지 실험" 패널에서 발행**해야 한다.
 """
 from __future__ import annotations
 
 import base64
 import json
+import re
 import time
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────
-# 프롬프트 상수 — 시행착오 이력은 pipelines/webtoon/prompts.py 상단의
-# "겪었던 문제 1~4"에 그대로 남아있다(이 파일로 옮기면서 이력 자체를
-# 옮기지는 않았다 — 그쪽이 원래 위치이자 admin DDB 동기화 대상 파일).
+# 안전망 기본값 — DDB(PROMPT#webtoon-image/published)를 못 읽을 때만 쓴다.
+# 시행착오 이력은 pipelines/webtoon/prompts.py 상단의 "겪었던 문제 1~4"에
+# 남아있다. 실제 프로덕션 값을 바꾸려면 이 상수가 아니라 admin "이미지
+# 실험" 패널에서 발행할 것 — 위 모듈 docstring 참고.
 # ─────────────────────────────────────────────────────────────
 
-STYLE = (
+_STYLE_FALLBACK = (
     "Modern Korean webtoon illustration — clean, crisp black linework "
     "with confident, uncluttered line weight. Soft cel-shaded coloring "
     "with gentle, restrained shading (not flat single-tone, not heavy "
@@ -74,7 +91,7 @@ STYLE = (
     "away from camera instead of inventing content."
 )
 
-FIXED_CHARACTERS = {
+_FIXED_CHARACTERS_FALLBACK = {
     "A (여성 기자, 설명자)": (
         "Korean woman, early-to-mid 30s. Chin-length neat black bob "
         "haircut, thin round metal-frame glasses. Navy blazer over a "
@@ -123,12 +140,86 @@ def characters_block(characters: dict | None) -> str:
     return "\n\n[CHARACTERS — keep consistent across all cuts]\n" + "\n".join(lines)
 
 
+# ─────────────────────────────────────────────────────────────
+# admin DB 발행 문서 — PROMPT#webtoon-image/published (2026-09-04)
+# ─────────────────────────────────────────────────────────────
+#
+# admin/backend/routes/prompts.py::handle_update 는 category/name 이
+# 무엇이든 받는 범용 라우트라 새 백엔드 라우트 없이 그대로 재사용한다
+# (`POST /admin/prompts/webtoon-image/published`, WebtoonImageLab.tsx의
+# "발행" 버튼이 부른다). content 는 그 라우트가 있는 그대로 저장하는
+# 산문 한 덩어리라 STYLE/두 캐릭터 3개를 아래 헤딩 포맷으로 합쳐 넣고,
+# 여기서 다시 파싱해 꺼낸다. sections_json 은 안 보낸다(이 문서는
+# PromptDrawer의 설명/지침/파일 3섹션 모델과 안 맞는 별개 구조라
+# 편집기가 다르다 — sections 가 없으면 프롬프트 드로어가 content 전체를
+# 한 섹션으로 보여주는데, 이 카테고리는 애초에 PromptDrawer로 안 연다).
+_DOC_HEADINGS = ("STYLE", "CHARACTER_FEMALE", "CHARACTER_MALE")
+_DOC_HEADING_RE = re.compile(r"^##\s+(STYLE|CHARACTER_FEMALE|CHARACTER_MALE)\s*$")
+
+
+def serialize_prompt_doc(style: str, char_female: str, char_male: str) -> str:
+    """세 값 → DDB에 저장할 content 문자열. `parse_prompt_doc`의 역함수."""
+    parts = dict(zip(_DOC_HEADINGS, (style.strip(), char_female.strip(), char_male.strip())))
+    return "\n\n".join(f"## {h}\n{parts[h]}" for h in _DOC_HEADINGS)
+
+
+def parse_prompt_doc(content: str) -> tuple[str, str, str]:
+    """content 문자열 → (style, char_female, char_male). 헤딩 형식이 예상과
+    다르면(빈 값 포함) ValueError — 호출부가 안전망 기본값으로 폴백한다."""
+    buckets: dict[str, list[str]] = {h: [] for h in _DOC_HEADINGS}
+    current: str | None = None
+    for line in content.split("\n"):
+        m = _DOC_HEADING_RE.match(line.strip())
+        if m:
+            current = m.group(1)
+            continue
+        if current:
+            buckets[current].append(line)
+    style, female, male = (("\n".join(buckets[h])).strip() for h in _DOC_HEADINGS)
+    if not style or not female or not male:
+        raise ValueError(
+            "webtoon-image/published 문서 형식이 예상과 다름 "
+            "(## STYLE / ## CHARACTER_FEMALE / ## CHARACTER_MALE 헤딩 필요)"
+        )
+    return style, female, male
+
+
+def _load_prompt_doc() -> tuple[str, str, str]:
+    """DDB(PROMPT#webtoon-image/published)에서 fresh하게 읽는다 — 캐시 없음
+    (모듈 docstring 참고). 실패하면 안전망 기본값으로 조용히 폴백한다."""
+    try:
+        import ddb_prompt  # pipelines/common/ 내 sibling — flat import
+
+        content = ddb_prompt.load_prompt("webtoon-image", "published")
+        return parse_prompt_doc(content)
+    except Exception as e:  # noqa: BLE001 — 웹툰 생성 자체를 절대 막으면 안 됨
+        print(
+            f"[webtoon_image] webtoon-image/published 로드 실패"
+            f"({type(e).__name__}: {e}) — 코드 내 안전망 기본값 사용"
+        )
+        return (
+            _STYLE_FALLBACK,
+            _FIXED_CHARACTERS_FALLBACK["A (여성 기자, 설명자)"],
+            _FIXED_CHARACTERS_FALLBACK["B (남성 청자)"],
+        )
+
+
+def get_style() -> str:
+    style, _female, _male = _load_prompt_doc()
+    return style
+
+
+def get_fixed_characters() -> dict:
+    _style, female, male = _load_prompt_doc()
+    return {"A (여성 기자, 설명자)": female, "B (남성 청자)": male}
+
+
 def build_background_prompt(
     camera: str,
     scene: str,
     characters: dict | None = None,
     *,
-    style: str = STYLE,
+    style: str | None = None,
     include_scene_reinforcement: bool = True,
     include_character_reinforcement: bool = True,
 ) -> str:
@@ -136,9 +227,14 @@ def build_background_prompt(
     확산 모델이 요청 안 한 글자를 그림에 멋대로 채워넣는 걸 막기 위해 명시적으로
     금지 문구도 붙인다(합성은 compose_text.py가 나중에 한다).
 
-    style/include_*_reinforcement — admin 실험 패널이 프로덕션 기본값을
-    바꿔서 시도해볼 수 있게 하는 파라미터. 프로덕션(pipeline.py)은 전부
-    기본값 그대로 호출해 기존 동작과 100% 동일하다."""
+    style/include_*_reinforcement — admin 실험 패널이 발행된 기본값을 바꿔서
+    시도해볼 수 있게 하는 파라미터. style=None(기본)이면 admin이 발행한 최신
+    값을 DDB에서 그대로 읽는다 — 예전엔 import 시점에 고정된 상수를 기본값
+    으로 썼는데, 그러면 admin에서 새로 발행해도 이미 로드된 프로세스는 옛
+    값을 계속 썼다(파라미터 기본값은 함수 정의 시점에 딱 한 번 평가되므로).
+    이제는 매 호출마다 get_style()을 불러 항상 최신값을 쓴다."""
+    if style is None:
+        style = get_style()
     style_block = style + f"\nCamera: {camera}. 3:2 horizontal."
     return (
         style_block + characters_block(characters) + f"\n\n[SCENE]\n{scene}"
