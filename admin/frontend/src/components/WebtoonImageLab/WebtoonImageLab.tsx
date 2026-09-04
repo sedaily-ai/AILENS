@@ -45,14 +45,15 @@ function buildImagePromptDoc(style: string, charFemale: string, charMale: string
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** 상위 화면이 "프롬프트/이미지 실험"을 한 트리거·한 헤더로 묶어 보여줄 때
-   *  주입하는 탭 UI(2026-09-04, webtoon/page.tsx). 안 주면 기존과 동일. */
-  topTabs?: React.ReactNode;
+  /** true면 자기 backdrop/aside/닫기 버튼 없이 헤더+본문만 렌더한다 — 상위
+   *  화면이 PromptDrawer와 한 aside 안에 이어 붙여 보여줄 때 쓴다
+   *  (2026-09-04, webtoon/page.tsx). 기본 false. */
+  embedded?: boolean;
 }
 
 type PanelTab = "generate" | "history";
 
-export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
+export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   const toast = useToast();
   const [tab, setTab] = useState<PanelTab>("generate");
 
@@ -285,62 +286,44 @@ export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
     toast.show("이 생성의 설정을 폼에 불러왔습니다", "info");
   };
 
-  return (
-    <>
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] animate-[ui-fade-up_160ms_ease-out]"
-          onClick={handleClose}
-          aria-hidden="true"
-        />
-      )}
-
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="webtoon-lab-title"
-        inert={!open}
-        className={`fixed right-0 top-0 z-50 flex h-full w-full transform flex-col border-l border-[var(--border-hairline)] bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out sm:max-w-[880px] ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="ui-divider space-y-3 border-b px-5 pb-3 pt-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2
-                id="webtoon-lab-title"
-                className="font-display text-[19px] font-bold text-[var(--text-primary)]"
-              >
-                이미지 실험
-              </h2>
-              <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
-                Bedrock Stable Diffusion · 프롬프트/파라미터를 바꿔 실제 생성 결과를 확인
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
-              aria-label="닫기"
+  const headerNode = (
+    <div className="ui-divider space-y-3 border-b px-5 pb-3 pt-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2
+            id="webtoon-lab-title"
+            className="font-display text-[19px] font-bold text-[var(--text-primary)]"
+          >
+            이미지 실험
+          </h2>
+          <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
+            Bedrock Stable Diffusion · 프롬프트/파라미터를 바꿔 실제 생성 결과를 확인
+          </p>
+        </div>
+        {!embedded && (
+          <button
+            type="button"
+            onClick={handleClose}
+            className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
+            aria-label="닫기"
+          >
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
 
-          {topTabs && <div className="flex gap-1">{topTabs}</div>}
-
-          <div className="flex gap-1">
+      <div className="flex gap-1">
             {(
               [
                 { id: "generate" as const, label: "생성" },
@@ -360,10 +343,12 @@ export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
                 {t.label}
               </button>
             ))}
-          </div>
-        </div>
+      </div>
+    </div>
+  );
 
-        <div className="flex-1 overflow-y-auto px-5 py-5">
+  const bodyNode = (
+    <div className={embedded ? "px-5 py-5" : "flex-1 overflow-y-auto px-5 py-5"}>
           {tab === "generate" && (
             <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
               {/* 왼쪽 — 입력 폼 */}
@@ -534,7 +519,39 @@ export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
               onApply={applyHistoryItem}
             />
           )}
-        </div>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex flex-col">
+        {headerNode}
+        {bodyNode}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] animate-[ui-fade-up_160ms_ease-out]"
+          onClick={handleClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="webtoon-lab-title"
+        inert={!open}
+        className={`fixed right-0 top-0 z-50 flex h-full w-full transform flex-col border-l border-[var(--border-hairline)] bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out sm:max-w-[880px] ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {headerNode}
+        {bodyNode}
       </aside>
     </>
   );

@@ -51,14 +51,13 @@ function WebtoonPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkReloadKey, setBulkReloadKey] = useState(0);
-  // "프롬프트"·"이미지 실험" 두 버튼을 따로 두니 왔다갔다 불편하다는
-  // 피드백(2026-09-04) — 트리거 버튼 하나 + 패널 안쪽 상단 탭으로 통합.
-  // 두 드로어(PromptDrawer/WebtoonImageLab)는 그대로 각자 컴포넌트지만,
-  // 같은 panelTab 상태로 open을 서로 배타적으로 제어해서 마치 한 패널
-  // 안의 탭처럼 보이게 한다(각자 컴포넌트 자체는 안 건드림 — 다른
-  // 화면에서 PromptDrawer를 계속 단독으로도 쓰기 때문).
+  // "프롬프트"·"이미지 실험"을 버튼 두 개, 그다음 탭 두 개로 나눠봤는데
+  // 둘 다 "왜 나눠져 있냐"는 같은 피드백을 받았다(2026-09-04) — 결국 한
+  // 화면에 이어붙였다. PromptDrawer/WebtoonImageLab 둘 다 embedded prop을
+  // 받으면 자기 backdrop/aside/닫기 버튼 없이 헤더+본문만 내놓는다 — 이
+  // 페이지가 그 둘을 하나의 aside 안에 순서대로 쌓는다(각 컴포넌트 자체는
+  // 안 바꾼 것과 같음 — 다른 화면은 embedded 없이 계속 단독으로 씀).
   const [panelOpen, setPanelOpen] = useState(false);
-  const [panelTab, setPanelTab] = useState<"prompt" | "imageLab">("prompt");
   const visibleReloadKey = useReloadOnVisible();
 
   const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
@@ -226,51 +225,50 @@ function WebtoonPage() {
         </div>
       )}
 
-      <PromptDrawer
-        channel="webtoon"
-        open={panelOpen && panelTab === "prompt"}
-        onClose={() => setPanelOpen(false)}
-        topTabs={<PanelTopTabs active={panelTab} onSelect={setPanelTab} />}
-      />
-      <WebtoonImageLab
-        open={panelOpen && panelTab === "imageLab"}
-        onClose={() => setPanelOpen(false)}
-        topTabs={<PanelTopTabs active={panelTab} onSelect={setPanelTab} />}
-      />
-    </div>
-  );
-}
+      {panelOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] animate-[ui-fade-up_160ms_ease-out]"
+          onClick={() => setPanelOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="webtoon-panel-title"
+        inert={!panelOpen}
+        className={`fixed right-0 top-0 z-50 flex h-full w-full transform flex-col overflow-y-auto border-l border-[var(--border-hairline)] bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out sm:max-w-[880px] ${
+          panelOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="ui-divider flex items-start justify-between gap-4 border-b px-5 pb-3 pt-5">
+          <h2
+            id="webtoon-panel-title"
+            className="font-display text-[19px] font-bold text-[var(--text-primary)]"
+          >
+            프롬프트 · 이미지 실험
+          </h2>
+          <button
+            type="button"
+            onClick={() => setPanelOpen(false)}
+            className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
+            aria-label="닫기"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-/** PromptDrawer/WebtoonImageLab 헤더에 공용으로 꽂는 상단 탭 — 이 둘을
- *  "한 패널"처럼 오가게 해준다(위 panelOpen/panelTab 주석 참고). */
-function PanelTopTabs({
-  active,
-  onSelect,
-}: {
-  active: "prompt" | "imageLab";
-  onSelect: (tab: "prompt" | "imageLab") => void;
-}) {
-  return (
-    <>
-      {(
-        [
-          { id: "prompt" as const, label: "프롬프트" },
-          { id: "imageLab" as const, label: "이미지 실험" },
-        ]
-      ).map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          onClick={() => onSelect(t.id)}
-          className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-            active === t.id
-              ? "bg-[var(--accent)] text-white"
-              : "text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)]"
-          }`}
-        >
-          {t.label}
-        </button>
-      ))}
-    </>
+        <PromptDrawer channel="webtoon" open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+
+        <div className="ui-divider border-t" />
+        <p className="px-5 pb-1 pt-5 text-[13px] font-semibold text-[var(--text-muted)]">
+          이미지 생성 테스트 (3단계 · Bedrock Stable Diffusion)
+        </p>
+
+        <WebtoonImageLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+      </aside>
+    </div>
   );
 }

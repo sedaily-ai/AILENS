@@ -77,11 +77,12 @@ interface Props {
   channels?: Array<{ id: string; label: string }>;
   open: boolean;
   onClose: () => void;
-  /** 상위 화면이 "프롬프트/이미지 실험"처럼 이 드로어를 다른 패널과 한
-   *  트리거·한 헤더 아래 묶어 보여주고 싶을 때 주입하는 탭 UI(2026-09-04,
-   *  webtoon/page.tsx). 안 주면(대부분의 다른 화면) 기존과 동일하게 아무것도
-   *  안 뜬다 — 이 prop은 순수 추가라 다른 사용처에 영향 없다. */
-  topTabs?: React.ReactNode;
+  /** true면 자기 backdrop/aside/닫기 버튼 없이 헤더+본문+푸터만 렌더한다 —
+   *  상위 화면이 다른 패널과 한 aside 안에 이어 붙여 보여주고 싶을 때
+   *  쓴다(2026-09-04, webtoon/page.tsx — "프롬프트"/"이미지 실험"을 탭으로
+   *  나누지 말고 한 화면에 이어서 보여달라는 피드백). 기본 false — 다른
+   *  4개 화면(video/posts/lens/podcast)은 안 건드린다. */
+  embedded?: boolean;
 }
 
 /** states 맵의 키 — 채널×스코프 조합 하나당 서버 상태 하나. */
@@ -89,7 +90,7 @@ function stateKey(channel: string, scope: string): string {
   return `${channel}::${scope}`;
 }
 
-export function PromptDrawer({ channel, channels, open, onClose, topTabs }: Props) {
+export function PromptDrawer({ channel, channels, open, onClose, embedded = false }: Props) {
   const toast = useToast();
   // 단일 채널(channel)이면 그 하나짜리 목록으로, 여러 채널(channels)이면
   // 그대로 — 아래 로직은 항상 이 배열 하나만 본다.
@@ -388,84 +389,69 @@ export function PromptDrawer({ channel, channels, open, onClose, topTabs }: Prop
 
   const chars = presetCharCount(preset);
 
-  return (
-    <>
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] animate-[ui-fade-up_160ms_ease-out]"
-          onClick={handleClose}
-          aria-hidden="true"
+  const headerNode = (
+    <div className="ui-divider space-y-3 border-b px-5 pb-3 pt-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2
+            id="prompt-drawer-title"
+            className="font-display text-[19px] font-bold text-[var(--text-primary)]"
+          >
+            프롬프트
+          </h2>
+          <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
+            <span className="font-mono">{promptIdFor(activeChannel, scopeId)}</span>
+            {state && !state.loading && (
+              <>
+                {" · "}
+                {state.version > 0 ? (
+                  <span className="font-mono font-semibold">v{state.version}</span>
+                ) : (
+                  "새 프롬프트"
+                )}
+              </>
+            )}
+          </p>
+        </div>
+        {/* embedded면 상위 패널이 닫기 버튼을 하나만 갖는다(2026-09-04). */}
+        {!embedded && (
+          <button
+            type="button"
+            onClick={handleClose}
+            className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
+            aria-label="닫기"
+          >
+            <Icon d={ICON.close} className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+
+      {/* 채널 탭 — channels prop을 받은 화면(2026-08-20, "4가지 시선")만
+          뜬다. 단일 channel 화면은 channelList.length === 1이라 안 뜬다. */}
+      {channelList.length > 1 && (
+        <ChannelTabs
+          channels={channelList}
+          activeId={activeChannel}
+          dirtyChannelIds={dirtyChannelIds}
+          filledChannelIds={filledChannelIds}
+          onSelect={setActiveChannel}
         />
       )}
 
-      {/* 항상 마운트하고 translate 로 밀어낸다(Sidebar 와 동일 패턴) — 그래야
-          열고 닫을 때 부드럽게 슬라이드된다. 닫힌 동안은 inert 로 막아 화면
-          밖 패널에 Tab 이 걸리지 않게 한다. */}
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="prompt-drawer-title"
-        inert={!open}
-        className={`fixed right-0 top-0 z-50 flex h-full w-full transform flex-col border-l border-[var(--border-hairline)] bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out sm:max-w-[600px] ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="ui-divider space-y-3 border-b px-5 pb-3 pt-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2
-                id="prompt-drawer-title"
-                className="font-display text-[19px] font-bold text-[var(--text-primary)]"
-              >
-                프롬프트
-              </h2>
-              <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
-                <span className="font-mono">{promptIdFor(activeChannel, scopeId)}</span>
-                {state && !state.loading && (
-                  <>
-                    {" · "}
-                    {state.version > 0 ? (
-                      <span className="font-mono font-semibold">v{state.version}</span>
-                    ) : (
-                      "새 프롬프트"
-                    )}
-                  </>
-                )}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
-              aria-label="닫기"
-            >
-              <Icon d={ICON.close} className="h-5 w-5" />
-            </button>
-          </div>
+      <ScopeTabs
+        activeId={scopeId}
+        dirtyIds={dirtyIds}
+        filledIds={filledIds}
+        onSelect={setScopeId}
+      />
+    </div>
+  );
 
-          {topTabs && <div className="flex gap-1">{topTabs}</div>}
-
-          {/* 채널 탭 — channels prop을 받은 화면(2026-08-20, "4가지 시선")만
-              뜬다. 단일 channel 화면은 channelList.length === 1이라 안 뜬다. */}
-          {channelList.length > 1 && (
-            <ChannelTabs
-              channels={channelList}
-              activeId={activeChannel}
-              dirtyChannelIds={dirtyChannelIds}
-              filledChannelIds={filledChannelIds}
-              onSelect={setActiveChannel}
-            />
-          )}
-
-          <ScopeTabs
-            activeId={scopeId}
-            dirtyIds={dirtyIds}
-            filledIds={filledIds}
-            onSelect={setScopeId}
-          />
-        </div>
-
-        <div ref={bodyRef} className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+  const bodyNode = (
+    <div
+      ref={bodyRef}
+      className={embedded ? "space-y-6 px-5 py-5" : "flex-1 space-y-6 overflow-y-auto px-5 py-5"}
+    >
           {(!state || state.loading) && <div className="ui-skeleton h-64 rounded-xl" />}
 
           {state?.error && (
@@ -627,9 +613,11 @@ export function PromptDrawer({ channel, channels, open, onClose, topTabs }: Prop
               )}
             </>
           )}
-        </div>
+    </div>
+  );
 
-        <div className="ui-divider space-y-3 border-t px-5 py-4">
+  const footerNode = (
+    <div className="ui-divider space-y-3 border-t px-5 py-4">
           <p className="text-xs text-[var(--text-muted)]">
             <span className="font-semibold text-[var(--text-secondary)]">
               {scopeLabel(scopeId)}
@@ -690,7 +678,44 @@ export function PromptDrawer({ channel, channels, open, onClose, topTabs }: Prop
               </button>
             </div>
           </div>
-        </div>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex flex-col">
+        {headerNode}
+        {bodyNode}
+        {footerNode}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] animate-[ui-fade-up_160ms_ease-out]"
+          onClick={handleClose}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* 항상 마운트하고 translate 로 밀어낸다(Sidebar 와 동일 패턴) — 그래야
+          열고 닫을 때 부드럽게 슬라이드된다. 닫힌 동안은 inert 로 막아 화면
+          밖 패널에 Tab 이 걸리지 않게 한다. */}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prompt-drawer-title"
+        inert={!open}
+        className={`fixed right-0 top-0 z-50 flex h-full w-full transform flex-col border-l border-[var(--border-hairline)] bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out sm:max-w-[600px] ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {headerNode}
+        {bodyNode}
+        {footerNode}
       </aside>
     </>
   );
