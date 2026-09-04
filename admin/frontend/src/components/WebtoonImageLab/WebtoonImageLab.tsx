@@ -333,12 +333,18 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                   label="스타일(STYLE) 직접 입력"
                   hint="끄면 기본 스타일(모던 한국 웹툰체)을 그대로 씁니다"
                   checked={customStyle}
-                  onChange={setCustomStyle}
+                  onChange={(v) => {
+                    setCustomStyle(v);
+                    // 체크할 때 실제 기본 프롬프트 값을 바로 채운다 — 연한
+                    // placeholder만으로는 "안 보인다"는 피드백을 받았다
+                    // (2026-09-04). 이미 뭔가 입력돼 있으면 안 덮어쓴다.
+                    if (v && !style && defaults) setStyle(defaults.style);
+                  }}
                 >
                   <textarea
                     value={style}
                     onChange={(e) => setStyle(e.target.value)}
-                    placeholder={defaults?.style ?? "불러오는 중..."}
+                    placeholder={defaults ? undefined : "불러오는 중..."}
                     rows={6}
                     className="ui-input w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                   />
@@ -348,7 +354,13 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                   label="캐릭터(CHARACTERS) 직접 입력"
                   hint="끄면 고정 캐릭터 A(여성 기자)/B(남성 청자) 기본값을 그대로 씁니다"
                   checked={customChars}
-                  onChange={setCustomChars}
+                  onChange={(v) => {
+                    setCustomChars(v);
+                    if (v && defaults) {
+                      if (!charFemale) setCharFemale(defaults.char_female);
+                      if (!charMale) setCharMale(defaults.char_male);
+                    }
+                  }}
                 >
                   <div className="space-y-2">
                     <div>
@@ -356,7 +368,7 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                       <textarea
                         value={charFemale}
                         onChange={(e) => setCharFemale(e.target.value)}
-                        placeholder={defaults?.char_female ?? "불러오는 중..."}
+                        placeholder={defaults ? undefined : "불러오는 중..."}
                         rows={4}
                         className="ui-input mt-0.5 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                       />
@@ -366,7 +378,7 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                       <textarea
                         value={charMale}
                         onChange={(e) => setCharMale(e.target.value)}
-                        placeholder={defaults?.char_male ?? "불러오는 중..."}
+                        placeholder={defaults ? undefined : "불러오는 중..."}
                         rows={4}
                         className="ui-input mt-0.5 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                       />
