@@ -29,14 +29,13 @@ webtoon의 이미지 생성 전용으로만 쓰기로 정책이 바뀌었다. �
 자동으로 채우거나 화이트리스트로 치환한다.
 """
 import json
-import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text  # 2026-08-22: GPT -> Bedrock Claude 이관 (GPT는 이미지 생성 전용)
-from json_extract import extract_fenced_json_text, loads_lenient  # 2026-08-23 공용화
+from json_extract import extract_json_object  # 2026-08-23 공용화, 2026-09-04 폴백까지 통합
 
 # src/components/Icon.tsx의 ICON_MAP과 반드시 같이 갱신할 것 — 여기 없는
 # 키는 렌더 시 HelpCircle(물음표)로 조용히 폴백되어 화면이 부실해진다.
@@ -86,44 +85,6 @@ def _fallback_icon(name: str) -> str:
 
 def _fix_icon(name: str) -> str:
     return name if name in ICON_WHITELIST else _fallback_icon(name)
-
-
-def extract_json_block(text: str) -> dict:
-    """Bedrock 응답(각본 텍스트 + ```json 렌더용 JSON``` 두 블록)에서 JSON만 뽑는다.
-
-    2026-08-23 — webtoon/pipeline.py의 같은 이름 함수와 같은 이유로 폴백을
-    추가(실운영 중 Claude가 코드블록 지침을 안 따르는 사례를 webtoon에서
-    확인). 여기는 원래도 실패 시 "영상 없이 3/4 포맷" 폴백이 있어 블라스트
-    반경이 작았지만, 불필요한 영상 누락을 줄이기 위해 같이 강화한다.
-    코드블록 추출 단계는 webtoon/pipeline.py·mustknow_auto/classify.py와
-    공용(common/json_extract.py, 같은 날 공용화)."""
-    fenced = extract_fenced_json_text(text, opener="{")
-    if fenced is not None:
-        # 2026-08-24 — 펜스를 찾아도 그 안이 깨져 있을 수 있다(모델이 \' 처럼
-        # JSON 에 없는 이스케이프를 쓰는 경우). 예전엔 여기서 바로 예외가 나
-        # 아래 폴백들이 아예 실행되지 않았다.
-        try:
-            return loads_lenient(fenced)
-        except json.JSONDecodeError:
-            pass
-
-    # 코드블록이 아예 없는 경우 — 원문 전체를 그대로 JSON으로 시도
-    stripped = text.strip()
-    try:
-        return loads_lenient(stripped)
-    except json.JSONDecodeError:
-        pass
-
-    # 앞뒤에 설명 문구가 섞여 있는 경우 — 첫 '{'~마지막 '}' 구간만 추출
-    start, end = stripped.find("{"), stripped.rfind("}")
-    if start != -1 and end > start:
-        try:
-            return loads_lenient(stripped[start:end + 1])
-        except json.JSONDecodeError:
-            pass
-
-    raise ValueError("Bedrock 응답에서 JSON을 찾지 못했습니다")
-
 
 def fix_script(
     script: dict, *, photo_url: str | None = None, photo_caption: str | None = None
@@ -267,7 +228,7 @@ def generate_script(
     # 1회 재요청한다. 내용을 다시 지어내라는 게 아니라 형식만 고쳐 달라는
     # 요청이라 §23 원칙과 무관.
     try:
-        script = extract_json_block(raw)
+        script = extract_json_object(raw)
     except (ValueError, json.JSONDecodeError) as e:
         print(f"{tag} JSON 파싱 실패({e}), 형식만 고쳐서 1회 재요청 시도...")
         retry_raw = call_text(
@@ -280,7 +241,7 @@ def generate_script(
             max_tokens=4000,
         )
         (out / "raw_response_retry.txt").write_text(retry_raw, encoding="utf-8")
-        script = extract_json_block(retry_raw)
+        script = extract_json_object(retry_raw)
 
     script, applied = fix_script(script, photo_url=photo_url, photo_caption=photo_caption)
     for line in applied:
@@ -311,7 +272,7 @@ def generate_script(
         )
         try:
             retry_raw = call_text(guide, retry_message, max_tokens=4000)
-            retry_script = extract_json_block(retry_raw)
+            retry_script = extract_json_object(retry_raw)
             retry_script, retry_applied = fix_script(retry_script, photo_url=photo_url, photo_caption=photo_caption)
             for line in retry_applied:
                 print(f"{tag} [자동수정·재시도] {line}")

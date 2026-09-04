@@ -1,12 +1,18 @@
-"""Bedrock 응답에서 JSON 텍스트를 코드블록으로 감싸 찾는 공용 앞부분.
+"""Bedrock 응답에서 JSON 텍스트를 뽑는 공용부.
 
 webtoon/pipeline.py, video/generate_script.py, mustknow_auto/classify.py
 셋 다 "```json 코드블록 우선 → 언어 태그 없는 ``` 코드블록 중 opener로
 시작하는 마지막 것" 두 단계까지는 완전히 같은 정규식을 각자 복사해 쓰고
-있었다(2026-08-23 코드 리팩토링 감사에서 발견). 그 뒤 폴백(원문 전체 시도,
-'{'~'}' 구간 추출 vs 배열 살리기)은 객체/배열이라 반환 형태 자체가 달라
-공용화하지 않고 각 파일에 그대로 둔다 — 이 함수는 텍스트만 반환하고
-json.loads()는 호출부 책임이다.
+있었다(2026-08-23 코드 리팩토링 감사에서 발견) — `extract_fenced_json_text`/
+`loads_lenient`로 공용화.
+
+그 뒤 폴백은 mustknow_auto/classify.py(배열, `_salvage_truncated_array`로
+잘린 배열을 살림)만 형태가 정말 달라 분리돼 있다. 반면 webtoon/pipeline.py의
+`_extract_json_block`과 video/generate_script.py의 `extract_json_block`은
+둘 다 객체(dict) 응답을 다루는데 폴백 로직까지 바이트 단위로 동일했다
+(2026-09-04 P2 리팩토링 감사에서 재확인 — 애초에 "객체/배열이라 통합 난이도
+있다"고 판단해 안 건드렸던 건데, 실제로는 webtoon·video 둘 다 객체라 통합
+난이도가 없었다). 그래서 이 둘만 `extract_json_object`로 마저 통합한다.
 """
 import json
 import re
@@ -91,3 +97,39 @@ def loads_lenient(text: str) -> Any:
         return json.loads(text)
     except json.JSONDecodeError:
         return json.loads(repair_invalid_escapes(text))
+
+
+def extract_json_object(text: str) -> dict:
+    """Bedrock 응답에서 JSON 객체(dict) 하나를 뽑는다.
+
+    코드블록 우선 → 없으면 원문 전체 → 첫 '{'~마지막 '}' 구간 순으로
+    폴백해서 실제로 유효한 JSON이면 형식과 무관하게 파싱되게 한다
+    (2026-08-23, 실운영에서 Claude가 ```json 코드블록 지침을 안 따르고
+    순수 JSON 텍스트만 반환하는 사례로 추가). 펜스를 찾아도 그 안이
+    깨져 있을 수 있어(모델이 \\' 처럼 JSON에 없는 이스케이프를 쓰는 경우,
+    2026-08-24) 각 단계에서 파싱 실패해도 다음 폴백으로 넘어간다.
+
+    webtoon/pipeline.py의 `_extract_json_block`과 video/generate_script.py의
+    `extract_json_block`이 폴백까지 바이트 단위로 동일해서 통합(2026-09-04).
+    """
+    fenced = extract_fenced_json_text(text, opener="{")
+    if fenced is not None:
+        try:
+            return loads_lenient(fenced)
+        except json.JSONDecodeError:
+            pass
+
+    stripped = text.strip()
+    try:
+        return loads_lenient(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    start, end = stripped.find("{"), stripped.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return loads_lenient(stripped[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError("Bedrock 응답에서 JSON을 찾지 못했습니다")

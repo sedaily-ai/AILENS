@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from json_extract import (  # noqa: E402
     extract_fenced_json_text,
+    extract_json_object,
     loads_lenient,
     repair_invalid_escapes,
 )
@@ -74,3 +75,38 @@ def test_production_payload_shape_parses():
 
     parsed = loads_lenient(fenced)
     assert parsed["scenes"][0]["scene"] == "캡션 박스 'D+20일'. 인물 없음."
+
+
+# --------------------------------------------------------------------------
+# extract_json_object — webtoon/pipeline.py·video/generate_script.py의
+# 중복 폴백 체인을 2026-09-04 통합한 함수. 두 파일의 실제 실패 사례를 그대로
+# 회귀 테스트로 옮긴다.
+
+
+def test_extract_json_object_prefers_json_fence():
+    raw = 'intro\n```json\n{"a": 1}\n```\ntrailer'
+    assert extract_json_object(raw) == {"a": 1}
+
+
+def test_extract_json_object_falls_back_to_bare_text():
+    # 코드블록 지침을 안 따르고 순수 JSON 텍스트만 반환하는 경우(2026-08-23 실패 사례)
+    assert extract_json_object('  {"a": 1}  ') == {"a": 1}
+
+
+def test_extract_json_object_falls_back_to_brace_slice():
+    # 앞뒤에 설명 문구가 섞여 있는 경우
+    raw = '여기 요청하신 JSON입니다: {"a": 1} 이상입니다.'
+    assert extract_json_object(raw) == {"a": 1}
+
+
+def test_extract_json_object_repairs_invalid_escape_inside_fence():
+    raw = "```json\n" + r'{"s": "\'D+20일\'"}' + "\n```"
+    assert extract_json_object(raw)["s"] == "'D+20일'"
+
+
+def test_extract_json_object_raises_when_nothing_parses():
+    try:
+        extract_json_object("이건 JSON이 아닙니다.")
+        raise AssertionError("파싱할 JSON이 없으면 ValueError 여야 한다")
+    except ValueError:
+        pass
