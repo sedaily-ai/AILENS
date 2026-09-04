@@ -51,8 +51,14 @@ function WebtoonPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkReloadKey, setBulkReloadKey] = useState(0);
-  const [promptOpen, setPromptOpen] = useState(false);
-  const [imageLabOpen, setImageLabOpen] = useState(false);
+  // "프롬프트"·"이미지 실험" 두 버튼을 따로 두니 왔다갔다 불편하다는
+  // 피드백(2026-09-04) — 트리거 버튼 하나 + 패널 안쪽 상단 탭으로 통합.
+  // 두 드로어(PromptDrawer/WebtoonImageLab)는 그대로 각자 컴포넌트지만,
+  // 같은 panelTab 상태로 open을 서로 배타적으로 제어해서 마치 한 패널
+  // 안의 탭처럼 보이게 한다(각자 컴포넌트 자체는 안 건드림 — 다른
+  // 화면에서 PromptDrawer를 계속 단독으로도 쓰기 때문).
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelTab, setPanelTab] = useState<"prompt" | "imageLab">("prompt");
   const visibleReloadKey = useReloadOnVisible();
 
   const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
@@ -175,25 +181,13 @@ function WebtoonPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setPromptOpen(true)}
+            onClick={() => setPanelOpen(true)}
             className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
             </svg>
-            프롬프트
-          </button>
-          <button
-            type="button"
-            onClick={() => setImageLabOpen(true)}
-            className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
-            이미지 실험
+            프롬프트 · 이미지 실험
           </button>
           <Link href="/webtoon/edit" className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
             새 웹툰
@@ -232,8 +226,51 @@ function WebtoonPage() {
         </div>
       )}
 
-      <PromptDrawer channel="webtoon" open={promptOpen} onClose={() => setPromptOpen(false)} />
-      <WebtoonImageLab open={imageLabOpen} onClose={() => setImageLabOpen(false)} />
+      <PromptDrawer
+        channel="webtoon"
+        open={panelOpen && panelTab === "prompt"}
+        onClose={() => setPanelOpen(false)}
+        topTabs={<PanelTopTabs active={panelTab} onSelect={setPanelTab} />}
+      />
+      <WebtoonImageLab
+        open={panelOpen && panelTab === "imageLab"}
+        onClose={() => setPanelOpen(false)}
+        topTabs={<PanelTopTabs active={panelTab} onSelect={setPanelTab} />}
+      />
     </div>
+  );
+}
+
+/** PromptDrawer/WebtoonImageLab 헤더에 공용으로 꽂는 상단 탭 — 이 둘을
+ *  "한 패널"처럼 오가게 해준다(위 panelOpen/panelTab 주석 참고). */
+function PanelTopTabs({
+  active,
+  onSelect,
+}: {
+  active: "prompt" | "imageLab";
+  onSelect: (tab: "prompt" | "imageLab") => void;
+}) {
+  return (
+    <>
+      {(
+        [
+          { id: "prompt" as const, label: "프롬프트" },
+          { id: "imageLab" as const, label: "이미지 실험" },
+        ]
+      ).map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onSelect(t.id)}
+          className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors ${
+            active === t.id
+              ? "bg-[var(--accent)] text-white"
+              : "text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)]"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </>
   );
 }

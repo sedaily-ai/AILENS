@@ -24,11 +24,14 @@ const _MAX_SCENE_CHARS = 1200; // 백엔드 _MAX_SCENE_BYTES(4000바이트)에 �
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** 상위 화면이 "프롬프트/이미지 실험"을 한 트리거·한 헤더로 묶어 보여줄 때
+   *  주입하는 탭 UI(2026-09-04, webtoon/page.tsx). 안 주면 기존과 동일. */
+  topTabs?: React.ReactNode;
 }
 
 type PanelTab = "generate" | "history";
 
-export function WebtoonImageLab({ open, onClose }: Props) {
+export function WebtoonImageLab({ open, onClose, topTabs }: Props) {
   const toast = useToast();
   const [tab, setTab] = useState<PanelTab>("generate");
 
@@ -274,6 +277,8 @@ export function WebtoonImageLab({ open, onClose }: Props) {
               </svg>
             </button>
           </div>
+
+          {topTabs && <div className="flex gap-1">{topTabs}</div>}
 
           <div className="flex gap-1">
             {(

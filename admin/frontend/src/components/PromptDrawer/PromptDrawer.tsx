@@ -77,6 +77,11 @@ interface Props {
   channels?: Array<{ id: string; label: string }>;
   open: boolean;
   onClose: () => void;
+  /** 상위 화면이 "프롬프트/이미지 실험"처럼 이 드로어를 다른 패널과 한
+   *  트리거·한 헤더 아래 묶어 보여주고 싶을 때 주입하는 탭 UI(2026-09-04,
+   *  webtoon/page.tsx). 안 주면(대부분의 다른 화면) 기존과 동일하게 아무것도
+   *  안 뜬다 — 이 prop은 순수 추가라 다른 사용처에 영향 없다. */
+  topTabs?: React.ReactNode;
 }
 
 /** states 맵의 키 — 채널×스코프 조합 하나당 서버 상태 하나. */
@@ -84,7 +89,7 @@ function stateKey(channel: string, scope: string): string {
   return `${channel}::${scope}`;
 }
 
-export function PromptDrawer({ channel, channels, open, onClose }: Props) {
+export function PromptDrawer({ channel, channels, open, onClose, topTabs }: Props) {
   const toast = useToast();
   // 단일 채널(channel)이면 그 하나짜리 목록으로, 여러 채널(channels)이면
   // 그대로 — 아래 로직은 항상 이 배열 하나만 본다.
@@ -437,6 +442,8 @@ export function PromptDrawer({ channel, channels, open, onClose }: Props) {
               <Icon d={ICON.close} className="h-5 w-5" />
             </button>
           </div>
+
+          {topTabs && <div className="flex gap-1">{topTabs}</div>}
 
           {/* 채널 탭 — channels prop을 받은 화면(2026-08-20, "4가지 시선")만
               뜬다. 단일 channel 화면은 channelList.length === 1이라 안 뜬다. */}
