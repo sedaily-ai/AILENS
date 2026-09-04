@@ -11,6 +11,7 @@ import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
 import { ListPagination } from '@/shared/ui/ListPagination';
+import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
 import { LISTEN_PAGE_SIZE } from './listenListShared';
 
 const PAGE_SIZE_OPTIONS = [30, 60, 120];
@@ -44,8 +45,6 @@ export function ListenListClient({
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<HomePlayerPost[]>(initialItems);
-  const [pageSize, setPageSize] = useState(LISTEN_PAGE_SIZE);
-  const [clientPage, setClientPage] = useState(initialPage);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,11 +56,9 @@ export function ListenListClient({
     };
   }, []);
 
-  const isCustomSize = pageSize !== LISTEN_PAGE_SIZE;
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const currentPage = Math.min(clientPage, totalPages);
-  const pageHref = (n: number) => (n <= 1 ? '/listen' : `/listen/page/${n}`);
-  const pageItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const {
+    pageItems, currentPage, totalPages, pageHref, isCustomSize, pageSize, onPageChange, onPageSizeChange,
+  } = usePageSizePagination(items, LISTEN_PAGE_SIZE, '/listen', initialPage);
 
   return (
     <div className="min-h-screen bg-white">
@@ -194,13 +191,10 @@ export function ListenListClient({
             totalPages={totalPages}
             pageHref={pageHref}
             isCustomSize={isCustomSize}
-            onPageChange={setClientPage}
+            onPageChange={onPageChange}
             pageSize={pageSize}
             pageSizeOptions={PAGE_SIZE_OPTIONS}
-            onPageSizeChange={(n) => {
-              setPageSize(n);
-              setClientPage(1);
-            }}
+            onPageSizeChange={onPageSizeChange}
             accentColor={NEUTRAL_ACCENT}
             totalCount={items.length}
           />

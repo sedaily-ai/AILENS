@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import { fetchWebtoons } from '@/shared/lib/api/cmsPostsApi';
+import { SITE_URL } from '@/shared/constants/site';
 import { AllWebtoonsClient } from './AllWebtoonsClient';
 
-const SITE_URL = 'https://ailens.sedaily.ai';
+// 2026-09-04 — SITE_URL 로컬 재정의 제거(리팩토링 감사로 발견) — 2026-08-23에
+// 21개 파일의 중복 정의를 shared/constants/site.ts로 통일했는데, 이 파일은
+// 그 직후(2026-08-24)에 신설되며 그 규칙을 다시 어겼다.
 const TITLE = '전체 웹툰 — AI LENS';
 const DESCRIPTION = '서울경제 AI LENS가 연재 중인 모든 웹툰 시리즈를 한눈에 볼 수 있어요.';
 
