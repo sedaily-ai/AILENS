@@ -195,23 +195,8 @@ def test_cost_total_sums_all_models(cw_tokens) -> None:
 from routes import newsletter as nl_route
 
 
-class _FakeScanTable:
-    def __init__(self, items: list[dict], raise_on_scan: bool = False):
-        self._items = items
-        self._raise = raise_on_scan
-
-    def scan(self, **kwargs) -> dict:
-        if self._raise:
-            raise RuntimeError("ddb down")
-        return {"Items": list(self._items)}
-
-
-class _FakeDdb:
-    def __init__(self, table: _FakeScanTable):
-        self._table = table
-
-    def Table(self, name: str) -> _FakeScanTable:
-        return self._table
+def _raising_list_all():
+    raise RuntimeError("ddb down")
 
 
 _SUBS = [
@@ -226,7 +211,7 @@ _SES = {"Send": 100, "Delivery": 90, "Open": 50, "Click": 10, "Bounce": 5, "Comp
 
 def test_newsletter_stats_shape_and_active_count(monkeypatch) -> None:
     # MBTI 페르소나 폐기(2026-08) 이후 by_group 집계는 없다 — 구독자는 그룹을 갖지 않는다.
-    monkeypatch.setattr(nl_route, "_ddb", _FakeDdb(_FakeScanTable(_SUBS)))
+    monkeypatch.setattr(nl_route.subscribers_repo, "list_all", lambda: list(_SUBS))
     monkeypatch.setattr(nl_route, "_ses_sum", lambda metric, days: 100)
 
     resp = nl_route.handle_stats({}, {}, {})
@@ -241,7 +226,7 @@ def test_newsletter_stats_shape_and_active_count(monkeypatch) -> None:
 
 
 def test_newsletter_masks_recent_emails(monkeypatch) -> None:
-    monkeypatch.setattr(nl_route, "_ddb", _FakeDdb(_FakeScanTable(_SUBS)))
+    monkeypatch.setattr(nl_route.subscribers_repo, "list_all", lambda: list(_SUBS))
     monkeypatch.setattr(nl_route, "_ses_sum", lambda metric, days: 0)
     body = json.loads(nl_route.handle_stats({}, {}, {})["body"])
     emails = [r["email"] for r in body["subscribers"]["recent"]]
@@ -250,7 +235,7 @@ def test_newsletter_masks_recent_emails(monkeypatch) -> None:
 
 
 def test_newsletter_computes_rates_from_ses_sums(monkeypatch) -> None:
-    monkeypatch.setattr(nl_route, "_ddb", _FakeDdb(_FakeScanTable([])))
+    monkeypatch.setattr(nl_route.subscribers_repo, "list_all", lambda: [])
     monkeypatch.setattr(nl_route, "_ses_sum", lambda metric, days: _SES[metric])
     metrics = json.loads(nl_route.handle_stats({}, {}, {})["body"])["metrics"]
     # 셋이 서로 다른 값이라 계산이 뒤바뀌면 반드시 하나 이상 실패한다.
@@ -264,7 +249,7 @@ def test_newsletter_computes_rates_from_ses_sums(monkeypatch) -> None:
 
 def test_newsletter_rates_are_zero_when_no_sends(monkeypatch) -> None:
     """0 나눗셈 방어 — send 가 0이면 세 비율 전부 0.0."""
-    monkeypatch.setattr(nl_route, "_ddb", _FakeDdb(_FakeScanTable([])))
+    monkeypatch.setattr(nl_route.subscribers_repo, "list_all", lambda: [])
     monkeypatch.setattr(nl_route, "_ses_sum", lambda metric, days: 0)
     metrics = json.loads(nl_route.handle_stats({}, {}, {})["body"])["metrics"]
     assert metrics["open_rate"] == 0.0
@@ -274,7 +259,7 @@ def test_newsletter_rates_are_zero_when_no_sends(monkeypatch) -> None:
 
 @pytest.mark.parametrize("raw,expected", [("0", 1), ("999", 90), ("abc", 7), (None, 7)])
 def test_newsletter_clamps_days(monkeypatch, raw, expected: int) -> None:
-    monkeypatch.setattr(nl_route, "_ddb", _FakeDdb(_FakeScanTable([])))
+    monkeypatch.setattr(nl_route.subscribers_repo, "list_all", lambda: [])
     monkeypatch.setattr(nl_route, "_ses_sum", lambda metric, days: 0)
     qp = {} if raw is None else {"days": raw}
     body = json.loads(nl_route.handle_stats({}, {}, qp)["body"])
@@ -282,7 +267,7 @@ def test_newsletter_clamps_days(monkeypatch, raw, expected: int) -> None:
 
 
 def test_newsletter_scan_failure_is_500(monkeypatch) -> None:
-    monkeypatch.setattr(nl_route, "_ddb", _FakeDdb(_FakeScanTable([], raise_on_scan=True)))
+    monkeypatch.setattr(nl_route.subscribers_repo, "list_all", _raising_list_all)
     resp = nl_route.handle_stats({}, {}, {})
     assert resp["statusCode"] == 500
     assert json.loads(resp["body"])["error"] == "subscribers scan failed"

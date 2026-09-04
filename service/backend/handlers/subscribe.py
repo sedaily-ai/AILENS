@@ -42,6 +42,7 @@ from typing import Any, Dict, Tuple
 
 import boto3
 
+from common.constants import SITE_URL
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
@@ -164,7 +165,7 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     })
 
 
-_BASE = "https://ailens.sedaily.ai"
+_BASE = SITE_URL
 
 
 def _send_today_letter(email: str, token: str) -> str:

@@ -29,11 +29,12 @@ import time
 import urllib.error
 import urllib.request
 
+from common.constants import SITE_URL
 from common.secrets import get_secret
 
 logger = logging.getLogger(__name__)
 
-_REVALIDATE_URL = "https://ailens.sedaily.ai/api/revalidate"
+_REVALIDATE_URL = f"{SITE_URL}/api/revalidate"
 _SECRET_PARAM = "/sedaily-mbti/ssr-revalidate-secret"
 _TIMEOUT_SECONDS = 2
 _RETRY_DELAY_SECONDS = 1

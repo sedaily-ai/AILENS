@@ -20,49 +20,32 @@ GET /admin/newsletter/stats?days=7
 구독자는 그룹을 갖지 않는다. 기존 저장분에 남아있는 mbti_group 값은 그대로
 두되(마이그레이션 없음), 이 대시보드는 더 이상 그 필드를 읽지 않는다.
 """
-import datetime as dt
 import logging
-import os
 
-import boto3
-
-from shared import response
+from repo import subscribers_repo
+from shared import cw_client, response
 
 logger = logging.getLogger(__name__)
 
-REGION = os.environ.get("AWS_REGION", "us-east-1")
-# 2026-09-04 — 환경변수 이름을 `SUBSCRIBERS_TABLE`로 통일(리팩토링 감사로
-# 발견: 여기만 `NEWSLETTER_SUBSCRIBERS_TABLE`을 썼다 — service/backend의
-# handlers/subscribe.py·newsletter/subscribers.py는 전부 SUBSCRIBERS_TABLE.
-# 운영 중 테이블을 옮기려고 환경변수 하나만 바꾸면 이 통계 대시보드만
-# 조용히 옛 테이블을 계속 보는 위험이 있었다).
-SUBSCRIBERS_TABLE = os.environ.get(
-    "SUBSCRIBERS_TABLE", "sedaily-mbti-newsletter-subscribers-dev"
-)
 SES_NAMESPACE = "AWS/SES"
 MESSAGE_TAG_VALUE = "newsletter"
 
-_ddb = boto3.resource("dynamodb", region_name=REGION)
-_cw = boto3.client("cloudwatch", region_name=REGION)
-
 
 def _ses_sum(metric: str, days: int) -> int:
-    end = dt.datetime.now(dt.timezone.utc)
-    start = end - dt.timedelta(days=days)
     try:
-        resp = _cw.get_metric_statistics(
-            Namespace=SES_NAMESPACE,
-            MetricName=metric,
-            Dimensions=[{"Name": "MessageTag", "Value": MESSAGE_TAG_VALUE}],
-            StartTime=start,
-            EndTime=end,
-            Period=86400,
-            Statistics=["Sum"],
+        total = cw_client.get_token_sum(
+            namespace=SES_NAMESPACE,
+            metric_name=metric,
+            dimensions=[{"Name": "MessageTag", "Value": MESSAGE_TAG_VALUE}],
+            days=days,
         )
     except Exception as e:  # noqa: BLE001
+        # 지표 하나(예: Complaint)가 CW 조회 실패해도 나머지 지표는 그대로 응답해야
+        # 한다 — 여기서 삼키지 않으면 handler.py 의 top-level catch-all 이 전체
+        # 요청을 500으로 만든다.
         logger.warning(f"CW metric {metric} fetch fail: {e}")
         return 0
-    return int(sum(p.get("Sum", 0) for p in resp.get("Datapoints", [])))
+    return int(total)
 
 
 def _mask_email(email: str) -> str:
@@ -85,25 +68,11 @@ def handle_stats(body, path_params, query_params):
     days = max(1, min(days, 90))
 
     # 1. 구독자 — full scan (수가 적으니 OK, 1000+ 되면 GSI 또는 CW custom metric 으로 전환)
-    table = _ddb.Table(SUBSCRIBERS_TABLE)
-    items: list[dict] = []
-    last_key: dict | None = None
-    while True:
-        kwargs: dict = {
-            "ProjectionExpression": "email, #s, created_at",
-            "ExpressionAttributeNames": {"#s": "status"},
-        }
-        if last_key:
-            kwargs["ExclusiveStartKey"] = last_key
-        try:
-            resp = table.scan(**kwargs)
-        except Exception as e:  # noqa: BLE001
-            logger.exception(f"ddb scan fail: {e}")
-            return response.err("subscribers scan failed", 500)
-        items.extend(resp.get("Items", []))
-        last_key = resp.get("LastEvaluatedKey")
-        if not last_key:
-            break
+    try:
+        items = subscribers_repo.list_all()
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"ddb scan fail: {e}")
+        return response.err("subscribers scan failed", 500)
 
     active = [i for i in items if i.get("status") == "active"]
     recent = sorted(items, key=lambda i: i.get("created_at") or "", reverse=True)[:10]

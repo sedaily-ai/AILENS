@@ -12,10 +12,12 @@ from __future__ import annotations
 import html
 from typing import Any, Dict, List
 
+from common.constants import SITE_URL
+
 _DEFAULT_NAME = "AI LENS"
 _DEFAULT_ROLE = "오늘의 한 통"
 _DEFAULT_ACCENT = "#3182F6"
-_BASE = "https://ailens.sedaily.ai"
+_BASE = SITE_URL
 
 
 def _esc(s: Any) -> str:
