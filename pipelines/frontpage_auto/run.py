@@ -22,7 +22,6 @@ webtoon/video 4포맷 생성 → S3 업로드 + DDB write(paper_section="전체"
 import json
 import sys
 import traceback
-import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -40,16 +39,15 @@ sys.path.insert(0, str(_ROOT / "common"))
 sys.path.insert(0, str(_ROOT / "video"))
 
 import boto3
-# 2026-09-04 — mustknow_auto/run.py와 공유하는 발행 헬퍼(리팩토링 감사로
-# 추출, publish_utils.py 참조) — _load_module/_display_category/_slugify/
-# _parse_letters/_parse_letter_summary_bullets/_already_published/
-# _generate_video/_get_revalidate_secret/_notify_revalidate가 이 모듈로
-# 이전됐다(둘 다 바이트 단위로 동일하던 것을 그대로 옮김).
+# 2026-09-04·2026-09-05 — mustknow_auto/run.py와 공유하는 발행 헬퍼
+# (리팩토링 감사로 추출, publish_utils.py 참조) — _load_module/
+# _display_category/_slugify/_parse_letters/_parse_letter_summary_bullets/
+# _already_published/_generate_video/_get_revalidate_secret/
+# _notify_revalidate에 더해, 두 파일의 process_article()/_publish() 본체
+# (4포맷 생성+업로드+DDB write, 바이트 단위로 동일했음)까지
+# publish_utils.publish_article()로 이전됐다.
 import publish_utils
-from config import AWS_REGION, CMS_POSTS_TABLE, CMS_MEDIA_BUCKET
-from s3_utils import upload_media
-from text_utils import strip_code_fence
-from facts_extract import extract_facts  # 2026-09 — 0단계 공용 팩트시트
+from config import AWS_REGION, CMS_POSTS_TABLE
 
 discovery = publish_utils.load_module("frontpage_auto_discovery", _ROOT / "discovery" / "pipeline.py")
 _letters_mod = publish_utils.load_module("frontpage_auto_letters", _ROOT / "letters" / "pipeline.py")
@@ -58,20 +56,16 @@ _webtoon_mod = publish_utils.load_module("frontpage_auto_webtoon", _ROOT / "webt
 
 REGION = AWS_REGION
 TABLE = CMS_POSTS_TABLE
-BUCKET = CMS_MEDIA_BUCKET
-
-
-# display_category/slugify/_upload(공용부만)/parse_letters/
-# parse_letter_summary_bullets/already_published/generate_video →
-# publish_utils.*로 이전(2026-09-04, mustknow_auto/run.py와 바이트 단위
-# 동일 함수 공용화 — publish_utils.py 참조). _upload는 그대로 남김 —
-# BUCKET을 캡처하는 로컬 래퍼라 이전 전에도 이미 얇았다.
-def _upload(s3, local_path: Path, key: str) -> str:
-    return upload_media(s3, local_path, key, BUCKET)
 
 
 def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> str:
-    """반환값: "published" | "published_no_video" | "skipped_duplicate" | "failed" """
+    """반환값: "published" | "published_no_video" | "skipped_duplicate" | "failed"
+
+    2026-09-05 — 4포맷 생성+업로드+DDB write 본체는 mustknow_auto/run.py의
+    `_publish()`와 바이트 단위로 동일했던 걸 `publish_utils.publish_article()`
+    로 공용화했다(P3 리팩토링 감사 — 2026-09-04 P1에서 코드블록 추출 등
+    작은 헬퍼 9개는 공용화했지만 정작 이 부분은 안 건드렸었다). 여기 남는
+    건 이 파일 고유의 판단(source_url 유효성, 중복확인, 이름 폴백)뿐."""
     source_url = article["url"]
     if not source_url:
         return "failed"
@@ -80,209 +74,13 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
         return "skipped_duplicate"
 
     name = article["key"] or publish_utils.slugify("", article["title"])
-    article_path = out_dir / f"{name}_article.txt"
-    # 0단계 — 공용 팩트시트(기준일/핵심 숫자/용어/논지)를 원문 뒤에 이어붙여
-    # 4포맷(레터/웹툰/팟캐스트/영상) 전부가 같은 파일을 읽는다. 각 포맷
-    # pipeline.py는 안 건드려도 된다 — 프롬프트가 이미 "입력은 0단계에서
-    # 만든 facts.json"이라고 전제하고 있었는데 실제로 이 단계가 없었다
-    # (기자 피드백 "포맷마다 설명 범위와 필수 정보가 달라질 가능성"의 원인).
-    # 실패해도 빈 문자열이라 원문만 쓰던 예전 동작으로 자연히 폴백.
-    facts = extract_facts(article["content"])
-    article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
-    article_path.write_text(article_text, encoding="utf-8")
-
-    letters_path = _letters_mod.run_article(name, str(article_path), out_dir)
-    letters_raw = letters_path.read_text(encoding="utf-8")
-    paragraphs = publish_utils.parse_letters(letters_raw)
-    letter_summary_bullets = publish_utils.parse_letter_summary_bullets(letters_raw)
-
-    podcast_mp3 = _podcast_mod.run_article(name, str(article_path), out_dir)
-
-    # 2026-09-04 — mustknow_auto/run.py의 2026-08-24 수정을 이식(리팩토링
-    # 감사로 발견: 이 파일만 웹툰 실패 격리가 없었다). 웹툰은 영상과 달리
-    # 폴백이 없어서, 이미지 생성이 실패하면(OpenAI 크레딧 소진 등) 이미
-    # 성공한 레터·팟캐스트까지 통째로 버려지고 기사가 failed로 집계되는
-    # 문제가 mustknow_auto에서 실제로 있었다 — 여기도 같은 코드 경로라
-    # 잠재적으로 같은 장애를 겪을 수 있었다. 영상과 같은 방식으로 "웹툰
-    # 없이 발행"까지는 살린다.
-    webtoon_script: dict = {}
-    webtoon_bullets, webtoon_images = [], []
-    try:
-        _webtoon_mod.run_article(name, str(article_path), out_dir)
-        webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
-        for cut in webtoon_script["cuts"]:
-            caption = cut.get("narration") or (
-                " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
-            ) or cut.get("caption", "")
-            webtoon_bullets.append(caption)
-            n = cut["cut"]
-            cut_path = out_dir / name / f"컷{n}.png"
-            key = f"media/frontpage-auto/{name}-webtoon-cut{n:03d}.png"
-            webtoon_images.append({"url": _upload(s3, cut_path, key), "caption": caption})
-    except Exception:
-        # 부분 성공(예: 3컷까지만 업로드)도 버린다 — 중간에 끊긴 웹툰을
-        # 내보내느니 웹툰 탭을 pending으로 두는 편이 낫다.
-        webtoon_script, webtoon_bullets, webtoon_images = {}, [], []
-        print(f"[frontpage-auto] {name} 웹툰 실패 — 웹툰 없이 발행\n{traceback.format_exc()}")
-
-    podcast_url = _upload(s3, podcast_mp3, f"media/podcast/frontpage-auto/{name}-podcast.mp3")
-
-    # 팟캐스트/영상 스크립트를 청각장애인 접근성용 텍스트로 같이 저장한다
-    # (2026-08-23 — mustknow_auto/run.py와 같은 이유, 사용자 요청).
-    podcast_script_path = out_dir / name / "대본.md"
-    podcast_transcript = (
-        strip_code_fence(podcast_script_path.read_text(encoding="utf-8"))
-        if podcast_script_path.exists() else None
-    ) or None
-
-    video = publish_utils.generate_video(
-        name, article_path, out_dir,
-        photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
+    return publish_utils.publish_article(
+        article, out_dir, s3, table, today_kst,
+        name=name, source_url=source_url,
+        paper_section="전체", display_order=article["_display_order"],
         log_prefix="frontpage-auto",
+        letters_mod=_letters_mod, podcast_mod=_podcast_mod, webtoon_mod=_webtoon_mod,
     )
-    video_url = thumb_url = None
-    video_transcript = None
-    status = "published"
-    if video:
-        video_url = _upload(s3, video["mp4_path"], f"media/video/frontpage-auto/{name}-video.mp4")
-        if video["thumb_path"]:
-            thumb_url = _upload(s3, video["thumb_path"], f"media/video/frontpage-auto/{name}-thumb.jpg")
-        video_script_path = out_dir / name / "script.json"
-        if video_script_path.exists():
-            video_script_data = json.loads(video_script_path.read_text(encoding="utf-8"))
-            video_transcript = "\n\n".join(
-                cut["narration"] for cut in video_script_data.get("cuts", []) if cut.get("narration")
-            ) or None
-    else:
-        status = "published_no_video"
-
-    lenses = [
-        {"label": "레터", "question": article["title"], "bullets": letter_summary_bullets, "paragraphs": paragraphs,
-         "images": [], "video_url": None, "media_url": None},
-        {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
-         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
-         "pending": not webtoon_images},
-        {"label": "팟캐스트", "question": article["title"], "bullets": [], "paragraphs": [],
-         "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
-        {"label": "영상", "question": article["title"], "bullets": [], "paragraphs": [],
-         "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
-         "pending": video_url is None, "transcript": video_transcript},
-    ]
-
-    publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
-    slug = publish_utils.slugify(publish_date_iso, article["title"])
-    now = datetime.now(timezone.utc).isoformat()
-    item = {
-        "id": str(uuid.uuid4()),
-        "slug": slug,
-        "status": "published",
-        "channels": ["lens"],
-        # UTC 타임스탬프(now)가 아니라 지면 날짜(today_kst, discovery가 조회한
-        # 바로 그 날짜)를 쓴다 — 위 KST 상수 도입 배경과 같은 이유.
-        "publish_date": publish_date_iso,
-        "editor_id": "AI LENS",
-        "headline": article["title"],
-        "subtitle": article["sub_title"],
-        "closing_line": None,
-        "body_inline": {
-            "body": [], "key_points": [], "keywords": [], "images": [],
-            "lenses": lenses,
-            "photo_image_url": article["photo_url"],
-            "category": publish_utils.display_category(article),
-            "paper_section": "전체",
-            "display_order": article["_display_order"],
-            "needs_video": video is None,
-        },
-        "cover_image_url": webtoon_images[0]["url"] if webtoon_images else None,
-        "source_url": source_url.split("?")[0],
-        "media_embed_url": None,
-        "display_order": None,
-        "created_by": "frontpage-auto",
-        "created_at": now,
-        "updated_at": now,
-        "published_at": now,
-    }
-    table.put_item(Item=item)
-
-    # 2026-08-23 — mustknow_auto/run.py와 같은 이유·같은 패턴(사용자 지적:
-    # 홈 "이슈를 웹툰으로" 카드가 렌즈 4유형 페이지로 가지 말고 웹툰 전용
-    # 페이지로 가면 좋겠다 + "만화방"(/webtoon 목록)에 렌즈발 웹툰이
-    # 안 올라온다). lens 글은 그대로 두고 웹툰 채널에도 독립 글을 하나 더
-    # 쓴다 — 슬러그 충돌 방지로 "-webtoon" 접미사.
-    if webtoon_images:
-        webtoon_item = {
-            "id": str(uuid.uuid4()),
-            "slug": f"{slug}-webtoon",
-            "status": "published",
-            "channels": ["webtoon"],
-            "publish_date": publish_date_iso,
-            "editor_id": "AI LENS",
-            "headline": webtoon_script.get("core_question") or article["title"],
-            "subtitle": article["sub_title"],
-            "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": webtoon_images},
-            "cover_image_url": webtoon_images[0]["url"],
-            "source_url": source_url.split("?")[0],
-            "media_embed_url": None,
-            "display_order": None,
-            "created_by": "frontpage-auto",
-            "created_at": now,
-            "updated_at": now,
-            "published_at": now,
-        }
-        table.put_item(Item=webtoon_item)
-
-    # 2026-08-23, 같은 요청의 연장(mustknow_auto/run.py와 동일) — 영상은
-    # video 채널, 팟캐스트는 home_player 채널(/listen이 보는 채널)에도
-    # 독립 글을 하나 더 쓴다.
-    if video_url:
-        video_item = {
-            "id": str(uuid.uuid4()),
-            "slug": f"{slug}-video",
-            "status": "published",
-            "channels": ["video"],
-            "publish_date": publish_date_iso,
-            "editor_id": "AI LENS",
-            "headline": lenses[3]["question"] or article["title"],
-            "subtitle": article["sub_title"],
-            "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "video_url": video_url},
-            "cover_image_url": thumb_url or article["photo_url"],
-            "source_url": source_url.split("?")[0],
-            "media_embed_url": None,
-            "display_order": None,
-            "created_by": "frontpage-auto",
-            "created_at": now,
-            "updated_at": now,
-            "published_at": now,
-        }
-        table.put_item(Item=video_item)
-
-    if podcast_url:
-        podcast_item = {
-            "id": str(uuid.uuid4()),
-            "slug": f"{slug}-podcast",
-            "status": "published",
-            "channels": ["home_player"],
-            "publish_date": publish_date_iso,
-            "editor_id": "AI LENS",
-            "headline": lenses[2]["question"] or article["title"],
-            "subtitle": article["sub_title"],
-            "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": publish_utils.display_category(article), "transcript": podcast_transcript},
-            "cover_image_url": article["photo_url"],
-            "source_url": source_url.split("?")[0],
-            "media_embed_url": podcast_url,
-            "display_order": 0,
-            "created_by": "frontpage-auto",
-            "created_at": now,
-            "updated_at": now,
-            "published_at": now,
-        }
-        table.put_item(Item=podcast_item)
-
-    print(f"[frontpage-auto] 발행 완료 — {slug} ({status})")
-    return status
 
 
 # _get_revalidate_secret/_notify_revalidate → publish_utils.get_revalidate_secret()/
