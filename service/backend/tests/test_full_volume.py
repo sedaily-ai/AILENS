@@ -34,7 +34,7 @@ import os
 import sys
 import time
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 import boto3
 
@@ -380,7 +380,7 @@ def main():
         if throttles.get('lambda_throttles', 0) > 0 or throttles.get('dynamodb_throttles', 0) > 0:
             print(f'      [WARN] Throttles: Lambda={throttles["lambda_throttles"]}, DynamoDB={throttles["dynamodb_throttles"]}')
         else:
-            print(f'      Throttles: none detected')
+            print('      Throttles: none detected')
 
         # Cost
         cost = estimate_cost(result)
@@ -458,13 +458,13 @@ def main():
     print(f'  DynamoDB throttles:       {report["total_dynamodb_throttles"]}')
     print(f'  Error count:              {report["error_count"]}')
     print(f'  Total test duration:      {report["total_test_duration_seconds"]}s')
-    print(f'')
+    print('')
     print(f'  Report saved: {filepath}')
 
     # Pass/fail verdict
     print('')
     if report['error_count'] == 0 and report['total_lambda_throttles'] == 0:
-        print(f'  \033[32mVERDICT: PASS — no errors, no throttling\033[0m')
+        print('  \033[32mVERDICT: PASS — no errors, no throttling\033[0m')
     elif report['total_lambda_throttles'] > 0:
         print(f'  \033[33mVERDICT: WARN — {report["total_lambda_throttles"]} throttle events detected\033[0m')
     else:

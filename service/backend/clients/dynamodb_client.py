@@ -361,7 +361,7 @@ class DynamoDBClient:
                 for item in items:
                     existing_ids.add(item['news_id'])
 
-            except Exception as e:
+            except Exception:
                 # Fallback to individual checks if batch fails
                 for nid in batch:
                     if await self.article_exists(nid):

@@ -18,7 +18,6 @@ Usage:
 Output: tests/results/performance_{date}.json
 """
 import argparse
-import asyncio
 import json
 import os
 import sys
