@@ -96,81 +96,18 @@
 # ⚠️ 이 파일을 고치면 admin의 DDB "3단계 — 이미지 생성 스타일 (참고용)"
 # 섹션도 반드시 손으로 같이 맞출 것(위 모듈 docstring 참고) — 이번
 # 변경은 아직 그쪽에 반영 안 됨.
+#
+# 2026-09-05 — STYLE/FIXED_CHARACTERS 실제 값은 common/webtoon_image.py로
+# 옮겼다(admin 콘솔의 "이미지 실험" 패널도 같은 값이 필요해져서 —
+# common/webtoon_image.py 모듈 docstring 참고). 여기서는 재export만 해서
+# 이 파일을 import해 쓰던 코드(pipeline.py 등)가 안 바뀌게 한다 — 값
+# 자체를 고칠 땐 common/webtoon_image.py를 고칠 것, 여기 다시 채워넣지
+# 말 것.
+from webtoon_image import STYLE, FIXED_CHARACTERS
 
-STYLE = (
-    "Modern Korean webtoon illustration — clean, crisp black linework "
-    "with confident, uncluttered line weight. Soft cel-shaded coloring "
-    "with gentle, restrained shading (not flat single-tone, not heavy "
-    "painterly texture — controlled shading that reads clearly at a "
-    "glance). This is a hand-illustrated artwork — clearly rendered "
-    "with visible linework, NOT a photograph, NOT photorealistic, NOT "
-    "camera-captured, NOT 3D-rendered.\n\n"
-    "Natural adult character proportions and clear, expressive but NOT "
-    "exaggerated eyes and expressions. Professional, editorial mood — "
-    "restrained faces; natural body language that reads clearly at a "
-    "glance (not exaggerated melodrama — this is a news setting, not "
-    "battle drama). Do NOT render in Studio Ghibli style, watercolor "
-    "style, storybook/fairy-tale illustration style, or Japanese anime "
-    "style. Do NOT render overly young/childlike characters, chibi/SD "
-    "proportions, or 3D-rendered characters.\n\n"
-    "Contemporary present-day South Korea only — modern office/newsroom "
-    "interiors, business-casual or business-formal wardrobe (suits, "
-    "blouses, cardigans), modern furniture and electronics. Do NOT "
-    "render historical, period (Joseon-era/sageuk), fantasy, or "
-    "traditional hanbok clothing or settings under any circumstance.\n\n"
-    "Render exactly what [SCENE] describes and nothing more — do not "
-    "add extra background crowds, bystanders, or characters beyond what "
-    "[SCENE] and [CHARACTERS] specify. If [SCENE] describes an empty "
-    "room, render it empty with no people.\n\n"
-    "Clean, uncluttered backgrounds — white or light-gray tones, tidy "
-    "and orderly, minimal background detail so the characters and any "
-    "infographic elements stay the clear focus. Accent color palette "
-    "centered on navy blue, sky blue, and red for emphasis elements "
-    "(charts, highlights, key colors) — a crisp editorial news-content "
-    "look rather than a moody cinematic one.\n\n"
-    "Anonymous generic characters only — do NOT render the specific "
-    "likeness of any real public figure; faces should read as illustrated "
-    "original characters, not a portrait of someone identifiable.\n\n"
-    "Any readable text inside a prop (document, poster, screen, chart, "
-    "sign, table) must come ONLY from the text explicitly given in this "
-    "prompt's [SCENE]/[CAPTION BOX]/[NARRATION]/speech bubble content. "
-    "Never invent additional readable text — no invented company names, "
-    "prices, dates, phone numbers, or stats. If a prop would otherwise "
-    "need text that wasn't given, render it blank, blurred, or angled "
-    "away from camera instead of inventing content."
-)
-
-# 2026-09-05 — 고정 진행자 2인("AI Lens 웹툰" 포맷). 기존엔 characters를
-# 1단계 스크립트가 기사마다 새로 지어냈는데(아래 _characters_block
-# 문서 참고 — pipeline.py), 이제 기사 내용과 무관하게 이 두 사람이 항상
-# 등장한다: 여성 기자가 설명하고 남성 청자가 반응하는 고정 포맷.
-# run_article()이 script.get("characters") 대신 이 값을 쓴다.
-# 참고: "서울경제신문 AILens 웹툰 제작 예시.docx"의 인물 스펙을 텍스트
-# 프롬프트용으로 옮김(그 문서의 image-editing 방식 자체는 아키텍처가
-# 달라 채택 안 함 — 위 "겪었던 문제 4" 참고).
-FIXED_CHARACTERS = {
-    "A (여성 기자, 설명자)": (
-        "Korean woman, early-to-mid 30s. Chin-length neat black bob "
-        "haircut, thin round metal-frame glasses. Navy blazer over a "
-        "light sky-blue blouse/shirt. Small white circular enamel badge "
-        "on the left chest of the blazer with a simple blue stylized "
-        "'S' monogram (a news outlet logo badge) — keep the badge small "
-        "and consistent, never oversized, never add any other text or "
-        "logo. Friendly but professional demeanor — actively gestures "
-        "while explaining: pointing at documents/charts, open palm "
-        "gestures, leaning toward materials. Keep face, hairstyle, "
-        "glasses, and outfit IDENTICAL across every cut."
-    ),
-    "B (남성 청자)": (
-        "Korean man, late 20s. Natural short black hair, no glasses. "
-        "White t-shirt under a dark gray cardigan. No badge, no logo of "
-        "any kind. Represents the reader's curiosity — reacts to what's "
-        "being explained: leaning in to look at materials, tilting "
-        "forward, resting chin on hand while thinking, looking "
-        "surprised or curious as the scene calls for. Keep face, "
-        "hairstyle, and outfit IDENTICAL across every cut."
-    ),
-}
+# pyflakes에게 "재export라 이 파일 안에서 안 써도 죽은 게 아니다"를 알려준다
+# (bare pyflakes는 flake8과 달리 `# noqa` 주석을 안 읽는다 — __all__만 본다).
+__all__ = ["STYLE", "FIXED_CHARACTERS"]
 
 BUBBLE_RULES = (
     "\n\n[SPEECH BUBBLES — CRITICAL]\n"

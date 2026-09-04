@@ -39,8 +39,6 @@ Nova Canvas든 SD3.5든 확산 모델 계열은 프롬프트로 요청한 한글
 import sys, json, base64, time
 from pathlib import Path
 
-import boto3
-
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
 from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
@@ -63,108 +61,22 @@ N_CUTS = 8
 # Bedrock, 텍스트는 compose_text.py가 합성) — OpenAI 크레딧 복구되면 다시
 # "openai"로 바꾸면 됨.
 IMAGE_PROVIDER = "bedrock"
-BEDROCK_IMAGE_REGION = "us-west-2"  # us-east-1엔 살아있는 순수 text-to-image 모델이 없음(Nova Canvas만 있는데 막힘)
-# 2026-08-28 — 베어 모델 ID 직호출을 application inference profile 로 교체했다.
-# 베어(`stability.stable-image-core-v1:1`)로 부르면 비용할당태그가 붙을 자리가 없어
-# 청구 데이터에서 전량 `Not Applicable` 로 샌다(BillingON 실측 8/18~8/26 $33.08,
-# 월 약 $110). 태그는 소급되지 않으므로 지난 발생분은 복구 불가다.
-# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image.
-# 2026-09-30 이후 Service 를 lens 로 원복 — docs/architecture/비용태깅_규칙.md 참고.
-# 되돌릴 때는 아래 상수를 "stability.stable-image-core-v1:1" 로 바꾸면 된다(요금 동일).
-BEDROCK_IMAGE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/5jauvzgplsjx"  # lens-webtoon-image-stable-core → stability.stable-image-core-v1:1
-BEDROCK_ASPECT_RATIO = "3:2"
 
-_bedrock_image_client = None
-
-
-def _get_bedrock_image_client():
-    global _bedrock_image_client
-    if _bedrock_image_client is None:
-        _bedrock_image_client = boto3.client("bedrock-runtime", region_name=BEDROCK_IMAGE_REGION)
-    return _bedrock_image_client
-
-
-def _characters_block(characters: dict | None) -> str:
-    """인물 묘사를 매 컷 이미지 프롬프트 앞에 반복 주입한다 — 8컷 모두
-    같은 characters 딕셔너리를 그대로 프롬프트에 넣어 확산 모델이 매번
-    같은 인물 묘사를 참조하게 한다(완벽한 동일성 보장은 아니지만, 진짜
-    캐릭터 시트·img2img 없이는 확산 모델 특성상 불가능 — 아예 정보가
-    없는 것보다는 훨씬 나은 절충).
-
-    2026-09(최초 도입) — 당시엔 1단계 스크립트가 기사마다 새로 지어낸
-    인물 묘사(characters: {A, B, setting})를 썼다. 기존 문제: 프롬프트
-    지침("스크립트 맨 앞에 인물 묘사를 명시하고 모든 컷에서 반복한다")은
-    1단계(대사·스크립트) 텍스트에 대한 것일 뿐, 실제 3단계 이미지 생성
-    호출엔 characters 자체가 인자로 전달되지 않아 각 컷이 인물 외형을
-    전혀 모른 채 독립 생성되고 있었다.
-
-    2026-09-05 — run_article()이 이제 매번 새로 지어내는 대신
-    prompts.FIXED_CHARACTERS(고정 진행자 2인)를 넘긴다 — "AI Lens 웹툰"
-    포맷 도입, prompts.py STYLE 근처 "겪었던 문제 4" 참고. 이 함수 자체는
-    "받은 딕셔너리를 프롬프트 블록으로 직렬화"만 하므로 변경 없음."""
-    if not characters:
-        return ""
-    lines = [f"{k}: {v}" for k, v in characters.items()]
-    return "\n\n[CHARACTERS — keep consistent across all cuts]\n" + "\n".join(lines)
-
-
-# [SCENE] 직후에 짧게 한 번 더 반복 — 프롬프트 앞쪽 STYLE 문구의 일반적
-# 톤(트렌디한 K-웹툰 로맨스 정형)이 뒤쪽 [SCENE]의 구체적 지시를 누르는
-# 경향을 실측으로 확인해서(2026-09, prompts.py STYLE 근처 "겪었던 문제
-# 3" 참고) 넣은 재강조 — [SCENE]에 가장 가까운 위치에서 같은 취지를
-# 한 번 더 짧게 못박는다.
-_SCENE_REINFORCEMENT = (
-    "\n\nSTRICT: Render exactly the scene above — modern present-day "
-    "setting, no historical/period/fantasy clothing, no extra crowds or "
-    "characters beyond what [SCENE]/[CHARACTERS] specify."
+# 2026-09-05 — 여기 있던 _characters_block/_SCENE_REINFORCEMENT/
+# _CHARACTER_REINFORCEMENT/build_background_prompt/BEDROCK_IMAGE_REGION/
+# BEDROCK_IMAGE_MODEL_ID/BEDROCK_ASPECT_RATIO/generate_image_bedrock 전부
+# common/webtoon_image.py로 옮겼다(admin 콘솔의 "이미지 실험" 패널도 이
+# 로직이 그대로 필요해져서 — 그 모듈 docstring 참고). 시행착오 이력
+# (재강조 문구가 왜 이 모양인지, 비용태깅 때문에 application inference
+# profile을 쓰는 이유 등)도 전부 그쪽·prompts.py에 있다 — 여기서는
+# 이전과 같은 이름으로 그대로 import해서 아래 호출부들은 안 바뀐다.
+from webtoon_image import (
+    build_background_prompt,
+    generate_bedrock_image as generate_image_bedrock,
+    characters_block as _characters_block,
+    SCENE_REINFORCEMENT as _SCENE_REINFORCEMENT,
+    CHARACTER_REINFORCEMENT as _CHARACTER_REINFORCEMENT,
 )
-
-# 2026-09-05 — FIXED_CHARACTERS 도입 직후 샘플 실측(article.txt, 8컷)에서
-# "겪었던 문제 3"와 정확히 같은 패턴이 [CHARACTERS]에도 나타났다: 안경·
-# 단발 밥컷·배지가 전부 무시되고 매 컷 다른 "K-드라마/아이돌풍 롱헤어
-# 클로즈업" 얼굴로 회귀(컷마다 서로 다른 사람처럼 보임 — 여성도 컷1/2/3이
-# 전부 다른 얼굴, 남성도 롱헤어 아이돌 스타일로 나와 스펙과 무관했음).
-# [CHARACTERS] 블록 자체가 프롬프트 앞쪽(STYLE 바로 뒤)에 있어서 [SCENE]
-# 재강조와 같은 "뒤쪽에 있어야 더 잘 반영된다"는 실측 교훈이 적용 안 되고
-# 있었던 것으로 추정 — _SCENE_REINFORCEMENT와 같은 위치([SCENE] 직후)에
-# 같은 방식(요약 재반복, 원문 그대로 복붙 아님 — 특정 캐릭터 스펙이 바뀌면
-# 여기도 고쳐야 하는 이중관리를 피하려고 일부러 일반적인 문구로 씀)으로
-# 재강조를 하나 더 추가.
-#
-# 재검증 결과(같은 날 후속 샘플): 이 재강조 추가로 남성 캐릭터의 "짧은
-# 머리"는 개선됐지만, 여성 캐릭터의 안경·배지·단발은 여전히 무시됐다.
-# 실패 지점을 더 구체적으로 못박는 3차 시도(대문자 태그 나열 + "이미
-# 무시된 적 있다" 문구)까지 해봤는데 안경/배지/단발은 그래도 안 뚫렸고
-# 오히려 색상이 통째로 사라지는 부작용만 생겨서 되돌렸다(prompts.py의
-# FIXED_CHARACTERS 근처 "겪었던 문제 4" 후속 메모 참고). 안경 같은 작은
-# 액세서리 단위의 완벽한 동일성은 이 모델·구조로는 프롬프트만으론 안
-# 되는 것으로 보고, 지금 이 재강조 수준(일반적 문구, 큰 특징만) 에서
-# 멈춘다 — 완전한 해결 보장은 없다는 게 이미 "겪었던 문제 3"의 결론이었고
-# 이번에도 같았다.
-_CHARACTER_REINFORCEMENT = (
-    "\n\nSTRICT: The two people above are RECURRING hosts, not one-off "
-    "K-drama/idol characters — render them with the EXACT hairstyle, hair "
-    "length, glasses, outfit, and badge described in [CHARACTERS], not a "
-    "generic long-haired romance-webtoon look. Every cut must show the "
-    "SAME two faces/hairstyles/outfits as each other, matching "
-    "[CHARACTERS] exactly — do not substitute, restyle, or omit any "
-    "described feature (glasses, badge, hair length)."
-)
-
-
-def build_background_prompt(camera: str, scene: str, characters: dict | None = None) -> str:
-    """Bedrock 경로 전용 — 텍스트(말풍선/캡션/내레이션) 지침 없이 스타일+장면만.
-    확산 모델이 요청 안 한 글자를 그림에 멋대로 채워넣는 걸 막기 위해 명시적으로
-    금지 문구도 붙인다(합성은 compose_text.py가 나중에 한다)."""
-    style = prompts.STYLE + f"\nCamera: {camera}. 3:2 horizontal."
-    return (
-        style + _characters_block(characters) + f"\n\n[SCENE]\n{scene}"
-        + _SCENE_REINFORCEMENT
-        + (_CHARACTER_REINFORCEMENT if characters else "")
-        + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
-        "or speech bubbles anywhere in this image — pure illustration only, no "
-        "readable characters of any kind. Text will be added separately afterward."
-    )
 
 _JSON_INSTRUCTION = (
     "\n\n[응답 형식]\n다른 설명 없이 ```json 코드블록 하나 안에 JSON 객체만 담아 응답한다."
@@ -262,34 +174,8 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
     return False
 
 
-def generate_image_bedrock(prompt: str, out_path: Path, retries: int = 3) -> bool:
-    """배경 이미지 1장 생성 (Stability Stable Image Core, Bedrock us-west-2).
-    실패 시 최대 retries회 재시도 — generate_image()(GPT)와 같은 지수 백오프
-    패턴을 맞췄다."""
-    body = json.dumps({
-        "prompt": prompt[:9500],  # Stability 프롬프트 상한(~1만자) 여유 두고 컷
-        "aspect_ratio": BEDROCK_ASPECT_RATIO,
-        "output_format": "png",
-    })
-    for attempt in range(retries):
-        try:
-            resp = _get_bedrock_image_client().invoke_model(modelId=BEDROCK_IMAGE_MODEL_ID, body=body)
-            payload = json.loads(resp["body"].read())
-            images = payload.get("images") or []
-            if not images:
-                raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_bytes(base64.b64decode(images[0]))
-            return True
-        except Exception as e:
-            if attempt < retries - 1:
-                wait = (attempt + 1) * 12
-                print(f"    ⚠️  오류: {e} → {wait}초 후 재시도...")
-                time.sleep(wait)
-            else:
-                print(f"    ❌ 최종 실패: {e}")
-                return False
-    return False
+# generate_image_bedrock()는 이제 webtoon_image.generate_bedrock_image의
+# import 별칭이다(위 import 블록 참조) — 여기 있던 원래 정의는 삭제.
 
 
 # 2026-09-02 — 기자 피드백("컷마다 캐릭터가 다르다", "말풍선이 인물과
