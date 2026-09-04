@@ -1,0 +1,59 @@
+# AI LENS pre-commit 설정 (2026-09-04 신설 — 리팩토링 감사에서 "컨벤션이
+# 문서로만 강제된다"는 반복 지적을 받아 도구로 옮긴다).
+#
+# 이전엔 없었다 — CLAUDE.md들이 규칙을 잘 적어두긴 했지만 강제하는 CI/훅이
+# 하나도 없어서, 실제로 위반이 몇 주씩 안 걸리고 넘어간 사례가 여럿
+# 있었다(widgets/ 폴더명 PascalCase 드리프트, features/onboarding/
+# ConsumeStep.tsx의 FSD 레이어 역방향 import 등 — 둘 다 이 커밋에서 같이
+# 고쳤다).
+#
+# 로컬 1회 설치:
+#   pip install pre-commit   (또는 이미 설치돼 있으면 생략)
+#   pre-commit install
+#
+# 이후 `git commit`마다 자동으로 돈다. 급할 때는 `git commit --no-verify`로
+# 건너뛸 수 있다(pre-commit 자체 기본 기능) — 베타 단계라 속도가 우선일 때
+# 쓰되, 나중에 그냥 넘어가지 말고 후속 커밋으로 고칠 것.
+#
+# CI는 아직 없다(.github/workflows 자체가 없음) — 이 훅은 "설치한 사람"에게만
+# 적용된다는 한계가 있다. 여러 명이 기여하게 되면 GitHub Actions로 같은
+# 검사를 push/PR에도 걸어 우회를 막는 걸 고려할 것.
+
+repos:
+  - repo: local
+    hooks:
+      - id: pyflakes
+        name: pyflakes (service/backend, admin/backend, pipelines — 미사용 import/변수)
+        description: >
+          죽은 import·변수를 커밋 전에 잡는다. 이전엔 리팩토링 감사 때마다
+          몰아서 발견됐다(2026-08~09 CLAUDE.md 기록 다수) — 매 커밋마다
+          잡으면 그 "주기적 고고학 청소"가 필요 없어진다.
+        entry: pyflakes
+        language: python
+        additional_dependencies: ["pyflakes==3.1.0"]
+        types: [python]
+        files: ^(service/backend|admin/backend|pipelines)/
+        # orphan-source/는 2026-07-30 파이프라인 폐기 때 참고용으로만 남겨둔
+        # 보관 코드다(infrastructure/decommission-2026-07-30/README.md 참조) —
+        # 라이브 소스가 아니라 린트 대상에서 제외한다.
+        exclude: ^service/backend/infrastructure/decommission-2026-07-30/orphan-source/
+
+      - id: eslint-service-frontend
+        name: eslint (service/frontend — FSD 레이어 방향 등)
+        description: >
+          boundaries/dependencies(FSD 레이어 단방향 규칙, app→pages→widgets→
+          features→entities→shared)가 2026-09-04부터 error로 격상됐다 —
+          이 훅이 없으면 로컬 IDE가 아니고서야 위반이 커밋을 막지 못한다.
+        entry: scripts/lint/eslint-service-frontend.sh
+        language: script
+        files: ^service/frontend/src/.*\.(ts|tsx)$
+
+      - id: fsd-folder-case
+        name: FSD 폴더 대소문자 규칙 (widgets=PascalCase, features/entities=kebab-case)
+        description: >
+          ESLint엔 폴더명 대소문자를 검사하는 표준 규칙이 없어(파일명 케이스는
+          있지만 디렉터리명은 없음) 새 의존성 없이 스크립트로 검사한다.
+          service/frontend/CLAUDE.md의 "파일 네이밍 컨벤션" 참조.
+        entry: python3 scripts/lint/check_fsd_folder_case.py
+        language: system
+        files: ^service/frontend/src/(widgets|features|entities)/
