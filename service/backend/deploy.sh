@@ -129,8 +129,14 @@ API_FUNCTIONS=(
   "sedaily-mbti-ws-message-dev"
   "sedaily-mbti-voice-stt-presign-dev"
   "sedaily-mbti-voice-tts-dev"
-  "sedaily-mbti-newsletter-subscribe-dev"
 )
+# 2026-09-04 — "sedaily-mbti-newsletter-subscribe-dev"(handlers/newsletter/
+# subscribe.py) 제거. 리팩토링 감사로 이 핸들러가 handlers/subscribe.py
+# (sedaily-mbti-v2-subscribe-dev, 아래 API_V2_FUNCTIONS)와 완전히 독립된
+# 중복 구현이었던 게 드러나 subscribe.py로 통합하고 소스 파일은 삭제했다.
+# ⚠️ 배포된 Lambda 함수·API Gateway 라우트(/api/newsletter/subscribe)
+# 자체는 아직 안 지웠다 — 이 배포 루프에서 빠졌으니 더 이상 코드 업데이트는
+# 안 되지만, AWS 자원 실삭제는 별도 확인 후 진행할 것.
 
 # --- API Functions (원래 v2 이름, 2026-08-05 소스 통합 — 함수명은 그대로) ---
 API_V2_FUNCTIONS=(

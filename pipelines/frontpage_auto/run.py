@@ -20,9 +20,6 @@ webtoon/video 4포맷 생성 → S3 업로드 + DDB write(paper_section="전체"
 이미 있으면 스킵.
 """
 import json
-import mimetypes
-import re
-import subprocess
 import sys
 import traceback
 import uuid
@@ -38,224 +35,39 @@ from pathlib import Path
 # UTC+9 오프셋이면 충분 — zoneinfo(IANA tzdata) 의존성 없이 안전하게 처리.
 KST = timezone(timedelta(hours=9))
 
-import importlib.util
-
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT / "common"))
 sys.path.insert(0, str(_ROOT / "video"))
 
 import boto3
-import requests
+# 2026-09-04 — mustknow_auto/run.py와 공유하는 발행 헬퍼(리팩토링 감사로
+# 추출, publish_utils.py 참조) — _load_module/_display_category/_slugify/
+# _parse_letters/_parse_letter_summary_bullets/_already_published/
+# _generate_video/_get_revalidate_secret/_notify_revalidate가 이 모듈로
+# 이전됐다(둘 다 바이트 단위로 동일하던 것을 그대로 옮김).
+import publish_utils
 from config import AWS_REGION, CMS_POSTS_TABLE, CMS_MEDIA_BUCKET
 from s3_utils import upload_media
-from text_utils import extract_fact_ids, strip_code_fence
+from text_utils import strip_code_fence
 from facts_extract import extract_facts  # 2026-09 — 0단계 공용 팩트시트
 
-
-def _load_module(name: str, file_path: Path):
-    """letters/podcast/webtoon 세 파이프라인이 전부 `pipeline.py`라는
-    같은 파일명을 써서(각 폴더 안에서만 실행되는 걸 전제로 짜여 있음)
-    `sys.path` 삽입 방식으로는 `sys.modules` 캐시가 충돌한다 — 파일
-    경로로 직접 로드해 서로 다른 이름의 모듈로 구분한다. 자기 폴더 안의
-    형제 모듈(webtoon/pipeline.py의 `import prompts`/`from stitch import
-    stitch`)을 쓰는 경우도 있어서, 로드 전에 그 폴더 자체를 sys.path에
-    넣어준다."""
-    folder = str(file_path.parent)
-    if folder not in sys.path:
-        sys.path.insert(0, folder)
-    spec = importlib.util.spec_from_file_location(name, file_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-discovery = _load_module("frontpage_auto_discovery", _ROOT / "discovery" / "pipeline.py")
-_letters_mod = _load_module("frontpage_auto_letters", _ROOT / "letters" / "pipeline.py")
-_podcast_mod = _load_module("frontpage_auto_podcast", _ROOT / "podcast" / "pipeline.py")
-_webtoon_mod = _load_module("frontpage_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
+discovery = publish_utils.load_module("frontpage_auto_discovery", _ROOT / "discovery" / "pipeline.py")
+_letters_mod = publish_utils.load_module("frontpage_auto_letters", _ROOT / "letters" / "pipeline.py")
+_podcast_mod = publish_utils.load_module("frontpage_auto_podcast", _ROOT / "podcast" / "pipeline.py")
+_webtoon_mod = publish_utils.load_module("frontpage_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
 
 REGION = AWS_REGION
 TABLE = CMS_POSTS_TABLE
 BUCKET = CMS_MEDIA_BUCKET
-VIDEO_DIR = _ROOT / "video"
-
-_NON_SLUG = re.compile(r"[^0-9A-Za-z가-힣]+")
-
-_CATEGORY_MAP = {
-    "증권": "증시",
-    "부동산": "부동산",
-    "산업": "산업",
-    "금융": "금융·정책",
-    "국제": "국제",
-    "문화·라이프": "문화",
-}
 
 
-def _display_category(article: dict) -> str | None:
-    """발행 시 body_inline.category에 넣을 사이트 카테고리 라벨.
-
-    mustknow_auto/run.py의 같은 이름 함수와 동일한 이유(2026-08-23) —
-    top_category는 XML의 첫 번째 category 태그만 보는데, 기사 하나가
-    태그를 여러 개 다는 경우가 흔해 실제로는 증권/산업 기사인데도
-    맨 앞 태그가 "경제"/"정치"라서 카테고리 없이 발행되는 버그가 있었다.
-    전체 category 태그를 순서대로 훑어 사이트 6개 카테고리와 일치하는
-    첫 값을 쓴다."""
-    for c in article.get("categories") or [article.get("top_category", "")]:
-        if c in _CATEGORY_MAP:
-            return _CATEGORY_MAP[c]
-    return None
-
-
-def _slugify(publish_date: str, headline: str) -> str:
-    tail = _NON_SLUG.sub("-", (headline or "").strip()).strip("-")
-    base = f"{publish_date}-{tail}" if tail else publish_date
-    return base[:80].rstrip("-")
-
-
+# display_category/slugify/_upload(공용부만)/parse_letters/
+# parse_letter_summary_bullets/already_published/generate_video →
+# publish_utils.*로 이전(2026-09-04, mustknow_auto/run.py와 바이트 단위
+# 동일 함수 공용화 — publish_utils.py 참조). _upload는 그대로 남김 —
+# BUCKET을 캡처하는 로컬 래퍼라 이전 전에도 이미 얇았다.
 def _upload(s3, local_path: Path, key: str) -> str:
-    # common/s3_utils.py로 공용화(mustknow_auto/run.py와 바이트 단위로
-    # 동일했음, 2026-08-23).
     return upload_media(s3, local_path, key, BUCKET)
-
-
-def _parse_letters(raw_md: str) -> list[str]:
-    """레터 파이프라인 산출물(마크다운)에서 본문 문단만 뽑는다 —
-    create_kosdaq_post.py 등에서 반복됐던 파싱을 이쪽으로 승격."""
-    # 2026-08-24 — FACT_IDS 트레일러를 먼저 떼어낸다. 이 함수엔 본문 종료
-    # 조건이 없어서(자료: 뒤로도 계속 buf 에 쌓는다) 안 떼면 커버리지 줄이
-    # 그대로 발행 본문 문단이 된다.
-    raw_md, _ = extract_fact_ids(raw_md)
-    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
-    lines = [l.strip() for l in body.split("\n") if l.strip()]
-    paragraphs, buf, skipping = [], [], False
-
-    def flush():
-        if buf:
-            t = " ".join(buf)
-            if t:
-                paragraphs.append(t)
-        buf.clear()
-
-    for line in lines:
-        if line.startswith("[제목]"):
-            skipping = True
-            continue
-        if line.startswith("[리드]"):
-            skipping = False
-            flush()
-            continue
-        if line.startswith("◾"):
-            skipping = False
-            flush()
-            continue
-        if line.startswith("자료:") or line == "—":
-            skipping = False
-            flush()
-            continue
-        # 2026-09 — [핵심 요약]("30초 핵심" 전용 불릿) 신설. 이 블록은
-        # _parse_letter_summary_bullets()가 따로 뽑으므로, 여기서는 만나는
-        # 순간부터 끝까지 전부 skip해 본문 문단에 안 섞이게 한다(그 전까지는
-        # "자료:" 뒤를 skip 안 해서, 신설 블록이 트레일러 문단처럼 잘못
-        # 붙었을 것).
-        if line.startswith("[핵심 요약]"):
-            flush()
-            break
-        if skipping:
-            continue
-        buf.append(line)
-    flush()
-    return paragraphs
-
-
-def _parse_letter_summary_bullets(raw_md: str) -> list[str]:
-    """레터 산출물의 [핵심 요약] 블록에서 "- "로 시작하는 불릿만 뽑는다.
-    "30초 핵심" 카드가 이 불릿을 쓴다(lensSamples.ts의 coreSummaryBullets,
-    2026-09부터 레터를 최우선으로 봄) — 예전엔 이 카드가 웹툰 컷 캡션을
-    재활용해서, 그림 없이 텍스트만 보면 맥락이 빠지는 문제가 있었다(기자
-    피드백). 블록이 없는 옛 프롬프트 결과물이면 빈 리스트를 돌려주고,
-    "30초 핵심"은 기존처럼 다른 포맷으로 폴백한다."""
-    raw_md, _ = extract_fact_ids(raw_md)
-    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
-    lines = [l.strip() for l in body.split("\n") if l.strip()]
-
-    bullets, in_block = [], False
-    for line in lines:
-        if line.startswith("[핵심 요약]"):
-            in_block = True
-            continue
-        if not in_block:
-            continue
-        if line.startswith("-"):
-            bullets.append(line.lstrip("-").strip())
-    return bullets
-
-
-def _already_published(table, article_key: str) -> bool:
-    """source_url 완전일치가 아니라 `contains`로 본다 — 기존에 수동
-    발행된 글들의 source_url엔 `?ref=sedailyEng` 같은 쿼리스트링이
-    붙어있거나 아예 없는 경우(원문 텍스트만 붙여넣어 발행한 글)가 섞여
-    있어서, 완전일치 비교로는 오늘(2026-08-21) 앞서 발행된 5건 중
-    다수를 놓쳐 중복 발행할 뻔했다(실제 DB 조회로 확인 후 수정)."""
-    if not article_key:
-        return False
-    resp = table.scan(
-        FilterExpression="contains(source_url, :k)",
-        ExpressionAttributeValues={":k": f"article/{article_key}"},
-        ProjectionExpression="id",
-    )
-    return len(resp.get("Items", [])) > 0
-
-
-def _generate_video(
-    name: str, article_path: Path, out_dir: Path, *, photo_url: str | None = None, photo_caption: str | None = None
-) -> dict | None:
-    """성공하면 {"video_url": Path, "thumbnail_url": Path} 반환, 팩트 누락으로
-    실패하면 None(그 기사는 영상 없이 3/4 포맷만 발행)."""
-    from generate_script import generate_script  # pipelines/video/generate_script.py
-
-    try:
-        script_path = generate_script(
-            name, str(article_path), output_root=out_dir, photo_url=photo_url, photo_caption=photo_caption
-        )
-    except ValueError as e:
-        # validate_script()가 의도적으로 던지는 에러 — 팩트(수치) 누락,
-        # 사람이 원문에서 채워야 함(§23).
-        print(f"[frontpage-auto] {name} 영상 각본 생성 실패(사람 확인 필요) — {e}")
-        return None
-    except Exception:
-        # 그 외(GPT API 오류, JSON 파싱 실패 등)도 영상만 포기하고 3/4
-        # 포맷은 그대로 발행한다 — 한 포맷의 실패가 기사 전체를 막으면
-        # 안 된다(AI LINK의 "기사 단위 격리" 원칙을 포맷 단위로도 적용).
-        print(f"[frontpage-auto] {name} 영상 각본 생성 중 예상 못한 오류:\n{traceback.format_exc()}")
-        return None
-
-    mp4_path = out_dir / name / "video.mp4"
-    try:
-        result = subprocess.run(
-            [
-                "npm", "run", "render", "--",
-                "--input", str(script_path.resolve()),
-                "--format", "horizontal",
-                "--output", str(mp4_path.resolve()),
-            ],
-            cwd=str(VIDEO_DIR),
-            capture_output=True,
-            text=True,
-        )
-    except OSError as e:
-        print(f"[frontpage-auto] {name} 영상 렌더 실행 자체 실패(npm/ffmpeg 없음?) — {e}")
-        return None
-    if result.returncode != 0:
-        print(f"[frontpage-auto] {name} 영상 렌더 실패:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
-        return None
-
-    thumb_path = out_dir / name / "thumb.jpg"
-    subprocess.run(
-        ["ffmpeg", "-y", "-ss", "2", "-i", str(mp4_path), "-frames:v", "1", str(thumb_path)],
-        capture_output=True,
-    )
-    return {"mp4_path": mp4_path, "thumb_path": thumb_path if thumb_path.exists() else None}
 
 
 def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> str:
@@ -263,11 +75,11 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
     source_url = article["url"]
     if not source_url:
         return "failed"
-    if _already_published(table, article["key"]):
+    if publish_utils.already_published(table, article["key"]):
         print(f"[frontpage-auto] 이미 발행됨, 스킵 — {article['title']}")
         return "skipped_duplicate"
 
-    name = article["key"] or _slugify("", article["title"])
+    name = article["key"] or publish_utils.slugify("", article["title"])
     article_path = out_dir / f"{name}_article.txt"
     # 0단계 — 공용 팩트시트(기준일/핵심 숫자/용어/논지)를 원문 뒤에 이어붙여
     # 4포맷(레터/웹툰/팟캐스트/영상) 전부가 같은 파일을 읽는다. 각 포맷
@@ -281,24 +93,37 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
 
     letters_path = _letters_mod.run_article(name, str(article_path), out_dir)
     letters_raw = letters_path.read_text(encoding="utf-8")
-    paragraphs = _parse_letters(letters_raw)
-    letter_summary_bullets = _parse_letter_summary_bullets(letters_raw)
+    paragraphs = publish_utils.parse_letters(letters_raw)
+    letter_summary_bullets = publish_utils.parse_letter_summary_bullets(letters_raw)
 
     podcast_mp3 = _podcast_mod.run_article(name, str(article_path), out_dir)
 
-    _webtoon_mod.run_article(name, str(article_path), out_dir)
-
-    webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+    # 2026-09-04 — mustknow_auto/run.py의 2026-08-24 수정을 이식(리팩토링
+    # 감사로 발견: 이 파일만 웹툰 실패 격리가 없었다). 웹툰은 영상과 달리
+    # 폴백이 없어서, 이미지 생성이 실패하면(OpenAI 크레딧 소진 등) 이미
+    # 성공한 레터·팟캐스트까지 통째로 버려지고 기사가 failed로 집계되는
+    # 문제가 mustknow_auto에서 실제로 있었다 — 여기도 같은 코드 경로라
+    # 잠재적으로 같은 장애를 겪을 수 있었다. 영상과 같은 방식으로 "웹툰
+    # 없이 발행"까지는 살린다.
+    webtoon_script: dict = {}
     webtoon_bullets, webtoon_images = [], []
-    for cut in webtoon_script["cuts"]:
-        caption = cut.get("narration") or (
-            " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
-        ) or cut.get("caption", "")
-        webtoon_bullets.append(caption)
-        n = cut["cut"]
-        cut_path = out_dir / name / f"컷{n}.png"
-        key = f"media/frontpage-auto/{name}-webtoon-cut{n:03d}.png"
-        webtoon_images.append({"url": _upload(s3, cut_path, key), "caption": caption})
+    try:
+        _webtoon_mod.run_article(name, str(article_path), out_dir)
+        webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+        for cut in webtoon_script["cuts"]:
+            caption = cut.get("narration") or (
+                " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
+            ) or cut.get("caption", "")
+            webtoon_bullets.append(caption)
+            n = cut["cut"]
+            cut_path = out_dir / name / f"컷{n}.png"
+            key = f"media/frontpage-auto/{name}-webtoon-cut{n:03d}.png"
+            webtoon_images.append({"url": _upload(s3, cut_path, key), "caption": caption})
+    except Exception:
+        # 부분 성공(예: 3컷까지만 업로드)도 버린다 — 중간에 끊긴 웹툰을
+        # 내보내느니 웹툰 탭을 pending으로 두는 편이 낫다.
+        webtoon_script, webtoon_bullets, webtoon_images = {}, [], []
+        print(f"[frontpage-auto] {name} 웹툰 실패 — 웹툰 없이 발행\n{traceback.format_exc()}")
 
     podcast_url = _upload(s3, podcast_mp3, f"media/podcast/frontpage-auto/{name}-podcast.mp3")
 
@@ -310,9 +135,10 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
         if podcast_script_path.exists() else None
     ) or None
 
-    video = _generate_video(
+    video = publish_utils.generate_video(
         name, article_path, out_dir,
         photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
+        log_prefix="frontpage-auto",
     )
     video_url = thumb_url = None
     video_transcript = None
@@ -334,7 +160,8 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
         {"label": "레터", "question": article["title"], "bullets": letter_summary_bullets, "paragraphs": paragraphs,
          "images": [], "video_url": None, "media_url": None},
         {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
-         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None},
+         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
+         "pending": not webtoon_images},
         {"label": "팟캐스트", "question": article["title"], "bullets": [], "paragraphs": [],
          "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
         {"label": "영상", "question": article["title"], "bullets": [], "paragraphs": [],
@@ -343,7 +170,7 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
     ]
 
     publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
-    slug = _slugify(publish_date_iso, article["title"])
+    slug = publish_utils.slugify(publish_date_iso, article["title"])
     now = datetime.now(timezone.utc).isoformat()
     item = {
         "id": str(uuid.uuid4()),
@@ -361,7 +188,7 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
             "body": [], "key_points": [], "keywords": [], "images": [],
             "lenses": lenses,
             "photo_image_url": article["photo_url"],
-            "category": _display_category(article),
+            "category": publish_utils.display_category(article),
             "paper_section": "전체",
             "display_order": article["_display_order"],
             "needs_video": video is None,
@@ -442,7 +269,7 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
             "headline": lenses[2]["question"] or article["title"],
             "subtitle": article["sub_title"],
             "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": _display_category(article), "transcript": podcast_transcript},
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": publish_utils.display_category(article), "transcript": podcast_transcript},
             "cover_image_url": article["photo_url"],
             "source_url": source_url.split("?")[0],
             "media_embed_url": podcast_url,
@@ -458,33 +285,15 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
     return status
 
 
-def _get_revalidate_secret(session):
-    try:
-        return session.client("ssm").get_parameter(
-            Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
-        )["Parameter"]["Value"]
-    except Exception:
-        print(f"[frontpage-auto] revalidate secret 조회 실패 — 이번 실행 내내 캐시 무효화 스킵:\n{traceback.format_exc()}")
-        return None
-
-
-def _notify_revalidate(secret):
-    try:
-        requests.post(
-            "https://ailens.sedaily.ai/api/revalidate",
-            headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
-            json={},
-            timeout=30,
-        )
-    except Exception:
-        print(f"[frontpage-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
+# _get_revalidate_secret/_notify_revalidate → publish_utils.get_revalidate_secret()/
+# notify_revalidate(log_prefix="frontpage-auto")로 이전(2026-09-04).
 
 
 def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
     table = session.resource("dynamodb").Table(TABLE)
-    revalidate_secret = _get_revalidate_secret(session)
+    revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="frontpage-auto")
 
     today = datetime.now(KST).strftime("%Y%m%d")
     candidates = discovery.fetch_front_page(today)
@@ -511,7 +320,7 @@ def main():
         # 페이지가 아직 캐시된 옛 목록이라 그 글을 못 찾은 것). 기사 하나가
         # 끝날 때마다 바로 무효화하면 이 창을 없앨 수 있다.
         if status in ("published", "published_no_video") and revalidate_secret:
-            _notify_revalidate(revalidate_secret)
+            publish_utils.notify_revalidate(revalidate_secret, log_prefix="frontpage-auto")
 
     print(f"[frontpage-auto] 완료 — {json.dumps(results, ensure_ascii=False)}")
 

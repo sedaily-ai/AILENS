@@ -1,7 +1,7 @@
 """구독 수집 API — newsletter 회원 자동 적재.
 
 라우팅(같은 Lambda):
-  POST /api/v2/subscribe     body {email, consent[, name]}
+  POST /api/v2/subscribe     body {email, consent[, name][, format][, interests][, letter]}
        → sedaily-mbti-newsletter-subscribers-dev 에 active 구독자 upsert
   GET  /api/v2/unsubscribe?token=...   → 해당 구독자 status=unsub (1클릭, 법적 필수)
 
@@ -12,6 +12,23 @@ Auth: NONE (v1 parity, 민감정보 없음 — 이메일만).
 구독자가 동일한 '오늘의 한 통'을 받는다. 기존 저장분에 남아있는 mbti_group
 값은 그대로 두되(마이그레이션 없음), 신규/재구독 upsert 는 더 이상 이 필드를
 쓰지 않는다.
+
+2026-09-04 — 리팩토링 감사로 발견: 이 파일과 별개로
+`handlers/newsletter/subscribe.py`(`POST /api/newsletter/subscribe`, 별도
+Lambda `sedaily-mbti-newsletter-subscribe-dev`)가 완전히 독립적으로
+같은 테이블에 구독자를 upsert하는 두 번째 구현으로 존재했다 — 토큰 생성
+방식이 다르고(uuid4 vs secrets.token_urlsafe), 이메일 템플릿을 따로
+인라인 구현했고, unsubscribe 엔드포인트가 아예 없었고, 결정적으로 테이블명
+환경변수 이름이 달라서(`SUBSCRIBERS_TABLE` vs
+`NEWSLETTER_SUBSCRIBERS_TABLE`) 운영 중 테이블을 옮기면 admin 통계
+대시보드만 조용히 옛 테이블을 계속 보는 위험이 있었다. 이 파일이 정본으로
+남고(unsubscribe가 있고 공용 newsletter/render.py·sender.py를 재사용해
+아키텍처가 더 나음), 저쪽만 갖고 있던 두 기능(`format`/`interests` 온보딩
+개인화값 캡처, 특정 `letter` 즉시 발송)을 이식해 통합했다.
+`handlers/newsletter/subscribe.py`는 삭제됨 — 배포된 Lambda 함수
+(`sedaily-mbti-newsletter-subscribe-dev`)와 API Gateway 라우트 자체는
+이번 정리 범위 밖(AWS 자원 삭제는 별도 확인 필요)이라 아직 남아있을 수
+있음.
 """
 from __future__ import annotations
 
@@ -95,20 +112,49 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if not consent:
         return error_response("consent required", status_code=400, code="CONSENT_REQUIRED")
 
+    # 온보딩(/start) 개인화값 — 둘 다 선택. 잘못된 타입이 오면 그냥 무시
+    # (구독 자체가 이 값들보다 중요하다 — newsletter/subscribe.py에서 이식,
+    # 발행 로직엔 아직 반영 안 됨, 지금은 기록만).
+    raw_format = body.get("format")
+    req_format = raw_format.strip() if isinstance(raw_format, str) and raw_format.strip() else None
+    raw_interests = body.get("interests")
+    req_interests = (
+        [i.strip() for i in raw_interests if isinstance(i, str) and i.strip()]
+        if isinstance(raw_interests, list) else None
+    ) or None
+
     now = datetime.now(timezone.utc).isoformat()
     tbl = _table()
     existing = tbl.get_item(Key={"email": email}).get("Item")
     token = (existing or {}).get("unsubscribe_token") or uuid.uuid4().hex
-    tbl.put_item(Item={
+
+    item: Dict[str, Any] = {
         "email": email, "status": "active",
         "consent": True, "unsubscribe_token": token, "name": name,
         "created_at": (existing or {}).get("created_at") or now,
         "updated_at": now,
-    })
+    }
+    # put_item은 아이템 전체를 교체한다 — 이번 요청에 값이 없으면 기존
+    # 저장분(있다면)을 그대로 이어받아, 재구독 시 이전 온보딩 선택이
+    # 지워지지 않게 한다.
+    onboarding_format = req_format or (existing or {}).get("onboarding_format")
+    if onboarding_format:
+        item["onboarding_format"] = onboarding_format
+    onboarding_interests = req_interests or (existing or {}).get("onboarding_interests")
+    if onboarding_interests:
+        item["onboarding_interests"] = onboarding_interests
+
+    tbl.put_item(Item=item)
     logger.info('{"event":"subscribed","resub":%s}', json.dumps(bool(existing)))
 
-    # 구독 즉시 — 오늘의 한 통을 그 이메일로 발송 (환영 발송).
-    send_status = _send_today_letter(email, token)
+    # 구독 즉시 발송 — 요청에 특정 letter가 실려 있으면 그걸(예: 방금 보던
+    # 페이지), 없으면 오늘의 한 통을 환영 발송(newsletter/subscribe.py에서
+    # 이식 — NewsletterCTA.tsx가 지금 보고 있는 레터를 함께 보낼 때 씀).
+    letter_payload = body.get("letter")
+    if isinstance(letter_payload, dict) and letter_payload.get("headline"):
+        send_status = _send_specific_letter(email, token, letter_payload)
+    else:
+        send_status = _send_today_letter(email, token)
 
     return success_response({
         "ok": True,
@@ -122,14 +168,19 @@ _BASE = "https://ailens.sedaily.ai"
 
 
 def _send_today_letter(email: str, token: str) -> str:
-    """가입 즉시 오늘의 한 통 발송. 발송 실패해도 구독은 유지(상태만 반환)."""
+    """가입 즉시 오늘의 한 통 발송. 발송 실패해도 구독은 유지(상태만 반환).
+
+    2026-09-04 — `handlers.newsletter`(그런 모듈 없음, `handlers/newsletter/`는
+    패키지일 뿐)에서 import하던 게 실은 이미 삭제된 `handlers/newsletter.py`
+    파일을 가리키고 있어 계속 ImportError → 무음 실패였다(newsletter/
+    today_letter.py 상단 주석에 경위 기록). 살아있는 위치로 교체."""
     try:
-        from handlers.newsletter import _load_today_letters, _kst_today  # noqa: lazy
+        from newsletter.today_letter import load_today_letter, kst_today  # noqa: lazy
         from newsletter.render import render_html, subject  # noqa: lazy
         from newsletter.sender import send  # noqa: lazy
 
-        date_str = _kst_today()
-        letter, src = _load_today_letters(date_str)
+        date_str = kst_today()
+        letter, src = load_today_letter(date_str)
         if not letter:
             logger.warning('{"event":"welcome_no_letter","src":"%s"}', src)
             return "no_letter"
@@ -140,4 +191,33 @@ def _send_today_letter(email: str, token: str) -> str:
         return st
     except Exception as e:
         logger.warning('{"event":"welcome_send_error","err":"%s"}', type(e).__name__)
+        return "error"
+
+
+def _send_specific_letter(email: str, token: str, payload: Dict[str, Any]) -> str:
+    """구독 시점에 화면에 떠 있던 특정 레터를 그대로 발송(newsletter/subscribe.py에서
+    이식) — `_send_today_letter`와 달리 DB 조회 없이 프런트가 넘긴 페이로드를
+    그대로 쓴다. render_html()이 기대하는 필드(headline/subtitle/body[]/
+    key_points[]/closing_line)만 추리고, editor_name/editor_role/accent는
+    무시한다(단일 명의 체계라 render_html이 항상 고정값을 씀 — 2026-08 결정과
+    동일). 발송 실패해도 구독은 유지(상태만 반환)."""
+    try:
+        from newsletter.render import render_html, subject  # noqa: lazy
+        from newsletter.sender import send  # noqa: lazy
+
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        letter = {
+            "headline": payload.get("headline") or "",
+            "subtitle": payload.get("subtitle") or "",
+            "body": [b for b in (payload.get("body") or []) if isinstance(b, str)],
+            "key_points": [k for k in (payload.get("key_points") or []) if isinstance(k, str)],
+            "closing_line": payload.get("closing_line"),
+        }
+        unsub = f"{_BASE}/unsubscribe?token={token}"
+        res = send(email, subject(letter, date_str), render_html(letter, {"unsubscribe_token": token}, date_str), unsub)
+        st = res.get("status", "error")
+        logger.info('{"event":"welcome_send_specific","status":"%s"}', st)
+        return st
+    except Exception as e:
+        logger.warning('{"event":"welcome_send_specific_error","err":"%s"}', type(e).__name__)
         return "error"
