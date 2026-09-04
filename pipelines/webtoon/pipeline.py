@@ -85,19 +85,23 @@ def _get_bedrock_image_client():
 
 
 def _characters_block(characters: dict | None) -> str:
-    """1단계가 정한 인물 묘사(characters: {A, B, setting})를 매 컷 이미지
-    프롬프트 앞에 반복 주입한다(2026-09, 기자 피드백 — "컷마다 캐릭터의
-    얼굴·복장·체형이 달라 동일 인물이 이어지는 서사로 보이지 않는다").
-
-    근본 원인: 프롬프트 지침("스크립트 맨 앞에 인물 묘사를 명시하고 모든
-    컷에서 반복한다")은 1단계(대사·스크립트) 텍스트에 대한 것일 뿐, 실제
-    3단계 이미지 생성 호출(build_background_prompt/build_image_prompt)엔
-    characters 자체가 인자로 전달되지 않았다 — 각 컷의 배경 이미지 생성이
-    인물이 어떻게 생겼는지 전혀 모르는 채로 독립 실행됐던 것. 8컷 모두
+    """인물 묘사를 매 컷 이미지 프롬프트 앞에 반복 주입한다 — 8컷 모두
     같은 characters 딕셔너리를 그대로 프롬프트에 넣어 확산 모델이 매번
-    같은 인물 묘사를 참조하게 한다 — 완벽한 동일성 보장은 아니지만(진짜
-    캐릭터 시트·img2img 없이는 확산 모델 특성상 불가능), 아예 정보가
-    없던 것보다는 훨씬 나은 최소 개선."""
+    같은 인물 묘사를 참조하게 한다(완벽한 동일성 보장은 아니지만, 진짜
+    캐릭터 시트·img2img 없이는 확산 모델 특성상 불가능 — 아예 정보가
+    없는 것보다는 훨씬 나은 절충).
+
+    2026-09(최초 도입) — 당시엔 1단계 스크립트가 기사마다 새로 지어낸
+    인물 묘사(characters: {A, B, setting})를 썼다. 기존 문제: 프롬프트
+    지침("스크립트 맨 앞에 인물 묘사를 명시하고 모든 컷에서 반복한다")은
+    1단계(대사·스크립트) 텍스트에 대한 것일 뿐, 실제 3단계 이미지 생성
+    호출엔 characters 자체가 인자로 전달되지 않아 각 컷이 인물 외형을
+    전혀 모른 채 독립 생성되고 있었다.
+
+    2026-09-05 — run_article()이 이제 매번 새로 지어내는 대신
+    prompts.FIXED_CHARACTERS(고정 진행자 2인)를 넘긴다 — "AI Lens 웹툰"
+    포맷 도입, prompts.py STYLE 근처 "겪었던 문제 4" 참고. 이 함수 자체는
+    "받은 딕셔너리를 프롬프트 블록으로 직렬화"만 하므로 변경 없음."""
     if not characters:
         return ""
     lines = [f"{k}: {v}" for k, v in characters.items()]
@@ -382,7 +386,11 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             continue
         s = scene_map[n]
         print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
-        characters = script.get("characters")
+        # 2026-09-05 — 기사마다 script.get("characters")로 새로 짓던 인물
+        # 묘사 대신, 고정 진행자 2인(prompts.FIXED_CHARACTERS)을 항상 쓴다
+        # — "AI Lens 웹툰" 포맷 도입(prompts.py STYLE 근처 "겪었던 문제 4"
+        # 참고).
+        characters = prompts.FIXED_CHARACTERS
         if IMAGE_PROVIDER == "bedrock":
             prompt = build_background_prompt(s["camera"], s["scene"], characters)
             ok, verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n)
