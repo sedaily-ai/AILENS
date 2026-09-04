@@ -23,6 +23,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 COMMON_DIR="$SCRIPT_DIR/../../service/backend/common"
+# 웹툰 이미지 실험(routes/webtoon_lab.py, 2026-09-05)이 flat import로 쓰는
+# pipelines/common/webtoon_image.py — admin은 flat import 규약(zip 루트 =
+# 이 디렉터리)이라 이 파일 하나만 zip 루트에 그대로 복사한다. 안 하면
+# handler.py가 routes.webtoon_lab을 import하는 순간(모듈 로드 시점) 콜드
+# 스타트에서 ModuleNotFoundError로 admin API 전체가 죽는다 — 이 route
+# 하나만 깨지는 게 아니다.
+WEBTOON_IMAGE_MODULE="$SCRIPT_DIR/../../pipelines/common/webtoon_image.py"
 
 FUNCTION_NAME="sedaily-mbti-admin-api-dev"
 PYTHON_VERSION="3.11"          # Lambda 런타임과 반드시 일치시킬 것
@@ -40,6 +47,7 @@ mkdir -p "$BUILD_DIR"
 cp handler.py auth.py __init__.py "$BUILD_DIR/"
 cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
+cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
 [ -d repo ] && cp -r repo "$BUILD_DIR/"
 
 # --python-version 은 필수다. 워크스테이션 Python 이 Lambda 런타임(3.11)과 다르면
