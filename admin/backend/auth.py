@@ -12,7 +12,6 @@ import logging
 
 import jwt as pyjwt
 from argon2 import PasswordHasher, exceptions as argon2_exc
-from boto3.dynamodb.conditions import Key
 
 from shared import audit, ddb_client, response, ssm_client
 

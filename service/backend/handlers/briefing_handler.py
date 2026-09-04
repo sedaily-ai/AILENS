@@ -14,7 +14,6 @@ cached item (news_briefing_latest) for the chatbot to read.
 import logging
 import json
 import asyncio
-from datetime import datetime, timezone, timedelta
 
 import boto3
 from boto3.dynamodb.conditions import Key

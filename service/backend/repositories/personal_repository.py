@@ -11,7 +11,7 @@ Follows the same patterns as SettingsRepository and LogRepository.
 
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone, timedelta
+from datetime import timezone, timedelta
 
 from clients.personal_db_client import PersonalDBClient
 from models.personal import ArchivedSentence, UserProfile, ReadingRecord

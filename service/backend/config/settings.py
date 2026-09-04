@@ -4,7 +4,7 @@ Replaces scattered os.getenv() calls throughout the codebase.
 """
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 from functools import lru_cache
 

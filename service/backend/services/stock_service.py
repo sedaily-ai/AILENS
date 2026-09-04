@@ -5,7 +5,7 @@ Used by the chatbot via Claude Tool Use for stock-related queries.
 """
 import logging
 import json
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from urllib.request import urlopen, Request
 from urllib.parse import quote
 from urllib.error import URLError

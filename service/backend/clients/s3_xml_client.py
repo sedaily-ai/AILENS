@@ -11,8 +11,8 @@ import html
 import re
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Dict, Any
-from dataclasses import dataclass, field
+from typing import List, Optional, Dict
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -485,8 +485,6 @@ class S3XMLClient:
         Returns:
             Style string: "normal", "bold", or "heading"
         """
-        # Check if entire text was wrapped in bold tags
-        bold_pattern = r'<b[^>]*>.*?</b>|<strong[^>]*>.*?</strong>'
         original_lower = original_html.lower()
 
         # If the text is short and wrapped in bold/strong, it's likely a heading
