@@ -19,10 +19,8 @@ Demo user: demo-user-sedaily
 """
 import argparse
 import asyncio
-import json
 import os
 import sys
-import uuid
 from datetime import datetime, timezone, timedelta
 
 import boto3
@@ -180,7 +178,6 @@ def check_s3_bodies():
     try:
         resp = s3.list_objects_v2(Bucket=bucket, Prefix='articles/', MaxKeys=10)
         count = resp.get('KeyCount', 0)
-        total = resp.get('Contents', [])
         print(f'    S3 body files: {count}+ objects')
         return count
     except Exception as e:

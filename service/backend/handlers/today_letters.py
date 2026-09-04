@@ -134,7 +134,7 @@ def _enrich_body(letter_row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def shape_letter_response(row: Dict[str, Any]) -> Dict[str, Any]:
-    """DDB row → API 응답 shape. handlers/newsletter.py도 이 함수를 재사용한다
+    """DDB row → API 응답 shape. newsletter/today_letter.py도 이 함수를 재사용한다
     (발송 내용이 라이브 '오늘의 한 통'과 동일해야 하므로) — public API로 취급."""
     enriched = _enrich_body(row)
     keywords = row.get("keywords") or []

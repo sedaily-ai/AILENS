@@ -12,7 +12,6 @@ Usage:
 Environment:
   API_URL — API Gateway endpoint (default: production)
 """
-import json
 import os
 import sys
 import time
@@ -45,13 +44,13 @@ class TestResult:
 
     def ok(self, name: str, elapsed_ms: int, detail: str = ''):
         self.passed += 1
-        status = f"\033[32mPASS\033[0m"
+        status = "\033[32mPASS\033[0m"
         print(f"  {status}  {name} ({elapsed_ms}ms) {detail}")
 
     def fail(self, name: str, elapsed_ms: int, reason: str):
         self.failed += 1
         self.errors.append((name, reason))
-        status = f"\033[31mFAIL\033[0m"
+        status = "\033[31mFAIL\033[0m"
         print(f"  {status}  {name} ({elapsed_ms}ms) — {reason}")
 
     def summary(self):

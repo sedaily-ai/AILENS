@@ -201,7 +201,7 @@ def test_phase1_storage():
         return False
     has_versions = all(body.get(f'version_{g}') for g in ['NT', 'NF', 'ST', 'SF'])
     if not has_versions:
-        results.fail(name, f'Missing versions in S3 body')
+        results.fail(name, 'Missing versions in S3 body')
         return False
     results.ok(name, f'{len(body)} fields')
 

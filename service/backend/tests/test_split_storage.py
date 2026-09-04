@@ -23,12 +23,9 @@ Usage:
 All test articles use a 'test_split_' prefix and are cleaned up after each test.
 """
 import asyncio
-import json
 import os
 import sys
-import time
 import uuid
-from datetime import datetime, timezone, timedelta
 
 import requests
 
@@ -159,7 +156,7 @@ def cleanup():
         except Exception:
             pass
 
-    print(f'  Cleanup done.')
+    print('  Cleanup done.')
 
 
 # ── Test 1: Save with split storage ──────────────────────────────────────────

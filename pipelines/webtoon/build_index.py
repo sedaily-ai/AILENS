@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def build(root: Path):
-    lines = [f"# 뉴스 웹툰 배치 결과", ""]
+    lines = ["# 뉴스 웹툰 배치 결과", ""]
     index = []
     for folder in sorted(root.iterdir()):
         if not folder.is_dir():

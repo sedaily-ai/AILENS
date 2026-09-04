@@ -35,10 +35,8 @@ def lambda_handler(event: dict, context) -> dict:
         rc = event.get("requestContext", {})
         if "http" in rc:
             method = rc["http"].get("method", "GET")
-            path = rc["http"].get("path", "")
         else:
             method = event.get("httpMethod", "GET")
-            path = event.get("path", "")
 
         params = event.get("queryStringParameters") or {}
         path_params = event.get("pathParameters") or {}

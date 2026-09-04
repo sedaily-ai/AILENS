@@ -187,7 +187,7 @@ def test_normal_execution(sfn_client, sfn_arn: str):
         return None
 
     if status == 'TIMED_OUT':
-        results.fail(name, f'Execution timed out (Step Functions level)')
+        results.fail(name, 'Execution timed out (Step Functions level)')
         return None
 
     if status != 'SUCCEEDED':
@@ -206,7 +206,6 @@ def test_normal_execution(sfn_client, sfn_arn: str):
         output
     )
 
-    step = pipeline_result.get('step', '')
     metrics = pipeline_result.get('metrics', {})
     stored = pipeline_result.get('stored_articles', [])
     rejected = pipeline_result.get('rejected_articles', [])
@@ -278,7 +277,6 @@ def test_verify_storage(execution_result: dict):
 
             has_content = bool(body.get('content_ko'))
             has_nt = bool(body.get('version_NT'))
-            has_nf = bool(body.get('version_NF'))
 
             if not has_content:
                 issues.append(f'{news_id}: S3 body missing content_ko')

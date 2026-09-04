@@ -12,7 +12,6 @@ Usage:
 
 Exit code 0 = all critical checks pass, 1 = failures exist.
 """
-import json
 import os
 import sys
 import time
@@ -166,7 +165,7 @@ def main():
         resp = s3.list_objects_v2(Bucket='sedaily-mbti-article-body-dev', Prefix='articles/', MaxKeys=5)
         count = resp.get('KeyCount', 0)
         if count > 0:
-            ok(f'S3 article bodies', f'({count}+ files)')
+            ok('S3 article bodies', f'({count}+ files)')
         else:
             warn('S3 article bodies', '0 files')
     except Exception:
@@ -220,7 +219,7 @@ def main():
     if total_errors == 0:
         ok('Lambda errors (24h)', '0 errors')
     else:
-        warn(f'Lambda errors (24h)', f'{total_errors} errors')
+        warn('Lambda errors (24h)', f'{total_errors} errors')
 
     # ── 5. Cost ──────────────────────────────────────────────────────
     print('\n── 비용 (Cost) ──\n')
@@ -229,7 +228,7 @@ def main():
         from tests.estimate_costs import estimate_bedrock_cost
         bedrock = estimate_bedrock_cost(cw, start_cw, end, 1)
         daily = bedrock.get('total_daily', 0)
-        ok(f'Bedrock daily cost', f'${daily:.4f}')
+        ok('Bedrock daily cost', f'${daily:.4f}')
     except Exception:
         warn('Bedrock cost check', 'estimate failed')
 
@@ -237,12 +236,11 @@ def main():
 
     # ── Summary ──────────────────────────────────────────────────────
     elapsed = int(time.time() - start_time)
-    total = passed + failed + warned
 
     print('')
     print('=' * 60)
     if failed == 0:
-        print(f'  \033[32m  READY FOR DEMO\033[0m')
+        print('  \033[32m  READY FOR DEMO\033[0m')
         print(f'  {passed} passed, {warned} warnings, 0 failures  ({elapsed}s)')
     else:
         print(f'  \033[31m  NOT READY — {failed} FAILURES\033[0m')

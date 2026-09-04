@@ -20,9 +20,8 @@ Output: tests/results/cost_estimate_{date}.json
 import argparse
 import json
 import os
-import sys
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List
+from typing import Dict, List
 
 import boto3
 
@@ -407,7 +406,7 @@ def main():
     print(f'  Monthly burn: ${monthly_total:.2f} ({report["summary"]["budget_percent_per_month"]}% of budget)')
 
     if months_remaining == float('inf'):
-        print(f'  Runway: no usage detected yet')
+        print('  Runway: no usage detected yet')
     else:
         print(f'  Runway: {months_remaining:.1f} months at current rate')
         if months_remaining < 6:
@@ -418,7 +417,7 @@ def main():
             print(f'  \033[32m  ✓ Budget is healthy ({months_remaining:.0f} months)\033[0m')
 
     print('')
-    print(f'  Detailed breakdown:')
+    print('  Detailed breakdown:')
     print(f'    Bedrock invocations: {sum(m["total_invocations"] for m in bedrock["models"].values()):,}')
     print(f'    DynamoDB WCU: {dynamodb["total_wcu"]:,} ({dynamodb["daily_wcu"]:.0f}/day)')
     print(f'    Lambda invocations: {lambda_cost["total_invocations"]:,} ({lambda_cost["daily_invocations"]:.0f}/day)')
