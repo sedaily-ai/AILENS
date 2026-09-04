@@ -22,6 +22,7 @@ from routes import (
     posts,
     prompts,
     quiz,
+    webtoon_lab,
 )
 from shared import audit, response
 
@@ -66,6 +67,13 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/quiz/{id}/publish": (quiz.handle_publish, True),
     "POST /admin/quiz/{id}/unpublish": (quiz.handle_unpublish, True),
     "DELETE /admin/quiz/{id}": (quiz.handle_delete, True),
+    # 웹툰 이미지 생성 실험 (2026-09-05) — routes/webtoon_lab.py 모듈
+    # docstring 참고. ⚠️ 로컬 개발 서버(local_server.py)에서만 라우팅되고,
+    # 실제 API Gateway엔 아직 이 4개 라우트가 없다(수동 추가 필요).
+    "POST /admin/webtoon-lab/generate": (webtoon_lab.handle_generate, True),
+    "GET /admin/webtoon-lab/history": (webtoon_lab.handle_history, True),
+    "GET /admin/webtoon-lab/defaults": (webtoon_lab.handle_defaults, True),
+    "GET /admin/webtoon-lab/{job_id}": (webtoon_lab.handle_status, True),
 }
 
 

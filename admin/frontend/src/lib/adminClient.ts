@@ -17,6 +17,10 @@ import type {
   PresignResponse,
   Quiz,
   QuizInput,
+  WebtoonLabGenerateInput,
+  WebtoonLabJob,
+  WebtoonLabHistoryItem,
+  WebtoonLabDefaults,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -306,4 +310,18 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ filename, content_type: contentType, size }),
     }),
+
+  // 웹툰 이미지 실험(2026-09-05) — job 생성 후 폴링(routes/webtoon_lab.py 참고,
+  // API Gateway 30초 타임아웃 때문에 동기 응답이 없다).
+  generateWebtoonImage: (input: WebtoonLabGenerateInput) =>
+    request<{ job_id: string; status: string }>("/admin/webtoon-lab/generate", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  getWebtoonImageJob: (jobId: string) =>
+    request<WebtoonLabJob>(`/admin/webtoon-lab/${encodeURIComponent(jobId)}`),
+  getWebtoonImageHistory: () =>
+    request<{ items: WebtoonLabHistoryItem[] }>("/admin/webtoon-lab/history"),
+  getWebtoonImageDefaults: () =>
+    request<WebtoonLabDefaults>("/admin/webtoon-lab/defaults"),
 };

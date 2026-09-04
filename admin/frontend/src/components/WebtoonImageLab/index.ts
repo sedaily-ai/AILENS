@@ -1,0 +1,1 @@
+export { WebtoonImageLab } from "./WebtoonImageLab";
