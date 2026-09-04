@@ -13,9 +13,9 @@
 **frontpage_auto와의 관계**: 지면1면은 이미 `pipelines/frontpage_auto`가
 1일 1회(07:00 KST) 처리 중이다. 이번 파이프라인을 그걸 대체할지는 아직
 결정 안 됐다(2026-08-22 설계 노트의 "이슈 B") — 그래서 frontpage_auto는
-건드리지 않고, 대신 이 파이프라인이 발행 직전 `_already_published_elsewhere()`
+건드리지 않고, 대신 이 파이프라인이 발행 직전 `publish_utils.already_published()`
 로 frontpage_auto가 이미 발행한 기사인지 한 번 더 확인해 중복 발행을
-막는다. `_publish()`·`_generate_video()`·`_upload()` 등은 frontpage_auto/
+막는다. `_publish()`·`publish_utils.generate_video()`·`_upload()` 등은 frontpage_auto/
 run.py에서 그대로 복사해왔다(import 아님 — frontpage_auto는 스크립트라
 import 시 부작용이 있고, 프로덕션 코드를 이번 작업으로 건드리는 리스크도
 피하기 위함). 두 파이프라인의 공용화는 "이슈 B" 결정 이후 별도 작업.
@@ -26,10 +26,8 @@ import 시 부작용이 있고, 프로덕션 코드를 이번 작업으로 건�
 """
 import difflib
 import json
-import mimetypes
 import re
 from decimal import Decimal
-import subprocess
 import sys
 import traceback
 import uuid
@@ -38,83 +36,39 @@ from pathlib import Path
 
 KST = timezone(timedelta(hours=9))
 
-import importlib.util
-
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT / "common"))
 sys.path.insert(0, str(_ROOT / "video"))
 sys.path.insert(0, str(Path(__file__).parent))
 
 import boto3
-import requests
 
 import ddb_prompt
 import classify
+# 2026-09-04 — frontpage_auto/run.py와 공유하는 발행 헬퍼(리팩토링 감사로
+# 추출, publish_utils.py 참조).
+import publish_utils
 from config import AWS_REGION, CMS_POSTS_TABLE, CMS_MEDIA_BUCKET
 from s3_utils import upload_media
-from text_utils import extract_fact_ids, strip_code_fence
+from text_utils import strip_code_fence
 from facts_extract import extract_facts  # 2026-09 — 0단계 공용 팩트시트
 
-
-def _load_module(name: str, file_path: Path):
-    """frontpage_auto/run.py와 동일한 이유로 동일하게 필요 — letters/podcast/
-    webtoon이 전부 `pipeline.py`라는 같은 파일명을 쓴다."""
-    folder = str(file_path.parent)
-    if folder not in sys.path:
-        sys.path.insert(0, folder)
-    spec = importlib.util.spec_from_file_location(name, file_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-discovery = _load_module("mustknow_auto_discovery", _ROOT / "discovery" / "pipeline.py")
-_letters_mod = _load_module("mustknow_auto_letters", _ROOT / "letters" / "pipeline.py")
-_podcast_mod = _load_module("mustknow_auto_podcast", _ROOT / "podcast" / "pipeline.py")
-_webtoon_mod = _load_module("mustknow_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
+discovery = publish_utils.load_module("mustknow_auto_discovery", _ROOT / "discovery" / "pipeline.py")
+_letters_mod = publish_utils.load_module("mustknow_auto_letters", _ROOT / "letters" / "pipeline.py")
+_podcast_mod = publish_utils.load_module("mustknow_auto_podcast", _ROOT / "podcast" / "pipeline.py")
+_webtoon_mod = publish_utils.load_module("mustknow_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
 
 REGION = AWS_REGION
 TABLE = CMS_POSTS_TABLE
 BUCKET = CMS_MEDIA_BUCKET
 SEEN_TABLE = "sedaily-lens-mustknow-seen-dev"
-VIDEO_DIR = _ROOT / "video"
 
-_NON_SLUG = re.compile(r"[^0-9A-Za-z가-힣]+")
 _BRACKET_RE = re.compile(r"\[[^\]]*\]")
 
-_CATEGORY_MAP = {
-    "증권": "증시",
-    "부동산": "부동산",
-    "산업": "산업",
-    "금융": "금융·정책",
-    "국제": "국제",
-    "문화·라이프": "문화",
-}
 
-
-def _display_category(article: dict) -> str | None:
-    """발행 시 body_inline.category에 넣을 사이트 카테고리 라벨.
-
-    2026-08-23 — 기존엔 `_CATEGORY_MAP.get(article["top_category"])`만
-    썼는데, top_category는 XML에서 그 기사의 **첫 번째** category 태그만
-    본다(discovery/pipeline.py). 기사 하나가 category 태그를 여러 개
-    달고 있는 경우가 흔해서(예: 삼성전자 주주환원 기사가 "경제,사회,
-    금융,증권,산업,국제" 6개를 동시에 달았는데 top_category는 그중
-    맨 앞의 "경제"만 봄), 실제로는 증권/산업 기사인데도 카테고리 없이
-    발행되는 버그가 있었다(사용자가 /archive에서 "4가지 시선"이라는
-    가짜 카테고리로 뜨는 걸 발견). 그 기사의 전체 category 태그
-    (`article["categories"]`)를 순서대로 훑어 사이트 6개 카테고리 중
-    하나와 일치하는 첫 값을 쓴다 — top_category 자체는 지면특별코너
-    4탭 선정(증권/산업/시그널 매칭)에 이미 검증된 채 쓰이고 있어 그대로
-    둔다. 정치·사회·오피니언처럼 애초에 경제 카테고리 태그가 전혀
-    없는 기사는 이 함수도 None을 돌려준다 — 사이트에 대응 카테고리
-    페이지가 없는 게 맞기 때문에 억지로 하나 붙이지 않는다."""
-    for c in article.get("categories") or [article.get("top_category", "")]:
-        if c in _CATEGORY_MAP:
-            return _CATEGORY_MAP[c]
-    return None
-
+# display_category()·_CATEGORY_MAP → publish_utils.display_category()/
+# publish_utils.CATEGORY_MAP로 이전(2026-09-04, frontpage_auto/run.py와
+# 바이트 단위 동일 함수 공용화 — publish_utils.py 참조).
 
 # 지면특별코너 4탭 — 전체(지면1면)는 점수 없이 TOP 배치 우선(discovery가
 # 이미 편집 데이터로 정렬해서 줌). 증권/산업/시그널은 점수 높은 순으로
@@ -146,105 +100,18 @@ _MIN_CONTENT_LEN = 300
 _DUP_TITLE_RATIO = 0.72
 
 
-def _slugify(publish_date: str, headline: str) -> str:
-    tail = _NON_SLUG.sub("-", (headline or "").strip()).strip("-")
-    base = f"{publish_date}-{tail}" if tail else publish_date
-    return base[:80].rstrip("-")
-
-
 def _upload(s3, local_path: Path, key: str) -> str:
     # common/s3_utils.py로 공용화(frontpage_auto/run.py와 바이트 단위로
     # 동일했음, 2026-08-23).
     return upload_media(s3, local_path, key, BUCKET)
 
 
-def _parse_letters(raw_md: str) -> list[str]:
-    """frontpage_auto/run.py의 동명 함수와 동일 — 레터 산출물(마크다운)에서
-    본문 문단만 뽑는다."""
-    # 2026-08-24 — FACT_IDS 트레일러를 먼저 떼어낸다. 이 함수엔 본문 종료
-    # 조건이 없어서(자료: 뒤로도 계속 buf 에 쌓는다) 안 떼면 커버리지 줄이
-    # 그대로 발행 본문 문단이 된다.
-    raw_md, _ = extract_fact_ids(raw_md)
-    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
-    lines = [l.strip() for l in body.split("\n") if l.strip()]
-    paragraphs, buf, skipping = [], [], False
-
-    def flush():
-        if buf:
-            t = " ".join(buf)
-            if t:
-                paragraphs.append(t)
-        buf.clear()
-
-    for line in lines:
-        if line.startswith("[제목]"):
-            skipping = True
-            continue
-        if line.startswith("[리드]"):
-            skipping = False
-            flush()
-            continue
-        if line.startswith("◾"):
-            skipping = False
-            flush()
-            continue
-        if line.startswith("자료:") or line == "—":
-            skipping = False
-            flush()
-            continue
-        # 2026-09 — [핵심 요약]("30초 핵심" 전용 불릿) 신설. 이 블록은
-        # _parse_letter_summary_bullets()가 따로 뽑으므로, 여기서는 만나는
-        # 순간부터 끝까지 전부 skip해 본문 문단에 안 섞이게 한다(그 전까지는
-        # "자료:" 뒤를 skip 안 해서, 신설 블록이 트레일러 문단처럼 잘못
-        # 붙었을 것).
-        if line.startswith("[핵심 요약]"):
-            flush()
-            break
-        if skipping:
-            continue
-        buf.append(line)
-    flush()
-    return paragraphs
-
-
-def _parse_letter_summary_bullets(raw_md: str) -> list[str]:
-    """레터 산출물의 [핵심 요약] 블록에서 "- "로 시작하는 불릿만 뽑는다.
-    "30초 핵심" 카드가 이 불릿을 쓴다(lensSamples.ts의 coreSummaryBullets,
-    2026-09부터 레터를 최우선으로 봄) — 예전엔 이 카드가 웹툰 컷 캡션을
-    재활용해서, 그림 없이 텍스트만 보면 맥락이 빠지는 문제가 있었다(기자
-    피드백). 블록이 없는 옛 프롬프트 결과물이면 빈 리스트를 돌려주고,
-    "30초 핵심"은 기존처럼 다른 포맷으로 폴백한다."""
-    raw_md, _ = extract_fact_ids(raw_md)
-    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
-    lines = [l.strip() for l in body.split("\n") if l.strip()]
-
-    bullets, in_block = [], False
-    for line in lines:
-        if line.startswith("[핵심 요약]"):
-            in_block = True
-            continue
-        if not in_block:
-            continue
-        if line.startswith("-"):
-            bullets.append(line.lstrip("-").strip())
-    return bullets
-
-
-def _already_published_elsewhere(table, article_key: str) -> bool:
-    """frontpage_auto/run.py의 _already_published()와 동일한 쿼리 — 그
-    파이프라인이 이미 발행한 기사(지면1면)와 겹치지 않는지 확인하는
-    유일한 수단이다(신규 seen 테이블엔 frontpage_auto의 발행 기록이
-    안 남으므로). source_url 완전일치가 아니라 contains로 본다 —
-    쿼리스트링·수동발행 케이스 때문에 완전일치는 놓친다(frontpage_auto
-    에서 실제로 겪은 문제, 그대로 승계)."""
-    if not article_key:
-        return False
-    resp = table.scan(
-        FilterExpression="contains(source_url, :k)",
-        ExpressionAttributeValues={":k": f"article/{article_key}"},
-        ProjectionExpression="id",
-    )
-    return len(resp.get("Items", [])) > 0
+# _parse_letters/_parse_letter_summary_bullets/_already_published_elsewhere →
+# publish_utils.parse_letters()/parse_letter_summary_bullets()/
+# already_published()로 이전(2026-09-04, frontpage_auto/run.py와 바이트
+# 단위 동일 함수 공용화 — publish_utils.py 참조. parse_letter_summary_bullets
+# 자체가 오늘 발견한 실제 발행 버그의 원인이었던 함수라, 다음부터는
+# 한 번만 고치면 되게 만드는 게 이 공용화의 핵심 동기였다).
 
 
 def _is_seen(seen_table, article_key: str) -> bool:
@@ -285,51 +152,8 @@ def _dedupe_near_identical(articles: list[dict]) -> list[dict]:
     return kept
 
 
-def _generate_video(
-    name: str, article_path: Path, out_dir: Path, *, photo_url: str | None = None, photo_caption: str | None = None
-) -> dict | None:
-    """frontpage_auto/run.py의 동명 함수와 동일 — 성공하면
-    {"mp4_path": Path, "thumb_path": Path|None} 반환, 팩트 누락으로 실패하면
-    None(그 기사는 영상 없이 3/4 포맷만 발행)."""
-    from generate_script import generate_script  # pipelines/video/generate_script.py
-
-    try:
-        script_path = generate_script(
-            name, str(article_path), output_root=out_dir, photo_url=photo_url, photo_caption=photo_caption
-        )
-    except ValueError as e:
-        print(f"[mustknow-auto] {name} 영상 각본 생성 실패(사람 확인 필요) — {e}")
-        return None
-    except Exception:
-        print(f"[mustknow-auto] {name} 영상 각본 생성 중 예상 못한 오류:\n{traceback.format_exc()}")
-        return None
-
-    mp4_path = out_dir / name / "video.mp4"
-    try:
-        result = subprocess.run(
-            [
-                "npm", "run", "render", "--",
-                "--input", str(script_path.resolve()),
-                "--format", "horizontal",
-                "--output", str(mp4_path.resolve()),
-            ],
-            cwd=str(VIDEO_DIR),
-            capture_output=True,
-            text=True,
-        )
-    except OSError as e:
-        print(f"[mustknow-auto] {name} 영상 렌더 실행 자체 실패(npm/ffmpeg 없음?) — {e}")
-        return None
-    if result.returncode != 0:
-        print(f"[mustknow-auto] {name} 영상 렌더 실패:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
-        return None
-
-    thumb_path = out_dir / name / "thumb.jpg"
-    subprocess.run(
-        ["ffmpeg", "-y", "-ss", "2", "-i", str(mp4_path), "-frames:v", "1", str(thumb_path)],
-        capture_output=True,
-    )
-    return {"mp4_path": mp4_path, "thumb_path": thumb_path if thumb_path.exists() else None}
+# _generate_video → publish_utils.generate_video(log_prefix="mustknow-auto")로
+# 이전(2026-09-04, publish_utils.py 참조).
 
 
 def _publish(
@@ -361,8 +185,8 @@ def _publish(
 
     letters_path = _letters_mod.run_article(name, str(article_path), out_dir)
     letters_raw = letters_path.read_text(encoding="utf-8")
-    paragraphs = _parse_letters(letters_raw)
-    letter_summary_bullets = _parse_letter_summary_bullets(letters_raw)
+    paragraphs = publish_utils.parse_letters(letters_raw)
+    letter_summary_bullets = publish_utils.parse_letter_summary_bullets(letters_raw)
 
     podcast_mp3 = _podcast_mod.run_article(name, str(article_path), out_dir)
 
@@ -409,9 +233,10 @@ def _publish(
         if podcast_script_path.exists() else None
     ) or None
 
-    video = _generate_video(
+    video = publish_utils.generate_video(
         name, article_path, out_dir,
         photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
+        log_prefix="mustknow-auto",
     )
     video_url = thumb_url = None
     video_transcript = None
@@ -443,7 +268,7 @@ def _publish(
     ]
 
     publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
-    slug = _slugify(publish_date_iso, article["title"])
+    slug = publish_utils.slugify(publish_date_iso, article["title"])
     now = datetime.now(timezone.utc).isoformat()
     item = {
         "id": str(uuid.uuid4()),
@@ -459,7 +284,7 @@ def _publish(
             "body": [], "key_points": [], "keywords": [], "images": [],
             "lenses": lenses,
             "photo_image_url": article["photo_url"],
-            "category": _display_category(article),
+            "category": publish_utils.display_category(article),
             "paper_section": paper_section,
             "display_order": display_order,
             "needs_video": video is None,
@@ -545,7 +370,7 @@ def _publish(
             "headline": lenses[2]["question"] or article["title"],
             "subtitle": article["sub_title"],
             "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": _display_category(article), "transcript": podcast_transcript},
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": publish_utils.display_category(article), "transcript": podcast_transcript},
             "cover_image_url": article["photo_url"],
             "source_url": (article["url"] or "").split("?")[0],
             "media_embed_url": podcast_url,
@@ -561,26 +386,8 @@ def _publish(
     return status
 
 
-def _get_revalidate_secret(session):
-    try:
-        return session.client("ssm").get_parameter(
-            Name="/sedaily-mbti/ssr-revalidate-secret", WithDecryption=True
-        )["Parameter"]["Value"]
-    except Exception:
-        print(f"[mustknow-auto] revalidate secret 조회 실패 — 이번 실행 내내 캐시 무효화 스킵:\n{traceback.format_exc()}")
-        return None
-
-
-def _notify_revalidate(secret):
-    try:
-        requests.post(
-            "https://ailens.sedaily.ai/api/revalidate",
-            headers={"Content-Type": "application/json", "X-Revalidate-Secret": secret},
-            json={},
-            timeout=30,
-        )
-    except Exception:
-        print(f"[mustknow-auto] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
+# _get_revalidate_secret/_notify_revalidate → publish_utils.get_revalidate_secret()/
+# notify_revalidate(log_prefix="mustknow-auto")로 이전(2026-09-04).
 
 
 def main():
@@ -588,7 +395,7 @@ def main():
     s3 = session.client("s3")
     table = session.resource("dynamodb").Table(TABLE)
     seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
-    revalidate_secret = _get_revalidate_secret(session)
+    revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
 
     today = datetime.now(KST).strftime("%Y%m%d")
     # 일요일은 지면(인쇄판) 자체가 안 나온다(사용자 확인, 2026-08-23 —
@@ -626,7 +433,7 @@ def main():
     def _try_publish(article, paper_section, display_order):
         """반환값을 호출부가 반드시 확인해야 한다 — "failed"면 seen을
         마킹하면 안 된다(아래 버그 설명 참조)."""
-        if _already_published_elsewhere(table, article["key"]):
+        if publish_utils.already_published(table, article["key"]):
             print(f"[mustknow-auto] frontpage_auto 등에 이미 발행됨, 스킵 — {article['title']}")
             results["skipped_duplicate"] += 1
             return "skipped_duplicate"
@@ -644,7 +451,7 @@ def main():
         # 같은 문제 — run.py의 같은 날짜 수정 참조). 기사 하나가 끝날
         # 때마다 바로 무효화해서 이 창을 없앤다.
         if status in ("published", "published_no_video") and revalidate_secret:
-            _notify_revalidate(revalidate_secret)
+            publish_utils.notify_revalidate(revalidate_secret, log_prefix="mustknow-auto")
         return status
 
     # 1) 전체(지면1면) — 점수 불필요, TOP 배치 우선(discovery가 이미 정렬해서 줌)
@@ -738,6 +545,13 @@ def main():
 
     print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
 
+    # 2026-09-04 — frontpage_auto/run.py에는 있던 전량 실패 알람이 여기엔
+    # 없었다(리팩토링 감사로 발견). 후보가 있었는데 발행 0건이면(예: discovery/
+    # API 장애) 지금은 exit 0으로 끝나 CloudWatch가 "정상 종료"로 본다 —
+    # 같은 방식으로 명시적 실패 코드를 반환해 알람이 걸리게 한다.
+    if fresh and results["published"] == 0 and results["published_no_video"] == 0 and results["skipped_duplicate"] == 0:
+        sys.exit(1)
+
 
 def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str]):
     """2026-08-26 — 사용자 요청으로 신규. 자정을 넘겨 discovery의 "오늘" 후보
@@ -750,7 +564,7 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
     s3 = session.client("s3")
     table = session.resource("dynamodb").Table(TABLE)
     seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
-    revalidate_secret = _get_revalidate_secret(session)
+    revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
     out_dir = Path("/tmp/mustknow_auto_out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -774,7 +588,7 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
             # 끝날 때마다 바로 무효화해서 나머지 기사 처리를 기다리는 동안
             # 캐시가 안 갱신되는 창을 없앤다.
             if revalidate_secret:
-                _notify_revalidate(revalidate_secret)
+                publish_utils.notify_revalidate(revalidate_secret, log_prefix="mustknow-auto")
 
     print(f"[mustknow-auto][manual] 완료 — {published}/{len(keys)}건 {tab} 탭에 발행")
 

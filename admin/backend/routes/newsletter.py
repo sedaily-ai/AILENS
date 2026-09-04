@@ -31,8 +31,13 @@ from shared import response
 logger = logging.getLogger(__name__)
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
+# 2026-09-04 — 환경변수 이름을 `SUBSCRIBERS_TABLE`로 통일(리팩토링 감사로
+# 발견: 여기만 `NEWSLETTER_SUBSCRIBERS_TABLE`을 썼다 — service/backend의
+# handlers/subscribe.py·newsletter/subscribers.py는 전부 SUBSCRIBERS_TABLE.
+# 운영 중 테이블을 옮기려고 환경변수 하나만 바꾸면 이 통계 대시보드만
+# 조용히 옛 테이블을 계속 보는 위험이 있었다).
 SUBSCRIBERS_TABLE = os.environ.get(
-    "NEWSLETTER_SUBSCRIBERS_TABLE", "sedaily-mbti-newsletter-subscribers-dev"
+    "SUBSCRIBERS_TABLE", "sedaily-mbti-newsletter-subscribers-dev"
 )
 SES_NAMESPACE = "AWS/SES"
 MESSAGE_TAG_VALUE = "newsletter"

@@ -1,2 +1,8 @@
 boto3>=1.34.0
 requests>=2.31.0
+# 2026-09-04 — 리팩토링 감사로 발견: run.py가 webtoon/pipeline.py를 동적
+# 로드하는데(runtime importlib) 그게 openai를 쓴다. 지금까지는 공유 Docker
+# 이미지(frontpage_auto/Dockerfile)가 6개 pipelines/*/requirements.txt를
+# 전부 한 venv에 설치해서 webtoon/requirements.txt 설치분에 얹혀가는
+# 우연으로만 동작했다 — mustknow_auto만 단독 빌드/실행하면 깨진다.
+openai>=1.30.0
