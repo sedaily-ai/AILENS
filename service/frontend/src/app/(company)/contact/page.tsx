@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { StaticPageShell } from '@/widgets/StaticPageShell';
+import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '문의',
   description: 'AI LENS(서울경제신문) 문의처 안내.',
-  alternates: { canonical: 'https://ailens.sedaily.ai/contact' },
+  alternates: { canonical: `${SITE_URL}/contact` },
   robots: { index: true, follow: true },
 };
 

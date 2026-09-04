@@ -1,3 +1,5 @@
+import { SITE_URL } from '@/shared/constants/site';
+
 // AWS Cognito Auth Configuration
 export const authConfig = {
   Auth: {
@@ -8,8 +10,8 @@ export const authConfig = {
         oauth: {
           domain: 'sedaily-mbti.auth.us-east-1.amazoncognito.com',
           scopes: ['email', 'profile', 'openid'] as const,
-          redirectSignIn: ['https://ailens.sedaily.ai/auth/callback', 'http://localhost:3000/auth/callback'],
-          redirectSignOut: ['https://ailens.sedaily.ai', 'http://localhost:3000'],
+          redirectSignIn: [`${SITE_URL}/auth/callback`, 'http://localhost:3000/auth/callback'],
+          redirectSignOut: [SITE_URL, 'http://localhost:3000'],
           responseType: 'code' as const,
           providers: ['Google'] as const,
         },
@@ -22,14 +24,14 @@ export const authConfig = {
 // mbti.sedaily.ai 도메인 폐기(2026-08-08, ailens.sedaily.ai로 통합) — CloudFront
 // alias·Route53 레코드 삭제 완료, 여기 남아있던 참조도 함께 제거.
 export function getRedirectUrl(): string {
-  if (typeof window === 'undefined') return 'https://ailens.sedaily.ai/auth/callback';
+  if (typeof window === 'undefined') return `${SITE_URL}/auth/callback`;
   return window.location.hostname === 'localhost'
     ? 'http://localhost:3000/auth/callback'
     : `${window.location.origin}/auth/callback`;
 }
 
 export function getSignOutUrl(): string {
-  if (typeof window === 'undefined') return 'https://ailens.sedaily.ai';
+  if (typeof window === 'undefined') return SITE_URL;
   return window.location.hostname === 'localhost'
     ? 'http://localhost:3000'
     : window.location.origin;

@@ -19,6 +19,7 @@ import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import { LetterBlock } from './LetterBlock';
 import { LetterTextExtras } from './LetterTextExtras';
 import { LetterSubscribeSection } from './LetterSubscribeSection';
+import { SITE_URL } from '@/shared/constants/site';
 
 // LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드).
 // production letter inline 렌더
@@ -132,7 +133,7 @@ export function LetterBody({
             </p>
           )}
           <a
-            href="https://www.google.com/preferences/source?q=ailens.sedaily.ai"
+            href={`https://www.google.com/preferences/source?q=${new URL(SITE_URL).host}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center"
@@ -148,7 +149,7 @@ export function LetterBody({
         >
           <div className="flex items-center" style={{ gap: 8 }}>
             <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-            <ArticleShareButtons title={letter.headline} url={`https://ailens.sedaily.ai/letters/${letter.id}`} />
+            <ArticleShareButtons title={letter.headline} url={`${SITE_URL}/letters/${letter.id}`} />
           </div>
           <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
             <ArticleFontSizeControl cssVar="--letter-font-scale" storageKey="letter-font-size" />
