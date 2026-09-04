@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { StaticPageShell } from '@/widgets/StaticPageShell';
+import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '이용약관',
   description: 'AI LENS(서울경제신문)의 이용약관.',
-  alternates: { canonical: 'https://ailens.sedaily.ai/terms' },
+  alternates: { canonical: `${SITE_URL}/terms` },
   robots: { index: true, follow: true },
 };
 

@@ -32,6 +32,7 @@ import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
 import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { Calendar } from 'lucide-react';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
+import { SITE_URL } from '@/shared/constants/site';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -450,7 +451,7 @@ export function LensViewClient({
               입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
             </p>
             <a
-              href="https://www.google.com/preferences/source?q=ailens.sedaily.ai"
+              href={`https://www.google.com/preferences/source?q=${new URL(SITE_URL).host}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center"
@@ -467,7 +468,7 @@ export function LensViewClient({
           >
             <div className="flex items-center" style={{ gap: 8 }}>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-              <ArticleShareButtons title={lens.headline} url={`https://ailens.sedaily.ai/lens/${slug}`} />
+              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}/lens/${slug}`} />
             </div>
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />

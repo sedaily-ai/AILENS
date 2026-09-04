@@ -5,6 +5,7 @@ import GamePlayClient from './GamePlayClient';
 // 할 수 있어서 임의 이름 `GAMES` 가 프로덕션 빌드의 타입 검사를 실패시켰다.
 // 자세한 경위는 그 파일 상단 주석 참조.
 import { GAMES, GAMES_BY_SLUG } from '@/shared/data/games';
+import { SITE_URL } from '@/shared/constants/site';
 
 export function generateStaticParams() {
   return GAMES.map((g) => ({ slug: g.slug }));
@@ -20,7 +21,7 @@ export async function generateMetadata({
   if (!g) return { title: '게임을 찾을 수 없어요', robots: { index: false } };
   const title = `${g.title} — 게임`;
   const description = `AI LENS 안에서 바로 플레이하는 ${g.title}.`;
-  const url = `https://ailens.sedaily.ai/games/play/${slug}`;
+  const url = `${SITE_URL}/games/play/${slug}`;
   return {
     title,
     description,
@@ -30,7 +31,7 @@ export async function generateMetadata({
       description,
       url,
       type: 'website',
-      images: [{ url: 'https://ailens.sedaily.ai/og-image.png', width: 1200, height: 630, alt: g.title }],
+      images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: g.title }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -38,12 +39,10 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
-      images: ['https://ailens.sedaily.ai/og-image.png'],
+      images: [`${SITE_URL}/og-image.png`],
     },
   };
 }
-
-import { SITE_URL } from '@/shared/constants/site';
 
 // VideoGame + BreadcrumbList(2026-08-14, SEO 감사 — 이 라우트만 JSON-LD가
 // 없던 걸 발견). 브라우저에서 바로 도는 H5 게임이라 applicationCategory를

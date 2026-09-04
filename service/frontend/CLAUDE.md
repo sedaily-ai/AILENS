@@ -104,7 +104,7 @@ features/[feature-name]/
 
 ## 코드 스타일
 - 컴포넌트: PascalCase (LoginForm.tsx)
-- 폴더: kebab-case (news-feed/)
+- 폴더: kebab-case (news-feed/) — widgets/는 예외, PascalCase (아래 "파일 네이밍 컨벤션" 참조)
 - 훅: useXxx (useArticles.ts)
 - 타입: PascalCase (ArticleData)
 - 상수: UPPER_SNAKE_CASE
@@ -122,6 +122,13 @@ features/[feature-name]/
 - 데이터 (.ts): camelCase — `mbtiGroups.ts`, `famousBirthdays.ts`
 - 폴더: kebab-case — `news-feed/`, `news-dna/`, `time-machine/`
 - kebab-case 파일 금지 (폴더만 kebab-case)
+- **예외 — `widgets/`는 PascalCase 폴더** (`widgets/Header/`, `widgets/FeedPage/`,
+  `widgets/HomeSideBar/` 등, 2026-09-04 확인 — 12개 전부 예외 없이 PascalCase).
+  `features/`·`entities/`는 위 규칙대로 kebab-case를 그대로 지키고 있다(`features/
+  news-feed/`, `entities/saju/` 등). widgets만 컴포넌트 이름과 폴더명을 맞추는
+  쪽으로 일관되게 굳어졌다고 판단해 — 리팩토링 감사에서 발견했지만 기존
+  import 12곳을 전부 rename하는 대신 문서를 실제 관례에 맞춰 고쳤다. 새
+  widget을 추가할 때도 kebab-case가 아니라 PascalCase 폴더를 쓸 것.
 
 ### 네이밍 원칙
 - 파일명만 보고 역할을 알 수 있어야 함
