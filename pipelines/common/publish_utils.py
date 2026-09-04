@@ -237,3 +237,253 @@ def notify_revalidate(secret, log_prefix: str = "publish") -> None:
         )
     except Exception:
         print(f"[{log_prefix}] revalidate 웹훅 실패(콘텐츠는 이미 발행됨):\n{traceback.format_exc()}")
+
+
+def publish_article(
+    article: dict,
+    out_dir: Path,
+    s3,
+    table,
+    today_kst: str,
+    *,
+    name: str,
+    source_url: str | None,
+    paper_section: str | None,
+    display_order: int | None,
+    log_prefix: str,
+    letters_mod,
+    podcast_mod,
+    webtoon_mod,
+    results: dict | None = None,
+) -> str:
+    """4포맷(레터/웹툰/팟캐스트/영상) 생성 + S3 업로드 + DDB write(최대 4개
+    아이템: lens 본글 + webtoon/video/home_player 채널별 독립 글) — 발행 여부
+    판단(중복확인·임계값·source_url 유효성)은 호출부 책임, 여기선 안 한다.
+
+    2026-09-05 — frontpage_auto/run.py::process_article()와
+    mustknow_auto/run.py::_publish()가 이 부분만 바이트 단위로 동일했다
+    (2026-09-04 P1에서 코드블록 추출 등 9개 헬퍼 함수는 이미 공용화했지만,
+    정작 제일 큰 이 블록 — 실제로 오늘 세션을 시작하게 만든 버그가 살고
+    있던 곳과 같은 위험 클래스 — 은 안 건드렸었다, P3 리팩토링 감사에서
+    재발견). 두 파일이 갈리는 지점(중복확인 시점·source_url 검증·이름
+    폴백·paper_section·display_order·로그 접두사)은 전부 파라미터로 받고,
+    그 갈리는 부분(래퍼)은 각 run.py에 그대로 남긴다.
+
+    name/source_url은 호출부가 이미 확정한 값을 받는다(mustknow_auto는
+    article["key"]가 항상 있다는 전제, frontpage_auto는 key가 없으면
+    slugify로 대체하는 자기만의 폴백이 있음 — 그 폴백 로직 자체는 호출부
+    책임). letters_mod/podcast_mod/webtoon_mod도 호출부가 넘긴다 — letters/
+    webtoon/podcast 전부 파일명이 `pipeline.py`로 같아서 `load_module()`이
+    호출부마다 다른 이름(`frontpage_auto_letters` 등)으로 등록한 별개
+    모듈 인스턴스이기 때문에 이 함수가 전역으로 하나만 들고 있을 수 없다.
+    """
+    from facts_extract import extract_facts  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
+    from text_utils import strip_code_fence  # noqa: lazy
+    from s3_utils import upload_media  # noqa: lazy
+    from config import CMS_MEDIA_BUCKET  # noqa: lazy — frontpage_auto/mustknow_auto 둘 다 같은 값
+
+    import json
+    import uuid
+    from datetime import datetime, timezone
+
+    def _upload(local_path: Path, key: str) -> str:
+        return upload_media(s3, local_path, key, CMS_MEDIA_BUCKET)
+
+    # 0단계 — 공용 팩트시트(기준일/핵심 숫자/용어/논지)를 원문 뒤에 이어붙여
+    # 4포맷 전부가 같은 파일을 읽는다. 실패해도 빈 문자열이라 원문만 쓰던
+    # 예전 동작으로 자연히 폴백.
+    article_path = out_dir / f"{name}_article.txt"
+    facts = extract_facts(article["content"])
+    article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
+    article_path.write_text(article_text, encoding="utf-8")
+
+    letters_path = letters_mod.run_article(name, str(article_path), out_dir)
+    letters_raw = letters_path.read_text(encoding="utf-8")
+    paragraphs = parse_letters(letters_raw)
+    letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
+
+    podcast_mp3 = podcast_mod.run_article(name, str(article_path), out_dir)
+
+    # 웹툰은 영상과 달리 폴백이 없다 — 이미지 생성이 실패하면(OpenAI 크레딧
+    # 소진 등) 이미 성공한 레터·팟캐스트까지 통째로 버려지고 기사가 failed로
+    # 집계되는 문제가 있었다(2026-08-24). 영상과 같은 방식으로 "웹툰 없이
+    # 발행"까지는 살린다. status는 계속 영상 기준으로만 정한다 — 호출부의
+    # 결과 집계와 revalidate 웹훅 분기가 그 값에 걸려 있어서, 여기에 새
+    # status를 끼우면 웹툰만 빠진 기사가 SSR 재검증을 조용히 건너뛴다.
+    webtoon_script: dict = {}
+    webtoon_bullets, webtoon_images = [], []
+    try:
+        webtoon_mod.run_article(name, str(article_path), out_dir)
+        webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+        for cut in webtoon_script["cuts"]:
+            caption = cut.get("narration") or (
+                " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
+            ) or cut.get("caption", "")
+            webtoon_bullets.append(caption)
+            n = cut["cut"]
+            cut_path = out_dir / name / f"컷{n}.png"
+            key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
+            webtoon_images.append({"url": _upload(cut_path, key), "caption": caption})
+    except Exception:
+        # 부분 성공(예: 3컷까지만 업로드)도 버린다 — 중간에 끊긴 웹툰을
+        # 내보내느니 웹툰 탭을 pending으로 두는 편이 낫다.
+        webtoon_script, webtoon_bullets, webtoon_images = {}, [], []
+        if results is not None:
+            results["degraded_no_webtoon"] = results.get("degraded_no_webtoon", 0) + 1
+        print(f"[{log_prefix}] {name} 웹툰 실패 — 웹툰 없이 발행\n{traceback.format_exc()}")
+
+    podcast_url = _upload(podcast_mp3, f"media/podcast/{log_prefix}/{name}-podcast.mp3")
+
+    # 팟캐스트/영상 스크립트를 청각장애인 접근성용 텍스트로 같이 저장한다
+    # (2026-08-23, 사용자 요청). 팟캐스트는 podcast/pipeline.py가 저장해둔
+    # 대본.md를 그대로 읽는다(TTS 입력과 달리 코드펜스가 안 벗겨진 원본이라
+    # 여기서 한 번 더 벗긴다). 영상은 generate_script.py가 저장한
+    # script.json의 컷별 narration을 이어붙인다.
+    podcast_script_path = out_dir / name / "대본.md"
+    podcast_transcript = (
+        strip_code_fence(podcast_script_path.read_text(encoding="utf-8"))
+        if podcast_script_path.exists() else None
+    ) or None
+
+    video = generate_video(
+        name, article_path, out_dir,
+        photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
+        log_prefix=log_prefix,
+    )
+    video_url = thumb_url = None
+    video_transcript = None
+    status = "published"
+    if video:
+        video_url = _upload(video["mp4_path"], f"media/video/{log_prefix}/{name}-video.mp4")
+        if video["thumb_path"]:
+            thumb_url = _upload(video["thumb_path"], f"media/video/{log_prefix}/{name}-thumb.jpg")
+        video_script_path = out_dir / name / "script.json"
+        if video_script_path.exists():
+            video_script_data = json.loads(video_script_path.read_text(encoding="utf-8"))
+            video_transcript = "\n\n".join(
+                cut["narration"] for cut in video_script_data.get("cuts", []) if cut.get("narration")
+            ) or None
+    else:
+        status = "published_no_video"
+
+    lenses = [
+        {"label": "레터", "question": article["title"], "bullets": letter_summary_bullets, "paragraphs": paragraphs,
+         "images": [], "video_url": None, "media_url": None},
+        {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
+         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
+         "pending": not webtoon_images},
+        {"label": "팟캐스트", "question": article["title"], "bullets": [], "paragraphs": [],
+         "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
+        {"label": "영상", "question": article["title"], "bullets": [], "paragraphs": [],
+         "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
+         "pending": video_url is None, "transcript": video_transcript},
+    ]
+
+    publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
+    slug = slugify(publish_date_iso, article["title"])
+    now = datetime.now(timezone.utc).isoformat()
+    clean_source_url = (source_url or "").split("?")[0]
+    item = {
+        "id": str(uuid.uuid4()),
+        "slug": slug,
+        "status": "published",
+        "channels": ["lens"],
+        "publish_date": publish_date_iso,
+        "editor_id": "AI LENS",
+        "headline": article["title"],
+        "subtitle": article["sub_title"],
+        "closing_line": None,
+        "body_inline": {
+            "body": [], "key_points": [], "keywords": [], "images": [],
+            "lenses": lenses,
+            "photo_image_url": article["photo_url"],
+            "category": display_category(article),
+            "paper_section": paper_section,
+            "display_order": display_order,
+            "needs_video": video is None,
+        },
+        "cover_image_url": webtoon_images[0]["url"] if webtoon_images else None,
+        "source_url": clean_source_url,
+        "media_embed_url": None,
+        "display_order": None,
+        "created_by": log_prefix,
+        "created_at": now,
+        "updated_at": now,
+        "published_at": now,
+    }
+    table.put_item(Item=item)
+
+    # lens 글은 그대로 두고(4유형 페이지는 계속 필요), 웹툰/영상/팟캐스트
+    # 채널에도 독립된 글을 하나씩 더 써서 각 채널 전용 목록·상세 화면에도
+    # 보이게 한다(2026-08-23) — 슬러그는 충돌 방지로 접미사를 붙인다.
+    if webtoon_images:
+        webtoon_item = {
+            "id": str(uuid.uuid4()),
+            "slug": f"{slug}-webtoon",
+            "status": "published",
+            "channels": ["webtoon"],
+            "publish_date": publish_date_iso,
+            "editor_id": "AI LENS",
+            "headline": webtoon_script.get("core_question") or article["title"],
+            "subtitle": article["sub_title"],
+            "closing_line": None,
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": webtoon_images},
+            "cover_image_url": webtoon_images[0]["url"],
+            "source_url": clean_source_url,
+            "media_embed_url": None,
+            "display_order": None,
+            "created_by": log_prefix,
+            "created_at": now,
+            "updated_at": now,
+            "published_at": now,
+        }
+        table.put_item(Item=webtoon_item)
+
+    if video_url:
+        video_item = {
+            "id": str(uuid.uuid4()),
+            "slug": f"{slug}-video",
+            "status": "published",
+            "channels": ["video"],
+            "publish_date": publish_date_iso,
+            "editor_id": "AI LENS",
+            "headline": lenses[3]["question"] or article["title"],
+            "subtitle": article["sub_title"],
+            "closing_line": None,
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "video_url": video_url},
+            "cover_image_url": thumb_url or article["photo_url"],
+            "source_url": clean_source_url,
+            "media_embed_url": None,
+            "display_order": None,
+            "created_by": log_prefix,
+            "created_at": now,
+            "updated_at": now,
+            "published_at": now,
+        }
+        table.put_item(Item=video_item)
+
+    if podcast_url:
+        podcast_item = {
+            "id": str(uuid.uuid4()),
+            "slug": f"{slug}-podcast",
+            "status": "published",
+            "channels": ["home_player"],
+            "publish_date": publish_date_iso,
+            "editor_id": "AI LENS",
+            "headline": lenses[2]["question"] or article["title"],
+            "subtitle": article["sub_title"],
+            "closing_line": None,
+            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": display_category(article), "transcript": podcast_transcript},
+            "cover_image_url": article["photo_url"],
+            "source_url": clean_source_url,
+            "media_embed_url": podcast_url,
+            "display_order": 0,
+            "created_by": log_prefix,
+            "created_at": now,
+            "updated_at": now,
+            "published_at": now,
+        }
+        table.put_item(Item=podcast_item)
+
+    print(f"[{log_prefix}] 발행 완료 — {slug} (section={paper_section}, {status})")
+    return status
