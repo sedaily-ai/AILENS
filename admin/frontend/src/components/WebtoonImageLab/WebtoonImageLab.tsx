@@ -33,7 +33,12 @@ export function WebtoonImageLab({ open, onClose }: Props) {
   const [tab, setTab] = useState<PanelTab>("generate");
 
   const [scene, setScene] = useState("");
-  const [camera, setCamera] = useState("medium shot, eye level");
+  // 실제 파이프라인(pipelines/webtoon/pipeline.py 2단계)이 쓰는 카메라 지시는
+  // 영어 촬영 용어가 아니라 이런 한국어 용어다(오버숄더/클로즈업/와이드/
+  // 부감 와이드/인서트 등, Claude가 장면마다 다르게 골라 씀) — 예전엔 제가
+  // 지어낸 영어식 기본값("medium shot, eye level")이었는데, 실제 사용
+  // 관례와 맞지 않아 혼란을 줄 수 있어 실제 예시로 바꿨다.
+  const [camera, setCamera] = useState("오버숄더");
   const [customStyle, setCustomStyle] = useState(false);
   const [style, setStyle] = useState("");
   const [customChars, setCustomChars] = useState(false);
@@ -306,7 +311,12 @@ export function WebtoonImageLab({ open, onClose }: Props) {
                     id="wl-scene"
                     value={scene}
                     onChange={(e) => setScene(e.target.value.slice(0, _MAX_SCENE_CHARS))}
-                    placeholder="예: 기자가 노트북 화면을 가리키며 통계 그래프를 설명하는 장면, 청자는 흥미롭게 듣고 있다."
+                    // 실제 파이프라인이 만들어낸 진짜 장면 지시문 예시(로컬 배치
+                    // 실행 결과, pipelines/webtoon/output/반도체팹/2_scenes.json
+                    // 2번 컷) — A/B 표기가 우리 고정 캐릭터(FIXED_CHARACTERS)
+                    // 키와 그대로 맞아떨어져서 예시로 그대로 가져왔다. 지어낸
+                    // 문장이 아니라 실제로 쓰인 프롬프트다.
+                    placeholder="예: A가 책상에 앉아 서류를 보고 있다. B가 옆에 서서 서류를 같이 보고 있다. A가 서류를 가리키며 대화하는 장면."
                     rows={4}
                     className="ui-input mt-1 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                   />
