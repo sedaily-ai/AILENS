@@ -303,6 +303,27 @@ def shape_lens_summary(post: Dict[str, Any]) -> Dict[str, Any]:
     return shaped
 
 
+def shape_webtoon_summary(post: Dict[str, Any]) -> Dict[str, Any]:
+    """목록(다건) 응답 전용 축약판(2026-09-07, 사이트 전역 응답 지연 조사 —
+    shape_lens_summary와 같은 문제를 webtoon 채널에서도 발견).
+
+    webtoon 글 하나가 컷(이미지+캡션) 수십 장을 `panels`에 통째로 담는다 —
+    limit=1000 목록 응답이 706건 기준 실측 3.2MB로, Next.js data cache
+    2MB 상한을 넘겨 캐시가 아예 안 붙는 원인이었다(cmsPostsApi.ts의
+    cacheOpts 참조).
+
+    목록 소비처(WebtoonListClient/WebtoonPreviewSection/SeriesViewClient/
+    AllWebtoonsClient — 프론트가 이미 toWebtoonPreviewSummaries()/
+    toWebtoonSeriesListPayload()로 panels를 지우고 쓰던 것과 동일 확인)는
+    전부 panels를 안 읽는다 — cover_image_url만 쓰고, 실제 컷 갤러리는
+    상세 페이지(`/api/v2/posts/{slug}?channel=webtoon`, shape_webtoon
+    그대로)에서 단건으로 받는다. cover_image_url의 panels[0] 폴백은
+    panels를 비우기 전에 이미 계산돼 있으므로 그대로 유지된다."""
+    shaped = shape_webtoon(post)
+    shaped["panels"] = []
+    return shaped
+
+
 def shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
     """홈 화면 하단 플레이 카드("오늘의 핵심 뉴스") 재생목록 항목(2026-08-16).
     기사와 무관하게 관리자가 직접 "제목 + 유튜브 링크"로 만드는 독립
@@ -334,6 +355,19 @@ def shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
         # run.py 참조) — 청각장애인 접근성 겸 빈 화면 보완.
         "transcript": (post.get("body_inline") or {}).get("transcript") or None,
     }
+
+
+def shape_home_player_summary(post: Dict[str, Any]) -> Dict[str, Any]:
+    """목록(다건) 응답 전용 축약판(2026-09-07, shape_webtoon_summary와 같은
+    조사에서 발견) — home_player 글은 팟캐스트/영상 전체 대본(transcript)을
+    담는데, limit=1000 목록 응답이 실측 4.4MB까지 나갔다. `/listen/{id}`
+    상세 페이지(ListenViewClient.tsx)만 transcript를 렌더하고, 그 페이지는
+    fetchHomePlayerBySlug() 단건 조회(shape_home_player_item 그대로)로
+    이미 따로 받는다 — 목록 소비처(ListenListClient/AudioPreviewSection/
+    홈 위젯)는 title/date/media_embed_url/category까지만 쓴다."""
+    shaped = shape_home_player_item(post)
+    shaped["transcript"] = None
+    return shaped
 
 
 SHAPERS = {

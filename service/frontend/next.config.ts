@@ -26,6 +26,11 @@ const nextConfig: NextConfig = {
   // 앱 폴더로 고정하는 것이 두 실패를 다 막는다 — 산출물이 평평해지고,
   // 다른 사람 머신의 lockfile 배치와 무관해진다.
   outputFileTracingRoot: path.join(__dirname),
+  // 로컬 dev 전용 — 레포 경로에 한글이 섞여 있어(회사/서울경제신문/...) Turbopack이
+  // 루트 추론을 상위로 올리면 "start byte index N is not a char boundary"
+  // TurbopackInternalError로 죽는다. root를 이 앱 폴더로 고정하면 식별자가
+  // ASCII(src/...) 상대경로로만 남아 패닉을 피한다(admin/frontend와 동일 조치).
+  turbopack: { root: path.join(__dirname) },
   experimental: {
     optimizePackageImports: ["lucide-react"],
     // 2026-08-23, "바로바로 이동되면 좋겠다" 요청 — [slug] page.tsx들이

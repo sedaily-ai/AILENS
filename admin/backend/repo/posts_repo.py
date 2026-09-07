@@ -49,6 +49,7 @@ def _to_dict(item: dict) -> dict:
         "slug": item["slug"],
         "status": item["status"],
         "channels": list(item.get("channels") or []),
+        "channel": item.get("channel"),
         "publish_date": item["publish_date"],
         "editor_id": item.get("editor_id"),
         "headline": item.get("headline", ""),
@@ -92,16 +93,32 @@ def _unique_slug(publish_date: str, headline: str) -> str:
     return f"{base}-{n}"
 
 
+def _primary_channel(channels: list | None) -> str | None:
+    """channels[0] — 공개 목록 GSI(channel-publish_date-index, 2026-09-07,
+    사이트 전역 응답 지연 조사)의 파티션키로 쓰는 스칼라 값. `channels`는
+    배열이지만 실측(발행분 500건 샘플) 결과 글 하나가 둘 이상의 채널에
+    동시에 속하는 경우가 0건이라, 이 단순화가 안전하다 — 여러 채널에
+    걸치는 글이 실제로 생기면 그때 재설계(예: 채널별로 별도 GSI 항목을
+    두는 얕은 복제 아이템 패턴)가 필요하다."""
+    return (channels or [None])[0]
+
+
 def create(data: dict, created_by: str) -> dict:
     slug = data.get("slug") or _unique_slug(
         data["publish_date"], data.get("headline", "")
     )
     now = _now_iso()
+    channels = data.get("channels") or []
     item = {
         "id": str(uuid.uuid4()),
         "slug": slug,
         "status": "draft",
-        "channels": data.get("channels") or [],
+        "channels": channels,
+        # channel(스칼라, 2026-09-07) — service/backend의 공개 목록 조회가
+        # "발행된 글 전체를 읽은 뒤 Python에서 채널 필터링" 하던 걸
+        # DynamoDB GSI로 직접 채널만 걸러 읽도록 바꾸는 마이그레이션의
+        # 쓰기 측 절반. clients/cms_posts_ddb_client.py 주석 참조.
+        "channel": _primary_channel(channels),
         "publish_date": data["publish_date"],
         "editor_id": data.get("editor_id") or None,
         "headline": data.get("headline", ""),
@@ -193,6 +210,10 @@ def update(post_id: str, data: dict) -> dict | None:
     for key in _UPDATABLE:
         if key in data:
             current_item[key] = data[key] if data[key] is not None else None
+    if "channels" in data:
+        # channel 스칼라(2026-09-07 GSI 마이그레이션)를 channels 배열과
+        # 항상 같이 갱신 — create()의 _primary_channel() 참조.
+        current_item["channel"] = _primary_channel(current_item.get("channels"))
     current_item["updated_at"] = _now_iso()
 
     posts_table().put_item(Item=current_item)

@@ -19,16 +19,28 @@ from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
 
 from clients import cms_posts_ddb_client as posts_client
-from services.cms_posts_shaping import SHAPERS, shape_letter, shape_lens_summary
+from services.cms_posts_shaping import (
+    SHAPERS,
+    shape_letter,
+    shape_lens_summary,
+    shape_webtoon_summary,
+    shape_home_player_summary,
+)
 
 logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
 # 목록(다건, ?channel=... 응답) 전용 shaper — 단건 조회(/{slug})는 여전히
-# SHAPERS(전체)를 그대로 쓴다. lens만 축약판으로 바꾼다(2026-09-03) —
-# shape_lens_summary()의 docstring 참조. 다른 채널은 원래도 목록/단건이
-# 똑같이 가벼워서 나눌 필요가 없었다.
-_LIST_SHAPERS = {**SHAPERS, "lens": shape_lens_summary}
+# SHAPERS(전체)를 그대로 쓴다. lens는 2026-09-03, webtoon/home_player는
+# 2026-09-07(사이트 전역 응답 지연 조사)에 축약판으로 바꿨다 — 각
+# shape_*_summary()의 docstring 참조. video/letters/paper/feed는 원래도
+# 목록/단건이 똑같이 가벼워서 나눌 필요가 없었다.
+_LIST_SHAPERS = {
+    **SHAPERS,
+    "lens": shape_lens_summary,
+    "webtoon": shape_webtoon_summary,
+    "home_player": shape_home_player_summary,
+}
 
 # trend_card 채널 폐기(2026-08-17) — "요즘 화제의 경제 이슈" 섹션을 "이슈
 # 톡톡"에 흡수 통합. 실사용 데이터 0건 확인 후 제거(letters 채널 +
