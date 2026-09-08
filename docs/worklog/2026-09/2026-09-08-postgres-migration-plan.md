@@ -116,3 +116,23 @@
   절차)의 구체 구현 방법 결정 — 자동화 여부, 담당.
 - 계획이 다 정리됐으므로, 실제 AWS 리소스 생성 여부를 사용자에게 별도로
   확인한다.
+
+---
+
+## §1 실행 기록 (2026-09-08) — 인프라 프로비저닝
+
+사용자 승인 후 §1(인프라 프로비저닝)을 dev 범위로 실제 실행. 기존
+서비스(DynamoDB, 프로덕션 API)는 건드리지 않고 신규 리소스만 생성.
+
+| 리소스 | 식별자 | 비고 |
+|---|---|---|
+| 보안그룹 | `sg-08059b36b3947cda3` (`lens-postgres-migration-sg`) | VPC `vpc-07a3a75110d6594aa`(기본 VPC), 인바운드 5432/tcp를 작업자 IP `58.234.10.40/32`로만 제한 |
+| Aurora 클러스터 | `lens-postgres-migration-dev` | engine `aurora-postgresql` 16.14, Serverless v2, MinCapacity=0.5 / MaxCapacity=2 ACU |
+| DB 인스턴스 | `lens-postgres-migration-dev-1` | `db.serverless` |
+| 엔드포인트 | `lens-postgres-migration-dev.cluster-c83iuyksky7r.us-east-1.rds.amazonaws.com` | 포트 5432 |
+| 마스터 계정 | `lens_admin` | 비밀번호는 AWS Secrets Manager가 자동 관리(`--manage-master-user-password`), 코드/문서에 평문 저장 안 함 |
+| 백업 보존 | 1일 | dev 환경 기준 최소값 |
+| 태그 | `Service=atlas4, Project=Sedaily-LENS, ServiceName=Sedaily-LENS, Environment=dev, CostCenter=sedaily-ai` | `docs/architecture/비용태깅_규칙.md` 스키마 그대로 적용 |
+
+생성 시각 기준 상태는 `creating` → 가용해지면 이 절에 실제 가용 시각과
+확인 결과를 추가한다.
