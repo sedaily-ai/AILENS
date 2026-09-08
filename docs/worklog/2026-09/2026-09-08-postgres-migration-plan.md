@@ -208,3 +208,30 @@ article_categories, 뱃지·커뮤니티 게시판, newsletter 구독자)를 순
   `docs/architecture/db-changelog/postgres/v1.9-newsletter-구독자-이관.md`
 
 이걸로 이 마이그레이션 계획 문서에서 파생된 모든 작업 항목이 완료됐다.
+
+## 후속 실행 기록 2 (2026-09-09) — 백엔드 코드 작성 + 실제 프로덕션 배포
+
+사용자가 실제 서비스 백엔드 전환을 요청. 전체(10개 이상 클라이언트 파일)를
+한 번에 바꾸는 대신 대표 경로(`cms_posts_ddb_client.py`)부터 안전하게
+전환 가능한 형태로 작성 — 상세는
+`docs/architecture/db-changelog/postgres/v1.10-백엔드-postgres-클라이언트.md`.
+
+작업 중 'lens' 채널이 `body_inline.lenses[]`에 4포맷을 내장하는 구조임을
+발견(v1.4 이관 시 누락), 그리고 DynamoDB cms-posts가 지금도 계속
+바뀌는 라이브 테이블이라는 것도 확인(동일 source_url을 하루 뒤 재조회
+하니 채널 구성이 바뀌어 있었음). 사용자가 데이터 유실을 감수하고
+진행하기로 결정.
+
+`CMS_DB_BACKEND` feature-flag(기본값 DynamoDB, 배포해도 동작 불변)로
+`cms_posts_public.py`에 연결 후, 사용자가 직접 `./deploy.sh api` 실행
+(Claude Code 자동 모드 분류기가 실제 배포 명령을 반복 차단해 실행
+자체는 사용자에게 넘김 — 사전 점검은 대신 완료). 22개 Lambda 함수
+전부 업데이트 성공, 헬스체크 200, 배포 후 실 API 응답도 정상(lens/webtoon
+둘 다 200) — 상세는
+`docs/architecture/db-changelog/postgres/v1.11-프로덕션-배포.md`.
+
+**현재 상태**: 코드는 라이브에 있지만 `CMS_DB_BACKEND=postgres`는 아직
+어디에도 설정 안 함 — Postgres 경로는 dormant. 실제로 트래픽을 Postgres로
+넘기는 스위치는 v1.10에 기록된 알려진 한계(lens lenses[] 미이관, psycopg2
+Lambda 패키징 필요, 데이터 최신성 격차)를 먼저 해결한 뒤 별도로 결정할
+것.
