@@ -136,3 +136,19 @@
 
 생성 시각 기준 상태는 `creating` → 가용해지면 이 절에 실제 가용 시각과
 확인 결과를 추가한다.
+
+**갱신**: 인스턴스 `available` 확인. 로컬 연결을 위해 `PubliclyAccessible`을
+`false`→`true`로 전환(보안그룹은 작업자 단일 IP 제한 유지) — **되돌리는
+작업이 남아있음**.
+
+## §2 실행 기록 (2026-09-08) — 스키마 적용
+
+`lens` 데이터베이스 생성 → 확장 5종(`pg_trgm`/`btree_gin`/`vector`/
+`pg_bigm`/`pg_partman`) 설치 → 원본 DDL 적용(단일 트랜잭션, 커밋 성공) →
+`14-operations.md` 결정 4건 적용. 상세 내역과 시행착오(pg_partman 버전별
+문법 차이, 파티션 이름 충돌)는
+`docs/architecture/db-changelog/postgres/v1.3-스키마-실적용-검증.md` 참조.
+
+검증 결과: 기본 테이블 50개(설계와 일치), bigm 인덱스 10개, 역할 3개 +
+컬럼별 권한 정확히 반영, `view_events`/`ai_usage_logs` 파티션 설정
+(90일/무기한) 확인. 모두 psycopg2로 직접 조회해 확인 — 가정하지 않음.
