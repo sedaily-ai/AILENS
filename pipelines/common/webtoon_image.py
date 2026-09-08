@@ -49,13 +49,19 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────
 
 _STYLE_FALLBACK = (
-    "Modern Korean webtoon illustration — clean, crisp black linework "
-    "with confident, uncluttered line weight. Soft cel-shaded coloring "
-    "with gentle, restrained shading (not flat single-tone, not heavy "
-    "painterly texture — controlled shading that reads clearly at a "
-    "glance). This is a hand-illustrated artwork — clearly rendered "
-    "with visible linework, NOT a photograph, NOT photorealistic, NOT "
-    "camera-captured, NOT 3D-rendered.\n\n"
+    "Modern Korean webtoon illustration — FULL COLOR, vivid and "
+    "saturated. Clean, crisp black linework with confident, uncluttered "
+    "line weight. Soft cel-shaded coloring with gentle, restrained "
+    "shading (not flat single-tone, not heavy painterly texture — "
+    "controlled shading that reads clearly at a glance). This is a "
+    "hand-illustrated artwork — clearly rendered with visible linework, "
+    "NOT a photograph, NOT photorealistic, NOT camera-captured, NOT "
+    "3D-rendered.\n\n"
+    "CRITICAL — always full color: skin tones, hair color, clothing "
+    "colors, and background colors must all be rendered in natural "
+    "full color. Do NOT render in grayscale, black-and-white, "
+    "monochrome, sepia, pencil sketch, or line-art-only style under "
+    "any circumstance.\n\n"
     "Natural adult character proportions and clear, expressive but NOT "
     "exaggerated eyes and expressions. Professional, editorial mood — "
     "restrained faces; natural body language that reads clearly at a "
@@ -92,26 +98,32 @@ _STYLE_FALLBACK = (
 )
 
 _FIXED_CHARACTERS_FALLBACK = {
+    # 2026-09-08 3차 — 안경/단발/배지 등 작은 액세서리 지시는 확산 모델이
+    # 실측으로 안 지켰다(prompts.py "겪었던 문제 4" 참고). 사용자가 공유한
+    # 참고 샘플에 맞춰 "머리 길이·색상·복장 실루엣" 같은 큰 특징 위주로
+    # 다시 썼다 — DDB(webtoon-image/published v4)와 동일 내용.
     "A (여성 기자, 설명자)": (
-        "Korean woman, early-to-mid 30s. Chin-length neat black bob "
-        "haircut, thin round metal-frame glasses. Navy blazer over a "
-        "light sky-blue blouse/shirt. Small white circular enamel badge "
-        "on the left chest of the blazer with a simple blue stylized "
-        "'S' monogram (a news outlet logo badge) — keep the badge small "
-        "and consistent, never oversized, never add any other text or "
-        "logo. Friendly but professional demeanor — actively gestures "
-        "while explaining: pointing at documents/charts, open palm "
-        "gestures, leaning toward materials. Keep face, hairstyle, "
-        "glasses, and outfit IDENTICAL across every cut."
+        "Korean woman, mid-20s to early-30s. Long wavy dark brown hair "
+        "past the shoulders, center or slight side part, no glasses, "
+        "no visible badge or logo. Wears a dark navy or charcoal "
+        "blazer/coat over a simple light-colored top. Warm, approachable "
+        "but professional expression — actively gestures while "
+        "explaining: pointing at documents/charts, open palm gestures, "
+        "leaning toward materials, sometimes holding a tablet or "
+        "folder. Keep hair length, hair color, and overall outfit "
+        "silhouette consistent across every cut — do not switch to "
+        "short hair, a bob cut, or glasses."
     ),
     "B (남성 청자)": (
-        "Korean man, late 20s. Natural short black hair, no glasses. "
-        "White t-shirt under a dark gray cardigan. No badge, no logo of "
-        "any kind. Represents the reader's curiosity — reacts to what's "
-        "being explained: leaning in to look at materials, tilting "
-        "forward, resting chin on hand while thinking, looking "
-        "surprised or curious as the scene calls for. Keep face, "
-        "hairstyle, and outfit IDENTICAL across every cut."
+        "Korean man, mid-to-late 20s. Short black hair, slightly "
+        "tousled/textured on top, no glasses. Wears a dark casual "
+        "jacket or blazer over a simple shirt or t-shirt — "
+        "smart-casual, not a formal suit. Represents the reader's "
+        "curiosity — reacts to what's being explained: leaning in to "
+        "look at materials, tilting forward, resting chin on hand "
+        "while thinking, looking surprised or curious as the scene "
+        "calls for. Keep hair style and overall outfit silhouette "
+        "consistent across every cut."
     ),
 }
 
