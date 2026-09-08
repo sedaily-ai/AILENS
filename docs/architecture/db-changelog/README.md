@@ -42,6 +42,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.9 — newsletters 시드 + 구독자 이관](postgres/v1.9-newsletter-구독자-이관.md) |
 | 2026-09-09 | postgres | [v1.10 — 백엔드 Postgres 클라이언트 작성·검증](postgres/v1.10-백엔드-postgres-클라이언트.md) |
 | 2026-09-09 | postgres | [v1.11 — 프로덕션 배포](postgres/v1.11-프로덕션-배포.md) |
+| 2026-09-09 | postgres | [v1.12 — lens 콘텐츠 백필](postgres/v1.12-lens-콘텐츠-백필.md) |
 
 ## 새 항목 추가 규칙
 
