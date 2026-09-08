@@ -355,14 +355,14 @@ def generate_bedrock_image_bytes(prompt: str) -> bytes:
     return base64.b64decode(images[0])
 
 
-def generate_bedrock_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
-    """`generate_bedrock_image_bytes()`의 파일-쓰기 + 재시도 래퍼 —
-    pipeline.py가 기존에 쓰던 `generate_image_bedrock()`과 동일한 계약
-    (성공 시 out_path에 파일 쓰고 True, 실패 시 False, 지수 백오프
-    재시도)이라 pipeline.py 쪽 호출부는 이 함수로 바꿔 꽂기만 하면 된다."""
+def _retry_generate_and_write(bytes_fn, out_path: Path, retries: int) -> bool:
+    """공통 재시도 + 파일-쓰기 래퍼 — generate_bedrock_image()와
+    generate_bedrock_style_guide_image()는 실제 생성 호출(bytes_fn)만
+    다르고 재시도 로직(지수 백오프 12/24/36초, 실패 로그)은 완전히
+    같아서 2026-09-08 Style Guide 추가 때 중복되던 걸 추출했다."""
     for attempt in range(retries):
         try:
-            data = generate_bedrock_image_bytes(prompt)
+            data = bytes_fn()
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(data)
             return True
@@ -375,6 +375,14 @@ def generate_bedrock_image(prompt: str, out_path: Path, retries: int = 3) -> boo
                 print(f"    ❌ 최종 실패: {e}")
                 return False
     return False
+
+
+def generate_bedrock_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
+    """`generate_bedrock_image_bytes()`의 파일-쓰기 + 재시도 래퍼 —
+    pipeline.py가 기존에 쓰던 `generate_image_bedrock()`과 동일한 계약
+    (성공 시 out_path에 파일 쓰고 True, 실패 시 False, 지수 백오프
+    재시도)이라 pipeline.py 쪽 호출부는 이 함수로 바꿔 꽂기만 하면 된다."""
+    return _retry_generate_and_write(lambda: generate_bedrock_image_bytes(prompt), out_path, retries)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -443,19 +451,6 @@ def generate_bedrock_style_guide_image_bytes(prompt: str, fidelity: float = STYL
 
 
 def generate_bedrock_style_guide_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
-    """generate_bedrock_image()와 동일한 파일-쓰기 + 재시도 래퍼(Style Guide 버전)."""
-    for attempt in range(retries):
-        try:
-            data = generate_bedrock_style_guide_image_bytes(prompt)
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_bytes(data)
-            return True
-        except Exception as e:
-            if attempt < retries - 1:
-                wait = (attempt + 1) * 12
-                print(f"    ⚠️  오류: {e} → {wait}초 후 재시도...")
-                time.sleep(wait)
-            else:
-                print(f"    ❌ 최종 실패: {e}")
-                return False
-    return False
+    """generate_bedrock_image()와 동일한 파일-쓰기 + 재시도 래퍼(Style Guide 버전,
+    _retry_generate_and_write() 공유)."""
+    return _retry_generate_and_write(lambda: generate_bedrock_style_guide_image_bytes(prompt), out_path, retries)

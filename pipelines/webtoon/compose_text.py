@@ -204,6 +204,60 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], face_x: list[float] | 
         _draw_bubble(img, d["line"], tone, anchor_x, top_y)
 
 
+def _draw_pill(
+    img: Image.Image,
+    lines: list[str],
+    font: ImageFont.FreeTypeFont,
+    y0: float,
+    fill: tuple[int, int, int],
+    text_fill: tuple[int, int, int],
+    *,
+    pad_w: float,
+    pad_h: float,
+    max_radius: float | None = None,
+    outline: tuple[int, int, int] | None = None,
+    outline_width: int = 2,
+    keyword: str | None = None,
+    keyword_fill: tuple[int, int, int] | None = None,
+) -> float:
+    """가로 중앙 정렬된 둥근 사각형("알약") 안에 여러 줄 텍스트를 그리는
+    공용 루틴 — 2026-09-08(3차, 리팩토링) 신설. draw_title/
+    draw_cover_header/draw_closing_caption 세 함수가 전부 "텍스트 측정
+    → 알약 그리기 → 줄마다 중앙 정렬"을 각자 반복하고 있던 걸 추출했다.
+
+    keyword가 주어지면 그 부분 문자열만 keyword_fill로 강조한다
+    (draw_cover_header의 헤드라인 박스 전용 기능). 반환값은 알약 하단
+    y좌표 — draw_cover_header가 그 아래에 헤드라인 박스를 이어 붙일 때
+    쓴다."""
+    draw = ImageDraw.Draw(img)
+    if not lines:
+        return y0
+    block_w, block_h = _measure_block(draw, lines, font)
+    bw = block_w + pad_w
+    bh = block_h + pad_h
+    x0 = (img.width - bw) / 2
+    x1 = x0 + bw
+    y1 = y0 + bh
+    radius = bh / 2 if max_radius is None else min(bh / 2, max_radius)
+    draw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=fill, outline=outline, width=outline_width)
+
+    ty = y0 + (bh - block_h) / 2
+    for ln in lines:
+        tw = draw.textlength(ln, font=font)
+        tx = (img.width - tw) / 2
+        if keyword and keyword in ln:
+            before, _, after = ln.partition(keyword)
+            draw.text((tx, ty), before, font=font, fill=text_fill)
+            cx = tx + draw.textlength(before, font=font)
+            draw.text((cx, ty), keyword, font=font, fill=keyword_fill)
+            cx += draw.textlength(keyword, font=font)
+            draw.text((cx, ty), after, font=font, fill=text_fill)
+        else:
+            draw.text((tx, ty), ln, font=font, fill=text_fill)
+        ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
+    return y1
+
+
 def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_FILL):
     """상단 제목 알약형 라벨 — 2026-09-08 신설(육하원칙 기반 웹툰 프롬프트
     문서 검토 후 도입). 기존 draw_caption(좌하단 수치용)·draw_narration
@@ -216,23 +270,8 @@ def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_F
     compose()가 title_fill_for_cut()으로 계산한 색을 넘긴다(§13 색상표)."""
     draw = ImageDraw.Draw(img)
     font = _font(30)
-    max_width = int(img.width * 0.6)
-    lines = _wrap_text(draw, text, font, max_width)
-    if not lines:
-        return
-    block_w, block_h = _measure_block(draw, lines, font)
-    bw = block_w + _PADDING * 2.4
-    bh = block_h + _PADDING * 1.3
-    x0 = (img.width - bw) / 2
-    y0 = img.height * 0.03
-    x1 = x0 + bw
-    y1 = y0 + bh
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=bh / 2, fill=fill)
-    ty = y0 + (bh - block_h) / 2
-    for ln in lines:
-        tw = draw.textlength(ln, font=font)
-        draw.text(((img.width - tw) / 2, ty), ln, font=font, fill=_NAVY_TEXT_FILL)
-        ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
+    lines = _wrap_text(draw, text, font, int(img.width * 0.6))
+    _draw_pill(img, lines, font, img.height * 0.03, fill, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.3)
 
 
 def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str | None = None):
@@ -247,49 +286,17 @@ def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str 
     강조색 처리 로직 자체가 다르다 — compose()가 cut==1일 때만 이걸 부른다."""
     draw = ImageDraw.Draw(img)
 
-    # 1) 브랜드 라벨(작은 남색 알약)
     brand_font = _font(24)
-    bw_ = draw.textlength(brand, font=brand_font)
-    bh_ = draw.textbbox((0, 0), brand, font=brand_font)[3]
-    pad_b = 16
-    bx0 = (img.width - (bw_ + pad_b * 2)) / 2
-    by0 = img.height * 0.025
-    bx1 = bx0 + bw_ + pad_b * 2
-    by1 = by0 + bh_ + pad_b * 1.1
-    draw.rounded_rectangle([bx0, by0, bx1, by1], radius=(by1 - by0) / 2, fill=_NAVY_FILL)
-    draw.text((bx0 + pad_b, by0 + (by1 - by0 - bh_) / 2), brand, font=brand_font, fill=_NAVY_TEXT_FILL)
+    brand_lines = _wrap_text(draw, brand, brand_font, int(img.width * 0.6))
+    by1 = _draw_pill(img, brand_lines, brand_font, img.height * 0.025, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=32, pad_h=17.6)
 
-    # 2) 헤드라인 박스(큰 흰색 둥근 사각형, keyword만 빨강)
-    font = _font(46)
-    max_width = int(img.width * 0.7)
-    lines = _wrap_text(draw, headline, font, max_width)[:2]
-    if not lines:
-        return
-    block_w, block_h = _measure_block(draw, lines, font)
-    hw = block_w + _PADDING * 3
-    hh = block_h + _PADDING * 2.4
-    hx0 = (img.width - hw) / 2
-    hy0 = by1 + img.height * 0.02
-    hx1 = hx0 + hw
-    hy1 = hy0 + hh
-    draw.rounded_rectangle([hx0, hy0, hx1, hy1], radius=min(hh / 2, 44), fill=_HEADLINE_FILL, outline=(210, 210, 210), width=2)
-
-    ty = hy0 + (hh - block_h) / 2
-    for ln in lines:
-        tw = draw.textlength(ln, font=font)
-        tx = (img.width - tw) / 2
-        if keyword and keyword in ln:
-            before, _, after = ln.partition(keyword)
-            kw_w = draw.textlength(keyword, font=font)
-            cx = tx
-            draw.text((cx, ty), before, font=font, fill=_HEADLINE_TEXT_FILL)
-            cx += draw.textlength(before, font=font)
-            draw.text((cx, ty), keyword, font=font, fill=_RED_FILL)
-            cx += kw_w
-            draw.text((cx, ty), after, font=font, fill=_HEADLINE_TEXT_FILL)
-        else:
-            draw.text((tx, ty), ln, font=font, fill=_HEADLINE_TEXT_FILL)
-        ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
+    headline_font = _font(46)
+    headline_lines = _wrap_text(draw, headline, headline_font, int(img.width * 0.7))[:2]
+    _draw_pill(
+        img, headline_lines, headline_font, by1 + img.height * 0.02, _HEADLINE_FILL, _HEADLINE_TEXT_FILL,
+        pad_w=_PADDING * 3, pad_h=_PADDING * 2.4, max_radius=44, outline=(210, 210, 210),
+        keyword=keyword, keyword_fill=_RED_FILL,
+    )
 
 
 def draw_closing_caption(img: Image.Image, text: str):
@@ -302,26 +309,22 @@ def draw_closing_caption(img: Image.Image, text: str):
     단계가 글자 수를 넘길 수도 있어(2026-09-08 실측 — closing_caption이
     25자를 넘겼는데 draw_closing_caption이 첫 줄만 그리고 나머지를 조용히
     버려서, 하마터면 문장 뒷부분이 통째로 사라질 뻔했다) 최대 2줄까지는
-    허용한다 — 잘림보다 두 줄이 낫다."""
+    허용한다 — 잘림보다 두 줄이 낫다.
+
+    아래에서 위로 쌓는 유일한 호출부라(화면 하단 고정) _draw_pill()의
+    top-anchored 계약과 안 맞아 block_h를 먼저 재서 y0를 역산한다 — 측정을
+    한 번 더 하는 셈이지만(PIL 텍스트 측정은 저렴) 헬퍼를 bottom-anchor
+    모드까지 지원하도록 넓히는 것보다 이 편이 간단하다."""
     draw = ImageDraw.Draw(img)
     font = _font(32)
-    max_width = int(img.width * 0.82)
-    lines = _wrap_text(draw, text, font, max_width)[:2]
+    lines = _wrap_text(draw, text, font, int(img.width * 0.82))[:2]
     if not lines:
         return
-    block_w, block_h = _measure_block(draw, lines, font)
-    bw = block_w + _PADDING * 2.4
+    _, block_h = _measure_block(draw, lines, font)
     bh = block_h + _PADDING * 1.6
-    x0 = (img.width - bw) / 2
     y1 = img.height - img.height * 0.05
     y0 = y1 - bh
-    x1 = x0 + bw
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=min(bh / 2, 40), fill=_NAVY_FILL)
-    ty = y0 + (bh - block_h) / 2
-    for ln in lines:
-        tw = draw.textlength(ln, font=font)
-        draw.text(((img.width - tw) / 2, ty), ln, font=font, fill=_NAVY_TEXT_FILL)
-        ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
+    _draw_pill(img, lines, font, y0, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.6, max_radius=40)
 
 
 def draw_caption(img: Image.Image, text: str):
