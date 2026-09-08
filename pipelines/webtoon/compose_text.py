@@ -169,39 +169,71 @@ def _draw_bubble(img: Image.Image, text: str, tone: str, anchor_x: int, top_y: i
     return y1 + 26  # 꼬리 아래 여백 포함, 다음 말풍선이 겹치지 않을 y
 
 
-def draw_dialogue(img: Image.Image, dialogue: list[dict], face_x: list[float] | None = None):
+_DEFAULT_BUBBLE_TOP_RATIO = 0.16  # draw_title()의 제목 알약 아래로 자리를 내주는 기본 높이
+_FACE_BUBBLE_MARGIN_PX = 150  # 얼굴 상단에서 이만큼 위에 말풍선을 배치(2줄짜리 말풍선이 넉넉히 들어가는 여유)
+
+
+def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | None = None):
     """dialogue = [{"speaker":..., "line":..., "tone":"보통"|"격앙"}, ...]
 
     2026-09-02 — 원래는 화자 위치 데이터가 없어서(1·2단계 JSON에 x/y 없음)
     상단에 좌→우로 순서대로 펼쳐 놓는 게 유일한 방법이었다(기자 피드백 —
-    "인물과 연결되지 않은 말풍선이 허공을 가리키는 컷이 있다"). 이제
-    pipeline.py가 생성된 배경 이미지를 비전 모델로 훑어 실제 얼굴 x좌표
-    (0~1 정규화)를 감지해서 넘겨준다 — 개수가 대사 수와 일치하면 그
-    좌표를 그대로 앵커로 쓴다. 개수가 안 맞거나(얼굴 인식 실패, 인물 수
-    불일치 등) face_x가 없으면 기존의 균등 분할 폴백으로 돌아간다 —
-    완벽한 보장은 아니지만(비전 모델의 얼굴 인식 자체도 100%는 아님),
-    "전혀 없던 것"보다는 훨씬 나은 근사치.
+    "인물과 연결되지 않은 말풍선이 허공을 가리키는 컷이 있다").
 
-    2026-09-08 — 폴백 순서를 좌→우에서 우→좌로 뒤집었다(육하원칙 프롬프트
-    문서 검토 후 published.md에 추가한 "첫 번째 말풍선은 화면 오른쪽 화자"
-    규칙과 맞추기 위함). 1단계 dialogue 배열의 첫 번째 항목이 그 컷에서
-    먼저 말하는(=오른쪽에 있는) 화자라는 게 이제 스크립트 단계의 계약이므로,
-    face_x가 없을 때도 dialogue[0]을 오른쪽에 앵커해야 한글 독자의 우→좌
-    읽기 흐름과 어긋나지 않는다."""
+    2026-09-08(얼굴 회피 리팩토링) — pipeline.py가 생성된 배경 이미지를
+    rekognition_client.detect_main_faces()로 훑어 얼굴 바운딩 박스(x/y/폭/높이,
+    0~1 정규화) 목록을 넘겨준다. 개수가 대사 수와 일치하면 각 얼굴의
+    가로 중심에 앵커하고, **세로 위치도 얼굴 상단 바로 위**로 계산한다 —
+    예전(2026-09-02~09-07)엔 얼굴의 x좌표만 있고 y좌표·크기 정보가 아예
+    없어서(당시 Claude 비전 모델이 x좌표만 추정) 세로는 항상 고정된
+    16% 높이였는데, 인물이 클로즈업으로 크게 나오는 컷에서 그 고정
+    높이가 얼굴(특히 이마·눈)을 그대로 덮는 문제가 실제로 있었다.
+    Rekognition은 바운딩 박스 전체를 주므로 이제 얼굴 상단을 알고 그
+    위에 배치할 수 있다.
+
+    개수가 안 맞거나(얼굴 인식 실패, 인물 수 불일치 등) faces가 없으면
+    기존의 균등 분할 폴백(고정 16% 높이)으로 돌아간다.
+
+    폴백 순서는 좌→우가 아니라 우→좌다(published.md "첫 번째 말풍선은
+    화면 오른쪽 화자" 규칙 — dialogue[0]이 그 컷에서 먼저 말하는=오른쪽
+    화자라는 게 스크립트 단계의 계약). rekognition_client.detect_main_faces()도
+    이미 오른쪽부터 정렬해서 반환하므로 같은 순서로 dialogue와 zip된다."""
     if not dialogue:
         return
     n = len(dialogue)
-    # 0.06 → 0.16(2026-09-08): draw_title()이 상단에 제목 알약을 새로
-    # 그리게 되면서, 말풍선이 그 아래부터 시작하도록 자리를 내줬다.
-    top_y = int(img.height * 0.16)
-    use_face_x = face_x is not None and len(face_x) == n
-    for i, d in enumerate(dialogue):
-        if use_face_x:
-            anchor_x = int(img.width * face_x[i])
+    default_top_y = int(img.height * _DEFAULT_BUBBLE_TOP_RATIO)
+    use_faces = faces is not None and len(faces) == n
+
+    anchors_x: list[int] = []
+    tops_y: list[int] = []
+    for i in range(n):
+        if use_faces:
+            f = faces[i]
+            anchors_x.append(int(img.width * (f["left"] + f["width"] / 2)))
+            face_top_px = int(img.height * f["top"])
+            # 얼굴 위 여백을 두되, 화면 밖(음수)으로 넘치거나 제목 알약과
+            # 겹치지 않게 default_top_y보다 낮아지지는 않게 한다 — 얼굴이
+            # 화면 최상단에 붙어있는 표지형 구도에서 보호막 역할.
+            tops_y.append(max(default_top_y, face_top_px - _FACE_BUBBLE_MARGIN_PX))
         else:
-            anchor_x = int(img.width * (n - 0.5 - i) / n)
+            anchors_x.append(int(img.width * (n - 0.5 - i) / n))
+            tops_y.append(default_top_y)
+
+    # 2026-09-08(2차) — 얼굴 회피를 적용한 뒤 실측(테스트_뤼미에르파트너십_v6)
+    # 으로 발견한 부수 문제: 인물 3명 이상이 몰려 나온 컷에서 주요 화자 2명의
+    # 얼굴이 화면 안에서 가까이 붙어있으면, 두 말풍선이 서로 겹쳐 글자가
+    # 가려졌다(_MAX_BUBBLE_WIDTH_RATIO=0.42 두 개면 최대 84%라 절반보다
+    # 가까우면 겹친다). 두 앵커 사이 거리가 화면 폭 절반보다 좁으면 같은
+    # 중심을 기준으로 좌우로 벌린다 — 오른쪽(anchors_x[0])이 계속 더
+    # 오른쪽에 남도록 부호를 유지한다.
+    if n == 2 and abs(anchors_x[0] - anchors_x[1]) < img.width * 0.5:
+        mid = sum(anchors_x) / 2
+        half_gap = img.width * 0.25
+        anchors_x = [int(mid + half_gap), int(mid - half_gap)]
+
+    for i, d in enumerate(dialogue):
         tone = d.get("tone", "보통")
-        _draw_bubble(img, d["line"], tone, anchor_x, top_y)
+        _draw_bubble(img, d["line"], tone, anchors_x[i], tops_y[i])
 
 
 def _draw_pill(
@@ -364,11 +396,11 @@ def draw_narration(img: Image.Image, text: str):
         ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
 
 
-def compose(img_path: Path, cut: dict, face_x: list[float] | None = None):
+def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
     """배경 이미지(img_path) 위에 cut의 title/dialogue/caption/(closing_caption
-    또는 narration)을 순서대로 합성해서 같은 경로에 덮어쓴다. face_x — 비전
-    검증 단계에서 감지한 얼굴 x좌표 목록(draw_dialogue 참고, 없으면 균등
-    분할 폴백).
+    또는 narration)을 순서대로 합성해서 같은 경로에 덮어쓴다. faces —
+    rekognition_client.detect_main_faces()가 반환한 얼굴 바운딩 박스 목록
+    (draw_dialogue 참고, 없거나 개수가 안 맞으면 균등 분할 폴백).
 
     2026-09-08 — title/closing_caption 추가. closing_caption과 narration은
     둘 다 하단 텍스트 요소라 시각적으로 겹친다 — closing_caption이 있으면
@@ -386,7 +418,7 @@ def compose(img_path: Path, cut: dict, face_x: list[float] | None = None):
     elif cut.get("title"):
         draw_title(img, cut["title"], fill=title_fill_for_cut(cut_no))
     if cut.get("dialogue"):
-        draw_dialogue(img, cut["dialogue"], face_x)
+        draw_dialogue(img, cut["dialogue"], faces)
     if cut.get("caption"):
         draw_caption(img, cut["caption"])
     if cut.get("closing_caption"):

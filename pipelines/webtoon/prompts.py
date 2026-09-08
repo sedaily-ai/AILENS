@@ -168,16 +168,20 @@ def narration(text):
 # 편집 대상이 아니고 DDB에 미러링할 필요도 없다. 위치만 다른 프롬프트
 # 상수들과 통일하려고 여기로 옮겼을 뿐(pipeline.py에 있었음) — DDB
 # 동기화 의무가 새로 생기는 게 아니라는 걸 명확히 해둔다.
+# 2026-09-08 — faces_left_to_right_x 필드를 제거했다. 말풍선을 얼굴 위에
+# 앵커하려고 이 비전 모델에게 좌표를 추정시켰었는데, x좌표 하나뿐이고
+# 세로 위치·크기 정보가 없어 정확도도 낮았다(LLM은 애초에 정밀 좌표
+# 추정용이 아님). rekognition_client.detect_main_faces()(AWS Rekognition
+# 전용 얼굴 감지 서비스)로 대체 — 바운딩 박스 전체(x/y/폭/높이)+신뢰도를
+# 주고, 만화 일러스트에도 실측으로 잘 동작함을 확인했다(pipeline.py
+# 호출부 참고). 이 프롬프트는 이제 Rekognition이 못 하는 의미적 판단
+# (사극 오염·인물 없음 위반)만 담당한다.
 VALIDATE_SYSTEM = (
     "당신은 뉴스 웹툰 이미지 QA 담당자입니다. 주어진 이미지 하나를 보고 "
     "아래 JSON 스키마 그대로만 응답하세요(설명 문구 없이 JSON 객체 하나만):\n"
-    '{"sageuk": true|false, "no_people_violated": true|false, '
-    '"faces_left_to_right_x": [0.0~1.0 사이 숫자, ...]}\n\n'
+    '{"sageuk": true|false, "no_people_violated": true|false}\n\n'
     "- sageuk: 이미지에 조선시대/사극/한복/전통 한옥 지붕 등 시대극 요소가 "
     "하나라도 보이면 true.\n"
     "- no_people_violated: [인물 없음 지시]가 주어졌는데 이미지에 사람이 "
-    "보이면 true. 인물 없음 지시가 없었다면 항상 false.\n"
-    "- faces_left_to_right_x: 이미지에서 뚜렷이 보이는 사람 얼굴들을 "
-    "왼쪽에서 오른쪽 순서로, 각 얼굴의 가로 중심 위치를 이미지 너비 대비 "
-    "0(왼쪽 끝)~1(오른쪽 끝) 사이 소수로 나열. 얼굴이 없으면 빈 배열."
+    "보이면 true. 인물 없음 지시가 없었다면 항상 false."
 )

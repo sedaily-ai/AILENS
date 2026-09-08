@@ -44,6 +44,7 @@ import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용�
 from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
 from bedrock_client import call_text, call_vision  # 2026-08-23 스크립트/장면연출 + 2026-09-02 이미지 QA
 from json_extract import extract_json_object  # pipelines/common/ — 2026-08-23 공용화, 2026-09-04 폴백까지 통합
+from rekognition_client import detect_main_faces  # pipelines/common/ — 2026-09-08 말풍선 얼굴 회피용
 
 import prompts
 import compose_text
@@ -207,7 +208,7 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
 # QA 호출 자체가 실패했을 때, 그리고 아직 QA를 한 번도 안 돌린 시점의
 # 초기값으로 공유하는 기본값 — 예전엔 두 곳(_validate_and_detect의 except
 # 블록, run_article의 루프 상단)에 리터럴이 그대로 중복돼 있었다.
-_DEFAULT_VERDICT = {"sageuk": False, "no_people_violated": False, "faces_left_to_right_x": []}
+_DEFAULT_VERDICT = {"sageuk": False, "no_people_violated": False}
 
 
 def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool) -> dict:
@@ -336,11 +337,15 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             else:
                 prompt = build_background_prompt(s["camera"], s["scene"], characters)
                 generate_fn = generate_image_bedrock
-            ok, verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n, generate_fn)
+            ok, _verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n, generate_fn)
             if ok:
-                face_x = verdict.get("faces_left_to_right_x") or None
+                # 2026-09-08 — 얼굴 위치는 이제 QA 비전 모델(verdict)이 아니라
+                # Rekognition 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM
+                # 상단 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
+                # 얼굴 상단을 피해 말풍선을 배치할 수 있다.
+                faces = detect_main_faces(img_path.read_bytes()) or None
                 try:
-                    compose_text.compose(img_path, cut, face_x)
+                    compose_text.compose(img_path, cut, faces)
                 except Exception as e:
                     print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:
