@@ -7,10 +7,13 @@ DynamoDB 아이템과 최대한 동일하게 맞춰 cms_posts_shaping.py를 그�
 재사용할 수 있게 한다.
 
 알려진 차이(2026-09-09 문서화, docs/architecture/db-changelog/postgres/
-v1.10·v1.12 참조):
-- 'lens' 채널 lenses[] 콘텐츠는 v1.12에서 백필 완료(포맷 라벨 방식은
-  포맷별 렌디션으로, 관점 라벨 방식은 letter 렌디션 텍스트 블록으로
-  — 완벽한 구조 재현은 아님).
+v1.10·v1.12·v1.17 참조):
+- 'lens' 채널 lenses[] 콘텐츠는 v1.12에서 백필, v1.17에서 단건 조회
+  (`get_published_post_by_slug(slug, channel='lens')`)에서 실제로
+  조립해 반환하도록 연결(포맷 라벨 방식은 포맷별 렌디션 그대로,
+  관점 라벨 방식은 letter 렌디션 텍스트 블록 하나로 — 완벽한 구조
+  재현은 아님). 목록 조회(`list_published_posts('lens', ...)`)는 여전히
+  메타데이터 위주 응답(별도 재설계 필요, 범위 밖).
 - DynamoDB 원본은 이 대체를 작성한 시점에도 계속 변경되는 라이브
   테이블이라, 이관된 Postgres 데이터는 2026-09-08~09 스냅샷 기준이다.
 """
@@ -33,6 +36,12 @@ _FORMAT_TO_CHANNEL = {
     "letter": "letters",
 }
 _CHANNEL_TO_FORMAT = {v: k for k, v in _FORMAT_TO_CHANNEL.items()}
+_FORMAT_TO_LENS_LABEL = {
+    "letter": "레터",
+    "webtoon": "웹툰",
+    "podcast": "팟캐스트",
+    "video": "영상",
+}
 
 
 def _conn():
@@ -172,6 +181,50 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
         conn.close()
 
 
+_LENS_RENDITIONS_SELECT = """
+    SELECT r.format,
+           ma.file_url AS media_url, ma.transcript,
+           (SELECT jsonb_agg(jsonb_build_object('url', wp.image_url, 'caption', wp.dialogue) ORDER BY wp.position)
+            FROM webtoon_panels wp WHERE wp.rendition_id = r.id) AS images_json,
+           (SELECT jsonb_agg(rb.content ORDER BY rb.position)
+            FROM rendition_blocks rb WHERE rb.rendition_id = r.id) AS body_json
+    FROM renditions r
+    LEFT JOIN media_assets ma ON ma.rendition_id = r.id
+    WHERE r.publication_id = %s
+    ORDER BY r.id
+"""
+
+
+def _fetch_lens_items(cur, pub_id: int) -> List[Dict[str, Any]]:
+    """publication의 모든 렌디션을 shape_lens()가 기대하는 lenses[] 항목
+    (label/question/bullets/paragraphs/images/video_url/media_url/transcript)
+    으로 재구성한다.
+
+    v1.12에서 두 원본 구조를 이관했다 — (a) "포맷 라벨"(레터/웹툰/팟캐스트/
+    영상 각각 별도 렌디션, 2건)은 여기서 포맷별로 정확히 복원된다.
+    (b) "관점 라벨"(4가지 분석 관점, 48건)은 하나의 letter 렌디션에 4개
+    텍스트 블록으로 뭉쳐 이관됐던 것이라, 여기서도 하나의 '레터' 항목
+    (paragraphs 4개)으로만 나온다 — 원래의 개별 관점 카드(question+
+    bullets 각각)로는 복원 안 됨(그 필드 자체가 렌디션 스키마에 없어
+    저장 시점에 유실, v1.12 문서화된 한계 그대로)."""
+    cur.execute(_LENS_RENDITIONS_SELECT, (pub_id,))
+    items = []
+    for row in _dictfetchall(cur):
+        fmt = row["format"]
+        items.append({
+            "label": _FORMAT_TO_LENS_LABEL.get(fmt, fmt or ""),
+            "question": "",
+            "bullets": [],
+            "paragraphs": row.get("body_json") or [],
+            "images": row.get("images_json") or [],
+            "video_url": row["media_url"] if fmt == "video" else None,
+            "thumbnail_url": None,
+            "media_url": row["media_url"] if fmt == "podcast" else None,
+            "transcript": row.get("transcript"),
+        })
+    return items
+
+
 _BY_PUBLICATION_ID_SELECT = """
     SELECT p.id AS publication_id, p.slug, p.title, p.subtitle, p.cover_image_url,
            p.source_url, p.status, p.published_at, p.created_at, p.updated_at,
@@ -205,10 +258,12 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
     letters/[id] 각각 자기 채널로 스코프된 fetch만 함). `channel`이
     없거나 그 채널에 해당하는 렌디션이 없으면(드묾 — v1.12로 모든
     publications가 최소 1개 렌디션을 가짐) 기존과 동일하게
-    `ORDER BY r.id LIMIT 1`로 임의 선택한다. 'lens'는 포맷이 아니라
-    별도 다중 포맷 조합 UI라 이 필터링 대상이 아니다(v1.12 문서화된
-    한계 그대로 — FormatPicker가 기대하는 4-포맷 통합 응답은 별도
-    재설계 필요, 이번 범위 밖).
+    `ORDER BY r.id LIMIT 1`로 임의 선택한다.
+
+    'lens'는 포맷이 아니라 최대 4개 렌디션(레터/웹툰/팟캐스트/영상)을
+    한 응답에 조합해야 하는 별도 UI(FormatPicker)라 별도 처리한다 —
+    모든 렌디션을 `body_inline.lenses[]`로 재구성해서 돌려준다
+    (`_fetch_lens_items` 참조, 관점 라벨 48건의 구조적 한계는 그대로).
     """
     conn = _conn()
     try:
@@ -226,6 +281,26 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
             if not hist_row:
                 return None
             pub_id = hist_row[0]
+
+        if channel == "lens":
+            cur.execute(
+                """
+                SELECT id AS publication_id, slug, title, subtitle, cover_image_url,
+                       source_url, status, published_at, created_at, updated_at
+                FROM publications
+                WHERE id = %s AND status = 'published' AND deleted_at IS NULL
+                """,
+                (pub_id,),
+            )
+            pub_row = _dictfetchone(cur)
+            if not pub_row:
+                return None
+            pub_row["channel"] = "lens"
+            pub_row["images"] = []
+            pub_row["body_paragraphs"] = []
+            post = _row_to_post(pub_row)
+            post["body_inline"]["lenses"] = _fetch_lens_items(cur, pub_id)
+            return post
 
         fmt = _CHANNEL_TO_FORMAT.get(channel) if channel else None
         found = None
