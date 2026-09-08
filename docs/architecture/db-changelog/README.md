@@ -37,6 +37,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-08 | postgres | [v1.4 — 데이터 마이그레이션 실행 (28,970건 실사용 데이터 이관)](postgres/v1.4-데이터-마이그레이션-실행.md) |
 | 2026-09-08 | postgres | [v1.5 — 이관 전/후 베이스라인 비교](postgres/v1.5-베이스라인-비교.md) |
 | 2026-09-08 | postgres | [v1.6 — articles 본문 백필 + 이미지·관련기사 이관](postgres/v1.6-articles-본문-백필.md) |
+| 2026-09-08 | postgres | [v1.7 — article_categories 매핑 확정·이관](postgres/v1.7-article-categories-매핑.md) |
 
 ## 새 항목 추가 규칙
 
