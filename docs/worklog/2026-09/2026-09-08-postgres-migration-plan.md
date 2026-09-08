@@ -276,5 +276,21 @@ v1.13이 남긴 두 번째 미해결 항목("프론트가 실제로 채널별 sl
 `docs/architecture/db-changelog/postgres/v1.16-slug-channel-disambiguation.md`.
 
 이로써 v1.13이 남긴 미해결 항목 2건(slug 유실, 포맷 disambiguation)
-전부 해소됨. 남은 건 'lens' 채널의 4-포맷 통합 응답 재설계(v1.12
-문서화, 별도 범위)와 `CMS_DB_BACKEND` 전환 스위치 시점 결정뿐이다.
+전부 해소됨.
+
+## 후속 실행 기록 5 (2026-09-09) — lens 단건 조회가 실제로 콘텐츠를 조립하도록 수정
+
+"lens 채널의 4-포맷 통합 응답 재설계"를 들여다보다가, 문제가 예상보다
+근본적이라는 걸 발견 — v1.12에서 백필한 lens 렌디션 데이터가
+`_row_to_post()`의 `body_inline.lenses` 하드코딩 빈 배열 때문에
+**단건 조회 응답에서 한 번도 노출된 적이 없었다**("완벽한 구조 재현은
+아님"이 아니라 "아예 안 보임"이었음). `get_published_post_by_slug`에
+`channel='lens'` 전용 분기를 추가해 발행물의 모든 렌디션을
+`shape_lens()`가 기대하는 형태로 조립하도록 수정, 프로덕션 배포(22개
+함수) 완료. 상세:
+`docs/architecture/db-changelog/postgres/v1.17-lens-단건조회-조립.md`.
+
+**현재 상태**: 남은 항목은 (1) lens 채널 목록 조회는 여전히 메타데이터
+위주(별도 후속), (2) 관점 라벨 48건은 구조적으로 "레터 1개 안의 4문단"
+으로만 표현 가능(v1.12부터의 근본 한계, 재현 불가), (3)
+`CMS_DB_BACKEND=postgres` 전환 스위치 시점 결정 — 이 셋뿐이다.

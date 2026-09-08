@@ -47,6 +47,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.14 — pg8000 전환분 프로덕션 배포](postgres/v1.14-pg8000-배포.md) |
 | 2026-09-09 | postgres | [v1.15 — publication_slug_history 백필 + slug 폴백](postgres/v1.15-slug-history-백필.md) |
 | 2026-09-09 | postgres | [v1.16 — slug 조회 channel 기반 포맷 disambiguation](postgres/v1.16-slug-channel-disambiguation.md) |
+| 2026-09-09 | postgres | [v1.17 — lens 단건 조회 렌디션 조립](postgres/v1.17-lens-단건조회-조립.md) |
 
 ## 새 항목 추가 규칙
 
