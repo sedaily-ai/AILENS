@@ -402,15 +402,107 @@ def draw_closing_caption(img: Image.Image, text: str):
     _draw_pill(img, lines, font, y0, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.6, max_radius=40)
 
 
+# ─────────────────────────────────────────────────────────────
+# 아이콘 배지 — 2026-09-09 신설(캡션 박스 옆 픽토그램, 원본 레퍼런스
+# 샘플 §셀프피드백 참고). PIL 도형만으로 그린다 — AI 이미지 생성에
+# 맡기면 지금까지 이 세션 내내 겪은 "요청 안 한 텍스트/디테일이
+# 불안정하게 나오는" 문제가 아이콘에도 그대로 재현될 것이므로, 텍스트와
+# 같은 이유로 결정적(deterministic)인 PIL 드로잉을 쓴다.
+# ─────────────────────────────────────────────────────────────
+_ICON_BADGE_FILL = _NAVY_FILL
+_ICON_STROKE = (255, 255, 255)
+_ICON_STROKE_W = 5
+
+# 캡션 텍스트에 등장하는 키워드 → 아이콘 이름. 순서가 우선순위(위에서부터
+# 먼저 매치되는 걸 씀) — 화폐 단위가 가장 흔하고 구체적이라 최우선.
+_ICON_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    ("money", ("유로", "달러", "원", "억", "조", "투자", "예산", "세액공제", "지원금")),
+    ("handshake", ("협약", "협정", "체결", "서명", "공동제작", "×", "협력", "MOU")),
+    ("calendar", ("년간", "년 안", "개월", "기한", "시한", "차년도")),
+    ("film", ("영화", "영상", "콘텐츠", "제작", "촬영", "리메이크", "IP")),
+    ("globe", ("국가", "개국", "글로벌", "해외", "세계", "국제", "다자")),
+    ("chart", ("증가", "확대", "성장", "규모", "흔들리고", "전환기")),
+]
+
+
+def _pick_icon_for_caption(text: str) -> str | None:
+    for icon, keywords in _ICON_KEYWORDS:
+        if any(k in text for k in keywords):
+            return icon
+    return None
+
+
+def _draw_icon_badge(img: Image.Image, icon: str, x0: float, y0: float, d: float):
+    """(x0, y0)를 좌상단으로 하는 d×d 정사각형 안에 색상 원 배지 + 흰색
+    픽토그램을 그린다."""
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([x0, y0, x0 + d, y0 + d], fill=_ICON_BADGE_FILL)
+    cx, cy = x0 + d / 2, y0 + d / 2
+    r = d * 0.32  # 픽토그램이 원 안에서 차지할 반경 기준
+
+    if icon == "money":
+        # 겹친 동전 두 개(타원)
+        for dy in (-r * 0.35, r * 0.35):
+            draw.ellipse([cx - r, cy + dy - r * 0.42, cx + r, cy + dy + r * 0.42], outline=_ICON_STROKE, width=_ICON_STROKE_W)
+    elif icon == "handshake":
+        # 2026-09-09 — 처음엔 지그재그 선으로 "악수"를 표현했는데 실측
+        # 확인 결과 형체를 못 알아봄. "서명된 계약서"(문서+체크마크)로
+        # 바꿈 — 협약·협정·체결 의미를 더 명확하게 전달.
+        draw.rounded_rectangle([cx - r * 0.75, cy - r, cx + r * 0.75, cy + r], radius=r * 0.12, outline=_ICON_STROKE, width=_ICON_STROKE_W)
+        for ly in (-r * 0.5, -r * 0.1, r * 0.3):
+            draw.line([cx - r * 0.4, cy + ly, cx + r * 0.4, cy + ly], fill=_ICON_STROKE, width=3)
+        draw.ellipse([cx + r * 0.15, cy + r * 0.15, cx + r * 1.15, cy + r * 1.15], fill=_ICON_BADGE_FILL, outline=_ICON_STROKE, width=4)
+        draw.line([cx + r * 0.4, cy + r * 0.65, cx + r * 0.6, cy + r * 0.85, cx + r * 0.95, cy + r * 0.4],
+                  fill=_ICON_STROKE, width=5, joint="curve")
+    elif icon == "calendar":
+        draw.rounded_rectangle([cx - r, cy - r * 0.75, cx + r, cy + r], radius=r * 0.2, outline=_ICON_STROKE, width=_ICON_STROKE_W)
+        draw.line([cx - r, cy - r * 0.15, cx + r, cy - r * 0.15], fill=_ICON_STROKE, width=3)
+        draw.line([cx - r * 0.5, cy - r * 1.1, cx - r * 0.5, cy - r * 0.6], fill=_ICON_STROKE, width=4)
+        draw.line([cx + r * 0.5, cy - r * 1.1, cx + r * 0.5, cy - r * 0.6], fill=_ICON_STROKE, width=4)
+    elif icon == "film":
+        draw.rounded_rectangle([cx - r, cy - r * 0.75, cx + r, cy + r * 0.75], radius=r * 0.15, outline=_ICON_STROKE, width=_ICON_STROKE_W)
+        for fx in (cx - r * 0.6, cx, cx + r * 0.6):
+            draw.rectangle([fx - r * 0.12, cy - r * 0.75, fx + r * 0.12, cy - r * 0.5], fill=_ICON_STROKE)
+            draw.rectangle([fx - r * 0.12, cy + r * 0.5, fx + r * 0.12, cy + r * 0.75], fill=_ICON_STROKE)
+    elif icon == "globe":
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=_ICON_STROKE, width=_ICON_STROKE_W)
+        draw.ellipse([cx - r * 0.4, cy - r, cx + r * 0.4, cy + r], outline=_ICON_STROKE, width=3)
+        draw.line([cx - r, cy, cx + r, cy], fill=_ICON_STROKE, width=3)
+    elif icon == "chart":
+        base_y = cy + r * 0.7
+        for i, h in enumerate((0.5, 0.9, 1.3)):
+            bx = cx - r * 0.7 + i * r * 0.7
+            draw.rectangle([bx - r * 0.22, base_y - r * h, bx + r * 0.22, base_y], fill=_ICON_STROKE)
+
+
 def draw_caption(img: Image.Image, text: str):
-    """작은 캡션 박스 — 좌하단, 수치·팩트 표기용."""
+    """작은 캡션 박스 — 좌하단, 수치·팩트 표기용.
+
+    2026-09-09 — 사용자가 공유한 원본 GPT-image 레퍼런스 샘플을 다시
+    대조한 결과(셀프피드백), 우리 파이프라인엔 원본에 있던 "아이콘
+    배지"(카메라·돈·악수 등 작은 픽토그램이 색상 원 안에 들어간 것)가
+    완전히 빠져 있었다 — 이게 원본의 정보 밀도·시각적 재미를 만드는
+    핵심 요소 중 하나였는데, AI 이미지 생성 품질과는 별개인 순수
+    레이아웃 요소라 새 이미지 모델 호출 없이 PIL로 바로 추가 가능하다.
+    caption 텍스트에서 키워드를 찾아 어울리는 아이콘을 캡션 박스 왼쪽에
+    붙인다(_pick_icon_for_caption 참고) — 매치되는 키워드가 없으면
+    아이콘 없이 기존과 동일하게 그린다(안전한 폴백)."""
     draw = ImageDraw.Draw(img)
     font = _font(26)
     max_width = int(img.width * 0.5)
     lines = _wrap_text(draw, text, font, max_width)
     block_w, block_h = _measure_block(draw, lines, font)
     bw, bh = block_w + _PADDING * 2, block_h + _PADDING * 2
-    x0, y0 = 24, img.height - bh - 24
+
+    icon = _pick_icon_for_caption(text)
+    badge_d = bh  # 배지 지름을 캡션 박스 높이에 맞춘다
+    badge_gap = 12 if icon else 0
+    x0 = 24 + (badge_d + badge_gap if icon else 0)
+    y0 = img.height - bh - 24
+
+    if icon:
+        _draw_icon_badge(img, icon, 24, y0, badge_d)
+
     draw.rectangle([x0, y0, x0 + bw, y0 + bh], fill=(255, 255, 255, 235), outline=_BUBBLE_OUTLINE, width=3)
     ty = y0 + _PADDING
     for ln in lines:
