@@ -262,3 +262,19 @@ v1.10에서 남긴 알려진 한계 3건을 순서대로 해소:
 Postgres 경로는 계속 dormant. 남은 항목은
 `docs/architecture/db-changelog/postgres/v1.15-slug-history-백필.md`
 "남은 미해결" 참조.
+
+## 후속 실행 기록 4 (2026-09-09) — slug channel disambiguation까지 v1.13 미해결 항목 전부 해소
+
+v1.13이 남긴 두 번째 미해결 항목("프론트가 실제로 채널별 slug를 URL에
+쓰는지 확인 필요")을 조사 에이전트로 확인 — 프론트엔드는 채널마다
+별도 라우트(`webtoon/[slug]`, `video/[slug]` 등)를 쓰고 단건 조회마다
+항상 `?channel=`을 붙인다는 것, 그리고 채널 간 slug를 섞어 쓰다 문제가
+됐던 과거 사례(2026-08-23 `lensMediaFeed.ts` 삭제)까지 확인. 이 정보로
+`get_published_post_by_slug()`가 `channel`을 받아 해당 포맷 렌디션으로
+필터링하도록 수정, 매칭 실패 시 기존 임의 선택으로 안전하게 폴백하도록
+구현. 프로덕션 배포(22개 함수) 완료, 실 API 정상 확인. 상세:
+`docs/architecture/db-changelog/postgres/v1.16-slug-channel-disambiguation.md`.
+
+이로써 v1.13이 남긴 미해결 항목 2건(slug 유실, 포맷 disambiguation)
+전부 해소됨. 남은 건 'lens' 채널의 4-포맷 통합 응답 재설계(v1.12
+문서화, 별도 범위)와 `CMS_DB_BACKEND` 전환 스위치 시점 결정뿐이다.
