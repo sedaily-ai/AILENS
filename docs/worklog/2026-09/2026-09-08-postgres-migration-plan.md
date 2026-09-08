@@ -235,3 +235,30 @@ article_categories, 뱃지·커뮤니티 게시판, newsletter 구독자)를 순
 넘기는 스위치는 v1.10에 기록된 알려진 한계(lens lenses[] 미이관, psycopg2
 Lambda 패키징 필요, 데이터 최신성 격차)를 먼저 해결한 뒤 별도로 결정할
 것.
+
+## 후속 실행 기록 3 (2026-09-09) — lens 백필, pg8000 전환, slug 백필까지 순차 완료
+
+v1.10에서 남긴 알려진 한계 3건을 순서대로 해소:
+
+1. **lens 콘텐츠 백필**(v1.12): `lenses[]`의 두 가지 라벨 체계(포맷명
+   vs "시선 N" 관점명)를 구분해 renditions로 재구성. 렌디션 0건인
+   publications 50건 → 0건.
+2. **psycopg2→pg8000 전환**(v1.13): Lambda 배포 패키지에 psycopg2-binary가
+   없어 켜면 즉시 ImportError였던 문제 해소, deploy.sh 변경 불필요.
+   같은 조사 중 `publications.slug` 유일성으로 형제 채널 slug가 유실된
+   사실 발견(마이그레이션 그룹핑 로직상 불가피했던 선택의 부작용).
+   프로덕션 배포(22개 함수) 완료 — v1.14.
+3. **publication_slug_history 백필**(v1.15): v1.13에서 발견한 슬롱 유실을
+   해소. DynamoDB cms-posts를 마이그레이션과 동일한 로직으로 재그룹핑해
+   형제 채널 slug 2,495건을 `publication_slug_history`에 채워 넣고,
+   `get_published_post_by_slug()`가 직접 조회 실패 시 이 테이블로
+   폴백하도록 확장. 프로덕션 배포(22개 함수) 완료, 실 API 정상 확인.
+
+이 세 건으로 v1.10 시점에 문서화됐던 "알려진 한계" 전부 해소됨(단,
+포맷 구분 없는 임의 렌디션 선택 문제는 v1.13에서 이미 분리해둔 별도
+후속 과제로 남음 — 프론트엔드 slug 라우팅 확인 필요).
+
+**현재 상태**: `CMS_DB_BACKEND=postgres`는 여전히 어디에도 설정 안 됨 —
+Postgres 경로는 계속 dormant. 남은 항목은
+`docs/architecture/db-changelog/postgres/v1.15-slug-history-백필.md`
+"남은 미해결" 참조.
