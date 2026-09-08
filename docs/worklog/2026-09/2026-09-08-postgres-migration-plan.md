@@ -290,7 +290,18 @@ v1.13이 남긴 두 번째 미해결 항목("프론트가 실제로 채널별 sl
 함수) 완료. 상세:
 `docs/architecture/db-changelog/postgres/v1.17-lens-단건조회-조립.md`.
 
-**현재 상태**: 남은 항목은 (1) lens 채널 목록 조회는 여전히 메타데이터
-위주(별도 후속), (2) 관점 라벨 48건은 구조적으로 "레터 1개 안의 4문단"
-으로만 표현 가능(v1.12부터의 근본 한계, 재현 불가), (3)
-`CMS_DB_BACKEND=postgres` 전환 스위치 시점 결정 — 이 셋뿐이다.
+## 후속 실행 기록 6 (2026-09-09) — lens 목록 조회 라벨 추가, 알려진 gap 전부 해소
+
+lens 채널 목록 조회(`list_published_posts`)도 여전히 NULL 하드코딩으로
+모든 렌디션 정보를 배제하고 있던 것을 발견 — 목록은
+`shape_lens_summary()`가 label/question/bullets만 쓰므로, 발행물별 전체
+콘텐츠 조립(N+1 위험) 대신 `renditions WHERE publication_id = ANY(%s)`
+단일 배치 쿼리로 라벨만 붙이도록 수정. 프로덕션 배포(22개 함수) 완료,
+20건 전부 라벨 채워짐 실측 확인. 상세:
+`docs/architecture/db-changelog/postgres/v1.18-lens-목록조회-라벨.md`.
+
+**현재 상태**: 남은 항목은 (1) 관점 라벨 48건은 구조적으로 "레터 1개
+안의 4문단"으로만 표현 가능(v1.12부터의 근본 한계, 재현 불가), (2)
+`CMS_DB_BACKEND=postgres` 전환 스위치 시점 결정 — 이 둘뿐이다. 이
+시점에서 Postgres 백엔드가 가진 알려진 기능적 gap은 사실상 모두
+해소됐다.

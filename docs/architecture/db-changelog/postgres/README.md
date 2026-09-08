@@ -26,6 +26,7 @@ DynamoDB에서 PostgreSQL로 이관하기 위한 스키마 설계가 어떤 순�
 | [v1.15](v1.15-slug-history-백필.md) | 2026-09-09 | publication_slug_history 백필(2,495건) + slug 폴백 조회 구현·배포 — v1.13 미해결 항목 해소 |
 | [v1.16](v1.16-slug-channel-disambiguation.md) | 2026-09-09 | get_published_post_by_slug에 channel 기반 포맷 disambiguation 추가·배포 — v1.13 두 번째 미해결 항목 해소 |
 | [v1.17](v1.17-lens-단건조회-조립.md) | 2026-09-09 | lens 채널 단건 조회가 v1.12 백필분을 실제로 조립해 반환하도록 수정·배포 |
+| [v1.18](v1.18-lens-목록조회-라벨.md) | 2026-09-09 | lens 채널 목록 조회에 렌디션 라벨 배치 조회 추가·배포 — 알려진 postgres 기능 gap 모두 해소 |
 
 새 버전을 추가할 땐 `vX.Y-주제.md` 파일을 만들고 이 표에 한 줄, 그리고
 앞뒤 버전 파일의 "이전/다음" 링크도 같이 갱신한다.
