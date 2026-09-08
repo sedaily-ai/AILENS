@@ -416,9 +416,18 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 else:
                     prompt = build_background_prompt(s["camera"], s["scene"], characters)
                     generate_fn = generate_image_bedrock
+                # 2026-09-09(R17) — 배경 인물 초과 체크(_MAX_EXPECTED_FACES)를
+                # 원래 "대사 있는 컷만"으로 한정했는데, 컷1(표지)은 대사가
+                # 없어서 이 게이트를 안 타 인물 수가 계속 불안정했다(R10~R12
+                # 관찰). 컷1은 대사가 없어도 항상 A/B 두 주인공을 표지에
+                # 담으려는 의도라 — 대본이 "인물 없음"을 명시한 경우는 이미
+                # no_people_expected 판정이 따로 걸러주므로, 컷1도 이 게이트
+                # 대상에 포함해도 안전하다(작게 스쳐가는 배경 군중은 여전히
+                # 신뢰도·크기 기준 미달이라 안 걸림 — _MAX_EXPECTED_FACES
+                # 주석 참고).
                 ok, _verdict, faces = _generate_and_qa_cut(
                     prompt, img_path, s["scene"], tag, n, generate_fn,
-                    has_dialogue=bool(cut.get("dialogue")),
+                    has_dialogue=bool(cut.get("dialogue")) or n == 1,
                 )
                 if ok:
                     # 2026-09-08 — 얼굴 위치는 QA 비전 모델(verdict)이 아니라
