@@ -152,3 +152,22 @@
 검증 결과: 기본 테이블 50개(설계와 일치), bigm 인덱스 10개, 역할 3개 +
 컬럼별 권한 정확히 반영, `view_events`/`ai_usage_logs` 파티션 설정
 (90일/무기한) 확인. 모두 psycopg2로 직접 조회해 확인 — 가정하지 않음.
+
+## §3 실행 기록 (2026-09-08) — 데이터 마이그레이션
+
+Plan Mode에서 Explore 에이전트 3개로 9개 DynamoDB 테이블의 이관 대상/
+제외를 코드 근거로 확정한 뒤 실행(승인된 계획: `/Users/yeong-gwang/
+.claude/plans/adaptive-napping-quasar.md`). 실행 중 cms-posts가
+source_url 기준으로 여러 채널에 걸쳐 반복됨을 발견해 그룹핑 방식으로
+계획을 수정. 결과: `publications` 986, `renditions` 2,520,
+`webtoon_panels` 6,768, `media_assets` 1,607, `rendition_blocks` 177,
+`articles` 18,114(메타데이터만), `users` 11, `user_archives` 11,
+`quizzes` 3, `quiz_options` 12. FK 무결성·테스트픽스처 유입·
+`v_live_renditions` 뷰 동작 전부 실측 검증 완료. 상세는
+`docs/architecture/db-changelog/postgres/v1.4-데이터-마이그레이션-실행.md`.
+
+**작업 중 이슈**: 로컬 네트워크 공인 IP가 세션 도중 3회 변경돼(58.234.10.40
+→ 117.111.5.144 → 219.248.162.147) 보안그룹 규칙을 그때마다 갱신해야
+했음. 장시간 단일 트랜잭션으로 처리하던 cms-posts 스크립트가 연결 끊김으로
+1회 실패 — 50그룹 단위 중간 커밋 + `ON CONFLICT ... DO UPDATE RETURNING`
+패턴으로 재실행 시 안전하게 이어지도록 수정 후 재실행해 해결.
