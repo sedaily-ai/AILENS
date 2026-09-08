@@ -37,6 +37,24 @@ _MAX_BUBBLE_WIDTH_RATIO = 0.42  # 이미지 너비의 42%를 넘기지 않고 �
 # "navy blue, sky blue, red" 강조색 팔레트와 맞춘다.
 _NAVY_FILL = (26, 41, 74)
 _NAVY_TEXT_FILL = (255, 255, 255)
+# 2026-09-08(2차) — 참고 이미지(사용자가 카카오톡으로 공유한 "기존 톤앤매너"
+# 샘플, 육하원칙 프롬프트 문서 §13 색상표와 동일) 대조 후 추가 — 컷별 제목
+# 색상이 짙은 빨강/짙은 남색을 번갈아 쓴다.
+_RED_FILL = (178, 34, 42)
+_RED_TEXT_FILL = (255, 255, 255)
+_HEADLINE_FILL = (255, 255, 255)
+_HEADLINE_TEXT_FILL = (20, 20, 20)
+
+# 컷 번호 → 제목 알약 색상. §13 디자인 규격 표 그대로(1은 별도 표지 처리라
+# 여기 없음). 정의 안 된 컷 번호는 빨강으로 폴백.
+_TITLE_COLOR_BY_CUT = {2: _RED_FILL, 3: _RED_FILL, 4: _NAVY_FILL, 5: _RED_FILL, 6: _NAVY_FILL, 7: _RED_FILL, 8: _RED_FILL}
+
+
+def title_fill_for_cut(cut_number: int | None) -> tuple[int, int, int]:
+    """컷 번호별 제목 알약 색상(§13 표). compose()가 draw_title() 호출 시 쓴다."""
+    if cut_number is None:
+        return _RED_FILL
+    return _TITLE_COLOR_BY_CUT.get(cut_number, _RED_FILL)
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont:
@@ -186,13 +204,16 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], face_x: list[float] | 
         _draw_bubble(img, d["line"], tone, anchor_x, top_y)
 
 
-def draw_title(img: Image.Image, text: str):
+def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_FILL):
     """상단 제목 알약형 라벨 — 2026-09-08 신설(육하원칙 기반 웹툰 프롬프트
     문서 검토 후 도입). 기존 draw_caption(좌하단 수치용)·draw_narration
     (하단 다큐 타이틀 카드)과 역할이 다르다 — 모든 컷 상단에 고정 배치돼
     "제목만 순서대로 읽어도 이야기 흐름이 드러나야 한다"(published.md
     "상단 제목" 절)를 담당한다. 한 줄(12자 이내 규칙)을 전제로 폭을
-    넉넉히 잡는다 — 넘치면 줄바꿈되지만 자간이 빡빡해질 뿐 잘리지 않는다."""
+    넉넉히 잡는다 — 넘치면 줄바꿈되지만 자간이 빡빡해질 뿐 잘리지 않는다.
+
+    fill — 2026-09-08(2차, 참고 이미지 대조 후) 컷별 색상 파라미터화.
+    compose()가 title_fill_for_cut()으로 계산한 색을 넘긴다(§13 색상표)."""
     draw = ImageDraw.Draw(img)
     font = _font(30)
     max_width = int(img.width * 0.6)
@@ -206,11 +227,68 @@ def draw_title(img: Image.Image, text: str):
     y0 = img.height * 0.03
     x1 = x0 + bw
     y1 = y0 + bh
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=bh / 2, fill=_NAVY_FILL)
+    draw.rounded_rectangle([x0, y0, x1, y1], radius=bh / 2, fill=fill)
     ty = y0 + (bh - block_h) / 2
     for ln in lines:
         tw = draw.textlength(ln, font=font)
         draw.text(((img.width - tw) / 2, ty), ln, font=font, fill=_NAVY_TEXT_FILL)
+        ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
+
+
+def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str | None = None):
+    """컷1 전용 표지 헤더 — 2026-09-08 신설. 사용자가 공유한 참고 샘플과
+    육하원칙 프롬프트 문서 §13 "컷1 표지" 규격을 그대로 따른다:
+    (1) 화면 최상단에 작은 짙은 남색 알약형 브랜드 라벨("서울경제 웹툰"),
+    (2) 그 아래 큼직한 흰색 둥근 헤드라인 박스 — 검은 굵은 글씨, keyword가
+    headline 안에서 발견되면 그 부분만 짙은 빨간색으로 강조.
+
+    draw_title()과 별개 함수인 이유: draw_title()은 컷2~8의 작은 단색
+    알약(§13 "컷2~8 상단 제목")이고, 이건 컷1 전용 2단 구성이라 레이아웃과
+    강조색 처리 로직 자체가 다르다 — compose()가 cut==1일 때만 이걸 부른다."""
+    draw = ImageDraw.Draw(img)
+
+    # 1) 브랜드 라벨(작은 남색 알약)
+    brand_font = _font(24)
+    bw_ = draw.textlength(brand, font=brand_font)
+    bh_ = draw.textbbox((0, 0), brand, font=brand_font)[3]
+    pad_b = 16
+    bx0 = (img.width - (bw_ + pad_b * 2)) / 2
+    by0 = img.height * 0.025
+    bx1 = bx0 + bw_ + pad_b * 2
+    by1 = by0 + bh_ + pad_b * 1.1
+    draw.rounded_rectangle([bx0, by0, bx1, by1], radius=(by1 - by0) / 2, fill=_NAVY_FILL)
+    draw.text((bx0 + pad_b, by0 + (by1 - by0 - bh_) / 2), brand, font=brand_font, fill=_NAVY_TEXT_FILL)
+
+    # 2) 헤드라인 박스(큰 흰색 둥근 사각형, keyword만 빨강)
+    font = _font(46)
+    max_width = int(img.width * 0.7)
+    lines = _wrap_text(draw, headline, font, max_width)[:2]
+    if not lines:
+        return
+    block_w, block_h = _measure_block(draw, lines, font)
+    hw = block_w + _PADDING * 3
+    hh = block_h + _PADDING * 2.4
+    hx0 = (img.width - hw) / 2
+    hy0 = by1 + img.height * 0.02
+    hx1 = hx0 + hw
+    hy1 = hy0 + hh
+    draw.rounded_rectangle([hx0, hy0, hx1, hy1], radius=min(hh / 2, 44), fill=_HEADLINE_FILL, outline=(210, 210, 210), width=2)
+
+    ty = hy0 + (hh - block_h) / 2
+    for ln in lines:
+        tw = draw.textlength(ln, font=font)
+        tx = (img.width - tw) / 2
+        if keyword and keyword in ln:
+            before, _, after = ln.partition(keyword)
+            kw_w = draw.textlength(keyword, font=font)
+            cx = tx
+            draw.text((cx, ty), before, font=font, fill=_HEADLINE_TEXT_FILL)
+            cx += draw.textlength(before, font=font)
+            draw.text((cx, ty), keyword, font=font, fill=_RED_FILL)
+            cx += kw_w
+            draw.text((cx, ty), after, font=font, fill=_HEADLINE_TEXT_FILL)
+        else:
+            draw.text((tx, ty), ln, font=font, fill=_HEADLINE_TEXT_FILL)
         ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
 
 
@@ -293,10 +371,17 @@ def compose(img_path: Path, cut: dict, face_x: list[float] | None = None):
     둘 다 하단 텍스트 요소라 시각적으로 겹친다 — closing_caption이 있으면
     (컷8) 그걸 쓰고 narration은 무시한다(published.md 규칙상 컷8은 둘 중
     closing_caption만 쓰도록 스크립트 단계에서 이미 나뉘어 있어야 하지만,
-    방어적으로 여기서도 우선순위를 명시)."""
+    방어적으로 여기서도 우선순위를 명시).
+
+    2026-09-08(2차) — 컷1은 draw_title() 대신 draw_cover_header()("서울경제
+    웹툰" 브랜드 라벨 + 헤드라인 박스)를 쓴다. 컷2~8은 title_fill_for_cut()
+    으로 계산한 §13 색상표 색을 draw_title()에 넘긴다."""
     img = Image.open(img_path).convert("RGB")
-    if cut.get("title"):
-        draw_title(img, cut["title"])
+    cut_no = cut.get("cut")
+    if cut_no == 1 and cut.get("title"):
+        draw_cover_header(img, "서울경제 웹툰", cut["title"], cut.get("title_keyword"))
+    elif cut.get("title"):
+        draw_title(img, cut["title"], fill=title_fill_for_cut(cut_no))
     if cut.get("dialogue"):
         draw_dialogue(img, cut["dialogue"], face_x)
     if cut.get("caption"):
