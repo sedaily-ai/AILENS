@@ -666,12 +666,15 @@ def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
     반환한다(R15). subjects가 "A"/"B"(한 명만 크게 나오는 컷)면 GPU
     IP-Adapter로 그 인물의 참조 얼굴을 고정한 사진을 만든다(캐릭터 일관성
     #15 근본 해법, gpu_ipadapter.py 모듈 docstring 참고). "BOTH"(두 사람
-    같이 나오는 컷)면 각자 따로 IP-Adapter로 고정 생성한 뒤 합성한다
-    (generate_dual_character_init_bytes(), R18 — 다중 인물 identity-lock은
-    범위 밖이라고 R15에서 미뤘던 걸 "각자 생성→합성" 구조로 해결). 세
-    경로 다 마지막은 동일하게 Style Transfer로 화풍을 입힌다 — BOTH
-    경로에서는 이 마지막 Style Transfer가 합성 이음매를 자연스럽게
-    재조정해주는 부수 효과도 있음을 실측으로 확인(라운드기록.md R18)."""
+    같이 나오는 컷)는 참조 없는 포토리얼 생성으로 떨어진다.
+
+    "BOTH" 컷도 각자 생성→합성하는 실험(generate_dual_character_init_bytes(),
+    R18)을 시도했으나 실전 8컷 재검증(v13)에서 재현성이 없어 기본
+    경로에서는 뺐다 — Style Transfer의 무작위성 때문에 두 사람이 뚜렷이
+    분리되는 결과도 나오지만, 옷 색깔이 반반 섞이는 등 하나로 뭉개지는
+    결과도 자주 나옴(같은 코드·같은 입력으로도 실행마다 다름). 함수
+    자체는 남겨뒀다 — 재현성 문제를 더 다듬으면(예: 재시도 후 얼굴 수
+    QA로 걸러내기) 다시 켤 수 있음(라운드기록.md R18~R19 참고)."""
     camera, scene = _parse_style_transfer_scene_input(scene_input)
     subjects, brief = translate_scene_to_photo_brief(camera, scene)
     if subjects in ("A", "B"):
@@ -679,11 +682,6 @@ def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
 
         init_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(brief, subjects)
         return generate_bedrock_style_transfer_bytes(init_bytes)
-    elif subjects == "BOTH":
-        init_bytes = generate_dual_character_init_bytes(brief)
-        # composition_fidelity를 기본값(0.9)보다 낮춰 이음매를 더 적극
-        # 재조정하게 한다(모듈 docstring 참고, 실측으로 0.75가 자연스러웠음).
-        return generate_bedrock_style_transfer_bytes(init_bytes, composition_fidelity=0.75, change_strength=0.85)
     else:
         init_prompt = build_photoreal_init_prompt(brief)
         init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
