@@ -60,17 +60,30 @@ N_CUTS = 8
 
 # "openai"(원래 GPT 경로, 말풍선까지 이미지 모델이 그림) | "bedrock"(Stable
 # Image Core, 순수 텍스트 프롬프트) | "bedrock-style-guide"(Stable Image
-# Style Guide, 참고 이미지로 화풍 고정 — 2026-09-08 신설, 기본값으로 승격).
-# 셋 다 텍스트는 compose_text.py가 합성(openai만 예외 — 모델이 직접 그림).
+# Style Guide, 참고 이미지로 화풍 고정) | "bedrock-style-transfer"(구도-화풍
+# 분리 3단계 — 2026-09-08 신설, 기본값으로 승격). 넷 다 텍스트는
+# compose_text.py가 합성(openai만 예외 — 모델이 직접 그림).
 #
 # bedrock → bedrock-style-guide 전환 경위: 사용자가 공유한 참고 샘플과
 # 대조한 결과 Stable Image Core 순수 텍스트 프롬프트는 "cel-shaded, NOT
 # photorealistic"을 명시해도 반실사 디지털 페인팅으로 나오는 화풍 자체의
 # 한계가 있었다. Style Guide는 참고 이미지(webtoon_image.py의
-# STYLE_REFERENCE_IMAGE_PATH)로 화풍을 고정해 실측상 훨씬 근접했다 — 사용자가
-# OpenAI 대신 Stable Diffusion 계열 유지를 명시적으로 결정했으므로(2026-09-08),
-# 그 제약 안에서 참고 샘플에 가장 가까운 이 경로를 기본값으로 삼는다.
-IMAGE_PROVIDER = "bedrock-style-guide"
+# STYLE_REFERENCE_IMAGE_PATH)로 화풍을 고정해 실측상 훨씬 근접했다.
+#
+# bedrock-style-guide → bedrock-style-transfer 전환 경위(R9~R11,
+# 라운드기록.md 참고) — Style Guide는 화풍+장면을 한 프롬프트에 동시에
+# 요구해서 [SCENE]이 "카페"라고 해도 계속 참고 이미지의 배경(영화
+# 촬영장)으로 쏠렸다(#4). negative_prompt로 완화해봤지만 확률적이었고,
+# R11에서 "화풍 지정 없이 사진처럼 요청하면 같은 모델이 장소 지시를
+# 정확히 따른다"는 걸 실측 확인 — 문제는 장소 이해력이 아니라 화풍+장면
+# 동시 요구 자체였다. webtoon_image.generate_bedrock_composed_image()가
+# (1)한국어 장면→영어 사진 브리핑 번역 (2)포토리얼 사진 생성 (3)Style
+# Transfer로 화풍만 덧입히기 3단계로 이 둘을 분리한다. 사용자가 OpenAI
+# 대신 Stable Diffusion 계열 유지를 명시적으로 결정했으므로(2026-09-08),
+# 그 제약 안에서 지금까지 중 [SCENE] 이행력이 가장 좋은 이 경로를
+# 기본값으로 삼는다. 컷당 Bedrock 호출이 1~2회→3회로 늘어 비용·시간이
+# 늘어나는 트레이드오프가 있다.
+IMAGE_PROVIDER = "bedrock-style-transfer"
 
 # 2026-09-05 — 여기 있던 _characters_block/_SCENE_REINFORCEMENT/
 # _CHARACTER_REINFORCEMENT/build_background_prompt/BEDROCK_IMAGE_REGION/
@@ -83,8 +96,10 @@ IMAGE_PROVIDER = "bedrock-style-guide"
 from webtoon_image import (
     build_background_prompt,
     build_style_guide_prompt,
+    build_style_transfer_scene_input,
     generate_bedrock_image as generate_image_bedrock,
     generate_bedrock_style_guide_image as generate_image_bedrock_style_guide,
+    generate_bedrock_composed_image as generate_image_bedrock_style_transfer,
     characters_block as _characters_block,
     SCENE_REINFORCEMENT as _SCENE_REINFORCEMENT,
     CHARACTER_REINFORCEMENT as _CHARACTER_REINFORCEMENT,
@@ -376,8 +391,11 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             continue
         s = scene_map[n]
         print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
-        if IMAGE_PROVIDER in ("bedrock", "bedrock-style-guide"):
-            if IMAGE_PROVIDER == "bedrock-style-guide":
+        if IMAGE_PROVIDER in ("bedrock", "bedrock-style-guide", "bedrock-style-transfer"):
+            if IMAGE_PROVIDER == "bedrock-style-transfer":
+                prompt = build_style_transfer_scene_input(s["camera"], s["scene"])
+                generate_fn = generate_image_bedrock_style_transfer
+            elif IMAGE_PROVIDER == "bedrock-style-guide":
                 prompt = build_style_guide_prompt(s["camera"], s["scene"])
                 generate_fn = generate_image_bedrock_style_guide
             else:

@@ -502,3 +502,150 @@ def generate_bedrock_style_guide_image(prompt: str, out_path: Path, retries: int
     """generate_bedrock_image()와 동일한 파일-쓰기 + 재시도 래퍼(Style Guide 버전,
     _retry_generate_and_write() 공유)."""
     return _retry_generate_and_write(lambda: generate_bedrock_style_guide_image_bytes(prompt), out_path, retries)
+
+
+# ─────────────────────────────────────────────────────────────
+# 구도-화풍 분리 파이프라인 (2026-09-08, R11) — #4(장면 이행력) 근본 해결
+# ─────────────────────────────────────────────────────────────
+#
+# 배경: Style Guide/Core 둘 다 "플랫 셀 웹툰체" 같은 화풍 지정과 [SCENE]의
+# 구체적 장소(카페·사무실 등)를 한 프롬프트에 동시에 요구하면 장소 지시를
+# 거의 무시하고 특정 배경(번화가 거리+군중)으로 쏠렸다(라운드기록.md R9).
+# 그런데 화풍 지정 없이 "사진처럼" 요청하면 같은 모델이 장소 지시를
+# 놀랍도록 정확히 따른다는 걸 R11에서 실측 확인 — 문제는 모델의 장소
+# 이해력이 아니라 "화풍+장면"을 동시에 요구하는 것 자체였다.
+#
+# 그래서 3단계로 나눈다:
+#   1) translate_scene_to_photo_brief() — 한국어 [SCENE]/[CAMERA]를 짧은
+#      영어 사진 브리핑으로 압축(Claude 텍스트 호출, 이미 1·2단계에 쓰는
+#      모델 재사용). 한국어 원문을 "사진처럼" 프롬프트에 그대로 섞으면
+#      Bedrock 콘텐츠 필터에 비결정적으로 걸리는 걸 실측으로 발견했다
+#      (동일 장면을 영어 브리핑 없이 여러 문장 구조로 시도 → 6/7 실패,
+#      번역 브리핑을 쓴 뒤로는 안정적으로 통과) — 필터 회피 목적도 겸한다.
+#   2) generate_bedrock_photoreal_image_bytes() — 이 브리핑으로 순수
+#      포토리얼 사진(Stable Image Core)을 생성. 화풍 지정이 없어서 장소·
+#      인원수 지시를 잘 따른다.
+#   3) generate_bedrock_style_transfer_bytes() — 그 사진을 init_image로,
+#      기존 webtoon_style_reference.png를 style_image로 Style Transfer
+#      호출 — 구도(장소+인원수)는 그대로 두고 화풍만 지금 확립한 플랫
+#      셀 웹툰체로 덧입힌다.
+#
+# 세 호출 다 실패하면 예외를 던져 _retry_generate_and_write()가 전체를
+# 재시도한다(부분 재시도는 안 함 — 어느 단계가 실패했든 처음부터 다시
+# 하는 게 상태 추적 복잡도를 피하는 더 단순한 선택).
+STYLE_TRANSFER_MODEL_ID = "us.stability.stable-style-transfer-v1:0"  # us-east-1
+# 프로파일 태그 없이 베어 모델 ID를 그대로 쓴다 — 2026-09-08 현재 이
+# 서비스군(Stability Image Services 13종)에 application inference profile이
+# 아직 안 뜬다(콘솔 확인). 정식 편입 전 비용태깅 상태를 재확인할 것
+# (docs/architecture/비용태깅_규칙.md).
+
+_SCENE_TRANSLATE_MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46 재사용
+
+_SCENE_TRANSLATE_SYSTEM = (
+    "You compress a Korean scene description into a short English photo-shoot brief "
+    "for a real photographer. Output plain English only, 2-3 sentences, under 60 words. "
+    "Describe the location, setting, mood, and camera framing as if directing a real "
+    "documentary photo shoot with two people (a Korean woman and a Korean man). "
+    "Do not mention illustration, cartoon, or any art style — describe it as a real photo."
+)
+
+_PHOTOREAL_NEGATIVE_PROMPT = (
+    "illustration, cartoon, anime, painting, drawing, third person, extra person, "
+    "additional character, third wheel, bystanders, crowd, other people, text, watermark"
+)
+
+
+def translate_scene_to_photo_brief(camera: str, scene: str) -> str:
+    """한국어 [SCENE]/[CAMERA] → 짧은 영어 사진 브리핑. bedrock_client.call_text()를
+    지연 import한다(이 모듈은 텍스트 호출 없이 이미지 생성만 하는 admin 실험
+    패널 등에서도 쓰이므로, 텍스트 클라이언트 초기화 비용을 정말 필요할 때만
+    치른다 — _get_bedrock_image_client()의 lazy-import boto3와 같은 이유)."""
+    from bedrock_client import call_text  # pipelines/common/ — sibling, flat import
+
+    user = f"[SCENE]\n{scene}\n\n[CAMERA]\n{camera}"
+    return call_text(_SCENE_TRANSLATE_SYSTEM, user, model=_SCENE_TRANSLATE_MODEL_ID, max_tokens=200, temperature=0.3)
+
+
+def build_photoreal_init_prompt(photo_brief: str) -> str:
+    return (
+        "Photograph of exactly two people only, nobody else in the frame. "
+        "Photorealistic, natural lighting, documentary photography style.\n\n"
+        + photo_brief
+    )
+
+
+def generate_bedrock_photoreal_image_bytes(prompt: str) -> bytes:
+    """Stable Image Core 호출(포토리얼 버전) — generate_bedrock_image_bytes()와
+    거의 같지만 negative_prompt를 받는다(_PHOTOREAL_NEGATIVE_PROMPT 고정,
+    "제3의 인물"·일러스트 화풍 배제 목적)."""
+    body = json.dumps({
+        "prompt": prompt[:9500],
+        "negative_prompt": _PHOTOREAL_NEGATIVE_PROMPT,
+        "aspect_ratio": BEDROCK_ASPECT_RATIO,
+        "output_format": "png",
+    })
+    resp = _get_bedrock_image_client().invoke_model(modelId=BEDROCK_IMAGE_MODEL_ID, body=body)
+    payload = json.loads(resp["body"].read())
+    images = payload.get("images") or []
+    if not images:
+        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
+    return base64.b64decode(images[0])
+
+
+def generate_bedrock_style_transfer_bytes(
+    init_image_bytes: bytes,
+    *,
+    composition_fidelity: float = 0.9,
+    style_strength: float = 1.0,
+    change_strength: float = 0.9,
+) -> bytes:
+    """Stable Style Transfer 호출 — init_image(구도)에 style_image(우리
+    webtoon_style_reference.png)의 화풍을 입힌다. 기본값은 R11 실측 비교에서
+    가장 화풍 일치도가 높았던 조합(style_strength=1.0)."""
+    body = json.dumps({
+        "init_image": base64.b64encode(init_image_bytes).decode(),
+        "style_image": _get_style_reference_b64(),
+        "prompt": _STYLE_GUIDE_STYLE_HINT,
+        "negative_prompt": _STYLE_GUIDE_NEGATIVE_PROMPT,
+        "composition_fidelity": composition_fidelity,
+        "style_strength": style_strength,
+        "change_strength": change_strength,
+        "output_format": "png",
+    })
+    resp = _get_bedrock_image_client().invoke_model(modelId=STYLE_TRANSFER_MODEL_ID, body=body)
+    payload = json.loads(resp["body"].read())
+    images = payload.get("images") or []
+    if not images:
+        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
+    return base64.b64decode(images[0])
+
+
+def build_style_transfer_scene_input(camera: str, scene: str) -> str:
+    """generate_bedrock_composed_image()에 넘길 입력 — build_style_guide_prompt()류
+    다른 빌더들과 시그니처를 맞추기 위해 camera+scene을 한 문자열로 묶는다.
+    실제 파싱은 translate_scene_to_photo_brief()가 한다(스키마: build_style_guide_prompt()
+    의 [SCENE] 블록 표기와 동일)."""
+    return f"[SCENE]\n{scene}\n\n[CAMERA]\n{camera}"
+
+
+def _parse_style_transfer_scene_input(scene_input: str) -> tuple[str, str]:
+    m = re.match(r"^\[SCENE\]\n(.*?)\n\n\[CAMERA\]\n(.*)$", scene_input, re.DOTALL)
+    if not m:
+        raise ValueError("build_style_transfer_scene_input()으로 만든 입력이 아님")
+    return m.group(2), m.group(1)  # (camera, scene)
+
+
+def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
+    camera, scene = _parse_style_transfer_scene_input(scene_input)
+    brief = translate_scene_to_photo_brief(camera, scene)
+    init_prompt = build_photoreal_init_prompt(brief)
+    init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
+    return generate_bedrock_style_transfer_bytes(init_bytes)
+
+
+def generate_bedrock_composed_image(scene_input: str, out_path: Path, retries: int = 2) -> bool:
+    """구도-화풍 분리 3단계(번역→포토리얼→Style Transfer) 전체의 파일-쓰기
+    + 재시도 래퍼. 세 호출을 다 묶어서 재시도한다(부분 재시도 없음). 기본
+    retries=2(다른 generate_*는 3) — 한 시도당 Bedrock 호출이 3번이라
+    기본값 3을 그대로 쓰면 최악의 경우 호출 수가 지나치게 늘어난다."""
+    return _retry_generate_and_write(lambda: generate_bedrock_composed_image_bytes(scene_input), out_path, retries)
