@@ -182,3 +182,29 @@ source_url 기준으로 여러 채널에 걸쳐 반복됨을 발견해 그룹핑
 것도 확인(정상 — 데이터가 적어서 플래너가 그렇게 판단). 진짜 이관 성공
 여부는 실제 백엔드가 Postgres로 전환된 뒤 종단 간 재측정으로 판단해야
 한다. 상세: `docs/architecture/db-changelog/postgres/v1.5-베이스라인-비교.md`.
+
+## 후속 실행 기록 (2026-09-08~09) — 미해결 항목 전부 마무리
+
+§4 완료 후 남아있던 미해결 4가지(articles 본문/이미지/관련기사,
+article_categories, 뱃지·커뮤니티 게시판, newsletter 구독자)를 순서대로
+처리:
+
+- **articles 본문 백필**: S3(`s3_body_uri`) 방식이 23%만 성공, 나머지는
+  DynamoDB에 `content_ko`가 직접 저장된 레거시 방식이었음을 확인해
+  2차 백필로 해결 — 18,114건 전부 채움. `article_images` 23,733건,
+  `article_related_news` 69,200건 이관. 상세:
+  `docs/architecture/db-changelog/postgres/v1.6-articles-본문-백필.md`
+- **article_categories**: `articles.category`(전통 신문 섹션)와
+  `categories`(AI LENS 자체 분류)가 다른 체계임을 확인, 사용자 확인 거쳐
+  경제→금융·정책/국제→국제/문화→문화만 매핑, 나머지 미배정 — 9,447건.
+  상세: `docs/architecture/db-changelog/postgres/v1.7-article-categories-매핑.md`
+- **뱃지·커뮤니티 게시판**: 원본 스키마에 없던 기능 2건을 사용자 확인
+  후 스키마 확장(`users.badges`, `community_posts`, `community_comments`).
+  뱃지 3명 이관, 커뮤니티 게시판은 실사용 데이터 0건(유일한 레코드가
+  테스트 픽스처였음을 직접 확인) 확인. 상세:
+  `docs/architecture/db-changelog/postgres/v1.8-뱃지-커뮤니티-스키마확장.md`
+- **newsletter 구독자**: `newsletters` 4행 시드(sections 기준) 후 구독자
+  3명을 지면 1면에 임시 배정(실제로는 단일 발송이라는 점 명시). 상세:
+  `docs/architecture/db-changelog/postgres/v1.9-newsletter-구독자-이관.md`
+
+이걸로 이 마이그레이션 계획 문서에서 파생된 모든 작업 항목이 완료됐다.

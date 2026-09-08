@@ -39,6 +39,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-08 | postgres | [v1.6 — articles 본문 백필 + 이미지·관련기사 이관](postgres/v1.6-articles-본문-백필.md) |
 | 2026-09-08 | postgres | [v1.7 — article_categories 매핑 확정·이관](postgres/v1.7-article-categories-매핑.md) |
 | 2026-09-09 | postgres | [v1.8 — 뱃지·커뮤니티 게시판 스키마 확장](postgres/v1.8-뱃지-커뮤니티-스키마확장.md) |
+| 2026-09-09 | postgres | [v1.9 — newsletters 시드 + 구독자 이관](postgres/v1.9-newsletter-구독자-이관.md) |
 
 ## 새 항목 추가 규칙
 
