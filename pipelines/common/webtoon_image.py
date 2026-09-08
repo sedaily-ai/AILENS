@@ -666,21 +666,150 @@ def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
     반환한다(R15). subjects가 "A"/"B"(한 명만 크게 나오는 컷)면 GPU
     IP-Adapter로 그 인물의 참조 얼굴을 고정한 사진을 만든다(캐릭터 일관성
     #15 근본 해법, gpu_ipadapter.py 모듈 docstring 참고). "BOTH"(두 사람
-    같이 나오는 컷)면 기존처럼 참조 얼굴 없는 포토리얼 생성으로 떨어진다
-    — IP-Adapter는 한 장의 참조로만 인물을 고정하는 기법이라 두 사람을
-    동시에 각자 다르게 고정하지 못하기 때문(다중 인물 identity-lock은
-    범위 밖, 라운드기록.md R15 참고). 두 경로 다 마지막은 동일하게
-    Style Transfer로 화풍을 입힌다."""
+    같이 나오는 컷)면 각자 따로 IP-Adapter로 고정 생성한 뒤 합성한다
+    (generate_dual_character_init_bytes(), R18 — 다중 인물 identity-lock은
+    범위 밖이라고 R15에서 미뤘던 걸 "각자 생성→합성" 구조로 해결). 세
+    경로 다 마지막은 동일하게 Style Transfer로 화풍을 입힌다 — BOTH
+    경로에서는 이 마지막 Style Transfer가 합성 이음매를 자연스럽게
+    재조정해주는 부수 효과도 있음을 실측으로 확인(라운드기록.md R18)."""
     camera, scene = _parse_style_transfer_scene_input(scene_input)
     subjects, brief = translate_scene_to_photo_brief(camera, scene)
     if subjects in ("A", "B"):
         import gpu_ipadapter  # pipelines/common/ — sibling, GPU 경로를 안 쓰는 호출부의 boto3 비용 회피 위해 지연 import
 
         init_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(brief, subjects)
+        return generate_bedrock_style_transfer_bytes(init_bytes)
+    elif subjects == "BOTH":
+        init_bytes = generate_dual_character_init_bytes(brief)
+        # composition_fidelity를 기본값(0.9)보다 낮춰 이음매를 더 적극
+        # 재조정하게 한다(모듈 docstring 참고, 실측으로 0.75가 자연스러웠음).
+        return generate_bedrock_style_transfer_bytes(init_bytes, composition_fidelity=0.75, change_strength=0.85)
     else:
         init_prompt = build_photoreal_init_prompt(brief)
         init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
-    return generate_bedrock_style_transfer_bytes(init_bytes)
+        return generate_bedrock_style_transfer_bytes(init_bytes)
+
+
+# ─────────────────────────────────────────────────────────────
+# 두 인물 동시 등장 컷의 캐릭터 일관성(#15 잔여 과제, R18) — 각자
+# 생성 후 합성
+# ─────────────────────────────────────────────────────────────
+#
+# IP-Adapter는 참조 이미지 한 장으로만 인물을 고정하는 기법이라 두
+# 사람이 한 프레임에 같이 나오는 컷엔 그대로 못 쓴다는 게 R15의 결론
+# 이었다(다중 인물 identity-lock은 InstantID 등 별도 기법 필요).
+# 대신 "각자 따로 생성 → 배경 제거 → 합성" 구조를 실측해보니(1) A만
+# 나온 사진 (2) B만 나온 사진을 각각 IP-Adapter로 고정 생성하고,
+# Bedrock Remove Background(R17에서 처음 실사용)로 인물만 오려낸 뒤,
+# 빈 배경 사진 위에 나란히 붙이면 — 그 자체로는 이질감이 있지만(스케일·
+# 그림자·조명이 안 맞아 "잘라 붙인 티"가 남), 그 결과를 그대로
+# generate_bedrock_style_transfer_bytes()에 한 번 더 통과시키면 Style
+# Transfer가 이음매·조명·비례를 자연스럽게 재조정해준다는 걸 확인했다
+# (모델이 합성본을 "구조 가이드"로만 쓰고 다시 그리기 때문 — 이게 바로
+# Style Transfer의 본래 용도인 "구도는 보존하되 다시 그린다"에 정확히
+# 들어맞는다). composition_fidelity를 solo/BOTH 기본값(0.9)보다 낮춘
+# 0.75 — 합성 이음매를 더 적극적으로 재조정하게 하려면 원본 구조를
+# 너무 꽉 붙들지 않는 편이 낫다는 걸 실측으로 확인.
+_EMPTY_SCENE_NEGATIVE_PROMPT = "people, person, man, woman, illustration, cartoon, text, watermark"
+REMOVE_BACKGROUND_MODEL_ID = "us.stability.stable-image-remove-background-v1:0"
+
+
+def build_empty_scene_prompt(photo_brief: str) -> str:
+    return (
+        "Photograph of an empty location, no people anywhere in frame. "
+        "Photorealistic, natural lighting, documentary photography style.\n\n"
+        + photo_brief
+    )
+
+
+def remove_background_bytes(image_bytes: bytes) -> bytes:
+    """Bedrock Remove Background 호출 — 알파 채널이 있는 PNG를 돌려준다
+    (인물만 남기고 나머지는 투명)."""
+    body = json.dumps({"image": base64.b64encode(image_bytes).decode(), "output_format": "png"})
+    resp = _get_bedrock_image_client().invoke_model(modelId=REMOVE_BACKGROUND_MODEL_ID, body=body)
+    payload = json.loads(resp["body"].read())
+    images = payload.get("images") or []
+    if not images:
+        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
+    return base64.b64decode(images[0])
+
+
+def _composite_two_characters(bg_bytes: bytes, a_bytes: bytes, b_bytes: bytes) -> bytes:
+    """배경(인물 없음) + A 단독 사진(배경 제거됨) + B 단독 사진(배경
+    제거됨)을 좌우로 배치해 합성한다. 스케일·위치는 "테이블 앞에 나란히
+    앉은 두샷"을 가정한 고정 비율 — 장면마다 다른 구도(클로즈업·와이드
+    등)를 정교하게 반영하진 못하지만, 뒤이은 Style Transfer가 이음매를
+    재조정해주므로 이 정도 근사로 충분함을 실측으로 확인했다(모듈 상단
+    주석 참고). 카메라 타입별 정교한 배치는 다음 라운드 과제."""
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw, ImageFilter
+
+    bg = Image.open(BytesIO(bg_bytes)).convert("RGBA")
+    a = Image.open(BytesIO(a_bytes)).convert("RGBA")
+    b = Image.open(BytesIO(b_bytes)).convert("RGBA")
+    bw, bh = bg.size
+
+    # 2026-09-09 실측 — 높이 기준으로만 리사이즈하면 상반신 크롭(가로로
+    # 넓은 원본)이 캔버스 폭의 절반을 훌쩍 넘어 두 인물이 가운데서 심하게
+    # 겹치고, 그 겹친 상태를 Style Transfer가 "얼굴 하나"로 뭉개버리는
+    # 문제를 발견함(라운드기록.md R18). 폭을 캔버스의 42%로 상한을 두고
+    # (높이 상한도 같이 걸어 이중 제약) 두 인물 사이에 최소 간격을 보장.
+    max_w = int(bw * 0.42)
+    max_h = int(bh * 0.70)
+
+    def _resize_to_fit(img, max_w, max_h):
+        scale = min(max_w / img.width, max_h / img.height)
+        return img.resize((int(img.width * scale), int(img.height * scale)))
+
+    a_r, b_r = _resize_to_fit(a, max_w, max_h), _resize_to_fit(b, max_w, max_h)
+    ground_y = int(bh * 0.98)
+    a_x, b_x = int(bw * 0.06), bw - int(bw * 0.06) - b_r.width
+    a_y, b_y = ground_y - a_r.height, ground_y - b_r.height
+
+    shadow = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.ellipse([a_x, ground_y - 30, a_x + a_r.width, ground_y + 30], fill=(0, 0, 0, 90))
+    sd.ellipse([b_x, ground_y - 30, b_x + b_r.width, ground_y + 30], fill=(0, 0, 0, 90))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(20))
+
+    canvas = Image.alpha_composite(bg, shadow)
+    canvas.alpha_composite(a_r, (a_x, a_y))
+    canvas.alpha_composite(b_r, (b_x, b_y))
+
+    out = BytesIO()
+    canvas.convert("RGB").save(out, format="PNG")
+    return out.getvalue()
+
+
+# 2026-09-09 실측 — 공유 brief(예: "A는 왼쪽, B는 오른쪽, 마주 앉아
+# 대화")를 A/B 각각의 solo IP-Adapter 생성에 그대로 넘기면, 그 문장이
+# 상대방 묘사까지 담고 있어서 생성 결과가 "두 사람 특징이 섞인 하이브리드
+# 인물"로 나옴(A의 재킷 색+B의 셔츠가 한 인물 옷차림에 뒤섞이는 등,
+# 실측 확인). solo 생성 프롬프트는 장면 디테일과 무관하게 일반적인
+# 상반신 인물 사진으로 고정하고, 실제 장소 정보는 배경 이미지 쪽에서만
+# 가져온다 — 합성 후 Style Transfer가 이음매를 재조정해주므로 solo
+# 단계에서 장소를 정교하게 맞출 필요가 없다.
+_DUAL_SOLO_PROMPT_TEMPLATE = (
+    "upper body portrait, sitting at a table, natural relaxed pose, looking slightly "
+    "to the side as if talking to someone, plain simple background"
+)
+
+
+def generate_dual_character_init_bytes(photo_brief: str) -> bytes:
+    import gpu_ipadapter  # pipelines/common/ — sibling
+
+    a_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(_DUAL_SOLO_PROMPT_TEMPLATE, "A")
+    b_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(_DUAL_SOLO_PROMPT_TEMPLATE, "B")
+    bg_bytes = generate_bedrock_photoreal_image_bytes(build_empty_scene_prompt(photo_brief))
+    # negative_prompt는 generate_bedrock_photoreal_image_bytes() 내부에
+    # 이미 _PHOTOREAL_NEGATIVE_PROMPT로 고정돼 있어(인물 배제 문구는
+    # 없음) 여기서는 프롬프트 텍스트로만 "no people"을 지시한다 — 배경
+    # 생성에서 사람이 섞여 나와도 어차피 그 위에 A/B를 덮어 그리므로
+    # 크리티컬하지 않다.
+    a_cut = remove_background_bytes(a_bytes)
+    b_cut = remove_background_bytes(b_bytes)
+    return _composite_two_characters(bg_bytes, a_cut, b_cut)
 
 
 def generate_bedrock_composed_image(scene_input: str, out_path: Path, retries: int = 2) -> bool:
