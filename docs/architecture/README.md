@@ -27,3 +27,4 @@
 | `admin-stack.md` | 어드민 콘솔 스택 |
 | `voice-conversation-architecture.md` | 음성 대화 아키텍처 |
 | `소스-없는-배포본.md` | AWS 에 살아있지만 소스가 이 레포에 없는 정적 사이트 2개 — 어디서 복원하나 |
+| `lens-erd-src/`, `lens-postgres-erd.html` | PostgreSQL 이관 검토용 스키마 설계(개념·논리·물리 단계별) — 아직 프로덕션 미반영, `lens-erd-src/README.md` 참조 |

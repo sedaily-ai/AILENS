@@ -26,7 +26,7 @@ erDiagram
     varchar(16) status "pending · generating · ready · failed"
     text label "약 3분 · 8컷"
     integer duration_sec "팟캐스트 · 영상"
-    integer sequence_no "웹툰 순번 · 그 외 NULL"
+    integer sequence_no "웹툰 순번 · 그 외 NULL · format='webtoon' 부분 UNIQUE"
     integer attempts "재시도 횟수"
     text last_error
     timestamptz next_retry_at
@@ -75,6 +75,10 @@ erDiagram
   }
 
   publications ||--o{ renditions : "0..4 · UNIQUE 짝 pub+format"
+  %% webtoon_series 엔터티 보류 결정(2026-09-08): 현재 시리즈 1개("AI Lens 웹툰"),
+  %% 복수 시리즈 로드맵 근거 없음 — 지금 승격하면 과설계. sequence_no 부분 UNIQUE
+  %% 유지하되, 시리즈가 2개 이상이 되는 시점에 webtoon_series 테이블(series_id,
+  %% title, ...) 승격 + sequence_no UNIQUE 짝을 series_id+sequence_no 로 재조정.
   publications ||--o{ publication_articles : "CASCADE"
   publications ||--o{ publication_slug_history : "CASCADE"
   publications ||--o{ publication_revisions : "CASCADE"

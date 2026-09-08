@@ -30,9 +30,8 @@ erDiagram
   ai_usage_logs {
     bigserial id PK "PK 일부 · 추정"
     varchar(16) purpose "generate · chat · classify"
-    bigint rendition_id FK "배타 · 정확히 하나"
-    bigint message_id FK "배타"
-    bigint candidate_id FK "배타"
+    varchar(16) subject_type "rendition · message · candidate · FK 아님(논리 설계 결정 참조)"
+    bigint subject_id "대상 행 id · FK 아님 · 앱이 참조무결성 보장"
     varchar(255) model_id "inference profile ARN"
     varchar(16) tier "익명 사용자 비용 분리"
     integer input_tokens "기본 0"
@@ -83,7 +82,15 @@ erDiagram
   pipeline_runs ||..o{ quizzes : "run_id · auto"
   articles ||..o{ lens_candidates : "article_no"
   prompts ||--o{ prompt_versions : "prompt_id"
-  lens_candidates ||..o{ ai_usage_logs : "candidate_id · 채점"
-  renditions ||..o{ ai_usage_logs : "rendition_id · 생성"
-  chat_messages ||..o{ ai_usage_logs : "message_id · 대화"
   editors ||..o{ audit_logs : "actor · 추정"
+
+  %% ai_usage_logs 참조 (논리 설계 결정, 2026-09-08):
+  %% lens_candidates/renditions/chat_messages → ai_usage_logs 는 FK 로 안 그린다.
+  %% subject_type 값으로 어느 테이블인지 구분, subject_id 로 해당 행을 가리키되
+  %% DB 레벨 참조무결성은 포기하고 애플리케이션이 보장한다.
+  %% 이유: 배타적 FK(하나만 NOT NULL) + CHECK 로 강제하면 대상 테이블의
+  %% CASCADE/SET NULL 삭제 정책과 반드시 충돌한다 — 특히 회원 하드 삭제 시
+  %% chat_messages 가 CASCADE 로 지워지면 비용 로그(정산 근거)까지 함께
+  %% 사라지거나, SET NULL 로 막으면 "정확히 하나" CHECK 를 위반한다.
+  %% 비용 집계 테이블은 원장(ledger) 성격이라 원본 삭제와 독립적으로
+  %% 보존돼야 한다는 게 이 결정의 핵심 근거. chat_quota_usage 와 같은 패턴.

@@ -166,6 +166,8 @@ flowchart LR
   pipeline_runs -.-> quizzes
   prompts --> prompt_versions
   lens_candidates -.-> ai_usage_logs
+  %% ai_usage_logs 로 들어오는 점선 3개(lens_candidates/renditions/chat_messages)는
+  %% FK 가 아니라 subject_type+subject_id 로 앱이 관리하는 참조 — 11-pipeline.mmd 결정 참조
 
   classDef core fill:#336791,stroke:#1f4a6b,color:#ffffff
   classDef tbl fill:#eaf1f7,stroke:#5a7f9e,color:#1a3a52

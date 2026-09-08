@@ -8,6 +8,7 @@ erDiagram
     timestamptz joined_at
     timestamptz last_login_at
     timestamptz updated_at
+    timestamptz deleted_at "탈퇴 시점 · 소프트 삭제, 행은 안 지운다"
   }
   user_identities {
     varchar(32) provider PK "cognito · google · kakao · naver · apple"
@@ -31,3 +32,9 @@ erDiagram
   users ||..o{ view_events : "user_id · FK 없음"
   anonymous_visitors ||--o{ chat_conversations : "anon_id · CASCADE"
   anonymous_visitors ||..o{ view_events : "anon_id · FK 없음"
+
+  %% 삭제 정책 (논리 설계 결정, 2026-09-08)
+  %% 탈퇴 = 즉시 소프트 삭제(status='withdrawn' + deleted_at 기록, 행 유지) →
+  %% 위 CASCADE는 이 시점엔 발동하지 않는다. 법정 보존기간(예: 30일) 경과 후
+  %% 별도 하드 삭제 배치가 행을 실제로 지울 때만 CASCADE가 발동한다.
+  %% 정확한 보존기간·PII 익명화 범위는 법무 확인 필요 — worklog 참조.
