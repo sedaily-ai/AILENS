@@ -45,17 +45,28 @@ SQL을 옮긴 것이다 — 뭔가 다르면 이 SQL이 맞고 `.mmd`가 틀린 
   `users.deleted_at`을 임의로 추가했었는데 원본엔 없음(탈퇴 정책은 원본에도
   미정 — 아래 미해결 참조).
 
-## 미해결 · 원본에도 없는 것
+## 기술 결정 3건 확정 (2026-09-08) — `14-operations.md`
+
+원본에 조건부/미정으로 남아있던 기술 결정 3가지를 AWS 확장 지원 사실을
+확인한 뒤 확정했다:
+
+- **한국어 전문검색 = pg_bigm 채택** — Aurora/RDS PostgreSQL 16 공식 지원
+  확인됨. `search_vector`(tsvector 'simple') 컬럼·인덱스를 걷어내고 원문
+  컬럼에 `gin_bigm_ops` 인덱스를 직접 건다. 가중 랭킹은 애플리케이션 쿼리에서
+  계산(구현 영향, 스키마 영향 아님).
+- **월별 파티션 자동화 = pg_partman 채택** — 마찬가지로 공식 지원 확인됨.
+  `view_events`(90일 보존 후 파티션째 삭제)·`ai_usage_logs`(무기한 보존)에
+  `create_parent()` 설정, 매달 `run_maintenance_proc()`을 기존 EventBridge
+  스케줄 패턴으로 호출.
+- **`view_counts` 갱신 권한 분리** — 이 레포의 두 백엔드 구조(service/admin)를
+  그대로 반영해 역할 3개(`lens_service_app`/`lens_admin_app`/`lens_batch`) +
+  컬럼 단위 GRANT로 구체화.
+
+## 미해결 · 원본에도 없는 것 (1건만 남음)
 
 - **회원 탈퇴 시 삭제 정책** — `users.status='withdrawn'`만 있고 소프트/하드
   삭제, 보존기간, PII 처리 범위가 원본 SQL에도 정의돼 있지 않다. 하위
   테이블은 전부 `ON DELETE CASCADE`(행 삭제 전제)라 실제 삭제 시점·방식은
-  운영 정책으로 별도 결정해야 한다.
-- **월별 파티션 운영** — `view_events`, `ai_usage_logs`는 2026-09/10 파티션만
-  만들어져 있다. 11월 이후 파티션을 누가 언제 미리 만드는지 배치/크론이 없다.
-- **한국어 전문검색 설정** — `search_vector`가 전부 `'simple'`(형태소 미분리)
-  설정. RDS `pg_bigm` 가용 여부 확인 후 교체 여부 결정 필요(스키마 구조는
-  안 바뀜, 원본 주석에 명시돼 있음).
-- **`view_counts.real_count` 갱신 권한 분리** — 애플리케이션 계정은 못 고치고
-  배치 계정만 갱신하게 하는 REVOKE/GRANT가 원본에 메모로만 있고 미실행.
+  운영 정책으로 별도 결정해야 한다. 법무/정책 판단 필요 — 기술적으로
+  임의로 정하지 않는다.
 - `lens-postgres-erd.html` 재렌더 — 로컬에 mermaid-cli 없음.

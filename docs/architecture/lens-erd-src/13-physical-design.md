@@ -64,9 +64,8 @@
   이미 생성됨), `PRIMARY KEY (id, occurred_at)` — 파티션 키가 PK에 포함돼야
   하는 Postgres 제약을 정확히 반영.
 
-두 테이블 다 신규 월 파티션을 매달 미리 만들어두는 운영 절차(배치/크론)가
-필요하다 — DDL엔 2026-09/10 두 달치만 있고 그 이후는 없다. **미해결 항목**
-으로 아래에 남긴다.
+두 테이블 다 신규 월 파티션을 매달 미리 만들어두는 운영 절차가 필요했다 —
+**pg_partman 채택으로 해결. `14-operations.md` 참조.**
 
 ## DynamoDB 실사용 패턴과의 대조 (검증)
 
@@ -77,18 +76,18 @@
 | channel/status + 발행일 범위 목록 조회 | `publications_category_idx`, `publications_section_idx`, `publications_published_idx` | 일치 — 부분 인덱스(`WHERE status='published'`)까지 정확히 대응 |
 | `Attr(...).contains()` 부분일치 텍스트 검색 | `publications_fts_idx`/`articles_fts_idx` GIN(search_vector) | 일치 — 원본이 이미 이 문제를 알고 설계(주석: "DDB full-scan 대체") |
 | slug-trim fallback 루프 | `publications_title_trgm_idx`, `articles_title_trgm_idx` | 일치 (단, 이건 en.sedaily 프로젝트의 pg_trgm 슬러그 유사검색 사례를 본뜬 것으로 보이며, AI LENS엔 slug 자체의 trgm 인덱스는 없고 title에만 있음 — slug 오타 대응이 필요하면 추가 검토) |
-| 조회수 read-modify-write(비원자적) | `view_counts.real_count`는 "배치만 갱신, 애플리케이션 계정엔 UPDATE 권한을 안 준다"(REVOKE/GRANT로 처리, 제약으로 표현 불가) | 원본이 이미 원자성보다 강한 방식(권한 분리)으로 해결 — 물리 설계보다 상위인 DB 권한 정책 이관 필요 |
+| 조회수 read-modify-write(비원자적) | `view_counts.real_count`는 "배치만 갱신, 애플리케이션 계정엔 UPDATE 권한을 안 준다"(REVOKE/GRANT로 처리, 제약으로 표현 불가) | 원본이 이미 원자성보다 강한 방식(권한 분리)으로 해결 — 구체적 역할·GRANT문은 `14-operations.md` §3 |
 | 챗봇 컨텍스트가 요청당 같은 인덱스 3회 호출 | 해당하는 원본 인덱스 없음(애플리케이션 레이어 이슈) | 스키마로 해결할 문제가 아님 — 이관 시 애플리케이션 코드에서 배치/조인으로 합칠 것 |
 | `limit=1000` 대량 조회 | 해당 인덱스는 있으나(정렬 인덱스) LIMIT 강제는 애플리케이션 책임 | 스키마 아님 — API 계약에서 강제 필요 |
 
-## 미해결
+## 미해결 → 3건 결정 완료 (2026-09-08), 1건만 남음
 
-- 월별 파티션(`view_events`, `ai_usage_logs`)을 2026-11부터 누가·어떻게
-  미리 만드는지 원본 DDL엔 없다 — 운영 크론/배치 설계 필요.
-- 한국어 전문검색이 'simple' 설정(형태소 미분리)으로 잠정 처리돼 있다
-  (`search_vector` 컬럼 주석 참조) — RDS의 `pg_bigm` 가용 여부 확인 후
-  GIN 인덱스 교체 여부 결정 필요. 테이블 구조는 바뀌지 않음.
-- `view_counts.real_count`를 배치 계정만 갱신하게 하는 권한 분리
-  (`REVOKE UPDATE ... FROM app_user; GRANT UPDATE ... TO batch_user;`)는
-  DDL 파일 맨 끝(14절)에 운영 메모로만 있고 실제 GRANT/REVOKE 문은
-  실행 전이다 — 이관 시 반드시 적용.
+원본에 조건부/미정으로 남아있던 3가지 기술 결정을 AWS 확장 지원 확인 후
+확정했다. 구체적 SQL·근거는 `14-operations.md` 참조:
+
+- ~~월별 파티션 자동화~~ → **pg_partman 채택** (§2)
+- ~~한국어 전문검색 설정~~ → **pg_bigm 채택** (§1, tsvector 'simple' 설정 폐기)
+- ~~view_counts 갱신 권한 분리~~ → **역할 3개(service/admin/batch) + 컬럼 단위 GRANT** (§3)
+
+**남은 미해결은 회원 탈퇴 삭제 정책 1건뿐** — 법무/정책 판단 필요,
+`README.md` 참조.
