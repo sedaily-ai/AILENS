@@ -383,43 +383,61 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     # 2026-09-04부터 이 값은 admin이 발행한 DDB가 정본이라 컷 루프 밖에서
     # 한 번만 가져온다(fresh하되 같은 기사 안 8컷은 일관되게 같은 값 사용).
     characters = prompts.get_fixed_characters()
-    for cut in script["cuts"]:
-        n = cut["cut"]
-        img_path = out / f"컷{n}.png"
-        if resume and img_path.exists():
-            print(f"{tag} 컷{n} 스킵(존재)")
-            continue
-        s = scene_map[n]
-        print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
-        if IMAGE_PROVIDER in ("bedrock", "bedrock-style-guide", "bedrock-style-transfer"):
-            if IMAGE_PROVIDER == "bedrock-style-transfer":
-                prompt = build_style_transfer_scene_input(s["camera"], s["scene"])
-                generate_fn = generate_image_bedrock_style_transfer
-            elif IMAGE_PROVIDER == "bedrock-style-guide":
-                prompt = build_style_guide_prompt(s["camera"], s["scene"])
-                generate_fn = generate_image_bedrock_style_guide
+
+    # 2026-09-09(R15) — bedrock-style-transfer 경로는 컷별로(한 명만 나오는
+    # 클로즈업이면) GPU IP-Adapter를 탈 수도, 안 탈 수도 있다(webtoon_image.
+    # generate_bedrock_composed_image_bytes()가 컷마다 판단) — 어느 컷이
+    # 쓸지 루프 전엔 모르니, 이 프로바이더면 배치 시작 시 한 번만 GPU를
+    # 켜두고 8컷 다 끝난 뒤(또는 예외로 중단돼도) 한 번만 끈다. 매 컷마다
+    # 켜고 끄면 g4dn.xlarge 부팅·SSM 연결 대기(수십 초~분 단위)가 컷마다
+    # 반복돼 배치가 크게 느려진다.
+    gpu_started = False
+    if IMAGE_PROVIDER == "bedrock-style-transfer":
+        import gpu_ipadapter  # pipelines/common/ — sibling
+        gpu_ipadapter.ensure_gpu_running()
+        gpu_started = True
+
+    try:
+        for cut in script["cuts"]:
+            n = cut["cut"]
+            img_path = out / f"컷{n}.png"
+            if resume and img_path.exists():
+                print(f"{tag} 컷{n} 스킵(존재)")
+                continue
+            s = scene_map[n]
+            print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
+            if IMAGE_PROVIDER in ("bedrock", "bedrock-style-guide", "bedrock-style-transfer"):
+                if IMAGE_PROVIDER == "bedrock-style-transfer":
+                    prompt = build_style_transfer_scene_input(s["camera"], s["scene"])
+                    generate_fn = generate_image_bedrock_style_transfer
+                elif IMAGE_PROVIDER == "bedrock-style-guide":
+                    prompt = build_style_guide_prompt(s["camera"], s["scene"])
+                    generate_fn = generate_image_bedrock_style_guide
+                else:
+                    prompt = build_background_prompt(s["camera"], s["scene"], characters)
+                    generate_fn = generate_image_bedrock
+                ok, _verdict, faces = _generate_and_qa_cut(
+                    prompt, img_path, s["scene"], tag, n, generate_fn,
+                    has_dialogue=bool(cut.get("dialogue")),
+                )
+                if ok:
+                    # 2026-09-08 — 얼굴 위치는 QA 비전 모델(verdict)이 아니라
+                    # Rekognition 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM
+                    # 상단 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
+                    # 얼굴 상단을 피해 말풍선을 배치할 수 있다. _generate_and_qa_cut()가
+                    # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다
+                    # (배경 인물 초과 체크에도 같은 결과를 재사용, 위 함수 docstring 참고).
+                    try:
+                        compose_text.compose(img_path, cut, faces)
+                    except Exception as e:
+                        print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
             else:
-                prompt = build_background_prompt(s["camera"], s["scene"], characters)
-                generate_fn = generate_image_bedrock
-            ok, _verdict, faces = _generate_and_qa_cut(
-                prompt, img_path, s["scene"], tag, n, generate_fn,
-                has_dialogue=bool(cut.get("dialogue")),
-            )
-            if ok:
-                # 2026-09-08 — 얼굴 위치는 QA 비전 모델(verdict)이 아니라
-                # Rekognition 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM
-                # 상단 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
-                # 얼굴 상단을 피해 말풍선을 배치할 수 있다. _generate_and_qa_cut()가
-                # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다
-                # (배경 인물 초과 체크에도 같은 결과를 재사용, 위 함수 docstring 참고).
-                try:
-                    compose_text.compose(img_path, cut, faces)
-                except Exception as e:
-                    print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
-        else:
-            prompt = build_image_prompt(s["camera"], s["scene"], cut, characters)
-            ok = generate_image(prompt, img_path)
-        print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
+                prompt = build_image_prompt(s["camera"], s["scene"], cut, characters)
+                ok = generate_image(prompt, img_path)
+            print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
+    finally:
+        if gpu_started:
+            gpu_ipadapter.stop_gpu()
 
     # 세로 스크롤 합치기
     try:

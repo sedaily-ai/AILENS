@@ -541,12 +541,26 @@ STYLE_TRANSFER_MODEL_ID = "us.stability.stable-style-transfer-v1:0"  # us-east-1
 
 _SCENE_TRANSLATE_MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46 재사용
 
+# 2026-09-09(R15) — subjects 분류를 같이 받도록 확장. 캐릭터 일관성(#15)
+# 근본 해법(gpu_ipadapter.py, IP-Adapter)은 참조 얼굴 1장으로 "이 사진
+# 속 인물처럼" 고정하는 기법이라 두 사람이 한 프레임에 같이 나오는 컷엔
+# 그대로 못 쓴다(둘 다 같은 얼굴로 쏠림 — 다중 인물 identity-lock은
+# InstantID 등 별도 기법 필요, 이번 범위 밖). 그래서 이 컷이 "한 명만
+# 크게 나오는 클로즈업"인지 "둘 다 나오는" 컷인지 미리 분류해서, 전자만
+# GPU IP-Adapter 경로를 태운다 — 텍스트 압축과 같은 호출에 묶어서 별도
+# LLM 호출을 추가하지 않는다.
 _SCENE_TRANSLATE_SYSTEM = (
     "You compress a Korean scene description into a short English photo-shoot brief "
-    "for a real photographer. Output plain English only, 2-3 sentences, under 60 words. "
-    "Describe the location, setting, mood, and camera framing as if directing a real "
-    "documentary photo shoot with two people (a Korean woman and a Korean man). "
-    "Do not mention illustration, cartoon, or any art style — describe it as a real photo."
+    "for a real photographer, AND classify which character(s) are the main visual "
+    "focus. Output exactly this format:\n"
+    "SUBJECTS: A|B|BOTH\n"
+    "BRIEF: <2-3 sentence English photo brief, under 60 words, describing location, "
+    "setting, mood, camera framing as if directing a real documentary photo shoot>\n\n"
+    "SUBJECTS=A means only character A (a Korean woman) is prominently visible in this "
+    "shot (close-up on her, or B is absent/tiny/off-frame). SUBJECTS=B means only "
+    "character B (a Korean man) is prominently visible. SUBJECTS=BOTH means both "
+    "people are clearly visible together in the frame. Do not mention illustration, "
+    "cartoon, or any art style — describe it as a real photo."
 )
 
 _PHOTOREAL_NEGATIVE_PROMPT = (
@@ -555,15 +569,27 @@ _PHOTOREAL_NEGATIVE_PROMPT = (
 )
 
 
-def translate_scene_to_photo_brief(camera: str, scene: str) -> str:
-    """한국어 [SCENE]/[CAMERA] → 짧은 영어 사진 브리핑. bedrock_client.call_text()를
-    지연 import한다(이 모듈은 텍스트 호출 없이 이미지 생성만 하는 admin 실험
-    패널 등에서도 쓰이므로, 텍스트 클라이언트 초기화 비용을 정말 필요할 때만
-    치른다 — _get_bedrock_image_client()의 lazy-import boto3와 같은 이유)."""
+def translate_scene_to_photo_brief(camera: str, scene: str) -> tuple[str, str]:
+    """한국어 [SCENE]/[CAMERA] → (subjects, brief). subjects는 "A"|"B"|"BOTH"
+    (gpu_ipadapter.py가 단일 인물 컷 판별에 씀), brief는 짧은 영어 사진
+    브리핑. bedrock_client.call_text()를 지연 import한다(이 모듈은 텍스트
+    호출 없이 이미지 생성만 하는 admin 실험 패널 등에서도 쓰이므로, 텍스트
+    클라이언트 초기화 비용을 정말 필요할 때만 치른다 —
+    _get_bedrock_image_client()의 lazy-import boto3와 같은 이유).
+
+    응답 형식이 예상과 다르면(파싱 실패) subjects="BOTH"로 안전하게
+    폴백한다 — GPU IP-Adapter 경로를 잘못 태우는 것보다 기존 경로로
+    떨어지는 게 안전하다."""
     from bedrock_client import call_text  # pipelines/common/ — sibling, flat import
 
     user = f"[SCENE]\n{scene}\n\n[CAMERA]\n{camera}"
-    return call_text(_SCENE_TRANSLATE_SYSTEM, user, model=_SCENE_TRANSLATE_MODEL_ID, max_tokens=200, temperature=0.3)
+    raw = call_text(_SCENE_TRANSLATE_SYSTEM, user, model=_SCENE_TRANSLATE_MODEL_ID, max_tokens=200, temperature=0.3)
+
+    m = re.search(r"SUBJECTS:\s*(A|B|BOTH)", raw)
+    subjects = m.group(1) if m else "BOTH"
+    m2 = re.search(r"BRIEF:\s*(.+)", raw, re.DOTALL)
+    brief = m2.group(1).strip() if m2 else raw.strip()
+    return subjects, brief
 
 
 def build_photoreal_init_prompt(photo_brief: str) -> str:
@@ -636,10 +662,24 @@ def _parse_style_transfer_scene_input(scene_input: str) -> tuple[str, str]:
 
 
 def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
+    """구도-화풍 분리 파이프라인(R12) — 번역 단계가 이제 subjects도 같이
+    반환한다(R15). subjects가 "A"/"B"(한 명만 크게 나오는 컷)면 GPU
+    IP-Adapter로 그 인물의 참조 얼굴을 고정한 사진을 만든다(캐릭터 일관성
+    #15 근본 해법, gpu_ipadapter.py 모듈 docstring 참고). "BOTH"(두 사람
+    같이 나오는 컷)면 기존처럼 참조 얼굴 없는 포토리얼 생성으로 떨어진다
+    — IP-Adapter는 한 장의 참조로만 인물을 고정하는 기법이라 두 사람을
+    동시에 각자 다르게 고정하지 못하기 때문(다중 인물 identity-lock은
+    범위 밖, 라운드기록.md R15 참고). 두 경로 다 마지막은 동일하게
+    Style Transfer로 화풍을 입힌다."""
     camera, scene = _parse_style_transfer_scene_input(scene_input)
-    brief = translate_scene_to_photo_brief(camera, scene)
-    init_prompt = build_photoreal_init_prompt(brief)
-    init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
+    subjects, brief = translate_scene_to_photo_brief(camera, scene)
+    if subjects in ("A", "B"):
+        import gpu_ipadapter  # pipelines/common/ — sibling, GPU 경로를 안 쓰는 호출부의 boto3 비용 회피 위해 지연 import
+
+        init_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(brief, subjects)
+    else:
+        init_prompt = build_photoreal_init_prompt(brief)
+        init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
     return generate_bedrock_style_transfer_bytes(init_bytes)
 
 
