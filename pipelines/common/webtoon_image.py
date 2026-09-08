@@ -307,6 +307,32 @@ _STYLE_GUIDE_CONTENT_RULES = (
     "or characters beyond what [SCENE] specifies."
 )
 
+# 2026-09-08(3차, #14 "배경 엑스트라 난입" 근본 원인 조사) — 위
+# _STYLE_GUIDE_CONTENT_RULES에 "no extra crowds"라고 이미 명시돼 있는데도
+# 실전 8컷 중 5컷에서 배경 인물이 계속 등장했다(라운드기록.md #14/R8).
+# 원인을 좁혀보니 텍스트 지시의 문제가 아니라 **참고 이미지(Style Guide의
+# 화풍 앵커) 자체가 "방송 스튜디오/카메라 장비"가 있는 배경**이라, 그
+# 구도·소품까지 이미지 컨디셔닝을 통해 같이 전이되고 있었다 — 프롬프트에
+# "하지 말라"는 문장을 아무리 강하게 추가해도(단일 테스트로 fidelity
+# 0.3~0.5 여러 조합 시도) 거의 효과가 없었다(positive 프롬프트 안의 부정문은
+# 확산 모델이 잘 못 지킨다는 게 이미 알려진 한계).
+#
+# 반면 Bedrock Style Guide 요청 바디에 별도 `negative_prompt` 필드를
+# 추가하니(문서화는 안 돼 있지만 Stability API 계열이 보통 지원) 단일
+# 테스트 4/4에서 스튜디오 장비·군중·제3의 인물이 안정적으로 사라지고
+# 정확히 2인 구성이 유지됐다 — negative_prompt는 classifier-free guidance로
+# 별도 처리되어 본문 프롬프트의 "하지 말라" 문장보다 훨씬 강하게 먹힌다.
+# (단, 이 negative_prompt만으로는 "카페" 같은 구체적 장소까지 재현하진
+# 못했다 — 여전히 기본값인 도심 거리로 나옴. 장소 재현은 [SCENE] 텍스트를
+# 영어 키워드로 앞세우는 별도 처리가 필요해 이번엔 범위 밖으로 남기고
+# #4로 계속 이월한다. 라운드기록.md R9 참고.)
+_STYLE_GUIDE_NEGATIVE_PROMPT = (
+    "broadcast studio, TV studio, press conference stage, stage lighting rig, "
+    "film camera, tripod, microphone, press badge, lanyard, crowd, third "
+    "person, extra person, additional character, background bystanders, "
+    "other people, signage text, readable text, letters, watermark"
+)
+
 
 def build_style_guide_prompt(camera: str, scene: str) -> str:
     """Style Guide 경로 전용 프롬프트 — 위 실측 결과를 따라 일부러
@@ -450,9 +476,15 @@ def generate_bedrock_style_guide_image_bytes(prompt: str, fidelity: float = STYL
     aspect_ratio를 BEDROCK_ASPECT_RATIO(3:2)로 고정 — 첫 실측 때 이 파라미터를
     빠뜨려서 1:1 정사각형으로 나왔고, 좁아진 캔버스에서 말풍선 2개가 겹쳐
     얼굴을 가리는 부수 문제까지 만들었다(compose_text.py의 말풍선 배치는
-    3:2 비율을 전제로 튜닝돼 있음)."""
+    3:2 비율을 전제로 튜닝돼 있음).
+
+    negative_prompt에 _STYLE_GUIDE_NEGATIVE_PROMPT를 항상 붙인다 — 참고
+    이미지의 스튜디오 장비·군중이 이미지 컨디셔닝으로 새어 들어오는 문제를
+    본문 프롬프트의 "하지 말라" 문장으로는 못 막았고, 이 필드로 실측
+    확인함(모듈 상단 _STYLE_GUIDE_NEGATIVE_PROMPT 주석·라운드기록.md R9)."""
     body = json.dumps({
         "prompt": prompt[:9500],
+        "negative_prompt": _STYLE_GUIDE_NEGATIVE_PROMPT,
         "image": _get_style_reference_b64(),
         "fidelity": fidelity,
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
