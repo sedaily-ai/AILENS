@@ -21,6 +21,7 @@ DynamoDB에서 PostgreSQL로 이관하기 위한 스키마 설계가 어떤 순�
 | [v1.10](v1.10-백엔드-postgres-클라이언트.md) | 2026-09-09 | 백엔드 Postgres 클라이언트 작성·검증(cms_posts), 라이브 데이터 모델 변경 발견, 배포 안전한 feature-flag로 연결 |
 | [v1.11](v1.11-프로덕션-배포.md) | 2026-09-09 | 실제 라이브 Lambda 22개 배포 완료(사용자 직접 실행) — CMS_DB_BACKEND는 아직 미설정(dormant) |
 | [v1.12](v1.12-lens-콘텐츠-백필.md) | 2026-09-09 | lens 채널 lenses[] 백필 — 렌디션 0개 publications 50→0, 알려진 한계 해소 |
+| [v1.13](v1.13-pg8000-전환-slug이슈.md) | 2026-09-09 | psycopg2→pg8000 전환(Lambda 패키징 문제 해소), publications.slug 유일성 이슈 발견 |
 
 새 버전을 추가할 땐 `vX.Y-주제.md` 파일을 만들고 이 표에 한 줄, 그리고
 앞뒤 버전 파일의 "이전/다음" 링크도 같이 갱신한다.

@@ -1,24 +1,25 @@
 """cms_posts 공개 조회 — Postgres 버전 (cms_posts_ddb_client.py의 드롭인 대체).
 
 lens-postgres-migration-dev(Aurora PostgreSQL, 2026-09 이관)를 사용한다.
-반환 shape은 기존 DynamoDB 아이템과 최대한 동일하게 맞춰
-cms_posts_shaping.py를 그대로 재사용할 수 있게 한다.
+드라이버는 pg8000(순수 Python, deploy.sh가 이미 Lambda용으로 패키징하는
+의존성 — psycopg2 같은 C 확장 빌드 문제가 없다). 반환 shape은 기존
+DynamoDB 아이템과 최대한 동일하게 맞춰 cms_posts_shaping.py를 그대로
+재사용할 수 있게 한다.
 
 알려진 차이(2026-09-09 문서화, docs/architecture/db-changelog/postgres/
-v1.10 참조):
-- 'lens' 채널의 body_inline.lenses[](4포맷 내장 콘텐츠)는 이관 범위에서
-  제외됐다 — publications 메타데이터(headline/subtitle/cover_image 등)만
-  반환하고 lenses는 빈 배열이다.
+v1.10·v1.12 참조):
+- 'lens' 채널 lenses[] 콘텐츠는 v1.12에서 백필 완료(포맷 라벨 방식은
+  포맷별 렌디션으로, 관점 라벨 방식은 letter 렌디션 텍스트 블록으로
+  — 완벽한 구조 재현은 아님).
 - DynamoDB 원본은 이 대체를 작성한 시점에도 계속 변경되는 라이브
-  테이블이라, 이관된 Postgres 데이터는 2026-09-08 스냅샷 기준이다.
+  테이블이라, 이관된 Postgres 데이터는 2026-09-08~09 스냅샷 기준이다.
 """
 from __future__ import annotations
 
 import os
 from typing import Any, Dict, List, Optional
 
-import psycopg2
-import psycopg2.extras
+import pg8000.dbapi
 
 _PG_HOST = os.environ.get("LENS_PG_HOST", "lens-postgres-migration-dev.cluster-c83iuyksky7r.us-east-1.rds.amazonaws.com")
 _PG_DB = os.environ.get("LENS_PG_DATABASE", "lens")
@@ -34,11 +35,22 @@ _FORMAT_TO_CHANNEL = {
 
 
 def _conn():
-    return psycopg2.connect(
-        host=_PG_HOST, port=5432, dbname=_PG_DB,
+    return pg8000.dbapi.connect(
+        host=_PG_HOST, port=5432, database=_PG_DB,
         user=_PG_USER, password=_PG_PASSWORD,
-        connect_timeout=5,
+        timeout=5,
     )
+
+
+def _dictfetchall(cur) -> List[Dict[str, Any]]:
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def _dictfetchone(cur) -> Optional[Dict[str, Any]]:
+    cols = [c[0] for c in cur.description]
+    row = cur.fetchone()
+    return dict(zip(cols, row)) if row else None
 
 
 def _row_to_post(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -55,7 +67,7 @@ def _row_to_post(row: Dict[str, Any]) -> Dict[str, Any]:
         "images": row.get("images") or [],
         "key_points": [],
         "keywords": [],
-        "lenses": [],  # 2026-09-09: 이관 범위 밖 — 알려진 차이(위 docstring)
+        "lenses": [],  # v1.12에서 renditions로 구조 변환 이관됨(별도 필드 유지 안 함)
     }
     media_embed_url = None
     if channel == "video" and row.get("video_url"):
@@ -103,7 +115,7 @@ _BASE_SELECT = """
             FROM rendition_blocks rb WHERE rb.rendition_id = r.id
         ) AS body_json
     FROM publications p
-    LEFT JOIN renditions r ON r.publication_id = p.id AND r.format = %(format)s
+    LEFT JOIN renditions r ON r.publication_id = p.id AND r.format = %s
     LEFT JOIN media_assets ma ON ma.rendition_id = r.id
 """
 
@@ -113,42 +125,43 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
     버전과 동일 계약."""
     conn = _conn()
     try:
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = conn.cursor()
         if channel == "lens":
-            # 'lens' 채널은 publications 자체 — renditions 조인 없음.
-            # lenses[] 콘텐츠는 위 docstring 참조(이관 범위 밖).
+            # 'lens' 채널도 v1.12부터 다른 채널과 동일하게 renditions를
+            # 가진다(format='letter', 관점 텍스트 백필분 포함) — 다만
+            # 원래 'lens' 슬롯 자체를 채널로 조회하는 경우는 publications
+            # 메타데이터 위주로 응답한다.
             sql = """
                 SELECT id AS publication_id, slug, title, subtitle, cover_image_url,
                        source_url, status, published_at, created_at, updated_at,
                        NULL AS video_url, NULL AS transcript,
                        NULL AS images_json, NULL AS body_json
                 FROM publications
-                WHERE status = 'published' AND deleted_at IS NULL
+                WHERE status = %s AND deleted_at IS NULL
             """
-            params: Dict[str, Any] = {}
+            params: List[Any] = ["published"]
             if date:
-                sql += " AND published_at::date = %(date)s"
-                params["date"] = date
-            sql += " ORDER BY published_at DESC LIMIT %(limit)s"
-            params["limit"] = limit
+                sql += " AND published_at::date = %s"
+                params.append(date)
+            sql += " ORDER BY published_at DESC LIMIT %s"
+            params.append(limit)
             cur.execute(sql, params)
         else:
             fmt = next((f for f, ch in _FORMAT_TO_CHANNEL.items() if ch == channel), None)
             if not fmt:
                 return []
-            sql = _BASE_SELECT + " WHERE p.status = 'published' AND p.deleted_at IS NULL AND r.id IS NOT NULL"
-            params = {"format": fmt}
+            sql = _BASE_SELECT + " WHERE p.status = %s AND p.deleted_at IS NULL AND r.id IS NOT NULL"
+            params = [fmt, "published"]
             if date:
-                sql += " AND p.published_at::date = %(date)s"
-                params["date"] = date
-            sql += " ORDER BY p.published_at DESC LIMIT %(limit)s"
-            params["limit"] = limit
+                sql += " AND p.published_at::date = %s"
+                params.append(date)
+            sql += " ORDER BY p.published_at DESC LIMIT %s"
+            params.append(limit)
             cur.execute(sql, params)
 
-        rows = cur.fetchall()
+        rows = _dictfetchall(cur)
         posts = []
         for row in rows:
-            row = dict(row)
             row["channel"] = channel
             row["images"] = row.pop("images_json", None) or []
             row["body_paragraphs"] = row.pop("body_json", None) or []
@@ -161,12 +174,12 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
 def get_published_post_by_slug(slug: str) -> Optional[Dict[str, Any]]:
     conn = _conn()
     try:
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = conn.cursor()
         cur.execute(
             "SELECT status, deleted_at FROM publications WHERE slug = %s",
             (slug,),
         )
-        row = cur.fetchone()
+        row = _dictfetchone(cur)
         if not row or row["status"] != "published" or row["deleted_at"]:
             return None
 
@@ -189,10 +202,9 @@ def get_published_post_by_slug(slug: str) -> Optional[Dict[str, Any]]:
             """,
             (slug,),
         )
-        found = cur.fetchone()
+        found = _dictfetchone(cur)
         if not found:
             return None
-        found = dict(found)
         found["channel"] = _FORMAT_TO_CHANNEL.get(found.get("format"), "lens")
         found["images"] = found.pop("images_json", None) or []
         found["body_paragraphs"] = found.pop("body_json", None) or []
