@@ -7,13 +7,14 @@ DynamoDB 아이템과 최대한 동일하게 맞춰 cms_posts_shaping.py를 그�
 재사용할 수 있게 한다.
 
 알려진 차이(2026-09-09 문서화, docs/architecture/db-changelog/postgres/
-v1.10·v1.12·v1.17 참조):
+v1.10·v1.12·v1.17·v1.18 참조):
 - 'lens' 채널 lenses[] 콘텐츠는 v1.12에서 백필, v1.17에서 단건 조회
   (`get_published_post_by_slug(slug, channel='lens')`)에서 실제로
   조립해 반환하도록 연결(포맷 라벨 방식은 포맷별 렌디션 그대로,
   관점 라벨 방식은 letter 렌디션 텍스트 블록 하나로 — 완벽한 구조
-  재현은 아님). 목록 조회(`list_published_posts('lens', ...)`)는 여전히
-  메타데이터 위주 응답(별도 재설계 필요, 범위 밖).
+  재현은 아님). 목록 조회(`list_published_posts('lens', ...)`)는
+  v1.18부터 라벨만 배치 조회해 붙인다(전체 콘텐츠는 여전히 단건
+  조회에서만).
 - DynamoDB 원본은 이 대체를 작성한 시점에도 계속 변경되는 라이브
   테이블이라, 이관된 Postgres 데이터는 2026-09-08~09 스냅샷 기준이다.
 """
@@ -138,9 +139,10 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
         cur = conn.cursor()
         if channel == "lens":
             # 'lens' 채널도 v1.12부터 다른 채널과 동일하게 renditions를
-            # 가진다(format='letter', 관점 텍스트 백필분 포함) — 다만
-            # 원래 'lens' 슬롯 자체를 채널로 조회하는 경우는 publications
-            # 메타데이터 위주로 응답한다.
+            # 가진다(format='letter', 관점 텍스트 백필분 포함). 목록은
+            # publications 메타데이터 위주로 조회하고, 각 발행물의 렌디션
+            # 라벨만 별도로 배치 조회해 붙인다(아래 lens_labels_by_pub,
+            # v1.18) — 전체 콘텐츠는 단건 조회(v1.17)에서만 조립한다.
             sql = """
                 SELECT id AS publication_id, slug, title, subtitle, cover_image_url,
                        source_url, status, published_at, created_at, updated_at,
@@ -170,12 +172,36 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             cur.execute(sql, params)
 
         rows = _dictfetchall(cur)
+
+        lens_labels_by_pub: Dict[int, List[str]] = {}
+        if channel == "lens" and rows:
+            pub_ids = [r["publication_id"] for r in rows]
+            cur.execute(
+                "SELECT publication_id, format FROM renditions WHERE publication_id = ANY(%s) ORDER BY id",
+                (pub_ids,),
+            )
+            for pub_id, fmt in cur.fetchall():
+                lens_labels_by_pub.setdefault(pub_id, []).append(
+                    _FORMAT_TO_LENS_LABEL.get(fmt, fmt or "")
+                )
+
         posts = []
         for row in rows:
             row["channel"] = channel
             row["images"] = row.pop("images_json", None) or []
             row["body_paragraphs"] = row.pop("body_json", None) or []
-            posts.append(_row_to_post(row))
+            post = _row_to_post(row)
+            if channel == "lens":
+                # 목록은 라벨만 필요(shape_lens_summary가 label/question/
+                # bullets만 남기고 나머지는 버림) — 렌디션당 전체 콘텐츠를
+                # 끌어오는 N+1 쿼리 대신, 위에서 한 번에 모은 라벨만 채운다.
+                # 실제 콘텐츠(paragraphs/images/video_url 등)는 단건 조회
+                # (get_published_post_by_slug, v1.17)에서만 조립한다.
+                post["body_inline"]["lenses"] = [
+                    {"label": label, "question": "", "bullets": []}
+                    for label in lens_labels_by_pub.get(row["publication_id"], [])
+                ]
+            posts.append(post)
         return posts
     finally:
         conn.close()
