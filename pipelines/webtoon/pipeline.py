@@ -57,10 +57,19 @@ IMAGE_SIZE = "1536x1024"         # 3:2 가로. 컷당 $0.165 (2026-08 기준, hi
 IMAGE_QUALITY = "high"
 N_CUTS = 8
 
-# "openai"(원래 GPT 경로, 말풍선까지 이미지 모델이 그림) | "bedrock"(배경만
-# Bedrock, 텍스트는 compose_text.py가 합성) — OpenAI 크레딧 복구되면 다시
-# "openai"로 바꾸면 됨.
-IMAGE_PROVIDER = "bedrock"
+# "openai"(원래 GPT 경로, 말풍선까지 이미지 모델이 그림) | "bedrock"(Stable
+# Image Core, 순수 텍스트 프롬프트) | "bedrock-style-guide"(Stable Image
+# Style Guide, 참고 이미지로 화풍 고정 — 2026-09-08 신설, 기본값으로 승격).
+# 셋 다 텍스트는 compose_text.py가 합성(openai만 예외 — 모델이 직접 그림).
+#
+# bedrock → bedrock-style-guide 전환 경위: 사용자가 공유한 참고 샘플과
+# 대조한 결과 Stable Image Core 순수 텍스트 프롬프트는 "cel-shaded, NOT
+# photorealistic"을 명시해도 반실사 디지털 페인팅으로 나오는 화풍 자체의
+# 한계가 있었다. Style Guide는 참고 이미지(webtoon_image.py의
+# STYLE_REFERENCE_IMAGE_PATH)로 화풍을 고정해 실측상 훨씬 근접했다 — 사용자가
+# OpenAI 대신 Stable Diffusion 계열 유지를 명시적으로 결정했으므로(2026-09-08),
+# 그 제약 안에서 참고 샘플에 가장 가까운 이 경로를 기본값으로 삼는다.
+IMAGE_PROVIDER = "bedrock-style-guide"
 
 # 2026-09-05 — 여기 있던 _characters_block/_SCENE_REINFORCEMENT/
 # _CHARACTER_REINFORCEMENT/build_background_prompt/BEDROCK_IMAGE_REGION/
@@ -72,7 +81,9 @@ IMAGE_PROVIDER = "bedrock"
 # 이전과 같은 이름으로 그대로 import해서 아래 호출부들은 안 바뀐다.
 from webtoon_image import (
     build_background_prompt,
+    build_style_guide_prompt,
     generate_bedrock_image as generate_image_bedrock,
+    generate_bedrock_style_guide_image as generate_image_bedrock_style_guide,
     characters_block as _characters_block,
     SCENE_REINFORCEMENT as _SCENE_REINFORCEMENT,
     CHARACTER_REINFORCEMENT as _CHARACTER_REINFORCEMENT,
@@ -214,22 +225,26 @@ def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool)
         return dict(_DEFAULT_VERDICT)
 
 
-def _generate_and_qa_cut(prompt: str, img_path: Path, scene: str, tag: str, n: int) -> tuple[bool, dict]:
+def _generate_and_qa_cut(prompt: str, img_path: Path, scene: str, tag: str, n: int, generate_fn=generate_image_bedrock) -> tuple[bool, dict]:
     """배경 생성 + QA 검증 + (필요시) 1회 재생성까지 한 컷 분량을 처리한다.
     run_article()의 3단계 루프가 생성·QA·재시도·합성을 전부 인라인으로
     떠안고 있어서(2026-09-02 QA 루프 추가 당시) 읽기 어려워진 걸 분리—
     이 함수는 "이미지 파일을 만든다"까지만 책임지고, 텍스트 합성은
     호출부(run_article)가 계속 맡는다.
 
-    Bedrock 경로 전용이다 — GPT 경로(IMAGE_PROVIDER="openai", 휴면)는 이
-    QA를 안 거친다. GPT의 image_generation 툴은 배경+말풍선 텍스트를
-    한 번에 완성된 그림으로 만들어서 애초에 "배경만 비전 모델로 검사"하는
-    이 구조 자체가 안 맞고(무엇을 사극/인물오탐 기준으로 잴지도 다름),
-    Bedrock 경로에서 발견된 변동성 문제(같은 프롬프트도 결과가 크게
-    다름)가 GPT 쪽에서도 똑같이 재현되는지 확인된 바가 없다 — 크레딧
-    복구 후 GPT 경로를 다시 쓰게 되면 그때 별도로 검증할 것.
+    generate_fn — 2026-09-08 추가. Bedrock 계열(Stable Image Core/Style
+    Guide) 둘 다 "배경만 그리고 QA로 검증"하는 이 구조를 그대로 쓸 수
+    있어서, 실제 생성 호출 함수만 파라미터로 뺐다(기본값은 Stable Image
+    Core, run_article()이 IMAGE_PROVIDER에 따라 다른 함수를 넘긴다).
+
+    GPT 경로(IMAGE_PROVIDER="openai", 휴면)는 이 QA를 안 거친다. GPT의
+    image_generation 툴은 배경+말풍선 텍스트를 한 번에 완성된 그림으로
+    만들어서 애초에 "배경만 비전 모델로 검사"하는 이 구조 자체가 안 맞고
+    (무엇을 사극/인물오탐 기준으로 잴지도 다름), Bedrock 경로에서 발견된
+    변동성 문제(같은 프롬프트도 결과가 크게 다름)가 GPT 쪽에서도 똑같이
+    재현되는지 확인된 바가 없다.
     """
-    ok = generate_image_bedrock(prompt, img_path)
+    ok = generate_fn(prompt, img_path)
     verdict = dict(_DEFAULT_VERDICT)
     if not ok:
         return ok, verdict
@@ -239,7 +254,7 @@ def _generate_and_qa_cut(prompt: str, img_path: Path, scene: str, tag: str, n: i
     if verdict.get("sageuk") or verdict.get("no_people_violated"):
         reason = "사극 오염" if verdict.get("sageuk") else "인물 없음 위반"
         print(f"{tag} 컷{n} QA 실패({reason}) — 재생성 1회 시도")
-        ok_retry = generate_image_bedrock(prompt, img_path)
+        ok_retry = generate_fn(prompt, img_path)
         if ok_retry:
             verdict = _validate_and_detect(img_path, scene, no_people_expected)
         # 재생성이 실패해도 첫 시도 결과가 파일로 남아있으니 발행은 계속한다
@@ -314,9 +329,14 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             continue
         s = scene_map[n]
         print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
-        if IMAGE_PROVIDER == "bedrock":
-            prompt = build_background_prompt(s["camera"], s["scene"], characters)
-            ok, verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n)
+        if IMAGE_PROVIDER in ("bedrock", "bedrock-style-guide"):
+            if IMAGE_PROVIDER == "bedrock-style-guide":
+                prompt = build_style_guide_prompt(s["camera"], s["scene"])
+                generate_fn = generate_image_bedrock_style_guide
+            else:
+                prompt = build_background_prompt(s["camera"], s["scene"], characters)
+                generate_fn = generate_image_bedrock
+            ok, verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n, generate_fn)
             if ok:
                 face_x = verdict.get("faces_left_to_right_x") or None
                 try:

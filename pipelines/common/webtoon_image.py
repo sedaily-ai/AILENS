@@ -258,6 +258,57 @@ def build_background_prompt(
     )
 
 
+# 2026-09-08 — Style Guide 경로 전용 프롬프트 조립.
+#
+# ⚠️ 실측으로 확인한 함정: 참고 이미지(STYLE_REFERENCE_IMAGE_PATH)만 넣으면
+# 화풍이 안 지켜진다. 처음 두 번의 수동 테스트(단순한 1~2문장 프롬프트 +
+# "flat cel-shaded webtoon" 문구 포함)는 성공했는데, 그대로 파이프라인에
+# 옮기면서 그 문구를 "이미지가 알아서 전달하겠지"라며 빼고 대신
+# characters_block(긴 인물 묘사)+CHARACTER_REINFORCEMENT+SCENE_REINFORCEMENT
+# 를 다 붙였더니 결과가 반실사 사진으로 되돌아갔다(실측: 컷1·4 전부 스튜디오
+# 사진처럼 나옴). fidelity를 0.5→0.75로 올려도 안 고쳐지고 오히려 더
+# 사진스러워졌다 — 참고 이미지의 "사진 같은 스튜디오 조명" 요소까지 같이
+# 강하게 전이된 것으로 추정. 원인을 좁히려고 단일 컷 테스트를 반복한 끝에,
+# **"flat cel-shaded webtoon, NOT photorealistic" 문구를 프롬프트 맨 앞에
+# 명시하고 나머지를 짧게 유지**하니 다시 원하는 화풍으로 돌아왔다(인물 2명·
+# 인포그래픽 화면까지 정상). 결론: 참고 이미지는 화풍의 "보조" 앵커일 뿐,
+# 텍스트로 명시한 스타일 지시를 대신하지 못한다 — 항상 같이 써야 한다.
+#
+# 그래서 이 함수는 build_background_prompt()보다 훨씬 짧게 유지한다:
+# 스타일 힌트(한 줄) + 카메라 + [SCENE] + 짧은 내용 규칙 + 텍스트 렌더
+# 금지. characters_block/CHARACTER_REINFORCEMENT(인물 세부 외형 재강조)는
+# 일부러 안 쓴다 — 참고 이미지가 이미 인물 톤을 앵커하고 있어서, 장문의
+# 인물 묘사를 더 얹으면 위 문제가 재현된다.
+_STYLE_GUIDE_STYLE_HINT = (
+    "Modern Korean webtoon illustration, full color, clean flat cel-shaded "
+    "linework style — NOT photorealistic, NOT a photograph, NOT camera-captured."
+)
+
+_STYLE_GUIDE_CONTENT_RULES = (
+    "Contemporary present-day South Korea only — do NOT render historical, "
+    "period, fantasy, or traditional hanbok clothing or settings. Do NOT "
+    "render the likeness of any real public figure, and do NOT render real "
+    "corporate logos, trademarks, or institutional insignia. Render exactly "
+    "what [SCENE] describes and nothing more — no extra background crowds "
+    "or characters beyond what [SCENE] specifies."
+)
+
+
+def build_style_guide_prompt(camera: str, scene: str) -> str:
+    """Style Guide 경로 전용 프롬프트 — 위 실측 결과를 따라 일부러
+    짧게 유지한다(스타일 힌트 + 카메라 + 장면 + 내용 규칙 + 텍스트
+    렌더 금지뿐). characters 파라미터를 안 받는 이유도 위 주석 참고."""
+    return (
+        _STYLE_GUIDE_STYLE_HINT
+        + f"\nCamera: {camera}."
+        + f"\n\n[SCENE]\n{scene}"
+        + f"\n\n{_STYLE_GUIDE_CONTENT_RULES}"
+        + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
+        "or speech bubbles anywhere in this image — pure illustration only, no "
+        "readable characters of any kind. Text will be added separately afterward."
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # Bedrock Stable Image Core 호출
 # ─────────────────────────────────────────────────────────────
@@ -312,6 +363,90 @@ def generate_bedrock_image(prompt: str, out_path: Path, retries: int = 3) -> boo
     for attempt in range(retries):
         try:
             data = generate_bedrock_image_bytes(prompt)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(data)
+            return True
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = (attempt + 1) * 12
+                print(f"    ⚠️  오류: {e} → {wait}초 후 재시도...")
+                time.sleep(wait)
+            else:
+                print(f"    ❌ 최종 실패: {e}")
+                return False
+    return False
+
+
+# ─────────────────────────────────────────────────────────────
+# Bedrock Stable Image Style Guide 호출 (2026-09-08 신설)
+# ─────────────────────────────────────────────────────────────
+#
+# 배경: 사용자가 카카오톡으로 공유한 참고 샘플(육하원칙 프롬프트 문서로
+# GPT 이미지 툴에서 뽑은 결과물)과 Stable Image Core 순수 텍스트 프롬프트
+# 출력을 나란히 대조한 결과, 인물 렌더링 자체가 "플랫 셀 채색 웹툰"이
+# 아니라 "정교한 반실사 디지털 페인팅"으로 나오는 근본적 화풍 차이를
+# 발견했다 — STYLE 프롬프트에 "cel-shaded, NOT photorealistic"를 아무리
+# 명시해도 Stable Image Core 자체의 렌더링 성향을 못 이겼다.
+#
+# Style Guide는 텍스트 프롬프트 + 참고 이미지 1장을 같이 받아 그 이미지의
+# 화풍(선화·채색·인물 톤)을 새 장면에 적용한다 — 실측(2026-09-08, 참고
+# 이미지 1장 고정, 서로 다른 두 장면 프롬프트)으로 화풍·인물 헤어스타일이
+# 두 장면에서 거의 동일하게 유지되는 걸 확인, Stable Image Core보다
+# 참고 샘플에 훨씬 근접했다. 텍스트는 이 모델도 여전히 정확히 못 그린다
+# (화면 속 글자가 깨져 나옴) — compose_text.py의 PIL 합성 구조는 그대로
+# 유지한다.
+#
+# 참고 이미지는 assets/webtoon_style_reference.png(사용자가 준 샘플 원본)
+# 하나로 고정 — 8컷 전체가 같은 스타일 앵커를 쓰게 해서 컷 간 화풍
+# 일관성도 같이 챙긴다(캐릭터 얼굴 100% 동일은 여전히 보장 못 하지만,
+# 헤어스타일·색감·선화 스타일은 Style Guide 쪽이 확실히 낫다).
+STYLE_REFERENCE_IMAGE_PATH = Path(__file__).parent / "assets" / "webtoon_style_reference.png"
+STYLE_GUIDE_FIDELITY = 0.5  # 0=프롬프트 위주, 1=참고 이미지 재현 위주. 실측 후 조정 가능.
+# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
+# (BEDROCK_IMAGE_MODEL_ID와 동일 태깅 정책 — 비용태깅_규칙.md 참고).
+STYLE_GUIDE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/118crex43ghc"  # lens-webtoon-image-style-guide → us.stability.stable-image-style-guide-v1:0
+
+_style_reference_b64: str | None = None
+
+
+def _get_style_reference_b64() -> str:
+    global _style_reference_b64
+    if _style_reference_b64 is None:
+        _style_reference_b64 = base64.b64encode(STYLE_REFERENCE_IMAGE_PATH.read_bytes()).decode()
+    return _style_reference_b64
+
+
+def generate_bedrock_style_guide_image_bytes(prompt: str, fidelity: float = STYLE_GUIDE_FIDELITY) -> bytes:
+    """Stable Image Style Guide(Bedrock) 1회 호출 — generate_bedrock_image_bytes()와
+    같은 계약(성공하면 PNG bytes, 실패하면 예외)이지만 STYLE 텍스트 대신
+    참고 이미지 1장으로 화풍을 고정한다. prompt는 build_style_guide_prompt()가
+    만든 짧은 프롬프트를 그대로 받는다(스타일 힌트 문구 포함 필수 — 그
+    함수 상단 주석의 실측 결과 참고, 이미지만으로는 화풍이 안 지켜진다).
+
+    aspect_ratio를 BEDROCK_ASPECT_RATIO(3:2)로 고정 — 첫 실측 때 이 파라미터를
+    빠뜨려서 1:1 정사각형으로 나왔고, 좁아진 캔버스에서 말풍선 2개가 겹쳐
+    얼굴을 가리는 부수 문제까지 만들었다(compose_text.py의 말풍선 배치는
+    3:2 비율을 전제로 튜닝돼 있음)."""
+    body = json.dumps({
+        "prompt": prompt[:9500],
+        "image": _get_style_reference_b64(),
+        "fidelity": fidelity,
+        "aspect_ratio": BEDROCK_ASPECT_RATIO,
+        "output_format": "png",
+    })
+    resp = _get_bedrock_image_client().invoke_model(modelId=STYLE_GUIDE_MODEL_ID, body=body)
+    payload = json.loads(resp["body"].read())
+    images = payload.get("images") or []
+    if not images:
+        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
+    return base64.b64decode(images[0])
+
+
+def generate_bedrock_style_guide_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
+    """generate_bedrock_image()와 동일한 파일-쓰기 + 재시도 래퍼(Style Guide 버전)."""
+    for attempt in range(retries):
+        try:
+            data = generate_bedrock_style_guide_image_bytes(prompt)
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(data)
             return True
