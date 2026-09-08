@@ -84,7 +84,7 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     slug: Optional[str] = path_params.get("slug")
 
     if slug:
-        post = posts_client.get_published_post_by_slug(slug)
+        post = posts_client.get_published_post_by_slug(slug, channel=qs.get("channel"))
         if not post:
             return error_response("post not found", status_code=404, code="NOT_FOUND")
         channel = (post.get("channels") or ["letters"])[0]

@@ -32,6 +32,7 @@ _FORMAT_TO_CHANNEL = {
     "podcast": "home_player",
     "letter": "letters",
 }
+_CHANNEL_TO_FORMAT = {v: k for k, v in _FORMAT_TO_CHANNEL.items()}
 
 
 def _conn():
@@ -184,21 +185,30 @@ _BY_PUBLICATION_ID_SELECT = """
     LEFT JOIN renditions r ON r.publication_id = p.id
     LEFT JOIN media_assets ma ON ma.rendition_id = r.id
     WHERE p.id = %s AND p.status = 'published' AND p.deleted_at IS NULL
-    ORDER BY r.id
-    LIMIT 1
 """
+_ORDER_LIMIT_ONE = " ORDER BY r.id LIMIT 1"
 
 
-def get_published_post_by_slug(slug: str) -> Optional[Dict[str, Any]]:
+def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """slug로 발행물을 조회한다.
 
     publications.slug에서 못 찾으면 publication_slug_history로 폴백한다
     (v1.13/v1.15 참조 — 마이그레이션 당시 형제 채널의 slug가 UNIQUE(slug)
     제약 때문에 대표 채널 slug에 밀려 유실됐는데, 그 옛 slug로 들어오는
-    북마크·검색엔진 색인 URL을 살리기 위함). 폴백 시에도 어떤 렌디션을
-    돌려줄지는 기존과 동일하게 `ORDER BY r.id LIMIT 1`로 임의 선택한다 —
-    포맷 구분 없이 조회하는 기존 한계(v1.13 문서화)를 그대로 유지할 뿐,
-    이 백필로 새로 나빠지는 건 없다(이전엔 404였던 것이 조회는 되게 함).
+    북마크·검색엔진 색인 URL을 살리기 위함).
+
+    한 발행물에 여러 포맷 렌디션이 있을 수 있어(v1.4 마이그레이션이
+    형제 채널들을 하나의 publications 행에 묶었다), `channel`을 받으면
+    그 채널에 대응하는 format으로 렌디션을 필터링해 정확한 것을
+    돌려준다 — 프론트엔드는 실제로 단건 조회마다 `?channel=` 을 항상
+    붙인다(2026-09-09 라우팅 조사 확인, webtoon/[slug]·video/[slug]·
+    letters/[id] 각각 자기 채널로 스코프된 fetch만 함). `channel`이
+    없거나 그 채널에 해당하는 렌디션이 없으면(드묾 — v1.12로 모든
+    publications가 최소 1개 렌디션을 가짐) 기존과 동일하게
+    `ORDER BY r.id LIMIT 1`로 임의 선택한다. 'lens'는 포맷이 아니라
+    별도 다중 포맷 조합 UI라 이 필터링 대상이 아니다(v1.12 문서화된
+    한계 그대로 — FormatPicker가 기대하는 4-포맷 통합 응답은 별도
+    재설계 필요, 이번 범위 밖).
     """
     conn = _conn()
     try:
@@ -217,8 +227,14 @@ def get_published_post_by_slug(slug: str) -> Optional[Dict[str, Any]]:
                 return None
             pub_id = hist_row[0]
 
-        cur.execute(_BY_PUBLICATION_ID_SELECT, (pub_id,))
-        found = _dictfetchone(cur)
+        fmt = _CHANNEL_TO_FORMAT.get(channel) if channel else None
+        found = None
+        if fmt:
+            cur.execute(_BY_PUBLICATION_ID_SELECT + " AND r.format = %s" + _ORDER_LIMIT_ONE, (pub_id, fmt))
+            found = _dictfetchone(cur)
+        if not found:
+            cur.execute(_BY_PUBLICATION_ID_SELECT + _ORDER_LIMIT_ONE, (pub_id,))
+            found = _dictfetchone(cur)
         if not found:
             return None
         found["channel"] = _FORMAT_TO_CHANNEL.get(found.get("format"), "lens")

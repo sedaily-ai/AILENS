@@ -31,7 +31,7 @@ def _install(monkeypatch, fake: _FakePosts) -> None:
     )
     monkeypatch.setattr(
         cms_posts_public.posts_client, "get_published_post_by_slug",
-        lambda slug: fake.one,
+        lambda slug, channel=None: fake.one,
     )
 
 

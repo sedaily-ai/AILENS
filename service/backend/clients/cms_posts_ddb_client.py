@@ -105,7 +105,10 @@ def list_published_posts(
     return _list_published_posts_legacy(channel, date, limit)
 
 
-def get_published_post_by_slug(slug: str) -> Optional[Dict[str, Any]]:
+def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """channel은 cms_posts_pg_client.py와의 인터페이스 호환을 위한 파라미터다
+    (Postgres는 여러 채널이 한 slug로 묶여 포맷 구분이 필요하지만, DynamoDB는
+    아이템별로 slug가 이미 고유해 여기서는 의미 없음 — 받기만 하고 무시)."""
     resp = _table().query(
         IndexName="slug-index",
         KeyConditionExpression=Key("slug").eq(slug),
