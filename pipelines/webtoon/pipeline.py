@@ -226,7 +226,24 @@ def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool)
         return dict(_DEFAULT_VERDICT)
 
 
-def _generate_and_qa_cut(prompt: str, img_path: Path, scene: str, tag: str, n: int, generate_fn=generate_image_bedrock) -> tuple[bool, dict]:
+
+# 2026-09-08(4차, #14 "배경 엑스트라 난입" 대응) — 참고 이미지 교체나
+# negative_prompt 같은 프롬프트 쪽 레버를 여러 조합(fidelity 0.3~0.65,
+# Style Guide/Core 둘 다, 강한 부정문/negative_prompt 파라미터)으로
+# 실측했지만 "군중·거리 배경으로 쏠리는 경향" 자체는 못 이겼다(라운드
+# 기록.md R9). 반면 이 파이프라인은 이미 "사극 오염 감지 → 안 좋으면
+# 재생성"(위 _generate_and_qa_cut) 구조와 Rekognition 얼굴 감지
+# (rekognition_client.detect_main_faces, 신뢰도 95%+·크기 5%+ 필터로
+# 주요 인물과 배경 엑스트라를 구분하는 게 실측으로 확인됨)를 이미 갖고
+# 있다 — 프롬프트로 확률을 낮추는 대신, 결과물의 얼굴 수를 세서 나쁘면
+# 걸러내는 같은 "생성→검사→재시도" 철학을 여기에도 적용한다.
+_MAX_EXPECTED_FACES = 2  # 이 파이프라인은 고정 진행자 2인(A/B)만 쓴다.
+
+
+def _generate_and_qa_cut(
+    prompt: str, img_path: Path, scene: str, tag: str, n: int, generate_fn=generate_image_bedrock,
+    *, has_dialogue: bool = True,
+) -> tuple[bool, dict, list | None]:
     """배경 생성 + QA 검증 + (필요시) 1회 재생성까지 한 컷 분량을 처리한다.
     run_article()의 3단계 루프가 생성·QA·재시도·합성을 전부 인라인으로
     떠안고 있어서(2026-09-02 QA 루프 추가 당시) 읽기 어려워진 걸 분리—
@@ -244,24 +261,53 @@ def _generate_and_qa_cut(prompt: str, img_path: Path, scene: str, tag: str, n: i
     (무엇을 사극/인물오탐 기준으로 잴지도 다름), Bedrock 경로에서 발견된
     변동성 문제(같은 프롬프트도 결과가 크게 다름)가 GPT 쪽에서도 똑같이
     재현되는지 확인된 바가 없다.
-    """
+
+    반환값에 faces가 추가됐다(2026-09-08, #14 대응) — QA 단계에서 이미
+    Rekognition을 돌리므로, 호출부(run_article)가 말풍선 배치를 위해
+    같은 이미지에 대해 또 한 번 부르지 않도록 여기서 감지한 결과를
+    그대로 넘긴다(재시도했다면 재시도 결과의 얼굴, 재시도 안 했다면
+    최초 생성 결과의 얼굴).
+
+    has_dialogue — 2026-09-08 추가. 배경 인물 초과 체크(_MAX_EXPECTED_FACES)는
+    "이 컷에 A/B 두 화자가 보여야 한다"는 전제 위에서만 의미가 있다.
+    컷1(표지)·컷8(마무리) 같은 상징적 컷은 대사가 없고 의도적으로 인물
+    없는 부감·군중 샷을 쓰기도 해서(실측: 실제 파이프라인 재현 중 컷1이
+    "수백 명 청중 부감" 장면으로 나왔는데 이 체크가 무차별 적용돼 불필요한
+    재생성이 걸림) — 대사가 있는 컷에서만 켠다. 호출부(run_article)가
+    `cut.get("dialogue")` 유무로 넘겨준다."""
     ok = generate_fn(prompt, img_path)
     verdict = dict(_DEFAULT_VERDICT)
+    faces = None
     if not ok:
-        return ok, verdict
+        return ok, verdict, faces
 
-    no_people_expected = "인물 없음" in scene
+    # "인물 없음"/"인물 없이"/"인물 없는" 등 2단계 장면 텍스트가 실제로 쓰는
+    # 표현이 갈린다(admin 가이드 문서에도 두 표현이 다 등장 — service/backend/
+    # prompts/webtoon/published.md 참고) — 원래 "인물 없음"만 봤던 게 컷1의
+    # "인물 없이" 표현을 못 잡는 걸 실전 재현으로 확인해 넓혔다.
+    no_people_expected = any(p in scene for p in ("인물 없음", "인물 없이", "인물 없는", "인물이 없"))
     verdict = _validate_and_detect(img_path, scene, no_people_expected)
-    if verdict.get("sageuk") or verdict.get("no_people_violated"):
-        reason = "사극 오염" if verdict.get("sageuk") else "인물 없음 위반"
+    faces = detect_main_faces(img_path.read_bytes()) or None
+    extra_people = (
+        has_dialogue and not no_people_expected
+        and faces is not None and len(faces) > _MAX_EXPECTED_FACES
+    )
+    if verdict.get("sageuk") or verdict.get("no_people_violated") or extra_people:
+        if verdict.get("sageuk"):
+            reason = "사극 오염"
+        elif verdict.get("no_people_violated"):
+            reason = "인물 없음 위반"
+        else:
+            reason = f"배경 인물 초과({len(faces)}명 감지, 최대 {_MAX_EXPECTED_FACES}명 예상)"
         print(f"{tag} 컷{n} QA 실패({reason}) — 재생성 1회 시도")
         ok_retry = generate_fn(prompt, img_path)
         if ok_retry:
             verdict = _validate_and_detect(img_path, scene, no_people_expected)
+            faces = detect_main_faces(img_path.read_bytes()) or None
         # 재생성이 실패해도 첫 시도 결과가 파일로 남아있으니 발행은 계속한다
         # (QA 실패 < 완전 실패 — 둘 다 막으면 자동 발행이 통째로 멈춘다).
         ok = ok_retry or ok
-    return ok, verdict
+    return ok, verdict, faces
 
 
 def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True):
@@ -337,13 +383,17 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             else:
                 prompt = build_background_prompt(s["camera"], s["scene"], characters)
                 generate_fn = generate_image_bedrock
-            ok, _verdict = _generate_and_qa_cut(prompt, img_path, s["scene"], tag, n, generate_fn)
+            ok, _verdict, faces = _generate_and_qa_cut(
+                prompt, img_path, s["scene"], tag, n, generate_fn,
+                has_dialogue=bool(cut.get("dialogue")),
+            )
             if ok:
-                # 2026-09-08 — 얼굴 위치는 이제 QA 비전 모델(verdict)이 아니라
+                # 2026-09-08 — 얼굴 위치는 QA 비전 모델(verdict)이 아니라
                 # Rekognition 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM
                 # 상단 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
-                # 얼굴 상단을 피해 말풍선을 배치할 수 있다.
-                faces = detect_main_faces(img_path.read_bytes()) or None
+                # 얼굴 상단을 피해 말풍선을 배치할 수 있다. _generate_and_qa_cut()가
+                # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다
+                # (배경 인물 초과 체크에도 같은 결과를 재사용, 위 함수 docstring 참고).
                 try:
                     compose_text.compose(img_path, cut, faces)
                 except Exception as e:
