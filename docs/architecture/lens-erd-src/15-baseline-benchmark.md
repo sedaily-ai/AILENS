@@ -85,6 +85,39 @@ curl -s -o /dev/null -w "time_total=%{time_total}s size=%{size_download}bytes\n"
 `cms-posts`는 측정 구간(2일) 동안 쓰기 용량(23,137)이 읽기 용량(20,431)보다
 많았다. 원인 분석은 이번 조사 범위 밖.
 
+## 5. 이관 후 측정 (2026-09-08, Postgres dev 인스턴스)
+
+`lens-postgres-migration-dev`(Aurora PostgreSQL 16.14, Serverless v2)에
+v1.4 데이터 마이그레이션 완료 후 측정. **방법론 차이를 먼저 밝힌다**:
+§3(DynamoDB)은 실제 프로덕션 API(`curl`)로 Lambda·API Gateway를 포함한
+종단 간 응답을 쟀지만, Postgres 쪽은 **아직 그 앞단(Lambda/API)이 없어서
+Python 스크립트→DB 직접 쿼리 왕복시간**을 쟀다 — 네트워크 왕복은
+포함되지만 애플리케이션 레이어 처리(JSON 직렬화, 인증 등)는 빠져 있다.
+그래서 아래 숫자는 "완전히 같은 조건의 재측정"이 아니라 **DB 계층
+자체가 실제로 얼마나 빠른지의 참고치**로 읽어야 한다.
+
+| 요청 | Postgres 응답시간 | 페이로드 | DynamoDB 이관 전(§3) | 비고 |
+|---|---|---|---|---|
+| webtoon limit=20 | 0.39s | 7.2KB | 2.10s / 14.3KB | |
+| video limit=20 | 0.19s | 7.2KB | 1.42s / 14.7KB | |
+| publications(=lens 대응) limit=20 | 0.19s | 13.8KB | 4.25s / 68.8KB | |
+| webtoon limit=1000 | 0.77s | 300.6KB | 2.89s / 603.3KB | 986건 중 848건 반환(전체가 848건) |
+| publications limit=1000(=lens 대응) | 0.39s | 603.4KB | 5.57s / 2.47MB | 986건 전부 반환 |
+
+**EXPLAIN ANALYZE 결과** (`publications` 최신순 20건 조회):
+```
+Limit → Sort(top-N heapsort) → Seq Scan on publications
+Execution Time: 0.380 ms
+```
+인덱스(`publications_published_idx`)를 안 쓰고 **Seq Scan**을 쓰고 있다 —
+지금 데이터가 986건뿐이라 Postgres 플래너가 "테이블 전체를 훑는 게
+인덱스 타는 것보다 싸다"고 판단한 것으로, **오작동이 아니라 이 규모에서
+정상적인 판단**이다. 실제 프로덕션 규모(articles 기준 수만~수십만 건)로
+커지면 플래너가 인덱스 스캔으로 전환하는지 재확인이 필요하다 — 지금
+검증된 건 아님.
+
+측정 스크립트: `scratchpad/benchmark.py`(psycopg2 직접 실행, `time.perf_counter()`로 측정).
+
 ## 이관 후 비교 방법 (재사용 절차)
 
 1. 위 4개 표의 명령을 Postgres 이관 완료 시점에 동일하게 재실행

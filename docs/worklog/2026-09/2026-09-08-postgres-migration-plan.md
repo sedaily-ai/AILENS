@@ -171,3 +171,14 @@ source_url 기준으로 여러 채널에 걸쳐 반복됨을 발견해 그룹핑
 했음. 장시간 단일 트랜잭션으로 처리하던 cms-posts 스크립트가 연결 끊김으로
 1회 실패 — 50그룹 단위 중간 커밋 + `ON CONFLICT ... DO UPDATE RETURNING`
 패턴으로 재실행 시 안전하게 이어지도록 수정 후 재실행해 해결.
+
+## §4 실행 기록 (2026-09-08) — 베이스라인 비교
+
+`docs/architecture/lens-erd-src/15-baseline-benchmark.md` §5에 Postgres
+측 재측정 결과 추가. 측정된 모든 항목(webtoon/publications × limit
+20/1000)에서 Postgres가 DynamoDB보다 빠르게 나왔으나, **아직 Lambda/API
+계층이 없어 종단 간 비교가 아니라 DB 직접 쿼리 비교**라는 방법론 차이를
+명시했다. EXPLAIN ANALYZE로 현재 986건 규모에서 Seq Scan이 선택되는
+것도 확인(정상 — 데이터가 적어서 플래너가 그렇게 판단). 진짜 이관 성공
+여부는 실제 백엔드가 Postgres로 전환된 뒤 종단 간 재측정으로 판단해야
+한다. 상세: `docs/architecture/db-changelog/postgres/v1.5-베이스라인-비교.md`.
