@@ -12,13 +12,23 @@ services/cms_posts_shaping.py로 뺐다(코드 리팩토링 감사 Track B, God
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
 
-from clients import cms_posts_ddb_client as posts_client
+# CMS_DB_BACKEND 컷오버 스위치 (2026-09-09, Postgres 이관 검증용) —
+# CMS_LIST_INDEX_MODE(2026-09-07 GSI 이관)와 같은 패턴: 코드 배포와 실제
+# 전환을 분리해 Lambda 환경변수만으로 즉시 롤백 가능하게 한다. 기본값은
+# 기존 DynamoDB 그대로라, 이 커밋을 배포해도 아무것도 안 바뀐다.
+# "postgres"로 바꾸기 전에 clients/cms_posts_pg_client.py 상단의 "알려진
+# 차이"(lens 채널 lenses[] 미이관 등)를 반드시 확인할 것.
+if os.environ.get("CMS_DB_BACKEND") == "postgres":
+    from clients import cms_posts_pg_client as posts_client
+else:
+    from clients import cms_posts_ddb_client as posts_client
 from services.cms_posts_shaping import (
     SHAPERS,
     shape_letter,

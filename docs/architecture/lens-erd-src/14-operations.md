@@ -160,6 +160,18 @@ GRANT SELECT, INSERT ON view_adjustments TO lens_admin_app;
 GRANT SELECT ON view_adjustments TO lens_service_app; -- 필요 시 조정 이력 노출용, 아니면 생략
 ```
 
+**추가 SELECT 권한 (2026-09-09, `cms_posts_pg_client.py` 작성하며 확인)**:
+위 §3 설계는 `view_counts`/`view_adjustments`만 다뤘는데, 실제로
+`lens_service_app`(공개 사이트)이 공개 조회 API를 서빙하려면 그 외
+테이블에도 일반 SELECT가 필요하다 — 컬럼별 GRANT만으로는 부족했다.
+
+```sql
+GRANT SELECT ON publications, renditions, webtoon_panels, media_assets, rendition_blocks,
+              articles, article_images, article_related_news, article_categories,
+              categories, sections, quizzes, quiz_options, users, v_live_renditions
+TO lens_service_app;
+```
+
 ---
 
 ## 4. 회원 탈퇴 삭제 정책 — 하드 삭제 원칙 (2026-09-08)
