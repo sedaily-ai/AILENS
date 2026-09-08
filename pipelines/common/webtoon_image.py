@@ -276,12 +276,26 @@ def build_background_prompt(
 #
 # 그래서 이 함수는 build_background_prompt()보다 훨씬 짧게 유지한다:
 # 스타일 힌트(한 줄) + 카메라 + [SCENE] + 짧은 내용 규칙 + 텍스트 렌더
-# 금지. characters_block/CHARACTER_REINFORCEMENT(인물 세부 외형 재강조)는
-# 일부러 안 쓴다 — 참고 이미지가 이미 인물 톤을 앵커하고 있어서, 장문의
-# 인물 묘사를 더 얹으면 위 문제가 재현된다.
+# 금지. characters_block/CHARACTER_REINFORCEMENT(인물 세부 외형 재강조,
+# 문단 단위)는 일부러 안 쓴다 — 참고 이미지가 이미 인물 톤을 앵커하고
+# 있어서, 장문의 인물 묘사를 더 얹으면 위 문제가 재현된다.
+#
+# 2026-09-08(2차, 독자 관점 피드백 "이 사람 누구야?" 대응) — 단, 성별
+# 정보는 완전히 빠뜨리면 안 된다는 게 실측으로 드러났다. 2단계 장면
+# 텍스트가 "A(청재킷)/B(짙은 남색 셔츠)"처럼 옷차림만 라벨링하고 성별
+# 단어 자체가 없는데(1단계 script의 characters.A="...여성...",
+# characters.B="...남성..."이 있어도 3단계 프롬프트엔 안 실림 — 애초에
+# 이 파이프라인은 기사마다 새로 짓는 그 인물 묘사 대신 고정 진행자
+# 2인을 쓰기로 한 설계라 pipeline.py가 이 값을 아예 안 넘긴다), 참고
+# 이미지 안에서 "A가 어느 쪽 인물인지" 판단할 근거가 하나도 없어서
+# 여성만 3명 나오거나 남성이 아예 안 나오는 등 인물 구성이 컷마다
+# 흔들렸다(라운드기록.md #15). "A는 여성, B는 남성"이라는 한 줄만
+# 추가했더니(문단 단위 재강조가 아니라 짧은 역할 매핑 한 줄) 화풍
+# 훼손 없이 남녀 둘 다 안정적으로 나오는 걸 확인 — 이 한 줄만 추가한다.
 _STYLE_GUIDE_STYLE_HINT = (
     "Modern Korean webtoon illustration, full color, clean flat cel-shaded "
-    "linework style — NOT photorealistic, NOT a photograph, NOT camera-captured."
+    "linework style — NOT photorealistic, NOT a photograph, NOT camera-captured. "
+    "Two recurring characters from the reference image: A is the woman, B is the man."
 )
 
 _STYLE_GUIDE_CONTENT_RULES = (
@@ -296,8 +310,10 @@ _STYLE_GUIDE_CONTENT_RULES = (
 
 def build_style_guide_prompt(camera: str, scene: str) -> str:
     """Style Guide 경로 전용 프롬프트 — 위 실측 결과를 따라 일부러
-    짧게 유지한다(스타일 힌트 + 카메라 + 장면 + 내용 규칙 + 텍스트
-    렌더 금지뿐). characters 파라미터를 안 받는 이유도 위 주석 참고."""
+    짧게 유지한다(스타일 힌트+성별 역할 한 줄 + 카메라 + 장면 + 내용
+    규칙 + 텍스트 렌더 금지뿐). characters 파라미터를 여전히 안 받는
+    이유(장문 묘사 배제)는 위 주석 참고 — 성별만 _STYLE_GUIDE_STYLE_HINT에
+    고정 문구로 포함한다."""
     return (
         _STYLE_GUIDE_STYLE_HINT
         + f"\nCamera: {camera}."
