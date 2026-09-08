@@ -171,37 +171,53 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
         conn.close()
 
 
+_BY_PUBLICATION_ID_SELECT = """
+    SELECT p.id AS publication_id, p.slug, p.title, p.subtitle, p.cover_image_url,
+           p.source_url, p.status, p.published_at, p.created_at, p.updated_at,
+           r.format,
+           ma.file_url AS video_url, ma.transcript,
+           (SELECT jsonb_agg(jsonb_build_object('url', wp.image_url, 'caption', wp.dialogue) ORDER BY wp.position)
+            FROM webtoon_panels wp WHERE wp.rendition_id = r.id) AS images_json,
+           (SELECT jsonb_agg(rb.content ORDER BY rb.position)
+            FROM rendition_blocks rb WHERE rb.rendition_id = r.id) AS body_json
+    FROM publications p
+    LEFT JOIN renditions r ON r.publication_id = p.id
+    LEFT JOIN media_assets ma ON ma.rendition_id = r.id
+    WHERE p.id = %s AND p.status = 'published' AND p.deleted_at IS NULL
+    ORDER BY r.id
+    LIMIT 1
+"""
+
+
 def get_published_post_by_slug(slug: str) -> Optional[Dict[str, Any]]:
+    """slug로 발행물을 조회한다.
+
+    publications.slug에서 못 찾으면 publication_slug_history로 폴백한다
+    (v1.13/v1.15 참조 — 마이그레이션 당시 형제 채널의 slug가 UNIQUE(slug)
+    제약 때문에 대표 채널 slug에 밀려 유실됐는데, 그 옛 slug로 들어오는
+    북마크·검색엔진 색인 URL을 살리기 위함). 폴백 시에도 어떤 렌디션을
+    돌려줄지는 기존과 동일하게 `ORDER BY r.id LIMIT 1`로 임의 선택한다 —
+    포맷 구분 없이 조회하는 기존 한계(v1.13 문서화)를 그대로 유지할 뿐,
+    이 백필로 새로 나빠지는 건 없다(이전엔 404였던 것이 조회는 되게 함).
+    """
     conn = _conn()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT status, deleted_at FROM publications WHERE slug = %s",
-            (slug,),
-        )
-        row = _dictfetchone(cur)
-        if not row or row["status"] != "published" or row["deleted_at"]:
-            return None
+        cur.execute("SELECT id FROM publications WHERE slug = %s", (slug,))
+        row = cur.fetchone()
+        pub_id = row[0] if row else None
 
-        cur.execute(
-            """
-            SELECT p.id AS publication_id, p.slug, p.title, p.subtitle, p.cover_image_url,
-                   p.source_url, p.status, p.published_at, p.created_at, p.updated_at,
-                   r.format,
-                   ma.file_url AS video_url, ma.transcript,
-                   (SELECT jsonb_agg(jsonb_build_object('url', wp.image_url, 'caption', wp.dialogue) ORDER BY wp.position)
-                    FROM webtoon_panels wp WHERE wp.rendition_id = r.id) AS images_json,
-                   (SELECT jsonb_agg(rb.content ORDER BY rb.position)
-                    FROM rendition_blocks rb WHERE rb.rendition_id = r.id) AS body_json
-            FROM publications p
-            LEFT JOIN renditions r ON r.publication_id = p.id
-            LEFT JOIN media_assets ma ON ma.rendition_id = r.id
-            WHERE p.slug = %s
-            ORDER BY r.id
-            LIMIT 1
-            """,
-            (slug,),
-        )
+        if pub_id is None:
+            cur.execute(
+                "SELECT publication_id FROM publication_slug_history WHERE old_slug = %s",
+                (slug,),
+            )
+            hist_row = cur.fetchone()
+            if not hist_row:
+                return None
+            pub_id = hist_row[0]
+
+        cur.execute(_BY_PUBLICATION_ID_SELECT, (pub_id,))
         found = _dictfetchone(cur)
         if not found:
             return None
