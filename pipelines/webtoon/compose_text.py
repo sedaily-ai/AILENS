@@ -173,8 +173,15 @@ _DEFAULT_BUBBLE_TOP_RATIO = 0.16  # draw_title()의 제목 알약 아래로 자�
 _FACE_BUBBLE_MARGIN_PX = 150  # 얼굴 상단에서 이만큼 위에 말풍선을 배치(2줄짜리 말풍선이 넉넉히 들어가는 여유)
 
 
-def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | None = None):
+def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | None = None, min_top_y: float | None = None):
     """dialogue = [{"speaker":..., "line":..., "tone":"보통"|"격앙"}, ...]
+
+    min_top_y — 2026-09-08(3차) 추가. compose()가 draw_title()/
+    draw_cover_header()의 실제 반환값(제목 알약 하단 y좌표)을 넘긴다.
+    이전엔 "제목 아래 16%"라는 고정 비율로 안전거리를 추측했는데, 제목
+    글자 수가 길어 알약이 예상보다 커지는 컷에서 그 추측이 틀려 말풍선이
+    제목과 겹치는 게 실측(컷6)으로 확인됐다 — 이제 실제 값을 쓴다.
+    None이면(제목이 없는 컷 등) _DEFAULT_BUBBLE_TOP_RATIO로 폴백.
 
     2026-09-02 — 원래는 화자 위치 데이터가 없어서(1·2단계 JSON에 x/y 없음)
     상단에 좌→우로 순서대로 펼쳐 놓는 게 유일한 방법이었다(기자 피드백 —
@@ -201,7 +208,7 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | No
     if not dialogue:
         return
     n = len(dialogue)
-    default_top_y = int(img.height * _DEFAULT_BUBBLE_TOP_RATIO)
+    default_top_y = int(min_top_y + 20) if min_top_y is not None else int(img.height * _DEFAULT_BUBBLE_TOP_RATIO)
     use_faces = faces is not None and len(faces) == n
 
     anchors_x: list[int] = []
@@ -220,16 +227,42 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | No
             tops_y.append(default_top_y)
 
     # 2026-09-08(2차) — 얼굴 회피를 적용한 뒤 실측(테스트_뤼미에르파트너십_v6)
-    # 으로 발견한 부수 문제: 인물 3명 이상이 몰려 나온 컷에서 주요 화자 2명의
-    # 얼굴이 화면 안에서 가까이 붙어있으면, 두 말풍선이 서로 겹쳐 글자가
-    # 가려졌다(_MAX_BUBBLE_WIDTH_RATIO=0.42 두 개면 최대 84%라 절반보다
-    # 가까우면 겹친다). 두 앵커 사이 거리가 화면 폭 절반보다 좁으면 같은
-    # 중심을 기준으로 좌우로 벌린다 — 오른쪽(anchors_x[0])이 계속 더
-    # 오른쪽에 남도록 부호를 유지한다.
-    if n == 2 and abs(anchors_x[0] - anchors_x[1]) < img.width * 0.5:
-        mid = sum(anchors_x) / 2
-        half_gap = img.width * 0.25
-        anchors_x = [int(mid + half_gap), int(mid - half_gap)]
+    # 으로 발견한 부수 문제: 두 말풍선이 서로 겹쳐 글자가 가려졌다. 처음엔
+    # "앵커 간격이 화면 폭의 50% 미만이면 벌린다"는 고정 비율로 고쳤는데
+    # (v6_face 커밋), 컷4를 여러 번 재현 테스트했지만 재현이 안 됐다 —
+    # _draw_bubble()의 x0 clamp(`max(10, min(img.width-bw-10, ...))`,
+    # 화면 밖으로 안 나가게 하는 안전장치)를 다시 읽고서야 진짜 원인을
+    # 찾았다: 대사가 길어 말풍선이 넓어지면, 앵커 간격은 50% 이상으로
+    # 충분히 벌려놔도 그 넓은 말풍선이 화면 오른쪽 끝에 걸려 clamp가
+    # 안쪽(왼쪽)으로 밀어 넣으면서 결과적으로 두 말풍선이 다시 가까워질
+    # 수 있다 — 앵커만 보는 고정 비율 검사로는 이 경우를 못 잡는다.
+    #
+    # 그래서 실제 텍스트를 미리 측정해 진짜 말풍선 폭(half-width)을 구하고,
+    # (1) 그 폭 기준으로 최소 간격을 계산해 앵커를 벌린 뒤 (2) 벌린 쌍
+    # 전체가 화면 안에 들어가도록 함께 이동시킨다 — 각자 따로 clamp하면
+    # 간격이 도로 좁아지는 문제를 이 순서로 피한다.
+    if n == 2:
+        measure_draw = ImageDraw.Draw(img)
+        measure_font = _font(34)  # _draw_bubble()의 기본 font_size와 맞춘다
+        half_widths = []
+        for d in dialogue:
+            lines = _wrap_text(measure_draw, d["line"], measure_font, int(img.width * _MAX_BUBBLE_WIDTH_RATIO))
+            block_w, _ = _measure_block(measure_draw, lines, measure_font)
+            half_widths.append((block_w + _PADDING * 2) / 2)
+
+        min_gap = half_widths[0] + half_widths[1] + 40  # 말풍선 사이 여백 40px
+        if abs(anchors_x[0] - anchors_x[1]) < min_gap:
+            mid = sum(anchors_x) / 2
+            anchors_x = [mid + min_gap / 2, mid - min_gap / 2]
+
+        shift = 0.0
+        right_edge = anchors_x[0] + half_widths[0]
+        if right_edge > img.width - 10:
+            shift = (img.width - 10) - right_edge
+        left_edge = anchors_x[1] - half_widths[1] + shift
+        if left_edge < 10:
+            shift += 10 - left_edge
+        anchors_x = [int(anchors_x[0] + shift), int(anchors_x[1] + shift)]
 
     for i, d in enumerate(dialogue):
         tone = d.get("tone", "보통")
@@ -290,7 +323,7 @@ def _draw_pill(
     return y1
 
 
-def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_FILL):
+def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_FILL) -> float:
     """상단 제목 알약형 라벨 — 2026-09-08 신설(육하원칙 기반 웹툰 프롬프트
     문서 검토 후 도입). 기존 draw_caption(좌하단 수치용)·draw_narration
     (하단 다큐 타이틀 카드)과 역할이 다르다 — 모든 컷 상단에 고정 배치돼
@@ -299,14 +332,21 @@ def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_F
     넉넉히 잡는다 — 넘치면 줄바꿈되지만 자간이 빡빡해질 뿐 잘리지 않는다.
 
     fill — 2026-09-08(2차, 참고 이미지 대조 후) 컷별 색상 파라미터화.
-    compose()가 title_fill_for_cut()으로 계산한 색을 넘긴다(§13 색상표)."""
+    compose()가 title_fill_for_cut()으로 계산한 색을 넘긴다(§13 색상표).
+
+    반환값(제목 알약 하단 y좌표) — 2026-09-08(3차) 추가. 예전엔 이 값을
+    버리고 draw_dialogue()가 "제목 아래 16% 지점"이라는 고정 비율로
+    안전거리를 추측했는데, 제목 글자 수가 길어 알약이 커지는 컷(예:
+    "영진위·MPA도 한팀")에서 그 추측이 실제 알약 하단보다 높아 말풍선이
+    제목과 겹치는 게 실측(테스트_뤼미에르파트너십_v6, 컷6)으로 확인됐다.
+    이제 compose()가 이 실제 값을 받아 draw_dialogue()에 넘긴다."""
     draw = ImageDraw.Draw(img)
     font = _font(30)
     lines = _wrap_text(draw, text, font, int(img.width * 0.6))
-    _draw_pill(img, lines, font, img.height * 0.03, fill, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.3)
+    return _draw_pill(img, lines, font, img.height * 0.03, fill, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.3)
 
 
-def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str | None = None):
+def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str | None = None) -> float:
     """컷1 전용 표지 헤더 — 2026-09-08 신설. 사용자가 공유한 참고 샘플과
     육하원칙 프롬프트 문서 §13 "컷1 표지" 규격을 그대로 따른다:
     (1) 화면 최상단에 작은 짙은 남색 알약형 브랜드 라벨("서울경제 웹툰"),
@@ -315,7 +355,10 @@ def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str 
 
     draw_title()과 별개 함수인 이유: draw_title()은 컷2~8의 작은 단색
     알약(§13 "컷2~8 상단 제목")이고, 이건 컷1 전용 2단 구성이라 레이아웃과
-    강조색 처리 로직 자체가 다르다 — compose()가 cut==1일 때만 이걸 부른다."""
+    강조색 처리 로직 자체가 다르다 — compose()가 cut==1일 때만 이걸 부른다.
+
+    반환값(헤드라인 박스 하단 y좌표) — draw_title()과 같은 이유(2026-09-08
+    3차, 제목-말풍선 충돌 수정)로 추가."""
     draw = ImageDraw.Draw(img)
 
     brand_font = _font(24)
@@ -324,7 +367,7 @@ def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str 
 
     headline_font = _font(46)
     headline_lines = _wrap_text(draw, headline, headline_font, int(img.width * 0.7))[:2]
-    _draw_pill(
+    return _draw_pill(
         img, headline_lines, headline_font, by1 + img.height * 0.02, _HEADLINE_FILL, _HEADLINE_TEXT_FILL,
         pad_w=_PADDING * 3, pad_h=_PADDING * 2.4, max_radius=44, outline=(210, 210, 210),
         keyword=keyword, keyword_fill=_RED_FILL,
@@ -410,15 +453,21 @@ def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
 
     2026-09-08(2차) — 컷1은 draw_title() 대신 draw_cover_header()("서울경제
     웹툰" 브랜드 라벨 + 헤드라인 박스)를 쓴다. 컷2~8은 title_fill_for_cut()
-    으로 계산한 §13 색상표 색을 draw_title()에 넘긴다."""
+    으로 계산한 §13 색상표 색을 draw_title()에 넘긴다.
+
+    2026-09-08(3차) — draw_title()/draw_cover_header()가 돌려주는 실제
+    제목 하단 y좌표(title_bottom)를 draw_dialogue()에 넘긴다 — 제목이
+    길어 알약이 예상보다 커지는 컷에서 말풍선이 제목과 겹치던 문제
+    수정(draw_dialogue() 상단 주석 참고)."""
     img = Image.open(img_path).convert("RGB")
     cut_no = cut.get("cut")
+    title_bottom = None
     if cut_no == 1 and cut.get("title"):
-        draw_cover_header(img, "서울경제 웹툰", cut["title"], cut.get("title_keyword"))
+        title_bottom = draw_cover_header(img, "서울경제 웹툰", cut["title"], cut.get("title_keyword"))
     elif cut.get("title"):
-        draw_title(img, cut["title"], fill=title_fill_for_cut(cut_no))
+        title_bottom = draw_title(img, cut["title"], fill=title_fill_for_cut(cut_no))
     if cut.get("dialogue"):
-        draw_dialogue(img, cut["dialogue"], faces)
+        draw_dialogue(img, cut["dialogue"], faces, title_bottom)
     if cut.get("caption"):
         draw_caption(img, cut["caption"])
     if cut.get("closing_caption"):
