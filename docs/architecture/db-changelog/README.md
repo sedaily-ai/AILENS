@@ -44,6 +44,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.11 — 프로덕션 배포](postgres/v1.11-프로덕션-배포.md) |
 | 2026-09-09 | postgres | [v1.12 — lens 콘텐츠 백필](postgres/v1.12-lens-콘텐츠-백필.md) |
 | 2026-09-09 | postgres | [v1.13 — pg8000 전환 + slug 이슈 발견](postgres/v1.13-pg8000-전환-slug이슈.md) |
+| 2026-09-09 | postgres | [v1.14 — pg8000 전환분 프로덕션 배포](postgres/v1.14-pg8000-배포.md) |
 
 ## 새 항목 추가 규칙
 
