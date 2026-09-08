@@ -1,12 +1,12 @@
-# 14 · 운영 결정 — 원본에 없던 3가지 기술 결정
+# 14 · 운영 결정 — 원본에 없던 기술 결정 4가지
 
 갱신: 2026-09-08
 
 `lens_schema_2026-08-26.sql`(원본, 수정하지 않는다)에 조건부로 남겨져 있던
-기술 결정 3가지를 AWS 확장 지원 확인 후 확정한다. 원본 파일은 "기준 파일"로
-그대로 두고, 이 문서가 원본 이후의 추가 결정을 담는다 — `docs/architecture`
-규칙("코드가 바뀌면 문서도 같이 고친다")에 따라 실제 마이그레이션 시 이
-문서의 SQL을 원본 DDL 뒤에 이어서 실행한다.
+기술 결정과, 원본에도 없던 회원 탈퇴 삭제 정책을 확정한다. 원본 파일은
+"기준 파일"로 그대로 두고, 이 문서가 원본 이후의 추가 결정을 담는다 —
+`docs/architecture` 규칙("코드가 바뀌면 문서도 같이 고친다")에 따라 실제
+마이그레이션 시 이 문서의 SQL을 원본 DDL 뒤에 이어서 실행한다.
 
 **남은 미해결은 회원 탈퇴 삭제 정책 1건뿐** — 이건 법무/정책 판단이 필요해
 이 문서에서 다루지 않는다 (`README.md` 참조).
@@ -159,3 +159,54 @@ GRANT UPDATE (adjustment, updated_at)  ON view_counts TO lens_admin_app; -- 조�
 GRANT SELECT, INSERT ON view_adjustments TO lens_admin_app;
 GRANT SELECT ON view_adjustments TO lens_service_app; -- 필요 시 조정 이력 노출용, 아니면 생략
 ```
+
+---
+
+## 4. 회원 탈퇴 삭제 정책 — 하드 삭제 원칙 (2026-09-08)
+
+### 법적 근거
+
+개인정보보호법 제21조: 개인정보처리자는 보유기간 경과·처리 목적 달성 등
+개인정보가 불필요해졌을 때 **지체 없이** 파기해야 한다. 파기 시에는
+복구·재생되지 않도록 조치해야 한다(소프트 삭제 플래그만으로는 이 요건을
+충족하지 못한다). 단서: 다른 법령이 보존을 요구하는 경우는 예외이며, 그
+경우 해당 정보는 다른 개인정보와 **분리해서** 저장·관리해야 한다.
+
+업계 실무 관행: "지체 없이"는 통상 근무일 기준 5일 이내로 처리된다.
+
+### AI LENS 서비스에 적용
+
+AI LENS는 전자상거래(결제·환불 기록 보존 의무 없음)나 통신(통신비밀보호법
+대상 아님) 서비스가 아니어서, 회원 정보 보존을 강제하는 별도 법령이 없다.
+→ **예외 없이 원칙(즉시 파기) 그대로 적용**.
+
+### 결정
+
+**탈퇴 = 하드 삭제(실제 행 삭제), 접수 후 영업일 5일 이내 처리.**
+
+- `users.status='withdrawn'`은 탈퇴 요청 접수 시점부터 삭제 배치가 실제
+  `DELETE`를 실행하기 전까지의 **임시 상태**로만 쓴다. 취소 가능한 유예
+  기간이 아니라, 배치 처리 지연을 위한 임시 상태다.
+- 배치가 `DELETE FROM users WHERE id = ...`를 실행하면, 원본 스키마의
+  `ON DELETE CASCADE` 관계(`user_identities`, `user_archives`,
+  `user_readings`, `recommendations`, `chat_conversations` → `chat_messages`
+  → `chat_message_sources`, `subscriptions`)가 그대로 하드 삭제 경로가
+  된다. **스키마 변경 없음** — 원본 설계가 이미 이 방식에 맞게 돼 있었다.
+- `ai_usage_logs`는 `rendition_id`/`message_id`/`candidate_id`에 FK가
+  없어(11-pipeline.mmd 참조) CASCADE 대상이 아니다 — `chat_messages`가
+  삭제돼도 `ai_usage_logs` 행은 그대로 남고, 그 자체에 PII 컬럼이 없다.
+  이게 법이 요구하는 "다른 개인정보와 분리해서 관리"를 구조적으로
+  만족시킨다 — 별도 조치 불필요.
+
+### 미해결
+
+- 탈퇴 취소(그레이스 기간) 기능은 이번 결정 범위에 없음 — 필요하면
+  이용약관에 별도 근거를 마련하고 그 기간의 열람 제한 방식을 따로
+  설계해야 한다.
+
+← [postgres 트랙 이력](../db-changelog/postgres/README.md)
+
+**Sources:**
+- [개인정보의 파기 — 찾기쉬운 생활법령정보](https://easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=1257&ccfNo=2&cciNo=2&cnpClsNo=3)
+- [개인정보 보호법 제21조 — CaseNote](https://casenote.kr/%EB%B2%95%EB%A0%B9/%EA%B0%9C%EC%9D%B8%EC%A0%95%EB%B3%B4_%EB%B3%B4%ED%98%B8%EB%B2%95/%EC%A0%9C21%EC%A1%B0)
+- [탈퇴한 회원의 개인정보 보관 및 처리 방안 가이드라인 — 법무법인 비트](https://www.veatlaw.kr/main/board_detail/1025)

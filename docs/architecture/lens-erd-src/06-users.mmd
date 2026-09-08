@@ -32,9 +32,8 @@ erDiagram
   anonymous_visitors ||--o{ chat_conversations : "anon_id · CASCADE"
   anonymous_visitors ||..o{ view_events : "anon_id · FK 없음"
 
-  %% 삭제 정책 미확정 (원본 lens_디비.sql 확인 결과, 2026-09-08):
-  %% users 테이블엔 status='withdrawn' 값만 있고 deleted_at 등 소프트 삭제
-  %% 컬럼이 없다. 하위 테이블은 전부 ON DELETE CASCADE(행이 실제로 지워지는
-  %% 걸 전제). 즉 "탈퇴 시 행을 언제·어떻게 지우는가"가 원본 스키마에도
-  %% 정의돼 있지 않다 — 코드/운영 정책으로 보완해야 하는 영역. 원본에 없는
-  %% 컬럼을 임의로 추가하지 않는다 — worklog 참조.
+  %% 삭제 정책 확정 (2026-09-08, 개인정보보호법 제21조 근거):
+  %% 탈퇴 = 하드 삭제(DELETE) 원칙. status='withdrawn'은 탈퇴 요청 접수 후
+  %% 삭제 배치가 실행되기 전까지의 임시 상태(영업일 5일 이내 처리)로만
+  %% 쓰인다. 위 CASCADE 관계가 그대로 하드 삭제 경로가 된다 — 스키마
+  %% 변경 없음. 근거·세부 절차는 14-operations.md §4 참조.
