@@ -220,3 +220,48 @@ DynamoDB→PostgreSQL 이관을 검토하는 초안이고, 작성자 본인이 �
   `14-operations.md`의 SQL을 순서대로 실행하는 마이그레이션 스크립트 작성,
   프로덕션 규모 데이터로 사전 검증 — 아직 시작 전.
 - `lens-postgres-erd.html` 재렌더는 여전히 미해결(mermaid-cli 없음).
+
+---
+
+## 후속 3 — DynamoDB 베이스라인 측정 (같은 날)
+
+### 배경
+
+사용자가 "이관 후 Postgres와 비교하려면 지금 DynamoDB를 측정해서 베이스라인을
+남겨두자"고 제안. SQL 튜닝서 목차 크로스체크 결과 "실제 데이터로 측정"이
+필요한 단계였던 것과도 맞아떨어짐.
+
+### 한 것
+
+1. AWS 계정 확인 — 이 프로젝트 테이블은 계정 887078546492, **us-east-1**
+   리전에 있음(그동안 대화에서 ap-northeast-2로 짐작했던 것과 다름 — 실제
+   확인 전엔 추측하지 않는 게 맞다는 걸 재확인).
+2. 테이블 메타데이터(`describe-table`): cms-posts 3,897건/21.3MB,
+   articles 24,613건/218.9MB 등 9개 테이블 규모 확인.
+3. CloudWatch `SuccessfulRequestLatency`(Query/Scan/GetItem): DynamoDB
+   자체 처리는 15~30ms로 빠름.
+4. 실제 프로덕션 API(`chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev`)
+   curl 직접 호출 — `channel=lens&limit=1000` 5.57초, `channel=webtoon&
+   limit=1000` 2.89초/603KB로 2026-09-07 이관 문서의 "이관 후" 수치와
+   거의 일치함을 확인(같은 시스템이니 당연하지만, 측정 방법 자체가
+   재현 가능함을 검증).
+5. `ConsumedReadCapacityUnits`/`ConsumedWriteCapacityUnits` 2일 합계로
+   트래픽 규모 확인.
+6. `15-baseline-benchmark.md` 신규 작성 — 위 4가지 표 + 재현 가능한
+   측정 명령 + 이관 후 비교 절차.
+
+### 결정
+
+- **DynamoDB 자체 지연(15~30ms)과 종단 간 응답(1.2~5.6초) 사이 격차가
+  핵심 지표**라고 판단. 병목이 DB 엔진이 아니라 애플리케이션 레이어(스캔
+  후 필터링, 큰 페이로드)에 있다는 09-07 문서 결론을 이번 실측으로 재확인
+  했고, 이 격차가 줄어드는지를 Postgres 이관 성공의 실질적 증거로 삼기로 함.
+- 베이스라인 문서는 새로 안 만들고 같은 파일에 "이관 후" 열을 추가하는
+  방식으로 유지 — 두 시점을 나란히 봐야 비교가 되므로 파일을 쪼개지 않음.
+
+### 다음
+
+- Postgres 이관 완료 시점에 `15-baseline-benchmark.md`의 명령을 동일 조건
+  (같은 채널, 같은 limit)으로 재실행해 비교표 완성.
+- 측정 시점 데이터 볼륨(아이템 수)이 계속 늘어나므로, 비교 시 "비슷한
+  규모에서 비교"인지 §1 표로 항상 같이 확인할 것.
