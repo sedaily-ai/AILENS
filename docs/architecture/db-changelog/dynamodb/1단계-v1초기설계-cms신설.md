@@ -5,6 +5,10 @@
 역추적한 것 — 실제 "단계"는 [2단계](2단계-v1v2통합-페이지네이션버그.md)부터
 커밋으로 추적 가능하다.
 
+**초기 아키텍처 방향 (사용자 확인, 2026-09-08)**: MVP(프로토타입) 단계에서
+서버 비용이 들지 않는 서버리스 아키텍처를 위해 DynamoDB를 선택했다.
+PostgreSQL은 상시 구동 서버가 필요해 비용이 들어, 초기 단계에서는 배제됐다.
+
 **상태**: v1 DynamoDB 테이블(`articles`(PK `news_id`, GSI
 `category-published_at-index`), `personal`, `podcast`, legacy `questions`)이
 이미 운영 중이었다(`service/backend/clients/dynamodb_client.py`,
@@ -26,9 +30,8 @@ v1 DynamoDB**(`/api/posts`, `/api/questions`)였다.
 DynamoDB로 전면 교체, moto 기반 테스트 13건 재작성. (이 결정 자체의
 커밋은 다음날 스냅샷 이전이라 해시가 없고 파일만 08-05 스냅샷에 포함됨.)
 
-**이 이력에서 배울 것**: 지금 이 프로젝트가 "DynamoDB → PostgreSQL 이관"을
-검토하는 이유 중 하나가 여기 있다 — CMS는 원래 관계형(RDS)으로 설계됐다가
-인프라 사고로 어쩔 수 없이 DynamoDB로 급전환된 이력이 있다. 지금의 Postgres
-이관 검토는 "새로운 시도"가 아니라 "원래 계획으로의 복귀"에 가깝다.
+**정리**: 전체 아키텍처의 서버리스 방향(위 참조)과 별개로, CMS 하위 시스템은
+한때 RDS 관계형으로 설계된 적이 있었고, 인프라 사고로 DynamoDB로
+전환됐다는 사실이 이번 조사로 확인됐다.
 
 ← [dynamodb 트랙 인덱스](README.md) · 다음: [2단계](2단계-v1v2통합-페이지네이션버그.md)

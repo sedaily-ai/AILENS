@@ -82,9 +82,8 @@ curl -s -o /dev/null -w "time_total=%{time_total}s size=%{size_download}bytes\n"
 | articles | 563.5 | 1,289 |
 | personal | 59 | 9 |
 
-`cms-posts`가 읽기보다 쓰기가 약간 많다 — 웹툰/lens 자동 파이프라인이
-발행물을 자주 갱신하는 쓰기 패턴이 섞여 있어서로 추정(정확한 원인 분석은
-범위 밖).
+`cms-posts`는 측정 구간(2일) 동안 쓰기 용량(23,137)이 읽기 용량(20,431)보다
+많았다. 원인 분석은 이번 조사 범위 밖.
 
 ## 이관 후 비교 방법 (재사용 절차)
 
