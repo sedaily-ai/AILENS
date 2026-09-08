@@ -10,17 +10,18 @@ erDiagram
   }
   view_counts {
     bigint publication_id PK "FK · CASCADE"
-    bigint real_count "배치만 갱신 · 기본 0"
+    bigint real_count "배치만 갱신(DB 권한으로 처리) · 기본 0"
     bigint adjustment "가감분 · 음수 허용 · 기본 0"
     bigint display_count "GENERATED · real_count + adjustment"
+    timestamptz updated_at "기본 now()"
   }
   view_adjustments {
     bigserial id PK
-    bigint publication_id FK "CASCADE"
-    bigint delta "조정량 · 추정"
-    text reason "조정 사유 · 추정"
-    varchar(32) editor_no FK "누가 · 추정"
-    timestamptz adjusted_at "추정"
+    bigint publication_id FK "NOT NULL · CASCADE"
+    bigint delta "조정량 · NOT NULL"
+    text reason "조정 사유"
+    varchar(32) editor_no FK "SET NULL · 누가"
+    timestamptz adjusted_at "기본 now()"
   }
 
   publications ||--o| view_counts : "CASCADE · 1:1"
@@ -28,4 +29,4 @@ erDiagram
   publications ||..o{ view_events : "적재 후 집계 · FK 없음"
   users ||..o{ view_events : "user_id"
   anonymous_visitors ||..o{ view_events : "anon_id"
-  editors ||..o{ view_adjustments : "조정자 · 추정"
+  editors ||..o{ view_adjustments : "editor_no · SET NULL"

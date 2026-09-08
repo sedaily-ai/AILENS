@@ -11,14 +11,15 @@ erDiagram
   chat_messages {
     bigserial id PK
     uuid conversation_id FK "NOT NULL · CASCADE"
-    varchar(16) role "user · assistant · 추정"
-    text content "추정"
-    timestamptz created_at "추정"
+    smallint position "NOT NULL · UNIQUE 짝: conversation_id + position"
+    varchar(16) role "NOT NULL · user · assistant"
+    text content "NOT NULL"
+    timestamptz created_at "기본 now()"
   }
   chat_message_sources {
-    bigserial id PK "추정"
+    bigserial id PK
     bigint message_id FK "NOT NULL · CASCADE"
-    smallint footnote_no "UNIQUE 짝 · 각주 1 2 3"
+    smallint footnote_no "NOT NULL · UNIQUE 짝 · 각주 1 2 3"
     bigint publication_id FK "NOT NULL · CASCADE · 기사가 아니라 발행물"
     integer start_pos "답변 본문 내 위치"
     integer end_pos
@@ -27,7 +28,8 @@ erDiagram
     varchar(16) subject_type PK "user · anon · ip"
     varchar(64) subject_id PK
     date window_date PK "날짜가 PK · 리셋 불필요"
-    integer used_count "추정"
+    integer message_count "기본 0"
+    bigint token_count "기본 0"
   }
 
   chat_conversations ||--o{ chat_messages : "conversation_id · CASCADE"

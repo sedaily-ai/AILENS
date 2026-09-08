@@ -77,3 +77,90 @@ DynamoDB→PostgreSQL 이관을 검토하는 초안이고, 작성자 본인이 �
   AI 작업 규칙(트랜잭션/타임아웃 명시, 프로덕션 규모 사전 검증, 인덱스
   CONCURRENTLY, 실제 롤백 테스트, 사람 승인 없이 프로덕션 반영 금지)을
   체크리스트로 먼저 문서화해두는 걸 권장.
+
+---
+
+## 후속 — 원본 정의서 확보 후 전체 대조 (같은 날 오후)
+
+### 배경
+
+사용자가 "lens_schema.sql 정의서부터 찾아서 대조해보시죠"라고 요청. 로컬
+파일시스템을 검색해 `~/Downloads/lens_디비.sql`(2026-08-26 작성, 실제 DDL —
+"추정" 없는 완성본)을 찾았다. 검색 중 `~/Downloads/en_sedaily_PostgreSQL_
+스키마_정의서.html`도 발견했는데, 이건 **AI LENS가 아니라 en.sedaily.com
+(AILINK/globe 프로젝트, 영문 뉴스 번역 사이트) 정의서**였다 — 테이블 구성
+(translation_runs, article_companies, PRISM 플래그 등)이 완전히 다른
+서비스였다. 파일명이 비슷해 혼동하기 쉬우니 기록해둔다.
+
+### 한 것
+
+1. 원본 SQL 전체(896줄, 50테이블)를 읽고 `.mmd` 12개 파일 전부와 1:1 대조.
+2. **오전 세션에서 제가 만든 오류 2건을 원복**:
+   - `11-pipeline.mmd`의 `ai_usage_logs` — `subject_type+subject_id`로
+     바꿨던 걸 원본 그대로(`rendition_id`/`message_id`/`candidate_id`,
+     FK 없음, CHECK만)로 되돌림. 원본은 애초에 FK를 안 걸어서 이 문제가
+     없었는데, 없는 문제를 고친 것이었다.
+   - `06-users.mmd`의 `deleted_at` 컬럼 — 원본에 없어서 제거. 삭제 정책은
+     "미확정"으로 정확하게 기록(원본에도 정의 안 돼 있음을 확인했으므로).
+3. **원본 대비 실제로 틀렸던 부분 다수 수정** (전부 이전 팀원의 "추정" 작업
+   중 발생한 오류, 제 오전 작업과 무관):
+   - `03-articles.mmd`: `article_images.url`(image_url 아님)
+   - `04-publications.mmd`: `publication_revisions.change_type`/`changed_at`
+     (change_summary/revised_at으로 잘못 추측돼 있었음), `renditions.attempts`
+     타입(INTEGER→SMALLINT), `renditions.created_at/updated_at` 누락 보강
+   - `06-users.mmd`: `name` VARCHAR(64)→(128), `user_identities.provider`
+     VARCHAR(32)→(16), `provider_uid` VARCHAR(128)→(255)
+   - `07-archive.mmd`: `sentence_stats.rendition_id` 컬럼 통째 누락 → 추가,
+     `recommendations`가 복합 PK로 잘못 설계돼 있었음(실제는 surrogate
+     `id` PK, user_id+article_no는 그냥 인덱스라 재계산마다 행이 누적되는
+     구조) → 수정, `user_readings.read_count` 누락 → 추가
+   - `09-chat.mmd`: `chat_messages.position`(정렬용) 누락 → 추가,
+     `chat_quota_usage`가 `used_count` 1개로 잘못 단순화(실제는
+     `message_count`+`token_count` 2개) → 수정
+   - `10-newsletter.mmd`: `newsletter_sends.publication_id`/`send_date`
+     통째 누락 → 추가, 존재하지 않는 컬럼 `sent_at` 삭제하고 실제
+     `started_at`/`finished_at`으로 교체, `newsletter_send_items.result`
+     컬럼 누락 → 추가, `delivered_at`은 실제 컬럼명 `sent_at`으로 정정
+   - `11-pipeline.mmd`: `prompts`가 완전히 다른 구조(`key`+`description`)로
+     잘못 추측돼 있었음 → 실제 구조(`id`+`name`+`category`)로 전면 수정,
+     `prompt_versions.created_by` 누락 → 추가, `prompt_versions.prompt_id`
+     타입 오류(VARCHAR(64)→SMALLINT), `feature_flags` PK명 오류(key→name),
+     `audit_logs`가 범용 감사로그(actor/action/target)로 완전히 잘못
+     추측돼 있었음 → 실제는 feature_flags 변경이력(flag_name/before_value/
+     after_value)으로 전면 수정, `incidents` PK 타입 오류(BIGSERIAL→
+     VARCHAR(64)) + `mechanism`/`severity`/`detail` 컬럼 누락 → 추가
+   - `05-extras.mmd`: `rendition_terms.position` 누락 → 추가,
+     `glossary_terms.is_active`/`created_at` 누락 → 추가
+   - `08-views.mmd`: `view_counts.updated_at` 누락 → 추가
+   - `99-full.mmd`: 위 변경에 맞춰 관계선 보강(newsletter_sends↔publications,
+     feature_flags↔audit_logs), ai_usage_logs 관련 주석 정정
+4. **`13-physical-design.md` 전면 재작성** — 어제 작성한 건 DynamoDB
+   접근 패턴에서 "추측"한 인덱스 계획이었는데, 원본 SQL에 인덱스·파티셔닝이
+   이미 전부 정의돼 있었다. 그 실제 정의를 옮기고, DynamoDB 실사용 패턴은
+   "검증"(실제 인덱스가 실사용 패턴을 커버하는지 대조) 용도로 재배치.
+5. **원본 SQL을 레포에 영구 보관** — `lens_schema_2026-08-26.sql`로 복사해
+   `lens-erd-src/` 안에 커밋. 그동안 `~/Downloads/`에만 있어서 지워질 위험이
+   있었다.
+6. `lens-erd-src/README.md`를 대조 완료 상태로 갱신 — 원본 SQL 위치, 오늘
+   바로잡은 것 목록, 원본에도 없어서 진짜 미해결로 남는 것(삭제 정책,
+   파티션 운영, 한국어 검색 설정, view_counts 권한 분리) 구분해서 기록.
+
+### 결정
+
+- **오전에 만든 두 "논리 설계 결정"은 전부 철회**. 진짜 원본이 나온 이상
+  추측 기반 결정은 의미가 없다 — 원본을 그대로 따르는 게 맞다.
+- **탈퇴 정책은 "미확정"으로 명시적으로 남긴다** — 컬럼을 지어내서 해결된
+  것처럼 보이게 하지 않는다. 원본 작성자도 안 정한 걸 제가 임의로 정하면
+  나중에 실제 정책과 또 어긋난다.
+- **원본 SQL을 레포에 커밋해서 단일 진실 공급원으로 고정** — Downloads
+  폴더에만 있으면 이번처럼(다른 프로젝트 파일과 이름이 비슷해 헷갈리는
+  것 포함) 또 유실·혼동될 수 있다.
+
+### 다음
+
+- `lens-postgres-erd.html` 재렌더는 여전히 미해결(mermaid-cli 없음).
+- 탈퇴 정책·파티션 운영·한국어 검색 설정·view_counts 권한 분리 4가지는
+  원본에도 없는 진짜 미해결 항목 — 다음 단계는 이 4가지에 대한 결정이다.
+- 이번 세션에서 "추정"을 확정으로 바꾸는 과정에서 오류가 이 정도로 많이
+  나온 걸 보면, 향후 이런 정의서 대조 작업은 원본을 먼저 확보한 뒤 시작하는
+  게 맞다 — 원본 없이 ERD부터 그리면 이번처럼 재작업이 필요해진다.

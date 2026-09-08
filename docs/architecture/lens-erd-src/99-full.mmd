@@ -156,6 +156,7 @@ flowchart LR
 
   newsletters --> subscriptions
   newsletters --> newsletter_sends
+  publications -.-> newsletter_sends
   newsletter_sends --> newsletter_send_items
   subscriptions -.-> newsletter_send_items
 
@@ -165,9 +166,11 @@ flowchart LR
   pipeline_runs -.-> glossary_terms
   pipeline_runs -.-> quizzes
   prompts --> prompt_versions
+  feature_flags -.-> audit_logs
   lens_candidates -.-> ai_usage_logs
   %% ai_usage_logs 로 들어오는 점선 3개(lens_candidates/renditions/chat_messages)는
-  %% FK 가 아니라 subject_type+subject_id 로 앱이 관리하는 참조 — 11-pipeline.mmd 결정 참조
+  %% 원본부터 FK 없이 rendition_id/message_id/candidate_id 컬럼 + CHECK(배타)만으로
+  %% 참조를 표현한다 — 11-pipeline.mmd 참조
 
   classDef core fill:#336791,stroke:#1f4a6b,color:#ffffff
   classDef tbl fill:#eaf1f7,stroke:#5a7f9e,color:#1a3a52

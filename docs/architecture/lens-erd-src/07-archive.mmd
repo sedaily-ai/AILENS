@@ -9,14 +9,16 @@ erDiagram
   }
   sentence_stats {
     char(64) sentence_hash PK
-    text content
-    bigint saved_count "N명이 담았어요 · 부분 인덱스 gt 1"
+    text content "NOT NULL"
+    bigint rendition_id FK "SET NULL"
+    integer saved_count "N명이 담았어요 · 부분 인덱스 gt 1 · 기본 0"
+    timestamptz updated_at "기본 now()"
   }
   archive_keywords {
-    bigserial id PK "추정"
-    bigint archive_id FK "CASCADE"
-    varchar(64) keyword "문장에서 추출"
-    numeric weight "가중치"
+    bigserial id PK
+    bigint archive_id FK "NOT NULL · CASCADE"
+    varchar(64) keyword "NOT NULL · 문장에서 추출"
+    numeric weight "정밀도 4·3 · 가중치 · 기본 1.0"
   }
   archive_embeddings {
     bigint archive_id PK "FK · CASCADE · 1:1"
@@ -25,16 +27,18 @@ erDiagram
     timestamptz created_at
   }
   recommendations {
-    varchar(64) user_id PK "FK · CASCADE"
-    varchar(32) article_no PK "FK · CASCADE"
-    numeric score "정밀도 5·4 · 화면의 98% 92%"
-    text[] matched_keywords "설명용 · 기본 {}"
+    bigserial id PK "user_id+article_no 는 PK 아님 · 재계산 시 행이 누적된다"
+    varchar(64) user_id FK "NOT NULL · CASCADE"
+    varchar(32) article_no FK "NOT NULL · CASCADE"
+    numeric score "정밀도 5·4 · NOT NULL · 벡터 유사도 단독"
+    text[] matched_keywords "설명용(표시 근거) · 기본 {}"
     timestamptz computed_at "기본 now()"
   }
   user_readings {
     varchar(64) user_id PK "FK · CASCADE"
     bigint publication_id PK "FK · CASCADE"
-    timestamptz read_at "추정"
+    timestamptz read_at "기본 now()"
+    integer read_count "기본 1"
   }
 
   users ||--o{ user_archives : "user_id · CASCADE"
@@ -42,6 +46,7 @@ erDiagram
   user_archives ||--o| archive_embeddings : "archive_id · CASCADE"
   sentence_stats ||..o{ user_archives : "sentence_hash · FK 아님"
   renditions ||..o{ user_archives : "rendition_id · SET NULL"
+  renditions ||..o{ sentence_stats : "rendition_id · SET NULL"
   users ||--o{ recommendations : "user_id · CASCADE"
   articles ||--o{ recommendations : "article_no · CASCADE"
   users ||--o{ user_readings : "user_id · CASCADE"

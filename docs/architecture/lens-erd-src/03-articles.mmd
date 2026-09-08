@@ -16,18 +16,18 @@ erDiagram
     tsvector search_vector "GENERATED · title B / subtitle C / body C"
   }
   article_images {
-    bigserial id PK "추정"
+    bigserial id PK
     varchar(32) article_no FK "NOT NULL · CASCADE"
     smallint position "UNIQUE 짝: article_no + position"
-    text image_url "DDB images 배열 전개"
-    text caption "추정"
+    text url "NOT NULL"
+    text caption
   }
   article_related_news {
-    bigserial id PK "추정"
+    bigserial id PK
     varchar(32) article_no FK "NOT NULL · CASCADE"
     smallint position "UNIQUE 짝: article_no + position"
-    text title "DDB related_news 배열 전개"
-    text url "추정"
+    text title
+    text url "NOT NULL"
   }
   article_categories {
     varchar(32) article_no PK "FK · CASCADE"

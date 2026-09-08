@@ -3,94 +3,100 @@ erDiagram
     bigserial id PK
     varchar(64) pipeline_name "frontpage_auto · mustknow_auto"
     varchar(32) trigger_source "기본 eventbridge"
-    varchar(16) status "success · partial · failed"
+    varchar(16) status "success · partial · failed · 기본 success"
     integer created_count "기본 0"
     integer skipped_count "기본 0"
     integer failed_count "기본 0"
     text ecs_task_arn "없으면 CloudWatch 추적 불가 · 미구현"
-    timestamptz started_at
+    timestamptz started_at "기본 now()"
     timestamptz finished_at
   }
   pipeline_run_items {
-    bigserial id PK "추정"
-    bigint run_id FK "CASCADE"
+    bigserial id PK
+    bigint run_id FK "NOT NULL · CASCADE"
     varchar(32) article_no "FK 없음 · 로그 성격"
-    varchar(16) result "추정"
-    text error_message "추정"
+    varchar(16) result "NOT NULL · created · skipped · failed"
+    varchar(64) reason "예: content_unchanged"
   }
   lens_candidates {
     bigserial id PK
-    varchar(32) article_no FK "채점 대상"
-    bigint run_id FK "어느 실행"
+    varchar(32) article_no FK "NOT NULL · CASCADE · 채점 대상"
+    bigint run_id FK "SET NULL · 어느 실행"
     numeric score "정밀도 4·2"
-    numeric threshold "7.0 · 8.0"
-    boolean is_selected "선정 여부"
-    timestamptz scored_at
+    numeric threshold "정밀도 4·2"
+    boolean is_selected "기본 FALSE"
+    timestamptz scored_at "기본 now()"
   }
   ai_usage_logs {
-    bigserial id PK "PK 일부 · 추정"
-    varchar(16) purpose "generate · chat · classify"
-    varchar(16) subject_type "rendition · message · candidate · FK 아님(논리 설계 결정 참조)"
-    bigint subject_id "대상 행 id · FK 아님 · 앱이 참조무결성 보장"
-    varchar(255) model_id "inference profile ARN"
+    bigserial id PK "PK 일부"
+    varchar(16) purpose "NOT NULL · generate · chat · classify"
+    bigint rendition_id "FK 없음 · 배타 · 정확히 하나만 채워짐"
+    bigint message_id "FK 없음 · 배타"
+    bigint candidate_id "FK 없음 · 배타"
+    varchar(255) model_id "NOT NULL · inference profile ARN"
     varchar(16) tier "익명 사용자 비용 분리"
     integer input_tokens "기본 0"
     integer output_tokens "기본 0"
-    integer cache_write_tokens "따로 센다"
-    integer cache_read_tokens "따로 센다"
-    numeric cost_usd "정밀도 12·6 · 전 테이블 통일"
-    varchar(16) outcome "success · refused · failed"
+    integer cache_write_tokens "따로 센다 · 기본 0"
+    integer cache_read_tokens "따로 센다 · 기본 0"
+    numeric cost_usd "정밀도 12·6 · 전 테이블 통일 · 기본 0"
+    varchar(16) outcome "success · refused · failed · 기본 success"
+    text error_message
     integer latency_ms
-    timestamptz occurred_at PK "파티션 키 · 월별"
+    timestamptz occurred_at PK "파티션 키 · 월별(2026_09, 2026_10)"
   }
   prompts {
-    varchar(64) key PK "추정"
-    text description "추정"
+    smallserial id PK
+    varchar(64) name UK
+    varchar(32) category
   }
   prompt_versions {
     bigserial id PK
-    varchar(64) prompt_id FK "UNIQUE 짝: prompt_id + version"
-    integer version
-    text body "추정"
-    boolean is_active "부분 UNIQUE · 키당 활성 1개"
-    timestamptz created_at
+    smallint prompt_id FK "NOT NULL · CASCADE · UNIQUE 짝: prompt_id + version"
+    integer version "NOT NULL"
+    text content "NOT NULL"
+    boolean is_active "기본 FALSE · 부분 UNIQUE · 프롬프트당 활성 1개"
+    varchar(32) created_by FK "SET NULL"
+    timestamptz created_at "기본 now()"
   }
   feature_flags {
-    varchar(64) key PK "기능 스위치 · 추정"
-    boolean is_enabled "추정"
-    timestamptz updated_at "추정"
+    varchar(64) name PK "기능 스위치"
+    boolean is_enabled "기본 FALSE"
+    timestamptz updated_at "기본 now()"
   }
   audit_logs {
-    bigserial id PK "추정"
-    varchar(32) actor FK "editors · 추정"
-    varchar(64) action "추정"
-    text target "추정"
-    timestamptz occurred_at "추정"
+    bigserial id PK
+    varchar(64) flag_name FK "SET NULL · 어느 플래그"
+    varchar(32) editor_no FK "SET NULL · 누가"
+    text before_value
+    text after_value
+    timestamptz changed_at "기본 now()"
   }
   incidents {
-    bigserial id PK "추정"
-    varchar(16) status "open 부분 인덱스"
-    text summary "추정"
-    timestamptz opened_at "추정"
-    timestamptz resolved_at "추정"
+    varchar(64) id PK
+    varchar(64) mechanism "NOT NULL"
+    varchar(16) status "open · resolved · 기본 open · 부분 인덱스"
+    varchar(16) severity
+    text title
+    jsonb detail "기본 {}"
+    timestamptz opened_at "기본 now()"
+    timestamptz resolved_at
   }
 
   pipeline_runs ||--o{ pipeline_run_items : "run_id · CASCADE"
-  pipeline_runs ||--o{ lens_candidates : "run_id"
-  pipeline_runs ||..o{ publications : "run_id · SET NULL"
-  pipeline_runs ||..o{ glossary_terms : "run_id · auto"
-  pipeline_runs ||..o{ quizzes : "run_id · auto"
-  articles ||..o{ lens_candidates : "article_no"
-  prompts ||--o{ prompt_versions : "prompt_id"
-  editors ||..o{ audit_logs : "actor · 추정"
+  pipeline_runs ||..o{ lens_candidates : "run_id · SET NULL"
+  pipeline_runs ||..o{ publications : "run_id · SET NULL · 뒤늦은 FK"
+  pipeline_runs ||..o{ glossary_terms : "run_id · SET NULL · 뒤늦은 FK"
+  pipeline_runs ||..o{ quizzes : "run_id · SET NULL · 뒤늦은 FK"
+  articles ||--o{ lens_candidates : "article_no · CASCADE"
+  prompts ||--o{ prompt_versions : "prompt_id · CASCADE"
+  editors ||..o{ prompt_versions : "created_by · SET NULL"
+  feature_flags ||..o{ audit_logs : "flag_name · SET NULL"
+  editors ||..o{ audit_logs : "editor_no · SET NULL"
 
-  %% ai_usage_logs 참조 (논리 설계 결정, 2026-09-08):
-  %% lens_candidates/renditions/chat_messages → ai_usage_logs 는 FK 로 안 그린다.
-  %% subject_type 값으로 어느 테이블인지 구분, subject_id 로 해당 행을 가리키되
-  %% DB 레벨 참조무결성은 포기하고 애플리케이션이 보장한다.
-  %% 이유: 배타적 FK(하나만 NOT NULL) + CHECK 로 강제하면 대상 테이블의
-  %% CASCADE/SET NULL 삭제 정책과 반드시 충돌한다 — 특히 회원 하드 삭제 시
-  %% chat_messages 가 CASCADE 로 지워지면 비용 로그(정산 근거)까지 함께
-  %% 사라지거나, SET NULL 로 막으면 "정확히 하나" CHECK 를 위반한다.
-  %% 비용 집계 테이블은 원장(ledger) 성격이라 원본 삭제와 독립적으로
-  %% 보존돼야 한다는 게 이 결정의 핵심 근거. chat_quota_usage 와 같은 패턴.
+  %% ai_usage_logs 참조 (원본 lens_디비.sql 확인, 2026-09-08):
+  %% rendition_id/message_id/candidate_id는 애초에 REFERENCES가 없다 —
+  %% CHECK(num_nonnulls(...)=1)로 배타만 강제하고 참조무결성은 처음부터
+  %% 포기한 설계다(pipeline_run_items.article_no와 같은 "로그 성격" 패턴).
+  %% 2026-09-08 세션 초반에 이걸 FK로 잘못 전제하고 subject_type+subject_id로
+  %% 구조를 바꿨었는데, 원본에 없는 문제를 고친 것이었다 — 원복함.

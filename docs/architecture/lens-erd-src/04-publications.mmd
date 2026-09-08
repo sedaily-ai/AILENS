@@ -27,9 +27,11 @@ erDiagram
     text label "약 3분 · 8컷"
     integer duration_sec "팟캐스트 · 영상"
     integer sequence_no "웹툰 순번 · 그 외 NULL · format='webtoon' 부분 UNIQUE"
-    integer attempts "재시도 횟수"
+    smallint attempts "재시도 횟수 · 기본 0"
     text last_error
     timestamptz next_retry_at
+    timestamptz created_at "기본 now()"
+    timestamptz updated_at "기본 now()"
   }
   rendition_blocks {
     bigserial id PK
@@ -57,21 +59,21 @@ erDiagram
   }
   publication_articles {
     bigint publication_id PK "FK · CASCADE"
-    varchar(32) article_no PK "FK"
-    boolean is_primary "중심 기사"
-    smallint position "순서"
+    varchar(32) article_no PK "FK · CASCADE"
+    boolean is_primary "중심 기사 · 기본 FALSE"
+    smallint position "순서 · 기본 0"
   }
   publication_slug_history {
     varchar(255) old_slug PK "옛 주소 · SEO / SNS 링크 유지"
-    bigint publication_id FK "CASCADE"
-    timestamptz changed_at "추정"
+    bigint publication_id FK "NOT NULL · CASCADE"
+    timestamptz changed_at "기본 now()"
   }
   publication_revisions {
     bigserial id PK
-    bigint publication_id FK "CASCADE"
-    varchar(32) editor_no FK "누가"
-    text change_summary "무엇을 · 추정"
-    timestamptz revised_at "언제 · 추정"
+    bigint publication_id FK "NOT NULL · CASCADE"
+    varchar(32) editor_no FK "SET NULL · 누가"
+    varchar(32) change_type "NOT NULL · 무엇을"
+    timestamptz changed_at "기본 now()"
   }
 
   publications ||--o{ renditions : "0..4 · UNIQUE 짝 pub+format"

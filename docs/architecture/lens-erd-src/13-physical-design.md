@@ -1,64 +1,94 @@
 # 13 · 물리 설계 — 인덱스 · 파티셔닝
 
-갱신: 2026-09-08
+갱신: 2026-09-08 (원본 `lens_디비.sql` 확인 후 전면 재작성)
 
-00~12는 개념·논리 설계(엔터티·관계·정규화·제약)만 다룬다. 이 문서는 그 위에
-얹는 물리 설계 — "실제로 어떻게 저장·조회되는가"다. 추측이 아니라 지금
-DynamoDB 위에서 실제로 도는 쿼리 패턴(코드 근거: `service/backend/clients/`,
-`admin/backend/repo/`, 2026-09-07 채널 GSI 이관 사고)을 근거로 삼는다. 경위·조사
-전체는 `docs/worklog/2026-09/2026-09-08-postgres-schema-단계별-설계.md` 참조.
+**이 문서는 더 이상 추측이 아니다.** 2026-08-26 작성된 원본 DDL(`lens_디비.sql`,
+로컬 `~/Downloads/lens_디비.sql`)에 인덱스·파티셔닝이 이미 전부 정의돼 있다.
+아래 표는 그 정의를 그대로 옮긴 것이고, "검증" 절만 실제 DynamoDB 접근
+패턴(2026-09-07 채널 GSI 이관 조사 근거)과 대조해 갭이 있는지 확인한다.
 
-## 원칙
+## 도메인별 인덱스 (원본 DDL 그대로)
 
-1. **인덱스는 실제 쿼리 조건을 보고 만든다, 추측하지 않는다.** 지금 DynamoDB
-   GSI(해시키+정렬키)가 이미 검증된 접근 패턴이므로, 그 조합을 그대로
-   Postgres 복합 인덱스로 옮기는 게 1순위다.
-2. **"전체 스캔 후 애플리케이션 필터링"은 이관 시점에 반드시 없앤다.**
-   DynamoDB에서 이 패턴이 최소 3곳(레거시 채널 목록, admin 상태-미지정
-   목록, slug 중복검사)에서 병목이었다. 그대로 옮기면 Postgres에서도
-   똑같이 느려진다 — WHERE 절/인덱스로 흡수해야 한다.
-3. **목록 API는 기본이 keyset pagination이다.** `limit=1000` 같은 대량 조회가
-   지금도 남아있고, 프론트가 SSR 데이터를 받고도 마운트 시 같은 목록을
-   재요청하는 전역 패턴이 있어 실질 조회 빈도가 배가된다. 물리 설계
-   단계에서 페이지네이션을 옵션이 아니라 기본값으로 넣는다.
-
-## 도메인별 인덱스 계획
-
-| 테이블 | 인덱스 | 근거 (실제 쿼리) |
+| 테이블 | 인덱스 | 조건/방식 |
 |---|---|---|
-| `publications` | `(section_id, published_at DESC)`, `(category_id, published_at DESC)`, UNIQUE `(slug)`, UNIQUE `(source_url)` | `category-published_at-index` GSI로 검색/브리핑/챗봇 컨텍스트가 카테고리+기간 Query — `search_service.py:230`, `chatbot_context_service.py:112,176,199` |
-| `publications` | GIN `(search_vector)` | 지금 `Attr(...).contains()` 부분일치 필터(title_ko/content_ko/keywords/hashtags)를 대체 — 순차 매치라 이관 1순위 |
-| `publications` (channel 개념이 있다면 status/channel 스칼라) | `(status, published_at DESC)` | admin 목록·CMS 레거시 목록이 쓰던 `status-publish_date-index` — status 지정 시엔 여전히 이 패턴이 유효 |
-| `media_assets` | GIN `(search_vector)` | transcript(대본/자막)가 검색 대상 포함으로 명시돼 있음 |
-| `renditions` | UNIQUE `(publication_id, format)`, 부분 UNIQUE `(sequence_no) WHERE format='webtoon'` | 이미 논리 설계에 명시된 제약, 물리적으로 인덱스로 구현 |
-| `newsletters`/`newsletter_sends` | `(newsletter_id, sent_at DESC)` | `letter_date-index` GSI 패턴 — daily_letters_ddb_client, letters_repo.py |
-| `chat_message_sources` | `(message_id, footnote_no)`, `(publication_id)` | 챗봇 컨텍스트가 대화당 최대 3회 같은 인덱스 호출 — 조인/배치로 합칠 여지 있으므로 publication_id 인덱스도 필요 |
-| `view_counts` | PK `(publication_id)`, `count` 컬럼은 원자적 `UPDATE ... SET count = count + 1` 대상 | 지금 DynamoDB는 get→+1→put(비원자적 RMW) — `personal_repository.py:261-277`. Postgres 이관 시 반드시 원자 연산으로 교체 |
-| `articles` | UNIQUE `(article_no)`(PK), `(section_id, published_at DESC)` | article 목록·수집 파이프라인 조회 패턴 |
-| `ai_usage_logs` | `(occurred_at)` range partition(월별) + PK `(id, occurred_at)`, `(subject_type, subject_id)` 보조 인덱스 | 파티션 키는 PK에 포함돼야 함(Postgres 네이티브 파티셔닝 제약). subject_type/subject_id는 논리 설계 결정(11-pipeline.mmd)에 따른 비FK 참조용 인덱스 |
-| `user_archives` | `(user_id, saved_at DESC)`, UNIQUE `(user_id, sentence_hash)` | Personal 테이블의 PK=user_id/SK=sk 단일 테이블 설계와 동일한 접근 패턴(`personal_db_client.py:120`) |
+| `articles` | `articles_published_idx` | (published_at DESC) |
+| | `articles_section_idx` | (section_id, published_at DESC) |
+| | `articles_fts_idx` | GIN(search_vector) |
+| | `articles_keywords_idx` / `articles_hashtags_idx` | GIN(배열) |
+| | `articles_title_trgm_idx` | GIN(title gin_trgm_ops) |
+| `article_categories` | `article_categories_reverse_idx` | (category_id, article_no) |
+| `article_embeddings` | `article_embeddings_hnsw_idx` | hnsw(embedding vector_cosine_ops) |
+| `external_archives` | `external_archives_date_idx` | (provider, published_at DESC) |
+| `publications` | `publications_published_idx` | (published_at DESC) WHERE status='published' AND deleted_at IS NULL |
+| | `publications_category_idx` | (category_id, published_at DESC) WHERE 상동 |
+| | `publications_section_idx` | (section_id, published_at DESC) WHERE 상동 |
+| | `publications_editor_idx` | (editor_no, updated_at DESC) |
+| | `publications_deleted_idx` | (deleted_at) WHERE deleted_at IS NOT NULL |
+| | `publications_fts_idx` / `publications_title_trgm_idx` | GIN(search_vector) / GIN(title gin_trgm_ops) |
+| `publication_articles` | `publication_articles_reverse_idx` | (article_no) |
+| `publication_slug_history` | `publication_slug_history_pub_idx` | (publication_id) |
+| `renditions` | `renditions_format_idx` | (format, created_at DESC) WHERE status='ready' |
+| | `renditions_retry_idx` | (next_retry_at) WHERE status='failed' |
+| | `renditions_webtoon_seq_idx` | UNIQUE(sequence_no) WHERE format='webtoon' AND sequence_no IS NOT NULL |
+| `rendition_blocks` | (익명 인덱스) | GIN(to_tsvector('simple', content)) |
+| `media_assets` | `media_assets_fts_idx` | GIN(search_vector) |
+| `publication_revisions` | `publication_revisions_pub_idx` | (publication_id, changed_at DESC) |
+| `glossary_terms` | `glossary_terms_fts_idx` / `glossary_terms_trgm_idx` | GIN(search_vector) / GIN(name gin_trgm_ops) |
+| | `glossary_terms_review_idx` | (created_at DESC) WHERE created_by_type='auto' AND NOT is_reviewed |
+| `user_identities` | `user_identities_user_idx` | (user_id) |
+| `sentence_stats` | `sentence_stats_popular_idx` | (saved_count DESC) WHERE saved_count > 1 |
+| `user_archives` | `user_archives_calendar_idx` | (user_id, saved_at DESC) |
+| | `user_archives_hash_idx` | (sentence_hash) |
+| `archive_keywords` | `archive_keywords_archive_idx` | (archive_id) |
+| `archive_embeddings` | `archive_embeddings_hnsw_idx` | hnsw(embedding vector_cosine_ops) |
+| `recommendations` | `recommendations_user_idx` | (user_id, score DESC) |
+| `view_events` | `view_events_pub_idx` | (publication_id, occurred_at DESC) |
+| `view_counts` | `view_counts_popular_idx` | (display_count DESC) |
+| `chat_conversations` | `chat_conversations_user_idx` | (user_id, updated_at DESC) WHERE user_id IS NOT NULL |
+| `subscriptions` | `subscriptions_active_idx` | (newsletter_id) WHERE cancelled_at IS NULL |
+| `newsletter_send_items` | `newsletter_send_items_send_idx` | (send_id) |
+| `pipeline_runs` | `pipeline_runs_started_idx` | (started_at DESC) |
+| `pipeline_run_items` | `pipeline_run_items_run_idx` | (run_id) |
+| `lens_candidates` | `lens_candidates_article_idx` | (article_no, scored_at DESC) |
+| `ai_usage_logs` | `ai_usage_logs_purpose_idx` | (purpose, occurred_at DESC) |
+| `prompt_versions` | `prompt_versions_active_idx` | UNIQUE(prompt_id) WHERE is_active |
+| `incidents` | `incidents_open_idx` | (opened_at DESC) WHERE status='open' |
 
-## 파티셔닝 후보
+## 파티셔닝 (원본 DDL 그대로)
 
-- **`ai_usage_logs`**: `occurred_at` 기준 월별 range partition. 이미 로그 볼륨이 크고
-  (모든 AI 호출마다 적재) 조회도 대부분 최근 구간 위주라 파티션 프루닝 효과가 큼.
-- **`publications`/`articles`**: 채널별 발행량이 계속 누적되는 채널(하루 최대
-  96건 규모, 2026-09-07 worklog 기준)이 있어 `published_at` 월별 파티션을
-  검토할 만하다. 단, 지금 규모(수천 건)에서 즉시 필요한 건 아니고, 인덱스만으로도
-  당분간 충분할 가능성이 높다 — 실측 후 결정(과설계 방지).
+- **`view_events`**: `PARTITION BY RANGE (occurred_at)`, 월별(`view_events_2026_09`,
+  `view_events_2026_10` 이미 생성됨). COMMENT: "이 시스템에서 가장 빨리 커진다 ·
+  조회수를 직접 UPDATE하지 않고 여기에 쌓은 뒤 주기적으로 합산 · 90일 후
+  파티션째 삭제".
+- **`ai_usage_logs`**: `PARTITION BY RANGE (occurred_at)`, 월별(2026_09/2026_10
+  이미 생성됨), `PRIMARY KEY (id, occurred_at)` — 파티션 키가 PK에 포함돼야
+  하는 Postgres 제약을 정확히 반영.
 
-## 응답 페이로드 · 페이지네이션
+두 테이블 다 신규 월 파티션을 매달 미리 만들어두는 운영 절차(배치/크론)가
+필요하다 — DDL엔 2026-09/10 두 달치만 있고 그 이후는 없다. **미해결 항목**
+으로 아래에 남긴다.
 
-- 목록 API는 본문/패널/자막 등 무거운 필드를 SELECT에서 제외한 shaper를
-  기본으로 둔다 — webtoon 목록 페이로드가 shaper 적용으로 3.2MB→604KB로
-  줄어든 전례가 이미 이 방향이 맞다는 걸 증명했다.
-- `limit=1000` 같은 무제한에 가까운 조회를 허용하지 않는다. keyset pagination
-  (예: `WHERE (published_at, id) < (:last_published_at, :last_id) ORDER BY
-  published_at DESC, id DESC LIMIT :n`)을 기본값으로.
+## DynamoDB 실사용 패턴과의 대조 (검증)
 
-## 미해결 · 확인 필요
+2026-09-07 채널 GSI 이관 조사에서 확인한 실제 접근 패턴을 위 인덱스와 대조:
 
-- 원본 정의서(`lens_schema.sql`, 2026-08-26)와 대조 전이라 위 인덱스 계획은
-  "실제 접근 패턴 기준 초안"이다. 컬럼명·테이블명이 정의서와 다를 수 있음.
-- `publications`/`articles` 파티셔닝은 실제 테이블 증가 속도를 봐야 확정 가능 —
-  지금은 후보로만 남긴다.
+| 실제 패턴 (DynamoDB) | 대응하는 실제 인덱스 | 판정 |
+|---|---|---|
+| channel/status + 발행일 범위 목록 조회 | `publications_category_idx`, `publications_section_idx`, `publications_published_idx` | 일치 — 부분 인덱스(`WHERE status='published'`)까지 정확히 대응 |
+| `Attr(...).contains()` 부분일치 텍스트 검색 | `publications_fts_idx`/`articles_fts_idx` GIN(search_vector) | 일치 — 원본이 이미 이 문제를 알고 설계(주석: "DDB full-scan 대체") |
+| slug-trim fallback 루프 | `publications_title_trgm_idx`, `articles_title_trgm_idx` | 일치 (단, 이건 en.sedaily 프로젝트의 pg_trgm 슬러그 유사검색 사례를 본뜬 것으로 보이며, AI LENS엔 slug 자체의 trgm 인덱스는 없고 title에만 있음 — slug 오타 대응이 필요하면 추가 검토) |
+| 조회수 read-modify-write(비원자적) | `view_counts.real_count`는 "배치만 갱신, 애플리케이션 계정엔 UPDATE 권한을 안 준다"(REVOKE/GRANT로 처리, 제약으로 표현 불가) | 원본이 이미 원자성보다 강한 방식(권한 분리)으로 해결 — 물리 설계보다 상위인 DB 권한 정책 이관 필요 |
+| 챗봇 컨텍스트가 요청당 같은 인덱스 3회 호출 | 해당하는 원본 인덱스 없음(애플리케이션 레이어 이슈) | 스키마로 해결할 문제가 아님 — 이관 시 애플리케이션 코드에서 배치/조인으로 합칠 것 |
+| `limit=1000` 대량 조회 | 해당 인덱스는 있으나(정렬 인덱스) LIMIT 강제는 애플리케이션 책임 | 스키마 아님 — API 계약에서 강제 필요 |
+
+## 미해결
+
+- 월별 파티션(`view_events`, `ai_usage_logs`)을 2026-11부터 누가·어떻게
+  미리 만드는지 원본 DDL엔 없다 — 운영 크론/배치 설계 필요.
+- 한국어 전문검색이 'simple' 설정(형태소 미분리)으로 잠정 처리돼 있다
+  (`search_vector` 컬럼 주석 참조) — RDS의 `pg_bigm` 가용 여부 확인 후
+  GIN 인덱스 교체 여부 결정 필요. 테이블 구조는 바뀌지 않음.
+- `view_counts.real_count`를 배치 계정만 갱신하게 하는 권한 분리
+  (`REVOKE UPDATE ... FROM app_user; GRANT UPDATE ... TO batch_user;`)는
+  DDL 파일 맨 끝(14절)에 운영 메모로만 있고 실제 GRANT/REVOKE 문은
+  실행 전이다 — 이관 시 반드시 적용.

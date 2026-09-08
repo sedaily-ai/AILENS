@@ -6,31 +6,35 @@ erDiagram
     varchar(16) created_by_type "human · auto"
     varchar(32) editor_no FK "human일 때 채워짐"
     bigint run_id FK "auto일 때 채워짐"
-    boolean is_reviewed "자동 생성물 검수 상태"
-    varchar(32) reviewed_by FK
+    boolean is_reviewed "자동 생성물 검수 상태 · 기본 FALSE"
+    varchar(32) reviewed_by FK "SET NULL"
     timestamptz reviewed_at
+    boolean is_active "기본 TRUE"
+    timestamptz created_at "기본 now()"
     tsvector search_vector "GENERATED · name A / description C"
   }
+  %% CHECK: created_by_type='human'이면 editor_no NOT NULL, 'auto'면 run_id NOT NULL
   rendition_terms {
     bigint rendition_id PK "FK · CASCADE"
     bigint term_id PK "FK · CASCADE"
+    smallint position "기본 0"
   }
   quizzes {
     bigserial id PK
     date quiz_date "UNIQUE 짝: quiz_date + position"
-    smallint position
-    text question "추정"
-    varchar(16) created_by_type "human · auto"
-    varchar(32) editor_no FK "human일 때"
-    bigint run_id FK "auto일 때"
-    boolean is_reviewed "검수 상태"
+    smallint position "기본 1"
+    text question "NOT NULL"
+    varchar(16) created_by_type "human · auto · 기본 human"
+    varchar(32) editor_no FK "SET NULL · human일 때"
+    bigint run_id FK "SET NULL · auto일 때 · 뒤늦은 FK"
+    boolean is_reviewed "기본 FALSE"
   }
   quiz_options {
     bigserial id PK
-    bigint quiz_id FK "CASCADE"
+    bigint quiz_id FK "NOT NULL · CASCADE"
     smallint position "UNIQUE 짝: quiz_id + position"
-    text content "추정"
-    boolean is_correct "정답 여부"
+    text content "NOT NULL"
+    boolean is_correct "기본 FALSE"
   }
 
   glossary_terms ||--o{ rendition_terms : "term_id · CASCADE"
