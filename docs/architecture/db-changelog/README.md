@@ -32,6 +32,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-08 | postgres | [v1.0 — 논리·물리 설계 확정](postgres/v1.0-논리물리-설계-확정.md) |
 | 2026-09-08 | dynamodb | [이관 전 베이스라인 확보](dynamodb/2026-09-08-이관전-베이스라인.md) |
 | 2026-09-08 | postgres | [v1.1 — 회원 탈퇴 삭제 정책 확정](postgres/v1.1-탈퇴정책-확정.md) |
+| 2026-09-08 | postgres | [v1.2 — Aurora PostgreSQL dev 인스턴스 프로비저닝](postgres/v1.2-인프라-프로비저닝.md) |
 
 ## 새 항목 추가 규칙
 
