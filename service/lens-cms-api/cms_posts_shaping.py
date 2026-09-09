@@ -155,7 +155,18 @@ def shape_webtoon(post: Dict[str, Any]) -> Dict[str, Any]:
 def shape_video(post: Dict[str, Any]) -> Dict[str, Any]:
     """영상 콘텐츠(2026-08-06) — 외부(YouTube 등) 임베드 URL 하나만 있으면
     되는 가벼운 포맷. admin이 body_inline.video_url 을 채운다. 썸네일은
-    admin이 직접 지정 안 하면 프론트가 YouTube URL에서 자동 추출한다."""
+    admin이 직접 지정 안 하면 프론트가 YouTube URL에서 자동 추출한다.
+
+    ⚠️ v1.30 — thumbnail_url 우선순위를 cover_image_url → media_assets.
+    thumbnail_url → photo_image_url → cover_image_url로 바꿨다.
+    cover_image_url은 lens 4포맷(레터/웹툰/팟캐스트/영상) 전체가 공유하는
+    "인스타 카드뉴스" 그래픽인데(shape_lens 주석 참조), 그중 웹툰 포맷의
+    첫 컷 이미지로 채워지는 경우가 대부분이라(파이프라인 로직) 영상 카드에
+    쓰면 실제로는 웹툰 삽화가 뜬다(사용자 신고: "영상 부분도... 웹툰거를
+    가져와서 쓰고 있네"). media_assets.thumbnail_url(진짜 영상 프레임
+    캡처)은 쓰기 경로가 아직 채운 적이 없어 현재는 거의 항상 비어있지만
+    스키마·읽기 경로는 미리 연결해 둔다 — photo_image_url("텍스트 없는
+    순수 기사 사진")이 지금 실질적인 1차 폴백."""
     b = post.get("body_inline") or {}
     return {
         "id": post["slug"],
@@ -164,7 +175,12 @@ def shape_video(post: Dict[str, Any]) -> Dict[str, Any]:
         "date": post.get("publish_date") or "",
         "published_at": post.get("published_at"),
         "video_url": b.get("video_url") or "",
-        "thumbnail_url": post.get("cover_image_url") or None,
+        "thumbnail_url": (
+            post.get("media_thumbnail_url")
+            or b.get("photo_image_url")
+            or post.get("cover_image_url")
+            or None
+        ),
         "is_cms": True,
     }
 

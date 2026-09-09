@@ -38,6 +38,7 @@ DynamoDB에서 PostgreSQL로 이관하기 위한 스키마 설계가 어떤 순�
 | [v1.27](v1.27-프롬프트-감사로그-전환.md) | 2026-09-09 | admin 프롬프트(24개, 76건 백필)·감사 로그 Postgres 전환 — audit_logs를 feature_flag 전용에서 범용 이벤트 로그로 재설계, audit.log() 단일 지점 교체로 20여 호출부 자동 전환 |
 | [v1.28](v1.28-feature-flag-threshold-lockout-전환.md) | 2026-09-09 | feature flag·threshold·admin 로그인 잠금 Postgres 전환 — thresholds/admin_login_lockout 테이블 신설, admin-config DynamoDB 테이블 라이브 writer 소거(WEBTOONLAB job 제외) |
 | [v1.29](v1.29-lens-지면코너-버그수정.md) | 2026-09-09 | **버그 수정** — "오늘의 이슈 4가지 시선"(lens 지면 특별 코너) 4탭 전부 빈 화면. 공개 읽기 경로가 admin_extra 미투영 + 원본 마이그레이션 때 필드 자체가 이관 안 됨(913건 백필) |
+| [v1.30](v1.30-영상썸네일-웹툰오염-버그수정.md) | 2026-09-09 | **버그 수정** — "영상으로 보는 이슈" 썸네일 778건 중 760건이 웹툰 컷 이미지. admin_extra 투영을 lens 채널에서 전체 채널로 일반화, 썸네일 우선순위 수정(746건 정상화) |
 
 새 버전을 추가할 땐 `vX.Y-주제.md` 파일을 만들고 이 표에 한 줄, 그리고
 앞뒤 버전 파일의 "이전/다음" 링크도 같이 갱신한다.

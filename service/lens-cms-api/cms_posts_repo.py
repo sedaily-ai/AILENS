@@ -56,6 +56,12 @@ def _row_to_post(row: Dict[str, Any]) -> Dict[str, Any]:
         "channels": [channel] if channel else [],
         "status": row.get("status"),
         "cover_image_url": row.get("cover_image_url"),
+        # media_assets.thumbnail_url — 실제 영상 프레임 캡처용 컬럼(v1.30에서
+        # 읽기 경로에 연결). 쓰기 경로(admin_posts_repo.py)가 아직 이 값을
+        # 채운 적이 없어(관리자 화면에 입력란 자체가 없음) 현재는 항상
+        # None이지만, 나중에 파이프라인/관리자 화면이 채우기 시작하면 이
+        # 읽기 경로가 이미 준비돼 있도록 미리 연결해 둔다.
+        "media_thumbnail_url": row.get("media_thumbnail_url"),
         "source_url": row.get("source_url"),
         "media_embed_url": media_embed_url,
         "publish_date": row["published_at"].date().isoformat() if row.get("published_at") else None,
@@ -74,8 +80,9 @@ _BASE_SELECT = """
     SELECT
         p.id AS publication_id, p.slug, p.title, p.subtitle, p.cover_image_url,
         p.source_url, p.status, p.published_at, p.created_at, p.updated_at,
+        p.admin_extra,
         r.format,
-        ma.file_url AS video_url, ma.transcript,
+        ma.file_url AS video_url, ma.thumbnail_url AS media_thumbnail_url, ma.transcript,
         (
             SELECT jsonb_agg(jsonb_build_object('url', wp.image_url, 'caption', wp.dialogue) ORDER BY wp.position)
             FROM webtoon_panels wp WHERE wp.rendition_id = r.id
@@ -91,7 +98,7 @@ _BASE_SELECT = """
 
 _LENS_RENDITIONS_SELECT = """
     SELECT r.format,
-           ma.file_url AS media_url, ma.transcript,
+           ma.file_url AS media_url, ma.thumbnail_url, ma.transcript,
            (SELECT jsonb_agg(jsonb_build_object('url', wp.image_url, 'caption', wp.dialogue) ORDER BY wp.position)
             FROM webtoon_panels wp WHERE wp.rendition_id = r.id) AS images_json,
            (SELECT jsonb_agg(rb.content ORDER BY rb.position)
@@ -115,19 +122,22 @@ def _fetch_lens_items(cur, pub_id: int) -> List[Dict[str, Any]]:
             "paragraphs": row.get("body_json") or [],
             "images": row.get("images_json") or [],
             "video_url": row["media_url"] if fmt == "video" else None,
-            "thumbnail_url": None,
+            "thumbnail_url": row.get("thumbnail_url"),
             "media_url": row["media_url"] if fmt == "podcast" else None,
             "transcript": row.get("transcript"),
         })
     return items
 
 
-def _apply_lens_admin_extra(post: Dict[str, Any], admin_extra: Optional[Dict[str, Any]]) -> None:
-    """lens 채널 전용 메타데이터(category/paper_section/photo_image_url/
+def _apply_admin_extra(post: Dict[str, Any], admin_extra: Optional[Dict[str, Any]]) -> None:
+    """모든 채널 공통 메타데이터(category/paper_section/photo_image_url/
     display_order/editor_id) — 정규화 테이블(renditions 등)엔 자리가 없고
-    admin_extra JSONB에만 있다("지면 특별 코너" 4탭 배치가 여기 의존,
-    v1.29에서 발견·수정: 공개 읽기 경로가 이 병합을 안 해서 4탭 전부
-    빈 상태로 보이던 버그)."""
+    admin_extra JSONB에만 있다. v1.29에서 lens 채널만 먼저 발견·수정(공개
+    읽기 경로가 이 병합을 안 해서 "지면 특별 코너" 4탭 전부 빈 상태로
+    보이던 버그) — v1.30에서 letters/webtoon/video/home_player도 같은
+    문제라는 게 드러나(예: "영상으로 보는 이슈" 카드가 photo_image_url
+    대신 웹툰 컷 이미지가 들어있는 cover_image_url로 항상 폴백) 전 채널로
+    일반화했다."""
     extra = admin_extra or {}
     extra_body = extra.get("body_inline") or {}
     post["body_inline"]["category"] = extra_body.get("category")
@@ -194,7 +204,7 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
                     {"label": label, "question": "", "bullets": []}
                     for label in lens_labels_by_pub.get(row["publication_id"], [])
                 ]
-                _apply_lens_admin_extra(post, row.get("admin_extra"))
+            _apply_admin_extra(post, row.get("admin_extra"))
             posts.append(post)
         return posts
 
@@ -202,8 +212,9 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
 _BY_PUBLICATION_ID_SELECT = """
     SELECT p.id AS publication_id, p.slug, p.title, p.subtitle, p.cover_image_url,
            p.source_url, p.status, p.published_at, p.created_at, p.updated_at,
+           p.admin_extra,
            r.format,
-           ma.file_url AS video_url, ma.transcript,
+           ma.file_url AS video_url, ma.thumbnail_url AS media_thumbnail_url, ma.transcript,
            (SELECT jsonb_agg(jsonb_build_object('url', wp.image_url, 'caption', wp.dialogue) ORDER BY wp.position)
             FROM webtoon_panels wp WHERE wp.rendition_id = r.id) AS images_json,
            (SELECT jsonb_agg(rb.content ORDER BY rb.position)
@@ -252,7 +263,7 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
             pub_row["body_paragraphs"] = []
             post = _row_to_post(pub_row)
             post["body_inline"]["lenses"] = _fetch_lens_items(cur, pub_id)
-            _apply_lens_admin_extra(post, pub_row.get("admin_extra"))
+            _apply_admin_extra(post, pub_row.get("admin_extra"))
             return post
 
         fmt = _CHANNEL_TO_FORMAT.get(channel) if channel else None
@@ -269,4 +280,6 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
         found["channel"] = _FORMAT_TO_CHANNEL.get(found.get("format"), "lens")
         found["images"] = found.pop("images_json", None) or []
         found["body_paragraphs"] = found.pop("body_json", None) or []
-        return _row_to_post(found)
+        post = _row_to_post(found)
+        _apply_admin_extra(post, found.get("admin_extra"))
+        return post
