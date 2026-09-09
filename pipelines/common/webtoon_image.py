@@ -556,11 +556,15 @@ _SCENE_TRANSLATE_SYSTEM = (
     "SUBJECTS: A|B|BOTH\n"
     "BRIEF: <2-3 sentence English photo brief, under 60 words, describing location, "
     "setting, mood, camera framing as if directing a real documentary photo shoot>\n\n"
-    "SUBJECTS=A means only character A (a Korean woman) is prominently visible in this "
-    "shot (close-up on her, or B is absent/tiny/off-frame). SUBJECTS=B means only "
-    "character B (a Korean man) is prominently visible. SUBJECTS=BOTH means both "
-    "people are clearly visible together in the frame. Do not mention illustration, "
-    "cartoon, or any art style — describe it as a real photo."
+    "Decision rule (apply in this order):\n"
+    "1. If the [SCENE] text describes an action, expression, or pose for BOTH A and B "
+    "(even briefly, e.g. 'A leans forward while B sits back'), output BOTH — this is "
+    "the default and most common case for a two-person dialogue scene.\n"
+    "2. Only output A or B when the OTHER character is explicitly described as absent, "
+    "tiny, blurred, off-frame, or the camera is an extreme close-up on just one face/"
+    "upper body with no mention of the other person's pose or action at all.\n"
+    "3. When genuinely unsure, prefer BOTH.\n"
+    "Do not mention illustration, cartoon, or any art style — describe it as a real photo."
 )
 
 _PHOTOREAL_NEGATIVE_PROMPT = (
@@ -585,7 +589,13 @@ def translate_scene_to_photo_brief(camera: str, scene: str) -> tuple[str, str]:
     user = f"[SCENE]\n{scene}\n\n[CAMERA]\n{camera}"
     raw = call_text(_SCENE_TRANSLATE_SYSTEM, user, model=_SCENE_TRANSLATE_MODEL_ID, max_tokens=200, temperature=0.3)
 
-    m = re.search(r"SUBJECTS:\s*(A|B|BOTH)", raw)
+    # 2026-09-09(R22) 버그 수정 — 정규식 알터네이션은 순서대로 첫 매치에서
+    # 멈춘다. (A|B|BOTH)로 쓰면 실제 텍스트가 "BOTH"여도 "B"가 먼저 매치돼
+    # 거기서 멈춰버려 늘 "B"로 잘못 파싱됐다(R15부터 존재하던 버그 — LLM이
+    # 맞게 "BOTH"라고 답해도 코드가 매번 "B"로 읽어서, "두 사람이 같이
+    # 나오는 컷"이 계속 "B 단독 인물 고정" 경로로 잘못 처리되고 있었다).
+    # 더 구체적인 대안(BOTH)을 먼저 시도하도록 순서를 바꿔서 해결.
+    m = re.search(r"SUBJECTS:\s*(BOTH|A|B)", raw)
     subjects = m.group(1) if m else "BOTH"
     m2 = re.search(r"BRIEF:\s*(.+)", raw, re.DOTALL)
     brief = m2.group(1).strip() if m2 else raw.strip()
@@ -666,15 +676,16 @@ def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
     반환한다(R15). subjects가 "A"/"B"(한 명만 크게 나오는 컷)면 GPU
     IP-Adapter로 그 인물의 참조 얼굴을 고정한 사진을 만든다(캐릭터 일관성
     #15 근본 해법, gpu_ipadapter.py 모듈 docstring 참고). "BOTH"(두 사람
-    같이 나오는 컷)는 참조 없는 포토리얼 생성으로 떨어진다.
+    같이 나오는 컷)는 각자 생성→합성한다(generate_dual_character_init_bytes()).
 
-    "BOTH" 컷도 각자 생성→합성하는 실험(generate_dual_character_init_bytes(),
-    R18)을 시도했으나 실전 8컷 재검증(v13)에서 재현성이 없어 기본
-    경로에서는 뺐다 — Style Transfer의 무작위성 때문에 두 사람이 뚜렷이
-    분리되는 결과도 나오지만, 옷 색깔이 반반 섞이는 등 하나로 뭉개지는
-    결과도 자주 나옴(같은 코드·같은 입력으로도 실행마다 다름). 함수
-    자체는 남겨뒀다 — 재현성 문제를 더 다듬으면(예: 재시도 후 얼굴 수
-    QA로 걸러내기) 다시 켤 수 있음(라운드기록.md R18~R19 참고)."""
+    2026-09-09(R22) — R18에서 이 BOTH 경로를 재현성 부족(Style Transfer가
+    가끔 두 사람을 하나로 뭉개버림)으로 기본에서 뺐었는데, composition_fidelity
+    를 0.75→0.9로 올려서 재실측하니 3/3 전부 "뭉개짐" 없이 두 사람이 뚜렷이
+    분리됨을 확인 — 대신 배경에 흐릿한 3번째/4번째 인물이 살짝 겹쳐 보이는
+    다른(훨씬 다루기 쉬운) 문제로 바뀌었다. 이건 이미 있는 Rekognition
+    얼굴 수 QA 게이트(R10, pipeline.py의 _generate_and_qa_cut)가 정확히
+    잡아 재시도하는 종류의 문제라 — 근본적인 "뭉개짐"보다 훨씬 다루기 쉬워
+    다시 기본 경로로 승격."""
     camera, scene = _parse_style_transfer_scene_input(scene_input)
     subjects, brief = translate_scene_to_photo_brief(camera, scene)
     if subjects in ("A", "B"):
@@ -682,6 +693,9 @@ def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
 
         init_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(brief, subjects)
         return generate_bedrock_style_transfer_bytes(init_bytes)
+    elif subjects == "BOTH":
+        init_bytes = generate_dual_character_init_bytes(brief)
+        return generate_bedrock_style_transfer_bytes(init_bytes, composition_fidelity=0.9, change_strength=0.7)
     else:
         init_prompt = build_photoreal_init_prompt(brief)
         init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
