@@ -305,3 +305,23 @@ lens 채널 목록 조회(`list_published_posts`)도 여전히 NULL 하드코딩
 `CMS_DB_BACKEND=postgres` 전환 스위치 시점 결정 — 이 둘뿐이다. 이
 시점에서 Postgres 백엔드가 가진 알려진 기능적 gap은 사실상 모두
 해소됐다.
+
+## 후속 실행 기록 7 (2026-09-09) — 실제 프로덕션 컷오버 완료(상시 서버로 아키텍처 전환)
+
+Lambda를 RDS와 통신시키려고 VPC에 붙였다가 NAT 부재로 실제 장애(간헐적
+503, 01:26~01:36 UTC) 발생 → 즉시 VPC 해제로 복구. 이 사고를 계기로
+사용자가 "근본적으로 해결"을 요청, 참조 사례(`1_ai_link/globe/decenter`
+— PM2 상시 서버+커넥션 풀)를 보고 Lambda 대신 상시 서버(EC2, FastAPI+
+psycopg2 풀, PM2 구동)로 아키텍처를 전환하기로 결정.
+
+새 EC2(`lens-cms-api-prod`)를 RDS와 같은 VPC에 만들고, `cms_posts_pg_client.py`/
+`cms_posts_shaping.py`를 포팅, CloudFront(`ailens.sedaily.ai`)에
+`/api/v2/posts*` 전용 오리진+behavior를 추가해 HTTPS로 노출, 프론트엔드의
+CMS posts 관련 fetch(11곳)를 새 도메인으로 전환 후 실제 배포(Docker/ECS
+Fargate)까지 완료. 과정에서 실 서비스 계정 권한 누락(`publication_slug_history`
+SELECT)과 프론트 버그(`fetchHomePlayerBySlug`의 channel 파라미터 누락)를
+추가로 발견·수정. 상세: `docs/architecture/db-changelog/postgres/v1.20-상시서버-실전환.md`.
+
+**이걸로 이 마이그레이션 프로젝트의 핵심 목표(CMS posts 공개 조회를
+DynamoDB에서 PostgreSQL로 이관)가 실제 프로덕션 트래픽 기준으로
+완료됐다.**
