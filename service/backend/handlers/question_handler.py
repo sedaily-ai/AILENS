@@ -10,18 +10,15 @@ Storage: Personal DB (sedaily-mbti-personal-dev)
 """
 import json
 import logging
-from typing import List
+from typing import Dict, List
 from datetime import datetime, timezone, timedelta
 
 import boto3
-from boto3.dynamodb.conditions import Key
 from botocore.config import Config
 
+import clients.articles_pg_client as articles_client
 from config import settings
-from config.constants import (
-    BEDROCK_MODEL_ID_HAIKU,
-    DYNAMODB_TABLE_ARTICLES_DEV,
-)
+from config.constants import BEDROCK_MODEL_ID_HAIKU
 from services.prompt_loader import load_prompt
 from common.feature_flag import is_enabled
 from core.decorators import lambda_handler as handler_decorator
@@ -80,30 +77,30 @@ def _save_questions(date_str: str, questions: list):
 # ── Article fetching ─────────────────────────────────────────────────────────
 
 def _fetch_article_titles(date_str: str) -> List[str]:
-    """Fetch today's article titles via the category-published_at GSI."""
-    from config.constants import CATEGORIES_KOREAN
-    date_prefix = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+    """Fetch today's article titles (PostgreSQL, v1.25).
 
+    DynamoDB 쪽은 카테고리별 GSI 쿼리(Limit=10)를 CATEGORIES_KOREAN 개수만큼
+    돌려 카테고리당 최대 10개, 합계 최대 30개를 모았다. Postgres는 날짜 하나로
+    그 날 전체를 한 번에 가져올 수 있어 서버 호출은 1번으로 줄이고, 카테고리당
+    상한 10개는 클라이언트에서 그대로 재현해 특정 카테고리 쏠림을 막는다."""
     try:
-        table = boto3.resource('dynamodb', region_name='us-east-1').Table(
-            DYNAMODB_TABLE_ARTICLES_DEV
-        )
+        articles = articles_client.get_transformed_articles_by_date(date_str, limit=300)
+        per_category: Dict[str, int] = {}
         titles: List[str] = []
-        # Query each category via the GSI to collect titles across categories
-        for cat in CATEGORIES_KOREAN:
-            resp = table.query(
-                IndexName='category-published_at-index',
-                KeyConditionExpression=Key('category').eq(cat)
-                    & Key('published_at').begins_with(date_prefix),
-                ProjectionExpression='title_ko',
-                Limit=10,
-            )
-            for item in resp.get('Items', []):
-                if item.get('title_ko'):
-                    titles.append(item['title_ko'])
+        for a in articles:
+            if len(titles) >= 30:
+                break
+            cat = a.get('category') or ''
+            if per_category.get(cat, 0) >= 10:
+                continue
+            title = a.get('title_ko')
+            if not title:
+                continue
+            titles.append(title)
+            per_category[cat] = per_category.get(cat, 0) + 1
 
         logger.info(f"Fetched {len(titles)} article titles for {date_str}")
-        return titles[:30]
+        return titles
     except Exception as e:
         logger.error(f"Failed to fetch article titles: {e}")
         return []

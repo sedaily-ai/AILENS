@@ -21,19 +21,30 @@ EC2 `lens-cms-api-prod`(`i-0e3d04bdb01584833`, RDS와 같은 VPC), PM2로
 
 ## 로컬 구조
 
-- `main.py` — FastAPI 앱. `/api/v2/posts*`(공개, `handlers/
-  cms_posts_public.py`의 Lambda 버전과 계약 동일) + `/admin/posts*`
-  (v1.21 신설, `X-Internal-Token` 공유 시크릿으로 보호)
+- `main.py` — FastAPI 앱. `/api/v2/posts*`·`/api/quiz/today`·
+  `/api/v2/articles*`는 공개(인증 없음, 기존 DynamoDB 경로도 공개
+  API였음), `/admin/*`·`/internal/*`는 `X-Internal-Token` 공유
+  시크릿으로 보호
 - `db.py` — psycopg2 `ThreadedConnectionPool`
 - `cms_posts_repo.py` — 공개 조회 쿼리·로직(`cms_posts_pg_client.py` 포팅)
 - `admin_posts_repo.py` — admin 쓰기 CRUD(v1.21 신설). admin_extra
   JSONB가 진실의 원천, renditions 등은 공개 읽기용 파생 프로젝션
+- `quiz_repo.py` — 용어 퀴즈 읽기·쓰기(v1.22 신설)
+- `subscribers_repo.py` — 뉴스레터 구독자 읽기·쓰기(v1.23 신설)
+- `personal_repo.py` — 내 서랍(archives)·읽은 기록(readings)·프로필
+  읽기·쓰기(v1.24 신설)
+- `articles_repo.py` — 뉴스 기사 읽기·쓰기(v1.25 신설). DynamoDB는
+  본문을 S3에 분리 저장했지만 Postgres articles.body는 이미 100%
+  백필돼 있어 인다이렉션 불필요. raw_category(v1.25 신규 컬럼)가
+  검색/목록이 실제로 쓰는 분류 키(article_categories/section_id와는
+  다른 세 번째 체계)
 - `cms_posts_shaping.py` — 채널별 응답 shaping(Lambda 버전과 완전 동일,
   그대로 복사)
 - `ecosystem.config.js` — PM2 프로세스 정의(비밀번호·내부 토큰은
   서버에만 직접 주입)
-- `nginx.conf` — 80→8000 리버스 프록시(health/api/v2/posts/admin/posts
-  3개 location)
+- `nginx.conf` — 80→8000 리버스 프록시(health/api/v2/posts/admin/posts/
+  api/quiz/admin/quizzes/internal/subscriptions/internal/personal/
+  api/v2/articles/internal/articles location)
 - `provision.sh` — 최초 프로비저닝 스크립트(패키지·venv·nginx·PM2 설정,
   `/admin/posts` location은 아직 반영 안 됨 — 최초 셋업 후 nginx.conf로
   갱신 필요)

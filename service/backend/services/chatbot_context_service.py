@@ -1,23 +1,32 @@
-"""챗봇 컨텍스트 조회 — DynamoDB/S3 기반 브리핑·최근기사·연관기사 검색.
+"""챗봇 컨텍스트 조회 — 브리핑(DynamoDB)·최근기사/연관기사 검색(PostgreSQL).
 
 2026-08-05: `handlers/chatbot_handler.py`(869줄)에서 분리. Bedrock 호출과
-무관한, 순수 데이터 조회 책임만 모았다 — raw boto3 그대로 유지(리팩토링 없음).
+무관한, 순수 데이터 조회 책임만 모았다.
 
 ⚠️ `get_cached_briefing`은 `clients/dynamodb_client.py`의 `DynamoDBClient`를
 쓰지 않고 boto3를 직접 호출한다. `handlers/briefing_handler.py`가 쓰는
 `DynamoDBClient.save_news_briefing()`과 짝을 이루는 읽기지만, staleness 체크
-로직이 달라 단순 클라이언트 교체가 아니다 — 그대로 둔다.
+로직이 달라 단순 클라이언트 교체가 아니다 — 그대로 둔다(v1.25 기사 전환과도
+무관 — 브리핑은 별도 아이템(`news_briefing_latest`), 기사 자체가 아니다).
 
 2026-08-07: MBTI 페르소나 제거로 그룹별 브리핑 선택 로직은 없앴다. 다만
 `services/briefing_generator.py`(이번 정리 범위 밖)는 아직 DDB 아이템에
 `briefing_NT`/`briefing_NF`/`briefing_ST`/`briefing_SF` 4개 키로 쓰고 있어,
 `get_cached_briefing`은 과도기적으로 그중 채워진 첫 값을 그대로 가져온다 —
 generator 가 단일 키로 정리되면 이 fallback 목록도 함께 정리할 것.
+
+2026-09-09(v1.25): `get_recent_articles`/`search_related_articles`는
+raw boto3 GSI 쿼리에서 PostgreSQL(lens-cms-api, `clients/articles_pg_client.py`)
+경유로 전환. 카테고리 리스트·불용어 필터링·broad-keyword fallback 등
+비즈니스 로직은 그대로 두고, DynamoDB 쿼리 프리미티브만 서버 호출로
+교체했다 — Postgres articles.body가 이미 인라인이라 S3 body fetch
+(`_fetch_article_body`)가 필요 없어져 함께 제거.
 """
 import logging
 import boto3
-import json
 from typing import Optional, Dict, Any, List
+
+import clients.articles_pg_client as articles_client
 from datetime import datetime
 
 from config.constants import (
@@ -80,41 +89,16 @@ def get_cached_briefing(mbti_group: str = None) -> Optional[str]:
         return None
 
 
-def _fetch_article_body(s3_body_uri: str, max_chars: int = 500) -> str:
-    """Fetch article body from S3 and return truncated content_ko."""
-    try:
-        if not s3_body_uri or not s3_body_uri.startswith('s3://'):
-            return ''
-        parts = s3_body_uri.replace('s3://', '').split('/', 1)
-        bucket, key = parts[0], parts[1]
-        s3 = boto3.client('s3', region_name='ap-northeast-2')
-        resp = s3.get_object(Bucket=bucket, Key=key)
-        body = json.loads(resp['Body'].read().decode('utf-8'))
-        content = body.get('content_ko', '')
-        return content[:max_chars] if content else ''
-    except Exception as e:
-        logger.warning(f"Failed to fetch article body from S3: {e}")
-        return ''
-
-
 def get_recent_articles(limit: int = 5) -> List[Dict[str, Any]]:
     """Fetch recent articles with body content for context"""
     try:
-        dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-        table = dynamodb.Table(DYNAMODB_TABLE_ARTICLES_DEV)
-
-        # Query recent articles from multiple categories
-        from boto3.dynamodb.conditions import Key
+        # 카테고리별 top-3 쿼리 후 merge — DynamoDB GSI 쿼리 4번(카테고리당
+        # Limit=3)을 그대로 재현. Postgres articles.body가 이미 인라인이라
+        # S3 body fetch가 필요 없다.
         all_items = []
         for cat in ['경제', '정치', '사회', 'IT_과학']:
             try:
-                response = table.query(
-                    IndexName='category-published_at-index',
-                    KeyConditionExpression=Key('category').eq(cat),
-                    ScanIndexForward=False,
-                    Limit=3
-                )
-                all_items.extend(response.get('Items', []))
+                all_items.extend(articles_client.get_recent_articles(cat, limit=3))
             except Exception:
                 continue
 
@@ -124,13 +108,12 @@ def get_recent_articles(limit: int = 5) -> List[Dict[str, Any]]:
 
         articles = []
         for item in all_items:
-            content = _fetch_article_body(item.get('s3_body_uri', ''))
             articles.append({
                 'news_id': item.get('news_id'),
                 'title': item.get('title_ko', ''),
                 'category': item.get('category', ''),
                 'published_at': item.get('published_at', ''),
-                'content': content,
+                'content': (item.get('content_ko') or '')[:500],
             })
 
         return articles
@@ -149,15 +132,12 @@ KOREAN_STOPWORDS = {
 
 
 def search_related_articles(user_message: str, limit: int = 3) -> List[Dict[str, Any]]:
-    """Search DynamoDB for articles related to the user's message keywords."""
+    """Search PostgreSQL for articles related to the user's message keywords."""
     try:
         keywords = [w for w in user_message.split() if len(w) >= 2 and w not in KOREAN_STOPWORDS][:5]
         if not keywords:
             return []
 
-        dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-        table = dynamodb.Table(DYNAMODB_TABLE_ARTICLES_DEV)
-        from boto3.dynamodb.conditions import Key, Attr
         from datetime import timedelta, timezone
 
         kst = timezone(timedelta(hours=9))
@@ -167,19 +147,9 @@ def search_related_articles(user_message: str, limit: int = 3) -> List[Dict[str,
         all_matches = []
         for cat in ['경제', '정치', '사회', 'IT_과학', '문화']:
             try:
-                filter_expr = None
-                for kw in keywords:
-                    cond = Attr('title_ko').contains(kw)
-                    filter_expr = cond if filter_expr is None else (filter_expr | cond)
-
-                response = table.query(
-                    IndexName='category-published_at-index',
-                    KeyConditionExpression=Key('category').eq(cat) & Key('published_at').gte(week_ago),
-                    FilterExpression=filter_expr,
-                    ScanIndexForward=False,
-                    Limit=20,
+                all_matches.extend(
+                    articles_client.category_query(cat, keywords_any=keywords, since=week_ago, limit=20)
                 )
-                all_matches.extend(response.get('Items', []))
             except Exception:
                 continue
 
@@ -195,13 +165,9 @@ def search_related_articles(user_message: str, limit: int = 3) -> List[Dict[str,
         if not all_matches and has_broad and is_short_query:
             for cat in ['경제', '정치', '사회']:
                 try:
-                    response = table.query(
-                        IndexName='category-published_at-index',
-                        KeyConditionExpression=Key('category').eq(cat) & Key('published_at').gte(week_ago),
-                        ScanIndexForward=False,
-                        Limit=2,
+                    all_matches.extend(
+                        articles_client.category_query(cat, keywords_any=None, since=week_ago, limit=2)
                     )
-                    all_matches.extend(response.get('Items', []))
                 except Exception:
                     continue
             all_matches.sort(key=lambda x: x.get('published_at', ''), reverse=True)

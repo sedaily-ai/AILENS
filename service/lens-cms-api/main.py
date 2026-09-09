@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import admin_posts_repo
+import articles_repo
 import cms_posts_repo as posts_client
 import personal_repo
 import quiz_repo
@@ -338,3 +339,84 @@ def internal_save_reading(payload: Dict[str, Any] = Body(...), x_internal_token:
 def internal_list_readings(user_id: str = Query(...), limit: int = Query(default=50), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
     return {"readings": personal_repo.list_reading_history(user_id, limit)}
+
+
+# --- articles (v1.25) ---
+# 공개 조회는 article-dev/search-dev/chatbot-dev/question-dev Lambda가 호출,
+# 인증 불필요(기존 DynamoDB 경로도 공개 API였음). 수집기(article-collector-dev)
+# 쓰기 경로만 내부 토큰으로 보호.
+
+# 주의: FastAPI/Starlette는 라우트를 등록 순서대로 매칭한다 — 정적 경로
+# (/search, /category-query)가 파라미터 경로(/{article_no})보다 반드시
+# 먼저 와야 "search"/"category-query"를 article_no로 오인해 삼키지 않는다.
+
+@app.get("/api/v2/articles")
+def list_articles(
+    date: Optional[str] = Query(default=None, description="YYYYMMDD"),
+    category: Optional[str] = Query(default=None),
+    categories: Optional[str] = Query(default=None, description="comma-separated"),
+    keyword: Optional[str] = Query(default=None),
+    days: Optional[int] = Query(default=None),
+    limit: int = Query(default=30),
+):
+    if date:
+        return {"articles": articles_repo.list_articles_by_date(date, limit)}
+    if category and not categories:
+        return {"articles": articles_repo.get_recent_articles(category, limit)}
+    cat_list = categories.split(",") if categories else None
+    return {"articles": articles_repo.search_articles(cat_list, keyword, days, limit)}
+
+
+@app.post("/api/v2/articles/search")
+def search_articles_paged(payload: Dict[str, Any] = Body(...)):
+    """search_service.py::search_dynamodb_optimized() 전용 — 카테고리 alias
+    확장은 호출부(Lambda)가 하고, 이미 확장된 categories를 그대로 넘긴다."""
+    return articles_repo.search_paged(
+        categories=payload.get("categories"),
+        keyword=payload.get("query") or None,
+        published_from=payload.get("published_from"),
+        published_until=payload.get("published_until"),
+        page=payload.get("page") or 1,
+        page_size=payload.get("page_size") or 10,
+    )
+
+
+@app.get("/api/v2/articles/category-query")
+def category_query(
+    category: str = Query(...),
+    keywords: Optional[str] = Query(default=None, description="comma-separated, OR-matched on title"),
+    since: Optional[str] = Query(default=None, description="ISO timestamp"),
+    limit: int = Query(default=20),
+):
+    """chatbot_context_service.py의 카테고리별 GSI 쿼리(카테고리=X AND
+    published_at>=since, 키워드 여러 개 중 하나라도 title에 포함) 전용."""
+    kw_list = keywords.split(",") if keywords else None
+    return {"articles": articles_repo.query_category_keywords(category, kw_list, since, limit)}
+
+
+@app.get("/api/v2/articles/{article_no}")
+def get_article(article_no: str):
+    article = articles_repo.get_article(article_no)
+    if not article:
+        raise HTTPException(status_code=404, detail="not found")
+    return {"article": article}
+
+
+@app.post("/internal/articles/exists")
+def internal_articles_exists(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"existing": articles_repo.batch_check_exists(payload.get("article_nos") or [])}
+
+
+@app.post("/internal/articles/hashes")
+def internal_articles_hashes(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"hashes": articles_repo.batch_get_hash(payload.get("article_nos") or [])}
+
+
+@app.put("/internal/articles/{article_no}")
+def internal_save_article(article_no: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    payload["news_id"] = article_no
+    articles_repo.save_article(payload)
+    return {"ok": True}

@@ -1,18 +1,27 @@
 """Article Collector 비즈니스 로직 — handlers/article_collector.py에서 추출
 (2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
 
-Collects Seoul Economic articles from S3 XML and saves them to DynamoDB.
+Collects Seoul Economic articles from S3 XML and saves them to PostgreSQL.
 
 Data Source: S3 XML (s3://sedaily-news-xml-storage/daily-xml/)
-Storage: DynamoDB (sedaily-mbti-articles-dev)
-"""
+Storage: PostgreSQL (v1.25 — lens-cms-api 경유, EventBridge 크론이 매일
+23시 KST에 이 함수를 실행)
+
+2026-09-09(v1.25): DynamoDB → PostgreSQL 전환. `save_collection_log`는
+Postgres에 대응 테이블이 없어(수집 실행 로그, 낮은 가치의 관측용 데이터라
+새 인프라를 만들 만큼 우선순위가 아니라고 판단) CloudWatch 로그만 남기는
+스텁으로 대체했다.
+
+⚠️ `batch_get_hash`가 published_at을 반환하지 않는다(DynamoDB 쪽도 원래
+안 넣었다 — article_collection_service.py의 original_published_at 보존
+로직은 발견된 죽은 코드, 이번 전환에서 그 동작을 그대로 보존했다. 상세는
+lens-cms-api/articles_repo.py::batch_get_hash 주석 참조)."""
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 
+import clients.articles_pg_client as articles_client
 from clients.s3_xml_client import S3XMLClient
-from clients.dynamodb_client import DynamoDBClient
-from config import settings
 from utils.hash_utils import hash_content, content_changed
 
 logger = logging.getLogger(__name__)
@@ -105,26 +114,19 @@ def _build_article_data(article, original_published_at: Dict[str, str]) -> Dict[
 
 async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any]:
     """
-    Collect articles from S3 XML and save to DynamoDB.
+    Collect articles from S3 XML and save to PostgreSQL.
 
     Flow:
     1. Fetch today's XML from S3
     2. Filter new/updated articles
-    3. Save all articles to DynamoDB
+    3. Save all articles to PostgreSQL
     """
-    dynamodb_client = None
-
     try:
         # Initialize clients
         s3_xml_client = S3XMLClient(
             bucket_name="sedaily-news-xml-storage",
             prefix="daily-xml",
             region="ap-northeast-2"
-        )
-
-        dynamodb_client = DynamoDBClient(
-            table_name=settings.dynamodb_table_articles,
-            region=settings.region
         )
 
         # ==================== Process Articles ====================
@@ -153,7 +155,7 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
 
         # Check duplicates
         new_article_ids = [a.nsid for a in new_articles_xml]
-        existing_ids = await dynamodb_client.batch_check_exists(new_article_ids)
+        existing_ids = articles_client.batch_check_exists(new_article_ids)
         articles_to_save = [a for a in new_articles_xml if a.nsid not in existing_ids]
 
         # Check updated articles for content changes
@@ -163,7 +165,7 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
         original_published_at = {}
 
         if updated_ids:
-            existing_articles = await dynamodb_client.batch_get_articles_with_hash(updated_ids)
+            existing_articles = articles_client.batch_get_hash(updated_ids)
 
             for article in updated_articles_xml:
                 existing = existing_articles.get(article.nsid)
@@ -218,8 +220,8 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                 category = article.main_category or 'news'
                 article_data = _build_article_data(article, original_published_at)
 
-                # Save to DynamoDB
-                saved = await dynamodb_client.save_article(article_data)
+                # Save to PostgreSQL
+                saved = articles_client.save_article(article.nsid, article_data)
 
                 if saved:
                     if article.nsid in updated_ids_set:
@@ -276,11 +278,7 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
             "article_details": article_details,
         }
 
-        # Save collection log
-        try:
-            await dynamodb_client.save_collection_log(result)
-        except Exception as e:
-            logger.error(f"Failed to save collection log: {e}")
+        _log_collection_result(result)
 
         logger.info(f"Article collection complete: {result}")
         return result
@@ -292,9 +290,11 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
             "error": str(e),
             "collection_time": datetime.now().isoformat()
         }
-        if dynamodb_client:
-            try:
-                await dynamodb_client.save_collection_log(error_result)
-            except Exception as log_e:
-                logger.error(f"Failed to save error log: {log_e}")
+        _log_collection_result(error_result)
         return error_result
+
+
+def _log_collection_result(result: Dict[str, Any]) -> None:
+    """수집 실행 로그 — v1.25에서 Postgres에 대응 테이블 없이 CloudWatch
+    로그로만 남기기로 결정(관측용 데이터, 우선순위 낮음)."""
+    logger.info(f"Collection log: {result}")

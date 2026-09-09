@@ -2,14 +2,17 @@
 (2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
 
 When user views an article:
-1. Fetch from DynamoDB (+ S3 body pointer)
+1. Fetch from PostgreSQL (v1.25 — lens-cms-api 경유, 본문 이미 인라인 저장)
 2. Return the article's original content
+
+2026-09-09(v1.25): DynamoDB(+S3 body pointer)에서 PostgreSQL로 전환.
+articles.body가 이미 100% 백필돼 있어 S3 merge 단계 자체가 없어졌다.
 """
 import logging
 from typing import Optional
 from dataclasses import dataclass
 
-from clients.dynamodb_client import DynamoDBClient
+import clients.articles_pg_client as articles_client
 from utils.date_utils import get_kst_today
 
 logger = logging.getLogger(__name__)
@@ -59,17 +62,8 @@ class ArticleHandlerError(Exception):
 
 class ArticleHandler:
     """
-    Handles article detail retrieval from DynamoDB
+    Handles article detail retrieval from PostgreSQL (lens-cms-api 경유)
     """
-
-    def __init__(self, dynamodb_client: DynamoDBClient):
-        """
-        Initialize ArticleHandler with DynamoDB client
-
-        Args:
-            dynamodb_client: Client for DynamoDB storage
-        """
-        self.dynamodb_client = dynamodb_client
 
     async def handle_article_detail(
         self,
@@ -94,15 +88,15 @@ class ArticleHandler:
             if not article_id or not article_id.strip():
                 raise ArticleHandlerError("Article ID is required")
 
-            # Retrieve from DynamoDB
-            cached_article = await self.dynamodb_client.get_article(article_id)
+            # Retrieve from PostgreSQL
+            cached_article = articles_client.get_article(article_id)
             if not cached_article:
-                logger.warning(f"Article {article_id} not found in DynamoDB")
+                logger.warning(f"Article {article_id} not found in PostgreSQL")
                 raise ArticleHandlerError(
                     "Article not found. This article has not been processed yet."
                 )
 
-            logger.info(f"Retrieved article {article_id} from DynamoDB")
+            logger.info(f"Retrieved article {article_id} from PostgreSQL")
 
             return ArticleDetailResponse(
                 news_id=cached_article['news_id'],
@@ -166,28 +160,11 @@ def _transform_article_for_list(article: dict) -> dict:
     }
 
 
-def _build_dynamodb_client() -> DynamoDBClient:
-    from config import settings
-    from clients.s3_article_client import S3ArticleClient
-
-    s3_article_client = S3ArticleClient(
-        bucket_name=settings.s3_article_body_bucket,
-        region=settings.s3_article_body_region,
-    )
-    return DynamoDBClient(
-        table_name=settings.dynamodb_table_articles,
-        region=settings.region,
-        s3_article_client=s3_article_client,
-    )
-
-
 async def list_articles(date_str: str, limit: int) -> dict:
     """
     GET /api/articles?date=YYYYMMDD&limit=30 의 실제 조회 로직.
 
-    List articles for a given date. Reads from the Article DB (DynamoDB
-    metadata + S3 body), filtering to articles that have been through the
-    pipeline (those with an s3_body_uri pointer).
+    List articles for a given date (PostgreSQL, lens-cms-api 경유).
     """
     date_str = (date_str or "").strip() or get_kst_today()
 
@@ -197,8 +174,7 @@ async def list_articles(date_str: str, limit: int) -> dict:
         limit = 30
     limit = max(1, min(limit, 200))
 
-    dynamodb_client = _build_dynamodb_client()
-    articles = await dynamodb_client.get_transformed_articles_by_date(date_str, limit)
+    articles = articles_client.get_transformed_articles_by_date(date_str, limit)
     result_articles = [_transform_article_for_list(a) for a in articles] if articles else []
 
     return {
@@ -210,6 +186,5 @@ async def list_articles(date_str: str, limit: int) -> dict:
 
 async def get_article_detail(article_id: str) -> ArticleDetailResponse:
     """GET /api/article/{article_id} 의 실제 조회 로직 (legacy detail route)."""
-    dynamodb_client = _build_dynamodb_client()
-    handler = ArticleHandler(dynamodb_client=dynamodb_client)
+    handler = ArticleHandler()
     return await handler.handle_article_detail(article_id)
