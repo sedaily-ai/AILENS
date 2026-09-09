@@ -145,33 +145,20 @@ async def handle_delete(
     if not user_id:
         return error(400, 'user_id is required')
 
-    # Format: "{user_id}-{article_id}-{timestamp}" — but article_id/timestamp may
-    # contain hyphens, so we can't reliably split it apart. Look up by exact id
-    # match instead (see the scan below); this just checks the shape is plausible.
-    if len(archive_id.split('-', 2)) < 3:
-        return error(400, 'Invalid archive_id format')
-
     repo = get_personal_repository()
-
-    # List user's archives for this article to find the exact match
-    sentences = await repo.list_archived_sentences(user_id=user_id, limit=200)
-    target = None
-    for s in sentences:
-        if s.id == archive_id:
-            target = s
-            break
-
-    if not target:
-        return error(404, '저장된 문장을 찾을 수 없습니다.')
-
+    # v1.24 — archive_id가 관계형 PK(user_archives.id)라 직접 삭제 가능해짐.
+    # DynamoDB 시절엔 sk가 "{article_id}#{timestamp}" 합성값이라 opaque한
+    # archive_id만으로 못 지우고, 목록을 다 긁어 id로 매칭한 뒤 그 항목의
+    # article_id/timestamp를 재조합해야 했다(이제 불필요, 소유자 확인은
+    # WHERE user_id=... 로 저장소가 대신함).
     deleted = await repo.delete_archived_sentence(
         user_id=user_id,
-        article_id=target.article_id,
-        timestamp=target.created_at,
+        article_id=archive_id,
+        timestamp='',
     )
 
     if not deleted:
-        return error(500, '문장 삭제에 실패했습니다.')
+        return error(404, '저장된 문장을 찾을 수 없습니다.')
 
     # pgvector 쪽 archive_vectors row는 정리되지 않는다 — 그 row의 UUID를
     # DynamoDB에 저장해두지 않아 특정할 방법이 없다(이전에는 여기서 매 삭제마다

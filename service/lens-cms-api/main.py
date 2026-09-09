@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 
 import admin_posts_repo
 import cms_posts_repo as posts_client
+import personal_repo
 import quiz_repo
 import subscribers_repo
 from cms_posts_shaping import (
@@ -257,3 +258,83 @@ def internal_list_subscriptions(
     if active_only:
         return {"subscribers": subscribers_repo.list_active_subscribers(newsletter_id)}
     return {"subscribers": subscribers_repo.list_all()}
+
+
+# ── 개인화(내 서랍·읽은 기록·프로필) — v1.24 ────────────────────────────
+# 스트릭·뱃지 계산 등 비즈니스 로직은 그대로 service/backend/services/
+# user_service.py에 남는다 — 여기는 순수 저장 primitive만.
+@app.post("/internal/personal/archives")
+def internal_save_archive(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"archive": personal_repo.save_archived_sentence(
+        payload["user_id"], payload["text"],
+        article_no=payload.get("article_no"), rendition_id=payload.get("rendition_id"),
+    )}
+
+
+@app.delete("/internal/personal/archives/{archive_id}")
+def internal_delete_archive(archive_id: str, user_id: str = Query(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"ok": personal_repo.delete_archived_sentence(user_id, archive_id)}
+
+
+@app.get("/internal/personal/archives")
+def internal_list_archives(
+    user_id: str = Query(...),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    limit: int = Query(default=100),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    return {"archives": personal_repo.list_archived_sentences(user_id, date_from, date_to, limit)}
+
+
+@app.get("/internal/personal/archives/popular")
+def internal_popular_archives(x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"archives": personal_repo.list_popular_archived_sentences()}
+
+
+@app.get("/internal/personal/users/{user_id}")
+def internal_get_user(user_id: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    profile = personal_repo.get_user_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="user not found")
+    return {"user": profile}
+
+
+@app.post("/internal/personal/users/{user_id}")
+def internal_get_or_create_user(user_id: str, payload: Dict[str, Any] = Body(default={}), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"user": personal_repo.get_or_create_user(
+        user_id, email=payload.get("email"), name=payload.get("name"), picture=payload.get("picture"),
+    )}
+
+
+@app.put("/internal/personal/users/{user_id}")
+def internal_update_user(user_id: str, updates: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    profile = personal_repo.update_user_profile(user_id, updates)
+    if not profile:
+        raise HTTPException(status_code=404, detail="user not found")
+    return {"user": profile}
+
+
+@app.post("/internal/personal/readings")
+def internal_save_reading(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return {"reading": personal_repo.save_reading_record(
+            payload["user_id"], article_no=payload.get("article_no"),
+            publication_id=payload.get("publication_id"),
+        )}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/internal/personal/readings")
+def internal_list_readings(user_id: str = Query(...), limit: int = Query(default=50), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"readings": personal_repo.list_reading_history(user_id, limit)}
