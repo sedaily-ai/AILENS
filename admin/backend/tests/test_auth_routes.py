@@ -14,7 +14,7 @@ import json
 import pytest
 from argon2 import PasswordHasher
 
-from conftest import FakeSSM, FakeTable, assert_no_cors
+from conftest import FakeSSM, assert_no_cors
 
 import auth
 from routes import admin_password
@@ -26,14 +26,19 @@ _HASH = _PH.hash(_GOOD)
 
 
 @pytest.fixture
-def wired(monkeypatch) -> FakeTable:
-    """lockout 없음 + 비밀번호 해시 준비된 상태."""
-    table = FakeTable()
+def wired(monkeypatch) -> None:
+    """lockout 없음 + 비밀번호 해시 준비된 상태.
+
+    2026-09-09(v1.28): lockout 저장이 DynamoDB에서 PostgreSQL(lens-cms-api,
+    repo/config_repo.py 경유)로 바뀌면서 FakeTable 대신 config_repo 함수를
+    직접 스텁한다.
+    """
     ssm = FakeSSM({auth.PASSWORD_HASH_PARAM: _HASH, auth.JWT_SECRET_PARAM: "test-secret"})
-    monkeypatch.setattr(auth.ddb_client, "config_table", lambda: table)
+    monkeypatch.setattr(auth.config_repo, "check_lockout", lambda: None)
+    monkeypatch.setattr(auth.config_repo, "record_login_fail", lambda threshold, lockout_minutes: (1, None))
+    monkeypatch.setattr(auth.config_repo, "reset_login_fail", lambda: None)
     monkeypatch.setattr(ssm_client, "get_secure", ssm.get_secure)
     monkeypatch.setattr(ssm_client, "put_secure", ssm.put_secure)
-    return table
 
 
 def test_login_success_returns_token_and_expiry(wired) -> None:

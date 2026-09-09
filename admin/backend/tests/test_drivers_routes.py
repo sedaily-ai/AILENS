@@ -1,8 +1,14 @@
 """drivers 4개 라우트의 현재 응답을 박제한다 (characterization).
 
-Run from service/backend/::
+2026-09-09(v1.28): feature flag/threshold 저장이 DynamoDB에서
+PostgreSQL(lens-cms-api, repo/config_repo.py 경유)로 바뀌면서 FakeTable
+기반 config_table() monkeypatch를 config_repo 함수 스텁으로 다시 썼다.
+EventBridge rule 제어(eb_client)는 AWS 리소스 자체 상태라 이번 전환과
+무관 — FakeEB는 그대로 유지.
 
-    python3 -m pytest admin/tests/test_drivers_routes.py -v
+Run from admin/backend/::
+
+    python3 -m pytest tests/test_drivers_routes.py -v
 """
 from __future__ import annotations
 
@@ -10,36 +16,31 @@ import json
 
 import pytest
 
-from conftest import FakeEB, FakeTable, assert_no_cors
+from conftest import FakeEB, assert_no_cors
 
 from routes import drivers
-from shared import ddb_client
 
 
 @pytest.fixture
-def wired(monkeypatch) -> tuple[FakeTable, FakeEB]:
-    table = FakeTable(items=[
-        {"pk": "CONFIG", "sk": "feature-flag/v2-selector", "value": {"enabled": True}},
-        {"pk": "CONFIG", "sk": "threshold/max-articles", "value": {"threshold": 30}},
-    ])
+def wired(monkeypatch) -> tuple[list, FakeEB]:
+    audit_calls: list = []
     eb = FakeEB(rules=[{"name": "sedaily-mbti-v2-selector-trigger", "state": "ENABLED",
                         "schedule": "rate(1 hour)", "preset": "1h"}])
-    monkeypatch.setattr(ddb_client, "config_table", lambda: table)
+    monkeypatch.setattr(drivers.config_repo, "list_feature_flags", lambda: {"v2-selector": True})
+    monkeypatch.setattr(drivers.config_repo, "list_thresholds", lambda: {"max-articles": 30})
+    monkeypatch.setattr(drivers.config_repo, "set_feature_flag", lambda name, enabled: "2026-09-09T00:00:00Z")
+    monkeypatch.setattr(drivers.config_repo, "set_threshold", lambda name, value: "2026-09-09T00:00:00Z")
     monkeypatch.setattr(drivers.eb_client, "list_rules", eb.list_rules)
     monkeypatch.setattr(drivers.eb_client, "enable_rule", eb.enable_rule)
     monkeypatch.setattr(drivers.eb_client, "disable_rule", eb.disable_rule)
     monkeypatch.setattr(drivers.eb_client, "set_schedule", eb.set_schedule)
     monkeypatch.setattr(drivers.eb_client, "describe_rule", eb.describe_rule)
 
-    # 2026-09-09(v1.27): audit.log()가 이제 config_table()이 아니라
-    # audit_repo(lens-cms-api)를 거친다 — 같은 FakeTable.put_calls에
-    # 계속 쌓이도록 스텁(이 파일 자체의 CONFIG 읽기/쓰기는 아직 미이관이라
-    # config_table 스텁은 그대로 유지).
     def fake_log_event(action, detail, actor, session, source_ip):
-        table.put_calls.append({"action": action, "detail": detail, "actor": actor})
+        audit_calls.append({"action": action, "detail": detail, "actor": actor})
 
     monkeypatch.setattr(drivers.audit.audit_repo, "log_event", fake_log_event)
-    return table, eb
+    return audit_calls, eb
 
 
 def test_list_returns_rules_flags_thresholds(wired) -> None:
@@ -85,11 +86,9 @@ def test_update_enable_returns_ok_and_rule(wired) -> None:
 
 
 def test_update_writes_audit_row(wired) -> None:
-    """drivers.handle_update 은 auth.audit_log 가 아니라 audit.log 를 직접 부른다 —
-    죽은 monkeypatch 스텁이 가리던 경로라 이관 후 무단언이었다 (리뷰 지적)."""
-    table, _ = wired
+    audit_calls, _ = wired
     drivers.handle_update({"action": "enable"}, {"id": "sedaily-mbti-x"}, {})
-    assert table.put_calls[0]["action"] == "driver-update"
+    assert audit_calls[0]["action"] == "driver-update"
 
 
 def test_update_set_cron_rejects_unknown_preset(wired) -> None:
@@ -114,14 +113,16 @@ def test_feature_flag_rejects_unknown_action(wired) -> None:
     assert_no_cors(resp)
 
 
-def test_feature_flag_enable_writes_and_returns_shape(wired) -> None:
-    table, _ = wired
+def test_feature_flag_enable_writes_and_returns_shape(monkeypatch, wired) -> None:
+    calls = []
+    monkeypatch.setattr(drivers.config_repo, "set_feature_flag",
+                        lambda name, enabled: calls.append((name, enabled)) or "2026-09-09T00:00:00Z")
     resp = drivers.handle_feature_flag_update({"action": "enable"}, {"name": "f"}, {})
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])
     assert set(body) == {"flag", "enabled", "updated_at"}
     assert body["flag"] == "f" and body["enabled"] is True
-    assert len(table.update_calls) == 1
+    assert calls == [("f", True)]
     assert_no_cors(resp)
 
 

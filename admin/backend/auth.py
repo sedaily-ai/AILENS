@@ -3,7 +3,11 @@
 handle_login: argon2id verify + JWT(HS256) 8시간 발급.
 verify_jwt: handler.py 가 jwt_required=True route 진입 전 호출.
 audit_log: 모든 mutating action 후 호출.
-rate limit: 5회 fail → 5분 lockout (DDB AUTH/lockout/global).
+rate limit: 5회 fail → 5분 lockout.
+
+2026-09-09(v1.28): lockout 상태 저장을 DynamoDB(admin-config 테이블
+AUTH/lockout/global)에서 PostgreSQL(lens-cms-api, `admin_login_lockout`
+단일 싱글턴 행)로 전환.
 """
 
 import datetime as dt
@@ -13,7 +17,8 @@ import logging
 import jwt as pyjwt
 from argon2 import PasswordHasher, exceptions as argon2_exc
 
-from shared import audit, ddb_client, response, ssm_client
+from repo import config_repo
+from shared import audit, response, ssm_client
 
 logger = logging.getLogger(__name__)
 
@@ -32,46 +37,17 @@ class AuthError(Exception):
 
 def _check_lockout() -> int | None:
     """lockout 활성 시 retry_after_seconds 반환, 아니면 None."""
-    table = ddb_client.config_table()
-    resp = table.get_item(Key={"pk": "AUTH", "sk": "lockout/global"})
-    item = resp.get("Item")
-    if not item:
-        return None
-    lockout_until = item.get("lockout_until")
-    if not lockout_until:
-        return None
-    now = dt.datetime.now(dt.timezone.utc)
-    try:
-        until_dt = dt.datetime.strptime(lockout_until, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
-    except ValueError:
-        return None
-    if now >= until_dt:
-        return None
-    return int((until_dt - now).total_seconds())
+    return config_repo.check_lockout()
 
 
 def _record_fail() -> tuple[int, str | None]:
-    table = ddb_client.config_table()
-    resp = table.get_item(Key={"pk": "AUTH", "sk": "lockout/global"})
-    item = resp.get("Item", {}) or {}
-    fail_count = int(item.get("fail_count", 0)) + 1
-    new_item: dict = {
-        "pk": "AUTH",
-        "sk": "lockout/global",
-        "fail_count": fail_count,
-    }
-    lockout_until: str | None = None
-    if fail_count >= LOCKOUT_THRESHOLD:
-        until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=LOCKOUT_DURATION_MINUTES)
-        lockout_until = until.strftime("%Y-%m-%dT%H:%M:%SZ")
-        new_item["lockout_until"] = lockout_until
-    table.put_item(Item=new_item)
-    return fail_count, lockout_until
+    return config_repo.record_login_fail(
+        threshold=LOCKOUT_THRESHOLD, lockout_minutes=LOCKOUT_DURATION_MINUTES,
+    )
 
 
 def _reset_fail() -> None:
-    table = ddb_client.config_table()
-    table.put_item(Item={"pk": "AUTH", "sk": "lockout/global", "fail_count": 0})
+    config_repo.reset_login_fail()
 
 
 def audit_log(action: str, detail: dict | None = None, actor: str = "admin") -> None:

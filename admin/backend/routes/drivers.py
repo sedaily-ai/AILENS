@@ -1,55 +1,28 @@
 """드라이버 (EventBridge rule + feature flag + threshold) 관리.
 
-list: list_rules(NamePrefix='sedaily-mbti-') + DDB CONFIG/feature-flag/* + threshold/* read.
+list: list_rules(NamePrefix='sedaily-mbti-') + feature_flags/thresholds 목록.
 rule update (handle_update): action ∈ {enable, disable, set-cron}. cron preset 만.
 flag update (handle_feature_flag_update): action ∈ {enable, disable}. — Admin-2a 추가.
 threshold update (handle_threshold_update): integer value, 1..10000 range. — Admin-2d 추가.
+
+2026-09-09(v1.28): feature flag/threshold 저장을 DynamoDB(admin-config
+테이블 pk='CONFIG')에서 PostgreSQL(lens-cms-api, repo/config_repo.py
+경유)로 전환. EventBridge rule 제어(eb_client)는 이번 범위 밖 — AWS
+리소스 자체 상태라 DB 마이그레이션과 무관.
 """
 
-import datetime as dt
 import logging
 
-from boto3.dynamodb.conditions import Key
-
-from shared import audit, ddb_client, eb_client, response
+from repo import config_repo
+from shared import audit, eb_client, response
 
 logger = logging.getLogger(__name__)
 
 
-def _load_feature_flags() -> dict:
-    table = ddb_client.config_table()
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq("CONFIG") & Key("sk").begins_with("feature-flag/"),
-    )
-    flags = {}
-    for item in resp.get("Items", []):
-        sk = item.get("sk", "")
-        flag_name = sk.replace("feature-flag/", "", 1)
-        value = item.get("value") or {}
-        flags[flag_name] = bool(value.get("enabled", True))
-    return flags
-
-
-def _load_thresholds() -> dict:
-    table = ddb_client.config_table()
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq("CONFIG") & Key("sk").begins_with("threshold/"),
-    )
-    thresholds: dict = {}
-    for item in resp.get("Items", []):
-        sk = item.get("sk", "")
-        name = sk.replace("threshold/", "", 1)
-        value = item.get("value") or {}
-        raw = value.get("threshold", 0)
-        # boto3 resource layer returns DDB Number as Decimal — coerce to int.
-        thresholds[name] = int(raw)
-    return thresholds
-
-
 def handle_list(body: dict, path_params: dict, query_params: dict) -> dict:
     rules = eb_client.list_rules()
-    flags = _load_feature_flags()
-    thresholds = _load_thresholds()
+    flags = config_repo.list_feature_flags()
+    thresholds = config_repo.list_thresholds()
     return response.ok({"rules": rules, "feature_flags": flags, "thresholds": thresholds})
 
 
@@ -99,25 +72,15 @@ def handle_feature_flag_update(body: dict, path_params: dict, query_params: dict
         return response.err("action must be one of: enable, disable", 400)
 
     enabled = (action == "enable")
-    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     try:
-        ddb_client.config_table().update_item(
-            Key={"pk": "CONFIG", "sk": f"feature-flag/{flag_name}"},
-            UpdateExpression="SET #v = :v, updated_at = :ts, actor = :a",
-            ExpressionAttributeNames={"#v": "value"},
-            ExpressionAttributeValues={
-                ":v": {"enabled": enabled},
-                ":ts": now,
-                ":a": "admin",
-            },
-        )
+        updated_at = config_repo.set_feature_flag(flag_name, enabled)
     except Exception as e:
         logger.exception(f"feature-flag-update failed: {flag_name} {action}")
         return response.err(f"feature flag update failed: {type(e).__name__}", 500)
 
     audit.log("feature-flag-update", {"flag": flag_name, "action": action})
-    return response.ok({"flag": flag_name, "enabled": enabled, "updated_at": now})
+    return response.ok({"flag": flag_name, "enabled": enabled, "updated_at": updated_at})
 
 
 def handle_threshold_update(body: dict, path_params: dict, query_params: dict) -> dict:
@@ -134,22 +97,11 @@ def handle_threshold_update(body: dict, path_params: dict, query_params: dict) -
     if value < 1 or value > 10000:
         return response.err("value out of range (1..10000)", 400)
 
-    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
     try:
-        ddb_client.config_table().update_item(
-            Key={"pk": "CONFIG", "sk": f"threshold/{name}"},
-            UpdateExpression="SET #v = :v, updated_at = :ts, actor = :a",
-            ExpressionAttributeNames={"#v": "value"},
-            ExpressionAttributeValues={
-                ":v": {"threshold": value},
-                ":ts": now,
-                ":a": "admin",
-            },
-        )
+        updated_at = config_repo.set_threshold(name, value)
     except Exception as e:
         logger.exception(f"threshold-update failed: {name} {value}")
         return response.err(f"threshold update failed: {type(e).__name__}", 500)
 
     audit.log("threshold-update", {"threshold": name, "value": value})
-    return response.ok({"threshold": name, "value": value, "updated_at": now})
+    return response.ok({"threshold": name, "value": value, "updated_at": updated_at})
