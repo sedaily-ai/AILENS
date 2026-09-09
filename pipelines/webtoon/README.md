@@ -1,50 +1,82 @@
 # 뉴스 웹툰 자동 생성 파이프라인
 
-기사 텍스트 1건 → 8컷 웹툰(개별 이미지 8장 + 세로 스크롤 1장) + 제목/설명까지
-자동으로 만드는 파이프라인. 2026-08-10 하루 동안 실제 지면 기사 20건으로
-검증 완료(총 160장).
+기사 텍스트 1건 → 8컷 웹툰(개별 이미지 8장 + 세로 스크롤 1장)을 자동으로
+만드는 파이프라인. **2026-09-08~09에 3단계(이미지 생성) 아키텍처를
+OpenAI GPT-image에서 AWS Bedrock(Stable Diffusion 계열) + 자체 GPU
+IP-Adapter로 전면 교체했다** — 아래 내용은 그 이후(R12~R22) 기준이다.
+과거 GPT 기반 시행착오는 이 문서 하단 "지난 아키텍처(2026-08, GPT
+기반)"에 남겨뒀고, 전체 실험 과정은
+`docs/evaluation/webtoon/라운드기록.md`(R1~R22)에 라운드별로 기록돼
+있다 — 특정 설계 결정의 이유가 궁금하면 거기부터 찾을 것.
 
-기존에 `2_ailens/마스터DB/03_개발·프롬프트/뉴스웹툰_파이프라인`(dev2 바깥,
-게다가 홈 디렉터리 전체가 git 루트로 잡혀 있어 커밋이 안 되던 위치)에
-있던 걸 2026-08-20에 이 저장소로 옮겼다 — `pipelines/video/`를 옮긴 것과
-같은 이유.
-
-## 아키텍처 — 3단계
+## 아키텍처 — 3단계 + 텍스트 합성
 
 ```
 [1단계] 기사 텍스트 + admin 프롬프트(DDB, webtoon 탭)
-   → 스크립트 생성 (GPT-4o)
-   → 8컷의 내레이션/대사(A·B, 각 대사에 tone: 보통|격앙)/캡션만 텍스트로
-     (그림 묘사 없음)
+   → 스크립트 생성 (Bedrock Claude)
+   → 8컷의 title/내레이션/대사(A·B, tone: 보통|격앙)/caption/
+     closing_caption만 텍스트로 (그림 묘사 없음)
 
 [2단계] 기사 + 1단계 스크립트 + 같은 admin 프롬프트
-   → 장면 연출 생성 (GPT-4o)
-   → 컷마다 카메라 앵글 + 시각 묘사 (대사는 안 건드림)
+   → 장면 연출 생성 (Bedrock Claude)
+   → 컷마다 카메라 앵글 + 시각 묘사. 같은 정적 자세가 3컷 넘게
+     연속되지 않게, 능동적 동작(가리키기·소품 들기·이동)을 최소
+     3컷 이상 넣으라는 지침 포함(admin DDB v#9)
 
-[3단계] 2단계 장면 + 1단계 대사(+tone)
-   → 이미지 생성 (gpt-5.5, Responses API의 image_generation 툴)
-   → 컷당 1장, 1536x1024, high quality. tone=격앙인 대사는 삐죽삐죽한
-     폭발형 말풍선으로 그려진다(`prompts.py`의 `bubbles()`)
+[3단계] 2단계 장면 → 텍스트 없는 배경 이미지 생성
+   구도-화풍 분리 파이프라인(webtoon_image.generate_bedrock_composed_image):
+     (a) translate_scene_to_photo_brief() — 한국어 [SCENE]/[CAMERA]를
+         영어 사진 브리핑으로 압축 + 이 컷의 주인공이 A/B 단독인지
+         둘 다(BOTH)인지 분류(Bedrock Claude, 1회 호출)
+     (b) 주인공 판정에 따라 배경 생성 경로 분기:
+         - A 또는 B 단독 → GPU IP-Adapter(gpu_ipadapter.py)로 참조
+           얼굴을 고정한 포토리얼 사진 생성
+         - BOTH(두 인물) → A·B 각각 IP-Adapter로 따로 생성 →
+           Bedrock Remove Background로 인물만 오려내기 → 빈 배경
+           사진 위에 합성(generate_dual_character_init_bytes)
+         - 그 외(주로 인물 없는 상징적 컷) → Bedrock Stable Image
+           Core로 참조 없는 포토리얼 생성
+     (c) 위 결과를 Bedrock Style Transfer에 통과시켜 확립된 플랫
+         셀 웹툰 화풍을 입힌다(webtoon_style_reference.png 참고)
+   QA 게이트(pipeline._generate_and_qa_cut): 생성한 배경을 Rekognition
+   얼굴 감지 + Claude 비전 검사에 통과시켜, 배경 인물 초과·인물 없음
+   위반·사극 오염을 잡으면 1회 재생성한다.
+
+[텍스트 합성] compose_text.compose() — PIL로 제목/말풍선/캡션/
+   마무리 자막을 배경 위에 직접 그린다(Bedrock 계열 모델이 한글을
+   정확히 못 그려서 텍스트는 항상 코드가 그린다 — "100% 정확" 보장이
+   이 구조의 존재 이유). 캡션 키워드에 맞는 아이콘 배지(돈·계약서·
+   달력·필름·지구본·차트)도 이 단계에서 붙는다.
 
 [스티칭] 8장을 세로로 이어붙여 웹툰_전체.png 하나로
 ```
 
-3단계로 나눈 이유: 한 번에 다 시키면 "그림 묘사까지 섞인 대사"가 나오거나
-말풍선 렌더링이 빠지는 등 품질이 불안정했다. 각 단계 역할을 좁게 나누고
-중간 결과(JSON)를 파일로 남기니 훨씬 안정적이고, 재실행 시 이미 끝난
-단계는 건너뛴다(resume).
+## GPU 인스턴스(IP-Adapter, 캐릭터 얼굴 고정)
 
-**1·2단계 지침은 이 저장소에 하드코딩돼 있지 않다.** admin 프롬프트
-드로어(`/lens` → 프롬프트 → 웹툰 탭)가 관리하는 DDB
-(`PROMPT#webtoon/published`)가 정본이고, `pipeline.py`가
-`ddb_prompt.load_prompt("webtoon")`로 매 실행마다 가져다 쓴다 — DDB를
-못 읽으면 `../service/backend/prompts/webtoon/published.md`(admin이
-저장할 때마다 같이 갱신하는 파일시스템 사본)로 떨어진다. 2026-08-20
-이전엔 이 저장소(당시 마스터DB)에 별도의 낡은 버전이 하드코딩돼 있어서,
-admin에서 프롬프트를 고쳐도 실제 이미지엔 반영이 안 되는 문제가 있었다
-— 자세한 경위는 `docs/evaluation/4format-samples/2026-08-11-빵지순례/
-라운드기록.md` 이슈 트래커 #11 참고. 3단계(이미지 스타일)만 여전히
-`prompts.py`에 코드로 남아있다 — 이유는 그 파일 상단 docstring 참고.
+Bedrock 관리형 API로는 IP-Adapter(참조 얼굴로 인물 정체성을 고정하는
+기법)를 못 쓴다 — 자체 GPU 인스턴스(`webtoon-ipadapter-gpu`,
+`i-02313c8c8285f9d91`, ap-northeast-2, g4dn.xlarge)를 배치 전용으로
+운영한다. `pipeline.py`가 `IMAGE_PROVIDER == "bedrock-style-transfer"`
+일 때 배치 시작 시 한 번만 자동 기동(SSM 온라인까지 대기)하고, 8컷 다
+끝나면(예외가 나도 try/finally로) 한 번만 자동 정지한다 — 상시 가동이
+아니라 "쓸 때만 켜고 끄는" 패턴이라 컷당 몇 초, 배치당 몇 분 수준의
+가동시간만 과금된다(g4dn.xlarge $0.647/시간).
+
+인스턴스가 처음부터 없거나 잃어버렸을 때 다시 세팅하는 절차는
+`../common/gpu_scripts/README.md` 참고. 실제 추론 코드
+(`ipadapter_infer.py`)와 오케스트레이션(`../common/gpu_ipadapter.py`)도
+거기·`pipelines/common/`에 있다.
+
+## 캐릭터 참조 이미지
+
+`pipelines/common/assets/character_ref_A.png`/`character_ref_B.png` —
+GPU 인스턴스의 IP-Adapter가 참조하는 A(여성)·B(남성)의 대표 얼굴 크롭.
+**깃 리포의 이 파일과 GPU 인스턴스(`/home/ec2-user/refs/`)의 실제
+파일은 자동 동기화되지 않는다** — 리포 쪽을 바꾸면 S3 경유로 수동
+재업로드해야 한다(`../common/gpu_scripts/README.md` 참고). 참조를
+고를 때 헤어스타일 등 "그 순간의 상태"까지 그대로 재현된다는 걸
+실측으로 확인했다(R15) — 대표적인 상태(예: 머리를 묶지 않은 상태)의
+크롭을 고를 것.
 
 ## 셋업
 
@@ -53,43 +85,30 @@ cd pipelines/webtoon
 pip install -r requirements.txt
 ```
 
-로컬 `.env`는 더 이상 안 쓴다(2026-08-21 — `../common/openai_client.py`로
-통일). OpenAI API 키는 AWS Secrets Manager `sedaily-mbti/openai-api-key`
-(계정 887078546492, us-east-1)에서 실행 시점에 자동으로 가져온다 —
-letters/podcast/video 파이프라인과 동일한 방식.
-
-DDB(`sedaily-mbti-admin-prompts-dev`, us-east-1) 읽기 권한이 있는 AWS
-자격 증명이 필요하다 — 로컬에서는 `AWS_PROFILE=yeonggwang` 환경변수로
-지정(`../common/ddb_prompt.py` 참고). 같은 자격 증명으로 위 Secrets
-Manager 시크릿도 조회하므로 별도 설정은 필요 없다. DDB 접근이 실패해도
-프롬프트는 파일시스템 폴백으로 계속 동작한다.
+AWS 자격 증명이 필요하다(DDB 프롬프트 읽기, Bedrock 이미지/텍스트
+호출, GPU 인스턴스 기동/정지, S3, Rekognition) — 로컬에서는
+`AWS_PROFILE=yeonggwang` 환경변수로 지정. DDB 접근이 실패해도
+1·2단계 프롬프트는 파일시스템 폴백(`../../service/backend/prompts/
+webtoon/published.md`)으로 계속 동작한다.
 
 ## 사용법
 
-**기사 1건**
-```python
-from pipeline import run_article
-run_article("01_삼성HBM4", "articles/삼성HBM4.txt")
-```
-
 **여러 건 한 번에 (CLI)**
 ```bash
-python3 run_batch.py 01_삼성HBM4 articles/삼성HBM4.txt \
-                      02_현대차파업 articles/현대차파업.txt
+python3 run_batch.py 01_기사명 articles/기사파일.txt \
+                      02_기사명2 articles/기사파일2.txt
 ```
 
-**병렬로 여러 건 (시간 단축)**
-```bash
-# 터미널 4개 또는 백그라운드 4개로 나눠서 실행
-python3 run_batch.py 01_A articles/A.txt 02_B articles/B.txt &
-python3 run_batch.py 03_C articles/C.txt 04_D articles/D.txt &
-# ... 동시 실행은 4~5개 이내 권장 (OpenAI 레이트리밋)
+**기사 1건 (Python)**
+```python
+from pipeline import run_article
+run_article("01_기사명", "articles/기사파일.txt")
 ```
 
 **제목·설명 생성 (전 폴더 일괄)**
 ```bash
 python3 generate_meta.py                    # 현재 폴더의 모든 웹툰 폴더 대상
-python3 generate_meta.py 01_삼성HBM4 02_현대차파업   # 특정 폴더만
+python3 generate_meta.py 01_기사명 02_기사명2   # 특정 폴더만
 ```
 
 **전체 목록 인덱스 만들기**
@@ -100,71 +119,54 @@ python3 build_index.py .   # INDEX.md + index.json 생성
 ## 출력 구조
 
 ```
-01_삼성HBM4/
-├── 1_script.json      1단계 결과 (재사용 가능)
+01_기사명/
+├── 1_script.json      1단계 결과 (재사용 가능, resume=True 기본값)
 ├── 2_scenes.json       2단계 결과 (재사용 가능)
 ├── 컷1.png ~ 컷8.png    개별 컷
 ├── 웹툰_전체.png        세로 스크롤 합본
 └── meta.json            제목 3안 + 작품설명 (generate_meta.py 실행 후 생김)
 ```
 
-## 비용 (2026-08 기준)
+## 비용 (2026-09 공개 단가 기준 추정치, 라운드기록 R16 참고)
 
-- 이미지 1장(1536×1024, high quality): **$0.165**
-- 8컷 웹툰 1편: 약 **$1.32** (텍스트 호출 2회는 무시할 수준, 편당 $0.01 미만)
-- 20편(160장) 실측: 약 **$26**
-
-가격 근거: [OpenAI 공식 가격 문서](https://developers.openai.com/api/docs/pricing).
-모델·가격 정책이 바뀔 수 있으니 대량 생성 전 반드시 재확인할 것.
-
-## 시행착오 — 같은 문제 반복하지 않기
-
-**1. 실사 사진처럼 나오는 문제**
-"semi-photographic rendering" 같은 문구를 쓰면 진짜 사진처럼 나온다.
-뉴스 웹툰인데 사진 같으면 실존 인물로 오인될 위험이 있어 위험하다.
-→ `prompts.py`의 `STYLE`에 "hand-illustrated, NOT a photograph" 명시로 해결.
-
-**2. 디테일을 낮추면 실사 문제가 해결될 거라 착각**
-위 문제를 "flat cel-shading, 디테일 최소화"로 풀려고 했다가 품질이
-확 떨어졌다. **"실사냐 아니냐"와 "디테일이 많냐 적냐"는 다른 축**이다.
-디테일은 최대로 유지하면서 "이건 그림이다"라고 명시하는 쪽이 맞다
-(마스터DB `03_개발·프롬프트/웹툰_이미지생성_참고(역사로)/generate.py`의
-"Kingdom급 웹툰" 스타일 참고 — 이 저장소 바깥, dev2 git 관리 대상 아님).
-
-**3. 말풍선이 아예 안 나오는 문제**
-장면 묘사만 있고 `[SPEECH BUBBLES TO RENDER]` 같은 명시적 렌더링 지시가
-없으면, 대사가 있는 장면인데도 말풍선 없이 그림만 나온다. 대사가 있는
-컷은 반드시 `prompts.bubbles()`로 명시적 지시를 넣을 것.
-
-**4. 대화 컷이 너무 적어서 "웹툰이 아니라 카드뉴스 같다"는 문제**
-1단계 프롬프트에 "대화 컷과 내레이션 컷을 번갈아 배치"라고만 하면
-GPT가 기계적으로 정확히 절반씩 나눠버려서, 8컷 중 4컷이 대사 없는
-내레이션뿐이 된다. → "최소 5컷 이상은 대화로, 내레이션 전용은 컷1·8
-포함 최대 3개까지"로 구체적 하한선을 명시해야 해결된다.
-
-**5. 캐릭터(A·B) 일관성**
-컷마다 독립적으로 이미지를 생성하기 때문에, 같은 인물 A·B라도 컷마다
-얼굴·복장이 미묘하게 달라질 수 있다. 완벽히 막을 방법은 없고, 완화하려면:
-- A·B의 외형을 아주 구체적으로 고정 문구화해서 매 프롬프트에 반복 삽입
-- 이미지 생성 API가 레퍼런스 이미지 입력을 지원하면, 기준 이미지를
-  매번 같이 넣어 일관성 강화 (아직 이 파이프라인엔 미구현)
+- 8컷 기사 1편: 약 **$1.03**(대사 컷 solo 4·BOTH 4 가정) — Bedrock
+  텍스트·이미지 호출 + GPU 가동시간 합산 추정
+- 실제 AWS 청구 데이터로는 아직 검증 안 함(반영 지연 + 소액 테스트와
+  섞여 분리 어려움) — 이 워크로드로 한 달 이상 운영 후 Cost Explorer에서
+  `Workload=webtoon-image`/`webtoon-ipadapter` 태그로 확인 권장
 
 ## 알려진 한계 / 다음에 할 것
 
-- 캐릭터 일관성 미해결 (위 참고)
-- 병렬 처리 시 OpenAI 레이트리밋에 걸리면 `pipeline.generate_image()`의
-  재시도 로직(최대 3회, 지수 백오프)이 흡수하지만, 너무 많이 병렬로
-  돌리면 실패율이 올라갈 수 있음 — 동시 실행 4~5개 초과 시 주의
-- 실사 원본 기사에 없는 배경 소품(예: 캘린더에 엉뚱한 연월 표기)이
-  가끔 등장 — `prompts.py`의 FORBIDDEN 목록에 이미 방지 문구가
-  있지만 100% 차단되진 않음, 발행 전 육안 확인 권장
-- AI LENS 실제 CMS/발행 파이프라인과의 연동(자동 발행, 별도 API 키
-  발급, 비용 상한 설정)은 아직 안 됨 — 이 파이프라인은 "생성"까지만
+라운드기록(R1~R22)의 이슈 트래커에 상세 기록돼 있다. 2026-09-09
+기준 핵심 이슈(#4 장면 이행력, #14 배경 엑스트라, #15 캐릭터 일관성)는
+전부 해결됐고, 남은 건:
 
-## 참고 — 원본 아이디어 출처
+- Style Transfer 단계에서 스튜디오 소품 잔여 오염이 이따금 보임(참고
+  이미지를 중립 배경으로 교체했지만 완전히는 안 없어짐)
+- 컷1(표지, 대사 없음)의 배경 인물 수는 다른 컷보다 덜 안정적
+- 실제 AWS 청구 데이터 기반 비용 검증 안 됨(위 참고)
+- 아이콘 배지 종류(현재 6종)가 실제 발행 기사들의 캡션 패턴을 다
+  커버하진 못함 — 발행량이 늘면 키워드 사전 보강 필요
+- AI LENS 실제 CMS/발행 파이프라인과의 연동(자동 발행)은 아직
+  안 됨 — 이 파이프라인은 "생성"까지만
 
-이 파이프라인의 아트 스타일과 말풍선 렌더링 규칙은 `역사로`(조선왕조실록
-기반 역사 웹툰) 프로젝트의 마스터DB
-`03_개발·프롬프트/웹툰_이미지생성_참고(역사로)/generate.py`에서 가져와
-뉴스 기사용으로 재설계한 것이다(이 저장소 바깥, dev2 git 관리 대상 아님).
-원본 코드도 함께 보면 도움이 된다.
+## 지난 아키텍처(2026-08, GPT 기반) — 참고용, 더 이상 안 씀
+
+3단계 이미지 생성을 OpenAI `gpt-5.5`(Responses API의 `image_generation`
+툴)로 했던 시절의 기록. 2026-09-08 사용자가 "OpenAI 대신 Stable
+Diffusion 계열을 쓰기로 결정"하면서 전면 교체됐다 — 코드 자체는
+`pipeline.py`에 `IMAGE_PROVIDER = "openai"`로 여전히 남아있어(휴면),
+필요하면 되돌릴 수 있다.
+
+당시 비용: 이미지 1장(1536×1024, high) $0.165, 8컷 편당 약 $1.32 —
+[OpenAI 공식 가격 문서](https://developers.openai.com/api/docs/pricing)
+기준(모델·가격이 바뀔 수 있음).
+
+당시 시행착오(지금은 대부분 해당 없음 — Bedrock 경로는 원천적으로
+텍스트를 안 그리므로 "말풍선이 안 나오는 문제" 자체가 없음 등):
+- 실사 사진처럼 나오는 문제 → STYLE에 "hand-illustrated, NOT a
+  photograph" 명시로 해결
+- 디테일을 낮추면 실사 문제가 해결될 거라 착각 → "실사냐 아니냐"와
+  "디테일 양"은 다른 축, 디테일은 유지하고 화풍만 명시하는 게 정답
+- 대화 컷이 너무 적어 카드뉴스 같아지는 문제 → 1단계 프롬프트에
+  "최소 5컷 이상 대화"처럼 구체적 하한선 명시로 해결
