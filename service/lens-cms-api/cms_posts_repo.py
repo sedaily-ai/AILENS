@@ -122,12 +122,28 @@ def _fetch_lens_items(cur, pub_id: int) -> List[Dict[str, Any]]:
     return items
 
 
+def _apply_lens_admin_extra(post: Dict[str, Any], admin_extra: Optional[Dict[str, Any]]) -> None:
+    """lens 채널 전용 메타데이터(category/paper_section/photo_image_url/
+    display_order/editor_id) — 정규화 테이블(renditions 등)엔 자리가 없고
+    admin_extra JSONB에만 있다("지면 특별 코너" 4탭 배치가 여기 의존,
+    v1.29에서 발견·수정: 공개 읽기 경로가 이 병합을 안 해서 4탭 전부
+    빈 상태로 보이던 버그)."""
+    extra = admin_extra or {}
+    extra_body = extra.get("body_inline") or {}
+    post["body_inline"]["category"] = extra_body.get("category")
+    post["body_inline"]["paper_section"] = extra_body.get("paper_section")
+    post["body_inline"]["photo_image_url"] = extra_body.get("photo_image_url")
+    post["display_order"] = extra.get("display_order")
+    post["editor_id"] = extra.get("editor_id")
+
+
 def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> List[Dict[str, Any]]:
     with get_cursor() as cur:
         if channel == "lens":
             sql = """
                 SELECT id AS publication_id, slug, title, subtitle, cover_image_url,
                        source_url, status, published_at, created_at, updated_at,
+                       admin_extra,
                        NULL AS video_url, NULL AS transcript,
                        NULL AS images_json, NULL AS body_json
                 FROM publications
@@ -178,6 +194,7 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
                     {"label": label, "question": "", "bullets": []}
                     for label in lens_labels_by_pub.get(row["publication_id"], [])
                 ]
+                _apply_lens_admin_extra(post, row.get("admin_extra"))
             posts.append(post)
         return posts
 
@@ -219,7 +236,8 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
             cur.execute(
                 """
                 SELECT id AS publication_id, slug, title, subtitle, cover_image_url,
-                       source_url, status, published_at, created_at, updated_at
+                       source_url, status, published_at, created_at, updated_at,
+                       admin_extra
                 FROM publications
                 WHERE id = %s AND status = 'published' AND deleted_at IS NULL
                 """,
@@ -234,6 +252,7 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
             pub_row["body_paragraphs"] = []
             post = _row_to_post(pub_row)
             post["body_inline"]["lenses"] = _fetch_lens_items(cur, pub_id)
+            _apply_lens_admin_extra(post, pub_row.get("admin_extra"))
             return post
 
         fmt = _CHANNEL_TO_FORMAT.get(channel) if channel else None

@@ -59,6 +59,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.26 — 커뮤니티 게시판·퀴즈 응답 통계 Postgres 전환, engagement 테이블 라이브 write 소거](postgres/v1.26-커뮤니티-퀴즈통계-전환.md) |
 | 2026-09-09 | postgres | [v1.27 — admin 프롬프트·감사 로그 Postgres 전환](postgres/v1.27-프롬프트-감사로그-전환.md) |
 | 2026-09-09 | postgres | [v1.28 — feature flag·threshold·admin 로그인 잠금 Postgres 전환](postgres/v1.28-feature-flag-threshold-lockout-전환.md) |
+| 2026-09-09 | postgres | [v1.29 — lens 지면 특별 코너 빈 화면 버그 수정(admin_extra 미투영 + 913건 백필)](postgres/v1.29-lens-지면코너-버그수정.md) |
 
 ## 새 항목 추가 규칙
 
