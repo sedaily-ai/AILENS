@@ -58,13 +58,24 @@ def _clients():
 
 def ensure_gpu_running(timeout_s: int = 180) -> None:
     """인스턴스가 stopped면 start하고 running+SSM 온라인까지 대기한다.
-    이미 running이면 바로 리턴(중복 start_instances 호출 방지)."""
+    이미 running이면 바로 리턴(중복 start_instances 호출 방지).
+
+    2026-09-09 버그 수정 — state가 "stopping"(직전 배치가 막 stop_gpu()를
+    부른 직후 등 전이 상태)일 때 start_instances도 안 부르고 그냥
+    instance_running waiter를 걸었더니, waiter가 "stopped"를 터미널
+    상태로 보고 즉시 실패하는 걸 실측으로 확인함(WaiterError). "running"이
+    아닌 모든 상태(stopping 포함)에서 먼저 stopped를 기다린 다음
+    start_instances를 부르도록 고침."""
     ssm, ec2, _s3 = _clients()
     state = ec2.describe_instances(InstanceIds=[GPU_INSTANCE_ID])["Reservations"][0]["Instances"][0]["State"]["Name"]
+    if state == "stopping":
+        print(f"[gpu_ipadapter] {GPU_INSTANCE_ID} 정지 완료 대기 중...")
+        ec2.get_waiter("instance_stopped").wait(InstanceIds=[GPU_INSTANCE_ID])
+        state = "stopped"
     if state == "stopped":
         print(f"[gpu_ipadapter] {GPU_INSTANCE_ID} 기동 중...")
         ec2.start_instances(InstanceIds=[GPU_INSTANCE_ID])
-    if state not in ("running",):
+    if state != "running":
         ec2.get_waiter("instance_running").wait(InstanceIds=[GPU_INSTANCE_ID])
 
     deadline = time.time() + timeout_s
