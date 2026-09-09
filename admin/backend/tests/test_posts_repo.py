@@ -1,178 +1,132 @@
-"""posts_repo 유닛 테스트 — moto 로 sedaily-mbti-cms-posts-dev 를 흉내낸 실제
-DynamoDB(인메모리)에 대고 돈다. AWS 크리덴셜/네트워크 불필요.
+"""posts_repo 유닛 테스트 — v1.21부터 posts_repo는 순수 HTTP 클라이언트라
+lens-cms-api(EC2)를 실제로 호출하는 대신 urllib.request.urlopen을 fake로
+대체해서 "요청을 올바르게 만드는지"만 검증한다.
 
-2026-08-04: pgvector RDS 삭제에 따라 posts_repo 가 SQL → DynamoDB 로 재구축되면서
-이 테스트도 pg_client fake 대신 moto 기반으로 다시 썼다. 커버리지는 SQL 버전과 동등.
+CRUD 로직 자체(slug 생성, 부분 수정 계약, lens 분해 등)의 정확성은
+service/lens-cms-api/admin_posts_repo.py가 실제로 갖고 있고, 그쪽은
+Postgres에 대고 도는 별도 스크립트로 수동 검증했다(docs/architecture/
+db-changelog/postgres/v1.21-admin-쓰기-전환.md 참조) — 이 파일이 그
+로직까지 재검증하지 않는다, 대상이 다르다.
 
-Run from service/backend/::
+Run from admin/backend/::
 
-    python3 -m pytest admin/tests/test_posts_repo.py -v
+    python3 -m pytest tests/test_posts_repo.py -v
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
+from urllib.error import HTTPError
 
-import boto3
 import pytest
-from moto import mock_aws
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from repo import posts_repo  # noqa: E402
 
-_TABLE_NAME = "sedaily-mbti-cms-posts-dev-test"
+
+class _FakeResponse:
+    def __init__(self, payload: dict):
+        self._body = json.dumps(payload).encode()
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
 
 
-@pytest.fixture
-def ddb_table(monkeypatch):
-    """실제 posts_table() 호출을 moto 백엔드의 임시 테이블로 바꿔치기한다.
-
-    shared.ddb_client 의 boto3 resource 싱글턴은 모듈 로드 시점에 이미 만들어져
-    있어 mock_aws 활성화 전이라 그대로 못 쓴다 — posts_repo.posts_table 자체를
-    monkeypatch 해서 우회한다.
-    """
-    with mock_aws():
-        resource = boto3.resource("dynamodb", region_name="us-east-1")
-        table = resource.create_table(
-            TableName=_TABLE_NAME,
-            KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
-            AttributeDefinitions=[
-                {"AttributeName": "id", "AttributeType": "S"},
-                {"AttributeName": "slug", "AttributeType": "S"},
-                {"AttributeName": "status", "AttributeType": "S"},
-                {"AttributeName": "publish_date", "AttributeType": "S"},
-            ],
-            GlobalSecondaryIndexes=[
-                {
-                    "IndexName": "slug-index",
-                    "KeySchema": [{"AttributeName": "slug", "KeyType": "HASH"}],
-                    "Projection": {"ProjectionType": "ALL"},
-                },
-                {
-                    "IndexName": "status-publish_date-index",
-                    "KeySchema": [
-                        {"AttributeName": "status", "KeyType": "HASH"},
-                        {"AttributeName": "publish_date", "KeyType": "RANGE"},
-                    ],
-                    "Projection": {"ProjectionType": "ALL"},
-                },
-            ],
-            BillingMode="PAY_PER_REQUEST",
-        )
-        table.wait_until_exists()
-        monkeypatch.setattr(posts_repo, "posts_table", lambda: table)
-        yield table
+@pytest.fixture(autouse=True)
+def _fake_token(monkeypatch):
+    monkeypatch.setattr(posts_repo, "get_secure", lambda name: "test-token")
 
 
-def _create(ddb_table, **overrides) -> dict:
-    data = {
-        "publish_date": "2026-07-27",
-        "headline": "제목",
-        "channels": ["letters"],
-        "subtitle": "부제",
-        "closing_line": "닫는 줄",
-        "editor_id": "하은",
-        "body_inline": {"body": ["문단1"]},
-    }
-    data.update(overrides)
-    return posts_repo.create(data, created_by="admin")
+def _capture_urlopen(monkeypatch, response_payload: dict):
+    captured = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["method"] = req.get_method()
+        captured["headers"] = dict(req.header_items())
+        captured["body"] = json.loads(req.data) if req.data else None
+        return _FakeResponse(response_payload)
+
+    monkeypatch.setattr(posts_repo.urllib.request, "urlopen", fake_urlopen)
+    return captured
 
 
-def test_create_generates_slug_and_returns_row(ddb_table) -> None:
-    out = _create(ddb_table)
-    assert out["slug"] == "2026-07-27-제목"
-    assert out["status"] == "draft"
-    assert out["channels"] == ["letters"]
-    assert out["published_at"] is None
+def test_create_posts_to_admin_posts_with_token(monkeypatch):
+    captured = _capture_urlopen(monkeypatch, {"post": {"id": "abc", "slug": "s"}})
+    out = posts_repo.create({"headline": "제목"}, created_by="admin")
+    assert out == {"id": "abc", "slug": "s"}
+    assert captured["method"] == "POST"
+    assert captured["url"].endswith("/admin/posts")
+    assert captured["body"] == {"data": {"headline": "제목"}, "created_by": "admin"}
+    assert captured["headers"].get("X-internal-token") == "test-token"
 
 
-def test_create_suffixes_slug_on_conflict(ddb_table) -> None:
-    _create(ddb_table)
-    _create(ddb_table)
-    third = _create(ddb_table)
-    assert third["slug"] == "2026-07-27-제목-3"
+def test_get_returns_post(monkeypatch):
+    captured = _capture_urlopen(monkeypatch, {"post": {"id": "abc"}})
+    out = posts_repo.get("abc")
+    assert out == {"id": "abc"}
+    assert captured["method"] == "GET"
+    assert captured["url"].endswith("/admin/posts/abc")
 
 
-def test_get_returns_none_when_missing(ddb_table) -> None:
-    assert posts_repo.get("11111111-1111-1111-1111-111111111111") is None
+def test_get_returns_none_on_404(monkeypatch):
+    def fake_urlopen(req, timeout=None):
+        raise HTTPError(req.full_url, 404, "not found", {}, None)
+
+    monkeypatch.setattr(posts_repo.urllib.request, "urlopen", fake_urlopen)
+    assert posts_repo.get("missing") is None
 
 
-def test_get_returns_none_when_soft_deleted(ddb_table) -> None:
-    post = _create(ddb_table)
-    posts_repo.soft_delete(post["id"])
-    assert posts_repo.get(post["id"]) is None
+def test_list_posts_builds_query_string(monkeypatch):
+    captured = _capture_urlopen(monkeypatch, {"posts": [{"id": "1"}]})
+    out = posts_repo.list_posts("draft", "letters", limit=10, date="2026-09-09")
+    assert out == [{"id": "1"}]
+    assert "status=draft" in captured["url"]
+    assert "channel=letters" in captured["url"]
+    assert "limit=10" in captured["url"]
+    assert "date=2026-09-09" in captured["url"]
 
 
-def test_soft_delete_sets_deleted_at(ddb_table) -> None:
-    post = _create(ddb_table)
-    assert posts_repo.soft_delete(post["id"]) is True
-    # 이미 삭제된 걸 다시 지우면 False — SQL 버전의 idempotency 계약과 동일.
-    assert posts_repo.soft_delete(post["id"]) is False
-
-
-def test_list_posts_filters_by_status_and_channel(ddb_table) -> None:
-    _create(ddb_table, channels=["letters"])
-    _create(ddb_table, channels=["paper"])
-    out = posts_repo.list_posts("draft", "letters", limit=20)
-    assert len(out) == 1
-    assert out[0]["channels"] == ["letters"]
-
-
-def test_list_posts_excludes_soft_deleted(ddb_table) -> None:
-    post = _create(ddb_table)
-    posts_repo.soft_delete(post["id"])
-    assert posts_repo.list_posts("draft", None, limit=20) == []
-
-
-def test_list_posts_filters_by_date(ddb_table) -> None:
-    _create(ddb_table, publish_date="2026-08-05")
-    _create(ddb_table, publish_date="2026-08-06")
-    out = posts_repo.list_posts("draft", None, limit=20, date="2026-08-06")
-    assert len(out) == 1
-    assert out[0]["publish_date"] == "2026-08-06"
-
-
-def test_set_status_publish_stamps_published_at(ddb_table) -> None:
-    post = _create(ddb_table)
-    out = posts_repo.set_status(post["id"], "published")
-    assert out is not None
-    assert out["status"] == "published"
-    assert out["published_at"] is not None
-
-
-def test_set_status_rejects_unknown_value(ddb_table) -> None:
-    with pytest.raises(ValueError):
-        posts_repo.set_status("11111111-1111-1111-1111-111111111111", "bogus")
-
-
-# --- 회귀: 부분 수정이 누락 필드를 지우면 안 된다 (2026-07-28 스모크 사고, SQL 버전 때 발견) ---
-
-
-def test_update_only_touches_provided_keys(ddb_table) -> None:
-    post = _create(ddb_table)
-    out = posts_repo.update(post["id"], {"subtitle": "새 부제"})
-    assert out is not None
+def test_update_sends_put_with_body(monkeypatch):
+    captured = _capture_urlopen(monkeypatch, {"post": {"id": "abc", "subtitle": "새 부제"}})
+    out = posts_repo.update("abc", {"subtitle": "새 부제"})
     assert out["subtitle"] == "새 부제"
-    # 보내지 않은 필드는 원래 값 그대로 — 유실되면 안 된다.
-    assert out["editor_id"] == "하은"
-    assert out["headline"] == "제목"
-    assert out["closing_line"] == "닫는 줄"
+    assert captured["method"] == "PUT"
+    assert captured["body"] == {"subtitle": "새 부제"}
 
 
-def test_update_allows_explicit_null_to_clear(ddb_table) -> None:
-    post = _create(ddb_table)
-    out = posts_repo.update(post["id"], {"editor_id": None})
-    assert out is not None
-    assert out["editor_id"] is None
+def test_update_returns_none_when_missing(monkeypatch):
+    def fake_urlopen(req, timeout=None):
+        raise HTTPError(req.full_url, 404, "not found", {}, None)
+
+    monkeypatch.setattr(posts_repo.urllib.request, "urlopen", fake_urlopen)
+    assert posts_repo.update("missing", {"subtitle": "x"}) is None
 
 
-def test_update_with_no_fields_returns_current(ddb_table) -> None:
-    post = _create(ddb_table)
-    out = posts_repo.update(post["id"], {})
-    assert out is not None
-    assert out["headline"] == post["headline"]
+def test_set_status_posts_to_status_endpoint(monkeypatch):
+    captured = _capture_urlopen(monkeypatch, {"post": {"id": "abc", "status": "published"}})
+    out = posts_repo.set_status("abc", "published")
+    assert out["status"] == "published"
+    assert captured["url"].endswith("/admin/posts/abc/status")
+    assert captured["body"] == {"status": "published"}
 
 
-def test_update_returns_none_when_missing(ddb_table) -> None:
-    assert posts_repo.update("11111111-1111-1111-1111-111111111111", {"subtitle": "x"}) is None
+def test_soft_delete_sends_delete_and_returns_bool(monkeypatch):
+    _capture_urlopen(monkeypatch, {"ok": True})
+    assert posts_repo.soft_delete("abc") is True
+
+
+def test_soft_delete_returns_false_when_missing(monkeypatch):
+    def fake_urlopen(req, timeout=None):
+        raise HTTPError(req.full_url, 404, "not found", {}, None)
+
+    monkeypatch.setattr(posts_repo.urllib.request, "urlopen", fake_urlopen)
+    assert posts_repo.soft_delete("missing") is False
