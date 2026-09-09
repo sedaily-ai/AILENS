@@ -61,6 +61,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.28 — feature flag·threshold·admin 로그인 잠금 Postgres 전환](postgres/v1.28-feature-flag-threshold-lockout-전환.md) |
 | 2026-09-09 | postgres | [v1.29 — lens 지면 특별 코너 빈 화면 버그 수정(admin_extra 미투영 + 913건 백필)](postgres/v1.29-lens-지면코너-버그수정.md) |
 | 2026-09-09 | postgres | [v1.30 — 영상 썸네일 웹툰 이미지 오염 버그 수정(admin_extra 투영을 전 채널로 일반화)](postgres/v1.30-영상썸네일-웹툰오염-버그수정.md) |
+| 2026-09-09 | postgres | [v1.31 — lens 게시물 4포맷 대량 누락 백필 + 정규 순서 정렬(원본 마이그레이션 형제채널 병합 설계 결함 발견)](postgres/v1.31-lens-4포맷-누락-백필.md) |
 
 ## 새 항목 추가 규칙
 

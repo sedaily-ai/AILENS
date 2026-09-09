@@ -98,10 +98,13 @@ def _write_format_body(cur, rendition_id: int, fmt: str, source: Dict[str, Any],
     if fmt == "video":
         video_url = source.get("video_url")
         if video_url:
+            # v1.31 — thumbnail_url(진짜 영상 프레임 캡처)도 같이 쓴다. 컬럼은
+            # 원래 스키마에 있었지만 이 INSERT가 한 번도 값을 넣은 적이 없어
+            # 죽어있었다(v1.30에서 읽기 경로만 먼저 연결, 쓰기는 이번에 마저).
             cur.execute(
-                "INSERT INTO media_assets (rendition_id, media_type, file_url, transcript) "
-                "VALUES (%s,'video',%s,%s) ON CONFLICT (rendition_id) DO NOTHING",
-                (rendition_id, video_url, source.get("transcript")),
+                "INSERT INTO media_assets (rendition_id, media_type, file_url, thumbnail_url, transcript) "
+                "VALUES (%s,'video',%s,%s,%s) ON CONFLICT (rendition_id) DO NOTHING",
+                (rendition_id, video_url, source.get("thumbnail_url"), source.get("transcript")),
             )
         return position_offset
     if fmt == "podcast":

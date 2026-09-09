@@ -28,6 +28,15 @@ _FORMAT_TO_LENS_LABEL = {
     "podcast": "팟캐스트",
     "video": "영상",
 }
+# 프론트(LensPreviewSection.tsx 등, shared/constants/lensPerspectives.ts)가
+# lenses 배열을 label 문자열이 아니라 **배열 인덱스로** 포맷 카드에 매핑한다
+# — "레터→웹툰→팟캐스트→영상 고정 순서"가 계약이라는 전제(라벨 문자열
+# 매칭은 admin에서 라벨 텍스트가 바뀌면 조용히 깨진다는 이유로 의도적으로
+# 피함, 프론트 주석 참조). v1.30까지는 renditions를 그냥 id(삽입 순서)로
+# 반환해 이 계약을 어기고 있었다 — 예: "영상" 렌디션이 "레터"보다 먼저
+# 생성된 글은 배열이 [영상, 웹툰, 팟캐스트]로 나가 첫 카드가 "레터"로
+# 잘못 라벨링되고 "영상" 옵션 자체가 사라져 보였다(v1.31에서 발견·수정).
+_CANONICAL_FORMAT_ORDER = "CASE r.format WHEN 'letter' THEN 0 WHEN 'webtoon' THEN 1 WHEN 'podcast' THEN 2 WHEN 'video' THEN 3 ELSE 4 END"
 
 
 def _row_to_post(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -106,8 +115,8 @@ _LENS_RENDITIONS_SELECT = """
     FROM renditions r
     LEFT JOIN media_assets ma ON ma.rendition_id = r.id
     WHERE r.publication_id = %s
-    ORDER BY r.id
-"""
+    ORDER BY {order}
+""".format(order=_CANONICAL_FORMAT_ORDER)
 
 
 def _fetch_lens_items(cur, pub_id: int) -> List[Dict[str, Any]]:
@@ -185,7 +194,10 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
         if channel == "lens" and rows:
             pub_ids = [r["publication_id"] for r in rows]
             cur.execute(
-                "SELECT publication_id, format FROM renditions WHERE publication_id = ANY(%s) ORDER BY id",
+                "SELECT publication_id, format FROM renditions WHERE publication_id = ANY(%s) "
+                "ORDER BY publication_id, "
+                "CASE format WHEN 'letter' THEN 0 WHEN 'webtoon' THEN 1 "
+                "WHEN 'podcast' THEN 2 WHEN 'video' THEN 3 ELSE 4 END",
                 (pub_ids,),
             )
             for r in cur.fetchall():
