@@ -221,3 +221,20 @@ def list_published_quizzes(limit: int = 4) -> List[Dict[str, Any]]:
                 "deleted_at": None,
             })
         return out
+
+
+def record_attempt(quiz_id: str, correct: bool) -> bool:
+    """익명 응답 집계 — v1.26, DynamoDB engagement QUIZ#{id}/STATS 대응.
+    quiz_id는 list_published_quizzes()가 내려준 값 그대로 돌아온다
+    (admin_post_id UUID 또는 id의 문자열 형태) — 어느 쪽이든 매칭."""
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            UPDATE quizzes
+            SET total_count = total_count + 1,
+                correct_count = correct_count + %s
+            WHERE admin_post_id::text = %s OR id::text = %s
+            """,
+            (1 if correct else 0, quiz_id, quiz_id),
+        )
+        return cur.rowcount > 0

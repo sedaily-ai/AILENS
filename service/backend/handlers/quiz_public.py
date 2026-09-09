@@ -9,34 +9,48 @@ GET  /api/quiz/today   — 발행된 용어 퀴즈 여러 개(최대 4개) 조�
                          전부(최대 4개) 최신 발행일 순으로 내려준다.
 POST /api/quiz/attempt — 응답 집계. body={quiz_id, correct}. 무인증(익명) —
                          newsletter/subscribe.py와 같은 공개 write 패턴.
-                         개인별 이력은 안 남기고 engagement 테이블에 집계
-                         카운터만 ADD한다(2026-08-09 스코프, 익명 집계까지만).
+                         개인별 이력은 안 남기고 집계 카운터만 올린다
+                         (2026-08-09 스코프, 익명 집계까지만).
+
+2026-09-09(v1.26): 집계 저장을 DynamoDB(engagement 테이블 공유)에서
+PostgreSQL(lens-cms-api, quizzes.total_count/correct_count)로 전환.
+이 Lambda(sedaily-mbti-v2-quiz-dev)는 sedaily-mbti-v2-collector-dev-role을
+써서 /sedaily-mbti/v2/* SSM 경로에 접근 가능(V2SecretsAccess 정책) —
+newsletter_subscribers_pg_client.py(v1.23)와 같은 토큰을 그대로 재사용한다.
 """
 import json
 import logging
-
-import boto3
-from botocore.exceptions import ClientError
+import urllib.error
+import urllib.request
 
 from clients.quiz_questions_ddb_client import list_published_quizzes
-from config.constants import CORS_HEADERS, DYNAMODB_TABLE_ENGAGEMENT_DEV
+from common.secrets import get_secret
+from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-ENGAGEMENT_TABLE = DYNAMODB_TABLE_ENGAGEMENT_DEV
+_API_URL = "http://13.223.179.151"
 _MAX_QUIZZES = 4
 
-_engagement_table = None
 
-
-def _get_engagement_table():
-    global _engagement_table
-    if _engagement_table is None:
-        _engagement_table = boto3.resource("dynamodb", region_name="us-east-1").Table(ENGAGEMENT_TABLE)
-    return _engagement_table
+def _record_attempt(quiz_id: str, correct: bool) -> bool:
+    token = get_secret("/sedaily-mbti/v2/lens-cms-api-token")
+    req = urllib.request.Request(
+        f"{_API_URL}/internal/quiz/attempt",
+        data=json.dumps({"quiz_id": quiz_id, "correct": correct}).encode(),
+        headers={"Content-Type": "application/json", "X-Internal-Token": token},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as res:
+            return json.loads(res.read()).get("ok", False)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return False
+        raise
 
 
 def _handle_today() -> dict:
@@ -59,14 +73,12 @@ def _handle_attempt(body: dict) -> dict:
         return error_response("quiz_id required", status_code=400)
     correct = bool(body.get("correct"))
     try:
-        _get_engagement_table().update_item(
-            Key={"pk": f"QUIZ#{quiz_id}", "sk": "STATS"},
-            UpdateExpression="ADD total_count :one, correct_count :c",
-            ExpressionAttributeValues={":one": 1, ":c": 1 if correct else 0},
-        )
-    except ClientError as e:
+        ok = _record_attempt(quiz_id, correct)
+    except Exception as e:
         logger.exception(f"quiz attempt write fail: {e}")
         return error_response("attempt write failed", status_code=500)
+    if not ok:
+        return error_response("quiz not found", status_code=404)
     return success_response({"ok": True})
 
 

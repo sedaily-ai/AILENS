@@ -1,54 +1,32 @@
 """Community Post 비즈니스 로직 — handlers/post_handler.py에서 추출
 (2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
 
-핸들러는 이제 라우팅(메서드/경로 판별, 이벤트 파싱)만 담당하고, DynamoDB
-접근·응답 shaping·투표/댓글 카운터 갱신 같은 실제 로직은 전부 여기 있다 —
-2026-08-05 chatbot_handler.py를 context_service/prompt_service/engine으로
-쪼갠 것과 같은 패턴(handler=라우팅, service=로직).
+핸들러는 이제 라우팅(메서드/경로 판별, 이벤트 파싱)만 담당하고, 저장·응답
+shaping·투표/댓글 카운터 갱신 같은 실제 로직은 전부 여기 있다 — 2026-08-05
+chatbot_handler.py를 context_service/prompt_service/engine으로 쪼갠 것과
+같은 패턴(handler=라우팅, service=로직).
 
-Posts are stored in the engagement DynamoDB table:
-  Post:    PK=COMMUNITY_POSTS  SK={date}#{post_id}
-  Comment: PK=POST#{post_id}   SK=COMMENT#{timestamp}
-  Vote:    PK=POST#{post_id}   SK=VOTE#{user_id}
+2026-09-09(v1.26): DynamoDB(engagement 테이블 공유, PK=COMMUNITY_POSTS/
+POST#{id}) → PostgreSQL(lens-cms-api, `community_posts`/`community_comments`
++ `community_post_votes`) 전환. `clients/community_pg_client.py`가 저장을
+전담하고, 이 파일은 원래 하던 응답 shaping(camelCase 변환, timeAgo 계산)만
+그대로 유지 — 서버가 돌려주는 딕셔너리 키(snake_case)가 예전 DynamoDB
+아이템 키와 동일해서 `to_post_response`/`to_comment_response`는 무변경.
+
+post_id가 문자열(cp_YYYYMMDDHHMMSS_hex)에서 Postgres bigint(문자열로 직렬화)
+로 바뀌었다 — dev 단계라 기존 게시글 ID 형식과의 하위호환은 고려하지 않음.
 """
 import json
 import logging
-import uuid
 from typing import Any
 from datetime import datetime, timezone, timedelta
-from decimal import Decimal
 
-import boto3
-from boto3.dynamodb.conditions import Key, Attr
-
-from config.constants import DYNAMODB_TABLE_ENGAGEMENT_DEV
+import clients.community_pg_client as community_client
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 KST = timezone(timedelta(hours=9))
-ENGAGEMENT_TABLE = DYNAMODB_TABLE_ENGAGEMENT_DEV
-
-_table = None
-
-def get_table():
-    global _table
-    if _table is None:
-        _table = boto3.resource('dynamodb', region_name='us-east-1').Table(ENGAGEMENT_TABLE)
-    return _table
-
-
-def _decimal_to_native(obj):
-    """Recursively convert Decimal values for JSON serialization."""
-    if isinstance(obj, Decimal):
-        if obj % 1 == 0:
-            return int(obj)
-        return float(obj)
-    elif isinstance(obj, dict):
-        return {k: _decimal_to_native(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_decimal_to_native(v) for v in obj]
-    return obj
 
 
 def cors(status_code: int, body: Any) -> dict:
@@ -70,12 +48,10 @@ def create_post(body: dict) -> dict:
     """Create a community post. Any authenticated user."""
     user_id = body.get('user_id', '')
     user_name = body.get('user_name', '')
-    user_mbti = body.get('user_mbti', '')
     user_avatar = body.get('user_avatar', '')
     archived_sentence = body.get('archived_sentence', '').strip()
     user_comment = body.get('user_comment', '').strip()
     article_id = body.get('article_id', '')
-    article_title = body.get('article_title', '')
     tags = body.get('tags', [])
 
     if not archived_sentence:
@@ -83,33 +59,13 @@ def create_post(body: dict) -> dict:
     if not user_id:
         return cors(400, {"error": "user_id is required"})
 
-    now = datetime.now(KST)
-    post_id = f"cp_{now.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"
-    date_str = now.strftime('%Y%m%d')
-    created_at = now.isoformat()
-
-    item = {
-        'pk': 'COMMUNITY_POSTS',
-        'sk': f'{date_str}#{post_id}',
-        'post_id': post_id,
-        'user_id': user_id,
-        'user_name': user_name,
-        'user_mbti': user_mbti,
-        'user_avatar': user_avatar,
-        'archived_sentence': archived_sentence,
-        'user_comment': user_comment,
-        'article_id': article_id,
-        'article_title': article_title,
-        'tags': tags,
-        'upvotes': 0,
-        'comment_count': 0,
-        'created_at': created_at,
-        'date': date_str,
-    }
-
-    get_table().put_item(Item=item)
-    logger.info(f"Created community post {post_id} by {user_id}")
-    return cors(201, to_post_response(item))
+    post = community_client.create_post(
+        user_id=user_id, user_name=user_name, user_avatar=user_avatar,
+        archived_sentence=archived_sentence, user_comment=user_comment,
+        article_id=article_id or None, tags=tags,
+    )
+    logger.info(f"Created community post {post['id']} by {user_id}")
+    return cors(201, to_post_response(post))
 
 
 def list_posts(params: dict) -> dict:
@@ -118,32 +74,16 @@ def list_posts(params: dict) -> dict:
     limit = int(params.get('limit', '30'))
     tag = params.get('tag')
 
-    # Query by partition key with date prefix on sort key
-    response = get_table().query(
-        KeyConditionExpression=Key('pk').eq('COMMUNITY_POSTS') & Key('sk').begins_with(date_str),
-        ScanIndexForward=False,
-        Limit=100,
-    )
-
-    items = response.get('Items', [])
-
-    # Filter by tag if specified
-    if tag:
-        items = [i for i in items if tag in (i.get('tags') or [])]
-
-    # Sort by upvotes descending (popularity), then recency
-    items.sort(key=lambda x: (x.get('upvotes', 0), x.get('created_at', '')), reverse=True)
-    items = items[:limit]
-
+    items = community_client.list_posts(date_str, limit=limit, tag=tag)
     posts = [to_post_response(i) for i in items]
     return cors(200, {"posts": posts, "total": len(posts)})
 
 
 def to_post_response(item: dict) -> dict:
-    """Convert DynamoDB item to API response format."""
+    """Convert the storage-layer post dict to API response format."""
     created_at = item.get('created_at', '')
-    return _decimal_to_native({
-        'id': item.get('post_id', ''),
+    return {
+        'id': item.get('id', ''),
         'userName': item.get('user_name', ''),
         'userMbti': item.get('user_mbti', ''),
         'userAvatar': item.get('user_avatar', ''),
@@ -156,7 +96,7 @@ def to_post_response(item: dict) -> dict:
         'commentCount': item.get('comment_count', 0),
         'createdAt': created_at,
         'timeAgo': time_ago(created_at),
-    })
+    }
 
 
 def time_ago(iso_str: str) -> str:
@@ -192,49 +132,14 @@ def vote_post(post_id: str, body: dict) -> dict:
 
     if not user_id:
         return cors(400, {"error": "user_id is required"})
-
-    table = get_table()
-
-    # Check existing vote
-    vote_key = {'pk': f'POST#{post_id}', 'sk': f'VOTE#{user_id}'}
-    existing = table.get_item(Key=vote_key).get('Item')
-
-    # Find the post to update its upvotes counter
-    # Query COMMUNITY_POSTS to find the post's SK
-    post_query = table.query(
-        KeyConditionExpression=Key('pk').eq('COMMUNITY_POSTS'),
-        FilterExpression=Attr('post_id').eq(post_id),
-        Limit=1,
-    )
-    post_items = post_query.get('Items', [])
-    if not post_items:
+    try:
+        pid = int(post_id)
+    except (TypeError, ValueError):
         return cors(404, {"error": "Post not found"})
 
-    post_key = {'pk': 'COMMUNITY_POSTS', 'sk': post_items[0]['sk']}
-    delta = 0
-
-    if existing:
-        old_type = existing.get('vote_type')
-        if old_type == vote_type:
-            # Remove vote (toggle off)
-            table.delete_item(Key=vote_key)
-            delta = -1 if vote_type == 'up' else 1
-        else:
-            # Switch vote
-            table.put_item(Item={**vote_key, 'vote_type': vote_type, 'created_at': datetime.now(KST).isoformat()})
-            delta = 2 if vote_type == 'up' else -2
-    else:
-        # New vote
-        table.put_item(Item={**vote_key, 'vote_type': vote_type, 'created_at': datetime.now(KST).isoformat()})
-        delta = 1 if vote_type == 'up' else -1
-
-    # Update post upvotes counter
-    if delta != 0:
-        table.update_item(
-            Key=post_key,
-            UpdateExpression='ADD upvotes :d',
-            ExpressionAttributeValues={':d': delta},
-        )
+    delta = community_client.vote_post(pid, user_id, vote_type)
+    if delta is None:
+        return cors(404, {"error": "Post not found"})
 
     return cors(200, {"post_id": post_id, "vote_type": vote_type, "delta": delta})
 
@@ -245,7 +150,6 @@ def add_comment(post_id: str, body: dict) -> dict:
     """Add a comment to a post."""
     user_id = body.get('user_id', '')
     user_name = body.get('user_name', '')
-    user_mbti = body.get('user_mbti', '')
     user_avatar = body.get('user_avatar', '')
     text = body.get('text', '').strip()
 
@@ -253,61 +157,34 @@ def add_comment(post_id: str, body: dict) -> dict:
         return cors(400, {"error": "text is required"})
     if not user_id:
         return cors(400, {"error": "user_id is required"})
+    try:
+        pid = int(post_id)
+    except (TypeError, ValueError):
+        return cors(404, {"error": "Post not found"})
 
-    table = get_table()
-    now = datetime.now(KST)
-    comment_id = f"cmt_{now.strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}"
+    comment = community_client.add_comment(pid, user_id, user_name, user_avatar, text)
+    if comment is None:
+        return cors(404, {"error": "Post not found"})
 
-    comment_item = {
-        'pk': f'POST#{post_id}',
-        'sk': f'COMMENT#{now.isoformat()}',
-        'comment_id': comment_id,
-        'user_id': user_id,
-        'user_name': user_name,
-        'user_mbti': user_mbti,
-        'user_avatar': user_avatar,
-        'text': text,
-        'likes': 0,
-        'created_at': now.isoformat(),
-    }
-
-    table.put_item(Item=comment_item)
-
-    # Increment comment_count on the post
-    post_query = table.query(
-        KeyConditionExpression=Key('pk').eq('COMMUNITY_POSTS'),
-        FilterExpression=Attr('post_id').eq(post_id),
-        Limit=1,
-    )
-    post_items = post_query.get('Items', [])
-    if post_items:
-        table.update_item(
-            Key={'pk': 'COMMUNITY_POSTS', 'sk': post_items[0]['sk']},
-            UpdateExpression='ADD comment_count :one',
-            ExpressionAttributeValues={':one': 1},
-        )
-
-    return cors(201, to_comment_response(comment_item))
+    return cors(201, to_comment_response(comment))
 
 
 def list_comments(post_id: str, params: dict) -> dict:
     """List comments for a post, newest first."""
     limit = int(params.get('limit', '50'))
+    try:
+        pid = int(post_id)
+    except (TypeError, ValueError):
+        return cors(200, {"comments": [], "total": 0})
 
-    response = get_table().query(
-        KeyConditionExpression=Key('pk').eq(f'POST#{post_id}') & Key('sk').begins_with('COMMENT#'),
-        ScanIndexForward=False,
-        Limit=limit,
-    )
-
-    items = response.get('Items', [])
+    items = community_client.list_comments(pid, limit=limit)
     comments = [to_comment_response(i) for i in items]
     return cors(200, {"comments": comments, "total": len(comments)})
 
 
 def to_comment_response(item: dict) -> dict:
-    return _decimal_to_native({
-        'id': item.get('comment_id', ''),
+    return {
+        'id': item.get('id', ''),
         'userName': item.get('user_name', ''),
         'userMbti': item.get('user_mbti', ''),
         'userAvatar': item.get('user_avatar', ''),
@@ -315,4 +192,4 @@ def to_comment_response(item: dict) -> dict:
         'likes': item.get('likes', 0),
         'createdAt': item.get('created_at', ''),
         'timeAgo': time_ago(item.get('created_at', '')),
-    })
+    }

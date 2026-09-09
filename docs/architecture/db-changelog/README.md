@@ -56,6 +56,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.23 — 뉴스레터 구독자 읽기·쓰기 Postgres 전환](postgres/v1.23-뉴스레터-구독자-전환.md) |
 | 2026-09-09 | postgres | [v1.24 — 개인화(내 서랍·읽은 기록·프로필) 읽기·쓰기 Postgres 전환](postgres/v1.24-개인화-전환.md) |
 | 2026-09-09 | postgres | [v1.25 — 뉴스 기사(articles) 읽기·쓰기 Postgres 전환(매일 23시 크론 포함)](postgres/v1.25-기사-전환.md) |
+| 2026-09-09 | postgres | [v1.26 — 커뮤니티 게시판·퀴즈 응답 통계 Postgres 전환, engagement 테이블 라이브 write 소거](postgres/v1.26-커뮤니티-퀴즈통계-전환.md) |
 
 ## 새 항목 추가 규칙
 

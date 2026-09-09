@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 import admin_posts_repo
 import articles_repo
 import cms_posts_repo as posts_client
+import community_repo
 import personal_repo
 import quiz_repo
 import subscribers_repo
@@ -160,10 +161,19 @@ def admin_delete_post(post_id: str, x_internal_token: Optional[str] = Header(def
     return {"ok": True}
 
 
-# ── 용어 퀴즈 — v1.22 ─────────────────────────────────────────────────
+# ── 용어 퀴즈 — v1.22, 응답 집계는 v1.26 ─────────────────────────────
 @app.get("/api/quiz/today")
 def quiz_today(limit: int = Query(default=4)):
     return {"quizzes": quiz_repo.list_published_quizzes(limit=limit)}
+
+
+@app.post("/internal/quiz/attempt")
+def internal_quiz_attempt(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    ok = quiz_repo.record_attempt(payload["quiz_id"], bool(payload.get("correct")))
+    if not ok:
+        raise HTTPException(status_code=404, detail="quiz not found")
+    return {"ok": True}
 
 
 @app.post("/admin/quizzes")
@@ -346,9 +356,13 @@ def internal_list_readings(user_id: str = Query(...), limit: int = Query(default
 # 인증 불필요(기존 DynamoDB 경로도 공개 API였음). 수집기(article-collector-dev)
 # 쓰기 경로만 내부 토큰으로 보호.
 
-# 주의: FastAPI/Starlette는 라우트를 등록 순서대로 매칭한다 — 정적 경로
-# (/search, /category-query)가 파라미터 경로(/{article_no})보다 반드시
-# 먼저 와야 "search"/"category-query"를 article_no로 오인해 삼키지 않는다.
+@app.get("/api/v2/articles/{article_no}")
+def get_article(article_no: str):
+    article = articles_repo.get_article(article_no)
+    if not article:
+        raise HTTPException(status_code=404, detail="not found")
+    return {"article": article}
+
 
 @app.get("/api/v2/articles")
 def list_articles(
@@ -365,41 +379,6 @@ def list_articles(
         return {"articles": articles_repo.get_recent_articles(category, limit)}
     cat_list = categories.split(",") if categories else None
     return {"articles": articles_repo.search_articles(cat_list, keyword, days, limit)}
-
-
-@app.post("/api/v2/articles/search")
-def search_articles_paged(payload: Dict[str, Any] = Body(...)):
-    """search_service.py::search_dynamodb_optimized() 전용 — 카테고리 alias
-    확장은 호출부(Lambda)가 하고, 이미 확장된 categories를 그대로 넘긴다."""
-    return articles_repo.search_paged(
-        categories=payload.get("categories"),
-        keyword=payload.get("query") or None,
-        published_from=payload.get("published_from"),
-        published_until=payload.get("published_until"),
-        page=payload.get("page") or 1,
-        page_size=payload.get("page_size") or 10,
-    )
-
-
-@app.get("/api/v2/articles/category-query")
-def category_query(
-    category: str = Query(...),
-    keywords: Optional[str] = Query(default=None, description="comma-separated, OR-matched on title"),
-    since: Optional[str] = Query(default=None, description="ISO timestamp"),
-    limit: int = Query(default=20),
-):
-    """chatbot_context_service.py의 카테고리별 GSI 쿼리(카테고리=X AND
-    published_at>=since, 키워드 여러 개 중 하나라도 title에 포함) 전용."""
-    kw_list = keywords.split(",") if keywords else None
-    return {"articles": articles_repo.query_category_keywords(category, kw_list, since, limit)}
-
-
-@app.get("/api/v2/articles/{article_no}")
-def get_article(article_no: str):
-    article = articles_repo.get_article(article_no)
-    if not article:
-        raise HTTPException(status_code=404, detail="not found")
-    return {"article": article}
 
 
 @app.post("/internal/articles/exists")
@@ -420,3 +399,57 @@ def internal_save_article(article_no: str, payload: Dict[str, Any] = Body(...), 
     payload["news_id"] = article_no
     articles_repo.save_article(payload)
     return {"ok": True}
+
+
+# --- community 게시판 (v1.26) ---
+# 목록/댓글 조회는 원본 DynamoDB 핸들러도 인증 없는 공개 GET이었다(post_handler.py
+# 참조 — POST만 JWT 필요). 글쓰기/투표/댓글 작성은 user_id가 Lambda 쪽에서
+# 이미 JWT로 검증된 값이라는 전제로 내부 토큰 라우트에 그대로 전달받는다.
+
+@app.get("/api/v2/community/posts")
+def community_list_posts(
+    date: str = Query(...),
+    limit: int = Query(default=30),
+    tag: Optional[str] = Query(default=None),
+):
+    return {"posts": community_repo.list_posts(date, limit, tag)}
+
+
+@app.get("/api/v2/community/posts/{post_id}/comments")
+def community_list_comments(post_id: int, limit: int = Query(default=50)):
+    return {"comments": community_repo.list_comments(post_id, limit)}
+
+
+@app.post("/internal/community/posts")
+def internal_community_create_post(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    post = community_repo.create_post(
+        user_id=payload["user_id"],
+        user_name=payload.get("user_name"),
+        user_avatar=payload.get("user_avatar"),
+        archived_sentence=payload["archived_sentence"],
+        user_comment=payload.get("user_comment"),
+        article_id=payload.get("article_id"),
+        tags=payload.get("tags"),
+    )
+    return {"post": post}
+
+
+@app.post("/internal/community/posts/{post_id}/vote")
+def internal_community_vote(post_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    delta = community_repo.vote_post(post_id, payload["user_id"], payload.get("vote_type", "up"))
+    if delta is None:
+        raise HTTPException(status_code=404, detail="post not found")
+    return {"post_id": post_id, "vote_type": payload.get("vote_type", "up"), "delta": delta}
+
+
+@app.post("/internal/community/posts/{post_id}/comments")
+def internal_community_add_comment(post_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    comment = community_repo.add_comment(
+        post_id, payload["user_id"], payload.get("user_name"), payload.get("user_avatar"), payload["text"],
+    )
+    if comment is None:
+        raise HTTPException(status_code=404, detail="post not found")
+    return {"comment": comment}
