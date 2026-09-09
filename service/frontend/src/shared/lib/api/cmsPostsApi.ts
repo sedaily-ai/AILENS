@@ -7,7 +7,7 @@
  * 실패해도 throw 하지 않는다 — 이 API 가 죽어도 기존 레터는 그대로 보여야 한다
  * (spec §8 fail-open). 호출부는 빈 배열만 다루면 된다.
  */
-import { API_URL } from '@/shared/config/apiClient';
+import { CMS_API_URL } from '@/shared/config/apiClient';
 import type { ApiLetter } from './todayLettersApi';
 
 export type CmsChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens';
@@ -181,7 +181,7 @@ export async function fetchCmsPosts(
       const qs = new URLSearchParams({ channel });
       if (date) qs.set('date', date);
       if (limit) qs.set('limit', String(limit));
-      const res = await fetch(`${API_URL}/api/v2/posts?${qs}`, cacheOpts(`posts:${channel}`));
+      const res = await fetch(`${CMS_API_URL}/api/v2/posts?${qs}`, cacheOpts(`posts:${channel}`));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLetter[] };
       return data.posts ?? [];
@@ -237,7 +237,7 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
       // 며칠 만에 다시 뚫려 오래된 화가 목록에서 사라졌다(archive 재설계
       // 논의 중 발견). 백엔드가 이미 1000까지는 DB 읽기 비용 증가 없이
       // 지원한다(cms_posts_public.py 참조 — 항상 전체를 읽은 뒤 슬라이스).
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=webtoon&limit=1000`, cacheOpts('posts:webtoon'));
+      const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=webtoon&limit=1000`, cacheOpts('posts:webtoon'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
       return data.posts ?? [];
@@ -249,7 +249,7 @@ export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
 
 export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, cacheOpts('posts:webtoon'));
+    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=webtoon`, cacheOpts('posts:webtoon'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsWebtoon };
     return data.post ?? null;
@@ -269,7 +269,7 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
   return cached('video', async () => {
     try {
       // limit=1000(2026-08-28, 100→1000) — fetchWebtoons()와 같은 이유.
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=video&limit=1000`, cacheOpts('posts:video'));
+      const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=video&limit=1000`, cacheOpts('posts:video'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
       return data.posts ?? [];
@@ -281,7 +281,7 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
 
 export async function fetchVideoBySlug(slug: string): Promise<CmsVideo | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=video`, cacheOpts('posts:video'));
+    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=video`, cacheOpts('posts:video'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsVideo };
     return data.post ?? null;
@@ -397,7 +397,7 @@ export async function fetchLensPosts(): Promise<CmsLens[]> {
       // shape_lens_summary 참조, 글당 크기 ~90% 감소 실측). 그 덕에
       // 상한을 다시 올려도 안전하다 — webtoon/video가 1000에서 정상인 것과
       // 같은 이유.
-      const res = await fetch(`${API_URL}/api/v2/posts?channel=lens&limit=1000`, cacheOpts('posts:lens'));
+      const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=lens&limit=1000`, cacheOpts('posts:lens'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsLens[] };
       return data.posts ?? [];
@@ -409,7 +409,7 @@ export async function fetchLensPosts(): Promise<CmsLens[]> {
 
 export async function fetchLensBySlug(slug: string): Promise<CmsLens | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=lens`, cacheOpts('posts:lens'));
+    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=lens`, cacheOpts('posts:lens'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsLens };
     return data.post ?? null;
@@ -425,7 +425,7 @@ export async function fetchCmsPostBySlug(
   slug: string,
 ): Promise<CmsLetter | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, cacheOpts(`posts:${channel}`));
+    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, cacheOpts(`posts:${channel}`));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: CmsLetter };
     return data.post ?? null;

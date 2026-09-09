@@ -5,7 +5,7 @@
  * admin/frontend home-player 화면, shaping: service/backend/handlers/
  * cms_posts_public.py::_shape_home_player_item).
  */
-import { API_URL } from '@/shared/config/apiClient';
+import { CMS_API_URL } from '@/shared/config/apiClient';
 
 export interface HomePlayerItem {
   id: string;
@@ -65,7 +65,7 @@ function toItem(i: ApiHomePlayerItem): HomePlayerPost {
 // no-store(발행 즉시 반영, 위젯 자체엔 SSR 캐시가 필요 없다).
 export async function fetchHomePlayerPlaylist(): Promise<HomePlayerItem[]> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts?channel=home_player&limit=50`, {
+    const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=home_player&limit=50`, {
       cache: 'no-store',
     });
     if (!res.ok) return [];
@@ -103,7 +103,7 @@ export async function fetchHomePlayerPosts(): Promise<HomePlayerPost[]> {
     // limit=1000(2026-08-28, 100→1000) — cmsPostsApi.ts의 lens/webtoon/video
     // 목록 fetch와 같은 이유(발행량 급증으로 100건 상한이 뚫려 오래된 글이
     // 목록에서 사라짐).
-    const res = await fetch(`${API_URL}/api/v2/posts?channel=home_player&limit=1000`, ssrCacheOpts('posts:home_player'));
+    const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=home_player&limit=1000`, ssrCacheOpts('posts:home_player'));
     if (!res.ok) return [];
     const data = (await res.json()) as { posts?: ApiHomePlayerItem[] };
     return (data.posts ?? []).filter((i) => i.media_embed_url).map(toItem);
@@ -115,7 +115,11 @@ export async function fetchHomePlayerPosts(): Promise<HomePlayerPost[]> {
 /** /listen/{id} 상세 페이지용 단건 조회. */
 export async function fetchHomePlayerBySlug(slug: string): Promise<HomePlayerPost | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v2/posts/${encodeURIComponent(slug)}`, ssrCacheOpts('posts:home_player'));
+    // channel=home_player 명시(2026-09-09, v1.20) — 이전엔 slug만으로 조회했는데,
+    // Postgres 이관 이후 한 slug가 여러 포맷 렌디션을 가질 수 있어(형제 채널이
+    // 같은 발행물로 묶임) 채널을 안 주면 백엔드가 임의의 렌디션을 반환할 수
+    // 있다(cmsPostsApi.ts의 다른 단건 조회 함수들은 전부 이미 명시하고 있었음).
+    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=home_player`, ssrCacheOpts('posts:home_player'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: ApiHomePlayerItem };
     return data.post ? toItem(data.post) : null;
