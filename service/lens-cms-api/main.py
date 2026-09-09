@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 
 import admin_posts_repo
 import cms_posts_repo as posts_client
+import quiz_repo
 from cms_posts_shaping import (
     SHAPERS,
     shape_letter,
@@ -153,4 +154,69 @@ def admin_delete_post(post_id: str, x_internal_token: Optional[str] = Header(def
     _check_admin_token(x_internal_token)
     if not admin_posts_repo.soft_delete(post_id):
         raise HTTPException(status_code=404, detail="post not found")
+    return {"ok": True}
+
+
+# ── 용어 퀴즈 — v1.22 ─────────────────────────────────────────────────
+@app.get("/api/quiz/today")
+def quiz_today(limit: int = Query(default=4)):
+    return {"quizzes": quiz_repo.list_published_quizzes(limit=limit)}
+
+
+@app.post("/admin/quizzes")
+def admin_create_quiz(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    data = payload.get("data") or {}
+    created_by = payload.get("created_by", "admin")
+    return {"quiz": quiz_repo.create(data, created_by)}
+
+
+@app.get("/admin/quizzes")
+def admin_list_quiz(
+    status: Optional[str] = Query(default=None),
+    limit: int = Query(default=50),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    limit = max(1, min(limit, 200))
+    quizzes = quiz_repo.list_quiz(status, limit)
+    return {"quizzes": quizzes, "count": len(quizzes)}
+
+
+@app.get("/admin/quizzes/{quiz_id}")
+def admin_get_quiz(quiz_id: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    quiz = quiz_repo.get(quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="quiz not found")
+    return {"quiz": quiz}
+
+
+@app.put("/admin/quizzes/{quiz_id}")
+def admin_update_quiz(quiz_id: str, data: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    quiz = quiz_repo.update(quiz_id, data)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="quiz not found")
+    return {"quiz": quiz}
+
+
+@app.post("/admin/quizzes/{quiz_id}/status")
+def admin_set_quiz_status(quiz_id: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    status = payload.get("status", "")
+    try:
+        quiz = quiz_repo.set_status(quiz_id, status)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not quiz:
+        raise HTTPException(status_code=404, detail="quiz not found")
+    return {"quiz": quiz}
+
+
+@app.delete("/admin/quizzes/{quiz_id}")
+def admin_delete_quiz(quiz_id: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    if not quiz_repo.soft_delete(quiz_id):
+        raise HTTPException(status_code=404, detail="quiz not found")
     return {"ok": True}
