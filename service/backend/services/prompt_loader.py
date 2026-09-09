@@ -1,53 +1,40 @@
-"""Centralized prompt loader — DDB-backed with 5-min TTL cache + filesystem fallback.
+"""Centralized prompt loader — PostgreSQL-backed(lens-cms-api) with 5-min TTL
+cache + filesystem fallback.
 
 Pattern (Admin-3, mirrors common.feature_flag.get_threshold):
     1. cache hit (< 5 min) → return cached content
-    2. DDB read sedaily-mbti-admin-prompts-dev:
-         get LATEST → active_version → get v#N → content
-    3. DDB error / row miss:
+    2. GET lens-cms-api /api/v2/prompts/{category}/{name} → content
+    3. HTTP error / 404:
          a) stale cache available → return it (graceful degradation)
          b) else filesystem fallback → prompts/<category>/<name>.md
        Then warn-log so the regression is visible without 5xx.
 
-DDB schema (Admin-1 import):
-    pk = 'PROMPT#<category>/<name>'
-    sk = 'LATEST'  → {active_version: <int>, updated_at}
-    sk = 'v#<int>' → {content: <str>, created_at, actor}
+2026-09-09(v1.27): DynamoDB(sedaily-mbti-admin-prompts-dev, pk='PROMPT#
+<category>/<name>', sk='LATEST'|'v#<int>')에서 전환. 공개 무인증 엔드포인트
+라 IAM 걱정이 없어졌다(예전엔 `dynamodb:GetItem` 권한을 Lambda 역할마다
+챙겨야 했음).
 
 Caller API:
     load_prompt(category, name)        — canonical
     load_chatbot_prompt(group)         — wrapper for prompts/chatbot/<group>.md
                                           (only 'default' exists post MBTI-persona removal)
-
-IAM: any Lambda invoking load_prompt needs `dynamodb:GetItem` on
-sedaily-mbti-admin-prompts-dev. v1 shared role inherits AmazonDynamoDBFullAccess.
-v2 shared role gained `AdminPromptsRead` inline policy in Admin-3 (Sid
-AdminPromptsDDBRead, scoped to that single table).
 """
+import json
 import logging
 import os
 import time
-
-import boto3
+import urllib.request
 
 logger = logging.getLogger(__name__)
 
-_TABLE_NAME = os.environ.get("ADMIN_PROMPTS_TABLE", "sedaily-mbti-admin-prompts-dev")
-_REGION = os.environ.get("AWS_REGION", "us-east-1")
+_API_URL = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
 _TTL_SECONDS = 300  # 5분 — admin UI 변경 → production 반영 SLA
+_TIMEOUT_SECONDS = 8
 
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
 
 # 모듈 레벨 cache: {(category, name): (content: str, fetched_at: float)}
 _cache: dict = {}
-_table = None
-
-
-def _get_table():
-    global _table
-    if _table is None:
-        _table = boto3.resource("dynamodb", region_name=_REGION).Table(_TABLE_NAME)
-    return _table
 
 
 def _read_filesystem(category: str, name: str) -> str:
@@ -57,22 +44,15 @@ def _read_filesystem(category: str, name: str) -> str:
         return f.read()
 
 
-def _fetch_from_ddb(category: str, name: str) -> str:
-    """DDB lookup: LATEST → active_version → v#N → content. Raises on miss/error."""
-    table = _get_table()
-    pk = f"PROMPT#{category}/{name}"
-    latest = table.get_item(Key={"pk": pk, "sk": "LATEST"}).get("Item")
-    if latest is None:
-        raise KeyError(f"{pk} LATEST not found")
-    active_version = int(latest["active_version"])
-    version_item = table.get_item(Key={"pk": pk, "sk": f"v#{active_version}"}).get("Item")
-    if version_item is None:
-        raise KeyError(f"{pk} v#{active_version} not found")
-    return version_item["content"]
+def _fetch_from_backend(category: str, name: str) -> str:
+    """lens-cms-api lookup: GET /api/v2/prompts/{category}/{name} → content. Raises on miss/error."""
+    req = urllib.request.Request(f"{_API_URL}/api/v2/prompts/{category}/{name}", method="GET")
+    with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as res:
+        return json.loads(res.read())["content"]
 
 
 def load_prompt(category: str, name: str) -> str:
-    """Load a prompt by (category, name). DDB-backed with 5-min TTL + filesystem fallback."""
+    """Load a prompt by (category, name). PostgreSQL-backed with 5-min TTL + filesystem fallback."""
     now = time.time()
     key = (category, name)
     cached = _cache.get(key)
@@ -80,18 +60,18 @@ def load_prompt(category: str, name: str) -> str:
         return cached[0]
 
     try:
-        content = _fetch_from_ddb(category, name)
+        content = _fetch_from_backend(category, name)
     except Exception as e:
-        # tier 1 fallback: stale cache (DDB hiccup, last-known good prompt is fine)
+        # tier 1 fallback: stale cache (backend hiccup, last-known good prompt is fine)
         if cached:
             logger.warning(
-                f"prompt_loader DDB error for {category}/{name}: "
+                f"prompt_loader backend error for {category}/{name}: "
                 f"{type(e).__name__}: {e}, using stale cache"
             )
             return cached[0]
-        # tier 2 fallback: filesystem (cold container with DDB still down)
+        # tier 2 fallback: filesystem (cold container with backend still down)
         logger.warning(
-            f"prompt_loader DDB error for {category}/{name}: "
+            f"prompt_loader backend error for {category}/{name}: "
             f"{type(e).__name__}: {e}, falling back to filesystem"
         )
         content = _read_filesystem(category, name)

@@ -6,29 +6,39 @@ Run from service/backend/::
 """
 from __future__ import annotations
 
-import base64
 import json
 
 import pytest
 
-from conftest import FakeTable, assert_no_cors
+from conftest import assert_no_cors
 
 from routes import audit as audit_route
-from shared import ddb_client
 
-_ROWS = [
-    {"pk": "AUDIT", "sk": "2026-07-29T05:00:00.000000Z", "action": "login-success",
-     "actor": "admin", "session": "2026-07-29T04:00:00Z", "source_ip": "203.0.113.7"},
-    {"pk": "AUDIT", "sk": "2026-07-29T04:00:00.000000Z", "action": "prompt-update",
-     "actor": "admin", "detail": {"prompt": "transform/nt"}},
+_AUDITS = [
+    {"ts": "2026-07-29T05:00:00.000000Z", "action": "login-success",
+     "actor": "admin", "detail": None, "session": "2026-07-29T04:00:00Z", "source_ip": "203.0.113.7"},
+    {"ts": "2026-07-29T04:00:00.000000Z", "action": "prompt-update",
+     "actor": "admin", "detail": {"prompt": "transform/nt"}, "session": None, "source_ip": None},
 ]
 
 
 @pytest.fixture
-def wired(monkeypatch) -> FakeTable:
-    table = FakeTable(items=_ROWS)
-    monkeypatch.setattr(ddb_client, "config_table", lambda: table)
-    return table
+def wired(monkeypatch) -> list:
+    """audit_repo.list_events 호출을 기록하고 _AUDITS를 그대로 돌려준다.
+
+    2026-09-09(v1.27): 저장이 PostgreSQL(lens-cms-api, id 내림차순 keyset
+    페이지네이션)로 바뀌면서 커서 포맷이 base64-JSON에서 단순 정수 문자열
+    (audit_logs.id)로 바뀌었다 — FakeTable 기반 DynamoDB 커서 테스트는
+    전부 이 새 계약으로 다시 썼다.
+    """
+    calls: list = []
+
+    def fake_list_events(limit, cursor):
+        calls.append({"limit": limit, "cursor": cursor})
+        return _AUDITS, None
+
+    monkeypatch.setattr(audit_route.audit_repo, "list_events", fake_list_events)
+    return calls
 
 
 def test_audit_default_limit_and_shape(wired) -> None:
@@ -41,6 +51,7 @@ def test_audit_default_limit_and_shape(wired) -> None:
     assert body["audits"][0]["ts"] == "2026-07-29T05:00:00.000000Z"
     assert body["audits"][0]["session"] == "2026-07-29T04:00:00Z"
     assert body["audits"][0]["source_ip"] == "203.0.113.7"
+    assert wired[-1]["limit"] == audit_route.DEFAULT_LIMIT
     assert_no_cors(resp)
 
 
@@ -51,51 +62,28 @@ def test_audit_rejects_non_integer_limit(wired) -> None:
     assert_no_cors(resp)
 
 
-@pytest.mark.parametrize("payload,label", [
-    ("[1, 2]", "JSON 배열"),
-    ("5", "JSON 정수"),
-    ('"pk"', "JSON 문자열"),
-    ("null", "JSON null"),
-])
-def test_audit_rejects_cursor_that_is_valid_json_but_not_an_object(
-    wired, payload: str, label: str
-) -> None:
-    """base64 도 JSON 도 통과하지만 dict 가 아닌 커서는 400 이어야 한다.
-
-    커서는 클라이언트 입력이다. dict 검증이 없으면 이런 값이 그대로
-    boto3 ``ExclusiveStartKey`` 로 넘어가 거기서 터지고, 400 이어야 할 잘못된
-    입력이 500 이 된다. 디코딩 실패(깨진 base64 등)만 검사하던 이전 구현이
-    놓치던 구멍이다.
-    """
-    cursor = base64.urlsafe_b64encode(payload.encode()).decode()
-    resp = audit_route.handle_list({}, {}, {"cursor": cursor})
-    assert resp["statusCode"] == 400, f"{label} 커서가 400 이 아니다"
+def test_audit_rejects_non_integer_cursor(wired) -> None:
+    """커서는 이제 audit_logs.id(정수 문자열)다 — 숫자가 아니면 400."""
+    resp = audit_route.handle_list({}, {}, {"cursor": "not-an-id"})
+    assert resp["statusCode"] == 400
     assert json.loads(resp["body"])["error"] == "invalid cursor"
     assert_no_cors(resp)
 
 
-def test_audit_accepts_well_formed_object_cursor(wired) -> None:
-    """정상 커서는 그대로 ExclusiveStartKey 로 전달돼야 한다 — 검증이 과하지 않은지."""
-    key = {"pk": "AUDIT", "sk": "2026-07-29T05:00:00.000000Z#abcd"}
-    cursor = base64.urlsafe_b64encode(json.dumps(key).encode()).decode()
-    resp = audit_route.handle_list({}, {}, {"cursor": cursor})
+def test_audit_accepts_well_formed_cursor(wired) -> None:
+    resp = audit_route.handle_list({}, {}, {"cursor": "42"})
     assert resp["statusCode"] == 200
-    assert wired.query_calls[-1]["ExclusiveStartKey"] == key
+    assert wired[-1]["cursor"] == "42"
 
 
 def test_audit_clamps_limit_to_max(wired) -> None:
     audit_route.handle_list({}, {}, {"limit": "9999"})
-    assert wired.query_calls[-1]["Limit"] == audit_route.MAX_LIMIT
+    assert wired[-1]["limit"] == audit_route.MAX_LIMIT
 
 
 def test_audit_clamps_limit_to_min(wired) -> None:
     audit_route.handle_list({}, {}, {"limit": "0"})
-    assert wired.query_calls[-1]["Limit"] == 1
-
-
-def test_audit_queries_descending(wired) -> None:
-    audit_route.handle_list({}, {}, {})
-    assert wired.query_calls[-1]["ScanIndexForward"] is False
+    assert wired[-1]["limit"] == 1
 
 
 def test_audit_returns_null_cursor_when_no_more_pages(wired) -> None:
@@ -104,36 +92,9 @@ def test_audit_returns_null_cursor_when_no_more_pages(wired) -> None:
 
 
 def test_audit_returns_cursor_when_more_pages_exist(monkeypatch) -> None:
-    class Paged(FakeTable):
-        def query(self, **kwargs):
-            out = super().query(**kwargs)
-            out["LastEvaluatedKey"] = {"pk": "AUDIT", "sk": "2026-07-29T04:00:00.000000Z"}
-            return out
-
-    table = Paged(items=_ROWS)
-    monkeypatch.setattr(ddb_client, "config_table", lambda: table)
+    monkeypatch.setattr(audit_route.audit_repo, "list_events", lambda limit, cursor: (_AUDITS, "2"))
     resp = audit_route.handle_list({}, {}, {})
-    cursor = json.loads(resp["body"])["next_cursor"]
-    assert isinstance(cursor, str) and cursor
-    assert audit_route._decode_cursor(cursor) == {"pk": "AUDIT", "sk": "2026-07-29T04:00:00.000000Z"}
-
-
-def test_audit_cursor_round_trips_into_exclusive_start_key(monkeypatch) -> None:
-    import base64
-
-    table = FakeTable(items=_ROWS)
-    monkeypatch.setattr(ddb_client, "config_table", lambda: table)
-    key = {"pk": "AUDIT", "sk": "2026-07-29T04:00:00.000000Z"}
-    cursor = base64.urlsafe_b64encode(json.dumps(key).encode()).decode()
-
-    audit_route.handle_list({}, {}, {"cursor": cursor})
-    assert table.query_calls[-1]["ExclusiveStartKey"] == key
-
-
-def test_audit_rejects_malformed_cursor(wired) -> None:
-    resp = audit_route.handle_list({}, {}, {"cursor": "!!!not-base64!!!"})
-    assert resp["statusCode"] == 400
-    assert json.loads(resp["body"])["error"] == "invalid cursor"
+    assert json.loads(resp["body"])["next_cursor"] == "2"
 
 
 # --------------------------------------------------------------------------- cost

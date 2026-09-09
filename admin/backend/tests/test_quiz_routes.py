@@ -198,8 +198,17 @@ from shared import audit, ddb_client
 
 @pytest.fixture
 def audit_table(monkeypatch) -> FakeTable:
+    """이름은 그대로 두되(다른 테스트들이 참조), 실제로는 audit_repo.log_event
+    를 스텁해 put_calls에 쌓는다 — 2026-09-09(v1.27) 감사 저장이
+    PostgreSQL(lens-cms-api)로 옮겨가면서 config_table()과는 더 이상
+    무관해졌다."""
     table = FakeTable()
     monkeypatch.setattr(ddb_client, "config_table", lambda: table)
+
+    def fake_log_event(action, detail, actor, session, source_ip):
+        table.put_calls.append({"action": action, "detail": detail, "actor": actor})
+
+    monkeypatch.setattr(audit.audit_repo, "log_event", fake_log_event)
     audit.reset_context()
     yield table
     audit.reset_context()

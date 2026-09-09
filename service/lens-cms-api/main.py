@@ -18,9 +18,11 @@ from fastapi.responses import JSONResponse
 
 import admin_posts_repo
 import articles_repo
+import audit_repo
 import cms_posts_repo as posts_client
 import community_repo
 import personal_repo
+import prompts_repo
 import quiz_repo
 import subscribers_repo
 from cms_posts_shaping import (
@@ -453,3 +455,69 @@ def internal_community_add_comment(post_id: int, payload: Dict[str, Any] = Body(
     if comment is None:
         raise HTTPException(status_code=404, detail="post not found")
     return {"comment": comment}
+
+
+# --- admin 프롬프트 (v1.27) ---
+# 공개 조회는 service/backend/services/prompt_loader.py, pipelines/common/
+# ddb_prompt.py 둘 다 사용 — 원래 DynamoDB GetItem도 무인증(같은 Lambda
+# 실행 역할 안이었을 뿐)이었다. 나머지(목록/버전이력/수정)는 admin 전용.
+
+@app.get("/api/v2/prompts/{category}/{name}")
+def get_prompt_content(category: str, name: str):
+    content = prompts_repo.get_active_content(category, name)
+    if content is None:
+        raise HTTPException(status_code=404, detail="prompt not found")
+    return {"content": content}
+
+
+@app.get("/internal/admin/prompts")
+def internal_list_prompts(x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"prompts": prompts_repo.list_prompts()}
+
+
+@app.get("/internal/admin/prompts/{category}/{name}")
+def internal_get_prompt(category: str, name: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    prompt = prompts_repo.get_prompt(category, name)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="prompt not found")
+    return prompt
+
+
+@app.put("/internal/admin/prompts/{category}/{name}")
+def internal_update_prompt(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    content = payload.get("content", "")
+    if not content:
+        raise HTTPException(status_code=400, detail="content required")
+    result = prompts_repo.update_prompt(category, name, content, sections=payload.get("sections"))
+    return result
+
+
+# --- 감사 로그 (v1.27) ---
+
+@app.post("/internal/audit/log")
+def internal_audit_log(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    audit_repo.log_event(
+        action=payload["action"],
+        detail=payload.get("detail"),
+        actor=payload.get("actor", "admin"),
+        session_id=payload.get("session"),
+        source_ip=payload.get("source_ip"),
+    )
+    return {"ok": True}
+
+
+@app.get("/internal/audit")
+def internal_audit_list(
+    limit: int = Query(default=50),
+    cursor: Optional[str] = Query(default=None),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    limit = max(1, min(limit, 200))
+    before_id = int(cursor) if cursor else None
+    events, next_cursor = audit_repo.list_events(limit=limit, before_id=before_id)
+    return {"audits": events, "count": len(events), "next_cursor": next_cursor}

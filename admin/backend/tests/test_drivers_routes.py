@@ -30,6 +30,15 @@ def wired(monkeypatch) -> tuple[FakeTable, FakeEB]:
     monkeypatch.setattr(drivers.eb_client, "disable_rule", eb.disable_rule)
     monkeypatch.setattr(drivers.eb_client, "set_schedule", eb.set_schedule)
     monkeypatch.setattr(drivers.eb_client, "describe_rule", eb.describe_rule)
+
+    # 2026-09-09(v1.27): audit.log()가 이제 config_table()이 아니라
+    # audit_repo(lens-cms-api)를 거친다 — 같은 FakeTable.put_calls에
+    # 계속 쌓이도록 스텁(이 파일 자체의 CONFIG 읽기/쓰기는 아직 미이관이라
+    # config_table 스텁은 그대로 유지).
+    def fake_log_event(action, detail, actor, session, source_ip):
+        table.put_calls.append({"action": action, "detail": detail, "actor": actor})
+
+    monkeypatch.setattr(drivers.audit.audit_repo, "log_event", fake_log_event)
     return table, eb
 
 
