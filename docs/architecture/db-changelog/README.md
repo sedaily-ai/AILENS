@@ -49,6 +49,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.16 — slug 조회 channel 기반 포맷 disambiguation](postgres/v1.16-slug-channel-disambiguation.md) |
 | 2026-09-09 | postgres | [v1.17 — lens 단건 조회 렌디션 조립](postgres/v1.17-lens-단건조회-조립.md) |
 | 2026-09-09 | postgres | [v1.18 — lens 목록 조회 라벨 배치 조회](postgres/v1.18-lens-목록조회-라벨.md) |
+| 2026-09-09 | postgres | [v1.19 — 컷오버 전 데이터 재동기화](postgres/v1.19-재동기화.md) |
 
 ## 새 항목 추가 규칙
 
