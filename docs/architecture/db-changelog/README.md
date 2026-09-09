@@ -54,6 +54,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.21 — admin CMS 글 쓰기도 Postgres로 전환, 동기화 버그 해소](postgres/v1.21-admin-쓰기-전환.md) |
 | 2026-09-09 | postgres | [v1.22 — 용어 퀴즈 읽기·쓰기 Postgres 전환](postgres/v1.22-퀴즈-전환.md) |
 | 2026-09-09 | postgres | [v1.23 — 뉴스레터 구독자 읽기·쓰기 Postgres 전환](postgres/v1.23-뉴스레터-구독자-전환.md) |
+| 2026-09-09 | postgres | [v1.24 — 개인화(내 서랍·읽은 기록·프로필) 읽기·쓰기 Postgres 전환](postgres/v1.24-개인화-전환.md) |
 
 ## 새 항목 추가 규칙
 
