@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 import admin_posts_repo
 import cms_posts_repo as posts_client
 import quiz_repo
+import subscribers_repo
 from cms_posts_shaping import (
     SHAPERS,
     shape_letter,
@@ -220,3 +221,39 @@ def admin_delete_quiz(quiz_id: str, x_internal_token: Optional[str] = Header(def
     if not quiz_repo.soft_delete(quiz_id):
         raise HTTPException(status_code=404, detail="quiz not found")
     return {"ok": True}
+
+
+# ── 뉴스레터 구독자 — v1.23 ────────────────────────────────────────────
+# 공개 HTTP 표면(검증·CAN-SPAM consent 체크·SES 발송)은 여전히 기존
+# Lambda(handlers/subscribe.py)가 담당한다 — 저장 계층만 여기로 옮겼다.
+# 그래서 이 라우터들은 전부 내부 전용(공개 노출 안 함), 공유 시크릿으로
+# 보호한다.
+@app.post("/internal/subscriptions")
+def internal_subscribe(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    sub = subscribers_repo.subscribe(
+        payload["email"], bool(payload.get("consent", True)),
+        name=payload.get("name"),
+        onboarding_format=payload.get("onboarding_format"),
+        onboarding_interests=payload.get("onboarding_interests"),
+        newsletter_id=payload.get("newsletter_id", 1),
+    )
+    return {"subscriber": sub}
+
+
+@app.post("/internal/subscriptions/unsubscribe")
+def internal_unsubscribe(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"ok": subscribers_repo.unsubscribe_by_token(payload["token"])}
+
+
+@app.get("/internal/subscriptions")
+def internal_list_subscriptions(
+    active_only: bool = Query(default=False),
+    newsletter_id: int = Query(default=1),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    if active_only:
+        return {"subscribers": subscribers_repo.list_active_subscribers(newsletter_id)}
+    return {"subscribers": subscribers_repo.list_all()}

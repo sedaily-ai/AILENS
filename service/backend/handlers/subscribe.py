@@ -2,8 +2,13 @@
 
 라우팅(같은 Lambda):
   POST /api/v2/subscribe     body {email, consent[, name][, format][, interests][, letter]}
-       → sedaily-mbti-newsletter-subscribers-dev 에 active 구독자 upsert
+       → PostgreSQL(subscriptions 테이블, lens-cms-api 경유)에 active 구독자 upsert
   GET  /api/v2/unsubscribe?token=...   → 해당 구독자 status=unsub (1클릭, 법적 필수)
+
+2026-09-09(v1.23) — 저장을 DynamoDB(sedaily-mbti-newsletter-subscribers-dev)
+에서 PostgreSQL로 이관. 검증·CAN-SPAM consent 체크·SES 발송 로직은
+이 파일에 그대로 남고, 저장만 clients/newsletter_subscribers_pg_client.py
+(lens-cms-api HTTP 호출)로 위임한다.
 
 consent=true 강제(CAN-SPAM). 재구독 시 idempotent upsert.
 Auth: NONE (v1 parity, 민감정보 없음 — 이메일만).
@@ -34,14 +39,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
-import boto3
-
+from clients import newsletter_subscribers_pg_client as subscribers_client
 from common.constants import SITE_URL
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
@@ -50,16 +52,7 @@ from core.response import error_response, success_response
 logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
-SUBSCRIBERS_TABLE = os.environ.get("SUBSCRIBERS_TABLE", "sedaily-mbti-newsletter-subscribers-dev")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-# 모듈 레벨 — 콜드스타트 1회만 생성, 웜 컨테이너에서 재사용 (기존엔 매 요청마다
-# boto3.resource() 를 새로 만들고 있었다).
-_resource = boto3.resource("dynamodb")
-
-
-def _table():
-    return _resource.Table(SUBSCRIBERS_TABLE)
 
 
 def _parse(event: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any], Dict[str, str]]:
@@ -88,19 +81,9 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         token = (qs.get("token") or "").strip()
         if not token:
             return error_response("token required", status_code=400, code="VALIDATION")
-        tbl = _table()
-        # Phase B: 토큰 인덱스 미설치 — scan 필터(저volume 허용, 추후 GSI 최적화)
-        resp = tbl.scan(FilterExpression="unsubscribe_token = :t",
-                        ExpressionAttributeValues={":t": token})
-        items = resp.get("Items", [])
-        if not items:
+        if not subscribers_client.unsubscribe_by_token(token):
             return error_response("invalid token", status_code=404, code="NOT_FOUND")
-        email = items[0]["email"]
-        tbl.update_item(Key={"email": email},
-                        UpdateExpression="SET #st = :u",
-                        ExpressionAttributeNames={"#st": "status"},
-                        ExpressionAttributeValues={":u": "unsub"})
-        logger.info('{"event":"unsubscribed","email_hash":"%s"}', hash(email))
+        logger.info('{"event":"unsubscribed"}')
         return success_response({"ok": True, "unsubscribed": True})
 
     # ── 구독 ────────────────────────────────────
@@ -124,28 +107,15 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if isinstance(raw_interests, list) else None
     ) or None
 
-    now = datetime.now(timezone.utc).isoformat()
-    tbl = _table()
-    existing = tbl.get_item(Key={"email": email}).get("Item")
-    token = (existing or {}).get("unsubscribe_token") or uuid.uuid4().hex
-
-    item: Dict[str, Any] = {
-        "email": email, "status": "active",
-        "consent": True, "unsubscribe_token": token, "name": name,
-        "created_at": (existing or {}).get("created_at") or now,
-        "updated_at": now,
-    }
-    # put_item은 아이템 전체를 교체한다 — 이번 요청에 값이 없으면 기존
-    # 저장분(있다면)을 그대로 이어받아, 재구독 시 이전 온보딩 선택이
-    # 지워지지 않게 한다.
-    onboarding_format = req_format or (existing or {}).get("onboarding_format")
-    if onboarding_format:
-        item["onboarding_format"] = onboarding_format
-    onboarding_interests = req_interests or (existing or {}).get("onboarding_interests")
-    if onboarding_interests:
-        item["onboarding_interests"] = onboarding_interests
-
-    tbl.put_item(Item=item)
+    # subscribers_client.subscribe()가 upsert(기존 토큰/온보딩값 보존)를
+    # 서버 쪽에서 전담한다 — 이 값이 없으면(None) 서버가 기존 저장분을
+    # 그대로 이어받으므로 재구독 시 이전 온보딩 선택이 지워지지 않는다.
+    subscriber = subscribers_client.subscribe(
+        email, True, name=name or None,
+        onboarding_format=req_format, onboarding_interests=req_interests,
+    )
+    existing = subscriber.get("resubscribed")
+    token = subscriber["unsubscribe_token"]
     logger.info('{"event":"subscribed","resub":%s}', json.dumps(bool(existing)))
 
     # 구독 즉시 발송 — 요청에 특정 letter가 실려 있으면 그걸(예: 방금 보던
