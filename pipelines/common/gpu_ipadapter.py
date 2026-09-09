@@ -108,7 +108,7 @@ def _run_ssm_command(commands: list[str], timeout_s: int = 300) -> dict:
 
 
 def generate_ipadapter_photo_bytes(
-    photo_brief: str, character: str, *, scale: float = 0.7, steps: int = 30, seed: int = 0
+    photo_brief: str, character: str, *, scale: float = 0.45, steps: int = 30, seed: int = 0
 ) -> bytes:
     """character: "A"|"B"(단일 인물 참조 고정) 또는 "NONE"(참조 없이, 두 사람 컷용).
     호출 전 ensure_gpu_running() 필수(이 함수는 반복 호출되므로 매번 상태
@@ -119,7 +119,17 @@ def generate_ipadapter_photo_bytes(
     섞인 문자열을 쉘 명령 안에 인라인으로 넣으면 인용 규칙이 깨지는 걸
     실측으로 확인함(2026-09-09). 대신 S3에 작은 텍스트 파일로 올리고,
     원격 스크립트가 그 파일을 읽게 한다 — 이미지 결과를 주고받는 것과
-    같은 방식으로 통일."""
+    같은 방식으로 통일.
+
+    scale=0.45(2026-09-09, R20 후속 실측) — 원래 기본값 0.7은 IP-Adapter-Plus가
+    얼굴만이 아니라 참조 이미지의 **자세·구도까지** 강하게 전이시켜서, R20에서
+    2단계 지침에 "능동적 동작"을 추가해도 실제 이미지는 계속 참조 이미지와 같은
+    "테이블에 기대앉은" 자세로 나오는 문제를 실측으로 확인함(같은 브리핑
+    "서서, 창가, 로우앵글"을 줘도 scale=0.7에선 앉은 자세로 나옴). scale을
+    0.35~0.5로 낮추며 비교한 결과 0.45가 자세 자유도(브리핑 지시를 따름)와
+    얼굴 정체성 유지의 균형점이었다 — 0.35는 자세는 완벽했지만 저해상도
+    앵글에서 이목구비 유지가 살짝 불안정했고, 0.5는 여전히 앉은 자세로
+    쏠리는 경향이 남아있었다."""
     ssm_client, _ec2, s3 = _clients()
     run_id = f"{character}_{abs(hash(photo_brief)) % 10_000_000}_{seed}"
     brief_key = f"brief_{run_id}.txt"
