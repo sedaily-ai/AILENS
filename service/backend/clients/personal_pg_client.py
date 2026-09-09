@@ -18,11 +18,17 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
 
-from common.secrets import get_secret
-
 _API_URL = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
-_TOKEN_PARAM = os.environ.get("LENS_CMS_API_TOKEN_PARAM", "/sedaily-mbti/v2/lens-cms-api-token")
 _TIMEOUT_SECONDS = 8
+
+# ⚠️ 다른 클라이언트들(subscribe.py 등)은 SSM SecureString에서 토큰을
+# 읽지만, 이 파일의 유일한 호출자(archive-dev/user-dev Lambda)는
+# `sedaily-mbti-lambda-execution-dev`라는, AI LENS 밖의 다른 프로젝트
+# (bigkinds/ga4 등 인라인 정책 이름으로 확인됨)와 공유하는 광범위 실행
+# 역할을 쓴다 — 이 역할에 SSM 권한을 추가하면 영향 범위가 이 프로젝트
+# 밖으로 샌다. 대신 이 두 함수에만 직접 환경변수로 토큰을 주입한다
+# (SSM 미경유, dev 단계 리스크 허용 범위로 판단).
+_TOKEN = os.environ.get("LENS_CMS_API_TOKEN", "")
 
 
 def _request(method: str, path: str, body: Optional[dict] = None, query: Optional[dict] = None) -> Any:
@@ -37,7 +43,7 @@ def _request(method: str, path: str, body: Optional[dict] = None, query: Optiona
         data=data,
         headers={
             "Content-Type": "application/json",
-            "X-Internal-Token": get_secret(_TOKEN_PARAM),
+            "X-Internal-Token": _TOKEN,
         },
         method=method,
     )
