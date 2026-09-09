@@ -51,6 +51,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.18 — lens 목록 조회 라벨 배치 조회](postgres/v1.18-lens-목록조회-라벨.md) |
 | 2026-09-09 | postgres | [v1.19 — 컷오버 전 데이터 재동기화](postgres/v1.19-재동기화.md) |
 | 2026-09-09 | postgres | [v1.20 — CMS posts 읽기 실제 프로덕션 전환 완료(상시 서버)](postgres/v1.20-상시서버-실전환.md) |
+| 2026-09-09 | postgres | [v1.21 — admin CMS 글 쓰기도 Postgres로 전환, 동기화 버그 해소](postgres/v1.21-admin-쓰기-전환.md) |
 
 ## 새 항목 추가 규칙
 
