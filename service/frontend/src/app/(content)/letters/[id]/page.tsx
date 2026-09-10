@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 import { withDisplayMeta, fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
-import { fetchCmsPosts, fetchCmsPostBySlug, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchCmsPosts, fetchCmsPostBySlug, fetchLensPosts, fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date';
@@ -104,7 +104,7 @@ export async function generateMetadata({
   // 발견 — today-letters 데드 API 뒤에 가려 있던 두 번째 버그).
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId);
-  const letter = await findLetter(id);
+  const [letter, lensPost] = await Promise.all([findLetter(id), fetchLensBySlug(id)]);
   if (!letter) {
     return { title: '레터를 찾을 수 없어요', robots: { index: false } };
   }
@@ -113,7 +113,12 @@ export async function generateMetadata({
   const bodyExcerpt = letter.body?.length ? letter.body.join(' ') : stripHtml(letter.body_html ?? '');
   const rawDesc = usableSubtitle(letter.subtitle) ?? (bodyExcerpt || `${ed.name}이 풀어낸 ${letter.date} 한 통.`);
   const description = trimToSnippetLength(rawDesc, 160);
-  const url = `${SITE_URL}/letters/${id}`;
+  // v1.32 — lens 글은 /letters/{id}가 아니라 4탭 페이지 /lens/{id}가 진짜
+  // 원본이다(generateStaticParams·news-sitemap.xml·rss.xml에 이미 적용한
+  // 것과 동일한 이유). 여기서 안 맞추면 이 페이지가 직접 URL로 열릴 때마다
+  // (dynamicParams 기본값 true) 스스로를 canonical로 선언해 /lens/{id}와
+  // 경쟁하게 된다.
+  const url = lensPost ? `${SITE_URL}/lens/${id}` : `${SITE_URL}/letters/${id}`;
   // letter 자체의 5개 keyword (term) + 발행처 — 검색엔진과 SNS 양쪽에 노출.
   // ApiLetter 외 fallback letter 는 keywords 가 없을 수 있어 옵셔널.
   const letterKeywords =
@@ -161,9 +166,9 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function buildArticleJsonLd(letter: ApiLetter & { date: string }) {
+function buildArticleJsonLd(letter: ApiLetter & { date: string }, canonicalUrl: string) {
   const ed = DEFAULT_AUTHOR;
-  const url = `${SITE_URL}/letters/${letter.id}`;
+  const url = canonicalUrl;
   const published = `${letter.date}T07:00:00+09:00`;
   const bodyJoined = letter.body?.length ? letter.body.join('\n\n') : stripHtml(letter.body_html ?? '');
   const subtitle = usableSubtitle(letter.subtitle);
@@ -252,8 +257,15 @@ export default async function LetterDetailPage({
   // (2026-08-23) — 없으면 클라이언트 fetch가 끝날 때까지 안 보여서
   // 실사용자가 "느리게 나타난다"고 느낀다(사용자가 프로덕션에서 직접
   // 발견, "letters도 모든 부분 마찬가지").
-  const [letter, hotLetters] = await Promise.all([findLetter(id), fetchFollowingLetters(5)]);
-  const jsonLd = letter ? buildArticleJsonLd(letter) : null;
+  const [letter, hotLetters, lensPost] = await Promise.all([
+    findLetter(id),
+    fetchFollowingLetters(5),
+    fetchLensBySlug(id),
+  ]);
+  // generateMetadata()의 canonical 계산과 동일한 규칙 — lens 글이면
+  // JSON-LD의 @id/url도 /lens/{id}를 가리켜야 canonical과 일치한다.
+  const canonicalUrl = lensPost ? `${SITE_URL}/lens/${id}` : `${SITE_URL}/letters/${id}`;
+  const jsonLd = letter ? buildArticleJsonLd(letter, canonicalUrl) : null;
   const { next, prev } = letter ? await findNeighbors(id) : { next: null, prev: null };
   return (
     <>
