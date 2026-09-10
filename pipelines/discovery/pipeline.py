@@ -104,7 +104,14 @@ def _parse_item(item: ET.Element) -> dict | None:
     # 검증된 로직이라 그대로 두고, 표시용으로만 전체 카테고리 태그를
     # 별도 필드에 담아 호출부가 그중 사이트 카테고리와 일치하는 걸
     # 골라 쓰게 한다.
-    categories = [c.attrib.get("name", "").split(",")[0] for c in cats]
+    # 2026-09-11 — 예전엔 여기서도 .split(",")[0]로 최상위 세그먼트만
+    # 남겼는데, "재테크"(사이트 nav 7번째 탭)는 daily-xml 전수조사 결과
+    # 최상위 카테고리 16개(증권/부동산/산업/금융/국제/문화·라이프/경제/
+    # 사회/정치/IT·과학/Signal/블록체인/스포츠/연예/오피니언/피플) 중에
+    # 아예 없다 — 대신 "산업,투자·재무,투자·재무"처럼 하위 세그먼트에만
+    # 있다. 그래서 전체 태그 문자열(콤마 포함)을 그대로 넘기고,
+    # display_category()가 하위 세그먼트까지 검사한다.
+    categories = [c.attrib.get("name", "") for c in cats]
     content_el = item.find("content")
     content_text = _strip_html(content_el.text or "") if content_el is not None else ""
     image_el = item.find("image")

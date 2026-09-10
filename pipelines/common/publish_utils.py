@@ -35,6 +35,13 @@ CATEGORY_MAP = {
     "문화·라이프": "문화",
 }
 
+# "재테크"(사이트 nav 7번째 탭, /investing)는 원문 최상위 카테고리엔
+# 없다(2026-09-11 daily-xml 전수조사로 확인 — 그래서 /investing이 계속
+# 0건이었다, 사용자 신고). "산업,투자·재무,투자·재무"·"Signal,Finance,투자"
+# 처럼 하위 세그먼트에만 투자 관련 태그가 붙는다 — display_category()의
+# 2차 패스가 이 세그먼트들을 하위 태그로 찾는다.
+_INVESTING_SUBCATEGORIES = {"투자", "투자·재무", "금융·투자"}
+
 
 def load_module(name: str, file_path: Path):
     """letters/podcast/webtoon이 전부 `pipeline.py`라는 같은 파일명을 써서
@@ -60,10 +67,20 @@ def display_category(article: dict) -> str | None:
     category 태그(`article["categories"]`)를 순서대로 훑어 사이트 6개
     카테고리 중 하나와 일치하는 첫 값을 쓴다. 정치·사회·오피니언처럼
     애초에 경제 카테고리 태그가 전혀 없는 기사는 None을 돌려준다 — 사이트에
-    대응 카테고리 페이지가 없는 게 맞기 때문에 억지로 하나 붙이지 않는다."""
-    for c in article.get("categories") or [article.get("top_category", "")]:
-        if c in CATEGORY_MAP:
-            return CATEGORY_MAP[c]
+    대응 카테고리 페이지가 없는 게 맞기 때문에 억지로 하나 붙이지 않는다.
+
+    2026-09-11 — "재테크"만은 최상위 태그 매칭(1차 패스)으로 못 찾는다
+    (CATEGORY_MAP 주석 참조). 1차 패스에서 아무 것도 안 걸리면 2차로
+    하위 세그먼트에서 투자 관련 태그를 찾는다."""
+    cats = article.get("categories") or [article.get("top_category", "")]
+    for c in cats:
+        top = c.split(",")[0]
+        if top in CATEGORY_MAP:
+            return CATEGORY_MAP[top]
+    for c in cats:
+        segments = c.split(",")
+        if any(seg in _INVESTING_SUBCATEGORIES for seg in segments[1:]):
+            return "재테크"
     return None
 
 
