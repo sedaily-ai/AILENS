@@ -325,8 +325,17 @@ def _generate_and_qa_cut(
     return ok, verdict, faces
 
 
-def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True):
-    """기사 1건 → 8컷 웹툰 전체 파이프라인. name은 출력 폴더명."""
+def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True,
+                 manage_gpu: bool = True):
+    """기사 1건 → 8컷 웹툰 전체 파이프라인. name은 출력 폴더명.
+
+    manage_gpu=False(2026-09-10) — frontpage_auto/mustknow_auto가 기사
+    여러 건을 순차 처리할 때, 기사마다 이 함수가 GPU를 껐다 켜면(부팅+SSM
+    온라인 대기만 기사당 수십 초~분) 배치 전체가 크게 느려진다(실측: 오늘
+    실행에서 기사 하나 끝날 때마다 GPU 재부팅하는 게 로그로 확인됨). 호출부
+    (run.py main())가 배치 시작 시 한 번만 켜고 끝나면 한 번만 끄도록
+    바뀌면서, 그 경우엔 이 함수가 켜고 끄지 않게 이 플래그로 막는다.
+    단독 호출(백필 스크립트 등)은 기본값 True로 기존처럼 자체 관리."""
     out = output_root / name
     out.mkdir(parents=True, exist_ok=True)
     article = Path(article_path).read_text(encoding="utf-8")
@@ -392,7 +401,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     # 켜고 끄면 g4dn.xlarge 부팅·SSM 연결 대기(수십 초~분 단위)가 컷마다
     # 반복돼 배치가 크게 느려진다.
     gpu_started = False
-    if IMAGE_PROVIDER == "bedrock-style-transfer":
+    if manage_gpu and IMAGE_PROVIDER == "bedrock-style-transfer":
         import gpu_ipadapter  # pipelines/common/ — sibling
         gpu_ipadapter.ensure_gpu_running()
         gpu_started = True

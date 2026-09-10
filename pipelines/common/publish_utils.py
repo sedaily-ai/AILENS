@@ -256,6 +256,7 @@ def publish_article(
     podcast_mod,
     webtoon_mod,
     results: dict | None = None,
+    manage_gpu: bool = True,
 ) -> str:
     """4포맷(레터/웹툰/팟캐스트/영상) 생성 + S3 업로드 + lens-cms-api(Postgres)
     발행 — 발행 여부 판단(중복확인·임계값·source_url 유효성)은 호출부
@@ -324,7 +325,7 @@ def publish_article(
     webtoon_script: dict = {}
     webtoon_bullets, webtoon_images = [], []
     try:
-        webtoon_mod.run_article(name, str(article_path), out_dir)
+        webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
         webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
         for cut in webtoon_script["cuts"]:
             caption = cut.get("narration") or (
