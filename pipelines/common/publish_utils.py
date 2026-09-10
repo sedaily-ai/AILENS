@@ -153,18 +153,20 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
     return bullets
 
 
-def already_published(table, article_key: str) -> bool:
-    """이 article_key가 이미 (다른 파이프라인 포함) 발행됐는지 확인 —
-    source_url 완전일치가 아니라 contains로 본다(쿼리스트링·수동발행
-    케이스 때문에 완전일치는 놓친다, 실제로 겪은 문제)."""
-    if not article_key:
+def already_published(source_url: str) -> bool:
+    """이 source_url이 이미 (다른 파이프라인 포함) 발행됐는지 확인 — v1.32.
+
+    예전엔 DynamoDB source_url `contains()` 스캔이었다(쿼리스트링 차이
+    때문에 완전일치를 피했었음). 이제는 여기서 직접 쿼리스트링을 떼어낸
+    뒤 lens-cms-api(Postgres)에 완전일치로 물어본다 — publish_article()이
+    저장할 때 쓰는 것과 정확히 같은 정리 규칙(`split("?")[0]`)이라 같은
+    문제가 재발하지 않는다."""
+    from lens_cms_client import find_by_source_url  # noqa: lazy
+
+    if not source_url:
         return False
-    resp = table.scan(
-        FilterExpression="contains(source_url, :k)",
-        ExpressionAttributeValues={":k": f"article/{article_key}"},
-        ProjectionExpression="id",
-    )
-    return len(resp.get("Items", [])) > 0
+    clean = source_url.split("?")[0]
+    return find_by_source_url(clean) is not None
 
 
 def generate_video(
@@ -243,7 +245,6 @@ def publish_article(
     article: dict,
     out_dir: Path,
     s3,
-    table,
     today_kst: str,
     *,
     name: str,
@@ -256,9 +257,9 @@ def publish_article(
     webtoon_mod,
     results: dict | None = None,
 ) -> str:
-    """4포맷(레터/웹툰/팟캐스트/영상) 생성 + S3 업로드 + DDB write(최대 4개
-    아이템: lens 본글 + webtoon/video/home_player 채널별 독립 글) — 발행 여부
-    판단(중복확인·임계값·source_url 유효성)은 호출부 책임, 여기선 안 한다.
+    """4포맷(레터/웹툰/팟캐스트/영상) 생성 + S3 업로드 + lens-cms-api(Postgres)
+    발행 — 발행 여부 판단(중복확인·임계값·source_url 유효성)은 호출부
+    책임, 여기선 안 한다.
 
     2026-09-05 — frontpage_auto/run.py::process_article()와
     mustknow_auto/run.py::_publish()가 이 부분만 바이트 단위로 동일했다
@@ -268,6 +269,17 @@ def publish_article(
     재발견). 두 파일이 갈리는 지점(중복확인 시점·source_url 검증·이름
     폴백·paper_section·display_order·로그 접두사)은 전부 파라미터로 받고,
     그 갈리는 부분(래퍼)은 각 run.py에 그대로 남긴다.
+
+    2026-09-10(v1.32) — 저장 대상이 DynamoDB(`table.put_item()`)에서
+    lens-cms-api HTTP API로 바뀌면서 `table` 파라미터를 없앴다. 예전엔
+    lens 본글과 별도로 webtoon/video/home_player 채널에 형제 글을
+    하나씩 더 썼는데(2026-08-23 도입, "각 채널 전용 화면에도 보이게"),
+    Postgres 읽기 경로(cms_posts_repo.py)는 그 형제 글 없이도 lens
+    publications 행의 rendition 포맷만 보고 channel=video/webtoon/
+    home_player 조회를 채워준다는 게 v1.30 조사로 이미 확인돼 있다 —
+    형제 글을 계속 만들면 이번 마이그레이션 내내 고치던 것과 같은
+    중복 publications 행 문제를 새로 만드는 것이라 없앴다. lens 글
+    하나(4포맷 전부 body_inline.lenses[]에 담아)만 쓴다.
 
     name/source_url은 호출부가 이미 확정한 값을 받는다(mustknow_auto는
     article["key"]가 항상 있다는 전제, frontpage_auto는 key가 없으면
@@ -281,10 +293,9 @@ def publish_article(
     from text_utils import strip_code_fence  # noqa: lazy
     from s3_utils import upload_media  # noqa: lazy
     from config import CMS_MEDIA_BUCKET  # noqa: lazy — frontpage_auto/mustknow_auto 둘 다 같은 값
+    from lens_cms_client import create_post, set_status  # noqa: lazy
 
     import json
-    import uuid
-    from datetime import datetime, timezone
 
     def _upload(local_path: Path, key: str) -> str:
         return upload_media(s3, local_path, key, CMS_MEDIA_BUCKET)
@@ -380,19 +391,16 @@ def publish_article(
     ]
 
     publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
-    slug = slugify(publish_date_iso, article["title"])
-    now = datetime.now(timezone.utc).isoformat()
     clean_source_url = (source_url or "").split("?")[0]
-    item = {
-        "id": str(uuid.uuid4()),
-        "slug": slug,
-        "status": "published",
-        "channels": ["lens"],
-        "publish_date": publish_date_iso,
-        "editor_id": "AI LENS",
+    data = {
         "headline": article["title"],
         "subtitle": article["sub_title"],
-        "closing_line": None,
+        "publish_date": publish_date_iso,
+        "channels": ["lens"],
+        "cover_image_url": webtoon_images[0]["url"] if webtoon_images else None,
+        "source_url": clean_source_url,
+        "editor_id": "AI LENS",
+        "display_order": display_order,
         "body_inline": {
             "body": [], "key_points": [], "keywords": [], "images": [],
             "lenses": lenses,
@@ -402,88 +410,10 @@ def publish_article(
             "display_order": display_order,
             "needs_video": video is None,
         },
-        "cover_image_url": webtoon_images[0]["url"] if webtoon_images else None,
-        "source_url": clean_source_url,
-        "media_embed_url": None,
-        "display_order": None,
-        "created_by": log_prefix,
-        "created_at": now,
-        "updated_at": now,
-        "published_at": now,
     }
-    table.put_item(Item=item)
-
-    # lens 글은 그대로 두고(4유형 페이지는 계속 필요), 웹툰/영상/팟캐스트
-    # 채널에도 독립된 글을 하나씩 더 써서 각 채널 전용 목록·상세 화면에도
-    # 보이게 한다(2026-08-23) — 슬러그는 충돌 방지로 접미사를 붙인다.
-    if webtoon_images:
-        webtoon_item = {
-            "id": str(uuid.uuid4()),
-            "slug": f"{slug}-webtoon",
-            "status": "published",
-            "channels": ["webtoon"],
-            "publish_date": publish_date_iso,
-            "editor_id": "AI LENS",
-            "headline": webtoon_script.get("core_question") or article["title"],
-            "subtitle": article["sub_title"],
-            "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": webtoon_images},
-            "cover_image_url": webtoon_images[0]["url"],
-            "source_url": clean_source_url,
-            "media_embed_url": None,
-            "display_order": None,
-            "created_by": log_prefix,
-            "created_at": now,
-            "updated_at": now,
-            "published_at": now,
-        }
-        table.put_item(Item=webtoon_item)
-
-    if video_url:
-        video_item = {
-            "id": str(uuid.uuid4()),
-            "slug": f"{slug}-video",
-            "status": "published",
-            "channels": ["video"],
-            "publish_date": publish_date_iso,
-            "editor_id": "AI LENS",
-            "headline": lenses[3]["question"] or article["title"],
-            "subtitle": article["sub_title"],
-            "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "video_url": video_url},
-            "cover_image_url": thumb_url or article["photo_url"],
-            "source_url": clean_source_url,
-            "media_embed_url": None,
-            "display_order": None,
-            "created_by": log_prefix,
-            "created_at": now,
-            "updated_at": now,
-            "published_at": now,
-        }
-        table.put_item(Item=video_item)
-
-    if podcast_url:
-        podcast_item = {
-            "id": str(uuid.uuid4()),
-            "slug": f"{slug}-podcast",
-            "status": "published",
-            "channels": ["home_player"],
-            "publish_date": publish_date_iso,
-            "editor_id": "AI LENS",
-            "headline": lenses[2]["question"] or article["title"],
-            "subtitle": article["sub_title"],
-            "closing_line": None,
-            "body_inline": {"body": [], "key_points": [], "keywords": [], "images": [], "category": display_category(article), "transcript": podcast_transcript},
-            "cover_image_url": article["photo_url"],
-            "source_url": clean_source_url,
-            "media_embed_url": podcast_url,
-            "display_order": 0,
-            "created_by": log_prefix,
-            "created_at": now,
-            "updated_at": now,
-            "published_at": now,
-        }
-        table.put_item(Item=podcast_item)
+    post = create_post(data, created_by=log_prefix)
+    set_status(post["id"], "published")
+    slug = post["slug"]
 
     print(f"[{log_prefix}] 발행 완료 — {slug} (section={paper_section}, {status})")
     return status

@@ -49,6 +49,11 @@ export interface ApiLetter {
   podcast_audio_url?: string | null;
   // 피드 카드 썸네일 (CMS 글 전용 — admin에서 지정 안 하면 null, 에디터 아바타로 폴백).
   cover_image_url?: string | null;
+  // 텍스트 없는 순수 기사 사진(v1.32) — channel=letters 조회가 lens 글도
+  // 같이 돌려주는데(letter 포맷 rendition 기준), cover_image_url이 그
+  // 글의 웹툰 첫 컷인 경우가 대부분이라 카드 썸네일에 쓰면 안 된다
+  // (shape_lens의 동일 필드·CmsLens.photo_image_url과 같은 이유).
+  photo_image_url?: string | null;
   // 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO 감사 —
   // "취재된 원본을 바탕으로" 라는 JSON-LD 소개를 실제로 검증 가능하게 만든다).
   // admin이 안 채우면 null.
@@ -273,7 +278,9 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
     editorName: meta.editorName,
     editorRole: meta.editorRole,
     editorAvatar: meta.editorAvatar,
-    thumbnailUrl: letter.cover_image_url || null,
+    // v1.32 — photo_image_url(진짜 기사 사진) 우선, cover_image_url(웹툰
+    // 첫 컷일 수 있음)은 폴백만. toLensLetterCard()와 같은 우선순위.
+    thumbnailUrl: letter.photo_image_url || letter.cover_image_url || null,
     archetype: letter.archetype ?? meta.editorRole,
     accent: meta.accent,
     accentBg: meta.accentBg,

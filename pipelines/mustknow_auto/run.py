@@ -15,8 +15,9 @@
 결정 안 됐다(2026-08-22 설계 노트의 "이슈 B") — 그래서 frontpage_auto의
 동작(스케줄·selection 로직)은 안 건드리고, 대신 이 파이프라인이 발행 직전
 `publish_utils.already_published()`로 frontpage_auto가 이미 발행한 기사인지
-한 번 더 확인해 중복 발행을 막는다. `_publish()`는 4포맷 생성+업로드+DDB
-write 본체를 `publish_utils.publish_article()`에 위임하는 얇은 래퍼다 —
+한 번 더 확인해 중복 발행을 막는다. `_publish()`는 4포맷 생성+업로드+
+lens-cms-api(Postgres) 발행 본체를 `publish_utils.publish_article()`에
+위임하는 얇은 래퍼다 —
 frontpage_auto/run.py의 `process_article()`도 같은 함수에 위임한다
 (2026-09-05, 두 래퍼가 그 본체를 바이트 단위로 복사해 갖고 있던 걸 공용화
 — "이슈 B" 결정과 무관하게 이 부분은 두 파이프라인이 영원히 같은 스키마로
@@ -50,7 +51,7 @@ import classify
 # (리팩토링 감사로 추출, publish_utils.py 참조) — publish_article()이
 # 4포맷 생성+업로드+DDB write 본체까지 담당한다.
 import publish_utils
-from config import AWS_REGION, CMS_POSTS_TABLE
+from config import AWS_REGION
 
 discovery = publish_utils.load_module("mustknow_auto_discovery", _ROOT / "discovery" / "pipeline.py")
 _letters_mod = publish_utils.load_module("mustknow_auto_letters", _ROOT / "letters" / "pipeline.py")
@@ -58,7 +59,10 @@ _podcast_mod = publish_utils.load_module("mustknow_auto_podcast", _ROOT / "podca
 _webtoon_mod = publish_utils.load_module("mustknow_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
 
 REGION = AWS_REGION
-TABLE = CMS_POSTS_TABLE
+# sedaily-mbti-cms-posts-dev(DynamoDB) 직접 write는 v1.32에서 없어졌다 —
+# publish_utils.publish_article()이 lens-cms-api(Postgres)로 발행한다.
+# seen 테이블은 "기사 후보를 이미 봤는지"만 추적하는 내부 캐시라 사이트
+# 콘텐츠와 무관하고, 이번 전환 범위 밖(그대로 DynamoDB 유지).
 SEEN_TABLE = "sedaily-lens-mustknow-seen-dev"
 
 _BRACKET_RE = re.compile(r"\[[^\]]*\]")
@@ -152,7 +156,6 @@ def _publish(
     article: dict,
     out_dir: Path,
     s3,
-    table,
     today_kst: str,
     *,
     paper_section: str | None,
@@ -163,14 +166,14 @@ def _publish(
     발행 여부 판단(중복확인·임계값)은 호출부(main)의 책임이라 여기선
     안 한다.
 
-    2026-09-05 — 4포맷 생성+업로드+DDB write 본체는 frontpage_auto/run.py의
+    2026-09-05 — 4포맷 생성+업로드+발행 본체는 frontpage_auto/run.py의
     `process_article()`와 바이트 단위로 동일했던 걸
     `publish_utils.publish_article()`로 공용화했다(P3 리팩토링 감사 —
     2026-09-04 P1에서 코드블록 추출 등 작은 헬퍼 9개는 공용화했지만 정작
     이 부분은 안 건드렸었다, 오늘 세션을 시작하게 만든 버그가 살고 있던
     곳과 같은 위험 클래스라 재발견 후 마저 통합)."""
     return publish_utils.publish_article(
-        article, out_dir, s3, table, today_kst,
+        article, out_dir, s3, today_kst,
         name=article["key"], source_url=article["url"],
         paper_section=paper_section, display_order=display_order,
         log_prefix="mustknow-auto",
@@ -186,7 +189,6 @@ def _publish(
 def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
-    table = session.resource("dynamodb").Table(TABLE)
     seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
     revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
 
@@ -226,12 +228,12 @@ def main():
     def _try_publish(article, paper_section, display_order):
         """반환값을 호출부가 반드시 확인해야 한다 — "failed"면 seen을
         마킹하면 안 된다(아래 버그 설명 참조)."""
-        if publish_utils.already_published(table, article["key"]):
+        if publish_utils.already_published(article["url"]):
             print(f"[mustknow-auto] frontpage_auto 등에 이미 발행됨, 스킵 — {article['title']}")
             results["skipped_duplicate"] += 1
             return "skipped_duplicate"
         try:
-            status = _publish(article, out_dir, s3, table, today, paper_section=paper_section, display_order=display_order, results=results)
+            status = _publish(article, out_dir, s3, today, paper_section=paper_section, display_order=display_order, results=results)
         except Exception:
             print(f"[mustknow-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵\n{traceback.format_exc()}")
             status = "failed"
@@ -355,7 +357,6 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
     경로 — main()의 seen 필터·임계값 선정을 안 거친다."""
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
-    table = session.resource("dynamodb").Table(TABLE)
     seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
     revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
     out_dir = Path("/tmp/mustknow_auto_out")
@@ -370,7 +371,7 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
             print(f"[mustknow-auto][manual] {key} — {source_ymd} 후보에서 못 찾음, 스킵")
             continue
         try:
-            status = _publish(article, out_dir, s3, table, target_ymd, paper_section=tab, display_order=i)
+            status = _publish(article, out_dir, s3, target_ymd, paper_section=tab, display_order=i)
         except Exception:
             print(f"[mustknow-auto][manual] {key} 처리 중 예외\n{traceback.format_exc()}")
             continue

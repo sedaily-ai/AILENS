@@ -57,6 +57,15 @@ def shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # 피드 카드 썸네일 — admin에서 지정 안 하면 None, 프론트가 에디터
         # 아바타로 폴백한다 (todayLettersApi.ts::toTodayLetterCard).
         "cover_image_url": post.get("cover_image_url") or None,
+        # 텍스트 없는 순수 기사 사진(v1.32) — shape_lens와 같은 이유로 추가.
+        # channel=letters 조회는 admin_channel='letters'뿐 아니라 letter
+        # 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을 돌려주는데,
+        # cover_image_url은 웹툰 첫 컷(있으면)이라 이 필드 없이는 홈
+        # "최신 뉴스" 그리드가 letters 경로로 들어온 lens 글의 썸네일을
+        # 웹툰 삽화로 잘못 표시한다(v1.30이 shape_video에서 고쳤던 것과
+        # 동일 증상, 사용자 신고로 발견). 프론트는 이 값을 cover_image_url
+        # 보다 우선한다(todayLettersApi.ts::toTodayLetterCard).
+        "photo_image_url": b.get("photo_image_url") or None,
         # 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO
         # 감사). admin이 안 채우면 None, 프론트는 있을 때만 "원문 보기" 노출.
         "source_url": post.get("source_url") or None,

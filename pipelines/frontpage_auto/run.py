@@ -2,8 +2,8 @@
 태스크의 진입점.
 
 흐름: discovery.fetch_front_page(오늘) → 후보마다 letters/podcast/
-webtoon/video 4포맷 생성 → S3 업로드 + DDB write(paper_section="전체")
-→ revalidate 웹훅. 기사 단위로 실패를 격리한다(한 기사가 실패해도 나머지는
+webtoon/video 4포맷 생성 → S3 업로드 + lens-cms-api(Postgres) 발행
+(paper_section="전체") → revalidate 웹훅. 기사 단위로 실패를 격리한다(한 기사가 실패해도 나머지는
 계속) — AI LINK(ai_link/globe/dev)의 "기사 단위 격리는 의도된 기능"
 원칙을 그대로 따름(2026-08-21 리서치 후 결정).
 
@@ -44,10 +44,10 @@ import boto3
 # _display_category/_slugify/_parse_letters/_parse_letter_summary_bullets/
 # _already_published/_generate_video/_get_revalidate_secret/
 # _notify_revalidate에 더해, 두 파일의 process_article()/_publish() 본체
-# (4포맷 생성+업로드+DDB write, 바이트 단위로 동일했음)까지
+# (4포맷 생성+업로드+lens-cms-api 발행, 바이트 단위로 동일했음)까지
 # publish_utils.publish_article()로 이전됐다.
 import publish_utils
-from config import AWS_REGION, CMS_POSTS_TABLE
+from config import AWS_REGION
 
 discovery = publish_utils.load_module("frontpage_auto_discovery", _ROOT / "discovery" / "pipeline.py")
 _letters_mod = publish_utils.load_module("frontpage_auto_letters", _ROOT / "letters" / "pipeline.py")
@@ -55,13 +55,12 @@ _podcast_mod = publish_utils.load_module("frontpage_auto_podcast", _ROOT / "podc
 _webtoon_mod = publish_utils.load_module("frontpage_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
 
 REGION = AWS_REGION
-TABLE = CMS_POSTS_TABLE
 
 
-def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> str:
+def process_article(article: dict, out_dir: Path, s3, today_kst: str) -> str:
     """반환값: "published" | "published_no_video" | "skipped_duplicate" | "failed"
 
-    2026-09-05 — 4포맷 생성+업로드+DDB write 본체는 mustknow_auto/run.py의
+    2026-09-05 — 4포맷 생성+업로드+발행 본체는 mustknow_auto/run.py의
     `_publish()`와 바이트 단위로 동일했던 걸 `publish_utils.publish_article()`
     로 공용화했다(P3 리팩토링 감사 — 2026-09-04 P1에서 코드블록 추출 등
     작은 헬퍼 9개는 공용화했지만 정작 이 부분은 안 건드렸었다). 여기 남는
@@ -69,13 +68,13 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
     source_url = article["url"]
     if not source_url:
         return "failed"
-    if publish_utils.already_published(table, article["key"]):
+    if publish_utils.already_published(source_url):
         print(f"[frontpage-auto] 이미 발행됨, 스킵 — {article['title']}")
         return "skipped_duplicate"
 
     name = article["key"] or publish_utils.slugify("", article["title"])
     return publish_utils.publish_article(
-        article, out_dir, s3, table, today_kst,
+        article, out_dir, s3, today_kst,
         name=name, source_url=source_url,
         paper_section="전체", display_order=article["_display_order"],
         log_prefix="frontpage-auto",
@@ -90,7 +89,6 @@ def process_article(article: dict, out_dir: Path, s3, table, today_kst: str) -> 
 def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
-    table = session.resource("dynamodb").Table(TABLE)
     revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="frontpage-auto")
 
     today = datetime.now(KST).strftime("%Y%m%d")
@@ -104,7 +102,7 @@ def main():
     for i, article in enumerate(candidates):
         article["_display_order"] = i
         try:
-            status = process_article(article, out_dir, s3, table, today)
+            status = process_article(article, out_dir, s3, today)
         except Exception:
             print(f"[frontpage-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵하고 계속\n{traceback.format_exc()}")
             status = "failed"

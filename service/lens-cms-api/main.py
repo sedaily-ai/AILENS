@@ -111,6 +111,15 @@ def admin_create_post(payload: Dict[str, Any] = Body(...), x_internal_token: Opt
     return {"post": admin_posts_repo.create(data, created_by)}
 
 
+@app.get("/admin/posts/by-source-url")
+def admin_find_post_by_source_url(source_url: str = Query(...), x_internal_token: Optional[str] = Header(default=None)):
+    # 자동 파이프라인(frontpage_auto/mustknow_auto) 중복 발행 방지 — v1.32.
+    # list_posts()는 admin_post_id IS NOT NULL 제한이 있어 v1.4 이관 글을
+    # 못 찾는다. 여기는 그 제한 없이 source_url 정확히 일치만 본다.
+    _check_admin_token(x_internal_token)
+    return {"post": admin_posts_repo.find_by_source_url(source_url)}
+
+
 @app.get("/admin/posts")
 def admin_list_posts(
     status: Optional[str] = Query(default=None),

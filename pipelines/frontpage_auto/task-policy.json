@@ -14,10 +14,43 @@
       "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev/*"
     },
     {
-      "Sid": "CmsPostsReadWrite",
+      "Sid": "WebtoonGpuControl",
       "Effect": "Allow",
-      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Scan", "dynamodb:Query"],
-      "Resource": "arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-cms-posts-dev"
+      "Action": ["ec2:DescribeInstances"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "WebtoonGpuStartStop",
+      "Effect": "Allow",
+      "Action": ["ec2:StartInstances", "ec2:StopInstances"],
+      "Resource": "arn:aws:ec2:ap-northeast-2:887078546492:instance/i-02313c8c8285f9d91"
+    },
+    {
+      "Sid": "WebtoonGpuSsm",
+      "Effect": "Allow",
+      "Action": ["ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "WebtoonGpuSsmSendCommand",
+      "Effect": "Allow",
+      "Action": ["ssm:SendCommand"],
+      "Resource": [
+        "arn:aws:ec2:ap-northeast-2:887078546492:instance/i-02313c8c8285f9d91",
+        "arn:aws:ssm:ap-northeast-2::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "WebtoonGpuBucketReadWrite",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::sedaily-webtoon-ipadapter-887078546492/*"
+    },
+    {
+      "Sid": "LensCmsApiTokenRead",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter"],
+      "Resource": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-mbti/admin/lens-cms-api-token"
     },
     {
       "Sid": "AdminPromptsRead",
@@ -82,7 +115,27 @@
       "Action": ["bedrock:InvokeModel"],
       "Resource": [
         "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/5jauvzgplsjx",
-        "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-image-core-v1:1"
+        "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-image-core-v1:1",
+        "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/118crex43ghc"
+      ]
+    },
+    {
+      "Sid": "WebtoonCrossRegionStabilityInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.stability.stable-style-transfer-v1:0",
+        "arn:aws:bedrock:us-east-2:887078546492:inference-profile/us.stability.stable-style-transfer-v1:0",
+        "arn:aws:bedrock:us-west-2:887078546492:inference-profile/us.stability.stable-style-transfer-v1:0",
+        "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.stability.stable-image-remove-background-v1:0",
+        "arn:aws:bedrock:us-east-2:887078546492:inference-profile/us.stability.stable-image-remove-background-v1:0",
+        "arn:aws:bedrock:us-west-2:887078546492:inference-profile/us.stability.stable-image-remove-background-v1:0",
+        "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-style-transfer-v1:0",
+        "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-style-transfer-v1:0",
+        "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-style-transfer-v1:0",
+        "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-remove-background-v1:0",
+        "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-remove-background-v1:0",
+        "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-image-remove-background-v1:0"
       ]
     }
   ]

@@ -58,7 +58,17 @@ export function buildArchiveItems(
   // 안 넘기면 그대로 빈 배열이라 동작이 안 바뀐다.
   lens: CmsLens[] = [],
 ): ArchiveItem[] {
-  const letterItems: ArchiveItem[] = letters.map((letter) => {
+  // v1.32 — channel=letters 조회는 admin_channel='letters'뿐 아니라 letter
+  // 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을 같이 돌려준다
+  // (cms_posts_repo.py의 channel=video/webtoon과 같은 설계, v1.30 조사
+  // 참조). letters·lens 두 인자를 같이 넘기는 호출부(카테고리 페이지 등)
+  // 에서는 같은 글이 두 번 카드로 뜬다(사용자 신고: "부동산"에 같은 글
+  // 두 번) — id(=post slug) 기준으로 겹치면 lens 버전만 남긴다(4포맷
+  // 전체를 담고 있어 더 완전하다).
+  const lensIds = new Set(lens.map((l) => l.id));
+  const dedupedLetters = letters.filter((letter) => !lensIds.has(letter.id));
+
+  const letterItems: ArchiveItem[] = dedupedLetters.map((letter) => {
     const meta = withDisplayMeta(letter);
     const date = letter.publish_date ?? '';
     const id = letter.id;

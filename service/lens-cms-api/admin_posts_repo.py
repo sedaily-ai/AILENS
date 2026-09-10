@@ -225,6 +225,28 @@ def get(admin_post_id: str) -> Optional[Dict[str, Any]]:
         return _to_dict(pub) if pub else None
 
 
+def find_by_source_url(source_url: str) -> Optional[Dict[str, Any]]:
+    """source_url로 기존 발행물 찾기(자동 파이프라인 중복 발행 방지용, v1.32).
+
+    list_posts()와 달리 admin_post_id IS NOT NULL 제한을 안 건다 — v1.4
+    이관으로 들어온 admin_post_id 없는 글도 여기서 걸려야 파이프라인이
+    "이미 있는 원문 기사"를 중복 발행하지 않는다. admin_post_id가 없으면
+    _to_dict()가 못 쓰므로, 그런 경우는 최소 필드만 반환한다.
+    """
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT * FROM publications WHERE source_url = %s AND deleted_at IS NULL "
+            "ORDER BY created_at DESC LIMIT 1",
+            (source_url,),
+        )
+        pub = cur.fetchone()
+        if not pub:
+            return None
+        if pub.get("admin_post_id"):
+            return _to_dict(pub)
+        return {"id": None, "slug": pub["slug"], "source_url": pub.get("source_url") or ""}
+
+
 def list_posts(status: Optional[str], channel: Optional[str], limit: int,
                 date: Optional[str]) -> List[Dict[str, Any]]:
     with get_cursor() as cur:
