@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 import { withDisplayMeta, fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
-import { fetchCmsPosts, fetchCmsPostBySlug } from '@/shared/lib/api/cmsPostsApi';
+import { fetchCmsPosts, fetchCmsPostBySlug, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date';
@@ -23,8 +23,21 @@ const DEFAULT_AUTHOR = { name: 'AI LENS', archetype: 'AI LENS 편집팀' };
 // 스캔이 아니라 slug 단건 조회라 "여기 없으면 영영 못 찾는" 문제는 없다
 // — 아래 findLetter 주석 참조).
 export async function generateStaticParams() {
-  const letters = await fetchCmsPosts('letters', undefined, 100);
-  return letters.filter((l) => l.id).map((l) => ({ id: l.id }));
+  const [letters, lensPosts] = await Promise.all([
+    fetchCmsPosts('letters', undefined, 100),
+    fetchLensPosts(),
+  ]);
+  // v1.32 — channel=letters 조회는 admin_channel='letters'뿐 아니라 letter
+  // 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을 같이 돌려준다
+  // (cms_posts_repo.py — video/webtoon과 같은 설계). 여기서 안 걸러내면
+  // 최근 lens 글 대부분이 /lens/{slug}(4탭)와 나란히 /letters/{slug}
+  // (레터 단독, 탭 없음) 정적 페이지로도 빌드·사이트맵/RSS에 노출돼
+  // 구글이 후자를 인덱싱하는 사고가 났다(사용자 신고: "4개 탭이 안
+  // 나온다"가 종종 있었던 원인). lens에도 걸리는 id는 정적 생성에서
+  // 뺀다 — 직접 URL로는 여전히 열린다(dynamicParams 기본값 true), 다만
+  // 더 이상 빌드 시점에 미리 만들거나 능동적으로 노출하지 않는다.
+  const lensIds = new Set(lensPosts.map((l) => l.id));
+  return letters.filter((l) => l.id && !lensIds.has(l.id)).map((l) => ({ id: l.id }));
 }
 
 // id 에 더 이상 날짜가 인코딩돼있지 않아(그룹-날짜 합성 id 스킴 폐지) 예전엔

@@ -42,6 +42,29 @@ export async function GET() {
   const seen = new Set<string>();
   const entries: Array<{ loc: string; headline: string; date: string; keywords: string[] }> = [];
 
+  // v1.32 — lens 먼저 채운다. channel=letters 조회는 admin_channel='letters'
+  // 뿐 아니라 letter 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을
+  // 같이 돌려준다(cms_posts_repo.py — video/webtoon과 같은 설계). 예전엔
+  // letters를 먼저 채워서 lens 글이 /letters/{slug} URL로 먼저 seen에
+  // 들어가 버렸다 — 구글 뉴스에 4탭 페이지 대신 레터 단독 페이지가
+  // 실렸다(사용자 신고: "4개 탭이 안 나온다"가 종종 있었던 원인 중 하나).
+  // lens를 먼저 채우면 겹치는 글은 항상 /lens/{slug}가 이긴다.
+  try {
+    const lensPosts = await fetchLensPosts();
+    for (const l of lensPosts) {
+      if (!recentDates.includes(l.date) || seen.has(l.id)) continue;
+      seen.add(l.id);
+      entries.push({
+        loc: `${BASE}/lens/${encodeURIComponent(l.id)}`,
+        headline: l.headline,
+        date: l.date,
+        keywords: [],
+      });
+    }
+  } catch {
+    /* lens API 불통이면 생략 */
+  }
+
   for (const date of recentDates) {
     try {
       const posts = await fetchCmsPosts('letters', date);
@@ -58,24 +81,6 @@ export async function GET() {
     } catch {
       /* 해당 날짜 조회 실패 — 다음 날짜로 계속 (rss.xml/sitemap.ts와 동일 원칙) */
     }
-  }
-
-  // lens("4가지 시선") — letters와 별도 채널이라 따로 조회. fetchLensPosts()는
-  // date 파라미터가 없어 전체를 가져온 뒤 최근 2일치만 걸러낸다.
-  try {
-    const lensPosts = await fetchLensPosts();
-    for (const l of lensPosts) {
-      if (!recentDates.includes(l.date) || seen.has(l.id)) continue;
-      seen.add(l.id);
-      entries.push({
-        loc: `${BASE}/lens/${encodeURIComponent(l.id)}`,
-        headline: l.headline,
-        date: l.date,
-        keywords: [],
-      });
-    }
-  } catch {
-    /* lens API 불통이면 생략 */
   }
 
   const urls = entries

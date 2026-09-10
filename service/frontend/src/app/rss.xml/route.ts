@@ -38,7 +38,15 @@ export async function GET() {
 
   type FeedEntry = { title: string; url: string; date: string | null | undefined; description: string };
 
-  const letterEntries: FeedEntry[] = letters.map((l) => ({
+  // v1.32 — channel=letters 조회는 admin_channel='letters'뿐 아니라 letter
+  // 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을 같이 돌려준다
+  // (cms_posts_repo.py — video/webtoon과 같은 설계). 걸러내지 않으면 같은
+  // 글이 "제목"(레터 단독)과 "제목 — 4가지 시선"(lens) 두 항목으로 같이
+  // 실린다 — lens 쪽만 남긴다.
+  const lensIds = new Set(lensPosts.map((l) => l.id));
+  const dedupedLetters = letters.filter((l) => !lensIds.has(l.id));
+
+  const letterEntries: FeedEntry[] = dedupedLetters.map((l) => ({
     title: l.headline,
     url: `${BASE}${letterHref(l.id)}`,
     date: l.publish_date,
