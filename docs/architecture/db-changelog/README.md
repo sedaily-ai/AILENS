@@ -64,6 +64,7 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-09 | postgres | [v1.31 — lens 게시물 4포맷 대량 누락 백필 + 정규 순서 정렬(원본 마이그레이션 형제채널 병합 설계 결함 발견)](postgres/v1.31-lens-4포맷-누락-백필.md) |
 | 2026-09-10 | postgres | [v1.32 — 자동 콘텐츠 파이프라인 DynamoDB → Postgres 직접 발행 전환(IAM 권한 갭 3건·프론트 버그 3건 발견, 244건 백필)](postgres/v1.32-파이프라인-postgres-직접발행-전환.md) |
 | 2026-09-10 | postgres | [v1.33 — articles.raw_category 인덱스 추가(실측 전/후 비교, count(*) 약 63%↓)](postgres/v1.33-articles-raw_category-인덱스.md) |
+| 2026-09-11 | postgres | [v1.34 — "서랍에 담기" 500 에러 버그 수정(user_archives.article_no FK를 articles→publications(slug)로 재연결)](postgres/v1.34-user_archives-article_no-fk-수정.md) |
 
 ## 새 항목 추가 규칙
 

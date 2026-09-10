@@ -11,6 +11,17 @@ DynamoDB personal.archived_sentence/reading_record는 "뉴스 기사
 렌디션만 가리킬 수 있었다 — v1.24에서 article_no를 exclusive arc로
 추가했다(둘 중 하나만 채움, user_archives는 최대 1개까지도 허용 —
 기존 11건이 마이그레이션 당시 연결정보 없이 이관돼 둘 다 NULL이었음).
+
+2026-09-11 — 그런데 실제 라이브 호출부(SentenceSelectionPopover.tsx,
+letters/lens 상세 페이지의 "서랍에 담기")는 article_no에 CMS 슬러그
+("2026-09-10-채무조정-...")를 넣고 있었다. article_no FK가 가리키던
+articles 테이블은 옛 스크래핑 전용 짧은 코드("2KDJYBDOKD" 등) 체계라
+매번 FK 위반 또는 VARCHAR(32) 길이초과로 500이 났다("서랍에 담기"가
+한 번도 성공한 적 없었음, user_archives 기존 11건도 전부 article_no
+NULL). user_archives.article_no의 FK/타입을 publications(slug)로
+바꿔서(VARCHAR(32)→VARCHAR(255)) 실제 호출부가 보내는 값과 맞췄다 —
+user_readings는 다른 호출부(publication_id 경유)가 정상 동작 중이라
+이번엔 안 건드림.
 """
 from __future__ import annotations
 
@@ -24,7 +35,7 @@ _ARCHIVE_SELECT = """
     SELECT ua.id, ua.user_id, ua.article_no, ua.rendition_id, ua.content, ua.saved_at,
            a.title AS article_title, a.published_at AS article_published_at
     FROM user_archives ua
-    LEFT JOIN articles a ON a.article_no = ua.article_no
+    LEFT JOIN publications a ON a.slug = ua.article_no
 """
 
 
@@ -95,7 +106,7 @@ def list_popular_archived_sentences(limit: int = 20, min_saves: int = 2) -> List
             SELECT ua.content, count(*) AS n, min(ua.article_no) AS article_no,
                    min(a.title) AS article_title
             FROM user_archives ua
-            LEFT JOIN articles a ON a.article_no = ua.article_no
+            LEFT JOIN publications a ON a.slug = ua.article_no
             GROUP BY ua.content
             HAVING count(*) >= %s
             ORDER BY n DESC
