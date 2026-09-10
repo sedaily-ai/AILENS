@@ -31,7 +31,7 @@ def _get_token() -> str:
     if _token is None:
         import boto3  # noqa: lazy
 
-        _token = boto3.client("ssm").get_parameter(
+        _token = boto3.client("ssm", region_name="us-east-1").get_parameter(
             Name=_TOKEN_PARAM, WithDecryption=True
         )["Parameter"]["Value"]
     return _token
