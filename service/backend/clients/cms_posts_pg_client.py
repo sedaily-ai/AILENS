@@ -20,6 +20,7 @@ v1.10·v1.12·v1.17·v1.18 참조):
 """
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional
 
@@ -174,6 +175,7 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
         rows = _dictfetchall(cur)
 
         lens_labels_by_pub: Dict[int, List[str]] = {}
+        lens_meta_by_pub: Dict[int, Dict[str, Dict[str, Any]]] = {}
         if channel == "lens" and rows:
             pub_ids = [r["publication_id"] for r in rows]
             cur.execute(
@@ -184,6 +186,31 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
                 lens_labels_by_pub.setdefault(pub_id, []).append(
                     _FORMAT_TO_LENS_LABEL.get(fmt, fmt or "")
                 )
+            # 2026-09-10 — bullets(핵심 요약)가 목록에서도 항상 빈 배열이던
+            # 버그 수정(get_published_post_by_slug와 같은 원인: bullets는
+            # admin_extra JSONB에만 있고 renditions 스키마엔 없음). 목록
+            # 응답이 무거워져 6MB 한도를 넘겼던 예전 장애(shape_lens_summary
+            # 참조)의 원인은 paragraphs/images/transcript 같은 큰 필드였지
+            # bullets가 아니다 — 그래서 admin_extra 전체를 끌어오는 대신
+            # jsonb_array_elements + `- 'paragraphs' - 'images'`로 무거운
+            # 키를 DB단에서 미리 떼어내고 label/question/bullets만 가볍게
+            # 배치 조회한다.
+            cur.execute(
+                """
+                SELECT p.id,
+                       jsonb_agg(elem - 'paragraphs' - 'images') AS lens_meta
+                FROM publications p,
+                     jsonb_array_elements(COALESCE(p.admin_extra->'body_inline'->'lenses', '[]'::jsonb)) AS elem
+                WHERE p.id = ANY(%s)
+                GROUP BY p.id
+                """,
+                (pub_ids,),
+            )
+            for pub_id, meta in cur.fetchall():
+                items = json.loads(meta) if isinstance(meta, str) else (meta or [])
+                lens_meta_by_pub[pub_id] = {
+                    item["label"]: item for item in items if item.get("label")
+                }
 
         posts = []
         for row in rows:
@@ -194,11 +221,16 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             if channel == "lens":
                 # 목록은 라벨만 필요(shape_lens_summary가 label/question/
                 # bullets만 남기고 나머지는 버림) — 렌디션당 전체 콘텐츠를
-                # 끌어오는 N+1 쿼리 대신, 위에서 한 번에 모은 라벨만 채운다.
-                # 실제 콘텐츠(paragraphs/images/video_url 등)는 단건 조회
-                # (get_published_post_by_slug, v1.17)에서만 조립한다.
+                # 끌어오는 N+1 쿼리 대신, 위에서 한 번에 모은 라벨·메타만
+                # 채운다. 무거운 실제 콘텐츠(paragraphs/images/video_url 등)는
+                # 단건 조회(get_published_post_by_slug, v1.17)에서만 조립한다.
+                pub_meta = lens_meta_by_pub.get(row["publication_id"], {})
                 post["body_inline"]["lenses"] = [
-                    {"label": label, "question": "", "bullets": []}
+                    {
+                        "label": label,
+                        "question": pub_meta.get(label, {}).get("question") or "",
+                        "bullets": [b for b in (pub_meta.get(label, {}).get("bullets") or []) if b],
+                    }
                     for label in lens_labels_by_pub.get(row["publication_id"], [])
                 ]
             posts.append(post)
@@ -221,7 +253,7 @@ _LENS_RENDITIONS_SELECT = """
 """
 
 
-def _fetch_lens_items(cur, pub_id: int) -> List[Dict[str, Any]]:
+def _fetch_lens_items(cur, pub_id: int, admin_extra: Any = None) -> List[Dict[str, Any]]:
     """publication의 모든 렌디션을 shape_lens()가 기대하는 lenses[] 항목
     (label/question/bullets/paragraphs/images/video_url/media_url/transcript)
     으로 재구성한다.
@@ -230,17 +262,37 @@ def _fetch_lens_items(cur, pub_id: int) -> List[Dict[str, Any]]:
     영상 각각 별도 렌디션, 2건)은 여기서 포맷별로 정확히 복원된다.
     (b) "관점 라벨"(4가지 분석 관점, 48건)은 하나의 letter 렌디션에 4개
     텍스트 블록으로 뭉쳐 이관됐던 것이라, 여기서도 하나의 '레터' 항목
-    (paragraphs 4개)으로만 나온다 — 원래의 개별 관점 카드(question+
-    bullets 각각)로는 복원 안 됨(그 필드 자체가 렌디션 스키마에 없어
-    저장 시점에 유실, v1.12 문서화된 한계 그대로)."""
+    (paragraphs 4개)으로만 나온다.
+
+    2026-09-10 — bullets(핵심 요약, "30초 핵심" 카드)가 렌디션 재구성
+    으로는 항상 빈 배열이었던 버그 수정. `rendition_blocks`엔 문단
+    텍스트(block_type='text')만 있고 bullets를 담을 컬럼 자체가 없다 —
+    반면 lens-cms-api가 발행 시 쓰는 `publications.admin_extra` JSONB엔
+    포맷별 bullets/question까지 원본 그대로 남아있다(admin_posts_repo.py
+    참조, 이 함수가 읽던 렌디션 테이블과는 완전히 다른 저장 경로). label로
+    매칭해서 있으면 덮어쓴다 — 레터/팟캐스트/영상/웹툰 4개 포맷 렌디션
+    (a)엔 항상 있고, admin_extra 자체가 없는 옛 (b) 48건은 매칭 안 돼
+    기존 동작(빈 배열) 그대로 유지된다."""
+    extra_by_label: Dict[str, Dict[str, Any]] = {}
+    if admin_extra:
+        try:
+            extra = json.loads(admin_extra) if isinstance(admin_extra, str) else admin_extra
+            for item in (extra.get("body_inline") or {}).get("lenses") or []:
+                if item.get("label"):
+                    extra_by_label[item["label"]] = item
+        except (TypeError, ValueError, AttributeError):
+            pass
+
     cur.execute(_LENS_RENDITIONS_SELECT, (pub_id,))
     items = []
     for row in _dictfetchall(cur):
         fmt = row["format"]
+        label = _FORMAT_TO_LENS_LABEL.get(fmt, fmt or "")
+        extra_item = extra_by_label.get(label) or {}
         items.append({
-            "label": _FORMAT_TO_LENS_LABEL.get(fmt, fmt or ""),
-            "question": "",
-            "bullets": [],
+            "label": label,
+            "question": extra_item.get("question") or "",
+            "bullets": [b for b in (extra_item.get("bullets") or []) if b],
             "paragraphs": row.get("body_json") or [],
             "images": row.get("images_json") or [],
             "video_url": row["media_url"] if fmt == "video" else None,
@@ -312,7 +364,7 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
             cur.execute(
                 """
                 SELECT id AS publication_id, slug, title, subtitle, cover_image_url,
-                       source_url, status, published_at, created_at, updated_at
+                       source_url, status, published_at, created_at, updated_at, admin_extra
                 FROM publications
                 WHERE id = %s AND status = 'published' AND deleted_at IS NULL
                 """,
@@ -321,11 +373,12 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
             pub_row = _dictfetchone(cur)
             if not pub_row:
                 return None
+            admin_extra = pub_row.pop("admin_extra", None)
             pub_row["channel"] = "lens"
             pub_row["images"] = []
             pub_row["body_paragraphs"] = []
             post = _row_to_post(pub_row)
-            post["body_inline"]["lenses"] = _fetch_lens_items(cur, pub_id)
+            post["body_inline"]["lenses"] = _fetch_lens_items(cur, pub_id, admin_extra)
             return post
 
         fmt = _CHANNEL_TO_FORMAT.get(channel) if channel else None

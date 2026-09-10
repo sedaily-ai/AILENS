@@ -119,15 +119,29 @@ _LENS_RENDITIONS_SELECT = """
 """.format(order=_CANONICAL_FORMAT_ORDER)
 
 
-def _fetch_lens_items(cur, pub_id: int) -> List[Dict[str, Any]]:
+def _lens_extra_by_label(admin_extra: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """admin_extra.body_inline.lenses[] 를 label로 색인한다 — bullets/
+    question은 renditions/rendition_blocks 스키마에 저장할 자리가 없어
+    admin_extra JSONB에만 남아있다(_apply_admin_extra의 category/
+    paper_section 등과 같은 이유·같은 패턴, 2026-09-10 발견·수정 —
+    "30초 핵심" 카드가 항상 빈 배열이라 렌더 안 되던 버그)."""
+    extra = admin_extra or {}
+    lenses = (extra.get("body_inline") or {}).get("lenses") or []
+    return {item["label"]: item for item in lenses if item.get("label")}
+
+
+def _fetch_lens_items(cur, pub_id: int, admin_extra: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    extra_by_label = _lens_extra_by_label(admin_extra)
     cur.execute(_LENS_RENDITIONS_SELECT, (pub_id,))
     items = []
     for row in cur.fetchall():
         fmt = row["format"]
+        label = _FORMAT_TO_LENS_LABEL.get(fmt, fmt or "")
+        extra_item = extra_by_label.get(label) or {}
         items.append({
-            "label": _FORMAT_TO_LENS_LABEL.get(fmt, fmt or ""),
-            "question": "",
-            "bullets": [],
+            "label": label,
+            "question": extra_item.get("question") or "",
+            "bullets": [b for b in (extra_item.get("bullets") or []) if b],
             "paragraphs": row.get("body_json") or [],
             "images": row.get("images_json") or [],
             "video_url": row["media_url"] if fmt == "video" else None,
@@ -212,8 +226,13 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             row["body_paragraphs"] = row.pop("body_json", None) or []
             post = _row_to_post(row)
             if channel == "lens":
+                extra_by_label = _lens_extra_by_label(row.get("admin_extra"))
                 post["body_inline"]["lenses"] = [
-                    {"label": label, "question": "", "bullets": []}
+                    {
+                        "label": label,
+                        "question": extra_by_label.get(label, {}).get("question") or "",
+                        "bullets": [b for b in (extra_by_label.get(label, {}).get("bullets") or []) if b],
+                    }
                     for label in lens_labels_by_pub.get(row["publication_id"], [])
                 ]
             _apply_admin_extra(post, row.get("admin_extra"))
@@ -274,7 +293,7 @@ def get_published_post_by_slug(slug: str, channel: Optional[str] = None) -> Opti
             pub_row["images"] = []
             pub_row["body_paragraphs"] = []
             post = _row_to_post(pub_row)
-            post["body_inline"]["lenses"] = _fetch_lens_items(cur, pub_id)
+            post["body_inline"]["lenses"] = _fetch_lens_items(cur, pub_id, pub_row.get("admin_extra"))
             _apply_admin_extra(post, pub_row.get("admin_extra"))
             return post
 
