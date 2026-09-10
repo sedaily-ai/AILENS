@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
 import { PromptDrawer } from "@/components/PromptDrawer";
+import { WebtoonStoryboardLab } from "@/components/WebtoonStoryboardLab";
 import { WebtoonImageLab } from "@/components/WebtoonImageLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
@@ -264,7 +265,13 @@ function WebtoonPage() {
 
         <div className="ui-divider border-t" />
         <p className="px-5 pb-1 pt-5 text-[13px] font-semibold text-[var(--text-muted)]">
-          이미지 생성 테스트 (3단계 · Bedrock Stable Diffusion)
+          스토리보드 테스트 (1·2단계 체인 + 컷별 3단계)
+        </p>
+        <WebtoonStoryboardLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+
+        <div className="ui-divider border-t" />
+        <p className="px-5 pb-1 pt-5 text-[13px] font-semibold text-[var(--text-muted)]">
+          이미지 생성 테스트 (3단계 · Bedrock Stable Diffusion, 장면 하나만 따로)
         </p>
 
         <WebtoonImageLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />

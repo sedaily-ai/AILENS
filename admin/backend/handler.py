@@ -41,6 +41,7 @@ HANDLERS: dict[str, tuple] = {
     "GET /admin/prompts/{category}/{name}": (prompts.handle_get, True),
     "POST /admin/prompts/{category}/{name}": (prompts.handle_update, True),
     "POST /admin/prompts/{category}/{name}/test": (prompts.handle_test, True),
+    "POST /admin/prompts/{category}/{name}/storyboard-test": (prompts.handle_storyboard_test, True),
     "GET /admin/cost": (cost.handle_summary, True),
     "GET /admin/audit": (audit_route.handle_list, True),
     "GET /admin/newsletter/stats": (newsletter.handle_stats, True),

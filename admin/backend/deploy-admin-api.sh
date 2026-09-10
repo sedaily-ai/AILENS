@@ -30,6 +30,10 @@ COMMON_DIR="$SCRIPT_DIR/../../service/backend/common"
 # 스타트에서 ModuleNotFoundError로 admin API 전체가 죽는다 — 이 route
 # 하나만 깨지는 게 아니다.
 WEBTOON_IMAGE_MODULE="$SCRIPT_DIR/../../pipelines/common/webtoon_image.py"
+# 웹툰 스토리보드 테스트(routes/prompts.py::handle_storyboard_test, 2026-09-11)가
+# 쓰는 pipelines/common/json_extract.py — 위와 같은 이유로 zip 루트에 복사
+# 필수(안 하면 routes.prompts import 시점에 전체 admin API가 죽는다).
+JSON_EXTRACT_MODULE="$SCRIPT_DIR/../../pipelines/common/json_extract.py"
 
 FUNCTION_NAME="sedaily-mbti-admin-api-dev"
 PYTHON_VERSION="3.11"          # Lambda 런타임과 반드시 일치시킬 것
@@ -48,6 +52,7 @@ cp handler.py auth.py __init__.py "$BUILD_DIR/"
 cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
+cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
 [ -d repo ] && cp -r repo "$BUILD_DIR/"
 
 # --python-version 은 필수다. 워크스테이션 Python 이 Lambda 런타임(3.11)과 다르면

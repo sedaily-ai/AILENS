@@ -21,6 +21,7 @@ import type {
   WebtoonLabJob,
   WebtoonLabHistoryItem,
   WebtoonLabDefaults,
+  WebtoonStoryboardResult,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -207,6 +208,13 @@ export const adminApi = {
   testPrompt: (category: string, name: string, content: string, article: string) =>
     request<{ output: string }>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/test`,
+      { method: "POST", body: JSON.stringify({ content, article }) }
+    ),
+  // 웹툰 스토리보드 테스트(2026-09-11) — 1·2단계를 체인 호출해 8컷을 한 번에
+  // 받는다(routes/prompts.py::handle_storyboard_test 참고).
+  storyboardTest: (category: string, name: string, content: string, article: string) =>
+    request<WebtoonStoryboardResult>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/storyboard-test`,
       { method: "POST", body: JSON.stringify({ content, article }) }
     ),
 

@@ -352,3 +352,31 @@ export interface WebtoonLabDefaults {
   char_female: string;
   char_male: string;
 }
+
+// 웹툰 스토리보드 테스트(2026-09-11) — 기사 원문 → 1단계(스크립트)+2단계
+// (장면 연출)를 체인 호출해 8컷을 한 번에 반환한다(routes/prompts.py::
+// handle_storyboard_test). 3단계(컷별 이미지)는 이 응답의 camera/scene을
+// WebtoonLabGenerateInput에 그대로 넣어 기존 webtoon-lab/generate를 컷마다
+// 호출한다 — 새 이미지 생성 엔드포인트를 만들지 않고 기존 것을 재사용.
+
+export interface WebtoonStoryboardDialogueLine {
+  speaker: string;
+  line: string;
+  tone?: string;
+}
+
+export interface WebtoonStoryboardCut {
+  cut: number;
+  narration: string;
+  caption: string;
+  dialogue: WebtoonStoryboardDialogueLine[];
+  /** 2단계 산출물 — 컷 카드에서 그대로 편집 가능(이미지 생성 전 손볼 수 있게). */
+  camera: string;
+  scene: string;
+}
+
+export interface WebtoonStoryboardResult {
+  core_question: string | null;
+  characters: Record<string, string> | null;
+  cuts: WebtoonStoryboardCut[];
+}

@@ -37,6 +37,7 @@ import urllib.request
 
 from repo import prompts_repo
 from shared import audit, response, secrets_client
+from json_extract import extract_json_object  # pipelines/common/ — deploy-admin-api.sh가 복사(webtoon_image.py와 같은 패턴)
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,13 @@ _OPENAI_SECRET_ID = "sedaily-mbti/openai-api-key"
 _OPENAI_MODEL = "gpt-4o"
 _OPENAI_TIMEOUT_SECONDS = 25
 _OPENAI_MAX_TOKENS = 3000
+
+# 스토리보드 테스트(2026-09-11)는 같은 30초 벽 안에서 OpenAI를 순차로 2번
+# 부른다(1단계+2단계) — 위 _OPENAI_TIMEOUT_SECONDS(25초)를 그대로 쓰면
+# 최악의 경우 둘이 50초까지 걸려 API Gateway 통합 타임아웃(30초 고정)은
+# 물론 Lambda 자체 Timeout(30초)에도 걸려 죽는다(에러 메시지조차 못
+# 돌려줌). 호출 하나당 여유를 훨씬 빠듯하게 줘서(합계 24초) Lambda가
+# 죽기 전에 우리 쪽에서 먼저 타임아웃 에러를 잡아 응답할 수 있게 한다.
 
 # Postgres엔 DynamoDB 400KB 아이템 한계가 없지만, 첨부 남용 방지용 sane
 # 상한으로 그대로 유지한다. 한글은 UTF-8에서 3바이트라 글자 수로 재면
@@ -139,20 +147,15 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
 _MAX_TEST_ARTICLE_BYTES = 60 * 1024  # 기사 원문 상한 — 과금 폭주 방지
 
 
-def _call_openai(prompt_content: str, article: str) -> str:
-    """content(프롬프트 산문) + article(기사 원문) → GPT 산출물 1회 호출.
-
-    facts.json 중간 산출물 없이 기사 원문을 곧바로 프롬프트 뒤에 붙인다 —
-    "프롬프트대로 하고 소스를 올려두면 출력이 되도록" 이라는 요청에 맞춘
-    가장 단순한 형태(0단계 사실 추출을 별도로 안 거친다). 프롬프트 자체가
-    "02_EXTRACT.md의 facts.json을 입력으로 받는다"고 적혀 있어도 모델이
-    기사 원문에서 곧바로 사실을 읽어 따라갈 수 있다 — 실제 파이프라인에
-    붙일 땐 별도 추출 단계를 앞에 둘 수 있지만, 이 테스트 실행은 프롬프트
-    품질을 빠르게 확인하는 용도라 1회 호출로 충분하다.
-    """
+def _call_openai_raw(user_content: str, *, timeout: int = _OPENAI_TIMEOUT_SECONDS) -> str:
+    """이미 완성된 user 메시지 하나로 GPT 산출물 1회 호출 — _call_openai와
+    handle_storyboard_test(2026-09-11)가 공용으로 쓰는 저수준 호출부.
+    2026-09-11 이전엔 _call_openai가 "prompt_content + article 조립"까지
+    한 번에 했는데, 스토리보드 테스트는 1단계·2단계마다 다른 접미사([지금
+    할 일] 문구·1단계 결과 포함 여부)를 붙여야 해서 조립 전 단계를 분리했다.
+    timeout을 인자로 받는 이유는 위 스토리보드 테스트 주석 참고."""
     api_key = secrets_client.get_secret_json_field(_OPENAI_SECRET_ID, "OPENAI_API_KEY")
 
-    user_content = f"{prompt_content}\n\n[입력 기사]\n{article}"
     body = json.dumps({
         "model": _OPENAI_MODEL,
         "messages": [{"role": "user", "content": user_content}],
@@ -170,13 +173,29 @@ def _call_openai(prompt_content: str, article: str) -> str:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=_OPENAI_TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             parsed = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")
         logger.warning(f"OpenAI test call failed: {e.code} {detail}")
         raise RuntimeError(f"OpenAI API 오류 ({e.code}): {detail[:300]}")
+    except TimeoutError:
+        raise RuntimeError(f"OpenAI 응답이 {timeout}초 안에 오지 않았습니다 — 다시 시도해 주세요")
     return parsed["choices"][0]["message"]["content"]
+
+
+def _call_openai(prompt_content: str, article: str) -> str:
+    """content(프롬프트 산문) + article(기사 원문) → GPT 산출물 1회 호출.
+
+    facts.json 중간 산출물 없이 기사 원문을 곧바로 프롬프트 뒤에 붙인다 —
+    "프롬프트대로 하고 소스를 올려두면 출력이 되도록" 이라는 요청에 맞춘
+    가장 단순한 형태(0단계 사실 추출을 별도로 안 거친다). 프롬프트 자체가
+    "02_EXTRACT.md의 facts.json을 입력으로 받는다"고 적혀 있어도 모델이
+    기사 원문에서 곧바로 사실을 읽어 따라갈 수 있다 — 실제 파이프라인에
+    붙일 땐 별도 추출 단계를 앞에 둘 수 있지만, 이 테스트 실행은 프롬프트
+    품질을 빠르게 확인하는 용도라 1회 호출로 충분하다.
+    """
+    return _call_openai_raw(f"{prompt_content}\n\n[입력 기사]\n{article}")
 
 
 def handle_test(body: dict, path_params: dict, query_params: dict) -> dict:
@@ -209,3 +228,96 @@ def handle_test(body: dict, path_params: dict, query_params: dict) -> dict:
         "output_bytes": len(output.encode("utf-8")),
     })
     return response.ok({"output": output})
+
+
+# 웹툰 스토리보드 테스트(2026-09-11) — "프롬프트·이미지 실험을 한 화면에서
+# 기사 → 8컷 스토리보드 → 컷별 이미지까지 이어서 해보고 싶다"는 사용자
+# 요청. handle_test는 1단계(스크립트)만 보여주는데, 실제 파이프라인
+# (pipelines/webtoon/pipeline.py::run_article)은 1단계 결과를 다시 프롬프트에
+# 실어 2단계(장면 연출)를 별도로 한 번 더 호출한다 — 그 두 호출을 그대로
+# 재현해서 컷마다 대사+장면+카메라를 합쳐 반환한다.
+#
+# 모델은 handle_test와 동일하게 GPT-4o를 쓴다(실제 프로덕션은 Bedrock
+# Claude, SCRIPT_MODEL) — 이 프롬프트 테스트 도구 전체가 2026-08-19부터
+# "빠른 프롬프트 반복"이 목적이라 GPT-4o만 써왔던 기존 트레이드오프를
+# 그대로 확장한 것이지, 새로 도입한 격차가 아니다. Bedrock으로 맞추려면
+# 이 Lambda에 bedrock:InvokeModel IAM 권한을 새로 붙여야 해서 범위를
+# 넘어간다.
+_STEP1_INSTRUCTION = (
+    "\n\n---\n[지금 할 일]\n위 지침을 참고해서 지금은 1단계(스크립트) 결과만"
+    " 출력한다. \"1단계 출력\" 섹션에 정의된 JSON 스키마 그대로, JSON 객체"
+    " 하나만 응답한다(설명 문구 없이).\n\n[입력 기사]\n"
+)
+_STEP2_INSTRUCTION = (
+    "\n\n---\n[지금 할 일]\n위 지침을 참고해서 지금은 2단계(장면 연출) 결과만"
+    " 출력한다. \"2단계 출력\" 섹션에 정의된 JSON 스키마 그대로, JSON 객체"
+    " 하나만 응답한다(설명 문구 없이).\n\n[기사]\n"
+)
+_STORYBOARD_STEP_TIMEOUT_SECONDS = 12  # 합계 24초 — 30초 벽(API GW·Lambda 둘 다) 안에서 여유 확보
+
+
+def handle_storyboard_test(body: dict, path_params: dict, query_params: dict) -> dict:
+    """웹툰 프롬프트 드로어의 "스토리보드 테스트" — 저장 여부 무관, 지금
+    편집 중인 content로 1단계(스크립트)+2단계(장면 연출)를 프로덕션과 같은
+    순서로 체인 호출해 컷별로 합쳐 반환한다."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    if not category or not name:
+        return response.err("category and name required", 400)
+
+    content = (body.get("content") or "").strip()
+    article = (body.get("article") or "").strip()
+    if not content:
+        return response.err("content required", 400)
+    if not article:
+        return response.err("article required", 400)
+    if len(article.encode("utf-8")) > _MAX_TEST_ARTICLE_BYTES:
+        return response.err(
+            f"기사 원문이 너무 깁니다 (최대 {_MAX_TEST_ARTICLE_BYTES // 1024}KB)", 400
+        )
+
+    try:
+        script_raw = _call_openai_raw(
+            content + _STEP1_INSTRUCTION + article,
+            timeout=_STORYBOARD_STEP_TIMEOUT_SECONDS,
+        )
+        script = extract_json_object(script_raw)
+    except Exception as e:
+        return response.err(f"1단계(스크립트) 생성 실패: {e}", 502)
+
+    try:
+        scene_raw = _call_openai_raw(
+            content
+            + _STEP2_INSTRUCTION
+            + article
+            + "\n\n[1단계 스크립트 결과]\n"
+            + json.dumps(script, ensure_ascii=False),
+            timeout=_STORYBOARD_STEP_TIMEOUT_SECONDS,
+        )
+        scenes = extract_json_object(scene_raw)
+    except Exception as e:
+        return response.err(f"2단계(장면 연출) 생성 실패: {e}", 502)
+
+    scene_by_cut = {s.get("cut"): s for s in (scenes.get("scenes") or [])}
+    cuts = []
+    for c in script.get("cuts") or []:
+        s = scene_by_cut.get(c.get("cut")) or {}
+        cuts.append({
+            "cut": c.get("cut"),
+            "narration": c.get("narration") or "",
+            "caption": c.get("caption") or "",
+            "dialogue": c.get("dialogue") or [],
+            "camera": s.get("camera") or "",
+            "scene": s.get("scene") or "",
+        })
+
+    audit.log("prompt-storyboard-test", {
+        "prompt": f"{category}/{name}",
+        "article_bytes": len(article.encode("utf-8")),
+        "cuts": len(cuts),
+    })
+    return response.ok({
+        "core_question": script.get("core_question"),
+        "characters": script.get("characters"),
+        "cuts": cuts,
+    })
