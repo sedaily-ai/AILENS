@@ -67,25 +67,6 @@ export function ServerRobotIcon({ accent, className }: IconProps) {
   );
 }
 
-// 재테크 — 동전 넣는 저금통 캐릭터
-export function PiggyBankIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <path
-        d="M24 56 Q22 40 40 36 Q46 30 58 34 Q70 32 74 44 Q80 46 78 54 Q76 58 70 58 L68 66 Q66 70 62 68 L60 62 L38 62 L36 68 Q32 70 30 66 L30 58 Q22 58 24 56 Z"
-        stroke="#1a1a1a"
-        strokeWidth={2.6}
-        strokeLinejoin="round"
-      />
-      <circle cx="60" cy="46" r="1.8" fill="#1a1a1a" />
-      <path d="M50 34 L48 26 L54 28" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M50 44 L58 44" stroke={accent} strokeWidth={3} strokeLinecap="round" />
-      <circle cx="44" cy="20" r="7" stroke={accent} strokeWidth={2.4} fill="none" />
-      <path d="M44 14 L44 20 L48 22" stroke={accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  );
-}
-
 // 투자 인사이트 — 반짝이는 전구 + 상승 곡선
 export function LightbulbIcon({ accent, className }: IconProps) {
   return (

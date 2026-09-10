@@ -7,7 +7,7 @@ import { CategoryArchiveClient } from './CategoryArchiveClient';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { HeaderTabKey } from '@/shared/lib/headerTabs';
 
-// 카테고리 아카이브 7개(증시/부동산/산업/금융·정책/국제/재테크/문화)가
+// 카테고리 아카이브 6개(증시/부동산/산업/금융·정책/국제/문화)가
 // fetch→filter→JSON-LD→렌더 로직이 완전히 동일하고 slug만 다른데, 예전엔
 // 이 7줄짜리 본문을 7개 page.tsx 파일에 그대로 복붙했다(2026-08-17 카테고리
 // 개편 때부터, 문화 추가 때 8번째 복사가 생길 뻔해서 2026-08-20에 여기로

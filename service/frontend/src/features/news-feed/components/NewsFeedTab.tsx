@@ -21,7 +21,7 @@ import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 // 카테고리 2개씩 짝지어 한 줄(2/3+1/3)로 배치(2026-08-17, 본지 en.sedaily.com
 // 참고 — 로컬 경로 1_ailink/globe/dev/frontend/src/components/home/HeroSection.tsx
 // 의 Markets+Property, Politics+Society, Culture+International 페어링과 동일
-// 원칙). 순서는 ECON_CATEGORIES 정의 순서(증시/부동산/산업/금융·정책/국제/재테크)를
+// 원칙). 순서는 ECON_CATEGORIES 정의 순서(증시/부동산/산업/금융·정책/국제)를
 // 그대로 2개씩 묶는다.
 //
 // "문화"는 2026-08-20에 7번째 카테고리로 신설됐지만(경제 카테고리 6개 짝을
@@ -30,10 +30,15 @@ import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 // 상태(사용자가 직접 확인 요청). 남는 파트너가 없으니 마지막 줄만 단독
 // (1개짜리) 행으로 추가 — CategoryPairRow가 slugs 1~2개를 모두 받도록
 // 확장했다.
+//
+// 2026-09-11 — "재테크"(investing) 카테고리 자체를 제거(항상 0건이라
+// econCategories.ts 참조)하며 '국제' 짝의 파트너가 사라졌다. 국제·문화를
+// 새로 묶는 대신(그러면 문화 섹션이 오디오 섹션보다 위로 올라가는 위치
+// 변경이 생김 — 이번 요청 범위 밖) '국제'도 문화처럼 단독 줄로 남긴다.
 const CATEGORY_PAIRS: readonly (readonly string[])[] = [
   ['markets', 'property'],
   ['industry', 'finance'],
-  ['international', 'investing'],
+  ['international'],
   ['culture'],
 ];
 
@@ -228,9 +233,10 @@ export function NewsFeedTab({
 
             {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제
                 콘텐츠처럼 안 보인다"는 피드백으로 카드형으로 교체
-                (WebtoonPreviewSection.tsx). 위치: 국제+재테크 짝(카테고리
-                마지막 줄) 바로 위(2026-08-17, 사용자 확인: "웹툰 부분은...
-                국제.. 재테크 바로 위쪽으로").
+                (WebtoonPreviewSection.tsx). 위치: 원래 국제+재테크 짝
+                바로 위(2026-08-17, 사용자 확인: "웹툰 부분은... 국제..
+                재테크 바로 위쪽으로") — 2026-09-11 재테크 제거 후엔
+                '국제' 단독 줄 바로 위.
                 영상 섹션을 바로 옆에 붙였다(2026-08-20, 사용자 확인 —
                 "영상이 재밌는 콘텐츠인데 맨 아래 있으니 애매하다"). 웹툰과
                 영상 둘 다 "재밌게 훑는 비주얼 콘텐츠"라는 같은 성격인데,

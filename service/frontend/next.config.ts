@@ -103,6 +103,11 @@ const nextConfig: NextConfig = {
       { source: "/letters", destination: "/archive", permanent: true },
       { source: "/column", destination: "/archive", permanent: true },
       { source: "/issue-talk", destination: "/archive", permanent: true },
+      // "재테크"(/investing) 카테고리 폐기(2026-09-11) — 원문 최상위
+      // 카테고리에 대응 태그가 없어 처음부터 계속 0건이었다(사용자 신고).
+      // sitemap에 2026-08-17부터 올라가 있어 구글에 이미 색인됐을 수
+      // 있으니, 위 사례들과 같은 이유로 맨 404 대신 /archive로 보낸다.
+      { source: "/investing", destination: "/archive", permanent: true },
     ];
     if (process.env.SAJU_ORIGIN) {
       const origin = process.env.SAJU_ORIGIN;

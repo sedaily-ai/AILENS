@@ -54,8 +54,8 @@ export function PostMode({ value, body, patch, patchBody, editor, uploadError }:
               축과 주제 축이 따로 있어서 독자에게도 관리자에게도 구분이
               헷갈렸다("인사이트에서 이슈 톡톡으로 옮기려는데 안 된다" 류
               피드백 반복). 이제 글은 오직 카테고리로만 분류된다 — 증시/
-              부동산/산업/금융·정책/국제/재테크(ECON_CATEGORIES, 2026-08-17
-              확정). "카드 전용 발행"(본문 비우면 상세페이지 없이 홈 카드로만
+              부동산/산업/금융·정책/국제(ECON_CATEGORIES, 2026-08-17 확정,
+              "재테크"는 2026-09-11 제거). "카드 전용 발행"(본문 비우면 상세페이지 없이 홈 카드로만
               나가는 것)은 더 이상 section==="column" 조건이 아니라 "본문이
               비어있는가" 하나로 단순화했다(posts/edit/page.tsx save() 참조). */}
           <MetaField label="카테고리">

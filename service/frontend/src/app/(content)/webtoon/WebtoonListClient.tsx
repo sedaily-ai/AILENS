@@ -88,7 +88,7 @@ import {
 // ── 카테고리 ──
 // "경제·금융·기업·정치·사회·국제·문화" 7개로 독립시켰다가, 같은 날 사용자
 // 확인으로 경제 레터와 같은 라벨 세트(ECON_CATEGORIES: 증시·부동산·산업·
-// 금융·정책·국제·재테크·문화)로 통일했다 — shared/constants/
+// 금융·정책·국제·문화)로 통일했다 — shared/constants/
 // webtoonCategories.ts. admin WebtoonMode.tsx의 저장 값과 라벨이 반드시
 // 일치해야 한다(의도적 중복, econCategories.ts와 같은 이유).
 //

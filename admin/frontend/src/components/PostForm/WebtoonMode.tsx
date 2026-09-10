@@ -113,10 +113,10 @@ export function WebtoonMode({ value, body, patch, patchBody }: ModeProps) {
               />
             </MetaField>
             <MetaDivider />
-            {/* 카테고리(2026-08-21) — 증시/부동산/산업/금융·정책/국제/재테크/
-                문화 7개. ECON_CATEGORIES와 같은 라벨 세트로 통일했다(경제
-                레터·웹툰이 같은 분류 체계를 쓰도록). 비워두면(미분류) 목록의
-                카테고리 칩에 안 잡히고 "전체"에만 나온다. */}
+            {/* 카테고리(2026-08-21) — 증시/부동산/산업/금융·정책/국제/문화
+                (2026-09-11 "재테크" 제거). ECON_CATEGORIES와 같은 라벨 세트로
+                통일했다(경제 레터·웹툰이 같은 분류 체계를 쓰도록). 비워두면
+                (미분류) 목록의 카테고리 칩에 안 잡히고 "전체"에만 나온다. */}
             <MetaField label="카테고리">
               <CustomSelect
                 value={body.category ?? ""}

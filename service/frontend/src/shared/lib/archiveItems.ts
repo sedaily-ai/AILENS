@@ -22,7 +22,7 @@ export interface ArchiveItem {
   /** true면 외부 링크(target=_blank) — 지금은 video만 해당(원본 유튜브 URL). */
   external?: boolean;
   avatarUrl: string | null;
-  /** 경제 버티컬 카테고리(증시/부동산/산업/금융·정책/국제/재테크, 2026-08-17
+  /** 경제 버티컬 카테고리(증시/부동산/산업/금융·정책/국제, 2026-08-17
    *  신설) — letter 항목만 값이 있다. 상단 탭이 형식(브리핑/인사이트)에서
    *  주제 기반으로 바뀌면서, 카테고리 아카이브 페이지가 kind와 무관하게
    *  이 값으로 필터링한다(shared/constants/econCategories.ts 참조). */
