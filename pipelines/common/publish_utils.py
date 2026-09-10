@@ -121,6 +121,35 @@ def parse_letters(raw_md: str) -> list[str]:
     return paragraphs
 
 
+def parse_letter_title(raw_md: str) -> str | None:
+    """레터 산출물의 [제목] 블록에서 독자 시선 진입형 제목을 뽑는다
+    (프롬프트 지침: "법은 강화됐습니다"가 아니라 "무효인 계약인데도 갚고
+    있다" 식, 15~30자).
+
+    2026-09-10 — 이 제목이 여태 parse_letters()에서 skip만 되고 실제
+    발행 headline/question엔 한 번도 안 쓰였다(사용자 지적: "뉴스레터
+    제목이 뉴스 기사 제목을 그대로 따오고 있다" — 원인은 프롬프트가
+    아니라 이 파싱 누락이었다. publish_article()이 대신 원문 뉴스 제목
+    article["title"]을 그대로 썼다)."""
+    from text_utils import extract_fact_ids  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
+
+    raw_md, _ = extract_fact_ids(raw_md)
+    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
+    lines = [l.strip() for l in body.split("\n") if l.strip()]
+    buf: list[str] = []
+    in_block = False
+    for line in lines:
+        if line.startswith("[제목]"):
+            in_block = True
+            continue
+        if line.startswith("[리드]"):
+            break
+        if in_block:
+            buf.append(line)
+    title = " ".join(buf).strip()
+    return title or None
+
+
 def parse_letter_summary_bullets(raw_md: str) -> list[str]:
     """레터 산출물의 [핵심 요약] 블록에서 "- "로 시작하는 불릿만 뽑는다.
     "30초 핵심" 카드가 이 불릿을 쓴다(lensSamples.ts의 coreSummaryBullets) —
@@ -313,6 +342,9 @@ def publish_article(
     letters_raw = letters_path.read_text(encoding="utf-8")
     paragraphs = parse_letters(letters_raw)
     letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
+    # 프롬프트가 생성하는 "독자 시선 진입형" 제목 — 모델이 안 만들었거나
+    # 파싱에 실패한 예외적인 경우에만 원문 뉴스 제목으로 폴백한다.
+    letter_title = parse_letter_title(letters_raw) or article["title"]
 
     podcast_mp3 = podcast_mod.run_article(name, str(article_path), out_dir)
 
@@ -379,14 +411,14 @@ def publish_article(
         status = "published_no_video"
 
     lenses = [
-        {"label": "레터", "question": article["title"], "bullets": letter_summary_bullets, "paragraphs": paragraphs,
+        {"label": "레터", "question": letter_title, "bullets": letter_summary_bullets, "paragraphs": paragraphs,
          "images": [], "video_url": None, "media_url": None},
-        {"label": "웹툰", "question": webtoon_script.get("core_question") or article["title"], "bullets": webtoon_bullets,
+        {"label": "웹툰", "question": webtoon_script.get("core_question") or letter_title, "bullets": webtoon_bullets,
          "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
          "pending": not webtoon_images},
-        {"label": "팟캐스트", "question": article["title"], "bullets": [], "paragraphs": [],
+        {"label": "팟캐스트", "question": letter_title, "bullets": [], "paragraphs": [],
          "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
-        {"label": "영상", "question": article["title"], "bullets": [], "paragraphs": [],
+        {"label": "영상", "question": letter_title, "bullets": [], "paragraphs": [],
          "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
          "pending": video_url is None, "transcript": video_transcript},
     ]
@@ -394,7 +426,7 @@ def publish_article(
     publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
     clean_source_url = (source_url or "").split("?")[0]
     data = {
-        "headline": article["title"],
+        "headline": letter_title,
         "subtitle": article["sub_title"],
         "publish_date": publish_date_iso,
         "channels": ["lens"],
