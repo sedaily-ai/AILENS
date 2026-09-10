@@ -5,6 +5,7 @@ import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
 import { WebtoonCutGallery } from '@/shared/ui/WebtoonCutGallery';
+import { wrapWithTerms } from '@/shared/ui/TermTooltip';
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import {
   lensFormatAt,
@@ -167,7 +168,7 @@ export function LensFormatPanel({
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
             {letterParagraphs.map((para, pi) => (
               <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
-                {para}
+                {wrapWithTerms(para, l.keywords ?? [])}
               </p>
             ))}
             {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:

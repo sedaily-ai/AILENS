@@ -205,6 +205,12 @@ def shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
             "label": item.get("label") or "",
             "question": item.get("question") or "",
             "bullets": [x for x in (item.get("bullets") or []) if x],
+            # "레터" 포맷 전용 용어 하이라이트(term+explain 쌍, 2026-09-11) —
+            # 나머지 세 포맷은 비어있다.
+            "keywords": [
+                k for k in (item.get("keywords") or [])
+                if k.get("term") and k.get("explain")
+            ],
             # "레터" 포맷 전용 문단 산문(2026-08-19) — 나머지 세 포맷은
             # bullets만 쓰므로 대개 빈 배열.
             "paragraphs": [x for x in (item.get("paragraphs") or []) if x],

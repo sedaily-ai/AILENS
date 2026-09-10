@@ -142,6 +142,12 @@ def _fetch_lens_items(cur, pub_id: int, admin_extra: Optional[Dict[str, Any]] = 
             "label": label,
             "question": extra_item.get("question") or "",
             "bullets": [b for b in (extra_item.get("bullets") or []) if b],
+            # 2026-09-11 — 본문 핵심 용어 하이라이트용(term+explain 쌍).
+            # bullets/question과 같은 이유로 admin_extra에만 있다.
+            "keywords": [
+                k for k in (extra_item.get("keywords") or [])
+                if k.get("term") and k.get("explain")
+            ],
             "paragraphs": row.get("body_json") or [],
             "images": row.get("images_json") or [],
             "video_url": row["media_url"] if fmt == "video" else None,

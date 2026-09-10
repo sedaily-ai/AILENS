@@ -175,11 +175,48 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
             continue
         if not in_block:
             continue
+        # 2026-09-11 — [용어] 블록 신설(parse_letter_terms 참조) 이후 이
+        # 체크가 없으면 "[용어]"와 그 뒤 "용어 | 설명" 줄들이 "-"로 시작 안
+        # 하니 전부 마지막 불릿에 이어붙어버린다.
+        if line.startswith("[용어]"):
+            break
         if line.startswith("-"):
             bullets.append(line.lstrip("-").strip())
         elif bullets:
             bullets[-1] = f"{bullets[-1]} {line}".strip()
     return bullets
+
+
+def parse_letter_terms(raw_md: str) -> list[dict]:
+    """레터 산출물의 [용어] 블록에서 "용어 | 설명" 쌍을 뽑는다.
+
+    2026-09-11 — 사용자 요청: 본문 핵심 용어를 (노란 하이라이트 등으로)
+    표시해서 뜻을 바로 확인할 수 있게 하고 싶다는 UX 요청에서 출발.
+    letters 프롬프트에 [용어] 섹션 지침을 추가(v6)하고 여기서 파싱해
+    lens.keywords로 흘려보낸다 — 프론트(shared/ui/TermHighlight.tsx)가
+    본문에서 이 용어들을 찾아 하이라이트 처리한다. 블록이 없는 옛
+    산출물이면 빈 리스트."""
+    from text_utils import extract_fact_ids  # noqa: lazy
+
+    raw_md, _ = extract_fact_ids(raw_md)
+    body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
+    lines = [l.strip() for l in body.split("\n") if l.strip()]
+
+    terms: list[dict] = []
+    in_block = False
+    for line in lines:
+        if line.startswith("[용어]"):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        if "|" not in line:
+            continue
+        term, _, explain = line.partition("|")
+        term, explain = term.strip(), explain.strip()
+        if term and explain:
+            terms.append({"term": term, "explain": explain})
+    return terms
 
 
 def already_published(source_url: str) -> bool:
@@ -342,6 +379,7 @@ def publish_article(
     letters_raw = letters_path.read_text(encoding="utf-8")
     paragraphs = parse_letters(letters_raw)
     letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
+    letter_terms = parse_letter_terms(letters_raw)
     # 프롬프트가 생성하는 "독자 시선 진입형" 제목 — 모델이 안 만들었거나
     # 파싱에 실패한 예외적인 경우에만 원문 뉴스 제목으로 폴백한다.
     letter_title = parse_letter_title(letters_raw) or article["title"]
@@ -412,7 +450,7 @@ def publish_article(
 
     lenses = [
         {"label": "레터", "question": letter_title, "bullets": letter_summary_bullets, "paragraphs": paragraphs,
-         "images": [], "video_url": None, "media_url": None},
+         "images": [], "video_url": None, "media_url": None, "keywords": letter_terms},
         {"label": "웹툰", "question": webtoon_script.get("core_question") or letter_title, "bullets": webtoon_bullets,
          "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
          "pending": not webtoon_images},

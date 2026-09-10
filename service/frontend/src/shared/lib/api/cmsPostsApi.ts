@@ -319,6 +319,10 @@ export interface CmsLensItem {
    *  청각장애인 접근성용). 타임스탬프 동기화는 없고 그냥 플레이어 아래에
    *  전체 텍스트로 보여준다. */
   transcript?: string | null;
+  /** "레터" 포맷 전용 용어 하이라이트(term+explain 쌍, 2026-09-11) —
+   *  본문에서 이 단어들을 wrapWithTerms()로 감싸 형광펜 마커+툴팁을 붙인다.
+   *  나머지 세 포맷은 항상 빈 배열. */
+  keywords?: Array<{ term: string; explain: string }>;
 }
 
 export interface CmsLens {

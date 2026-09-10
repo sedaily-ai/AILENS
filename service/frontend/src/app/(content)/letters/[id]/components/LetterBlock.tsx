@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { wrapWithTerms } from './TermTooltip';
+import { wrapWithTerms } from '@/shared/ui/TermTooltip';
 
 // LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드).
 // ── 본문 블록 위계 렌더 ───────────────────────────────────────────────
