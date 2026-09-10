@@ -47,6 +47,12 @@
       "Resource": "arn:aws:s3:::sedaily-webtoon-ipadapter-887078546492/*"
     },
     {
+      "Sid": "WebtoonGpuLockTable",
+      "Effect": "Allow",
+      "Action": ["dynamodb:UpdateItem"],
+      "Resource": "arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-lens-gpu-lock-dev"
+    },
+    {
       "Sid": "LensCmsApiTokenRead",
       "Effect": "Allow",
       "Action": ["ssm:GetParameter"],

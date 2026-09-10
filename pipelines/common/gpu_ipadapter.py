@@ -40,9 +40,25 @@ GPU_INSTANCE_ID = "i-02313c8c8285f9d91"  # webtoon-ipadapter-gpu (2026-09-09 생
 GPU_BUCKET = "sedaily-webtoon-ipadapter-887078546492"
 _INFER_SCRIPT_S3_KEY = "ipadapter_infer.py"
 
+# 2026-09-10 — mustknow_auto 스케줄(하루 6회, ~3시간 간격)보다 한 실행이
+# 더 오래 걸리는 날엔 이전 실행이 아직 GPU를 쓰는 중에 다음 실행이
+# 시작돼 동시에 여러 태스크가 같은 GPU_INSTANCE_ID를 공유하게 된다(실측:
+# 2026-09-10 15/18/21시 태스크 3개 동시 실행). 이 모듈은 원래 "한 태스크가
+# 켜고 그 태스크가 끈다"만 가정했어서, 먼저 끝난 태스크가 stop_gpu()를
+# 부르면 아직 컷을 만들던 다른 태스크의 SendCommand가 인스턴스가
+# stopping/stopped 상태라 "InvalidInstanceId"로 줄줄이 실패했다(실측
+# 로그: 15시 태스크 컷2~5 연속 실패). DynamoDB 원자적 ADD로 활성 사용자
+# 수를 세어, 마지막으로 빠지는 태스크만 실제로 stop_instances()를
+# 부르도록 고친다 — 완벽한 분산 락은 아니고(감소·재확인 사이 극히
+# 짧은 경합 창은 남는다) stop_instances() 자체가 멱등이라 최악의 경우도
+# "동시성이 전혀 없던 예전"보다 항상 낫다.
+GPU_LOCK_TABLE = "sedaily-lens-gpu-lock-dev"
+GPU_LOCK_REGION = "us-east-1"  # 다른 파이프라인 상태 테이블(mustknow-seen 등)과 같은 리전 — GPU_REGION과 무관
+
 _ssm_client = None
 _ec2_client = None
 _s3_client = None
+_ddb_client = None
 
 
 def _clients():
@@ -56,6 +72,28 @@ def _clients():
     return _ssm_client, _ec2_client, _s3_client
 
 
+def _ddb():
+    global _ddb_client
+    if _ddb_client is None:
+        import boto3  # noqa: lazy
+
+        _ddb_client = boto3.client("dynamodb", region_name=GPU_LOCK_REGION)
+    return _ddb_client
+
+
+def _adjust_active_count(delta: int) -> int:
+    """activ_count에 delta를 원자적으로 더하고 갱신된 값을 반환한다.
+    아이템이 없으면 DynamoDB ADD가 0에서 시작해 새로 만든다."""
+    resp = _ddb().update_item(
+        TableName=GPU_LOCK_TABLE,
+        Key={"instance_id": {"S": GPU_INSTANCE_ID}},
+        UpdateExpression="ADD active_count :d",
+        ExpressionAttributeValues={":d": {"N": str(delta)}},
+        ReturnValues="UPDATED_NEW",
+    )
+    return int(resp["Attributes"]["active_count"]["N"])
+
+
 def ensure_gpu_running(timeout_s: int = 180) -> None:
     """인스턴스가 stopped면 start하고 running+SSM 온라인까지 대기한다.
     이미 running이면 바로 리턴(중복 start_instances 호출 방지).
@@ -65,7 +103,14 @@ def ensure_gpu_running(timeout_s: int = 180) -> None:
     instance_running waiter를 걸었더니, waiter가 "stopped"를 터미널
     상태로 보고 즉시 실패하는 걸 실측으로 확인함(WaiterError). "running"이
     아닌 모든 상태(stopping 포함)에서 먼저 stopped를 기다린 다음
-    start_instances를 부르도록 고침."""
+    start_instances를 부르도록 고침.
+
+    2026-09-10 — 호출할 때마다 활성 사용자 수를 먼저 +1 해서 stop_gpu()가
+    아직 쓰는 중인 다른 태스크의 GPU를 끄지 않게 한다(모듈 상단 주석
+    참조). 이 함수 자체는 여러 태스크가 동시에 불러도 안전(멱등) —
+    이미 running+온라인이면 바로 리턴."""
+    count = _adjust_active_count(1)
+    print(f"[gpu_ipadapter] 활성 사용 태스크 {count}개")
     ssm, ec2, _s3 = _clients()
     state = ec2.describe_instances(InstanceIds=[GPU_INSTANCE_ID])["Reservations"][0]["Instances"][0]["State"]["Name"]
     if state == "stopping":
@@ -91,7 +136,20 @@ def ensure_gpu_running(timeout_s: int = 180) -> None:
 
 
 def stop_gpu() -> None:
-    """배치 작업이 끝나면 반드시 호출 — 안 끄면 시간당 $0.647가 계속 나간다."""
+    """배치 작업이 끝나면 반드시 호출 — 안 끄면 시간당 $0.647가 계속 나간다.
+
+    2026-09-10 — 활성 사용자 수를 먼저 -1 해서, 아직 다른 태스크가 쓰는
+    중이면(count > 0) 실제 stop_instances()는 건너뛴다 — 마지막으로
+    빠지는 태스크만 진짜로 끈다. 음수로 떨어지는 걸 막기 위해 0 미만이면
+    0으로 보정(비정상 종료로 감소가 두 번 이상 일어난 극단적 경우 대비)."""
+    count = _adjust_active_count(-1)
+    if count < 0:
+        _adjust_active_count(-count)  # 0으로 보정
+        count = 0
+    print(f"[gpu_ipadapter] 활성 사용 태스크 {count}개 남음")
+    if count > 0:
+        print("[gpu_ipadapter] 다른 태스크가 아직 사용 중 — stop 보류")
+        return
     _ssm, ec2, _s3 = _clients()
     print(f"[gpu_ipadapter] {GPU_INSTANCE_ID} 정지 중...")
     ec2.stop_instances(InstanceIds=[GPU_INSTANCE_ID])
