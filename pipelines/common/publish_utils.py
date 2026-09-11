@@ -138,6 +138,9 @@ def parse_letters(raw_md: str) -> list[str]:
     return paragraphs
 
 
+_MAX_TITLE_CHARS = 60  # 프롬프트 지침은 15~30자 — 여유를 둔 안전 상한(2026-09-11)
+
+
 def parse_letter_title(raw_md: str) -> str | None:
     """레터 산출물의 [제목] 블록에서 독자 시선 진입형 제목을 뽑는다
     (프롬프트 지침: "법은 강화됐습니다"가 아니라 "무효인 계약인데도 갚고
@@ -147,7 +150,18 @@ def parse_letter_title(raw_md: str) -> str | None:
     발행 headline/question엔 한 번도 안 쓰였다(사용자 지적: "뉴스레터
     제목이 뉴스 기사 제목을 그대로 따오고 있다" — 원인은 프롬프트가
     아니라 이 파싱 누락이었다. publish_article()이 대신 원문 뉴스 제목
-    article["title"]을 그대로 썼다)."""
+    article["title"]을 그대로 썼다).
+
+    2026-09-11 — 종료 조건이 [리드] 하나뿐이었다. parse_letters()는
+    [리드]·◾·자료:/—·[핵심 요약] 네 가지를 전부 종료 조건으로 보는데
+    (문단 파싱에서 이미 검증된 마커 집합), 이 함수만 [리드]만 보고
+    있었다 — 모델이 [제목] 뒤에 [리드]를 안 쓰거나 형식이 어긋나면
+    멈출 데를 못 찾고 본문 끝(핵심 요약·용어 설명까지)까지 통째로
+    buf에 쌓아 제목이 2000~3000자짜리 본문 전체가 돼버렸다(실사용자
+    신고로 발견 — admin 웹툰 목록에서 제목 칸에 본문이 그대로 나옴).
+    parse_letters()와 같은 종료 조건 집합으로 맞추고, 그래도 모델이
+    예상 못 한 형식으로 새면 길이 상한(_MAX_TITLE_CHARS)이 최후
+    방어선이다."""
     from text_utils import extract_fact_ids  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
 
     raw_md, _ = extract_fact_ids(raw_md)
@@ -161,9 +175,17 @@ def parse_letter_title(raw_md: str) -> str | None:
             continue
         if line.startswith("[리드]"):
             break
+        if line.startswith("◾"):
+            break
+        if line.startswith("자료:") or line == "—":
+            break
+        if line.startswith("[핵심 요약]"):
+            break
         if in_block:
             buf.append(line)
     title = " ".join(buf).strip()
+    if len(title) > _MAX_TITLE_CHARS:
+        title = title[:_MAX_TITLE_CHARS].rstrip()
     return title or None
 
 
