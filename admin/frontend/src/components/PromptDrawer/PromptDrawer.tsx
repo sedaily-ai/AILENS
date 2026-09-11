@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import {
-  DEFAULT_SCOPE_ID,
   MAX_ATTACHMENT_BYTES,
   MAX_PDF_BYTES,
   PROMPT_PAYLOAD_LIMIT_BYTES,
@@ -18,23 +17,20 @@ import {
   presetHasContent,
   promptIdFor,
   samePresetContent,
-  scopeGroups,
-  scopeLabel,
   type PromptPreset,
   type PromptSection,
   type PromptSectionKey,
 } from "@/lib/prompt";
 import type { PromptHistoryEntry } from "@/lib/types";
 import { Icon, ICON } from "./Icons";
-import { ScopeTabs } from "./ScopeTabs";
 import { ChannelTabs } from "./ChannelTabs";
 import { PromptField } from "./PromptField";
 
 /* 콘텐츠 목록 화면(글 관리·영상·웹툰)의 "프롬프트" 버튼이 여는 우측 슬라이드 패널.
    2026-08-09 의 정중앙 모달(PromptEditModal)을 대체한다.
 
-   구조: 상태 탭(초안·발행) → 각 상태가 백엔드 프롬프트 id 하나(<channel>/<scope>).
-         상태별로 설명·구조·지침 3섹션, 섹션마다
+   구조: 채널(letters/webtoon/podcast/video)당 문서 하나(백엔드 프롬프트 id
+         `<channel>/published`). 설명·구조·지침 3섹션, 섹션마다
            · 형식(Markdown · 텍스트 · 코드+언어)을 골라 직접 입력하거나
            · 텍스트 기반 파일·PDF 를 첨부한다(본문을 읽어 보관 → 프롬프트에 들어간다).
 
@@ -42,13 +38,18 @@ import { PromptField } from "./PromptField";
    새 버전(v#N)을 쌓고, 산문은 content, 구조는 sections 로 나눠 보낸다. 이력·
    버전 표시는 모달에 있던 걸 유지했다. 데이터 규칙은 전부 @/lib/prompt.
 
-   2026-08-19 — Icon/FileIcon(Icons.tsx), ScopeTabs, FormatPicker, PromptField 를
-   각자 파일로 분리(PostForm/ 폴더와 같은 컨벤션). 로직·마크업은 그대로, 구조만
+   2026-08-19 — Icon/FileIcon(Icons.tsx), FormatPicker, PromptField 를 각자
+   파일로 분리(PostForm/ 폴더와 같은 컨벤션). 로직·마크업은 그대로, 구조만
    나눴다 — service/frontend 의 ArchiveTab.tsx 분리와 동일한 이유(916줄 한 파일에
-   컴포넌트 5개가 섞여 있었다). */
+   컴포넌트 5개가 섞여 있었다). 이때 같이 분리했던 ScopeTabs는 2026-09-11에
+   스코프 개념 자체가 없어지며 폐기·삭제됐다(바로 아래).
 
-/** 스코프 하나의 서버 상태. */
-interface ScopeState {
+   2026-09-11 — "초안"/"발행" 스코프 탭(ScopeTabs) 폐기. 저장하면 곧바로
+   파이프라인이 읽는 문서가 바뀌도록 채널당 문서를 하나로 합쳤다 —
+   @/lib/prompt 상단 주석 참조. */
+
+/** 채널 하나의 서버 상태. */
+interface ChannelState {
   saved: PromptPreset; // 서버에 있는 것
   draft: PromptPreset; // 편집 중인 것
   version: number; // 0 = 아직 서버에 없음
@@ -57,7 +58,7 @@ interface ScopeState {
   error: string | null;
 }
 
-const emptyScopeState = (): ScopeState => ({
+const emptyChannelState = (): ChannelState => ({
   saved: emptyPreset(),
   draft: emptyPreset(),
   version: 0,
@@ -85,46 +86,40 @@ interface Props {
   embedded?: boolean;
 }
 
-/** states 맵의 키 — 채널×스코프 조합 하나당 서버 상태 하나. */
-function stateKey(channel: string, scope: string): string {
-  return `${channel}::${scope}`;
-}
-
 export function PromptDrawer({ channel, channels, open, onClose, embedded = false }: Props) {
   const toast = useToast();
   // 단일 채널(channel)이면 그 하나짜리 목록으로, 여러 채널(channels)이면
   // 그대로 — 아래 로직은 항상 이 배열 하나만 본다.
   const channelList = channels ?? (channel ? [{ id: channel, label: channel }] : []);
   const [activeChannel, setActiveChannel] = useState<string>(channelList[0]?.id ?? "");
-  const [scopeId, setScopeId] = useState<string>(DEFAULT_SCOPE_ID);
-  const [states, setStates] = useState<Record<string, ScopeState>>({});
+  const [states, setStates] = useState<Record<string, ChannelState>>({});
   const [saving, setSaving] = useState(false);
   const firstFieldRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // LLMOps 테스트 실행(2026-08-19) — 저장 여부와 무관하게 "지금 편집 중인"
   // 프롬프트를 기사 원문과 함께 GPT에 던져 실제 산출물을 바로 보여준다.
-  // 기사 원문은 스코프(초안/발행)를 넘나들며 같은 걸로 비교해보고 싶을
-  // 때가 많아 스코프 공용 상태로 둔다 — 탭을 바꿔도 article은 유지.
+  // 기사 원문은 채널을 넘나들며 같은 걸로 비교해보고 싶을 때가 많아
+  // 채널 공용 상태로 둔다 — 탭을 바꿔도 article은 유지.
   const [testArticle, setTestArticle] = useState("");
   const [testing, setTesting] = useState(false);
   const [testOutput, setTestOutput] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
 
-  const key = stateKey(activeChannel, scopeId);
+  const key = activeChannel;
   const state = states[key];
   const preset = state?.draft ?? emptyPreset();
 
   const load = useCallback(
-    async (targetChannel: string, scope: string, { silent = false } = {}) => {
-      const promptId = promptIdFor(targetChannel, scope);
+    async (targetChannel: string, { silent = false } = {}) => {
+      const promptId = promptIdFor(targetChannel);
       const slash = promptId.indexOf("/");
       const category = promptId.slice(0, slash);
       const name = promptId.slice(slash + 1);
-      const k = stateKey(targetChannel, scope);
+      const k = targetChannel;
 
       if (!silent) {
-        setStates((s) => ({ ...s, [k]: s[k] ?? emptyScopeState() }));
+        setStates((s) => ({ ...s, [k]: s[k] ?? emptyChannelState() }));
       }
       try {
         const detail = await adminApi.getPrompt(category, name);
@@ -165,28 +160,25 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
     []
   );
 
-  // 이미 요청을 보낸 (채널,스코프) 조합 — setStates 안에서 side effect를
-  // 실행하는 반패턴을 피하려고 렌더와 무관한 ref로 따로 추적한다. 열 때마다
-  // 비워서(아래 effect) "다시 열면 서버 최신값으로 새로고침"하던 기존
-  // 동작을 유지한다 — 채널 탭 전환 중 같은 채널을 반복 방문할 때만 중복
-  // 요청을 막는 용도.
+  // 이미 요청을 보낸 채널 — setStates 안에서 side effect를 실행하는
+  // 반패턴을 피하려고 렌더와 무관한 ref로 따로 추적한다. 열 때마다 비워서
+  // (아래 effect) "다시 열면 서버 최신값으로 새로고침"하던 기존 동작을
+  // 유지한다 — 채널 탭 전환 중 같은 채널을 반복 방문할 때만 중복 요청을
+  // 막는 용도.
   const requestedKeysRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (open) requestedKeysRef.current = new Set();
   }, [open]);
 
-  // 열릴 때, 그리고 채널 탭을 바꿀 때마다 그 채널의 스코프 두 개를 받아
-  // 둔다(2026-08-20, 채널이 여러 개인 화면 대응 — 매번 전부 다시 받지
-  // 않고 아직 안 불러온 채널만). 탭을 눌렀을 때 기다리지 않게, 그리고
-  // 어느 상태에 프롬프트가 있는지 점으로 바로 보여주려면 필요하다.
+  // 열릴 때, 그리고 채널 탭을 바꿀 때마다 그 채널을 받아 둔다(2026-08-20,
+  // 채널이 여러 개인 화면 대응 — 매번 전부 다시 받지 않고 아직 안 불러온
+  // 채널만). 탭을 눌렀을 때 기다리지 않게, 그리고 어느 채널에 프롬프트가
+  // 있는지 점으로 바로 보여주려면 필요하다.
   useEffect(() => {
     if (!open || !activeChannel) return;
-    for (const scope of scopeGroups().flatMap((g) => g.scopes)) {
-      const k = stateKey(activeChannel, scope.id);
-      if (requestedKeysRef.current.has(k)) continue;
-      requestedKeysRef.current.add(k);
-      void load(activeChannel, scope.id);
-    }
+    if (requestedKeysRef.current.has(activeChannel)) return;
+    requestedKeysRef.current.add(activeChannel);
+    void load(activeChannel);
   }, [open, activeChannel, load]);
 
   // 배경 스크롤 잠금 + 첫 입력칸 포커스 — open 이 바뀔 때만.
@@ -200,70 +192,47 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
     };
   }, [open]);
 
-  // 스코프를 바꾸면 내용이 통째로 갈리므로 스크롤을 위로 되돌린다.
+  // 채널을 바꾸면 내용이 통째로 갈리므로 스크롤을 위로 되돌린다.
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 });
-  }, [scopeId]);
+  }, [activeChannel]);
 
-  // ScopeTabs(초안·발행)용 — 지금 보고 있는 채널(activeChannel) 기준.
-  const dirtyIds = scopeGroups()
-    .flatMap((g) => g.scopes)
-    .map((s) => s.id)
-    .filter((scope) => {
-      const st = states[stateKey(activeChannel, scope)];
-      return st && !st.loading && !samePresetContent(st.saved, st.draft);
-    });
-  const filledIds = scopeGroups()
-    .flatMap((g) => g.scopes)
-    .map((s) => s.id)
-    .filter((scope) => {
-      const st = states[stateKey(activeChannel, scope)];
-      return st && !st.loading && presetHasContent(st.saved);
-    });
-  // ChannelTabs용(2026-08-20) — 채널 하나당 스코프 두 개 중 하나라도
-  // 해당하면 그 채널 탭에 점을 찍는다. channelList가 1개뿐인 화면(단일
-  // channel prop 사용처)은 ChannelTabs 자체를 안 그리니 계산해도 무해하다.
+  // ChannelTabs용(2026-08-20) — 채널마다 저장 안 된 변경/저장된 내용
+  // 여부로 점을 찍는다. channelList가 1개뿐인 화면(단일 channel prop
+  // 사용처)은 ChannelTabs 자체를 안 그리니 계산해도 무해하다.
   const dirtyChannelIds = channelList
     .map((c) => c.id)
-    .filter((cid) =>
-      scopeGroups()
-        .flatMap((g) => g.scopes)
-        .some((s) => {
-          const st = states[stateKey(cid, s.id)];
-          return st && !st.loading && !samePresetContent(st.saved, st.draft);
-        })
-    );
+    .filter((cid) => {
+      const st = states[cid];
+      return st && !st.loading && !samePresetContent(st.saved, st.draft);
+    });
   const filledChannelIds = channelList
     .map((c) => c.id)
-    .filter((cid) =>
-      scopeGroups()
-        .flatMap((g) => g.scopes)
-        .some((s) => {
-          const st = states[stateKey(cid, s.id)];
-          return st && !st.loading && presetHasContent(st.saved);
-        })
-    );
-  const dirty = state ? dirtyIds.includes(scopeId) : false;
+    .filter((cid) => {
+      const st = states[cid];
+      return st && !st.loading && presetHasContent(st.saved);
+    });
+  const dirty = state ? !state.loading && !samePresetContent(state.saved, state.draft) : false;
   const filled = presetHasContent(preset);
   const bytes = payloadBytes(preset);
   const overBudget = bytes > PROMPT_PAYLOAD_LIMIT_BYTES;
 
   const handleClose = () => {
     // 채널이 여러 개면(2026-08-20) 지금 안 보고 있는 채널의 미저장 변경도
-    // 놓치지 않게 전체를 훑는다 — dirtyIds는 activeChannel 하나만 본다.
-    const allDirtyKeys = Object.keys(states).filter((k) => {
+    // 놓치지 않게 전체를 훑는다 — dirty는 activeChannel 하나만 본다.
+    const dirtyChannels = Object.keys(states).filter((k) => {
       const st = states[k];
       return st && !st.loading && !samePresetContent(st.saved, st.draft);
     });
-    if (allDirtyKeys.length > 0) {
-      const labels = allDirtyKeys
-        .map((k) => {
-          const [ch, sc] = k.split("::");
-          const chLabel = channelList.find((c) => c.id === ch)?.label ?? ch;
-          return channelList.length > 1 ? `${chLabel}/${scopeLabel(sc)}` : scopeLabel(sc);
-        })
-        .join(" · ");
-      if (!window.confirm(`저장하지 않은 변경이 있습니다 (${labels}). 닫을까요?`)) {
+    if (dirtyChannels.length > 0) {
+      // 채널이 하나뿐인 화면(글 관리·웹툰·영상·팟캐스트)은 어차피 그
+      // 채널 얘기니 이름을 또 안 붙인다 — "4가지 시선"처럼 여러 채널을
+      // 오갈 때만 어느 채널인지 밝힌다.
+      const suffix =
+        channelList.length > 1
+          ? ` (${dirtyChannels.map((ch) => channelList.find((c) => c.id === ch)?.label ?? ch).join(" · ")})`
+          : "";
+      if (!window.confirm(`저장하지 않은 변경이 있습니다${suffix}. 닫을까요?`)) {
         return;
       }
     }
@@ -305,7 +274,7 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
       return;
     }
 
-    const promptId = promptIdFor(activeChannel, scopeId);
+    const promptId = promptIdFor(activeChannel);
     const slash = promptId.indexOf("/");
     const category = promptId.slice(0, slash);
     const name = promptId.slice(slash + 1);
@@ -320,11 +289,11 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
       );
       toast.show(
         r.created
-          ? `${scopeLabel(scopeId)} 프롬프트를 만들었습니다 (v1)`
-          : `${scopeLabel(scopeId)} v${r.new_version} 저장 — 5분 안에 반영`,
+          ? "프롬프트를 만들었습니다 (v1)"
+          : `v${r.new_version} 저장 — 다음 실행부터 바로 적용됩니다`,
         "success"
       );
-      await load(activeChannel, scopeId, { silent: true });
+      await load(activeChannel, { silent: true });
     } catch (err) {
       toast.show(
         `저장 실패: ${err instanceof AdminApiError ? err.message : "알 수 없는 오류"}`,
@@ -347,7 +316,7 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
       return;
     }
 
-    const promptId = promptIdFor(activeChannel, scopeId);
+    const promptId = promptIdFor(activeChannel);
     const slash = promptId.indexOf("/");
     const category = promptId.slice(0, slash);
     const name = promptId.slice(slash + 1);
@@ -376,12 +345,12 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
   const handleCopy = async () => {
     const text = buildPromptText(preset);
     if (!text) {
-      toast.show(`${scopeLabel(scopeId)}에 복사할 내용이 없습니다`, "error");
+      toast.show("복사할 내용이 없습니다", "error");
       return;
     }
     try {
       await navigator.clipboard.writeText(text);
-      toast.show(`${scopeLabel(scopeId)} 프롬프트를 복사했습니다`, "success");
+      toast.show("프롬프트를 복사했습니다", "success");
     } catch {
       toast.show("복사에 실패했습니다 (브라우저 권한 확인)", "error");
     }
@@ -400,7 +369,7 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
             프롬프트
           </h2>
           <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">
-            <span className="font-mono">{promptIdFor(activeChannel, scopeId)}</span>
+            <span className="font-mono">{activeChannel}</span>
             {state && !state.loading && (
               <>
                 {" · "}
@@ -437,13 +406,6 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
           onSelect={setActiveChannel}
         />
       )}
-
-      <ScopeTabs
-        activeId={scopeId}
-        dirtyIds={dirtyIds}
-        filledIds={filledIds}
-        onSelect={setScopeId}
-      />
     </div>
   );
 
@@ -472,10 +434,10 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
               )}
 
               {SECTION_DEFS.map((def, i) => (
-                // key 에 스코프를 섞는다 — 탭을 바꾸면 첨부 미리보기 같은 필드
-                // 내부 상태가 이전 스코프 값을 물고 있으면 안 된다.
+                // key 에 채널을 섞는다 — 채널 탭을 바꾸면 첨부 미리보기 같은
+                // 필드 내부 상태가 이전 채널 값을 물고 있으면 안 된다.
                 <PromptField
-                  key={`${scopeId}-${def.key}`}
+                  key={`${activeChannel}-${def.key}`}
                   fieldId={`pm-${def.key}`}
                   label={def.label}
                   hint={def.hint}
@@ -619,10 +581,7 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
   const footerNode = (
     <div className="ui-divider space-y-3 border-t px-5 py-4">
           <p className="text-xs text-[var(--text-muted)]">
-            <span className="font-semibold text-[var(--text-secondary)]">
-              {scopeLabel(scopeId)}
-            </span>
-            {chars > 0 && ` · ${chars.toLocaleString("ko-KR")}자`}
+            {chars > 0 ? `${chars.toLocaleString("ko-KR")}자` : "비어 있음"}
             {chars > 0 && (
               <span style={{ color: overBudget ? "var(--danger)" : undefined }}>
                 {" · "}
@@ -642,7 +601,7 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
                 onClick={() => void handleCopy()}
                 disabled={!filled}
                 className="ui-btn rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)]"
-                title={`${scopeLabel(scopeId)}의 설명·구조·지침과 첨부 내용을 하나의 프롬프트로 합쳐 복사`}
+                title="설명·구조·지침과 첨부 내용을 하나의 프롬프트로 합쳐 복사"
               >
                 <Icon d={ICON.copy} className="h-3.5 w-3.5" />
                 복사

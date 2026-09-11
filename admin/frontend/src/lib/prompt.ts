@@ -16,50 +16,24 @@
 // 즉 content 는 sections 에서 파생된다(buildPromptText). 되읽을 때는 sections 가
 // 정본이고, 없으면(옛 버전 · /prompts/edit 평문 저장) content 에서 최대한 복원한다.
 //
-// ## 스코프
+// ## 스코프 — 2026-09-11 폐기
 //
-// "어떤 상황에 쓰는 프롬프트인가"를 백엔드 키로 매핑한다 — 스코프 하나가
-// 프롬프트 id 하나이므로 버전 관리·이력이 스코프별로 따로 쌓인다.
-//
-//   초안 → `<channel>/draft`      (예: letters/draft)
-//   발행 → `<channel>/published`  (예: letters/published)
+// 원래 "초안"(`<channel>/draft`)과 "발행"(`<channel>/published`)을 완전히
+// 별개 문서로 나눠서, 초안을 아무리 고쳐도 파이프라인(항상 published만
+// 읽음)엔 반영이 안 됐다 — 사용자가 관리자 화면에서 이 구조를 몰랐다가
+// "왜 고쳤는데 안 바뀌지"로 직접 걸려 넘어졌다("초안"이 기본 탭이라 열 때마다
+// 그쪽부터 보였다). 채널당 문서를 하나로 합쳐 "저장하면 그게 곧 파이프라인이
+// 쓰는 것"으로 단순화했다. 백엔드 프롬프트 id는 여전히 `<channel>/published`
+// 리터럴을 쓴다 — 파이프라인(pipelines/common/ddb_prompt.py)이 이미
+// name="published" 기본값으로 읽고 있어서, 이름을 안 바꾸면 파이프라인 쪽
+// 코드를 하나도 안 건드리고 프런트만 고쳐서 끝낼 수 있었다(예전 `/draft`
+// 문서들은 정리 대상이라 이제 이 프런트에서 만들 방법이 없다 — 남은 것들은
+// admin_prompts 테이블에 고아로 남아있을 뿐 아무도 안 읽는다).
 
-/* ---------- 스코프 ---------- */
-
-export type PromptScopeKind = "status";
-
-export interface PromptScope {
-  id: string;
-  label: string;
-  hint: string;
-  kind: PromptScopeKind;
-}
-
-export const PROMPT_SCOPES: PromptScope[] = [
-  { id: "draft", label: "초안", hint: "초안을 처음 만들어낼 때", kind: "status" },
-  { id: "published", label: "발행", hint: "발행할 원고로 다듬을 때", kind: "status" },
-];
-
-export const SCOPE_KIND_LABEL: Record<PromptScopeKind, string> = { status: "상태" };
-
-export const DEFAULT_SCOPE_ID = "draft";
-
-/** 스코프 + 채널 → 백엔드 프롬프트 id (`category/name`). */
-export function promptIdFor(channel: string, scopeId: string): string {
-  return `${channel}/${scopeId}`;
-}
-
-export function scopeLabel(id: string): string {
-  return PROMPT_SCOPES.find((s) => s.id === id)?.label ?? id;
-}
-
-/** kind 별로 묶은 스코프 목록. 지금은 상태 한 줄뿐이지만 토픽이 추가되면
- *  탭이 줄을 나눠 렌더할 수 있게 모양을 맞춰 둔다. */
-export function scopeGroups(): Array<{ kind: PromptScopeKind; scopes: PromptScope[] }> {
-  const kinds: PromptScopeKind[] = ["status"];
-  return kinds
-    .map((kind) => ({ kind, scopes: PROMPT_SCOPES.filter((s) => s.kind === kind) }))
-    .filter((g) => g.scopes.length > 0);
+/** 채널 → 백엔드 프롬프트 id (`category/name`). name은 항상 "published"
+ *  고정 — 파이프라인이 읽는 이름과 맞춰 파이프라인 코드를 안 건드린다. */
+export function promptIdFor(channel: string): string {
+  return `${channel}/published`;
 }
 
 /* ---------- 형식 ---------- */
