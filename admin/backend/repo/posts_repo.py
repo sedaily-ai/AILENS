@@ -60,6 +60,17 @@ def _request(method: str, path: str, body: dict | None = None, query: dict | Non
             return {}
         body_text = e.read().decode(errors="replace")
         logger.error(f"lens-cms-api {method} {path} -> {e.code}: {body_text}")
+        if e.code == 400:
+            # lens_cms_api의 admin_posts_repo.update()가 ValueError로 막은
+            # 안전장치(예: lens 번들 통째 덮어쓰기 시도)는 여기서도
+            # ValueError로 다시 던져야 routes/posts.py가 e.read()를 두 번
+            # 부르지 않고(이미 위에서 소비됨) 그 메시지를 그대로 400으로
+            # 돌려줄 수 있다(2026-09-11, 웹툰 스코프 저장 기능).
+            try:
+                detail = json.loads(body_text).get("detail", body_text)
+            except (json.JSONDecodeError, AttributeError):
+                detail = body_text
+            raise ValueError(detail) from e
         raise
 
 
@@ -86,8 +97,8 @@ def list_posts(
     return resp.get("posts", [])
 
 
-def update(post_id: str, data: dict) -> dict | None:
-    resp = _request("PUT", f"/admin/posts/{post_id}", body=data)
+def update(post_id: str, data: dict, channel: str | None = None) -> dict | None:
+    resp = _request("PUT", f"/admin/posts/{post_id}", body=data, query={"channel": channel} if channel else None)
     return resp.get("post")
 
 

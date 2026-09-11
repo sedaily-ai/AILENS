@@ -105,7 +105,12 @@ function WebtoonEditPage() {
         toast.show("저장했습니다", "success");
         router.replace(`/webtoon/edit?id=${encodeURIComponent(post.id)}`);
       } else {
-        const { post } = await adminApi.updatePost(id, payload);
+        // isLensBundle이면 channel="webtoon"을 실어 보낸다 — 서버가
+        // admin_extra.body_inline.lenses[]에서 웹툰 항목 하나만 바꾸고
+        // 레터·팟캐스트·영상은 그대로 둔다(_update_lens_bundle_slice,
+        // 2026-09-11 — "웹툰도 따로 완성해서 저장할 수 있어야 한다"는
+        // 사용자 요청으로 통째 잠금을 풀고 이 스코프 저장으로 교체).
+        const { post } = await adminApi.updatePost(id, payload, saved?.is_lens_bundle ? "webtoon" : undefined);
         setSaved(post);
         toast.show("저장했습니다", "success");
       }
@@ -157,12 +162,14 @@ function WebtoonEditPage() {
   // 2026-09-11 — 자동 파이프라인이 만든 "4가지 시선" 번들(admin_channel=
   // 'lens')이 웹툰 렌디션을 갖고 있어 이 목록/편집 화면에 같이 뜨는 경우
   // (사용자 신고: "웹툰 CMS에 데이터가 안 쌓인다" — 원인은 admin_channel
-  // 완전일치 필터, list_posts()에서 고쳤다). 이 화면(WebtoonMode.tsx)은
-  // body_inline이 평평한 단일 포맷 모양이라고 가정하고 저장하는데, 그대로
-  // 저장하면 서버가 lens 번들의 admin_extra.body_inline 전체를 이 웹툰
-  // 슬라이스 하나짜리 모양으로 덮어써 레터·팟캐스트·영상이 유실된다 —
-  // 서버(admin_posts_repo.update)가 이미 거부하지만, 프론트에서 먼저
-  // 잠가 "저장 눌렀는데 에러만 뜬다"는 혼란을 막는다.
+  // 완전일치 필터, list_posts()에서 고쳤다). 처음엔 저장 자체를 통째로
+  // 막았는데(body_inline 전체 덮어쓰기로 다른 포맷 유실 위험), 사용자가
+  // "웹툰도 따로 완성해서 저장할 수 있어야 한다"고 요청해 스코프 저장으로
+  // 바꿨다(save() 참조) — 저장은 이제 되지만, 발행/내리기/삭제는 이
+  // publications 행 전체(레터·팟캐스트·영상 공유)에 적용되는 동작이라
+  // 웹툰 화면 하나만 보고 누르면 나머지 포맷까지 같이 바뀌거나(발행 상태)
+  // 전부 사라진다(삭제) — 그건 이번 요청 범위 밖이라 계속 "4가지 시선"
+  // 화면으로 유도한다.
   const isLensBundle = !!saved?.is_lens_bundle;
 
   return (
@@ -191,11 +198,12 @@ function WebtoonEditPage() {
             </p>
           )}
         </div>
-        {!isLensBundle && (
-          <div className="flex gap-2">
-            <button type="button" disabled={busy} onClick={save} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
-              저장
-            </button>
+        <div className="flex gap-2">
+          <button type="button" disabled={busy} onClick={save} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
+            저장
+          </button>
+          {!isLensBundle && (
+            <>
             {saved && saved.status !== "published" && (
               <button
                 type="button"
@@ -226,15 +234,17 @@ function WebtoonEditPage() {
                 삭제
               </button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {isLensBundle && (
         <div className="ui-card rounded-xl border px-4 py-3 text-[13px]" style={{ borderColor: "var(--warn, #f59e0b)", background: "var(--warn-soft, #fffbeb)" }}>
           이 웹툰은 자동 파이프라인이 만든 <strong>&ldquo;4가지 시선&rdquo;</strong> 글의 한
-          포맷입니다 — 레터·팟캐스트·영상과 한 묶음이라 이 화면에서는 보기만
-          가능하고 저장할 수 없어요. 수정하려면{" "}
+          포맷입니다 — 여기서 저장하면 이 웹툰 부분만 바뀌고 레터·팟캐스트·
+          영상은 그대로 유지돼요. 발행 상태 변경·삭제는 이 4가지 시선 전체에
+          적용되는 동작이라 이 화면에선 막아뒀습니다 — 필요하면{" "}
           <a href={`/lens/edit?id=${encodeURIComponent(id)}`} className="text-[var(--accent)] hover:underline font-semibold">
             4가지 시선 편집 화면 ↗
           </a>
@@ -243,11 +253,6 @@ function WebtoonEditPage() {
       )}
 
       {(isNew || saved) ? (
-        // 2026-09-11 — isLensBundle이면 저장/발행/내리기/삭제 버튼 자체가
-        // 위에서 이미 안 그려진다(서버도 어차피 저장을 거부) — 폼 필드를
-        // 입력 불가로 막는 것까지는 PostForm 내부(WebtoonMode 등) 여러
-        // 컴포넌트를 다 손봐야 해서 이번 범위에선 안 함, 저장 경로 자체를
-        // 없앤 것으로 데이터 안전은 충분히 확보된다.
         <div className="ui-enter">
           <PostForm value={draft} onChange={setDraft} mode="webtoon" />
         </div>

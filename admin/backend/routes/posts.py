@@ -81,7 +81,17 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
     err = _validate(body, require_all=False)
     if err:
         return response.err(err, 400)
-    post = posts_repo.update((path_params or {}).get("id", ""), body)
+    # channel — handle_get()과 같은 이유(2026-09-11): 웹툰/영상/홈플레이어
+    # 편집기가 자기 채널을 실어 보내면 lens_cms_api가 그 포맷 슬라이스만
+    # 스코프해서 저장한다(admin_posts_repo.py::_update_lens_bundle_slice
+    # 참조). 안 흘리면 lens 번들 저장이 400(안전장치)으로 막힌다.
+    channel = (query_params or {}).get("channel")
+    try:
+        post = posts_repo.update((path_params or {}).get("id", ""), body, channel)
+    except ValueError as e:
+        # posts_repo._request()가 lens_cms_api의 400(예: lens 번들 안전장치)을
+        # ValueError로 다시 던진다 — 그 메시지를 그대로 프런트에 보여준다.
+        return response.err(str(e), 400)
     if not post:
         return response.err("post not found", 404)
     audit.log("post-update", {"id": post["id"]})

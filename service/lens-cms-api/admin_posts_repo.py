@@ -320,7 +320,93 @@ def list_posts(status: Optional[str], channel: Optional[str], limit: int,
         return [_to_dict(r, view_channel=channel) for r in cur.fetchall()]
 
 
-def update(admin_post_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _update_lens_bundle_slice(
+    cur, pub: Dict[str, Any], pub_id: int, extra: Dict[str, Any],
+    edit_channel: str, data: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """lens 번들(4가지 시선)의 한 포맷만 스코프해서 저장한다(2026-09-11
+    신설) — 웹툰/영상/홈플레이어 편집기로 lens 번들을 열었을 때, 처음엔
+    저장 자체를 막았는데(admin_extra.body_inline 전체를 그 포맷 하나짜리
+    모양으로 덮어써 나머지 포맷이 유실되는 걸 막기 위함) 사용자가 "웹툰도
+    따로 완성해서 저장할 수 있어야 한다"고 요청 — 통째로 덮어쓰는 대신
+    body_inline.lenses[] 배열에서 이 포맷 항목 하나만 바꾸고 나머지
+    (레터·팟캐스트·영상)는 그대로 보존한다. 파생 프로젝션(renditions/
+    webtoon_panels/media_assets)도 이 포맷의 렌디션만 다시 쓴다."""
+    fmt = _CHANNEL_TO_FORMAT.get(edit_channel)
+    label = next((l for l, f in _LENS_LABEL_TO_FORMAT.items() if f == fmt), None)
+    if not fmt or not label:
+        raise ValueError(f"지원하지 않는 편집 채널입니다: {edit_channel}")
+
+    body_inline = dict(extra.get("body_inline") or {})
+    lenses = [dict(it) for it in (body_inline.get("lenses") or [])]
+    idx = next((i for i, it in enumerate(lenses) if it.get("label") == label), None)
+    item = dict(lenses[idx]) if idx is not None else {"label": label, "question": "", "bullets": []}
+
+    incoming_body = data.get("body_inline") or {}
+    if fmt == "webtoon":
+        item["images"] = incoming_body.get("images") or []
+        if "series_title" in incoming_body:
+            item["series_title"] = incoming_body.get("series_title")
+    elif fmt == "video":
+        item["video_url"] = incoming_body.get("video_url")
+        item["thumbnail_url"] = incoming_body.get("thumbnail_url")
+        item["transcript"] = incoming_body.get("transcript")
+    elif fmt == "podcast":
+        # home-player 화면(홈 플레이어 Row)은 오디오/유튜브 링크를
+        # body_inline.media_url이 아니라 최상위 media_embed_url로 보낸다
+        # (home-player/page.tsx의 Row.save() 참조) — body_inline.media_url만
+        # 보면 GET이 투영해 되돌려준 "저장 전" 값을 그대로 다시 저장해
+        # admin_extra(진실의 원천)가 실제 방금 바뀐 URL과 어긋난다.
+        item["media_url"] = data.get("media_embed_url") or incoming_body.get("media_url")
+        item["transcript"] = incoming_body.get("transcript")
+
+    if idx is not None:
+        lenses[idx] = item
+    else:
+        lenses.append(item)
+    body_inline["lenses"] = lenses
+    # category는 lens 번들 전체(레터/웹툰/팟캐스트/영상 공통)에 적용되는
+    # 사이트 카테고리다(display_category()가 읽는 자리와 동일) — 이
+    # 편집기의 "카테고리" 필드가 실제로 이 top-level 키를 바꾼다.
+    if "category" in incoming_body:
+        body_inline["category"] = incoming_body["category"]
+    extra["body_inline"] = body_inline
+
+    set_clauses = ["admin_extra = %s"]
+    params: List[Any] = [json.dumps(extra)]
+    if "headline" in data:
+        set_clauses.append("title = %s")
+        params.append(data["headline"])
+    if "subtitle" in data:
+        set_clauses.append("subtitle = %s")
+        params.append(data["subtitle"])
+    if "cover_image_url" in data:
+        set_clauses.append("cover_image_url = %s")
+        params.append(data["cover_image_url"])
+    if "publish_date" in data:
+        set_clauses.append("admin_publish_date = %s")
+        params.append(data["publish_date"])
+    set_clauses.append("updated_at = now()")
+    params.append(pub_id)
+    cur.execute(f"UPDATE publications SET {', '.join(set_clauses)} WHERE id = %s", params)
+
+    rendition_id = _get_or_create_rendition(cur, pub_id, fmt)
+    if fmt == "webtoon":
+        cur.execute("DELETE FROM webtoon_panels WHERE rendition_id = %s", (rendition_id,))
+    elif fmt in ("video", "podcast"):
+        cur.execute("DELETE FROM media_assets WHERE rendition_id = %s", (rendition_id,))
+    _write_format_body(cur, rendition_id, fmt, item, data.get("media_embed_url"), 0)
+
+    # get(...)로 재조회하면 새 커넥션(pool.getconn())을 새로 얻는데, 이
+    # 함수는 아직 커밋 전(바깥 update()의 with get_cursor() 블록 안)이라
+    # 다른 커넥션에서는 이 UPDATE가 안 보인다 — 응답이 방금 저장한 값이
+    # 아니라 저장 전 값을 돌려주는 버그였다(로컬 실전 데이터 테스트로
+    # 발견). 같은 트랜잭션(같은 cur)에서 바로 재조회해 해결.
+    cur.execute("SELECT * FROM publications WHERE id = %s", (pub_id,))
+    return _to_dict(cur.fetchone(), view_channel=edit_channel)
+
+
+def update(admin_post_id: str, data: Dict[str, Any], edit_channel: Optional[str] = None) -> Optional[Dict[str, Any]]:
     with get_cursor() as cur:
         cur.execute(
             "SELECT * FROM publications WHERE admin_post_id = %s AND deleted_at IS NULL",
@@ -331,15 +417,18 @@ def update(admin_post_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]
             return None
         pub_id = pub["id"]
         extra = dict(pub.get("admin_extra") or {})
+        is_lens_bundle = pub.get("admin_channel") == "lens"
 
-        # 2026-09-11 — 안전장치: lens 번들(자동 파이프라인 발행물)을 단일
-        # 포맷 편집기(웹툰/영상/홈플레이어, is_lens_bundle 참조)로 열어
-        # 저장하면 아래 "body_inline" in data 분기가 admin_extra.body_inline
-        # 전체를 그 포맷 하나짜리 얕은 모양으로 통째로 덮어써서 나머지
-        # 포맷(레터·팟캐스트·영상 등)이 유실된다 — admin_extra가 진실의
-        # 원천이라 한 번 유실되면 복구 불가. 프론트가 먼저 저장을 막아야
-        # 하지만 서버에서도 한 번 더 막는다.
-        if pub.get("admin_channel") == "lens" and ("channels" in data or "body_inline" in data):
+        # 2026-09-11 — edit_channel이 주어지면(웹툰/영상/홈플레이어 편집기가
+        # ?channel=X로 자기 채널을 밝힌 경우) lens 번들의 그 포맷 슬라이스만
+        # 스코프해서 저장한다 — _update_lens_bundle_slice() 참조.
+        if is_lens_bundle and edit_channel and edit_channel != "lens":
+            return _update_lens_bundle_slice(cur, pub, pub_id, extra, edit_channel, data)
+
+        # 안전장치 — edit_channel 없이(구버전 프론트 등) lens 번들을 통째로
+        # 덮어쓰려는 시도는 막는다. admin_extra.body_inline 전체가 단일
+        # 포맷 모양으로 덮여써져 나머지 포맷이 유실되는 걸 방지(2026-09-11).
+        if is_lens_bundle and ("channels" in data or "body_inline" in data):
             if data.get("channels") != ["lens"]:
                 raise ValueError(
                     "이 글은 자동 파이프라인이 만든 '4가지 시선' 번들입니다 — "

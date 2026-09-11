@@ -103,7 +103,9 @@ function VideoEditPage() {
         toast.show("저장했습니다", "success");
         router.replace(`/video/edit?id=${encodeURIComponent(post.id)}`);
       } else {
-        const { post } = await adminApi.updatePost(id, payload);
+        // isLensBundle이면 channel="video"를 실어 보낸다 — webtoon/edit와
+        // 같은 이유(2026-09-11, _update_lens_bundle_slice).
+        const { post } = await adminApi.updatePost(id, payload, saved?.is_lens_bundle ? "video" : undefined);
         setSaved(post);
         toast.show("저장했습니다", "success");
       }
@@ -152,7 +154,9 @@ function VideoEditPage() {
     );
   }
 
-  // 2026-09-11 — webtoon/edit/page.tsx와 같은 이유·같은 패턴(주석 참조).
+  // 2026-09-11 — webtoon/edit/page.tsx와 같은 이유·같은 패턴(주석 참조):
+  // 저장은 스코프 저장으로 열려 있지만, 발행/내리기/삭제는 4가지 시선
+  // 전체(레터·웹툰·팟캐스트 공유)에 적용되는 동작이라 이 화면에선 막는다.
   const isLensBundle = !!saved?.is_lens_bundle;
 
   return (
@@ -171,11 +175,12 @@ function VideoEditPage() {
             </p>
           )}
         </div>
-        {!isLensBundle && (
-          <div className="flex gap-2">
-            <button type="button" disabled={busy} onClick={save} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
-              저장
-            </button>
+        <div className="flex gap-2">
+          <button type="button" disabled={busy} onClick={save} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
+            저장
+          </button>
+          {!isLensBundle && (
+            <>
             {saved && saved.status !== "published" && (
               <button
                 type="button"
@@ -206,15 +211,17 @@ function VideoEditPage() {
                 삭제
               </button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {isLensBundle && (
         <div className="ui-card rounded-xl border px-4 py-3 text-[13px]" style={{ borderColor: "var(--warn, #f59e0b)", background: "var(--warn-soft, #fffbeb)" }}>
           이 영상은 자동 파이프라인이 만든 <strong>&ldquo;4가지 시선&rdquo;</strong> 글의 한
-          포맷입니다 — 레터·웹툰·팟캐스트와 한 묶음이라 이 화면에서는 보기만
-          가능하고 저장할 수 없어요. 수정하려면{" "}
+          포맷입니다 — 여기서 저장하면 이 영상 부분만 바뀌고 레터·웹툰·
+          팟캐스트는 그대로 유지돼요. 발행 상태 변경·삭제는 이 4가지 시선
+          전체에 적용되는 동작이라 이 화면에선 막아뒀습니다 — 필요하면{" "}
           <a href={`/lens/edit?id=${encodeURIComponent(id)}`} className="text-[var(--accent)] hover:underline font-semibold">
             4가지 시선 편집 화면 ↗
           </a>

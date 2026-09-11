@@ -249,11 +249,17 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-  updatePost: (id: string, input: CmsPostInput) =>
-    request<{ post: CmsPost }>(`/admin/posts/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      body: JSON.stringify(input),
-    }),
+  // channel — getPost()와 같은 이유(2026-09-11): 웹툰/영상/홈플레이어
+  // 편집기가 자기 채널을 실어 보내면 lens 번들의 그 포맷 슬라이스만
+  // 스코프해서 저장한다(안 실으면 lens 번들 저장이 안전장치로 막힌다).
+  updatePost: (id: string, input: CmsPostInput, channel?: string) =>
+    request<{ post: CmsPost }>(
+      `/admin/posts/${encodeURIComponent(id)}${channel ? `?channel=${encodeURIComponent(channel)}` : ""}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }
+    ),
   publishPost: (id: string) =>
     request<{ post: CmsPost }>(`/admin/posts/${encodeURIComponent(id)}/publish`, {
       method: "POST",

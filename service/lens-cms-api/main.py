@@ -151,10 +151,18 @@ def admin_get_post(
 
 
 @app.put("/admin/posts/{post_id}")
-def admin_update_post(post_id: str, data: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+def admin_update_post(
+    post_id: str,
+    channel: Optional[str] = Query(default=None),
+    data: Dict[str, Any] = Body(...),
+    x_internal_token: Optional[str] = Header(default=None),
+):
     _check_admin_token(x_internal_token)
+    # channel — 2026-09-11, 웹툰/영상/홈플레이어 편집기가 자기 채널을
+    # 실어 보내면 lens 번들의 그 포맷 슬라이스만 스코프해서 저장한다
+    # (admin_posts_repo.update/_update_lens_bundle_slice 참조).
     try:
-        post = admin_posts_repo.update(post_id, data)
+        post = admin_posts_repo.update(post_id, data, edit_channel=channel)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not post:

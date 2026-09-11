@@ -141,12 +141,20 @@ function Row({ post, onChanged }: { post: CmsPost; onChanged: () => void }) {
   const save = async () => {
     setBusy(true);
     try {
-      await adminApi.updatePost(post.id, {
-        headline: title.trim(),
-        media_embed_url: url.trim() || null,
-        display_order: order,
-        body_inline: { ...post.body_inline, category: category || undefined },
-      });
+      // is_lens_bundle이면 channel="home_player"를 실어 보낸다 —
+      // webtoon/edit·video/edit와 같은 이유(2026-09-11,
+      // _update_lens_bundle_slice) — 레터·웹툰·영상은 그대로 두고 이
+      // 항목의 media_url/transcript만 스코프해서 바뀐다.
+      await adminApi.updatePost(
+        post.id,
+        {
+          headline: title.trim(),
+          media_embed_url: url.trim() || null,
+          display_order: order,
+          body_inline: { ...post.body_inline, category: category || undefined },
+        },
+        post.is_lens_bundle ? "home_player" : undefined
+      );
       toast.show("저장했습니다", "success");
       onChanged();
     } catch (err) {
@@ -206,19 +214,18 @@ function Row({ post, onChanged }: { post: CmsPost; onChanged: () => void }) {
         className="ui-input w-20 rounded-lg px-2 py-1.5 text-[13px]"
       />
       <CustomSelect value={category} options={CATEGORY_OPTIONS} onChange={setCategory} placeholder="카테고리" />
-      {/* 2026-09-11 — webtoon/edit·video/edit와 같은 이유(is_lens_bundle
-          참조): 이 저장은 body_inline을 통째로 덮어써서 lens 번들(4가지
-          시선)의 다른 포맷을 유실시킬 수 있다. 서버가 최종 방어선으로
-          거부하지만, 프론트에서 먼저 막아 "저장했는데 에러만 뜬다"는
-          혼란을 없앤다. */}
+      {/* 2026-09-11 — is_lens_bundle이면 save()가 channel="home_player"를
+          실어 보내 admin_extra.body_inline.lenses[]의 이 항목(팟캐스트)만
+          스코프해서 바꾼다(레터·웹툰·영상은 그대로) — 처음엔 통째 덮어쓰기
+          위험 때문에 저장을 아예 막았는데, "웹툰도 따로 완성해서 저장할
+          수 있어야 한다"는 사용자 요청으로 스코프 저장으로 바꿨다. */}
       <button
         type="button"
-        disabled={!dirty || busy || post.is_lens_bundle}
+        disabled={!dirty || busy}
         onClick={save}
-        title={post.is_lens_bundle ? "4가지 시선 번들 — '4가지 시선'에서 편집해 주세요" : undefined}
         className="ui-btn ui-btn-primary shrink-0 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold"
       >
-        {post.is_lens_bundle ? "4가지 시선에서 편집" : "저장"}
+        저장
       </button>
       <button
         type="button"
