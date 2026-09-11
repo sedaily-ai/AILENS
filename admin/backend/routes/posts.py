@@ -65,7 +65,13 @@ def handle_list(body: dict, path_params: dict, query_params: dict) -> dict:
 
 
 def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
-    post = posts_repo.get((path_params or {}).get("id", ""))
+    # channel — 2026-09-11, 웹툰/영상/홈플레이어 편집 화면이 자기 채널을
+    # 실어 보내면 lens 번들 글의 body_inline을 그 포맷에 맞는 평평한
+    # 모양으로 받는다(service/lens-cms-api/admin_posts_repo.py::_to_dict
+    # 참조). 여기서 안 읽고 그냥 흘리면 편집 화면이 매번 빈 컷 목록을
+    # 받는다(실제로 이 누락 때문에 8컷이 다 안 보이는 버그가 났었음).
+    channel = (query_params or {}).get("channel")
+    post = posts_repo.get((path_params or {}).get("id", ""), channel)
     if not post:
         return response.err("post not found", 404)
     return response.ok({"post": post})

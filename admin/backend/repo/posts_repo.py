@@ -68,8 +68,8 @@ def create(data: dict, created_by: str) -> dict:
     return resp["post"]
 
 
-def get(post_id: str) -> dict | None:
-    resp = _request("GET", f"/admin/posts/{post_id}")
+def get(post_id: str, channel: str | None = None) -> dict | None:
+    resp = _request("GET", f"/admin/posts/{post_id}", query={"channel": channel} if channel else None)
     return resp.get("post")
 
 
