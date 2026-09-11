@@ -292,10 +292,18 @@ export function ContentTable({
                         className="cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="max-w-xl px-4 py-3">
                       <Link
                         href={editHref(p)}
-                        className="font-medium text-[var(--text-primary)] hover:underline underline-offset-2"
+                        // 2026-09-11 — 파이프라인 버그로 headline에 본문 전체(2000자+)가
+                        // 들어간 글이 실제로 발행된 적이 있다(레터 제목 파싱 버그, 이제
+                        // 파이프라인 쪽은 고쳤다). 원인 버그와 별개로 이 표는 본디
+                        // 제목이 아무리 길어도 안 잘리는 구조였다 — line-clamp이
+                        // 없으면 이런 이상치 하나가 표 전체를 깨진 것처럼 보이게
+                        // 만든다(카드 보기는 이미 line-clamp-2를 쓰고 있었는데 이
+                        // 표 보기만 빠져 있었다). 정상 제목엔 영향 없다.
+                        className="line-clamp-2 font-medium text-[var(--text-primary)] hover:underline underline-offset-2"
+                        title={p.headline}
                       >
                         {p.headline}
                       </Link>
