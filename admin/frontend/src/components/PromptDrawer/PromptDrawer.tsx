@@ -395,6 +395,29 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
         )}
       </div>
 
+      {/* 2026-09-11 — "지금 화면이 실제 쓰이는 프롬프트와 같은 상태인지
+          실시간으로 보여달라"는 요청. dirty는 draft/saved를 매 렌더마다
+          직접 비교하므로 타이핑하는 즉시(별도 폴링·debounce 없이) 뒤집힌다
+          — 스크롤해야 보이는 푸터의 작은 점 표시(예전엔 이것만 있었다)
+          말고, 패널을 열자마자 보이는 자리에 뒀다. state.version === 0
+          (아직 한 번도 저장 안 한 새 프롬프트)이면 본문에 이미 있는
+          안내(“저장하면 v1로 새로 생깁니다”)와 뜻이 겹쳐서 여기선 뺀다. */}
+      {state && !state.loading && state.version > 0 && (
+        <div
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold"
+          style={
+            dirty
+              ? { background: "var(--warn-soft)", color: "var(--warn)" }
+              : { background: "var(--ok-soft)", color: "var(--ok)" }
+          }
+        >
+          <span className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "currentColor" }} aria-hidden="true" />
+          {dirty
+            ? `저장 안 된 변경이 있습니다 — 지금 파이프라인은 v${state.version} 그대로 씁니다`
+            : `저장됨 — 지금 파이프라인이 쓰는 내용과 같습니다`}
+        </div>
+      )}
+
       {/* 채널 탭 — channels prop을 받은 화면(2026-08-20, "4가지 시선")만
           뜬다. 단일 channel 화면은 channelList.length === 1이라 안 뜬다. */}
       {channelList.length > 1 && (
