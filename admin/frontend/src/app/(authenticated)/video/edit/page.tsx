@@ -56,7 +56,7 @@ function VideoEditPage() {
     if (!id) return;
     let cancelled = false;
     adminApi
-      .getPost(id)
+      .getPost(id, "video")
       .then(({ post }) => {
         if (cancelled) return;
         setSaved(post);
@@ -152,6 +152,9 @@ function VideoEditPage() {
     );
   }
 
+  // 2026-09-11 — webtoon/edit/page.tsx와 같은 이유·같은 패턴(주석 참조).
+  const isLensBundle = !!saved?.is_lens_bundle;
+
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
@@ -168,42 +171,56 @@ function VideoEditPage() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
-          <button type="button" disabled={busy} onClick={save} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
-            저장
-          </button>
-          {saved && saved.status !== "published" && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => act(() => adminApi.publishPost(saved.id), "발행했습니다")}
-              className="ui-btn ui-btn-ok-soft rounded-lg px-4 py-2 text-sm font-semibold"
-            >
-              발행
+        {!isLensBundle && (
+          <div className="flex gap-2">
+            <button type="button" disabled={busy} onClick={save} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
+              저장
             </button>
-          )}
-          {saved && saved.status === "published" && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => act(() => adminApi.unpublishPost(saved.id), "내렸습니다")}
-              className="ui-btn ui-btn-warn-soft rounded-lg px-4 py-2 text-sm font-semibold"
-            >
-              내리기
-            </button>
-          )}
-          {saved && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={remove}
-              className="ui-btn ui-btn-ghost ui-btn-danger rounded-lg px-4 py-2 text-sm font-semibold"
-            >
-              삭제
-            </button>
-          )}
-        </div>
+            {saved && saved.status !== "published" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act(() => adminApi.publishPost(saved.id), "발행했습니다")}
+                className="ui-btn ui-btn-ok-soft rounded-lg px-4 py-2 text-sm font-semibold"
+              >
+                발행
+              </button>
+            )}
+            {saved && saved.status === "published" && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act(() => adminApi.unpublishPost(saved.id), "내렸습니다")}
+                className="ui-btn ui-btn-warn-soft rounded-lg px-4 py-2 text-sm font-semibold"
+              >
+                내리기
+              </button>
+            )}
+            {saved && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={remove}
+                className="ui-btn ui-btn-ghost ui-btn-danger rounded-lg px-4 py-2 text-sm font-semibold"
+              >
+                삭제
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {isLensBundle && (
+        <div className="ui-card rounded-xl border px-4 py-3 text-[13px]" style={{ borderColor: "var(--warn, #f59e0b)", background: "var(--warn-soft, #fffbeb)" }}>
+          이 영상은 자동 파이프라인이 만든 <strong>&ldquo;4가지 시선&rdquo;</strong> 글의 한
+          포맷입니다 — 레터·웹툰·팟캐스트와 한 묶음이라 이 화면에서는 보기만
+          가능하고 저장할 수 없어요. 수정하려면{" "}
+          <a href={`/lens/edit?id=${encodeURIComponent(id)}`} className="text-[var(--accent)] hover:underline font-semibold">
+            4가지 시선 편집 화면 ↗
+          </a>
+          에서 해주세요.
+        </div>
+      )}
 
       {(isNew || saved) ? (
         <div className="ui-enter">

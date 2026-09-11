@@ -237,8 +237,13 @@ export const adminApi = {
     const suffix = qs.toString() ? `?${qs}` : "";
     return request<{ posts: CmsPost[]; count: number }>(`/admin/posts${suffix}`);
   },
-  getPost: (id: string) =>
-    request<{ post: CmsPost }>(`/admin/posts/${encodeURIComponent(id)}`),
+  // channel — 2026-09-11, 웹툰/영상/홈플레이어 편집 화면이 자기 채널을
+  // 실어 보내면 lens 번들 글(is_lens_bundle)의 body_inline을 그 포맷에
+  // 맞는 평평한 모양(images/video_url/media_url 등)으로 받는다.
+  getPost: (id: string, channel?: string) =>
+    request<{ post: CmsPost }>(
+      `/admin/posts/${encodeURIComponent(id)}${channel ? `?channel=${encodeURIComponent(channel)}` : ""}`
+    ),
   createPost: (input: CmsPostInput) =>
     request<{ post: CmsPost }>("/admin/posts", {
       method: "POST",

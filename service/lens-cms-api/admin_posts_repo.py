@@ -155,20 +155,48 @@ def _write_channel_content(cur, pub_id: int, channel: Optional[str],
     _write_format_body(cur, rendition_id, fmt, body_inline, media_embed_url, 0)
 
 
-def _to_dict(pub: Dict[str, Any]) -> Dict[str, Any]:
+def _to_dict(pub: Dict[str, Any], view_channel: Optional[str] = None) -> Dict[str, Any]:
     extra = pub.get("admin_extra") or {}
+    admin_channel = pub.get("admin_channel")
+    body_inline = extra.get("body_inline") or {}
+
+    # 2026-09-11 — lens 번들(자동 파이프라인 발행물)을 웹툰/영상/홈플레이어
+    # 관리 화면에서 열람할 때 대응 — admin_extra.body_inline은 4포맷이
+    # lenses[] 배열에 중첩된 모양이라 그 화면들의 편집기(WebtoonMode.tsx 등)가
+    # 기대하는 평평한 모양(top-level images/video_url/media_url/transcript)과
+    # 안 맞는다. "웹툰 CMS에 데이터가 안 쌓인다"는 사용자 신고로 list_posts()의
+    # admin_channel 완전일치 필터부터 고쳤는데(그것만으로는 목록에 나와도
+    # 필드가 비어 보임), view_channel이 주어지고 이 글이 lens 번들이면 해당
+    # 포맷 항목을 평평하게 얹어서 기존 편집기 코드를 안 건드리고 그대로
+    # 읽게 한다 — lenses[] 원본은 그대로 남겨둔다(다른 소비처가 참조 가능).
+    if admin_channel == "lens" and view_channel and view_channel != "lens":
+        fmt = _CHANNEL_TO_FORMAT.get(view_channel)
+        label = next((l for l, f in _LENS_LABEL_TO_FORMAT.items() if f == fmt), None) if fmt else None
+        item = (
+            next((it for it in (body_inline.get("lenses") or []) if it.get("label") == label), None)
+            if label else None
+        )
+        if item:
+            body_inline = {
+                **body_inline,
+                "images": item.get("images") or [],
+                "video_url": item.get("video_url"),
+                "media_url": item.get("media_url"),
+                "transcript": item.get("transcript"),
+            }
+
     return {
         "id": str(pub["admin_post_id"]),
         "slug": pub["slug"],
         "status": pub["status"],
-        "channels": [pub["admin_channel"]] if pub.get("admin_channel") else [],
-        "channel": pub.get("admin_channel"),
+        "channels": [admin_channel] if admin_channel else [],
+        "channel": admin_channel,
         "publish_date": pub["admin_publish_date"].isoformat() if pub.get("admin_publish_date") else None,
         "editor_id": extra.get("editor_id"),
         "headline": pub.get("title") or "",
         "subtitle": pub.get("subtitle"),
         "closing_line": extra.get("closing_line"),
-        "body_inline": extra.get("body_inline") or {},
+        "body_inline": body_inline,
         "cover_image_url": pub.get("cover_image_url") or "",
         "source_url": pub.get("source_url") or "",
         "media_embed_url": extra.get("media_embed_url"),
@@ -177,6 +205,13 @@ def _to_dict(pub: Dict[str, Any]) -> Dict[str, Any]:
         "created_at": pub["created_at"].isoformat() if pub.get("created_at") else None,
         "updated_at": pub["updated_at"].isoformat() if pub.get("updated_at") else None,
         "published_at": pub["published_at"].isoformat() if pub.get("published_at") else None,
+        # 2026-09-11 — true면 이 항목은 자동 파이프라인이 만든 4가지 시선
+        # 번들의 한 포맷 슬라이스일 뿐이다. 프론트는 이 값이 true면 단일
+        # 포맷 편집기(웹툰/영상/홈플레이어)에서 저장을 막아야 한다 — 저장
+        # 시 body_inline 전체가 이 슬라이스 하나짜리 모양으로 덮여써져
+        # 나머지 포맷이 유실된다(update()의 서버 쪽 안전장치가 한 번 더
+        # 막지만, 프론트에서 먼저 잠그는 게 UX상 맞다).
+        "is_lens_bundle": admin_channel == "lens",
     }
 
 
@@ -215,14 +250,14 @@ def create(data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
     return get(admin_post_id)
 
 
-def get(admin_post_id: str) -> Optional[Dict[str, Any]]:
+def get(admin_post_id: str, view_channel: Optional[str] = None) -> Optional[Dict[str, Any]]:
     with get_cursor() as cur:
         cur.execute(
             "SELECT * FROM publications WHERE admin_post_id = %s AND deleted_at IS NULL",
             (admin_post_id,),
         )
         pub = cur.fetchone()
-        return _to_dict(pub) if pub else None
+        return _to_dict(pub, view_channel=view_channel) if pub else None
 
 
 def find_by_source_url(source_url: str) -> Optional[Dict[str, Any]]:
@@ -256,15 +291,33 @@ def list_posts(status: Optional[str], channel: Optional[str], limit: int,
             sql += " AND status = %s"
             params.append(status)
         if channel:
-            sql += " AND admin_channel = %s"
-            params.append(channel)
+            fmt = _CHANNEL_TO_FORMAT.get(channel)
+            if fmt:
+                # 2026-09-11 — "웹툰 CMS에 데이터가 안 쌓인다" 사용자 신고로
+                # 발견: 자동 파이프라인 발행물은 전부 admin_channel='lens'라
+                # (실측: admin_post_id 있는 277건 전부) 완전일치 필터로는
+                # 웹툰/영상/홈플레이어 관리 화면이 파이프라인 콘텐츠를
+                # 영원히 못 찾았다. 공개 읽기 API(cms_posts_repo.py)가 이미
+                # 쓰는 "채널=포맷 렌디션 존재 여부" 판정과 같은 원칙으로,
+                # admin이 직접 그 채널로 쓴 글(admin_channel 완전일치) OR
+                # 해당 포맷 렌디션을 가진 lens 번들도 같이 찾는다.
+                sql += (
+                    " AND (admin_channel = %s OR EXISTS ("
+                    "SELECT 1 FROM renditions r "
+                    "WHERE r.publication_id = publications.id AND r.format = %s"
+                    "))"
+                )
+                params += [channel, fmt]
+            else:
+                sql += " AND admin_channel = %s"
+                params.append(channel)
         if date:
             sql += " AND admin_publish_date = %s"
             params.append(date)
         sql += " ORDER BY admin_publish_date DESC NULLS LAST, created_at DESC LIMIT %s"
         params.append(limit)
         cur.execute(sql, params)
-        return [_to_dict(r) for r in cur.fetchall()]
+        return [_to_dict(r, view_channel=channel) for r in cur.fetchall()]
 
 
 def update(admin_post_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -278,6 +331,20 @@ def update(admin_post_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]
             return None
         pub_id = pub["id"]
         extra = dict(pub.get("admin_extra") or {})
+
+        # 2026-09-11 — 안전장치: lens 번들(자동 파이프라인 발행물)을 단일
+        # 포맷 편집기(웹툰/영상/홈플레이어, is_lens_bundle 참조)로 열어
+        # 저장하면 아래 "body_inline" in data 분기가 admin_extra.body_inline
+        # 전체를 그 포맷 하나짜리 얕은 모양으로 통째로 덮어써서 나머지
+        # 포맷(레터·팟캐스트·영상 등)이 유실된다 — admin_extra가 진실의
+        # 원천이라 한 번 유실되면 복구 불가. 프론트가 먼저 저장을 막아야
+        # 하지만 서버에서도 한 번 더 막는다.
+        if pub.get("admin_channel") == "lens" and ("channels" in data or "body_inline" in data):
+            if data.get("channels") != ["lens"]:
+                raise ValueError(
+                    "이 글은 자동 파이프라인이 만든 '4가지 시선' 번들입니다 — "
+                    "이 편집기로는 저장할 수 없습니다. '4가지 시선'에서 편집해 주세요."
+                )
 
         set_clauses = []
         params: List[Any] = []

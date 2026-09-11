@@ -206,13 +206,19 @@ function Row({ post, onChanged }: { post: CmsPost; onChanged: () => void }) {
         className="ui-input w-20 rounded-lg px-2 py-1.5 text-[13px]"
       />
       <CustomSelect value={category} options={CATEGORY_OPTIONS} onChange={setCategory} placeholder="카테고리" />
+      {/* 2026-09-11 — webtoon/edit·video/edit와 같은 이유(is_lens_bundle
+          참조): 이 저장은 body_inline을 통째로 덮어써서 lens 번들(4가지
+          시선)의 다른 포맷을 유실시킬 수 있다. 서버가 최종 방어선으로
+          거부하지만, 프론트에서 먼저 막아 "저장했는데 에러만 뜬다"는
+          혼란을 없앤다. */}
       <button
         type="button"
-        disabled={!dirty || busy}
+        disabled={!dirty || busy || post.is_lens_bundle}
         onClick={save}
+        title={post.is_lens_bundle ? "4가지 시선 번들 — '4가지 시선'에서 편집해 주세요" : undefined}
         className="ui-btn ui-btn-primary shrink-0 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold"
       >
-        저장
+        {post.is_lens_bundle ? "4가지 시선에서 편집" : "저장"}
       </button>
       <button
         type="button"

@@ -135,9 +135,16 @@ def admin_list_posts(
 
 
 @app.get("/admin/posts/{post_id}")
-def admin_get_post(post_id: str, x_internal_token: Optional[str] = Header(default=None)):
+def admin_get_post(
+    post_id: str,
+    channel: Optional[str] = Query(default=None),
+    x_internal_token: Optional[str] = Header(default=None),
+):
     _check_admin_token(x_internal_token)
-    post = admin_posts_repo.get(post_id)
+    # channel — 2026-09-11, 웹툰/영상/홈플레이어 편집 화면이 자기 채널을
+    # 실어 보내면 lens 번들 글의 body_inline을 그 포맷에 맞게 평평한
+    # 모양으로 얹어 받는다(admin_posts_repo._to_dict 참조).
+    post = admin_posts_repo.get(post_id, view_channel=channel)
     if not post:
         raise HTTPException(status_code=404, detail="post not found")
     return {"post": post}
@@ -146,7 +153,10 @@ def admin_get_post(post_id: str, x_internal_token: Optional[str] = Header(defaul
 @app.put("/admin/posts/{post_id}")
 def admin_update_post(post_id: str, data: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
-    post = admin_posts_repo.update(post_id, data)
+    try:
+        post = admin_posts_repo.update(post_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not post:
         raise HTTPException(status_code=404, detail="post not found")
     return {"post": post}

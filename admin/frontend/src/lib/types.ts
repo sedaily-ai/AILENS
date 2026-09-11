@@ -213,6 +213,14 @@ export interface CmsPost {
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  /** 2026-09-11 — true면 이 글은 자동 파이프라인이 만든 "4가지 시선" 번들의
+   *  한 포맷 슬라이스를 보여주는 것뿐이다(admin_channel='lens', 이 채널의
+   *  렌디션만 있어 이 목록/편집 화면에 같이 떴다). 단일 포맷 편집기(웹툰/
+   *  영상/홈플레이어)에서 저장하면 서버가 거부한다(body_inline 전체가
+   *  이 슬라이스 하나짜리 모양으로 덮여써져 나머지 포맷이 유실되기
+   *  때문) — 프론트는 이 값이 true면 편집 자체를 잠그고 "4가지 시선"
+   *  편집 화면으로 안내해야 한다. */
+  is_lens_bundle?: boolean;
 }
 
 /** 생성·수정 payload — 부분 수정이므로 전부 선택적. */
