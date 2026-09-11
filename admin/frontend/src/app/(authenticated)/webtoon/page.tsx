@@ -59,6 +59,14 @@ function WebtoonPage() {
   // 페이지가 그 둘을 하나의 aside 안에 순서대로 쌓는다(각 컴포넌트 자체는
   // 안 바꾼 것과 같음 — 다른 화면은 embedded 없이 계속 단독으로 씀).
   const [panelOpen, setPanelOpen] = useState(false);
+  // 2026-09-11 — 셋을 그냥 이어붙이니 "복잡하다"는 피드백. 다시 탭/버튼으로
+  // 쪼개면 위와 같은 불만이 재발하니(2026-09-04), 자리는 하나로 유지하되
+  // 한 번에 하나만 펼쳐 보이는 아코디언으로 바꿨다 — 셋 다 항상 이
+  // 패널 안에 있다는 건 그대로 보이면서, 지금 안 보는 도구의 폼이 화면을
+  // 채우지 않는다. 접혀 있어도 언마운트하지 않는다(LabSection의 hidden
+  // 속성 참조) — 스토리보드/이미지 생성 폴링이 다른 단계를 보는 동안에도
+  // 끊기지 않고 계속돼야 한다.
+  const [openLab, setOpenLab] = useState<"prompt" | "storyboard" | "image">("prompt");
   const visibleReloadKey = useReloadOnVisible();
 
   const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
@@ -242,40 +250,135 @@ function WebtoonPage() {
           panelOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="ui-divider flex items-start justify-between gap-4 border-b px-5 pb-3 pt-5">
-          <h2
-            id="webtoon-panel-title"
-            className="font-display text-[19px] font-bold text-[var(--text-primary)]"
-          >
-            프롬프트 · 이미지 실험
-          </h2>
-          <button
-            type="button"
-            onClick={() => setPanelOpen(false)}
-            className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
-            aria-label="닫기"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
+        <div className="ui-divider space-y-1 border-b px-5 pb-3 pt-5">
+          <div className="flex items-start justify-between gap-4">
+            <h2
+              id="webtoon-panel-title"
+              className="font-display text-[19px] font-bold text-[var(--text-primary)]"
+            >
+              프롬프트 · 이미지 실험
+            </h2>
+            <button
+              type="button"
+              onClick={() => setPanelOpen(false)}
+              className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
+              aria-label="닫기"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-[12.5px] text-[var(--text-muted)]">
+            프롬프트를 손보고 → 기사로 스토리보드를 테스트하고 → 마음에 드는 그림체를 찾으면 발행하세요.
+          </p>
         </div>
 
-        <PromptDrawer channel="webtoon" open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+        <LabSection
+          step={1}
+          title="프롬프트 편집"
+          description="설명·구조·지침을 쓰고 저장 · 기사로 텍스트 테스트"
+          isOpen={openLab === "prompt"}
+          onToggle={() => setOpenLab("prompt")}
+        >
+          <PromptDrawer channel="webtoon" open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+        </LabSection>
 
-        <div className="ui-divider border-t" />
-        <p className="px-5 pb-1 pt-5 text-[13px] font-semibold text-[var(--text-muted)]">
-          스토리보드 테스트 (1·2단계 체인 + 컷별 3단계)
-        </p>
-        <WebtoonStoryboardLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+        <LabSection
+          step={2}
+          title="스토리보드 테스트"
+          description="기사 원문 → 8컷 대사·연출(1·2단계) → 컷별 이미지(3단계)"
+          isOpen={openLab === "storyboard"}
+          onToggle={() => setOpenLab("storyboard")}
+        >
+          <WebtoonStoryboardLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+        </LabSection>
 
-        <div className="ui-divider border-t" />
-        <p className="px-5 pb-1 pt-5 text-[13px] font-semibold text-[var(--text-muted)]">
-          이미지 생성 테스트 (3단계 · Bedrock Stable Diffusion, 장면 하나만 따로)
-        </p>
-
-        <WebtoonImageLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+        <LabSection
+          step={3}
+          title="이미지 실험실"
+          description="스타일·캐릭터(그림체) 파라미터 튜닝 · 발행 · 히스토리 갤러리"
+          isOpen={openLab === "image"}
+          onToggle={() => setOpenLab("image")}
+        >
+          <WebtoonImageLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
+        </LabSection>
       </aside>
+    </div>
+  );
+}
+
+// 2026-09-11 — 프롬프트/스토리보드/이미지 실험 세 도구를 한 번에 하나씩만
+// 펼쳐 보이는 아코디언 행. 접혀 있어도 children을 계속 마운트해두고
+// hidden 속성으로만 감춘다(display:none과 동일 효과) — 조건부 렌더링으로
+// 언마운트하면 스토리보드/이미지 생성의 폴링 타이머와 히스토리 상태가
+// 다른 단계를 보는 사이 사라진다.
+function LabSection({
+  step,
+  title,
+  description,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  step: number;
+  title: string;
+  description: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="ui-divider border-b">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="flex w-full cursor-pointer items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-[var(--surface-sunken)]"
+      >
+        <span
+          className="flex h-7 w-7 flex-none items-center justify-center rounded-full text-[13px] font-bold"
+          style={
+            isOpen
+              ? { background: "var(--accent)", color: "white" }
+              : { background: "var(--surface-sunken)", color: "var(--text-muted)" }
+          }
+          aria-hidden="true"
+        >
+          {step}
+        </span>
+        <span className="min-w-0 flex-1">
+          {/* 펼쳐지면 아래 도구 자신의 헤더(제목+탭)가 바로 나온다 — 이
+              줄이 똑같은 제목을 또 크게 반복하지 않도록 열렸을 때는
+              작고 옅은 "지금 여기" 표시로만 남긴다. */}
+          <span
+            className={
+              isOpen
+                ? "block text-[12px] font-medium text-[var(--text-faint)]"
+                : "block text-[14px] font-semibold text-[var(--text-primary)]"
+            }
+          >
+            {title}
+          </span>
+          {!isOpen && (
+            <span className="mt-0.5 block truncate text-[12px] text-[var(--text-muted)]">{description}</span>
+          )}
+        </span>
+        <svg
+          className="h-4 w-4 flex-none text-[var(--text-faint)] transition-transform duration-200"
+          style={{ transform: isOpen ? "rotate(180deg)" : undefined }}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      <div hidden={!isOpen}>{children}</div>
     </div>
   );
 }
