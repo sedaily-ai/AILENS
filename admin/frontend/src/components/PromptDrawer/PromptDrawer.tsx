@@ -30,7 +30,9 @@ import { PromptField } from "./PromptField";
    2026-08-09 의 정중앙 모달(PromptEditModal)을 대체한다.
 
    구조: 채널(letters/webtoon/podcast/video)당 문서 하나(백엔드 프롬프트 id
-         `<channel>/published`). 설명·구조·지침 3섹션, 섹션마다
+         `<channel>/published`), 섹션은 "프롬프트" 하나(2026-09-11까지는
+         설명·구조·지침·파일로 나뉘어 있었다 — 전부 이 하나로 합쳐졌다,
+         아래 2026-09-11 항목 참조). 그 하나 안에서
            · 형식(Markdown · 텍스트 · 코드+언어)을 골라 직접 입력하거나
            · 텍스트 기반 파일·PDF 를 첨부한다(본문을 읽어 보관 → 프롬프트에 들어간다).
 
@@ -46,7 +48,13 @@ import { PromptField } from "./PromptField";
 
    2026-09-11 — "초안"/"발행" 스코프 탭(ScopeTabs) 폐기. 저장하면 곧바로
    파이프라인이 읽는 문서가 바뀌도록 채널당 문서를 하나로 합쳤다 —
-   @/lib/prompt 상단 주석 참조. */
+   @/lib/prompt 상단 주석 참조.
+
+   2026-09-11(같은 날) — "설명"/"지침"/"파일" 3섹션도 "프롬프트" 한
+   섹션으로 합쳤다("이 둘을 어떤 기준으로 나누냐"는 사용자 지적 —
+   SECTION_DEFS 정의는 @/lib/prompt, 마이그레이션은 presetFromSections/
+   presetFromProse 참조). 이 파일 쪽 코드는 SECTION_DEFS를 그대로
+   순회해서 렌더하므로 섹션 개수가 바뀌어도 따로 손 볼 데가 없었다. */
 
 /** 채널 하나의 서버 상태. */
 interface ChannelState {
@@ -624,7 +632,7 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
                 onClick={() => void handleCopy()}
                 disabled={!filled}
                 className="ui-btn rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)]"
-                title="설명·구조·지침과 첨부 내용을 하나의 프롬프트로 합쳐 복사"
+                title="프롬프트 내용과 첨부 파일을 하나로 합쳐 복사"
               >
                 <Icon d={ICON.copy} className="h-3.5 w-3.5" />
                 복사

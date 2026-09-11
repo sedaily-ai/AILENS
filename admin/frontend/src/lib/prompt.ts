@@ -1,4 +1,4 @@
-// 프롬프트 편집 문서 모델 — 스코프 · 섹션 · 형식 · 첨부 · 백엔드 직렬화.
+// 프롬프트 편집 문서 모델 — 섹션 · 형식 · 첨부 · 백엔드 직렬화.
 //
 // PromptDrawer 는 UI 만 담당하고 데이터 규칙은 전부 여기 모은다.
 //
@@ -7,9 +7,12 @@
 // 백엔드는 `PROMPT#<category>/<name>` 하나당 버전 행(`v#N`)을 쌓는다. 그 행에
 // 두 가지를 넣는다:
 //
-//   content       ← 3섹션을 이어붙인 **산문**. prompt_loader 가 읽어 Bedrock 에
-//                   그대로(템플릿 치환·파싱 없이) 넘기는 값이라 여기엔 모델이
-//                   읽을 텍스트만 들어가야 한다. JSON 을 넣으면 모델이 JSON 을 읽는다.
+//   content       ← 2섹션(프롬프트·파일)을 이어붙인 **산문**. prompt_loader 가
+//                   읽어 Bedrock 에 그대로(템플릿 치환·파싱 없이) 넘기는 값이라
+//                   여기엔 모델이 읽을 텍스트만 들어가야 한다. JSON 을 넣으면
+//                   모델이 JSON 을 읽는다. ⚠️ 이 필드 이름과 아래 PromptSectionKey
+//                   "content"(프롬프트 섹션 하나)는 이름만 같고 다른 것이다 —
+//                   전자는 백엔드 최상위 문자열 필드, 후자는 sections 안 섹션 키.
 //   sections_json ← 편집기가 폼을 복원하기 위한 **구조**. 읽기 경로는 이 속성을
 //                   보지 않으므로 추론에 영향이 없다.
 //
@@ -105,14 +108,18 @@ export interface PromptSection {
 }
 
 // "구조"(structure)는 2026-08-20 없앴다 — "지침"과 경계가 흐릿해(출력 틀도
-// 결국 지켜야 할 규칙 중 하나) 실제로는 거의 항상 같이 채워졌다. 대신 그
-// 자리에 "파일"(attachments) 섹션을 뒀다 — 참고 문서(레퍼런스 프롬프트
-// 원본 .md, 예시 산출물 등)를 첨부 전용으로 붙이는 자리. PromptSection이
-// 이미 attachments를 들고 있어 다른 두 섹션과 같은 컴포넌트(PromptField)를
-// 그대로 재사용한다 — 텍스트 칸도 있지만 보통 비워두고 첨부만 쓴다.
-export type PromptSectionKey = "description" | "guidelines" | "attachments";
+// 결국 지켜야 할 규칙 중 하나) 실제로는 거의 항상 같이 채워졌다.
+//
+// 2026-09-11 — 같은 이유로 "설명"·"지침"·"파일" 셋 다 하나로 합쳤다.
+// "이게 뭔지"(설명)/"어떻게 만들지"(지침)/"참고 자료"(파일)를 칸으로
+// 나눠놨더니 사용자가 "이걸 어떤 기준으로 나누나" 헷갈려했다 — "구조"를
+// 없앨 때와 완전히 같은 패턴. 이제 칸이 하나뿐이라 파일 첨부 전용
+// 섹션도 의미가 없어졌다(첨부는 섹션이 아니라 PromptSection 자체가 갖는
+// 속성 — 아래 attachments 필드 — 이라 남은 유일한 섹션에 그대로 붙일 수
+// 있다. 기능은 그대로, 칸만 줄었다).
+export type PromptSectionKey = "content";
 
-/** 프롬프트 한 벌 = 3섹션. 버전·저장시각은 백엔드가 관리하므로 여기 없다. */
+/** 프롬프트 한 벌 = 섹션 하나. 버전·저장시각은 백엔드가 관리하므로 여기 없다. */
 export type PromptPreset = Record<PromptSectionKey, PromptSection>;
 
 export const SECTION_DEFS: Array<{
@@ -124,28 +131,13 @@ export const SECTION_DEFS: Array<{
   placeholder: string;
 }> = [
   {
-    key: "description",
-    label: "설명",
-    hint: "무엇인지 · 언제 쓰는지",
-    rows: 3,
-    defaultFormat: "text",
-    placeholder: "예) 오늘의 1면 요약 기사를 만들 때 쓰는 프롬프트",
-  },
-  {
-    key: "guidelines",
-    label: "지침",
-    hint: "출력 틀 · 지켜야 할 규칙 · 톤 · 제약",
-    rows: 10,
+    key: "content",
+    label: "프롬프트",
+    hint: "무엇인지 · 언제 쓰는지 · 출력 틀 · 지켜야 할 규칙 · 톤 · 제약 · (필요하면 파일 첨부)",
+    rows: 16,
     defaultFormat: "markdown",
-    placeholder: "예)\n1. 헤드라인\n2. 3문단 요약\n3. 핵심 키워드 3개\n\n- 문장은 간결하게\n- 추측성 표현 금지\n- 숫자는 출처와 함께",
-  },
-  {
-    key: "attachments",
-    label: "파일",
-    hint: "참고 문서 첨부 (본문은 비워둬도 됩니다)",
-    rows: 3,
-    defaultFormat: "text",
-    placeholder: "본문 없이 첨부 파일만 붙여도 됩니다.",
+    placeholder:
+      "예)\n오늘의 1면 요약 기사를 만들 때 쓰는 프롬프트.\n\n1. 헤드라인\n2. 3문단 요약\n3. 핵심 키워드 3개\n\n- 문장은 간결하게\n- 추측성 표현 금지\n- 숫자는 출처와 함께",
   },
 ];
 
@@ -155,9 +147,7 @@ export function emptySection(format: PromptFormat): PromptSection {
 
 export function emptyPreset(): PromptPreset {
   return {
-    description: emptySection("text"),
-    guidelines: emptySection("markdown"),
-    attachments: emptySection("text"),
+    content: emptySection("markdown"),
   };
 }
 
@@ -440,12 +430,12 @@ function utf8Bytes(s: string): number {
   return new TextEncoder().encode(s).length;
 }
 
-/** 백엔드 `sections` 로 보낼 구조. content 와 달리 모델이 읽지 않는다. */
+/** 백엔드 `sections` 로 보낼 구조. content(프롬프트 산문 전체)와 이름이
+ *  겹치지만 다른 것이다 — 이건 편집기 폼 복원용 구조고, 모델이 읽는 값은
+ *  buildPromptText()가 만드는 산문이다. */
 export function sectionsPayload(p: PromptPreset): Record<string, PromptSection> {
   return {
-    description: p.description,
-    guidelines: p.guidelines,
-    attachments: p.attachments,
+    content: p.content,
   };
 }
 
@@ -488,32 +478,69 @@ function toSection(v: unknown, fallback: PromptFormat): PromptSection {
   };
 }
 
-/** 백엔드 `sections` (unknown) → 프리셋. 모양이 아니면 null. */
+/** 백엔드 `sections` (unknown) → 프리셋. 모양이 아니면 null.
+ *
+ * 2026-09-11 이전엔 `{description, guidelines, attachments}` 3키로 저장됐다
+ * ("설명"/"지침"/"파일" 통합 전). 그 옛 모양을 만나면 셋 다 합쳐 새
+ * `content` 한 칸으로 옮긴다(첨부 파일은 텍스트가 아니라 각 섹션의
+ * attachments 배열이므로 그대로 이어붙인다) — 읽을 때 1회성
+ * 마이그레이션이라, 다음에 저장하면 새 모양(`{content}`)으로 다시 쓰인다.
+ * 같은 날 아주 잠깐 썼던 `{content, attachments}` 2키 모양도 같은 방식으로
+ * 흡수한다. */
 export function presetFromSections(raw: unknown): PromptPreset | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  // 세 키 중 하나라도 섹션 모양이면 구조가 있는 것으로 본다.
-  const known = SECTION_DEFS.some((d) => r[d.key] && typeof r[d.key] === "object");
-  if (!known) return null;
+
+  const hasContentShape = !!r.content && typeof r.content === "object";
+  const hasOldShape =
+    (!!r.description && typeof r.description === "object") ||
+    (!!r.guidelines && typeof r.guidelines === "object");
+  const hasAttachmentsOnly = !!r.attachments && typeof r.attachments === "object";
+  if (!hasContentShape && !hasOldShape && !hasAttachmentsOnly) return null;
+
+  // 예전 "파일" 섹션(있었으면) — 파일 자체는 attachments 배열이라 어느
+  // 모양이든 마지막에 content.attachments로 이어붙인다.
+  const filesSection = toSection(r.attachments, "text");
+
+  if (hasOldShape) {
+    const description = toSection(r.description, "text");
+    const guidelines = toSection(r.guidelines, "markdown");
+    const mergedText = [description.text, guidelines.text]
+      .filter((t) => t.trim() !== "")
+      .join("\n\n");
+    return {
+      content: {
+        text: mergedText,
+        format: guidelines.text.trim() ? guidelines.format : description.format,
+        language: guidelines.language ?? description.language,
+        attachments: [...description.attachments, ...guidelines.attachments, ...filesSection.attachments],
+      },
+    };
+  }
+
+  const content = toSection(r.content, "markdown");
   return {
-    description: toSection(r.description, "text"),
-    guidelines: toSection(r.guidelines, "markdown"),
-    attachments: toSection(r.attachments, "text"),
+    content: { ...content, attachments: [...content.attachments, ...filesSection.attachments] },
   };
 }
 
 const HEADING_BY_LABEL: Record<string, PromptSectionKey> = {
-  설명: "description",
-  지침: "guidelines",
-  파일: "attachments",
+  // "설명"/"지침"/"파일"은 2026-09-11 이전 옛 헤딩 — 새로 저장되는 문서는
+  // 이제 "프롬프트" 하나만 쓰지만, 그 이전에 sections 없이(순수 content만)
+  // 저장됐던 프롬프트를 프로세스 폴백으로 되읽을 때를 위해 계속 인식한다.
+  설명: "content",
+  지침: "content",
+  프롬프트: "content",
+  파일: "content",
 };
 
 /**
  * sections 가 없는 프롬프트(옛 버전 · /prompts/edit 평문 저장 · 시드 .md)를
- * 최대한 섹션으로 되돌린다. `## 설명` / `## 지침` / `## 파일` 헤딩만 인식하고,
- * 하나도 없으면 전체를 지침에 넣는다 — 내용을 잃지 않는 게 우선이다. 옛
- * `## 구조` 헤딩(2026-08-20 폐기)은 더 이상 안 잡힌다 — 그 아래 내용은
- * 헤딩 자체가 일반 텍스트로 취급되어 직전 섹션(대개 설명)에 그대로 붙는다.
+ * 최대한 섹션으로 되돌린다. `## 프롬프트`(신규) 또는 `## 설명`/`## 지침`
+ * (구, 2026-09-11 통합 전) / `## 파일` 헤딩만 인식하고, 하나도 없으면
+ * 전체를 프롬프트 칸에 넣는다 — 내용을 잃지 않는 게 우선이다. 옛 `## 구조`
+ * 헤딩(2026-08-20 폐기)은 더 이상 안 잡힌다 — 그 아래 내용은 헤딩 자체가
+ * 일반 텍스트로 취급되어 직전 섹션에 그대로 붙는다.
  *
  * ⚠️ sections 가 있으면 그게 정본이다. 이건 폴백 전용이다.
  */
@@ -526,7 +553,7 @@ export function presetFromProse(content: string): PromptPreset {
   let current: PromptSectionKey | null = null;
 
   for (const line of lines) {
-    const m = /^##\s+(설명|지침|파일)\s*$/.exec(line.trim());
+    const m = /^##\s+(설명|지침|프롬프트|파일)\s*$/.exec(line.trim());
     if (m) {
       current = HEADING_BY_LABEL[m[1]];
       buckets[current] = buckets[current] ?? [];
@@ -538,7 +565,7 @@ export function presetFromProse(content: string): PromptPreset {
 
   const matched = Object.keys(buckets).length > 0;
   if (!matched) {
-    preset.guidelines.text = content.trim();
+    preset.content.text = content.trim();
     return preset;
   }
 
@@ -546,10 +573,10 @@ export function presetFromProse(content: string): PromptPreset {
     const body = buckets[def.key];
     if (body) preset[def.key].text = body.join("\n").trim();
   }
-  // 첫 헤딩 앞에 있던 내용은 버리지 않고 설명 앞에 붙인다.
+  // 첫 헤딩 앞에 있던 내용은 버리지 않고 프롬프트 칸 앞에 붙인다.
   const lead = preamble.join("\n").trim();
   if (lead) {
-    preset.description.text = [lead, preset.description.text]
+    preset.content.text = [lead, preset.content.text]
       .filter((v) => v !== "")
       .join("\n\n");
   }
