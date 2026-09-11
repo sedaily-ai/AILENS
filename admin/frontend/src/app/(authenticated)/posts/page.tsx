@@ -63,6 +63,10 @@ function PostsPage() {
   const searchParams = useSearchParams();
   const [posts, setPosts] = useState<CmsPost[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 2026-09-11 — 필터 변경 재조회 중 posts가 이전 값 그대로라 화면이
+  // 멈춘 것처럼 보였다는 지적(ContentTable의 loading prop 참조). 자세한
+  // 이유는 webtoon/page.tsx의 같은 주석 참조(set-state-in-effect 회피).
+  const [fetchedKey, setFetchedKey] = useState("");
   // 필터·페이지 상태를 URL(?status=&channel=&from=&to=&page=)에 동기화 —
   // 글 하나를 열었다가 뒤로가기 했을 때 필터가 "전체"·1페이지로 리셋되던
   // 문제(2026-08-08 사용자 리포트). 초기값은 URL에서 읽고, 바뀔 때마다
@@ -143,7 +147,16 @@ function PostsPage() {
   const visibleReloadKey = useReloadOnVisible();
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
-  // 필터를 바꿔도 이전 목록을 유지하다가 새 응답이 오면 교체 — 깜빡임도 없다.
+  // 필터를 바꿔도 이전 목록을 유지하다가 새 응답이 오면 교체 — 예전엔
+  // 이걸로 "깜빡임 없음"만 노렸는데, 그러다 보니 재조회가 오래 걸릴 때
+  // 화면이 멈춘 것처럼 보인다는 지적을 받았다(2026-09-11). fetchedKey를
+  // "지금 필터 조합"(requestKey)과 비교해서 loading을 파생시키면 setState
+  // 동기 호출 없이도(.then()/.catch() 콜백 안에서만 부름) 로딩 신호를
+  // 만들 수 있다 — ContentTable의 loading prop 참조. channel은 Set이라
+  // JSON.stringify가 내용을 못 담으므로(항상 "{}") 배열로 바꿔서 넣는다.
+  const requestKey = JSON.stringify([status, [...channel].sort(), dateRange, visibleReloadKey, bulkReloadKey]);
+  const loading = fetchedKey !== requestKey;
+
   useEffect(() => {
     let cancelled = false;
     const params: { status?: string; limit?: number } = {
@@ -169,13 +182,17 @@ function PostsPage() {
         );
         setPosts(filtered);
         setError(null);
+        setFetchedKey(requestKey);
       })
       .catch((err) => {
-        if (!cancelled) setError((err as Error).message);
+        if (cancelled) return;
+        setError((err as Error).message);
+        setFetchedKey(requestKey);
       });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey는 아래 deps에서 파생돼 그 값들과 항상 동기화됨
   }, [status, channel, dateRange, visibleReloadKey, bulkReloadKey]);
 
   // 필터가 바뀌면 화면에 보이던 선택 대상 자체가 통째로 바뀌는 셈이라(다른
@@ -297,6 +314,7 @@ function PostsPage() {
 
       <ContentTable
         posts={posts}
+        loading={loading}
         editHref={(p) => `/posts/edit?id=${encodeURIComponent(p.id)}`}
         newHref="/posts/edit"
         newLabel="새 글 쓰기"

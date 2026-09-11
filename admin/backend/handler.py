@@ -41,7 +41,9 @@ HANDLERS: dict[str, tuple] = {
     "GET /admin/prompts/{category}/{name}": (prompts.handle_get, True),
     "POST /admin/prompts/{category}/{name}": (prompts.handle_update, True),
     "POST /admin/prompts/{category}/{name}/test": (prompts.handle_test, True),
+    "GET /admin/prompts/{category}/{name}/test/{job_id}": (prompts.handle_test_status, True),
     "POST /admin/prompts/{category}/{name}/storyboard-test": (prompts.handle_storyboard_test, True),
+    "GET /admin/prompts/{category}/{name}/storyboard-test/{job_id}": (prompts.handle_storyboard_test_status, True),
     "GET /admin/cost": (cost.handle_summary, True),
     "GET /admin/audit": (audit_route.handle_list, True),
     "GET /admin/newsletter/stats": (newsletter.handle_stats, True),
@@ -141,6 +143,20 @@ def _session_from_claims(claims: dict | None) -> str | None:
 
 
 def lambda_handler(event: dict, context) -> dict:
+    # 2026-09-11 — 프롬프트 테스트(Bedrock)가 30초 API Gateway 벽을 넘길 수
+    # 있어 비동기로 뺐다: 원 요청은 job_id만 즉시 돌려주고, 실제 Bedrock
+    # 호출은 이 함수가 자기 자신을 InvocationType="Event"로 다시 호출해서
+    # 만든 완전히 별개의 invocation에서 처리한다(routes/prompts.py::
+    # _self_invoke_async 참고). webtoon_lab.py의 threading 방식(그 파일
+    # docstring이 직접 경고: "Lambda는 호출이 끝나는 순간 컨테이너가
+    # 얼려질 수 있어 스레드가 안 끝날 위험")은 수 초짜리 작업엔 버텨도
+    # 25~40초 걸리는 이 작업엔 못 버틴다 — self-invoke는 완전히 새
+    # invocation이라 그 문제가 없다. 이 내부 이벤트는 API Gateway를 안
+    # 거쳐 HTTP 모양이 아니므로 정상 라우팅보다 먼저 걸러낸다.
+    if event.get("_async_prompt_job"):
+        from routes import prompts
+        prompts.run_async_job(event["_async_prompt_job"])
+        return {}
     try:
         method, path, route_key, path_params, query_params, body = _parse_event(event)
         logger.info(f"admin: {method} {path} (routeKey={route_key})")

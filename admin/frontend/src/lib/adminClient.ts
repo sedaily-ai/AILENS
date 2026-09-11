@@ -21,7 +21,8 @@ import type {
   WebtoonLabJob,
   WebtoonLabHistoryItem,
   WebtoonLabDefaults,
-  WebtoonStoryboardResult,
+  PromptTestJob,
+  WebtoonStoryboardJob,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -203,19 +204,30 @@ export const adminApi = {
         body: JSON.stringify(sections === undefined ? { content } : { content, sections }),
       }
     ),
-  // LLMOps 테스트 실행(2026-08-19) — 저장 여부와 무관하게 지금 편집 중인
-  // content를 기사 원문과 함께 GPT에 넘겨 실제 산출물을 받는다.
+  // LLMOps 테스트 실행(2026-08-19, 2026-09-11 작업+폴링으로 전환) — 저장
+  // 여부와 무관하게 지금 편집 중인 content를 기사 원문과 함께 그 채널의
+  // 실제 프로덕션 모델(Bedrock)에 넘긴다. 레터(Opus 5)는 실측상 API
+  // Gateway 30초 벽 안에 동기 응답이 불가능해서(routes/prompts.py 참고)
+  // job_id만 즉시 받고 getPromptTestJob으로 폴링한다.
   testPrompt: (category: string, name: string, content: string, article: string) =>
-    request<{ output: string }>(
+    request<{ job_id: string; status: string }>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/test`,
       { method: "POST", body: JSON.stringify({ content, article }) }
     ),
-  // 웹툰 스토리보드 테스트(2026-09-11) — 1·2단계를 체인 호출해 8컷을 한 번에
-  // 받는다(routes/prompts.py::handle_storyboard_test 참고).
+  getPromptTestJob: (category: string, name: string, jobId: string) =>
+    request<PromptTestJob>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/test/${encodeURIComponent(jobId)}`
+    ),
+  // 웹툰 스토리보드 테스트(2026-09-11, 같은 날 작업+폴링으로 전환) — 1·2단계를
+  // 체인 호출해 8컷을 반환한다(routes/prompts.py::handle_storyboard_test).
   storyboardTest: (category: string, name: string, content: string, article: string) =>
-    request<WebtoonStoryboardResult>(
+    request<{ job_id: string; status: string }>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/storyboard-test`,
       { method: "POST", body: JSON.stringify({ content, article }) }
+    ),
+  getStoryboardTestJob: (category: string, name: string, jobId: string) =>
+    request<WebtoonStoryboardJob>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/storyboard-test/${encodeURIComponent(jobId)}`
     ),
 
   // Cost & Audit

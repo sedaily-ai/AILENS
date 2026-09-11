@@ -48,12 +48,25 @@ interface Props {
    *  PromptDrawer·WebtoonImageLab과 같은 관례(webtoon/page.tsx가 한 aside
    *  안에 셋을 순서대로 쌓는다). 기본 false. */
   embedded?: boolean;
+  /** 2026-09-11 — "프롬프트 편집" 단계의 테스트 실행과 기사 원문을
+   *  공유하고 싶을 때만 준다(PromptDrawer의 같은 이름 prop과 짝) — 한쪽에
+   *  붙여넣으면 다른 쪽에도 그대로 보인다. 안 주면 내부 state로 독립 관리. */
+  article?: string;
+  onArticleChange?: (v: string) => void;
 }
 
-export function WebtoonStoryboardLab({ open, onClose, embedded = false }: Props) {
+export function WebtoonStoryboardLab({
+  open,
+  onClose,
+  embedded = false,
+  article: controlledArticle,
+  onArticleChange,
+}: Props) {
   const toast = useToast();
 
-  const [article, setArticle] = useState("");
+  const [internalArticle, setInternalArticle] = useState("");
+  const article = controlledArticle ?? internalArticle;
+  const setArticle = onArticleChange ?? setInternalArticle;
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [storyboard, setStoryboard] = useState<WebtoonStoryboardResult | null>(null);
@@ -61,10 +74,18 @@ export function WebtoonStoryboardLab({ open, onClose, embedded = false }: Props)
   const [cutJobs, setCutJobs] = useState<Record<number, CutJobState>>({});
 
   const pollTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  // 2026-09-11 — 스토리보드 생성 자체도(1·2단계 체인) 이제 작업+폴링이라
+  // (레터/웹툰이 GPT-4o에서 실제 프로덕션 모델로 바뀌면서 API Gateway
+  // 30초 벽을 넘길 수 있게 됨) 컷별 이미지 폴링과는 별개 타이머가 필요.
+  const storyboardPollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearAllPolls = useCallback(() => {
     Object.values(pollTimers.current).forEach(clearTimeout);
     pollTimers.current = {};
+    if (storyboardPollTimer.current) {
+      clearTimeout(storyboardPollTimer.current);
+      storyboardPollTimer.current = null;
+    }
   }, []);
 
   useEffect(() => clearAllPolls, [clearAllPolls]);
@@ -139,6 +160,37 @@ export function WebtoonStoryboardLab({ open, onClose, embedded = false }: Props)
 
   const anyPending = Object.values(cutJobs).some((j) => j.status === "pending");
 
+  // 2026-09-11 — 웹툰 스크립트+장면연출(1·2단계 체인)이 GPT-4o에서 실제
+  // 프로덕션 모델(Sonnet 4.6)로 바뀌면서 작업+폴링 방식이 됐다 — 순차 2회
+  // 호출이라 API Gateway 30초 벽을 넘기기 더 쉽다(PromptDrawer.tsx의
+  // 같은 이유 참조). 재귀 폴링이라 함수 선언(호이스팅 필요).
+  function pollStoryboardJob(jobId: string) {
+    adminApi
+      .getStoryboardTestJob("webtoon", "published", jobId)
+      .then((j) => {
+        if (j.status === "pending") {
+          storyboardPollTimer.current = setTimeout(() => pollStoryboardJob(jobId), 4000);
+          return;
+        }
+        setGenerating(false);
+        if (j.status === "done" && j.cuts) {
+          const result: WebtoonStoryboardResult = {
+            core_question: j.core_question,
+            characters: j.characters,
+            cuts: j.cuts,
+          };
+          setStoryboard(result);
+          setCuts(result.cuts);
+        } else {
+          setGenError(j.error ?? "스토리보드 생성 실패");
+        }
+      })
+      .catch((err) => {
+        setGenerating(false);
+        setGenError(err instanceof AdminApiError ? err.message : "상태 조회 실패");
+      });
+  }
+
   const handleGenerateStoryboard = async () => {
     if (generating) return;
     if (!article.trim()) {
@@ -153,13 +205,11 @@ export function WebtoonStoryboardLab({ open, onClose, embedded = false }: Props)
     setCutJobs({});
     try {
       const prompt = await adminApi.getPrompt("webtoon", "published");
-      const result = await adminApi.storyboardTest("webtoon", "published", prompt.active_content, article.trim());
-      setStoryboard(result);
-      setCuts(result.cuts);
+      const { job_id } = await adminApi.storyboardTest("webtoon", "published", prompt.active_content, article.trim());
+      storyboardPollTimer.current = setTimeout(() => pollStoryboardJob(job_id), 4000);
     } catch (err) {
-      setGenError(err instanceof AdminApiError ? err.message : "스토리보드 생성 실패");
-    } finally {
       setGenerating(false);
+      setGenError(err instanceof AdminApiError ? err.message : "스토리보드 생성 실패");
     }
   };
 
@@ -219,8 +269,13 @@ export function WebtoonStoryboardLab({ open, onClose, embedded = false }: Props)
             disabled={generating}
             className="ui-btn ui-btn-primary mt-2 rounded-lg px-4 py-2.5 text-sm font-semibold"
           >
-            {generating ? "1·2단계 생성 중... (최대 30초)" : "스토리보드 생성"}
+            {generating ? "1·2단계 생성 중..." : "스토리보드 생성"}
           </button>
+          {generating && (
+            <p className="mt-1 text-[11px] text-[var(--text-faint)]">
+              실제 프로덕션 모델(Bedrock Sonnet 4.6)로 순차 2단계를 진행합니다 — 1분 가까이 걸릴 수 있습니다.
+            </p>
+          )}
         </div>
 
         {genError && (

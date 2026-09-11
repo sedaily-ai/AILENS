@@ -21,6 +21,14 @@ import type { CmsPost } from "@/lib/types";
 // 글 관리와 같은 ContentTable을 쓴다("표는 공통된 컴포넌트 사용" 요청).
 // 채널이 이미 webtoon 하나로 고정된 화면이라 ContentTable의 채널 열은 뺐다.
 
+type LabId = "prompt" | "storyboard" | "image";
+
+const LAB_STEPS: Array<{ id: LabId; step: number; title: string }> = [
+  { id: "prompt", step: 1, title: "프롬프트 편집" },
+  { id: "storyboard", step: 2, title: "스토리보드 테스트" },
+  { id: "image", step: 3, title: "이미지 실험실" },
+];
+
 // useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수.
 export default function WebtoonPageWrapper() {
   return (
@@ -36,6 +44,13 @@ function WebtoonPage() {
   const searchParams = useSearchParams();
   const [posts, setPosts] = useState<CmsPost[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 2026-09-11 — 필터 변경 재조회 중 posts가 이전 값 그대로라 화면이
+  // 멈춘 것처럼 보였다는 지적(ContentTable의 loading prop 참조). effect
+  // 본문에서 setLoading(true)를 동기 호출하면 set-state-in-effect 린트에
+  // 걸린다("근본 수정 먼저" 정책) — 대신 "지금 필터 조합"을 키로 만들어
+  // "마지막으로 성공/실패까지 완료한 필터 조합" 키와 비교한다. setState는
+  // 전부 .then()/.catch() 콜백 안에서만(비동기 경계 안에서만) 부른다.
+  const [fetchedKey, setFetchedKey] = useState("");
   const [status, setStatusState] = useState(() => searchParams.get("status") ?? "");
   const [dateRange, setDateRangeState] = useState<DateRange>(() => ({
     from: searchParams.get("from") || null,
@@ -61,12 +76,23 @@ function WebtoonPage() {
   const [panelOpen, setPanelOpen] = useState(false);
   // 2026-09-11 — 셋을 그냥 이어붙이니 "복잡하다"는 피드백. 다시 탭/버튼으로
   // 쪼개면 위와 같은 불만이 재발하니(2026-09-04), 자리는 하나로 유지하되
-  // 한 번에 하나만 펼쳐 보이는 아코디언으로 바꿨다 — 셋 다 항상 이
-  // 패널 안에 있다는 건 그대로 보이면서, 지금 안 보는 도구의 폼이 화면을
-  // 채우지 않는다. 접혀 있어도 언마운트하지 않는다(LabSection의 hidden
-  // 속성 참조) — 스토리보드/이미지 생성 폴링이 다른 단계를 보는 동안에도
-  // 끊기지 않고 계속돼야 한다.
-  const [openLab, setOpenLab] = useState<"prompt" | "storyboard" | "image">("prompt");
+  // 한 번에 하나만 보이도록 바꿨다 — 셋 다 항상 이 패널 안에 있다는 건
+  // 그대로 유지하면서, 지금 안 보는 도구의 폼이 화면을 채우지 않는다.
+  // 처음엔 아코디언(각 단계 제목을 누르면 그 아래로 펼쳐짐)으로 했는데,
+  // "단계 전환이 상단에 고정된 이어지는 흐름처럼 보였으면 좋겠다"는
+  // 요청으로 StepBar(아래) 방식으로 바꿨다 — 3단계 전부 패널 맨 위에
+  // sticky로 고정된 연결된 스텝바로 보여주고, 그 아래에 선택된 단계의
+  // 내용만 나온다. 안 보이는 단계도 언마운트하지 않는다(hidden 속성) —
+  // 스토리보드/이미지 생성 폴링이 다른 단계를 보는 동안에도 끊기지
+  // 않고 계속돼야 한다.
+  const [openLab, setOpenLab] = useState<LabId>("prompt");
+  // 2026-09-11 — "각 단계를 효율적으로 넘어갈 수 있도록" 요청 — 1단계
+  // (프롬프트 편집의 테스트 실행)와 2단계(스토리보드 테스트)가 똑같은
+  // 기사 원문을 각자 따로 입력받고 있어서, 매번 두 번 붙여넣어야 했다.
+  // 여기서 하나로 들어올려 PromptDrawer·WebtoonStoryboardLab 둘 다에
+  // 제어 컴포넌트로 넘긴다(각 컴포넌트의 testArticle/article prop 참조) —
+  // 한쪽에 붙여넣으면 다른 쪽에도 그대로 보인다.
+  const [sharedArticle, setSharedArticle] = useState("");
   const visibleReloadKey = useReloadOnVisible();
 
   const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
@@ -106,6 +132,9 @@ function WebtoonPage() {
     });
   };
 
+  const requestKey = JSON.stringify([status, dateRange, visibleReloadKey, bulkReloadKey]);
+  const loading = fetchedKey !== requestKey;
+
   useEffect(() => {
     let cancelled = false;
     adminApi
@@ -122,13 +151,17 @@ function WebtoonPage() {
         });
         setPosts(filtered);
         setError(null);
+        setFetchedKey(requestKey);
       })
       .catch((err) => {
-        if (!cancelled) setError((err as Error).message);
+        if (cancelled) return;
+        setError((err as Error).message);
+        setFetchedKey(requestKey);
       });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey는 [status, dateRange, ...]에서 파생돼 그 값들과 항상 동기화됨
   }, [status, dateRange, visibleReloadKey, bulkReloadKey]);
 
   useEffect(() => {
@@ -207,6 +240,7 @@ function WebtoonPage() {
 
       <ContentTable
         posts={posts}
+        loading={loading}
         editHref={(p) => `/webtoon/edit?id=${encodeURIComponent(p.id)}`}
         newHref="/webtoon/edit"
         newLabel="새 웹툰"
@@ -250,135 +284,119 @@ function WebtoonPage() {
           panelOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="ui-divider space-y-1 border-b px-5 pb-3 pt-5">
-          <div className="flex items-start justify-between gap-4">
-            <h2
-              id="webtoon-panel-title"
-              className="font-display text-[19px] font-bold text-[var(--text-primary)]"
-            >
-              프롬프트 · 이미지 실험
-            </h2>
-            <button
-              type="button"
-              onClick={() => setPanelOpen(false)}
-              className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
-              aria-label="닫기"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
+        {/* 2026-09-11 — 제목·닫기·스텝바를 한 sticky 블록으로 묶어 패널
+            맨 위에 고정한다 — 아래 도구 내용이 아무리 길어도(특히 프롬프트
+            텍스트 칸) 스크롤해서 다른 단계로 못 넘어가는 일이 없게. 배경을
+            불투명하게 칠해야 한다 — 안 칠하면 스크롤되는 본문이 뒤에서
+            비친다. */}
+        <div className="sticky top-0 z-10 bg-[var(--surface-card)]">
+          <div className="ui-divider space-y-1 border-b px-5 pb-3 pt-5">
+            <div className="flex items-start justify-between gap-4">
+              <h2
+                id="webtoon-panel-title"
+                className="font-display text-[19px] font-bold text-[var(--text-primary)]"
+              >
+                프롬프트 · 이미지 실험
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPanelOpen(false)}
+                className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
+                aria-label="닫기"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-[12.5px] text-[var(--text-muted)]">
+              프롬프트를 손보고 → 기사로 스토리보드를 테스트하고 → 마음에 드는 그림체를 찾으면 발행하세요.
+            </p>
           </div>
-          <p className="text-[12.5px] text-[var(--text-muted)]">
-            프롬프트를 손보고 → 기사로 스토리보드를 테스트하고 → 마음에 드는 그림체를 찾으면 발행하세요.
-          </p>
+          <StepBar steps={LAB_STEPS} activeId={openLab} onSelect={setOpenLab} />
         </div>
 
-        <LabSection
-          step={1}
-          title="프롬프트 편집"
-          description="설명·구조·지침을 쓰고 저장 · 기사로 텍스트 테스트"
-          isOpen={openLab === "prompt"}
-          onToggle={() => setOpenLab("prompt")}
-        >
-          <PromptDrawer channel="webtoon" open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
-        </LabSection>
-
-        <LabSection
-          step={2}
-          title="스토리보드 테스트"
-          description="기사 원문 → 8컷 대사·연출(1·2단계) → 컷별 이미지(3단계)"
-          isOpen={openLab === "storyboard"}
-          onToggle={() => setOpenLab("storyboard")}
-        >
-          <WebtoonStoryboardLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
-        </LabSection>
-
-        <LabSection
-          step={3}
-          title="이미지 실험실"
-          description="스타일·캐릭터(그림체) 파라미터 튜닝 · 발행 · 히스토리 갤러리"
-          isOpen={openLab === "image"}
-          onToggle={() => setOpenLab("image")}
-        >
+        {/* 안 보이는 단계도 언마운트하지 않는다 — 스토리보드/이미지 생성
+            폴링이 다른 단계를 보는 동안에도 끊기지 않고 계속돼야 한다. */}
+        <div hidden={openLab !== "prompt"}>
+          <PromptDrawer
+            channel="webtoon"
+            open={panelOpen}
+            onClose={() => setPanelOpen(false)}
+            embedded
+            testArticle={sharedArticle}
+            onTestArticleChange={setSharedArticle}
+          />
+        </div>
+        <div hidden={openLab !== "storyboard"}>
+          <WebtoonStoryboardLab
+            open={panelOpen}
+            onClose={() => setPanelOpen(false)}
+            embedded
+            article={sharedArticle}
+            onArticleChange={setSharedArticle}
+          />
+        </div>
+        <div hidden={openLab !== "image"}>
           <WebtoonImageLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
-        </LabSection>
+        </div>
       </aside>
     </div>
   );
 }
 
-// 2026-09-11 — 프롬프트/스토리보드/이미지 실험 세 도구를 한 번에 하나씩만
-// 펼쳐 보이는 아코디언 행. 접혀 있어도 children을 계속 마운트해두고
-// hidden 속성으로만 감춘다(display:none과 동일 효과) — 조건부 렌더링으로
-// 언마운트하면 스토리보드/이미지 생성의 폴링 타이머와 히스토리 상태가
-// 다른 단계를 보는 사이 사라진다.
-function LabSection({
-  step,
-  title,
-  description,
-  isOpen,
-  onToggle,
-  children,
+// 2026-09-11 — 상단 고정 스텝바. 3단계를 원 배지 + 이어지는 선으로 붙여
+// "흐름"처럼 보이게 하고, 어디를 눌러도 그 자리에서 바로(스크롤 없이)
+// 해당 단계로 전환된다. 아코디언(위 커밋 로그 참조)의 다음 버전 —
+// 아코디언은 펼친 단계의 내용이 길면 스텝 자체가 스크롤 밖으로 밀려나는
+// 문제가 있었는데, 이건 부모(webtoon/page.tsx)가 이 컴포넌트를 sticky
+// 블록 안에 둬서 그 문제를 없앤다.
+function StepBar({
+  steps,
+  activeId,
+  onSelect,
 }: {
-  step: number;
-  title: string;
-  description: string;
-  isOpen: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  steps: Array<{ id: LabId; step: number; title: string }>;
+  activeId: LabId;
+  onSelect: (id: LabId) => void;
 }) {
   return (
-    <div className="ui-divider border-b">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        className="flex w-full cursor-pointer items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-[var(--surface-sunken)]"
-      >
-        <span
-          className="flex h-7 w-7 flex-none items-center justify-center rounded-full text-[13px] font-bold"
-          style={
-            isOpen
-              ? { background: "var(--accent)", color: "white" }
-              : { background: "var(--surface-sunken)", color: "var(--text-muted)" }
-          }
-          aria-hidden="true"
-        >
-          {step}
-        </span>
-        <span className="min-w-0 flex-1">
-          {/* 펼쳐지면 아래 도구 자신의 헤더(제목+탭)가 바로 나온다 — 이
-              줄이 똑같은 제목을 또 크게 반복하지 않도록 열렸을 때는
-              작고 옅은 "지금 여기" 표시로만 남긴다. */}
-          <span
-            className={
-              isOpen
-                ? "block text-[12px] font-medium text-[var(--text-faint)]"
-                : "block text-[14px] font-semibold text-[var(--text-primary)]"
-            }
+    <div className="ui-divider flex items-center overflow-x-auto border-b px-5 py-3">
+      {steps.map((s, i) => (
+        <div key={s.id} className={`flex items-center ${i < steps.length - 1 ? "flex-1" : ""}`}>
+          <button
+            type="button"
+            onClick={() => onSelect(s.id)}
+            aria-current={activeId === s.id ? "step" : undefined}
+            className="flex flex-none cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
           >
-            {title}
-          </span>
-          {!isOpen && (
-            <span className="mt-0.5 block truncate text-[12px] text-[var(--text-muted)]">{description}</span>
+            <span
+              className="flex h-6 w-6 flex-none items-center justify-center rounded-full text-[12px] font-bold"
+              style={
+                activeId === s.id
+                  ? { background: "var(--accent)", color: "white" }
+                  : { background: "var(--surface-sunken)", color: "var(--text-muted)" }
+              }
+              aria-hidden="true"
+            >
+              {s.step}
+            </span>
+            <span
+              className="text-[13px] font-semibold"
+              style={{ color: activeId === s.id ? "var(--text-primary)" : "var(--text-muted)" }}
+            >
+              {s.title}
+            </span>
+          </button>
+          {i < steps.length - 1 && (
+            <div
+              className="mx-2 h-px min-w-6 flex-1"
+              style={{ background: "var(--border-hairline)" }}
+              aria-hidden="true"
+            />
           )}
-        </span>
-        <svg
-          className="h-4 w-4 flex-none text-[var(--text-faint)] transition-transform duration-200"
-          style={{ transform: isOpen ? "rotate(180deg)" : undefined }}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-      <div hidden={!isOpen}>{children}</div>
+        </div>
+      ))}
     </div>
   );
 }

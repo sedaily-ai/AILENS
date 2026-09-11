@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DatePickerField } from "@/components/DatePickerField";
 import { CoverImageField } from "@/components/CoverImageField";
 import { CustomSelect } from "@/components/CustomSelect";
@@ -71,6 +71,41 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<string | null>(null);
 
+  // 2026-09-11 — "AI로 생성"이 GPT-4o에서 각 채널의 실제 프로덕션 모델
+  // (Bedrock — 레터는 Opus 5)로 바뀌면서 작업+폴링 방식이 됐다(레터는
+  // 실측상 API Gateway 30초 벽 안에 동기 응답이 불가능했다 —
+  // PromptDrawer.tsx의 같은 이유 참조). 재귀 폴링이라 useCallback 대신
+  // 함수 선언(호이스팅 필요).
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    },
+    []
+  );
+
+  function pollJob(channel: string, jobId: string) {
+    adminApi
+      .getPromptTestJob(channel, "published", jobId)
+      .then((j) => {
+        if (j.status === "pending") {
+          pollTimerRef.current = setTimeout(() => pollJob(channel, jobId), 4000);
+          return;
+        }
+        setGenerating(false);
+        if (j.status === "done") setGenerated(j.output);
+        else
+          toast.show(`생성 실패: ${j.error ?? "알 수 없는 오류"}`, "error");
+      })
+      .catch((err) => {
+        setGenerating(false);
+        toast.show(
+          `상태 조회 실패: ${err instanceof AdminApiError ? err.message : "알 수 없는 오류"}`,
+          "error"
+        );
+      });
+  }
+
   const patchLens = (i: number, p: Partial<CmsLensItem>) => {
     const next = lenses.map((l, idx) => (idx === i ? { ...l, ...p } : l));
     patchBody({ lenses: next });
@@ -80,6 +115,10 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
     if (!article.trim()) {
       toast.show("기사 원문을 붙여넣어 주세요", "error");
       return;
+    }
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
     }
     setGenerating(true);
     setGenerated(null);
@@ -91,17 +130,17 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
           `${LENS_LABELS[tab]} 프롬프트가 비어 있습니다 — 먼저 ${channel} 화면에서 프롬프트를 채워주세요`,
           "error"
         );
+        setGenerating(false);
         return;
       }
-      const { output } = await adminApi.testPrompt(channel, "published", active_content, article);
-      setGenerated(output);
+      const { job_id } = await adminApi.testPrompt(channel, "published", active_content, article);
+      pollTimerRef.current = setTimeout(() => pollJob(channel, job_id), 4000);
     } catch (err) {
+      setGenerating(false);
       toast.show(
         `생성 실패: ${err instanceof AdminApiError ? err.message : "알 수 없는 오류"}`,
         "error"
       );
-    } finally {
-      setGenerating(false);
     }
   };
 
@@ -237,6 +276,11 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
                 {generating ? "생성 중..." : "AI로 생성"}
               </button>
             </div>
+            {generating && (
+              <p className="text-[11px] text-gray-400">
+                이 포맷의 실제 프로덕션 모델을 그대로 쓰다 보니(레터는 Opus 5) 수십 초 걸릴 수 있습니다.
+              </p>
+            )}
 
             {generated && (
               <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-[13px] leading-relaxed text-gray-700">

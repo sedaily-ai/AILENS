@@ -21,7 +21,6 @@ import {
   type PromptSection,
   type PromptSectionKey,
 } from "@/lib/prompt";
-import type { PromptHistoryEntry } from "@/lib/types";
 import { Icon, ICON } from "./Icons";
 import { ChannelTabs } from "./ChannelTabs";
 import { PromptField } from "./PromptField";
@@ -54,14 +53,20 @@ import { PromptField } from "./PromptField";
    섹션으로 합쳤다("이 둘을 어떤 기준으로 나누냐"는 사용자 지적 —
    SECTION_DEFS 정의는 @/lib/prompt, 마이그레이션은 presetFromSections/
    presetFromProse 참조). 이 파일 쪽 코드는 SECTION_DEFS를 그대로
-   순회해서 렌더하므로 섹션 개수가 바뀌어도 따로 손 볼 데가 없었다. */
+   순회해서 렌더하므로 섹션 개수가 바뀌어도 따로 손 볼 데가 없었다.
+
+   2026-09-11(같은 날) — 버전 히스토리 표(버전·저장 시각·작성자)도 없앴다
+   ("굳이 보여줄 이유가 있냐"는 사용자 지적). 단일 공유 관리자 계정이라
+   작성자 칸이 항상 "admin"이었고, 옛 버전을 눌러 보거나 되돌리는 액션도
+   없어서 순수 읽기용 표가 화면만 길게 늘렸다 — 실제로 쓸모 있으려면
+   "이 버전으로 되돌리기" 같은 액션이 있어야 하는데 지금은 없다. 백엔드
+   API는 여전히 history를 내려주니 필요해지면 다시 붙이면 된다. */
 
 /** 채널 하나의 서버 상태. */
 interface ChannelState {
   saved: PromptPreset; // 서버에 있는 것
   draft: PromptPreset; // 편집 중인 것
   version: number; // 0 = 아직 서버에 없음
-  history: PromptHistoryEntry[];
   loading: boolean;
   error: string | null;
 }
@@ -70,7 +75,6 @@ const emptyChannelState = (): ChannelState => ({
   saved: emptyPreset(),
   draft: emptyPreset(),
   version: 0,
-  history: [],
   loading: true,
   error: null,
 });
@@ -92,9 +96,24 @@ interface Props {
    *  나누지 말고 한 화면에 이어서 보여달라는 피드백). 기본 false — 다른
    *  4개 화면(video/posts/lens/podcast)은 안 건드린다. */
   embedded?: boolean;
+  /** 2026-09-11 — webtoon/page.tsx가 "프롬프트 편집"과 "스토리보드 테스트"
+   *  단계 사이에 기사 원문을 공유하고 싶을 때만 이 둘을 같이 준다(제어
+   *  컴포넌트로 전환) — 한쪽에 붙여넣으면 다른 쪽에도 그대로 보여서 두 번
+   *  안 붙여도 된다. 안 주면(다른 4개 화면) 기존처럼 내부 state로 독립
+   *  관리한다 — 그 화면들은 안 건드린다. */
+  testArticle?: string;
+  onTestArticleChange?: (v: string) => void;
 }
 
-export function PromptDrawer({ channel, channels, open, onClose, embedded = false }: Props) {
+export function PromptDrawer({
+  channel,
+  channels,
+  open,
+  onClose,
+  embedded = false,
+  testArticle: controlledTestArticle,
+  onTestArticleChange,
+}: Props) {
   const toast = useToast();
   // 단일 채널(channel)이면 그 하나짜리 목록으로, 여러 채널(channels)이면
   // 그대로 — 아래 로직은 항상 이 배열 하나만 본다.
@@ -105,11 +124,14 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
   const firstFieldRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
-  // LLMOps 테스트 실행(2026-08-19) — 저장 여부와 무관하게 "지금 편집 중인"
-  // 프롬프트를 기사 원문과 함께 GPT에 던져 실제 산출물을 바로 보여준다.
-  // 기사 원문은 채널을 넘나들며 같은 걸로 비교해보고 싶을 때가 많아
-  // 채널 공용 상태로 둔다 — 탭을 바꿔도 article은 유지.
-  const [testArticle, setTestArticle] = useState("");
+  // LLMOps 테스트 실행(2026-08-19, 2026-09-11 Bedrock 이관) — 저장 여부와
+  // 무관하게 "지금 편집 중인" 프롬프트를 기사 원문과 함께 그 채널의 실제
+  // 프로덕션 모델에 던져 실제 산출물을 바로 보여준다. 기사 원문은 채널을
+  // 넘나들며 같은 걸로 비교해보고 싶을 때가 많아 채널 공용 상태로 둔다 —
+  // 탭을 바꿔도 article은 유지.
+  const [internalTestArticle, setInternalTestArticle] = useState("");
+  const testArticle = controlledTestArticle ?? internalTestArticle;
+  const setTestArticle = onTestArticleChange ?? setInternalTestArticle;
   const [testing, setTesting] = useState(false);
   const [testOutput, setTestOutput] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
@@ -139,7 +161,6 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
             // 편집 중인 내용은 지키지 않는다 — 저장 직후 재조회 경로라 draft==saved 가 맞다.
             draft: structuredClone(loaded),
             version: detail.active_version,
-            history: detail.history ?? [],
             loading: false,
             error: null,
           },
@@ -154,7 +175,6 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
             saved: emptyPreset(),
             draft: emptyPreset(),
             version: 0,
-            history: [],
             loading: false,
             error: notFound
               ? null
@@ -312,6 +332,38 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
     }
   };
 
+  // 2026-09-11 — 테스트 실행이 GPT-4o에서 각 채널의 실제 프로덕션 모델
+  // (Bedrock — 레터는 Opus 5)로 바뀌면서 작업+폴링 방식이 됐다. 레터는
+  // 실측상 25초에 480자밖에 못 뽑을 만큼 느려서(routes/prompts.py 참고)
+  // API Gateway 30초 벽 안에 동기 응답이 불가능하다 — WebtoonImageLab.tsx의
+  // pollJob과 같은 패턴(재귀 setTimeout, useCallback 아님 — 자기 자신을
+  // 참조하는 재귀 폴링이라 함수 선언 호이스팅이 필요).
+  const testPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (testPollTimerRef.current) clearTimeout(testPollTimerRef.current);
+    },
+    []
+  );
+
+  function pollTestJob(category: string, name: string, jobId: string) {
+    adminApi
+      .getPromptTestJob(category, name, jobId)
+      .then((j) => {
+        if (j.status === "pending") {
+          testPollTimerRef.current = setTimeout(() => pollTestJob(category, name, jobId), 4000);
+          return;
+        }
+        setTesting(false);
+        if (j.status === "done") setTestOutput(j.output);
+        else setTestError(j.error ?? "알 수 없는 오류");
+      })
+      .catch((err) => {
+        setTesting(false);
+        setTestError(err instanceof AdminApiError ? err.message : "상태 조회 실패");
+      });
+  }
+
   const handleTest = async () => {
     if (!state || testing) return;
     if (!testArticle.trim()) {
@@ -329,16 +381,19 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
     const category = promptId.slice(0, slash);
     const name = promptId.slice(slash + 1);
 
+    if (testPollTimerRef.current) {
+      clearTimeout(testPollTimerRef.current);
+      testPollTimerRef.current = null;
+    }
     setTesting(true);
     setTestError(null);
     setTestOutput(null);
     try {
       const r = await adminApi.testPrompt(category, name, text, testArticle);
-      setTestOutput(r.output);
+      testPollTimerRef.current = setTimeout(() => pollTestJob(category, name, r.job_id), 4000);
     } catch (err) {
-      setTestError(err instanceof AdminApiError ? err.message : "알 수 없는 오류");
-    } finally {
       setTesting(false);
+      setTestError(err instanceof AdminApiError ? err.message : "알 수 없는 오류");
     }
   };
 
@@ -491,7 +546,7 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
                   </h3>
                   <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                     저장 여부와 상관없이 지금 편집 중인 내용을 기사 원문에
-                    바로 적용해 봅니다 (GPT-4o).
+                    바로 적용해 봅니다 — 이 채널의 실제 프로덕션 모델을 그대로 씁니다.
                   </p>
                 </div>
                 <textarea
@@ -511,9 +566,14 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
                     disabled={testing}
                     className="ui-btn ui-btn-primary rounded-lg px-3.5 py-1.5 text-sm font-semibold"
                   >
-                    {testing ? "실행 중..." : "테스트 실행"}
+                    {testing ? "생성 중..." : "테스트 실행"}
                   </button>
                 </div>
+                {testing && (
+                  <p className="text-[11px] text-[var(--text-faint)]">
+                    채널마다 실제 프로덕션 모델을 그대로 쓰다 보니(레터는 Opus 5) 수십 초 걸릴 수 있습니다.
+                  </p>
+                )}
                 {testError && (
                   <p className="text-sm" style={{ color: "var(--danger)" }}>
                     {testError}
@@ -543,67 +603,6 @@ export function PromptDrawer({ channel, channels, open, onClose, embedded = fals
                 </p>
               </div>
 
-              {state.history.length > 0 && (
-                <section className="space-y-2">
-                  <h3
-                    className="text-sm font-semibold"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    히스토리{" "}
-                    <span className="font-normal" style={{ color: "var(--text-muted)" }}>
-                      ({state.history.length})
-                    </span>
-                  </h3>
-                  <div
-                    className="rounded-xl border"
-                    style={{ borderColor: "var(--border-hairline)" }}
-                  >
-                    <table className="w-full text-sm">
-                      <thead className="ui-thead">
-                        <tr>
-                          <th className="px-3 py-2 text-left">버전</th>
-                          <th className="px-3 py-2 text-left">저장 시각</th>
-                          <th className="px-3 py-2 text-left">작성자</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {state.history.map((h) => (
-                          <tr key={h.version} className="ui-divider border-t">
-                            <td className="px-3 py-2 font-mono text-xs">
-                              v{h.version}
-                              {h.version === state.version && (
-                                <span
-                                  className="ml-1"
-                                  style={{ color: "var(--ok)" }}
-                                  aria-label="active"
-                                >
-                                  ●
-                                </span>
-                              )}
-                            </td>
-                            <td
-                              className="px-3 py-2 text-xs tabular-nums"
-                              style={{ color: "var(--text-muted)" }}
-                            >
-                              {h.created_at
-                                ? new Date(h.created_at).toLocaleString("ko-KR", {
-                                    timeZone: "Asia/Seoul",
-                                  })
-                                : "-"}
-                            </td>
-                            <td
-                              className="px-3 py-2 font-mono text-xs"
-                              style={{ color: "var(--text-muted)" }}
-                            >
-                              {h.actor}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )}
             </>
           )}
     </div>

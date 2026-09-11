@@ -43,6 +43,10 @@ function LensPage() {
   const searchParams = useSearchParams();
   const [posts, setPosts] = useState<CmsPost[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 2026-09-11 — 필터 변경 재조회 중 posts가 이전 값 그대로라 화면이
+  // 멈춘 것처럼 보였다는 지적(ContentTable의 loading prop 참조). 자세한
+  // 이유는 webtoon/page.tsx의 같은 주석 참조(set-state-in-effect 회피).
+  const [fetchedKey, setFetchedKey] = useState("");
   const [status, setStatusState] = useState(() => searchParams.get("status") ?? "");
   const [dateRange, setDateRangeState] = useState<DateRange>(() => ({
     from: searchParams.get("from") || null,
@@ -99,6 +103,9 @@ function LensPage() {
     });
   };
 
+  const requestKey = JSON.stringify([status, dateRange, visibleReloadKey, bulkReloadKey]);
+  const loading = fetchedKey !== requestKey;
+
   useEffect(() => {
     let cancelled = false;
     adminApi
@@ -115,13 +122,17 @@ function LensPage() {
         });
         setPosts(filtered);
         setError(null);
+        setFetchedKey(requestKey);
       })
       .catch((err) => {
-        if (!cancelled) setError((err as Error).message);
+        if (cancelled) return;
+        setError((err as Error).message);
+        setFetchedKey(requestKey);
       });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey는 [status, dateRange, ...]에서 파생돼 그 값들과 항상 동기화됨
   }, [status, dateRange, visibleReloadKey, bulkReloadKey]);
 
   useEffect(() => {
@@ -200,6 +211,7 @@ function LensPage() {
 
       <ContentTable
         posts={posts}
+        loading={loading}
         editHref={(p) => `/lens/edit?id=${encodeURIComponent(p.id)}`}
         newHref="/lens/edit"
         newLabel="새로 쓰기"

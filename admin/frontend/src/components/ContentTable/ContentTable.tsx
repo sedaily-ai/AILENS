@@ -33,6 +33,14 @@ export interface ContentTableChannelColumn {
 
 export interface ContentTableProps {
   posts: CmsPost[] | null;
+  /** true면 행/카드 자리에 스켈레톤을 보여준다 — 최초 로드뿐 아니라 날짜
+   *  필터·상태 필터 등으로 목록을 다시 불러오는 동안에도 켜라. 예전엔
+   *  호출부가 재조회 중에도 posts를 이전 값 그대로 둬서(재조회 완료
+   *  전까지 null로 안 비움) 필터를 눌러도 화면이 잠깐 멈춘 것처럼
+   *  보였다(2026-09-11 사용자 지적 — "날짜 필터 선택할 때 로딩이 좀
+   *  걸리는데 아무 표시가 없다"). 헤더·필터·페이지네이션은 로딩 중에도
+   *  그대로 둔다 — 필터를 되돌릴 컨트롤까지 같이 사라지면 안 된다. */
+  loading?: boolean;
   editHref: (p: CmsPost) => string;
   newHref: string;
   newLabel: string;
@@ -62,6 +70,7 @@ export interface ContentTableProps {
 
 export function ContentTable({
   posts,
+  loading = false,
   editHref,
   newHref,
   newLabel,
@@ -188,11 +197,11 @@ export function ContentTable({
 
       {view === "table" ? (
       <>
-      {/* 표 헤더(상태/채널 필터 포함)는 결과가 0건이어도 항상 보인다 —
-          필터를 되돌릴 컨트롤까지 같이 사라지지 않게. 빈 상태는 tbody 안
-          한 행(colSpan)으로만 표시된다. 카드 테두리·그림자 없이 페이지
-          배경과 이어지는 Linear·Notion 식 표. */}
-      {posts && (
+      {/* 표 헤더(상태/채널 필터 포함)는 결과가 0건이어도, 로딩 중에도
+          항상 보인다 — 필터를 되돌릴 컨트롤까지 같이 사라지지 않게. 빈
+          상태는 tbody 안 한 행(colSpan)으로만 표시된다. 카드 테두리·
+          그림자 없이 페이지 배경과 이어지는 Linear·Notion 식 표. */}
+      {(posts || loading) && (
         <div>
           <table className="w-full text-sm">
             <thead className="ui-thead">
@@ -246,7 +255,9 @@ export function ContentTable({
               </tr>
             </thead>
             <tbody>
-              {sortedPosts!.length === 0 ? (
+              {loading ? (
+                <SkeletonRows />
+              ) : sortedPosts!.length === 0 ? (
                 <tr>
                   <td colSpan={colSpan} className="px-4 py-16">
                     {search.trim() ? (
@@ -333,9 +344,13 @@ export function ContentTable({
       )}
       </>
       ) : (
-        posts && (
+        (posts || loading) && (
           <div className="space-y-4">
-            {sortedPosts!.length === 0 ? (
+            {loading ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <SkeletonCards />
+              </div>
+            ) : sortedPosts!.length === 0 ? (
               search.trim() ? (
                 <EmptyState
                   title="검색 결과가 없습니다"
@@ -410,6 +425,50 @@ export function ContentTable({
           </div>
         )
       )}
+    </>
+  );
+}
+
+// 2026-09-11 — 재조회(날짜·상태 필터 변경) 중에도 뭔가 반응하고 있다는
+// 걸 보여주려고 추가. 개수는 실제 pageSize와 안 맞아도 된다 — 어차피
+// 로딩이 끝나면 진짜 행/카드로 바뀌니 시각적 placeholder면 충분하다.
+const _SKELETON_COUNT = 8;
+
+function SkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: _SKELETON_COUNT }).map((_, i) => (
+        <tr key={i} className="border-b ui-divider last:border-0">
+          <td className="px-4 py-3">
+            <div className="ui-skeleton h-4 w-4" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="ui-skeleton h-4" style={{ width: `${55 + (i % 3) * 10}%` }} />
+          </td>
+          <td className="px-4 py-3">
+            <div className="ui-skeleton h-5 w-14 rounded-full" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="ui-skeleton h-4 w-24" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function SkeletonCards() {
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="ui-card rounded-xl overflow-hidden">
+          <div className="ui-skeleton aspect-[16/10] rounded-none" />
+          <div className="space-y-2 p-3.5">
+            <div className="ui-skeleton h-5 w-14 rounded-full" />
+            <div className="ui-skeleton h-4" style={{ width: `${70 + (i % 3) * 8}%` }} />
+          </div>
+        </div>
+      ))}
     </>
   );
 }

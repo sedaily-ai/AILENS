@@ -388,3 +388,25 @@ export interface WebtoonStoryboardResult {
   characters: Record<string, string> | null;
   cuts: WebtoonStoryboardCut[];
 }
+
+// 2026-09-11 — 테스트 실행·스토리보드 테스트를 GPT-4o에서 각 채널의 실제
+// 프로덕션 모델(Bedrock Claude — 레터는 Opus 5)로 바꾸면서 비동기(작업+
+// 폴링)로 전환했다. 실측 결과 레터(Opus 5)는 max_tokens을 1500까지
+// 줄여도 25초에 480자밖에 못 뽑아 API Gateway 30초 벽 안에 동기 응답이
+// 불가능했다 — WebtoonLabJob과 같은 job/poll 패턴을 그대로 따른다.
+
+export interface PromptTestJob {
+  job_id: string;
+  status: "pending" | "done" | "error";
+  output: string | null;
+  error: string | null;
+}
+
+export interface WebtoonStoryboardJob {
+  job_id: string;
+  status: "pending" | "done" | "error";
+  core_question: string | null;
+  characters: Record<string, string> | null;
+  cuts: WebtoonStoryboardCut[] | null;
+  error: string | null;
+}
