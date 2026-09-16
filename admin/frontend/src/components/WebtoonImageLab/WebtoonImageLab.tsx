@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
+import { buildImagePromptDoc } from "@/lib/webtoonImagePromptDoc";
 import type {
   WebtoonImageAssetKind,
   WebtoonImageAssetUrls,
@@ -30,23 +31,15 @@ import type {
    완전히 같은 구조)가 정본이라, 여기서 발행하면 새 백엔드 라우트 없이
    기존 범용 프롬프트 저장 API(`POST /admin/prompts/{category}/{name}`)를
    그대로 불러 새 버전을 만든다 — pipelines/common/webtoon_image.py가 다음
-   생성부터 바로 그 값을 읽는다(캐시 없음). content 조립 포맷은 백엔드
-   파서(webtoon_image.py의 parse_prompt_doc/_DOC_HEADINGS)와 정확히 맞아야
-   해서 아래 buildImagePromptDoc()에 그 포맷을 그대로 미러링해뒀다. */
+   생성부터 바로 그 값을 읽는다(캐시 없음). content 조립 포맷(buildImagePromptDoc,
+   `@/lib/webtoonImagePromptDoc`)은 WebtoonImageSettingsPanel.tsx와 공유한다 —
+   둘 다 같은 백엔드 파서(webtoon_image.py의 parse_prompt_doc/_DOC_HEADINGS)를
+   맞춰야 해서. defaults/assets fetch·업로드·발행 로직 자체는 두 화면의
+   실제 기능이 갈라져 있어(참조 이미지 갤러리는 WebtoonImageSettingsPanel에만
+   있음, 2026-09-16) 공유하지 않고 각자 둔다. */
 
 const _POLL_INTERVAL_MS = 4000;
 const _MAX_SCENE_CHARS = 1200; // 백엔드 _MAX_SCENE_BYTES(4000바이트)에 여유를 둔 UTF-8 대략치
-
-/** webtoon_image.py::serialize_prompt_doc()과 정확히 같은 포맷이어야 한다
- *  (## STYLE / ## CHARACTER_FEMALE / ## CHARACTER_MALE 헤딩) — 한쪽만
- *  고치면 발행한 프롬프트를 파이프라인이 못 읽는다. */
-function buildImagePromptDoc(style: string, charFemale: string, charMale: string): string {
-  return [
-    `## STYLE\n${style.trim()}`,
-    `## CHARACTER_FEMALE\n${charFemale.trim()}`,
-    `## CHARACTER_MALE\n${charMale.trim()}`,
-  ].join("\n\n");
-}
 
 interface Props {
   open: boolean;

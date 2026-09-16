@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { adminApi, WS_URL } from "@/lib/adminClient";
-import { getToken } from "@/lib/auth";
+import { adminApi } from "@/lib/adminClient";
+import { useAdminChatSocket } from "@/lib/useAdminChatSocket";
 import type { ChatThreadSummary, WebtoonStoryboardCut } from "@/lib/types";
 // IMAGE_MODELS는 이제 이미지를 안 만드는 이 컴포넌트에선 CutImagePreview
 // (구버전 저장 대화에 남아있는 imagePreview 메시지 렌더용)에서만 쓴다.
@@ -125,6 +125,7 @@ export function PromptChatLab({
   onClose: () => void;
   embedded?: boolean;
 }) {
+  const { wsOpen, send: wsSend, subscribe } = useAdminChatSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [input, setInput] = useState("");
   const [storyboard, setStoryboard] = useState<{ coreQuestion: string | null; cuts: WebtoonStoryboardCut[] } | null>(null);
@@ -165,7 +166,6 @@ export function PromptChatLab({
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
-  const [wsOpen, setWsOpen] = useState(false);
   // 기사 반응 문구가 토큰 단위로 도착하는 동안 임시로 담아두는 곳(완료
   // 전까지는 messages 배열에 안 넣는다 — text_done에서 한 번에 확정).
   const [liveText, setLiveText] = useState<string | null>(null);
@@ -183,7 +183,6 @@ export function PromptChatLab({
   const [waiting, setWaiting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   // 좌측 사이드바 — 대화 스레드 목록/현재 스레드(2026-09-15, 사용자 요청:
   // "대화들.. 저장 가능한 세션들.. 좌측 사이드바.. 각 대화마다 어떤
   // 대화를 했고 출력물이 나왔는지 체크"). threadIdRef는 ws.onmessage
@@ -304,132 +303,29 @@ export function PromptChatLab({
       .catch((err) => console.error("대화 불러오기 실패", err));
   };
 
-  // API Gateway WebSocket API의 프레임 크기 하드 리밋(32,768바이트, 못
-  // 늘림). 2026-09-16 이전엔 우측 패널 지침 원문(prompt_override)을 매
-  // 메시지에 실어 보내서 이 한도를 넘기면 서버가 code 1009로 연결 자체를
-  // 끊어버렸다("계속 돌고 끊기는" 장애의 정체) — nova(nova/backend/
-  // websocket/prompt_builder.py::load_engine_full_prompt)와 같은 방식으로
-  // 바꿔서(클라이언트는 프롬프트 원문을 아예 안 보내고, 서버가 저장된
-  // 지침을 DB에서 직접 읽어옴) 이 문제 자체가 구조적으로 없어졌다. 기사
-  // 본문 같은 다른 필드가 비정상적으로 클 때만을 위한 일반 안전장치로
-  // 남겨둔다.
-  const WS_FRAME_SAFE_BYTES = 30000;
-
   const sendWs = (kind: string, data: unknown = {}) => {
-    const serialized = JSON.stringify({ action: "message", kind, data });
-    const byteLength = new TextEncoder().encode(serialized).length;
-    if (byteLength > WS_FRAME_SAFE_BYTES) {
+    const result = wsSend(kind, data);
+    if (result.sent) return;
+    if (result.tooLarge) {
       appendMessage({
         role: "assistant",
-        text: `요청이 너무 커서(${byteLength.toLocaleString()}바이트) 보낼 수 없습니다 — 내용을 줄여서 다시 시도해 주세요.`,
+        text: `요청이 너무 커서(${result.byteLength?.toLocaleString()}바이트) 보낼 수 없습니다 — 내용을 줄여서 다시 시도해 주세요.`,
       });
       return;
     }
-
-    // WebSocket 스펙상 readyState가 CLOSING/CLOSED일 때 send()는 예외 없이
-    // 그냥 조용히 데이터를 버린다 — wsOpen state가 아직 true인 채로 이
-    // 순간(유휴 타임아웃 등으로 서버가 이미 끊었지만 onclose 이벤트가
-    // 아직 도착 전인 틈)에 걸리면 아무 에러도 없이 사용자 메시지만
-    // 증발한다(2026-09-15, 사용자가 실제로 겪은 버그 — 메시지는
-    // 대화기록에 저장됐는데 답변이 아예 안 옴, 콘솔에도 아무 흔적 없음).
-    // 여기서 readyState를 직접 확인해서 화면에 보이게 알리고, 소켓을
-    // 명시로 닫아 위 useEffect의 재연결 로직이 즉시 돌게 한다.
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      setWsOpen(false);
-      appendMessage({ role: "assistant", text: "연결이 끊어졌어요 — 자동으로 다시 연결 중입니다. 잠시 후 다시 시도해 주세요." });
-      ws?.close();
-      return;
-    }
-    ws.send(serialized);
+    // 연결이 끊긴 채로 보내려던 경우 — 소켓은 useAdminChatSocket이 이미
+    // 닫아 재연결을 앞당겼다(2026-09-15, 사용자가 실제로 겪은 버그 —
+    // readyState 미확인 시 메시지가 조용히 증발했었다. 이제 hook이 확인함).
+    appendMessage({ role: "assistant", text: "연결이 끊어졌어요 — 자동으로 다시 연결 중입니다. 잠시 후 다시 시도해 주세요." });
   };
 
-  // WebSocket 연결 — 패널이 열려 있는 동안 유지한다(routes/chat_ws.py 참고).
-  // 브라우저 네이티브 WebSocket은 커스텀 헤더를 못 붙여서 JWT를
-  // 쿼리스트링으로 보낸다(HTTP API의 Authorization 헤더 방식과 다른
-  // 유일한 지점). 이 이펙트는 open이 바뀔 때만 다시 도는데, onmessage
-  // 안에서 messages/storyboard/gpuState를 "읽지"는 않고 setState의
-  // 함수형 갱신·ref만 쓰므로 클로저가 오래돼도 안전하다.
+  // 수신 메시지 처리 — 연결·하트비트·재연결 자체는 useAdminChatSocket이
+  // 전담한다(2026-09-16 리팩토링 감사, 그 훅 docstring 참고 — WebtoonCutGenerator
+  // 와 소켓을 공유). 이 리스너는 messages/storyboard를 "읽지"는 않고
+  // setState의 함수형 갱신·ref만 쓰므로 마운트 시 한 번만 등록해도 안전하다.
   useEffect(() => {
-    if (!open || !WS_URL) return;
-    // 연결이 끊기면(API Gateway WebSocket 유휴 타임아웃·일시적 네트워크
-    // 문제 등) 자동으로 다시 붙는다(2026-09-15, 사용자가 실제로 겪은 문제
-    // — 끊긴 뒤 "연결 중..." 문구만 계속 뜨고 아무 재시도 없이 멈춰
-    // 있었음). cancelled는 패널이 닫히거나 컴포넌트가 언마운트될 때만
-    // true — 그때는 재연결을 안 한다. 재연결 시도 횟수를 제한해서(최대
-    // 10회) 인증 만료처럼 계속 실패할 수밖에 없는 상황에서 무한 재시도
-    // 스팸을 막는다.
-    let cancelled = false;
-    let reconnectAttempts = 0;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    const MAX_RECONNECT_ATTEMPTS = 10;
-    // API Gateway WebSocket은 10분 유휴 시 무조건 끊는다(AWS 하드 제한,
-    // 늘릴 수 없음) — 패널을 오래 열어두고 대화 없이 있다가 메시지를
-    // 보내면 정확히 그 순간 소켓이 이미 죽어있다(2026-09-15, 사용자가
-    // 실제로 겪음 — readyState 체크를 추가했는데도 여전히 응답이 안
-    // 옴: onclose가 아직 안 왔을 뿐 서버는 이미 끊었거나, 중간 경로가
-    // 조용히 끊겨 readyState는 OPEN인데 실제로는 죽은 상태였던 것으로
-    // 보임). 그래서 유휴 타임아웃보다 짧은 주기로 ping을 보내 (1)
-    // 서버 쪽 활동으로 인식시켜 타임아웃 자체를 안 나게 하고, (2) pong이
-    // 제때 안 오면 "죽은 척 열려있는" 소켓을 직접 닫아 재연결시킨다.
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    let pongTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
-    const HEARTBEAT_INTERVAL_MS = 4 * 60 * 1000;
-    const PONG_TIMEOUT_MS = 8000;
-
-    const clearHeartbeat = () => {
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (pongTimeoutTimer) clearTimeout(pongTimeoutTimer);
-      heartbeatTimer = null;
-      pongTimeoutTimer = null;
-    };
-
-    const connect = () => {
-      const token = getToken();
-      const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token ?? "")}`);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        reconnectAttempts = 0;
-        setWsOpen(true);
-        clearHeartbeat();
-        heartbeatTimer = setInterval(() => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          ws.send(JSON.stringify({ action: "message", kind: "ping", data: {} }));
-          pongTimeoutTimer = setTimeout(() => {
-            ws.close(); // pong 무응답 — 죽어있는 연결로 간주하고 닫아서 재연결 유도
-          }, PONG_TIMEOUT_MS);
-        }, HEARTBEAT_INTERVAL_MS);
-      };
-      ws.onclose = (event: CloseEvent) => {
-        setWsOpen(false);
-        clearHeartbeat();
-        // 2026-09-16 — close code/reason을 콘솔에 남겨둔다(연결이 32KB
-        // 프레임 한도 초과로 code 1009와 함께 끊기던 실제 장애를 이걸로
-        // 특정했다 — sendWs의 크기 가드로 재발은 막았지만, 다른 원인으로
-        // 또 끊길 수 있어 devtools에서 바로 보이게 유지). 화면에는 매번
-        // 안 띄운다 — 정상적인 재연결(유휴 타임아웃, pong 무응답으로 자체
-        // close 등)도 여길 타므로 매번 사용자에게 알리면 소음이 된다.
-        if (event.code !== 1000) {
-          console.warn(`[chat-ws] closed code=${event.code} reason=${event.reason || "(none)"} wasClean=${event.wasClean}`);
-        }
-        if (cancelled || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
-        reconnectAttempts += 1;
-        reconnectTimer = setTimeout(connect, 2000);
-      };
-      ws.onerror = () => setWsOpen(false);
-      ws.onmessage = (evt: MessageEvent<string>) => {
-        let msg: WsPush;
-        try {
-          msg = JSON.parse(evt.data);
-        } catch {
-          return;
-        }
-        if (msg.type === "pong") {
-          if (pongTimeoutTimer) clearTimeout(pongTimeoutTimer);
-          pongTimeoutTimer = null;
-          return;
-        }
+    return subscribe((raw) => {
+        const msg = raw as WsPush;
         setWaiting(false); // 뭐가 됐든 서버에서 응답이 왔다는 뜻 — 대기 표시(점 세 개) 끔
         switch (msg.type) {
           case "text_chunk":
@@ -485,20 +381,9 @@ export function PromptChatLab({
             appendMessage({ role: "assistant", text: msg.message });
             break;
         }
-      };
-    };
-
-    connect();
-
-    return () => {
-      cancelled = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      clearHeartbeat();
-      wsRef.current?.close();
-      wsRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- appendMessage는 매 렌더 새로 만들어지지만 messages/threadIdRef를 함수형 갱신·ref로만 다뤄 클로저가 오래돼도 안전하다(위 주석 참고) — deps에 넣으면 open 변경 때만 재연결하려는 의도가 깨진다
-  }, [open]);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- appendMessage는 매 렌더 새로 만들어지지만 messages/threadIdRef를 함수형 갱신·ref로만 다뤄 클로저가 오래돼도 안전하다(위 주석 참고) — subscribe 자체는 마운트 시 한 번만
+  }, []);
 
   /** 1단계 카드의 "2단계로 진행" 버튼 — script/article을 그대로 서버에
    *  되돌려보낸다. 해당 메시지에 confirmed:true를 찍어 버튼이 다시
@@ -747,7 +632,7 @@ export function PromptChatLab({
           <p className="text-[13px] font-semibold text-[var(--text-primary)]">이미지 생성</p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <WebtoonCutGenerator cuts={storyboard?.cuts ?? []} compact />
+          <WebtoonCutGenerator cuts={storyboard?.cuts ?? []} compact wsOpen={wsOpen} send={wsSend} subscribe={subscribe} />
         </div>
       </aside>
       {/* 2026-09-16 — 톱니바퀴(지침 편집)·사람 아이콘(이미지 실험) 두 개짜리

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
+import { buildImagePromptDoc } from "@/lib/webtoonImagePromptDoc";
 import type {
   WebtoonImageAssetGalleryItem,
   WebtoonImageAssetKind,
@@ -23,10 +24,14 @@ import { CollapsibleSection } from "./CollapsibleSection";
    히스토리 갤러리는 여기서 뺐다(그건 "이번 한 번 테스트"용이라 상시
    노출할 만큼 자주 안 쓴다는 판단, PromptChatLab.tsx 쪽 "테스트 생성기
    열기" 링크로 기존 WebtoonImageLab 전체 화면을 그대로 열 수 있다).
-   두 컴포넌트가 defaults/assets fetch·발행 로직을 각자 갖고 있어 코드
-   일부가 겹치지만, 상태 공유 없이 완전히 독립된 화면(하나는 상시 패널,
-   하나는 필요할 때 여는 전체 모달)이라 공용 훅으로 묶는 것보다 지금처럼
-   따로 두는 쪽이 더 단순하다. */
+
+   2026-09-16 리팩토링 감사 — 문서 조립 포맷(buildImagePromptDoc)은
+   WebtoonImageLab.tsx와 완전히 동일해서 `@/lib/webtoonImagePromptDoc`로
+   공유한다. defaults/assets fetch·업로드·발행 로직은 그대로 각자 둔다 —
+   겹치는 것처럼 보이지만 실제로는 이미 갈라져 있다(이 패널의 참조 이미지
+   갤러리 기능은 WebtoonImageLab.tsx엔 없음, 위 문단 참고) — 상태 공유가
+   전혀 없는 두 독립 화면인데 억지로 공용 훅 하나로 묶으면 그 안에서
+   "갤러리 있음/없음"을 매번 분기해야 해서 오히려 더 복잡해진다. */
 
 /* 캐릭터 프리셋(2026-09-16, 사용자 요청 — "프롬프트도 여러 유형으로 둬주시면
    비교하고 테스트하기에 용이할 것") — 클릭하면 그 텍스트가 textarea에
@@ -59,16 +64,6 @@ const CHAR_MALE_PRESETS: { label: string; text: string }[] = [
     text: "Korean man, mid-20s. Short buzzed hair, no glasses. Wears a plain gray hoodie or crewneck under a light jacket — relaxed, casual look. Represents the reader's curiosity — reacts to what's being explained: leaning in to look at materials, tilting forward, resting chin on hand while thinking, looking surprised or curious as the scene calls for. Keep hair style and overall outfit silhouette consistent across every cut.",
   },
 ];
-
-/** webtoon_image.py::serialize_prompt_doc()과 정확히 같은 포맷이어야 한다
- *  (## STYLE / ## CHARACTER_FEMALE / ## CHARACTER_MALE 헤딩). */
-function buildImagePromptDoc(style: string, charFemale: string, charMale: string): string {
-  return [
-    `## STYLE\n${style.trim()}`,
-    `## CHARACTER_FEMALE\n${charFemale.trim()}`,
-    `## CHARACTER_MALE\n${charMale.trim()}`,
-  ].join("\n\n");
-}
 
 export function WebtoonImageSettingsPanel({ onOpenFullLab }: { onOpenFullLab: () => void }) {
   const toast = useToast();

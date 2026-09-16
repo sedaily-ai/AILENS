@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WS_URL } from "@/lib/adminClient";
-import { getToken } from "@/lib/auth";
+import type { SendResult, WsPushBase } from "@/lib/useAdminChatSocket";
 import type { WebtoonGpuStatus, WebtoonStoryboardCut } from "@/lib/types";
 import { IMAGE_MODELS } from "@/lib/webtoonImageModels";
 
@@ -68,19 +67,6 @@ interface SlotState {
   error: string | null;
 }
 
-type WsPush =
-  | { type: "cut_image"; cut: number; image_url: string; model?: string }
-  | { type: "cut_image_error"; cut: number; error: string }
-  | { type: "gpu_status"; state: WebtoonGpuStatus["state"] }
-  | { type: "gpu_error"; error: string }
-  | { type: "gpu_stopping" }
-  | { type: "error"; message: string }
-  | { type: "pong" }
-  | { type: string; [key: string]: unknown };
-
-const HEARTBEAT_INTERVAL_MS = 4 * 60 * 1000;
-const PONG_TIMEOUT_MS = 8000;
-
 function _emptySlot(index: number): SlotState {
   return {
     index,
@@ -100,12 +86,21 @@ export function WebtoonCutGenerator({
   cuts,
   title,
   compact = false,
+  wsOpen,
+  send,
+  subscribe,
 }: {
   cuts: WebtoonStoryboardCut[];
   title?: string;
   /** true면 텍스트 페이지 우측 레일에 끼워 넣는 좁은 레이아웃(2열) —
    *  false(기본)면 넓은 화면 전체를 쓰는 그리드(별도 페이지/전체 화면용). */
   compact?: boolean;
+  /** 소켓 연결 자체는 부모(PromptChatLab)가 useAdminChatSocket()으로 한 번만
+   *  만들어 내려준다 — 2026-09-16 리팩토링 감사, 이 컴포넌트가 따로
+   *  WebSocket을 열면 같은 화면에 소켓이 2개가 된다(그 훅 docstring 참고). */
+  wsOpen: boolean;
+  send: (kind: string, data?: unknown) => SendResult;
+  subscribe: (listener: (msg: WsPushBase) => void) => () => void;
 }) {
   const [slots, setSlots] = useState<Record<number, SlotState>>(() => {
     const initial: Record<number, SlotState> = {};
@@ -133,25 +128,11 @@ export function WebtoonCutGenerator({
     });
   }
 
-  const [wsOpen, setWsOpen] = useState(false);
   const [gpuState, setGpuState] = useState<WebtoonGpuStatus["state"] | "unknown">("unknown");
-  const wsRef = useRef<WebSocket | null>(null);
   const gpuStartingRef = useRef(false);
   // GPU 기동 대기 중 눌러둔 "기동되면 생성할 슬롯 번호들" — 여러 카드를
   // 연달아 눌러도 전부 기억했다가 gpu_status:running이 오면 순서대로 보낸다.
   const pendingAfterGpuRef = useRef<number[]>([]);
-
-  const sendWs = (kind: string, data: unknown) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-    ws.send(JSON.stringify({ action: "message", kind, data }));
-    return true;
-  };
-
-  // API Gateway WebSocket 프레임 하드 리밋(32,768바이트) — PromptChatLab.tsx의
-  // WS_FRAME_SAFE_BYTES와 같은 안전장치. 이 컷 페이로드는 scene/narration/
-  // caption/dialogue를 다 합쳐 보내므로 드물게 커질 수 있다.
-  const WS_FRAME_SAFE_BYTES = 30000;
 
   const sendGenerate = (slotIndex: number) => {
     setSlots((prev) => {
@@ -171,116 +152,52 @@ export function WebtoonCutGenerator({
         apply_character_lock: s.applyCharacterLock,
         apply_style_transfer: s.applyStyleTransfer,
       };
-      const wsData = { cut: cutPayload, model: s.model };
-      const byteLength = new TextEncoder().encode(JSON.stringify({ action: "message", kind: "cut_image", data: wsData })).length;
-      if (byteLength > WS_FRAME_SAFE_BYTES) {
-        return {
-          ...prev,
-          [slotIndex]: { ...s, status: "error", error: `요청이 너무 커서(${byteLength.toLocaleString()}바이트) 보낼 수 없습니다 — 내용을 줄여서 다시 시도해 주세요.` },
-        };
-      }
-      // sendWs는 소켓이 OPEN이 아니면 false를 돌려주고 아무것도 안 보낸다
-      // (WebSocket.send()는 CLOSING/CLOSED에서 예외 없이 조용히 데이터를
-      // 버림) — 반환값을 확인 안 하면 슬롯이 "생성 중"에 영원히 멈춘다.
-      const sent = sendWs("cut_image", wsData);
-      if (!sent) {
-        return { ...prev, [slotIndex]: { ...s, status: "error", error: "연결이 끊어졌어요 — 자동으로 다시 연결 중입니다. 잠시 후 다시 시도해 주세요." } };
+      // send()가 소켓 상태 확인과 32KB 프레임 크기 가드를 둘 다 내부에서
+      // 처리한다(useAdminChatSocket 참고) — 반환값을 확인 안 하면 슬롯이
+      // "생성 중"에 영원히 멈춘다.
+      const result = send("cut_image", { cut: cutPayload, model: s.model });
+      if (!result.sent) {
+        const error = result.tooLarge
+          ? `요청이 너무 커서(${result.byteLength?.toLocaleString()}바이트) 보낼 수 없습니다 — 내용을 줄여서 다시 시도해 주세요.`
+          : "연결이 끊어졌어요 — 자동으로 다시 연결 중입니다. 잠시 후 다시 시도해 주세요.";
+        return { ...prev, [slotIndex]: { ...s, status: "error", error } };
       }
       return { ...prev, [slotIndex]: { ...s, status: "pending", error: null } };
     });
   };
 
   useEffect(() => {
-    if (!WS_URL) return;
-    let cancelled = false;
-    let reconnectAttempts = 0;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    const MAX_RECONNECT_ATTEMPTS = 10;
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    let pongTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const clearHeartbeat = () => {
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-      if (pongTimeoutTimer) clearTimeout(pongTimeoutTimer);
-      heartbeatTimer = null;
-      pongTimeoutTimer = null;
-    };
-
-    const connect = () => {
-      const token = getToken();
-      const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token ?? "")}`);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        reconnectAttempts = 0;
-        setWsOpen(true);
-        clearHeartbeat();
-        heartbeatTimer = setInterval(() => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          ws.send(JSON.stringify({ action: "message", kind: "ping", data: {} }));
-          pongTimeoutTimer = setTimeout(() => ws.close(), PONG_TIMEOUT_MS);
-        }, HEARTBEAT_INTERVAL_MS);
-      };
-      ws.onclose = () => {
-        setWsOpen(false);
-        clearHeartbeat();
-        if (cancelled || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
-        reconnectAttempts += 1;
-        reconnectTimer = setTimeout(connect, 2000);
-      };
-      ws.onerror = () => setWsOpen(false);
-      ws.onmessage = (evt: MessageEvent<string>) => {
-        let msg: WsPush;
-        try {
-          msg = JSON.parse(evt.data);
-        } catch {
-          return;
-        }
-        if (msg.type === "pong") {
-          if (pongTimeoutTimer) clearTimeout(pongTimeoutTimer);
-          pongTimeoutTimer = null;
-          return;
-        }
-        if (msg.type === "cut_image") {
-          const m = msg as { cut: number; image_url: string };
-          setSlots((prev) =>
-            prev[m.cut] ? { ...prev, [m.cut]: { ...prev[m.cut], status: "done", imageUrl: m.image_url, error: null } } : prev
-          );
-        } else if (msg.type === "cut_image_error") {
-          const m = msg as { cut: number; error: string };
-          setSlots((prev) => (prev[m.cut] ? { ...prev, [m.cut]: { ...prev[m.cut], status: "error", error: m.error } } : prev));
-        } else if (msg.type === "gpu_status") {
-          const m = msg as { state: WebtoonGpuStatus["state"] };
-          setGpuState(m.state);
-          gpuStartingRef.current = false;
-          if (m.state === "running" && pendingAfterGpuRef.current.length > 0) {
-            const toSend = pendingAfterGpuRef.current;
-            pendingAfterGpuRef.current = [];
-            for (const idx of toSend) sendGenerate(idx);
-          }
-        } else if (msg.type === "gpu_error") {
-          gpuStartingRef.current = false;
+    return subscribe((msg) => {
+      if (msg.type === "cut_image") {
+        const m = msg as unknown as { cut: number; image_url: string };
+        setSlots((prev) =>
+          prev[m.cut] ? { ...prev, [m.cut]: { ...prev[m.cut], status: "done", imageUrl: m.image_url, error: null } } : prev
+        );
+      } else if (msg.type === "cut_image_error") {
+        const m = msg as unknown as { cut: number; error: string };
+        setSlots((prev) => (prev[m.cut] ? { ...prev, [m.cut]: { ...prev[m.cut], status: "error", error: m.error } } : prev));
+      } else if (msg.type === "gpu_status") {
+        const m = msg as unknown as { state: WebtoonGpuStatus["state"] };
+        setGpuState(m.state);
+        gpuStartingRef.current = false;
+        if (m.state === "running" && pendingAfterGpuRef.current.length > 0) {
+          const toSend = pendingAfterGpuRef.current;
           pendingAfterGpuRef.current = [];
-          setGpuState("unknown");
+          for (const idx of toSend) sendGenerate(idx);
         }
-      };
-    };
-
-    connect();
-    return () => {
-      cancelled = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      clearHeartbeat();
-      wsRef.current?.close();
-      wsRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendGenerate/setSlots는 ref·함수형 갱신만 쓰므로 클로저가 오래돼도 안전
+      } else if (msg.type === "gpu_error") {
+        gpuStartingRef.current = false;
+        pendingAfterGpuRef.current = [];
+        setGpuState("unknown");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendGenerate/setSlots는 ref·함수형 갱신만 쓰므로 클로저가 오래돼도 안전, subscribe 자체는 마운트 시 한 번만
   }, []);
 
   const requestGpuStart = () => {
     if (gpuStartingRef.current) return;
     gpuStartingRef.current = true;
-    sendWs("gpu_start", {});
+    send("gpu_start", {});
   };
 
   const handleGenerate = (slotIndex: number) => {
@@ -295,7 +212,7 @@ export function WebtoonCutGenerator({
     sendGenerate(slotIndex);
   };
 
-  const handleStopGpu = () => sendWs("gpu_stop", {});
+  const handleStopGpu = () => send("gpu_stop", {});
 
   const orderedSlots = Object.values(slots).sort((a, b) => a.index - b.index);
 
