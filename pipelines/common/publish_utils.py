@@ -410,7 +410,7 @@ def publish_article(
     # 4포맷 전부가 같은 파일을 읽는다. 실패해도 빈 문자열이라 원문만 쓰던
     # 예전 동작으로 자연히 폴백.
     article_path = out_dir / f"{name}_article.txt"
-    facts = extract_facts(article["content"])
+    facts = extract_facts(article["content"], today_kst)
     article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
     article_path.write_text(article_text, encoding="utf-8")
 

@@ -14,12 +14,14 @@ import auth
 from routes import (
     admin_password,
     audit as audit_route,
+    chat_threads,
     cost,
     drivers,
     letters,
     media,
     newsletter,
     posts,
+    prompt_lab,
     prompts,
     quiz,
     webtoon_lab,
@@ -44,6 +46,22 @@ HANDLERS: dict[str, tuple] = {
     "GET /admin/prompts/{category}/{name}/test/{job_id}": (prompts.handle_test_status, True),
     "POST /admin/prompts/{category}/{name}/storyboard-test": (prompts.handle_storyboard_test, True),
     "GET /admin/prompts/{category}/{name}/storyboard-test/{job_id}": (prompts.handle_storyboard_test_status, True),
+    # 프롬프트 실험 챗랩 — 설명/지침/파일 개별 CRUD (2026-09-15)
+    "GET /admin/prompt-lab/{category}/{name}": (prompt_lab.handle_get_doc, True),
+    "PUT /admin/prompt-lab/{category}/{name}/description": (prompt_lab.handle_update_description, True),
+    "PUT /admin/prompt-lab/{category}/{name}/instructions": (prompt_lab.handle_update_instructions, True),
+    "POST /admin/prompt-lab/{category}/{name}/files": (prompt_lab.handle_create_file, True),
+    "GET /admin/prompt-lab/{category}/{name}/files/{file_id}": (prompt_lab.handle_get_file, True),
+    "PUT /admin/prompt-lab/{category}/{name}/files/{file_id}": (prompt_lab.handle_update_file, True),
+    "DELETE /admin/prompt-lab/{category}/{name}/files/{file_id}": (prompt_lab.handle_delete_file, True),
+    "POST /admin/prompt-lab/{category}/{name}/publish": (prompt_lab.handle_publish, True),
+    # 프롬프트 실험 챗랩 — 대화 스레드/메시지 (2026-09-15)
+    "POST /admin/chat-threads": (chat_threads.handle_create, True),
+    "GET /admin/chat-threads": (chat_threads.handle_list, True),
+    "GET /admin/chat-threads/{thread_id}": (chat_threads.handle_get, True),
+    "POST /admin/chat-threads/{thread_id}/messages": (chat_threads.handle_append_message, True),
+    "PUT /admin/chat-threads/{thread_id}": (chat_threads.handle_update, True),
+    "DELETE /admin/chat-threads/{thread_id}": (chat_threads.handle_delete, True),
     "GET /admin/cost": (cost.handle_summary, True),
     "GET /admin/audit": (audit_route.handle_list, True),
     "GET /admin/newsletter/stats": (newsletter.handle_stats, True),
@@ -71,12 +89,24 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/quiz/{id}/unpublish": (quiz.handle_unpublish, True),
     "DELETE /admin/quiz/{id}": (quiz.handle_delete, True),
     # 웹툰 이미지 생성 실험 (2026-09-05) — routes/webtoon_lab.py 모듈
-    # docstring 참고. ⚠️ 로컬 개발 서버(local_server.py)에서만 라우팅되고,
-    # 실제 API Gateway엔 아직 이 4개 라우트가 없다(수동 추가 필요).
+    # docstring 참고. API Gateway에도 이미 올라가 있다(2026-09-16 확인,
+    # AuthorizationType NONE — Lambda가 직접 JWT 검증). 새 라우트를 추가할
+    # 땐 여기 등록 + API Gateway에 `aws apigatewayv2 create-route`로 같은
+    # integration(기존 라우트로 `get-routes`ID 조회) 붙이는 것 둘 다 필요.
     "POST /admin/webtoon-lab/generate": (webtoon_lab.handle_generate, True),
     "GET /admin/webtoon-lab/history": (webtoon_lab.handle_history, True),
     "GET /admin/webtoon-lab/defaults": (webtoon_lab.handle_defaults, True),
     "GET /admin/webtoon-lab/{job_id}": (webtoon_lab.handle_status, True),
+    # 컷별 "실제 품질" 이미지 생성 + GPU 켜기/끄기 (2026-09-14)
+    "POST /admin/webtoon-lab/generate-composed": (webtoon_lab.handle_generate_composed, True),
+    "GET /admin/webtoon-lab/gpu/status": (webtoon_lab.handle_gpu_status, True),
+    "POST /admin/webtoon-lab/gpu/start": (webtoon_lab.handle_gpu_start, True),
+    "POST /admin/webtoon-lab/gpu/stop": (webtoon_lab.handle_gpu_stop, True),
+    # 인물·화풍 참조 이미지 업로드 (2026-09-16) — webtoon_lab.py 새 섹션 주석 참고.
+    "GET /admin/webtoon-lab/image-assets": (webtoon_lab.handle_image_assets_get, True),
+    "POST /admin/webtoon-lab/image-assets/presign": (webtoon_lab.handle_image_assets_presign, True),
+    "GET /admin/webtoon-lab/image-assets/gallery": (webtoon_lab.handle_image_assets_gallery, True),
+    "POST /admin/webtoon-lab/image-assets/select": (webtoon_lab.handle_image_assets_select, True),
 }
 
 
@@ -157,6 +187,35 @@ def lambda_handler(event: dict, context) -> dict:
         from routes import prompts
         prompts.run_async_job(event["_async_prompt_job"])
         return {}
+    # 2026-09-14 — 웹툰 컷 이미지를 실제 발행본과 같은 경로(GPU IP-Adapter+
+    # Style Transfer+QA+텍스트 합성)로 만들면서 webtoon_lab.py도 같은
+    # self-invoke 비동기 패턴이 필요해졌다(threading 방식은 이 파일
+    # docstring이 이미 경고한 대로 이렇게 긴 작업엔 못 버틴다) — 마커
+    # 키만 달리해서 두 모듈의 비동기 작업을 구분한다.
+    if event.get("_async_webtoon_job"):
+        from routes import webtoon_lab
+        webtoon_lab.run_async_job(event["_async_webtoon_job"])
+        return {}
+    # 2026-09-14 — 프롬프트 실험 채팅(PromptChatLab.tsx) 실시간 스트리밍용
+    # self-invoke 마커. 위 둘과 같은 이유(routes/chat_ws.py 모듈 docstring
+    # 참고) — 마커 키만 다르다.
+    if event.get("_async_ws_job"):
+        from routes import chat_ws
+        chat_ws.run_async_job(event["_async_ws_job"])
+        return {}
+    # 2026-09-14 — API Gateway WebSocket API(p4yjifd5v1, HTTP API인
+    # chzwwtjtgk와 별개)가 보내는 이벤트는 routeKey 대신
+    # requestContext.eventType(CONNECT/DISCONNECT/MESSAGE)로 구분된다 —
+    # HTTP 라우팅(HANDLERS)보다 먼저 걸러낸다. routes/chat_ws.py 모듈
+    # docstring 참고.
+    ws_event_type = (event.get("requestContext") or {}).get("eventType")
+    if ws_event_type in ("CONNECT", "DISCONNECT", "MESSAGE"):
+        from routes import chat_ws
+        if ws_event_type == "CONNECT":
+            return chat_ws.handle_connect(event)
+        if ws_event_type == "DISCONNECT":
+            return chat_ws.handle_disconnect(event)
+        return chat_ws.handle_message(event)
     try:
         method, path, route_key, path_params, query_params, body = _parse_event(event)
         logger.info(f"admin: {method} {path} (routeKey={route_key})")

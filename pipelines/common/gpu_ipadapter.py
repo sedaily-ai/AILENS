@@ -4,8 +4,17 @@
 인물 정체성을 고정하는 기법)를 못 쓴다. 회사가 "서버리스만 고집하지
 않는다"고 확인해줘서(BangBot 계열 EC2 t3.small을 이미 상시 운영 중),
 전용 GPU 인스턴스 하나를 배치 작업용으로 띄운다 — 상시 가동이 아니라
-"이 모듈이 시작→쓰고→끈다"는 패턴(g4dn.xlarge $0.647/시간, 하루 몇
-컷 뽑는 배치 작업이라 24시간 켜둘 이유가 없다).
+"이 모듈이 시작→쓰고→끈다"는 패턴(g5.xlarge $1.237/시간(ap-northeast-2),
+하루 몇 컷 뽑는 배치 작업이라 24시간 켜둘 이유가 없다).
+
+2026-09-16 — 컷 생성이 너무 느리다는 사용자 지적으로 g4dn.xlarge(Tesla
+T4, $0.647/시간)에서 g5.xlarge(NVIDIA A10G, $1.237/시간)로 업그레이드.
+같은 AMI/디스크 그대로 인스턴스 타입만 바꿨고(EBS 루트 볼륨 유지),
+nvidia-smi로 새 GPU가 정상 인식되는 것까지 실측 확인했다 — 드라이버
+재설치 없이 그대로 동작. A10G가 추론 속도상 T4보다 크게 빠르고 VRAM도
+16GB→23GB로 늘어 여유가 생긴다. 시간당 단가는 오르지만 배치가 그만큼
+빨리 끝나 컷당 실비용은 비슷하거나 나을 것으로 예상 — 실측 비교는
+아직 안 함.
 
 **중요한 한계(2026-09-09 실측)**: IP-Adapter는 한 장의 참조 이미지로
 "이 사진의 인물과 닮게" 조건을 주는 기법이라, 두 사람(A+B)이 한
@@ -17,7 +26,8 @@
 translate_scene_to_photo_brief()가 반환하는 subjects("A"/"B"/"BOTH")로
 호출부(pipeline.py)가 이걸 판단한다.
 
-**인프라**: g4dn.xlarge(Tesla T4) + AWS Deep Learning AMI(PyTorch 사전
+**인프라**: g5.xlarge(NVIDIA A10G, 2026-09-16 이전엔 g4dn.xlarge/Tesla T4)
++ AWS Deep Learning AMI(PyTorch 사전
 설치) + 기존 sedaily-eng-ec2-role(SSM 권한 재사용, 새 IAM 불필요).
 인바운드 없는 전용 보안그룹(SSM Session Manager로만 접근) — 이미
 콘솔/CLI로 1회 생성해뒀다(GPU_INSTANCE_ID 참고, 재생성 불필요).
@@ -28,11 +38,19 @@ STOP(터미네이트 아님)으로 꺼서 디스크에 캐시된 모델 가중�
 **데이터 전달**: S3(GPU_BUCKET)로 참조 이미지·결과 이미지를 주고받는다
 (SSM RunShellScript 파라미터는 큰 바이너리를 못 실어나른다 — base64
 인코딩해도 명령 크기 제한에 걸림). 참조 이미지(character_ref_A/B.png)는
-인스턴스 로컬 디스크(/home/ec2-user/refs/)에 이미 캐시돼 있어 매
-호출마다 다시 받지 않는다.
+인스턴스 로컬 디스크(/home/ec2-user/refs/)에 캐시돼 있다.
+
+2026-09-16 — 참조 이미지가 예전엔 인스턴스에 한 번 수동으로 올려진 뒤로
+코드가 안 건드리는 고정 자산이었다. admin "이미지 실험" 패널에서 이걸
+업로드/교체할 수 있게 되면서, S3(`refs/character_ref_A.png`·`_B.png`)가
+정본이 됐고 `ensure_gpu_running()`이 매번(배치 시작마다) S3→로컬 디스크로
+덮어쓴다(`_sync_character_refs()`) — admin이 방금 올린 사진이 다음 배치부터
+반영된다. 매 컷 호출마다 다시 받는 게 아니라 "배치 시작 시 한 번"이라
+"이미 캐시돼 있어 매 호출마다 다시 받지 않는다"는 성능 특성 자체는 그대로다.
 """
 from __future__ import annotations
 
+import threading
 import time
 
 GPU_REGION = "ap-northeast-2"
@@ -59,16 +77,29 @@ _ssm_client = None
 _ec2_client = None
 _s3_client = None
 _ddb_client = None
+# 2026-09-16 — routes/chat_ws.py::_run_all_cuts_flow가 8컷을
+# ThreadPoolExecutor로 동시에 돌리면서, 이 함수를 여러 스레드가 동시에
+# 호출하는 게 실제로 일어난다는 게 드러났다(전체 컷 생성 시 컷 여러 개가
+# "'NoneType' object has no attribute 'put_object'"로 실패). 원래 코드는
+# `_ssm_client is None`만 보고 세 전역을 순서대로 채웠는데, 한 스레드가
+# _ssm_client까지만 채운 순간 다른 스레드가 그 가드를 통과해버려
+# _s3_client가 아직 None인 채로 반환되는 경쟁 조건이었다 — 락으로 막는다.
+_clients_lock = threading.Lock()
+# GPU(g5.xlarge) 한 대의 실제 추론 자체를 직렬화 — generate_ipadapter_photo_bytes
+# 내부에서 사용(아래 해당 함수 주석 참고).
+_gpu_infer_lock = threading.Lock()
 
 
 def _clients():
     global _ssm_client, _ec2_client, _s3_client
-    if _ssm_client is None:
-        import boto3  # noqa: lazy — GPU 경로를 안 쓰는 admin 실험 패널 등에서 boto3 초기화 비용 회피
+    if _ssm_client is None or _ec2_client is None or _s3_client is None:
+        with _clients_lock:
+            if _ssm_client is None or _ec2_client is None or _s3_client is None:
+                import boto3  # noqa: lazy — GPU 경로를 안 쓰는 admin 실험 패널 등에서 boto3 초기화 비용 회피
 
-        _ssm_client = boto3.client("ssm", region_name=GPU_REGION)
-        _ec2_client = boto3.client("ec2", region_name=GPU_REGION)
-        _s3_client = boto3.client("s3", region_name=GPU_REGION)
+                _ssm_client = boto3.client("ssm", region_name=GPU_REGION)
+                _ec2_client = boto3.client("ec2", region_name=GPU_REGION)
+                _s3_client = boto3.client("s3", region_name=GPU_REGION)
     return _ssm_client, _ec2_client, _s3_client
 
 
@@ -130,13 +161,37 @@ def ensure_gpu_running(timeout_s: int = 180) -> None:
         )["InstanceInformationList"]
         if info and info[0]["PingStatus"] == "Online":
             print(f"[gpu_ipadapter] {GPU_INSTANCE_ID} SSM 준비 완료")
+            _sync_character_refs()
             return
         time.sleep(5)
     raise TimeoutError(f"{GPU_INSTANCE_ID} SSM 온라인 대기 타임아웃({timeout_s}s)")
 
 
+def _sync_character_refs() -> None:
+    """S3(refs/character_ref_A/B.png)를 인스턴스 로컬 디스크(/home/ec2-user/refs/)로
+    동기화한다 — 2026-09-16, admin "이미지 실험" 패널에서 인물 참조 사진을
+    업로드/교체할 수 있게 되면서 추가. 예전엔 이 두 파일이 인스턴스에 한 번
+    수동으로 올려진 뒤로 코드 어디서도 안 건드리는 고정 자산이었다(모듈
+    상단 docstring 참고) — 지금은 S3가 정본이고, 배치를 시작할 때마다(=이
+    함수가 호출될 때마다) 최신 값으로 덮어써서 admin이 방금 올린 사진이
+    다음 배치부터 바로 반영되게 한다. S3에 아직 아무것도 없으면(최초 상태)
+    `aws s3 cp`가 조용히 실패하고 인스턴스에 이미 있던 예전 파일이 그대로
+    남는다 — 그래서 `; true`로 전체 명령 실패를 막는다(동기화 실패로 배치
+    자체가 죽으면 안 됨, 다른 함수들과 같은 fail-open 원칙)."""
+    cmd = (
+        "mkdir -p /home/ec2-user/refs && "
+        f"aws s3 cp s3://{GPU_BUCKET}/refs/character_ref_A.png /home/ec2-user/refs/character_ref_A.png ; "
+        f"aws s3 cp s3://{GPU_BUCKET}/refs/character_ref_B.png /home/ec2-user/refs/character_ref_B.png ; "
+        "true"
+    )
+    try:
+        _run_ssm_command([cmd], timeout_s=60)
+    except Exception as e:  # noqa: BLE001 — 동기화 실패해도 배치는 계속(위 docstring 참고)
+        print(f"[gpu_ipadapter] 참조 사진 동기화 실패(무시): {e}")
+
+
 def stop_gpu() -> None:
-    """배치 작업이 끝나면 반드시 호출 — 안 끄면 시간당 $0.647가 계속 나간다.
+    """배치 작업이 끝나면 반드시 호출 — 안 끄면 시간당 $1.237가 계속 나간다.
 
     2026-09-10 — 활성 사용자 수를 먼저 -1 해서, 아직 다른 태스크가 쓰는
     중이면(count > 0) 실제 stop_instances()는 건너뛴다 — 마지막으로
@@ -200,7 +255,17 @@ def generate_ipadapter_photo_bytes(
     앵글에서 이목구비 유지가 살짝 불안정했고, 0.5는 여전히 앉은 자세로
     쏠리는 경향이 남아있었다."""
     ssm_client, _ec2, s3 = _clients()
-    run_id = f"{character}_{abs(hash(photo_brief)) % 10_000_000}_{seed}"
+    # 2026-09-16 — run_id를 photo_brief 해시로만 만들면, 같은 문구를 쓰는
+    # 두 인물 합성 컷(webtoon_image.py::generate_dual_character_init_bytes가
+    # _DUAL_SOLO_PROMPT_TEMPLATE라는 고정 문구를 캐릭터 A/B 각각에 매번
+    # 그대로 넘김)이 여러 컷에서 동시에 호출되면 전부 같은 run_id → 같은
+    # S3 키로 겹친다. "전체 컷" 동시 요청에서 실제로 재현: 컷 하나가 끝나며
+    # finally에서 brief_*.txt를 지우는 순간, 같은 키를 쓰던 다른 컷의 SSM
+    # 명령이 그 파일을 읽으려다 404로 실패했다. uuid로 매 호출마다 고유한
+    # 키를 쓰게 해서 겹칠 수 없게 한다(내용 기반 해시는 더 이상 안 씀).
+    import uuid as _uuid
+
+    run_id = f"{character}_{_uuid.uuid4().hex[:12]}"
     brief_key = f"brief_{run_id}.txt"
     out_key = f"out_{run_id}.png"
     s3.put_object(Bucket=GPU_BUCKET, Key=brief_key, Body=photo_brief.encode("utf-8"))
@@ -212,7 +277,16 @@ def generate_ipadapter_photo_bytes(
         f"--out-key {out_key} --scale {scale} --steps {steps} --seed {seed}"
     )
     try:
-        result = _run_ssm_command([cmd], timeout_s=180)
+        # 2026-09-16 — routes/chat_ws.py::_run_all_cuts_flow가 8컷을
+        # ThreadPoolExecutor로 동시에 돌리는데, GPU는 g5.xlarge 한 대뿐이다.
+        # 락 없이 그대로 두면 SSM RunShellScript가 같은 인스턴스에 동시에
+        # 여러 개 들어가 PyTorch 추론끼리 GPU를 다퉈서(VRAM 경합) 전부
+        # 180초 안에 못 끝나고 타임아웃으로 실패하는 걸 실측으로 확인했다
+        # ("전체 컷" 요청 시 8컷 전부 "SSM 명령 대기 타임아웃"). 이 락으로
+        # GPU 추론 자체만 한 번에 하나씩 돌게 직렬화한다 — Bedrock 호출·
+        # S3 업로드·QA처럼 GPU를 안 쓰는 다른 작업은 여전히 병렬로 돈다.
+        with _gpu_infer_lock:
+            result = _run_ssm_command([cmd], timeout_s=180)
         if result["Status"] != "Success":
             raise RuntimeError(
                 f"GPU IP-Adapter 추론 실패: {result['Status']}\n"

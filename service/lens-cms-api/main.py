@@ -22,7 +22,9 @@ import audit_repo
 import cms_posts_repo as posts_client
 import community_repo
 import config_repo
+import chat_threads_repo
 import personal_repo
+import prompt_lab_repo
 import prompts_repo
 import quiz_repo
 import subscribers_repo
@@ -521,6 +523,146 @@ def internal_update_prompt(category: str, name: str, payload: Dict[str, Any] = B
         raise HTTPException(status_code=400, detail="content required")
     result = prompts_repo.update_prompt(category, name, content, sections=payload.get("sections"))
     return result
+
+
+# --- 프롬프트 실험 챗랩: 설명/지침/파일 개별 저장 (2026-09-15) ---
+# prompt_lab_repo.py 모듈 docstring 참고 — prompts_repo(프로덕션 버전
+# 스냅샷)와는 별개 저장소, "발행"만 그쪽을 조립해서 부른다.
+
+@app.get("/internal/admin/prompt-lab/{category}/{name}")
+def internal_get_prompt_lab_doc(category: str, name: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return prompt_lab_repo.get_doc(category, name)
+
+
+@app.put("/internal/admin/prompt-lab/{category}/{name}/description")
+def internal_update_lab_description(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return prompt_lab_repo.update_description(category, name, payload.get("text") or "")
+
+
+@app.put("/internal/admin/prompt-lab/{category}/{name}/instructions")
+def internal_update_lab_instructions(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return prompt_lab_repo.update_instructions(category, name, payload.get("text") or "")
+
+
+@app.post("/internal/admin/prompt-lab/{category}/{name}/files")
+def internal_create_lab_file(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    file_name = (payload.get("name") or "").strip() or "이름 없음"
+    content = payload.get("content") or ""
+    return prompt_lab_repo.create_file(category, name, file_name, content)
+
+
+@app.get("/internal/admin/prompt-lab/{category}/{name}/files/{file_id}")
+def internal_get_lab_file(category: str, name: str, file_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    f = prompt_lab_repo.get_file_content(file_id)
+    if not f:
+        raise HTTPException(status_code=404, detail="file not found")
+    return f
+
+
+@app.put("/internal/admin/prompt-lab/{category}/{name}/files/{file_id}")
+def internal_update_lab_file(category: str, name: str, file_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    r = prompt_lab_repo.update_file(file_id, payload.get("name"), payload.get("content"))
+    if r is None:
+        raise HTTPException(status_code=404, detail="file not found")
+    return r
+
+
+@app.delete("/internal/admin/prompt-lab/{category}/{name}/files/{file_id}")
+def internal_delete_lab_file(category: str, name: str, file_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    if not prompt_lab_repo.delete_file(file_id):
+        raise HTTPException(status_code=404, detail="file not found")
+    return {"deleted": True}
+
+
+@app.post("/internal/admin/prompt-lab/{category}/{name}/publish")
+def internal_publish_prompt_lab(category: str, name: str, x_internal_token: Optional[str] = Header(default=None)):
+    """설명+지침+파일을 조립해 prompts_repo에 새 프로덕션 버전으로 발행한다
+    — admin/backend가 조립 로직 없이 그대로 위임할 수 있게 서버 쪽에서
+    한 번에 처리한다(프론트가 들고 있던 조립 문자열을 다시 그대로
+    쏴주는 것보다, 서버가 지금 저장된 desc/instructions/files를 정본으로
+    다시 조립하는 편이 "화면에 아직 저장 안 한 편집 중 내용"이 실수로
+    발행되는 걸 막는다)."""
+    _check_admin_token(x_internal_token)
+    doc = prompt_lab_repo.get_doc(category, name)
+    parts = []
+    if doc["description"].strip():
+        parts.append(doc["description"].strip())
+    if doc["instructions"].strip():
+        parts.append(doc["instructions"].strip())
+    for meta in doc["files"]:
+        full = prompt_lab_repo.get_file_content(meta["id"])
+        if full and full["content"].strip():
+            parts.append(f"### 파일 · {full['name']}\n\n{full['content'].strip()}")
+    content = "\n\n".join(parts)
+    if not content:
+        raise HTTPException(status_code=400, detail="empty prompt — nothing to publish")
+    return prompts_repo.update_prompt(category, name, content, sections=None)
+
+
+# --- 프롬프트 실험 챗랩: 대화 스레드/메시지 (2026-09-15) ---
+# chat_threads_repo.py 모듈 docstring 참고 — 순수 대화 기록 저장소.
+
+@app.post("/internal/admin/chat-threads")
+def internal_create_chat_thread(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    category = payload.get("category") or ""
+    name = payload.get("name") or ""
+    if not category or not name:
+        raise HTTPException(status_code=400, detail="category and name required")
+    return chat_threads_repo.create_thread(category, name, payload.get("title") or "")
+
+
+@app.get("/internal/admin/chat-threads")
+def internal_list_chat_threads(category: str = Query(...), name: str = Query(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"threads": chat_threads_repo.list_threads(category, name)}
+
+
+@app.get("/internal/admin/chat-threads/{thread_id}")
+def internal_get_chat_thread(thread_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    thread = chat_threads_repo.get_thread(thread_id)
+    if not thread:
+        raise HTTPException(status_code=404, detail="thread not found")
+    return thread
+
+
+@app.post("/internal/admin/chat-threads/{thread_id}/messages")
+def internal_append_chat_message(thread_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    role = payload.get("role")
+    if role not in ("user", "assistant"):
+        raise HTTPException(status_code=400, detail="role must be user or assistant")
+    result = chat_threads_repo.append_message(thread_id, role, payload.get("payload") or {})
+    if result is None:
+        raise HTTPException(status_code=404, detail="thread not found")
+    return result
+
+
+@app.put("/internal/admin/chat-threads/{thread_id}")
+def internal_update_chat_thread(thread_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    title = payload.get("title")
+    if title is None:
+        raise HTTPException(status_code=400, detail="title required")
+    if not chat_threads_repo.update_thread_title(thread_id, title):
+        raise HTTPException(status_code=404, detail="thread not found")
+    return {"updated": True}
+
+
+@app.delete("/internal/admin/chat-threads/{thread_id}")
+def internal_delete_chat_thread(thread_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    if not chat_threads_repo.delete_thread(thread_id):
+        raise HTTPException(status_code=404, detail="thread not found")
+    return {"deleted": True}
 
 
 # --- 감사 로그 (v1.27) ---

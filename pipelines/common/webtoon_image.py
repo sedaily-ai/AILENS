@@ -226,6 +226,21 @@ def get_fixed_characters() -> dict:
     return {"A (여성 기자, 설명자)": female, "B (남성 청자)": male}
 
 
+def _character_text_for(subject: str) -> str:
+    """A/B 각각의 admin 저장 CHARACTER 텍스트 한 명분만 돌려준다(GPU
+    IP-Adapter 솔로 생성 프롬프트에 붙이는 용도 — generate_bedrock_composed_image_bytes()/
+    generate_dual_character_init_bytes() 참고). 2026-09-16 — 예전엔 CHARACTER
+    텍스트가 pipeline 모델 생성 어디에도 안 쓰였다(identity는 참조 사진만
+    으로 고정). admin이 CHARACTER_FEMALE/MALE을 편집·발행해도 실제 생성
+    결과가 전혀 안 바뀌는 건 "화면에서 저장한 프롬프트만 생성을 통제해야
+    한다"는 원칙 위반이라 여기서부터 합류시킨다."""
+    chars = get_fixed_characters()
+    for label, text in chars.items():
+        if label.startswith(subject + " "):
+            return text
+    return ""
+
+
 def build_background_prompt(
     camera: str,
     scene: str,
@@ -292,11 +307,19 @@ def build_background_prompt(
 # 흔들렸다(라운드기록.md #15). "A는 여성, B는 남성"이라는 한 줄만
 # 추가했더니(문단 단위 재강조가 아니라 짧은 역할 매핑 한 줄) 화풍
 # 훼손 없이 남녀 둘 다 안정적으로 나오는 걸 확인 — 이 한 줄만 추가한다.
-_STYLE_GUIDE_STYLE_HINT = (
-    "Modern Korean webtoon illustration, full color, clean flat cel-shaded "
-    "linework style — NOT photorealistic, NOT a photograph, NOT camera-captured. "
-    "Two recurring characters from the reference image: A is the woman, B is the man."
-)
+# 2026-09-16 — 예전엔 이 자리가 코드에 박힌 고정 문구(_STYLE_GUIDE_STYLE_HINT)
+# 였다. admin이 "화풍" 필드를 편집·발행해도 이 문구가 그대로 쓰여서, 화면에서
+# 보이지 않는 별도 텍스트가 실제 생성을 통제하고 있었다 — "관리자가 화면에서
+# 저장한 프롬프트만이 생성을 통제해야 한다"는 원칙 위반. 이제 get_style()
+# (admin이 저장한 실제 STYLE 텍스트)을 그대로 쓴다. 성별 역할 매핑 한 줄
+# ("A는 여성, B는 남성")만 별도로 유지하는 이유는 build_style_guide_prompt()
+# 주석 참고 — 이건 "화풍" 내용이 아니라 참고 이미지 속 어느 쪽이 A/B인지
+# 알려주는 구조적 배선이라 admin 편집 대상이 아니다.
+_STYLE_AB_ROLE_LINE = " Two recurring characters from the reference image: A is the woman, B is the man."
+
+
+def _style_hint_from_db() -> str:
+    return get_style() + _STYLE_AB_ROLE_LINE
 
 _STYLE_GUIDE_CONTENT_RULES = (
     "Contemporary present-day South Korea only — do NOT render historical, "
@@ -338,10 +361,10 @@ def build_style_guide_prompt(camera: str, scene: str) -> str:
     """Style Guide 경로 전용 프롬프트 — 위 실측 결과를 따라 일부러
     짧게 유지한다(스타일 힌트+성별 역할 한 줄 + 카메라 + 장면 + 내용
     규칙 + 텍스트 렌더 금지뿐). characters 파라미터를 여전히 안 받는
-    이유(장문 묘사 배제)는 위 주석 참고 — 성별만 _STYLE_GUIDE_STYLE_HINT에
-    고정 문구로 포함한다."""
+    이유(장문 묘사 배제)는 위 주석 참고 — 성별 역할 매핑만
+    _STYLE_AB_ROLE_LINE으로 별도 고정한다."""
     return (
-        _STYLE_GUIDE_STYLE_HINT
+        _style_hint_from_db()
         + f"\nCamera: {camera}."
         + f"\n\n[SCENE]\n{scene}"
         + f"\n\n{_STYLE_GUIDE_CONTENT_RULES}"
@@ -456,14 +479,39 @@ STYLE_GUIDE_FIDELITY = 0.5  # 0=프롬프트 위주, 1=참고 이미지 재현 �
 # (BEDROCK_IMAGE_MODEL_ID와 동일 태깅 정책 — 비용태깅_규칙.md 참고).
 STYLE_GUIDE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/118crex43ghc"  # lens-webtoon-image-style-guide → us.stability.stable-image-style-guide-v1:0
 
-_style_reference_b64: str | None = None
+# 2026-09-16 — "코드로 설정하는 모든 것을 화면에서 커스터마이징 가능하게"
+# 요청으로, 지금까지 이 레포에 고정 번들된 파일(위 STYLE_REFERENCE_IMAGE_PATH)
+# 이었던 화풍 레퍼런스 이미지를 admin "이미지 실험" 패널에서 업로드/교체할 수
+# 있게 만든다. gpu_ipadapter.py의 인물 참조 사진(character_ref_A/B.png)과
+# 같은 버킷·같은 "refs/" 프리픽스를 쓴다 — 이미 그 GPU 파이프라인용으로
+# admin Lambda 역할에 Get/Put/Delete 권한이 나 있어(AdminWebtoonGpuBucket)
+# 새 IAM이 필요 없다. S3에 아직 아무것도 업로드된 적 없으면(최초 배포 직후)
+# 지금까지 쓰던 번들 파일로 조용히 폴백 — 이 폴백 때문에 기존 동작이
+# 하나도 안 바뀐다.
+_STYLE_REF_BUCKET = "sedaily-webtoon-ipadapter-887078546492"
+_STYLE_REF_KEY = "refs/style_reference.png"
+_STYLE_REF_REGION = "ap-northeast-2"  # gpu_ipadapter.GPU_REGION과 동일(버킷 홈 리전)
+_STYLE_REF_CACHE_TTL_SEC = 60  # prompt_lab_repo.py의 draft 캐시와 같은 패턴 — admin이 방금 올린 이미지가 1분 안에 반영
+
+_style_reference_cache: tuple[float, str] | None = None  # (fetched_at, base64)
 
 
 def _get_style_reference_b64() -> str:
-    global _style_reference_b64
-    if _style_reference_b64 is None:
-        _style_reference_b64 = base64.b64encode(STYLE_REFERENCE_IMAGE_PATH.read_bytes()).decode()
-    return _style_reference_b64
+    global _style_reference_cache
+    now = time.time()
+    if _style_reference_cache is not None and now - _style_reference_cache[0] < _STYLE_REF_CACHE_TTL_SEC:
+        return _style_reference_cache[1]
+    try:
+        import boto3  # noqa: lazy — S3 경로를 안 타는 호출부(텍스트 전용 실험 등)에서 초기화 비용 회피
+
+        s3 = boto3.client("s3", region_name=_STYLE_REF_REGION)
+        body = s3.get_object(Bucket=_STYLE_REF_BUCKET, Key=_STYLE_REF_KEY)["Body"].read()
+        encoded = base64.b64encode(body).decode()
+    except Exception as e:  # noqa: BLE001 — 업로드 전이거나 조회 실패해도 번들 기본값으로 폴백, 생성 자체를 막지 않는다
+        print(f"[webtoon_image] 화풍 레퍼런스 S3 조회 실패({type(e).__name__}: {e}) — 번들 기본값 사용")
+        encoded = base64.b64encode(STYLE_REFERENCE_IMAGE_PATH.read_bytes()).decode()
+    _style_reference_cache = (now, encoded)
+    return encoded
 
 
 def generate_bedrock_style_guide_image_bytes(prompt: str, fidelity: float = STYLE_GUIDE_FIDELITY) -> bytes:
@@ -549,13 +597,29 @@ _SCENE_TRANSLATE_MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-
 # 크게 나오는 클로즈업"인지 "둘 다 나오는" 컷인지 미리 분류해서, 전자만
 # GPU IP-Adapter 경로를 태운다 — 텍스트 압축과 같은 호출에 묶어서 별도
 # LLM 호출을 추가하지 않는다.
+# 2026-09-16 — 원래 문구가 "compress"(압축)였는데, 실제로는 admin이 SCENE에
+# 적은 내용 중 일부가 조용히 요약·생략된 채로 이미지 생성에 들어갈 수 있다는
+# 뜻이었다("관리자가 화면에서 저장한 프롬프트만이, 안 보이는 변형 없이 생성을
+# 통제해야 한다"는 원칙 위반). 이 호출 자체(한국어→영어 번역)는 없앨 수
+# 없다 — GPU IP-Adapter(SD1.5)·Bedrock Stable Image Core 둘 다 영어 학습
+# 모델이라 한국어 프롬프트를 직접 못 알아듣는다(순수 언어 변환은 "안 보이는
+# 곳에서 내용이 달라지는" 문제가 아니라 모델이 요구하는 언어로 옮기는
+# 기술적 필수 단계). 그래서 "압축·요약" 대신 "SCENE에 적힌 내용을 빠짐없이
+# 그대로 번역, 생략·요약·창작 금지"로 지침을 바꾼다 — subjects 분류(A/B/BOTH)
+# 는 이미지에 실리는 콘텐츠가 아니라 어느 GPU 경로를 탈지 정하는 순수 라우팅
+# 판단이라 그대로 유지한다.
 _SCENE_TRANSLATE_SYSTEM = (
-    "You compress a Korean scene description into a short English photo-shoot brief "
-    "for a real photographer, AND classify which character(s) are the main visual "
-    "focus. Output exactly this format:\n"
+    "You translate a Korean scene description into English for a real "
+    "photographer, AND classify which character(s) are the main visual "
+    "focus. This is a literal translation, not a rewrite — preserve every "
+    "detail, action, and prop the original text describes; do not omit, "
+    "summarize away, or invent anything that isn't in the original. Output "
+    "exactly this format:\n"
     "SUBJECTS: A|B|BOTH\n"
-    "BRIEF: <2-3 sentence English photo brief, under 60 words, describing location, "
-    "setting, mood, camera framing as if directing a real documentary photo shoot>\n\n"
+    "BRIEF: <English translation of the scene, describing location, setting, "
+    "mood, camera framing as if directing a real documentary photo shoot — "
+    "translate completely, keep it as concise as the original Korean text "
+    "already is>\n\n"
     "Decision rule (apply in this order):\n"
     "1. If the [SCENE] text describes an action, expression, or pose for BOTH A and B "
     "(even briefly, e.g. 'A leans forward while B sits back'), output BOTH — this is "
@@ -637,11 +701,13 @@ def generate_bedrock_style_transfer_bytes(
 ) -> bytes:
     """Stable Style Transfer 호출 — init_image(구도)에 style_image(우리
     webtoon_style_reference.png)의 화풍을 입힌다. 기본값은 R11 실측 비교에서
-    가장 화풍 일치도가 높았던 조합(style_strength=1.0)."""
+    가장 화풍 일치도가 높았던 조합(style_strength=1.0). prompt는
+    _style_hint_from_db()로 admin이 저장한 STYLE 텍스트를 그대로 쓴다(2026-09-16
+    — 위 _STYLE_AB_ROLE_LINE 주석 참고)."""
     body = json.dumps({
         "init_image": base64.b64encode(init_image_bytes).decode(),
         "style_image": _get_style_reference_b64(),
-        "prompt": _STYLE_GUIDE_STYLE_HINT,
+        "prompt": _style_hint_from_db(),
         "negative_prompt": _STYLE_GUIDE_NEGATIVE_PROMPT,
         "composition_fidelity": composition_fidelity,
         "style_strength": style_strength,
@@ -671,7 +737,12 @@ def _parse_style_transfer_scene_input(scene_input: str) -> tuple[str, str]:
     return m.group(2), m.group(1)  # (camera, scene)
 
 
-def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
+def generate_bedrock_composed_image_bytes(
+    scene_input: str,
+    *,
+    apply_character_lock: bool = True,
+    apply_style_transfer: bool = True,
+) -> bytes:
     """구도-화풍 분리 파이프라인(R12) — 번역 단계가 이제 subjects도 같이
     반환한다(R15). subjects가 "A"/"B"(한 명만 크게 나오는 컷)면 GPU
     IP-Adapter로 그 인물의 참조 얼굴을 고정한 사진을 만든다(캐릭터 일관성
@@ -685,21 +756,43 @@ def generate_bedrock_composed_image_bytes(scene_input: str) -> bytes:
     다른(훨씬 다루기 쉬운) 문제로 바뀌었다. 이건 이미 있는 Rekognition
     얼굴 수 QA 게이트(R10, pipeline.py의 _generate_and_qa_cut)가 정확히
     잡아 재시도하는 종류의 문제라 — 근본적인 "뭉개짐"보다 훨씬 다루기 쉬워
-    다시 기본 경로로 승격."""
+    다시 기본 경로로 승격.
+
+    2026-09-16 — admin에서 "이미지 고정(인물)·화풍 고정을 껐다 켰다 하고
+    싶다"는 요청으로 두 옵션을 추가했다(둘 다 기본 True = 지금까지의
+    동작 그대로).
+    - apply_character_lock=False: subjects를 "NONE"으로 강제해 GPU
+      IP-Adapter 참조 얼굴 고정 경로 자체를 건너뛴다 — 인물이 몇 명
+      나오든 "일반적인 사람"으로 생성된다(admin이 저장한 CHARACTER
+      텍스트도 이 경로에선 같이 빠진다 — 아래 분기 참고, subjects="NONE"
+      이면 IP-Adapter 분기를 안 타므로 _character_text_for()도 안 붙는다).
+    - apply_style_transfer=False: 3단계(Style Transfer)를 건너뛰고 그
+      직전 단계의 포토리얼 원본을 그대로 반환한다 — **결과물이 삽화가
+      아니라 사실적인 사진처럼 나온다**는 뜻이다(화풍 자체를 텍스트로
+      대신 입히는 게 아니라 그 단계를 통째로 스킵하는 것). 순수하게
+      "이 인물/구도가 실제로 어떻게 나오는지" 확인하고 싶을 때 쓴다."""
     camera, scene = _parse_style_transfer_scene_input(scene_input)
     subjects, brief = translate_scene_to_photo_brief(camera, scene)
+    if not apply_character_lock:
+        subjects = "NONE"
+
     if subjects in ("A", "B"):
         import gpu_ipadapter  # pipelines/common/ — sibling, GPU 경로를 안 쓰는 호출부의 boto3 비용 회피 위해 지연 import
 
-        init_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(brief, subjects)
-        return generate_bedrock_style_transfer_bytes(init_bytes)
+        subject_brief = f"{brief} {_character_text_for(subjects)}".strip()
+        init_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(subject_brief, subjects)
+        style_kwargs = {}
     elif subjects == "BOTH":
         init_bytes = generate_dual_character_init_bytes(brief)
-        return generate_bedrock_style_transfer_bytes(init_bytes, composition_fidelity=0.9, change_strength=0.7)
+        style_kwargs = {"composition_fidelity": 0.9, "change_strength": 0.7}
     else:
         init_prompt = build_photoreal_init_prompt(brief)
         init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
-        return generate_bedrock_style_transfer_bytes(init_bytes)
+        style_kwargs = {}
+
+    if not apply_style_transfer:
+        return init_bytes
+    return generate_bedrock_style_transfer_bytes(init_bytes, **style_kwargs)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -806,13 +899,23 @@ _DUAL_SOLO_PROMPT_TEMPLATE = (
     "upper body portrait, sitting at a table, natural relaxed pose, looking slightly "
     "to the side as if talking to someone, plain simple background"
 )
+# _DUAL_SOLO_PROMPT_TEMPLATE는 "화풍/인물 묘사" 같은 admin 편집 대상 콘텐츠가
+# 아니라, 위 R9 실측 결과에 따라 일부러 장면과 무관하게 고정해야 하는 기술적
+# 포즈 스캐폴드다(공유 brief를 그대로 쓰면 인물 특징이 섞이는 문제가 재현됨
+# — 위 주석 참고). 대신 "누구를 그리는지"에 해당하는 실제 외형 콘텐츠는
+# admin이 저장한 CHARACTER_FEMALE/MALE(_character_text_for())에서 매 호출마다
+# 가져온다(2026-09-16).
 
 
 def generate_dual_character_init_bytes(photo_brief: str) -> bytes:
     import gpu_ipadapter  # pipelines/common/ — sibling
 
-    a_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(_DUAL_SOLO_PROMPT_TEMPLATE, "A")
-    b_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(_DUAL_SOLO_PROMPT_TEMPLATE, "B")
+    a_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(
+        f"{_DUAL_SOLO_PROMPT_TEMPLATE}. {_character_text_for('A')}".strip(), "A"
+    )
+    b_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(
+        f"{_DUAL_SOLO_PROMPT_TEMPLATE}. {_character_text_for('B')}".strip(), "B"
+    )
     bg_bytes = generate_bedrock_photoreal_image_bytes(build_empty_scene_prompt(photo_brief))
     # negative_prompt는 generate_bedrock_photoreal_image_bytes() 내부에
     # 이미 _PHOTOREAL_NEGATIVE_PROMPT로 고정돼 있어(인물 배제 문구는
@@ -830,3 +933,63 @@ def generate_bedrock_composed_image(scene_input: str, out_path: Path, retries: i
     retries=2(다른 generate_*는 3) — 한 시도당 Bedrock 호출이 3번이라
     기본값 3을 그대로 쓰면 최악의 경우 호출 수가 지나치게 늘어난다."""
     return _retry_generate_and_write(lambda: generate_bedrock_composed_image_bytes(scene_input), out_path, retries)
+
+
+# ─────────────────────────────────────────────────────────────
+# Amazon Nova Canvas (Bedrock) — 프롬프트 챗랩 이미지 모델 비교 실험 전용
+# (2026-09-15, 사용자 요청: "nova canvas도 모델을 올려두긴해야합니다").
+#
+# ⚠️ 이전에 시도했다가 막혔던 건 모델 자체 접근 거부가 아니라 IAM
+# 권한(과 비용태깅용 application inference profile) 미비였다 — 실측으로
+# 직접 확인(2026-09-15, us-east-1에서 실제 InvokeModel 성공). 모델
+# 카탈로그상 "LEGACY" 표시가 있지만 이 계정은 이미 접근 가능한 상태다.
+# us-east-1 전용(us-west-2엔 Nova Canvas 자체가 없음, 위 BEDROCK_IMAGE_REGION
+# 주석 참고) — 그래서 클라이언트를 따로 둔다.
+# ─────────────────────────────────────────────────────────────
+
+NOVA_CANVAS_REGION = "us-east-1"
+NOVA_CANVAS_MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/jbnsv603bm7x"  # lens-webtoon-image-nova-canvas → amazon.nova-canvas-v1:0
+
+_nova_canvas_client = None
+
+
+def _get_nova_canvas_client():
+    global _nova_canvas_client
+    if _nova_canvas_client is None:
+        import boto3  # noqa: lazy — 위 _get_bedrock_image_client()와 같은 이유
+
+        _nova_canvas_client = boto3.client("bedrock-runtime", region_name=NOVA_CANVAS_REGION)
+    return _nova_canvas_client
+
+
+def generate_nova_canvas_image_bytes(prompt: str) -> bytes:
+    """Amazon Nova Canvas(Bedrock) 1회 호출 — 성공하면 PNG bytes 반환.
+    요청/응답 계약이 Stability 계열(prompt+aspect_ratio)과 달라
+    (taskType 기반, width/height 직접 지정) 별도 함수로 둔다. prompt는
+    build_style_guide_prompt()가 만든 짧은 프롬프트를 그대로 받는다 —
+    Nova Canvas는 참고 이미지 컨디셔닝이 없는 순수 text-to-image라 스타일
+    힌트 문구가 특히 중요하다.
+
+    ⚠️ height/width가 512x512(정사각형)인 이유(2026-09-15 실측) — 이
+    모델은 Bedrock 카탈로그상 "LEGACY"라 임의의 해상도를 못 받는다.
+    1024x1024·768x1152·896x1152·720x1280(세로형 전부)·1280x720은 전부
+    "Access denied. This Model is marked by provider as Legacy..."로
+    거부됐고, 512x512와 1280x1024(가로형)만 성공했다 — 다른 모델들처럼
+    4:5 세로형을 못 만든다는 뜻. 비교 실험 목적상(화풍/품질만 확인) 정사각형
+    쪽을 택했다 — compose_text.py의 말풍선 배치가 세로형 전제라 이 모델
+    결과물엔 텍스트 합성이 다소 안 맞을 수 있음을 감안할 것."""
+    body = json.dumps({
+        "taskType": "TEXT_IMAGE",
+        "textToImageParams": {"text": prompt[:1024]},  # Nova Canvas 프롬프트 상한(1024자)
+        "imageGenerationConfig": {
+            "numberOfImages": 1,
+            "height": 512,
+            "width": 512,
+        },
+    })
+    resp = _get_nova_canvas_client().invoke_model(modelId=NOVA_CANVAS_MODEL_ID, body=body)
+    payload = json.loads(resp["body"].read())
+    images = payload.get("images") or []
+    if not images:
+        raise ValueError(f"응답에 이미지 없음: {payload.get('error')}")
+    return base64.b64decode(images[0])

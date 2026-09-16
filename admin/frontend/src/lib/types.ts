@@ -53,6 +53,54 @@ export interface PromptDetail {
   sections?: unknown;
 }
 
+/** 프롬프트 실험 챗랩 우측 패널 전용 — 설명/지침/파일 개별 저장(2026-09-15).
+ *  PromptDetail(발행된 프로덕션 프롬프트 버전 스냅샷)과는 별개 저장소. */
+export interface PromptLabFile {
+  id: number;
+  name: string;
+  size: number;
+  updated_at: string | null;
+}
+
+export interface PromptLabDoc {
+  description: string;
+  instructions: string;
+  files: PromptLabFile[];
+}
+
+/** 프롬프트 실험 챗랩 좌측 사이드바 — 대화 스레드/메시지(2026-09-15).
+ *  PromptLabDoc과도 별개 저장소 — 순수 대화 기록만 담는다. */
+export interface ChatThreadSummary {
+  id: number;
+  title: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ChatThreadMessage {
+  id: number;
+  role: "user" | "assistant";
+  created_at: string | null;
+  text?: string;
+  step1?: unknown;
+  storyboard?: { coreQuestion: string; cuts: unknown[] };
+  imagePreview?: { cut: number; imageUrl: string; model?: string };
+  /** storyboard 메시지에만 딸려온다 — 화면 표시용 storyboard 필드는
+   *  요약본이라, 컷 이미지 재요청까지 이어가려면 원본 전체 cuts가
+   *  따로 필요하다(WebtoonStoryboardCut[]). */
+  fullCuts?: WebtoonStoryboardCut[];
+}
+
+export interface ChatThreadDetail extends ChatThreadSummary {
+  messages: ChatThreadMessage[];
+}
+
+export interface PromptLabFileContent {
+  id: number;
+  name: string;
+  content: string;
+}
+
 export interface CostEntry {
   input_tokens?: number;
   output_tokens?: number;
@@ -354,11 +402,43 @@ export interface WebtoonLabJob {
 /** 히스토리 항목 — prompt_preview·error는 목록엔 없음(job_id로 상세 조회해야 함). */
 export type WebtoonLabHistoryItem = Omit<WebtoonLabJob, "error" | "prompt_preview">;
 
-/** 프로덕션 기본 STYLE/FIXED_CHARACTERS — "직접 입력" 토글의 placeholder로 쓴다. */
+/** GPU IP-Adapter 인스턴스 상태(2026-09-14) — "실제 품질" 컷 생성 중 클로즈업
+ *  컷(A/B 단독)에서만 실제로 쓰인다. ec2 DescribeInstances의 State.Name 값. */
+export interface WebtoonGpuStatus {
+  state: "running" | "stopped" | "stopping" | "pending" | "shutting-down" | "terminated";
+}
+
+/** 프로덕션 기본 STYLE/FIXED_CHARACTERS — 패널 텍스트 필드를 항상 이 값으로 채운다. */
 export interface WebtoonLabDefaults {
   style: string;
   char_female: string;
   char_male: string;
+}
+
+/** 화풍·인물 참조 이미지(2026-09-16) — routes/webtoon_lab.py::handle_image_assets_get.
+ *  키가 아직 없으면(이론상만 — 세 키 다 시딩해둠) null. */
+export interface WebtoonImageAssetUrls {
+  style_url: string | null;
+  char_female_url: string | null;
+  char_male_url: string | null;
+}
+
+export type WebtoonImageAssetKind = "style" | "char_female" | "char_male";
+
+export interface WebtoonImageAssetPresign {
+  upload_url: string;
+  key: string;
+  expires_in: number;
+}
+
+/** 참조 이미지 갤러리(2026-09-16) — routes/webtoon_lab.py::handle_image_assets_gallery.
+ *  asset 하나의 업로드 이력, 최신순. active=true인 항목이 지금 실제
+ *  생성에 쓰이는 정본과 같은 내용(ETag로 판별, 위 라우트 주석 참고). */
+export interface WebtoonImageAssetGalleryItem {
+  key: string;
+  url: string;
+  uploaded_at: string;
+  active: boolean;
 }
 
 // 웹툰 스토리보드 테스트(2026-09-11) — 기사 원문 → 1단계(스크립트)+2단계
@@ -381,6 +461,12 @@ export interface WebtoonStoryboardCut {
   /** 2단계 산출물 — 컷 카드에서 그대로 편집 가능(이미지 생성 전 손볼 수 있게). */
   camera: string;
   scene: string;
+  /** 1단계 산출물 — "실제 품질" 컷 이미지 생성(2026-09-14)에서 compose_text.py가
+   *  제목 알약·컷8 마무리 자막을 그리는 데 쓴다. 이전엔 백엔드 cuts.append()가
+   *  버리고 있었음(컷 카드 화면엔 표시하지 않음, 생성 요청 시에만 그대로 전달). */
+  title?: string;
+  title_keyword?: string;
+  closing_caption?: string;
 }
 
 export interface WebtoonStoryboardResult {

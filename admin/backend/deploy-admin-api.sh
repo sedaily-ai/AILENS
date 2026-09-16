@@ -34,6 +34,31 @@ WEBTOON_IMAGE_MODULE="$SCRIPT_DIR/../../pipelines/common/webtoon_image.py"
 # 쓰는 pipelines/common/json_extract.py — 위와 같은 이유로 zip 루트에 복사
 # 필수(안 하면 routes.prompts import 시점에 전체 admin API가 죽는다).
 JSON_EXTRACT_MODULE="$SCRIPT_DIR/../../pipelines/common/json_extract.py"
+# 2026-09-14 — "실제 발행본과 같은 품질" 요청으로 webtoon_lab.py가 프로덕션
+# 웹툰 파이프라인(pipelines/webtoon/pipeline.py)과 같은 이미지 경로(GPU
+# IP-Adapter+Style Transfer+텍스트 합성)를 타게 되면서 새로 필요해진
+# 모듈들 — 위 두 파일과 같은 이유로 전부 zip 루트에 flat 복사한다.
+BEDROCK_CLIENT_MODULE="$SCRIPT_DIR/../../pipelines/common/bedrock_client.py"
+GPU_IPADAPTER_MODULE="$SCRIPT_DIR/../../pipelines/common/gpu_ipadapter.py"
+REKOGNITION_CLIENT_MODULE="$SCRIPT_DIR/../../pipelines/common/rekognition_client.py"
+COMPOSE_TEXT_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/compose_text.py"
+# webtoon_image.py::_load_prompt_doc()이 flat import로 쓰는
+# pipelines/common/ddb_prompt.py — 2026-09-16까지 이 줄이 빠져있어서
+# get_style()/get_fixed_characters()가 매번 ModuleNotFoundError로 코드
+# 안 안전망(fallback) 값으로 조용히 떨어지고 있었다(실측: CloudWatch
+# 로그에 "[webtoon_image] webtoon-image/published 로드 실패
+# (ModuleNotFoundError: No module named 'ddb_prompt')"). 안전망 값이
+# 마지막 실제 발행값과 우연히 같아서 눈치채기 어려웠다 — 위 세 모듈과
+# 같은 이유로 복사 필수.
+DDB_PROMPT_MODULE="$SCRIPT_DIR/../../pipelines/common/ddb_prompt.py"
+# webtoon_image.py(STYLE_REFERENCE_IMAGE_PATH)와 compose_text.py(FONT_PATH)
+# 둘 다 "자기 옆의 assets/"를 찾는다 — flat 구조에선 둘 다 zip 루트에
+# 나란히 있으니, 원래 서로 다른 두 폴더(pipelines/common/assets,
+# pipelines/webtoon/assets)에서 그 둘이 실제로 쓰는 파일만 한 assets/로
+# 합친다(gpu_ipadapter.py용 character_ref_A/B.png는 GPU 인스턴스 로컬
+# 디스크에 이미 캐시돼 있어 Lambda 쪽엔 불필요 — 안 복사).
+STYLE_REF_ASSET="$SCRIPT_DIR/../../pipelines/common/assets/webtoon_style_reference.png"
+FONT_ASSET="$SCRIPT_DIR/../../pipelines/webtoon/assets/NotoSansKR-Bold.ttf"
 
 FUNCTION_NAME="sedaily-mbti-admin-api-dev"
 PYTHON_VERSION="3.11"          # Lambda 런타임과 반드시 일치시킬 것
@@ -48,11 +73,14 @@ rm -rf "$BUILD_DIR" "$PACKAGE_FILE"
 mkdir -p "$BUILD_DIR"
 
 # 런타임 소스만 (tests 제외).
-cp handler.py auth.py __init__.py "$BUILD_DIR/"
+cp handler.py auth.py __init__.py openai_image.py "$BUILD_DIR/"
 cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
+cp "$BEDROCK_CLIENT_MODULE" "$GPU_IPADAPTER_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$BUILD_DIR/"
+mkdir -p "$BUILD_DIR/assets"
+cp "$STYLE_REF_ASSET" "$FONT_ASSET" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"
 
 # --python-version 은 필수다. 워크스테이션 Python 이 Lambda 런타임(3.11)과 다르면

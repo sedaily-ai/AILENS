@@ -26,16 +26,23 @@ Functions로 바꿔야 한다(아직 안 함, 로컬 실험용으로만 스레�
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import os
 import threading
 import uuid
+from pathlib import Path
 
 import boto3
 from boto3.dynamodb.conditions import Key
 
 from shared import audit, ddb_client, response
 import webtoon_image  # pipelines/common/ — 배포 시 zip에 복사됨(위 docstring 참고)
+import bedrock_client  # pipelines/common/ — QA 비전 호출용(2026-09-14)
+import gpu_ipadapter  # pipelines/common/ — GPU IP-Adapter 제어(2026-09-14)
+import rekognition_client  # pipelines/common/ — 말풍선 배치용 얼굴 감지(2026-09-14)
+import compose_text  # pipelines/webtoon/ — 대사·캡션·내레이션 합성(2026-09-14)
+from json_extract import extract_json_object  # pipelines/common/
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +50,39 @@ _JOB_PK = "WEBTOONLAB"
 _MAX_SCENE_BYTES = 4000
 _MAX_TEXT_BYTES = 20000  # style/character 필드 상한 — 오남용(과금 폭주) 방지
 _HISTORY_LIMIT = 24
+
+# ─────────────────────────────────────────────────────────────
+# "실제 발행본과 같은 품질" 컷 생성 (2026-09-14)
+# ─────────────────────────────────────────────────────────────
+#
+# 배경: 기존 handle_generate()는 Stable Image Core 배경만 그리고 끝 —
+# 실제 프로덕션(pipelines/webtoon/pipeline.py, IMAGE_PROVIDER=
+# "bedrock-style-transfer")은 GPU IP-Adapter로 캐릭터 얼굴을 고정하고,
+# 비전 모델 QA+Rekognition 얼굴 감지를 거쳐, compose_text.py로 대사·
+# 캡션·내레이션까지 그려 넣는다. 사용자 요청("실제와 같은 품질을
+# 원합니다")에 맞춰 그 전체 경로를 admin 컷별 이미지 생성에도 그대로
+# 태운다 — 새 엔드포인트(POST .../generate-composed)로 분리해서 기존
+# handle_generate()(이미지 실험실 3단계, style/char_female/char_male
+# 자유 입력 계약)는 그대로 둔다(다른 화면·다른 입력 계약이라 합치면
+# 오히려 둘 다 망가진다).
+#
+# QA·재시도 로직(_validate_and_detect)은 pipelines/webtoon/pipeline.py의
+# _generate_and_qa_cut()과 같은 판정 기준(VALIDATE_SYSTEM)을 쓰지만,
+# prompts.py 전체를 복사하는 대신 그 상수 하나만 그대로 옮겨왔다(다른
+# 내용은 admin 프롬프트 드로어가 관리하는 DDB 프롬프트라 여기서 쓸 일이
+# 없다).
+_QA_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
+_MAX_EXPECTED_FACES = 2  # 고정 진행자 2인(A/B)만 쓰는 파이프라인 — pipeline.py와 동일
+_VALIDATE_SYSTEM = (
+    "당신은 뉴스 웹툰 이미지 QA 담당자입니다. 주어진 이미지 하나를 보고 "
+    "아래 JSON 스키마 그대로만 응답하세요(설명 문구 없이 JSON 객체 하나만):\n"
+    '{"sageuk": true|false, "no_people_violated": true|false}\n\n'
+    "- sageuk: 이미지에 조선시대/사극/한복/전통 한옥 지붕 등 시대극 요소가 "
+    "하나라도 보이면 true.\n"
+    "- no_people_violated: [인물 없음 지시]가 주어졌는데 이미지에 사람이 "
+    "보이면 true. 인물 없음 지시가 없었다면 항상 false."
+)
+_MAX_CUT_TEXT_BYTES = 4000  # 컷 하나의 narration/caption/title 등 필드 하나당 상한
 
 _s3_client = None
 
@@ -119,18 +159,485 @@ def _run_generation(job_id: str, prompt: str) -> None:
         _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
 
 
+def _self_invoke_async(payload: dict) -> None:
+    """자기 자신을 InvocationType="Event"로 다시 호출해 GPU/Bedrock 체인
+    작업을 완전히 별개의 invocation에서 처리한다 — routes/prompts.py의
+    같은 이름 헬퍼와 동일한 이유·동일한 패턴(그쪽 docstring 참고). 마커
+    키만 "_async_webtoon_job"으로 달리해서 handler.py가 두 모듈의 비동기
+    작업을 구분해 라우팅한다."""
+    lambda_client = boto3.client("lambda")
+    function_name = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "sedaily-mbti-admin-api-dev")
+    lambda_client.invoke(
+        FunctionName=function_name,
+        InvocationType="Event",
+        Payload=json.dumps({"_async_webtoon_job": payload}).encode("utf-8"),
+    )
+
+
+def run_async_job(payload: dict) -> None:
+    """handler.py가 self-invoke된 별도 invocation에서 직접 호출."""
+    kind = payload.get("kind")
+    job_id = payload.get("job_id")
+    if kind == "generate_composed":
+        _run_composed_generation(job_id, payload["cut"])
+    elif kind == "gpu_start":
+        _run_gpu_start(job_id)
+
+
+def _validate_and_detect(image_bytes: bytes, scene: str, no_people_expected: bool) -> dict:
+    """생성된 배경 이미지 1장을 비전 모델로 검사 — pipeline.py의
+    _validate_and_detect()와 동일 계약(실패해도 항상 "문제 없음"으로
+    처리해 가용성을 우선한다)."""
+    try:
+        no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
+        user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
+        raw = bedrock_client.call_vision(_VALIDATE_SYSTEM, user_msg, image_bytes, model=_QA_MODEL, max_tokens=500)
+        return extract_json_object(raw)
+    except Exception as e:  # noqa: BLE001 — QA 실패가 생성 자체를 막으면 안 됨
+        logger.warning(f"webtoon-lab QA 실패(통과 처리): {e}")
+        return {"sageuk": False, "no_people_violated": False}
+
+
+# 프롬프트 챗랩 이미지 모델 선택(2026-09-15, 사용자 요청: "다양하게
+# 테스트를 해보려는게 목적.. 사용가능한것들은.. 입력창쪽에.. 모델
+# 선택가능하도록", 이어서 "nova canvas도 모델을 올려두긴해야합니다..
+# openai api도 연결을 해서.. 이미지 생성 가능하도록"). Nova Canvas는
+# 예전(다른 기능)에서 막혔던 전례가 있어 처음엔 뺐었는데, 실측으로 직접
+# 확인해보니 모델 자체 접근 거부가 아니라 이 Lambda 역할에 IAM 권한이
+# 없었던 것뿐이었다 — 비용태깅용 application inference profile을 새로
+# 만들고 권한을 추가해서 해결(2026-09-15). style_guide도 같은 조사 중에
+# 이 Lambda 역할엔 애초에 권한이 없었다는 걸 발견해 같이 추가했다.
+#
+# 2026-09-16까지는 "pipeline"(기본)만 QA+얼굴감지+1회 재생성까지 프로덕션과
+# 동일하게 돌고, 나머지 넷은 "이 모델 자체의 원본 출력"만 보는 게 목적이라
+# QA 없이 바로 반환했다. 사용자 요청("다른 모델들도 동일한 로직을 돌게...
+# 프롬프트만으로 제어")으로 다섯 모델 전부 같은 QA+재시도를 거치도록
+# 통일했다(_generate_composed_with_qa/_generate_once 참고) — 비교 대상은
+# 이제 "안전장치 유무"가 아니라 순수하게 "같은 지문을 모델마다 어떻게
+# 표현하느냐"가 됐다.
+_IMAGE_MODELS = {"pipeline", "stable_image_core", "style_guide", "nova_canvas", "openai_dalle3"}
+
+
+def _generate_once(
+    camera: str,
+    scene: str,
+    model: str,
+    apply_character_lock: bool,
+    apply_style_transfer: bool,
+) -> bytes:
+    """model 하나로 이미지 1장 생성 — 모델별 프롬프트 조립 방식만 다르고,
+    QA·재시도는 호출부(_generate_composed_with_qa)가 모델 구분 없이 공통
+    으로 담당한다(아래 함수 docstring 참고)."""
+    if model == "stable_image_core":
+        chars = webtoon_image.get_fixed_characters()
+        prompt = webtoon_image.build_background_prompt(
+            camera, scene, chars, style=webtoon_image.get_style(),
+            include_scene_reinforcement=True, include_character_reinforcement=True,
+        )
+        return webtoon_image.generate_bedrock_image_bytes(prompt)
+
+    if model == "style_guide":
+        prompt = webtoon_image.build_style_guide_prompt(camera, scene)
+        return webtoon_image.generate_bedrock_style_guide_image_bytes(prompt)
+
+    if model == "nova_canvas":
+        # 참고 이미지 컨디셔닝이 없는 순수 text-to-image라 style_guide와
+        # 같은(스타일 힌트가 포함된) 프롬프트를 그대로 재사용한다 —
+        # 모델별로 다른 프롬프트를 쓰면 "같은 지문, 다른 모델" 비교가 아니게 된다.
+        prompt = webtoon_image.build_style_guide_prompt(camera, scene)
+        return webtoon_image.generate_nova_canvas_image_bytes(prompt)
+
+    if model == "openai_dalle3":
+        import openai_image  # admin/backend/ 루트 — lazy(이 모델을 안 쓰면 시크릿 fetch 비용 없음)
+
+        prompt = webtoon_image.build_style_guide_prompt(camera, scene)
+        return openai_image.generate_image_bytes(prompt)
+
+    # "pipeline"(기본)
+    scene_input = webtoon_image.build_style_transfer_scene_input(camera, scene)
+    return webtoon_image.generate_bedrock_composed_image_bytes(
+        scene_input, apply_character_lock=apply_character_lock, apply_style_transfer=apply_style_transfer
+    )
+
+
+def _generate_composed_with_qa(
+    camera: str,
+    scene: str,
+    has_dialogue: bool,
+    model: str = "pipeline",
+    *,
+    apply_character_lock: bool = True,
+    apply_style_transfer: bool = True,
+) -> tuple[bytes, list | None]:
+    """이미지 1장 생성(_generate_once) + QA 검증 + (필요시) 1회 재생성 —
+    pipeline.py::_generate_and_qa_cut()과 같은 판정 기준을 admin 컷별
+    생성에도 그대로 적용한다.
+
+    2026-09-16(같은 날 후속) — "다른 모델들도 동일한 로직을 돌면 좋겠다...
+    프롬프트만으로 제어를 하려고 한다"는 요청으로, 예전엔 model=="pipeline"
+    일 때만 거치던 이 QA+재시도를 다섯 모델 전부에 공통 적용하도록 바꿨다.
+    모델별 프롬프트 조립(build_background_prompt/build_style_guide_prompt
+    등, _generate_once 참고)은 그대로 다르게 둔다 — 사용자가 다르게
+    하고 싶은 건 "결과를 검증·재시도하느냐"라는 공통 안전장치 쪽이지,
+    모델마다 이미 다르게 튜닝된 프롬프트 조립 방식 자체가 아니기 때문이다.
+
+    apply_character_lock/apply_style_transfer — 2026-09-16, "이미지(인물)
+    고정·화풍 고정을 체크로 껐다 켰다 하고 싶다"는 요청으로 추가. model이
+    "pipeline"일 때만 의미가 있다(다른 모델은 애초에 이 두 메커니즘 자체가
+    없다) — _generate_once를 거쳐 webtoon_image.generate_bedrock_composed_image_bytes()
+    로 그대로 전달된다."""
+    image_bytes = _generate_once(camera, scene, model, apply_character_lock, apply_style_transfer)
+
+    no_people_expected = any(p in scene for p in ("인물 없음", "인물 없이", "인물 없는", "인물이 없"))
+    verdict = _validate_and_detect(image_bytes, scene, no_people_expected)
+    faces = rekognition_client.detect_main_faces(image_bytes) or None
+    extra_people = (
+        has_dialogue and not no_people_expected
+        and faces is not None and len(faces) > _MAX_EXPECTED_FACES
+    )
+    if verdict.get("sageuk") or verdict.get("no_people_violated") or extra_people:
+        logger.info(f"webtoon-lab QA 실패({model}) — 재생성 1회 시도")
+        image_bytes = _generate_once(camera, scene, model, apply_character_lock, apply_style_transfer)
+        faces = rekognition_client.detect_main_faces(image_bytes) or None
+    return image_bytes, faces
+
+
+def _run_composed_generation(job_id: str, cut: dict, push=None, model: str = "pipeline") -> None:
+    """전체 경로 — 배경 생성(GPU/Style Transfer)+QA+얼굴 감지+텍스트 합성.
+    프로덕션(pipeline.py::run_article)과 같은 순서. 텍스트 합성이 실패해도
+    배경 이미지는 남기고 발행을 막지 않는다(pipeline.py와 동일 원칙).
+
+    push — 2026-09-14, 웹소켓 채팅(routes/chat_ws.py) 전용. 주어지면 완료/
+    실패 시 DDB 기록과 별개로 이 콜백으로 즉시 결과를 밀어넣는다(폴링
+    없이 실시간 통지) — HTTP job/폴링 호출부(handle_generate_composed)는
+    안 넘기므로 동작 그대로.
+
+    model — 2026-09-15, 프롬프트 챗랩의 이미지 모델 선택 드롭다운 전용.
+    _IMAGE_MODELS에 없는 값이 오면 "pipeline"으로 취급한다(오타·구버전
+    프론트가 보낸 값이어도 조용히 기본 동작).
+
+    cut의 apply_character_lock/apply_style_transfer — 2026-09-16, "인물
+    고정·화풍 고정 체크박스" 요청. 키가 아예 없으면(구버전 프론트) True로
+    — 지금까지의 기본 동작 그대로."""
+    if model not in _IMAGE_MODELS:
+        model = "pipeline"
+    try:
+        camera = (cut.get("camera") or "").strip()
+        scene = (cut.get("scene") or "").strip()
+        has_dialogue = bool(cut.get("dialogue")) or cut.get("cut") == 1
+        apply_character_lock = cut.get("apply_character_lock", True)
+        apply_style_transfer = cut.get("apply_style_transfer", True)
+        image_bytes, faces = _generate_composed_with_qa(
+            camera, scene, has_dialogue, model=model,
+            apply_character_lock=apply_character_lock, apply_style_transfer=apply_style_transfer,
+        )
+
+        tmp_path = Path(f"/tmp/webtoon-lab-{job_id}.png")
+        tmp_path.write_bytes(image_bytes)
+        try:
+            compose_text.compose(tmp_path, cut, faces)
+        except Exception as e:  # noqa: BLE001 — 배경은 유지, 합성 실패만 로그
+            logger.warning(f"webtoon-lab 컷{cut.get('cut')} 텍스트 합성 실패(배경만 유지): {e}")
+        final_bytes = tmp_path.read_bytes()
+        tmp_path.unlink(missing_ok=True)
+
+        bucket = _bucket()
+        if not bucket:
+            raise RuntimeError("CMS_MEDIA_BUCKET not configured")
+        key = f"media/webtoon-lab/{job_id}.png"
+        _s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
+        image_url = f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}"
+        _update_job(job_id, {"status": "done", "image_url": image_url, "updated_at": _now_iso()})
+        audit.log("webtoon-lab-generate-composed-done", {"job_id": job_id, "cut": cut.get("cut")})
+        if push:
+            push({"type": "cut_image", "cut": cut.get("cut"), "image_url": image_url, "model": model})
+    except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위, 안 잡으면 job이 영원히 pending
+        logger.exception(f"webtoon-lab composed generate failed: {job_id}")
+        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
+        if push:
+            push({"type": "cut_image_error", "cut": cut.get("cut"), "error": str(e)[:500]})
+
+
+def handle_generate_composed(body: dict, path_params: dict, query_params: dict) -> dict:
+    """웹툰 스토리보드 테스트(WebtoonStoryboardLab.tsx)의 컷별 "이미지 생성" —
+    실제 발행본과 같은 경로(GPU IP-Adapter+Style Transfer+QA+텍스트 합성)를
+    탄다(2026-09-14, 사용자 요청 "실제와 같은 품질을 원합니다"). GPU를 쓰는
+    컷(클로즈업)은 호출 전에 GPU가 켜져 있어야 한다(POST .../gpu/start) —
+    여기서 자동으로 켜지 않는다(테스트 세션 동안 켜둔 채로 여러 컷을
+    처리하고 다 쓰면 수동으로 끄는 방식을 사용자가 직접 요청함).
+
+    handle_generate()(이미지 실험실 3단계, style/char_female/char_male 자유
+    입력 계약)와는 별개 엔드포인트 — 입력 계약이 완전히 달라(컷 전체 JSON)
+    합치면 두 화면 다 망가진다."""
+    body = body or {}
+    scene = (body.get("scene") or "").strip()
+    camera = (body.get("camera") or "").strip()
+    if not scene:
+        return response.err("scene is required", 400)
+    if not camera:
+        return response.err("camera is required", 400)
+
+    cut = {
+        "cut": body.get("cut"),
+        "camera": camera,
+        "scene": scene,
+        "narration": (body.get("narration") or "").strip(),
+        "caption": (body.get("caption") or "").strip(),
+        "closing_caption": (body.get("closing_caption") or "").strip(),
+        "title": (body.get("title") or "").strip(),
+        "title_keyword": (body.get("title_keyword") or "").strip(),
+        "dialogue": body.get("dialogue") or [],
+    }
+    for label in ("camera", "scene", "narration", "caption", "closing_caption", "title", "title_keyword"):
+        if len(cut[label].encode("utf-8")) > _MAX_CUT_TEXT_BYTES:
+            return response.err(f"{label} too long (max {_MAX_CUT_TEXT_BYTES} bytes)", 400)
+
+    job_id = uuid.uuid4().hex[:16]
+    now = _now_iso()
+    _put_job(job_id, {
+        "status": "pending", "cut": cut.get("cut"), "camera": camera, "scene": scene,
+        "created_at": now, "updated_at": now,
+    })
+    _self_invoke_async({"kind": "generate_composed", "job_id": job_id, "cut": cut})
+    audit.log("webtoon-lab-generate-composed-start", {"job_id": job_id, "cut": cut.get("cut")})
+    return response.ok({"job_id": job_id, "status": "pending"})
+
+
+# ─────────────────────────────────────────────────────────────
+# GPU 켜기/끄기 (2026-09-14) — "테스트하는 동안은 계속 켜두고 작업자가
+# 다 쓰면 수동으로 끄는" 방식(사용자 요청). gpu_ipadapter.py의 활성
+# 사용자 수 카운트(DynamoDB 원자적 ADD)를 그대로 재사용 — 프로덕션
+# 파이프라인이 같은 GPU를 동시에 쓰는 중이어도 admin 세션이 자기 몫만
+# 안전하게 켜고 끌 수 있다(gpu_ipadapter.py 모듈 docstring 참고).
+# ─────────────────────────────────────────────────────────────
+
+def handle_gpu_status(body: dict, path_params: dict, query_params: dict) -> dict:
+    ec2 = boto3.client("ec2", region_name=gpu_ipadapter.GPU_REGION)
+    state = ec2.describe_instances(
+        InstanceIds=[gpu_ipadapter.GPU_INSTANCE_ID]
+    )["Reservations"][0]["Instances"][0]["State"]["Name"]
+    return response.ok({"state": state})
+
+
+def _run_gpu_start(job_id: str, push=None) -> None:
+    try:
+        gpu_ipadapter.ensure_gpu_running()
+        _update_job(job_id, {"status": "done", "updated_at": _now_iso()})
+        if push:
+            push({"type": "gpu_status", "state": "running"})
+    except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위
+        logger.exception(f"webtoon-lab gpu start failed: {job_id}")
+        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
+        if push:
+            push({"type": "gpu_error", "error": str(e)[:500]})
+
+
+def handle_gpu_start(body: dict, path_params: dict, query_params: dict) -> dict:
+    """기동+SSM 온라인 대기까지 1~3분 걸릴 수 있어(gpu_ipadapter.ensure_gpu_running
+    timeout_s=180) 30초 API Gateway 벽을 넘길 수 있다 — 컷 생성과 같은
+    self-invoke 비동기 패턴. 폴링은 기존 GET .../{job_id}를 그대로 쓴다
+    (이 job도 같은 테이블·같은 status/error 모양이라 별도 엔드포인트가
+    필요 없다)."""
+    job_id = uuid.uuid4().hex[:16]
+    now = _now_iso()
+    _put_job(job_id, {"status": "pending", "created_at": now, "updated_at": now})
+    _self_invoke_async({"kind": "gpu_start", "job_id": job_id})
+    audit.log("webtoon-lab-gpu-start", {"job_id": job_id})
+    return response.ok({"job_id": job_id, "status": "pending"})
+
+
+def handle_gpu_stop(body: dict, path_params: dict, query_params: dict) -> dict:
+    """빠른 동기 호출(ec2:StopInstances 한 번, 대기 없음) — 다른 태스크가
+    아직 쓰는 중이면 gpu_ipadapter.stop_gpu()가 알아서 실제 정지를
+    보류한다."""
+    try:
+        gpu_ipadapter.stop_gpu()
+        return response.ok({"stopping": True})
+    except Exception as e:
+        return response.err(str(e), 500)
+
+
 def handle_defaults(body: dict, path_params: dict, query_params: dict) -> dict:
     """현재 발행된(admin DDB `webtoon-image/published`) STYLE/FIXED_CHARACTERS
-    조회 — "직접 입력" 토글을 켰을 때 빈 칸이 아니라 지금 실제로 쓰이는
-    프롬프트를 값으로 채워주기 위함(2026-09-04, admin 콘솔 실사용 피드백).
-    webtoon_image.get_style()/get_fixed_characters()가 매번 DDB에서 fresh하게
-    읽는다 — 여기서 값을 복제하지 않는다."""
+    조회 — 패널의 텍스트 필드가 빈 칸이 아니라 지금 실제로 쓰이는 프롬프트를
+    값으로 항상 채워서 보여주기 위함(2026-09-04 최초 도입, 2026-09-16 "직접
+    입력" 체크박스를 없애고 필드를 상시 노출하도록 변경). webtoon_image.
+    get_style()/get_fixed_characters()가 매번 DDB에서 fresh하게 읽는다 —
+    여기서 값을 복제하지 않는다."""
     chars = webtoon_image.get_fixed_characters()
     return response.ok({
         "style": webtoon_image.get_style(),
         "char_female": chars["A (여성 기자, 설명자)"],
         "char_male": chars["B (남성 청자)"],
     })
+
+
+# ─────────────────────────────────────────────────────────────
+# 인물·화풍 참조 이미지(refs/*.png) — 2026-09-16 신설. 코드/GPU 인스턴스에만
+# 있던 이미지 자산 두 종류(화풍 레퍼런스, 인물 A/B 참조 사진)를 admin에서
+# 직접 업로드/교체할 수 있게 한다("코드로 설정하는 건 전부 화면에서
+# 커스터마이징 가능해야" 요청). 저장은 gpu_ipadapter.GPU_BUCKET을 그대로
+# 재사용(이미 admin Lambda 역할에 Get/Put/Delete 권한이 있어 새 IAM 불필요,
+# AdminWebtoonGpuBucket 참고). style_reference.png는 webtoon_image.py가
+# 60초 캐시로 읽고, 두 character_ref는 gpu_ipadapter.ensure_gpu_running()이
+# 배치 시작마다 인스턴스 로컬 디스크로 동기화한다 — 실제 생성 코드는 항상
+# 이 "정본 키" 3개(refs/style_reference.png, refs/character_ref_A.png,
+# refs/character_ref_B.png)만 본다.
+#
+# 2026-09-16(같은 날 후속) — "여러 샘플 중에서 골라 비교하고 싶다" 요청으로
+# 갤러리를 추가했다. 업로드는 이제 정본 키를 바로 덮어쓰지 않고 asset별
+# refs/gallery/{asset}/{uuid}.png 에 쌓인다(과거 업로드가 안 사라짐) —
+# handle_image_assets_gallery_select가 고른 갤러리 파일을 정본 키로
+# copy_object 해야 실제 생성에 반영된다(업로드 직후에는 프론트가 업로드
+# 응답의 key로 바로 select까지 호출해 "올리면 즉시 반영"이던 기존 동작을
+# 그대로 유지한다). "지금 활성인 샘플"은 별도 포인터 테이블 없이 ETag로
+# 판별한다 — S3 PutObject/CopyObject의 ETag는 (멀티파트가 아닌 한) 내용의
+# MD5라서, 정본 키의 ETag와 같은 갤러리 항목이 곧 "그 내용이 복사돼 지금
+# 쓰이는 파일"이다.
+# ─────────────────────────────────────────────────────────────
+_IMAGE_ASSET_BUCKET = gpu_ipadapter.GPU_BUCKET
+_IMAGE_ASSET_REGION = gpu_ipadapter.GPU_REGION
+_IMAGE_ASSET_KEYS = {
+    "style": "refs/style_reference.png",
+    "char_female": "refs/character_ref_A.png",
+    "char_male": "refs/character_ref_B.png",
+}
+_IMAGE_ASSET_GALLERY_PREFIXES = {
+    "style": "refs/gallery/style/",
+    "char_female": "refs/gallery/char_female/",
+    "char_male": "refs/gallery/char_male/",
+}
+_IMAGE_ASSET_MAX_BYTES = 8 * 1024 * 1024
+_IMAGE_ASSET_URL_EXPIRES = 300
+_IMAGE_ASSET_GALLERY_MAX_ITEMS = 24  # 오래된 샘플은 목록에서만 안 보임(S3에서 안 지움 — 실수로 고른 걸 되돌릴 수 있게)
+
+_image_asset_s3_client = None
+
+
+def _image_asset_s3():
+    global _image_asset_s3_client
+    if _image_asset_s3_client is None:
+        _image_asset_s3_client = boto3.client("s3", region_name=_IMAGE_ASSET_REGION)
+    return _image_asset_s3_client
+
+
+def handle_image_assets_get(body: dict, path_params: dict, query_params: dict) -> dict:
+    """화풍/인물 참조 이미지 미리보기 URL — 실제 생성이 읽는 바로 그 S3
+    객체를 가리키는 presigned GET(5분 유효)이다. 키가 없으면(업로드 전)
+    null을 돌려줘 프론트가 "아직 없음"으로 처리하게 한다(세 키 다
+    2026-09-16에 그때까지 쓰이던 값으로 시딩해둬서 보통은 항상 있다)."""
+    s3 = _image_asset_s3()
+    urls: dict[str, str | None] = {}
+    for asset, key in _IMAGE_ASSET_KEYS.items():
+        try:
+            s3.head_object(Bucket=_IMAGE_ASSET_BUCKET, Key=key)
+            urls[f"{asset}_url"] = s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": _IMAGE_ASSET_BUCKET, "Key": key},
+                ExpiresIn=_IMAGE_ASSET_URL_EXPIRES,
+            )
+        except Exception:  # noqa: BLE001 — 아직 업로드된 적 없는 키(정상 상태)
+            urls[f"{asset}_url"] = None
+    return response.ok(urls)
+
+
+def handle_image_assets_presign(body: dict, path_params: dict, query_params: dict) -> dict:
+    """참조 이미지 업로드용 presigned PUT 발급 — routes/media.py의 프리사인
+    업로드와 같은 이유(admin Lambda를 안 거치고 브라우저가 S3에 직접 올려야
+    페이로드 한계를 안 걸림)로 같은 패턴을 쓴다. media.py처럼 매번 새
+    키(uuid)를 발급한다 — 2026-09-16부터 정본 키를 바로 안 덮어쓰고 갤러리에
+    쌓은 뒤 handle_image_assets_select로 골라야 반영되는 구조로 바뀌었다(위
+    섹션 주석 참고)."""
+    body = body or {}
+    asset = (body.get("asset") or "").strip()
+    content_type = (body.get("content_type") or "").strip()
+    size = body.get("size") or 0
+
+    if asset not in _IMAGE_ASSET_KEYS:
+        return response.err(f"unknown asset: {asset} (style|char_female|char_male)", 400)
+    if content_type != "image/png":
+        return response.err(f"unsupported content_type: {content_type} (image/png only)", 400)
+    try:
+        size = int(size)
+    except (TypeError, ValueError):
+        return response.err("size must be a number", 400)
+    if size <= 0 or size > _IMAGE_ASSET_MAX_BYTES:
+        return response.err(f"size must be 1..{_IMAGE_ASSET_MAX_BYTES} bytes", 400)
+
+    key = f"{_IMAGE_ASSET_GALLERY_PREFIXES[asset]}{uuid.uuid4().hex}.png"
+    upload_url = _image_asset_s3().generate_presigned_url(
+        "put_object",
+        Params={"Bucket": _IMAGE_ASSET_BUCKET, "Key": key, "ContentType": content_type},
+        ExpiresIn=_IMAGE_ASSET_URL_EXPIRES,
+    )
+    audit.log("webtoon-lab-image-asset-presign", {"asset": asset, "key": key})
+    return response.ok({"upload_url": upload_url, "key": key, "expires_in": _IMAGE_ASSET_URL_EXPIRES})
+
+
+def handle_image_assets_gallery(body: dict, path_params: dict, query_params: dict) -> dict:
+    """asset 하나의 업로드 이력을 최신순으로 반환 — 갤러리 그리드용. 정본
+    키의 ETag와 같은 항목에 active:true를 표시한다(위 섹션 주석의 ETag
+    판별 방식 참고). 정본 키가 아직 없으면(최초 상태) 전부 active:false."""
+    query_params = query_params or {}
+    asset = (query_params.get("asset") or "").strip()
+    if asset not in _IMAGE_ASSET_KEYS:
+        return response.err(f"unknown asset: {asset} (style|char_female|char_male)", 400)
+
+    s3 = _image_asset_s3()
+    try:
+        active_etag = s3.head_object(Bucket=_IMAGE_ASSET_BUCKET, Key=_IMAGE_ASSET_KEYS[asset])["ETag"]
+    except Exception:  # noqa: BLE001 — 정본 키가 아직 없음(정상 상태)
+        active_etag = None
+
+    resp = s3.list_objects_v2(
+        Bucket=_IMAGE_ASSET_BUCKET,
+        Prefix=_IMAGE_ASSET_GALLERY_PREFIXES[asset],
+        MaxKeys=_IMAGE_ASSET_GALLERY_MAX_ITEMS,
+    )
+    items = sorted(resp.get("Contents", []), key=lambda o: o["LastModified"], reverse=True)
+    return response.ok({
+        "items": [
+            {
+                "key": obj["Key"],
+                "url": s3.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": _IMAGE_ASSET_BUCKET, "Key": obj["Key"]},
+                    ExpiresIn=_IMAGE_ASSET_URL_EXPIRES,
+                ),
+                "uploaded_at": obj["LastModified"].isoformat(),
+                "active": active_etag is not None and obj["ETag"] == active_etag,
+            }
+            for obj in items
+        ],
+    })
+
+
+def handle_image_assets_select(body: dict, path_params: dict, query_params: dict) -> dict:
+    """갤러리에서 고른 샘플을 정본 키로 복사 — 이 순간부터 다음 생성이 이
+    사진/이미지를 쓴다(style은 다음 컷 생성부터 60초 캐시 후, character는
+    다음 GPU 배치 시작 때 — 위 섹션 주석 참고). key가 그 asset의 갤러리
+    프리픽스 밖을 가리키면 거부한다(다른 asset 파일을 잘못 골라 정본을
+    덮어쓰는 사고 방지)."""
+    body = body or {}
+    asset = (body.get("asset") or "").strip()
+    key = (body.get("key") or "").strip()
+    if asset not in _IMAGE_ASSET_KEYS:
+        return response.err(f"unknown asset: {asset} (style|char_female|char_male)", 400)
+    if not key.startswith(_IMAGE_ASSET_GALLERY_PREFIXES[asset]):
+        return response.err("key does not belong to this asset's gallery", 400)
+
+    s3 = _image_asset_s3()
+    try:
+        s3.copy_object(
+            Bucket=_IMAGE_ASSET_BUCKET,
+            CopySource={"Bucket": _IMAGE_ASSET_BUCKET, "Key": key},
+            Key=_IMAGE_ASSET_KEYS[asset],
+            ContentType="image/png",
+        )
+    except Exception as e:  # noqa: BLE001 — 존재하지 않는 키 등 사용자 입력 오류를 400으로
+        return response.err(f"select failed: {e}", 400)
+    audit.log("webtoon-lab-image-asset-select", {"asset": asset, "key": key})
+    return response.ok({"selected": True})
 
 
 def handle_generate(body: dict, path_params: dict, query_params: dict) -> dict:

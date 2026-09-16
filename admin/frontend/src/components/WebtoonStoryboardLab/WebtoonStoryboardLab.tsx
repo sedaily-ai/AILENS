@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
-import type { WebtoonStoryboardCut, WebtoonStoryboardResult } from "@/lib/types";
+import type { WebtoonGpuStatus, WebtoonStoryboardCut, WebtoonStoryboardResult } from "@/lib/types";
 
 /* 웹툰 스토리보드 테스트 — "기사 원문 → 8컷 스토리보드 → 컷별 이미지"를
    한 화면에서 이어서 해볼 수 있는 실험 패널(2026-09-11 신설).
@@ -73,6 +73,66 @@ export function WebtoonStoryboardLab({
   const [cuts, setCuts] = useState<WebtoonStoryboardCut[]>([]);
   const [cutJobs, setCutJobs] = useState<Record<number, CutJobState>>({});
 
+  // GPU IP-Adapter 켜기/끄기(2026-09-14) — "실제 품질" 컷 생성이 클로즈업
+  // 컷(A/B 단독)에서 쓴다. 매 컷마다 자동으로 켜고 끄지 않는다 — 테스트
+  // 세션 동안 켜둔 채로 여러 컷을 처리하고 다 쓰면 수동으로 끄는 방식을
+  // 사용자가 직접 요청함(자동이면 컷마다 부팅 대기 1~3분이 반복된다).
+  const [gpuState, setGpuState] = useState<WebtoonGpuStatus["state"] | "unknown">("unknown");
+  const [gpuBusy, setGpuBusy] = useState(false);
+  const gpuPollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const refreshGpuStatus = useCallback(() => {
+    adminApi
+      .getWebtoonGpuStatus()
+      .then((r) => setGpuState(r.state))
+      .catch(() => setGpuState("unknown"));
+  }, []);
+
+  useEffect(() => {
+    if (open) refreshGpuStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshGpuStatus는 안정적 참조
+  }, [open]);
+
+  function pollGpuStartJob(jobId: string) {
+    adminApi
+      .getWebtoonImageJob(jobId)
+      .then((j) => {
+        if (j.status === "pending") {
+          gpuPollTimer.current = setTimeout(() => pollGpuStartJob(jobId), 4000);
+          return;
+        }
+        setGpuBusy(false);
+        if (j.status === "error") toast.show(`GPU 기동 실패: ${j.error ?? "알 수 없는 오류"}`, "error");
+        refreshGpuStatus();
+      })
+      .catch((err) => {
+        setGpuBusy(false);
+        toast.show(err instanceof AdminApiError ? err.message : "GPU 상태 조회 실패", "error");
+      });
+  }
+
+  const handleStartGpu = async () => {
+    if (gpuBusy) return;
+    setGpuBusy(true);
+    try {
+      const { job_id } = await adminApi.startWebtoonGpu();
+      gpuPollTimer.current = setTimeout(() => pollGpuStartJob(job_id), 4000);
+    } catch (err) {
+      setGpuBusy(false);
+      toast.show(err instanceof AdminApiError ? err.message : "GPU 기동 요청 실패", "error");
+    }
+  };
+
+  const handleStopGpu = async () => {
+    try {
+      await adminApi.stopWebtoonGpu();
+      toast.show("GPU 정지 요청함 — 다른 작업이 없으면 곧 꺼집니다", "success");
+      setTimeout(refreshGpuStatus, 3000);
+    } catch (err) {
+      toast.show(err instanceof AdminApiError ? err.message : "GPU 정지 요청 실패", "error");
+    }
+  };
+
   const pollTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   // 2026-09-11 — 스토리보드 생성 자체도(1·2단계 체인) 이제 작업+폴링이라
   // (레터/웹툰이 GPT-4o에서 실제 프로덕션 모델로 바뀌면서 API Gateway
@@ -89,6 +149,15 @@ export function WebtoonStoryboardLab({
   }, []);
 
   useEffect(() => clearAllPolls, [clearAllPolls]);
+  // GPU 기동 폴링은 "스토리보드 재생성" 시 clearAllPolls()에 같이 쓸려가면
+  // 안 된다(기동 중에 재생성을 눌러도 GPU 폴링은 별개로 계속돼야 gpuBusy가
+  // 멈추지 않는다) — 언마운트 때만 정리.
+  useEffect(
+    () => () => {
+      if (gpuPollTimer.current) clearTimeout(gpuPollTimer.current);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -137,7 +206,7 @@ export function WebtoonStoryboardLab({
     }
     setCutJobs((prev) => ({ ...prev, [cut.cut]: { status: "pending", jobId: null, imageUrl: null, error: null } }));
     try {
-      const r = await adminApi.generateWebtoonImage({ scene: cut.scene.trim(), camera: cut.camera.trim() });
+      const r = await adminApi.generateComposedWebtoonImage(cut);
       setCutJobs((prev) => ({ ...prev, [cut.cut]: { status: "pending", jobId: r.job_id, imageUrl: null, error: null } }));
       pollTimers.current[cut.cut] = setTimeout(() => pollCutJob(cut.cut, r.job_id), _POLL_INTERVAL_MS);
     } catch (err) {
@@ -228,6 +297,7 @@ export function WebtoonStoryboardLab({
             기사 원문 → 1·2단계(스크립트+장면연출) → 컷별 이미지까지 한 화면에서
           </p>
         </div>
+        <GpuStatusBadge state={gpuState} busy={gpuBusy} onStart={() => void handleStartGpu()} onStop={() => void handleStopGpu()} />
         {!embedded && (
           <button
             type="button"
@@ -306,6 +376,11 @@ export function WebtoonStoryboardLab({
                 {anyPending ? "생성 중..." : "전체 이미지 생성"}
               </button>
             </div>
+            <p className="text-[11px] leading-relaxed text-[var(--text-faint)]">
+              실제 발행본과 같은 경로(GPU 캐릭터 고정+화풍 변환+QA+텍스트 합성)로 그립니다 —
+              인물 클로즈업 컷은 위 GPU가 켜져 있어야 정상 생성됩니다. 컷 하나당 30초~2분
+              가까이 걸릴 수 있습니다.
+            </p>
 
             <div className="space-y-4">
               {cuts.map((cut) => (
@@ -457,6 +532,72 @@ function CutCard({
           />
         )}
       </div>
+    </div>
+  );
+}
+
+/* GPU IP-Adapter 상태 배지 + 켜기/끄기(2026-09-14) — "테스트하는 동안은
+   계속 켜두고 다 쓰면 수동으로 끈다"는 사용자 요청을 그대로 반영한 UI.
+   시간당 과금($0.647/h)이 나가는 리소스라 상태를 항상 눈에 보이게 헤더에
+   둔다 — 켜져 있는 걸 잊고 방치하는 사고를 줄이기 위함. */
+function GpuStatusBadge({
+  state,
+  busy,
+  onStart,
+  onStop,
+}: {
+  state: WebtoonGpuStatus["state"] | "unknown";
+  busy: boolean;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  const label =
+    busy || state === "pending"
+      ? "GPU 켜는 중..."
+      : state === "running"
+        ? "GPU 켜짐"
+        : state === "stopping"
+          ? "GPU 끄는 중..."
+          : state === "unknown"
+            ? "GPU 상태 확인 중"
+            : "GPU 꺼짐";
+  const tone =
+    state === "running" ? "ok" : busy || state === "pending" || state === "stopping" ? "warn" : "off";
+  const style =
+    tone === "ok"
+      ? { background: "var(--ok-soft)", color: "var(--ok)" }
+      : tone === "warn"
+        ? { background: "var(--warn-soft)", color: "var(--warn)" }
+        : { background: "var(--surface-sunken)", color: "var(--text-muted)" };
+  const canStart = !busy && (state === "stopped" || state === "unknown");
+  const canStop = !busy && state === "running";
+  return (
+    <div className="flex flex-none items-center gap-1.5">
+      <span
+        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
+        style={style}
+      >
+        <span className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "currentColor" }} aria-hidden="true" />
+        {label}
+      </span>
+      {canStart && (
+        <button
+          type="button"
+          onClick={onStart}
+          className="ui-btn rounded-lg px-2.5 py-1 text-[12px] font-semibold"
+        >
+          켜기
+        </button>
+      )}
+      {canStop && (
+        <button
+          type="button"
+          onClick={onStop}
+          className="ui-btn rounded-lg px-2.5 py-1 text-[12px] font-semibold"
+        >
+          끄기
+        </button>
+      )}
     </div>
   );
 }

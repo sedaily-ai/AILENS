@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 import { withDisplayMeta, fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { fetchCmsPosts, fetchCmsPostBySlug, fetchLensPosts, fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
@@ -262,6 +263,14 @@ export default async function LetterDetailPage({
     fetchFollowingLetters(5),
     fetchLensBySlug(id),
   ]);
+  // lens 글(4탭 보유)이 /letters/{id}로 직접 열리면 레터 탭만 보이고 나머지
+  // 3개(웹툰/팟캐스트/영상)는 화면 어디에도 링크가 없어 도달 불가였다 —
+  // generateMetadata()의 canonical(v1.32)은 크롤러용이라 실사용자 내비게이션엔
+  // 영향이 없었던 게 원인(사용자 신고 "레터만 있는데 4가지 유형은?", 2026-09-13).
+  // /lens/{id}가 이미 canonical로 지정된 "진짜 원본"이므로 사람도 그리로 보낸다.
+  if (lensPost) {
+    redirect(`/lens/${encodeURIComponent(id)}`);
+  }
   // generateMetadata()의 canonical 계산과 동일한 규칙 — lens 글이면
   // JSON-LD의 @id/url도 /lens/{id}를 가리켜야 canonical과 일치한다.
   const canonicalUrl = lensPost ? `${SITE_URL}/lens/${id}` : `${SITE_URL}/letters/${id}`;

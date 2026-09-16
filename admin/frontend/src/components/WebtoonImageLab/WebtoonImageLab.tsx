@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
-import type { WebtoonLabDefaults, WebtoonLabHistoryItem, WebtoonLabJob } from "@/lib/types";
+import type {
+  WebtoonImageAssetKind,
+  WebtoonImageAssetUrls,
+  WebtoonLabDefaults,
+  WebtoonLabHistoryItem,
+  WebtoonLabJob,
+} from "@/lib/types";
 
 /* 웹툰 3단계(이미지 생성) 프롬프트 실험 패널 — 웹툰 목록 화면의 "이미지 실험"
    버튼이 연다(PromptDrawer와 같은 우측 슬라이드 패턴, 다만 이미지 미리보기 +
@@ -64,9 +70,7 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   // 지어낸 영어식 기본값("medium shot, eye level")이었는데, 실제 사용
   // 관례와 맞지 않아 혼란을 줄 수 있어 실제 예시로 바꿨다.
   const [camera, setCamera] = useState("오버숄더");
-  const [customStyle, setCustomStyle] = useState(false);
   const [style, setStyle] = useState("");
-  const [customChars, setCustomChars] = useState(false);
   const [charFemale, setCharFemale] = useState("");
   const [charMale, setCharMale] = useState("");
   const [sceneReinforce, setSceneReinforce] = useState(true);
@@ -82,11 +86,63 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // 기본 STYLE/FIXED_CHARACTERS(백엔드 pipelines/common/webtoon_image.py가 정본) —
-  // "직접 입력" 토글을 켰을 때 빈 칸이 아니라 지금 실제로 쓰이는 프롬프트를
-  // placeholder로 보여준다(2026-09-04 실사용 피드백: 빈 textarea만 있으면
-  // 뭘 기준으로 고쳐야 할지 알 수 없다).
+  // 기본 STYLE/FIXED_CHARACTERS(백엔드 pipelines/common/webtoon_image.py가 정본).
+  // 2026-09-16까지는 "직접 입력" 체크박스를 켜야만 textarea가 나타나고, 꺼져
+  //있으면 지금 실제로 발행돼 있는 값이 화면 어디에도 안 보이는 채로 "기본값을
+  // 그대로 씁니다"라는 문구만 있었다 — 사용자 지적("지금 설정된 값들이 화면에
+  // 보여지도록 한거죠? 작업자가 커스텀이 가능해야해요")으로 체크박스를 없애고
+  // 발행된 값을 항상 그대로 채워서 보여준다(=늘 편집 가능한 상태). 사용자가
+  // 안 건드리면 그 값 그대로 생성/발행에 쓰이고, 고치면 changedFromDefaults가
+  // 감지해 발행 버튼이 켜진다.
   const [defaults, setDefaults] = useState<WebtoonLabDefaults | null>(null);
+
+  // 화풍·인물 참조 이미지(2026-09-16) — 텍스트(STYLE/CHARACTER)와 같은 이유로
+  // "코드에 고정된 건 전부 화면에서 커스터마이징 가능해야" 요청에 따라
+  // 실제 생성이 쓰는 이미지 파일 자체를 여기서 업로드/교체한다. presigned
+  // URL만 들고 있고 실제 업로드는 handleUploadAsset이 브라우저→S3 직접
+  // PUT으로 한다(routes/media.py와 같은 패턴).
+  const [assets, setAssets] = useState<WebtoonImageAssetUrls | null>(null);
+  const [assetUploading, setAssetUploading] = useState<Record<WebtoonImageAssetKind, boolean>>({
+    style: false,
+    char_female: false,
+    char_male: false,
+  });
+
+  const loadAssets = useCallback(() => {
+    adminApi
+      .getWebtoonImageAssets()
+      .then(setAssets)
+      .catch(() => {
+        /* 미리보기 못 띄워도 생성 자체엔 영향 없음 — 조용히 무시 */
+      });
+  }, []);
+
+  const handleUploadAsset = async (kind: WebtoonImageAssetKind, file: File) => {
+    if (file.type !== "image/png") {
+      toast.show("PNG 파일만 업로드할 수 있어요", "error");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.show("파일이 너무 큽니다 (최대 8MB)", "error");
+      return;
+    }
+    setAssetUploading((prev) => ({ ...prev, [kind]: true }));
+    try {
+      const presign = await adminApi.presignWebtoonImageAsset(kind, file.size);
+      const putRes = await fetch(presign.upload_url, {
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error(`업로드 실패 (HTTP ${putRes.status})`);
+      toast.show("이미지를 교체했습니다 — 다음 생성부터 반영됩니다", "success");
+      loadAssets();
+    } catch (err) {
+      toast.show(`업로드 실패: ${err instanceof Error ? err.message : "알 수 없는 오류"}`, "error");
+    } finally {
+      setAssetUploading((prev) => ({ ...prev, [kind]: false }));
+    }
+  };
 
   const clearPoll = useCallback(() => {
     if (pollTimerRef.current) {
@@ -110,9 +166,18 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   const loadDefaults = useCallback(() => {
     adminApi
       .getWebtoonImageDefaults()
-      .then(setDefaults)
+      .then((d) => {
+        setDefaults(d);
+        // 항상 발행된 현재 값으로 채운다(체크박스로 숨기지 않음) — 위 defaults
+        // state 선언부 주석 참고. handlePublish 성공 뒤에도 이 함수가 다시
+        // 불려서 방금 발행한 값으로 재동기화된다(사용자가 방금 입력한 값과
+        // 같으므로 화면상 변화는 없다).
+        setStyle(d.style);
+        setCharFemale(d.char_female);
+        setCharMale(d.char_male);
+      })
       .catch(() => {
-        /* placeholder 용도라 실패해도 조용히 무시 — generate는 백엔드가 어차피 기본값을 채운다 */
+        /* 실패해도 조용히 무시 — generate는 백엔드가 어차피 기본값을 채운다 */
       });
   }, []);
 
@@ -132,6 +197,9 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
       // 이펙트 본문에서 동기적으로 부르는 게 아니라 react-hooks/set-state-in-effect가
       // 안 걸린다 — disable 주석 불필요.
       loadDefaults();
+    }
+    if (assets === null) {
+      loadAssets();
     }
     return () => {
       document.body.style.overflow = prevOverflow;
@@ -193,9 +261,9 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
       const r = await adminApi.generateWebtoonImage({
         scene: scene.trim(),
         camera: camera.trim(),
-        style: customStyle && style.trim() ? style.trim() : undefined,
-        char_female: customChars && charFemale.trim() ? charFemale.trim() : undefined,
-        char_male: customChars && charMale.trim() ? charMale.trim() : undefined,
+        style: style.trim() || undefined,
+        char_female: charFemale.trim() || undefined,
+        char_male: charMale.trim() || undefined,
         scene_reinforce: sceneReinforce,
         char_reinforce: charReinforce,
       });
@@ -225,10 +293,11 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
     }
   };
 
-  // "직접 입력"이 꺼져 있으면 지금 화면에 보이는 값 = defaults(발행된 값) 그대로다.
-  const effectiveStyle = customStyle && style.trim() ? style.trim() : (defaults?.style ?? "");
-  const effectiveCharFemale = customChars && charFemale.trim() ? charFemale.trim() : (defaults?.char_female ?? "");
-  const effectiveCharMale = customChars && charMale.trim() ? charMale.trim() : (defaults?.char_male ?? "");
+  // 필드는 항상 편집 가능한 상태로 defaults가 채워준다(loadDefaults 참고) —
+  // 사용자가 안 건드렸으면 그대로 defaults와 동일한 값이라 changedFromDefaults가 false.
+  const effectiveStyle = style.trim();
+  const effectiveCharFemale = charFemale.trim();
+  const effectiveCharMale = charMale.trim();
   const changedFromDefaults =
     !!defaults &&
     (effectiveStyle !== defaults.style ||
@@ -266,20 +335,11 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   const applyHistoryItem = (item: WebtoonLabHistoryItem) => {
     setScene(item.scene ?? "");
     setCamera(item.camera ?? "");
-    if (item.style) {
-      setCustomStyle(true);
-      setStyle(item.style);
-    } else {
-      setCustomStyle(false);
-      setStyle("");
-    }
-    if (item.char_female || item.char_male) {
-      setCustomChars(true);
-      setCharFemale(item.char_female ?? "");
-      setCharMale(item.char_male ?? "");
-    } else {
-      setCustomChars(false);
-    }
+    // 그 생성이 커스텀 값을 안 썼으면(당시 기본값 그대로) 지금 발행된 기본값으로
+    // 되돌린다 — 필드가 항상 채워져 있는 지금 구조에서 빈 칸으로 두면 안 된다.
+    setStyle(item.style ?? defaults?.style ?? "");
+    setCharFemale(item.char_female ?? defaults?.char_female ?? "");
+    setCharMale(item.char_male ?? defaults?.char_male ?? "");
     setSceneReinforce(item.scene_reinforce ?? true);
     setCharReinforce(item.char_reinforce ?? true);
     setTab("generate");
@@ -350,11 +410,48 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   const bodyNode = (
     <div className={embedded ? "px-5 py-5" : "flex-1 overflow-y-auto px-5 py-5"}>
           {tab === "generate" && (
-            <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+            <div className="space-y-4">
+              {/* 2026-09-16 — 사용자 요청("처음 볼 때 구조를 이해하기 힘들다,
+                  위쪽에 설명서 + 각 요소에 어떻게 반영되는지"): 이 패널을
+                  처음 여는 사람도 두 영역의 성격이 다르다는 걸 바로 알 수
+                  있게 항상 보이는 요약을 맨 위에 둔다. 필드별 title
+                  속성(호버 툴팁)은 아래 각 라벨에 추가돼 있다 — 네이티브
+                  브라우저 툴팁이라 새 의존성 없이 바로 된다. */}
+              <div
+                className="rounded-xl border p-3 text-[12px] leading-relaxed"
+                style={{ borderColor: "var(--border-hairline)", background: "var(--surface-sunken)" }}
+              >
+                <p className="font-semibold text-[var(--text-secondary)]">이 화면 사용법</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-[var(--text-muted)]">
+                  <li>
+                    <strong className="text-[var(--text-secondary)]">장면 설명·카메라 지시</strong>는 이번 테스트
+                    한 번에만 쓰입니다 — 저장되지 않고, 실제 서비스에는 영향이 없어요. 자유롭게 바꿔가며
+                    &ldquo;생성&rdquo;을 눌러보세요.
+                  </li>
+                  <li>
+                    <strong className="text-[var(--text-secondary)]">스타일·캐릭터 텍스트</strong>는 실제
+                    프로덕션 설정입니다. 항상 지금 발행된 값이 채워져 있고 직접 고칠 수 있어요 — 단, 아래
+                    &ldquo;발행&rdquo;을 눌러야만 다음 실제 웹툰 생성부터 반영됩니다(안 누르면 이번 테스트에서만
+                    쓰이고 사라져요).
+                  </li>
+                  <li>
+                    <strong className="text-[var(--text-secondary)]">참조 이미지(화풍·인물 A/B 사진)</strong>는
+                    텍스트와 다르게 &ldquo;발행&rdquo; 단계가 없어요 — 파일을 고르는 즉시 바로 업로드되고
+                    바로 반영됩니다(되돌리기 없음, 신중하게 골라주세요).
+                  </li>
+                  <li>각 항목에 마우스를 올리면(호버) 짧은 설명이 더 나옵니다.</li>
+                </ul>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
               {/* 왼쪽 — 입력 폼 */}
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="wl-scene" className="text-[13px] font-semibold text-[var(--text-secondary)]">
+                  <label
+                    htmlFor="wl-scene"
+                    title="이번 테스트 생성 한 번에만 쓰입니다 — 저장 안 되고 실제 서비스엔 영향 없어요."
+                    className="text-[13px] font-semibold text-[var(--text-secondary)]"
+                  >
                     장면 설명 (SCENE)
                   </label>
                   <textarea
@@ -376,7 +473,11 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
                 </div>
 
                 <div>
-                  <label htmlFor="wl-camera" className="text-[13px] font-semibold text-[var(--text-secondary)]">
+                  <label
+                    htmlFor="wl-camera"
+                    title="이번 테스트 생성 한 번에만 쓰입니다 — 저장 안 되고 실제 서비스엔 영향 없어요. 오버숄더/클로즈업/와이드처럼 실제 2단계가 쓰는 한국어 용어를 그대로 넣으면 됩니다."
+                    className="text-[13px] font-semibold text-[var(--text-secondary)]"
+                  >
                     카메라 지시
                   </label>
                   <input
@@ -389,62 +490,100 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
                   />
                 </div>
 
-                <ToggleField
-                  label="스타일(STYLE) 직접 입력"
-                  hint="끄면 기본 스타일(모던 한국 웹툰체)을 그대로 씁니다"
-                  checked={customStyle}
-                  onChange={(v) => {
-                    setCustomStyle(v);
-                    // 체크할 때 실제 기본 프롬프트 값을 바로 채운다 — 연한
-                    // placeholder만으로는 "안 보인다"는 피드백을 받았다
-                    // (2026-09-04). 이미 뭔가 입력돼 있으면 안 덮어쓴다.
-                    if (v && !style && defaults) setStyle(defaults.style);
-                  }}
-                >
+                <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-hairline)" }}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span
+                      title="그림체 지침(색감·선화·금지 스타일 등)을 문장으로 적습니다. 컷마다 이 문장이 프롬프트 앞부분에 그대로 들어갑니다. 발행해야 실제 생성에 반영돼요."
+                      className="text-[13px] font-semibold text-[var(--text-secondary)]"
+                    >
+                      스타일(STYLE)
+                    </span>
+                    {defaults && effectiveStyle !== defaults.style && (
+                      <span className="text-[10.5px] font-medium" style={{ color: "var(--accent)" }}>
+                        발행된 값과 다름
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[var(--text-faint)]">지금 발행돼 있는 값이 아래 그대로 채워져 있습니다 — 직접 고치면 됩니다.</p>
                   <textarea
                     value={style}
                     onChange={(e) => setStyle(e.target.value)}
                     placeholder={defaults ? undefined : "불러오는 중..."}
+                    title="발행해야 실제 웹툰 생성에 반영됩니다. 지금은 자유롭게 고쳐서 왼쪽 '생성'으로 테스트만 해볼 수도 있어요."
                     rows={6}
-                    className="ui-input w-full resize-y rounded-lg px-3 py-2 text-[13px]"
+                    className="ui-input mt-2 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                   />
-                </ToggleField>
+                  <ImageAssetField
+                    label="화풍 레퍼런스 이미지 — Style Transfer가 매번 이 그림의 화풍을 입힙니다"
+                    url={assets?.style_url}
+                    uploading={assetUploading.style}
+                    onUpload={(file) => void handleUploadAsset("style", file)}
+                  />
+                </div>
 
-                <ToggleField
-                  label="캐릭터(CHARACTERS) 직접 입력"
-                  hint="끄면 고정 캐릭터 A(여성 기자)/B(남성 청자) 기본값을 그대로 씁니다"
-                  checked={customChars}
-                  onChange={(v) => {
-                    setCustomChars(v);
-                    if (v && defaults) {
-                      if (!charFemale) setCharFemale(defaults.char_female);
-                      if (!charMale) setCharMale(defaults.char_male);
-                    }
-                  }}
-                >
-                  <div className="space-y-2">
+                <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-hairline)" }}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span
+                      title="두 고정 진행자(A/B)의 외형 묘사입니다. 헤어·복장 등 문장으로 적으면 매 컷 프롬프트에 [CHARACTERS] 블록으로 들어갑니다. 발행해야 실제 생성에 반영돼요."
+                      className="text-[13px] font-semibold text-[var(--text-secondary)]"
+                    >
+                      캐릭터(CHARACTERS)
+                    </span>
+                    {defaults &&
+                      (effectiveCharFemale !== defaults.char_female || effectiveCharMale !== defaults.char_male) && (
+                        <span className="text-[10.5px] font-medium" style={{ color: "var(--accent)" }}>
+                          발행된 값과 다름
+                        </span>
+                      )}
+                  </div>
+                  <p className="text-[11px] text-[var(--text-faint)]">고정 캐릭터 A(여성 기자)/B(남성 청자)의 지금 발행된 묘사입니다 — 직접 고치면 됩니다.</p>
+                  <div className="mt-2 space-y-2">
                     <div>
-                      <span className="text-[11px] font-semibold text-[var(--text-muted)]">A — 여성 기자</span>
+                      <span
+                        title="A(여성 기자) 외형 묘사 — 발행해야 반영됩니다."
+                        className="text-[11px] font-semibold text-[var(--text-muted)]"
+                      >
+                        A — 여성 기자
+                      </span>
                       <textarea
                         value={charFemale}
                         onChange={(e) => setCharFemale(e.target.value)}
                         placeholder={defaults ? undefined : "불러오는 중..."}
+                        title="발행해야 실제 웹툰 생성에 반영됩니다."
                         rows={4}
                         className="ui-input mt-0.5 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                       />
+                      <ImageAssetField
+                        label="A 참조 사진 — 클로즈업 컷에서 이 얼굴로 identity-lock"
+                        url={assets?.char_female_url}
+                        uploading={assetUploading.char_female}
+                        onUpload={(file) => void handleUploadAsset("char_female", file)}
+                      />
                     </div>
                     <div>
-                      <span className="text-[11px] font-semibold text-[var(--text-muted)]">B — 남성 청자</span>
+                      <span
+                        title="B(남성 청자) 외형 묘사 — 발행해야 반영됩니다."
+                        className="text-[11px] font-semibold text-[var(--text-muted)]"
+                      >
+                        B — 남성 청자
+                      </span>
                       <textarea
                         value={charMale}
                         onChange={(e) => setCharMale(e.target.value)}
                         placeholder={defaults ? undefined : "불러오는 중..."}
+                        title="발행해야 실제 웹툰 생성에 반영됩니다."
                         rows={4}
                         className="ui-input mt-0.5 w-full resize-y rounded-lg px-3 py-2 text-[13px]"
                       />
+                      <ImageAssetField
+                        label="B 참조 사진 — 클로즈업 컷에서 이 얼굴로 identity-lock"
+                        url={assets?.char_male_url}
+                        uploading={assetUploading.char_male}
+                        onUpload={(file) => void handleUploadAsset("char_male", file)}
+                      />
                     </div>
                   </div>
-                </ToggleField>
+                </div>
 
                 <div className="flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--border-hairline)" }}>
                   <CheckboxField
@@ -507,6 +646,7 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
               <div className="space-y-3">
                 <JobPreview job={job} error={jobError} />
               </div>
+              </div>
             </div>
           )}
 
@@ -557,38 +697,6 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   );
 }
 
-function ToggleField({
-  label,
-  hint,
-  checked,
-  onChange,
-  children,
-}: {
-  label: string;
-  hint: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border p-3" style={{ borderColor: "var(--border-hairline)" }}>
-      <label className="flex cursor-pointer items-start gap-2">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          className="mt-0.5"
-        />
-        <span>
-          <span className="block text-[13px] font-semibold text-[var(--text-secondary)]">{label}</span>
-          <span className="block text-[11px] text-[var(--text-faint)]">{hint}</span>
-        </span>
-      </label>
-      {checked && <div className="mt-2.5">{children}</div>}
-    </div>
-  );
-}
-
 function CheckboxField({
   label,
   hint,
@@ -613,6 +721,62 @@ function CheckboxField({
         <span className="block text-[11px] text-[var(--text-faint)]">{hint}</span>
       </span>
     </label>
+  );
+}
+
+/* 화풍/인물 참조 이미지 미리보기 + 교체(2026-09-16) — STYLE/CHARACTERS
+   텍스트 필드 바로 밑에 붙는다. 실제 생성이 지금 쓰는 파일 그대로를
+   presigned URL로 보여주고, 파일 선택하면 바로 업로드까지 한 번에 —
+   숨긴 <input type=file>을 버튼 클릭으로 열어준다(흔한 패턴). */
+function ImageAssetField({
+  label,
+  url,
+  uploading,
+  onUpload,
+}: {
+  label: string;
+  url: string | null | undefined;
+  uploading: boolean;
+  onUpload: (file: File) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="mt-2 flex items-center gap-3">
+      <div
+        className="h-16 w-16 flex-none overflow-hidden rounded-lg border bg-[var(--surface-sunken)]"
+        style={{ borderColor: "var(--border-hairline)" }}
+      >
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- presigned S3 URL(짧은 만료), next/image 도메인 등록 불필요한 실험 화면
+          <img src={url} alt={label} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[9px] text-[var(--text-faint)]">없음</div>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10.5px] leading-snug text-[var(--text-faint)]">{label}</p>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          title="PNG 파일(최대 8MB)을 고르면 즉시 업로드됩니다 — 별도 '발행' 없이 바로 이 자리를 덮어씁니다."
+          className="ui-btn ui-btn-ghost mt-1 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold disabled:opacity-50"
+        >
+          {uploading ? "업로드 중..." : "이미지 교체 (PNG)"}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) onUpload(file);
+          }}
+        />
+      </div>
+    </div>
   );
 }
 

@@ -8,9 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
-import { PromptDrawer } from "@/components/PromptDrawer";
-import { WebtoonStoryboardLab } from "@/components/WebtoonStoryboardLab";
-import { WebtoonImageLab } from "@/components/WebtoonImageLab";
+import { PromptChatLab } from "@/components/PromptChatLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -20,14 +18,14 @@ import type { CmsPost } from "@/lib/types";
 // 다시 뺐다 — 독립된 메뉴·독립된 "새 글 쓰기"를 유지하되, 표 자체는
 // 글 관리와 같은 ContentTable을 쓴다("표는 공통된 컴포넌트 사용" 요청).
 // 채널이 이미 webtoon 하나로 고정된 화면이라 ContentTable의 채널 열은 뺐다.
-
-type LabId = "prompt" | "storyboard" | "image";
-
-const LAB_STEPS: Array<{ id: LabId; step: number; title: string }> = [
-  { id: "prompt", step: 1, title: "프롬프트 편집" },
-  { id: "storyboard", step: 2, title: "스토리보드 테스트" },
-  { id: "image", step: 3, title: "이미지 실험실" },
-];
+//
+// 2026-09-14 — "프롬프트 편집/스토리보드 테스트/이미지 실험실" 3단계
+// StepBar(아래 커밋 로그의 LAB_STEPS/StepBar)를 PromptChatLab 하나로
+// 통합했다(사용자 요청: "클로드처럼 채팅을 할 수 있는 형태로"). 1차는
+// 화면(UI)만 — PromptDrawer/WebtoonStoryboardLab/WebtoonImageLab의 실제
+// 테스트·생성 로직은 다음 단계에서 이 채팅 화면 안으로 옮겨 붙인다(그
+// 세 컴포넌트 파일 자체는 로직을 재사용할 수 있어 아직 안 지웠다 — 다른
+// 화면에서 쓰는 PromptDrawer는 물론 그대로 유지).
 
 // useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수.
 export default function WebtoonPageWrapper() {
@@ -74,25 +72,6 @@ function WebtoonPage() {
   // 페이지가 그 둘을 하나의 aside 안에 순서대로 쌓는다(각 컴포넌트 자체는
   // 안 바꾼 것과 같음 — 다른 화면은 embedded 없이 계속 단독으로 씀).
   const [panelOpen, setPanelOpen] = useState(false);
-  // 2026-09-11 — 셋을 그냥 이어붙이니 "복잡하다"는 피드백. 다시 탭/버튼으로
-  // 쪼개면 위와 같은 불만이 재발하니(2026-09-04), 자리는 하나로 유지하되
-  // 한 번에 하나만 보이도록 바꿨다 — 셋 다 항상 이 패널 안에 있다는 건
-  // 그대로 유지하면서, 지금 안 보는 도구의 폼이 화면을 채우지 않는다.
-  // 처음엔 아코디언(각 단계 제목을 누르면 그 아래로 펼쳐짐)으로 했는데,
-  // "단계 전환이 상단에 고정된 이어지는 흐름처럼 보였으면 좋겠다"는
-  // 요청으로 StepBar(아래) 방식으로 바꿨다 — 3단계 전부 패널 맨 위에
-  // sticky로 고정된 연결된 스텝바로 보여주고, 그 아래에 선택된 단계의
-  // 내용만 나온다. 안 보이는 단계도 언마운트하지 않는다(hidden 속성) —
-  // 스토리보드/이미지 생성 폴링이 다른 단계를 보는 동안에도 끊기지
-  // 않고 계속돼야 한다.
-  const [openLab, setOpenLab] = useState<LabId>("prompt");
-  // 2026-09-11 — "각 단계를 효율적으로 넘어갈 수 있도록" 요청 — 1단계
-  // (프롬프트 편집의 테스트 실행)와 2단계(스토리보드 테스트)가 똑같은
-  // 기사 원문을 각자 따로 입력받고 있어서, 매번 두 번 붙여넣어야 했다.
-  // 여기서 하나로 들어올려 PromptDrawer·WebtoonStoryboardLab 둘 다에
-  // 제어 컴포넌트로 넘긴다(각 컴포넌트의 testArticle/article prop 참조) —
-  // 한쪽에 붙여넣으면 다른 쪽에도 그대로 보인다.
-  const [sharedArticle, setSharedArticle] = useState("");
   const visibleReloadKey = useReloadOnVisible();
 
   const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
@@ -228,7 +207,7 @@ function WebtoonPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
             </svg>
-            프롬프트 · 이미지 실험
+프롬프트 실험
           </button>
           <Link href="/webtoon/edit" className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
             새 웹툰
@@ -268,135 +247,20 @@ function WebtoonPage() {
         </div>
       )}
 
-      {panelOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] animate-[ui-fade-up_160ms_ease-out]"
-          onClick={() => setPanelOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+      {/* 2026-09-15, 사용자 요청: "프롬프트 실험 버튼 누르면 우측 사이드에서
+          나오는게 아니고 전체화면으로 보여지도록" — 오른쪽에서 슬라이드
+          들어오던 720~1080px 드로어를 뷰포트 전체를 덮는 화면으로 전환. */}
       <aside
         role="dialog"
         aria-modal="true"
-        aria-labelledby="webtoon-panel-title"
+        aria-labelledby="prompt-chat-lab-title"
         inert={!panelOpen}
-        className={`fixed right-0 top-0 z-50 flex h-full w-full transform flex-col overflow-y-auto border-l border-[var(--border-hairline)] bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out sm:max-w-[880px] ${
-          panelOpen ? "translate-x-0" : "translate-x-full"
+        className={`fixed inset-0 z-50 flex h-full w-full flex-col bg-[var(--surface-card)] transition-opacity duration-200 ease-out ${
+          panelOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        {/* 2026-09-11 — 제목·닫기·스텝바를 한 sticky 블록으로 묶어 패널
-            맨 위에 고정한다 — 아래 도구 내용이 아무리 길어도(특히 프롬프트
-            텍스트 칸) 스크롤해서 다른 단계로 못 넘어가는 일이 없게. 배경을
-            불투명하게 칠해야 한다 — 안 칠하면 스크롤되는 본문이 뒤에서
-            비친다. */}
-        <div className="sticky top-0 z-10 bg-[var(--surface-card)]">
-          <div className="ui-divider space-y-1 border-b px-5 pb-3 pt-5">
-            <div className="flex items-start justify-between gap-4">
-              <h2
-                id="webtoon-panel-title"
-                className="font-display text-[19px] font-bold text-[var(--text-primary)]"
-              >
-                프롬프트 · 이미지 실험
-              </h2>
-              <button
-                type="button"
-                onClick={() => setPanelOpen(false)}
-                className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
-                aria-label="닫기"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-[12.5px] text-[var(--text-muted)]">
-              프롬프트를 손보고 → 기사로 스토리보드를 테스트하고 → 마음에 드는 그림체를 찾으면 발행하세요.
-            </p>
-          </div>
-          <StepBar steps={LAB_STEPS} activeId={openLab} onSelect={setOpenLab} />
-        </div>
-
-        {/* 안 보이는 단계도 언마운트하지 않는다 — 스토리보드/이미지 생성
-            폴링이 다른 단계를 보는 동안에도 끊기지 않고 계속돼야 한다. */}
-        <div hidden={openLab !== "prompt"}>
-          <PromptDrawer
-            channel="webtoon"
-            open={panelOpen}
-            onClose={() => setPanelOpen(false)}
-            embedded
-            testArticle={sharedArticle}
-            onTestArticleChange={setSharedArticle}
-          />
-        </div>
-        <div hidden={openLab !== "storyboard"}>
-          <WebtoonStoryboardLab
-            open={panelOpen}
-            onClose={() => setPanelOpen(false)}
-            embedded
-            article={sharedArticle}
-            onArticleChange={setSharedArticle}
-          />
-        </div>
-        <div hidden={openLab !== "image"}>
-          <WebtoonImageLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
-        </div>
+        <PromptChatLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
       </aside>
-    </div>
-  );
-}
-
-// 2026-09-11 — 상단 고정 스텝바. 3단계를 원 배지 + 이어지는 선으로 붙여
-// "흐름"처럼 보이게 하고, 어디를 눌러도 그 자리에서 바로(스크롤 없이)
-// 해당 단계로 전환된다. 아코디언(위 커밋 로그 참조)의 다음 버전 —
-// 아코디언은 펼친 단계의 내용이 길면 스텝 자체가 스크롤 밖으로 밀려나는
-// 문제가 있었는데, 이건 부모(webtoon/page.tsx)가 이 컴포넌트를 sticky
-// 블록 안에 둬서 그 문제를 없앤다.
-function StepBar({
-  steps,
-  activeId,
-  onSelect,
-}: {
-  steps: Array<{ id: LabId; step: number; title: string }>;
-  activeId: LabId;
-  onSelect: (id: LabId) => void;
-}) {
-  return (
-    <div className="ui-divider flex items-center overflow-x-auto border-b px-5 py-3">
-      {steps.map((s, i) => (
-        <div key={s.id} className={`flex items-center ${i < steps.length - 1 ? "flex-1" : ""}`}>
-          <button
-            type="button"
-            onClick={() => onSelect(s.id)}
-            aria-current={activeId === s.id ? "step" : undefined}
-            className="flex flex-none cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
-          >
-            <span
-              className="flex h-6 w-6 flex-none items-center justify-center rounded-full text-[12px] font-bold"
-              style={
-                activeId === s.id
-                  ? { background: "var(--accent)", color: "white" }
-                  : { background: "var(--surface-sunken)", color: "var(--text-muted)" }
-              }
-              aria-hidden="true"
-            >
-              {s.step}
-            </span>
-            <span
-              className="text-[13px] font-semibold"
-              style={{ color: activeId === s.id ? "var(--text-primary)" : "var(--text-muted)" }}
-            >
-              {s.title}
-            </span>
-          </button>
-          {i < steps.length - 1 && (
-            <div
-              className="mx-2 h-px min-w-6 flex-1"
-              style={{ background: "var(--border-hairline)" }}
-              aria-hidden="true"
-            />
-          )}
-        </div>
-      ))}
     </div>
   );
 }

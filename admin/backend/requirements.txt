@@ -3,3 +3,8 @@ PyJWT==2.12.1
 
 # pgvector 접근 (CMS, 2026-07-27). 순수 파이썬이라 Lambda 친화적 — v2 와 동일 핀.
 pg8000==1.31.2
+
+# 웹툰 컷 텍스트 합성(routes/webtoon_lab.py → pipelines/webtoon/compose_text.py,
+# 2026-09-14) — 대사·캡션·내레이션을 PIL로 직접 그려 넣는다. pipelines
+# 쪽에서 실측된 버전과 맞춘다(pipelines/*/requirements.txt).
+Pillow==12.2.0

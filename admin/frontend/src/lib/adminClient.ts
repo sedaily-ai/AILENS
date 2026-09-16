@@ -7,6 +7,11 @@ import type {
   DriversResponse,
   PromptListItem,
   PromptDetail,
+  PromptLabDoc,
+  PromptLabFile,
+  PromptLabFileContent,
+  ChatThreadSummary,
+  ChatThreadDetail,
   CostResponse,
   AuditResponse,
   NewsletterStatsResponse,
@@ -21,6 +26,12 @@ import type {
   WebtoonLabJob,
   WebtoonLabHistoryItem,
   WebtoonLabDefaults,
+  WebtoonGpuStatus,
+  WebtoonStoryboardCut,
+  WebtoonImageAssetUrls,
+  WebtoonImageAssetKind,
+  WebtoonImageAssetPresign,
+  WebtoonImageAssetGalleryItem,
   PromptTestJob,
   WebtoonStoryboardJob,
 } from "./types";
@@ -31,6 +42,10 @@ if (!BASE) {
   // .env.local 에 NEXT_PUBLIC_ADMIN_API_BASE_URL 설정 필요.
   console.error("NEXT_PUBLIC_ADMIN_API_BASE_URL is not set");
 }
+
+// 프롬프트 실험 채팅(PromptChatLab.tsx) 실시간 스트리밍 전용 — HTTP API
+// (BASE)와 별개의 API Gateway WebSocket API(routes/chat_ws.py 참고).
+export const WS_URL = process.env.NEXT_PUBLIC_ADMIN_WS_URL;
 
 export class AdminApiError extends Error {
   status: number;
@@ -230,6 +245,78 @@ export const adminApi = {
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/storyboard-test/${encodeURIComponent(jobId)}`
     ),
 
+  // 프롬프트 실험 챗랩 우측 패널 — 설명/지침/파일 개별 CRUD(2026-09-15).
+  // PromptDetail(위 getPrompt/updatePrompt, 발행된 버전 스냅샷)과는 별개
+  // 저장소 — 여기는 저장 버튼을 누른 즉시 그 필드 하나만 서버에 반영된다.
+  getPromptLabDoc: (category: string, name: string) =>
+    request<PromptLabDoc>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}`
+    ),
+  updatePromptLabDescription: (category: string, name: string, text: string) =>
+    request<{ updated: boolean }>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}/description`,
+      { method: "PUT", body: JSON.stringify({ text }) }
+    ),
+  updatePromptLabInstructions: (category: string, name: string, text: string) =>
+    request<{ updated: boolean }>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}/instructions`,
+      { method: "PUT", body: JSON.stringify({ text }) }
+    ),
+  createPromptLabFile: (category: string, name: string, fileName: string, content: string) =>
+    request<PromptLabFile>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}/files`,
+      { method: "POST", body: JSON.stringify({ name: fileName, content }) }
+    ),
+  getPromptLabFile: (category: string, name: string, fileId: number) =>
+    request<PromptLabFileContent>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}/files/${fileId}`
+    ),
+  updatePromptLabFile: (
+    category: string,
+    name: string,
+    fileId: number,
+    patch: { name?: string; content?: string }
+  ) =>
+    request<PromptLabFile>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}/files/${fileId}`,
+      { method: "PUT", body: JSON.stringify(patch) }
+    ),
+  deletePromptLabFile: (category: string, name: string, fileId: number) =>
+    request<{ deleted: boolean }>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}/files/${fileId}`,
+      { method: "DELETE" }
+    ),
+  publishPromptLab: (category: string, name: string) =>
+    request<{ created: boolean; new_version: number; prev_version: number }>(
+      `/admin/prompt-lab/${encodeURIComponent(category)}/${encodeURIComponent(name)}/publish`,
+      { method: "POST" }
+    ),
+
+  // 프롬프트 실험 챗랩 좌측 사이드바 — 대화 스레드/메시지(2026-09-15).
+  createChatThread: (category: string, name: string, title = "") =>
+    request<ChatThreadSummary>("/admin/chat-threads", {
+      method: "POST",
+      body: JSON.stringify({ category, name, title }),
+    }),
+  listChatThreads: (category: string, name: string) =>
+    request<{ threads: ChatThreadSummary[] }>(
+      `/admin/chat-threads?category=${encodeURIComponent(category)}&name=${encodeURIComponent(name)}`
+    ),
+  getChatThread: (threadId: number) =>
+    request<ChatThreadDetail>(`/admin/chat-threads/${threadId}`),
+  appendChatMessage: (threadId: number, role: "user" | "assistant", payload: Record<string, unknown>) =>
+    request<{ id: number; created_at: string }>(`/admin/chat-threads/${threadId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ role, payload }),
+    }),
+  updateChatThreadTitle: (threadId: number, title: string) =>
+    request<{ updated: boolean }>(`/admin/chat-threads/${threadId}`, {
+      method: "PUT",
+      body: JSON.stringify({ title }),
+    }),
+  deleteChatThread: (threadId: number) =>
+    request<{ deleted: boolean }>(`/admin/chat-threads/${threadId}`, { method: "DELETE" }),
+
   // Cost & Audit
   getCost: () => cachedGet("cost", () => request<CostResponse>("/admin/cost")),
   getAudit: (limit = 50) =>
@@ -355,4 +442,42 @@ export const adminApi = {
     request<{ items: WebtoonLabHistoryItem[] }>("/admin/webtoon-lab/history"),
   getWebtoonImageDefaults: () =>
     request<WebtoonLabDefaults>("/admin/webtoon-lab/defaults"),
+
+  // 화풍·인물 참조 이미지(2026-09-16) — presign 받아 브라우저가 S3로 직접
+  // PUT(위 presignMedia와 같은 이유). 업로드는 갤러리에 쌓이고, select로
+  // 골라야 실제 생성에 쓰이는 정본 키에 반영된다(2026-09-16 후속 — "여러
+  // 샘플 중에서 선택" 요청으로 덮어쓰기 방식에서 갤러리 방식으로 변경).
+  getWebtoonImageAssets: () =>
+    request<WebtoonImageAssetUrls>("/admin/webtoon-lab/image-assets"),
+  presignWebtoonImageAsset: (asset: WebtoonImageAssetKind, size: number) =>
+    request<WebtoonImageAssetPresign>("/admin/webtoon-lab/image-assets/presign", {
+      method: "POST",
+      body: JSON.stringify({ asset, content_type: "image/png", size }),
+    }),
+  getWebtoonImageAssetGallery: (asset: WebtoonImageAssetKind) =>
+    request<{ items: WebtoonImageAssetGalleryItem[] }>(
+      `/admin/webtoon-lab/image-assets/gallery?asset=${encodeURIComponent(asset)}`
+    ),
+  selectWebtoonImageAsset: (asset: WebtoonImageAssetKind, key: string) =>
+    request<{ selected: boolean }>("/admin/webtoon-lab/image-assets/select", {
+      method: "POST",
+      body: JSON.stringify({ asset, key }),
+    }),
+
+  // "실제 품질" 컷 이미지 생성 + GPU 켜기/끄기(2026-09-14) — 스토리보드
+  // 테스트(WebtoonStoryboardLab.tsx)가 쓴다. 프로덕션과 같은 경로(GPU
+  // IP-Adapter+Style Transfer+QA+텍스트 합성)라 위 generateWebtoonImage
+  // (배경만, style/character 자유 입력)와는 별개 계약 — 컷 전체를 보낸다.
+  generateComposedWebtoonImage: (cut: WebtoonStoryboardCut) =>
+    request<{ job_id: string; status: string }>("/admin/webtoon-lab/generate-composed", {
+      method: "POST",
+      body: JSON.stringify(cut),
+    }),
+  // job 모양이 generateWebtoonImage와 같아(job_id/status/image_url/error)
+  // 폴링은 기존 getWebtoonImageJob을 그대로 재사용한다.
+  getWebtoonGpuStatus: () => request<WebtoonGpuStatus>("/admin/webtoon-lab/gpu/status"),
+  startWebtoonGpu: () =>
+    request<{ job_id: string; status: string }>("/admin/webtoon-lab/gpu/start", { method: "POST" }),
+  stopWebtoonGpu: () =>
+    request<{ stopping: boolean }>("/admin/webtoon-lab/gpu/stop", { method: "POST" }),
 };

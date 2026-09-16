@@ -33,6 +33,7 @@ content 전체를 한 섹션으로 취급해 폴백한다.
 import datetime as dt
 import json
 import os
+import re
 import uuid
 
 import boto3
@@ -94,7 +95,16 @@ _CATEGORY_BEDROCK = {
     "webtoon": {
         "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7",  # lens-webtoon-script-sonnet-46
         "mode": "webtoon_json",
-        "max_tokens": 4000,  # pipelines/webtoon/pipeline.py::call_json과 동일.
+        # 2026-09-15 — 저장된 웹툰 프롬프트가 v11(2026-09-14 05:40 UTC)에서
+        # 컷당 필드가 훨씬 많은 스키마(scene_type·camera_distance·
+        # composition·bubble_1/2 등)로 바뀌면서, 옛 4000으로는 8컷을 다
+        # 채우기 전에 2단계 응답이 중간에 잘려 JSON 파싱이 실패했다(실측:
+        # cut_07 도중 문장 끊김, 사용자 신고 "2단계 생성 실패"). 8000으로
+        # 올려 재현 테스트하니 8컷 전부 안 잘리고 완성됨을 직접 확인했다.
+        # pipelines/webtoon/pipeline.py::call_json은 아직 4000 그대로다 —
+        # 이 스키마 변경이 실제 발행 파이프라인까지 반영된 게 맞다면 거기도
+        # 같이 올려야 한다(admin 실험 도구 범위 밖이라 여기서 안 건드림).
+        "max_tokens": 8000,
     },
 }
 _WEBTOON_SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
@@ -404,6 +414,95 @@ def handle_test_status(body: dict, path_params: dict, query_params: dict) -> dic
 # 실어 2단계(장면 연출)를 별도로 한 번 더 호출한다 — 그 두 호출을 그대로
 # 재현해서 컷마다 대사+장면+카메라를 합쳐 반환한다. 이것도 handle_test와
 # 같은 이유로 비동기(작업+폴링)다 — 순차 호출 2번이라 부담은 더 크다.
+# ─────────────────────────────────────────────────────────────
+# 단계별 지침 분리 (2026-09-16) — 지금까지 1·2단계 호출 둘 다 발행된 웹툰
+# 프롬프트 전체(105K자, 22개 챕터: "## N. 제목" 형식)를 통째로 시스템
+# 프롬프트에 넣고 있었다. 실측(이 리팩토링 착수 전 로컬 테스트 중 발견):
+# - 1단계는 사실분석·대사·컷 텍스트만 필요한데 3단계 이미지 스타일(14장,
+#   5797자)·발행 규칙(18장)까지 매번 같이 들어갔다.
+# - 2단계는 반대로 화자 페르소나·대사 규칙까지 다 필요 없는데 그대로 들어갔다.
+# 그래서 챕터 번호 기준으로 필요한 것만 잘라 조립한다 — 새 프롬프트 파일을
+# 따로 안 만들고(admin에 다단 파일 편집 UI를 새로 만들 필요 없음), 발행된
+# 프롬프트 문서 자체에서 그때그때 챕터를 추출한다. 문서가 수정돼도(챕터
+# 번호 체계를 유지하는 한) 자동으로 최신 내용을 반영한다.
+#
+# ⚠️ 이 작업 중 실제 발행 프롬프트 원본 자체에 결함을 발견했다(고쳐야 할
+# 것 — 이번 라운드에서 DDB 원본은 안 건드림, 아래 _extract_chapters가
+# 방어적으로 우회): 0~21장이 문서 안에 통째로 두 번 들어있고(뒤쪽 사본이
+# 최신 — "챕터당 마지막 등장만 쓴다"로 자동 회피), 맨 끝에 admin 파일
+# 편집 UI의 라벨("### 파일 · 새 파일")과 테스트로 보이는 "aaaa" 텍스트가
+# 그대로 발행 내용에 섞여 있다("### 파일" 이후를 잘라낸다). 원본 정리는
+# 별도로 다룰 것.
+_CHAPTER_HEADER_RE = re.compile(r"^##\s*(\d+)\.\s*.+$", re.MULTILINE)
+_KNOWN_GARBAGE_MARKERS = ("### 파일 · 새 파일",)  # admin 편집 UI 라벨이 섞여 들어간 흔적
+
+
+def _extract_chapters(content: str, chapter_numbers: list[int]) -> str:
+    """"## N. 제목" 헤더로 구분된 챕터 중 번호가 일치하는 것만 뽑아 순서대로
+    이어붙인다. 같은 번호가 여러 번 나오면(발행 프롬프트 실측 결함 참고)
+    가장 마지막(=가장 최근에 수정된) 사본만 쓴다. 챕터 헤더 패턴 자체가
+    없는 문서(예: 실험용 prompt_override 초안)면 안전하게 원문 그대로
+    반환한다 — 이 구조를 전제로 만들어진 문서가 아닐 수 있어서다."""
+    matches = list(_CHAPTER_HEADER_RE.finditer(content))
+    if not matches:
+        return content
+
+    starts = [m.start() for m in matches]
+    last_start_by_num: dict[int, int] = {}
+    for m in matches:
+        last_start_by_num[int(m.group(1))] = m.start()
+
+    parts = []
+    for num in chapter_numbers:
+        start = last_start_by_num.get(num)
+        if start is None:
+            continue
+        end = next((s for s in starts if s > start), len(content))
+        chunk = content[start:end]
+        for marker in _KNOWN_GARBAGE_MARKERS:
+            idx = chunk.find(marker)
+            if idx != -1:
+                chunk = chunk[:idx].rstrip()
+        parts.append(chunk.strip())
+    return "\n\n".join(parts)
+
+
+# 모든 단계 공통(캐릭터·문체 일관성에 필요) — 0.역할과 최종 산출물,
+# 2.절대 규칙, 6.고정 화자 페르소나, 7.기사별 스타일링.
+_COMMON_CHAPTERS = [0, 2, 6, 7]
+# 1단계 전용 — 사실분석·중복판정·컷 정보설계·대사규칙·텍스트 규칙·
+# 8컷 전체 중복검사·1단계 출력 스키마(22장, 발행 프롬프트에 실제로 있음).
+_STAGE1_CHAPTERS = _COMMON_CHAPTERS + [1, 3, 4, 5, 8, 9, 10, 11, 15, 22]
+# 2단계 전용 — 장면 설계·이미지 텍스트 화이트리스트·공통 이미지 스타일.
+# (발행 프롬프트에 2단계용 정식 출력 스키마 챕터가 아직 없다 — 그래서
+# 1단계 22장과 같은 엄격도로 아래 _STAGE2_OUTPUT_FORMAT을 코드 쪽에서
+# 보강한다. 나중에 프롬프트 쪽에 정식 챕터가 생기면 이 상수는 지운다.)
+_STAGE2_CHAPTERS = _COMMON_CHAPTERS + [12, 13, 14]
+
+_STAGE2_OUTPUT_FORMAT = (
+    "\n\n---\n### 2단계 출력 형식 (코드 보강 — 발행 프롬프트에 아직 정식"
+    " 챕터가 없어 여기서 고정한다)\n"
+    "다른 설명 없이 JSON 객체 하나만 응답한다:\n"
+    '{"scenes": [{"cut_id": "cut_01", "camera_distance": "", '
+    '"camera_height": "", "composition": "", "background": ""}]}\n'
+    "- cut_id는 1단계 결과와 정확히 같은 값(cut_01~cut_08)을 그대로 쓴다.\n"
+    "- 8개 컷 전부 채운다. 누락·추가 금지.\n"
+    "- camera_distance/camera_height/composition/background 네 필드 모두"
+    " 채운다 — 비워두지 않는다."
+)
+
+# 항상 human-in-the-loop — 2026-09-16, 사용자 요청: "항상 휴먼 인 더 루프로
+# 작업하도록"(별도 상태 관리 UI 없이 프롬프트 지침만으로 강제). 이 단계
+# 응답을 낸 뒤 모델이 스스로 다음 단계로 이어가지 않도록 매 호출 끝에
+# 못박는다 — 실제 다음 단계 진행은 여전히 화면의 "2단계로 진행" 버튼이나
+# "N번 컷"/"전체 컷" 같은 명시적 요청으로만 트리거된다(routes/chat_ws.py·
+# PromptChatLab.tsx 참고, 이 리팩토링에서 그 트리거 자체는 안 건드림).
+_HITL_REMINDER = (
+    "\n\n---\n[중요] 이 단계 결과만 내고 멈춘다. 다음 단계를 이어서 만들거나"
+    " 미리 보여주지 않는다. 사용자가 명시적으로 다음 단계를 요청하기 전까지는"
+    " 기다린다."
+)
+
 _STEP1_INSTRUCTION = (
     "\n\n---\n[지금 할 일]\n위 지침을 참고해서 지금은 1단계(스크립트) 결과만"
     " 출력한다. \"1단계 출력\" 섹션에 정의된 JSON 스키마 그대로, JSON 객체"
@@ -416,59 +515,152 @@ _STEP2_INSTRUCTION = (
 )
 
 
-def _run_storyboard_job(job_id: str, content: str, article: str) -> None:
+def _build_step1_call(content: str, article: str) -> tuple[str, str, str, int]:
+    """1단계 호출에 필요한 (system, user_message, model, max_tokens)만
+    조립하고 Bedrock은 안 부른다 — 2026-09-16, 사용자 요청: "출력도 단계별로
+    쪼개서 보여줘야 한다"에 맞춰 routes/chat_ws.py가 이 조립 결과로 직접
+    converse_stream을 불러 실시간으로 청크를 밀어보낼 수 있게 분리했다
+    (_generate_step1_script은 이 함수 + 논스트리밍 _call_bedrock을 그대로
+    쓰는 얇은 래퍼로 남겨 handle_test/handle_storyboard_test 같은 기존
+    HTTP job/폴링 호출부는 안 건드린다)."""
     webtoon_cfg = _CATEGORY_BEDROCK["webtoon"]
-    webtoon_model = webtoon_cfg["model"]
-    max_tokens = webtoon_cfg["max_tokens"]
+    stage_content = _extract_chapters(content, _STAGE1_CHAPTERS)
+    user_message = stage_content + _STEP1_INSTRUCTION + article + _WEBTOON_JSON_INSTRUCTION + _HITL_REMINDER
+    return _WEBTOON_SYSTEM_PROMPT, user_message, webtoon_cfg["model"], webtoon_cfg["max_tokens"]
 
+
+def _build_step2_call(content: str, article: str, script: dict) -> tuple[str, str, str, int]:
+    """2단계용 — _build_step1_call과 같은 이유·같은 모양."""
+    webtoon_cfg = _CATEGORY_BEDROCK["webtoon"]
+    stage_content = _extract_chapters(content, _STAGE2_CHAPTERS)
+    user_message = (
+        stage_content
+        + _STEP2_INSTRUCTION
+        + article
+        + "\n\n[1단계 스크립트 결과]\n"
+        + json.dumps(script, ensure_ascii=False)
+        + _STAGE2_OUTPUT_FORMAT
+        + _HITL_REMINDER
+    )
+    return _WEBTOON_SYSTEM_PROMPT, user_message, webtoon_cfg["model"], webtoon_cfg["max_tokens"]
+
+
+def _generate_step1_script(content: str, article: str) -> dict:
+    """1단계(스크립트)만 호출(논스트리밍) — handle_test/handle_storyboard_test
+    같은 HTTP job/폴링 호출부 전용. routes/chat_ws.py의 웹소켓 채팅은
+    2026-09-16부터 _build_step1_call + 자체 스트리밍 호출을 쓴다(실시간
+    청크 중계, 아래 _generate_storyboard·chat_ws.py::_stream_json_completion
+    참고)."""
+    system, user_message, model, max_tokens = _build_step1_call(content, article)
     try:
-        script_raw = _call_bedrock(
-            webtoon_model,
-            _WEBTOON_SYSTEM_PROMPT,
-            content + _STEP1_INSTRUCTION + article + _WEBTOON_JSON_INSTRUCTION,
-            max_tokens=max_tokens,
-            temperature=0.7,
-        )
-        script = extract_json_object(script_raw)
+        script_raw = _call_bedrock(model, system, user_message, max_tokens=max_tokens, temperature=0.7)
+        return extract_json_object(script_raw)
     except Exception as e:
-        _update_job(_STORYBOARD_JOB_PK, job_id, {
-            "status": "error", "error": f"1단계(스크립트) 생성 실패: {e}"[:500], "updated_at": _now_iso(),
-        })
-        return
+        raise RuntimeError(f"1단계(스크립트) 생성 실패: {e}") from e
 
+
+def _generate_step2_scenes(content: str, article: str, script: dict) -> dict:
+    """2단계(장면 연출)만 호출(논스트리밍) — 위 _generate_step1_script와
+    같은 이유로 HTTP job/폴링 호출부 전용으로 남긴다."""
+    system, user_message, model, max_tokens = _build_step2_call(content, article, script)
     try:
-        scene_raw = _call_bedrock(
-            webtoon_model,
-            _WEBTOON_SYSTEM_PROMPT,
-            content
-            + _STEP2_INSTRUCTION
-            + article
-            + "\n\n[1단계 스크립트 결과]\n"
-            + json.dumps(script, ensure_ascii=False)
-            + _WEBTOON_JSON_INSTRUCTION,
-            max_tokens=max_tokens,
-            temperature=0.7,
-        )
-        scenes = extract_json_object(scene_raw)
+        scene_raw = _call_bedrock(model, system, user_message, max_tokens=max_tokens, temperature=0.7)
+        return extract_json_object(scene_raw)
     except Exception as e:
-        _update_job(_STORYBOARD_JOB_PK, job_id, {
-            "status": "error", "error": f"2단계(장면 연출) 생성 실패: {e}"[:500], "updated_at": _now_iso(),
-        })
-        return
+        raise RuntimeError(f"2단계(장면 연출) 생성 실패: {e}") from e
 
-    scene_by_cut = {s.get("cut"): s for s in (scenes.get("scenes") or [])}
+
+def _generate_storyboard(content: str, article: str) -> tuple[dict, dict]:
+    """1단계+2단계를 곧바로 이어 부른다(확인 없이) — 원시 script/scenes
+    dict 반환(합치기는 _merge_storyboard_cuts()가 따로 함). _run_storyboard_job
+    (HTTP job/폴링, 기존 WebtoonStoryboardLab.tsx가 쓰던 경로)이 이 함수를
+    쓴다 — 웹소켓 채팅(routes/chat_ws.py)은 확인 단계를 넣으려고
+    _generate_step1_script/_generate_step2_scenes를 직접 따로 부른다."""
+    script = _generate_step1_script(content, article)
+    scenes = _generate_step2_scenes(content, article, script)
+    return script, scenes
+
+
+def _cut_number(d: dict) -> int | None:
+    """v11 스키마는 컷 번호를 정수 "cut" 대신 문자열 "cut_id"("cut_01")로
+    준다 — 둘 다 받는다(2026-09-15, 아래 _merge_storyboard_cuts 주석 참고)."""
+    n = d.get("cut")
+    if isinstance(n, int):
+        return n
+    cut_id = d.get("cut_id") or d.get("id")
+    if isinstance(cut_id, str):
+        digits = "".join(ch for ch in cut_id if ch.isdigit())
+        if digits:
+            return int(digits)
+    return None
+
+
+def _first_nonempty(*values: object) -> str:
+    for v in values:
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
+
+
+def _dialogue_from_bubbles(c: dict) -> list[dict]:
+    """v11 스키마는 "dialogue" 배열 대신 bubble_1/bubble_2(각각
+    {"speaker":"female"|"male","text":...})로 준다 — 구도 없이 만들어진
+    옛 dialogue 스키마와 나란히 지원."""
+    if c.get("dialogue"):
+        return c["dialogue"]
+    lines = []
+    for key in ("bubble_1", "bubble_2"):
+        b = c.get(key)
+        if isinstance(b, dict) and b.get("text"):
+            speaker = "A" if b.get("speaker") == "female" else "B" if b.get("speaker") == "male" else key
+            lines.append({"speaker": speaker, "line": b["text"]})
+    return lines
+
+
+def _merge_storyboard_cuts(script: dict, scenes: dict) -> list[dict]:
+    """1단계(script)+2단계(scenes) 결과를 컷별로 합친다.
+
+    2026-09-15 — 저장된 웹툰 프롬프트가 v11에서 컷 번호(cut→cut_id)·대사
+    (dialogue→bubble_1/bubble_2)·2단계 최상위 키(scenes→cuts)·장면 묘사
+    (camera/scene→camera_distance+camera_height/composition+background)를
+    전부 새 스키마로 바꿨다(사용자 확인: 진행 중인 개편, 되돌릴 생각
+    없음). compose_text.py·컷 이미지 생성은 여전히 옛 필드 이름(camera/
+    scene/dialogue/title/narration/caption)을 기대하므로, 있으면 그대로
+    쓰고 없으면 새 필드에서 최대한 끌어와 채운다 — 스키마가 아직도 바뀌는
+    중이라 한쪽에 단단히 맞추기보다 방어적으로 짠다."""
+    scene_list = scenes.get("scenes") or scenes.get("cuts") or []
+    scene_by_cut = {n: s for s in scene_list if (n := _cut_number(s)) is not None}
+
     cuts = []
     for c in script.get("cuts") or []:
-        s = scene_by_cut.get(c.get("cut")) or {}
+        n = _cut_number(c)
+        s = scene_by_cut.get(n) or {}
+        camera = _first_nonempty(s.get("camera"), " ".join(filter(None, [s.get("camera_distance"), s.get("camera_height")])))
+        scene = _first_nonempty(s.get("scene"), " ".join(filter(None, [s.get("composition"), s.get("background")])))
         cuts.append({
-            "cut": c.get("cut"),
-            "narration": c.get("narration") or "",
-            "caption": c.get("caption") or "",
-            "dialogue": c.get("dialogue") or [],
-            "camera": s.get("camera") or "",
-            "scene": s.get("scene") or "",
+            "cut": n,
+            "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
+            "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
+            "closing_caption": c.get("closing_caption") or "",
+            "title": _first_nonempty(c.get("title"), c.get("headline")),
+            "title_keyword": c.get("title_keyword") or "",
+            "dialogue": _dialogue_from_bubbles(c),
+            "camera": camera,
+            "scene": scene,
         })
+    return cuts
 
+
+def _run_storyboard_job(job_id: str, content: str, article: str) -> None:
+    try:
+        script, scenes = _generate_storyboard(content, article)
+    except Exception as e:
+        _update_job(_STORYBOARD_JOB_PK, job_id, {
+            "status": "error", "error": str(e)[:500], "updated_at": _now_iso(),
+        })
+        return
+
+    cuts = _merge_storyboard_cuts(script, scenes)
     _update_job(_STORYBOARD_JOB_PK, job_id, {
         "status": "done",
         "core_question": script.get("core_question"),
