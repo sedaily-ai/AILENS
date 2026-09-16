@@ -488,11 +488,3 @@ export interface PromptTestJob {
   error: string | null;
 }
 
-export interface WebtoonStoryboardJob {
-  job_id: string;
-  status: "pending" | "done" | "error";
-  core_question: string | null;
-  characters: Record<string, string> | null;
-  cuts: WebtoonStoryboardCut[] | null;
-  error: string | null;
-}

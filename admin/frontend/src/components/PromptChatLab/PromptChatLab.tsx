@@ -771,7 +771,7 @@ export function PromptChatLab({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">설정</p>
         </div>
         <CollapsibleSection title="대본 프롬프트 — 설명·지침·파일" defaultOpen>
-          <PromptSectionsPanel />
+          <PromptSectionsPanel category={PROMPT_CATEGORY} name={PROMPT_NAME} />
         </CollapsibleSection>
         <div className="ui-divider border-t" />
         <CollapsibleSection title="이미지 프롬프트 — 화풍·인물" defaultOpen>
@@ -947,7 +947,7 @@ function CutImagePreview({ data }: { data: { cut: number; imageUrl: string; mode
   const modelLabel = IMAGE_MODELS.find((m) => m.id === data.model)?.label ?? data.model;
   return (
     <div className="ui-card overflow-hidden rounded-xl" style={{ maxWidth: 360 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- S3 원본 URL, next/image 최적화 대상 아님(실험 도구, WebtoonStoryboardLab.tsx와 동일) */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- S3 원본 URL, next/image 최적화 대상 아님(실험 도구) */}
       <img src={data.imageUrl} alt={`컷 ${data.cut} 생성 이미지`} className="w-full" />
       <div className="flex items-center justify-between px-3 py-2">
         <span className="text-[11px] font-semibold text-[var(--text-muted)]">컷 {data.cut}</span>

@@ -44,8 +44,6 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/prompts/{category}/{name}": (prompts.handle_update, True),
     "POST /admin/prompts/{category}/{name}/test": (prompts.handle_test, True),
     "GET /admin/prompts/{category}/{name}/test/{job_id}": (prompts.handle_test_status, True),
-    "POST /admin/prompts/{category}/{name}/storyboard-test": (prompts.handle_storyboard_test, True),
-    "GET /admin/prompts/{category}/{name}/storyboard-test/{job_id}": (prompts.handle_storyboard_test_status, True),
     # 프롬프트 실험 챗랩 — 설명/지침/파일 개별 CRUD (2026-09-15)
     "GET /admin/prompt-lab/{category}/{name}": (prompt_lab.handle_get_doc, True),
     "PUT /admin/prompt-lab/{category}/{name}/description": (prompt_lab.handle_update_description, True),
@@ -97,8 +95,9 @@ HANDLERS: dict[str, tuple] = {
     "GET /admin/webtoon-lab/history": (webtoon_lab.handle_history, True),
     "GET /admin/webtoon-lab/defaults": (webtoon_lab.handle_defaults, True),
     "GET /admin/webtoon-lab/{job_id}": (webtoon_lab.handle_status, True),
-    # 컷별 "실제 품질" 이미지 생성 + GPU 켜기/끄기 (2026-09-14)
-    "POST /admin/webtoon-lab/generate-composed": (webtoon_lab.handle_generate_composed, True),
+    # GPU 켜기/끄기 (2026-09-14) — 컷별 "실제 품질" 이미지 생성은 이제 WebSocket
+    # (routes/chat_ws.py) 경로로만 트리거된다(HTTP generate-composed 라우트는
+    # 2026-09-16 삭제 — 유일한 호출부였던 WebtoonStoryboardLab.tsx가 없어짐).
     "GET /admin/webtoon-lab/gpu/status": (webtoon_lab.handle_gpu_status, True),
     "POST /admin/webtoon-lab/gpu/start": (webtoon_lab.handle_gpu_start, True),
     "POST /admin/webtoon-lab/gpu/stop": (webtoon_lab.handle_gpu_stop, True),
@@ -185,7 +184,10 @@ def lambda_handler(event: dict, context) -> dict:
     # 거쳐 HTTP 모양이 아니므로 정상 라우팅보다 먼저 걸러낸다.
     if event.get("_async_prompt_job"):
         from routes import prompts
-        prompts.run_async_job(event["_async_prompt_job"])
+        try:
+            prompts.run_async_job(event["_async_prompt_job"])
+        except Exception as e:  # noqa: BLE001 — self-invoke 최상위, 안 잡으면 로그도 없이 크래시
+            logger.exception(f"async prompt job error: {type(e).__name__}: {e}")
         return {}
     # 2026-09-14 — 웹툰 컷 이미지를 실제 발행본과 같은 경로(GPU IP-Adapter+
     # Style Transfer+QA+텍스트 합성)로 만들면서 webtoon_lab.py도 같은
@@ -194,14 +196,20 @@ def lambda_handler(event: dict, context) -> dict:
     # 키만 달리해서 두 모듈의 비동기 작업을 구분한다.
     if event.get("_async_webtoon_job"):
         from routes import webtoon_lab
-        webtoon_lab.run_async_job(event["_async_webtoon_job"])
+        try:
+            webtoon_lab.run_async_job(event["_async_webtoon_job"])
+        except Exception as e:  # noqa: BLE001 — self-invoke 최상위, 안 잡으면 로그도 없이 크래시
+            logger.exception(f"async webtoon job error: {type(e).__name__}: {e}")
         return {}
     # 2026-09-14 — 프롬프트 실험 채팅(PromptChatLab.tsx) 실시간 스트리밍용
     # self-invoke 마커. 위 둘과 같은 이유(routes/chat_ws.py 모듈 docstring
     # 참고) — 마커 키만 다르다.
     if event.get("_async_ws_job"):
         from routes import chat_ws
-        chat_ws.run_async_job(event["_async_ws_job"])
+        try:
+            chat_ws.run_async_job(event["_async_ws_job"])
+        except Exception as e:  # noqa: BLE001 — self-invoke 최상위, 안 잡으면 로그도 없이 크래시
+            logger.exception(f"async ws job error: {type(e).__name__}: {e}")
         return {}
     # 2026-09-14 — API Gateway WebSocket API(p4yjifd5v1, HTTP API인
     # chzwwtjtgk와 별개)가 보내는 이벤트는 routeKey 대신
@@ -211,11 +219,15 @@ def lambda_handler(event: dict, context) -> dict:
     ws_event_type = (event.get("requestContext") or {}).get("eventType")
     if ws_event_type in ("CONNECT", "DISCONNECT", "MESSAGE"):
         from routes import chat_ws
-        if ws_event_type == "CONNECT":
-            return chat_ws.handle_connect(event)
-        if ws_event_type == "DISCONNECT":
-            return chat_ws.handle_disconnect(event)
-        return chat_ws.handle_message(event)
+        try:
+            if ws_event_type == "CONNECT":
+                return chat_ws.handle_connect(event)
+            if ws_event_type == "DISCONNECT":
+                return chat_ws.handle_disconnect(event)
+            return chat_ws.handle_message(event)
+        except Exception as e:  # noqa: BLE001 — 안 잡으면 로그도 없이 크래시(HTTP 경로의 최상위 except와 동일 원칙)
+            logger.exception(f"ws {ws_event_type} handler error: {type(e).__name__}: {e}")
+            return {"statusCode": 500}
     try:
         method, path, route_key, path_params, query_params, body = _parse_event(event)
         logger.info(f"admin: {method} {path} (routeKey={route_key})")

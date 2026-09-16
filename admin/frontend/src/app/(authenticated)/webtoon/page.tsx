@@ -21,11 +21,10 @@ import type { CmsPost } from "@/lib/types";
 //
 // 2026-09-14 — "프롬프트 편집/스토리보드 테스트/이미지 실험실" 3단계
 // StepBar(아래 커밋 로그의 LAB_STEPS/StepBar)를 PromptChatLab 하나로
-// 통합했다(사용자 요청: "클로드처럼 채팅을 할 수 있는 형태로"). 1차는
-// 화면(UI)만 — PromptDrawer/WebtoonStoryboardLab/WebtoonImageLab의 실제
-// 테스트·생성 로직은 다음 단계에서 이 채팅 화면 안으로 옮겨 붙인다(그
-// 세 컴포넌트 파일 자체는 로직을 재사용할 수 있어 아직 안 지웠다 — 다른
-// 화면에서 쓰는 PromptDrawer는 물론 그대로 유지).
+// 통합했다(사용자 요청: "클로드처럼 채팅을 할 수 있는 형태로"). 스토리보드
+// 테스트·컷 생성 로직은 이후 PromptChatLab/WebtoonCutGenerator로 옮겨 붙었고,
+// 안 쓰이게 된 WebtoonStoryboardLab.tsx는 2026-09-16 삭제(다른 화면에서
+// 쓰는 PromptDrawer는 그대로 유지).
 
 // useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수.
 export default function WebtoonPageWrapper() {

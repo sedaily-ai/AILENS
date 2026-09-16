@@ -24,9 +24,6 @@ import { adminApi } from "@/lib/adminClient";
    테스트(routes/chat_ws.py)에 반영된다 — 이 패널은 그 저장 자체만
    책임진다. */
 
-const PROMPT_CATEGORY = "webtoon";
-const PROMPT_NAME = "published";
-
 interface LabFile {
   id: number;
   name: string;
@@ -36,7 +33,7 @@ interface LabFile {
   saving: boolean;
 }
 
-export function PromptSectionsPanel() {
+export function PromptSectionsPanel({ category, name }: { category: string; name: string }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -62,7 +59,7 @@ export function PromptSectionsPanel() {
     let cancelled = false;
     (async () => {
       try {
-        const doc = await adminApi.getPromptLabDoc(PROMPT_CATEGORY, PROMPT_NAME);
+        const doc = await adminApi.getPromptLabDoc(category, name);
         if (cancelled) return;
 
         let initialInstructions = doc.instructions;
@@ -73,7 +70,7 @@ export function PromptSectionsPanel() {
           // 남는다 — 그래서 아래 savedInstructions는 빈 문자열로 둬서
           // "저장 안 됨" 상태로 보이게 한다).
           try {
-            const published = await adminApi.getPrompt(PROMPT_CATEGORY, PROMPT_NAME);
+            const published = await adminApi.getPrompt(category, name);
             initialInstructions = published.active_content;
             if (cancelled) return;
             setServerVersion(published.active_version);
@@ -82,7 +79,7 @@ export function PromptSectionsPanel() {
           }
         } else {
           try {
-            const published = await adminApi.getPrompt(PROMPT_CATEGORY, PROMPT_NAME);
+            const published = await adminApi.getPrompt(category, name);
             if (!cancelled) setServerVersion(published.active_version);
           } catch {
             // 버전 표시만 못 할 뿐 패널 자체는 정상 동작
@@ -90,7 +87,7 @@ export function PromptSectionsPanel() {
         }
 
         const loadedFiles = await Promise.all(
-          doc.files.map((f) => adminApi.getPromptLabFile(PROMPT_CATEGORY, PROMPT_NAME, f.id))
+          doc.files.map((f) => adminApi.getPromptLabFile(category, name, f.id))
         );
         if (cancelled) return;
 
@@ -117,12 +114,12 @@ export function PromptSectionsPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [category, name]);
 
   const saveDescription = async () => {
     setSavingDescription(true);
     try {
-      await adminApi.updatePromptLabDescription(PROMPT_CATEGORY, PROMPT_NAME, description);
+      await adminApi.updatePromptLabDescription(category, name, description);
       setSavedDescription(description);
     } catch (err) {
       console.error("설명 저장 실패", err);
@@ -134,7 +131,7 @@ export function PromptSectionsPanel() {
   const saveInstructions = async () => {
     setSavingInstructions(true);
     try {
-      await adminApi.updatePromptLabInstructions(PROMPT_CATEGORY, PROMPT_NAME, instructions);
+      await adminApi.updatePromptLabInstructions(category, name, instructions);
       setSavedInstructions(instructions);
     } catch (err) {
       console.error("지침 저장 실패", err);
@@ -146,7 +143,7 @@ export function PromptSectionsPanel() {
   const addFile = async () => {
     setAddingFile(true);
     try {
-      const meta = await adminApi.createPromptLabFile(PROMPT_CATEGORY, PROMPT_NAME, "새 파일", "");
+      const meta = await adminApi.createPromptLabFile(category, name, "새 파일", "");
       setFiles((prev) => [
         ...prev,
         { id: meta.id, name: meta.name, content: "", serverName: meta.name, serverContent: "", saving: false },
@@ -168,7 +165,7 @@ export function PromptSectionsPanel() {
     if (!target) return;
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, saving: true } : f)));
     try {
-      const meta = await adminApi.updatePromptLabFile(PROMPT_CATEGORY, PROMPT_NAME, id, {
+      const meta = await adminApi.updatePromptLabFile(category, name, id, {
         name: target.name,
         content: target.content,
       });
@@ -187,7 +184,7 @@ export function PromptSectionsPanel() {
 
   const removeFile = async (id: number) => {
     try {
-      await adminApi.deletePromptLabFile(PROMPT_CATEGORY, PROMPT_NAME, id);
+      await adminApi.deletePromptLabFile(category, name, id);
       setFiles((prev) => prev.filter((f) => f.id !== id));
       setEditingFileId((prev) => (prev === id ? null : prev));
     } catch (err) {
@@ -197,7 +194,7 @@ export function PromptSectionsPanel() {
 
   const publish = async () => {
     try {
-      const r = await adminApi.publishPromptLab(PROMPT_CATEGORY, PROMPT_NAME);
+      const r = await adminApi.publishPromptLab(category, name);
       setServerVersion(r.new_version);
     } catch (err) {
       console.error("발행 실패", err);

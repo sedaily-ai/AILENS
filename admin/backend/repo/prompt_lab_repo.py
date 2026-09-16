@@ -9,34 +9,15 @@ prompts_repo.py(발행된 프로덕션 프롬프트 버전 스냅샷)와는 별�
 """
 from __future__ import annotations
 
-import json
 import os
 import time
 import urllib.error
-import urllib.parse
-import urllib.request
 
-from shared.ssm_client import get_secure
-
-_API_URL = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
-_TOKEN_PARAM = os.environ.get("LENS_CMS_API_TOKEN_PARAM", "/sedaily-mbti/admin/lens-cms-api-token")
-_TIMEOUT_SECONDS = 8
+from shared import lens_cms_client
 
 
 def _request(method: str, path: str, body: dict | None = None) -> dict:
-    url = f"{_API_URL}{path}"
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "X-Internal-Token": get_secure(_TOKEN_PARAM),
-        },
-        method=method,
-    )
-    with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as res:
-        return json.loads(res.read())
+    return lens_cms_client.request(method, path, body=body)
 
 
 def get_doc(category: str, name: str) -> dict:

@@ -226,6 +226,14 @@ def get_fixed_characters() -> dict:
     return {"A (여성 기자, 설명자)": female, "B (남성 청자)": male}
 
 
+# 이 파이프라인은 고정 진행자 2인(A/B)만 쓴다 — QA 단계(얼굴 수 초과 감지)의
+# 기대 상한값. 예전엔 pipeline.py와 admin/backend/routes/webtoon_lab.py가
+# 각자 같은 값으로 따로 정의하고 있었다(2026-09-16 리팩토링 감사) — get_fixed_characters()
+# 가 정확히 A/B 2명만 반환하는 이 모듈이 "고정 인물이 몇 명인가"의 정본이라
+# 여기로 모은다.
+MAX_EXPECTED_FACES = 2
+
+
 def _character_text_for(subject: str) -> str:
     """A/B 각각의 admin 저장 CHARACTER 텍스트 한 명분만 돌려준다(GPU
     IP-Adapter 솔로 생성 프롬프트에 붙이는 용도 — generate_bedrock_composed_image_bytes()/
@@ -401,6 +409,21 @@ def _get_bedrock_image_client():
     return _bedrock_image_client
 
 
+def _invoke_and_decode_image(client, model_id: str, body: str, *, error_key: str = "finish_reasons") -> bytes:
+    """이 모듈의 이미지 생성 함수(Stable Image Core/Style Guide/Style
+    Transfer/Remove Background/Nova Canvas) 6곳이 전부 같은 뒷부분을 반복했다
+    — invoke_model → payload.images[0] 파싱 → 없으면 에러. client/modelId/요청
+    body 조립은 호출부 책임으로 남기고, 이 공통 뒷부분만 통일한다.
+    error_key — 실패 시 원인을 어느 필드에서 읽을지(Stability 계열은
+    "finish_reasons", Nova Canvas는 "error")."""
+    resp = client.invoke_model(modelId=model_id, body=body)
+    payload = json.loads(resp["body"].read())
+    images = payload.get("images") or []
+    if not images:
+        raise ValueError(f"응답에 이미지 없음: {payload.get(error_key)}")
+    return base64.b64decode(images[0])
+
+
 def generate_bedrock_image_bytes(prompt: str) -> bytes:
     """Stable Image Core(Bedrock) 1회 호출 — 성공하면 PNG bytes 반환,
     실패하면 예외를 던진다. 재시도는 호출부 책임이다 — 파일에 쓰는 배치
@@ -412,12 +435,7 @@ def generate_bedrock_image_bytes(prompt: str) -> bytes:
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
     })
-    resp = _get_bedrock_image_client().invoke_model(modelId=BEDROCK_IMAGE_MODEL_ID, body=body)
-    payload = json.loads(resp["body"].read())
-    images = payload.get("images") or []
-    if not images:
-        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
-    return base64.b64decode(images[0])
+    return _invoke_and_decode_image(_get_bedrock_image_client(), BEDROCK_IMAGE_MODEL_ID, body)
 
 
 def _retry_generate_and_write(bytes_fn, out_path: Path, retries: int) -> bool:
@@ -538,12 +556,7 @@ def generate_bedrock_style_guide_image_bytes(prompt: str, fidelity: float = STYL
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
     })
-    resp = _get_bedrock_image_client().invoke_model(modelId=STYLE_GUIDE_MODEL_ID, body=body)
-    payload = json.loads(resp["body"].read())
-    images = payload.get("images") or []
-    if not images:
-        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
-    return base64.b64decode(images[0])
+    return _invoke_and_decode_image(_get_bedrock_image_client(), STYLE_GUIDE_MODEL_ID, body)
 
 
 def generate_bedrock_style_guide_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
@@ -684,12 +697,7 @@ def generate_bedrock_photoreal_image_bytes(prompt: str) -> bytes:
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
     })
-    resp = _get_bedrock_image_client().invoke_model(modelId=BEDROCK_IMAGE_MODEL_ID, body=body)
-    payload = json.loads(resp["body"].read())
-    images = payload.get("images") or []
-    if not images:
-        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
-    return base64.b64decode(images[0])
+    return _invoke_and_decode_image(_get_bedrock_image_client(), BEDROCK_IMAGE_MODEL_ID, body)
 
 
 def generate_bedrock_style_transfer_bytes(
@@ -714,12 +722,7 @@ def generate_bedrock_style_transfer_bytes(
         "change_strength": change_strength,
         "output_format": "png",
     })
-    resp = _get_bedrock_image_client().invoke_model(modelId=STYLE_TRANSFER_MODEL_ID, body=body)
-    payload = json.loads(resp["body"].read())
-    images = payload.get("images") or []
-    if not images:
-        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
-    return base64.b64decode(images[0])
+    return _invoke_and_decode_image(_get_bedrock_image_client(), STYLE_TRANSFER_MODEL_ID, body)
 
 
 def build_style_transfer_scene_input(camera: str, scene: str) -> str:
@@ -831,12 +834,7 @@ def remove_background_bytes(image_bytes: bytes) -> bytes:
     """Bedrock Remove Background 호출 — 알파 채널이 있는 PNG를 돌려준다
     (인물만 남기고 나머지는 투명)."""
     body = json.dumps({"image": base64.b64encode(image_bytes).decode(), "output_format": "png"})
-    resp = _get_bedrock_image_client().invoke_model(modelId=REMOVE_BACKGROUND_MODEL_ID, body=body)
-    payload = json.loads(resp["body"].read())
-    images = payload.get("images") or []
-    if not images:
-        raise ValueError(f"응답에 이미지 없음: {payload.get('finish_reasons')}")
-    return base64.b64decode(images[0])
+    return _invoke_and_decode_image(_get_bedrock_image_client(), REMOVE_BACKGROUND_MODEL_ID, body)
 
 
 def _composite_two_characters(bg_bytes: bytes, a_bytes: bytes, b_bytes: bytes) -> bytes:
@@ -987,9 +985,4 @@ def generate_nova_canvas_image_bytes(prompt: str) -> bytes:
             "width": 512,
         },
     })
-    resp = _get_nova_canvas_client().invoke_model(modelId=NOVA_CANVAS_MODEL_ID, body=body)
-    payload = json.loads(resp["body"].read())
-    images = payload.get("images") or []
-    if not images:
-        raise ValueError(f"응답에 이미지 없음: {payload.get('error')}")
-    return base64.b64decode(images[0])
+    return _invoke_and_decode_image(_get_nova_canvas_client(), NOVA_CANVAS_MODEL_ID, body, error_key="error")

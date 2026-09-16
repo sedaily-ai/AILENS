@@ -51,6 +51,12 @@ COMPOSE_TEXT_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/compose_text.py"
 # 마지막 실제 발행값과 우연히 같아서 눈치채기 어려웠다 — 위 세 모듈과
 # 같은 이유로 복사 필수.
 DDB_PROMPT_MODULE="$SCRIPT_DIR/../../pipelines/common/ddb_prompt.py"
+# routes/webtoon_lab.py의 QA 판정 프롬프트(VALIDATE_SYSTEM)가 예전엔 이 파일
+# 안에 별도 사본으로 있었다(prompts.py 전체를 복사하기 부담스러워서) — 2026-09-16
+# 리팩토링 감사로 정본(pipelines/webtoon/prompts.py) 하나만 남기기로 하고
+# 대신 이 파일을 flat 복사한다. webtoon_image만 import하는 가벼운 모듈이라
+# 위 다른 common 모듈들과 같은 방식으로 추가해도 부담 없음.
+WEBTOON_PROMPTS_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/prompts.py"
 # webtoon_image.py(STYLE_REFERENCE_IMAGE_PATH)와 compose_text.py(FONT_PATH)
 # 둘 다 "자기 옆의 assets/"를 찾는다 — flat 구조에선 둘 다 zip 루트에
 # 나란히 있으니, 원래 서로 다른 두 폴더(pipelines/common/assets,
@@ -78,7 +84,7 @@ cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
-cp "$BEDROCK_CLIENT_MODULE" "$GPU_IPADAPTER_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$BUILD_DIR/"
+cp "$BEDROCK_CLIENT_MODULE" "$GPU_IPADAPTER_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$BUILD_DIR/"
 mkdir -p "$BUILD_DIR/assets"
 cp "$STYLE_REF_ASSET" "$FONT_ASSET" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"

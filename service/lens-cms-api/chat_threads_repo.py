@@ -76,10 +76,14 @@ def get_thread(thread_id: int) -> Optional[Dict[str, Any]]:
         )
         messages = [
             {
+                # payload는 호출부가 자유롭게 채우는 dict라 어떤 키가 들어올지
+                # 보장이 없다 — 실제 컬럼값(id/role/created_at)을 먼저 스프레드해
+                # payload가 같은 이름의 키를 담고 있어도 절대 덮어쓰지 못하게 한다
+                # (예전엔 순서가 반대라 그런 payload가 오면 조용히 덮어썼다).
+                **(m["payload"] or {}),
                 "id": m["id"],
                 "role": m["role"],
                 "created_at": m["created_at"].isoformat() if m.get("created_at") else None,
-                **(m["payload"] or {}),
             }
             for m in cur.fetchall()
         ]

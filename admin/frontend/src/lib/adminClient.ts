@@ -27,13 +27,11 @@ import type {
   WebtoonLabHistoryItem,
   WebtoonLabDefaults,
   WebtoonGpuStatus,
-  WebtoonStoryboardCut,
   WebtoonImageAssetUrls,
   WebtoonImageAssetKind,
   WebtoonImageAssetPresign,
   WebtoonImageAssetGalleryItem,
   PromptTestJob,
-  WebtoonStoryboardJob,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -233,18 +231,6 @@ export const adminApi = {
     request<PromptTestJob>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/test/${encodeURIComponent(jobId)}`
     ),
-  // 웹툰 스토리보드 테스트(2026-09-11, 같은 날 작업+폴링으로 전환) — 1·2단계를
-  // 체인 호출해 8컷을 반환한다(routes/prompts.py::handle_storyboard_test).
-  storyboardTest: (category: string, name: string, content: string, article: string) =>
-    request<{ job_id: string; status: string }>(
-      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/storyboard-test`,
-      { method: "POST", body: JSON.stringify({ content, article }) }
-    ),
-  getStoryboardTestJob: (category: string, name: string, jobId: string) =>
-    request<WebtoonStoryboardJob>(
-      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/storyboard-test/${encodeURIComponent(jobId)}`
-    ),
-
   // 프롬프트 실험 챗랩 우측 패널 — 설명/지침/파일 개별 CRUD(2026-09-15).
   // PromptDetail(위 getPrompt/updatePrompt, 발행된 버전 스냅샷)과는 별개
   // 저장소 — 여기는 저장 버튼을 누른 즉시 그 필드 하나만 서버에 반영된다.
@@ -464,17 +450,9 @@ export const adminApi = {
       body: JSON.stringify({ asset, key }),
     }),
 
-  // "실제 품질" 컷 이미지 생성 + GPU 켜기/끄기(2026-09-14) — 스토리보드
-  // 테스트(WebtoonStoryboardLab.tsx)가 쓴다. 프로덕션과 같은 경로(GPU
-  // IP-Adapter+Style Transfer+QA+텍스트 합성)라 위 generateWebtoonImage
-  // (배경만, style/character 자유 입력)와는 별개 계약 — 컷 전체를 보낸다.
-  generateComposedWebtoonImage: (cut: WebtoonStoryboardCut) =>
-    request<{ job_id: string; status: string }>("/admin/webtoon-lab/generate-composed", {
-      method: "POST",
-      body: JSON.stringify(cut),
-    }),
-  // job 모양이 generateWebtoonImage와 같아(job_id/status/image_url/error)
-  // 폴링은 기존 getWebtoonImageJob을 그대로 재사용한다.
+  // GPU 켜기/끄기(2026-09-14) — 프롬프트 챗랩 우측 컷 생성 패널이 WebSocket
+  // (routes/chat_ws.py)으로 컷 이미지 생성을 직접 트리거하므로, HTTP 컷 생성은
+  // 이 GPU 상태 조회/제어만 남는다.
   getWebtoonGpuStatus: () => request<WebtoonGpuStatus>("/admin/webtoon-lab/gpu/status"),
   startWebtoonGpu: () =>
     request<{ job_id: string; status: string }>("/admin/webtoon-lab/gpu/start", { method: "POST" }),

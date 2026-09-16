@@ -77,10 +77,14 @@ _ssm_client = None
 _ec2_client = None
 _s3_client = None
 _ddb_client = None
-# 2026-09-16 — routes/chat_ws.py::_run_all_cuts_flow가 8컷을
-# ThreadPoolExecutor로 동시에 돌리면서, 이 함수를 여러 스레드가 동시에
+# 2026-09-16 — 발견 당시엔 routes/chat_ws.py에 8컷을 ThreadPoolExecutor로
+# 동시에 돌리는 "전체 컷" 흐름이 있어서, 이 함수를 여러 스레드가 동시에
 # 호출하는 게 실제로 일어난다는 게 드러났다(전체 컷 생성 시 컷 여러 개가
-# "'NoneType' object has no attribute 'put_object'"로 실패). 원래 코드는
+# "'NoneType' object has no attribute 'put_object'"로 실패). 그 흐름은 이후
+# 컷 하나당 WebSocket 메시지(chat_ws.py::_run_cut_image_flow, 컷마다 별도
+# Lambda self-invoke)로 바뀌었지만, 로컬 개발 서버(admin/backend/
+# local_server.py)는 ThreadingHTTPServer라 동시 요청이 같은 프로세스의
+# 스레드로 들어와 같은 경쟁 조건이 여전히 재현될 수 있다. 원래 코드는
 # `_ssm_client is None`만 보고 세 전역을 순서대로 채웠는데, 한 스레드가
 # _ssm_client까지만 채운 순간 다른 스레드가 그 가드를 통과해버려
 # _s3_client가 아직 None인 채로 반환되는 경쟁 조건이었다 — 락으로 막는다.
@@ -277,14 +281,22 @@ def generate_ipadapter_photo_bytes(
         f"--out-key {out_key} --scale {scale} --steps {steps} --seed {seed}"
     )
     try:
-        # 2026-09-16 — routes/chat_ws.py::_run_all_cuts_flow가 8컷을
-        # ThreadPoolExecutor로 동시에 돌리는데, GPU는 g5.xlarge 한 대뿐이다.
-        # 락 없이 그대로 두면 SSM RunShellScript가 같은 인스턴스에 동시에
-        # 여러 개 들어가 PyTorch 추론끼리 GPU를 다퉈서(VRAM 경합) 전부
-        # 180초 안에 못 끝나고 타임아웃으로 실패하는 걸 실측으로 확인했다
-        # ("전체 컷" 요청 시 8컷 전부 "SSM 명령 대기 타임아웃"). 이 락으로
-        # GPU 추론 자체만 한 번에 하나씩 돌게 직렬화한다 — Bedrock 호출·
-        # S3 업로드·QA처럼 GPU를 안 쓰는 다른 작업은 여전히 병렬로 돈다.
+        # 2026-09-16 — 발견 당시(chat_ws.py에 8컷을 ThreadPoolExecutor로 동시에
+        # 돌리는 "전체 컷" 흐름이 있던 시점) GPU(g5.xlarge 한 대)에 SSM
+        # RunShellScript가 동시에 여러 개 들어가 PyTorch 추론끼리 GPU를
+        # 다퉈서(VRAM 경합) 전부 180초 안에 못 끝나고 타임아웃으로 실패하는
+        # 걸 실측으로 확인했다("전체 컷" 요청 시 8컷 전부 "SSM 명령 대기
+        # 타임아웃"). 이 락으로 GPU 추론 자체만 한 번에 하나씩 돌게
+        # 직렬화한다 — Bedrock 호출·S3 업로드·QA처럼 GPU를 안 쓰는 다른
+        # 작업은 여전히 병렬로 돈다.
+        #
+        # ⚠️ 이 락은 threading.Lock()이라 같은 프로세스(로컬 ThreadingHTTPServer
+        # 동시 요청) 안에서만 유효하다. 지금은 컷 하나당 별도 self-invoke
+        # Lambda(chat_ws.py::_run_cut_image_flow)라 컷 여러 개가 동시에
+        # 요청되면 서로 다른 실행 환경에서 각자 자기만의 락을 얻어, 이 락이
+        # 실제로 두 컷의 SSM 명령을 막아주지 못할 수 있다 — 프로덕션에서
+        # 동시 컷 생성이 잦다면 DynamoDB 조건부 쓰기 등 프로세스 간 락으로
+        # 바꿔야 한다(아직 실측/수정 안 함).
         with _gpu_infer_lock:
             result = _run_ssm_command([cmd], timeout_s=180)
         if result["Status"] != "Success":

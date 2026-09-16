@@ -148,6 +148,11 @@ export function WebtoonCutGenerator({
     return true;
   };
 
+  // API Gateway WebSocket 프레임 하드 리밋(32,768바이트) — PromptChatLab.tsx의
+  // WS_FRAME_SAFE_BYTES와 같은 안전장치. 이 컷 페이로드는 scene/narration/
+  // caption/dialogue를 다 합쳐 보내므로 드물게 커질 수 있다.
+  const WS_FRAME_SAFE_BYTES = 30000;
+
   const sendGenerate = (slotIndex: number) => {
     setSlots((prev) => {
       const s = prev[slotIndex];
@@ -166,7 +171,21 @@ export function WebtoonCutGenerator({
         apply_character_lock: s.applyCharacterLock,
         apply_style_transfer: s.applyStyleTransfer,
       };
-      sendWs("cut_image", { cut: cutPayload, model: s.model });
+      const wsData = { cut: cutPayload, model: s.model };
+      const byteLength = new TextEncoder().encode(JSON.stringify({ action: "message", kind: "cut_image", data: wsData })).length;
+      if (byteLength > WS_FRAME_SAFE_BYTES) {
+        return {
+          ...prev,
+          [slotIndex]: { ...s, status: "error", error: `요청이 너무 커서(${byteLength.toLocaleString()}바이트) 보낼 수 없습니다 — 내용을 줄여서 다시 시도해 주세요.` },
+        };
+      }
+      // sendWs는 소켓이 OPEN이 아니면 false를 돌려주고 아무것도 안 보낸다
+      // (WebSocket.send()는 CLOSING/CLOSED에서 예외 없이 조용히 데이터를
+      // 버림) — 반환값을 확인 안 하면 슬롯이 "생성 중"에 영원히 멈춘다.
+      const sent = sendWs("cut_image", wsData);
+      if (!sent) {
+        return { ...prev, [slotIndex]: { ...s, status: "error", error: "연결이 끊어졌어요 — 자동으로 다시 연결 중입니다. 잠시 후 다시 시도해 주세요." } };
+      }
       return { ...prev, [slotIndex]: { ...s, status: "pending", error: null } };
     });
   };

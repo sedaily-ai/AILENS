@@ -15,17 +15,19 @@ zip에 복사한다 — `service/backend/common/`을 복사하던 것과 같은 
 ⚠️ 비동기 실행 방식 — 로컬 개발과 실제 Lambda 배포가 다르다: 로컬
 개발 서버(`admin/backend/local_server.py`)는 프로세스가 계속 떠 있으므로
 백그라운드 스레드로 안전하게 끝까지 돈다. 실제 Lambda는 호출이 끝나는
-순간 컨테이너가 얼려질 수 있어 스레드가 안 끝날 위험이 있다 — 프로덕션
-배포 전에 Lambda 비동기 self-invoke(`InvocationType="Event"`)나 Step
-Functions로 바꿔야 한다(아직 안 함, 로컬 실험용으로만 스레드 사용).
+순간 컨테이너가 얼려질 수 있어 스레드가 안 끝날 위험이 있다 — GPU/Bedrock
+체인을 도는 나머지 작업(컷 이미지 합성 `_run_composed_generation`, GPU 기동
+`_run_gpu_start`)은 2026-09-14~16 사이 Lambda 비동기 self-invoke
+(`InvocationType="Event"`, `run_async_job`/`_self_invoke_async` 참고)로
+옮겼다. `handle_generate`(3단계 이미지 실험실, Bedrock 단독 경로)만 아직
+로컬 스레드 방식으로 남아있다 — 별도 확인 후 마이그레이션 필요.
 
-⚠️ 라우트 자체(`/admin/webtoon-lab/*`)도 API Gateway에 아직 없다 —
-`.clauderules`상 deploy 스크립트는 라우트를 안 만든다, 프로덕션에 실제로
-연결하려면 기존 라우트(`/admin/drivers/{id}` 등)와 같은 방식으로 콘솔/CLI
-에서 수동으로 추가해야 한다."""
+`/admin/webtoon-lab/*` 라우트는 API Gateway에 등록돼 있다(`handler.py`의
+HANDLERS 등록 주석 참고) — 새 라우트를 추가할 땐 거기 등록 + API Gateway에
+`aws apigatewayv2 create-route`로 같은 integration을 붙이는 것 둘 다
+필요하다(`.clauderules`상 deploy 스크립트는 라우트를 안 만든다)."""
 from __future__ import annotations
 
-import datetime as dt
 import json
 import logging
 import os
@@ -36,12 +38,13 @@ from pathlib import Path
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from shared import audit, ddb_client, response
+from shared import audit, ddb_client, response, time_utils
 import webtoon_image  # pipelines/common/ — 배포 시 zip에 복사됨(위 docstring 참고)
 import bedrock_client  # pipelines/common/ — QA 비전 호출용(2026-09-14)
 import gpu_ipadapter  # pipelines/common/ — GPU IP-Adapter 제어(2026-09-14)
 import rekognition_client  # pipelines/common/ — 말풍선 배치용 얼굴 감지(2026-09-14)
 import compose_text  # pipelines/webtoon/ — 대사·캡션·내레이션 합성(2026-09-14)
+import prompts  # pipelines/webtoon/ — QA 판정 프롬프트(VALIDATE_SYSTEM) 정본, 2026-09-16 deploy-admin-api.sh에 flat 복사 추가
 from json_extract import extract_json_object  # pipelines/common/
 
 logger = logging.getLogger(__name__)
@@ -67,23 +70,11 @@ _HISTORY_LIMIT = 24
 # 오히려 둘 다 망가진다).
 #
 # QA·재시도 로직(_validate_and_detect)은 pipelines/webtoon/pipeline.py의
-# _generate_and_qa_cut()과 같은 판정 기준(VALIDATE_SYSTEM)을 쓰지만,
-# prompts.py 전체를 복사하는 대신 그 상수 하나만 그대로 옮겨왔다(다른
-# 내용은 admin 프롬프트 드로어가 관리하는 DDB 프롬프트라 여기서 쓸 일이
-# 없다).
+# _generate_and_qa_cut()과 같은 판정 기준(prompts.VALIDATE_SYSTEM)을 쓴다 —
+# 2026-09-16까지는 그 상수 하나만 여기로 복사해뒀었는데(prompts.py 전체를
+# 배포에 복사하기 부담스러워서), 리팩토링 감사로 정본 하나만 남기기로 하고
+# prompts.py를 flat 복사 대상에 추가했다(deploy-admin-api.sh 참고).
 _QA_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
-_MAX_EXPECTED_FACES = 2  # 고정 진행자 2인(A/B)만 쓰는 파이프라인 — pipeline.py와 동일
-_VALIDATE_SYSTEM = (
-    "당신은 뉴스 웹툰 이미지 QA 담당자입니다. 주어진 이미지 하나를 보고 "
-    "아래 JSON 스키마 그대로만 응답하세요(설명 문구 없이 JSON 객체 하나만):\n"
-    '{"sageuk": true|false, "no_people_violated": true|false}\n\n'
-    "- sageuk: 이미지에 조선시대/사극/한복/전통 한옥 지붕 등 시대극 요소가 "
-    "하나라도 보이면 true.\n"
-    "- no_people_violated: [인물 없음 지시]가 주어졌는데 이미지에 사람이 "
-    "보이면 true. 인물 없음 지시가 없었다면 항상 false."
-)
-_MAX_CUT_TEXT_BYTES = 4000  # 컷 하나의 narration/caption/title 등 필드 하나당 상한
-
 _s3_client = None
 
 
@@ -96,10 +87,6 @@ def _s3():
 
 def _bucket() -> str:
     return os.environ.get("CMS_MEDIA_BUCKET", "")
-
-
-def _now_iso() -> str:
-    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _job_table():
@@ -152,11 +139,11 @@ def _run_generation(job_id: str, prompt: str) -> None:
         key = f"media/webtoon-lab/{job_id}.png"
         _s3().put_object(Bucket=bucket, Key=key, Body=image_bytes, ContentType="image/png")
         image_url = f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}"
-        _update_job(job_id, {"status": "done", "image_url": image_url, "updated_at": _now_iso()})
+        _update_job(job_id, {"status": "done", "image_url": image_url, "updated_at": time_utils.now_iso()})
         audit.log("webtoon-lab-generate-done", {"job_id": job_id})
     except Exception as e:  # noqa: BLE001 — 백그라운드 스레드 최상위, 여기서 안 잡으면 조용히 사라짐
         logger.exception(f"webtoon-lab generate failed: {job_id}")
-        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
+        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": time_utils.now_iso()})
 
 
 def _self_invoke_async(payload: dict) -> None:
@@ -178,9 +165,7 @@ def run_async_job(payload: dict) -> None:
     """handler.py가 self-invoke된 별도 invocation에서 직접 호출."""
     kind = payload.get("kind")
     job_id = payload.get("job_id")
-    if kind == "generate_composed":
-        _run_composed_generation(job_id, payload["cut"])
-    elif kind == "gpu_start":
+    if kind == "gpu_start":
         _run_gpu_start(job_id)
 
 
@@ -191,7 +176,7 @@ def _validate_and_detect(image_bytes: bytes, scene: str, no_people_expected: boo
     try:
         no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
         user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
-        raw = bedrock_client.call_vision(_VALIDATE_SYSTEM, user_msg, image_bytes, model=_QA_MODEL, max_tokens=500)
+        raw = bedrock_client.call_vision(prompts.VALIDATE_SYSTEM, user_msg, image_bytes, model=_QA_MODEL, max_tokens=500)
         return extract_json_object(raw)
     except Exception as e:  # noqa: BLE001 — QA 실패가 생성 자체를 막으면 안 됨
         logger.warning(f"webtoon-lab QA 실패(통과 처리): {e}")
@@ -293,7 +278,7 @@ def _generate_composed_with_qa(
     faces = rekognition_client.detect_main_faces(image_bytes) or None
     extra_people = (
         has_dialogue and not no_people_expected
-        and faces is not None and len(faces) > _MAX_EXPECTED_FACES
+        and faces is not None and len(faces) > webtoon_image.MAX_EXPECTED_FACES
     )
     if verdict.get("sageuk") or verdict.get("no_people_violated") or extra_people:
         logger.info(f"webtoon-lab QA 실패({model}) — 재생성 1회 시도")
@@ -309,8 +294,7 @@ def _run_composed_generation(job_id: str, cut: dict, push=None, model: str = "pi
 
     push — 2026-09-14, 웹소켓 채팅(routes/chat_ws.py) 전용. 주어지면 완료/
     실패 시 DDB 기록과 별개로 이 콜백으로 즉시 결과를 밀어넣는다(폴링
-    없이 실시간 통지) — HTTP job/폴링 호출부(handle_generate_composed)는
-    안 넘기므로 동작 그대로.
+    없이 실시간 통지).
 
     model — 2026-09-15, 프롬프트 챗랩의 이미지 모델 선택 드롭다운 전용.
     _IMAGE_MODELS에 없는 값이 오면 "pipeline"으로 취급한다(오타·구버전
@@ -347,60 +331,15 @@ def _run_composed_generation(job_id: str, cut: dict, push=None, model: str = "pi
         key = f"media/webtoon-lab/{job_id}.png"
         _s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
         image_url = f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}"
-        _update_job(job_id, {"status": "done", "image_url": image_url, "updated_at": _now_iso()})
+        _update_job(job_id, {"status": "done", "image_url": image_url, "updated_at": time_utils.now_iso()})
         audit.log("webtoon-lab-generate-composed-done", {"job_id": job_id, "cut": cut.get("cut")})
         if push:
             push({"type": "cut_image", "cut": cut.get("cut"), "image_url": image_url, "model": model})
     except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위, 안 잡으면 job이 영원히 pending
         logger.exception(f"webtoon-lab composed generate failed: {job_id}")
-        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
+        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": time_utils.now_iso()})
         if push:
             push({"type": "cut_image_error", "cut": cut.get("cut"), "error": str(e)[:500]})
-
-
-def handle_generate_composed(body: dict, path_params: dict, query_params: dict) -> dict:
-    """웹툰 스토리보드 테스트(WebtoonStoryboardLab.tsx)의 컷별 "이미지 생성" —
-    실제 발행본과 같은 경로(GPU IP-Adapter+Style Transfer+QA+텍스트 합성)를
-    탄다(2026-09-14, 사용자 요청 "실제와 같은 품질을 원합니다"). GPU를 쓰는
-    컷(클로즈업)은 호출 전에 GPU가 켜져 있어야 한다(POST .../gpu/start) —
-    여기서 자동으로 켜지 않는다(테스트 세션 동안 켜둔 채로 여러 컷을
-    처리하고 다 쓰면 수동으로 끄는 방식을 사용자가 직접 요청함).
-
-    handle_generate()(이미지 실험실 3단계, style/char_female/char_male 자유
-    입력 계약)와는 별개 엔드포인트 — 입력 계약이 완전히 달라(컷 전체 JSON)
-    합치면 두 화면 다 망가진다."""
-    body = body or {}
-    scene = (body.get("scene") or "").strip()
-    camera = (body.get("camera") or "").strip()
-    if not scene:
-        return response.err("scene is required", 400)
-    if not camera:
-        return response.err("camera is required", 400)
-
-    cut = {
-        "cut": body.get("cut"),
-        "camera": camera,
-        "scene": scene,
-        "narration": (body.get("narration") or "").strip(),
-        "caption": (body.get("caption") or "").strip(),
-        "closing_caption": (body.get("closing_caption") or "").strip(),
-        "title": (body.get("title") or "").strip(),
-        "title_keyword": (body.get("title_keyword") or "").strip(),
-        "dialogue": body.get("dialogue") or [],
-    }
-    for label in ("camera", "scene", "narration", "caption", "closing_caption", "title", "title_keyword"):
-        if len(cut[label].encode("utf-8")) > _MAX_CUT_TEXT_BYTES:
-            return response.err(f"{label} too long (max {_MAX_CUT_TEXT_BYTES} bytes)", 400)
-
-    job_id = uuid.uuid4().hex[:16]
-    now = _now_iso()
-    _put_job(job_id, {
-        "status": "pending", "cut": cut.get("cut"), "camera": camera, "scene": scene,
-        "created_at": now, "updated_at": now,
-    })
-    _self_invoke_async({"kind": "generate_composed", "job_id": job_id, "cut": cut})
-    audit.log("webtoon-lab-generate-composed-start", {"job_id": job_id, "cut": cut.get("cut")})
-    return response.ok({"job_id": job_id, "status": "pending"})
 
 
 # ─────────────────────────────────────────────────────────────
@@ -422,12 +361,12 @@ def handle_gpu_status(body: dict, path_params: dict, query_params: dict) -> dict
 def _run_gpu_start(job_id: str, push=None) -> None:
     try:
         gpu_ipadapter.ensure_gpu_running()
-        _update_job(job_id, {"status": "done", "updated_at": _now_iso()})
+        _update_job(job_id, {"status": "done", "updated_at": time_utils.now_iso()})
         if push:
             push({"type": "gpu_status", "state": "running"})
     except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위
         logger.exception(f"webtoon-lab gpu start failed: {job_id}")
-        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
+        _update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": time_utils.now_iso()})
         if push:
             push({"type": "gpu_error", "error": str(e)[:500]})
 
@@ -439,7 +378,7 @@ def handle_gpu_start(body: dict, path_params: dict, query_params: dict) -> dict:
     (이 job도 같은 테이블·같은 status/error 모양이라 별도 엔드포인트가
     필요 없다)."""
     job_id = uuid.uuid4().hex[:16]
-    now = _now_iso()
+    now = time_utils.now_iso()
     _put_job(job_id, {"status": "pending", "created_at": now, "updated_at": now})
     _self_invoke_async({"kind": "gpu_start", "job_id": job_id})
     audit.log("webtoon-lab-gpu-start", {"job_id": job_id})
@@ -674,7 +613,7 @@ def handle_generate(body: dict, path_params: dict, query_params: dict) -> dict:
     )
 
     job_id = uuid.uuid4().hex[:16]
-    now = _now_iso()
+    now = time_utils.now_iso()
     _put_job(job_id, {
         "status": "pending",
         "scene": scene,

@@ -30,7 +30,6 @@ sections 는 optional 이다 — 없으면(옛 버전, /prompts/edit 의 평문 
 content 전체를 한 섹션으로 취급해 폴백한다.
 """
 
-import datetime as dt
 import json
 import os
 import re
@@ -40,8 +39,7 @@ import boto3
 from botocore.config import Config as BotoConfig
 
 from repo import prompts_repo
-from shared import audit, ddb_client, response
-from json_extract import extract_json_object  # pipelines/common/ — deploy-admin-api.sh가 복사(webtoon_image.py와 같은 패턴)
+from shared import audit, ddb_client, response, time_utils
 
 # LLMOps 테스트 실행(2026-08-19, 2026-09-11 Bedrock로 이관) — 프롬프트
 # 드로어에서 "테스트 실행"을 누르면(저장 여부와 무관하게) 지금 편집 중인
@@ -284,7 +282,6 @@ def _call_bedrock_for_category(category: str, content: str, article: str) -> str
 # pk 네임스페이스 하나씩 더 늘리는 방식, 새 테이블 안 만듦) ----------
 
 _TEST_JOB_PK = "PROMPTTEST"
-_STORYBOARD_JOB_PK = "PROMPTSTORYBOARDTEST"
 
 
 def _job_table():
@@ -310,10 +307,6 @@ def _update_job(pk: str, job_id: str, updates: dict) -> None:
 def _get_job(pk: str, job_id: str) -> dict | None:
     resp = _job_table().get_item(Key={"pk": pk, "sk": f"job/{job_id}"})
     return resp.get("Item")
-
-
-def _now_iso() -> str:
-    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _self_invoke_async(payload: dict) -> None:
@@ -342,17 +335,15 @@ def run_async_job(payload: dict) -> None:
     job_id = payload.get("job_id")
     if kind == "test":
         _run_test_job(job_id, payload["category"], payload["content"], payload["article"])
-    elif kind == "storyboard":
-        _run_storyboard_job(job_id, payload["content"], payload["article"])
 
 
 def _run_test_job(job_id: str, category: str, content: str, article: str) -> None:
     try:
         output = _call_bedrock_for_category(category, content, article)
-        _update_job(_TEST_JOB_PK, job_id, {"status": "done", "output": output, "updated_at": _now_iso()})
+        _update_job(_TEST_JOB_PK, job_id, {"status": "done", "output": output, "updated_at": time_utils.now_iso()})
         audit.log("prompt-test-done", {"job_id": job_id, "prompt": category, "output_bytes": len(output.encode("utf-8"))})
     except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위, 여기서 안 잡으면 job이 영원히 pending으로 남는다
-        _update_job(_TEST_JOB_PK, job_id, {"status": "error", "error": str(e)[:500], "updated_at": _now_iso()})
+        _update_job(_TEST_JOB_PK, job_id, {"status": "error", "error": str(e)[:500], "updated_at": time_utils.now_iso()})
 
 
 def handle_test(body: dict, path_params: dict, query_params: dict) -> dict:
@@ -380,7 +371,7 @@ def handle_test(body: dict, path_params: dict, query_params: dict) -> dict:
         return response.err(f"이 채널은 테스트 실행을 지원하지 않습니다: {category}", 400)
 
     job_id = uuid.uuid4().hex[:16]
-    now = _now_iso()
+    now = time_utils.now_iso()
     _put_job(_TEST_JOB_PK, job_id, {"status": "pending", "prompt": f"{category}/{name}", "created_at": now, "updated_at": now})
     _self_invoke_async({"kind": "test", "job_id": job_id, "category": category, "content": content, "article": article})
 
@@ -545,42 +536,6 @@ def _build_step2_call(content: str, article: str, script: dict) -> tuple[str, st
     return _WEBTOON_SYSTEM_PROMPT, user_message, webtoon_cfg["model"], webtoon_cfg["max_tokens"]
 
 
-def _generate_step1_script(content: str, article: str) -> dict:
-    """1단계(스크립트)만 호출(논스트리밍) — handle_test/handle_storyboard_test
-    같은 HTTP job/폴링 호출부 전용. routes/chat_ws.py의 웹소켓 채팅은
-    2026-09-16부터 _build_step1_call + 자체 스트리밍 호출을 쓴다(실시간
-    청크 중계, 아래 _generate_storyboard·chat_ws.py::_stream_json_completion
-    참고)."""
-    system, user_message, model, max_tokens = _build_step1_call(content, article)
-    try:
-        script_raw = _call_bedrock(model, system, user_message, max_tokens=max_tokens, temperature=0.7)
-        return extract_json_object(script_raw)
-    except Exception as e:
-        raise RuntimeError(f"1단계(스크립트) 생성 실패: {e}") from e
-
-
-def _generate_step2_scenes(content: str, article: str, script: dict) -> dict:
-    """2단계(장면 연출)만 호출(논스트리밍) — 위 _generate_step1_script와
-    같은 이유로 HTTP job/폴링 호출부 전용으로 남긴다."""
-    system, user_message, model, max_tokens = _build_step2_call(content, article, script)
-    try:
-        scene_raw = _call_bedrock(model, system, user_message, max_tokens=max_tokens, temperature=0.7)
-        return extract_json_object(scene_raw)
-    except Exception as e:
-        raise RuntimeError(f"2단계(장면 연출) 생성 실패: {e}") from e
-
-
-def _generate_storyboard(content: str, article: str) -> tuple[dict, dict]:
-    """1단계+2단계를 곧바로 이어 부른다(확인 없이) — 원시 script/scenes
-    dict 반환(합치기는 _merge_storyboard_cuts()가 따로 함). _run_storyboard_job
-    (HTTP job/폴링, 기존 WebtoonStoryboardLab.tsx가 쓰던 경로)이 이 함수를
-    쓴다 — 웹소켓 채팅(routes/chat_ws.py)은 확인 단계를 넣으려고
-    _generate_step1_script/_generate_step2_scenes를 직접 따로 부른다."""
-    script = _generate_step1_script(content, article)
-    scenes = _generate_step2_scenes(content, article, script)
-    return script, scenes
-
-
 def _cut_number(d: dict) -> int | None:
     """v11 스키마는 컷 번호를 정수 "cut" 대신 문자열 "cut_id"("cut_01")로
     준다 — 둘 다 받는다(2026-09-15, 아래 _merge_storyboard_cuts 주석 참고)."""
@@ -651,74 +606,3 @@ def _merge_storyboard_cuts(script: dict, scenes: dict) -> list[dict]:
     return cuts
 
 
-def _run_storyboard_job(job_id: str, content: str, article: str) -> None:
-    try:
-        script, scenes = _generate_storyboard(content, article)
-    except Exception as e:
-        _update_job(_STORYBOARD_JOB_PK, job_id, {
-            "status": "error", "error": str(e)[:500], "updated_at": _now_iso(),
-        })
-        return
-
-    cuts = _merge_storyboard_cuts(script, scenes)
-    _update_job(_STORYBOARD_JOB_PK, job_id, {
-        "status": "done",
-        "core_question": script.get("core_question"),
-        "characters": script.get("characters"),
-        "cuts": cuts,
-        "updated_at": _now_iso(),
-    })
-    audit.log("prompt-storyboard-test-done", {"job_id": job_id, "cuts": len(cuts)})
-
-
-def handle_storyboard_test(body: dict, path_params: dict, query_params: dict) -> dict:
-    """웹툰 프롬프트 드로어의 "스토리보드 테스트" — 저장 여부 무관, 지금
-    편집 중인 content로 1단계(스크립트)+2단계(장면 연출)를 프로덕션과 같은
-    순서로 체인 호출해 컷별로 합쳐 반환한다. 1·2단계 지침이 웹툰 8컷
-    스키마 전용이라 category가 webtoon이 아니면 애초에 의미가 없다."""
-    category = (path_params or {}).get("category", "")
-    name = (path_params or {}).get("name", "")
-    if not category or not name:
-        return response.err("category and name required", 400)
-    if category != "webtoon":
-        return response.err("스토리보드 테스트는 webtoon 채널 전용입니다", 400)
-
-    content = (body.get("content") or "").strip()
-    article = (body.get("article") or "").strip()
-    if not content:
-        return response.err("content required", 400)
-    if not article:
-        return response.err("article required", 400)
-    if len(article.encode("utf-8")) > _MAX_TEST_ARTICLE_BYTES:
-        return response.err(
-            f"기사 원문이 너무 깁니다 (최대 {_MAX_TEST_ARTICLE_BYTES // 1024}KB)", 400
-        )
-
-    job_id = uuid.uuid4().hex[:16]
-    now = _now_iso()
-    _put_job(_STORYBOARD_JOB_PK, job_id, {"status": "pending", "created_at": now, "updated_at": now})
-    _self_invoke_async({"kind": "storyboard", "job_id": job_id, "content": content, "article": article})
-
-    audit.log("prompt-storyboard-test-start", {
-        "prompt": f"{category}/{name}",
-        "job_id": job_id,
-        "article_bytes": len(article.encode("utf-8")),
-    })
-    return response.ok({"job_id": job_id, "status": "pending"})
-
-
-def handle_storyboard_test_status(body: dict, path_params: dict, query_params: dict) -> dict:
-    job_id = (path_params or {}).get("job_id", "")
-    if not job_id:
-        return response.err("job_id required", 400)
-    item = _get_job(_STORYBOARD_JOB_PK, job_id)
-    if not item:
-        return response.err("job not found", 404)
-    return response.ok({
-        "job_id": job_id,
-        "status": item.get("status"),
-        "core_question": item.get("core_question"),
-        "characters": item.get("characters"),
-        "cuts": item.get("cuts"),
-        "error": item.get("error"),
-    })

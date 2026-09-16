@@ -51,15 +51,11 @@ function buildImagePromptDoc(style: string, charFemale: string, charMale: string
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** true면 자기 backdrop/aside/닫기 버튼 없이 헤더+본문만 렌더한다 — 상위
-   *  화면이 PromptDrawer와 한 aside 안에 이어 붙여 보여줄 때 쓴다
-   *  (2026-09-04, webtoon/page.tsx). 기본 false. */
-  embedded?: boolean;
 }
 
 type PanelTab = "generate" | "history";
 
-export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
+export function WebtoonImageLab({ open, onClose }: Props) {
   const toast = useToast();
   const [tab, setTab] = useState<PanelTab>("generate");
 
@@ -360,27 +356,25 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
             Bedrock Stable Diffusion · 프롬프트/파라미터를 바꿔 실제 생성 결과를 확인
           </p>
         </div>
-        {!embedded && (
-          <button
-            type="button"
-            onClick={handleClose}
-            className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
-            aria-label="닫기"
+        <button
+          type="button"
+          onClick={handleClose}
+          className="-mr-1.5 cursor-pointer rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)]"
+          aria-label="닫기"
+        >
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-        )}
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       <div className="flex gap-1">
@@ -408,7 +402,7 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
   );
 
   const bodyNode = (
-    <div className={embedded ? "px-5 py-5" : "flex-1 overflow-y-auto px-5 py-5"}>
+    <div className="flex-1 overflow-y-auto px-5 py-5">
           {tab === "generate" && (
             <div className="space-y-4">
               {/* 2026-09-16 — 사용자 요청("처음 볼 때 구조를 이해하기 힘들다,
@@ -661,15 +655,6 @@ export function WebtoonImageLab({ open, onClose, embedded = false }: Props) {
           )}
     </div>
   );
-
-  if (embedded) {
-    return (
-      <div className="flex flex-col">
-        {headerNode}
-        {bodyNode}
-      </div>
-    );
-  }
 
   return (
     <>

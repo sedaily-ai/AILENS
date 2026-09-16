@@ -37,6 +37,7 @@ import boto3
 import auth
 from repo import prompt_lab_repo, prompts_repo
 from routes import webtoon_lab
+from shared import time_utils
 from routes.prompts import (
     _CATEGORY_BEDROCK,
     _build_step1_call,
@@ -399,8 +400,13 @@ def _run_cut_image_flow(push: Push, cut: dict, model: str = "pipeline") -> None:
         push({"type": "error", "message": "컷 정보가 없습니다."})
         return
     job_id = uuid.uuid4().hex[:16]
-    now = webtoon_lab._now_iso()
-    webtoon_lab._put_job(job_id, {"status": "pending", "cut": cut.get("cut"), "created_at": now, "updated_at": now})
+    now = time_utils.now_iso()
+    try:
+        webtoon_lab._put_job(job_id, {"status": "pending", "cut": cut.get("cut"), "created_at": now, "updated_at": now})
+    except Exception as e:  # noqa: BLE001 — 여기서 안 잡으면 push도 없이 클라이언트가 무한 대기
+        logger.exception(f"webtoon-lab job 생성 실패: {job_id}")
+        push({"type": "cut_image_error", "cut": cut.get("cut"), "error": str(e)[:500]})
+        return
     webtoon_lab._run_composed_generation(job_id, cut, push=push, model=model)
 
 

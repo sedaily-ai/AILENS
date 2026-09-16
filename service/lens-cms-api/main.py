@@ -19,10 +19,10 @@ from fastapi.responses import JSONResponse
 import admin_posts_repo
 import articles_repo
 import audit_repo
+import chat_threads_repo
 import cms_posts_repo as posts_client
 import community_repo
 import config_repo
-import chat_threads_repo
 import personal_repo
 import prompt_lab_repo
 import prompts_repo
@@ -528,6 +528,10 @@ def internal_update_prompt(category: str, name: str, payload: Dict[str, Any] = B
 # --- 프롬프트 실험 챗랩: 설명/지침/파일 개별 저장 (2026-09-15) ---
 # prompt_lab_repo.py 모듈 docstring 참고 — prompts_repo(프로덕션 버전
 # 스냅샷)와는 별개 저장소, "발행"만 그쪽을 조립해서 부른다.
+# (이 파일의 "v1.X" 섹션 버전 태그는 v1.28(줄 696 근방) 이후로는 안 붙여왔다 —
+# 맨 위 모듈 docstring도 v1.20에 멈춰있는 등 이 파일 자체에서도 v1.29+ 구간은
+# 비공식적으로 날짜만 남기는 쪽으로 굳어진 상태. 여기서 새로 번호를 매기지
+# 않고 그 관례를 따른다.)
 
 @app.get("/internal/admin/prompt-lab/{category}/{name}")
 def internal_get_prompt_lab_doc(category: str, name: str, x_internal_token: Optional[str] = Header(default=None)):
@@ -567,6 +571,11 @@ def internal_get_lab_file(category: str, name: str, file_id: int, x_internal_tok
 @app.put("/internal/admin/prompt-lab/{category}/{name}/files/{file_id}")
 def internal_update_lab_file(category: str, name: str, file_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
+    # update_file()은 name/content 둘 다 없을 때도 None을 돌려준다(파일이
+    # 실제로 없는 경우와 같은 신호) — "수정할 내용 없음"과 "파일 없음"을
+    # 여기서 먼저 구분해야 전자를 404로 잘못 응답하지 않는다.
+    if payload.get("name") is None and payload.get("content") is None:
+        raise HTTPException(status_code=400, detail="name or content required")
     r = prompt_lab_repo.update_file(file_id, payload.get("name"), payload.get("content"))
     if r is None:
         raise HTTPException(status_code=404, detail="file not found")
@@ -608,6 +617,7 @@ def internal_publish_prompt_lab(category: str, name: str, x_internal_token: Opti
 
 # --- 프롬프트 실험 챗랩: 대화 스레드/메시지 (2026-09-15) ---
 # chat_threads_repo.py 모듈 docstring 참고 — 순수 대화 기록 저장소.
+# (버전 태그 생략 이유는 위 프롬프트 실험 챗랩 섹션 주석 참고.)
 
 @app.post("/internal/admin/chat-threads")
 def internal_create_chat_thread(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):

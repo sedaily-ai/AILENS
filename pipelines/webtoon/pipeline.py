@@ -103,6 +103,7 @@ from webtoon_image import (
     characters_block as _characters_block,
     SCENE_REINFORCEMENT as _SCENE_REINFORCEMENT,
     CHARACTER_REINFORCEMENT as _CHARACTER_REINFORCEMENT,
+    MAX_EXPECTED_FACES as _MAX_EXPECTED_FACES,
 )
 
 _JSON_INSTRUCTION = (
@@ -251,8 +252,8 @@ def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool)
 # (rekognition_client.detect_main_faces, 신뢰도 95%+·크기 5%+ 필터로
 # 주요 인물과 배경 엑스트라를 구분하는 게 실측으로 확인됨)를 이미 갖고
 # 있다 — 프롬프트로 확률을 낮추는 대신, 결과물의 얼굴 수를 세서 나쁘면
-# 걸러내는 같은 "생성→검사→재시도" 철학을 여기에도 적용한다.
-_MAX_EXPECTED_FACES = 2  # 이 파이프라인은 고정 진행자 2인(A/B)만 쓴다.
+# 걸러내는 같은 "생성→검사→재시도" 철학을 여기에도 적용한다. 기대 상한값
+# (_MAX_EXPECTED_FACES)은 위 import대로 common/webtoon_image.py가 정본이다.
 
 
 def _generate_and_qa_cut(
