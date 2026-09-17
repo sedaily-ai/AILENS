@@ -89,9 +89,74 @@ _ddb_client = None
 # _ssm_client까지만 채운 순간 다른 스레드가 그 가드를 통과해버려
 # _s3_client가 아직 None인 채로 반환되는 경쟁 조건이었다 — 락으로 막는다.
 _clients_lock = threading.Lock()
-# GPU(g5.xlarge) 한 대의 실제 추론 자체를 직렬화 — generate_ipadapter_photo_bytes
-# 내부에서 사용(아래 해당 함수 주석 참고).
-_gpu_infer_lock = threading.Lock()
+
+# 2026-09-17 — GPU 추론 직렬화를 threading.Lock()에서 DynamoDB 조건부 쓰기
+# 기반 분산 락으로 교체했다. 실측(CloudWatch): 컷 여러 개를 동시에 눌렀더니
+# 10초 사이 SSM 명령 8개가 같은 GPU 인스턴스에 동시에 꽂혀 전부
+# "SSM 명령 대기 타임아웃"으로 실패했다 — 아래 이전 주석에서 이미 예견했던
+# 정확히 그 실패 모드다(컷 하나당 별도 self-invoke Lambda라 각자 자기만의
+# threading.Lock()을 얻어서 서로를 못 막았다). GPU_LOCK_TABLE(이미 active_count
+# 용으로 쓰던 테이블)에 락 보유자 토큰+만료시각을 더해, 프로세스 경계를
+# 넘어서도 "지금 GPU를 실제로 쓰는 중"인 요청이 딱 하나만 있게 만든다.
+_INFER_LOCK_TTL_S = 200  # SSM 타임아웃(180s)보다 여유를 둔다 — 락 보유자가 죽어도 이 시간 뒤엔 자동 회수됨
+_INFER_LOCK_POLL_S = 4
+_INFER_LOCK_MAX_WAIT_S = 400  # Lambda 자체 타임아웃(900s)에 크게 못 미치게 — GPU 한 대가 순서대로 처리할 수 있는 현실적 대기 상한
+
+
+def _acquire_gpu_infer_lock(max_wait_s: int = _INFER_LOCK_MAX_WAIT_S) -> str:
+    """GPU_LOCK_TABLE에 조건부 쓰기로 추론 락을 잡는다 — 다른 컷(다른 Lambda
+    invocation)이 이미 잡고 있으면(만료 전이면) ConditionalCheckFailedException이
+    나고, 여기서 짧게 자며 재시도한다. 성공하면 이 락의 소유를 증명하는 토큰을
+    돌려준다 — 반드시 finally에서 _release_gpu_infer_lock(token)을 불러야 한다.
+
+    만료된(죽은 보유자가 못 지운) 락은 `infer_lock_expires_at < now` 조건으로
+    자동 회수된다 — 완벽한 상호배제는 아니다(만료 직후 두 요청이 동시에
+    쓰기를 시도하면 조건부 쓰기가 정확히 하나만 통과시키므로 실제로는 안전).
+    """
+    import uuid as _uuid
+
+    token = _uuid.uuid4().hex
+    deadline = time.time() + max_wait_s
+    ddb = _ddb()
+    while True:
+        now = int(time.time())
+        try:
+            ddb.update_item(
+                TableName=GPU_LOCK_TABLE,
+                Key={"instance_id": {"S": GPU_INSTANCE_ID}},
+                UpdateExpression="SET infer_lock_holder = :tok, infer_lock_expires_at = :exp",
+                ConditionExpression="attribute_not_exists(infer_lock_holder) OR infer_lock_expires_at < :now",
+                ExpressionAttributeValues={
+                    ":tok": {"S": token},
+                    ":exp": {"N": str(now + _INFER_LOCK_TTL_S)},
+                    ":now": {"N": str(now)},
+                },
+            )
+            return token
+        except ddb.exceptions.ConditionalCheckFailedException:
+            if time.time() >= deadline:
+                raise TimeoutError(
+                    f"GPU 추론 락 획득 대기 타임아웃({max_wait_s}s) — "
+                    "다른 컷 생성이 계속 GPU를 쓰고 있습니다. 잠시 후 다시 시도해 주세요."
+                ) from None
+            time.sleep(_INFER_LOCK_POLL_S)
+
+
+def _release_gpu_infer_lock(token: str) -> None:
+    """내가 잡은 락(토큰이 일치할 때)만 지운다 — 이미 만료돼 다른 요청이 새로
+    잡은 락을 실수로 풀어버리지 않기 위해서다. 실패해도(이미 만료돼 넘어간
+    경우) 그냥 넘어간다 — 다음 보유자가 알아서 덮어쓴다."""
+    ddb = _ddb()
+    try:
+        ddb.update_item(
+            TableName=GPU_LOCK_TABLE,
+            Key={"instance_id": {"S": GPU_INSTANCE_ID}},
+            UpdateExpression="REMOVE infer_lock_holder, infer_lock_expires_at",
+            ConditionExpression="infer_lock_holder = :tok",
+            ExpressionAttributeValues={":tok": {"S": token}},
+        )
+    except ddb.exceptions.ConditionalCheckFailedException:
+        pass
 
 
 def _clients():
@@ -281,24 +346,19 @@ def generate_ipadapter_photo_bytes(
         f"--out-key {out_key} --scale {scale} --steps {steps} --seed {seed}"
     )
     try:
-        # 2026-09-16 — 발견 당시(chat_ws.py에 8컷을 ThreadPoolExecutor로 동시에
-        # 돌리는 "전체 컷" 흐름이 있던 시점) GPU(g5.xlarge 한 대)에 SSM
-        # RunShellScript가 동시에 여러 개 들어가 PyTorch 추론끼리 GPU를
-        # 다퉈서(VRAM 경합) 전부 180초 안에 못 끝나고 타임아웃으로 실패하는
-        # 걸 실측으로 확인했다("전체 컷" 요청 시 8컷 전부 "SSM 명령 대기
-        # 타임아웃"). 이 락으로 GPU 추론 자체만 한 번에 하나씩 돌게
-        # 직렬화한다 — Bedrock 호출·S3 업로드·QA처럼 GPU를 안 쓰는 다른
-        # 작업은 여전히 병렬로 돈다.
-        #
-        # ⚠️ 이 락은 threading.Lock()이라 같은 프로세스(로컬 ThreadingHTTPServer
-        # 동시 요청) 안에서만 유효하다. 지금은 컷 하나당 별도 self-invoke
-        # Lambda(chat_ws.py::_run_cut_image_flow)라 컷 여러 개가 동시에
-        # 요청되면 서로 다른 실행 환경에서 각자 자기만의 락을 얻어, 이 락이
-        # 실제로 두 컷의 SSM 명령을 막아주지 못할 수 있다 — 프로덕션에서
-        # 동시 컷 생성이 잦다면 DynamoDB 조건부 쓰기 등 프로세스 간 락으로
-        # 바꿔야 한다(아직 실측/수정 안 함).
-        with _gpu_infer_lock:
+        # GPU(g5.xlarge) 한 대의 실제 추론 자체를 직렬화 — 컷 하나당 별도
+        # self-invoke Lambda(chat_ws.py::_run_cut_image_flow)라 threading.Lock()
+        # 같은 같은-프로세스 락은 서로를 못 막는다(2026-09-16 실측: 컷 여러 개
+        # 동시 요청 시 SSM 명령이 한꺼번에 꽂혀 전부 "SSM 명령 대기 타임아웃"으로
+        # 실패, 2026-09-17 실제 프로덕션에서 재현). GPU_LOCK_TABLE 기반 분산
+        # 락(_acquire_gpu_infer_lock)으로 프로세스 경계를 넘어 직렬화한다 —
+        # Bedrock 호출·S3 업로드·QA처럼 GPU를 안 쓰는 다른 작업은 여전히
+        # 병렬로 돈다.
+        infer_token = _acquire_gpu_infer_lock()
+        try:
             result = _run_ssm_command([cmd], timeout_s=180)
+        finally:
+            _release_gpu_infer_lock(infer_token)
         if result["Status"] != "Success":
             raise RuntimeError(
                 f"GPU IP-Adapter 추론 실패: {result['Status']}\n"
