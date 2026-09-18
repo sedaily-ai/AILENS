@@ -42,12 +42,6 @@ import { WebtoonImageLab } from "../WebtoonImageLab";
 
 type MsgRole = "user" | "assistant";
 
-interface StoryboardCutPreview {
-  cut: number;
-  title: string;
-  scene: string;
-}
-
 /** 1단계(스크립트) 결과 — human-in-the-loop 확인용(2026-09-15, 사용자
  *  요청: "1단계 출력하면 다음 단계 진행할지 확인받고 2단계 진행"). script/
  *  article을 그대로 들고 있다가 확인 버튼을 누르면 서버로 그대로
@@ -66,7 +60,7 @@ interface ChatMessage {
   role: MsgRole;
   text?: string;
   step1?: Step1Data;
-  storyboard?: { coreQuestion: string; cuts: StoryboardCutPreview[] };
+  storyboard?: { coreQuestion: string; cuts: WebtoonStoryboardCut[] };
   imagePreview?: { cut: number; imageUrl: string; model?: string };
   /** true면 처음 나타날 때 타이핑되듯 스트리밍 연출 — 상태 메시지("GPU를
    *  켜는 중입니다" 등)처럼 완성본이 한 번에 오는 텍스트에만 쓴다. 진짜
@@ -286,7 +280,7 @@ export function PromptChatLab({
           role: m.role,
           text: m.text,
           step1: m.step1 as Step1Data | undefined,
-          storyboard: m.storyboard as { coreQuestion: string; cuts: StoryboardCutPreview[] } | undefined,
+          storyboard: m.storyboard as { coreQuestion: string; cuts: WebtoonStoryboardCut[] } | undefined,
           imagePreview: m.imagePreview,
           animate: false,
         }));
@@ -362,19 +356,16 @@ export function PromptChatLab({
             break;
           case "storyboard":
             setStoryboard({ coreQuestion: msg.core_question, cuts: msg.cuts });
+            // 2026-09-18, 사용자 요청 — "정리해서 나오는 작업 없애주시고, 날것으로
+            // 모든 출력결과 다 출력해주세요"(예: 대사가 카드 요약에선 안 보였음).
+            // 컷을 title+scene으로 추려내던 걸 걷어내고 msg.cuts(2단계 산출물 전체
+            // — narration/caption/dialogue/camera/scene/title 등)를 그대로 싣는다.
             appendMessage(
               {
                 role: "assistant",
-                storyboard: {
-                  coreQuestion: msg.core_question ?? "",
-                  cuts: msg.cuts.map((c) => ({
-                    cut: c.cut,
-                    title: c.title || c.caption || c.narration || `컷 ${c.cut}`,
-                    scene: c.scene,
-                  })),
-                },
+                storyboard: { coreQuestion: msg.core_question ?? "", cuts: msg.cuts },
               },
-              { fullCuts: msg.cuts } // 컷 이미지 재요청까지 이어가려면 화면 요약본 말고 원본 전체가 필요
+              { fullCuts: msg.cuts } // 컷 이미지 재요청에 쓰는 원본 — 지금은 storyboard.cuts와 내용이 같지만 용도가 달라 그대로 둔다
             );
             break;
           case "error":
@@ -797,30 +788,34 @@ function TypewriterText({ text, animate }: { text: string; animate: boolean }) {
 /* 박스·카드 없이 대화 텍스트처럼 바로 흘러나오게(2026-09-15, 사용자 요청
    — "박스 같은거 만들 필요없이 날것으로 빠르게 대화 답변 출력"). 구분은
    테두리·배경이 아니라 타이포그래피(굵기·크기)와 컷 번호만으로 준다. */
+/** 2026-09-18, 사용자 요청 — "정리해서 카드처럼 나오는 작업 없애주시고, 날것으로
+ *  모든 출력결과 다 출력해주세요"(예: 대사(dialogue)가 title+scene 요약 카드에선
+ *  안 보였음). 컷마다 2단계 산출물 전체(narration/caption/dialogue/camera/scene/
+ *  title/title_keyword/closing_caption)를 필드 그대로 나열한다 — 골라서 보여주지
+ *  않는다. */
 function StoryboardCard({
   data,
   animate,
 }: {
-  data: { coreQuestion: string; cuts: StoryboardCutPreview[] };
+  data: { coreQuestion: string; cuts: WebtoonStoryboardCut[] };
   animate: boolean;
 }) {
   return (
     <div>
       <p className="text-[14px] font-semibold text-[var(--text-primary)]">{data.coreQuestion}</p>
-      <div className="mt-2.5 space-y-2.5">
+      <div className="mt-2.5 space-y-3">
         {data.cuts.map((c, i) => (
           <div
             key={c.cut}
-            className={i > 0 ? "border-t border-[var(--border-hairline)] pt-2.5" : ""}
+            className={i > 0 ? "border-t border-[var(--border-hairline)] pt-3" : ""}
             style={animate ? { animation: `ui-fade-up 200ms ease-out both`, animationDelay: `${i * 70}ms` } : undefined}
           >
-            <p className="text-[13px] font-semibold text-[var(--text-primary)]">
-              <span className="mr-1.5" style={{ color: "var(--accent)" }}>
-                컷 {c.cut}
-              </span>
-              {c.title}
+            <p className="mb-1 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+              컷 {c.cut}
             </p>
-            <p className="mt-0.5 text-[13px] leading-relaxed text-[var(--text-secondary)]">{c.scene}</p>
+            <pre className="whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-[var(--text-secondary)]">
+              {JSON.stringify(c, null, 2)}
+            </pre>
           </div>
         ))}
       </div>
