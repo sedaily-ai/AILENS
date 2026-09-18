@@ -25,11 +25,14 @@ export const IMAGE_MODELS: WebtoonImageModel[] = [
   { id: "pipeline", label: "현재 파이프라인 (GPU+Style Transfer)", shortLabel: "파이프라인 (GPU)", badge: "운영 중" },
   { id: "stable_image_core", label: "Stable Image Core (GPU 없음)", shortLabel: "Stable Core" },
   { id: "style_guide", label: "Style Guide (레퍼런스 기반)", shortLabel: "Style Guide" },
-  // Nova Canvas — 실측(2026-09-15)해보니 이 계정에서 LEGACY 모델 취급이라
-  // 호출이 간헐적으로 성공/실패를 오간다(AWS 쪽 엔타이틀먼트 자체가
-  // 불안정 — 프롬프트·해상도와 무관하게 같은 요청도 됐다 안 됐다 함).
-  // 코드/권한은 다 갖춰놨지만 실패해도 코드 버그가 아니라는 걸 알 수
-  // 있게 라벨에 명시해 둔다.
-  { id: "nova_canvas", label: "Nova Canvas", badge: "불안정(간헐적 실패)" },
   { id: "openai_dalle3", label: "OpenAI (gpt-image-1)" },
+  // Nova Canvas — 2026-09-18 목록에서 제외(사용자 확인). amazon.nova-canvas-v1:0
+  // 자체가 AWS Bedrock에서 LEGACY로 지정돼 있고, "최근 30일 미사용 시 호출
+  // 차단"이라는 모델 단위(계정 권한과 무관) 제약에 걸려있다 — 직접 모델 ID
+  // 호출·리전 변경으로도 재현 확인, CLI/API로 재활성화하는 방법이 없다
+  // (콘솔 Playground에서 직접 호출해야 풀릴 가능성). 후속 버전(v2 등)도
+  // 없어 당장은 복구 전망이 없다. 백엔드(routes/webtoon_lab.py의
+  // _IMAGE_MODELS, webtoon_image.py의 generate_nova_canvas_image_bytes)는
+  // 그대로 남겨뒀다 — 나중에 콘솔에서 재활성화되면 이 배열에 다시 넣기만
+  // 하면 된다.
 ];
