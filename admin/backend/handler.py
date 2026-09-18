@@ -106,6 +106,15 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/webtoon-lab/image-assets/presign": (webtoon_lab.handle_image_assets_presign, True),
     "GET /admin/webtoon-lab/image-assets/gallery": (webtoon_lab.handle_image_assets_gallery, True),
     "POST /admin/webtoon-lab/image-assets/select": (webtoon_lab.handle_image_assets_select, True),
+    # 단계별 생성 (2026-09-18) — webtoon_lab.py "단계별 생성" 섹션 주석 참고.
+    # stage/character는 GPU(SSM) 왕복이라 비동기(job_id)라 위 GET
+    # /admin/webtoon-lab/{job_id}로 그대로 폴링한다 — 별도 GET 라우트 불필요.
+    "POST /admin/webtoon-lab/stage/translate": (webtoon_lab.handle_stage_translate, True),
+    "POST /admin/webtoon-lab/stage/character": (webtoon_lab.handle_stage_character, True),
+    "POST /admin/webtoon-lab/stage/background": (webtoon_lab.handle_stage_background, True),
+    "POST /admin/webtoon-lab/stage/composite": (webtoon_lab.handle_stage_composite, True),
+    "POST /admin/webtoon-lab/stage/style": (webtoon_lab.handle_stage_style, True),
+    "GET /admin/webtoon-lab/stage/history": (webtoon_lab.handle_stage_history, True),
 }
 
 

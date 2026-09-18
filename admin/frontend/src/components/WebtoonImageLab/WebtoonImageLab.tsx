@@ -124,6 +124,15 @@ export function WebtoonImageLab({ open, onClose }: Props) {
         body: file,
       });
       if (!putRes.ok) throw new Error(`업로드 실패 (HTTP ${putRes.status})`);
+      // 2026-09-18 버그 수정 — 2026-09-16 갤러리 리팩토링으로 presign이
+      // 정본 키가 아니라 갤러리 키(refs/gallery/{asset}/{uuid}.png)를
+      // 발급하도록 바뀌었는데, 이 select 호출이 누락돼 있었다. 업로드는
+      // "성공"으로 뜨지만 정본 키(실제 생성이 읽는 파일)는 그대로라
+      // 화면상 아무 변화도 안 생기는 100% 무효 버그였다(양진희 피드백
+      // — "샘플을 추가했는데도 반영이 안 됩니다"). PromptChatLab의
+      // WebtoonImageSettingsPanel.tsx와 동일하게 업로드 직후 바로
+      // select까지 호출해 "올리면 즉시 반영"을 되살린다.
+      await adminApi.selectWebtoonImageAsset(kind, presign.key);
       toast.show("이미지를 교체했습니다 — 다음 생성부터 반영됩니다", "success");
       loadAssets();
     } catch (err) {
@@ -260,6 +269,7 @@ export function WebtoonImageLab({ open, onClose }: Props) {
         job_id: r.job_id,
         status: "pending",
         image_url: null,
+        s3_key: null,
         error: null,
         scene: scene.trim(),
         camera: camera.trim(),

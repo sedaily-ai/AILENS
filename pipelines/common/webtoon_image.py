@@ -281,6 +281,68 @@ def build_background_prompt(
     )
 
 
+# 2026-09-18 — SD3 계열(SD3.5 Large/Stable Image Ultra) 전용 프롬프트 조립.
+#
+# 실측(사용자 확인, "aws 에서 모델 추가/gpt 급 퀄리티" 요청으로 두 모델을
+# 추가한 뒤 build_background_prompt를 그대로 태웠더니) — 요청한 장면 대신
+# 인물 컨셉시트(여러 각도 얼굴, 프로필 4컷)를 그렸다. 긴 프롬프트/짧은
+# 프롬프트(build_style_guide_prompt) 둘 다 재현 — 프롬프트 길이가 아니라
+# 구조 문제로 좁혀졌다. 의심되는 두 가지:
+# 1) build_background_prompt는 [CHARACTERS](인물 외형 문단)가 [SCENE]보다
+#    먼저 나온다 — SD3 계열이 이걸 "인물 소개가 주제"로 오해석했을 가능성.
+# 2) CHARACTER_REINFORCEMENT/프리셋 문구 안의 "Keep ... consistent across
+#    every cut"/"Every cut must show the SAME..." 같은 "여러 컷에 걸친
+#    일관성" 표현이, 컨셉시트/캐릭터 턴어라운드 요청과 문구가 겹쳐서 그
+#    쪽으로 끌렸을 가능성(둘 다 "이 인물의 여러 버전/각도를 한 이미지에
+#    보여달라"는 의미로 읽힐 수 있는 문구라서).
+# 이 함수는 재료(STYLE/CHARACTERS/SCENE)는 build_background_prompt와
+# 같지만 순서·표현을 바꾼다 — SCENE을 먼저 배치하고, "여러 컷 일관성"
+# 문구 대신 "단일 패널, 시트 아님"을 명시적으로 프롬프트 맨 앞에 못박는다.
+_SINGLE_PANEL_FRAME = (
+    "A single wide illustration panel from an ongoing Korean webtoon news "
+    "series — ONE continuous scene, NOT a character design sheet, NOT a "
+    "turnaround, NOT a grid of separate portraits or profile views, NOT "
+    "multiple isolated close-up faces. Show the characters together, at "
+    "natural size, acting within the described environment."
+)
+
+_CHARACTER_SINGLE_IMAGE_REINFORCEMENT = (
+    "\n\nSTRICT: The people above are recurring hosts of this news series — "
+    "render them with the exact hairstyle, hair length, glasses, outfit, "
+    "and badge described in [CHARACTERS], not a generic long-haired "
+    "romance-webtoon look. Do not substitute, restyle, or omit any "
+    "described feature."
+)
+
+
+def build_scene_first_prompt(
+    camera: str,
+    scene: str,
+    characters: dict | None = None,
+    *,
+    style: str | None = None,
+) -> str:
+    """SD3.5 Large / Stable Image Ultra 전용 — build_background_prompt와
+    재료는 같지만 SCENE을 CHARACTERS보다 먼저 배치하고, "여러 컷 걸친
+    일관성" 표현 대신 "단일 패널" 프레이밍을 쓴다(위 섹션 주석 참고).
+    아직 실측 검증 전이라 _generate_once에서 안 쓴다 — 검증되면 그때
+    dispatch를 이 함수로 바꾼다(사용자 확인, 2026-09-18)."""
+    if style is None:
+        style = get_style()
+    style_block = style + f"\nCamera: {camera}. 3:2 horizontal."
+    return (
+        _SINGLE_PANEL_FRAME
+        + "\n\n" + style_block
+        + f"\n\n[SCENE]\n{scene}"
+        + SCENE_REINFORCEMENT
+        + characters_block(characters)
+        + (_CHARACTER_SINGLE_IMAGE_REINFORCEMENT if characters else "")
+        + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
+        "or speech bubbles anywhere in this image — pure illustration only, no "
+        "readable characters of any kind. Text will be added separately afterward."
+    )
+
+
 # 2026-09-08 — Style Guide 경로 전용 프롬프트 조립.
 #
 # ⚠️ 실측으로 확인한 함정: 참고 이미지(STYLE_REFERENCE_IMAGE_PATH)만 넣으면
@@ -361,7 +423,15 @@ _STYLE_GUIDE_NEGATIVE_PROMPT = (
     "broadcast studio, TV studio, press conference stage, stage lighting rig, "
     "film camera, tripod, microphone, press badge, lanyard, crowd, third "
     "person, extra person, additional character, background bystanders, "
-    "other people, signage text, readable text, letters, watermark"
+    "other people, "
+    # 2026-09-18, 양진희 피드백("배경과 인물이 겹쳐서 나오고 있는") — 이
+    # negative_prompt는 generate_bedrock_style_transfer_bytes()(파이프라인
+    # 최종 합성 단계)도 재사용한다(_style_hint_from_db 주석 참고). R22에서
+    # 이미 한 번 발견됐던 "흐릿한 유령 인물" 문제가 실사용에서 재현돼
+    # 관련 항목을 보강한다.
+    "ghosted people, blurred people, silhouette people, faded figures, "
+    "double exposure people, transparent people, "
+    "signage text, readable text, letters, watermark"
 )
 
 
@@ -409,14 +479,41 @@ def _get_bedrock_image_client():
     return _bedrock_image_client
 
 
+_TRANSIENT_BEDROCK_ERRORS = (
+    "ServiceUnavailableException",
+    "ThrottlingException",
+    "ModelTimeoutException",
+    "InternalServerException",
+)
+_TRANSIENT_RETRY_ATTEMPTS = 3
+_TRANSIENT_RETRY_WAIT_S = 2  # 짧게 — "출력속도가 중요하다"(2026-09-18) 요청과 같은 방향
+
+
 def _invoke_and_decode_image(client, model_id: str, body: str, *, error_key: str = "finish_reasons") -> bytes:
     """이 모듈의 이미지 생성 함수(Stable Image Core/Style Guide/Style
-    Transfer/Remove Background/Nova Canvas) 6곳이 전부 같은 뒷부분을 반복했다
-    — invoke_model → payload.images[0] 파싱 → 없으면 에러. client/modelId/요청
-    body 조립은 호출부 책임으로 남기고, 이 공통 뒷부분만 통일한다.
-    error_key — 실패 시 원인을 어느 필드에서 읽을지(Stability 계열은
-    "finish_reasons", Nova Canvas는 "error")."""
-    resp = client.invoke_model(modelId=model_id, body=body)
+    Transfer/Remove Background/Nova Canvas 등) 9곳이 전부 같은 뒷부분을
+    반복했다 — invoke_model → payload.images[0] 파싱 → 없으면 에러.
+    client/modelId/요청 body 조립은 호출부 책임으로 남기고, 이 공통
+    뒷부분만 통일한다. error_key — 실패 시 원인을 어느 필드에서 읽을지
+    (Stability 계열은 "finish_reasons", Nova Canvas는 "error").
+
+    2026-09-18 버그 수정 — Bedrock이 일시적으로 503(ServiceUnavailableException)을
+    던진 경우가 하나도 재시도 없이 그대로 컷 전체를 실패시켰다(실제
+    사고: remove_background_bytes 호출 중 1회 발생, "출력속도가 중요"한
+    사용자 요청과 상충하지 않게 2초×3회의 짧은 재시도만 추가 — 위
+    _retry_generate_and_write의 12/24/36초 백오프는 배치 파이프라인용으로
+    너무 느려 여기엔 안 맞는다). 재시도로도 안 풀리는 실제 오류(잘못된
+    body 등)는 그대로 즉시 올라간다."""
+    for attempt in range(_TRANSIENT_RETRY_ATTEMPTS):
+        try:
+            resp = client.invoke_model(modelId=model_id, body=body)
+            break
+        except Exception as e:  # noqa: BLE001 — 아래서 transient 여부만 보고 재판단
+            is_transient = any(code in str(e) for code in _TRANSIENT_BEDROCK_ERRORS)
+            if not is_transient or attempt == _TRANSIENT_RETRY_ATTEMPTS - 1:
+                raise
+            print(f"[webtoon_image] Bedrock 일시 오류({e}) — {_TRANSIENT_RETRY_WAIT_S}초 후 재시도({attempt + 1}/{_TRANSIENT_RETRY_ATTEMPTS})")
+            time.sleep(_TRANSIENT_RETRY_WAIT_S)
     payload = json.loads(resp["body"].read())
     images = payload.get("images") or []
     if not images:
@@ -436,6 +533,55 @@ def generate_bedrock_image_bytes(prompt: str) -> bytes:
         "output_format": "png",
     })
     return _invoke_and_decode_image(_get_bedrock_image_client(), BEDROCK_IMAGE_MODEL_ID, body)
+
+
+# ─────────────────────────────────────────────────────────────
+# Bedrock Stable Diffusion 3.5 Large 호출 (2026-09-18 신설)
+# ─────────────────────────────────────────────────────────────
+# Stable Image Core보다 최신 세대(SD3.5) 모델 — 사용자 요청("aws 에서
+# 모델 추가되면 좋겠어요")으로 추가. Stable Image Core와 같은 응답
+# 스키마(_invoke_and_decode_image 재사용)지만 "mode": "text-to-image"가
+# 필수 필드로 붙는다(SD3 계열은 같은 엔드포인트로 image-to-image도
+# 받기 때문 — 여긴 텍스트 전용 고정). us-east-1엔 없고 us-west-2에만
+# 있다(BEDROCK_IMAGE_REGION과 동일 — 위 주석 참고).
+# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
+# (BEDROCK_IMAGE_MODEL_ID와 동일 태깅 정책 — 비용태깅_규칙.md 참고).
+SD35_LARGE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/52u16muojn2u"  # lens-webtoon-image-sd35-large → stability.sd3-5-large-v1:0
+
+
+def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
+    """Stable Diffusion 3.5 Large(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
+    계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임."""
+    body = json.dumps({
+        "prompt": prompt[:9500],
+        "mode": "text-to-image",
+        "aspect_ratio": BEDROCK_ASPECT_RATIO,
+        "output_format": "png",
+    })
+    return _invoke_and_decode_image(_get_bedrock_image_client(), SD35_LARGE_MODEL_ID, body)
+
+
+# ─────────────────────────────────────────────────────────────
+# Bedrock Stable Image Ultra 호출 (2026-09-18 신설)
+# ─────────────────────────────────────────────────────────────
+# Stability AI 라인업 중 최상위 품질 등급 — 사용자 요청("gpt 와 동일한
+# 퀄리티로 나오면 제일 좋은뎅")으로 실측 비교(us-west-2, 동일 프롬프트)
+# 후 추가. Stable Image Core와 요청 스키마 동일(mode 불필요 — SD3.5
+# Large와 다름, Ultra는 Core 계열 엔드포인트).
+# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
+# (BEDROCK_IMAGE_MODEL_ID와 동일 태깅 정책 — 비용태깅_규칙.md 참고).
+SD_ULTRA_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/htvjnctxyvs1"  # lens-webtoon-image-sd-ultra → stability.stable-image-ultra-v1:1
+
+
+def generate_bedrock_sd_ultra_image_bytes(prompt: str) -> bytes:
+    """Stable Image Ultra(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
+    계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임."""
+    body = json.dumps({
+        "prompt": prompt[:9500],
+        "aspect_ratio": BEDROCK_ASPECT_RATIO,
+        "output_format": "png",
+    })
+    return _invoke_and_decode_image(_get_bedrock_image_client(), SD_ULTRA_MODEL_ID, body)
 
 
 def _retry_generate_and_write(bytes_fn, out_path: Path, retries: int) -> bool:
@@ -644,7 +790,15 @@ _SCENE_TRANSLATE_SYSTEM = (
 
 _PHOTOREAL_NEGATIVE_PROMPT = (
     "illustration, cartoon, anime, painting, drawing, third person, extra person, "
-    "additional character, third wheel, bystanders, crowd, other people, text, watermark"
+    "additional character, third wheel, bystanders, crowd, other people, "
+    "ghosted people, blurred people, silhouette people, faded figures, "
+    "double exposure people, transparent people, watermark, "
+    # 2026-09-18, 양진희 피드백 — 배경 소품(주유소 간판·가격판 등)에 한글이
+    # 아닌 가짜 동양권 문자(일본어+중국어 짜집기처럼 보이는)가 새어 들어옴.
+    # "text" 한 단어만으로는 약해서(실측 재현), _STYLE_GUIDE_NEGATIVE_PROMPT가
+    # 이미 효과를 본 것과 같은 수준으로 구체적으로 나열한다.
+    "text, signage text, readable text, storefront text, price board text, "
+    "screen text, letters"
 )
 
 
@@ -821,9 +975,21 @@ REMOVE_BACKGROUND_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application
 
 
 def build_empty_scene_prompt(photo_brief: str) -> str:
+    """2026-09-18, 양진희 피드백("배경과 인물이 겹쳐서 나오고 있는") — 이
+    배경만 생성하는 단계가 "no people"이라고만 해도 흐릿한 사람 형체가
+    섞여 나오는 걸 실측 확인(코드 상단 R22 주석에 이미 기록된 문제 —
+    당시엔 Rekognition 얼굴 수 QA 게이트로 재시도해서 넘어갔는데, 그
+    게이트가 흐릿한 유령 인물을 "얼굴"로 인식 못 해 통과시키는 사례가
+    실사용에서 나옴). "no people"보다 "건물·가구만 그려라"는 적극적
+    지시가 부정문보다 확산 모델에 더 잘 먹힌다는 게 이 파일 다른 곳의
+    실측 결론(_STYLE_GUIDE_NEGATIVE_PROMPT 도입 배경 주석 참고)이라,
+    같은 방향으로 강화한다."""
     return (
-        "Photograph of an empty location, no people anywhere in frame. "
-        "Photorealistic, natural lighting, documentary photography style.\n\n"
+        "Photograph of an empty location with absolutely no people, no human "
+        "figures, no silhouettes, and no blurred or ghosted human shapes "
+        "anywhere in the frame — compose using architecture, furniture, and "
+        "objects only. Photorealistic, natural lighting, documentary "
+        "photography style.\n\n"
         + photo_brief
     )
 

@@ -355,6 +355,19 @@ export function WebtoonCutGenerator({
               </div>
             )}
 
+            {/* 2026-09-18, 양진희 피드백 — "OpenAI 모델은 인물고정/화풍고정이
+                안 되는 건가요?": 체크박스가 그냥 사라지기만 해서 이유를
+                알기 어려웠다. pipeline이 아닌 모델을 고르면 왜 안 되는지
+                한 줄로 안내한다(admin/backend/routes/webtoon_lab.py의
+                _generate_once 주석과 같은 사실 — 다른 모델은 이 두
+                메커니즘 자체가 없다). */}
+            {s.model !== "pipeline" && (
+              <p className="text-[10px] text-amber-600">
+                이 모델은 인물·화풍 고정을 지원하지 않습니다 — 고정하려면 모델을
+                &ldquo;{IMAGE_MODELS.find((m) => m.id === "pipeline")?.shortLabel}&rdquo;로 바꿔주세요.
+              </p>
+            )}
+
             <button
               type="button"
               className="ui-btn ui-btn-primary"

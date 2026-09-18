@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { adminApi } from "@/lib/adminClient";
 import { useAdminChatSocket } from "@/lib/useAdminChatSocket";
 import type { ChatThreadSummary, WebtoonStoryboardCut } from "@/lib/types";
@@ -13,6 +13,7 @@ import { CollapsibleSection } from "./CollapsibleSection";
 import { ChatThreadSidebar } from "./ChatThreadSidebar";
 import { WebtoonCutGenerator } from "../WebtoonCutGenerator/WebtoonCutGenerator";
 import { WebtoonImageLab } from "../WebtoonImageLab";
+import { WebtoonStageLab } from "../WebtoonStageLab";
 
 /* 프롬프트·이미지 실험 — 채팅형 통합(2026-09-14, 사용자 요청: "클로드처럼
    채팅을 할 수 있는 형태로 통합해주세요" → "실제 대화 가능하도록 백엔드
@@ -20,11 +21,18 @@ import { WebtoonImageLab } from "../WebtoonImageLab";
 
    2026-09-16 — 좌우 역할을 다시 나눴다(사용자 요청: "좌측 부분에서는
    텍스트만 출력되는 걸로 목적을 잡으면 될 것 같고, 우측에서는 이미지를
-   출력하는걸로"). 이 컴포넌트(왼쪽)는 기사 → 1단계(스크립트) → 2단계
-   (장면 연출)까지 텍스트만 다룬다 — 컷 이미지 생성은 전부 오른쪽
-   패널(../WebtoonCutGenerator)이 독자적인 WebSocket 연결로 처리한다.
+   출력하는걸로"). 이 컴포넌트(왼쪽)는 기사 → 스크립트·장면 연출까지
+   텍스트만 다룬다 — 컷 이미지 생성은 전부 오른쪽 패널
+   (../WebtoonCutGenerator)이 독자적인 WebSocket 연결로 처리한다.
    "N번 컷"/"전체 컷" 텍스트 명령, 모델 선택, GPU 켜기/끄기는 전부 그쪽
    으로 옮겨갔다 — 여기 남기면 두 군데서 같은 일을 하는 꼴이라 전부 뺐다.
+
+   2026-09-18 — "1단계(스크립트)/2단계(장면 연출)" 구분 자체를 없앴다
+   (사용자 요청: "스테이지 구분 자체가 왜 있어야하는거죠?? 그런거
+   필요없을텐데요"). 기사를 보내면 서버가 단일 Bedrock 호출로 스크립트+
+   장면 연출을 한 번에 만들어 storyboard 메시지 하나로 돌려준다
+   (routes/chat_ws.py::_run_article_flow 참고) — 화면에 "1단계"/"2단계"·
+   "장면 연출 생성 중" 같은 중간 단계 표시가 따로 뜨지 않는다.
 
    **전송 방식**: HTTP job/폴링(4초 간격) 대신 API Gateway WebSocket API
    (routes/chat_ws.py, HTTP API인 adminClient.ts의 BASE와는 별개 API)로
@@ -34,32 +42,18 @@ import { WebtoonImageLab } from "../WebtoonImageLab";
    지점이다(스토리보드 JSON은 완성돼야 의미가 있는 데이터라 토큰 단위로
    보여줄 게 못 된다, routes/chat_ws.py 모듈 docstring 참고).
 
-   의도 분류는 충분히 긴 텍스트(새 기사)와 "(1)/(2)" 숫자 하나(단계 전환
-   선택지)만 간단한 규칙으로 걸러내고, 그 외 나머지는 전부 일반 대화로
-   Bedrock에 그대로 흘려보낸다(2026-09-15, 사용자 요청: "자연스럽게 대화가
-   가능하도록... 일반 챗봇처럼... 베드락 모두 호출되도록" — 예전엔 이
-   나머지 분기가 Bedrock 호출 없이 고정 안내 문구만 돌려줬다). */
+   의도 분류는 충분히 긴 텍스트(새 기사)만 간단한 규칙으로 걸러내고, 그
+   외 나머지는 전부 일반 대화로 Bedrock에 그대로 흘려보낸다(2026-09-15,
+   사용자 요청: "자연스럽게 대화가 가능하도록... 일반 챗봇처럼... 베드락
+   모두 호출되도록" — 예전엔 이 나머지 분기가 Bedrock 호출 없이 고정
+   안내 문구만 돌려줬다). */
 
 type MsgRole = "user" | "assistant";
-
-/** 1단계(스크립트) 결과 — human-in-the-loop 확인용(2026-09-15, 사용자
- *  요청: "1단계 출력하면 다음 단계 진행할지 확인받고 2단계 진행"). script/
- *  article을 그대로 들고 있다가 확인 버튼을 누르면 서버로 그대로
- *  되돌려보낸다(서버가 연결별 상태를 안 들고 있으므로 — chat_ws.py
- *  모듈 docstring 참고). confirmed는 버튼 중복 클릭 방지용. */
-interface Step1Data {
-  coreQuestion: string | null;
-  cuts: Array<{ cut: number | null; summary: string }>;
-  script: unknown;
-  article: string;
-  confirmed?: boolean;
-}
 
 interface ChatMessage {
   id: string;
   role: MsgRole;
   text?: string;
-  step1?: Step1Data;
   storyboard?: { coreQuestion: string; cuts: WebtoonStoryboardCut[] };
   imagePreview?: { cut: number; imageUrl: string; model?: string };
   /** true면 처음 나타날 때 타이핑되듯 스트리밍 연출 — 상태 메시지("GPU를
@@ -73,7 +67,10 @@ interface ChatMessage {
 const GREETING: ChatMessage = {
   id: "greeting",
   role: "assistant",
-  text: "기사를 붙여넣어 주세요 — 먼저 1단계(스크립트)만 만들어 보여드리고, 완성되면 (1)/(2) 선택지로 2단계(장면 연출) 진행 여부를 물어볼게요. 컷 이미지는 오른쪽 패널에서 만드시면 됩니다.",
+  // 2026-09-18, 사용자 요청 — "원빵에 출력하는 방향으로 하기로 했는데요":
+  // 스크립트→장면 연출을 한 번에 이어서 만든다. "1단계/2단계" 구분·
+  // 확인 절차는 더 이상 없다.
+  text: "기사를 붙여넣어 주세요 — 스크립트부터 장면 연출까지 한 번에 만들어 보여드릴게요. 컷 이미지는 오른쪽 패널에서 만드시면 됩니다.",
   animate: false,
 };
 
@@ -89,23 +86,15 @@ const MIN_ARTICLE_LEN = 40; // 이보다 짧으면 "새 기사"가 아니라 다
 type WsPush =
   | { type: "text_chunk"; text: string }
   | { type: "text_done" }
-  // 1·2단계 JSON 생성 중 원문 미리보기 청크(2026-09-16) — step1_chunk_done/
-  // step2_chunk_done 다음에 완성된 step1/storyboard 메시지가 온다.
-  | { type: "step1_chunk"; text: string }
-  | { type: "step1_chunk_done" }
-  | { type: "step2_chunk"; text: string }
-  | { type: "step2_chunk_done" }
-  // 단계 완료 후 다음 선택지 안내 텍스트(2026-09-16) — 그냥 평범한
-  // 어시스턴트 텍스트 메시지로 렌더한다. 실제 번호 해석은 sendInner가
-  // 한다(서버는 안내 문구만 보낸다).
+  // 스크립트+장면 연출 JSON 생성 중 원문 미리보기 청크(2026-09-16) —
+  // script_chunk_done 다음에 완성된 storyboard 메시지가 온다. 2026-09-18
+  // — "1단계/2단계" 구분을 없애면서 step1_chunk/step2_chunk 두 종류였던
+  // 걸 script_chunk 하나로 합쳤다(사용자 요청: "스테이지 구분 자체가 왜
+  // 있어야하는거죠?? 그런거 필요없을텐데요").
+  | { type: "script_chunk"; text: string }
+  | { type: "script_chunk_done" }
+  // 완료 후 안내 텍스트 — 그냥 평범한 어시스턴트 텍스트 메시지로 렌더한다.
   | { type: "options_prompt"; message: string }
-  | {
-      type: "step1";
-      core_question: string | null;
-      cuts: Array<{ cut: number | null; summary: string }>;
-      script: unknown;
-      article: string;
-    }
   | { type: "storyboard"; core_question: string | null; cuts: WebtoonStoryboardCut[] }
   | { type: "error"; message: string }
   | { type: "pong" };
@@ -138,6 +127,7 @@ export function PromptChatLab({
   // 자주 안 쓰는 기능은 여전히 WebtoonImageLab 전체 화면(standalone
   // 모드, 자기 backdrop+aside 880px)을 그대로 재사용해서 필요할 때만 연다.
   const [imageLabOpen, setImageLabOpen] = useState(false);
+  const [stageLabOpen, setStageLabOpen] = useState(false);
   // 2026-09-16, 사용자 요청 — "좌측 사이드바는 접혔다 펼 수 있도록":
   // 대화 목록이 당장 필요 없을 때 챗 영역을 넓게 쓸 수 있게 한다.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -163,14 +153,84 @@ export function PromptChatLab({
   // 기사 반응 문구가 토큰 단위로 도착하는 동안 임시로 담아두는 곳(완료
   // 전까지는 messages 배열에 안 넣는다 — text_done에서 한 번에 확정).
   const [liveText, setLiveText] = useState<string | null>(null);
-  // 1·2단계 JSON 생성 중 원문 미리보기(2026-09-16, 사용자 요청 — "출력하는
-  // 것도 단계별로 쪼개서 출력을 해줘야 해요": 점 세 개만 뜨고 아무것도
-  // 안 보이던 구간을 없앤다). 반쪽짜리 JSON이라 파싱해서 카드로는 못
-  // 보여주고, 생성되는 원문을 그대로 스크롤되는 미리보기로만 보여준다 —
-  // step1/storyboard 메시지가 도착하면(=완성) liveStepText를 지우고 그
-  // 카드로 교체된다.
-  const [liveStepText, setLiveStepText] = useState<string | null>(null);
+  // 스크립트+장면 연출 JSON 생성 중 원문 미리보기(2026-09-16, 사용자 요청
+  // — "출력하는것도 단계별로 쪼개서 출력을 해줘야 해요": 점 세 개만 뜨고
+  // 아무것도 안 보이던 구간을 없앤다). liveStepActive는 "지금 실시간
+  // 미리보기를 보여줄지"만 담당 — 실제 원문·리빌 진행도는 아래
+  // fullTextRef/revealedIndexRef(ref, 리렌더 유발 안 함)가 담당한다.
+  // storyboard 메시지가 도착하면(=완성) liveStepActive를 끄고 그 카드로
+  // 교체된다.
+  const [liveStepActive, setLiveStepActive] = useState(false);
   const [liveStepLabel, setLiveStepLabel] = useState<string>("");
+  const [liveParsed, setLiveParsed] = useState<{ value: unknown; inProgressPath: JsonPath } | null>(null);
+  // 2026-09-18, 사용자 요청 — "타이핑하듯이.. 타닥타닥타닥 이런게 나와야
+  // 하는데.. 지금은 쭉 한번에 끊기듯이 나오잖아요.. 노바 챗봇 서비스는
+  // 어떻게 만들었는지 봐주시고 똑같은 값을 적용" — nova/frontend의
+  // useSmoothStreaming.js를 그대로 포팅한다: 서버에서 온 원문은
+  // fullTextRef(참조)에 즉시 그대로 쌓이고(네트워크 속도와 무관, 싸다),
+  // requestAnimationFrame 루프가 "밀린 양(backlog)에 비례한 속도"로 한
+  // 글자씩 드러낸다(최소 25자/초, 밀릴수록 더 빨리 — nova 원본과 동일
+  // 공식) — 그 "드러난 부분"만 매 프레임 다시 파싱해 DumpNode로 그린다.
+  // 그래서 필드가 통째로 뚝뚝 나타나는 대신 글자 단위로 자연스럽게
+  // 채워진다. nova는 markdown 문자열을 그대로 리빌하지만, 여기는 구조화
+  // 렌더링(DumpNode)이라 "리빌된 원문 prefix"를 매번 다시 파싱해서 쓴다.
+  const fullTextRef = useRef("");
+  const revealedIndexRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const lastTimeRef = useRef(0);
+  // 2026-09-18(같은 날 후속) — 사용자 요청: "스크롤 하고 싶은데 계속
+  // 아래쪽으로.. 그리고 지금 버벅임.. 코드블럭 때문에 그런것 같은데":
+  // liveParsed가 매 프레임(최대 초당 60번) 바뀌면서, (1) 코드블럭 포함된
+  // 트리 전체를 60번/초 리렌더해 버벅이고, (2) 그때마다 스크롤도 같이
+  // 호출돼 사용자가 위로 스크롤해도 다음 프레임에 바로 눌려버렸다.
+  // 리빌 인덱스 계산(revealedIndexRef)은 매 프레임 그대로 하되, 실제
+  // setLiveParsed(=리렌더+스크롤 트리거)는 RENDER_INTERVAL_MS 간격으로만
+  // 묶는다 — nova의 rAF 리빌은 유지하면서 리렌더 빈도만 낮춘다.
+  const lastRenderTimeRef = useRef(0);
+  const RENDER_INTERVAL_MS = 90;
+
+  const revealStep = (timestamp: number) => {
+    if (!lastTimeRef.current) lastTimeRef.current = timestamp;
+    const deltaTime = timestamp - lastTimeRef.current;
+    const targetLength = fullTextRef.current.length;
+    const caughtUp = revealedIndexRef.current >= targetLength;
+    if (!caughtUp && deltaTime > 0) {
+      const backlog = targetLength - revealedIndexRef.current;
+      const cps = Math.max(25, backlog * 2.2); // nova useSmoothStreaming.js와 동일 공식
+      const step = Math.max(1, Math.round((cps * deltaTime) / 1000));
+      revealedIndexRef.current = Math.min(targetLength, revealedIndexRef.current + step);
+      lastTimeRef.current = timestamp;
+    }
+    const justCaughtUp = !caughtUp && revealedIndexRef.current >= targetLength;
+    if (justCaughtUp || timestamp - lastRenderTimeRef.current >= RENDER_INTERVAL_MS) {
+      lastRenderTimeRef.current = timestamp;
+      setLiveParsed(tryParsePartialJson(fullTextRef.current.slice(0, revealedIndexRef.current)));
+    }
+    if (revealedIndexRef.current < targetLength) {
+      rafRef.current = requestAnimationFrame(revealStep);
+    } else {
+      rafRef.current = null;
+      lastTimeRef.current = 0;
+    }
+  };
+
+  const appendLiveText = (chunk: string) => {
+    fullTextRef.current += chunk;
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(revealStep);
+    }
+  };
+
+  /** 다음 단계(1단계→2단계) 전환 시 버퍼만 비우고 진행 표시는 유지한다. */
+  const resetLiveBuffer = () => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    fullTextRef.current = "";
+    revealedIndexRef.current = 0;
+    lastTimeRef.current = 0;
+  };
   // 요청 보내고 첫 응답이 오기 전까지 "생각 중" 점 세 개(2026-09-15,
   // 사용자 요청 — "기다리는 동안 심심하니까"). 서버에서 뭐든 한 번 오면
   // (반응 스트리밍 첫 토큰이든, 스토리보드 완성이든) 바로 끈다.
@@ -192,9 +252,32 @@ export function PromptChatLab({
     setThreadIdState(id);
   };
 
+  // 2026-09-18, 사용자 요청 — "출력될때 위로 스크롤하면.. 안움직이도록..
+  // 계속 출력되는쪽으로 스크롤 이동되네.. 위로 스크롤 가능하게 해주세요":
+  // 이미 바닥 근처에 있을 때만 자동 스크롤한다 — 사용자가 위로 올려서
+  // 읽고 있으면(바닥에서 멀어졌으면) 새 내용이 와도 억지로 안 끌어내린다.
+  const isNearBottomRef = useRef(true);
+  const handleListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
+
+  // 새 메시지(드묾)는 부드럽게, 실시간 리빌 중(초당 ~11회) 갱신은 즉시
+  // 스냅한다 — smooth 애니메이션이 겹쳐 쌓이면 그 자체가 사용자의 위쪽
+  // 스크롤 조작과 계속 부딪힌다(애니메이션이 끝나기 전에 다음 스크롤이
+  // 또 걸림).
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, liveText, liveStepText]);
+    if (isNearBottomRef.current) {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "auto" });
+    }
+  }, [liveText, liveParsed]);
 
   const refreshThreads = () => {
     adminApi
@@ -244,7 +327,6 @@ export function PromptChatLab({
     if (threadIdRef.current !== null) {
       const payload: Record<string, unknown> = { ...persistExtra };
       if (msg.text !== undefined) payload.text = msg.text;
-      if (msg.step1 !== undefined) payload.step1 = msg.step1;
       if (msg.storyboard !== undefined) payload.storyboard = msg.storyboard;
       if (msg.imagePreview !== undefined) payload.imagePreview = msg.imagePreview;
       adminApi
@@ -279,7 +361,6 @@ export function PromptChatLab({
           id: `saved-${m.id}`,
           role: m.role,
           text: m.text,
-          step1: m.step1 as Step1Data | undefined,
           storyboard: m.storyboard as { coreQuestion: string; cuts: WebtoonStoryboardCut[] } | undefined,
           imagePreview: m.imagePreview,
           animate: false,
@@ -331,28 +412,22 @@ export function PromptChatLab({
               return null;
             });
             break;
-          case "step1_chunk":
-            setLiveStepLabel("1단계(스크립트) 생성 중");
-            setLiveStepText((prev) => (prev ?? "") + msg.text);
+          // 2026-09-18 — 원문(JSON 조각)은 fullTextRef에 즉시 쌓이고,
+          // requestAnimationFrame 리빌 루프(revealStep)가 타이핑하듯 한
+          // 글자씩 드러내며 그때그때 DumpNode로 그린다(위 상태 선언부
+          // 주석 참고) — 완성 전후로 디자인이 안 바뀐다.
+          case "script_chunk":
+            setLiveStepLabel("스크립트·장면 연출 작성 중");
+            setLiveStepActive(true);
+            appendLiveText(msg.text);
             break;
-          case "step1_chunk_done":
-            setLiveStepText(null);
-            break;
-          case "step2_chunk":
-            setLiveStepLabel("2단계(장면 연출) 생성 중");
-            setLiveStepText((prev) => (prev ?? "") + msg.text);
-            break;
-          case "step2_chunk_done":
-            setLiveStepText(null);
+          case "script_chunk_done":
+            resetLiveBuffer();
+            setLiveStepActive(false);
+            setLiveParsed(null);
             break;
           case "options_prompt":
             appendMessage({ role: "assistant", text: msg.message, animate: false });
-            break;
-          case "step1":
-            appendMessage({
-              role: "assistant",
-              step1: { coreQuestion: msg.core_question, cuts: msg.cuts, script: msg.script, article: msg.article },
-            });
             break;
           case "storyboard":
             setStoryboard({ coreQuestion: msg.core_question, cuts: msg.cuts });
@@ -375,19 +450,6 @@ export function PromptChatLab({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- appendMessage는 매 렌더 새로 만들어지지만 messages/threadIdRef를 함수형 갱신·ref로만 다뤄 클로저가 오래돼도 안전하다(위 주석 참고) — subscribe 자체는 마운트 시 한 번만
   }, []);
-
-  /** 1단계 카드의 "2단계로 진행" 버튼 — script/article을 그대로 서버에
-   *  되돌려보낸다. 해당 메시지에 confirmed:true를 찍어 버튼이 다시
-   *  안 눌리게 한다(중복 클릭 방지). */
-  const confirmStep2 = (messageId: string, step1: Step1Data) => {
-    if (step1.confirmed) return;
-    setMessages((prev) =>
-      prev.map((m) => (m.id === messageId && m.step1 ? { ...m, step1: { ...m.step1, confirmed: true } } : m))
-    );
-    appendMessage({ role: "assistant", text: "2단계(장면 연출)를 만들고 있어요..." });
-    setWaiting(true);
-    sendWs("confirm_step2", { script: step1.script, article: step1.article });
-  };
 
   const send = () => {
     const text = input.trim();
@@ -417,31 +479,6 @@ export function PromptChatLab({
 
   const sendInner = (text: string) => {
     appendMessage({ role: "user", text });
-
-    const isShortCommand = text.length < MIN_ARTICLE_LEN;
-
-    // 1단계 결과 뒤에 붙는 "(1)/(2)" 선택지를 화면의 버튼 대신 숫자만 쳐서
-    // 보내도 처리한다(2026-09-16, 사용자 요청 — "사용자는 1이나 2번을
-    // 입력창에 넣고 전송하면... 다음 단계에 대한 답변 결과물도
-    // 출력하겠네요"). 번호 해석은 반드시 여기(프론트)가 한다 — 모델에게
-    // "사용자가 2라고 했으니 알아서 해석하라"고 맡기지 않는다. 아직 확인
-    // 안 된 1단계 카드가 없으면(엉뚱한 "2"를 여기서 가로채면 오히려
-    // 헷갈리므로) 그냥 아래 일반 분기로 흘려보낸다.
-    const bareDigitMatch = isShortCommand ? /^[12]$/.exec(text.trim()) : null;
-    if (bareDigitMatch) {
-      const lastStep1Msg = [...messages].reverse().find((m) => m.role === "assistant" && m.step1 && !m.step1.confirmed);
-      if (lastStep1Msg?.step1) {
-        if (bareDigitMatch[0] === "2") {
-          confirmStep2(lastStep1Msg.id, lastStep1Msg.step1);
-          return;
-        }
-        // "1" — 같은 기사로 1단계를 다시 만든다.
-        appendMessage({ role: "assistant", text: "1단계를 다시 만들고 있어요..." });
-        setWaiting(true);
-        sendWs("article", { article: lastStep1Msg.step1.article });
-        return;
-      }
-    }
 
     if (text.length >= MIN_ARTICLE_LEN) {
       setWaiting(true);
@@ -525,9 +562,9 @@ export function PromptChatLab({
   );
 
   const bodyNode = (
-    <div ref={listRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+    <div ref={listRef} onScroll={handleListScroll} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
       {messages.map((m) => (
-        <ChatBubble key={m.id} msg={m} onConfirmStep2={confirmStep2} />
+        <ChatBubble key={m.id} msg={m} />
       ))}
       {liveText !== null && (
         <div className="flex justify-start">
@@ -539,18 +576,22 @@ export function PromptChatLab({
           </div>
         </div>
       )}
-      {liveStepText !== null && (
+      {liveStepActive && (
         <div className="flex justify-start">
           <div className="w-full max-w-[92%]">
-            <p className="mb-1 text-[11px] font-medium text-[var(--text-muted)]">{liveStepLabel}</p>
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--text-primary)]">
-              {liveStepText}
-              <span className="ml-0.5 inline-block h-[13px] w-[2px] animate-pulse bg-[var(--text-faint)] align-middle" aria-hidden="true" />
+            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+              {liveStepLabel}
+              <span className="inline-block h-[7px] w-[7px] animate-pulse rounded-full bg-[var(--accent)]" aria-hidden="true" />
             </p>
+            {liveParsed ? (
+              <div className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                <DumpNode value={liveParsed.value} inProgressPath={liveParsed.inProgressPath} />
+              </div>
+            ) : null}
           </div>
         </div>
       )}
-      {waiting && liveText === null && liveStepText === null && <TypingDots />}
+      {waiting && liveText === null && !liveStepActive && <TypingDots />}
     </div>
   );
 
@@ -651,10 +692,14 @@ export function PromptChatLab({
         </CollapsibleSection>
         <div className="ui-divider border-t" />
         <CollapsibleSection title="이미지 프롬프트 — 화풍·인물" defaultOpen>
-          <WebtoonImageSettingsPanel onOpenFullLab={() => setImageLabOpen(true)} />
+          <WebtoonImageSettingsPanel
+            onOpenFullLab={() => setImageLabOpen(true)}
+            onOpenStageLab={() => setStageLabOpen(true)}
+          />
         </CollapsibleSection>
       </aside>
       <WebtoonImageLab open={imageLabOpen} onClose={() => setImageLabOpen(false)} />
+      <WebtoonStageLab open={stageLabOpen} onClose={() => setStageLabOpen(false)} />
     </div>
   );
 
@@ -679,13 +724,7 @@ export function PromptChatLab({
   );
 }
 
-function ChatBubble({
-  msg,
-  onConfirmStep2,
-}: {
-  msg: ChatMessage;
-  onConfirmStep2: (messageId: string, step1: Step1Data) => void;
-}) {
+function ChatBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -700,7 +739,6 @@ function ChatBubble({
         ) : (
           <div className="space-y-2.5">
             {msg.text && <TypewriterText text={msg.text} animate={!!msg.animate} />}
-            {msg.step1 && <Step1Card data={msg.step1} onConfirm={() => onConfirmStep2(msg.id, msg.step1!)} />}
             {msg.storyboard && <StoryboardCard data={msg.storyboard} animate={!!msg.animate} />}
             {msg.imagePreview && <CutImagePreview data={msg.imagePreview} />}
           </div>
@@ -710,43 +748,239 @@ function ChatBubble({
   );
 }
 
-/* 1단계 결과 카드 — human-in-the-loop 확인 지점(2026-09-15). 컷별 요약은
-   scene_type·camera 같은 연출 디테일 없이 "이 컷이 뭘 다루는지"만 한
-   줄로 보여준다(2단계가 있어야 나오는 정보라 아직 없음). */
-/* animateKey — 이 카드가 방금 도착했을 때만 애니메이션을 태운다. React가
-   같은 컴포넌트 인스턴스를 재사용하면(confirmed 값만 바뀌는 리렌더 등)
-   useState 초기값이 다시 안 돌아서 스토리보드 카드처럼 마운트 시점에만
-   흘려보내면 된다 — 매 리렌더마다 다시 재생되지 않게 useRef로 "이미 한
-   번 재생했는지"를 기억한다. */
-function Step1Card({ data, onConfirm }: { data: Step1Data; onConfirm: () => void }) {
-  // 이 카드는 메시지 하나당 한 번만 마운트된다(부모가 안정적인 key로
-  // 렌더) — confirmed 값이 바뀌어 리렌더돼도 useTypewriter의 useEffect는
-  // 빈 의존성 배열이라 다시 안 돌고, CSS 애니메이션도 같은 style 값을
-  // 다시 대입한다고 브라우저가 재생을 재시작하진 않는다. 그래서 "이미
-  // 재생했는지"를 ref로 따로 추적할 필요가 없다(추적하려면 렌더 중
-  // ref.current를 읽고 쓰게 돼 react-hooks/refs 규칙 위반이 된다).
-  const coreQuestion = useTypewriter(data.coreQuestion ?? "", true);
+/* 2026-09-18, 사용자 요청 — "전체 출력을 하고나서.. 보정을 하네요(코드블럭에
+   감싼다거나.. 구조를 깔끔하게 개선한다거나).. 실시간으로 바로바로
+   디자인해야 합니다": 스트리밍 중엔 평문으로 보여주다 완성되면 DumpNode
+   (코드블럭 포함)로 "바뀌는" 게 바로 그 "보정"이었다. 그래서 스트리밍
+   중에도 완성본과 똑같이 DumpNode를 쓴다 — 아직 안 끝난 JSON 원문을
+   최선을 다해(짝 안 맞는 따옴표·괄호를 보정해) 매 청크마다 다시 파싱해서,
+   그 순간까지 들어온 필드만큼만 완성본과 동일한 디자인으로 보여준다.
+   파싱 자체가 안 되는 극초반(예: 아직 "{"밖에 없음)에는 null을 돌려주고
+   호출부가 "작성 중" 표시만 보여준다. */
+type JsonPath = Array<string | number>;
 
-  return (
-    <div>
-      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{coreQuestion}</p>
-      {/* 2026-09-18, 사용자 요청 — "컷2(2단계)는 날것으로 다 보이는데 컷1(1단계)도
-          날것으로 보이게 해주세요". cut+summary로 추린 목록 대신 서버가 실제로
-          만든 1단계 script 전체(예: characters 등 요약에서 빠졌던 필드 포함)를
-          그대로 보여준다. */}
-      <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-[var(--text-secondary)]">
-        {JSON.stringify(data.script, null, 2)}
-      </pre>
-      <button
-        type="button"
-        onClick={onConfirm}
-        disabled={data.confirmed}
-        className="ui-btn ui-btn-primary mt-3 rounded-lg px-3.5 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
-      >
-        {data.confirmed ? "2단계 진행 중..." : "2단계(장면 연출)로 진행"}
-      </button>
-    </div>
-  );
+/** 스트리밍 원문(repair 전)에서 "지금 값이 채워지고 있는 자리"의 경로를
+ *  추적한다 — 예: {"cuts":[{"camera":"클로즈"  ← 아직 안 끝남
+ *  이면 ["cuts", 0, "camera"]를 돌려준다. DumpNode가 이 경로와 자기
+ *  경로가 같은 필드만 "아직 쓰는 중"으로 보고 코드블럭 박스를 미룬다
+ *  (2026-09-18, 사용자 요청 — "다 쓰고 나서 보정은 제가 원하는게
+ *  아닙니다": 전체 응답이 아니라 필드 하나하나가 끝나는 시점마다
+ *  자연스럽게 감싸야 한다는 뜻이라, "이 필드가 지금도 자라는 중인지"를
+ *  알아야 한다). JSON이 완전히 닫혀 있으면(스택이 빈 상태) 빈 배열을
+ *  돌려준다 — "지금 진행 중인 필드가 없다"는 뜻. */
+function computeInProgressPath(text: string): JsonPath {
+  type Frame = { type: "obj"; key: string | null } | { type: "arr"; index: number };
+  const stack: Frame[] = [];
+  let inString = false;
+  let escapeNext = false;
+  let stringIsKey = false;
+  let keyBuffer = "";
+  let expectKeyNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+      } else if (ch === "\\") {
+        escapeNext = true;
+      } else if (ch === '"') {
+        inString = false;
+        const top = stack[stack.length - 1];
+        if (stringIsKey) {
+          if (top && top.type === "obj") top.key = keyBuffer;
+        } else if (top && top.type === "obj") {
+          // 문자열 "값"이 닫혔다 — 콤마/닫는 중괄호를 기다릴 것 없이 이
+          // 키는 지금 이 순간 완성이다(카메라/장면처럼 값이 항상 문자열인
+          // 필드가 대부분이라, 이 시점을 놓치면 다음 키가 시작될 때까지
+          // "아직 쓰는 중"으로 잘못 붙잡아 두게 된다).
+          top.key = null;
+        }
+      } else if (stringIsKey) {
+        keyBuffer += ch;
+      }
+      continue;
+    }
+    const top = stack[stack.length - 1];
+    switch (ch) {
+      case '"':
+        inString = true;
+        stringIsKey = !!(top && top.type === "obj" && expectKeyNext);
+        keyBuffer = "";
+        expectKeyNext = false;
+        break;
+      case "{":
+        stack.push({ type: "obj", key: null });
+        expectKeyNext = true;
+        break;
+      case "[":
+        stack.push({ type: "arr", index: 0 });
+        break;
+      case "}":
+      case "]":
+        stack.pop();
+        break;
+      case ",":
+        if (top?.type === "obj") {
+          top.key = null;
+          expectKeyNext = true;
+        } else if (top?.type === "arr") {
+          top.index += 1;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  const path: JsonPath = [];
+  for (const frame of stack) {
+    if (frame.type === "obj") {
+      if (frame.key != null) path.push(frame.key);
+    } else {
+      path.push(frame.index);
+    }
+  }
+  return path;
+}
+
+function pathsEqual(a: JsonPath, b: JsonPath): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/* 2026-09-18, 사용자 요청 — "전체 출력을 하고나서.. 보정을 하네요(코드블럭에
+   감싼다거나.. 구조를 깔끔하게 개선한다거나).. 실시간으로 바로바로
+   디자인해야 합니다" + (같은 날 후속) "다 쓰고 나서 보정은 제가 원하는게
+   아닙니다": 스트리밍 중엔 평문으로 보여주다 완성되면 DumpNode(코드블럭
+   포함)로 "바뀌는" 게 바로 그 "보정"이었다. 그래서 스트리밍 중에도
+   완성본과 똑같이 DumpNode를 쓴다 — 아직 안 끝난 JSON 원문을 최선을
+   다해(짝 안 맞는 따옴표·괄호를 보정해) 매 청크마다 다시 파싱해서, 그
+   순간까지 들어온 필드만큼만 완성본과 동일한 디자인으로 보여준다.
+   파싱 자체가 안 되는 극초반(예: 아직 "{"밖에 없음)에는 null을 돌려주고
+   호출부가 "작성 중" 표시만 보여준다.
+
+   다만 전체가 아니라 "필드 단위"로 완성 시점을 맞추려면(위 사용자 요청)
+   응답 전체가 끝나기 전이라도 이미 다음 필드로 넘어간 필드는 완성된
+   것으로 보고 코드블럭을 씌워야 한다 — 지금 한 글자씩 자라고 있는
+   마지막 필드만 예외로 평문 유지한다. inProgressPath가 그 "지금 자라는
+   중인 필드"의 경로다(computeInProgressPath 참고). */
+function tryParsePartialJson(raw: string): { value: unknown; inProgressPath: JsonPath } | null {
+  let text = raw
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/```\s*$/, "");
+  if (!text) return null;
+  const inProgressPath = computeInProgressPath(text);
+  try {
+    return { value: JSON.parse(text), inProgressPath };
+  } catch {
+    // 아래 보정 시도로 넘어간다
+  }
+  // 마지막에 안 닫힌 문자열(따옴표 개수가 홀수)이 있으면 그 시작 지점까지 잘라낸다.
+  const quoteCount = (text.match(/(?<!\\)"/g) || []).length;
+  if (quoteCount % 2 === 1) {
+    text = text.slice(0, text.lastIndexOf('"'));
+  }
+  text = text.replace(/,\s*$/, "");
+  // 값 없이 key만 덜렁 남은 경우(콜론 유무 무관) 그 key째로 버린다 —
+  // "key"까지만 왔고 값이 아직 하나도 없으면 유효한 JSON을 못 만든다.
+  text = text.replace(/,\s*"(?:[^"\\]|\\.)*"\s*:?\s*$/, "");
+  text = text.replace(/,\s*$/, "");
+  // 안 닫힌 { [ 를 스택으로 추적해 끝에 닫아준다(문자열 내부는 건너뜀).
+  const closers: string[] = [];
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' && text[i - 1] !== "\\") inString = !inString;
+    if (inString) continue;
+    if (ch === "{" || ch === "[") closers.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") closers.pop();
+  }
+  while (closers.length) text += closers.pop();
+  try {
+    return { value: JSON.parse(text), inProgressPath };
+  } catch {
+    return null;
+  }
+}
+
+/* 2026-09-18, 사용자 요청 — "이미지 프롬프트 같은거는.. 코드블럭에.. 감싸서
+   출력해도 좋겠네": key가 "image_prompt"류면 값을 코드블럭(모노스페이스
+   +테두리 박스)으로, 그 외는 "key: value" 한 줄로 보여준다. 스트리밍 중
+   미리보기(tryParsePartialJson 결과)와 완성 후 최종 카드 둘 다 이
+   컴포넌트 하나로 그린다 — 완성 전후로 디자인이 갈리지 않는다.
+
+   inProgressPath(기본 null — 완성된 메시지 카드는 항상 null)가 주어지면,
+   지금 그 경로와 같은 필드만 "아직 쓰는 중"으로 보고 코드블럭 박스를
+   미룬다(위 tryParsePartialJson 주석 참고) — 그 필드를 지나 다음 필드로
+   넘어간 순간 바로 코드블럭으로 확정된다, 응답 전체가 끝나길 기다리지
+   않는다. */
+function DumpNode({
+  value,
+  depth = 0,
+  path = [],
+  inProgressPath = null,
+}: {
+  value: unknown;
+  depth?: number;
+  path?: JsonPath;
+  inProgressPath?: JsonPath | null;
+}): ReactNode {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="text-[var(--text-faint)]">(없음)</span>;
+    return (
+      <div className="space-y-3">
+        {value.map((v, i) => (
+          <div
+            key={i}
+            className={depth === 0 ? "border-t border-[var(--border-hairline)] pt-3 first:border-t-0 first:pt-0" : ""}
+          >
+            <DumpNode value={v} depth={depth + 1} path={[...path, i]} inProgressPath={inProgressPath} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (value && typeof value === "object") {
+    return (
+      <div className="space-y-1">
+        {Object.entries(value as Record<string, unknown>).map(([k, v]) => {
+          const childPath = [...path, k];
+          const isCodeField = /image_prompt|animation_prompt/i.test(k);
+          const isInProgress = !!inProgressPath && pathsEqual(childPath, inProgressPath);
+          if (v && typeof v === "object") {
+            return (
+              <div key={k}>
+                <span className="font-semibold text-[var(--text-muted)]">{k}:</span>
+                <div className="pl-3">
+                  <DumpNode value={v} depth={depth + 1} path={childPath} inProgressPath={inProgressPath} />
+                </div>
+              </div>
+            );
+          }
+          if (isCodeField && !isInProgress) {
+            return (
+              <div key={k}>
+                <span className="font-semibold text-[var(--text-muted)]">{k}:</span>
+                <pre
+                  className="mt-1 whitespace-pre-wrap break-words rounded-md border px-2.5 py-2 font-mono text-[11px] leading-relaxed"
+                  style={{ background: "var(--surface-sunken)", borderColor: "var(--border-hairline)" }}
+                >
+                  {String(v ?? "")}
+                </pre>
+              </div>
+            );
+          }
+          return (
+            <p key={k}>
+              <span className="font-semibold text-[var(--text-muted)]">{k}: </span>
+              <span>{String(v ?? "")}</span>
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+  return <span>{String(value)}</span>;
 }
 
 /* 기사 반응 문구(진짜 토큰 스트리밍, liveText 참고)를 뺀 나머지 어시스턴트
@@ -756,8 +990,8 @@ function Step1Card({ data, onConfirm }: { data: Step1Data; onConfirm: () => void
    docstring·routes/chat_ws.py 참고). 그래도 채팅 톤을 맞추려고 여기서
    타자 치듯 풀어내는 연출을 입힌다. */
 /** 타자 치듯 문자열을 점진적으로 드러낸다 — 이미 문자열 하나짜리 값이
- *  필요한 자리(다른 요소 안에 끼워 넣을 때, 예: Step1Card의 핵심 질문)에
- *  쓴다. 자체 마크업을 갖는 텍스트 블록은 아래 TypewriterText를 쓴다. */
+ *  필요한 자리(다른 요소 안에 끼워 넣을 때)에 쓴다. 자체 마크업을 갖는
+ *  텍스트 블록은 아래 TypewriterText를 쓴다. */
 function useTypewriter(text: string, animate: boolean): string {
   const [shown, setShown] = useState(animate ? "" : text);
   useEffect(() => {
@@ -809,9 +1043,9 @@ function StoryboardCard({
             <p className="mb-1 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
               컷 {c.cut}
             </p>
-            <pre className="whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-[var(--text-secondary)]">
-              {JSON.stringify(c, null, 2)}
-            </pre>
+            <div className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
+              <DumpNode value={c} />
+            </div>
           </div>
         ))}
       </div>

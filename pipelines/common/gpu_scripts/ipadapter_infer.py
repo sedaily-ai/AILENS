@@ -53,7 +53,17 @@ def main():
     negative_prompt = (
         "cartoon, illustration, anime, painting, drawing, extra person, additional person, "
         "third person, duplicate person, twins, clone, split screen, multiple views, "
-        "two women, two men, deformed, blurry, low quality, watermark, text"
+        "two women, two men, deformed, blurry, low quality, watermark, "
+        # 2026-09-18, 양진희 피드백("손이 겹쳐서 나온다던지") — SD1.5의 잘 알려진
+        # 약점(손·손가락)에 대한 negative_prompt 항목이 전혀 없었다. SD1.5
+        # 커뮤니티에서 표준적으로 쓰이는 손 교정 키워드를 추가한다.
+        "bad hands, malformed hands, deformed hands, mutated hands, extra fingers, "
+        "missing fingers, fused fingers, too many fingers, extra limbs, "
+        # 배경 소품(간판·안내판 등)에 가짜 한글/한자/일본어 혼종 문자가 새어
+        # 들어오는 문제(같은 피드백)도 같이 막는다 — _PHOTOREAL_NEGATIVE_PROMPT
+        # (webtoon_image.py)에 적용한 것과 같은 방향.
+        "signage text, readable text, storefront text, price board text, "
+        "screen text, letters, watermark, text"
     )
 
     kwargs = dict(

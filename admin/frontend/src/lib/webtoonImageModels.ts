@@ -19,21 +19,25 @@ export interface WebtoonImageModel {
 }
 
 export const IMAGE_MODELS: WebtoonImageModel[] = [
+  // 2026-09-18, 사용자 결정 — 인물고정·화풍고정(GPU) 없이도 된다고 판단,
+  // 새 프롬프트 구조(장면 중심·캐릭터 재서술 없음)로 여러 모델 비교 테스트
+  // 후 Stable Image Ultra로 확정("울트라로 하는걸로 하시죠"). 목록 맨
+  // 위 = 이제 이게 1순위 선택지라 WebtoonCutGenerator.tsx의 기본 선택값
+  // (IMAGE_MODELS[0])도 자동으로 이걸로 바뀐다.
+  { id: "sd_ultra", label: "Stable Image Ultra (GPU 없음)", shortLabel: "Stable Ultra" },
   // "운영 중" — 실제 발행 파이프라인(pipelines/webtoon/pipeline.py)이
-  // 지금 쓰는 것과 동일한 경로(2026-09-15 사용자 요청: "현재 사용중인것은
-  // 무엇인지도 같이 넣어줘야합니다"). 2026-09-18, 사용자 요청 — "파이프라인
-  // 이라고 하지 말고 이미지 모델명을 써달라": 실제로 GPU에서 도는
-  // SD1.5+IP-Adapter(인물 고정)와, 그 결과에 Bedrock Stable Style Transfer
-  // (화풍 적용)를 잇달아 태우는 2단계 조합이다 — 두 모델 이름을 그대로
-  // 적는다(각 단계 개별 on/off는 컷 카드의 체크박스, WebtoonCutGenerator.tsx
-  // 참고).
+  // 지금 쓰는 것과 동일한 경로. 위 결정 이후에도 프로덕션 파이프라인
+  // 자체는 아직 이 GPU 경로 그대로라(별도 마이그레이션 작업 전) 배지는
+  // 그대로 둔다 — "운영 중" 표시는 admin 실험 도구 선호도가 아니라
+  // pipeline.py가 실제로 쓰는 경로를 가리킨다.
   {
     id: "pipeline",
-    label: "SD1.5 IP-Adapter + Stable Style Transfer",
-    shortLabel: "IP-Adapter+Style Transfer",
+    label: "Stable Diffusion 1.5 (IP-Adapter) + Stable Style Transfer",
+    shortLabel: "Stable Diffusion 1.5",
     badge: "운영 중",
   },
   { id: "stable_image_core", label: "Stable Image Core (GPU 없음)", shortLabel: "Stable Core" },
+  { id: "sd35_large", label: "Stable Diffusion 3.5 Large (GPU 없음)", shortLabel: "SD3.5 Large" },
   { id: "style_guide", label: "Style Guide (레퍼런스 기반)", shortLabel: "Style Guide" },
   { id: "openai_dalle3", label: "OpenAI (gpt-image-1)" },
   // Nova Canvas — 2026-09-18 목록에서 제외(사용자 확인). amazon.nova-canvas-v1:0

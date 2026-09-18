@@ -31,6 +31,9 @@ import type {
   WebtoonImageAssetKind,
   WebtoonImageAssetPresign,
   WebtoonImageAssetGalleryItem,
+  WebtoonStageTranslateResult,
+  WebtoonStageImageResult,
+  WebtoonStageHistoryItem,
   PromptTestJob,
 } from "./types";
 
@@ -458,4 +461,37 @@ export const adminApi = {
     request<{ job_id: string; status: string }>("/admin/webtoon-lab/gpu/start", { method: "POST" }),
   stopWebtoonGpu: () =>
     request<{ stopping: boolean }>("/admin/webtoon-lab/gpu/stop", { method: "POST" }),
+
+  // 단계별 생성(2026-09-18) — admin/backend/routes/webtoon_lab.py "단계별
+  // 생성" 섹션 참고. character만 GPU(SSM) 왕복이라 job_id/폴링(기존
+  // getWebtoonImageJob 재사용), 나머지는 동기 응답.
+  stageTranslate: (scene: string, camera: string, cut?: number) =>
+    request<WebtoonStageTranslateResult>("/admin/webtoon-lab/stage/translate", {
+      method: "POST",
+      body: JSON.stringify({ scene, camera, cut }),
+    }),
+  stageCharacter: (character: "A" | "B", prompt: string, cut?: number) =>
+    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/character", {
+      method: "POST",
+      body: JSON.stringify({ character, prompt, cut }),
+    }),
+  stageBackground: (prompt: string, cut?: number) =>
+    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/background", {
+      method: "POST",
+      body: JSON.stringify({ prompt, cut }),
+    }),
+  stageComposite: (backgroundKey: string, charAKey: string, charBKey: string, cut?: number) =>
+    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/composite", {
+      method: "POST",
+      body: JSON.stringify({ background_key: backgroundKey, char_a_key: charAKey, char_b_key: charBKey, cut }),
+    }),
+  stageStyle: (initKey: string, prompt?: string, cut?: number) =>
+    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/style", {
+      method: "POST",
+      body: JSON.stringify({ init_key: initKey, prompt, cut }),
+    }),
+  getStageHistory: (cut?: number) =>
+    request<{ items: WebtoonStageHistoryItem[] }>(
+      `/admin/webtoon-lab/stage/history${cut !== undefined ? `?cut=${cut}` : ""}`
+    ),
 };

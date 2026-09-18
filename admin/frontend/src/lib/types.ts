@@ -387,6 +387,7 @@ export interface WebtoonLabJob {
   job_id: string;
   status: "pending" | "done" | "error";
   image_url: string | null;
+  s3_key: string | null;
   error: string | null;
   scene: string | null;
   camera: string | null;
@@ -401,6 +402,47 @@ export interface WebtoonLabJob {
 
 /** 히스토리 항목 — prompt_preview·error는 목록엔 없음(job_id로 상세 조회해야 함). */
 export type WebtoonLabHistoryItem = Omit<WebtoonLabJob, "error" | "prompt_preview">;
+
+/** 단계별 생성 (2026-09-18) — admin/backend/routes/webtoon_lab.py "단계별
+ *  생성" 섹션과 1:1 대응. "pipeline" 모델의 각 단계(번역/인물/배경/합성/
+ *  화풍)를 독립적으로 호출·재시도할 수 있게 한다(사용자 요청 — "단계별로
+ *  컨트롤 하고 싶은 니즈가 있어서"). */
+export interface WebtoonStageTranslateResult {
+  job_id: string;
+  subjects: "A" | "B" | "BOTH" | "NONE";
+  brief: string;
+  character_prompt_a: string;
+  character_prompt_b: string;
+  background_prompt: string;
+  style_prompt: string;
+}
+
+export interface WebtoonStageImageResult {
+  job_id: string;
+  image_url?: string;
+  s3_key?: string;
+  status?: "pending" | "done" | "error";
+}
+
+export type WebtoonStageName = "translate" | "character" | "background" | "composite" | "style";
+
+/** GET /admin/webtoon-lab/stage/history 항목 — 컷별로 지금까지 시도한
+ *  모든 단계 호출을 시간 역순으로 보여준다(사용자 요청 — "생성된
+ *  이미지들을 볼 수 있어야하고, 버전별로요... 설정한 값들도 투명하게
+ *  기록이 히스토리쪽에 남는게 중요"). */
+export interface WebtoonStageHistoryItem {
+  job_id: string;
+  stage: WebtoonStageName;
+  cut: number | null;
+  status: "pending" | "done" | "error";
+  character: "A" | "B" | null;
+  prompt: string | null;
+  params: Record<string, unknown> | null;
+  image_url: string | null;
+  s3_key: string | null;
+  error: string | null;
+  created_at: string | null;
+}
 
 /** GPU IP-Adapter 인스턴스 상태(2026-09-14) — "실제 품질" 컷 생성 중 클로즈업
  *  컷(A/B 단독)에서만 실제로 쓰인다. ec2 DescribeInstances의 State.Name 값. */

@@ -40,12 +40,9 @@ from routes import webtoon_lab
 from shared import time_utils
 from routes.prompts import (
     _CATEGORY_BEDROCK,
-    _build_step1_call,
-    _build_step2_call,
-    _cut_number,
-    _first_nonempty,
+    _build_script_call,
     _get_bedrock_client,
-    _merge_storyboard_cuts,
+    _normalize_cuts,
 )
 from json_extract import extract_json_object  # pipelines/common/ — deploy 시 zip 루트에 복사됨(routes/prompts.py와 동일 패턴)
 
@@ -66,8 +63,8 @@ _REACTION_MODEL = _CATEGORY_BEDROCK["webtoon"]["model"]  # lens-webtoon-script-s
 _CHAT_SYSTEM = (
     "당신은 AI LENS 웹툰 프롬프트 실험 챗봇입니다. 사용자와 자연스러운"
     " 한국어 대화체로 이야기하세요. 이 화면은 왼쪽(텍스트)과 오른쪽(이미지)이"
-    " 나뉘어 있습니다 — 사용자가 기사 원문을 붙여넣으면 여기(왼쪽)서 1단계"
-    " 스크립트, 이어서 2단계 장면 연출까지 만들어줍니다. 컷 이미지 생성은"
+    " 나뉘어 있습니다 — 사용자가 기사 원문을 붙여넣으면 여기(왼쪽)서 스크립트와"
+    " 장면 연출을 한 번에 만들어줍니다. 컷 이미지 생성은"
     " 이 채팅이 아니라 오른쪽 이미지 패널(칸마다 프롬프트+생성 버튼)에서"
     " 합니다 — 여기 채팅에 '3번 컷'이나 '전체 컷'처럼 쳐도 이미지가 생성되지"
     " 않으니, 그런 요청이 오면 오른쪽 패널을 쓰라고 안내하세요. 그 외"
@@ -202,8 +199,6 @@ def run_async_job(payload: dict) -> None:
         _run_chat_flow(push, data.get("message") or "", data.get("history") or [], saved_draft)
     elif kind == "article":
         _run_article_flow(push, data.get("article") or "", saved_draft)
-    elif kind == "confirm_step2":
-        _run_step2_flow(push, data.get("script") or {}, data.get("article") or "", saved_draft)
     elif kind == "cut_image":
         _run_cut_image_flow(push, data.get("cut") or {}, data.get("model") or "pipeline")
     elif kind == "gpu_start":
@@ -239,18 +234,19 @@ def _stream_completion(push: Push, system: str, messages: list[dict], max_tokens
 
 
 def _stream_json_completion(push: Push, event_type: str, system: str, user_message: str, model: str, max_tokens: int) -> str:
-    """1·2단계 JSON 생성을 converse_stream으로 돌려 실시간 원문 청크를
-    `{event_type}_chunk`로 중계하고, 다 받으면 `{event_type}_chunk_done`을
-    보낸 뒤 누적된 전체 텍스트를 반환한다(호출부가 JSON으로 파싱).
+    """스크립트+장면 연출 JSON 생성을 converse_stream으로 돌려 실시간 원문
+    청크를 `{event_type}_chunk`로 중계하고, 다 받으면
+    `{event_type}_chunk_done`을 보낸 뒤 누적된 전체 텍스트를 반환한다
+    (호출부가 JSON으로 파싱).
 
     2026-09-16, 사용자 요청: "출력하는것도 단계별로 쪼개서 출력을 해줘야
-    해요" — 그 전까진 1·2단계가 논스트리밍 _call_bedrock이라 8000토큰짜리
-    응답이 다 만들어질 때까지 화면엔 점 세 개만 뜨고 아무 진행 표시가
-    없었다(반응 문구만 진짜 스트리밍이던 것과 대비). 반쪽짜리 JSON
-    자체는 구조화해서 보여줄 게 못 되므로(잘린 필드·안 닫힌 괄호),
-    프런트는 이 청크들을 완성된 카드가 아니라 "생성 중" 원문 미리보기로만
-    렌더링하고, chunk_done 다음에 오는 최종 step1/storyboard 메시지가
-    도착하면 그걸로 교체한다 — 반쪽 JSON을 파싱하려 들지 않는다."""
+    해요" — 그 전까진 논스트리밍 _call_bedrock이라 8000토큰짜리 응답이 다
+    만들어질 때까지 화면엔 점 세 개만 뜨고 아무 진행 표시가 없었다(반응
+    문구만 진짜 스트리밍이던 것과 대비). 반쪽짜리 JSON 자체는 구조화해서
+    보여줄 게 못 되므로(잘린 필드·안 닫힌 괄호), 프런트는 이 청크들을
+    완성된 카드가 아니라 "생성 중" 원문 미리보기로만 렌더링하고, chunk_done
+    다음에 오는 최종 storyboard 메시지가 도착하면 그걸로 교체한다 — 반쪽
+    JSON을 파싱하려 들지 않는다."""
     client = _get_bedrock_client()
     parts: list[str] = []
     try:
@@ -316,25 +312,15 @@ def _resolve_prompt_content(push: Push, saved_draft: str | None) -> str | None:
     return prompt["active_content"]
 
 
-_STEP1_OPTIONS_TEXT = (
-    "1단계 스크립트가 완성됐습니다.\n\n다음 중 선택해 주세요:\n"
-    "(1) 1단계 다시 생성\n(2) 2단계(장면 연출) 진행"
-)
-
-
 def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) -> None:
-    """기사 → 1단계(스크립트)까지만. 2026-09-16 — 사용자 요청으로 반응
-    문구 스트리밍을 없앴다("짧은 반응 문구는 필요없고... 기사를 보내면
-    프롬프트에 있는 내용 기반으로 답변이 출력되는거고"): 기사가 오면 바로
-    1단계 프롬프트(_build_step1_call)로 넘어간다.
+    """기사 → 스크립트+장면 연출을 한 번의 Bedrock 호출로.
 
-    2026-09-15 결정(사용자 요청 "1단계 출력하면 다음 단계 진행할지
-    확인받고 2단계 진행")은 그대로 유지 — 2단계를 자동으로 이어 부르지
-    않는다. 다만 확인 방식을 2026-09-16에 바꿨다: 화면의 버튼뿐 아니라,
-    1단계 결과 끝에 "(1)/(2)" 선택지 텍스트를 붙여서 사용자가 그 숫자를
-    입력창에 쳐서 보내도 같은 동작이 되게 한다(PromptChatLab.tsx::sendInner
-    참고 — 숫자 해석은 프론트가 하고, 여기 서버는 여전히 "1단계 결과 +
-    옵션 안내" 두 메시지를 보내기만 한다)."""
+    2026-09-18 — "1단계/2단계" 구분 자체를 없앴다(사용자 요청: "스테이지
+    구분 자체가 왜 있어야하는거죠?? 그런거 필요없을텐데요"). 예전엔 여기서
+    두 번(_build_step1_call→_build_step2_call) 나눠 불러 그 사이에 "1단계
+    결과" 메시지·"2단계로 진행" 안내 문구가 끼어 있었다 — 이제 단일 호출
+    (_build_script_call, routes/prompts.py 참고)로 스크립트·카메라·장면을
+    한 번에 받는다."""
     if not article.strip():
         push({"type": "error", "message": "기사 원문이 비어 있습니다."})
         return
@@ -342,56 +328,25 @@ def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) 
         content = _resolve_prompt_content(push, saved_draft)
         if content is None:
             return
-        system, user_message, model, max_tokens = _build_step1_call(content, article)
-        raw = _stream_json_completion(push, "step1", system, user_message, model, max_tokens)
+        system, user_message, model, max_tokens = _build_script_call(content, article)
+        raw = _stream_json_completion(push, "script", system, user_message, model, max_tokens)
         script = extract_json_object(raw)
-        cuts_preview = [
-            {
-                "cut": _cut_number(c),
-                "summary": _first_nonempty(c.get("cut_question"), c.get("new_conclusion"), c.get("title"), c.get("headline")),
-            }
-            for c in (script.get("cuts") or [])
-        ]
-        push({
-            "type": "step1",
-            "core_question": script.get("core_question"),
-            "cuts": cuts_preview,
-            "script": script,
-            "article": article,
-        })
-        push({"type": "options_prompt", "message": _STEP1_OPTIONS_TEXT})
-    except Exception as e:  # noqa: BLE001 — 채팅 흐름 최상위, 여기서 안 잡으면 클라이언트가 영원히 대기
-        push({"type": "error", "message": str(e)[:500]})
-
-
-def _run_step2_flow(push: Push, script: dict, article: str, saved_draft: str | None = None) -> None:
-    if not script or not article.strip():
-        push({"type": "error", "message": "1단계 결과가 없습니다 — 기사부터 다시 보내 주세요."})
-        return
-    try:
-        content = _resolve_prompt_content(push, saved_draft)
-        if content is None:
-            return
-        system, user_message, model, max_tokens = _build_step2_call(content, article, script)
-        raw = _stream_json_completion(push, "step2", system, user_message, model, max_tokens)
-        scenes = extract_json_object(raw)
-        cuts = _merge_storyboard_cuts(script, scenes)
+        cuts = _normalize_cuts(script)
         push({
             "type": "storyboard",
             "core_question": script.get("core_question"),
             "characters": script.get("characters"),
             "cuts": cuts,
         })
-        # 2026-09-16 — 컷 이미지 생성은 채팅에서 완전히 빠지고 우측 패널
-        # (WebtoonCutGenerator, 독립된 WebSocket 연결)로 옮겨갔다(사용자
-        # 요청: "좌측 부분에서는 텍스트만 출력되는 걸로... 우측에서는
-        # 이미지를 출력하는걸로"). 여기서는 그쪽으로 안내만 한다 — "N번
-        # 컷"/"전체 컷" 텍스트 명령은 더 이상 이 채팅에서 안 먹힌다.
+        # 컷 이미지 생성은 채팅에서 완전히 빠지고 우측 패널
+        # (WebtoonCutGenerator, 독립된 WebSocket 연결)로 옮겨갔다(2026-09-16
+        # 사용자 요청: "좌측 부분에서는 텍스트만 출력되는 걸로... 우측에서는
+        # 이미지를 출력하는걸로"). 여기서는 그쪽으로 안내만 한다.
         push({
             "type": "options_prompt",
-            "message": "2단계(장면 연출)가 완성됐습니다. 오른쪽 이미지 패널에서 컷을 생성해 보세요 — 장면 지문이 자동으로 채워져 있습니다.",
+            "message": "스크립트·장면 연출이 완성됐습니다. 오른쪽 이미지 패널에서 컷을 생성해 보세요 — 장면 지문이 자동으로 채워져 있습니다.",
         })
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — 채팅 흐름 최상위, 여기서 안 잡으면 클라이언트가 영원히 대기
         push({"type": "error", "message": str(e)[:500]})
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { buildImagePromptDoc } from "@/lib/webtoonImagePromptDoc";
@@ -65,7 +65,13 @@ const CHAR_MALE_PRESETS: { label: string; text: string }[] = [
   },
 ];
 
-export function WebtoonImageSettingsPanel({ onOpenFullLab }: { onOpenFullLab: () => void }) {
+export function WebtoonImageSettingsPanel({
+  onOpenFullLab,
+  onOpenStageLab,
+}: {
+  onOpenFullLab: () => void;
+  onOpenStageLab: () => void;
+}) {
   const toast = useToast();
 
   const [style, setStyle] = useState("");
@@ -242,7 +248,7 @@ export function WebtoonImageSettingsPanel({ onOpenFullLab }: { onOpenFullLab: ()
               className="text-[10px] text-[var(--text-faint)]"
               title="그림체 지침(색감·선화·금지 스타일 등)을 문장으로 적습니다. 컷마다 이 문장이 프롬프트 앞부분에 그대로 들어갑니다. 발행해야 실제 생성에 반영돼요."
             >
-              그림체 지침 — 발행해야 반영됩니다.
+              그림체 지침 — 발행해야 반영됩니다. <ScopeTag>모든 모델에 적용</ScopeTag>
             </p>
             <textarea
               value={style}
@@ -252,7 +258,13 @@ export function WebtoonImageSettingsPanel({ onOpenFullLab }: { onOpenFullLab: ()
               className="ui-input mt-1.5 w-full resize-y rounded-md px-3 py-2 text-[12px]"
             />
             <ImageAssetField
-              label="화풍 레퍼런스 이미지 — Style Transfer가 매번 이 그림의 화풍을 입힙니다"
+              label={
+                <>
+                  화풍 레퍼런스 이미지 — Style Transfer가 매번 이 그림의 화풍을 입힙니다{" "}
+                  <ScopeTag>SD1.5 파이프라인 · Style Guide 전용</ScopeTag>
+                </>
+              }
+              altText="화풍 레퍼런스 이미지"
               url={assets?.style_url}
               uploading={assetUploading.style}
               onUpload={(file) => void handleUploadAsset("style", file)}
@@ -288,17 +300,26 @@ export function WebtoonImageSettingsPanel({ onOpenFullLab }: { onOpenFullLab: ()
             }
           >
             <div className="px-3.5">
+              <p className="text-[10px] text-[var(--text-faint)]">
+                A(여성 기자) 외형 묘사 — 발행해야 반영됩니다.{" "}
+                <ScopeTag>Stable Core · SD3.5 · Ultra 전용 — SD1.5 파이프라인엔 미적용</ScopeTag>
+              </p>
               <textarea
                 value={charFemale}
                 onChange={(e) => setCharFemale(e.target.value)}
                 placeholder={defaults ? undefined : "불러오는 중..."}
-                title="A(여성 기자) 외형 묘사 — 발행해야 반영됩니다."
                 rows={4}
-                className="ui-input w-full resize-y rounded-md px-3 py-2 text-[12px]"
+                className="ui-input mt-1.5 w-full resize-y rounded-md px-3 py-2 text-[12px]"
               />
               <PresetRow presets={CHAR_FEMALE_PRESETS} onPick={setCharFemale} />
               <ImageAssetField
-                label="A 참조 사진 — 클로즈업 컷에서 이 얼굴로 identity-lock"
+                label={
+                  <>
+                    A 참조 사진 — 클로즈업 컷에서 이 얼굴로 identity-lock{" "}
+                    <ScopeTag>SD1.5 파이프라인 전용</ScopeTag>
+                  </>
+                }
+                altText="A 참조 사진"
                 url={assets?.char_female_url}
                 uploading={assetUploading.char_female}
                 onUpload={(file) => void handleUploadAsset("char_female", file)}
@@ -321,17 +342,26 @@ export function WebtoonImageSettingsPanel({ onOpenFullLab }: { onOpenFullLab: ()
             }
           >
             <div className="px-3.5">
+              <p className="text-[10px] text-[var(--text-faint)]">
+                B(남성 청자) 외형 묘사 — 발행해야 반영됩니다.{" "}
+                <ScopeTag>Stable Core · SD3.5 · Ultra 전용 — SD1.5 파이프라인엔 미적용</ScopeTag>
+              </p>
               <textarea
                 value={charMale}
                 onChange={(e) => setCharMale(e.target.value)}
                 placeholder={defaults ? undefined : "불러오는 중..."}
-                title="B(남성 청자) 외형 묘사 — 발행해야 반영됩니다."
                 rows={4}
-                className="ui-input w-full resize-y rounded-md px-3 py-2 text-[12px]"
+                className="ui-input mt-1.5 w-full resize-y rounded-md px-3 py-2 text-[12px]"
               />
               <PresetRow presets={CHAR_MALE_PRESETS} onPick={setCharMale} />
               <ImageAssetField
-                label="B 참조 사진 — 클로즈업 컷에서 이 얼굴로 identity-lock"
+                label={
+                  <>
+                    B 참조 사진 — 클로즈업 컷에서 이 얼굴로 identity-lock{" "}
+                    <ScopeTag>SD1.5 파이프라인 전용</ScopeTag>
+                  </>
+                }
+                altText="B 참조 사진"
                 url={assets?.char_male_url}
                 uploading={assetUploading.char_male}
                 onUpload={(file) => void handleUploadAsset("char_male", file)}
@@ -361,6 +391,17 @@ export function WebtoonImageSettingsPanel({ onOpenFullLab }: { onOpenFullLab: ()
         >
           장면 하나로 테스트 생성 / 히스토리 보기 →
         </button>
+        {/* 2026-09-18, 사용자 요청("단계별로 컨트롤 하고 싶은 니즈가 있어서"
+            → "그럼 그런 단계들도 프롬프트별로 보이게 하면 안되나요??") —
+            SD1.5 파이프라인의 번역/인물/배경/합성/화풍 각 단계를 프롬프트
+            보면서 하나씩 실행·재시도할 수 있는 화면. WebtoonStageLab.tsx. */}
+        <button
+          type="button"
+          onClick={onOpenStageLab}
+          className="ui-btn ui-btn-ghost w-full rounded-lg px-3 py-1.5 text-[12px] font-semibold"
+        >
+          단계별 생성(번역·인물·배경·합성·화풍) →
+        </button>
       </div>
     </div>
   );
@@ -387,6 +428,24 @@ function PresetRow({ presets, onPick }: { presets: { label: string; text: string
   );
 }
 
+/* 어떤 모델에 적용되는 필드인지 보여주는 작은 태그 — 2026-09-18, 사용자
+   요청("프롬프트쪽도 있고 샘플도 있어서 헷갈리거든?? ... 명확하게 구분을
+   좀 해주시면"). 껐다 켰다 하는 토글이 아니라 정보 표시다 — 어떤 필드가
+   어떤 모델에 쓰이는지는 사용자가 고르는 게 아니라 코드가 고정으로
+   정한 사실이라(예: 인물 텍스트는 SD1.5 파이프라인에서 아예 안 읽힘,
+   webtoon_image.py의 build_background_prompt/_style_hint_from_db 참고),
+   토글을 만들면 "껐는데 왜 그대로 되지?" 같은 새 혼란만 생긴다. */
+function ScopeTag({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="ui-divider inline-block rounded-full border px-1.5 py-0.5 text-[9.5px] font-medium text-[var(--text-muted)]"
+      style={{ background: "var(--surface-sunken)" }}
+    >
+      {children}
+    </span>
+  );
+}
+
 /* 화풍/인물 참조 이미지 미리보기 + 업로드 + 갤러리(선택) — WebtoonImageLab.tsx와
    같은 모양의 작은 컴포넌트를 여기 독립적으로 둔다(두 화면이 서로의 내부
    구현에 의존하지 않게, 위 모듈 docstring 참고). 2026-09-16 후속 — "여러
@@ -394,6 +453,7 @@ function PresetRow({ presets, onPick }: { presets: { label: string; text: string
    고를 수 있게 했다. */
 function ImageAssetField({
   label,
+  altText,
   url,
   uploading,
   onUpload,
@@ -401,7 +461,9 @@ function ImageAssetField({
   selecting,
   onSelect,
 }: {
-  label: string;
+  label: ReactNode;
+  /** <img alt>용 순수 텍스트 — label은 ScopeTag(JSX)를 포함할 수 있어 alt로 못 씀. */
+  altText: string;
   url: string | null | undefined;
   uploading: boolean;
   onUpload: (file: File) => void;
@@ -417,7 +479,7 @@ function ImageAssetField({
         <div className="ui-divider h-14 w-14 flex-none overflow-hidden rounded-md border bg-[var(--surface-sunken)]">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element -- presigned S3 URL(짧은 만료), next/image 도메인 등록 불필요한 실험 화면
-            <img src={url} alt={label} className="h-full w-full object-cover" />
+            <img src={url} alt={altText} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-[9px] text-[var(--text-faint)]">없음</div>
           )}

@@ -458,80 +458,43 @@ def _extract_chapters(content: str, chapter_numbers: list[int]) -> str:
     return "\n\n".join(parts)
 
 
-# 모든 단계 공통(캐릭터·문체 일관성에 필요) — 0.역할과 최종 산출물,
-# 2.절대 규칙, 6.고정 화자 페르소나, 7.기사별 스타일링.
-_COMMON_CHAPTERS = [0, 2, 6, 7]
-# 1단계 전용 — 사실분석·중복판정·컷 정보설계·대사규칙·텍스트 규칙·
-# 8컷 전체 중복검사·1단계 출력 스키마(22장, 발행 프롬프트에 실제로 있음).
-_STAGE1_CHAPTERS = _COMMON_CHAPTERS + [1, 3, 4, 5, 8, 9, 10, 11, 15, 22]
-# 2단계 전용 — 장면 설계·이미지 텍스트 화이트리스트·공통 이미지 스타일.
-# (발행 프롬프트에 2단계용 정식 출력 스키마 챕터가 아직 없다 — 그래서
-# 1단계 22장과 같은 엄격도로 아래 _STAGE2_OUTPUT_FORMAT을 코드 쪽에서
-# 보강한다. 나중에 프롬프트 쪽에 정식 챕터가 생기면 이 상수는 지운다.)
-_STAGE2_CHAPTERS = _COMMON_CHAPTERS + [12, 13, 14]
+# 2026-09-18 — "1단계(스크립트)/2단계(장면 연출)" 구분 자체를 없앴다(사용자
+# 요청: "스테이지 구분 자체가 왜 있어야하는거죠?? 그런거 필요없을텐데요").
+# 그 전까지는 Bedrock을 두 번 나눠 불러(_build_step1_call → _build_step2_call)
+# 1단계 스크립트 결과를 2단계 프롬프트에 다시 끼워넣는 방식이었는데, 발행
+# 프롬프트 어디에도 "2단계"라는 개념이 없다 — 22장은 "Stage 1 Script Output
+# Format"이라고만 돼 있고 2단계용 정식 출력 스키마 챕터 자체가 없어서, 코드
+# 쪽 _STAGE2_OUTPUT_FORMAT 상수가 그 자리를 강제로 메꾸고 있었던 것뿐이다
+# (그 강제 스키마가 camera_distance/camera_height/composition/background
+# 같은, 사용자가 요청한 적 없는 필드를 계속 밀어넣던 원인). 이제 필요한 모든
+# 챕터(사실분석+장면설계+텍스트화이트리스트+공통이미지스타일)를 한 번에
+# 넘기고, 22장 스크립트 스키마의 각 컷에 camera/scene 두 필드만 코드에서
+# 추가 요구해서 단일 호출로 끝낸다.
+_SCRIPT_CHAPTERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22]
 
-_STAGE2_OUTPUT_FORMAT = (
-    "\n\n---\n### 2단계 출력 형식 (코드 보강 — 발행 프롬프트에 아직 정식"
-    " 챕터가 없어 여기서 고정한다)\n"
-    "다른 설명 없이 JSON 객체 하나만 응답한다:\n"
-    '{"scenes": [{"cut_id": "cut_01", "camera_distance": "", '
-    '"camera_height": "", "composition": "", "background": ""}]}\n'
-    "- cut_id는 1단계 결과와 정확히 같은 값(cut_01~cut_08)을 그대로 쓴다.\n"
-    "- 8개 컷 전부 채운다. 누락·추가 금지.\n"
-    "- camera_distance/camera_height/composition/background 네 필드 모두"
-    " 채운다 — 비워두지 않는다."
-)
-
-# 항상 human-in-the-loop — 2026-09-16, 사용자 요청: "항상 휴먼 인 더 루프로
-# 작업하도록"(별도 상태 관리 UI 없이 프롬프트 지침만으로 강제). 이 단계
-# 응답을 낸 뒤 모델이 스스로 다음 단계로 이어가지 않도록 매 호출 끝에
-# 못박는다 — 실제 다음 단계 진행은 여전히 화면의 "2단계로 진행" 버튼이나
-# "N번 컷"/"전체 컷" 같은 명시적 요청으로만 트리거된다(routes/chat_ws.py·
-# PromptChatLab.tsx 참고, 이 리팩토링에서 그 트리거 자체는 안 건드림).
-_HITL_REMINDER = (
-    "\n\n---\n[중요] 이 단계 결과만 내고 멈춘다. 다음 단계를 이어서 만들거나"
-    " 미리 보여주지 않는다. 사용자가 명시적으로 다음 단계를 요청하기 전까지는"
-    " 기다린다."
-)
-
-_STEP1_INSTRUCTION = (
-    "\n\n---\n[지금 할 일]\n위 지침을 참고해서 지금은 1단계(스크립트) 결과만"
-    " 출력한다. \"1단계 출력\" 섹션에 정의된 JSON 스키마 그대로, JSON 객체"
-    " 하나만 응답한다(설명 문구 없이).\n\n[입력 기사]\n"
-)
-_STEP2_INSTRUCTION = (
-    "\n\n---\n[지금 할 일]\n위 지침을 참고해서 지금은 2단계(장면 연출) 결과만"
-    " 출력한다. \"2단계 출력\" 섹션에 정의된 JSON 스키마 그대로, JSON 객체"
-    " 하나만 응답한다(설명 문구 없이).\n\n[기사]\n"
+_SCRIPT_OUTPUT_ADDENDUM = (
+    "\n\n---\n### 출력 형식 (코드 보강)\n"
+    "위 \"Stage 1 Script Output Format\" JSON 스키마 그대로 컷 8개를 채우되,"
+    " 각 cuts 원소마다 다음 두 필드를 추가한다:\n"
+    '- "camera": 카메라 거리·앵글을 서술하는 한국어 문장.\n'
+    '- "scene": 구도·배경·인물 동작·소품을 서술하는 한국어 문장(위 12장'
+    " Scene Design 지침 반영, 8컷 연속 동일 구도 금지).\n"
+    "다른 설명 없이 JSON 객체 하나만 응답한다."
 )
 
 
-def _build_step1_call(content: str, article: str) -> tuple[str, str, str, int]:
-    """1단계 호출에 필요한 (system, user_message, model, max_tokens)만
-    조립하고 Bedrock은 안 부른다 — 2026-09-16, 사용자 요청: "출력도 단계별로
-    쪼개서 보여줘야 한다"에 맞춰 routes/chat_ws.py가 이 조립 결과로 직접
-    converse_stream을 불러 실시간으로 청크를 밀어보낼 수 있게 분리했다
-    (_generate_step1_script은 이 함수 + 논스트리밍 _call_bedrock을 그대로
-    쓰는 얇은 래퍼로 남겨 handle_test/handle_storyboard_test 같은 기존
-    HTTP job/폴링 호출부는 안 건드린다)."""
+def _build_script_call(content: str, article: str) -> tuple[str, str, str, int]:
+    """스크립트+장면 연출을 한 번에 만드는 단일 호출용 (system, user_message,
+    model, max_tokens) 조립. routes/chat_ws.py가 이 결과로 직접
+    converse_stream을 불러 실시간으로 청크를 밀어보낸다."""
     webtoon_cfg = _CATEGORY_BEDROCK["webtoon"]
-    stage_content = _extract_chapters(content, _STAGE1_CHAPTERS)
-    user_message = stage_content + _STEP1_INSTRUCTION + article + _WEBTOON_JSON_INSTRUCTION + _HITL_REMINDER
-    return _WEBTOON_SYSTEM_PROMPT, user_message, webtoon_cfg["model"], webtoon_cfg["max_tokens"]
-
-
-def _build_step2_call(content: str, article: str, script: dict) -> tuple[str, str, str, int]:
-    """2단계용 — _build_step1_call과 같은 이유·같은 모양."""
-    webtoon_cfg = _CATEGORY_BEDROCK["webtoon"]
-    stage_content = _extract_chapters(content, _STAGE2_CHAPTERS)
+    stage_content = _extract_chapters(content, _SCRIPT_CHAPTERS)
     user_message = (
         stage_content
-        + _STEP2_INSTRUCTION
+        + "\n\n---\n[지금 할 일]\n위 지침을 참고해서 스크립트와 장면 연출을 한 번에 만든다.\n\n[입력 기사]\n"
         + article
-        + "\n\n[1단계 스크립트 결과]\n"
-        + json.dumps(script, ensure_ascii=False)
-        + _STAGE2_OUTPUT_FORMAT
-        + _HITL_REMINDER
+        + _WEBTOON_JSON_INSTRUCTION
+        + _SCRIPT_OUTPUT_ADDENDUM
     )
     return _WEBTOON_SYSTEM_PROMPT, user_message, webtoon_cfg["model"], webtoon_cfg["max_tokens"]
 
@@ -572,36 +535,33 @@ def _dialogue_from_bubbles(c: dict) -> list[dict]:
     return lines
 
 
-def _merge_storyboard_cuts(script: dict, scenes: dict) -> list[dict]:
-    """1단계(script)+2단계(scenes) 결과를 컷별로 합친다.
+def _normalize_cuts(script: dict) -> list[dict]:
+    """단일 호출(_build_script_call) 결과의 cuts를 컷 이미지 생성·
+    compose_text.py가 기대하는 옛 필드 이름(camera/scene/dialogue/title/
+    narration/caption)으로 정규화한다.
+
+    2026-09-18 — 예전엔 script(1단계)+scenes(2단계) 두 호출 결과를 컷
+    번호로 매칭해 합치는 _merge_storyboard_cuts였다. 이제 한 번의 호출이
+    같은 컷 객체 안에 camera/scene까지 직접 채워 주므로(_build_script_call
+    참고) 두 딕셔너리를 매칭할 필요가 없다 — script["cuts"]를 그대로
+    순회하며 필드 이름만 맞춘다.
 
     2026-09-15 — 저장된 웹툰 프롬프트가 v11에서 컷 번호(cut→cut_id)·대사
-    (dialogue→bubble_1/bubble_2)·2단계 최상위 키(scenes→cuts)·장면 묘사
-    (camera/scene→camera_distance+camera_height/composition+background)를
-    전부 새 스키마로 바꿨다(사용자 확인: 진행 중인 개편, 되돌릴 생각
-    없음). compose_text.py·컷 이미지 생성은 여전히 옛 필드 이름(camera/
-    scene/dialogue/title/narration/caption)을 기대하므로, 있으면 그대로
-    쓰고 없으면 새 필드에서 최대한 끌어와 채운다 — 스키마가 아직도 바뀌는
-    중이라 한쪽에 단단히 맞추기보다 방어적으로 짠다."""
-    scene_list = scenes.get("scenes") or scenes.get("cuts") or []
-    scene_by_cut = {n: s for s in scene_list if (n := _cut_number(s)) is not None}
-
+    (dialogue→bubble_1/bubble_2)를 새 스키마로 바꿨다(사용자 확인: 진행
+    중인 개편, 되돌릴 생각 없음) — 있으면 그대로 쓰고 없으면 새 필드에서
+    끌어와 채운다."""
     cuts = []
     for c in script.get("cuts") or []:
-        n = _cut_number(c)
-        s = scene_by_cut.get(n) or {}
-        camera = _first_nonempty(s.get("camera"), " ".join(filter(None, [s.get("camera_distance"), s.get("camera_height")])))
-        scene = _first_nonempty(s.get("scene"), " ".join(filter(None, [s.get("composition"), s.get("background")])))
         cuts.append({
-            "cut": n,
+            "cut": _cut_number(c),
             "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
             "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
             "closing_caption": c.get("closing_caption") or "",
             "title": _first_nonempty(c.get("title"), c.get("headline")),
             "title_keyword": c.get("title_keyword") or "",
             "dialogue": _dialogue_from_bubbles(c),
-            "camera": camera,
-            "scene": scene,
+            "camera": c.get("camera") or "",
+            "scene": c.get("scene") or "",
         })
     return cuts
 
