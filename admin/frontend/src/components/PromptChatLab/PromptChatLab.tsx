@@ -730,17 +730,13 @@ function Step1Card({ data, onConfirm }: { data: Step1Data; onConfirm: () => void
   return (
     <div>
       <p className="text-[14px] font-semibold text-[var(--text-primary)]">{coreQuestion}</p>
-      <div className="mt-2 space-y-1">
-        {data.cuts.map((c, i) => (
-          <p
-            key={i}
-            className="text-[13px] leading-relaxed text-[var(--text-secondary)]"
-            style={{ animation: `ui-fade-up 200ms ease-out both`, animationDelay: `${500 + i * 70}ms` }}
-          >
-            <span className="font-semibold text-[var(--text-faint)]">{c.cut ?? i + 1}.</span> {c.summary}
-          </p>
-        ))}
-      </div>
+      {/* 2026-09-18, 사용자 요청 — "컷2(2단계)는 날것으로 다 보이는데 컷1(1단계)도
+          날것으로 보이게 해주세요". cut+summary로 추린 목록 대신 서버가 실제로
+          만든 1단계 script 전체(예: characters 등 요약에서 빠졌던 필드 포함)를
+          그대로 보여준다. */}
+      <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-[var(--text-secondary)]">
+        {JSON.stringify(data.script, null, 2)}
+      </pre>
       <button
         type="button"
         onClick={onConfirm}
