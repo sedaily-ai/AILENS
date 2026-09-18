@@ -312,13 +312,17 @@ export function WebtoonCutGenerator({
 
             {/* 2026-09-16, 사용자 요청 — "이미지(인물) 고정, 화풍 고정을 체크로
                 풀었다 체크했다 할 수 있도록... 꼭 해당 고정을 적용 안 하고
-                싶을 수도 있으니": "파이프라인" 모델일 때만 의미가 있는
-                토글이라 다른 모델에서는 숨긴다. */}
+                싶을 수도 있으니": "SD1.5 IP-Adapter + Stable Style Transfer"
+                모델일 때만 의미가 있는 토글이라 다른 모델에서는 숨긴다.
+                2026-09-18, 사용자 요청 — "1·2단계도 쪼개서 선택할 수 있게":
+                두 단계가 서로 다른 모델(GPU의 SD1.5 IP-Adapter / Bedrock
+                Stable Style Transfer)이라는 걸 라벨에서 바로 알 수 있게
+                모델명을 붙인다. */}
             {s.model === "pipeline" && (
               <div className="flex flex-col gap-0.5">
                 <label
                   className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]"
-                  title="꺼면 GPU 참조 얼굴 고정 없이 '일반적인 사람'으로 생성됩니다."
+                  title="1단계 · GPU에서 SD1.5+IP-Adapter로 참조 얼굴을 고정해 사진을 만듭니다. 꺼면 참조 얼굴 고정 없이 '일반적인 사람'으로 생성됩니다."
                 >
                   <input
                     type="checkbox"
@@ -330,11 +334,11 @@ export function WebtoonCutGenerator({
                       }))
                     }
                   />
-                  인물 고정 적용
+                  1단계 · SD1.5 IP-Adapter (인물 고정)
                 </label>
                 <label
                   className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]"
-                  title="꺼면 화풍(Style Transfer)이 안 입혀진 사실적인 사진처럼 나옵니다 — 삽화가 아닙니다."
+                  title="2단계 · Bedrock Stable Style Transfer로 웹툰 화풍을 입힙니다. 꺼면 이 단계를 건너뛰고 1단계의 사실적인 사진을 그대로 씁니다 — 삽화가 아닙니다."
                 >
                   <input
                     type="checkbox"
@@ -346,7 +350,7 @@ export function WebtoonCutGenerator({
                       }))
                     }
                   />
-                  화풍 고정 적용
+                  2단계 · Stable Style Transfer (화풍 적용)
                 </label>
               </div>
             )}

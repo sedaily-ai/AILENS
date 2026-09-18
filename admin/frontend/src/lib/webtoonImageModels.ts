@@ -21,8 +21,18 @@ export interface WebtoonImageModel {
 export const IMAGE_MODELS: WebtoonImageModel[] = [
   // "운영 중" — 실제 발행 파이프라인(pipelines/webtoon/pipeline.py)이
   // 지금 쓰는 것과 동일한 경로(2026-09-15 사용자 요청: "현재 사용중인것은
-  // 무엇인지도 같이 넣어줘야합니다").
-  { id: "pipeline", label: "현재 파이프라인 (GPU+Style Transfer)", shortLabel: "파이프라인 (GPU)", badge: "운영 중" },
+  // 무엇인지도 같이 넣어줘야합니다"). 2026-09-18, 사용자 요청 — "파이프라인
+  // 이라고 하지 말고 이미지 모델명을 써달라": 실제로 GPU에서 도는
+  // SD1.5+IP-Adapter(인물 고정)와, 그 결과에 Bedrock Stable Style Transfer
+  // (화풍 적용)를 잇달아 태우는 2단계 조합이다 — 두 모델 이름을 그대로
+  // 적는다(각 단계 개별 on/off는 컷 카드의 체크박스, WebtoonCutGenerator.tsx
+  // 참고).
+  {
+    id: "pipeline",
+    label: "SD1.5 IP-Adapter + Stable Style Transfer",
+    shortLabel: "IP-Adapter+Style Transfer",
+    badge: "운영 중",
+  },
   { id: "stable_image_core", label: "Stable Image Core (GPU 없음)", shortLabel: "Stable Core" },
   { id: "style_guide", label: "Style Guide (레퍼런스 기반)", shortLabel: "Style Guide" },
   { id: "openai_dalle3", label: "OpenAI (gpt-image-1)" },
