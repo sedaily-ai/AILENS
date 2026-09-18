@@ -34,9 +34,18 @@
 - 호출 리전·요청 body·기반 모델은 바꾸지 않고 SYSTEM profile을 감싼 application profile ARN만 사용한다. 성능·가격이 아니라 비용 귀속만 바뀐다.
 - 실제 이미지 추론 호출은 검증 목적으로 새로 만들지 않았다. IAM 시뮬레이션과 프로파일 상태·태그 재조회까지만 수행했다. 실동작 검증은 다음 정상 업무 태스크의 로그·CloudTrail로 한다.
 
+## 배포 후속
+
+- PR #36 병합(`0c6bbdb`) 후 병합된 main으로 공용 ARM64 이미지를 빌드했다.
+- Windows Docker Desktop에서 ARM64 binfmt를 활성화해 빌드 완료. 배포 스크립트 CRLF와 Git Bash의 AWS CLI PATH 문제는 ECR push 전 발생해 운영 변경 없이 중단됐고, 같은 빌드의 push/register 단계만 PowerShell에서 재개했다.
+- ECR `latest`: `sha256:264049…` → `sha256:8a0218…`(2026-09-18 13:01 KST).
+- frontpage task definition: `:44` → `:45`, `Service=atlas4` 등 기존 태그 보존.
+- mustknow task definition `:7`은 같은 ECR `:latest`를 매 실행 pull하므로 별도 리비전 등록 불필요.
+- 배포 이미지 내부 상수를 ARM64 컨테이너에서 직접 출력해 두 신규 application profile ARN과 일치함을 확인했다.
+- EventBridge 규칙은 frontpage·mustknow 모두 `ENABLED`. 수동 태스크·중복 콘텐츠 생성은 하지 않았다.
+
 ## 다음
 
-- 브랜치 PR 머지 후 frontpage-auto 공용 ECR 이미지를 재빌드하고 두 task definition을 새 리비전으로 등록한다. 머지 전 배포하면 다음 배포가 되돌릴 수 있으므로 아직 배포하지 않았다.
-- 첫 정상 업무 태스크에서 로그 오류 0, CloudTrail `modelId`가 신규 app ARN인지 확인한다.
+- 다음 정상 mustknow 실행(15:00 KST 이후)에서 태스크 완료·로그 오류 0, CloudTrail `modelId`가 신규 app ARN인지 확인한다.
 - BillingON T+3~4에서 `Stability AI Image Services`가 `Service=atlas4`로 이동하는지 확인한다.
 - 2026-09-30 지원 종료 시 두 프로파일의 `Service`를 `lens`로 원복 대상에 포함한다.
