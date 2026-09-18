@@ -594,11 +594,9 @@ def generate_bedrock_style_guide_image(prompt: str, out_path: Path, retries: int
 # 세 호출 다 실패하면 예외를 던져 _retry_generate_and_write()가 전체를
 # 재시도한다(부분 재시도는 안 함 — 어느 단계가 실패했든 처음부터 다시
 # 하는 게 상태 추적 복잡도를 피하는 더 단순한 선택).
-STYLE_TRANSFER_MODEL_ID = "us.stability.stable-style-transfer-v1:0"  # us-east-1
-# 프로파일 태그 없이 베어 모델 ID를 그대로 쓴다 — 2026-09-08 현재 이
-# 서비스군(Stability Image Services 13종)에 application inference profile이
-# 아직 안 뜬다(콘솔 확인). 정식 편입 전 비용태깅 상태를 재확인할 것
-# (docs/architecture/비용태깅_규칙.md).
+STYLE_TRANSFER_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/tck49g1f12v9"  # lens-webtoon-image-style-transfer
+# 2026-09-18 — SYSTEM 프로파일 직호출을 Service=atlas4 application profile로 교체.
+# 기반 모델·리전·응답은 동일하고 비용 귀속만 Not Applicable → atlas4로 바뀐다.
 
 _SCENE_TRANSLATE_MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46 재사용
 
@@ -819,7 +817,7 @@ def generate_bedrock_composed_image_bytes(
 # 0.75 — 합성 이음매를 더 적극적으로 재조정하게 하려면 원본 구조를
 # 너무 꽉 붙들지 않는 편이 낫다는 걸 실측으로 확인.
 _EMPTY_SCENE_NEGATIVE_PROMPT = "people, person, man, woman, illustration, cartoon, text, watermark"
-REMOVE_BACKGROUND_MODEL_ID = "us.stability.stable-image-remove-background-v1:0"
+REMOVE_BACKGROUND_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/fo8lxrosnj66"  # lens-webtoon-image-remove-background
 
 
 def build_empty_scene_prompt(photo_brief: str) -> str:

@@ -130,6 +130,8 @@
       "Effect": "Allow",
       "Action": ["bedrock:InvokeModel"],
       "Resource": [
+        "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/tck49g1f12v9",
+        "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/fo8lxrosnj66",
         "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.stability.stable-style-transfer-v1:0",
         "arn:aws:bedrock:us-east-2:887078546492:inference-profile/us.stability.stable-style-transfer-v1:0",
         "arn:aws:bedrock:us-west-2:887078546492:inference-profile/us.stability.stable-style-transfer-v1:0",
