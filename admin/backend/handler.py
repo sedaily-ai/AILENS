@@ -24,8 +24,12 @@ from routes import (
     prompt_lab,
     prompts,
     quiz,
-    webtoon_lab,
 )
+from routes.webtoon import assets as webtoon_assets
+from routes.webtoon import generate as webtoon_generate
+from routes.webtoon import gpu as webtoon_gpu
+from routes.webtoon import jobs as webtoon_jobs
+from routes.webtoon import stage as webtoon_stage
 from shared import audit, response
 
 logger = logging.getLogger()
@@ -86,35 +90,36 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/quiz/{id}/publish": (quiz.handle_publish, True),
     "POST /admin/quiz/{id}/unpublish": (quiz.handle_unpublish, True),
     "DELETE /admin/quiz/{id}": (quiz.handle_delete, True),
-    # 웹툰 이미지 생성 실험 (2026-09-05) — routes/webtoon_lab.py 모듈
-    # docstring 참고. API Gateway에도 이미 올라가 있다(2026-09-16 확인,
-    # AuthorizationType NONE — Lambda가 직접 JWT 검증). 새 라우트를 추가할
-    # 땐 여기 등록 + API Gateway에 `aws apigatewayv2 create-route`로 같은
-    # integration(기존 라우트로 `get-routes`ID 조회) 붙이는 것 둘 다 필요.
-    "POST /admin/webtoon-lab/generate": (webtoon_lab.handle_generate, True),
-    "GET /admin/webtoon-lab/history": (webtoon_lab.handle_history, True),
-    "GET /admin/webtoon-lab/defaults": (webtoon_lab.handle_defaults, True),
-    "GET /admin/webtoon-lab/{job_id}": (webtoon_lab.handle_status, True),
+    # 웹툰 이미지 생성 실험 (2026-09-05) — routes/webtoon/ 패키지(2026-09-20
+    # 분리, __init__.py docstring 참고). API Gateway에도 이미 올라가 있다
+    # (2026-09-16 확인, AuthorizationType NONE — Lambda가 직접 JWT 검증).
+    # 새 라우트를 추가할 땐 여기 등록 + API Gateway에
+    # `aws apigatewayv2 create-route`로 같은 integration(기존 라우트로
+    # `get-routes`ID 조회) 붙이는 것 둘 다 필요.
+    "POST /admin/webtoon-lab/generate": (webtoon_generate.handle_generate, True),
+    "GET /admin/webtoon-lab/history": (webtoon_generate.handle_history, True),
+    "GET /admin/webtoon-lab/defaults": (webtoon_generate.handle_defaults, True),
+    "GET /admin/webtoon-lab/{job_id}": (webtoon_jobs.handle_status, True),
     # GPU 켜기/끄기 (2026-09-14) — 컷별 "실제 품질" 이미지 생성은 이제 WebSocket
     # (routes/chat_ws.py) 경로로만 트리거된다(HTTP generate-composed 라우트는
     # 2026-09-16 삭제 — 유일한 호출부였던 WebtoonStoryboardLab.tsx가 없어짐).
-    "GET /admin/webtoon-lab/gpu/status": (webtoon_lab.handle_gpu_status, True),
-    "POST /admin/webtoon-lab/gpu/start": (webtoon_lab.handle_gpu_start, True),
-    "POST /admin/webtoon-lab/gpu/stop": (webtoon_lab.handle_gpu_stop, True),
-    # 인물·화풍 참조 이미지 업로드 (2026-09-16) — webtoon_lab.py 새 섹션 주석 참고.
-    "GET /admin/webtoon-lab/image-assets": (webtoon_lab.handle_image_assets_get, True),
-    "POST /admin/webtoon-lab/image-assets/presign": (webtoon_lab.handle_image_assets_presign, True),
-    "GET /admin/webtoon-lab/image-assets/gallery": (webtoon_lab.handle_image_assets_gallery, True),
-    "POST /admin/webtoon-lab/image-assets/select": (webtoon_lab.handle_image_assets_select, True),
-    # 단계별 생성 (2026-09-18) — webtoon_lab.py "단계별 생성" 섹션 주석 참고.
+    "GET /admin/webtoon-lab/gpu/status": (webtoon_gpu.handle_gpu_status, True),
+    "POST /admin/webtoon-lab/gpu/start": (webtoon_gpu.handle_gpu_start, True),
+    "POST /admin/webtoon-lab/gpu/stop": (webtoon_gpu.handle_gpu_stop, True),
+    # 인물·화풍 참조 이미지 업로드 (2026-09-16) — routes/webtoon/assets.py 참고.
+    "GET /admin/webtoon-lab/image-assets": (webtoon_assets.handle_get, True),
+    "POST /admin/webtoon-lab/image-assets/presign": (webtoon_assets.handle_presign, True),
+    "GET /admin/webtoon-lab/image-assets/gallery": (webtoon_assets.handle_gallery, True),
+    "POST /admin/webtoon-lab/image-assets/select": (webtoon_assets.handle_gallery_select, True),
+    # 단계별 생성 (2026-09-18) — routes/webtoon/stage.py 참고.
     # stage/character는 GPU(SSM) 왕복이라 비동기(job_id)라 위 GET
     # /admin/webtoon-lab/{job_id}로 그대로 폴링한다 — 별도 GET 라우트 불필요.
-    "POST /admin/webtoon-lab/stage/translate": (webtoon_lab.handle_stage_translate, True),
-    "POST /admin/webtoon-lab/stage/character": (webtoon_lab.handle_stage_character, True),
-    "POST /admin/webtoon-lab/stage/background": (webtoon_lab.handle_stage_background, True),
-    "POST /admin/webtoon-lab/stage/composite": (webtoon_lab.handle_stage_composite, True),
-    "POST /admin/webtoon-lab/stage/style": (webtoon_lab.handle_stage_style, True),
-    "GET /admin/webtoon-lab/stage/history": (webtoon_lab.handle_stage_history, True),
+    "POST /admin/webtoon-lab/stage/translate": (webtoon_stage.handle_translate, True),
+    "POST /admin/webtoon-lab/stage/character": (webtoon_stage.handle_character, True),
+    "POST /admin/webtoon-lab/stage/background": (webtoon_stage.handle_background, True),
+    "POST /admin/webtoon-lab/stage/composite": (webtoon_stage.handle_composite, True),
+    "POST /admin/webtoon-lab/stage/style": (webtoon_stage.handle_style, True),
+    "GET /admin/webtoon-lab/stage/history": (webtoon_stage.handle_history, True),
 }
 
 
@@ -185,8 +190,8 @@ def lambda_handler(event: dict, context) -> dict:
     # 있어 비동기로 뺐다: 원 요청은 job_id만 즉시 돌려주고, 실제 Bedrock
     # 호출은 이 함수가 자기 자신을 InvocationType="Event"로 다시 호출해서
     # 만든 완전히 별개의 invocation에서 처리한다(routes/prompts.py::
-    # _self_invoke_async 참고). webtoon_lab.py의 threading 방식(그 파일
-    # docstring이 직접 경고: "Lambda는 호출이 끝나는 순간 컨테이너가
+    # _self_invoke_async 참고). routes/webtoon/generate.py의 threading
+    # 방식(그 파일 docstring이 직접 경고: "Lambda는 호출이 끝나는 순간 컨테이너가
     # 얼려질 수 있어 스레드가 안 끝날 위험")은 수 초짜리 작업엔 버텨도
     # 25~40초 걸리는 이 작업엔 못 버틴다 — self-invoke는 완전히 새
     # invocation이라 그 문제가 없다. 이 내부 이벤트는 API Gateway를 안
@@ -199,14 +204,14 @@ def lambda_handler(event: dict, context) -> dict:
             logger.exception(f"async prompt job error: {type(e).__name__}: {e}")
         return {}
     # 2026-09-14 — 웹툰 컷 이미지를 실제 발행본과 같은 경로(GPU IP-Adapter+
-    # Style Transfer+QA+텍스트 합성)로 만들면서 webtoon_lab.py도 같은
-    # self-invoke 비동기 패턴이 필요해졌다(threading 방식은 이 파일
+    # Style Transfer+QA+텍스트 합성)로 만들면서 routes/webtoon/ 패키지도
+    # 같은 self-invoke 비동기 패턴이 필요해졌다(threading 방식은 이 파일
     # docstring이 이미 경고한 대로 이렇게 긴 작업엔 못 버틴다) — 마커
     # 키만 달리해서 두 모듈의 비동기 작업을 구분한다.
     if event.get("_async_webtoon_job"):
-        from routes import webtoon_lab
+        from routes import webtoon
         try:
-            webtoon_lab.run_async_job(event["_async_webtoon_job"])
+            webtoon.run_async_job(event["_async_webtoon_job"])
         except Exception as e:  # noqa: BLE001 — self-invoke 최상위, 안 잡으면 로그도 없이 크래시
             logger.exception(f"async webtoon job error: {type(e).__name__}: {e}")
         return {}

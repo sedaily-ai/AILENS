@@ -10,7 +10,7 @@
 **설계**: WebSocket 라우트(AWS_PROXY 통합)의 응답 시간은 HTTP API와 똑같이
 약 29초로 제한된다 — Bedrock 스토리보드 생성(수십 초)·GPU 부팅(1~3분)은
 그 안에 못 끝낸다. 그래서 메시지 수신 핸들러는 "받았다"만 빠르게 응답하고,
-실제 작업은 routes/prompts.py·routes/webtoon_lab.py의 기존 self-invoke
+실제 작업은 routes/prompts.py·routes/webtoon/의 기존 self-invoke
 비동기(Event invocation) 패턴을 그대로 재사용해 떼어낸다 — 다른 점은
 그 비동기 작업이 끝났을 때 DynamoDB에 써서 클라이언트가 폴링하게 하는
 대신, 여기서는 `post_to_connection`으로 그 커넥션에 직접 결과를 밀어넣는다
@@ -36,14 +36,12 @@ import boto3
 
 import auth
 from repo import prompt_lab_repo, prompts_repo
-from routes import webtoon_lab
+from routes.webtoon import generate as webtoon_generate
+from routes.webtoon import gpu as webtoon_gpu
+from routes.webtoon import jobs as webtoon_jobs
+from routes.webtoon import script as webtoon_script
 from shared import time_utils
-from routes.prompts import (
-    _CATEGORY_BEDROCK,
-    _build_script_call,
-    _get_bedrock_client,
-    _normalize_cuts,
-)
+from routes.prompts import _CATEGORY_BEDROCK, _get_bedrock_client
 from json_extract import extract_json_object  # pipelines/common/ — deploy 시 zip 루트에 복사됨(routes/prompts.py와 동일 패턴)
 
 logger = logging.getLogger(__name__)
@@ -202,7 +200,7 @@ def run_async_job(payload: dict) -> None:
     elif kind == "cut_image":
         _run_cut_image_flow(push, data.get("cut") or {}, data.get("model") or "pipeline")
     elif kind == "gpu_start":
-        webtoon_lab._run_gpu_start(uuid.uuid4().hex[:16], push=push)
+        webtoon_gpu.run_gpu_start(uuid.uuid4().hex[:16], push=push)
     elif kind == "gpu_stop":
         _run_gpu_stop_flow(push)
     else:
@@ -319,8 +317,8 @@ def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) 
     구분 자체가 왜 있어야하는거죠?? 그런거 필요없을텐데요"). 예전엔 여기서
     두 번(_build_step1_call→_build_step2_call) 나눠 불러 그 사이에 "1단계
     결과" 메시지·"2단계로 진행" 안내 문구가 끼어 있었다 — 이제 단일 호출
-    (_build_script_call, routes/prompts.py 참고)로 스크립트·카메라·장면을
-    한 번에 받는다."""
+    (webtoon_script.build_script_call, routes/webtoon/script.py 참고)로
+    스크립트·카메라·장면을 한 번에 받는다."""
     if not article.strip():
         push({"type": "error", "message": "기사 원문이 비어 있습니다."})
         return
@@ -328,10 +326,10 @@ def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) 
         content = _resolve_prompt_content(push, saved_draft)
         if content is None:
             return
-        system, user_message, model, max_tokens = _build_script_call(content, article)
+        system, user_message, model, max_tokens = webtoon_script.build_script_call(content, article)
         raw = _stream_json_completion(push, "script", system, user_message, model, max_tokens)
         script = extract_json_object(raw)
-        cuts = _normalize_cuts(script)
+        cuts = webtoon_script.normalize_cuts(script)
         push({
             "type": "storyboard",
             "core_question": script.get("core_question"),
@@ -357,12 +355,12 @@ def _run_cut_image_flow(push: Push, cut: dict, model: str = "pipeline") -> None:
     job_id = uuid.uuid4().hex[:16]
     now = time_utils.now_iso()
     try:
-        webtoon_lab._put_job(job_id, {"status": "pending", "cut": cut.get("cut"), "created_at": now, "updated_at": now})
+        webtoon_jobs.put_job(job_id, {"status": "pending", "cut": cut.get("cut"), "created_at": now, "updated_at": now})
     except Exception as e:  # noqa: BLE001 — 여기서 안 잡으면 push도 없이 클라이언트가 무한 대기
         logger.exception(f"webtoon-lab job 생성 실패: {job_id}")
         push({"type": "cut_image_error", "cut": cut.get("cut"), "error": str(e)[:500]})
         return
-    webtoon_lab._run_composed_generation(job_id, cut, push=push, model=model)
+    webtoon_generate.run_composed_generation(job_id, cut, push=push, model=model)
 
 
 def _run_gpu_stop_flow(push: Push) -> None:
