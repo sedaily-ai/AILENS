@@ -249,7 +249,12 @@ def main():
             results["skipped_duplicate"] += 1
             return "skipped_duplicate"
         try:
-            status = _publish(article, out_dir, s3, today, paper_section=paper_section, display_order=display_order, results=results, manage_gpu=False)
+            # 2026-09-20 — main()의 배치 레벨 GPU 감싸기를 제거하면서
+            # manage_gpu도 기본값 True(pipeline.py::run_article()가 기사
+            # 단위로 자체 관리)로 되돌렸다. IMAGE_PROVIDER가 Ultra인 동안은
+            # 이 인자가 안 쓰인다(GPU 분기가 안 걸림) — GPU 경로 롤백 시
+            # 안전망.
+            status = _publish(article, out_dir, s3, today, paper_section=paper_section, display_order=display_order, results=results)
         except Exception:
             print(f"[mustknow-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵\n{traceback.format_exc()}")
             status = "failed"
@@ -284,87 +289,88 @@ def main():
     # 고친 뒤 재실행해도 두 기사는 다시 안 걸렸다). status가 "failed"면
     # seen을 안 찍어서 다음 회차에 다시 시도되게 한다.
     # 2026-09-10 — GPU(웹툰 IP-Adapter) 배치 전체(1~4단계)를 감싸 한 번만
-    # 켜고 끝나면 한 번만 끈다(publish_utils.publish_article() docstring
-    # 참조) — 기사마다 켜고 끄면 부팅+SSM 온라인 대기가 기사 수만큼
-    # 반복돼 오늘 실행에서 실측된 것처럼 누적 오버헤드가 크다. try/finally
-    # 로 감싸 중간에 예외가 나도 반드시 끈다.
-    import gpu_ipadapter  # noqa: lazy — pipelines/common/
-    if front_page or fresh:
-        gpu_ipadapter.ensure_gpu_running()
-    try:
-        if not is_sunday:
-            for a in front_page:
-                if a["key"] and _is_seen(seen_table, a["key"]):
-                    continue
-                if tab_counts["전체"] >= _TAB_CAP:
-                    break
-                selected_keys.add(a["key"])
-                status = _try_publish(a, "전체", tab_counts["전체"])
-                if status != "failed":
-                    _mark_seen(seen_table, a["key"], tab="전체")
-                tab_counts["전체"] += 1
-
-        # 2) Sonnet 5 배치 채점 — fresh 전체(전체 탭 후보 제외한 나머지)
-        scorable = [a for a in fresh if a["key"] not in selected_keys]
-        guide = ddb_prompt.load_prompt("mustknow")
-        scores = classify.score_articles(guide, scorable) if scorable else {}
-        print(f"[mustknow-auto] 채점 완료 {len(scores)}/{len(scorable)}건")
-
-        # 일반 임계값(7.0)이 전체 경로 중 가장 낮은 바닥 — "단, 증권/산업/시그널은
-        # 예외"(2026-08-25). 이 세 카테고리는 바로 아래 3)에서 임계값 미달이어도
-        # 그날 최고점 순으로 탭 정원(4건)을 채우는 근사치 폴백을 타므로, 여기서
-        # 미리 seen 확정하면 그 폴백 후보 자체가 사라진다 — 탭 카테고리는
-        # 건너뛰고, 그 외 카테고리만 기존대로 조기 확정한다.
-        for a in scorable:
-            if a["top_category"] in _TAB_CATEGORY.values():
+    # 켜고 끝나면 한 번만 끈다는 게 여기 있었다. 2026-09-20(Phase 4,
+    # 정리후보 A+D) — `pipeline.py`의 `IMAGE_PROVIDER`가 `"bedrock-sd-ultra"`
+    # 로 바뀌면서 어떤 컷도 더 이상 GPU IP-Adapter 경로를 안 탄다 — 이
+    # 배치 레벨 warm-up을 그대로 두면 후보가 있을 때마다(사실상 매일)
+    # 쓰지도 않을 GPU를 켜서 시간당 $0.647를 계속 태우게 된다(실제로
+    # 이날 이 함수 실행에서 확인 — `fresh` 35건이 있어 GPU가 켜졌지만
+    # 결과적으로 한 건도 GPU 경로를 안 씀). GPU EC2 인스턴스·
+    # `gpu_ipadapter.py` 자체는 Phase 4 안정화(1~2주) 확인 전까지 롤백
+    # 경로로 남겨두지만(정리후보 D 참고), 매 배치마다 자동으로 켜는 이
+    # 호출은 제거한다 — GPU 경로로 롤백되면 `_publish()`가 넘기는
+    # `manage_gpu`(기본값 True)로 `pipeline.py::run_article()`가 기사
+    # 단위로 다시 자체 관리한다.
+    if not is_sunday:
+        for a in front_page:
+            if a["key"] and _is_seen(seen_table, a["key"]):
                 continue
-            row = scores.get(a["key"])
-            if row is not None and (row.get("total") or 0) < _GENERAL_THRESHOLD:
-                _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
-
-        # 3) 증권/산업/시그널 — 점수 있는 후보를 높은 점수 순으로 정렬해 탭당
-        #    4건을 채운다(일요일엔 스킵 — 위 is_sunday 주석 참조).
-        #
-        # 2026-08-25 — 절대 임계값(_TAB_THRESHOLD) 미달이어도 그날 최선의
-        # 근사치로 정원을 채우도록 바꿨다. "8.0 이상만" 고수했더니 파이프라인
-        # 가동 3일간(249건 발행) 이 세 탭에 단 한 건도 배정되지 않은 게
-        # 확인됐고(사용자 신고로 발견), 사용자 명시 지침 — "발행이 안되면
-        # 안됩니다. 8.0 없으면 그 아래 점수로라도 근사치로라도 4개씩 올리도록
-        # 해야합니다." — 에 따라 임계값을 "발행 여부"가 아니라 "정렬 우선순위"
-        # 로만 쓴다. _TAB_THRESHOLD는 그 우선순위를 설명하는 참고값으로 남긴다
-        # (오늘 실측 기준 6.5 이상이 나오면 그게 먼저 채워지고, 없으면 그보다
-        # 낮은 점수라도 채워진다).
-        if not is_sunday:
-            for tab, cat in _TAB_CATEGORY.items():
-                pool = [a for a in scorable if a["top_category"] == cat and scores.get(a["key"])]
-                pool.sort(key=lambda a: scores[a["key"]].get("total") or 0, reverse=True)
-                for a in pool:
-                    if tab_counts[tab] >= _TAB_CAP:
-                        break
-                    row = scores[a["key"]]
-                    selected_keys.add(a["key"])
-                    status = _try_publish(a, tab, tab_counts[tab])
-                    if status != "failed":
-                        _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
-                    tab_counts[tab] += 1
-
-        # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게
-        #    7.0 넘으면 전부(캡 없음) — 증권/산업/시그널 중 탭 정원을 못 채운
-        #    기사도 여기서 일반 카테고리로는 발행될 수 있다(정보 손실 방지).
-        for a in scorable:
-            if a["key"] in selected_keys:
-                continue
-            row = scores.get(a["key"])
-            if not row or (row.get("total") or 0) < _GENERAL_THRESHOLD:
-                continue
+            if tab_counts["전체"] >= _TAB_CAP:
+                break
             selected_keys.add(a["key"])
-            status = _try_publish(a, None, None)
+            status = _try_publish(a, "전체", tab_counts["전체"])
             if status != "failed":
-                _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
-            tab_counts["일반"] += 1
-    finally:
-        if front_page or fresh:
-            gpu_ipadapter.stop_gpu()
+                _mark_seen(seen_table, a["key"], tab="전체")
+            tab_counts["전체"] += 1
+
+    # 2) Sonnet 5 배치 채점 — fresh 전체(전체 탭 후보 제외한 나머지)
+    scorable = [a for a in fresh if a["key"] not in selected_keys]
+    guide = ddb_prompt.load_prompt("mustknow")
+    scores = classify.score_articles(guide, scorable) if scorable else {}
+    print(f"[mustknow-auto] 채점 완료 {len(scores)}/{len(scorable)}건")
+
+    # 일반 임계값(7.0)이 전체 경로 중 가장 낮은 바닥 — "단, 증권/산업/시그널은
+    # 예외"(2026-08-25). 이 세 카테고리는 바로 아래 3)에서 임계값 미달이어도
+    # 그날 최고점 순으로 탭 정원(4건)을 채우는 근사치 폴백을 타므로, 여기서
+    # 미리 seen 확정하면 그 폴백 후보 자체가 사라진다 — 탭 카테고리는
+    # 건너뛰고, 그 외 카테고리만 기존대로 조기 확정한다.
+    for a in scorable:
+        if a["top_category"] in _TAB_CATEGORY.values():
+            continue
+        row = scores.get(a["key"])
+        if row is not None and (row.get("total") or 0) < _GENERAL_THRESHOLD:
+            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+
+    # 3) 증권/산업/시그널 — 점수 있는 후보를 높은 점수 순으로 정렬해 탭당
+    #    4건을 채운다(일요일엔 스킵 — 위 is_sunday 주석 참조).
+    #
+    # 2026-08-25 — 절대 임계값(_TAB_THRESHOLD) 미달이어도 그날 최선의
+    # 근사치로 정원을 채우도록 바꿨다. "8.0 이상만" 고수했더니 파이프라인
+    # 가동 3일간(249건 발행) 이 세 탭에 단 한 건도 배정되지 않은 게
+    # 확인됐고(사용자 신고로 발견), 사용자 명시 지침 — "발행이 안되면
+    # 안됩니다. 8.0 없으면 그 아래 점수로라도 근사치로라도 4개씩 올리도록
+    # 해야합니다." — 에 따라 임계값을 "발행 여부"가 아니라 "정렬 우선순위"
+    # 로만 쓴다. _TAB_THRESHOLD는 그 우선순위를 설명하는 참고값으로 남긴다
+    # (오늘 실측 기준 6.5 이상이 나오면 그게 먼저 채워지고, 없으면 그보다
+    # 낮은 점수라도 채워진다).
+    if not is_sunday:
+        for tab, cat in _TAB_CATEGORY.items():
+            pool = [a for a in scorable if a["top_category"] == cat and scores.get(a["key"])]
+            pool.sort(key=lambda a: scores[a["key"]].get("total") or 0, reverse=True)
+            for a in pool:
+                if tab_counts[tab] >= _TAB_CAP:
+                    break
+                row = scores[a["key"]]
+                selected_keys.add(a["key"])
+                status = _try_publish(a, tab, tab_counts[tab])
+                if status != "failed":
+                    _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+                tab_counts[tab] += 1
+
+    # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게
+    #    7.0 넘으면 전부(캡 없음) — 증권/산업/시그널 중 탭 정원을 못 채운
+    #    기사도 여기서 일반 카테고리로는 발행될 수 있다(정보 손실 방지).
+    for a in scorable:
+        if a["key"] in selected_keys:
+            continue
+        row = scores.get(a["key"])
+        if not row or (row.get("total") or 0) < _GENERAL_THRESHOLD:
+            continue
+        selected_keys.add(a["key"])
+        status = _try_publish(a, None, None)
+        if status != "failed":
+            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+        tab_counts["일반"] += 1
 
     print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
 

@@ -126,6 +126,17 @@
       ]
     },
     {
+      "Sid": "WebtoonSd35UltraBedrockInvoke",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/52u16muojn2u",
+        "arn:aws:bedrock:us-west-2::foundation-model/stability.sd3-5-large-v1:0",
+        "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/htvjnctxyvs1",
+        "arn:aws:bedrock:us-west-2::foundation-model/stability.stable-image-ultra-v1:1"
+      ]
+    },
+    {
       "Sid": "WebtoonCrossRegionStabilityInvoke",
       "Effect": "Allow",
       "Action": ["bedrock:InvokeModel"],

@@ -79,7 +79,10 @@ def process_article(article: dict, out_dir: Path, s3, today_kst: str) -> str:
         paper_section="전체", display_order=article["_display_order"],
         log_prefix="frontpage-auto",
         letters_mod=_letters_mod, podcast_mod=_podcast_mod, webtoon_mod=_webtoon_mod,
-        manage_gpu=False,  # main()이 배치 전체를 감싸 한 번만 켜고 끈다
+        # 2026-09-20 — main()의 배치 레벨 GPU 감싸기를 제거하면서 기본값
+        # True(webtoon/pipeline.py::run_article()가 기사 단위로 자체 관리)로
+        # 되돌렸다. IMAGE_PROVIDER가 Ultra인 동안은 이 인자 자체가 안 쓰인다
+        # (GPU 분기가 안 걸림) — GPU 경로로 롤백될 경우를 위한 안전망.
     )
 
 
@@ -102,36 +105,35 @@ def main():
     results = {"published": 0, "published_no_video": 0, "skipped_duplicate": 0, "failed": 0}
 
     # 2026-09-10 — GPU(웹툰 IP-Adapter) 배치 전체를 감싸 한 번만 켜고 끝나면
-    # 한 번만 끈다. 예전엔 process_article() 안(webtoon/pipeline.py::run_article())
-    # 에서 기사마다 켜고 껐는데, g4dn.xlarge 부팅+SSM 온라인 대기만 기사당
-    # 수십 초~분이라 후보가 많은 날은 이 오버헤드만 누적으로 수십 분씩
-    # 됐다(오늘 실행에서 실측). try/finally로 감싸 중간에 예외가 나도
-    # 반드시 끈다 — 안 끄면 시간당 $0.647가 계속 나간다.
-    import gpu_ipadapter  # noqa: lazy — pipelines/common/, GPU 안 쓰는 실행에선 굳이 부작용 없음
-    if candidates:
-        gpu_ipadapter.ensure_gpu_running()
-    try:
-        for i, article in enumerate(candidates):
-            article["_display_order"] = i
-            try:
-                status = process_article(article, out_dir, s3, today)
-            except Exception:
-                print(f"[frontpage-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵하고 계속\n{traceback.format_exc()}")
-                status = "failed"
-            results[status] = results.get(status, 0) + 1
-            # 2026-09-03 — 예전엔 이 웹훅을 후보 전체 루프가 끝난 뒤 한 번만
-            # 불렀다. 뒤에 남은 후보의 영상 생성(수 분 소요)이 안 끝나면 이미
-            # DDB엔 써진 앞선 기사도 그동안 프런트 SSR 캐시(revalidate: 300s)가
-            # 안 갱신돼 "이슈를 찾을 수 없어요"로 뜨는 걸 사용자가 실제로
-            # 클릭해보고 신고해서 발견(홈 "오늘의 이슈, 4가지 시선" 형식 타일
-            # 클릭이 "안 넘어간다"고 느껴짐 — 실제로는 링크는 타는데 목적지
-            # 페이지가 아직 캐시된 옛 목록이라 그 글을 못 찾은 것). 기사 하나가
-            # 끝날 때마다 바로 무효화하면 이 창을 없앨 수 있다.
-            if status in ("published", "published_no_video") and revalidate_secret:
-                publish_utils.notify_revalidate(revalidate_secret, log_prefix="frontpage-auto")
-    finally:
-        if candidates:
-            gpu_ipadapter.stop_gpu()
+    # 한 번만 끈다는 게 여기 있었다(g4dn.xlarge 부팅+SSM 온라인 대기 오버헤드
+    # 누적 방지). 2026-09-20(Phase 4, 정리후보 A+D) — `pipeline.py`의
+    # `IMAGE_PROVIDER`가 `"bedrock-sd-ultra"`로 바뀌면서 어떤 컷도 더 이상
+    # GPU IP-Adapter 경로를 안 탄다 — 이 배치 레벨 warm-up을 그대로 두면
+    # 후보가 있을 때마다(사실상 매일) 쓰지도 않을 GPU를 켜서 시간당 $0.647를
+    # 계속 태우게 된다(실제로 이날 mustknow_auto 실행에서 확인). GPU EC2
+    # 인스턴스·`gpu_ipadapter.py` 자체는 Phase 4 안정화(1~2주) 확인 전까지
+    # 롤백 경로로 남겨두지만(정리후보 D 참고), 매 배치마다 자동으로 켜는
+    # 이 호출은 더 이상 쓸모가 없어 제거한다 — 정말 필요해지면(IMAGE_PROVIDER
+    # 롤백) `pipeline.py::run_article()`의 `manage_gpu` 인자로도 다시 켤 수
+    # 있으니 여기서 별도로 감쌀 필요는 없다.
+    for i, article in enumerate(candidates):
+        article["_display_order"] = i
+        try:
+            status = process_article(article, out_dir, s3, today)
+        except Exception:
+            print(f"[frontpage-auto] {article['title']} 처리 중 예외 — 이 기사만 스킵하고 계속\n{traceback.format_exc()}")
+            status = "failed"
+        results[status] = results.get(status, 0) + 1
+        # 2026-09-03 — 예전엔 이 웹훅을 후보 전체 루프가 끝난 뒤 한 번만
+        # 불렀다. 뒤에 남은 후보의 영상 생성(수 분 소요)이 안 끝나면 이미
+        # DDB엔 써진 앞선 기사도 그동안 프런트 SSR 캐시(revalidate: 300s)가
+        # 안 갱신돼 "이슈를 찾을 수 없어요"로 뜨는 걸 사용자가 실제로
+        # 클릭해보고 신고해서 발견(홈 "오늘의 이슈, 4가지 시선" 형식 타일
+        # 클릭이 "안 넘어간다"고 느껴짐 — 실제로는 링크는 타는데 목적지
+        # 페이지가 아직 캐시된 옛 목록이라 그 글을 못 찾은 것). 기사 하나가
+        # 끝날 때마다 바로 무효화하면 이 창을 없앨 수 있다.
+        if status in ("published", "published_no_video") and revalidate_secret:
+            publish_utils.notify_revalidate(revalidate_secret, log_prefix="frontpage-auto")
 
     print(f"[frontpage-auto] 완료 — {json.dumps(results, ensure_ascii=False)}")
 

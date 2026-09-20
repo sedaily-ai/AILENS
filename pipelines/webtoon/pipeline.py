@@ -42,9 +42,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — 2026-08-20 letters/podcast와 공용화
 from openai_client import get_client  # pipelines/common/ — 2026-08-21 로컬 .env 제거 (이미지 생성 전용)
-from bedrock_client import call_text, call_vision  # 2026-08-23 스크립트/장면연출 + 2026-09-02 이미지 QA
+from bedrock_client import call_text  # 2026-08-23 스크립트/장면연출용
 from json_extract import extract_json_object  # pipelines/common/ — 2026-08-23 공용화, 2026-09-04 폴백까지 통합
-from rekognition_client import detect_main_faces  # pipelines/common/ — 2026-09-08 말풍선 얼굴 회피용
 
 import prompts
 import compose_text
@@ -58,11 +57,13 @@ IMAGE_SIZE = "1536x1024"         # 3:2 가로. 컷당 $0.165 (2026-08 기준, hi
 IMAGE_QUALITY = "high"
 N_CUTS = 8
 
-# "openai"(원래 GPT 경로, 말풍선까지 이미지 모델이 그림) | "bedrock"(Stable
-# Image Core, 순수 텍스트 프롬프트) | "bedrock-style-guide"(Stable Image
-# Style Guide, 참고 이미지로 화풍 고정) | "bedrock-style-transfer"(구도-화풍
-# 분리 3단계 — 2026-09-08 신설, 기본값으로 승격). 넷 다 텍스트는
-# compose_text.py가 합성(openai만 예외 — 모델이 직접 그림).
+# "openai"(원래 GPT 경로, 말풍선까지 이미지 모델이 그림, 휴면·사업상 미사용) |
+# "bedrock"(Stable Image Core, 순수 텍스트 프롬프트, 휴면) | "bedrock-style-guide"
+# (Stable Image Style Guide, 참고 이미지로 화풍 고정, 휴면) | "bedrock-style-transfer"
+# (구도-화풍 분리 3단계, GPU IP-Adapter — 2026-09-08~2026-09-20 기본값,
+# 이제 휴면·롤백용) | "bedrock-sd-ultra"(Stable Image Ultra, GPU 없음 —
+# 2026-09-20부터 기본값). 전부 텍스트는 compose_text.py가 합성(openai만
+# 예외 — 모델이 직접 그림).
 #
 # bedrock → bedrock-style-guide 전환 경위: 사용자가 공유한 참고 샘플과
 # 대조한 결과 Stable Image Core 순수 텍스트 프롬프트는 "cel-shaded, NOT
@@ -78,32 +79,64 @@ N_CUTS = 8
 # 정확히 따른다"는 걸 실측 확인 — 문제는 장소 이해력이 아니라 화풍+장면
 # 동시 요구 자체였다. webtoon_image.generate_bedrock_composed_image()가
 # (1)한국어 장면→영어 사진 브리핑 번역 (2)포토리얼 사진 생성 (3)Style
-# Transfer로 화풍만 덧입히기 3단계로 이 둘을 분리한다. 사용자가 OpenAI
-# 대신 Stable Diffusion 계열 유지를 명시적으로 결정했으므로(2026-09-08),
-# 그 제약 안에서 지금까지 중 [SCENE] 이행력이 가장 좋은 이 경로를
-# 기본값으로 삼는다. 컷당 Bedrock 호출이 1~2회→3회로 늘어 비용·시간이
-# 늘어나는 트레이드오프가 있다.
-IMAGE_PROVIDER = "bedrock-style-transfer"
+# Transfer로 화풍만 덧입히기 3단계로 이 둘을 분리한다. 컷당 Bedrock
+# 호출이 1~2회→3회로 늘어 비용·시간이 늘어나는 트레이드오프가 있었다.
+#
+# bedrock-style-transfer → bedrock-sd-ultra 전환 경위(2026-09-20, 정리후보
+# A+D Phase 4) — "GPU를 꼭 써야할까요? 인물을 고정할 필요도 없거든"
+# (2026-09-18) 결정에 따라 admin 실험 패널은 이미 Stable Image Ultra를
+# 기본값으로 확정했지만, 발행 파이프라인은 Phase 3까지도 구조만 공유
+# 디스패치로 옮기고 IMAGE_PROVIDER 자체는 그대로 뒀다(구조 변경과 모델
+# 전환을 한 배포에 같이 실으면 문제 발생 시 원인 구분이 안 되므로 —
+# 02-정리후보/04-GPU경로결정미반영.md 참고). 이번이 실제 전환 배포다.
+# GPU IP-Adapter(인물 고정)·Style Transfer(화풍 분리) 둘 다 더 이상
+# 필요 없다고 판단했으므로 아래 컷 루프의 provider→model 매핑 표에서
+# "bedrock-sd-ultra"만 실사용, GPU 기동 분기(`manage_gpu and IMAGE_PROVIDER
+# == "bedrock-style-transfer"`)는 이 값이 더 이상 매칭되지 않아 자연히
+# 안 탄다 — GPU EC2 인스턴스 자체는 1~2주 안정화 확인 전까지 삭제하지
+# 않는다(롤백 경로 유지, task-policy.json의 WebtoonGpu* 권한도 유지).
+IMAGE_PROVIDER = "bedrock-sd-ultra"
+
+# IMAGE_PROVIDER 문자열 → webtoon_image.generate_cut_image_to_file() 호출
+# 인자 매핑(run_article() 컷 루프가 씀). retries는 기존 개별 함수 기본값을
+# 그대로 유지(pipeline→2 — generate_bedrock_composed_image가 컷당 Bedrock
+# 호출 3회라 더 짧게 잡혀 있던 이유는 webtoon_image.py 해당 함수 docstring
+# 참고, 나머지→3).
+#
+# with_qa/check_extra_people(Phase 4 QA 정책, 2026-09-20) — sageuk(사극
+# 오염)·no_people_violated(인물 없음 위반) 검사는 프롬프트가 아니라
+# 결과물을 검사하는 후처리라 "프롬프트 외 영향 요인 없음" 원칙과 성격이
+# 다르다(실제 독자에게 나가는 안전망이라 Ultra 경로에서도 유지).
+# extra_people(고정 인물 수 초과 시 재생성)만은 "군중을 그려달라"는
+# 정당한 사용자 지시와 충돌할 수 있어(admin이 pipeline 외 모델에서 QA
+# 자체를 끈 이유와 같은 맥락) Ultra 경로는 이것만 끈다 —
+# webtoon_image.generate_cut_image()의 check_extra_people 파라미터 참고.
+_PROVIDER_CONFIG = {
+    "bedrock-sd-ultra": dict(model="sd_ultra", retries=3, with_qa=True, check_extra_people=False),
+    "bedrock-style-transfer": dict(model="pipeline", retries=2, with_qa=None, check_extra_people=True),
+    "bedrock-style-guide": dict(model="style_guide", retries=3, with_qa=None, check_extra_people=True),
+    "bedrock": dict(model="stable_image_core", retries=3, with_qa=None, check_extra_people=True),
+}
 
 # 2026-09-05 — 여기 있던 _characters_block/_SCENE_REINFORCEMENT/
 # _CHARACTER_REINFORCEMENT/build_background_prompt/BEDROCK_IMAGE_REGION/
 # BEDROCK_IMAGE_MODEL_ID/BEDROCK_ASPECT_RATIO/generate_image_bedrock 전부
 # common/webtoon_image.py로 옮겼다(admin 콘솔의 "이미지 실험" 패널도 이
-# 로직이 그대로 필요해져서 — 그 모듈 docstring 참고). 시행착오 이력
-# (재강조 문구가 왜 이 모양인지, 비용태깅 때문에 application inference
-# profile을 쓰는 이유 등)도 전부 그쪽·prompts.py에 있다 — 여기서는
-# 이전과 같은 이름으로 그대로 import해서 아래 호출부들은 안 바뀐다.
+# 로직이 그대로 필요해져서 — 그 모듈 docstring 참고).
+#
+# 2026-09-20 — 컷 생성·QA·재시도 디스패치(_generate_and_qa_cut/
+# _validate_and_detect, 아래에 있었음) 자체를 걷어내고
+# webtoon_image.generate_cut_image_to_file() 한 호출로 대체했다(정리후보
+# A+D Phase 3 — admin 실험 패널과 발행 파이프라인이 같은 디스패치를 쓰게
+# 통일, 이번 phase는 IMAGE_PROVIDER를 그대로 유지해 동작은 100% 동일).
+# _characters_block/_SCENE_REINFORCEMENT/_CHARACTER_REINFORCEMENT는 아래
+# GPT 경로(build_image_prompt, IMAGE_PROVIDER="openai", 휴면)가 여전히
+# 써서 남겨뒀다.
 from webtoon_image import (
-    build_background_prompt,
-    build_style_guide_prompt,
-    build_style_transfer_scene_input,
-    generate_bedrock_image as generate_image_bedrock,
-    generate_bedrock_style_guide_image as generate_image_bedrock_style_guide,
-    generate_bedrock_composed_image as generate_image_bedrock_style_transfer,
+    generate_cut_image_to_file,
     characters_block as _characters_block,
     SCENE_REINFORCEMENT as _SCENE_REINFORCEMENT,
     CHARACTER_REINFORCEMENT as _CHARACTER_REINFORCEMENT,
-    MAX_EXPECTED_FACES as _MAX_EXPECTED_FACES,
 )
 
 _JSON_INSTRUCTION = (
@@ -202,10 +235,6 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
     return False
 
 
-# generate_image_bedrock()는 이제 webtoon_image.generate_bedrock_image의
-# import 별칭이다(위 import 블록 참조) — 여기 있던 원래 정의는 삭제.
-
-
 # 2026-09-02 — 기자 피드백("컷마다 캐릭터가 다르다", "말풍선이 인물과
 # 연결 안 됨") 대응 3종 세트 중 "생성→검증→재시도" 루프. 실측(같은 날)으로
 # 확인한 근본 원인: Stable Image Core/SD3.5/Ultra 전부 **완전히 동일한
@@ -220,111 +249,10 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
 # 되니 한 번에 처리. 프롬프트 본문(VALIDATE_SYSTEM)은 prompts.py에 있다
 # — 다른 프롬프트 상수들과 위치를 통일했을 뿐, admin 편집·DDB 동기화
 # 대상은 아니다(prompts.py의 해당 섹션 주석 참고).
-
-# QA 호출 자체가 실패했을 때, 그리고 아직 QA를 한 번도 안 돌린 시점의
-# 초기값으로 공유하는 기본값 — 예전엔 두 곳(_validate_and_detect의 except
-# 블록, run_article의 루프 상단)에 리터럴이 그대로 중복돼 있었다.
-_DEFAULT_VERDICT = {"sageuk": False, "no_people_violated": False}
-
-
-def _validate_and_detect(image_path: Path, scene: str, no_people_expected: bool) -> dict:
-    """생성된 배경 이미지 1장을 비전 모델로 검사. 실패(호출 에러) 시 항상
-    "문제 없음"으로 처리해서 재시도 루프가 무한정 돌지 않게 한다 — QA
-    자체의 실패가 발행을 막으면 안 된다(가용성 우선)."""
-    try:
-        image_bytes = image_path.read_bytes()
-        no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
-        user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
-        raw = call_vision(prompts.VALIDATE_SYSTEM, user_msg, image_bytes, model=SCRIPT_MODEL, max_tokens=500)
-        return extract_json_object(raw)
-    except Exception as e:
-        print(f"    ⚠️  이미지 QA 검사 실패(통과 처리): {e}")
-        return dict(_DEFAULT_VERDICT)
-
-
-
-# 2026-09-08(4차, #14 "배경 엑스트라 난입" 대응) — 참고 이미지 교체나
-# negative_prompt 같은 프롬프트 쪽 레버를 여러 조합(fidelity 0.3~0.65,
-# Style Guide/Core 둘 다, 강한 부정문/negative_prompt 파라미터)으로
-# 실측했지만 "군중·거리 배경으로 쏠리는 경향" 자체는 못 이겼다(라운드
-# 기록.md R9). 반면 이 파이프라인은 이미 "사극 오염 감지 → 안 좋으면
-# 재생성"(위 _generate_and_qa_cut) 구조와 Rekognition 얼굴 감지
-# (rekognition_client.detect_main_faces, 신뢰도 95%+·크기 5%+ 필터로
-# 주요 인물과 배경 엑스트라를 구분하는 게 실측으로 확인됨)를 이미 갖고
-# 있다 — 프롬프트로 확률을 낮추는 대신, 결과물의 얼굴 수를 세서 나쁘면
-# 걸러내는 같은 "생성→검사→재시도" 철학을 여기에도 적용한다. 기대 상한값
-# (_MAX_EXPECTED_FACES)은 위 import대로 common/webtoon_image.py가 정본이다.
-
-
-def _generate_and_qa_cut(
-    prompt: str, img_path: Path, scene: str, tag: str, n: int, generate_fn=generate_image_bedrock,
-    *, has_dialogue: bool = True,
-) -> tuple[bool, dict, list | None]:
-    """배경 생성 + QA 검증 + (필요시) 1회 재생성까지 한 컷 분량을 처리한다.
-    run_article()의 3단계 루프가 생성·QA·재시도·합성을 전부 인라인으로
-    떠안고 있어서(2026-09-02 QA 루프 추가 당시) 읽기 어려워진 걸 분리—
-    이 함수는 "이미지 파일을 만든다"까지만 책임지고, 텍스트 합성은
-    호출부(run_article)가 계속 맡는다.
-
-    generate_fn — 2026-09-08 추가. Bedrock 계열(Stable Image Core/Style
-    Guide) 둘 다 "배경만 그리고 QA로 검증"하는 이 구조를 그대로 쓸 수
-    있어서, 실제 생성 호출 함수만 파라미터로 뺐다(기본값은 Stable Image
-    Core, run_article()이 IMAGE_PROVIDER에 따라 다른 함수를 넘긴다).
-
-    GPT 경로(IMAGE_PROVIDER="openai", 휴면)는 이 QA를 안 거친다. GPT의
-    image_generation 툴은 배경+말풍선 텍스트를 한 번에 완성된 그림으로
-    만들어서 애초에 "배경만 비전 모델로 검사"하는 이 구조 자체가 안 맞고
-    (무엇을 사극/인물오탐 기준으로 잴지도 다름), Bedrock 경로에서 발견된
-    변동성 문제(같은 프롬프트도 결과가 크게 다름)가 GPT 쪽에서도 똑같이
-    재현되는지 확인된 바가 없다.
-
-    반환값에 faces가 추가됐다(2026-09-08, #14 대응) — QA 단계에서 이미
-    Rekognition을 돌리므로, 호출부(run_article)가 말풍선 배치를 위해
-    같은 이미지에 대해 또 한 번 부르지 않도록 여기서 감지한 결과를
-    그대로 넘긴다(재시도했다면 재시도 결과의 얼굴, 재시도 안 했다면
-    최초 생성 결과의 얼굴).
-
-    has_dialogue — 2026-09-08 추가. 배경 인물 초과 체크(_MAX_EXPECTED_FACES)는
-    "이 컷에 A/B 두 화자가 보여야 한다"는 전제 위에서만 의미가 있다.
-    컷1(표지)·컷8(마무리) 같은 상징적 컷은 대사가 없고 의도적으로 인물
-    없는 부감·군중 샷을 쓰기도 해서(실측: 실제 파이프라인 재현 중 컷1이
-    "수백 명 청중 부감" 장면으로 나왔는데 이 체크가 무차별 적용돼 불필요한
-    재생성이 걸림) — 대사가 있는 컷에서만 켠다. 호출부(run_article)가
-    `cut.get("dialogue")` 유무로 넘겨준다."""
-    ok = generate_fn(prompt, img_path)
-    verdict = dict(_DEFAULT_VERDICT)
-    faces = None
-    if not ok:
-        return ok, verdict, faces
-
-    # "인물 없음"/"인물 없이"/"인물 없는" 등 2단계 장면 텍스트가 실제로 쓰는
-    # 표현이 갈린다(admin 가이드 문서에도 두 표현이 다 등장 — service/backend/
-    # prompts/webtoon/published.md 참고) — 원래 "인물 없음"만 봤던 게 컷1의
-    # "인물 없이" 표현을 못 잡는 걸 실전 재현으로 확인해 넓혔다.
-    no_people_expected = any(p in scene for p in ("인물 없음", "인물 없이", "인물 없는", "인물이 없"))
-    verdict = _validate_and_detect(img_path, scene, no_people_expected)
-    faces = detect_main_faces(img_path.read_bytes()) or None
-    extra_people = (
-        has_dialogue and not no_people_expected
-        and faces is not None and len(faces) > _MAX_EXPECTED_FACES
-    )
-    if verdict.get("sageuk") or verdict.get("no_people_violated") or extra_people:
-        if verdict.get("sageuk"):
-            reason = "사극 오염"
-        elif verdict.get("no_people_violated"):
-            reason = "인물 없음 위반"
-        else:
-            reason = f"배경 인물 초과({len(faces)}명 감지, 최대 {_MAX_EXPECTED_FACES}명 예상)"
-        print(f"{tag} 컷{n} QA 실패({reason}) — 재생성 1회 시도")
-        ok_retry = generate_fn(prompt, img_path)
-        if ok_retry:
-            verdict = _validate_and_detect(img_path, scene, no_people_expected)
-            faces = detect_main_faces(img_path.read_bytes()) or None
-        # 재생성이 실패해도 첫 시도 결과가 파일로 남아있으니 발행은 계속한다
-        # (QA 실패 < 완전 실패 — 둘 다 막으면 자동 발행이 통째로 멈춘다).
-        ok = ok_retry or ok
-    return ok, verdict, faces
-
+#
+# 2026-09-20 — 이 루프의 실제 구현(_validate_and_detect_cut, extra_people
+# 체크)은 common/webtoon_image.py의 generate_cut_image()로 옮겼다(정리후보
+# A+D Phase 3) — 위 배경·근거는 그대로 유효하다.
 
 def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True,
                  manage_gpu: bool = True):
@@ -416,36 +344,31 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 continue
             s = scene_map[n]
             print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
-            if IMAGE_PROVIDER in ("bedrock", "bedrock-style-guide", "bedrock-style-transfer"):
-                if IMAGE_PROVIDER == "bedrock-style-transfer":
-                    prompt = build_style_transfer_scene_input(s["camera"], s["scene"])
-                    generate_fn = generate_image_bedrock_style_transfer
-                elif IMAGE_PROVIDER == "bedrock-style-guide":
-                    prompt = build_style_guide_prompt(s["camera"], s["scene"])
-                    generate_fn = generate_image_bedrock_style_guide
-                else:
-                    prompt = build_background_prompt(s["camera"], s["scene"], characters)
-                    generate_fn = generate_image_bedrock
-                # 2026-09-09(R17) — 배경 인물 초과 체크(_MAX_EXPECTED_FACES)를
+            if IMAGE_PROVIDER in _PROVIDER_CONFIG:
+                # 2026-09-09(R17) — 배경 인물 초과 체크(QA의 extra_people)를
                 # 원래 "대사 있는 컷만"으로 한정했는데, 컷1(표지)은 대사가
                 # 없어서 이 게이트를 안 타 인물 수가 계속 불안정했다(R10~R12
                 # 관찰). 컷1은 대사가 없어도 항상 A/B 두 주인공을 표지에
                 # 담으려는 의도라 — 대본이 "인물 없음"을 명시한 경우는 이미
                 # no_people_expected 판정이 따로 걸러주므로, 컷1도 이 게이트
                 # 대상에 포함해도 안전하다(작게 스쳐가는 배경 군중은 여전히
-                # 신뢰도·크기 기준 미달이라 안 걸림 — _MAX_EXPECTED_FACES
-                # 주석 참고).
-                ok, _verdict, faces = _generate_and_qa_cut(
-                    prompt, img_path, s["scene"], tag, n, generate_fn,
+                # 신뢰도·크기 기준 미달이라 안 걸림). Ultra 경로는
+                # check_extra_people=False라 이 로직 자체가 안 걸린다
+                # (아래 _PROVIDER_CONFIG 주석 참고).
+                cfg = _PROVIDER_CONFIG[IMAGE_PROVIDER]
+                ok, faces = generate_cut_image_to_file(
+                    s["camera"], s["scene"], cfg["model"], img_path,
                     has_dialogue=bool(cut.get("dialogue")) or n == 1,
+                    retries=cfg["retries"],
+                    with_qa=cfg["with_qa"],
+                    check_extra_people=cfg["check_extra_people"],
                 )
                 if ok:
-                    # 2026-09-08 — 얼굴 위치는 QA 비전 모델(verdict)이 아니라
-                    # Rekognition 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM
-                    # 상단 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
-                    # 얼굴 상단을 피해 말풍선을 배치할 수 있다. _generate_and_qa_cut()가
-                    # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다
-                    # (배경 인물 초과 체크에도 같은 결과를 재사용, 위 함수 docstring 참고).
+                    # 2026-09-08 — 얼굴 위치는 QA 비전 모델이 아니라 Rekognition
+                    # 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM 상단
+                    # 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
+                    # 얼굴 상단을 피해 말풍선을 배치할 수 있다. generate_cut_image_to_file()이
+                    # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다.
                     try:
                         compose_text.compose(img_path, cut, faces)
                     except Exception as e:

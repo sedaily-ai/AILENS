@@ -281,66 +281,13 @@ def build_background_prompt(
     )
 
 
-# 2026-09-18 — SD3 계열(SD3.5 Large/Stable Image Ultra) 전용 프롬프트 조립.
-#
-# 실측(사용자 확인, "aws 에서 모델 추가/gpt 급 퀄리티" 요청으로 두 모델을
-# 추가한 뒤 build_background_prompt를 그대로 태웠더니) — 요청한 장면 대신
-# 인물 컨셉시트(여러 각도 얼굴, 프로필 4컷)를 그렸다. 긴 프롬프트/짧은
-# 프롬프트(build_style_guide_prompt) 둘 다 재현 — 프롬프트 길이가 아니라
-# 구조 문제로 좁혀졌다. 의심되는 두 가지:
-# 1) build_background_prompt는 [CHARACTERS](인물 외형 문단)가 [SCENE]보다
-#    먼저 나온다 — SD3 계열이 이걸 "인물 소개가 주제"로 오해석했을 가능성.
-# 2) CHARACTER_REINFORCEMENT/프리셋 문구 안의 "Keep ... consistent across
-#    every cut"/"Every cut must show the SAME..." 같은 "여러 컷에 걸친
-#    일관성" 표현이, 컨셉시트/캐릭터 턴어라운드 요청과 문구가 겹쳐서 그
-#    쪽으로 끌렸을 가능성(둘 다 "이 인물의 여러 버전/각도를 한 이미지에
-#    보여달라"는 의미로 읽힐 수 있는 문구라서).
-# 이 함수는 재료(STYLE/CHARACTERS/SCENE)는 build_background_prompt와
-# 같지만 순서·표현을 바꾼다 — SCENE을 먼저 배치하고, "여러 컷 일관성"
-# 문구 대신 "단일 패널, 시트 아님"을 명시적으로 프롬프트 맨 앞에 못박는다.
-_SINGLE_PANEL_FRAME = (
-    "A single wide illustration panel from an ongoing Korean webtoon news "
-    "series — ONE continuous scene, NOT a character design sheet, NOT a "
-    "turnaround, NOT a grid of separate portraits or profile views, NOT "
-    "multiple isolated close-up faces. Show the characters together, at "
-    "natural size, acting within the described environment."
-)
-
-_CHARACTER_SINGLE_IMAGE_REINFORCEMENT = (
-    "\n\nSTRICT: The people above are recurring hosts of this news series — "
-    "render them with the exact hairstyle, hair length, glasses, outfit, "
-    "and badge described in [CHARACTERS], not a generic long-haired "
-    "romance-webtoon look. Do not substitute, restyle, or omit any "
-    "described feature."
-)
-
-
-def build_scene_first_prompt(
-    camera: str,
-    scene: str,
-    characters: dict | None = None,
-    *,
-    style: str | None = None,
-) -> str:
-    """SD3.5 Large / Stable Image Ultra 전용 — build_background_prompt와
-    재료는 같지만 SCENE을 CHARACTERS보다 먼저 배치하고, "여러 컷 걸친
-    일관성" 표현 대신 "단일 패널" 프레이밍을 쓴다(위 섹션 주석 참고).
-    아직 실측 검증 전이라 _generate_once에서 안 쓴다 — 검증되면 그때
-    dispatch를 이 함수로 바꾼다(사용자 확인, 2026-09-18)."""
-    if style is None:
-        style = get_style()
-    style_block = style + f"\nCamera: {camera}. 3:2 horizontal."
-    return (
-        _SINGLE_PANEL_FRAME
-        + "\n\n" + style_block
-        + f"\n\n[SCENE]\n{scene}"
-        + SCENE_REINFORCEMENT
-        + characters_block(characters)
-        + (_CHARACTER_SINGLE_IMAGE_REINFORCEMENT if characters else "")
-        + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
-        "or speech bubbles anywhere in this image — pure illustration only, no "
-        "readable characters of any kind. Text will be added separately afterward."
-    )
+# 2026-09-20 — build_scene_first_prompt()(2026-09-18 신설, SD3 계열이
+# build_background_prompt의 인물 재강조 문구를 인물 컨셉시트 요청으로
+# 오해석하는 문제의 실험적 대안)를 삭제했다. admin 실험 패널(_generate_once)
+# 이 이제 stable_image_core/sd35_large/sd_ultra에 인물 고정·재강조 자체를
+# 아예 안 넣기로 하면서(사용자 요청 — "단순하게 사용자가 입력한 이미지
+# 프롬프트로만 제어가 되도록") 이 함수가 풀려던 문제 자체가 없어졌다 —
+# 검증 전 상태로 남겨두면 나중에 헷갈릴 죽은 코드라 같이 정리한다.
 
 
 # 2026-09-08 — Style Guide 경로 전용 프롬프트 조립.
@@ -1150,3 +1097,187 @@ def generate_nova_canvas_image_bytes(prompt: str) -> bytes:
         },
     })
     return _invoke_and_decode_image(_get_nova_canvas_client(), NOVA_CANVAS_MODEL_ID, body, error_key="error")
+
+
+# ─────────────────────────────────────────────────────────────
+# 컷 이미지 생성 — 단일 정본 디스패치 (2026-09-20 신설)
+# ─────────────────────────────────────────────────────────────
+#
+# admin/backend/routes/webtoon/generate.py(admin 실험 패널)와
+# pipelines/webtoon/pipeline.py(실제 발행 파이프라인)가 각자 독립적인
+# 모델 디스패치 if/elif를 갖고 있어서, admin에서 검증한 모델·원칙("사용자
+# 프롬프트 외 영향 요인 없음")이 실제 발행에 전혀 반영되지 않는 문제가
+# 있었다(docs/architecture/webtoon_custom/02-정리후보/01-모델디스패치중복.md
+# — 정리후보 A). 이 함수가 그 정본이다 — admin/발행 양쪽이 이 함수 하나를
+# 부르게 만드는 게 목표(정리후보 A+D 계획, 2026-09-20 승인).
+#
+# openai_dalle3는 여기 안 넣는다 — admin 전용 모듈(admin/backend/openai_image.py)
+# 에 의존하고 ECS 발행 파이프라인엔 그 모듈 자체가 없는 데다, 이미 사업상
+# 사용 불가로 확정됐다(2026-09-18) — admin/backend/routes/webtoon/generate.py
+# 가 이 함수를 부르기 "전에" 별도로 분기해서 처리한다.
+_QA_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
+
+
+def _validate_and_detect_cut(image_bytes: bytes, scene: str, no_people_expected: bool) -> dict:
+    """생성된 배경 이미지 1장을 비전 모델로 검사 — pipeline.py의 옛
+    _generate_and_qa_cut()/admin의 옛 _validate_and_detect()와 동일 계약
+    (실패해도 항상 "문제 없음"으로 처리해 가용성을 우선한다). bedrock_client/
+    prompts/json_extract는 지연 import — 이 모듈은 텍스트 호출 없이 순수
+    이미지 생성만 하는 호출부(예: 단일 모델 비교 테스트)도 많아, QA를 실제로
+    쓸 때만 그 비용을 치른다(translate_scene_to_photo_brief()와 같은 이유)."""
+    from bedrock_client import call_vision  # pipelines/common/ — sibling, flat import
+    from json_extract import extract_json_object  # pipelines/common/ — sibling, flat import
+    import prompts  # pipelines/webtoon/ — sibling, flat import(VALIDATE_SYSTEM 정본)
+
+    try:
+        no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
+        user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
+        raw = call_vision(prompts.VALIDATE_SYSTEM, user_msg, image_bytes, model=_QA_MODEL, max_tokens=500)
+        return extract_json_object(raw)
+    except Exception as e:  # noqa: BLE001 — QA 실패가 생성 자체를 막으면 안 됨
+        print(f"[webtoon_image] 컷 QA 실패(통과 처리): {type(e).__name__}: {e}")
+        return {"sageuk": False, "no_people_violated": False}
+
+
+def _generate_cut_once(
+    camera: str,
+    scene: str,
+    model: str,
+    apply_character_lock: bool,
+    apply_style_transfer: bool,
+) -> bytes:
+    """model 하나로 이미지 1장 생성 — 모델별 프롬프트 조립 방식만 다르고,
+    QA·재시도는 호출부(generate_cut_image)가 모델 구분 없이 공통으로 담당한다.
+
+    2026-09-20, 사용자 요청 — "단순하게.. 사용자가 입력한 이미지 프롬프트로만
+    제어가 되도록 하는것이 적절합니다": stable_image_core/sd35_large/sd_ultra는
+    고정 인물(characters)도, 재강조 문구(scene/character reinforcement — 특히
+    "군중 금지"류로 사용자가 scene에 직접 적은 내용과 충돌하던 문구)도 안
+    붙인다 — admin이 발행한 STYLE(공통 화풍)만 그대로 얹고 나머지는 순수
+    camera/scene 텍스트로 결정된다."""
+    if model == "stable_image_core":
+        prompt = build_background_prompt(
+            camera, scene, style=get_style(),
+            include_scene_reinforcement=False, include_character_reinforcement=False,
+        )
+        return generate_bedrock_image_bytes(prompt)
+
+    if model == "sd35_large":
+        prompt = build_background_prompt(
+            camera, scene, style=get_style(),
+            include_scene_reinforcement=False, include_character_reinforcement=False,
+        )
+        return generate_bedrock_sd35_image_bytes(prompt)
+
+    if model == "sd_ultra":
+        prompt = build_background_prompt(
+            camera, scene, style=get_style(),
+            include_scene_reinforcement=False, include_character_reinforcement=False,
+        )
+        return generate_bedrock_sd_ultra_image_bytes(prompt)
+
+    if model == "style_guide":
+        prompt = build_style_guide_prompt(camera, scene)
+        return generate_bedrock_style_guide_image_bytes(prompt)
+
+    if model == "nova_canvas":
+        # 참고 이미지 컨디셔닝이 없는 순수 text-to-image라 style_guide와
+        # 같은(스타일 힌트가 포함된) 프롬프트를 그대로 재사용한다 — 모델별로
+        # 다른 프롬프트를 쓰면 "같은 지문, 다른 모델" 비교가 아니게 된다.
+        prompt = build_style_guide_prompt(camera, scene)
+        return generate_nova_canvas_image_bytes(prompt)
+
+    # "pipeline"(기본) — GPU IP-Adapter + Style Transfer
+    scene_input = build_style_transfer_scene_input(camera, scene)
+    return generate_bedrock_composed_image_bytes(
+        scene_input, apply_character_lock=apply_character_lock, apply_style_transfer=apply_style_transfer
+    )
+
+
+def generate_cut_image(
+    camera: str,
+    scene: str,
+    model: str = "pipeline",
+    *,
+    has_dialogue: bool = True,
+    apply_character_lock: bool = True,
+    apply_style_transfer: bool = True,
+    with_qa: bool | None = None,
+    check_extra_people: bool = True,
+) -> tuple[bytes, list | None]:
+    """컷 이미지 1장 생성 — admin 실험 패널과 발행 파이프라인이 공유하는
+    단일 정본 디스패치(위 섹션 주석 참고, 정리후보 A+D). 반환값은
+    (image_bytes, faces) — faces는 Rekognition 얼굴 바운딩 박스 목록(QA를
+    안 거쳤거나 얼굴 감지가 안 되면 None, compose_text.py가 None일 때
+    균등분할로 폴백한다).
+
+    with_qa — None(기본)이면 model=="pipeline"일 때만 QA(비전 판정+
+    Rekognition 얼굴 수 검사)를 거친다(GPU IP-Adapter 경로는 참조 사진으로
+    인물 identity 자체를 고정하는 별개 메커니즘이라 이 QA가 여전히
+    의미 있다 — 2026-09-20 admin 결정). 나머지 모델은 "사용자 프롬프트
+    외 영향 요인 없음" 원칙에 따라 기본적으로 QA 없이 _generate_cut_once()
+    결과를 그대로 쓴다. True/False로 명시하면 model과 무관하게 강제된다.
+
+    check_extra_people — 2026-09-20(Phase 4, GPU→Ultra 전환) 추가. 사극
+    오염(sageuk)·인물 없음 위반(no_people_violated)은 프롬프트를 바꾸는
+    게 아니라 결과물을 검사하는 후처리라 "프롬프트 외 영향 요인 없음"
+    원칙과 성격이 다르다(실제 독자에게 나가는 안전망) — with_qa=True로
+    켜는 모델은 기본으로 계속 받는다. extra_people(고정 인물 수 초과 시
+    재생성)만은 "군중을 그려달라"는 정당한 사용자 지시와 충돌할 수 있어
+    (admin이 pipeline 외 모델에서 QA 자체를 끈 이유와 같음) 이 플래그로
+    따로 끌 수 있게 뺐다 — 발행 파이프라인의 Ultra 경로가 이 조합
+    (QA는 켜되 extra_people만 끔)을 쓴다."""
+    image_bytes = _generate_cut_once(camera, scene, model, apply_character_lock, apply_style_transfer)
+    run_qa = (model == "pipeline") if with_qa is None else with_qa
+    if not run_qa:
+        return image_bytes, None
+
+    from rekognition_client import detect_main_faces  # pipelines/common/ — sibling, flat import
+
+    no_people_expected = any(p in scene for p in ("인물 없음", "인물 없이", "인물 없는", "인물이 없"))
+    verdict = _validate_and_detect_cut(image_bytes, scene, no_people_expected)
+    faces = detect_main_faces(image_bytes) or None
+    extra_people = (
+        check_extra_people and has_dialogue and not no_people_expected
+        and faces is not None and len(faces) > MAX_EXPECTED_FACES
+    )
+    if verdict.get("sageuk") or verdict.get("no_people_violated") or extra_people:
+        print(f"[webtoon_image] 컷 QA 실패({model}) — 재생성 1회 시도")
+        image_bytes = _generate_cut_once(camera, scene, model, apply_character_lock, apply_style_transfer)
+        faces = detect_main_faces(image_bytes) or None
+    return image_bytes, faces
+
+
+def generate_cut_image_to_file(
+    camera: str,
+    scene: str,
+    model: str,
+    out_path: Path,
+    *,
+    has_dialogue: bool = True,
+    apply_character_lock: bool = True,
+    apply_style_transfer: bool = True,
+    with_qa: bool | None = None,
+    check_extra_people: bool = True,
+    retries: int = 3,
+) -> tuple[bool, list | None]:
+    """generate_cut_image()의 파일-쓰기 + 배치 재시도(12/24/36초 백오프,
+    _retry_generate_and_write() 공유) 래퍼 — pipeline.py(무인 자동 발행)가
+    쓴다. admin 실험 패널(bytes만 필요, S3에 직접 업로드)은 generate_cut_image()를
+    그대로 쓰고 이 래퍼는 안 거친다(2026-09-20, 정리후보 A Phase 3)."""
+    faces_holder: list = [None]
+
+    def _once() -> bytes:
+        image_bytes, faces = generate_cut_image(
+            camera, scene, model,
+            has_dialogue=has_dialogue,
+            apply_character_lock=apply_character_lock,
+            apply_style_transfer=apply_style_transfer,
+            with_qa=with_qa,
+            check_extra_people=check_extra_people,
+        )
+        faces_holder[0] = faces
+        return image_bytes
+
+    ok = _retry_generate_and_write(_once, out_path, retries)
+    return ok, faces_holder[0]
