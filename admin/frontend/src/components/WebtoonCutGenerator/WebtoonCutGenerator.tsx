@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SendResult, WsPushBase } from "@/lib/useAdminChatSocket";
 import type { WebtoonGpuStatus, WebtoonStoryboardCut } from "@/lib/types";
 import { IMAGE_MODELS } from "@/lib/webtoonImageModels";
+import { CustomSelect } from "@/components/CustomSelect";
 
 /* 이미지 생성 패널(2026-09-16 신설, 같은 날 두 번 다시 설계) — 텍스트
    페이지(PromptChatLab) 우측에 상시 붙는다.
@@ -298,17 +299,22 @@ export function WebtoonCutGenerator({
               }
             />
 
-            <select
-              className="ui-input rounded-md text-[11px]"
+            {/* 2026-09-20, 사용자 요청 — "사용하지 않기로 한 모델이랑
+                사용하는거랑 구분을 좀 해주시고 커스텀 디자인좀 해주시죠":
+                네이티브 <select>는 옵션별로 색을 못 입혀서(OS가 팝업을
+                그림) CustomSelect(이미 다른 화면에서 쓰던 공용 드롭다운)
+                로 교체 — 상태 배지(badge)·흐린 색(muted)을 옵션별로
+                보여줄 수 있다. */}
+            <CustomSelect
               value={s.model}
-              onChange={(e) => setSlots((prev) => ({ ...prev, [s.index]: { ...prev[s.index], model: e.target.value } }))}
-            >
-              {IMAGE_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.shortLabel ?? m.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setSlots((prev) => ({ ...prev, [s.index]: { ...prev[s.index], model: v } }))}
+              options={IMAGE_MODELS.map((m) => ({
+                value: m.id,
+                label: m.shortLabel ?? m.label,
+                badge: m.badge,
+                muted: m.notInUse,
+              }))}
+            />
 
             {/* 2026-09-16, 사용자 요청 — "이미지(인물) 고정, 화풍 고정을 체크로
                 풀었다 체크했다 할 수 있도록... 꼭 해당 고정을 적용 안 하고

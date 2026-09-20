@@ -9,6 +9,14 @@ import { useEffect, useRef, useState } from "react";
 interface Option<T extends string> {
   value: T;
   label: string;
+  /** 2026-09-20, 웹툰 모델 선택 — "사용 중"/"운영 중"/"사업상 미사용"처럼
+   *  옵션 옆에 작은 상태 태그를 붙이고 싶을 때. 없으면 안 그린다(기존
+   *  호출부는 그대로 동작). */
+  badge?: string;
+  /** true면 선택은 그대로 가능하되(비교용으로 여전히 골라볼 수 있어야
+   *  하므로 클릭 자체는 안 막는다) 글자색을 흐리게 렌더해 "정책상 지금은
+   *  안 쓰기로 한 옵션"임을 표시한다. */
+  muted?: boolean;
 }
 
 interface Props<T extends string> {
@@ -38,14 +46,15 @@ export function CustomSelect<T extends string>({ value, options, onChange, place
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex cursor-pointer items-center gap-1 outline-none"
+        className="flex cursor-pointer items-center gap-1.5 outline-none"
       >
         <span
           className="text-[12.5px] font-medium"
-          style={{ color: current ? "var(--text-primary)" : "var(--text-muted)" }}
+          style={{ color: current?.muted ? "var(--text-faint)" : current ? "var(--text-primary)" : "var(--text-muted)" }}
         >
           {current?.label ?? placeholder ?? "선택"}
         </span>
+        {current?.badge && <OptionBadge text={current.badge} muted={current.muted} />}
         <svg
           width="10"
           height="10"
@@ -77,17 +86,34 @@ export function CustomSelect<T extends string>({ value, options, onChange, place
                 onChange(o.value);
                 setOpen(false);
               }}
-              className="block w-full cursor-pointer rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium transition-colors hover:bg-[var(--surface-sunken)]"
+              className="flex w-full cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium transition-colors hover:bg-[var(--surface-sunken)]"
               style={{
-                color: o.value === value ? "var(--accent)" : "var(--text-secondary)",
-                background: o.value === value ? "var(--accent-soft)" : undefined,
+                color: o.muted ? "var(--text-faint)" : o.value === value ? "var(--accent)" : "var(--text-secondary)",
+                background: o.value === value && !o.muted ? "var(--accent-soft)" : undefined,
               }}
             >
-              {o.label}
+              <span>{o.label}</span>
+              {o.badge && <OptionBadge text={o.badge} muted={o.muted} />}
             </button>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/** 옵션 옆 작은 상태 태그 — muted면 회색(정책상 미사용), 아니면 accent
+ *  톤(현재 사용/운영 중처럼 눈에 띄어야 하는 상태). */
+function OptionBadge({ text, muted }: { text: string; muted?: boolean }) {
+  return (
+    <span
+      className="shrink-0 rounded-full px-1.5 py-[1px] text-[10px] font-medium"
+      style={{
+        color: muted ? "var(--text-faint)" : "var(--accent)",
+        background: muted ? "var(--surface-sunken)" : "var(--accent-soft)",
+      }}
+    >
+      {text}
+    </span>
   );
 }

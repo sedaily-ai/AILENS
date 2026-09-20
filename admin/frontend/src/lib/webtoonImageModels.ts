@@ -16,6 +16,14 @@ export interface WebtoonImageModel {
    *  그대로 쓴다. */
   shortLabel?: string;
   badge?: string;
+  /** 2026-09-20, 사용자 요청 — "사용하지 않기로 한 모델이랑 사용하는거랑
+   *  구분을 좀 해주시고... 비활성화된 색상을 좀 놔두거나": 모델 자체가
+   *  기술적으로 막힌 게 아니라(그런 경우는 Nova Canvas처럼 목록에서 아예
+   *  뺀다) "쓸 수는 있지만 정책상 안 쓰기로 확정한" 경우에만 켠다 —
+   *  지금은 OpenAI(사업적 사용 불가, 2026-09-18 확정)뿐. CustomSelect가
+   *  이 값을 보고 흐리게 렌더한다(선택 자체는 막지 않음 — 비교용으로는
+   *  여전히 볼 수 있어야 하므로). */
+  notInUse?: boolean;
 }
 
 export const IMAGE_MODELS: WebtoonImageModel[] = [
@@ -24,7 +32,7 @@ export const IMAGE_MODELS: WebtoonImageModel[] = [
   // 후 Stable Image Ultra로 확정("울트라로 하는걸로 하시죠"). 목록 맨
   // 위 = 이제 이게 1순위 선택지라 WebtoonCutGenerator.tsx의 기본 선택값
   // (IMAGE_MODELS[0])도 자동으로 이걸로 바뀐다.
-  { id: "sd_ultra", label: "Stable Image Ultra (GPU 없음)", shortLabel: "Stable Ultra" },
+  { id: "sd_ultra", label: "Stable Image Ultra (GPU 없음)", shortLabel: "Stable Ultra", badge: "현재 사용" },
   // "운영 중" — 실제 발행 파이프라인(pipelines/webtoon/pipeline.py)이
   // 지금 쓰는 것과 동일한 경로. 위 결정 이후에도 프로덕션 파이프라인
   // 자체는 아직 이 GPU 경로 그대로라(별도 마이그레이션 작업 전) 배지는
@@ -39,7 +47,12 @@ export const IMAGE_MODELS: WebtoonImageModel[] = [
   { id: "stable_image_core", label: "Stable Image Core (GPU 없음)", shortLabel: "Stable Core" },
   { id: "sd35_large", label: "Stable Diffusion 3.5 Large (GPU 없음)", shortLabel: "SD3.5 Large" },
   { id: "style_guide", label: "Style Guide (레퍼런스 기반)", shortLabel: "Style Guide" },
-  { id: "openai_dalle3", label: "OpenAI (gpt-image-1)" },
+  {
+    id: "openai_dalle3",
+    label: "OpenAI (gpt-image-1)",
+    badge: "사업상 미사용",
+    notInUse: true,
+  },
   // Nova Canvas — 2026-09-18 목록에서 제외(사용자 확인). amazon.nova-canvas-v1:0
   // 자체가 AWS Bedrock에서 LEGACY로 지정돼 있고, "최근 30일 미사용 시 호출
   // 차단"이라는 모델 단위(계정 권한과 무관) 제약에 걸려있다 — 직접 모델 ID
