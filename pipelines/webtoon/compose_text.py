@@ -64,7 +64,16 @@ def _font(size: int) -> ImageFont.FreeTypeFont:
 def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
     """공백 기준으로 줄바꿈. 한글은 공백 없이 길게 이어지는 경우가 많아서,
     한 "단어"(공백으로 나눈 조각)가 그 자체로 max_width를 넘으면 글자 단위로도
-    쪼갠다."""
+    쪼갠다.
+
+    2026-09-20 — 스크립트 단일 호출 전환(정리후보 A/pipeline.py) 이후
+    headline 필드가 "韓·佛, 영상산업\n5년·8000억 투자 선언"처럼 줄바꿈을
+    포함해서 오는 걸 확인(컷1 표지). PIL의 draw.textlength()는 개행이
+    섞인 문자열을 주면 "can't measure length of multiline text"로 바로
+    예외를 던져서 컷1 텍스트 합성 전체가 실패했다 — 어차피 이 함수 자체가
+    폭에 맞춰 줄바꿈을 다시 계산하는 게 일이라, 호출자가 준 개행은 신뢰하지
+    않고 공백으로 합친 뒤 새로 감아준다."""
+    text = text.replace("\n", " ")
     words = text.split(" ")
     lines: list[str] = []
     current = ""

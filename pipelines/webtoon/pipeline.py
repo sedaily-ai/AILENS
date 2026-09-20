@@ -3,9 +3,11 @@
 =====================================
 기사 1건을 받아 8컷 웹툰(이미지 8장 + 세로 스크롤 1장)을 만든다.
 
-흐름: 1단계 스크립트 생성 → 2단계 장면 연출 → 3단계 이미지 생성 → 스티칭
-각 단계는 중간 결과(JSON)를 파일로 저장하므로, 중간에 끊겨도 재실행하면
-이미 끝난 단계는 건너뛰고 이어서 진행한다(resume).
+흐름: 스크립트+장면 연출(단일 Bedrock 호출) → 이미지 생성 → 스티칭.
+중간 결과(JSON)를 파일로 저장하므로, 중간에 끊겨도 재실행하면 이미 끝난
+단계는 건너뛰고 이어서 진행한다(resume). "1단계/2단계" 구분은 2026-09-20
+없앴다(아래 call_json 주석 참고) — admin의 실시간 스크립트챗랩과 동일하게
+스크립트·장면 연출을 한 호출로 만든다.
 
 2026-08-23 — 1·2단계(스크립트/장면연출) 텍스트 생성을 GPT-4o에서 Bedrock
 Claude로 이관(letters/podcast/video와 같은 이유: 텍스트 생성은 전부
@@ -36,7 +38,7 @@ Nova Canvas든 SD3.5든 확산 모델 계열은 프롬프트로 요청한 한글
 남겨뒀다 — `IMAGE_PROVIDER`를 "openai"로 바꾸면 크레딧 충전 후 바로
 원래 방식으로 되돌릴 수 있다.
 """
-import sys, json, base64, time
+import sys, json, base64, re, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
@@ -147,21 +149,29 @@ _JSON_INSTRUCTION = (
 _SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 
 
-def call_json(prompt: str, debug_path: Path | None = None) -> dict:
-    """Bedrock Claude에 JSON 응답을 요청한다. (스크립트/장면연출 공용)
+def call_json(prompt: str, debug_path: Path | None = None, max_tokens: int = 4000) -> dict:
+    """Bedrock Claude에 JSON 응답을 요청한다.
 
-    2026-08-23 — max_tokens을 2000→4000으로 올렸다. 1·2단계가 같은 한도를
-    공유하는데, 2단계(장면 연출)는 8컷 각각의 카메라 앵글+장면 묘사를
-    전부 써야 해서 1단계(대사/캡션)보다 원래 더 길어진다 — 실운영 중
-    2단계에서만 "Bedrock 응답에서 JSON을 찾지 못했습니다" 실패가 반복
-    발생한 게 이 한도 때문일 가능성이 커서(응답이 문장 중간에 잘리면
-    닫는 '}'가 아예 없어 4단계 폴백 전부 실패), video 파이프라인이
-    비슷한 분량(8~9컷)에 쓰는 max_tokens=4000과 맞췄다.
+    2026-08-23 — max_tokens을 2000→4000으로 올렸다(당시엔 1·2단계 두 호출이
+    이 한도를 공유). 그런데 저장된 웹툰 프롬프트가 2026-09-14 v11로 갱신되며
+    컷당 필드가 훨씬 많은 스키마로 바뀌어 2단계 응답이 8컷을 다 채우기 전에
+    잘리는 실패가 반복됐고(admin 쪽은 2026-09-15에 max_tokens=8000으로 올려
+    해결 — admin/backend/routes/prompts.py의 _CATEGORY_BEDROCK["webtoon"]
+    주석 참고), 이 파이프라인은 그 갱신을 놓치고 있었다. 게다가 2026-09-18
+    "1단계/2단계 구분 제거" 프롬프트 개편으로 발행 프롬프트 문서에서
+    "1단계 출력"/"2단계 출력" 섹션 자체가 사라졌는데도(문서엔 이제 "Stage 1
+    Script Output Format" 하나만 있음) 이 함수 호출부는 여전히 그 이름을
+    참조하고 있어서, 모델이 스키마 없이 매번 다른(점점 더 장황해지는)
+    JSON 구조를 즉흥적으로 만들어내며 잘림을 가속시켰다 — 2026-09-20
+    run_batch.py 사전 점검 중 재현 확인. run_article()을 admin의
+    build_script_call() 패턴(단일 호출+max_tokens=8000)과 맞춰 이 두 문제를
+    한 번에 해소했다(아래 SCRIPT_CHAPTERS/normalize_cuts 참고) — 이 함수의
+    기본값 4000은 다른 단순 호출부(generate_meta.py)엔 그대로 맞는다.
 
     debug_path — 파싱 실패 시 원문 응답을 저장해서 원인을 사후에 볼 수
     있게 한다(이게 없어서 오늘 실패 원인을 추정만 하고 확인은 못 했다).
     성공하면 안 남긴다(디스크 낭비 방지)."""
-    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=4000, temperature=0.7)
+    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=max_tokens, temperature=0.7)
     try:
         return extract_json_object(raw)
     except ValueError:
@@ -173,6 +183,115 @@ def call_json(prompt: str, debug_path: Path | None = None) -> dict:
             debug_path.write_text(raw, encoding="utf-8")
         print(f"    [call_json] 파싱 실패 원문(최대 2000자):\n{raw[:2000]}")
         raise
+
+
+# ─────────────────────────────────────────────────────────────
+# 스크립트+장면 연출 단일 호출 — admin/backend/routes/webtoon/script.py의
+# build_script_call()/normalize_cuts()를 그대로 이식했다(2026-09-20). admin
+# Lambda와 이 ECS 파이프라인은 서로 다른 배포 표면이라 코드를 직접 공유할
+# 수 없어서(admin은 flat-copy, 여긴 sys.path 기반) 포크 형태로 복사 —
+# 원본 쪽이 바뀌면(예: SCRIPT_CHAPTERS 챕터 번호, 스키마 필드명 변경) 이쪽도
+# 같이 갱신해야 한다는 뜻. 두 곳을 공유 모듈로 합치는 건 이번 범위 밖
+# (정리후보로 별도 기록 필요).
+_CHAPTER_HEADER_RE = re.compile(r"^##\s*(\d+)\.\s*.+$", re.MULTILINE)
+_KNOWN_GARBAGE_MARKERS = ("### 파일 · 새 파일",)  # admin 편집 UI 라벨이 섞여 들어간 흔적
+
+
+def _extract_chapters(content: str, chapter_numbers: list[int]) -> str:
+    """"## N. 제목" 헤더로 구분된 챕터 중 번호가 일치하는 것만 뽑아 순서대로
+    이어붙인다. 같은 번호가 여러 번 나오면 가장 마지막 사본만 쓴다."""
+    matches = list(_CHAPTER_HEADER_RE.finditer(content))
+    if not matches:
+        return content
+
+    starts = [m.start() for m in matches]
+    last_start_by_num: dict[int, int] = {}
+    for m in matches:
+        last_start_by_num[int(m.group(1))] = m.start()
+
+    parts = []
+    for num in chapter_numbers:
+        start = last_start_by_num.get(num)
+        if start is None:
+            continue
+        end = next((s for s in starts if s > start), len(content))
+        chunk = content[start:end]
+        for marker in _KNOWN_GARBAGE_MARKERS:
+            idx = chunk.find(marker)
+            if idx != -1:
+                chunk = chunk[:idx].rstrip()
+        parts.append(chunk.strip())
+    return "\n\n".join(parts)
+
+
+# 사실분석+장면설계+텍스트화이트리스트+공통이미지스타일 챕터만 — 3단계
+# 이미지 화풍/발행 규칙(16~21장) 등 스크립트·장면 연출에 불필요한 챕터는
+# 뺀다(admin script.py SCRIPT_CHAPTERS와 동일).
+_SCRIPT_CHAPTERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22]
+
+_SCRIPT_OUTPUT_ADDENDUM = (
+    "\n\n---\n### 출력 형식 (코드 보강)\n"
+    "위 \"Stage 1 Script Output Format\" JSON 스키마 그대로 컷 8개를 채우되,"
+    " 각 cuts 원소마다 다음 두 필드를 추가한다:\n"
+    '- "camera": 카메라 거리·앵글을 서술하는 한국어 문장.\n'
+    '- "scene": 구도·배경·인물 동작·소품을 서술하는 한국어 문장(12장'
+    " Scene Design 지침 반영, 8컷 연속 동일 구도 금지).\n"
+    "다른 설명 없이 JSON 객체 하나만 응답한다."
+)
+
+
+def _cut_number(d: dict) -> int | None:
+    """v11 스키마는 컷 번호를 정수 "cut" 대신 문자열 "cut_id"("cut_01")로
+    준다 — 둘 다 받는다."""
+    n = d.get("cut")
+    if isinstance(n, int):
+        return n
+    cut_id = d.get("cut_id") or d.get("id")
+    if isinstance(cut_id, str):
+        digits = "".join(ch for ch in cut_id if ch.isdigit())
+        if digits:
+            return int(digits)
+    return None
+
+
+def _first_nonempty(*values: object) -> str:
+    for v in values:
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
+
+
+def _dialogue_from_bubbles(c: dict) -> list[dict]:
+    """v11 스키마는 "dialogue" 배열 대신 bubble_1/bubble_2로 준다 — 구도
+    없이 만들어진 옛 dialogue 스키마와 나란히 지원."""
+    if c.get("dialogue"):
+        return c["dialogue"]
+    lines = []
+    for key in ("bubble_1", "bubble_2"):
+        b = c.get(key)
+        if isinstance(b, dict) and b.get("text"):
+            speaker = "A" if b.get("speaker") == "female" else "B" if b.get("speaker") == "male" else key
+            lines.append({"speaker": speaker, "line": b["text"]})
+    return lines
+
+
+def _normalize_cuts(script: dict) -> list[dict]:
+    """단일 호출 결과의 cuts를 컷 이미지 생성·compose_text.py가 기대하는
+    필드 이름(camera/scene/dialogue/title/narration/caption)으로 정규화."""
+    cuts = []
+    for c in script.get("cuts") or []:
+        cuts.append({
+            "cut": _cut_number(c),
+            "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
+            "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
+            "closing_caption": c.get("closing_caption") or "",
+            "title": _first_nonempty(c.get("title"), c.get("headline")),
+            "title_keyword": c.get("title_keyword") or "",
+            "dialogue": _dialogue_from_bubbles(c),
+            "camera": c.get("camera") or "",
+            "scene": c.get("scene") or "",
+        })
+    return cuts
 
 
 def build_image_prompt(camera: str, scene: str, cut: dict, characters: dict | None = None) -> str:
@@ -270,48 +389,32 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     article = Path(article_path).read_text(encoding="utf-8")
     tag = f"[{name}]"
 
-    # admin 프롬프트 드로어(webtoon 탭)에 저장된 지침 — 1·2단계 프롬프트를 여기서
-    # 매번 새로 조립한다. 이 함수 안에서 딱 한 번만 fetch(재실행 resume 경로에서도
-    # 굳이 다시 부르지 않도록 스킵 분기보다 위에 둔다).
+    # admin 프롬프트 드로어(webtoon 탭)에 저장된 지침 — 스크립트+장면 연출
+    # 프롬프트를 여기서 매번 새로 조립한다. 이 함수 안에서 딱 한 번만
+    # fetch(재실행 resume 경로에서도 굳이 다시 부르지 않도록 스킵 분기보다
+    # 위에 둔다).
     guide = ddb_prompt.load_prompt("webtoon")
 
-    # 1단계: 스크립트
+    # 스크립트+장면 연출: admin script.py::build_script_call()과 동일하게
+    # 단일 호출로 처리(2026-09-20, 위 call_json/_normalize_cuts 주석 참고
+    # — "1단계/2단계" 구분과 그로 인한 응답 잘림 문제를 여기서 없앴다).
     script_path = out / "1_script.json"
     if resume and script_path.exists():
-        print(f"{tag} 1단계 재사용")
+        print(f"{tag} 스크립트+장면 연출 재사용")
         script = json.loads(script_path.read_text(encoding="utf-8"))
     else:
-        print(f"{tag} 1단계 스크립트 생성")
+        print(f"{tag} 스크립트+장면 연출 생성")
         script_prompt = (
-            guide
-            + "\n\n---\n[지금 할 일]\n위 지침을 참고해서 지금은 1단계(스크립트)"
-            " 결과만 출력한다. \"1단계 출력\" 섹션에 정의된 JSON 스키마 그대로,"
-            " JSON 객체 하나만 응답한다(설명 문구 없이).\n\n[입력 기사]\n"
+            _extract_chapters(guide, _SCRIPT_CHAPTERS)
+            + "\n\n---\n[지금 할 일]\n위 지침을 참고해서 스크립트와 장면 연출을"
+            " 한 번에 만든다.\n\n[입력 기사]\n"
             + article
+            + _SCRIPT_OUTPUT_ADDENDUM
         )
-        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt")
+        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt", max_tokens=8000)
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # 2단계: 장면 연출
-    scenes_path = out / "2_scenes.json"
-    if resume and scenes_path.exists():
-        print(f"{tag} 2단계 재사용")
-        scenes = json.loads(scenes_path.read_text(encoding="utf-8"))
-    else:
-        print(f"{tag} 2단계 장면 연출 생성")
-        scene_prompt = (
-            guide
-            + "\n\n---\n[지금 할 일]\n위 지침을 참고해서 지금은 2단계(장면 연출)"
-            " 결과만 출력한다. \"2단계 출력\" 섹션에 정의된 JSON 스키마 그대로,"
-            " JSON 객체 하나만 응답한다(설명 문구 없이).\n\n[기사]\n"
-            + article
-            + "\n\n[1단계 스크립트 결과]\n"
-            + json.dumps(script, ensure_ascii=False)
-        )
-        scenes = call_json(scene_prompt, debug_path=out / "2_raw_response.txt")
-        scenes_path.write_text(json.dumps(scenes, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    scene_map = {s["cut"]: s for s in scenes["scenes"]}
+    cuts = _normalize_cuts(script)
 
     # 3단계: 이미지 생성
     print(f"{tag} 3단계 이미지 생성 ({N_CUTS}컷)")
@@ -336,13 +439,12 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
         gpu_started = True
 
     try:
-        for cut in script["cuts"]:
+        for cut in cuts:
             n = cut["cut"]
             img_path = out / f"컷{n}.png"
             if resume and img_path.exists():
                 print(f"{tag} 컷{n} 스킵(존재)")
                 continue
-            s = scene_map[n]
             print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
             if IMAGE_PROVIDER in _PROVIDER_CONFIG:
                 # 2026-09-09(R17) — 배경 인물 초과 체크(QA의 extra_people)를
@@ -357,7 +459,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 # (아래 _PROVIDER_CONFIG 주석 참고).
                 cfg = _PROVIDER_CONFIG[IMAGE_PROVIDER]
                 ok, faces = generate_cut_image_to_file(
-                    s["camera"], s["scene"], cfg["model"], img_path,
+                    cut["camera"], cut["scene"], cfg["model"], img_path,
                     has_dialogue=bool(cut.get("dialogue")) or n == 1,
                     retries=cfg["retries"],
                     with_qa=cfg["with_qa"],
@@ -374,7 +476,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                     except Exception as e:
                         print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
             else:
-                prompt = build_image_prompt(s["camera"], s["scene"], cut, characters)
+                prompt = build_image_prompt(cut["camera"], cut["scene"], cut, characters)
                 ok = generate_image(prompt, img_path)
             print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
     finally:
