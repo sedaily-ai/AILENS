@@ -6,7 +6,8 @@ OpenAI GPT-image에서 AWS Bedrock(Stable Diffusion 계열) + 자체 GPU
 IP-Adapter로 전면 교체했다** — 아래 내용은 그 이후(R12~R22) 기준이다.
 과거 GPT 기반 시행착오는 이 문서 하단 "지난 아키텍처(2026-08, GPT
 기반)"에 남겨뒀고, 전체 실험 과정은
-`docs/evaluation/webtoon/라운드기록.md`(R1~R22)에 라운드별로 기록돼
+`docs/architecture/webtoon_custom/05-라운드기록/라운드기록.md`(R1~R22,
+2026-09-20 `docs/evaluation/webtoon/`에서 이관)에 라운드별로 기록돼
 있다 — 특정 설계 결정의 이유가 궁금하면 거기부터 찾을 것.
 
 ## 아키텍처 — 3단계 + 텍스트 합성
