@@ -280,11 +280,29 @@ export function PromptChatLab({
   // 계속 출력되는쪽으로 스크롤 이동되네.. 위로 스크롤 가능하게 해주세요":
   // 이미 바닥 근처에 있을 때만 자동 스크롤한다 — 사용자가 위로 올려서
   // 읽고 있으면(바닥에서 멀어졌으면) 새 내용이 와도 억지로 안 끌어내린다.
+  //
+  // 2026-09-21(후속) — "스크롤을 위로 하려는데 계속 못 움직이게 하네":
+  // 스트리밍 중엔 liveParsed가 90ms마다 갱신되며 매번 바닥으로 끌어
+  // 내리는데, 거리 임계값(120px)만으로 판단하면 사용자가 살짝만 위로
+  // 스크롤해도(120px 안쪽) 바로 다음 틱에 도로 끌려 내려가 "전혀 안
+  // 움직이는" 것처럼 느껴졌다 — 임계값을 더 낮추는 걸로는 정도의
+  // 차이일 뿐 같은 문제가 반복된다. 대신 스크롤 "방향"을 본다 —
+  // scrollTop이 직전보다 줄었다(=사용자가 위로 올렸다)는 게 감지되면
+  // 거리와 무관하게 즉시 자동 스크롤을 끈다(우리 코드는 스스로 위로
+  // 스크롤하는 일이 없으므로 이 방향 감소는 항상 사용자 조작이다).
+  // 바닥 근처(20px 이내)로 직접 돌아오면 다시 자동 스크롤을 재개한다.
   const isNearBottomRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
   const handleListScroll = () => {
     const el = listRef.current;
     if (!el) return;
-    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (el.scrollTop < lastScrollTopRef.current) {
+      isNearBottomRef.current = false;
+    } else if (distanceFromBottom < 20) {
+      isNearBottomRef.current = true;
+    }
+    lastScrollTopRef.current = el.scrollTop;
   };
 
   // 새 메시지(드묾)는 부드럽게, 실시간 리빌 중(초당 ~11회) 갱신은 즉시
