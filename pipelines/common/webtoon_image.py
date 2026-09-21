@@ -160,24 +160,46 @@ def characters_block(characters: dict | None) -> str:
 # 무엇이든 받는 범용 라우트라 새 백엔드 라우트 없이 그대로 재사용한다
 # (`POST /admin/prompts/webtoon-image/published`, WebtoonImageLab.tsx의
 # "발행" 버튼이 부른다). content 는 그 라우트가 있는 그대로 저장하는
-# 산문 한 덩어리라 STYLE/두 캐릭터 3개를 아래 헤딩 포맷으로 합쳐 넣고,
-# 여기서 다시 파싱해 꺼낸다. sections_json 은 안 보낸다(이 문서는
+# 산문 한 덩어리라 STYLE/두 캐릭터/모델 4개를 아래 헤딩 포맷으로 합쳐
+# 넣고, 여기서 다시 파싱해 꺼낸다. sections_json 은 안 보낸다(이 문서는
 # PromptDrawer의 설명/지침/파일 3섹션 모델과 안 맞는 별개 구조라
 # 편집기가 다르다 — sections 가 없으면 프롬프트 드로어가 content 전체를
 # 한 섹션으로 보여주는데, 이 카테고리는 애초에 PromptDrawer로 안 연다).
-_DOC_HEADINGS = ("STYLE", "CHARACTER_FEMALE", "CHARACTER_MALE")
-_DOC_HEADING_RE = re.compile(r"^##\s+(STYLE|CHARACTER_FEMALE|CHARACTER_MALE)\s*$")
+#
+# IMAGE_MODEL(2026-09-20 추가, 정리후보 A 후속) — "관리자가 CMS에서
+# 저장하면 다음 발행부터 자동 반영"을 실제 발행 파이프라인의 모델
+# 선택까지 확장한 것. STYLE/CHARACTER_*와 같은 방식(DDB fresh read,
+# 실패 시 코드 기본값 폴백)이지만 하위호환을 위해 **필수는 아니다** —
+# 이 헤딩이 아예 없는 옛 발행 문서(오늘 이전에 저장된 것)를 만나도
+# ValueError를 던지지 않고 _DEFAULT_IMAGE_MODEL로 조용히 채운다(STYLE/
+# CHARACTER_*가 비어 있는 건 여전히 에러 — 그건 정말 문서가 깨진
+# 경우다). 값은 pipeline.py::_PROVIDER_CONFIG·admin
+# webtoonImageModels.ts의 IMAGE_MODELS[].id와 같은 어휘를 쓴다
+# ("sd_ultra"/"pipeline"/"stable_image_core"/"sd35_large"/"style_guide").
+_DOC_HEADINGS = ("STYLE", "CHARACTER_FEMALE", "CHARACTER_MALE", "IMAGE_MODEL")
+_DOC_HEADING_RE = re.compile(r"^##\s+(STYLE|CHARACTER_FEMALE|CHARACTER_MALE|IMAGE_MODEL)\s*$")
+
+_DEFAULT_IMAGE_MODEL = "sd_ultra"  # 2026-09-20 결정 — "GPU를 꼭 써야할까요?" 이후 admin 기본값과 동일
+_VALID_IMAGE_MODELS = ("sd_ultra", "pipeline", "stable_image_core", "sd35_large", "style_guide")
 
 
-def serialize_prompt_doc(style: str, char_female: str, char_male: str) -> str:
-    """세 값 → DDB에 저장할 content 문자열. `parse_prompt_doc`의 역함수."""
-    parts = dict(zip(_DOC_HEADINGS, (style.strip(), char_female.strip(), char_male.strip())))
-    return "\n\n".join(f"## {h}\n{parts[h]}" for h in _DOC_HEADINGS)
+def serialize_prompt_doc(style: str, char_female: str, char_male: str, image_model: str = "") -> str:
+    """네 값 → DDB에 저장할 content 문자열. `parse_prompt_doc`의 역함수.
+    image_model 생략 시(빈 문자열) IMAGE_MODEL 섹션 자체를 안 쓴다 —
+    아직 이 설정을 모르는 옛 화면(WebtoonImageLab.tsx 구버전 등)이
+    실수로 발행해도 다른 관리자가 고른 모델을 조용히 지우지 않는다."""
+    parts = dict(zip(_DOC_HEADINGS[:3], (style.strip(), char_female.strip(), char_male.strip())))
+    chunks = [f"## {h}\n{parts[h]}" for h in _DOC_HEADINGS[:3]]
+    if image_model.strip():
+        chunks.append(f"## IMAGE_MODEL\n{image_model.strip()}")
+    return "\n\n".join(chunks)
 
 
-def parse_prompt_doc(content: str) -> tuple[str, str, str]:
-    """content 문자열 → (style, char_female, char_male). 헤딩 형식이 예상과
-    다르면(빈 값 포함) ValueError — 호출부가 안전망 기본값으로 폴백한다."""
+def parse_prompt_doc(content: str) -> tuple[str, str, str, str]:
+    """content 문자열 → (style, char_female, char_male, image_model). STYLE/
+    CHARACTER_* 헤딩 형식이 예상과 다르면(빈 값 포함) ValueError — 호출부가
+    안전망 기본값으로 폴백한다. IMAGE_MODEL은 없거나 모르는 값이면 빈
+    문자열을 반환(필수 아님, 호출부가 _DEFAULT_IMAGE_MODEL로 채운다)."""
     buckets: dict[str, list[str]] = {h: [] for h in _DOC_HEADINGS}
     current: str | None = None
     for line in content.split("\n"):
@@ -187,16 +209,18 @@ def parse_prompt_doc(content: str) -> tuple[str, str, str]:
             continue
         if current:
             buckets[current].append(line)
-    style, female, male = (("\n".join(buckets[h])).strip() for h in _DOC_HEADINGS)
+    style, female, male, image_model = (("\n".join(buckets[h])).strip() for h in _DOC_HEADINGS)
     if not style or not female or not male:
         raise ValueError(
             "webtoon-image/published 문서 형식이 예상과 다름 "
             "(## STYLE / ## CHARACTER_FEMALE / ## CHARACTER_MALE 헤딩 필요)"
         )
-    return style, female, male
+    if image_model not in _VALID_IMAGE_MODELS:
+        image_model = ""
+    return style, female, male, image_model
 
 
-def _load_prompt_doc() -> tuple[str, str, str]:
+def _load_prompt_doc() -> tuple[str, str, str, str]:
     """DDB(PROMPT#webtoon-image/published)에서 fresh하게 읽는다 — 캐시 없음
     (모듈 docstring 참고). 실패하면 안전망 기본값으로 조용히 폴백한다."""
     try:
@@ -213,25 +237,42 @@ def _load_prompt_doc() -> tuple[str, str, str]:
             _STYLE_FALLBACK,
             _FIXED_CHARACTERS_FALLBACK["A (여성 기자, 설명자)"],
             _FIXED_CHARACTERS_FALLBACK["B (남성 청자)"],
+            "",
         )
 
 
 def get_style() -> str:
-    style, _female, _male = _load_prompt_doc()
+    style, _female, _male, _model = _load_prompt_doc()
     return style
 
 
 def get_fixed_characters() -> dict:
-    _style, female, male = _load_prompt_doc()
+    _style, female, male, _model = _load_prompt_doc()
     return {"A (여성 기자, 설명자)": female, "B (남성 청자)": male}
 
 
-# 이 파이프라인은 고정 진행자 2인(A/B)만 쓴다 — QA 단계(얼굴 수 초과 감지)의
-# 기대 상한값. 예전엔 pipeline.py와 admin/backend/routes/webtoon_lab.py가
-# 각자 같은 값으로 따로 정의하고 있었다(2026-09-16 리팩토링 감사) — get_fixed_characters()
-# 가 정확히 A/B 2명만 반환하는 이 모듈이 "고정 인물이 몇 명인가"의 정본이라
-# 여기로 모은다.
-MAX_EXPECTED_FACES = 2
+def get_active_image_model() -> str:
+    """실제 발행 파이프라인(pipeline.py)이 지금 써야 할 이미지 모델 id.
+    admin이 발행한 값을 매번 fresh하게 읽는다(캐시 없음, get_style()과
+    같은 이유) — 관리자가 저장하면 재배포 없이 다음 컷 생성부터 반영된다."""
+    _style, _female, _male, model = _load_prompt_doc()
+    return model or _DEFAULT_IMAGE_MODEL
+
+
+def get_image_settings() -> tuple[str, dict, str]:
+    """(style, fixed_characters, active_image_model) 세 값을 DDB 조회
+    **한 번**으로 전부 얻는다. 2026-09-20 admin/backend/routes/webtoon/
+    generate.py::handle_defaults()가 이 세 값을 동시에 다 보여줘야
+    하는데, get_style()/get_fixed_characters()/get_active_image_model()을
+    각각 부르면 같은 webtoon-image/published 문서를 세 번(캐시가 없으므로
+    실제로 세 번 다 네트워크 왕복) 읽는 꼴이었다 — "프롬프트 실험 페이지
+    로딩이 느리다" 신고로 발견. 한 값만 필요한 다른 호출부(예:
+    _generate_cut_once의 get_style() 단독 호출)는 그대로 개별 함수를
+    쓴다 — 거기선 한 번만 읽으니 합칠 이유가 없다."""
+    style, female, male, model = _load_prompt_doc()
+    characters = {"A (여성 기자, 설명자)": female, "B (남성 청자)": male}
+    return style, characters, (model or _DEFAULT_IMAGE_MODEL)
+
 
 
 def _character_text_for(subject: str) -> str:
@@ -267,10 +308,14 @@ def build_background_prompt(
     값을 DDB에서 그대로 읽는다 — 예전엔 import 시점에 고정된 상수를 기본값
     으로 썼는데, 그러면 admin에서 새로 발행해도 이미 로드된 프로세스는 옛
     값을 계속 썼다(파라미터 기본값은 함수 정의 시점에 딱 한 번 평가되므로).
-    이제는 매 호출마다 get_style()을 불러 항상 최신값을 쓴다."""
+    이제는 매 호출마다 get_style()을 불러 항상 최신값을 쓴다. style=""
+    (빈 문자열, None과 다름)을 명시하면 이 fetch 자체를 건너뛰고 화풍
+    지침 없이 camera/[SCENE]만으로 프롬프트를 만든다 — _generate_cut_once()
+    의 stable_image_core/sd35_large/sd_ultra가 2026-09-20부터 이렇게 쓴다."""
     if style is None:
         style = get_style()
-    style_block = style + f"\nCamera: {camera}. 3:2 horizontal."
+    style_block = f"{style}\n" if style else ""
+    style_block += f"Camera: {camera}. 3:2 horizontal."
     return (
         style_block + characters_block(characters) + f"\n\n[SCENE]\n{scene}"
         + (SCENE_REINFORCEMENT if include_scene_reinforcement else "")
@@ -1115,28 +1160,14 @@ def generate_nova_canvas_image_bytes(prompt: str) -> bytes:
 # 에 의존하고 ECS 발행 파이프라인엔 그 모듈 자체가 없는 데다, 이미 사업상
 # 사용 불가로 확정됐다(2026-09-18) — admin/backend/routes/webtoon/generate.py
 # 가 이 함수를 부르기 "전에" 별도로 분기해서 처리한다.
-_QA_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
-
-
-def _validate_and_detect_cut(image_bytes: bytes, scene: str, no_people_expected: bool) -> dict:
-    """생성된 배경 이미지 1장을 비전 모델로 검사 — pipeline.py의 옛
-    _generate_and_qa_cut()/admin의 옛 _validate_and_detect()와 동일 계약
-    (실패해도 항상 "문제 없음"으로 처리해 가용성을 우선한다). bedrock_client/
-    prompts/json_extract는 지연 import — 이 모듈은 텍스트 호출 없이 순수
-    이미지 생성만 하는 호출부(예: 단일 모델 비교 테스트)도 많아, QA를 실제로
-    쓸 때만 그 비용을 치른다(translate_scene_to_photo_brief()와 같은 이유)."""
-    from bedrock_client import call_vision  # pipelines/common/ — sibling, flat import
-    from json_extract import extract_json_object  # pipelines/common/ — sibling, flat import
-    import prompts  # pipelines/webtoon/ — sibling, flat import(VALIDATE_SYSTEM 정본)
-
-    try:
-        no_people_note = "\n\n[인물 없음 지시]: 이 장면은 인물이 없어야 합니다." if no_people_expected else ""
-        user_msg = f"[SCENE 지문]\n{scene}{no_people_note}"
-        raw = call_vision(prompts.VALIDATE_SYSTEM, user_msg, image_bytes, model=_QA_MODEL, max_tokens=500)
-        return extract_json_object(raw)
-    except Exception as e:  # noqa: BLE001 — QA 실패가 생성 자체를 막으면 안 됨
-        print(f"[webtoon_image] 컷 QA 실패(통과 처리): {type(e).__name__}: {e}")
-        return {"sageuk": False, "no_people_violated": False}
+#
+# 2026-09-20 — 생성 결과를 비전 모델로 재검증해 조건부 재생성하던 QA
+# 단계(사극 오염·인물 없음 위반·고정 인물 수 초과 체크, _validate_and_detect_cut
+# + Rekognition 얼굴 수 검사)를 통째로 제거했다(사용자 요청: "QA도 안
+# 하기로 한거 아닌가?" → "그냥 삭제하시죠"). admin 실험 패널은 QA를 이미
+# 기본으로 안 썼고, 발행 파이프라인의 Ultra 경로만 하드코딩으로 QA를
+# 켜고 있어서 "CMS에서만 제어돼야 한다"는 원칙과 안 맞았다 — CMS 토글을
+# 새로 만드는 대신 검증+재생성 후처리 자체를 없앴다.
 
 
 def _generate_cut_once(
@@ -1153,25 +1184,35 @@ def _generate_cut_once(
     제어가 되도록 하는것이 적절합니다": stable_image_core/sd35_large/sd_ultra는
     고정 인물(characters)도, 재강조 문구(scene/character reinforcement — 특히
     "군중 금지"류로 사용자가 scene에 직접 적은 내용과 충돌하던 문구)도 안
-    붙인다 — admin이 발행한 STYLE(공통 화풍)만 그대로 얹고 나머지는 순수
-    camera/scene 텍스트로 결정된다."""
+    붙인다.
+
+    2026-09-20(같은 날, 후속) — 처음엔 admin이 발행한 STYLE(공통 화풍)
+    텍스트만 예외로 남겨뒀는데("STYLE만 그대로 얹고 나머지는 순수
+    camera/scene"), 사용자가 재검토 후 "화풍지침 필요없고 프롬프트로만
+    제어 가능하게" 요청 — 이 세 모델은 이제 style 자체를 안 넘긴다
+    (build_background_prompt에 style=""). Camera/[SCENE]과 "텍스트 렌더
+    금지" 안전장치만 남고, 화풍을 포함한 나머지는 전부 camera/scene
+    텍스트가 결정한다. style_guide/pipeline(GPU) 모델은 별개 메커니즘
+    (참고 이미지가 화풍을 앵커하고 텍스트는 그걸 보조하는 구조)이라
+    이 변경 밖 — build_style_guide_prompt()의 _style_hint_from_db()
+    주석 참고."""
     if model == "stable_image_core":
         prompt = build_background_prompt(
-            camera, scene, style=get_style(),
+            camera, scene, style="",
             include_scene_reinforcement=False, include_character_reinforcement=False,
         )
         return generate_bedrock_image_bytes(prompt)
 
     if model == "sd35_large":
         prompt = build_background_prompt(
-            camera, scene, style=get_style(),
+            camera, scene, style="",
             include_scene_reinforcement=False, include_character_reinforcement=False,
         )
         return generate_bedrock_sd35_image_bytes(prompt)
 
     if model == "sd_ultra":
         prompt = build_background_prompt(
-            camera, scene, style=get_style(),
+            camera, scene, style="",
             include_scene_reinforcement=False, include_character_reinforcement=False,
         )
         return generate_bedrock_sd_ultra_image_bytes(prompt)
@@ -1202,50 +1243,65 @@ def generate_cut_image(
     has_dialogue: bool = True,
     apply_character_lock: bool = True,
     apply_style_transfer: bool = True,
-    with_qa: bool | None = None,
-    check_extra_people: bool = True,
 ) -> tuple[bytes, list | None]:
     """컷 이미지 1장 생성 — admin 실험 패널과 발행 파이프라인이 공유하는
     단일 정본 디스패치(위 섹션 주석 참고, 정리후보 A+D). 반환값은
-    (image_bytes, faces) — faces는 Rekognition 얼굴 바운딩 박스 목록(QA를
-    안 거쳤거나 얼굴 감지가 안 되면 None, compose_text.py가 None일 때
-    균등분할로 폴백한다).
+    (image_bytes, faces) — faces는 말풍선 배치 참고용 Rekognition 얼굴
+    바운딩 박스 목록(대사가 있는 컷에서만 조회, 없으면 None —
+    compose_text.py가 None일 때 균등분할로 폴백한다).
 
-    with_qa — None(기본)이면 model=="pipeline"일 때만 QA(비전 판정+
-    Rekognition 얼굴 수 검사)를 거친다(GPU IP-Adapter 경로는 참조 사진으로
-    인물 identity 자체를 고정하는 별개 메커니즘이라 이 QA가 여전히
-    의미 있다 — 2026-09-20 admin 결정). 나머지 모델은 "사용자 프롬프트
-    외 영향 요인 없음" 원칙에 따라 기본적으로 QA 없이 _generate_cut_once()
-    결과를 그대로 쓴다. True/False로 명시하면 model과 무관하게 강제된다.
-
-    check_extra_people — 2026-09-20(Phase 4, GPU→Ultra 전환) 추가. 사극
-    오염(sageuk)·인물 없음 위반(no_people_violated)은 프롬프트를 바꾸는
-    게 아니라 결과물을 검사하는 후처리라 "프롬프트 외 영향 요인 없음"
-    원칙과 성격이 다르다(실제 독자에게 나가는 안전망) — with_qa=True로
-    켜는 모델은 기본으로 계속 받는다. extra_people(고정 인물 수 초과 시
-    재생성)만은 "군중을 그려달라"는 정당한 사용자 지시와 충돌할 수 있어
-    (admin이 pipeline 외 모델에서 QA 자체를 끈 이유와 같음) 이 플래그로
-    따로 끌 수 있게 뺐다 — 발행 파이프라인의 Ultra 경로가 이 조합
-    (QA는 켜되 extra_people만 끔)을 쓴다."""
+    2026-09-20 — 생성 결과를 검사해 조건부 재생성하던 QA(사극 오염·인물
+    없음 위반·고정 인물 수 초과)를 통째로 제거했다(사용자 요청, 위 섹션
+    주석 참고). 그 전엔 admin 실험 패널은 QA 기본 off, 발행 파이프라인의
+    Ultra 경로만 하드코딩으로 QA on이라 "CMS로만 제어돼야 한다" 원칙에
+    어긋났다 — 새 토글을 만드는 대신 후처리 자체를 없애 양쪽이 항상
+    같게 동작하도록 정리했다."""
     image_bytes = _generate_cut_once(camera, scene, model, apply_character_lock, apply_style_transfer)
-    run_qa = (model == "pipeline") if with_qa is None else with_qa
-    if not run_qa:
-        return image_bytes, None
-
-    from rekognition_client import detect_main_faces  # pipelines/common/ — sibling, flat import
-
-    no_people_expected = any(p in scene for p in ("인물 없음", "인물 없이", "인물 없는", "인물이 없"))
-    verdict = _validate_and_detect_cut(image_bytes, scene, no_people_expected)
-    faces = detect_main_faces(image_bytes) or None
-    extra_people = (
-        check_extra_people and has_dialogue and not no_people_expected
-        and faces is not None and len(faces) > MAX_EXPECTED_FACES
-    )
-    if verdict.get("sageuk") or verdict.get("no_people_violated") or extra_people:
-        print(f"[webtoon_image] 컷 QA 실패({model}) — 재생성 1회 시도")
-        image_bytes = _generate_cut_once(camera, scene, model, apply_character_lock, apply_style_transfer)
+    faces = None
+    if has_dialogue:
+        from rekognition_client import detect_main_faces  # pipelines/common/ — sibling, flat import
         faces = detect_main_faces(image_bytes) or None
     return image_bytes, faces
+
+
+# 2026-09-20 — 198건 백필 실사용에서 실패 18건 중 대다수(FileNotFoundError로
+# 관측된 것들)의 실제 원인이 "응답에 이미지 없음: ['Filter reason: prompt']"
+# 였다 — Bedrock 콘텐츠 필터가 그 컷의 image_prompt 내용 자체를 거부하는
+# 것으로, 네트워크 오류와 달리 **같은 문장으로 재시도해도 매번 똑같이
+# 거부된다**(동일 기사·동일 컷 번호가 서로 다른 배치 실행에서 매번 같은
+# 방식으로 실패한 걸 로그로 확인). _retry_generate_and_write()의 기존
+# 재시도는 이 실패 모드에 대해 완전히 무의미했다 — "재시도보다 근본
+# 원인을 바로잡으라"는 사용자 요청으로, 필터 거부를 감지하면 텍스트
+# 모델로 프롬프트를 한 번 순화해서 재시도하도록 바꿨다. 어떤 단어가
+# 걸렸는지 Bedrock이 안 알려줘서 규칙 기반으로 미리 걸러낼 수 없다(이전에
+# "lower abdomen" 사례처럼 사후에 하나씩 찾아 문서에 지침을 추가하는
+# 방식은 새로 나타나는 표현마다 놓칠 수밖에 없다) — 그래서 실패 시점에
+# 즉석으로 순화하는 쪽을 택했다.
+_PROMPT_HELPER_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
+
+
+def _soften_scene_for_filter(scene: str) -> str:
+    """Bedrock 콘텐츠 필터('Filter reason: prompt')에 거부된 image_prompt를
+    텍스트 모델로 한 번 순화해서 돌려준다. 실패하면 원문을 그대로
+    돌려줘 호출부가 최소한 기존 동작(동일 프롬프트로 재시도)으로
+    폴백하게 한다."""
+    try:
+        from bedrock_client import call_text  # pipelines/common/ — sibling, flat import
+
+        system = (
+            "다음은 이미지 생성 요청 프롬프트인데 안전 필터에 거부됐다. "
+            "장면의 핵심 구도·소재·색감·NEGATIVE 문구는 최대한 그대로 "
+            "유지하되, 실존 인물처럼 읽힐 수 있는 묘사, 신체 부위·통증·"
+            "갈등·폭력을 구체적으로 연상시키는 단어만 더 중립적이고 "
+            "추상적인 표현으로 바꿔 같은 형식(쉼표로 이어진 영어 구 "
+            "나열)으로 다시 써라. 다른 설명 없이 프롬프트 문장만 응답한다."
+        )
+        rewritten = call_text(system, scene, model=_PROMPT_HELPER_MODEL, max_tokens=600)
+        rewritten = rewritten.strip()
+        return rewritten or scene
+    except Exception as e:  # noqa: BLE001 — 순화 자체가 실패해도 원본으로 계속 진행
+        print(f"[webtoon_image] 프롬프트 순화 실패(원문 유지): {type(e).__name__}: {e}")
+        return scene
 
 
 def generate_cut_image_to_file(
@@ -1257,25 +1313,40 @@ def generate_cut_image_to_file(
     has_dialogue: bool = True,
     apply_character_lock: bool = True,
     apply_style_transfer: bool = True,
-    with_qa: bool | None = None,
-    check_extra_people: bool = True,
     retries: int = 3,
 ) -> tuple[bool, list | None]:
     """generate_cut_image()의 파일-쓰기 + 배치 재시도(12/24/36초 백오프,
     _retry_generate_and_write() 공유) 래퍼 — pipeline.py(무인 자동 발행)가
     쓴다. admin 실험 패널(bytes만 필요, S3에 직접 업로드)은 generate_cut_image()를
-    그대로 쓰고 이 래퍼는 안 거친다(2026-09-20, 정리후보 A Phase 3)."""
+    그대로 쓰고 이 래퍼는 안 거친다(2026-09-20, 정리후보 A Phase 3).
+
+    콘텐츠 필터 거부(위 _soften_scene_for_filter 참고)는 한 번만 순화를
+    시도한다 — 순화 후에도 걸리면 원래 재시도 루프(백오프)에 맡긴다."""
     faces_holder: list = [None]
+    scene_holder = [scene]
+    softened = [False]
 
     def _once() -> bytes:
-        image_bytes, faces = generate_cut_image(
-            camera, scene, model,
-            has_dialogue=has_dialogue,
-            apply_character_lock=apply_character_lock,
-            apply_style_transfer=apply_style_transfer,
-            with_qa=with_qa,
-            check_extra_people=check_extra_people,
-        )
+        try:
+            image_bytes, faces = generate_cut_image(
+                camera, scene_holder[0], model,
+                has_dialogue=has_dialogue,
+                apply_character_lock=apply_character_lock,
+                apply_style_transfer=apply_style_transfer,
+            )
+        except ValueError as e:
+            if "Filter reason: prompt" in str(e) and not softened[0]:
+                softened[0] = True
+                print("[webtoon_image] 콘텐츠 필터 거부 — 프롬프트 순화 후 재시도")
+                scene_holder[0] = _soften_scene_for_filter(scene_holder[0])
+                image_bytes, faces = generate_cut_image(
+                    camera, scene_holder[0], model,
+                    has_dialogue=has_dialogue,
+                    apply_character_lock=apply_character_lock,
+                    apply_style_transfer=apply_style_transfer,
+                )
+            else:
+                raise
         faces_holder[0] = faces
         return image_bytes
 

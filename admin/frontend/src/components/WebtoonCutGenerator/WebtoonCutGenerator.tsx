@@ -111,10 +111,21 @@ export function WebtoonCutGenerator({
   // storyboard(cuts prop)가 나중에 도착하거나 다시 바뀌면 해당 번호 슬롯에
   // 말풍선·캡션 메타데이터(sourceCut)만 조용히 매칭한다 — 화면에 보이는
   // 프롬프트 텍스트는 건드리지 않는다(사용자가 직접 복붙, 위 모듈
-  // docstring 3번 참고). 사용자가 이미 손으로 고친(dirty) 슬롯이나 이미
-  // 생성 중/완료된 슬롯은 자동으로 덮어쓰지 않는다. 렌더 중 비교해서
-  // 반영한다(useEffect 안에서 setState하면 캐스케이드 리렌더가 생겨
-  // 린트가 막는다 — React의 "prop 바뀔 때 상태 맞추기" 패턴).
+  // docstring 3번 참고). 렌더 중 비교해서 반영한다(useEffect 안에서
+  // setState하면 캐스케이드 리렌더가 생겨 린트가 막는다 — React의
+  // "prop 바뀔 때 상태 맞추기" 패턴).
+  //
+  // 2026-09-20 — 예전엔 dirty(사용자가 손으로 고친 슬롯)나 status!=="idle"
+  // (생성 중/완료/에러)인 슬롯은 매칭을 건너뛰었다. 의도는 "텍스트를
+  // 덮어쓰지 않겠다"였는데, 실제로는 sourceCut 갱신이 텍스트를 전혀
+  // 안 건드리는데도 메타데이터 자체가 영영 안 붙는 부작용이 있었다 —
+  // 같은 세션에서 먼저 테스트해 dirty/done 상태가 된 슬롯에 새 기사의
+  // 스크립트를 다시 생성하면, 그 슬롯만 조용히 narration이 안 붙는 채로
+  // 남았다(사용자가 실제로 겪음: 8컷 중 4개만 자막이 안 나옴). sourceCut은
+  // 매번 최신으로 갱신해도 안전하다 — 프롬프트 텍스트도, 이미 보낸 생성
+  // 요청도 안 건드리기 때문이다(sendGenerate가 클릭 시점 sourceCut을
+  // 그대로 페이로드에 복사해 보내므로, 이후 sourceCut이 바뀌어도 이미
+  // 전송된 요청엔 영향 없다).
   const [prevCuts, setPrevCuts] = useState(cuts);
   if (cuts !== prevCuts) {
     setPrevCuts(cuts);
@@ -122,7 +133,7 @@ export function WebtoonCutGenerator({
       const next = { ...prev };
       for (const cut of cuts) {
         const existing = next[cut.cut];
-        if (!existing || existing.dirty || existing.status !== "idle") continue;
+        if (!existing) continue;
         next[cut.cut] = { ...existing, sourceCut: cut };
       }
       return next;

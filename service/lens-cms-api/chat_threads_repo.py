@@ -60,7 +60,18 @@ def list_threads(category: str, name: str, limit: int = 50) -> List[Dict[str, An
         return [_thread_summary(r) for r in cur.fetchall()]
 
 
-def get_thread(thread_id: int) -> Optional[Dict[str, Any]]:
+def get_thread(thread_id: int, message_limit: int = 40) -> Optional[Dict[str, Any]]:
+    """message_limit(2026-09-20 추가) — 이 대화의 가장 최근 메시지 N개만
+    가져온다. 예전엔 LIMIT 없이 전체를 가져왔는데(2026-09-18 "날것으로
+    모든 출력결과 다 출력해주세요" 결정으로 메시지 하나당 storyboard
+    8컷 전체 JSON — camera/scene 문장까지 — 이 payload에 그대로 실림),
+    오래 쓴 대화(사이드바에서 자주 재사용되는 스레드일수록 턴이 많음)를
+    열 때 admin에서 실측 렉 신고("좌측 채팅 기록 버튼 클릭하면 반응도
+    느리고") — list_threads()가 이미 쓰는 것과 같은 "무제한 대신 최근
+    N개만" 패턴을 여기도 적용한다. id DESC로 최근 N개를 뽑은 뒤 화면
+    표시 순서(오래된→최신)로 다시 뒤집는다. 오래된 메시지를 더 보고
+    싶을 때의 페이지네이션 UI는 없음(지금은 범위 밖 — 필요해지면
+    이 함수에 before_id 커서를 추가)."""
     with get_cursor() as cur:
         cur.execute(
             "SELECT id, title, created_at, updated_at FROM prompt_lab_threads WHERE id=%s",
@@ -71,8 +82,8 @@ def get_thread(thread_id: int) -> Optional[Dict[str, Any]]:
             return None
         cur.execute(
             "SELECT id, role, payload, created_at FROM prompt_lab_thread_messages "
-            "WHERE thread_id=%s ORDER BY id",
-            (thread_id,),
+            "WHERE thread_id=%s ORDER BY id DESC LIMIT %s",
+            (thread_id, message_limit),
         )
         messages = [
             {
@@ -85,7 +96,7 @@ def get_thread(thread_id: int) -> Optional[Dict[str, Any]]:
                 "role": m["role"],
                 "created_at": m["created_at"].isoformat() if m.get("created_at") else None,
             }
-            for m in cur.fetchall()
+            for m in reversed(cur.fetchall())
         ]
         return {**_thread_summary(row), "messages": messages}
 

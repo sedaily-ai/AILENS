@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminClient";
+import type { PromptListItem } from "@/lib/types";
 
 /* 우측 사이드 패널 — "편집 대상"(webtoon/published) 프롬프트를 설명(단일)·
    지침(단일)·파일(다중, 추가/삭제) 셋으로 나눠 각각 독립적으로 저장한다
@@ -59,7 +60,14 @@ export function PromptSectionsPanel({ category, name }: { category: string; name
     let cancelled = false;
     (async () => {
       try {
-        const doc = await adminApi.getPromptLabDoc(category, name);
+        // 2026-09-20 — 예전엔 getPromptLabDoc()을 기다린 "다음에" 버전 표시용
+        // getPrompt()를 또 불렀다(순차) — "프롬프트 실험 페이지 로딩이 느리다"
+        // 신고로 발견. getPromptLabDoc()과는 서로 독립적인 요청이라 Promise.all로
+        // 동시에 쏜다 — 응답 대기가 두 요청 합산이 아니라 더 느린 쪽 하나로 줄어든다.
+        const [doc, promptList] = await Promise.all([
+          adminApi.getPromptLabDoc(category, name),
+          adminApi.listPrompts().catch(() => ({ prompts: [] as PromptListItem[] })),
+        ]);
         if (cancelled) return;
 
         let initialInstructions = doc.instructions;
@@ -68,7 +76,8 @@ export function PromptSectionsPanel({ category, name }: { category: string; name
           // 이 챗랩 저장소를 아직 한 번도 안 쓴 프롬프트 — 발행된 내용을
           // 지침 칸의 시작값으로만 보여준다(저장 전까지는 서버에 안
           // 남는다 — 그래서 아래 savedInstructions는 빈 문자열로 둬서
-          // "저장 안 됨" 상태로 보이게 한다).
+          // "저장 안 됨" 상태로 보이게 한다). 이 경우는 실제 본문이
+          // 필요해서 무거운 getPrompt()를 그대로 쓴다(아래 else와 다름).
           try {
             const published = await adminApi.getPrompt(category, name);
             initialInstructions = published.active_content;
@@ -78,12 +87,13 @@ export function PromptSectionsPanel({ category, name }: { category: string; name
             // 발행된 것도 없으면 그냥 빈 채로 시작
           }
         } else {
-          try {
-            const published = await adminApi.getPrompt(category, name);
-            if (!cancelled) setServerVersion(published.active_version);
-          } catch {
-            // 버전 표시만 못 할 뿐 패널 자체는 정상 동작
-          }
+          // 2026-09-20 — 여기선 버전 숫자 하나만 필요한데, 예전엔 getPrompt()로
+          // 발행 본문(웹툰 카테고리 기준 10만자 이상)을 통째로 받아 그중
+          // active_version만 꺼내고 나머지는 버렸다 — listPrompts()(카테고리
+          // 전체의 가벼운 요약, 본문 없음)에서 같은 값을 찾는 걸로 바꿔
+          // 그 낭비를 없앴다. 위에서 doc과 이미 병렬로 fetch해뒀다.
+          const listed = promptList.prompts.find((p) => p.id === `${category}/${name}`);
+          if (listed) setServerVersion(listed.active_version);
         }
 
         const loadedFiles = await Promise.all(

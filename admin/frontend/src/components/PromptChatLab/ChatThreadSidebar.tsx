@@ -85,7 +85,15 @@ export function ChatThreadSidebar({
               key={t.id}
               type="button"
               onClick={() => onSelect(t.id)}
-              className="block w-full truncate rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors"
+              // 2026-09-20, 사용자 요청 — "마우스를 올려둘 때 전체적으로 호버
+              // 기능이 필요": 이 버튼엔 hover 스타일이 아예 없어서(transition-colors
+              // 클래스만 있고 실제 hover: 규칙이 없었음) 클릭 전엔 반응이 없는
+              // 것처럼 보였다. 활성 항목(active)은 인라인 style의 배경이
+              // hover:보다 우선하므로(인라인 스타일이 항상 이김) 그대로 강조색을
+              // 유지하고, 비활성 항목만 사이드바 배경(--surface-sunken)보다
+              // 밝은 --surface-card로 hover 배경을 준다 — 접기 버튼(위) hover와
+              // 같은 톤.
+              className="block w-full truncate rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors hover:bg-[var(--surface-card)]"
               style={
                 active
                   ? { background: "var(--accent-soft, #eef2ff)", color: "var(--text-primary)", fontWeight: 600 }

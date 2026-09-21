@@ -345,6 +345,13 @@ def _update_lens_bundle_slice(
     incoming_body = data.get("body_inline") or {}
     if fmt == "webtoon":
         item["images"] = incoming_body.get("images") or []
+        # 2026-09-20 — 이 스코프 저장 경로가 images만 바꾸고 pending은 건드리지
+        # 않아서, 실제로 컷 이미지를 저장해도 사이트엔 "준비 중"으로 계속 떴다
+        # (실사용 백필 중 실측 발견 — 이미지 8장 저장 후 재조회해도 pending
+        # True 그대로). publish_utils.py의 자동 파이프라인 경로는 애초에
+        # "pending": not webtoon_images로 매번 새로 계산해서 이 문제가 없었다
+        # — 여기도 같은 규칙을 적용한다.
+        item["pending"] = not item["images"]
         if "series_title" in incoming_body:
             item["series_title"] = incoming_body.get("series_title")
     elif fmt == "video":
