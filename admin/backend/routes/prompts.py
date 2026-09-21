@@ -104,6 +104,55 @@ _CATEGORY_BEDROCK = {
         "max_tokens": 8000,
     },
 }
+
+# 2026-09-20, 사용자 요청 — "좌측 채팅창에도 텍스트 모델 선택 가능하게
+# 해주시죠": 웹툰 스크립트·장면 연출(build_script_call) + 일반 대화
+# (_run_chat_flow) 둘 다 지금까지 _CATEGORY_BEDROCK["webtoon"]["model"]
+# (Sonnet 4.6) 하나로 고정돼 있었다. 이미지 모델(webtoonImageModels.ts)과
+# 같은 패턴으로 admin이 요청마다 고를 수 있게 별도 레지스트리로 뺀다.
+# "Opus 5.1"·"GPT 최신 모델"도 요청받았지만 정확한 모델명을 확인 못 해
+# 이번엔 뺐다 — 확인되면 여기 한 줄만 추가하면 된다. 각 항목은 비용
+# 태깅 규칙(docs/architecture/비용태깅_규칙.md)에 따라 이 용도 전용
+# application inference profile을 새로 만들어 넣었다(2026-09-20,
+# lens-webtoon-script-opus-5/lens-webtoon-script-sonnet-5).
+TEXT_MODELS: dict[str, str] = {
+    "sonnet-46": _CATEGORY_BEDROCK["webtoon"]["model"],  # lens-webtoon-script-sonnet-46, 기존 기본값
+    "opus-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j5kfly25ohjo",  # lens-webtoon-script-opus-5
+    "sonnet-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dy1fhtb04pon",  # lens-webtoon-script-sonnet-5
+}
+DEFAULT_TEXT_MODEL = "sonnet-46"
+
+# 2026-09-20, 실측 — sonnet-5는 이 웹툰 스크립트 생성(4만5천자 프롬프트+8컷
+# 구조화 JSON)에서 내부 reasoning이 max_tokens(8000) 예산을 전부 써버려
+# 240초를 기다려도 실제 답변 텍스트가 0글자였다(재현 확인). 백엔드
+# 레지스트리·IAM·비용태깅 프로파일은 그대로 두지만(나중에 문제가 풀리면
+# 바로 켤 수 있게), PromptChatLab.tsx의 좌측 드롭다운에서는 뺐다 — 고르면
+# 그냥 실패하는 옵션을 보여줄 이유가 없다. opus-5도 같은 이유로 느리지만
+# (2026-09-11 기록에도 이미 있던 known issue) 완주는 하는 걸 확인해서 남김.
+
+
+def resolve_text_model(model_id: str | None) -> str:
+    """admin이 고른 model_id(TEXT_MODELS의 키) → 실제 호출용 ARN. 모르는
+    값이거나 비어 있으면 기존 기본값(Sonnet 4.6)으로 조용히 떨어진다 —
+    프런트가 옛 버전이라 model을 안 보내는 경우도 안전해야 한다."""
+    return TEXT_MODELS.get(model_id or "", TEXT_MODELS[DEFAULT_TEXT_MODEL])
+
+
+# 2026-09-20 — Opus 5·Sonnet 5(Claude 5 계열)는 converse의 temperature
+# 파라미터 자체를 거부한다("`temperature` is deprecated for this model",
+# 직접 호출로 재현 확인) — pipelines/common/bedrock_client.py::call_text()
+# 가 2026-08-22 mustknow_auto에서 Sonnet 5로 처음 겪고 이미 고친 문제와
+# 동일(그 함수 docstring 참고). 거기선 매개변수 있을 때만 넣는 방식으로
+# 풀었는데, 여기(chat_ws.py의 스트리밍 경로)는 기존 호출부가
+# temperature=0.7을 무조건 넣고 있어서 같은 방식으로 model_id 기준
+# on/off를 판단하는 헬퍼가 필요했다.
+_MODELS_WITHOUT_TEMPERATURE = {"opus-5", "sonnet-5"}
+
+
+def text_model_supports_temperature(model_id: str | None) -> bool:
+    return (model_id or DEFAULT_TEXT_MODEL) not in _MODELS_WITHOUT_TEMPERATURE
+
+
 _WEBTOON_SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 _WEBTOON_JSON_INSTRUCTION = (
     "\n\n[응답 형식]\n다른 설명 없이 ```json 코드블록 하나 안에 JSON 객체만 담아 응답한다."
@@ -117,7 +166,14 @@ _WEBTOON_JSON_INSTRUCTION = (
 # 오버헤드가 큼). 그래서 이 기능 전체를 비동기(작업 생성 + 폴링)로 바꿨다
 # — 아래 job 관련 함수 참조. 덕분에 max_tokens을 눈치 볼 필요가 없어져서
 # 위 _CATEGORY_BEDROCK에 프로덕션과 완전히 같은 값을 그대로 넣었다.
-_BEDROCK_READ_TIMEOUT_SECONDS = 90  # Lambda 자체 Timeout을 300초로 늘려둠(자기호출 invocation 전용, API Gateway 동기 경로는 여전히 즉시 응답)
+_BEDROCK_READ_TIMEOUT_SECONDS = 240  # 2026-09-20, 90→240초로 늘림 — Opus 5는
+# 위 2026-09-11 기록대로 원래도 느렸는데, Claude 5 계열(Opus 5·Sonnet 5)이
+# 좌측 채팅창 모델 드롭다운으로 실제 선택 가능해지면서 이 복잡한 스크립트
+# 생성 작업(4만5천자 프롬프트+8컷 구조화 JSON)에서 내부 reasoning이 90초를
+# 불규칙하게 넘겨 ReadTimeoutError로 죽는 걸 실측 확인했다. Lambda 자체
+# Timeout이 300초라 여유가 있어 그 안에서 최대한 늘렸다 — 그래도 안 되면
+# (Sonnet 5는 240초 안에서도 답변 0글자로 토큰 예산을 reasoning에 다 써버림,
+# TEXT_MODELS 주석 참고) 타임아웃보다 더 근본적인 문제라 모델 자체를 빼야 한다.
 
 _bedrock_client = None
 

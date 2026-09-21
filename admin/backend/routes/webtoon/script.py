@@ -36,13 +36,14 @@ Format"이라고만 돼 있고 2단계용 정식 출력 스키마 챕터 자체�
 camera_distance/camera_height/composition/background 같은, 사용자가
 요청한 적 없는 필드를 계속 밀어넣던 원인). 이제 필요한 모든 챕터(사실분석+
 장면설계+텍스트화이트리스트+공통이미지스타일)를 한 번에 넘기고, 22장
-스크립트 스키마의 각 컷에 camera/scene 두 필드만 코드에서 추가 요구해서
-단일 호출로 끝낸다."""
+스크립트 스키마의 각 컷에 image_prompt 필드 하나만 코드에서 추가 요구해서
+단일 호출로 끝낸다(2026-09-20 — camera/scene 2필드 분리도 같은 이유로
+없앴다, 아래 normalize_cuts 참고)."""
 from __future__ import annotations
 
 import re
 
-from routes.prompts import _CATEGORY_BEDROCK, _WEBTOON_JSON_INSTRUCTION, _WEBTOON_SYSTEM_PROMPT
+from routes.prompts import _CATEGORY_BEDROCK, _WEBTOON_JSON_INSTRUCTION, _WEBTOON_SYSTEM_PROMPT, resolve_text_model
 
 _CHAPTER_HEADER_RE = re.compile(r"^##\s*(\d+)\.\s*.+$", re.MULTILINE)
 _KNOWN_GARBAGE_MARKERS = ("### 파일 · 새 파일",)  # admin 편집 UI 라벨이 섞여 들어간 흔적
@@ -83,18 +84,26 @@ SCRIPT_CHAPTERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22]
 _SCRIPT_OUTPUT_ADDENDUM = (
     "\n\n---\n### 출력 형식 (코드 보강)\n"
     "위 \"Stage 1 Script Output Format\" JSON 스키마 그대로 컷 8개를 채우되,"
-    " 각 cuts 원소마다 다음 두 필드를 추가한다:\n"
-    '- "camera": 카메라 거리·앵글을 서술하는 한국어 문장.\n'
-    '- "scene": 구도·배경·인물 동작·소품을 서술하는 한국어 문장(위 12장'
-    " Scene Design 지침 반영, 8컷 연속 동일 구도 금지).\n"
+    " 각 cuts 원소마다 다음 필드를 추가한다:\n"
+    '- "image_prompt": 이 컷의 배경 이미지를 그대로 생성할 수 있는 완성된'
+    " 한국어 프롬프트 문장 하나. 어떤 장면 포맷(위 12장 Scene Design 목록)을"
+    " 쓸지, 카메라를 어떻게 잡을지는 기사 내용에 맞춰 자유롭게 판단한다 —"
+    " 코드가 카메라 거리/앵글/구도 등을 항목별로 강제하지 않는다, 12장"
+    " 지침(연속 구도 금지·요소 다양화)만 따르면 된다.\n"
     "다른 설명 없이 JSON 객체 하나만 응답한다."
 )
 
 
-def build_script_call(content: str, article: str) -> tuple[str, str, str, int]:
+def build_script_call(content: str, article: str, model_id: str | None = None) -> tuple[str, str, str, int]:
     """스크립트+장면 연출을 한 번에 만드는 단일 호출용 (system, user_message,
     model, max_tokens) 조립. routes/chat_ws.py가 이 결과로 직접
-    converse_stream을 불러 실시간으로 청크를 밀어보낸다."""
+    converse_stream을 불러 실시간으로 청크를 밀어보낸다.
+
+    model_id(2026-09-20 추가) — admin이 좌측 채팅창에서 고른 텍스트 모델
+    (prompts.TEXT_MODELS의 키, 예: "opus-5"). None이거나 모르는 값이면
+    resolve_text_model()이 기존 기본값(Sonnet 4.6)으로 떨어진다 —
+    max_tokens는 모델과 무관하게 웹툰 스크립트 스키마 크기에 맞춘 고정값
+    그대로 쓴다(_CATEGORY_BEDROCK["webtoon"]["max_tokens"])."""
     webtoon_cfg = _CATEGORY_BEDROCK["webtoon"]
     stage_content = extract_chapters(content, SCRIPT_CHAPTERS)
     user_message = (
@@ -104,7 +113,7 @@ def build_script_call(content: str, article: str) -> tuple[str, str, str, int]:
         + _WEBTOON_JSON_INSTRUCTION
         + _SCRIPT_OUTPUT_ADDENDUM
     )
-    return _WEBTOON_SYSTEM_PROMPT, user_message, webtoon_cfg["model"], webtoon_cfg["max_tokens"]
+    return _WEBTOON_SYSTEM_PROMPT, user_message, resolve_text_model(model_id), webtoon_cfg["max_tokens"]
 
 
 def _cut_number(d: dict) -> int | None:
@@ -145,14 +154,23 @@ def _dialogue_from_bubbles(c: dict) -> list[dict]:
 
 def normalize_cuts(script: dict) -> list[dict]:
     """단일 호출(build_script_call) 결과의 cuts를 컷 이미지 생성·
-    compose_text.py가 기대하는 옛 필드 이름(camera/scene/dialogue/title/
+    compose_text.py가 기대하는 옛 필드 이름(image_prompt/dialogue/title/
     narration/caption)으로 정규화한다.
 
     2026-09-18 — 예전엔 script(1단계)+scenes(2단계) 두 호출 결과를 컷
     번호로 매칭해 합치는 _merge_storyboard_cuts였다. 이제 한 번의 호출이
-    같은 컷 객체 안에 camera/scene까지 직접 채워 주므로(build_script_call
+    같은 컷 객체 안에 image_prompt까지 직접 채워 주므로(build_script_call
     참고) 두 딕셔너리를 매칭할 필요가 없다 — script["cuts"]를 그대로
     순회하며 필드 이름만 맞춘다.
+
+    2026-09-20 — "camera"/"scene" 두 필드를 "image_prompt" 하나로 합쳤다
+    (사용자 질문: "컷별 카메라, 씬 구조가 생성에 필수라고요?? 꼭 넣어야하는
+    거?"). camera/scene 분리는 애초에 발행된 프롬프트 원본 스키마(22장
+    "Stage 1 Script Output Format")에 없던 개념 — 2026-09-18에 1/2단계
+    구분을 없애면서 코드(_SCRIPT_OUTPUT_ADDENDUM)가 임의로 요구하던 두
+    필드였다. 이제 모델이 컷 카드에 바로 복붙할 수 있는 완성된 한 문장을
+    한 번에 준다 — 사용자가 WebtoonCutGenerator 우측 패널에 붙여넣는 값과
+    정확히 일치.
 
     2026-09-15 — 저장된 웹툰 프롬프트가 v11에서 컷 번호(cut→cut_id)·대사
     (dialogue→bubble_1/bubble_2)를 새 스키마로 바꿨다(사용자 확인: 진행
@@ -168,7 +186,6 @@ def normalize_cuts(script: dict) -> list[dict]:
             "title": _first_nonempty(c.get("title"), c.get("headline")),
             "title_keyword": c.get("title_keyword") or "",
             "dialogue": _dialogue_from_bubbles(c),
-            "camera": c.get("camera") or "",
-            "scene": c.get("scene") or "",
+            "image_prompt": c.get("image_prompt") or "",
         })
     return cuts

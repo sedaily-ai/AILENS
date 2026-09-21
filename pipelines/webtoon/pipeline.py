@@ -35,8 +35,12 @@ Nova Canvas든 SD3.5든 확산 모델 계열은 프롬프트로 요청한 한글
 정확도 100% 보장, 대신 말풍선이 화자 입을 정확히 가리키는 정교한 배치는
 포기 — 자세한 트레이드오프는 compose_text.py 상단 설명 참고). GPT 경로
 코드(`generate_image`, `build_image_prompt`)는 전혀 안 건드리고 그대로
-남겨뒀다 — `IMAGE_PROVIDER`를 "openai"로 바꾸면 크레딧 충전 후 바로
-원래 방식으로 되돌릴 수 있다.
+남겨뒀다. 2026-09-20까지는 `IMAGE_PROVIDER`를 "openai"로 바꾸면 크레딧
+충전 후 바로 되돌릴 수 있었는데, 같은 날 이 상수 자체를 없애고 admin이
+발행하는 모델 id로 대체하면서(아래 _PROVIDER_CONFIG 참고) "openai"는
+그 발행 가능 값 목록(webtoon_image._VALID_IMAGE_MODELS)에 없다 —
+되살리려면 그 목록에 추가하고 admin 드롭다운에도 노출해야 한다(둘 다
+사업상 미사용 확정이라 일부러 안 함).
 """
 import sys, json, base64, re, time
 from pathlib import Path
@@ -59,65 +63,38 @@ IMAGE_SIZE = "1536x1024"         # 3:2 가로. 컷당 $0.165 (2026-08 기준, hi
 IMAGE_QUALITY = "high"
 N_CUTS = 8
 
-# "openai"(원래 GPT 경로, 말풍선까지 이미지 모델이 그림, 휴면·사업상 미사용) |
-# "bedrock"(Stable Image Core, 순수 텍스트 프롬프트, 휴면) | "bedrock-style-guide"
-# (Stable Image Style Guide, 참고 이미지로 화풍 고정, 휴면) | "bedrock-style-transfer"
-# (구도-화풍 분리 3단계, GPU IP-Adapter — 2026-09-08~2026-09-20 기본값,
-# 이제 휴면·롤백용) | "bedrock-sd-ultra"(Stable Image Ultra, GPU 없음 —
-# 2026-09-20부터 기본값). 전부 텍스트는 compose_text.py가 합성(openai만
-# 예외 — 모델이 직접 그림).
+# 2026-09-05~2026-09-20 이 자리엔 IMAGE_PROVIDER 코드 상수(문자열 enum,
+# "bedrock-sd-ultra"/"bedrock-style-transfer"/...)가 있었다 — 모델을
+# 바꾸려면 이 파일을 고쳐 재배포해야 했다(Stable Image Core→Style
+# Guide→Style Transfer→Ultra 전환이 전부 이 방식이었다, 각 전환 경위는
+# git log 참고).
 #
-# bedrock → bedrock-style-guide 전환 경위: 사용자가 공유한 참고 샘플과
-# 대조한 결과 Stable Image Core 순수 텍스트 프롬프트는 "cel-shaded, NOT
-# photorealistic"을 명시해도 반실사 디지털 페인팅으로 나오는 화풍 자체의
-# 한계가 있었다. Style Guide는 참고 이미지(webtoon_image.py의
-# STYLE_REFERENCE_IMAGE_PATH)로 화풍을 고정해 실측상 훨씬 근접했다.
+# 2026-09-20(정리후보 A 후속, "CMS에서 저장하면 다음 발행부터 자동
+# 반영" 요청) — admin이 STYLE/CHARACTER_FEMALE/CHARACTER_MALE을 DDB
+# (webtoon-image/published)에 발행하면 재배포 없이 바로 반영되는 것과
+# 같은 방식으로, 어떤 모델을 쓸지도 그 문서의 IMAGE_MODEL 섹션에서
+# 매 컷 생성 직전 fresh하게 읽는다(webtoon_image.get_active_image_model(),
+# run_article() 참고) — 코드 상수는 더 이상 없다.
 #
-# bedrock-style-guide → bedrock-style-transfer 전환 경위(R9~R11,
-# 라운드기록.md 참고) — Style Guide는 화풍+장면을 한 프롬프트에 동시에
-# 요구해서 [SCENE]이 "카페"라고 해도 계속 참고 이미지의 배경(영화
-# 촬영장)으로 쏠렸다(#4). negative_prompt로 완화해봤지만 확률적이었고,
-# R11에서 "화풍 지정 없이 사진처럼 요청하면 같은 모델이 장소 지시를
-# 정확히 따른다"는 걸 실측 확인 — 문제는 장소 이해력이 아니라 화풍+장면
-# 동시 요구 자체였다. webtoon_image.generate_bedrock_composed_image()가
-# (1)한국어 장면→영어 사진 브리핑 번역 (2)포토리얼 사진 생성 (3)Style
-# Transfer로 화풍만 덧입히기 3단계로 이 둘을 분리한다. 컷당 Bedrock
-# 호출이 1~2회→3회로 늘어 비용·시간이 늘어나는 트레이드오프가 있었다.
-#
-# bedrock-style-transfer → bedrock-sd-ultra 전환 경위(2026-09-20, 정리후보
-# A+D Phase 4) — "GPU를 꼭 써야할까요? 인물을 고정할 필요도 없거든"
-# (2026-09-18) 결정에 따라 admin 실험 패널은 이미 Stable Image Ultra를
-# 기본값으로 확정했지만, 발행 파이프라인은 Phase 3까지도 구조만 공유
-# 디스패치로 옮기고 IMAGE_PROVIDER 자체는 그대로 뒀다(구조 변경과 모델
-# 전환을 한 배포에 같이 실으면 문제 발생 시 원인 구분이 안 되므로 —
-# 02-정리후보/04-GPU경로결정미반영.md 참고). 이번이 실제 전환 배포다.
-# GPU IP-Adapter(인물 고정)·Style Transfer(화풍 분리) 둘 다 더 이상
-# 필요 없다고 판단했으므로 아래 컷 루프의 provider→model 매핑 표에서
-# "bedrock-sd-ultra"만 실사용, GPU 기동 분기(`manage_gpu and IMAGE_PROVIDER
-# == "bedrock-style-transfer"`)는 이 값이 더 이상 매칭되지 않아 자연히
-# 안 탄다 — GPU EC2 인스턴스 자체는 1~2주 안정화 확인 전까지 삭제하지
-# 않는다(롤백 경로 유지, task-policy.json의 WebtoonGpu* 권한도 유지).
-IMAGE_PROVIDER = "bedrock-sd-ultra"
-
-# IMAGE_PROVIDER 문자열 → webtoon_image.generate_cut_image_to_file() 호출
-# 인자 매핑(run_article() 컷 루프가 씀). retries는 기존 개별 함수 기본값을
-# 그대로 유지(pipeline→2 — generate_bedrock_composed_image가 컷당 Bedrock
-# 호출 3회라 더 짧게 잡혀 있던 이유는 webtoon_image.py 해당 함수 docstring
+# 모델 id → webtoon_image.generate_cut_image_to_file() 호출 인자 매핑
+# (run_article() 컷 루프가 씀). retries는 기존 개별 함수 기본값을 그대로
+# 유지(pipeline→2 — generate_bedrock_composed_image가 컷당 Bedrock 호출
+# 3회라 더 짧게 잡혀 있던 이유는 webtoon_image.py 해당 함수 docstring
 # 참고, 나머지→3).
 #
-# with_qa/check_extra_people(Phase 4 QA 정책, 2026-09-20) — sageuk(사극
-# 오염)·no_people_violated(인물 없음 위반) 검사는 프롬프트가 아니라
-# 결과물을 검사하는 후처리라 "프롬프트 외 영향 요인 없음" 원칙과 성격이
-# 다르다(실제 독자에게 나가는 안전망이라 Ultra 경로에서도 유지).
-# extra_people(고정 인물 수 초과 시 재생성)만은 "군중을 그려달라"는
-# 정당한 사용자 지시와 충돌할 수 있어(admin이 pipeline 외 모델에서 QA
-# 자체를 끈 이유와 같은 맥락) Ultra 경로는 이것만 끈다 —
-# webtoon_image.generate_cut_image()의 check_extra_people 파라미터 참고.
+# 2026-09-20 — QA(사극 오염·인물 없음 위반·고정 인물 수 초과 검사 후
+# 조건부 재생성)를 전부 제거했다(사용자 요청, webtoon_image.py의
+# generate_cut_image() 독스트링 참고) — 그래서 with_qa/check_extra_people
+# 키가 없어졌다. GPU 기동 분기(run_article()의 manage_gpu)는
+# active_model=="pipeline"일 때만 걸린다 — 아래 5개 모두 admin
+# webtoonImageModels.ts의 IMAGE_MODELS[].id·webtoon_image._VALID_IMAGE_MODELS
+# 와 같은 어휘.
 _PROVIDER_CONFIG = {
-    "bedrock-sd-ultra": dict(model="sd_ultra", retries=3, with_qa=True, check_extra_people=False),
-    "bedrock-style-transfer": dict(model="pipeline", retries=2, with_qa=None, check_extra_people=True),
-    "bedrock-style-guide": dict(model="style_guide", retries=3, with_qa=None, check_extra_people=True),
-    "bedrock": dict(model="stable_image_core", retries=3, with_qa=None, check_extra_people=True),
+    "sd_ultra": dict(retries=3),
+    "pipeline": dict(retries=2),
+    "style_guide": dict(retries=3),
+    "stable_image_core": dict(retries=3),
+    "sd35_large": dict(retries=3),
 }
 
 # 2026-09-05 — 여기 있던 _characters_block/_SCENE_REINFORCEMENT/
@@ -136,6 +113,7 @@ _PROVIDER_CONFIG = {
 # 써서 남겨뒀다.
 from webtoon_image import (
     generate_cut_image_to_file,
+    get_active_image_model,
     characters_block as _characters_block,
     SCENE_REINFORCEMENT as _SCENE_REINFORCEMENT,
     CHARACTER_REINFORCEMENT as _CHARACTER_REINFORCEMENT,
@@ -232,10 +210,12 @@ _SCRIPT_CHAPTERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22]
 _SCRIPT_OUTPUT_ADDENDUM = (
     "\n\n---\n### 출력 형식 (코드 보강)\n"
     "위 \"Stage 1 Script Output Format\" JSON 스키마 그대로 컷 8개를 채우되,"
-    " 각 cuts 원소마다 다음 두 필드를 추가한다:\n"
-    '- "camera": 카메라 거리·앵글을 서술하는 한국어 문장.\n'
-    '- "scene": 구도·배경·인물 동작·소품을 서술하는 한국어 문장(12장'
-    " Scene Design 지침 반영, 8컷 연속 동일 구도 금지).\n"
+    " 각 cuts 원소마다 다음 필드를 추가한다:\n"
+    '- "image_prompt": 이 컷의 배경 이미지를 그대로 생성할 수 있는 완성된'
+    " 한국어 프롬프트 문장 하나. 어떤 장면 포맷(12장 Scene Design 목록)을"
+    " 쓸지, 카메라를 어떻게 잡을지는 기사 내용에 맞춰 자유롭게 판단한다 —"
+    " 코드가 카메라 거리/앵글/구도 등을 항목별로 강제하지 않는다, 12장"
+    " 지침(연속 구도 금지·요소 다양화)만 따르면 된다.\n"
     "다른 설명 없이 JSON 객체 하나만 응답한다."
 )
 
@@ -277,7 +257,10 @@ def _dialogue_from_bubbles(c: dict) -> list[dict]:
 
 def _normalize_cuts(script: dict) -> list[dict]:
     """단일 호출 결과의 cuts를 컷 이미지 생성·compose_text.py가 기대하는
-    필드 이름(camera/scene/dialogue/title/narration/caption)으로 정규화."""
+    필드 이름(image_prompt/dialogue/title/narration/caption)으로 정규화.
+
+    2026-09-20 — camera/scene 2필드를 image_prompt 하나로 합쳤다(admin
+    script.py::normalize_cuts와 동일 결정, 사유는 그쪽 docstring 참고)."""
     cuts = []
     for c in script.get("cuts") or []:
         cuts.append({
@@ -288,17 +271,16 @@ def _normalize_cuts(script: dict) -> list[dict]:
             "title": _first_nonempty(c.get("title"), c.get("headline")),
             "title_keyword": c.get("title_keyword") or "",
             "dialogue": _dialogue_from_bubbles(c),
-            "camera": c.get("camera") or "",
-            "scene": c.get("scene") or "",
+            "image_prompt": c.get("image_prompt") or "",
         })
     return cuts
 
 
-def build_image_prompt(camera: str, scene: str, cut: dict, characters: dict | None = None) -> str:
+def build_image_prompt(image_prompt: str, cut: dict, characters: dict | None = None) -> str:
     """2단계(장면) + 1단계(대사) 결과를 3단계 이미지 프롬프트로 합친다."""
-    style = prompts.get_style() + f"\nCamera: {camera}. 3:2 horizontal."
+    style = prompts.get_style() + "\n3:2 horizontal."
     parts = [
-        style, _characters_block(characters), f"\n\n[SCENE]\n{scene}", _SCENE_REINFORCEMENT,
+        style, _characters_block(characters), f"\n\n[SCENE]\n{image_prompt}", _SCENE_REINFORCEMENT,
         _CHARACTER_REINFORCEMENT if characters else "",
     ]
     if cut.get("narration"):
@@ -354,24 +336,13 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
     return False
 
 
-# 2026-09-02 — 기자 피드백("컷마다 캐릭터가 다르다", "말풍선이 인물과
-# 연결 안 됨") 대응 3종 세트 중 "생성→검증→재시도" 루프. 실측(같은 날)으로
-# 확인한 근본 원인: Stable Image Core/SD3.5/Ultra 전부 **완전히 동일한
-# 프롬프트**로도 결과가 크게 요동친다(사극 오염 재현율 약 25%, 장면
-# 이행력도 실행마다 딴판). 프롬프트를 아무리 다듬어도 이 변동성 자체는
-# 못 없앤다는 게 오늘의 결론이라, 프롬프트 수정 대신 "결과물을 비전
-# 모델로 검사해서 나쁘면 다시 뽑는" 방식으로 우회한다 — 확률을 낮추는
-# 게 아니라 나쁜 뽑기를 걸러내는 접근.
-#
-# 같은 호출에서 얼굴 x좌표도 같이 받아온다(말풍선 동적 배치용, compose_text.
-# draw_dialogue 참고) — 검증과 별도 호출로 나누면 비전 모델 호출이 2배가
-# 되니 한 번에 처리. 프롬프트 본문(VALIDATE_SYSTEM)은 prompts.py에 있다
-# — 다른 프롬프트 상수들과 위치를 통일했을 뿐, admin 편집·DDB 동기화
-# 대상은 아니다(prompts.py의 해당 섹션 주석 참고).
-#
-# 2026-09-20 — 이 루프의 실제 구현(_validate_and_detect_cut, extra_people
-# 체크)은 common/webtoon_image.py의 generate_cut_image()로 옮겼다(정리후보
-# A+D Phase 3) — 위 배경·근거는 그대로 유효하다.
+# 2026-09-02 — 한때 "생성→비전 모델로 검증→나쁘면 재생성" QA 루프가
+# 여기 있었다(기자 피드백 대응, 실측으로 사극 오염 재현율 약 25% 확인).
+# 2026-09-20 사용자 요청으로 이 QA 자체를 완전히 제거했다 — admin 실험
+# 패널은 QA를 기본 안 썼는데 발행 파이프라인만 하드코딩으로 켜고 있어서
+# "CMS로만 제어돼야 한다" 원칙에 안 맞았다(webtoon_image.py의
+# generate_cut_image() 독스트링 참고). 말풍선 배치용 얼굴 위치 감지는
+# 대사가 있는 컷에서만 그대로 남아있다(검증·재생성과는 별개 기능).
 
 def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True,
                  manage_gpu: bool = True):
@@ -425,15 +396,21 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     # 한 번만 가져온다(fresh하되 같은 기사 안 8컷은 일관되게 같은 값 사용).
     characters = prompts.get_fixed_characters()
 
-    # 2026-09-09(R15) — bedrock-style-transfer 경로는 컷별로(한 명만 나오는
-    # 클로즈업이면) GPU IP-Adapter를 탈 수도, 안 탈 수도 있다(webtoon_image.
-    # generate_bedrock_composed_image_bytes()가 컷마다 판단) — 어느 컷이
-    # 쓸지 루프 전엔 모르니, 이 프로바이더면 배치 시작 시 한 번만 GPU를
-    # 켜두고 8컷 다 끝난 뒤(또는 예외로 중단돼도) 한 번만 끈다. 매 컷마다
-    # 켜고 끄면 g4dn.xlarge 부팅·SSM 연결 대기(수십 초~분 단위)가 컷마다
-    # 반복돼 배치가 크게 느려진다.
+    # 2026-09-20 — 어떤 모델을 쓸지도 admin이 발행한 DDB에서 이 기사
+    # 처리를 시작할 때 딱 한 번 fresh하게 읽는다(위 characters와 같은
+    # 이유·같은 문서, get_active_image_model() 참고) — 관리자가 저장한
+    # 값이 재배포 없이 다음 기사부터 바로 반영된다.
+    active_model = get_active_image_model()
+
+    # 2026-09-09(R15) — active_model=="pipeline"(GPU IP-Adapter+Style
+    # Transfer) 경로는 컷별로(한 명만 나오는 클로즈업이면) GPU를 탈 수도,
+    # 안 탈 수도 있다(webtoon_image.generate_bedrock_composed_image_bytes()가
+    # 컷마다 판단) — 어느 컷이 쓸지 루프 전엔 모르니, 이 모델이면 배치
+    # 시작 시 한 번만 GPU를 켜두고 8컷 다 끝난 뒤(또는 예외로 중단돼도)
+    # 한 번만 끈다. 매 컷마다 켜고 끄면 g4dn.xlarge 부팅·SSM 연결 대기
+    # (수십 초~분 단위)가 컷마다 반복돼 배치가 크게 느려진다.
     gpu_started = False
-    if manage_gpu and IMAGE_PROVIDER == "bedrock-style-transfer":
+    if manage_gpu and active_model == "pipeline":
         import gpu_ipadapter  # pipelines/common/ — sibling
         gpu_ipadapter.ensure_gpu_running()
         gpu_started = True
@@ -445,25 +422,13 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             if resume and img_path.exists():
                 print(f"{tag} 컷{n} 스킵(존재)")
                 continue
-            print(f"{tag} 컷{n} 생성 중... ({IMAGE_PROVIDER})")
-            if IMAGE_PROVIDER in _PROVIDER_CONFIG:
-                # 2026-09-09(R17) — 배경 인물 초과 체크(QA의 extra_people)를
-                # 원래 "대사 있는 컷만"으로 한정했는데, 컷1(표지)은 대사가
-                # 없어서 이 게이트를 안 타 인물 수가 계속 불안정했다(R10~R12
-                # 관찰). 컷1은 대사가 없어도 항상 A/B 두 주인공을 표지에
-                # 담으려는 의도라 — 대본이 "인물 없음"을 명시한 경우는 이미
-                # no_people_expected 판정이 따로 걸러주므로, 컷1도 이 게이트
-                # 대상에 포함해도 안전하다(작게 스쳐가는 배경 군중은 여전히
-                # 신뢰도·크기 기준 미달이라 안 걸림). Ultra 경로는
-                # check_extra_people=False라 이 로직 자체가 안 걸린다
-                # (아래 _PROVIDER_CONFIG 주석 참고).
-                cfg = _PROVIDER_CONFIG[IMAGE_PROVIDER]
+            print(f"{tag} 컷{n} 생성 중... ({active_model})")
+            if active_model in _PROVIDER_CONFIG:
+                cfg = _PROVIDER_CONFIG[active_model]
                 ok, faces = generate_cut_image_to_file(
-                    cut["camera"], cut["scene"], cfg["model"], img_path,
+                    "", cut["image_prompt"], active_model, img_path,
                     has_dialogue=bool(cut.get("dialogue")) or n == 1,
                     retries=cfg["retries"],
-                    with_qa=cfg["with_qa"],
-                    check_extra_people=cfg["check_extra_people"],
                 )
                 if ok:
                     # 2026-09-08 — 얼굴 위치는 QA 비전 모델이 아니라 Rekognition
@@ -476,7 +441,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                     except Exception as e:
                         print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
             else:
-                prompt = build_image_prompt(cut["camera"], cut["scene"], cut, characters)
+                prompt = build_image_prompt(cut["image_prompt"], cut, characters)
                 ok = generate_image(prompt, img_path)
             print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
     finally:

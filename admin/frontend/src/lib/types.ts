@@ -450,11 +450,14 @@ export interface WebtoonGpuStatus {
   state: "running" | "stopped" | "stopping" | "pending" | "shutting-down" | "terminated";
 }
 
-/** 프로덕션 기본 STYLE/FIXED_CHARACTERS — 패널 텍스트 필드를 항상 이 값으로 채운다. */
+/** 프로덕션 기본 STYLE/FIXED_CHARACTERS/IMAGE_MODEL — 패널 필드를 항상 이
+ *  값으로 채운다. image_model(2026-09-20) — 실제 발행 파이프라인이 지금
+ *  쓰는 모델 id, webtoonImageModels.ts의 IMAGE_MODELS[].id와 같은 값. */
 export interface WebtoonLabDefaults {
   style: string;
   char_female: string;
   char_male: string;
+  image_model: string;
 }
 
 /** 화풍·인물 참조 이미지(2026-09-16) — routes/webtoon_lab.py::handle_image_assets_get.
@@ -483,11 +486,12 @@ export interface WebtoonImageAssetGalleryItem {
   active: boolean;
 }
 
-// 웹툰 스토리보드 테스트(2026-09-11) — 기사 원문 → 1단계(스크립트)+2단계
-// (장면 연출)를 체인 호출해 8컷을 한 번에 반환한다(routes/prompts.py::
-// handle_storyboard_test). 3단계(컷별 이미지)는 이 응답의 camera/scene을
-// WebtoonLabGenerateInput에 그대로 넣어 기존 webtoon-lab/generate를 컷마다
-// 호출한다 — 새 이미지 생성 엔드포인트를 만들지 않고 기존 것을 재사용.
+// 웹툰 스토리보드(2026-09-18부터 단일 호출) — 기사 원문 → 스크립트+장면
+// 연출을 한 번에 반환한다(routes/webtoon/script.py::build_script_call/
+// normalize_cuts, chat_ws.py::_run_article_flow가 실시간 스트리밍으로 부름).
+// 컷별 이미지 생성은 이 응답의 image_prompt를 사용자가 WebtoonCutGenerator
+// 우측 패널 슬롯에 직접 복붙해 넣는다(자동 채움 아님 — 위 컴포넌트
+// docstring 참고).
 
 export interface WebtoonStoryboardDialogueLine {
   speaker: string;
@@ -500,9 +504,10 @@ export interface WebtoonStoryboardCut {
   narration: string;
   caption: string;
   dialogue: WebtoonStoryboardDialogueLine[];
-  /** 2단계 산출물 — 컷 카드에서 그대로 편집 가능(이미지 생성 전 손볼 수 있게). */
-  camera: string;
-  scene: string;
+  /** 이 컷의 배경 이미지 프롬프트 — 컷 카드에서 그대로 복붙해 우측 생성
+   *  패널에 붙여넣는 값(2026-09-20 이전엔 camera+scene 2필드였다가 통합,
+   *  routes/webtoon/script.py::normalize_cuts 참고). */
+  image_prompt: string;
   /** 1단계 산출물 — "실제 품질" 컷 이미지 생성(2026-09-14)에서 compose_text.py가
    *  제목 알약·컷8 마무리 자막을 그리는 데 쓴다. 이전엔 백엔드 cuts.append()가
    *  버리고 있었음(컷 카드 화면엔 표시하지 않음, 생성 요청 시에만 그대로 전달). */

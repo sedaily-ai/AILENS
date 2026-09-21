@@ -41,7 +41,7 @@ from routes.webtoon import gpu as webtoon_gpu
 from routes.webtoon import jobs as webtoon_jobs
 from routes.webtoon import script as webtoon_script
 from shared import time_utils
-from routes.prompts import _CATEGORY_BEDROCK, _get_bedrock_client
+from routes.prompts import _CATEGORY_BEDROCK, _get_bedrock_client, resolve_text_model, text_model_supports_temperature
 from json_extract import extract_json_object  # pipelines/common/ — deploy 시 zip 루트에 복사됨(routes/prompts.py와 동일 패턴)
 
 logger = logging.getLogger(__name__)
@@ -194,9 +194,9 @@ def run_async_job(payload: dict) -> None:
     saved_draft = _resolve_saved_draft()
 
     if kind == "chat":
-        _run_chat_flow(push, data.get("message") or "", data.get("history") or [], saved_draft)
+        _run_chat_flow(push, data.get("message") or "", data.get("history") or [], saved_draft, data.get("model"))
     elif kind == "article":
-        _run_article_flow(push, data.get("article") or "", saved_draft)
+        _run_article_flow(push, data.get("article") or "", saved_draft, data.get("model"))
     elif kind == "cut_image":
         _run_cut_image_flow(push, data.get("cut") or {}, data.get("model") or "pipeline")
     elif kind == "gpu_start":
@@ -207,15 +207,19 @@ def run_async_job(payload: dict) -> None:
         push({"type": "error", "message": f"알 수 없는 요청입니다: {kind}"})
 
 
-def _stream_completion(push: Push, system: str, messages: list[dict], max_tokens: int = 400) -> None:
+def _stream_completion(push: Push, system: str, messages: list[dict], max_tokens: int = 400, model: str | None = None) -> None:
     """converse_stream으로 텍스트를 토큰 단위로 밀어넣는다 — 기사 반응 문구·
     자유 대화 공용(2026-09-15, 자유 대화 추가하며 일반화). 완료되면
-    text_done을 보낸다."""
+    text_done을 보낸다.
+
+    model(2026-09-20 추가) — 없으면 기존처럼 _REACTION_MODEL(Sonnet 4.6)
+    을 쓴다 — 좌측 채팅창 모델 드롭다운에서 고른 값을 _run_chat_flow가
+    resolve_text_model()로 바꿔 넘긴다."""
     client = _get_bedrock_client()
     logger.info(f"stream_completion system(앞 200자)={system[:200]!r} messages={len(messages)}개")
     try:
         resp = client.converse_stream(
-            modelId=_REACTION_MODEL,
+            modelId=model or _REACTION_MODEL,
             system=[{"text": system}],
             messages=messages,
             inferenceConfig={"maxTokens": max_tokens},
@@ -231,7 +235,9 @@ def _stream_completion(push: Push, system: str, messages: list[dict], max_tokens
     push({"type": "text_done"})
 
 
-def _stream_json_completion(push: Push, event_type: str, system: str, user_message: str, model: str, max_tokens: int) -> str:
+def _stream_json_completion(
+    push: Push, event_type: str, system: str, user_message: str, model: str, max_tokens: int, use_temperature: bool = True
+) -> str:
     """스크립트+장면 연출 JSON 생성을 converse_stream으로 돌려 실시간 원문
     청크를 `{event_type}_chunk`로 중계하고, 다 받으면
     `{event_type}_chunk_done`을 보낸 뒤 누적된 전체 텍스트를 반환한다
@@ -244,15 +250,25 @@ def _stream_json_completion(push: Push, event_type: str, system: str, user_messa
     보여줄 게 못 되므로(잘린 필드·안 닫힌 괄호), 프런트는 이 청크들을
     완성된 카드가 아니라 "생성 중" 원문 미리보기로만 렌더링하고, chunk_done
     다음에 오는 최종 storyboard 메시지가 도착하면 그걸로 교체한다 — 반쪽
-    JSON을 파싱하려 들지 않는다."""
+    JSON을 파싱하려 들지 않는다.
+
+    use_temperature(2026-09-20 추가) — Opus 5·Sonnet 5는 converse의
+    temperature 파라미터 자체를 ValidationException으로 거부한다
+    (`text_model_supports_temperature` 참고, 실측 확인). 좌측 채팅창
+    모델 드롭다운으로 이 모델들을 고를 수 있게 되면서 무조건 0.7을
+    넣던 게 그 모델들에서 깨진다 — 호출부(_run_article_flow)가
+    prompts.text_model_supports_temperature(model_id)로 판단해 넘긴다."""
     client = _get_bedrock_client()
     parts: list[str] = []
     try:
+        inference_config: dict = {"maxTokens": max_tokens}
+        if use_temperature:
+            inference_config["temperature"] = 0.7
         resp = client.converse_stream(
             modelId=model,
             system=[{"text": system}],
             messages=[{"role": "user", "content": [{"text": user_message}]}],
-            inferenceConfig={"maxTokens": max_tokens, "temperature": 0.7},
+            inferenceConfig=inference_config,
         )
         for chunk in resp["stream"]:
             delta = (chunk.get("contentBlockDelta") or {}).get("delta") or {}
@@ -266,7 +282,9 @@ def _stream_json_completion(push: Push, event_type: str, system: str, user_messa
     return "".join(parts)
 
 
-def _run_chat_flow(push: Push, message: str, history: list[dict], saved_draft: str | None = None) -> None:
+def _run_chat_flow(
+    push: Push, message: str, history: list[dict], saved_draft: str | None = None, model_id: str | None = None
+) -> None:
     """기사도 컷 요청도 아닌 일반 대화 — 최근 대화 몇 턴을 같이 넘겨서
     자연스럽게 이어지게 한다(2026-09-15 사용자 요청). history는
     프런트(PromptChatLab.tsx)가 보낸 [{role, text}] — role은 "user"/
@@ -277,7 +295,10 @@ def _run_chat_flow(push: Push, message: str, history: list[dict], saved_draft: s
     시스템 프롬프트로 쓴다 — 고정된 _CHAT_SYSTEM 대신 저장해 둔 프롬프트
     내용을 기준으로 답하게 하기 위함(2026-09-15 사용자 요청: "프롬프트에
     입력했을 때.. 기반으로 답변이 출력되도록"). 없으면(저장된 게 아직
-    없을 때) _CHAT_SYSTEM으로 폴백."""
+    없을 때) _CHAT_SYSTEM으로 폴백.
+
+    model_id(2026-09-20 추가) — 좌측 채팅창 모델 드롭다운 선택값
+    (prompts.TEXT_MODELS 키)."""
     if not message.strip():
         return
     system = saved_draft if saved_draft and saved_draft.strip() else _CHAT_SYSTEM
@@ -293,7 +314,7 @@ def _run_chat_flow(push: Push, message: str, history: list[dict], saved_draft: s
     # 문장 중간에서 뚝 끊겼다. 타임아웃이 아니라 순수 토큰 상한 문제였음).
     # saved_draft가 실제 웹툰 프롬프트일 때도 모델이 예시로 스토리보드
     # 초안을 풀어 쓸 수 있어 여유 있게 잡는다.
-    _stream_completion(push, system, messages, max_tokens=2000)
+    _stream_completion(push, system, messages, max_tokens=2000, model=resolve_text_model(model_id))
 
 
 def _resolve_prompt_content(push: Push, saved_draft: str | None) -> str | None:
@@ -310,7 +331,7 @@ def _resolve_prompt_content(push: Push, saved_draft: str | None) -> str | None:
     return prompt["active_content"]
 
 
-def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) -> None:
+def _run_article_flow(push: Push, article: str, saved_draft: str | None = None, model_id: str | None = None) -> None:
     """기사 → 스크립트+장면 연출을 한 번의 Bedrock 호출로.
 
     2026-09-18 — "1단계/2단계" 구분 자체를 없앴다(사용자 요청: "스테이지
@@ -318,7 +339,10 @@ def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) 
     두 번(_build_step1_call→_build_step2_call) 나눠 불러 그 사이에 "1단계
     결과" 메시지·"2단계로 진행" 안내 문구가 끼어 있었다 — 이제 단일 호출
     (webtoon_script.build_script_call, routes/webtoon/script.py 참고)로
-    스크립트·카메라·장면을 한 번에 받는다."""
+    스크립트·카메라·장면을 한 번에 받는다.
+
+    model_id(2026-09-20 추가) — 좌측 채팅창 모델 드롭다운에서 고른 값
+    (prompts.TEXT_MODELS 키). build_script_call로 그대로 흘려보낸다."""
     if not article.strip():
         push({"type": "error", "message": "기사 원문이 비어 있습니다."})
         return
@@ -326,9 +350,23 @@ def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) 
         content = _resolve_prompt_content(push, saved_draft)
         if content is None:
             return
-        system, user_message, model, max_tokens = webtoon_script.build_script_call(content, article)
-        raw = _stream_json_completion(push, "script", system, user_message, model, max_tokens)
-        script = extract_json_object(raw)
+        system, user_message, model, max_tokens = webtoon_script.build_script_call(content, article, model_id)
+        raw = _stream_json_completion(
+            push, "script", system, user_message, model, max_tokens,
+            use_temperature=text_model_supports_temperature(model_id),
+        )
+        try:
+            script = extract_json_object(raw)
+        except ValueError:
+            # 2026-09-20 — 이 except 전체를 감싸는 바깥쪽 try/except(아래)는
+            # 사용자에게 push만 하고 서버 로그는 전혀 안 남기고 있었다 —
+            # "Bedrock 응답에서 JSON을 찾지 못했습니다" 신고를 실제 CloudWatch
+            # 로그로 확인하려다 흔적이 아예 없어서 발견. 원문(최대 2000자)을
+            # 로그에 남겨야 다음에 똑같은 신고가 오면 "무슨 모델이 어떻게
+            # 잘못 응답했는지" 바로 볼 수 있다 — 지금은 raw만 남기고 그대로
+            # 다시 던져 바깥 except가 사용자에게 안내하게 둔다.
+            logger.error(f"script JSON 파싱 실패(model_id={model_id!r}) 원문(최대 2000자): {raw[:2000]!r}")
+            raise
         cuts = webtoon_script.normalize_cuts(script)
         push({
             "type": "storyboard",
@@ -340,11 +378,20 @@ def _run_article_flow(push: Push, article: str, saved_draft: str | None = None) 
         # (WebtoonCutGenerator, 독립된 WebSocket 연결)로 옮겨갔다(2026-09-16
         # 사용자 요청: "좌측 부분에서는 텍스트만 출력되는 걸로... 우측에서는
         # 이미지를 출력하는걸로"). 여기서는 그쪽으로 안내만 한다.
+        # 2026-09-20 — 예전엔 여기서 "장면 지문이 자동으로 채워져 있습니다"라고
+        # 안내했는데, WebtoonCutGenerator.tsx는 2026-09-16부터 이미 자동 채움을
+        # 없앴다(그 파일 모듈 docstring 3번 참고 — "자동으로 채워지지 않으면
+        # 좋겠는데요... 사용자가 직접 복붙하면 좋겠어요, 헷갈려서"). 실제 동작과
+        # 안 맞는 안내문이 남아있던 걸 발견해 문구를 고친다.
         push({
             "type": "options_prompt",
-            "message": "스크립트·장면 연출이 완성됐습니다. 오른쪽 이미지 패널에서 컷을 생성해 보세요 — 장면 지문이 자동으로 채워져 있습니다.",
+            "message": "스크립트·장면 연출이 완성됐습니다. 오른쪽 이미지 패널 슬롯에 장면 지문을 직접 붙여넣어 컷을 생성해 보세요.",
         })
     except Exception as e:  # noqa: BLE001 — 채팅 흐름 최상위, 여기서 안 잡으면 클라이언트가 영원히 대기
+        # 2026-09-20 — logger.exception 없이 push만 하고 있었다(_run_cut_image_flow
+        # 는 이미 로깅하는데 여기만 빠져 있었음) — 사용자에게 에러 문구는
+        # 보이는데 서버 쪽엔 흔적이 전혀 안 남아 사후 조사가 불가능했다.
+        logger.exception(f"article flow 실패(model_id={model_id!r})")
         push({"type": "error", "message": str(e)[:500]})
 
 

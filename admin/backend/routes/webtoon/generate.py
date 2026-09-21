@@ -56,16 +56,17 @@ logger = logging.getLogger(__name__)
 # 만들고 권한을 추가해서 해결(2026-09-15). style_guide도 같은 조사 중에
 # 이 Lambda 역할엔 애초에 권한이 없었다는 걸 발견해 같이 추가했다.
 #
-# QA 방침(2026-09-20, webtoon_image.generate_cut_image()의 with_qa=None
-# 기본값 참고) — model=="pipeline"(GPU IP-Adapter)일 때만 비전 판정+
-# Rekognition 얼굴 수 검사를 거친다. 나머지 모델은 "사용자 프롬프트 외
-# 영향 요인 없음" 원칙에 따라 QA 없이 결과를 그대로 쓴다(Rekognition
-# 얼굴 수 검사가 "군중을 그려라" 같은 정당한 지시를 실패로 오판하던
-# 문제가 있었음).
+# QA 방침(2026-09-20 재검토) — 한때 model=="pipeline"일 때만 비전 판정+
+# Rekognition 얼굴 수 검사를 거치는 정책이 있었는데, 사용자 요청으로
+# QA(검증 후 조건부 재생성) 자체를 완전히 제거했다 — admin은 QA 기본
+# off였고 발행 파이프라인만 하드코딩으로 on이라 "CMS로만 제어돼야
+# 한다" 원칙과 안 맞았다(webtoon_image.generate_cut_image() 독스트링
+# 참고). 말풍선 배치용 얼굴 위치 감지(검증과 무관)는 대사가 있는 컷에서
+# 그대로 남아있다.
 IMAGE_MODELS = {"pipeline", "stable_image_core", "sd35_large", "sd_ultra", "style_guide", "nova_canvas", "openai_dalle3"}
 
 
-def _generate_composed_with_qa(
+def _generate_composed(
     camera: str,
     scene: str,
     has_dialogue: bool,
@@ -115,7 +116,7 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "pip
         has_dialogue = bool(cut.get("dialogue")) or cut.get("cut") == 1
         apply_character_lock = cut.get("apply_character_lock", True)
         apply_style_transfer = cut.get("apply_style_transfer", True)
-        image_bytes, faces = _generate_composed_with_qa(
+        image_bytes, faces = _generate_composed(
             camera, scene, has_dialogue, model=model,
             apply_character_lock=apply_character_lock, apply_style_transfer=apply_style_transfer,
         )
@@ -147,17 +148,20 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "pip
 
 
 def handle_defaults(body: dict, path_params: dict, query_params: dict) -> dict:
-    """현재 발행된(admin DDB `webtoon-image/published`) STYLE/FIXED_CHARACTERS
-    조회 — 패널의 텍스트 필드가 빈 칸이 아니라 지금 실제로 쓰이는 프롬프트를
-    값으로 항상 채워서 보여주기 위함(2026-09-04 최초 도입, 2026-09-16 "직접
-    입력" 체크박스를 없애고 필드를 상시 노출하도록 변경). webtoon_image.
-    get_style()/get_fixed_characters()가 매번 DDB에서 fresh하게 읽는다 —
-    여기서 값을 복제하지 않는다."""
-    chars = webtoon_image.get_fixed_characters()
+    """현재 발행된(admin DDB `webtoon-image/published`) STYLE/FIXED_CHARACTERS/
+    IMAGE_MODEL 조회 — 패널의 필드가 빈 칸이 아니라 지금 실제로 쓰이는 값을
+    항상 채워서 보여주기 위함(2026-09-04 최초 도입, 2026-09-16 "직접 입력"
+    체크박스를 없애고 필드를 상시 노출하도록 변경, 2026-09-20 image_model
+    추가). webtoon_image.get_image_settings()가 세 값을 한 번의 fresh
+    조회로 같이 가져온다(캐시 없음) — get_style()/get_fixed_characters()/
+    get_active_image_model()을 따로따로 부르면 같은 문서를 세 번 읽어서
+    "프롬프트 실험 페이지 로딩이 느리다" 신고로 발견, 합쳤다."""
+    style, chars, image_model = webtoon_image.get_image_settings()
     return response.ok({
-        "style": webtoon_image.get_style(),
+        "style": style,
         "char_female": chars["A (여성 기자, 설명자)"],
         "char_male": chars["B (남성 청자)"],
+        "image_model": image_model,
     })
 
 

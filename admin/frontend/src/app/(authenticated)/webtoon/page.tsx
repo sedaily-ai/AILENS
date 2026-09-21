@@ -70,10 +70,21 @@ function WebtoonPage() {
   // 받으면 자기 backdrop/aside/닫기 버튼 없이 헤더+본문만 내놓는다 — 이
   // 페이지가 그 둘을 하나의 aside 안에 순서대로 쌓는다(각 컴포넌트 자체는
   // 안 바꾼 것과 같음 — 다른 화면은 embedded 없이 계속 단독으로 씀).
-  const [panelOpen, setPanelOpen] = useState(false);
+  // 2026-09-20, 사용자 요청 — "새로고침하면 머물렀던 화면에 계속
+  // 머무르도록": panelOpen이 순수 React state라 새로고침하면 항상
+  // false로 초기화돼 목록 화면으로 튕겨나갔다. 다른 필터(status/sort/
+  // search/page)와 같은 패턴으로 URL 쿼리(panel=chat)에 동기화한다.
+  const [panelOpen, setPanelOpenState] = useState(() => searchParams.get("panel") === "chat");
   const visibleReloadKey = useReloadOnVisible();
 
-  const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
+  const syncUrl = (next: {
+    status: string;
+    dateRange: DateRange;
+    sortDir: "asc" | "desc";
+    search: string;
+    page: number;
+    panelOpen: boolean;
+  }) => {
     const params = new URLSearchParams();
     if (next.status) params.set("status", next.status);
     if (next.dateRange.from) params.set("from", next.dateRange.from);
@@ -81,33 +92,38 @@ function WebtoonPage() {
     if (next.sortDir === "asc") params.set("sort", "asc");
     if (next.search) params.set("q", next.search);
     if (next.page > 1) params.set("page", String(next.page));
+    if (next.panelOpen) params.set("panel", "chat");
     const qs = params.toString();
     router.replace(qs ? `/webtoon?${qs}` : "/webtoon", { scroll: false });
   };
 
   const setStatus = (next: string) => {
     setStatusState(next);
-    syncUrl({ status: next, dateRange, sortDir, search, page: 1 });
+    syncUrl({ status: next, dateRange, sortDir, search, page: 1, panelOpen });
   };
   const setDateRange = (next: DateRange) => {
     setDateRangeState(next);
-    syncUrl({ status, dateRange: next, sortDir, search, page: 1 });
+    syncUrl({ status, dateRange: next, sortDir, search, page: 1, panelOpen });
   };
   const toggleSortDir = () => {
     const next = sortDir === "desc" ? "asc" : "desc";
     setSortDirState(next);
-    syncUrl({ status, dateRange, sortDir: next, search, page: 1 });
+    syncUrl({ status, dateRange, sortDir: next, search, page: 1, panelOpen });
   };
   const setSearch = (next: string) => {
     setSearchState(next);
-    syncUrl({ status, dateRange, sortDir, search: next, page: 1 });
+    syncUrl({ status, dateRange, sortDir, search: next, page: 1, panelOpen });
   };
   const setPage = (updater: number | ((prev: number) => number)) => {
     setPageState((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      syncUrl({ status, dateRange, sortDir, search, page: next });
+      syncUrl({ status, dateRange, sortDir, search, page: next, panelOpen });
       return next;
     });
+  };
+  const setPanelOpen = (next: boolean) => {
+    setPanelOpenState(next);
+    syncUrl({ status, dateRange, sortDir, search, page, panelOpen: next });
   };
 
   const requestKey = JSON.stringify([status, dateRange, visibleReloadKey, bulkReloadKey]);

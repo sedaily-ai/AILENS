@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { buildImagePromptDoc } from "@/lib/webtoonImagePromptDoc";
+import { IMAGE_MODELS } from "@/lib/webtoonImageModels";
+import { CustomSelect } from "@/components/CustomSelect";
 import type {
   WebtoonImageAssetGalleryItem,
   WebtoonImageAssetKind,
@@ -11,6 +13,33 @@ import type {
   WebtoonLabDefaults,
 } from "@/lib/types";
 import { CollapsibleSection } from "./CollapsibleSection";
+
+/* 발행 모델 선택지(2026-09-20 신설) — "관리자가 CMS에서 저장하면 재배포
+   없이 다음 발행부터 자동 반영" 요청으로, 이 패널에 "지금 실제 자동
+   발행이 쓸 모델" 선택을 추가했다. WebtoonCutGenerator의 컷별 모델
+   드롭다운(IMAGE_MODELS 전체, 비교용이라 openai_dalle3도 보여줌)과
+   달리 여기는 **실제 프로덕션이 지원하는 모델만** — pipeline.py의
+   _PROVIDER_CONFIG에 없는 openai_dalle3(사업상 미사용 확정)을 고르면
+   실제로는 아무 효과가 없거나 예상 밖 동작이 나므로 아예 뺀다. */
+const PRODUCTION_IMAGE_MODELS = IMAGE_MODELS.filter((m) => !m.notInUse);
+
+/* 2026-09-20, 사용자 지적 — "이미지도 매번 불러올 거 없잖아요": 참조
+   이미지(화풍/인물 A/B) URL은 presigned라 호출마다 서명이 달라진다 —
+   내용이 똑같아도 브라우저는 매번 "새 리소스"로 보고 이미지 바이트를
+   다시 받고, 백엔드도 S3 head_object·list_objects_v2·presign을 실험
+   패널을 열 때마다(마운트마다) 다시 계산한다(최대 갤러리 24장×3종=72번
+   서명까지). 모듈 스코프 캐시로 같은 탭 세션(새로고침 전까지) 안에서는
+   재사용하고, 업로드·선택으로 실제 내용이 바뀐 순간에만 force=true로
+   강제 재조회한다. TTL은 presigned URL 서버 만료(routes/webtoon/assets.py
+   의 URL_EXPIRES=300초)보다 짧게 잡아 캐시가 만료된 URL을 내보내는
+   일이 없게 한다. STYLE/CHARACTERS 텍스트(loadDefaults)는 "관리자가
+   저장하면 바로 봐야 한다"는 기존 설계 원칙 그대로 캐시 안 함 — 이미지
+   자체가 아니라 presigned URL 재서명 비용·이미지 재다운로드만 문제였다. */
+const IMAGE_CACHE_TTL_MS = 4 * 60 * 1000;
+let assetsCache: { data: WebtoonImageAssetUrls; fetchedAt: number } | null = null;
+const galleryCache: Partial<
+  Record<WebtoonImageAssetKind, { items: WebtoonImageAssetGalleryItem[]; fetchedAt: number }>
+> = {};
 
 /* "고정값 설정"(화풍 STYLE + 고정 캐릭터 A/B) — 2026-09-16, 사용자가 화면
    구조가 헷갈린다며("뒤에 고정하고 뭐 하고, 프롬프트는 어디서 바꿔야
@@ -77,6 +106,7 @@ export function WebtoonImageSettingsPanel({
   const [style, setStyle] = useState("");
   const [charFemale, setCharFemale] = useState("");
   const [charMale, setCharMale] = useState("");
+  const [imageModel, setImageModel] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [defaults, setDefaults] = useState<WebtoonLabDefaults | null>(null);
 
@@ -98,10 +128,21 @@ export function WebtoonImageSettingsPanel({
   });
   const [selecting, setSelecting] = useState<string | null>(null); // 지금 선택 처리 중인 갤러리 항목의 key
 
-  const loadGallery = useCallback((kind: WebtoonImageAssetKind) => {
+  const loadGallery = useCallback((kind: WebtoonImageAssetKind, force = false) => {
+    const cached = galleryCache[kind];
+    if (!force && cached && Date.now() - cached.fetchedAt < IMAGE_CACHE_TTL_MS) {
+      // 캐시 히트라도 setState는 반드시 .then() 콜백 안에서만 — 이펙트
+      // 바디에서 동기 setState하면 react-hooks/set-state-in-effect가 걸린다
+      // (이 파일의 다른 load* 함수들과 같은 컨벤션, loadDefaults 참고).
+      Promise.resolve(cached.items).then((items) => setGalleries((prev) => ({ ...prev, [kind]: items })));
+      return;
+    }
     adminApi
       .getWebtoonImageAssetGallery(kind)
-      .then((r) => setGalleries((prev) => ({ ...prev, [kind]: r.items })))
+      .then((r) => {
+        galleryCache[kind] = { items: r.items, fetchedAt: Date.now() };
+        setGalleries((prev) => ({ ...prev, [kind]: r.items }));
+      })
       .catch(() => {
         /* 갤러리 못 띄워도 지금 쓰는 이미지 미리보기(assets)엔 영향 없음 — 조용히 무시 */
       });
@@ -115,16 +156,25 @@ export function WebtoonImageSettingsPanel({
         setStyle(d.style);
         setCharFemale(d.char_female);
         setCharMale(d.char_male);
+        setImageModel(d.image_model);
       })
       .catch(() => {
         /* 실패해도 조용히 무시 — 생성 자체는 백엔드가 어차피 기본값을 채운다 */
       });
   }, []);
 
-  const loadAssets = useCallback(() => {
+  const loadAssets = useCallback((force = false) => {
+    if (!force && assetsCache && Date.now() - assetsCache.fetchedAt < IMAGE_CACHE_TTL_MS) {
+      // 캐시 히트라도 setState는 .then() 콜백 안에서만(위 loadGallery와 같은 이유).
+      Promise.resolve(assetsCache.data).then(setAssets);
+      return;
+    }
     adminApi
       .getWebtoonImageAssets()
-      .then(setAssets)
+      .then((data) => {
+        assetsCache = { data, fetchedAt: Date.now() };
+        setAssets(data);
+      })
       .catch(() => {
         /* 미리보기 못 띄워도 영향 없음 — 조용히 무시 */
       });
@@ -136,7 +186,7 @@ export function WebtoonImageSettingsPanel({
     // 주석 불필요.
     loadDefaults();
     loadAssets();
-    (["style", "char_female", "char_male"] as const).forEach(loadGallery);
+    (["style", "char_female", "char_male"] as const).forEach((kind) => loadGallery(kind));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
   }, []);
 
@@ -162,8 +212,8 @@ export function WebtoonImageSettingsPanel({
       // 예전 체감을 유지한다(과거 샘플은 갤러리에 그대로 남는다).
       await adminApi.selectWebtoonImageAsset(kind, presign.key);
       toast.show("이미지를 추가하고 선택했습니다 — 다음 생성부터 반영됩니다", "success");
-      loadAssets();
-      loadGallery(kind);
+      loadAssets(true); // force — 방금 바뀐 값이니 캐시 무시하고 다시 받는다
+      loadGallery(kind, true);
     } catch (err) {
       toast.show(`업로드 실패: ${err instanceof Error ? err.message : "알 수 없는 오류"}`, "error");
     } finally {
@@ -176,8 +226,8 @@ export function WebtoonImageSettingsPanel({
     try {
       await adminApi.selectWebtoonImageAsset(kind, key);
       toast.show("선택했습니다 — 다음 생성부터 반영됩니다", "success");
-      loadAssets();
-      loadGallery(kind);
+      loadAssets(true); // force — 방금 바뀐 값이니 캐시 무시하고 다시 받는다
+      loadGallery(kind, true);
     } catch (err) {
       toast.show(`선택 실패: ${err instanceof Error ? err.message : "알 수 없는 오류"}`, "error");
     } finally {
@@ -192,7 +242,8 @@ export function WebtoonImageSettingsPanel({
     !!defaults &&
     (effectiveStyle !== defaults.style ||
       effectiveCharFemale !== defaults.char_female ||
-      effectiveCharMale !== defaults.char_male);
+      effectiveCharMale !== defaults.char_male ||
+      imageModel !== defaults.image_model);
 
   const handlePublish = async () => {
     if (publishing || !changedFromDefaults || !defaults) return;
@@ -208,7 +259,7 @@ export function WebtoonImageSettingsPanel({
       const r = await adminApi.updatePrompt(
         "webtoon-image",
         "published",
-        buildImagePromptDoc(effectiveStyle, effectiveCharFemale, effectiveCharMale)
+        buildImagePromptDoc(effectiveStyle, effectiveCharFemale, effectiveCharMale, imageModel)
       );
       toast.show(`발행했습니다 — v${r.new_version}부터 다음 생성에 적용됩니다`, "success");
       loadDefaults();
@@ -226,9 +277,41 @@ export function WebtoonImageSettingsPanel({
     <div className="space-y-4 px-3.5 py-3.5">
       <div>
         <p className="text-[10px] leading-snug text-[var(--text-faint)]">
-          컷 이미지가 항상 지키는 화풍·인물 설정입니다. 텍스트는 아래 &ldquo;발행&rdquo;을 눌러야, 참조
+          컷 이미지가 항상 지키는 모델·화풍·인물 설정입니다. 텍스트는 아래 &ldquo;발행&rdquo;을 눌러야, 참조
           이미지는 파일을 고르는 즉시 반영됩니다.
         </p>
+      </div>
+
+      {/* 발행 모델(2026-09-20 신설) — "관리자가 CMS에서 저장하면 재배포
+          없이 다음 발행부터 자동 반영" 요청의 핵심 컨트롤이라, 접었다 펴는
+          CollapsibleSection이 아니라 상시 노출한다(가장 자주 바뀌고 가장
+          영향이 큰 설정). 고른 즉시 저장되는 게 아니라 아래 "발행" 버튼을
+          눌러야 반영된다 — STYLE/CHARACTERS와 같은 발행 단위(한 문서)라
+          따로 즉시저장을 만들면 오히려 "이건 왜 바로 반영되고 저건 버튼을
+          눌러야 하지"라는 혼란만 생긴다. */}
+      <div className="ui-card space-y-1.5 rounded-xl border p-3.5">
+        <div className="flex items-center justify-between gap-2">
+          <p
+            className="text-[10px] text-[var(--text-faint)]"
+            title="실제 자동 발행 파이프라인(frontpage_auto/mustknow_auto)이 다음 기사부터 이 모델로 컷을 생성합니다."
+          >
+            발행 모델 — 실제 자동 발행이 다음 기사부터 쓸 모델입니다.
+          </p>
+          {defaults && imageModel !== defaults.image_model && (
+            <span className="shrink-0 text-[10px] font-medium" style={{ color: "var(--accent)" }}>
+              변경됨
+            </span>
+          )}
+        </div>
+        <CustomSelect
+          value={imageModel}
+          onChange={setImageModel}
+          options={PRODUCTION_IMAGE_MODELS.map((m) => ({
+            value: m.id,
+            label: m.shortLabel ?? m.label,
+            badge: m.badge,
+          }))}
+        />
       </div>
 
       <div className="ui-divider divide-y divide-[var(--border-hairline)] rounded-xl border">
@@ -248,7 +331,8 @@ export function WebtoonImageSettingsPanel({
               className="text-[10px] text-[var(--text-faint)]"
               title="그림체 지침(색감·선화·금지 스타일 등)을 문장으로 적습니다. 컷마다 이 문장이 프롬프트 앞부분에 그대로 들어갑니다. 발행해야 실제 생성에 반영돼요."
             >
-              그림체 지침 — 발행해야 반영됩니다. <ScopeTag>모든 모델에 적용</ScopeTag>
+              그림체 지침 — 발행해야 반영됩니다.{" "}
+              <ScopeTag>Style Guide · SD1.5 파이프라인 전용 — Stable Core·SD3.5·Ultra엔 미적용</ScopeTag>
             </p>
             <textarea
               value={style}
@@ -302,7 +386,7 @@ export function WebtoonImageSettingsPanel({
             <div className="px-3.5">
               <p className="text-[10px] text-[var(--text-faint)]">
                 A(여성 기자) 외형 묘사 — 발행해야 반영됩니다.{" "}
-                <ScopeTag>Stable Core · SD3.5 · Ultra 전용 — SD1.5 파이프라인엔 미적용</ScopeTag>
+                <ScopeTag>SD1.5 파이프라인 전용 — Stable Core·SD3.5·Ultra엔 미적용</ScopeTag>
               </p>
               <textarea
                 value={charFemale}
@@ -344,7 +428,7 @@ export function WebtoonImageSettingsPanel({
             <div className="px-3.5">
               <p className="text-[10px] text-[var(--text-faint)]">
                 B(남성 청자) 외형 묘사 — 발행해야 반영됩니다.{" "}
-                <ScopeTag>Stable Core · SD3.5 · Ultra 전용 — SD1.5 파이프라인엔 미적용</ScopeTag>
+                <ScopeTag>SD1.5 파이프라인 전용 — Stable Core·SD3.5·Ultra엔 미적용</ScopeTag>
               </p>
               <textarea
                 value={charMale}

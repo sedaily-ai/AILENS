@@ -24,9 +24,13 @@ interface Props<T extends string> {
   options: Option<T>[];
   onChange: (v: T) => void;
   placeholder?: string;
+  /** 2026-09-20, 좌측 채팅창 입력창 위 모델 드롭다운 요청 — 트리거가 화면
+   *  하단(채팅 입력창)에 가까우면 기본(아래로 펼침) 팝업이 뷰포트 밖으로
+   *  잘린다. true면 팝업이 트리거 위쪽으로 펼쳐진다. */
+  openUp?: boolean;
 }
 
-export function CustomSelect<T extends string>({ value, options, onChange, placeholder }: Props<T>) {
+export function CustomSelect<T extends string>({ value, options, onChange, placeholder, openUp = false }: Props<T>) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +75,9 @@ export function CustomSelect<T extends string>({ value, options, onChange, place
 
       {open && (
         <div
-          className="absolute z-20 mt-1.5 min-w-[140px] rounded-xl border p-1"
+          className={`absolute z-20 min-w-[140px] rounded-xl border p-1 ${
+            openUp ? "bottom-full mb-1.5" : "mt-1.5"
+          }`}
           style={{
             background: "var(--surface-card)",
             borderColor: "var(--border-hairline)",

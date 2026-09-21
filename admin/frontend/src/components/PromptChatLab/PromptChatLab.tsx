@@ -14,6 +14,26 @@ import { ChatThreadSidebar } from "./ChatThreadSidebar";
 import { WebtoonCutGenerator } from "../WebtoonCutGenerator/WebtoonCutGenerator";
 import { WebtoonImageLab } from "../WebtoonImageLab";
 import { WebtoonStageLab } from "../WebtoonStageLab";
+import { CustomSelect } from "@/components/CustomSelect";
+
+/* 좌측 채팅창 텍스트 모델 선택지(2026-09-20 신설) — admin/backend/routes/
+   prompts.py::TEXT_MODELS와 정확히 같은 키를 써야 한다(한쪽만 고치면
+   서버가 모르는 값이 와서 기본값으로 조용히 폴백한다 — resolve_text_model
+   참고, 실패로 보이진 않지만 고른 모델이 안 먹는 상태가 된다). "Opus
+   5.1"·"GPT 최신 모델"도 요청받았지만 정확한 모델명 확인 전이라 이번엔
+   뺐다 — 확인되면 이 배열 + 백엔드 TEXT_MODELS 양쪽에 한 줄씩 추가.
+
+   sonnet-5는 백엔드 TEXT_MODELS엔 있지만(IAM·비용태깅 프로파일까지 이미
+   준비됨) 여기 드롭다운엔 일부러 안 넣었다 — 실측으로 이 웹툰 스크립트
+   생성 작업에서 240초를 기다려도 내부 reasoning이 토큰 예산을 다 써서
+   실제 답변이 0글자로 나오는 걸 확인했다(prompts.py TEXT_MODELS 주석
+   참고). 고르면 그냥 실패하는 옵션을 보여줄 이유가 없어 뺐다. opus-5도
+   느리지만(수십~200초대) 완주는 하는 걸 확인해서 남긴다. */
+const TEXT_MODELS: { id: string; label: string }[] = [
+  { id: "sonnet-46", label: "Claude Sonnet 4.6 (기존)" },
+  { id: "opus-5", label: "Claude Opus 5 (느릴 수 있음)" },
+];
+const DEFAULT_TEXT_MODEL = "sonnet-46";
 
 /* 프롬프트·이미지 실험 — 채팅형 통합(2026-09-14, 사용자 요청: "클로드처럼
    채팅을 할 수 있는 형태로 통합해주세요" → "실제 대화 가능하도록 백엔드
@@ -111,6 +131,10 @@ export function PromptChatLab({
   const { wsOpen, send: wsSend, subscribe } = useAdminChatSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [input, setInput] = useState("");
+  // 2026-09-20, 사용자 요청 — "좌측 채팅창에도 텍스트 모델 선택 가능하게":
+  // 이미지 모델 드롭다운(WebtoonCutGenerator)과 같은 패턴. 기본값은 기존
+  // 동작 그대로(Sonnet 4.6) — 아무것도 고르지 않아도 예전과 똑같이 나간다.
+  const [textModel, setTextModel] = useState<string>(DEFAULT_TEXT_MODEL);
   const [storyboard, setStoryboard] = useState<{ coreQuestion: string | null; cuts: WebtoonStoryboardCut[] } | null>(null);
   // 2026-09-16 — 우측은 항상 이미지 생성 패널(WebtoonCutGenerator)을 보여준다
   // (사용자 요청: "항상 2개 단이 구분되어서 보여지면 좋겠어요" — 텍스트|이미지
@@ -204,7 +228,7 @@ export function PromptChatLab({
     const justCaughtUp = !caughtUp && revealedIndexRef.current >= targetLength;
     if (justCaughtUp || timestamp - lastRenderTimeRef.current >= RENDER_INTERVAL_MS) {
       lastRenderTimeRef.current = timestamp;
-      setLiveParsed(tryParsePartialJson(fullTextRef.current.slice(0, revealedIndexRef.current)));
+      setLiveParsed(normalizeLiveParsed(tryParsePartialJson(fullTextRef.current.slice(0, revealedIndexRef.current))));
     }
     if (revealedIndexRef.current < targetLength) {
       rafRef.current = requestAnimationFrame(revealStep);
@@ -456,25 +480,25 @@ export function PromptChatLab({
     if (!text || !wsOpen) return;
     setInput("");
 
-    // 이 세션의 첫 메시지면 스레드를 먼저 만든다(2026-09-15, 사용자 요청
-    // — 좌측 사이드바에 대화 저장). 실패해도 채팅 자체는 계속 진행 —
-    // 저장이 안 될 뿐 실험은 막지 않는다.
-    const proceed = () => sendInner(text);
+    // 2026-09-20 — 예전엔 스레드 생성(createChatThread, admin Lambda→
+    // lens-cms-api HTTP 왕복)이 끝나야 sendInner()를 불렀다 — "새 대화
+    // 누르고 처음 보낼 때 너무 늦게 나타난다"는 신고로 발견. 사용자가
+    // 실제로 기다리는 건 AI 응답이지 스레드 저장이 아니라서, 스레드
+    // 생성은 백그라운드로 돌리고 메시지 전송(sendInner, 사용자 말풍선
+    // 표시 + WebSocket 전송)은 그 응답을 기다리지 않고 바로 실행한다.
+    // threadIdRef가 아직 null인 짧은 창(스레드 생성 HTTP 왕복 시간) 동안
+    // 나가는 메시지는 저장이 스킵될 수 있지만(appendMessage가 threadId
+    // 없으면 조용히 건너뜀), 실사용 체감(응답이 바로 보임)이 우선이다.
     if (threadIdRef.current === null) {
       adminApi
         .createChatThread(PROMPT_CATEGORY, PROMPT_NAME, text.slice(0, 60))
         .then((thread) => {
           setThreadId(thread.id);
           refreshThreads();
-          proceed();
         })
-        .catch((err) => {
-          console.error("대화 스레드 생성 실패", err);
-          proceed();
-        });
-    } else {
-      proceed();
+        .catch((err) => console.error("대화 스레드 생성 실패", err));
     }
+    sendInner(text);
   };
 
   const sendInner = (text: string) => {
@@ -482,7 +506,7 @@ export function PromptChatLab({
 
     if (text.length >= MIN_ARTICLE_LEN) {
       setWaiting(true);
-      sendWs("article", { article: text });
+      sendWs("article", { article: text, model: textModel });
     } else {
       // 기사도 컷 요청도 아니면 일반 챗봇처럼 Bedrock을 직접 호출한다
       // (2026-09-15, 사용자 요청: "자연스럽게 대화가 가능하도록... 일반
@@ -497,7 +521,7 @@ export function PromptChatLab({
         .slice(-10)
         .map((m) => ({ role: m.role, text: m.text }));
       setWaiting(true);
-      sendWs("chat", { message: text, history });
+      sendWs("chat", { message: text, history, model: textModel });
     }
   };
 
@@ -597,6 +621,14 @@ export function PromptChatLab({
 
   const composerNode = (
     <div className="ui-divider border-t px-4 py-3">
+      {/* 2026-09-20, 사용자 요청 — "좌측 채팅창 입력하는 부분에 모델
+          드롭다운이 위로 향하게": 입력창 바로 위에 상시 노출. 화면 하단에
+          붙어 있어 기본(아래로 펼침) 팝업이 잘리므로 CustomSelect의
+          openUp을 쓴다. */}
+      <div className="mb-1.5 flex items-center gap-1.5 px-1">
+        <span className="text-[10.5px] text-[var(--text-faint)]">모델</span>
+        <CustomSelect value={textModel} onChange={setTextModel} options={TEXT_MODELS.map((m) => ({ value: m.id, label: m.label }))} openUp />
+      </div>
       <div className="ui-input flex items-end gap-2 rounded-2xl px-3 py-2">
         <textarea
           ref={textareaRef}
@@ -739,7 +771,7 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
         ) : (
           <div className="space-y-2.5">
             {msg.text && <TypewriterText text={msg.text} animate={!!msg.animate} />}
-            {msg.storyboard && <StoryboardCard data={msg.storyboard} animate={!!msg.animate} />}
+            {msg.storyboard && <StoryboardCard data={msg.storyboard} />}
             {msg.imagePreview && <CutImagePreview data={msg.imagePreview} />}
           </div>
         )}
@@ -903,6 +935,82 @@ function tryParsePartialJson(raw: string): { value: unknown; inProgressPath: Jso
   }
 }
 
+/* 2026-09-20, 사용자 요청 — "스트리밍 중에도 이미 정리된 필드명으로
+   보이게": 백엔드(routes/webtoon/script.py::normalize_cuts)는 전체
+   JSON이 다 온 뒤에야 cut_id→cut, new_conclusion→narration, keyword→
+   caption, headline→title, bubble_1/bubble_2→dialogue 같은 필드명
+   정리를 한다. 스트리밍 중엔 위 tryParsePartialJson이 모델이 실제로
+   쓰고 있는 원본 필드명(22장 스키마)을 그대로 돌려주므로, 스트리밍
+   화면과 완성 후 storyboard 카드가 다른 필드명으로 보여 "다 쓰고 나서
+   갑자기 정리된다"는 인상을 줬다(chat_ws.py::_stream_json_completion
+   독스트링 참고 — 원래 의도된 설계였지만 사용자가 이 전환 자체를
+   없애고 싶어함). 서버의 normalize_cuts()와 정확히 같은 규칙을
+   여기서도 적용해 스트리밍 중에도 이미 정리된 필드명으로 보이게
+   한다 — 서버 쪽 정규화는 그대로 둔다(최종 storyboard 메시지는 여전히
+   서버가 만든다, 여긴 그 결과를 미리 보여주는 클라이언트 전용 거울). */
+function liveCutNumber(c: Record<string, unknown>): number | null {
+  const n = c["cut"];
+  if (typeof n === "number") return n;
+  const cutId = c["cut_id"] ?? c["id"];
+  if (typeof cutId === "string") {
+    const digits = cutId.replace(/\D/g, "");
+    if (digits) return parseInt(digits, 10);
+  }
+  return null;
+}
+
+function liveFirstNonEmpty(...values: unknown[]): string {
+  for (const v of values) {
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return "";
+}
+
+function liveDialogueFromBubbles(c: Record<string, unknown>): unknown[] {
+  const existing = c["dialogue"];
+  if (Array.isArray(existing) && existing.length) return existing;
+  const lines: { speaker: string; line: string }[] = [];
+  for (const key of ["bubble_1", "bubble_2"] as const) {
+    const b = c[key];
+    if (b && typeof b === "object" && !Array.isArray(b)) {
+      const bo = b as Record<string, unknown>;
+      const text = bo["text"];
+      if (typeof text === "string" && text) {
+        const speakerRaw = bo["speaker"];
+        const speaker = speakerRaw === "female" ? "A" : speakerRaw === "male" ? "B" : key;
+        lines.push({ speaker, line: text });
+      }
+    }
+  }
+  return lines;
+}
+
+function normalizeLiveCut(c: unknown): unknown {
+  if (!c || typeof c !== "object" || Array.isArray(c)) return c;
+  const co = c as Record<string, unknown>;
+  return {
+    cut: liveCutNumber(co),
+    narration: liveFirstNonEmpty(co["narration"], co["new_conclusion"]),
+    caption: liveFirstNonEmpty(co["caption"], co["keyword"]),
+    closing_caption: (typeof co["closing_caption"] === "string" && co["closing_caption"]) || "",
+    title: liveFirstNonEmpty(co["title"], co["headline"]),
+    title_keyword: (typeof co["title_keyword"] === "string" && co["title_keyword"]) || "",
+    dialogue: liveDialogueFromBubbles(co),
+    image_prompt: (typeof co["image_prompt"] === "string" && co["image_prompt"]) || "",
+  };
+}
+
+function normalizeLiveParsed(
+  parsed: { value: unknown; inProgressPath: JsonPath } | null
+): { value: unknown; inProgressPath: JsonPath } | null {
+  if (!parsed) return null;
+  const v = parsed.value;
+  if (!v || typeof v !== "object" || Array.isArray(v)) return parsed;
+  const vo = v as Record<string, unknown>;
+  if (!Array.isArray(vo["cuts"])) return parsed;
+  return { value: { ...vo, cuts: vo["cuts"].map(normalizeLiveCut) }, inProgressPath: parsed.inProgressPath };
+}
+
 /* 2026-09-18, 사용자 요청 — "이미지 프롬프트 같은거는.. 코드블럭에.. 감싸서
    출력해도 좋겠네": key가 "image_prompt"류면 값을 코드블럭(모노스페이스
    +테두리 박스)으로, 그 외는 "key: value" 한 줄로 보여준다. 스트리밍 중
@@ -957,13 +1065,21 @@ function DumpNode({
               </div>
             );
           }
+          // 2026-09-20, 사용자 요청 — "코드블럭 때문에 복잡해지네.. 대신
+          // 선을 두거나 해서 구분하는 좀 더 간편한 방식으로": 배경+테두리
+          // 박스(border-radius·padding·surface-sunken 배경)가 스트리밍 중
+          // 필드 하나가 "미완성(평문)"에서 "완성(박스)"으로 바뀌는 순간
+          // 박스가 갑자기 나타나며 레이아웃이 흔들리는 게 거슬렸다 — 박스
+          // 대신 왼쪽 세로선 하나로만 코드 필드임을 표시한다(배경·둘레
+          // 테두리·둥근 모서리 없음, 등장할 때 튀는 느낌이 훨씬 적다).
+          // 모노스페이스 폰트는 코드 필드라는 걸 구분하는 용도로 유지.
           if (isCodeField && !isInProgress) {
             return (
               <div key={k}>
                 <span className="font-semibold text-[var(--text-muted)]">{k}:</span>
                 <pre
-                  className="mt-1 whitespace-pre-wrap break-words rounded-md border px-2.5 py-2 font-mono text-[11px] leading-relaxed"
-                  style={{ background: "var(--surface-sunken)", borderColor: "var(--border-hairline)" }}
+                  className="mt-1 whitespace-pre-wrap break-words border-l-2 pl-2.5 font-mono text-[11px] leading-relaxed"
+                  style={{ borderColor: "var(--border-hairline)" }}
                 >
                   {String(v ?? "")}
                 </pre>
@@ -1023,32 +1139,21 @@ function TypewriterText({ text, animate }: { text: string; animate: boolean }) {
  *  안 보였음). 컷마다 2단계 산출물 전체(narration/caption/dialogue/camera/scene/
  *  title/title_keyword/closing_caption)를 필드 그대로 나열한다 — 골라서 보여주지
  *  않는다. */
-function StoryboardCard({
-  data,
-  animate,
-}: {
-  data: { coreQuestion: string; cuts: WebtoonStoryboardCut[] };
-  animate: boolean;
-}) {
+/* 2026-09-20, 사용자 요청 — "답변 출력을 모두 마무리하고 깔끔한 디자인으로
+   렌더링 하는 과정이 있는데 이 과정을 없애고 싶어요.. 처음 출력한 거
+   그대로 가도록": 이 카드는 스트리밍이 끝난 뒤(storyboard 메시지 도착
+   시점) 붙는 "완성본" 카드다. 1차로 컷마다 순차 fade-up 애니메이션
+   (animationDelay: i*70ms)을 없앴는데도, 사용자가 스크린샷으로 "아직도
+   디자인 입혀서 나온다"고 재지적 — "컷 N"이라는 라벨을 accent 색상
+   굵은 글씨로 별도로 얹고 있던 게 남아있었다(실시간 스트리밍 중엔
+   DumpNode가 배열을 그냥 나열만 하지 "컷 N" 헤더를 안 만든다 — 이
+   컴포넌트가 완성 후에만 그 헤더를 "입혀서" 보여준 것). 이제 스트리밍
+   중 보던 것과 완전히 같은 렌더러(DumpNode)에 같은 값을 그대로 넘긴다
+   — 이 컴포넌트에 남는 건 DumpNode 호출 하나뿐이다. */
+function StoryboardCard({ data }: { data: { coreQuestion: string; cuts: WebtoonStoryboardCut[] } }) {
   return (
-    <div>
-      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{data.coreQuestion}</p>
-      <div className="mt-2.5 space-y-3">
-        {data.cuts.map((c, i) => (
-          <div
-            key={c.cut}
-            className={i > 0 ? "border-t border-[var(--border-hairline)] pt-3" : ""}
-            style={animate ? { animation: `ui-fade-up 200ms ease-out both`, animationDelay: `${i * 70}ms` } : undefined}
-          >
-            <p className="mb-1 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-              컷 {c.cut}
-            </p>
-            <div className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
-              <DumpNode value={c} />
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
+      <DumpNode value={data} />
     </div>
   );
 }

@@ -317,7 +317,12 @@ export function WebtoonImageLab({ open, onClose }: Props) {
       const r = await adminApi.updatePrompt(
         "webtoon-image",
         "published",
-        buildImagePromptDoc(effectiveStyle, effectiveCharFemale, effectiveCharMale)
+        // 2026-09-20 — 이 화면엔 발행 모델 선택 UI가 없지만(WebtoonImageSettingsPanel
+        // 전용), fetch해둔 현재 값(defaults.image_model)을 그대로 실어 보내야
+        // 한다 — 안 넘기면 문서에서 IMAGE_MODEL 섹션이 통째로 빠져, 다른
+        // 관리자가 골라둔 발행 모델이 다음 읽기부터 기본값(sd_ultra)으로
+        // 조용히 되돌아간다(buildImagePromptDoc 계약 참고).
+        buildImagePromptDoc(effectiveStyle, effectiveCharFemale, effectiveCharMale, defaults?.image_model ?? "")
       );
       toast.show(`발행했습니다 — v${r.new_version}부터 다음 생성에 적용됩니다`, "success");
       loadDefaults();
