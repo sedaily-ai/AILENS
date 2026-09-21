@@ -117,6 +117,16 @@ type WsPush =
   | { type: "options_prompt"; message: string }
   | { type: "storyboard"; core_question: string | null; cuts: WebtoonStoryboardCut[] }
   | { type: "error"; message: string }
+  // 2026-09-21, 사용자 요청 — "특정 대화에서 출력한 이미지들이 다시 그
+  // 대화를 들어가면 날아가 있는데 저장할 수 있도록": 우측 패널
+  // (WebtoonCutGenerator)에서 컷을 생성하면 이 이벤트가 오는데, 지금까지
+  // PromptChatLab은 이걸 안 듣고 WebtoonCutGenerator만 자기 로컬
+  // state(slots)에 담아뒀다 — 스레드를 나갔다 들어오면 그 로컬 state가
+  // 사라져 이미지가 없어진 것처럼 보였다. imagePreview 메시지 저장·복원
+  // 배선(appendMessage/openThread)은 예전 설계(컷 생성이 채팅 안에
+  // 있던 시절)부터 이미 있었는데 그 뒤로 아무도 안 부르고 있었다 —
+  // 여기서 다시 연결한다(아래 case "cut_image").
+  | { type: "cut_image"; cut: number; image_url: string; model?: string }
   | { type: "pong" };
 
 export function PromptChatLab({
@@ -487,6 +497,16 @@ export function PromptChatLab({
             break;
           case "error":
             appendMessage({ role: "assistant", text: msg.message });
+            break;
+          case "cut_image":
+            // 우측 패널(WebtoonCutGenerator)이 자기 화면(슬롯) 갱신은
+            // 따로 처리한다 — 여기서는 채팅 기록에 남겨서 스레드를
+            // 나갔다 다시 들어와도 생성된 이미지가 안 사라지게만 한다.
+            appendMessage({
+              role: "assistant",
+              imagePreview: { cut: msg.cut, imageUrl: msg.image_url, model: msg.model },
+              animate: false,
+            });
             break;
         }
     });
