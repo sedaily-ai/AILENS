@@ -1,7 +1,7 @@
 # AILENS 팟캐스트 제작 프롬프트
 
 01_COMMON.md의 모든 규칙을 준수한다.
-02_EXTRACT.md의 facts.json을 입력으로 받는다.
+`../02_EXTRACT/`의 facts.json을 입력으로 받는다.
 
 ────────────────────────
 ## 0. 이 포맷이 맡는 것
