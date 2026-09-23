@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { adminApi } from "@/lib/adminClient";
 import { useAdminChatSocket } from "@/lib/useAdminChatSocket";
-import type { ChatThreadSummary, WebtoonStoryboardCut } from "@/lib/types";
+import type { ChatThreadSummary, PromptHistoryEntry, WebtoonStoryboardCut } from "@/lib/types";
 // IMAGE_MODELS는 이제 이미지를 안 만드는 이 컴포넌트에선 CutImagePreview
 // (구버전 저장 대화에 남아있는 imagePreview 메시지 렌더용)에서만 쓴다.
 import { IMAGE_MODELS } from "@/lib/webtoonImageModels";
@@ -11,29 +11,23 @@ import { PromptSectionsPanel } from "./PromptSectionsPanel";
 import { WebtoonImageSettingsPanel } from "./WebtoonImageSettingsPanel";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ChatThreadSidebar } from "./ChatThreadSidebar";
+import { VersionPreviewModal } from "./VersionPreviewModal";
+import { TEXT_MODELS, DEFAULT_TEXT_MODEL } from "./textModels";
 import { WebtoonCutGenerator } from "../WebtoonCutGenerator/WebtoonCutGenerator";
 import { WebtoonImageLab } from "../WebtoonImageLab";
 import { WebtoonStageLab } from "../WebtoonStageLab";
 import { CustomSelect } from "@/components/CustomSelect";
 
-/* 좌측 채팅창 텍스트 모델 선택지(2026-09-20 신설) — admin/backend/routes/
-   prompts.py::TEXT_MODELS와 정확히 같은 키를 써야 한다(한쪽만 고치면
-   서버가 모르는 값이 와서 기본값으로 조용히 폴백한다 — resolve_text_model
-   참고, 실패로 보이진 않지만 고른 모델이 안 먹는 상태가 된다). "Opus
-   5.1"·"GPT 최신 모델"도 요청받았지만 정확한 모델명 확인 전이라 이번엔
-   뺐다 — 확인되면 이 배열 + 백엔드 TEXT_MODELS 양쪽에 한 줄씩 추가.
-
-   sonnet-5는 백엔드 TEXT_MODELS엔 있지만(IAM·비용태깅 프로파일까지 이미
-   준비됨) 여기 드롭다운엔 일부러 안 넣었다 — 실측으로 이 웹툰 스크립트
-   생성 작업에서 240초를 기다려도 내부 reasoning이 토큰 예산을 다 써서
-   실제 답변이 0글자로 나오는 걸 확인했다(prompts.py TEXT_MODELS 주석
-   참고). 고르면 그냥 실패하는 옵션을 보여줄 이유가 없어 뺐다. opus-5도
-   느리지만(수십~200초대) 완주는 하는 걸 확인해서 남긴다. */
-const TEXT_MODELS: { id: string; label: string }[] = [
-  { id: "sonnet-46", label: "Claude Sonnet 4.6 (기존)" },
-  { id: "opus-5", label: "Claude Opus 5 (느릴 수 있음)" },
-];
-const DEFAULT_TEXT_MODEL = "sonnet-46";
+// 좌측 채팅창 텍스트 모델 선택지 — 2026-09-22, ./textModels.ts로 이전
+// (PromptTextLab.tsx와 공용, 내용 변경 없음). 원래 주석: "Opus 5.1"·
+// "GPT 최신 모델"도 요청받았지만 정확한 모델명 확인 전이라 이번엔 뺐다 —
+// 확인되면 textModels.ts + 백엔드 TEXT_MODELS 양쪽에 한 줄씩 추가. sonnet-5는
+// 백엔드 TEXT_MODELS엔 있지만(IAM·비용태깅 프로파일까지 이미 준비됨) 여기
+// 드롭다운엔 일부러 안 넣었다 — 실측으로 이 웹툰 스크립트 생성 작업에서
+// 240초를 기다려도 내부 reasoning이 토큰 예산을 다 써서 실제 답변이
+// 0글자로 나오는 걸 확인했다(prompts.py TEXT_MODELS 주석 참고). 고르면
+// 그냥 실패하는 옵션을 보여줄 이유가 없어 뺐다. opus-5도 느리지만
+// (수십~200초대) 완주는 하는 걸 확인해서 남긴다.
 
 /* 프롬프트·이미지 실험 — 채팅형 통합(2026-09-14, 사용자 요청: "클로드처럼
    채팅을 할 수 있는 형태로 통합해주세요" → "실제 대화 가능하도록 백엔드
@@ -74,7 +68,7 @@ interface ChatMessage {
   id: string;
   role: MsgRole;
   text?: string;
-  storyboard?: { coreQuestion: string; cuts: WebtoonStoryboardCut[] };
+  storyboard?: { coreQuestion: string; cuts: WebtoonStoryboardCut[]; testedVersion?: number | null };
   imagePreview?: { cut: number; imageUrl: string; model?: string };
   /** true면 처음 나타날 때 타이핑되듯 스트리밍 연출 — 상태 메시지("GPU를
    *  켜는 중입니다" 등)처럼 완성본이 한 번에 오는 텍스트에만 쓴다. 진짜
@@ -115,7 +109,9 @@ type WsPush =
   | { type: "script_chunk_done" }
   // 완료 후 안내 텍스트 — 그냥 평범한 어시스턴트 텍스트 메시지로 렌더한다.
   | { type: "options_prompt"; message: string }
-  | { type: "storyboard"; core_question: string | null; cuts: WebtoonStoryboardCut[] }
+  // tested_version(2026-09-21 추가) — 과거 버전 드롭다운으로 시험 발화한
+  // 결과면 그 버전 번호, "최신"으로 보낸 평소 요청이면 null.
+  | { type: "storyboard"; core_question: string | null; cuts: WebtoonStoryboardCut[]; tested_version?: number | null }
   | { type: "error"; message: string }
   // 2026-09-21, 사용자 요청 — "특정 대화에서 출력한 이미지들이 다시 그
   // 대화를 들어가면 날아가 있는데 저장할 수 있도록": 우측 패널
@@ -157,9 +153,9 @@ export function PromptChatLab({
   // 3번째 칼럼(아래 layout)으로 최종 정착했다 — 이제 promptPanelOpen 같은
   // 토글 state는 필요 없다.
   //
-  // imageLabOpen만 남겨둔다 — 장면 하나로 테스트 생성·히스토리 갤러리처럼
-  // 자주 안 쓰는 기능은 여전히 WebtoonImageLab 전체 화면(standalone
-  // 모드, 자기 backdrop+aside 880px)을 그대로 재사용해서 필요할 때만 연다.
+  // 2026-09-21 — 히스토리 갤러리(WebtoonImageLab)는 이제 섹션 헤더의
+  // 히스토리 아이콘으로만 연다(생성 탭은 제거 — WebtoonImageSettingsPanel/
+  // WebtoonCutGenerator에 이미 있던 기능과 중복이었다).
   const [imageLabOpen, setImageLabOpen] = useState(false);
   const [stageLabOpen, setStageLabOpen] = useState(false);
   // 2026-09-16, 사용자 요청 — "좌측 사이드바는 접혔다 펼 수 있도록":
@@ -343,6 +339,45 @@ export function PromptChatLab({
     refreshThreads();
   }, [open]);
 
+  // 2026-09-21, 사용자 요청 — "프롬프트를 버전별로 볼 수 있으면... 버전을
+  // 드롭다운 해서 선택할 수 있고 그걸로 적용해서 출력... AB 테스트 느낌".
+  // "최신"(promptVersion=null)이면 기존 동작(우측 패널 초안 → 없으면
+  // 발행본) 그대로, 특정 버전을 고르면 그 버전 content로 일회성 override —
+  // 지금 초안/발행 상태는 전혀 안 건드린다(chat_ws.py::_resolve_prompt_content
+  // 참고).
+  const [promptHistory, setPromptHistory] = useState<PromptHistoryEntry[]>([]);
+  const [promptVersion, setPromptVersion] = useState<number | null>(null);
+  const [versionPreviewOpen, setVersionPreviewOpen] = useState(false);
+  const [versionPreviewContent, setVersionPreviewContent] = useState<string | null>(null);
+  const [versionPreviewLoading, setVersionPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    // getPrompt()가 아니라 getPromptHistory() — active_content(웹툰
+    // 카테고리 10만자 이상)까지 통째로 받는 무거운 쪽은 안 쓴다(2026-09-20
+    // "프롬프트 실험 페이지 로딩이 느리다" 신고로 serverVersion 쪽이 이미
+    // 한 번 겪은 전례, PromptSectionsPanel.tsx 참고).
+    adminApi
+      .getPromptHistory(PROMPT_CATEGORY, PROMPT_NAME)
+      .then((r) => setPromptHistory(r.history))
+      .catch((err) => console.error("프롬프트 버전 목록 불러오기 실패", err));
+  }, [open]);
+
+  const openVersionPreview = () => {
+    if (promptVersion === null) return;
+    setVersionPreviewOpen(true);
+    setVersionPreviewLoading(true);
+    setVersionPreviewContent(null);
+    adminApi
+      .getPromptVersion(PROMPT_CATEGORY, PROMPT_NAME, promptVersion)
+      .then((v) => setVersionPreviewContent(v.content))
+      .catch((err) => {
+        console.error("프롬프트 버전 내용 불러오기 실패", err);
+        setVersionPreviewContent("(불러오기 실패)");
+      })
+      .finally(() => setVersionPreviewLoading(false));
+  };
+
   // 입력창 자동 높이 조절(2026-09-14, 사용자 요청 — "글이 많이 들어가면
   // 크기가 늘어나도록") — height를 auto로 되돌린 다음 scrollHeight로
   // 다시 재는 표준 패턴. rows={1} 고정이라 CSS만으로는 안 늘어난다.
@@ -413,7 +448,7 @@ export function PromptChatLab({
           id: `saved-${m.id}`,
           role: m.role,
           text: m.text,
-          storyboard: m.storyboard as { coreQuestion: string; cuts: WebtoonStoryboardCut[] } | undefined,
+          storyboard: m.storyboard as { coreQuestion: string; cuts: WebtoonStoryboardCut[]; testedVersion?: number | null } | undefined,
           imagePreview: m.imagePreview,
           animate: false,
         }));
@@ -490,7 +525,7 @@ export function PromptChatLab({
             appendMessage(
               {
                 role: "assistant",
-                storyboard: { coreQuestion: msg.core_question ?? "", cuts: msg.cuts },
+                storyboard: { coreQuestion: msg.core_question ?? "", cuts: msg.cuts, testedVersion: msg.tested_version ?? null },
               },
               { fullCuts: msg.cuts } // 컷 이미지 재요청에 쓰는 원본 — 지금은 storyboard.cuts와 내용이 같지만 용도가 달라 그대로 둔다
             );
@@ -525,14 +560,22 @@ export function PromptChatLab({
     // 생성은 백그라운드로 돌리고 메시지 전송(sendInner, 사용자 말풍선
     // 표시 + WebSocket 전송)은 그 응답을 기다리지 않고 바로 실행한다.
     // threadIdRef가 아직 null인 짧은 창(스레드 생성 HTTP 왕복 시간) 동안
-    // 나가는 메시지는 저장이 스킵될 수 있지만(appendMessage가 threadId
-    // 없으면 조용히 건너뜀), 실사용 체감(응답이 바로 보임)이 우선이다.
+    // 나가는 메시지는 저장이 스킵된다(appendMessage가 threadId 없으면
+    // 조용히 건너뜀) — 실사용 체감(응답이 바로 보임)은 그대로 유지하되,
+    // 아래에서 스레드 생성이 끝나는 즉시 그 첫 메시지를 뒤늦게 저장한다
+    // (2026-09-22 버그 수정 — PromptTextLab.tsx에서 사용자가 실제로 겪은
+    // 신고: "이전 대화 쓰레드... 사용자가 입력한 말풍선은 안보이더라고" —
+    // 그 스레드를 나중에 openThread()로 다시 열면 첫 말풍선이 통째로
+    // 안 보였다. 같은 패턴이라 여기도 같이 고친다).
     if (threadIdRef.current === null) {
       adminApi
         .createChatThread(PROMPT_CATEGORY, PROMPT_NAME, text.slice(0, 60))
         .then((thread) => {
           setThreadId(thread.id);
-          refreshThreads();
+          adminApi
+            .appendChatMessage(thread.id, "user", { text })
+            .then(() => refreshThreads())
+            .catch((err) => console.error("첫 메시지 저장 실패", err));
         })
         .catch((err) => console.error("대화 스레드 생성 실패", err));
     }
@@ -544,7 +587,7 @@ export function PromptChatLab({
 
     if (text.length >= MIN_ARTICLE_LEN) {
       setWaiting(true);
-      sendWs("article", { article: text, model: textModel });
+      sendWs("article", { article: text, model: textModel, version: promptVersion ?? undefined });
     } else {
       // 기사도 컷 요청도 아니면 일반 챗봇처럼 Bedrock을 직접 호출한다
       // (2026-09-15, 사용자 요청: "자연스럽게 대화가 가능하도록... 일반
@@ -663,10 +706,21 @@ export function PromptChatLab({
           드롭다운이 위로 향하게": 입력창 바로 위에 상시 노출. 화면 하단에
           붙어 있어 기본(아래로 펼침) 팝업이 잘리므로 CustomSelect의
           openUp을 쓴다. */}
-      <div className="mb-1.5 flex items-center gap-1.5 px-1">
+      <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
         <span className="text-[10.5px] text-[var(--text-faint)]">모델</span>
         <CustomSelect value={textModel} onChange={setTextModel} options={TEXT_MODELS.map((m) => ({ value: m.id, label: m.label }))} openUp />
       </div>
+      {/* 2026-09-21 — 버전 선택 드롭다운 자체는 우측 설정 패널의 "대본
+          프롬프트 — 발행 버전" 쪽으로 옮겼다(사용자 요청: "버전 부분을...
+          설정에... 발행 버전 부분에 드롭다운"). 여기는 지금 무엇으로
+          테스트 중인지 놓치지 않게 상태만 보여준다(입력창 바로 위라 보낼
+          때 한 번 더 눈에 들어옴) — 컨트롤 자체를 두 곳에 두면 어느 쪽이
+          정본인지 헷갈리므로 여기서 바꾸는 기능은 없앴다. */}
+      {promptVersion !== null && (
+        <p className="mb-1.5 px-1 text-[10.5px] font-medium" style={{ color: "var(--warn)" }}>
+          v{promptVersion}로 시험 중 — 지금 편집 중인 지침·발행본은 그대로 유지됩니다
+        </p>
+      )}
       <div className="ui-input flex items-end gap-2 rounded-2xl px-3 py-2">
         <textarea
           ref={textareaRef}
@@ -758,18 +812,54 @@ export function PromptChatLab({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">설정</p>
         </div>
         <CollapsibleSection title="대본 프롬프트 — 설명·지침·파일" defaultOpen>
-          <PromptSectionsPanel category={PROMPT_CATEGORY} name={PROMPT_NAME} />
+          <PromptSectionsPanel
+            category={PROMPT_CATEGORY}
+            name={PROMPT_NAME}
+            promptHistory={promptHistory}
+            promptVersion={promptVersion}
+            onPromptVersionChange={setPromptVersion}
+            onPreviewVersion={openVersionPreview}
+          />
         </CollapsibleSection>
         <div className="ui-divider border-t" />
-        <CollapsibleSection title="이미지 프롬프트 — 화풍·인물" defaultOpen>
-          <WebtoonImageSettingsPanel
-            onOpenFullLab={() => setImageLabOpen(true)}
-            onOpenStageLab={() => setStageLabOpen(true)}
-          />
+        <CollapsibleSection
+          title="이미지 프롬프트 — 화풍·인물"
+          defaultOpen
+          badge={
+            <button
+              type="button"
+              onClick={(e) => {
+                // <summary> 안에 있어 클릭이 그대로 버블되면 섹션이 접힌다 —
+                // 히스토리를 보러 눌렀는데 섹션까지 접히면 안 되므로 막는다.
+                e.preventDefault();
+                e.stopPropagation();
+                setImageLabOpen(true);
+              }}
+              className="flex-none rounded-md p-1 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text-secondary)]"
+              title="컷 생성 히스토리 보기"
+              aria-label="컷 생성 히스토리 보기"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 3v5h5" />
+                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+                <path d="M12 7v5l4 2" />
+              </svg>
+            </button>
+          }
+        >
+          <WebtoonImageSettingsPanel onOpenStageLab={() => setStageLabOpen(true)} />
         </CollapsibleSection>
       </aside>
       <WebtoonImageLab open={imageLabOpen} onClose={() => setImageLabOpen(false)} />
       <WebtoonStageLab open={stageLabOpen} onClose={() => setStageLabOpen(false)} />
+      {versionPreviewOpen && (
+        <VersionPreviewModal
+          version={promptVersion}
+          content={versionPreviewContent}
+          loading={versionPreviewLoading}
+          onClose={() => setVersionPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 
@@ -1188,9 +1278,20 @@ function TypewriterText({ text, animate }: { text: string; animate: boolean }) {
    컴포넌트가 완성 후에만 그 헤더를 "입혀서" 보여준 것). 이제 스트리밍
    중 보던 것과 완전히 같은 렌더러(DumpNode)에 같은 값을 그대로 넘긴다
    — 이 컴포넌트에 남는 건 DumpNode 호출 하나뿐이다. */
-function StoryboardCard({ data }: { data: { coreQuestion: string; cuts: WebtoonStoryboardCut[] } }) {
+function StoryboardCard({ data }: { data: { coreQuestion: string; cuts: WebtoonStoryboardCut[]; testedVersion?: number | null } }) {
   return (
     <div className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
+      {/* 2026-09-21 — 과거 버전으로 시험 발화한 결과인지 배지로 구분(A/B
+          테스트 느낌, 사용자 요청). 채팅 기록을 스크롤해서 보면 어느 결과가
+          최신 기준이고 어느 게 과거 버전 테스트였는지 헷갈릴 수 있어서. */}
+      {data.testedVersion != null && (
+        <span
+          className="mb-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold"
+          style={{ background: "var(--warn-soft)", color: "var(--warn)" }}
+        >
+          v{data.testedVersion}로 시험 발화
+        </span>
+      )}
       <DumpNode value={data} />
     </div>
   );
@@ -1204,11 +1305,36 @@ function CutImagePreview({ data }: { data: { cut: number; imageUrl: string; mode
       <img src={data.imageUrl} alt={`컷 ${data.cut} 생성 이미지`} className="w-full" />
       <div className="flex items-center justify-between px-3 py-2">
         <span className="text-[11px] font-semibold text-[var(--text-muted)]">컷 {data.cut}</span>
-        {modelLabel && (
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "var(--surface-sunken)", color: "var(--text-faint)" }}>
-            {modelLabel}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {modelLabel && (
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "var(--surface-sunken)", color: "var(--text-faint)" }}>
+              {modelLabel}
+            </span>
+          )}
+          {/* 2026-09-21, 사용자 요청 — "이미지들을 개별적으로 다운로드 가능한
+              버튼": WebtoonCutGenerator.tsx의 downloadImage()와 같은 패턴
+              (<a download> 트리거, presign/blob fetch 없이 공개 S3 URL 그대로). */}
+          <button
+            type="button"
+            onClick={() => {
+              const a = document.createElement("a");
+              a.href = data.imageUrl;
+              a.download = `cut-${data.cut}.png`;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            }}
+            className="rounded p-0.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-card)] hover:text-[var(--text-secondary)]"
+            title="이 컷 다운로드"
+            aria-label="이 컷 다운로드"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

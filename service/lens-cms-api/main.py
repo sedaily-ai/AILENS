@@ -515,6 +515,21 @@ def internal_get_prompt(category: str, name: str, x_internal_token: Optional[str
     return prompt
 
 
+@app.get("/internal/admin/prompts/{category}/{name}/history")
+def internal_get_prompt_history(category: str, name: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"history": prompts_repo.get_prompt_history(category, name)}
+
+
+@app.get("/internal/admin/prompts/{category}/{name}/versions/{version}")
+def internal_get_prompt_version(category: str, name: str, version: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    v = prompts_repo.get_prompt_version(category, name, version)
+    if not v:
+        raise HTTPException(status_code=404, detail="prompt version not found")
+    return v
+
+
 @app.put("/internal/admin/prompts/{category}/{name}")
 def internal_update_prompt(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)

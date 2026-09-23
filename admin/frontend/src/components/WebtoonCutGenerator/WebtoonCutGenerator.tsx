@@ -68,6 +68,24 @@ interface SlotState {
   error: string | null;
 }
 
+/* 2026-09-21, 사용자 요청 — "이미지들을 일괄적으로나 개별적으로나
+   다운로드 가능한 버튼이라도 넣으면 좋을듯": <a download>으로 트리거만
+   한다 — S3 원본이 공개 URL이라 별도 presign/프록시 없이 그대로 쓸 수
+   있고, 크로스오리진이라도 대부분 브라우저가 download 속성을 존중한다
+   (안 되는 극소수 환경에선 새 탭으로 열리는 정도로 성능 저하 없이
+   우아하게 실패). blob fetch 방식은 버킷 CORS 설정에 의존하게 돼
+   불필요한 실패 지점을 하나 더 만들어서 안 씀. */
+function downloadImage(url: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 function _emptySlot(index: number): SlotState {
   return {
     index,
@@ -227,6 +245,17 @@ export function WebtoonCutGenerator({
   const handleStopGpu = () => send("gpu_stop", {});
 
   const orderedSlots = Object.values(slots).sort((a, b) => a.index - b.index);
+  const doneSlots = orderedSlots.filter((s) => s.status === "done" && s.imageUrl);
+
+  const handleDownloadAll = () => {
+    // 브라우저가 다운로드를 "여러 파일 요청"으로 한꺼번에 막는 걸 피하려고
+    // 살짝 간격을 두고 순차 트리거한다(동시에 쏘면 Chrome이 일부만 받고
+    // 나머지는 차단 알림만 띄우는 경우가 있음).
+    doneSlots.forEach((s, i) => {
+      if (!s.imageUrl) return;
+      setTimeout(() => downloadImage(s.imageUrl as string, `cut-${s.index}.png`), i * 300);
+    });
+  };
 
   return (
     <div className={compact ? "px-3 py-3" : "mx-auto max-w-[1400px] px-6 py-6"}>
@@ -240,6 +269,11 @@ export function WebtoonCutGenerator({
           </div>
         )}
         <div className="flex items-center gap-2 text-[11px]">
+          {doneSlots.length > 0 && (
+            <button type="button" className="ui-btn ui-btn-ghost" onClick={handleDownloadAll}>
+              전체 다운로드 ({doneSlots.length})
+            </button>
+          )}
           <span className={`ui-badge ${wsOpen ? "ui-badge-published" : ""}`}>{wsOpen ? "연결됨" : "연결 중..."}</span>
           <span className="ui-badge">GPU {gpuState === "running" ? "켜짐" : gpuState === "unknown" ? "확인 중" : gpuState}</span>
           {gpuState === "running" && (
@@ -255,8 +289,23 @@ export function WebtoonCutGenerator({
           <div key={s.index} className="ui-card flex flex-col gap-1.5 p-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-[var(--text-primary)]">컷 {s.index}</span>
-              {s.status === "pending" && <span className="text-[10px] text-[var(--text-muted)]">생성 중</span>}
-              {s.sourceCut && <span className="text-[10px] text-[var(--text-faint)]">스토리보드</span>}
+              <div className="flex items-center gap-1.5">
+                {s.status === "pending" && <span className="text-[10px] text-[var(--text-muted)]">생성 중</span>}
+                {s.sourceCut && <span className="text-[10px] text-[var(--text-faint)]">스토리보드</span>}
+                {s.status === "done" && s.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => downloadImage(s.imageUrl as string, `cut-${s.index}.png`)}
+                    className="rounded p-0.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-card)] hover:text-[var(--text-secondary)]"
+                    title="이 컷 다운로드"
+                    aria-label="이 컷 다운로드"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 2026-09-16 — 4:5 세로 비율(README 근거 없이 잘못 적혀있던 값)에서

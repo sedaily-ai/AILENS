@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable } from "@/components/ContentTable";
-import { PromptDrawer } from "@/components/PromptDrawer";
+import { PromptLab } from "@/components/PromptChatLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 import { ECON_CATEGORIES, type EconCategory } from "@/lib/types";
@@ -356,11 +356,7 @@ function PostsPage() {
         </div>
       )}
 
-      <PromptDrawer
-        channel="letters"
-        open={promptOpen}
-        onClose={() => setPromptOpen(false)}
-      />
+      <PromptLab open={promptOpen} onClose={() => setPromptOpen(false)} initialCategory="letters" />
 
     </div>
   );

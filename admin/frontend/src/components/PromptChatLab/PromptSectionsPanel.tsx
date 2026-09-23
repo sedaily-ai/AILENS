@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/adminClient";
-import type { PromptListItem } from "@/lib/types";
+import type { PromptHistoryEntry, PromptListItem } from "@/lib/types";
+import { CustomSelect } from "@/components/CustomSelect";
 
 /* 우측 사이드 패널 — "편집 대상"(webtoon/published) 프롬프트를 설명(단일)·
    지침(단일)·파일(다중, 추가/삭제) 셋으로 나눠 각각 독립적으로 저장한다
@@ -34,7 +35,26 @@ interface LabFile {
   saving: boolean;
 }
 
-export function PromptSectionsPanel({ category, name }: { category: string; name: string }) {
+export function PromptSectionsPanel({
+  category,
+  name,
+  promptHistory,
+  promptVersion,
+  onPromptVersionChange,
+  onPreviewVersion,
+}: {
+  category: string;
+  name: string;
+  /** 2026-09-21, 사용자 요청 — "버전 부분을... 설정에... 발행 버전 부분에
+   *  드롭다운": 목록/선택 상태·미리보기 로직은 부모(PromptChatLab)가 들고
+   *  있다 — 채팅 전송 시 보낼 버전 번호를 부모가 알아야 하고, 여기서
+   *  자체적으로 또 fetch하면 위 getPromptHistory 도입 취지(가벼운 조회로
+   *  분리)가 무색해진다. 이 패널은 순수 렌더 + 선택 콜백만 담당. */
+  promptHistory: PromptHistoryEntry[];
+  promptVersion: number | null;
+  onPromptVersionChange: (version: number | null) => void;
+  onPreviewVersion: () => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -239,6 +259,48 @@ export function PromptSectionsPanel({ category, name }: { category: string; name
         <p className="mt-1.5 text-[10px] leading-snug text-[var(--text-faint)]">
           각 칸의 저장 버튼을 눌러야 채팅 테스트에 반영됩니다(최대 60초 지연). 저장은 칸마다 따로 서버에 남습니다.
         </p>
+
+        {/* 2026-09-21, 사용자 요청 — "프롬프트를 버전별로 볼 수 있으면...
+            드롭다운 해서... 적용해서 출력... AB 테스트 느낌". "최신"이면
+            평소처럼 우측 지침 초안(있으면) → 없으면 발행본 순서 그대로,
+            과거 버전을 고르면 다음 기사 전송부터 그 버전 content로 일회성
+            override(지금 초안/발행 상태는 안 건드림, chat_ws.py::
+            _resolve_prompt_content 참고). */}
+        {promptHistory.length > 0 && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <span className="text-[10.5px] text-[var(--text-faint)]">테스트 버전</span>
+            <CustomSelect
+              value={promptVersion === null ? "latest" : String(promptVersion)}
+              onChange={(v) => onPromptVersionChange(v === "latest" ? null : Number(v))}
+              options={[
+                { value: "latest", label: "최신 (지침/발행본)" },
+                ...promptHistory.map((h) => ({
+                  value: String(h.version),
+                  label: `v${h.version} · ${h.created_at ? h.created_at.slice(0, 16).replace("T", " ") : "날짜 없음"}`,
+                })),
+              ]}
+            />
+            {promptVersion !== null && (
+              <button
+                type="button"
+                onClick={onPreviewVersion}
+                className="rounded p-1 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-card)] hover:text-[var(--text-secondary)]"
+                title={`v${promptVersion} 내용 보기`}
+                aria-label={`v${promptVersion} 내용 보기`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+        {promptVersion !== null && (
+          <p className="mt-1.5 text-[10px] font-medium" style={{ color: "var(--warn)" }}>
+            v{promptVersion}로 시험 중 — 지금 편집 중인 지침·발행본은 그대로 유지됩니다
+          </p>
+        )}
       </div>
 
       <div className="space-y-4 px-3.5 py-3.5">

@@ -24,6 +24,7 @@ from routes import (
     prompt_lab,
     prompts,
     quiz,
+    video_lab,
 )
 from routes.webtoon import assets as webtoon_assets
 from routes.webtoon import generate as webtoon_generate
@@ -45,6 +46,8 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/drivers/threshold/{name}": (drivers.handle_threshold_update, True),
     "GET /admin/prompts": (prompts.handle_list, True),
     "GET /admin/prompts/{category}/{name}": (prompts.handle_get, True),
+    "GET /admin/prompts/{category}/{name}/history": (prompts.handle_get_history, True),
+    "GET /admin/prompts/{category}/{name}/versions/{version}": (prompts.handle_get_version, True),
     "POST /admin/prompts/{category}/{name}": (prompts.handle_update, True),
     "POST /admin/prompts/{category}/{name}/test": (prompts.handle_test, True),
     "GET /admin/prompts/{category}/{name}/test/{job_id}": (prompts.handle_test_status, True),
@@ -120,6 +123,13 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/webtoon-lab/stage/composite": (webtoon_stage.handle_composite, True),
     "POST /admin/webtoon-lab/stage/style": (webtoon_stage.handle_style, True),
     "GET /admin/webtoon-lab/stage/history": (webtoon_stage.handle_history, True),
+    # 영상 랩(2026-09-23) — routes/video_lab.py 참고. ⚠️ 이 dict에 문자열
+    # 키를 추가하는 것만으로는 API Gateway가 실제로 이 경로를 몰라 404를
+    # 낸다 — `aws apigatewayv2 create-route`로 기존 라우트의 integration을
+    # 재사용해 새 라우트를 만드는 것도 같이 해야 한다(위 webtoon-lab 라우트
+    # 등록 시 겪은 것과 같은 함정, 2026-09-21 프롬프트 버전 히스토리
+    # 라우트에서도 반복됨).
+    "GET /admin/video-lab/{job_id}": (video_lab.handle_poll, True),
 }
 
 

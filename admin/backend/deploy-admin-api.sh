@@ -65,6 +65,13 @@ WEBTOON_PROMPTS_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/prompts.py"
 # 디스크에 이미 캐시돼 있어 Lambda 쪽엔 불필요 — 안 복사).
 STYLE_REF_ASSET="$SCRIPT_DIR/../../pipelines/common/assets/webtoon_style_reference.png"
 FONT_ASSET="$SCRIPT_DIR/../../pipelines/webtoon/assets/NotoSansKR-Bold.ttf"
+# 2026-09-22 — 팟캐스트 음성 설정(routes/prompts.py::handle_update가
+# category="podcast-voice"로 그대로 재사용)과 chat_ws.py의 "음성으로
+# 듣기"(synthesize_audio WS kind, 사용자 요청: "대본만 텍스트로 출력이
+# 되는건가요? 음성도 출력이 되면 좋겠는데")가 flat import로 쓰는
+# pipelines/common/podcast_voice.py — 위 웹툰 모듈들과 같은 이유로 zip
+# 루트에 복사 필수(안 하면 chat_ws.py import 시점에 admin API 전체가 죽는다).
+PODCAST_VOICE_MODULE="$SCRIPT_DIR/../../pipelines/common/podcast_voice.py"
 
 FUNCTION_NAME="sedaily-mbti-admin-api-dev"
 PYTHON_VERSION="3.11"          # Lambda 런타임과 반드시 일치시킬 것
@@ -84,7 +91,7 @@ cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
-cp "$BEDROCK_CLIENT_MODULE" "$GPU_IPADAPTER_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$BUILD_DIR/"
+cp "$BEDROCK_CLIENT_MODULE" "$GPU_IPADAPTER_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$BUILD_DIR/"
 mkdir -p "$BUILD_DIR/assets"
 cp "$STYLE_REF_ASSET" "$FONT_ASSET" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"

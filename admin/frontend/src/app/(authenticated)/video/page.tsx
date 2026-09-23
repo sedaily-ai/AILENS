@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
-import { PromptDrawer } from "@/components/PromptDrawer";
+import { PromptLab } from "@/components/PromptChatLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -239,7 +239,7 @@ function VideoPage() {
         </div>
       )}
 
-      <PromptDrawer channel="video" open={promptOpen} onClose={() => setPromptOpen(false)} />
+      <PromptLab open={promptOpen} onClose={() => setPromptOpen(false)} initialCategory="video" />
     </div>
   );
 }

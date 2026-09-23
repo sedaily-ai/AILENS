@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PromptDrawer } from "@/components/PromptDrawer";
+import { PromptLab } from "@/components/PromptChatLab";
 
 // 2026-08-19 — 4포맷 파이프라인(레터/웹툰/영상/팟캐스트) 중 팟캐스트 전용
 // 관리 화면. 다른 세 채널과 달리 아직 생성 파이프라인(ElevenLabs TTS 등)이
@@ -35,7 +35,7 @@ export default function PodcastPage() {
         추가됩니다.
       </div>
 
-      <PromptDrawer channel="podcast" open={promptOpen} onClose={() => setPromptOpen(false)} />
+      <PromptLab open={promptOpen} onClose={() => setPromptOpen(false)} initialCategory="podcast" />
     </div>
   );
 }

@@ -95,10 +95,8 @@ const CHAR_MALE_PRESETS: { label: string; text: string }[] = [
 ];
 
 export function WebtoonImageSettingsPanel({
-  onOpenFullLab,
   onOpenStageLab,
 }: {
-  onOpenFullLab: () => void;
   onOpenStageLab: () => void;
 }) {
   const toast = useToast();
@@ -468,13 +466,11 @@ export function WebtoonImageSettingsPanel({
         >
           {publishing ? "발행 중..." : changedFromDefaults ? "현재 설정 발행 → 프로덕션 반영" : "발행 (변경 사항 없음)"}
         </button>
-        <button
-          type="button"
-          onClick={onOpenFullLab}
-          className="ui-btn ui-btn-ghost w-full rounded-lg px-3 py-1.5 text-[12px] font-semibold"
-        >
-          장면 하나로 테스트 생성 / 히스토리 보기 →
-        </button>
+        {/* 2026-09-21 — "장면 하나로 테스트 생성" 버튼(WebtoonImageLab의
+            생성 탭으로 이동)을 없앴다 — 그 탭 자체를 지웠고, 실제 컷
+            생성은 우측 WebtoonCutGenerator가 이미 담당한다. 히스토리는
+            섹션 헤더 아이콘(PromptChatLab.tsx의 CollapsibleSection
+            badge)에서만 연다. */}
         {/* 2026-09-18, 사용자 요청("단계별로 컨트롤 하고 싶은 니즈가 있어서"
             → "그럼 그런 단계들도 프롬프트별로 보이게 하면 안되나요??") —
             SD1.5 파이프라인의 번역/인물/배경/합성/화풍 각 단계를 프롬프트

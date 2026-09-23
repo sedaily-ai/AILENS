@@ -31,6 +31,16 @@ def get_prompt(category: str, name: str) -> dict | None:
     return resp or None
 
 
+def get_prompt_history(category: str, name: str) -> list[dict]:
+    resp = _request("GET", f"/internal/admin/prompts/{category}/{name}/history")
+    return resp.get("history", [])
+
+
+def get_prompt_version(category: str, name: str, version: int) -> dict | None:
+    resp = _request("GET", f"/internal/admin/prompts/{category}/{name}/versions/{version}")
+    return resp or None
+
+
 def update_prompt(category: str, name: str, content: str, sections: dict | None) -> dict:
     body = {"content": content}
     if sections is not None:

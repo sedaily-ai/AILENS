@@ -7,6 +7,7 @@ import type {
   DriversResponse,
   PromptListItem,
   PromptDetail,
+  PromptHistoryEntry,
   PromptLabDoc,
   PromptLabFile,
   PromptLabFileContent,
@@ -22,7 +23,6 @@ import type {
   PresignResponse,
   Quiz,
   QuizInput,
-  WebtoonLabGenerateInput,
   WebtoonLabJob,
   WebtoonLabHistoryItem,
   WebtoonLabDefaults,
@@ -203,6 +203,20 @@ export const adminApi = {
   getPrompt: (category: string, name: string) =>
     request<PromptDetail>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}`
+    ),
+  // 2026-09-21 — 버전 드롭다운 채우기 전용, content 없이 버전·시각만(가벼움).
+  // getPrompt()(active_content까지 통째로, 웹툰 카테고리 10만자+)를 드롭다운
+  // 채우려고 부르면 낭비라 별도로 뺐다.
+  getPromptHistory: (category: string, name: string) =>
+    request<{ history: PromptHistoryEntry[] }>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/history`
+    ),
+  // 2026-09-21, 사용자 요청 — "버전을 드롭다운 해서... 그걸로 적용해서
+  // 출력... AB 테스트 느낌": 과거 버전 하나의 content만 조회. PromptChatLab의
+  // 버전 드롭다운이 쓴다 — 지금 초안/발행본은 안 건드리고 일회성으로만 씀.
+  getPromptVersion: (category: string, name: string, version: number) =>
+    request<{ version: number; content: string; created_at: string | null }>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/versions/${version}`
     ),
   // sections 는 optional — 평문 편집기(/prompts/edit)는 안 보내고, 섹션
   // 편집기(PromptDrawer)만 보낸다. 백엔드는 content 를 그대로 Bedrock 에
@@ -419,12 +433,10 @@ export const adminApi = {
     }),
 
   // 웹툰 이미지 실험(2026-09-05) — job 생성 후 폴링(routes/webtoon_lab.py 참고,
-  // API Gateway 30초 타임아웃 때문에 동기 응답이 없다).
-  generateWebtoonImage: (input: WebtoonLabGenerateInput) =>
-    request<{ job_id: string; status: string }>("/admin/webtoon-lab/generate", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
+  // API Gateway 30초 타임아웃 때문에 동기 응답이 없다). generateWebtoonImage
+  // 자체(POST /admin/webtoon-lab/generate)는 2026-09-21 WebtoonImageLab의
+  // "생성" 탭 제거로 프론트 호출부가 없어져 걷어냈다 — getWebtoonImageJob은
+  // WebtoonStageLab(단계별 생성)이 여전히 폴링에 쓴다.
   getWebtoonImageJob: (jobId: string) =>
     request<WebtoonLabJob>(`/admin/webtoon-lab/${encodeURIComponent(jobId)}`),
   getWebtoonImageHistory: () =>
@@ -494,4 +506,22 @@ export const adminApi = {
     request<{ items: WebtoonStageHistoryItem[] }>(
       `/admin/webtoon-lab/stage/history${cut !== undefined ? `?cut=${cut}` : ""}`
     ),
+  // 영상 랩(2026-09-23) — routes/chat_ws.py의 "render_video" WS kind가 ECS
+  // RunTask만 걸고 바로 응답하므로(렌더가 수십 초~수 분 걸려 WS로 못 기다림),
+  // VideoRenderGenerator.tsx가 이 라우트를 주기적으로 폴링해 실제 결과를 받는다.
+  // progress(같은 날 추가, 사용자 요청 — "진행상황... 퍼센테이지로 볼 수
+  // 있거나 하는 UX는 적용할 수 없는건가?? 렌더가 길어서")는 pending 상태일
+  // 때만 채워진다.
+  pollVideoLab: (jobId: string) =>
+    request<{
+      status: "pending" | "done" | "error";
+      video_url?: string;
+      thumb_url?: string | null;
+      message?: string;
+      progress?:
+        | { stage: "tts"; current: number; total: number }
+        | { stage: "bundling" }
+        | { stage: "rendering"; percent: number; renderedFrames: number; totalFrames: number; encodedFrames: number }
+        | null;
+    }>(`/admin/video-lab/${encodeURIComponent(jobId)}`),
 };

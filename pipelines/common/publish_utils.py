@@ -113,7 +113,7 @@ def parse_letters(raw_md: str) -> list[str]:
         if line.startswith("[제목]"):
             skipping = True
             continue
-        if line.startswith("[리드]"):
+        if line.startswith("[리드"):  # "[리드]"·"[리드 3~5문장]" 둘 다 매칭(아래 참고)
             skipping = False
             flush()
             continue
@@ -161,7 +161,16 @@ def parse_letter_title(raw_md: str) -> str | None:
     신고로 발견 — admin 웹툰 목록에서 제목 칸에 본문이 그대로 나옴).
     parse_letters()와 같은 종료 조건 집합으로 맞추고, 그래도 모델이
     예상 못 한 형식으로 새면 길이 상한(_MAX_TITLE_CHARS)이 최후
-    방어선이다."""
+    방어선이다.
+
+    2026-09-21 — [리드] 매칭이 문자 그대로 "[리드]"만 봐서 프롬프트의
+    실제 섹션 헤더 "[리드 3~5문장]"과 안 맞았다(부분 문자열이 아니라
+    정확히 "[리드]"로 시작해야 했음 — "[리드 3~5문장]"은 5번째 글자가
+    공백이라 불일치). 최신 발행 레터 다수를 직접 열어보니 모델은 v7~v10
+    스타일 제목을 실제로 잘 만들고 있었는데(레터 본문 1문단에 제목+리드가
+    그대로 섞여 있었음 — "인벤테라" 건 등 직접 확인), 이 마커 불일치
+    때문에 [제목] 블록이 [리드] 시작 지점에서 안 끊기고 있었다. 매칭을
+    "[리드"로 느슨하게 고쳤다(아래 parse_letters()도 동일)."""
     from text_utils import extract_fact_ids  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
 
     raw_md, _ = extract_fact_ids(raw_md)
@@ -173,7 +182,7 @@ def parse_letter_title(raw_md: str) -> str | None:
         if line.startswith("[제목]"):
             in_block = True
             continue
-        if line.startswith("[리드]"):
+        if line.startswith("[리드"):  # "[리드]"·"[리드 3~5문장]" 둘 다 매칭
             break
         if line.startswith("◾"):
             break
@@ -184,6 +193,34 @@ def parse_letter_title(raw_md: str) -> str | None:
         if in_block:
             buf.append(line)
     title = " ".join(buf).strip()
+    if len(title) > _MAX_TITLE_CHARS:
+        title = title[:_MAX_TITLE_CHARS].rstrip()
+    return title or None
+
+
+_EMOJI_RE = re.compile(r"[\U0001F300-\U0001FAFF☀-➿⬀-⯿⌀-⏿]️?")
+
+
+def extract_title_from_lead(paragraphs: list[str]) -> str | None:
+    """parse_letter_title()이 실패했을 때의 2차 방어선 — 원문 뉴스 제목으로
+    바로 폴백하지 않고, 첫 문단에서 제목을 직접 뽑아본다.
+
+    2026-09-21 — [제목] 마커를 못 찾는 실패 사례를 다수 직접 열어봤더니,
+    모델이 [제목] 블록을 아예 별도 줄로 안 쓰고 리드 문장에 섞어 쓴
+    경우가 흔했다(예: "인벤테라" 건 — 첫 문단이 "어깨 MRI 찍을 때 쓰는
+    조영제, 허가받은 게 아직 하나도 없습니다 🧲 어깨가 아파 MRI를
+    찍을 때..." 식으로 제목+본문이 한 덩어리). 프롬프트 규칙상 제목은
+    항상 이모지 1개로 끝나므로, 첫 문단에서 첫 이모지까지를 잘라내면
+    제목만 복원된다 — 실사용 데이터로 36건 검증 확인. 그래도 못 찾으면
+    (이모지가 아예 없으면) None — 호출부가 최후 수단으로 원문 제목을
+    쓴다."""
+    if not paragraphs:
+        return None
+    p0 = paragraphs[0]
+    m = _EMOJI_RE.search(p0)
+    if not m:
+        return None
+    title = p0[: m.end()].strip()
     if len(title) > _MAX_TITLE_CHARS:
         title = title[:_MAX_TITLE_CHARS].rstrip()
     return title or None
@@ -294,18 +331,30 @@ def generate_video(
         print(f"[{log_prefix}] {name} 영상 각본 생성 중 예상 못한 오류:\n{traceback.format_exc()}")
         return None
 
+    # 2026-09-23 — CMS video-settings 발행값(성우·엔진·포맷)을 admin
+    # 프롬프트 실험 랩(pipelines/video/render_from_script.py)과 똑같이
+    # 반영한다(podcast_voice.py가 admin·발행 파이프라인 양쪽에서 공유되는
+    # 것과 동일 이유) — 관리자가 CMS에서 저장하면 재배포 없이 다음 발행
+    # 영상부터 적용된다.
+    import os
+
+    import video_settings  # pipelines/common/ — 호출부가 sys.path 세팅 완료 후 부름
+
+    settings = video_settings.get_render_settings()
     mp4_path = out_dir / name / "video.mp4"
     try:
         result = subprocess.run(
             [
                 "npm", "run", "render", "--",
                 "--input", str(script_path.resolve()),
-                "--format", "horizontal",
+                "--format", settings["format"],
                 "--output", str(mp4_path.resolve()),
+                "--voice", settings["voice"],
             ],
             cwd=str(VIDEO_DIR),
             capture_output=True,
             text=True,
+            env={**os.environ, "TTS_ENGINE": settings["engine"]},
         )
     except OSError as e:
         print(f"[{log_prefix}] {name} 영상 렌더 실행 자체 실패(npm/ffmpeg 없음?) — {e}")
@@ -419,9 +468,17 @@ def publish_article(
     paragraphs = parse_letters(letters_raw)
     letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
     letter_terms = parse_letter_terms(letters_raw)
-    # 프롬프트가 생성하는 "독자 시선 진입형" 제목 — 모델이 안 만들었거나
-    # 파싱에 실패한 예외적인 경우에만 원문 뉴스 제목으로 폴백한다.
-    letter_title = parse_letter_title(letters_raw) or article["title"]
+    # 프롬프트가 생성하는 "독자 시선 진입형" 제목. 2026-09-21 —
+    # parse_letter_title()이 [제목] 마커를 못 찾는 경우가 흔해서(위
+    # extract_title_from_lead() docstring 참고) 원문 뉴스 제목으로 바로
+    # 폴백하지 않고, 첫 문단에서 이모지 경계로 한 번 더 복구를 시도한다.
+    # 그마저 실패해야(첫 문단에 이모지 자체가 없는 극단적인 경우만)
+    # 원문 제목으로 폴백한다.
+    letter_title = (
+        parse_letter_title(letters_raw)
+        or extract_title_from_lead(paragraphs)
+        or article["title"]
+    )
 
     podcast_mp3 = podcast_mod.run_article(name, str(article_path), out_dir)
 

@@ -243,8 +243,11 @@ def handle_generate(body: dict, path_params: dict, query_params: dict) -> dict:
 
 
 def handle_history(body: dict, path_params: dict, query_params: dict) -> dict:
-    """완료된 생성 이력(이 admin 계정 전체 공유) — 이미지 실험실 3단계
-    (handle_generate) 히스토리 갤러리용."""
+    """완료된 생성 이력 전체(이 admin 계정 전체 공유) — 히스토리 갤러리용
+    (WebtoonImageLab.tsx). 2026-09-21 — 출력 직전 `done[:jobs.HISTORY_LIMIT]`
+    로 24개만 잘라 보내던 걸 없앴다 — 쿼리 자체는 이미 LastEvaluatedKey를
+    끝까지 따라가며 전량을 읽어오고 있었으니(아래 while 루프) 자르는 딱
+    한 줄만 문제였다. 프론트가 페이지네이션으로 잘라 보여준다."""
     table = jobs.job_table()
     items: list[dict] = []
     kwargs: dict = {
@@ -273,6 +276,6 @@ def handle_history(body: dict, path_params: dict, query_params: dict) -> dict:
             "char_reinforce": i.get("char_reinforce"),
             "created_at": i.get("created_at"),
         }
-        for i in done[:jobs.HISTORY_LIMIT]
+        for i in done
     ]
     return response.ok({"items": out})

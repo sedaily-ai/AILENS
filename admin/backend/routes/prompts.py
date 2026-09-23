@@ -228,6 +228,35 @@ def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
     return response.ok(payload)
 
 
+def handle_get_history(body: dict, path_params: dict, query_params: dict) -> dict:
+    """버전 드롭다운 채우기용 — content 없이 버전·시각만(handle_get_version
+    docstring 참고, 2026-09-21)."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    if not category or not name:
+        return response.err("category and name required", 400)
+    return response.ok({"history": prompts_repo.get_prompt_history(category, name)})
+
+
+def handle_get_version(body: dict, path_params: dict, query_params: dict) -> dict:
+    """과거 버전 content 하나 조회 — 버전 드롭다운으로 골라 지금 초안/발행본을
+    건드리지 않고 테스트 실행하는 용도(2026-09-21, 사용자 요청)."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    version_raw = (path_params or {}).get("version", "")
+    if not category or not name or not version_raw:
+        return response.err("category, name and version required", 400)
+    try:
+        version = int(version_raw)
+    except (TypeError, ValueError):
+        return response.err("version must be an integer", 400)
+
+    v = prompts_repo.get_prompt_version(category, name, version)
+    if not v:
+        return response.err(f"prompt version not found: {category}/{name} v{version}", 404)
+    return response.ok(v)
+
+
 def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
     category = (path_params or {}).get("category", "")
     name = (path_params or {}).get("name", "")

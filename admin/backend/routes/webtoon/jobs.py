@@ -21,7 +21,6 @@ from shared import ddb_client, response
 JOB_PK = "WEBTOONLAB"
 MAX_SCENE_BYTES = 4000
 MAX_TEXT_BYTES = 20000  # style/character 필드 상한 — 오남용(과금 폭주) 방지
-HISTORY_LIMIT = 24
 
 _s3_client = None
 

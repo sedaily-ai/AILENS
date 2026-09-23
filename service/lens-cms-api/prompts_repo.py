@@ -94,6 +94,57 @@ def get_prompt(category: str, name: str, history_limit: int = 10) -> Optional[Di
         }
 
 
+def get_prompt_history(category: str, name: str, history_limit: int = 20) -> List[Dict[str, Any]]:
+    """버전 번호·시각만 — content(웹툰 카테고리 기준 10만자 이상)는 안 준다.
+    get_prompt()가 이미 같은 쿼리를 하지만 active_content까지 같이 읽어오는
+    무거운 함수라(2026-09-20 "프롬프트 실험 페이지 로딩이 느리다" 신고로
+    listPrompts() 경량화를 한 번 했던 전례, admin/backend/routes/prompts.py
+    참고) 버전 드롭다운 채우기 용도로는 이 가벼운 쪽을 쓴다(2026-09-21)."""
+    with get_cursor() as cur:
+        cur.execute("SELECT id FROM prompts WHERE category=%s AND name=%s", (category, name))
+        row = cur.fetchone()
+        if not row:
+            return []
+        cur.execute(
+            "SELECT version, created_at FROM prompt_versions WHERE prompt_id=%s "
+            "ORDER BY version DESC LIMIT %s",
+            (row["id"], history_limit),
+        )
+        return [
+            {
+                "version": r["version"],
+                "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                "actor": "admin",
+            }
+            for r in cur.fetchall()
+        ]
+
+
+def get_prompt_version(category: str, name: str, version: int) -> Optional[Dict[str, Any]]:
+    """특정 과거 버전의 content 하나만 — 버전 드롭다운으로 골라 "지금
+    초안/발행본을 건드리지 않고" 테스트 실행하는 용도(2026-09-21, 사용자
+    요청 — "버전을 드롭다운 해서... 그걸로 적용해서 출력... AB 테스트
+    느낌"). get_prompt()의 history는 버전 번호·시각만 주고 content는 안
+    주므로 별도로 뺐다."""
+    with get_cursor() as cur:
+        cur.execute("SELECT id FROM prompts WHERE category=%s AND name=%s", (category, name))
+        row = cur.fetchone()
+        if not row:
+            return None
+        cur.execute(
+            "SELECT version, content, created_at FROM prompt_versions WHERE prompt_id=%s AND version=%s",
+            (row["id"], version),
+        )
+        v = cur.fetchone()
+        if not v:
+            return None
+        return {
+            "version": v["version"],
+            "content": v["content"],
+            "created_at": v["created_at"].isoformat() if v.get("created_at") else None,
+        }
+
+
 def update_prompt(category: str, name: str, content: str,
                    sections: Optional[dict] = None) -> Dict[str, Any]:
     """새 버전 삽입 + 이전 활성 버전 비활성화를 한 트랜잭션으로 — DynamoDB

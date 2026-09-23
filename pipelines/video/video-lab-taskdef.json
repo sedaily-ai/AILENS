@@ -1,0 +1,33 @@
+{
+  "family": "sedaily-lens-video-lab",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "taskRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-task-role",
+  "executionRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-execution-role",
+  "runtimePlatform": {
+    "cpuArchitecture": "ARM64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "containerDefinitions": [
+    {
+      "name": "video-lab",
+      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-lens-frontpage-auto:latest",
+      "entryPoint": ["python3.11", "/app/pipelines/video/render_from_script.py"],
+      "essential": true,
+      "environment": [
+        {"name": "BEDROCK_ENDPOINT_URL", "value": "https://vpce-0a3db42bd30a484d1-aqh61lqy.bedrock-runtime.us-east-1.vpce.amazonaws.com"},
+        {"name": "AWS_REGION", "value": "us-east-1"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sedaily-lens-frontpage-auto",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "video-lab"
+        }
+      }
+    }
+  ]
+}

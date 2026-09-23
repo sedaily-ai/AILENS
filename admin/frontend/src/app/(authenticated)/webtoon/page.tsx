@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
-import { PromptChatLab } from "@/components/PromptChatLab";
+import { PromptLab } from "@/components/PromptChatLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -264,18 +264,10 @@ function WebtoonPage() {
 
       {/* 2026-09-15, 사용자 요청: "프롬프트 실험 버튼 누르면 우측 사이드에서
           나오는게 아니고 전체화면으로 보여지도록" — 오른쪽에서 슬라이드
-          들어오던 720~1080px 드로어를 뷰포트 전체를 덮는 화면으로 전환. */}
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="prompt-chat-lab-title"
-        inert={!panelOpen}
-        className={`fixed inset-0 z-50 flex h-full w-full flex-col bg-[var(--surface-card)] transition-opacity duration-200 ease-out ${
-          panelOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      >
-        <PromptChatLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
-      </aside>
+          들어오던 720~1080px 드로어를 뷰포트 전체를 덮는 화면으로 전환.
+          2026-09-22 — PromptLab(4포맷 탭)으로 교체, 이 화면(전체화면
+          dialog) 자체는 PromptLab이 내부에서 그대로 재현한다. */}
+      <PromptLab open={panelOpen} onClose={() => setPanelOpen(false)} initialCategory="webtoon" />
     </div>
   );
 }
