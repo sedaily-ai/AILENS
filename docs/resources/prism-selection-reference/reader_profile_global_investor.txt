@@ -1,0 +1,116 @@
+
+# reader_profile_global_investor.yaml
+# version: 1.0.0
+# description: 글로벌 투자자(Global Investor LOG) 독자 유형 프로필
+# depends_on: core_knowledge.yaml
+# referenced_by: selection_metrics_global_investor.yaml, selection_global_investor_description.md, selection_global_investor_instructions.md, selection_global_investor_knowledge.md
+
+# 글로벌 투자자(Global Investor LOG) 프로필
+
+## 기본 정보
+code_name: global_investor_log
+target_audience: 국내외 자산을 운용하는 기관 및 개인 투자자(30대 중반 ~ 60대 초반 중심)
+consumption_purpose: 글로벌 투자 의사결정 최적화 및 포트폴리오 관리를 위한 정보 수집
+
+## 핵심 관심사
+concerns:
+  - name: 글로벌 시장 동향 및 트렌드
+    importance: 10
+    keywords: [글로벌시장, 경제전망, 시장트렌드, 투자심리, 자본흐름, 신흥시장, 선진시장]
+    specific_areas: 주요국 경제 지표 변화, 글로벌 자본 흐름, 자산군별 트렌드, 시장 심리 변화, 지역별 성장 전망
+
+  - name: 투자 기회 및 전략
+    importance: 9
+    keywords: [투자기회, 자산배분, 포트폴리오, 알파전략, 투자테마, 섹터분석, 종목발굴]
+    specific_areas: 자산군별 투자 기회, 지역/국가별 유망 섹터, 신규 투자 테마, 알파 창출 전략, 틈새 시장 발굴
+
+  - name: 위험 관리 및 방어 전략
+    importance: 9
+    keywords: [리스크관리, 헤지전략, 변동성, 하방보호, 리스크분산, 상관관계, 테일리스크]
+    specific_areas: 포트폴리오 위험 분산, 하방 위험 관리, 변동성 대응 전략, 시장 충격 방어책, 위기 시나리오 분석
+
+  - name: 거시경제 및 정책 환경
+    importance: 8
+    keywords: [통화정책, 재정정책, 금리환경, 인플레이션, 환율, 무역정책, 중앙은행]
+    specific_areas: 주요국 중앙은행 정책, 글로벌 금리 트렌드, 재정 정책 변화, 인플레이션/디플레이션 전망, 환율 영향
+
+  - name: 지정학적 리스크 및 규제 변화
+    importance: 8
+    keywords: [지정학적리스크, 규제변화, 무역갈등, 정치불확실성, 제재, 자본통제, ESG규제]
+    specific_areas: 국제 관계 및 긴장 상황, 글로벌 무역 갈등, 주요국 규제 변화, 지역별 정치적 불확실성, ESG 관련 규제
+
+  - name: 신기술 및 혁신 트렌드
+    importance: 7
+    keywords: [기술혁신, 디지털전환, 신산업, 파괴적혁신, AI, 블록체인, 녹색기술]
+    specific_areas: 산업 구조 변화, 신기술 투자 기회, 디지털 전환 영향, 파괴적 혁신 사례, 지속가능 기술 발전
+
+  - name: 시장 가치평가 및 수익률 분석
+    importance: 8
+    keywords: [밸류에이션, 수익률분석, 멀티플, PER, PBR, 자본비용, 기대수익률]
+    specific_areas: 지역/섹터별 가치평가 분석, 상대적 가치 비교, 역사적 평균 대비 분석, 수익률 분해, 위험 대비 수익 분석
+
+## 가치 우선순위
+value_priorities:
+  - type: 정확성과 신뢰성
+    importance: 10
+    description: 검증된 데이터와 분석에 기반한 객관적이고 신뢰할 수 있는 정보
+
+  - type: 시의성
+    importance: 9
+    description: 시장 변화와 새로운 트렌드를 적시에 반영한 최신 정보
+
+  - type: 분석 깊이
+    importance: 9
+    description: 표면적 정보를 넘어선 심층적인 분석과 통찰력
+
+  - type: 차별화된 시각
+    importance: 8
+    description: 주류적 견해를 넘어선 독창적 관점과 대안적 시나리오
+
+  - type: 실행 가능성
+    importance: 8
+    description: 실제 투자 의사결정과 포트폴리오 구성에 적용 가능한 구체적인 정보
+
+  - type: 글로벌 맥락
+    importance: 7
+    description: 글로벌 연결성과 국가 간 상호작용을 고려한 통합적 관점
+
+## 정보 소비 선호도
+consumption_preferences:
+  depth_preference: 매우 높음
+  practicality_emphasis: 높음
+  scanning_tendency: 높음
+  preferred_formats: [데이터 시각화, 비교분석표, 전문가 분석, 정량적 지표, 시나리오 분석]
+
+## 정보 해석 렌즈
+interpretation_lens:
+  key_questions:
+    - "이 정보가 현재 포트폴리오 전략에 어떤 시사점을 갖는가?"
+    - "컨센서스와 다른 통찰이나 기회가 있는가?"
+    - "주요 리스크 요인과 완화 방안은 무엇인가?"
+    - "다양한 시장 환경에서 어떻게 작동할 것인가?"
+    - "장기적 트렌드와 단기적 촉매제는 무엇인가?"
+
+## 언어 선호도
+language_preferences:
+  tone: 객관적이고 분석적인 톤, 사실에 기반한 표현
+  complexity: 높음 (전문 용어와 복잡한 개념 포함)
+  terminology_level: 투자 및 금융 전문 용어 적극 활용
+  expression_style: 정량적 데이터와 논리적 분석이 강조된 표현
+
+## 심리적 특성
+psychological_traits:
+  - trait: 합리적 의사결정 추구
+    description: 감정보다 데이터와 논리에 기반한 판단을 중시하는 성향
+    
+  - trait: 위험-수익 균형 중시
+    description: 잠재적 수익과 관련 리스크를 균형있게 평가하는 성향
+    
+  - trait: 확증 편향 경계
+    description: 자신의 기존 견해를 지지하는 정보만 선택적으로 수용하는 경향성을 경계
+    
+  - trait: 장기적 관점 유지
+    description: 단기적 변동성보다 장기적 가치와 트렌드에 초점을 맞추는 경향
+    
+  - trait: 분산화 성향
+    description: 집중 투자보다 리스크 분산과 다각화를 선호하는 경향

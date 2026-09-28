@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 from bedrock_client import call_text
-from json_extract import extract_fenced_json_text, loads_lenient  # 2026-08-23 공용화
+from json_extract import extract_fenced_json_text, loads_lenient, extract_json_object  # 2026-08-23 공용화
 
 MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/zmdham3vkj89"  # lens-mustknow-sonnet-5
 
@@ -114,6 +114,77 @@ def score_articles(guide: str, articles: list[dict]) -> dict[str, dict]:
         if missing:
             print(f"[mustknow] 배치 응답에서 {len(missing)}건 누락(다음 회차로 이월): {missing}")
     return results
+
+
+_GENERAL_LEAD_CHARS = 200
+_GENERAL_MAX_TOKENS = 12000
+
+# 2026-09-28 실측 — 응답이 완성됐는데도 문법이 깨지는 사례 발견:
+# {"key": "20095049" if False else "20095230", ...} 처럼 모델이 key를
+# 바꾸던 내부 사고 과정이 그대로 출력에 leak됐다. classify.py의 기존
+# 방어(_salvage_truncated_array)는 "응답이 잘리는" 실패 모드용이라 이건
+# 못 잡는다 — "else" 뒤의 값이 모델의 최종 선택으로 보여(먼저 쓴 값을
+# 버리고 바꾼 흔적), else 쪽 문자열만 남기고 치환한다. 그래도 파싱이
+# 안 되면 값을 지어내지 않고 포기한다(기존 원칙 유지).
+_TERNARY_LEAK_RE = re.compile(r'"[^"]*"\s+if\s+.+?\s+else\s+("[^"]*")')
+
+
+def _repair_ternary_leak(text: str) -> str:
+    return _TERNARY_LEAK_RE.sub(r"\1", text)
+
+
+def _build_general_prompt(candidates: list[dict]) -> str:
+    lines = ["다음 후보 기사들 중에서 골라주세요.\n"]
+    for i, a in enumerate(candidates, 1):
+        lead = (a.get("content") or "")[:_GENERAL_LEAD_CHARS]
+        lines.append(
+            f"[{i}] key={a['key']}\n"
+            f"카테고리: {a['top_category']}\n"
+            f"제목: {a['title']}\n"
+            f"부제: {a.get('sub_title') or '(없음)'}\n"
+            f"리드: {lead}\n"
+        )
+    return "\n".join(lines)
+
+
+def select_general_articles(guide: str, candidates: list[dict]) -> dict | None:
+    """"일반" 카테고리 최대 20건 직접 선정 — score_articles()처럼 배치
+    채점이 아니라, 소거를 거친 후보 전체를 한 번에 보고 LLM이 종합
+    판단한다(docs/prompt/selection/ v1.4 설계, 2026-09-28 실 Bedrock
+    호출로 검증됨 — today_context·다양성 규칙·화제×경제 교차점 전부
+    의도대로 작동 확인, JSON 파싱 버그는 이 함수의 _repair_ternary_leak로
+    대응).
+
+    반환값: {"today_context": str, "candidates_total": int,
+    "excluded_count": int, "excluded_reasons": list[str],
+    "selected": [{"key","category","reason"}, ...]} 또는 파싱 완전
+    실패 시 None(호출부는 이번 회차 "일반" 선정을 스킵하고 다음
+    회차에 재시도 — 값을 지어내지 않는다)."""
+    if not candidates:
+        return None
+    user_message = _build_general_prompt(candidates)
+    try:
+        raw = call_text(guide, user_message, model=MODEL, max_tokens=_GENERAL_MAX_TOKENS)
+    except Exception as e:
+        print(f"[mustknow] select_general_articles Bedrock 호출 실패 — {e}")
+        return None
+
+    for attempt_text in (raw, _repair_ternary_leak(raw)):
+        try:
+            data = extract_json_object(attempt_text)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict) or "selected" not in data:
+            continue
+        valid_keys = {a["key"] for a in candidates}
+        data["selected"] = [
+            row for row in data.get("selected", [])
+            if isinstance(row, dict) and row.get("key") in valid_keys
+        ]
+        return data
+
+    print("[mustknow] select_general_articles JSON 파싱 실패(치환 후에도) — 이번 회차 스킵")
+    return None
 
 
 if __name__ == "__main__":

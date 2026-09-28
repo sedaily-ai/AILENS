@@ -16,3 +16,4 @@
 | 폴더 | 내용 |
 |---|---|
 | `edragon/` | 서울경제 edragon(경제용 피드) 크롤링 자료 — 경제 용어집·투자 교육 아티클. 2026-08-07 수집. `LetterDetailClient.tsx` 주석에서 "배경자료(edragon 등)"로 참조되는 편집자용 소재 |
+| `prism-selection-reference/` | AI 프리즘(`1_ai_link/prism`) 기사 선별 프롬프트 원본 — mustknow_auto "일반" 선정 로직 재설계 참고용. 2026-09-28 수집 |

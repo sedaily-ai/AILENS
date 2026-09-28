@@ -5,7 +5,9 @@
 받는다 → seen 테이블(`sedaily-lens-mustknow-seen-dev`, key GetItem)로 이미
 처리한 기사를 제외한 델타만 남긴다 → 규칙 기반 사전필터(중복게재 탐지,
 최소 길이) → ① 지면특별코너 4탭(전체·증권·산업·시그널, 탭당 최대 4건) →
-② 그 외 일반 필수뉴스(종합점수 ≥7.0, 캡 없음) 순서로 처리한다. 매 회차
+② 그 외 일반 필수뉴스(연예·스포츠·피플·오피니언 소거 후 최대 20건,
+select_general_articles()가 후보 전체를 한 번에 보고 직접 선정 — 2026-09-28,
+옛 종합점수 ≥7.0 임계값 방식 폐기) 순서로 처리한다. 매 회차
 "이번에 채점한 기사는 선정 여부와 무관하게" seen에 기록해 같은 기사가
 다음 회차에 다시 채점되지 않게 한다(단, Bedrock 응답 파싱 자체가 실패한
 기사는 seen에 안 남겨 다음 회차에 재시도되게 둔다 — classify.py 참조).
@@ -153,7 +155,13 @@ def _rank_tab_candidates(cat_pool: list[dict], scores: dict) -> list[dict]:
         reverse=True,
     )
     return paper_pool + fallback_pool
-_GENERAL_THRESHOLD = 7.0
+# 2026-09-28 — 점수 임계값(7.0) 방식 폐기. seen 테이블 769건 실측에서
+# 점수가 7.0~7.4에 68.5% 쏠려 사실상 통과/미통과 이진 신호였고, 임계값
+# 자체도 검증된 기준이 아니었다 — select_general_articles()(classify.py)
+# 로 교체, docs/prompt/selection/ 참고. 이 4개 카테고리는 개인 신상·
+# 명예훼손 리스크(연예·피플) 및 서비스 컨셉과 결이 다르다는 판단(스포츠·
+# 오피니언)으로 후보 자체에서 소거한다(사용자 확정, 2026-09-28).
+_GENERAL_EXCLUDE_CATEGORIES = {"연예", "스포츠", "피플", "오피니언"}
 _TAB_CAP = 4
 _MIN_CONTENT_LEN = 300
 _DUP_TITLE_RATIO = 0.72
@@ -262,7 +270,7 @@ def main():
     # 지면특별코너 4탭(전체/증권/산업/시그널)은 전부 "오늘의 지면"을 그대로
     # 옮긴다는 게 전제인 기능이라, 지면이 없는 날 억지로 채우면 실제로는
     # 없는 지면을 있는 것처럼 보여주게 된다 — 그래서 일요일엔 이 4탭을
-    # 전부 건너뛰고 일반 카테고리(임계값 7.0, 캡 없음)만 처리한다.
+    # 전부 건너뛰고 일반 카테고리(select_general_articles() 직접 선정)만 처리한다.
     is_sunday = datetime.now(KST).weekday() == 6
     all_articles = discovery.fetch_articles(today)
     front_page = [] if is_sunday else discovery.fetch_front_page(today)
@@ -370,23 +378,16 @@ def main():
                 _mark_seen(seen_table, a["key"], tab="전체")
             tab_counts["전체"] += 1
 
-    # 2) Sonnet 5 배치 채점 — fresh 전체(전체 탭 후보 제외한 나머지)
+    # 2) Sonnet 5 배치 채점 — 탭(증권/산업/시그널) 후보만 채점한다. "일반"은
+    # 더 이상 점수 임계값을 안 쓰고(2026-09-28, select_general_articles()가
+    # 후보 전체를 한 번에 보고 직접 고름 — docs/prompt/selection/ 참고,
+    # 점수가 7.0~7.4에 68.5% 쏠려 사실상 이진 신호였던 문제 때문에 폐기)
+    # 탭 폴백 정렬에만 점수가 필요하다.
     scorable = [a for a in fresh if a["key"] not in selected_keys]
+    tab_pool_all = [a for a in scorable if _tab_of(a) is not None]
     guide = ddb_prompt.load_prompt("mustknow")
-    scores = classify.score_articles(guide, scorable) if scorable else {}
-    print(f"[mustknow-auto] 채점 완료 {len(scores)}/{len(scorable)}건")
-
-    # 일반 임계값(7.0)이 전체 경로 중 가장 낮은 바닥 — "단, 증권/산업/시그널은
-    # 예외"(2026-08-25). 이 세 카테고리는 바로 아래 3)에서 임계값 미달이어도
-    # 그날 최고점 순으로 탭 정원(4건)을 채우는 근사치 폴백을 타므로, 여기서
-    # 미리 seen 확정하면 그 폴백 후보 자체가 사라진다 — 탭 카테고리는
-    # 건너뛰고, 그 외 카테고리만 기존대로 조기 확정한다.
-    for a in scorable:
-        if _tab_of(a) is not None:
-            continue
-        row = scores.get(a["key"])
-        if row is not None and (row.get("total") or 0) < _GENERAL_THRESHOLD:
-            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+    scores = classify.score_articles(guide, tab_pool_all) if tab_pool_all else {}
+    print(f"[mustknow-auto] 탭 후보 채점 완료 {len(scores)}/{len(tab_pool_all)}건")
 
     # 3) 증권/산업/시그널 — 점수 있는 후보를 높은 점수 순으로 정렬해 탭당
     #    4건을 채운다(일요일엔 스킵 — 위 is_sunday 주석 참조).
@@ -417,20 +418,46 @@ def main():
                     _mark_seen(seen_table, a["key"], **meta)
                 tab_counts[tab] += 1
 
-    # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게
-    #    7.0 넘으면 전부(캡 없음) — 증권/산업/시그널 중 탭 정원을 못 채운
-    #    기사도 여기서 일반 카테고리로는 발행될 수 있다(정보 손실 방지).
-    for a in scorable:
-        if a["key"] in selected_keys:
-            continue
-        row = scores.get(a["key"])
-        if not row or (row.get("total") or 0) < _GENERAL_THRESHOLD:
-            continue
-        selected_keys.add(a["key"])
-        status = _try_publish(a, None, None)
-        if status != "failed":
-            _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
-        tab_counts["일반"] += 1
+    # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외(증권/산업/시그널 중 탭
+    #    정원을 못 채운 기사도 여기 후보 풀엔 남는다 — 정보 손실 방지,
+    #    기존 동작 유지). 연예·스포츠·피플·오피니언은 소거(2026-09-28,
+    #    개인 신상·명예훼손 리스크 및 서비스 컨셉과 결이 다르다는 판단).
+    #    점수 임계값 대신 select_general_articles()가 후보 전체를 한 번에
+    #    보고 최대 20건을 직접 고른다.
+    general_pool = [
+        a for a in scorable
+        if a["key"] not in selected_keys and a["top_category"] not in _GENERAL_EXCLUDE_CATEGORIES
+    ]
+    if general_pool:
+        selection_guide = ddb_prompt.load_prompt("selection")
+        result = classify.select_general_articles(selection_guide, general_pool)
+        if result is None:
+            print("[mustknow-auto] 일반 선정 실패(파싱 불가) — 이번 회차 스킵, 다음 회차 재시도")
+        else:
+            print(
+                f"[mustknow-auto] 일반 선정 — today_context: {result.get('today_context', '')[:200]}"
+            )
+            print(
+                f"[mustknow-auto] 일반 후보 {result.get('candidates_total')}건 중 "
+                f"{result.get('excluded_count')}건 제외 — {result.get('excluded_reasons', [])}"
+            )
+            by_key = {a["key"]: a for a in general_pool}
+            for row in result.get("selected", []):
+                a = by_key.get(row.get("key"))
+                if a is None:
+                    continue
+                selected_keys.add(a["key"])
+                status = _try_publish(a, None, None)
+                if status != "failed":
+                    _mark_seen(seen_table, a["key"], reason=row.get("reason", "")[:200])
+                tab_counts["일반"] += 1
+            # 선정 안 된 나머지 후보도 seen 처리 — 파싱은 성공했으니 LLM이
+            # 이번 회차엔 실제로 검토하고 뺀 게 맞다(값을 지어낸 게 아니라
+            # 판단 결과). 다음 회차에 같은 대량 후보를 또 통째로 재평가하는
+            # 낭비를 막는다.
+            for a in general_pool:
+                if a["key"] not in selected_keys:
+                    _mark_seen(seen_table, a["key"], excluded_from_general=True)
 
     print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
 
