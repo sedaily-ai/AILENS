@@ -167,7 +167,12 @@ export function LensFormatPanel({
         <article data-letter-body>
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
             {letterParagraphs.map((para, pi) => (
-              <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
+              <p
+                key={pi}
+                className={
+                  para.startsWith('◾') ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined
+                }
+              >
                 {wrapWithTerms(para, l.keywords ?? [])}
               </p>
             ))}

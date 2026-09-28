@@ -379,6 +379,13 @@ export function LensViewClient({
         .lread > p.lread-lead::first-letter { float: left; font-family: "Noto Serif KR", serif;
           font-size: 3em; line-height: 0.84; font-weight: 700;
           color: var(--lc, #111827); margin: 6px 12px 0 0; }
+        /* 소제목(2026-09-23) — 모델이 만드는 "◾ 소제목" 줄. 예전엔 발행
+           직전에 통째로 버려져 본문이 소제목 없는 연속 프로즈로만 나갔다
+           (사용자 리포트: 실제 발행글 스크린샷엔 구획 표시가 전혀 없음).
+           본문 문단과 구분되도록 형식 색으로 볼드 처리 + 위쪽 여백을
+           늘려 섹션 전환처럼 보이게 한다. */
+        .lread > p.lread-sub { font-weight: 700; font-size: calc(15px * var(--lens-font-scale, 1));
+          color: var(--lc, #111827); margin-top: 32px !important; }
         /* 레터 사인오프 — 편지 서명. 형식 색 마크 + 발신인 + 위 얇은 룰. */
         .lread-sign { display: flex; align-items: center; gap: 10px;
           margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(17,24,39,0.1); }

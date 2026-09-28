@@ -17,7 +17,11 @@ const AUTO_ADVANCE_MS = 4200;
 // 문장 끝(.!?) + 공백 뒤에서만 자른다 — "2.6조"·"0.09%포인트"처럼 숫자
 // 안의 마침표는 뒤에 공백이 없어 안 걸린다.
 function splitIntoSentences(paragraphs: string[]): string[] {
+  // 2026-09-23 — "◾ 소제목" 문단(발행 파이프라인이 더는 버리지 않고 살려서
+  // 넘긴다)은 마침표 없는 짧은 한 줄이라 그대로 스토리 카드 한 장이 되면
+  // 어색하다. 이 스토리 카드 뷰는 문장 단위 낭독용이라 소제목은 건너뛴다.
   return paragraphs
+    .filter((para) => !para.startsWith('◾'))
     .flatMap((para) => para.split(/(?<=[.!?])\s+/))
     .map((s) => s.trim())
     .filter(Boolean);
