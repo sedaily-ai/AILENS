@@ -40,8 +40,11 @@ JSON_EXTRACT_MODULE="$SCRIPT_DIR/../../pipelines/common/json_extract.py"
 # 루트에 flat 복사한다.
 # 2026-09-25 — GPU_IPADAPTER_MODULE(gpu_ipadapter.py) 줄을 뺐다 — "pipeline"
 # 모델 삭제로 그 파일 자체가 삭제됐다(webtoon_image.py 상단 주석 참고).
+# 2026-09-28 — REKOGNITION_CLIENT_MODULE 줄을 뺐다. 말풍선 배치용
+# Rekognition 얼굴 감지 자체를 제거했다(사용자 결정, webtoon_image.py
+# 상단 주석 참고) — 그 파일(pipelines/common/rekognition_client.py)도
+# 같이 삭제돼 복사할 게 없다.
 BEDROCK_CLIENT_MODULE="$SCRIPT_DIR/../../pipelines/common/bedrock_client.py"
-REKOGNITION_CLIENT_MODULE="$SCRIPT_DIR/../../pipelines/common/rekognition_client.py"
 COMPOSE_TEXT_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/compose_text.py"
 # webtoon_image.py::_load_prompt_doc()이 flat import로 쓰는
 # pipelines/common/ddb_prompt.py — 2026-09-16까지 이 줄이 빠져있어서
@@ -97,7 +100,7 @@ cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
-cp "$BEDROCK_CLIENT_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$BUILD_DIR/"
+cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$BUILD_DIR/"
 mkdir -p "$BUILD_DIR/assets"
 cp "$FONT_ASSET" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"

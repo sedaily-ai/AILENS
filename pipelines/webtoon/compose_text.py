@@ -185,6 +185,13 @@ _FACE_BUBBLE_MARGIN_PX = 150  # 얼굴 상단에서 이만큼 위에 말풍선�
 def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | None = None, min_top_y: float | None = None):
     """dialogue = [{"speaker":..., "line":..., "tone":"보통"|"격앙"}, ...]
 
+    2026-09-28 — 호출부(webtoon_image.py::generate_cut_image())가
+    Rekognition 얼굴 감지를 완전히 제거해서 `faces`는 이제 항상 None이다
+    (사용자 결정: "리코그니션 자체를 안 사용하기로 했고 삭제했어요").
+    즉 아래 `use_faces` 분기는 사실상 항상 폴백(균등 분할)으로만 동작한다.
+    파라미터·로직은 남겨뒀다 — 균등분할 자체가 그 폴백 경로라 별도
+    분기 제거가 불필요했다. 아래는 그 기능이 있던 시절의 설계 기록.
+
     min_top_y — 2026-09-08(3차) 추가. compose()가 draw_title()/
     draw_cover_header()의 실제 반환값(제목 알약 하단 y좌표)을 넘긴다.
     이전엔 "제목 아래 16%"라는 고정 비율로 안전거리를 추측했는데, 제목
@@ -555,8 +562,8 @@ def draw_narration(img: Image.Image, text: str) -> int:
 def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
     """배경 이미지(img_path) 위에 cut의 title/dialogue/caption/(closing_caption
     또는 narration)을 순서대로 합성해서 같은 경로에 덮어쓴다. faces —
-    rekognition_client.detect_main_faces()가 반환한 얼굴 바운딩 박스 목록
-    (draw_dialogue 참고, 없거나 개수가 안 맞으면 균등 분할 폴백).
+    항상 None(2026-09-28, Rekognition 얼굴 감지 제거 — draw_dialogue
+    상단 주석 참고), 균등 분할 폴백만 동작한다.
 
     2026-09-08 — title/closing_caption 추가. closing_caption과 narration은
     둘 다 하단 텍스트 요소라 시각적으로 겹친다 — closing_caption이 있으면

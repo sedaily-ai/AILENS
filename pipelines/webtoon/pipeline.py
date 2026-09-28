@@ -379,8 +379,9 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
 # 2026-09-20 사용자 요청으로 이 QA 자체를 완전히 제거했다 — admin 실험
 # 패널은 QA를 기본 안 썼는데 발행 파이프라인만 하드코딩으로 켜고 있어서
 # "CMS로만 제어돼야 한다" 원칙에 안 맞았다(webtoon_image.py의
-# generate_cut_image() 독스트링 참고). 말풍선 배치용 얼굴 위치 감지는
-# 대사가 있는 컷에서만 그대로 남아있다(검증·재생성과는 별개 기능).
+# generate_cut_image() 독스트링 참고). 말풍선 배치용 얼굴 위치 감지
+# (Rekognition)는 2026-09-28에 완전히 제거했다(사용자 결정 — 아래
+# faces 주석 참고).
 
 def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True,
                  manage_gpu: bool = True):
@@ -470,11 +471,9 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 retries=cfg["retries"],
             )
             if ok:
-                # 2026-09-08 — 얼굴 위치는 QA 비전 모델이 아니라 Rekognition
-                # 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM 상단
-                # 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
-                # 얼굴 상단을 피해 말풍선을 배치할 수 있다. generate_cut_image_to_file()이
-                # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다.
+                # faces는 항상 None(2026-09-28, Rekognition 얼굴 감지
+                # 제거 — webtoon_image.py::generate_cut_image() 독스트링
+                # 참고). compose_text.compose()가 균등 분할로 폴백한다.
                 try:
                     compose_text.compose(img_path, cut, faces)
                 except Exception as e:

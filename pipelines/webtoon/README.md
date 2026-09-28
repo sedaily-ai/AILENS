@@ -39,9 +39,11 @@ IP-Adapter로 전면 교체했다** — 아래 내용은 그 이후(R12~R22) 기
            Core로 참조 없는 포토리얼 생성
      (c) 위 결과를 Bedrock Style Transfer에 통과시켜 확립된 플랫
          셀 웹툰 화풍을 입힌다(webtoon_style_reference.png 참고)
-   QA 게이트(pipeline._generate_and_qa_cut): 생성한 배경을 Rekognition
-   얼굴 감지 + Claude 비전 검사에 통과시켜, 배경 인물 초과·인물 없음
-   위반·사극 오염을 잡으면 1회 재생성한다.
+   ⚠️ 이 QA 게이트 문단은 낡은 정보다 — 2026-09-20에 검증+재생성 후처리
+   자체를 통째로 제거했고(webtoon_image.py::generate_cut_image() 독스트링
+   참고), 말풍선 배치용 얼굴 위치 감지(Rekognition)도 2026-09-28에 마저
+   제거했다(pipelines/common/rekognition_client.py 삭제). 지금은 컷
+   생성 후 QA·재생성 없이 바로 텍스트 합성으로 넘어간다.
 
 [텍스트 합성] compose_text.compose() — PIL로 제목/말풍선/캡션/
    마무리 자막을 배경 위에 직접 그린다(Bedrock 계열 모델이 한글을
@@ -87,7 +89,7 @@ pip install -r requirements.txt
 ```
 
 AWS 자격 증명이 필요하다(DDB 프롬프트 읽기, Bedrock 이미지/텍스트
-호출, GPU 인스턴스 기동/정지, S3, Rekognition) — 로컬에서는
+호출, GPU 인스턴스 기동/정지, S3) — 로컬에서는
 `AWS_PROFILE=yeonggwang` 환경변수로 지정. DDB 접근이 실패해도
 1·2단계 프롬프트는 파일시스템 폴백(`../../service/backend/prompts/
 webtoon/published.md`)으로 계속 동작한다.
