@@ -41,3 +41,18 @@ Postgres에서 그때그때 다시 받아와 덮어씀 — `../README.md` 참고
 | v1.3 | 2026-09-28 | "화제성"을 "화제 자체"와 "화제×경제/생활 교차점"으로 구분 — 실측(추석·아시안게임 등 순수 이벤트 보도는 배제 대상, 그 화제가 경제·소비에 미친 영향을 다룬 기사가 우선) 기준으로 예시 추가 |
 | v1.4 | 2026-09-28 | v1.3을 실제 Bedrock에 호출해 검증(9/27 후보 147건 → 20건 선정). today_context·다양성 규칙·화제×경제 교차점 전부 의도대로 작동 확인. 단, JSON 파싱 실패 버그 발견(응답에 파이썬 삼항연산자 구문 섞임) — 코드 반영 시 방어 로직 필요 |
 | v1.5 | 2026-09-28 | "오늘의 흐름 파악"과 "선정 후보"를 별개 입력으로 분리 — 하루 4~8회 도는 실제 운영에서 회차별 델타만 보면 표본이 작아지는 구조적 결함을 발견·수정. `context_articles`(그날 전체 제목) 파라미터 추가, "늦은 회차(델타 12건)+전체 맥락(221건)" 시뮬레이션으로 검증 완료 |
+
+## 🛑 실제 런타임 파일은 여기가 아니다 (2026-09-28, 배포 직전 발견)
+
+당초 계획은 `service/backend/prompts/selection/published.md`를
+`ddb_prompt.load_prompt("selection")`이 읽는 것이었는데, 배포 직전
+Dockerfile을 확인하니 **이미지 빌드 컨텍스트가 `pipelines/`로 한정돼
+있어** `service/`가 컨테이너 안에 없다는 걸 발견했다. "selection"은
+admin CMS(Postgres)에도 등록 안 돼 있어 API 호출이 항상 실패하고, 그러면
+반드시 파일시스템 폴백을 타는데 그 파일이 컨테이너에 없어
+`FileNotFoundError`로 `main()` 전체가 죽는 문제였다.
+
+**실제 런타임이 읽는 파일은 `pipelines/mustknow_auto/selection_prompt.md`
+다**(`run.py`가 `ddb_prompt` 안 거치고 직접 읽음). `service/backend/
+prompts/selection/published.md`는 사람이 보는 문서 사본으로만 유지 —
+내용 바꿀 땐 **두 파일 다** 갱신할 것.

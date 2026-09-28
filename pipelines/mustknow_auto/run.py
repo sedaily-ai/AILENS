@@ -162,6 +162,20 @@ def _rank_tab_candidates(cat_pool: list[dict], scores: dict) -> list[dict]:
 # 로 교체, docs/prompt/selection/ 참고. 이 4개 카테고리는 개인 신상·
 # 명예훼손 리스크(연예·피플) 및 서비스 컨셉과 결이 다르다는 판단(스포츠·
 # 오피니언)으로 후보 자체에서 소거한다(사용자 확정, 2026-09-28).
+# "selection" 프롬프트는 ddb_prompt.load_prompt()(Postgres API → 실패 시
+# service/backend/prompts/<category>/published.md 파일시스템 폴백)를 안
+# 쓴다 — 2026-09-28 배포 직전 발견: Dockerfile의 빌드 컨텍스트가
+# `pipelines/`로 한정돼 있어(`COPY . .`가 pipelines/ 안에서 실행됨)
+# service/backend/는 컨테이너 안에 아예 없다. "selection"은 admin
+# CMS(Postgres)에도 등록 안 돼 있어서(사용자 결정: 파일로만 관리) API
+# 호출은 항상 실패하고, 그러면 반드시 파일시스템 폴백을 타는데 그 파일이
+# 컨테이너에 없어 FileNotFoundError로 main() 전체가 죽는다(다른 카테고리는
+# Postgres에 등록돼 있어 API 호출이 보통 성공하므로 이 폴백 경로가 실전에서
+# 거의 안 타져서 지금까지 안 드러났던 문제). pipelines/ 안의 이 파일을
+# 직접 읽어서 우회한다 — service/backend/prompts/selection/published.md는
+# 사람이 보는 문서 사본으로만 유지(둘 다 갱신할 것).
+_SELECTION_PROMPT_PATH = Path(__file__).parent / "selection_prompt.md"
+
 _GENERAL_EXCLUDE_CATEGORIES = {"연예", "스포츠", "피플", "오피니언"}
 _GENERAL_DAILY_CAP = 20
 _TAB_CAP = 4
@@ -458,7 +472,7 @@ def main():
             f"— 이번 회차 스킵(Bedrock 호출 안 함)"
         )
     elif general_pool:
-        selection_guide = ddb_prompt.load_prompt("selection")
+        selection_guide = _SELECTION_PROMPT_PATH.read_text(encoding="utf-8")
         result = classify.select_general_articles(
             selection_guide, general_pool, context_articles=all_articles, max_count=general_remaining
         )
