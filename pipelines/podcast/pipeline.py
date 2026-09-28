@@ -40,7 +40,13 @@ import podcast_voice
 from bedrock_client import call_text
 from text_utils import strip_code_fence
 
-_SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/kmkagk616y1c"  # lens-podcast-sonnet-46
+# 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요. 클로드 5.0
+# opus로 모든 프로덕션... 업데이트": 전용 프로파일 lens-podcast-opus-5
+# (신규 생성, us.anthropic.claude-opus-5 copyFrom, Service=atlas4·
+# Workload=podcast)로 교체 — admin/backend/routes/prompts.py::
+# _CATEGORY_BEDROCK["podcast"]와 반드시 같은 ARN을 유지할 것(admin
+# 테스트 도구와 실제 발행이 어긋나면 안 된다는 이 세션 기존 원칙).
+_SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/6bjkzt0icf74"  # lens-podcast-opus-5
 
 
 def run_article(
@@ -59,8 +65,12 @@ def run_article(
         print(f"{tag} podcast 프롬프트 로드")
         guide = ddb_prompt.load_prompt("podcast")
         print(f"{tag} 대본 생성 중...")
+        # 2026-09-26 — "다음 기사 원문으로 팟캐스트 대본을 만들어주세요"처럼
+        # 코드가 결과물 종류를 못박던 문구를 뺐다(admin/backend/routes/
+        # prompts.py::_CATEGORY_BEDROCK 주석 참고). 무엇을 만들지는 전적으로
+        # guide(저장된 podcast 지침, system 메시지)에 맡긴다.
         script = call_text(
-            guide, f"다음 기사 원문으로 팟캐스트 대본을 만들어주세요.\n\n{article}", model=_SCRIPT_MODEL
+            guide, f"[입력 기사]\n{article}", model=_SCRIPT_MODEL
         )
         script_path.write_text(script, encoding="utf-8")
 

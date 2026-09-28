@@ -118,8 +118,15 @@ def parse_letters(raw_md: str) -> list[str]:
             flush()
             continue
         if line.startswith("◾"):
+            # 2026-09-23 — 예전엔 이 줄 자체를 버렸다(flush만 하고 continue).
+            # 그래서 모델이 소제목을 잘 만들어도 발행 직전에 통째로 사라져,
+            # 실제 사이트엔 소제목 없는 연속 프로즈만 남았다(사용자 리포트:
+            # 발행글 스크린샷엔 "◾" 표시가 전혀 없음). 소제목 줄을 별도
+            # 문단으로 살려서 paragraphs에 넣는다 — 프론트(LensFormatPanel)가
+            # "◾"로 시작하는 문단을 감지해 구분되게 보여준다.
             skipping = False
             flush()
+            paragraphs.append(line)
             continue
         if line.startswith("자료:") or line == "—":
             skipping = False
@@ -343,6 +350,11 @@ def generate_video(
     settings = video_settings.get_render_settings()
     mp4_path = out_dir / name / "video.mp4"
     try:
+        # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+provider가
+        # elevenlabs면 ELEVENLABS_*)을 만든다 — render_from_script.py와 이
+        # 로직을 공유한다(2026-09-24, 사용자 요청: "동일한 부분은 동일하게
+        # 로직이나 코드 사용할 수 있도록", video_settings.py 모듈
+        # docstring 참고).
         result = subprocess.run(
             [
                 "npm", "run", "render", "--",
@@ -354,7 +366,7 @@ def generate_video(
             cwd=str(VIDEO_DIR),
             capture_output=True,
             text=True,
-            env={**os.environ, "TTS_ENGINE": settings["engine"]},
+            env={**os.environ, **video_settings.get_render_env()},
         )
     except OSError as e:
         print(f"[{log_prefix}] {name} 영상 렌더 실행 자체 실패(npm/ffmpeg 없음?) — {e}")
@@ -488,23 +500,41 @@ def publish_article(
     # 발행"까지는 살린다. status는 계속 영상 기준으로만 정한다 — 호출부의
     # 결과 집계와 revalidate 웹훅 분기가 그 값에 걸려 있어서, 여기에 새
     # status를 끼우면 웹툰만 빠진 기사가 SSR 재검증을 조용히 건너뛴다.
+    # 2026-09-28 — 사용자 지적("갤런당 50마일이...웹툰이 아직 안 나오게
+    # 된 이유는?") 실측 확인: 8컷 중 컷7 하나만 이미지 생성 실패(콘텐츠
+    # 필터 등)했는데, 아래 "전부 아니면 무(all-or-nothing)" 정책 때문에
+    # 이미 잘 나온 7컷까지 통째로 버려졌다(FileNotFoundError로 업로드
+    # 루프가 죽고 except가 전체 폐기). 사용자 확인 후 완화 — 실패한
+    # 컷만 건너뛰고, 남은 컷이 MIN_WEBTOON_CUTS 이상이면 그대로 발행한다
+    # (8컷 중 1~2컷 빠진 정도는 웹툰 자체를 못 쓸 정도는 아니라는 판단).
+    # 그 미만이면 여전히 전부 버린다 — 아래 except의 기존 "부분 발행보다
+    # pending이 낫다" 원칙은 "너무 부실한" 경우에 한해 유지.
+    MIN_WEBTOON_CUTS = max(1, webtoon_mod.N_CUTS - 2)
     webtoon_script: dict = {}
     webtoon_bullets, webtoon_images = [], []
     try:
         webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
         webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
         for cut in webtoon_script["cuts"]:
+            n = cut["cut"]
+            cut_path = out_dir / name / f"컷{n}.png"
+            if not cut_path.exists():
+                print(f"[{log_prefix}] {name} 컷{n} 파일 없음(생성 실패) — 이 컷만 건너뜀")
+                continue
             caption = cut.get("narration") or (
                 " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
             ) or cut.get("caption", "")
             webtoon_bullets.append(caption)
-            n = cut["cut"]
-            cut_path = out_dir / name / f"컷{n}.png"
             key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
             webtoon_images.append({"url": _upload(cut_path, key), "caption": caption})
+        if len(webtoon_images) < MIN_WEBTOON_CUTS:
+            raise ValueError(
+                f"컷 {len(webtoon_images)}/{len(webtoon_script['cuts'])}개만 성공 "
+                f"(최소 {MIN_WEBTOON_CUTS}개 필요) — 웹툰 전체 폐기"
+            )
     except Exception:
-        # 부분 성공(예: 3컷까지만 업로드)도 버린다 — 중간에 끊긴 웹툰을
-        # 내보내느니 웹툰 탭을 pending으로 두는 편이 낫다.
+        # 부분 성공이어도 MIN_WEBTOON_CUTS 미만이면 여전히 통째로 버린다 —
+        # 너무 부실한 웹툰을 내보내느니 웹툰 탭을 pending으로 두는 편이 낫다.
         webtoon_script, webtoon_bullets, webtoon_images = {}, [], []
         if results is not None:
             results["degraded_no_webtoon"] = results.get("degraded_no_webtoon", 0) + 1

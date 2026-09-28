@@ -247,7 +247,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="이미 생성된 각본 텍스트로 영상만 렌더(CMS 영상 랩 전용)")
     parser.add_argument("--job-id", required=True)
     parser.add_argument("--script-s3-key", required=True)
+    # 2026-09-25 — 사용자 리포트("일레븐 랩스를 선택하고 영상을 생성했는데
+    # ... 영상에 담긴거는 polly 음성이 선택이 되어서 나왔네요") 수정.
+    # CMS 카드(VideoCardGenerator.tsx)가 "성우 미리듣기"에서 고른
+    # provider/voice를 이 렌더 1회에도 그대로 쓰고 싶을 때
+    # chat_ws.py::_run_render_video_flow가 JSON으로 담아 넘긴다 — 없으면
+    # (자동 발행 파이프라인 등) 지금처럼 발행된 설정만 쓴다.
+    parser.add_argument("--settings-override", default=None)
     args = parser.parse_args()
+    settings_override = json.loads(args.settings_override) if args.settings_override else None
 
     s3 = boto3.client("s3", region_name="us-east-1")
     work_dir = Path("/tmp") / args.job_id
@@ -280,21 +288,37 @@ def main() -> None:
     script_path = work_dir / "script.json"
     script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
 
-    settings = video_settings.get_render_settings()  # admin CMS에서 fresh 조회(캐시 없음)
+    settings = video_settings.get_render_settings(settings_override)  # admin CMS에서 fresh 조회(캐시 없음), --settings-override가 있으면 그 위에 덮어씀
     mp4_path = work_dir / "video.mp4"
-    print(f"렌더 시작... (voice={settings['voice']}, engine={settings['engine']}, format={settings['format']})")
+    print(
+        f"렌더 시작... (provider={settings['provider']}, voice={settings['voice']}, "
+        f"engine={settings['engine']}, format={settings['format']})"
+    )
+    # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+provider가
+    # elevenlabs면 ELEVENLABS_*)을 만든다 — publish_utils.py::generate_video()
+    # 와 이 로직을 공유한다(2026-09-24, 사용자 요청: "동일한 부분은
+    # 동일하게 로직이나 코드 사용할 수 있도록", video_settings.py
+    # 모듈 docstring 참고).
+    #
+    # render → render:lambda(2026-09-24) — 단일 Fargate 컨테이너 렌더는
+    # 코어 수 한계를 못 벗어난다는 조사 결과로 Remotion Lambda로 교체
+    # (docs/worklog/2026-09/2026-09-24-영상랩-렌더속도-3배단축.md "다음"
+    # 참고). npm 스크립트 이름과 --job-id 인자만 바뀌고, 나머지 계약
+    # (work_dir/video.mp4가 로컬에 생성됨)은 그대로라 이 함수의 나머지
+    # 로직(썸네일 생성·S3 업로드)은 무변경.
     returncode, output = _run_render_streaming(
         [
-            "npm", "run", "render", "--",
+            "npm", "run", "render:lambda", "--",
             "--input", str(script_path.resolve()),
             "--format", settings["format"],
             "--output", str(mp4_path.resolve()),
             "--voice", settings["voice"],
+            "--job-id", args.job_id,
         ],
         cwd=str(VIDEO_DIR),
         s3=s3,
         job_id=args.job_id,
-        env={**os.environ, "TTS_ENGINE": settings["engine"]},
+        env={**os.environ, **video_settings.get_render_env(settings_override)},
     )
     if returncode != 0 or not mp4_path.exists():
         _upload_error(s3, args.job_id, f"렌더 실패(returncode={returncode}): {output[-1000:]}")

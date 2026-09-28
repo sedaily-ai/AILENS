@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "remotion studio src/index.ts",
     "render": "tsx scripts/render.ts",
+    "render:lambda": "tsx scripts/render-lambda.ts",
     "still": "remotion still src/index.ts",
     "tts:resolve": "tsx scripts/resolve-audio.ts"
   },
@@ -14,8 +15,10 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-polly": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.1139.0",
     "@remotion/bundler": "4.0.513",
     "@remotion/cli": "4.0.513",
+    "@remotion/lambda": "4.0.513",
     "@remotion/renderer": "4.0.513",
     "@remotion/transitions": "4.0.513",
     "lucide-react": "^1.32.0",

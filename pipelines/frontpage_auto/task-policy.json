@@ -90,6 +90,7 @@
       "Action": ["bedrock:InvokeModel"],
       "Resource": [
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/r9n8dvqc1t0r",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/p28gzlq5kj6s",
         "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
@@ -109,6 +110,9 @@
         "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-opus-5",
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/kmkagk616y1c",
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/6bjkzt0icf74",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/p28gzlq5kj6s",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j5kfly25ohjo",
         "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",

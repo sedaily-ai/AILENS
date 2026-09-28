@@ -28,7 +28,11 @@ export const NewsVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
               durationInFrames={cutFramesOf(cut.duration, fps)}
               layout="none"
             >
-              {cut.audioFile ? <Audio src={staticFile(cut.audioFile)} /> : null}
+              {cut.audioFile ? (
+                <Audio
+                  src={cut.audioFile.startsWith('http') ? cut.audioFile : staticFile(cut.audioFile)}
+                />
+              ) : null}
               <CutRenderer
                 cut={cut}
                 brand={script.brand}

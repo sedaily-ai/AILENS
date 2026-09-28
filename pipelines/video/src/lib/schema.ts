@@ -14,8 +14,10 @@ const baseCutFields = {
   duration: z.number().positive(),
   narration: z.string().min(1),
   caption: captionSchema,
-  // TTS 해석(scripts/resolve-audio.ts) 이후에만 채워진다. 작성자가 직접 넣는 값이 아니다.
-  // public/ 기준 상대 경로 (예: "audio/ab12cd34.mp3") — staticFile()로 참조.
+  // TTS 해석(lib/resolveAudio.ts) 이후에만 채워진다. 작성자가 직접 넣는 값이 아니다.
+  // 로컬 렌더(render.ts): public/ 기준 상대 경로(예: "audio/ab12cd34.mp3") — staticFile()로 참조.
+  // Remotion Lambda 렌더(render-lambda.ts): S3 절대 URL(https://...) — NewsVideo.tsx가
+  // "http"로 시작하면 그대로 <Audio src>에 쓰고, 아니면 staticFile()을 거친다.
   audioFile: z.string().optional(),
 };
 

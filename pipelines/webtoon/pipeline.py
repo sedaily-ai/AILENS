@@ -57,7 +57,12 @@ from stitch import stitch
 
 client = get_client()
 
-SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
+# 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요. 클로드 5.0
+# opus로 모든 프로덕션... 업데이트": lens-webtoon-script-opus-5(2026-09-20에
+# admin CMS 드롭다운용으로 이미 만들어져 있던 프로파일을 그대로 프로덕션
+# 기본값으로 승격 — 새로 안 만듦)로 교체. admin/backend/routes/prompts.py::
+# _CATEGORY_BEDROCK["webtoon"]과 반드시 같은 ARN을 유지할 것.
+SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j5kfly25ohjo"  # lens-webtoon-script-opus-5
 IMAGE_MODEL = "gpt-5.5"          # 이미지 생성 모델 (Responses API의 image_generation 툴)
 IMAGE_SIZE = "1536x1024"         # 3:2 가로. 컷당 $0.165 (2026-08 기준, high quality)
 IMAGE_QUALITY = "high"
@@ -77,22 +82,24 @@ N_CUTS = 8
 # run_article() 참고) — 코드 상수는 더 이상 없다.
 #
 # 모델 id → webtoon_image.generate_cut_image_to_file() 호출 인자 매핑
-# (run_article() 컷 루프가 씀). retries는 기존 개별 함수 기본값을 그대로
-# 유지(pipeline→2 — generate_bedrock_composed_image가 컷당 Bedrock 호출
-# 3회라 더 짧게 잡혀 있던 이유는 webtoon_image.py 해당 함수 docstring
-# 참고, 나머지→3).
+# (run_article() 컷 루프가 씀). retries=3 — 나머지 generate_bedrock_*
+# 함수 기본값과 동일.
 #
 # 2026-09-20 — QA(사극 오염·인물 없음 위반·고정 인물 수 초과 검사 후
 # 조건부 재생성)를 전부 제거했다(사용자 요청, webtoon_image.py의
 # generate_cut_image() 독스트링 참고) — 그래서 with_qa/check_extra_people
-# 키가 없어졌다. GPU 기동 분기(run_article()의 manage_gpu)는
-# active_model=="pipeline"일 때만 걸린다 — 아래 5개 모두 admin
-# webtoonImageModels.ts의 IMAGE_MODELS[].id·webtoon_image._VALID_IMAGE_MODELS
-# 와 같은 어휘.
+# 키가 없어졌다.
+#
+# 2026-09-25, 사용자 결정 — "pipeline"(GPU IP-Adapter+Style Transfer)·
+# "style_guide"(레퍼런스 이미지 화풍) 키를 뺐다. 발행 문서에 IMAGE_MODEL이
+# 한 번도 없어 실제로는 둘 다 쓰인 적이 없었다(sd_ultra로 계속 폴백) —
+# GPU 기동 분기(run_article()가 예전에 갖고 있던 manage_gpu 로직)도
+# 같이 삭제했다. 아래 3개는 admin webtoonImageModels.ts의 IMAGE_MODELS[].id·
+# webtoon_image._VALID_IMAGE_MODELS와 같은 어휘(다만 sd35_large/
+# stable_image_core는 UI 드롭다운엔 이제 없고 코드에만 남아있다 —
+# webtoonImageModels.ts 주석 참고).
 _PROVIDER_CONFIG = {
     "sd_ultra": dict(retries=3),
-    "pipeline": dict(retries=2),
-    "style_guide": dict(retries=3),
     "stable_image_core": dict(retries=3),
     "sd35_large": dict(retries=3),
 }
@@ -124,7 +131,13 @@ _JSON_INSTRUCTION = (
 )
 
 
-_SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
+# 2026-09-26 — "당신은 뉴스 웹툰 제작자입니다"라는 페르소나·주제 고정
+# 문구를 뺐다(admin/backend/routes/prompts.py::_WEBTOON_SYSTEM_PROMPT와
+# 동일 이유 — 이 파일은 그쪽 script.py::build_script_call을 그대로 이식한
+# 포크라 원본이 바뀌면 같이 갱신한다, 위 모듈 docstring 참고). JSON
+# 스키마를 지키라는 부분만 남긴다 — 스키마 자체는 저장된 지침 22장에서
+# 온다, 응답 파싱에 실제로 필요한 부분만 유지.
+_SYSTEM_PROMPT = "지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 
 
 def call_json(prompt: str, debug_path: Path | None = None, max_tokens: int = 4000) -> dict:
@@ -148,8 +161,15 @@ def call_json(prompt: str, debug_path: Path | None = None, max_tokens: int = 400
 
     debug_path — 파싱 실패 시 원문 응답을 저장해서 원인을 사후에 볼 수
     있게 한다(이게 없어서 오늘 실패 원인을 추정만 하고 확인은 못 했다).
-    성공하면 안 남긴다(디스크 낭비 방지)."""
-    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=max_tokens, temperature=0.7)
+    성공하면 안 남긴다(디스크 낭비 방지).
+
+    2026-09-27 — SCRIPT_MODEL이 Opus 5로 바뀐 뒤 전체 발행 회차가 전부
+    ValidationException("`temperature` is deprecated for this model")으로
+    죽던 걸 실측(CloudWatch)으로 확인 — Sonnet 4.6 시절 남아있던 고정
+    temperature=0.7을 제거한다. bedrock_client.call_text()는 temperature가
+    None이면 inferenceConfig에 아예 안 넣으므로(모듈 docstring 2026-08-22
+    항목 참고) 모델별 지원 여부를 신경 쓸 필요가 없다."""
+    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=max_tokens)
     try:
         return extract_json_object(raw)
     except ValueError:
@@ -222,10 +242,22 @@ _SCRIPT_OUTPUT_ADDENDUM = (
 
 def _cut_number(d: dict) -> int | None:
     """v11 스키마는 컷 번호를 정수 "cut" 대신 문자열 "cut_id"("cut_01")로
-    준다 — 둘 다 받는다."""
+    준다 — 둘 다 받는다.
+
+    2026-09-26 — admin script.py::_cut_number와 동일 결정(그쪽 docstring
+    참고, 실제 chat_threads 저장 데이터 조회로 8컷 전부 "cut": None인 걸
+    확인) — 이 파일이 진짜 자동 발행 파이프라인이라 같은 스키마·같은
+    모델을 쓰면 동일하게 실패할 수 있어 여기도 같이 방어한다. int로 안
+    잡히는 문자열/소수 값도 구제한다."""
     n = d.get("cut")
-    if isinstance(n, int):
+    if isinstance(n, bool):
+        pass
+    elif isinstance(n, int):
         return n
+    elif isinstance(n, float) and n.is_integer():
+        return int(n)
+    elif isinstance(n, str) and n.strip().isdigit():
+        return int(n.strip())
     cut_id = d.get("cut_id") or d.get("id")
     if isinstance(cut_id, str):
         digits = "".join(ch for ch in cut_id if ch.isdigit())
@@ -260,11 +292,17 @@ def _normalize_cuts(script: dict) -> list[dict]:
     필드 이름(image_prompt/dialogue/title/narration/caption)으로 정규화.
 
     2026-09-20 — camera/scene 2필드를 image_prompt 하나로 합쳤다(admin
-    script.py::normalize_cuts와 동일 결정, 사유는 그쪽 docstring 참고)."""
+    script.py::normalize_cuts와 동일 결정, 사유는 그쪽 docstring 참고).
+
+    2026-09-26 — _cut_number()가 그래도 None이면 배열 순서를 최후 수단으로
+    쓴다(admin script.py::normalize_cuts와 동일 결정·동일 이유 — 실제
+    발행 컷 파일명이 `컷{n}.png`라 n이 None이면 8컷이 전부 같은 파일명에
+    덮어써질 수 있는 심각한 버그였다)."""
     cuts = []
-    for c in script.get("cuts") or []:
+    for idx, c in enumerate(script.get("cuts") or [], start=1):
+        cut_number = _cut_number(c)
         cuts.append({
-            "cut": _cut_number(c),
+            "cut": cut_number if cut_number is not None else idx,
             "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
             "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
             "closing_caption": c.get("closing_caption") or "",
@@ -382,7 +420,15 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             + article
             + _SCRIPT_OUTPUT_ADDENDUM
         )
-        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt", max_tokens=8000)
+        # 2026-09-27 — temperature 제거 후 실측(로컬 재현, 1_raw_response.txt)
+        # 으로 확인: Opus 5가 컷당 영/한 image_prompt를 둘 다 길게 쓰는
+        # 지금 지침 아래에서는 8000으로도 8컷을 다 채우기 전에 멀티바이트
+        # 문자 중간에서 응답이 잘렸다(마지막 몇 바이트가 깨진 유니코드
+        # replacement 문자로 확인) — extract_json_object가 그 잘린 JSON을
+        # 못 읽어 "웹툰 실패"로 이어졌다. admin/backend/routes/prompts.py::
+        # _CATEGORY_BEDROCK["webtoon"]도 같은 8000이라 admin 실험 도구도
+        # 똑같이 잘릴 것 — 거기도 같이 올려서 어긋나지 않게 한다.
+        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt", max_tokens=16000)
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
     cuts = _normalize_cuts(script)
@@ -402,51 +448,41 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     # 값이 재배포 없이 다음 기사부터 바로 반영된다.
     active_model = get_active_image_model()
 
-    # 2026-09-09(R15) — active_model=="pipeline"(GPU IP-Adapter+Style
-    # Transfer) 경로는 컷별로(한 명만 나오는 클로즈업이면) GPU를 탈 수도,
-    # 안 탈 수도 있다(webtoon_image.generate_bedrock_composed_image_bytes()가
-    # 컷마다 판단) — 어느 컷이 쓸지 루프 전엔 모르니, 이 모델이면 배치
-    # 시작 시 한 번만 GPU를 켜두고 8컷 다 끝난 뒤(또는 예외로 중단돼도)
-    # 한 번만 끈다. 매 컷마다 켜고 끄면 g4dn.xlarge 부팅·SSM 연결 대기
-    # (수십 초~분 단위)가 컷마다 반복돼 배치가 크게 느려진다.
-    gpu_started = False
-    if manage_gpu and active_model == "pipeline":
-        import gpu_ipadapter  # pipelines/common/ — sibling
-        gpu_ipadapter.ensure_gpu_running()
-        gpu_started = True
+    # 2026-09-25 — 여기 있던 GPU 기동 분기("pipeline" 모델일 때만
+    # 배치 시작 시 한 번 켜고 끝나면 끄던 로직)를 삭제했다 — pipeline
+    # 모델 자체를 뺐다(모듈 상단 주석, webtoon_image.py 참고). manage_gpu
+    # 인자는 frontpage_auto/mustknow_auto의 run.py가 여전히 넘기고 있어
+    # 시그니처는 남겨뒀지만 이제 아무 분기도 안 탄다(무해한 미사용 인자
+    # — 그쪽 두 파일까지 같이 고치는 건 이번 정리 범위 밖).
 
-    try:
-        for cut in cuts:
-            n = cut["cut"]
-            img_path = out / f"컷{n}.png"
-            if resume and img_path.exists():
-                print(f"{tag} 컷{n} 스킵(존재)")
-                continue
-            print(f"{tag} 컷{n} 생성 중... ({active_model})")
-            if active_model in _PROVIDER_CONFIG:
-                cfg = _PROVIDER_CONFIG[active_model]
-                ok, faces = generate_cut_image_to_file(
-                    "", cut["image_prompt"], active_model, img_path,
-                    has_dialogue=bool(cut.get("dialogue")) or n == 1,
-                    retries=cfg["retries"],
-                )
-                if ok:
-                    # 2026-09-08 — 얼굴 위치는 QA 비전 모델이 아니라 Rekognition
-                    # 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM 상단
-                    # 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
-                    # 얼굴 상단을 피해 말풍선을 배치할 수 있다. generate_cut_image_to_file()이
-                    # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다.
-                    try:
-                        compose_text.compose(img_path, cut, faces)
-                    except Exception as e:
-                        print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
-            else:
-                prompt = build_image_prompt(cut["image_prompt"], cut, characters)
-                ok = generate_image(prompt, img_path)
-            print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
-    finally:
-        if gpu_started:
-            gpu_ipadapter.stop_gpu()
+    for cut in cuts:
+        n = cut["cut"]
+        img_path = out / f"컷{n}.png"
+        if resume and img_path.exists():
+            print(f"{tag} 컷{n} 스킵(존재)")
+            continue
+        print(f"{tag} 컷{n} 생성 중... ({active_model})")
+        if active_model in _PROVIDER_CONFIG:
+            cfg = _PROVIDER_CONFIG[active_model]
+            ok, faces = generate_cut_image_to_file(
+                "", cut["image_prompt"], active_model, img_path,
+                has_dialogue=bool(cut.get("dialogue")) or n == 1,
+                retries=cfg["retries"],
+            )
+            if ok:
+                # 2026-09-08 — 얼굴 위치는 QA 비전 모델이 아니라 Rekognition
+                # 전용 얼굴 감지로 구한다(prompts.py VALIDATE_SYSTEM 상단
+                # 주석 참고) — 바운딩 박스 전체를 주므로 draw_dialogue()가
+                # 얼굴 상단을 피해 말풍선을 배치할 수 있다. generate_cut_image_to_file()이
+                # QA 단계에서 이미 감지해 넘겨주므로 여기서 다시 부르지 않는다.
+                try:
+                    compose_text.compose(img_path, cut, faces)
+                except Exception as e:
+                    print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
+        else:
+            prompt = build_image_prompt(cut["image_prompt"], cut, characters)
+            ok = generate_image(prompt, img_path)
+        print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
 
     # 세로 스크롤 합치기
     try:

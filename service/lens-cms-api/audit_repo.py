@@ -57,3 +57,28 @@ def list_events(limit: int = 50, before_id: Optional[int] = None) -> Tuple[List[
         ]
         next_cursor = str(rows[-1]["id"]) if len(rows) == limit else None
         return events, next_cursor
+
+
+def list_prompt_activation_history(category: str, name: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """특정 프롬프트(category/name)의 "프로덕션에 적용" 이력만 최신순으로
+    — 2026-09-26 신설, 사용자 요청: "프로덕션에 적용한 이력들도 남아야
+    해요, 몇시 몇분... 날짜에 했는지". prompts_repo.py의 activate_version()
+    이 항상 호출하는 audit.log("prompt-activate", {"prompt": f"{category}/
+    {name}", "version": version})를 그대로 걸러서 재사용한다 — 새 테이블을
+    안 만들어도 이미 남고 있던 기록이라 바로 조회만 추가하면 됐다."""
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT detail->>'version' AS version, actor, logged_at "
+            "FROM audit_logs WHERE action='prompt-activate' AND detail->>'prompt'=%s "
+            "ORDER BY id DESC LIMIT %s",
+            (f"{category}/{name}", limit),
+        )
+        rows = cur.fetchall()
+        return [
+            {
+                "version": int(r["version"]) if r.get("version") else None,
+                "actor": r.get("actor"),
+                "logged_at": r["logged_at"].isoformat() if r.get("logged_at") else None,
+            }
+            for r in rows
+        ]

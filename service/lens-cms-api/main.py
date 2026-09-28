@@ -9,6 +9,7 @@ Lambda 버전과의 차이는 순수 인프라 계층뿐(커넥션 풀 재사용
 """
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, Optional
 
@@ -103,6 +104,25 @@ _ADMIN_TOKEN = os.environ.get("ADMIN_INTERNAL_TOKEN", "")
 def _check_admin_token(x_internal_token: Optional[str]) -> None:
     if not _ADMIN_TOKEN or x_internal_token != _ADMIN_TOKEN:
         raise HTTPException(status_code=401, detail="unauthorized")
+
+
+# 2026-09-25 — 프롬프트 실험(챗랩) 백엔드 CRUD 점검 중 추가. admin/backend/
+# routes/posts.py::_MAX_PAYLOAD_BYTES(340KB, CMS 글 본문 기준)와 같은
+# 원칙 — 크기 제한이 아예 없는 텍스트/JSONB 필드가 2026-09-25 admin/posts
+# 413(payload too large)의 원인이었다(목록 조회가 이 무제한 필드를 그대로
+# 실어 보내서). 그 사고를 겪은 필드(prompt_lab_thread_messages.payload)와
+# 같은 패턴(대화 메시지·프롬프트 실험 파일)에 선제적으로 상한을 건다 —
+# 아직 이 필드들에서 같은 사고가 난 적은 없지만 구조가 동일하다.
+_MAX_TEXT_FIELD_BYTES = 200 * 1024
+
+
+def _check_field_size(value: str, field_name: str) -> None:
+    size = len(value.encode("utf-8"))
+    if size > _MAX_TEXT_FIELD_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field_name} too large: {size} bytes (max {_MAX_TEXT_FIELD_BYTES})",
+        )
 
 
 @app.post("/admin/posts")
@@ -536,7 +556,77 @@ def internal_update_prompt(category: str, name: str, payload: Dict[str, Any] = B
     content = payload.get("content", "")
     if not content:
         raise HTTPException(status_code=400, detail="content required")
-    result = prompts_repo.update_prompt(category, name, content, sections=payload.get("sections"))
+    _check_field_size(content, "content")
+    activate = payload.get("activate", True)
+    result = prompts_repo.update_prompt(category, name, content, sections=payload.get("sections"), activate=activate)
+    return result
+
+
+@app.post("/internal/admin/prompts/{category}/{name}/activate")
+def internal_activate_prompt_version(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """update_prompt(activate=False)로 저장해둔 버전을 프로덕션 활성값으로
+    승격한다 — 새 버전을 안 만들고 is_active만 옮긴다(2026-09-26 신설).
+
+    prompt_lab_docs/files(관리자 화면의 편집 가능한 초안, "프로덕션" 카드가
+    보여주는 값)도 같이 맞춘다 — 안 그러면 "테스트 카드가 만든 버전을
+    활성화"했는데 프로덕션 카드의 설명/지침/파일 칸은 예전 초안을 그대로
+    보여주는 채로 남아서, 사용자가 거기서 무심코 "발행"을 다시 누르면 방금
+    활성화한 내용을 예전 초안으로 덮어써버리는 함정이 생긴다. sections가
+    이 챗랩이 만든 모양({kind: "prompt_lab", ...})일 때만 동기화한다 — 그
+    이전 방식(PromptDrawer)으로 만들어진 버전은 애초에 이 화면과 무관한
+    설명/지침/파일 구조가 없어 손대지 않는다."""
+    _check_admin_token(x_internal_token)
+    version = payload.get("version")
+    if not isinstance(version, int):
+        raise HTTPException(status_code=400, detail="version (int) required")
+    result = prompts_repo.activate_version(category, name, version)
+    if result is None:
+        raise HTTPException(status_code=404, detail="prompt version not found")
+
+    v = prompts_repo.get_prompt_version(category, name, version)
+    sections = (v or {}).get("sections") or {}
+    if isinstance(sections, dict) and sections.get("kind") == "prompt_lab":
+        prompt_lab_repo.update_description(category, name, sections.get("description") or "")
+        prompt_lab_repo.update_instructions(category, name, sections.get("instructions") or "")
+        doc = prompt_lab_repo.get_doc(category, name)
+        for f in doc["files"]:
+            prompt_lab_repo.delete_file(f["id"])
+        for f in sections.get("files") or []:
+            if isinstance(f, dict):
+                prompt_lab_repo.create_file(category, name, f.get("name") or "이름 없음", f.get("content") or "")
+
+    return result
+
+
+@app.delete("/internal/admin/prompts/{category}/{name}/versions/{version}")
+def internal_delete_prompt_version(category: str, name: str, version: int, x_internal_token: Optional[str] = Header(default=None)):
+    """버전 하나를 완전히 삭제한다(2026-09-26 신설, 사용자 요청: "버전을
+    삭제하는 방법도 있어야 할 것 같고"). 활성(프로덕션) 버전은 400으로
+    거부 — prompts_repo.delete_version 참고."""
+    _check_admin_token(x_internal_token)
+    result = prompts_repo.delete_version(category, name, version)
+    if result is None:
+        raise HTTPException(status_code=404, detail="prompt version not found")
+    if not result.get("deleted"):
+        raise HTTPException(
+            status_code=400,
+            detail="지금 프로덕션에서 쓰이는 버전은 삭제할 수 없습니다 — 다른 버전을 먼저 적용한 뒤 삭제해 주세요.",
+        )
+    return result
+
+
+@app.patch("/internal/admin/prompts/{category}/{name}/versions/{version}/label")
+def internal_rename_prompt_version(category: str, name: str, version: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """버전 번호·content는 그대로 두고 이름표(sections.label)만 바꾼다 —
+    2026-09-26 신설, 사용자 지적: "버전이름도 수정가능하게 해야합니다".
+    prompts_repo.rename_version 참고."""
+    _check_admin_token(x_internal_token)
+    label = payload.get("label")
+    if not isinstance(label, str):
+        raise HTTPException(status_code=400, detail="label (string) required")
+    result = prompts_repo.rename_version(category, name, version, label)
+    if result is None:
+        raise HTTPException(status_code=404, detail="prompt version not found")
     return result
 
 
@@ -557,13 +647,17 @@ def internal_get_prompt_lab_doc(category: str, name: str, x_internal_token: Opti
 @app.put("/internal/admin/prompt-lab/{category}/{name}/description")
 def internal_update_lab_description(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
-    return prompt_lab_repo.update_description(category, name, payload.get("text") or "")
+    text = payload.get("text") or ""
+    _check_field_size(text, "description")
+    return prompt_lab_repo.update_description(category, name, text)
 
 
 @app.put("/internal/admin/prompt-lab/{category}/{name}/instructions")
 def internal_update_lab_instructions(category: str, name: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
-    return prompt_lab_repo.update_instructions(category, name, payload.get("text") or "")
+    text = payload.get("text") or ""
+    _check_field_size(text, "instructions")
+    return prompt_lab_repo.update_instructions(category, name, text)
 
 
 @app.post("/internal/admin/prompt-lab/{category}/{name}/files")
@@ -571,6 +665,7 @@ def internal_create_lab_file(category: str, name: str, payload: Dict[str, Any] =
     _check_admin_token(x_internal_token)
     file_name = (payload.get("name") or "").strip() or "이름 없음"
     content = payload.get("content") or ""
+    _check_field_size(content, "content")
     return prompt_lab_repo.create_file(category, name, file_name, content)
 
 
@@ -591,6 +686,8 @@ def internal_update_lab_file(category: str, name: str, file_id: int, payload: Di
     # 여기서 먼저 구분해야 전자를 404로 잘못 응답하지 않는다.
     if payload.get("name") is None and payload.get("content") is None:
         raise HTTPException(status_code=400, detail="name or content required")
+    if payload.get("content") is not None:
+        _check_field_size(payload["content"], "content")
     r = prompt_lab_repo.update_file(file_id, payload.get("name"), payload.get("content"))
     if r is None:
         raise HTTPException(status_code=404, detail="file not found")
@@ -612,7 +709,17 @@ def internal_publish_prompt_lab(category: str, name: str, x_internal_token: Opti
     한 번에 처리한다(프론트가 들고 있던 조립 문자열을 다시 그대로
     쏴주는 것보다, 서버가 지금 저장된 desc/instructions/files를 정본으로
     다시 조립하는 편이 "화면에 아직 저장 안 한 편집 중 내용"이 실수로
-    발행되는 걸 막는다)."""
+    발행되는 걸 막는다).
+
+    2026-09-26 — sections에 조립 전 원본 구조(설명/지침/파일 분리)도 같이
+    남긴다(사용자 지적: 테스트 카드의 "생성 프롬프트" 참조가 프로덕션
+    패널과 다른 구조라 헷갈림 — 프론트가 이 버전을 다시 볼 때 flattened
+    content 대신 이 구조를 그대로 재현해서 프로덕션과 동일하게 보여준다).
+    /prompts/edit(PromptDrawer)의 sections(PromptSectionKey="content" 형태)
+    와는 필드 모양이 다르다 — 같은 컬럼이지만 카테고리별로 어느 편집기가
+    발행했는지에 따라 다른 모양이 들어가는 건 이미 sections가 unknown
+    타입(lib/types.ts::PromptDetail.sections)으로 다뤄지고 있어서 문제
+    없다."""
     _check_admin_token(x_internal_token)
     doc = prompt_lab_repo.get_doc(category, name)
     parts = []
@@ -620,14 +727,22 @@ def internal_publish_prompt_lab(category: str, name: str, x_internal_token: Opti
         parts.append(doc["description"].strip())
     if doc["instructions"].strip():
         parts.append(doc["instructions"].strip())
+    lab_files = []
     for meta in doc["files"]:
         full = prompt_lab_repo.get_file_content(meta["id"])
         if full and full["content"].strip():
             parts.append(f"### 파일 · {full['name']}\n\n{full['content'].strip()}")
+            lab_files.append({"name": full["name"], "content": full["content"]})
     content = "\n\n".join(parts)
     if not content:
         raise HTTPException(status_code=400, detail="empty prompt — nothing to publish")
-    return prompts_repo.update_prompt(category, name, content, sections=None)
+    sections = {
+        "kind": "prompt_lab",
+        "description": doc["description"],
+        "instructions": doc["instructions"],
+        "files": lab_files,
+    }
+    return prompts_repo.update_prompt(category, name, content, sections=sections)
 
 
 # --- 프롬프트 실험 챗랩: 대화 스레드/메시지 (2026-09-15) ---
@@ -651,12 +766,28 @@ def internal_list_chat_threads(category: str = Query(...), name: str = Query(...
 
 
 @app.get("/internal/admin/chat-threads/{thread_id}")
-def internal_get_chat_thread(thread_id: int, x_internal_token: Optional[str] = Header(default=None)):
+def internal_get_chat_thread(
+    thread_id: int,
+    before_id: Optional[int] = Query(default=None),
+    x_internal_token: Optional[str] = Header(default=None),
+):
     _check_admin_token(x_internal_token)
-    thread = chat_threads_repo.get_thread(thread_id)
+    thread = chat_threads_repo.get_thread(thread_id, before_id=before_id)
     if not thread:
         raise HTTPException(status_code=404, detail="thread not found")
     return thread
+
+
+@app.get("/internal/admin/chat-threads/{thread_id}/media-keys")
+def internal_list_chat_thread_media_keys(thread_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    """2026-09-25 — delete_thread()가 S3 정리를 안 하는 문제 수정의
+    일부(chat_threads_repo.list_media_keys() docstring 참고). admin
+    Lambda가 스레드 삭제 직전에 이걸 불러 지울 S3 키 목록을 받는다."""
+    _check_admin_token(x_internal_token)
+    cur = chat_threads_repo.get_thread(thread_id, message_limit=1)
+    if cur is None:
+        raise HTTPException(status_code=404, detail="thread not found")
+    return {"keys": chat_threads_repo.list_media_keys(thread_id)}
 
 
 @app.post("/internal/admin/chat-threads/{thread_id}/messages")
@@ -665,7 +796,9 @@ def internal_append_chat_message(thread_id: int, payload: Dict[str, Any] = Body(
     role = payload.get("role")
     if role not in ("user", "assistant"):
         raise HTTPException(status_code=400, detail="role must be user or assistant")
-    result = chat_threads_repo.append_message(thread_id, role, payload.get("payload") or {})
+    message_payload = payload.get("payload") or {}
+    _check_field_size(json.dumps(message_payload, ensure_ascii=False), "payload")
+    result = chat_threads_repo.append_message(thread_id, role, message_payload)
     if result is None:
         raise HTTPException(status_code=404, detail="thread not found")
     return result
@@ -673,11 +806,23 @@ def internal_append_chat_message(thread_id: int, payload: Dict[str, Any] = Body(
 
 @app.put("/internal/admin/chat-threads/{thread_id}")
 def internal_update_chat_thread(thread_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """title(이름 변경)·tag(이모지 태그) 둘 다 이 PUT 하나로 처리한다 —
+    2026-09-26 tag 추가 전엔 title 하나뿐이라 필수값이었지만, 이제 어느
+    쪽이든 하나만 와도 된다(둘 다 없으면 400). tag는 "tag" 키가 payload에
+    있는지로 판단한다(None 값 자체가 "태그 해제"라는 유효한 요청이라
+    `payload.get("tag")`만으로는 "안 보냄"과 "해제"를 구분 못 한다)."""
     _check_admin_token(x_internal_token)
     title = payload.get("title")
-    if title is None:
-        raise HTTPException(status_code=400, detail="title required")
-    if not chat_threads_repo.update_thread_title(thread_id, title):
+    has_tag = "tag" in payload
+    tag = payload.get("tag")
+    if title is None and not has_tag:
+        raise HTTPException(status_code=400, detail="title or tag required")
+    updated = False
+    if title is not None:
+        updated = chat_threads_repo.update_thread_title(thread_id, title) or updated
+    if has_tag:
+        updated = chat_threads_repo.set_thread_tag(thread_id, tag) or updated
+    if not updated:
         raise HTTPException(status_code=404, detail="thread not found")
     return {"updated": True}
 
@@ -716,6 +861,15 @@ def internal_audit_list(
     before_id = int(cursor) if cursor else None
     events, next_cursor = audit_repo.list_events(limit=limit, before_id=before_id)
     return {"audits": events, "count": len(events), "next_cursor": next_cursor}
+
+
+@app.get("/internal/admin/prompts/{category}/{name}/activation-history")
+def internal_prompt_activation_history(category: str, name: str, x_internal_token: Optional[str] = Header(default=None)):
+    """2026-09-26 신설, 사용자 요청 — "프로덕션에 적용한 이력들도 남아야
+    해요, 몇시 몇분... 날짜에 했는지". audit_repo.list_prompt_activation_history
+    참고 — 새 저장소 없이 기존 audit_logs를 그대로 거른다."""
+    _check_admin_token(x_internal_token)
+    return {"history": audit_repo.list_prompt_activation_history(category, name)}
 
 
 # --- feature flag / threshold / admin 로그인 잠금 (v1.28) ---

@@ -52,7 +52,11 @@ def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> 
     # 3000~4500 토큰 필요) 생성에 도달하지 못한 것으로 보인다 — Sonnet
     # 계열에선 안 겪던 문제(추론 트레이스가 훨씬 김). reasoning+출력 둘 다
     # 여유 있게 max_tokens를 크게 올려서 재발 방지.
-    output = call_text(guide, f"다음 기사 원문으로 레터를 만들어주세요.\n\n{article}", model=MODEL, max_tokens=12000)
+    # 2026-09-26 — "다음 기사 원문으로 레터를 만들어주세요"처럼 코드가
+    # 결과물 종류를 못박던 문구를 뺐다(admin/backend/routes/prompts.py::
+    # _CATEGORY_BEDROCK 주석 참고). 무엇을 만들지는 전적으로 guide(저장된
+    # letters 지침, system 메시지)에 맡긴다.
+    output = call_text(guide, f"[입력 기사]\n{article}", model=MODEL, max_tokens=12000)
     out_path.write_text(output, encoding="utf-8")
 
     print(f"{tag} 완료 — {out_path}")

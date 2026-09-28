@@ -183,6 +183,14 @@ def _to_dict(pub: Dict[str, Any], view_channel: Optional[str] = None) -> Dict[st
                 "video_url": item.get("video_url"),
                 "media_url": item.get("media_url"),
                 "transcript": item.get("transcript"),
+                # series_title(2026-09-25 추가) — PostForm/WebtoonMode.tsx의
+                # useExistingSeriesTitles가 list_posts() 응답에서 이 필드를
+                # 읽는다(자동완성 제안용). lens 번들의 series_title은
+                # lenses[].series_title에만 있고 이 평탄화 블록이 여태
+                # 안 옮겨서, list_posts()가 lenses[] 원본을 빼면(아래 §413
+                # 수정) 파이프라인 발행 웹툰의 자동완성만 조용히 비게 될
+                # 뻔했다 — 여기서 같이 복사해 그 빈틈을 막는다.
+                "series_title": item.get("series_title"),
             }
 
     return {
@@ -317,7 +325,29 @@ def list_posts(status: Optional[str], channel: Optional[str], limit: int,
         sql += " ORDER BY admin_publish_date DESC NULLS LAST, created_at DESC LIMIT %s"
         params.append(limit)
         cur.execute(sql, params)
-        return [_to_dict(r, view_channel=channel) for r in cur.fetchall()]
+        posts = [_to_dict(r, view_channel=channel) for r in cur.fetchall()]
+
+    # 2026-09-25 — GET /admin/posts가 Lambda 동기 응답 한도(6MB)를 넘겨
+    # 413으로 매일 여러 번 죽고 있었다(admin/backend 로그 실측). 원인:
+    # 목록 응답이 상세 조회와 같은 _to_dict()를 그대로 써서 lens 번들
+    # (admin_post_id 있는 글 전부 — "277건 전부" 위 주석 참고)마다
+    # body_inline.lenses[](4포맷 전체 — 이미지 배열+영상/팟캐스트
+    # transcript 전문까지 중복 보유)를 통째로 실어 보냈다. 목록 화면
+    # 어디서도 이 원본 배열을 직접 읽지 않는다(admin/frontend 조사 —
+    # /posts는 body_inline.category만, /webtoon·/video·/home-player는
+    # 위 _to_dict()가 이미 평탄화해 body_inline 최상위에 복사해둔
+    # images/video_url/media_url/transcript/series_title만 읽는다) —
+    # 그래서 이 무거운 원본만 목록 응답에서 뺀다. 저장 경로
+    # (_update_lens_bundle_slice)는 클라이언트가 보낸 body_inline의
+    # lenses를 신뢰하지 않고 DB에 저장된 lenses를 다시 읽어 그 포맷
+    # 슬라이스 하나만 바꾸므로, 목록에서 lenses가 빠져도 저장 시
+    # 데이터 유실이 없다. 상세 조회(get())는 이 함수를 안 거치므로
+    # "4가지 시선" 편집기가 필요로 하는 전체 lenses[]를 그대로 받는다.
+    for post in posts:
+        body_inline = post.get("body_inline")
+        if isinstance(body_inline, dict) and "lenses" in body_inline:
+            body_inline.pop("lenses", None)
+    return posts
 
 
 def _update_lens_bundle_slice(

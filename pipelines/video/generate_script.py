@@ -29,6 +29,7 @@ webtoon의 이미지 생성 전용으로만 쓰기로 정책이 바뀌었다. �
 자동으로 채우거나 화이트리스트로 치환한다.
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -147,6 +148,35 @@ def fix_script(
                     applied.append(f"{tag}: 커넥터 variant '{node.get('variant')}' → 'arrow'(스키마상 유일 허용값)")
                     node["variant"] = "arrow"
 
+        # 2026-09-27 — 실측(20095225, 프로덕션 실패): stat 컷의 data.value가
+        # 숫자가 아니라 "1,200"처럼 콤마 섞인 문자열로 와서 schema.ts의
+        # z.number()에서 렌더 자체가 깨졌다(§23과 무관 — 수치는 이미
+        # 있는데 형식만 문자열이라 콤마/공백/단위 글자만 벗겨내는 순수
+        # 포맷 보정. unit 필드가 이미 따로 있으므로 "3.5조"처럼 배수
+        # 단위가 섞인 경우도 숫자 부분만 남기면 unit과 짝이 맞는다).
+        # 벗겨내도 숫자가 안 남으면(완전히 비수치) 건드리지 않고 그대로
+        # 둔다 — validate_script()가 누락으로 잡아 재요청 경로를 탄다.
+        if cut_type == "stat":
+            data = cut.get("data") or {}
+            value = data.get("value")
+            if isinstance(value, str):
+                # 콤마·공백만 순수 포맷으로 보고 벗긴 뒤, 맨 앞 숫자 하나만
+                # 뽑는다 — 뒤에 남는 게 전부 비숫자(단위 글자 등)일 때만
+                # 안전하게 확정한다. "16~30"처럼 뒤에 또 숫자가 남으면
+                # 범위/목록이라 **손대지 않는다** — 실제 사고(20095225):
+                # 순진하게 비숫자 문자를 전부 지우면 "~"만 사라져
+                # "1630"이라는 없는 숫자가 만들어졌다.
+                cleaned = re.sub(r"[,\s]", "", value)
+                m = re.match(r"^(-?\d+(?:\.\d+)?)", cleaned)
+                coerced = None
+                if m and not re.search(r"\d", cleaned[m.end():]):
+                    coerced = float(m.group(1))
+                if coerced is not None:
+                    if coerced == int(coerced):
+                        coerced = int(coerced)
+                    data["value"] = coerced
+                    applied.append(f"{tag}: data.value 문자열 '{value}' → 숫자 {coerced}")
+
         fixed_cuts.append(cut)
 
     script["cuts"] = fixed_cuts
@@ -154,8 +184,24 @@ def fix_script(
 
 
 def validate_script(script: dict) -> list[str]:
-    """자동으로 못 고치는(=사실 정보가 빠진) 문제만 에러로 남긴다."""
+    """자동으로 못 고치는(=사실 정보가 빠진) 문제만 에러로 남긴다.
+
+    2026-09-27 — cuts가 아예 비어있거나 brand/source가 빠진 스크립트가
+    여기서는 에러 0건으로 통과해(for 루프가 빈 cuts를 그냥 건너뜀, brand/
+    source는 애초에 검사한 적이 없음) script.json으로 그대로 저장되고,
+    한참 뒤 render.ts의 Zod 스키마(brand: min(1), cuts: min(1), source:
+    min(1))에서야 실패하는 걸 실측(CloudWatch)으로 확인 — Opus 5 전환
+    후 재요청 응답이 거의 빈 JSON으로 오는 경우가 실제로 있었다. 이제
+    최상위 필수 필드도 여기서 검사해 기존 재요청(§ generate_script의
+    "검증 실패" 분기) 경로를 타게 한다 — render.ts까지 안 가고 여기서
+    막혀야 원인이 뭔지(어떤 필드가 비었는지) 로그에 남는다."""
     errors: list[str] = []
+    if not (script.get("brand") or "").strip():
+        errors.append("brand: 비어있음")
+    if not (script.get("source") or "").strip():
+        errors.append("source: 비어있음")
+    if not script.get("cuts"):
+        errors.append("cuts: 비어있음(최소 1개 필요)")
     for i, cut in enumerate(script.get("cuts", [])):
         cut_type = cut.get("type")
         tag = f"cut[{i}]({cut_type})"
@@ -172,6 +218,21 @@ def validate_script(script: dict) -> list[str]:
         if cut_type == "stat":
             if not data or data.get("value") is None or not data.get("unit") or not data.get("label"):
                 errors.append(f"{tag}: data.value/unit/label 중 누락 — 수치 정보 직접 확인 필요")
+            elif isinstance(data.get("value"), str):
+                # 2026-09-28 실측(20095225) — fix_script()의 콤마·단위 보정
+                # (아래 참고)으로도 못 고치는 경우, 즉 "16~30"처럼 숫자가
+                # 둘 이상 섞인 범위값이면 render.ts의 z.number() 스키마에서
+                # 매번 죽는다. 범위는 stat 한 칸에 담을 수 있는 값이 아니라
+                # 재요청으로 컷 타입 자체를 바꾸게 한다(§23과 무관 — 있는
+                # 수치를 지어내는 게 아니라 "이 수치는 stat 칸에 안
+                # 맞는다"는 형식 문제).
+                cleaned = re.sub(r"[,\s]", "", data["value"])
+                m = re.match(r"^-?\d+(?:\.\d+)?", cleaned)
+                if not (m and not re.search(r"\d", cleaned[m.end():])):
+                    errors.append(
+                        f"{tag}: data.value가 범위/비수치 문자열('{data['value']}') — "
+                        "stat이 아니라 highlight 등 수치 없는 타입으로 바꿀 것"
+                    )
         elif cut_type == "diagram":
             if not data or not data.get("nodes"):
                 errors.append(f"{tag}: data.nodes 누락/비어있음")
@@ -218,7 +279,12 @@ def generate_script(
     )
 
     print(f"{tag} 각본 생성 중...")
-    raw = call_text(guide, f"다음 기사 원문으로 영상 각본 + 렌더용 JSON을 만들어주세요.\n\n{article_input}", max_tokens=4000)
+    # 2026-09-26 — "다음 기사 원문으로 영상 각본 + 렌더용 JSON을 만들어주세요"
+    # 처럼 코드가 결과물 종류를 못박던 문구를 뺐다(admin/backend/routes/
+    # prompts.py::_CATEGORY_BEDROCK 주석 참고, 사용자 지적: "프롬프트 입력
+    # 칸에 넣은 대로 제어가 되기를 바란다"). 무엇을 만들지는 전적으로
+    # guide(저장된 video 지침, system 메시지)에 맡긴다.
+    raw = call_text(guide, f"[입력 기사]\n{article_input}", max_tokens=4000)
     (out / "raw_response.txt").write_text(raw, encoding="utf-8")
 
     # 2026-08-22 — GPT에서 Bedrock Claude로 각본 생성 모델을 바꾸며 새로 나온

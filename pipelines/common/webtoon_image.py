@@ -175,12 +175,21 @@ def characters_block(characters: dict | None) -> str:
 # CHARACTER_*가 비어 있는 건 여전히 에러 — 그건 정말 문서가 깨진
 # 경우다). 값은 pipeline.py::_PROVIDER_CONFIG·admin
 # webtoonImageModels.ts의 IMAGE_MODELS[].id와 같은 어휘를 쓴다
-# ("sd_ultra"/"pipeline"/"stable_image_core"/"sd35_large"/"style_guide").
+# ("sd_ultra"/"stable_image_core"/"sd35_large").
+#
+# 2026-09-25, 사용자 결정 — "pipeline"(GPU IP-Adapter+Style Transfer)과
+# "style_guide"(레퍼런스 이미지 화풍)를 뺐다. 둘 다 실제로는 쓰이고
+# 있지 않았다(발행 문서에 IMAGE_MODEL 자체가 없어 sd_ultra로 계속
+# 폴백 중이었음, get_active_image_model() 참고) — "사용하지 않으면
+# 삭제" 결정에 따라 GPU 경로(_generate_cut_once의 두 분기, gpu_ipadapter.py
+# 전체, GPU EC2 인스턴스·IAM)까지 같이 걷어냈다. style_guide가 쓰던
+# build_style_guide_prompt()는 nova_canvas가 그대로 재사용하므로 남겨뒀다
+# (_generate_cut_once의 nova_canvas 분기 참고).
 _DOC_HEADINGS = ("STYLE", "CHARACTER_FEMALE", "CHARACTER_MALE", "IMAGE_MODEL")
 _DOC_HEADING_RE = re.compile(r"^##\s+(STYLE|CHARACTER_FEMALE|CHARACTER_MALE|IMAGE_MODEL)\s*$")
 
 _DEFAULT_IMAGE_MODEL = "sd_ultra"  # 2026-09-20 결정 — "GPU를 꼭 써야할까요?" 이후 admin 기본값과 동일
-_VALID_IMAGE_MODELS = ("sd_ultra", "pipeline", "stable_image_core", "sd35_large", "style_guide")
+_VALID_IMAGE_MODELS = ("sd_ultra", "stable_image_core", "sd35_large")
 
 
 def serialize_prompt_doc(style: str, char_female: str, char_male: str, image_model: str = "") -> str:
@@ -273,21 +282,6 @@ def get_image_settings() -> tuple[str, dict, str]:
     characters = {"A (여성 기자, 설명자)": female, "B (남성 청자)": male}
     return style, characters, (model or _DEFAULT_IMAGE_MODEL)
 
-
-
-def _character_text_for(subject: str) -> str:
-    """A/B 각각의 admin 저장 CHARACTER 텍스트 한 명분만 돌려준다(GPU
-    IP-Adapter 솔로 생성 프롬프트에 붙이는 용도 — generate_bedrock_composed_image_bytes()/
-    generate_dual_character_init_bytes() 참고). 2026-09-16 — 예전엔 CHARACTER
-    텍스트가 pipeline 모델 생성 어디에도 안 쓰였다(identity는 참조 사진만
-    으로 고정). admin이 CHARACTER_FEMALE/MALE을 편집·발행해도 실제 생성
-    결과가 전혀 안 바뀌는 건 "화면에서 저장한 프롬프트만 생성을 통제해야
-    한다"는 원칙 위반이라 여기서부터 합류시킨다."""
-    chars = get_fixed_characters()
-    for label, text in chars.items():
-        if label.startswith(subject + " "):
-            return text
-    return ""
 
 
 def build_background_prompt(
@@ -391,41 +385,6 @@ _STYLE_GUIDE_CONTENT_RULES = (
     "what [SCENE] describes and nothing more — no extra background crowds "
     "or characters beyond what [SCENE] specifies."
 )
-
-# 2026-09-08(3차, #14 "배경 엑스트라 난입" 근본 원인 조사) — 위
-# _STYLE_GUIDE_CONTENT_RULES에 "no extra crowds"라고 이미 명시돼 있는데도
-# 실전 8컷 중 5컷에서 배경 인물이 계속 등장했다(라운드기록.md #14/R8).
-# 원인을 좁혀보니 텍스트 지시의 문제가 아니라 **참고 이미지(Style Guide의
-# 화풍 앵커) 자체가 "방송 스튜디오/카메라 장비"가 있는 배경**이라, 그
-# 구도·소품까지 이미지 컨디셔닝을 통해 같이 전이되고 있었다 — 프롬프트에
-# "하지 말라"는 문장을 아무리 강하게 추가해도(단일 테스트로 fidelity
-# 0.3~0.5 여러 조합 시도) 거의 효과가 없었다(positive 프롬프트 안의 부정문은
-# 확산 모델이 잘 못 지킨다는 게 이미 알려진 한계).
-#
-# 반면 Bedrock Style Guide 요청 바디에 별도 `negative_prompt` 필드를
-# 추가하니(문서화는 안 돼 있지만 Stability API 계열이 보통 지원) 단일
-# 테스트 4/4에서 스튜디오 장비·군중·제3의 인물이 안정적으로 사라지고
-# 정확히 2인 구성이 유지됐다 — negative_prompt는 classifier-free guidance로
-# 별도 처리되어 본문 프롬프트의 "하지 말라" 문장보다 훨씬 강하게 먹힌다.
-# (단, 이 negative_prompt만으로는 "카페" 같은 구체적 장소까지 재현하진
-# 못했다 — 여전히 기본값인 도심 거리로 나옴. 장소 재현은 [SCENE] 텍스트를
-# 영어 키워드로 앞세우는 별도 처리가 필요해 이번엔 범위 밖으로 남기고
-# #4로 계속 이월한다. 라운드기록.md R9 참고.)
-_STYLE_GUIDE_NEGATIVE_PROMPT = (
-    "broadcast studio, TV studio, press conference stage, stage lighting rig, "
-    "film camera, tripod, microphone, press badge, lanyard, crowd, third "
-    "person, extra person, additional character, background bystanders, "
-    "other people, "
-    # 2026-09-18, 양진희 피드백("배경과 인물이 겹쳐서 나오고 있는") — 이
-    # negative_prompt는 generate_bedrock_style_transfer_bytes()(파이프라인
-    # 최종 합성 단계)도 재사용한다(_style_hint_from_db 주석 참고). R22에서
-    # 이미 한 번 발견됐던 "흐릿한 유령 인물" 문제가 실사용에서 재현돼
-    # 관련 항목을 보강한다.
-    "ghosted people, blurred people, silhouette people, faded figures, "
-    "double exposure people, transparent people, "
-    "signage text, readable text, letters, watermark"
-)
-
 
 def build_style_guide_prompt(camera: str, scene: str) -> str:
     """Style Guide 경로 전용 프롬프트 — 위 실측 결과를 따라 일부러
@@ -577,10 +536,10 @@ def generate_bedrock_sd_ultra_image_bytes(prompt: str) -> bytes:
 
 
 def _retry_generate_and_write(bytes_fn, out_path: Path, retries: int) -> bool:
-    """공통 재시도 + 파일-쓰기 래퍼 — generate_bedrock_image()와
-    generate_bedrock_style_guide_image()는 실제 생성 호출(bytes_fn)만
-    다르고 재시도 로직(지수 백오프 12/24/36초, 실패 로그)은 완전히
-    같아서 2026-09-08 Style Guide 추가 때 중복되던 걸 추출했다."""
+    """공통 재시도 + 파일-쓰기 래퍼 — 모델별 generate_bedrock_*_image() 함수들은
+    실제 생성 호출(bytes_fn)만 다르고 재시도 로직(지수 백오프 12/24/36초,
+    실패 로그)은 완전히 같아서 2026-09-08 Style Guide 추가 때 중복되던
+    걸 추출했다."""
     for attempt in range(retries):
         try:
             data = bytes_fn()
@@ -606,487 +565,25 @@ def generate_bedrock_image(prompt: str, out_path: Path, retries: int = 3) -> boo
     return _retry_generate_and_write(lambda: generate_bedrock_image_bytes(prompt), out_path, retries)
 
 
-# ─────────────────────────────────────────────────────────────
-# Bedrock Stable Image Style Guide 호출 (2026-09-08 신설)
-# ─────────────────────────────────────────────────────────────
-#
-# 배경: 사용자가 카카오톡으로 공유한 참고 샘플(육하원칙 프롬프트 문서로
-# GPT 이미지 툴에서 뽑은 결과물)과 Stable Image Core 순수 텍스트 프롬프트
-# 출력을 나란히 대조한 결과, 인물 렌더링 자체가 "플랫 셀 채색 웹툰"이
-# 아니라 "정교한 반실사 디지털 페인팅"으로 나오는 근본적 화풍 차이를
-# 발견했다 — STYLE 프롬프트에 "cel-shaded, NOT photorealistic"를 아무리
-# 명시해도 Stable Image Core 자체의 렌더링 성향을 못 이겼다.
-#
-# Style Guide는 텍스트 프롬프트 + 참고 이미지 1장을 같이 받아 그 이미지의
-# 화풍(선화·채색·인물 톤)을 새 장면에 적용한다 — 실측(2026-09-08, 참고
-# 이미지 1장 고정, 서로 다른 두 장면 프롬프트)으로 화풍·인물 헤어스타일이
-# 두 장면에서 거의 동일하게 유지되는 걸 확인, Stable Image Core보다
-# 참고 샘플에 훨씬 근접했다. 텍스트는 이 모델도 여전히 정확히 못 그린다
-# (화면 속 글자가 깨져 나옴) — compose_text.py의 PIL 합성 구조는 그대로
-# 유지한다.
-#
-# 참고 이미지는 assets/webtoon_style_reference.png(사용자가 준 샘플 원본)
-# 하나로 고정 — 8컷 전체가 같은 스타일 앵커를 쓰게 해서 컷 간 화풍
-# 일관성도 같이 챙긴다(캐릭터 얼굴 100% 동일은 여전히 보장 못 하지만,
-# 헤어스타일·색감·선화 스타일은 Style Guide 쪽이 확실히 낫다).
-STYLE_REFERENCE_IMAGE_PATH = Path(__file__).parent / "assets" / "webtoon_style_reference.png"
-STYLE_GUIDE_FIDELITY = 0.5  # 0=프롬프트 위주, 1=참고 이미지 재현 위주. 실측 후 조정 가능.
-# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
-# (BEDROCK_IMAGE_MODEL_ID와 동일 태깅 정책 — 비용태깅_규칙.md 참고).
-STYLE_GUIDE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/118crex43ghc"  # lens-webtoon-image-style-guide → us.stability.stable-image-style-guide-v1:0
-
-# 2026-09-16 — "코드로 설정하는 모든 것을 화면에서 커스터마이징 가능하게"
-# 요청으로, 지금까지 이 레포에 고정 번들된 파일(위 STYLE_REFERENCE_IMAGE_PATH)
-# 이었던 화풍 레퍼런스 이미지를 admin "이미지 실험" 패널에서 업로드/교체할 수
-# 있게 만든다. gpu_ipadapter.py의 인물 참조 사진(character_ref_A/B.png)과
-# 같은 버킷·같은 "refs/" 프리픽스를 쓴다 — 이미 그 GPU 파이프라인용으로
-# admin Lambda 역할에 Get/Put/Delete 권한이 나 있어(AdminWebtoonGpuBucket)
-# 새 IAM이 필요 없다. S3에 아직 아무것도 업로드된 적 없으면(최초 배포 직후)
-# 지금까지 쓰던 번들 파일로 조용히 폴백 — 이 폴백 때문에 기존 동작이
-# 하나도 안 바뀐다.
-_STYLE_REF_BUCKET = "sedaily-webtoon-ipadapter-887078546492"
-_STYLE_REF_KEY = "refs/style_reference.png"
-_STYLE_REF_REGION = "ap-northeast-2"  # gpu_ipadapter.GPU_REGION과 동일(버킷 홈 리전)
-_STYLE_REF_CACHE_TTL_SEC = 60  # prompt_lab_repo.py의 draft 캐시와 같은 패턴 — admin이 방금 올린 이미지가 1분 안에 반영
-
-_style_reference_cache: tuple[float, str] | None = None  # (fetched_at, base64)
+# 2026-09-25 — 여기 있던 "Bedrock Stable Image Style Guide 호출"
+# 블록(참고 이미지 refs/style_reference.png 기반 화풍 고정, 2026-09-08
+# 신설)을 삭제했다. style_guide 모델 자체를 뺀 이유는 위
+# build_style_guide_prompt() 근처 주석 참고 — 이 참고 이미지를 admin에서
+# 업로드/교체하던 UI(admin/backend/routes/webtoon/assets.py)도 함께
+# 정리했다.
 
 
-def _get_style_reference_b64() -> str:
-    global _style_reference_cache
-    now = time.time()
-    if _style_reference_cache is not None and now - _style_reference_cache[0] < _STYLE_REF_CACHE_TTL_SEC:
-        return _style_reference_cache[1]
-    try:
-        import boto3  # noqa: lazy — S3 경로를 안 타는 호출부(텍스트 전용 실험 등)에서 초기화 비용 회피
-
-        s3 = boto3.client("s3", region_name=_STYLE_REF_REGION)
-        body = s3.get_object(Bucket=_STYLE_REF_BUCKET, Key=_STYLE_REF_KEY)["Body"].read()
-        encoded = base64.b64encode(body).decode()
-    except Exception as e:  # noqa: BLE001 — 업로드 전이거나 조회 실패해도 번들 기본값으로 폴백, 생성 자체를 막지 않는다
-        print(f"[webtoon_image] 화풍 레퍼런스 S3 조회 실패({type(e).__name__}: {e}) — 번들 기본값 사용")
-        encoded = base64.b64encode(STYLE_REFERENCE_IMAGE_PATH.read_bytes()).decode()
-    _style_reference_cache = (now, encoded)
-    return encoded
-
-
-def generate_bedrock_style_guide_image_bytes(prompt: str, fidelity: float = STYLE_GUIDE_FIDELITY) -> bytes:
-    """Stable Image Style Guide(Bedrock) 1회 호출 — generate_bedrock_image_bytes()와
-    같은 계약(성공하면 PNG bytes, 실패하면 예외)이지만 STYLE 텍스트 대신
-    참고 이미지 1장으로 화풍을 고정한다. prompt는 build_style_guide_prompt()가
-    만든 짧은 프롬프트를 그대로 받는다(스타일 힌트 문구 포함 필수 — 그
-    함수 상단 주석의 실측 결과 참고, 이미지만으로는 화풍이 안 지켜진다).
-
-    aspect_ratio를 BEDROCK_ASPECT_RATIO(3:2)로 고정 — 첫 실측 때 이 파라미터를
-    빠뜨려서 1:1 정사각형으로 나왔고, 좁아진 캔버스에서 말풍선 2개가 겹쳐
-    얼굴을 가리는 부수 문제까지 만들었다(compose_text.py의 말풍선 배치는
-    3:2 비율을 전제로 튜닝돼 있음).
-
-    negative_prompt에 _STYLE_GUIDE_NEGATIVE_PROMPT를 항상 붙인다 — 참고
-    이미지의 스튜디오 장비·군중이 이미지 컨디셔닝으로 새어 들어오는 문제를
-    본문 프롬프트의 "하지 말라" 문장으로는 못 막았고, 이 필드로 실측
-    확인함(모듈 상단 _STYLE_GUIDE_NEGATIVE_PROMPT 주석·라운드기록.md R9)."""
-    body = json.dumps({
-        "prompt": prompt[:9500],
-        "negative_prompt": _STYLE_GUIDE_NEGATIVE_PROMPT,
-        "image": _get_style_reference_b64(),
-        "fidelity": fidelity,
-        "aspect_ratio": BEDROCK_ASPECT_RATIO,
-        "output_format": "png",
-    })
-    return _invoke_and_decode_image(_get_bedrock_image_client(), STYLE_GUIDE_MODEL_ID, body)
-
-
-def generate_bedrock_style_guide_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
-    """generate_bedrock_image()와 동일한 파일-쓰기 + 재시도 래퍼(Style Guide 버전,
-    _retry_generate_and_write() 공유)."""
-    return _retry_generate_and_write(lambda: generate_bedrock_style_guide_image_bytes(prompt), out_path, retries)
-
-
-# ─────────────────────────────────────────────────────────────
-# 구도-화풍 분리 파이프라인 (2026-09-08, R11) — #4(장면 이행력) 근본 해결
-# ─────────────────────────────────────────────────────────────
-#
-# 배경: Style Guide/Core 둘 다 "플랫 셀 웹툰체" 같은 화풍 지정과 [SCENE]의
-# 구체적 장소(카페·사무실 등)를 한 프롬프트에 동시에 요구하면 장소 지시를
-# 거의 무시하고 특정 배경(번화가 거리+군중)으로 쏠렸다(라운드기록.md R9).
-# 그런데 화풍 지정 없이 "사진처럼" 요청하면 같은 모델이 장소 지시를
-# 놀랍도록 정확히 따른다는 걸 R11에서 실측 확인 — 문제는 모델의 장소
-# 이해력이 아니라 "화풍+장면"을 동시에 요구하는 것 자체였다.
-#
-# 그래서 3단계로 나눈다:
-#   1) translate_scene_to_photo_brief() — 한국어 [SCENE]/[CAMERA]를 짧은
-#      영어 사진 브리핑으로 압축(Claude 텍스트 호출, 이미 1·2단계에 쓰는
-#      모델 재사용). 한국어 원문을 "사진처럼" 프롬프트에 그대로 섞으면
-#      Bedrock 콘텐츠 필터에 비결정적으로 걸리는 걸 실측으로 발견했다
-#      (동일 장면을 영어 브리핑 없이 여러 문장 구조로 시도 → 6/7 실패,
-#      번역 브리핑을 쓴 뒤로는 안정적으로 통과) — 필터 회피 목적도 겸한다.
-#   2) generate_bedrock_photoreal_image_bytes() — 이 브리핑으로 순수
-#      포토리얼 사진(Stable Image Core)을 생성. 화풍 지정이 없어서 장소·
-#      인원수 지시를 잘 따른다.
-#   3) generate_bedrock_style_transfer_bytes() — 그 사진을 init_image로,
-#      기존 webtoon_style_reference.png를 style_image로 Style Transfer
-#      호출 — 구도(장소+인원수)는 그대로 두고 화풍만 지금 확립한 플랫
-#      셀 웹툰체로 덧입힌다.
-#
-# 세 호출 다 실패하면 예외를 던져 _retry_generate_and_write()가 전체를
-# 재시도한다(부분 재시도는 안 함 — 어느 단계가 실패했든 처음부터 다시
-# 하는 게 상태 추적 복잡도를 피하는 더 단순한 선택).
-STYLE_TRANSFER_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/tck49g1f12v9"  # lens-webtoon-image-style-transfer
-# 2026-09-18 — SYSTEM 프로파일 직호출을 Service=atlas4 application profile로 교체.
-# 기반 모델·리전·응답은 동일하고 비용 귀속만 Not Applicable → atlas4로 바뀐다.
-
-_SCENE_TRANSLATE_MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46 재사용
-
-# 2026-09-09(R15) — subjects 분류를 같이 받도록 확장. 캐릭터 일관성(#15)
-# 근본 해법(gpu_ipadapter.py, IP-Adapter)은 참조 얼굴 1장으로 "이 사진
-# 속 인물처럼" 고정하는 기법이라 두 사람이 한 프레임에 같이 나오는 컷엔
-# 그대로 못 쓴다(둘 다 같은 얼굴로 쏠림 — 다중 인물 identity-lock은
-# InstantID 등 별도 기법 필요, 이번 범위 밖). 그래서 이 컷이 "한 명만
-# 크게 나오는 클로즈업"인지 "둘 다 나오는" 컷인지 미리 분류해서, 전자만
-# GPU IP-Adapter 경로를 태운다 — 텍스트 압축과 같은 호출에 묶어서 별도
-# LLM 호출을 추가하지 않는다.
-# 2026-09-16 — 원래 문구가 "compress"(압축)였는데, 실제로는 admin이 SCENE에
-# 적은 내용 중 일부가 조용히 요약·생략된 채로 이미지 생성에 들어갈 수 있다는
-# 뜻이었다("관리자가 화면에서 저장한 프롬프트만이, 안 보이는 변형 없이 생성을
-# 통제해야 한다"는 원칙 위반). 이 호출 자체(한국어→영어 번역)는 없앨 수
-# 없다 — GPU IP-Adapter(SD1.5)·Bedrock Stable Image Core 둘 다 영어 학습
-# 모델이라 한국어 프롬프트를 직접 못 알아듣는다(순수 언어 변환은 "안 보이는
-# 곳에서 내용이 달라지는" 문제가 아니라 모델이 요구하는 언어로 옮기는
-# 기술적 필수 단계). 그래서 "압축·요약" 대신 "SCENE에 적힌 내용을 빠짐없이
-# 그대로 번역, 생략·요약·창작 금지"로 지침을 바꾼다 — subjects 분류(A/B/BOTH)
-# 는 이미지에 실리는 콘텐츠가 아니라 어느 GPU 경로를 탈지 정하는 순수 라우팅
-# 판단이라 그대로 유지한다.
-_SCENE_TRANSLATE_SYSTEM = (
-    "You translate a Korean scene description into English for a real "
-    "photographer, AND classify which character(s) are the main visual "
-    "focus. This is a literal translation, not a rewrite — preserve every "
-    "detail, action, and prop the original text describes; do not omit, "
-    "summarize away, or invent anything that isn't in the original. Output "
-    "exactly this format:\n"
-    "SUBJECTS: A|B|BOTH\n"
-    "BRIEF: <English translation of the scene, describing location, setting, "
-    "mood, camera framing as if directing a real documentary photo shoot — "
-    "translate completely, keep it as concise as the original Korean text "
-    "already is>\n\n"
-    "Decision rule (apply in this order):\n"
-    "1. If the [SCENE] text describes an action, expression, or pose for BOTH A and B "
-    "(even briefly, e.g. 'A leans forward while B sits back'), output BOTH — this is "
-    "the default and most common case for a two-person dialogue scene.\n"
-    "2. Only output A or B when the OTHER character is explicitly described as absent, "
-    "tiny, blurred, off-frame, or the camera is an extreme close-up on just one face/"
-    "upper body with no mention of the other person's pose or action at all.\n"
-    "3. When genuinely unsure, prefer BOTH.\n"
-    "Do not mention illustration, cartoon, or any art style — describe it as a real photo."
-)
-
-_PHOTOREAL_NEGATIVE_PROMPT = (
-    "illustration, cartoon, anime, painting, drawing, third person, extra person, "
-    "additional character, third wheel, bystanders, crowd, other people, "
-    "ghosted people, blurred people, silhouette people, faded figures, "
-    "double exposure people, transparent people, watermark, "
-    # 2026-09-18, 양진희 피드백 — 배경 소품(주유소 간판·가격판 등)에 한글이
-    # 아닌 가짜 동양권 문자(일본어+중국어 짜집기처럼 보이는)가 새어 들어옴.
-    # "text" 한 단어만으로는 약해서(실측 재현), _STYLE_GUIDE_NEGATIVE_PROMPT가
-    # 이미 효과를 본 것과 같은 수준으로 구체적으로 나열한다.
-    "text, signage text, readable text, storefront text, price board text, "
-    "screen text, letters"
-)
-
-
-def translate_scene_to_photo_brief(camera: str, scene: str) -> tuple[str, str]:
-    """한국어 [SCENE]/[CAMERA] → (subjects, brief). subjects는 "A"|"B"|"BOTH"
-    (gpu_ipadapter.py가 단일 인물 컷 판별에 씀), brief는 짧은 영어 사진
-    브리핑. bedrock_client.call_text()를 지연 import한다(이 모듈은 텍스트
-    호출 없이 이미지 생성만 하는 admin 실험 패널 등에서도 쓰이므로, 텍스트
-    클라이언트 초기화 비용을 정말 필요할 때만 치른다 —
-    _get_bedrock_image_client()의 lazy-import boto3와 같은 이유).
-
-    응답 형식이 예상과 다르면(파싱 실패) subjects="BOTH"로 안전하게
-    폴백한다 — GPU IP-Adapter 경로를 잘못 태우는 것보다 기존 경로로
-    떨어지는 게 안전하다."""
-    from bedrock_client import call_text  # pipelines/common/ — sibling, flat import
-
-    user = f"[SCENE]\n{scene}\n\n[CAMERA]\n{camera}"
-    raw = call_text(_SCENE_TRANSLATE_SYSTEM, user, model=_SCENE_TRANSLATE_MODEL_ID, max_tokens=200, temperature=0.3)
-
-    # 2026-09-09(R22) 버그 수정 — 정규식 알터네이션은 순서대로 첫 매치에서
-    # 멈춘다. (A|B|BOTH)로 쓰면 실제 텍스트가 "BOTH"여도 "B"가 먼저 매치돼
-    # 거기서 멈춰버려 늘 "B"로 잘못 파싱됐다(R15부터 존재하던 버그 — LLM이
-    # 맞게 "BOTH"라고 답해도 코드가 매번 "B"로 읽어서, "두 사람이 같이
-    # 나오는 컷"이 계속 "B 단독 인물 고정" 경로로 잘못 처리되고 있었다).
-    # 더 구체적인 대안(BOTH)을 먼저 시도하도록 순서를 바꿔서 해결.
-    m = re.search(r"SUBJECTS:\s*(BOTH|A|B)", raw)
-    subjects = m.group(1) if m else "BOTH"
-    m2 = re.search(r"BRIEF:\s*(.+)", raw, re.DOTALL)
-    brief = m2.group(1).strip() if m2 else raw.strip()
-    return subjects, brief
-
-
-def build_photoreal_init_prompt(photo_brief: str) -> str:
-    return (
-        "Photograph of exactly two people only, nobody else in the frame. "
-        "Photorealistic, natural lighting, documentary photography style.\n\n"
-        + photo_brief
-    )
-
-
-def generate_bedrock_photoreal_image_bytes(prompt: str) -> bytes:
-    """Stable Image Core 호출(포토리얼 버전) — generate_bedrock_image_bytes()와
-    거의 같지만 negative_prompt를 받는다(_PHOTOREAL_NEGATIVE_PROMPT 고정,
-    "제3의 인물"·일러스트 화풍 배제 목적)."""
-    body = json.dumps({
-        "prompt": prompt[:9500],
-        "negative_prompt": _PHOTOREAL_NEGATIVE_PROMPT,
-        "aspect_ratio": BEDROCK_ASPECT_RATIO,
-        "output_format": "png",
-    })
-    return _invoke_and_decode_image(_get_bedrock_image_client(), BEDROCK_IMAGE_MODEL_ID, body)
-
-
-def generate_bedrock_style_transfer_bytes(
-    init_image_bytes: bytes,
-    *,
-    composition_fidelity: float = 0.9,
-    style_strength: float = 1.0,
-    change_strength: float = 0.9,
-) -> bytes:
-    """Stable Style Transfer 호출 — init_image(구도)에 style_image(우리
-    webtoon_style_reference.png)의 화풍을 입힌다. 기본값은 R11 실측 비교에서
-    가장 화풍 일치도가 높았던 조합(style_strength=1.0). prompt는
-    _style_hint_from_db()로 admin이 저장한 STYLE 텍스트를 그대로 쓴다(2026-09-16
-    — 위 _STYLE_AB_ROLE_LINE 주석 참고)."""
-    body = json.dumps({
-        "init_image": base64.b64encode(init_image_bytes).decode(),
-        "style_image": _get_style_reference_b64(),
-        "prompt": _style_hint_from_db(),
-        "negative_prompt": _STYLE_GUIDE_NEGATIVE_PROMPT,
-        "composition_fidelity": composition_fidelity,
-        "style_strength": style_strength,
-        "change_strength": change_strength,
-        "output_format": "png",
-    })
-    return _invoke_and_decode_image(_get_bedrock_image_client(), STYLE_TRANSFER_MODEL_ID, body)
-
-
-def build_style_transfer_scene_input(camera: str, scene: str) -> str:
-    """generate_bedrock_composed_image()에 넘길 입력 — build_style_guide_prompt()류
-    다른 빌더들과 시그니처를 맞추기 위해 camera+scene을 한 문자열로 묶는다.
-    실제 파싱은 translate_scene_to_photo_brief()가 한다(스키마: build_style_guide_prompt()
-    의 [SCENE] 블록 표기와 동일)."""
-    return f"[SCENE]\n{scene}\n\n[CAMERA]\n{camera}"
-
-
-def _parse_style_transfer_scene_input(scene_input: str) -> tuple[str, str]:
-    m = re.match(r"^\[SCENE\]\n(.*?)\n\n\[CAMERA\]\n(.*)$", scene_input, re.DOTALL)
-    if not m:
-        raise ValueError("build_style_transfer_scene_input()으로 만든 입력이 아님")
-    return m.group(2), m.group(1)  # (camera, scene)
-
-
-def generate_bedrock_composed_image_bytes(
-    scene_input: str,
-    *,
-    apply_character_lock: bool = True,
-    apply_style_transfer: bool = True,
-) -> bytes:
-    """구도-화풍 분리 파이프라인(R12) — 번역 단계가 이제 subjects도 같이
-    반환한다(R15). subjects가 "A"/"B"(한 명만 크게 나오는 컷)면 GPU
-    IP-Adapter로 그 인물의 참조 얼굴을 고정한 사진을 만든다(캐릭터 일관성
-    #15 근본 해법, gpu_ipadapter.py 모듈 docstring 참고). "BOTH"(두 사람
-    같이 나오는 컷)는 각자 생성→합성한다(generate_dual_character_init_bytes()).
-
-    2026-09-09(R22) — R18에서 이 BOTH 경로를 재현성 부족(Style Transfer가
-    가끔 두 사람을 하나로 뭉개버림)으로 기본에서 뺐었는데, composition_fidelity
-    를 0.75→0.9로 올려서 재실측하니 3/3 전부 "뭉개짐" 없이 두 사람이 뚜렷이
-    분리됨을 확인 — 대신 배경에 흐릿한 3번째/4번째 인물이 살짝 겹쳐 보이는
-    다른(훨씬 다루기 쉬운) 문제로 바뀌었다. 이건 이미 있는 Rekognition
-    얼굴 수 QA 게이트(R10, pipeline.py의 _generate_and_qa_cut)가 정확히
-    잡아 재시도하는 종류의 문제라 — 근본적인 "뭉개짐"보다 훨씬 다루기 쉬워
-    다시 기본 경로로 승격.
-
-    2026-09-16 — admin에서 "이미지 고정(인물)·화풍 고정을 껐다 켰다 하고
-    싶다"는 요청으로 두 옵션을 추가했다(둘 다 기본 True = 지금까지의
-    동작 그대로).
-    - apply_character_lock=False: subjects를 "NONE"으로 강제해 GPU
-      IP-Adapter 참조 얼굴 고정 경로 자체를 건너뛴다 — 인물이 몇 명
-      나오든 "일반적인 사람"으로 생성된다(admin이 저장한 CHARACTER
-      텍스트도 이 경로에선 같이 빠진다 — 아래 분기 참고, subjects="NONE"
-      이면 IP-Adapter 분기를 안 타므로 _character_text_for()도 안 붙는다).
-    - apply_style_transfer=False: 3단계(Style Transfer)를 건너뛰고 그
-      직전 단계의 포토리얼 원본을 그대로 반환한다 — **결과물이 삽화가
-      아니라 사실적인 사진처럼 나온다**는 뜻이다(화풍 자체를 텍스트로
-      대신 입히는 게 아니라 그 단계를 통째로 스킵하는 것). 순수하게
-      "이 인물/구도가 실제로 어떻게 나오는지" 확인하고 싶을 때 쓴다."""
-    camera, scene = _parse_style_transfer_scene_input(scene_input)
-    subjects, brief = translate_scene_to_photo_brief(camera, scene)
-    if not apply_character_lock:
-        subjects = "NONE"
-
-    if subjects in ("A", "B"):
-        import gpu_ipadapter  # pipelines/common/ — sibling, GPU 경로를 안 쓰는 호출부의 boto3 비용 회피 위해 지연 import
-
-        subject_brief = f"{brief} {_character_text_for(subjects)}".strip()
-        init_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(subject_brief, subjects)
-        style_kwargs = {}
-    elif subjects == "BOTH":
-        init_bytes = generate_dual_character_init_bytes(brief)
-        style_kwargs = {"composition_fidelity": 0.9, "change_strength": 0.7}
-    else:
-        init_prompt = build_photoreal_init_prompt(brief)
-        init_bytes = generate_bedrock_photoreal_image_bytes(init_prompt)
-        style_kwargs = {}
-
-    if not apply_style_transfer:
-        return init_bytes
-    return generate_bedrock_style_transfer_bytes(init_bytes, **style_kwargs)
-
-
-# ─────────────────────────────────────────────────────────────
-# 두 인물 동시 등장 컷의 캐릭터 일관성(#15 잔여 과제, R18) — 각자
-# 생성 후 합성
-# ─────────────────────────────────────────────────────────────
-#
-# IP-Adapter는 참조 이미지 한 장으로만 인물을 고정하는 기법이라 두
-# 사람이 한 프레임에 같이 나오는 컷엔 그대로 못 쓴다는 게 R15의 결론
-# 이었다(다중 인물 identity-lock은 InstantID 등 별도 기법 필요).
-# 대신 "각자 따로 생성 → 배경 제거 → 합성" 구조를 실측해보니(1) A만
-# 나온 사진 (2) B만 나온 사진을 각각 IP-Adapter로 고정 생성하고,
-# Bedrock Remove Background(R17에서 처음 실사용)로 인물만 오려낸 뒤,
-# 빈 배경 사진 위에 나란히 붙이면 — 그 자체로는 이질감이 있지만(스케일·
-# 그림자·조명이 안 맞아 "잘라 붙인 티"가 남), 그 결과를 그대로
-# generate_bedrock_style_transfer_bytes()에 한 번 더 통과시키면 Style
-# Transfer가 이음매·조명·비례를 자연스럽게 재조정해준다는 걸 확인했다
-# (모델이 합성본을 "구조 가이드"로만 쓰고 다시 그리기 때문 — 이게 바로
-# Style Transfer의 본래 용도인 "구도는 보존하되 다시 그린다"에 정확히
-# 들어맞는다). composition_fidelity를 solo/BOTH 기본값(0.9)보다 낮춘
-# 0.75 — 합성 이음매를 더 적극적으로 재조정하게 하려면 원본 구조를
-# 너무 꽉 붙들지 않는 편이 낫다는 걸 실측으로 확인.
-_EMPTY_SCENE_NEGATIVE_PROMPT = "people, person, man, woman, illustration, cartoon, text, watermark"
-REMOVE_BACKGROUND_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/fo8lxrosnj66"  # lens-webtoon-image-remove-background
-
-
-def build_empty_scene_prompt(photo_brief: str) -> str:
-    """2026-09-18, 양진희 피드백("배경과 인물이 겹쳐서 나오고 있는") — 이
-    배경만 생성하는 단계가 "no people"이라고만 해도 흐릿한 사람 형체가
-    섞여 나오는 걸 실측 확인(코드 상단 R22 주석에 이미 기록된 문제 —
-    당시엔 Rekognition 얼굴 수 QA 게이트로 재시도해서 넘어갔는데, 그
-    게이트가 흐릿한 유령 인물을 "얼굴"로 인식 못 해 통과시키는 사례가
-    실사용에서 나옴). "no people"보다 "건물·가구만 그려라"는 적극적
-    지시가 부정문보다 확산 모델에 더 잘 먹힌다는 게 이 파일 다른 곳의
-    실측 결론(_STYLE_GUIDE_NEGATIVE_PROMPT 도입 배경 주석 참고)이라,
-    같은 방향으로 강화한다."""
-    return (
-        "Photograph of an empty location with absolutely no people, no human "
-        "figures, no silhouettes, and no blurred or ghosted human shapes "
-        "anywhere in the frame — compose using architecture, furniture, and "
-        "objects only. Photorealistic, natural lighting, documentary "
-        "photography style.\n\n"
-        + photo_brief
-    )
-
-
-def remove_background_bytes(image_bytes: bytes) -> bytes:
-    """Bedrock Remove Background 호출 — 알파 채널이 있는 PNG를 돌려준다
-    (인물만 남기고 나머지는 투명)."""
-    body = json.dumps({"image": base64.b64encode(image_bytes).decode(), "output_format": "png"})
-    return _invoke_and_decode_image(_get_bedrock_image_client(), REMOVE_BACKGROUND_MODEL_ID, body)
-
-
-def _composite_two_characters(bg_bytes: bytes, a_bytes: bytes, b_bytes: bytes) -> bytes:
-    """배경(인물 없음) + A 단독 사진(배경 제거됨) + B 단독 사진(배경
-    제거됨)을 좌우로 배치해 합성한다. 스케일·위치는 "테이블 앞에 나란히
-    앉은 두샷"을 가정한 고정 비율 — 장면마다 다른 구도(클로즈업·와이드
-    등)를 정교하게 반영하진 못하지만, 뒤이은 Style Transfer가 이음매를
-    재조정해주므로 이 정도 근사로 충분함을 실측으로 확인했다(모듈 상단
-    주석 참고). 카메라 타입별 정교한 배치는 다음 라운드 과제."""
-    from io import BytesIO
-
-    from PIL import Image, ImageDraw, ImageFilter
-
-    bg = Image.open(BytesIO(bg_bytes)).convert("RGBA")
-    a = Image.open(BytesIO(a_bytes)).convert("RGBA")
-    b = Image.open(BytesIO(b_bytes)).convert("RGBA")
-    bw, bh = bg.size
-
-    # 2026-09-09 실측 — 높이 기준으로만 리사이즈하면 상반신 크롭(가로로
-    # 넓은 원본)이 캔버스 폭의 절반을 훌쩍 넘어 두 인물이 가운데서 심하게
-    # 겹치고, 그 겹친 상태를 Style Transfer가 "얼굴 하나"로 뭉개버리는
-    # 문제를 발견함(라운드기록.md R18). 폭을 캔버스의 42%로 상한을 두고
-    # (높이 상한도 같이 걸어 이중 제약) 두 인물 사이에 최소 간격을 보장.
-    max_w = int(bw * 0.42)
-    max_h = int(bh * 0.70)
-
-    def _resize_to_fit(img, max_w, max_h):
-        scale = min(max_w / img.width, max_h / img.height)
-        return img.resize((int(img.width * scale), int(img.height * scale)))
-
-    a_r, b_r = _resize_to_fit(a, max_w, max_h), _resize_to_fit(b, max_w, max_h)
-    ground_y = int(bh * 0.98)
-    a_x, b_x = int(bw * 0.06), bw - int(bw * 0.06) - b_r.width
-    a_y, b_y = ground_y - a_r.height, ground_y - b_r.height
-
-    shadow = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    sd.ellipse([a_x, ground_y - 30, a_x + a_r.width, ground_y + 30], fill=(0, 0, 0, 90))
-    sd.ellipse([b_x, ground_y - 30, b_x + b_r.width, ground_y + 30], fill=(0, 0, 0, 90))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(20))
-
-    canvas = Image.alpha_composite(bg, shadow)
-    canvas.alpha_composite(a_r, (a_x, a_y))
-    canvas.alpha_composite(b_r, (b_x, b_y))
-
-    out = BytesIO()
-    canvas.convert("RGB").save(out, format="PNG")
-    return out.getvalue()
-
-
-# 2026-09-09 실측 — 공유 brief(예: "A는 왼쪽, B는 오른쪽, 마주 앉아
-# 대화")를 A/B 각각의 solo IP-Adapter 생성에 그대로 넘기면, 그 문장이
-# 상대방 묘사까지 담고 있어서 생성 결과가 "두 사람 특징이 섞인 하이브리드
-# 인물"로 나옴(A의 재킷 색+B의 셔츠가 한 인물 옷차림에 뒤섞이는 등,
-# 실측 확인). solo 생성 프롬프트는 장면 디테일과 무관하게 일반적인
-# 상반신 인물 사진으로 고정하고, 실제 장소 정보는 배경 이미지 쪽에서만
-# 가져온다 — 합성 후 Style Transfer가 이음매를 재조정해주므로 solo
-# 단계에서 장소를 정교하게 맞출 필요가 없다.
-_DUAL_SOLO_PROMPT_TEMPLATE = (
-    "upper body portrait, sitting at a table, natural relaxed pose, looking slightly "
-    "to the side as if talking to someone, plain simple background"
-)
-# _DUAL_SOLO_PROMPT_TEMPLATE는 "화풍/인물 묘사" 같은 admin 편집 대상 콘텐츠가
-# 아니라, 위 R9 실측 결과에 따라 일부러 장면과 무관하게 고정해야 하는 기술적
-# 포즈 스캐폴드다(공유 brief를 그대로 쓰면 인물 특징이 섞이는 문제가 재현됨
-# — 위 주석 참고). 대신 "누구를 그리는지"에 해당하는 실제 외형 콘텐츠는
-# admin이 저장한 CHARACTER_FEMALE/MALE(_character_text_for())에서 매 호출마다
-# 가져온다(2026-09-16).
-
-
-def generate_dual_character_init_bytes(photo_brief: str) -> bytes:
-    import gpu_ipadapter  # pipelines/common/ — sibling
-
-    a_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(
-        f"{_DUAL_SOLO_PROMPT_TEMPLATE}. {_character_text_for('A')}".strip(), "A"
-    )
-    b_bytes = gpu_ipadapter.generate_ipadapter_photo_bytes(
-        f"{_DUAL_SOLO_PROMPT_TEMPLATE}. {_character_text_for('B')}".strip(), "B"
-    )
-    bg_bytes = generate_bedrock_photoreal_image_bytes(build_empty_scene_prompt(photo_brief))
-    # negative_prompt는 generate_bedrock_photoreal_image_bytes() 내부에
-    # 이미 _PHOTOREAL_NEGATIVE_PROMPT로 고정돼 있어(인물 배제 문구는
-    # 없음) 여기서는 프롬프트 텍스트로만 "no people"을 지시한다 — 배경
-    # 생성에서 사람이 섞여 나와도 어차피 그 위에 A/B를 덮어 그리므로
-    # 크리티컬하지 않다.
-    a_cut = remove_background_bytes(a_bytes)
-    b_cut = remove_background_bytes(b_bytes)
-    return _composite_two_characters(bg_bytes, a_cut, b_cut)
-
-
-def generate_bedrock_composed_image(scene_input: str, out_path: Path, retries: int = 2) -> bool:
-    """구도-화풍 분리 3단계(번역→포토리얼→Style Transfer) 전체의 파일-쓰기
-    + 재시도 래퍼. 세 호출을 다 묶어서 재시도한다(부분 재시도 없음). 기본
-    retries=2(다른 generate_*는 3) — 한 시도당 Bedrock 호출이 3번이라
-    기본값 3을 그대로 쓰면 최악의 경우 호출 수가 지나치게 늘어난다."""
-    return _retry_generate_and_write(lambda: generate_bedrock_composed_image_bytes(scene_input), out_path, retries)
+# 2026-09-25 — 여기 있던 "구도-화풍 분리 파이프라인"(GPU IP-Adapter 인물
+# 고정 + Bedrock Stable Style Transfer 화풍 적용, pipeline 모델의 실제
+# 구현이었다) 블록을 통째로 삭제했다. 인물/화풍 고정이 발행 문서에
+# 한 번도 실제로 쓰인 적이 없었다는 게 라이브 확인으로 드러나(다른 주석
+# 참고), "사용하지 않으면 삭제" 결정에 따라 translate_scene_to_photo_brief·
+# generate_bedrock_photoreal_image_bytes·generate_bedrock_style_transfer_bytes·
+# generate_bedrock_composed_image_bytes(및 두 사람 동시 등장 컷 합성용
+# generate_dual_character_init_bytes/remove_background_bytes/
+# _composite_two_characters)까지 전부 같이 걷어냈다. gpu_ipadapter.py를
+# 부르는 유일한 코드가 이 블록이었다 — 그 모듈 자체(GPU EC2 제어)도
+# 함께 삭제됐다.
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1174,8 +671,6 @@ def _generate_cut_once(
     camera: str,
     scene: str,
     model: str,
-    apply_character_lock: bool,
-    apply_style_transfer: bool,
 ) -> bytes:
     """model 하나로 이미지 1장 생성 — 모델별 프롬프트 조립 방식만 다르고,
     QA·재시도는 호출부(generate_cut_image)가 모델 구분 없이 공통으로 담당한다.
@@ -1192,10 +687,13 @@ def _generate_cut_once(
     제어 가능하게" 요청 — 이 세 모델은 이제 style 자체를 안 넘긴다
     (build_background_prompt에 style=""). Camera/[SCENE]과 "텍스트 렌더
     금지" 안전장치만 남고, 화풍을 포함한 나머지는 전부 camera/scene
-    텍스트가 결정한다. style_guide/pipeline(GPU) 모델은 별개 메커니즘
-    (참고 이미지가 화풍을 앵커하고 텍스트는 그걸 보조하는 구조)이라
-    이 변경 밖 — build_style_guide_prompt()의 _style_hint_from_db()
-    주석 참고."""
+    텍스트가 결정한다.
+
+    2026-09-25 — "pipeline"(GPU IP-Adapter+Style Transfer)·"style_guide"
+    (레퍼런스 이미지 화풍) 분기를 삭제했다(사용자 결정, 모듈 상단 주석
+    참고). 알 수 없는 model이 오면(예: 옛 발행 문서에 남은 값) sd_ultra로
+    안전하게 폴백한다 — get_active_image_model()이 이미 _DEFAULT_IMAGE_MODEL
+    로 같은 폴백을 하고 있어 여기서도 조용히 죽지 않는 게 일관된 동작."""
     if model == "stable_image_core":
         prompt = build_background_prompt(
             camera, scene, style="",
@@ -1210,39 +708,27 @@ def _generate_cut_once(
         )
         return generate_bedrock_sd35_image_bytes(prompt)
 
-    if model == "sd_ultra":
-        prompt = build_background_prompt(
-            camera, scene, style="",
-            include_scene_reinforcement=False, include_character_reinforcement=False,
-        )
-        return generate_bedrock_sd_ultra_image_bytes(prompt)
-
-    if model == "style_guide":
-        prompt = build_style_guide_prompt(camera, scene)
-        return generate_bedrock_style_guide_image_bytes(prompt)
-
     if model == "nova_canvas":
-        # 참고 이미지 컨디셔닝이 없는 순수 text-to-image라 style_guide와
-        # 같은(스타일 힌트가 포함된) 프롬프트를 그대로 재사용한다 — 모델별로
+        # 참고 이미지 컨디셔닝이 없는 순수 text-to-image라 style_guide가
+        # 쓰던(스타일 힌트가 포함된) 프롬프트를 그대로 재사용한다 — 모델별로
         # 다른 프롬프트를 쓰면 "같은 지문, 다른 모델" 비교가 아니게 된다.
         prompt = build_style_guide_prompt(camera, scene)
         return generate_nova_canvas_image_bytes(prompt)
 
-    # "pipeline"(기본) — GPU IP-Adapter + Style Transfer
-    scene_input = build_style_transfer_scene_input(camera, scene)
-    return generate_bedrock_composed_image_bytes(
-        scene_input, apply_character_lock=apply_character_lock, apply_style_transfer=apply_style_transfer
+    # "sd_ultra"(기본, 알 수 없는 값도 여기로 폴백)
+    prompt = build_background_prompt(
+        camera, scene, style="",
+        include_scene_reinforcement=False, include_character_reinforcement=False,
     )
+    return generate_bedrock_sd_ultra_image_bytes(prompt)
 
 
 def generate_cut_image(
     camera: str,
     scene: str,
-    model: str = "pipeline",
+    model: str = "sd_ultra",
     *,
     has_dialogue: bool = True,
-    apply_character_lock: bool = True,
-    apply_style_transfer: bool = True,
 ) -> tuple[bytes, list | None]:
     """컷 이미지 1장 생성 — admin 실험 패널과 발행 파이프라인이 공유하는
     단일 정본 디스패치(위 섹션 주석 참고, 정리후보 A+D). 반환값은
@@ -1256,7 +742,7 @@ def generate_cut_image(
     Ultra 경로만 하드코딩으로 QA on이라 "CMS로만 제어돼야 한다" 원칙에
     어긋났다 — 새 토글을 만드는 대신 후처리 자체를 없애 양쪽이 항상
     같게 동작하도록 정리했다."""
-    image_bytes = _generate_cut_once(camera, scene, model, apply_character_lock, apply_style_transfer)
+    image_bytes = _generate_cut_once(camera, scene, model)
     faces = None
     if has_dialogue:
         from rekognition_client import detect_main_faces  # pipelines/common/ — sibling, flat import
@@ -1311,8 +797,6 @@ def generate_cut_image_to_file(
     out_path: Path,
     *,
     has_dialogue: bool = True,
-    apply_character_lock: bool = True,
-    apply_style_transfer: bool = True,
     retries: int = 3,
 ) -> tuple[bool, list | None]:
     """generate_cut_image()의 파일-쓰기 + 배치 재시도(12/24/36초 백오프,
@@ -1331,8 +815,6 @@ def generate_cut_image_to_file(
             image_bytes, faces = generate_cut_image(
                 camera, scene_holder[0], model,
                 has_dialogue=has_dialogue,
-                apply_character_lock=apply_character_lock,
-                apply_style_transfer=apply_style_transfer,
             )
         except ValueError as e:
             if "Filter reason: prompt" in str(e) and not softened[0]:
@@ -1342,8 +824,6 @@ def generate_cut_image_to_file(
                 image_bytes, faces = generate_cut_image(
                     camera, scene_holder[0], model,
                     has_dialogue=has_dialogue,
-                    apply_character_lock=apply_character_lock,
-                    apply_style_transfer=apply_style_transfer,
                 )
             else:
                 raise

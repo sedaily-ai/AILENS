@@ -2,8 +2,8 @@
   "family": "sedaily-lens-video-lab",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
-  "cpu": "2048",
-  "memory": "4096",
+  "cpu": "1024",
+  "memory": "2048",
   "taskRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-task-role",
   "executionRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-execution-role",
   "runtimePlatform": {
