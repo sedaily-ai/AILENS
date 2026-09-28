@@ -246,3 +246,56 @@ Play Store 앱 번들 업데이트 작업(`mobile-capacitor/` Capacitor 전환) 
 - n=1(하루 전체) + n=1(늦은 회차) 검증뿐 — 여러 날짜/패턴 반복 검증 필요
 - 비용 실측 안 됨
 - 커밋 완료, 배포는 여전히 사용자 지시 대기
+
+---
+
+## 이어서 — 하루 누적 캡 구현 (같은 날)
+
+사용자 질문("그거는 어떻게 구현을 하면 되는건가요")에 답하며 실제 구현.
+
+**핵심 발견**: 새 엔드포인트가 필요 없었다. `GET /admin/posts`
+(`status`/`channel`/`date` 필터 이미 지원, `admin_posts_repo.list_posts`)가
+이미 있었고, 응답의 `body_inline.paper_section`으로 탭별/일반 구분이
+바로 가능했다.
+
+### 한 것
+
+- `pipelines/common/lens_cms_client.py`: `list_published_today(date,
+  channel, limit)` 신설 — 기존 `GET /admin/posts` 재사용. 실패 시 빈
+  리스트 반환(fail-open, 캡 계산 실패가 발행 자체를 막지 않음).
+- `pipelines/mustknow_auto/run.py`:
+  - `_today_published_counts(today_kst)` 신설 — 오늘 이미 발행된 글을
+    탭별(paper_section)+일반으로 카운트
+  - `tab_counts` 초기값을 `{"전체":0, ...}` 대신 이 함수 결과로 시작 —
+    기존 `if tab_counts[tab] >= _TAB_CAP` 체크가 코드 변경 없이 자동으로
+    "회차당"에서 "하루 누적"으로 바뀜(시작값만 바꿔서 해결, 최소 diff)
+  - `_GENERAL_DAILY_CAP = 20` 신설, "일반" 섹션에 `general_remaining
+    = _GENERAL_DAILY_CAP - tab_counts["일반"]` 계산 → 0 이하면 Bedrock
+    호출 자체를 스킵(비용 절감), 아니면 `max_count=general_remaining`으로
+    전달
+- `pipelines/mustknow_auto/classify.py`: `select_general_articles()`/
+  `_build_general_prompt()`에 `max_count` 파라미터 추가 — 프롬프트
+  원문(published.md)의 고정 "최대 20건" 문구를 실제 남은 자리 수로
+  덮어쓰는 지시를 앞에 삽입. 모델이 그 지시를 무시할 경우 대비해
+  `selected[:max_count]`로 클라이언트 사이드 하드컷도 추가.
+
+### 검증
+
+실제 라이브 lens-cms-api 호출로 오늘(2026-09-28) 발행 현황 확인:
+**증권 15건·산업 12건·전체 1건·시그널 1건·일반 10건**(총 39건) —
+목표(증권/산업/전체/시그널 각 4건, 일반 20건) 대비 증권·산업이 이미
+3~4배 초과 발행된 상태를 실측으로 재확인(회차당 상한만 있던 문제의
+실제 증거). 새 코드가 배포되면 다음 회차부터 `tab_counts["증권"]=15
+>= _TAB_CAP=4`로 즉시 걸려 더 이상 증권 기사를 안 뽑게 됨 — 문제와
+해결책이 동시에 실데이터로 확인됨.
+
+`py_compile` 전부 통과, `list_published_today()`는 실제 API 호출로
+검증 완료(카운트 로직도 실데이터로 재현).
+
+### 다음
+
+- 미커밋 — 이 세션 마지막 변경분, 커밋 대기
+- 배포 전까지는 라이브에 반영 안 됨(여전히 예전 무제한 누적 로직)
+- 다양성 규칙(카테고리당 5건 상한)은 여전히 회차 단위 — 하루 누적으론
+  "일반 카운트"만 캡이 걸리지, 회차별로 뽑힌 카테고리 조합까지 하루
+  전체로 다양성이 보장되진 않음(별도 이슈로 남김)

@@ -71,6 +71,31 @@ def create_post(data: dict[str, Any], created_by: str) -> dict[str, Any]:
     return res.json()["post"]
 
 
+def list_published_today(date: str, channel: str = "lens", limit: int = 200) -> list[dict[str, Any]]:
+    """오늘(또는 지정일) 이미 발행된 글 목록 — 하루 누적 캡(2026-09-28,
+    mustknow_auto 지면특별코너 4탭+일반 카테고리)에 쓴다. `GET /admin/posts`
+    가 이미 status/channel/date 필터를 지원해서(`admin_posts_repo.list_posts`)
+    새 엔드포인트 없이 재사용 — `date`는 `YYYY-MM-DD`(admin_publish_date
+    컬럼과 동일 형식, `_publish()`의 `publish_date_iso`와 같은 포맷).
+    limit=200은 하루 실제 발행량(현재 실측 최대 ~50건대)에 여유 있는 값.
+    실패 시 빈 리스트 반환(호출부가 "오늘 0건 발행"으로 간주 — fail-open,
+    캡 계산이 실패해도 발행 자체를 막지 않는다는 기존 원칙과 동일)."""
+    import requests  # noqa: lazy
+
+    try:
+        res = requests.get(
+            f"{LENS_CMS_API_URL}/admin/posts",
+            params={"status": "published", "channel": channel, "date": date, "limit": limit},
+            headers=_headers(),
+            timeout=(5, 15),
+        )
+        res.raise_for_status()
+        return res.json().get("posts", [])
+    except Exception as e:
+        print(f"[lens_cms_client] list_published_today 실패(fail-open, 0건으로 간주) — {e}")
+        return []
+
+
 def set_status(post_id: str, status: str) -> dict[str, Any]:
     import requests  # noqa: lazy
 

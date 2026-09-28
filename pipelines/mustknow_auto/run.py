@@ -53,6 +53,7 @@ import classify
 # (리팩토링 감사로 추출, publish_utils.py 참조) — publish_article()이
 # 4포맷 생성+업로드+DDB write 본체까지 담당한다.
 import publish_utils
+import lens_cms_client
 from config import AWS_REGION
 
 discovery = publish_utils.load_module("mustknow_auto_discovery", _ROOT / "discovery" / "pipeline.py")
@@ -162,6 +163,7 @@ def _rank_tab_candidates(cat_pool: list[dict], scores: dict) -> list[dict]:
 # 명예훼손 리스크(연예·피플) 및 서비스 컨셉과 결이 다르다는 판단(스포츠·
 # 오피니언)으로 후보 자체에서 소거한다(사용자 확정, 2026-09-28).
 _GENERAL_EXCLUDE_CATEGORIES = {"연예", "스포츠", "피플", "오피니언"}
+_GENERAL_DAILY_CAP = 20
 _TAB_CAP = 4
 _MIN_CONTENT_LEN = 300
 _DUP_TITLE_RATIO = 0.72
@@ -190,6 +192,23 @@ def _mark_seen(seen_table, article_key: str, **meta):
     item = {"article_key": article_key, "seen_at": datetime.now(timezone.utc).isoformat()}
     item.update(meta)
     seen_table.put_item(Item=item)
+
+
+def _today_published_counts(today_kst: str) -> dict[str, int]:
+    """오늘 이미 발행된 글을 탭별(paper_section)/일반으로 센다 — 2026-09-28,
+    "탭당 4건·일반 20건"이 회차(실행)당 상한이지 하루 총량이 아니었던
+    문제(9/23 증권 26건·산업 28건까지 누적 발행 실측) 수정. lens-cms-api의
+    기존 GET /admin/posts?date=...&status=published를 그대로 재사용(새
+    엔드포인트 불필요) — admin_publish_date는 _publish()가 쓰는
+    publish_date_iso와 같은 포맷(YYYY-MM-DD)."""
+    date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
+    posts = lens_cms_client.list_published_today(date_iso)
+    counts = {"전체": 0, "증권": 0, "산업": 0, "시그널": 0, "일반": 0}
+    for post in posts:
+        section = (post.get("body_inline") or {}).get("paper_section")
+        key = section if section in counts else "일반"
+        counts[key] += 1
+    return counts
 
 
 def _normalize_title(title: str) -> str:
@@ -304,7 +323,11 @@ def main():
 
     results = {"published": 0, "published_no_video": 0, "degraded_no_webtoon": 0, "failed": 0, "skipped_duplicate": 0}
     selected_keys: set[str] = set()
-    tab_counts = {"전체": 0, "증권": 0, "산업": 0, "시그널": 0, "일반": 0}
+    # 2026-09-28 — 회차당 0이 아니라 "오늘 이미 발행된 건수"로 시작한다.
+    # 이러면 아래 tab_counts[tab] >= _TAB_CAP 체크가 자동으로 하루 누적
+    # 상한이 된다(코드 변경 없이 시작값만 바꿔서 해결).
+    tab_counts = _today_published_counts(today)
+    print(f"[mustknow-auto] 오늘 이미 발행된 건수 — {tab_counts}")
 
     def _try_publish(article, paper_section, display_order):
         """반환값을 호출부가 반드시 확인해야 한다 — "failed"면 seen을
@@ -428,9 +451,17 @@ def main():
         a for a in scorable
         if a["key"] not in selected_keys and a["top_category"] not in _GENERAL_EXCLUDE_CATEGORIES
     ]
-    if general_pool:
+    general_remaining = _GENERAL_DAILY_CAP - tab_counts["일반"]
+    if general_remaining <= 0:
+        print(
+            f"[mustknow-auto] 일반 하루 누적 캡 도달({tab_counts['일반']}/{_GENERAL_DAILY_CAP}) "
+            f"— 이번 회차 스킵(Bedrock 호출 안 함)"
+        )
+    elif general_pool:
         selection_guide = ddb_prompt.load_prompt("selection")
-        result = classify.select_general_articles(selection_guide, general_pool, context_articles=all_articles)
+        result = classify.select_general_articles(
+            selection_guide, general_pool, context_articles=all_articles, max_count=general_remaining
+        )
         if result is None:
             print("[mustknow-auto] 일반 선정 실패(파싱 불가) — 이번 회차 스킵, 다음 회차 재시도")
         else:
