@@ -133,8 +133,24 @@ def _repair_ternary_leak(text: str) -> str:
     return _TERNARY_LEAK_RE.sub(r"\1", text)
 
 
-def _build_general_prompt(candidates: list[dict]) -> str:
-    lines = ["다음 후보 기사들 중에서 골라주세요.\n"]
+def _build_general_prompt(candidates: list[dict], context_articles: list[dict] | None) -> str:
+    lines = []
+    # 2026-09-28(v1.5) — "오늘의 흐름 파악"이 선정 후보(=이번 회차 델타,
+    # 이미 평가한 건 seen 처리돼 빠짐)만 보면 표본이 작아진다. 하루
+    # 4~8회 도는데 첫 회차가 아닌 이상 이번 회차 델타는 몇~몇십 건뿐일
+    # 수 있다 — "오늘 전체적으로 뭐가 화제인지" 판단엔 부적합. 맥락
+    # 파악용으로는 그날 지금까지 게재된 전체 기사(제목+카테고리만,
+    # 선정 대상 아님)를 따로 준다 — run.py의 all_articles(seen 여부
+    # 무관하게 discovery.fetch_articles(today) 전체)를 그대로 넘겨받는다.
+    if context_articles:
+        lines.append(
+            "## 오늘 지금까지 게재된 전체 기사 목록 (맥락 파악 전용 — 선정 대상 아님, 이 중에서 고르지 않는다)\n"
+        )
+        for a in context_articles:
+            lines.append(f"- [{a['top_category']}] {a['title']}")
+        lines.append("")
+
+    lines.append("## 선정 후보 (이번 회차에 새로 고를 수 있는 기사 — 여기서만 고른다)\n")
     for i, a in enumerate(candidates, 1):
         lead = (a.get("content") or "")[:_GENERAL_LEAD_CHARS]
         lines.append(
@@ -147,13 +163,21 @@ def _build_general_prompt(candidates: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def select_general_articles(guide: str, candidates: list[dict]) -> dict | None:
+def select_general_articles(
+    guide: str, candidates: list[dict], context_articles: list[dict] | None = None
+) -> dict | None:
     """"일반" 카테고리 최대 20건 직접 선정 — score_articles()처럼 배치
     채점이 아니라, 소거를 거친 후보 전체를 한 번에 보고 LLM이 종합
     판단한다(docs/prompt/selection/ v1.4 설계, 2026-09-28 실 Bedrock
     호출로 검증됨 — today_context·다양성 규칙·화제×경제 교차점 전부
     의도대로 작동 확인, JSON 파싱 버그는 이 함수의 _repair_ternary_leak로
     대응).
+
+    `context_articles`(v1.5, 2026-09-28) — "오늘의 흐름 파악"이 선정
+    후보(회차별 델타, 표본이 작을 수 있음)만 보고 판단하지 않도록, 그날
+    지금까지 게재된 전체 기사(제목+카테고리만)를 별도로 넘긴다. `run.py`의
+    `all_articles`를 그대로 전달하면 된다 — None이면 후보만으로 판단
+    (이전 버전과 동일 동작, 하위호환).
 
     반환값: {"today_context": str, "candidates_total": int,
     "excluded_count": int, "excluded_reasons": list[str],
@@ -162,7 +186,7 @@ def select_general_articles(guide: str, candidates: list[dict]) -> dict | None:
     회차에 재시도 — 값을 지어내지 않는다)."""
     if not candidates:
         return None
-    user_message = _build_general_prompt(candidates)
+    user_message = _build_general_prompt(candidates, context_articles)
     try:
         raw = call_text(guide, user_message, model=MODEL, max_tokens=_GENERAL_MAX_TOKENS)
     except Exception as e:

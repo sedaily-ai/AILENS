@@ -430,7 +430,7 @@ def main():
     ]
     if general_pool:
         selection_guide = ddb_prompt.load_prompt("selection")
-        result = classify.select_general_articles(selection_guide, general_pool)
+        result = classify.select_general_articles(selection_guide, general_pool, context_articles=all_articles)
         if result is None:
             print("[mustknow-auto] 일반 선정 실패(파싱 불가) — 이번 회차 스킵, 다음 회차 재시도")
         else:
