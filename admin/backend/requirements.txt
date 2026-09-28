@@ -1,6 +1,14 @@
 argon2-cffi==25.1.0
 PyJWT==2.12.1
 
+# Lambda 런타임 내장 boto3(1.35.0, 미고정 상태였음)는 Bedrock Converse의
+# cachePoint를 몰라 ParamValidationError로 클라이언트 단에서 막는다
+# (2026-09-24, 직접 재현 확인). 프롬프트 캐싱(routes/prompts.py::
+# model_supports_prompt_cache 참고)을 쓰려면 이 핀이 필요하다 — 격리
+# 환경에 1.43.101을 설치해 cachePoint 동작(cacheReadInputTokens 등)까지
+# 실측 확인한 버전 그대로 고정한다.
+boto3==1.43.101
+
 # pgvector 접근 (CMS, 2026-07-27). 순수 파이썬이라 Lambda 친화적 — v2 와 동일 핀.
 pg8000==1.31.2
 

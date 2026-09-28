@@ -37,13 +37,17 @@ import boto3
 import auth
 from repo import prompt_lab_repo, prompts_repo
 from routes.webtoon import generate as webtoon_generate
-from routes.webtoon import gpu as webtoon_gpu
 from routes.webtoon import jobs as webtoon_jobs
 from routes.webtoon import script as webtoon_script
 from shared import time_utils
-from routes.prompts import _CATEGORY_BEDROCK, _get_bedrock_client, resolve_text_model, text_model_supports_temperature
+from routes.prompts import (
+    _CATEGORY_BEDROCK, _get_bedrock_client, get_thinking_config, model_supports_prompt_cache, resolve_text_model,
+    text_model_supports_temperature,
+)
 from json_extract import extract_json_object  # pipelines/common/ — deploy 시 zip 루트에 복사됨(routes/prompts.py와 동일 패턴)
 import podcast_voice  # pipelines/common/ — 배포 시 zip 루트에 복사됨(webtoon_image.py와 동일 패턴)
+import video_settings  # pipelines/common/ — 위와 동일 패턴, "성우 미리듣기"(2026-09-24)
+import elevenlabs_tts  # pipelines/common/ — 위와 동일 패턴, CMS 실험 전용(2026-09-24)
 
 logger = logging.getLogger(__name__)
 
@@ -225,49 +229,107 @@ def run_async_job(payload: dict) -> None:
     elif kind == "article":
         _run_article_flow(push, data.get("article") or "", saved_draft, data.get("model"), data.get("version"), category)
     elif kind == "cut_image":
-        _run_cut_image_flow(push, data.get("cut") or {}, data.get("model") or "pipeline")
-    elif kind == "gpu_start":
-        webtoon_gpu.run_gpu_start(uuid.uuid4().hex[:16], push=push)
-    elif kind == "gpu_stop":
-        _run_gpu_stop_flow(push)
+        _run_cut_image_flow(push, data.get("cut") or {}, data.get("model") or "sd_ultra")
     elif kind == "synthesize_audio":
-        _run_synthesize_audio_flow(push, data.get("text") or "", data.get("slot_id") or "")
+        _run_synthesize_audio_flow(
+            push, data.get("text") or "", data.get("slot_id") or "",
+            provider=data.get("provider") or "polly",
+            voice_id=data.get("voice_id"),
+            model_id=data.get("model_id"),
+            voice_settings=data.get("voice_settings"),
+            polly_settings=data.get("polly_settings"),
+            format=data.get("format") or "podcast",
+        )
     elif kind == "render_video":
-        _run_render_video_flow(push, data.get("text") or "", data.get("slot_id") or "")
+        _run_render_video_flow(
+            push, data.get("text") or "", data.get("slot_id") or "",
+            provider=data.get("provider") or "polly",
+            voice_id=data.get("voice_id"),
+            model_id=data.get("model_id"),
+            voice_settings=data.get("voice_settings"),
+            polly_settings=data.get("polly_settings"),
+        )
     else:
         push({"type": "error", "message": f"알 수 없는 요청입니다: {kind}"})
 
 
-def _stream_completion(push: Push, system: str, messages: list[dict], max_tokens: int = 400, model: str | None = None) -> None:
+def _stream_completion(
+    push: Push, system: str, messages: list[dict], max_tokens: int = 400, model: str | None = None,
+    additional_fields: dict | None = None, use_cache: bool = True,
+) -> None:
     """converse_stream으로 텍스트를 토큰 단위로 밀어넣는다 — 기사 반응 문구·
     자유 대화 공용(2026-09-15, 자유 대화 추가하며 일반화). 완료되면
-    text_done을 보낸다.
+    text_done을 보낸다. 레터·팟캐스트·영상의 기사→산출물 스트리밍
+    (_run_article_text_flow)도 전부 이 함수를 거친다.
 
     model(2026-09-20 추가) — 없으면 기존처럼 _REACTION_MODEL(Sonnet 4.6)
     을 쓴다 — 좌측 채팅창 모델 드롭다운에서 고른 값을 _run_chat_flow가
-    resolve_text_model()로 바꿔 넘긴다."""
+    resolve_text_model()로 바꿔 넘긴다.
+
+    예외 처리(2026-09-24 보강) — 사용자 리포트: "영상 탭에서... Opus 5를
+    사용했는데... 각본이 출력되다가 중단되었네요", "로그들도 잘 심어났나요?
+    오류가 발생하면 바로 찍어 볼 수 있어야합." 원래는 ReadTimeoutError 등이
+    나도 `logger.warning(f"...: {e}")`(트레이스백 없음)만 남기고 곧바로
+    text_done을 보내 — 사용자 화면엔 스트리밍이 그냥 조용히 멈춘 것처럼
+    보이고, 로그도 "무슨 예외인지"만 한 줄 남을 뿐 어디서 어떻게 실패
+    했는지는 안 남았다. `_run_article_flow`(웹툰 경로)는 이미 2026-09-20에
+    같은 문제를 `logger.exception`+`push({"type": "error", ...})`로 고쳤는데
+    (그 커밋 주석 참고), 이 함수는 안 고쳐진 채로 남아있었다 — 이제 같은
+    패턴으로 맞춘다: 트레이스백까지 남기고(모델 ID 포함해서 "이 모델이
+    어떻게 실패했는지" 바로 보이게), 이미 스트리밍된 부분은 text_done으로
+    저장한 다음 사용자에게도 실패 사실을 명확히 보여준다(채팅 말풍선으로
+    렌더됨, PromptTextLab.tsx/PromptChatLab.tsx의 "error" 케이스 참고).
+
+    additional_fields(2026-09-24 후속) — 같은 조사 중 진짜 원인을 하나 더
+    찾았다: sonnet-5는 타임아웃이 아니라 내부 reasoning(확장 사고)이
+    max_tokens 예산을 전부 써버려 실제 답변이 0글자가 되는 게 문제였다
+    (직접 호출로 재현). 사용자 판단: "리즈닝과 같이 시간이 더 걸리도록
+    영향을 주는 것은 비활성화를 하는 것이 좋을 것 같네요" — Converse API의
+    additionalModelRequestFields로 모델별로 reasoning을 끄거나 줄인다
+    (routes/prompts.py::get_thinking_config, 어떤 모델이 뭘 지원하는지는
+    그 함수 주석에 직접 호출로 확인한 값 전부 남아있다). 호출부가
+    resolve_text_model() 이전의 원래 model_id(키)로 미리 계산해서 넘긴다
+    — 여기서 model(ARN)만 보고는 역산이 안 된다.
+
+    use_cache(2026-09-24 추가) — 프롬프트 캐싱(사용자 질문: "프롬프트 캐싱은
+    적용이 된건가요?"). system이 카테고리 프롬프트(수천 자)일 때 Bedrock의
+    cachePoint로 반복 호출 비용·지연을 줄인다. gpt-6-astra/gpt-6-sol은
+    캐싱 자체를 서버에서 거부해(직접 호출로 AccessDeniedException 재현,
+    routes/prompts.py::model_supports_prompt_cache 주석 참고) 호출부가
+    False로 넘긴다."""
     client = _get_bedrock_client()
     logger.info(f"stream_completion system(앞 200자)={system[:200]!r} messages={len(messages)}개")
+    failure: Exception | None = None
     try:
-        resp = client.converse_stream(
-            modelId=model or _REACTION_MODEL,
-            system=[{"text": system}],
-            messages=messages,
-            inferenceConfig={"maxTokens": max_tokens},
-        )
+        system_blocks: list[dict] = [{"text": system}]
+        if use_cache:
+            system_blocks.append({"cachePoint": {"type": "default"}})
+        kwargs: dict = {
+            "modelId": model or _REACTION_MODEL,
+            "system": system_blocks,
+            "messages": messages,
+            "inferenceConfig": {"maxTokens": max_tokens},
+        }
+        if additional_fields:
+            kwargs["additionalModelRequestFields"] = additional_fields
+        resp = client.converse_stream(**kwargs)
         for chunk in resp["stream"]:
             delta = (chunk.get("contentBlockDelta") or {}).get("delta") or {}
             text = delta.get("text")
             if text:
                 if not push({"type": "text_chunk", "text": text}):
                     return  # 연결이 끊겼으면 남은 청크를 계속 보낼 이유가 없다
-    except Exception as e:  # noqa: BLE001 — 스트리밍 실패해도 호출부 흐름은 계속돼야 함
-        logger.warning(f"stream completion failed: {e}")
-    push({"type": "text_done"})
+    except Exception as e:  # noqa: BLE001 — 스트리밍 실패해도 호출부 흐름은 계속돼야 함(아래에서 사용자·로그 둘 다에 알림)
+        failure = e
+        logger.exception(f"stream completion 실패(model={model or _REACTION_MODEL!r})")
+    push({"type": "text_done"})  # 여기까지 스트리밍된 부분이 있으면 먼저 메시지로 저장
+    if failure is not None:
+        push({"type": "error", "message": f"응답 생성 중 오류가 발생했습니다: {failure}"[:500]})
 
 
 def _stream_json_completion(
-    push: Push, event_type: str, system: str, user_message: str, model: str, max_tokens: int, use_temperature: bool = True
+    push: Push, event_type: str, system: str, user_message: str, model: str, max_tokens: int, use_temperature: bool = True,
+    additional_fields: dict | None = None, use_cache: bool = True,
 ) -> str:
     """스크립트+장면 연출 JSON 생성을 converse_stream으로 돌려 실시간 원문
     청크를 `{event_type}_chunk`로 중계하고, 다 받으면
@@ -288,19 +350,36 @@ def _stream_json_completion(
     (`text_model_supports_temperature` 참고, 실측 확인). 좌측 채팅창
     모델 드롭다운으로 이 모델들을 고를 수 있게 되면서 무조건 0.7을
     넣던 게 그 모델들에서 깨진다 — 호출부(_run_article_flow)가
-    prompts.text_model_supports_temperature(model_id)로 판단해 넘긴다."""
+    prompts.text_model_supports_temperature(model_id)로 판단해 넘긴다.
+
+    additional_fields(2026-09-24 추가) — _stream_completion과 같은 이유
+    (모듈 docstring 참고) — reasoning이 max_tokens를 다 써버려 응답이
+    빈 문자열이 되면 이 함수 자체엔 except가 없어(try/finally만) 그대로
+    빈 raw를 반환하고, 호출부(_run_article_flow)의 extract_json_object가
+    "JSON을 찾지 못했습니다"로 실패한다 — 애초에 reasoning을 꺼서 그 경로
+    자체를 안 타게 한다.
+
+    use_cache(2026-09-24 추가) — _stream_completion과 같은 이유(그쪽
+    docstring 참고). 웹툰 스크립트 프롬프트(4만5천자)가 이 함수를 거치므로
+    캐싱 효과가 가장 크다 — gpt-6 계열만 호출부가 False로 넘긴다."""
     client = _get_bedrock_client()
     parts: list[str] = []
     try:
         inference_config: dict = {"maxTokens": max_tokens}
         if use_temperature:
             inference_config["temperature"] = 0.7
-        resp = client.converse_stream(
-            modelId=model,
-            system=[{"text": system}],
-            messages=[{"role": "user", "content": [{"text": user_message}]}],
-            inferenceConfig=inference_config,
-        )
+        system_blocks: list[dict] = [{"text": system}]
+        if use_cache:
+            system_blocks.append({"cachePoint": {"type": "default"}})
+        kwargs: dict = {
+            "modelId": model,
+            "system": system_blocks,
+            "messages": [{"role": "user", "content": [{"text": user_message}]}],
+            "inferenceConfig": inference_config,
+        }
+        if additional_fields:
+            kwargs["additionalModelRequestFields"] = additional_fields
+        resp = client.converse_stream(**kwargs)
         for chunk in resp["stream"]:
             delta = (chunk.get("contentBlockDelta") or {}).get("delta") or {}
             text = delta.get("text")
@@ -356,8 +435,15 @@ def _run_chat_flow(
     # "샘플 출력해줘"처럼 모델이 긴 예시(가상 기사 전문 등)를 쓰려고 하면
     # 문장 중간에서 뚝 끊겼다. 타임아웃이 아니라 순수 토큰 상한 문제였음).
     # saved_draft가 실제 웹툰 프롬프트일 때도 모델이 예시로 스토리보드
-    # 초안을 풀어 쓸 수 있어 여유 있게 잡는다.
-    _stream_completion(push, system, messages, max_tokens=2000, model=resolve_text_model(model_id))
+    # 초안을 풀어 쓸 수 있어 여유 있게 잡는다. 400→2000(2026-09-15)→
+    # 8000(2026-09-24, 사용자 요청) — get_thinking_config로 reasoning을 이미
+    # 꺼둔 모델(sonnet-46/opus-5/sonnet-5)은 이 예산을 답변에 전부 쓸 수
+    # 있어 부작용이 없고, opus-5-5(reasoning "adaptive"+"low"로만 완화됨)도
+    # 여유가 늘수록 0글자 위험이 줄어드는 방향이라 올려도 안전하다.
+    _stream_completion(
+        push, system, messages, max_tokens=8000, model=resolve_text_model(model_id),
+        additional_fields=get_thinking_config(model_id), use_cache=model_supports_prompt_cache(model_id),
+    )
 
 
 def _resolve_prompt_content(
@@ -414,9 +500,18 @@ def _run_article_text_flow(
         return
     user_message = cfg["user_template"].format(article=article)
     model = resolve_text_model(model_id) if model_id else cfg["model"]
+    # 2026-09-27 — "if model_id else None" 가드를 없앴다. 카테고리 기본
+    # 모델(model_id 없음)이 전부 Opus 5로 바뀌면서(routes/prompts.py::
+    # _CATEGORY_BEDROCK) 이 경로도 reasoning 위험이 생겼는데, 예전 가드는
+    # "기본값=Sonnet 4.6이라 안전하다"는 가정으로 일부러 thinking 설정을
+    # 건너뛰고 있었다 — get_thinking_config가 이제 model_id 없을 때도
+    # "opus-5" 설정으로 폴백하므로(routes/prompts.py 참고) 그냥 항상 불러도
+    # 된다.
     _stream_completion(
         push, content, [{"role": "user", "content": [{"text": user_message[:12000]}]}],
         max_tokens=cfg["max_tokens"], model=model,
+        additional_fields=get_thinking_config(model_id),
+        use_cache=model_supports_prompt_cache(model_id) if model_id else True,
     )
 
 
@@ -462,6 +557,8 @@ def _run_article_flow(
         raw = _stream_json_completion(
             push, "script", system, user_message, model, max_tokens,
             use_temperature=text_model_supports_temperature(model_id),
+            additional_fields=get_thinking_config(model_id),
+            use_cache=model_supports_prompt_cache(model_id),
         )
         try:
             script = extract_json_object(raw)
@@ -504,7 +601,7 @@ def _run_article_flow(
         push({"type": "error", "message": str(e)[:500]})
 
 
-def _run_cut_image_flow(push: Push, cut: dict, model: str = "pipeline") -> None:
+def _run_cut_image_flow(push: Push, cut: dict, model: str = "sd_ultra") -> None:
     if not cut.get("cut"):
         push({"type": "error", "message": "컷 정보가 없습니다."})
         return
@@ -514,7 +611,7 @@ def _run_cut_image_flow(push: Push, cut: dict, model: str = "pipeline") -> None:
         webtoon_jobs.put_job(job_id, {"status": "pending", "cut": cut.get("cut"), "created_at": now, "updated_at": now})
     except Exception as e:  # noqa: BLE001 — 여기서 안 잡으면 push도 없이 클라이언트가 무한 대기
         logger.exception(f"webtoon-lab job 생성 실패: {job_id}")
-        push({"type": "cut_image_error", "cut": cut.get("cut"), "error": str(e)[:500]})
+        push({"type": "cut_image_error", "cut": cut.get("cut"), "test_id": cut.get("test_id"), "error": str(e)[:500]})
         return
     webtoon_generate.run_composed_generation(job_id, cut, push=push, model=model)
 
@@ -522,8 +619,16 @@ def _run_cut_image_flow(push: Push, cut: dict, model: str = "pipeline") -> None:
 _MAX_SYNTHESIZE_TEXT_BYTES = 20000  # webtoon/jobs.py::MAX_TEXT_BYTES와 같은 자릿수 — 과금 폭주 방지
 
 
-def _run_synthesize_audio_flow(push: Push, text: str, slot_id: str) -> None:
-    """팟캐스트 탭 전용 음성 생성 — 2026-09-22 신설, 같은 날 재설계.
+def _run_synthesize_audio_flow(
+    push: Push, text: str, slot_id: str, provider: str = "polly",
+    voice_id: str | None = None, model_id: str | None = None,
+    voice_settings: dict | None = None, polly_settings: dict | None = None,
+    format: str = "podcast",
+) -> None:
+    """팟캐스트·영상 탭 공용 "성우 미리듣기" — 2026-09-22 신설, 같은 날
+    재설계, 2026-09-24에 영상 탭도 같은 함수를 쓰도록 일반화(사용자 요청:
+    "근데 영상에도 음성이 들어가잖아요?? ... 팟캐스트 부분이랑 영상 탭에
+    대해서 구조가 좀 통일될 건 통일 하면 좋지 않을까요").
     처음엔 채팅 메시지마다 버튼을 달았는데(사용자 요청 1차: "대본만
     텍스트로 출력이 되는건가요? 음성도 출력이 되면 좋겠는데"), 사용자가
     다시 요청: "왼쪽은 텍스트만, 우측은 음성을 생성하는거죠 — 웹툰처럼
@@ -533,12 +638,36 @@ def _run_synthesize_audio_flow(push: Push, text: str, slot_id: str) -> None:
     돌려줘서 PodcastAudioGenerator.tsx가 동시에 여러 슬롯을 돌려도 어느
     응답이 어느 슬롯 것인지 구분한다.
 
-    실제 발행 파이프라인과 똑같은 함수(podcast_voice.synthesize — 지금
-    CMS에 발행된 성우/엔진/속도/음량을 fresh 조회)를 그대로 불러 mp3를
-    만들고, 웹툰 컷 이미지 랩과 같은 방식(webtoon_jobs.s3()/bucket(),
-    공개 S3 URL, 발행 미디어와 구분되는 별도 lab 접두사)으로 S3에
-    올려 URL을 돌려준다. admin Lambda 역할의 polly:SynthesizeSpeech
-    권한은 2026-09-22 사용자 승인 후 추가 완료(AdminPodcastVoicePolly)."""
+    format(2026-09-24 추가) — "podcast"|"video". provider="polly"일 때
+    어느 모듈을 부를지 이걸로 고른다: podcast_voice.synthesize() 또는
+    video_settings.synthesize() — 2026-09-25부터 둘 다 SSML <prosody>로
+    속도/음량을 반영한다(video는 tts.ts에 prosody 지원을 새로 추가하면서
+    맞췄다, video_settings.py 모듈 docstring 참고). 둘 다 "지금 CMS에
+    발행된 설정을 fresh 조회"라는 원칙은 동일하다.
+
+    provider(2026-09-24 추가, 사용자 요청: "일레븐랩스도... 선택할 수
+    있도록") — 기본값 "polly"면 위 format 분기, "elevenlabs"면 format과
+    무관하게 elevenlabs_tts.synthesize(voice_id, model_id)를 부른다 —
+    이건 저장되는 설정이 아니라 이 한 번의 슬롯 생성에만 쓰이는 값이고,
+    실제 발행 파이프라인(podcast/pipeline.py, video 렌더)은 이 분기를
+    아예 모른다(2026-08-27에 비용 때문에 ElevenLabs→Polly로 이미 전환한
+    결정을 그대로 유지 — 되돌리지 않는다. elevenlabs_tts.py 모듈
+    docstring 참고).
+
+    polly_settings(2026-09-24 추가, 사용자 요청: "폴리를 클릭했을때
+    튜닝할 수 있는거는 합치면 좋겠네요" — ElevenLabs 카드처럼 Polly도
+    카드마다 독립적으로 성우/엔진(팟캐스트는 속도/음량도)을 바꿔가며
+    비교하고 싶다는 뜻) — provider="polly"일 때만 의미 있다. 있으면
+    podcast_voice.synthesize()/video_settings.synthesize()에 그대로
+    넘겨 "지금 이 카드에서 고른 값"으로 합성한다. 없으면(예: 구버전
+    프론트) 두 함수 다 인자 없이 불러 예전처럼 발행 설정을 그대로
+    쓴다 — 기본 동작은 안 바뀐다.
+
+    웹툰 컷 이미지 랩과 같은 방식(webtoon_jobs.s3()/bucket(), 공개 S3
+    URL, 발행 미디어와 구분되는 별도 lab 접두사)으로 S3에 올려 URL을
+    돌려준다. admin Lambda 역할의 polly:SynthesizeSpeech 권한은
+    2026-09-22 사용자 승인 후 추가 완료(AdminPodcastVoicePolly),
+    secretsmanager:GetSecretValue(ai-labs/elevenlabs)는 2026-09-24 추가."""
     if not text.strip():
         push({"type": "audio_error", "slot_id": slot_id, "message": "합성할 텍스트가 없습니다."})
         return
@@ -549,17 +678,27 @@ def _run_synthesize_audio_flow(push: Push, text: str, slot_id: str) -> None:
         })
         return
     try:
-        audio = podcast_voice.synthesize(text)
-    except Exception as e:  # noqa: BLE001 — Polly 실패를 사용자에게 명확히 알려야 함(무한 대기 방지)
-        logger.exception("팟캐스트 음성 합성 실패")
+        ps = polly_settings or {}
+        if provider == "elevenlabs":
+            audio = elevenlabs_tts.synthesize(text, voice_id, model_id, voice_settings)
+        elif format == "video":
+            audio = video_settings.synthesize(
+                text, voice=ps.get("voice"), engine=ps.get("engine"), rate=ps.get("rate"), volume=ps.get("volume"),
+            )
+        else:
+            audio = podcast_voice.synthesize(
+                text, voice=ps.get("voice"), engine=ps.get("engine"), rate=ps.get("rate"), volume=ps.get("volume"),
+            )
+    except Exception as e:  # noqa: BLE001 — 합성 실패를 사용자에게 명확히 알려야 함(무한 대기 방지)
+        logger.exception(f"성우 미리듣기 합성 실패(format={format}, provider={provider})")
         push({"type": "audio_error", "slot_id": slot_id, "message": f"음성 합성 실패: {e}"})
         return
     job_id = uuid.uuid4().hex[:16]
-    key = f"media/podcast-lab/{job_id}.mp3"
+    key = f"media/{format}-lab/{job_id}.mp3"
     try:
         webtoon_jobs.s3().put_object(Bucket=webtoon_jobs.bucket(), Key=key, Body=audio, ContentType="audio/mpeg")
     except Exception as e:  # noqa: BLE001 — 업로드 실패도 사용자에게 알림
-        logger.exception("팟캐스트 음성 미리듣기 S3 업로드 실패")
+        logger.exception("음성 미리듣기 S3 업로드 실패")
         push({"type": "audio_error", "slot_id": slot_id, "message": f"업로드 실패: {e}"})
         return
     url = f"https://{webtoon_jobs.bucket()}.s3.us-east-1.amazonaws.com/{key}"
@@ -591,7 +730,11 @@ def _ecs() -> "boto3.client":
     return _ecs_client
 
 
-def _run_render_video_flow(push: Push, text: str, slot_id: str) -> None:
+def _run_render_video_flow(
+    push: Push, text: str, slot_id: str, provider: str = "polly",
+    voice_id: str | None = None, model_id: str | None = None,
+    voice_settings: dict | None = None, polly_settings: dict | None = None,
+) -> None:
     """영상 탭 우측 "영상 생성" 패널(VideoRenderGenerator.tsx, 팟캐스트의
     PodcastAudioGenerator.tsx와 같은 슬롯-리스트 구조) 전용. 여기서는 ECS
     RunTask만 걸고 바로 응답한다 — Remotion 렌더는 수십 초~수 분 걸려
@@ -602,7 +745,17 @@ def _run_render_video_flow(push: Push, text: str, slot_id: str) -> None:
 
     text는 이미 CMS 영상 탭 채팅이 만든 각본 텍스트 그대로(JSON이
     아니어도 됨 — 렌더 태스크(render_from_script.py)가 extract_json_object
-    +fix_script+validate_script로 직접 추출·보정·검증한다)."""
+    +fix_script+validate_script로 직접 추출·보정·검증한다).
+
+    provider/voice_id/model_id/voice_settings/polly_settings(2026-09-25
+    추가, 사용자 리포트 — "일레븐 랩스를 선택하고 영상을 생성했는데...
+    영상에 담긴거는 polly 음성이 선택이 되어서 나왔네요") — 지금까지는
+    이 카드가 "성우 미리듣기"(_run_synthesize_audio_flow)에만 provider를
+    넘기고 실제 렌더는 몰라서, 카드에서 ElevenLabs를 골라도 실제 영상은
+    항상 CMS에 발행된 설정(대개 Polly)으로 나갔다 — 사용자 확인 후
+    "카드 선택대로 실제 영상도 렌더"하도록 바꾼다. video_settings.
+    get_render_settings()의 override 인자와 같은 모양으로 조립해
+    render_from_script.py에 --settings-override로 전달한다."""
     if not text.strip():
         push({"type": "render_error", "slot_id": slot_id, "message": "렌더할 각본이 없습니다."})
         return
@@ -622,6 +775,23 @@ def _run_render_video_flow(push: Push, text: str, slot_id: str) -> None:
         logger.exception("영상 랩 각본 S3 업로드 실패")
         push({"type": "render_error", "slot_id": slot_id, "message": f"업로드 실패: {e}"})
         return
+    settings_override: dict | None = None
+    if provider == "elevenlabs":
+        settings_override = {
+            "provider": "elevenlabs",
+            "elevenlabs_voice": voice_id,
+            "elevenlabs_model": model_id,
+            "elevenlabs_voice_settings": voice_settings or {},
+        }
+    elif polly_settings:
+        settings_override = {
+            "provider": "polly",
+            "voice": polly_settings.get("voice"),
+            "engine": polly_settings.get("engine"),
+        }
+    command = ["--job-id", job_id, "--script-s3-key", input_key]
+    if settings_override:
+        command += ["--settings-override", json.dumps(settings_override, ensure_ascii=False)]
     try:
         _ecs().run_task(
             cluster=_VIDEO_LAB_CLUSTER,
@@ -636,7 +806,7 @@ def _run_render_video_flow(push: Push, text: str, slot_id: str) -> None:
             },
             overrides={
                 "containerOverrides": [
-                    {"name": _VIDEO_LAB_CONTAINER, "command": ["--job-id", job_id, "--script-s3-key", input_key]}
+                    {"name": _VIDEO_LAB_CONTAINER, "command": command}
                 ]
             },
         )
@@ -645,13 +815,3 @@ def _run_render_video_flow(push: Push, text: str, slot_id: str) -> None:
         push({"type": "render_error", "slot_id": slot_id, "message": f"렌더 작업 시작 실패: {e}"})
         return
     push({"type": "render_started", "slot_id": slot_id, "job_id": job_id})
-
-
-def _run_gpu_stop_flow(push: Push) -> None:
-    try:
-        import gpu_ipadapter  # pipelines/common/ — sibling, lazy(이 경로를 안 타면 boto3 초기화 비용 회피)
-
-        gpu_ipadapter.stop_gpu()
-        push({"type": "gpu_stopping"})
-    except Exception as e:  # noqa: BLE001
-        push({"type": "gpu_error", "error": str(e)[:500]})

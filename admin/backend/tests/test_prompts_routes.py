@@ -116,18 +116,18 @@ def test_update_creates_prompt_when_latest_missing(monkeypatch, audit_calls) -> 
     calls: list = []
     monkeypatch.setattr(
         prompts.prompts_repo, "update_prompt",
-        lambda category, name, content, sections: (
-            calls.append((category, name, content, sections))
+        lambda category, name, content, sections, activate=True: (
+            calls.append((category, name, content, sections, activate))
             or {"created": True, "new_version": 1, "prev_version": 0}
         ),
     )
     resp = prompts.handle_update({"content": "첫 저장"}, {"category": "letters", "name": "draft"}, {})
     assert resp["statusCode"] == 200
     assert json.loads(resp["body"]) == {"ok": True, "new_version": 1, "created": True}
-    assert calls == [("letters", "draft", "첫 저장", None)]
+    assert calls == [("letters", "draft", "첫 저장", None, True)]
     assert audit_calls == [("prompt-update", {
         "prompt": "letters/draft", "new_version": 1, "prev_version": 0,
-        "created": True, "has_sections": False, "bytes": len("첫 저장".encode("utf-8")),
+        "created": True, "has_sections": False, "activate": True, "bytes": len("첫 저장".encode("utf-8")),
     })]
     assert_no_cors(resp)
 
@@ -135,7 +135,7 @@ def test_update_creates_prompt_when_latest_missing(monkeypatch, audit_calls) -> 
 def test_update_bumps_version_and_writes_both_rows(monkeypatch, audit_calls) -> None:
     monkeypatch.setattr(
         prompts.prompts_repo, "update_prompt",
-        lambda category, name, content, sections: {"created": False, "new_version": 4, "prev_version": 3},
+        lambda category, name, content, sections, activate=True: {"created": False, "new_version": 4, "prev_version": 3},
     )
     resp = prompts.handle_update({"content": "본문 v4"}, {"category": "transform", "name": "nt"}, {})
     assert resp["statusCode"] == 200
@@ -169,7 +169,7 @@ def test_update_passes_sections_as_dict(monkeypatch, audit_calls) -> None:
     calls: list = []
     monkeypatch.setattr(
         prompts.prompts_repo, "update_prompt",
-        lambda category, name, content, sections: (
+        lambda category, name, content, sections, activate=True: (
             calls.append((content, sections))
             or {"created": False, "new_version": 2, "prev_version": 1}
         ),
@@ -235,7 +235,7 @@ def test_get_returns_sections_when_present(monkeypatch) -> None:
 def test_update_writes_audit_row(monkeypatch, audit_calls) -> None:
     monkeypatch.setattr(
         prompts.prompts_repo, "update_prompt",
-        lambda category, name, content, sections: {"created": False, "new_version": 4, "prev_version": 3},
+        lambda category, name, content, sections, activate=True: {"created": False, "new_version": 4, "prev_version": 3},
     )
     prompts.handle_update({"content": "본문 v4"}, {"category": "transform", "name": "nt"}, {})
     assert audit_calls[0][0] == "prompt-update"

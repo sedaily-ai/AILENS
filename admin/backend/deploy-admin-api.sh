@@ -35,11 +35,12 @@ WEBTOON_IMAGE_MODULE="$SCRIPT_DIR/../../pipelines/common/webtoon_image.py"
 # 필수(안 하면 routes.prompts import 시점에 전체 admin API가 죽는다).
 JSON_EXTRACT_MODULE="$SCRIPT_DIR/../../pipelines/common/json_extract.py"
 # 2026-09-14 — "실제 발행본과 같은 품질" 요청으로 webtoon_lab.py가 프로덕션
-# 웹툰 파이프라인(pipelines/webtoon/pipeline.py)과 같은 이미지 경로(GPU
-# IP-Adapter+Style Transfer+텍스트 합성)를 타게 되면서 새로 필요해진
-# 모듈들 — 위 두 파일과 같은 이유로 전부 zip 루트에 flat 복사한다.
+# 웹툰 파이프라인(pipelines/webtoon/pipeline.py)과 같은 이미지 경로를
+# 타게 되면서 새로 필요해진 모듈들 — 위 두 파일과 같은 이유로 전부 zip
+# 루트에 flat 복사한다.
+# 2026-09-25 — GPU_IPADAPTER_MODULE(gpu_ipadapter.py) 줄을 뺐다 — "pipeline"
+# 모델 삭제로 그 파일 자체가 삭제됐다(webtoon_image.py 상단 주석 참고).
 BEDROCK_CLIENT_MODULE="$SCRIPT_DIR/../../pipelines/common/bedrock_client.py"
-GPU_IPADAPTER_MODULE="$SCRIPT_DIR/../../pipelines/common/gpu_ipadapter.py"
 REKOGNITION_CLIENT_MODULE="$SCRIPT_DIR/../../pipelines/common/rekognition_client.py"
 COMPOSE_TEXT_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/compose_text.py"
 # webtoon_image.py::_load_prompt_doc()이 flat import로 쓰는
@@ -57,13 +58,11 @@ DDB_PROMPT_MODULE="$SCRIPT_DIR/../../pipelines/common/ddb_prompt.py"
 # 대신 이 파일을 flat 복사한다. webtoon_image만 import하는 가벼운 모듈이라
 # 위 다른 common 모듈들과 같은 방식으로 추가해도 부담 없음.
 WEBTOON_PROMPTS_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/prompts.py"
-# webtoon_image.py(STYLE_REFERENCE_IMAGE_PATH)와 compose_text.py(FONT_PATH)
-# 둘 다 "자기 옆의 assets/"를 찾는다 — flat 구조에선 둘 다 zip 루트에
-# 나란히 있으니, 원래 서로 다른 두 폴더(pipelines/common/assets,
-# pipelines/webtoon/assets)에서 그 둘이 실제로 쓰는 파일만 한 assets/로
-# 합친다(gpu_ipadapter.py용 character_ref_A/B.png는 GPU 인스턴스 로컬
-# 디스크에 이미 캐시돼 있어 Lambda 쪽엔 불필요 — 안 복사).
-STYLE_REF_ASSET="$SCRIPT_DIR/../../pipelines/common/assets/webtoon_style_reference.png"
+# compose_text.py(FONT_PATH)가 "자기 옆의 assets/"를 찾는다 — flat
+# 구조에선 zip 루트에 나란히 있어야 해서 그 폴더의 파일을 복사한다.
+# 2026-09-25 — STYLE_REF_ASSET(webtoon_style_reference.png) 줄을 뺐다 —
+# style_guide 모델 삭제로 이 이미지를 읽던 코드(webtoon_image.py의
+# STYLE_REFERENCE_IMAGE_PATH)가 없어졌다.
 FONT_ASSET="$SCRIPT_DIR/../../pipelines/webtoon/assets/NotoSansKR-Bold.ttf"
 # 2026-09-22 — 팟캐스트 음성 설정(routes/prompts.py::handle_update가
 # category="podcast-voice"로 그대로 재사용)과 chat_ws.py의 "음성으로
@@ -72,6 +71,13 @@ FONT_ASSET="$SCRIPT_DIR/../../pipelines/webtoon/assets/NotoSansKR-Bold.ttf"
 # pipelines/common/podcast_voice.py — 위 웹툰 모듈들과 같은 이유로 zip
 # 루트에 복사 필수(안 하면 chat_ws.py import 시점에 admin API 전체가 죽는다).
 PODCAST_VOICE_MODULE="$SCRIPT_DIR/../../pipelines/common/podcast_voice.py"
+# 2026-09-24 — routes/elevenlabs.py·chat_ws.py(synthesize_audio,
+# provider="elevenlabs")가 flat import하는 pipelines/common/
+# elevenlabs_tts.py — 위와 같은 이유로 zip 루트 복사 필수.
+ELEVENLABS_TTS_MODULE="$SCRIPT_DIR/../../pipelines/common/elevenlabs_tts.py"
+# 2026-09-24 — 영상 탭 "성우 미리듣기"(synthesize_audio, format="video")가
+# flat import하는 pipelines/common/video_settings.py — 위와 같은 이유.
+VIDEO_SETTINGS_MODULE="$SCRIPT_DIR/../../pipelines/common/video_settings.py"
 
 FUNCTION_NAME="sedaily-mbti-admin-api-dev"
 PYTHON_VERSION="3.11"          # Lambda 런타임과 반드시 일치시킬 것
@@ -91,9 +97,9 @@ cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
-cp "$BEDROCK_CLIENT_MODULE" "$GPU_IPADAPTER_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$BUILD_DIR/"
+cp "$BEDROCK_CLIENT_MODULE" "$REKOGNITION_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$BUILD_DIR/"
 mkdir -p "$BUILD_DIR/assets"
-cp "$STYLE_REF_ASSET" "$FONT_ASSET" "$BUILD_DIR/assets/"
+cp "$FONT_ASSET" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"
 
 # --python-version 은 필수다. 워크스테이션 Python 이 Lambda 런타임(3.11)과 다르면

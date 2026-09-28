@@ -17,6 +17,7 @@ from routes import (
     chat_threads,
     cost,
     drivers,
+    elevenlabs,
     letters,
     media,
     newsletter,
@@ -26,11 +27,7 @@ from routes import (
     quiz,
     video_lab,
 )
-from routes.webtoon import assets as webtoon_assets
 from routes.webtoon import generate as webtoon_generate
-from routes.webtoon import gpu as webtoon_gpu
-from routes.webtoon import jobs as webtoon_jobs
-from routes.webtoon import stage as webtoon_stage
 from shared import audit, response
 
 logger = logging.getLogger()
@@ -44,11 +41,17 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/drivers/{id}": (drivers.handle_update, True),
     "POST /admin/drivers/feature-flag/{name}": (drivers.handle_feature_flag_update, True),
     "POST /admin/drivers/threshold/{name}": (drivers.handle_threshold_update, True),
+    "GET /admin/elevenlabs/options": (elevenlabs.handle_get_options, True),
     "GET /admin/prompts": (prompts.handle_list, True),
+    "GET /admin/prompts/{category}/current-model": (prompts.handle_current_model, True),
     "GET /admin/prompts/{category}/{name}": (prompts.handle_get, True),
     "GET /admin/prompts/{category}/{name}/history": (prompts.handle_get_history, True),
     "GET /admin/prompts/{category}/{name}/versions/{version}": (prompts.handle_get_version, True),
+    "DELETE /admin/prompts/{category}/{name}/versions/{version}": (prompts.handle_delete_version, True),
+    "PATCH /admin/prompts/{category}/{name}/versions/{version}/label": (prompts.handle_rename_version, True),
+    "GET /admin/prompts/{category}/{name}/activation-history": (prompts.handle_get_activation_history, True),
     "POST /admin/prompts/{category}/{name}": (prompts.handle_update, True),
+    "POST /admin/prompts/{category}/{name}/activate": (prompts.handle_activate_version, True),
     "POST /admin/prompts/{category}/{name}/test": (prompts.handle_test, True),
     "GET /admin/prompts/{category}/{name}/test/{job_id}": (prompts.handle_test_status, True),
     # 프롬프트 실험 챗랩 — 설명/지침/파일 개별 CRUD (2026-09-15)
@@ -85,6 +88,7 @@ HANDLERS: dict[str, tuple] = {
     "DELETE /admin/letters/{id}": (letters.handle_delete, True),
     # 이미지 업로드 presign (2026-07-28)
     "POST /admin/media/presign": (media.handle_presign, True),
+    "GET /admin/media/download-url": (media.handle_download_url, True),
     # 용어 퀴즈 (2026-08-09)
     "POST /admin/quiz": (quiz.handle_create, True),
     "GET /admin/quiz": (quiz.handle_list, True),
@@ -94,35 +98,15 @@ HANDLERS: dict[str, tuple] = {
     "POST /admin/quiz/{id}/unpublish": (quiz.handle_unpublish, True),
     "DELETE /admin/quiz/{id}": (quiz.handle_delete, True),
     # 웹툰 이미지 생성 실험 (2026-09-05) — routes/webtoon/ 패키지(2026-09-20
-    # 분리, __init__.py docstring 참고). API Gateway에도 이미 올라가 있다
-    # (2026-09-16 확인, AuthorizationType NONE — Lambda가 직접 JWT 검증).
-    # 새 라우트를 추가할 땐 여기 등록 + API Gateway에
-    # `aws apigatewayv2 create-route`로 같은 integration(기존 라우트로
-    # `get-routes`ID 조회) 붙이는 것 둘 다 필요.
-    "POST /admin/webtoon-lab/generate": (webtoon_generate.handle_generate, True),
-    "GET /admin/webtoon-lab/history": (webtoon_generate.handle_history, True),
+    # 분리, __init__.py docstring 참고).
+    #
+    # 2026-09-25 — generate/history(이미지 실험실 3단계)·{job_id}(폴링,
+    # 컷 생성은 이제 WebSocket으로만 결과를 받아 프론트 호출부가 없었음)·
+    # gpu/*·image-assets/*·stage/* 전부 삭제했다("pipeline"/"style_guide"
+    # 모델 삭제의 후속 — routes/webtoon/__init__.py·pipelines/common/
+    # webtoon_image.py 상단 주석 참고). 남은 건 "발행 모델" 패널이 쓰는
+    # defaults뿐.
     "GET /admin/webtoon-lab/defaults": (webtoon_generate.handle_defaults, True),
-    "GET /admin/webtoon-lab/{job_id}": (webtoon_jobs.handle_status, True),
-    # GPU 켜기/끄기 (2026-09-14) — 컷별 "실제 품질" 이미지 생성은 이제 WebSocket
-    # (routes/chat_ws.py) 경로로만 트리거된다(HTTP generate-composed 라우트는
-    # 2026-09-16 삭제 — 유일한 호출부였던 WebtoonStoryboardLab.tsx가 없어짐).
-    "GET /admin/webtoon-lab/gpu/status": (webtoon_gpu.handle_gpu_status, True),
-    "POST /admin/webtoon-lab/gpu/start": (webtoon_gpu.handle_gpu_start, True),
-    "POST /admin/webtoon-lab/gpu/stop": (webtoon_gpu.handle_gpu_stop, True),
-    # 인물·화풍 참조 이미지 업로드 (2026-09-16) — routes/webtoon/assets.py 참고.
-    "GET /admin/webtoon-lab/image-assets": (webtoon_assets.handle_get, True),
-    "POST /admin/webtoon-lab/image-assets/presign": (webtoon_assets.handle_presign, True),
-    "GET /admin/webtoon-lab/image-assets/gallery": (webtoon_assets.handle_gallery, True),
-    "POST /admin/webtoon-lab/image-assets/select": (webtoon_assets.handle_gallery_select, True),
-    # 단계별 생성 (2026-09-18) — routes/webtoon/stage.py 참고.
-    # stage/character는 GPU(SSM) 왕복이라 비동기(job_id)라 위 GET
-    # /admin/webtoon-lab/{job_id}로 그대로 폴링한다 — 별도 GET 라우트 불필요.
-    "POST /admin/webtoon-lab/stage/translate": (webtoon_stage.handle_translate, True),
-    "POST /admin/webtoon-lab/stage/character": (webtoon_stage.handle_character, True),
-    "POST /admin/webtoon-lab/stage/background": (webtoon_stage.handle_background, True),
-    "POST /admin/webtoon-lab/stage/composite": (webtoon_stage.handle_composite, True),
-    "POST /admin/webtoon-lab/stage/style": (webtoon_stage.handle_style, True),
-    "GET /admin/webtoon-lab/stage/history": (webtoon_stage.handle_history, True),
     # 영상 랩(2026-09-23) — routes/video_lab.py 참고. ⚠️ 이 dict에 문자열
     # 키를 추가하는 것만으로는 API Gateway가 실제로 이 경로를 몰라 404를
     # 낸다 — `aws apigatewayv2 create-route`로 기존 라우트의 integration을
@@ -213,18 +197,9 @@ def lambda_handler(event: dict, context) -> dict:
         except Exception as e:  # noqa: BLE001 — self-invoke 최상위, 안 잡으면 로그도 없이 크래시
             logger.exception(f"async prompt job error: {type(e).__name__}: {e}")
         return {}
-    # 2026-09-14 — 웹툰 컷 이미지를 실제 발행본과 같은 경로(GPU IP-Adapter+
-    # Style Transfer+QA+텍스트 합성)로 만들면서 routes/webtoon/ 패키지도
-    # 같은 self-invoke 비동기 패턴이 필요해졌다(threading 방식은 이 파일
-    # docstring이 이미 경고한 대로 이렇게 긴 작업엔 못 버틴다) — 마커
-    # 키만 달리해서 두 모듈의 비동기 작업을 구분한다.
-    if event.get("_async_webtoon_job"):
-        from routes import webtoon
-        try:
-            webtoon.run_async_job(event["_async_webtoon_job"])
-        except Exception as e:  # noqa: BLE001 — self-invoke 최상위, 안 잡으면 로그도 없이 크래시
-            logger.exception(f"async webtoon job error: {type(e).__name__}: {e}")
-        return {}
+    # 2026-09-25 — `_async_webtoon_job` 마커(GPU 기동·단계별 생성용
+    # self-invoke)를 없앴다 — 유일한 발행자였던 routes/webtoon/gpu.py·
+    # stage.py가 삭제됐다(pipeline/style_guide 모델 삭제 후속).
     # 2026-09-14 — 프롬프트 실험 채팅(PromptChatLab.tsx) 실시간 스트리밍용
     # self-invoke 마커. 위 둘과 같은 이유(routes/chat_ws.py 모듈 docstring
     # 참고) — 마커 키만 다르다.
