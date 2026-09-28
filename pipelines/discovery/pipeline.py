@@ -14,12 +14,17 @@ JSON으로 저장해서 사람이 훑어보고, 그중 실제로 4포맷 콘텐�
 독립 스크립트 모음이라는 기존 원칙(pipelines/README.md)을 따르기
 위함.
 
-분류 기준(2026-08-21, 실제 XML 확인 후 두 번 수정):
-  - "시그널": XML의 최상위 category가 정확히 "Signal"인 기사 —
-    제목에 이미 "[시그널]"이 그대로 박혀 있어 서울경제 자체 코너와
-    그대로 일치한다. **그날 daily-xml 파일**(웹 게재일 기준) 안에서 찾는다.
-  - "증권"/"산업": 같은 파일 안에서 최상위 category가 그대로
-    "증권"/"산업"인 기사.
+분류 기준(2026-08-21, 실제 XML 확인 후 두 번 수정 / 2026-09-28 시그널 판정
+방식 추가 수정 — `_is_market_signal()` 참조):
+  - "시그널": category 태그 목록 아무거나 "Signal"이 있거나, 제목에
+    "마켓시그널"/"[시그널]"이 박혀 있는 기사. 기존엔 top_category(XML에
+    가장 먼저 나온 카테고리 태그 하나)만 봤는데, 기사 하나에 카테고리
+    태그가 여러 개 붙어 top_category가 "증권" 등으로 먼저 잡히는 경우가
+    많아 실제 마켓시그널 코너 기사의 40%를 놓치고 있었다(2026-09-28,
+    10일 표본 58건 중 23건 확인). **그날 daily-xml 파일**(웹 게재일
+    기준) 안에서 찾는다.
+  - "증권"/"산업": 시그널이 아니면서, 같은 파일 안에서 최상위 category가
+    그대로 "증권"/"산업"인 기사.
   - "전체"(지면 1면): `<paper><editingInfo><paperNumber>`가 "1"인
     기사 — 실제 인쇄판 1면에 배치된 기사 그대로다(추정 아님).
     **다만 이건 daily-xml 파일 날짜와 다른 기준이 필요하다** — 처음엔
@@ -68,6 +73,20 @@ def _strip_html(raw: str) -> str:
     return _WHITESPACE_RE.sub(" ", text).strip()
 
 
+def _is_market_signal(title: str, categories: list[str]) -> bool:
+    """"마켓시그널" 코너 판정 — top_category(XML에 가장 먼저 나온 카테고리
+    태그 하나만 봄)만으로는 놓치는 기사가 있다(2026-09-28 확인, 10일
+    표본에서 실제 마켓시그널 코너 58건 중 40%가 top_category=="Signal"이
+    아니었음 — top_category가 "증권"으로 먼저 잡히는 같은 버그 패턴).
+    category 태그 전체 목록과 제목 표시("마켓시그널"/"[시그널]")를 같이
+    본다 — 10일 표본 전수 확인 결과 제목에 "시그널" 단어가 들어간 56건이
+    전부 이 두 패턴 중 하나로 잡혔다(오탐·누락 없음)."""
+    if any((c or "").split(",")[0] == "Signal" for c in categories):
+        return True
+    title = title or ""
+    return "마켓시그널" in title or "[시그널" in title
+
+
 def _s3_client(profile: str | None):
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
     # discovery/는 common/의 어느 것도 안 쓰는 게 문서화된 설계(admin
@@ -112,6 +131,7 @@ def _parse_item(item: ET.Element) -> dict | None:
     # 있다. 그래서 전체 태그 문자열(콤마 포함)을 그대로 넘기고,
     # display_category()가 하위 세그먼트까지 검사한다.
     categories = [c.attrib.get("name", "") for c in cats]
+    is_market_signal = _is_market_signal(title_el.text.strip(), categories)
     content_el = item.find("content")
     content_text = _strip_html(content_el.text or "") if content_el is not None else ""
     image_el = item.find("image")
@@ -142,6 +162,7 @@ def _parse_item(item: ET.Element) -> dict | None:
         "sub_title": _strip_html(sub_title_el.text or "") if sub_title_el is not None else "",
         "top_category": top_category,
         "categories": categories,
+        "is_market_signal": is_market_signal,
         # 4포맷 파이프라인(letters 등)에 그대로 넘길 원문 — discovery는
         # "분류"만 한다는 원칙은 유지하되, 후속 자동 발행 단계가 다시
         # 원문을 가져올 필요 없도록 여기서 한 번에 담아둔다.
@@ -216,7 +237,7 @@ def fetch_front_page(print_date: str, profile: str | None = None) -> list[dict]:
 def classify(date: str, profile: str | None = None) -> dict[str, list[dict]]:
     buckets: dict[str, list[dict]] = {"전체": [], "증권": [], "산업": [], "시그널": []}
     for a in fetch_articles(date, profile=profile):
-        if a["top_category"] == "Signal":
+        if a["is_market_signal"]:
             buckets["시그널"].append(a)
         elif a["top_category"] == "증권":
             buckets["증권"].append(a)

@@ -1,0 +1,183 @@
+{
+  "core_question": "한·프 8천억 투자 선언, 실제로 영화판을 바꿀 수 있을까?",
+  "characters": {
+    "A": "30대 중반 여성, 영상 콘텐츠 업계 기획자, 청바지에 재킷, 호기심 많고 직설적인 인상",
+    "B": "40대 초반 남성, 국제 공동제작 경험 있는 프로듀서, 셔츠에 안경, 차분하고 단정적인 말투",
+    "setting": "서울 시내 영상 제작사 회의실, 노트북과 서류가 놓인 긴 테이블"
+  },
+  "cuts": [
+    {
+      "cut": 1,
+      "title": "한·프 8천억, 영화판 바꿀까?",
+      "title_keyword": "8천억",
+      "narration": "2026년 9월 7일, 프랑스 생폴드방스. 한국과 프랑스 정상이 나란히 섰다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [
+        1,
+        2
+      ]
+    },
+    {
+      "cut": 2,
+      "title": "두 정상의 선언",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "5억 유로 × 2국",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "이재명·마크롱이 직접 나왔다고요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "공동 의장으로요. 각국이 5년간 8천억씩 자국 영화에 쏘겠다는 거죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        3,
+        4
+      ]
+    },
+    {
+      "cut": 3,
+      "title": "왜 지금, 왜 프랑스?",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "수교 140주년",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "OTT 확산에 AI까지. 지금이 전환점이니까요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "영화의 탄생지에서 새 판을 짜겠다는 거네.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        5,
+        6
+      ]
+    },
+    {
+      "cut": 4,
+      "title": "기업들도 움직였다",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "SLL이 유럽 최대 미디어 그룹이랑 리메이크 공동제작을 한다고요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "네이버는 프랑스 국립시청각연구소랑 AI 아카이브 복원 연구도요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        7,
+        8
+      ]
+    },
+    {
+      "cut": 5,
+      "title": "이탈리아와도 서명",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "세액공제·지원금",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "이탈리아 문화부 장관과 공동제작 협정도 직접 서명했어요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "그럼 한·이탈 공동작은 양국에서 자국 영화로 인정받는 거잖아요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        9,
+        10
+      ]
+    },
+    {
+      "cut": 6,
+      "title": "50개국, 200명",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "50개국·200여 명",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "영진위는 미국영화협회랑도 인재 교류 협약을 맺었대요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "이번 서밋이 양자가 아니라 다자 체계를 겨냥한 거니까요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        11,
+        12
+      ]
+    },
+    {
+      "cut": 7,
+      "title": "선언이 현실이 되려면",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "운영위원회를 꾸린다는데, 실제로 돈이 움직이기까지 얼마나 걸릴까요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "협정 서명은 됐고. 이제 각국 예산이 실제로 배정되느냐가 관건이죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        4,
+        13
+      ]
+    },
+    {
+      "cut": 8,
+      "title": "다음 장면은 현장에서",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "closing_caption": "제도의 효과는 현장에서 다시 확인해야 한다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "케이-콘텐츠 해외 진출 다변화, 말은 쉽죠.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "그래서 우리가 지켜봐야 하는 거 아닌가요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        14
+      ]
+    }
+  ]
+}

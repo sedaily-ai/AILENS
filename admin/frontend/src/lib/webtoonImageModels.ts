@@ -40,6 +40,13 @@ export const IMAGE_MODELS: WebtoonImageModel[] = [
   // 수 있게 된 지금은 "현재 사용"이 고정 사실이 아니라 "아무것도 발행
   // 안 됐을 때의 기본값"이라고 말하는 게 정확하다.
   { id: "sd_ultra", label: "Stable Image Ultra (GPU 없음)", shortLabel: "Stable Ultra", badge: "기본값" },
+  // 2026-09-28, 사용자 요청 — 비용 점검 중 Stable Image Ultra가 9/20
+  // 전환 이후 이미지 생성 비용의 최대 항목(26일 828달러 중 537달러)으로
+  // 확인되면서, Core·SD3.5 Large를 다시 비교 테스트할 수 있게 목록에
+  // 되살렸다. 2026-09-25에 뺐던 이유("품질·비용 비교 기록이 없다")는
+  // 여전히 유효 — 이번엔 그 비교 자체를 다시 해보려고 넣는 것.
+  { id: "stable_image_core", label: "Stable Image Core", shortLabel: "SD Core" },
+  { id: "sd35_large", label: "Stable Diffusion 3.5 Large", shortLabel: "SD3.5 Large" },
   // 2026-09-25, 사용자 결정 — pipeline(Stable Diffusion 1.5 IP-Adapter +
   // Style Transfer, GPU) 삭제. 처음엔 "유일하게 인물·화풍 고정을 지원"
   // 이라는 이유로 남겼는데, 사용자가 "인물/화풍 고정은 지금 없는거
