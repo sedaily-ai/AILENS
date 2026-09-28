@@ -41,6 +41,11 @@ export interface PromptHistoryEntry {
   version: number;
   created_at: string;
   actor: string;
+  /** 2026-09-26 추가, 사용자 요청 — "버전 저장... 사용자가 직접 버전
+   *  네이밍을 입력하고 저장할 수 있도록": 프롬프트 실험 챗랩이 발행한
+   *  버전만 있을 수 있다(sections JSONB 안에 저장 — 새 컬럼 없이). 그
+   *  이전 버전·이름을 안 넣고 저장한 버전은 null. */
+  label?: string | null;
 }
 
 export interface PromptDetail {
@@ -68,11 +73,39 @@ export interface PromptLabDoc {
   files: PromptLabFile[];
 }
 
+/** 프롬프트 실험 챗랩이 발행한 버전의 sections 구조(2026-09-26 추가) —
+ *  PromptDetail.sections(PromptDrawer 전용, {content: PromptSection} 모양)와
+ *  같은 DB 컬럼을 쓰지만 이 챗랩이 발행한 버전만 이 모양이다. "kind"로
+ *  구분한다 — 둘 다 unknown 경계값이라 lib/prompt.ts::isPromptLabSections
+ *  같은 검증기를 거쳐야 신뢰할 수 있다. 테스트 카드의 "생성 프롬프트 —
+ *  사용된 버전" 토글이 프로덕션 패널(PromptSectionsPanel)과 동일한
+ *  구조로 그 버전의 설명/지침/파일을 읽기 전용으로 보여줄 때 쓴다. */
+export interface PromptLabSections {
+  kind: "prompt_lab";
+  /** 2026-09-26 추가 — 사용자가 "버전 저장" 시 붙인 별명(선택). 버전
+   *  번호(v17 등) 자체는 그대로 자동 증가라 충돌 걱정 없이 라벨만
+   *  자유롭게 붙인다. */
+  label?: string;
+  description: string;
+  instructions: string;
+  files: { name: string; content: string }[];
+}
+
+export interface PromptVersionDetail {
+  version: number;
+  content: string;
+  created_at: string | null;
+  /** 옛 버전(이 구조 도입 전 발행)에는 없다 — content로 폴백. */
+  sections?: unknown;
+}
+
 /** 프롬프트 실험 챗랩 좌측 사이드바 — 대화 스레드/메시지(2026-09-15).
  *  PromptLabDoc과도 별개 저장소 — 순수 대화 기록만 담는다. */
 export interface ChatThreadSummary {
   id: number;
   title: string;
+  /** 2026-09-26 신설 — 대화당 이모지 태그 1개(없으면 null). */
+  tag: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -84,11 +117,51 @@ export interface ChatThreadMessage {
   text?: string;
   step1?: unknown;
   storyboard?: { coreQuestion: string; cuts: unknown[] };
-  imagePreview?: { cut: number; imageUrl: string; model?: string };
+  /** testId(2026-09-26 추가) — 웹툰 "테스트 N" 카드 여러 개가 각자 독립된
+   *  8컷 세트를 가지면서, 컷 번호(1~8)만으론 어느 테스트 것인지 구분이
+   *  안 된다(WebtoonCutGenerator.tsx 모듈 docstring 참고). 구버전에 저장된
+   *  메시지는 이 필드가 없다 — PromptChatLab.tsx가 복원 시 첫 번째
+   *  테스트로 묶는다. */
+  imagePreview?: { cut: number; imageUrl: string; model?: string; testId?: string };
   /** storyboard 메시지에만 딸려온다 — 화면 표시용 storyboard 필드는
    *  요약본이라, 컷 이미지 재요청까지 이어가려면 원본 전체 cuts가
    *  따로 필요하다(WebtoonStoryboardCut[]). */
   fullCuts?: WebtoonStoryboardCut[];
+  /** 팟캐스트 "성우 미리듣기" 카드 결과물(2026-09-24) —
+   *  useChatLabThread.ts::persistArtifact가 저장, VoicePreviewGenerator.tsx가
+   *  복원. imagePreview와 같은 이유로 채팅 말풍선용이 아니라 사이드
+   *  패널 전용 데이터(persistArtifact는 로컬 messages를 안 건드리므로
+   *  이 필드가 실제로 채팅 화면에 렌더되는 일은 없다). */
+  audioPreview?: {
+    provider: "polly" | "elevenlabs";
+    voiceId?: string;
+    modelId?: string;
+    voiceSettings?: { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean; speed: number };
+    pollySettings?: { voice: string; engine: string; rate?: string; volume?: string };
+    audioUrl: string;
+    summary: string;
+    text: string;
+  };
+  /** 영상 "성우+영상 생성" 카드 결과물(2026-09-24) — audioPreview와 같은
+   *  이유·구조. 완료(done)·실패(error)한 렌더만 저장한다(진행 중 상태는
+   *  VideoCardGenerator.tsx의 localStorage가 같은 브라우저 한정으로
+   *  이미 커버). */
+  videoPreview?: {
+    input: string;
+    provider: "polly" | "elevenlabs";
+    voiceId?: string;
+    modelId?: string;
+    voiceSettings?: { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean; speed: number };
+    pollySettings?: { voice: string; engine: string; rate?: string; volume?: string };
+    format?: string;
+    voiceSummary?: string | null;
+    audioUrl?: string | null;
+    jobId?: string | null;
+    videoUrl?: string | null;
+    thumbUrl?: string | null;
+    renderStatus: "done" | "error";
+    renderError?: string | null;
+  };
 }
 
 export interface ChatThreadDetail extends ChatThreadSummary {

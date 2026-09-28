@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable } from "@/components/ContentTable";
-import { PromptLab } from "@/components/PromptChatLab";
+import { usePromptLab } from "@/components/PromptChatLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 import { ECON_CATEGORIES, type EconCategory } from "@/lib/types";
@@ -20,8 +20,19 @@ import { ECON_CATEGORIES, type EconCategory } from "@/lib/types";
 // 웹툰/영상은 2026-08-09에 이 목록으로 잠깐 합쳤다가 같은 날 다시 뺐다 —
 // 합쳐두니 "새 글 쓰기"를 누를 때마다 종류를 또 골라야 해서 오히려
 // 불편하다는 지적("독립성을 주고 따로 빼라"). 각자 별도 사이드바 메뉴
-// (/webtoon, /video)와 자기 목록·자기 "새 글 쓰기"를 갖는다 — 이 화면은
-// 다시 레터 전용. (표 자체는 ContentTable로 세 화면이 공유한다.)
+// (/webtoon, /video)와 자기 목록·자기 "새 글 쓰기"를 가졌었다.
+//
+// 2026-09-28, 사용자 요청으로 재통합 — "4개 유형을 탭별로 쪼개지 말고
+// 글 관리 탭 하나에서 통합... 어차피 레터(4개 유형이 담긴) 형태로만
+// 계속 발행하는 것이니까": 지금은 자동 파이프라인(mustknow_auto 등)이
+// 항상 레터·웹툰·팟캐스트·영상 4종을 한 번에 묶어(lens 번들) 발행해서,
+// 2026-08-09 당시 문제였던 "새 글 쓰기 누르면 종류부터 골라야 하는 불편"
+// 자체가 더 이상 없다 — "새 글 쓰기"는 여전히 레터 작성 하나뿐이고,
+// 나머지 포맷은 파이프라인이나 /lens/edit에서 채운다. 그래서 제외 필터를
+// 뺀다 — 웹툰/영상 채널 글(대부분 is_lens_bundle=true)도 이 목록에 같이
+// 보인다. 클릭 시 편집기 분기는 아래 editHref 참고. /webtoon, /video,
+// /lens 사이드바 메뉴는 없앴지만 라우트 자체는 남겨뒀다(되돌리기 쉽게 —
+// 이 저장소 기존 관례, "프롬프트" 탭 제거 때와 동일).
 const CATEGORY_FILTERS: Array<{ key: string; label: string }> = [
   { key: "", label: "전체" },
   ...ECON_CATEGORIES.map((c) => ({ key: c, label: c })),
@@ -96,7 +107,14 @@ function PostsPage() {
   // 거른다(ContentTable 내부, channel/dateRange와 같은 패턴).
   const [search, setSearchState] = useState(() => searchParams.get("q") ?? "");
 
-  const syncUrl = (next: { status: string; channel: Set<string>; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
+  const syncUrl = (next: {
+    status: string;
+    channel: Set<string>;
+    dateRange: DateRange;
+    sortDir: "asc" | "desc";
+    search: string;
+    page: number;
+  }) => {
     const params = new URLSearchParams();
     if (next.status) params.set("status", next.status);
     if (next.channel.size > 0) params.set("channel", [...next.channel].join(","));
@@ -143,8 +161,19 @@ function PostsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkReloadKey, setBulkReloadKey] = useState(0);
-  const [promptOpen, setPromptOpen] = useState(false);
+  // 2026-09-24, 두 번째 개편 — PromptLab이 페이지별 로컬 state가 아니라
+  // 레이아웃 레벨의 전역 Provider로 옮겨갔다(사용자 요청: "근본적으로...
+  // 진짜 다 동시작업이 가능하도록... 대화 다른 곳에 머물러도 될 수
+  // 있게"). panelOpen을 다른 필터처럼 URL에 계속 되써넣는 건 그만두고
+  // (webtoon/page.tsx와 같은 이유), 새로고침 시 복원용으로 마운트 시
+  // 1회만 `?panel=chat`을 읽어 열어준다.
+  const { open: openPromptLab } = usePromptLab();
   const visibleReloadKey = useReloadOnVisible();
+
+  useEffect(() => {
+    if (searchParams.get("panel") === "chat") openPromptLab();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 URL을 읽어 복원(이후 탭 전환 등은 Provider가 직접 관리)
+  }, []);
 
   // effect 본문에서 동기 setState 를 하지 않는다 (set-state-in-effect 규칙).
   // 필터를 바꿔도 이전 목록을 유지하다가 새 응답이 오면 교체 — 예전엔
@@ -171,14 +200,8 @@ function PostsPage() {
       .listPosts(params)
       .then((r) => {
         if (cancelled) return;
-        // 웹툰/영상은 별도 화면(/webtoon, /video)에서 관리한다 — "전체" 필터를
-        // 골라도 이 목록엔 안 섞이게 항상 제외한다.
         const filtered = r.posts.filter(
-          (p) =>
-            !p.channels.includes("webtoon") &&
-            !p.channels.includes("video") &&
-            matchesCategoryFilter(p, channel) &&
-            inDateRange(p.publish_date, dateRange),
+          (p) => matchesCategoryFilter(p, channel) && inDateRange(p.publish_date, dateRange),
         );
         setPosts(filtered);
         setError(null);
@@ -293,7 +316,7 @@ function PostsPage() {
               만들 수 있다. */}
           <button
             type="button"
-            onClick={() => setPromptOpen(true)}
+            onClick={() => openPromptLab()}
             className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -315,7 +338,15 @@ function PostsPage() {
       <ContentTable
         posts={posts}
         loading={loading}
-        editHref={(p) => `/posts/edit?id=${encodeURIComponent(p.id)}`}
+        // 2026-09-28 — 목록을 통합하면서 lens 번들 글(is_lens_bundle)은
+        // 레터 전용 편집기(/posts/edit)가 아니라 4탭(레터/웹툰/팟캐스트/
+        // 영상) 편집기(/lens/edit)로 바로 들어가게 분기한다. 안 이러면
+        // 웹툰/영상이 채워진 글을 레터 편집기로 열게 돼 그 내용이 안 보인다.
+        editHref={(p) =>
+          p.is_lens_bundle
+            ? `/lens/edit?id=${encodeURIComponent(p.id)}`
+            : `/posts/edit?id=${encodeURIComponent(p.id)}`
+        }
         newHref="/posts/edit"
         newLabel="새 글 쓰기"
         emptyTitle="아직 글이 없습니다"
@@ -355,8 +386,6 @@ function PostsPage() {
           />
         </div>
       )}
-
-      <PromptLab open={promptOpen} onClose={() => setPromptOpen(false)} initialCategory="letters" />
 
     </div>
   );

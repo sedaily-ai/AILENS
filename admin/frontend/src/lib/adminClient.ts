@@ -11,6 +11,7 @@ import type {
   PromptLabDoc,
   PromptLabFile,
   PromptLabFileContent,
+  PromptVersionDetail,
   ChatThreadSummary,
   ChatThreadDetail,
   CostResponse,
@@ -23,17 +24,7 @@ import type {
   PresignResponse,
   Quiz,
   QuizInput,
-  WebtoonLabJob,
-  WebtoonLabHistoryItem,
   WebtoonLabDefaults,
-  WebtoonGpuStatus,
-  WebtoonImageAssetUrls,
-  WebtoonImageAssetKind,
-  WebtoonImageAssetPresign,
-  WebtoonImageAssetGalleryItem,
-  WebtoonStageTranslateResult,
-  WebtoonStageImageResult,
-  WebtoonStageHistoryItem,
   PromptTestJob,
 } from "./types";
 
@@ -211,28 +202,112 @@ export const adminApi = {
     request<{ history: PromptHistoryEntry[] }>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/history`
     ),
+  // 2026-09-24 — 채팅랩 헤더 배지("Claude Opus 5" 등)용. 프론트에 모델명을
+  // 하드코딩하지 않고 백엔드 _CATEGORY_BEDROCK["model_label"]을 그대로
+  // 찍는다 — 프로덕션 모델이 바뀌면 그 한 줄만 고치면 프론트 재배포 없이
+  // 다음 새로고침부터 반영된다(사용자 요청: "지금은 하드코딩된거라 바뀌면
+  // 또 바꿔야 하잖아요").
+  // 2026-09-24, 두 번째 개편 — "프롬프트 실험 페이지도 캐싱이나 등등..
+  // 최적화" 요청. PromptLab이 탭을 계속 마운트한 채로 유지하도록 바뀌면서
+  // (PromptLabProvider.tsx), 랩을 닫았다 다시 열 때마다 이 값을 다시
+  // 조회하고 있었다(useCurrentModel.ts의 effect가 `enabled`=dialog open
+  // 여부에 걸려 있어서) — 거의 안 바뀌는 값인데 재조회가 잦았다. 기존
+  // cachedGet(대시보드 getDrivers/getCost용으로 이미 있던 유틸)을 그대로
+  // 재사용 — 새 캐싱 메커니즘을 또 만들지 않는다.
+  getCurrentModel: (category: string) =>
+    cachedGet(`current-model|${category}`, () =>
+      request<{ category: string; label: string }>(
+        `/admin/prompts/${encodeURIComponent(category)}/current-model`
+      )
+    ),
+  // 2026-09-24, 사용자 요청 — "음성도 모델들 보여지면 좋겠는데... 일레븐랩스...
+  // 선택할 수 있도록요": 팟캐스트 탭 우측 "음성 생성" 패널 전용, 실험용
+  // ElevenLabs 성우/모델 목록. pipelines/common/elevenlabs_tts.py가 정본.
+  // voice_settings_defaults/ranges(2026-09-24 추가, 사용자 요청: "일래븐
+  // 랩스쪽은... 파라미터들? 피치나 속도나... 조정하도록... 포함
+  // 시켜야 합니다") — pitch는 실존하지 않는 파라미터라 뺐다(직접
+  // GET /v1/voices/{id}/settings로 확인, elevenlabs_tts.py 참고).
+  // 2026-09-24, 두 번째 개편 — 위 getCurrentModel과 같은 이유. 이 값을
+  // 부르는 곳이 4군데(VoicePreviewGenerator/PodcastVoiceSettingsPanel/
+  // VideoCardGenerator/VideoRenderSettingsPanel)인데, 탭이 계속 마운트된
+  // 채로 유지되니 팟캐스트·영상 탭을 둘 다 열기만 해도 같은 데이터를
+  // 최소 2번, ElevenLabs를 카드에서도 고르면 최대 4번까지 반복 요청하고
+  // 있었다 — 코드에 박힌 고정 목록이라 세션 중엔 사실상 안 바뀌는데도.
+  getElevenLabsOptions: () =>
+    cachedGet("elevenlabs-options", () =>
+      request<{
+        voices: { id: string; label: string; gender: string; sample_url: string }[];
+        models: { id: string; label: string; supports_style: boolean; supports_speaker_boost: boolean }[];
+        voice_settings_defaults: { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean; speed: number };
+        voice_settings_ranges: { stability: [number, number]; similarity_boost: [number, number]; style: [number, number]; speed: [number, number] };
+      }>("/admin/elevenlabs/options")
+    ),
   // 2026-09-21, 사용자 요청 — "버전을 드롭다운 해서... 그걸로 적용해서
   // 출력... AB 테스트 느낌": 과거 버전 하나의 content만 조회. PromptChatLab의
   // 버전 드롭다운이 쓴다 — 지금 초안/발행본은 안 건드리고 일회성으로만 씀.
+  // 2026-09-26 — sections도 같이 온다(프롬프트 실험 챗랩이 발행한 버전만,
+  // types.ts::PromptLabSections 참고). 테스트 카드마다 "생성 프롬프트 —
+  // 사용된 버전" 토글이 같은 버전을 반복 조회할 수 있어(여러 카드가 같은
+  // 버전으로 테스트) cachedGet으로 감쌌다 — 발행된 버전은 불변이라 60초
+  // TTL 캐시 히트가 항상 최신값과 같다.
   getPromptVersion: (category: string, name: string, version: number) =>
-    request<{ version: number; content: string; created_at: string | null }>(
-      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/versions/${version}`
+    cachedGet(`prompt-version|${category}|${name}|${version}`, () =>
+      request<PromptVersionDetail>(
+        `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/versions/${version}`
+      )
     ),
   // sections 는 optional — 평문 편집기(/prompts/edit)는 안 보내고, 섹션
   // 편집기(PromptDrawer)만 보낸다. 백엔드는 content 를 그대로 Bedrock 에
   // 넘기므로 content 에는 항상 산문만, 구조는 sections 로 따로 간다.
+  // 2026-09-26 — activate 추가(기본 true, 기존 호출부 전부 그대로 즉시
+  // 활성화). false로 부르면 새 버전은 남기되 프로덕션 활성값은 안
+  // 바뀐다 — 테스트 카드의 "버전 저장"(PromptVersionReference.tsx)이
+  // 쓴다. 프로덕션 승격은 activatePromptVersion()이 따로 맡는다.
   updatePrompt: (
     category: string,
     name: string,
     content: string,
-    sections?: unknown
+    sections?: unknown,
+    activate = true
   ) =>
     request<{ ok: boolean; new_version: number; created?: boolean }>(
       `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}`,
       {
         method: "POST",
-        body: JSON.stringify(sections === undefined ? { content } : { content, sections }),
+        body: JSON.stringify(sections === undefined ? { content, activate } : { content, sections, activate }),
       }
+    ),
+  // 2026-09-26 신설 — 이미 있는 버전(테스트 카드가 activate=false로
+  // 저장해둔 것 포함)을 프로덕션 활성값으로 승격한다. 새 버전은 안 만듦.
+  activatePromptVersion: (category: string, name: string, version: number) =>
+    request<{ activated: boolean; version: number }>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/activate`,
+      { method: "POST", body: JSON.stringify({ version }) }
+    ),
+  // 2026-09-26 신설, 사용자 요청 — "버전을 삭제하는 방법도 있어야 할 것
+  // 같고". 지금 프로덕션에서 쓰이는(활성) 버전을 삭제하려 하면 400과 함께
+  // 사람이 읽을 에러 메시지가 온다(AdminApiError.message로 그대로 잡힘).
+  deletePromptVersion: (category: string, name: string, version: number) =>
+    request<{ deleted: boolean }>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/versions/${version}`,
+      { method: "DELETE" }
+    ),
+  // 2026-09-26 신설, 사용자 지적 — "버전이름도 수정가능하게 해야합니다":
+  // "버전 저장"은 항상 새 버전(번호 증가)을 만드는 동작이라 이미 저장된
+  // 버전의 이름만 고치기엔 안 맞는다(새 번호가 매겨져 버림) — 번호·내용은
+  // 그대로 두고 그 버전의 이름표만 갈아끼우는 전용 엔드포인트.
+  renamePromptVersion: (category: string, name: string, version: number, label: string) =>
+    request<{ renamed: boolean; version: number; label: string | null }>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/versions/${version}/label`,
+      { method: "PATCH", body: JSON.stringify({ label }) }
+    ),
+  // 2026-09-26 신설, 사용자 요청 — "프로덕션에 적용한 이력들도 남아야
+  // 해요, 몇시 몇분... 날짜에 했는지": 검토 모달에서 "최근 적용 이력"으로
+  // 보여준다 — audit_logs에 이미 남고 있던 prompt-activate 기록을 그대로
+  // 거른 것뿐이라 새 저장소는 없다.
+  getPromptActivationHistory: (category: string, name: string) =>
+    request<{ history: { version: number | null; actor: string | null; logged_at: string | null }[] }>(
+      `/admin/prompts/${encodeURIComponent(category)}/${encodeURIComponent(name)}/activation-history`
     ),
   // LLMOps 테스트 실행(2026-08-19, 2026-09-11 작업+폴링으로 전환) — 저장
   // 여부와 무관하게 지금 편집 중인 content를 기사 원문과 함께 그 채널의
@@ -316,6 +391,14 @@ export const adminApi = {
     request<{ updated: boolean }>(`/admin/chat-threads/${threadId}`, {
       method: "PUT",
       body: JSON.stringify({ title }),
+    }),
+  /** 2026-09-26 신설 — 이모지 태그 설정/해제. tag=null은 "태그 없음"이라는
+   *  유효한 요청이라(같은 이모지를 다시 누르면 해제하는 토글 UX) 항상
+   *  key 자체를 body에 싣는다. */
+  setChatThreadTag: (threadId: number, tag: string | null) =>
+    request<{ updated: boolean }>(`/admin/chat-threads/${threadId}`, {
+      method: "PUT",
+      body: JSON.stringify({ tag }),
     }),
   deleteChatThread: (threadId: number) =>
     request<{ deleted: boolean }>(`/admin/chat-threads/${threadId}`, { method: "DELETE" }),
@@ -431,81 +514,23 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ filename, content_type: contentType, size }),
     }),
+  // 2026-09-26 신설 — "다운로드" 버튼이 실제로 파일을 저장하지 않고 새
+  // 탭에 이미지만 열던 문제(버킷 CORS가 GET을 허용 안 해서 fetch()로
+  // blob을 못 읽고, <a download>도 크로스오리진이라 대부분 무시됨) 해결용.
+  // presigned GET URL 자체에 다운로드 헤더를 실어 받아온다 — 그 URL로
+  // 그냥 이동만 하면 브라우저가 다운로드를 강제한다(CORS 불필요).
+  getMediaDownloadUrl: (url: string, filename: string) =>
+    request<{ download_url: string; expires_in: number }>(
+      `/admin/media/download-url?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+    ),
 
-  // 웹툰 이미지 실험(2026-09-05) — job 생성 후 폴링(routes/webtoon_lab.py 참고,
-  // API Gateway 30초 타임아웃 때문에 동기 응답이 없다). generateWebtoonImage
-  // 자체(POST /admin/webtoon-lab/generate)는 2026-09-21 WebtoonImageLab의
-  // "생성" 탭 제거로 프론트 호출부가 없어져 걷어냈다 — getWebtoonImageJob은
-  // WebtoonStageLab(단계별 생성)이 여전히 폴링에 쓴다.
-  getWebtoonImageJob: (jobId: string) =>
-    request<WebtoonLabJob>(`/admin/webtoon-lab/${encodeURIComponent(jobId)}`),
-  getWebtoonImageHistory: () =>
-    request<{ items: WebtoonLabHistoryItem[] }>("/admin/webtoon-lab/history"),
+  // 웹툰 발행 모델 기본값(2026-09-25 — STYLE/CHARACTERS 편집·히스토리
+  // 갤러리·단계별 생성 화면은 삭제, 발행 모델 선택만 남음. 나머지
+  // webtoon-lab 엔드포인트(job/history/image-assets/gpu/stage)는 그
+  // 화면들의 전용 호출부라 함께 정리했다).
   getWebtoonImageDefaults: () =>
     request<WebtoonLabDefaults>("/admin/webtoon-lab/defaults"),
 
-  // 화풍·인물 참조 이미지(2026-09-16) — presign 받아 브라우저가 S3로 직접
-  // PUT(위 presignMedia와 같은 이유). 업로드는 갤러리에 쌓이고, select로
-  // 골라야 실제 생성에 쓰이는 정본 키에 반영된다(2026-09-16 후속 — "여러
-  // 샘플 중에서 선택" 요청으로 덮어쓰기 방식에서 갤러리 방식으로 변경).
-  getWebtoonImageAssets: () =>
-    request<WebtoonImageAssetUrls>("/admin/webtoon-lab/image-assets"),
-  presignWebtoonImageAsset: (asset: WebtoonImageAssetKind, size: number) =>
-    request<WebtoonImageAssetPresign>("/admin/webtoon-lab/image-assets/presign", {
-      method: "POST",
-      body: JSON.stringify({ asset, content_type: "image/png", size }),
-    }),
-  getWebtoonImageAssetGallery: (asset: WebtoonImageAssetKind) =>
-    request<{ items: WebtoonImageAssetGalleryItem[] }>(
-      `/admin/webtoon-lab/image-assets/gallery?asset=${encodeURIComponent(asset)}`
-    ),
-  selectWebtoonImageAsset: (asset: WebtoonImageAssetKind, key: string) =>
-    request<{ selected: boolean }>("/admin/webtoon-lab/image-assets/select", {
-      method: "POST",
-      body: JSON.stringify({ asset, key }),
-    }),
-
-  // GPU 켜기/끄기(2026-09-14) — 프롬프트 챗랩 우측 컷 생성 패널이 WebSocket
-  // (routes/chat_ws.py)으로 컷 이미지 생성을 직접 트리거하므로, HTTP 컷 생성은
-  // 이 GPU 상태 조회/제어만 남는다.
-  getWebtoonGpuStatus: () => request<WebtoonGpuStatus>("/admin/webtoon-lab/gpu/status"),
-  startWebtoonGpu: () =>
-    request<{ job_id: string; status: string }>("/admin/webtoon-lab/gpu/start", { method: "POST" }),
-  stopWebtoonGpu: () =>
-    request<{ stopping: boolean }>("/admin/webtoon-lab/gpu/stop", { method: "POST" }),
-
-  // 단계별 생성(2026-09-18) — admin/backend/routes/webtoon_lab.py "단계별
-  // 생성" 섹션 참고. character만 GPU(SSM) 왕복이라 job_id/폴링(기존
-  // getWebtoonImageJob 재사용), 나머지는 동기 응답.
-  stageTranslate: (scene: string, camera: string, cut?: number) =>
-    request<WebtoonStageTranslateResult>("/admin/webtoon-lab/stage/translate", {
-      method: "POST",
-      body: JSON.stringify({ scene, camera, cut }),
-    }),
-  stageCharacter: (character: "A" | "B", prompt: string, cut?: number) =>
-    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/character", {
-      method: "POST",
-      body: JSON.stringify({ character, prompt, cut }),
-    }),
-  stageBackground: (prompt: string, cut?: number) =>
-    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/background", {
-      method: "POST",
-      body: JSON.stringify({ prompt, cut }),
-    }),
-  stageComposite: (backgroundKey: string, charAKey: string, charBKey: string, cut?: number) =>
-    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/composite", {
-      method: "POST",
-      body: JSON.stringify({ background_key: backgroundKey, char_a_key: charAKey, char_b_key: charBKey, cut }),
-    }),
-  stageStyle: (initKey: string, prompt?: string, cut?: number) =>
-    request<WebtoonStageImageResult>("/admin/webtoon-lab/stage/style", {
-      method: "POST",
-      body: JSON.stringify({ init_key: initKey, prompt, cut }),
-    }),
-  getStageHistory: (cut?: number) =>
-    request<{ items: WebtoonStageHistoryItem[] }>(
-      `/admin/webtoon-lab/stage/history${cut !== undefined ? `?cut=${cut}` : ""}`
-    ),
   // 영상 랩(2026-09-23) — routes/chat_ws.py의 "render_video" WS kind가 ECS
   // RunTask만 걸고 바로 응답하므로(렌더가 수십 초~수 분 걸려 WS로 못 기다림),
   // VideoRenderGenerator.tsx가 이 라우트를 주기적으로 폴링해 실제 결과를 받는다.

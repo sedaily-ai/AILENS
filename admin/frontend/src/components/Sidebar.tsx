@@ -39,51 +39,11 @@ const IconPen = svg(
     <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </>
 );
-const IconSend = svg(
-  <>
-    <path d="m22 2-7 20-4-9-9-4Z" />
-    <path d="M22 2 11 13" />
-  </>
-);
 const IconMusic = svg(
   <>
     <path d="M9 18V5l12-2v13" />
     <circle cx="6" cy="18" r="3" />
     <circle cx="18" cy="16" r="3" />
-  </>
-);
-const IconMic = svg(
-  <>
-    <rect x="9" y="2" width="6" height="12" rx="3" />
-    <path d="M5 10a7 7 0 0 0 14 0" />
-    <path d="M12 19v3" />
-    <path d="M8 22h8" />
-  </>
-);
-const IconWebtoon = svg(
-  <>
-    <rect x="4" y="3" width="13" height="13" rx="2" />
-    <path d="M8 21h13a2 2 0 0 0 2-2V8" />
-  </>
-);
-const IconVideo = svg(
-  <>
-    <rect x="2" y="5" width="14" height="14" rx="2" />
-    <path d="m22 8-6 4 6 4Z" />
-  </>
-);
-const IconLens = svg(
-  <>
-    <circle cx="12" cy="12" r="7" />
-    <circle cx="12" cy="12" r="2.6" />
-    <path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21" />
-  </>
-);
-const IconQuiz = svg(
-  <>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M9.2 9a2.8 2.8 0 1 1 3.8 2.6c-.7.3-1 .9-1 1.6" />
-    <path d="M12 17v.01" strokeWidth={2.6} />
   </>
 );
 const IconCoin = svg(
@@ -125,6 +85,20 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
+// 2026-09-28, 사용자 요청으로 2차 개편 — "4개 유형을 탭별로 쪼개지 말고
+// 글 관리 탭 하나에서 통합하면 좋을 듯요... 어차피 레터(4개 유형이 담긴)
+// 형태로만 계속 발행하는 것이니까": 웹툰/영상/4가지 시선은 이제 독립
+// 콘텐츠가 아니라 자동 파이프라인이 한 번에 묶어 발행하는 lens 번들의
+// 포맷 슬라이스일 뿐이라(각자 목록이 사실상 같은 글들을 채널만 다르게
+// 걸러본 것) 세 메뉴를 없애고 "글 관리" 하나로 합쳤다(posts/page.tsx가
+// 이제 그 글들도 같이 보여주고, 클릭하면 4탭 편집기 /lens/edit로 들어감
+// — 같은 파일의 editHref 분기 참고). /webtoon, /video, /lens 라우트
+// 자체는 지우지 않았다(되돌리기 쉽게, 이 저장소 기존 관례).
+//
+// 이어서 3차 개편 — "팟캐스트, 퀴즈, 뉴스레터... 필요가 있는게 맞나요?"
+// 실사용 확인(2026-09-28): 퀴즈 발행 0건, 뉴스레터 구독자 5명(최근 12일
+// 신규 없음), 팟캐스트는 애초에 콘텐츠 목록 자체가 없는 플레이스홀더 —
+// 셋 다 사실상 안 쓰여서 같은 원칙으로 메뉴만 뺐다(라우트 유지).
 const MENU_GROUPS: MenuGroup[] = [
   {
     title: "콘텐츠",
@@ -135,27 +109,6 @@ const MENU_GROUPS: MenuGroup[] = [
       // 만들지 말고 분류 쪽에 넣어달라, 탭도 없애라"는 요청으로 되돌렸다.
       // "글 관리" 안에서 분류=이슈 톡톡으로 쓰고 채널 필터로 걸러본다
       // (posts/page.tsx, PostMode.tsx 참조) — 딥다이브·인사이트와 동일 패턴.
-      // 웹툰·영상은 2026-08-09에 이 메뉴(글 관리)로 합쳤다가 같은 날 다시
-      // 뺐다 — 합쳐두니 "새 글 쓰기"를 누를 때마다 종류를 또 골라야 해서
-      // 오히려 불편하다는 지적("독립성을 주고 따로 빼라, 새 글 쓰기는
-      // 바로바로 들어가게"). 각자 자기 목록·자기 "새 글 쓰기"를 갖는 원래
-      // 구조로 되돌렸다 — 컷 목록·URL 하나짜리 가벼운 콘텐츠라 긴 글쓰기용
-      // 캔버스에 끼워둘 이유도 없었다(2026-08-09 최초 분리 때의 이유).
-      { label: "웹툰", href: "/webtoon", Icon: IconWebtoon },
-      { label: "영상", href: "/video", Icon: IconVideo },
-      // "오늘의 이슈, 4가지 시선"(2026-08-12) — Instagram @ailens 카드뉴스
-      // 포맷을 웹으로. 웹툰/영상과 같은 이유로 독립 메뉴.
-      { label: "4가지 시선", href: "/lens", Icon: IconLens },
-      // 4포맷 파이프라인(레터/웹툰/영상/팟캐스트) 중 팟캐스트만 관리 화면이
-      // 없었다(2026-08-19) — 자동 생성 파이프라인(ElevenLabs 등)이 아직
-      // 없어 콘텐츠 목록·"새로 쓰기"는 없이 프롬프트 편집만 가능한 화면.
-      // 레터 상세의 "팟캐스트"(PodcastUploadField, mp3 수동 업로드)와는
-      // 다른 기능 — 헷갈리지 않게 별도 메뉴로 둔다.
-      { label: "팟캐스트", href: "/podcast", Icon: IconMic },
-      // 홈 화면 "오늘의 단어 퀴즈" CMS 직접 출제(2026-08-09) — 별도 독립
-      // 콘텐츠 타입(term/explain만, CmsPost 아님).
-      { label: "퀴즈", href: "/quiz", Icon: IconQuiz },
-      { label: "뉴스레터", href: "/newsletter", Icon: IconSend },
       // 홈 화면 하단 플레이 카드가 재생할 배경 음악(유튜브 링크) 전용 관리
       // 화면(2026-08-16) — 레터 안의 "팟캐스트"(레터 상세 페이지 mp3 업로드,
       // PodcastUploadField)와는 다른 기능이라 별도 탭으로 분리.
@@ -174,11 +127,8 @@ const MENU_GROUPS: MenuGroup[] = [
       // 목록 탭이 더 필요 없어졌다. 페이지 자체(/prompts, /prompts/edit)는
       // 아직 지우지 않았다 — 다른 화면들과 같은 이유(라우트는 남기고
       // 진입만 없애는 쪽이 되돌리기 쉽다).
+      { label: "설정", href: "/settings", Icon: IconCog },
     ],
-  },
-  {
-    title: "설정",
-    items: [{ label: "설정", href: "/settings", Icon: IconCog }],
   },
 ];
 

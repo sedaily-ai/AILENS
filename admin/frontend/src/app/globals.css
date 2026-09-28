@@ -113,6 +113,13 @@ body {
   font-feature-settings: "ss01";
 }
 
+/* AI LENS 공식 워드마크 얼굴(Noto Sans KR 900) — 스플래시 핸드오프 지정,
+   브랜드 워드마크 노출 지점 전용(현재 로그인 화면). layout.tsx 참고. */
+.font-brand {
+  font-family: var(--font-brand), "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.02em;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -143,6 +150,23 @@ body {
   background: var(--surface-card);
   border: 1px solid var(--border-hairline);
   box-shadow: var(--shadow-md);
+}
+
+/* CollapsibleSection 화살표 — Tailwind `group-open:`(자손 선택자)는 중첩된
+   <details>에서 가장 가까운 조상이 아니라 열려있는 아무 조상에나 걸려서,
+   부모가 열려있으면 자식(닫힘)까지 아래 화살표로 잘못 그려졌다(2026-09-26).
+   `>` 자식 결합자로 "가장 가까운 details"에만 걸리도록 순수 CSS로 대체.
+
+   2026-09-26(후속) — 사용자 요청: "토글... 위로 가는 화살표 말고... 접혔을때는
+   노션 구조처럼.. 삼각형 > 화살표 방향으로": 닫힘=위/열림=아래(회전
+   180도)였던 걸 노션 디스클로저 삼각형 관용구로 바꿨다 — SVG 자체를
+   오른쪽 화살표(CollapsibleSection.tsx의 path)로 바꾸고, 닫힘=오른쪽
+   (회전 없음)·열림=아래(90도 회전)로 CSS만 조정. */
+.cs-chevron {
+  transform: rotate(0deg);
+}
+details[open] > summary .cs-chevron {
+  transform: rotate(90deg);
 }
 
 /* 클릭 가능한 카드 — 뜨는 느낌만 주고 레이아웃은 흔들지 않는다
@@ -316,6 +340,52 @@ body {
 @keyframes ui-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* 로그인 화면 마크 입장 연출(2026-09-27, 2차) — 1차는 novadb의 "부유하는
+   블루 광원"+"잉크 선 한 획" 연출을 그대로 가져왔었는데, 사용자 피드백
+   ("전문 디자이너가 그린 느낌 맞나? 잉크선 더 예술적이고 디테일하게 안
+   될까?")을 계기로 novadb 차용 대신 AI LENS 자체 스플래시 핸드오프(docs/
+   design-system/notes/2026-08-25-ai-lens-splash-handoff.md §4)의 마크
+   입장 모션 — "조리개가 닫히듯" 4조각이 각자 자리로 회전해 들어오는
+   연출 — 을 이 배지 크기에 맞게 단순화해 가져왔다. 원본은 조각마다
+   자기 바깥 모서리 반대쪽 꼭짓점을 축으로 82˚ 회전해 들어오지만(정확한
+   피벗 좌표가 필요), 여기서는 각 path 의 자체 바운딩박스 중심을 축으로
+   삼는다(`transform-box: fill-box` 로 좌표 계산 없이 가능) — 56px 배지
+   에선 육안 차이가 거의 없으면서 훨씬 안정적이다. 회전 방향을 조각마다
+   번갈아(파랑/amber는 반시계, 빨강/초록은 시계) 줘서 "사방에서 모여
+   닫히는" 조리개 느낌을 낸다. 정지 워터마크(카드 뒤 코너)는 애니메이션
+   없이 고정 — AiLensMark 의 animate prop 이 true 인 곳(로그인 카드
+   본체)에서만 켠다. */
+@keyframes ails-piece-in {
+  from {
+    opacity: 0;
+    transform: scale(0.55) rotate(var(--ails-rot, -70deg));
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+.ails-animate path {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ails-piece-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ails-animate path:nth-of-type(1) { --ails-rot: -78deg; animation-delay: 0ms; }
+.ails-animate path:nth-of-type(2) { --ails-rot: 78deg; animation-delay: 90ms; }
+.ails-animate path:nth-of-type(3) { --ails-rot: -78deg; animation-delay: 180ms; }
+.ails-animate path:nth-of-type(4) { --ails-rot: 78deg; animation-delay: 270ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ails-animate path {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 

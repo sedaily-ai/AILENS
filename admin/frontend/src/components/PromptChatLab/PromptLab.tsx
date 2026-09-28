@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { PromptChatLab } from "./PromptChatLab";
 import { PromptTextLab } from "./PromptTextLab";
+import { TABS, usePromptLab } from "./PromptLabProvider";
 
 /* 프롬프트 실험 — 4포맷 탭(2026-09-22 신설). 사용자 요청: "지금 웹툰은
    완성이 되어있는데... 웹툰 프롬프트쪽을 활용... 상단에 탭 4개를 만들면
@@ -14,42 +14,36 @@ import { PromptTextLab } from "./PromptTextLab";
    버튼이 여는 화면을 하나로 통일한다 — 탭을 눌러도 페이지를 안 떠나고
    같은 전체화면 안에서 카테고리만 바뀐다.
 
-   웹툰 탭은 기존 PromptChatLab을 그대로 쓴다(컷 이미지 생성·GPU 제어가
-   있는 유일한 포맷이라 그 컴포넌트 자체는 안 건드림). 나머지 3개는
-   PromptTextLab(신설, 순수 텍스트 스트리밍 버전)을 쓴다. `key={category}`로
-   레터↔팟캐스트↔영상 전환 시에도 항상 새로 마운트되게 한다 — 대화
-   목록·프롬프트 버전·입력창 같은 카테고리별 상태가 이전 탭 것과 섞이지
-   않도록(리액트가 "같은 컴포넌트 타입"이라 기본적으론 리마운트 없이
-   props만 갈아끼우는데, 그러면 messages/threadId 등이 그대로 남는다). */
+   2026-09-24, 두 번째 개편 — 사용자 요청: "근본적으로... 진짜 다
+   동시작업이 가능하도록 하고 싶은데... 대화 다른 곳에 머물러도... 될
+   수 있게?" 예전엔 탭을 바꾸면 `key={category}`로 이전 탭을 통째로
+   언마운트했다(대화 상태가 섞이지 않게 하려던 의도였는데, 그 대가로
+   전환할 때마다 웹소켓 연결·진행 중이던 작업이 전부 날아갔다). 이제
+   상태 소유권 자체가 PromptLabProvider.tsx(신설)로 옮겨갔고, 이
+   컴포넌트는 그 Provider가 넘겨주는 `visited`(한 번이라도 연 적 있는
+   탭) Set에 있는 탭만 마운트하되 — 한 번 마운트된 탭은 절대
+   언마운트하지 않는다. 비활성 탭은 CSS `hidden`으로 화면에서만 숨긴다
+   (컴포넌트는 살아있으니 PromptChatLab/PromptTextLab이 각자 들고 있는
+   useAdminChatSocket() 연결·채팅 상태·영상 카드 상태가 그대로 유지됨).
+   PromptChatLab.tsx/PromptTextLab.tsx 내부는 전혀 안 건드렸다 — 원래도
+   그 둘이 요구하는 props(open/onClose/embedded/category)만 그대로 준다.
 
-const TABS = [
-  { id: "letters", label: "레터" },
-  { id: "webtoon", label: "웹툰" },
-  { id: "podcast", label: "팟캐스트" },
-  { id: "video", label: "영상" },
-] as const;
+   `open`/`onClose`/`category` 등 상태는 이제 전부 Provider 소유라 이
+   컴포넌트는 props를 받지 않는다 — `usePromptLab()`으로 직접 구독한다.
+   TABS/PromptLabCategory도 Provider가 정본(카테고리 상태를 Provider가
+   소유하니 그 타입의 원천도 거기로 옮겼다). */
 
-export type PromptLabCategory = (typeof TABS)[number]["id"];
-
-export function PromptLab({
-  open,
-  onClose,
-  initialCategory = "webtoon",
-}: {
-  open: boolean;
-  onClose: () => void;
-  initialCategory?: PromptLabCategory;
-}) {
-  const [category, setCategory] = useState<PromptLabCategory>(initialCategory);
+export function PromptLab() {
+  const { isOpen, category, visited, setCategory, close } = usePromptLab();
 
   return (
     <aside
       role="dialog"
       aria-modal="true"
       aria-labelledby="prompt-lab-title"
-      inert={!open}
+      inert={!isOpen}
       className={`fixed inset-0 z-50 flex h-full w-full flex-col bg-[var(--surface-card)] transition-opacity duration-200 ease-out ${
-        open ? "opacity-100" : "pointer-events-none opacity-0"
+        isOpen ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
       <div className="ui-divider flex flex-none items-center gap-1 border-b bg-[var(--surface-sunken)] px-3 py-2">
@@ -74,7 +68,7 @@ export function PromptLab({
         <div className="flex-1" />
         <button
           type="button"
-          onClick={onClose}
+          onClick={close}
           className="flex-none rounded-lg p-1.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-card)] hover:text-[var(--text-primary)]"
           aria-label="닫기"
           title="닫기"
@@ -85,17 +79,24 @@ export function PromptLab({
         </button>
       </div>
       <div className="min-h-0 flex-1">
-        {category === "webtoon" ? (
-          <PromptChatLab open={open} onClose={onClose} embedded />
-        ) : (
-          <PromptTextLab
-            key={category}
-            open={open}
-            onClose={onClose}
-            embedded
-            category={category}
-            categoryLabel={TABS.find((t) => t.id === category)!.label}
-          />
+        {visited.has("webtoon") && (
+          <div className={category === "webtoon" ? "h-full" : "hidden"}>
+            <PromptChatLab open={isOpen} onClose={close} embedded />
+          </div>
+        )}
+        {(["letters", "podcast", "video"] as const).map(
+          (id) =>
+            visited.has(id) && (
+              <div key={id} className={category === id ? "h-full" : "hidden"}>
+                <PromptTextLab
+                  open={isOpen}
+                  onClose={close}
+                  embedded
+                  category={id}
+                  categoryLabel={TABS.find((t) => t.id === id)!.label}
+                />
+              </div>
+            )
         )}
       </div>
     </aside>

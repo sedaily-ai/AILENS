@@ -23,6 +23,44 @@ function extractYouTubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+// 2026-09-28, 사용자 지적 — "팟캐스트, 영상 부분... 실제 걸로 나오게 하면
+// 안되는건가요? 지금 링크로만 있는 상황이라서": 자동 파이프라인이 채우는
+// media_url/video_url은 YouTube가 아니라 S3에 직접 올라간 mp3/mp4
+// 파일이라(예: .../media/podcast/mustknow-auto/xxx-podcast.mp3),
+// YouTube 썸네일만 그리던 예전 로직으로는 아무 미리보기도 안 뜨고
+// 링크 입력창만 보였다 — YouTube면 iframe으로, 아니면 그냥 <audio>/
+// <video> 태그로 URL을 직접 재생한다(파일 확장자를 굳이 안 가린다 —
+// 브라우저가 재생 못 하면 컨트롤만 뜨고 조용히 실패하는 정도라 안전).
+function MediaPreview({ url, kind }: { url: string; kind: "audio" | "video" }) {
+  if (!url.trim()) return null;
+  const videoId = extractYouTubeId(url);
+  if (videoId) {
+    return (
+      <div className="mt-3 aspect-video w-full max-w-[360px] overflow-hidden rounded-lg bg-black">
+        <iframe
+          src={`https://www.youtube.com/embed/${videoId}`}
+          title="미리보기"
+          className="h-full w-full"
+          allow="accelerate-compute; encrypted-media; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+  if (kind === "audio") {
+    return (
+      <audio controls src={url} className="mt-3 w-full max-w-[360px]">
+        오디오를 재생할 수 없습니다.
+      </audio>
+    );
+  }
+  return (
+    <video controls src={url} className="mt-3 w-full max-w-[360px] rounded-lg bg-black">
+      영상을 재생할 수 없습니다.
+    </video>
+  );
+}
+
 // mode="lens" — "오늘의 이슈, 4가지 시선"(2026-08-12) → "4개 포맷 편집"으로
 // 재구성(2026-08-19). 원래는 "원인이 궁금한 사람/사람이 먼저 보이는 사람/
 // 내 일이 걱정되는 사람/숫자부터 찾는 사람" 4개 고정 독자-관점 라벨로,
@@ -344,6 +382,7 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
                   placeholder="https://www.youtube.com/watch?v=..."
                   className="ui-input w-full rounded-lg px-3 py-2 text-sm"
                 />
+                <MediaPreview url={lens.media_url ?? ""} kind="audio" />
               </div>
             )}
 
@@ -357,23 +396,7 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
                   placeholder="https://www.youtube.com/watch?v=... 또는 youtu.be/..."
                   className="ui-input w-full rounded-lg px-3 py-2 text-sm"
                 />
-                {(() => {
-                  const videoId = extractYouTubeId(lens.video_url ?? "");
-                  return videoId ? (
-                    <div className="mt-3 aspect-video w-full max-w-[280px] overflow-hidden rounded-lg bg-black">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ) : lens.video_url ? (
-                    <p className="mt-2 text-xs text-amber-600">
-                      YouTube 링크가 아니면 썸네일 미리보기가 안 뜰 수 있어요 — 저장은 그대로 됩니다.
-                    </p>
-                  ) : null;
-                })()}
+                <MediaPreview url={lens.video_url ?? ""} kind="video" />
               </div>
             )}
 

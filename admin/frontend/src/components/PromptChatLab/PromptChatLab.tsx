@@ -3,19 +3,18 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { adminApi } from "@/lib/adminClient";
 import { useAdminChatSocket } from "@/lib/useAdminChatSocket";
-import type { ChatThreadSummary, PromptHistoryEntry, WebtoonStoryboardCut } from "@/lib/types";
-// IMAGE_MODELS는 이제 이미지를 안 만드는 이 컴포넌트에선 CutImagePreview
-// (구버전 저장 대화에 남아있는 imagePreview 메시지 렌더용)에서만 쓴다.
-import { IMAGE_MODELS } from "@/lib/webtoonImageModels";
-import { PromptSectionsPanel } from "./PromptSectionsPanel";
-import { WebtoonImageSettingsPanel } from "./WebtoonImageSettingsPanel";
+import type { PromptHistoryEntry, WebtoonStoryboardCut } from "@/lib/types";
+import { PromptVersionReference, type PromptVersionReferenceHandle } from "./PromptVersionReference";
+import { WebtoonImageSettingsPanel, type WebtoonImageSettingsPanelHandle } from "./WebtoonImageSettingsPanel";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { ActivationHistoryButton } from "./ActivationHistory";
+import { StepTabs } from "./StepTabs";
 import { ChatThreadSidebar } from "./ChatThreadSidebar";
-import { VersionPreviewModal } from "./VersionPreviewModal";
 import { TEXT_MODELS, DEFAULT_TEXT_MODEL } from "./textModels";
-import { WebtoonCutGenerator } from "../WebtoonCutGenerator/WebtoonCutGenerator";
-import { WebtoonImageLab } from "../WebtoonImageLab";
-import { WebtoonStageLab } from "../WebtoonStageLab";
+import { useChatLabThread } from "./useChatLabThread";
+import { useCurrentModelLabel } from "./useCurrentModel";
+import { WebtoonCutGenerator, WebtoonProductionCutGrid } from "../WebtoonCutGenerator/WebtoonCutGenerator";
+import { LatestPublishedContentLink } from "./LatestPublishedContentLink";
 import { CustomSelect } from "@/components/CustomSelect";
 
 // 좌측 채팅창 텍스트 모델 선택지 — 2026-09-22, ./textModels.ts로 이전
@@ -69,7 +68,6 @@ interface ChatMessage {
   role: MsgRole;
   text?: string;
   storyboard?: { coreQuestion: string; cuts: WebtoonStoryboardCut[]; testedVersion?: number | null };
-  imagePreview?: { cut: number; imageUrl: string; model?: string };
   /** true면 처음 나타날 때 타이핑되듯 스트리밍 연출 — 상태 메시지("GPU를
    *  켜는 중입니다" 등)처럼 완성본이 한 번에 오는 텍스트에만 쓴다. 진짜
    *  스트리밍(기사 반응 문구)은 아래 liveText가 따로 담당하므로 여기선
@@ -118,11 +116,13 @@ type WsPush =
   // (WebtoonCutGenerator)에서 컷을 생성하면 이 이벤트가 오는데, 지금까지
   // PromptChatLab은 이걸 안 듣고 WebtoonCutGenerator만 자기 로컬
   // state(slots)에 담아뒀다 — 스레드를 나갔다 들어오면 그 로컬 state가
-  // 사라져 이미지가 없어진 것처럼 보였다. imagePreview 메시지 저장·복원
-  // 배선(appendMessage/openThread)은 예전 설계(컷 생성이 채팅 안에
-  // 있던 시절)부터 이미 있었는데 그 뒤로 아무도 안 부르고 있었다 —
-  // 여기서 다시 연결한다(아래 case "cut_image").
-  | { type: "cut_image"; cut: number; image_url: string; model?: string }
+  // 사라져 이미지가 없어진 것처럼 보였다.
+  // 2026-09-26 — 저장은 persistArtifact로 한다(채팅 말풍선엔 안 보임,
+  // 아래 case "cut_image" 참고) — 사용자 지적: "이미지 부분이 채팅
+  // 부분에도 출력이 되는데, 출력할 필요 없고요... 우측에만 출력된게
+  // 나오도록". 한때 appendMessage(말풍선으로도 보임)로 연결했었는데
+  // 그걸 되돌린 것.
+  | { type: "cut_image"; cut: number; test_id?: string; image_url: string; model?: string }
   | { type: "pong" };
 
 export function PromptChatLab({
@@ -135,13 +135,67 @@ export function PromptChatLab({
   embedded?: boolean;
 }) {
   const { wsOpen, send: wsSend, subscribe } = useAdminChatSocket();
-  const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
+  const currentModelLabel = useCurrentModelLabel(PROMPT_CATEGORY, open);
+  const {
+    messages,
+    threads,
+    threadId,
+    appendMessage,
+    startNewThread: startNewThreadCore,
+    openThread: openThreadCore,
+    ensureThread,
+    persistArtifact,
+    renameThread,
+    setThreadTag,
+    deleteThread,
+    bulkDeleteThreads,
+  } = useChatLabThread<ChatMessage>({
+    category: PROMPT_CATEGORY,
+    promptName: PROMPT_NAME,
+    enabled: open,
+    makeGreeting: () => GREETING,
+    // 2026-09-26 — persistArtifact로 저장된 컷 이미지(imagePreview만 있고
+    // text·storyboard는 없는 메시지)는 채팅 말풍선으로 복원하지 않는다
+    // (null 반환 → useChatLabThread.ts가 걸러냄). 우측 패널 복원은
+    // openThread()가 detail.messages 원본을 따로 스캔해서
+    // restoredCutImages에 담당한다(아래 참고) — 이 mapSavedMessage와는
+    // 무관하게 항상 동작한다.
+    mapSavedMessage: (m) => {
+      if (m.imagePreview && !m.text && !m.storyboard) return null;
+      return {
+        id: `saved-${m.id}`,
+        role: m.role,
+        text: m.text,
+        storyboard: m.storyboard as { coreQuestion: string; cuts: WebtoonStoryboardCut[]; testedVersion?: number | null } | undefined,
+        animate: false,
+      };
+    },
+    decorateMessage: (msg) => ({ animate: msg.role === "assistant", ...msg }),
+    buildPersistPayload: (msg, persistExtra) => {
+      const payload: Record<string, unknown> = { ...persistExtra };
+      if (msg.text !== undefined) payload.text = msg.text;
+      if (msg.storyboard !== undefined) payload.storyboard = msg.storyboard;
+      return payload;
+    },
+  });
   const [input, setInput] = useState("");
   // 2026-09-20, 사용자 요청 — "좌측 채팅창에도 텍스트 모델 선택 가능하게":
   // 이미지 모델 드롭다운(WebtoonCutGenerator)과 같은 패턴. 기본값은 기존
   // 동작 그대로(Sonnet 4.6) — 아무것도 고르지 않아도 예전과 똑같이 나간다.
   const [textModel, setTextModel] = useState<string>(DEFAULT_TEXT_MODEL);
   const [storyboard, setStoryboard] = useState<{ coreQuestion: string | null; cuts: WebtoonStoryboardCut[] } | null>(null);
+  // 2026-09-24, 사용자 지적 — "대화 하고 나갔다 오면... 웹툰 등... 사라지는데...
+  // 대화들은 살아있는데, 나머지들도 다 남으면 좋지": 컷 이미지(imagePreview)는
+  // 원래도 생성 즉시 스레드에 저장되고 있었는데(cut_image WS 케이스), 그
+  // 데이터가 채팅 말풍선 렌더링에만 쓰이고 실제 사용자가 보는 우측
+  // WebtoonCutGenerator 그리드로는 전혀 복원되지 않았다 — openThread에서
+  // imagePreview 메시지들을 모아 여기 담아 WebtoonCutGenerator에 내려준다.
+  // 2026-09-26 — "테스트 N" 카드가 여러 개로 늘어나면서(WebtoonCutGenerator.tsx
+  // 모듈 docstring 참고) 컷 번호 하나만으론 키가 부족해졌다 — testId를
+  // 바깥 키로 한 겹 더 둔다. 구버전(testId 없이 저장된) 메시지는 "legacy"
+  // 키 하나로 묶는다 — 그 글자 자체는 의미 없고, 그냥 restoredImages의
+  // Object.entries() 순서상 첫 번째 테스트로 복원되기만 하면 된다.
+  const [restoredCutImages, setRestoredCutImages] = useState<Record<string, Record<number, { imageUrl: string; model?: string }>>>({});
   // 2026-09-16 — 우측은 항상 이미지 생성 패널(WebtoonCutGenerator)을 보여준다
   // (사용자 요청: "항상 2개 단이 구분되어서 보여지면 좋겠어요" — 텍스트|이미지
   // 두 칸이 탭으로 서로를 가리는 대신 늘 같이 보여야 한다는 뜻).
@@ -153,25 +207,35 @@ export function PromptChatLab({
   // 3번째 칼럼(아래 layout)으로 최종 정착했다 — 이제 promptPanelOpen 같은
   // 토글 state는 필요 없다.
   //
-  // 2026-09-21 — 히스토리 갤러리(WebtoonImageLab)는 이제 섹션 헤더의
-  // 히스토리 아이콘으로만 연다(생성 탭은 제거 — WebtoonImageSettingsPanel/
-  // WebtoonCutGenerator에 이미 있던 기능과 중복이었다).
-  const [imageLabOpen, setImageLabOpen] = useState(false);
-  const [stageLabOpen, setStageLabOpen] = useState(false);
+  // 2026-09-25 — 화풍/인물(STYLE/CHARACTERS) 설정 삭제 결정(사용자 요청,
+  // 발행된 webtoon-image 문서에 IMAGE_MODEL 섹션이 없어 실제 자동발행도
+  // 기본 모델(sd_ultra)로 떨어지고 있음을 라이브로 확인 — sd_ultra는 이
+  // 값들을 아예 안 읽어 실제로도 죽은 설정이었다)에 따라 이 값들을 편집
+  // 하던 화면(WebtoonImageLab 히스토리 갤러리·WebtoonStageLab 단계별
+  // 생성)도 함께 제거했다 — 삭제된 패널을 여는 유일한 진입점이라 남겨두면
+  // 죽은 코드만 된다. "발행 모델"(어떤 모델을 쓸지) 선택 UI는 팟캐스트의
+  // podcast-voice·영상의 video-settings와 같은 성격(실제 살아있는 프로덕션
+  // 설정)이라 그대로 유지한다.
   // 2026-09-16, 사용자 요청 — "좌측 사이드바는 접혔다 펼 수 있도록":
   // 대화 목록이 당장 필요 없을 때 챗 영역을 넓게 쓸 수 있게 한다.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // 2026-09-16, 사용자 요청 — "이미지 생성 부분이 늘렸다 펴졌다.. 직접
-  // 손으로 끌고 갈 수 있도록": 우측 이미지 패널 폭을 드래그로 조절한다.
-  const [imagePanelWidth, setImagePanelWidth] = useState(340);
-  const handleImagePanelResizeStart = (e: React.MouseEvent) => {
+  // 손으로 끌고 갈 수 있도록": 우측 패널 폭을 드래그로 조절한다.
+  // 2026-09-25 — 중간 "이미지 생성" 칼럼과 우측 "설정" 칼럼을 하나로
+  // 합쳤다(사용자 지적: "중간 섹션이랑.. 우측 사이드 섹션.. 이렇게
+  // 두개가 있을 이유가 있을까요? 통합하면 어떨까..") — "설정"을
+  // "프로덕션" 토글로 감싸고, 그 아래 "결과값" 토글에 컷 이미지 그리드를
+  // 담아 한 칼럼에서 스크롤로 다 본다. 폭 state도 하나로 합쳐졌다(이전
+  // imagePanelWidth+settingsPanelWidth 두 개 드래그 핸들 → 하나).
+  const [settingsPanelWidth, setSettingsPanelWidth] = useState(640);
+  const handleSettingsPanelResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = imagePanelWidth;
+    const startWidth = settingsPanelWidth;
     const onMove = (moveEvent: MouseEvent) => {
-      const delta = startX - moveEvent.clientX; // 왼쪽으로 끌수록(마우스 X 감소) 패널이 넓어진다
-      const next = Math.min(720, Math.max(280, startWidth + delta));
-      setImagePanelWidth(next);
+      const delta = startX - moveEvent.clientX;
+      const next = Math.min(900, Math.max(320, startWidth + delta));
+      setSettingsPanelWidth(next);
     };
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
@@ -180,6 +244,104 @@ export function PromptChatLab({
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
+  // 2026-09-26, 사용자 요청 — "프로덕션 부분은.. 고정하고 싶네요...
+  // 위아래로 잡아당기고 끌 수 있도록" — PromptTextLab.tsx와 동일 패턴,
+  // 그 파일 주석 참고.
+  const [productionHeight, setProductionHeight] = useState(360);
+  // 2026-09-27, 사용자 지적 — "테스트 추가 부분.. 고정해야겠네.. 스크롤
+  // 내리면 사라지네": "테스트" 경계 띠(WebtoonCutGenerator.tsx)가 프로덕션
+  // 카드 밑 일반 흐름에 있어서, 테스트 카드가 많아 아래로 스크롤하면
+  // 화면 밖으로 사라졌다. 프로덕션 카드(sticky top-0)는 이미 고정돼
+  // 있으니, 그 바로 아래에 띠도 같이 고정하면 된다 — 다만 프로덕션 카드는
+  // 접혔다 펴지거나(CollapsibleSection의 <details>, 여기서 제어 못 함)
+  // 드래그로 높이가 바뀌므로(productionHeight) "지금 실제로 화면에서
+  // 차지하는 높이"를 고정값으로 가정할 수 없다 — ResizeObserver로 실측해서
+  // 그 값을 띠의 top으로 넘긴다(WebtoonCutGenerator에 stickyTop prop).
+  const productionCardRef = useRef<HTMLDivElement>(null);
+  const [productionCardHeight, setProductionCardHeight] = useState(0);
+  useEffect(() => {
+    const el = productionCardRef.current;
+    if (!el) return;
+    // 2026-09-27(후속) — 사용자 리포트: "스크롤했는데 테스트 섹션 행이
+    // 프로덕션 카드랑 겹치는데요": ResizeObserver 콜백만 믿었더니, 이
+    // 카드 안의 <details>(CollapsibleSection, 접힘↔펼침) 토글이 이
+    // 중첩된 flex+overflow-hidden+max-height 조합에서 항상 콜백을
+    // 새로 안 태우는 경우가 있었다 — 접힘 상태에서 측정한 작은 높이가
+    // 펼친 뒤에도 안 갱신돼서, "테스트" 띠가 그 낡은(작은) top 값에
+    // 붙어 펼쳐진 프로덕션 카드 아랫부분을 덮어버린 것. ResizeObserver는
+    // 그대로 두되, 이 카드 안의 모든 <details>(중첩 토글 포함)에 직접
+    // toggle 리스너를 걸어 접힘/펼침 "그 즉시" 강제로 다시 잰다 —
+    // 두 경로 중 하나라도 놓치지 않게 이중 방어.
+    const measure = () => setProductionCardHeight(el.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    const detailsEls = Array.from(el.querySelectorAll("details"));
+    detailsEls.forEach((d) => d.addEventListener("toggle", measure));
+    return () => {
+      observer.disconnect();
+      detailsEls.forEach((d) => d.removeEventListener("toggle", measure));
+    };
+  }, []);
+  const handleProductionResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = productionHeight;
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientY - startY;
+      const next = Math.min(720, Math.max(120, startHeight + delta));
+      setProductionHeight(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  // 2026-09-26(후속×3), 사용자 요청 — "프로덕션 부분 카드도.. 테스트
+  // 카드랑 동일한 구조가 되도록 하면 어떤가요?": PromptSectionsPanel(별도
+  // prompt_lab_docs 저장소, VersionSwitcher 드롭다운)을 완전히 걷어내고
+  // 테스트 카드와 똑같은 PromptVersionReference를 그대로 쓴다 — 이제
+  // "프로덕션" 카드도 "테스트 N" 카드처럼 왼쪽 사이드바로 버전을 훑어보고
+  // 불러오고, "+ 새 버전"으로 새로 만들고, 이 카드 전용 "프로덕션에 적용"
+  // 버튼으로 승격한다. prompt_lab_docs라는 별개 저장소 자체가 없어지므로
+  // "배지는 v18인데 본문은 다른 버전"처럼 둘이 어긋나는 근본 원인이
+  // 사라진다 — 항상 prompt_versions 하나만 본다.
+  const scriptPromptRef = useRef<PromptVersionReferenceHandle>(null);
+  const imageSettingsRef = useRef<WebtoonImageSettingsPanelHandle>(null);
+  const [scriptServerVersion, setScriptServerVersion] = useState<number | null>(null);
+  const [applyingScriptVersion, setApplyingScriptVersion] = useState(false);
+  // 2026-09-26(후속×4), 사용자 지적 — "처음 들어갈때 프로덕션 카드 보면,
+  // 프로덕션에 적용 카드가 활성화되어있는데, 고치지 않았으면, 활성화가
+  // 되지 않아야하는거 아닌가요?": 이 카드가 지금 사이드바에 불러와 둔
+  // 버전(scriptActiveInfo)이 이미 프로덕션(scriptServerVersion)과 같으면
+  // 눌러도 아무 일도 안 일어나는 버튼이라, 그 상태에선 비활성화해 둔다.
+  const [scriptActiveInfo, setScriptActiveInfo] = useState<{ version: number; label: string | null } | null>(null);
+  const scriptVersionUnchanged =
+    scriptActiveInfo !== null && scriptServerVersion !== null && scriptActiveInfo.version === scriptServerVersion;
+  // 2026-09-26(후속), 사용자 요청 — "테스트 카드도 마찬가지": 테스트
+  // 카드의 "프로덕션에 적용"도 같은 원칙으로 비활성화하려면, 테스트
+  // 카드들이 지금 실제 발행된 이미지 모델이 뭔지 알아야 한다 —
+  // WebtoonImageSettingsPanel이 방금 fetch한 defaults.image_model을 여기로
+  // 올려보내고, WebtoonCutGenerator에 그대로 내려준다.
+  const [productionImageModel, setProductionImageModel] = useState<string | null>(null);
+  const handleApplyScriptVersion = async () => {
+    if (applyingScriptVersion) return;
+    setApplyingScriptVersion(true);
+    try {
+      await scriptPromptRef.current?.activateIfNeeded();
+    } finally {
+      setApplyingScriptVersion(false);
+    }
+  };
+  // 2026-09-26(후속), 사용자 지적 — "생성 프롬프트에서도 프로덕션 적용,
+  // 이미지 생성 컷에서도 프로덕션 적용 이렇게 따로 있는게 아니고, 프로덕션
+  // 적용은 테스트 카드에서... 테스트 1 카드에서 바로 보이게": 컷 카드의
+  // 통합 "프로덕션에 적용" 버튼(WebtoonCutGenerator.tsx)이 부른다 — 이제
+  // 값만 채우는 게 아니라 그 자리에서 바로 발행까지 한다
+  // (WebtoonImageSettingsPanel.tsx::applyAndPublish).
+  const handleApplyImageModel = (model: string) => imageSettingsRef.current?.applyAndPublish(model) ?? Promise.resolve();
   // 기사 반응 문구가 토큰 단위로 도착하는 동안 임시로 담아두는 곳(완료
   // 전까지는 messages 배열에 안 넣는다 — text_done에서 한 번에 확정).
   const [liveText, setLiveText] = useState<string | null>(null);
@@ -192,6 +354,19 @@ export function PromptChatLab({
   // 교체된다.
   const [liveStepActive, setLiveStepActive] = useState(false);
   const [liveStepLabel, setLiveStepLabel] = useState<string>("");
+  // 2026-09-27, 사용자 요청 — "복사버튼 있으면 좋을것같고요.. nova
+  // 서비스처럼": PromptTextLab.tsx와 동일 패턴(handleCopy/copiedId).
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const handleCopy = async (m: ChatMessage) => {
+    if (!m.text) return;
+    try {
+      await navigator.clipboard.writeText(m.text);
+      setCopiedId(m.id);
+      setTimeout(() => setCopiedId((prev) => (prev === m.id ? null : prev)), 1800);
+    } catch (err) {
+      console.error("클립보드 복사 실패", err);
+    }
+  };
   const [liveParsed, setLiveParsed] = useState<{ value: unknown; inProgressPath: JsonPath } | null>(null);
   // 2026-09-18, 사용자 요청 — "타이핑하듯이.. 타닥타닥타닥 이런게 나와야
   // 하는데.. 지금은 쭉 한번에 끊기듯이 나오잖아요.. 노바 챗봇 서비스는
@@ -269,18 +444,9 @@ export function PromptChatLab({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // 좌측 사이드바 — 대화 스레드 목록/현재 스레드(2026-09-15, 사용자 요청:
   // "대화들.. 저장 가능한 세션들.. 좌측 사이드바.. 각 대화마다 어떤
-  // 대화를 했고 출력물이 나왔는지 체크"). threadIdRef는 ws.onmessage
-  // 클로저에서 최신값을 안전히 읽기 위함(2026-09-16, 예전엔
-  // draftPromptRef도 같은 이유였으나 그건 제거됨 — 아래 sendWs 참고) —
-  // appendMessage가 호출될 때마다 이 값이 있으면 그 스레드에 메시지를
-  // 이어붙인다.
-  const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
-  const [threadId, setThreadIdState] = useState<number | null>(null);
-  const threadIdRef = useRef<number | null>(null);
-  const setThreadId = (id: number | null) => {
-    threadIdRef.current = id;
-    setThreadIdState(id);
-  };
+  // 대화를 했고 출력물이 나왔는지 체크"). threads/threadId/threadIdRef는
+  // useChatLabThread가 관리(2026-09-24 리팩토링 — PromptTextLab.tsx와
+  // 중복이던 골격을 훅으로 뽑았다).
 
   // 2026-09-18, 사용자 요청 — "출력될때 위로 스크롤하면.. 안움직이도록..
   // 계속 출력되는쪽으로 스크롤 이동되네.. 위로 스크롤 가능하게 해주세요":
@@ -327,18 +493,6 @@ export function PromptChatLab({
     }
   }, [liveText, liveParsed]);
 
-  const refreshThreads = () => {
-    adminApi
-      .listChatThreads(PROMPT_CATEGORY, PROMPT_NAME)
-      .then((r) => setThreads(r.threads))
-      .catch((err) => console.error("대화 목록 불러오기 실패", err));
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    refreshThreads();
-  }, [open]);
-
   // 2026-09-21, 사용자 요청 — "프롬프트를 버전별로 볼 수 있으면... 버전을
   // 드롭다운 해서 선택할 수 있고 그걸로 적용해서 출력... AB 테스트 느낌".
   // "최신"(promptVersion=null)이면 기존 동작(우측 패널 초안 → 없으면
@@ -347,36 +501,36 @@ export function PromptChatLab({
   // 참고).
   const [promptHistory, setPromptHistory] = useState<PromptHistoryEntry[]>([]);
   const [promptVersion, setPromptVersion] = useState<number | null>(null);
-  const [versionPreviewOpen, setVersionPreviewOpen] = useState(false);
-  const [versionPreviewContent, setVersionPreviewContent] = useState<string | null>(null);
-  const [versionPreviewLoading, setVersionPreviewLoading] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    // getPrompt()가 아니라 getPromptHistory() — active_content(웹툰
-    // 카테고리 10만자 이상)까지 통째로 받는 무거운 쪽은 안 쓴다(2026-09-20
-    // "프롬프트 실험 페이지 로딩이 느리다" 신고로 serverVersion 쪽이 이미
-    // 한 번 겪은 전례, PromptSectionsPanel.tsx 참고).
+  // getPrompt()가 아니라 getPromptHistory() — active_content(웹툰 카테고리
+  // 10만자 이상)까지 통째로 받는 무거운 쪽은 안 쓴다(2026-09-20 "프롬프트
+  // 실험 페이지 로딩이 느리다" 신고).
+  const refreshPromptHistory = () => {
     adminApi
       .getPromptHistory(PROMPT_CATEGORY, PROMPT_NAME)
       .then((r) => setPromptHistory(r.history))
       .catch((err) => console.error("프롬프트 버전 목록 불러오기 실패", err));
-  }, [open]);
-
-  const openVersionPreview = () => {
-    if (promptVersion === null) return;
-    setVersionPreviewOpen(true);
-    setVersionPreviewLoading(true);
-    setVersionPreviewContent(null);
-    adminApi
-      .getPromptVersion(PROMPT_CATEGORY, PROMPT_NAME, promptVersion)
-      .then((v) => setVersionPreviewContent(v.content))
-      .catch((err) => {
-        console.error("프롬프트 버전 내용 불러오기 실패", err);
-        setVersionPreviewContent("(불러오기 실패)");
-      })
-      .finally(() => setVersionPreviewLoading(false));
   };
+
+  // 2026-09-26(후속×3) — 프로덕션 카드가 더 이상 PromptSectionsPanel을
+  // 안 쓰므로(위 scriptPromptRef 주석 참고), scriptServerVersion(지금
+  // 프로덕션 활성 버전 번호)을 여기서 직접 가볍게 구한다 — listPrompts()는
+  // 카테고리 전체 요약뿐이라 본문 없이 active_version만 가져온다.
+  const refreshScriptServerVersion = () => {
+    adminApi
+      .listPrompts()
+      .then((r) => {
+        const listed = r.prompts.find((p) => p.id === `${PROMPT_CATEGORY}/${PROMPT_NAME}`);
+        setScriptServerVersion(listed ? listed.active_version : null);
+      })
+      .catch((err) => console.error("프로덕션 버전 조회 실패", err));
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    refreshPromptHistory();
+    refreshScriptServerVersion();
+  }, [open]);
 
   // 입력창 자동 높이 조절(2026-09-14, 사용자 요청 — "글이 많이 들어가면
   // 크기가 늘어나도록") — height를 auto로 되돌린 다음 scrollHeight로
@@ -398,71 +552,50 @@ export function PromptChatLab({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  /** persistExtra는 화면 렌더에는 안 쓰지만 저장은 해야 하는 값 —
-   *  storyboard 메시지의 fullCuts(컷 이미지 재요청에 필요한 원본 전체
-   *  cuts, 화면에 보이는 storyboard 필드는 요약본이라 따로 챙긴다)가
-   *  유일한 예. */
-  const appendMessage = (msg: Omit<ChatMessage, "id">, persistExtra?: Record<string, unknown>) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        animate: msg.role === "assistant", // 사용자 메시지는 이미 화면에 입력해뒀던 텍스트라 타이핑 연출 불필요
-        ...msg,
-        id: `${msg.role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      },
-    ]);
-    if (threadIdRef.current !== null) {
-      const payload: Record<string, unknown> = { ...persistExtra };
-      if (msg.text !== undefined) payload.text = msg.text;
-      if (msg.storyboard !== undefined) payload.storyboard = msg.storyboard;
-      if (msg.imagePreview !== undefined) payload.imagePreview = msg.imagePreview;
-      adminApi
-        .appendChatMessage(threadIdRef.current, msg.role, payload)
-        .then(() => refreshThreads()) // updated_at 갱신 -> 최신 대화가 목록 맨 위로
-        .catch((err) => console.error("메시지 저장 실패", err));
-    }
-  };
-
   /** 사이드바 "새 대화" — 지금 화면을 초기 상태로 되돌린다. 서버에 빈
    *  스레드를 미리 만들진 않는다 — 첫 메시지를 보낼 때(send()) 만든다,
    *  그래야 아무것도 안 치고 나가도 빈 스레드가 목록에 안 쌓인다. */
   const startNewThread = () => {
-    setThreadId(null);
-    setMessages([GREETING]);
+    startNewThreadCore();
     setStoryboard(null);
+    setRestoredCutImages({});
     setLiveText(null);
     setWaiting(false);
+    // 2026-09-26, 사용자 요청 — "항상 처음 들어가면 프로덕션이 기본값이
+    // 되도록"(PromptTextLab.tsx와 동일 이유, 그 파일 주석 참고).
+    setPromptVersion(null);
   };
 
   /** 사이드바에서 기존 스레드 클릭 — 저장된 메시지를 그대로 복원한다.
    *  storyboard 메시지 중 가장 최근 것에 fullCuts가 있으면 그걸로
    *  storyboard 상태까지 복원해서(컷 이미지 재요청도 이어갈 수 있게),
    *  없으면(옛 스레드거나 storyboard가 아예 없던 대화) storyboard는
-   *  비운다. */
+   *  비운다. imagePreview가 있는 메시지들은 컷 번호별로 모아
+   *  restoredCutImages에 담는다(2026-09-24, 위 주석 참고) — 같은 컷을
+   *  여러 번 다시 만들었으면 나중 메시지가 이긴다(reduce가 앞→뒤 순서로
+   *  덮어씀). */
   const openThread = (id: number) => {
-    adminApi
-      .getChatThread(id)
-      .then((detail) => {
-        setThreadId(id);
-        const loaded: ChatMessage[] = detail.messages.map((m) => ({
-          id: `saved-${m.id}`,
-          role: m.role,
-          text: m.text,
-          storyboard: m.storyboard as { coreQuestion: string; cuts: WebtoonStoryboardCut[]; testedVersion?: number | null } | undefined,
-          imagePreview: m.imagePreview,
-          animate: false,
-        }));
-        setMessages(loaded.length ? loaded : [GREETING]);
-        const withFullCuts = [...detail.messages].reverse().find((m) => m.fullCuts && m.fullCuts.length > 0);
-        setStoryboard(
-          withFullCuts
-            ? { coreQuestion: withFullCuts.storyboard?.coreQuestion ?? null, cuts: withFullCuts.fullCuts! }
-            : null
-        );
-        setLiveText(null);
-        setWaiting(false);
-      })
-      .catch((err) => console.error("대화 불러오기 실패", err));
+    openThreadCore(id).then((detail) => {
+      if (!detail) return;
+      const withFullCuts = [...detail.messages].reverse().find((m) => m.fullCuts && m.fullCuts.length > 0);
+      setStoryboard(
+        withFullCuts
+          ? { coreQuestion: withFullCuts.storyboard?.coreQuestion ?? null, cuts: withFullCuts.fullCuts! }
+          : null
+      );
+      setRestoredCutImages(
+        detail.messages.reduce<Record<string, Record<number, { imageUrl: string; model?: string }>>>((acc, m) => {
+          if (m.imagePreview) {
+            const testId = m.imagePreview.testId ?? "legacy";
+            acc[testId] = { ...acc[testId], [m.imagePreview.cut]: { imageUrl: m.imagePreview.imageUrl, model: m.imagePreview.model } };
+          }
+          return acc;
+        }, {})
+      );
+      setLiveText(null);
+      setWaiting(false);
+      setPromptVersion(null);
+    });
   };
 
   const sendWs = (kind: string, data: unknown = {}) => {
@@ -535,12 +668,19 @@ export function PromptChatLab({
             break;
           case "cut_image":
             // 우측 패널(WebtoonCutGenerator)이 자기 화면(슬롯) 갱신은
-            // 따로 처리한다 — 여기서는 채팅 기록에 남겨서 스레드를
-            // 나갔다 다시 들어와도 생성된 이미지가 안 사라지게만 한다.
-            appendMessage({
-              role: "assistant",
-              imagePreview: { cut: msg.cut, imageUrl: msg.image_url, model: msg.model },
-              animate: false,
+            // 따로 처리한다 — 여기서는 스레드를 나갔다 다시 들어와도
+            // 생성된 이미지가 안 사라지게 서버에만 저장한다.
+            // 2026-09-26 — appendMessage(채팅 말풍선으로도 보임)를
+            // persistArtifact(서버 저장만, 채팅엔 안 보임)로 바꿨다 —
+            // 사용자 지적: "이미지 부분이 채팅 부분에도 출력이 되는데,
+            // 출력할 필요 없고요... 우측에만 출력된게 나오도록". 팟캐스트
+            // 음성 카드·영상 카드가 이미 쓰는 것과 동일 패턴(useChatLabThread.ts::
+            // persistArtifact 모듈 docstring 참고) — 복원(openThread)은
+            // 서버에 저장된 메시지를 그대로 다시 읽어오는 거라 그대로
+            // 동작한다, 화면에 말풍선으로 안 보였을 뿐 저장 자체는 항상
+            // 서버에 했었다.
+            persistArtifact({
+              imagePreview: { cut: msg.cut, imageUrl: msg.image_url, model: msg.model, testId: msg.test_id },
             });
             break;
         }
@@ -548,9 +688,16 @@ export function PromptChatLab({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- appendMessage는 매 렌더 새로 만들어지지만 messages/threadIdRef를 함수형 갱신·ref로만 다뤄 클로저가 오래돼도 안전하다(위 주석 참고) — subscribe 자체는 마운트 시 한 번만
   }, []);
 
+  // 2026-09-27, 사용자 지적 — "답변 출력중에는 또 다른 채팅 못보내도록
+  // 하시고... 한번 입력했는데 2번 출력되는 것도 있구요"(PromptTextLab.tsx
+  // 와 동일 버그·동일 수정, 그 파일 주석 참고). 웹툰은 liveStepActive
+  // (JSON 미리보기 리빌 중)도 "응답 중"에 포함해야 한다 — liveText가
+  // null이어도 storyboard가 아직 안 끝났으면 여전히 생성 중이다.
+  const isGenerating = waiting || liveText !== null || liveStepActive;
+
   const send = () => {
     const text = input.trim();
-    if (!text || !wsOpen) return;
+    if (!text || !wsOpen || isGenerating) return;
     setInput("");
 
     // 2026-09-20 — 예전엔 스레드 생성(createChatThread, admin Lambda→
@@ -558,27 +705,9 @@ export function PromptChatLab({
     // 누르고 처음 보낼 때 너무 늦게 나타난다"는 신고로 발견. 사용자가
     // 실제로 기다리는 건 AI 응답이지 스레드 저장이 아니라서, 스레드
     // 생성은 백그라운드로 돌리고 메시지 전송(sendInner, 사용자 말풍선
-    // 표시 + WebSocket 전송)은 그 응답을 기다리지 않고 바로 실행한다.
-    // threadIdRef가 아직 null인 짧은 창(스레드 생성 HTTP 왕복 시간) 동안
-    // 나가는 메시지는 저장이 스킵된다(appendMessage가 threadId 없으면
-    // 조용히 건너뜀) — 실사용 체감(응답이 바로 보임)은 그대로 유지하되,
-    // 아래에서 스레드 생성이 끝나는 즉시 그 첫 메시지를 뒤늦게 저장한다
-    // (2026-09-22 버그 수정 — PromptTextLab.tsx에서 사용자가 실제로 겪은
-    // 신고: "이전 대화 쓰레드... 사용자가 입력한 말풍선은 안보이더라고" —
-    // 그 스레드를 나중에 openThread()로 다시 열면 첫 말풍선이 통째로
-    // 안 보였다. 같은 패턴이라 여기도 같이 고친다).
-    if (threadIdRef.current === null) {
-      adminApi
-        .createChatThread(PROMPT_CATEGORY, PROMPT_NAME, text.slice(0, 60))
-        .then((thread) => {
-          setThreadId(thread.id);
-          adminApi
-            .appendChatMessage(thread.id, "user", { text })
-            .then(() => refreshThreads())
-            .catch((err) => console.error("첫 메시지 저장 실패", err));
-        })
-        .catch((err) => console.error("대화 스레드 생성 실패", err));
-    }
+    // 표시 + WebSocket 전송)은 그 응답을 기다리지 않고 바로 실행한다
+    // (ensureThread — useChatLabThread 참고).
+    ensureThread(text);
     sendInner(text);
   };
 
@@ -625,23 +754,15 @@ export function PromptChatLab({
     <div className="ui-divider flex items-start justify-between gap-4 border-b px-5 pb-3 pt-5">
       <div className="flex min-w-0 items-start gap-3">
         {/* 2026-09-16, 사용자 요청 — "뒤로가기 버튼을 만들어주셔야 이전
-            화면으로 나갈 수 있을 것 같습니다": 전체화면으로 열리는
-            embedded 모드에서 닫기 버튼이 아예 숨겨져 있어(!embedded 조건),
-            Esc 키 말고는 나갈 방법이 없었다 — 항상 보이는 뒤로가기로
-            바꾸고, "닫기"(X)보다 "이전 화면으로 돌아간다"는 의도가 더
-            분명한 화살표+라벨 버튼으로 뺐다. */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="-ml-1 mt-0.5 flex flex-none cursor-pointer items-center gap-1 rounded-lg py-1 pl-1 pr-2 text-[13px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]"
-          aria-label="목록으로 돌아가기"
-          title="목록으로 돌아가기"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
-          목록으로
-        </button>
+            화면으로 나갈 수 있을 것 같습니다": 그때는 이 컴포넌트가
+            독립적으로 전체화면 다이얼로그였어서, embedded 모드에서 닫기
+            버튼이 숨겨져 있으면(!embedded 조건) Esc 키 말고는 나갈 방법이
+            없었다. 2026-09-22에 PromptLab(4포맷 탭 셸)이 이 컴포넌트를
+            감싸게 되면서 그 셸 자신의 닫기(X) 버튼이 항상 보이게 됐고,
+            레터/팟캐스트/영상 탭(PromptTextLab)도 처음부터 자기 헤더에
+            뒤로가기를 안 뒀다 — 여기 것만 남아있던 중복이라 걷어낸다
+            (2026-09-24, 사용자 지적: "4탭 모두 목록으로 나가는 로직도
+            공통된 위치에 잘 있는거죠?"). */}
         <div className="min-w-0">
           <h2 id="prompt-chat-lab-title" className="font-display text-[17px] font-bold text-[var(--text-primary)]">
             프롬프트 실험
@@ -649,7 +770,21 @@ export function PromptChatLab({
           <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">기사를 붙여넣고 스크립트·장면 연출을 만들어보세요 — 텍스트만</p>
         </div>
       </div>
-      <div className="flex flex-none items-center gap-2">
+      <div className="flex flex-none items-center gap-1.5">
+        {/* 2026-09-24 — PromptTextLab.tsx와 같은 이유·같은 배지(사용자
+            요청: "배지 형태로... 하드코딩된거라 바뀌면 또 바꿔야
+            하잖아요"): 지금 실제 발행에 쓰이는 모델을 백엔드에서 받아와
+            보여준다. 좌측 드롭다운(textModel)은 이 채팅창에서 골라 시험
+            호출할 모델일 뿐, 이 배지와는 무관하다. */}
+        {currentModelLabel && (
+          <span
+            className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+            title="지금 실제 발행에 쓰이는 모델"
+          >
+            {currentModelLabel}
+          </span>
+        )}
         <span
           className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold"
           style={
@@ -669,7 +804,7 @@ export function PromptChatLab({
   const bodyNode = (
     <div ref={listRef} onScroll={handleListScroll} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
       {messages.map((m) => (
-        <ChatBubble key={m.id} msg={m} />
+        <ChatBubble key={m.id} msg={m} copiedId={copiedId} onCopy={handleCopy} />
       ))}
       {liveText !== null && (
         <div className="flex justify-start">
@@ -716,27 +851,38 @@ export function PromptChatLab({
           테스트 중인지 놓치지 않게 상태만 보여준다(입력창 바로 위라 보낼
           때 한 번 더 눈에 들어옴) — 컨트롤 자체를 두 곳에 두면 어느 쪽이
           정본인지 헷갈리므로 여기서 바꾸는 기능은 없앴다. */}
-      {promptVersion !== null && (
-        <p className="mb-1.5 px-1 text-[10.5px] font-medium" style={{ color: "var(--warn)" }}>
-          v{promptVersion}로 시험 중 — 지금 편집 중인 지침·발행본은 그대로 유지됩니다
-        </p>
-      )}
+      {/* 2026-09-26, 사용자 요청 — "채팅 부분에.. 처음 들어가면, 어떤
+          버전의 생성 프롬프트가 사용되는지 활성화되었는지 항상 뜨도록":
+          예전엔 promptVersion !== null(테스트 버전을 골랐을 때)에만
+          보였다 — 기본값(프로덕션)일 땐 표시가 아예 없었다. 항상
+          보이게 바꾸고, 기본값일 땐 프로덕션임을 명시한다. */}
+      <p
+        className="mb-1.5 px-1 text-[10.5px] font-medium"
+        style={{ color: promptVersion !== null ? "var(--warn)" : "var(--text-faint)" }}
+      >
+        {promptVersion !== null
+          ? `v${promptVersion}로 시험 중 — 다음 채팅 생성부터 이 버전이 쓰입니다(프로덕션·편집 중인 지침엔 영향 없음)`
+          : scriptServerVersion !== null
+            ? `v${scriptServerVersion} (프로덕션) 사용 중`
+            : "프로덕션 (아직 발행 전) 사용 중"}
+      </p>
       <div className="ui-input flex items-end gap-2 rounded-2xl px-3 py-2">
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleComposerKeyDown}
-          placeholder={wsOpen ? "기사를 붙여넣어 스크립트를 만들어보세요" : "연결 중..."}
+          placeholder={!wsOpen ? "연결 중..." : isGenerating ? "응답을 기다리는 중..." : "기사를 붙여넣어 스크립트를 만들어보세요"}
           rows={1}
-          disabled={!wsOpen}
+          disabled={!wsOpen || isGenerating}
           className="max-h-60 min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent text-[13px] leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-faint)] disabled:opacity-60"
           style={{ border: "none" }}
         />
         <button
           type="button"
           onClick={send}
-          disabled={!input.trim() || !wsOpen}
+          disabled={!input.trim() || !wsOpen || isGenerating}
+          title={isGenerating ? "응답이 끝난 뒤에 다시 보낼 수 있어요" : undefined}
           className="ui-btn ui-btn-primary flex-none rounded-xl px-3.5 py-2 text-sm font-semibold disabled:opacity-40"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -767,6 +913,10 @@ export function PromptChatLab({
         onNew={startNewThread}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
+        onRename={renameThread}
+        onTag={setThreadTag}
+        onDelete={deleteThread}
+        onBulkDelete={bulkDeleteThreads}
       />
       <div className="flex h-full min-w-0 flex-1 flex-col">
         {headerNode}
@@ -776,90 +926,185 @@ export function PromptChatLab({
       <div
         role="separator"
         aria-orientation="vertical"
-        onMouseDown={handleImagePanelResizeStart}
+        onMouseDown={handleSettingsPanelResizeStart}
         className="w-1.5 flex-none cursor-col-resize bg-transparent transition-colors hover:bg-[var(--accent-soft)] active:bg-[var(--accent-soft)]"
         title="드래그해서 폭 조절"
       />
+      {/* 2026-09-26 — "프로덕션"/"테스트" 상자를 카드 리스트로 합친 뒤
+          (사용자 지적, PromptTextLab.tsx와 동일 결정), 프로덕션의 하위
+          토글 2개가 카드로 안 감싸인 채 바깥에 노출돼 있던 게 잘못이었다
+          (사용자 재지적: "3개 토글이 지금 외부에 보이는데.. 이걸
+          감싸야합니다... 카드1, 카드2... 이렇게 뻗어나가는 구조여야" —
+          그 파일 주석 참고, 웹툰은 하위 토글이 2개뿐이라는 점만 다름).
+          프로덕션도 "테스트 N"과 똑같이 그 자체가 하나의 카드다. */}
       <aside
         className="flex flex-none flex-col border-l ui-divider bg-[var(--surface-card)]"
-        style={{ width: imagePanelWidth }}
+        style={{ width: settingsPanelWidth }}
       >
-        <div className="ui-divider border-b px-3.5 py-3.5">
-          <p className="text-[13px] font-semibold text-[var(--text-primary)]">이미지 생성</p>
-        </div>
+        {/* 2026-09-27, 사용자 지적(후속) — "아예 여백 틈 자체가 없는
+            디자인으로 가자는거지.. 카드처럼 하지말구.. 그림자도 필요없고요":
+            "여백을 줄인다"가 아니라 애초에 "카드"라는 개념 자체를 뺐다 —
+            바깥 padding·카드 사이 gap을 완전히 0으로, 각 카드의 둥근 모서리·
+            그림자(ui-card)도 뺐다. 구분은 오직 border-b 헤어라인 하나로만
+            한다(문서/리스트처럼 이어지는 느낌 — 서로 다른 "떠있는 상자"가
+            아니라 하나의 패널 안에 쌓인 섹션들). */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <WebtoonCutGenerator cuts={storyboard?.cuts ?? []} compact wsOpen={wsOpen} send={wsSend} subscribe={subscribe} />
-        </div>
-      </aside>
-      {/* 2026-09-16 — 톱니바퀴(지침 편집)·사람 아이콘(이미지 실험) 두 개짜리
-          숨김 오버레이를 걷어내고 항상 보이는 3번째 칼럼으로 바꿨다(사용자
-          요청: "하나의 화면에서 원클릭 정도로 보면서 수정하는 스타일을
-          선호... 프리미어 프로 설정 바·일레븐랩스 값 조정 바처럼"). 왔다갔다
-          여닫을 필요 없이 설명/지침/파일(PromptSectionsPanel) 바로 아래에
-          고정값 설정(WebtoonImageSettingsPanel, STYLE/CHARACTERS+참조
-          이미지)이 스크롤 한 번으로 쭉 이어진다.
-          2026-09-16(같은 날 후속) — "설명/지침/파일도 보여야 한다, 그럼
-          토글로 접었다 펴게, 단계별로(대본/이미지) + 이미지 하위에 인물
-          같은 걸로 구분되면 깔끔하겠다"는 후속 요청으로, 대본 프롬프트
-          (설명·지침·파일)와 이미지 프롬프트(화풍·인물) 두 최상위 그룹을
-          CollapsibleSection으로 감쌌다 — WebtoonImageSettingsPanel 내부도
-          화풍/인물, 인물 하위 A·B까지 같은 컴포넌트로 한 번 더 나뉜다.
-          장면 하나로 테스트 생성·히스토리 갤러리처럼 자주 안 쓰는 기능은
-          이 칼럼 맨 아래 링크로 기존 WebtoonImageLab 전체 화면을 그대로
-          열 수 있게 남겨뒀다. */}
-      <aside className="flex w-[380px] flex-none flex-col overflow-y-auto border-l ui-divider bg-[var(--surface-card)]">
-        <div className="ui-divider border-b px-3.5 py-2.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">설정</p>
-        </div>
-        <CollapsibleSection title="대본 프롬프트 — 설명·지침·파일" defaultOpen>
-          <PromptSectionsPanel
-            category={PROMPT_CATEGORY}
-            name={PROMPT_NAME}
-            promptHistory={promptHistory}
-            promptVersion={promptVersion}
-            onPromptVersionChange={setPromptVersion}
-            onPreviewVersion={openVersionPreview}
-          />
-        </CollapsibleSection>
-        <div className="ui-divider border-t" />
-        <CollapsibleSection
-          title="이미지 프롬프트 — 화풍·인물"
-          defaultOpen
-          badge={
-            <button
-              type="button"
-              onClick={(e) => {
-                // <summary> 안에 있어 클릭이 그대로 버블되면 섹션이 접힌다 —
-                // 히스토리를 보러 눌렀는데 섹션까지 접히면 안 되므로 막는다.
-                e.preventDefault();
-                e.stopPropagation();
-                setImageLabOpen(true);
-              }}
-              className="flex-none rounded-md p-1 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text-secondary)]"
-              title="컷 생성 히스토리 보기"
-              aria-label="컷 생성 히스토리 보기"
+          <div>
+            {/* 2026-09-26 — 사용자 요청: "프로덕션 부분은.. 고정하고
+                싶네요. 스크롤 내려도 볼 수 있도록" — PromptTextLab.tsx와
+                동일 이유, 그 파일 주석 참고. 후속 — 기본 접힘 + 세로
+                드래그로 높이 조절(PromptTextLab.tsx와 동일 패턴). */}
+            <div
+              ref={productionCardRef}
+              className="sticky top-0 z-10 flex flex-col overflow-hidden border-b bg-[var(--surface-card)]"
+              style={{ borderColor: "var(--border-hairline)", maxHeight: productionHeight }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 3v5h5" />
-                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
-                <path d="M12 7v5l4 2" />
-              </svg>
-            </button>
-          }
-        >
-          <WebtoonImageSettingsPanel onOpenStageLab={() => setStageLabOpen(true)} />
-        </CollapsibleSection>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+              <CollapsibleSection
+                title="프로덕션"
+                titleExtra={
+                  scriptServerVersion !== null ? (
+                    <span className="flex items-center gap-1">
+                      <span className="flex-none truncate rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: "var(--surface-sunken)", color: "var(--text-faint)" }}>
+                        v{scriptServerVersion}
+                      </span>
+                      {/* 2026-09-27 — 사용자 요청: "그렇게 변경된것도 화면에
+                          나오도록.. 프로덕션 카드에 히스토리 아이콘". 버전
+                          배지 바로 옆에 둬서 "지금 이 버전이 언제부터
+                          프로덕션이었는지"를 한 클릭으로 확인할 수 있게. */}
+                      <ActivationHistoryButton category={PROMPT_CATEGORY} name={PROMPT_NAME} channel="webtoon" urlPath="webtoon" />
+                    </span>
+                  ) : undefined
+                }
+                badge={
+                  <div className="flex items-center gap-1.5">
+                    {/* 2026-09-26(후속×3), 사용자 요청 — "프로덕션 부분
+                        카드도.. 테스트 카드랑 동일한 구조가 되도록":
+                        이 카드도 테스트 카드처럼 자기 전용 "프로덕션에
+                        적용" 버튼을 갖는다 — 왼쪽 사이드바에서 과거
+                        버전으로 옮겨보고 있었다면, 그걸 바로 진짜
+                        프로덕션으로 승격한다(이미 최신이면 아무 일도
+                        안 함). */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void handleApplyScriptVersion();
+                      }}
+                      disabled={applyingScriptVersion || scriptVersionUnchanged}
+                      title={scriptVersionUnchanged ? "지금 불러온 버전이 이미 프로덕션과 같습니다" : undefined}
+                      className="ui-btn ui-btn-primary rounded-lg px-2 py-1 text-[10.5px] font-semibold disabled:opacity-50"
+                    >
+                      {applyingScriptVersion ? "적용 중..." : "프로덕션에 적용"}
+                    </button>
+                    <span className="ui-badge ui-badge-published text-[10px]">발행 중</span>
+                  </div>
+                }
+              >
+                {/* 2026-09-27, 사용자 지적 — "프로덕션쪽에.. 파란 색상
+                    없애주세요.. 테스트 카드랑 색상 동일하게": 이 옅은
+                    파란 배경(--accent-soft)이 프로덕션 카드 전체 몸통을
+                    덮고 있어서, 앞서 여러 차례 지적받은 "배경에 색상이
+                    있다"의 진짜 원인이었다 — 테스트 카드(WebtoonCutGenerator
+                    쪽)는 이 래퍼 자체가 없어 항상 무색이었다. 배경을 뺘서
+                    두 카드가 완전히 같은 색으로 보이게 했다. */}
+                <div className="pb-1">
+                  {/* 2026-09-26(후속×3) — PromptSectionsPanel+VersionSwitcher
+                      (별도 prompt_lab_docs 저장소) 대신 테스트 카드와 똑같은
+                      PromptVersionReference를 그대로 쓴다 — 왼쪽 사이드바로
+                      버전을 훑어보고, "+ 새 버전"으로 새로 만들고, 연필/
+                      휴지통으로 이름 수정·삭제까지 전부 이 컴포넌트 하나
+                      안에서 끝난다(테스트 카드와 완전히 동일한 구조). */}
+                  <StepTabs
+                    steps={[
+                      {
+                        key: "prompt",
+                        label: "생성 프롬프트",
+                        content: (
+                          <PromptVersionReference
+                            ref={scriptPromptRef}
+                            category={PROMPT_CATEGORY}
+                            name={PROMPT_NAME}
+                            serverVersion={scriptServerVersion}
+                            promptHistory={promptHistory}
+                            testVersion={promptVersion}
+                            onTestVersionChange={setPromptVersion}
+                            onServerVersionChange={setScriptServerVersion}
+                            onPromptHistoryRefresh={refreshPromptHistory}
+                            onActiveInfoChange={setScriptActiveInfo}
+                            bare
+                          />
+                        ),
+                      },
+                      {
+                        key: "image",
+                        label: "이미지 설정",
+                        content: (
+                          <>
+                            <WebtoonImageSettingsPanel ref={imageSettingsRef} onProductionModelChange={setProductionImageModel} />
+                            {/* 2026-09-27 — 사용자 지적: "프로덕션 결과물이라는
+                                거를 만드는게 아니고요.. 이미지 설정 단계로
+                                가면 이미지 생성 하도록 되잖아? .. 프로덕션
+                                결과물 섹션을 만들라는게 아닙니다": 별도
+                                CollapsibleSection이 아니라 이 탭 안에 그리드를
+                                직접 붙인다(WebtoonCutGenerator.tsx의
+                                WebtoonProductionCutGrid 참고) — "테스트 N"
+                                카드의 "이미지 생성" 탭과 완전히 같은 모양.
+                                key={threadId}로 대화가 바뀔 때마다 통째로
+                                새로 마운트되게 해서(복원은 restoredCutImages
+                                초기값으로 한 번만) 복잡한 리셋 로직 없이도
+                                항상 그 대화 것만 보인다. */}
+                            <div className="border-t ui-divider mt-2 pt-2">
+                              <WebtoonProductionCutGrid
+                                key={threadId ?? "draft"}
+                                cuts={storyboard?.cuts ?? []}
+                                wsOpen={wsOpen}
+                                send={wsSend}
+                                subscribe={subscribe}
+                                productionModel={productionImageModel}
+                                restoredImages={restoredCutImages}
+                              />
+                            </div>
+                            <LatestPublishedContentLink channel="webtoon" urlPath="webtoon" label="최근 발행 웹툰 확인" />
+                          </>
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              </CollapsibleSection>
+              </div>
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                onMouseDown={handleProductionResizeStart}
+                className="h-1.5 flex-none cursor-row-resize bg-transparent transition-colors hover:bg-[var(--accent-soft)] active:bg-[var(--accent-soft)]"
+                title="드래그해서 높이 조절"
+              />
+            </div>
+            <WebtoonCutGenerator
+              cuts={storyboard?.cuts ?? []}
+              compact
+              stickyTop={productionCardHeight}
+              threadId={threadId}
+              restoredImages={restoredCutImages}
+              wsOpen={wsOpen}
+              send={wsSend}
+              subscribe={subscribe}
+              onApplyModelToProduction={handleApplyImageModel}
+              productionModel={productionImageModel}
+              serverVersion={scriptServerVersion}
+              promptHistory={promptHistory}
+              testVersion={promptVersion}
+              onTestVersionChange={setPromptVersion}
+              onServerVersionChange={setScriptServerVersion}
+              onPromptHistoryRefresh={refreshPromptHistory}
+              category={PROMPT_CATEGORY}
+              name={PROMPT_NAME}
+            />
+          </div>
+        </div>
       </aside>
-      <WebtoonImageLab open={imageLabOpen} onClose={() => setImageLabOpen(false)} />
-      <WebtoonStageLab open={stageLabOpen} onClose={() => setStageLabOpen(false)} />
-      {versionPreviewOpen && (
-        <VersionPreviewModal
-          version={promptVersion}
-          content={versionPreviewContent}
-          loading={versionPreviewLoading}
-          onClose={() => setVersionPreviewOpen(false)}
-        />
-      )}
     </div>
   );
 
@@ -884,7 +1129,15 @@ export function PromptChatLab({
   );
 }
 
-function ChatBubble({ msg }: { msg: ChatMessage }) {
+function ChatBubble({
+  msg,
+  copiedId,
+  onCopy,
+}: {
+  msg: ChatMessage;
+  copiedId: string | null;
+  onCopy: (m: ChatMessage) => void;
+}) {
   const isUser = msg.role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -900,7 +1153,29 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
           <div className="space-y-2.5">
             {msg.text && <TypewriterText text={msg.text} animate={!!msg.animate} />}
             {msg.storyboard && <StoryboardCard data={msg.storyboard} />}
-            {msg.imagePreview && <CutImagePreview data={msg.imagePreview} />}
+            {/* 2026-09-27, 사용자 요청 — "복사버튼 있으면 좋을것같고요..
+                nova 서비스처럼": PromptTextLab.tsx와 동일한 위치·모양
+                (답변 아래, 아이콘+라벨). storyboard(JSON 카드)만 있고
+                text가 없는 메시지엔 복사할 평문이 없어 안 보여준다. */}
+            {msg.id !== "greeting" && msg.text && (
+              <button
+                type="button"
+                onClick={() => onCopy(msg)}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text-secondary)]"
+              >
+                {copiedId === msg.id ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                )}
+                {copiedId === msg.id ? "복사됨" : "복사"}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1293,49 +1568,6 @@ function StoryboardCard({ data }: { data: { coreQuestion: string; cuts: WebtoonS
         </span>
       )}
       <DumpNode value={data} />
-    </div>
-  );
-}
-
-function CutImagePreview({ data }: { data: { cut: number; imageUrl: string; model?: string } }) {
-  const modelLabel = IMAGE_MODELS.find((m) => m.id === data.model)?.label ?? data.model;
-  return (
-    <div className="ui-card overflow-hidden rounded-xl" style={{ maxWidth: 360 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- S3 원본 URL, next/image 최적화 대상 아님(실험 도구) */}
-      <img src={data.imageUrl} alt={`컷 ${data.cut} 생성 이미지`} className="w-full" />
-      <div className="flex items-center justify-between px-3 py-2">
-        <span className="text-[11px] font-semibold text-[var(--text-muted)]">컷 {data.cut}</span>
-        <div className="flex items-center gap-2">
-          {modelLabel && (
-            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: "var(--surface-sunken)", color: "var(--text-faint)" }}>
-              {modelLabel}
-            </span>
-          )}
-          {/* 2026-09-21, 사용자 요청 — "이미지들을 개별적으로 다운로드 가능한
-              버튼": WebtoonCutGenerator.tsx의 downloadImage()와 같은 패턴
-              (<a download> 트리거, presign/blob fetch 없이 공개 S3 URL 그대로). */}
-          <button
-            type="button"
-            onClick={() => {
-              const a = document.createElement("a");
-              a.href = data.imageUrl;
-              a.download = `cut-${data.cut}.png`;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-            }}
-            className="rounded p-0.5 text-[var(--text-faint)] transition-colors hover:bg-[var(--surface-card)] hover:text-[var(--text-secondary)]"
-            title="이 컷 다운로드"
-            aria-label="이 컷 다운로드"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" />
-            </svg>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
