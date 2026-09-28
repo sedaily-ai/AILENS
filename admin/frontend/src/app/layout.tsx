@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Noto_Serif_KR } from "next/font/google";
+import { Noto_Serif_KR, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 
@@ -12,6 +12,21 @@ const notoSerifKr = Noto_Serif_KR({
   subsets: ["latin"],
   weight: ["700"],
   variable: "--font-display",
+  display: "swap",
+});
+
+/* 브랜드 워드마크 전용 — AI LENS 공식 스플래시 핸드오프(docs/design-system/notes/
+   2026-08-25-ai-lens-splash-handoff.md)가 지정한 얼굴은 Noto Sans KR 900이다.
+   "LENS" 워드마크(로그인 화면, .font-brand 사용처)는 전부 라틴 문자라 위
+   .font-display 와 같은 이유로 subsets는 latin 하나, weight도 900 하나만
+   담는다(같은 용량 절감 원칙). 앱 전역 .font-display 를 이 얼굴로 바꾸지
+   않은 건 그게 시압/StepTabs 등 이미 자리잡은 다른 화면까지 건드리기
+   때문 — 이 폰트는 브랜드 워드마크 노출 지점(현재는 로그인 화면)에만
+   .font-brand 로 스코프한다. */
+const notoSansKr = Noto_Sans_KR({
+  subsets: ["latin"],
+  weight: ["900"],
+  variable: "--font-brand",
   display: "swap",
 });
 
@@ -30,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`h-full ${notoSerifKr.variable}`}>
+    <html lang="ko" className={`h-full ${notoSerifKr.variable} ${notoSansKr.variable}`}>
       <body className="min-h-full flex flex-col antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>

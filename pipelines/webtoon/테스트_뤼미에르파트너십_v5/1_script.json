@@ -1,0 +1,188 @@
+{
+  "core_question": "한·프 8000억 투자 약속, 영화판을 어떻게 바꾸나",
+  "characters": {
+    "A": "30대 초반 여성, 콘텐츠 업계 실무자, 캐주얼한 재킷, 호기심 많은 눈빛",
+    "B": "40대 중반 남성, 영상산업 베테랑, 셔츠에 안경, 짧고 단정한 말투",
+    "setting": "유리창 너머 도시 야경이 보이는 미디어 회사 사무실"
+  },
+  "cuts": [
+    {
+      "cut": 1,
+      "title": "한·프 8000억, 영화판 바꿀까?",
+      "title_keyword": "8000억",
+      "narration": "2026년 9월 7일, 프랑스 생폴드방스. 한국과 프랑스 정상이 나란히 섰다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "cut": 2,
+      "title": "두 정상의 선언",
+      "title_keyword": null,
+      "narration": "",
+      "caption": "각각 5억 유로·5년",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "양국이 각각 8000억씩 투자한다고요?",
+          "tone": "격앙"
+        },
+        {
+          "speaker": "B",
+          "line": "5년 약속이에요. 자국 산업에 각자 넣는 거고요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        4,
+        5
+      ]
+    },
+    {
+      "cut": 3,
+      "title": "왜 지금인가",
+      "title_keyword": null,
+      "narration": "",
+      "caption": "OTT·AI 대전환기",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "OTT가 판을 바꾸고 AI까지 들어왔잖아요. 창작 생태계가 흔들리고 있으니까요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "그래서 정책금융으로 먼저 막겠다는 거군요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        6,
+        7
+      ]
+    },
+    {
+      "cut": 4,
+      "title": "기업들도 움직였다",
+      "title_keyword": null,
+      "narration": "",
+      "caption": "SLL·미디어완 협약",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "SLL은 유럽 최대 미디어 그룹과 IP 리메이크·공동제작을 하기로 했어요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "한국 드라마 포맷을 유럽판으로 만들 수도 있겠네요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        8,
+        9
+      ]
+    },
+    {
+      "cut": 5,
+      "title": "네이버, 아카이브 캔다",
+      "title_keyword": null,
+      "narration": "",
+      "caption": "네이버·INA 협약",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "네이버가 프랑스 국립시청각연구소랑 AI로 영상 유산 복원을 한다고요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "INA 아카이브가 방대하거든요. 거기에 AI를 붙이는 거죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        10,
+        11
+      ]
+    },
+    {
+      "cut": 6,
+      "title": "이탈리아까지",
+      "title_keyword": null,
+      "narration": "",
+      "caption": "한·이탈리아 공동제작 협정",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "장관이 이탈리아 문화부 장관과 공동제작 협정에도 서명했어요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "공동 제작물로 인정받으면 세액공제랑 지원금도 받을 수 있는 거잖아요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        12,
+        13,
+        14
+      ]
+    },
+    {
+      "cut": 7,
+      "title": "약속에서 구조로",
+      "title_keyword": null,
+      "narration": "",
+      "caption": "50여 개국·200여 명",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "그런데 선언이 실제로 이어질지는 모르는 거 아닌가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "운영위원회를 만들기로 했어요. 구조를 짜야 굴러가니까요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        15,
+        16,
+        17
+      ]
+    },
+    {
+      "cut": 8,
+      "title": "다음 장면은 현장에서",
+      "title_keyword": null,
+      "narration": "",
+      "closing_caption": "이제 관건은 운영위원회가 약속을 현실로 옮기는 일이다.",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "케이-콘텐츠 진출 다변화가 목표래요. 유럽·미국 모두요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "선언은 됐고, 이제 실제로 뭐가 만들어지는지 봐야죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        18,
+        19,
+        20
+      ]
+    }
+  ]
+}

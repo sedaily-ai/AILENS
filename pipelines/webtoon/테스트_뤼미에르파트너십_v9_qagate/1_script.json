@@ -1,0 +1,173 @@
+{
+  "core_question": "한·프 8000억 투자 선언, 영상산업의 무엇이 달라지나",
+  "characters": {
+    "A": "30대 초반 여성, 콘텐츠 업계 실무자, 청재킷에 태블릿 들고 있음, 호기심 많고 직설적인 인상",
+    "B": "40대 남성, 문화정책 관련 기관 직원, 셔츠에 안경, 차분하고 단정적인 말투",
+    "setting": "유리창 너머 도시 야경이 보이는 사무실 회의 공간"
+  },
+  "cuts": [
+    {
+      "cut": 1,
+      "title": "한·프 8천억, 영화판 바꿀까?",
+      "title_keyword": "8천억",
+      "narration": "2026년 9월, 프랑스 생폴드방스. 한국과 프랑스 대통령이 나란히 섰다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "cut": 2,
+      "title": "선언의 무게",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "각각 5억 유로",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "양국이 각각 8000억을 투자한다고요?",
+          "tone": "격앙"
+        },
+        {
+          "speaker": "B",
+          "line": "5년 안에. 자국 영화·영상산업에 각자 쏟는 거예요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        4,
+        5
+      ]
+    },
+    {
+      "cut": 3,
+      "title": "왜 지금인가",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "OTT 확산에 AI까지. 산업 판이 통째로 뒤집히고 있으니까요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "창작 생태계가 버텨낼 수 있을지 모르는 거잖아요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        6,
+        7
+      ]
+    },
+    {
+      "cut": 4,
+      "title": "기업들도 움직였다",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "SLL·네이버·영진위",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "SLL은 유럽 최대 미디어 그룹이랑 IP 리메이크 공동제작을 약속했고요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "네이버는 프랑스 방송 아카이브에 AI 기술을 붙이는 거라고요?",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "cut": 5,
+      "title": "미국도 들어왔다",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "영진위가 미국영화협회랑 손잡은 건 좀 의외인데요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "신인 발굴, 인재 교류. 제작 지원이 아니라 사람을 키우는 쪽이에요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        11
+      ]
+    },
+    {
+      "cut": 6,
+      "title": "이탈리아와 서명",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "공동제작 협정 서명",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "이탈리아랑은 아예 공동제작 협정에 서명했어요. 양국 공동 제작물은 자국 영화로 인정받아요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "세액공제에 지원금까지. 실질적으로 다르네요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        12,
+        13
+      ]
+    },
+    {
+      "cut": 7,
+      "title": "달라지는 건 뭔가",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "결국 K-콘텐츠 해외 진출 루트를 다변화하겠다는 거잖아요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "선언은 나왔어요. 운영위원회가 어떻게 굴러가느냐가 진짜 문제고요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        14,
+        15
+      ]
+    },
+    {
+      "cut": 8,
+      "title": "약속 이후",
+      "title_keyword": "",
+      "closing_caption": "이제 관건은 약속을 현장에서 실현하는 일이다",
+      "caption": "50여 개국·200여 명 참석",
+      "dialogue": [],
+      "fact_ids": [
+        16,
+        17
+      ]
+    }
+  ]
+}

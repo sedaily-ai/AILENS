@@ -49,15 +49,21 @@ export function VideoMode({ value, body, patch, patchBody }: ModeProps) {
         />
         {videoId ? (
           <div className="mt-3 aspect-video w-full max-w-[360px] overflow-hidden rounded-lg bg-black">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
-              alt=""
-              className="h-full w-full object-cover"
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}`}
+              title="미리보기"
+              className="h-full w-full"
+              allow="accelerate-compute; encrypted-media; picture-in-picture"
+              allowFullScreen
             />
           </div>
         ) : body.video_url ? (
-          <p className="mt-2 text-xs text-amber-600">YouTube 링크가 아니면 썸네일 미리보기가 안 뜰 수 있어요 — 저장은 그대로 됩니다.</p>
+          // 2026-09-28 — YouTube가 아니면(자동 파이프라인이 채우는 S3 mp4
+          // 직링크 등, LensMode.tsx의 같은 날짜 주석 참고) 썸네일 대신
+          // 네이티브 <video>로 직접 재생한다.
+          <video controls src={body.video_url} className="mt-3 w-full max-w-[360px] rounded-lg bg-black">
+            영상을 재생할 수 없습니다.
+          </video>
         ) : null}
       </div>
     </PostFormShell>

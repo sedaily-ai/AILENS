@@ -40,6 +40,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "service" / "backen
 # 위한 경로 추가 — deploy-admin-api.sh가 배포 시엔 이 파일을 zip에 직접
 # 복사하지만, 로컬 실행에선 저장소의 실제 위치를 그대로 가리켜도 된다.
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "pipelines" / "common"))
+# 2026-09-22 추가 — routes/webtoon/generate.py가 bare import하는
+# compose_text(pipelines/webtoon/compose_text.py)가 이 줄이 없어서
+# ModuleNotFoundError로 로컬 서버 자체가 기동 안 됐다(실측 확인).
+# deploy-admin-api.sh도 이 파일을 zip 루트에 개별 flat-copy한다
+# (COMPOSE_TEXT_MODULE) — 같은 flat-import 규약을 로컬에서도 맞춘다.
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "pipelines" / "webtoon"))
 
 import handler as admin_handler  # noqa: E402 — sys.path 세팅 후 import
 

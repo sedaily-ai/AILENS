@@ -68,29 +68,59 @@ from shared import audit, ddb_client, response, time_utils
 # 메시지로 감싼다(letters/podcast/video 프로덕션과 동일 — pipelines/letters,
 # podcast, video 확인). "webtoon_json"은 지침을 사용자 메시지 안에 넣고
 # 고정 system 문구 + JSON 코드블록 지침을 붙인다(webtoon 프로덕션과 동일 —
-# pipelines/webtoon/pipeline.py 확인). video의 user_template에 "렌더용
-# JSON"이 이미 들어있는 건 프로덕션 그대로다 — 별도 JSON 지침을 안 붙인다.
+# pipelines/webtoon/pipeline.py 확인).
+#
+# 2026-09-26 — user_template이 예전엔 "다음 기사 원문으로 OOO를 만들어주세요"
+# 처럼 그 채널이 뭘 만드는지 코드에서 직접 지시했다(letters="레터",
+# podcast="팟캐스트 대본", video="영상 각본 + 렌더용 JSON"). 사용자 지적:
+# "그런 프롬프트 템플릿은 있으면 안됩니다... 사용자가 프롬프트 입력칸에
+# 넣은 대로 제어가 되기를 바란다" — 웹툰 탭에 영상 관련 지침을 넣으면
+# 영상 산출물이 나와야 하는데, 코드가 "레터를 만들어라"/"영상 각본을
+# 만들어라"처럼 채널별로 결과물 종류를 미리 못박고 있으면 그게 안 된다.
+# 이제 기사 원문만 표시하고("[입력 기사]"), 무엇을 만들지는 전적으로
+# 저장된 지침(system 메시지)에 맡긴다 — pipelines/letters/pipeline.py,
+# pipelines/podcast/pipeline.py, pipelines/video/generate_script.py의
+# 실제 발행 코드도 사용자 확인 후 동일하게 고쳤다(이 admin 테스트 도구가
+# 실제 프로덕션과 다르게 동작하면 테스트 도구로서 의미가 없어서 — 테스트
+# 도구만 고치고 프로덕션을 안 고치면 괴리가 생긴다는 걸 먼저 확인받았다).
 _CATEGORY_BEDROCK = {
     "letters": {
         "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq",  # lens-letters-opus-5
+        "model_label": "Claude Opus 5",  # 2026-09-24 — 프론트 배지 표시용, 아래 handle_current_model 참고. model 바꿀 때 이 줄도 같이 바꿀 것.
         "mode": "system",
-        "user_template": "다음 기사 원문으로 레터를 만들어주세요.\n\n{article}",
+        "user_template": "[입력 기사]\n{article}",
         "max_tokens": 12000,  # pipelines/letters/pipeline.py와 동일 — 비동기라 그대로 맞출 수 있다.
     },
     "podcast": {
-        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/kmkagk616y1c",  # lens-podcast-sonnet-46
+        # 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요. 클로드 5.0
+        # opus로 모든 프로덕션... 업데이트 해주시죠": 전용 프로파일
+        # lens-podcast-opus-5(신규 생성, us.anthropic.claude-opus-5 copyFrom)
+        # 로 교체. pipelines/podcast/pipeline.py의 _SCRIPT_MODEL도 동일하게
+        # 바꿨다 — 이 admin 테스트 도구와 실제 발행이 어긋나면 안 된다는
+        # 이 세션 기존 원칙 그대로(_run_article_text_flow 독스트링 참고).
+        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/6bjkzt0icf74",  # lens-podcast-opus-5
+        "model_label": "Claude Opus 5",
         "mode": "system",
-        "user_template": "다음 기사 원문으로 팟캐스트 대본을 만들어주세요.\n\n{article}",
+        "user_template": "[입력 기사]\n{article}",
         "max_tokens": 3000,  # pipelines/podcast/pipeline.py — max_tokens 생략(bedrock_client.py 기본값 3000)과 동일.
     },
     "video": {
-        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/r9n8dvqc1t0r",  # lens-video-sonnet-46
+        # 2026-09-27 — 위 podcast와 동일 결정·동일 이유. 전용 프로파일
+        # lens-video-opus-5(신규 생성)로 교체. pipelines/common/bedrock_client.py
+        # 의 기본 MODEL_ID(video 전용 — 이 파일 자체 독스트링 참고)도 같이 바꿨다.
+        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/p28gzlq5kj6s",  # lens-video-opus-5
+        "model_label": "Claude Opus 5",
         "mode": "system",
-        "user_template": "다음 기사 원문으로 영상 각본 + 렌더용 JSON을 만들어주세요.\n\n{article}",
+        "user_template": "[입력 기사]\n{article}",
         "max_tokens": 4000,  # pipelines/video/generate_script.py와 동일.
     },
     "webtoon": {
-        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7",  # lens-webtoon-script-sonnet-46
+        # 2026-09-27 — 위 podcast/video와 동일 결정. lens-webtoon-script-opus-5
+        # 는 2026-09-20에 TEXT_MODELS 드롭다운용으로 이미 만들어져 있던 걸
+        # 그대로 프로덕션 기본값으로 승격했다(새로 안 만듦). pipelines/webtoon/
+        # pipeline.py의 SCRIPT_MODEL도 동일하게 바꿨다.
+        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j5kfly25ohjo",  # lens-webtoon-script-opus-5
+        "model_label": "Claude Opus 5",
         "mode": "webtoon_json",
         # 2026-09-15 — 저장된 웹툰 프롬프트가 v11(2026-09-14 05:40 UTC)에서
         # 컷당 필드가 훨씬 많은 스키마(scene_type·camera_distance·
@@ -101,7 +131,14 @@ _CATEGORY_BEDROCK = {
         # pipelines/webtoon/pipeline.py::call_json은 아직 4000 그대로다 —
         # 이 스키마 변경이 실제 발행 파이프라인까지 반영된 게 맞다면 거기도
         # 같이 올려야 한다(admin 실험 도구 범위 밖이라 여기서 안 건드림).
-        "max_tokens": 8000,
+        #
+        # 2026-09-27 — Opus 5 전환 후 8000도 부족해졌다(실측: 발행
+        # 파이프라인 로컬 재현에서 컷당 영/한 image_prompt를 둘 다 길게
+        # 쓰는 지금 지침으로는 8컷 완성 전에 응답이 멀티바이트 문자
+        # 중간에서 잘림 — pipelines/webtoon/pipeline.py의 같은 날짜 주석
+        # 참고). 여기 admin 실험 도구도 같은 모델·같은 프롬프트를 쓰므로
+        # 동일하게 잘릴 것 — 어긋나지 않게 같이 올린다.
+        "max_tokens": 16000,
     },
 }
 
@@ -115,12 +152,26 @@ _CATEGORY_BEDROCK = {
 # 태깅 규칙(docs/architecture/비용태깅_규칙.md)에 따라 이 용도 전용
 # application inference profile을 새로 만들어 넣었다(2026-09-20,
 # lens-webtoon-script-opus-5/lens-webtoon-script-sonnet-5).
+# 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요... 드롭다운에서도
+# 삭제": sonnet-46 키를 통째로 뺐다. DEFAULT_TEXT_MODEL도 "opus-5"로
+# 바꿨다 — 이제 _CATEGORY_BEDROCK 4개 카테고리 전부 Opus 5 기본값이라
+# "모델 미지정 = Sonnet 4.6"이라는 옛 가정이 깨졌다(아래 get_thinking_config
+# 참고, 그 가정에 기대던 동작을 같이 고쳤다).
 TEXT_MODELS: dict[str, str] = {
-    "sonnet-46": _CATEGORY_BEDROCK["webtoon"]["model"],  # lens-webtoon-script-sonnet-46, 기존 기본값
     "opus-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j5kfly25ohjo",  # lens-webtoon-script-opus-5
     "sonnet-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dy1fhtb04pon",  # lens-webtoon-script-sonnet-5
+    # 2026-09-24, 사용자 요청 — "opus 5.5나 5.1이나, sonnet도... 최신모델들은
+    # 항상 가져오면 좋겠어요" + "gpt는 없나? 아스트라나 sol이나": Bedrock
+    # list-foundation-models로 실제 계정에 있는 모델을 직접 확인(Opus 5.1은
+    # 존재하지 않음 — 착오)하고, 없던 3개는 새 application inference profile을
+    # 만들어 추가했다(비용태깅_규칙.md 3단계 그대로: 프로파일 생성 →
+    # AdminPromptTestBedrockInvoke IAM에 3종 ARN 추가 → 여기 등록. IAM은
+    # 이 세션 자동승인 범위 밖이라 사용자가 직접 put-role-policy 실행).
+    "opus-5-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/izf9wzkcahnq",  # lens-textlab-opus-5-5
+    "gpt-6-astra": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/uwlacvtlgavh",  # lens-textlab-gpt6-astra
+    "gpt-6-sol": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j2pv1qbv1mlb",  # lens-textlab-gpt6-sol
 }
-DEFAULT_TEXT_MODEL = "sonnet-46"
+DEFAULT_TEXT_MODEL = "opus-5"
 
 # 2026-09-20, 실측 — sonnet-5는 이 웹툰 스크립트 생성(4만5천자 프롬프트+8컷
 # 구조화 JSON)에서 내부 reasoning이 max_tokens(8000) 예산을 전부 써버려
@@ -129,6 +180,9 @@ DEFAULT_TEXT_MODEL = "sonnet-46"
 # 바로 켤 수 있게), PromptChatLab.tsx의 좌측 드롭다운에서는 뺐다 — 고르면
 # 그냥 실패하는 옵션을 보여줄 이유가 없다. opus-5도 같은 이유로 느리지만
 # (2026-09-11 기록에도 이미 있던 known issue) 완주는 하는 걸 확인해서 남김.
+# 2026-09-24 — 레터/팟캐스트/영상 탭(PromptTextLab)은 이 거대 웹툰 JSON
+# 프롬프트를 안 쓰니 sonnet-5도 정상 작동할 가능성이 높아, 이번엔
+# textModels.ts 드롭다운에 다시 올렸다(실사용 중 같은 증상 재현되면 다시 뺄 것).
 
 
 def resolve_text_model(model_id: str | None) -> str:
@@ -146,14 +200,84 @@ def resolve_text_model(model_id: str | None) -> str:
 # 풀었는데, 여기(chat_ws.py의 스트리밍 경로)는 기존 호출부가
 # temperature=0.7을 무조건 넣고 있어서 같은 방식으로 model_id 기준
 # on/off를 판단하는 헬퍼가 필요했다.
-_MODELS_WITHOUT_TEMPERATURE = {"opus-5", "sonnet-5"}
+_MODELS_WITHOUT_TEMPERATURE = {"opus-5", "sonnet-5", "opus-5-5", "gpt-6-astra", "gpt-6-sol"}
+# 2026-09-24 — opus-5-5는 opus-5/sonnet-5와 같은 이유로 거부. GPT-6 Astra/
+# Sol은 메시지가 다르지만("This model doesn't support the temperature
+# field") 마찬가지로 거부 — 셋 다 직접 호출로 재현 확인.
 
 
 def text_model_supports_temperature(model_id: str | None) -> bool:
     return (model_id or DEFAULT_TEXT_MODEL) not in _MODELS_WITHOUT_TEMPERATURE
 
 
-_WEBTOON_SYSTEM_PROMPT = "당신은 뉴스 웹툰 제작자입니다. 지시받은 JSON 스키마를 정확히 지켜 응답합니다."
+# 2026-09-24 — 사용자 리포트("영상 탭에서 Opus 5를 사용했는데... 각본이
+# 출력되다가 중단되었네요")를 조사하다 직접 호출로 확인: sonnet-5는
+# 내부 reasoning(확장 사고)이 max_tokens 예산을 전부 써버리면 실제 답변이
+# 0글자가 되는 게 실제 원인이었다(240초/300초 타임아웃과는 별개 — 응답
+# 자체가 비어서 났다). "리즈닝과 같이 시간이 더 걸리도록 영향을 주는
+# 것은 비활성화를 하는 것이 좋겠다"는 사용자 판단대로, Converse API의
+# additionalModelRequestFields로 reasoning을 직접 꺼봤다(실측):
+#   - sonnet-46/opus-5/sonnet-5: {"thinking": {"type": "disabled"}} 그대로
+#     허용됨. sonnet-5는 이걸로 완전히 해결(재현 테스트: 0자·174초 →
+#     5,923자·27.8초, reasoning 블록 자체가 응답에서 사라짐).
+#   - opus-5-5: "disabled"는 거부된다 — Bedrock 에러 메시지가 그대로
+#     알려줌("thinking.type.disabled" is not supported for this model.
+#     Use "thinking.type.adaptive" and "output_config.effort"). 유효한
+#     effort 값은 low/medium/high/xhigh/max(minimal·none은 미지원, 이것도
+#     에러 메시지로 직접 확인) — "adaptive"+"low"로 reasoning을 줄일 순
+#     있지만 완전히 끄는 건 이 모델 자체가 구조적으로 지원 안 한다. 즉
+#     opus-5-5는 이 완화를 적용해도 0글자 위험이 0%가 되진 않는다.
+#   - gpt-6-astra/gpt-6-sol: thinking 파라미터 자체가 없다(Claude 전용
+#     필드) — 보내면 "Unknown parameter: 'thinking'"으로 요청 자체가
+#     거부된다(직접 호출로 확인) — 이 두 모델은 매핑에서 아예 뺀다.
+#   - category 기본 모델(model_id 없이 호출되는 경우, 예: 프론트가 모델을
+#     안 고른 채 보냄)은 그때는 전부 Sonnet 4.6 프로파일이라 안 건드렸다.
+#     2026-09-27 — 레터/팟캐스트/영상/웹툰 전 카테고리가 Opus 5로 바뀌면서
+#     이 가정이 깨졌다: 이제 model_id 없이 호출되는 경우도 실제로는 항상
+#     Opus 5를 부르므로, 아래 get_thinking_config가 model_id 없을 때도
+#     "opus-5" 설정으로 폴백하도록 바꿨다(안 그러면 카테고리 기본 호출
+#     경로에서 이 세션이 이미 겪은 "각본이 출력되다가 중단" 버그가
+#     그대로 재현된다).
+_THINKING_CONFIG: dict[str, dict] = {
+    "opus-5": {"thinking": {"type": "disabled"}},
+    "sonnet-5": {"thinking": {"type": "disabled"}},
+    "opus-5-5": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}},
+}
+
+
+def get_thinking_config(model_id: str | None) -> dict | None:
+    """model_id(TEXT_MODELS의 키, resolve_text_model 이전의 원래 값) →
+    Converse API의 additionalModelRequestFields. model_id가 없으면(카테고리
+    기본 모델 호출) "opus-5" 설정으로 폴백한다 — 2026-09-27부터 모든
+    카테고리 기본값이 Opus 5라(위 주석 참고) 기본 호출 경로도 예외가 아니다."""
+    return _THINKING_CONFIG.get(model_id or "opus-5")
+
+
+# 2026-09-24 — 프롬프트 캐싱(system 배열에 {"cachePoint": {"type":
+# "default"}} 추가) 조사 중 실측 확인: gpt-6-astra/gpt-6-sol은 이걸 보내면
+# Bedrock이 서버 단에서 AccessDeniedException("You invoked an unsupported
+# model or your request did not allow prompt caching")으로 거부한다 —
+# temperature/thinking처럼 파라미터 자체를 모르는 게 아니라, 이 두 모델이
+# Converse 프롬프트 캐싱 자체를 지원 안 하는 것(직접 호출로 재현 확인,
+# boto3 1.43.101 기준). Claude 계열(sonnet-46/opus-5/sonnet-5/opus-5-5)과
+# category 기본 모델(model_id 없음 — 전부 Claude 프로파일)은 정상 캐싱됨을
+# 확인했다.
+_MODELS_WITHOUT_PROMPT_CACHE = {"gpt-6-astra", "gpt-6-sol"}
+
+
+def model_supports_prompt_cache(model_id: str | None) -> bool:
+    return (model_id or DEFAULT_TEXT_MODEL) not in _MODELS_WITHOUT_PROMPT_CACHE
+
+
+# 2026-09-26 — "당신은 뉴스 웹툰 제작자입니다"라는 페르소나·주제 고정
+# 문구를 뺐다(사용자 지적: "코드단에 입력된 템플릿이 있는것을 원치
+# 않으며" — 웹툰 탭에 다른 주제의 지침을 넣어도 그 지침대로 나와야
+# 하는데, 이 문구가 항상 "뉴스 웹툰"이라는 주제를 강제하고 있었다).
+# JSON 스키마를 지키라는 부분만 남긴다 — 이건 주제 강제가 아니라
+# 응답 형식 규칙(스키마 자체는 사용자가 저장한 지침 22장에서 온다,
+# script.py::build_script_call 참고)이라 app이 응답을 파싱하는 데
+# 실제로 필요하다.
+_WEBTOON_SYSTEM_PROMPT = "지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 _WEBTOON_JSON_INSTRUCTION = (
     "\n\n[응답 형식]\n다른 설명 없이 ```json 코드블록 하나 안에 JSON 객체만 담아 응답한다."
 )
@@ -166,14 +290,22 @@ _WEBTOON_JSON_INSTRUCTION = (
 # 오버헤드가 큼). 그래서 이 기능 전체를 비동기(작업 생성 + 폴링)로 바꿨다
 # — 아래 job 관련 함수 참조. 덕분에 max_tokens을 눈치 볼 필요가 없어져서
 # 위 _CATEGORY_BEDROCK에 프로덕션과 완전히 같은 값을 그대로 넣었다.
-_BEDROCK_READ_TIMEOUT_SECONDS = 240  # 2026-09-20, 90→240초로 늘림 — Opus 5는
+_BEDROCK_READ_TIMEOUT_SECONDS = 300  # 2026-09-24, 240→300초로 늘림(5분) —
 # 위 2026-09-11 기록대로 원래도 느렸는데, Claude 5 계열(Opus 5·Sonnet 5)이
 # 좌측 채팅창 모델 드롭다운으로 실제 선택 가능해지면서 이 복잡한 스크립트
-# 생성 작업(4만5천자 프롬프트+8컷 구조화 JSON)에서 내부 reasoning이 90초를
-# 불규칙하게 넘겨 ReadTimeoutError로 죽는 걸 실측 확인했다. Lambda 자체
-# Timeout이 300초라 여유가 있어 그 안에서 최대한 늘렸다 — 그래도 안 되면
-# (Sonnet 5는 240초 안에서도 답변 0글자로 토큰 예산을 reasoning에 다 써버림,
-# TEXT_MODELS 주석 참고) 타임아웃보다 더 근본적인 문제라 모델 자체를 빼야 한다.
+# 생성 작업(4만5천자 프롬프트+8컷 구조화 JSON)에서 내부 reasoning이 불규칙한
+# 간격을 두고 ReadTimeoutError로 죽는 걸 실측 확인했다(90→240초로 한 번
+# 늘렸는데도 영상 탭에서 Opus 5로 각본 생성 중 재발 — 사용자 리포트:
+# "각본이 출력되다가 중단되었다", "어떤 답변을 출력하더라도 중단되는 일이
+# 발생되지 않았으면"). Lambda 자체 타임아웃은 900초(2026-09-24 기준
+# `aws lambda get-function-configuration`으로 직접 확인 — 위 2026-09-20
+# 주석이 "300초라 여유가 있어"라고 적어둔 건 그 시점 값이고 이미 올라가
+# 있었다)라 여유가 훨씬 크다. read_timeout은 botocore가 소켓에서 "얼마나
+# 오래 새 바이트가 안 오면 끊을지"를 재는 값이라, 스트리밍 전체 길이가
+# 아니라 모델이 한 번에 오래 침묵하는 구간(reasoning)에 걸리는 것 — 그래도
+# 안 되면(Sonnet 5는 240초 안에서도 답변 0글자로 토큰 예산을 reasoning에
+# 다 써버림, TEXT_MODELS 주석 참고) 타임아웃보다 더 근본적인 문제라 모델
+# 자체를 빼야 한다.
 
 _bedrock_client = None
 
@@ -183,7 +315,24 @@ def _get_bedrock_client():
     if _bedrock_client is None:
         kwargs = {
             "region_name": "us-east-1",
-            "config": BotoConfig(read_timeout=_BEDROCK_READ_TIMEOUT_SECONDS, connect_timeout=5, retries={"max_attempts": 1}),
+            # retries(2026-09-24, 사용자 질문 — "개선할 부분은 더 없는건가요?")
+            # — 원래 max_attempts=1(재시도 완전 없음, 이유를 설명하는 주석
+            # 없음)이라 Bedrock 쓰로틀링·순간 커넥션 오류 같은 일시적 실패도
+            # 바로 사용자에게 에러로 떨어졌다. 2로 올리고 "standard" 모드
+            # (지수 백오프+지터)를 켠다 — botocore 재시도는 최초 요청/응답
+            # 헤더 수신 단계에서만 판단되고, converse_stream처럼 우리 쪽
+            # `for chunk in resp["stream"]`으로 직접 순회하는 도중에 발생하는
+            # ReadTimeoutError는 그 시점엔 이미 응답 객체가 호출부로 넘어온
+            # 뒤라 botocore가 재시도하지 않는다(별도 재시작 요청을 안 보냄) —
+            # 즉 스트리밍 도중 재시도가 걸려 사용자에게 텍스트가 중복
+            # 노출되는 경우는 없다. max_attempts는 낮게(2) 유지 —
+            # read_timeout(300초) × 2 + connect_timeout 여유를 더해도 약
+            # 610초로, Lambda 자체 타임아웃 900초 안에 충분히 들어온다(3으로
+            # 올리면 최악의 경우 915초로 초과 위험).
+            "config": BotoConfig(
+                read_timeout=_BEDROCK_READ_TIMEOUT_SECONDS, connect_timeout=5,
+                retries={"max_attempts": 2, "mode": "standard"},
+            ),
         }
         endpoint = os.environ.get("BEDROCK_ENDPOINT_URL")
         if endpoint:
@@ -201,6 +350,20 @@ def handle_list(body: dict, path_params: dict, query_params: dict) -> dict:
     prompts = prompts_repo.list_prompts()
     prompts.sort(key=lambda p: p["id"])
     return response.ok({"prompts": prompts})
+
+
+def handle_current_model(body: dict, path_params: dict, query_params: dict) -> dict:
+    """지금 이 카테고리가 실제 발행에 쓰는 모델 이름 — 프론트 채팅랩 헤더의
+    "실시간 연결됨" 옆 배지가 이걸 그대로 찍는다(2026-09-24, 사용자 요청:
+    "프로덕션 기본값(레터) 이거는... 헷갈릴 것 같은데... 배지 형태로...
+    작업자가 다른 모델로 발행하면 바뀌고... 지금은 하드코딩된거라 바뀌면
+    또 바꿔야 하잖아요" — _CATEGORY_BEDROCK["model_label"]이 정본이라
+    거기 값만 바꾸면 프론트 재배포 없이 다음 새로고침부터 바로 반영된다)."""
+    category = (path_params or {}).get("category", "")
+    cfg = _CATEGORY_BEDROCK.get(category)
+    if not cfg:
+        return response.err(f"unknown category: {category}", 400)
+    return response.ok({"category": category, "label": cfg["model_label"]})
 
 
 def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
@@ -228,6 +391,35 @@ def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
     return response.ok(payload)
 
 
+def handle_get_history(body: dict, path_params: dict, query_params: dict) -> dict:
+    """버전 드롭다운 채우기용 — content 없이 버전·시각만(handle_get_version
+    docstring 참고, 2026-09-21)."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    if not category or not name:
+        return response.err("category and name required", 400)
+    return response.ok({"history": prompts_repo.get_prompt_history(category, name)})
+
+
+def handle_get_version(body: dict, path_params: dict, query_params: dict) -> dict:
+    """과거 버전 content 하나 조회 — 버전 드롭다운으로 골라 지금 초안/발행본을
+    건드리지 않고 테스트 실행하는 용도(2026-09-21, 사용자 요청)."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    version_raw = (path_params or {}).get("version", "")
+    if not category or not name or not version_raw:
+        return response.err("category, name and version required", 400)
+    try:
+        version = int(version_raw)
+    except (TypeError, ValueError):
+        return response.err("version must be an integer", 400)
+
+    v = prompts_repo.get_prompt_version(category, name, version)
+    if not v:
+        return response.err(f"prompt version not found: {category}/{name} v{version}", 404)
+    return response.ok(v)
+
+
 def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
     category = (path_params or {}).get("category", "")
     name = (path_params or {}).get("name", "")
@@ -243,6 +435,13 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
     if sections is not None and not isinstance(sections, dict):
         return response.err("sections must be an object", 400)
 
+    # 2026-09-26 — activate 추가(기본 True, 기존 /prompts/edit·프로덕션
+    # "발행" 흐름은 그대로 즉시 활성화). 테스트 카드의 "버전 저장"만
+    # False를 보내 프로덕션 활성값을 안 건드리고 버전만 남긴다.
+    activate = body.get("activate", True)
+    if not isinstance(activate, bool):
+        return response.err("activate must be a boolean", 400)
+
     payload_bytes = len(new_content.encode("utf-8"))
     if sections is not None:
         payload_bytes += len(json.dumps(sections, ensure_ascii=False).encode("utf-8"))
@@ -253,7 +452,7 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
             400,
         )
 
-    result = prompts_repo.update_prompt(category, name, new_content, sections)
+    result = prompts_repo.update_prompt(category, name, new_content, sections, activate)
     new_version = result["new_version"]
     prev_version = result["prev_version"]
     created = result["created"]
@@ -264,6 +463,7 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
         "prev_version": prev_version,
         "created": created,
         "has_sections": sections is not None,
+        "activate": activate,
         "bytes": payload_bytes,
     })
     return response.ok({
@@ -271,6 +471,93 @@ def handle_update(body: dict, path_params: dict, query_params: dict) -> dict:
         "new_version": new_version,
         "created": created,
     })
+
+
+def handle_activate_version(body: dict, path_params: dict, query_params: dict) -> dict:
+    """이미 존재하는 버전을 프로덕션 활성값으로 승격한다(새 버전을 만들지
+    않음) — 2026-09-26 신설, update_prompt(activate=False)로 저장해둔
+    테스트 버전을 "프로덕션에 적용" 버튼이 부른다."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    if not category or not name:
+        return response.err("category and name required", 400)
+
+    version = body.get("version")
+    if not isinstance(version, int):
+        return response.err("version (int) required", 400)
+
+    result = prompts_repo.activate_version(category, name, version)
+    if result is None:
+        return response.err("prompt version not found", 404)
+
+    audit.log("prompt-activate", {"prompt": f"{category}/{name}", "version": version})
+    return response.ok(result)
+
+
+def handle_delete_version(body: dict, path_params: dict, query_params: dict) -> dict:
+    """버전 하나를 완전히 삭제한다 — 2026-09-26 신설, 사용자 요청: "버전을
+    삭제하는 방법도 있어야 할 것 같고." 지금 프로덕션에서 쓰이는(활성)
+    버전은 삭제를 거부한다."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    version_raw = (path_params or {}).get("version", "")
+    if not category or not name or not version_raw:
+        return response.err("category, name and version required", 400)
+    try:
+        version = int(version_raw)
+    except (TypeError, ValueError):
+        return response.err("version must be an integer", 400)
+
+    result = prompts_repo.delete_version(category, name, version)
+    if not result.get("deleted"):
+        if result.get("reason") == "active":
+            return response.err(
+                "지금 프로덕션에서 쓰이는 버전은 삭제할 수 없습니다 — 다른 버전을 먼저 적용한 뒤 삭제해 주세요.",
+                400,
+            )
+        return response.err("prompt version not found", 404)
+
+    audit.log("prompt-delete-version", {"prompt": f"{category}/{name}", "version": version})
+    return response.ok(result)
+
+
+def handle_rename_version(body: dict, path_params: dict, query_params: dict) -> dict:
+    """버전 번호·내용은 그대로 두고 이름표(sections.label)만 바꾼다 —
+    2026-09-26 신설, 사용자 지적: "버전이름도 수정가능하게 해야합니다".
+    "버전 저장"은 항상 새 버전을 만드는 동작이라 기존 버전의 이름만
+    고치는 덴 안 맞아서 별도로 뚫었다."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    version_raw = (path_params or {}).get("version", "")
+    if not category or not name or not version_raw:
+        return response.err("category, name and version required", 400)
+    try:
+        version = int(version_raw)
+    except (TypeError, ValueError):
+        return response.err("version must be an integer", 400)
+
+    label = body.get("label")
+    if not isinstance(label, str):
+        return response.err("label (string) required", 400)
+
+    result = prompts_repo.rename_version(category, name, version, label)
+    if result is None:
+        return response.err("prompt version not found", 404)
+
+    audit.log("prompt-rename-version", {"prompt": f"{category}/{name}", "version": version})
+    return response.ok(result)
+
+
+def handle_get_activation_history(body: dict, path_params: dict, query_params: dict) -> dict:
+    """"프로덕션에 적용" 이력 조회 — 2026-09-26 신설, 사용자 요청: "프로덕션에
+    적용한 이력들도 남아야 해요, 몇시 몇분... 날짜에 했는지"."""
+    category = (path_params or {}).get("category", "")
+    name = (path_params or {}).get("name", "")
+    if not category or not name:
+        return response.err("category and name required", 400)
+
+    history = prompts_repo.get_activation_history(category, name)
+    return response.ok({"history": history})
 
 
 _MAX_TEST_ARTICLE_BYTES = 60 * 1024  # 기사 원문 상한 — 과금 폭주 방지
@@ -287,7 +574,13 @@ def _call_bedrock(
     """Bedrock converse 저수준 호출부 — _run_test_job/_run_storyboard_job
     공용. bedrock_client.py(pipelines/common, call_text)와 같은 시그니처
     원칙을 따르되, 여기는 파이프라인 전용 모듈을 admin Lambda에 끌어오지
-    않고 직접 구현했다(admin/backend는 pipelines/를 import하지 않는다)."""
+    않고 직접 구현했다(admin/backend는 pipelines/를 import하지 않는다).
+
+    cachePoint(2026-09-24 추가) — 호출부(_call_bedrock_for_category)가 항상
+    _CATEGORY_BEDROCK의 카테고리 기본 모델(전부 Claude 프로파일, GPT-6 없음)
+    로만 부른다 — model_supports_prompt_cache 판단 없이 무조건 붙여도
+    안전하다(gpt-6 계열이 캐싱을 거부하는 문제는 chat_ws.py의 모델
+    드롭다운 경로에서만 해당)."""
     client = _get_bedrock_client()
     inference_config = {"maxTokens": max_tokens}
     if temperature is not None:
@@ -295,7 +588,7 @@ def _call_bedrock(
     try:
         resp = client.converse(
             modelId=model,
-            system=[{"text": system_prompt}],
+            system=[{"text": system_prompt}, {"cachePoint": {"type": "default"}}],
             messages=[{"role": "user", "content": [{"text": user_message}]}],
             inferenceConfig=inference_config,
         )

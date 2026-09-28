@@ -19,77 +19,34 @@ Polly generative 엔진으로 합성하면 약 $17/월(82% 절감) — 같은 �
 불필요(Fargate 태스크 IAM 롤 권한만으로 호출) 부수 이점도 있음. Polly
 한국어 보이스 중 generative 엔진을 지원하는 건 Seoyeon뿐(Jihye는 neural
 전용) — Seoyeon/generative를 기본값으로 승격.
+
+2026-09-22 — 성우·속도·음량을 admin CMS에서 조정할 수 있게
+pipelines/common/podcast_voice.py(웹툰 이미지 설정과 동일한 "## 헤딩
+발행 문서" 패턴)를 신설, VoiceId/Engine 하드코딩 상수를 없애고 매 실행
+fresh 조회로 바꿨다(사용자 요청: "웹툰이랑 동일한 구조로 짜주시죠"). 텍스트는
+SSML <prosody>로 감싸 rate/volume을 반영한다 — Seoyeon/Jihye 기본값
+(100%/+0dB)일 때는 예전과 들리는 결과가 동일하다(prosody 기본값 자체가
+무변경이므로). 실제 Polly 호출(_polly/_split_for_polly/synthesize)은
+같은 날 후속으로 podcast_voice.py로 옮겼다 — admin CMS의 "음성 미리듣기"
+기능이 발행 파이프라인과 똑같은 함수를 공유해야 진짜 미리듣기이기
+때문(아래 podcast_voice.synthesize() 호출부 참고).
 """
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
+import podcast_voice
 from bedrock_client import call_text
 from text_utils import strip_code_fence
 
-import boto3
-import os
-import re
-
-_SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/kmkagk616y1c"  # lens-podcast-sonnet-46
-
-_AWS_PROFILE = os.environ.get("AWS_PROFILE")
-_REGION = os.environ.get("AWS_REGION", "us-east-1")
-_POLLY_VOICE_ID = "Seoyeon"
-_POLLY_ENGINE = "generative"
-# 동기 SynthesizeSpeech API 실제 상한은 3,000자 — 여유를 두고 이 아래에서 문장
-# 경계로 쪼갠다(실측 대본 평균 1,386자·최대 1,815자라 지금은 거의 안 걸리지만,
-# 프롬프트가 바뀌어 길어져도 조용히 잘리지 않게 방어).
-_POLLY_MAX_CHARS = 2800
-
-_polly_client = None
-
-
-def _polly() -> "boto3.client":
-    global _polly_client
-    if _polly_client is None:
-        session = (
-            boto3.Session(profile_name=_AWS_PROFILE)
-            if _AWS_PROFILE
-            else boto3.Session()
-        )
-        _polly_client = session.client("polly", region_name=_REGION)
-    return _polly_client
-
-
-def _split_for_polly(text: str) -> list[str]:
-    """_POLLY_MAX_CHARS 이하 조각으로 문장 경계에서 나눈다(문장이 그 자체로
-    한도를 넘는 극단적 경우엔 그 문장 하나만 통째로 넘는 조각이 된다 —
-    Polly가 그 조각에서 에러를 내면 그대로 실패해서 눈에 띄게 한다)."""
-    if len(text) <= _POLLY_MAX_CHARS:
-        return [text]
-    sentences = re.split(r"(?<=[.!?다요]\s)", text)
-    chunks: list[str] = []
-    current = ""
-    for sentence in sentences:
-        if current and len(current) + len(sentence) > _POLLY_MAX_CHARS:
-            chunks.append(current)
-            current = sentence
-        else:
-            current += sentence
-    if current:
-        chunks.append(current)
-    return chunks
-
-
-def _synthesize_polly(text: str) -> bytes:
-    audio = b""
-    for chunk in _split_for_polly(text):
-        resp = _polly().synthesize_speech(
-            Text=chunk,
-            OutputFormat="mp3",
-            VoiceId=_POLLY_VOICE_ID,
-            Engine=_POLLY_ENGINE,
-            LanguageCode="ko-KR",
-        )
-        audio += resp["AudioStream"].read()
-    return audio
+# 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요. 클로드 5.0
+# opus로 모든 프로덕션... 업데이트": 전용 프로파일 lens-podcast-opus-5
+# (신규 생성, us.anthropic.claude-opus-5 copyFrom, Service=atlas4·
+# Workload=podcast)로 교체 — admin/backend/routes/prompts.py::
+# _CATEGORY_BEDROCK["podcast"]와 반드시 같은 ARN을 유지할 것(admin
+# 테스트 도구와 실제 발행이 어긋나면 안 된다는 이 세션 기존 원칙).
+_SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/6bjkzt0icf74"  # lens-podcast-opus-5
 
 
 def run_article(
@@ -108,8 +65,12 @@ def run_article(
         print(f"{tag} podcast 프롬프트 로드")
         guide = ddb_prompt.load_prompt("podcast")
         print(f"{tag} 대본 생성 중...")
+        # 2026-09-26 — "다음 기사 원문으로 팟캐스트 대본을 만들어주세요"처럼
+        # 코드가 결과물 종류를 못박던 문구를 뺐다(admin/backend/routes/
+        # prompts.py::_CATEGORY_BEDROCK 주석 참고). 무엇을 만들지는 전적으로
+        # guide(저장된 podcast 지침, system 메시지)에 맡긴다.
         script = call_text(
-            guide, f"다음 기사 원문으로 팟캐스트 대본을 만들어주세요.\n\n{article}", model=_SCRIPT_MODEL
+            guide, f"[입력 기사]\n{article}", model=_SCRIPT_MODEL
         )
         script_path.write_text(script, encoding="utf-8")
 
@@ -119,7 +80,7 @@ def run_article(
     else:
         print(f"{tag} Polly 음성 합성 중...")
         text = strip_code_fence(script)
-        audio = _synthesize_polly(text)
+        audio = podcast_voice.synthesize(text)
         mp3_path.write_bytes(audio)
 
     print(f"{tag} 완료 — {script_path}, {mp3_path}")

@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
-import { PromptDrawer } from "@/components/PromptDrawer";
+import { usePromptLab } from "@/components/PromptChatLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -60,10 +60,27 @@ function VideoPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkReloadKey, setBulkReloadKey] = useState(0);
-  const [promptOpen, setPromptOpen] = useState(false);
+  // 2026-09-24, 두 번째 개편 — PromptLab이 페이지별 로컬 state가 아니라
+  // 레이아웃 레벨의 전역 Provider로 옮겨갔다(사용자 요청: "근본적으로...
+  // 진짜 다 동시작업이 가능하도록... 대화 다른 곳에 머물러도 될 수
+  // 있게"). panelOpen을 다른 필터처럼 URL에 계속 되써넣는 건 그만두고
+  // (webtoon/page.tsx와 같은 이유), 새로고침 시 복원용으로 마운트 시
+  // 1회만 `?panel=chat`을 읽어 열어준다.
+  const { open: openPromptLab } = usePromptLab();
   const visibleReloadKey = useReloadOnVisible();
 
-  const syncUrl = (next: { status: string; dateRange: DateRange; sortDir: "asc" | "desc"; search: string; page: number }) => {
+  useEffect(() => {
+    if (searchParams.get("panel") === "chat") openPromptLab();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 URL을 읽어 복원(이후 탭 전환 등은 Provider가 직접 관리)
+  }, []);
+
+  const syncUrl = (next: {
+    status: string;
+    dateRange: DateRange;
+    sortDir: "asc" | "desc";
+    search: string;
+    page: number;
+  }) => {
     const params = new URLSearchParams();
     if (next.status) params.set("status", next.status);
     if (next.dateRange.from) params.set("from", next.dateRange.from);
@@ -190,7 +207,7 @@ function VideoPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setPromptOpen(true)}
+            onClick={() => openPromptLab()}
             className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -238,8 +255,6 @@ function VideoPage() {
           <SimpleBulkBar count={selected.size} busy={bulkBusy} onDelete={bulkDelete} onClear={() => setSelected(new Set())} />
         </div>
       )}
-
-      <PromptDrawer channel="video" open={promptOpen} onClose={() => setPromptOpen(false)} />
     </div>
   );
 }

@@ -94,8 +94,65 @@ _BRACKET_RE = re.compile(r"\[[^\]]*\]")
 # 근사치로 정원을 채우도록 아래 3) 선정 로직 자체를 바꿨다. _GENERAL_
 # THRESHOLD(7.0)는 정치·국제·금융정책 등 전 카테고리를 대상으로 하는
 # 별도 풀이라 비교 대상이 아니다.
-_TAB_CATEGORY = {"증권": "증권", "산업": "산업", "시그널": "Signal"}
+#
+# 2026-09-28 — 위 "paper_section 0건" 진단이 부정확했던 걸 재확인 후
+# (실제로는 paperNumber 자체는 10일 표본 기준 전체의 44%에 붙어 있었고,
+# 0건이었던 건 특정 3~4일뿐 — 당시 3일치만 봐서 생긴 착시), 증권/산업/
+# 시그널도 "전체"(1면)처럼 점수보다 지면 배치를 우선하는 쪽으로 바꿨다
+# (`_rank_tab_candidates` 참조) — 사용자 지침: "지면 순위가 높은 것이
+# 편집국에서 앞에 넣자고 이미 결정한 것". AI 점수는 지면 정보가 없는
+# 날짜의 폴백으로만 쓴다. 같이 시그널 판정 방식도 `_tab_of`로 바꿈
+# (top_category 단일 태그 → is_market_signal, 마켓시그널 코너 40% 누락
+# 보정).
+_TAB_NAMES = ("증권", "산업", "시그널")
 _TAB_THRESHOLD = 6.5
+
+
+def _tab_of(article: dict) -> str | None:
+    """이 기사가 지면특별코너 4탭(증권/산업/시그널) 중 어디 후보인지 —
+    시그널을 먼저 본다. 2026-09-28 — top_category(XML에 가장 먼저 나온
+    카테고리 태그 하나만 봄)로 "Signal"만 걸렀더니 실제 마켓시그널 코너
+    기사의 40%(카테고리 태그 여러 개 중 "증권" 등이 먼저 나온 경우)를
+    놓치고 있었다(10일 표본 58건 중 23건 확인) — discovery.pipeline의
+    `is_market_signal`(카테고리 태그 전체 + 제목 "마켓시그널"/"[시그널]"
+    표시까지 확인)로 대체. 편집국이 이미 "마켓시그널" 코너로 명시
+    지정해둔 기사는 top_category가 우연히 "증권"이어도 시그널 탭이
+    가져간다 — 증권/산업 탭은 그 나머지만 본다."""
+    if article.get("is_market_signal"):
+        return "시그널"
+    if article["top_category"] == "증권":
+        return "증권"
+    if article["top_category"] == "산업":
+        return "산업"
+    return None
+
+
+def _rank_tab_candidates(cat_pool: list[dict], scores: dict) -> list[dict]:
+    """지면특별코너 후보 정렬 — 2026-09-28, 편집국이 이미 정해준 지면
+    배치를 AI 채점보다 우선한다(사용자 지침: "지면 순위가 높은 것이
+    편집국에서 앞에 넣자고 이미 결정한 것"). paperNumber가 날마다
+    제각각이라(증권이 어떤 날은 18/19면, 다른 날은 1/2/14/15면 —
+    "N면=증권" 식 고정 매핑은 애초에 불가능, 2026-09-28 실측) "몇 면인가"
+    자체가 아니라 "그 페이지 안에서 몇 번째인가"만 신호로 쓴다.
+
+    1차: paperNumber 오름차순 + 같은 면이면 TOP 우선 — 점수 유무와
+    무관하게 채택(편집국 판단이 AI 채점보다 우선). 같은 페이지에 TOP이
+    2건 붙는 경우(전체 지면 데이터의 6% — 서로 다른 성격의 기사 묶음이
+    한 지면에 같이 실리는 경우로 추정)도 정렬 키가 동일해 둘 다 자연스럽게
+    앞쪽에 온다 — 별도 처리 불필요.
+    2차: 지면 정보 없는 후보 중 AI 점수(published.md 5지표) 높은 순 —
+    1차만으로 정원을 못 채우는 날의 폴백(증권/산업은 10일 중 4~7일,
+    시그널은 거의 매일 폴백이 필요했다, 2026-09-28 실측)."""
+    paper_pool = sorted(
+        (a for a in cat_pool if a.get("paper_number")),
+        key=lambda a: (int(a["paper_number"]), a.get("paper_paragraph") != "TOP"),
+    )
+    fallback_pool = sorted(
+        (a for a in cat_pool if not a.get("paper_number") and scores.get(a["key"])),
+        key=lambda a: scores[a["key"]].get("total") or 0,
+        reverse=True,
+    )
+    return paper_pool + fallback_pool
 _GENERAL_THRESHOLD = 7.0
 _TAB_CAP = 4
 _MIN_CONTENT_LEN = 300
@@ -325,7 +382,7 @@ def main():
     # 미리 seen 확정하면 그 폴백 후보 자체가 사라진다 — 탭 카테고리는
     # 건너뛰고, 그 외 카테고리만 기존대로 조기 확정한다.
     for a in scorable:
-        if a["top_category"] in _TAB_CATEGORY.values():
+        if _tab_of(a) is not None:
             continue
         row = scores.get(a["key"])
         if row is not None and (row.get("total") or 0) < _GENERAL_THRESHOLD:
@@ -344,17 +401,20 @@ def main():
     # (오늘 실측 기준 6.5 이상이 나오면 그게 먼저 채워지고, 없으면 그보다
     # 낮은 점수라도 채워진다).
     if not is_sunday:
-        for tab, cat in _TAB_CATEGORY.items():
-            pool = [a for a in scorable if a["top_category"] == cat and scores.get(a["key"])]
-            pool.sort(key=lambda a: scores[a["key"]].get("total") or 0, reverse=True)
-            for a in pool:
+        for tab in _TAB_NAMES:
+            cat_pool = [a for a in scorable if _tab_of(a) == tab]
+            ordered = _rank_tab_candidates(cat_pool, scores)
+            for a in ordered:
                 if tab_counts[tab] >= _TAB_CAP:
                     break
-                row = scores[a["key"]]
+                row = scores.get(a["key"])
                 selected_keys.add(a["key"])
                 status = _try_publish(a, tab, tab_counts[tab])
                 if status != "failed":
-                    _mark_seen(seen_table, a["key"], score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+                    meta = {"rank_method": "paper" if a.get("paper_number") else "score"}
+                    if row:
+                        meta.update(score=row.get("total"), reasoning=row.get("reasoning", "")[:200])
+                    _mark_seen(seen_table, a["key"], **meta)
                 tab_counts[tab] += 1
 
     # 4) 일반 — 위 4탭에 이미 뽑힌 기사만 제외, 나머지는 카테고리 무관하게

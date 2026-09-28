@@ -1,15 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import { PromptDrawer } from "@/components/PromptDrawer";
+import { Suspense, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { usePromptLab } from "@/components/PromptChatLab";
 
 // 2026-08-19 — 4포맷 파이프라인(레터/웹툰/영상/팟캐스트) 중 팟캐스트 전용
 // 관리 화면. 다른 세 채널과 달리 아직 생성 파이프라인(ElevenLabs TTS 등)이
 // 붙어있지 않아 콘텐츠 목록·"새로 쓰기"가 없다 — 프롬프트를 미리 다듬어
 // 두는 용도로 프롬프트 편집만 연다. 파이프라인이 붙으면 webtoon/page.tsx와
 // 같은 패턴(ContentTable + "새로 쓰기")으로 확장할 것.
-export default function PodcastPage() {
-  const [promptOpen, setPromptOpen] = useState(false);
+
+// useSearchParams 는 클라이언트 사이드 only — static export 시 Suspense boundary 필수.
+export default function PodcastPageWrapper() {
+  return (
+    <Suspense fallback={<div className="ui-spinner w-5 h-5 mt-4" />}>
+      <PodcastPage />
+    </Suspense>
+  );
+}
+
+function PodcastPage() {
+  const searchParams = useSearchParams();
+  // 2026-09-24, 두 번째 개편 — PromptLab이 페이지별 로컬 state가 아니라
+  // 레이아웃 레벨의 전역 Provider로 옮겨갔다(사용자 요청: "근본적으로...
+  // 진짜 다 동시작업이 가능하도록... 대화 다른 곳에 머물러도 될 수
+  // 있게", webtoon/page.tsx와 같은 이유). 새로고침 시 복원용으로 마운트
+  // 시 1회만 `?panel=chat`을 읽어 열어준다.
+  const { open: openPromptLab } = usePromptLab();
+
+  useEffect(() => {
+    if (searchParams.get("panel") === "chat") openPromptLab();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 URL을 읽어 복원(이후 탭 전환 등은 Provider가 직접 관리)
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -19,7 +41,7 @@ export default function PodcastPage() {
         </h1>
         <button
           type="button"
-          onClick={() => setPromptOpen(true)}
+          onClick={() => openPromptLab()}
           className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -34,8 +56,6 @@ export default function PodcastPage() {
         다듬어 둘 수 있습니다 — 생성이 붙으면 이 화면에 콘텐츠 목록이
         추가됩니다.
       </div>
-
-      <PromptDrawer channel="podcast" open={promptOpen} onClose={() => setPromptOpen(false)} />
     </div>
   );
 }

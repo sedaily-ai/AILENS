@@ -98,3 +98,47 @@ def handle_presign(body: dict, path_params: dict, query_params: dict) -> dict:
         "key": key,
         "expires_in": _EXPIRES,
     })
+
+
+# 2026-09-26 — "다운로드" 버튼이 실제로 다운로드를 안 하고 새 탭에 이미지만
+# 열던 문제(사용자 리포트: "다운로드 버튼을 클릭하면 실제로 이미지가
+# 다운로드가 되면 좋겠습니다") 원인: 이 버킷 CORS는 PUT만 허용해서(위
+# handle_presign, 업로드 전용) 프론트가 fetch()로 blob을 못 읽고, HTML
+# <a download> 속성도 크로스오리진 URL에서는 대부분 브라우저가 무시한다
+# (같은 origin이거나 blob:/data: URL에만 적용됨) — 그래서 그냥 새 탭에서
+# 이미지를 여는 걸로 조용히 실패하고 있었다.
+#
+# presigned GET URL 자체에 ResponseContentDisposition을 실어 보내면 S3가
+# 응답 헤더에 그걸 그대로 얹어준다 — CORS·<a download> 둘 다 필요 없이,
+# 브라우저가 그 URL로 이동하는 순간 서버(S3)가 다운로드를 강제한다.
+_DOWNLOAD_EXPIRES = 60
+
+
+def handle_download_url(body: dict, path_params: dict, query_params: dict) -> dict:
+    url = ((query_params or {}).get("url") or "").strip()
+    filename = ((query_params or {}).get("filename") or "download").strip()
+
+    bucket = _bucket()
+    if not bucket:
+        return response.err("CMS_MEDIA_BUCKET not configured", 500)
+
+    prefix = f"https://{bucket}.s3.us-east-1.amazonaws.com/"
+    if not url.startswith(prefix):
+        return response.err("url must be a CMS media URL", 400)
+    key = url[len(prefix):]
+
+    # _safe_name()은 저장용 키를 만드는 함수(uuid 접두사를 붙임)라 여기
+    # 그대로 쓰면 사용자가 받는 파일명이 "a1b2c3d4-cut-1.png"처럼 지저분해
+    # 진다 — 다운로드 파일명은 그냥 헤더 인젝션만 막으면 된다(따옴표·
+    # 줄바꿈 제거).
+    safe_filename = filename.replace('"', "").replace("\n", "").replace("\r", "") or "download"
+    download_url = _s3().generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": bucket,
+            "Key": key,
+            "ResponseContentDisposition": f'attachment; filename="{safe_filename}"',
+        },
+        ExpiresIn=_DOWNLOAD_EXPIRES,
+    )
+    return response.ok({"download_url": download_url, "expires_in": _DOWNLOAD_EXPIRES})

@@ -8,7 +8,7 @@ import { useReloadOnVisible } from "@/lib/useReloadOnVisible";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { ContentTable, SimpleBulkBar } from "@/components/ContentTable";
-import { PromptChatLab } from "@/components/PromptChatLab";
+import { usePromptLab } from "@/components/PromptChatLab";
 import { type DateRange } from "@/components/DateRangeCalendar";
 import type { CmsPost } from "@/lib/types";
 
@@ -70,12 +70,20 @@ function WebtoonPage() {
   // 받으면 자기 backdrop/aside/닫기 버튼 없이 헤더+본문만 내놓는다 — 이
   // 페이지가 그 둘을 하나의 aside 안에 순서대로 쌓는다(각 컴포넌트 자체는
   // 안 바꾼 것과 같음 — 다른 화면은 embedded 없이 계속 단독으로 씀).
-  // 2026-09-20, 사용자 요청 — "새로고침하면 머물렀던 화면에 계속
-  // 머무르도록": panelOpen이 순수 React state라 새로고침하면 항상
-  // false로 초기화돼 목록 화면으로 튕겨나갔다. 다른 필터(status/sort/
-  // search/page)와 같은 패턴으로 URL 쿼리(panel=chat)에 동기화한다.
-  const [panelOpen, setPanelOpenState] = useState(() => searchParams.get("panel") === "chat");
+  const { open: openPromptLab } = usePromptLab();
   const visibleReloadKey = useReloadOnVisible();
+
+  // 2026-09-24 — PromptLab이 페이지별 로컬 state가 아니라 레이아웃
+  // 레벨의 전역 Provider로 옮겨갔다(사용자 요청: "근본적으로... 진짜 다
+  // 동시작업이 가능하도록... 대화 다른 곳에 머물러도 될 수 있게"). 그
+  // 결과 panelOpen을 다른 필터처럼 URL에 계속 되써넣는 건 그만두고(탭
+  // 전환·랩 닫기가 이제 Provider가 들고 있는 상태라 이 페이지가 매번
+  // 다시 반영할 이유가 없다), 새로고침 시 복원용으로 마운트 시 1회만
+  // `?panel=chat`을 읽어 열어준다.
+  useEffect(() => {
+    if (searchParams.get("panel") === "chat") openPromptLab();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만 URL을 읽어 복원(이후 탭 전환 등은 Provider가 직접 관리)
+  }, []);
 
   const syncUrl = (next: {
     status: string;
@@ -83,7 +91,6 @@ function WebtoonPage() {
     sortDir: "asc" | "desc";
     search: string;
     page: number;
-    panelOpen: boolean;
   }) => {
     const params = new URLSearchParams();
     if (next.status) params.set("status", next.status);
@@ -92,38 +99,33 @@ function WebtoonPage() {
     if (next.sortDir === "asc") params.set("sort", "asc");
     if (next.search) params.set("q", next.search);
     if (next.page > 1) params.set("page", String(next.page));
-    if (next.panelOpen) params.set("panel", "chat");
     const qs = params.toString();
     router.replace(qs ? `/webtoon?${qs}` : "/webtoon", { scroll: false });
   };
 
   const setStatus = (next: string) => {
     setStatusState(next);
-    syncUrl({ status: next, dateRange, sortDir, search, page: 1, panelOpen });
+    syncUrl({ status: next, dateRange, sortDir, search, page: 1 });
   };
   const setDateRange = (next: DateRange) => {
     setDateRangeState(next);
-    syncUrl({ status, dateRange: next, sortDir, search, page: 1, panelOpen });
+    syncUrl({ status, dateRange: next, sortDir, search, page: 1 });
   };
   const toggleSortDir = () => {
     const next = sortDir === "desc" ? "asc" : "desc";
     setSortDirState(next);
-    syncUrl({ status, dateRange, sortDir: next, search, page: 1, panelOpen });
+    syncUrl({ status, dateRange, sortDir: next, search, page: 1 });
   };
   const setSearch = (next: string) => {
     setSearchState(next);
-    syncUrl({ status, dateRange, sortDir, search: next, page: 1, panelOpen });
+    syncUrl({ status, dateRange, sortDir, search: next, page: 1 });
   };
   const setPage = (updater: number | ((prev: number) => number)) => {
     setPageState((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      syncUrl({ status, dateRange, sortDir, search, page: next, panelOpen });
+      syncUrl({ status, dateRange, sortDir, search, page: next });
       return next;
     });
-  };
-  const setPanelOpen = (next: boolean) => {
-    setPanelOpenState(next);
-    syncUrl({ status, dateRange, sortDir, search, page, panelOpen: next });
   };
 
   const requestKey = JSON.stringify([status, dateRange, visibleReloadKey, bulkReloadKey]);
@@ -216,7 +218,7 @@ function WebtoonPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setPanelOpen(true)}
+            onClick={() => openPromptLab()}
             className="ui-btn ui-btn-ghost inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -262,20 +264,6 @@ function WebtoonPage() {
         </div>
       )}
 
-      {/* 2026-09-15, 사용자 요청: "프롬프트 실험 버튼 누르면 우측 사이드에서
-          나오는게 아니고 전체화면으로 보여지도록" — 오른쪽에서 슬라이드
-          들어오던 720~1080px 드로어를 뷰포트 전체를 덮는 화면으로 전환. */}
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="prompt-chat-lab-title"
-        inert={!panelOpen}
-        className={`fixed inset-0 z-50 flex h-full w-full flex-col bg-[var(--surface-card)] transition-opacity duration-200 ease-out ${
-          panelOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      >
-        <PromptChatLab open={panelOpen} onClose={() => setPanelOpen(false)} embedded />
-      </aside>
     </div>
   );
 }

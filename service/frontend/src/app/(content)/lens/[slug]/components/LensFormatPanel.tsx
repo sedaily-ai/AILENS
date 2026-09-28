@@ -17,6 +17,20 @@ import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
 import { ARTICLE_FORMAT_SAMPLES, articleFormatSample } from './lensSamples';
 import { CardnewsCarousel } from './CardnewsCarousel';
 
+// 2026-09-28, 사용자 요청 — "문장 끝날 때... 줄바꿈... 문맥에 맞게 줄바꿈을
+// 철저하게 해야합니다": "대사로 읽기" 목록(아래 227행 부근)이 cut.caption을
+// 가공 없이 그대로 렌더해서, 한 컷 캡션에 문장이 여럿 붙어 있으면(내레이션
+// 원문이 마침표로만 이어붙는 경우가 흔함) 한 줄로 쭉 이어졌다. 문장 종결
+// 부호(./!/?) 뒤에서 끊어 문장 단위로 나눈다 — 종결 부호 뒤에 공백이 있든
+// 없든(원본 캡션이 공백 없이 붙어있는 경우도 실측 확인) 둘 다 처리하도록
+// 부호 자체를 기준으로 split한다.
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해) — 4개 포맷(레터/
 // 웹툰/팟캐스트/영상) 중 하나의 시선 패널 전체. lenses.map()의 콜백 본문을
 // 그대로 컴포넌트로 옮긴 것 — 계산 로직·렌더 분기 전부 원본과 동일, 순수
@@ -167,7 +181,12 @@ export function LensFormatPanel({
         <article data-letter-body>
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
             {letterParagraphs.map((para, pi) => (
-              <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
+              <p
+                key={pi}
+                className={
+                  para.startsWith('◾') ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined
+                }
+              >
                 {wrapWithTerms(para, l.keywords ?? [])}
               </p>
             ))}
@@ -255,7 +274,15 @@ export function LensFormatPanel({
                 <span aria-hidden className="hang-n">
                   {String(ci + 1).padStart(2, '0')}
                 </span>
-                <span>{cut.caption || '(대사 없음)'}</span>
+                <span>
+                  {cut.caption
+                    ? splitSentences(cut.caption).map((sentence, si) => (
+                        <span key={si} style={{ display: 'block' }}>
+                          {sentence}
+                        </span>
+                      ))
+                    : '(대사 없음)'}
+                </span>
               </li>
             ))}
           </ol>

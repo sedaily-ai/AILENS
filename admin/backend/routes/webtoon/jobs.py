@@ -1,27 +1,29 @@
-"""웹툰 실험 패널 전용 작업(job) 저장소 — `routes/webtoon/` 하위 모든
-모듈(generate.py/gpu.py/stage.py)이 공유한다.
+"""웹툰 실험 패널 전용 작업(job) 저장소·S3 헬퍼 — `routes/webtoon/generate.py`
+가 컷 이미지 job 기록에, `routes/chat_ws.py`·`routes/chat_threads.py`·
+`routes/video_lab.py`가 `s3()`/`bucket()`만 공용 S3 헬퍼로 쓴다.
 
 2026-09-20 — `routes/webtoon_lab.py`(1035줄) 하나에 컷 이미지 생성·GPU
 제어·참조 이미지 업로드·단계별 생성이 전부 섞여 있던 걸 기능별로 쪼갰다
 (사용자 요청: "웹툰 관련한거는... 기능별로 코드파일들이 있기를
-원하는데요"). 이 파일은 그 쪼갠 조각들이 공통으로 쓰는 job 테이블
-읽기/쓰기·S3 업로드·self-invoke 헬퍼와, 모든 job 종류가 공유하는 단일
-폴링 라우트(`GET /admin/webtoon-lab/{job_id}`)만 담는다 — 새 테이블을
-만들지 않고 기존 admin config 테이블을 pk="WEBTOONLAB" 네임스페이스로
-재사용하는 건 예전 그대로다."""
+원하는데요"). 새 테이블을 만들지 않고 기존 admin config 테이블을
+pk="WEBTOONLAB" 네임스페이스로 재사용하는 건 예전 그대로다.
+
+2026-09-25 — gpu.py/stage.py 삭제(pipeline/style_guide 모델 삭제 후속)로
+이 파일이 갖고 있던 self_invoke_async()·get_job()·job_payload()·
+handle_status()(공유 폴링 라우트)가 전부 무호출이 돼 같이 삭제했다.
+put_job/update_job/bucket/s3/job_table은 generate.py(컷 생성 job 기록)
+와 다른 route들(S3 공용 헬퍼)이 계속 쓴다."""
 from __future__ import annotations
 
-import json
 import os
 
 import boto3
 
-from shared import ddb_client, response
+from shared import ddb_client
 
 JOB_PK = "WEBTOONLAB"
 MAX_SCENE_BYTES = 4000
 MAX_TEXT_BYTES = 20000  # style/character 필드 상한 — 오남용(과금 폭주) 방지
-HISTORY_LIMIT = 24
 
 _s3_client = None
 
@@ -70,56 +72,3 @@ def update_job(job_id: str, updates: dict) -> None:
     )
 
 
-def get_job(job_id: str) -> dict | None:
-    resp = job_table().get_item(Key={"pk": JOB_PK, "sk": f"job/{job_id}"})
-    return resp.get("Item")
-
-
-def self_invoke_async(payload: dict) -> None:
-    """자기 자신을 InvocationType="Event"로 다시 호출해 GPU/Bedrock 체인
-    작업을 완전히 별개의 invocation에서 처리한다 — routes/prompts.py의
-    같은 이름 헬퍼와 동일한 이유·동일한 패턴(그쪽 docstring 참고). 마커
-    키만 "_async_webtoon_job"으로 달리해서 handler.py가 두 모듈의 비동기
-    작업을 구분해 라우팅한다."""
-    lambda_client = boto3.client("lambda")
-    function_name = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "sedaily-mbti-admin-api-dev")
-    lambda_client.invoke(
-        FunctionName=function_name,
-        InvocationType="Event",
-        Payload=json.dumps({"_async_webtoon_job": payload}).encode("utf-8"),
-    )
-
-
-def job_payload(job_id: str, item: dict) -> dict:
-    """`GET /admin/webtoon-lab/{job_id}` 응답 모양 — job 종류마다 필드가
-    다를 수 있어(예: 단계별 생성은 stage/character/params) 존재하는 키만
-    담아도 되게 `.get()`으로 느슨하게 읽는다."""
-    return {
-        "job_id": job_id,
-        "status": item.get("status"),
-        "image_url": item.get("image_url"),
-        "s3_key": item.get("s3_key"),
-        "error": item.get("error"),
-        "scene": item.get("scene"),
-        "camera": item.get("camera"),
-        "style": item.get("style"),
-        "char_female": item.get("char_female"),
-        "char_male": item.get("char_male"),
-        "scene_reinforce": item.get("scene_reinforce"),
-        "char_reinforce": item.get("char_reinforce"),
-        "prompt_preview": item.get("prompt_preview"),
-        "created_at": item.get("created_at"),
-    }
-
-
-def handle_status(body: dict, path_params: dict, query_params: dict) -> dict:
-    """`GET /admin/webtoon-lab/{job_id}` — 모든 job 종류(컷 생성/GPU 시작/
-    단계별 생성)가 공유하는 단일 폴링 라우트. 종류별 전용 GET 라우트를
-    따로 안 만든다(handler.py 등록 주석 참고)."""
-    job_id = (path_params or {}).get("job_id", "")
-    if not job_id:
-        return response.err("job_id required", 400)
-    item = get_job(job_id)
-    if not item:
-        return response.err("job not found", 404)
-    return response.ok(job_payload(job_id, item))

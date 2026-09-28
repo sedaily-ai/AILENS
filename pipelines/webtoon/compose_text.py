@@ -383,7 +383,7 @@ def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str 
     )
 
 
-def draw_closing_caption(img: Image.Image, text: str):
+def draw_closing_caption(img: Image.Image, text: str) -> int | None:
     """컷8 전용 마무리 자막 — 2026-09-08 신설. 화면 하단 짙은 남색 둥근
     바 + 흰 굵은 글씨. draw_narration(하단 1/3 어두운 스크림 + 다큐
     타이틀)과 시각적으로 겹치므로, 컷8은 narration 대신 이걸 쓴다
@@ -409,6 +409,7 @@ def draw_closing_caption(img: Image.Image, text: str):
     y1 = img.height - img.height * 0.05
     y0 = y1 - bh
     _draw_pill(img, lines, font, y0, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.6, max_radius=40)
+    return int(y0)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -484,7 +485,7 @@ def _draw_icon_badge(img: Image.Image, icon: str, x0: float, y0: float, d: float
             draw.rectangle([bx - r * 0.22, base_y - r * h, bx + r * 0.22, base_y], fill=_ICON_STROKE)
 
 
-def draw_caption(img: Image.Image, text: str):
+def draw_caption(img: Image.Image, text: str, bottom_limit: int | None = None):
     """작은 캡션 박스 — 좌하단, 수치·팩트 표기용.
 
     2026-09-09 — 사용자가 공유한 원본 GPT-image 레퍼런스 샘플을 다시
@@ -495,7 +496,16 @@ def draw_caption(img: Image.Image, text: str):
     레이아웃 요소라 새 이미지 모델 호출 없이 PIL로 바로 추가 가능하다.
     caption 텍스트에서 키워드를 찾아 어울리는 아이콘을 캡션 박스 왼쪽에
     붙인다(_pick_icon_for_caption 참고) — 매치되는 키워드가 없으면
-    아이콘 없이 기존과 동일하게 그린다(안전한 폴백)."""
+    아이콘 없이 기존과 동일하게 그린다(안전한 폴백).
+
+    2026-09-28, 사용자 리포트("좌하단에 흰 박스와 검은 박스가 겹쳐서
+    나와 내용 파악이 어렵습니다") — caption은 항상 화면 맨 밑(y0 =
+    height - bh - 24)에 고정 배치였는데, 같은 컷에 narration/
+    closing_caption(둘 다 하단 텍스트 요소)이 같이 있으면 그 위에
+    그대로 겹쳐 그려졌다. compose()가 narration/closing_caption을
+    먼저 그려 상단 y좌표를 돌려주면 그 값을 bottom_limit으로 받아
+    캡션 박스를 그 위로 띄운다 — draw_title()의 결과를 draw_dialogue()에
+    넘기던 것과 같은 패턴(위 compose() 3차 개편 주석 참고)."""
     draw = ImageDraw.Draw(img)
     font = _font(26)
     max_width = int(img.width * 0.5)
@@ -507,7 +517,8 @@ def draw_caption(img: Image.Image, text: str):
     badge_d = bh  # 배지 지름을 캡션 박스 높이에 맞춘다
     badge_gap = 12 if icon else 0
     x0 = 24 + (badge_d + badge_gap if icon else 0)
-    y0 = img.height - bh - 24
+    default_y0 = img.height - bh - 24
+    y0 = min(default_y0, bottom_limit - bh - 16) if bottom_limit is not None else default_y0
 
     if icon:
         _draw_icon_badge(img, icon, 24, y0, badge_d)
@@ -519,7 +530,7 @@ def draw_caption(img: Image.Image, text: str):
         ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
 
 
-def draw_narration(img: Image.Image, text: str):
+def draw_narration(img: Image.Image, text: str) -> int:
     """다큐 타이틀 카드 스타일 — 하단 1/3에 어두운 스크림 + 흰 텍스트."""
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     odraw = ImageDraw.Draw(overlay)
@@ -538,6 +549,7 @@ def draw_narration(img: Image.Image, text: str):
         tw = draw.textlength(ln, font=font)
         draw.text(((img.width - tw) / 2, ty), ln, font=font, fill=(255, 255, 255))
         ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
+    return y0
 
 
 def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
@@ -559,7 +571,14 @@ def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
     2026-09-08(3차) — draw_title()/draw_cover_header()가 돌려주는 실제
     제목 하단 y좌표(title_bottom)를 draw_dialogue()에 넘긴다 — 제목이
     길어 알약이 예상보다 커지는 컷에서 말풍선이 제목과 겹치던 문제
-    수정(draw_dialogue() 상단 주석 참고)."""
+    수정(draw_dialogue() 상단 주석 참고).
+
+    2026-09-28 — caption(좌하단 작은 박스)과 narration/closing_caption
+    (하단 전체 밴드)이 같은 컷에 같이 있으면 둘 다 화면 맨 밑을 기준으로
+    독립적으로 그려져 겹쳤다(사용자 리포트 — "좌하단에 흰 박스와 검은
+    박스가 겹쳐서 나와 내용 파악이 어렵습니다"). narration/closing_caption
+    을 caption보다 먼저 그리고 그 상단 y좌표를 받아 caption을 그 위로
+    띄운다 — title_bottom을 draw_dialogue()에 넘기던 것과 같은 패턴."""
     img = Image.open(img_path).convert("RGB")
     cut_no = cut.get("cut")
     title_bottom = None
@@ -569,10 +588,11 @@ def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
         title_bottom = draw_title(img, cut["title"], fill=title_fill_for_cut(cut_no))
     if cut.get("dialogue"):
         draw_dialogue(img, cut["dialogue"], faces, title_bottom)
-    if cut.get("caption"):
-        draw_caption(img, cut["caption"])
+    bottom_top = None
     if cut.get("closing_caption"):
-        draw_closing_caption(img, cut["closing_caption"])
+        bottom_top = draw_closing_caption(img, cut["closing_caption"])
     elif cut.get("narration"):
-        draw_narration(img, cut["narration"])
+        bottom_top = draw_narration(img, cut["narration"])
+    if cut.get("caption"):
+        draw_caption(img, cut["caption"], bottom_limit=bottom_top)
     img.save(img_path)

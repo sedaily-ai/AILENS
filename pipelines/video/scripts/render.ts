@@ -81,12 +81,23 @@ async function main() {
   );
   const outputLocation = path.resolve(output);
 
+  // concurrency(2026-09-24, 사용자 요청 — "동영상 생성이 더 빨라지면") —
+  // Remotion 기본값은 감지된 코어 수의 "절반"만 쓴다(round(min(8,
+  // max(1, cpu/2))), @remotion/renderer/dist/get-concurrency.js 확인).
+  // video-lab Fargate 태스크가 그동안 2 vCPU라 2/2=1 → 사실상 싱글스레드로
+  // 프레임을 하나씩 렌더링하고 있었다(1684프레임 렌더에 ~400초 소요 실측).
+  // 컨테이너 CPU 감지 자체는 os.availableParallelism()로 cgroup을 정확히
+  // 읽는 버전이라(같은 파일 확인) 오감지 문제는 아니다 — 절반만 쓰는 게
+  // 의도된 기본값일 뿐이라 100%로 명시 오버라이드한다. video-lab-taskdef.json
+  // 의 vCPU 상향과 같이 적용해야 실제 효과가 난다(코어 자체가 여전히
+  // 2개면 100%든 50%든 상한은 2).
   await renderMedia({
     composition,
     serveUrl,
     codec: 'h264',
     outputLocation,
     inputProps: { script: resolved },
+    concurrency: '100%',
     onProgress: ({ progress, renderedFrames, encodedFrames }) => {
       process.stdout.write(
         `\r  진행률: ${Math.round(progress * 100)}% (렌더 ${renderedFrames}/${composition.durationInFrames}, 인코딩 ${encodedFrames})   `

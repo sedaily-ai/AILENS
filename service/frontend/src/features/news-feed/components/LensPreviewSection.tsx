@@ -139,8 +139,17 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
     // publish_date/published_at 내림차순을 그대로 따른다(정렬 안정성
     // 덕분에 순서 유지). published_at을 정렬 키인 척 수동 재기록하던
     // 임시방편(2026-08-21 이전 지면 4건 전부 이렇게 처리)을 대체한다.
+    //
+    // 2026-09-28 — display_order는 파이프라인이 "그날 회차 안에서" 매기는
+    // 0부터 시작하는 인덱스라(pipelines/frontpage_auto/run.py), 날짜
+    // 구분 없이 여기서 전역 오름차순만 걸면 예전 어느 날 우연히 0을
+    // 받은 글이 그보다 값이 큰(예: 2) 오늘 새 글보다 계속 앞자리를
+    // 차지하는 버그가 생긴다(실측 — 9/23 글이 9/28 새 글을 밀어내고
+    // 계속 지면 1면 1번 자리에 남아있었음). 날짜(YYYY-MM-DD)를 1순위로
+    // 최신순 정렬하고, 같은 날짜 안에서만 display_order로 미세 조정한다.
     .slice()
     .sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
       const orderA = a.display_order;
       const orderB = b.display_order;
       if (orderA != null && orderB != null) return orderA - orderB;

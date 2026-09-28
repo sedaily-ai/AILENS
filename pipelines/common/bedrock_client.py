@@ -28,7 +28,14 @@ import boto3
 from botocore.config import Config
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
-MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/r9n8dvqc1t0r"  # lens-video-sonnet-46
+# 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요. 클로드 5.0 opus로
+# 모든 프로덕션... 업데이트": 전용 프로파일 lens-video-opus-5(신규 생성,
+# us.anthropic.claude-opus-5 copyFrom, Service=atlas4·Workload=video)로
+# 교체 — admin/backend/routes/prompts.py::_CATEGORY_BEDROCK["video"]와
+# 반드시 같은 ARN을 유지할 것. 이 상수는 video/generate_script.py만 쓴다
+# (다른 파이프라인은 각자 model= 인자를 명시적으로 넘긴다 — 위 모듈
+# docstring 참고).
+MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/p28gzlq5kj6s"  # lens-video-opus-5
 
 # 2026-08-22 — mustknow_auto가 60건 배치(추론 오버헤드 있는 Sonnet 5)를
 # 넣었더니 boto3 기본 read timeout(60초)을 넘겨 Read timeout으로 전부
@@ -88,7 +95,20 @@ def call_text(
     (분류 배치)에서 content 블록이 `[reasoning 블록, text 블록]` 순서로
     와서 `content[0]["text"]`가 KeyError — Sonnet 5가 추론 블록을 먼저
     반환하는 것으로 보임(boto3가 그 블록 타입을 `SDK_UNKNOWN_MEMBER`로
-    표시). 인덱스 0을 가정하지 않고 `text` 키를 가진 첫 블록을 찾는다."""
+    표시). 인덱스 0을 가정하지 않고 `text` 키를 가진 첫 블록을 찾는다.
+
+    2026-09-27 — letters/podcast/video/webtoon 스크립트 생성이 전부 Opus 5로
+    바뀌면서(사용자 요청), admin CMS 쪽에서 이미 겪은 것과 같은 위험을
+    그대로 물려받는다 — 확장 사고(reasoning)가 max_tokens 예산을 전부
+    써버리면 실제 답변이 0글자가 되는 실패 모드(admin/backend/routes/
+    prompts.py::_THINKING_CONFIG 독스트링 참고, "영상 탭에서 Opus 5...
+    각본이 출력되다가 중단" 실측 사례 — 여기 podcast(3000)·video(4000)
+    max_tokens는 letters(12000)보다 훨씬 작아 그 위험이 더 크다). admin
+    쪽이 쓴 것과 동일한 완화(additionalModelRequestFields로 thinking을
+    끔)를 이 함수를 부르는 모든 곳에 무조건 적용한다 — sonnet-46/opus-5/
+    sonnet-5 셋 다 이 필드를 그대로 받아준다는 걸 admin 쪽에서 이미 실측
+    확인했고(이 함수의 현재 호출부는 전부 이 세 모델 중 하나), 셋 다
+    reasoning 자체가 불필요한 단순 생성 작업이라 끄는 게 손해도 없다."""
     client = _get_client()
     inference_config = {"maxTokens": max_tokens}
     if temperature is not None:
@@ -98,6 +118,7 @@ def call_text(
         system=[{"text": system_prompt}],
         messages=[{"role": "user", "content": [{"text": user_message}]}],
         inferenceConfig=inference_config,
+        additionalModelRequestFields={"thinking": {"type": "disabled"}},
     )
     for block in resp["output"]["message"]["content"]:
         if "text" in block:

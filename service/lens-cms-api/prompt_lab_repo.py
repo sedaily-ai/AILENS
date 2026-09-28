@@ -27,11 +27,19 @@ from db import get_cursor
 
 
 def _get_or_create_prompt_id(cur, category: str, name: str) -> int:
+    """2026-09-25 — 원래 SELECT 후 없으면 INSERT하는 2단계였는데, 동시
+    요청 둘이 동시에 "없음"을 보고 둘 다 INSERT를 시도하면 `prompts`의
+    (category, name) 복합 UNIQUE 제약(`prompts_category_name_key`, 실측
+    확인)에 걸려 뒤에 도착한 쪽이 psycopg2.errors.UniqueViolation으로
+    500이 나는 경쟁 상태가 있었다(코드 감사로 발견, 실제 재현 트래픽은
+    아직 없었음). INSERT ... ON CONFLICT DO NOTHING 후 SELECT로
+    원자적으로 만든다 — 경쟁이 나도 있는 쪽 id를 그대로 반환."""
+    cur.execute(
+        "INSERT INTO prompts (name, category) VALUES (%s,%s) "
+        "ON CONFLICT (category, name) DO NOTHING",
+        (name, category),
+    )
     cur.execute("SELECT id FROM prompts WHERE category=%s AND name=%s", (category, name))
-    row = cur.fetchone()
-    if row:
-        return row["id"]
-    cur.execute("INSERT INTO prompts (name, category) VALUES (%s,%s) RETURNING id", (name, category))
     return cur.fetchone()["id"]
 
 

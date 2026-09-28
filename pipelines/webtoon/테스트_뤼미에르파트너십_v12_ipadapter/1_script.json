@@ -1,0 +1,186 @@
+{
+  "core_question": "한·프 8000억 투자 선언, 영화판의 무엇이 바뀌나",
+  "characters": {
+    "A": "30대 중반 여성, 콘텐츠 업계 실무자, 캐주얼 재킷에 태블릿 들고 있음, 호기심 많고 직설적인 인상",
+    "B": "40대 초반 남성, 영상산업 정책 담당자, 셔츠에 안경, 차분하고 단정한 인상",
+    "setting": "유리창 너머로 도시 야경이 보이는 사무실 회의 공간"
+  },
+  "cuts": [
+    {
+      "cut": 1,
+      "title": "한·프 8000억, 영화판 바꿀까?",
+      "title_keyword": "8000억",
+      "narration": "2026년 9월 7일, 프랑스 생폴드방스. 한국과 프랑스 정상이 함께 선언대에 섰다.",
+      "caption": "",
+      "dialogue": [],
+      "fact_ids": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "cut": 2,
+      "title": "선언의 내용은",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "각각 5억 유로",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "양국이 각각 8000억씩 투자한다고요?",
+          "tone": "격앙"
+        },
+        {
+          "speaker": "B",
+          "line": "5년 안에. 자국 영화·영상산업에 각자 쏟는 거예요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        4,
+        5
+      ]
+    },
+    {
+      "cut": 3,
+      "title": "왜 지금 프랑스와",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "수교 140주년",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "OTT 확산에 AI까지. 산업 구조가 통째로 흔들리고 있잖아요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "그러니까 지금 안 잡으면 늦는다는 거네요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        6,
+        7
+      ]
+    },
+    {
+      "cut": 4,
+      "title": "기업들도 움직였다",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "SLL이 유럽 최대 미디어 그룹이랑 리메이크 공동제작을 한대요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "네이버는 프랑스 국립시청각연구소랑 AI 아카이브 연구도요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "cut": 5,
+      "title": "이탈리아도 합류",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "공동제작 협정",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "한·이탈리아 영화 공동제작 협정도 이번에 서명했어요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "그럼 한국 영화가 이탈리아 영화로도 인정받는 건가요?",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        11,
+        12
+      ]
+    },
+    {
+      "cut": 6,
+      "title": "세액공제에 인력까지",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "공동 제작물로 인정되면 세액공제, 지원금, 인력 이동 보장까지 받아요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "제작사 입장에선 문이 하나 더 열리는 거네요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        12,
+        13
+      ]
+    },
+    {
+      "cut": 7,
+      "title": "운영위가 관건",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "선언은 나왔는데, 실제로 돈이 어떻게 흐를지는 아직 안 나온 거 아닌가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "그래서 양국 문화부가 참여하는 운영위원회를 꾸리기로 한 거예요.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        14,
+        15
+      ]
+    },
+    {
+      "cut": 8,
+      "title": "이제 현장이 답한다",
+      "title_keyword": "",
+      "narration": "",
+      "caption": "",
+      "closing_caption": "제도의 효과는 현장에서 다시 확인해야 한다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "50개국 200명이 모인 건 처음이라고요.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "다자 체계를 만든 건 맞아요. 이제 채워가는 게 남았죠.",
+          "tone": "보통"
+        }
+      ],
+      "fact_ids": [
+        16,
+        17
+      ]
+    }
+  ]
+}

@@ -32,21 +32,48 @@ export const IMAGE_MODELS: WebtoonImageModel[] = [
   // 후 Stable Image Ultra로 확정("울트라로 하는걸로 하시죠"). 목록 맨
   // 위 = 이제 이게 1순위 선택지라 WebtoonCutGenerator.tsx의 기본 선택값
   // (IMAGE_MODELS[0])도 자동으로 이걸로 바뀐다.
-  { id: "sd_ultra", label: "Stable Image Ultra (GPU 없음)", shortLabel: "Stable Ultra", badge: "현재 사용" },
-  // "운영 중" — 실제 발행 파이프라인(pipelines/webtoon/pipeline.py)이
-  // 지금 쓰는 것과 동일한 경로. 위 결정 이후에도 프로덕션 파이프라인
-  // 자체는 아직 이 GPU 경로 그대로라(별도 마이그레이션 작업 전) 배지는
-  // 그대로 둔다 — "운영 중" 표시는 admin 실험 도구 선호도가 아니라
-  // pipeline.py가 실제로 쓰는 경로를 가리킨다.
-  {
-    id: "pipeline",
-    label: "Stable Diffusion 1.5 (IP-Adapter) + Stable Style Transfer",
-    shortLabel: "Stable Diffusion 1.5",
-    badge: "운영 중",
-  },
-  { id: "stable_image_core", label: "Stable Image Core (GPU 없음)", shortLabel: "Stable Core" },
-  { id: "sd35_large", label: "Stable Diffusion 3.5 Large (GPU 없음)", shortLabel: "SD3.5 Large" },
-  { id: "style_guide", label: "Style Guide (레퍼런스 기반)", shortLabel: "Style Guide" },
+  //
+  // 2026-09-25 — 배지를 "현재 사용"→"기본값"으로 정정했다. 발행된
+  // webtoon-image 문서를 라이브로 조회해보니 IMAGE_MODEL 섹션 자체가
+  // 없었고(get_active_image_model()이 이럴 때 쓰는 값이 바로 이 모델),
+  // WebtoonImageSettingsPanel.tsx에서 "발행 모델"을 언제든 admin이 바꿀
+  // 수 있게 된 지금은 "현재 사용"이 고정 사실이 아니라 "아무것도 발행
+  // 안 됐을 때의 기본값"이라고 말하는 게 정확하다.
+  { id: "sd_ultra", label: "Stable Image Ultra (GPU 없음)", shortLabel: "Stable Ultra", badge: "기본값" },
+  // 2026-09-28, 사용자 요청 — 비용 점검 중 Stable Image Ultra가 9/20
+  // 전환 이후 이미지 생성 비용의 최대 항목(26일 828달러 중 537달러)으로
+  // 확인되면서, Core·SD3.5 Large를 다시 비교 테스트할 수 있게 목록에
+  // 되살렸다. 2026-09-25에 뺐던 이유("품질·비용 비교 기록이 없다")는
+  // 여전히 유효 — 이번엔 그 비교 자체를 다시 해보려고 넣는 것.
+  { id: "stable_image_core", label: "Stable Image Core", shortLabel: "SD Core" },
+  { id: "sd35_large", label: "Stable Diffusion 3.5 Large", shortLabel: "SD3.5 Large" },
+  // 2026-09-25, 사용자 결정 — pipeline(Stable Diffusion 1.5 IP-Adapter +
+  // Style Transfer, GPU) 삭제. 처음엔 "유일하게 인물·화풍 고정을 지원"
+  // 이라는 이유로 남겼는데, 사용자가 "인물/화풍 고정은 지금 없는거
+  // 아닌가요?"라고 반문 — 맞는 지적이었다: 발행 문서에 IMAGE_MODEL이
+  // 없어 실제 자동발행은 sd_ultra(위)로 떨어지고 있고, pipeline이 실제로
+  // 발행된 적이 없어 "지원 가능한 기능"과 "지금 쓰이는 기능"을 착각한
+  // 판단이었다. "사용하지 않으면 삭제" 원칙에 따라 뺀다. 뒷단 GPU
+  // EC2(`webtoon-ipadapter-gpu`, i-02313c8c8285f9d91, 2026-09-25 기준
+  // running)·`gpu_ipadapter.py`·`pipeline.py`의 `_PROVIDER_CONFIG["pipeline"]`
+  // 등 백엔드/인프라 쪽은 아직 안 건드렸다 — EC2 종료·IAM 삭제는 별도
+  // 확인 후 진행하기로 함(2026-09-20 워크로그에 "1~2주 안정화 확인 후
+  // 삭제" 계획이 있었으나 이 프론트 변경 시점엔 아직 유효 여부 미확인).
+  // 2026-09-25, 사용자 요청("몇개 색출해주시고.. 좋은걸로... 3개정도?") —
+  // stable_image_core·sd35_large를 목록에서 뺐다. 둘 다 왜 남겨야 하는지
+  // 근거를 찾아봤지만(worklog·코드 주석·git log 전수 조사) stable_image_core는
+  // "Ultra 나오기 전 예전 기본값"이라는 것 말곤 품질·비용 비교 기록이
+  // 없고, sd35_large는 "AWS에 모델이 추가되면 좋겠다"는 요청으로만 들어와
+  // 다른 모델 대비 우위가 한 번도 검증된 적이 없다(2026-09-18 실제
+  // 비교 테스트는 sd_ultra만 승자로 남겼다).
+  //
+  // 2026-09-25(후속) — style_guide도 뺐다. 처음엔 "화풍 레퍼런스 이미지로
+  // Stable Image Core의 반실사 문제를 고친 유일한 경로"라 남기려 했는데,
+  // 그 레퍼런스 이미지 업로드 UI를 이미 걷어낸 상태였다(위 pipeline 삭제
+  // 때 STYLE/CHARACTERS 패널 전체를 지우며 같이 빠짐)는 걸 알게 되자
+  // 사용자가 "뺴기로 한거 아녀? 스타일 가이드 모델 빼죠. 걍 ultra로만
+  // 계속"이라고 정리 — sd_ultra 단일 모델 + openai(업무상 남겨둠)만
+  // 남는다.
   {
     id: "openai_dalle3",
     label: "OpenAI (gpt-image-1)",

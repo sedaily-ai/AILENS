@@ -118,10 +118,26 @@ def build_script_call(content: str, article: str, model_id: str | None = None) -
 
 def _cut_number(d: dict) -> int | None:
     """v11 스키마는 컷 번호를 정수 "cut" 대신 문자열 "cut_id"("cut_01")로
-    준다 — 둘 다 받는다."""
+    준다 — 둘 다 받는다.
+
+    2026-09-26 — 실제 운영 데이터(chat_threads에 저장된 storyboard 메시지)를
+    직접 조회해보니 8컷 전부 "cut": None으로 저장돼 있었다("스토리보드에서
+    채우기" 버튼이 항상 아무것도 못 채우던 원인 — sourceCut 매칭이
+    cut.cut 번호로 이뤄지는데 전부 None이라 단 하나도 안 붙었다). 프롬프트
+    스키마(webtoon/published)는 `"cut": 1`처럼 정수 리터럴을 요구하지만,
+    실제 모델 응답은 종종 문자열("1")이나 소수(1.0)로 흔들린다 — bool은
+    Python에서 int의 서브클래스라 실수로 True/False가 섞여 들어와도 걸러야
+    하므로 먼저 제외한다. int로 안 잡히는 값도 숫자로 읽을 수 있으면
+    구제한다."""
     n = d.get("cut")
-    if isinstance(n, int):
+    if isinstance(n, bool):
+        pass
+    elif isinstance(n, int):
         return n
+    elif isinstance(n, float) and n.is_integer():
+        return int(n)
+    elif isinstance(n, str) and n.strip().isdigit():
+        return int(n.strip())
     cut_id = d.get("cut_id") or d.get("id")
     if isinstance(cut_id, str):
         digits = "".join(ch for ch in cut_id if ch.isdigit())
@@ -175,11 +191,18 @@ def normalize_cuts(script: dict) -> list[dict]:
     2026-09-15 — 저장된 웹툰 프롬프트가 v11에서 컷 번호(cut→cut_id)·대사
     (dialogue→bubble_1/bubble_2)를 새 스키마로 바꿨다(사용자 확인: 진행
     중인 개편, 되돌릴 생각 없음) — 있으면 그대로 쓰고 없으면 새 필드에서
-    끌어와 채운다."""
+    끌어와 채운다.
+
+    2026-09-26 — _cut_number()가 그래도 None을 돌려주면(스키마와 완전히
+    다른 키로 응답한 경우) 배열 순서를 최후 수단으로 쓴다 — 이 스키마는
+    항상 컷 1~8을 순서대로 담으라고 명시돼 있어 순서가 어긋난 적이
+    실측상 없었다. 사용자 지적으로 발견: 실제 저장된 storyboard가 8컷
+    전부 "cut": None이라 "스토리보드에서 채우기"가 항상 빈손이었다."""
     cuts = []
-    for c in script.get("cuts") or []:
+    for idx, c in enumerate(script.get("cuts") or [], start=1):
+        cut_number = _cut_number(c)
         cuts.append({
-            "cut": _cut_number(c),
+            "cut": cut_number if cut_number is not None else idx,
             "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
             "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
             "closing_caption": c.get("closing_caption") or "",
