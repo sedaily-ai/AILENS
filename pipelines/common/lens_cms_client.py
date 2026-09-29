@@ -96,6 +96,41 @@ def list_published_today(date: str, channel: str = "lens", limit: int = 200) -> 
         return []
 
 
+def log_selection_run(
+    run_date: str,
+    today_context: Optional[str],
+    candidates_total: int,
+    excluded_count: int,
+    excluded_reasons: list[str],
+    selected: list[dict[str, Any]],
+    category: str = "general",
+) -> None:
+    """"선정 실험실"(admin `/selection-lab`, v1.35) 기록용 — run.py가 매
+    회차(select_general_articles 호출 직후) 부른다. 발행 자체를 막아선
+    안 되는 부가 기록이라 list_published_today()와 같은 fail-open —
+    실패해도 조용히 넘어가고 파이프라인은 계속 진행한다."""
+    import requests  # noqa: lazy
+
+    try:
+        res = requests.post(
+            f"{LENS_CMS_API_URL}/internal/selection-runs",
+            json={
+                "run_date": run_date,
+                "category": category,
+                "today_context": today_context,
+                "candidates_total": candidates_total,
+                "excluded_count": excluded_count,
+                "excluded_reasons": excluded_reasons,
+                "selected": selected,
+            },
+            headers=_headers(),
+            timeout=(5, 15),
+        )
+        res.raise_for_status()
+    except Exception as e:
+        print(f"[lens_cms_client] log_selection_run 실패(fail-open, 기록만 유실) — {e}")
+
+
 def set_status(post_id: str, status: str) -> dict[str, Any]:
     import requests  # noqa: lazy
 

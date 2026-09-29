@@ -224,7 +224,16 @@ def select_general_articles(
         ]
         # 방어적 하드컷 — 프롬프트에 max_count를 명시해도 모델이 그 수를
         # 넘겨 돌려줄 가능성을 배제 못 한다(자체검증 지시라 강제력 없음).
+        # 2026-09-28 발견(Claude 코드 리뷰) — 이 하드컷으로 잘려나간
+        # 기사들이 run.py에서 "LLM이 거절한 기사"와 똑같이 seen 처리돼
+        # 영구 제외되던 버그가 있었다(캡이 리셋되는 내일도 재검토 못 함,
+        # 좋은 기사가 순전히 타이밍 때문에 사라짐). 잘려나간 키를
+        # 별도로 노출해서 run.py가 "진짜 거절"과 "자리 없어서 밀림"을
+        # 구분할 수 있게 한다 — 프롬프트에도 중요도 순 정렬 지시를
+        # 추가했으니(selection_prompt.md) 최소한 하위권부터 잘리지만,
+        # 정렬 지시엔 강제력이 없어 이 안전장치는 유지한다.
         data["selected"] = selected[:max_count]
+        data["overflow_keys"] = [row["key"] for row in selected[max_count:]]
         return data
 
     print("[mustknow] select_general_articles JSON 파싱 실패(치환 후에도) — 이번 회차 스킵")

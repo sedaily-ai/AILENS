@@ -487,6 +487,30 @@ def main():
                 f"{result.get('excluded_count')}건 제외 — {result.get('excluded_reasons', [])}"
             )
             by_key = {a["key"]: a for a in general_pool}
+            # 선정 실험실(admin `/selection-lab`, v1.35) 기록 — 발행 자체를
+            # 막지 않는 부가 기록이라 lens_cms_client.log_selection_run()이
+            # 내부적으로 fail-open. selected는 아래 루프가 채우기 전 이
+            # 회차의 LLM 원본 선정 결과(title/category/reason)를 먼저
+            # 스냅샷해서 남긴다.
+            date_iso = f"{today[:4]}-{today[4:6]}-{today[6:8]}"
+            selection_log = [
+                {
+                    "key": row.get("key"),
+                    "title": (by_key.get(row.get("key")) or {}).get("title", ""),
+                    "category": (by_key.get(row.get("key")) or {}).get("top_category", ""),
+                    "reason": row.get("reason", ""),
+                }
+                for row in result.get("selected", [])
+                if by_key.get(row.get("key"))
+            ]
+            lens_cms_client.log_selection_run(
+                run_date=date_iso,
+                today_context=result.get("today_context"),
+                candidates_total=result.get("candidates_total", 0),
+                excluded_count=result.get("excluded_count", 0),
+                excluded_reasons=result.get("excluded_reasons", []),
+                selected=selection_log,
+            )
             for row in result.get("selected", []):
                 a = by_key.get(row.get("key"))
                 if a is None:
@@ -496,13 +520,19 @@ def main():
                 if status != "failed":
                     _mark_seen(seen_table, a["key"], reason=row.get("reason", "")[:200])
                 tab_counts["일반"] += 1
-            # 선정 안 된 나머지 후보도 seen 처리 — 파싱은 성공했으니 LLM이
-            # 이번 회차엔 실제로 검토하고 뺀 게 맞다(값을 지어낸 게 아니라
-            # 판단 결과). 다음 회차에 같은 대량 후보를 또 통째로 재평가하는
-            # 낭비를 막는다.
+            # 선정 안 된 나머지 후보도 seen 처리 — 단, "LLM이 진짜 거절한
+            # 기사"와 "LLM은 골랐지만 오늘 남은 자리가 없어 하드컷된 기사"
+            # (overflow_keys, classify.py 참고)는 구분한다. 2026-09-28
+            # 발견(Claude 코드 리뷰) — 예전엔 둘 다 seen 처리해서, 자리가
+            # 없어 밀린 좋은 기사가 seen 테이블에 만료 없이 영구 기록돼
+            # 캡이 리셋되는 다음날에도 재검토 대상에서 빠지는 버그가 있었다.
+            # overflow 기사는 seen 마킹을 아예 하지 않는다 — 다음 회차/
+            # 다음날 다시 후보 풀에 남아 재평가받는다.
+            overflow_keys = set(result.get("overflow_keys") or [])
             for a in general_pool:
-                if a["key"] not in selected_keys:
-                    _mark_seen(seen_table, a["key"], excluded_from_general=True)
+                if a["key"] in selected_keys or a["key"] in overflow_keys:
+                    continue
+                _mark_seen(seen_table, a["key"], excluded_from_general=True)
 
     print(f"[mustknow-auto] 완료 — {json.dumps(results, ensure_ascii=False)} / 탭별 {json.dumps(tab_counts, ensure_ascii=False)}")
 
