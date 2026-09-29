@@ -11,9 +11,17 @@ postgres/v1.20 참조).
 """
 from __future__ import annotations
 
+from datetime import timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from db import get_cursor
+
+# 2026-09-29 발견(스크린샷으로 사용자 신고 — /lens 페이지 "다른 이슈"에서
+# 오늘 오전에 발행된 글이 "어제" 날짜로 묶임) — Postgres 세션 타임존이
+# UTC라, published_at(timestamptz)을 그냥 .date()하면 UTC 달력일이 나온다.
+# 한국 독자 기준 "오늘"은 KST 달력일인데, 00:00~08:59 KST에 발행된 글은
+# 전부 UTC로는 여전히 전날이라 매일 그 시간대 글이 하루 밀려 보였다.
+_KST = timezone(timedelta(hours=9))
 
 _FORMAT_TO_CHANNEL = {
     "webtoon": "webtoon",
@@ -73,7 +81,7 @@ def _row_to_post(row: Dict[str, Any]) -> Dict[str, Any]:
         "media_thumbnail_url": row.get("media_thumbnail_url"),
         "source_url": row.get("source_url"),
         "media_embed_url": media_embed_url,
-        "publish_date": row["published_at"].date().isoformat() if row.get("published_at") else None,
+        "publish_date": row["published_at"].astimezone(_KST).date().isoformat() if row.get("published_at") else None,
         "published_at": row["published_at"].isoformat() if row.get("published_at") else None,
         "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
         "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
@@ -190,7 +198,7 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             """
             params: List[Any] = ["published"]
             if date:
-                sql += " AND published_at::date = %s"
+                sql += " AND (published_at AT TIME ZONE 'Asia/Seoul')::date = %s"
                 params.append(date)
             sql += " ORDER BY published_at DESC LIMIT %s"
             params.append(limit)
@@ -202,7 +210,7 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             sql = _BASE_SELECT + " WHERE p.status = %s AND p.deleted_at IS NULL AND r.id IS NOT NULL"
             params = [fmt, "published"]
             if date:
-                sql += " AND p.published_at::date = %s"
+                sql += " AND (p.published_at AT TIME ZONE 'Asia/Seoul')::date = %s"
                 params.append(date)
             sql += " ORDER BY p.published_at DESC LIMIT %s"
             params.append(limit)

@@ -732,9 +732,17 @@ def generate_cut_image(
 ) -> tuple[bytes, list | None]:
     """컷 이미지 1장 생성 — admin 실험 패널과 발행 파이프라인이 공유하는
     단일 정본 디스패치(위 섹션 주석 참고, 정리후보 A+D). 반환값은
-    (image_bytes, faces) — faces는 말풍선 배치 참고용 Rekognition 얼굴
-    바운딩 박스 목록(대사가 있는 컷에서만 조회, 없으면 None —
-    compose_text.py가 None일 때 균등분할로 폴백한다).
+    (image_bytes, faces) — faces는 항상 None이다(2026-09-28, 아래 참고).
+    compose_text.py는 faces가 None이면 균등분할로 말풍선을 배치한다.
+
+    2026-09-28 — 말풍선 배치용 AWS Rekognition 얼굴 감지(2026-09-08 도입,
+    rekognition_client.detect_main_faces())를 완전히 제거했다(사용자
+    결정: "리코그니션 자체를 안 사용하기로 했고 삭제했어요"). mustknow_auto/
+    frontpage_auto 태스크 역할에 rekognition:DetectFaces 권한이 애초에
+    없어서 매 호출이 실패하고 항상 균등분할 폴백으로만 동작해왔다(실측
+    2026-09-28 로그) — 그 사실을 계기로 기능 자체를 걷어냈다. `faces`
+    파라미터는 compose_text.py 시그니처를 그대로 유지하려고 남겼다(항상
+    None을 받는 게 원래 폴백 경로였으므로 별도 분기 불필요).
 
     2026-09-20 — 생성 결과를 검사해 조건부 재생성하던 QA(사극 오염·인물
     없음 위반·고정 인물 수 초과)를 통째로 제거했다(사용자 요청, 위 섹션
@@ -743,11 +751,7 @@ def generate_cut_image(
     어긋났다 — 새 토글을 만드는 대신 후처리 자체를 없애 양쪽이 항상
     같게 동작하도록 정리했다."""
     image_bytes = _generate_cut_once(camera, scene, model)
-    faces = None
-    if has_dialogue:
-        from rekognition_client import detect_main_faces  # pipelines/common/ — sibling, flat import
-        faces = detect_main_faces(image_bytes) or None
-    return image_bytes, faces
+    return image_bytes, None
 
 
 # 2026-09-20 — 198건 백필 실사용에서 실패 18건 중 대다수(FileNotFoundError로

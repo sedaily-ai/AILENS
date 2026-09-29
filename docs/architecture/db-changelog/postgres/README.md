@@ -43,6 +43,7 @@ DynamoDB에서 PostgreSQL로 이관하기 위한 스키마 설계가 어떤 순�
 | [v1.32](v1.32-파이프라인-postgres-직접발행-전환.md) | 2026-09-10 | **파이프라인 전환** — frontpage_auto/mustknow_auto가 DynamoDB 대신 Postgres에 직접 발행(내부 HTTP API 재사용). IAM 권한 갭 3건·홈페이지 썸네일/중복카드/사이트맵 버그 3건 발견·수정, 9/7~9/10 고립 244건 백필 |
 | [v1.33](v1.33-articles-raw_category-인덱스.md) | 2026-09-10 | **성능 개선** — `articles.raw_category` 인덱스 부재로 카테고리 조회가 매번 풀스캔. 인덱스 추가로 count(*) 6.4ms→2.4ms(약 63%↓), 깊은 페이지네이션 1.3ms→0.5ms(약 62%↓) 실측 |
 | [v1.34](v1.34-user_archives-article_no-fk-수정.md) | 2026-09-11 | **버그 수정** — "서랍에 담기" 500 에러. `user_archives.article_no` FK가 옛 `articles`(짧은 코드) 테이블을 가리켜 CMS 슬러그가 매번 FK 위반·길이초과로 실패(한 번도 성공한 적 없었음). `publications(slug)`로 재연결 |
+| [v1.35](v1.35-선정실험실-테이블-신설.md) | 2026-09-28 | **테이블 신설** — `selection_runs`/`selection_articles`. mustknow_auto "일반" 선정 결과를 날짜별로 모아 채점하는 "선정 실험실" admin 화면을 목업에서 실제 저장으로 전환 |
 
 새 버전을 추가할 땐 `vX.Y-주제.md` 파일을 만들고 이 표에 한 줄, 그리고
 앞뒤 버전 파일의 "이전/다음" 링크도 같이 갱신한다.

@@ -107,3 +107,327 @@ Play Store 앱 번들 업데이트 작업(`mobile-capacitor/` Capacitor 전환) 
   v1.0-2026-09-28-...md`부터 시작 — 이번 worklog 다음 섹션/파일로 이어감.
 - Prism 벤치마킹에서 나온 "다양성 메커니즘"(카테고리 쏠림 방지 상한)은
   일반 20건 로직에 아직 구체적 수치(상한 %)가 안 정해짐.
+
+---
+
+## 이어서 — 묶음 레터 보류, 일반 카테고리 선정 프롬프트 v1.0~v1.4, 코드 구현까지 (같은 날)
+
+관련: `docs/prompt/selection/`, `docs/resources/prism-selection-reference/`,
+`pipelines/mustknow_auto/classify.py`
+
+### 한 것
+
+**1) 묶음 레터 → 다이제스트 레이어로 축소 → 그것도 보류**
+
+- 화면 실사용 확인(`ailens.sedaily.ai/markets` 스크린샷): 이미 날짜별로
+  개별 레터가 그룹핑돼 있음을 확인 — 빠진 건 "요약/조망" 한 조각뿐이라는
+  결론. 개별 레터 생성 파이프라인(4포맷 전부)을 안 건드리고, 이미 발행된
+  핵심요약을 재료로 "오늘의 [탭] 조망" 카드 하나만 추가하는 안으로 축소.
+- 이것도 UI/UX 설계가 먼저 필요하다는 판단으로 **보류** — `08_BUNDLE_LETTER/
+  README.md` 상태를 "보류"로 갱신, 우선순위를 일반 카테고리 선정 쪽으로 이동.
+
+**2) Prism 프롬프트 7개 파일 전수 확인**
+
+- 처음엔 3개 파일만 보고 "LLM이 후보를 보고 직접 고른다"로 이해했는데,
+  나머지 4개(`desc.txt`, `reader_profile_*.txt`,
+  `selection_*_knowledge.txt`, `command_execution_examples_*.txt`)까지
+  마저 확인(사용자 지적으로 발견). 새로 발견한 것:
+  - Prism은 완전자동이 아니라 사람이 "확인"/"동의"를 입력해야 다음
+    단계로 넘어가는 대화형(챗봇) 워크플로우 — mustknow_auto(무인 자동)엔
+    확인 게이트 자체는 못 가져오지만, "분류 통계+선정 이유를 구조화해서
+    보여준다"는 형식은 로깅/감사 목적으로 채택.
+  - Prism의 다양성은 카테고리(테마) 하나가 아니라 지역·자산군·정보유형·
+    시간프레임 등 여러 차원 — AI LENS는 v1 범위에서 카테고리 하나만
+    쓰기로 하고 나머지는 보류.
+- 원본 전부 `docs/resources/prism-selection-reference/`에 저장.
+
+**3) 일반 카테고리 선정 프롬프트 v1.0~v1.4 반복 설계**(`docs/prompt/selection/`)
+
+- v1.0: 초안(점수 채점 → LLM 직접 선정으로 전환, published.md 5지표 +
+  카테고리 상한 다양성 규칙)
+- v1.1: Prism의 5개 자체검증 질문을 AI LENS 기준으로 재작성해 추가,
+  검증 결과 로깅(candidates_total/excluded_count/excluded_reasons) 추가
+- v1.2: "오늘의 흐름 파악" 1단계 추가 — 페르소나 없이(published.md
+  대전제 유지: 불특정 다수 일반 독자) "오늘 뭐가 화제인지"로 시의성 판단
+  근거 강화. Prism의 "먼저 전체 분류·집계 후 추천" 순서를 참고.
+- v1.3: "화제성"을 "화제 자체"(추석 인파, 아시안게임 메달 등 순수 이벤트
+  보도)와 "화제×경제/생활 교차점"(그 화제가 경제·소비에 미친 구체적
+  영향)으로 명확히 구분 — 사용자 지적("아시안게임 자체보다 그로 인한
+  주가·매출 변화가 소재")으로 촉발.
+- v1.4: v1.3을 실제 Bedrock(`lens-mustknow-sonnet-5` 프로파일)에 호출해
+  검증 — 2026-09-27 daily-xml 221건 → 소거 후 147건 후보 → 20건 선정.
+  today_context·다양성 규칙(6개 카테고리, 최대 5건)·화제×경제 교차점
+  전부 의도대로 작동 확인. **JSON 파싱 버그 발견**: 응답에
+  `"key": "A" if False else "B"` 같은 파이썬 삼항연산자 구문이 그대로
+  섞여 나와 파싱 실패(모델의 내부 수정 흔적이 출력에 leak된 것으로 추정).
+- 모든 버전 파일 하단에 "그 시점 기준 완성된 프롬프트 전체"를 반드시
+  포함하는 규칙을 세움(변경 이유는 위, 실사용 프롬프트는 맨 아래).
+
+**4) 코드 구현 완료**
+
+- `service/backend/prompts/selection/published.md` 신설 — v1.4 최종
+  프롬프트. admin CMS(Postgres) 연동 없이 파일로만 관리(`ddb_prompt.
+  load_prompt("selection")`이 API 실패 시 자동으로 이 파일로 폴백하는
+  기존 메커니즘 그대로 재사용 — 나중에 admin 연동 필요해져도 코드 변경
+  없이 확장 가능).
+- `pipelines/mustknow_auto/classify.py`: `select_general_articles()`
+  신설(후보 전체를 한 번에 Bedrock에 보내 최대 20건 직접 선정),
+  `_repair_ternary_leak()` 신설(위 JSON 버그 방어 — 실제 캡처한 버그
+  케이스로 검증 완료: else 값만 남기고 if 값 폐기 확인). 기존
+  `extract_json_object()` 공용 유틸 재사용.
+- `pipelines/mustknow_auto/run.py`:
+  - `_GENERAL_EXCLUDE_CATEGORIES = {"연예", "스포츠", "피플", "오피니언"}` 신설
+  - 2단계 Sonnet 채점 범위를 "전체 후보"에서 "증권/산업/시그널 탭
+    후보만"으로 축소(일반은 점수 불필요 — Bedrock 호출 비용도 절감)
+  - 4단계 "일반" 로직을 옛 임계값(7.0) 방식에서 `select_general_articles()`
+    직접 선정으로 교체. 선정 안 된 후보도 seen 처리(파싱 성공 = LLM이
+    실제로 검토하고 뺀 것이므로 값 조작 아님 — 다음 회차 재평가 낭비 방지)
+  - `_GENERAL_THRESHOLD` 제거(죽은 상수), 모듈 docstring·주석 갱신
+- 둘 다 `py_compile` 통과. `select_general_articles()`는 실제 캡처한
+  9/27 응답(버그 포함)으로 재검증 — 파싱 성공, 20건 정상 복구 확인.
+
+### 결정
+
+- 프롬프트는 admin CMS Postgres에 등록하지 않고 파일(`service/backend/
+  prompts/selection/published.md`)로만 관리하기로 함 — "파이프라인 돌 때
+  그냥 읽으면 되는 거 아니냐"는 사용자 판단, admin 편집 UI는 필요해지면
+  나중에.
+- 선정 안 된 general_pool 후보는 매 회차 seen 처리(선정된 것과 동일하게)
+  — "일반" 후보 재평가를 회차마다 반복하지 않도록. 단, 이는 "하루 20건
+  누적 캡"을 실제로 강제하는 것과는 다른 얘기 — 여전히 회차마다 새로
+  유입되는 신선한 후보가 있으면 회차당 최대 20건씩 추가될 수 있다(지면
+  특별코너 4탭이 회차당 4건씩 쌓여 하루 26건까지 갔던 것과 같은 구조적
+  여지가 "일반"에도 남아있음 — "하루 누적 20건 캡"은 여전히 미구현).
+
+### 다음
+
+- **미배포·미커밋**: 오늘 전체 세션 코드 변경분(지면특별코너 로직 +
+  일반 카테고리 로직 둘 다)이 git 커밋만 되고 아직 ECR 이미지 빌드/ECS
+  태스크 갱신은 안 됨 — 라이브는 여전히 예전 로직.
+- `run.py::main()` 전체 실행(실제 발행까지)은 로컬에서 안 해봄 — 실제
+  S3 업로드·lens-cms-api 발행까지 일어나는 액션이라 함부로 트리거 안 함.
+  다음 검증은 실제 배포 후 스테이징에서.
+- "하루 36건(16+20) 누적 캡" 실제 강제는 여전히 미구현 — RDS COUNT
+  쿼리 또는 lens-cms-api 신규 엔드포인트 필요(이전 섹션 "결정" 참고).
+- Prism의 "top N 자동선정 + 나머지 다양성보정" 2단계 구조, "오늘의
+  흐름"과 "다양성 규칙" 충돌 시 우선순위는 여전히 미반영(v1.5 이후 후보).
+- 묶음 레터/다이제스트 레이어는 보류 — UI/UX 설계 먼저 필요.
+
+---
+
+## 이어서 — "오늘의 흐름 파악" 구조적 결함 발견 및 수정 (v1.5, 같은 날)
+
+사용자 요청으로 오늘 방향 전체를 되짚다가 발견: v1.4까지의 "오늘의 흐름
+파악"은 **선정 후보 목록 자체**로 트렌드를 판단했는데, 실제 운영은 하루
+4~8회 도는 파이프라인이라 매 회차 후보는 "그날 전체"가 아니라 "지난
+회차 이후 새로 들어온 델타"일 뿐 — 늦은 회차일수록 표본이 작아져
+"오늘의 흐름 파악"이 부정확해질 구조적 위험이 있었다(v1.4 검증은 "하루
+전체를 한 번에 보는" 이상적 상황만 확인, 실제 델타 패턴은 미검증).
+
+**해결**: `run.py`가 이미 갖고 있던 `all_articles`(그날 게재된 전체
+기사, seen 여부 무관)를 "맥락 파악 전용"(제목+카테고리만)으로 프롬프트에
+별도 섹션 추가 — "선정 후보"(회차별 델타)와 분리. 새 데이터 소스 없이
+기존 값 재사용.
+
+- `classify.py`: `_build_general_prompt`/`select_general_articles`에
+  `context_articles` 파라미터 추가(하위호환, None이면 이전과 동일)
+- `run.py`: `select_general_articles(..., context_articles=all_articles)`
+- `service/backend/prompts/selection/published.md`: 입력이 두 목록으로
+  나뉜다는 설명 + 1단계가 전체 목록을 보도록 명시(v1.5)
+- 검증: 9/27 데이터로 "늦은 회차" 시뮬레이션(선정 후보 12건, 저품질
+  샘플 + 전체 맥락 221건) — `today_context`가 하루 전체로 봤을 때(v1.4)와
+  동일한 맥락을 정확히 잡아냈고, 12건 중에서도 가짜 신호 없이 진짜
+  괜찮은 4건만 정확히 선정. `docs/prompt/selection/v1.5-...md` 기록.
+
+### 다음
+
+- 다양성 규칙은 여전히 회차 단위 — 하루 누적 강제는 미구현(위 "하루
+  36건 누적 캡" 항목과 동일 근본 원인)
+- n=1(하루 전체) + n=1(늦은 회차) 검증뿐 — 여러 날짜/패턴 반복 검증 필요
+- 비용 실측 안 됨
+- 커밋 완료, 배포는 여전히 사용자 지시 대기
+
+---
+
+## 이어서 — 하루 누적 캡 구현 (같은 날)
+
+사용자 질문("그거는 어떻게 구현을 하면 되는건가요")에 답하며 실제 구현.
+
+**핵심 발견**: 새 엔드포인트가 필요 없었다. `GET /admin/posts`
+(`status`/`channel`/`date` 필터 이미 지원, `admin_posts_repo.list_posts`)가
+이미 있었고, 응답의 `body_inline.paper_section`으로 탭별/일반 구분이
+바로 가능했다.
+
+### 한 것
+
+- `pipelines/common/lens_cms_client.py`: `list_published_today(date,
+  channel, limit)` 신설 — 기존 `GET /admin/posts` 재사용. 실패 시 빈
+  리스트 반환(fail-open, 캡 계산 실패가 발행 자체를 막지 않음).
+- `pipelines/mustknow_auto/run.py`:
+  - `_today_published_counts(today_kst)` 신설 — 오늘 이미 발행된 글을
+    탭별(paper_section)+일반으로 카운트
+  - `tab_counts` 초기값을 `{"전체":0, ...}` 대신 이 함수 결과로 시작 —
+    기존 `if tab_counts[tab] >= _TAB_CAP` 체크가 코드 변경 없이 자동으로
+    "회차당"에서 "하루 누적"으로 바뀜(시작값만 바꿔서 해결, 최소 diff)
+  - `_GENERAL_DAILY_CAP = 20` 신설, "일반" 섹션에 `general_remaining
+    = _GENERAL_DAILY_CAP - tab_counts["일반"]` 계산 → 0 이하면 Bedrock
+    호출 자체를 스킵(비용 절감), 아니면 `max_count=general_remaining`으로
+    전달
+- `pipelines/mustknow_auto/classify.py`: `select_general_articles()`/
+  `_build_general_prompt()`에 `max_count` 파라미터 추가 — 프롬프트
+  원문(published.md)의 고정 "최대 20건" 문구를 실제 남은 자리 수로
+  덮어쓰는 지시를 앞에 삽입. 모델이 그 지시를 무시할 경우 대비해
+  `selected[:max_count]`로 클라이언트 사이드 하드컷도 추가.
+
+### 검증
+
+실제 라이브 lens-cms-api 호출로 오늘(2026-09-28) 발행 현황 확인:
+**증권 15건·산업 12건·전체 1건·시그널 1건·일반 10건**(총 39건) —
+목표(증권/산업/전체/시그널 각 4건, 일반 20건) 대비 증권·산업이 이미
+3~4배 초과 발행된 상태를 실측으로 재확인(회차당 상한만 있던 문제의
+실제 증거). 새 코드가 배포되면 다음 회차부터 `tab_counts["증권"]=15
+>= _TAB_CAP=4`로 즉시 걸려 더 이상 증권 기사를 안 뽑게 됨 — 문제와
+해결책이 동시에 실데이터로 확인됨.
+
+`py_compile` 전부 통과, `list_published_today()`는 실제 API 호출로
+검증 완료(카운트 로직도 실데이터로 재현).
+
+### 다음
+
+- 미커밋 — 이 세션 마지막 변경분, 커밋 대기
+- 배포 전까지는 라이브에 반영 안 됨(여전히 예전 무제한 누적 로직)
+- 다양성 규칙(카테고리당 5건 상한)은 여전히 회차 단위 — 하루 누적으론
+  "일반 카운트"만 캡이 걸리지, 회차별로 뽑힌 카테고리 조합까지 하루
+  전체로 다양성이 보장되진 않음(별도 이슈로 남김)
+
+## 이어서 — "선정 실험실" admin 정식 기능화(목업 → 실제 DB) (같은 날)
+
+앞서 만든 "선정 검토실" Artifact(Claude Artifact, `db` capability)를
+"팀원이 루틴하게 할거라"는 이유로 admin/frontend 정식 탭("선정
+실험실", `/selection-lab`)으로 승격. 처음엔 프론트 목업(`MOCK_RUNS`
+하드코딩)부터 만들었는데, 사용자가 바로 지적: **"이거...하드코딩
+하는게 아니고...db 랑 연결하면 되는거아닌가요? 매일 쌓아야하는데.."**
+— 실제 저장으로 전환.
+
+### 한 것
+
+- **스키마**: `selection_runs`(회차 메타 — today_context/candidates_total/
+  excluded_count/excluded_reasons) + `selection_articles`(선정 기사별
+  verdict/note/scored_by) 신설. 문서:
+  [`docs/architecture/db-changelog/postgres/v1.35-선정실험실-테이블-신설.md`](../../architecture/db-changelog/postgres/v1.35-선정실험실-테이블-신설.md)
+- **4계층 전부 연결**:
+  - `service/lens-cms-api/selection_repo.py`(신설) + `main.py` 라우트 3개
+    (`POST /internal/selection-runs`, `GET /admin/selection-runs`,
+    `GET /admin/selection-runs/dates`, `PATCH
+    /admin/selection-articles/{id}/score`)
+  - `admin/backend/repo/selection_repo.py`(신설, HTTP 클라이언트 미러) +
+    `routes/selection.py`(신설) + `handler.py` HANDLERS 등록 + API
+    Gateway `create-route` 3개(사용자 직접 실행 — `chzwwtjtgk`, 기존
+    integration `lgj4lzl` 재사용)
+  - `pipelines/mustknow_auto/run.py`: `select_general_articles()` 직후
+    매 회차 `lens_cms_client.log_selection_run()` 호출(신설, fail-open —
+    기록 실패가 발행을 막지 않음)
+  - `admin/frontend/selection-lab/page.tsx`: `MOCK_RUNS` 제거, 실제
+    날짜 목록(`getSelectionDates`)·날짜별 조회(`getSelectionDay`)·
+    채점 즉시 저장(`scoreSelectionArticle`)로 교체
+- tsc/eslint(프론트)·pyflakes(백엔드 5개 파일) 전부 클린 확인 후 배포
+
+### DDL 실행 — 마스터 계정, 여러 번 막힘
+
+`lens_service_app`(앱 DB 역할)엔 DDL 권한이 없어 마스터 계정 필요.
+Claude Code 자동 모드가 이 세션에서 마스터 비밀번호를 다루는 시도를
+**"관리자 승인"으로도 우회 불가능하게 반복 차단**(Credential
+Materialization) — 사용자가 직접 실행하는 경로로 진행:
+
+1. `session-manager-plugin` 미설치 → sudo 인터랙티브 설치라 별도
+   터미널에서 사용자가 직접(brew cask)
+2. RDS가 VPC 내부망이라 `aws ssm start-session
+   --document-name AWS-StartPortForwardingSessionToRemoteHost`로
+   lens-cms-api EC2(`i-0e3d04bdb01584833`) 경유 포트포워딩(이 명령
+   자체는 비밀번호 없어 Claude Code가 백그라운드로 대행)
+3. 마스터 비밀번호를 기억 못 해 `aws rds modify-db-cluster
+   --master-user-password`로 재설정 필요 — **v1.33에서 이미 한 번
+   채팅에 노출됐던 `Sedaily2024!`로 재설정**(사용자가 직접 붙여넣음,
+   또 한 번 노출됨 — "다음" 항목 참고)
+4. `psql` 복붙 시 마크다운 코드펜스(````sql`) 텍스트까지 같이
+   입력되면서 첫 `CREATE TABLE`이 깨짐(`syntax error at or near
+   "sql"`) → 연쇄로 전 테이블 생성 실패. `.sql` 파일을 스크래치패드에
+   따로 써서 `\i <path>`로 재실행해 해결(복붙 실수 여지 제거)
+
+### 검증
+
+`curl localhost:8787/admin/selection-runs/dates` → `{"dates": []}`
+(테이블 생성 확인, 아직 실제 회차 기록 없음 — 정상). `lens-cms-api`
+배포 헬스체크 200, `admin/backend` 배포 헬스체크 401(인증 필요 응답 —
+정상), API Gateway 라우트 3개 등록 확인(`create-route` 응답 각각
+RouteId 반환).
+
+### 다음
+
+- `mustknow_auto` 다음 스케줄 회차부터 실데이터 자동 축적 시작 —
+  아직 실제 선정 기록 0건
+- **미해결(반복)**: RDS 마스터 비밀번호(`Sedaily2024!`)가 이번에도
+  채팅에 그대로 노출됨(v1.33 때와 동일 항목) — 작업 종료 후 재변경
+  권장, 이번엔 실제로 처리할지는 사용자 판단
+- 이 커밋들도 아직 push/PR 안 함(세션 내내 유지된 방침 — "배포만
+  조용히")
+
+## 이어서 — 일반 선정 하드컷 버그 발견·수정 (같은 날, 코드 리뷰)
+
+사용자 요청("프롬프트나 그런거... 클로드씨가 봤을때")으로 데이터가
+아니라 프롬프트·코드 자체를 직접 읽고 판단 — 실제 코드에서 버그를
+하나 발견.
+
+### 문제 발견
+
+`classify.py:227`의 `data["selected"] = selected[:max_count]`(하루
+남은 자리만큼 하드컷)가 배열 순서 그대로 자르는데, 프롬프트 어디에도
+"중요도순으로 출력하라"는 지시가 없었다 — LLM이 우연히 나열한 순서가
+곧 생존 여부를 결정했다. 더 심각한 건 `run.py`: 이 하드컷으로 잘린
+기사가 "LLM이 명시적으로 거절한 기사"와 **완전히 동일하게**
+`excluded_from_general=True`로 seen 테이블에 기록됐고, 그 기록에
+만료(TTL) 필드가 없어(`_mark_seen()` 확인) **영구 제외**됐다 — 오늘
+자리가 없어 밀린 것뿐인데 내일 캡이 리셋돼도 다시는 후보에 안 들어옴.
+
+### 왜
+
+- 하드컷 자체는 "프롬프트에 max_count를 명시해도 모델이 그 수를 넘겨
+  돌려줄 가능성을 배제 못 한다"는 방어적 안전장치로 의도된 것 —
+  문제는 그 이후 "잘린 기사 = 거절된 기사"로 뭉뚱그려 처리한 부분
+- 데이터로는 안 보이는 종류의 결함(선정 실험실에 아직 실데이터가
+  없어 채점으로는 발견 불가) — 코드를 직접 읽어야만 나오는 문제였음
+
+### 한 것
+
+- `classify.py::select_general_articles()` — 하드컷으로 잘린 키를
+  `data["overflow_keys"]`로 별도 노출
+- `run.py` — 선정 안 된 후보를 seen 처리할 때 `overflow_keys`는
+  건너뛴다(제외) — "진짜 거절"(LLM이 배제 판단)만 영구 seen, "자리
+  없어 밀림"은 다음 회차/다음날 재검토 가능하게 둔다
+- `selection_prompt.md` + `published.md`(둘 다 갱신, 정본 규칙 준수):
+  "### 출력 순서 — 중요도순으로 정렬한다" 섹션 추가 — 하드컷이 최소한
+  모델이 판단한 하위권부터 잘리도록(강제력은 없지만 순서 신경 안 쓰고
+  나열하는 것보다는 나음)
+
+### 검증
+
+pyflakes(`run.py`, `classify.py`) 클린. 실데이터로 하드컷 시나리오
+자체를 재현 검증하진 않음(현재 개발 서버가 데이터를 안 쌓고 있어
+n=0 상태) — 다음 실제 캡 근접 상황(하루 후반, 남은 자리 적을 때)에서
+`overflow_keys`가 실제로 비지 않는지 로그로 확인 필요.
+
+### 배포
+
+`pipelines/frontpage_auto/deploy.sh`(공유 이미지, mustknow_auto도
+같은 `:latest` 태그를 참조해 별도 taskdef 재등록 불필요) — 이미지
+푸시 완료(`sha256:c9d99e1c...`), `sedaily-lens-frontpage-auto`
+태스크 정의 리비전 86 등록. 다음 스케줄 회차(매일 07:00 KST 첫
+트리거, 이후 하루 여러 회차)부터 반영.
+
+### 다음
+
+- 실제 운영에서 `overflow_keys`가 채워지는 회차(하루 후반, 캡 근접)를
+  한 번 이상 로그로 확인해 실제로 seen 마킹이 스킵되는지 재검증할 것
+- 자체검증 4문항(self-grading)의 실효성, 200자 리드만으로 판단하는
+  구조는 이번엔 손대지 않음(코드 리뷰에서 같이 지적했으나 우선순위상
+  보류) — 다음 후보

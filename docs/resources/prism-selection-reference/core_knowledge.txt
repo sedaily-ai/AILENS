@@ -1,0 +1,148 @@
+# core_knowledge.yaml
+# version: 1.0.0
+# description: AI 프리즘 시스템의 공통 구조 및 프로세스 정의
+# referenced_by: reader_profile_campus.yaml, selection_metrics_campus.yaml, selection_campuslog_description.md, selection_campuslog_instructions.md, selection_campuslog_knowledge.md, reader_profile_global_investor.yaml, selection_metrics_global_investor.yaml, selection_global_investor_description.md, selection_global_investor_instructions.md, selection_global_investor_knowledge.md
+
+## 시스템 정의
+system_name: AI 프리즘 (AI PRISM)
+system_version: 1.0.0
+system_purpose: 다양한 독자 유형별로 최적화된 가치 있는 콘텐츠를 선별하고 생성하는 맞춤형 정보 서비스 제공
+
+## 핵심 철학
+core_philosophy:
+  - name: 독자 맞춤형 가치 최적화
+    description: 단순 정보 전달이 아닌 독자 유형별 특성과 니즈에 맞춘 실질적 가치 제공
+    principle: 모든 콘텐츠는 해당 독자 유형에게 제공하는 실질적 가치를 기준으로 평가되어야 함
+  
+  - name: 표준화된 구조와 일관된 품질
+    description: 모든 독자 유형에 대해 일관된 품질과 구조를 제공하면서도 내용은 맞춤화
+    principle: 형식의 일관성과 내용의 맞춤화 간의 균형을 유지하여 브랜드 신뢰성 구축
+
+  - name: 모듈화된 유지보수 가능한 설계
+    description: 공통 요소와 독자별 특화 요소의 명확한 분리를 통한 효율적 관리
+    principle: 시스템 진화와 확장을 용이하게 하기 위한 구조적 설계 중시
+
+## 공통 기사 선별 프로세스
+selection_process:
+  - step: 1. 초기 스크리닝
+    description: 독자 관련성 기준으로 잠재적 가치가 있는 기사 후보군 선정
+    method: 독자 유형의 핵심 관심사와 직접적으로 연관된 키워드 및 주제 기반 필터링
+    input: 전체 기사 풀 (가변적, 최소 12개 이상)
+    output: 후보 기사 풀 (25-30개, 약 30-35%)
+    criteria:
+      - 독자 핵심 관심사와의 직접적 연관성 (최소 50% 이상)
+      - 시의성 (발행일 최신순)
+      - 정보 완전성 (부분적/불완전한 정보 제외)
+  
+  - step: 2. 심층 평가
+    description: 독자 유형별 세부 메트릭스에 기반한 상세 가치 평가
+    method: 독자 유형별 selection_metrics 파일의 평가 지표와 가중치 적용
+    input: 후보 기사 풀 (25-30개)
+    output: 우선순위 기사 풀 (고정 12개)
+    criteria:
+      - 주요 평가 지표 (primary_metrics) 기준 점수화
+      - 부가 평가 지표 (secondary_metrics) 보완적 고려
+      - 조합 평가 지표 (combined_metrics) 통합 평가
+  
+  - step: 3. 최종 선별
+    description: 최종 선정 기사들 간의 다양성과 상호보완성 고려한 최적 조합 선택
+    method: 최고 점수 기사와 주제 다양성을 고려한 균형있는 선택
+    input: 우선순위 기사 풀 (고정 12개)
+    output: 최종 선정 기사 (고정 6개)
+    criteria:
+      - 절대 평가 기준: 상위 3개 기사는 평가 점수 최상위권에서 자동 선정
+      - 다양성 기준: 나머지 3개는 독자 관심사의 다양한 영역을 포괄하도록 선정
+      - 상호보완성: 선정된 기사들이 서로 중복되지 않고 보완적 가치를 제공하는지 확인
+      - 최신성 균형: 초시의성 기사와 기본 가치 기사의 적절한 혼합
+
+## 공통 콘텐츠 생성 프로세스
+generation_process:
+  - step: 1. 핵심 가치 추출
+    description: 독자 유형 관점에서 기사의 가장 중요한 가치 요소 파악
+    method: reader_profile의 가치 우선순위와 정보 해석 렌즈 적용
+    input: 선정된 개별 기사
+    output: 독자 맥락에서 재해석된 핵심 가치 포인트
+    criteria:
+      - 독자 가치 우선순위와의 연관성
+      - 독자 핵심 관심사와의 직접적 관련성
+      - 실행 가능한 인사이트 추출 가능성
+  
+  - step: 2. 맞춤형 재구성
+    description: 독자 유형의 정보 소비 선호도에 맞게 내용 재구성
+    method: reader_profile의 정보 소비 선호도와 선호 형식 적용
+    input: 추출된 핵심 가치 포인트
+    output: 구조화된 콘텐츠 아웃라인
+    criteria:
+      - 독자 선호 형식 및 구조 적용
+      - 정보 깊이와 복잡성 조정
+      - 우선순위에 따른 정보 배치
+  
+  - step: 3. 독자 친화적 표현
+    description: 독자 유형의 언어 선호도와 이해 수준에 맞게 표현
+    method: reader_profile의 언어 선호도와 표현 스타일 적용
+    input: 구조화된 콘텐츠 아웃라인
+    output: 최종 맞춤형 콘텐츠
+    criteria:
+      - 독자 선호 톤과 표현 스타일 적용
+      - 적절한 용어 수준과 복잡성 조정
+      - 독자 친화적 예시와 비유 활용
+
+## 품질 검증 기준
+quality_criteria:
+  - name: 독자 적합성
+    description: 선별/요약된 콘텐츠가 독자 유형의 프로필과 일치하는 정도
+    evaluation_points:
+      - 독자 핵심 관심사와의 직접적 연관성
+      - 독자 가치 우선순위와의 부합도
+      - 독자 정보 소비 선호도 반영 정도
+  
+  - name: 가치 명확성
+    description: 독자에게 제공하는 실질적 가치가 명확하게 드러나는 정도
+    evaluation_points:
+      - 핵심 가치 포인트의 명확한 제시
+      - 독자 맥락에서의 의미와 중요성 설명
+      - 가치 요소들 간의 논리적 연결성
+  
+  - name: 실행 가능성
+    description: 독자가 정보를 바탕으로 실제 행동으로 옮길 수 있는 정도
+    evaluation_points:
+      - 구체적 행동 지침 또는 적용 방안 제시
+      - 실행 단계 또는 방법의 명확성
+      - 현실적 실행 가능성과 접근성
+  
+  - name: 일관성과 통합성
+    description: 선별된 기사들이 전체적으로 일관되고 통합된 가치를 제공하는 정도
+    evaluation_points:
+      - 기사들 간의 논리적 연결성과 보완성
+      - 전체 기사 세트가 제공하는 통합적 가치
+      - 중복 없이 다양한 관점과 정보 제공
+  
+  - name: 신뢰성
+    description: 제공되는 정보의 정확성과 신뢰할 수 있는 근거 제시
+    evaluation_points:
+      - 사실 기반 정보와 데이터 활용
+      - 출처 명시 또는 검증 가능성
+      - 주관적 의견과 객관적 사실의 명확한 구분
+
+## 시스템 모듈 구조
+system_modules:
+  - name: 코어 모듈
+    components:
+      - core_knowledge.yaml
+    purpose: 모든 독자 유형과 프로젝트에 공통으로 적용되는
+  
+  - name: 독자 프로필 모듈
+    components:
+      - reader_profile_{독자유형코드}.yaml (예: reader_profile_campus.yaml)
+    purpose: 특정 독자 유형의 특성, 니즈, 선호도 정의
+  
+  - name: 선별 메트릭스 모듈
+    components:
+      - selection_metrics_{독자유형코드}.yaml (예: selection_metrics_campus.yaml)
+    purpose: 특정 독자 유형을 위한 기사 선별 기준과 평가 방법 정의
+  
+  - name: 프로젝트 특화 모듈
+    components:
+      - selection_{독자유형코드}_{파일유형}.md (예: selection_description_campus.md)
+      - generation_{독자유형코드}_{파일유형}.md (예: generation_instructions_campus.md)
+    purpose: 특정 독자 유형과 프로젝트(선별/생성)에 특화된 지침 정의

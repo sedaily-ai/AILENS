@@ -29,6 +29,14 @@ curl -s http://13.223.179.151/api/v2/prompts/<letters|webtoon|podcast|video>/pub
 모델·max_tokens 등 정확한 설정값은 `admin/backend/routes/prompts.py`의
 `_CATEGORY_BEDROCK` 딕셔너리가 정본이다(여기 표는 참고용).
 
+## `selection/` — 예외, 아직 라이브 아님
+
+`selection/`은 위 4개와 컨벤션이 다르다 — mustknow_auto "일반" 카테고리
+선정 프롬프트를 재설계하는 중이라 **아직 Postgres에 발행된 적 없고**,
+그래서 단일 `published.md` 스냅샷이 아니라 `docs/product/4format-pipeline/
+08_BUNDLE_LETTER/`처럼 `vX.Y-YYYY-MM-DD-주제.md` 버전 이력을 쌓는다.
+자세한 배경은 `selection/README.md`.
+
 성우/음성(팟캐스트)·렌더 설정(영상)은 별도 프롬프트 카테고리가 아니라
 `pipelines/common/podcast_voice.py`/`video_settings.py`가 관리하는 설정
 문서라 이 폴더엔 포함하지 않았다.

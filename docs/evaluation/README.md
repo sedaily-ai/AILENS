@@ -22,6 +22,7 @@
 | `4format-evaluation-system.md` | 4포맷 공통 평가 체계 |
 | `4format-samples/` | 실제 4포맷 생성 산출물 샘플(라운드별) |
 | `harness/`, `clusters/` | MBTI 프롬프트 평가 하네스 코드 + 동결 클러스터(자세한 방법론은 `harness/README.md`) |
+| `selection-harness/` | mustknow_auto "일반" 카테고리 선정 로직을 여러 날짜에 걸쳐 반복 실행해 규칙 위반(다양성 쏠림 등)을 빠르게 확인하는 하네스(자세한 방법론은 `selection-harness/README.md`) |
 
 ⚠️ `harness/`는 마지막 커밋이 2026-08-05(2026-08-22 기준 약 2.5주 전)로,
 최근 계속 쓰이고 있는지 확인이 필요하다 — 새로 돌리기 전에 `config.yaml`의

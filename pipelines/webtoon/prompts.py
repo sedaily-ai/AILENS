@@ -176,6 +176,9 @@ def narration(text):
 # 주고, 만화 일러스트에도 실측으로 잘 동작함을 확인했다(pipeline.py
 # 호출부 참고). 이 프롬프트는 이제 Rekognition이 못 하는 의미적 판단
 # (사극 오염·인물 없음 위반)만 담당한다.
+# 2026-09-28 — 위 rekognition_client.detect_main_faces()는 이후 완전히
+# 제거됐다(사용자 결정, webtoon_image.py::generate_cut_image() 독스트링
+# 참고) — 이 단락은 그 기능이 있던 시절의 역사적 기록으로 남긴다.
 VALIDATE_SYSTEM = (
     "당신은 뉴스 웹툰 이미지 QA 담당자입니다. 주어진 이미지 하나를 보고 "
     "아래 JSON 스키마 그대로만 응답하세요(설명 문구 없이 JSON 객체 하나만):\n"

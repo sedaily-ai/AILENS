@@ -26,6 +26,9 @@ import type {
   QuizInput,
   WebtoonLabDefaults,
   PromptTestJob,
+  SelectionRunsDayResponse,
+  SelectionArticle,
+  SelectionVerdict,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -549,4 +552,25 @@ export const adminApi = {
         | { stage: "rendering"; percent: number; renderedFrames: number; totalFrames: number; encodedFrames: number }
         | null;
     }>(`/admin/video-lab/${encodeURIComponent(jobId)}`),
+
+  // 선정 실험실(2026-09-28) — mustknow_auto "일반" 선정 결과를 날짜별로
+  // 모아 채점. 날짜 탭은 실제 회차가 있었던 날짜만(getSelectionDates) —
+  // 목업처럼 하드코딩된 날짜 목록을 쓰지 않는다(사용자 지적).
+  getSelectionDates: (category = "general") =>
+    request<{ dates: string[] }>(
+      `/admin/selection-runs/dates?category=${encodeURIComponent(category)}`
+    ),
+  getSelectionDay: (date: string, category = "general") =>
+    request<SelectionRunsDayResponse>(
+      `/admin/selection-runs?date=${encodeURIComponent(date)}&category=${encodeURIComponent(category)}`
+    ),
+  scoreSelectionArticle: (
+    articleId: number,
+    verdict: SelectionVerdict | null,
+    note: string | null
+  ) =>
+    request<{ article: SelectionArticle }>(
+      `/admin/selection-articles/${articleId}/score`,
+      { method: "PATCH", body: JSON.stringify({ verdict, note }) }
+    ),
 };

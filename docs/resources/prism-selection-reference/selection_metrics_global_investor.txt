@@ -1,0 +1,294 @@
+# selection_metrics_global_investor.yaml
+# version: 1.0.0
+# description: 글로벌 투자자(Global Investor LOG) 기사 선별 평가 지표
+# depends_on: core_knowledge.yaml, reader_profile_global_investor.yaml
+# referenced_by: selection_global_investor_description.md, selection_global_investor_instructions.md, selection_global_investor_knowledge.md
+
+# 글로벌 투자자(Global Investor LOG) 기사 선별 평가 지표
+
+## 선별 워크플로우
+selection_workflow:
+  # 1단계: 초기 스크리닝
+  initial_screening:
+    purpose: 글로벌 투자자 관련성 기준으로 잠재적 가치가 있는 기사 후보군 선정
+    input: 전체 기사 풀 (가변적, 최소 12개 이상)
+    output: 후보 기사 풀 (25-30개)
+    minimum_threshold: 관련성 점수 6.0 이상 (10점 만점)
+    filter_criteria:
+      - 핵심 키워드 포함 여부 (투자, 시장전망, 자산배분, 리스크, 경제지표, 글로벌, 수익률 등)
+      - 글로벌 투자자 핵심 관심사 중 하나 이상과의 직접적 연관성
+      - 최근 1개월 이내 발행된 기사 우선 (시의성)
+      - 명확한 정보 제공 기사 (불완전하거나 지나치게 짧은 기사 제외)
+  
+  # 2단계: 심층 평가
+  in_depth_evaluation:
+    purpose: 글로벌 투자자 가치 기준에 따른 기사별 점수화 및 평가
+    input: 후보 기사 풀 (25-30개)
+    output: 우선순위 기사 풀 (고정 12개)
+    scoring_system:
+      scale: 1-10점 (소수점 첫째 자리까지)
+      calculation: "각 지표별 점수 × 가중치의 합계 ÷ 가중치 총합"
+      minimum_threshold: 종합 점수 7.0 이상
+    process:
+      - 각 주요 평가 지표별 점수 산정 (1-10점)
+      - 각 부가 평가 지표별 점수 산정 (1-10점)
+      - 조합 평가 지표별 점수 산정 (1-10점)
+      - 가중치를 적용한 종합 점수 계산
+      - 종합 점수 기준 상위 12개 기사 선정
+  
+  # 3단계: 최종 선별
+  final_selection:
+    purpose: 글로벌 투자자에게 최적화된 기사 조합 구성
+    input: 우선순위 기사 풀 (고정 12개)
+    output: 최종 선정 기사 (고정 6개)
+    selection_criteria:
+      automatic_selection: 종합 점수 기준 상위 3개 기사 자동 선정
+      diversity_selection: 
+        purpose: 나머지 3개는 다양한 관심사 영역을 포괄하도록 선정
+        process:
+          - 자동 선정된 3개 기사의 주요 관심사 영역 식별
+          - 미포함된 관심사 영역 중 높은 점수 순으로 선정
+          - 특정 관심사에 3개 이상 기사가 집중되지 않도록 조정
+      balance_criteria:
+        - 거시적 시장 전망과 구체적 투자 전략의 균형
+        - 다양한 지역과 자산군에 관한 정보의 균형
+        - 단기 촉매제와 장기 구조적 트렌드 분석의 균형
+
+## 주요 평가 지표
+primary_metrics:
+  - name: 분석 깊이와 통찰력
+    weight: 10
+    description: 표면적 정보를 넘어 심층적 분석과 차별화된 통찰을 제공하는 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 매우 심층적이고 독창적인 분석으로 시장의 일반적 견해를 넘어선 통찰 제공
+      - score: 7-8
+        description: 좋은 분석 깊이를 제공하나 일부 측면에서 독창성이나 차별화가 제한적
+      - score: 5-6
+        description: 기본적인 분석은 있으나 깊이나 독창적 통찰이 다소 부족
+      - score: 3-4
+        description: 표면적 정보와 일반적 견해에 그치는 수준의 분석
+      - score: 1-2
+        description: 분석 깊이가 매우 낮거나 피상적인 정보 나열에 그침
+    evaluation_questions:
+      - 기사가 일반적으로 알려진 정보를 넘어선 깊은 분석을 제공하는가?
+      - 시장의 주류적 견해와 다른 차별화된 관점이나 통찰을 포함하는가?
+      - 복잡한 요소들 간의 연결성과 상호작용을 분석하는가?
+      - 이면의 구조적 동인과 함의를 명확히 드러내는가?
+
+  - name: 데이터 기반 객관성
+    weight: 9
+    description: 검증된 데이터와 객관적 사실에 기반한 신뢰할 수 있는 정보 제공 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 풍부한 정량적 데이터와 신뢰할 수 있는 출처를 활용한 철저히 객관적인 분석
+      - score: 7-8
+        description: 데이터 기반 분석을 제공하나 일부 영역에서 출처나 완전성이 제한적
+      - score: 5-6
+        description: 기본적인 데이터는 있으나 포괄성이 부족하거나 주관적 해석이 다소 혼재
+      - score: 3-4
+        description: 제한적인 데이터만 활용하고 주로 의견 중심의 분석
+      - score: 1-2
+        description: 데이터 기반 객관성이 매우 낮거나 검증되지 않은 정보에 의존
+    evaluation_questions:
+      - 기사가 신뢰할 수 있는 출처의 구체적 데이터와 통계를 활용하는가?
+      - 주장과 분석이 검증 가능한 사실에 기반하는가?
+      - 다양한 관점과 상반된 증거도 균형 있게 고려하는가?
+      - 사실과 의견이 명확히 구분되어 있는가?
+
+  - name: 투자 의사결정 유용성
+    weight: 9
+    description: 실제 투자 결정과 포트폴리오 관리에 직접 적용할 수 있는 가치 제공 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 명확한 투자 함의와 실행 가능한 전략을 제시하며 의사결정에 직접 활용 가능
+      - score: 7-8
+        description: 투자 함의를 제공하나 일부 구체성이나 실행 가능성에 제한이 있음
+      - score: 5-6
+        description: 일반적인 투자 관련 정보는 있으나 직접적 적용을 위한 구체성 부족
+      - score: 3-4
+        description: 투자와 연관은 있으나 실질적 의사결정 도움이 제한적
+      - score: 1-2
+        description: 투자 의사결정에 거의 도움이 되지 않거나 추상적 내용에 그침
+    evaluation_questions:
+      - 기사가 투자 전략이나 자산 배분에 대한 구체적 함의를 제공하는가?
+      - 현재 시장 상황에서 실행 가능한 인사이트나 접근법을 제시하는가?
+      - 투자 기회나 위험에 대한 명확한 식별과 평가를 포함하는가?
+      - 포트폴리오 구성이나 조정에 적용할 수 있는 구체적 정보를 담고 있는가?
+
+## 부가 평가 지표
+secondary_metrics:
+  - name: 글로벌 맥락 이해
+    weight: 8
+    description: 국제적 상호연관성과 다양한 지역의 맥락을 통합적으로 고려하는 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 다양한 지역과 시장 간의 상호작용을 포괄적으로 분석하며 글로벌 맥락을 깊이 있게 고려
+      - score: 7-8
+        description: 글로벌 맥락을 고려하나 일부 지역이나 상호연관성에 제한이 있음
+      - score: 5-6
+        description: 기본적인 국제적 맥락은 있으나 통합적 시각이나 상호연관성 분석이 부족
+      - score: 3-4
+        description: 국제적 요소를 언급하나 깊이 있는 글로벌 맥락 분석이 제한적
+      - score: 1-2
+        description: 글로벌 맥락을 거의 고려하지 않거나 매우 제한적인 지역만 다룸
+    evaluation_questions:
+      - 기사가 다양한 지역과 시장 간의 연결성과 파급 효과를 분석하는가?
+      - 글로벌 자본 흐름과 국제 무역 관계의 영향을 고려하는가?
+      - 지역별 특수성과 글로벌 공통 요인을 균형있게 다루는가?
+      - 국제적 맥락에서 한국 시장의 위치와 영향을 평가하는가?
+
+  - name: 리스크 분석 완전성
+    weight: 8
+    description: 잠재적 리스크와 불확실성 요소를 포괄적으로 식별하고 평가하는 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 다양한 리스크 요인을 포괄적으로 식별하고 심층 분석하며 계량화와 대응 전략을 제시
+      - score: 7-8
+        description: 주요 리스크를 분석하나 일부 요인이나 대응 전략에 제한이 있음
+      - score: 5-6
+        description: 기본적인 리스크 요인은 언급하나 분석 깊이나 대응 방안이 부족
+      - score: 3-4
+        description: 제한적인 리스크만 다루거나 피상적 분석에 그침
+      - score: 1-2
+        description: 리스크 분석이 거의 없거나 매우 불완전함
+    evaluation_questions:
+      - 기사가 주요 하방 리스크와 테일 리스크를 포괄적으로 식별하는가?
+      - 다양한 리스크 유형(시장, 신용, 유동성, 지정학적, 규제 등)을 균형있게 다루는가?
+      - 리스크의 확률과 잠재적 영향을 분석하거나 계량화하는가?
+      - 리스크 완화 또는 대응 전략에 대한 인사이트를 제공하는가?
+
+  - name: 시간적 관점 균형
+    weight: 7
+    description: 단기 촉매와 장기 구조적 트렌드를 균형있게 분석하는 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 단기 역학과 장기 추세를 명확히 구분하고 통합적으로 분석하며 투자 기간별 함의를 제시
+      - score: 7-8
+        description: 시간적 관점의 구분이 있으나 일부 기간에 치우치거나 통합성이 제한적
+      - score: 5-6
+        description: 시간적 구분은 있으나 균형이 부족하거나 특정 기간에 편중됨
+      - score: 3-4
+        description: 시간적 구분이 모호하거나 단일 시간 프레임에 치중
+      - score: 1-2
+        description: 시간적 관점의 구분이 거의 없거나 매우 불균형함
+    evaluation_questions:
+      - 기사가 단기 시장 움직임과 장기 구조적 트렌드를 명확히 구분하는가?
+      - 다양한 투자 기간(단기, 중기, 장기)에 따른 함의를 분석하는가?
+      - 일시적 현상과 근본적 변화를 구별하는 통찰을 제공하는가?
+      - 현재 상황을 역사적 맥락과 미래 전망 속에서 위치시키는가?
+
+## 조합 평가 지표
+combined_metrics:
+  - name: 컨센서스 대비 차별성
+    weight: 8
+    description: 시장의 일반적 견해를 넘어선 독창적 관점과 대안적 시나리오 제공 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 시장 컨센서스를 명확히 식별하고 차별화된 분석을 통해 독창적 통찰과 대안적 시나리오 제시
+      - score: 7-8
+        description: 컨센서스와 일부 차별화된 관점을 제공하나 독창성이나 대안적 분석이 제한적
+      - score: 5-6
+        description: 컨센서스 식별은 있으나 차별화된 시각이 제한적이거나 부분적임
+      - score: 3-4
+        description: 대체로 컨센서스를 반복하며 차별화된 관점이 미미함
+      - score: 1-2
+        description: 컨센서스 식별 없이 일반적 견해만 반복하거나 차별성이 없음
+    calculation: "(분석 깊이와 통찰력 × 0.7) + (시간적 관점 균형 × 0.3)"
+    evaluation_questions:
+      - 기사가 현재 시장 컨센서스나 주류 견해를 명확히 식별하는가?
+      - 기존 관점에 도전하거나 새로운 관점을 제시하는 차별화된 분석을 포함하는가?
+      - 대안적 시나리오나 간과된 가능성을 탐색하는가?
+      - 역발상 투자 기회나 과대/과소평가된 리스크를 식별하는가?
+
+  - name: 자산군 간 상호연관성
+    weight: 8
+    description: 다양한 자산군과 시장 간의 상호작용 및 파급효과 분석 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 다양한 자산군 간의 복잡한 상호작용을 심층적으로 분석하고 통합적 관점에서 시장 역학 제시
+      - score: 7-8
+        description: 자산군 간 연관성을 다루나 일부 자산이나 상호작용에 제한이 있음
+      - score: 5-6
+        description: 기본적인 자산군 간 관계는 언급하나 통합적 분석이나 상호작용의 깊이가 부족
+      - score: 3-4
+        description: 제한된 자산군만 다루거나 상호연관성 분석이 피상적
+      - score: 1-2
+        description: 자산군 간 상호작용을 거의 고려하지 않거나 단일 자산군에만 초점
+    calculation: "(글로벌 맥락 이해 × 0.5) + (데이터 기반 객관성 × 0.5)"
+    evaluation_questions:
+      - 기사가 다양한 자산군(주식, 채권, 원자재, 통화 등) 간의 상호작용을 분석하는가?
+      - 자산군 간 상관관계 변화와 그 촉매요인을 식별하는가?
+      - 한 시장의 움직임이 다른 시장에 미치는 파급효과를 추적하는가?
+      - 다양한 자산군을 포괄하는 통합적 투자 맥락을 제시하는가?
+
+  - name: 전략적 실행 가능성
+    weight: 9
+    description: 분석 결과를 실제 투자 전략으로 전환할 수 있는 구체성과 실용성 정도
+    scoring_criteria:
+      - score: 9-10
+        description: 분석을 구체적이고 실행 가능한 투자 전략으로 명확히 전환하며 실행 조건과 제약을 고려
+      - score: 7-8
+        description: 실행 가능한 함의를 제공하나 일부 구체성이나 실행 조건에 제한이 있음
+      - score: 5-6
+        description: 전략적 함의는 있으나 구체적 실행 방안이나 조건이 불완전함
+      - score: 3-4
+        description: 전략적 함의가 모호하거나 실행 가능성이 제한적임
+      - score: 1-2
+        description: 실행 가능한 전략적 함의가 거의 없거나 매우 추상적임
+    calculation: "(투자 의사결정 유용성 × 0.6) + (리스크 분석 완전성 × 0.4)"
+    evaluation_questions:
+      - 기사의 분석이 구체적인 투자 행동이나 전략으로 명확히 전환되는가?
+      - 전략 실행을 위한 조건, 타이밍, 제약 요소를 명시하는가?
+      - 실행에 따른 잠재적 결과와 리스크를 균형있게 평가하는가?
+      - 다양한 투자자 유형이나 목표에 따른 맞춤형 접근을 제시하는가?
+
+## 종합 평가 시스템
+comprehensive_evaluation:
+  formula: |
+    종합 점수 = (주요 지표 점수 합계 × 0.6 + 부가 지표 점수 합계 × 0.2 + 조합 지표 점수 합계 × 0.2) 
+                ÷ (주요 지표 가중치 합계 × 0.6 + 부가 지표 가중치 합계 × 0.2 + 조합 지표 가중치 합계 × 0.2)
+  
+  score_interpretation:
+    - range: "9.0 - 10.0"
+      description: 최우선 선별 기사 (글로벌 투자자에게 매우 높은 가치 제공)
+    - range: "8.0 - 8.9"
+      description: 우선 선별 기사 (글로벌 투자자에게 높은 가치 제공)
+    - range: "7.0 - 7.9"
+      description: 선별 검토 기사 (글로벌 투자자에게 상당한 가치 제공)
+    - range: "6.0 - 6.9"
+      description: 조건부 선별 기사 (특정 관심사 영역 필요 시 고려)
+    - range: "5.0 - 5.9"
+      description: 대안 기사 (핵심 관심사 기사 부족 시 대체용)
+    - range: "1.0 - 4.9"
+      description: 비선별 기사 (글로벌 투자자에게 제한적 가치만 제공)
+
+## 다양성 보장 메커니즘
+diversity_mechanism:
+  concern_areas_coverage:
+    minimum_coverage: 4개 이상의 서로 다른 핵심 관심사 영역 포함
+    ideal_balance: 특정 관심사에 3개 이상의 기사가 집중되지 않도록 조정
+  
+  content_type_balance:
+    categories:
+      - name: 시장 전망 및 트렌드
+        ideal_proportion: "20-35%"
+      - name: 투자 전략 및 자산 배분
+        ideal_proportion: "25-40%"
+      - name: 리스크 분석 및 관리
+        ideal_proportion: "15-30%"
+      - name: 거시경제 및 정책 분석
+        ideal_proportion: "15-30%"
+      - name: 특정 섹터/자산군 심층 분석
+        ideal_proportion: "15-30%"
+  
+  regional_diversity:
+    categories:
+      - name: 글로벌/다지역 분석
+        ideal_proportion: "20-35%"
+      - name: 선진국 시장
+        ideal_proportion: "20-35%"
+      - name: 신흥국 시장
+        ideal_proportion: "15-30%"
+      - name: 한국 시장 관련
+        ideal_proportion: "20-35%"
