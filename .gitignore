@@ -23,6 +23,11 @@ lambda_package.zip
 lambda_package_v2.zip
 lambda_package_admin.zip
 
+# admin/backend 배포 스크립트의 pip 설치 캐시(2026-09-29) — requirements.txt
+# 해시가 안 바뀌면 재사용해서 매 배포마다 전체 재설치를 피한다
+# (lens-cms-api/deploy.sh의 .requirements.sha256 패턴과 동일 원칙).
+admin/backend/.pip-cache-admin/
+
 # Android TWA (mobile/) — 서명 키스토어(비밀값) + Gradle/빌드 산출물.
 # 전체 디렉터리를 통째로 제외한다(bubblewrap 생성물이라 재현 가능, 커밋 불필요).
 mobile/

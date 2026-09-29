@@ -37,13 +37,26 @@ RUN cd video && npm ci
 # 네트워크 상태에 따라 실패 위험도 생긴다.
 RUN cd video && npx remotion browser ensure
 
-COPY . .
-
 # 파이썬 의존성 — pipelines/*/requirements.txt 전부 한 venv에(common/은
 # requirements.txt가 없다 — 필요한 boto3/requests는 아래 6개 파일이 이미
 # 요구하고 있어 커버됨). mustknow_auto/requirements.txt는 2026-08-23 코드
 # 리팩토링 감사 전까지 여기 안 걸려 있었다 — mustknow_auto/run.py가 쓰는
 # requests가 다른 5개 파일 설치분에 얹혀가서 우연히 동작하던 상태였다.
+#
+# 2026-09-29 — requirements.txt들만 먼저 복사해서 pip install을 그
+# 위 npm ci와 같은 원칙(캐시 레이어 분리)으로 옮겼다. 예전엔 COPY . .
+# 뒤에 pip install이 있어서 pipelines/ 안의 .py 파일 하나만 고쳐도
+# COPY . . 레이어부터 캐시가 깨지고, 뒤따르는 pip install(6개 파일,
+# 의존성 자체는 거의 안 바뀜)까지 매번 처음부터 다시 돌았다 — 배포가
+# 잦아질수록 낭비가 누적되는 구조라(사용자 지적) requirements.txt가
+# 실제로 안 바뀌면 이 레이어가 캐시에서 재사용되도록 순서를 바꿨다.
+COPY letters/requirements.txt letters/requirements.txt
+COPY podcast/requirements.txt podcast/requirements.txt
+COPY webtoon/requirements.txt webtoon/requirements.txt
+COPY discovery/requirements.txt discovery/requirements.txt
+COPY frontpage_auto/requirements.txt frontpage_auto/requirements.txt
+COPY mustknow_auto/requirements.txt mustknow_auto/requirements.txt
+
 RUN python3.11 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir \
@@ -53,6 +66,10 @@ RUN pip install --no-cache-dir \
     -r discovery/requirements.txt \
     -r frontpage_auto/requirements.txt \
     -r mustknow_auto/requirements.txt
+
+# 나머지 코드는 pip install 레이어 뒤로 — 코드만 바뀐 배포는 여기서부터만
+# 다시 빌드된다.
+COPY . .
 
 WORKDIR /app/pipelines/frontpage_auto
 ENTRYPOINT ["python3.11", "run.py"]

@@ -89,6 +89,13 @@ PACKAGE_FILE="lambda_package_admin.zip"
 S3_BUCKET="sedaily-mbti-lambda-packages-dev"
 S3_KEY="lambda_package_admin.zip"
 AWS_REGION="us-east-1"
+# 2026-09-29 — requirements.txt 해시가 안 바뀌면 pip install을 건너뛴다
+# (lens-cms-api/deploy.sh와 동일 원칙, 사용자 요청 — "배포 잦아질 텐데
+# 효과적으로"). BUILD_DIR은 매번 rm -rf로 새로 만들어서 여기엔 캐시를
+# 못 둔다 — 대신 별도 영속 디렉터리(.pip-cache-admin/deps)에 설치해두고
+# 매번 BUILD_DIR로 복사만 한다.
+DEP_CACHE_DIR=".pip-cache-admin"
+DEP_HASH_FILE="$DEP_CACHE_DIR/.requirements.sha256"
 
 echo "[1/4] Building package..."
 rm -rf "$BUILD_DIR" "$PACKAGE_FILE"
@@ -108,11 +115,22 @@ cp "$FONT_ASSET" "$BUILD_DIR/assets/"
 # --python-version 은 필수다. 워크스테이션 Python 이 Lambda 런타임(3.11)과 다르면
 # argon2-cffi 의 네이티브 의존성(cffi)이 잘못된 ABI 로 설치돼
 # "No module named '_cffi_backend'" 로 함수 전체가 죽는다 (2026-07-27 실제 사고).
-python3 -m pip install -q -r requirements.txt -t "$BUILD_DIR" \
-  --platform manylinux2014_x86_64 \
-  --python-version "$PYTHON_VERSION" \
-  --implementation cp \
-  --only-binary=:all: --upgrade
+NEW_HASH="$(sha256sum requirements.txt | awk '{print $1}')"
+OLD_HASH="$(cat "$DEP_HASH_FILE" 2>/dev/null || echo "")"
+if [ "$NEW_HASH" != "$OLD_HASH" ] || [ ! -d "$DEP_CACHE_DIR/deps" ]; then
+  echo "  requirements.txt 변경됨(또는 최초 실행) — pip install 실행"
+  rm -rf "$DEP_CACHE_DIR/deps"
+  mkdir -p "$DEP_CACHE_DIR/deps"
+  python3 -m pip install -q -r requirements.txt -t "$DEP_CACHE_DIR/deps" \
+    --platform manylinux2014_x86_64 \
+    --python-version "$PYTHON_VERSION" \
+    --implementation cp \
+    --only-binary=:all: --upgrade
+  echo "$NEW_HASH" > "$DEP_HASH_FILE"
+else
+  echo "  requirements.txt 안 바뀜 — pip install 생략(캐시 재사용)"
+fi
+cp -r "$DEP_CACHE_DIR/deps/." "$BUILD_DIR/"
 
 find "$BUILD_DIR" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 rm -rf "$BUILD_DIR/common/tests"
