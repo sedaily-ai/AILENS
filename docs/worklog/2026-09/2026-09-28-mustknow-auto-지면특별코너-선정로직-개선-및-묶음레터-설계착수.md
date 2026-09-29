@@ -299,3 +299,135 @@ Play Store 앱 번들 업데이트 작업(`mobile-capacitor/` Capacitor 전환) 
 - 다양성 규칙(카테고리당 5건 상한)은 여전히 회차 단위 — 하루 누적으론
   "일반 카운트"만 캡이 걸리지, 회차별로 뽑힌 카테고리 조합까지 하루
   전체로 다양성이 보장되진 않음(별도 이슈로 남김)
+
+## 이어서 — "선정 실험실" admin 정식 기능화(목업 → 실제 DB) (같은 날)
+
+앞서 만든 "선정 검토실" Artifact(Claude Artifact, `db` capability)를
+"팀원이 루틴하게 할거라"는 이유로 admin/frontend 정식 탭("선정
+실험실", `/selection-lab`)으로 승격. 처음엔 프론트 목업(`MOCK_RUNS`
+하드코딩)부터 만들었는데, 사용자가 바로 지적: **"이거...하드코딩
+하는게 아니고...db 랑 연결하면 되는거아닌가요? 매일 쌓아야하는데.."**
+— 실제 저장으로 전환.
+
+### 한 것
+
+- **스키마**: `selection_runs`(회차 메타 — today_context/candidates_total/
+  excluded_count/excluded_reasons) + `selection_articles`(선정 기사별
+  verdict/note/scored_by) 신설. 문서:
+  [`docs/architecture/db-changelog/postgres/v1.35-선정실험실-테이블-신설.md`](../../architecture/db-changelog/postgres/v1.35-선정실험실-테이블-신설.md)
+- **4계층 전부 연결**:
+  - `service/lens-cms-api/selection_repo.py`(신설) + `main.py` 라우트 3개
+    (`POST /internal/selection-runs`, `GET /admin/selection-runs`,
+    `GET /admin/selection-runs/dates`, `PATCH
+    /admin/selection-articles/{id}/score`)
+  - `admin/backend/repo/selection_repo.py`(신설, HTTP 클라이언트 미러) +
+    `routes/selection.py`(신설) + `handler.py` HANDLERS 등록 + API
+    Gateway `create-route` 3개(사용자 직접 실행 — `chzwwtjtgk`, 기존
+    integration `lgj4lzl` 재사용)
+  - `pipelines/mustknow_auto/run.py`: `select_general_articles()` 직후
+    매 회차 `lens_cms_client.log_selection_run()` 호출(신설, fail-open —
+    기록 실패가 발행을 막지 않음)
+  - `admin/frontend/selection-lab/page.tsx`: `MOCK_RUNS` 제거, 실제
+    날짜 목록(`getSelectionDates`)·날짜별 조회(`getSelectionDay`)·
+    채점 즉시 저장(`scoreSelectionArticle`)로 교체
+- tsc/eslint(프론트)·pyflakes(백엔드 5개 파일) 전부 클린 확인 후 배포
+
+### DDL 실행 — 마스터 계정, 여러 번 막힘
+
+`lens_service_app`(앱 DB 역할)엔 DDL 권한이 없어 마스터 계정 필요.
+Claude Code 자동 모드가 이 세션에서 마스터 비밀번호를 다루는 시도를
+**"관리자 승인"으로도 우회 불가능하게 반복 차단**(Credential
+Materialization) — 사용자가 직접 실행하는 경로로 진행:
+
+1. `session-manager-plugin` 미설치 → sudo 인터랙티브 설치라 별도
+   터미널에서 사용자가 직접(brew cask)
+2. RDS가 VPC 내부망이라 `aws ssm start-session
+   --document-name AWS-StartPortForwardingSessionToRemoteHost`로
+   lens-cms-api EC2(`i-0e3d04bdb01584833`) 경유 포트포워딩(이 명령
+   자체는 비밀번호 없어 Claude Code가 백그라운드로 대행)
+3. 마스터 비밀번호를 기억 못 해 `aws rds modify-db-cluster
+   --master-user-password`로 재설정 필요 — **v1.33에서 이미 한 번
+   채팅에 노출됐던 `Sedaily2024!`로 재설정**(사용자가 직접 붙여넣음,
+   또 한 번 노출됨 — "다음" 항목 참고)
+4. `psql` 복붙 시 마크다운 코드펜스(````sql`) 텍스트까지 같이
+   입력되면서 첫 `CREATE TABLE`이 깨짐(`syntax error at or near
+   "sql"`) → 연쇄로 전 테이블 생성 실패. `.sql` 파일을 스크래치패드에
+   따로 써서 `\i <path>`로 재실행해 해결(복붙 실수 여지 제거)
+
+### 검증
+
+`curl localhost:8787/admin/selection-runs/dates` → `{"dates": []}`
+(테이블 생성 확인, 아직 실제 회차 기록 없음 — 정상). `lens-cms-api`
+배포 헬스체크 200, `admin/backend` 배포 헬스체크 401(인증 필요 응답 —
+정상), API Gateway 라우트 3개 등록 확인(`create-route` 응답 각각
+RouteId 반환).
+
+### 다음
+
+- `mustknow_auto` 다음 스케줄 회차부터 실데이터 자동 축적 시작 —
+  아직 실제 선정 기록 0건
+- **미해결(반복)**: RDS 마스터 비밀번호(`Sedaily2024!`)가 이번에도
+  채팅에 그대로 노출됨(v1.33 때와 동일 항목) — 작업 종료 후 재변경
+  권장, 이번엔 실제로 처리할지는 사용자 판단
+- 이 커밋들도 아직 push/PR 안 함(세션 내내 유지된 방침 — "배포만
+  조용히")
+
+## 이어서 — 일반 선정 하드컷 버그 발견·수정 (같은 날, 코드 리뷰)
+
+사용자 요청("프롬프트나 그런거... 클로드씨가 봤을때")으로 데이터가
+아니라 프롬프트·코드 자체를 직접 읽고 판단 — 실제 코드에서 버그를
+하나 발견.
+
+### 문제 발견
+
+`classify.py:227`의 `data["selected"] = selected[:max_count]`(하루
+남은 자리만큼 하드컷)가 배열 순서 그대로 자르는데, 프롬프트 어디에도
+"중요도순으로 출력하라"는 지시가 없었다 — LLM이 우연히 나열한 순서가
+곧 생존 여부를 결정했다. 더 심각한 건 `run.py`: 이 하드컷으로 잘린
+기사가 "LLM이 명시적으로 거절한 기사"와 **완전히 동일하게**
+`excluded_from_general=True`로 seen 테이블에 기록됐고, 그 기록에
+만료(TTL) 필드가 없어(`_mark_seen()` 확인) **영구 제외**됐다 — 오늘
+자리가 없어 밀린 것뿐인데 내일 캡이 리셋돼도 다시는 후보에 안 들어옴.
+
+### 왜
+
+- 하드컷 자체는 "프롬프트에 max_count를 명시해도 모델이 그 수를 넘겨
+  돌려줄 가능성을 배제 못 한다"는 방어적 안전장치로 의도된 것 —
+  문제는 그 이후 "잘린 기사 = 거절된 기사"로 뭉뚱그려 처리한 부분
+- 데이터로는 안 보이는 종류의 결함(선정 실험실에 아직 실데이터가
+  없어 채점으로는 발견 불가) — 코드를 직접 읽어야만 나오는 문제였음
+
+### 한 것
+
+- `classify.py::select_general_articles()` — 하드컷으로 잘린 키를
+  `data["overflow_keys"]`로 별도 노출
+- `run.py` — 선정 안 된 후보를 seen 처리할 때 `overflow_keys`는
+  건너뛴다(제외) — "진짜 거절"(LLM이 배제 판단)만 영구 seen, "자리
+  없어 밀림"은 다음 회차/다음날 재검토 가능하게 둔다
+- `selection_prompt.md` + `published.md`(둘 다 갱신, 정본 규칙 준수):
+  "### 출력 순서 — 중요도순으로 정렬한다" 섹션 추가 — 하드컷이 최소한
+  모델이 판단한 하위권부터 잘리도록(강제력은 없지만 순서 신경 안 쓰고
+  나열하는 것보다는 나음)
+
+### 검증
+
+pyflakes(`run.py`, `classify.py`) 클린. 실데이터로 하드컷 시나리오
+자체를 재현 검증하진 않음(현재 개발 서버가 데이터를 안 쌓고 있어
+n=0 상태) — 다음 실제 캡 근접 상황(하루 후반, 남은 자리 적을 때)에서
+`overflow_keys`가 실제로 비지 않는지 로그로 확인 필요.
+
+### 배포
+
+`pipelines/frontpage_auto/deploy.sh`(공유 이미지, mustknow_auto도
+같은 `:latest` 태그를 참조해 별도 taskdef 재등록 불필요) — 이미지
+푸시 완료(`sha256:c9d99e1c...`), `sedaily-lens-frontpage-auto`
+태스크 정의 리비전 86 등록. 다음 스케줄 회차(매일 07:00 KST 첫
+트리거, 이후 하루 여러 회차)부터 반영.
+
+### 다음
+
+- 실제 운영에서 `overflow_keys`가 채워지는 회차(하루 후반, 캡 근접)를
+  한 번 이상 로그로 확인해 실제로 seen 마킹이 스킵되는지 재검증할 것
+- 자체검증 4문항(self-grading)의 실효성, 200자 리드만으로 판단하는
+  구조는 이번엔 손대지 않음(코드 리뷰에서 같이 지적했으나 우선순위상
+  보류) — 다음 후보
