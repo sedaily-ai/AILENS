@@ -220,7 +220,17 @@ def extract_title_from_lead(paragraphs: list[str]) -> str | None:
     항상 이모지 1개로 끝나므로, 첫 문단에서 첫 이모지까지를 잘라내면
     제목만 복원된다 — 실사용 데이터로 36건 검증 확인. 그래도 못 찾으면
     (이모지가 아예 없으면) None — 호출부가 최후 수단으로 원문 제목을
-    쓴다."""
+    쓴다.
+
+    2026-09-29 발견(사용자 신고 — 라이브 글 제목이 이모지 하나뿐
+    "🦈") — 이 가정이 항상 맞진 않았다. 모델이 드물게 이모지를 제목
+    "끝"이 아니라 "맨 앞"에 붙여 쓰면(예: "🦈 상어 한 마리가 9일
+    만에...") 첫 이모지가 문단 맨 앞에서 바로 잡혀 `p0[:m.end()]`가
+    이모지 한 글자만 남긴다 — None이 아니라 쓸모없는 문자열을
+    돌려줘서 호출부의 `or article["title"]` 폴백이 아예 안 탔다.
+    이모지를 다 떼어내고 남는 실제 글자가 거의 없으면(2자 미만)
+    추출 실패로 간주해 None을 돌려준다 — 호출부가 원문 제목으로
+    올바르게 폴백하게."""
     if not paragraphs:
         return None
     p0 = paragraphs[0]
@@ -228,6 +238,8 @@ def extract_title_from_lead(paragraphs: list[str]) -> str | None:
     if not m:
         return None
     title = p0[: m.end()].strip()
+    if len(_EMOJI_RE.sub("", title).strip()) < 2:
+        return None
     if len(title) > _MAX_TITLE_CHARS:
         title = title[:_MAX_TITLE_CHARS].rstrip()
     return title or None
