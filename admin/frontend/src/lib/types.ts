@@ -597,3 +597,38 @@ export interface PromptTestJob {
   error: string | null;
 }
 
+// 선정 실험실 (2026-09-28) — service/lens-cms-api/selection_repo.py의
+// _run_to_dict/_article_to_dict와 필드 동일.
+export interface SelectionRun {
+  id: number;
+  run_date: string;
+  category: string;
+  today_context: string | null;
+  candidates_total: number | null;
+  excluded_count: number | null;
+  excluded_reasons: string[];
+  created_at: string | null;
+}
+
+export type SelectionVerdict = "ok" | "unclear" | "bad";
+
+export interface SelectionArticle {
+  id: number;
+  run_id: number;
+  key: string;
+  title: string;
+  category: string | null;
+  reason: string | null;
+  verdict: SelectionVerdict | null;
+  note: string | null;
+  scored_by: string | null;
+  scored_at: string | null;
+}
+
+export interface SelectionRunsDayResponse {
+  run_date: string;
+  category: string;
+  runs: SelectionRun[];
+  articles: SelectionArticle[];
+}
+

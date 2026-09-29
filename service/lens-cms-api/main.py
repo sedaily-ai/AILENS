@@ -28,6 +28,7 @@ import personal_repo
 import prompt_lab_repo
 import prompts_repo
 import quiz_repo
+import selection_repo
 import subscribers_repo
 from cms_posts_shaping import (
     SHAPERS,
@@ -211,6 +212,68 @@ def admin_delete_post(post_id: str, x_internal_token: Optional[str] = Header(def
     if not admin_posts_repo.soft_delete(post_id):
         raise HTTPException(status_code=404, detail="post not found")
     return {"ok": True}
+
+
+# ── 선정 실험실 — v1.35 ────────────────────────────────────────────
+# mustknow_auto "일반" 카테고리 선정 결과를 날짜별로 모아 팀원이 적절/
+# 애매/부적절로 채점하는 admin 화면. /internal/selection-runs는
+# pipelines/mustknow_auto/run.py가 매 회차 직후 호출(하루 여러 번).
+@app.post("/internal/selection-runs")
+def internal_create_selection_run(
+    payload: Dict[str, Any] = Body(...),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    return selection_repo.create_run(
+        run_date=payload["run_date"],
+        category=payload.get("category", "general"),
+        today_context=payload.get("today_context"),
+        candidates_total=payload.get("candidates_total", 0),
+        excluded_count=payload.get("excluded_count", 0),
+        excluded_reasons=payload.get("excluded_reasons") or [],
+        selected=payload.get("selected") or [],
+    )
+
+
+@app.get("/admin/selection-runs/dates")
+def admin_selection_run_dates(
+    category: str = Query(default="general"),
+    limit: int = Query(default=30),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    return {"dates": selection_repo.list_dates(category, limit)}
+
+
+@app.get("/admin/selection-runs")
+def admin_selection_run_day(
+    date: str = Query(...),
+    category: str = Query(default="general"),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    return selection_repo.get_day(date, category)
+
+
+@app.patch("/admin/selection-articles/{article_id}/score")
+def admin_score_selection_article(
+    article_id: int,
+    payload: Dict[str, Any] = Body(...),
+    x_internal_token: Optional[str] = Header(default=None),
+):
+    _check_admin_token(x_internal_token)
+    try:
+        article = selection_repo.score_article(
+            article_id,
+            payload.get("verdict"),
+            payload.get("note"),
+            payload.get("scored_by", "admin"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not article:
+        raise HTTPException(status_code=404, detail="article not found")
+    return {"article": article}
 
 
 # ── 용어 퀴즈 — v1.22, 응답 집계는 v1.26 ─────────────────────────────

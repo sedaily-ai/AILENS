@@ -25,6 +25,7 @@ from routes import (
     prompt_lab,
     prompts,
     quiz,
+    selection,
     video_lab,
 )
 from routes.webtoon import generate as webtoon_generate
@@ -107,6 +108,10 @@ HANDLERS: dict[str, tuple] = {
     # webtoon_image.py 상단 주석 참고). 남은 건 "발행 모델" 패널이 쓰는
     # defaults뿐.
     "GET /admin/webtoon-lab/defaults": (webtoon_generate.handle_defaults, True),
+    # 선정 실험실 (2026-09-28)
+    "GET /admin/selection-runs/dates": (selection.handle_list_dates, True),
+    "GET /admin/selection-runs": (selection.handle_get_day, True),
+    "PATCH /admin/selection-articles/{id}/score": (selection.handle_score, True),
     # 영상 랩(2026-09-23) — routes/video_lab.py 참고. ⚠️ 이 dict에 문자열
     # 키를 추가하는 것만으로는 API Gateway가 실제로 이 경로를 몰라 404를
     # 낸다 — `aws apigatewayv2 create-route`로 기존 라우트의 integration을
