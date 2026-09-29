@@ -22,9 +22,16 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import pg8000.dbapi
+
+# 2026-09-29 — service/lens-cms-api/cms_posts_repo.py와 동일 버그·동일
+# 수정(그쪽 주석 참고: UTC 세션 타임존에서 published_at.date()가 KST
+# 00:00~08:59 발행 글을 "전날"로 잘못 묶던 문제). 두 파일은 쿼리·로직이
+# 동일해야 한다는 이 파일 docstring의 원칙대로 같이 고친다.
+_KST = timezone(timedelta(hours=9))
 
 _PG_HOST = os.environ.get("LENS_PG_HOST", "lens-postgres-migration-dev.cluster-c83iuyksky7r.us-east-1.rds.amazonaws.com")
 _PG_DB = os.environ.get("LENS_PG_DATABASE", "lens")
@@ -100,7 +107,7 @@ def _row_to_post(row: Dict[str, Any]) -> Dict[str, Any]:
         "cover_image_url": row.get("cover_image_url"),
         "source_url": row.get("source_url"),
         "media_embed_url": media_embed_url,
-        "publish_date": row["published_at"].date().isoformat() if row.get("published_at") else None,
+        "publish_date": row["published_at"].astimezone(_KST).date().isoformat() if row.get("published_at") else None,
         "published_at": row["published_at"].isoformat() if row.get("published_at") else None,
         "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
         "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
@@ -154,7 +161,7 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             """
             params: List[Any] = ["published"]
             if date:
-                sql += " AND published_at::date = %s"
+                sql += " AND (published_at AT TIME ZONE 'Asia/Seoul')::date = %s"
                 params.append(date)
             sql += " ORDER BY published_at DESC LIMIT %s"
             params.append(limit)
@@ -166,7 +173,7 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             sql = _BASE_SELECT + " WHERE p.status = %s AND p.deleted_at IS NULL AND r.id IS NOT NULL"
             params = [fmt, "published"]
             if date:
-                sql += " AND p.published_at::date = %s"
+                sql += " AND (p.published_at AT TIME ZONE 'Asia/Seoul')::date = %s"
                 params.append(date)
             sql += " ORDER BY p.published_at DESC LIMIT %s"
             params.append(limit)
