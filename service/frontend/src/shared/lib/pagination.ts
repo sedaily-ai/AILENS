@@ -7,47 +7,34 @@
  * (video/listen용)도 같은 패턴이라 flex-wrap 덕에 안 깨질 뿐 페이지가
  * 많아지면 버튼이 수십 개씩 나열되는 건 똑같았다 — 둘 다 이 함수로 교체.
  *
- * 항상 첫/마지막 페이지를 보여주고, 현재 페이지 좌우로 siblingCount개씩
- * 보여주고, 나머지 구간은 'ellipsis' 하나로 뭉친다. 흔한 페이지네이션
- * UX 패턴(구글 검색 결과 등)과 동일.
+ * 2026-09-30 — 현재 페이지 좌우 sibling만 보여주던 방식(구글 검색 결과
+ * 스타일, "1 2 … 16")에서 "1~10칸씩 통째로 보여주는" 방식(국내 뉴스
+ * 사이트 게시판 관례, 카테고리 페이지네이션 신설 때 사용자가 직접
+ * 지적: "번호를 1,2,3,4,5,6,7,8,9,10 이 다 보이도록")으로 교체. 현재
+ * 페이지가 속한 blockSize(기본 10)개 구간을 항상 통째로 보여주고, 그
+ * 구간 밖에 더 있으면 첫/끝 페이지 + 생략 부호로 표시.
  */
 export type PageItem = number | 'ellipsis';
 
-export function buildPageItems(current: number, total: number, siblingCount = 1): PageItem[] {
+export function buildPageItems(current: number, total: number, blockSize = 10): PageItem[] {
   if (total <= 1) return [1];
 
-  // 생략 부호를 쓸 필요가 없을 만큼 적으면(첫/끝 2개 + 현재 주변 + 여백)
-  // 그냥 전부 보여준다 — 어차피 생략 부호 자리 하나 아끼자고 숫자를
-  // 감추는 건 페이지 수가 적을 때는 오히려 불친절하다.
-  const totalNumbersWhenNoEllipsis = siblingCount * 2 + 5; // 첫+끝+현재+양쪽생략경계
-  if (total <= totalNumbersWhenNoEllipsis) {
-    return Array.from({ length: total }, (_, i) => i + 1);
+  const blockStart = Math.floor((current - 1) / blockSize) * blockSize + 1;
+  const blockEnd = Math.min(blockStart + blockSize - 1, total);
+
+  const items: PageItem[] = [];
+
+  if (blockStart > 1) {
+    items.push(1);
+    if (blockStart > 2) items.push('ellipsis');
   }
 
-  const leftSibling = Math.max(current - siblingCount, 1);
-  const rightSibling = Math.min(current + siblingCount, total);
+  for (let p = blockStart; p <= blockEnd; p += 1) items.push(p);
 
-  const showLeftEllipsis = leftSibling > 2;
-  const showRightEllipsis = rightSibling < total - 1;
-
-  const items: PageItem[] = [1];
-
-  if (showLeftEllipsis) {
-    items.push('ellipsis');
-  } else {
-    for (let p = 2; p < leftSibling; p += 1) items.push(p);
+  if (blockEnd < total) {
+    if (blockEnd < total - 1) items.push('ellipsis');
+    items.push(total);
   }
 
-  for (let p = leftSibling; p <= rightSibling; p += 1) {
-    if (p !== 1 && p !== total) items.push(p);
-  }
-
-  if (showRightEllipsis) {
-    items.push('ellipsis');
-  } else {
-    for (let p = rightSibling + 1; p < total; p += 1) items.push(p);
-  }
-
-  items.push(total);
   return items;
 }
