@@ -119,7 +119,7 @@ export async function generateMetadata({
   // 것과 동일한 이유). 여기서 안 맞추면 이 페이지가 직접 URL로 열릴 때마다
   // (dynamicParams 기본값 true) 스스로를 canonical로 선언해 /lens/{id}와
   // 경쟁하게 된다.
-  const url = lensPost ? `${SITE_URL}/lens/${id}` : `${SITE_URL}/letters/${id}`;
+  const url = lensPost ? `${SITE_URL}/${id}` : `${SITE_URL}/letters/${id}`;
   // letter 자체의 5개 keyword (term) + 발행처 — 검색엔진과 SNS 양쪽에 노출.
   // ApiLetter 외 fallback letter 는 keywords 가 없을 수 있어 옵셔널.
   const letterKeywords =
@@ -269,11 +269,11 @@ export default async function LetterDetailPage({
   // 영향이 없었던 게 원인(사용자 신고 "레터만 있는데 4가지 유형은?", 2026-09-13).
   // /lens/{id}가 이미 canonical로 지정된 "진짜 원본"이므로 사람도 그리로 보낸다.
   if (lensPost) {
-    redirect(`/lens/${encodeURIComponent(id)}`);
+    redirect(`/${encodeURIComponent(id)}`);
   }
   // generateMetadata()의 canonical 계산과 동일한 규칙 — lens 글이면
-  // JSON-LD의 @id/url도 /lens/{id}를 가리켜야 canonical과 일치한다.
-  const canonicalUrl = lensPost ? `${SITE_URL}/lens/${id}` : `${SITE_URL}/letters/${id}`;
+  // JSON-LD의 @id/url도 /{id}(구 /lens/{id})를 가리켜야 canonical과 일치한다.
+  const canonicalUrl = lensPost ? `${SITE_URL}/${id}` : `${SITE_URL}/letters/${id}`;
   const jsonLd = letter ? buildArticleJsonLd(letter, canonicalUrl) : null;
   const { next, prev } = letter ? await findNeighbors(id) : { next: null, prev: null };
   return (

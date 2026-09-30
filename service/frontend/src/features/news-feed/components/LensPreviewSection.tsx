@@ -88,15 +88,14 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 localStorage 1회 읽기(NewsTimeMachine.tsx:62와 같은 관례). 렌더 중에는 읽을 수 없다 — 서버에는 localStorage가 없어 하이드레이션이 깨진다.
-      if (!window.localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
-    } catch {
-      // localStorage 접근 불가(시크릿 모드 등) — 자동으로는 안 띄우고,
-      // ⓘ 버튼으로는 여전히 열 수 있다.
-    }
-  }, []);
+  // 첫 방문 자동 팝업은 2026-09-29 요청으로 껐다(진입 즉시 모달이 뜨는 게
+  // 방해된다는 판단) — GUIDE_SEEN_KEY/closeGuide는 그대로 둬서 ⓘ 버튼으로
+  // 수동으로 여는 경로는 안 건드린다. 되돌릴 땐 아래 useEffect만 복원하면 됨:
+  //   useEffect(() => {
+  //     try {
+  //       if (!window.localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
+  //     } catch {}
+  //   }, []);
 
   // 온보딩(/start)에서 고른 관심분야로 기본 탭을 맞춘다(2026-09) — 지금까지는
   // 저장만 하고 아무 데도 안 썼다. SECTIONS의 paperSection이 온보딩
@@ -161,7 +160,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   const total = sectionArticles.length;
   const safeArticleIndex = total > 0 ? Math.min(articleIndex, total - 1) : 0;
   const current = total > 0 ? sectionArticles[safeArticleIndex] : null;
-  const href = current ? `/lens/${encodeURIComponent(current.id)}` : null;
+  const href = current ? `/${encodeURIComponent(current.id)}` : null;
   const photo = current ? pickLensPhoto(current) : null;
   const rows = current ? (current.lenses ?? []).slice(0, 4) : [];
 

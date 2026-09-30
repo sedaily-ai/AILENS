@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { pickLensPhoto, lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { LensFormatPanel } from '@/app/(content)/lens/[slug]/components';
+import { LensFormatPanel } from '@/app/(content)/[slug]/components';
 import { OnboardingHeader } from './OnboardingHeader';
 import { LetterStoryCards } from './LetterStoryCards';
 

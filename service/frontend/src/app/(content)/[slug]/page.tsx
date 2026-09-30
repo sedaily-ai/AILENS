@@ -101,7 +101,7 @@ export async function generateMetadata({
   }
   const title = buildPageTitle(lens.headline, '4가지 시선');
   const description = buildSeoDescription(lens.context, '오늘의 이슈를 4가지 시선으로 짚어드려요.');
-  const url = `${SITE_URL}/lens/${slug}`;
+  const url = `${SITE_URL}/${slug}`;
   const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
   return {
     title,
@@ -138,7 +138,7 @@ export async function generateMetadata({
 // letters/[id]/page.tsx의 NewsArticle 패턴(articleSection·wordCount·
 // BreadcrumbList)과 동일하게 맞춘다.
 function buildJsonLd(lens: CmsLens, slug: string) {
-  const url = `${SITE_URL}/lens/${slug}`;
+  const url = `${SITE_URL}/${slug}`;
   const published = `${lens.date}T07:00:00+09:00`;
   const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
   const bodyJoined = [

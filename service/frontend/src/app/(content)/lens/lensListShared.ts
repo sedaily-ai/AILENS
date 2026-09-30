@@ -36,7 +36,7 @@ export function buildLensJsonLd(items: CmsLens[]) {
       itemListElement: items.slice(0, 20).map((l, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        url: `${SITE_URL}/lens/${l.id}`,
+        url: `${SITE_URL}/${l.id}`,
         name: l.headline,
       })),
     },

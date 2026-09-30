@@ -53,7 +53,7 @@ export function LatestGridSection({ items, heroSlot }: { items: ArchiveItem[]; h
 
       <div style={{ textAlign: 'center', marginTop: 28 }}>
         <Link
-          href="/archive"
+          href="/lens"
           className="inline-block rounded-full text-gray-700 hover:bg-gray-100 transition-colors"
           style={{ padding: '10px 22px', border: '1px solid #e5e7eb', fontSize: 13, fontWeight: 700 }}
         >

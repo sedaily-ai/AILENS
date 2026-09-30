@@ -280,14 +280,29 @@ export default function RootLayout({
                 (function () {
                   var el = document.getElementById('app-splash');
                   if (!el) return;
-                  var isTwa = document.referrer.indexOf('android-app://') === 0;
-                  if (!isTwa) { el.remove(); return; }
-                  if (sessionStorage.getItem('ailens_splash_shown')) { el.remove(); return; }
-                  sessionStorage.setItem('ailens_splash_shown', '1');
-                  setTimeout(function () {
-                    el.classList.add('is-leaving');
-                    setTimeout(function () { el.remove(); }, 360);
-                  }, 1600);
+                  // 2026-09-29 — 웹 방문에서도 스플래시가 안 사라진다는 신고(스크린샷)로
+                  // 추가한 방어 타이머. 위 분기(isTwa 판별·sessionStorage 접근)가
+                  // 어떤 이유로든(예외, referrer 판별 엣지케이스) el.remove()를 못 타는
+                  // 경우를 대비해, 무슨 일이 있어도 4초 뒤엔 강제로 없앤다 — TWA
+                  // 정상 경로(1600ms 노출+360ms 트랜지션=1960ms)보다 넉넉히 뒤라
+                  // 정상 동작을 방해하지 않는다. 근본 원인 재현은 아직 못 함(Chrome
+                  // 확장 미연결로 실브라우저 디버깅 보류) — 이건 안전장치일 뿐.
+                  var forceRemove = setTimeout(function () {
+                    if (el && el.parentNode) el.remove();
+                  }, 4000);
+                  try {
+                    var isTwa = document.referrer.indexOf('android-app://') === 0;
+                    if (!isTwa) { clearTimeout(forceRemove); el.remove(); return; }
+                    if (sessionStorage.getItem('ailens_splash_shown')) { clearTimeout(forceRemove); el.remove(); return; }
+                    sessionStorage.setItem('ailens_splash_shown', '1');
+                    setTimeout(function () {
+                      el.classList.add('is-leaving');
+                      setTimeout(function () { clearTimeout(forceRemove); el.remove(); }, 360);
+                    }, 1600);
+                  } catch (e) {
+                    clearTimeout(forceRemove);
+                    el.remove();
+                  }
                 })();
               </script>
             `,

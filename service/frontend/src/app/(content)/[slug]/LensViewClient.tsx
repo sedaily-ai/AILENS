@@ -475,7 +475,7 @@ export function LensViewClient({
           >
             <div className="flex items-center" style={{ gap: 8 }}>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}/lens/${slug}`} />
+              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}/${slug}`} />
             </div>
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
@@ -666,7 +666,7 @@ export function LensViewClient({
                   return (
                     <Link
                       key={l.id}
-                      href={`/lens/${encodeURIComponent(l.id)}`}
+                      href={`/${encodeURIComponent(l.id)}`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',

@@ -129,7 +129,7 @@ export function buildArchiveItems(
     excerpt: l.context,
     date: l.date,
     accent: LENS_ACCENT,
-    href: `/lens/${encodeURIComponent(l.id)}`,
+    href: `/${encodeURIComponent(l.id)}`,
     avatarUrl: l.photo_image_url || l.cover_image_url || null,
     category: l.category ?? null,
     publishedAt: l.published_at ?? null,

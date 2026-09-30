@@ -311,7 +311,7 @@ export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
   const subtitle = (lens.context || '').trim();
   return {
     letterId: lens.id,
-    href: `/lens/${encodeURIComponent(lens.id)}`,
+    href: `/${encodeURIComponent(lens.id)}`,
     editorId: lens.editor_id,
     editorName: meta.editorName,
     editorRole: meta.editorRole,

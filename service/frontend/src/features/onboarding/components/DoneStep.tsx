@@ -20,7 +20,7 @@ export function DoneStep({
   formatIndex: number;
   subscribed: boolean;
 }) {
-  const href = lens ? `/lens/${encodeURIComponent(lens.id)}?v=${formatIndex + 1}` : '/';
+  const href = lens ? `/${encodeURIComponent(lens.id)}?v=${formatIndex + 1}` : '/';
   const p = lensPerspectiveAt(formatIndex);
 
   return (

@@ -57,7 +57,7 @@ export async function GET() {
 
   const lensEntries: FeedEntry[] = lensPosts.map((l) => ({
     title: `${l.headline} — 4가지 시선`,
-    url: `${BASE}/lens/${encodeURIComponent(l.id)}`,
+    url: `${BASE}/${encodeURIComponent(l.id)}`,
     date: l.date,
     description: l.context,
   }));

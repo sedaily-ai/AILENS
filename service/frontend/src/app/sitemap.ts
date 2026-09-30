@@ -38,7 +38,6 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 금융·정책
   { path: '/international', priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 국제
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
-  { path: '/archive',      priority: 0.5, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 전체 모아보기
   { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 웹툰 목록
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
   { path: '/video',        priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 영상 목록
@@ -144,7 +143,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     for (const l of lensPosts) {
       const daysOld = daysBetween(l.date);
       entries.push({
-        url: `${BASE}/lens/${l.id}`,
+        url: `${BASE}/${l.id}`,
         lastModified: new Date(l.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),

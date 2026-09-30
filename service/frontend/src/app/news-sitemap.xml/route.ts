@@ -55,7 +55,7 @@ export async function GET() {
       if (!recentDates.includes(l.date) || seen.has(l.id)) continue;
       seen.add(l.id);
       entries.push({
-        loc: `${BASE}/lens/${encodeURIComponent(l.id)}`,
+        loc: `${BASE}/${encodeURIComponent(l.id)}`,
         headline: l.headline,
         date: l.date,
         keywords: [],
