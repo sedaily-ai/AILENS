@@ -20,6 +20,17 @@ import { TimelineDayClient } from './TimelineDayClient';
 import { SITE_URL } from '@/shared/constants/site';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// generateStaticParams/dynamicParams/revalidate 전부 없어서 이 라우트가
+// 빌드에서 계속 ƒ(fully dynamic, 캐시 전혀 안 됨)로 분류돼 있었다 — 카테고리
+// 아카이브·페이지네이션·시선 상세에서 같은 패턴으로 실측 확인된 문제와
+// 동일 원인(2026-09-30). generateStaticParams가 없으면 Next의 'auto' 모드가
+// 이 라우트를 정적/ISR로 렌더할 근거가 아예 없어 통째로 SSR-only가 된다.
+export const revalidate = 300;
+export const dynamicParams = true;
+export async function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({
   params,
 }: {
