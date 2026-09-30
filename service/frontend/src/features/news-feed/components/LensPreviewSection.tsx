@@ -7,6 +7,7 @@ import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { LENS_ACCENT, lensFormatCaption, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { getSavedInterests } from '@/shared/lib/onboardingStorage';
+import { lensPath } from '@/shared/lib/lensUrl';
 import { LensFormatGuide } from './LensFormatGuide';
 
 // 첫 방문자에게 가이드를 자동으로 한 번만 띄운다(2026-08-21, 사용자
@@ -160,7 +161,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   const total = sectionArticles.length;
   const safeArticleIndex = total > 0 ? Math.min(articleIndex, total - 1) : 0;
   const current = total > 0 ? sectionArticles[safeArticleIndex] : null;
-  const href = current ? `/${encodeURIComponent(current.id)}` : null;
+  const href = current ? lensPath(current) : null;
   const photo = current ? pickLensPhoto(current) : null;
   const rows = current ? (current.lenses ?? []).slice(0, 4) : [];
 

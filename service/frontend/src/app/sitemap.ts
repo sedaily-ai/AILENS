@@ -11,6 +11,7 @@ import { GAMES } from '@/shared/data/games';
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
 import { SITE_URL as BASE } from '@/shared/constants/site';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 // lastModified는 각 라우트 파일의 최근 git 커밋 날짜(2026-08-11 GEO 감사에서
@@ -143,7 +144,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     for (const l of lensPosts) {
       const daysOld = daysBetween(l.date);
       entries.push({
-        url: `${BASE}/${l.id}`,
+        url: `${BASE}${lensPath(l)}`,
         lastModified: new Date(l.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),

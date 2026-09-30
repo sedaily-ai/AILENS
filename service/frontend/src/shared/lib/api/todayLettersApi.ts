@@ -7,6 +7,7 @@
  */
 import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 // 이미지 채널 — 코드 렌더용 차트 데이터 (레터 실수치, AI 생성 아님).
 export interface LetterChart {
@@ -311,7 +312,7 @@ export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
   const subtitle = (lens.context || '').trim();
   return {
     letterId: lens.id,
-    href: `/${encodeURIComponent(lens.id)}`,
+    href: lensPath(lens),
     editorId: lens.editor_id,
     editorName: meta.editorName,
     editorRole: meta.editorRole,

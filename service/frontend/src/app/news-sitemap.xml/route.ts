@@ -1,5 +1,6 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
+import { lensPath } from '@/shared/lib/lensUrl';
 import { kstTodayStr } from '@/shared/lib/date';
 
 // Google News sitemap (news:news 확장, https://www.google.com/schemas/sitemap-news/0.9) —
@@ -55,7 +56,7 @@ export async function GET() {
       if (!recentDates.includes(l.date) || seen.has(l.id)) continue;
       seen.add(l.id);
       entries.push({
-        loc: `${BASE}/${encodeURIComponent(l.id)}`,
+        loc: `${BASE}${lensPath(l)}`,
         headline: l.headline,
         date: l.date,
         keywords: [],

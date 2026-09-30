@@ -6,6 +6,7 @@ import { letterHref } from '@/shared/lib/letterHref';
 import { withDisplayMeta, toTodayLetterCard } from '@/shared/lib/api/todayLettersApi';
 import type { CmsLetter, CmsTrendCard, CmsVideo, CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 export const PAGE_SIZE = 100;
 
@@ -129,7 +130,7 @@ export function buildArchiveItems(
     excerpt: l.context,
     date: l.date,
     accent: LENS_ACCENT,
-    href: `/${encodeURIComponent(l.id)}`,
+    href: lensPath(l),
     avatarUrl: l.photo_image_url || l.cover_image_url || null,
     category: l.category ?? null,
     publishedAt: l.published_at ?? null,

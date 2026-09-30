@@ -33,6 +33,7 @@ import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { Calendar } from 'lucide-react';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -475,7 +476,7 @@ export function LensViewClient({
           >
             <div className="flex items-center" style={{ gap: 8 }}>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}/${slug}`} />
+              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
             </div>
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
@@ -666,7 +667,7 @@ export function LensViewClient({
                   return (
                     <Link
                       key={l.id}
-                      href={`/${encodeURIComponent(l.id)}`}
+                      href={lensPath(l)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',

@@ -1,5 +1,6 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 // AI LENS RSS 2.0 피드 — en.sedaily.com/rss/newsall 패턴 참고(2026-08-07).
 // AI 크롤러/뉴스 애그리게이터가 sitemap 외에 RSS로도 신규 콘텐츠를 빠르게
@@ -57,7 +58,7 @@ export async function GET() {
 
   const lensEntries: FeedEntry[] = lensPosts.map((l) => ({
     title: `${l.headline} — 4가지 시선`,
-    url: `${BASE}/${encodeURIComponent(l.id)}`,
+    url: `${BASE}${lensPath(l)}`,
     date: l.date,
     description: l.context,
   }));
