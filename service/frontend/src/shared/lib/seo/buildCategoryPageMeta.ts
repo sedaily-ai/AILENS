@@ -34,6 +34,35 @@ export function buildCategoryMetadata(config: EconCategoryConfig): Metadata {
   };
 }
 
+// 2쪽 이상(2026-09-30, 페이지네이션 신설) — video/listen/lens의 page/[n]과
+// 같은 원칙: 페이지마다 title·canonical을 다르게 줘서 중복 콘텐츠로
+// 묶이지 않게 한다(/video/page/[n]/page.tsx 참조).
+export function buildCategoryPageNMetadata(config: EconCategoryConfig, page: number): Metadata {
+  const suffix = config.metaSuffix ?? '경제 뉴스';
+  const title = `${config.label} — ${suffix} — ${page}페이지`;
+  const url = `${SITE_URL}/${config.slug}/page/${page}`;
+  return {
+    title,
+    description: config.description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description: config.description,
+      url,
+      type: 'website',
+      images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: 'AI LENS' }],
+      locale: 'ko_KR',
+      siteName: 'AI LENS — 서울경제',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description: config.description,
+      images: [`${SITE_URL}/og-image.png`],
+    },
+  };
+}
+
 export function buildCategoryJsonLd(config: EconCategoryConfig, items: ArchiveItem[]) {
   const url = `${SITE_URL}/${config.slug}`;
   return {

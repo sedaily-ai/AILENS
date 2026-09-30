@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/archiveItems';
-import { buildCategoryMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
+import { buildCategoryMetadata, buildCategoryPageNMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
 import { CategoryArchiveClient } from './CategoryArchiveClient';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { HeaderTabKey } from '@/shared/lib/headerTabs';
@@ -20,11 +20,11 @@ function configFor(slug: string) {
   return config;
 }
 
-export function buildEconomyCategoryMetadata(slug: string): Metadata {
-  return buildCategoryMetadata(configFor(slug));
+export function buildEconomyCategoryMetadata(slug: string, page = 1): Metadata {
+  return page > 1 ? buildCategoryPageNMetadata(configFor(slug), page) : buildCategoryMetadata(configFor(slug));
 }
 
-export async function EconomyCategoryPage({ slug }: { slug: string }) {
+export async function EconomyCategoryPage({ slug, page = 1 }: { slug: string; page?: number }) {
   const config = configFor(slug);
   // 우측 사이드바 "요즘 가장 많이 읽힌 글" 서버 프리페치(2026-08-23) —
   // app/page.tsx(홈)와 같은 이유: 이거 없이 클라이언트 fetch만 쓰면
@@ -47,6 +47,7 @@ export async function EconomyCategoryPage({ slug }: { slug: string }) {
         tabKey={slug as HeaderTabKey}
         initialItems={items}
         initialHotLetters={hotLetters}
+        initialPage={page}
       />
     </>
   );

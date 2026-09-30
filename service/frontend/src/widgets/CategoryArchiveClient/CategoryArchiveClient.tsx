@@ -12,18 +12,28 @@ import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
 import { ArchiveHeader } from '@/shared/ui/ArchiveHeader';
 import { ArchiveList } from '@/shared/ui/ArchiveList';
+import { ListPagination } from '@/shared/ui/ListPagination';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
+import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
+
+// 카테고리 아카이브 페이지 크기(2026-09-30, 페이지네이션 신설 — 서울경제
+// 본지 사이트(sedaily.com/politics/president) 참고 요청). video(24)·
+// listen(30)과 같은 급의 목록이지만 ArchiveList는 사진 없이 텍스트 행만
+// 그려 한 화면에 더 들어가도 부담이 적어 20으로 잡았다.
+const CATEGORY_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 export function CategoryArchiveClient({
   config,
   tabKey,
   initialItems,
   initialHotLetters,
+  initialPage = 1,
 }: {
   config: EconCategoryConfig;
   tabKey: HeaderTabKey;
@@ -33,6 +43,8 @@ export function CategoryArchiveClient({
   // "인기글 섹션이 통째로 없어진 것처럼" 보인다(사용자 지적: "그런건
   // 어디감?"). 첫 페인트부터 채워서 홈과 동일하게 즉시 보이게 한다.
   initialHotLetters?: TodayLetterCardLike[];
+  /** /{category}/page/[n] 라우트가 넘기는 초기 페이지(2026-09-30). */
+  initialPage?: number;
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<ArchiveItem[]>(initialItems);
@@ -52,6 +64,10 @@ export function CategoryArchiveClient({
       cancelled = true;
     };
   }, [config.label]);
+
+  const {
+    pageItems, currentPage, totalPages, pageHref, isCustomSize, pageSize, onPageChange, onPageSizeChange,
+  } = usePageSizePagination(items, CATEGORY_PAGE_SIZE, `/${config.slug}`, initialPage);
 
   return (
     <div className="min-h-screen bg-white">
@@ -89,7 +105,19 @@ export function CategoryArchiveClient({
               description={config.description}
             />
             <p style={{ fontSize: 12.5, color: '#9ca3af', marginBottom: 14 }}>총 {items.length}개</p>
-            <ArchiveList items={items} emptyLabel={`아직 ${config.label} 글이 없어요.`} />
+            <ArchiveList items={pageItems} emptyLabel={`아직 ${config.label} 글이 없어요.`} />
+            <ListPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageHref={pageHref}
+              isCustomSize={isCustomSize}
+              onPageChange={onPageChange}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageSizeChange={onPageSizeChange}
+              accentColor={config.accent}
+              totalCount={items.length}
+            />
           </main>
 
           <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
