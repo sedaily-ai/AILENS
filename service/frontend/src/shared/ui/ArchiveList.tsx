@@ -14,7 +14,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { LetterMailIcon, StockBullIcon, LightbulbIcon } from '@/shared/ui/icons/HandDrawnIcons';
-import type { ArchiveItem, Kind } from '@/shared/lib/archiveItems';
+import type { ArchiveItem } from '@/shared/lib/archiveItems';
 
 function VideoPlayIcon({ accent, className }: { accent: string; className?: string }) {
   return (
@@ -25,27 +25,17 @@ function VideoPlayIcon({ accent, className }: { accent: string; className?: stri
   );
 }
 
-// 날짜 헤더 대신 각 항목 메타 줄에 붙는 "발행 주체" 라벨 — 뉴닉의 바이라인
-// (뉴닉/솔티라이프 등 채널명) 자리에 해당. 우리는 필진명 대신 콘텐츠
-// 종류를 쓴다(개별 저자 정보가 없는 항목이 대부분이라).
-//
-// "분류"(이슈 톡톡/인사이트/딥다이브) 축이 2026-08-19 카테고리로 대체된
-// 뒤로는 letter 항목의 kind가 사실상 전부 issue_talk로 고정돼(admin이 더
-// 이상 section을 고를 수 없다, PostMode.tsx 참조) 이 맵만 쓰면 모든 새 글이
-// "이슈 톡톡"으로 찍힌다 — LetterDetailClient.tsx와 같은 패턴으로 category를
-// 우선하고, category가 없는 옛 글에서만 이 kind 라벨로 폴백한다(아래
-// labelFor 참조).
-const KIND_LABEL: Record<Kind, string> = {
-  letter: '레터',
-  issue_talk: '이슈 톡톡',
-  column: '인사이트',
-  video: '영상',
-  trend: '딥다이브',
-  lens: '4가지 시선',
-};
-
-function labelFor(item: ArchiveItem): string {
-  return item.category?.trim() || KIND_LABEL[item.kind];
+// 발행 시각(시:분)만 — 카테고리 태그를 대체한다(2026-10-01, 사용자 지적:
+// 이 컴포넌트는 현재 카테고리 아카이브 페이지에서만 쓰이는데(ArchiveList.tsx
+// 상단 주석의 "전용" 구상과 달리 실제 소비처는 그거 하나뿐), 페이지 자체가
+// 이미 그 카테고리로 필터링돼 있어 항목마다 같은 카테고리명을 또 붙이는
+// 게 순수 반복이었다 — 날짜 그룹 헤더엔 없는 정보(시:분)로 교체해 같은
+// 날짜 안에서도 항목을 구분할 수 있게 한다).
+function timeLabel(isoUtc: string | null | undefined): string | null {
+  if (!isoUtc) return null;
+  const d = new Date(isoUtc);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
 }
 
 function dateHeaderLabel(iso: string): string {
@@ -99,7 +89,7 @@ function ArchiveRow({ item }: { item: ArchiveItem }) {
               lineHeight: 1.6,
               marginTop: 6,
               display: '-webkit-box',
-              WebkitLineClamp: 2,
+              WebkitLineClamp: 3,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}
@@ -107,9 +97,11 @@ function ArchiveRow({ item }: { item: ArchiveItem }) {
             {item.excerpt}
           </p>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: item.accent }}>{labelFor(item)}</span>
-        </div>
+        {timeLabel(item.publishedAt) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <span style={{ fontSize: 12, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{timeLabel(item.publishedAt)}</span>
+          </div>
+        )}
       </div>
       {item.avatarUrl ? (
         <span

@@ -46,6 +46,11 @@ export interface LensPerspective {
   full: string;
   /** "이 역할에게 뭘 주는가" — 덱의 payoff 캡션에 해당. */
   tagline: string;
+  /** 소요시간 한 줄(2026-09-30, 메인 리디자인 — "자투리 시간에 씹어준다"는
+   * 미션을 형식 타일에서 바로 증명). 실측 값이 아니라 평균적인 소비
+   * 시간을 편집팀 감각으로 붙인 근사치 — 실제 재생시간/글자수 기반 동적
+   * 계산으로 바꾸려면 CMS에 duration 필드가 따로 필요하다(지금은 없음). */
+  duration: string;
   /** 실제로 뭐가 담겨 있는지(2026-08-21, 첫 방문자용 가이드
    * LensFormatGuide.tsx 전용) — tagline이 "언제 고르는가"라면 이건
    * "고르면 뭘 보게 되는가". */
@@ -107,6 +112,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '레터',
     full: '차분히 읽고 싶은 사람',
     tagline: '구조와 흐름까지 제대로 알고 싶다면',
+    duration: '2분 읽기',
     content: '기승전결 갖춘 글 한 편 — 배경부터 전망까지 순서대로 읽어요',
     illustration: '/lens/role-1-newcomer.png',
     icon: BookOpen,
@@ -119,6 +125,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '웹툰',
     full: '그림으로 가볍게 보고 싶은 사람',
     tagline: '이야기로 스르륵 넘겨보고 싶다면',
+    duration: '30초 스와이프',
     content: '8컷 만화 — 등장인물 대화로 상황을 재구성해서 보여줘요',
     illustration: '/lens/role-2-worker.png',
     icon: Image,
@@ -131,6 +138,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '팟캐스트',
     full: '귀로 듣고 싶은 사람',
     tagline: '이동 중이라 화면 볼 여유가 없다면',
+    duration: '3분 청취',
     content: '음성 브리핑 — 내레이션으로 핵심을 차분히 풀어서 읽어줘요',
     illustration: '/lens/role-3-owner.png',
     icon: Headphones,
@@ -143,6 +151,7 @@ export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
     short: '영상',
     full: '빠르게 훑고 싶은 사람',
     tagline: '3초 안에 무슨 일인지 알고 싶다면',
+    duration: '15초 시청',
     content: '숏폼 영상 — 자막·그래픽과 함께 컷별로 핵심 수치를 보여줘요',
     illustration: '/lens/role-4-investor.png',
     icon: Video,

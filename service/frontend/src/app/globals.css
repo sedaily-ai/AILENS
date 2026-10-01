@@ -83,6 +83,22 @@ body {
   display: none;
 }
 
+/* 기사 썸네일 hover 확대 — ArticleCard.tsx(ArticleThumb) 공용. 리디자인
+   (2026-09-30) — "최신 뉴스" 그리드가 hover 시 제목 밑줄만 있고 이미지는
+   아무 반응이 없어 사이트 다른 곳(오늘의 이슈 카드, 배너 캐러셀)의
+   hover 언어보다 밋밋했다. 살짝 확대만(1.04배) — 카드 자체를 들어올리면
+   그리드 인접 카드와 높이가 어긋나 보여 이미지 안쪽만 스케일. */
+.group:hover .block-thumb-img {
+  transform: scale(1.045);
+}
+
+/* 카테고리 섹션 대표 기사 썸네일 hover 확대 — CategoryFeatureSection.tsx
+   (HeroArticle) 공용. block-thumb-img와 같은 목적, 클래스만 분리(이미 .group
+   이 다른 용도로 쓰이는 파일이라 충돌 방지). */
+.cf-hero:hover .cf-hero-img {
+  transform: scale(1.045);
+}
+
 /* @view-transition 제거 — Next 16 클라이언트 라우팅과 충돌해
    letter 카드 클릭이 hang 되고 새 페이지 스크롤 위치가 페이지 하단으로
    복원되는 버그 발생. 데코레이션 fade 보다 정상 navigation 우선. */

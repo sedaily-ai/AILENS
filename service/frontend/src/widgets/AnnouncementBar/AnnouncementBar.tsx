@@ -23,7 +23,7 @@ const ANNOUNCEMENTS: Announcement[] = [
   { emoji: '🎬', text: '웹툰 파일럿 오픈 — 이슈를 컷으로 만나보세요', href: '/webtoon' },
   { emoji: '📖', text: '용어 해설 퀴즈가 새로 생겼어요, 오늘의 문제 풀어보기', href: '/words' },
   { emoji: '🗞️', text: '나는 신문을 이렇게 읽어요 — 독자들의 스타일 구경하기', href: '/style' },
-  { emoji: '✉️', text: '매일 아침, 놓치기 아까운 레터 모아보기', href: '/archive' },
+  { emoji: '✉️', text: '매일 아침, 놓치기 아까운 이슈 모아보기', href: '/lens' },
 ];
 
 export function AnnouncementBar() {

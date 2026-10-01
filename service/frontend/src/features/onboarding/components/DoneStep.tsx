@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { lensPath } from '@/shared/lib/lensUrl';
 import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import { onboardingPrimaryButtonStyle } from '../lib/onboardingButton';
 import { OnboardingHeader } from './OnboardingHeader';
@@ -20,7 +21,7 @@ export function DoneStep({
   formatIndex: number;
   subscribed: boolean;
 }) {
-  const href = lens ? `/lens/${encodeURIComponent(lens.id)}?v=${formatIndex + 1}` : '/';
+  const href = lens ? `${lensPath(lens)}?v=${formatIndex + 1}` : '/';
   const p = lensPerspectiveAt(formatIndex);
 
   return (

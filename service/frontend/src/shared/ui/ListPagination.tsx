@@ -10,23 +10,55 @@ import { buildPageItems } from '@/shared/lib/pagination';
 // 전체 목록을 다시 슬라이스만 하면 되므로) 그 세션 한정으로 버튼 기반
 // 클라이언트 상태 페이지네이션으로 전환한다 — 커스텀 크기마다 정적
 // 라우트를 만들 필요가 없다.
+// 번호 버튼 테두리 제거(2026-10-01, 사용자 피드백 — "1~10 블록 전체 노출"
+// 구조(2026-09-30 결정, pagination.ts 주석 참조)는 그대로 두되, 12개
+// 가까운 박스가 테두리까지 둘러 한 줄에 쭉 늘어서니 무겁고 "그런
+// 부분들?"로 지적받았다. 현재 페이지만 채운 원형으로 강조하고 나머지는
+// 테두리 없는 숫자로 — hover는 .lp-num 클래스(아래 <style>)로 처리.
+//
+// 활성 페이지 배경을 accent 꽉 채운 색 대신 10% 알파 톤으로 낮췄다
+// (2026-10-01, "빨간색 버튼이 좀 진하지 않나요" — 증시 카테고리 accent
+// #dc2626을 큰 원 배경으로 꽉 채우니 텍스트 포인트로 쓸 때보다 훨씬
+// 쎄 보였다). ArticleThumb 등 다른 곳에서도 이미 쓰는 `${accent}14`
+// 알파 배경 + accent 텍스트 패턴 그대로 재사용.
 const PG_STYLE = (active: boolean, disabled: boolean, accent: string): React.CSSProperties => ({
-  minWidth: 40,
-  height: 40,
-  padding: '0 8px',
-  borderRadius: 9,
+  minWidth: 32,
+  height: 32,
+  padding: '0 4px',
+  borderRadius: 999,
   fontSize: 13.5,
-  fontWeight: 700,
+  fontWeight: active ? 700 : 500,
   cursor: disabled ? 'default' : 'pointer',
   fontVariantNumeric: 'tabular-nums',
-  border: active ? `1px solid ${accent}` : '1px solid rgba(17,24,39,0.12)',
-  background: active ? accent : '#fff',
-  color: active ? '#fff' : disabled ? '#c0c5cc' : '#374151',
+  border: 'none',
+  background: active ? `${accent}1A` : 'transparent',
+  color: active ? accent : disabled ? '#d1d5db' : '#4b5563',
   pointerEvents: disabled ? 'none' : undefined,
   textDecoration: 'none',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
+  transition: 'background 0.15s ease, color 0.15s ease',
+});
+
+// 이전/다음 화살표만 옅은 원형 테두리로 남긴다 — 숫자 무리와 구분되는
+// "컨트롤"이라는 역할을 시각적으로도 유지.
+const PG_ARROW_STYLE = (disabled: boolean): React.CSSProperties => ({
+  minWidth: 32,
+  height: 32,
+  borderRadius: 999,
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: disabled ? 'default' : 'pointer',
+  border: '1px solid rgba(17,24,39,0.12)',
+  background: '#fff',
+  color: disabled ? '#d1d5db' : '#4b5563',
+  pointerEvents: disabled ? 'none' : undefined,
+  textDecoration: 'none',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'background 0.15s ease',
 });
 
 export function ListPagination({
@@ -98,7 +130,7 @@ export function ListPagination({
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 aria-label="이전 페이지"
-                style={PG_STYLE(false, currentPage === 1, accentColor)}
+                style={PG_ARROW_STYLE(currentPage === 1)}
               >
                 ‹
               </button>
@@ -114,6 +146,7 @@ export function ListPagination({
                     onClick={() => onPageChange(n)}
                     aria-current={n === currentPage ? 'page' : undefined}
                     aria-label={`${n}페이지`}
+                    className={n === currentPage ? undefined : 'lp-num'}
                     style={PG_STYLE(n === currentPage, false, accentColor)}
                   >
                     {n}
@@ -125,7 +158,7 @@ export function ListPagination({
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 aria-label="다음 페이지"
-                style={PG_STYLE(false, currentPage === totalPages, accentColor)}
+                style={PG_ARROW_STYLE(currentPage === totalPages)}
               >
                 ›
               </button>
@@ -136,7 +169,7 @@ export function ListPagination({
                 href={pageHref(currentPage - 1)}
                 aria-label="이전 페이지"
                 aria-disabled={currentPage === 1}
-                style={PG_STYLE(false, currentPage === 1, accentColor)}
+                style={PG_ARROW_STYLE(currentPage === 1)}
               >
                 ‹
               </Link>
@@ -151,6 +184,7 @@ export function ListPagination({
                     href={pageHref(n)}
                     aria-current={n === currentPage ? 'page' : undefined}
                     aria-label={`${n}페이지`}
+                    className={n === currentPage ? undefined : 'lp-num'}
                     style={PG_STYLE(n === currentPage, false, accentColor)}
                   >
                     {n}
@@ -161,7 +195,7 @@ export function ListPagination({
                 href={pageHref(currentPage + 1)}
                 aria-label="다음 페이지"
                 aria-disabled={currentPage === totalPages}
-                style={PG_STYLE(false, currentPage === totalPages, accentColor)}
+                style={PG_ARROW_STYLE(currentPage === totalPages)}
               >
                 ›
               </Link>
@@ -169,6 +203,9 @@ export function ListPagination({
           )}
         </nav>
       )}
+      <style>{`
+        .lp-num:hover { background: rgba(17,24,39,0.06); color: #111827; }
+      `}</style>
     </div>
   );
 }

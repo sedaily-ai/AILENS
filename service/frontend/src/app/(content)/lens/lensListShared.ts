@@ -1,5 +1,6 @@
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { SITE_URL } from '@/shared/constants/site';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 export { SITE_URL };
 
@@ -36,7 +37,7 @@ export function buildLensJsonLd(items: CmsLens[]) {
       itemListElement: items.slice(0, 20).map((l, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        url: `${SITE_URL}/lens/${l.id}`,
+        url: `${SITE_URL}${lensPath(l)}`,
         name: l.headline,
       })),
     },

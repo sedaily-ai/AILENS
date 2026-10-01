@@ -125,7 +125,7 @@ const CONTENT_LINKS: { label: string; href: string }[] = [
   { label: '영상', href: '/video' },
   { label: '웹툰', href: '/webtoon' },
   { label: '오디오', href: '/listen' },
-  { label: '전체 콘텐츠', href: '/archive' },
+  { label: '전체 콘텐츠', href: '/lens' },
 ];
 
 export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?: boolean }) {

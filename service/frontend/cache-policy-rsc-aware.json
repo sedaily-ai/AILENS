@@ -1,0 +1,20 @@
+{
+  "Name": "AILens-CachingOptimized-RSC-Aware",
+  "Comment": "Managed-CachingOptimized 기반 + Next.js RSC/prefetch 헤더를 캐시 키에 포함 — 2026-09-30 RSC flight payload 노출 사고 재발 방지",
+  "DefaultTTL": 300,
+  "MaxTTL": 31536000,
+  "MinTTL": 0,
+  "ParametersInCacheKeyAndForwardedToOrigin": {
+    "EnableAcceptEncodingGzip": true,
+    "EnableAcceptEncodingBrotli": true,
+    "HeadersConfig": {
+      "HeaderBehavior": "whitelist",
+      "Headers": {
+        "Quantity": 4,
+        "Items": ["RSC", "Next-Router-Prefetch", "Next-Router-State-Tree", "Next-Router-Segment-Prefetch"]
+      }
+    },
+    "CookiesConfig": { "CookieBehavior": "none" },
+    "QueryStringsConfig": { "QueryStringBehavior": "none" }
+  }
+}

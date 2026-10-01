@@ -33,6 +33,7 @@ import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { Calendar } from 'lucide-react';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -319,16 +320,22 @@ export function LensViewClient({
           align-items: center; justify-content: center; gap: 4px;
           min-height: 56px; padding: 8px 4px; border: none; background: none;
           border-radius: 10px 10px 0 0; cursor: pointer; }
-        .fmt-name { font-size: 14px; font-weight: 600; color: #6b7280;
+        .fmt-name { font-size: 14px; font-weight: 600; color: #374151;
           letter-spacing: -0.01em; white-space: nowrap; transition: color .2s ease; }
         .fmt-amt { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #6b7280;
           font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .2s ease; }
         /* 형식 손그림 아이콘(LensFormatArt) — 2026-08-24, 이모지 대체.
            currentColor를 따르므로 비활성은 아래 .fmt-amt 회색, 활성은
-           형식 색으로 물든다(아래 규칙). */
-        .fmt-art { display: inline-flex; flex-shrink: 0; color: #9ca3af; }
+           형식 색으로 물든다(아래 규칙).
+           2026-10-01 — 비활성 탭 아이콘·이름 색을 한 톤씩 진하게(#9ca3af→
+           #6b7280, #6b7280→#374151, 사용자 피드백: "다른 3개 탭이 존재감이
+           너무 약해서 안 눌러보고 싶게 생겼다"). 색 채움(배경 틴트)을 다시
+           키우는 대신 텍스트·아이콘 자체의 명도만 올려 "선택됨 vs 비선택"
+           대비는 유지하면서 비선택 탭도 또렷하게 읽히게 했다 — 과거 "칠한
+           사각형처럼 무겁다" 피드백으로 뺐던 배경 채움은 그대로 둔다. */
+        .fmt-art { display: inline-flex; flex-shrink: 0; color: #6b7280; }
         .fmt[aria-selected='true'] .fmt-art { color: var(--c); }
-        .fmt[aria-selected='false']:hover .fmt-art { color: #6b7280; }
+        .fmt[aria-selected='false']:hover .fmt-art { color: #374151; }
         /* 선택된 형식은 이름이 그 형식 색으로 물든다(2026-08-24, 사용자 요청:
            "레터 누르면 레터 텍스트가 보라색으로"). --c는 활성 형식 색이고
            활성 탭만 aria-selected=true라 정확히 그 탭에만 적용된다. 볼드(800)
@@ -475,7 +482,7 @@ export function LensViewClient({
           >
             <div className="flex items-center" style={{ gap: 8 }}>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}/lens/${slug}`} />
+              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
             </div>
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
@@ -666,7 +673,7 @@ export function LensViewClient({
                   return (
                     <Link
                       key={l.id}
-                      href={`/lens/${encodeURIComponent(l.id)}`}
+                      href={lensPath(l)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',

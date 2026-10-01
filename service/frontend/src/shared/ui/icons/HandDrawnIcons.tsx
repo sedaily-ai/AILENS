@@ -205,6 +205,46 @@ export function PocketWatchIcon({ accent, className }: IconProps) {
   );
 }
 
+// 영상(숏폼) — 스마트폰 화면 속 웃는 얼굴 + 재생 버튼. "오늘의 이슈, 4가지
+// 시선" 형식 4종(레터=LetterMailIcon·웹툰=ComicBubbleIcon·팟캐스트=
+// ListeningHeadphoneIllustration) 중 유일하게 빠져 있던 영상 캐릭터
+// (2026-09-30, 메인 리디자인 — LensPreviewSection.tsx 형식 타일에서 사진
+// 아바타 대신 이 4종을 쓴다). 세로 화면(숏폼 특성)에 얼굴 + 재생 삼각형.
+export function VideoPhoneIcon({ accent, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 96 96" fill="none" className={className}>
+      <rect x="30" y="12" width="36" height="66" rx="9" stroke="#1a1a1a" strokeWidth={2.6} />
+      <path d="M42 82 L54 82" stroke="#1a1a1a" strokeWidth={2.4} strokeLinecap="round" />
+      <circle cx="40" cy="37" r="2" fill="#1a1a1a" />
+      <circle cx="56" cy="37" r="2" fill="#1a1a1a" />
+      <path d="M40 45 Q48 50 56 45" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
+      <path d="M43 56 L43 68 L54 62 Z" fill={accent} />
+      <path d="M80 16 L82 22 L88 24 L82 26 L80 32 L78 26 L72 24 L78 22 Z" fill={accent} opacity={0.85} />
+      <path d="M14 46 L15.5 50 L19 51.5 L15.5 53 L14 56.5 L12.5 53 L9 51.5 L12.5 50 Z" fill={accent} opacity={0.7} />
+    </svg>
+  );
+}
+
+// 발행 도장 — "오늘의 이슈" 신문 지면 리디자인(2026-09-30)의 데이트라인
+// 옆에 붙이는 잉크 스탬프. 살짝 삐뚤빼뚤한 원(GoodJobStampIcon과 같은
+// 손도장 질감)에 체크마크를 넣어 "오늘 자 발행·검수 완료"를 상징한다 —
+// GoodJobStampIcon(퀴즈 정답 피드백)과는 쓰이는 맥락이 달라 별도로 그렸다.
+export function PublishSealIcon({ accent, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 96 96" fill="none" className={className}>
+      <path
+        d="M48 8 Q68 7 75 27 Q82 45 71 59 Q61 73 44 74 Q24 75 15 57 Q7 41 17 24 Q27 8 48 8 Z"
+        stroke="#1a1a1a"
+        strokeWidth={2.6}
+        strokeLinejoin="round"
+      />
+      <circle cx="45" cy="41" r="17" stroke={accent} strokeWidth={2.2} />
+      <path d="M38 41 L43 46 L53 34" stroke={accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M74 18 L76 23 L81 25 L76 27 L74 32 L72 27 L67 25 L72 23 Z" fill={accent} opacity={0.85} />
+    </svg>
+  );
+}
+
 // 오늘의 시선 — 작은 집과 해 (부동산/도시 이슈)
 export function HouseSunIcon({ accent, className }: IconProps) {
   return (

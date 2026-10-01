@@ -25,14 +25,16 @@ function dateTimeLabel(item: ArchiveItem): string {
 export function ArticleThumb({ item, aspectRatio = '16 / 9' }: { item: ArchiveItem; aspectRatio?: string }) {
   return (
     <span
+      className="block-thumb"
       style={{
         display: 'block',
         width: '100%',
         aspectRatio,
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: 'hidden',
         background: item.avatarUrl ? '#f3f4f6' : `${item.accent}14`,
         flexShrink: 0,
+        boxShadow: 'inset 0 0 0 1px rgba(17,24,39,0.06)',
       }}
     >
       {item.avatarUrl && (
@@ -41,7 +43,8 @@ export function ArticleThumb({ item, aspectRatio = '16 / 9' }: { item: ArchiveIt
           alt=""
           width={400}
           height={225}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          className="block-thumb-img"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .35s cubic-bezier(.2,.7,.3,1)' }}
         />
       )}
     </span>
@@ -59,7 +62,11 @@ function CardMeta({ item }: { item: ArchiveItem }) {
   );
 }
 
-/** 그리드 카드 — 제목만(요약 없음). 뉴닉 "최신 뉴스" 4열 그리드와 동일 밀도. */
+/** 그리드 카드 — 제목+본문 미리보기 1줄(2026-10-01, 어피티 레퍼런스 —
+    "본문 n자 미리보기처럼 나오는게 중요"). 원래는 뉴닉 참고해 제목만
+    보여줬는데, excerpt는 애초에 모든 ArchiveItem에 이미 채워져 있던
+    값이라 그리드에서만 못 쓰게 막아둔 셈이었다 — 레일 카드(아래
+    ArticleRailCard)와 같은 필드를 그냥 숨기고 있던 것. */
 export function ArticleGridCard({ item }: { item: ArchiveItem }) {
   return (
     <Link href={item.href ?? '#'} className="block group">
@@ -79,6 +86,22 @@ export function ArticleGridCard({ item }: { item: ArchiveItem }) {
       >
         {item.title}
       </p>
+      {item.excerpt && (
+        <p
+          style={{
+            marginTop: 5,
+            fontSize: 12.5,
+            color: '#6b7280',
+            lineHeight: 1.55,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {item.excerpt}
+        </p>
+      )}
       <CardMeta item={item} />
     </Link>
   );

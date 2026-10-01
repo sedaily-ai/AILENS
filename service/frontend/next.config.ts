@@ -85,29 +85,43 @@ const nextConfig: NextConfig = {
       { source: "/fortune/:path*", destination: "/saju", permanent: true },
       { source: "/saju-match", destination: "/saju", permanent: true },
       { source: "/saju-match/:path*", destination: "/saju", permanent: true },
+      // 2026-09-29 — "/archive(형식별 진입 디렉토리)도 /lens와 겹치니 지워도
+      // 된다, 전부 /lens로 가게 하라"는 요청으로 /archive 자체를 폐기하고
+      // 여기로 모이던 리다이렉트를 전부 /lens로 재조준. /archive에 nav
+      // 진입점이 없었고(헤더에 링크된 적 없음) 웹툰/영상/오디오는 이미
+      // 각자 독립 탭이 있어 "형식별 허브"로서 실질 가치가 없었다.
       // "딥다이브"(/trend) 아카이브 폐기(2026-08-17) — 처음엔 "이슈 톡톡"
       // 하나로 흡수해 /issue-talk로 보냈는데, 2026-08-19에 "분류"(형식) 축
       // 자체가 카테고리(주제)로 완전히 대체되면서 /issue-talk도 같이
-      // 퇴역했다 — 최종 목적지를 /archive로 다시 정리.
-      { source: "/trend", destination: "/archive", permanent: true },
-      { source: "/trend/:path*", destination: "/archive", permanent: true },
+      // 퇴역했다.
+      { source: "/trend", destination: "/lens", permanent: true },
+      { source: "/trend/:path*", destination: "/lens", permanent: true },
       // /letters, /column, /issue-talk 아카이브 목록 페이지 전부 폐기
       // (마지막으로 남아있던 /issue-talk은 2026-08-19) — 2026-08-17 상단
       // 탭 개편 이후 형식(브리핑/인사이트/이슈톡톡) 기준 대신 주제(증시/
       // 부동산/산업 등 6개 경제 카테고리) 기준으로 완전히 넘어갔다. 세
       // 페이지 다 그 뒤로 사이트 안 어디서도 링크되지 않는 채로 URL만
-      // 살아있었다. "전체 모아보기"(/archive)가 애초에 이 페이지들의
-      // 후속 역할로 만들어진 페이지라 그리로 리다이렉트.
+      // 살아있었다.
       // ⚠️ /letters/:path* 는 만들지 않는다 — /letters/{id}(개별 레터
       // 상세)·/letters/view 는 지금도 정상 사용 중인 라우트라 그대로 둔다.
-      { source: "/letters", destination: "/archive", permanent: true },
-      { source: "/column", destination: "/archive", permanent: true },
-      { source: "/issue-talk", destination: "/archive", permanent: true },
+      { source: "/letters", destination: "/lens", permanent: true },
+      { source: "/column", destination: "/lens", permanent: true },
+      { source: "/issue-talk", destination: "/lens", permanent: true },
       // "재테크"(/investing) 카테고리 폐기(2026-09-11) — 원문 최상위
       // 카테고리에 대응 태그가 없어 처음부터 계속 0건이었다(사용자 신고).
       // sitemap에 2026-08-17부터 올라가 있어 구글에 이미 색인됐을 수
-      // 있으니, 위 사례들과 같은 이유로 맨 404 대신 /archive로 보낸다.
-      { source: "/investing", destination: "/archive", permanent: true },
+      // 있으니 맨 404 대신 리다이렉트로 보낸다.
+      { source: "/investing", destination: "/lens", permanent: true },
+      // /archive 자체도 sitemap에 2026-08-11부터 올라가 있어 색인됐을 수
+      // 있다 — 404 대신 영구 리다이렉트.
+      { source: "/archive", destination: "/lens", permanent: true },
+      // 2026-09-30 — 기사 상세 URL에서 /lens/ 프리픽스 제거 요청("바로
+      // /증시 /부동산처럼 가는 게 깔끔하다"). /lens(목록 허브)·
+      // /lens/page/:n(페이지네이션)은 그대로 둔다 — :slug는 정확히 한
+      // 세그먼트만 매칭해서 이 둘과 안 겹친다. 기존에 색인·공유된
+      // /lens/{slug} 링크가 깨지지 않도록 새 루트 경로(/{slug})로 영구
+      // 리다이렉트.
+      { source: "/lens/:slug", destination: "/:slug", permanent: true },
     ];
     if (process.env.SAJU_ORIGIN) {
       const origin = process.env.SAJU_ORIGIN;

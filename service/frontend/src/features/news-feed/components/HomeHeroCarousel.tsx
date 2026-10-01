@@ -33,9 +33,13 @@ export function HomeHeroCarousel() {
 
   // 도트 옆에 나란히 — 슬라이드 카드 위에 얹었을 때 제목 텍스트와 겹치던
   // 문제(2026-08-06)를 카드 밖으로 빼서 해결.
+  // 22px → 36px(2026-09-30, "오늘의 이슈" 화살표 크기 지적과 같은 문제 —
+  // 이쪽이 더 작았다). 44px 터치타겟까진 못 가지만(이 파일은 CSS
+  // ::after 트릭을 쓸 별도 <style> 블록이 없어 인라인만으로는 한계),
+  // 22px보다는 훨씬 누르기 쉽다.
   const navBtnStyle = {
-    width: 22,
-    height: 22,
+    width: 36,
+    height: 36,
     borderRadius: 999,
     border: '1px solid #e7e2d8',
     background: '#fff',
@@ -43,7 +47,7 @@ export function HomeHeroCarousel() {
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: 700,
     color: '#6b6558',
     lineHeight: 1,
@@ -130,6 +134,7 @@ export function HomeHeroCarousel() {
 
       {/* 슬라이드 3 — 사주. /saju는 다른 Next.js 앱(zone)으로 rewrite되는
           경로라 next/link 대신 일반 <a>로 하드 내비게이션(headerTabs.ts 참조) */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- 위 주석 참조, 의도된 하드 네비게이션 */}
       <a
         href="/saju"
         className="items-center transition-transform duration-200 hover:-translate-y-0.5"

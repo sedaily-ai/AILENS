@@ -390,24 +390,37 @@ export function toLensPreviewSummaries(lenses: CmsLens[]): CmsLens[] {
 
 export async function fetchLensPosts(): Promise<CmsLens[]> {
   return cached('lens', async () => {
-    try {
-      // limit=1000(2026-09-03, webtoon/video와 통일) — 100/250이었던 이유는
-      // lens 채널이 글마다 4포맷 전체(문단·웹툰 컷·팟캐스트/영상 대본
-      // 전문)를 통째로 담아 너무 무거워서, 300건 근처만 돼도 백엔드가
-      // Lambda 동기 응답 6MB 한도를 넘겨 500을 던졌기 때문이다(2026-09-02
-      // 홈 "오늘의 지면" 실종 장애 원인). 근본 수정 완료 — 목록(다건)
-      // 응답은 이제 백엔드가 축약판(label/question/bullets만, 나머지 무거운
-      // 필드는 단건 조회에서만)을 돌려준다(cms_posts_shaping.py의
-      // shape_lens_summary 참조, 글당 크기 ~90% 감소 실측). 그 덕에
-      // 상한을 다시 올려도 안전하다 — webtoon/video가 1000에서 정상인 것과
-      // 같은 이유.
-      const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=lens&limit=1000`, cacheOpts('posts:lens'));
-      if (!res.ok) return [];
-      const data = (await res.json()) as { posts?: CmsLens[] };
-      return data.posts ?? [];
-    } catch {
-      return [];
+    // limit=1000(2026-09-03, webtoon/video와 통일) — 100/250이었던 이유는
+    // lens 채널이 글마다 4포맷 전체(문단·웹툰 컷·팟캐스트/영상 대본
+    // 전문)를 통째로 담아 너무 무거워서, 300건 근처만 돼도 백엔드가
+    // Lambda 동기 응답 6MB 한도를 넘겨 500을 던졌기 때문이다(2026-09-02
+    // 홈 "오늘의 지면" 실종 장애 원인). 근본 수정 완료 — 목록(다건)
+    // 응답은 이제 백엔드가 축약판(label/question/bullets만, 나머지 무거운
+    // 필드는 단건 조회에서만)을 돌려준다(cms_posts_shaping.py의
+    // shape_lens_summary 참조, 글당 크기 ~90% 감소 실측). 그 덕에
+    // 상한을 다시 올려도 안전하다 — webtoon/video가 1000에서 정상인 것과
+    // 같은 이유.
+    const url = `${CMS_API_URL}/api/v2/posts?channel=lens&limit=1000`;
+    // 2026-10-01 — 이 fetch가 실패하면(간헐적으로 재현, 원인 미확정) 조용히
+    // 빈 배열을 돌려줘서 홈 "오늘의 이슈, 4가지 시선" 히어로 전체가 아무
+    // 로그도 없이 통째로 사라지는 실제 장애가 반복됐다(2026-09-02에도 같은
+    // 증상 — 주석 기록으로 확인). 재시도 1회 + 실패 시 로그를 남겨
+    // (a) 한 번의 일시적 실패로 전체 섹션이 비는 걸 줄이고 (b) 다음에
+    // 또 발생하면 CloudWatch 로그로 원인 추적이 가능하게 한다.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await fetch(url, cacheOpts('posts:lens'));
+        if (!res.ok) {
+          console.error(`fetchLensPosts: HTTP ${res.status} (attempt ${attempt}/2)`);
+          continue;
+        }
+        const data = (await res.json()) as { posts?: CmsLens[] };
+        return data.posts ?? [];
+      } catch (e) {
+        console.error(`fetchLensPosts: fetch threw (attempt ${attempt}/2):`, e);
+      }
     }
+    return [];
   });
 }
 

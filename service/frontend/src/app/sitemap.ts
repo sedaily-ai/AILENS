@@ -11,6 +11,7 @@ import { GAMES } from '@/shared/data/games';
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
 import { SITE_URL as BASE } from '@/shared/constants/site';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 // lastModified는 각 라우트 파일의 최근 git 커밋 날짜(2026-08-11 GEO 감사에서
@@ -38,7 +39,6 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 금융·정책
   { path: '/international', priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 국제
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
-  { path: '/archive',      priority: 0.5, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 전체 모아보기
   { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 웹툰 목록
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
   { path: '/video',        priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 영상 목록
@@ -144,7 +144,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     for (const l of lensPosts) {
       const daysOld = daysBetween(l.date);
       entries.push({
-        url: `${BASE}/lens/${l.id}`,
+        url: `${BASE}${lensPath(l)}`,
         lastModified: new Date(l.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),

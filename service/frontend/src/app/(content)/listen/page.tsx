@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
+import { CACHE_TTL_FALLBACK_SECONDS } from '@/shared/lib/api/cmsPostsApi';
 import { ListenListClient } from './ListenListClient';
 import { SITE_URL, LISTEN_LIST_TITLE as TITLE, LISTEN_LIST_DESCRIPTION as DESCRIPTION, buildListenJsonLd } from './listenListShared';
 
@@ -30,6 +31,11 @@ export const metadata: Metadata = {
 
 // 페이지네이션을 경로로 옮김(2026-08-28, lens/page.tsx와 같은 이유) — 2페이지
 // 부터는 /listen/page/[n]/page.tsx.
+// export const revalidate 명시(2026-09-30) — 카테고리 아카이브에서 같은
+// 코드가 빌드마다 s-maxage=31536000으로 굳는 현상이 실측 확인돼, 이
+// 라우트도 명시적으로 300초 고정(lens/page.tsx와 동일 조치).
+export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts) — route segment config는 정적 분석돼 import한 상수를 못 쓴다, 값 바뀌면 여기도 같이 바꿀 것
+
 export default async function ListenListPage() {
   const items = await fetchHomePlayerPosts();
   const jsonLd = buildListenJsonLd(items);

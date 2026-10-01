@@ -30,26 +30,37 @@ function dateTimeLabel(item: ArchiveItem): string {
 
 function HeroArticle({ item, large }: { item: ArchiveItem; large: boolean }) {
   return (
-    <Link href={item.href ?? '#'} className="block group">
+    <Link href={item.href ?? '#'} className="cf-hero block group">
       {/* rounded-sm(2px)이던 걸 10px로 맞췄다(2026-08-17, 사용자 피드백:
           "round는 어때요 전체적으로?" — ArticleCard.tsx의 ArticleThumb,
-          ArchiveList.tsx 썸네일이 전부 10px라 이 카드만 각지게 보였다). */}
+          ArchiveList.tsx 썸네일이 전부 10px라 이 카드만 각지게 보였다).
+          2026-09-30 리디자인 — 12px로 한 단계 더 키워 카드 라운드(16~18px)
+          와 톤을 맞추고, 썸네일에도 hover 확대(ArticleCard.tsx의
+          .block-thumb-img와 같은 언어)를 추가. */}
       {item.avatarUrl && (
-        <div className="relative w-full aspect-video overflow-hidden rounded-[10px] mb-3" style={{ background: '#f3f4f6' }}>
+        <div className="relative w-full aspect-video overflow-hidden rounded-xl mb-3" style={{ background: '#f3f4f6' }}>
           <Image
             src={item.avatarUrl}
             alt=""
             fill
             sizes={large ? '(max-width: 768px) 100vw, 66vw' : '(max-width: 768px) 100vw, 33vw'}
-            style={{ objectFit: 'cover', objectPosition: 'center 15%' }}
+            className="cf-hero-img"
+            style={{ objectFit: 'cover', objectPosition: 'center 15%', transition: 'transform .4s cubic-bezier(.2,.7,.3,1)' }}
           />
         </div>
       )}
+      {/* 헤드라인(large만 세리프) — 신문 지면 탭 리디자인(2026-09-30)과 같은
+          방향: 이 카드의 대표 기사만 Noto Serif KR로 무게감을 주고, 목록
+          기사(ListArticle)·narrow 카드는 산세리프로 남겨 "대표 vs 목록"
+          위계를 서체로도 표현한다. */}
       <h3
-        className="font-bold leading-snug text-gray-900 group-hover:text-blue-700 transition-colors mb-2"
+        className="leading-snug group-hover:text-blue-700 transition-colors mb-2"
         style={{
-          fontSize: large ? 'clamp(20px, 2.6vw, 26px)' : 'clamp(17px, 2vw, 20px)',
-          letterSpacing: '-0.02em',
+          fontFamily: large ? "'Noto Serif KR', serif" : undefined,
+          fontWeight: large ? 700 : 700,
+          color: '#1c1917',
+          fontSize: large ? 'clamp(21px, 2.7vw, 27px)' : 'clamp(17px, 2vw, 20px)',
+          letterSpacing: large ? '-0.01em' : '-0.02em',
           display: '-webkit-box',
           WebkitLineClamp: large ? 3 : 2,
           WebkitBoxOrient: 'vertical',
@@ -122,18 +133,44 @@ export function CategoryFeatureSection({
   const narrowSecond = span === 'narrow' ? rest[0] : null;
 
   return (
-    <div className={span === 'wide' ? 'md:col-span-2' : 'md:col-span-1'}>
-      {/* 헤더 밑줄을 2px 검정에서 1px 연회색으로 낮췄다(2026-08-17, 사용자
-          피드백: "영문사이트처럼 선 색깔을 그레이로 하면 좋지 않으려나...
-          진한 느낌이 없고 디자인적으로 깔끔한, 모던한 느낌" — 본지
-          en.sedaily.com 영문판 참고 스크린샷 대비). */}
-      <header className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid #d1d5db', paddingBottom: 8 }}>
-        <h2 className="font-bold text-gray-900" style={{ fontSize: 17 }}>
-          {config.label}
-        </h2>
-        <Link href={`/${config.slug}`} className="text-gray-400 hover:text-gray-900 transition-colors" style={{ fontSize: 13, fontWeight: 600 }}>
-          전체 보기 →
-        </Link>
+    <div
+      className={span === 'wide' ? 'md:col-span-2' : 'md:col-span-1'}
+      style={{
+        background: '#fff',
+        border: '1px solid rgba(17,24,39,0.06)',
+        borderRadius: 18,
+        boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 10px 24px -16px rgba(17,24,39,0.1)',
+        padding: 'clamp(16px, 2.2vw, 22px)',
+      }}
+    >
+      {/* 헤더 밑줄을 2px 검정에서 1px 연회색으로 낮췄던 결정(2026-08-17,
+          "진한 느낌이 없고 모던한 느낌" 피드백)은 유지한다 — 굵은 검정 선을
+          다시 넣지 않는다. 대신 리디자인(2026-09-30, "고급지게·신문
+          느낌")은 카드 자체(배경·둥근 모서리·옅은 그림자)와 대표 기사
+          세리프 헤드라인으로 무게감을 준다 — 헤더는 여전히 가볍게.
+          제목 크기만 다른 섹션(단어퀴즈/웹툰/영상/오디오/타임머신 — 전부
+          eyebrow 11px+h2 24px 조합)과 맞춘다(2026-10-01) — 상단 네비게이션에도
+          있는 핵심 카테고리인데 이 섹션에서만 16px로 작게 나와 위계가
+          어긋나 있었다. 박스·그림자·언더라인 톤은 그대로 유지. */}
+      <header className="mb-4" style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: 10 }}>
+        <p
+          className="text-gray-400"
+          style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
+        >
+          오늘의 지면
+        </p>
+        <div className="flex items-center justify-between" style={{ gap: 8 }}>
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            {config.label}
+          </h2>
+          <Link
+            href={`/${config.slug}`}
+            className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors"
+            style={{ fontSize: 13, fontWeight: 600 }}
+          >
+            전체 보기 →
+          </Link>
+        </div>
       </header>
 
       <HeroArticle item={hero} large={span === 'wide'} />

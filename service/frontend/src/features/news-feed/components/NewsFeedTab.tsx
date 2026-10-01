@@ -54,14 +54,13 @@ function CategoryPairRow({
   const configs = slugs.map((slug) => ECON_CATEGORIES.find((c) => c.slug === slug)!);
   const itemsBySlug = configs.map((cfg) => archiveItems.filter((it) => it.category === cfg.label));
   if (itemsBySlug.every((items) => items.length === 0)) return null;
-  // 행 사이 구분선을 2px 검정에서 1px 연회색으로 낮췄다(2026-08-17, 사용자
-  // 피드백: "하단에 선도 좀 어색하지 않나요, 검정색 선이요" — 본지의 굵은
-  // "지면 구분선"을 그대로 따라했는데, 우리 페이지 나머지 구분선(카테고리
-  // 섹션 내부 리스트, 최신 뉴스 등)은 전부 옅은 회색이라 이 진한 검정선만
-  // 튀었다).
+  // 행 사이 구분선(2026-08-17엔 1px 연회색 hairline)을 리디자인(2026-09-30)
+  // 에서 완전히 뺐다 — CategoryFeatureSection 각각이 이제 자기 카드(배경+
+  // 테두리+그림자)를 가지므로, 카드 밖에 또 구분선을 그으면 카드 테두리와
+  // 겹쳐 이중 프레임처럼 보인다. 카드 사이 간격(marginTop)만으로 행 구분.
   return (
-    <div style={{ borderTop: first ? 'none' : '1px solid #e5e7eb', paddingTop: first ? 0 : 32 }}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginTop: 32, marginBottom: 32 }}>
+    <div style={{ marginTop: first ? 0 : 24 }}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6" style={{ marginBottom: 24 }}>
         <CategoryFeatureSection config={configs[0]} items={itemsBySlug[0]} span="wide" />
         {configs[1] && <CategoryFeatureSection config={configs[1]} items={itemsBySlug[1]} span="narrow" />}
       </div>
@@ -167,10 +166,6 @@ export function NewsFeedTab({
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
           <div style={{ gridColumn: 1 }}>
             {topBanner}
-            {/* 홈 히어로 배너(2026-08-06) — "신문 읽는 스타일" 이벤트 단일 배너였다가
-                "점박이(캐러셀 도트) 있어야 배너답다, 웹툰·사주도 같이 소개하자"는
-                피드백으로 3슬라이드 캐러셀(HomeHeroCarousel.tsx)로 확장. */}
-            <HomeHeroCarousel />
 
             {/* "최신 뉴스" 히어로 자리+그리드+전체보기(2026-08-17, 배너 바로
                 아래 — 사용자가 스크린샷으로 히어로 위치를 정확히 짚어 확인).
@@ -202,6 +197,17 @@ export function NewsFeedTab({
                 바로 다음 자리로 옮긴다. 영상 섹션은 이미 썸네일이 시각적으로
                 스캔되기 쉬운 포맷이라 원래 자리(카테고리 레일 다음) 유지. */}
             <WordsPreviewSection initialTerms={initialWordTerms} />
+
+            {/* 홈 히어로 배너(2026-08-06, "신문 읽는 스타일"/웹툰/사주 3슬라이드
+                프로모 캐러셀) — 리디자인(2026-09-30)으로 이 자리로 이동. 원래는
+                헤더 바로 아래, 즉 "오늘의 이슈" 히어로·최신 뉴스 그리드보다도
+                위였다 — 첫 화면에서 실제 제품 가치(오늘의 이슈 4가지 시선)를
+                보여주기 전에 자체 프로모션 배너 3개(신문읽기 이벤트/웹툰
+                파일럿/사주)가 먼저 지나가는 순서였다. 퀴즈(WordsPreviewSection)
+                자리는 "스크롤 이탈 전에 걸려야 한다"는 근거가 있어(위 주석
+                참조) 그대로 두고, 프로모 캐러셀만 그 다음으로 내려 실제 콘텐츠가
+                먼저 보이게 했다. */}
+            <HomeHeroCarousel />
 
             {/* 카테고리 섹션(2026-08-17, 본지 en.sedaily.com 스타일 참고 — 사용자
                 확인: "본지형식대로 해보시죠"). 한때 카테고리 레일(그리드형)로

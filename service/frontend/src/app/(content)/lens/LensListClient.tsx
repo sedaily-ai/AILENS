@@ -10,6 +10,7 @@ import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { buildPageItems } from '@/shared/lib/pagination';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
+import { lensPath } from '@/shared/lib/lensUrl';
 
 // "오늘의 이슈, 4가지 시선" 목록.
 //
@@ -198,7 +199,7 @@ export function LensListClient({
 
             <div style={{ border: '1px solid rgba(17,24,39,0.1)', borderRadius: 16, overflow: 'hidden' }}>
               <Link
-                href={`/lens/${encodeURIComponent(latest.id)}`}
+                href={lensPath(latest)}
                 prefetch
                 className="group"
                 style={{ display: 'block', textDecoration: 'none' }}
@@ -267,7 +268,7 @@ export function LensListClient({
                       return (
                         <Link
                           key={i}
-                          href={`/lens/${encodeURIComponent(latest.id)}?v=${i + 1}`}
+                          href={`${lensPath(latest)}?v=${i + 1}`}
                           prefetch
                           className="hrow"
                         >
@@ -364,7 +365,7 @@ export function LensListClient({
                     const thumb = pickLensPhoto(l);
                     const n = (l.lenses ?? []).length;
                     return (
-                      <Link key={l.id} href={`/lens/${encodeURIComponent(l.id)}`} prefetch className="prow">
+                      <Link key={l.id} href={lensPath(l)} prefetch className="prow">
                         <span
                           className="flex-shrink-0"
                           style={{ width: 72, height: 72, borderRadius: 10, overflow: 'hidden', background: '#f3f4f6', boxShadow: 'inset 0 0 0 1px rgba(17,24,39,0.07)' }}
