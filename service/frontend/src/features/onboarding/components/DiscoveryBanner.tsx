@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { X, Sparkles } from 'lucide-react';
+import { X } from 'lucide-react';
 
 /**
  * 메인 피드 상단 — 온보딩(/start) 발견 배너.
@@ -24,9 +24,13 @@ export function DiscoveryBanner() {
 
   if (!visible) return null;
 
-  // 리디자인(2026-09-30) — 박스(배경+테두리) 대신 슬림한 한 줄 텍스트로.
-  // 헤더 바로 아래, 실제 제품 가치(오늘의 이슈)보다도 앞자리에 있는 유일한
-  // 요소라 "박스 위에 박스"로 안 보이게 시각 무게를 최소화 — 기능(디스미스
+  // 2차 리디자인(2026-10-01, 사용자 피드백 — 히어로 이미지 전에 쌓인
+  // 줄이 너무 많다는 지적과 함께 이 배너도 "깔끔하게" 지적받음) — 토스
+  // 블루 스파클 아이콘을 뺐다. 페이지 전체가 잉크/그레이 톤인데 이
+  // 배너만 유일하게 색이 있는 아이콘을 달고 맨 위에 떠 있어서 오히려
+  // 눈에 먼저 걸렸다(사주 위젯 등 다른 블루 포인트는 사이드바 쪽이라
+  // 본문 맨 위와 안 겹친다). 텍스트도 한 톤 낮춰(#374151→#6b7280)
+  // "제목"이 아니라 "작은 보조 링크"로 읽히게 했다 — 기능(디스미스
   // 가능한 /start 발견 배너)은 그대로 유지.
   return (
     <div
@@ -39,16 +43,15 @@ export function DiscoveryBanner() {
         margin: '0 0 14px',
       }}
     >
-      <Sparkles size={14} color="#3182F6" strokeWidth={2.2} style={{ flexShrink: 0 }} />
       <Link
         href="/start"
-        className="group-hover:text-blue-700 transition-colors"
+        className="group-hover:text-gray-900 transition-colors"
         style={{
           flex: 1,
           minWidth: 0,
-          fontSize: 13,
-          fontWeight: 600,
-          color: '#374151',
+          fontSize: 12.5,
+          fontWeight: 500,
+          color: '#6b7280',
           textDecoration: 'none',
         }}
       >

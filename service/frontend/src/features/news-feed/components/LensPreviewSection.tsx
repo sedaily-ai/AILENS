@@ -3,24 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Info } from 'lucide-react';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { LENS_ACCENT, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { getSavedInterests } from '@/shared/lib/onboardingStorage';
 import { lensPath } from '@/shared/lib/lensUrl';
 import { LensFormatGuide } from './LensFormatGuide';
-import { PublishSealIcon } from '@/shared/ui/icons/HandDrawnIcons';
-
-// 데이트라인(2026-09-30, "신문사다운 구조" 요청) — "2026년 9월 30일 수요일"
-// 형태. features/timeline의 kdate()는 요일이 없고, FSD 규칙상 다른
-// feature를 직접 import할 수도 없어(features → features 금지) 여기 로컬로
-// 다시 작게 만든다.
-const DOW = ['일', '월', '화', '수', '목', '금', '토'] as const;
-function fullDateline(iso: string): string {
-  const d = new Date(`${iso}T00:00:00+09:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
-}
 
 // 형식 타일 아이콘 — 2차 리디자인(2026-09-30, 사용자 피드백: "일러스트
 // 구리고요"). 손그림 캐릭터 아이콘(눈코입+반짝이)으로 1차 교체했던 게
@@ -111,10 +100,6 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   // 혼동 없이 정정). 즉 "히어로+작은 카드 3개" 레이아웃 자체는 맞았고,
   // 그 4개가 "다른 지면들"이 아니라 "같은 지면의 다른 기사들"이어야 했다.
   const [activeTab, setActiveTab] = useState(0);
-  // 온보딩 관심사와 일치하는 탭 인덱스 — "맞춤" 배지 표시용. activeTab과
-  // 분리해두는 이유는 이전과 동일: 사용자가 탭을 수동으로 바꿔도 배지는
-  // 원래 관심사 탭에 남아 있어야 한다.
-  const [personalizedTab, setPersonalizedTab] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +133,6 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
     if (idx < 0) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 localStorage 1회 읽기(바로 위 GUIDE_SEEN_KEY effect와 같은 관례).
     setActiveTab(idx);
-    setPersonalizedTab(idx);
   }, []);
 
   // useCallback으로 고정한다 — LensFormatGuide가 이 함수를 ESC 리스너
@@ -252,18 +236,18 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
       `}</style>
 
       <header style={{ marginBottom: 14 }}>
-        {/* 데이트라인 + 발행 도장(2026-09-30, "신문사다운 구조" 요청) — 이
-            섹션이 UI 위젯이 아니라 "오늘 자 지면"이라는 걸 활자로 먼저
-            알린다. "오늘의 지면" 라벨을 대체하지 않고 그 위에 얹는다(라벨은
-            무슨 코너인지, 데이트라인은 언제 발행인지 — 역할이 다르다). */}
-        <div className="flex items-center" style={{ gap: 6, marginBottom: 6 }}>
-          <PublishSealIcon accent={LENS_ACCENT} className="w-[15px] h-[15px] flex-shrink-0" />
-          <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 12.5, color: '#78716c', letterSpacing: '0.01em' }}>
-            {fullDateline(hero?.date ?? new Date().toISOString().slice(0, 10))} 발행
-          </span>
-        </div>
+        {/* 데이트라인을 "오늘의 지면" 라벨과 한 줄로 합쳤다(2026-10-01,
+            사용자 피드백 — 배너·eyebrow·데이트라인·제목·부제·고지문까지
+            히어로 이미지 전에 7줄이 쌓여 "그러네요"로 지적받음). 도장
+            아이콘+세리프 전용 줄로 따로 뺐던 이전 버전(2026-09-30,
+            "신문사다운 구조")은 그 자체로는 맞는 방향이었지만 줄 수를
+            늘리는 비용이 더 컸다 — 같은 정보(언제 발행)를 라벨 옆 보조
+            텍스트로 압축. */}
         <p className="text-gray-400" style={{ fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
-          오늘의 지면
+          오늘의 지면{' '}
+          <span style={{ color: '#b7b2a6', fontWeight: 600, letterSpacing: 0, textTransform: 'none' }}>
+            · {(hero?.date ?? new Date().toISOString().slice(0, 10)).replaceAll('-', '.')} 발행
+          </span>
         </p>
         {/* "전체 보기" 링크 삭제(2026-10-01, 사용자 요청) — 어차피 /lens로
             가는 같은 목적지 링크가 바로 아래 "최신 뉴스" 섹션 쪽으로
@@ -274,31 +258,30 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
             오늘의 이슈, 4가지 시선
           </h2>
           {/* 가이드 트리거 — 첫 방문자에겐 자동으로 뜨고, 재방문자는
-              이 버튼으로 다시 볼 수 있다(LensFormatGuide.tsx 참조). */}
+              이 버튼으로 다시 볼 수 있다(LensFormatGuide.tsx 참조).
+              손으로 그린 원+굵은 "i" 글자 조합이 촌스럽다는 지적(2026-10-01)
+              — 다른 곳(DiscoveryBanner 등)에서도 쓰는 lucide-react 아이콘
+              세트로 교체, 원형 테두리도 없앴다. 히트 영역(44×44)은
+              .lz-info::after로 그대로 유지. */}
           <button
             type="button"
             onClick={() => setShowGuide(true)}
             aria-label="4가지 형식 안내 보기"
-            className="lz-info flex items-center justify-center flex-shrink-0 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-            style={{ width: 22, height: 22, borderRadius: '50%', background: 'none', border: '1.5px solid currentColor', color: '#6b7280', cursor: 'pointer' }}
+            className="lz-info flex items-center justify-center flex-shrink-0 hover:text-gray-900 transition-colors"
+            style={{ width: 16, height: 16, background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}
           >
-            <span style={{ fontSize: 12, fontWeight: 700, lineHeight: 1 }}>i</span>
+            <Info size={16} strokeWidth={1.8} />
           </button>
         </div>
-        {/* 사용법 설명을 줄였다(2026-08-24) — 탭·화살표·형식 타일이 각자
-            생김새로 이미 역할을 말한다. 이 줄은 "왜 네 형식인가"만 말한다. */}
-        <p style={{ fontSize: 14, color: '#6b7280', marginTop: 4, wordBreak: 'keep-all' }}>
-          같은 기사를 네 가지 형식으로 담았어요. 원하는 방식으로 보세요.
-        </p>
-        {/* 신뢰 신호(2026-09-30, 메인 리디자인) — /about·AiDisclaimer.tsx(기사
-            하단)엔 "AI 초안 → 사람 검수" 편집 프로세스가 이미 명시돼 있는데,
-            홈에는 어디에도 이 설명이 없었다 — 처음 들어온 방문자는 기사를
-            하나 클릭해서 맨 아래까지 스크롤해야만 "누가·어떻게 만들었는지"를
-            알 수 있었다. 이 서비스의 핵심 콘텐츠(오늘의 이슈) 바로 위에 한
-            줄로 짧게 — 법적 고지문이 아니라 신뢰를 위한 안내라 톤을
-            가볍게(별도 박스·테두리 없이 캡션처럼). */}
-        <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 7, wordBreak: 'keep-all' }}>
-          서울경제신문 기자가 취재한 기사를 AI가 요약·재구성하고, 편집팀이 검수해 발행해요.
+        {/* 사용법 설명(무슨 기능인가)과 신뢰 신호(누가·어떻게 만들었나,
+            2026-09-30 메인 리디자인 때 추가 — /about·AiDisclaimer.tsx에만
+            있던 "AI 초안 → 사람 검수" 설명을 핵심 콘텐츠 바로 위에도
+            노출)가 원래 톤·줄 간격이 다른 두 문단으로 따로 떠 있어 어수선해
+            보였다(2026-10-01, 사용자 지적) — 한 문단으로 합쳐 한 호흡에
+            읽히게 했다. 정보 두 가지(기능 설명+제작 방식)는 그대로 유지. */}
+        <p style={{ fontSize: 13.5, color: '#6b7280', marginTop: 4, lineHeight: 1.6, wordBreak: 'keep-all' }}>
+          같은 기사를 네 가지 형식으로 담았어요. 원하는 방식으로 보세요. 서울경제신문 기자가
+          취재한 기사를 AI가 요약·재구성하고, 편집팀이 검수해 발행해요.
         </p>
       </header>
 
@@ -336,24 +319,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                   cursor: 'pointer',
                 }}
               >
-                <span className="inline-flex items-center" style={{ gap: 5 }}>
-                  {s.label}
-                  {personalizedTab === i && (
-                    <span
-                      style={{
-                        fontSize: 9.5,
-                        fontWeight: 700,
-                        color: '#2563eb',
-                        background: 'rgba(37,99,235,0.1)',
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        letterSpacing: 0,
-                      }}
-                    >
-                      맞춤
-                    </span>
-                  )}
-                </span>
+                {s.label}
               </button>
             );
           })}
@@ -513,6 +479,27 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                   >
                     {article.headline}
                   </span>
+                  {/* 본문 미리보기 1줄 추가(2026-10-01, 사용자 지적 —
+                      히어로엔 article.context가 있는데 이 3개 보조기사엔
+                      빠져있었다). 그리드 카드(ArticleCard.tsx)와 같은
+                      톤·크기로 맞춘다. */}
+                  {article.context && (
+                    <span
+                      style={{
+                        display: '-webkit-box',
+                        marginTop: 5,
+                        fontSize: 12.5,
+                        color: '#6b7280',
+                        lineHeight: 1.55,
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        wordBreak: 'keep-all',
+                      }}
+                    >
+                      {article.context}
+                    </span>
+                  )}
                   <span style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: '#9ca3af', fontWeight: 600 }}>
                     {kstDateTimeLabel(article.published_at) ?? article.date.replaceAll('-', '.')}
                   </span>
