@@ -35,6 +35,7 @@ import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
 import { ArticleChapterNav } from './components/ArticleChapterNav';
 import { ArticleResume } from './components/ArticleResume';
+import { IconStopwatch } from './components/LensIcons';
 import { ArticleReveal } from './components/ArticleReveal';
 import { letterChapters } from './components/lensChapters';
 import { readMinutes } from './components/lensSamples';
@@ -336,8 +337,8 @@ export function LensViewClient({
            AI 고지는 바이라인·하단 AiDisclaimer가 이미 맡으므로 요약 안엔 "AI 요약" 표기를 두지 않는다. */
         .sum { margin-top: 12px; padding: clamp(24px, 3.4vw, 34px) clamp(22px, 3.6vw, 36px) clamp(26px, 3.6vw, 36px);
           background: #f6f7f9; border-radius: 20px; }
-        .sum-head { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
-        .sum-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sum-accent); flex-shrink: 0; }
+        .sum-head { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; }
+        .sum-ico { flex-shrink: 0; color: var(--sum-accent); }
         .sum-title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.015em; color: #111827; }
         .sum-list { display: flex; flex-direction: column; gap: 18px; list-style: none; padding: 0; margin: 0; }
         .sum-item { display: flex; align-items: flex-start; gap: 14px; word-break: keep-all; }
@@ -665,7 +666,7 @@ export function LensViewClient({
           {coreSummaryBullets(lens).length > 0 && (
             <div data-speakable="summary" className="sum" style={{ ['--sum-accent' as string]: lensPerspectiveAt(0).color }}>
               <div className="sum-head">
-                <span className="sum-dot" aria-hidden />
+                <IconStopwatch size={22} className="sum-ico" />
                 <p className="sum-title">30초 핵심</p>
               </div>
               <ol className="sum-list">

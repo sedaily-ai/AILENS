@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Headphones, Printer, Share2 } from 'lucide-react';
+import { IconListen, IconPrint, IconShare, IconTextMinus, IconTextPlus } from './LensIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 
 // 기사 왼쪽 고정 도구 레일(2026-10-01) — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + /
@@ -107,22 +107,18 @@ export function ArticleToolRail({
     <>
       {onListen && (
         <ToolButton label="듣기" onClick={onListen}>
-          <Headphones size={22} strokeWidth={1.5} aria-hidden />
+          <IconListen size={24} />
         </ToolButton>
       )}
       <ToolButton label="글자 +" onClick={() => step(1)} disabled={size === 'large'}>
-        <span aria-hidden style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 22, lineHeight: '22px' }}>
-          T
-        </span>
+        <IconTextPlus size={24} />
       </ToolButton>
       <ToolButton label="글자 −" onClick={() => step(-1)} disabled={size === 'small'}>
-        <span aria-hidden style={{ fontSize: 17, lineHeight: '22px', fontWeight: 500 }}>
-          Aa
-        </span>
+        <IconTextMinus size={24} />
       </ToolButton>
       <div ref={shareRef} style={{ position: 'relative' }}>
         <ToolButton label="공유" onClick={() => setShareOpen((v) => !v)} expanded={shareOpen}>
-          <Share2 size={22} strokeWidth={1.5} aria-hidden />
+          <IconShare size={24} />
         </ToolButton>
         {shareOpen && (
           <div role="dialog" aria-label="공유" className="rail-pop">
@@ -131,7 +127,7 @@ export function ArticleToolRail({
         )}
       </div>
       <ToolButton label="인쇄" onClick={() => window.print()}>
-        <Printer size={22} strokeWidth={1.5} aria-hidden />
+        <IconPrint size={24} />
       </ToolButton>
     </>
   );
