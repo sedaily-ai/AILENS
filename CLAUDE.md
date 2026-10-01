@@ -62,9 +62,8 @@ CloudFront(`E1QS7PY350VHF6`, `E1MITYI58DB9UW`), 같은 Lambda 함수 이름
   ARN 을 경유한다. 이 레포는 이 문제로 **W22 에 주당 약 $1,156 을 미지정으로 흘린 전례**가 있고
   (`constants.py` `BEDROCK_MODEL_ID_OPUS` 주석), Opus 만 고쳐져 Haiku·Sonnet·Nova·챗봇 경로는
   아직 베어다.
-- **2026-09-30까지 AI LENS 전체의 `Service` 기본값은 `atlas4`.** 기존 113개도 2026-08-24
-  이관 완료됐고, 9/30에 `lens`로 원복한다. 2026-10-01 이후 신규는 `lens`를 쓴다.
-  최종 크레딧 적격성은 이테크가 판정하므로 `atlas4=AI LENS 전체`임을 매핑표에 명시한다.
+- **AI LENS 전체의 `Service` 값은 `lens`.** 2026-08-24부터 Atlas 크레딧 lane `atlas4`로
+  옮겼던 리소스는 원복이 끝났다(AI-dashboard `ops/atlas-lane-rollback`). `atlas4`를 새로 붙이지 않는다.
 - **태그는 소급되지 않는다.** 일회성·단발 작업은 기회가 한 번뿐이므로 **착수 전에** 붙인다.
 - 태그 값을 스크립트 사본마다 하드코딩하지 않는다 — 변수 한 곳으로 뺀다. 배포가 덮어쓴 전례가 있다.
 

@@ -412,7 +412,7 @@ BEDROCK_IMAGE_REGION = "us-west-2"  # us-east-1엔 살아있는 순수 text-to-i
 # 베어(`stability.stable-image-core-v1:1`)로 부르면 비용할당태그가 붙을 자리가 없어
 # 청구 데이터에서 전량 `Not Applicable`로 샌다(BillingON 실측 8/18~8/26 $33.08,
 # 월 약 $110). 태그는 소급되지 않으므로 지난 발생분은 복구 불가다.
-# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image.
+# 프로파일 태그: Service=lens · Project=Sedaily-LENS · Workload=webtoon-image.
 # 2026-09-30 이후 Service를 lens로 원복 — docs/architecture/비용태깅_규칙.md 참고.
 BEDROCK_IMAGE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/5jauvzgplsjx"  # lens-webtoon-image-stable-core → stability.stable-image-core-v1:1
 BEDROCK_ASPECT_RATIO = "3:2"
@@ -495,7 +495,7 @@ def generate_bedrock_image_bytes(prompt: str) -> bytes:
 # 필수 필드로 붙는다(SD3 계열은 같은 엔드포인트로 image-to-image도
 # 받기 때문 — 여긴 텍스트 전용 고정). us-east-1엔 없고 us-west-2에만
 # 있다(BEDROCK_IMAGE_REGION과 동일 — 위 주석 참고).
-# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
+# 프로파일 태그: Service=lens · Project=Sedaily-LENS · Workload=webtoon-image
 # (BEDROCK_IMAGE_MODEL_ID와 동일 태깅 정책 — 비용태깅_규칙.md 참고).
 SD35_LARGE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/52u16muojn2u"  # lens-webtoon-image-sd35-large → stability.sd3-5-large-v1:0
 
@@ -519,7 +519,7 @@ def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
 # 퀄리티로 나오면 제일 좋은뎅")으로 실측 비교(us-west-2, 동일 프롬프트)
 # 후 추가. Stable Image Core와 요청 스키마 동일(mode 불필요 — SD3.5
 # Large와 다름, Ultra는 Core 계열 엔드포인트).
-# 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
+# 프로파일 태그: Service=lens · Project=Sedaily-LENS · Workload=webtoon-image
 # (BEDROCK_IMAGE_MODEL_ID와 동일 태깅 정책 — 비용태깅_규칙.md 참고).
 SD_ULTRA_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/htvjnctxyvs1"  # lens-webtoon-image-sd-ultra → stability.stable-image-ultra-v1:1
 

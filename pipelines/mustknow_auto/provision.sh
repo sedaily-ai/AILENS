@@ -35,9 +35,9 @@ FAMILY="sedaily-lens-mustknow-auto"
 # Atlas 작업으로 집계된다. mustknow 체인은 lane 4다. WorkItem=atlas-4444 는
 # 담당자 내부 마커로 유지하지만, WorkItem 키는 payer 비용할당 태그로 활성화돼
 # 있지 않아 청구 데이터에 나타나지 않는다 — 집계에 실제로 잡히는 것은 Service 뿐.
-# ⚠ 크레딧 지원 종료일 2026-09-30 에 SERVICE_TAG 를 "lens" 로 되돌릴 것.
-#    되돌릴 때 tags-ecs.json 의 Service 값도 함께 바꿔야 한다.
-SERVICE_TAG="atlas4"  # 9/30 이후 "lens"
+# Atlas lane 원복(AI-dashboard ops/atlas-lane-rollback) — Service 를 lens 로 되돌렸다.
+#    tags-ecs.json 의 Service 값도 같은 변경에서 lens 로 바꿨다. 다시 atlas4 를 넣지 않는다.
+SERVICE_TAG="lens"
 
 TAGS_KV="Key=Project,Value=Sedaily-LENS Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-LENS Key=Environment,Value=dev Key=Service,Value=${SERVICE_TAG} Key=Workload,Value=mustknow-auto Key=WorkItem,Value=atlas-4444"  # iam (대문자 Key/Value)
 TAGS_EQ="Project=Sedaily-LENS,CostCenter=sedaily-ai,ServiceName=Sedaily-LENS,Environment=dev,Service=${SERVICE_TAG},Workload=mustknow-auto,WorkItem=atlas-4444"  # logs

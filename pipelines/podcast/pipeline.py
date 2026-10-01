@@ -42,7 +42,7 @@ from text_utils import strip_code_fence
 
 # 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요. 클로드 5.0
 # opus로 모든 프로덕션... 업데이트": 전용 프로파일 lens-podcast-opus-5
-# (신규 생성, us.anthropic.claude-opus-5 copyFrom, Service=atlas4·
+# (신규 생성, us.anthropic.claude-opus-5 copyFrom, Service=lens·
 # Workload=podcast)로 교체 — admin/backend/routes/prompts.py::
 # _CATEGORY_BEDROCK["podcast"]와 반드시 같은 ARN을 유지할 것(admin
 # 테스트 도구와 실제 발행이 어긋나면 안 된다는 이 세션 기존 원칙).

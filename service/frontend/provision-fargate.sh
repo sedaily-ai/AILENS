@@ -32,11 +32,11 @@ CF_PREFIX_LIST="pl-3b927c52"
 CLUSTER="sedaily-lens-frontend"
 REPO="sedaily-lens-frontend"
 
-# ⚠ 크레딧 지원 종료일 2026-09-30에 "lens"로 되돌릴 것(되돌릴 때
-#   tags-ecs.json의 Service 값도 함께 바꿔야 한다) —
+# Atlas lane 원복(AI-dashboard ops/atlas-lane-rollback) — Service 를 lens 로 되돌렸다
+#   (tags-ecs.json 의 Service 값도 같은 변경에서 lens) —
 #   docs/architecture/비용태깅_규칙.md 참조. 태그 값은 이 변수 한 곳에서만
 #   — 사본마다 하드코딩하면 새는 구멍이 생긴다(같은 문서 §6, 실제 전례).
-SERVICE_TAG="atlas4"  # 9/30 이후 "lens"
+SERVICE_TAG="lens"
 
 TAGS_KV="Key=Project,Value=Sedaily-LENS Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-LENS Key=Environment,Value=prod Key=Service,Value=${SERVICE_TAG} Key=Workload,Value=frontend"  # elbv2 (Key=/Value= 공백 구분)
 TAGS_EQ="Project=Sedaily-LENS,CostCenter=sedaily-ai,ServiceName=Sedaily-LENS,Environment=prod,Service=${SERVICE_TAG},Workload=frontend"  # logs
