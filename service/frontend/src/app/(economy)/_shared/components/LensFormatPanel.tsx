@@ -205,7 +205,10 @@ export function LensFormatPanel({
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
             {/* 본문 블록 렌더(2026-10-01) — parseLetterBlocks가 소제목·목록·인용·구분선을 읽어 풀어 주므로 프롬프트
                 출력 형식이 달라져도 기호가 그대로 새지 않는다. 소제목 id는 오른쪽 구간 목차의 앵커. */}
-            {parseLetterBlocks(letterParagraphs, { headline: lens.headline }).map((b, bi) => {
+            {(() => {
+              const blocks = parseLetterBlocks(letterParagraphs, { headline: lens.headline });
+              const chTotal = blocks.filter((x) => x.type === 'sub').length;
+              return blocks.map((b, bi) => {
               const kw = l.keywords ?? [];
               switch (b.type) {
                 case 'lead':
@@ -217,7 +220,10 @@ export function LensFormatPanel({
                 case 'sub':
                   return (
                     <h3 key={bi} id={chapterId(b.no)} className="lread-sub">
-                      <span className="ch-no">{String(b.no + 1).padStart(2, '0')}</span>
+                      <span className="ch-no">
+                        {String(b.no + 1).padStart(2, '0')}
+                        <i>/ {String(chTotal).padStart(2, '0')}</i>
+                      </span>
                       <span className="ch-t">{renderInline(b.head, kw)}</span>
                       {b.question && <span className="ch-q">{renderInline(b.question, kw)}</span>}
                     </h3>
@@ -249,7 +255,8 @@ export function LensFormatPanel({
                 default:
                   return <p key={bi}>{renderInline(b.text, kw)}</p>;
               }
-            })}
+              });
+            })()}
             {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
                 "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
                 신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +

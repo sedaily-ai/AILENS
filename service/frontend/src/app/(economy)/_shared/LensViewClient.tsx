@@ -451,13 +451,17 @@ export function LensViewClient({
         /* 소제목 — 번호 + 세리프 제목 + 연한 질문(2단). 구획 사이는 여백으로만. */
         .lread > .lread-sub { scroll-margin-top: 160px; margin-top: 52px; margin-bottom: 18px; }
         .lread > .lread-sub + * { margin-top: 0; }
-        .lread-sub .ch-no { display: block; margin-bottom: 9px; font-size: 12px; font-weight: 800; letter-spacing: 0.1em;
-          color: var(--lc, #111827); font-variant-numeric: tabular-nums; }
+        /* 챕터 번호 알약 "02 / 06"(2026-10-01, 에듀테크식 단계감) — 형식 색 8% 면 + 형식 색 글자. 테두리 없음. */
+        .lread-sub .ch-no { display: inline-flex; align-items: baseline; gap: 5px; margin-bottom: 12px; padding: 4px 11px; border-radius: 999px;
+          font-size: 12px; font-weight: 800; letter-spacing: 0.04em; color: var(--lc, #111827); font-variant-numeric: tabular-nums;
+          background: color-mix(in srgb, var(--lc, #111827) 9%, #fff); }
+        .lread-sub .ch-no i { font-style: normal; font-weight: 600; opacity: 0.55; }
         .lread-sub .ch-t, .lread-sub .ch-q { text-wrap: balance; }
         .lread-sub .ch-t { display: block; font-family: "Noto Serif KR", serif; font-size: calc(25px * var(--lens-font-scale, 1));
           font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; color: #111827; word-break: keep-all; }
-        .lread-sub .ch-q { display: block; margin-top: 7px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.55;
-          font-weight: 500; color: #6b7280; word-break: keep-all; }
+        /* 질문 — "이 구간이 답할 질문"을 연한 면 위에 두어 독자가 읽기 전에 목적을 잡게 한다. */
+        .lread-sub .ch-q { display: block; width: fit-content; max-width: 100%; margin-top: 12px; padding: 8px 14px; border-radius: 12px;
+          background: #f4f5f7; font-size: calc(15.5px * var(--lens-font-scale, 1)); line-height: 1.5; font-weight: 500; color: #4b5563; word-break: keep-all; }
         /* 편지 마무리 — 따뜻한 한 줄 + 발신인. 위쪽 룰 없이 여백만. */
         .lread-sign { margin-top: 48px; }
         .lread-thanks { margin: 0 0 14px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; color: #374151; font-weight: 500; }
