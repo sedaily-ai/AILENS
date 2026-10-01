@@ -9,6 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type TouchEvent as ReactTouchEvent,
 } from 'react';
+import Image from 'next/image';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
@@ -32,7 +33,6 @@ import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
-import { ArticleHero } from './components/ArticleHero';
 import { ArticleStickyBar } from './components/ArticleStickyBar';
 import { ArticleToolRail } from './components/ArticleToolRail';
 import {
@@ -279,45 +279,6 @@ export function LensViewClient({
       </span>
     </a>
   ) : null;
-  // 바이라인·입력 시각·(히어로일 때) 원문 링크·구글 출처 알약 + 헤어라인 + 좁은 화면 도구 줄.
-  const metaBlock = (withSource: boolean) => (
-    <>
-      <div className="flex items-center justify-between flex-wrap" style={{ gap: 10, paddingBottom: 16 }}>
-        <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
-          <strong style={{ color: '#111827', fontWeight: 700 }}>AI LENS 편집팀</strong>
-          <span aria-hidden> · </span>
-          입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
-        </p>
-        <div className="flex items-center flex-wrap" style={{ gap: 12 }}>
-          {withSource && sourceLink}
-          <a
-            href={`https://www.google.com/preferences/source?q=${new URL(SITE_URL).host}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="pill"
-          >
-            <GoogleIcon className="w-3.5 h-3.5" />
-            구글 검색 선호 출처로 추가
-          </a>
-        </div>
-      </div>
-
-      <div className="rule" />
-
-      {/* 좁은 화면(<1100px) 도구 줄 — 넓은 화면에서는 왼쪽 레일로 대체. */}
-      <div className="tools-inline flex items-center justify-between flex-wrap" style={{ marginTop: 14, gap: 12, paddingBottom: 14 }}>
-        <div className="flex items-center" style={{ gap: 8 }}>
-          <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-          <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
-        </div>
-        <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
-          <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
-          <div style={{ width: 1, alignSelf: 'stretch', background: '#e5e7eb' }} aria-hidden />
-          <ArticlePrintButton />
-        </div>
-      </div>
-    </>
-  );
   const podcastIdx = lenses.findIndex((l) => l.label === '팟캐스트');
   // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
   const activeP = lensPerspectiveAt(active);
@@ -339,7 +300,6 @@ export function LensViewClient({
         .lw { max-width: 720px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px); }
         .art-main { position: relative; }
         .rail-host { display: none; }
-        .rail-host.hero-below { top: var(--hero-h) !important; }
         @media (min-width: 1100px) {
           .tools-inline { display: none !important; }
           .rail-host { display: block; position: absolute; top: 0; bottom: 0; left: calc(50% - 360px - 120px); width: 76px; }
@@ -532,14 +492,14 @@ export function LensViewClient({
         }
       `}</style>
 
-      <main id="main-content" className="art-main" style={{ ['--hero-h' as string]: 'clamp(260px, 40vh, 460px)' }}>
+      <main id="main-content" className="art-main">
         <ArticleStickyBar
           category={lens.category ?? null}
           categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
           title={lens.headline}
         />
         {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
-        <div className={`rail-host${photo ? ' hero-below' : ''}`}>
+        <div className="rail-host">
           <nav className="rail" aria-label="기사 도구">
             <ArticleToolRail
               title={lens.headline}
@@ -551,54 +511,101 @@ export function LensViewClient({
           </nav>
         </div>
 
-        {/* ── 기사 머리 ── 사진이 있으면 사진 히어로(제목·부제를 사진 위에), 없으면 텍스트 머리. */}
-        {photo ? (
-          <>
-            <ArticleHero
-              photo={photo}
-              headline={lens.headline}
-              deck={lens.context}
-              category={lens.category}
-              categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
-              subcategory={lens.subcategory}
-              creditHref={lens.source_url}
-              accent={LENS_ACCENT}
-            />
-            <div className="lw" style={{ paddingTop: 18 }}>{metaBlock(true)}</div>
-          </>
-        ) : (
-          <div className="lw" style={{ paddingTop: 'clamp(8px, 2vw, 16px)' }}>
-            <p className="eyebrow">
-              {lens.category && <Link href={`/${lensCategorySlug(lens.category)}`}>{lens.category}</Link>}
-              {lens.subcategory && <> · {lens.subcategory}</>}
-              <span className="badge">4가지 시선</span>
-            </p>
-            <h1
-              id="art-h1"
-              data-speakable="headline"
-              style={{
-                fontFamily: '"Noto Serif KR", serif',
-                fontSize: 'clamp(28px, 4vw, 40px)',
-                fontWeight: 700,
-                color: '#111827',
-                letterSpacing: '-0.025em',
-                lineHeight: 1.35,
-                marginBottom: 14,
-                textWrap: 'balance',
-                wordBreak: 'keep-all',
-              }}
+        {/* ── 기사 머리 ── 카테고리 아이브로우 → 세리프 헤드라인 → 부제 → 바이라인/발행시각 → 헤어라인 */}
+        <div className="lw" style={{ paddingTop: 'clamp(8px, 2vw, 16px)' }}>
+          <p className="eyebrow">
+            {lens.category && <Link href={`/${lensCategorySlug(lens.category)}`}>{lens.category}</Link>}
+            {lens.subcategory && <> · {lens.subcategory}</>}
+            <span className="badge">4가지 시선</span>
+          </p>
+          <h1
+            id="art-h1"
+            data-speakable="headline"
+            style={{
+              fontFamily: '"Noto Serif KR", serif',
+              fontSize: 'clamp(28px, 4vw, 40px)',
+              fontWeight: 700,
+              color: '#111827',
+              letterSpacing: '-0.025em',
+              lineHeight: 1.35,
+              marginBottom: 14,
+              textWrap: 'balance',
+              wordBreak: 'keep-all',
+            }}
+          >
+            {displayHeadline(lens.headline)}
+          </h1>
+          {lens.context && (
+            <p
+              data-speakable="summary"
+              style={{ fontSize: 'calc(18px * var(--lens-font-scale, 1))', lineHeight: 1.65, color: '#374151', margin: '0 0 18px', whiteSpace: 'pre-line', wordBreak: 'keep-all' }}
             >
-              {displayHeadline(lens.headline)}
-            </h1>
-            {lens.context && (
-              <p
-                data-speakable="summary"
-                style={{ fontSize: 'calc(18px * var(--lens-font-scale, 1))', lineHeight: 1.65, color: '#374151', margin: '0 0 18px', whiteSpace: 'pre-line', wordBreak: 'keep-all' }}
-              >
-                {lens.context}
+              {lens.context}
+            </p>
+          )}
+          <div className="flex items-center justify-between flex-wrap" style={{ gap: 10, paddingBottom: 16 }}>
+            <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
+              <strong style={{ color: '#111827', fontWeight: 700 }}>AI LENS 편집팀</strong>
+              <span aria-hidden> · </span>
+              입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
+            </p>
+            <a
+              href={`https://www.google.com/preferences/source?q=${new URL(SITE_URL).host}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pill"
+            >
+              <GoogleIcon className="w-3.5 h-3.5" />
+              구글 검색 선호 출처로 추가
+            </a>
+          </div>
+
+          <div className="rule" />
+
+          {/* 좁은 화면(<1100px) 도구 줄 — 넓은 화면에서는 왼쪽 레일로 대체. */}
+          <div
+            className="tools-inline flex items-center justify-between flex-wrap"
+            style={{ marginTop: 14, gap: 12, paddingBottom: 14 }}
+          >
+            <div className="flex items-center" style={{ gap: 8 }}>
+              <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
+              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
+            </div>
+            <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
+              <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
+              <div style={{ width: 1, alignSelf: 'stretch', background: '#e5e7eb' }} aria-hidden />
+              <ArticlePrintButton />
+            </div>
+          </div>
+        </div>
+
+        {photo && (
+          <div className="lw" style={{ paddingTop: 20 }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
+              <Image
+                src={photo}
+                alt={lens.headline}
+                fill
+                sizes="(min-width: 760px) 720px, 100vw"
+                priority
+                style={{ objectFit: 'cover', objectPosition: 'center' }}
+              />
+            </div>
+            <div className="flex items-center justify-between" style={{ gap: 12, marginTop: 8 }}>
+              <p style={{ fontSize: 11.5, color: '#9ca3af', margin: 0 }}>
+                {lens.source_url ? (
+                  <>
+                    사진 ·{' '}
+                    <a href={lens.source_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                      서울경제
+                    </a>
+                  </>
+                ) : (
+                  '사진 · 서울경제'
+                )}
               </p>
-            )}
-            {metaBlock(false)}
+              {sourceLink}
+            </div>
           </div>
         )}
 

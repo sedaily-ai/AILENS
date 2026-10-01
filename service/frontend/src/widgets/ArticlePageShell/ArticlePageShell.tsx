@@ -34,9 +34,7 @@ export function ArticlePageShell({ sidebar, afterContent, children }: Props) {
   const [showSearch, setShowSearch] = useState(false);
 
   return (
-    // overflow-x: clip — 상세 히어로가 100vw 풀블리드로 읽기 컬럼을 벗어나는데, 세로 스크롤바가 있는 환경에서
-    // 100vw가 화면보다 넓어 생기는 가로 스크롤을 막는다(clip은 sticky를 깨지 않는다).
-    <div className="min-h-screen bg-white" style={{ overflowX: 'clip' }}>
+    <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
       <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
