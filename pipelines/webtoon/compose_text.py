@@ -21,7 +21,7 @@ image_generation 툴은 이걸 잘 하길래 웹툰에 써왔던 것.
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 FONT_PATH = Path(__file__).parent / "assets" / "NotoSansKR-Bold.ttf"
 
@@ -57,8 +57,25 @@ def title_fill_for_cut(cut_number: int | None) -> tuple[int, int, int]:
     return _TITLE_COLOR_BY_CUT.get(cut_number, _RED_FILL)
 
 
+# 고해상도 합성(2026-10-01) — 배경 그림은 모델 출력(1216x832)이 한계라 레티나 화면(약 1840px 필요)에서 흐려 보인다.
+# 그림은 Lanczos로 키우되, 눈에 가장 거슬리는 글자·말풍선은 키운 캔버스 위에서 처음부터 큰 글자로 다시 그려 선명하게 한다.
+# 이 파일의 모든 레이아웃 수치(px)는 1216 기준이라 한 배율(_SCALE)로 함께 키운다 — 배율 1.0이면 예전 출력과 완전히 같다.
+_SCALE = 1.0
+OUTPUT_SCALE = 1.5  # run_article이 쓰는 기본 배율(1216 -> 1824px)
+
+
+def _k(v: float) -> float:
+    """1216px 기준 길이(px)를 현재 배율로."""
+    return v * _SCALE
+
+
+def _w(v: int) -> int:
+    """선 굵기(px) — 최소 1."""
+    return max(1, int(round(v * _SCALE)))
+
+
 def _font(size: int) -> ImageFont.FreeTypeFont:
-    return ImageFont.truetype(str(FONT_PATH), size)
+    return ImageFont.truetype(str(FONT_PATH), int(round(size * _SCALE)))
 
 
 def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
@@ -108,16 +125,17 @@ def _measure_block(draw, lines, font):
 
 
 def _rounded_bubble_path(draw, x0, y0, x1, y1, tail_x, radius=26):
+    radius = _k(radius)
     """부드러운 타원형 말풍선(보통 톤) — 둥근 사각형 + 하단 중앙에서 아래로
     뻗는 삼각 꼬리."""
     draw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH)
-    tail_h = 26
+    tail_h = _k(26)
     draw.polygon(
-        [(tail_x - 16, y1 - 4), (tail_x + 16, y1 - 4), (tail_x, y1 + tail_h)],
+        [(tail_x - _k(16), y1 - _k(4)), (tail_x + _k(16), y1 - _k(4)), (tail_x, y1 + tail_h)],
         fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH,
     )
     # 꼬리와 몸통 이음새의 겹친 외곽선을 지운다
-    draw.line([(tail_x - 14, y1 - 2), (tail_x + 14, y1 - 2)], fill=_BUBBLE_FILL, width=_OUTLINE_WIDTH + 2)
+    draw.line([(tail_x - _k(14), y1 - _k(2)), (tail_x + _k(14), y1 - _k(2))], fill=_BUBBLE_FILL, width=_OUTLINE_WIDTH + _w(2))
 
 
 def _spiky_bubble_path(draw, x0, y0, x1, y1, tail_x, spikes=14, inflate=1.3):
@@ -140,9 +158,9 @@ def _spiky_bubble_path(draw, x0, y0, x1, y1, tail_x, spikes=14, inflate=1.3):
         r_scale = 1.0 if i % 2 == 0 else 0.82
         points.append((cx + math.cos(angle) * rx * r_scale, cy + math.sin(angle) * ry * r_scale))
     draw.polygon(points, fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH)
-    tail_h = 26
+    tail_h = _k(26)
     draw.polygon(
-        [(tail_x - 16, y1 - 4), (tail_x + 16, y1 - 4), (tail_x, y1 + tail_h)],
+        [(tail_x - _k(16), y1 - _k(4)), (tail_x + _k(16), y1 - _k(4)), (tail_x, y1 + tail_h)],
         fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH,
     )
 
@@ -158,11 +176,11 @@ def _draw_bubble(img: Image.Image, text: str, tone: str, anchor_x: int, top_y: i
 
     bw = block_w + _PADDING * 2
     bh = block_h + _PADDING * 2
-    x0 = max(10, min(img.width - bw - 10, anchor_x - bw / 2))
+    x0 = max(_k(10), min(img.width - bw - _k(10), anchor_x - bw / 2))
     x1 = x0 + bw
     y0 = top_y
     y1 = y0 + bh
-    tail_x = min(max(x0 + 30, anchor_x), x1 - 30)
+    tail_x = min(max(x0 + _k(30), anchor_x), x1 - _k(30))
 
     if tone == "격앙":
         _spiky_bubble_path(draw, x0, y0, x1, y1, tail_x)
@@ -175,7 +193,7 @@ def _draw_bubble(img: Image.Image, text: str, tone: str, anchor_x: int, top_y: i
         draw.text((x0 + (bw - tw) / 2, ty), ln, font=font, fill=_TEXT_FILL)
         ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
 
-    return y1 + 26  # 꼬리 아래 여백 포함, 다음 말풍선이 겹치지 않을 y
+    return y1 + _k(26)  # 꼬리 아래 여백 포함, 다음 말풍선이 겹치지 않을 y
 
 
 _DEFAULT_BUBBLE_TOP_RATIO = 0.16  # draw_title()의 제목 알약 아래로 자리를 내주는 기본 높이
@@ -224,7 +242,7 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | No
     if not dialogue:
         return
     n = len(dialogue)
-    default_top_y = int(min_top_y + 20) if min_top_y is not None else int(img.height * _DEFAULT_BUBBLE_TOP_RATIO)
+    default_top_y = int(min_top_y + _k(20)) if min_top_y is not None else int(img.height * _DEFAULT_BUBBLE_TOP_RATIO)
     use_faces = faces is not None and len(faces) == n
 
     anchors_x: list[int] = []
@@ -266,18 +284,18 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | No
             block_w, _ = _measure_block(measure_draw, lines, measure_font)
             half_widths.append((block_w + _PADDING * 2) / 2)
 
-        min_gap = half_widths[0] + half_widths[1] + 40  # 말풍선 사이 여백 40px
+        min_gap = half_widths[0] + half_widths[1] + _k(40)  # 말풍선 사이 여백 40px
         if abs(anchors_x[0] - anchors_x[1]) < min_gap:
             mid = sum(anchors_x) / 2
             anchors_x = [mid + min_gap / 2, mid - min_gap / 2]
 
         shift = 0.0
         right_edge = anchors_x[0] + half_widths[0]
-        if right_edge > img.width - 10:
-            shift = (img.width - 10) - right_edge
+        if right_edge > img.width - _k(10):
+            shift = (img.width - _k(10)) - right_edge
         left_edge = anchors_x[1] - half_widths[1] + shift
-        if left_edge < 10:
-            shift += 10 - left_edge
+        if left_edge < _k(10):
+            shift += _k(10) - left_edge
         anchors_x = [int(anchors_x[0] + shift), int(anchors_x[1] + shift)]
 
     for i, d in enumerate(dialogue):
@@ -320,7 +338,7 @@ def _draw_pill(
     x1 = x0 + bw
     y1 = y0 + bh
     radius = bh / 2 if max_radius is None else min(bh / 2, max_radius)
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=fill, outline=outline, width=outline_width)
+    draw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=fill, outline=outline, width=_w(outline_width))
 
     ty = y0 + (bh - block_h) / 2
     for ln in lines:
@@ -379,13 +397,13 @@ def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str 
 
     brand_font = _font(24)
     brand_lines = _wrap_text(draw, brand, brand_font, int(img.width * 0.6))
-    by1 = _draw_pill(img, brand_lines, brand_font, img.height * 0.025, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=32, pad_h=17.6)
+    by1 = _draw_pill(img, brand_lines, brand_font, img.height * 0.025, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=_k(32), pad_h=_k(17.6))
 
     headline_font = _font(46)
     headline_lines = _wrap_text(draw, headline, headline_font, int(img.width * 0.7))[:2]
     return _draw_pill(
         img, headline_lines, headline_font, by1 + img.height * 0.02, _HEADLINE_FILL, _HEADLINE_TEXT_FILL,
-        pad_w=_PADDING * 3, pad_h=_PADDING * 2.4, max_radius=44, outline=(210, 210, 210),
+        pad_w=_PADDING * 3, pad_h=_PADDING * 2.4, max_radius=_k(44), outline=(210, 210, 210),
         keyword=keyword, keyword_fill=_RED_FILL,
     )
 
@@ -415,7 +433,7 @@ def draw_closing_caption(img: Image.Image, text: str) -> int | None:
     bh = block_h + _PADDING * 1.6
     y1 = img.height - img.height * 0.05
     y0 = y1 - bh
-    _draw_pill(img, lines, font, y0, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.6, max_radius=40)
+    _draw_pill(img, lines, font, y0, _NAVY_FILL, _NAVY_TEXT_FILL, pad_w=_PADDING * 2.4, pad_h=_PADDING * 1.6, max_radius=_k(40))
     return int(y0)
 
 
@@ -467,15 +485,15 @@ def _draw_icon_badge(img: Image.Image, icon: str, x0: float, y0: float, d: float
         # 바꿈 — 협약·협정·체결 의미를 더 명확하게 전달.
         draw.rounded_rectangle([cx - r * 0.75, cy - r, cx + r * 0.75, cy + r], radius=r * 0.12, outline=_ICON_STROKE, width=_ICON_STROKE_W)
         for ly in (-r * 0.5, -r * 0.1, r * 0.3):
-            draw.line([cx - r * 0.4, cy + ly, cx + r * 0.4, cy + ly], fill=_ICON_STROKE, width=3)
-        draw.ellipse([cx + r * 0.15, cy + r * 0.15, cx + r * 1.15, cy + r * 1.15], fill=_ICON_BADGE_FILL, outline=_ICON_STROKE, width=4)
+            draw.line([cx - r * 0.4, cy + ly, cx + r * 0.4, cy + ly], fill=_ICON_STROKE, width=_w(3))
+        draw.ellipse([cx + r * 0.15, cy + r * 0.15, cx + r * 1.15, cy + r * 1.15], fill=_ICON_BADGE_FILL, outline=_ICON_STROKE, width=_w(4))
         draw.line([cx + r * 0.4, cy + r * 0.65, cx + r * 0.6, cy + r * 0.85, cx + r * 0.95, cy + r * 0.4],
-                  fill=_ICON_STROKE, width=5, joint="curve")
+                  fill=_ICON_STROKE, width=_w(5), joint="curve")
     elif icon == "calendar":
         draw.rounded_rectangle([cx - r, cy - r * 0.75, cx + r, cy + r], radius=r * 0.2, outline=_ICON_STROKE, width=_ICON_STROKE_W)
-        draw.line([cx - r, cy - r * 0.15, cx + r, cy - r * 0.15], fill=_ICON_STROKE, width=3)
-        draw.line([cx - r * 0.5, cy - r * 1.1, cx - r * 0.5, cy - r * 0.6], fill=_ICON_STROKE, width=4)
-        draw.line([cx + r * 0.5, cy - r * 1.1, cx + r * 0.5, cy - r * 0.6], fill=_ICON_STROKE, width=4)
+        draw.line([cx - r, cy - r * 0.15, cx + r, cy - r * 0.15], fill=_ICON_STROKE, width=_w(3))
+        draw.line([cx - r * 0.5, cy - r * 1.1, cx - r * 0.5, cy - r * 0.6], fill=_ICON_STROKE, width=_w(4))
+        draw.line([cx + r * 0.5, cy - r * 1.1, cx + r * 0.5, cy - r * 0.6], fill=_ICON_STROKE, width=_w(4))
     elif icon == "film":
         draw.rounded_rectangle([cx - r, cy - r * 0.75, cx + r, cy + r * 0.75], radius=r * 0.15, outline=_ICON_STROKE, width=_ICON_STROKE_W)
         for fx in (cx - r * 0.6, cx, cx + r * 0.6):
@@ -483,8 +501,8 @@ def _draw_icon_badge(img: Image.Image, icon: str, x0: float, y0: float, d: float
             draw.rectangle([fx - r * 0.12, cy + r * 0.5, fx + r * 0.12, cy + r * 0.75], fill=_ICON_STROKE)
     elif icon == "globe":
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=_ICON_STROKE, width=_ICON_STROKE_W)
-        draw.ellipse([cx - r * 0.4, cy - r, cx + r * 0.4, cy + r], outline=_ICON_STROKE, width=3)
-        draw.line([cx - r, cy, cx + r, cy], fill=_ICON_STROKE, width=3)
+        draw.ellipse([cx - r * 0.4, cy - r, cx + r * 0.4, cy + r], outline=_ICON_STROKE, width=_w(3))
+        draw.line([cx - r, cy, cx + r, cy], fill=_ICON_STROKE, width=_w(3))
     elif icon == "chart":
         base_y = cy + r * 0.7
         for i, h in enumerate((0.5, 0.9, 1.3)):
@@ -522,15 +540,15 @@ def draw_caption(img: Image.Image, text: str, bottom_limit: int | None = None):
 
     icon = _pick_icon_for_caption(text)
     badge_d = bh  # 배지 지름을 캡션 박스 높이에 맞춘다
-    badge_gap = 12 if icon else 0
-    x0 = 24 + (badge_d + badge_gap if icon else 0)
-    default_y0 = img.height - bh - 24
-    y0 = min(default_y0, bottom_limit - bh - 16) if bottom_limit is not None else default_y0
+    badge_gap = _k(12) if icon else 0
+    x0 = _k(24) + (badge_d + badge_gap if icon else 0)
+    default_y0 = img.height - bh - _k(24)
+    y0 = min(default_y0, bottom_limit - bh - _k(16)) if bottom_limit is not None else default_y0
 
     if icon:
-        _draw_icon_badge(img, icon, 24, y0, badge_d)
+        _draw_icon_badge(img, icon, _k(24), y0, badge_d)
 
-    draw.rectangle([x0, y0, x0 + bw, y0 + bh], fill=(255, 255, 255, 235), outline=_BUBBLE_OUTLINE, width=3)
+    draw.rectangle([x0, y0, x0 + bw, y0 + bh], fill=(255, 255, 255, 235), outline=_BUBBLE_OUTLINE, width=_w(3))
     ty = y0 + _PADDING
     for ln in lines:
         draw.text((x0 + _PADDING, ty), ln, font=font, fill=_TEXT_FILL)
@@ -559,7 +577,33 @@ def draw_narration(img: Image.Image, text: str) -> int:
     return y0
 
 
-def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
+# 배율 적용 대상 전역 수치의 1216px 기준값(원본). compose(scale=)가 이 값에 배율을 곱해 일시적으로 덮어쓴다.
+_BASE_METRICS = {
+    "_OUTLINE_WIDTH": _OUTLINE_WIDTH,
+    "_PADDING": _PADDING,
+    "_LINE_SPACING": _LINE_SPACING,
+    "_FACE_BUBBLE_MARGIN_PX": _FACE_BUBBLE_MARGIN_PX,
+    "_ICON_STROKE_W": _ICON_STROKE_W,
+}
+
+
+def compose(img_path: Path, cut: dict, faces: list[dict] | None = None, scale: float = 1.0):
+    """(scale > 1이면 배경을 Lanczos로 키운 뒤 글자·말풍선을 그 크기에 맞춰 새로 그린다 — 아래 _compose_at 참고.)"""
+    global _SCALE
+    g = globals()
+    prev_scale = _SCALE
+    _SCALE = scale
+    for name, base in _BASE_METRICS.items():
+        g[name] = max(1, int(round(base * scale))) if name in ("_OUTLINE_WIDTH", "_ICON_STROKE_W") else base * scale
+    try:
+        _compose_at(img_path, cut, faces, scale)
+    finally:
+        _SCALE = prev_scale
+        for name, base in _BASE_METRICS.items():
+            g[name] = base
+
+
+def _compose_at(img_path: Path, cut: dict, faces: list[dict] | None, scale: float):
     """배경 이미지(img_path) 위에 cut의 title/dialogue/caption/(closing_caption
     또는 narration)을 순서대로 합성해서 같은 경로에 덮어쓴다. faces —
     항상 None(2026-09-28, Rekognition 얼굴 감지 제거 — draw_dialogue
@@ -587,6 +631,10 @@ def compose(img_path: Path, cut: dict, faces: list[dict] | None = None):
     을 caption보다 먼저 그리고 그 상단 y좌표를 받아 caption을 그 위로
     띄운다 — title_bottom을 draw_dialogue()에 넘기던 것과 같은 패턴."""
     img = Image.open(img_path).convert("RGB")
+    if scale != 1.0:
+        # 그림은 Lanczos로 키우고 가장자리를 아주 약하게 샤픈(과하면 인공물이 생겨 약하게).
+        img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+        img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=40, threshold=3))
     cut_no = cut.get("cut")
     title_bottom = None
     if cut_no == 1 and cut.get("title"):

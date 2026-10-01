@@ -475,7 +475,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 # 제거 — webtoon_image.py::generate_cut_image() 독스트링
                 # 참고). compose_text.compose()가 균등 분할로 폴백한다.
                 try:
-                    compose_text.compose(img_path, cut, faces)
+                    compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
                 except Exception as e:
                     print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:
