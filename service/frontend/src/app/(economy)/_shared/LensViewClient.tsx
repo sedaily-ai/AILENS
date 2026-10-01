@@ -39,6 +39,7 @@ import { IconStopwatch } from './components/LensIcons';
 import { ArticleReveal } from './components/ArticleReveal';
 import { letterChapters } from './components/lensChapters';
 import { readMinutes } from './components/lensSamples';
+import { renderInline } from './components/renderInline';
 import { ArticleStickyBar } from './components/ArticleStickyBar';
 import { ArticleToolRail } from './components/ArticleToolRail';
 import {
@@ -661,7 +662,7 @@ export function LensViewClient({
                     <span className="sum-n" aria-hidden>
                       {si + 1}
                     </span>
-                    <span className="sum-t">{t}</span>
+                    <span className="sum-t">{renderInline(t, [], { numbers: true })}</span>
                   </li>
                 ))}
               </ol>
