@@ -33,6 +33,8 @@ import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
+import { ArticleChapterNav } from './components/ArticleChapterNav';
+import { letterChapters } from './components/lensChapters';
 import { ArticleStickyBar } from './components/ArticleStickyBar';
 import { ArticleToolRail } from './components/ArticleToolRail';
 import {
@@ -279,6 +281,8 @@ export function LensViewClient({
       </span>
     </a>
   ) : null;
+  // 레터 본문의 소제목 → 오른쪽 구간 목차(레터 탭일 때만 보임).
+  const chapters = letterChapters(lenses.find((l) => l.label === '레터')?.paragraphs);
   const podcastIdx = lenses.findIndex((l) => l.label === '팟캐스트');
   // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
   const activeP = lensPerspectiveAt(active);
@@ -454,7 +458,7 @@ export function LensViewClient({
            (사용자 리포트: 실제 발행글 스크린샷엔 구획 표시가 전혀 없음).
            본문 문단과 구분되도록 형식 색으로 볼드 처리 + 위쪽 여백을
            늘려 섹션 전환처럼 보이게 한다. */
-        .lread > p.lread-sub { font-weight: 700; font-size: calc(15px * var(--lens-font-scale, 1));
+        .lread > p.lread-sub { scroll-margin-top: 134px; font-weight: 700; font-size: calc(15px * var(--lens-font-scale, 1));
           color: var(--lc, #111827); margin-top: 32px !important; }
         /* 레터 사인오프 — 편지 서명. 형식 색 마크 + 발신인 + 위 얇은 룰. */
         .lread-sign { display: flex; align-items: center; gap: 10px;
@@ -510,6 +514,12 @@ export function LensViewClient({
             />
           </nav>
         </div>
+
+        <ArticleChapterNav
+          chapters={chapters}
+          show={lensFormatAt(active) === 'letter'}
+          accent={lensPerspectiveAt(0).color}
+        />
 
         {/* ── 기사 머리 ── 카테고리 아이브로우 → 세리프 헤드라인 → 부제 → 바이라인/발행시각 → 헤어라인 */}
         <div className="lw" style={{ paddingTop: 'clamp(8px, 2vw, 16px)' }}>

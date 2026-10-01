@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
+import { chapterId } from './lensChapters';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
@@ -180,7 +181,10 @@ export function LensFormatPanel({
       {format === 'letter' && letterParagraphs && (
         <article data-letter-body>
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
-            {letterParagraphs.map((para, pi) => {
+            {(() => {
+              // 소제목에 구간 앵커 id를 단다 — 오른쪽 목차(ArticleChapterNav)가 이 id로 점프·현재 구간을 잡는다.
+              let subNo = 0;
+              return letterParagraphs.map((para, pi) => {
               // "##" 소제목 마커(2026-10-01, 파이프라인 출력 순서 변경 —
               // publish_utils.py의 parse_letters() 주석 참조) — "◾"와 같은
               // 역할이지만 마크다운 문법 기호라 "◾"처럼 그대로 보여주면
@@ -191,11 +195,16 @@ export function LensFormatPanel({
               const text = isHashSub ? para.replace(/^##\s*/, '') : para;
               const isSub = para.startsWith('◾') || isHashSub;
               return (
-                <p key={pi} className={isSub ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined}>
+                <p
+                  key={pi}
+                  id={isSub ? chapterId(subNo++) : undefined}
+                  className={isSub ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined}
+                >
                   {wrapWithTerms(text, l.keywords ?? [])}
                 </p>
               );
-            })}
+              });
+            })()}
             {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
                 "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
                 신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +
