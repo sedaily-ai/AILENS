@@ -24,11 +24,14 @@ webtoon-pipeline에서 실제로 발견된 문제 — admin에서 프롬프트�
 """
 import json
 import os
+import time
 import urllib.request
 from pathlib import Path
 
 _API_URL = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
-_TIMEOUT_SECONDS = 8
+_TIMEOUT_SECONDS = 15
+_MAX_ATTEMPTS = 3
+_RETRY_WAIT_SECONDS = 4
 
 _FILESYSTEM_FALLBACK = (
     Path(__file__).parent.parent.parent / "service" / "backend" / "prompts"
@@ -42,14 +45,23 @@ def _read_filesystem(category: str, name: str) -> str:
 
 def load_prompt(category: str, name: str = "published") -> str:
     """lens-cms-api GET /api/v2/prompts/{category}/{name}. 실패하면 파일시스템 폴백."""
-    try:
-        req = urllib.request.Request(f"{_API_URL}/api/v2/prompts/{category}/{name}", method="GET")
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as res:
-            content = json.loads(res.read())["content"]
-        print(f"[ddb_prompt] {category}/{name} (lens-cms-api)")
-        return content
-    except Exception as e:
-        print(f"[ddb_prompt] lens-cms-api 조회 실패({type(e).__name__}: {e}), 파일시스템 폴백")
-        content = _read_filesystem(category, name)
-        print(f"[ddb_prompt] {category}/{name} (파일시스템 폴백)")
-        return content
+    # 재시도(2026-10-02) — 2026-10-01 12:00 KST 실행에서 lens-cms-api가 일시적으로 시간 초과·404를 내자 곧바로 파일시스템 폴백으로
+    # 떨어졌는데, 컨테이너엔 그 파일이 없어(service/backend/prompts) 웹툰·영상 프롬프트 로드가 통째로 실패했다. 일시 장애는 몇 초 뒤
+    # 되살아나므로 폴백 전에 짧은 대기와 함께 최대 3번 시도한다.
+    last_err: Exception | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            req = urllib.request.Request(f"{_API_URL}/api/v2/prompts/{category}/{name}", method="GET")
+            with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as res:
+                content = json.loads(res.read())["content"]
+            print(f"[ddb_prompt] {category}/{name} (lens-cms-api)" + (f" — {attempt}번째 시도에 성공" if attempt > 1 else ""))
+            return content
+        except Exception as e:
+            last_err = e
+            print(f"[ddb_prompt] lens-cms-api 조회 실패 {attempt}/{_MAX_ATTEMPTS}({type(e).__name__}: {e})")
+            if attempt < _MAX_ATTEMPTS:
+                time.sleep(_RETRY_WAIT_SECONDS * attempt)
+    print(f"[ddb_prompt] lens-cms-api {_MAX_ATTEMPTS}번 모두 실패({type(last_err).__name__}), 파일시스템 폴백")
+    content = _read_filesystem(category, name)
+    print(f"[ddb_prompt] {category}/{name} (파일시스템 폴백)")
+    return content

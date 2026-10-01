@@ -141,6 +141,11 @@ def slugify(publish_date: str, headline: str) -> str:
     return base[:80].rstrip("-")
 
 
+# 레터 본문 최소 문단 수·재생성 횟수(2026-10-02) — publish_article()의 품질 검사에서 쓴다.
+MIN_LETTER_PARAGRAPHS = 6
+MAX_LETTER_RETRIES = 2
+
+
 def parse_letters(raw_md: str) -> list[str]:
     """레터 산출물(마크다운)에서 본문 문단만 뽑는다.
 
@@ -586,6 +591,19 @@ def publish_article(
     letters_path = letters_mod.run_article(name, str(article_path), out_dir)
     letters_raw = letters_path.read_text(encoding="utf-8")
     paragraphs = parse_letters(letters_raw)
+    # 레터 본문 품질 검사(2026-10-02) — 2026-10-01 12:00 KST 실행에서 4건이 본문 1문단(리드 한 줄)뿐인 레터로 그대로 발행됐다
+    # (나머지 21건은 13문단). 생성 응답이 잘렸거나 파싱에서 본문이 유실된 경우인데 아무 검사 없이 발행되는 게 문제였다.
+    # 문단이 너무 적으면 생성을 최대 2번 더 시도하고, 그래도 부족하면 예외로 이 기사를 발행하지 않는다(seen 표시가 안 되어 다음
+    # 회차에 다시 후보가 된다). 정상 글은 항상 10문단 안팎이라 임계값 6은 여유가 있다.
+    for _attempt in range(1, MAX_LETTER_RETRIES + 1):
+        if len(paragraphs) >= MIN_LETTER_PARAGRAPHS:
+            break
+        print(f"[{log_prefix}] {name} 레터 본문 {len(paragraphs)}문단(최소 {MIN_LETTER_PARAGRAPHS}) — 재생성 {_attempt}/{MAX_LETTER_RETRIES}")
+        letters_path = letters_mod.run_article(name, str(article_path), out_dir)
+        letters_raw = letters_path.read_text(encoding="utf-8")
+        paragraphs = parse_letters(letters_raw)
+    if len(paragraphs) < MIN_LETTER_PARAGRAPHS:
+        raise ValueError(f"레터 본문 {len(paragraphs)}문단 — 최소 {MIN_LETTER_PARAGRAPHS}문단 필요, 발행 보류")
     letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
     letter_terms = parse_letter_terms(letters_raw)
     # 프롬프트가 생성하는 "독자 시선 진입형" 제목. 2026-09-21 —
