@@ -90,7 +90,8 @@ export function WebtoonCutGallery({
               src={cut.url}
               alt={cut.caption || `${ci + 1}번째 컷`}
               fill
-              sizes="(min-width: 920px) 700px, 100vw"
+              sizes="(min-width: 952px) 920px, calc(100vw - 32px)"
+              quality={85}
               style={{ objectFit: 'contain' }}
             />
           </div>
