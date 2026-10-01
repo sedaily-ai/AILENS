@@ -346,7 +346,7 @@ const FOLLOWING_MAX_DISPLAY = 4;
 // 역순 조회 루프 자체가 필요 없어졌다 — 단순 slice.
 export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLAY): Promise<TodayLetterCardLike[]> {
   try {
-    const posts = await fetchLensPosts();
+    const posts = await fetchLensPosts(limit);
     return posts.slice(0, limit).map(toLensLetterCard);
   } catch {
     return [];

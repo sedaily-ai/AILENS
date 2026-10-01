@@ -70,7 +70,8 @@ export function OnboardingFlow() {
   // webtoon 상세 페이지가 오늘 이미 쓰기 시작한 것과 같은 패턴.
   useEffect(() => {
     let cancelled = false;
-    fetchLensPosts().then((posts) => {
+    // "오늘의 1면"만 고르면 되므로 최신 100건이면 충분(전체 지면 글이 그 안에 8건 이상).
+    fetchLensPosts(100).then((posts) => {
       const top = pickTopArticle(posts);
       if (!top) {
         if (!cancelled) setLens(null);

@@ -103,7 +103,8 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
 
   useEffect(() => {
     let cancelled = false;
-    fetchLensPosts().then((data) => {
+    // 4개 지면 탭(전체·증권·산업·시그널)이 각각 최신 4건씩만 쓴다 — 최신 100건이면 각 지면 8건 이상 확보.
+    fetchLensPosts(100).then((data) => {
       // 빈 응답으로 SSR 프리페치 결과를 덮지 않는다.
       if (!cancelled && data.length > 0) setItems(data);
     });

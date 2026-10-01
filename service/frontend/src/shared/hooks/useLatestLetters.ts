@@ -31,7 +31,7 @@ export function useLatestLetters(): LatestLettersState {
 
   useEffect(() => {
     let cancelled = false;
-    fetchLensPosts()
+    fetchLensPosts(LATEST_LETTERS_COUNT)
       .then((posts) => {
         if (cancelled) return;
         const top = posts.slice(0, LATEST_LETTERS_COUNT);
