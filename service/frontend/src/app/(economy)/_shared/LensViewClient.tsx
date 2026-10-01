@@ -435,11 +435,11 @@ export function LensViewClient({
            (잡지식 2단)으로 구획 전환이 또렷하게. 테두리 없이 여백과 타이포로만 구분한다. */
         .lread { max-width: 720px; }
         .lread > p, .lread > ul, .lread > ol, .lread > blockquote { font-size: calc(17px * var(--lens-font-scale, 1));
-          line-height: 1.9; letter-spacing: -0.005em; color: #1f2937; word-break: keep-all; }
+          line-height: 1.8; letter-spacing: -0.005em; color: #191919; word-break: keep-all; overflow-wrap: anywhere; text-align: left; }
         .lread > p { text-wrap: pretty; }
         .lread > * + * { margin-top: 1.4em; }
-        .lread > p.lread-lead { font-size: calc(19.5px * var(--lens-font-scale, 1)); line-height: 1.8; font-weight: 500; color: #111827; }
-        .lread strong { font-weight: 700; color: #111827; }
+        .lread > p.lread-lead { font-size: calc(19.5px * var(--lens-font-scale, 1)); line-height: 1.75; font-weight: 500; color: #111827; }
+        .lread strong, .sum-t strong { font-weight: 600; color: #111; }
         .lread > ul { list-style: disc outside; padding-left: 1.35em; }
         .lread > ol { list-style: decimal outside; padding-left: 1.5em; }
         .lread > ul li + li, .lread > ol li + li { margin-top: 0.55em; }
