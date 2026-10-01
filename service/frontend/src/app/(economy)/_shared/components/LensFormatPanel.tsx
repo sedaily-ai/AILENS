@@ -307,6 +307,23 @@ export function LensFormatPanel({
           렌더하는 것과 완주율 계측은 WebtoonCutGallery가 담당한다. */}
       {format === 'webtoon' && realWebtoonCuts && <WebtoonCutGallery cuts={realWebtoonCuts} articleId={lens.id} />}
 
+      {/* 웹툰이 끝난 자리 — 네이버 웹툰이 회차 끝에서 다음 화로 잇듯, 같은 기사를 레터로 더 깊이 읽도록 조용히 잇는다(2026-10-01). */}
+      {format === 'webtoon' && realWebtoonCuts && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 36 }}>
+          <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>여기까지 웹툰으로 봤어요</p>
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById(lensTabId(0))?.click();
+              setTimeout(() => document.getElementById(lensPanelId(0))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+            }}
+            style={{ padding: '11px 20px', border: 'none', borderRadius: 999, background: '#f2f3f5', color: '#111827', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+          >
+            레터로 더 자세히 읽기 →
+          </button>
+        </div>
+      )}
+
       {/* 대사 전문 — 컷 안 말풍선에 이미 있는 대사를 여기서 한 번 더
           접어서 보여준다(소리를 못 듣거나 이미지가 안 뜨거나, 인용하려는
           경우). hidden으로만 감춰서 DOM에는 항상 있다. */}

@@ -409,10 +409,10 @@ export function LensViewClient({
         }
         .fmt-sub { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: #6b7280; letter-spacing: -0.01em; }
 
+        /* 형식 설명 — 색 면 박스 대신 조용한 한 줄(2026-10-01). 콘텐츠(웹툰 컷·본문)가 먼저 보이게 한다. */
         .fmt-toast { display: flex; align-items: flex-start; gap: 8px;
-          margin-top: 10px; padding: 12px 14px; border-radius: 12px;
-          background: color-mix(in srgb, var(--c) 8%, #ffffff);
-          font-size: 15px; line-height: 1.6; color: #374151; word-break: keep-all; }
+          margin-top: 10px; padding: 2px 2px; background: none;
+          font-size: 14px; line-height: 1.6; color: #6b7280; word-break: keep-all; }
         @media (prefers-reduced-motion: no-preference) {
           .fmt-toast { animation: toast-in .22s ease-out; }
           @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
@@ -516,7 +516,8 @@ export function LensViewClient({
         <ArticleResume articleId={lens.id} />
         <ArticleReveal />
         {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
-        <div className="rail-host">
+        {/* 웹툰 탭에서는 도구 레일을 숨겨 이미지에만 집중하게 한다(2026-10-01). */}
+        <div className="rail-host" hidden={lensFormatAt(active) === 'webtoon'}>
           <nav className="rail" aria-label="기사 도구">
             <ArticleToolRail
               title={lens.headline}

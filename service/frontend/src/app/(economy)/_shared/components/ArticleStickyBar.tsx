@@ -54,11 +54,17 @@ export function ArticleStickyBar({
       const bodyEl = document.querySelector('[data-letter-body]');
       const bRect = bodyEl ? bodyEl.getBoundingClientRect() : null;
       const heads = Array.from(document.querySelectorAll('[data-letter-body] .lread > .lread-sub'));
-      const segOn = !!bRect && bRect.height > 0 && heads.length >= 2;
-      setSegCount(segOn ? heads.length : 0);
-      if (segOn && bRect) {
+      // 웹툰 탭이 열려 있으면 컷 하나가 한 칸(2026-10-01) — 컷마다 읽은 만큼 채워져 몇 컷 봤는지 한눈에 보인다.
+      const cuts = Array.from(document.querySelectorAll('[data-cut-index]')).filter((c) => c.getBoundingClientRect().height > 0);
+      const letterOn = !!bRect && bRect.height > 0 && heads.length >= 2;
+      const cutsOn = !letterOn && cuts.length >= 2;
+      const segOn = letterOn || cutsOn;
+      setSegCount(letterOn ? heads.length : cutsOn ? cuts.length : 0);
+      if (segOn) {
         const eye = window.innerHeight * 0.6;
-        const edges = [bRect.top, ...heads.slice(1).map((h) => h.getBoundingClientRect().top), bRect.bottom];
+        const edges = letterOn && bRect
+          ? [bRect.top, ...heads.slice(1).map((h) => h.getBoundingClientRect().top), bRect.bottom]
+          : [...cuts.map((c) => c.getBoundingClientRect().top), cuts[cuts.length - 1].getBoundingClientRect().bottom];
         segRefs.current.forEach((el, i) => {
           if (!el || i >= edges.length - 1) return;
           const span = edges[i + 1] - edges[i];
