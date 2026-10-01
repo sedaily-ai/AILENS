@@ -64,6 +64,7 @@ docs/
 | 알고 싶은 것 | 문서 |
 |---|---|
 | 어드민 스택 | `architecture/admin-stack.md` |
+| 배포 스크립트 어디 있고 뭘 배포하나 | `architecture/배포_스크립트_지도.md` |
 | 음성 대화 아키텍처 | `architecture/voice-conversation-architecture.md` |
 | 4포맷이 왜 이렇게 설계됐나 | `product/4format-persona-system.md` |
 | 레터·4포맷 품질 평가 체계 | `evaluation/letter-evaluation-system.md`, `evaluation/4format-evaluation-system.md` |
