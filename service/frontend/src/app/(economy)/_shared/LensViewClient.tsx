@@ -337,7 +337,9 @@ export function LensViewClient({
            AI 고지는 바이라인·하단 AiDisclaimer가 이미 맡으므로 요약 안엔 "AI 요약" 표기를 두지 않는다. */
         .sum { margin-top: 12px; padding: clamp(24px, 3.4vw, 34px) clamp(22px, 3.6vw, 36px) clamp(26px, 3.6vw, 36px);
           background: #f6f7f9; border-radius: 20px; }
-        .sum-head { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; }
+        .sum-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+        /* 제목 아래 한 줄 — 본문과 같은 "~요" 말투로 친근하게, 회색 작은 글씨라 과하지 않게(2026-10-01). */
+        .sum-sub { margin: 0 0 22px 31px; font-size: 14px; line-height: 1.5; color: #6b7280; letter-spacing: -0.01em; }
         .sum-ico { flex-shrink: 0; color: var(--sum-accent); }
         .sum-title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.015em; color: #111827; }
         .sum-list { display: flex; flex-direction: column; gap: 18px; list-style: none; padding: 0; margin: 0; }
@@ -669,6 +671,7 @@ export function LensViewClient({
                 <IconStopwatch size={22} className="sum-ico" />
                 <p className="sum-title">30초 핵심</p>
               </div>
+              <p className="sum-sub">바쁘시면 여기까지만 읽어도 돼요</p>
               <ol className="sum-list">
                 {coreSummaryBullets(lens).map((t, si) => (
                   <li key={si} className="sum-item">
