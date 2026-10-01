@@ -366,7 +366,9 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
         # 뒤 36건 전부 도입부가 마지막 불릿에 붙은 실제 버그). 무시한다.
     # "자료: 서울경제신문(...)" 출처 줄은 요약 불릿이 아니다 — 같은 날부터
     # 모델이 불릿 형식으로 출력해 5번째 "30초 핵심" 항목으로 새고 있었다.
-    return [b for b in bullets if not b.startswith("자료")]
+    # "자료:"처럼 콜론이 붙은 출처 줄만 제외한다 — "자료를 공개한 의원은…"처럼 "자료"로
+    # 시작하는 정상 불릿(실제 9/26 발행분)까지 지우지 않도록 패턴을 좁힌다.
+    return [b for b in bullets if not re.match(r"^자료\s*[:：]", b)]
 
 
 def _ends_sentence(text: str) -> bool:
