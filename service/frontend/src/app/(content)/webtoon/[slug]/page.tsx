@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
-import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
+import { findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
@@ -102,11 +102,12 @@ export async function generateMetadata({
   }
   const title = buildPageTitle(webtoon.title, '웹툰');
   const description = buildSeoDescription(webtoon.excerpt, '요즘 이슈를 컷으로 이어 보여드려요.');
-  // 정본(canonical)은 같은 기사의 lens 페이지(2026-10-01, SEO 감사) — 서비스 API의 웹툰 채널 글은 panels가 비어(1000건 전부,
-  // ID가 lens 글과 동일) 이 페이지엔 컷 이미지가 없고 제목·요약만 있는 얇은 중복 페이지다. 검색 신호를 기사 페이지 한 곳으로 모은다.
-  // 페이지 자체는 독자를 위해 그대로 유지하고, 대응하는 lens 글이 없을 때만 자기 URL을 정본으로 쓴다.
+  // 웹툰 페이지는 자기 자신이 정본이다(2026-10-02 정정) — 한때 기사 페이지로 통합했으나, 그 근거("panels가 비어 있는 얇은 페이지")는
+  // 목록 API가 응답 경량화로 panels를 비워 내려주는 것을 오해한 것이었다. 단건 조회에는 컷 8장이 정상으로 오고 서버 HTML에도 컷이 들어
+  // 있으며, 검색 실적(클릭 29)도 있었다. 중복의 원인은 페이지 아래에 덧붙인 기사 본문(보강 텍스트)이다.
+  // lens 글은 대표 이미지 폴백에만 쓴다.
   const lens = await findLensForChannelSlug(slug);
-  const url = canonicalFromLens(lens, `/webtoon/${slug}`);
+  const url = `${SITE_URL}/webtoon/${slug}`;
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
   return {
@@ -134,7 +135,7 @@ export async function generateMetadata({
 
 function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
   // generateMetadata와 같은 정본 URL(lens 페이지)을 쓴다 — 구조화 데이터의 url이 canonical과 어긋나지 않게.
-  const url = canonicalFromLens(lens, `/webtoon/${slug}`);
+  const url = `${SITE_URL}/webtoon/${slug}`;
   const published = webtoon.published_at || `${webtoon.date}T07:00:00+09:00`;
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
