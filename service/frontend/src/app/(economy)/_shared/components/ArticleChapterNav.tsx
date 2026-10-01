@@ -12,6 +12,9 @@ import type { LensChapter } from './lensChapters';
 //  · 레터 탭을 보고 있을 때만(show) 의미가 있다 — 다른 형식엔 소제목이 없다.
 //  · 모션 줄이기 설정이면 점프도 즉시 이동.
 
+// 항목마다 아주 살짝 다른 기울기 — 반듯한 UI 부품이 아니라 손으로 적어 둔 목록 같은 느낌.
+const ROT = [-0.6, 0.4, -0.3, 0.5, -0.5, 0.3];
+
 export function ArticleChapterNav({
   chapters,
   show,
@@ -80,21 +83,27 @@ export function ArticleChapterNav({
             transition: opacity .25s ease, transform .25s ease; }
           .chn[data-visible='true'] { opacity: 1; transform: none; pointer-events: auto; }
         }
-        .chn-label { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; color: #6b7280; margin: 0 0 12px; }
-        .chn-list { list-style: none; margin: 0; padding: 0; border-left: 1px solid #e5e7eb; }
-        .chn-btn { position: relative; display: block; width: 100%; text-align: left; padding: 7px 22px 7px 14px; margin-left: -1px; border: none; border-left: 2px solid transparent;
-          background: none; cursor: pointer; font-size: 13.5px; line-height: 1.4; color: #9ca3af; word-break: keep-all;
-          transition: color .2s ease, border-color .2s ease; }
+        /* 손으로 그린 듯한 톤(2026-10-01) — 세로선·테두리 없이, 현재 구간은 펜으로 그은 밑줄, 읽은 구간은 손으로 쓴 체크. */
+        .chn-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #9ca3af; margin: 0 0 14px; }
+        .chn-list { list-style: none; margin: 0; padding: 0; }
+        .chn-btn { position: relative; display: block; width: 100%; text-align: left; padding: 8px 26px 8px 0; border: none;
+          background: none; cursor: pointer; font-size: 13.5px; line-height: 1.4; color: #b4bac3; word-break: keep-all;
+          transform: rotate(var(--chn-rot, 0deg)); transform-origin: left center; transition: color .2s ease; }
         .chn-btn:hover { color: #111827; }
-        /* 다 읽은 구간 오른쪽에 작은 체크가 톡 붙는다(2026-10-01, 가볍게 친근한 완독 피드백). */
-        .chn-ck { position: absolute; right: 2px; top: 50%; width: 14px; height: 14px; margin-top: -7px; color: var(--chn-accent); opacity: 0; transform: scale(.4); }
-        .chn-btn[data-state='read'] .chn-ck { opacity: 1; transform: none; animation: chn-pop .38s cubic-bezier(.34,1.56,.64,1); }
-        @keyframes chn-pop { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
-        .chn-btn[data-state='read'] { color: #4b5563; }
-        .chn-btn[data-state='now'] { color: #111827; font-weight: 700; border-left-color: var(--chn-accent); }
+        .chn-t { position: relative; display: inline; }
+        .chn-line { position: absolute; left: -2px; right: -2px; bottom: -5px; width: calc(100% + 4px); height: 7px; overflow: visible; opacity: 0; pointer-events: none; }
+        .chn-line path { fill: none; stroke: var(--chn-accent); stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        .chn-btn[data-state='now'] .chn-line { opacity: 0.85; }
+        .chn-btn[data-state='now'] .chn-line path { stroke-dashoffset: 0; transition: stroke-dashoffset .45s ease-out; }
+        .chn-ck { position: absolute; right: 2px; top: 50%; width: 16px; height: 16px; margin-top: -8px; color: var(--chn-accent); opacity: 0; }
+        .chn-ck path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+        .chn-btn[data-state='read'] .chn-ck { opacity: 1; }
+        .chn-btn[data-state='read'] .chn-ck path { stroke-dashoffset: 0; transition: stroke-dashoffset .4s ease-out; }
+        .chn-btn[data-state='read'] { color: #6b7280; }
+        .chn-btn[data-state='now'] { color: #111827; font-weight: 700; }
         .chn-btn:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
-        .chn-count { margin: 12px 0 0 14px; font-size: 12px; color: #9ca3af; font-variant-numeric: tabular-nums; }
-        @media (prefers-reduced-motion: reduce) { .chn, .chn-btn { transition: none; } }
+        .chn-count { margin: 12px 0 0; font-size: 12px; color: #b4bac3; font-variant-numeric: tabular-nums; }
+        @media (prefers-reduced-motion: reduce) { .chn, .chn-btn, .chn-line path, .chn-ck path { transition: none !important; } }
         @media print { .chn-host { display: none; } }
       `}</style>
       <div className="chn-host" style={{ ['--chn-accent' as string]: accent }}>
@@ -111,10 +120,16 @@ export function ArticleChapterNav({
                   tabIndex={visible ? 0 : -1}
                   title={c.full}
                   onClick={() => jump(c.id)}
+                  style={{ ['--chn-rot' as string]: `${ROT[i % ROT.length]}deg` }}
                 >
-                  {c.label}
-                  <svg className="chn-ck" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="m3.2 8.4 3 3 6.6-6.8" />
+                  <span className="chn-t">
+                    {c.label}
+                    <svg className="chn-line" viewBox="0 0 100 7" preserveAspectRatio="none" aria-hidden>
+                      <path pathLength={1} d="M1 4.6 C 14 1.8, 26 6, 44 3.4 S 78 2.2, 99 4.2" />
+                    </svg>
+                  </span>
+                  <svg className="chn-ck" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path pathLength={1} d="M2.2 8.9 C 3.6 9.6, 4.6 10.8, 5.7 12.6 C 8 8.4, 10.8 4.8, 14 2.6" />
                   </svg>
                 </button>
               </li>
