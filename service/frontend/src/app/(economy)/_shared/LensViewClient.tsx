@@ -10,6 +10,7 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react';
 import Image from 'next/image';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
@@ -258,6 +259,26 @@ export function LensViewClient({
   const photo = pickLensPhoto(lens);
   const lenses = lens.lenses ?? [];
   // 레일 "듣기" — 팟캐스트 시선 탭으로 이동(없으면 항목 숨김).
+  // 원문 링크 — 사진이 있으면 사진 캡션 줄 오른쪽에, 없으면 단독 줄로(2026-10-01, 사진 아래 큰 여백 제거).
+  const sourceLink = lens.source_url ? (
+    <a
+      href={lens.source_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="lnk"
+      style={{ minHeight: 28, fontSize: 13 }}
+      onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: lensFormatAt(active) })}
+    >
+      기사 원문 보기
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M7 17 17 7" />
+        <path d="M8 7h9v9" />
+      </svg>
+      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+        (새 창으로 열립니다)
+      </span>
+    </a>
+  ) : null;
   const podcastIdx = lenses.findIndex((l) => l.label === '팟캐스트');
   // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
   const activeP = lensPerspectiveAt(active);
@@ -293,9 +314,9 @@ export function LensViewClient({
         .rail-cap { font-size: 12px; color: #6b7280; white-space: nowrap; }
         .rail-pop { position: absolute; left: calc(100% + 8px); top: 0; z-index: 30; padding: 12px 14px;
           background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 6px 20px rgba(17,24,39,0.08); }
-        .badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 3px;
-          font-size: 11px; font-weight: 800; letter-spacing: 0.04em; color: #fff; background: ${LENS_ACCENT}; vertical-align: 1px; }
-        .sum { border-top: 2px solid #111827; background: #f7f6f2; padding: 18px 24px 22px; margin-top: 28px; }
+        .badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px;
+          font-size: 11.5px; font-weight: 700; color: ${LENS_ACCENT}; background: ${LENS_ACCENT}14; vertical-align: 1px; }
+        .sum { border-top: 2px solid #111827; background: #f7f6f2; padding: 18px 24px 22px; margin-top: 8px; }
         .sum-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
         .sum-title { font-size: 13px; font-weight: 800; letter-spacing: 0.08em; color: #111827; }
         .sum-note { font-size: 12px; color: #6b7280; }
@@ -502,17 +523,17 @@ export function LensViewClient({
             data-speakable="headline"
             style={{
               fontFamily: '"Noto Serif KR", serif',
-              fontSize: 'clamp(30px, 4.6vw, 46px)',
+              fontSize: 'clamp(28px, 4vw, 40px)',
               fontWeight: 700,
               color: '#111827',
               letterSpacing: '-0.025em',
-              lineHeight: 1.3,
+              lineHeight: 1.35,
               marginBottom: 14,
               textWrap: 'balance',
               wordBreak: 'keep-all',
             }}
           >
-            {lens.headline}
+            {displayHeadline(lens.headline)}
           </h1>
           {lens.context && (
             <p
@@ -522,9 +543,10 @@ export function LensViewClient({
               {lens.context}
             </p>
           )}
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 10px' }}>AI LENS 편집팀</p>
           <div className="flex items-center justify-between flex-wrap" style={{ gap: 10, paddingBottom: 16 }}>
             <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
+              <strong style={{ color: '#111827', fontWeight: 700 }}>AI LENS 편집팀</strong>
+              <span aria-hidden> · </span>
               입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
             </p>
             <a
@@ -559,7 +581,7 @@ export function LensViewClient({
 
         {photo && (
           <div className="lw" style={{ paddingTop: 20 }}>
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
               <Image
                 src={photo}
                 alt={lens.headline}
@@ -569,18 +591,21 @@ export function LensViewClient({
                 style={{ objectFit: 'cover', objectPosition: 'center' }}
               />
             </div>
-            <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 8 }}>
-              {lens.source_url ? (
-                <>
-                  사진 ·{' '}
-                  <a href={lens.source_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
-                    서울경제
-                  </a>
-                </>
-              ) : (
-                '사진 · 서울경제'
-              )}
-            </p>
+            <div className="flex items-center justify-between" style={{ gap: 12, marginTop: 8 }}>
+              <p style={{ fontSize: 11.5, color: '#9ca3af', margin: 0 }}>
+                {lens.source_url ? (
+                  <>
+                    사진 ·{' '}
+                    <a href={lens.source_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                      서울경제
+                    </a>
+                  </>
+                ) : (
+                  '사진 · 서울경제'
+                )}
+              </p>
+              {sourceLink}
+            </div>
           </div>
         )}
 
@@ -596,26 +621,7 @@ export function LensViewClient({
             으로만 구조를 만든다" 원칙에서 유일한 예외였다. */}
         <div className="lw" style={{ paddingTop: 'clamp(20px, 3.4vw, 28px)' }}>
         <div>
-          {lens.source_url && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <a
-                href={lens.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="lnk"
-                onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: lensFormatAt(active) })}
-              >
-                기사 원문 보기
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M7 17 17 7" />
-                  <path d="M8 7h9v9" />
-                </svg>
-                <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
-                  (새 창으로 열립니다)
-                </span>
-              </a>
-            </div>
-          )}
+          {!photo && sourceLink && <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{sourceLink}</div>}
 
           {coreSummaryBullets(lens).length > 0 && (
             <div data-speakable="summary" className="sum">
