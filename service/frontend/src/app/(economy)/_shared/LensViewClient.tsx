@@ -34,7 +34,10 @@ import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components'
 import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
 import { ArticleChapterNav } from './components/ArticleChapterNav';
+import { ArticleResume } from './components/ArticleResume';
+import { ArticleReveal } from './components/ArticleReveal';
 import { letterChapters } from './components/lensChapters';
+import { readMinutes } from './components/lensSamples';
 import { ArticleStickyBar } from './components/ArticleStickyBar';
 import { ArticleToolRail } from './components/ArticleToolRail';
 import {
@@ -84,6 +87,11 @@ import {
 // ⚠️ SEO — 비활성 시선도 DOM 에는 항상 렌더하고 hidden 으로만 감춘다.
 // 조건부 렌더로 3개를 빼면 page.tsx 의 NewsArticle articleBody / mainEntity
 // (Question+acceptedAnswer 4쌍)와 실제 본문이 어긋난다.
+
+// 대표 사진 그림자(2026-10-01) — 한 겹이 아니라 가까운 그림자(윤곽)·중간·멀리 퍼지는 그림자를 겹쳐 사진이
+// 종이 위에 놓인 듯 떠 보이게 한다. 번지는 반경은 크고 색은 옅게(Toss·당근식 부드러운 그림자, 굵은 테두리 X).
+const PHOTO_SHADOW =
+  '0 1px 2px rgba(17,24,39,0.06), 0 6px 16px -4px rgba(17,24,39,0.12), 0 22px 44px -14px rgba(17,24,39,0.18)';
 
 export function LensViewClient({
   slug,
@@ -282,6 +290,9 @@ export function LensViewClient({
     </a>
   ) : null;
   // 레터 본문의 소제목 → 오른쪽 구간 목차(레터 탭일 때만 보임).
+  // 레터 예상 읽기 시간(분) — 형식 탭의 "약 N분"과 같은 계산(readMinutes, 분당 500자).
+  const letterParas = lenses.find((l) => l.label === '레터')?.paragraphs;
+  const readMin = letterParas && letterParas.length > 0 ? readMinutes(letterParas.join('').length) : null;
   const chapters = letterChapters(lenses.find((l) => l.label === '레터')?.paragraphs);
   const podcastIdx = lenses.findIndex((l) => l.label === '팟캐스트');
   // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
@@ -501,7 +512,10 @@ export function LensViewClient({
           category={lens.category ?? null}
           categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
           title={lens.headline}
+          readMin={readMin}
         />
+        <ArticleResume articleId={lens.id} />
+        <ArticleReveal />
         {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
         <div className="rail-host">
           <nav className="rail" aria-label="기사 도구">
@@ -558,6 +572,11 @@ export function LensViewClient({
               <strong style={{ color: '#111827', fontWeight: 700 }}>AI LENS 편집팀</strong>
               <span aria-hidden> · </span>
               입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
+              {readMin && (
+                <>
+                  <span aria-hidden> · </span>약 {readMin}분 읽기
+                </>
+              )}
             </p>
             <a
               href={`https://www.google.com/preferences/source?q=${new URL(SITE_URL).host}`}
@@ -591,7 +610,7 @@ export function LensViewClient({
 
         {photo && (
           <div className="lw" style={{ paddingTop: 20 }}>
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0, borderRadius: 10, boxShadow: PHOTO_SHADOW }}>
               <Image
                 src={photo}
                 alt={lens.headline}
