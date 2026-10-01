@@ -42,6 +42,57 @@ CATEGORY_MAP = {
 # 2차 패스가 이 세그먼트들을 하위 태그로 찾는다.
 _INVESTING_SUBCATEGORIES = {"투자", "투자·재무", "금융·투자"}
 
+# 하위 카테고리(2026-10-01 신설) taxonomy — service/frontend/src/shared/
+# constants/econSubcategories.ts와 같은 값(의도적 중복, ECON_CATEGORIES와
+# 같은 원칙). 본지 실제 GNB 메뉴 구조(마켓시그널/기업/집슐랭/금융/국제/
+# 문화 하위분류)를 그대로 가져왔다. 원문 XML의 category 태그 2번째
+# 세그먼트(예: "증권,국내증시,...")가 이 taxonomy와 이름이 안 맞는 옛
+# 체계라 규칙 매핑 대신 LLM으로 분류한다. 처음엔 분량이 충분한 증시·산업만
+# 뒀다가(2026-10-01 실측, 나머지는 하위 탭 하나당 10개 안팎) 사용자 요청으로
+# 나머지 4개도 추가 — 분량이 얇아도 탭은 값이 있을 때만 뜨니 깨지진 않는다.
+SUBCATEGORY_MAP = {
+    "증시": ["국내증시", "해외증시", "IB&Deal", "펀드·채권", "정책", "증권일반"],
+    "산업": ["대기업", "중기·IT", "유통·생활", "바이오", "기업인", "투자·재무", "기업일반"],
+    "부동산": ["정책", "부동산일반", "건설업계"],
+    "금융·정책": ["은행", "보험", "카드", "가상자산", "금융일반"],
+    "국제": ["미국·중남미", "일본·중국", "아시아·호주", "유럽", "중동·아프리카"],
+    "문화": ["전시·공연", "영화·미디어", "출판", "여행·레저", "문화일반", "아트씽"],
+}
+
+# 전용 profile을 새로 만들지 않고 facts_extract.py와 같은 걸 재사용한다
+# (lens-letters-sonnet-46) — 분류 작업은 facts 추출만큼이나 가벼워서 새
+# AWS 리소스를 만들 필요가 없다고 판단.
+_SUBCATEGORY_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"
+
+
+def display_subcategory(category: str | None, headline: str, context: str) -> str | None:
+    """발행 시 body_inline.subcategory에 넣을 하위 카테고리. category가
+    SUBCATEGORY_MAP에 없는 값(증시·산업 외 전부, 또는 None)이면 분류
+    자체를 안 하고 None — 빈 탭을 만들지 않기 위한 의도적 제한
+    (SUBCATEGORY_MAP 주석 참조). Bedrock 호출 실패 시에도 None으로
+    폴백한다 — 이 필드가 없어도 발행 자체는 막히면 안 된다(facts_extract.
+    extract_facts와 같은 원칙)."""
+    options = SUBCATEGORY_MAP.get(category or "")
+    if not options:
+        return None
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from bedrock_client import call_text  # noqa: lazy — 실패해도 발행이 안 막히게
+
+        system = (
+            f"다음 기사가 '{category}' 카테고리 안에서 어느 하위 분류에 가장 가까운지 "
+            f"선택지 중 딱 하나만 골라 그 단어 그대로만 출력하세요. 다른 설명은 쓰지 마세요.\n"
+            f"선택지: {', '.join(options)}"
+        )
+        user = f"제목: {headline}\n요약: {context}".strip()
+        raw = call_text(system, user, model=_SUBCATEGORY_MODEL, max_tokens=20).strip()
+        for opt in options:
+            if opt in raw:
+                return opt
+    except Exception as e:
+        print(f"[display_subcategory] 분류 실패, 생략: {e}")
+    return None
+
 
 def load_module(name: str, file_path: Path):
     """letters/podcast/webtoon이 전부 `pipeline.py`라는 같은 파일명을 써서
@@ -88,6 +139,11 @@ def slugify(publish_date: str, headline: str) -> str:
     tail = _NON_SLUG.sub("-", (headline or "").strip()).strip("-")
     base = f"{publish_date}-{tail}" if tail else publish_date
     return base[:80].rstrip("-")
+
+
+# 레터 본문 최소 문단 수·재생성 횟수(2026-10-02) — publish_article()의 품질 검사에서 쓴다.
+MIN_LETTER_PARAGRAPHS = 6
+MAX_LETTER_RETRIES = 2
 
 
 def parse_letters(raw_md: str) -> list[str]:
@@ -307,9 +363,24 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
             break
         if line.startswith("-"):
             bullets.append(line.lstrip("-").strip())
-        elif bullets:
+        elif bullets and not _ends_sentence(bullets[-1]):
             bullets[-1] = f"{bullets[-1]} {line}".strip()
-    return bullets
+        # else: 직전 불릿이 문장 종결로 끝났는데 "-" 없는 줄이 왔다면 줄바꿈
+        # 이어쓰기가 아니다 — 불릿 블록과 "## 본문" 사이의 도입부 문단이다
+        # (2026-10-01 오후, 레터 출력 순서가 "불릿 → 도입부 → ##본문"으로 바뀐
+        # 뒤 36건 전부 도입부가 마지막 불릿에 붙은 실제 버그). 무시한다.
+    # "자료: 서울경제신문(...)" 출처 줄은 요약 불릿이 아니다 — 같은 날부터
+    # 모델이 불릿 형식으로 출력해 5번째 "30초 핵심" 항목으로 새고 있었다.
+    # "자료:"처럼 콜론이 붙은 출처 줄만 제외한다 — "자료를 공개한 의원은…"처럼 "자료"로
+    # 시작하는 정상 불릿(실제 9/26 발행분)까지 지우지 않도록 패턴을 좁힌다.
+    return [b for b in bullets if not re.match(r"^자료\s*[:：]", b)]
+
+
+def _ends_sentence(text: str) -> bool:
+    """불릿이 완결 문장으로 끝났는지. 따옴표·괄호 닫힘을 건너뛰고 마지막
+    글자가 . ! ? 면 완결로 본다 — 모델이 긴 불릿을 두 줄로 나눌 때는
+    문장 중간에서 끊기므로(2026-09-04 이어붙이기 규칙의 대상) 구분된다."""
+    return text.rstrip(" \"'”’)」』]").endswith((".", "!", "?", "。"))
 
 
 def parse_letter_terms(raw_md: str) -> list[dict]:
@@ -520,6 +591,19 @@ def publish_article(
     letters_path = letters_mod.run_article(name, str(article_path), out_dir)
     letters_raw = letters_path.read_text(encoding="utf-8")
     paragraphs = parse_letters(letters_raw)
+    # 레터 본문 품질 검사(2026-10-02) — 2026-10-01 12:00 KST 실행에서 4건이 본문 1문단(리드 한 줄)뿐인 레터로 그대로 발행됐다
+    # (나머지 21건은 13문단). 생성 응답이 잘렸거나 파싱에서 본문이 유실된 경우인데 아무 검사 없이 발행되는 게 문제였다.
+    # 문단이 너무 적으면 생성을 최대 2번 더 시도하고, 그래도 부족하면 예외로 이 기사를 발행하지 않는다(seen 표시가 안 되어 다음
+    # 회차에 다시 후보가 된다). 정상 글은 항상 10문단 안팎이라 임계값 6은 여유가 있다.
+    for _attempt in range(1, MAX_LETTER_RETRIES + 1):
+        if len(paragraphs) >= MIN_LETTER_PARAGRAPHS:
+            break
+        print(f"[{log_prefix}] {name} 레터 본문 {len(paragraphs)}문단(최소 {MIN_LETTER_PARAGRAPHS}) — 재생성 {_attempt}/{MAX_LETTER_RETRIES}")
+        letters_path = letters_mod.run_article(name, str(article_path), out_dir)
+        letters_raw = letters_path.read_text(encoding="utf-8")
+        paragraphs = parse_letters(letters_raw)
+    if len(paragraphs) < MIN_LETTER_PARAGRAPHS:
+        raise ValueError(f"레터 본문 {len(paragraphs)}문단 — 최소 {MIN_LETTER_PARAGRAPHS}문단 필요, 발행 보류")
     letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
     letter_terms = parse_letter_terms(letters_raw)
     # 프롬프트가 생성하는 "독자 시선 진입형" 제목. 2026-09-21 —
@@ -567,8 +651,19 @@ def publish_article(
                 " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
             ) or cut.get("caption", "")
             webtoon_bullets.append(caption)
-            key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
-            webtoon_images.append({"url": _upload(cut_path, key), "caption": caption})
+            # 업로드는 WebP(품질 90)로(2026-10-01) — 1.5배 해상도 PNG(컷당 2MB대) 대신 약 300KB로 줄여 로딩·전송 비용을 낮추고
+            # Core Web Vitals에도 유리하다. 로컬 PNG는 세로 합치기(stitch)용으로 그대로 둔다. 변환 실패 시 PNG로 폴백.
+            try:
+                from PIL import Image
+
+                webp_path = cut_path.with_suffix(".webp")
+                Image.open(cut_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
+                key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.webp"
+                webtoon_images.append({"url": _upload(webp_path, key), "caption": caption})
+            except Exception as e:
+                print(f"[{log_prefix}] {name} 컷{n} WebP 변환 실패 — PNG로 업로드: {e}")
+                key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
+                webtoon_images.append({"url": _upload(cut_path, key), "caption": caption})
         if len(webtoon_images) < MIN_WEBTOON_CUTS:
             raise ValueError(
                 f"컷 {len(webtoon_images)}/{len(webtoon_script['cuts'])}개만 성공 "
@@ -644,7 +739,8 @@ def publish_article(
             "body": [], "key_points": [], "keywords": [], "images": [],
             "lenses": lenses,
             "photo_image_url": article["photo_url"],
-            "category": display_category(article),
+            "category": (category := display_category(article)),
+            "subcategory": display_subcategory(category, letter_title, article.get("sub_title") or ""),
             "paper_section": paper_section,
             "display_order": display_order,
             "needs_video": video is None,

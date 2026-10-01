@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { pickLensPhoto, lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
@@ -31,7 +31,6 @@ export function ConsumeStep({
   onContinue: () => void;
   onBack?: () => void;
 }) {
-  const [showScript, setShowScript] = useState(false);
   const photo = pickLensPhoto(lens);
   const l = lens.lenses?.[formatIndex];
 
@@ -85,8 +84,6 @@ export function ConsumeStep({
             dir={0}
             onPanelTouchStart={onPanelTouchStart}
             onPanelTouchEnd={onPanelTouchEnd}
-            showScript={showScript}
-            setShowScript={setShowScript}
             noteDur={noteDur}
           />
         )}

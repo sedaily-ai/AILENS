@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/entities/user';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
@@ -15,16 +15,55 @@ import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 // - 로그인: 즉시 /api/archive 로 서버 저장 (saveArchiveSentence)
 // - 비로그인: /login 으로 안내
 // scoping: article[data-letter-body] 내부 selection 만 인정.
+//
+// 용어 풀이(2026-10-01) — 선택한 문장 안에 발행 시 미리 뽑아 둔 용어(keywords)가 들어 있으면 "용어 풀이" 버튼이
+// 함께 뜨고, 누르면 그 용어의 뜻을 바로 아래 카드로 보여 준다. 런타임 AI 호출이 없어 독자 수와 무관하게 비용 0.
+function pillStyle(busy: boolean, bg: string): React.CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '7px 13px',
+    fontSize: 12.5,
+    fontWeight: 700,
+    color: '#fff',
+    background: bg,
+    border: 'none',
+    borderRadius: 999,
+    boxShadow: '0 4px 16px rgba(15,23,42,0.22), 0 1px 2px rgba(15,23,42,0.08)',
+    cursor: busy ? 'default' : 'pointer',
+    whiteSpace: 'nowrap',
+    opacity: busy ? 0.65 : 1,
+    transition: 'opacity 0.15s',
+  };
+}
+
 export function SentenceSelectionPopover({
   letter,
+  glossary,
 }: {
   letter: { id: string; headline: string; publishedAt?: string };
+  glossary?: Array<{ term: string; explain: string }>;
 }) {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [pos, setPos] = useState<{ x: number; y: number; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [showTerms, setShowTerms] = useState(false);
+
+  // 선택 문장에 들어 있는 용어만 — 공백 차이는 무시하고, 같은 용어는 한 번만.
+  const matched = useMemo(() => {
+    if (!pos || !glossary?.length) return [];
+    const flat = pos.text.replace(/\s+/g, '').toLowerCase();
+    const seen = new Set<string>();
+    return glossary.filter((g) => {
+      const key = g.term.replace(/\s+/g, '').toLowerCase();
+      if (!key || seen.has(key) || !flat.includes(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [pos, glossary]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -39,13 +78,16 @@ export function SentenceSelectionPopover({
       if (!el || !el.closest('article[data-letter-body]')) { setPos(null); return; }
       const rect = range.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) { setPos(null); return; }
+      setShowTerms(false);
       setPos({
         x: rect.left + rect.width / 2 + window.scrollX,
         y: rect.top - 12 + window.scrollY,
         text,
       });
     };
-    const onUp = () => {
+    const onUp = (e: Event) => {
+      // 팝오버 안쪽 클릭(용어 풀이 토글 등)은 선택이 바뀐 게 아니므로 갱신하지 않는다 — 카드가 닫히는 걸 막는다.
+      if ((e.target as Element | null)?.closest?.('[data-sel-popover]')) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(refresh, 40);
     };
@@ -124,39 +166,71 @@ export function SentenceSelectionPopover({
         }
       `}</style>
       {pos && (
-        <button
-          type="button"
-          onClick={save}
+        <div
+          data-sel-popover
           onMouseDown={(e) => e.preventDefault()}
-          disabled={saving}
           style={{
             position: 'absolute',
             left: pos.x,
             top: pos.y,
             transform: 'translate(-50%, -100%)',
             zIndex: 60,
-            display: 'inline-flex',
+            display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: 6,
-            padding: '7px 13px',
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: '#fff',
-            background: '#111827',
-            border: 'none',
-            borderRadius: 999,
-            boxShadow: '0 4px 16px rgba(15,23,42,0.22), 0 1px 2px rgba(15,23,42,0.08)',
-            cursor: saving ? 'default' : 'pointer',
-            whiteSpace: 'nowrap',
-            opacity: saving ? 0.65 : 1,
-            transition: 'opacity 0.15s',
+            gap: 8,
           }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-          </svg>
-          {isAuthenticated ? (saving ? '담는 중…' : '서랍에 담기') : '로그인하고 담기'}
-        </button>
+          {showTerms && matched.length > 0 && (
+            <div
+              role="dialog"
+              aria-label="용어 풀이"
+              style={{
+                width: 'min(320px, calc(100vw - 32px))',
+                background: '#fff',
+                color: '#111827',
+                borderRadius: 16,
+                padding: '14px 16px',
+                boxShadow: '0 12px 32px rgba(15,23,42,0.18), 0 1px 3px rgba(15,23,42,0.08)',
+                textAlign: 'left',
+                wordBreak: 'keep-all',
+              }}
+            >
+              {matched.map((g, i) => (
+                <div key={g.term} style={{ marginTop: i ? 12 : 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800 }}>{g.term}</div>
+                  <div style={{ marginTop: 3, fontSize: 13.5, lineHeight: 1.6, color: '#4b5563' }}>{g.explain}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'inline-flex', gap: 6 }}>
+            {matched.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowTerms((v) => !v);
+                  if (!showTerms) trackEvent('letter_term_explain', { letter_id: letter.id, terms: matched.length });
+                }}
+                aria-expanded={showTerms}
+                style={pillStyle(false, showTerms ? '#374151' : '#111827')}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M9.6 9.4a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1.1.9-1.1 1.7M12 16.9h.01" />
+                </svg>
+                용어 풀이
+              </button>
+            )}
+            <button type="button" onClick={save} disabled={saving} style={pillStyle(saving, '#111827')}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+              </svg>
+              {isAuthenticated ? (saving ? '담는 중…' : '서랍에 담기') : '로그인하고 담기'}
+            </button>
+          </div>
+        </div>
       )}
       {toast && (
         <div

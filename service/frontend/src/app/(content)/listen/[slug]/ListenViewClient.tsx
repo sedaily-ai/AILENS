@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
@@ -99,7 +100,7 @@ export function ListenViewClient({
                 lineHeight: 1.4,
               }}
             >
-              {item.title}
+              {displayHeadline(item.title)}
             </h1>
           </div>
 

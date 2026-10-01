@@ -19,6 +19,7 @@ import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
 import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
+import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
 // 카테고리 아카이브 페이지 크기(2026-09-30, 페이지네이션 신설 — 서울경제
@@ -48,14 +49,21 @@ export function CategoryArchiveClient({
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<ArchiveItem[]>(initialItems);
+  // 하위 카테고리 탭(2026-10-01, en.sedaily.com/finance 구조 참고 — "Home |
+  // Banking | Insurance | Card | ..."). econSubcategories.ts에 taxonomy가
+  // 있는 카테고리(지금은 증시·산업)에서만, 그마저도 실제로 글이 있는 값만
+  // 탭으로 뜬다 — taxonomy엔 있어도 아직 백필 전이면 탭 자체가 안 보인다.
+  const [activeSub, setActiveSub] = useState<string>('all');
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([fetchCmsPosts('letters', undefined, PAGE_SIZE), fetchLensPosts()]).then(
       ([letters, lens]) => {
         if (cancelled) return;
-        const all = buildArchiveItems(letters, [], [], lens).filter(
-          (it) => it.category === config.label,
+        // "시그널"(filterBy:'paperSection')은 category가 아니라 paperSection으로
+        // 거른다 — EconomyCategoryPage.tsx(서버 최초 fetch)와 같은 규칙.
+        const all = buildArchiveItems(letters, [], [], lens).filter((it) =>
+          config.filterBy === 'paperSection' ? it.paperSection === config.label : it.category === config.label,
         );
         if (all.length > 0) setItems(all);
       },
@@ -63,11 +71,16 @@ export function CategoryArchiveClient({
     return () => {
       cancelled = true;
     };
-  }, [config.label]);
+  }, [config.label, config.filterBy]);
+
+  const subTabValues = econSubcategoriesFor(config.slug).filter((sub) =>
+    items.some((it) => it.subcategory === sub),
+  );
+  const filteredItems = activeSub === 'all' ? items : items.filter((it) => it.subcategory === activeSub);
 
   const {
     pageItems, currentPage, totalPages, pageHref, isCustomSize, pageSize, onPageChange, onPageSizeChange,
-  } = usePageSizePagination(items, CATEGORY_PAGE_SIZE, `/${config.slug}`, initialPage);
+  } = usePageSizePagination(filteredItems, CATEGORY_PAGE_SIZE, `/${config.slug}`, initialPage);
 
   return (
     <div className="min-h-screen bg-white">
@@ -104,7 +117,34 @@ export function CategoryArchiveClient({
               accentColor={config.accent}
               description={config.description}
             />
-            <p style={{ fontSize: 12.5, color: '#9ca3af', marginBottom: 14 }}>총 {items.length}개</p>
+            {subTabValues.length > 0 && (
+              <div className="flex items-center" style={{ gap: 4, marginBottom: 16, borderBottom: '1px solid #ececec', flexWrap: 'wrap' }}>
+                {['all', ...subTabValues].map((key) => {
+                  const active = activeSub === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActiveSub(key)}
+                      style={{
+                        padding: '8px 10px',
+                        marginBottom: -1,
+                        fontSize: 13.5,
+                        fontWeight: active ? 700 : 500,
+                        color: active ? '#1c1917' : '#9ca3af',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: active ? `2px solid ${config.accent}` : '2px solid transparent',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {key === 'all' ? '전체' : key}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p style={{ fontSize: 12.5, color: '#9ca3af', marginBottom: 14 }}>총 {filteredItems.length}개</p>
             <ArchiveList items={pageItems} emptyLabel={`아직 ${config.label} 글이 없어요.`} />
             <ListPagination
               currentPage={currentPage}
@@ -116,7 +156,7 @@ export function CategoryArchiveClient({
               pageSizeOptions={PAGE_SIZE_OPTIONS}
               onPageSizeChange={onPageSizeChange}
               accentColor={config.accent}
-              totalCount={items.length}
+              totalCount={filteredItems.length}
             />
           </main>
 

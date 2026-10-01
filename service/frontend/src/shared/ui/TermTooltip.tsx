@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 // letters/[id]/components/TermTooltip.tsx 에서 이전(2026-09-11) — lens
 // 4탭 페이지(레터 탭)도 같은 용어 하이라이트를 쓰게 되면서 두 페이지가
@@ -67,7 +67,25 @@ export function TermTooltip({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [place, setPlace] = useState({ shift: 0, below: false });
+  const cardRef = useRef<HTMLSpanElement>(null);
   const angle = hashAngle(term);
+
+  // 카드가 화면 밖(좌우 가장자리·위쪽 고정 바 아래)으로 나가면 밀어 넣거나 아래로 뒤집는다.
+  useLayoutEffect(() => {
+    if (!open || !cardRef.current) return;
+    const r = cardRef.current.getBoundingClientRect();
+    const m = 16;
+    const cur = place.shift;
+    const left = r.left - cur;
+    const right = r.right - cur;
+    let shift = 0;
+    if (left < m) shift = m - left;
+    else if (right > window.innerWidth - m) shift = window.innerWidth - m - right;
+    const below = !place.below ? r.top < 150 : place.below;
+    if (shift !== cur || below !== place.below) setPlace({ shift, below });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   return (
     <span
       role="button"
@@ -105,47 +123,42 @@ export function TermTooltip({
       </span>
       {open && (
         <span
+          ref={cardRef}
           role="tooltip"
+          className="term-card"
           style={{
             position: 'absolute',
-            bottom: 'calc(100% + 8px)',
+            [place.below ? 'top' : 'bottom']: 'calc(100% + 10px)',
             left: '50%',
-            transform: 'translateX(-50%)',
-            padding: '10px 14px',
-            background: '#111827',
-            color: '#fff',
-            fontSize: 12.5,
-            fontWeight: 400,
-            lineHeight: 1.55,
-            borderRadius: 8,
-            minWidth: 200,
-            maxWidth: 'min(320px, 80vw)',
+            transform: `translateX(calc(-50% + ${place.shift}px))`,
             width: 'max-content',
+            minWidth: 200,
+            maxWidth: 'min(300px, calc(100vw - 32px))',
+            padding: '12px 14px 13px',
+            background: '#fff',
+            color: '#111827',
+            borderRadius: 14,
             whiteSpace: 'normal',
-            zIndex: 20,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+            wordBreak: 'keep-all',
             textAlign: 'left',
+            zIndex: 20,
+            boxShadow: '0 12px 32px rgba(15,23,42,0.16), 0 1px 3px rgba(15,23,42,0.08)',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif',
+            fontWeight: 400,
             letterSpacing: '-0.005em',
+            cursor: 'default',
           }}
         >
-          <span style={{ fontWeight: 700, color: '#fbbf24', display: 'block', marginBottom: 4 }}>
-            {term}
+          <style>{`
+            @keyframes term-in { from { opacity: 0; translate: 0 ${place.below ? '-4px' : '4px'}; } to { opacity: 1; translate: 0 0; } }
+            .term-card { animation: term-in .16s ease-out; }
+            @media (prefers-reduced-motion: reduce) { .term-card { animation: none; } }
+          `}</style>
+          <span style={{ display: 'block', fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', color: '#a16207', marginBottom: 4 }}>
+            용어
           </span>
-          {explain}
-          <span
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderTop: '6px solid #111827',
-            }}
-          />
+          <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800, lineHeight: 1.35 }}>{term}</span>
+          <span style={{ display: 'block', marginTop: 4, fontSize: 13.5, lineHeight: 1.6, color: '#4b5563' }}>{explain}</span>
         </span>
       )}
     </span>

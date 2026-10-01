@@ -1,5 +1,10 @@
 #!/bin/bash
 # Deploy Script for Sedaily-MBTI Backend
+#
+# ⚠ 이름 주의(2026-10-01) — 이 스크립트는 "옛 Lambda API"(sedaily-mbti-*-dev) 배포용이다.
+# 지금 서비스의 공개 API(/api/v2/posts*)는 service/lens-cms-api(EC2, PM2)가 서빙하고
+# 그쪽 배포는 service/lens-cms-api/deploy.sh 다. 이 Lambda들은 일부(검색·피드·타임라인·
+# 퀴즈 등)가 아직 호출되고 있어 현역이다 — 전체 지도는 docs/architecture/배포_스크립트_지도.md.
 # Builds and deploys Lambda functions for MBTI news style transformation.
 #
 # 2026-08-05: v1/v2 소스 통합 — 예전에 별도였던 deploy-v2.sh(별도 zip, 별도

@@ -38,9 +38,8 @@ export function AiDisclaimer({
         display: 'flex',
         gap: 12,
         padding: '14px 16px',
-        borderLeft: '3px solid #93c5fd',
-        background: '#f8fafc',
-        borderRadius: '0 10px 10px 0',
+        background: '#f6f7f9',
+        borderRadius: '16px 12px 17px 11px / 12px 17px 11px 16px',
       }}
     >
       <span aria-hidden style={{ flexShrink: 0, color: '#9ca3af', marginTop: 1 }}>

@@ -21,10 +21,15 @@ FROM node:20-bookworm AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# BuildKit 캐시 마운트(2026-10-01) — npm 다운로드 캐시(~/.npm)와 Next 웹팩
+# 증분 캐시(.next/cache)를 빌드 사이에 유지한다. 이미지 레이어와 달리
+# 소스가 바뀌어(COPY . . 무효화) 빌드가 다시 돌아도 캐시 디렉터리는 남아
+# 변경분만 다시 컴파일한다. 마운트 내용은 최종 이미지에 들어가지 않는다
+# (standalone 산출물은 .next/cache를 쓰지 않는다).
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 COPY . .
-RUN npm run build
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # ---
 

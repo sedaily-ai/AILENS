@@ -24,6 +24,13 @@ import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
  */
 
 export const LENS_ACCENT = '#3b82f6';
+
+/**
+ * 기사 상세 읽기 영역의 강조색(2026-10-01) — 서울경제 CI의 푸른 S 로고에서 뽑은 색(로고 본색 약 #5b7bb0)을
+ * 밝은 파스텔로 올렸다(2026-10-01 사용자 피드백 — 진한 색은 어둡고 무거움). 작은 글자는 사용처에서 진하게 섞는다. 형식(레터·웹툰·팟캐스트·영상)별 색 대신 읽기 영역
+ * 전체(챕터 번호·목차·완독 체크·서명·요약 번호)에 이 한 색만 쓴다 — 형식 구분은 탭 아이콘이 맡는다.
+ */
+export const READING_ACCENT = '#5b8def';
 export const LENS_CARD_BORDER = '1px solid rgba(0,0,0,0.06)';
 export const LENS_CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)';
 

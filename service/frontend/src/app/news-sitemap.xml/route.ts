@@ -41,7 +41,7 @@ export async function GET() {
   const recentDates = [today, shiftDate(today, -1)];
 
   const seen = new Set<string>();
-  const entries: Array<{ loc: string; headline: string; date: string; keywords: string[] }> = [];
+  const entries: Array<{ loc: string; headline: string; date: string; publishedAt?: string | null; keywords: string[] }> = [];
 
   // v1.32 — lens 먼저 채운다. channel=letters 조회는 admin_channel='letters'
   // 뿐 아니라 letter 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을
@@ -59,7 +59,12 @@ export async function GET() {
         loc: `${BASE}${lensPath(l)}`,
         headline: l.headline,
         date: l.date,
-        keywords: [],
+        publishedAt: l.published_at,
+        // 카테고리·하위 카테고리(2026-10-01 econSubcategories.ts 신설) —
+        // 이전엔 항상 빈 배열이라 news:keywords가 lens 글에서 한 번도
+        // 안 찍혔다. letters 쪽(아래)은 실제 용어 키워드를 쓰지만 lens엔
+        // 그런 필드가 없어 가장 가까운 신호(주제 분류)로 채운다.
+        keywords: [l.category, l.subcategory].filter((k): k is string => !!k),
       });
     }
   } catch {
@@ -76,6 +81,7 @@ export async function GET() {
           loc: `${BASE}${letterHref(p.id)}`,
           headline: p.headline,
           date: p.publish_date ?? date,
+          publishedAt: p.published_at,
           keywords: (p.keywords ?? []).map((k) => k.term).filter(Boolean),
         });
       }
@@ -85,7 +91,13 @@ export async function GET() {
   }
 
   const urls = entries
-    .map(({ loc, headline, date, keywords }) => {
+    .map(({ loc, headline, date, publishedAt, keywords }) => {
+      // 발행 시각(초 단위)이 있으면 그걸 쓴다(2026-10-01) — 이전엔 전부
+      // 07:00 고정이라 같은 날 글이 전부 같은 시각으로 신고돼 신선도 신호가
+      // 사라졌다(rss.xml pubDate와 같은 문제). 없으면 기존 폴백 유지.
+      const pubDate = publishedAt && !isNaN(new Date(publishedAt).getTime())
+        ? new Date(publishedAt).toISOString()
+        : `${date}T07:00:00+09:00`;
       const keywordsTag = keywords.length
         ? `\n      <news:keywords>${escapeXml(keywords.join(', '))}</news:keywords>`
         : '';
@@ -96,7 +108,7 @@ export async function GET() {
         <news:name>${escapeXml(PUBLICATION_NAME)}</news:name>
         <news:language>ko</news:language>
       </news:publication>
-      <news:publication_date>${date}T07:00:00+09:00</news:publication_date>
+      <news:publication_date>${pubDate}</news:publication_date>
       <news:title>${escapeXml(headline)}</news:title>${keywordsTag}
     </news:news>
   </url>`;

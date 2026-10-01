@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Image from 'next/image';
 import { letterHref } from '@/shared/lib/letterHref';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
@@ -96,7 +97,7 @@ export function EditorCommentsSection({ otherLetters }: Props) {
                 margin: '0 0 10px',
               }}
             >
-              {ltr.headline}
+              {displayHeadline(ltr.headline)}
             </h4>
             <div className="flex items-center justify-end">
               <Link

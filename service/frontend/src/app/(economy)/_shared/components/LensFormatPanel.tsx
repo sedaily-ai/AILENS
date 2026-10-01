@@ -1,35 +1,31 @@
 'use client';
 
+import { renderInline } from './renderInline';
+
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { chapterId } from './lensChapters';
+import { ReadDone } from './ReadDone';
+import { lensPath } from '@/shared/lib/lensUrl';
+import { SITE_URL } from '@/shared/constants/site';
+import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
+import { parseLetterBlocks } from './lensBlocks';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
 import { WebtoonCutGallery } from '@/shared/ui/WebtoonCutGallery';
-import { wrapWithTerms } from '@/shared/ui/TermTooltip';
+
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import {
   lensFormatAt,
   lensPanelId,
   lensPerspectiveAt,
   lensTabId,
+  READING_ACCENT,
 } from '@/shared/constants/lensPerspectives';
 import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
-import { ARTICLE_FORMAT_SAMPLES, articleFormatSample } from './lensSamples';
+import { ARTICLE_FORMAT_SAMPLES, articleFormatSample, readMinutes } from './lensSamples';
 import { CardnewsCarousel } from './CardnewsCarousel';
-
-// 2026-09-28, 사용자 요청 — "문장 끝날 때... 줄바꿈... 문맥에 맞게 줄바꿈을
-// 철저하게 해야합니다": "대사로 읽기" 목록(아래 227행 부근)이 cut.caption을
-// 가공 없이 그대로 렌더해서, 한 컷 캡션에 문장이 여럿 붙어 있으면(내레이션
-// 원문이 마침표로만 이어붙는 경우가 흔함) 한 줄로 쭉 이어졌다. 문장 종결
-// 부호(./!/?) 뒤에서 끊어 문장 단위로 나눈다 — 종결 부호 뒤에 공백이 있든
-// 없든(원본 캡션이 공백 없이 붙어있는 경우도 실측 확인) 둘 다 처리하도록
-// 부호 자체를 기준으로 split한다.
-function splitSentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s*/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해) — 4개 포맷(레터/
 // 웹툰/팟캐스트/영상) 중 하나의 시선 패널 전체. lenses.map()의 콜백 본문을
@@ -58,8 +54,6 @@ export function LensFormatPanel({
   dir,
   onPanelTouchStart,
   onPanelTouchEnd,
-  showScript,
-  setShowScript,
   noteDur,
 }: {
   lens: CmsLens;
@@ -72,9 +66,6 @@ export function LensFormatPanel({
   dir: number;
   onPanelTouchStart: (e: ReactTouchEvent) => void;
   onPanelTouchEnd: (e: ReactTouchEvent, i: number) => void;
-  /** 웹툰 대사 전문 펼침 — 한 번에 한 패널만 보이므로 상태 하나를 공유한다. */
-  showScript: boolean;
-  setShowScript: (updater: (v: boolean) => boolean) => void;
   /** 실측 오디오·영상 길이(초) 보고 — 부모가 FormatPicker의 분량 표기에 쓴다. */
   noteDur: (i: number, sec: number) => void;
 }) {
@@ -168,7 +159,12 @@ export function LensFormatPanel({
       {/* 질문 — 카드 안 시각적 정점. 네 형식의 첫 줄 무게를 하나로 맞춘다 —
           탭을 옮길 때마다 첫 줄 크기가 뛰면 "같은 대상의 다른 표면"이
           아니라 "다른 페이지"로 느껴진다. */}
-      {format === 'letter' && l.question && <p className="fmt-lede">{l.question}</p>}
+      {/* 맨 위 제목과 똑같은 문장이 탭 바로 아래에 한 번 더 나와 반복돼 보여서 눈에는 숨긴다(스크린리더·구조는 유지). */}
+      {format === 'letter' && l.question && (
+        <p className="fmt-lede" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+          {displayHeadline(l.question)}
+        </p>
+      )}
 
       {/* 레터 본문 — 편집 지면 톤(읽기 폭 620px 상한 + 첫 문단 리드인 +
           문단 간격 24px). AI LENS 편집장 프롬프트의 문체 가이드(친근한
@@ -179,33 +175,79 @@ export function LensFormatPanel({
           붙어있어서 문장을 긁어도 서랍에 담는 버튼이 안 떴다. */}
       {format === 'letter' && letterParagraphs && (
         <article data-letter-body>
-          <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
-            {letterParagraphs.map((para, pi) => {
-              // "##" 소제목 마커(2026-10-01, 파이프라인 출력 순서 변경 —
-              // publish_utils.py의 parse_letters() 주석 참조) — "◾"와 같은
-              // 역할이지만 마크다운 문법 기호라 "◾"처럼 그대로 보여주면
-              // 글자가 그대로 노출된 버그처럼 보인다. 접두어는 떼고
-              // lread-sub 스타일(굵게+색)만 적용 — "◾"는 의도된 시각
-              // 마커라 원문 그대로 유지.
-              const isHashSub = para.startsWith('##');
-              const text = isHashSub ? para.replace(/^##\s*/, '') : para;
-              const isSub = para.startsWith('◾') || isHashSub;
-              return (
-                <p key={pi} className={isSub ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined}>
-                  {wrapWithTerms(text, l.keywords ?? [])}
-                </p>
-              );
-            })}
+          <div className="lread" style={{ ['--lc' as string]: READING_ACCENT } as CSSProperties}>
+            {/* 본문 블록 렌더(2026-10-01) — parseLetterBlocks가 소제목·목록·인용·구분선을 읽어 풀어 주므로 프롬프트
+                출력 형식이 달라져도 기호가 그대로 새지 않는다. 소제목 id는 오른쪽 구간 목차의 앵커. */}
+            {(() => {
+              const blocks = parseLetterBlocks(letterParagraphs, { headline: lens.headline });
+              const chTotal = blocks.filter((x) => x.type === 'sub').length;
+              return blocks.map((b, bi) => {
+              const kw = l.keywords ?? [];
+              switch (b.type) {
+                case 'lead':
+                  return (
+                    <p key={bi} className="lread-lead">
+                      {renderInline(b.text, kw)}
+                    </p>
+                  );
+                case 'sub':
+                  return (
+                    <h3 key={bi} id={chapterId(b.no)} className="lread-sub">
+                      <span className="ch-no">
+                        {String(b.no + 1).padStart(2, '0')}
+                        <i>/ {String(chTotal).padStart(2, '0')}</i>
+                      </span>
+                      <span className="ch-t">{renderInline(b.head, kw)}</span>
+                      {b.question && <span className="ch-q">{renderInline(b.question, kw)}</span>}
+                    </h3>
+                  );
+                case 'ul':
+                  return (
+                    <ul key={bi}>
+                      {b.items.map((it, ii) => (
+                        <li key={ii}>{renderInline(it, kw, { numbers: true })}</li>
+                      ))}
+                    </ul>
+                  );
+                case 'ol':
+                  return (
+                    <ol key={bi}>
+                      {b.items.map((it, ii) => (
+                        <li key={ii}>{renderInline(it, kw, { numbers: true })}</li>
+                      ))}
+                    </ol>
+                  );
+                case 'quote':
+                  return <blockquote key={bi}>{renderInline(b.text, kw)}</blockquote>;
+                case 'hr':
+                  return (
+                    <div key={bi} className="lread-hr" aria-hidden>
+                      ···
+                    </div>
+                  );
+                default:
+                  return <p key={bi}>{renderInline(b.text, kw, { numbers: true })}</p>;
+              }
+              });
+            })()}
             {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
                 "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
                 신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +
                 발신인 라벨로 뉴스레터 서명처럼 닫는다. */}
-            <div aria-hidden className="lread-sign">
-              <span className="lread-sign-mark" style={{ background: p.color }} />
-              <span className="lread-sign-name">AI LENS 레터</span>
+            <ReadDone minutes={readMinutes(letterParagraphs.join('').length)} />
+            <div className="lread-sign">
+              <p className="lread-thanks">끝까지 읽어주셔서 고마워요.</p>
+              <p className="lread-from">
+                <span className="lread-sign-mark" style={{ background: READING_ACCENT }} aria-hidden />
+                <span className="lread-sign-name">AI LENS 편집팀</span>
+              </p>
+              <div className="lread-share">
+                <span className="lread-share-label">친구에게 공유하기</span>
+                <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
+              </div>
             </div>
           </div>
-          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}
+          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} glossary={l.keywords} />}
         </article>
       )}
 
@@ -226,7 +268,7 @@ export function LensFormatPanel({
               </li>
             ))}
           </ol>
-          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}
+          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} glossary={l.keywords} />}
         </article>
       )}
 
@@ -246,50 +288,34 @@ export function LensFormatPanel({
           렌더하는 것과 완주율 계측은 WebtoonCutGallery가 담당한다. */}
       {format === 'webtoon' && realWebtoonCuts && <WebtoonCutGallery cuts={realWebtoonCuts} articleId={lens.id} />}
 
+      {/* 웹툰이 끝난 자리 — 네이버 웹툰이 회차 끝에서 다음 화로 잇듯, 같은 기사를 레터로 더 깊이 읽도록 조용히 잇는다(2026-10-01). */}
+      {format === 'webtoon' && realWebtoonCuts && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 36 }}>
+          <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>여기까지 웹툰으로 봤어요</p>
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById(lensTabId(0))?.click();
+              setTimeout(() => document.getElementById(lensPanelId(0))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+            }}
+            style={{ padding: '11px 20px', border: 'none', borderRadius: 999, background: '#f2f3f5', color: '#111827', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+          >
+            레터로 더 자세히 읽기 →
+          </button>
+        </div>
+      )}
+
       {/* 대사 전문 — 컷 안 말풍선에 이미 있는 대사를 여기서 한 번 더
           접어서 보여준다(소리를 못 듣거나 이미지가 안 뜨거나, 인용하려는
           경우). hidden으로만 감춰서 DOM에는 항상 있다. */}
+      {/* 대사 전문(2026-10-01) — 화면에서는 버튼·목록을 없앴다(독자에겐 군더더기). 컷 안 글자는 이미지라 검색엔진·AI·스크린리더가
+          읽지 못하므로, 같은 대사를 텍스트로 DOM에 그대로 둔다(시각적으로만 숨김 = 접근성 표준 sr-only, 이미지 안 글과 동일한 내용). */}
       {format === 'webtoon' && realWebtoonCuts && realWebtoonCuts.some((c) => c.caption) && (
-        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
-          <button
-            type="button"
-            className="lnk"
-            aria-expanded={showScript}
-            aria-controls={`${lensPanelId(i)}-script`}
-            onClick={() => setShowScript((v) => !v)}
-          >
-            대사로 읽기 {realWebtoonCuts.length}컷
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-              style={{ transform: showScript ? 'rotate(180deg)' : 'none', transition: 'transform .2s ease' }}
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-          <ol id={`${lensPanelId(i)}-script`} hidden={!showScript} className="hang lread" style={{ marginTop: 16 }}>
+        <div className="sr-only">
+          <h3>웹툰 대사 전문</h3>
+          <ol>
             {realWebtoonCuts.map((cut, ci) => (
-              <li key={ci}>
-                <span aria-hidden className="hang-n">
-                  {String(ci + 1).padStart(2, '0')}
-                </span>
-                <span>
-                  {cut.caption
-                    ? splitSentences(cut.caption).map((sentence, si) => (
-                        <span key={si} style={{ display: 'block' }}>
-                          {sentence}
-                        </span>
-                      ))
-                    : '(대사 없음)'}
-                </span>
-              </li>
+              <li key={ci}>{cut.caption || '(대사 없음)'}</li>
             ))}
           </ol>
         </div>
@@ -319,7 +345,7 @@ export function LensFormatPanel({
         <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
           <iframe
             src={realPodcast.embedUrl}
-            title={l.question || '팟캐스트'}
+            title={displayHeadline(l.question) || '팟캐스트'}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
@@ -338,7 +364,7 @@ export function LensFormatPanel({
           accent={p.color}
           label={p.short}
           kicker="AI 음성 브리핑"
-          title={l.question || '오늘의 브리핑'}
+          title={displayHeadline(l.question) || '오늘의 브리핑'}
           coverImage={photo}
           byline={lens.source_url ? '서울경제 원문 기사' : null}
           bylineHref={lens.source_url}
@@ -351,7 +377,7 @@ export function LensFormatPanel({
           걷어내고, 실제로 존재하는 것(대본)만 밝혀 보여준다. */}
       {format === 'podcast' && !hasPodcast && (
         <div>
-          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
           {scriptBullets.length > 0 && (
             <ol className="hang lread">
               {scriptBullets.map((b, bi) => (
@@ -388,11 +414,11 @@ export function LensFormatPanel({
           플레이어를 임베드한다. */}
       {format === 'video' && realVideo && (
         <div>
-          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
           <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 14, background: '#111827' }}>
             <iframe
               src={realVideo.embedUrl}
-              title={l.question || '영상'}
+              title={displayHeadline(l.question) || '영상'}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -416,7 +442,7 @@ export function LensFormatPanel({
           accent={p.color}
           label={p.short}
           kicker="AI 영상 브리핑"
-          title={l.question || '오늘의 영상'}
+          title={displayHeadline(l.question) || '오늘의 영상'}
           byline={lens.source_url ? '서울경제 원문 기사' : null}
           bylineHref={lens.source_url}
           onDuration={(sec) => noteDur(i, sec)}
@@ -427,7 +453,7 @@ export function LensFormatPanel({
           걷어냈다. 남긴 것: 실제로 있는 대본. */}
       {format === 'video' && !hasVideo && (
         <div>
-          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
           {scriptBullets.length > 0 && (
             <ol className="hang lread">
               {scriptBullets.map((b, bi) => (

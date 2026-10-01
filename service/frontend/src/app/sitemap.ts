@@ -1,7 +1,5 @@
 import type { MetadataRoute } from 'next';
 import { fetchWebtoons, fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
-import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { kstTodayStr } from '@/shared/lib/date';
 // 2026-08-25: `./(content)/games/play/[slug]/page` 에서 가져오던 것을 단일 출처로
 // 교체. app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
@@ -12,6 +10,20 @@ import { GAMES } from '@/shared/data/games';
 
 import { SITE_URL as BASE } from '@/shared/constants/site';
 import { lensPath } from '@/shared/lib/lensUrl';
+
+// Next.js의 MetadataRoute.Sitemap video/image 확장은 title/description 같은
+// 텍스트 필드를 XML에 그대로 꽂아 넣고 자동 이스케이프하지 않는다(실측
+// 확인, 2026-10-01 — 사용자가 "sitemap.xml 파싱 에러" 스크린샷으로 신고).
+// 기사 제목에 흔한 "&"("SK이노베이션 E&S", "M&A로 더본코리아" 등)가 그대로
+// 들어가면 "&S", "&A"가 유효한 XML 엔티티가 아니라 사이트맵 전체가
+// 파싱 에러로 깨진다 — 첫 에러 지점 이후는 구글/크롤러가 아예 못 읽는다.
+// video:title/video:description에 넣기 전에 직접 이스케이프한다.
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 // lastModified는 각 라우트 파일의 최근 git 커밋 날짜(2026-08-11 GEO 감사에서
@@ -34,6 +46,7 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // 반드시 일치해야 한다(수동 나열 — 이 배열 자체가 priority/changeFrequency
   // 같은 편집 판단을 담고 있어 다른 3곳처럼 .map()으로 자동 생성하지 않았다).
   { path: '/markets',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 증시
+  { path: '/signal',        priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-01' }, // 시그널(Market Signal)
   { path: '/property',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 부동산
   { path: '/industry',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 산업
   { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 금융·정책
@@ -126,10 +139,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const daysOld = daysBetween(w.date);
       entries.push({
         url: `${BASE}/webtoon/${w.id}`,
-        lastModified: new Date(w.date + 'T07:00:00+09:00'),
+        lastModified: new Date(w.published_at || w.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
-        images: w.panels.map((p) => p.url),
+        // 목록 API는 panels를 비워 내려주므로(응답 경량화) 첫 컷인 대표 이미지를 알린다(2026-10-01 점검).
+        images: w.panels.length > 0 ? w.panels.map((p) => p.url) : w.cover_image_url ? [w.cover_image_url] : [],
       });
     }
   } catch {
@@ -145,9 +159,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const daysOld = daysBetween(l.date);
       entries.push({
         url: `${BASE}${lensPath(l)}`,
-        lastModified: new Date(l.date + 'T07:00:00+09:00'),
+        lastModified: new Date(l.updated_at || l.published_at || l.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
+        // 이미지 사이트맵(2026-10-01) — 위 웹툰 채널 글은 panels가 비어 있어(서비스 API 실측) images가 한 장도 안 나갔다.
+        // 실제 웹툰 컷은 이 lens 글의 웹툰 형식(lenses[].images)에 있으므로 대표 이미지와 함께 여기서 알린다.
+        images: Array.from(
+          new Set(
+            [l.cover_image_url, ...(l.lenses ?? []).flatMap((x) => (x.images ?? []).map((im) => im.url))].filter(
+              (u): u is string => Boolean(u),
+            ),
+          ),
+        ),
       });
     }
   } catch {
@@ -166,16 +189,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const daysOld = daysBetween(v.date);
       entries.push({
         url: `${BASE}/video/${v.id}`,
-        lastModified: new Date(v.date + 'T07:00:00+09:00'),
+        lastModified: new Date(v.published_at || v.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
         videos: [
           {
-            title: v.title,
+            title: escapeXml(v.title),
             thumbnail_loc: v.thumbnail_url || `${BASE}/og-image.png`,
-            description: v.excerpt || v.title,
+            description: escapeXml(v.excerpt || v.title),
             content_loc: v.video_url,
-            publication_date: `${v.date}T07:00:00+09:00`,
+            publication_date: v.published_at || `${v.date}T07:00:00+09:00`,
             family_friendly: 'yes',
           },
         ],
@@ -185,45 +208,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     /* 영상 API 불통이면 생략 */
   }
 
-  // 오디오 — 영상과 같은 이유로 개별 URL을 sitemap에 추가(2026-08-21,
-  // /listen 신설). date가 빈 문자열인 항목(옛 home_player 데이터, 백엔드
-  // 필드 확장 전)은 lastModified를 못 정하니 건너뛴다.
-  // videos 확장(2026-09-03) — 이 채널은 순수 오디오(mp3 등)와 영상(유튜브/
-  // 네이버TV/자체 mp4)이 섞여 있다. listen/[slug]/page.tsx의 buildJsonLd()가
-  // isDirectAudioUrl()로 이미 이 둘을 나누고 있어 같은 판별을 그대로 쓴다 —
-  // 순수 오디오는 Google 비디오 sitemap 스펙 대상이 아니라서 videos 필드를
-  // 안 채운다(PodcastEpisode로만 노출, JSON-LD는 이미 있음).
-  try {
-    const listen = await fetchHomePlayerPosts();
-    for (const it of listen) {
-      if (!it.date) continue;
-      const daysOld = daysBetween(it.date);
-      const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
-      const resolved = isAudio ? null : resolveVideo(it.mediaEmbedUrl);
-      entries.push({
-        url: `${BASE}/listen/${it.id}`,
-        lastModified: new Date(it.date + 'T07:00:00+09:00'),
-        changeFrequency: 'never',
-        priority: freshnessPriority(daysOld),
-        ...(isAudio
-          ? {}
-          : {
-              videos: [
-                {
-                  title: it.title,
-                  thumbnail_loc: resolved?.autoThumbnailUrl || `${BASE}/og-image.png`,
-                  description: it.excerpt || it.title,
-                  ...(resolved ? { player_loc: resolved.embedUrl } : { content_loc: it.mediaEmbedUrl }),
-                  publication_date: `${it.date}T07:00:00+09:00`,
-                  family_friendly: 'yes',
-                },
-              ],
-            }),
-      });
-    }
-  } catch {
-    /* 오디오 API 불통이면 생략 */
-  }
+  // 오디오(/listen/{id}) 개별 페이지는 사이트맵에서 뺀다(2026-10-01, SEO 감사) — 본문이 기사 페이지와 93% 겹치는 중복 페이지라 canonical을
+  // lens 기사 페이지로 지정했다(lensCanonical.ts). 영상(/video/{id})은 서버 HTML에 <video>와 VideoObject가 있는 정식 시청 페이지라
+  // 사이트맵·자기 canonical을 유지한다(Search Console 동영상 색인 230건이 이 페이지들 — 기사 페이지는 영상이 숨은 탭 안이라 시청 페이지가 아니다).
 
   // 타임라인 날짜별 페이지(2026-08-12, GEO 감사) — 처음엔 최근 7일만
   // 시딩했다. 그땐 과거 날짜가 실제 존재하는지 확인이 안 된 상태라(빈

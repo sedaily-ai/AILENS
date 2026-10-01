@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons, fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
+import { IssueContextSection } from '../../_shared/IssueContextSection';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -100,8 +102,14 @@ export async function generateMetadata({
   }
   const title = buildPageTitle(webtoon.title, '웹툰');
   const description = buildSeoDescription(webtoon.excerpt, '요즘 이슈를 컷으로 이어 보여드려요.');
+  // 웹툰 페이지는 자기 자신이 정본이다(2026-10-02 정정) — 한때 기사 페이지로 통합했으나, 그 근거("panels가 비어 있는 얇은 페이지")는
+  // 목록 API가 응답 경량화로 panels를 비워 내려주는 것을 오해한 것이었다. 단건 조회에는 컷 8장이 정상으로 오고 서버 HTML에도 컷이 들어
+  // 있으며, 검색 실적(클릭 29)도 있었다. 중복의 원인은 페이지 아래에 덧붙인 기사 본문(보강 텍스트)이다.
+  // lens 글은 대표 이미지 폴백에만 쓴다.
+  const lens = await findLensForChannelSlug(slug);
   const url = `${SITE_URL}/webtoon/${slug}`;
-  const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
+  const image =
+    webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
   return {
     title,
     description,
@@ -111,7 +119,7 @@ export async function generateMetadata({
       description,
       url,
       type: 'article',
-      publishedTime: `${webtoon.date}T07:00:00+09:00`,
+      publishedTime: webtoon.published_at || `${webtoon.date}T07:00:00+09:00`,
       images: [{ url: image, width: 1200, height: 800, alt: webtoon.title }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
@@ -125,10 +133,12 @@ export async function generateMetadata({
   };
 }
 
-function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
+function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
+  // generateMetadata와 같은 정본 URL(lens 페이지)을 쓴다 — 구조화 데이터의 url이 canonical과 어긋나지 않게.
   const url = `${SITE_URL}/webtoon/${slug}`;
-  const published = `${webtoon.date}T07:00:00+09:00`;
-  const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
+  const published = webtoon.published_at || `${webtoon.date}T07:00:00+09:00`;
+  const image =
+    webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
   // SEO/GEO 강화(2026-09-02) — 이전엔 대표 이미지 1장만 image에 담았다.
   // 실제로는 컷마다 별도 이미지+대사가 있는데 그 구조가 구조화 데이터에
   // 전혀 안 드러나서, 검색·AI 답변엔진이 이 페이지를 "이미지 1장짜리 기사"
@@ -197,7 +207,9 @@ export default async function WebtoonViewPage({
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
   const webtoon = await findWebtoon(slug);
-  const jsonLd = webtoon ? buildJsonLd(webtoon, slug) : null;
+  // 같은 이슈의 lens 글(슬러그 동일) — 텍스트 보강(IssueContextSection)과 정본 URL 계산에 함께 쓴다.
+  const lens = webtoon ? await findLensForChannelSlug(slug) : null;
+  const jsonLd = webtoon ? buildJsonLd(webtoon, slug, lens) : null;
   const { episodeLabel, next, prev } = webtoon
     ? await findNeighbors(slug)
     : { episodeLabel: undefined, next: null, prev: null };
@@ -215,6 +227,7 @@ export default async function WebtoonViewPage({
         episodeLabel={episodeLabel}
         nextEpisode={next}
         prevEpisode={prev}
+        supplement={<IssueContextSection lens={lens} format="웹툰" tone="dark" />}
       />
     </>
   );

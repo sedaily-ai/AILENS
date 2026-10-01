@@ -5,6 +5,7 @@ import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { ListenViewClient } from './ListenViewClient';
+import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -67,9 +68,11 @@ export async function generateMetadata({
   }
   const title = buildPageTitle(item.title, '오디오');
   const description = buildSeoDescription(item.excerpt, '서울경제 AI LENS가 정리한 오디오 뉴스입니다.');
-  const url = `${SITE_URL}/listen/${slug}`;
+  // 정본은 같은 기사의 lens 페이지(2026-10-01, SEO 감사 — 본문이 기사 페이지와 93% 겹치는 중복 페이지).
+  const lensForCanonical = await findLensForChannelSlug(slug);
+  const url = canonicalFromLens(lensForCanonical, `/listen/${slug}`);
   const resolved = resolveVideo(item.mediaEmbedUrl);
-  const image = resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
+  const image = resolved?.autoThumbnailUrl || lensForCanonical?.cover_image_url || `${SITE_URL}/og-image.png`;
   return {
     title,
     description,

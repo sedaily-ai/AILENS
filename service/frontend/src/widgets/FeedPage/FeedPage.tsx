@@ -115,14 +115,24 @@ export function FeedPage({
   const [activeTab, setActiveTabState] = useState<"question" | "feed" | "archive" | "dna">("feed");
 
   // 탭 변경 함수 - URL도 함께 업데이트 (replaceState로 히스토리에 안 쌓임)
+  // "feed"는 기본 탭이라 쿼리스트링을 아예 지운다(2026-10-01, 사용자 지적
+  // — 로고를 눌러도 "/?tab=feed"가 남아 SEO에 안 좋아 보인다는 우려).
+  // 이전엔 어떤 탭이든 무조건 ?tab=...을 박아넣어서, 기본값으로 돌아가는
+  // 클릭(로고 등)조차 불필요한 쿼리스트링을 남겼다 — question/archive/dna
+  // 처럼 진짜 비기본 탭은 새로고침 유지를 위해 그대로 남긴다.
   const setActiveTab = useCallback((tab: "question" | "feed" | "archive" | "dna") => {
     setActiveTabState(tab);
     const params = new URLSearchParams(window.location.search);
-    params.set('tab', tab);
+    if (tab === "feed") {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    const qs = params.toString();
     window.history.replaceState(
       { ...window.history.state, tab },
       "",
-      `${pathname}?${params.toString()}${window.location.hash}`
+      `${pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
     );
   }, [pathname]);
 

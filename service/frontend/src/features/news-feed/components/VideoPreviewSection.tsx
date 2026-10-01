@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
@@ -262,7 +263,7 @@ export function VideoPreviewSection({ initialVideos }: Props) {
                         overflow: 'hidden',
                       }}
                     >
-                      {v.title}
+                      {displayHeadline(v.title)}
                     </h3>
                   </div>
                 </div>

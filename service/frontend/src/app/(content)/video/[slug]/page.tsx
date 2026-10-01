@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { fetchVideos, fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
+import { fetchVideos, fetchVideoBySlug, fetchLensBySlug, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { VideoViewClient } from './VideoViewClient';
+import { IssueContextSection } from '../../_shared/IssueContextSection';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -73,6 +74,7 @@ export async function generateMetadata({
   }
   const title = buildPageTitle(video.title, '영상');
   const description = buildSeoDescription(video.excerpt, '서울경제 AI LENS가 정리한 이슈 영상입니다.');
+  // 영상 시청 페이지는 자기 자신이 정본(2026-10-01) — 서버 HTML에 <video>와 VideoObject가 있어 동영상 색인의 대상이다.
   const url = `${SITE_URL}/video/${slug}`;
   const resolved = resolveVideo(video.video_url);
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
@@ -98,9 +100,11 @@ export async function generateMetadata({
   };
 }
 
-function buildJsonLd(video: CmsVideo, slug: string) {
+function buildJsonLd(video: CmsVideo, slug: string, lens: CmsLens | null) {
+  // VideoObject.transcript — 영상 대본이 있으면 구조화데이터에도 싣는다.
+  const transcript = lens?.lenses.find((l) => l.label === '영상')?.transcript?.trim();
   const url = `${SITE_URL}/video/${slug}`;
-  const published = `${video.date}T07:00:00+09:00`;
+  const published = video.published_at || `${video.date}T07:00:00+09:00`;
   const resolved = resolveVideo(video.video_url);
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
   return {
@@ -131,6 +135,7 @@ function buildJsonLd(video: CmsVideo, slug: string) {
           parentOrganization: { '@id': `${SITE_URL}/#organization` },
         },
         publisher: { '@id': `${SITE_URL}/#organization` },
+        ...(transcript ? { transcript } : {}),
         isFamilyFriendly: true,
       },
       // 2026-08-21 GEO 재감사 — letters/lens는 이미 있던 BreadcrumbList가
@@ -162,7 +167,9 @@ export default async function VideoViewPage({
   if (!video) {
     notFound();
   }
-  const jsonLd = buildJsonLd(video, slug);
+  // 같은 이슈의 lens 글(슬러그 동일)로 텍스트 보강(IssueContextSection 참조).
+  const lens = await fetchLensBySlug(slug);
+  const jsonLd = buildJsonLd(video, slug, lens);
   return (
     <>
       {jsonLd && (
@@ -171,7 +178,11 @@ export default async function VideoViewPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <VideoViewClient slug={slug} initialVideo={video} />
+      <VideoViewClient
+        slug={slug}
+        initialVideo={video}
+        supplement={<IssueContextSection lens={lens} format="영상" tone="light" />}
+      />
     </>
   );
 }

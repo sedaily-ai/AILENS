@@ -7,6 +7,7 @@ import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 
 export type HeaderTabKey =
   | 'markets'
+  | 'signal'
   | 'property'
   | 'industry'
   | 'finance'

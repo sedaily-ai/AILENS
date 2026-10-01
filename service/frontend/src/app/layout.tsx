@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import localFont from "next/font/local";
+import "./pretendard.css";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ConditionalFooter } from "@/widgets/SiteFooter";
@@ -10,28 +10,17 @@ import { ConditionalTodayNewsPlayer } from "@/widgets/TodayNewsPlayer";
 // GA4 Measurement ID — ailens.sedaily.ai 전용 속성.
 const GA_ID = "G-BJZ09B6PB6";
 
-// globals.css의 --font-sans가 'Pretendard Variable'을 가리키고 있었지만
-// 실제로 로드하는 코드가 어디에도 없어(웹폰트 미적용) 브라우저가 계속
-// 시스템 폰트로 폴백하고 있었다(2026-08-06 디자인 감사에서 발견) — 토스·
-// 배민 등이 쓰는 그 폰트인데 안 쓰이고 있던 것. next/font/local로 self-host
-// (CDN 왕복 없음, layout shift 없음, font-display:swap). 가변 폰트 TTF(6.7MB)
-// 대신 실제 쓰는 굵기만 정적 woff2 5종(굵기당 ~770KB, 브라우저가 실제 렌더링에
-// 쓰는 굵기만 지연 로드)으로 용량을 줄였다.
-const pretendard = localFont({
-  src: [
-    { path: "./fonts/Pretendard-Regular.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/Pretendard-Medium.woff2", weight: "500", style: "normal" },
-    { path: "./fonts/Pretendard-SemiBold.woff2", weight: "600", style: "normal" },
-    { path: "./fonts/Pretendard-Bold.woff2", weight: "700", style: "normal" },
-    { path: "./fonts/Pretendard-ExtraBold.woff2", weight: "800", style: "normal" },
-  ],
-  variable: "--font-pretendard",
-  display: "swap",
-});
-
+// Pretendard는 동적 서브셋 CSS(pretendard.css, 2026-10-01)로 로드한다 — 예전엔 next/font/local로 굵기당 약 780KB짜리 전체 글리프
+// woff2 5종(3.9MB)을 모든 페이지에서 받았다. 이제 글자 조각별 약 12KB 파일을 화면에 필요한 만큼만 받는다(모바일 용량·LCP 개선).
 import { SITE_URL } from "@/shared/constants/site";
 const SITE_TITLE = "AI LENS — 서울경제신문의 AI 경제 뉴스";
-const SITE_DESC = "서울경제신문이 만드는 AI 경제 뉴스 서비스. 그날의 핵심 경제 이슈를 매일 정리해 전합니다.";
+// 2026-10-01 — 사용자 요청으로 보강("다양한 멀티소스를 실시간으로 구체적으로
+// 심층적으로 전달"). 기존 문구는 "AI 경제 뉴스 서비스"라고만 해서 이
+// 서비스의 실제 차별점(기자 취재 → AI가 레터/웹툰/팟캐스트/영상 4형식으로
+// 재구성 → 편집팀 검수)이 메타디스크립션·WebSite JSON-LD 어디에도 안
+// 드러났었다. meta description·OG·Twitter·WebSite 구조화 데이터가 전부 이
+// 상수 하나를 공유해서(아래 4곳) 고치면 전체에 일괄 반영된다.
+const SITE_DESC = "서울경제신문 기자가 취재한 경제 뉴스를 AI가 레터·웹툰·팟캐스트·영상 4가지 형식으로 매일 재구성하고 편집팀이 검수합니다. 증시·산업·부동산·금융 등 다양한 분야의 이슈를 구체적인 숫자와 맥락까지 담아 깊이 있게 전합니다.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -85,6 +74,9 @@ export const metadata: Metadata = {
   other: {
     "msapplication-TileColor": "#3B82F6",
     "theme-color": "#3B82F6",
+    // Bing Webmaster Tools 사이트 소유 확인(2026-10-01, 사용자 제공 코드).
+    // Google은 public/google*.html 파일 방식으로 따로 인증돼 있다.
+    "msvalidate.01": "16F11CE1835D2FA5F841CACCB3713A55",
   },
 };
 
@@ -163,7 +155,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`antialiased ${pretendard.variable}`}>
+    <html lang="ko" className="antialiased">
       <head>
         {/* Noto Serif KR — 세리프 헤딩에 여러 컴포넌트가 인라인 fontFamily로
             그대로 참조 중이라(문자열 다 안 바꿈, 위험 대비 최소 diff) 문자열은

@@ -37,3 +37,6 @@ mobile/
 # 생성물이라 텍스트 diff 가 안 되면서 히스토리에만 수 MB씩 쌓인다.
 # 필요할 때 lens-postgres-erd.html 의 [SVG 저장] · [PNG 저장] 버튼으로 뽑아 쓴다.
 docs/architecture/lens-erd-img/
+
+# 복구 스크립트가 쓰기 전에 만드는 글 백업(운영 데이터) — 커밋하지 않는다
+pipelines/scripts/repair_backup/

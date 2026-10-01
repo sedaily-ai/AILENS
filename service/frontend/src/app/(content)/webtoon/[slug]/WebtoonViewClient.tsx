@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
@@ -29,12 +30,15 @@ export function WebtoonViewClient({
   episodeLabel,
   nextEpisode,
   prevEpisode,
+  supplement,
 }: {
   slug: string;
   initialWebtoon?: CmsWebtoon | null;
   episodeLabel?: string;
   nextEpisode?: CmsWebtoon | null;
   prevEpisode?: CmsWebtoon | null;
+  /** 서버에서 만든 텍스트 보강 섹션(IssueContextSection) — 초기 HTML에 포함시키려는 슬롯. */
+  supplement?: ReactNode;
 }) {
   const [webtoon, setWebtoon] = useState<CmsWebtoon | null | undefined>(initialWebtoon);
 
@@ -168,7 +172,7 @@ export function WebtoonViewClient({
                 letterSpacing: '-0.02em',
               }}
             >
-              {webtoon.title}
+              {displayHeadline(webtoon.title)}
             </h1>
             {webtoon.excerpt && (
               <p style={{ fontSize: 13.5, color: '#a1a1aa', lineHeight: 1.65, maxWidth: 480, margin: '0 auto' }}>{webtoon.excerpt}</p>
@@ -238,7 +242,7 @@ export function WebtoonViewClient({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {nextEpisode.title}
+                    {displayHeadline(nextEpisode.title)}
                   </p>
                 </div>
                 <span style={{ fontSize: 18, color: '#fde047', flexShrink: 0 }}>→</span>
@@ -279,10 +283,11 @@ export function WebtoonViewClient({
                   background: '#0b0b0d',
                 }}
               >
-                ← 이전 화: {prevEpisode.title}
+                ← 이전 화: {displayHeadline(prevEpisode.title)}
               </Link>
             )}
           </div>
+          {supplement}
         </div>
       )}
     </div>

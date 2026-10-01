@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Header } from '@/widgets/Header';
@@ -584,7 +585,7 @@ function HeroCarousel({
                 .filter(Boolean)
                 .join(' · ')}
             </p>
-            <h3 className="wt-hcap-t">{current.title}</h3>
+            <h3 className="wt-hcap-t">{displayHeadline(current.title)}</h3>
             <p className="wt-hcap-ex">{current.excerpt}</p>
           </Link>
         </div>

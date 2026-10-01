@@ -57,17 +57,24 @@ const nextConfig: NextConfig = {
   // redirects()에 합쳐서 명시적 redirect로 처리한다 — 로컬 dev에서만 URL이
   // localhost:3010으로 실제로 바뀌는 트레이드오프를 감수(개발 환경이라
   // 문제없음, 프로덕션은 CDN이라 이 규칙 자체가 도달 안 함).
-  // next/image 컴포넌트 도입(2026-08-13, 속도 개선) — 단 서버 측 리사이즈/포맷
-  // 변환(/​_next/image, sharp 필요)은 켜지 않는다: 이 앱은 로컬(macOS)에서
-  // standalone 빌드해 EC2(Linux)로 그대로 올리는 구조라 node_modules/sharp가
-  // sharp-darwin-arm64 바이너리로 트레이싱돼 EC2에서 로드가 안 된다 — 이미
-  // WebtoonListClient.tsx 포스터 이미지에서 2026-08-11에 같은 문제로 next/image를
-  // 포기하고 정적 webp로 대체한 전례가 있다(SSM으로 재확인, 2026-08-13). 대신
-  // unoptimized: true로 sharp 없이도 next/image의 다른 이점(명시적 width/height로
-  // CLS 방지, priority로 LCP 이미지 preload)만 취한다 — 리사이즈/차세대 포맷
-  // 변환은 이 배포 구조를 CI 기반으로 바꾸기 전까진 보류.
+  // 이미지 최적화(2026-10-01, 모바일 성능) — 예전엔 배포가 "macOS에서 standalone 빌드 -> EC2 업로드" 구조라 sharp 바이너리가 플랫폼
+  // 불일치로 못 돌아 unoptimized:true였다(2026-08-13). 지금은 Docker(linux/arm64)에서 빌드해 Fargate로 올리므로 sharp가 맞는 바이너리로
+  // 설치된다. 이미지 서버(서울경제 wimg, 우리 S3 미디어 버킷, 유튜브 썸네일)가 크기 변환을 지원하지 않아 163x92 썸네일 칸에도
+  // 1200px 원본(약 900KB)을 받던 것을(모바일 실측 홈 이미지 7.3MB) Next 내장 최적화(/_next/image — 필요한 폭으로 줄이고 WebP 변환)로 줄인다.
+  // 허용 호스트 밖 이미지는 변환이 거부되므로, 새 이미지 호스트를 쓰는 컴포넌트가 생기면 여기에 추가할 것.
+  // (커스텀 loader를 쓰면 내장 /_next/image 엔드포인트가 꺼져 404가 되므로 기본 로더를 쓴다.)
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'wimg.sedaily.com' },
+      { protocol: 'https', hostname: 'sedaily-mbti-cms-media-dev.s3.us-east-1.amazonaws.com' },
+      { protocol: 'https', hostname: 'img.youtube.com' },
+    ],
+    formats: ['image/webp'],
+    qualities: [75, 85], // 75 = 기본, 85 = 웹툰 컷(글자가 많아 조금 더 높게)
+    deviceSizes: [360, 480, 640, 768, 1024, 1280, 1600],
+    imageSizes: [40, 72, 96, 132, 160, 200, 256, 320],
+    // 변환 결과를 하루 캐시 — CloudFront가 /_next/image를 같은 키로 캐시하면 서버는 같은 변환을 반복하지 않는다.
+    minimumCacheTTL: 86400,
   },
   // 사주 기능이 외부 CDN 마운트(/saju*, AI-saju 별도 서비스)로 옮겨간 뒤
   // (2026-05, 2026-08-09) /fortune·/saju-match는 이 Next.js 앱에 더는 없는
@@ -121,7 +128,8 @@ const nextConfig: NextConfig = {
       // 세그먼트만 매칭해서 이 둘과 안 겹친다. 기존에 색인·공유된
       // /lens/{slug} 링크가 깨지지 않도록 새 루트 경로(/{slug})로 영구
       // 리다이렉트.
-      { source: "/lens/:slug", destination: "/:slug", permanent: true },
+      // /lens/:slug -> /:slug 는 걷어냈다(2026-10-01) — 두 번 이동(옛 주소 -> 평면 주소 -> 정본)하던 걸 app/(content)/lens/[slug]/page.tsx가
+      // 정본 주소로 한 번에(308) 보낸다. 카테고리를 알아야 해서 설정 파일이 아니라 라우트에서 처리한다.
     ];
     if (process.env.SAJU_ORIGIN) {
       const origin = process.env.SAJU_ORIGIN;

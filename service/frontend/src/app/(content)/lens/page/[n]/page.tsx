@@ -44,6 +44,8 @@ export async function generateMetadata({
     title,
     description: LENS_LIST_DESCRIPTION,
     alternates: { canonical: url },
+    // 뒷장(2페이지 이후)은 얇은 목록이라 색인에서 뺀다(링크는 따라가게 follow) — 기사는 사이트맵·내부 링크로 발견된다(2026-10-01, SEO 감사).
+    robots: { index: false, follow: true },
     openGraph: {
       title,
       description: LENS_LIST_DESCRIPTION,

@@ -17,8 +17,10 @@ export function LetterViewClient() {
       <div className="min-h-screen bg-white">
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center text-neutral-500">
           <p>레터를 찾을 수 없습니다.</p>
+          {/* feed가 기본 탭이라 쿼리스트링 없이도 그대로 피드가 뜬다
+              (FeedPage.tsx 참조, 2026-10-01 — "/?tab=feed" SEO 정리). */}
           <Link
-            href="/?tab=feed"
+            href="/"
             className="mt-4 inline-block text-sm underline underline-offset-4 hover:text-neutral-900"
           >
             레터 피드로

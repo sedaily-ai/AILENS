@@ -357,6 +357,13 @@ export interface CmsLens {
    * 6개 값. 2026-08-20 추가, /markets 등 카테고리 페이지에 lens 글도 같이
    * 노출하기 위함. 없으면(미분류) 어느 카테고리 페이지에도 안 뜬다. */
   category?: string | null;
+  /** 하위 카테고리(2026-10-01 신설) — category(6개 주제) 안에서 한 단계 더
+   * 들어간 분류(예: 증시 → 국내증시/해외증시/IB&Deal/...).
+   * shared/constants/econSubcategories.ts의 라벨과 매칭. 아직 증시·산업만
+   * 백필돼 있고, 다른 카테고리는 분량이 얇아(국제·부동산·금융·정책·문화)
+   * 당장은 비어있다 — 값이 없으면 하위 탭 자체가 안 뜬다
+   * (CategoryArchiveClient.tsx). */
+  subcategory?: string | null;
   /** "지면 특별 코너" 전용 배치 필드(2026-08-21) — 위 category와 별개.
    * "전체"/"증권"/"산업"/"시그널" 중 하나여야 LensPreviewSection의 해당
    * 탭에 뜬다. 없으면 지면 특별 코너엔 아예 안 뜨고 category 기반
@@ -388,8 +395,12 @@ export function toLensPreviewSummaries(lenses: CmsLens[]): CmsLens[] {
   }));
 }
 
-export async function fetchLensPosts(): Promise<CmsLens[]> {
-  return cached('lens', async () => {
+// limit 파라미터화(2026-10-01) — 기본 1000(전체 목록: sitemap·카테고리·/lens 목록). 홈 미리보기·
+// 사이드바처럼 최신 몇 건만 쓰는 호출부는 작은 값을 넘긴다. 이유: 전체 목록 응답(~3MB)이
+// 서버(Next 데이터 캐시 한도 2MB 초과 → 렌더마다 재요청)와 방문자 브라우저(캐시 안 됨, 홈
+// 방문마다 전체 수신) 양쪽에서 매번 EC2까지 가고 있었다. 캐시 키·URL이 limit별로 갈린다.
+export async function fetchLensPosts(limit: number = 1000): Promise<CmsLens[]> {
+  return cached(`lens:${limit}`, async () => {
     // limit=1000(2026-09-03, webtoon/video와 통일) — 100/250이었던 이유는
     // lens 채널이 글마다 4포맷 전체(문단·웹툰 컷·팟캐스트/영상 대본
     // 전문)를 통째로 담아 너무 무거워서, 300건 근처만 돼도 백엔드가
@@ -400,7 +411,7 @@ export async function fetchLensPosts(): Promise<CmsLens[]> {
     // shape_lens_summary 참조, 글당 크기 ~90% 감소 실측). 그 덕에
     // 상한을 다시 올려도 안전하다 — webtoon/video가 1000에서 정상인 것과
     // 같은 이유.
-    const url = `${CMS_API_URL}/api/v2/posts?channel=lens&limit=1000`;
+    const url = `${CMS_API_URL}/api/v2/posts?channel=lens&limit=${limit}`;
     // 2026-10-01 — 이 fetch가 실패하면(간헐적으로 재현, 원인 미확정) 조용히
     // 빈 배열을 돌려줘서 홈 "오늘의 이슈, 4가지 시선" 히어로 전체가 아무
     // 로그도 없이 통째로 사라지는 실제 장애가 반복됐다(2026-09-02에도 같은

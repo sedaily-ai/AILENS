@@ -178,6 +178,8 @@ def _apply_admin_extra(post: Dict[str, Any], admin_extra: Optional[Dict[str, Any
     extra = admin_extra or {}
     extra_body = extra.get("body_inline") or {}
     post["body_inline"]["category"] = extra_body.get("category")
+    # 하위 카테고리(2026-10-01 신설) — category와 같은 자리, 같은 병합 규칙.
+    post["body_inline"]["subcategory"] = extra_body.get("subcategory")
     post["body_inline"]["paper_section"] = extra_body.get("paper_section")
     post["body_inline"]["photo_image_url"] = extra_body.get("photo_image_url")
     post["display_order"] = extra.get("display_order")

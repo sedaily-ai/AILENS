@@ -11,7 +11,11 @@
 #
 # 사용:
 #   cd service/frontend
-#   ./deploy.sh
+#   ./deploy.sh              # 롤링 배포가 안정화될 때까지 대기(기본)
+#   ./deploy.sh --no-wait    # update-service 직후 반환(2026-10-01) — 새 코드는
+#                            # 보통 시작 후 ~40초면 서비스되지만 이전 태스크
+#                            # 정리까지 기다리면 2분 이상 걸린다. 성공 여부는
+#                            # 아래 안내 명령으로 별도 확인.
 #
 # 전제:
 #   - `provision-fargate.sh`로 인프라(ECR/IAM/ALB/ECS 클러스터·서비스)가
@@ -21,6 +25,14 @@
 #   - output: "standalone" (next.config.ts) → .next/standalone/ 생성,
 #     Dockerfile이 이걸 그대로 컨테이너 이미지에 담는다.
 set -euo pipefail
+
+WAIT=1
+[ "${1:-}" = "--no-wait" ] && WAIT=0
+
+# 단계별 소요 시간 출력(2026-10-01) — 어디가 느린지 매번 바로 보이게.
+T0=$SECONDS
+TL=$SECONDS
+lap() { echo "  [${1}] $(( SECONDS - TL ))s (누적 $(( SECONDS - T0 ))s)"; TL=$SECONDS; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -35,12 +47,14 @@ echo "=== 1/4 이미지 빌드 (linux/arm64 — Fargate 태스크 정의와 일�
 # 빌드 컨텍스트는 반드시 이 폴더(service/frontend/) — next.config.ts의
 # outputFileTracingRoot가 여기로 고정돼 있다(Dockerfile 상단 주석 참조).
 docker build --platform linux/arm64 -t "${REPO}:latest" .
+lap "빌드"
 
 echo ""
 echo "=== 2/4 ECR push ==="
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 docker tag "${REPO}:latest" "${ECR_URI}:latest"
 docker push "${ECR_URI}:latest"
+lap "ECR push"
 
 echo ""
 echo "=== 3/4 태스크 정의 새 리비전 등록 ==="
@@ -57,20 +71,42 @@ aws ecs update-service --cluster "$CLUSTER" --service "$CLUSTER" \
   --task-definition "$CLUSTER" --force-new-deployment \
   --region "$REGION" --query "service.{Status:status,DesiredCount:desiredCount,RunningCount:runningCount}" --output json
 
+lap "태스크 정의·롤링 시작"
+
+if [ "$WAIT" = "0" ]; then
+  echo ""
+  echo "=== --no-wait: 롤링 배포는 백그라운드로 진행 중 ==="
+  echo "상태 확인: aws ecs describe-services --cluster $CLUSTER --services $CLUSTER --region $REGION --query 'services[0].deployments[0].rolloutState' --output text"
+  echo "총 소요: $(( SECONDS - T0 ))s"
+  exit 0
+fi
+
 echo "  배포 완료 대기 중..."
 aws ecs wait services-stable --cluster "$CLUSTER" --services "$CLUSTER" --region "$REGION"
+lap "롤링 안정화 대기"
+
+# CloudFront 캐시 무효화(2026-10-01) — 배포 직후 옛 빌드의 HTML·RSC 페이로드가 캐시에 남아(실측: /start RSC가 12시간 전 것) 옛 폰트 참조 등이
+# 계속 내려갔다. 경로 "/*"는 1경로로 계산되어 월 1,000경로까지 무료다. 실패해도 배포 자체는 성공이므로 경고만 낸다.
+# (이미지 변환 캐시도 같이 비워져 배포 직후 첫 요청은 다시 변환된다 — 서버 디스크 캐시와 CloudFront가 곧 다시 채운다.)
+CF_DIST_ID="E1QS7PY350VHF6"
+echo ""
+echo "=== CloudFront 캐시 무효화 ==="
+aws cloudfront create-invalidation --distribution-id "$CF_DIST_ID" --paths "/*" --query 'Invalidation.[Id,Status]' --output text \
+  || echo "WARNING: CloudFront 무효화 실패 — 수동으로 실행하거나 최대 5분(TTL) 기다릴 것." >&2
+lap "CloudFront 무효화 요청"
 
 ALB_DNS=$(aws elbv2 describe-load-balancers --names sedaily-lens-frontend-alb \
   --region "$REGION" --query "LoadBalancers[0].DNSName" --output text)
 echo ""
 echo "=== 헬스체크 (ALB 직접) ==="
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${ALB_DNS}/")
+# 로컬(사무실 IP)에서는 ALB로 직접 못 닿아 시간 초과가 날 수 있다 — set -e로 스크립트가 죽지 않게 || true(2026-10-01).
+HTTP_CODE=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" "http://${ALB_DNS}/" || true)
 echo "  http://${ALB_DNS}/ → $HTTP_CODE"
 if [ "$HTTP_CODE" != "200" ]; then
-  echo "WARNING: 헬스체크가 200이 아님 — 수동 확인 필요." >&2
+  echo "WARNING: ALB 직접 헬스체크가 200이 아님(로컬에서 ALB에 닿지 않을 수 있음) — https://ailens.sedaily.ai 로 확인할 것." >&2
 fi
 
 echo ""
-echo "=== 배포 완료 ==="
+echo "=== 배포 완료 (총 $(( SECONDS - T0 ))s) ==="
 echo "ALB: http://${ALB_DNS}/"
 echo "실도메인(CloudFront가 이미 ALB를 오리진으로 쓰는 경우만 반영됨): https://ailens.sedaily.ai"

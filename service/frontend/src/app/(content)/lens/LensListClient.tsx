@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
@@ -225,7 +226,7 @@ export function LensListClient({
                     className="group-hover:underline"
                     style={{ fontSize: 'clamp(20px, 2.6vw, 24px)', fontWeight: 800, color: '#111827', letterSpacing: '-0.025em', lineHeight: 1.35, textUnderlineOffset: 3, wordBreak: 'keep-all' }}
                   >
-                    {latest.headline}
+                    {displayHeadline(latest.headline)}
                   </h2>
                   {latest.context && (
                     <p
@@ -400,7 +401,7 @@ export function LensListClient({
                               wordBreak: 'keep-all',
                             }}
                           >
-                            {l.headline}
+                            {displayHeadline(l.headline)}
                           </span>
                           {l.context && (
                             <span

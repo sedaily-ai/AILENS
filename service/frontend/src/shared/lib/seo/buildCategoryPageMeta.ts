@@ -15,7 +15,8 @@ export function buildCategoryMetadata(config: EconCategoryConfig): Metadata {
     title,
     description: config.description,
     keywords: [config.label, `${config.label} 뉴스`, 'AI LENS', '서울경제', suffix],
-    alternates: { canonical: url },
+    // 카테고리별 RSS 자동 발견(2026-10-01) — /{slug}/rss.xml
+    alternates: { canonical: url, types: { 'application/rss+xml': `${url}/rss.xml` } },
     openGraph: {
       title,
       description: config.description,

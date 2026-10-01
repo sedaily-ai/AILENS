@@ -1,4 +1,4 @@
-import { redirect, notFound } from 'next/navigation';
+import { permanentRedirect, notFound } from 'next/navigation';
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { lensPath } from '@/shared/lib/lensUrl';
 
@@ -19,5 +19,6 @@ export default async function LegacyFlatLensRedirect({
   const slug = decodeURIComponent(rawSlug);
   const lens = await fetchLensBySlug(slug);
   if (!lens) notFound();
-  redirect(lensPath(lens));
+  // 영구 이동(308) — 예전엔 redirect()라 307(임시)이어서 구글이 옛 주소를 색인에 남길 수 있었다(2026-10-01 Search Console 점검).
+  permanentRedirect(lensPath(lens));
 }

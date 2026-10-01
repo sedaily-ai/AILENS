@@ -1,3 +1,7 @@
+# 2026-10-01: 모든 그룹의 `Disallow: /_next/`를 제거했다. /_next/static/(JS·CSS·폰트)과 /_next/image(최적화된 이미지)는 구글이 페이지를
+# 렌더링하는 데 필요한 리소스인데 이 줄이 전부 막고 있었다(Search Console "robots.txt에 의해 차단됨"에 폰트 11건이 잡힘 — 구글은 가장 긴
+# 규칙을 우선하므로 `Allow: /`보다 `Disallow: /_next/`가 이긴다). 막히면 구글이 스타일·이미지 없는 페이지로 렌더링해 모바일 사용성·
+# 페이지 경험 평가에 불리하다. 크롤 예산 걱정은 /_next/static/*이 CloudFront에서 장기 캐시되므로 필요 없다.
 # AI LENS (ailens.sedaily.ai) — robots policy
 # en.sedaily.com 의 AEO 보고서 기준: AI 검색엔진(ChatGPT/Perplexity/Claude/Gemini)이
 # 트래픽의 49% 차지. AI 크롤러를 명시적으로 환영하는 정책.
@@ -14,69 +18,72 @@
 User-agent: *
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # ── 한국 검색엔진 ──────────────────────────────────────────
 User-agent: Yeti
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: Daumoa
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # ── AI 검색 (사용자 질의 응답용 — 우리 콘텐츠 노출에 유리) ────
 User-agent: ChatGPT-User
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: OAI-SearchBot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: Claude-Web
 Allow: /
 Disallow: /api/
-Disallow: /_next/
+Disallow: /login
+
+# Anthropic 공식 문서(2026-10-01 확인): ClaudeBot=학습용, Claude-SearchBot=검색 결과
+# 품질용 색인(막으면 검색 최적화 색인에서 빠짐), Claude-User=사용자 질의 시 조회.
+# 이전엔 SearchBot/User가 이름 그룹이 없어 "*" 그룹을 따랐지만, 위 "이름 그룹이
+# 있으면 * 무시" 규칙과 일관되게 명시한다.
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /login
+
+User-agent: Claude-User
+Allow: /
+Disallow: /api/
 Disallow: /login
 
 User-agent: ClaudeBot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: PerplexityBot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: Perplexity-User
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: Google-Extended
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: GoogleOther
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # Bingbot(전통 검색)은 이름 있는 그룹이 없으면 위 "*" 그룹을 그대로 따르지만,
@@ -85,38 +92,32 @@ Disallow: /login
 User-agent: Bingbot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # ── AI 학습 크롤러 (모델 학습에 콘텐츠 포함되는 것 허용) ─────
 User-agent: GPTBot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: anthropic-ai
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: CCBot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: cohere-ai
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: Bytespider
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # Apple Intelligence/Siri 검색(Applebot-Extended는 학습용, Applebot은 검색
@@ -124,34 +125,29 @@ Disallow: /login
 User-agent: Applebot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 User-agent: Applebot-Extended
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # Meta AI(2026-08-23 추가).
 User-agent: meta-externalagent
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # Amazon(Rufus/Alexa+, 2026-08-23 추가).
 User-agent: Amazonbot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # DuckDuckGo AI 답변(2026-08-23 추가).
 User-agent: DuckAssistBot
 Allow: /
 Disallow: /api/
-Disallow: /_next/
 Disallow: /login
 
 # ── 사이트맵 ──────────────────────────────────────────────
