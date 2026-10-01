@@ -24,30 +24,31 @@ export function DiscoveryBanner() {
 
   if (!visible) return null;
 
+  // 리디자인(2026-09-30) — 박스(배경+테두리) 대신 슬림한 한 줄 텍스트로.
+  // 헤더 바로 아래, 실제 제품 가치(오늘의 이슈)보다도 앞자리에 있는 유일한
+  // 요소라 "박스 위에 박스"로 안 보이게 시각 무게를 최소화 — 기능(디스미스
+  // 가능한 /start 발견 배너)은 그대로 유지.
   return (
     <div
+      className="group"
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
         width: '100%',
-        margin: '0 0 16px',
-        padding: '12px 14px',
-        borderRadius: 12,
-        background: '#eff6ff',
-        border: '1px solid #dbeafe',
-        boxSizing: 'border-box',
+        margin: '0 0 14px',
       }}
     >
-      <Sparkles size={16} color="#3182F6" strokeWidth={2} style={{ flexShrink: 0 }} />
+      <Sparkles size={14} color="#3182F6" strokeWidth={2.2} style={{ flexShrink: 0 }} />
       <Link
         href="/start"
+        className="group-hover:text-blue-700 transition-colors"
         style={{
           flex: 1,
           minWidth: 0,
           fontSize: 13,
           fontWeight: 600,
-          color: '#1d4ed8',
+          color: '#374151',
           textDecoration: 'none',
         }}
       >
@@ -66,10 +67,10 @@ export function DiscoveryBanner() {
           padding: 4,
           cursor: 'pointer',
           flexShrink: 0,
-          color: '#93c5fd',
+          color: '#c7cdd6',
         }}
       >
-        <X size={15} strokeWidth={2} />
+        <X size={14} strokeWidth={2} />
       </button>
     </div>
   );

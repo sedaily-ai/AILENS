@@ -5,10 +5,30 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
-import { LENS_ACCENT, lensFormatCaption, lensPerspectiveAt, pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { LENS_ACCENT, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { getSavedInterests } from '@/shared/lib/onboardingStorage';
 import { lensPath } from '@/shared/lib/lensUrl';
 import { LensFormatGuide } from './LensFormatGuide';
+import { PublishSealIcon } from '@/shared/ui/icons/HandDrawnIcons';
+
+// 데이트라인(2026-09-30, "신문사다운 구조" 요청) — "2026년 9월 30일 수요일"
+// 형태. features/timeline의 kdate()는 요일이 없고, FSD 규칙상 다른
+// feature를 직접 import할 수도 없어(features → features 금지) 여기 로컬로
+// 다시 작게 만든다.
+const DOW = ['일', '월', '화', '수', '목', '금', '토'] as const;
+function fullDateline(iso: string): string {
+  const d = new Date(`${iso}T00:00:00+09:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
+}
+
+// 형식 타일 아이콘 — 2차 리디자인(2026-09-30, 사용자 피드백: "일러스트
+// 구리고요"). 손그림 캐릭터 아이콘(눈코입+반짝이)으로 1차 교체했던 게
+// "고급진 신문 디자인" 방향과 정면으로 부딪혔다 — 귀여운 캐릭터와 절제된
+// 에디토리얼은 같이 안 간다. lensPerspectives.ts에 처음부터 있었지만 이
+// 타일에서 한 번도 안 쓰이던 p.icon(lucide-react: BookOpen/Image/
+// Headphones/Video)으로 되돌아간다 — 손으로 그린 티가 안 나는, 획 굵기
+// 일정한 미니멀 라인 아이콘.
 
 // 첫 방문자에게 가이드를 자동으로 한 번만 띄운다(2026-08-21, 사용자
 // 요청 — "처음 온 사람들이... 왜 그렇게 봐야하고 각 유형은 어떤 내용을
@@ -27,15 +47,24 @@ const LENS_ACCENT_STRONG = '#2563eb';
 // 사용자 요청: "전체 지면 1면, 증권면 1면, 산업면 1면, 시그널 1면 이렇게
 // 구성하고, 해당 중요한 기사들을 넣는 탭으로 만들겁니다").
 //
-// 2단 구조다(세 번째 시도 만에 정리 — 앞선 두 번은 사용자가 스크린샷으로
-// 직접 고쳐줬다):
-//  1. **탭**(전체/증권/산업/시그널) — 지면을 고른다. 탭마다 최대 4개의
-//     기사가 있다("각 유형별로 기사 4개를 뽑아줄거니까").
-//  2. **화살표** — 고른 탭 "안의" 기사 4개를 좌우로 넘긴다("이 화살표
-//     부분 좌우 누르면 그 유형 안에 있는 기사를 움직인다는거죠"). 탭을
-//     바꾸는 게 아니라, 같은 탭 안에서 기사 위치만 바뀐다.
-//  각 기사는 예전과 동일한 레이아웃(사진+헤드라인 + 레터/웹툰/팟캐스트/
-//  영상 4형식 캐릭터 행)으로 보여준다 — 이 시각 구조 자체는 안 바뀐다.
+// 구조 변천사(2026-09-30 하루 동안 네 번 — 각 라운드 사용자 확인 인용):
+//  1. 탭+화살표 페이저(2026-08-21) — 탭으로 지면 고르고, 화살표로 그 지면
+//     "안의" 기사 4건을 하나씩 넘겨봄.
+//  2. 신문 지면 탭 스타일링(2026-09-30 오전) — 구조는 1과 같음, 탭을
+//     세리프+잉크 밑줄로 톤만 바꿈("약간 신문 디자인처럼").
+//  3. 4지면 동시 배치(2026-09-30 오후, "신문이 왼쪽 위에서 오른쪽 아래로
+//     내려오는 게 중요한 순서... 4지면 동시 배치로 바꿔주세요") — 탭을
+//     없애고 4개 지면(전체/증권/산업/시그널)을 한 화면에 동시 배치.
+//  4. **현재**(2026-09-30 저녁, 3을 정정 — "4개의 탭으로 분류하고..
+//     증권 탭 가면 레이아웃 유지하면서 4개가 존재하고.. 지금은 한 화면에
+//     4개 유형이 다 들어가있네" — 3은 "동시 배치"라는 시각 언어는 맞았지만
+//     그걸 "지면들 사이"가 아니라 "지면 안 기사들 사이"에 적용했어야 했다).
+//     탭(전체/증권/산업/시그널)은 1·2처럼 유지 — 지면을 고르는 축은
+//     탭이다. 고른 지면 "안의" 기사 최대 4건을 3의 레이아웃(히어로 1 +
+//     작은 카드 3, 왼쪽 위→오른쪽 아래로 작아짐)으로 동시에 보여준다 —
+//     화살표로 하나씩 넘기는 대신 한눈에 다 보인다. 히어로만 레터/웹툰/
+//     팟캐스트/영상 4형식 타일을 갖고, 나머지 3개는 헤드라인만 — 클릭하면
+//     해당 글 상세(4형식 전부 있는 곳)로 이동한다.
 //
 // 지면별 기사는 lens.paper_section 필드로 고른다(2026-08-21, 데이터 모델
 // 수정 — 처음엔 lens.category(/markets 등 일반 카테고리 페이지가 쓰는
@@ -70,13 +99,22 @@ const SECTIONS: SectionSlot[] = [
   { key: 'signal', label: '시그널 1면', paperSection: '시그널' },
 ];
 
-const ARTICLES_PER_SECTION = 4;
-
 export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] }) {
   const [items, setItems] = useState<CmsLens[] | null>(initialItems ?? null);
-  const [activeTab, setActiveTab] = useState(0);
-  const [articleIndex, setArticleIndex] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
+  // 탭(지면 선택) — 4지면 동시 배치(2026-09-30 오후)를 다시 되돌렸다.
+  // 사용자가 원한 건 "4개 지면을 한 화면에"가 아니라 "탭으로 지면을
+  // 고르고, 고른 지면 안에 4개 기사가 신문 1면처럼(큰 히어로+작은 3개)
+  // 동시에 보이는 것"이었다("4개의 탭으로 분류하고.. 증권으로 탭
+  // 가면.. 레이아웃 유지하면서 4개가 존재하고.. 지금은 한 화면에 4개
+  // 유형이 다 들어가있네" — 2026-09-30 저녁, 방금 만든 4지면 동시 배치를
+  // 혼동 없이 정정). 즉 "히어로+작은 카드 3개" 레이아웃 자체는 맞았고,
+  // 그 4개가 "다른 지면들"이 아니라 "같은 지면의 다른 기사들"이어야 했다.
+  const [activeTab, setActiveTab] = useState(0);
+  // 온보딩 관심사와 일치하는 탭 인덱스 — "맞춤" 배지 표시용. activeTab과
+  // 분리해두는 이유는 이전과 동일: 사용자가 탭을 수동으로 바꿔도 배지는
+  // 원래 관심사 탭에 남아 있어야 한다.
+  const [personalizedTab, setPersonalizedTab] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +148,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
     if (idx < 0) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 localStorage 1회 읽기(바로 위 GUIDE_SEEN_KEY effect와 같은 관례).
     setActiveTab(idx);
+    setPersonalizedTab(idx);
   }, []);
 
   // useCallback으로 고정한다 — LensFormatGuide가 이 함수를 ESC 리스너
@@ -125,28 +164,22 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
   }, []);
 
   if (!items || items.length === 0) return null;
+  const allItems = items;
 
   function selectTab(i: number) {
     setActiveTab(i);
-    setArticleIndex(0); // 탭을 바꾸면 그 탭의 첫 기사부터.
   }
 
+  // 탭(지면) 하나 안의 기사 최대 4건 — 정렬 규칙은 기존과 동일
+  // (display_order가 있으면 그 날짜 안에서 오름차순 우선, 날짜는 항상
+  // 최신 우선). 이 4건을 "히어로 1 + 작은 카드 3"으로 동시에 보여준다
+  // (2026-09-30 최종 정리 — "4개의 탭으로 분류하고.. 증권 탭 가면 레이아웃
+  // 유지하면서 4개가 존재하고" 요청. 탭으로 지면을 고르고, 그 지면 "안의"
+  // 4건을 신문 1면 레이아웃으로 동시 배치 — 지면들 사이가 아니라 기사들
+  // 사이의 배치였다).
   const activeSection = SECTIONS[activeTab];
-  const sectionArticles = items
+  const sectionArticles = allItems
     .filter((l) => l.paper_section === activeSection.paperSection)
-    // display_order가 있는 글은 오름차순으로 우선 배치(1번 자리에 실을
-    // 글을 명시적으로 고르는 용도) — 없는 글은 items가 이미 정렬해 온
-    // publish_date/published_at 내림차순을 그대로 따른다(정렬 안정성
-    // 덕분에 순서 유지). published_at을 정렬 키인 척 수동 재기록하던
-    // 임시방편(2026-08-21 이전 지면 4건 전부 이렇게 처리)을 대체한다.
-    //
-    // 2026-09-28 — display_order는 파이프라인이 "그날 회차 안에서" 매기는
-    // 0부터 시작하는 인덱스라(pipelines/frontpage_auto/run.py), 날짜
-    // 구분 없이 여기서 전역 오름차순만 걸면 예전 어느 날 우연히 0을
-    // 받은 글이 그보다 값이 큰(예: 2) 오늘 새 글보다 계속 앞자리를
-    // 차지하는 버그가 생긴다(실측 — 9/23 글이 9/28 새 글을 밀어내고
-    // 계속 지면 1면 1번 자리에 남아있었음). 날짜(YYYY-MM-DD)를 1순위로
-    // 최신순 정렬하고, 같은 날짜 안에서만 display_order로 미세 조정한다.
     .slice()
     .sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? 1 : -1;
@@ -157,34 +190,54 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
       if (orderB != null) return 1;
       return 0;
     })
-    .slice(0, ARTICLES_PER_SECTION);
-  const total = sectionArticles.length;
-  const safeArticleIndex = total > 0 ? Math.min(articleIndex, total - 1) : 0;
-  const current = total > 0 ? sectionArticles[safeArticleIndex] : null;
-  const href = current ? lensPath(current) : null;
-  const photo = current ? pickLensPhoto(current) : null;
-  const rows = current ? (current.lenses ?? []).slice(0, 4) : [];
+    .slice(0, 4);
+
+  const hero = sectionArticles[0] ?? null;
+  const heroHref = hero ? lensPath(hero) : null;
+  const heroPhoto = hero ? pickLensPhoto(hero) : null;
+  const minorArticles = sectionArticles.slice(1, 4);
 
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <style>{`
-        /* 지면 탭 — 언더라인 관례는 유지하되, 선택을 색 하나가 아니라
-           [연한 배경 틴트 + 미끄러지는 인디케이터 + 굵기]로 함께 설명한다. */
+        /* 지면 탭 — 세리프 라벨 + 잉크색 밑줄, 미끄러지는 인디케이터
+           (2026-09-30 최종 정리). */
         .lz-tabs { position: relative; display: flex; }
-        .lz-tab { position: relative; transition: background .15s ease, color .15s ease; }
-        .lz-tab:not(.is-active):hover { background: #f4f6f8; color: #374151; }
+        .lz-tab { position: relative; transition: background .15s ease, color .15s ease; font-family: 'Noto Serif KR', serif; }
+        .lz-tab:not(.is-active):hover { background: #faf9f7; color: #374151; }
         .lz-tab:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -3px; border-radius: 8px; }
-        /* 인디케이터: 활성 탭 폭(=1/탭수)만큼만 그리고, translateX로 그 자리로
-           미끄러진다. 탭이 모두 flex-1(균등폭)이라 활성 인덱스 × 100%면 정확히
-           해당 탭 아래에 선다. */
-        .lz-tab-ind { position: absolute; bottom: -1px; left: 0; height: 2.5px;
-          border-radius: 2px; background: ${LENS_ACCENT}; pointer-events: none;
+        .lz-tab-ind { position: absolute; bottom: -1px; left: 0; height: 3px;
+          border-radius: 0; background: #1c1917; pointer-events: none;
           transition: transform .28s cubic-bezier(.4, 0, .2, 1); will-change: transform; }
         @media (prefers-reduced-motion: reduce) { .lz-tab-ind { transition: none; } }
-        .lz-arrow { transition: background .15s ease, transform .08s ease; }
-        .lz-arrow:not(:disabled):hover { background: #dbeafe; }
-        .lz-arrow:not(:disabled):active { transform: scale(.9); }
-        .lz-dot { transition: background .15s ease, width .15s ease; }
+
+        /* 4차 리디자인(2026-09-30, 사용자 지적 — "카드 세로 길이가.. 지면
+           신문이 어떻게 배치돼있나요?"). 실제 신문 지면은 좌우 2단 분할이
+           아니라 컬럼 그리드다 — 리드 기사가 여러 컬럼 폭 + 큰 사진으로
+           위쪽 전체를 차지하고, 작은 기사들은 그 아래 좁은 컬럼으로
+           나열된다(대칭 그리드가 아니라 "위 크게, 아래 여러 개"). 왼쪽
+           작은 사진+오른쪽 텍스트로 나란히 두던 히어로를 사진이 위, 헤드라인이
+           아래로 오는 세로 배치로 바꾸고(사진을 훨씬 크게 쓸 수 있다),
+          좁은 세로 사이드바였던 부기사 3건을 히어로 아래 가로 3열로
+           내렸다 — 컬럼 폭이 다른 두 블록이 나란히 있어 높이가 안 맞던
+           문제도 이걸로 자연히 해소된다(전부 한 칼럼 폭 기준으로 쌓이므로).
+           부기사에도 작은 썸네일을 붙여 3열이 허전해 보이지 않게 했다. */
+        .lz-hero-col { border-bottom: 1px solid rgba(17,24,39,0.09); }
+        .lz-minor-col { display: grid; grid-template-columns: minmax(0, 1fr); }
+        @media (min-width: 640px) {
+          .lz-minor-col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        .lz-minor { display: block; padding: 16px clamp(14px, 2.4vw, 20px); text-decoration: none;
+          border-bottom: 1px solid rgba(17,24,39,0.08); transition: background .15s ease; }
+        .lz-minor:last-child { border-bottom: none; }
+        @media (min-width: 640px) {
+          .lz-minor { border-bottom: none; border-right: 1px solid rgba(17,24,39,0.08); }
+          .lz-minor:nth-child(3n) { border-right: none; }
+        }
+        .lz-minor:hover { background: #faf9f7; }
+        .lz-minor:hover .lz-minor-h { text-decoration: underline; text-underline-offset: 3px; }
+        .lz-minor:hover .lz-minor-thumb-img { transform: scale(1.045); }
+        .lz-minor:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -2px; }
 
         /* 가이드 ⓘ 트리거 — 제목 옆이라 시각 크기는 22px로 작게 두되,
            ::after로 히트 영역만 44×44로 넓힌다(레이아웃은 그대로).
@@ -196,82 +249,56 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
         .lz-info:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 3px; }
 
         .lz-issue:hover .lz-h { text-decoration: underline; text-underline-offset: 3px; }
-
-        /* ── 형식 4칸 ── 2026-08-24 재구조화.
-           이전엔 [일러스트][역할명][질문+태그라인][›] 세로 4행이었다. 문제가
-           둘: (a) 행마다 두 줄씩 ~290px를 먹어서, 이 섹션의 주인공(오늘의
-           이슈)보다 형식 목록이 화면을 더 차지했다 — 위계가 뒤집혔다.
-           (b) 네 행이 거의 같은 텍스처의 반복이었고, 그 안의 태그라인은
-           기사와 무관한 고정 문구라 매일 같은 말이 4줄 반복됐다(스티어링
-           §4 "카드 반복의 함정").
-           지금은 그리드 타일이다 — 모바일 2×2, 720px↑ 4열. 높이가 절반
-           이하로 줄고 "네 개가 한 세트의 선택지"로 읽힌다. 1px 간격 +
-           바탕색으로 헤어라인 격자를 만들어 별도 테두리를 안 쓴다. */
-        /* 칸 구분선 — gap+바탕색 대신 셀 border로 그린다(2026-08-24, "세로
-           선을 칸 끝까지" 요청). gap 방식은 선이 그리드 트랙에만 그려져
-           칸보다 짧게 끊겨 보였다. border는 셀 박스 높이를 그대로 따라가므로
-           위아래 끝까지 이어진다. 칸이 항상 4개라 nth-child로 마지막 열·행의
-           선만 뺀다. align-items: stretch(기본)라 네 칸의 높이가 같아져
-           세로선 길이도 서로 어긋나지 않는다. */
-        .lz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-          align-items: stretch; }
-        .lz-cell { display: flex; flex-direction: column; gap: 9px; min-height: 104px; height: 100%;
-          padding: 14px clamp(12px, 1.8vw, 16px); background: #fff; text-decoration: none;
-          border-right: 1px solid rgba(17,24,39,0.1);
-          border-bottom: 1px solid rgba(17,24,39,0.1);
-          transition: background .14s ease; }
-        /* 모바일 2×2 — 오른쪽 열(2,4) 우측선 없음, 아래 행(3,4) 하단선 없음. */
-        .lz-cell:nth-child(2n) { border-right: none; }
-        .lz-cell:nth-child(n + 3) { border-bottom: none; }
-        @media (min-width: 720px) {
-          .lz-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-          /* 4열 한 줄 — 하단선 전부 없음, 마지막 칸만 우측선 없음. */
-          .lz-cell { border-bottom: none; }
-          .lz-cell:nth-child(2n) { border-right: 1px solid rgba(17,24,39,0.1); }
-          .lz-cell:last-child { border-right: none; }
-        }
-        .lz-cell:hover { background: #f7f9fc; }
-        .lz-cell:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -2px; }
-        .lz-cell:hover .lz-cq { color: #111827; }
-        .lz-cq { transition: color .14s ease; }
-        .lz-avatar { box-shadow: inset 0 0 0 1px rgba(17,24,39,0.06); }
-
-        /* 페이저 — 카드 안, 히어로 바로 아래로 옮겼다(2026-08-24). 이전엔
-           카드 **밖** 아래에 있어서, 카드 안 내용을 바꾸는 컨트롤이 카드
-           밖에 떠 있었다(무엇을 조작하는지 안 읽힘). */
-        .lz-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px;
-          padding: 9px clamp(12px, 2.4vw, 18px); border-top: 1px solid rgba(17,24,39,0.06); }
       `}</style>
 
       <header style={{ marginBottom: 14 }}>
+        {/* 데이트라인 + 발행 도장(2026-09-30, "신문사다운 구조" 요청) — 이
+            섹션이 UI 위젯이 아니라 "오늘 자 지면"이라는 걸 활자로 먼저
+            알린다. "오늘의 지면" 라벨을 대체하지 않고 그 위에 얹는다(라벨은
+            무슨 코너인지, 데이트라인은 언제 발행인지 — 역할이 다르다). */}
+        <div className="flex items-center" style={{ gap: 6, marginBottom: 6 }}>
+          <PublishSealIcon accent={LENS_ACCENT} className="w-[15px] h-[15px] flex-shrink-0" />
+          <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 12.5, color: '#78716c', letterSpacing: '0.01em' }}>
+            {fullDateline(hero?.date ?? new Date().toISOString().slice(0, 10))} 발행
+          </span>
+        </div>
         <p className="text-gray-400" style={{ fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
           오늘의 지면
         </p>
-        <div className="flex items-center justify-between" style={{ gap: 8 }}>
-          <div className="flex items-center" style={{ gap: 6 }}>
-            <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-              오늘의 이슈, 4가지 시선
-            </h2>
-            {/* 가이드 트리거 — 첫 방문자에겐 자동으로 뜨고, 재방문자는
-                이 버튼으로 다시 볼 수 있다(LensFormatGuide.tsx 참조). */}
-            <button
-              type="button"
-              onClick={() => setShowGuide(true)}
-              aria-label="4가지 형식 안내 보기"
-              className="lz-info flex items-center justify-center flex-shrink-0 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-              style={{ width: 22, height: 22, borderRadius: '50%', background: 'none', border: '1.5px solid currentColor', color: '#6b7280', cursor: 'pointer' }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 700, lineHeight: 1 }}>i</span>
-            </button>
-          </div>
-          <Link href="/lens" className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors" style={{ fontSize: 14, fontWeight: 600 }}>
-            전체 보기 →
-          </Link>
+        {/* "전체 보기" 링크 삭제(2026-10-01, 사용자 요청) — 어차피 /lens로
+            가는 같은 목적지 링크가 바로 아래 "최신 뉴스" 섹션 쪽으로
+            옮겨갔다(LatestGridSection.tsx 참조). 이 헤더엔 제목+가이드
+            버튼만 남긴다. */}
+        <div className="flex items-center" style={{ gap: 6 }}>
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            오늘의 이슈, 4가지 시선
+          </h2>
+          {/* 가이드 트리거 — 첫 방문자에겐 자동으로 뜨고, 재방문자는
+              이 버튼으로 다시 볼 수 있다(LensFormatGuide.tsx 참조). */}
+          <button
+            type="button"
+            onClick={() => setShowGuide(true)}
+            aria-label="4가지 형식 안내 보기"
+            className="lz-info flex items-center justify-center flex-shrink-0 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            style={{ width: 22, height: 22, borderRadius: '50%', background: 'none', border: '1.5px solid currentColor', color: '#6b7280', cursor: 'pointer' }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 700, lineHeight: 1 }}>i</span>
+          </button>
         </div>
         {/* 사용법 설명을 줄였다(2026-08-24) — 탭·화살표·형식 타일이 각자
             생김새로 이미 역할을 말한다. 이 줄은 "왜 네 형식인가"만 말한다. */}
         <p style={{ fontSize: 14, color: '#6b7280', marginTop: 4, wordBreak: 'keep-all' }}>
           같은 기사를 네 가지 형식으로 담았어요. 원하는 방식으로 보세요.
+        </p>
+        {/* 신뢰 신호(2026-09-30, 메인 리디자인) — /about·AiDisclaimer.tsx(기사
+            하단)엔 "AI 초안 → 사람 검수" 편집 프로세스가 이미 명시돼 있는데,
+            홈에는 어디에도 이 설명이 없었다 — 처음 들어온 방문자는 기사를
+            하나 클릭해서 맨 아래까지 스크롤해야만 "누가·어떻게 만들었는지"를
+            알 수 있었다. 이 서비스의 핵심 콘텐츠(오늘의 이슈) 바로 위에 한
+            줄로 짧게 — 법적 고지문이 아니라 신뢰를 위한 안내라 톤을
+            가볍게(별도 박스·테두리 없이 캡션처럼). */}
+        <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 7, wordBreak: 'keep-all' }}>
+          서울경제신문 기자가 취재한 기사를 AI가 요약·재구성하고, 편집팀이 검수해 발행해요.
         </p>
       </header>
 
@@ -284,8 +311,8 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
           boxShadow: '0 1px 2px rgba(17,24,39,0.04), 0 14px 36px -10px rgba(17,24,39,0.09)',
         }}
       >
-        {/* 지면 탭 — 1단계 선택. 화살표(아래)와 역할이 다르다: 탭은 지면을
-            바꾸고, 화살표는 고른 지면 "안의" 기사를 넘긴다. */}
+        {/* 지면 탭 — 1단계 선택(2026-09-30 최종). 세리프 라벨 + 잉크색
+            밑줄, 미끄러지는 인디케이터. */}
         <div className="lz-tabs" style={{ borderBottom: '1px solid rgba(17,24,39,0.09)' }}>
           {SECTIONS.map((s, i) => {
             const isActive = i === activeTab;
@@ -299,21 +326,37 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                 style={{
                   minHeight: 48,
                   padding: '15px 6px',
-                  fontSize: 14,
-                  fontWeight: isActive ? 800 : 700,
-                  letterSpacing: '-0.01em',
+                  fontSize: 14.5,
+                  fontWeight: isActive ? 700 : 500,
+                  letterSpacing: '-0.005em',
                   border: 'none',
-                  background: isActive ? 'rgba(59,130,246,0.07)' : 'transparent',
-                  // 비활성 #5b6472 ≈ 6:1, 활성 #2563eb ≈ 5.2:1 — 둘 다 AA 통과.
-                  color: isActive ? LENS_ACCENT_STRONG : '#5b6472',
+                  background: 'transparent',
+                  // 잉크 #1c1917 on 흰 배경 ≈ 17.9:1, 비활성 #5b6472 ≈ 6:1 — 둘 다 AA 여유 있게 통과.
+                  color: isActive ? '#1c1917' : '#5b6472',
                   cursor: 'pointer',
                 }}
               >
-                {s.label}
+                <span className="inline-flex items-center" style={{ gap: 5 }}>
+                  {s.label}
+                  {personalizedTab === i && (
+                    <span
+                      style={{
+                        fontSize: 9.5,
+                        fontWeight: 700,
+                        color: '#2563eb',
+                        background: 'rgba(37,99,235,0.1)',
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        letterSpacing: 0,
+                      }}
+                    >
+                      맞춤
+                    </span>
+                  )}
+                </span>
               </button>
             );
           })}
-          {/* 활성 위치로 미끄러지는 하단 인디케이터 — 색 대신 움직임/위치로 선택을 설명. */}
           <span
             aria-hidden
             className="lz-tab-ind"
@@ -321,46 +364,43 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
           />
         </div>
 
-        {!current ? (
+        {!hero ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
             <p style={{ fontSize: 14, color: '#9ca3af', fontWeight: 600 }}>
               {activeSection.label}을 준비하고 있어요.
             </p>
           </div>
         ) : (
-          <>
-            {/* ── 하나의 이슈 ── 네 시선이 공유하는 원본. 사진 + 헤드라인 + 요약. */}
-            <Link
-              href={href!}
-              prefetch
-              className="lz-issue flex"
-              style={{ gap: 'clamp(12px, 2.4vw, 18px)', padding: 'clamp(14px, 2.4vw, 18px)', textDecoration: 'none', alignItems: 'center' }}
-            >
-              {photo && (
+        <>
+        <div className="lz-hero-col">
+            {/* ── 히어로 기사 ── 이 지면의 대표 기사(최대 4건 중 1번). 사진이
+                위(넓고 크게), 헤드라인·요약이 아래 — 실제 신문 리드 기사가
+                큰 사진을 위에 걸고 그 아래 헤드라인을 넓게 쓰는 것과 같은
+                순서(2026-09-30, "카드 세로 길이를 넓히고.. 지면신문처럼"). */}
+            <Link href={heroHref!} prefetch className="lz-issue block" style={{ textDecoration: 'none' }}>
+              {heroPhoto && (
                 <span
-                  className="flex-shrink-0"
                   style={{
+                    display: 'block',
                     position: 'relative',
-                    width: 'clamp(112px, 22vw, 168px)',
-                    aspectRatio: '3 / 2',
-                    borderRadius: 10,
+                    width: '100%',
+                    aspectRatio: '21 / 9',
                     overflow: 'hidden',
                     background: '#f3f4f6',
-                    boxShadow: 'inset 0 0 0 1px rgba(17,24,39,0.07)',
                   }}
                 >
                   <Image
-                    src={photo}
+                    src={heroPhoto}
                     alt=""
                     fill
-                    sizes="168px"
+                    sizes="(max-width: 780px) 100vw, 700px"
                     style={{ objectFit: 'cover', objectPosition: 'center' }}
                   />
                 </span>
               )}
 
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span className="flex items-center" style={{ gap: 7, marginBottom: 5 }}>
+              <span style={{ display: 'block', padding: 'clamp(16px, 2.6vw, 24px)' }}>
+                <span className="flex items-center" style={{ gap: 7, marginBottom: 8 }}>
                   <span
                     style={{
                       fontSize: 11.5,
@@ -375,17 +415,18 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                     {activeSection.label}
                   </span>
                   <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>
-                    {kstDateTimeLabel(current.published_at) ?? current.date.replaceAll('-', '.')}
+                    {kstDateTimeLabel(hero.published_at) ?? hero.date.replaceAll('-', '.')}
                   </span>
                 </span>
                 <span
                   className="lz-h"
                   style={{
                     display: '-webkit-box',
-                    fontSize: 'clamp(16px, 2.4vw, 20px)',
-                    fontWeight: 800,
+                    fontFamily: "'Noto Serif KR', serif",
+                    fontSize: 'clamp(22px, 3.2vw, 30px)',
+                    fontWeight: 700,
                     color: '#111827',
-                    letterSpacing: '-0.025em',
+                    letterSpacing: '-0.015em',
                     lineHeight: 1.35,
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
@@ -393,188 +434,94 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                     wordBreak: 'keep-all',
                   }}
                 >
-                  {current.headline}
+                  {hero.headline}
                 </span>
-                {current.context && (
+                {hero.context && (
                   <span
-                    className="hidden sm:block"
                     style={{
-                      marginTop: 5,
-                      fontSize: 14,
-                      color: '#6b7280',
-                      lineHeight: 1.6,
                       display: '-webkit-box',
-                      WebkitLineClamp: 1,
+                      marginTop: 10,
+                      fontSize: 15,
+                      color: '#6b7280',
+                      lineHeight: 1.65,
+                      WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                       wordBreak: 'keep-all',
                     }}
                   >
-                    {current.context}
+                    {hero.context}
                   </span>
                 )}
               </span>
             </Link>
+        </div>
 
-            {rows.length > 0 && (
-              <>
-                <p
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: '#9ca3af',
-                    letterSpacing: '0.01em',
-                    padding: '13px clamp(12px, 2.4vw, 18px) 10px',
-                    borderTop: '1px solid rgba(17,24,39,0.06)',
-                  }}
-                >
-                  어떤 형식으로 볼까요
-                </p>
-
-                {/* 형식 타일 — 항상 고정 태그라인만 쓴다(lensFormatCaption).
-                    한때 "기사별 질문(실제 내용)을 보여준다"는 의도로
-                    l.question을 썼던 적이 있는데, 실제로는 레터·팟캐스트·
-                    영상의 question이 파이프라인에서 기사 제목을 그대로
-                    복사한 값이라(웹툰만 진짜 별도 core_question을 만듦)
-                    "실제 내용"이 아니라 헤드라인 중복 표시였다 — 2026-08-23
-                    발견 후 고쳤다가 다음날 그리드 재설계로 조용히
-                    재도입됐던 걸 2026-09-03 재발견해 다시 고쳤다. 형식이
-                    뭔지에 대한 설명은 제목 옆 ⓘ 가이드(LensFormatGuide)가
-                    담당한다. */}
-                <div className="lz-grid">
-                  {rows.map((l, i) => {
-                    const p = lensPerspectiveAt(i);
-                    return (
-                      <Link key={i} href={`${href}?v=${i + 1}`} prefetch className="lz-cell">
-                        <span className="flex items-center" style={{ gap: 8 }}>
-                          <span
-                            className="lz-avatar flex items-center justify-center flex-shrink-0"
-                            style={{ width: 34, height: 34, borderRadius: 999, background: p.tint, overflow: 'hidden' }}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트 */}
-                            <img
-                              src={p.illustration}
-                              alt=""
-                              width={34}
-                              height={34}
-                              loading="lazy"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
-                            />
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 800,
-                              color: p.color,
-                              letterSpacing: '-0.01em',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {p.short}
-                          </span>
-                        </span>
-                        <span
-                          className="lz-cq"
-                          style={{
-                            display: '-webkit-box',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: '#374151',
-                            lineHeight: 1.5,
-                            letterSpacing: '-0.015em',
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            wordBreak: 'keep-all',
-                          }}
-                        >
-                          {lensFormatCaption(i)}
-                        </span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            {/* ── 이 지면의 다른 기사 ── 카드 맨 아래(2026-08-24, 위치
-                교체 요청). 히어로와 형식 4칸은 "같은 기사"에 속하므로 붙여
-                두고, 기사 자체를 바꾸는 컨트롤은 그 묶음 밖 맨 아래에
-                둔다. 라벨로 무엇이 바뀌는지 명시한다(형식 타일이 아니라
-                위 히어로). 기사가 1건이면 넘길 게 없어 숨긴다. */}
-            {total > 1 && (
-              <div className="lz-pager">
-                <span style={{ marginRight: 'auto', fontSize: 12.5, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.01em' }}>
-                  이 지면의 다른 기사
-                </span>
-                <button
-                  type="button"
-                  aria-label="이전 기사"
-                  disabled={safeArticleIndex === 0}
-                  onClick={() => setArticleIndex((i) => Math.max(0, i - 1))}
-                  className="lz-arrow flex items-center justify-center flex-shrink-0"
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: 'transparent',
-                    color: LENS_ACCENT_STRONG,
-                    cursor: safeArticleIndex === 0 ? 'default' : 'pointer',
-                    opacity: safeArticleIndex === 0 ? 0.3 : 1,
-                    pointerEvents: safeArticleIndex === 0 ? 'none' : 'auto',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 6l-6 6 6 6" />
-                  </svg>
-                </button>
-                <div className="flex items-center" style={{ gap: 5 }}>
-                  {sectionArticles.map((l, i) => (
-                    <button
-                      key={l.id}
-                      type="button"
-                      aria-label={`${i + 1}번째 기사로 이동`}
-                      onClick={() => setArticleIndex(i)}
-                      className="lz-dot"
+        {/* ── 같은 지면의 나머지 기사 최대 3건 ── 히어로 아래, 가로 3열
+            (2026-09-30, "카드 세로 길이.. 지면신문처럼" 요청 — 실제 신문은
+            리드 기사가 위쪽 전체를 차지하고 작은 기사들이 그 아래 좁은
+            컬럼으로 나열된다. 세로로 좁게 쌓던 사이드바를 이 배치로
+            바꾸면서 히어로·부기사 두 블록의 폭이 같아져, 사진을 뺐을 때
+            생기던 높이 불일치도 같이 해소됐다). 작은 썸네일을 붙여 3열이
+            허전해 보이지 않게 했다 — 헤드라인 크기는 셋 다 동일(가로
+            나열이라 왼쪽부터 순서대로 읽히므로 크기 차등이 필요 없다,
+            세로 스택일 때와 다른 점). 지면명은 반복 안 함(탭에 이미
+            표시돼 있어 중복). */}
+        {minorArticles.length > 0 && (
+          <div className="lz-minor-col" style={{ borderTop: '1px solid rgba(17,24,39,0.09)' }}>
+            {minorArticles.map((article) => {
+              const photo = pickLensPhoto(article);
+              return (
+                <Link key={article.id} href={lensPath(article)} prefetch className="lz-minor">
+                  {photo && (
+                    <span
                       style={{
-                        width: i === safeArticleIndex ? 16 : 6,
-                        height: 6,
-                        borderRadius: 999,
-                        border: 'none',
-                        background: i === safeArticleIndex ? LENS_ACCENT : '#dbeafe',
-                        cursor: 'pointer',
+                        display: 'block',
+                        position: 'relative',
+                        width: '100%',
+                        aspectRatio: '16 / 10',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        marginBottom: 10,
+                        background: '#f3f4f6',
                       }}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  aria-label="다음 기사"
-                  disabled={safeArticleIndex === total - 1}
-                  onClick={() => setArticleIndex((i) => Math.min(total - 1, i + 1))}
-                  className="lz-arrow flex items-center justify-center flex-shrink-0"
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: 'transparent',
-                    color: LENS_ACCENT_STRONG,
-                    cursor: safeArticleIndex === total - 1 ? 'default' : 'pointer',
-                    opacity: safeArticleIndex === total - 1 ? 0.3 : 1,
-                    pointerEvents: safeArticleIndex === total - 1 ? 'none' : 'auto',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 6l6 6-6 6" />
-                  </svg>
-                </button>
-              </div>
-            )}
-          </>
+                    >
+                      <Image
+                        src={photo}
+                        alt=""
+                        fill
+                        sizes="220px"
+                        className="lz-minor-thumb-img"
+                        style={{ objectFit: 'cover', transition: 'transform .35s cubic-bezier(.2,.7,.3,1)' }}
+                      />
+                    </span>
+                  )}
+                  <span
+                    className="lz-minor-h"
+                    style={{
+                      display: '-webkit-box',
+                      fontSize: 14.5,
+                      fontWeight: 700,
+                      color: '#1c1917',
+                      letterSpacing: '-0.015em',
+                      lineHeight: 1.4,
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {article.headline}
+                  </span>
+                  <span style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: '#9ca3af', fontWeight: 600 }}>
+                    {kstDateTimeLabel(article.published_at) ?? article.date.replaceAll('-', '.')}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+        </>
         )}
       </div>
 
