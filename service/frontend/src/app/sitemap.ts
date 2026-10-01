@@ -163,6 +163,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(l.updated_at || l.published_at || l.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
+        // 이미지 사이트맵(2026-10-01) — 위 웹툰 채널 글은 panels가 비어 있어(서비스 API 실측) images가 한 장도 안 나갔다.
+        // 실제 웹툰 컷은 이 lens 글의 웹툰 형식(lenses[].images)에 있으므로 대표 이미지와 함께 여기서 알린다.
+        images: Array.from(
+          new Set(
+            [l.cover_image_url, ...(l.lenses ?? []).flatMap((x) => (x.images ?? []).map((im) => im.url))].filter(
+              (u): u is string => Boolean(u),
+            ),
+          ),
+        ),
       });
     }
   } catch {
