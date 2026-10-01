@@ -22,6 +22,7 @@ import {
   lensPerspectiveAt,
   parseLensView,
   pickLensPhoto,
+  READING_ACCENT,
 } from '@/shared/constants/lensPerspectives';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
@@ -346,7 +347,7 @@ export function LensViewClient({
         .sum-list { display: flex; flex-direction: column; gap: 18px; list-style: none; padding: 0; margin: 0; }
         .sum-item { display: flex; align-items: flex-start; gap: 14px; word-break: keep-all; }
         .sum-n { flex-shrink: 0; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 1px; border-radius: 52% 48% 55% 45% / 48% 54% 46% 52%;
-          background: #fff; color: var(--sum-accent); font-size: 12px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
+          background: #fff; color: color-mix(in srgb, var(--sum-accent) 62%, #1f2a44); font-size: 12px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
           box-shadow: 0 1px 3px rgba(17,24,39,0.10); }
         .sum-t { font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; letter-spacing: -0.01em; color: #1f2937; }
         .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #6b7280; margin: 0 0 12px; }
@@ -448,7 +449,7 @@ export function LensViewClient({
         /* 인용 — 형식 색 6% 면 위의 둥근 카드 + 작은 여는 따옴표(테두리 없음). */
         .lread > blockquote { font-family: "Noto Serif KR", serif; font-size: calc(19px * var(--lens-font-scale, 1)); line-height: 1.7;
           font-weight: 600; color: #111827; margin-top: 1.8em; margin-bottom: 0.4em; padding: 18px 22px 20px; border-radius: 20px 16px 22px 15px / 16px 21px 15px 20px;
-          background: color-mix(in srgb, var(--lc, #111827) 6%, #fff); }
+          background: color-mix(in srgb, var(--lc, #111827) 11%, #fff); }
         .lread > blockquote::before { content: '\\201C'; display: block; font-size: 38px; line-height: 0.7; color: var(--lc, #111827); margin-bottom: 8px; }
         .lread-hr { width: 84px; height: 8px; margin: 2.2em auto 0.6em; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.26' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; font-size: 0; }
         /* 소제목 — 번호 + 세리프 제목 + 연한 질문(2단). 구획 사이는 여백으로만. */
@@ -456,8 +457,8 @@ export function LensViewClient({
         .lread > .lread-sub + * { margin-top: 0; }
         /* 챕터 번호 알약 "02 / 06"(2026-10-01, 에듀테크식 단계감) — 형식 색 8% 면 + 형식 색 글자. 테두리 없음. */
         .lread-sub .ch-no { display: inline-flex; align-items: baseline; gap: 5px; margin-bottom: 12px; padding: 3px 12px 4px; border-radius: 16px 11px 15px 10px / 11px 16px 10px 15px;
-          font-size: 12px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.2; color: var(--lc, #111827); font-variant-numeric: tabular-nums;
-          background: color-mix(in srgb, var(--lc, #111827) 9%, #fff); }
+          font-size: 12px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.2; color: color-mix(in srgb, var(--lc, #111827) 62%, #1f2a44); font-variant-numeric: tabular-nums;
+          background: color-mix(in srgb, var(--lc, #111827) 15%, #fff); }
         .lread-sub .ch-no i { font-style: normal; font-weight: 600; opacity: 0.55; }
         .lread-sub .ch-t, .lread-sub .ch-q { text-wrap: balance; }
         .lread-sub .ch-t { display: block; font-family: "Noto Serif KR", serif; font-size: calc(25px * var(--lens-font-scale, 1));
@@ -530,7 +531,7 @@ export function LensViewClient({
         <ArticleChapterNav
           chapters={chapters}
           show={lensFormatAt(active) === 'letter'}
-          accent={lensPerspectiveAt(0).color}
+          accent={READING_ACCENT}
         />
 
         {/* ── 기사 머리 ── 카테고리 아이브로우 → 세리프 헤드라인 → 부제 → 바이라인/발행시각 → 헤어라인 */}
@@ -651,7 +652,7 @@ export function LensViewClient({
           {!photo && sourceLink && <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{sourceLink}</div>}
 
           {coreSummaryBullets(lens).length > 0 && (
-            <div data-speakable="summary" className="sum" style={{ ['--sum-accent' as string]: lensPerspectiveAt(0).color }}>
+            <div data-speakable="summary" className="sum" style={{ ['--sum-accent' as string]: READING_ACCENT }}>
               <div className="sum-head">
                 <IconStopwatch size={22} className="sum-ico" />
                 <p className="sum-title">30초 핵심</p>

@@ -21,6 +21,7 @@ import {
   lensPanelId,
   lensPerspectiveAt,
   lensTabId,
+  READING_ACCENT,
 } from '@/shared/constants/lensPerspectives';
 import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
 import { ARTICLE_FORMAT_SAMPLES, articleFormatSample, readMinutes } from './lensSamples';
@@ -193,7 +194,7 @@ export function LensFormatPanel({
           붙어있어서 문장을 긁어도 서랍에 담는 버튼이 안 떴다. */}
       {format === 'letter' && letterParagraphs && (
         <article data-letter-body>
-          <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
+          <div className="lread" style={{ ['--lc' as string]: READING_ACCENT } as CSSProperties}>
             {/* 본문 블록 렌더(2026-10-01) — parseLetterBlocks가 소제목·목록·인용·구분선을 읽어 풀어 주므로 프롬프트
                 출력 형식이 달라져도 기호가 그대로 새지 않는다. 소제목 id는 오른쪽 구간 목차의 앵커. */}
             {(() => {
@@ -256,7 +257,7 @@ export function LensFormatPanel({
             <div className="lread-sign">
               <p className="lread-thanks">끝까지 읽어주셔서 고마워요.</p>
               <p className="lread-from">
-                <span className="lread-sign-mark" style={{ background: p.color }} aria-hidden />
+                <span className="lread-sign-mark" style={{ background: READING_ACCENT }} aria-hidden />
                 <span className="lread-sign-name">AI LENS 편집팀</span>
               </p>
               <div className="lread-share">
