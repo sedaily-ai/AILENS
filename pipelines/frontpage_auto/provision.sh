@@ -26,9 +26,9 @@ REPO="sedaily-lens-frontpage-auto"
 # 있었다(mustknow_auto/provision.sh는 처음부터 tags-ecs.json 등으로 태깅됨).
 # docs/architecture/비용태깅_규칙.md 스키마 그대로, mustknow_auto와 같은
 # 패턴 — 다만 WorkItem은 "mustknow 계열에만, 선택"이라 여긴 안 붙인다.
-# ⚠ 크레딧 지원 종료일 2026-09-30에 SERVICE_TAG를 "lens"로 되돌릴 것
-#    (되돌릴 때 tags-ecs.json의 Service 값도 함께 바꿔야 한다).
-SERVICE_TAG="atlas4"  # 9/30 이후 "lens"
+# Atlas lane 원복(AI-dashboard ops/atlas-lane-rollback) — Service 를 lens 로 되돌렸다.
+#    tags-ecs.json 의 Service 값도 같은 변경에서 lens 로 바꿨다.
+SERVICE_TAG="lens"
 
 TAGS_KV="Key=Project,Value=Sedaily-LENS Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-LENS Key=Environment,Value=dev Key=Service,Value=${SERVICE_TAG} Key=Workload,Value=frontpage-auto"  # iam (대문자 Key/Value)
 TAGS_EQ="Project=Sedaily-LENS,CostCenter=sedaily-ai,ServiceName=Sedaily-LENS,Environment=dev,Service=${SERVICE_TAG},Workload=frontpage-auto"  # logs

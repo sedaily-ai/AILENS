@@ -3,6 +3,6 @@
   {"key": "CostCenter", "value": "sedaily-ai"},
   {"key": "ServiceName", "value": "Sedaily-LENS"},
   {"key": "Environment", "value": "prod"},
-  {"key": "Service", "value": "atlas4"},
+  {"key": "Service", "value": "lens"},
   {"key": "Workload", "value": "frontend"}
 ]

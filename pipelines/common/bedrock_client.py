@@ -30,7 +30,7 @@ from botocore.config import Config
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 # 2026-09-27, 사용자 요청 — "클로드 4.6sonnet 빼시고요. 클로드 5.0 opus로
 # 모든 프로덕션... 업데이트": 전용 프로파일 lens-video-opus-5(신규 생성,
-# us.anthropic.claude-opus-5 copyFrom, Service=atlas4·Workload=video)로
+# us.anthropic.claude-opus-5 copyFrom, Service=lens·Workload=video)로
 # 교체 — admin/backend/routes/prompts.py::_CATEGORY_BEDROCK["video"]와
 # 반드시 같은 ARN을 유지할 것. 이 상수는 video/generate_script.py만 쓴다
 # (다른 파이프라인은 각자 model= 인자를 명시적으로 넘긴다 — 위 모듈

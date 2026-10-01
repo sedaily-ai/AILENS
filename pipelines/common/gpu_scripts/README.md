@@ -31,7 +31,7 @@ aws ssm send-command --profile yeonggwang --region ap-northeast-2 \
    불필요) — 아웃바운드는 기본 전체 허용으로 충분(HuggingFace Hub·S3
    접근용).
 5. 비용 태그 필수(`docs/architecture/비용태깅_규칙.md` 참고):
-   `Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-ipadapter`
+   `Service=lens · Project=Sedaily-LENS · Workload=webtoon-ipadapter`
 6. `--instance-initiated-shutdown-behavior stop`으로 띄운다(terminate
    아님) — stop해야 디스크에 캐시된 pip 패키지·모델 가중치가 남아
    다음 기동이 빠르다.
