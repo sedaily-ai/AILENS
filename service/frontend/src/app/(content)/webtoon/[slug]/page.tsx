@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { lensPath } from '@/shared/lib/lensUrl';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
@@ -101,8 +102,13 @@ export async function generateMetadata({
   }
   const title = buildPageTitle(webtoon.title, '웹툰');
   const description = buildSeoDescription(webtoon.excerpt, '요즘 이슈를 컷으로 이어 보여드려요.');
-  const url = `${SITE_URL}/webtoon/${slug}`;
-  const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
+  // 정본(canonical)은 같은 기사의 lens 페이지(2026-10-01, SEO 감사) — 서비스 API의 웹툰 채널 글은 panels가 비어(1000건 전부,
+  // ID가 lens 글과 동일) 이 페이지엔 컷 이미지가 없고 제목·요약만 있는 얇은 중복 페이지다. 검색 신호를 기사 페이지 한 곳으로 모은다.
+  // 페이지 자체는 독자를 위해 그대로 유지하고, 대응하는 lens 글이 없을 때만 자기 URL을 정본으로 쓴다.
+  const lens = await fetchLensBySlug(slug);
+  const url = lens ? `${SITE_URL}${lensPath(lens)}` : `${SITE_URL}/webtoon/${slug}`;
+  const image =
+    webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
   return {
     title,
     description,
@@ -126,10 +132,12 @@ export async function generateMetadata({
   };
 }
 
-function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
-  const url = `${SITE_URL}/webtoon/${slug}`;
+function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
+  // generateMetadata와 같은 정본 URL(lens 페이지)을 쓴다 — 구조화 데이터의 url이 canonical과 어긋나지 않게.
+  const url = lens ? `${SITE_URL}${lensPath(lens)}` : `${SITE_URL}/webtoon/${slug}`;
   const published = webtoon.published_at || `${webtoon.date}T07:00:00+09:00`;
-  const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
+  const image =
+    webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
   // SEO/GEO 강화(2026-09-02) — 이전엔 대표 이미지 1장만 image에 담았다.
   // 실제로는 컷마다 별도 이미지+대사가 있는데 그 구조가 구조화 데이터에
   // 전혀 안 드러나서, 검색·AI 답변엔진이 이 페이지를 "이미지 1장짜리 기사"
@@ -198,9 +206,9 @@ export default async function WebtoonViewPage({
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
   const webtoon = await findWebtoon(slug);
-  const jsonLd = webtoon ? buildJsonLd(webtoon, slug) : null;
-  // 같은 이슈의 lens 글(슬러그 동일)로 텍스트 보강(IssueContextSection 참조).
+  // 같은 이슈의 lens 글(슬러그 동일) — 텍스트 보강(IssueContextSection)과 정본 URL 계산에 함께 쓴다.
   const lens = webtoon ? await fetchLensBySlug(slug) : null;
+  const jsonLd = webtoon ? buildJsonLd(webtoon, slug, lens) : null;
   const { episodeLabel, next, prev } = webtoon
     ? await findNeighbors(slug)
     : { episodeLabel: undefined, next: null, prev: null };

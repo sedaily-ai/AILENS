@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { fetchWebtoons, fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchHomePlayerPosts } from '@/shared/lib/api/homePlayerApi';
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { kstTodayStr } from '@/shared/lib/date';
@@ -128,28 +128,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 살려둔다(기존 백링크·북마크로 들어오는 사람은 정상적으로 볼 수 있게)
   // — sitemap 제출만 멈춘다.
 
-  // 웹툰 — 경로 기반 전환(2026-08-07) 이후 sitemap에도 추가.
-  // images 확장(2026-09-02, SEO/GEO 감사) — 웹툰은 텍스트 기사보다 시각적
-  // 콘텐츠 비중이 커서 구글 이미지 검색 유입 잠재력이 큰데, 그동안 사이트맵이
-  // URL만 알려주고 "이 페이지 안에 이런 이미지들이 있다"는 명시적 신호를
-  // 안 주고 있었다(next의 MetadataRoute.Sitemap이 images 필드로 표준
-  // 이미지 사이트맵 확장을 지원 — Google 이미지 sitemap 문서 참조).
-  // 컷 전부 넣는다 — 어느 컷이 검색에 걸릴지 미리 알 수 없다.
-  try {
-    const webtoons = await fetchWebtoons();
-    for (const w of webtoons) {
-      const daysOld = daysBetween(w.date);
-      entries.push({
-        url: `${BASE}/webtoon/${w.id}`,
-        lastModified: new Date(w.published_at || w.date + 'T07:00:00+09:00'),
-        changeFrequency: 'never',
-        priority: freshnessPriority(daysOld),
-        images: w.panels.map((p) => p.url),
-      });
-    }
-  } catch {
-    /* 웹툰 API 불통이면 생략 — sitemap 나머지는 그대로 반환 */
-  }
+  // 독립 웹툰 페이지(/webtoon/{id})는 사이트맵에서 뺀다(2026-10-01, SEO 감사) — 서비스 API의 웹툰 채널 글 1000건이 전부 panels가
+  // 비어 있고 ID가 lens 기사와 동일해서, 컷 이미지 없는 얇은 중복 페이지였다. 정본은 lens 기사 페이지(canonical 지정)이고
+  // 웹툰 컷 이미지는 아래 lens 항목의 images로 알린다. 목록 /webtoon 자체는 STATIC_ROUTES에 그대로 있다.
 
   // "오늘의 이슈, 4가지 시선" — 웹툰과 같은 이유로 개별 URL을 sitemap에
   // 추가(2026-08-12). /timemachine/{date}와 달리 하루 하나씩 실제로 발행된
