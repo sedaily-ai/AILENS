@@ -329,7 +329,7 @@ export function LensViewClient({
         .rail-ico { display: flex; align-items: center; justify-content: center; height: 24px; }
         .rail-cap { font-size: 12px; color: #6b7280; white-space: nowrap; }
         .rail-pop { position: absolute; left: calc(100% + 8px); top: 0; z-index: 30; padding: 12px 14px;
-          background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 6px 20px rgba(17,24,39,0.08); }
+          background: #fff; border-radius: 14px; box-shadow: 0 12px 32px rgba(15,23,42,0.14), 0 1px 3px rgba(15,23,42,0.08); }
         .badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px;
           font-size: 11.5px; font-weight: 700; color: ${LENS_ACCENT}; background: ${LENS_ACCENT}14; vertical-align: 1px; }
         /* "30초 핵심" 요약 카드(2026-10-01 재디자인) — 굵은 윗선·베이지 박스·■ 마커·"AI 요약" 문구를 걷어내고
@@ -443,10 +443,11 @@ export function LensViewClient({
         .lread > ol { list-style: decimal outside; padding-left: 1.5em; }
         .lread > ul li + li, .lread > ol li + li { margin-top: 0.55em; }
         .lread li::marker { color: var(--lc, #6b7280); font-weight: 700; }
-        /* 인용 — 테두리 대신 큰 여는 따옴표와 세리프로(테두리 없는 톤). */
-        .lread > blockquote { font-family: "Noto Serif KR", serif; font-size: calc(21px * var(--lens-font-scale, 1)); line-height: 1.65;
-          font-weight: 600; color: #111827; margin-top: 2em; margin-bottom: 0.4em; }
-        .lread > blockquote::before { content: '\\201C'; display: block; font-size: 46px; line-height: 0.7; color: var(--lc, #111827); margin-bottom: 8px; }
+        /* 인용 — 형식 색 6% 면 위의 둥근 카드 + 작은 여는 따옴표(테두리 없음). */
+        .lread > blockquote { font-family: "Noto Serif KR", serif; font-size: calc(19px * var(--lens-font-scale, 1)); line-height: 1.7;
+          font-weight: 600; color: #111827; margin-top: 1.8em; margin-bottom: 0.4em; padding: 18px 22px 20px; border-radius: 16px;
+          background: color-mix(in srgb, var(--lc, #111827) 6%, #fff); }
+        .lread > blockquote::before { content: '\\201C'; display: block; font-size: 38px; line-height: 0.7; color: var(--lc, #111827); margin-bottom: 8px; }
         .lread-hr { text-align: center; letter-spacing: 0.7em; color: #c4c8cf; font-size: 18px; margin-top: 2em; margin-bottom: 0.4em; }
         /* 소제목 — 번호 + 세리프 제목 + 연한 질문(2단). 구획 사이는 여백으로만. */
         .lread > .lread-sub { scroll-margin-top: 160px; margin-top: 52px; margin-bottom: 18px; }
@@ -605,7 +606,7 @@ export function LensViewClient({
 
         {photo && (
           <div className="lw" style={{ paddingTop: 20 }}>
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0, borderRadius: 10, boxShadow: PHOTO_SHADOW }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0, borderRadius: 16, boxShadow: PHOTO_SHADOW }}>
               <Image
                 src={photo}
                 alt={lens.headline}
