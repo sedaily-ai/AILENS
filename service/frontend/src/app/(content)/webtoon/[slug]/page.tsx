@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
@@ -105,8 +105,8 @@ export async function generateMetadata({
   // 정본(canonical)은 같은 기사의 lens 페이지(2026-10-01, SEO 감사) — 서비스 API의 웹툰 채널 글은 panels가 비어(1000건 전부,
   // ID가 lens 글과 동일) 이 페이지엔 컷 이미지가 없고 제목·요약만 있는 얇은 중복 페이지다. 검색 신호를 기사 페이지 한 곳으로 모은다.
   // 페이지 자체는 독자를 위해 그대로 유지하고, 대응하는 lens 글이 없을 때만 자기 URL을 정본으로 쓴다.
-  const lens = await fetchLensBySlug(slug);
-  const url = lens ? `${SITE_URL}${lensPath(lens)}` : `${SITE_URL}/webtoon/${slug}`;
+  const lens = await findLensForChannelSlug(slug);
+  const url = canonicalFromLens(lens, `/webtoon/${slug}`);
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
   return {
@@ -134,7 +134,7 @@ export async function generateMetadata({
 
 function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
   // generateMetadata와 같은 정본 URL(lens 페이지)을 쓴다 — 구조화 데이터의 url이 canonical과 어긋나지 않게.
-  const url = lens ? `${SITE_URL}${lensPath(lens)}` : `${SITE_URL}/webtoon/${slug}`;
+  const url = canonicalFromLens(lens, `/webtoon/${slug}`);
   const published = webtoon.published_at || `${webtoon.date}T07:00:00+09:00`;
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
@@ -207,7 +207,7 @@ export default async function WebtoonViewPage({
   const slug = decodeURIComponent(rawSlug);
   const webtoon = await findWebtoon(slug);
   // 같은 이슈의 lens 글(슬러그 동일) — 텍스트 보강(IssueContextSection)과 정본 URL 계산에 함께 쓴다.
-  const lens = webtoon ? await fetchLensBySlug(slug) : null;
+  const lens = webtoon ? await findLensForChannelSlug(slug) : null;
   const jsonLd = webtoon ? buildJsonLd(webtoon, slug, lens) : null;
   const { episodeLabel, next, prev } = webtoon
     ? await findNeighbors(slug)
