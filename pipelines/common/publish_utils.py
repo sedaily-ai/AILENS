@@ -633,8 +633,19 @@ def publish_article(
                 " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
             ) or cut.get("caption", "")
             webtoon_bullets.append(caption)
-            key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
-            webtoon_images.append({"url": _upload(cut_path, key), "caption": caption})
+            # 업로드는 WebP(품질 90)로(2026-10-01) — 1.5배 해상도 PNG(컷당 2MB대) 대신 약 300KB로 줄여 로딩·전송 비용을 낮추고
+            # Core Web Vitals에도 유리하다. 로컬 PNG는 세로 합치기(stitch)용으로 그대로 둔다. 변환 실패 시 PNG로 폴백.
+            try:
+                from PIL import Image
+
+                webp_path = cut_path.with_suffix(".webp")
+                Image.open(cut_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
+                key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.webp"
+                webtoon_images.append({"url": _upload(webp_path, key), "caption": caption})
+            except Exception as e:
+                print(f"[{log_prefix}] {name} 컷{n} WebP 변환 실패 — PNG로 업로드: {e}")
+                key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
+                webtoon_images.append({"url": _upload(cut_path, key), "caption": caption})
         if len(webtoon_images) < MIN_WEBTOON_CUTS:
             raise ValueError(
                 f"컷 {len(webtoon_images)}/{len(webtoon_script['cuts'])}개만 성공 "
