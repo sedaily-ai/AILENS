@@ -121,7 +121,8 @@ const nextConfig: NextConfig = {
       // 세그먼트만 매칭해서 이 둘과 안 겹친다. 기존에 색인·공유된
       // /lens/{slug} 링크가 깨지지 않도록 새 루트 경로(/{slug})로 영구
       // 리다이렉트.
-      { source: "/lens/:slug", destination: "/:slug", permanent: true },
+      // /lens/:slug -> /:slug 는 걷어냈다(2026-10-01) — 두 번 이동(옛 주소 -> 평면 주소 -> 정본)하던 걸 app/(content)/lens/[slug]/page.tsx가
+      // 정본 주소로 한 번에(308) 보낸다. 카테고리를 알아야 해서 설정 파일이 아니라 라우트에서 처리한다.
     ];
     if (process.env.SAJU_ORIGIN) {
       const origin = process.env.SAJU_ORIGIN;
