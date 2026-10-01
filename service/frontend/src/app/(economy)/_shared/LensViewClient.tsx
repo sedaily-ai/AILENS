@@ -32,6 +32,7 @@ import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
+import { ArticleStickyBar } from './components/ArticleStickyBar';
 import { ArticleToolRail } from './components/ArticleToolRail';
 import {
   ArticleFooterStyles,
@@ -471,6 +472,11 @@ export function LensViewClient({
       `}</style>
 
       <main id="main-content" className="art-main">
+        <ArticleStickyBar
+          category={lens.category ?? null}
+          categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
+          title={lens.headline}
+        />
         {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
         <div className="rail-host">
           <nav className="rail" aria-label="기사 도구">
@@ -492,6 +498,7 @@ export function LensViewClient({
             <span className="badge">4가지 시선</span>
           </p>
           <h1
+            id="art-h1"
             data-speakable="headline"
             style={{
               fontFamily: '"Noto Serif KR", serif',
