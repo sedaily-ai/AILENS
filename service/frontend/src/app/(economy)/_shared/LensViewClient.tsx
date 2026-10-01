@@ -532,7 +532,7 @@ export function LensViewClient({
         }
       `}</style>
 
-      <main id="main-content" className="art-main" style={{ ['--hero-h' as string]: 'clamp(360px, 62vh, 620px)' }}>
+      <main id="main-content" className="art-main" style={{ ['--hero-h' as string]: 'clamp(260px, 40vh, 460px)' }}>
         <ArticleStickyBar
           category={lens.category ?? null}
           categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
