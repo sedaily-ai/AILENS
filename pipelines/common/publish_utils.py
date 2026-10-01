@@ -42,6 +42,57 @@ CATEGORY_MAP = {
 # 2차 패스가 이 세그먼트들을 하위 태그로 찾는다.
 _INVESTING_SUBCATEGORIES = {"투자", "투자·재무", "금융·투자"}
 
+# 하위 카테고리(2026-10-01 신설) taxonomy — service/frontend/src/shared/
+# constants/econSubcategories.ts와 같은 값(의도적 중복, ECON_CATEGORIES와
+# 같은 원칙). 본지 실제 GNB 메뉴 구조(마켓시그널/기업/집슐랭/금융/국제/
+# 문화 하위분류)를 그대로 가져왔다. 원문 XML의 category 태그 2번째
+# 세그먼트(예: "증권,국내증시,...")가 이 taxonomy와 이름이 안 맞는 옛
+# 체계라 규칙 매핑 대신 LLM으로 분류한다. 처음엔 분량이 충분한 증시·산업만
+# 뒀다가(2026-10-01 실측, 나머지는 하위 탭 하나당 10개 안팎) 사용자 요청으로
+# 나머지 4개도 추가 — 분량이 얇아도 탭은 값이 있을 때만 뜨니 깨지진 않는다.
+SUBCATEGORY_MAP = {
+    "증시": ["국내증시", "해외증시", "IB&Deal", "펀드·채권", "정책", "증권일반"],
+    "산업": ["대기업", "중기·IT", "유통·생활", "바이오", "기업인", "투자·재무", "기업일반"],
+    "부동산": ["정책", "부동산일반", "건설업계"],
+    "금융·정책": ["은행", "보험", "카드", "가상자산", "금융일반"],
+    "국제": ["미국·중남미", "일본·중국", "아시아·호주", "유럽", "중동·아프리카"],
+    "문화": ["전시·공연", "영화·미디어", "출판", "여행·레저", "문화일반", "아트씽"],
+}
+
+# 전용 profile을 새로 만들지 않고 facts_extract.py와 같은 걸 재사용한다
+# (lens-letters-sonnet-46) — 분류 작업은 facts 추출만큼이나 가벼워서 새
+# AWS 리소스를 만들 필요가 없다고 판단.
+_SUBCATEGORY_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"
+
+
+def display_subcategory(category: str | None, headline: str, context: str) -> str | None:
+    """발행 시 body_inline.subcategory에 넣을 하위 카테고리. category가
+    SUBCATEGORY_MAP에 없는 값(증시·산업 외 전부, 또는 None)이면 분류
+    자체를 안 하고 None — 빈 탭을 만들지 않기 위한 의도적 제한
+    (SUBCATEGORY_MAP 주석 참조). Bedrock 호출 실패 시에도 None으로
+    폴백한다 — 이 필드가 없어도 발행 자체는 막히면 안 된다(facts_extract.
+    extract_facts와 같은 원칙)."""
+    options = SUBCATEGORY_MAP.get(category or "")
+    if not options:
+        return None
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from bedrock_client import call_text  # noqa: lazy — 실패해도 발행이 안 막히게
+
+        system = (
+            f"다음 기사가 '{category}' 카테고리 안에서 어느 하위 분류에 가장 가까운지 "
+            f"선택지 중 딱 하나만 골라 그 단어 그대로만 출력하세요. 다른 설명은 쓰지 마세요.\n"
+            f"선택지: {', '.join(options)}"
+        )
+        user = f"제목: {headline}\n요약: {context}".strip()
+        raw = call_text(system, user, model=_SUBCATEGORY_MODEL, max_tokens=20).strip()
+        for opt in options:
+            if opt in raw:
+                return opt
+    except Exception as e:
+        print(f"[display_subcategory] 분류 실패, 생략: {e}")
+    return None
+
 
 def load_module(name: str, file_path: Path):
     """letters/podcast/webtoon이 전부 `pipeline.py`라는 같은 파일명을 써서
@@ -644,7 +695,8 @@ def publish_article(
             "body": [], "key_points": [], "keywords": [], "images": [],
             "lenses": lenses,
             "photo_image_url": article["photo_url"],
-            "category": display_category(article),
+            "category": (category := display_category(article)),
+            "subcategory": display_subcategory(category, letter_title, article.get("sub_title") or ""),
             "paper_section": paper_section,
             "display_order": display_order,
             "needs_video": video is None,

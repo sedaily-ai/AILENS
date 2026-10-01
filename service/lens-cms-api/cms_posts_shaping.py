@@ -80,6 +80,7 @@ def shape_letter(post: Dict[str, Any]) -> Dict[str, Any]:
         # 인사이트") — admin PostForm 이 "post" 모드에서도 이제 이 값을 받는다
         # (mode="trend_card" 의 category 필드와 동일 규약, 2026-08-07).
         "category": b.get("category") or None,
+        "subcategory": b.get("subcategory") or None,
         "is_cms": True,
     }
 
@@ -144,6 +145,7 @@ def shape_webtoon(post: Dict[str, Any]) -> Dict[str, Any]:
         # 기존 발행분은 값이 없다(None) — 프론트는 실제로 값이 있는 카테고리만
         # 칩으로 그리므로 백필 전에는 칩 바가 아예 안 나온다.
         "category": b.get("category") or None,
+        "subcategory": b.get("subcategory") or None,
         # display_order 추가(2026-08-21) — /webtoon 목록의 "편집국 추천" 순서.
         #
         # 요청은 "인기 소식" 섹션이었지만 인기를 계산할 지표가 시스템에 하나도
@@ -271,6 +273,9 @@ def shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
         # 라벨 문자열)를 그대로 읽는다 — lens 글도 /markets 등 카테고리별
         # 페이지에 letters와 함께 노출하기 위해 2026-08-20 추가.
         "category": b.get("category") or None,
+        # 하위 카테고리(2026-10-01 신설) — econSubcategories.ts(프론트)
+        # taxonomy와 매칭되는 라벨 문자열. category와 같은 저장 위치.
+        "subcategory": b.get("subcategory") or None,
         # "지면 특별 코너"(LensPreviewSection.tsx) 전용 배치 필드(2026-08-21
         # 신설) — 위 category와 완전히 별개다. 처음엔 지면 특별 코너의
         # "전체" 탭이 category 무관 최신순이었는데, 이후 발행된 산업/증권
@@ -379,6 +384,7 @@ def shape_home_player_item(post: Dict[str, Any]) -> Dict[str, Any]:
         "media_embed_url": post.get("media_embed_url") or "",
         "display_order": post.get("display_order") if post.get("display_order") is not None else 0,
         "category": (post.get("body_inline") or {}).get("category") or None,
+        "subcategory": (post.get("body_inline") or {}).get("subcategory") or None,
         # 팟캐스트 전체 대본(2026-08-23, 사용자 지적 — "들어갈 때 이것만
         # 있으니까 너무 허전한데, 텍스트 스크립트 표출하면 어떰?"). lens
         # 글의 팟캐스트 포맷이 이미 갖고 있던 접근성용 transcript를 이

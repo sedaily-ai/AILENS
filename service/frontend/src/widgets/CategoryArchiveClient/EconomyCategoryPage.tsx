@@ -34,7 +34,11 @@ export async function EconomyCategoryPage({ slug, page = 1 }: { slug: string; pa
     fetchLensPosts(),
     fetchFollowingLetters(5),
   ]);
-  const items = buildArchiveItems(letters, [], [], lens).filter((it) => it.category === config.label);
+  // "시그널"(filterBy:'paperSection')은 category가 아니라 paperSection으로
+  // 거른다 — econCategories.ts 주석 참조.
+  const items = buildArchiveItems(letters, [], [], lens).filter((it) =>
+    config.filterBy === 'paperSection' ? it.paperSection === config.label : it.category === config.label,
+  );
   const jsonLd = buildCategoryJsonLd(config, items);
   return (
     <>

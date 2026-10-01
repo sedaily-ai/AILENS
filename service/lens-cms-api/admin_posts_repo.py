@@ -407,6 +407,11 @@ def _update_lens_bundle_slice(
     # 편집기의 "카테고리" 필드가 실제로 이 top-level 키를 바꾼다.
     if "category" in incoming_body:
         body_inline["category"] = incoming_body["category"]
+    # subcategory(하위 카테고리, 2026-10-01 신설) — category와 같은 자리에
+    # 같은 패턴으로 저장. 카테고리 아카이브 페이지(/markets 등)의 2단 탭
+    # (econSubcategories.ts)이 이 값으로 추가 필터링한다.
+    if "subcategory" in incoming_body:
+        body_inline["subcategory"] = incoming_body["subcategory"]
     extra["body_inline"] = body_inline
 
     set_clauses = ["admin_extra = %s"]

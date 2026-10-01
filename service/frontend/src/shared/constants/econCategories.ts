@@ -27,10 +27,28 @@ export interface EconCategoryConfig {
    *  '경제 뉴스'(경제/비즈니스 6개 카테고리의 기존 기본값). 문화처럼 경제
    *  범주가 아닌 카테고리를 위해 2026-08-20 추가. */
   metaSuffix?: string;
+  /** 'paperSection'이면 이 카테고리 아카이브가 글의 category(주제) 대신
+   *  paperSection("오늘의 지면" 특별 코너, archiveItems.ts 참조)으로
+   *  필터링한다 — "시그널" 전용(2026-10-01). 안 주면 기존처럼 category로
+   *  필터링(기본값). */
+  filterBy?: 'paperSection';
 }
 
 export const ECON_CATEGORIES: readonly EconCategoryConfig[] = [
   { slug: 'markets', label: '증시', description: '코스피·코스닥부터 개별 종목까지, 시장을 움직이는 오늘의 숫자.', accent: '#dc2626' },
+  // 2026-10-01 추가 — 본지(sedaily.com) 영문 사이트의 실제 GNB에 "Market
+  // Signal"(국내증시/해외증시/IB&Deal/펀드채권/정책/증권일반 하위)이 상단
+  // 1차 카테고리로 운영되고 있음을 메뉴구조.html(1_ai_link/globe 참고자료)로
+  // 확인하고 신설(사용자 요청: "상단에 카테고리에 시그널 있음 좋겠는데").
+  // AI LENS는 이 글(lens.paper_section='시그널')이 전부 category='증시'로도
+  // 같이 잡혀 있어(2026-10-01 데이터 확인, 68건 중 64건) category가 아니라
+  // paperSection으로 걸러야 한다 — filterBy 참조. 증시 바로 다음에 둔
+  // 이유도 같다(내용이 가장 가까운 카테고리).
+  // 같은 날 CategoryArchiveClient.tsx에 먼저 만들었던 "증시 안의 시그널
+  // 서브탭"은 이 전용 페이지가 생기며 중복이라 제거했다(사용자가 서브탭
+  // 방식을 명시로 반대: "그렇게 말구.. 상단에 카테고리에 시그널 있음
+  // 좋겠는데").
+  { slug: 'signal', label: '시그널', description: '지분 매각, M&A, 투자 유치 — 시장을 먼저 움직이는 딜의 신호.', accent: '#0f766e', filterBy: 'paperSection' },
   { slug: 'property', label: '부동산', description: '집값, 전세, 공급대책 — 내 자산과 직결되는 부동산 이슈.', accent: '#b45309' },
   { slug: 'industry', label: '산업', description: '반도체·자동차·플랫폼, 기업들이 만드는 산업의 흐름.', accent: '#1e40af' },
   { slug: 'finance', label: '금융·정책', description: '금리, 세제, 연금까지 — 경제의 룰을 바꾸는 정책 이야기.', accent: '#059669' },

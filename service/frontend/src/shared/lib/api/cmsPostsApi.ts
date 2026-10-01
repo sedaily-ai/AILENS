@@ -357,6 +357,13 @@ export interface CmsLens {
    * 6개 값. 2026-08-20 추가, /markets 등 카테고리 페이지에 lens 글도 같이
    * 노출하기 위함. 없으면(미분류) 어느 카테고리 페이지에도 안 뜬다. */
   category?: string | null;
+  /** 하위 카테고리(2026-10-01 신설) — category(6개 주제) 안에서 한 단계 더
+   * 들어간 분류(예: 증시 → 국내증시/해외증시/IB&Deal/...).
+   * shared/constants/econSubcategories.ts의 라벨과 매칭. 아직 증시·산업만
+   * 백필돼 있고, 다른 카테고리는 분량이 얇아(국제·부동산·금융·정책·문화)
+   * 당장은 비어있다 — 값이 없으면 하위 탭 자체가 안 뜬다
+   * (CategoryArchiveClient.tsx). */
+  subcategory?: string | null;
   /** "지면 특별 코너" 전용 배치 필드(2026-08-21) — 위 category와 별개.
    * "전체"/"증권"/"산업"/"시그널" 중 하나여야 LensPreviewSection의 해당
    * 탭에 뜬다. 없으면 지면 특별 코너엔 아예 안 뜨고 category 기반

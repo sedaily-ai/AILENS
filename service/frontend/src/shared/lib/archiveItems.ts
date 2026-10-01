@@ -28,6 +28,9 @@ export interface ArchiveItem {
    *  주제 기반으로 바뀌면서, 카테고리 아카이브 페이지가 kind와 무관하게
    *  이 값으로 필터링한다(shared/constants/econCategories.ts 참조). */
   category?: string | null;
+  /** 하위 카테고리(2026-10-01 신설) — econSubcategories.ts 참조. lens 항목만
+   *  값이 있고, 증시·산업만 당장 백필돼 있다. */
+  subcategory?: string | null;
   /** 발행 완료 시각(ISO, UTC) — 2026-08-23 lens부터 시작해서 같은 날 letter/
    *  video까지 백엔드가 노출하도록 넓혔다("이 서비스에 있는 건 날짜만
    *  말고 시간/분도 있어야 함" — 사용자 요청). trend/column(cardItems,
@@ -35,6 +38,14 @@ export interface ArchiveItem {
    *  날짜만(date) 표시로 자연스럽게 폴백한다(shared/lib/date.ts
    *  kstDateTimeLabel). */
   publishedAt?: string | null;
+  /** "오늘의 지면" 특별 코너 값(전체/증권/산업/시그널, lens.paper_section
+   *  그대로) — lens 항목만 값이 있다(2026-10-01 신설). category(주제
+   *  카테고리)와 별개 축 — 홈 LensPreviewSection.tsx가 이 값으로 4지면
+   *  티저 탭을 뽑는다. "시그널"만 본지(sedaily.com) 실제 GNB의 "Market
+   *  Signal"에 대응하는 진짜 카테고리라 econCategories.ts에 filterBy:
+   *  'paperSection' 카테고리(/signal)로도 승격했다(2026-10-01, 메뉴구조.html
+   *  확인 후 — "증시"처럼 category로 거르는 게 아니라 이 필드로 거른다). */
+  paperSection?: string | null;
 }
 
 export const TREND_ACCENT = '#dc2626';
@@ -133,6 +144,8 @@ export function buildArchiveItems(
     href: lensPath(l),
     avatarUrl: l.photo_image_url || l.cover_image_url || null,
     category: l.category ?? null,
+    subcategory: l.subcategory ?? null,
+    paperSection: l.paper_section ?? null,
     publishedAt: l.published_at ?? null,
   }));
 

@@ -11,7 +11,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // 아예 안 남아 정상적으로 ISR 캐시(revalidate:300)를 받는다.
 const PAGE_N_BASES = new Set([
   'lens', 'webtoon', 'video', 'listen',
-  'markets', 'property', 'industry', 'finance', 'international', 'culture',
+  'markets', 'signal', 'property', 'industry', 'finance', 'international', 'culture',
 ]);
 
 // /lens?page=N, /webtoon?page=N 옛 링크 정리(2026-08-23) — next.config.ts의
@@ -50,7 +50,7 @@ export const config = {
   matcher: [
     '/lens', '/webtoon',
     '/lens/page/:n', '/webtoon/page/:n', '/video/page/:n', '/listen/page/:n',
-    '/markets/page/:n', '/property/page/:n', '/industry/page/:n',
+    '/markets/page/:n', '/signal/page/:n', '/property/page/:n', '/industry/page/:n',
     '/finance/page/:n', '/international/page/:n', '/culture/page/:n',
   ],
 };
