@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
@@ -83,7 +84,7 @@ export function MoreInCategory({ lens, items }: { lens: CmsLens; items: CmsLens[
       <Link href={lensPath(lead)} className="af-more-lead af-link">
         <span>
           <span className="af-serif" style={{ display: 'block', fontSize: 'clamp(19px, 2.6vw, 24px)', lineHeight: 1.35 }}>
-            {lead.headline}
+            {displayHeadline(lead.headline)}
           </span>
           <span className="af-meta" style={{ display: 'block' }}>
             {lead.subcategory ?? lead.category} · {dateShort(lead)}
@@ -100,7 +101,7 @@ export function MoreInCategory({ lens, items }: { lens: CmsLens; items: CmsLens[
           {rest.map((l) => (
             <Link key={l.id} href={lensPath(l)} className="af-link">
               <span className="af-serif" style={{ display: 'block', fontSize: 16, lineHeight: 1.4 }}>
-                {l.headline}
+                {displayHeadline(l.headline)}
               </span>
               <span className="af-meta" style={{ display: 'block' }}>
                 {l.subcategory ?? l.category} · {dateShort(l)}
@@ -128,7 +129,7 @@ export function RelatedArticles({ items }: { items: CmsLens[] }) {
         {items.map((l) => (
           <Link key={l.id} href={lensPath(l)} className="af-link">
             <span className="af-serif" style={{ display: 'block', fontSize: 16, lineHeight: 1.4 }}>
-              {l.headline}
+              {displayHeadline(l.headline)}
             </span>
             <span className="af-meta" style={{ display: 'block' }}>
               {dateShort(l)}

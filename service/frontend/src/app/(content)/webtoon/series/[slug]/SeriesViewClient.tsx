@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Header } from '@/widgets/Header';
@@ -130,7 +131,7 @@ export function SeriesViewClient({
                           overflow: 'hidden',
                         }}
                       >
-                        {ep.title}
+                        {displayHeadline(ep.title)}
                       </h3>
                     </div>
                   </Link>

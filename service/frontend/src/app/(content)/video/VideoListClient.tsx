@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Image from 'next/image';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
@@ -162,7 +163,7 @@ export function VideoListClient({
                         overflow: 'hidden',
                       }}
                     >
-                      {v.title}
+                      {displayHeadline(v.title)}
                     </h2>
                   </div>
                 </button>

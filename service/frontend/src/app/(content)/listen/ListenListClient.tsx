@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
@@ -167,7 +168,7 @@ export function ListenListClient({
                         overflow: 'hidden',
                       }}
                     >
-                      {it.title}
+                      {displayHeadline(it.title)}
                     </span>
                     {it.date && (
                       <span style={{ display: 'block', fontSize: 11.5, color: '#9ca3af', marginTop: 3, fontWeight: 600 }}>

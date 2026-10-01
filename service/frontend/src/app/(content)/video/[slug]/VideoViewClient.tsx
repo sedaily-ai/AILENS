@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
@@ -121,7 +122,7 @@ export function VideoViewClient({
                 lineHeight: 1.35,
               }}
             >
-              {video.title}
+              {displayHeadline(video.title)}
             </h1>
             {video.excerpt && (
               <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.65 }}>{video.excerpt}</p>

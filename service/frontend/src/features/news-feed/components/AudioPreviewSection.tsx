@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
@@ -201,7 +202,7 @@ export function AudioPreviewSection({ initialItems }: Props) {
                   overflow: 'hidden',
                 }}
               >
-                {it.title}
+                {displayHeadline(it.title)}
               </span>
             </Link>
           );

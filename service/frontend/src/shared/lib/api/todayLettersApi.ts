@@ -6,6 +6,7 @@
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { letterHref } from '@/shared/lib/letterHref';
 import { lensPath } from '@/shared/lib/lensUrl';
 
@@ -285,7 +286,7 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
     archetype: letter.archetype ?? meta.editorRole,
     accent: meta.accent,
     accentBg: meta.accentBg,
-    title: letter.headline,
+    title: displayHeadline(letter.headline),
     subtitle: letter.subtitle ?? '',
     excerpt: truncate(
       stripLeadingMarkers(letter.subtitle?.trim() || '') ||
@@ -321,7 +322,7 @@ export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
     archetype: meta.editorRole,
     accent: meta.accent,
     accentBg: meta.accentBg,
-    title: lens.headline,
+    title: displayHeadline(lens.headline),
     subtitle,
     excerpt: truncate(subtitle || stripLeadingMarkers(letterFormat?.paragraphs?.[0] || ''), 200),
     readMinutes: estimateReadMinutes(letterFormat?.paragraphs || []),

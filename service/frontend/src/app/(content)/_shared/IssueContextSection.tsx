@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { lensPath } from '@/shared/lib/lensUrl';
 
@@ -60,7 +61,7 @@ export function IssueContextSection({
       >
         이 이슈, 한눈에 보기
       </h2>
-      <p style={{ fontSize: 14, lineHeight: 1.75, color: c.body, marginBottom: 6 }}>{lens.headline}</p>
+      <p style={{ fontSize: 14, lineHeight: 1.75, color: c.body, marginBottom: 6 }}>{displayHeadline(lens.headline)}</p>
       {lens.context && <p style={{ fontSize: 13.5, lineHeight: 1.75, color: c.body }}>{lens.context}</p>}
 
       {points.length > 0 && (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
@@ -480,7 +481,7 @@ export function TodayNewsPlayer() {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {it.title}
+                      {displayHeadline(it.title)}
                     </span>
                   </button>
 
@@ -590,7 +591,7 @@ export function TodayNewsPlayer() {
               textOverflow: 'ellipsis',
             }}
           >
-            {error ? '재생할 수 없어요 — 다시 시도해주세요' : current.title}
+            {error ? '재생할 수 없어요 — 다시 시도해주세요' : displayHeadline(current.title)}
           </p>
         </div>
 

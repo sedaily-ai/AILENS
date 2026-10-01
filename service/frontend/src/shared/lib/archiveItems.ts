@@ -3,6 +3,7 @@
 // 에러. 순수 함수·타입만 이 파일로 분리해서 서버·클라이언트 양쪽에서 같이
 // import 한다(2026-08-07, 목록 페이지 SSG 전환 중 발견).
 import { letterHref } from '@/shared/lib/letterHref';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { withDisplayMeta, toTodayLetterCard } from '@/shared/lib/api/todayLettersApi';
 import type { CmsLetter, CmsTrendCard, CmsVideo, CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
@@ -99,7 +100,7 @@ export function buildArchiveItems(
     return {
       key: `letter-${letter.id}`,
       kind,
-      title: letter.headline,
+      title: displayHeadline(letter.headline),
       excerpt: card.excerpt,
       date,
       accent: meta.accent,
@@ -137,7 +138,7 @@ export function buildArchiveItems(
   const lensItems: ArchiveItem[] = lens.map((l) => ({
     key: `lens-${l.id}`,
     kind: 'lens' as const,
-    title: l.headline,
+    title: displayHeadline(l.headline),
     excerpt: l.context,
     date: l.date,
     accent: LENS_ACCENT,

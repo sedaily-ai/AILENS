@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 
 // 스크롤하면 상단 메뉴가 "카테고리 + 기사 제목 + 읽기 진행선"의 얇은 바로 바뀐다(2026-10-01,
 // 영문 사이트 상세 동작을 따름). 헤드라인이 화면 위로 지나간 뒤에 나타나 sticky 헤더
@@ -9,12 +10,6 @@ import Link from 'next/link';
 // 그대로 유효하다. 진행선은 기사 본문(main) 기준으로 계산하고 리렌더 없이 transform으로만 갱신한다.
 
 const BAR_HEIGHT = 57;
-
-// 발행 제목은 "산업 | 노로바이러스 백신 개발…"처럼 앞에 분류 접두어가 붙는 형태라, 바에서 카테고리와
-// 나란히 놓으면 "산업 산업 |"로 겹쳐 보인다 — 바에서는 접두어(짧은 단어 + 파이프)를 뗀 제목만 쓴다.
-function stripCategoryPrefix(title: string): string {
-  return title.replace(/^\s*[^|｜]{1,8}\s*[|｜]\s*/, '') || title;
-}
 
 export function ArticleStickyBar({
   category,
@@ -90,7 +85,7 @@ export function ArticleStickyBar({
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             title="맨 위로"
           >
-            {stripCategoryPrefix(title)}
+            {displayHeadline(title)}
           </button>
         </div>
         <div ref={progressRef} className="sbar-prog" aria-hidden />

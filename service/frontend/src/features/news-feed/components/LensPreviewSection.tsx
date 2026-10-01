@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Info } from 'lucide-react';
@@ -401,7 +402,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                     wordBreak: 'keep-all',
                   }}
                 >
-                  {hero.headline}
+                  {displayHeadline(hero.headline)}
                 </span>
                 {hero.context && (
                   <span
@@ -478,7 +479,7 @@ export function LensPreviewSection({ initialItems }: { initialItems?: CmsLens[] 
                       wordBreak: 'keep-all',
                     }}
                   >
-                    {article.headline}
+                    {displayHeadline(article.headline)}
                   </span>
                   {/* 본문 미리보기 1줄 추가(2026-10-01, 사용자 지적 —
                       히어로엔 article.context가 있는데 이 3개 보조기사엔

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
@@ -237,7 +238,7 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
                     overflow: 'hidden',
                   }}
                 >
-                  {w.title}
+                  {displayHeadline(w.title)}
                 </h3>
                 {w.excerpt && (
                   <p
