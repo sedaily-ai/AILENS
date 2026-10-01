@@ -431,6 +431,28 @@ def already_published(source_url: str) -> bool:
     return find_by_source_url(clean) is not None
 
 
+def sanitize_video_script(script_path: Path) -> int:
+    """영상 각본의 자막 배열에서 빈 조각({"text": ""})을 걸러낸다(2026-10-02). 모델이 "강조" 컷의 caption을 빈 text 조각으로 시작하는
+    배열로 내는 경우가 있는데, 렌더러(Remotion 스키마)는 text 최소 1자를 요구해 렌더 전 검증에서 거부한다 — 그 기사는 영상 없이
+    발행됐다(국고채 글, 2026-10-01). 빈 조각만 빼면 의미는 그대로다. 걸러낸 조각 수를 돌려준다."""
+    import json  # noqa: lazy — 이 모듈의 다른 함수들처럼 함수 안에서 불러온다
+
+    data = json.loads(script_path.read_text(encoding="utf-8"))
+    removed = 0
+    for cut in data.get("cuts", []):
+        cap = cut.get("caption")
+        if isinstance(cap, list):
+            kept = [seg for seg in cap if not (isinstance(seg, dict) and not str(seg.get("text", "")).strip())]
+            removed += len(cap) - len(kept)
+            if kept:
+                cut["caption"] = kept
+            else:
+                cut["caption"] = cut.get("narration") or "—"
+    if removed:
+        script_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return removed
+
+
 def generate_video(
     name: str, article_path: Path, out_dir: Path, *,
     photo_url: str | None = None, photo_caption: str | None = None,
@@ -450,6 +472,9 @@ def generate_video(
     except Exception:
         print(f"[{log_prefix}] {name} 영상 각본 생성 중 예상 못한 오류:\n{traceback.format_exc()}")
         return None
+    n_removed = sanitize_video_script(script_path)
+    if n_removed:
+        print(f"[{log_prefix}] {name} 영상 각본 정리 — 빈 자막 조각 {n_removed}개 제거")
 
     # 2026-09-23 — CMS video-settings 발행값(성우·엔진·포맷)을 admin
     # 프롬프트 실험 랩(pipelines/video/render_from_script.py)과 똑같이
