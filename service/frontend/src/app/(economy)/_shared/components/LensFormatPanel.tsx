@@ -267,7 +267,7 @@ export function LensFormatPanel({
               </div>
             </div>
           </div>
-          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}
+          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} glossary={l.keywords} />}
         </article>
       )}
 
@@ -288,7 +288,7 @@ export function LensFormatPanel({
               </li>
             ))}
           </ol>
-          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}
+          {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} glossary={l.keywords} />}
         </article>
       )}
 
