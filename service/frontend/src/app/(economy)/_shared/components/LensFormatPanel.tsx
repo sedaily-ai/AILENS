@@ -180,16 +180,22 @@ export function LensFormatPanel({
       {format === 'letter' && letterParagraphs && (
         <article data-letter-body>
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
-            {letterParagraphs.map((para, pi) => (
-              <p
-                key={pi}
-                className={
-                  para.startsWith('◾') ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined
-                }
-              >
-                {wrapWithTerms(para, l.keywords ?? [])}
-              </p>
-            ))}
+            {letterParagraphs.map((para, pi) => {
+              // "##" 소제목 마커(2026-10-01, 파이프라인 출력 순서 변경 —
+              // publish_utils.py의 parse_letters() 주석 참조) — "◾"와 같은
+              // 역할이지만 마크다운 문법 기호라 "◾"처럼 그대로 보여주면
+              // 글자가 그대로 노출된 버그처럼 보인다. 접두어는 떼고
+              // lread-sub 스타일(굵게+색)만 적용 — "◾"는 의도된 시각
+              // 마커라 원문 그대로 유지.
+              const isHashSub = para.startsWith('##');
+              const text = isHashSub ? para.replace(/^##\s*/, '') : para;
+              const isSub = para.startsWith('◾') || isHashSub;
+              return (
+                <p key={pi} className={isSub ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined}>
+                  {wrapWithTerms(text, l.keywords ?? [])}
+                </p>
+              );
+            })}
             {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
                 "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
                 신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +

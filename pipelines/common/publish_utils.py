@@ -91,7 +91,20 @@ def slugify(publish_date: str, headline: str) -> str:
 
 
 def parse_letters(raw_md: str) -> list[str]:
-    """레터 산출물(마크다운)에서 본문 문단만 뽑는다."""
+    """레터 산출물(마크다운)에서 본문 문단만 뽑는다.
+
+    2026-10-01 — [핵심 요약] 블록 뒤에 실제 본문("## 소제목" 섹션들)이
+    이어지는 새 출력 순서로 모델이 바뀌었는데(parse_letter_summary_bullets()
+    버그와 같은 원인 — 그 함수 docstring 참조), 이 함수는 [핵심 요약]을
+    "그 뒤로는 볼 것 없다"는 영구 종료 신호(break)로 보고 있어서 그 뒤에
+    오는 본문 전체가 통째로 유실되는 실제 프로덕션 버그가 났다(2026-10-01
+    발행 31건, 레터 상세 페이지에 리드 한 줄만 뜨고 본문이 없었음 —
+    사용자가 레터 상세 페이지에서 직접 발견). [핵심 요약]을 [제목]과
+    같은 "skip 구간"으로 바꾸고, "##"로 시작하는 줄(새 소제목 마커)을
+    만나면 skip을 풀고 본문 수집을 재개한다 — "◾"(옛 소제목 마커)와
+    동일하게 취급. [용어] 블록도 본문이 아니므로 만나면 종료한다
+    (2026-10-01 추가 — 전엔 이 마커 자체를 몰라서 용어 설명 줄이 본문
+    문단에 섞여 들어갈 수 있었다)."""
     from text_utils import extract_fact_ids  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
 
     # FACT_IDS 트레일러를 먼저 떼어낸다. 이 함수엔 본문 종료 조건이 없어서
@@ -117,13 +130,14 @@ def parse_letters(raw_md: str) -> list[str]:
             skipping = False
             flush()
             continue
-        if line.startswith("◾"):
-            # 2026-09-23 — 예전엔 이 줄 자체를 버렸다(flush만 하고 continue).
+        if line.startswith("◾") or line.startswith("##"):
+            # 2026-09-23 — 예전엔 "◾" 줄 자체를 버렸다(flush만 하고 continue).
             # 그래서 모델이 소제목을 잘 만들어도 발행 직전에 통째로 사라져,
             # 실제 사이트엔 소제목 없는 연속 프로즈만 남았다(사용자 리포트:
             # 발행글 스크린샷엔 "◾" 표시가 전혀 없음). 소제목 줄을 별도
             # 문단으로 살려서 paragraphs에 넣는다 — 프론트(LensFormatPanel)가
-            # "◾"로 시작하는 문단을 감지해 구분되게 보여준다.
+            # "◾"로 시작하는 문단을 감지해 구분되게 보여준다. "##"(새 마커,
+            # 2026-10-01)도 같은 역할이라 같은 분기에서 처리한다.
             skipping = False
             flush()
             paragraphs.append(line)
@@ -132,10 +146,15 @@ def parse_letters(raw_md: str) -> list[str]:
             skipping = False
             flush()
             continue
-        # [핵심 요약]("30초 핵심" 전용 불릿) 블록은 parse_letter_summary_bullets()가
-        # 따로 뽑으므로, 여기서는 만나는 순간부터 끝까지 전부 skip해 본문
-        # 문단에 안 섞이게 한다.
+        # [핵심 요약]("30초 핵심" 전용 불릿)은 parse_letter_summary_bullets()가
+        # 따로 뽑으므로 그 불릿 줄들("-"로 시작)은 여기서 skip한다 — 다만
+        # 예전처럼 영구 종료가 아니라, 바로 위 "##"/"◾" 분기가 다음 소제목을
+        # 만나는 순간 skip을 풀고 본문 수집을 재개한다.
         if line.startswith("[핵심 요약]"):
+            skipping = True
+            flush()
+            continue
+        if line.startswith("[용어]"):
             flush()
             break
         if skipping:
@@ -256,7 +275,16 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
     2026-09-04 — 긴 불릿을 모델이(프롬프트 자체 예시가 그렇게 보여주듯)
     두 줄로 줄바꿈해 출력하는 경우가 있는데, "-"로 시작하지 않는 이어지는
     줄을 그냥 버려서 불릿이 문장 중간에 끊긴 채 발행된 실제 버그를 여기서
-    고쳤다 — "-"로 시작 안 하는 줄은 직전 불릿에 이어붙인다."""
+    고쳤다 — "-"로 시작 안 하는 줄은 직전 불릿에 이어붙인다.
+
+    2026-10-01 — [핵심 요약] 블록 뒤 레터 본문이 "## 소제목" 마크다운
+    헤딩으로 시작하는데, 이 함수는 "[용어]"만 종료 마커로 알고 있어서
+    본문 전체(모든 "## " 문단)가 마지막 불릿에 그대로 이어붙는 실제
+    프로덕션 버그가 났다(2026-10-01 발행분 29건 전부, "30초 핵심" 카드
+    4번째 항목에 본문 수천 자+마크다운 기호가 그대로 노출됨 — 사용자가
+    레터 상세 페이지 리뷰 중 직접 발견). "##"로 시작하는 줄은 위 줄바꿈
+    이어붙이기 대상이 될 수 없다(불릿 문장이 마크다운 헤딩으로 줄바꿈될
+    리 없음) — [용어]와 같은 종료 마커로 추가했다."""
     from text_utils import extract_fact_ids  # noqa: lazy
 
     raw_md, _ = extract_fact_ids(raw_md)
@@ -273,7 +301,9 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
         # 2026-09-11 — [용어] 블록 신설(parse_letter_terms 참조) 이후 이
         # 체크가 없으면 "[용어]"와 그 뒤 "용어 | 설명" 줄들이 "-"로 시작 안
         # 하니 전부 마지막 불릿에 이어붙어버린다.
-        if line.startswith("[용어]"):
+        # 2026-10-01 — 레터 본문("## 소제목"으로 시작)도 같은 이유로 종료
+        # 마커 추가(위 docstring 참조).
+        if line.startswith("[용어]") or line.startswith("##"):
             break
         if line.startswith("-"):
             bullets.append(line.lstrip("-").strip())
