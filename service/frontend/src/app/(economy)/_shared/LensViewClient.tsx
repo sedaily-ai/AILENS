@@ -123,9 +123,6 @@ export function LensViewClient({
   // 다음에 다른 탭을 고르기 전까지 계속 떠 있는다 — 저절로 사라지지
   // 않으니 저절로 화면이 움직일 일도 없다.
   const [showDesc, setShowDesc] = useState(false);
-  // 웹툰 대사 전문 펼침 — 형식별로 나누지 않는다: 한 번에 한 패널만
-  // 보이므로 상태 하나로 충분하다.
-  const [showScript, setShowScript] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   // 패널 가로 스와이프 시작점. 세로 스크롤·텍스트 선택과 다투지 않게
   // 가로 우세를 확실히 요구한다(onPanelTouchEnd 참조).
@@ -721,8 +718,6 @@ export function LensViewClient({
                 dir={dir}
                 onPanelTouchStart={onPanelTouchStart}
                 onPanelTouchEnd={onPanelTouchEnd}
-                showScript={showScript}
-                setShowScript={setShowScript}
                 noteDur={noteDur}
               />
             ))}

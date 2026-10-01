@@ -27,20 +27,6 @@ import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
 import { ARTICLE_FORMAT_SAMPLES, articleFormatSample, readMinutes } from './lensSamples';
 import { CardnewsCarousel } from './CardnewsCarousel';
 
-// 2026-09-28, 사용자 요청 — "문장 끝날 때... 줄바꿈... 문맥에 맞게 줄바꿈을
-// 철저하게 해야합니다": "대사로 읽기" 목록(아래 227행 부근)이 cut.caption을
-// 가공 없이 그대로 렌더해서, 한 컷 캡션에 문장이 여럿 붙어 있으면(내레이션
-// 원문이 마침표로만 이어붙는 경우가 흔함) 한 줄로 쭉 이어졌다. 문장 종결
-// 부호(./!/?) 뒤에서 끊어 문장 단위로 나눈다 — 종결 부호 뒤에 공백이 있든
-// 없든(원본 캡션이 공백 없이 붙어있는 경우도 실측 확인) 둘 다 처리하도록
-// 부호 자체를 기준으로 split한다.
-function splitSentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s*/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해) — 4개 포맷(레터/
 // 웹툰/팟캐스트/영상) 중 하나의 시선 패널 전체. lenses.map()의 콜백 본문을
 // 그대로 컴포넌트로 옮긴 것 — 계산 로직·렌더 분기 전부 원본과 동일, 순수
@@ -68,8 +54,6 @@ export function LensFormatPanel({
   dir,
   onPanelTouchStart,
   onPanelTouchEnd,
-  showScript,
-  setShowScript,
   noteDur,
 }: {
   lens: CmsLens;
@@ -82,9 +66,6 @@ export function LensFormatPanel({
   dir: number;
   onPanelTouchStart: (e: ReactTouchEvent) => void;
   onPanelTouchEnd: (e: ReactTouchEvent, i: number) => void;
-  /** 웹툰 대사 전문 펼침 — 한 번에 한 패널만 보이므로 상태 하나를 공유한다. */
-  showScript: boolean;
-  setShowScript: (updater: (v: boolean) => boolean) => void;
   /** 실측 오디오·영상 길이(초) 보고 — 부모가 FormatPicker의 분량 표기에 쓴다. */
   noteDur: (i: number, sec: number) => void;
 }) {
@@ -327,47 +308,14 @@ export function LensFormatPanel({
       {/* 대사 전문 — 컷 안 말풍선에 이미 있는 대사를 여기서 한 번 더
           접어서 보여준다(소리를 못 듣거나 이미지가 안 뜨거나, 인용하려는
           경우). hidden으로만 감춰서 DOM에는 항상 있다. */}
+      {/* 대사 전문(2026-10-01) — 화면에서는 버튼·목록을 없앴다(독자에겐 군더더기). 컷 안 글자는 이미지라 검색엔진·AI·스크린리더가
+          읽지 못하므로, 같은 대사를 텍스트로 DOM에 그대로 둔다(시각적으로만 숨김 = 접근성 표준 sr-only, 이미지 안 글과 동일한 내용). */}
       {format === 'webtoon' && realWebtoonCuts && realWebtoonCuts.some((c) => c.caption) && (
-        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
-          <button
-            type="button"
-            className="lnk"
-            aria-expanded={showScript}
-            aria-controls={`${lensPanelId(i)}-script`}
-            onClick={() => setShowScript((v) => !v)}
-          >
-            대사로 읽기 {realWebtoonCuts.length}컷
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-              style={{ transform: showScript ? 'rotate(180deg)' : 'none', transition: 'transform .2s ease' }}
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-          <ol id={`${lensPanelId(i)}-script`} hidden={!showScript} className="hang lread" style={{ marginTop: 16 }}>
+        <div className="sr-only">
+          <h3>웹툰 대사 전문</h3>
+          <ol>
             {realWebtoonCuts.map((cut, ci) => (
-              <li key={ci}>
-                <span aria-hidden className="hang-n">
-                  {String(ci + 1).padStart(2, '0')}
-                </span>
-                <span>
-                  {cut.caption
-                    ? splitSentences(cut.caption).map((sentence, si) => (
-                        <span key={si} style={{ display: 'block' }}>
-                          {sentence}
-                        </span>
-                      ))
-                    : '(대사 없음)'}
-                </span>
-              </li>
+              <li key={ci}>{cut.caption || '(대사 없음)'}</li>
             ))}
           </ol>
         </div>
