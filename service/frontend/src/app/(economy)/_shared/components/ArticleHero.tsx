@@ -62,12 +62,12 @@ export function ArticleHero({
         /* 풀블리드 — 읽기 컬럼(.lw)·셸 패딩을 벗어나 화면 폭 전체를 쓴다. 헤더 바로 밑까지 붙인다. */
         .hero { position: relative; height: var(--hero-h); overflow: hidden; background: #111827; color: #fff;
           width: 100vw; margin-left: calc(50% - 50vw); margin-top: calc(-1 * clamp(8px, 2vw, 16px)); }
-        .hero-bg { position: absolute; inset: -40px; filter: blur(34px) brightness(0.7) saturate(1.1); transform: scale(1.05); }
+        .hero-bg { position: absolute; inset: -40px; filter: blur(44px) brightness(0.92) saturate(1.05); transform: scale(1.05); }
         .hero-bg img { object-fit: cover; }
         .hero-fg { position: absolute; inset: 0; will-change: transform; }
         .hero-img { position: absolute; top: 0; bottom: -12%; left: 50%; width: min(100%, 1200px); transform: translateX(-50%);
-          -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-          mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+          -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); }
         @media (max-width: 1200px) { .hero-img { -webkit-mask-image: none; mask-image: none; } }
         .hero-img img { object-fit: cover; object-position: center 35%; }
         .hero-shade { position: absolute; inset: 0; pointer-events: none;
