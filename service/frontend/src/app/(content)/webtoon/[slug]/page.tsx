@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { fetchWebtoons, fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
+import { IssueContextSection } from '../../_shared/IssueContextSection';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -111,7 +112,7 @@ export async function generateMetadata({
       description,
       url,
       type: 'article',
-      publishedTime: `${webtoon.date}T07:00:00+09:00`,
+      publishedTime: webtoon.published_at || `${webtoon.date}T07:00:00+09:00`,
       images: [{ url: image, width: 1200, height: 800, alt: webtoon.title }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
@@ -127,7 +128,7 @@ export async function generateMetadata({
 
 function buildJsonLd(webtoon: CmsWebtoon, slug: string) {
   const url = `${SITE_URL}/webtoon/${slug}`;
-  const published = `${webtoon.date}T07:00:00+09:00`;
+  const published = webtoon.published_at || `${webtoon.date}T07:00:00+09:00`;
   const image = webtoon.cover_image_url || webtoon.panels[0]?.url || `${SITE_URL}/og-image.png`;
   // SEO/GEO 강화(2026-09-02) — 이전엔 대표 이미지 1장만 image에 담았다.
   // 실제로는 컷마다 별도 이미지+대사가 있는데 그 구조가 구조화 데이터에
@@ -198,6 +199,8 @@ export default async function WebtoonViewPage({
   const slug = decodeURIComponent(rawSlug);
   const webtoon = await findWebtoon(slug);
   const jsonLd = webtoon ? buildJsonLd(webtoon, slug) : null;
+  // 같은 이슈의 lens 글(슬러그 동일)로 텍스트 보강(IssueContextSection 참조).
+  const lens = webtoon ? await fetchLensBySlug(slug) : null;
   const { episodeLabel, next, prev } = webtoon
     ? await findNeighbors(slug)
     : { episodeLabel: undefined, next: null, prev: null };
@@ -215,6 +218,7 @@ export default async function WebtoonViewPage({
         episodeLabel={episodeLabel}
         nextEpisode={next}
         prevEpisode={prev}
+        supplement={<IssueContextSection lens={lens} format="웹툰" tone="dark" />}
       />
     </>
   );

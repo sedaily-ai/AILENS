@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
@@ -19,9 +19,12 @@ import { useMediaProgress } from '@/shared/lib/tracking/useMediaProgress';
 export function VideoViewClient({
   slug,
   initialVideo = undefined,
+  supplement,
 }: {
   slug: string;
   initialVideo?: CmsVideo | null;
+  /** 서버에서 만든 텍스트 보강 섹션(IssueContextSection) — 초기 HTML에 포함시키려고 서버 컴포넌트를 슬롯으로 받는다. */
+  supplement?: ReactNode;
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [video, setVideo] = useState<CmsVideo | null | undefined>(initialVideo);
@@ -124,6 +127,7 @@ export function VideoViewClient({
               <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.65 }}>{video.excerpt}</p>
             )}
           </div>
+          {supplement}
         </main>
       )}
     </div>

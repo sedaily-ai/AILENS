@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
@@ -29,12 +29,15 @@ export function WebtoonViewClient({
   episodeLabel,
   nextEpisode,
   prevEpisode,
+  supplement,
 }: {
   slug: string;
   initialWebtoon?: CmsWebtoon | null;
   episodeLabel?: string;
   nextEpisode?: CmsWebtoon | null;
   prevEpisode?: CmsWebtoon | null;
+  /** 서버에서 만든 텍스트 보강 섹션(IssueContextSection) — 초기 HTML에 포함시키려는 슬롯. */
+  supplement?: ReactNode;
 }) {
   const [webtoon, setWebtoon] = useState<CmsWebtoon | null | undefined>(initialWebtoon);
 
@@ -283,6 +286,7 @@ export function WebtoonViewClient({
               </Link>
             )}
           </div>
+          {supplement}
         </div>
       )}
     </div>
