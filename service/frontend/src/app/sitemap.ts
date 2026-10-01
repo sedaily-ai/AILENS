@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
 import { fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { lensIdFromChannelId } from '@/shared/lib/seo/lensCanonical';
 import { kstTodayStr } from '@/shared/lib/date';
 // 2026-08-25: `./(content)/games/play/[slug]/page` 에서 가져오던 것을 단일 출처로
 // 교체. app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
@@ -136,15 +135,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 것만 있어서(임의 날짜 추정 없음) 전부 시딩해도 안전하다.
   try {
     const lensPosts = await fetchLensPosts();
-    // 영상은 같은 기사의 lens 항목에 videos로 붙인다(채널 ID의 -video 접미사는 떼고 매칭).
-    const videoByLensId = new Map<string, Awaited<ReturnType<typeof fetchVideos>>[number]>();
-    try {
-      for (const v of await fetchVideos()) videoByLensId.set(lensIdFromChannelId(v.id), v);
-    } catch {
-      /* 영상 API 불통이면 videos 없이 */
-    }
     for (const l of lensPosts) {
-      const v = videoByLensId.get(l.id);
       const daysOld = daysBetween(l.date);
       entries.push({
         url: `${BASE}${lensPath(l)}`,
@@ -160,29 +151,46 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             ),
           ),
         ),
-        ...(v?.video_url
-          ? {
-              videos: [
-                {
-                  title: escapeXml(v.title),
-                  thumbnail_loc: v.thumbnail_url || `${BASE}/og-image.png`,
-                  description: escapeXml(v.excerpt || v.title),
-                  content_loc: v.video_url,
-                  publication_date: v.published_at || `${v.date}T07:00:00+09:00`,
-                  family_friendly: 'yes' as const,
-                },
-              ],
-            }
-          : {}),
       });
     }
   } catch {
     /* lens API 불통이면 생략 */
   }
 
-  // 영상(/video/{id})·오디오(/listen/{id}) 개별 페이지도 사이트맵에서 뺀다(2026-10-01, SEO 감사) — 본문이 기사 페이지와 67~93% 겹치는
-  // 중복 페이지라 canonical을 lens 기사 페이지로 지정했고(lensCanonical.ts), 사이트맵은 정본 URL만 알린다. 영상은 위 lens 항목의
-  // videos로 이어 알린다. 목록 /video·/listen 자체는 STATIC_ROUTES에 그대로 있다.
+  // 영상 — 웹툰과 같은 이유로 개별 URL을 sitemap에 추가(2026-08-11).
+  // videos 확장(2026-09-03, GEO 감사) — 웹툰의 images 필드와 같은 논리:
+  // sitemap이 URL만 주지 말고 "이 페이지 안에 이런 영상이 있다"는 걸
+  // Google 비디오 sitemap 스펙(next의 MetadataRoute.Sitemap[].videos)으로
+  // 명시한다. video 채널은 항상 자체 렌더링해 S3에 올린 mp4라 video_url을
+  // content_loc(원본 파일 직링크)로 그대로 쓸 수 있다.
+  try {
+    const videos = await fetchVideos();
+    for (const v of videos) {
+      const daysOld = daysBetween(v.date);
+      entries.push({
+        url: `${BASE}/video/${v.id}`,
+        lastModified: new Date(v.published_at || v.date + 'T07:00:00+09:00'),
+        changeFrequency: 'never',
+        priority: freshnessPriority(daysOld),
+        videos: [
+          {
+            title: escapeXml(v.title),
+            thumbnail_loc: v.thumbnail_url || `${BASE}/og-image.png`,
+            description: escapeXml(v.excerpt || v.title),
+            content_loc: v.video_url,
+            publication_date: v.published_at || `${v.date}T07:00:00+09:00`,
+            family_friendly: 'yes',
+          },
+        ],
+      });
+    }
+  } catch {
+    /* 영상 API 불통이면 생략 */
+  }
+
+  // 오디오(/listen/{id}) 개별 페이지는 사이트맵에서 뺀다(2026-10-01, SEO 감사) — 본문이 기사 페이지와 93% 겹치는 중복 페이지라 canonical을
+  // lens 기사 페이지로 지정했다(lensCanonical.ts). 영상(/video/{id})은 서버 HTML에 <video>와 VideoObject가 있는 정식 시청 페이지라
+  // 사이트맵·자기 canonical을 유지한다(Search Console 동영상 색인 230건이 이 페이지들 — 기사 페이지는 영상이 숨은 탭 안이라 시청 페이지가 아니다).
 
   // 타임라인 날짜별 페이지(2026-08-12, GEO 감사) — 처음엔 최근 7일만
   // 시딩했다. 그땐 과거 날짜가 실제 존재하는지 확인이 안 된 상태라(빈

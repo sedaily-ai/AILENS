@@ -6,7 +6,6 @@ import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { VideoViewClient } from './VideoViewClient';
 import { IssueContextSection } from '../../_shared/IssueContextSection';
-import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -75,8 +74,8 @@ export async function generateMetadata({
   }
   const title = buildPageTitle(video.title, '영상');
   const description = buildSeoDescription(video.excerpt, '서울경제 AI LENS가 정리한 이슈 영상입니다.');
-  // 정본은 같은 기사의 lens 페이지(2026-10-01, SEO 감사 — 본문이 기사 페이지와 대부분 겹치는 중복 페이지).
-  const url = canonicalFromLens(await findLensForChannelSlug(slug), `/video/${slug}`);
+  // 영상 시청 페이지는 자기 자신이 정본(2026-10-01) — 서버 HTML에 <video>와 VideoObject가 있어 동영상 색인의 대상이다.
+  const url = `${SITE_URL}/video/${slug}`;
   const resolved = resolveVideo(video.video_url);
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
   return {
