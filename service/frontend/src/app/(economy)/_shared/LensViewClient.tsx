@@ -337,7 +337,7 @@ export function LensViewClient({
            Toss식 부드러운 라운드 카드로. 테두리 없이 면(연한 회색)과 여백으로만 구분하고, 번호는 작은 원형 배지.
            AI 고지는 바이라인·하단 AiDisclaimer가 이미 맡으므로 요약 안엔 "AI 요약" 표기를 두지 않는다. */
         .sum { margin-top: 12px; padding: clamp(24px, 3.4vw, 34px) clamp(22px, 3.6vw, 36px) clamp(26px, 3.6vw, 36px);
-          background: #f6f7f9; border-radius: 20px; }
+          background: #f6f7f9; border-radius: 26px 22px 28px 20px / 22px 27px 20px 26px; }
         .sum-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
         /* 제목 아래 한 줄 — 본문과 같은 "~요" 말투로 친근하게, 회색 작은 글씨라 과하지 않게(2026-10-01). */
         .sum-sub { margin: 0 0 22px 31px; font-size: 14px; line-height: 1.5; color: #6b7280; letter-spacing: -0.01em; }
@@ -345,8 +345,8 @@ export function LensViewClient({
         .sum-title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.015em; color: #111827; }
         .sum-list { display: flex; flex-direction: column; gap: 18px; list-style: none; padding: 0; margin: 0; }
         .sum-item { display: flex; align-items: flex-start; gap: 14px; word-break: keep-all; }
-        .sum-n { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; margin-top: 2px; border-radius: 50%;
-          background: #fff; color: var(--sum-accent); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+        .sum-n { flex-shrink: 0; display: grid; place-items: center; width: 26px; height: 26px; margin-top: 1px; border-radius: 52% 48% 55% 45% / 48% 54% 46% 52%;
+          background: #fff; color: var(--sum-accent); font-size: 12px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
           box-shadow: 0 1px 3px rgba(17,24,39,0.10); }
         .sum-t { font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; letter-spacing: -0.01em; color: #1f2937; }
         .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #6b7280; margin: 0 0 12px; }
@@ -356,7 +356,8 @@ export function LensViewClient({
           border-radius: 999px; font-size: 12.5px; font-weight: 600; color: #374151; text-decoration: none; background: #fff; }
         .pill:hover { border-color: #9ca3af; color: #111827; }
         .lm { max-width: 100%; }
-        .rule { height: 1px; background: rgba(17,24,39,0.1); }
+        /* 스케치 톤(2026-10-01) — 직선 대신 손으로 그은 획, 반듯한 모서리 대신 살짝 불규칙한 모서리, 글자는 단정하게 두고 선과 모서리만 손맛(손글씨 폰트는 유아틱해서 제외). */
+        .rule { height: 8px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.26' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
         .back:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
 
         /* ── 이 페이지의 공통 문법 3개 ───────────────────────────────────
@@ -446,29 +447,29 @@ export function LensViewClient({
         .lread li::marker { color: var(--lc, #6b7280); font-weight: 700; }
         /* 인용 — 형식 색 6% 면 위의 둥근 카드 + 작은 여는 따옴표(테두리 없음). */
         .lread > blockquote { font-family: "Noto Serif KR", serif; font-size: calc(19px * var(--lens-font-scale, 1)); line-height: 1.7;
-          font-weight: 600; color: #111827; margin-top: 1.8em; margin-bottom: 0.4em; padding: 18px 22px 20px; border-radius: 16px;
+          font-weight: 600; color: #111827; margin-top: 1.8em; margin-bottom: 0.4em; padding: 18px 22px 20px; border-radius: 20px 16px 22px 15px / 16px 21px 15px 20px;
           background: color-mix(in srgb, var(--lc, #111827) 6%, #fff); }
         .lread > blockquote::before { content: '\\201C'; display: block; font-size: 38px; line-height: 0.7; color: var(--lc, #111827); margin-bottom: 8px; }
-        .lread-hr { text-align: center; letter-spacing: 0.7em; color: #c4c8cf; font-size: 18px; margin-top: 2em; margin-bottom: 0.4em; }
+        .lread-hr { width: 84px; height: 8px; margin: 2.2em auto 0.6em; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.26' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; font-size: 0; }
         /* 소제목 — 번호 + 세리프 제목 + 연한 질문(2단). 구획 사이는 여백으로만. */
         .lread > .lread-sub { scroll-margin-top: 160px; margin-top: 52px; margin-bottom: 18px; }
         .lread > .lread-sub + * { margin-top: 0; }
         /* 챕터 번호 알약 "02 / 06"(2026-10-01, 에듀테크식 단계감) — 형식 색 8% 면 + 형식 색 글자. 테두리 없음. */
-        .lread-sub .ch-no { display: inline-flex; align-items: baseline; gap: 5px; margin-bottom: 12px; padding: 4px 11px; border-radius: 999px;
-          font-size: 12px; font-weight: 800; letter-spacing: 0.04em; color: var(--lc, #111827); font-variant-numeric: tabular-nums;
+        .lread-sub .ch-no { display: inline-flex; align-items: baseline; gap: 5px; margin-bottom: 12px; padding: 3px 12px 4px; border-radius: 16px 11px 15px 10px / 11px 16px 10px 15px;
+          font-size: 12px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.2; color: var(--lc, #111827); font-variant-numeric: tabular-nums;
           background: color-mix(in srgb, var(--lc, #111827) 9%, #fff); }
         .lread-sub .ch-no i { font-style: normal; font-weight: 600; opacity: 0.55; }
         .lread-sub .ch-t, .lread-sub .ch-q { text-wrap: balance; }
         .lread-sub .ch-t { display: block; font-family: "Noto Serif KR", serif; font-size: calc(25px * var(--lens-font-scale, 1));
           font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; color: #111827; word-break: keep-all; }
         /* 질문 — "이 구간이 답할 질문"을 연한 면 위에 두어 독자가 읽기 전에 목적을 잡게 한다. */
-        .lread-sub .ch-q { display: block; width: fit-content; max-width: 100%; margin-top: 12px; padding: 8px 14px; border-radius: 12px;
+        .lread-sub .ch-q { display: block; width: fit-content; max-width: 100%; margin-top: 12px; padding: 8px 15px; border-radius: 15px 12px 16px 11px / 12px 16px 11px 15px;
           background: #f4f5f7; font-size: calc(15.5px * var(--lens-font-scale, 1)); line-height: 1.5; font-weight: 500; color: #4b5563; word-break: keep-all; }
         /* 편지 마무리 — 따뜻한 한 줄 + 발신인. 위쪽 룰 없이 여백만. */
         .lread-sign { margin-top: 48px; }
         .lread-thanks { margin: 0 0 14px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; color: #374151; font-weight: 500; }
         .lread-from { display: flex; align-items: center; gap: 10px; margin: 0; }
-        .lread-sign-mark { flex-shrink: 0; width: 22px; height: 3px; border-radius: 999px; }
+        .lread-sign-mark { flex-shrink: 0; width: 30px; height: 7px; border-radius: 0; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='1' stroke-width='2.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='1' stroke-width='2.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
         /* 글 끝 공유(2026-10-01) — 모바일엔 왼쪽 도구 레일이 없어 글을 다 읽고도 공유할 곳이 없었다. */
         .lread-share { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 28px; }
         .lread-share-label { font-size: 13.5px; color: #6b7280; }

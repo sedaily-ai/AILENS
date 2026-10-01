@@ -37,7 +37,7 @@ export function ReadDone({ minutes }: { minutes: number | null }) {
         .rdone { display: flex; align-items: center; gap: 16px; margin-top: 60px; }
         .rdone-ico { flex-shrink: 0; width: 52px; height: 52px; }
         .rdone-bg { fill: var(--lc, #6d28d9); fill-opacity: 0.12; transform-origin: center; transform: scale(0.6); opacity: 0; }
-        .rdone-ck { fill: none; stroke: var(--lc, #6d28d9); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 30; stroke-dashoffset: 30; }
+        .rdone-ck { fill: none; stroke: var(--lc, #6d28d9); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }
         .rdone[data-on='true'] .rdone-bg { transform: none; opacity: 1; transition: transform .45s cubic-bezier(.34,1.56,.64,1), opacity .3s ease; }
         .rdone[data-on='true'] .rdone-ck { stroke-dashoffset: 0; transition: stroke-dashoffset .45s ease .25s; }
         .rdone-t { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: #111827; }
@@ -51,8 +51,8 @@ export function ReadDone({ minutes }: { minutes: number | null }) {
       `}</style>
       <div ref={ref} className="rdone" data-on={on}>
         <svg className="rdone-ico" viewBox="0 0 52 52" aria-hidden>
-          <circle className="rdone-bg" cx="26" cy="26" r="24" />
-          <path className="rdone-ck" d="M16 27.5 23.2 34.5 36.5 19" />
+          <path className="rdone-bg" d="M26 2.5 C 39.5 1.8, 50.4 12.5, 49.6 26.4 C 48.9 40, 38.2 50.6, 25.2 49.7 C 11.8 48.9, 2.2 38.6, 2.8 25.4 C 3.4 12.6, 13 3.2, 26 2.5 Z" />
+          <path className="rdone-ck" d="M15.6 27.8 C 18 29.2, 20.6 31.8, 23 35 C 27 27.6, 31.6 22.4, 37 18.6" />
         </svg>
         <div className="rdone-tx">
           <p className="rdone-t">다 읽었어요</p>

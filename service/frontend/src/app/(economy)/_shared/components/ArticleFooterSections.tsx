@@ -28,20 +28,21 @@ export function ArticleFooterStyles() {
       .af-serif { font-family: ${SERIF}; font-weight: 700; color: #111827; letter-spacing: -0.015em;
         word-break: keep-all; text-wrap: balance; }
       .af-meta { font-size: 12.5px; color: #9ca3af; margin-top: 6px; }
-      .af-sec { border-top: 1px solid #111827; padding-top: 18px; margin-top: 56px; }
-      .af-sec + .af-sec { border-top-color: #e5e7eb; margin-top: 40px; }
+      /* 스케치 톤 — 직선 테두리 대신 손으로 그은 획(2026-10-01). */
+      .af-sec { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.32' stroke-width='1.7' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") top / 100% 8px no-repeat; padding-top: 26px; margin-top: 56px; }
+      .af-sec + .af-sec { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.14' stroke-width='1.4' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E"); margin-top: 40px; }
       .af-link:hover .af-serif { text-decoration: underline; text-underline-offset: 3px; }
       .af-more-lead { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 20px; align-items: start;
         text-decoration: none; padding-bottom: 20px; }
       .af-more-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
-      .af-more-grid a { display: block; text-decoration: none; padding: 14px 0; border-top: 1px solid #e5e7eb; }
+      .af-more-grid a { display: block; text-decoration: none; padding: 18px 0 14px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.14' stroke-width='1.4' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") top / 100% 8px no-repeat; }
       .af-all { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 8px;
         font-size: 14px; font-weight: 700; color: #111827; text-decoration: none; }
       .af-all:hover { text-decoration: underline; text-underline-offset: 3px; }
       .af-rel { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
-      .af-rel a { display: block; text-decoration: none; padding: 14px 0; border-top: 1px solid #e5e7eb; }
-      .af-most a { display: flex; align-items: baseline; gap: 16px; text-decoration: none; padding: 14px 0;
-        border-top: 1px solid #e5e7eb; }
+      .af-rel a { display: block; text-decoration: none; padding: 18px 0 14px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.14' stroke-width='1.4' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") top / 100% 8px no-repeat; }
+      .af-most a { display: flex; align-items: baseline; gap: 16px; text-decoration: none; padding: 18px 0 14px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.14' stroke-width='1.4' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") top / 100% 8px no-repeat; }
       .af-most-n { flex-shrink: 0; width: 18px; font-size: 15px; font-weight: 800; color: #1d4ed8;
         font-variant-numeric: tabular-nums; }
       .af-tags a { font-size: 14px; color: #1d4ed8; text-decoration: none; margin-right: 14px; }
