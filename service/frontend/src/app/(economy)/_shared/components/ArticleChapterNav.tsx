@@ -79,7 +79,7 @@ export function ArticleChapterNav({
         .chn-host { display: none; }
         @media (min-width: 1240px) {
           .chn-host { display: block; position: absolute; top: 0; bottom: 0; left: calc(50% + 360px + 40px); width: 210px; pointer-events: none; }
-          .chn { position: sticky; top: 150px; opacity: 0; transform: translateY(6px); pointer-events: none;
+          .chn { position: sticky; top: 110px; opacity: 0; transform: translateY(6px); pointer-events: none;
             transition: opacity .25s ease, transform .25s ease; }
           .chn[data-visible='true'] { opacity: 1; transform: none; pointer-events: auto; }
         }

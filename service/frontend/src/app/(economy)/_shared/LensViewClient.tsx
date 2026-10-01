@@ -321,7 +321,7 @@ export function LensViewClient({
         @media (min-width: 1100px) {
           .tools-inline { display: none !important; }
           .rail-host { display: block; position: absolute; top: 0; bottom: 0; left: calc(50% - 360px - 120px); width: 76px; }
-          .rail { position: sticky; top: 140px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+          .rail { position: sticky; top: 110px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
         }
         .rail-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 64px; padding: 6px 0;
           border: none; background: none; cursor: pointer; color: #374151; }
@@ -381,9 +381,8 @@ export function LensViewClient({
         /* 형식 선택기(2026-10-01 개편) — 밑줄 탭 → 둥근 회색 트랙 위의 흰색 알약 세그먼트(Toss식).
            테두리 없이 면 + 부드러운 그림자로만 선택을 보여 준다. 선택된 알약이 칸 사이를 미끄러진다.
            바 높이 = 위 패딩 10 + 트랙(4 + 56 + 4) + 아래 패딩 10 = 84px. */
-        .fmt-bar { position: sticky; top: 57px; z-index: 20; background: #fff; padding: 10px 0; }
-        .fmt-bar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -16px; height: 16px; pointer-events: none;
-          background: linear-gradient(#fff, rgba(255,255,255,0)); }
+        /* 형식 탭은 더 이상 스크롤을 따라오지 않는다(2026-10-01, 읽는 데 방해) — 제자리에 있는 일반 블록. */
+        .fmt-bar { position: static; background: #fff; padding: 10px 0; }
         .fmt-row { position: relative; display: grid; gap: 0; padding: 4px; background: #f2f3f5; border-radius: 16px;
           grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
         .fmt-thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; pointer-events: none; z-index: 0;
@@ -453,7 +452,7 @@ export function LensViewClient({
         .lread > blockquote::before { content: '\\201C'; display: block; font-size: 38px; line-height: 0.7; color: var(--lc, #111827); margin-bottom: 8px; }
         .lread-hr { width: 84px; height: 8px; margin: 2.2em auto 0.6em; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='0.26' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; font-size: 0; }
         /* 소제목 — 번호 + 세리프 제목 + 연한 질문(2단). 구획 사이는 여백으로만. */
-        .lread > .lread-sub { scroll-margin-top: 160px; margin-top: 52px; margin-bottom: 18px; }
+        .lread > .lread-sub { scroll-margin-top: 84px; margin-top: 52px; margin-bottom: 18px; }
         .lread > .lread-sub + * { margin-top: 0; }
         /* 챕터 번호 알약 "02 / 06"(2026-10-01, 에듀테크식 단계감) — 형식 색 8% 면 + 형식 색 글자. 테두리 없음. */
         .lread-sub .ch-no { display: inline-flex; align-items: baseline; gap: 5px; margin-bottom: 12px; padding: 3px 12px 4px; border-radius: 16px 11px 15px 10px / 11px 16px 10px 15px;
@@ -489,8 +488,8 @@ export function LensViewClient({
         .fmt-arrow:disabled { cursor: default; opacity: .4; }
         .fmt-arrow:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
 
-        /* sticky 헤더(56px) + 형식 바(72px) + 여유 6px. */
-        .lens-panel { scroll-margin-top: 160px; }
+        /* 고정 제목 바(57px) + 여유. 형식 바는 더 이상 고정되지 않는다. */
+        .lens-panel { scroll-margin-top: 84px; }
 
         @media (prefers-reduced-motion: no-preference) {
           .panel[data-dir='1'] { animation: swap-fwd .24s cubic-bezier(.22,.85,.2,1); }
