@@ -33,6 +33,9 @@ export function ArticleStickyBar({
   const passed = useRef<Set<number> | null>(null);
   const cheerTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const progressRef = useRef<HTMLDivElement>(null);
+  // 챕터별 칸 진행(2026-10-01) — 레터 본문에 소제목이 2개 이상일 때만, 연속 선 대신 챕터 수만큼 칸을 나눠 읽은 만큼 채운다.
+  const [segCount, setSegCount] = useState(0);
+  const segRefs = useRef<Array<HTMLSpanElement | null>>([]);
 
   useEffect(() => {
     const h1 = document.getElementById('art-h1');
@@ -47,6 +50,22 @@ export function ArticleStickyBar({
       const total = m.height - window.innerHeight;
       const p = total > 0 ? Math.min(1, Math.max(0, -m.top / total)) : 0;
       if (progressRef.current) progressRef.current.style.transform = `scaleX(${p})`;
+      // 칸 진행: 칸 i = (i=0이면 본문 시작, 아니면 i번째 소제목) ~ 다음 소제목(마지막은 본문 끝). 독자 시선(화면 60%)이 지난 만큼 채운다.
+      const bodyEl = document.querySelector('[data-letter-body]');
+      const bRect = bodyEl ? bodyEl.getBoundingClientRect() : null;
+      const heads = Array.from(document.querySelectorAll('[data-letter-body] .lread > .lread-sub'));
+      const segOn = !!bRect && bRect.height > 0 && heads.length >= 2;
+      setSegCount(segOn ? heads.length : 0);
+      if (segOn && bRect) {
+        const eye = window.innerHeight * 0.6;
+        const edges = [bRect.top, ...heads.slice(1).map((h) => h.getBoundingClientRect().top), bRect.bottom];
+        segRefs.current.forEach((el, i) => {
+          if (!el || i >= edges.length - 1) return;
+          const span = edges[i + 1] - edges[i];
+          const f = span > 0 ? Math.min(1, Math.max(0, (eye - edges[i]) / span)) : 0;
+          el.style.transform = `scaleX(${f})`;
+        });
+      }
       // 남은 읽기 시간 — 레터 본문(보이는 동안)만. 본문 위치 기준: 화면 60% 지점까지 읽었다고 본다.
       const body = document.querySelector('[data-letter-body]');
       const br = body ? body.getBoundingClientRect() : null;
@@ -103,12 +122,17 @@ export function ArticleStickyBar({
         .sbar-title { min-width: 0; flex: 1; font-family: "Noto Serif KR", serif; font-size: 17px; font-weight: 700; color: #111827;
           letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: none; background: none;
           padding: 0; text-align: left; cursor: pointer; }
+        .sbar[data-segs='true'] .sbar-prog { display: none; }
+        .sbar-segs { position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; display: flex; gap: 3px; padding: 0 clamp(20px, 4vw, 28px);
+          max-width: 720px; margin: 0 auto; }
+        .sbar-seg { position: relative; flex: 1; height: 100%; border-radius: 2px; background: #e5e7eb; overflow: hidden; }
+        .sbar-seg > span { position: absolute; inset: 0; background: #111827; transform-origin: left; transform: scaleX(0); }
         .sbar-prog { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: #111827;
           transform-origin: left; transform: scaleX(0); }
         @media (prefers-reduced-motion: reduce) { .sbar, .sbar[data-show='true'] { transition: none; } }
         @media print { .sbar { display: none; } }
       `}</style>
-      <div className="sbar" data-show={show} aria-hidden={!show}>
+      <div className="sbar" data-show={show} data-segs={segCount > 0} aria-hidden={!show}>
         <div className="sbar-in">
           {category &&
             (categoryHref ? (
@@ -133,6 +157,15 @@ export function ArticleStickyBar({
             </span>
           )}
         </div>
+        {segCount > 0 && (
+          <div className="sbar-segs" aria-hidden>
+            {Array.from({ length: segCount }, (_, i) => (
+              <span key={i} className="sbar-seg">
+                <span ref={(el) => { segRefs.current[i] = el; }} />
+              </span>
+            ))}
+          </div>
+        )}
         <div ref={progressRef} className="sbar-prog" aria-hidden />
       </div>
     </>
