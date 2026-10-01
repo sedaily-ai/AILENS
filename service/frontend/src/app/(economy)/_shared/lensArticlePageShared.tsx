@@ -56,7 +56,9 @@ async function findOtherLens(slug: string, limit = 3): Promise<CmsLens[]> {
 
 function buildJsonLd(lens: CmsLens) {
   const url = `${SITE_URL}${lensPath(lens)}`;
-  const published = `${lens.date}T07:00:00+09:00`;
+  // 발행 시각(초 단위)이 있으면 그걸 쓴다(2026-10-01, Google 날짜 가이드 —
+  // 정확한 시각+타임존). 옛 글은 date 폴백.
+  const published = lens.published_at || `${lens.date}T07:00:00+09:00`;
   const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
   const bodyJoined = [
     lens.context,
@@ -143,7 +145,8 @@ export async function buildLensArticleMetadata(
       description,
       url,
       type: 'article',
-      publishedTime: `${lens.date}T07:00:00+09:00`,
+      publishedTime: lens.published_at || `${lens.date}T07:00:00+09:00`,
+      modifiedTime: clampModifiedIso(lens.updated_at, lens.published_at || `${lens.date}T07:00:00+09:00`),
       authors: ['AI LENS 편집팀'],
       section: '경제',
       tags: ['오늘의 이슈', '4가지 시선', '뉴스 해설', 'AI LENS', '서울경제'],

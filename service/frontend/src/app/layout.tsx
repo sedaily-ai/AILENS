@@ -31,7 +31,13 @@ const pretendard = localFont({
 
 import { SITE_URL } from "@/shared/constants/site";
 const SITE_TITLE = "AI LENS — 서울경제신문의 AI 경제 뉴스";
-const SITE_DESC = "서울경제신문이 만드는 AI 경제 뉴스 서비스. 그날의 핵심 경제 이슈를 매일 정리해 전합니다.";
+// 2026-10-01 — 사용자 요청으로 보강("다양한 멀티소스를 실시간으로 구체적으로
+// 심층적으로 전달"). 기존 문구는 "AI 경제 뉴스 서비스"라고만 해서 이
+// 서비스의 실제 차별점(기자 취재 → AI가 레터/웹툰/팟캐스트/영상 4형식으로
+// 재구성 → 편집팀 검수)이 메타디스크립션·WebSite JSON-LD 어디에도 안
+// 드러났었다. meta description·OG·Twitter·WebSite 구조화 데이터가 전부 이
+// 상수 하나를 공유해서(아래 4곳) 고치면 전체에 일괄 반영된다.
+const SITE_DESC = "서울경제신문 기자가 취재한 경제 뉴스를 AI가 레터·웹툰·팟캐스트·영상 4가지 형식으로 매일 재구성하고 편집팀이 검수합니다. 증시·산업·부동산·금융 등 다양한 분야의 이슈를 구체적인 숫자와 맥락까지 담아 깊이 있게 전합니다.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -85,6 +91,9 @@ export const metadata: Metadata = {
   other: {
     "msapplication-TileColor": "#3B82F6",
     "theme-color": "#3B82F6",
+    // Bing Webmaster Tools 사이트 소유 확인(2026-10-01, 사용자 제공 코드).
+    // Google은 public/google*.html 파일 방식으로 따로 인증돼 있다.
+    "msvalidate.01": "16F11CE1835D2FA5F841CACCB3713A55",
   },
 };
 

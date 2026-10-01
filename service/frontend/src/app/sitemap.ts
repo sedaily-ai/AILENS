@@ -13,6 +13,20 @@ import { GAMES } from '@/shared/data/games';
 import { SITE_URL as BASE } from '@/shared/constants/site';
 import { lensPath } from '@/shared/lib/lensUrl';
 
+// Next.js의 MetadataRoute.Sitemap video/image 확장은 title/description 같은
+// 텍스트 필드를 XML에 그대로 꽂아 넣고 자동 이스케이프하지 않는다(실측
+// 확인, 2026-10-01 — 사용자가 "sitemap.xml 파싱 에러" 스크린샷으로 신고).
+// 기사 제목에 흔한 "&"("SK이노베이션 E&S", "M&A로 더본코리아" 등)가 그대로
+// 들어가면 "&S", "&A"가 유효한 XML 엔티티가 아니라 사이트맵 전체가
+// 파싱 에러로 깨진다 — 첫 에러 지점 이후는 구글/크롤러가 아예 못 읽는다.
+// video:title/video:description에 넣기 전에 직접 이스케이프한다.
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 // 정적 라우트 — 항상 노출되는 핵심 페이지
 // lastModified는 각 라우트 파일의 최근 git 커밋 날짜(2026-08-11 GEO 감사에서
 // 수기 반영) — SSR이라 빌드타임 상수가 없어서 `new Date()`(요청 시각)를 썼었는데,
@@ -34,6 +48,7 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // 반드시 일치해야 한다(수동 나열 — 이 배열 자체가 priority/changeFrequency
   // 같은 편집 판단을 담고 있어 다른 3곳처럼 .map()으로 자동 생성하지 않았다).
   { path: '/markets',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 증시
+  { path: '/signal',        priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-01' }, // 시그널(Market Signal)
   { path: '/property',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 부동산
   { path: '/industry',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 산업
   { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 금융·정책
@@ -126,7 +141,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const daysOld = daysBetween(w.date);
       entries.push({
         url: `${BASE}/webtoon/${w.id}`,
-        lastModified: new Date(w.date + 'T07:00:00+09:00'),
+        lastModified: new Date(w.published_at || w.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
         images: w.panels.map((p) => p.url),
@@ -145,7 +160,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const daysOld = daysBetween(l.date);
       entries.push({
         url: `${BASE}${lensPath(l)}`,
-        lastModified: new Date(l.date + 'T07:00:00+09:00'),
+        lastModified: new Date(l.updated_at || l.published_at || l.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
       });
@@ -166,16 +181,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const daysOld = daysBetween(v.date);
       entries.push({
         url: `${BASE}/video/${v.id}`,
-        lastModified: new Date(v.date + 'T07:00:00+09:00'),
+        lastModified: new Date(v.published_at || v.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
         videos: [
           {
-            title: v.title,
+            title: escapeXml(v.title),
             thumbnail_loc: v.thumbnail_url || `${BASE}/og-image.png`,
-            description: v.excerpt || v.title,
+            description: escapeXml(v.excerpt || v.title),
             content_loc: v.video_url,
-            publication_date: `${v.date}T07:00:00+09:00`,
+            publication_date: v.published_at || `${v.date}T07:00:00+09:00`,
             family_friendly: 'yes',
           },
         ],
@@ -210,9 +225,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           : {
               videos: [
                 {
-                  title: it.title,
+                  title: escapeXml(it.title),
                   thumbnail_loc: resolved?.autoThumbnailUrl || `${BASE}/og-image.png`,
-                  description: it.excerpt || it.title,
+                  description: escapeXml(it.excerpt || it.title),
                   ...(resolved ? { player_loc: resolved.embedUrl } : { content_loc: it.mediaEmbedUrl }),
                   publication_date: `${it.date}T07:00:00+09:00`,
                   family_friendly: 'yes',
