@@ -85,14 +85,25 @@ echo "  배포 완료 대기 중..."
 aws ecs wait services-stable --cluster "$CLUSTER" --services "$CLUSTER" --region "$REGION"
 lap "롤링 안정화 대기"
 
+# CloudFront 캐시 무효화(2026-10-01) — 배포 직후 옛 빌드의 HTML·RSC 페이로드가 캐시에 남아(실측: /start RSC가 12시간 전 것) 옛 폰트 참조 등이
+# 계속 내려갔다. 경로 "/*"는 1경로로 계산되어 월 1,000경로까지 무료다. 실패해도 배포 자체는 성공이므로 경고만 낸다.
+# (이미지 변환 캐시도 같이 비워져 배포 직후 첫 요청은 다시 변환된다 — 서버 디스크 캐시와 CloudFront가 곧 다시 채운다.)
+CF_DIST_ID="E1QS7PY350VHF6"
+echo ""
+echo "=== CloudFront 캐시 무효화 ==="
+aws cloudfront create-invalidation --distribution-id "$CF_DIST_ID" --paths "/*" --query 'Invalidation.[Id,Status]' --output text \
+  || echo "WARNING: CloudFront 무효화 실패 — 수동으로 실행하거나 최대 5분(TTL) 기다릴 것." >&2
+lap "CloudFront 무효화 요청"
+
 ALB_DNS=$(aws elbv2 describe-load-balancers --names sedaily-lens-frontend-alb \
   --region "$REGION" --query "LoadBalancers[0].DNSName" --output text)
 echo ""
 echo "=== 헬스체크 (ALB 직접) ==="
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://${ALB_DNS}/")
+# 로컬(사무실 IP)에서는 ALB로 직접 못 닿아 시간 초과가 날 수 있다 — set -e로 스크립트가 죽지 않게 || true(2026-10-01).
+HTTP_CODE=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" "http://${ALB_DNS}/" || true)
 echo "  http://${ALB_DNS}/ → $HTTP_CODE"
 if [ "$HTTP_CODE" != "200" ]; then
-  echo "WARNING: 헬스체크가 200이 아님 — 수동 확인 필요." >&2
+  echo "WARNING: ALB 직접 헬스체크가 200이 아님(로컬에서 ALB에 닿지 않을 수 있음) — https://ailens.sedaily.ai 로 확인할 것." >&2
 fi
 
 echo ""
