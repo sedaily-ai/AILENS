@@ -1,8 +1,11 @@
 'use client';
 
+import { Fragment } from 'react';
+
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { chapterId } from './lensChapters';
+import { parseLetterBlocks } from './lensBlocks';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
@@ -51,6 +54,15 @@ function splitSentences(text: string): string[] {
 // 탭이 sticky로 항상 떠 있고 이미 진행 인디케이터를 보여주므로 본문 끝마다
 // 같은 안내를 반복할 필요가 없다는 판단, 게다가 항상 다음 인덱스 하나만
 // 가리켜서 탭을 건너뛰어 온 사용자에겐 안내가 틀렸었다).
+// 인라인 마크다운(**굵게**, *기울임*) — 기호가 그대로 보이지 않게 풀고, 나머지 글자에는 용어 하이라이트를 입힌다.
+function renderInline(text: string, kw: Parameters<typeof wrapWithTerms>[1]) {
+  return text.split(/(\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*)/g).map((part, i) => {
+    if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={i}>{wrapWithTerms(part.slice(2, -2), kw)}</strong>;
+    if (/^\*[^*]+\*$/.test(part)) return <em key={i}>{wrapWithTerms(part.slice(1, -1), kw)}</em>;
+    return <Fragment key={i}>{wrapWithTerms(part, kw)}</Fragment>;
+  });
+}
+
 export function LensFormatPanel({
   lens,
   l,
@@ -187,51 +199,63 @@ export function LensFormatPanel({
       {format === 'letter' && letterParagraphs && (
         <article data-letter-body>
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
-            {(() => {
-              // 소제목 → 번호 + 세리프 제목 + 연한 질문의 2단 구획(2026-10-01 개편). "소제목: 질문?" 형태면 콜론 앞이
-              // 제목, 뒤가 질문이다. id는 오른쪽 구간 목차(ArticleChapterNav)가 점프·현재 구간을 잡는 앵커.
-              // "##" 마커는 떼고(마크다운 기호가 그대로 보이면 버그처럼 보임), "◾"도 같은 역할이라 같이 처리한다.
-              let subNo = 0;
+            {/* 본문 블록 렌더(2026-10-01) — parseLetterBlocks가 소제목·목록·인용·구분선을 읽어 풀어 주므로 프롬프트
+                출력 형식이 달라져도 기호가 그대로 새지 않는다. 소제목 id는 오른쪽 구간 목차의 앵커. */}
+            {parseLetterBlocks(letterParagraphs, { headline: lens.headline }).map((b, bi) => {
               const kw = l.keywords ?? [];
-              return letterParagraphs.map((para, pi) => {
-                const isHashSub = para.startsWith('##');
-                const text = isHashSub ? para.replace(/^##\s*/, '') : para;
-                const isSub = para.startsWith('◾') || isHashSub;
-                if (isSub) {
-                  const n = subNo++;
-                  const body = text.replace(/^◾\s*/, '');
-                  const [head, ...rest] = body.split(/[:：]/);
-                  const question = rest.join(':').trim();
+              switch (b.type) {
+                case 'lead':
                   return (
-                    <h3 key={pi} id={chapterId(n)} className="lread-sub">
-                      <span className="ch-no">{String(n + 1).padStart(2, '0')}</span>
-                      <span className="ch-t">{wrapWithTerms(head.trim(), kw)}</span>
-                      {question && <span className="ch-q">{wrapWithTerms(question, kw)}</span>}
+                    <p key={bi} className="lread-lead">
+                      {renderInline(b.text, kw)}
+                    </p>
+                  );
+                case 'sub':
+                  return (
+                    <h3 key={bi} id={chapterId(b.no)} className="lread-sub">
+                      <span className="ch-no">{String(b.no + 1).padStart(2, '0')}</span>
+                      <span className="ch-t">{renderInline(b.head, kw)}</span>
+                      {b.question && <span className="ch-q">{renderInline(b.question, kw)}</span>}
                     </h3>
                   );
-                }
-                let body = pi === 0 ? displayHeadline(text) : text;
-                if (pi === 0) {
-                  // 10/1 발행분부터 첫 문단이 "제목 + 부제" 한 줄로 나온다 — 그대로 두면 맨 위 제목이 도입 문단에서
-                  // 한 번 더 반복된다. 제목 부분은 떼고 부제(도입 문장)만 남기고, 남는 게 없으면 문단 자체를 숨긴다.
-                  const h = displayHeadline(lens.headline).trim();
-                  if (h && body.startsWith(h)) body = body.slice(h.length).trim();
-                  if (!body) return null;
-                }
-                return (
-                  <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
-                    {wrapWithTerms(body, kw)}
-                  </p>
-                );
-              });
-            })()}
+                case 'ul':
+                  return (
+                    <ul key={bi}>
+                      {b.items.map((it, ii) => (
+                        <li key={ii}>{renderInline(it, kw)}</li>
+                      ))}
+                    </ul>
+                  );
+                case 'ol':
+                  return (
+                    <ol key={bi}>
+                      {b.items.map((it, ii) => (
+                        <li key={ii}>{renderInline(it, kw)}</li>
+                      ))}
+                    </ol>
+                  );
+                case 'quote':
+                  return <blockquote key={bi}>{renderInline(b.text, kw)}</blockquote>;
+                case 'hr':
+                  return (
+                    <div key={bi} className="lread-hr" aria-hidden>
+                      ···
+                    </div>
+                  );
+                default:
+                  return <p key={bi}>{renderInline(b.text, kw)}</p>;
+              }
+            })}
             {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:
                 "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
                 신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +
                 발신인 라벨로 뉴스레터 서명처럼 닫는다. */}
-            <div aria-hidden className="lread-sign">
-              <span className="lread-sign-mark" style={{ background: p.color }} />
-              <span className="lread-sign-name">AI LENS 레터</span>
+            <div className="lread-sign">
+              <p className="lread-thanks">끝까지 읽어주셔서 고마워요.</p>
+              <p className="lread-from">
+                <span className="lread-sign-mark" style={{ background: p.color }} aria-hidden />
+                <span className="lread-sign-name">AI LENS 편집팀</span>
+              </p>
             </div>
           </div>
           {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}

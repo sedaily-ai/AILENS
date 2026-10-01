@@ -1,5 +1,6 @@
-// 레터 본문의 소제목("## 소제목: 질문?" / "◾ 소제목")을 "구간"으로 뽑는다(2026-10-01, 챕터 내비게이션).
-// 소제목 마커 규칙은 LensFormatPanel(렌더)·publish_utils.parse_letters(파이프라인)와 같다.
+// 레터 본문의 소제목을 "구간"으로 뽑는다(2026-10-01, 챕터 내비게이션). 파싱은 렌더러와 같은 parseLetterBlocks를 써서
+// 목차와 본문 소제목이 항상 일치한다(마크다운 변형·빈 소제목도 같은 규칙으로 처리).
+import { parseLetterBlocks } from './lensBlocks';
 
 export interface LensChapter {
   /** 본문 소제목에 붙는 앵커 id. */
@@ -12,23 +13,10 @@ export interface LensChapter {
 
 export const chapterId = (n: number) => `lens-ch-${n}`;
 
-export function isSubPara(para: string): boolean {
-  return para.startsWith('##') || para.startsWith('◾');
-}
-
-export function subText(para: string): string {
-  return para.replace(/^(?:##|◾)\s*/, '').trim();
-}
-
 export function letterChapters(paragraphs?: string[] | null): LensChapter[] {
-  if (!paragraphs) return [];
-  const out: LensChapter[] = [];
-  for (const para of paragraphs) {
-    if (!isSubPara(para)) continue;
-    const full = subText(para);
-    if (!full) continue;
-    const head = full.split(/[:：]/)[0].trim();
-    out.push({ id: chapterId(out.length), label: head.length >= 2 ? head : full, full });
-  }
-  return out;
+  return parseLetterBlocks(paragraphs).flatMap((b) =>
+    b.type === 'sub'
+      ? [{ id: chapterId(b.no), label: b.head, full: b.question ? `${b.head}: ${b.question}` : b.head }]
+      : [],
+  );
 }
