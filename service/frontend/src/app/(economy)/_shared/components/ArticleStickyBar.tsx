@@ -10,6 +10,10 @@ import { displayHeadline } from '@/shared/lib/displayHeadline';
 // 그대로 유효하다. 진행선은 기사 본문(main) 기준으로 계산하고 리렌더 없이 transform으로만 갱신한다.
 
 const BAR_HEIGHT = 57;
+const MILESTONES = [
+  { at: 0.5, text: '절반 읽었어요' },
+  { at: 0.85, text: '거의 다 왔어요' },
+];
 
 export function ArticleStickyBar({
   category,
@@ -25,6 +29,9 @@ export function ArticleStickyBar({
 }) {
   const [show, setShow] = useState(false);
   const [remain, setRemain] = useState<string | null>(null);
+  const [cheer, setCheer] = useState<string | null>(null);
+  const passed = useRef<Set<number> | null>(null);
+  const cheerTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const progressRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,6 +54,21 @@ export function ArticleStickyBar({
         const read = Math.min(br.height, Math.max(0, window.innerHeight * 0.6 - br.top));
         const left = readMin * (1 - read / br.height);
         setRemain(left <= 0.4 ? '다 읽었어요' : `남은 약 ${Math.max(1, Math.ceil(left))}분`);
+        // 가볍게 친근한 격려(2026-10-01) — 절반·거의 끝에 닿는 순간 2.6초만 한 줄. 처음 열 때 이미 지난 구간은 조용히 넘긴다
+        // (이어 읽기로 중간에 들어왔을 때 갑자기 격려하지 않게).
+        const frac = read / br.height;
+        if (!passed.current) {
+          passed.current = new Set(MILESTONES.filter((m) => frac >= m.at).map((m) => m.at));
+        } else {
+          for (const m of MILESTONES) {
+            if (frac >= m.at && !passed.current.has(m.at)) {
+              passed.current.add(m.at);
+              setCheer(m.text);
+              if (cheerTimer.current) clearTimeout(cheerTimer.current);
+              cheerTimer.current = setTimeout(() => setCheer(null), 2600);
+            }
+          }
+        }
       } else {
         setRemain(null);
       }
@@ -67,6 +89,9 @@ export function ArticleStickyBar({
   return (
     <>
       <style>{`
+        .sbar-cheer { color: #111827; font-weight: 800; }
+        @media (prefers-reduced-motion: no-preference) { .sbar-cheer { animation: sbar-cheer-in .35s cubic-bezier(.22,.85,.2,1); }
+          @keyframes sbar-cheer-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } } }
         .sbar-remain { flex-shrink: 0; margin-left: 4px; font-size: 12.5px; font-weight: 600; color: #6b7280; font-variant-numeric: tabular-nums; }
         .sbar { position: fixed; top: 0; left: 0; right: 0; height: ${BAR_HEIGHT}px; z-index: 110; background: #fff;
           border-bottom: 1px solid #e5e7eb; transform: translateY(-100%); visibility: hidden;
@@ -102,7 +127,11 @@ export function ArticleStickyBar({
           >
             {displayHeadline(title)}
           </button>
-          {remain && <span className="sbar-remain">{remain}</span>}
+          {(cheer ?? remain) && (
+            <span key={cheer ?? 'remain'} className={cheer ? 'sbar-remain sbar-cheer' : 'sbar-remain'}>
+              {cheer ?? remain}
+            </span>
+          )}
         </div>
         <div ref={progressRef} className="sbar-prog" aria-hidden />
       </div>

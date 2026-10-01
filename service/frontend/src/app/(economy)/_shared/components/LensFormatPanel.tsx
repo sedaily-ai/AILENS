@@ -5,6 +5,7 @@ import { Fragment } from 'react';
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { chapterId } from './lensChapters';
+import { ReadDone } from './ReadDone';
 import { lensPath } from '@/shared/lib/lensUrl';
 import { SITE_URL } from '@/shared/constants/site';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
@@ -22,7 +23,7 @@ import {
   lensTabId,
 } from '@/shared/constants/lensPerspectives';
 import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
-import { ARTICLE_FORMAT_SAMPLES, articleFormatSample } from './lensSamples';
+import { ARTICLE_FORMAT_SAMPLES, articleFormatSample, readMinutes } from './lensSamples';
 import { CardnewsCarousel } from './CardnewsCarousel';
 
 // 2026-09-28, 사용자 요청 — "문장 끝날 때... 줄바꿈... 문맥에 맞게 줄바꿈을
@@ -253,6 +254,7 @@ export function LensFormatPanel({
                 "레터 형식에 맞게 디자인 요소 추가"). 앞선 ■ 하나는 "기사 끝"
                 신호일 뿐 편지 느낌을 주지 못했다. 얇은 룰 + 형식 색 마크 +
                 발신인 라벨로 뉴스레터 서명처럼 닫는다. */}
+            <ReadDone minutes={readMinutes(letterParagraphs.join('').length)} />
             <div className="lread-sign">
               <p className="lread-thanks">끝까지 읽어주셔서 고마워요.</p>
               <p className="lread-from">
