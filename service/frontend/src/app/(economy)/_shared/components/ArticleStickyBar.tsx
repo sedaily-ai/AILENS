@@ -10,6 +10,12 @@ import Link from 'next/link';
 
 const BAR_HEIGHT = 57;
 
+// 발행 제목은 "산업 | 노로바이러스 백신 개발…"처럼 앞에 분류 접두어가 붙는 형태라, 바에서 카테고리와
+// 나란히 놓으면 "산업 산업 |"로 겹쳐 보인다 — 바에서는 접두어(짧은 단어 + 파이프)를 뗀 제목만 쓴다.
+function stripCategoryPrefix(title: string): string {
+  return title.replace(/^\s*[^|｜]{1,8}\s*[|｜]\s*/, '') || title;
+}
+
 export function ArticleStickyBar({
   category,
   categoryHref,
@@ -84,7 +90,7 @@ export function ArticleStickyBar({
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             title="맨 위로"
           >
-            {title}
+            {stripCategoryPrefix(title)}
           </button>
         </div>
         <div ref={progressRef} className="sbar-prog" aria-hidden />
