@@ -36,10 +36,12 @@ export function ArticleChapterNav({
       const heads = chapters.map((c) => document.getElementById(c.id));
       if (heads.some((h) => !h)) return;
       const tops = heads.map((h) => (h as HTMLElement).getBoundingClientRect().top);
-      // 지금 구간 = 헤더 아래(150px)를 지난 마지막 소제목. 아직 첫 소제목 전이면 0.
+      // 지금 구간 = 화면 38% 지점(독자의 시선이 머무는 위치)을 지난 마지막 소제목. 아직 첫 소제목 전이면 0.
+      // (예전엔 고정 바 아래 150px을 기준으로 해서, 소제목이 화면 중간에 보여도 목차가 한 구간 늦게 바뀌었다.)
+      const eye = window.innerHeight * 0.38;
       let cur = 0;
       tops.forEach((t, i) => {
-        if (t <= 150) cur = i;
+        if (t <= eye) cur = i;
       });
       setActive(cur);
       const body = document.querySelector('[data-letter-body]');

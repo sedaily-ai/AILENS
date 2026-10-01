@@ -435,6 +435,7 @@ export function LensViewClient({
         .lread { max-width: 720px; }
         .lread > p, .lread > ul, .lread > ol, .lread > blockquote { font-size: calc(17px * var(--lens-font-scale, 1));
           line-height: 1.9; letter-spacing: -0.005em; color: #1f2937; word-break: keep-all; }
+        .lread > p { text-wrap: pretty; }
         .lread > * + * { margin-top: 1.4em; }
         .lread > p.lread-lead { font-size: calc(19.5px * var(--lens-font-scale, 1)); line-height: 1.8; font-weight: 500; color: #111827; }
         .lread strong { font-weight: 700; color: #111827; }
@@ -452,6 +453,7 @@ export function LensViewClient({
         .lread > .lread-sub + * { margin-top: 0; }
         .lread-sub .ch-no { display: block; margin-bottom: 9px; font-size: 12px; font-weight: 800; letter-spacing: 0.1em;
           color: var(--lc, #111827); font-variant-numeric: tabular-nums; }
+        .lread-sub .ch-t, .lread-sub .ch-q { text-wrap: balance; }
         .lread-sub .ch-t { display: block; font-family: "Noto Serif KR", serif; font-size: calc(25px * var(--lens-font-scale, 1));
           font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; color: #111827; word-break: keep-all; }
         .lread-sub .ch-q { display: block; margin-top: 7px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.55;
@@ -461,6 +463,9 @@ export function LensViewClient({
         .lread-thanks { margin: 0 0 14px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; color: #374151; font-weight: 500; }
         .lread-from { display: flex; align-items: center; gap: 10px; margin: 0; }
         .lread-sign-mark { flex-shrink: 0; width: 22px; height: 3px; border-radius: 999px; }
+        /* 글 끝 공유(2026-10-01) — 모바일엔 왼쪽 도구 레일이 없어 글을 다 읽고도 공유할 곳이 없었다. */
+        .lread-share { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 28px; }
+        .lread-share-label { font-size: 13.5px; color: #6b7280; }
         .lread-sign-name { font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: #6b7280; }
 
         .hang { display: flex; flex-direction: column; gap: 20px;

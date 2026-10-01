@@ -5,6 +5,9 @@ import { Fragment } from 'react';
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { chapterId } from './lensChapters';
+import { lensPath } from '@/shared/lib/lensUrl';
+import { SITE_URL } from '@/shared/constants/site';
+import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { parseLetterBlocks } from './lensBlocks';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
@@ -256,6 +259,10 @@ export function LensFormatPanel({
                 <span className="lread-sign-mark" style={{ background: p.color }} aria-hidden />
                 <span className="lread-sign-name">AI LENS 편집팀</span>
               </p>
+              <div className="lread-share">
+                <span className="lread-share-label">친구에게 공유하기</span>
+                <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
+              </div>
             </div>
           </div>
           {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} />}
