@@ -358,9 +358,22 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
             break
         if line.startswith("-"):
             bullets.append(line.lstrip("-").strip())
-        elif bullets:
+        elif bullets and not _ends_sentence(bullets[-1]):
             bullets[-1] = f"{bullets[-1]} {line}".strip()
-    return bullets
+        # else: 직전 불릿이 문장 종결로 끝났는데 "-" 없는 줄이 왔다면 줄바꿈
+        # 이어쓰기가 아니다 — 불릿 블록과 "## 본문" 사이의 도입부 문단이다
+        # (2026-10-01 오후, 레터 출력 순서가 "불릿 → 도입부 → ##본문"으로 바뀐
+        # 뒤 36건 전부 도입부가 마지막 불릿에 붙은 실제 버그). 무시한다.
+    # "자료: 서울경제신문(...)" 출처 줄은 요약 불릿이 아니다 — 같은 날부터
+    # 모델이 불릿 형식으로 출력해 5번째 "30초 핵심" 항목으로 새고 있었다.
+    return [b for b in bullets if not b.startswith("자료")]
+
+
+def _ends_sentence(text: str) -> bool:
+    """불릿이 완결 문장으로 끝났는지. 따옴표·괄호 닫힘을 건너뛰고 마지막
+    글자가 . ! ? 면 완결로 본다 — 모델이 긴 불릿을 두 줄로 나눌 때는
+    문장 중간에서 끊기므로(2026-09-04 이어붙이기 규칙의 대상) 구분된다."""
+    return text.rstrip(" \"'”’)」』]").endswith((".", "!", "?", "。"))
 
 
 def parse_letter_terms(raw_md: str) -> list[dict]:
