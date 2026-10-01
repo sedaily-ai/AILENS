@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
+import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { chapterId } from './lensChapters';
 import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
@@ -169,7 +170,7 @@ export function LensFormatPanel({
       {/* 질문 — 카드 안 시각적 정점. 네 형식의 첫 줄 무게를 하나로 맞춘다 —
           탭을 옮길 때마다 첫 줄 크기가 뛰면 "같은 대상의 다른 표면"이
           아니라 "다른 페이지"로 느껴진다. */}
-      {format === 'letter' && l.question && <p className="fmt-lede">{l.question}</p>}
+      {format === 'letter' && l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
 
       {/* 레터 본문 — 편집 지면 톤(읽기 폭 620px 상한 + 첫 문단 리드인 +
           문단 간격 24px). AI LENS 편집장 프롬프트의 문체 가이드(친근한
@@ -200,7 +201,7 @@ export function LensFormatPanel({
                   id={isSub ? chapterId(subNo++) : undefined}
                   className={isSub ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined}
                 >
-                  {wrapWithTerms(text, l.keywords ?? [])}
+                  {wrapWithTerms(pi === 0 && !isSub ? displayHeadline(text) : text, l.keywords ?? [])}
                 </p>
               );
               });
@@ -328,7 +329,7 @@ export function LensFormatPanel({
         <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
           <iframe
             src={realPodcast.embedUrl}
-            title={l.question || '팟캐스트'}
+            title={displayHeadline(l.question) || '팟캐스트'}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
@@ -347,7 +348,7 @@ export function LensFormatPanel({
           accent={p.color}
           label={p.short}
           kicker="AI 음성 브리핑"
-          title={l.question || '오늘의 브리핑'}
+          title={displayHeadline(l.question) || '오늘의 브리핑'}
           coverImage={photo}
           byline={lens.source_url ? '서울경제 원문 기사' : null}
           bylineHref={lens.source_url}
@@ -360,7 +361,7 @@ export function LensFormatPanel({
           걷어내고, 실제로 존재하는 것(대본)만 밝혀 보여준다. */}
       {format === 'podcast' && !hasPodcast && (
         <div>
-          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
           {scriptBullets.length > 0 && (
             <ol className="hang lread">
               {scriptBullets.map((b, bi) => (
@@ -397,11 +398,11 @@ export function LensFormatPanel({
           플레이어를 임베드한다. */}
       {format === 'video' && realVideo && (
         <div>
-          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
           <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 14, background: '#111827' }}>
             <iframe
               src={realVideo.embedUrl}
-              title={l.question || '영상'}
+              title={displayHeadline(l.question) || '영상'}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -425,7 +426,7 @@ export function LensFormatPanel({
           accent={p.color}
           label={p.short}
           kicker="AI 영상 브리핑"
-          title={l.question || '오늘의 영상'}
+          title={displayHeadline(l.question) || '오늘의 영상'}
           byline={lens.source_url ? '서울경제 원문 기사' : null}
           bylineHref={lens.source_url}
           onDuration={(sec) => noteDur(i, sec)}
@@ -436,7 +437,7 @@ export function LensFormatPanel({
           걷어냈다. 남긴 것: 실제로 있는 대본. */}
       {format === 'video' && !hasVideo && (
         <div>
-          {l.question && <p className="fmt-lede">{l.question}</p>}
+          {l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
           {scriptBullets.length > 0 && (
             <ol className="hang lread">
               {scriptBullets.map((b, bi) => (

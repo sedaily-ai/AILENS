@@ -331,10 +331,20 @@ export function LensViewClient({
           background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 6px 20px rgba(17,24,39,0.08); }
         .badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px;
           font-size: 11.5px; font-weight: 700; color: ${LENS_ACCENT}; background: ${LENS_ACCENT}14; vertical-align: 1px; }
-        .sum { border-top: 2px solid #111827; background: #f7f6f2; padding: 18px 24px 22px; margin-top: 8px; }
-        .sum-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-        .sum-title { font-size: 13px; font-weight: 800; letter-spacing: 0.08em; color: #111827; }
-        .sum-note { font-size: 12px; color: #6b7280; }
+        /* "30초 핵심" 요약 카드(2026-10-01 재디자인) — 굵은 윗선·베이지 박스·■ 마커·"AI 요약" 문구를 걷어내고
+           Toss식 부드러운 라운드 카드로. 테두리 없이 면(연한 회색)과 여백으로만 구분하고, 번호는 작은 원형 배지.
+           AI 고지는 바이라인·하단 AiDisclaimer가 이미 맡으므로 요약 안엔 "AI 요약" 표기를 두지 않는다. */
+        .sum { margin-top: 12px; padding: clamp(24px, 3.4vw, 34px) clamp(22px, 3.6vw, 36px) clamp(26px, 3.6vw, 36px);
+          background: #f6f7f9; border-radius: 20px; }
+        .sum-head { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+        .sum-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sum-accent); flex-shrink: 0; }
+        .sum-title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.015em; color: #111827; }
+        .sum-list { display: flex; flex-direction: column; gap: 18px; list-style: none; padding: 0; margin: 0; }
+        .sum-item { display: flex; align-items: flex-start; gap: 14px; word-break: keep-all; }
+        .sum-n { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; margin-top: 2px; border-radius: 50%;
+          background: #fff; color: var(--sum-accent); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+          box-shadow: 0 1px 3px rgba(17,24,39,0.10); }
+        .sum-t { font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; letter-spacing: -0.01em; color: #1f2937; }
         .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #6b7280; margin: 0 0 12px; }
         .eyebrow a { color: inherit; text-decoration: none; }
         .eyebrow a:hover { color: #111827; text-decoration: underline; text-underline-offset: 3px; }
@@ -653,21 +663,18 @@ export function LensViewClient({
           {!photo && sourceLink && <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{sourceLink}</div>}
 
           {coreSummaryBullets(lens).length > 0 && (
-            <div data-speakable="summary" className="sum">
+            <div data-speakable="summary" className="sum" style={{ ['--sum-accent' as string]: lensPerspectiveAt(0).color }}>
               <div className="sum-head">
-                <p className="sum-title">■ 30초 핵심</p>
-                <p className="sum-note">AI 요약 · 편집팀 검수</p>
+                <span className="sum-dot" aria-hidden />
+                <p className="sum-title">30초 핵심</p>
               </div>
-              <ol style={{ display: 'flex', flexDirection: 'column', gap: 14, listStyle: 'none', padding: 0, margin: 0 }}>
-                {coreSummaryBullets(lens).map((s, si) => (
-                  <li key={si} style={{ display: 'flex', alignItems: 'baseline', gap: 14, wordBreak: 'keep-all' }}>
-                    <span
-                      aria-hidden
-                      style={{ flexShrink: 0, width: 20, fontSize: 14, fontWeight: 800, color: '#6b7280', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.02em' }}
-                    >
-                      {String(si + 1).padStart(2, '0')}
+              <ol className="sum-list">
+                {coreSummaryBullets(lens).map((t, si) => (
+                  <li key={si} className="sum-item">
+                    <span className="sum-n" aria-hidden>
+                      {si + 1}
                     </span>
-                    <span style={{ fontSize: 'calc(16px * var(--lens-font-scale, 1))', lineHeight: 1.7, color: '#1f2937' }}>{s}</span>
+                    <span className="sum-t">{t}</span>
                   </li>
                 ))}
               </ol>
