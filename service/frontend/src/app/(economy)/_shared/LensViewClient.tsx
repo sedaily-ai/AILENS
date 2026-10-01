@@ -375,71 +375,36 @@ export function LensViewClient({
            2026-08-24 — 룰을 3 → 2px로 얇혔다(사용자 요청: "스트록이 좀 더
            얇아져야"). 대비는 색 기준이라 두께와 무관(앰버 3.19:1 유지).
            바 높이 = 8(위 패딩) + 60(탭: 8+20+4+20+8) + 2(룰) + 1(경계선) = 71px. */
-        .fmt-bar { position: sticky; top: 56px; z-index: 20; background: #fff;
-          padding: 8px 0 2px; border-bottom: 1px solid rgba(17,24,39,0.12); }
-        .fmt-row { position: relative; display: grid; gap: 8px;
+        /* 형식 선택기(2026-10-01 개편) — 밑줄 탭 → 둥근 회색 트랙 위의 흰색 알약 세그먼트(Toss식).
+           테두리 없이 면 + 부드러운 그림자로만 선택을 보여 준다. 선택된 알약이 칸 사이를 미끄러진다.
+           바 높이 = 위 패딩 10 + 트랙(4 + 56 + 4) + 아래 패딩 10 = 84px. */
+        .fmt-bar { position: sticky; top: 57px; z-index: 20; background: #fff; padding: 10px 0; }
+        .fmt-bar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -16px; height: 16px; pointer-events: none;
+          background: linear-gradient(#fff, rgba(255,255,255,0)); }
+        .fmt-row { position: relative; display: grid; gap: 0; padding: 4px; background: #f2f3f5; border-radius: 16px;
           grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
-
-        .fmt-thumb { position: absolute; inset: 0 auto 0 0; pointer-events: none;
-          width: calc((100% - (var(--n) - 1) * 8px) / var(--n));
-          transform: translateX(calc(var(--ai) * (100% + 8px)));
-          border-radius: 10px 10px 0 0;
-          /* 2026-08-24 (재조정) — 탭 칸 전체를 틴트로 채우던 방식은 "칠한
-             사각형"처럼 무거워 보였다(사용자: "이상해, 더 세련되고 고급지게").
-             편집형 지면의 고급 세그먼트 탭처럼 채움을 거의 없애고, 밑줄에서
-             아주 은은하게 피어오르는 바텀 글로우만 남긴다 — 위쪽 55%는 완전
-             투명, 맨 아래만 형식 색 9% 워시라 "칠한 블록"이 아니라 "밑줄에서
-             배어나온 빛"으로 읽힌다. 활성 라벨(#111827)은 투명 구간에 놓여
-             대비가 흰 배경 그대로다.
-             color-mix 미지원 브라우저는 앞 줄의 soft 틴트로 폴백. */
-          background: var(--t);
-          background: linear-gradient(180deg,
-            transparent 0%, transparent 48%,
-            color-mix(in srgb, var(--c) 14%, #ffffff) 100%);
+        .fmt-thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; pointer-events: none; z-index: 0;
+          width: calc((100% - 8px) / var(--n)); transform: translateX(calc(var(--ai) * 100%));
+          background: #fff; border-radius: 12px;
+          box-shadow: 0 1px 2px rgba(17,24,39,0.08), 0 4px 12px -2px rgba(17,24,39,0.10);
           transition: transform .3s cubic-bezier(.22,.85,.2,1); }
-        /* 컬러 룰 — 2026-08-24, 원색이 쨍해서 흰색을 섞어 파스텔로 낮췄다
-           (사용자: "색이 더 파스텔 톤이여도 될 것 같아"). 파스텔이라 밑줄
-           단독 대비는 3:1 아래로 내려가지만, 선택 상태는 굵은 잉크 라벨(800)
-           + 바텀 글로우 채움으로도 함께 전달돼 색에만 의존하지 않는다.
-           2px + 파스텔 색의 부드러운 글로우로 은은하게 떠 보이게 한다. */
-        .fmt-thumb::after { content: ''; position: absolute; left: 0; right: 0; bottom: -2px;
-          height: 2px; border-radius: 2px 2px 0 0;
-          background: color-mix(in srgb, var(--c) 62%, #ffffff);
-          box-shadow: 0 1px 9px -1px color-mix(in srgb, var(--c) 34%, transparent); }
-
-        .fmt { position: relative; z-index: 1; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; gap: 4px;
-          min-height: 56px; padding: 8px 4px; border: none; background: none;
-          border-radius: 10px 10px 0 0; cursor: pointer; }
-        .fmt-name { font-size: 14px; font-weight: 600; color: #374151;
-          letter-spacing: -0.01em; white-space: nowrap; transition: color .2s ease; }
-        .fmt-amt { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #6b7280;
-          font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .2s ease; }
-        /* 형식 손그림 아이콘(LensFormatArt) — 2026-08-24, 이모지 대체.
-           currentColor를 따르므로 비활성은 아래 .fmt-amt 회색, 활성은
-           형식 색으로 물든다(아래 규칙).
-           2026-10-01 — 비활성 탭 아이콘·이름 색을 한 톤씩 진하게(#9ca3af→
-           #6b7280, #6b7280→#374151, 사용자 피드백: "다른 3개 탭이 존재감이
-           너무 약해서 안 눌러보고 싶게 생겼다"). 색 채움(배경 틴트)을 다시
-           키우는 대신 텍스트·아이콘 자체의 명도만 올려 "선택됨 vs 비선택"
-           대비는 유지하면서 비선택 탭도 또렷하게 읽히게 했다 — 과거 "칠한
-           사각형처럼 무겁다" 피드백으로 뺐던 배경 채움은 그대로 둔다. */
-        .fmt-art { display: inline-flex; flex-shrink: 0; color: #6b7280; }
+        .fmt { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+          min-height: 56px; padding: 8px 4px; border: none; background: none; border-radius: 12px; cursor: pointer; }
+        .fmt-name { font-size: 14px; font-weight: 600; color: #6b7280; letter-spacing: -0.01em; white-space: nowrap; transition: color .2s ease; }
+        .fmt-amt { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: #9ca3af; font-variant-numeric: tabular-nums;
+          white-space: nowrap; transition: color .2s ease; }
+        .fmt-art { display: inline-flex; flex-shrink: 0; color: #9ca3af; transition: color .2s ease; }
+        .fmt[aria-selected='true'] .fmt-name { color: #111827; font-weight: 800; }
+        .fmt[aria-selected='true'] .fmt-amt { color: #6b7280; }
         .fmt[aria-selected='true'] .fmt-art { color: var(--c); }
-        .fmt[aria-selected='false']:hover .fmt-art { color: #374151; }
-        /* 선택된 형식은 이름이 그 형식 색으로 물든다(2026-08-24, 사용자 요청:
-           "레터 누르면 레터 텍스트가 보라색으로"). --c는 활성 형식 색이고
-           활성 탭만 aria-selected=true라 정확히 그 탭에만 적용된다. 볼드(800)
-           14px라 3:1 기준 대상 — 네 브랜드 색 모두 흰 배경에서 통과한다. */
-        .fmt[aria-selected='true'] .fmt-name { color: var(--c); font-weight: 800; }
-        .fmt[aria-selected='true'] .fmt-amt { color: #4b5563; }
-        .fmt[aria-selected='false']:hover .fmt-name,
-        .fmt[aria-selected='false']:hover .fmt-amt { color: #111827; }
+        .fmt[aria-selected='false']:hover .fmt-name { color: #111827; }
+        .fmt[aria-selected='false']:hover .fmt-art, .fmt[aria-selected='false']:hover .fmt-amt { color: #6b7280; }
         .fmt:focus-visible { outline: 2px solid #111827; outline-offset: -2px; }
         @media (max-width: 359px) {
           .fmt { padding: 8px 2px; }
-          .fmt-amt { font-size: 13px; gap: 2px; }
+          .fmt-amt { font-size: 12px; gap: 2px; }
         }
+        .fmt-sub { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: #6b7280; letter-spacing: -0.01em; }
 
         .fmt-toast { display: flex; align-items: flex-start; gap: 8px;
           margin-top: 10px; padding: 12px 14px; border-radius: 12px;
@@ -464,29 +429,24 @@ export function LensViewClient({
            올려 폭 차이를 크게 줄이면서도 긴 산문 가독성(스티어링 25~40자
            권장에 근접)을 지킨다. 왼쪽 기준선은 그대로라 위 요소들과 시작선이
            일치하고, 넓어진 줄은 행간 1.85로 받친다. */
+        /* 레터 본문(2026-10-01 개편) — 드롭캡·반복 제목·작은 보라색 소제목을 걷고, 읽기 편한 큰 글씨와 넉넉한 여백으로.
+           본문 17px / 줄간격 1.95 / 단락 간격 1.5em, 도입 문단은 한 단계 크게. 소제목은 번호 + 세리프 제목 + 연한 질문
+           (잡지식 2단)으로 구획 전환이 또렷하게. 테두리 없이 여백과 타이포로만 구분한다. */
         .lread { max-width: 720px; }
-        .lread > p { font-size: calc(16px * var(--lens-font-scale, 1));
-          line-height: 1.85; color: #374151; word-break: keep-all; }
-        .lread > p + p { margin-top: 24px; }
-        .lread > p.lread-lead { font-size: calc(18px * var(--lens-font-scale, 1));
-          line-height: 1.8; color: #1f2937; }
-        /* 드롭캡(2026-08-24) — 편지·칼럼의 오프닝 관례. 첫 글자를 세리프로
-           크게 흘려 "읽는 편지"의 문을 연다. 형식 색(레터=보라, --lc는
-           .lread에 인라인으로 주입)으로 물들여 탭·인디케이터와 한 색으로
-           묶는다. ::first-letter는 부모의 커스텀 속성을 상속받는다. */
-        .lread > p.lread-lead::first-letter { float: left; font-family: "Noto Serif KR", serif;
-          font-size: 3em; line-height: 0.84; font-weight: 700;
-          color: var(--lc, #111827); margin: 6px 12px 0 0; }
-        /* 소제목(2026-09-23) — 모델이 만드는 "◾ 소제목" 줄. 예전엔 발행
-           직전에 통째로 버려져 본문이 소제목 없는 연속 프로즈로만 나갔다
-           (사용자 리포트: 실제 발행글 스크린샷엔 구획 표시가 전혀 없음).
-           본문 문단과 구분되도록 형식 색으로 볼드 처리 + 위쪽 여백을
-           늘려 섹션 전환처럼 보이게 한다. */
-        .lread > p.lread-sub { scroll-margin-top: 134px; font-weight: 700; font-size: calc(15px * var(--lens-font-scale, 1));
-          color: var(--lc, #111827); margin-top: 32px !important; }
-        /* 레터 사인오프 — 편지 서명. 형식 색 마크 + 발신인 + 위 얇은 룰. */
-        .lread-sign { display: flex; align-items: center; gap: 10px;
-          margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(17,24,39,0.1); }
+        .lread > p { font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.95; letter-spacing: -0.005em;
+          color: #1f2937; word-break: keep-all; margin: 0; }
+        .lread > p + p { margin-top: 1.5em; }
+        .lread > p.lread-lead { font-size: calc(19.5px * var(--lens-font-scale, 1)); line-height: 1.85; font-weight: 500; color: #111827; }
+        .lread > .lread-sub { scroll-margin-top: 160px; margin: 68px 0 22px; }
+        .lread > .lread-sub + p { margin-top: 0; }
+        .lread-sub .ch-no { display: block; margin-bottom: 10px; font-size: 12px; font-weight: 800; letter-spacing: 0.1em;
+          color: var(--lc, #111827); font-variant-numeric: tabular-nums; }
+        .lread-sub .ch-t { display: block; font-family: "Noto Serif KR", serif; font-size: calc(25px * var(--lens-font-scale, 1));
+          font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; color: #111827; word-break: keep-all; }
+        .lread-sub .ch-q { display: block; margin-top: 8px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.55;
+          font-weight: 500; color: #6b7280; word-break: keep-all; }
+        /* 레터 사인오프 — 형식 색 마크 + 발신인. 위쪽 룰(테두리)은 걷고 여백으로만. */
+        .lread-sign { display: flex; align-items: center; gap: 10px; margin-top: 64px; }
         .lread-sign-mark { flex-shrink: 0; width: 22px; height: 3px; border-radius: 999px; }
         .lread-sign-name { font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: #6b7280; }
 
@@ -504,7 +464,7 @@ export function LensViewClient({
         .fmt-arrow:focus-visible { outline: 2px solid #111827; outline-offset: 2px; }
 
         /* sticky 헤더(56px) + 형식 바(72px) + 여유 6px. */
-        .lens-panel { scroll-margin-top: 134px; }
+        .lens-panel { scroll-margin-top: 160px; }
 
         @media (prefers-reduced-motion: no-preference) {
           .panel[data-dir='1'] { animation: swap-fwd .24s cubic-bezier(.22,.85,.2,1); }
@@ -699,9 +659,12 @@ export function LensViewClient({
                 형식이 뭘 주는지 보여주면서 모달이 하는 말과 겹쳤다(모달
                 자체는 홈 티저 LensPreviewSection에서 계속 쓰인다 — 거기는
                 기사를 고르기 전이라 분량을 보여줄 수 없다). */}
-            <h2 className="ovl" style={{ margin: '32px 0 16px' }}>
-              어떻게 볼까요
-            </h2>
+            <div style={{ margin: '36px 0 6px' }}>
+              <h2 className="ovl" style={{ margin: 0 }}>
+                어떻게 볼까요?
+              </h2>
+              <p className="fmt-sub">같은 기사를 네 가지 방식으로 읽을 수 있어요</p>
+            </div>
 
             <FormatPicker lens={lens} lenses={lenses} active={active} mediaDur={mediaDur} select={select} onTabKeyDown={onTabKeyDown} tabRefs={tabRefs} />
 

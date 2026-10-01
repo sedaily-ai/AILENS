@@ -11,7 +11,7 @@ import { useEffect } from 'react';
 //  · 모션 줄이기 설정이면 아무것도 하지 않는다. 인쇄 시엔 전부 보이게.
 //  · 탭 전환으로 나중에 보이는 요소(웹툰·팟캐스트 패널)는 대상이 아니다 — 처음 렌더 시점의 요소만.
 
-const SELECTOR = '.lread > p.lread-sub, .af-sec';
+const SELECTOR = '.lread > .lread-sub, .af-sec';
 
 export function ArticleReveal() {
   useEffect(() => {

@@ -170,7 +170,12 @@ export function LensFormatPanel({
       {/* 질문 — 카드 안 시각적 정점. 네 형식의 첫 줄 무게를 하나로 맞춘다 —
           탭을 옮길 때마다 첫 줄 크기가 뛰면 "같은 대상의 다른 표면"이
           아니라 "다른 페이지"로 느껴진다. */}
-      {format === 'letter' && l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
+      {/* 맨 위 제목과 똑같은 문장이 탭 바로 아래에 한 번 더 나와 반복돼 보여서 눈에는 숨긴다(스크린리더·구조는 유지). */}
+      {format === 'letter' && l.question && (
+        <p className="fmt-lede" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+          {displayHeadline(l.question)}
+        </p>
+      )}
 
       {/* 레터 본문 — 편집 지면 톤(읽기 폭 620px 상한 + 첫 문단 리드인 +
           문단 간격 24px). AI LENS 편집장 프롬프트의 문체 가이드(친근한
@@ -183,27 +188,41 @@ export function LensFormatPanel({
         <article data-letter-body>
           <div className="lread" style={{ ['--lc' as string]: p.color } as CSSProperties}>
             {(() => {
-              // 소제목에 구간 앵커 id를 단다 — 오른쪽 목차(ArticleChapterNav)가 이 id로 점프·현재 구간을 잡는다.
+              // 소제목 → 번호 + 세리프 제목 + 연한 질문의 2단 구획(2026-10-01 개편). "소제목: 질문?" 형태면 콜론 앞이
+              // 제목, 뒤가 질문이다. id는 오른쪽 구간 목차(ArticleChapterNav)가 점프·현재 구간을 잡는 앵커.
+              // "##" 마커는 떼고(마크다운 기호가 그대로 보이면 버그처럼 보임), "◾"도 같은 역할이라 같이 처리한다.
               let subNo = 0;
+              const kw = l.keywords ?? [];
               return letterParagraphs.map((para, pi) => {
-              // "##" 소제목 마커(2026-10-01, 파이프라인 출력 순서 변경 —
-              // publish_utils.py의 parse_letters() 주석 참조) — "◾"와 같은
-              // 역할이지만 마크다운 문법 기호라 "◾"처럼 그대로 보여주면
-              // 글자가 그대로 노출된 버그처럼 보인다. 접두어는 떼고
-              // lread-sub 스타일(굵게+색)만 적용 — "◾"는 의도된 시각
-              // 마커라 원문 그대로 유지.
-              const isHashSub = para.startsWith('##');
-              const text = isHashSub ? para.replace(/^##\s*/, '') : para;
-              const isSub = para.startsWith('◾') || isHashSub;
-              return (
-                <p
-                  key={pi}
-                  id={isSub ? chapterId(subNo++) : undefined}
-                  className={isSub ? 'lread-sub' : pi === 0 ? 'lread-lead' : undefined}
-                >
-                  {wrapWithTerms(pi === 0 && !isSub ? displayHeadline(text) : text, l.keywords ?? [])}
-                </p>
-              );
+                const isHashSub = para.startsWith('##');
+                const text = isHashSub ? para.replace(/^##\s*/, '') : para;
+                const isSub = para.startsWith('◾') || isHashSub;
+                if (isSub) {
+                  const n = subNo++;
+                  const body = text.replace(/^◾\s*/, '');
+                  const [head, ...rest] = body.split(/[:：]/);
+                  const question = rest.join(':').trim();
+                  return (
+                    <h3 key={pi} id={chapterId(n)} className="lread-sub">
+                      <span className="ch-no">{String(n + 1).padStart(2, '0')}</span>
+                      <span className="ch-t">{wrapWithTerms(head.trim(), kw)}</span>
+                      {question && <span className="ch-q">{wrapWithTerms(question, kw)}</span>}
+                    </h3>
+                  );
+                }
+                let body = pi === 0 ? displayHeadline(text) : text;
+                if (pi === 0) {
+                  // 10/1 발행분부터 첫 문단이 "제목 + 부제" 한 줄로 나온다 — 그대로 두면 맨 위 제목이 도입 문단에서
+                  // 한 번 더 반복된다. 제목 부분은 떼고 부제(도입 문장)만 남기고, 남는 게 없으면 문단 자체를 숨긴다.
+                  const h = displayHeadline(lens.headline).trim();
+                  if (h && body.startsWith(h)) body = body.slice(h.length).trim();
+                  if (!body) return null;
+                }
+                return (
+                  <p key={pi} className={pi === 0 ? 'lread-lead' : undefined}>
+                    {wrapWithTerms(body, kw)}
+                  </p>
+                );
               });
             })()}
             {/* 레터 사인오프 — 편지 형식의 마무리(2026-08-24, 사용자 요청:

@@ -122,3 +122,68 @@ export function IconTextMinus(props: IconProps) {
     </Base>
   );
 }
+
+/** 레터 — 봉투. */
+export function IconLetter(props: IconProps) {
+  return (
+    <Base {...props}>
+      {(f) => (
+        <>
+          <rect x="3.4" y="5.6" width="17.2" height="12.8" rx="2.8" fill={f} fillOpacity={0.16} />
+          <path d="m4.6 8.4 6.2 4.6a2 2 0 0 0 2.4 0l6.2-4.6" />
+        </>
+      )}
+    </Base>
+  );
+}
+
+/** 웹툰 — 세 컷의 칸. */
+export function IconWebtoon(props: IconProps) {
+  return (
+    <Base {...props}>
+      {(f) => (
+        <>
+          <rect x="3.6" y="3.8" width="16.8" height="7.4" rx="2" fill={f} fillOpacity={0.16} />
+          <rect x="3.6" y="14" width="7.8" height="6.2" rx="2" />
+          <rect x="14" y="14" width="6.4" height="6.2" rx="2" />
+        </>
+      )}
+    </Base>
+  );
+}
+
+/** 팟캐스트 — 마이크. */
+export function IconPodcast(props: IconProps) {
+  return (
+    <Base {...props}>
+      {(f) => (
+        <>
+          <rect x="8.8" y="3.4" width="6.4" height="11.4" rx="3.2" fill={f} fillOpacity={0.16} />
+          <path d="M5.4 11.6a6.6 6.6 0 0 0 13.2 0M12 18.2v2.6M9 20.8h6" />
+        </>
+      )}
+    </Base>
+  );
+}
+
+/** 영상 — 재생. */
+export function IconVideo(props: IconProps) {
+  return (
+    <Base {...props}>
+      {(f) => (
+        <>
+          <rect x="3.4" y="5.2" width="17.2" height="13.6" rx="3.4" fill={f} fillOpacity={0.16} />
+          <path d="M10.4 9.6v4.8l4.2-2.4Z" fill="currentColor" fillOpacity={0.9} />
+        </>
+      )}
+    </Base>
+  );
+}
+
+/** 형식 이름 → 아이콘. */
+export function FormatIcon({ format, ...props }: IconProps & { format: string }) {
+  if (format === 'letter') return <IconLetter {...props} />;
+  if (format === 'webtoon') return <IconWebtoon {...props} />;
+  if (format === 'podcast') return <IconPodcast {...props} />;
+  return <IconVideo {...props} />;
+}
