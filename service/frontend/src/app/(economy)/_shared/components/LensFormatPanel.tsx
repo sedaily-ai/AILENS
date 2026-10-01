@@ -59,10 +59,16 @@ function splitSentences(text: string): string[] {
 // 같은 안내를 반복할 필요가 없다는 판단, 게다가 항상 다음 인덱스 하나만
 // 가리켜서 탭을 건너뛰어 온 사용자에겐 안내가 틀렸었다).
 // 인라인 마크다운(**굵게**, *기울임*) — 기호가 그대로 보이지 않게 풀고, 나머지 글자에는 용어 하이라이트를 입힌다.
+// 따옴표로 묶인 말(“…” ‘…’ "…" '…')은 마크다운 기호가 없어도 자동으로 굵게(2026-10-01) — 발언·핵심어가 눈에 먼저 들어오게 한다.
+// 홑따옴표('…')는 영어 아포스트로피와 겹치지 않게 글자·숫자 바로 옆에 붙은 경우는 제외하고, 길이도 제한한다.
+const INLINE_SPLIT =
+  /(\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|“[^”\n]{1,60}”|‘[^’\n]{1,40}’|"[^"\n]{1,60}"|(?<![\p{L}\p{N}])'[^'\n]{1,40}'(?![\p{L}\p{N}]))/gu;
+const QUOTED = /^(?:“[^”]+”|‘[^’]+’|"[^"]+"|'[^']+')$/u;
 function renderInline(text: string, kw: Parameters<typeof wrapWithTerms>[1]) {
-  return text.split(/(\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*)/g).map((part, i) => {
+  return text.split(INLINE_SPLIT).map((part, i) => {
     if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={i}>{wrapWithTerms(part.slice(2, -2), kw)}</strong>;
     if (/^\*[^*]+\*$/.test(part)) return <em key={i}>{wrapWithTerms(part.slice(1, -1), kw)}</em>;
+    if (QUOTED.test(part)) return <strong key={i}>{wrapWithTerms(part, kw)}</strong>;
     return <Fragment key={i}>{wrapWithTerms(part, kw)}</Fragment>;
   });
 }
