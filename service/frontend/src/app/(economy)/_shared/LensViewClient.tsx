@@ -42,6 +42,7 @@ import { letterChapters } from './components/lensChapters';
 import { readMinutes } from './components/lensSamples';
 import { renderInline } from './components/renderInline';
 import { ArticleStickyBar } from './components/ArticleStickyBar';
+import { ArticleToTop } from './components/ArticleToTop';
 import { ArticleToolRail } from './components/ArticleToolRail';
 import {
   ArticleFooterStyles,
@@ -506,6 +507,7 @@ export function LensViewClient({
       `}</style>
 
       <main id="main-content" className="art-main">
+        <ArticleToTop />
         <ArticleStickyBar
           category={lens.category ?? null}
           categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
