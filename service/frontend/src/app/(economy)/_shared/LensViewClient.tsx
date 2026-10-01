@@ -532,7 +532,7 @@ export function LensViewClient({
         }
       `}</style>
 
-      <main id="main-content" className="art-main" style={{ ['--hero-h' as string]: 'clamp(440px, 72vh, 680px)' }}>
+      <main id="main-content" className="art-main" style={{ ['--hero-h' as string]: 'clamp(360px, 62vh, 620px)' }}>
         <ArticleStickyBar
           category={lens.category ?? null}
           categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
@@ -562,6 +562,7 @@ export function LensViewClient({
               categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
               subcategory={lens.subcategory}
               creditHref={lens.source_url}
+              accent={LENS_ACCENT}
             />
             <div className="lw" style={{ paddingTop: 18 }}>{metaBlock(true)}</div>
           </>

@@ -5,16 +5,57 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 
-// 사진이 이끄는 기사 히어로(2026-10-01, "기사 느낌이 너무 강하다 — 사진 베이스의 인터랙티브
-// 웹 페이지 느낌" 요청의 1단계).
+// 사진이 이끄는 기사 첫 화면(2026-10-01, "기사 느낌이 너무 강하다 — 사진 베이스의 인터랙티브 웹
+// 페이지 느낌" 요청의 1단계).
+//
+// 구조: 화면 폭 전체(풀블리드) 사진 → 그 아래 흰 바탕에 분류·제목·부제. 처음엔 제목을 사진 위에
+// 얹었는데(어두운 그라데이션 + 흰 글씨), 밝은 사진이나 얼굴과 겹치면 제목이 안 읽히고 사진 아래쪽을
+// 그라데이션이 덮어서 뺐다 — 사진은 가리지 않고, 제목은 어떤 사진에서도 읽힌다.
 //
 // 해상도: 원본 사진은 서울경제 피드의 이미지(대부분 가로 1200px, 일부 630~720px)라 화면 전체로
 // 늘리면 흐려진다. 그래서 선명한 사진은 최대 1200px로 가운데 두고(.hero-img), 같은 사진을 크게
 // 블러해 뒤에 깔아(.hero-bg) 넓은 화면의 양옆을 채운다. 사진이 작은 글도 같은 방식으로 깨져 보이지 않는다.
 //
-// 제목·부제는 어두운 그라데이션 위 흰 글씨. h1#art-h1·data-speakable은 상세 페이지의 스크롤 바와
-// 음성 읽기 마크업이 그대로 쓰므로 유지한다. 스크롤하면 사진이 천천히 따라 올라가는 패럴랙스(모션
-// 줄이기 설정이면 끔).
+// h1#art-h1·data-speakable은 상세 페이지의 스크롤 바와 음성 읽기 마크업이 쓰므로 유지한다.
+// 스크롤하면 사진이 천천히 따라 올라가는 패럴랙스(모션 줄이기 설정이면 끔).
+
+const HERO_CSS = `
+  /* 풀블리드 — 읽기 컬럼(.lw)·셸 패딩을 벗어나 화면 폭 전체를 쓴다. 헤더 바로 밑까지 붙인다. */
+  .hero { position: relative; height: var(--hero-h); overflow: hidden; background: #111827;
+    width: 100vw; margin-left: calc(50% - 50vw); margin-top: calc(-1 * clamp(8px, 2vw, 16px)); }
+  .hero-bg { position: absolute; inset: -40px; filter: blur(44px) brightness(0.92) saturate(1.05); transform: scale(1.05); }
+  .hero-fg { position: absolute; inset: 0; will-change: transform; }
+  .hero-img { position: absolute; top: 0; bottom: -12%; left: 50%; width: min(100%, 1200px); transform: translateX(-50%);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); }
+  @media (max-width: 1200px) { .hero-img { -webkit-mask-image: none; mask-image: none; } }
+  .hero-img img { object-fit: cover; object-position: center 35%; }
+  /* 위쪽만 살짝 어둡게 — 우상단 사진 크레딧(흰 글씨)이 밝은 사진에서도 읽히게. 사진 본문은 가리지 않는다. */
+  .hero-shade { position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0) 22%); }
+  .hero-credit { position: absolute; right: 14px; top: 12px; margin: 0; font-size: 11.5px; color: rgba(255,255,255,0.88);
+    text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+  .hero-credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+  .hero-title { max-width: 720px; margin: 0 auto; padding: clamp(26px, 4vw, 40px) clamp(20px, 4vw, 28px) 0; }
+  .hero-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #6b7280; margin: 0 0 12px; }
+  .hero-eyebrow a { color: inherit; text-decoration: none; }
+  .hero-eyebrow a:hover { color: #111827; text-decoration: underline; text-underline-offset: 3px; }
+  .hero-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+    color: var(--lens-accent); background: color-mix(in srgb, var(--lens-accent) 9%, #ffffff); vertical-align: 1px; }
+  .hero-h1 { font-family: "Noto Serif KR", serif; font-weight: 700; color: #111827; letter-spacing: -0.025em; line-height: 1.34;
+    font-size: clamp(30px, 4.4vw, 44px); margin: 0 0 16px; text-wrap: balance; word-break: keep-all; }
+  .hero-deck { font-size: calc(18px * var(--lens-font-scale, 1)); line-height: 1.65; color: #374151; margin: 0 0 20px;
+    white-space: pre-line; word-break: keep-all; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-title > * { animation: hero-up .6s cubic-bezier(.22,.85,.2,1) both; }
+    .hero-title > *:nth-child(2) { animation-delay: .06s; }
+    .hero-title > *:nth-child(3) { animation-delay: .12s; }
+    @keyframes hero-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  }
+  @media print { .hero { height: auto; } .hero-bg, .hero-fg, .hero-shade, .hero-credit { display: none; } }
+`;
 
 export function ArticleHero({
   photo,
@@ -24,6 +65,7 @@ export function ArticleHero({
   categoryHref,
   subcategory,
   creditHref,
+  accent,
 }: {
   photo: string;
   headline: string;
@@ -32,6 +74,8 @@ export function ArticleHero({
   categoryHref?: string | null;
   subcategory?: string | null;
   creditHref?: string | null;
+  /** "4가지 시선" 배지 색(브랜드 색). */
+  accent: string;
 }) {
   const imgRef = useRef<HTMLDivElement>(null);
 
@@ -57,85 +101,47 @@ export function ArticleHero({
   }, []);
 
   return (
-    <header className="hero">
-      <style>{`
-        /* 풀블리드 — 읽기 컬럼(.lw)·셸 패딩을 벗어나 화면 폭 전체를 쓴다. 헤더 바로 밑까지 붙인다. */
-        .hero { position: relative; height: var(--hero-h); overflow: hidden; background: #111827; color: #fff;
-          width: 100vw; margin-left: calc(50% - 50vw); margin-top: calc(-1 * clamp(8px, 2vw, 16px)); }
-        .hero-bg { position: absolute; inset: -40px; filter: blur(44px) brightness(0.92) saturate(1.05); transform: scale(1.05); }
-        .hero-bg img { object-fit: cover; }
-        .hero-fg { position: absolute; inset: 0; will-change: transform; }
-        .hero-img { position: absolute; top: 0; bottom: -12%; left: 50%; width: min(100%, 1200px); transform: translateX(-50%);
-          -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent);
-          mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); }
-        @media (max-width: 1200px) { .hero-img { -webkit-mask-image: none; mask-image: none; } }
-        .hero-img img { object-fit: cover; object-position: center 35%; }
-        .hero-shade { position: absolute; inset: 0; pointer-events: none;
-          background: linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 28%, rgba(0,0,0,0.20) 48%, rgba(0,0,0,0.78) 100%); }
-        .hero-copy { position: absolute; left: 0; right: 0; bottom: 0; }
-        .hero-copy-in { max-width: 720px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px) clamp(28px, 5vh, 48px); }
-        .hero-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: rgba(255,255,255,0.82); margin: 0 0 12px; }
-        .hero-eyebrow a { color: inherit; text-decoration: none; }
-        .hero-eyebrow a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
-        .hero-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
-          color: #fff; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.32); vertical-align: 1px; }
-        .hero-h1 { font-family: "Noto Serif KR", serif; font-weight: 700; color: #fff; letter-spacing: -0.025em; line-height: 1.32;
-          font-size: clamp(30px, 4.8vw, 48px); margin: 0 0 14px; text-wrap: balance; word-break: keep-all;
-          text-shadow: 0 2px 18px rgba(0,0,0,0.35); }
-        .hero-deck { font-size: calc(18px * var(--lens-font-scale, 1)); line-height: 1.6; color: rgba(255,255,255,0.88); margin: 0;
-          white-space: pre-line; word-break: keep-all; max-width: 640px; }
-        .hero-credit { position: absolute; right: 14px; top: 12px; font-size: 11.5px; color: rgba(255,255,255,0.75);
-          text-shadow: 0 1px 6px rgba(0,0,0,0.5); }
-        .hero-credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-        @media (prefers-reduced-motion: no-preference) {
-          .hero-copy-in > * { animation: hero-up .6s cubic-bezier(.22,.85,.2,1) both; }
-          .hero-copy-in > *:nth-child(2) { animation-delay: .06s; }
-          .hero-copy-in > *:nth-child(3) { animation-delay: .12s; }
-          @keyframes hero-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-        }
-        @media print { .hero { height: auto; background: none; color: #111; } .hero-bg, .hero-fg, .hero-shade { display: none; }
-          .hero-copy { position: static; } .hero-h1, .hero-deck, .hero-eyebrow { color: #111; text-shadow: none; } }
-      `}</style>
-
-      <div className="hero-bg" aria-hidden>
-        <Image src={photo} alt="" fill sizes="25vw" style={{ objectFit: 'cover' }} />
-      </div>
-      <div className="hero-fg" ref={imgRef}>
-        <div className="hero-img">
-          <Image src={photo} alt={headline} fill sizes="(min-width: 1200px) 1200px, 100vw" quality={90} priority />
+    <>
+      <style>{HERO_CSS}</style>
+      <header className="hero" aria-label="대표 사진">
+        <div className="hero-bg" aria-hidden>
+          <Image src={photo} alt="" fill sizes="25vw" style={{ objectFit: 'cover' }} />
         </div>
-      </div>
-      <div className="hero-shade" aria-hidden />
-      <p className="hero-credit">
-        {creditHref ? (
-          <>
-            사진 ·{' '}
-            <a href={creditHref} target="_blank" rel="noopener noreferrer">
-              서울경제
-            </a>
-          </>
-        ) : (
-          '사진 · 서울경제'
-        )}
-      </p>
-
-      <div className="hero-copy">
-        <div className="hero-copy-in">
-          <p className="hero-eyebrow">
-            {category && (categoryHref ? <Link href={categoryHref}>{category}</Link> : category)}
-            {subcategory && <> · {subcategory}</>}
-            <span className="hero-badge">4가지 시선</span>
-          </p>
-          <h1 id="art-h1" data-speakable="headline" className="hero-h1">
-            {displayHeadline(headline)}
-          </h1>
-          {deck && (
-            <p data-speakable="summary" className="hero-deck">
-              {deck}
-            </p>
+        <div className="hero-fg" ref={imgRef}>
+          <div className="hero-img">
+            <Image src={photo} alt={headline} fill sizes="(min-width: 1200px) 1200px, 100vw" quality={90} priority />
+          </div>
+        </div>
+        <div className="hero-shade" aria-hidden />
+        <p className="hero-credit">
+          {creditHref ? (
+            <>
+              사진 ·{' '}
+              <a href={creditHref} target="_blank" rel="noopener noreferrer">
+                서울경제
+              </a>
+            </>
+          ) : (
+            '사진 · 서울경제'
           )}
-        </div>
+        </p>
+      </header>
+
+      <div className="hero-title" style={{ ['--lens-accent' as string]: accent }}>
+        <p className="hero-eyebrow">
+          {category && (categoryHref ? <Link href={categoryHref}>{category}</Link> : category)}
+          {subcategory && <> · {subcategory}</>}
+          <span className="hero-badge">4가지 시선</span>
+        </p>
+        <h1 id="art-h1" data-speakable="headline" className="hero-h1">
+          {displayHeadline(headline)}
+        </h1>
+        {deck && (
+          <p data-speakable="summary" className="hero-deck">
+            {deck}
+          </p>
+        )}
       </div>
-    </header>
+    </>
   );
 }
