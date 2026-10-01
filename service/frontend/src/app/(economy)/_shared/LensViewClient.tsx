@@ -22,7 +22,6 @@ import {
   parseLensView,
   pickLensPhoto,
 } from '@/shared/constants/lensPerspectives';
-import { HomeSideBar } from '@/widgets/HomeSideBar';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
@@ -30,10 +29,17 @@ import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
 import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
-import { Calendar } from 'lucide-react';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
+import { ArticleToolRail } from './components/ArticleToolRail';
+import {
+  ArticleFooterStyles,
+  ArticleTags,
+  MoreInCategory,
+  MostRead,
+  RelatedArticles,
+} from './components/ArticleFooterSections';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //
@@ -79,11 +85,13 @@ export function LensViewClient({
   slug,
   initialLens = undefined,
   otherLens = [],
+  relatedLens = [],
   initialHotLetters,
 }: {
   slug: string;
   initialLens?: CmsLens | null;
   otherLens?: CmsLens[];
+  relatedLens?: CmsLens[];
   initialHotLetters?: TodayLetterCardLike[];
 }) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
@@ -248,6 +256,8 @@ export function LensViewClient({
 
   const photo = pickLensPhoto(lens);
   const lenses = lens.lenses ?? [];
+  // 레일 "듣기" — 팟캐스트 시선 탭으로 이동(없으면 항목 숨김).
+  const podcastIdx = lenses.findIndex((l) => l.label === '팟캐스트');
   // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
   const activeP = lensPerspectiveAt(active);
   const ActiveIcon = activeP.icon;
@@ -257,12 +267,43 @@ export function LensViewClient({
   // 중복돼 있던 걸 ArticlePageShell로 추출(아래 2026-08-17/08-23 결정
   // 이후에도 계속 각 파일이 따로 복제해왔던 것 — 이제 단일 소스).
   return (
-    <ArticlePageShell sidebar={<HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />}>
+    <ArticlePageShell>
       {/* ⚠️ 아래 <style> 안의 주석은 CSS 문자열이라 HTML 응답에 그대로
           실려 나간다(SSR 페이지라 매 요청마다) — 그래서 한 줄짜리 힌트만
           남긴다. 설계 근거는 이 파일과 components/의 JSX 주석에 있다. */}
       <style>{`
-        .lw { max-width: 880px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px); }
+        /* 2026-10-01 상세 재설계(영문 사이트 구조) — 사이드바를 걷고 단일 읽기 컬럼(720px)으로.
+           ≥1100px에서는 도구(글자 크기·공유·인쇄)가 컬럼 왼쪽 고정 레일로 나가고, 그보다
+           좁으면 기존처럼 본문 위 가로 줄(.tools-inline)로 남는다. */
+        .lw { max-width: 720px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px); }
+        .art-main { position: relative; }
+        .rail-host { display: none; }
+        @media (min-width: 1100px) {
+          .tools-inline { display: none !important; }
+          .rail-host { display: block; position: absolute; top: 0; bottom: 0; left: calc(50% - 360px - 120px); width: 76px; }
+          .rail { position: sticky; top: 140px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+        }
+        .rail-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 64px; padding: 6px 0;
+          border: none; background: none; cursor: pointer; color: #374151; }
+        .rail-btn:hover:not(:disabled) { color: #111827; }
+        .rail-btn:disabled { opacity: .35; cursor: default; }
+        .rail-btn:focus-visible { outline: 2px solid #111827; outline-offset: 2px; border-radius: 6px; }
+        .rail-ico { display: flex; align-items: center; justify-content: center; height: 24px; }
+        .rail-cap { font-size: 12px; color: #6b7280; white-space: nowrap; }
+        .rail-pop { position: absolute; left: calc(100% + 8px); top: 0; z-index: 30; padding: 12px 14px;
+          background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 6px 20px rgba(17,24,39,0.08); }
+        .badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 3px;
+          font-size: 11px; font-weight: 800; letter-spacing: 0.04em; color: #fff; background: ${LENS_ACCENT}; vertical-align: 1px; }
+        .sum { border-top: 2px solid #111827; background: #f7f6f2; padding: 18px 24px 22px; margin-top: 28px; }
+        .sum-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+        .sum-title { font-size: 13px; font-weight: 800; letter-spacing: 0.08em; color: #111827; }
+        .sum-note { font-size: 12px; color: #6b7280; }
+        .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #6b7280; margin: 0 0 12px; }
+        .eyebrow a { color: inherit; text-decoration: none; }
+        .eyebrow a:hover { color: #111827; text-decoration: underline; text-underline-offset: 3px; }
+        .pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1px solid #d1d5db;
+          border-radius: 999px; font-size: 12.5px; font-weight: 600; color: #374151; text-decoration: none; background: #fff; }
+        .pill:hover { border-color: #9ca3af; color: #111827; }
         .lm { max-width: 100%; }
         .rule { height: 1px; background: rgba(17,24,39,0.1); }
         .back:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: 2px; }
@@ -429,17 +470,36 @@ export function LensViewClient({
         }
       `}</style>
 
-      <main id="main-content">
-        {/* ── 기사 머리 ── 위계: 아이브로우 13 → 헤드라인 40 → 메타 13 */}
-        <div className="lw">
+      <main id="main-content" className="art-main">
+        {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
+        <div className="rail-host">
+          <nav className="rail" aria-label="기사 도구">
+            <ArticleToolRail
+              title={lens.headline}
+              url={`${SITE_URL}${lensPath(lens)}`}
+              cssVar="--lens-font-scale"
+              storageKey="lens-font-size"
+              onListen={podcastIdx >= 0 ? () => select(podcastIdx) : undefined}
+            />
+          </nav>
+        </div>
+
+        {/* ── 기사 머리 ── 카테고리 아이브로우 → 세리프 헤드라인 → 부제 → 바이라인/발행시각 → 헤어라인 */}
+        <div className="lw" style={{ paddingTop: 'clamp(8px, 2vw, 16px)' }}>
+          <p className="eyebrow">
+            {lens.category && <Link href={`/${lensCategorySlug(lens.category)}`}>{lens.category}</Link>}
+            {lens.subcategory && <> · {lens.subcategory}</>}
+            <span className="badge">4가지 시선</span>
+          </p>
           <h1
             data-speakable="headline"
             style={{
-              fontSize: 'clamp(26px, 3.4vw, 36px)',
-              fontWeight: 800,
+              fontFamily: '"Noto Serif KR", serif',
+              fontSize: 'clamp(30px, 4.6vw, 46px)',
+              fontWeight: 700,
               color: '#111827',
-              letterSpacing: '-0.03em',
-              lineHeight: 1.25,
+              letterSpacing: '-0.025em',
+              lineHeight: 1.3,
               marginBottom: 14,
               textWrap: 'balance',
               wordBreak: 'keep-all',
@@ -447,38 +507,36 @@ export function LensViewClient({
           >
             {lens.headline}
           </h1>
-          <div className="flex items-center flex-wrap" style={{ gap: 12, marginBottom: 10 }}>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                padding: '3px 10px',
-                borderRadius: 999,
-                background: `${LENS_ACCENT}14`,
-                color: LENS_ACCENT,
-              }}
+          {lens.context && (
+            <p
+              data-speakable="summary"
+              style={{ fontSize: 'calc(18px * var(--lens-font-scale, 1))', lineHeight: 1.65, color: '#374151', margin: '0 0 18px', whiteSpace: 'pre-line', wordBreak: 'keep-all' }}
             >
-              4가지 시선
-            </span>
-            <p className="flex items-center" style={{ gap: 5, fontSize: 13, color: '#6b7280', fontWeight: 600, margin: 0 }}>
-              <Calendar className="w-4 h-4" aria-hidden />
+              {lens.context}
+            </p>
+          )}
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 10px' }}>AI LENS 편집팀</p>
+          <div className="flex items-center justify-between flex-wrap" style={{ gap: 10, paddingBottom: 16 }}>
+            <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
               입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
             </p>
             <a
               href={`https://www.google.com/preferences/source?q=${new URL(SITE_URL).host}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center"
-              style={{ gap: 5, fontSize: 11.5, color: '#9ca3af', textDecoration: 'none' }}
+              className="pill"
             >
-              <GoogleIcon className="w-3 h-3" />
+              <GoogleIcon className="w-3.5 h-3.5" />
               구글 검색 선호 출처로 추가
             </a>
           </div>
 
+          <div className="rule" />
+
+          {/* 좁은 화면(<1100px) 도구 줄 — 넓은 화면에서는 왼쪽 레일로 대체. */}
           <div
-            className="flex items-center justify-between flex-wrap"
-            style={{ marginTop: 'clamp(14px, 2.4vw, 20px)', marginBottom: 'clamp(18px, 3vw, 24px)', gap: 12, padding: '10px 0', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}
+            className="tools-inline flex items-center justify-between flex-wrap"
+            style={{ marginTop: 14, gap: 12, paddingBottom: 14 }}
           >
             <div className="flex items-center" style={{ gap: 8 }}>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
@@ -493,13 +551,13 @@ export function LensViewClient({
         </div>
 
         {photo && (
-          <div className="lw">
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '2 / 1', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
+          <div className="lw" style={{ paddingTop: 20 }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 2', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0 }}>
               <Image
                 src={photo}
                 alt={lens.headline}
                 fill
-                sizes="(min-width: 920px) 880px, 100vw"
+                sizes="(min-width: 760px) 720px, 100vw"
                 priority
                 style={{ objectFit: 'cover', objectPosition: 'center' }}
               />
@@ -531,16 +589,6 @@ export function LensViewClient({
             으로만 구조를 만든다" 원칙에서 유일한 예외였다. */}
         <div className="lw" style={{ paddingTop: 'clamp(20px, 3.4vw, 28px)' }}>
         <div>
-          {lens.context && (
-            <p
-              data-speakable="summary"
-              className="lm"
-              style={{ fontSize: 'calc(18px * var(--lens-font-scale, 1))', lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-line', wordBreak: 'keep-all' }}
-            >
-              {lens.context}
-            </p>
-          )}
-
           {lens.source_url && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <a
@@ -563,12 +611,12 @@ export function LensViewClient({
           )}
 
           {coreSummaryBullets(lens).length > 0 && (
-            <div data-speakable="summary" style={{ marginTop: 24 }}>
-              <div className="rule" />
-              <p className="ovl" style={{ margin: '32px 0 16px' }}>
-                30초 핵심
-              </p>
-              <ol style={{ display: 'flex', flexDirection: 'column', gap: 16, listStyle: 'none', padding: 0, margin: 0 }}>
+            <div data-speakable="summary" className="sum">
+              <div className="sum-head">
+                <p className="sum-title">■ 30초 핵심</p>
+                <p className="sum-note">AI 요약 · 편집팀 검수</p>
+              </div>
+              <ol style={{ display: 'flex', flexDirection: 'column', gap: 14, listStyle: 'none', padding: 0, margin: 0 }}>
                 {coreSummaryBullets(lens).map((s, si) => (
                   <li key={si} style={{ display: 'flex', alignItems: 'baseline', gap: 14, wordBreak: 'keep-all' }}>
                     <span
@@ -653,86 +701,21 @@ export function LensViewClient({
           </div>
         )}
 
-        <div className="lw" style={{ paddingTop: 'clamp(44px, 6vw, 64px)', paddingBottom: 100 }}>
-        <div>
-          <div className="rule" />
+        {/* ── 하단 구획 ── 영문 사이트 구조: 태그 → {카테고리} 더 보기 → 관련 기사 → 많이 읽은 기사.
+            이전 "다른 시선" 3건(카테고리 무관 최신)은 같은 카테고리 기준 "더 보기"로 대체했다. */}
+        <div className="lw" style={{ paddingTop: 8, paddingBottom: 100 }}>
+          <ArticleFooterStyles />
+          <ArticleTags lens={lens} />
+          <MoreInCategory lens={lens} items={otherLens} />
+          <RelatedArticles items={relatedLens} />
+          <MostRead items={initialHotLetters ?? []} />
 
-          {/* "다른 시선" 미리보기(2026-08-16) — 마감부가 문구 한 줄 + 링크
-              하나뿐이라 "허전하다"는 피드백. page.tsx가 fetchAllLens()
-              in-flight 캐시에 편승해 이미 가져온 값 중 현재 글만 뺀 3개를
-              넘겨준다(추가 API 호출 없음). PR #10이 갈라져 나간 뒤 main에
-              추가된 기능이라 그 브랜치엔 없었다 — 유지. */}
-          {otherLens.length > 0 && (
-            <div style={{ margin: '28px 0 8px' }}>
-              <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 4 }}>
-                다른 시선
-              </p>
-              <div>
-                {otherLens.map((l) => {
-                  const otherPhoto = pickLensPhoto(l);
-                  return (
-                    <Link
-                      key={l.id}
-                      href={lensPath(l)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 14,
-                        padding: '14px 0',
-                        textDecoration: 'none',
-                        borderTop: '1px solid rgba(17,24,39,0.07)',
-                      }}
-                    >
-                      {otherPhoto && (
-                        <span
-                          className="flex-shrink-0"
-                          style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', background: '#f3f4f6' }}
-                        >
-                          <Image src={otherPhoto} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
-                        </span>
-                      )}
-                      <span style={{ minWidth: 0, flex: 1 }}>
-                        <span style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 3 }}>
-                          {kstDateTimeLabel(l.published_at) ?? l.date.replaceAll('-', '.')}
-                        </span>
-                        <span
-                          style={{
-                            display: '-webkit-box',
-                            fontSize: 15,
-                            fontWeight: 700,
-                            color: '#111827',
-                            lineHeight: 1.4,
-                            letterSpacing: '-0.01em',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            wordBreak: 'keep-all',
-                          }}
-                        >
-                          {l.headline}
-                        </span>
-                      </span>
-                      <span aria-hidden className="flex-shrink-0" style={{ color: '#c0c5cc', fontSize: 16 }}>
-                        ›
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <p style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '28px 0 4px', lineHeight: 1.5 }}>
-            일상 속의 모든 소식, 신속하고 정확한 전달
-          </p>
-          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>통찰력 있는 이야기 · 인스타그램 @lens.sedaily</p>
-          <Link
-            href="/lens"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, fontSize: 14, fontWeight: 700, color: LENS_ACCENT, textDecoration: 'none' }}
-          >
-            다른 시선 보기 →
-          </Link>
-        </div>
+          <div style={{ marginTop: 56, paddingTop: 20, borderTop: '1px solid #e5e7eb' }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '0 0 4px', lineHeight: 1.5 }}>
+              일상 속의 모든 소식, 신속하고 정확한 전달
+            </p>
+            <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>통찰력 있는 이야기 · 인스타그램 @lens.sedaily</p>
+          </div>
         </div>
       </main>
     </ArticlePageShell>

@@ -49,9 +49,22 @@ async function findLens(slug: string): Promise<CmsLens | null> {
   return null;
 }
 
-async function findOtherLens(slug: string, limit = 3): Promise<CmsLens[]> {
-  const items = await fetchAllLens();
-  return items.filter((l) => l.id !== slug).slice(0, limit);
+// 하단 "{카테고리} 더 보기"(같은 카테고리 최신 3건)와 "관련 기사"(같은 하위 카테고리 최대 4건,
+// 앞 3건과 겹치지 않게)를 한 번에 뽑는다 — 이미 받아온 전체 목록에서 거르므로 추가 API 호출 없음.
+// 카테고리가 없는 글(미분류)은 카테고리 무관 최신으로 폴백(2026-10-01, 이전 동작).
+async function findOtherLens(
+  slug: string,
+  current: CmsLens | null,
+): Promise<{ more: CmsLens[]; related: CmsLens[] }> {
+  const items = (await fetchAllLens()).filter((l) => l.id !== slug);
+  if (!current?.category) return { more: items.slice(0, 3), related: [] };
+  const sameCat = items.filter((l) => l.category === current.category);
+  const more = sameCat.slice(0, 3);
+  const taken = new Set(more.map((l) => l.id));
+  const related = current.subcategory
+    ? sameCat.filter((l) => l.subcategory === current.subcategory && !taken.has(l.id)).slice(0, 4)
+    : [];
+  return { more, related };
 }
 
 function buildJsonLd(lens: CmsLens) {
@@ -169,11 +182,8 @@ export async function LensArticlePageContent(
 ) {
   const { year, month, day, slug: rawSlug } = await paramsPromise;
   const slug = decodeURIComponent(rawSlug);
-  const [lens, otherLens, hotLetters] = await Promise.all([
-    findLens(slug),
-    findOtherLens(slug),
-    fetchFollowingLetters(5),
-  ]);
+  const [lens, hotLetters] = await Promise.all([findLens(slug), fetchFollowingLetters(5)]);
+  const { more: otherLens, related: relatedLens } = await findOtherLens(slug, lens);
 
   // 요청 경로(카테고리/연/월/일)가 실제 글의 정본 경로와 다르면(카테고리
   // 재분류, 다른 카테고리 폴더로 잘못 들어온 링크 등) 정본으로 리다이렉트
@@ -199,7 +209,7 @@ export async function LensArticlePageContent(
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <LensViewClient slug={slug} initialLens={lens} otherLens={otherLens} initialHotLetters={hotLetters} />
+      <LensViewClient slug={slug} initialLens={lens} otherLens={otherLens} relatedLens={relatedLens} initialHotLetters={hotLetters} />
     </>
   );
 }
