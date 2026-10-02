@@ -664,8 +664,15 @@ def publish_article(
     webtoon_script: dict = {}
     webtoon_bullets, webtoon_images = [], []
     try:
-        webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
-        webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+        # 웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어(2026-10-02 08:06 KST 프로테오믹스 글: KeyError 'cuts' → 웹툰 없이 발행)
+        # 각본이 비정상이면 한 번 더 생성한다(이미지 생성 전 단계라 재시도 비용이 작다 — 각본 JSON만 다시 만든다).
+        webtoon_script = {}
+        for _attempt in (1, 2):
+            webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
+            webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+            if webtoon_script.get("cuts"):
+                break
+            print(f"[{log_prefix}] {name} 웹툰 각본에 cuts 없음 — 재생성 {_attempt}/2")
         for cut in webtoon_script["cuts"]:
             n = cut["cut"]
             cut_path = out_dir / name / f"컷{n}.png"

@@ -119,6 +119,17 @@ def _make_video(article: dict, article_path: Path, out_dir: Path, upload) -> dic
     return {"video_url": video_url, "thumbnail_url": thumb_url, "transcript": transcript}
 
 
+def _kst_ymd(ts: str) -> str:
+    """발행 시각(ISO, UTC일 수 있음)을 KST 날짜(YYYYMMDD)로 — 원문 후보 파일(daily-xml)은 KST 게재일 기준이다.
+    UTC 날짜를 그대로 쓰면 00~09시 KST 발행분이 하루 전 날짜로 계산돼 원문을 못 찾는다(2026-10-02 확인)."""
+    from datetime import datetime, timedelta, timezone
+
+    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone(timedelta(hours=9))).strftime("%Y%m%d")
+
+
 def main():
     urls = [a for a in sys.argv[1:] if a.startswith("http")]
     if not urls:
@@ -152,7 +163,7 @@ def main():
                 continue
             if not APPLY:
                 continue
-            date = (cur.get("published_at") or cur.get("publish_date") or "")[:10].replace("-", "")
+            date = _kst_ymd(cur.get("published_at")) if cur.get("published_at") else (cur.get("publish_date") or "").replace("-", "")
             article = _load_article(su, date)
             out_dir = Path(tempfile.mkdtemp(prefix="repair_formats_"))
             article_path = _article_file(article, out_dir)
