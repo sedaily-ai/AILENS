@@ -1,5 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
+import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { lensPath } from '@/shared/lib/lensUrl';
+import { pingIndexNow } from '@/shared/lib/seo/indexNow';
 
 // admin이 글을 발행/수정/삭제하면 이 webhook을 호출한다(2026-08-08 신설).
 //
@@ -56,5 +59,22 @@ export async function POST(request: Request) {
     revalidateTag(tag, { expire: 0 });
   }
 
+  // IndexNow — 최근 3시간 안에 발행·수정된 기사와 홈·지면을 검색엔진에 바로 알린다(응답을 기다리지 않는다).
+  void notifyIndexNow();
+
   return Response.json({ ok: true, revalidated: CONTENT_TAGS });
+}
+
+async function notifyIndexNow(): Promise<void> {
+  try {
+    const since = Date.now() - 3 * 60 * 60 * 1000;
+    const recent = (await fetchLensPosts(40)).filter((l) => {
+      const t = Date.parse(l.updated_at || l.published_at || '');
+      return Number.isFinite(t) && t >= since;
+    });
+    const latestDate = recent.map((l) => l.date).sort().pop();
+    await pingIndexNow(['/', ...(latestDate ? [`/paper/${latestDate}`] : []), ...recent.map((l) => lensPath(l))]);
+  } catch {
+    // 무시 — 발행 흐름과 무관.
+  }
 }

@@ -94,12 +94,7 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // 앞으로 당김(사용자 확인) — "오락성들보다도 뒤에 있으면 안 된다".
     // 2026-08-17 — tier를 'extra'에서 'more'로: 카테고리 6개가 추가되며
     // 1차 줄이 12개까지 늘어 "더보기" 드롭다운으로 옮겼다(Header.tsx 참조).
-    { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'more' },
-    { key: 'video', label: '영상', href: '/video', active: active === 'video', tier: 'more' },
-    // 오디오 재생목록(2026-08-21) — 지금까지 홈 하단 미니 플레이어에만
-    // 있어서 고유 URL이 없어 검색엔진에 전혀 안 걸렸다(GEO 감사). /video와
-    // 같은 이유로 전용 목록/상세 페이지(/listen)를 신설하며 nav에도 추가.
-    { key: 'listen', label: '오디오', href: '/listen', active: active === 'listen', tier: 'more' },
+    // 2026-10-04 — 웹툰·영상·오디오 탭 제거(목록 페이지 폐기, 홈은 미리보기만).
     // '내 서랍' 탭도 네비게이션에서 제거(2026-08-06) — 커뮤니티 대체로
     // "오늘의 한 문장 + 다른 사람들이 담은 문장 + 내 문장" 3단 구조까지
     // 만들었지만, 워딩(서랍→스크랩) 논의 끝에 상시 탭으로 노출하기보다

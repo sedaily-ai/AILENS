@@ -51,8 +51,8 @@ export function SeriesViewClient({
         <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center" style={{ color: MUTED }}>
           <p>시리즈를 찾을 수 없어요.</p>
-          <Link href="/webtoon" className="mt-4 inline-block text-sm underline underline-offset-4" style={{ color: MUTED }}>
-            웹툰 목록으로
+          <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4" style={{ color: MUTED }}>
+            최신 뉴스로
           </Link>
         </div>
       </div>

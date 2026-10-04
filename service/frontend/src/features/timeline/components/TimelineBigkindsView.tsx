@@ -61,8 +61,9 @@
 // 만들었다(사용자 리포트). 지금은 분야 이름만 쓴다.
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { BigKindsArticle, InvestmentScenario } from '../lib/timelineApi';
-import { kdate, isReadableOriginal, resolveArticleLink } from '../lib/timelineApi';
+import type { BigKindsArticle, InvestmentScenario } from '@/shared/lib/api/timelineApi';
+import { kdate } from '@/shared/lib/timelineDates';
+import { isReadableOriginal, resolveArticleLink } from '../lib/articleLinks';
 import { buildDayLayout } from '../lib/rankArticles';
 import {
   SURFACE, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT,
@@ -264,7 +265,7 @@ export function TimelineBigkindsView({
             </h1>
             {total > 0 && (
               <p style={{ fontSize: FONT.meta, color: TEXT_MUTED, marginTop: SPACE.sm, lineHeight: LEADING.body }}>
-                그날 지면에서 {total}건을 찾았어요
+                그날 기사 {total}건을 찾았어요
               </p>
             )}
           </header>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { NewsTimeMachine, ExitPill, SURFACE, GLOBAL_CSS } from '@/features/timeline';
+import { NewsTimeMachine, HubCards, ExitPill, SURFACE, GLOBAL_CSS } from '@/features/timeline';
 
 // 공용 Header 대신 좌상단 EXIT 필 — /timeline/[date](TimelineDayClient.tsx)와
 // 같은 이유·같은 톤(2026-08-17, "완전 몰입형 공간" 취급을 /timeline 전체로
@@ -27,7 +27,9 @@ export default function TimelinePage() {
       <style>{GLOBAL_CSS}</style>
       <ExitPill />
       <main>
-        <NewsTimeMachine />
+        <NewsTimeMachine>
+          <HubCards />
+        </NewsTimeMachine>
       </main>
     </div>
   );

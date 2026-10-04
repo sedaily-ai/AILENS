@@ -94,7 +94,7 @@ export function HomeHeroCarousel() {
 
       {/* 슬라이드 2 — 웹툰 파일럿 */}
       <Link
-        href="/webtoon"
+        href="/lens"
         className="items-center transition-transform duration-200 hover:-translate-y-0.5"
         style={{
           ...slideBase,

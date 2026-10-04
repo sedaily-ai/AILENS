@@ -63,7 +63,9 @@ export function WordsPreviewSection({ initialTerms }: Props) {
     // 둘 다 온 뒤에 카드를 확정한다 — CMS 응답을 기다리지 않고 자동생성
     // 카드부터 보여줬다가 뒤늦게 CMS 카드로 바뀌면, 그 사이 이미 답을 고른
     // 사용자 입장에선 문제가 손 밑에서 바뀌는 셈이라 피한다.
-    Promise.all([fetchFollowingWordTerms(), fetchActiveQuizzes()]).then(([deduped, quizzes]) => {
+    // 서버가 키워드(initialTerms)를 계산해 줬으면(빈 배열 포함 — 지금은 레터에 keywords가 없어 항상 []) 레터 50건(약 270KB)을
+    // 브라우저에서 다시 받지 않고 CMS 퀴즈만 조회한다(2026-10-03).
+    Promise.all([initialTerms !== undefined ? Promise.resolve(initialTerms) : fetchFollowingWordTerms(), fetchActiveQuizzes()]).then(([deduped, quizzes]) => {
       if (cancelled) return;
       setTerms(deduped);
       setCmsQuizzes(quizzes);

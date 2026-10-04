@@ -1,3 +1,5 @@
+import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { fetchVideos, fetchVideoBySlug, fetchLensBySlug, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
@@ -72,22 +74,28 @@ export async function generateMetadata({
   if (!video) {
     return { title: '영상을 찾을 수 없어요', robots: { index: false } };
   }
-  const title = buildPageTitle(video.title, '영상');
+  const headline = seoHeadline(video.title);
+  const title = buildPageTitle(headline, '영상');
   const description = buildSeoDescription(video.excerpt, '서울경제 AI LENS가 정리한 이슈 영상입니다.');
   // 영상 시청 페이지는 자기 자신이 정본(2026-10-01) — 서버 HTML에 <video>와 VideoObject가 있어 동영상 색인의 대상이다.
   const url = `${SITE_URL}/video/${slug}`;
   const resolved = resolveVideo(video.video_url);
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
+  const extras = mediaSeoExtras({ headline, description, url, publishedIso: video.published_at || `${video.date}T07:00:00+09:00`, kind: '영상' });
   return {
     title,
     description,
-    alternates: { canonical: url },
+    keywords: extras.keywords,
+    authors: extras.authors,
+    category: extras.category,
+    other: extras.other,
+    alternates: { canonical: url, languages: extras.languages },
     openGraph: {
       title,
       description,
       url,
       type: 'video.other',
-      images: [{ url: image, width: 1200, height: 630, alt: video.title }],
+      images: [{ url: image, width: 1200, height: 630, alt: headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -114,8 +122,15 @@ function buildJsonLd(video: CmsVideo, slug: string, lens: CmsLens | null) {
         '@type': 'VideoObject',
         '@id': `${url}#video`,
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-        name: video.title,
-        description: buildSeoDescription(video.excerpt, video.title),
+        name: seoHeadline(video.title),
+        description: buildSeoDescription(video.excerpt, seoHeadline(video.title)),
+        keywords: [...new Set([seoHeadline(video.title), '영상', '경제 영상', '오늘의 이슈', 'AI LENS', '서울경제'])],
+        genre: '뉴스 해설 영상',
+        copyrightHolder: { '@id': `${SITE_URL}/#organization` },
+        copyrightYear: Number(video.date.slice(0, 4)),
+        creditText: '서울경제신문 AI LENS',
+        ...(lens?.source_url ? { isBasedOn: { '@type': 'NewsArticle', url: lens.source_url, publisher: { '@id': `${SITE_URL}/#organization` } } } : {}),
+        potentialAction: { '@type': 'WatchAction', target: [url] },
         thumbnailUrl: image,
         uploadDate: published,
         inLanguage: 'ko-KR',
@@ -144,7 +159,7 @@ function buildJsonLd(video: CmsVideo, slug: string, lens: CmsLens | null) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '영상', item: `${SITE_URL}/video` },
+          { '@type': 'ListItem', position: 2, name: '최신 뉴스', item: `${SITE_URL}/lens` },
           { '@type': 'ListItem', position: 3, name: video.title, item: url },
         ],
       },

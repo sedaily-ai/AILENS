@@ -94,7 +94,7 @@ function ssrCacheOpts(tag: string): RequestInit {
 // 불필요하게 부풀리는 원인. 이 섹션의 유일한 소비자(AudioPreviewSection)
 // 라서 서버가 넘기기 전에 미리 4개로 자르고 안 쓰는 필드를 비운다.
 export function toAudioPreviewSummaries(posts: HomePlayerPost[]): HomePlayerPost[] {
-  return posts.slice(0, 4).map((p) => ({ ...p, transcript: null, excerpt: '' }));
+  return posts.slice(0, 5).map((p) => ({ ...p, transcript: null, excerpt: '' }));
 }
 
 /** /listen 목록 페이지용 — 발행일 순 정렬. */

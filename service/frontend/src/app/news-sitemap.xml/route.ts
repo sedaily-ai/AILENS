@@ -1,6 +1,7 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
 import { lensPath } from '@/shared/lib/lensUrl';
+import { seoHeadline } from '@/shared/lib/displayHeadline';
 import { kstTodayStr } from '@/shared/lib/date';
 
 // Google News sitemap (news:news 확장, https://www.google.com/schemas/sitemap-news/0.9) —
@@ -57,7 +58,7 @@ export async function GET() {
       seen.add(l.id);
       entries.push({
         loc: `${BASE}${lensPath(l)}`,
-        headline: l.headline,
+        headline: seoHeadline(l.headline), // news:title — 부서 접두사·이모지 제거(2026-10-04)
         date: l.date,
         publishedAt: l.published_at,
         // 카테고리·하위 카테고리(2026-10-01 econSubcategories.ts 신설) —

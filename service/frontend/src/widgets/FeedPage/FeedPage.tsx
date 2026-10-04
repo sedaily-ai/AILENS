@@ -11,7 +11,6 @@ import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/api/questi
 import type { DailyQuestionItem } from "@/features/question";
 import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
 import { useAuth } from "@/features/auth";
-import { DiscoveryBanner } from "@/features/onboarding";
 import { Header } from "@/widgets/Header";
 import { HomeSideBar } from "@/widgets/HomeSideBar";
 import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";
@@ -33,6 +32,7 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
+  paperDates?: string[];
   initialArchiveItems?: ArchiveItem[];
   initialHotLetters?: TodayLetterCardLike[];
   initialHomePlayerPosts?: HomePlayerPost[];
@@ -83,6 +83,7 @@ export function FeedPage({
   initialVideos,
   initialWordTerms,
   initialLensPosts,
+  paperDates,
   initialArchiveItems,
   initialHotLetters,
   initialHomePlayerPosts,
@@ -282,12 +283,12 @@ export function FeedPage({
             initialVideos={initialVideos}
             initialWordTerms={initialWordTerms}
             initialLensPosts={initialLensPosts}
+            paperDates={paperDates}
             initialArchiveItems={initialArchiveItems}
             initialHomePlayerPosts={initialHomePlayerPosts}
             sidebar={
-              <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />
+              <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} railLimit={6} style={{ paddingTop: 52 }} />
             }
-            topBanner={<DiscoveryBanner />}
           />
         )}
 

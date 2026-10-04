@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { HandUnderline } from '@/shared/ui/HandUnderline';
 import Image from 'next/image';
 import type { ArchiveItem } from '@/shared/lib/archiveItems';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
@@ -135,13 +136,8 @@ export function CategoryFeatureSection({
   return (
     <div
       className={span === 'wide' ? 'md:col-span-2' : 'md:col-span-1'}
-      style={{
-        background: '#fff',
-        border: '1px solid rgba(17,24,39,0.06)',
-        borderRadius: 18,
-        boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 10px 24px -16px rgba(17,24,39,0.1)',
-        padding: 'clamp(16px, 2.2vw, 22px)',
-      }}
+      // 2026-10-04 평면화(사용자: "NYT처럼 선으로 깔끔하게") — 둥근 테두리·그림자 카드를 걷고, 구역 위에 가는 먹색 선 한 줄(홈의 다른 구역과 같은 규칙).
+      style={{ borderTop: '1px solid #d3d6db', paddingTop: 16 }}
     >
       {/* 헤더 밑줄을 2px 검정에서 1px 연회색으로 낮췄던 결정(2026-08-17,
           "진한 느낌이 없고 모던한 느낌" 피드백)은 유지한다 — 굵은 검정 선을
@@ -152,20 +148,14 @@ export function CategoryFeatureSection({
           eyebrow 11px+h2 24px 조합)과 맞춘다(2026-10-01) — 상단 네비게이션에도
           있는 핵심 카테고리인데 이 섹션에서만 16px로 작게 나와 위계가
           어긋나 있었다. 박스·그림자·언더라인 톤은 그대로 유지. */}
-      <header className="mb-4" style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: 10 }}>
-        <p
-          className="text-gray-400"
-          style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
-        >
-          오늘의 지면
-        </p>
-        <div className="flex items-center justify-between" style={{ gap: 8 }}>
-          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            {config.label}
+      <header className="mb-4">
+        <div className="flex items-baseline justify-between" style={{ gap: 8 }}>
+          <h2 className="text-gray-900" style={{ fontSize: 'clamp(17px, 3.6vw, 20px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
+            <HandUnderline>{config.label}</HandUnderline>
           </h2>
           <Link
             href={`/${config.slug}`}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors"
+            className="flex-shrink-0 text-gray-500 hover:text-gray-900 transition-colors"
             style={{ fontSize: 13, fontWeight: 600 }}
           >
             전체 보기 →

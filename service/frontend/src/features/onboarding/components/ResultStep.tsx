@@ -33,7 +33,7 @@ export function ResultStep({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <OnboardingHeader currentStep={5} onBack={onBack} />
+      <OnboardingHeader currentStep={4} onBack={onBack} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 26px', gap: 20, maxWidth: 420, margin: '0 auto', width: '100%' }}>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.22em', textTransform: 'uppercase' }}>

@@ -7,10 +7,9 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
-  type TouchEvent as ReactTouchEvent,
 } from 'react';
 import Image from 'next/image';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline, seoHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
@@ -35,7 +34,6 @@ import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components'
 import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
 import { ArticleChapterNav } from './components/ArticleChapterNav';
-import { ArticleResume } from './components/ArticleResume';
 import { IconStopwatch } from './components/LensIcons';
 import { ArticleReveal } from './components/ArticleReveal';
 import { letterChapters } from './components/lensChapters';
@@ -44,6 +42,7 @@ import { renderInline } from './components/renderInline';
 import { ArticleStickyBar } from './components/ArticleStickyBar';
 import { ArticleToTop } from './components/ArticleToTop';
 import { ArticleToolRail } from './components/ArticleToolRail';
+import { ArticleNeighborLinks, ArticleNeighborNav, type ArticleNeighbor } from './components/ArticleNeighborNav';
 import {
   ArticleFooterStyles,
   ArticleTags,
@@ -102,12 +101,14 @@ export function LensViewClient({
   initialLens = undefined,
   otherLens = [],
   relatedLens = [],
+  neighbors,
   initialHotLetters,
 }: {
   slug: string;
   initialLens?: CmsLens | null;
   otherLens?: CmsLens[];
   relatedLens?: CmsLens[];
+  neighbors?: { prev: ArticleNeighbor | null; next: ArticleNeighbor | null };
   initialHotLetters?: TodayLetterCardLike[];
 }) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
@@ -124,10 +125,6 @@ export function LensViewClient({
   // 않으니 저절로 화면이 움직일 일도 없다.
   const [showDesc, setShowDesc] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  // 패널 가로 스와이프 시작점. 세로 스크롤·텍스트 선택과 다투지 않게
-  // 가로 우세를 확실히 요구한다(onPanelTouchEnd 참조).
-  const swipe = useRef<{ x: number; y: number } | null>(null);
-
   const noteDur = useCallback((i: number, raw: number) => {
     if (!Number.isFinite(raw) || raw <= 0) return;
     const sec = Math.round(raw);
@@ -171,6 +168,7 @@ export function LensViewClient({
           article_id: lens.id,
           from_format: lensFormatAt(prev),
           to_format: lensFormatAt(i),
+          ...(lens.category ? { category: lens.category } : {}),
         });
       }
       setDir(i > prev ? 1 : i < prev ? -1 : 0);
@@ -199,40 +197,8 @@ export function LensViewClient({
     });
   }, [lens]);
 
-  /**
-   * 패널 가로 스와이프로 형식 넘기기(2026-08-21, PR #10) — 이 서비스는
-   * "출퇴근길에 한 손으로"가 기본 사용 맥락인데, 앞서는 형식을 바꿀
-   * 방법이 탭 하나뿐이었다. 탭은 그대로 남는다 — 스와이프는 발견 가능한
-   * 조작이 아니므로 유일한 수단이 되면 안 된다.
-   */
-  const onPanelTouchStart = useCallback((e: ReactTouchEvent) => {
-    const t = e.touches[0];
-    // 오디오 스크러버·임베드·자체 스와이프를 가진 캐러셀 위에서는 안 잡는다.
-    if (!t || (e.target as HTMLElement).closest?.('audio, video, iframe, [data-own-swipe]')) {
-      swipe.current = null;
-      return;
-    }
-    swipe.current = { x: t.clientX, y: t.clientY };
-  }, []);
-
-  const onPanelTouchEnd = useCallback(
-    (e: ReactTouchEvent, i: number) => {
-      const start = swipe.current;
-      swipe.current = null;
-      if (!start || count < 2) return;
-      const t = e.changedTouches[0];
-      if (!t) return;
-      const dx = t.clientX - start.x;
-      const dy = t.clientY - start.y;
-      // 56px 이상 + 세로 이동의 1.6배 이상 — 세로 스크롤 중의 손떨림이나
-      // 텍스트 드래그가 형식 전환으로 오인되지 않는 최소 조건.
-      if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
-      const next = dx < 0 ? i + 1 : i - 1;
-      if (next < 0 || next >= count) return;
-      select(next);
-    },
-    [count, select],
-  );
+  // 형식 스와이프는 2026-10-03에 없앴다 — 좌우 스와이프는 이전/다음 기사 이동(ArticleNeighborNav)이 쓴다.
+  // 형식 전환은 상단 탭과 패널 맨 아래 이전/다음 버튼(FormatStepNav)이 맡는다.
 
   const onTabKeyDown = useCallback(
     (e: ReactKeyboardEvent, i: number) => {
@@ -278,7 +244,7 @@ export function LensViewClient({
       rel="noopener noreferrer"
       className="lnk"
       style={{ minHeight: 28, fontSize: 13 }}
-      onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: lensFormatAt(active) })}
+      onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: lensFormatAt(active), ...(lens.category ? { category: lens.category } : {}) })}
     >
       기사 원문 보기
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -327,6 +293,9 @@ export function LensViewClient({
         .rail-btn:disabled { opacity: .35; cursor: default; }
         .rail-btn:focus-visible { outline: 2px solid #111827; outline-offset: 2px; border-radius: 6px; }
         .rail-ico { display: flex; align-items: center; justify-content: center; height: 24px; }
+        .rail-ico .sk { transition: transform .25s cubic-bezier(.2,0,0,1); }
+        .rail-btn:hover:not(:disabled) .sk { transform: rotate(-6deg) translateY(-1px); }
+        @media (prefers-reduced-motion: reduce) { .rail-ico .sk { transition: none; } .rail-btn:hover:not(:disabled) .sk { transform: none; } }
         .rail-cap { font-size: 12px; color: #6b7280; white-space: nowrap; }
         .rail-pop { position: absolute; left: calc(100% + 8px); top: 0; z-index: 30; padding: 12px 14px;
           background: #fff; border-radius: 14px; box-shadow: 0 12px 32px rgba(15,23,42,0.14), 0 1px 3px rgba(15,23,42,0.08); }
@@ -511,14 +480,14 @@ export function LensViewClient({
           title={lens.headline}
           readMin={readMin}
         />
-        <ArticleResume articleId={lens.id} />
+        {neighbors && <ArticleNeighborNav articleId={lens.id} prev={neighbors.prev} next={neighbors.next} />}
         <ArticleReveal />
         {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
         {/* 웹툰 탭에서는 도구 레일을 숨겨 이미지에만 집중하게 한다(2026-10-01). */}
         <div className="rail-host" hidden={lensFormatAt(active) === 'webtoon'}>
           <nav className="rail" aria-label="기사 도구">
             <ArticleToolRail
-              title={lens.headline}
+              title={seoHeadline(lens.headline)}
               url={`${SITE_URL}${lensPath(lens)}`}
               cssVar="--lens-font-scale"
               storageKey="lens-font-size"
@@ -596,7 +565,7 @@ export function LensViewClient({
           >
             <div className="flex items-center" style={{ gap: 8 }}>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-              <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
+              <ArticleShareButtons title={seoHeadline(lens.headline)} url={`${SITE_URL}${lensPath(lens)}`} />
             </div>
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
@@ -611,7 +580,7 @@ export function LensViewClient({
             <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', overflow: 'hidden', background: '#f6f7f9', lineHeight: 0, borderRadius: 16, boxShadow: PHOTO_SHADOW }}>
               <Image
                 src={photo}
-                alt={lens.headline}
+                alt={seoHeadline(lens.headline)}
                 fill
                 sizes="(min-width: 760px) 720px, 100vw"
                 priority
@@ -688,7 +657,7 @@ export function LensViewClient({
               <h2 className="ovl" style={{ margin: 0 }}>
                 어떻게 볼까요?
               </h2>
-              <p className="fmt-sub">같은 기사를 네 가지 방식으로 읽을 수 있어요</p>
+              <p className="fmt-sub">취향대로 골라보세요 — 같은 기사를 네 가지 방식으로 만나요</p>
             </div>
 
             <FormatPicker lens={lens} lenses={lenses} active={active} mediaDur={mediaDur} select={select} onTabKeyDown={onTabKeyDown} tabRefs={tabRefs} />
@@ -716,8 +685,6 @@ export function LensViewClient({
                 active={active}
                 photo={photo}
                 dir={dir}
-                onPanelTouchStart={onPanelTouchStart}
-                onPanelTouchEnd={onPanelTouchEnd}
                 noteDur={noteDur}
               />
             ))}
@@ -744,6 +711,7 @@ export function LensViewClient({
             이전 "다른 시선" 3건(카테고리 무관 최신)은 같은 카테고리 기준 "더 보기"로 대체했다. */}
         <div className="lw" style={{ paddingTop: 8, paddingBottom: 100 }}>
           <ArticleFooterStyles />
+          {neighbors && <ArticleNeighborLinks articleId={lens.id} prev={neighbors.prev} next={neighbors.next} />}
           <ArticleTags lens={lens} />
           <MoreInCategory lens={lens} items={otherLens} />
           <RelatedArticles items={relatedLens} />

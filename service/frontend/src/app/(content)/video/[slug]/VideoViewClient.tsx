@@ -54,8 +54,8 @@ export function VideoViewClient({
         <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center text-neutral-500">
           <p>영상을 찾을 수 없어요.</p>
-          <Link href="/video" className="mt-4 inline-block text-sm underline underline-offset-4 hover:text-neutral-900">
-            영상 목록으로
+          <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4 hover:text-neutral-900">
+            최신 뉴스로
           </Link>
         </div>
       </div>
@@ -79,11 +79,11 @@ export function VideoViewClient({
       {video && (
         <main style={{ maxWidth: 780, margin: '0 auto', padding: 'clamp(24px, 5vw, 40px) clamp(20px, 5vw, 32px) 80px' }}>
           <Link
-            href="/video"
+            href="/lens"
             className="text-gray-400 hover:text-gray-900 transition-colors"
             style={{ fontSize: 13, fontWeight: 600, display: 'inline-block', marginBottom: 16 }}
           >
-            ← 영상 목록으로
+            ← 최신 뉴스로
           </Link>
 
           <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 12, background: '#111827' }}>

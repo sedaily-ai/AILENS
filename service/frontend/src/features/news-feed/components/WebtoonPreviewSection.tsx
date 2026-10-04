@@ -1,5 +1,6 @@
 'use client';
 
+import { WebtoonSketch } from '@/shared/ui/icons/VideoSketch';
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
@@ -91,6 +92,10 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
   const [items, setItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
 
   useEffect(() => {
+  // 서버가 이미 최신 4건을 HTML에 심어 보냈으면 브라우저에서 1000건짜리 전체 목록을 다시 받지 않는다(2026-10-03).
+  // 이 섹션은 앞 4건만 그리는데, 마운트 직후 전체 목록(약 350KB)을 받아 같은 내용으로 바꿔 끼우느라 화면이 한 번 더 그려지고 네트워크만 썼다.
+  // 새 글은 발행 때 서버가 캐시를 무효화(revalidate)해 HTML에 반영된다.
+    if (initialItems && initialItems.length > 0) return;
     let cancelled = false;
     fetchWebtoons().then((rows) => {
       if (!cancelled) setItems(rows);
@@ -117,37 +122,14 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <header style={{ marginBottom: 18 }}>
-        <span
-          className="inline-flex items-center"
-          style={{
-            gap: 6,
-            background: '#111827',
-            color: '#fde047',
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: '0.06em',
-            padding: '4px 10px',
-            borderRadius: 999,
-            transform: 'rotate(-2deg)',
-            marginBottom: 8,
-          }}
-        >
-          ✦ WEBTOON PILOT
-        </span>
         <div className="flex items-center justify-between" style={{ gap: 8 }}>
           <h2
             className="text-gray-900"
-            style={{ fontSize: 'clamp(21px, 4.6vw, 25px)', fontWeight: 800, letterSpacing: '-0.02em' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'clamp(21px, 4.6vw, 25px)', fontWeight: 800, letterSpacing: '-0.02em' }}
           >
+            <WebtoonSketch className="w-12 h-10 -ml-1" />
             이슈를 웹툰으로
           </h2>
-          <Link
-            href="/webtoon"
-            className="flex-shrink-0 text-gray-400 hover:text-gray-900 transition-colors"
-            style={{ fontSize: 13, fontWeight: 700 }}
-          >
-            더보기 →
-          </Link>
         </div>
       </header>
 
@@ -200,25 +182,6 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
                   </div>
                 )}
               </div>
-
-              {/* 회차 배지 — 이미지 모서리에 삐져나오게, 살짝 반대로 기울여 부착감. */}
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -11,
-                  left: -9,
-                  fontSize: 11.5,
-                  fontWeight: 800,
-                  color: '#fff',
-                  background: accent,
-                  padding: '3px 9px',
-                  borderRadius: 999,
-                  transform: `rotate(${-tilt * 1.4 - 3}deg)`,
-                  boxShadow: '2px 2px 0 rgba(28,25,23,0.5)',
-                }}
-              >
-                {i + 1}화
-              </span>
 
               <div style={{ padding: 'clamp(10px, 2.2vw, 14px)' }}>
                 <p style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4, fontWeight: 600 }}>

@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
+import { HandUnderline } from '@/shared/ui/HandUnderline';
+import { useEffect, useRef, useState } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
-import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
 
 // 카드 4개가 전부 "팟캐스트" 캐릭터 하나만 반복돼 단조로워 보인다는
@@ -16,7 +17,6 @@ import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
 // 처음엔 캐릭터별 브랜드 색(tint/color)까지 입혔는데, "캐릭터는
 // 흑백친구들로 하시죠"라는 후속 피드백으로 아바타·재생 배지 색은
 // 다시 중립 톤으로 되돌리고 캐릭터 종류만 다르게 유지한다.
-const NEUTRAL_ACCENT = '#3b82f6';
 
 // 오디오 섹션(2026-08-21, 사용자 요청 — "오디오 섹션도 메인 페이지에 걸어주시죠",
 // 위치는 "문화 섹션 위에"). TodayNewsPlayer.tsx(하단 고정 미니 플레이어)에만
@@ -28,10 +28,38 @@ interface Props {
   initialItems?: HomePlayerPost[];
 }
 
+const PREVIEW_COUNT = 5;
+
 export function AudioPreviewSection({ initialItems }: Props) {
   const [items, setItems] = useState<HomePlayerPost[] | null>(initialItems ?? null);
+  const [nowId, setNowId] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState({ t: 0, d: 0 });
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const fmt = (sec: number) => (Number.isFinite(sec) && sec > 0 ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : '0:00');
+  // 그 자리 재생(2026-10-04) — 같은 행이면 재생/일시정지, 다른 행이면 그 곡으로 바꿔 재생. 하단 고정 플레이어와 동시에 울리지 않게, 시작할 때 하단 플레이어를 멈추는 신호는 따로 없어 목록 쪽을 한 곡만 허용한다.
+  const playItem = (it: HomePlayerPost) => {
+    const a = audioRef.current;
+    if (!a) return;
+    setNowId(it.id);
+    setProgress({ t: 0, d: 0 });
+    a.src = it.mediaEmbedUrl;
+    void a.play().catch(() => setPlaying(false));
+  };
+  const toggleItem = (it: HomePlayerPost) => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (nowId === it.id) {
+      if (a.paused) void a.play().catch(() => undefined);
+      else a.pause();
+    } else playItem(it);
+  };
 
   useEffect(() => {
+  // 서버가 이미 최신 4건을 HTML에 심어 보냈으면 브라우저에서 1000건짜리 전체 목록을 다시 받지 않는다(2026-10-03).
+  // 이 섹션은 앞 4건만 그리는데, 마운트 직후 전체 목록(약 350KB)을 받아 같은 내용으로 바꿔 끼우느라 화면이 한 번 더 그려지고 네트워크만 썼다.
+  // 새 글은 발행 때 서버가 캐시를 무효화(revalidate)해 HTML에 반영된다.
+    if (initialItems && initialItems.length > 0) return;
     let cancelled = false;
     fetchHomePlayerPosts().then((rows) => {
       if (!cancelled) setItems(rows);
@@ -43,168 +71,114 @@ export function AudioPreviewSection({ initialItems }: Props) {
 
   if (!items || items.length === 0) return null;
 
-  const shown = items.slice(0, 4);
+  // 홈은 미리보기만(2026-10-04) — 최신 5건. 날짜 필터·더 불러오기·전용 목록 페이지는 없앴다(이전 구현: AudioPreviewSection.with-filter.tsx).
+  const shown = items.slice(0, PREVIEW_COUNT);
 
   return (
-    <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
-      <header
-        style={{
-          marginBottom: 14,
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 12,
-        }}
-      >
-        <div>
-          <p
-            className="text-gray-400"
-            style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
-          >
-            오디오
-          </p>
-          <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            오늘의 뉴스를 귀로
-          </h2>
-        </div>
-        <Link
-          href="/listen"
-          className="text-gray-500 hover:text-gray-900 flex-shrink-0"
-          style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-        >
-          더 보기
-          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
-          </svg>
-        </Link>
+    <section>
+      <header style={{ marginBottom: 6, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 'clamp(17px, 3.6vw, 20px)', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827' }}>
+          <PodcastSketch className="w-12 h-10 -ml-1" />
+          <HandUnderline>오늘의 뉴스를 귀로</HandUnderline>
+        </h2>
       </header>
 
-      {/* 세로 카드형 그리드(2026-08-21, 사용자 요청 — "세로 카드형으로...
-          깔끔한 모던 디자인으로"). 1차 카드형에 대해 "세로가 좀 더
-          길게, 오디오 느낌 나게, 재생버튼 있으면 더 예쁘지 않을까"라는
-          후속 피드백 반영 — minHeight로 카드를 더 세로로 늘리고, 캐릭터
-          원형 아바타 오른쪽 아래에 재생 버튼 배지를 겹쳐 "재생 가능한
-          오디오 카드"라는 게 한눈에 보이게 했다(흰 테두리로 아바타 위에
-          떠 있는 느낌, Spotify/Apple Music류 관례). 장식(회전·그림자
-          과다) 없이 얇은 테두리 + 은은한 그림자만 쓰는 미니멀 톤
-          (feedback_frontend_design_tone: 과한 그라데이션·굵은 테두리 금지). */}
-      <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap: 'clamp(12px, 2vw, 18px)' }}>
-        {shown.map((it, i) => {
+      <style>{`
+        .ap-list { border-top: 1px solid #e5e7eb; }
+        .ap-row { border-bottom: 1px solid #eceef1; }
+        .ap-day { margin: 0; padding: 12px 4px 4px; font-size: 12.5px; font-weight: 800; color: #6b7280; background: #fff; position: sticky; top: 0; z-index: 1; }
+        .ap-main { width: 100%; display: flex; align-items: center; gap: 16px; padding: 14px 4px; border: none; background: none; text-align: left; cursor: pointer; }
+        .ap-title { transition: color .18s ease; }
+        .ap-main:hover .ap-title, .ap-row.is-on .ap-title { color: #3d70de; }
+        .ap-play { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; background: #1f2937; color: #fff; display: flex; align-items: center; justify-content: center; transition: background .2s ease, transform .2s ease; }
+        .ap-main:hover .ap-play { background: #3d70de; transform: scale(1.06); }
+        .ap-main:active .ap-play { transform: scale(.94); }
+        .ap-row.is-on .ap-play { background: #3d70de; }
+        .ap-bar { display: flex; align-items: center; gap: 12px; padding: 0 4px 14px 64px; }
+        .ap-time { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; min-width: 34px; }
+        .ap-range { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 999px; background: linear-gradient(to right, #3d70de var(--p, 0%), #e5e7eb var(--p, 0%)); outline: none; cursor: pointer; }
+        .ap-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #3d70de; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(17,24,39,.3); }
+        .ap-range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #3d70de; border: 2px solid #fff; }
+        .ap-eq { display: flex; align-items: flex-end; gap: 2.5px; height: 16px; }
+        .ap-eq i { width: 3px; border-radius: 2px; background: #fff; animation: ap-eq .9s ease-in-out infinite; }
+        .ap-eq i:nth-child(2) { animation-delay: .2s; } .ap-eq i:nth-child(3) { animation-delay: .4s; }
+        @keyframes ap-eq { 0%, 100% { height: 4px; } 50% { height: 16px; } }
+        .ap-more { margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #9ca3af; text-decoration: none; }
+        .ap-more:hover { background: #f1f5f9; color: #111827; }
+        @media (prefers-reduced-motion: reduce) { .ap-title, .ap-play, .ap-eq i { transition: none; animation: none; } .ap-eq i { height: 10px; } }
+      `}</style>
+      {/* 플레이리스트(2026-10-04, 사용자: "리스트로, 스크롤하면서, 그 영역에서 바로 재생, 재생 타임라인 바도 보이게") — 세로 한 열 목록을 영역 안에서 스크롤한다.
+          행을 누르면 그 자리에서 재생되고, 재생 중인 행 아래에 타임라인(진행 막대·현재/전체 시간)이 펼쳐진다. 다시 누르면 일시정지. 이동은 오른쪽 › 로. */}
+      <audio
+        ref={audioRef}
+        preload="none"
+        onTimeUpdate={(e) => setProgress({ t: e.currentTarget.currentTime, d: e.currentTarget.duration || 0 })}
+        onLoadedMetadata={(e) => setProgress({ t: e.currentTarget.currentTime, d: e.currentTarget.duration || 0 })}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => {
+          const i = shown.findIndex((x) => x.id === nowId);
+          const next = shown.slice(i + 1).find((x) => isDirectAudioUrl(x.mediaEmbedUrl));
+          if (next) playItem(next);
+        }}
+      />
+      <div
+        className="ap-list"
+      >
+        {shown.map((it) => {
           const isAudio = isDirectAudioUrl(it.mediaEmbedUrl);
-          const p = lensPerspectiveAt(i);
+          const on = nowId === it.id;
+          const p = progress.d > 0 ? (progress.t / progress.d) * 100 : 0;
           return (
-            <Link
-              key={it.id}
-              href={`/listen/${encodeURIComponent(it.id)}`}
-              prefetch
-              className="group flex flex-col"
-              style={{
-                borderRadius: 16,
-                border: '1px solid rgba(17,24,39,0.07)',
-                background: '#fff',
-                boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 2px 8px rgba(17,24,39,0.04)',
-                padding: 'clamp(22px, 3vw, 28px) clamp(16px, 2.4vw, 20px) clamp(20px, 2.6vw, 24px)',
-                minHeight: 'clamp(210px, 26vw, 248px)',
-                textDecoration: 'none',
-                transition: 'transform .18s ease, box-shadow .18s ease, border-color .18s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 10px 22px rgba(17,24,39,0.1)';
-                e.currentTarget.style.borderColor = NEUTRAL_ACCENT;
-                const title = e.currentTarget.querySelector<HTMLElement>('[data-title]');
-                if (title) title.style.color = NEUTRAL_ACCENT;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 1px 2px rgba(17,24,39,0.03), 0 2px 8px rgba(17,24,39,0.04)';
-                e.currentTarget.style.borderColor = 'rgba(17,24,39,0.07)';
-                const title = e.currentTarget.querySelector<HTMLElement>('[data-title]');
-                if (title) title.style.color = '';
-              }}
-            >
-              <span className="relative flex-shrink-0" style={{ width: 68, height: 68, marginBottom: 18 }}>
-                <span
-                  className="flex items-center justify-center"
-                  style={{ width: 68, height: 68, borderRadius: '50%', background: '#f3f4f6', overflow: 'hidden' }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, LensViewClient.tsx와 동일 패턴 */}
-                  <img
-                    src={p.illustration}
-                    alt=""
-                    width={68}
-                    height={68}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 18%', mixBlendMode: 'multiply' }}
-                  />
-                </span>
-                {/* 재생 버튼 배지 — 클릭하면 카드가 가리키는 /listen 상세로
-                    이동하는 대신, 하단 고정 플레이어(TodayNewsPlayer)에서
-                    바로 재생을 시작한다(2026-08-21, "재생버튼 누르면 바
-                    흘러가게, 해당 페이지로 리다이렉트말구"). 크기를
-                    26px→36px로 키우고 세모(재생) 아이콘도 같이 키워
-                    "더 크고 직관적으로" 피드백 반영 — 눈에 바로 띄는
-                    1차 액션임을 명확히 한다. <a> 안에 실제 <button>을
-                    못 넣어(중첩 인터랙티브 엘리먼트) role=button span +
-                    키보드 핸들러로 대체. stopPropagation으로 부모 Link
-                    네비게이션을 막는다. */}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  aria-label="재생"
-                  className="absolute flex items-center justify-center"
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: NEUTRAL_ACCENT,
-                    border: '3px solid #fff',
-                    bottom: -6,
-                    right: -6,
-                    boxShadow: `0 3px 8px ${NEUTRAL_ACCENT}66`,
-                    cursor: 'pointer',
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    requestPlayHomePlayerItem(it.id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      requestPlayHomePlayerItem(it.id);
-                    }
-                  }}
-                >
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 2 }}>
-                    <path d="M8 5v14l11-7z" />
+            <div key={it.id} className={`ap-row${on ? ' is-on' : ''}`}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <button type="button" className="ap-main" aria-label={`${it.title} ${on && playing ? '일시정지' : '재생'}`} onClick={() => (isAudio ? toggleItem(it) : requestPlayHomePlayerItem(it.id))}>
+                  <span className="ap-play" aria-hidden>
+                    {on && playing ? (
+                      <span className="ap-eq"><i /><i /><i /></span>
+                    ) : (
+                      <svg width={16} height={16} viewBox="0 0 24 24" fill="#fff" style={{ marginLeft: 2 }}>
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    )}
+                  </span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span className="ap-title" style={{ display: '-webkit-box', fontSize: 16, fontWeight: 700, lineHeight: 1.4, letterSpacing: '-0.02em', color: '#111827', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'keep-all', textWrap: 'pretty' }}>
+                      {displayHeadline(it.title)}
+                    </span>
+                    <span style={{ display: 'block', marginTop: 5, fontSize: 12.5, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>
+                      {it.category ?? (isAudio ? '팟캐스트' : '영상')}
+                      {it.date && <> · {kstDateTimeLabel(it.publishedAt) ?? it.date.replaceAll('-', '.')}</>}
+                    </span>
+                  </span>
+                </button>
+                <Link href={`/listen/${encodeURIComponent(it.id)}`} prefetch={false} className="ap-more" aria-label="상세 보기" title="상세 보기">
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
                   </svg>
-                </span>
-              </span>
-
-              <span style={{ fontSize: 11, color: '#9ca3af', marginBottom: 7, fontWeight: 700, letterSpacing: '0.01em' }}>
-                {it.category ?? (isAudio ? '팟캐스트' : '영상')}
-                {it.date && <> · {kstDateTimeLabel(it.publishedAt) ?? it.date.replaceAll('-', '.')}</>}
-              </span>
-
-              <span
-                data-title
-                className="text-gray-900 transition-colors"
-                style={{
-                  fontFamily: '"Noto Serif KR", serif',
-                  fontSize: 'clamp(14.5px, 2vw, 15.5px)',
-                  fontWeight: 700,
-                  lineHeight: 1.42,
-                  letterSpacing: '-0.01em',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {displayHeadline(it.title)}
-              </span>
-            </Link>
+                </Link>
+              </div>
+              {on && (
+                <div className="ap-bar">
+                  <span className="ap-time">{fmt(progress.t)}</span>
+                  <input
+                    type="range"
+                    className="ap-range"
+                    min={0}
+                    max={progress.d || 0}
+                    step={0.1}
+                    value={Math.min(progress.t, progress.d || 0)}
+                    style={{ ['--p' as string]: `${p}%` }}
+                    aria-label="재생 위치"
+                    onChange={(e) => {
+                      const a = audioRef.current;
+                      if (a) a.currentTime = Number(e.target.value);
+                    }}
+                  />
+                  <span className="ap-time" style={{ textAlign: 'right' }}>{fmt(progress.d)}</span>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

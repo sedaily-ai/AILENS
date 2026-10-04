@@ -1,15 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { lensPerspectiveAt, LENS_FORMATS } from '@/shared/constants/lensPerspectives';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { OnboardingHeader } from './OnboardingHeader';
 
-const AUTO_ADVANCE_MS = 5000;
-const DEFAULT_FORMAT_INDEX = 0; // 레터
-
-// STEP 2 — 오늘의 1면 기사를 어떤 포맷으로 볼지 고른다. 5초 안에 안 고르면
-// 기본값(레터)으로 자동 진행 — 막다른 화면을 만들지 않는다는 원칙.
+// "하루의 틈" 장면이 안 맞는 사람을 위한 우회로 — 오늘의 1면을 어떤 포맷으로 볼지 직접 고른다.
+// (2026-10-04 이전엔 STEP 2였고 5초 뒤 레터로 자동 진행했다. 직접 고르겠다고 온 사람에게 타이머는 맞지 않아 뺐다.)
 export function FormatStep({
   lens,
   onSelect,
@@ -21,19 +17,9 @@ export function FormatStep({
   onSkip: () => void;
   onBack?: () => void;
 }) {
-  const onSelectRef = useRef(onSelect);
-  useEffect(() => {
-    onSelectRef.current = onSelect;
-  }, [onSelect]);
-
-  useEffect(() => {
-    const t = setTimeout(() => onSelectRef.current(DEFAULT_FORMAT_INDEX), AUTO_ADVANCE_MS);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <OnboardingHeader currentStep={2} onSkip={onSkip} onBack={onBack} />
+      <OnboardingHeader currentStep={1} onSkip={onSkip} onBack={onBack} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px 24px', textAlign: 'center', gap: 14, maxWidth: 420, margin: '0 auto', width: '100%' }}>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.22em', textTransform: 'uppercase' }}>
@@ -81,9 +67,6 @@ export function FormatStep({
         </div>
       </div>
 
-      <div style={{ textAlign: 'center', padding: '0 0 28px' }}>
-        <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>5초 후 레터로 자동 진행</p>
-      </div>
     </div>
   );
 }

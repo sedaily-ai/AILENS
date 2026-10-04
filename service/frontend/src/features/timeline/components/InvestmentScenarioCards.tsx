@@ -15,7 +15,7 @@
 // 문장으로 구성한다(백엔드 config/investment_scenarios.py 참조) — 데이터가
 // 없는 구간은 카드 자체가 배열에서 빠지므로(추정치로 안 채움) 여기선 있는
 // 것만 그대로 렌더링한다.
-import type { InvestmentScenario } from '../lib/timelineApi';
+import type { InvestmentScenario } from '@/shared/lib/api/timelineApi';
 import {
   SURFACE_SUNKEN, TEXT_STRONG, TEXT_BODY, TEXT_MUTED,
   BORDER_HAIRLINE, BORDER_STRONG, FONT, LEADING, SPACE, RADIUS,

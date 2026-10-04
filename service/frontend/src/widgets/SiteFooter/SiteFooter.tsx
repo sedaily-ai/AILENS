@@ -122,9 +122,6 @@ const NAV: { label: string; href: string }[] = [
 // 손으로 옮겨 적지 않는다.
 const CONTENT_LINKS: { label: string; href: string }[] = [
   ...ECON_CATEGORIES.map((c) => ({ label: c.label, href: `/${c.slug}` })),
-  { label: '영상', href: '/video' },
-  { label: '웹툰', href: '/webtoon' },
-  { label: '오디오', href: '/listen' },
   { label: '전체 콘텐츠', href: '/lens' },
 ];
 

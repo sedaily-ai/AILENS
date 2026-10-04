@@ -14,7 +14,7 @@
 // 디자인: "토스나 나이키, 일본의 장인 감성" — 카카오톡·인스타그램만 각자
 // 브랜드 색(노란 원, 인스타 그라디언트)을 쓰고, 그 외(공유하기)는 절제된
 // 모노톤 라인아이콘으로 남겨 튀지 않게 했다. 이상한 이모지는 안 씀.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { generateShareCardBlob, type ShareCardData } from '../lib/shareCard';
 import { TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '../lib/tone';
 
@@ -123,7 +123,12 @@ function ShareBarButton({
 export function ShareBar({ cardData }: { cardData: ShareCardData }) {
   const [kakaoFeedback, setKakaoFeedback] = useState<string | null>(null);
   const [igFeedback, setIgFeedback] = useState<string | null>(null);
-  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  // 브라우저 공유 지원 여부는 마운트 뒤에 정한다. 렌더 중에 navigator를 읽으면 서버(미지원)와 브라우저(지원)가 다르게 그려져 하이드레이션 오류(#418)가 났다(2026-10-04 운영에서 확인).
+  const [canNativeShare, setCanNativeShare] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회 기능 감지
+    setCanNativeShare(typeof navigator.share === 'function');
+  }, []);
 
   const flash = (setter: (v: string | null) => void, text: string) => {
     setter(text);

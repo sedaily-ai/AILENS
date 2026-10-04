@@ -40,6 +40,8 @@ interface HeaderProps {
   logoHref?: string;
   onLogo?: () => void;
   frosted?: boolean;
+  /** 특정 카테고리 안에 들어와 있을 때(2026-10-04, 영문판 "‹ POLITICS" 구조): 메인 카테고리 메뉴 대신 왼쪽 위에 "‹ 카테고리명"(누르면 href로 돌아감), 가운데 로고, 오른쪽 검색·로그인만 보인다. */
+  section?: { label: string; href: string };
 }
 
 // 폰트 크기(2026-08-06 확대) — 컬리/밑미/밑미도구상점 등 레퍼런스 대비
@@ -394,7 +396,7 @@ function MobileDrawer({
   );
 }
 
-export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: HeaderProps) {
+export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, section }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   // 1차 줄(핵심+카테고리) vs "더보기" 드롭다운(부가 기능) — tier:'more'
   // 참조(shared/lib/headerTabs.ts). 모바일 드로어는 그대로 전체 목록을
@@ -420,8 +422,17 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
         frosted ? 'bg-white/95 backdrop-blur-md' : 'bg-white'
       }`}
     >
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
-        <div className="flex items-center h-[56px] gap-4 md:gap-10">
+      {/* 카테고리 모드(section)에서는 아래 본문 컨테이너(maxWidth 1320, 좌우 clamp(24px,3.5vw,44px))와 똑같은 폭·여백을 써서, 왼쪽 "‹ 카테고리"의 화살표 끝이 탭 "전체"의 첫 글자와, 오른쪽 끝이 본문 오른쪽 끝과 한 선에 놓이게 한다(2026-10-04). */}
+      <div className={section ? 'mx-auto' : 'max-w-[1200px] mx-auto px-4 sm:px-6'} style={section ? { maxWidth: 1320, padding: '0 clamp(24px, 3.5vw, 44px)' } : undefined}>
+        <div className={section ? 'grid grid-cols-[1fr_auto_1fr] items-center h-[56px] gap-3' : 'flex items-center h-[56px] gap-4 md:gap-10'}>
+          {section && (
+            <Link href={section.href} className="group inline-flex items-center gap-1 min-w-0 justify-self-start" aria-label={`${section.label} — 메인으로 돌아가기`}>
+              <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0 -ml-[5px] transition-transform duration-200 group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+              <span className="text-[15px] font-bold text-gray-900 truncate">{section.label}</span>
+            </Link>
+          )}
           {onLogo ? (
             <button onClick={onLogo} className={logoCls}>
               <span>AI LENS</span>
@@ -437,14 +448,16 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted }: Head
           {/* 데스크탑 탭 — core/extra 구분선은 뺐다(2026-08-11) — 탭이 8개로
               늘면서 "|" 하나로는 굳이 안 나눠도 된다는 피드백, 무게(굵기·색)
               차이만으로 core/extra 구분은 그대로 유지. */}
-          <nav className="hidden md:flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
-            {primaryTabs.map((tab) => (
-              <DesktopTab key={tab.key} tab={tab} />
-            ))}
-            <MoreTabsMenu tabs={moreTabs} />
-          </nav>
+          {!section && (
+            <nav className="hidden md:flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
+              {primaryTabs.map((tab) => (
+                <DesktopTab key={tab.key} tab={tab} />
+              ))}
+              <MoreTabsMenu tabs={moreTabs} />
+            </nav>
+          )}
 
-          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+          <div className={`flex items-center gap-2 flex-shrink-0 ${section ? 'justify-self-end -mr-3' : 'ml-auto'}`}>
             {/* 검색창처럼 생긴 입력 바(2026-08-06 설계, Notion/Linear류 "Search or
                 ask AI" 패턴)를 아이콘 전용으로 축소(2026-08-17) — 카테고리 탭
                 6개가 늘면서 1차 줄이 좁아져(사용자 확인), 모바일에서 이미 쓰던

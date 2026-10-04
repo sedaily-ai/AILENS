@@ -8,6 +8,7 @@
     "start": "next start",
     "start:ssr": "node .next/standalone/server.js",
     "lint": "eslint",
+    "smoke": "bash scripts/smoke.sh",
     "test:lens-blocks": "node --experimental-strip-types scripts/test-lens-blocks.mjs"
   },
   "dependencies": {
@@ -19,6 +20,9 @@
     "@tailwindcss/typography": "^0.5.19",
     "aromanize": "^0.1.5",
     "aws-amplify": "^6.16.3",
+    "d3-array": "^3.2.4",
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
@@ -31,6 +35,9 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3-array": "^3.2.2",
+    "@types/d3-scale": "^4.0.9",
+    "@types/d3-shape": "^3.2.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

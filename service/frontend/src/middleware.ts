@@ -10,7 +10,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // 렌더링 파이프라인 밖)에서 처리하면 페이지 컴포넌트엔 redirect() 호출이
 // 아예 안 남아 정상적으로 ISR 캐시(revalidate:300)를 받는다.
 const PAGE_N_BASES = new Set([
-  'lens', 'webtoon', 'video', 'listen',
+  'lens',
   'markets', 'signal', 'property', 'industry', 'finance', 'international', 'culture',
 ]);
 
@@ -38,7 +38,7 @@ export function middleware(request: NextRequest) {
   if (!page || !/^\d+$/.test(page)) return NextResponse.next();
 
   const n = parseInt(page, 10);
-  const base = pathname === '/lens' ? '/lens' : '/webtoon';
+  const base = '/lens';
   const destination = n <= 1 ? base : `${base}/page/${n}`;
   const url = request.nextUrl.clone();
   url.pathname = destination;
@@ -48,8 +48,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/lens', '/webtoon',
-    '/lens/page/:n', '/webtoon/page/:n', '/video/page/:n', '/listen/page/:n',
+    '/lens',
+    '/lens/page/:n',
     '/markets/page/:n', '/signal/page/:n', '/property/page/:n', '/industry/page/:n',
     '/finance/page/:n', '/international/page/:n', '/culture/page/:n',
   ],

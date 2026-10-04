@@ -72,7 +72,7 @@ export default async function LensListPageN({ params }: { params: Promise<{ n: s
   const parsedN = parseInt(rawN, 10);
   const n = Number.isFinite(parsedN) && parsedN > 1 ? parsedN : 1;
 
-  const [items, hotLetters] = await Promise.all([fetchLensPosts(), fetchFollowingLetters(5)]);
+  const [items, hotLetters] = await Promise.all([fetchLensPosts(), fetchFollowingLetters(10)]);
   const jsonLd = buildLensJsonLd(items);
   return (
     <>

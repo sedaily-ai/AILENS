@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { useCutViewTracking } from '@/shared/lib/tracking/useCutViewTracking';
+import { webtoonVariant } from '@/shared/lib/tracking/webtoonVariant';
 
 /**
  * 경로 기반(`/webtoon/[slug]`) 웹툰 상세의 클라이언트 본체(2026-08-07, 쿼리스트링
@@ -55,7 +56,7 @@ export function WebtoonViewClient({
 
   // hooks는 아래 early return보다 위에서 무조건 불러야 한다(Rules of Hooks).
   const cutsContainerRef = useRef<HTMLDivElement>(null);
-  useCutViewTracking(cutsContainerRef, webtoon?.id, webtoon?.panels.length ?? 0);
+  useCutViewTracking(cutsContainerRef, webtoon?.id, webtoon?.panels.length ?? 0, webtoonVariant(webtoon?.panels));
 
   if (!slug || webtoon === null) {
     return (
@@ -63,11 +64,11 @@ export function WebtoonViewClient({
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center" style={{ color: '#71717a' }}>
           <p>웹툰을 찾을 수 없어요.</p>
           <Link
-            href="/webtoon"
+            href="/lens"
             className="mt-4 inline-block text-sm underline underline-offset-4"
             style={{ color: '#a1a1aa' }}
           >
-            웹툰 목록으로
+            최신 뉴스로
           </Link>
         </div>
       </div>
@@ -106,8 +107,8 @@ export function WebtoonViewClient({
         }}
       >
         <Link
-          href="/webtoon"
-          aria-label="웹툰 목록으로"
+          href="/lens"
+          aria-label="최신 뉴스로"
           style={{ fontSize: 18, color: '#f4f4f5', textDecoration: 'none', lineHeight: 1, flexShrink: 0 }}
         >
           ←
@@ -251,7 +252,7 @@ export function WebtoonViewClient({
               <div style={{ padding: '20px 20px', textAlign: 'center', background: '#111114' }}>
                 <p style={{ fontSize: 13, color: '#71717a', marginBottom: 12 }}>최신 화까지 다 보셨어요.</p>
                 <Link
-                  href="/webtoon"
+                  href="/lens"
                   style={{
                     display: 'inline-block',
                     fontSize: 12.5,

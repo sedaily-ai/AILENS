@@ -59,8 +59,8 @@ function CategoryPairRow({
   // 테두리+그림자)를 가지므로, 카드 밖에 또 구분선을 그으면 카드 테두리와
   // 겹쳐 이중 프레임처럼 보인다. 카드 사이 간격(marginTop)만으로 행 구분.
   return (
-    <div style={{ marginTop: first ? 0 : 24 }}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6" style={{ marginBottom: 24 }}>
+    <div style={{ marginTop: 'clamp(32px, 4.4vw, 48px)' }}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginBottom: 8 }}>
         <CategoryFeatureSection config={configs[0]} items={itemsBySlug[0]} span="wide" />
         {configs[1] && <CategoryFeatureSection config={configs[1]} items={itemsBySlug[1]} span="narrow" />}
       </div>
@@ -83,6 +83,7 @@ interface Props {
   initialVideos?: CmsVideo[];
   initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
+  paperDates?: string[];
   // "최신 뉴스" 그리드 + 카테고리 레일이 공유하는 letters 원본(2026-08-17,
   // 홈 구조 개편) — 한 번만 fetch해서 최신순 슬라이스와 카테고리별 필터
   // 양쪽에 다 쓴다(app/page.tsx 참조).
@@ -99,8 +100,18 @@ interface Props {
   // 본문 칼럼(gridColumn:1) 맨 위, 히어로 캐러셀 위에 얹는 배너 — sidebar와
   // 같은 이유(features가 다른 feature를 직접 import 못 함)로 렌더된
   // 엘리먼트를 그대로 받는다. 2026-09, features/onboarding의
-  // DiscoveryBanner용으로 신설 — widgets/FeedPage/FeedPage.tsx가 조립.
+  // 피드 상단 슬롯(현재 FeedPage는 쓰지 않음 — 2026-10-04 DiscoveryBanner 제거).
   topBanner?: ReactNode;
+}
+
+// 홈 구역 구분(2026-10-04, 사용자: "뉴욕타임스처럼 영역별로 선으로 깔끔하게") — 구역마다 위에 가는 먹색 선 한 줄 + 일정한 간격. 각 구역이 따로 갖던 위 여백은 선 아래 16px로 통일한다.
+function HomeSection({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="home-sec">
+      <style>{`.home-sec { border-top: 1px solid #d3d6db; margin-top: clamp(32px, 4.4vw, 48px); padding-top: 16px; } .home-sec > section { padding-top: 0 !important; } .home-sec > section > header { margin-top: 0; }`}</style>
+      {children}
+    </div>
+  );
 }
 
 export function NewsFeedTab({
@@ -108,6 +119,7 @@ export function NewsFeedTab({
   initialVideos,
   initialWordTerms,
   initialLensPosts,
+  paperDates,
   initialArchiveItems,
   initialHomePlayerPosts,
   sidebar,
@@ -186,7 +198,7 @@ export function NewsFeedTab({
                 범용 archiveItems로는 불가능하다. */}
             <LatestGridSection
               items={archiveItems}
-              heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} /> : undefined}
+              heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} paperDates={paperDates} /> : undefined}
             />
 
             {/* 단어 퀴즈를 "최신 뉴스" 바로 아래로 올렸다(2026-08-20, 사용자
@@ -196,7 +208,7 @@ export function NewsFeedTab({
                 충족감을 즉시 주는 포맷 — 이탈 전에 걸리는 게 핵심이라 히어로
                 바로 다음 자리로 옮긴다. 영상 섹션은 이미 썸네일이 시각적으로
                 스캔되기 쉬운 포맷이라 원래 자리(카테고리 레일 다음) 유지. */}
-            <WordsPreviewSection initialTerms={initialWordTerms} />
+            <HomeSection><WordsPreviewSection initialTerms={initialWordTerms} /></HomeSection>
 
             {/* 홈 히어로 배너(2026-08-06, "신문 읽는 스타일"/웹툰/사주 3슬라이드
                 프로모 캐러셀) — 리디자인(2026-09-30)으로 이 자리로 이동. 원래는
@@ -233,7 +245,7 @@ export function NewsFeedTab({
                 NewsTimeMachineSection.tsx 상단 주석 참조.
                 위치: 카테고리 섹션 첫 짝(증시+부동산) 바로 아래, 산업 짝 바로
                 위(2026-08-17, 사용자 확인). */}
-            <NewsTimeMachineSection />
+            <HomeSection><NewsTimeMachineSection /></HomeSection>
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[1]} archiveItems={archiveItems} first={false} />
 
@@ -250,9 +262,9 @@ export function NewsFeedTab({
                 떨어져 있어서 단어 퀴즈(§ 오늘 앞서 옮김)와 같은 문제를
                 겪고 있었다 — 웹툰 옆으로 옮겨 "비주얼 콘텐츠" 블록으로
                 묶는다. */}
-            <WebtoonPreviewSection initialItems={initialWebtoons} />
+            <HomeSection><WebtoonPreviewSection initialItems={initialWebtoons} /></HomeSection>
 
-            <VideoPreviewSection initialVideos={initialVideos} />
+            <HomeSection><VideoPreviewSection initialVideos={initialVideos} /></HomeSection>
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
 
@@ -262,7 +274,7 @@ export function NewsFeedTab({
                 있어서 스크롤되는 본문 콘텐츠 목록엔 전혀 안 걸려있었다 —
                 /listen 목록과 같은 home_player 데이터를 텍스트 리스트로
                 보여준다(AudioPreviewSection.tsx). */}
-            <AudioPreviewSection initialItems={initialHomePlayerPosts} />
+            <HomeSection><AudioPreviewSection initialItems={initialHomePlayerPosts} /></HomeSection>
 
             {/* 문화(culture) — 경제 카테고리 6개 짝(3줄)을 다 채운 뒤에 생긴
                 7번째 카테고리라 파트너가 없다. 단독 1개짜리 줄로 마지막에

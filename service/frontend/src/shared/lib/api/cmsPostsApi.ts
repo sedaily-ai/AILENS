@@ -38,6 +38,8 @@ export interface CmsTrendCard {
 export interface CmsWebtoonPanel {
   url: string;
   caption: string;
+  /** 2026-10-04 — true면 나레이션 띠가 이미지에 박혀 있지 않고, 컷 아래 흰 여백에 caption을 글자로 보여준다. */
+  text_caption?: boolean;
 }
 
 export interface CmsWebtoon {
@@ -103,6 +105,8 @@ export interface CmsVideo {
   published_at?: string | null;
   video_url: string;
   thumbnail_url: string | null;
+  /** 홈 영상 섹션 전용(2026-10-04) — 같은 이슈 기사(lens)의 사진. 영상 프레임(thumbnail_url)은 전환 도중 글자가 잘려 찍히는 일이 많아 이 사진을 우선 쓴다. */
+  poster_url?: string | null;
   is_cms: true;
   /** lens("4가지 시선")의 영상 포맷에서 파생된 카드일 때만 채워짐(2026-08-20,
    *  shared/lib/lensMediaFeed.ts) — 기본 `/video/{id}` 대신 이 경로로
@@ -261,8 +265,14 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
 // 홈 영상 미리보기(VideoPreviewSection) 전용 축약본(2026-09-03) — 항상
 // 상위 4개만 쓰는데 최대 1000건 전체를 넘기고 있었다. CmsVideo 자체엔
 // 무거운 필드가 없어(대본 등 없음) 개수만 줄여도 충분하다.
-export function toVideoPreviewSummaries(videos: CmsVideo[]): CmsVideo[] {
-  return videos.slice(0, 4);
+export function toVideoPreviewSummaries(videos: CmsVideo[], lens: CmsLens[] = []): CmsVideo[] {
+  // 영상 id = 같은 이슈 lens 글의 id(슬러그 동일) — 기사 사진을 포스터로 붙인다.
+  const photoById = new Map(lens.map((l) => [l.id, pickPhoto(l)] as const));
+  return videos.slice(0, 4).map((v) => ({ ...v, poster_url: photoById.get(v.id) ?? null }));
+}
+
+function pickPhoto(l: CmsLens): string | null {
+  return l.photo_image_url || l.cover_image_url || null;
 }
 
 export async function fetchVideos(): Promise<CmsVideo[]> {
@@ -433,6 +443,100 @@ export async function fetchLensPosts(limit: number = 1000): Promise<CmsLens[]> {
     }
     return [];
   });
+}
+
+/** 특정 날짜(KST)에 발행된 글 목록 — 채널별 1,000건 상한 밖 과거 글을 이어 받는 데 쓴다(lens·webtoon·video 공통). */
+async function fetchChannelOnDate<T>(channel: 'lens' | 'webtoon' | 'video', date: string): Promise<T[]> {
+  return cached(`${channel}:date:${date}`, async () => {
+    try {
+      const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=${channel}&date=${date}&limit=1000`, cacheOpts(`posts:${channel}`));
+      if (!res.ok) return [];
+      const data = (await res.json()) as { posts?: T[] };
+      return data.posts ?? [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function shiftDay(date: string, delta: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * 최신 1,000건 상한 밖 과거 글 이어 받기(2026-10-04, sitemap 전용).
+ *
+ * 목록 API는 채널당 최신 1,000건에서 잘린다(백엔드 limit 상한 1000, offset·cursor 없음 — 다음 페이지는 `date=` 조회뿐).
+ * 2026-10-04 실측: lens·webtoon·video 모두 최신 1,000건의 가장 오래된 날짜가 2026-09-14인데 그 이전 글(lens 9/13 13건,
+ * 9/1 96건, 8/20 5건 …)이 실제로 있어 sitemap에서 통째로 빠져 있었다. 상한에 닿았을 때만 가장 오래된 날짜(그날은 중간에 잘렸을 수
+ * 있어 다시 포함)부터 6일씩 병렬로 거슬러 내려가며 받는다. 연속으로 비는 날이 20일 이어지거나 서비스 시작 전(2026-07-01)이면 멈춘다.
+ * 카테고리·/lens 목록·이전/다음 이동은 여전히 최신 1,000건 기준이다(HTML 크기 때문에 이번 범위 밖).
+ */
+async function extendBeyondCap<T extends { id: string; date: string }>(channel: 'lens' | 'webtoon' | 'video', recent: T[]): Promise<T[]> {
+  if (recent.length < 1000) return recent;
+  const byId = new Map(recent.map((p) => [p.id, p]));
+  let day = recent.reduce((m, p) => (p.date < m ? p.date : m), recent[0].date);
+  let emptyRun = 0;
+  while (day >= '2026-07-01' && emptyRun < 20) {
+    const batchDays = Array.from({ length: 6 }, (_, i) => shiftDay(day, -i));
+    const batches = await Promise.all(batchDays.map((d) => fetchChannelOnDate<T>(channel, d)));
+    for (const posts of batches) {
+      if (posts.length === 0) emptyRun += 1;
+      else emptyRun = 0;
+      for (const p of posts) if (!byId.has(p.id)) byId.set(p.id, p);
+    }
+    day = shiftDay(day, -6);
+  }
+  return [...byId.values()];
+}
+
+/** 특정 날짜(KST) lens 글 — "지난 지면" 페이지(/paper/[date])용(2026-10-04). */
+export async function fetchLensPostsOnDate(date: string): Promise<CmsLens[]> {
+  return fetchChannelOnDate<CmsLens>('lens', date);
+}
+
+/** 홈 지면 탭이 쓰는 paper_section 값 — features/news-feed LensPreviewSection의 SECTIONS와 같은 값(그쪽이 이 값으로 탭별 기사를 거른다). */
+export const PAPER_SECTION_VALUES = ['전체', '증권', '산업', '시그널'] as const;
+
+/**
+ * 지면이 편성된 날짜 목록(최신순, YYYY-MM-DD) — 4개 지면 중 하나라도 기사가 있는 날.
+ * 최신 1,000건 안에서 구한다. 지면(paper_section) 데이터는 2026-09-29부터 있어(그 이전 글엔 값이 없다) 상한 문제가 없다.
+ */
+export async function fetchPaperDates(): Promise<string[]> {
+  // 최신 1,000건 응답이 약 3MB라 Next 데이터 캐시 한도(2MB)를 넘어 캐시되지 않는다(2026-10-04 실측 2.96MB) —
+  // 그대로 두면 홈·지난 지면·사이트맵 렌더마다 3MB를 새로 받는다. 날짜 목록(수십 바이트)만 서버 메모리에 5분 보관한다.
+  const now = Date.now();
+  if (paperDatesMemo && now - paperDatesMemo.at < CACHE_TTL_FALLBACK_SECONDS * 1000) return paperDatesMemo.dates;
+  if (paperDatesInFlight) return paperDatesInFlight;
+  paperDatesInFlight = (async () => {
+    const posts = await fetchLensPosts(1000);
+    const sections = new Set<string>(PAPER_SECTION_VALUES);
+    const dates = new Set<string>();
+    for (const p of posts) {
+      if (p.paper_section && sections.has(p.paper_section)) dates.add(p.date);
+    }
+    const list = [...dates].sort().reverse();
+    // 빈 결과(API 일시 실패)는 보관하지 않는다 — 다음 요청이 바로 다시 시도한다.
+    if (list.length > 0) paperDatesMemo = { at: Date.now(), dates: list };
+    return list;
+  })().finally(() => {
+    paperDatesInFlight = null;
+  });
+  return paperDatesInFlight;
+}
+let paperDatesMemo: { at: number; dates: string[] } | null = null;
+let paperDatesInFlight: Promise<string[]> | null = null;
+
+export async function fetchAllLensPosts(): Promise<CmsLens[]> {
+  return extendBeyondCap('lens', await fetchLensPosts(1000));
+}
+export async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
+  return extendBeyondCap('webtoon', await fetchWebtoons());
+}
+export async function fetchAllVideos(): Promise<CmsVideo[]> {
+  return extendBeyondCap('video', await fetchVideos());
 }
 
 export async function fetchLensBySlug(slug: string): Promise<CmsLens | null> {

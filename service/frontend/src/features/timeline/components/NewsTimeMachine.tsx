@@ -8,17 +8,9 @@ import {
   BORDER_CONTROL, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN, CONTAINER_MAX,
 } from '../lib/tone';
 import { VintageCalendar } from './VintageCalendar';
-import { kstTodayStr } from '../lib/timelineApi';
-
-// 빅카인즈가 공식 지원하는 최소 날짜(OpenAPI 사용자지침서 V1.5 §4) —
-// NewsTimeMachineSection.tsx(홈 위젯)에도 같은 값이 있다. FSD 레이어 간
-// import 금지 규칙 때문에 의도적으로 중복.
-const MIN_DATE = '1990-01-01';
-
-function kdateLabel(ymd: string): string {
-  const [y, m, d] = ymd.split('-');
-  return `${y}년 ${parseInt(m, 10)}월 ${parseInt(d, 10)}일`;
-}
+import { kstTodayStr } from '@/shared/lib/date';
+import { kdate } from '@/shared/lib/timelineDates';
+import { BIGKINDS_MIN_DATE } from '@/shared/constants/timeline';
 
 /**
  * 뉴스 타임머신 — 날짜를 입력하면 '서울경제' 신문이 그 날짜로 되감기는
@@ -36,7 +28,8 @@ function kdateLabel(ymd: string): string {
 
 type Phase = 'input' | 'rewinding';
 
-export function NewsTimeMachine() {
+/** children: 날짜 입력 아래에 이어 붙일 내용(시대 카드 등). 입력 화면이 100vh라 밖에 두면 화면 아래로 밀려 안 보인다. */
+export function NewsTimeMachine({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
   const today = kstTodayStr();
   const [phase, setPhase] = useState<Phase>('input');
@@ -128,7 +121,7 @@ export function NewsTimeMachine() {
                 lineHeight: LEADING.body,
               }}
             >
-              1990년부터 오늘까지, 날짜를 고르면 그날 지면을 그대로 펼쳐드려요.
+              1990년부터 오늘까지, 날짜를 고르면 그날의 뉴스를 그대로 펼쳐드려요.
             </p>
 
             <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -158,7 +151,7 @@ export function NewsTimeMachine() {
                     minWidth: 'clamp(140px, 40vw, 180px)',
                   }}
                 >
-                  {date ? kdateLabel(date) : '날짜 선택'}
+                  {date ? kdate(date) : '날짜 선택'}
                 </button>
                 <button
                   type="button"
@@ -188,7 +181,7 @@ export function NewsTimeMachine() {
               {showCalendar && (
                 <VintageCalendar
                   value={date}
-                  min={MIN_DATE}
+                  min={BIGKINDS_MIN_DATE}
                   max={today}
                   viewMonth={viewMonth}
                   onViewMonthChange={setViewMonth}
@@ -216,6 +209,7 @@ export function NewsTimeMachine() {
             />
           </div>
         )}
+        {phase === 'input' && children}
       </div>
     </div>
   );

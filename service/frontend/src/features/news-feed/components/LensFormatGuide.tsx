@@ -2,208 +2,152 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LENS_PERSPECTIVES, type LensPerspective } from '@/shared/constants/lensPerspectives';
+import { LENS_PERSPECTIVES } from '@/shared/constants/lensPerspectives';
 
 /**
- * "지면 특별 코너" 첫 방문자용 가이드 — 네 형식(레터·웹툰·팟캐스트·영상)이
- * 각각 뭘 담고 있는지 알려준다.
+ * "지면 특별 코너" 첫 방문자용 가이드 — 같은 이슈가 레터·웹툰·팟캐스트·영상 네 가지로 만들어져 있다는 걸 알려준다.
  *
- * ── 2026-08-21 (1차) 자동재생 캐러셀 → 직접 눌러보는 디스클로저 ──
- * 이전 버전은 커서가 스스로 탭·행을 클릭하는 3단계 루프 애니메이션
- * (LensGuideAnimation.tsx, 삭제) + 그 아래 4형식 정적 리스트였다. 세 가지가
- * 깨져 있었다:
- *  1. **375px에서 무대가 잘렸다.** `STAGE_W = 420`을 슬라이드 폭·트랙 폭·
- *     translateX 이동거리에 그대로 썼는데 375px 실제 가시 폭은 303px
- *     (= 375 − 32 백드롭 padding − 40 패널 padding)이라 오른쪽 117px이
- *     잘렸다. 4번째 탭 "시그널"(x 313~404)은 화면 밖이었다.
- *  2. **14.2초 자동재생인데 제어 수단이 없었다.** 점 인디케이터가
- *     `<span>`이라 클릭 불가, 일시정지·키보드 조작 없음,
- *     `prefers-reduced-motion` 무시.
- *  3. **같은 문구를 두 번 보여줬다.** 캐러셀이 형식별 `content`를 보여준
- *     직후 아래 정적 리스트가 똑같은 문장을 반복했다.
- *
- * 그래서 "보여주기"를 버리고 가이드 자체를 눌러보는 것으로 바꿨다. 커서가
- * 대신 클릭하는 걸 구경하는 대신 사용자가 직접 열어보면 실제 섹션의
- * 조작(형식을 눌러 고른다)을 몸으로 배운다.
- *
- * ── 2026-08-21 (2차) 카드 아코디언 → 헤어라인 인덱스 ──
- * 1차가 "가시성은 높지만 세련되지 않다"는 지적을 받았다. 흰 패널 위에 흰
- * 카드 4장(1px 테두리) + 그 안에 또 흰 샘플 박스(1px 테두리)로 액자가
- * 3중이었고, 일러스트는 40px 원에 갇혀 넷 다 비슷한 회색 덩어리가 됐다.
- * 카드·테두리를 전부 걷어내고 전폭 헤어라인으로만 구분하고, 열림은 배경색
- * 대신 (a) 왼쪽 3px 컬러 룰, (b) 펼쳐진 영역의 넉넉한 여백, (c) 일러스트
- * 불투명도로 표시하도록 바꿨다. 원형 마스크도 제거했다.
- *
- * ── 2026-08-21 (3차) 도식 → 미니어처 UI ──
- * 2차가 "평면적이고 단순해 보인다"는 지적을 받았다. 네 샘플을 나란히 놓고
- * 보니 원인이 분명했다 — **시각적 무게가 1:5:3:10으로 제각각**이었다.
- * 레터는 거의 안 보이는 얇은 회색 줄, 웹툰은 빨간 테두리 4컷에 빨간
- * 말풍선(경고 표시처럼 강렬), 팟캐스트는 초록 띠, 영상은 200px 검정
- * 블록(혼자만 입체감). 크기·모양·비율이 다 달라서 허공에 떠 있는
- * 것처럼 보였고, 그림자나 계층이 없어 평면적이었다.
- *
- * 그래서 샘플을 **공통 규격의 미니어처 UI**로 격상했다:
- *  - 모든 샘플이 같은 **캔버스**(전폭 × 96px, 형식 색 옅은 그라데이션) 위에
- *    같은 크기의 **흰 카드**(72px 고정 + 그림자)로 놓인다. 넷의 무게가
- *    같아지고, 카드가 플레이트 위에 떠서 깊이가 생긴다.
- *  - 카드 안에는 그 형식의 실제 화면 구조를 축소해 그린다 — 태그+헤드라인+
- *    본문(레터), 말풍선 든 4컷(웹툰), 커버+제목+파형(팟캐스트),
- *    프레임+재생+진행바(영상). 도식이 아니라 축소판이라 정보량이 있다.
- *  - 미니어처 안에는 글자를 넣지 않는다 — 실제 크기 글자가 축소판에 섞이면
- *    스케일 착시가 깨진다.
- *
- * ── 색 원칙 ──
- * 최초 버전은 강조색이 5개였다(LENS_ACCENT + 형식 4색 동시 노출). 여기서는
- * **열린 항목 하나의 색만** 보인다. 텍스트는 전부 무채색이고
- * (#111827 / #374151 / #4b5563 / #6b7280), 형식 색은 **흰 카드 위** 도형과
- * 왼쪽 룰에만 쓴다 — 형식 4색은 흰 배경에서 3.18~5.71:1로 UI 요소 기준
- * 3:1을 통과하지만, 자기 tint 위에서는 2.81~4.93:1로 4.5:1을 못 넘긴다
- * (영상 #d97706 on #f7f0e3 = 2.81:1). 그래서 tint는 캔버스 배경으로만 쓰고
- * 그 위에 색 도형이나 색 글자를 직접 얹지 않는다. 서수(①②③④)에도 색을
- * 입히지 않는다 — 14px 비굵은 글자는 4.5:1이 필요해 주황이 통과 못 한다.
- *
- * 형식 구분을 색에만 의존하지 않는다 — 서수 + 이름 + 일러스트가 함께 붙는다.
- *
- * ── 왜 createPortal 인가 ──
- * FeedPage.tsx의 `.tab-fade-in` transform이 조상에 남아 `position:fixed`의
- * containing block이 되면서 모달이 문서 중간으로 밀리는 문제가 있다.
- * VideoLightbox.tsx 상단 주석 참조 — 이 관례는 유지해야 한다.
+ * ── 2026-10-04 전면 재설계(4차, 튜토리얼 모션 추가) ──
+ * 이전 버전은 형식별 일러스트를 /lens/role-N.png 이미지로 불러왔는데 일부 환경에서 깨져 나왔고, 아코디언 + 축소 UI 미니어처라 "설명서" 같았다.
+ *  - 이미지 파일을 쓰지 않는다. 일러스트는 인라인 SVG 스케치(어두운 잉크 선 + 살짝 흔들리는 거친 필터 + 옅은 파랑 면)라 깨질 수 없다.
+ *  - 튜토리얼처럼 움직인다: 네 형식을 차례로 하나씩 "시연"한다(3.6초씩 자동으로 넘어감). 지금 시연 중인 행만 강조되고, 그 행의 그림이 반복 재생된다.
+ *      레터 = 연필이 줄을 한 줄씩 쓴다 / 웹툰 = 컷이 1→2→3→4로 나타나고 말풍선이 뜬다
+ *      팟캐스트 = 소리 막대가 오르내린다 / 영상 = 재생을 누르면 진행선이 찬다
+ *    시연 행에는 "어디서 고르는지" 한 줄이 붙는다(기사 화면의 형식 탭 이름과 같다).
+ *  - 사용자가 행을 누르거나 포커스하면 자동 넘김을 멈추고 그 행을 보여 준다(제어 수단 없는 자동재생 금지 — 2026-08-21 지적).
+ *    움직임 줄이기 설정이면 자동 넘김·반복 모두 끄고 완성된 그림만 보여 준다.
+ *  - 카피는 토스처럼 말 걸듯이, 의미 단위(구)로만 줄이 바뀐다. 색은 사이트(서울경제 파랑 + 앰버 한 점)에 맞췄다.
+ * 모달 동작(포털, 포커스 이동·복귀, Tab 가두기, ESC, 스크롤 잠금)은 이전과 같다 — FeedPage의 transform 조상 때문에 createPortal을 쓴다.
  */
 
 const EASE = 'cubic-bezier(.22,.8,.22,1)';
+const INK = '#1f2937';
+const TINT = '#eaf1ff';
+const BLUE = '#5b8def';
+const AMBER = '#FFB020';
+const STEP_MS = 3600;
 
-/**
- * 웹툰 4컷 — 말풍선 크기·위치와 **인물 위치(fx)** 를 컷마다 달리한다.
- * 넷이 똑같으면 만화가 아니라 반복 패턴으로 읽힌다.
- */
-const CUTS = [
-  { bw: 22, bh: 9, bx: 5, by: 7, fx: 62 },
-  { bw: 15, bh: 8, bx: 14, by: 9, fx: 34 },
-  { bw: 24, bh: 10, bx: 4, by: 6, fx: 66 },
-  { bw: 17, bh: 8, bx: 11, by: 11, fx: 42 },
-];
+// 형식별 카피 — 이름은 "하고 싶은 행동"으로, 설명은 "그러면 뭐가 좋은지"로, how는 "어디서 누르는지".
+const COPY: Record<string, { name: string; phrases: string[]; how: string }> = {
+  레터: { name: '차근차근 읽을래요', phrases: ['배경부터 전망까지,', '글 한 편으로 풀어드려요'], how: '기사 화면 위 탭에서 ‘레터’를 눌러요' },
+  웹툰: { name: '그림으로 쓱 볼래요', phrases: ['대화를 따라가면', '금방 이해돼요'], how: '탭에서 ‘웹툰’을 누르고 아래로 쭉 내려요' },
+  팟캐스트: { name: '귀로 들을래요', phrases: ['출퇴근길에 틀어두면', '핵심이 들려요'], how: '탭에서 ‘팟캐스트’를 누르면 바로 재생돼요' },
+  영상: { name: '눈으로 훑을래요', phrases: ['핵심 숫자만', '콕 짚어 보여드려요'], how: '탭에서 ‘영상’을 누르면 짧게 보여줘요' },
+};
 
-/** 레터 미니어처 — 제목 한 줄 + 구분선 + 본문 네 줄. 굵기 차이로 위계를 만든다. */
-const DOC_BODY = ['100%', '94%', '98%', '62%'];
+type LineProps = { fill: 'none'; stroke: string; strokeWidth: number; strokeLinecap: 'round'; strokeLinejoin: 'round'; pathLength: 1 };
+const line: LineProps = { fill: 'none', stroke: INK, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', pathLength: 1 };
 
-/** 팟캐스트 미니어처의 파형. 앞 PLAYED 개는 재생된 구간. */
-const WAVE = [
-  5, 9, 7, 12, 10, 14, 11, 8, 13, 6, 12, 9, 15, 7, 11, 8, 13, 10, 6, 12, 9, 14, 7, 11, 5, 10, 8, 13, 6, 11, 9, 7,
-];
-const WAVE_PLAYED = 14;
+/** 스케치 한 장. 클래스 gs-l = 열릴 때 한 번 그려지는 선, gs-xx = 시연 중(활성 행)에만 반복되는 동작. */
+function Sketch({ short, filterId }: { short: string; filterId: string }) {
+  const common = { width: '100%', height: '100%', viewBox: '0 0 96 76', 'aria-hidden': true } as const;
 
-/**
- * 형식별 미니어처 UI. 넷 다 같은 캔버스(96px) 위 같은 카드(72px)에 담긴다 —
- * 크기가 통일돼야 네 형식이 같은 위계로 읽힌다.
- *
- * 등장 모션은 형식의 성격을 설명할 때만 쓴다(장식용 아님): 레터는 줄이
- * 위→아래로 그려지고(읽는 순서), 웹툰은 4컷이 1→2→3→4로 순차 등장하고
- * (컷 넘김), 팟캐스트는 파형이 좌→우로 솟고(시간축), 영상은 진행바가
- * 자란다(재생). 전부 1회성 — 무한 루프 없음.
- */
-function FormatSample({ p }: { p: LensPerspective }) {
-  switch (p.short) {
+  switch (short) {
     case '레터':
       return (
-        <div className="lfg-card lfg-doc">
-          <span className="lfg-chip" style={{ background: p.color, animationDelay: '40ms' }} />
-          <span className="lfg-hl" style={{ width: '90%', animationDelay: '90ms' }} />
-          <span className="lfg-rule" style={{ animationDelay: '140ms' }} />
-          {DOC_BODY.map((w, i) => (
-            <span key={i} className="lfg-bl" style={{ width: w, animationDelay: `${180 + i * 40}ms` }} />
-          ))}
-        </div>
+        <svg {...common}>
+          <g filter={`url(#${filterId})`}>
+            <rect x="21" y="13" width="50" height="56" rx="3" fill={TINT} />
+            <path className="gs-l" d="M16 9 H62 a3 3 0 0 1 3 3 V62 a3 3 0 0 1 -3 3 H16 a3 3 0 0 1 -3 -3 V12 a3 3 0 0 1 3 -3 Z" {...line} />
+            <path className="gs-l gs-w" style={{ animationDelay: '.15s' }} d="M21 21 H47" {...line} strokeWidth={2.6} />
+            <path className="gs-l gs-w" style={{ animationDelay: '.55s' }} d="M21 30 H57" {...line} strokeWidth={1.4} />
+            <path className="gs-l gs-w" style={{ animationDelay: '.95s' }} d="M21 37 H55" {...line} strokeWidth={1.4} />
+            <path className="gs-l gs-w" style={{ animationDelay: '1.35s' }} d="M21 44 H57" {...line} strokeWidth={1.4} />
+            <path className="gs-l gs-w" style={{ animationDelay: '1.75s' }} d="M21 51 H44" {...line} strokeWidth={1.4} />
+            <g className="gs-pencil">
+              <path d="M70 58 L84 24 L88 26 L75 60 L70 62 Z" {...line} fill="#fff" />
+              <path d="M70 58 L75 60" {...line} stroke={BLUE} strokeWidth={2.4} />
+            </g>
+          </g>
+        </svg>
       );
-
     case '웹툰':
       return (
-        <div className="lfg-card lfg-strip">
-          {CUTS.map((c, i) => (
-            <span key={i} className="lfg-cut" style={{ background: p.tint, animationDelay: `${60 + i * 80}ms` }}>
-              <span
-                className="lfg-bubble"
-                style={{ background: p.color, width: c.bw, height: c.bh, left: c.bx, top: c.by }}
-              />
-              <span className="lfg-fig" style={{ left: `${c.fx}%` }} />
-            </span>
-          ))}
-        </div>
+        <svg {...common}>
+          <g filter={`url(#${filterId})`}>
+            <rect x="14" y="14" width="40" height="26" rx="2" fill={TINT} />
+            <path className="gs-l gs-c1" d="M10 10 H52 V36 H10 Z" {...line} />
+            <path className="gs-l gs-c2" style={{ animationDelay: '.12s' }} d="M57 10 H86 V36 H57 Z" {...line} />
+            <path className="gs-l gs-c3" style={{ animationDelay: '.24s' }} d="M10 41 H34 V66 H10 Z" {...line} />
+            <path className="gs-l gs-c4" style={{ animationDelay: '.36s' }} d="M39 41 H86 V66 H39 Z" {...line} />
+            <g className="gs-bubble">
+              <path d="M16 16 q9 -4 18 0 q9 4 0 9 q-3 2 -7 2 l-4 4 l0 -4 q-7 -1 -7 -5 q0 -4 0 -6 Z" {...line} fill="#fff" />
+              <circle className="gs-dot gs-dot1" cx="21" cy="21" r="1.3" fill={INK} />
+              <circle className="gs-dot gs-dot2" cx="26" cy="21" r="1.3" fill={INK} />
+              <circle className="gs-dot gs-dot3" cx="31" cy="21" r="1.3" fill={INK} />
+            </g>
+            <path className="gs-l gs-c4" style={{ animationDelay: '.62s' }} d="M62 62 q4 -14 12 -14 q8 0 8 14" {...line} stroke={BLUE} />
+          </g>
+        </svg>
       );
-
     case '팟캐스트':
       return (
-        <div className="lfg-card lfg-pod">
-          <span className="lfg-cover" style={{ background: p.color, animationDelay: '50ms' }}>
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="#fff" aria-hidden>
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-          <span className="lfg-col">
-            <span className="lfg-hl" style={{ width: '78%', animationDelay: '110ms' }} />
-            <span className="lfg-bl" style={{ width: '46%', animationDelay: '150ms' }} />
-            <span className="lfg-wave">
-              {WAVE.map((h, i) => (
-                <span
-                  key={i}
-                  className="lfg-bar"
-                  style={{
-                    height: h,
-                    background: p.color,
-                    opacity: i < WAVE_PLAYED ? 1 : 0.24,
-                    animationDelay: `${190 + i * 18}ms`,
-                  }}
-                />
-              ))}
-            </span>
-          </span>
-        </div>
+        <svg {...common}>
+          <g filter={`url(#${filterId})`}>
+            <circle cx="52" cy="40" r="22" fill={TINT} />
+            <g className="gs-hp">
+              <path className="gs-l" d="M20 46 V38 a28 28 0 0 1 56 0 V46" {...line} />
+              <path className="gs-l" style={{ animationDelay: '.15s' }} d="M16 42 h8 a2 2 0 0 1 2 2 v14 a2 2 0 0 1 -2 2 h-6 a4 4 0 0 1 -4 -4 Z" {...line} fill="#fff" />
+              <path className="gs-l" style={{ animationDelay: '.25s' }} d="M80 42 h-8 a2 2 0 0 0 -2 2 v14 a2 2 0 0 0 2 2 h6 a4 4 0 0 0 4 -4 Z" {...line} fill="#fff" />
+            </g>
+            {[38, 44, 50, 56, 62].map((x, i) => (
+              <path
+                key={x}
+                className={`gs-bar gs-bar${i + 1}`}
+                d={`M${x} ${[52, 58, 54, 58, 54][i]} V${[42, 36, 40, 32, 38][i]}`}
+                {...line}
+                stroke={BLUE}
+                strokeWidth={2.6}
+                pathLength={undefined}
+              />
+            ))}
+          </g>
+        </svg>
       );
-
-    case '영상':
-      return (
-        <div className="lfg-card lfg-vid">
-          <span className="lfg-frame" style={{ animationDelay: '50ms' }}>
-            <span className="lfg-play">
-              <svg width={11} height={11} viewBox="0 0 24 24" fill={p.color} aria-hidden>
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </span>
-            <span className="lfg-cap" />
-            <span className="lfg-track">
-              <span className="lfg-track-f" style={{ background: p.color }} />
-            </span>
-          </span>
-          <span className="lfg-col">
-            <span className="lfg-chip" style={{ background: p.color, animationDelay: '130ms' }} />
-            <span className="lfg-hl" style={{ width: '92%', animationDelay: '170ms' }} />
-            <span className="lfg-hl" style={{ width: '58%', animationDelay: '210ms' }} />
-            <span className="lfg-bl" style={{ width: '74%', animationDelay: '250ms' }} />
-          </span>
-        </div>
-      );
-
     default:
-      return null;
+      return (
+        <svg {...common}>
+          <g filter={`url(#${filterId})`}>
+            <rect x="19" y="19" width="62" height="40" rx="5" fill={TINT} />
+            <path className="gs-l" d="M15 14 H73 a4 4 0 0 1 4 4 V52 a4 4 0 0 1 -4 4 H15 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" {...line} />
+            <g className="gs-play">
+              <path d="M36 24 L54 35 L36 46 Z" {...line} fill={AMBER} />
+            </g>
+            <circle className="gs-tap" cx="44" cy="35" r="6" fill="none" stroke={BLUE} strokeWidth={1.6} />
+            <path d="M15 63 H73" {...line} strokeWidth={1.4} />
+            <path className="gs-prog" d="M15 63 H73" {...line} stroke={BLUE} strokeWidth={2.6} />
+            <path className="gs-spark" d="M82 20 l5 -5 M84 30 h7 M82 40 l5 5" {...line} strokeWidth={1.4} pathLength={undefined} />
+          </g>
+        </svg>
+      );
   }
 }
 
-export function LensFormatGuide({ onClose }: { onClose: () => void }) {
-  // 처음엔 ① 레터가 열려 있다 — 빈 인덱스로 시작하면 "눌러야 뭔가 나온다"는
-  // 걸 아무도 알려주지 않는다.
-  const [openIndex, setOpenIndex] = useState(0);
-  // 같은 항목을 다시 열어도 등장 모션이 다시 돌게 하는 리마운트 키.
-  const [run, setRun] = useState(0);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const uid = useId();
+// 하단 버튼 카피 — 지금 시연 중인 형식의 "행동"으로 바뀐다(2026-10-04, "알겠어요"보다 바로 가 보게 하는 말).
+const CTA: Record<string, string> = {
+  레터: '지금 읽으러 갈래요',
+  웹툰: '지금 웹툰 보러 갈래요',
+  팟캐스트: '지금 들으러 갈래요',
+  영상: '지금 영상 보러 갈래요',
+};
 
-  // 배경 스크롤 잠금 + 포커스 이동/복귀. MobileDrawer(Header.tsx:299-309)와
-  // 같은 방식으로 이전 overflow 값을 복원한다.
+/**
+ * onGo — 하단 버튼을 눌렀을 때 고른 형식(0=레터, 1=웹툰, 2=팟캐스트, 3=영상)으로 오늘 기사를 열게 한다.
+ * 없으면 버튼은 그냥 닫기로 동작한다.
+ */
+export function LensFormatGuide({ onClose, onGo, initialIndex }: { onClose: () => void; onGo?: (formatIndex: number) => void; initialIndex?: number }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const uid = useId().replace(/:/g, '');
+  const filterId = `${uid}-rough`;
+  // 지금 시연 중인 행. 사용자가 행을 건드리면 자동 넘김을 멈춘다.
+  // 헤더의 칩(읽기·웹툰·듣기·영상)에서 열렸으면 그 형식부터 보여 주고, 그 뒤 자동 넘김은 이어간다(사용자가 행을 고르면 멈춘다).
+  const [active, setActive] = useState(initialIndex ?? 0);
+  const [auto, setAuto] = useState(true);
+
   useEffect(() => {
     const restoreFocusTo = document.activeElement as HTMLElement | null;
     const { overflow } = document.body.style;
     document.body.style.overflow = 'hidden';
-    // 패널 자체로 포커스를 옮긴다(닫기 버튼이 아니라) — 스크린리더가
-    // dialog 의 이름(aria-labelledby)부터 읽고 Tab 이 패널 안에서 시작된다.
     panelRef.current?.focus();
     return () => {
       document.body.style.overflow = overflow;
@@ -211,8 +155,6 @@ export function LensFormatGuide({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  // ESC 닫기 — 최초 버전은 이 리스너가 부모(LensPreviewSection)에 있었다.
-  // 모달이 자기 생명주기를 소유해야 부모가 열림 상태를 몰라도 된다.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -221,304 +163,239 @@ export function LensFormatGuide({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  /** Tab 을 패널 안에 가둔다 — 없으면 모달이 열린 채로 뒤 페이지 링크를 훑는다. */
+  // 자동 넘김 — 움직임 줄이기면 켜지 않는다. 행을 직접 고르면 멈춘다.
+  useEffect(() => {
+    if (!auto) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const id = window.setInterval(() => setActive((i) => (i + 1) % LENS_PERSPECTIVES.length), STEP_MS);
+    return () => window.clearInterval(id);
+  }, [auto]);
+
+  function pick(i: number) {
+    setAuto(false);
+    setActive(i);
+  }
+
+  /** Tab을 패널 안에 가둔다. */
   function trapTab(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'Tab') return;
     const nodes = panelRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), [href]');
     if (!nodes || nodes.length === 0) return;
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
-    const active = document.activeElement;
-    if (e.shiftKey && (active === first || active === panelRef.current)) {
+    const cur = document.activeElement;
+    if (e.shiftKey && (cur === first || cur === panelRef.current)) {
       e.preventDefault();
       last.focus();
-    } else if (!e.shiftKey && active === last) {
+    } else if (!e.shiftKey && cur === last) {
       e.preventDefault();
       first.focus();
     }
   }
 
-  function toggle(i: number) {
-    setOpenIndex((cur) => (cur === i ? -1 : i));
-    setRun((n) => n + 1);
-  }
-
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={`${uid}-title`}
-      onKeyDown={trapTab}
-      style={{ position: 'fixed', inset: 0, zIndex: 200 }}
-    >
+    <div role="dialog" aria-modal="true" aria-labelledby={`${uid}-title`} onKeyDown={trapTab} style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
       <style>{`
-        /* ── 모션 ── 전부 1회성. 상태 변화(펼침)와 형식의 성격만 설명한다. */
-        @keyframes lfg-in { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
-        @keyframes lfg-fade { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes lfg-lift { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
-        @keyframes lfg-draw { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
-        @keyframes lfg-pop { from { transform: scale(.76); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes lfg-rise { from { transform: scaleY(.1); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
-        @keyframes lfg-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        @keyframes gs-in { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
+        @keyframes gs-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes gs-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+        @keyframes gs-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-        .lfg-scrim { position: absolute; inset: 0; background: rgba(17,24,39,0.5);
-          -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
-          animation: lfg-fade .22s ease both; }
+        .gs-scrim { position: absolute; inset: 0; background: rgba(17,24,39,0.46); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: gs-fade .22s ease both; }
+        .gs-panel { position: relative; width: 100%; max-width: 460px; max-height: min(92vh, 800px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+          background: #fff; border-radius: 22px; padding: 28px clamp(16px, 5vw, 26px) 22px;
+          box-shadow: 0 40px 80px -32px rgba(17,24,39,0.45); animation: gs-in .32s ${EASE} both; }
+        .gs-panel:focus { outline: none; }
+        .gs-head { padding: 0 clamp(4px, 1vw, 8px); }
 
-        .lfg-panel { --pad: 20px;
-          position: relative; width: 100%; max-width: 480px; max-height: min(88vh, 780px);
-          overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-          background: #fff; border-radius: 16px;
-          box-shadow: 0 40px 80px -32px rgba(17,24,39,0.45), 0 0 0 1px rgba(17,24,39,0.05);
-          animation: lfg-in .3s ${EASE} both; }
-        @media (min-width: 480px) { .lfg-panel { --pad: 32px; } }
-        /* 프로그램적으로 포커스를 받는 컨테이너다. Tab 순서에 없어서
-           (tabindex="-1") 링을 지워도 키보드 사용자가 길을 잃지 않는다 —
-           닫기 버튼·형식 4개·하단 버튼은 모두 :focus-visible 링을 갖는다. */
-        .lfg-panel:focus { outline: none; }
+        .gs-close { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; display: grid; place-items: center; border: none; border-radius: 50%; background: none; color: #6b7280; cursor: pointer; transition: background .15s, color .15s; }
+        .gs-close:hover { background: #f3f4f6; color: #111827; }
+        .gs-close:focus-visible { outline: 2px solid #111827; outline-offset: -3px; }
 
-        .lfg-head { padding: 20px var(--pad) 0; }
-        .lfg-title { font-family: "Noto Serif KR", serif; font-size: clamp(20px, 4.6vw, 24px);
-          font-weight: 700; color: #111827; letter-spacing: -0.02em; line-height: 1.35; }
-        .lfg-lead { margin-top: 8px; font-size: 16px; line-height: 1.65; color: #4b5563; word-break: keep-all; }
+        .gs-title { position: relative; display: inline-block; margin: 0; font-size: clamp(24px, 6vw, 28px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.3; color: #111827; word-break: keep-all; }
+        .gs-scribble { position: absolute; left: -2px; right: 0; bottom: -4px; width: calc(100% + 4px); height: 10px; overflow: visible; }
+        .gs-lead { margin: 14px 0 0; font-size: 16px; line-height: 1.65; color: #4b5563; word-break: keep-all; text-wrap: balance; }
+        .gs-ph { display: inline-block; white-space: nowrap; }
+        @media (max-width: 340px) { .gs-ph { white-space: normal; } }
 
-        .lfg-close { width: 44px; height: 44px; margin: -8px -8px 0 0; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          border: none; border-radius: 50%; background: none; color: #6b7280; cursor: pointer;
-          transition: background .15s ease, color .15s ease; }
-        .lfg-close:hover { background: #f3f4f6; color: #111827; }
-        .lfg-close:focus-visible { outline: 2px solid #111827; outline-offset: -4px; }
+        .gs-list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+        .gs-li { animation: gs-rise .42s ${EASE} both; }
+        /* 한 행 = 버튼. 시연 중인 행은 옅은 파랑 판 + 그림이 움직이고, 나머지는 한 걸음 물러난다. */
+        .gs-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 12px; border: none; border-radius: 18px; background: transparent; text-align: left; font-family: inherit; cursor: pointer;
+          transition: background .3s ${EASE}; }
+        .gs-row[data-active='true'] { background: #f3f7ff; }
+        .gs-row:focus-visible { outline: 2px solid #3d70de; outline-offset: -2px; }
+        .gs-art { flex: none; width: 96px; height: 76px; opacity: .72; transition: opacity .3s ease; }
+        .gs-row[data-active='true'] .gs-art { opacity: 1; }
+        .gs-art svg { display: block; overflow: visible; }
+        .gs-txt { min-width: 0; flex: 1; }
+        .gs-name { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: #111827; }
+        .gs-time { font-size: 13px; font-weight: 600; color: #6b7280; }
+        .gs-line { margin: 4px 0 0; font-size: 15px; line-height: 1.55; color: #4b5563; word-break: keep-all; }
+        /* 시연 중인 행에만 "어디서 누르는지" 한 줄이 부드럽게 펼쳐진다. */
+        .gs-how-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s ${EASE}; }
+        .gs-row[data-active='true'] .gs-how-wrap { grid-template-rows: 1fr; }
+        .gs-how-wrap > div { overflow: hidden; min-height: 0; }
+        .gs-how { margin: 8px 0 0; font-size: 13.5px; font-weight: 700; line-height: 1.5; color: #3d70de; word-break: keep-all; }
+        .gs-prog-bar { height: 2px; margin-top: 8px; border-radius: 2px; background: rgba(61,112,222,.16); overflow: hidden; }
+        .gs-prog-bar > i { display: block; height: 100%; width: 100%; background: #3d70de; transform-origin: left; transform: scaleX(0); }
+        .gs-row[data-active='true'][data-auto='true'] .gs-prog-bar > i { animation: gs-step ${STEP_MS}ms linear forwards; }
+        @keyframes gs-step { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-        /* ── 형식 인덱스 ── 박스 없이 전폭 헤어라인으로만 구분한다. */
-        .lfg-list { margin-top: 16px; border-top: 1px solid rgba(17,24,39,0.09); }
-        .lfg-item { position: relative; transition: box-shadow .26s ease; }
-        .lfg-item + .lfg-item { border-top: 1px solid rgba(17,24,39,0.09); }
-        /* 열림 표시 = 왼쪽 3px 컬러 룰. */
-        .lfg-item[data-open='true'] { box-shadow: inset 3px 0 0 var(--c); }
+        /* ── 그림 ── 열릴 때 한 번 그려지고(gs-l), 시연 중이면 형식마다 다른 동작이 반복된다. */
+        .gs-l { stroke-dasharray: 1; stroke-dashoffset: 1; animation: gs-draw .7s ${EASE} .1s forwards; }
+        .gs-pencil, .gs-hp, .gs-bubble, .gs-play, .gs-bar, .gs-spark, .gs-dot { transform-box: fill-box; transform-origin: center; }
+        .gs-prog { stroke-dasharray: 1; stroke-dashoffset: 0; }
+        .gs-tap { opacity: 0; transform-box: fill-box; transform-origin: center; }
 
-        .lfg-trig { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 56px;
-          padding: 16px var(--pad); border: none; background: none; text-align: left; cursor: pointer;
-          transition: background .16s ease; }
-        .lfg-trig:hover { background: rgba(17,24,39,0.022); }
-        .lfg-trig:focus-visible { outline: 2px solid #111827; outline-offset: -3px; }
+        /* 레터 — 연필이 줄을 한 줄씩 쓴다(줄은 지워졌다 다시 쓰이며 반복). */
+        .gs-row[data-active='true'] .gs-w { animation: gs-write 4.6s ease-in-out infinite; }
+        @keyframes gs-write { 0% { stroke-dashoffset: 1; opacity: 1; } 12% { stroke-dashoffset: 0; } 86% { stroke-dashoffset: 0; opacity: 1; } 94% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: 1; opacity: 0; } }
+        .gs-row[data-active='true'] .gs-pencil { animation: gs-pencil 4.6s ease-in-out infinite; }
+        @keyframes gs-pencil { 0% { transform: translate(-23px,-41px); } 10% { transform: translate(-23px,-41px); } 20% { transform: translate(-13px,-32px); } 30% { transform: translate(-15px,-25px); } 40% { transform: translate(-13px,-18px); } 50% { transform: translate(-26px,-11px); } 62% { transform: translate(0,0); } 100% { transform: translate(0,0); } }
 
-        /* 원형 마스크를 걷어냈다 — 40px 원에 갇힌 라인아트는 넷 다 비슷한
-           회색 덩어리로 보였다. 닫힌 항목은 불투명도로 물러나고, 열린
-           항목만 형식 색 tint 판을 깔아 앵커가 되게 한다(라인아트가 연해서
-           흰 배경에서는 무게가 안 실린다). 장식 이미지라 대비 규칙 대상은
-           아니다 — alt="" 로 접근성 트리에서 빠진다. */
-        .lfg-ill { width: 48px; height: 48px; flex-shrink: 0; overflow: hidden; border-radius: 10px;
-          background: transparent; opacity: .5;
-          transition: opacity .26s ease, background .26s ease; }
-        .lfg-item[data-open='true'] .lfg-ill { opacity: 1; background: var(--tint); }
-        .lfg-ill img { width: 100%; height: 100%; object-fit: cover; object-position: center 14%;
-          mix-blend-mode: multiply; filter: contrast(1.1); }
+        /* 웹툰 — 컷이 1→2→3→4로 나타나고, 말풍선이 뜨며 점이 깜빡인다. */
+        .gs-row[data-active='true'] .gs-c1, .gs-row[data-active='true'] .gs-c2, .gs-row[data-active='true'] .gs-c3, .gs-row[data-active='true'] .gs-c4 { animation: gs-cut 4.8s ease-in-out infinite; stroke-dashoffset: 0; }
+        .gs-row[data-active='true'] .gs-c1 { animation-delay: 0s !important; }
+        .gs-row[data-active='true'] .gs-c2 { animation-delay: .45s !important; }
+        .gs-row[data-active='true'] .gs-c3 { animation-delay: .9s !important; }
+        .gs-row[data-active='true'] .gs-c4 { animation-delay: 1.35s !important; }
+        @keyframes gs-cut { 0% { opacity: 0; transform: translateY(4px); } 10% { opacity: 1; transform: none; } 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+        .gs-row[data-active='true'] .gs-bubble { animation: gs-pop 4.8s ease-in-out infinite; }
+        @keyframes gs-pop { 0%, 14% { opacity: 0; transform: scale(.6); } 22% { opacity: 1; transform: scale(1.08); } 28% { transform: scale(1); } 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+        .gs-row[data-active='true'] .gs-dot { animation: gs-blink 1.2s ease-in-out infinite; }
+        .gs-row[data-active='true'] .gs-dot2 { animation-delay: .2s; } .gs-row[data-active='true'] .gs-dot3 { animation-delay: .4s; }
+        @keyframes gs-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
-        .lfg-txt { min-width: 0; flex: 1; }
-        .lfg-name-row { display: flex; align-items: baseline; gap: 8px; }
-        .lfg-ord { font-size: 14px; font-weight: 700; color: #6b7280; transition: color .2s ease; }
-        .lfg-item[data-open='true'] .lfg-ord { color: #111827; }
-        .lfg-name { font-size: 18px; font-weight: 700; color: #111827; letter-spacing: -0.01em; }
-        .lfg-tag { display: block; margin-top: 4px; font-size: 14px; line-height: 1.5;
-          color: #6b7280; word-break: keep-all; }
+        /* 팟캐스트 — 헤드폰이 박자에 맞춰 살짝 들썩이고, 소리 막대가 오르내린다. */
+        .gs-row[data-active='true'] .gs-bar { animation: gs-eq 1s ease-in-out infinite; stroke-dashoffset: 0; }
+        .gs-row[data-active='true'] .gs-bar1 { animation-duration: .9s; } .gs-row[data-active='true'] .gs-bar2 { animation-duration: 1.15s; animation-delay: .1s; }
+        .gs-row[data-active='true'] .gs-bar3 { animation-duration: .8s; animation-delay: .2s; } .gs-row[data-active='true'] .gs-bar4 { animation-duration: 1.05s; animation-delay: .05s; }
+        .gs-row[data-active='true'] .gs-bar5 { animation-duration: .95s; animation-delay: .25s; }
+        @keyframes gs-eq { 0%, 100% { transform: scaleY(.45); } 50% { transform: scaleY(1.25); } }
+        .gs-row[data-active='true'] .gs-hp { animation: gs-bob 1.9s ease-in-out infinite; }
+        @keyframes gs-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.6px); } }
 
-        .lfg-chev { flex-shrink: 0; color: #6b7280;
-          transition: transform .3s ${EASE}, color .2s ease; }
-        /* hover 시 살짝 오른쪽으로 — 누르면 뭔가 열린다는 방향 암시. */
-        .lfg-trig:hover .lfg-chev { transform: translateX(3px); color: #374151; }
-        .lfg-item[data-open='true'] .lfg-chev,
-        .lfg-item[data-open='true'] .lfg-trig:hover .lfg-chev { transform: rotate(90deg); }
+        /* 영상 — 손가락으로 재생을 누르면(파문) 삼각형이 눌렸다 돌아오고 진행선이 찬다. */
+        .gs-row[data-active='true'] .gs-play { animation: gs-press 4.2s ease-in-out infinite; }
+        @keyframes gs-press { 0%, 8% { transform: scale(1); } 12% { transform: scale(.82); } 20% { transform: scale(1); } 100% { transform: scale(1); } }
+        .gs-row[data-active='true'] .gs-tap { animation: gs-ripple 4.2s ease-out infinite; }
+        @keyframes gs-ripple { 0%, 8% { opacity: 0; transform: scale(.4); } 12% { opacity: .9; transform: scale(.8); } 26% { opacity: 0; transform: scale(2.2); } 100% { opacity: 0; } }
+        .gs-row[data-active='true'] .gs-prog { animation: gs-fill 4.2s linear infinite; }
+        @keyframes gs-fill { 0%, 14% { stroke-dashoffset: 1; } 86% { stroke-dashoffset: 0; } 96% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: 1; opacity: 0; } }
+        .gs-row[data-active='true'] .gs-spark { animation: gs-blink 1.4s ease-in-out infinite; }
 
-        /* 0fr → 1fr 로 열면 내용 높이를 몰라도 부드럽게 펼쳐진다.
-           미지원 브라우저에서는 즉시 열림으로 폴백(레이아웃은 안 깨진다). */
-        .lfg-pane { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .34s ${EASE}; }
-        .lfg-item[data-open='true'] .lfg-pane { grid-template-rows: 1fr; }
-        .lfg-pane > div { overflow: hidden; min-height: 0; }
-        .lfg-pane-inner { padding: 8px var(--pad) 24px; }
-        .lfg-desc { margin-top: 16px; font-size: 16px; line-height: 1.7; color: #374151; word-break: keep-all; }
+        .gs-done { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 52px; margin-top: 14px; border: none; border-radius: 16px; background: #3d70de; color: #fff; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .15s, transform .15s; }
+        /* 서울경제 CI 파랑(#5b8def)을 흰 글자 대비 4.5:1이 나오도록 한 단계 깊게 쓴다. */
+        .gs-done:hover { background: #3260c8; }
+        .gs-done:active { transform: scale(.985); }
+        /* 형식이 바뀔 때 글자가 살짝 올라오며 바뀌고, 화살표는 호버 때 앞으로 나아간다. */
+        .gs-done-t { animation: gs-rise .26s ${EASE} both; }
+        .gs-done-arrow { display: inline-block; transition: transform .2s ${EASE}; }
+        .gs-done:hover .gs-done-arrow { transform: translateX(3px); }
+        .gs-done:focus-visible { outline: 2px solid #3d70de; outline-offset: 3px; }
 
-        /* ── 미니어처 캔버스 ── 넷 다 같은 규격. 형식 색 옅은 그라데이션
-           플레이트 위에 흰 카드가 떠 있어 깊이가 생긴다. */
-        .lfg-stage { position: relative; display: flex; align-items: center; justify-content: center;
-          width: 100%; height: 88px; padding: 8px; border-radius: 12px; overflow: hidden;
-          background: linear-gradient(135deg, var(--tint) 0%, var(--tint) 38%, #fcfdfe 100%);
-          box-shadow: inset 0 0 0 1px rgba(17,24,39,0.05); }
-
-        .lfg-card { position: relative; box-sizing: border-box; width: 100%; max-width: 300px; height: 72px;
-          padding: 10px 12px; border-radius: 8px; background: #fff;
-          box-shadow: 0 1px 2px rgba(17,24,39,0.07), 0 8px 18px -8px rgba(17,24,39,0.22);
-          animation: lfg-lift .36s ${EASE} both; }
-
-        /* 미니어처 부품 — 실제 크기 글자를 섞지 않는다(스케일 착시 유지). */
-        .lfg-chip { height: 5px; width: 26px; border-radius: 3px; flex-shrink: 0;
-          transform-origin: left center; animation: lfg-draw .34s ${EASE} both; }
-        .lfg-hl { height: 5px; border-radius: 2px; background: #2f3742;
-          transform-origin: left center; animation: lfg-draw .34s ${EASE} both; }
-        .lfg-bl { height: 3px; border-radius: 2px; background: #d5dae1;
-          transform-origin: left center; animation: lfg-draw .34s ${EASE} both; }
-        .lfg-rule { height: 1px; width: 100%; background: rgba(17,24,39,0.08);
-          transform-origin: left center; animation: lfg-draw .34s ${EASE} both; }
-        .lfg-col { display: flex; flex-direction: column; justify-content: center; gap: 5px;
-          min-width: 0; flex: 1; }
-
-        /* 레터 — 태그 + 제목 한 줄 + 구분선 + 본문 네 줄. 굵기 차이(6px vs
-           3px)로 제목·본문 위계가 읽힌다. 위에서 아래로 순서대로 그려진다. */
-        .lfg-doc { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
-        .lfg-doc .lfg-hl { height: 6px; }
-
-        /* 웹툰 — 말풍선 든 4컷이 1→2→3→4 로 순차 등장한다. */
-        .lfg-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-        .lfg-cut { position: relative; border-radius: 5px; overflow: hidden;
-          box-shadow: inset 0 0 0 1px rgba(17,24,39,0.07);
-          animation: lfg-pop .34s ${EASE} both; }
-        .lfg-bubble { position: absolute; border-radius: 5px; }
-        .lfg-bubble::after { content: ''; position: absolute; left: 4px; bottom: -3px;
-          width: 5px; height: 4px; background: inherit; clip-path: polygon(0 0, 100% 0, 0 100%); }
-        /* 인물 실루엣 — 머리+어깨. 있으면 컷이 패턴 아니라 만화로 읽힌다. */
-        .lfg-fig { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
-          width: 20px; height: 13px; border-radius: 10px 10px 0 0; background: rgba(17,24,39,0.16); }
-        .lfg-fig::before { content: ''; position: absolute; left: 50%; top: -7px; transform: translateX(-50%);
-          width: 8px; height: 8px; border-radius: 50%; background: rgba(17,24,39,0.16); }
-
-        /* 팟캐스트 — 커버 + 제목 + 파형. 파형이 좌→우로 솟는다. */
-        .lfg-pod { display: flex; align-items: center; gap: 10px; }
-        .lfg-cover { display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-          width: 52px; height: 52px; border-radius: 6px; padding-left: 2px;
-          animation: lfg-pop .34s ${EASE} both; }
-        /* 막대를 flex 로 늘려 우측 컬럼 폭을 다 쓴다 — 고정 폭이면 파형이
-           카드 절반만 채워서 미완성처럼 보였다. */
-        .lfg-wave { display: flex; align-items: center; gap: 2px; width: 100%; height: 16px; margin-top: 2px; }
-        .lfg-bar { flex: 1 1 0; min-width: 2px; border-radius: 1px; animation: lfg-rise .3s ${EASE} both; }
-
-        /* 영상 — 프레임 + 재생 + 자막 + 진행바. */
-        .lfg-vid { display: flex; align-items: center; gap: 10px; }
-        .lfg-frame { position: relative; display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; width: 92px; height: 52px; border-radius: 6px; overflow: hidden;
-          background: #141b26; animation: lfg-pop .34s ${EASE} both; }
-        .lfg-play { display: flex; align-items: center; justify-content: center;
-          width: 22px; height: 22px; margin-bottom: 4px; padding-left: 1px;
-          border-radius: 50%; background: #fff; }
-        .lfg-cap { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
-          width: 42px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.78); }
-        .lfg-track { position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
-          background: rgba(255,255,255,0.2); }
-        .lfg-track-f { display: block; width: 42%; height: 100%; transform-origin: left center;
-          animation: lfg-grow .8s ${EASE} .25s both; }
-
-        /* sticky 를 뺐다 — 불투명한 하단 바가 ④ 영상 행을 덮어서 목록이
-           잘린 것처럼 보였다. 콘텐츠가 넘칠 때는 마지막 행이 패널 아래
-           경계에서 살짝 잘려 보이는 게 "아래에 더 있다"는 정상 신호다.
-           상단 X(44px)·ESC·백드롭 탭으로 언제든 닫을 수 있다. */
-        .lfg-foot { background: #fff; border-top: 1px solid rgba(17,24,39,0.09); }
-        .lfg-done { width: 100%; height: 48px; border: none; background: none;
-          font-size: 16px; font-weight: 700; color: #374151; cursor: pointer; transition: color .15s ease; }
-        .lfg-done:hover { color: #111827; }
-        .lfg-done:focus-visible { outline: 2px solid #111827; outline-offset: -3px; }
-
-        /* 움직임을 줄여 달라고 한 사용자에게는 전부 최종 상태로 보여준다. */
+        @media (max-width: 380px) { .gs-art { width: 76px; height: 60px; } .gs-row { gap: 10px; padding: 10px 8px; } }
+        /* 움직임을 줄여 달라고 한 사용자에게는 반복·자동 넘김 없이 완성된 그림만 보여 준다. */
         @media (prefers-reduced-motion: reduce) {
-          .lfg-scrim, .lfg-panel, .lfg-card, .lfg-chip, .lfg-hl, .lfg-bl, .lfg-rule,
-          .lfg-cut, .lfg-cover, .lfg-bar, .lfg-frame, .lfg-track-f { animation: none !important; }
-          .lfg-panel, .lfg-item, .lfg-pane, .lfg-chev, .lfg-trig, .lfg-ill, .lfg-close, .lfg-done {
-            transition: none !important; }
+          .gs-scrim, .gs-panel, .gs-li { animation: none !important; }
+          .gs-l { animation: none !important; stroke-dashoffset: 0; }
+          .gs-row *, .gs-row[data-active='true'] * { animation: none !important; }
+          .gs-prog-bar { display: none; }
+          .gs-close, .gs-done, .gs-row, .gs-how-wrap, .gs-done-arrow { transition: none !important; }
+          .gs-done-t { animation: none !important; }
         }
       `}</style>
 
-      <div className="lfg-scrim" onClick={onClose} />
+      {/* 선이 살짝 흔들리는 거친 필터 — 컴퓨터로 그은 직선이 아니라 손으로 그은 느낌. 모든 스케치가 공유한다. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+        <filter id={filterId} x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" />
+        </filter>
+      </svg>
 
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'clamp(16px, 4vw, 40px)',
-          pointerEvents: 'none',
-        }}
-      >
-        <div ref={panelRef} tabIndex={-1} className="lfg-panel" style={{ pointerEvents: 'auto' }}>
-          <div className="lfg-head">
-            <div className="flex items-start justify-between" style={{ gap: 16 }}>
-              <h2 id={`${uid}-title`} className="lfg-title">
-                같은 뉴스, 네 가지 형식
-              </h2>
-              <button type="button" onClick={onClose} aria-label="닫기" className="lfg-close">
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-            <p className="lfg-lead">
-              매일 이슈 하나를 네 가지 형식으로 만들어요. 지면을 고른 뒤 원하는 형식을 누르면 돼요.
+      <div className="gs-scrim" onClick={onClose} />
+
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(12px, 4vw, 40px)', pointerEvents: 'none' }}>
+        <div ref={panelRef} tabIndex={-1} className="gs-panel" style={{ pointerEvents: 'auto' }}>
+          <button type="button" onClick={onClose} aria-label="닫기" className="gs-close">
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+
+          <div className="gs-head">
+            <h2 id={`${uid}-title`} className="gs-title">
+              오늘 이슈, 어떻게 볼래요?
+              {/* 손으로 그은 밑줄 — 제목 아래 한 번 그어지는 선. */}
+              <svg className="gs-scribble" viewBox="0 0 200 10" preserveAspectRatio="none" aria-hidden>
+                <path className="gs-l" style={{ animationDelay: '.35s' }} d="M2 6 C28 2, 60 8, 98 5 S168 3, 198 6" fill="none" stroke={AMBER} strokeWidth={3} strokeLinecap="round" pathLength={1} />
+              </svg>
+            </h2>
+            <p className="gs-lead">
+              <span className="gs-ph">같은 뉴스를 네 가지로 만들어 뒀어요.</span> <span className="gs-ph">지금 상황에 맞는 걸 골라 보면 돼요.</span>
             </p>
           </div>
 
-          <div className="lfg-list">
+          <ul className="gs-list">
             {LENS_PERSPECTIVES.map((p, i) => {
-              const open = openIndex === i;
+              const c = COPY[p.short] ?? { name: p.short, phrases: [p.content], how: '' };
+              const on = active === i;
               return (
-                <div
-                  key={p.short}
-                  className="lfg-item"
-                  data-open={open}
-                  style={{ '--c': p.color, '--tint': p.tint } as React.CSSProperties}
-                >
+                <li key={p.short} className="gs-li" style={{ animationDelay: `${80 + i * 70}ms` }}>
                   <button
                     type="button"
-                    className="lfg-trig"
-                    id={`${uid}-trig-${i}`}
-                    aria-expanded={open}
-                    aria-controls={`${uid}-pane-${i}`}
-                    onClick={() => toggle(i)}
+                    className="gs-row"
+                    data-active={on}
+                    data-auto={auto}
+                    aria-pressed={on}
+                    onClick={() => pick(i)}
+                    onMouseEnter={() => pick(i)}
+                    onFocus={() => setActive(i)}
                   >
-                    <span className="lfg-ill">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 라인아트, LensViewClient.tsx와 동일 패턴 */}
-                      <img src={p.illustration} alt="" width={48} height={48} />
-                    </span>
-
-                    <span className="lfg-txt">
-                      <span className="lfg-name-row">
-                        <span className="lfg-ord">{p.ordinal}</span>
-                        <span className="lfg-name">{p.short}</span>
-                      </span>
-                      <span className="lfg-tag">{p.tagline}</span>
-                    </span>
-
-                    <svg className="lfg-chev" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M9 6l6 6-6 6" />
-                    </svg>
-                  </button>
-
-                  <div
-                    className="lfg-pane"
-                    id={`${uid}-pane-${i}`}
-                    role="region"
-                    aria-labelledby={`${uid}-trig-${i}`}
-                    aria-hidden={!open}
-                  >
-                    <div>
-                      <div className="lfg-pane-inner">
-                        <div className="lfg-stage">
-                          {/* 열 때마다 리마운트해서 등장 모션을 다시 돌린다. */}
-                          <FormatSample key={open ? `run-${run}` : 'idle'} p={p} />
+                    <div className="gs-art">
+                      {/* key로 시연이 시작될 때마다 그림을 처음부터 다시 재생한다. */}
+                      <Sketch key={on ? `on-${i}` : `off-${i}`} short={p.short} filterId={filterId} />
+                    </div>
+                    <div className="gs-txt">
+                      <div className="gs-name">
+                        <span>{c.name}</span>
+                        <span className="gs-time">{p.duration}</span>
+                      </div>
+                      <p className="gs-line">
+                        {c.phrases.map((ph, k) => (
+                          <span key={k}>
+                            {k > 0 ? ' ' : null}
+                            <span className="gs-ph">{ph}</span>
+                          </span>
+                        ))}
+                      </p>
+                      <div className="gs-how-wrap" aria-hidden={!on}>
+                        <div>
+                          <p className="gs-how">{c.how}</p>
+                          <div className="gs-prog-bar">
+                            <i key={`${on}-${active}-${auto}`} />
+                          </div>
                         </div>
-                        <p className="lfg-desc">{p.content}</p>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  </button>
+                </li>
               );
             })}
-          </div>
+          </ul>
 
-          <div className="lfg-foot">
-            <button type="button" onClick={onClose} className="lfg-done">
-              닫기
-            </button>
-          </div>
+          <button type="button" onClick={() => (onGo ? onGo(active) : onClose())} className="gs-done">
+            <span key={active} className="gs-done-t">
+              {CTA[LENS_PERSPECTIVES[active]?.short ?? ''] ?? '지금 보러 갈래요'}
+            </span>
+            <span aria-hidden className="gs-done-arrow">
+              →
+            </span>
+          </button>
         </div>
       </div>
     </div>,

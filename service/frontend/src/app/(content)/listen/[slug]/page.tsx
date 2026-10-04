@@ -1,3 +1,5 @@
+import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { fetchHomePlayerPosts, fetchHomePlayerBySlug, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
@@ -66,23 +68,29 @@ export async function generateMetadata({
   if (!item) {
     return { title: '오디오를 찾을 수 없어요', robots: { index: false } };
   }
-  const title = buildPageTitle(item.title, '오디오');
+  const headline = seoHeadline(item.title);
+  const title = buildPageTitle(headline, '오디오');
   const description = buildSeoDescription(item.excerpt, '서울경제 AI LENS가 정리한 오디오 뉴스입니다.');
   // 정본은 같은 기사의 lens 페이지(2026-10-01, SEO 감사 — 본문이 기사 페이지와 93% 겹치는 중복 페이지).
   const lensForCanonical = await findLensForChannelSlug(slug);
   const url = canonicalFromLens(lensForCanonical, `/listen/${slug}`);
   const resolved = resolveVideo(item.mediaEmbedUrl);
   const image = resolved?.autoThumbnailUrl || lensForCanonical?.cover_image_url || `${SITE_URL}/og-image.png`;
+  const extras = mediaSeoExtras({ headline, description, url, publishedIso: item.date ? `${item.date}T07:00:00+09:00` : new Date().toISOString(), kind: '오디오' });
   return {
     title,
     description,
-    alternates: { canonical: url },
+    keywords: extras.keywords,
+    authors: extras.authors,
+    category: extras.category,
+    other: extras.other,
+    alternates: { canonical: url, languages: extras.languages },
     openGraph: {
       title,
       description,
       url,
       type: isDirectAudioUrl(item.mediaEmbedUrl) ? 'music.song' : 'video.other',
-      images: [{ url: image, width: 1200, height: 630, alt: item.title }],
+      images: [{ url: image, width: 1200, height: 630, alt: headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -109,8 +117,11 @@ function buildJsonLd(item: HomePlayerPost, slug: string) {
   };
   const base = {
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-    name: item.title,
-    description: buildSeoDescription(item.excerpt, item.title),
+    name: seoHeadline(item.title),
+    description: buildSeoDescription(item.excerpt, seoHeadline(item.title)),
+    keywords: [...new Set([seoHeadline(item.title), '오디오', '경제 팟캐스트', '오늘의 이슈', 'AI LENS', '서울경제'])],
+    copyrightHolder: { '@id': `${SITE_URL}/#organization` },
+    creditText: '서울경제신문 AI LENS',
     inLanguage: 'ko-KR',
     author,
     publisher: { '@id': `${SITE_URL}/#organization` },
@@ -122,7 +133,7 @@ function buildJsonLd(item: HomePlayerPost, slug: string) {
         '@id': `${url}#episode`,
         datePublished: published,
         associatedMedia: { '@type': 'MediaObject', contentUrl: item.mediaEmbedUrl },
-        partOfSeries: { '@type': 'PodcastSeries', name: 'AI LENS 오디오 뉴스', url: `${SITE_URL}/listen` },
+        partOfSeries: { '@type': 'PodcastSeries', name: 'AI LENS 오디오 뉴스', url: `${SITE_URL}/lens` },
       }
     : {
         ...base,
@@ -144,7 +155,7 @@ function buildJsonLd(item: HomePlayerPost, slug: string) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '오디오', item: `${SITE_URL}/listen` },
+          { '@type': 'ListItem', position: 2, name: '최신 뉴스', item: `${SITE_URL}/lens` },
           { '@type': 'ListItem', position: 3, name: item.title, item: url },
         ],
       },

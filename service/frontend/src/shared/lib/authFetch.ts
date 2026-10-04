@@ -22,7 +22,7 @@
  *   // without an account (e.g. recommended feed, public archive search).
  *   const res = await authFetch(url, { requireAuth: false });
  */
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { loadAmplifyAuth } from '@/shared/lib/amplifyLoader';
 
 export interface AuthFetchOptions extends RequestInit {
   /** When true (default), throws if no valid Cognito session is available. */
@@ -38,7 +38,8 @@ export class NotSignedInError extends Error {
 
 async function getIdToken(): Promise<string | undefined> {
   try {
-    const session = await fetchAuthSession();
+    const { auth } = await loadAmplifyAuth();
+    const session = await auth.fetchAuthSession();
     return session.tokens?.idToken?.toString();
   } catch {
     return undefined;

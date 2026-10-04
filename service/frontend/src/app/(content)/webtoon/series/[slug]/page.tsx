@@ -120,7 +120,7 @@ function buildJsonLd(series: WebtoonSeries, slug: string) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '웹툰', item: `${SITE_URL}/webtoon` },
+          { '@type': 'ListItem', position: 2, name: '최신 뉴스', item: `${SITE_URL}/lens` },
           { '@type': 'ListItem', position: 3, name: series.title, item: url },
         ],
       },

@@ -1,9 +1,10 @@
 'use client';
 
-import { ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronLeft, Home } from 'lucide-react';
 import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
 
-// 온보딩 7단계(GoalStep~DoneStep) 공용 헤더 — 2026-09-03, 디자인 통일 작업.
+// 온보딩 6단계(MomentStep~DoneStep) 공용 헤더 — 2026-09-03, 디자인 통일 작업.
 // 이전엔 7개 파일이 "AI LENS" 워드마크+스킵 버튼 마크업을 각자 복붙해뒀고,
 // 그나마도 스텝마다 있다 없다 했다(Result/Subscribe/Done엔 아예 없었고,
 // Interest만 진행 표시로 점 2개를 따로 그렸다) — 사용자가 "버튼이나
@@ -26,22 +27,27 @@ import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
 // 때 살짝 눌리는 스케일 반응(active)과 호버 시 톤 변화를 더해 정적인
 // 아이콘이 아니라 반응하는 요소로 만들었다 — LensPreviewSection.tsx의
 // `.lz-arrow`(원형 배경 화살표 버튼) 패턴과 같은 어휘.
-export const ONBOARDING_TOTAL_STEPS = 7;
+export const ONBOARDING_TOTAL_STEPS = 6;
 
 export function OnboardingHeader({
-  currentStep,
+  currentStep = 0,
+  hideProgress = false,
+  contentMaxWidth,
   onSkip,
   skipLabel = '건너뛰기 →',
   onBack,
 }: {
-  /** 1-indexed — Goal=1, Format=2, Consume=3, Interest=4, Result=5, Subscribe=6, Done=7. */
-  currentStep: number;
+  /** 1-indexed 진행 칸(옛 6단계 위저드용). 2화면으로 줄인 뒤(2026-10-04)엔 hideProgress로 진행바를 숨긴다. */
+  currentStep?: number;
+  hideProgress?: boolean;
+  /** 아래 본문 칼럼의 최대 폭 — 지정하면 헤더도 같은 폭으로 가운데 정렬해 좌우 끝선을 본문과 맞춘다. */
+  contentMaxWidth?: number;
   onSkip?: () => void;
   skipLabel?: string;
   onBack?: () => void;
 }) {
   return (
-    <div style={{ padding: '22px 22px 0' }}>
+    <div style={{ padding: '22px 22px 0', maxWidth: contentMaxWidth, margin: '0 auto', width: '100%' }}>
       <style>{`
         .ob-back-btn { transition: background .15s ease, transform .1s ease; }
         .ob-back-btn:hover { background: #e9edf3; }
@@ -60,9 +66,10 @@ export function OnboardingHeader({
               <ChevronLeft size={18} strokeWidth={2.4} />
             </button>
           )}
-          <span style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+          <Link href="/" aria-label="홈으로" style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: '"Noto Serif KR", serif', fontSize: 13, fontWeight: 700, color: '#0f172a', textDecoration: 'none' }}>
+            <Home size={16} strokeWidth={2.1} color="#475569" aria-hidden />
             AI LENS
-          </span>
+          </Link>
         </div>
         {onSkip && (
           <button
@@ -74,7 +81,7 @@ export function OnboardingHeader({
           </button>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 4, marginTop: 14 }} aria-hidden>
+      {!hideProgress && <div style={{ display: 'flex', gap: 4, marginTop: 14 }} aria-hidden>
         {Array.from({ length: ONBOARDING_TOTAL_STEPS }, (_, i) => (
           <div
             key={i}
@@ -87,7 +94,7 @@ export function OnboardingHeader({
             }}
           />
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

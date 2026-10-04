@@ -7,7 +7,7 @@ import { GAMES } from '@/shared/data/games';
 
 import { SITE_URL } from '@/shared/constants/site';
 const TITLE = 'AI LENS 게임 — 가볍게 한 판';
-const DESCRIPTION = 'AI LENS 가 직접 만든 서울경제 H5 게임. 출근길·점심·잠들기 전 가볍게 한 판.';
+const DESCRIPTION = 'AI LENS가 직접 만든 서울경제 H5 미니게임 모음입니다. 설치 없이 브라우저에서 바로, 출근길·점심시간·잠들기 전에 가볍게 한 판 즐겨 보세요.';
 
 // CollectionPage + ItemList(2026-08-14, SEO 감사) — sitemap.ts와 같은 이유로
 // GAMES를 재사용해 개별 VideoGame 엔트리를 참조한다.

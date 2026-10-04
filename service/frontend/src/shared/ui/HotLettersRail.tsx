@@ -5,27 +5,25 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
-const HOT_LETTERS_LIMIT = 5;
+/** 레일에 그리는 한 줄 — 홈·기사 쪽은 TodayLetterCardLike를, 카테고리 페이지는 그 카테고리의 글(ArchiveItem)을 이 모양으로 바꿔 넘긴다. */
+export interface RailItem {
+  key: string;
+  href: string;
+  title: string;
+  thumb: string | null;
+  /** 제목 아래 작은 분류 라벨(예: 금융·정책). */
+  label: string;
+}
 
-// 홈 우측 사이드바(2026-08-17) — SideRail.tsx의 "요즘 가장 많이 읽힌 글"
-// 부분만 떼어냈다. 인기글 목록 자체는 원래 무채색이라 손댈 것 없이 그대로
-// 재사용. 사주 궁합 파트는 별도로 SajuMiniRail.tsx로 뽑아 톤(violet)만
-// 다시 입혔다 — 둘 다 HomeSideBar.tsx가 하나의 컨테이너로 묶는다.
-//
-// initialItems — 처음엔 이 값 없이 client useEffect로만 불러와서 항상
-// 빈 화면 → 딜레이 후 팝인이었다(2026-08-17, 사용자 피드백: "왜 항상
-// 늦게 나타나지, 빨리 뜨도록 하는거 안하고 있나요"). 홈의 다른 섹션들처럼
-// app/page.tsx 빌드타임 프리페치 값을 받아 초기 렌더부터 채운다 — effect는
-// 여전히 돌려 최신 데이터로 갱신(다른 initial* prop 패턴과 동일, 예:
-// WebtoonPreviewSection.tsx).
-// 5개를 화살표로 한 장씩 넘기게 바꿨다가(2026-08-17, "화살표 눌러 이동
-// 하게 해도 되니 너무 길게 하지 말아주시죠") 실제로 보니 "1~5까지 한번에
-// 나와야합니다"라는 재요청으로 다시 목록 전체를 한 번에 보여주는 원래
-// 방식으로 되돌렸다.
-export function HotLettersRail({ initialItems }: { initialItems?: TodayLetterCardLike[] }) {
+const HOT_LETTERS_LIMIT = 10;
+
+export function HotLettersRail({ initialItems, items, heading = '많이 읽은 글', limit = HOT_LETTERS_LIMIT }: { initialItems?: TodayLetterCardLike[]; items?: RailItem[]; heading?: string; limit?: number }) {
   const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>(initialItems ?? []);
 
   useEffect(() => {
+    // 서버가 준 인기 글 5건이 있으면 브라우저에서 레터 50건(약 270KB)을 다시 받아 같은 순위를 계산하지 않는다(2026-10-03).
+    // 순위는 서버가 발행 때·최대 5분 주기로 갱신한 HTML에 반영된다.
+    if (initialItems && initialItems.length > 0) return;
     let cancelled = false;
     fetchFollowingLetters(HOT_LETTERS_LIMIT).then((cards) => {
       if (!cancelled) setHotLetters(cards);
@@ -35,83 +33,59 @@ export function HotLettersRail({ initialItems }: { initialItems?: TodayLetterCar
     };
   }, []);
 
-  if (hotLetters.length === 0) return null;
+  const rows: RailItem[] =
+    items && items.length > 0
+      ? items
+      : hotLetters.filter((l) => l.category).map((l) => ({ key: l.letterId, href: l.href, title: l.title, thumb: l.thumbnailUrl ?? l.editorAvatar, label: l.category ?? '' }));
+  if (rows.length === 0) return null;
 
+  // 사이드바 개편(2026-10-04) — 영문판(en.sedaily.com) "{분류} Most Read"를 그대로 따른다: 굵은 제목, 항목마다 굵은 제목(최대 3줄)+아래 작은 분류 라벨,
+  // 오른쪽에 작은 사진과 모서리 번호 배지, 항목 사이 얇은 선. 10건. 마우스를 올리면 제목이 파랗게, 사진이 살짝 커진다.
   return (
     <section>
-      <header className="flex items-baseline justify-between mb-3">
-        <h3
-          className="font-medium text-gray-900"
-          style={{ fontFamily: '"Noto Serif KR", serif', fontSize: 15, letterSpacing: '-0.015em' }}
-        >
-          요즘 가장 많이 읽힌 글
-        </h3>
-        <Link href="/?tab=archive" className="text-gray-400 hover:text-gray-900 transition-colors" style={{ fontSize: 11.5, fontWeight: 500 }}>
-          전체 →
-        </Link>
-      </header>
-      <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {hotLetters.map((l, idx) => (
-          <li key={l.letterId}>
-            <Link
-              href={l.href}
-              className="group flex items-start transition-opacity"
-              style={{
-                gap: 12,
-                padding: '10px 0',
-                borderTop: idx === 0 ? 'none' : '1px solid #f3f4f6',
-                textDecoration: 'none',
-              }}
-            >
-              <span
-                className="flex-shrink-0"
-                style={{
-                  fontFamily: '"Noto Serif KR", serif',
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: '#9ca3af',
-                  letterSpacing: '-0.02em',
-                  fontVariantNumeric: 'tabular-nums',
-                  minWidth: 22,
-                  lineHeight: 1.1,
-                }}
-              >
-                {String(idx + 1).padStart(2, '0')}
-              </span>
-              <span className="flex-shrink-0" style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', background: '#f3f4f6' }}>
-                <Image
-                  src={l.thumbnailUrl ?? l.editorAvatar}
-                  alt=""
-                  width={40}
-                  height={40}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </span>
-              <div className="flex-1 min-w-0">
-                {/* 5개 항목의 제목 굵기가 서로 다르게 보인다는 피드백
-                    (2026-08-18, "그 볼드를 누군 주고 안주고 하지말고
-                    동일하게") — 코드상 조건 분기는 없이 전부 같은
-                    font-medium 클래스였지만, Tailwind 클래스 대신
-                    fontWeight를 인라인 숫자로 못박아 다섯 항목이 정확히
-                    같은 값을 쓰도록 확정했다(브라우저·폰트 렌더링 차이로
-                    클래스 적용이 흔들릴 여지를 아예 없앤다). */}
+      <style>{`
+        .hl-row { display: flex; gap: 16px; align-items: flex-start; padding: 16px 0; text-decoration: none; border-top: 1px solid #ececec; transition: transform .15s cubic-bezier(.22,.8,.22,1); }
+        .hl-row:first-child { border-top: none; padding-top: 10px; }
+        .hl-title { transition: color .18s ease; }
+        .hl-row:hover .hl-title { color: #3d70de; }
+        .hl-thumb img { transition: transform .4s cubic-bezier(.22,.8,.22,1); }
+        .hl-row:hover .hl-thumb img { transform: scale(1.06); }
+        .hl-row:active { transform: scale(.99); }
+        @media (prefers-reduced-motion: reduce) { .hl-thumb img, .hl-row { transition: none; } .hl-row:active { transform: none; } }
+      `}</style>
+      <h3 style={{ margin: '-3px 0 6px', lineHeight: 1.25, fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: '#111827' }}>{heading}</h3>
+      <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column' }}>
+        {rows.slice(0, limit).map((r, idx) => (
+          <li key={r.key}>
+            <Link href={r.href} className="hl-row">
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p
-                  className="text-gray-900 group-hover:opacity-70 transition-opacity"
+                  className="hl-title"
                   style={{
-                    fontFamily: '"Noto Serif KR", serif',
-                    fontSize: 13,
-                    fontWeight: 500,
+                    margin: 0,
+                    fontSize: 15.5,
+                    fontWeight: 700,
                     lineHeight: 1.45,
                     letterSpacing: '-0.015em',
+                    color: '#111827',
                     display: '-webkit-box',
-                    WebkitLineClamp: 2,
+                    WebkitLineClamp: 3,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
+                    wordBreak: 'keep-all',
+                    textWrap: 'pretty', // 끝의 이모지 하나만 다음 줄로 떨어지는 것을 막는다
                   }}
                 >
-                  {l.title}
+                  {r.title}
                 </p>
+                {r.label && <p style={{ margin: '8px 0 0', fontSize: 13, color: '#9ca3af' }}>{r.label}</p>}
               </div>
+              <span className="hl-thumb" style={{ position: 'relative', width: 100, height: 66, borderRadius: 4, overflow: 'hidden', background: '#f3f4f6', flexShrink: 0, display: 'block' }}>
+                {r.thumb && <Image src={r.thumb} alt="" width={200} height={132} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                <span style={{ position: 'absolute', left: 0, top: 0, minWidth: 22, height: 22, padding: '0 6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#2f5fe0', color: '#fff', fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                  {idx + 1}
+                </span>
+              </span>
             </Link>
           </li>
         ))}

@@ -4,7 +4,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '문의',
-  description: 'AI LENS(서울경제신문) 문의처 안내.',
+  description: 'AI LENS(서울경제신문) 문의처 안내입니다. 서비스 이용과 콘텐츠, 제휴 등에 관한 문의를 보내실 방법과 연락처를 안내합니다.',
   alternates: { canonical: `${SITE_URL}/contact` },
   robots: { index: true, follow: true },
 };

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ARCHIVE_MIN_DATE, fetchBigkindsDay, fetchDayArticles, kdate, isReadableOriginal } from '@/features/timeline';
+import { isReadableOriginal } from '@/features/timeline';
+import { fetchBigkindsDay, fetchDayArticles } from '@/shared/lib/api/timelineApi';
+import { isArchiveDate } from '@/shared/constants/timeline';
+import { kdate } from '@/shared/lib/timelineDates';
 import { TimelineDayClient } from './TimelineDayClient';
 
 // 날짜별 고유 URL(2026-08-12, GEO 감사) — 예전엔 /timeline이 입력창 하나만
@@ -40,12 +43,12 @@ export async function generateMetadata({
   if (!DATE_RE.test(date)) return { robots: { index: false } };
 
   const label = kdate(date);
-  const isRecent = date >= ARCHIVE_MIN_DATE;
+  const isRecent = isArchiveDate(date);
   const title = `${label}자 서울경제 — 뉴스 타임라인`;
-  const description = `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 지면 그대로 모아봅니다.`;
+  const description = `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 그대로 모아봅니다.`;
 
   const indexable = isRecent
-    ? (await fetchDayArticles(date)).list.length > 0
+    ? (await fetchDayArticles(date)).length > 0
     : (await fetchBigkindsDay(date)).articles.length > 0;
 
   return {
@@ -89,7 +92,7 @@ function buildJsonLd(date: string, articles: { title: string; original_link: str
     '@id': `${SITE_URL}/timeline/${date}#collection`,
     url: `${SITE_URL}/timeline/${date}`,
     name: `${label}자 서울경제 — 뉴스 타임라인`,
-    description: `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 지면 그대로 모아봅니다.`,
+    description: `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 그대로 모아봅니다.`,
     inLanguage: 'ko-KR',
     isPartOf: { '@id': `${SITE_URL}/#website` },
     publisher: { '@id': `${SITE_URL}/#organization` },
@@ -129,7 +132,7 @@ export default async function TimelineDayPage({
   const { date } = await params;
   if (!DATE_RE.test(date)) notFound();
 
-  if (date < ARCHIVE_MIN_DATE) {
+  if (!isArchiveDate(date)) {
     const { articles, investments } = await fetchBigkindsDay(date);
     const jsonLd = buildJsonLd(date, articles);
     return (
@@ -143,8 +146,8 @@ export default async function TimelineDayPage({
     );
   }
 
-  const { list } = await fetchDayArticles(date);
-  const jsonLd = buildJsonLd(date, list);
+  const articles = await fetchDayArticles(date);
+  const jsonLd = buildJsonLd(date, articles);
 
   return (
     <>
@@ -152,7 +155,7 @@ export default async function TimelineDayPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <TimelineDayClient date={date} initialArticles={list} />
+      <TimelineDayClient date={date} initialArticles={articles} />
     </>
   );
 }

@@ -1,5 +1,6 @@
+import { ERAS, DECADES } from '@/shared/data/timelineEvents';
 import type { MetadataRoute } from 'next';
-import { fetchWebtoons, fetchVideos, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchAllWebtoons, fetchAllVideos, fetchAllLensPosts, fetchPaperDates } from '@/shared/lib/api/cmsPostsApi';
 import { kstTodayStr } from '@/shared/lib/date';
 // 2026-08-25: `./(content)/games/play/[slug]/page` 에서 가져오던 것을 단일 출처로
 // 교체. app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
@@ -52,10 +53,7 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 금융·정책
   { path: '/international', priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 국제
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
-  { path: '/webtoon',      priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 웹툰 목록
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
-  { path: '/video',        priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 영상 목록
-  { path: '/listen',       priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-21' }, // 오디오 목록
   { path: '/games',        priority: 0.5, changeFrequency: 'monthly', lastModified: '2026-08-11' },
   { path: '/words',        priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 단어장 — 레터 키워드 기반, 매일 갱신
   { path: '/style',        priority: 0.3, changeFrequency: 'monthly', lastModified: '2026-08-08' },
@@ -80,6 +78,10 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   // 날짜는 4개뿐). famousBirthdays.ts/economicSnapshots.ts/
   // investmentScenarios.ts/timeMachineApi.ts도 이 라우트 전용이라 같이 삭제.
   { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly',  lastModified: '2026-08-12' }, // 입력 화면 — 실제 콘텐츠는 /timeline/{date}
+  // 시대 페이지(연표) — 정적 데이터(shared/data/timelineEras.ts), 시대가 늘면 자동으로 올라간다.
+  { path: '/timeline/chronicle', priority: 0.8, changeFrequency: 'monthly' as const, lastModified: '2026-10-04' },
+  ...DECADES.map((d) => ({ path: `/timeline/decade/${d.key}`, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: '2026-10-04' })),
+  ...ERAS.map((era) => ({ path: `/timeline/era/${era.slug}`, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: '2026-10-04' })),
   { path: '/about',        priority: 0.3, changeFrequency: 'yearly',  lastModified: '2026-08-11' },
   { path: '/contact',      priority: 0.3, changeFrequency: 'yearly',  lastModified: '2026-08-08' },
   { path: '/terms',        priority: 0.2, changeFrequency: 'yearly',  lastModified: '2026-08-08' },
@@ -105,6 +107,11 @@ function daysBetween(isoDate: string): number {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
+  // 세 채널의 전체 목록(상한 밖 과거 글 포함)을 동시에 받는다(2026-10-04) — 순차로 받으면 첫 생성이 14초 걸려 CDN 오리진 대기 한도에 가까워진다.
+  // 각 함수는 실패해도 throw하지 않고 빈 배열을 돌려주므로(아래 try 블록은 안전망) 미리 시작해 둬도 안전하다.
+  const webtoonsPromise = fetchAllWebtoons();
+  const lensPromise = fetchAllLensPosts();
+  const videosPromise = fetchAllVideos();
 
   // 정적 라우트
   for (const r of STATIC_ROUTES) {
@@ -134,7 +141,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 이미지 사이트맵 확장을 지원 — Google 이미지 sitemap 문서 참조).
   // 컷 전부 넣는다 — 어느 컷이 검색에 걸릴지 미리 알 수 없다.
   try {
-    const webtoons = await fetchWebtoons();
+    const webtoons = await webtoonsPromise; // 최신 1,000건 상한 밖 과거 글 포함(2026-10-04)
     for (const w of webtoons) {
       const daysOld = daysBetween(w.date);
       entries.push({
@@ -154,12 +161,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 추가(2026-08-12). /timemachine/{date}와 달리 하루 하나씩 실제로 발행된
   // 것만 있어서(임의 날짜 추정 없음) 전부 시딩해도 안전하다.
   try {
-    const lensPosts = await fetchLensPosts();
+    // 최신 1,000건 상한을 넘는 과거 글까지 전부(2026-10-04) — fetchAllLensPosts 주석 참조.
+    const lensPosts = await lensPromise;
     for (const l of lensPosts) {
       const daysOld = daysBetween(l.date);
       entries.push({
         url: `${BASE}${lensPath(l)}`,
-        lastModified: new Date(l.updated_at || l.published_at || l.date + 'T07:00:00+09:00'),
+        // lastmod는 최초 발행 시각(2026-10-04). 이전엔 updated_at을 우선했는데, 2026-10-01 일괄 백필(카테고리·파싱 보정)이
+        // 저장 시각을 now()로 덮어 1,000건 중 750건(75%)이 같은 날짜가 됐다 — 실제 수정일이 아니면 구글은 lastmod를 신뢰하지 않는다.
+        // changeFrequency 'never'와도 일관된다. 본문이 실제로 바뀐 시각을 따로 기록하는 필드는 후속 과제(content_updated_at).
+        lastModified: new Date(l.published_at || l.date + 'T07:00:00+09:00'),
         changeFrequency: 'never',
         priority: freshnessPriority(daysOld),
         // 이미지 사이트맵(2026-10-01) — 위 웹툰 채널 글은 panels가 비어 있어(서비스 API 실측) images가 한 장도 안 나갔다.
@@ -177,6 +188,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     /* lens API 불통이면 생략 */
   }
 
+  // 지난 지면(2026-10-04) — 지면이 편성된 날짜별 페이지. 그날 이후 바뀌지 않으므로 lastmod는 발행일 오전 7시(KST).
+  try {
+    for (const date of await fetchPaperDates()) {
+      entries.push({
+        url: `${BASE}/paper/${date}`,
+        lastModified: new Date(`${date}T07:00:00+09:00`),
+        changeFrequency: 'never',
+        priority: freshnessPriority(daysBetween(date)),
+      });
+    }
+  } catch {
+    /* 지면 날짜 조회 실패 시 생략 */
+  }
+
   // 영상 — 웹툰과 같은 이유로 개별 URL을 sitemap에 추가(2026-08-11).
   // videos 확장(2026-09-03, GEO 감사) — 웹툰의 images 필드와 같은 논리:
   // sitemap이 URL만 주지 말고 "이 페이지 안에 이런 영상이 있다"는 걸
@@ -184,7 +209,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 명시한다. video 채널은 항상 자체 렌더링해 S3에 올린 mp4라 video_url을
   // content_loc(원본 파일 직링크)로 그대로 쓸 수 있다.
   try {
-    const videos = await fetchVideos();
+    const videos = await videosPromise; // 최신 1,000건 상한 밖 과거 글 포함(2026-10-04)
     for (const v of videos) {
       const daysOld = daysBetween(v.date);
       entries.push({
@@ -195,9 +220,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         videos: [
           {
             title: escapeXml(v.title),
-            thumbnail_loc: v.thumbnail_url || `${BASE}/og-image.png`,
+            // thumbnail_loc·content_loc도 이스케이프한다(2026-10-04): Next는 videos 필드를 이스케이프하지 않는다(title·description은 위에서 직접 처리).
+            // 유튜브 주소의 `&t=24s` 같은 쿼리가 그대로 나가 XML이 깨졌고(서치콘솔 "구문분석 오류 70340행"), 구글이 사이트맵 전체를 0페이지로 읽었다.
+            // 과거 영상은 1,000건 상한에 가려져 있다가 이번에 과거 글까지 넣으면서 드러났다.
+            thumbnail_loc: escapeXml(v.thumbnail_url || `${BASE}/og-image.png`),
             description: escapeXml(v.excerpt || v.title),
-            content_loc: v.video_url,
+            content_loc: escapeXml(v.video_url),
             publication_date: v.published_at || `${v.date}T07:00:00+09:00`,
             family_friendly: 'yes',
           },

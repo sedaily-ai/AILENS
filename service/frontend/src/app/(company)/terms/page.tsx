@@ -4,7 +4,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '이용약관',
-  description: 'AI LENS(서울경제신문)의 이용약관.',
+  description: 'AI LENS(서울경제신문)의 이용약관입니다. 서비스 이용 조건과 이용자의 권리·책임, 콘텐츠 이용 범위를 안내합니다.',
   alternates: { canonical: `${SITE_URL}/terms` },
   robots: { index: true, follow: true },
 };

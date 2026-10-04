@@ -7,19 +7,24 @@ import type { ArchiveItem } from '@/shared/lib/archiveItems';
 // 빌더를 여기 하나로 합쳐 재사용한다(2026-08-17).
 import { SITE_URL } from '@/shared/constants/site';
 
+/** 검색 결과·공유 카드용 설명 — 화면 부제(config.description)에 서비스 설명을 붙여 80~130자로 만든다(2026-10-04, 기존 33~42자는 너무 짧았다). */
+function metaDescription(config: EconCategoryConfig): string {
+  return `${config.description} 서울경제신문 기자가 취재한 ${config.label} 이슈를 AI LENS가 레터·웹툰·팟캐스트·영상 4가지 형식으로 매일 새롭게 정리합니다.`;
+}
+
 export function buildCategoryMetadata(config: EconCategoryConfig): Metadata {
   const suffix = config.metaSuffix ?? '경제 뉴스';
   const title = `${config.label} — ${suffix}`;
   const url = `${SITE_URL}/${config.slug}`;
   return {
     title,
-    description: config.description,
+    description: metaDescription(config),
     keywords: [config.label, `${config.label} 뉴스`, 'AI LENS', '서울경제', suffix],
     // 카테고리별 RSS 자동 발견(2026-10-01) — /{slug}/rss.xml
     alternates: { canonical: url, types: { 'application/rss+xml': `${url}/rss.xml` } },
     openGraph: {
       title,
-      description: config.description,
+      description: metaDescription(config),
       url,
       type: 'website',
       images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: 'AI LENS' }],
@@ -29,7 +34,7 @@ export function buildCategoryMetadata(config: EconCategoryConfig): Metadata {
     twitter: {
       card: 'summary_large_image',
       title,
-      description: config.description,
+      description: metaDescription(config),
       images: [`${SITE_URL}/og-image.png`],
     },
   };
@@ -44,11 +49,11 @@ export function buildCategoryPageNMetadata(config: EconCategoryConfig, page: num
   const url = `${SITE_URL}/${config.slug}/page/${page}`;
   return {
     title,
-    description: config.description,
+    description: metaDescription(config),
     alternates: { canonical: url },
     openGraph: {
       title,
-      description: config.description,
+      description: metaDescription(config),
       url,
       type: 'website',
       images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: 'AI LENS' }],
@@ -58,7 +63,7 @@ export function buildCategoryPageNMetadata(config: EconCategoryConfig, page: num
     twitter: {
       card: 'summary_large_image',
       title,
-      description: config.description,
+      description: metaDescription(config),
       images: [`${SITE_URL}/og-image.png`],
     },
   };
@@ -72,7 +77,7 @@ export function buildCategoryJsonLd(config: EconCategoryConfig, items: ArchiveIt
     '@id': `${url}#collection`,
     url,
     name: `${config.label} — ${config.metaSuffix ?? '경제 뉴스'}`,
-    description: config.description,
+    description: metaDescription(config),
     inLanguage: 'ko-KR',
     isPartOf: { '@id': `${SITE_URL}/#website` },
     publisher: { '@id': `${SITE_URL}/#organization` },

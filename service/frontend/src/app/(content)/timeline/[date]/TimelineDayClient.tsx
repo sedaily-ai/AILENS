@@ -1,9 +1,7 @@
 'use client';
 
-import {
-  TimelineResultView, TimelineBigkindsView, ExitPill, SURFACE, GLOBAL_CSS,
-  type Article, type BigKindsArticle, type InvestmentScenario,
-} from '@/features/timeline';
+import { TimelineResultView, TimelineBigkindsView, ExitPill, SURFACE, GLOBAL_CSS } from '@/features/timeline';
+import type { Article, BigKindsArticle, InvestmentScenario } from '@/shared/lib/api/timelineApi';
 
 type Props =
   | { date: string; initialArticles: Article[]; initialBigkindsArticles?: undefined; initialInvestments?: undefined }

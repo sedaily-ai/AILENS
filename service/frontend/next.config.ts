@@ -31,6 +31,10 @@ const nextConfig: NextConfig = {
   // TurbopackInternalError로 죽는다. root를 이 앱 폴더로 고정하면 식별자가
   // ASCII(src/...) 상대경로로만 남아 패닉을 피한다(admin/frontend와 동일 조치).
   turbopack: { root: path.join(__dirname) },
+  // ISR 페이지의 Cache-Control `stale-while-revalidate` 길이(2026-10-03). 기본값은 약 1년이라, 방문자가 적은 이 사이트에서는
+  // CloudFront가 만료된 낡은 HTML을 "먼저 보여 주고 뒤에서 갱신"하는 경로를 자주 타서 첫 방문자가 몇 시간 전 화면을 봤다.
+  // 600초면 s-maxage(홈 300초)+낡은 채로 허용 300초 = 최대 10분 안에는 반드시 새 HTML을 기다려 받는다. 원본 재생성 주기·SEO 영향 없음.
+  expireTime: 600,
   experimental: {
     optimizePackageImports: ["lucide-react"],
     // 2026-08-23, "바로바로 이동되면 좋겠다" 요청 — [slug] page.tsx들이
@@ -122,6 +126,15 @@ const nextConfig: NextConfig = {
       // /archive 자체도 sitemap에 2026-08-11부터 올라가 있어 색인됐을 수
       // 있다 — 404 대신 영구 리다이렉트.
       { source: "/archive", destination: "/lens", permanent: true },
+      // 2026-10-04 — 웹툰·영상·오디오 목록 페이지 폐기. 같은 기사의 형식 탭과 중복이라 홈은 미리보기만 두고 목록은 /lens로 모은다.
+      // 개별 상세(/webtoon/{slug}, /video/{slug}, /listen/{slug}, /webtoon/series/{slug})는 색인·공유 링크가 있어 유지.
+      { source: "/webtoon", destination: "/lens", permanent: true },
+      { source: "/webtoon/all", destination: "/lens", permanent: true },
+      { source: "/webtoon/page/:n", destination: "/lens", permanent: true },
+      { source: "/video", destination: "/lens", permanent: true },
+      { source: "/video/page/:n", destination: "/lens", permanent: true },
+      { source: "/listen", destination: "/lens", permanent: true },
+      { source: "/listen/page/:n", destination: "/lens", permanent: true },
       // 2026-09-30 — 기사 상세 URL에서 /lens/ 프리픽스 제거 요청("바로
       // /증시 /부동산처럼 가는 게 깔끔하다"). /lens(목록 허브)·
       // /lens/page/:n(페이지네이션)은 그대로 둔다 — :slug는 정확히 한

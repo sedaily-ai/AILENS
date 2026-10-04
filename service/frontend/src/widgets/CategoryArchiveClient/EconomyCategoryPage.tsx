@@ -32,7 +32,7 @@ export async function EconomyCategoryPage({ slug, page = 1 }: { slug: string; pa
   const [letters, lens, hotLetters] = await Promise.all([
     fetchCmsPosts('letters', undefined, PAGE_SIZE),
     fetchLensPosts(),
-    fetchFollowingLetters(5),
+    fetchFollowingLetters(10),
   ]);
   // "시그널"(filterBy:'paperSection')은 category가 아니라 paperSection으로
   // 거른다 — econCategories.ts 주석 참조.

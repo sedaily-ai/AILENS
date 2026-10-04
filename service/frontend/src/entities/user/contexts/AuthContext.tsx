@@ -1,27 +1,31 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
-import { Amplify, type ResourcesConfig } from 'aws-amplify';
-import {
-  signInWithRedirect,
-  signOut,
-  getCurrentUser,
-  fetchAuthSession,
-  signIn,
-  signUp,
-  autoSignIn,
-  confirmSignUp,
-  resendSignUpCode,
-  resetPassword,
-  confirmResetPassword,
-  updatePassword,
-} from 'aws-amplify/auth';
-import { Hub } from 'aws-amplify/utils';
-import { authConfig } from '@/shared/config/auth';
 import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/authFetch';
+import { loadAmplifyAuth } from '@/shared/lib/amplifyLoader';
 import { PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/passwordPolicy';
 
-// Configure Amplify
-Amplify.configure(authConfig as ResourcesConfig);
+// aws-amplify는 처음 쓰는 순간에만 불러온다(2026-10-04 경량화 — 첫 번들에서 약 122KB 제거). 아래 얇은 래퍼는 원래 함수와 이름·인자·반환이
+// 같아서 이 파일의 호출부는 그대로다. Amplify.configure()는 로더가 처음 불러올 때 한 번 한다.
+type AuthApi = typeof import('aws-amplify/auth');
+function lazyAuth<K extends keyof AuthApi>(name: K) {
+  type Fn = AuthApi[K] extends (...a: infer A) => infer R ? (...a: A) => R : never;
+  return (async (...args: unknown[]) => {
+    const { auth } = await loadAmplifyAuth();
+    return (auth[name] as unknown as (...a: unknown[]) => unknown)(...args);
+  }) as unknown as Fn extends (...a: infer A) => infer R ? (...a: A) => Promise<Awaited<R>> : never;
+}
+const signInWithRedirect = lazyAuth('signInWithRedirect');
+const signOut = lazyAuth('signOut');
+const getCurrentUser = lazyAuth('getCurrentUser');
+const fetchAuthSession = lazyAuth('fetchAuthSession');
+const signIn = lazyAuth('signIn');
+const signUp = lazyAuth('signUp');
+const autoSignIn = lazyAuth('autoSignIn');
+const confirmSignUp = lazyAuth('confirmSignUp');
+const resendSignUpCode = lazyAuth('resendSignUpCode');
+const resetPassword = lazyAuth('resetPassword');
+const confirmResetPassword = lazyAuth('confirmResetPassword');
+const updatePassword = lazyAuth('updatePassword');
 
 // 이 파일이 다루는 Cognito 예외 이름 — 상수로 모아 문자열 리터럴 오타를 줄인다
 // (이슈 #20). `err.name`은 여전히 string이라 완전한 컴파일 타임 보장은 아니지만,
@@ -152,21 +156,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [syncUserProfile]);
 
   useEffect(() => {
-    checkUser();
+    // 로그인 확인은 화면이 뜬 직후(한가할 때)로 미룬다 — aws-amplify를 첫 번들에서 뺐기 때문에, 하이드레이션과 겹쳐 내려받지 않게 한다.
+    // (헤더의 "로그인" 표시는 isLoading 동안 그대로 유지되고, 확인이 끝나면 사용자 상태로 바뀐다.)
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    const run = () => {
+      if (cancelled) return;
+      checkUser();
+      // Listen for auth events
+      loadAmplifyAuth()
+        .then(({ utils }) => {
+          if (cancelled) return;
+          unsubscribe = utils.Hub.listen('auth', ({ payload }) => {
+            switch (payload.event) {
+              case 'signInWithRedirect':
+                checkUser();
+                break;
+              case 'signedOut':
+                setUser(null);
+                break;
+            }
+          });
+        })
+        .catch(() => {
+          // 로드 실패 시 이벤트 구독만 포기 — 로그인 확인(checkUser)은 위에서 이미 시도했다.
+        });
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    const idleId = ric ? ric(run, { timeout: 1200 }) : window.setTimeout(run, 300);
 
-    // Listen for auth events
-    const unsubscribe = Hub.listen('auth', ({ payload }) => {
-      switch (payload.event) {
-        case 'signInWithRedirect':
-          checkUser();
-          break;
-        case 'signedOut':
-          setUser(null);
-          break;
-      }
-    });
-
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+      if (!ric) window.clearTimeout(idleId);
+      unsubscribe?.();
+    };
   }, [checkUser]);
 
   const signInWithGoogle = async () => {

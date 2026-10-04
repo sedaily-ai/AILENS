@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { IconListen, IconPrint, IconShare, IconTextMinus, IconTextPlus } from './LensIcons';
+import { SketchListen, SketchPrint, SketchShare, SketchTextMinus, SketchTextPlus } from './SketchIcons';
 import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 
 // 기사 왼쪽 고정 도구 레일(2026-10-01) — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + /
@@ -107,18 +107,18 @@ export function ArticleToolRail({
     <>
       {onListen && (
         <ToolButton label="듣기" onClick={onListen}>
-          <IconListen size={24} />
+          <SketchListen size={24} />
         </ToolButton>
       )}
       <ToolButton label="글자 +" onClick={() => step(1)} disabled={size === 'large'}>
-        <IconTextPlus size={24} />
+        <SketchTextPlus size={24} />
       </ToolButton>
       <ToolButton label="글자 −" onClick={() => step(-1)} disabled={size === 'small'}>
-        <IconTextMinus size={24} />
+        <SketchTextMinus size={24} />
       </ToolButton>
       <div ref={shareRef} style={{ position: 'relative' }}>
         <ToolButton label="공유" onClick={() => setShareOpen((v) => !v)} expanded={shareOpen}>
-          <IconShare size={24} />
+          <SketchShare size={24} />
         </ToolButton>
         {shareOpen && (
           <div role="dialog" aria-label="공유" className="rail-pop">
@@ -127,7 +127,7 @@ export function ArticleToolRail({
         )}
       </div>
       <ToolButton label="인쇄" onClick={() => window.print()}>
-        <IconPrint size={24} />
+        <SketchPrint size={24} />
       </ToolButton>
     </>
   );

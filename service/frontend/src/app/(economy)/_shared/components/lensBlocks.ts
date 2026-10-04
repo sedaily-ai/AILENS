@@ -108,8 +108,8 @@ export function parseLetterBlocks(paragraphs: string[] | null | undefined, opts:
   const firstIdx = blocks.findIndex((b) => b.type === 'p');
   const firstBlock = blocks[0];
   if (firstIdx === 0 && firstBlock.type === 'p') {
-    let t = firstBlock.text.replace(/^\s*(?:증시|시그널|부동산|경제|금융|산업|정치|사회|국제|세계|문화|스포츠|오피니언)\s*[|｜]\s*/, '');
-    const h = (opts.headline ?? '').replace(/^\s*(?:증시|시그널|부동산|경제|금융|산업|정치|사회|국제|세계|문화|스포츠|오피니언)\s*[|｜]\s*/, '').trim();
+    let t = firstBlock.text.replace(/^\s*(?:증권|증시|시그널|부동산|경제|금융|산업|정치|사회|국제|세계|문화|생활|스포츠|오피니언|IT|과학|건강|교육|환경|노동)\s*[|｜]\s*/, '');
+    const h = (opts.headline ?? '').replace(/^\s*(?:증권|증시|시그널|부동산|경제|금융|산업|정치|사회|국제|세계|문화|생활|스포츠|오피니언|IT|과학|건강|교육|환경|노동)\s*[|｜]\s*/, '').trim();
     if (h && t.startsWith(h)) t = t.slice(h.length).trim();
     if (!t) {
       blocks.shift();

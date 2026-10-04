@@ -6,7 +6,7 @@
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline, headlineSection } from '@/shared/lib/displayHeadline';
 import { letterHref } from '@/shared/lib/letterHref';
 import { lensPath } from '@/shared/lib/lensUrl';
 
@@ -269,6 +269,8 @@ export interface TodayLetterCardLike {
   deliveryHint: string;
   dateLabel: string;
   newsId: string;
+  /** 분류 라벨(증시·산업 등) — 레일의 작은 라벨용. 분류가 없는 글은 비운다. */
+  category?: string | null;
 }
 
 export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayLetterCardLike {
@@ -329,6 +331,7 @@ export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
     deliveryHint: '오늘 발행',
     dateLabel: formatDateLabel(lens.date),
     newsId: lens.id,
+    category: lens.category ?? headlineSection(lens.headline),
   };
 }
 
@@ -347,8 +350,9 @@ const FOLLOWING_MAX_DISPLAY = 4;
 // 역순 조회 루프 자체가 필요 없어졌다 — 단순 slice.
 export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLAY): Promise<TodayLetterCardLike[]> {
   try {
-    const posts = await fetchLensPosts(limit);
-    return posts.slice(0, limit).map(toLensLetterCard);
+    // 분류(증시·산업 등)가 있는 글만, 홈과 같은 최신 100건 캐시에서 고른다(2026-10-04) — 레일 라벨이 항상 붙고 요청도 추가되지 않는다.
+    const posts = await fetchLensPosts(100);
+    return posts.filter((p) => p.category || headlineSection(p.headline)).slice(0, limit).map(toLensLetterCard);
   } catch {
     return [];
   }

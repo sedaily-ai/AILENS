@@ -1,157 +1,73 @@
-# 2026-10-01: 모든 그룹의 `Disallow: /_next/`를 제거했다. /_next/static/(JS·CSS·폰트)과 /_next/image(최적화된 이미지)는 구글이 페이지를
-# 렌더링하는 데 필요한 리소스인데 이 줄이 전부 막고 있었다(Search Console "robots.txt에 의해 차단됨"에 폰트 11건이 잡힘 — 구글은 가장 긴
-# 규칙을 우선하므로 `Allow: /`보다 `Disallow: /_next/`가 이긴다). 막히면 구글이 스타일·이미지 없는 페이지로 렌더링해 모바일 사용성·
-# 페이지 경험 평가에 불리하다. 크롤 예산 걱정은 /_next/static/*이 CloudFront에서 장기 캐시되므로 필요 없다.
 # AI LENS (ailens.sedaily.ai) — robots policy
-# en.sedaily.com 의 AEO 보고서 기준: AI 검색엔진(ChatGPT/Perplexity/Claude/Gemini)이
-# 트래픽의 49% 차지. AI 크롤러를 명시적으로 환영하는 정책.
-#
-# 2026-08-18: 이름 있는 User-agent 그룹(Yeti/ChatGPT-User/GPTBot 등)이
-# Disallow 없이 "Allow: /"만 갖고 있던 걸 발견해 고쳤다 — robots.txt 스펙상
-# 봇에 이름이 명시된 그룹이 있으면 그 봇은 "User-agent: *" 그룹을 완전히
-# 무시하고 자기 이름 그룹만 따른다. 즉 그동안 아래 모든 이름 있는 봇들은
-# */_next/·/login 을 그대로 긁을 수 있는 상태였다(en.sedaily.com의
-# robots.ts가 모든 그룹에 같은 Disallow를 반복하는 것과 같은 이유로,
-# 여기도 모든 그룹에 동일하게 반복한다).
+# 컨셉: "열어두고, 많이 들어오게" (2026-10-04, 사용자 결정). 검색엔진·AI 검색/답변·AI 학습 봇을 모두 허용하고,
+# 독자·인용을 가져다주지 않는 SEO 도구 크롤러(Semrush·Ahrefs·dotbot)만 막는다.
+#   · 같은 날 본지(www.sedaily.com) 정책(학습 봇 차단)을 한 번 따라 해 봤다가, "AI LENS는 열어두는 컨셉"으로 정리해 되돌렸다.
+#     학습 봇 차단이 인용을 막지 못한다는 조사(검색 봇과 학습 봇은 별개)와 차단 매체의 유입 감소 연구를 근거로 했다 — 근거·출처는 docs/worklog 참조.
+#   · 이전 파일(2026-08-18 정책)은 이름 그룹 20여 개에 같은 Disallow를 반복하던 구조였다. 이번에 그룹을 합쳐 읽기 쉽게 했다.
+# robots.txt 스펙상 이름이 명시된 그룹이 있는 봇은 "User-agent: *" 그룹을 무시하고 자기 그룹만 따른다 —
+# 그래서 이름 그룹마다 공통 Disallow(/api/, /login)를 반복한다. (/_next/ 는 렌더링에 필요한 정적 리소스라 막지 않는다.)
+# 신규 AI 서비스가 나오면 아래 허용 그룹에 한 줄 추가한다.
 
-# ── 전통 검색엔진 (Google, Bing, ...) ───────────────────────
-User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# ── 한국 검색엔진 ──────────────────────────────────────────
-User-agent: Yeti
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: Daumoa
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# ── AI 검색 (사용자 질의 응답용 — 우리 콘텐츠 노출에 유리) ────
-User-agent: ChatGPT-User
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: OAI-SearchBot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: Claude-Web
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# Anthropic 공식 문서(2026-10-01 확인): ClaudeBot=학습용, Claude-SearchBot=검색 결과
-# 품질용 색인(막으면 검색 최적화 색인에서 빠짐), Claude-User=사용자 질의 시 조회.
-# 이전엔 SearchBot/User가 이름 그룹이 없어 "*" 그룹을 따랐지만, 위 "이름 그룹이
-# 있으면 * 무시" 규칙과 일관되게 명시한다.
-User-agent: Claude-SearchBot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: Claude-User
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: ClaudeBot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: PerplexityBot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: Perplexity-User
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: Google-Extended
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: GoogleOther
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# Bingbot(전통 검색)은 이름 있는 그룹이 없으면 위 "*" 그룹을 그대로 따르지만,
-# Copilot(빙 AI 답변)도 결국 Bingbot 크롤 결과를 쓰므로 명시적으로 한 번 더
-# 확인(2026-08-23, "빙도 잘 들어오게" 요청).
+# ── 허용: 검색엔진 ───────────────────────────────────────
+User-agent: Googlebot
+User-agent: Googlebot-News
+User-agent: Googlebot-Image
 User-agent: Bingbot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# ── AI 학습 크롤러 (모델 학습에 콘텐츠 포함되는 것 허용) ─────
-User-agent: GPTBot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: anthropic-ai
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: CCBot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: cohere-ai
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-User-agent: Bytespider
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# Apple Intelligence/Siri 검색(Applebot-Extended는 학습용, Applebot은 검색
-# 인덱싱용 — 2026-08-23 추가).
+User-agent: Yeti
+User-agent: Daumoa
 User-agent: Applebot
+User-agent: DuckDuckBot
 Allow: /
 Disallow: /api/
 Disallow: /login
 
-User-agent: Applebot-Extended
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# Meta AI(2026-08-23 추가).
-User-agent: meta-externalagent
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# Amazon(Rufus/Alexa+, 2026-08-23 추가).
-User-agent: Amazonbot
-Allow: /
-Disallow: /api/
-Disallow: /login
-
-# DuckDuckGo AI 답변(2026-08-23 추가).
+# ── 허용: AI 검색·답변(인용되려면 필요) · 사용자 질의 실시간 fetch ─────
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: Claude-Web
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: MistralAI-User
+User-agent: Google-CloudVertexBot
+User-agent: Meta-ExternalFetcher
 User-agent: DuckAssistBot
 Allow: /
 Disallow: /api/
 Disallow: /login
 
+# ── 허용: AI 모델 학습용 수집(모델이 서울경제·AI LENS를 알게 되는 경로) ──
+User-agent: GPTBot
+User-agent: Google-Extended
+User-agent: GoogleOther
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Applebot-Extended
+User-agent: Amazonbot
+User-agent: CCBot
+User-agent: cohere-ai
+User-agent: Meta-ExternalAgent
+User-agent: Bytespider
+Allow: /
+Disallow: /api/
+Disallow: /login
+
+# ── 차단: SEO 도구 크롤러(독자·인용 없이 서버 부하만 준다) ─────────────
+User-agent: SemrushBot
+User-agent: AhrefsBot
+User-agent: dotbot
+Disallow: /
+
+# ── 그 외 모든 봇 ────────────────────────────────────────
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+# Cloudflare Content Signals — 검색·AI 답변 인용·모델 학습 모두 허용.
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
 # ── 사이트맵 ──────────────────────────────────────────────
 Sitemap: https://ailens.sedaily.ai/sitemap.xml
-# Google News sitemap — 최근 2일 발행 기사만(스펙 요구사항), 실시간 뉴스
-# 노출 속도용. 일반 sitemap.xml과 별개 채널(News/Top Stories/Discover).
+# Google News sitemap — 최근 2일 발행 기사만(스펙 요구사항), 실시간 뉴스 노출 속도용.
 Sitemap: https://ailens.sedaily.ai/news-sitemap.xml

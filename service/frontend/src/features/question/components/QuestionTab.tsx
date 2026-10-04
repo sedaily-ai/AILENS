@@ -278,6 +278,7 @@ export function QuestionTab({ onSkip }: Props) {
           <Reveal delay={100}>
             {/* /saju는 다른 Next.js 앱(zone)으로 rewrite되는 경로라 일반 <a>로
                 하드 내비게이션(headerTabs.ts 주석 참조) */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- 다른 Next 앱(zone)이라 하드 내비게이션 */}
             <a
               href="/saju"
               className="block max-w-[520px] mx-auto group"

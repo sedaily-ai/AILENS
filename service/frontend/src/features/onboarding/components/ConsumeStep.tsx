@@ -69,7 +69,7 @@ export function ConsumeStep({
           중이라 그 라벨을 여기 두면 "다음으로"인지 "그만 보기"인지
           헷갈린다(사용자 지적: "건너뛰기를 누르면 다음으로 이동하네").
           이 단계의 "다음"은 아래 "다 보셨다면" 버튼 하나로 충분하다. */}
-      <OnboardingHeader currentStep={3} onBack={onBack} />
+      <OnboardingHeader currentStep={2} onBack={onBack} />
 
       <div style={{ flex: 1, padding: '8px 22px 0', maxWidth: isLetter ? 420 : 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: isLetter ? 'center' : undefined }}>
         {isLetter ? (

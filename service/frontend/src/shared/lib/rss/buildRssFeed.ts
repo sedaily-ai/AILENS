@@ -1,6 +1,7 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { letterHref } from '@/shared/lib/letterHref';
 import { lensPath } from '@/shared/lib/lensUrl';
+import { seoHeadline } from '@/shared/lib/displayHeadline';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
 import { SITE_URL as BASE } from '@/shared/constants/site';
@@ -138,7 +139,7 @@ export async function buildRssResponse(category?: EconCategoryConfig): Promise<R
         : '') +
       linksHtml(url, l.source_url);
     return {
-      title: `${l.headline} — 4가지 시선`,
+      title: seoHeadline(l.headline), // 접두사·이모지·접미사 제거(2026-10-04)
       url,
       date: l.published_at ?? l.date,
       description,

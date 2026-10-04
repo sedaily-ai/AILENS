@@ -9,3 +9,6 @@ export { EditorCommentsSection } from './components/EditorCommentsSection';
 export { InteractiveBlock } from './components/InteractiveBlock';
 export type { InteractiveBlockData } from './components/InteractiveBlock';
 export { NewsletterCTA } from './components/NewsletterCTA';
+
+// "지난 지면" 페이지(app/(content)/paper/[date])가 홈과 같은 4탭 카드를 재사용한다(2026-10-04) — variant="archive".
+export { LensPreviewSection } from './components/LensPreviewSection';

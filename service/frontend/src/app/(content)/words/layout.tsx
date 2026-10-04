@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 // 기본값만 상속하던 걸 발견).
 import { SITE_URL } from '@/shared/constants/site';
 const TITLE = '용어 해설 — 경제 용어 사전';
-const DESCRIPTION = 'AI LENS 레터에 나온 경제·시사 용어를 모아뒀어요. 궁금할 때마다 하나씩 찾아보세요.';
+const DESCRIPTION = 'AI LENS 기사에 나온 경제·시사 용어를 쉬운 말로 풀어 모았습니다. 금리·환율·공매도 같은 낯선 경제 용어가 궁금할 때 하나씩 찾아보고, 퀴즈로 복습할 수도 있습니다.';
 
 export const metadata: Metadata = {
   title: TITLE,

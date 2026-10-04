@@ -41,7 +41,7 @@ export function SubscribeStep({
       {/* 2026-09-03 — "지금은 넘어가기"였다가 "건너뛰기 →"로 통일. 이제
           모든 단계의 skip이 "전체 종료, 홈으로"라는 같은 뜻이라 라벨도
           맞춰야 사용자가 어디서든 같은 버튼=같은 동작이라고 믿을 수 있다. */}
-      <OnboardingHeader currentStep={6} onSkip={onSkip} onBack={onBack} />
+      <OnboardingHeader currentStep={5} onSkip={onSkip} onBack={onBack} />
 
       <div style={{ padding: '28px 28px 0', textAlign: 'center' }}>
         <h1 style={{ margin: '0 0 26px', fontFamily: '"Noto Serif KR", serif', fontSize: 24, fontWeight: 700, lineHeight: 1.4, letterSpacing: '-0.02em', color: '#0f172a' }}>

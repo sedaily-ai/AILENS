@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AuthProvider } from '@/features/auth';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { reportWebVitals } from '@/shared/lib/tracking/webVitals';
+import { LinkPrefetcher } from '@/shared/ui/LinkPrefetcher';
 
 // 속도 KPI 계측(2026-08-23, "전체적으로 더 빠르게 하려면?" 대화의 연장).
 // web-vitals는 브라우저 Navigation/Paint API를 직접 관찰하는 방식이라
@@ -47,6 +48,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           남겨둠 — 필요해지면 되돌릴 수 있게). */}
       <SessionSourceTracker />
       <WebVitalsTracker />
+      <LinkPrefetcher />
       {children}
     </AuthProvider>
   );

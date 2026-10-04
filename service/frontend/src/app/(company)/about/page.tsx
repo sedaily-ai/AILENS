@@ -5,7 +5,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '회사소개',
-  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스, AI LENS를 소개합니다.',
+  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스 AI LENS를 소개합니다. 기자가 취재한 기사를 AI가 레터·웹툰·팟캐스트·영상으로 재구성하고 편집팀이 검수하는 제작 방식과 운영 원칙을 안내합니다.',
   alternates: { canonical: `${SITE_URL}/about` },
   robots: { index: true, follow: true },
 };
@@ -20,7 +20,7 @@ const JSON_LD = {
   '@id': `${SITE_URL}/about#page`,
   url: `${SITE_URL}/about`,
   name: '회사소개',
-  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스, AI LENS를 소개합니다.',
+  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스 AI LENS를 소개합니다. 기자가 취재한 기사를 AI가 레터·웹툰·팟캐스트·영상으로 재구성하고 편집팀이 검수하는 제작 방식과 운영 원칙을 안내합니다.',
   inLanguage: 'ko-KR',
   isPartOf: { '@id': `${SITE_URL}/#website` },
   mainEntity: { '@id': `${SITE_URL}/#organization` },

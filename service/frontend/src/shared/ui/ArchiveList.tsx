@@ -13,17 +13,8 @@
 // 자체를 shared/ui/icons로 승격해 레이어링 위반과 복제 위험을 동시에 해소했다.
 import Link from 'next/link';
 import Image from 'next/image';
-import { LetterMailIcon, StockBullIcon, LightbulbIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import type { ArchiveItem } from '@/shared/lib/archiveItems';
-
-function VideoPlayIcon({ accent, className }: { accent: string; className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke={accent} strokeWidth="1.6" />
-      <path d="M10 8.5l6 3.5-6 3.5v-7z" fill={accent} />
-    </svg>
-  );
-}
+import { kstDateTimeLabel } from '@/shared/lib/date';
 
 // 발행 시각(시:분)만 — 카테고리 태그를 대체한다(2026-10-01, 사용자 지적:
 // 이 컴포넌트는 현재 카테고리 아카이브 페이지에서만 쓰이는데(ArchiveList.tsx
@@ -60,23 +51,21 @@ function groupByDate(items: ArchiveItem[]): { date: string; items: ArchiveItem[]
   return groups;
 }
 
-function ArchiveRow({ item }: { item: ArchiveItem }) {
-  const Icon =
-    item.kind === 'trend' ? StockBullIcon
-    : item.kind === 'column' ? LightbulbIcon
-    : item.kind === 'video' ? VideoPlayIcon
-    : LetterMailIcon;
-
+function ArchiveRow({ item, showCategory }: { item: ArchiveItem; showCategory?: boolean }) {
   const content = (
     <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
       <div style={{ minWidth: 0, flex: 1 }}>
         <p
+          data-ar-title
           className="font-semibold text-gray-900"
           style={{
             fontFamily: '"Noto Serif KR", serif',
-            fontSize: 'clamp(16px, 3vw, 18px)',
-            lineHeight: 1.4,
-            letterSpacing: '-0.01em',
+            fontSize: 'clamp(17px, 3vw, 21px)',
+            fontWeight: 700,
+            textWrap: 'pretty',
+            lineHeight: 1.38,
+            letterSpacing: '-0.015em',
+            transition: 'color .18s ease',
           }}
         >
           {item.title}
@@ -84,12 +73,12 @@ function ArchiveRow({ item }: { item: ArchiveItem }) {
         {item.excerpt && (
           <p
             style={{
-              fontSize: 13.5,
+              fontSize: 14.5,
               color: '#6b7280',
               lineHeight: 1.6,
-              marginTop: 6,
+              marginTop: 8,
               display: '-webkit-box',
-              WebkitLineClamp: 3,
+              WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}
@@ -97,18 +86,23 @@ function ArchiveRow({ item }: { item: ArchiveItem }) {
             {item.excerpt}
           </p>
         )}
-        {timeLabel(item.publishedAt) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <span style={{ fontSize: 12, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{timeLabel(item.publishedAt)}</span>
+        {(timeLabel(item.publishedAt) || (showCategory && item.category)) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+            {showCategory && item.category && (
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#374151', padding: '2px 8px', borderRadius: 999, background: '#f1f2f4' }}>
+                {item.subcategory ? `${item.category} · ${item.subcategory}` : item.category}
+              </span>
+            )}
+            {(kstDateTimeLabel(item.publishedAt) ?? timeLabel(item.publishedAt)) && <span style={{ fontSize: 12, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>{kstDateTimeLabel(item.publishedAt) ?? timeLabel(item.publishedAt)}</span>}
           </div>
         )}
       </div>
       {item.avatarUrl ? (
         <span
           style={{
-            width: 132,
+            width: 'clamp(96px, 24vw, 184px)',
             aspectRatio: '3 / 2',
-            borderRadius: 10,
+            borderRadius: 6,
             flexShrink: 0,
             overflow: 'hidden',
             background: '#f3f4f6',
@@ -117,42 +111,27 @@ function ArchiveRow({ item }: { item: ArchiveItem }) {
           <Image
             src={item.avatarUrl}
             alt=""
-            width={132}
-            height={88}
+            width={368}
+            height={245}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         </span>
-      ) : (
-        <span
-          className="hidden sm:flex"
-          style={{
-            width: 132,
-            aspectRatio: '3 / 2',
-            borderRadius: 10,
-            flexShrink: 0,
-            background: `${item.accent}14`,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon accent={item.accent} className="w-8 h-8" />
-        </span>
-      )}
+      ) : null /* 사진이 없는 글은 자리를 비우고 글이 폭을 다 쓴다(예전 아이콘 상자는 비어 보였다) */}
     </div>
   );
 
-  const rowStyle = { padding: '18px 4px', textDecoration: 'none' } as const;
+  const rowStyle = { padding: '20px 14px', margin: '0 -14px', textDecoration: 'none' } as const;
 
   if (item.href && item.external) {
     return (
-      <a key={item.key} href={item.href} target="_blank" rel="noopener noreferrer" className="block transition-opacity hover:opacity-80" style={rowStyle}>
+      <a key={item.key} href={item.href} target="_blank" rel="noopener noreferrer" className="ar-link" style={rowStyle}>
         {content}
       </a>
     );
   }
   if (item.href) {
     return (
-      <Link key={item.key} href={item.href} className="block transition-opacity hover:opacity-80" style={rowStyle}>
+      <Link key={item.key} href={item.href} className="ar-link" style={rowStyle}>
         {content}
       </Link>
     );
@@ -164,12 +143,16 @@ function ArchiveRow({ item }: { item: ArchiveItem }) {
   );
 }
 
-export function ArchiveList({ items, emptyLabel }: { items: ArchiveItem[]; emptyLabel?: string }) {
+/** firstRowAction: 첫 날짜 라벨과 같은 줄 오른쪽에 놓는 도구(예: 날짜별 보기 버튼) — 영문판처럼 "SEP 28, 2026 ··· Browse by date" 한 줄 구성(2026-10-04). */
+export function ArchiveList({ items, emptyLabel, firstRowAction, skipFirstDate, showCategory }: { items: ArchiveItem[]; emptyLabel?: string; firstRowAction?: React.ReactNode; /** 여러 분류가 섞인 목록(/lens 등)에서 각 글의 분류 라벨을 보여 준다. 분류 페이지에선 모두 같아 생략. */ showCategory?: boolean; /** 이 날짜면 첫 그룹의 날짜 줄을 그리지 않는다 — 호출부가 같은 날짜를 목록 위에 따로 보여 줄 때(중복 방지). */ skipFirstDate?: string }) {
   if (items.length === 0) {
     return (
-      <p style={{ fontSize: 14, color: '#9ca3af', padding: '40px 0', textAlign: 'center' }}>
-        {emptyLabel ?? '아직 콘텐츠가 없어요.'}
-      </p>
+      <>
+        {firstRowAction && <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{firstRowAction}</div>}
+        <p style={{ fontSize: 14, color: '#9ca3af', padding: '40px 0', textAlign: 'center' }}>
+          {emptyLabel ?? '아직 콘텐츠가 없어요.'}
+        </p>
+      </>
     );
   }
 
@@ -177,27 +160,42 @@ export function ArchiveList({ items, emptyLabel }: { items: ArchiveItem[]; empty
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* 토스처럼 가볍게(2026-10-04): 줄이 아래서 살짝 올라오며 차례로 나타나고, 올리면 부드러운 배경이 깔리며 사진이 살짝 커지고, 누르는 순간 눌린 듯 작아진다. */}
+      <style>{`
+        .ar-link { display: block; border-radius: 16px; transition: background .18s ease, transform .18s cubic-bezier(.22,.8,.22,1); }
+        .ar-link:hover { background: #f6f8fc; }
+        .ar-link:active { transform: scale(.985); background: #eff3fb; }
+        .ar-link img { transition: transform .35s cubic-bezier(.22,.8,.22,1); }
+        .ar-link:hover img { transform: scale(1.05); }
+        .ar-link:hover [data-ar-title] { color: #3d70de; }
+        [data-ar-item] { animation: ar-up .45s cubic-bezier(.22,.8,.22,1) both; animation-delay: calc(min(var(--i, 0), 9) * 45ms); }
+        @keyframes ar-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { [data-ar-item] { animation: none; } .ar-link, .ar-link img { transition: none; } .ar-link:active { transform: none; } }
+      `}</style>
       {groups.map((group, gi) => (
-        <div key={group.date || `no-date-${gi}`} style={{ marginTop: gi === 0 ? 0 : 36 }}>
+        <div key={group.date || `no-date-${gi}`} style={{ marginTop: gi === 0 ? 0 : 44 }}>
+          {!(gi === 0 && skipFirstDate && group.date === skipFirstDate) && (
           <div
             style={{
               display: 'flex',
-              alignItems: 'baseline',
+              alignItems: 'center',
               justifyContent: 'space-between',
-              borderBottom: '1px solid #ececec',
-              paddingBottom: 10,
-              marginBottom: 4,
+              gap: 12,
+              minHeight: gi === 0 && firstRowAction ? 36 : undefined,
+              paddingBottom: 6,
             }}
           >
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
+            {/* 날짜는 작고 조용한 라벨로(영문판 "SEP 28, 2026" 톤) — 건수·굵은 구분선은 뺐다. 항목 사이 가는 선만 남긴다. */}
+            <span style={{ fontSize: 'clamp(15px, 2.2vw, 16.5px)', fontWeight: 700, letterSpacing: '-0.01em', color: '#374151' }}>
               {group.date ? dateHeaderLabel(group.date) : '날짜 미상'}
             </span>
-            <span style={{ fontSize: 12, color: '#9ca3af' }}>{group.items.length}개의 아티클</span>
+            {gi === 0 && firstRowAction}
           </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {group.items.map((item, i) => (
-              <div key={item.key} style={{ borderTop: i === 0 ? 'none' : '1px solid #f4f4f3' }}>
-                <ArchiveRow item={item} />
+              <div key={item.key} data-ar-item style={{ borderTop: i === 0 ? 'none' : '1px solid #f4f4f3', ['--i' as string]: gi * 3 + i }}>
+                <ArchiveRow item={item} showCategory={showCategory} />
               </div>
             ))}
           </div>

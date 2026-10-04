@@ -4,7 +4,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '개인정보처리방침',
-  description: 'AI LENS(서울경제신문)의 개인정보처리방침.',
+  description: 'AI LENS(서울경제신문)의 개인정보처리방침입니다. 수집하는 개인정보 항목과 이용 목적, 보유 기간, 이용자의 권리와 보호 조치를 안내합니다.',
   alternates: { canonical: `${SITE_URL}/privacy` },
   robots: { index: true, follow: true },
 };

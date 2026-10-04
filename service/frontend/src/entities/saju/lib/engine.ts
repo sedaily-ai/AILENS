@@ -12,6 +12,6 @@
  */
 import { calculateSaju } from '@fullstackfamily/manseryeok';
 
-export const CG_OH: Record<string, string> = {'甲':'목','乙':'목','丙':'화','丁':'화','戊':'토','己':'토','庚':'금','辛':'금','壬':'수','癸':'수'};
+export { CG_OH } from './ganOh';
 
 export { calculateSaju };

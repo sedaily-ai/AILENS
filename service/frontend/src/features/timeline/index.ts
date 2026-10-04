@@ -2,10 +2,9 @@ export { NewsTimeMachine } from './components/NewsTimeMachine';
 export { TimelineResultView } from './components/TimelineResultView';
 export { TimelineBigkindsView } from './components/TimelineBigkindsView';
 export { ExitPill } from './components/ExitPill';
+export { EraView } from './components/EraView';
+export { DecadeView } from './components/DecadeView';
+export { HubCards } from './components/HubCards';
 export { SURFACE, GLOBAL_CSS } from './lib/tone';
-export {
-  fetchDayArticles, fetchBigkindsDay, ymd, kdate, kstTodayStr,
-  isReadableOriginal, bigkindsArticleUrl, resolveArticleLink,
-  ARCHIVE_MIN_DATE,
-  type Article, type BigKindsArticle, type InvestmentScenario, type ArticleLink,
-} from './lib/timelineApi';
+export { isReadableOriginal } from './lib/articleLinks';
+export { ChronicleExplorer } from './components/chronicle/ChronicleExplorer';

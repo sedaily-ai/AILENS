@@ -6,7 +6,11 @@ import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date';
 import { lensPath } from '@/shared/lib/lensUrl';
+import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';
+import type { ArticleNeighbor } from './components/ArticleNeighborNav';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -67,12 +71,60 @@ async function findOtherLens(
   return { more, related };
 }
 
+// 이전/다음 기사(2026-10-03) — 같은 카테고리 안에서 발행 시각 순. "이전"=더 오래된 글, "다음"=더 최근 글.
+// 카테고리가 없는 글은 전체 목록 기준. 이미 받아온 전체 목록에서 고르므로 추가 API 호출은 없다.
+async function findNeighbors(slug: string, current: CmsLens | null): Promise<{ prev: ArticleNeighbor | null; next: ArticleNeighbor | null }> {
+  if (!current) return { prev: null, next: null };
+  const pool = (await fetchAllLens()).filter((l) => (current.category ? l.category === current.category : true));
+  const stamp = (l: CmsLens) => l.published_at ?? l.date;
+  const sorted = [...pool].sort((a, b) => (stamp(a) < stamp(b) ? 1 : stamp(a) > stamp(b) ? -1 : 0)); // 최신순
+  const i = sorted.findIndex((l) => l.id === slug);
+  if (i < 0) return { prev: null, next: null };
+  const pick = (l: CmsLens | undefined): ArticleNeighbor | null =>
+    l ? { id: l.id, date: l.date, category: l.category ?? null, headline: l.headline } : null;
+  return { prev: pick(sorted[i + 1]), next: pick(sorted[i - 1]) };
+}
+
+const DEFAULT_COVER = `${SITE_URL}/lens/default-cover.webp`;
+
+/** 검색·공유용 대표 이미지(2026-10-04). 기사 원 사진(운영 CDN, 대부분 보유) → 카드/웹툰 컷 → 기본 커버 순.
+ *  이전엔 cover_image_url(웹툰 컷이 들어가는 경우가 많음)만 써서 검색·공유 미리보기가 만화 컷이었다. RSS(buildRssFeed)와 같은 우선순위. */
+function pickShareImages(lens: CmsLens): { primary: string; all: string[]; isDefault: boolean } {
+  const abs = (u: string | null | undefined) => (u ? (u.startsWith('/') ? `${SITE_URL}${u}` : u) : '');
+  const all = [...new Set([abs(pickLensPhoto(lens)), abs(lens.cover_image_url)].filter(Boolean))];
+  return all.length > 0 ? { primary: all[0], all, isDefault: false } : { primary: DEFAULT_COVER, all: [DEFAULT_COVER], isDefault: true };
+}
+
+/** 빵부스러기용 분류 단계. 분류가 없거나 정본 분류 목록에 없으면 null(단계 생략) — 미분류 글 경로 /news 는 목록 페이지가 없어 링크하면 404. */
+function breadcrumbCategory(lens: CmsLens): { name: string; url: string } | null {
+  const cat = ECON_CATEGORIES.find((c) => c.label === lens.category);
+  return cat ? { name: cat.label, url: `${SITE_URL}/${cat.slug}` } : null;
+}
+
+function faqItems(lens: CmsLens) {
+  return lens.lenses
+    .filter((l) => l.question && l.bullets.length > 0)
+    .map((l) => ({
+      '@type': 'Question',
+      name: l.question,
+      acceptedAnswer: { '@type': 'Answer', text: l.bullets.join(' ') },
+    }));
+}
+
+/** 기사 키워드 — 분류·하위분류를 앞에 두고(검색어 매칭), 서비스 고정어를 뒤에 붙인다. */
+function articleKeywords(lens: CmsLens): string[] {
+  const headline = seoHeadline(lens.headline);
+  return [...new Set([lens.category, lens.subcategory, headline, '경제 뉴스', '뉴스 해설', '오늘의 이슈', '4가지 시선', 'AI LENS', '서울경제'].filter((k): k is string => !!k))];
+}
+
 function buildJsonLd(lens: CmsLens) {
   const url = `${SITE_URL}${lensPath(lens)}`;
+  const headline = seoHeadline(lens.headline);
   // 발행 시각(초 단위)이 있으면 그걸 쓴다(2026-10-01, Google 날짜 가이드 —
   // 정확한 시각+타임존). 옛 글은 date 폴백.
   const published = lens.published_at || `${lens.date}T07:00:00+09:00`;
-  const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
+  const shareImages = pickShareImages(lens);
+  const category = breadcrumbCategory(lens);
   const bodyJoined = [
     lens.context,
     ...lens.lenses.flatMap((l) => [l.question, ...l.bullets]),
@@ -84,10 +136,20 @@ function buildJsonLd(lens: CmsLens) {
         '@type': 'NewsArticle',
         '@id': `${url}#article`,
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-        headline: lens.headline,
+        headline,
         description: lens.context,
         articleBody: bodyJoined,
-        articleSection: '경제',
+        articleSection: lens.category || '경제',
+        // 2026-10-04 GEO·AEO 보강 — 분류·주제·요약·출처·저작권·읽기 동작을 기계가 그대로 읽도록 명시.
+        abstract: lens.context,
+        keywords: articleKeywords(lens),
+        thumbnailUrl: shareImages.primary,
+        genre: '뉴스 해설',
+        about: [{ '@type': 'Thing', name: lens.category || '경제' }, ...(lens.subcategory ? [{ '@type': 'Thing', name: lens.subcategory }] : [])],
+        copyrightHolder: { '@id': `${SITE_URL}/#organization` },
+        copyrightYear: Number(lens.date.slice(0, 4)),
+        creditText: '서울경제신문 AI LENS',
+        potentialAction: { '@type': 'ReadAction', target: [url] },
         wordCount: bodyJoined.length,
         datePublished: published,
         dateModified: clampModifiedIso(lens.updated_at, published),
@@ -101,8 +163,15 @@ function buildJsonLd(lens: CmsLens) {
           parentOrganization: { '@id': `${SITE_URL}/#organization` },
         },
         publisher: { '@id': `${SITE_URL}/#organization` },
-        image: { '@type': 'ImageObject', url: image, width: 1200, height: 800 },
-        ...(lens.source_url ? { citation: lens.source_url } : {}),
+        // 실제 크기를 모르는 이미지에 1200×800을 박아 두던 것을 뺐다(2026-10-04). 사진 + 카드/웹툰 컷을 함께 제공.
+        image: shareImages.all.map((u) => ({ '@type': 'ImageObject', url: u })),
+        ...(lens.source_url
+          ? {
+              citation: lens.source_url,
+              // 이 글이 어느 원문 취재 기사를 바탕으로 했는지(서울경제 원문 링크) — 출처 신호.
+              isBasedOn: { '@type': 'NewsArticle', url: lens.source_url, publisher: { '@id': `${SITE_URL}/#organization` } },
+            }
+          : {}),
         speakable: {
           '@type': 'SpeakableSpecification',
           cssSelector: ['[data-speakable="headline"]', '[data-speakable="summary"]', '[data-speakable="qa"]'],
@@ -122,12 +191,25 @@ function buildJsonLd(lens: CmsLens) {
         },
         isAccessibleForFree: true,
       },
+      // 질문-답변 구조를 FAQPage로도 노출(2026-10-04) — 화면에 실제로 보이는 4가지 시선 Q&A와 같은 내용이라 AI 답변 엔진·리치 결과가 그대로 인용한다.
+      ...(faqItems(lens).length > 0
+        ? [
+            {
+              '@type': 'FAQPage',
+              '@id': `${url}#faq`,
+              url,
+              inLanguage: 'ko-KR',
+              mainEntity: faqItems(lens),
+            },
+          ]
+        : []),
       {
         '@type': 'BreadcrumbList',
+        // AI LENS > {분류} > 기사 (2026-10-04). 이전 중간 단계 "시선(/lens)"은 분류 단계로 대체. 분류가 없으면 단계를 건너뛴다.
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '시선', item: `${SITE_URL}/lens` },
-          { '@type': 'ListItem', position: 3, name: lens.headline, item: url },
+          ...(category ? [{ '@type': 'ListItem', position: 2, name: category.name, item: category.url }] : []),
+          { '@type': 'ListItem', position: category ? 3 : 2, name: headline, item: url },
         ],
       },
     ],
@@ -144,15 +226,19 @@ export async function buildLensArticleMetadata(
   if (!lens) {
     return { title: '이슈를 찾을 수 없어요', robots: { index: false } };
   }
-  const title = buildPageTitle(lens.headline, '4가지 시선');
+  // 제목은 정제한 헤드라인만(2026-10-04): 부서 접두사·이모지·"— 4가지 시선"을 뺐다. layout 템플릿이 " | AI LENS"를 붙여 검색 결과에서 잘리지 않는 길이가 된다.
+  const headline = seoHeadline(lens.headline);
+  const title = buildPageTitle(headline);
   const description = buildSeoDescription(lens.context, '오늘의 이슈를 4가지 시선으로 짚어드려요.');
   const url = `${SITE_URL}${lensPath(lens)}`;
-  const image = lens.cover_image_url || `${SITE_URL}/lens/default-cover.webp`;
+  const shareImages = pickShareImages(lens);
   return {
     title,
     description,
-    keywords: ['오늘의 이슈', '4가지 시선', lens.headline, '뉴스 해설', 'AI LENS', '서울경제'],
-    alternates: { canonical: url },
+    keywords: articleKeywords(lens),
+    authors: [{ name: 'AI LENS 편집팀', url: `${SITE_URL}/about` }],
+    category: lens.category || '경제',
+    alternates: { canonical: url, languages: { 'ko-KR': url } },
     openGraph: {
       title,
       description,
@@ -162,8 +248,9 @@ export async function buildLensArticleMetadata(
       modifiedTime: clampModifiedIso(lens.updated_at, lens.published_at || `${lens.date}T07:00:00+09:00`),
       authors: ['AI LENS 편집팀'],
       section: '경제',
-      tags: ['오늘의 이슈', '4가지 시선', '뉴스 해설', 'AI LENS', '서울경제'],
-      images: [{ url: image, width: 1200, height: 800, alt: lens.headline }],
+      tags: articleKeywords(lens),
+      // 실제 크기를 모르는 이미지에 1200×800을 박지 않는다. 기본 커버만 알려진 크기를 쓴다.
+      images: shareImages.isDefault ? [{ url: shareImages.primary, width: 1200, height: 800, alt: headline }] : [{ url: shareImages.primary, alt: headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -171,7 +258,24 @@ export async function buildLensArticleMetadata(
       card: 'summary_large_image',
       title,
       description,
-      images: [image],
+      images: [shareImages.primary],
+    },
+    // 검색·공유·서지 보강 메타(2026-10-04): 뉴스 키워드, 수정 시각, 분류, Dublin Core, 슬랙·트위터 라벨.
+    other: {
+      news_keywords: articleKeywords(lens).join(', '),
+      'og:updated_time': clampModifiedIso(lens.updated_at, lens.published_at || `${lens.date}T07:00:00+09:00`),
+      'article:publisher': 'https://www.facebook.com/seouleconomydaily/',
+      'DC.title': headline,
+      'DC.creator': 'AI LENS 편집팀',
+      'DC.subject': articleKeywords(lens).join(', '),
+      'DC.description': description,
+      'DC.date': lens.published_at || `${lens.date}T07:00:00+09:00`,
+      'DC.identifier': url,
+      'DC.source': lens.source_url || url,
+      'twitter:label1': '분류',
+      'twitter:data1': lens.category || '경제',
+      'twitter:label2': '발행',
+      'twitter:data2': lens.date,
     },
   };
 }
@@ -182,8 +286,9 @@ export async function LensArticlePageContent(
 ) {
   const { year, month, day, slug: rawSlug } = await paramsPromise;
   const slug = decodeURIComponent(rawSlug);
-  const [lens, hotLetters] = await Promise.all([findLens(slug), fetchFollowingLetters(5)]);
+  const [lens, hotLetters] = await Promise.all([findLens(slug), fetchFollowingLetters(10)]);
   const { more: otherLens, related: relatedLens } = await findOtherLens(slug, lens);
+  const neighbors = await findNeighbors(slug, lens);
 
   // 요청 경로(카테고리/연/월/일)가 실제 글의 정본 경로와 다르면(카테고리
   // 재분류, 다른 카테고리 폴더로 잘못 들어온 링크 등) 정본으로 리다이렉트
@@ -209,7 +314,7 @@ export async function LensArticlePageContent(
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <LensViewClient slug={slug} initialLens={lens} otherLens={otherLens} relatedLens={relatedLens} initialHotLetters={hotLetters} />
+      <LensViewClient slug={slug} initialLens={lens} otherLens={otherLens} relatedLens={relatedLens} neighbors={neighbors} initialHotLetters={hotLetters} />
     </>
   );
 }

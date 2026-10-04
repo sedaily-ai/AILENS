@@ -60,6 +60,7 @@ export function SajuFunnelCard() {
           생년월일로 사주도 풀어볼 수 있어요
         </p>
       </div>
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- /saju는 다른 Next 앱(zone)이라 하드 내비게이션 */}
       <a
         href="/saju"
         className="tl-focus"

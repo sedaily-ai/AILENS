@@ -26,7 +26,7 @@ export function DoneStep({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <OnboardingHeader currentStep={7} />
+      <OnboardingHeader currentStep={6} />
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '28px 0 0' }}>
         {subscribed && (

@@ -7,7 +7,7 @@ import { lensPerspectiveAt } from '@/shared/constants/lensPerspectives';
 const FORMAT_TEXT: Record<number, { situation: string; action: string }> = {
   0: { situation: '차분히 읽고 싶을 때', action: '구조와 흐름을 짚어가며' },
   1: { situation: '이야기로 가볍게 보고 싶을 때', action: '8컷 만화로 스르륵 넘기며' },
-  2: { situation: '이동 중 핵심만 듣고 싶을 때', action: '내레이션으로 들으며' },
+  2: { situation: '이동 중 핵심만 듣고 싶을 때', action: '귀로 들으며' },
   3: { situation: '3초 안에 훑고 싶을 때', action: '자막·그래픽으로 훑으며' },
 };
 

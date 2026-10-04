@@ -3,7 +3,7 @@
 import { renderInline } from './renderInline';
 
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline, seoHeadline } from '@/shared/lib/displayHeadline';
 import { chapterId } from './lensChapters';
 import { ReadDone } from './ReadDone';
 import { lensPath } from '@/shared/lib/lensUrl';
@@ -14,6 +14,10 @@ import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
 import { WebtoonCutGallery } from '@/shared/ui/WebtoonCutGallery';
+import { FormatStepNav } from './FormatStepNav';
+import { PodcastTranscript } from './PodcastTranscript';
+import { podcastScriptParagraphs } from '@/shared/lib/podcastScript';
+import { webtoonVariant } from '@/shared/lib/tracking/webtoonVariant';
 
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import {
@@ -64,8 +68,8 @@ export function LensFormatPanel({
   /** 방금 어느 방향으로 이동했는지(-1/0/+1) — 인디케이터 이동 방향과
    *  본문 진입 방향(swap-fwd/swap-back)을 맞추는 데만 쓴다. */
   dir: number;
-  onPanelTouchStart: (e: ReactTouchEvent) => void;
-  onPanelTouchEnd: (e: ReactTouchEvent, i: number) => void;
+  onPanelTouchStart?: (e: ReactTouchEvent) => void;
+  onPanelTouchEnd?: (e: ReactTouchEvent, i: number) => void;
   /** 실측 오디오·영상 길이(초) 보고 — 부모가 FormatPicker의 분량 표기에 쓴다. */
   noteDur: (i: number, sec: number) => void;
 }) {
@@ -97,6 +101,10 @@ export function LensFormatPanel({
       : null);
   const podcastScript =
     format === 'podcast' && letterFullText && letterFullText.length > 0 ? letterFullText : scriptBullets;
+  // 플레이어 대본 패널의 문단 — 실제로 음성으로 읽는 원고(transcript)가 있으면 그것을 쓴다(2026-10-03).
+  // 예전엔 레터 본문을 대신 보여 줘서 "듣는 내용과 대본이 다르다"는 문제가 있었다. 원고가 없는 글만 예전 폴백(레터/요약)을 쓴다.
+  const podcastChapters =
+    format === 'podcast' ? (l.transcript ? podcastScriptParagraphs(l.transcript) : podcastScript) : [];
   // 레터 본문 — 데모 오버라이드 → 없으면 admin이 채운 실제
   // paragraphs(2026-08-19 신설 필드) → 그것도 없으면 아래
   // 불릿 목록으로 폴백(letterParagraphs가 null인 경우).
@@ -148,7 +156,7 @@ export function LensFormatPanel({
       className={on ? 'lens-panel panel' : 'lens-panel'}
       data-dir={on ? dir : undefined}
       onTouchStart={onPanelTouchStart}
-      onTouchEnd={(e) => onPanelTouchEnd(e, i)}
+      onTouchEnd={(e) => onPanelTouchEnd?.(e, i)}
       style={{ marginTop: 'clamp(24px, 3.4vw, 32px)' }}
     >
       {/* 패널 제목줄(형식 이름 + 분량)은 걷어냈다 — 그 정보가 탭 안으로
@@ -243,7 +251,7 @@ export function LensFormatPanel({
               </p>
               <div className="lread-share">
                 <span className="lread-share-label">친구에게 공유하기</span>
-                <ArticleShareButtons title={lens.headline} url={`${SITE_URL}${lensPath(lens)}`} />
+                <ArticleShareButtons title={seoHeadline(lens.headline)} url={`${SITE_URL}${lensPath(lens)}`} />
               </div>
             </div>
           </div>
@@ -286,24 +294,7 @@ export function LensFormatPanel({
           WebtoonPanelsEditor로 올린 이미지+캡션이 있으면 아래 목업 캐러셀
           대신 실제 컷을 순서대로 보여준다. 컷을 이어 붙인 한 줄기로
           렌더하는 것과 완주율 계측은 WebtoonCutGallery가 담당한다. */}
-      {format === 'webtoon' && realWebtoonCuts && <WebtoonCutGallery cuts={realWebtoonCuts} articleId={lens.id} />}
-
-      {/* 웹툰이 끝난 자리 — 네이버 웹툰이 회차 끝에서 다음 화로 잇듯, 같은 기사를 레터로 더 깊이 읽도록 조용히 잇는다(2026-10-01). */}
-      {format === 'webtoon' && realWebtoonCuts && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 36 }}>
-          <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>여기까지 웹툰으로 봤어요</p>
-          <button
-            type="button"
-            onClick={() => {
-              document.getElementById(lensTabId(0))?.click();
-              setTimeout(() => document.getElementById(lensPanelId(0))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-            }}
-            style={{ padding: '11px 20px', border: 'none', borderRadius: 999, background: '#f2f3f5', color: '#111827', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-          >
-            레터로 더 자세히 읽기 →
-          </button>
-        </div>
-      )}
+      {format === 'webtoon' && realWebtoonCuts && <WebtoonCutGallery cuts={realWebtoonCuts} articleId={lens.id} category={lens.category ?? null} />}
 
       {/* 대사 전문 — 컷 안 말풍선에 이미 있는 대사를 여기서 한 번 더
           접어서 보여준다(소리를 못 듣거나 이미지가 안 뜨거나, 인용하려는
@@ -361,14 +352,14 @@ export function LensFormatPanel({
       {format === 'podcast' && directPodcastUrl && (
         <ArticleAudioPlayer
           src={directPodcastUrl}
-          accent={p.color}
+          accent={READING_ACCENT}
           label={p.short}
-          kicker="AI 음성 브리핑"
+          kicker="귀로 듣는 브리핑"
           title={displayHeadline(l.question) || '오늘의 브리핑'}
           coverImage={photo}
           byline={lens.source_url ? '서울경제 원문 기사' : null}
           bylineHref={lens.source_url}
-          chapters={podcastScript.length > 0 ? podcastScript.map((text) => ({ text })) : undefined}
+          chapters={podcastChapters.length > 0 ? podcastChapters.map((text) => ({ text })) : undefined}
           onDuration={(sec) => noteDur(i, sec)}
         />
       )}
@@ -399,15 +390,9 @@ export function LensFormatPanel({
           목업엔 없어서 자연히 안 보인다. ArticleAudioPlayer의 chapters는
           짧은 요약 3~5줄뿐이라, 전체 원고가 필요한 접근성 용도로는
           별도로 둔다. */}
-      {format === 'podcast' && l.transcript && (
-        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
-          <p className="ovl" style={{ marginBottom: 16 }}>
-            스크립트 (본문 텍스트)
-          </p>
-          <div className="lread" style={{ whiteSpace: 'pre-wrap' }}>
-            {l.transcript}
-          </div>
-        </div>
+      {/* 재생기가 있으면 그 안의 대본 패널이 이 원고를 보여 주므로(2026-10-03) 아래에 또 두지 않는다. 음성이 없는 글만 이 단독 대본을 쓴다. */}
+      {format === 'podcast' && l.transcript && !directPodcastUrl && (
+        <PodcastTranscript text={l.transcript} />
       )}
 
       {/* 실제 영상(2026-08-19) — admin이 YouTube 등 링크를 채운 경우 실제
@@ -441,11 +426,12 @@ export function LensFormatPanel({
           poster={l.thumbnail_url}
           accent={p.color}
           label={p.short}
-          kicker="AI 영상 브리핑"
+          kicker="15초 영상 브리핑"
           title={displayHeadline(l.question) || '오늘의 영상'}
           byline={lens.source_url ? '서울경제 원문 기사' : null}
           bylineHref={lens.source_url}
           onDuration={(sec) => noteDur(i, sec)}
+          chapters={l.transcript ? podcastScriptParagraphs(l.transcript).map((text) => ({ text })) : undefined}
         />
       )}
 
@@ -470,7 +456,7 @@ export function LensFormatPanel({
       )}
 
       {/* 스크립트 전문(2026-08-23) — 팟캐스트와 같은 이유(접근성). */}
-      {format === 'video' && l.transcript && (
+      {format === 'video' && l.transcript && !directVideoUrl && (
         <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(17,24,39,0.1)' }}>
           <p className="ovl" style={{ marginBottom: 16 }}>
             스크립트 (본문 텍스트)
@@ -480,6 +466,8 @@ export function LensFormatPanel({
           </div>
         </div>
       )}
+      {/* 형식 이어 보기 — 이전/다음 형식으로 차례대로 넘긴다(웹툰 끝의 "레터로 더 자세히 읽기"를 모든 형식 공통 이전·다음 이동으로 확장, 2026-10-03). */}
+      <FormatStepNav index={i} articleId={lens.id} category={lens.category ?? null} webtoonVariant={format === 'webtoon' ? webtoonVariant(realWebtoonCuts) : undefined} />
     </section>
   );
 }

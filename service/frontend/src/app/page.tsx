@@ -1,6 +1,7 @@
 import { FeedPage } from "@/widgets/FeedPage";
-import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchCmsPosts, toLensPreviewSummaries, toWebtoonPreviewSummaries, toVideoPreviewSummaries } from "@/shared/lib/api/cmsPostsApi";
+import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchPaperDates, fetchCmsPosts, toLensPreviewSummaries, toWebtoonPreviewSummaries, toVideoPreviewSummaries } from "@/shared/lib/api/cmsPostsApi";
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
+import { pickLensPostsForHome, trimArchiveItemsForHome } from "@/shared/lib/homeFeedTrim";
 import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
 import { fetchHomePlayerPosts, toAudioPreviewSummaries } from "@/shared/lib/api/homePlayerApi";
@@ -28,6 +29,7 @@ interface HomeContentProps {
   initialArchiveItems: ArchiveItem[];
   initialHotLetters: TodayLetterCardLike[];
   initialHomePlayerPosts: HomePlayerPost[];
+  paperDates?: string[];
 }
 
 function HomeContent({
@@ -38,6 +40,7 @@ function HomeContent({
   initialArchiveItems,
   initialHotLetters,
   initialHomePlayerPosts,
+  paperDates,
 }: HomeContentProps) {
   return (
     <FeedPage
@@ -49,6 +52,7 @@ function HomeContent({
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
       initialHomePlayerPosts={initialHomePlayerPosts}
+      paperDates={paperDates}
     />
   );
 }
@@ -89,7 +93,9 @@ export default async function HomePage() {
     fetchWebtoons(),
     fetchVideos(),
     fetchFollowingWordTerms(),
-    fetchLensPosts(),
+    // 홈은 최신 100건이면 충분하다(히어로 4지면 탭·카테고리 줄·최신 그리드 모두 최신 몇 건만 씀) — 2026-10-03.
+    // 예전엔 기본값 1000건을 통째로 받아 홈 HTML에 약 1.8MB(압축 전)로 심었다. 100건은 LensPreviewSection의 클라이언트 조회와 같은 캐시 키(lens:100)다.
+    fetchLensPosts(100),
     fetchCmsPosts('letters', undefined, 100),
     // "요즘 가장 많이 읽힌 글"(HotLettersRail) 서버 프리페치(2026-08-17,
     // 사용자 피드백: "왜 항상 늦게 나타나지, 빨리 뜨도록 하는거 안하고
@@ -98,7 +104,7 @@ export default async function HomePage() {
     // fetchFollowingLetters는 이미 "서버(app/page.tsx)와 클라이언트 양쪽이
     // 같은 로직을 쓰도록" 설계된 함수(todayLettersApi.ts 주석 참조)라 여기
     // 그대로 재사용.
-    fetchFollowingLetters(5),
+    fetchFollowingLetters(10),
     // 오디오 섹션(AudioPreviewSection) 서버 프리페치(2026-08-21).
     fetchHomePlayerPosts(),
   ]);
@@ -114,11 +120,15 @@ export default async function HomePage() {
   // 뿐이다 — `/lens` 목록 페이지(LensListClient.tsx)도 같은 이유로 "가장 새로운
   // 이슈" 히어로엔 딱 1건만 빼고 나머지는 바로 "다른 이슈"에 쌓는다. 그 관례를
   // 그대로 따라 여기서도 1건만 제외한다.
-  const initialArchiveItems = buildArchiveItems(
-    letters,
-    [],
-    [],
-    initialLensPosts.slice(1),
+  // 화면이 쓰는 건수(최신 그리드 8 + 카테고리 카드당 3)만 클라이언트로 보낸다(2026-10-04) — homeFeedTrim.ts 참조.
+  // 이전엔 100건 전부(약 74KB)를 HTML에 실었다. 기사 링크는 서버가 렌더한 DOM에 그대로 있어 크롤러가 보는 구조는 같다.
+  const initialArchiveItems = trimArchiveItemsForHome(
+    buildArchiveItems(
+      letters,
+      [],
+      [],
+      initialLensPosts.slice(1),
+    ),
   );
 
   // 2026-09-03 — LensPreviewSection(히어로 "오늘의 이슈, 4가지 시선")은
@@ -127,7 +137,12 @@ export default async function HomePage() {
   // 6.7MB의 주된 원인 — cmsPostsApi.ts의 toLensPreviewSummaries() 주석
   // 참조). buildArchiveItems()는 이미 위에서 필요한 필드만 뽑아 별도
   // ArchiveItem[]로 만들어 두므로, 여기서 축약해도 그 결과엔 영향 없다.
-  const lensPreviewPosts = toLensPreviewSummaries(initialLensPosts);
+  // 2026-10-04 — 지면 탭 4개가 실제로 쓰는 최대 16건만 보낸다(이전 100건, 약 109KB) — homeFeedTrim.ts 참조.
+  const lensPreviewPosts = toLensPreviewSummaries(pickLensPostsForHome(initialLensPosts));
+  // 홈 지면 헤더의 ◀(이전 지면)이 가는 날짜(2026-10-04) — 지면이 있는 날 중 홈이 보여 주는 날(가장 최근) 바로 앞날. 주말처럼 지면이 없는 날은 건너뛴다.
+  const allPaperDates = await fetchPaperDates();
+  const shownDate = lensPreviewPosts.reduce((m, l) => (l.date > m ? l.date : m), "");
+  const paperDates = allPaperDates.filter((d) => d <= shownDate).slice(0, 30);
 
   // 2026-09-03 — 같은 문제를 오디오 섹션에서도 발견. AudioPreviewSection은
   // 최대 4장만 쓰는데 최대 1000건(각 건 팟캐스트 전체 대본 포함)을 그대로
@@ -141,7 +156,7 @@ export default async function HomePage() {
   // toWebtoonPreviewSummaries()/toVideoPreviewSummaries() 참조. 이 값들도
   // 각각 WebtoonPreviewSection/VideoPreviewSection 외 다른 소비자가 없다.
   const webtoonPreviewItems = toWebtoonPreviewSummaries(initialWebtoons);
-  const videoPreviewItems = toVideoPreviewSummaries(initialVideos);
+  const videoPreviewItems = toVideoPreviewSummaries(initialVideos, initialLensPosts);
 
   return (
     <HomeContent
@@ -152,6 +167,7 @@ export default async function HomePage() {
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
       initialHomePlayerPosts={audioPreviewPosts}
+      paperDates={paperDates}
     />
   );
 }

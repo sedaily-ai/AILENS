@@ -45,7 +45,7 @@ export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts) �
 export default async function LensListPage() {
   // 우측 사이드바(HomeSideBar) 서버 프리페치(2026-08-23) — 홈/카테고리
   // 페이지와 같은 이유(economyCategoryPage.tsx 참조).
-  const [items, hotLetters] = await Promise.all([fetchLensPosts(), fetchFollowingLetters(5)]);
+  const [items, hotLetters] = await Promise.all([fetchLensPosts(), fetchFollowingLetters(10)]);
   const jsonLd = buildLensJsonLd(items);
   return (
     <>

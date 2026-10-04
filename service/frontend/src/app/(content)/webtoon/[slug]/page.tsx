@@ -1,3 +1,5 @@
+import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
 import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
@@ -100,7 +102,8 @@ export async function generateMetadata({
   if (!webtoon) {
     return { title: '웹툰을 찾을 수 없어요', robots: { index: false } };
   }
-  const title = buildPageTitle(webtoon.title, '웹툰');
+  const headline = seoHeadline(webtoon.title);
+  const title = buildPageTitle(headline, '웹툰');
   const description = buildSeoDescription(webtoon.excerpt, '요즘 이슈를 컷으로 이어 보여드려요.');
   // 웹툰 페이지는 자기 자신이 정본이다(2026-10-02 정정) — 한때 기사 페이지로 통합했으나, 그 근거("panels가 비어 있는 얇은 페이지")는
   // 목록 API가 응답 경량화로 panels를 비워 내려주는 것을 오해한 것이었다. 단건 조회에는 컷 8장이 정상으로 오고 서버 HTML에도 컷이 들어
@@ -110,17 +113,25 @@ export async function generateMetadata({
   const url = `${SITE_URL}/webtoon/${slug}`;
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
+  const extras = mediaSeoExtras({ headline, description, url, publishedIso: webtoon.published_at || `${webtoon.date}T07:00:00+09:00`, kind: '웹툰' });
   return {
     title,
     description,
-    alternates: { canonical: url },
+    keywords: extras.keywords,
+    authors: extras.authors,
+    category: extras.category,
+    other: extras.other,
+    alternates: { canonical: url, languages: extras.languages },
     openGraph: {
       title,
       description,
       url,
       type: 'article',
       publishedTime: webtoon.published_at || `${webtoon.date}T07:00:00+09:00`,
-      images: [{ url: image, width: 1200, height: 800, alt: webtoon.title }],
+      authors: ['AI LENS 편집팀'],
+      section: webtoon.category || '웹툰',
+      tags: extras.keywords,
+      images: [{ url: image, width: 1200, height: 800, alt: headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -166,8 +177,17 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
         '@type': 'Article',
         '@id': `${url}#article`,
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-        headline: webtoon.title,
+        headline: seoHeadline(webtoon.title),
         description: webtoon.excerpt,
+        keywords: [...new Set([seoHeadline(webtoon.title), '웹툰', '경제 웹툰', '오늘의 이슈', 'AI LENS', '서울경제'])],
+        genre: '웹툰',
+        articleSection: '웹툰',
+        thumbnailUrl: image,
+        copyrightHolder: { '@id': `${SITE_URL}/#organization` },
+        copyrightYear: Number(webtoon.date.slice(0, 4)),
+        creditText: '서울경제신문 AI LENS',
+        ...(lens?.source_url ? { isBasedOn: { '@type': 'NewsArticle', url: lens.source_url, publisher: { '@id': `${SITE_URL}/#organization` } } } : {}),
+        potentialAction: { '@type': 'ReadAction', target: [url] },
         ...(articleBody ? { articleBody } : {}),
         datePublished: published,
         dateModified: published,
@@ -191,7 +211,7 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '웹툰', item: `${SITE_URL}/webtoon` },
+          { '@type': 'ListItem', position: 2, name: '최신 뉴스', item: `${SITE_URL}/lens` },
           { '@type': 'ListItem', position: 3, name: webtoon.title, item: url },
         ],
       },

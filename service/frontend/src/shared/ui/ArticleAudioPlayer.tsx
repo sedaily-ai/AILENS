@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { Repeat, RotateCcw, RotateCw, Bookmark, ChevronDown, Check } from 'lucide-react';
 import { clock, spoken, boldenQuotes, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/lib/mediaPlayerFormat';
 import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/useMediaPlayerControls';
+import { aapCss } from './articleAudioPlayerStyles';
 
 /**
  * 기사 안에 박아 쓰는 오디오 플레이어 — 2026-08-21 신설, 여러 차례 재설계.
@@ -33,9 +34,17 @@ import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shar
  * 1차: 강조색 원형 버튼 + 회색 슬라이더 한 줄 — "생성된 UI" 기본형.
  * 2차: #111827 평평한 다크 사각형 — 재질 없이 "칠해진 사각형".
  * 3차: radial glow + 유리 하이라이트 + 그레인 + 이퀄라이저 3줄 레이아웃.
- * 4차(지금): 3차의 재질 언어(다크 표면, accent 광원, 유리 재생 버튼)를
+ * 4차: 3차의 재질 언어(다크 표면, accent 광원, 유리 재생 버튼)를
  * 유지하면서 레퍼런스의 정보 구조(커버 → 배지+제목 → 바이라인 → 탭 →
  * 대본 패널 → 파형 → 하단 컨트롤)로 다시 짰다.
+ * 5차(2026-10-03, 사용자 요청 "팟캐스트 리디자인"): 다크 유리 카드를 걷고
+ * 밝은 앱 카드로 바꿨다 → "깔끔하지만 흔하다"는 피드백으로 같은 날 6차로 재설계.
+ * 6차("전시 도록·쇼룸": 종이색·세리프·드롭캡)는 "AI 티가 너무 난다"는 피드백으로
+ * 같은 날 폐기. 7차("요즘 팟캐스트 앱 재생 화면"): 큰 커버, 고딕 제목,
+ * 얇은 진행 바(가짜 파형은 화면에서 숨김), 파랑 채움 재생 버튼. 커버 색이 번지는
+ * 그라데이션 배경은 "단색이 더 안정감 있다"는 피드백으로 걷어내고 단색 회색 카드로 정했다.
+ * 구조·동작은 4차 그대로이고 스타일은 articleAudioPlayerStyles.ts에 있다.
+ * (위 4차까지의 "다크 표면 유지" 판단은 폐기.)
  *
  * ── 파형에 대한 원칙 ──
  * 레퍼런스의 막대 파형은 그대로 가져오되, **오디오 데이터를 디코딩해서
@@ -107,14 +116,14 @@ export interface ArticleAudioChapter {
 
 export function ArticleAudioPlayer({
   src,
-  accent = '#7c86ff',
+  accent = '#5b8def',
   label = '오디오',
   kicker,
   title,
   coverImage,
   byline,
   bylineHref,
-  chapters,
+  chapters: chaptersProp,
   onDuration,
 }: {
   src: string;
@@ -146,10 +155,10 @@ export function ArticleAudioPlayer({
 }) {
   const ref = useRef<HTMLAudioElement | null>(null);
   const [looping, setLooping] = useState(false);
-  // 대본은 접힌 상태로 시작한다(2026-08-24, 사용자 요청) — 팟캐스트는
-  // "읽기 대신 듣기" 모드라 대본이 처음부터 펼쳐져 있으면 플레이어보다
-  // 텍스트가 더 커 보인다. 필요할 때 탭으로 펼친다.
-  const [tab, setTab] = useState<TabKey | null>(null);
+  // 대본은 펼친 상태로 시작한다(2026-10-03, 사용자 요청 — 플레이어 안의 대본이 기준이고 아래 중복 대본은 없앴다).
+  // 2026-08-24에는 "듣기 모드라 텍스트가 더 커 보인다"며 접힌 채 시작했으나, 이제 대본이 이 패널 하나뿐이고
+  // 재생 위치를 따라가며 읽는 용도(접근성 포함)라 펼쳐 둔다. 패널 높이는 제한돼 있어(스크롤) 플레이어를 가리지 않는다.
+  const [tab, setTab] = useState<TabKey | null>(chaptersProp && chaptersProp.length > 0 ? 'script' : null);
   // 대본 자동 추적 — 사용자가 리스트를 수동 스크롤하면 잠깐 해제한다(요청:
   // "현재 재생 중 단락 하이라이트 + 자동 스크롤(수동 스크롤 시 일시 해제)").
   const [autoTrack, setAutoTrack] = useState(true);
@@ -185,6 +194,21 @@ export function ArticleAudioPlayer({
   // 타임코드가 있는 챕터가 하나도 없으면 자동 하이라이트·자동 스크롤을
   // 아예 켜지 않는다 — 존재하지 않는 시점을 가리키는 "가짜 추적"이 되지
   // 않게 한다.
+  // 실측 타임코드가 없으면, 길이를 안 뒤에 "글자 수 비율"로 각 문단의 시작 시각을 어림한다(2026-10-03, 사용자 요청 — 말하는 부분 표시).
+  // 실제 음성의 문단별 시각은 아니므로 화면에 "대략"이라고 밝힌다(estimatedTrack). 실측 값이 들어오면 그것을 그대로 쓴다.
+  const rawHasTimecodes = !!chaptersProp?.some((c) => typeof c.time === 'number');
+  const estimatedTrack = !rawHasTimecodes && dur > 0 && !!chaptersProp && chaptersProp.length > 1;
+  const chapters = useMemo(() => {
+    if (!chaptersProp || !estimatedTrack) return chaptersProp;
+    const total = chaptersProp.reduce((s, c) => s + c.text.length, 0) || 1;
+    let acc = 0;
+    return chaptersProp.map((c) => {
+      const time = (acc / total) * dur;
+      acc += c.text.length;
+      return { ...c, time };
+    });
+  }, [chaptersProp, estimatedTrack, dur]);
+
   const hasTimecodes = useMemo(() => !!chapters?.some((c) => typeof c.time === 'number'), [chapters]);
 
   const activeChapterIdx = useMemo(() => {
@@ -198,13 +222,29 @@ export function ArticleAudioPlayer({
     return idx;
   }, [chapters, cur, hasTimecodes]);
 
+  // 대본 문단을 누르면 그 위치로 옮기고 바로 재생한다 — 멈춰 있어도 소리가 나야 "이동했다"고 느낀다.
+  const playFrom = (sec: number) => {
+    seekTo(sec);
+    void ref.current?.play().catch(() => {});
+    setAutoTrack(true);
+  };
+
   useEffect(() => {
     if (!hasTimecodes || !autoTrack || activeChapterIdx < 0 || tab !== 'script') return;
     const list = scriptListRef.current;
     if (!list) return;
     const item = list.children[activeChapterIdx] as HTMLElement | undefined;
-    item?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    // 패널 안에서만 스크롤한다(2026-10-03) — scrollIntoView는 페이지 전체도 같이 움직여 재생 중 화면이 튀었다.
+    if (item) list.scrollTo({ top: Math.max(0, item.offsetTop - list.clientHeight / 3), behavior: 'smooth' });
   }, [activeChapterIdx, autoTrack, tab, hasTimecodes]);
+
+  const jumpToActive = useCallback(() => {
+    setAutoTrack(true);
+    if (autoTrackResumeTimer.current) clearTimeout(autoTrackResumeTimer.current);
+    const list = scriptListRef.current;
+    const item = list?.children[activeChapterIdx] as HTMLElement | undefined;
+    if (list && item) list.scrollTo({ top: Math.max(0, item.offsetTop - list.clientHeight / 3), behavior: 'smooth' });
+  }, [activeChapterIdx]);
 
   const onScriptScroll = useCallback(() => {
     setAutoTrack(false);
@@ -235,265 +275,8 @@ export function ArticleAudioPlayer({
         } as CSSProperties
       }
     >
-      {/* ⚠️ 아래 <style>은 CSS 문자열이라 주석이 그대로 HTML 응답에 실려 나간다
-          (SSR 페이지라 매 요청마다). 설계 근거는 파일 상단 docblock에 두고
-          여기엔 구조·대비 힌트만 남긴다.
-
-          대비(다크 베이스 luminance ≈ 0.01):
-           · 흰 유리 재생 버튼 위 아이콘(#111827) — 18:1대.
-           · 커버 배지·바이라인: accent를 흰색에 45~60%만 섞어 luminance가
-             흰색 쪽으로 치우치므로 다크 배경 대비 8:1 이상 유지.
-           · 제목 흰 100%, 바이라인 흰 66%, 시간 흰 100%·58%.
-           · 대본 비활성 단락 흰 62% ≈ 8.9:1, 활성 단락 흰 100% + accent 왼쪽 룰.
-           · 포커스 링은 흰색, outline-offset로 다크 카드 위에 놓여 18:1. */}
-      <style>{`
-        .aap { position: relative; overflow: hidden; isolation: isolate;
-          border-radius: 20px; padding: clamp(16px, 4vw, 22px);
-          background:
-            radial-gradient(130% 160% at 8% 0%, color-mix(in srgb, var(--aap-c) 26%, transparent) 0%, transparent 58%),
-            radial-gradient(90% 120% at 100% 120%, color-mix(in srgb, var(--aap-c) 12%, transparent) 0%, transparent 60%),
-            linear-gradient(165deg, #1c2333 0%, #12141f 52%, #0a0a10 100%);
-          box-shadow:
-            0 24px 48px -24px rgba(0,0,0,0.6),
-            0 1px 0 0 rgba(255,255,255,0.06) inset,
-            0 0 0 1px rgba(255,255,255,0.05) inset; }
-        .aap::before { content: ''; position: absolute; inset: 0; pointer-events: none;
-          background: linear-gradient(122deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0) 30%); }
-        .aap::after { content: ''; position: absolute; inset: 0; pointer-events: none;
-          opacity: 0.4; mix-blend-mode: overlay;
-          background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0);
-          background-size: 3px 3px; }
-
-        .aap-inner { position: relative; z-index: 1; }
-
-        /* ── 헤더: 커버 + 배지/제목/바이라인 ── 레퍼런스의 정사각 커버 +
-           우측 텍스트 블록 구조를 그대로 옮긴다. */
-        .aap-head { display: flex; gap: 14px; align-items: flex-start; }
-        .aap-cover { flex-shrink: 0; width: 68px; height: 68px; border-radius: 14px;
-          overflow: hidden; background: rgba(255,255,255,0.06);
-          box-shadow: 0 6px 16px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08) inset; }
-        .aap-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        @media (max-width: 359px) { .aap-cover { width: 56px; height: 56px; border-radius: 12px; } }
-
-        .aap-headtext { flex: 1; min-width: 0; }
-        /* 배지 — 레퍼런스의 초록 필 아웃라인을 accent 색으로. "#1 top podcast"
-           같은 지어낸 순위 대신 실제 형식 이름을 담는다. */
-        .aap-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 10px;
-          border-radius: 999px; border: 1px solid color-mix(in srgb, var(--aap-c) 55%, transparent);
-          font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
-          color: color-mix(in srgb, var(--aap-c) 60%, #ffffff); margin-bottom: 8px; }
-        .aap-title { margin: 0; font-size: clamp(17px, 2.4vw, 19px); font-weight: 700;
-          line-height: 1.32; color: #fff; letter-spacing: -0.01em; word-break: keep-all;
-          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .aap-byline { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
-          font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.66);
-          background: none; border: none; padding: 0; cursor: default;
-          font-family: inherit; }
-        .aap-byline[data-link='true'] { cursor: pointer; text-decoration: none; }
-        .aap-byline[data-link='true']:hover { color: rgba(255,255,255,0.88); }
-        .aap-byline[data-link='true']:focus-visible { outline: 2px solid #fff; outline-offset: 2px;
-          border-radius: 4px; }
-
-        /* ── 대본 탭 + 배속을 한 줄에 ── 2026-08-21, "대본하고 속도 조절
-           기능이 열이 안맞는다" 요청. 이전엔 대본 탭(.aap-tabs, height 36px)
-           과 배속(.aap-rate, height 32px)이 서로 다른 줄에, 게다가 높이도
-           달라서 나란히 놓아도 어긋났다. 이제 한 행(.aap-toprow)에 두고
-           둘 다 36px로 맞춘다 — align-items: flex-start라 높이가 같으면
-           위 끝이 그대로 같은 줄이 된다("윗줄 정렬"). 대본 탭이 없는
-           기사(chapters 없음)는 이 행에 배속만 오른쪽 정렬로 남는다. */
-        .aap-toprow { display: flex; align-items: flex-start; justify-content: space-between;
-          gap: 8px; margin-top: 16px; }
-        .aap-toprow[data-solo='true'] { justify-content: flex-end; }
-        .aap-tabs { display: flex; gap: 8px; }
-        .aap-tab { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 16px;
-          border-radius: 999px; border: none; cursor: pointer;
-          font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
-          background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.78);
-          transition: background-color .2s cubic-bezier(.2,0,0,1), color .2s cubic-bezier(.2,0,0,1); }
-        .aap-tab[aria-expanded='true'] { background: var(--aap-c); color: #fff; }
-        .aap-tab:hover { background: rgba(255,255,255,0.14); }
-        .aap-tab[aria-expanded='true']:hover { background: var(--aap-c); filter: brightness(1.08); }
-        .aap-tab:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-
-        /* ── 대본 패널 ── 2026-08-21(재수정) — 번호 붙은 불릿 목록에서
-           **흐르는 원고 문단**으로 바꿨다. CMS에 저장된 건 짧은 요약
-           문장(bullets)뿐이라 새 문장을 지어 쓸 수는 없지만(있는 사실만
-           쓴다는 이 파일의 오랜 원칙), 그 문장들을 번호 칩 목록이 아니라
-           연속된 글줄로 이어 붙이면 "읽어주는 원고"처럼 읽힌다 — 사진
-           레퍼런스의 대본 패널도 번호 없는 연속 문단이다.
-           타임코드가 있는 항목(seekable)만 클릭 가능한 문단으로 두고,
-           지금 재생 위치를 지난 문단은 살짝 밝게(활성), 그 앞뒤는 낮은
-           대비로 스며들게 한다. 위아래 페이드로 "더 있다"는 신호를 준다. */
-        .aap-script { position: relative; margin-top: 14px; max-height: 240px;
-          overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-          list-style: none; padding: 0; margin-block: 0; display: flex; flex-direction: column; gap: 14px;
-          -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
-          mask-image: linear-gradient(to bottom, transparent 0, black 16px, black calc(100% - 16px), transparent 100%); }
-        .aap-script-item { display: block; width: 100%; text-align: left; border: none; cursor: default;
-          border-radius: 14px; padding: 10px 14px; background: none; margin: 0;
-          font-size: 15px; line-height: 1.7; color: rgba(255,255,255,0.62); word-break: keep-all;
-          transition: background-color .2s cubic-bezier(.2,0,0,1), color .2s cubic-bezier(.2,0,0,1); }
-        button.aap-script-item { cursor: pointer; }
-        button.aap-script-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }
-        button.aap-script-item:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-        .aap-script-item[data-active='true'] { background: rgba(255,255,255,0.1); color: #fff;
-          box-shadow: inset 3px 0 0 0 var(--aap-c); }
-        /* 직접 인용(따옴표로 감싼 발언)만 굵게 — color는 부모를 그대로
-           상속해 비활성 단락에서도 대비가 그대로 유지된다(#fff·62% 흰
-           둘 다 굵기만 바뀌지 톤은 안 바뀐다). */
-        .aap-script-item strong { font-weight: 700; color: inherit; }
-
-        /* ── 파형 + 분눈금 ── 레퍼런스의 좌우 시간 라벨 + 점 눈금 + 재생/잔여
-           2색 막대. 재생 위치를 지난 눈금은 accent, 아닌 눈금은 옅게. */
-        .aap-wavewrap { margin-top: 8px; }
-        /* grid로 바꿨다(2026-08-21) — flex:1 + max-width 조합은 막대들의
-           최대 폭 합이 카드 안쪽 폭보다 작아서 남는 공간이 오른쪽에 그대로
-           비었다("파형이 중간까지밖에 없다" 원인). grid는 열 개수(고정)가
-           1fr씩 나뉘므로 항상 카드 폭을 정확히 끝까지 채운다.
-           gap 2 → 1px, radius 2 → 1px(2026-08-21, "더 세분화, 엄청 얇게"
-           요청) — 96개 막대가 1px 틈으로 촘촘히 붙어 레퍼런스 사진처럼
-           가는 선들의 다발로 보인다. */
-        .aap-wave { position: relative; display: grid; grid-template-columns: repeat(${WAVE_BAR_COUNT}, 1fr);
-          align-items: center; gap: 1px; height: 40px; padding: 0; cursor: pointer; }
-        /* 막대 굵기 — 2026-08-24, "훨씬 더 얇게" 요청. 이전엔 1fr 칸 전체
-           폭(width:100%)을 채워 5~6px로 굵었다. 2px 고정 폭 + 칸 안 가운데
-           정렬로, 칸 간격은 그대로 두고 막대만 가늘게 만든다. */
-        .aap-wave-bar { width: 2px; justify-self: center; border-radius: 999px;
-          background: rgba(255,255,255,0.22); transition: background-color .2s ease; }
-        .aap-wave-bar[data-played='true'] { background: color-mix(in srgb, var(--aap-c) 85%, #ffffff); }
-        /* 재생 중 아주 미세한 진폭만 — 과하면 시선을 뺏는다는 스펙 요청. */
-        @media (prefers-reduced-motion: no-preference) {
-          .aap-wave[data-playing='true'] .aap-wave-bar { animation: aap-wave-breathe 1.6s ease-in-out infinite; }
-        }
-        @keyframes aap-wave-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.08); } }
-        /* 길이를 아직 모를 때(로딩) — 막대를 낮은 대비로 죽이고 셔머를
-           흘려 "재생 준비 중"임을 알린다. 재생 중 진폭 애니메이션과 동시에
-           걸릴 일은 없다(재생 중이면 이미 dur > 0). */
-        .aap-wave[data-loading='true'] .aap-wave-bar {
-          background: rgba(255,255,255,0.14);
-          animation: aap-wave-shimmer 1.8s ease-in-out infinite; }
-        @keyframes aap-wave-shimmer { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-        @media (prefers-reduced-motion: reduce) {
-          .aap-wave[data-loading='true'] .aap-wave-bar { animation: none; opacity: 0.7; }
-        }
-        /* 실제 탐색은 투명 range 인풋을 파형 위에 겹쳐서 처리한다 — 시각은
-           막대가, 조작·키보드·스크린리더 시맨틱은 네이티브 slider가 담당한다. */
-        .aap-wave-seek { position: absolute; inset: 0; width: 100%; height: 100%;
-          margin: 0; opacity: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
-        .aap-wave-seek:disabled { cursor: default; }
-        .aap-wave-seek:focus-visible ~ .aap-wave-focus-ring { opacity: 1; }
-        .aap-wave-focus-ring { position: absolute; inset: -3px; border-radius: 10px;
-          border: 2px solid #fff; opacity: 0; pointer-events: none; }
-        /* 드래그 중 시간 툴팁 — 시크바 위 커서 근처. */
-        .aap-scrub-tip { position: absolute; bottom: calc(100% + 8px); transform: translateX(-50%);
-          padding: 4px 8px; border-radius: 8px; background: #fff; color: #111827;
-          font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
-          white-space: nowrap; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-
-        /* 유일한 시간 표기 줄 — 좌측 현재 위치, 우측 잔여시간(-mm:ss).
-           스펙 그대로: "좌측 현재 위치, 우측 잔여시간" 한 줄만 남긴다. */
-        .aap-time-row { display: flex; align-items: center; justify-content: space-between;
-          margin-top: 8px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
-          color: #fff; }
-        .aap-time-row span:last-child { color: rgba(255,255,255,0.58); font-weight: 600; }
-
-        /* ── 하단 컨트롤 바 ── 반복 / -5초 / 재생(56px, 유일한 primary) /
-           +5초 / 북마크. 배속은 컨트롤 바 위 별도 줄 우측(모바일 탭 순환,
-           데스크톱도 동일 — 이 컴포넌트에 볼륨 대상 자체가 없어 데스크톱
-           전용 볼륨 슬라이더는 만들지 않는다, 아래 산출물 보고에 기록). */
-        .aap-transport { display: flex; align-items: center; justify-content: center;
-          gap: clamp(14px, 5vw, 22px); margin-top: 18px; }
-        .aap-icon-btn { display: flex; align-items: center; justify-content: center;
-          width: 44px; height: 44px; border-radius: 999px; border: none; background: none;
-          color: rgba(255,255,255,0.7); cursor: pointer;
-          transition: background-color .2s cubic-bezier(.2,0,0,1), color .2s cubic-bezier(.2,0,0,1); }
-        .aap-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-        .aap-icon-btn:active { background: rgba(255,255,255,0.16); }
-        .aap-icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-        .aap-icon-btn[aria-pressed='true'] { color: var(--aap-c); }
-
-        .aap-play { flex-shrink: 0; position: relative; display: flex; align-items: center;
-          justify-content: center; width: 56px; height: 56px; border-radius: 999px;
-          border: none; cursor: pointer; color: #111827;
-          background: linear-gradient(160deg, #ffffff 0%, #f1f2f6 55%, #dfe2ea 100%);
-          box-shadow:
-            0 8px 18px -6px rgba(0,0,0,0.5),
-            0 0 0 1px rgba(255,255,255,0.5) inset,
-            0 -3px 6px rgba(0,0,0,0.1) inset,
-            0 0 26px 2px color-mix(in srgb, var(--aap-c) 55%, transparent);
-          transition: transform .2s cubic-bezier(.2,0,0,1), box-shadow .2s cubic-bezier(.2,0,0,1); }
-        .aap-play:hover { box-shadow:
-            0 8px 18px -6px rgba(0,0,0,0.5),
-            0 0 0 1px rgba(255,255,255,0.5) inset,
-            0 -3px 6px rgba(0,0,0,0.1) inset,
-            0 0 32px 4px color-mix(in srgb, var(--aap-c) 70%, transparent); }
-        .aap-play:active { transform: scale(.95); }
-        .aap-play:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-        @media (max-width: 359px) { .aap-play { width: 50px; height: 50px; } }
-
-        @media (prefers-reduced-motion: no-preference) {
-          .aap-play[data-playing='true'] { animation: aap-breathe 2.6s ease-in-out infinite; }
-        }
-        @keyframes aap-breathe {
-          0%, 100% { box-shadow:
-            0 8px 18px -6px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.5) inset,
-            0 -3px 6px rgba(0,0,0,0.1) inset, 0 0 22px 2px color-mix(in srgb, var(--aap-c) 50%, transparent); }
-          50% { box-shadow:
-            0 8px 18px -6px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.5) inset,
-            0 -3px 6px rgba(0,0,0,0.1) inset, 0 0 34px 5px color-mix(in srgb, var(--aap-c) 65%, transparent); }
-        }
-
-        /* 배속 — 대본 탭과 같은 .aap-toprow에 놓인다(위 .aap-toprow 주석
-           참조). 모바일도 데스크톱도 탭 순환 — 이 카드 폭에서 드롭다운을
-           새로 놓을 자리가 없어 배속 자체를 탭 순환 버튼 하나로 통일했다
-           (스펙의 "모바일만 탭 순환" 요구보다 더 단순하게 맞췄다).
-           height 32 → 36px(2026-08-21) — .aap-tab과 정확히 같은 높이로
-           맞춰야 "윗줄 정렬"이 실제로 같은 줄이 된다. */
-        .aap-rate-wrap { position: relative; flex-shrink: 0; }
-        .aap-rate { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px 0 14px;
-          border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
-          font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.85); cursor: pointer;
-          font-variant-numeric: tabular-nums;
-          transition: background-color .2s cubic-bezier(.2,0,0,1); }
-        .aap-rate:hover { background: rgba(255,255,255,0.12); }
-        .aap-rate[aria-expanded='true'] { background: rgba(255,255,255,0.14); }
-        .aap-rate:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-
-        /* 배속 목록 — 트리거 바로 아래 오른쪽 정렬로 뜬다. 다크 카드보다
-           한 단계 밝은 표면(#20263a)을 써서 카드 배경과 구별되는 "떠 있는
-           패널"로 보이게 한다. */
-        .aap-rate-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 5;
-          min-width: 96px; margin: 0; padding: 6px; list-style: none;
-          border-radius: 14px; background: #20263a; border: 1px solid rgba(255,255,255,0.1);
-          box-shadow: 0 12px 28px -10px rgba(0,0,0,0.55); }
-        @media (prefers-reduced-motion: no-preference) {
-          .aap-rate-menu { animation: aap-menu-in .16s cubic-bezier(.2,0,0,1); }
-          @keyframes aap-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-        }
-        .aap-rate-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-          width: 100%; height: 38px; padding: 0 10px; border: none; border-radius: 9px;
-          background: none; cursor: pointer; font-size: 14px; font-weight: 600;
-          color: rgba(255,255,255,0.82); font-variant-numeric: tabular-nums;
-          transition: background-color .14s ease; }
-        .aap-rate-opt:hover { background: rgba(255,255,255,0.08); }
-        .aap-rate-opt:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
-        .aap-rate-opt[aria-selected='true'] { color: #fff; font-weight: 700; }
-        .aap-rate-opt[aria-selected='true'] svg { color: var(--aap-c); }
-
-        .aap-fail { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-          flex-wrap: wrap; font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.9); word-break: keep-all; }
-        .aap-retry { flex-shrink: 0; height: 36px; padding: 0 16px; border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: #fff;
-          font-size: 13px; font-weight: 700; cursor: pointer; }
-        .aap-retry:hover { background: rgba(255,255,255,0.16); }
-        .aap-retry:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-
-        @media (prefers-reduced-motion: reduce) {
-          .aap-play, .aap-icon-btn, .aap-tab, .aap-script-item, .aap-wave-bar, .aap-rate-opt { transition: none; }
-          .aap-play:active { transform: none; }
-          .aap-tab svg, .aap-rate svg { transition: none; }
-        }
-      `}</style>
+      {/* 스타일은 articleAudioPlayerStyles.ts(2026-10-03 밝은 톤 재설계) — 이 CSS 문자열은 SSR HTML에 그대로 실리므로 주석을 두지 않는다. */}
+      <style>{aapCss(WAVE_BAR_COUNT)}</style>
 
       <div className="aap-inner">
         {/* controls 없이 둔다 — 위 컨트롤이 전부 이 엘리먼트를 직접 조작한다.
@@ -617,6 +400,8 @@ export function ArticleAudioPlayer({
             </div>
 
             {chapters && chapters.length > 0 && tab === 'script' && (
+              <>
+              <div className="aap-scriptwrap">
               <ol
                 ref={scriptListRef}
                 id="aap-script-panel"
@@ -637,7 +422,7 @@ export function ArticleAudioPlayer({
                           type="button"
                           className="aap-script-item"
                           data-active={i === activeChapterIdx}
-                          onClick={() => seekTo(c.time as number)}
+                          onClick={() => playFrom(c.time as number)}
                           aria-current={i === activeChapterIdx ? 'true' : undefined}
                           aria-label={`${spoken(c.time as number)}로 이동: ${c.text}`}
                         >
@@ -652,6 +437,17 @@ export function ArticleAudioPlayer({
                   );
                 })}
               </ol>
+              {/* 직접 스크롤해서 읽던 위치를 벗어났을 때만 나온다 — 누르면 지금 재생 중인 문단으로 돌아가 다시 따라간다. */}
+              {!autoTrack && cur > 0 && activeChapterIdx >= 0 && (
+                <button type="button" className="aap-script-jump" onClick={jumpToActive}>
+                  지금 재생 위치로
+                  <ChevronDown size={14} aria-hidden />
+                </button>
+              )}
+              </div>
+              {/* 시각을 글자 수 비율로 어림했을 때만 밝힌다 — 실제 문단별 시각으로 오해하지 않게(estimatedTrack). */}
+              {estimatedTrack && <p className="aap-script-note">재생 위치에 맞춰 대략 따라가요. 문단을 누르면 그 근처로 이동해요.</p>}
+              </>
             )}
 
             <div className="aap-wavewrap">
@@ -738,10 +534,10 @@ export function ArticleAudioPlayer({
                 title={looping ? '반복 재생 끄기' : '반복 재생 켜기'}
                 onClick={() => setLooping((v) => !v)}
               >
-                <Repeat size={19} aria-hidden />
+                <Repeat size={19} strokeWidth={1.5} aria-hidden />
               </button>
               <button type="button" className="aap-icon-btn" onClick={() => nudge(-5)} aria-label="5초 뒤로" title="5초 뒤로">
-                <RotateCcw size={20} aria-hidden />
+                <RotateCcw size={20} strokeWidth={1.5} aria-hidden />
               </button>
               <button
                 type="button"
@@ -763,7 +559,7 @@ export function ArticleAudioPlayer({
                 )}
               </button>
               <button type="button" className="aap-icon-btn" onClick={() => nudge(5)} aria-label="5초 앞으로" title="5초 앞으로">
-                <RotateCw size={20} aria-hidden />
+                <RotateCw size={20} strokeWidth={1.5} aria-hidden />
               </button>
               <button
                 type="button"
@@ -773,7 +569,7 @@ export function ArticleAudioPlayer({
                 title={bookmarked ? '북마크 해제' : '북마크에 저장'}
                 onClick={toggleBookmark}
               >
-                <Bookmark size={19} aria-hidden fill={bookmarked ? 'currentColor' : 'none'} />
+                <Bookmark size={19} strokeWidth={1.5} aria-hidden fill={bookmarked ? 'currentColor' : 'none'} />
               </button>
             </div>
 

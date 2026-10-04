@@ -21,7 +21,7 @@ export interface EconCategoryConfig {
   label: string;
   /** 아카이브 페이지 설명(메타 description/헤더 부제) */
   description: string;
-  /** ArchiveHeader kicker·리스트 강조색 — archiveItems.ts의 TREND_ACCENT류와 같은 역할. */
+  /** 리스트 강조색 — archiveItems.ts의 TREND_ACCENT류와 같은 역할. */
   accent: string;
   /** buildCategoryPageMeta의 title 접미사("{label} — {metaSuffix}"). 안 주면
    *  '경제 뉴스'(경제/비즈니스 6개 카테고리의 기존 기본값). 문화처럼 경제

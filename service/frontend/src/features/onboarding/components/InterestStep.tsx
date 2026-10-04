@@ -33,7 +33,7 @@ export function InterestStep({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#ffffff' }}>
-      <OnboardingHeader currentStep={4} onSkip={onSkip} onBack={onBack} />
+      <OnboardingHeader currentStep={3} onSkip={onSkip} onBack={onBack} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 30px', textAlign: 'center', gap: 12 }}>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.22em', textTransform: 'uppercase' }}>
