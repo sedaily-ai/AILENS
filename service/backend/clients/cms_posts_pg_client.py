@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import timedelta, timezone
+from utils.date_validation import KST as _KST
 from typing import Any, Dict, List, Optional
 
 import pg8000.dbapi
@@ -31,7 +31,6 @@ import pg8000.dbapi
 # 수정(그쪽 주석 참고: UTC 세션 타임존에서 published_at.date()가 KST
 # 00:00~08:59 발행 글을 "전날"로 잘못 묶던 문제). 두 파일은 쿼리·로직이
 # 동일해야 한다는 이 파일 docstring의 원칙대로 같이 고친다.
-_KST = timezone(timedelta(hours=9))
 
 _PG_HOST = os.environ.get("LENS_PG_HOST", "lens-postgres-migration-dev.cluster-c83iuyksky7r.us-east-1.rds.amazonaws.com")
 _PG_DB = os.environ.get("LENS_PG_DATABASE", "lens")

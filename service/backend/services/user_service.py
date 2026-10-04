@@ -6,7 +6,8 @@ API contract unchanged — all request/response formats preserved.
 """
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from utils.date_validation import KST
 from decimal import Decimal
 from typing import Dict, Any, List
 
@@ -17,7 +18,6 @@ from models.personal import UserProfile, ReadingRecord
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-KST = timezone(timedelta(hours=9))
 
 
 def decimal_to_float(obj):

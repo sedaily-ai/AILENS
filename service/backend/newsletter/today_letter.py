@@ -23,12 +23,12 @@ ImportError → 무음 except → `send_status="error"`로 계속 실패해왔�
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from utils.date_validation import KST as _KST
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_KST = timezone(timedelta(hours=9))
 
 # daily_letters/오프라인 폴백 — today_letters API 응답 shape 준수.
 MOCK_LETTER: Dict[str, Any] = {

@@ -19,14 +19,14 @@ post_id가 문자열(cp_YYYYMMDDHHMMSS_hex)에서 Postgres bigint(문자열로 �
 import json
 import logging
 from typing import Any
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
+from utils.date_validation import KST
 
 import clients.community_pg_client as community_client
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-KST = timezone(timedelta(hours=9))
 
 
 def cors(status_code: int, body: Any) -> dict:

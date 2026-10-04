@@ -11,7 +11,8 @@ Storage: Personal DB (sedaily-mbti-personal-dev)
 import json
 import logging
 from typing import Dict, List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
+from utils.date_validation import KST
 
 import boto3
 from botocore.config import Config
@@ -27,7 +28,6 @@ from core.response import error_response, success_response
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-KST = timezone(timedelta(hours=9))
 BEDROCK_CONFIG = Config(read_timeout=60, connect_timeout=10, retries={'max_attempts': 2})
 
 QUESTIONS_USER_ID = '__questions__'

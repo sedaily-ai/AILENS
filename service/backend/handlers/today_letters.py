@@ -26,7 +26,8 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from utils.date_validation import KST as _KST
 from typing import Any, Dict, List
 
 from config.constants import CORS_HEADERS
@@ -39,7 +40,6 @@ from clients import daily_letters_ddb_client as letters_client
 logger = logging.getLogger(__name__)
 logging.getLogger().setLevel(logging.INFO)
 
-_KST = timezone(timedelta(hours=9))
 
 
 def _parse_query_date(event: Dict[str, Any]) -> str:

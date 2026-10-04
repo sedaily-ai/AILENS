@@ -18,11 +18,8 @@ SK patterns:
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
-from datetime import datetime, timezone, timedelta
-
-
-# Korea Standard Time
-KST = timezone(timedelta(hours=9))
+from datetime import datetime
+from utils.date_validation import KST
 
 
 def _now_kst_iso() -> str:
