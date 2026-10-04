@@ -7,6 +7,7 @@ import { LensPreviewSection } from '@/features/news-feed';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { PaperDateNav } from './PaperDateNav';
+import { paperDateLabel, parsePaperDate } from './paperShared';
 
 // 지난 지면 한 날(2026-10-04) — 홈의 4탭 지면 카드를 그 날짜 기사로 보여 주고, 위에서 날짜를 옮긴다.
 // 날짜 이동은 전부 링크(서버가 같은 HTML을 만들어 검색엔진도 따라갈 수 있다). 지면이 편성된 날만 이동 대상이다(dates).
@@ -28,16 +29,14 @@ export function PaperDayClient({
   return (
     <ArticlePageShell sidebar={<HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />}>
       <main id="main-content" style={{ paddingBottom: 100, minHeight: '80vh' }}>
-        <header style={{ padding: 'clamp(28px, 4vw, 40px) 0 6px' }}>
-          <p style={{ margin: 0, fontSize: 13.5, fontWeight: 800, letterSpacing: '0.02em', color: '#6b7280' }}>지난 지면</p>
-          {/* 제목이 곧 날짜 선택기(눌러서 달력) + 가벼운 날짜 띠 — PaperDateNav. 설명 문장은 탭이 이미 말해 주므로 뺐다. */}
-          <div style={{ marginTop: 8 }}>
-            <PaperDateNav date={date} dates={dates} />
-          </div>
-        </header>
+        {/* 눈에 보이는 '지난 지면' 라벨·제목·날짜 띠는 2026-10-05 삭제(사용자 요청) — 카드 안 제호가 날짜를 말하고, 날짜 선택 달력은 카드 머리띠 오른쪽에 둔다. h1은 검색엔진·스크린리더용으로 숨겨 둔다. */}
+        <h1 style={{ position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>
+          {paperDateLabel(date)} ({parsePaperDate(date).weekday}) 지면
+        </h1>
+        <div style={{ height: 'clamp(4px, 1.5vw, 12px)' }} />
 
         {/* 홈과 같은 4탭 카드(variant="archive": 소개 헤더 없이 카드만) */}
-        <LensPreviewSection initialItems={items} variant="archive" />
+        <LensPreviewSection initialItems={items} variant="archive" headerAction={<PaperDateNav date={date} dates={dates} />} />
 
         {idx > 0 && (
           <p style={{ margin: '28px 0 0' }}>

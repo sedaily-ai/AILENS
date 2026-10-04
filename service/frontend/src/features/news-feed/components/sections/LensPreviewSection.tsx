@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -49,7 +49,7 @@ const LENS_ACCENT_STRONG = '#2563eb';
 // 지면 로직은 ../lib/paperSections.ts, 구조 변천사(탭→동시 배치→탭 복귀)는 docs/worklog/2026-10/2026-10-05-리팩토링/LensPreviewSection_구조변천사.md.
 import { SECTIONS, pickSection, paperTitle } from '@/features/news-feed/lib/paperSections';
 
-export function LensPreviewSection({ initialItems, variant = 'home', paperDates }: { initialItems?: CmsLens[]; variant?: 'home' | 'archive'; /** 홈 헤더 ◀ ▶로 넘길 수 있는 지면 날짜(최신순, 첫 값 = 지금 보여 주는 날). 없으면 화살표를 그리지 않는다. */ paperDates?: string[] }) {
+export function LensPreviewSection({ initialItems, variant = 'home', paperDates, headerAction }: { initialItems?: CmsLens[]; variant?: 'home' | 'archive'; /** archive 변형에서 "전체 보기" 자리에 들어가는 요소(지난 지면의 날짜 선택 달력 등). */ headerAction?: ReactNode; /** 홈 헤더 ◀ ▶로 넘길 수 있는 지면 날짜(최신순, 첫 값 = 지금 보여 주는 날). 없으면 화살표를 그리지 않는다. */ paperDates?: string[] }) {
   // 4개 지면 탭(전체·증권·산업·시그널)이 각각 최신 4건씩만 쓴다 — 최신 100건이면 각 지면 8건 이상 확보. 이 섹션은 bullets를 안 읽어 SSR 요약본으로 충분하다.
   const items = useServerSeededList<CmsLens[], null>(initialItems, null, () => fetchLensPosts(100), (data) => data.length > 0 /* 빈 응답으로 SSR 프리페치 결과를 덮지 않는다 */);
   const [showGuide, setShowGuide] = useState(false);
@@ -619,9 +619,11 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates 
                 </button>
               </>
             )}
-            <Link href={viewDay ?? hero?.date ? `/paper/${viewDay ?? hero?.date}` : '/paper'} className="flex-shrink-0 text-gray-600 hover:text-gray-900 transition-colors" style={{ fontSize: 14, fontWeight: 700, marginLeft: 6 }}>
-              전체 보기 →
-            </Link>
+            {variant === 'archive' ? headerAction : (
+              <Link href={viewDay ?? hero?.date ? `/paper/${viewDay ?? hero?.date}` : '/paper'} className="flex-shrink-0 text-gray-600 hover:text-gray-900 transition-colors" style={{ fontSize: 14, fontWeight: 700, marginLeft: 6 }}>
+                전체 보기 →
+              </Link>
+            )}
           </div>
         </div>
         {/* 지면 탭 — 1단계 선택(2026-09-30 최종). 세리프 라벨 + 잉크색

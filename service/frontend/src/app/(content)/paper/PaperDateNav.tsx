@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { paperDateLabel, paperPath, parsePaperDate } from './paperShared';
+import { paperPath } from './paperShared';
 
 // 지난 지면 날짜 이동(2026-10-04, 사용자 요청 — "어제 지면은 뭐였지?" 하며 들어온 사람이 원클릭으로 어제·그제로 가고, 원하는 날짜를 바로 고르고, 주·월 단위로 끊어 늘어지지 않게).
 //  - 제목 바로 오른쪽 달력 아이콘: 월 단위 달력(팝업). 먼 날짜를 한 번에 고를 때.
@@ -15,7 +15,6 @@ export function PaperDateNav({ date, dates }: { date: string; dates: string[] })
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const has = useMemo(() => new Set(dates), [dates]);
-  const { weekday } = parsePaperDate(date);
 
   useEffect(() => {
     if (!open) return;
@@ -34,11 +33,11 @@ export function PaperDateNav({ date, dates }: { date: string; dates: string[] })
   return (
     <div>
       <style>{`
-        .pn-cal { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: none; background: #f1f5f9; color: #475569; flex-shrink: 0; cursor: pointer; transition: background .15s ease, color .15s ease; }
+        .pn-cal { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(17,24,39,.055); color: #475569; flex-shrink: 0; cursor: pointer; transition: background .15s ease, color .15s ease; }
         .pn-cal:hover { background: #e2e8f0; }
         .pn-cal[aria-expanded='true'] { background: #5b8def; color: #fff; }
         .pn-cal:focus:not(:focus-visible), .pn-arrow:focus:not(:focus-visible) { outline: none; }
-        .pn-pop { position: absolute; top: calc(100% + 10px); left: 0; z-index: 30; width: min(330px, calc(100vw - 32px)); padding: 16px 16px 14px; border-radius: 18px; background: #fff; border: 1px solid rgba(17,24,39,.07); box-shadow: 0 2px 4px rgba(17,24,39,.04), 0 18px 44px -8px rgba(17,24,39,.18); animation: pn-in .16s ease-out; }
+        .pn-pop { position: absolute; top: calc(100% + 10px); right: 0; z-index: 30; width: min(330px, calc(100vw - 32px)); padding: 16px 16px 14px; border-radius: 18px; background: #fff; border: 1px solid rgba(17,24,39,.07); box-shadow: 0 2px 4px rgba(17,24,39,.04), 0 18px 44px -8px rgba(17,24,39,.18); animation: pn-in .16s ease-out; }
         @keyframes pn-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
         .pn-arrow { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #9ca3af; flex-shrink: 0; cursor: pointer; transition: background .15s ease, color .15s ease; }
         .pn-arrow:hover:not(:disabled) { background: #f1f5f9; color: #374151; }
@@ -64,12 +63,9 @@ export function PaperDateNav({ date, dates }: { date: string; dates: string[] })
         .pn-gday.is-cur { background: #5b8def; color: #fff; }
         @media (prefers-reduced-motion: reduce) { .pn-pop { animation: none; } }
       `}</style>
-      <div ref={rootRef} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <h1 style={{ margin: 0, fontFamily: "'Noto Serif KR', serif", fontSize: 'clamp(26px, 5.4vw, 34px)', fontWeight: 700, letterSpacing: '-0.025em', color: '#1f2937' }}>
-          {paperDateLabel(date)} ({weekday}) 지면
-        </h1>
+      <div ref={rootRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
         <button type="button" className="pn-cal" aria-label="달력으로 날짜 선택" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((v) => !v)}>
-          <CalendarDays size={18} strokeWidth={2.1} />
+          <CalendarDays size={16} strokeWidth={2.1} />
         </button>
         {open && (
           <div className="pn-pop" role="dialog" aria-label="지면 날짜 선택">
@@ -77,7 +73,6 @@ export function PaperDateNav({ date, dates }: { date: string; dates: string[] })
           </div>
         )}
       </div>
-      <div style={{ marginBottom: 20 }} />
     </div>
   );
 }
