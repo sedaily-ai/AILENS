@@ -82,20 +82,3 @@ export function WebtoonWindIllustration({
 // 하단 오디오 플레이어 재생목록 패널(2026-08-21) — 헤드폰을 쓰고 뉴스를
 // 듣는 캐릭터. 다른 아이콘들과 같은 문법: 얼굴은 먹색(#1a1a1a), 사운드
 // 웨이브·헤드폰 밴드는 accent 하나만.
-export function ListeningHeadphoneIllustration({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <ellipse cx="48" cy="50" rx="18" ry="16" stroke="#1a1a1a" strokeWidth={2.6} />
-      <circle cx="41" cy="48" r="1.8" fill="#1a1a1a" />
-      <circle cx="55" cy="48" r="1.8" fill="#1a1a1a" />
-      <path d="M42 57 Q48 61 54 57" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
-      {/* 헤드폰 밴드 + 이어컵 */}
-      <path d="M28 46 Q30 22 48 22 Q66 22 68 46" stroke={accent} strokeWidth={3} strokeLinecap="round" fill="none" />
-      <rect x="22" y="42" width="10" height="16" rx="4" stroke={accent} strokeWidth={2.8} />
-      <rect x="64" y="42" width="10" height="16" rx="4" stroke={accent} strokeWidth={2.8} />
-      {/* 사운드 웨이브 */}
-      <path d="M12 50 Q8 50 8 46 M12 54 Q4 54 4 46" stroke={accent} strokeWidth={2} strokeLinecap="round" opacity={0.75} />
-      <path d="M84 50 Q88 50 88 46 M84 54 Q92 54 92 46" stroke={accent} strokeWidth={2} strokeLinecap="round" opacity={0.75} />
-    </svg>
-  );
-}

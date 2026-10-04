@@ -5,7 +5,6 @@ import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi
 import type { ArchiveItem } from "@/shared/lib/content/archiveItems";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 import { WebtoonPreviewSection } from "./sections/WebtoonPreviewSection";
-import { HomeHeroCarousel } from "./HomeHeroCarousel";
 import { VideoPreviewSection } from "./sections/VideoPreviewSection";
 import { GamesPreviewSection } from "./sections/GamesPreviewSection";
 import { AudioPreviewSection } from "./sections/AudioPreviewSection";
@@ -176,9 +175,6 @@ export function NewsFeedTab({
               items={archiveItems}
               heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} paperDates={paperDates} /> : undefined}
             />
-
-            {/* 홈 히어로 배너(프로모 캐러셀 2슬라이드) — 첫 화면에서 실제 콘텐츠(오늘의 이슈 4가지 시선)가 먼저 보이도록 콘텐츠 다음에 둔다(2026-09-30). */}
-            <HomeHeroCarousel />
 
             {/* 카테고리 섹션(2026-08-17, 본지 en.sedaily.com 스타일 참고 — 사용자
                 확인: "본지형식대로 해보시죠"). 한때 카테고리 레일(그리드형)로

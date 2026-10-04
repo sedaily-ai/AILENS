@@ -50,9 +50,6 @@ export const TEXT_INVERSE = '#ffffff';
 export const ACCENT = '#1d4ed8';
 /** 액센트 hover. */
 export const ACCENT_HOVER = '#1a44bd';
-/** 연한 파랑 배경. ACCENT 글자와 5.49:1. */
-export const ACCENT_SUNKEN = '#dbeafe';
-
 /**
  * 장식용 헤어라인 — 목록 구분선·카드 테두리. 홈 형제 섹션과 같은 값.
  * 1.2:1 수준으로 3:1 을 못 넘지만, WCAG 1.4.11(비텍스트 대비)은 "컨트롤을
