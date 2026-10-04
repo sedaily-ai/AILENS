@@ -38,9 +38,9 @@ src/
 │   ├── api/                     # Route Handlers
 │   ├── start/                   # 온보딩 6단계 위저드 진입 라우트(features/onboarding 참조)
 │   └── layout.tsx / providers.tsx / sitemap.ts / rss.xml
-├── widgets/                     # AnnouncementBar, ArticlePageShell,
+├── widgets/                     # ArticlePageShell,
 │   │                            # CategoryArchiveClient, FeedPage, Header,
-│   │                            # HomeSideBar, NavProgress, SentenceSelectionPopover,
+│   │                            # HomeSideBar, SentenceSelectionPopover,
 │   │                            # SiteFooter, StaticPageShell, TodayNewsPlayer, WordsPage
 │   │                            # — 폴더명이 PascalCase다(예외, "파일 네이밍
 │   │                            # 컨벤션" 참조 — features/entities는 kebab-case 그대로).
@@ -48,11 +48,10 @@ src/
 │   ├── archive/                 # 내 서랍 (저장 문장)
 │   ├── auth/                    # 로그인 폼
 │   ├── news-feed/               # 뉴스 피드 탭
-│   ├── onboarding/              # 온보딩 6단계 위저드(Goal/Interest/Format/Consume/Result)
+│   ├── onboarding/              # 온보딩 위저드(Moment/Glance 흐름)
 │   ├── question/                # AI 질문 탭
 │   └── timeline/                # 타임라인 뉴스
 ├── entities/
-│   ├── saju/                    # 사주 미니 계산(widgets/HomeSideBar/SajuMiniRail 전용)
 │   └── user/                    # AuthContext 등 사용자 도메인
 └── shared/
     ├── ui/                      # 공통 UI (ArticleAudioPlayer, ArticleShareButtons 등)
