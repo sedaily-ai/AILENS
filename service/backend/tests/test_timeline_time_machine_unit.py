@@ -40,6 +40,7 @@ def _clean_state(monkeypatch):
     ts._day_cache.clear()
     monkeypatch.setattr(dv, 'today_kst', lambda: '2026-10-04')
     monkeypatch.setattr(ts, 'today_kst', lambda: '2026-10-04')
+    monkeypatch.setattr(tm, 'today_kst', lambda: '2026-10-04')  # tm은 이름으로 import해 위 패치가 닿지 않음
     yield
     ts._day_cache.clear()
 
