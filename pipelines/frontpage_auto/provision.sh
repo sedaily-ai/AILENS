@@ -1,20 +1,9 @@
 #!/usr/bin/env bash
 # 지면 1면 자동 발행 파이프라인의 AWS 인프라 최초 프로비저닝 기록.
 #
-# CloudFormation/CDK를 안 쓰는 이 저장소 컨벤션대로(admin/backend
-# deploy-admin-api.sh 등과 같은 이유) 직접 aws cli로 순서대로 실행한
-# 것을 그대로 스크립트로 남긴다 — 2026-08-21에 이 순서 그대로 실행해서
-# 검증 완료(로컬 Docker 빌드+실행 → ECR push → IAM 역할 2개 →
-# CloudWatch 로그그룹 → ECS 클러스터 → 태스크 정의 → 수동 run-task로
-# 실제 Fargate 검증 → EventBridge 규칙+타겟).
-#
-# 이미 만들어진 리소스라 재실행하면 대부분 "already exists" 에러가
-# 난다 — 이건 최초 셋업 기록용이지, 매번 돌리는 배포 스크립트가
-# 아니다(이미지만 갱신하려면 deploy.sh 참고).
-#
-# 2026-08-23 — 리소스명에서 "mbti"를 걷어내는 작업으로 sedaily-mbti-* →
-# sedaily-lens-*로 전부 재생성했다(구 리소스는 데이터 유실 감수하고 삭제 —
-# 아직 프로토타입 단계라 다운타임/데이터 손실 허용된 상태에서 진행).
+# CloudFormation/CDK 없이 aws cli로 순서대로 실행한 내용을 그대로 남긴 스크립트이다.
+# 이미 만들어진 리소스에는 "already exists" 에러가 나므로 최초 셋업 기록용이며,
+# 이미지 갱신 배포는 deploy.sh를 쓴다.
 set -euo pipefail
 
 REGION="us-east-1"
@@ -22,12 +11,10 @@ ACCOUNT_ID="887078546492"
 CLUSTER="sedaily-lens-frontpage-auto"
 REPO="sedaily-lens-frontpage-auto"
 
-# 2026-09-03 비용태깅 감사 — 이 스크립트는 애초에 태그를 하나도 안 붙이고
-# 있었다(mustknow_auto/provision.sh는 처음부터 tags-ecs.json 등으로 태깅됨).
-# docs/architecture/비용태깅_규칙.md 스키마 그대로, mustknow_auto와 같은
-# 패턴 — 다만 WorkItem은 "mustknow 계열에만, 선택"이라 여긴 안 붙인다.
-# ⚠ 크레딧 지원 종료일 2026-09-30에 SERVICE_TAG를 "lens"로 되돌릴 것
-#    (되돌릴 때 tags-ecs.json의 Service 값도 함께 바꿔야 한다).
+# 비용 태그는 docs/architecture/비용태깅_규칙.md 스키마를 따른다(mustknow_auto와 같은 패턴,
+# WorkItem 태그는 mustknow 계열에만 붙이므로 여기서는 생략).
+# 주의: 크레딧 지원 종료일(2026-09-30) 이후 SERVICE_TAG를 "lens"로 되돌려야 하며,
+# tags-ecs.json의 Service 값도 함께 바꾼다.
 SERVICE_TAG="atlas4"  # 9/30 이후 "lens"
 
 TAGS_KV="Key=Project,Value=Sedaily-LENS Key=CostCenter,Value=sedaily-ai Key=ServiceName,Value=Sedaily-LENS Key=Environment,Value=dev Key=Service,Value=${SERVICE_TAG} Key=Workload,Value=frontpage-auto"  # iam (대문자 Key/Value)
@@ -55,9 +42,8 @@ aws iam attach-role-policy --role-name sedaily-lens-frontpage-auto-execution-rol
 aws iam create-role --role-name sedaily-lens-frontpage-auto-eventbridge-role \
   --assume-role-policy-document file://trust-policy-events.json \
   --tags $TAGS_KV
-# 이 정책에는 ecs:TagResource가 필요하다(mustknow_auto/provision.sh와 같은
-# 이유) — EventBridge 타깃에 PropagateTags=TASK_DEFINITION을 쓰면 RunTask가
-# 태스크에 태그를 붙이는데, 그 권한이 없으면 RunTask 자체가 실패한다.
+# 이 정책에는 ecs:TagResource가 필요하다. EventBridge 타깃에 PropagateTags=TASK_DEFINITION을
+# 쓰면 RunTask가 태스크에 태그를 붙이는데, 권한이 없으면 RunTask 자체가 실패한다.
 aws iam put-role-policy --role-name sedaily-lens-frontpage-auto-eventbridge-role \
   --policy-name RunFrontpageAutoTask --policy-document file://eventbridge-runtask-policy.json
 
@@ -78,10 +64,8 @@ aws events put-rule --name "${CLUSTER}-daily" \
 aws events tag-resource --resource-arn "arn:aws:events:${REGION}:${ACCOUNT_ID}:rule/${CLUSTER}-daily" --tags "$TAGS_JSON" --region "$REGION"
 
 echo "=== 7/7 EventBridge 타겟(위 태스크 정의 연결) ==="
-# eventbridge-target.json의 PropagateTags=TASK_DEFINITION은 필수다 — 이게
-# 없으면 RunTask로 뜨는 Fargate 태스크(컴퓨트 비용)에 태그가 하나도 안
-# 붙는다. task definition을 태깅해도 실행 태스크는 별개(2026-09-03 실측
-# 확인 — frontpage_auto는 이 필드 자체가 없어서 지금까지 전부 미태깅이었다).
+# eventbridge-target.json의 PropagateTags=TASK_DEFINITION은 필수이다. 없으면 RunTask로 뜨는
+# Fargate 태스크(컴퓨트 비용)에 태그가 붙지 않는다(태스크 정의 태그와 실행 태스크 태그는 별개).
 aws events put-targets --rule "${CLUSTER}-daily" --targets file://eventbridge-target.json --region "$REGION"
 
 echo "완료 — 기본 VPC(vpc-07a3a75110d6594aa)의 public 서브넷 + default 보안그룹 사용"

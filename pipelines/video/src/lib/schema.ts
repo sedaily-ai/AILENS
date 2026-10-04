@@ -68,9 +68,8 @@ export const diagramCutSchema = z.object({
   }),
 });
 
-// url은 LLM이 직접 쓰지 않는다 — pipelines/video/generate_script.py의
-// fix_script()가 파이프라인이 이미 아는 실제 원문 사진 URL로 항상
-// 덮어쓴다(2026-09-03, 기자 피드백 "원문 사진이 들어가면 좋겠다").
+// url은 LLM이 직접 쓰지 않는다 — pipelines/video/generate_script.py의 fix_script()가
+// 파이프라인이 이미 아는 실제 원문 사진 URL로 항상 덮어쓴다.
 export const photoCutSchema = z.object({
   type: z.literal('photo'),
   ...baseCutFields,
@@ -98,7 +97,7 @@ export const chartCutSchema = z.object({
   }),
 });
 
-// emphasis 문자열은 caption 세그먼트 구조로 대체되어 더 이상 필요 없다.
+// highlight 컷의 강조는 caption 세그먼트(emphasis)로 표현하므로 별도 data 필드가 없다.
 export const highlightCutSchema = z.object({
   type: z.literal('highlight'),
   ...baseCutFields,
@@ -111,7 +110,7 @@ export const closingCutSchema = z.object({
   data: z.object({}).partial(),
 });
 
-// 전후 비교(2026-10-03, 프롬프트 §6) — 기준값(before)이 먼저 나타나고, 결과(after)를 말할 때 기준값이 흐려지며 줄이 그어지고 작아진다.
+// 전후 비교(프롬프트 §6) — 기준값(before)이 먼저 나타나고, 결과(after)를 말할 때 기준값이 흐려지며 줄이 그어지고 작아진다.
 // 방향 표시(▲ 빨강 / ▼ 파랑)는 두 값의 크기로 렌더러가 정한다 — 모델이 방향을 따로 적지 않는다(값과 어긋날 수 없게).
 const compareValueSchema = z.object({ label: z.string(), value: z.number(), unit: z.string().optional() });
 export const compareCutSchema = z.object({
@@ -166,11 +165,10 @@ export const newsScriptSchema = z.object({
   source: z.string().min(1),
   // 피해·의료·투자 등 민감 소재에서 클로징에 붙는 안내 문구. 없으면 노출 안 함.
   disclaimer: z.string().optional(),
-  // 이 영상이 다루는 사실의 기준 시점(2026-09, 기자 피드백 — "영상에도
-  // 기준 날짜가 필요하다"). 예산안 발표일, 통계 기준월처럼 원문에 명시된
-  // 시점 — 없으면 OpeningCut에 아무것도 안 뜬다(지어내지 않음).
+  // 이 영상이 다루는 사실의 기준 시점. 예산안 발표일, 통계 기준월처럼 원문에 명시된 시점이며,
+  // 없으면 표시하지 않는다(지어내지 않음).
   asOfDate: z.string().optional(),
-  // 키워드 라벨(2026-10-03, 프롬프트 §7) — 왼쪽 위에 상시 노출되는 기사 핵심 명사 2~8자. 없으면 brand를 대신 보인다.
+  // 키워드 라벨(프롬프트 §7) — 왼쪽 위에 상시 노출되는 기사 핵심 명사 2~8자. 없으면 brand를 대신 보인다.
   keyword: z.string().optional(),
 });
 

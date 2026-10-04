@@ -9,7 +9,7 @@ import { CaptionValue } from '../lib/schema';
 import { COLORS, FONT_FAMILY, FONT_WEIGHT } from '../styles/tokens';
 import { CAPTION_DELAY_SECONDS, useEntranceStyle } from '../lib/animation';
 
-// 모든 컷이 공유하는 레이아웃(2026-10-03 재디자인): 왼쪽 위 키워드 라벨 / 본문 / 하단 큰 자막(왼쪽 정렬) + 출처.
+// 모든 컷이 공유하는 레이아웃: 왼쪽 위 키워드 라벨 / 본문 / 하단 큰 자막(왼쪽 정렬) + 출처.
 // 토스·에듀 인포그래픽처럼 왼쪽 정렬 타이포 한 축으로 세운다. 박스·테두리 장식은 쓰지 않는다.
 export const CutLayout: React.FC<{
   brand: string;

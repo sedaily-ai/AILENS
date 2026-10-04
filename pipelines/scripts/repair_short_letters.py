@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""본문이 1문단뿐인 레터(생성 실패 후 그대로 발행된 글)를 레터만 다시 생성해 복구한다 — 2026-10-02.
+"""본문이 1문단뿐인 레터(생성 실패 후 그대로 발행된 글)를 레터만 다시 생성해 복구한다.
 
-배경: 2026-10-01 12:00 KST 실행이 발행한 4건이 리드 한 줄뿐인 레터로 나갔다(품질 검사 도입 전).
-이 스크립트는 그 글들의 원문 기사를 다시 찾아 레터만 재생성하고, 글의 나머지(웹툰·팟캐스트·영상 등)는 건드리지 않는다.
+원문 기사를 다시 찾아 레터만 재생성하고, 글의 나머지(웹툰·팟캐스트·영상 등)는 건드리지 않는다.
 
 사용(pipelines/ 에서):
   python3 scripts/repair_short_letters.py <source_url> [<source_url> ...]            # 드라이런(쓰기 없음)
@@ -108,8 +107,8 @@ def _revalidate():
 
 
 def _kst_ymd(ts: str) -> str:
-    """발행 시각(ISO, UTC일 수 있음)을 KST 날짜(YYYYMMDD)로 — 원문 후보 파일(daily-xml)은 KST 게재일 기준이다.
-    UTC 날짜를 그대로 쓰면 00~09시 KST 발행분이 하루 전 날짜로 계산돼 원문을 못 찾는다(2026-10-02 확인)."""
+    """발행 시각(ISO, UTC일 수 있음)을 KST 날짜(YYYYMMDD)로 변환한다. daily-xml은 KST 게재일 기준이라
+    UTC 날짜를 쓰면 00~09시 KST 발행분의 원문을 못 찾는다."""
     from datetime import datetime, timedelta, timezone
 
     dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))

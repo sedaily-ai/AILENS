@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""웹툰 컷1의 글자 합성만 다시 해서 교체한다 — 2026-10-02.
+"""웹툰 컷1의 글자 합성만 다시 해서 교체한다.
 
-배경: 웹툰식 말풍선 모드에서 표지(컷1)는 제목 띠가 위를 차지해 말풍선 자리 계산이 실패했고(개정 108에서 수정),
-그 오류로 컷1 글자 합성이 통째로 빠진 채 올라갔다. repair_missing_formats.py --redo 가 남긴 임시 폴더의 원본 컷1(글자 없음)을 그대로 써서
-다시 합성한다 — 이미지 생성 비용 없음.
+repair_missing_formats.py --redo가 남긴 임시 폴더의 원본 컷1(글자 없음)을
+그대로 써서 다시 합성하므로 이미지 생성 비용이 들지 않는다.
+컷1 원본이 없으면 --apply 시에만 같은 프롬프트·seed로 그림을 재생성한다.
 
 사용(pipelines/ 에서):
   python3 scripts/recompose_cut1.py [--apply] <source_url> [...]
@@ -66,7 +66,7 @@ def main():
             script = json.loads((wd / "1_script.json").read_text(encoding="utf-8"))
             cut = next(c for c in script["cuts"] if int(c["cut"]) == 1)
             if Image.open(raw).size != (1216, 832):
-                # 컷1이 이미 기본 스타일로 합성돼 원본이 없다 — 같은 프롬프트·seed로 컷1 그림만 한 장 다시 뽑는다(약 $0.08)
+                # 원본(글자 없음)이 없으면 같은 프롬프트·seed로 컷1 그림만 재생성한다(약 $0.08).
                 if not APPLY:
                     print(f"DRY  컷1 원본 없음 — --apply 시 컷1 그림을 다시 생성 {su}")
                     continue

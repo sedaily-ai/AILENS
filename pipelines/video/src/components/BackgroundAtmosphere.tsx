@@ -2,7 +2,7 @@ import React from 'react';
 import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { COLORS } from '../styles/tokens';
 
-// 딥네이비 배경(2026-10-03, 프롬프트 §7): 아주 느린 그라데이션(한 바퀴 12초)과 옅은 점 격자(투명도 8%)가 천천히 흐른다.
+// 딥네이비 배경(프롬프트 §7): 아주 느린 그라데이션(한 바퀴 12초)과 옅은 점 격자(투명도 8%)가 천천히 흐른다.
 // 배경이 글자보다 눈에 띄면 안 되므로 변화 폭을 작게 잡았다. 모든 값은 frame에서 결정론적으로 계산한다.
 const LOOP_SECONDS = 12;
 const GRID = 56;

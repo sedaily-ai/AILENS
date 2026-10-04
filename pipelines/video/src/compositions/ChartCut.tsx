@@ -20,7 +20,7 @@ const formatValue = (value: number, unit?: string) =>
   `${value.toLocaleString('ko-KR')}${unit ?? ''}`;
 
 // 막대 그래프(프롬프트 §6) — 막대가 아래에서 0.3초 간격으로 자라고, 다 자란 뒤 값 라벨이 붙는다. 핵심 막대 하나만 강조색.
-// 2026-10-03 재디자인: 가는 기준선과 옅은 눈금선, 둥근 윗모서리, 한 단계 밝은 네이비 막대(강조 막대만 앰버). 장식 테두리 없음.
+// 가는 기준선과 옅은 눈금선, 둥근 윗모서리, 한 단계 밝은 네이비 막대(강조 막대만 앰버). 장식 테두리 없음.
 const Bar: React.FC<{
   barWidth: number;
   barHeight: number;

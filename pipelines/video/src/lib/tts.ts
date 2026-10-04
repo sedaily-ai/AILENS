@@ -15,9 +15,8 @@ export type TtsVoiceConfig = {
   // Polly(provider === 'polly'일 때만 의미 있음)
   voiceId?: VoiceId;
   engine?: Engine;
-  // Polly SSML <prosody> 속도·음량(2026-09-25 추가) — pipelines/common/
-  // podcast_voice.py::_synthesize_polly와 같은 형식 그대로("100%"/"+0dB")
-  // 값 자체를 <prosody rate volume> 속성에 그대로 꽂는다.
+  // Polly SSML <prosody> 속도·음량. pipelines/common/podcast_voice.py::_synthesize_polly와 같은 형식
+  // ("100%"/"+0dB")이며 값을 그대로 <prosody rate volume> 속성에 넣는다.
   rate?: string;
   volume?: string;
   // ElevenLabs(provider === 'elevenlabs'일 때만 의미 있음)
@@ -27,9 +26,8 @@ export type TtsVoiceConfig = {
   elevenLabsVoiceSettings?: ElevenLabsVoiceSettings;
 };
 
-// pipelines/common/elevenlabs_tts.py::DEFAULT_VOICE_SETTINGS/VOICE_SETTINGS_RANGES와
-// 값을 맞춰뒀다(2026-09-24 — "동일한 환경이 되도록 구축해주세요"). env var가
-// 없으면(발행 설정에 저장 안 된 키) 이 기본값을 쓴다.
+// pipelines/common/elevenlabs_tts.py::DEFAULT_VOICE_SETTINGS/VOICE_SETTINGS_RANGES와 값을 맞춘다.
+// 환경변수가 없으면(발행 설정에 저장 안 된 키) 이 기본값을 쓴다.
 const ELEVENLABS_DEFAULT_VOICE_SETTINGS: ElevenLabsVoiceSettings = {
   stability: 0.5,
   similarity_boost: 0.75,
@@ -64,32 +62,20 @@ function clampElevenLabsVoiceSettings(): ElevenLabsVoiceSettings {
   return result;
 }
 
-// 2026-08-23 — Google Cloud TTS(Chirp3-HD)에서 ElevenLabs로 전환.
-// 2026-08-27 — ElevenLabs에서 AWS Polly로 재전환. 실사용량(월 565K자) 기준
-// ElevenLabs 실비용이 구독료+초과요금 합산 약 $95.81/월인데, 같은 물량을
-// Polly generative 엔진으로 합성하면 약 $17/월(82% 절감) — 같은 대본으로
-// 품질 비교 샘플까지 직접 뽑아 확인 후 결정(pipelines/podcast/pipeline.py와
-// 같은 이유, 그쪽과 동일 보이스로 통일).
-// 한국어 보이스 중 generative 엔진을 지원하는 건 Seoyeon뿐(Jihye는 neural 전용).
+// 기본 TTS는 AWS Polly generative 엔진이다. 월 565K자 기준 ElevenLabs는 약 $95.81, Polly generative는
+// 약 $17이어서(pipelines/podcast/pipeline.py와 같은 이유) 그쪽과 같은 보이스를 쓴다.
+// 한국어 보이스 중 generative를 지원하는 것은 Seoyeon뿐이다(Jihye는 neural 전용).
 //
-// 2026-09-24 — 사용자 요청으로 ElevenLabs를 다시 프로덕션 옵션으로 열었다
-// ("가장 우측 부분은... 프로덕션을 위해서 발행하는 공간으로 정의할게요.
-// 따라서... 폴리 뿐 아니고 일레븐 랩스도 같이 적용할 수 있도록 해야합니다",
-// "동일한 부분은 동일하게 로직이나 코드 사용할 수 있도록 구조를 짜고"). 이
-// 선택은 pipelines/common/elevenlabs_tts.py(Python, admin CMS·팟캐스트가
-// 이미 씀)의 REST 호출부와 **의도적으로 같은 모양**으로 짰다 — 엔드포인트,
-// 요청 바디(text/model_id/voice_settings), 헤더(xi-api-key) 전부 동일.
-// API 키는 Python 쪽(render_from_script.py/publish_utils.py)이 Secrets
-// Manager에서 미리 읽어 ELEVENLABS_API_KEY 환경변수로 넘겨준다 — Node
-// 프로세스가 AWS SDK로 시크릿을 직접 읽는 대신(새 npm 의존성 필요 없음),
-// 이미 boto3가 있는 Python 쪽에서 한 번만 읽는 게 더 간단하다.
+// ElevenLabs도 발행 설정으로 고를 수 있다. 호출부는 pipelines/common/elevenlabs_tts.py(Python)의
+// REST 호출과 의도적으로 같은 모양이다(엔드포인트, 요청 바디 text/model_id/voice_settings, 헤더 xi-api-key).
+// API 키는 Python 쪽(render_from_script.py/publish_utils.py)이 Secrets Manager에서 읽어
+// ELEVENLABS_API_KEY 환경변수로 넘긴다. Node가 AWS SDK로 시크릿을 직접 읽으면 새 npm 의존성이 필요해서다.
 export const DEFAULT_VOICE: TtsVoiceConfig = {
   provider: (process.env.TTS_PROVIDER as TtsProvider) ?? 'polly',
   voiceId: (process.env.TTS_VOICE_ID as VoiceId) ?? 'Seoyeon',
   engine: (process.env.TTS_ENGINE as Engine) ?? 'generative',
-  // 2026-09-25 — pipelines/common/video_settings.py::get_render_env()가
-  // 새로 넘기는 TTS_RATE/TTS_VOLUME. 기본값은 podcast_voice.py의
-  // _DEFAULT_RATE/_DEFAULT_VOLUME과 동일("100%"/"+0dB" = 변화 없음).
+  // pipelines/common/video_settings.py::get_render_env()가 넘기는 TTS_RATE/TTS_VOLUME.
+  // 기본값은 podcast_voice.py의 _DEFAULT_RATE/_DEFAULT_VOLUME과 같다("100%"/"+0dB" = 변화 없음).
   rate: process.env.TTS_RATE ?? '100%',
   volume: process.env.TTS_VOLUME ?? '+0dB',
   elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID,
@@ -117,13 +103,9 @@ function escapeSsmlText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// 2026-09-25 — Polly SSML <prosody> 지원 추가. 사용자 요청: "팟캐스트
-// 부분처럼.. 동일하게 해야죠" — video-settings 발행 화면에 속도·음량
-// 슬라이더를 보여주고도 실제로 반영이 안 됐던 이유가 바로 이 함수가
-// 평문(Text=)만 보내서였다(pipelines/common/video_settings.py 모듈
-// docstring 참고). pipelines/common/podcast_voice.py::_synthesize_polly와
-// 같은 패턴: rate/volume 값을 <prosody> 속성에 그대로 꽂고 TextType을
-// 'ssml'로 바꾼다.
+// Polly SSML <prosody>를 쓴다. 평문(Text=)만 보내면 video-settings의 속도·음량이 반영되지 않는다
+// (pipelines/common/video_settings.py 모듈 docstring 참고). podcast_voice.py::_synthesize_polly와
+// 같은 패턴으로 rate/volume을 <prosody> 속성에 넣고 TextType을 'ssml'로 보낸다.
 async function synthesizeSpeechPolly(text: string, voice: TtsVoiceConfig): Promise<Buffer> {
   const client = getClient();
   const rate = voice.rate ?? '100%';

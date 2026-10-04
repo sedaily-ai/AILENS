@@ -7,15 +7,10 @@ import { COLORS, FONT_FAMILY, FONT_WEIGHT } from '../styles/tokens';
 import { useScale } from '../lib/layout';
 import { DIAGRAM_STAGGER_SECONDS, useDelayedProgress, useFrames } from '../lib/animation';
 
-// connector variant → 아이콘 키 매핑. variant가 늘어나면 여기만 추가.
-const CONNECTOR_ICON: Record<string, string> = {
-  arrow: 'arrow-right',
-};
-
 const NODE_TILE = 168;
 
 // 흐름도(프롬프트 §6) — 아이콘 + 라벨 묶음이 차례로 나타나고 화살표(선)가 그려지듯 뻗는다. 세로 화면은 위에서 아래로 쌓는다.
-// 2026-10-03 재디자인: 테두리 없는 부드러운 아이콘 타일(한 단계 밝은 네이비 면) + 얇은 연결선. 장식 요소를 쓰지 않는다.
+// 테두리 없는 부드러운 아이콘 타일(한 단계 밝은 네이비 면) + 얇은 연결선. 장식 요소를 쓰지 않는다.
 const DiagramNode: React.FC<{
   item: Extract<DiagramCutType['data']['nodes'][number], { kind: 'node' }>;
   delayFrames: number;

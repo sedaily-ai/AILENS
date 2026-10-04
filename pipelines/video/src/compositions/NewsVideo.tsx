@@ -16,7 +16,7 @@ import { BackgroundAtmosphere } from '../components/BackgroundAtmosphere';
 const cutFramesOf = (durationSeconds: number, fps: number): number =>
   Math.ceil(durationSeconds * fps);
 
-// 장면마다 화면 전체가 아주 느리게 다가온다(1.00 → 1.03배, 2026-10-03, 프롬프트 §10).
+// 장면마다 화면 전체가 아주 느리게 다가온다(1.00 → 1.03배, 프롬프트 §10).
 const SlowZoom: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();

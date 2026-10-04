@@ -5,7 +5,7 @@ import { COLORS } from '../styles/tokens';
 import { SPRING_EMPHASIS } from '../lib/animation';
 
 // caption이 문자열이면 그대로, 세그먼트 배열이면 emphasis 구간만 앰버로 칠한다.
-// 2026-10-03(프롬프트 §5·§10): 강조어는 다른 단어보다 0.2~0.3초 늦게, 크게(기본 1.6배), 앰버로, 살짝 튀며(damping 9 / stiffness 180) 나타난다.
+// 강조어(프롬프트 §5·§10)는 다른 단어보다 0.2~0.3초 늦게, 크게(기본 1.6배), 앰버로, 살짝 튀며(damping 9 / stiffness 180) 나타난다.
 // emphasisProgress를 직접 주면(하이라이트 컷의 테두리 이후 전환 등) 그 진행도를 색에 쓰고, 안 주면 delaySeconds 뒤 스프링으로 자동 진행한다.
 export const CaptionText: React.FC<{
   value: CaptionValue;

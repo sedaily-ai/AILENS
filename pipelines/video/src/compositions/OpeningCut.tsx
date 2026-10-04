@@ -7,7 +7,7 @@ import { COLORS } from '../styles/tokens';
 import { useScale } from '../lib/layout';
 import { useEnterProgress } from '../lib/animation';
 
-// 첫 컷. 2026-10-03 재디자인 — 둥근 아이콘 원 대신 부드러운 타일, 제목은 전면 타이포(단어가 하나씩 올라옴).
+// 첫 컷. 둥근 아이콘 원 대신 부드러운 타일, 제목은 전면 타이포(단어가 하나씩 올라옴).
 // 기준 시점은 왼쪽 위 키워드 라벨 아래에 상시 보인다(없으면 이 컷에서 따로 보이지 않는다).
 export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string; asOfDate?: string }> = ({ cut, brand }) => {
   const scale = useScale();

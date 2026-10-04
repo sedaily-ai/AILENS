@@ -1,15 +1,8 @@
 """frontpage_auto/run.py·mustknow_auto/run.py 공용 발행 헬퍼.
 
-2026-09-04 — 리팩토링 감사로 신설. 두 run.py는 "import 아님 — frontpage_auto는
-스크립트라 import 시 부작용이 있고, 프로덕션 코드를 건드리는 리스크도 피하기
-위함"(mustknow_auto/run.py 자체 설명)이라는 이유로 헬퍼 함수 9개를 그대로
-복사-붙여넣기 해왔다. 그런데 바로 이 패턴 때문에 실제 버그가 났다 —
-`_parse_letter_summary_bullets()`의 줄바꿈 처리 버그를 한쪽만 고치고 다른
-쪽은 안 고쳐서 프로덕션에 두 번 심어진 게 2026-09-04 콘텐츠 품질 검수로
-드러났다(worklog 2026-09-04 참조). "복사해온다"는 이유 자체는 여전히
-유효하지만(각 run.py는 여전히 독자적인 스크립트, 서로를 import 안 함),
-공통부만 이 모듈로 옮기면 양쪽 다 이 모듈 하나만 import해서 원본을 안 건드리는
-전제를 유지하면서도 다음 버그부터는 한 번만 고치면 된다.
+레터 산출물 파싱, 카테고리 매핑, 영상 렌더, 4포맷 생성·업로드·발행을 담당한다.
+두 run.py는 서로를 import하지 않는 독립 스크립트이므로, 공통 로직을 이 모듈에 두어
+한 번만 고치면 양쪽에 반영되게 한다(복사본 중 한쪽만 고쳐 버그가 남는 문제를 막는다).
 """
 from __future__ import annotations
 
@@ -35,21 +28,15 @@ CATEGORY_MAP = {
     "문화·라이프": "문화",
 }
 
-# "재테크"(사이트 nav 7번째 탭, /investing)는 원문 최상위 카테고리엔
-# 없다(2026-09-11 daily-xml 전수조사로 확인 — 그래서 /investing이 계속
-# 0건이었다, 사용자 신고). "산업,투자·재무,투자·재무"·"Signal,Finance,투자"
-# 처럼 하위 세그먼트에만 투자 관련 태그가 붙는다 — display_category()의
-# 2차 패스가 이 세그먼트들을 하위 태그로 찾는다.
+# "재테크"(사이트 nav 7번째 탭, /investing)는 원문 최상위 카테고리에 없다.
+# "산업,투자·재무,투자·재무"·"Signal,Finance,투자"처럼 하위 세그먼트에만 투자 관련 태그가
+# 붙으므로 display_category()의 2차 패스가 하위 세그먼트에서 찾는다.
 _INVESTING_SUBCATEGORIES = {"투자", "투자·재무", "금융·투자"}
 
-# 하위 카테고리(2026-10-01 신설) taxonomy — service/frontend/src/shared/
-# constants/econSubcategories.ts와 같은 값(의도적 중복, ECON_CATEGORIES와
-# 같은 원칙). 본지 실제 GNB 메뉴 구조(마켓시그널/기업/집슐랭/금융/국제/
-# 문화 하위분류)를 그대로 가져왔다. 원문 XML의 category 태그 2번째
-# 세그먼트(예: "증권,국내증시,...")가 이 taxonomy와 이름이 안 맞는 옛
-# 체계라 규칙 매핑 대신 LLM으로 분류한다. 처음엔 분량이 충분한 증시·산업만
-# 뒀다가(2026-10-01 실측, 나머지는 하위 탭 하나당 10개 안팎) 사용자 요청으로
-# 나머지 4개도 추가 — 분량이 얇아도 탭은 값이 있을 때만 뜨니 깨지진 않는다.
+# 하위 카테고리 taxonomy — service/frontend/src/shared/constants/econSubcategories.ts와
+# 같은 값이다(의도적 중복). 본지 GNB 메뉴 구조를 따른다. 원문 XML의 category 2번째
+# 세그먼트(예: "증권,국내증시,...")는 이 taxonomy와 이름이 맞지 않는 옛 체계라
+# 규칙 매핑 대신 LLM으로 분류한다. 탭은 값이 있을 때만 노출되므로 분량이 얇은 분류도 안전하다.
 SUBCATEGORY_MAP = {
     "증시": ["국내증시", "해외증시", "IB&Deal", "펀드·채권", "정책", "증권일반"],
     "산업": ["대기업", "중기·IT", "유통·생활", "바이오", "기업인", "투자·재무", "기업일반"],
@@ -59,19 +46,15 @@ SUBCATEGORY_MAP = {
     "문화": ["전시·공연", "영화·미디어", "출판", "여행·레저", "문화일반", "아트씽"],
 }
 
-# 전용 profile을 새로 만들지 않고 facts_extract.py와 같은 걸 재사용한다
-# (lens-letters-sonnet-46) — 분류 작업은 facts 추출만큼이나 가벼워서 새
-# AWS 리소스를 만들 필요가 없다고 판단.
+# 전용 profile 없이 facts_extract.py와 같은 profile(lens-letters-sonnet-46)을 재사용한다.
 _SUBCATEGORY_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"
 
 
 def display_subcategory(category: str | None, headline: str, context: str) -> str | None:
-    """발행 시 body_inline.subcategory에 넣을 하위 카테고리. category가
-    SUBCATEGORY_MAP에 없는 값(증시·산업 외 전부, 또는 None)이면 분류
-    자체를 안 하고 None — 빈 탭을 만들지 않기 위한 의도적 제한
-    (SUBCATEGORY_MAP 주석 참조). Bedrock 호출 실패 시에도 None으로
-    폴백한다 — 이 필드가 없어도 발행 자체는 막히면 안 된다(facts_extract.
-    extract_facts와 같은 원칙)."""
+    """발행 시 body_inline.subcategory에 넣을 하위 카테고리.
+    category가 SUBCATEGORY_MAP에 없으면(또는 None) 분류하지 않고 None을 돌려준다 —
+    빈 탭을 만들지 않기 위한 제한이다. Bedrock 호출이 실패해도 None으로 폴백한다
+    (이 필드가 없어도 발행은 막히면 안 된다)."""
     options = SUBCATEGORY_MAP.get(category or "")
     if not options:
         return None
@@ -110,18 +93,11 @@ def load_module(name: str, file_path: Path):
 def display_category(article: dict) -> str | None:
     """발행 시 body_inline.category에 넣을 사이트 카테고리 라벨.
 
-    top_category는 XML에서 그 기사의 **첫 번째** category 태그만 본다
-    (discovery/pipeline.py) — 기사 하나가 category 태그를 여러 개 달고
-    있는 경우가 흔해서(예: "경제,사회,금융,증권,산업,국제" 6개를 동시에
-    달았는데 top_category는 그중 맨 앞의 "경제"만 봄), 실제로는 증권/산업
-    기사인데도 카테고리 없이 발행되는 버그가 있었다. 그 기사의 전체
-    category 태그(`article["categories"]`)를 순서대로 훑어 사이트 6개
-    카테고리 중 하나와 일치하는 첫 값을 쓴다. 정치·사회·오피니언처럼
-    애초에 경제 카테고리 태그가 전혀 없는 기사는 None을 돌려준다 — 사이트에
-    대응 카테고리 페이지가 없는 게 맞기 때문에 억지로 하나 붙이지 않는다.
-
-    2026-09-11 — "재테크"만은 최상위 태그 매칭(1차 패스)으로 못 찾는다
-    (CATEGORY_MAP 주석 참조). 1차 패스에서 아무 것도 안 걸리면 2차로
+    top_category는 XML의 첫 번째 category 태그만 보지만 기사는 태그를 여러 개 다는
+    경우가 흔하다(예: "경제,사회,금융,증권,산업,국제"). 그래서 전체 태그
+    (`article["categories"]`)를 순서대로 훑어 사이트 6개 카테고리와 일치하는 첫 값을 쓴다.
+    경제 카테고리 태그가 없는 기사(정치·사회·오피니언)는 대응 페이지가 없으므로 None이다.
+    "재테크"는 1차 패스(최상위 태그)로 찾을 수 없어, 1차에서 걸리지 않으면
     하위 세그먼트에서 투자 관련 태그를 찾는다."""
     cats = article.get("categories") or [article.get("top_category", "")]
     for c in cats:
@@ -141,7 +117,7 @@ def slugify(publish_date: str, headline: str) -> str:
     return base[:80].rstrip("-")
 
 
-# 레터 본문 최소 문단 수·재생성 횟수(2026-10-02) — publish_article()의 품질 검사에서 쓴다.
+# 레터 본문 최소 문단 수·재생성 횟수 — publish_article()의 품질 검사에서 쓴다.
 MIN_LETTER_PARAGRAPHS = 6
 MAX_LETTER_RETRIES = 2
 
@@ -149,23 +125,14 @@ MAX_LETTER_RETRIES = 2
 def parse_letters(raw_md: str) -> list[str]:
     """레터 산출물(마크다운)에서 본문 문단만 뽑는다.
 
-    2026-10-01 — [핵심 요약] 블록 뒤에 실제 본문("## 소제목" 섹션들)이
-    이어지는 새 출력 순서로 모델이 바뀌었는데(parse_letter_summary_bullets()
-    버그와 같은 원인 — 그 함수 docstring 참조), 이 함수는 [핵심 요약]을
-    "그 뒤로는 볼 것 없다"는 영구 종료 신호(break)로 보고 있어서 그 뒤에
-    오는 본문 전체가 통째로 유실되는 실제 프로덕션 버그가 났다(2026-10-01
-    발행 31건, 레터 상세 페이지에 리드 한 줄만 뜨고 본문이 없었음 —
-    사용자가 레터 상세 페이지에서 직접 발견). [핵심 요약]을 [제목]과
-    같은 "skip 구간"으로 바꾸고, "##"로 시작하는 줄(새 소제목 마커)을
-    만나면 skip을 풀고 본문 수집을 재개한다 — "◾"(옛 소제목 마커)와
-    동일하게 취급. [용어] 블록도 본문이 아니므로 만나면 종료한다
-    (2026-10-01 추가 — 전엔 이 마커 자체를 몰라서 용어 설명 줄이 본문
-    문단에 섞여 들어갈 수 있었다)."""
+    출력 순서는 [제목] → [리드] → [핵심 요약] → "## 소제목" 본문 → [용어]다.
+    [제목]·[핵심 요약]은 skip 구간이며 "##"(또는 "◾") 소제목을 만나면 skip을 풀고
+    본문 수집을 재개한다. [핵심 요약]을 영구 종료 신호로 보면 그 뒤 본문이 통째로
+    유실된다. [용어] 블록은 본문이 아니므로 만나면 종료한다."""
     from text_utils import extract_fact_ids  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
 
-    # FACT_IDS 트레일러를 먼저 떼어낸다. 이 함수엔 본문 종료 조건이 없어서
-    # (자료: 뒤로도 계속 buf에 쌓는다) 안 떼면 커버리지 줄이 그대로 발행
-    # 본문 문단이 된다.
+    # FACT_IDS 트레일러를 먼저 뗀다. 이 함수엔 본문 종료 조건이 없어
+    # 그대로 두면 커버리지 줄이 발행 본문 문단이 된다.
     raw_md, _ = extract_fact_ids(raw_md)
     body = re.sub(r"^```\w*\n|```$", "", raw_md.strip(), flags=re.MULTILINE).strip()
     lines = [l.strip() for l in body.split("\n") if l.strip()]
@@ -187,13 +154,8 @@ def parse_letters(raw_md: str) -> list[str]:
             flush()
             continue
         if line.startswith("◾") or line.startswith("##"):
-            # 2026-09-23 — 예전엔 "◾" 줄 자체를 버렸다(flush만 하고 continue).
-            # 그래서 모델이 소제목을 잘 만들어도 발행 직전에 통째로 사라져,
-            # 실제 사이트엔 소제목 없는 연속 프로즈만 남았다(사용자 리포트:
-            # 발행글 스크린샷엔 "◾" 표시가 전혀 없음). 소제목 줄을 별도
-            # 문단으로 살려서 paragraphs에 넣는다 — 프론트(LensFormatPanel)가
-            # "◾"로 시작하는 문단을 감지해 구분되게 보여준다. "##"(새 마커,
-            # 2026-10-01)도 같은 역할이라 같은 분기에서 처리한다.
+            # 소제목 줄은 별도 문단으로 살려 둔다. 프론트(LensFormatPanel)가
+            # "◾"로 시작하는 문단을 소제목으로 구분해 보여준다("##"도 같은 역할).
             skipping = False
             flush()
             paragraphs.append(line)
@@ -202,10 +164,8 @@ def parse_letters(raw_md: str) -> list[str]:
             skipping = False
             flush()
             continue
-        # [핵심 요약]("30초 핵심" 전용 불릿)은 parse_letter_summary_bullets()가
-        # 따로 뽑으므로 그 불릿 줄들("-"로 시작)은 여기서 skip한다 — 다만
-        # 예전처럼 영구 종료가 아니라, 바로 위 "##"/"◾" 분기가 다음 소제목을
-        # 만나는 순간 skip을 풀고 본문 수집을 재개한다.
+        # [핵심 요약]("30초 핵심" 전용 불릿)은 parse_letter_summary_bullets()가 따로 뽑으므로
+        # 불릿 줄은 여기서 skip한다. 다음 "##"/"◾" 소제목에서 skip이 풀린다.
         if line.startswith("[핵심 요약]"):
             skipping = True
             flush()
@@ -220,39 +180,16 @@ def parse_letters(raw_md: str) -> list[str]:
     return paragraphs
 
 
-_MAX_TITLE_CHARS = 60  # 프롬프트 지침은 15~30자 — 여유를 둔 안전 상한(2026-09-11)
+_MAX_TITLE_CHARS = 60  # 프롬프트 지침은 15~30자 — 여유를 둔 안전 상한
 
 
 def parse_letter_title(raw_md: str) -> str | None:
     """레터 산출물의 [제목] 블록에서 독자 시선 진입형 제목을 뽑는다
-    (프롬프트 지침: "법은 강화됐습니다"가 아니라 "무효인 계약인데도 갚고
-    있다" 식, 15~30자).
+    (프롬프트 지침: "법은 강화됐습니다"가 아니라 "무효인 계약인데도 갚고 있다" 식, 15~30자).
 
-    2026-09-10 — 이 제목이 여태 parse_letters()에서 skip만 되고 실제
-    발행 headline/question엔 한 번도 안 쓰였다(사용자 지적: "뉴스레터
-    제목이 뉴스 기사 제목을 그대로 따오고 있다" — 원인은 프롬프트가
-    아니라 이 파싱 누락이었다. publish_article()이 대신 원문 뉴스 제목
-    article["title"]을 그대로 썼다).
-
-    2026-09-11 — 종료 조건이 [리드] 하나뿐이었다. parse_letters()는
-    [리드]·◾·자료:/—·[핵심 요약] 네 가지를 전부 종료 조건으로 보는데
-    (문단 파싱에서 이미 검증된 마커 집합), 이 함수만 [리드]만 보고
-    있었다 — 모델이 [제목] 뒤에 [리드]를 안 쓰거나 형식이 어긋나면
-    멈출 데를 못 찾고 본문 끝(핵심 요약·용어 설명까지)까지 통째로
-    buf에 쌓아 제목이 2000~3000자짜리 본문 전체가 돼버렸다(실사용자
-    신고로 발견 — admin 웹툰 목록에서 제목 칸에 본문이 그대로 나옴).
-    parse_letters()와 같은 종료 조건 집합으로 맞추고, 그래도 모델이
-    예상 못 한 형식으로 새면 길이 상한(_MAX_TITLE_CHARS)이 최후
-    방어선이다.
-
-    2026-09-21 — [리드] 매칭이 문자 그대로 "[리드]"만 봐서 프롬프트의
-    실제 섹션 헤더 "[리드 3~5문장]"과 안 맞았다(부분 문자열이 아니라
-    정확히 "[리드]"로 시작해야 했음 — "[리드 3~5문장]"은 5번째 글자가
-    공백이라 불일치). 최신 발행 레터 다수를 직접 열어보니 모델은 v7~v10
-    스타일 제목을 실제로 잘 만들고 있었는데(레터 본문 1문단에 제목+리드가
-    그대로 섞여 있었음 — "인벤테라" 건 등 직접 확인), 이 마커 불일치
-    때문에 [제목] 블록이 [리드] 시작 지점에서 안 끊기고 있었다. 매칭을
-    "[리드"로 느슨하게 고쳤다(아래 parse_letters()도 동일)."""
+    종료 조건은 parse_letters()와 같은 마커 집합([리드"로 시작, ◾, 자료:/—, [핵심 요약])이다.
+    "[리드 3~5문장]" 같은 변형 헤더도 잡도록 "[리드"로 느슨하게 매칭한다.
+    예상 밖 형식으로 새면 본문 전체가 제목이 되므로 길이 상한(_MAX_TITLE_CHARS)이 최후 방어선이다."""
     from text_utils import extract_fact_ids  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
 
     raw_md, _ = extract_fact_ids(raw_md)
@@ -284,28 +221,12 @@ _EMOJI_RE = re.compile(r"[\U0001F300-\U0001FAFF☀-➿⬀-⯿⌀-⏿]️?")
 
 
 def extract_title_from_lead(paragraphs: list[str]) -> str | None:
-    """parse_letter_title()이 실패했을 때의 2차 방어선 — 원문 뉴스 제목으로
-    바로 폴백하지 않고, 첫 문단에서 제목을 직접 뽑아본다.
+    """parse_letter_title()이 실패했을 때의 2차 방어선 — 첫 문단에서 제목을 직접 뽑는다.
 
-    2026-09-21 — [제목] 마커를 못 찾는 실패 사례를 다수 직접 열어봤더니,
-    모델이 [제목] 블록을 아예 별도 줄로 안 쓰고 리드 문장에 섞어 쓴
-    경우가 흔했다(예: "인벤테라" 건 — 첫 문단이 "어깨 MRI 찍을 때 쓰는
-    조영제, 허가받은 게 아직 하나도 없습니다 🧲 어깨가 아파 MRI를
-    찍을 때..." 식으로 제목+본문이 한 덩어리). 프롬프트 규칙상 제목은
-    항상 이모지 1개로 끝나므로, 첫 문단에서 첫 이모지까지를 잘라내면
-    제목만 복원된다 — 실사용 데이터로 36건 검증 확인. 그래도 못 찾으면
-    (이모지가 아예 없으면) None — 호출부가 최후 수단으로 원문 제목을
-    쓴다.
-
-    2026-09-29 발견(사용자 신고 — 라이브 글 제목이 이모지 하나뿐
-    "🦈") — 이 가정이 항상 맞진 않았다. 모델이 드물게 이모지를 제목
-    "끝"이 아니라 "맨 앞"에 붙여 쓰면(예: "🦈 상어 한 마리가 9일
-    만에...") 첫 이모지가 문단 맨 앞에서 바로 잡혀 `p0[:m.end()]`가
-    이모지 한 글자만 남긴다 — None이 아니라 쓸모없는 문자열을
-    돌려줘서 호출부의 `or article["title"]` 폴백이 아예 안 탔다.
-    이모지를 다 떼어내고 남는 실제 글자가 거의 없으면(2자 미만)
-    추출 실패로 간주해 None을 돌려준다 — 호출부가 원문 제목으로
-    올바르게 폴백하게."""
+    모델이 [제목] 블록을 별도 줄로 쓰지 않고 리드 문장에 섞어 쓰는 경우가 있다.
+    프롬프트 규칙상 제목은 이모지 1개로 끝나므로 첫 문단에서 첫 이모지까지 잘라 제목을 복원한다.
+    이모지가 제목 맨 앞에 붙는 드문 경우를 막기 위해, 이모지를 제외한 글자가 2자 미만이면
+    실패로 보고 None을 돌려준다(호출부가 원문 제목으로 폴백한다)."""
     if not paragraphs:
         return None
     p0 = paragraphs[0]
@@ -322,25 +243,12 @@ def extract_title_from_lead(paragraphs: list[str]) -> str | None:
 
 def parse_letter_summary_bullets(raw_md: str) -> list[str]:
     """레터 산출물의 [핵심 요약] 블록에서 "- "로 시작하는 불릿만 뽑는다.
-    "30초 핵심" 카드가 이 불릿을 쓴다(lensSamples.ts의 coreSummaryBullets) —
-    예전엔 이 카드가 웹툰 컷 캡션을 재활용해서, 그림 없이 텍스트만 보면
-    맥락이 빠지는 문제가 있었다(기자 피드백). 블록이 없는 옛 프롬프트
-    결과물이면 빈 리스트를 돌려주고, "30초 핵심"은 기존처럼 다른 포맷으로
-    폴백한다.
+    "30초 핵심" 카드가 이 불릿을 쓴다(lensSamples.ts의 coreSummaryBullets).
+    블록이 없는 옛 산출물이면 빈 리스트를 돌려주고 "30초 핵심"은 다른 포맷으로 폴백한다.
 
-    2026-09-04 — 긴 불릿을 모델이(프롬프트 자체 예시가 그렇게 보여주듯)
-    두 줄로 줄바꿈해 출력하는 경우가 있는데, "-"로 시작하지 않는 이어지는
-    줄을 그냥 버려서 불릿이 문장 중간에 끊긴 채 발행된 실제 버그를 여기서
-    고쳤다 — "-"로 시작 안 하는 줄은 직전 불릿에 이어붙인다.
-
-    2026-10-01 — [핵심 요약] 블록 뒤 레터 본문이 "## 소제목" 마크다운
-    헤딩으로 시작하는데, 이 함수는 "[용어]"만 종료 마커로 알고 있어서
-    본문 전체(모든 "## " 문단)가 마지막 불릿에 그대로 이어붙는 실제
-    프로덕션 버그가 났다(2026-10-01 발행분 29건 전부, "30초 핵심" 카드
-    4번째 항목에 본문 수천 자+마크다운 기호가 그대로 노출됨 — 사용자가
-    레터 상세 페이지 리뷰 중 직접 발견). "##"로 시작하는 줄은 위 줄바꿈
-    이어붙이기 대상이 될 수 없다(불릿 문장이 마크다운 헤딩으로 줄바꿈될
-    리 없음) — [용어]와 같은 종료 마커로 추가했다."""
+    모델이 긴 불릿을 두 줄로 줄바꿈해 출력하는 경우가 있어, "-"로 시작하지 않는 줄은
+    직전 불릿이 문장 종결로 끝나지 않았을 때에 한해 이어붙인다.
+    "[용어]"와 "##"(본문 소제목)는 종료 마커다. 빠지면 본문 전체가 마지막 불릿에 붙는다."""
     from text_utils import extract_fact_ids  # noqa: lazy
 
     raw_md, _ = extract_fact_ids(raw_md)
@@ -354,44 +262,32 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
             continue
         if not in_block:
             continue
-        # 2026-09-11 — [용어] 블록 신설(parse_letter_terms 참조) 이후 이
-        # 체크가 없으면 "[용어]"와 그 뒤 "용어 | 설명" 줄들이 "-"로 시작 안
-        # 하니 전부 마지막 불릿에 이어붙어버린다.
-        # 2026-10-01 — 레터 본문("## 소제목"으로 시작)도 같은 이유로 종료
-        # 마커 추가(위 docstring 참조).
+        # 종료 마커: [용어] 블록과 본문("## 소제목"). 없으면 뒤 줄들이 마지막 불릿에 이어붙는다.
         if line.startswith("[용어]") or line.startswith("##"):
             break
         if line.startswith("-"):
             bullets.append(line.lstrip("-").strip())
         elif bullets and not _ends_sentence(bullets[-1]):
             bullets[-1] = f"{bullets[-1]} {line}".strip()
-        # else: 직전 불릿이 문장 종결로 끝났는데 "-" 없는 줄이 왔다면 줄바꿈
-        # 이어쓰기가 아니다 — 불릿 블록과 "## 본문" 사이의 도입부 문단이다
-        # (2026-10-01 오후, 레터 출력 순서가 "불릿 → 도입부 → ##본문"으로 바뀐
-        # 뒤 36건 전부 도입부가 마지막 불릿에 붙은 실제 버그). 무시한다.
-    # "자료: 서울경제신문(...)" 출처 줄은 요약 불릿이 아니다 — 같은 날부터
-    # 모델이 불릿 형식으로 출력해 5번째 "30초 핵심" 항목으로 새고 있었다.
-    # "자료:"처럼 콜론이 붙은 출처 줄만 제외한다 — "자료를 공개한 의원은…"처럼 "자료"로
-    # 시작하는 정상 불릿(실제 9/26 발행분)까지 지우지 않도록 패턴을 좁힌다.
+        # else: 직전 불릿이 문장 종결로 끝났는데 "-" 없는 줄이 오면 줄바꿈 이어쓰기가 아니라
+        # 불릿 블록과 "## 본문" 사이의 도입부 문단이다. 무시한다.
+    # "자료: 서울경제신문(...)" 출처 줄은 요약 불릿이 아니다. "자료를 공개한 의원은…" 같은
+    # 정상 불릿을 지우지 않도록 콜론이 붙은 출처 줄만 제외한다.
     return [b for b in bullets if not re.match(r"^자료\s*[:：]", b)]
 
 
 def _ends_sentence(text: str) -> bool:
     """불릿이 완결 문장으로 끝났는지. 따옴표·괄호 닫힘을 건너뛰고 마지막
     글자가 . ! ? 면 완결로 본다 — 모델이 긴 불릿을 두 줄로 나눌 때는
-    문장 중간에서 끊기므로(2026-09-04 이어붙이기 규칙의 대상) 구분된다."""
+    문장 중간에서 끊기므로(이어붙이기 대상) 구분된다."""
     return text.rstrip(" \"'”’)」』]").endswith((".", "!", "?", "。"))
 
 
 def parse_letter_terms(raw_md: str) -> list[dict]:
     """레터 산출물의 [용어] 블록에서 "용어 | 설명" 쌍을 뽑는다.
 
-    2026-09-11 — 사용자 요청: 본문 핵심 용어를 (노란 하이라이트 등으로)
-    표시해서 뜻을 바로 확인할 수 있게 하고 싶다는 UX 요청에서 출발.
-    letters 프롬프트에 [용어] 섹션 지침을 추가(v6)하고 여기서 파싱해
-    lens.keywords로 흘려보낸다 — 프론트(shared/ui/TermHighlight.tsx)가
-    본문에서 이 용어들을 찾아 하이라이트 처리한다. 블록이 없는 옛
-    산출물이면 빈 리스트."""
+    lens.keywords로 전달되며 프론트(shared/ui/TermHighlight.tsx)가 본문에서 이 용어를
+    찾아 하이라이트한다. 블록이 없는 옛 산출물이면 빈 리스트."""
     from text_utils import extract_fact_ids  # noqa: lazy
 
     raw_md, _ = extract_fact_ids(raw_md)
@@ -416,13 +312,10 @@ def parse_letter_terms(raw_md: str) -> list[dict]:
 
 
 def already_published(source_url: str) -> bool:
-    """이 source_url이 이미 (다른 파이프라인 포함) 발행됐는지 확인 — v1.32.
+    """이 source_url이 이미(다른 파이프라인 포함) 발행됐는지 확인한다.
 
-    예전엔 DynamoDB source_url `contains()` 스캔이었다(쿼리스트링 차이
-    때문에 완전일치를 피했었음). 이제는 여기서 직접 쿼리스트링을 떼어낸
-    뒤 lens-cms-api(Postgres)에 완전일치로 물어본다 — publish_article()이
-    저장할 때 쓰는 것과 정확히 같은 정리 규칙(`split("?")[0]`)이라 같은
-    문제가 재발하지 않는다."""
+    쿼리스트링을 떼어낸 뒤 lens-cms-api에 완전일치로 조회한다. publish_article()이
+    저장할 때 쓰는 정리 규칙(`split("?")[0]`)과 같다."""
     from lens_cms_client import find_by_source_url  # noqa: lazy
 
     if not source_url:
@@ -432,10 +325,11 @@ def already_published(source_url: str) -> bool:
 
 
 def sanitize_video_script(script_path: Path) -> int:
-    """영상 각본의 자막 배열에서 빈 조각({"text": ""})을 걸러낸다(2026-10-02). 모델이 "강조" 컷의 caption을 빈 text 조각으로 시작하는
-    배열로 내는 경우가 있는데, 렌더러(Remotion 스키마)는 text 최소 1자를 요구해 렌더 전 검증에서 거부한다 — 그 기사는 영상 없이
-    발행됐다(국고채 글, 2026-10-01). 빈 조각만 빼면 의미는 그대로다. 걸러낸 조각 수를 돌려준다."""
-    import json  # noqa: lazy — 이 모듈의 다른 함수들처럼 함수 안에서 불러온다
+    """영상 각본의 자막 배열에서 빈 조각({"text": ""})을 걸러낸다.
+    모델이 "강조" 컷의 caption을 빈 text 조각으로 시작하는 배열로 내는 경우가 있고,
+    렌더러(Remotion 스키마)는 text 최소 1자를 요구해 렌더 전 검증에서 거부한다.
+    빈 조각만 빼면 의미는 그대로다. 걸러낸 조각 수를 돌려준다."""
+    import json  # noqa: lazy
 
     data = json.loads(script_path.read_text(encoding="utf-8"))
     removed = 0
@@ -476,11 +370,8 @@ def generate_video(
     if n_removed:
         print(f"[{log_prefix}] {name} 영상 각본 정리 — 빈 자막 조각 {n_removed}개 제거")
 
-    # 2026-09-23 — CMS video-settings 발행값(성우·엔진·포맷)을 admin
-    # 프롬프트 실험 랩(pipelines/video/render_from_script.py)과 똑같이
-    # 반영한다(podcast_voice.py가 admin·발행 파이프라인 양쪽에서 공유되는
-    # 것과 동일 이유) — 관리자가 CMS에서 저장하면 재배포 없이 다음 발행
-    # 영상부터 적용된다.
+    # CMS video-settings 발행값(성우·엔진·포맷)을 admin 프롬프트 실험 랩
+    # (pipelines/video/render_from_script.py)과 똑같이 반영한다. 재배포 없이 다음 발행 영상부터 적용된다.
     import os
 
     import video_settings  # pipelines/common/ — 호출부가 sys.path 세팅 완료 후 부름
@@ -488,11 +379,8 @@ def generate_video(
     settings = video_settings.get_render_settings()
     mp4_path = out_dir / name / "video.mp4"
     try:
-        # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+provider가
-        # elevenlabs면 ELEVENLABS_*)을 만든다 — render_from_script.py와 이
-        # 로직을 공유한다(2026-09-24, 사용자 요청: "동일한 부분은 동일하게
-        # 로직이나 코드 사용할 수 있도록", video_settings.py 모듈
-        # docstring 참고).
+        # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+elevenlabs면 ELEVENLABS_*)을
+        # 만든다. render_from_script.py와 같은 로직이다(video_settings.py 참고).
         result = subprocess.run(
             [
                 "npm", "run", "render", "--",
@@ -562,37 +450,20 @@ def publish_article(
     results: dict | None = None,
     manage_gpu: bool = True,
 ) -> str:
-    """4포맷(레터/웹툰/팟캐스트/영상) 생성 + S3 업로드 + lens-cms-api(Postgres)
-    발행 — 발행 여부 판단(중복확인·임계값·source_url 유효성)은 호출부
-    책임, 여기선 안 한다.
+    """4포맷(레터/웹툰/팟캐스트/영상) 생성 + S3 업로드 + lens-cms-api(Postgres) 발행.
+    발행 여부 판단(중복확인·임계값·source_url 유효성)은 호출부 책임이다.
 
-    2026-09-05 — frontpage_auto/run.py::process_article()와
-    mustknow_auto/run.py::_publish()가 이 부분만 바이트 단위로 동일했다
-    (2026-09-04 P1에서 코드블록 추출 등 9개 헬퍼 함수는 이미 공용화했지만,
-    정작 제일 큰 이 블록 — 실제로 오늘 세션을 시작하게 만든 버그가 살고
-    있던 곳과 같은 위험 클래스 — 은 안 건드렸었다, P3 리팩토링 감사에서
-    재발견). 두 파일이 갈리는 지점(중복확인 시점·source_url 검증·이름
-    폴백·paper_section·display_order·로그 접두사)은 전부 파라미터로 받고,
-    그 갈리는 부분(래퍼)은 각 run.py에 그대로 남긴다.
+    frontpage_auto/run.py::process_article()와 mustknow_auto/run.py::_publish()가 공유하는
+    블록이다. 두 호출부가 갈리는 지점(중복확인 시점·source_url 검증·이름 폴백·
+    paper_section·display_order·로그 접두사)은 파라미터로 받는다.
 
-    2026-09-10(v1.32) — 저장 대상이 DynamoDB(`table.put_item()`)에서
-    lens-cms-api HTTP API로 바뀌면서 `table` 파라미터를 없앴다. 예전엔
-    lens 본글과 별도로 webtoon/video/home_player 채널에 형제 글을
-    하나씩 더 썼는데(2026-08-23 도입, "각 채널 전용 화면에도 보이게"),
-    Postgres 읽기 경로(cms_posts_repo.py)는 그 형제 글 없이도 lens
-    publications 행의 rendition 포맷만 보고 channel=video/webtoon/
-    home_player 조회를 채워준다는 게 v1.30 조사로 이미 확인돼 있다 —
-    형제 글을 계속 만들면 이번 마이그레이션 내내 고치던 것과 같은
-    중복 publications 행 문제를 새로 만드는 것이라 없앴다. lens 글
-    하나(4포맷 전부 body_inline.lenses[]에 담아)만 쓴다.
+    lens 글 하나(4포맷 전부 body_inline.lenses[]에 담아)만 쓴다. webtoon/video/home_player
+    채널 조회는 cms_posts_repo.py가 lens publications 행의 rendition 포맷으로 채우므로
+    형제 글을 따로 만들면 중복 행이 생긴다.
 
-    name/source_url은 호출부가 이미 확정한 값을 받는다(mustknow_auto는
-    article["key"]가 항상 있다는 전제, frontpage_auto는 key가 없으면
-    slugify로 대체하는 자기만의 폴백이 있음 — 그 폴백 로직 자체는 호출부
-    책임). letters_mod/podcast_mod/webtoon_mod도 호출부가 넘긴다 — letters/
-    webtoon/podcast 전부 파일명이 `pipeline.py`로 같아서 `load_module()`이
-    호출부마다 다른 이름(`frontpage_auto_letters` 등)으로 등록한 별개
-    모듈 인스턴스이기 때문에 이 함수가 전역으로 하나만 들고 있을 수 없다.
+    name/source_url은 호출부가 확정한 값을 받는다. letters_mod/podcast_mod/webtoon_mod도
+    호출부가 넘긴다 — 세 모듈 파일명이 모두 `pipeline.py`라 `load_module()`이 호출부마다
+    다른 이름으로 등록한 별개 인스턴스이기 때문이다.
     """
     from facts_extract import extract_facts  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
     from text_utils import strip_code_fence  # noqa: lazy
@@ -606,8 +477,7 @@ def publish_article(
         return upload_media(s3, local_path, key, CMS_MEDIA_BUCKET)
 
     # 0단계 — 공용 팩트시트(기준일/핵심 숫자/용어/논지)를 원문 뒤에 이어붙여
-    # 4포맷 전부가 같은 파일을 읽는다. 실패해도 빈 문자열이라 원문만 쓰던
-    # 예전 동작으로 자연히 폴백.
+    # 4포맷이 같은 파일을 읽게 한다. 실패하면 빈 문자열이라 원문만 쓴다.
     article_path = out_dir / f"{name}_article.txt"
     facts = extract_facts(article["content"], today_kst)
     article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
@@ -616,10 +486,9 @@ def publish_article(
     letters_path = letters_mod.run_article(name, str(article_path), out_dir)
     letters_raw = letters_path.read_text(encoding="utf-8")
     paragraphs = parse_letters(letters_raw)
-    # 레터 본문 품질 검사(2026-10-02) — 2026-10-01 12:00 KST 실행에서 4건이 본문 1문단(리드 한 줄)뿐인 레터로 그대로 발행됐다
-    # (나머지 21건은 13문단). 생성 응답이 잘렸거나 파싱에서 본문이 유실된 경우인데 아무 검사 없이 발행되는 게 문제였다.
-    # 문단이 너무 적으면 생성을 최대 2번 더 시도하고, 그래도 부족하면 예외로 이 기사를 발행하지 않는다(seen 표시가 안 되어 다음
-    # 회차에 다시 후보가 된다). 정상 글은 항상 10문단 안팎이라 임계값 6은 여유가 있다.
+    # 레터 본문 품질 검사. 생성 응답이 잘리거나 파싱에서 본문이 유실되면 리드 한 줄만 있는
+    # 레터가 발행되므로, 문단이 적으면 최대 MAX_LETTER_RETRIES번 재생성하고 그래도 부족하면
+    # 예외로 발행을 보류한다(seen 표시가 안 되어 다음 회차에 다시 후보가 된다). 정상 글은 10문단 안팎이다.
     for _attempt in range(1, MAX_LETTER_RETRIES + 1):
         if len(paragraphs) >= MIN_LETTER_PARAGRAPHS:
             break
@@ -631,12 +500,8 @@ def publish_article(
         raise ValueError(f"레터 본문 {len(paragraphs)}문단 — 최소 {MIN_LETTER_PARAGRAPHS}문단 필요, 발행 보류")
     letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
     letter_terms = parse_letter_terms(letters_raw)
-    # 프롬프트가 생성하는 "독자 시선 진입형" 제목. 2026-09-21 —
-    # parse_letter_title()이 [제목] 마커를 못 찾는 경우가 흔해서(위
-    # extract_title_from_lead() docstring 참고) 원문 뉴스 제목으로 바로
-    # 폴백하지 않고, 첫 문단에서 이모지 경계로 한 번 더 복구를 시도한다.
-    # 그마저 실패해야(첫 문단에 이모지 자체가 없는 극단적인 경우만)
-    # 원문 제목으로 폴백한다.
+    # 프롬프트가 생성하는 "독자 시선 진입형" 제목. [제목] 마커를 못 찾으면
+    # 첫 문단의 이모지 경계로 복구하고, 그것도 실패하면 원문 제목으로 폴백한다.
     letter_title = (
         parse_letter_title(letters_raw)
         or extract_title_from_lead(paragraphs)
@@ -645,27 +510,17 @@ def publish_article(
 
     podcast_mp3 = podcast_mod.run_article(name, str(article_path), out_dir)
 
-    # 웹툰은 영상과 달리 폴백이 없다 — 이미지 생성이 실패하면(OpenAI 크레딧
-    # 소진 등) 이미 성공한 레터·팟캐스트까지 통째로 버려지고 기사가 failed로
-    # 집계되는 문제가 있었다(2026-08-24). 영상과 같은 방식으로 "웹툰 없이
-    # 발행"까지는 살린다. status는 계속 영상 기준으로만 정한다 — 호출부의
-    # 결과 집계와 revalidate 웹훅 분기가 그 값에 걸려 있어서, 여기에 새
-    # status를 끼우면 웹툰만 빠진 기사가 SSR 재검증을 조용히 건너뛴다.
-    # 2026-09-28 — 사용자 지적("갤런당 50마일이...웹툰이 아직 안 나오게
-    # 된 이유는?") 실측 확인: 8컷 중 컷7 하나만 이미지 생성 실패(콘텐츠
-    # 필터 등)했는데, 아래 "전부 아니면 무(all-or-nothing)" 정책 때문에
-    # 이미 잘 나온 7컷까지 통째로 버려졌다(FileNotFoundError로 업로드
-    # 루프가 죽고 except가 전체 폐기). 사용자 확인 후 완화 — 실패한
-    # 컷만 건너뛰고, 남은 컷이 MIN_WEBTOON_CUTS 이상이면 그대로 발행한다
-    # (8컷 중 1~2컷 빠진 정도는 웹툰 자체를 못 쓸 정도는 아니라는 판단).
-    # 그 미만이면 여전히 전부 버린다 — 아래 except의 기존 "부분 발행보다
-    # pending이 낫다" 원칙은 "너무 부실한" 경우에 한해 유지.
+    # 웹툰 이미지 생성이 실패해도 이미 성공한 레터·팟캐스트를 버리지 않고 "웹툰 없이 발행"한다.
+    # status는 영상 기준으로만 정한다 — 호출부의 결과 집계와 revalidate 웹훅 분기가 그 값에
+    # 걸려 있어, 새 status를 끼우면 웹툰만 빠진 기사가 SSR 재검증을 건너뛴다.
+    # 컷 단위로도 실패한 컷만 건너뛰고, 남은 컷이 MIN_WEBTOON_CUTS 이상이면 그대로 발행한다.
+    # 그 미만이면 전부 버린다(아래 except).
     MIN_WEBTOON_CUTS = max(1, webtoon_mod.N_CUTS - 2)
     webtoon_script: dict = {}
     webtoon_bullets, webtoon_images = [], []
     try:
-        # 웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어(2026-10-02 08:06 KST 프로테오믹스 글: KeyError 'cuts' → 웹툰 없이 발행)
-        # 각본이 비정상이면 한 번 더 생성한다(이미지 생성 전 단계라 재시도 비용이 작다 — 각본 JSON만 다시 만든다).
+        # 웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어 한 번 더 생성한다
+        # (이미지 생성 전 단계라 재시도 비용이 작다).
         webtoon_script = {}
         for _attempt in (1, 2):
             webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
@@ -683,10 +538,10 @@ def publish_article(
                 " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
             ) or cut.get("caption", "")
             webtoon_bullets.append(caption)
-            # 나레이션을 그림에 굽지 않은 컷이면(웹툰 합성이 남긴 표시 파일) 사이트가 컷 아래 여백에 글자로 보여준다(2026-10-04).
+            # 나레이션을 그림에 굽지 않은 컷이면(웹툰 합성이 남긴 표시 파일) 사이트가 컷 아래 여백에 글자로 보여준다.
             text_caption_flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}
-            # 업로드는 WebP(품질 90)로(2026-10-01) — 1.5배 해상도 PNG(컷당 2MB대) 대신 약 300KB로 줄여 로딩·전송 비용을 낮추고
-            # Core Web Vitals에도 유리하다. 로컬 PNG는 세로 합치기(stitch)용으로 그대로 둔다. 변환 실패 시 PNG로 폴백.
+            # 업로드는 WebP(품질 90)로 한다(1.5배 해상도 PNG는 컷당 2MB대, WebP는 약 300KB).
+            # 로컬 PNG는 세로 합치기(stitch)용으로 남기며, 변환 실패 시 PNG로 폴백한다.
             try:
                 from PIL import Image
 
@@ -698,7 +553,7 @@ def publish_article(
                 print(f"[{log_prefix}] {name} 컷{n} WebP 변환 실패 — PNG로 업로드: {e}")
                 key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
                 webtoon_images.append({"url": _upload(cut_path, key), "caption": caption, **text_caption_flag})
-        # 핵심 정리 카드(컷9) — 파이프라인이 만들었을 때만 덧붙인다. 최소 컷 수 판정에는 넣지 않는다.
+        # 핵심 정리 카드(컷9) — 파이프라인이 만들었을 때만 덧붙이며 최소 컷 수 판정에는 넣지 않는다.
         n_cut_images = len(webtoon_images)  # 카드는 제외한 컷 수 — 최소 컷 수 판정용
         card_path = out_dir / name / "컷9.png"
         if webtoon_images and card_path.exists():
@@ -716,8 +571,7 @@ def publish_article(
                 f"(최소 {MIN_WEBTOON_CUTS}개 필요) — 웹툰 전체 폐기"
             )
     except Exception:
-        # 부분 성공이어도 MIN_WEBTOON_CUTS 미만이면 여전히 통째로 버린다 —
-        # 너무 부실한 웹툰을 내보내느니 웹툰 탭을 pending으로 두는 편이 낫다.
+        # 부분 성공이어도 MIN_WEBTOON_CUTS 미만이면 통째로 버린다. 부실한 웹툰보다 pending이 낫다.
         webtoon_script, webtoon_bullets, webtoon_images = {}, [], []
         if results is not None:
             results["degraded_no_webtoon"] = results.get("degraded_no_webtoon", 0) + 1
@@ -725,11 +579,9 @@ def publish_article(
 
     podcast_url = _upload(podcast_mp3, f"media/podcast/{log_prefix}/{name}-podcast.mp3")
 
-    # 팟캐스트/영상 스크립트를 청각장애인 접근성용 텍스트로 같이 저장한다
-    # (2026-08-23, 사용자 요청). 팟캐스트는 podcast/pipeline.py가 저장해둔
-    # 대본.md를 그대로 읽는다(TTS 입력과 달리 코드펜스가 안 벗겨진 원본이라
-    # 여기서 한 번 더 벗긴다). 영상은 generate_script.py가 저장한
-    # script.json의 컷별 narration을 이어붙인다.
+    # 팟캐스트/영상 스크립트를 접근성용 텍스트로 같이 저장한다. 팟캐스트는 podcast/pipeline.py가
+    # 저장한 대본.md(코드펜스가 안 벗겨진 원본)를 읽어 벗기고, 영상은 script.json의 컷별
+    # narration을 이어붙인다.
     podcast_script_path = out_dir / name / "대본.md"
     podcast_transcript = (
         strip_code_fence(podcast_script_path.read_text(encoding="utf-8"))

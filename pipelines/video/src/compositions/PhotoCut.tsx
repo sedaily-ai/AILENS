@@ -7,12 +7,9 @@ import { PhotoCutType } from '../lib/schema';
 import { useScale } from '../lib/layout';
 import { CAPTION_DELAY_SECONDS, useEntranceStyle } from '../lib/animation';
 
-// 다른 컷과 달리 CutLayout을 안 쓴다 — CutLayout은 배경(BackgroundAtmosphere,
-// 밝은 크림톤)이 그대로 비치는 걸 전제로 본문을 중앙 정렬하는데, 이 컷은
-// 원문 사진 자체가 풀블리드 배경이라 그 위에 브랜드 태그·자막이 항상
-// 읽혀야 한다 — 그래서 위/아래에 다크 스크림을 깔고 그 위에 SafeArea를
-// 얹는 구조로 직접 짠다(2026-09-03, 기자 피드백 "원문 사진이 들어가면
-// 좋겠다"의 유일한 신규 컷 타입).
+// 다른 컷과 달리 CutLayout을 쓰지 않는다. CutLayout은 BackgroundAtmosphere 배경이 비치는 것을 전제로
+// 본문을 중앙 정렬하는데, 이 컷은 원문 사진이 풀블리드 배경이라 그 위에서도 브랜드 태그·자막이 읽혀야
+// 한다. 그래서 위/아래에 다크 스크림을 깔고 그 위에 SafeArea를 얹는 구조로 직접 구성한다.
 export const PhotoCut: React.FC<{ cut: PhotoCutType; brand: string }> = ({ cut, brand }) => {
   const scale = useScale();
   const bodyStyle = useEntranceStyle();

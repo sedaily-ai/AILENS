@@ -7,7 +7,7 @@ import { useCountUpDecimal, useEnterProgress } from '../lib/animation';
 import { interpolate } from 'remotion';
 
 // 큰 수치(프롬프트 §6): 숫자가 0에서 목표값까지 올라가고, 멈추는 순간 살짝 커졌다 돌아온다. 라벨은 0.2초 뒤 아래에서 올라온다.
-// 2026-10-03 재디자인 — 왼쪽 정렬, 라벨은 숫자 위 작은 설명, 숫자는 단독으로 크게(수치만 앰버).
+// 왼쪽 정렬, 라벨은 숫자 위 작은 설명, 숫자는 단독으로 크게(수치만 앰버).
 export const StatCut: React.FC<{ cut: StatCutType; brand: string }> = ({ cut, brand }) => {
   const scale = useScale();
   const { value, unit, label, sourceNote } = cut.data;

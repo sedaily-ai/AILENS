@@ -1,44 +1,19 @@
-"""discovery 파이프라인 — 서울경제 일일 기사 XML에서 "지면 특별 코너"
-(전체/증권/산업/시그널) 후보를 뽑아 분류만 해준다.
+"""discovery 파이프라인 — 서울경제 일일 기사 XML에서 지면 특별 코너
+(전체/증권/산업/시그널) 후보를 분류해 로컬 JSON으로 저장한다.
 
-다른 pipelines/*와 같은 원칙: **생성(여기서는 "분류")까지만, 발행은
-범위 밖**이다 — S3 업로드도 DDB write도 하지 않는다. 결과를 로컬
-JSON으로 저장해서 사람이 훑어보고, 그중 실제로 4포맷 콘텐츠로 만들
-기사를 고르면 그 뒤는 기존 절차(pipelines/letters 등 + 발행
-스크립트)를 그대로 따른다.
+분류까지만 수행하며 S3 업로드와 DDB write는 하지 않는다. 입력은
+`s3://sedaily-news-xml-storage/daily-xml/YYYYMMDD.xml`이다
+(service/backend/clients/s3_xml_client.py와 같은 버킷·키 패턴). pipelines/가
+service/backend에 의존하지 않도록 파싱 로직을 별도로 둔다.
 
-읽는 데이터: `s3://sedaily-news-xml-storage/daily-xml/YYYYMMDD.xml`
-— `service/backend/clients/s3_xml_client.py`가 이미 쓰는 것과 같은
-버킷·키 패턴. 그 클라이언트를 그대로 import하지 않고 가볍게 새로
-파싱하는 이유는 `pipelines/`가 `service/backend`에 의존하지 않는
-독립 스크립트 모음이라는 기존 원칙(pipelines/README.md)을 따르기
-위함.
-
-분류 기준(2026-08-21, 실제 XML 확인 후 두 번 수정 / 2026-09-28 시그널 판정
-방식 추가 수정 — `_is_market_signal()` 참조):
-  - "시그널": category 태그 목록 아무거나 "Signal"이 있거나, 제목에
-    "마켓시그널"/"[시그널]"이 박혀 있는 기사. 기존엔 top_category(XML에
-    가장 먼저 나온 카테고리 태그 하나)만 봤는데, 기사 하나에 카테고리
-    태그가 여러 개 붙어 top_category가 "증권" 등으로 먼저 잡히는 경우가
-    많아 실제 마켓시그널 코너 기사의 40%를 놓치고 있었다(2026-09-28,
-    10일 표본 58건 중 23건 확인). **그날 daily-xml 파일**(웹 게재일
-    기준) 안에서 찾는다.
-  - "증권"/"산업": 시그널이 아니면서, 같은 파일 안에서 최상위 category가
-    그대로 "증권"/"산업"인 기사.
-  - "전체"(지면 1면): `<paper><editingInfo><paperNumber>`가 "1"인
-    기사 — 실제 인쇄판 1면에 배치된 기사 그대로다(추정 아님).
-    **다만 이건 daily-xml 파일 날짜와 다른 기준이 필요하다** — 처음엔
-    "그날 파일 안에서 paperNumber=='1' 찾기"로 만들었는데, 실제
-    구조를 다시 보니 신문은 전날 저녁 마감이라 어제 웹에 게재된
-    기사가 오늘 아침 지면 1면에 실린다. `<paper><publishInfo><date>`
-    필드가 "이 기사가 실릴 지면의 실제 발행일"을 따로 갖고 있어서
-    (예: 8/20 게재 기사인데 publishInfo/date는 20260821), daily-xml
-    파일 자체의 날짜가 아니라 이 필드로 걸러야 한다. 검증: 2026-08-20
-    daily-xml에서 publishInfo/date=="20260821" & paperNumber=="1"인
-    기사 5건이, 이 세션에서 사용자가 실제로 골랐던 4건(호남반도체·
-    가계대출·GV90·트럼프北핵)과 정확히 일치했다. 그래서 "전체"는
-    지면 날짜(D) 기준으로 D와 D-1(전날, 대부분 여기서 나옴) 두 파일을
-    같이 훑는다.
+분류 기준
+  - 시그널: category 태그 중 하나라도 "Signal"이거나 제목에 "마켓시그널"/
+    "[시그널]"이 있는 기사. top_category만 보면 누락이 많다(`_is_market_signal()` 참조).
+  - 증권/산업: 시그널이 아니면서 최상위 category가 "증권"/"산업"인 기사.
+  - 전체(지면 1면): `<paper><editingInfo><paperNumber>`가 "1"이고
+    `<paper><publishInfo><date>`가 지면 날짜와 일치하는 기사. 신문은 전날
+    저녁 마감이라 웹 게재일과 지면 발행일이 다르므로, 지면 날짜 D와 D-1
+    두 파일을 함께 탐색한다.
 """
 import argparse
 import html
@@ -60,27 +35,17 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _strip_html(raw: str) -> str:
-    # 2026-09-03 — 태그를 빈 문자열로 지웠더니 원문의 <br/>(부제 줄바꿈 등)
-    # 자리에 아무 구분자도 안 남아 앞뒤 문장이 그대로 붙어버렸다("...수요
-    # 확보<br/>하이닉스 자금..." → "...수요 확보하이닉스 자금...").
-    # 메타디스크립션 감사에서 lens/video/letters 세 채널 전부의 context가
-    # 이 형태로 깨져 있는 걸 발견 — sub_title이 이 함수를 거쳐 저장되고
-    # service/backend/services/cms_posts_shaping.py:220의 context가 그
-    # sub_title을 그대로 쓴다. 태그를 공백으로 바꾸고 공백을 하나로
-    # 접으면 어떤 태그가 구분자였든 최소한 단어가 붙는 사고는 안 난다.
+    # 태그를 공백으로 치환해 <br/> 등 구분자 자리의 앞뒤 단어가 붙지 않게 한다.
+    # sub_title이 이 함수를 거쳐 저장되고 cms_posts_shaping의 context로 쓰인다.
     text = _TAG_RE.sub(" ", raw or "")
     text = html.unescape(text)
     return _WHITESPACE_RE.sub(" ", text).strip()
 
 
 def _is_market_signal(title: str, categories: list[str]) -> bool:
-    """"마켓시그널" 코너 판정 — top_category(XML에 가장 먼저 나온 카테고리
-    태그 하나만 봄)만으로는 놓치는 기사가 있다(2026-09-28 확인, 10일
-    표본에서 실제 마켓시그널 코너 58건 중 40%가 top_category=="Signal"이
-    아니었음 — top_category가 "증권"으로 먼저 잡히는 같은 버그 패턴).
-    category 태그 전체 목록과 제목 표시("마켓시그널"/"[시그널]")를 같이
-    본다 — 10일 표본 전수 확인 결과 제목에 "시그널" 단어가 들어간 56건이
-    전부 이 두 패턴 중 하나로 잡혔다(오탐·누락 없음)."""
+    """"마켓시그널" 코너 판정. top_category(XML 첫 카테고리 태그)만 보면
+    누락이 많아(10일 표본 58건 중 약 40%) category 태그 전체 목록과 제목
+    표시("마켓시그널"/"[시그널]")를 함께 본다."""
     if any((c or "").split(",")[0] == "Signal" for c in categories):
         return True
     title = title or ""
@@ -89,10 +54,8 @@ def _is_market_signal(title: str, categories: list[str]) -> bool:
 
 def _s3_client(profile: str | None):
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
-    # discovery/는 common/의 어느 것도 안 쓰는 게 문서화된 설계(admin
-    # 프롬프트·Bedrock을 안 건드리는 사전 생성 단계) — common/config.py를
-    # 새로 의존하는 대신 같은 os.environ.get 패턴만 여기서 직접 씀
-    # (2026-08-23 코드 리팩토링 감사).
+    # discovery/는 common/에 의존하지 않는 독립 단계이므로 config.py 대신
+    # 같은 환경변수 패턴을 직접 쓴다.
     return session.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 
 
@@ -111,25 +74,10 @@ def _parse_item(item: ET.Element) -> dict | None:
         return None
     cats = item.findall("category")
     top_category = cats[0].attrib.get("name", "").split(",")[0] if cats else ""
-    # 기사 하나에 category 태그가 여러 개 붙는 경우가 흔하다(예: 삼성전자
-    # 주주환원 기사가 "경제,사회,금융,증권,산업,국제" 6개를 동시에 달고
-    # 있는데 top_category는 그중 XML에 가장 먼저 나온 "경제" 하나만 본다).
-    # 2026-08-23 — mustknow_auto/frontpage_auto가 category(사이트 6개
-    # 경제 카테고리 라벨) 표시에 top_category만 쓰다 보니, 실제로는
-    # "증권"·"산업" 태그를 갖고 있는 기사인데도 첫 태그가 "경제"/"정치"
-    # 라서 카테고리 없이 발행되는 버그를 발견(사용자가 /archive에서
-    # "4가지 시선"이라는 가짜 카테고리로 뜨는 걸 지적). top_category는
-    # 지면특별코너 4탭 선정(증권/산업/시그널 매칭)이 이미 이 값 기준으로
-    # 검증된 로직이라 그대로 두고, 표시용으로만 전체 카테고리 태그를
-    # 별도 필드에 담아 호출부가 그중 사이트 카테고리와 일치하는 걸
-    # 골라 쓰게 한다.
-    # 2026-09-11 — 예전엔 여기서도 .split(",")[0]로 최상위 세그먼트만
-    # 남겼는데, "재테크"(사이트 nav 7번째 탭)는 daily-xml 전수조사 결과
-    # 최상위 카테고리 16개(증권/부동산/산업/금융/국제/문화·라이프/경제/
-    # 사회/정치/IT·과학/Signal/블록체인/스포츠/연예/오피니언/피플) 중에
-    # 아예 없다 — 대신 "산업,투자·재무,투자·재무"처럼 하위 세그먼트에만
-    # 있다. 그래서 전체 태그 문자열(콤마 포함)을 그대로 넘기고,
-    # display_category()가 하위 세그먼트까지 검사한다.
+    # 기사 하나에 category 태그가 여러 개 붙는 경우가 흔해 top_category(첫 태그의
+    # 최상위 세그먼트)는 지면특별코너 선정용으로만 쓴다. 표시용 카테고리는
+    # 전체 태그 문자열을 그대로 넘기고 display_category()가 하위 세그먼트까지
+    # 검사한다("재테크"는 최상위가 아니라 하위 세그먼트로만 존재).
     categories = [c.attrib.get("name", "") for c in cats]
     is_market_signal = _is_market_signal(title_el.text.strip(), categories)
     content_el = item.find("content")
@@ -152,28 +100,21 @@ def _parse_item(item: ET.Element) -> dict | None:
 
     return {
         "nsid": (item.find("nsid").text or "").strip() if item.find("nsid") is not None else "",
-        # `key`는 sedaily.com/article/{key} URL에 그대로 쓰이는 공개
-        # 기사 번호(nsid와 다름 — nsid는 내부 영숫자 코드). 발행 후
-        # 중복 방지 체크는 이 값으로 해야 한다 — `url`에는 종종
-        # `?ref=sedailyEng` 같은 쿼리스트링이 붙어서 문자열 완전일치로
-        # 비교하면 같은 기사인데도 다르다고 잘못 판단한다.
+        # `key`는 sedaily.com/article/{key}의 공개 기사 번호로 nsid와 다르다.
+        # `url`에는 `?ref=` 같은 쿼리스트링이 붙어 중복 방지 비교에 쓸 수 없다.
         "key": (item.find("key").text or "").strip() if item.find("key") is not None else "",
         "title": title_el.text.strip(),
         "sub_title": _strip_html(sub_title_el.text or "") if sub_title_el is not None else "",
         "top_category": top_category,
         "categories": categories,
         "is_market_signal": is_market_signal,
-        # 4포맷 파이프라인(letters 등)에 그대로 넘길 원문 — discovery는
-        # "분류"만 한다는 원칙은 유지하되, 후속 자동 발행 단계가 다시
-        # 원문을 가져올 필요 없도록 여기서 한 번에 담아둔다.
+        # 후속 4포맷 파이프라인에 그대로 넘길 원문.
         "content": content_text,
         "content_len": len(content_text),
         "has_photo": image_el is not None,
         "photo_url": image_el.attrib.get("href") if image_el is not None else None,
-        # 영상 포맷의 photo 컷(2026-09-03, 기자 피드백 "원문 사진이 들어가면
-        # 좋겠다")이 캡션까지 참고할 수 있도록 같이 담아둔다 — clients/
-        # s3_xml_client.py의 _parse_image()와 같은 속성명(caption_title/
-        # caption_content). 둘 다 비어있을 수 있어 빈 문자열로 폴백.
+        # 영상 photo 컷이 캡션을 참고할 수 있게 함께 담는다(s3_xml_client._parse_image()와
+        # 같은 속성명). 둘 다 비면 None.
         "photo_caption": (
             (image_el.attrib.get("caption_title", "") + " " + image_el.attrib.get("caption_content", "")).strip()
             if image_el is not None else None

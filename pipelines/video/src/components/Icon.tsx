@@ -60,5 +60,3 @@ export const Icon: React.FC<{
   const Component = ICON_MAP[name] ?? HelpCircle;
   return <Component size={size} color={color} strokeWidth={strokeWidth} />;
 };
-
-export const hasIcon = (name: string): boolean => name in ICON_MAP;

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""웹툰·영상 없이 발행된 글(생성 실패 후 그대로 발행)에 빠진 포맷만 다시 만들어 채운다 — 2026-10-02.
+"""웹툰·영상 없이 발행된 글(생성 실패 후 그대로 발행)에 빠진 포맷만 다시 만들어 채운다.
 
-배경: 2026-10-01 12:04 KST 실행의 첫 글(국고채 3년물)이 프롬프트 로드 시간 초과로 웹툰 없이(영상도 없이) 발행됐다.
-이 스크립트는 원문 기사를 다시 찾아 빠진 포맷(웹툰·영상)만 생성·업로드하고, 글의 나머지(레터·팟캐스트 등)는 건드리지 않는다.
+원문 기사를 다시 찾아 빠진 포맷(웹툰·영상)만 생성·업로드하고, 글의 나머지(레터·팟캐스트 등)는 건드리지 않는다.
 
 사용(pipelines/ 에서):
   python3 scripts/repair_missing_formats.py <source_url>                     # 어떤 포맷이 빠졌는지만 확인(생성·저장 없음)
@@ -33,7 +32,7 @@ import publish_utils as pu  # noqa: E402
 
 APPLY = "--apply" in sys.argv
 ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
-REDO = "--redo" in sys.argv  # 웹툰이 이미 있어도 다시 만든다(2026-10-02, 프롬프트 v34·웹툰식 말풍선 재생성용)
+REDO = "--redo" in sys.argv  # 웹툰이 이미 있어도 현재 설정으로 다시 만든다
 BACKUP_DIR = HERE / "repair_backup"
 LOG = "mustknow-auto"  # 원래 파이프라인과 같은 S3 경로 접두어
 
@@ -89,12 +88,12 @@ def _make_webtoon(article: dict, article_path: Path, out_dir: Path, upload) -> d
         bullets.append(caption)
         webp = cut_path.with_suffix(".webp")
         Image.open(cut_path).convert("RGB").save(webp, "WEBP", quality=90, method=6)
-        flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}  # 나레이션을 그림에 굽지 않은 컷(2026-10-04)
+        flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}  # 나레이션을 그림에 굽지 않은 컷
         images.append({"url": upload(webp, f"media/{LOG}/{name}-webtoon-cut{n:03d}.webp"), "caption": caption, **flag})
     if len(images) < min_cuts:
         print(f"   웹툰 컷 {len(images)}/{len(script['cuts'])}개만 성공(최소 {min_cuts}) — 저장 안 함")
         return None
-    # 핵심 정리 카드(컷9) — 웹툰식 말풍선 모드에서 파이프라인이 만들었으면 덧붙인다(최소 컷 수 판정에는 포함하지 않음)
+    # 핵심 정리 카드(컷9)는 파이프라인이 만들었을 때만 덧붙이며 최소 컷 수 판정에는 포함하지 않는다.
     card = out_dir / name / "컷9.png"
     if card.exists():
         webp = card.with_suffix(".webp")
@@ -106,7 +105,7 @@ def _make_webtoon(article: dict, article_path: Path, out_dir: Path, upload) -> d
 def _make_video(article: dict, article_path: Path, out_dir: Path, upload) -> dict | None:
     name = article["key"]
     video = None
-    # 각본 생성 결과가 렌더 전 스키마 검증(예: 자막 text가 빈 문자열)에 걸리는 경우가 가끔 있어, 각본부터 다시 만들어 최대 3번 시도한다.
+    # 각본이 렌더 전 스키마 검증(예: 빈 자막 text)에 걸리는 경우가 있어 각본부터 최대 3번 재시도한다.
     for attempt in range(1, 4):
         video = pu.generate_video(
             name, article_path, out_dir, photo_url=article.get("photo_url"),
@@ -129,8 +128,8 @@ def _make_video(article: dict, article_path: Path, out_dir: Path, upload) -> dic
 
 
 def _kst_ymd(ts: str) -> str:
-    """발행 시각(ISO, UTC일 수 있음)을 KST 날짜(YYYYMMDD)로 — 원문 후보 파일(daily-xml)은 KST 게재일 기준이다.
-    UTC 날짜를 그대로 쓰면 00~09시 KST 발행분이 하루 전 날짜로 계산돼 원문을 못 찾는다(2026-10-02 확인)."""
+    """발행 시각(ISO, UTC일 수 있음)을 KST 날짜(YYYYMMDD)로 변환한다. daily-xml은 KST 게재일 기준이라
+    UTC 날짜를 쓰면 00~09시 KST 발행분의 원문을 못 찾는다."""
     from datetime import datetime, timedelta, timezone
 
     dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -186,7 +185,7 @@ def main():
             payload = {"channels": ["lens"]}
             if new_wt:
                 t = _lens(new_body, "웹툰")
-                t["images"], t["bullets"] = new_wt["images"], new_wt["bullets"]  # (카드가 있으면 images가 bullets보다 한 장 많다)
+                t["images"], t["bullets"] = new_wt["images"], new_wt["bullets"]  # 카드가 있으면 images가 bullets보다 한 장 많다
                 if new_wt.get("question"):
                     t["question"] = new_wt["question"]
                 t["pending"] = False

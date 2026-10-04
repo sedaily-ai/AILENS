@@ -1,22 +1,9 @@
-"""
-뉴스 웹툰 파이프라인 — 텍스트 합성(말풍선/캡션/내레이션)
-=====================================
-2026-08-23 — OpenAI 크레딧 소진으로 3단계 이미지 생성이 막힌 김에, Bedrock
-이미지 모델(Nova Canvas, Stable Image Core, SD3.5 Large 전부 테스트함)로
-전환을 검토했는데, 셋 다 확산 모델 계열이라 프롬프트로 요청한 한글 텍스트를
-그림 안에 정확히 못 그린다(실측: "가계대출 규제 강화"를 요청했더니 의미
-없는 한글 비슷한 글자만 나옴 — Nova Canvas·SD3.5 둘 다 동일 증상). GPT의
-image_generation 툴은 이걸 잘 하길래 웹툰에 써왔던 것.
+"""뉴스 웹툰 파이프라인 — 텍스트 합성(말풍선·캡션·내레이션·제목).
 
-그래서 구조를 바꿨다 — Bedrock 이미지 모델에는 "텍스트 없는 배경 그림"만
-맡기고(스타일·장면 지침만 프롬프트에 넣고 말풍선/캡션/내레이션 지침은 아예
-안 줌), 말풍선/캡션/내레이션은 이 파일이 PIL로 직접 그려서 배경 위에
-합성한다. 이러면 텍스트가 100% 정확하다는 게 보장된다(모델이 그림 vs 코드가
-그림의 차이). 대신 GPT가 하던 "말풍선 꼬리가 정확히 화자 입을 가리키는"
-정교한 배치는 못 한다 — 1·2단계 JSON에 화자 위치(x/y) 데이터가 없어서
-(원래 이미지 모델이 그림을 보면서 알아서 배치했음), 여기서는 화자 순서대로
-상단에 좌→우로 펼쳐 놓는 단순한 레이아웃으로 타협했다. GPT 경로로 되돌리면
-이 타협 없이 원래 방식 그대로 쓸 수 있다(pipeline.py의 IMAGE_PROVIDER 참고).
+확산 계열 이미지 모델은 프롬프트로 요청한 한글을 정확히 그리지 못한다. 모델에는 텍스트 없는
+배경 그림만 맡기고, 말풍선·캡션·내레이션·제목은 이 파일이 PIL로 배경 위에 직접 합성한다.
+스크립트 JSON에는 화자 위치(x/y)가 없으므로 말풍선은 화자(A/B)·균등 분할 기준으로 배치하고,
+사람·얼굴 위치(detect)가 주어지면 그에 맞춰 자리와 꼬리 끝을 계획한다.
 """
 import math
 import re
@@ -34,20 +21,18 @@ _PADDING = 22
 _LINE_SPACING = 10
 _MAX_BUBBLE_WIDTH_RATIO = 0.42  # 이미지 너비의 42%를 넘기지 않고 줄바꿈
 
-# 2026-09-08 — 상단 제목/컷8 마무리 자막용 짙은 남색. STYLE(webtoon_image.py)의
-# "navy blue, sky blue, red" 강조색 팔레트와 맞춘다.
+# 상단 제목·컷8 마무리 자막용 짙은 남색. STYLE(webtoon_image.py)의 강조색 팔레트
+# (navy blue, sky blue, red)와 맞춘다.
 _NAVY_FILL = (26, 41, 74)
 _NAVY_TEXT_FILL = (255, 255, 255)
-# 2026-09-08(2차) — 참고 이미지(사용자가 카카오톡으로 공유한 "기존 톤앤매너"
-# 샘플, 육하원칙 프롬프트 문서 §13 색상표와 동일) 대조 후 추가 — 컷별 제목
-# 색상이 짙은 빨강/짙은 남색을 번갈아 쓴다.
+# 컷별 제목 색상은 짙은 빨강과 짙은 남색을 번갈아 쓴다.
 _RED_FILL = (178, 34, 42)
 _RED_TEXT_FILL = (255, 255, 255)
 _HEADLINE_FILL = (255, 255, 255)
 _HEADLINE_TEXT_FILL = (20, 20, 20)
 
-# 컷 번호 → 제목 알약 색상. §13 디자인 규격 표 그대로(1은 별도 표지 처리라
-# 여기 없음). 정의 안 된 컷 번호는 빨강으로 폴백.
+# 컷 번호 → 제목 알약 색상(웹툰 프롬프트 §13 디자인 규격). 컷1은 표지 헤더로 따로 그리므로
+# 없고, 정의되지 않은 컷 번호는 빨강으로 폴백한다.
 _TITLE_COLOR_BY_CUT = {2: _RED_FILL, 3: _RED_FILL, 4: _NAVY_FILL, 5: _RED_FILL, 6: _NAVY_FILL, 7: _RED_FILL, 8: _RED_FILL}
 
 
@@ -58,9 +43,9 @@ def title_fill_for_cut(cut_number: int | None) -> tuple[int, int, int]:
     return _TITLE_COLOR_BY_CUT.get(cut_number, _RED_FILL)
 
 
-# 고해상도 합성(2026-10-01) — 배경 그림은 모델 출력(1216x832)이 한계라 레티나 화면(약 1840px 필요)에서 흐려 보인다.
-# 그림은 Lanczos로 키우되, 눈에 가장 거슬리는 글자·말풍선은 키운 캔버스 위에서 처음부터 큰 글자로 다시 그려 선명하게 한다.
-# 이 파일의 모든 레이아웃 수치(px)는 1216 기준이라 한 배율(_SCALE)로 함께 키운다 — 배율 1.0이면 예전 출력과 완전히 같다.
+# 고해상도 합성: 배경 그림은 모델 출력(1216x832)이 한계라 레티나 화면(약 1840px 필요)에서 흐려 보인다.
+# 그림은 Lanczos로 키우고, 글자·말풍선은 키운 캔버스 위에서 처음부터 큰 글자로 다시 그려 선명하게 한다.
+# 모든 레이아웃 수치(px)는 1216 기준이며 한 배율(_SCALE)로 함께 키운다. 배율 1.0이면 확대 전 출력과 같다.
 _SCALE = 1.0
 OUTPUT_SCALE = 1.5  # run_article이 쓰는 기본 배율(1216 -> 1824px)
 
@@ -81,12 +66,7 @@ def _font(size: int) -> ImageFont.FreeTypeFont:
 
 def _font_regular(size: int):
     """보통 굵기(약 420) 글꼴 — 네이버 웹툰식 대사. 가변 글꼴을 못 읽으면 기본(굵은) 글꼴로 되돌아간다."""
-    try:
-        f = ImageFont.truetype(str(_REGULAR_FONT_PATH), int(round(size * _SCALE)))
-        f.set_variation_by_axes([430])
-        return f
-    except Exception:  # noqa: BLE001
-        return _font(size)
+    return _font_w(size, 430)
 
 
 def _oval_dims(block_w: float, block_h: float) -> tuple[float, float]:
@@ -148,8 +128,6 @@ def make_summary_card(out_path, headline: str, items: list[dict], scale: float =
         d.text((px0 + _k(18), py0 + _k(7)), label, font=pill_f, fill=(255, 255, 255))
         title_f = _font_w(40, 700)
         head = (headline or "").strip().replace("\n", " ")
-        for ln in _wrap_text(d, head, title_f, int(W - _k(140)))[:2]:
-            pass
         lines = _wrap_text(d, head, title_f, int(W - _k(140)))[:2]
         ty = py0 + _k(78)
         for ln in lines:
@@ -175,17 +153,11 @@ def make_summary_card(out_path, headline: str, items: list[dict], scale: float =
 
 
 def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
-    """공백 기준으로 줄바꿈. 한글은 공백 없이 길게 이어지는 경우가 많아서,
-    한 "단어"(공백으로 나눈 조각)가 그 자체로 max_width를 넘으면 글자 단위로도
-    쪼갠다.
+    """공백 기준으로 줄바꿈한다. 공백 없이 길게 이어진 "단어"가 max_width를 넘으면 글자 단위로도 쪼갠다.
 
-    2026-09-20 — 스크립트 단일 호출 전환(정리후보 A/pipeline.py) 이후
-    headline 필드가 "韓·佛, 영상산업\n5년·8000억 투자 선언"처럼 줄바꿈을
-    포함해서 오는 걸 확인(컷1 표지). PIL의 draw.textlength()는 개행이
-    섞인 문자열을 주면 "can't measure length of multiline text"로 바로
-    예외를 던져서 컷1 텍스트 합성 전체가 실패했다 — 어차피 이 함수 자체가
-    폭에 맞춰 줄바꿈을 다시 계산하는 게 일이라, 호출자가 준 개행은 신뢰하지
-    않고 공백으로 합친 뒤 새로 감아준다."""
+    headline 필드에 개행이 섞여 오는 경우가 있고, PIL의 draw.textlength()는 개행이 포함된 문자열에
+    예외("can't measure length of multiline text")를 던진다. 그래서 호출자가 준 개행은 무시하고
+    공백으로 합친 뒤 폭에 맞춰 다시 줄바꿈한다."""
     text = text.replace("\n", " ")
     words = text.split(" ")
     lines: list[str] = []
@@ -224,9 +196,9 @@ _BUBBLE_STYLE = "classic"  # "oval" = 네이버 웹툰식(타원·얇은 선·�
 _REGULAR_FONT_PATH = Path(__file__).parent / "assets" / "PretendardVariable.ttf"
 _MARGIN_RATIO = 0.30  # 말풍선 여백 높이(그림 높이 대비)
 _SPECIAL_TONES = ("격앙", "속삭임", "생각")
-_TAIL_MAX_RATIO = 0.15  # 꼬리 길이 상한 = 이미지 높이의 15%(QA 요청서 1번)
+_TAIL_MAX_RATIO = 0.15  # 꼬리 길이 상한 = 이미지 높이의 15%
 _TAIL_TARGET_Y_RATIO = 0.50  # 화자 인물 중심 높이(대략 화면 가운데)
-_BUBBLE_CHARS_PER_LINE = 12  # 말풍선 한 줄 목표 글자 수(QA 요청서 4번)
+_BUBBLE_CHARS_PER_LINE = 12  # 말풍선 한 줄 목표 글자 수
 
 
 def _tail_geometry(x0, y1, x1, tail_x, target, img_h, exact=False, y0=None):
@@ -288,45 +260,6 @@ def _bubble_lines(draw, text, font, max_width):
         if all(ln and draw.textlength(ln, font=font) <= max_width for ln in lines):
             return lines
     return _wrap_text(draw, text, font, max_width)
-
-
-def _rounded_bubble_path(draw, x0, y0, x1, y1, tail_x, radius=26, tail_pts=None):
-    radius = _k(radius)
-    """부드러운 타원형 말풍선(보통 톤) — 둥근 사각형 + 하단 중앙에서 아래로
-    뻗는 삼각 꼬리."""
-    draw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH)
-    draw.polygon(
-        tail_pts or [(tail_x - _k(16), y1 - _k(4)), (tail_x + _k(16), y1 - _k(4)), (tail_x, y1 + _k(26))],
-        fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH,
-    )
-    # 꼬리와 몸통 이음새의 겹친 외곽선을 지운다
-    draw.line([(tail_x - _k(14), y1 - _k(2)), (tail_x + _k(14), y1 - _k(2))], fill=_BUBBLE_FILL, width=_OUTLINE_WIDTH + _w(2))
-
-
-def _spiky_bubble_path(draw, x0, y0, x1, y1, tail_x, spikes=14, inflate=1.3, tail_pts=None):
-    """격앙 톤 — 폭발형(삐죽삐죽) 말풍선.
-
-    2026-09-08 버그 수정: x0..x1/y0..y1은 텍스트를 감싸도록 계산된
-    사각형인데, 예전엔 그 사각형에 내접하는 타원으로 폭발 꼭짓점을
-    그렸다 — 타원은 사각형 모서리 쪽에서 안으로 파고들기 때문에 텍스트
-    가로 폭이 넓은(1~2줄) 말풍선에서 좌우 글자가 삐죽삐죽한 테두리에
-    잘리는 게 실제로 확인됐다(격앙 톤 스모크 테스트, "실제로 입주까지
-    이어질까요?"). inflate로 반지름을 텍스트 사각형보다 30% 키워서
-    타원이 사각형을 완전히 감싸게 한다 — 격앙 말풍선이 보통보다 조금
-    크게 보이는 건 오히려 published.md의 "격앙 말풍선은 보통보다 조금
-    크게 표현" 규칙과도 맞다."""
-    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-    rx, ry = (x1 - x0) / 2 * inflate, (y1 - y0) / 2 * inflate
-    points = []
-    for i in range(spikes * 2):
-        angle = math.pi * 2 * i / (spikes * 2)
-        r_scale = 1.0 if i % 2 == 0 else 0.82
-        points.append((cx + math.cos(angle) * rx * r_scale, cy + math.sin(angle) * ry * r_scale))
-    draw.polygon(points, fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH)
-    draw.polygon(
-        tail_pts or [(tail_x - _k(16), y1 - _k(4)), (tail_x + _k(16), y1 - _k(4)), (tail_x, y1 + _k(26))],
-        fill=_BUBBLE_FILL, outline=_BUBBLE_OUTLINE, width=_OUTLINE_WIDTH,
-    )
 
 
 def _rr_points(x0, y0, x1, y1, radius, step=18.0, jitter=0.0, seed=0):
@@ -471,7 +404,7 @@ def _ellipse_tail(cx, cy, a, b, target, img_h, max_ratio=0.16):
     return [base1, base2, tip], seam
 
 
-def _oval_bubble(draw, x0, y0, x1, y1, target, img_w, img_h):
+def _oval_bubble(draw, x0, y0, x1, y1, target, img_h):
     """네이버 웹툰식 말풍선 — 얇은 검은 선의 흰 타원 + 화자 쪽으로 짧고 뾰족한 꼬리."""
     ow = _w(2)
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -484,7 +417,10 @@ def _oval_bubble(draw, x0, y0, x1, y1, target, img_w, img_h):
 
 
 def _spiky_with_tail(draw, x0, y0, x1, y1, target, img_h, spikes=14, inflate=1.3):
-    """격앙 — 삐죽한 폭발형 풍선. 꼬리는 사각형이 아니라 실제 폭발 테두리(평균 반지름)에서 나가고 이음새를 지운다."""
+    """격앙 — 삐죽한 폭발형 풍선. 꼬리는 사각형이 아니라 실제 폭발 테두리(평균 반지름)에서 나가고 이음새를 지운다.
+
+    inflate는 폭발 꼭짓점의 반지름을 글자 사각형보다 키우는 배율이다. 내접 타원으로 그리면 사각형
+    모서리 쪽에서 안으로 파고들어 가로로 긴 대사의 좌우 글자가 테두리에 잘린다."""
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     rx, ry = (x1 - x0) / 2 * inflate, (y1 - y0) / 2 * inflate
     tail = _ellipse_tail(cx, cy, rx * 0.88, ry * 0.88, target, img_h)
@@ -531,7 +467,7 @@ def _draw_bubble(img: Image.Image, text: str, tone: str, anchor_x: int, top_y: i
         })
     seed = sum(ord(c) for c in text)
     if oval:
-        _oval_bubble(draw, x0, y0, x1, y1, target, img.width, img.height)
+        _oval_bubble(draw, x0, y0, x1, y1, target, img.height)
     elif tone == "격앙":
         _spiky_with_tail(draw, x0, y0, x1, y1, target, img.height)
     elif tone == "속삭임":
@@ -702,44 +638,16 @@ def _plan_with_people(img, dialogue, detect, min_top_y, max_bottom=0.85):
 
 
 def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | None = None, min_top_y: float | None = None, detect: dict | None = None, max_bottom: float = 0.85):
-    """dialogue = [{"speaker":..., "line":..., "tone":"보통"|"격앙"}, ...]
+    """dialogue = [{"speaker":..., "line":..., "tone":"보통"|"격앙"|"속삭임"|"생각"}, ...]
 
-    2026-09-28 — 호출부(webtoon_image.py::generate_cut_image())가
-    Rekognition 얼굴 감지를 완전히 제거해서 `faces`는 이제 항상 None이다
-    (사용자 결정: "리코그니션 자체를 안 사용하기로 했고 삭제했어요").
-    즉 아래 `use_faces` 분기는 사실상 항상 폴백(균등 분할)으로만 동작한다.
-    파라미터·로직은 남겨뒀다 — 균등분할 자체가 그 폴백 경로라 별도
-    분기 제거가 불필요했다. 아래는 그 기능이 있던 시절의 설계 기록.
+    faces는 항상 None으로 호출된다(얼굴 감지 제거). use_faces 분기는 faces가 대사 수와 같은 길이일
+    때만 켜지며, 현재는 균등 분할 폴백만 동작한다. faces가 주어지면 각 얼굴의 가로 중심에 앵커하고
+    세로는 얼굴 상단 위로 올린다(left/top/width/height, 0~1 정규화).
 
-    min_top_y — 2026-09-08(3차) 추가. compose()가 draw_title()/
-    draw_cover_header()의 실제 반환값(제목 알약 하단 y좌표)을 넘긴다.
-    이전엔 "제목 아래 16%"라는 고정 비율로 안전거리를 추측했는데, 제목
-    글자 수가 길어 알약이 예상보다 커지는 컷에서 그 추측이 틀려 말풍선이
-    제목과 겹치는 게 실측(컷6)으로 확인됐다 — 이제 실제 값을 쓴다.
-    None이면(제목이 없는 컷 등) _DEFAULT_BUBBLE_TOP_RATIO로 폴백.
+    min_top_y는 draw_title()/draw_cover_header()가 돌려준 제목 하단 y좌표다. 고정 비율로 추측하면
+    제목이 길어 알약이 커지는 컷에서 말풍선이 제목과 겹친다. None이면 _DEFAULT_BUBBLE_TOP_RATIO를 쓴다.
 
-    2026-09-02 — 원래는 화자 위치 데이터가 없어서(1·2단계 JSON에 x/y 없음)
-    상단에 좌→우로 순서대로 펼쳐 놓는 게 유일한 방법이었다(기자 피드백 —
-    "인물과 연결되지 않은 말풍선이 허공을 가리키는 컷이 있다").
-
-    2026-09-08(얼굴 회피 리팩토링) — pipeline.py가 생성된 배경 이미지를
-    rekognition_client.detect_main_faces()로 훑어 얼굴 바운딩 박스(x/y/폭/높이,
-    0~1 정규화) 목록을 넘겨준다. 개수가 대사 수와 일치하면 각 얼굴의
-    가로 중심에 앵커하고, **세로 위치도 얼굴 상단 바로 위**로 계산한다 —
-    예전(2026-09-02~09-07)엔 얼굴의 x좌표만 있고 y좌표·크기 정보가 아예
-    없어서(당시 Claude 비전 모델이 x좌표만 추정) 세로는 항상 고정된
-    16% 높이였는데, 인물이 클로즈업으로 크게 나오는 컷에서 그 고정
-    높이가 얼굴(특히 이마·눈)을 그대로 덮는 문제가 실제로 있었다.
-    Rekognition은 바운딩 박스 전체를 주므로 이제 얼굴 상단을 알고 그
-    위에 배치할 수 있다.
-
-    개수가 안 맞거나(얼굴 인식 실패, 인물 수 불일치 등) faces가 없으면
-    기존의 균등 분할 폴백(고정 16% 높이)으로 돌아간다.
-
-    폴백 순서는 좌→우가 아니라 우→좌다(published.md "첫 번째 말풍선은
-    화면 오른쪽 화자" 규칙 — dialogue[0]이 그 컷에서 먼저 말하는=오른쪽
-    화자라는 게 스크립트 단계의 계약). rekognition_client.detect_main_faces()도
-    이미 오른쪽부터 정렬해서 반환하므로 같은 순서로 dialogue와 zip된다."""
+    균등 분할 폴백은 우→좌 순서다. 스크립트 단계의 계약상 dialogue[0]이 먼저 말하는 오른쪽 화자다."""
     if not dialogue:
         return
     # 한 컷의 두 대사가 모두 특수 톤(격앙·속삭임·생각)이면 앞 대사만 살리고 뒤는 보통으로 — 프롬프트 규칙을 모델이 어겼을 때의 안전망
@@ -764,27 +672,16 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | No
             anchors_x.append(int(img.width * (n - 0.5 - i) / n))
             tops_y.append(default_top_y)
 
-    # 화자 기준 배치(QA 요청서 1번) — 두 명이 말하고 화자가 A/B면, 인물 배치 계약(A=왼쪽, B=오른쪽)대로
-    # 풍선도 화자 쪽에 둔다. 예전엔 "첫 대사=오른쪽"이라는 순서 규칙만 써서, A가 먼저 말하면 풍선과 꼬리가 엉뚱한 인물을 가리켰다.
+    # 두 명이 말하고 화자가 A/B면 인물 배치 계약(A=왼쪽, B=오른쪽)대로 풍선도 화자 쪽에 둔다.
+    # "첫 대사=오른쪽" 순서 규칙만 쓰면 A가 먼저 말할 때 풍선과 꼬리가 엉뚱한 인물을 가리킨다.
     by_speaker = n == 2 and not use_faces and {d.get("speaker") for d in dialogue} == {"A", "B"}
     if by_speaker:
         anchors_x = [int(img.width * (0.25 if d.get("speaker") == "A" else 0.75)) for d in dialogue]
 
-    # 2026-09-08(2차) — 얼굴 회피를 적용한 뒤 실측(테스트_뤼미에르파트너십_v6)
-    # 으로 발견한 부수 문제: 두 말풍선이 서로 겹쳐 글자가 가려졌다. 처음엔
-    # "앵커 간격이 화면 폭의 50% 미만이면 벌린다"는 고정 비율로 고쳤는데
-    # (v6_face 커밋), 컷4를 여러 번 재현 테스트했지만 재현이 안 됐다 —
-    # _draw_bubble()의 x0 clamp(`max(10, min(img.width-bw-10, ...))`,
-    # 화면 밖으로 안 나가게 하는 안전장치)를 다시 읽고서야 진짜 원인을
-    # 찾았다: 대사가 길어 말풍선이 넓어지면, 앵커 간격은 50% 이상으로
-    # 충분히 벌려놔도 그 넓은 말풍선이 화면 오른쪽 끝에 걸려 clamp가
-    # 안쪽(왼쪽)으로 밀어 넣으면서 결과적으로 두 말풍선이 다시 가까워질
-    # 수 있다 — 앵커만 보는 고정 비율 검사로는 이 경우를 못 잡는다.
-    #
-    # 그래서 실제 텍스트를 미리 측정해 진짜 말풍선 폭(half-width)을 구하고,
-    # (1) 그 폭 기준으로 최소 간격을 계산해 앵커를 벌린 뒤 (2) 벌린 쌍
-    # 전체가 화면 안에 들어가도록 함께 이동시킨다 — 각자 따로 clamp하면
-    # 간격이 도로 좁아지는 문제를 이 순서로 피한다.
+    # 두 말풍선이 겹쳐 글자가 가려지는 것을 막는다. 앵커 간격만 보는 고정 비율 검사는, 긴 대사로 넓어진
+    # 말풍선이 화면 끝에서 안쪽으로 밀리며(_draw_bubble의 x0 clamp) 다시 가까워지는 경우를 놓친다.
+    # 그래서 실제 텍스트로 말풍선 폭(half-width)을 측정해 (1) 그 폭 기준 최소 간격으로 앵커를 벌리고
+    # (2) 벌린 쌍 전체를 화면 안으로 함께 이동한다. 각자 따로 clamp하면 간격이 도로 좁아진다.
     # 꼬리가 가리킬 화자 위치 — 균등분할과 같은 관례(첫 대사=오른쪽 화자). 얼굴이 감지되면 그 얼굴 중심.
     target_y = img.height * _TAIL_TARGET_Y_RATIO
     targets = [(x, target_y) for x in anchors_x]
@@ -823,7 +720,7 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | No
     #   pos  = {"x": 말풍선 가로 중심, "y": 말풍선 윗변}
     #   tail = {"x", "y"}: 꼬리 끝이 닿을 점
     exact = [False] * n
-    # 사람·얼굴 위치(Rekognition)가 있으면 풍선 자리·꼬리를 거기에 맞춰 자동 계획 — 사람이 직접 옮긴 값(pos/tail)이 우선한다
+    # 사람·얼굴 위치(detect)가 있으면 풍선 자리·꼬리를 거기에 맞춰 자동 계획한다. 사람이 직접 옮긴 값(pos/tail)이 우선한다.
     try:
         planned = _plan_with_people(img, dialogue, detect, min_top_y, max_bottom) if detect else None
     except Exception as e:  # noqa: BLE001 — 자리 계산이 어떤 이유로든 실패하면 글자 합성 전체를 잃지 말고 고정 배치로
@@ -863,15 +760,11 @@ def _draw_pill(
     keyword: str | None = None,
     keyword_fill: tuple[int, int, int] | None = None,
 ) -> float:
-    """가로 중앙 정렬된 둥근 사각형("알약") 안에 여러 줄 텍스트를 그리는
-    공용 루틴 — 2026-09-08(3차, 리팩토링) 신설. draw_title/
-    draw_cover_header/draw_closing_caption 세 함수가 전부 "텍스트 측정
-    → 알약 그리기 → 줄마다 중앙 정렬"을 각자 반복하고 있던 걸 추출했다.
+    """가로 중앙 정렬된 둥근 사각형("알약") 안에 여러 줄 텍스트를 그리는 공용 루틴.
+    draw_title/draw_cover_header/draw_closing_caption이 공유한다.
 
-    keyword가 주어지면 그 부분 문자열만 keyword_fill로 강조한다
-    (draw_cover_header의 헤드라인 박스 전용 기능). 반환값은 알약 하단
-    y좌표 — draw_cover_header가 그 아래에 헤드라인 박스를 이어 붙일 때
-    쓴다."""
+    keyword가 주어지면 그 부분 문자열만 keyword_fill로 강조한다(헤드라인 박스 전용).
+    반환값은 알약 하단 y좌표이며, draw_cover_header가 그 아래에 헤드라인 박스를 이어 붙일 때 쓴다."""
     draw = ImageDraw.Draw(img)
     if not lines:
         return y0
@@ -902,22 +795,12 @@ def _draw_pill(
 
 
 def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_FILL) -> float:
-    """상단 제목 알약형 라벨 — 2026-09-08 신설(육하원칙 기반 웹툰 프롬프트
-    문서 검토 후 도입). 기존 draw_caption(좌하단 수치용)·draw_narration
-    (하단 다큐 타이틀 카드)과 역할이 다르다 — 모든 컷 상단에 고정 배치돼
-    "제목만 순서대로 읽어도 이야기 흐름이 드러나야 한다"(published.md
-    "상단 제목" 절)를 담당한다. 한 줄(12자 이내 규칙)을 전제로 폭을
-    넉넉히 잡는다 — 넘치면 줄바꿈되지만 자간이 빡빡해질 뿐 잘리지 않는다.
+    """상단 제목 알약형 라벨. 모든 컷 상단에 고정 배치돼 "제목만 순서대로 읽어도 이야기 흐름이
+    드러나야 한다"(published.md "상단 제목" 절)를 담당한다. 한 줄(12자 이내 규칙)을 전제로 폭을
+    넉넉히 잡으며, 넘치면 줄바꿈될 뿐 잘리지 않는다.
 
-    fill — 2026-09-08(2차, 참고 이미지 대조 후) 컷별 색상 파라미터화.
-    compose()가 title_fill_for_cut()으로 계산한 색을 넘긴다(§13 색상표).
-
-    반환값(제목 알약 하단 y좌표) — 2026-09-08(3차) 추가. 예전엔 이 값을
-    버리고 draw_dialogue()가 "제목 아래 16% 지점"이라는 고정 비율로
-    안전거리를 추측했는데, 제목 글자 수가 길어 알약이 커지는 컷(예:
-    "영진위·MPA도 한팀")에서 그 추측이 실제 알약 하단보다 높아 말풍선이
-    제목과 겹치는 게 실측(테스트_뤼미에르파트너십_v6, 컷6)으로 확인됐다.
-    이제 compose()가 이 실제 값을 받아 draw_dialogue()에 넘긴다."""
+    fill은 컷별 색상이며 compose()가 title_fill_for_cut()으로 계산해 넘긴다.
+    반환값(알약 하단 y좌표)은 draw_dialogue()가 말풍선 시작 위치를 정하는 데 쓴다."""
     draw = ImageDraw.Draw(img)
     font = _font(30)
     lines = _wrap_text(draw, text, font, int(img.width * 0.6))
@@ -925,18 +808,12 @@ def draw_title(img: Image.Image, text: str, fill: tuple[int, int, int] = _NAVY_F
 
 
 def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str | None = None) -> float:
-    """컷1 전용 표지 헤더 — 2026-09-08 신설. 사용자가 공유한 참고 샘플과
-    육하원칙 프롬프트 문서 §13 "컷1 표지" 규격을 그대로 따른다:
-    (1) 화면 최상단에 작은 짙은 남색 알약형 브랜드 라벨("서울경제 웹툰"),
-    (2) 그 아래 큼직한 흰색 둥근 헤드라인 박스 — 검은 굵은 글씨, keyword가
-    headline 안에서 발견되면 그 부분만 짙은 빨간색으로 강조.
+    """컷1 전용 표지 헤더(웹툰 프롬프트 §13 "컷1 표지" 규격).
+    (1) 화면 최상단의 작은 짙은 남색 알약형 브랜드 라벨("서울경제 웹툰"),
+    (2) 그 아래 큼직한 흰색 둥근 헤드라인 박스(검은 굵은 글씨, keyword는 짙은 빨강으로 강조).
 
-    draw_title()과 별개 함수인 이유: draw_title()은 컷2~8의 작은 단색
-    알약(§13 "컷2~8 상단 제목")이고, 이건 컷1 전용 2단 구성이라 레이아웃과
-    강조색 처리 로직 자체가 다르다 — compose()가 cut==1일 때만 이걸 부른다.
-
-    반환값(헤드라인 박스 하단 y좌표) — draw_title()과 같은 이유(2026-09-08
-    3차, 제목-말풍선 충돌 수정)로 추가."""
+    컷2~8의 단색 알약(draw_title)과 레이아웃·강조 처리가 달라 별도 함수로 둔다.
+    반환값은 헤드라인 박스 하단 y좌표이며 draw_title()과 같은 용도로 쓴다."""
     draw = ImageDraw.Draw(img)
 
     brand_font = _font(24)
@@ -953,21 +830,13 @@ def draw_cover_header(img: Image.Image, brand: str, headline: str, keyword: str 
 
 
 def draw_closing_caption(img: Image.Image, text: str) -> int | None:
-    """컷8 전용 마무리 자막 — 2026-09-08 신설. 화면 하단 짙은 남색 둥근
-    바 + 흰 굵은 글씨. draw_narration(하단 1/3 어두운 스크림 + 다큐
-    타이틀)과 시각적으로 겹치므로, 컷8은 narration 대신 이걸 쓴다
-    (compose() 참고 — 같은 컷에 둘 다 그리지 않는다). published.md의
-    "컷8 마무리 자막" 규칙(25자 이내, 대사·캡션과 중복 금지, 숫자
-    지양)을 그대로 따르는 짧은 한 줄을 전제로 폭을 넉넉히 잡지만, 스크립트
-    단계가 글자 수를 넘길 수도 있어(2026-09-08 실측 — closing_caption이
-    25자를 넘겼는데 draw_closing_caption이 첫 줄만 그리고 나머지를 조용히
-    버려서, 하마터면 문장 뒷부분이 통째로 사라질 뻔했다) 최대 2줄까지는
-    허용한다 — 잘림보다 두 줄이 낫다.
+    """컷8 전용 마무리 자막. 화면 하단의 짙은 남색 둥근 바 + 흰 굵은 글씨.
+    draw_narration(하단 어두운 스크림)과 시각적으로 겹치므로 컷8은 narration 대신 이것을 쓴다
+    (compose()는 같은 컷에 둘 다 그리지 않는다).
 
-    아래에서 위로 쌓는 유일한 호출부라(화면 하단 고정) _draw_pill()의
-    top-anchored 계약과 안 맞아 block_h를 먼저 재서 y0를 역산한다 — 측정을
-    한 번 더 하는 셈이지만(PIL 텍스트 측정은 저렴) 헬퍼를 bottom-anchor
-    모드까지 지원하도록 넓히는 것보다 이 편이 간단하다."""
+    published.md의 "컷8 마무리 자막" 규칙(25자 이내)을 전제로 하지만 스크립트가 글자 수를 넘길 수
+    있어 최대 2줄까지 허용한다(첫 줄만 그리면 문장 뒷부분이 사라진다).
+    하단 고정이라 _draw_pill()의 top-anchored 계약과 맞지 않으므로 block_h를 먼저 재서 y0를 역산한다."""
     draw = ImageDraw.Draw(img)
     font = _font(32)
     lines = _wrap_text(draw, text, font, int(img.width * 0.82))[:2]
@@ -982,11 +851,8 @@ def draw_closing_caption(img: Image.Image, text: str) -> int | None:
 
 
 # ─────────────────────────────────────────────────────────────
-# 아이콘 배지 — 2026-09-09 신설(캡션 박스 옆 픽토그램, 원본 레퍼런스
-# 샘플 §셀프피드백 참고). PIL 도형만으로 그린다 — AI 이미지 생성에
-# 맡기면 지금까지 이 세션 내내 겪은 "요청 안 한 텍스트/디테일이
-# 불안정하게 나오는" 문제가 아이콘에도 그대로 재현될 것이므로, 텍스트와
-# 같은 이유로 결정적(deterministic)인 PIL 드로잉을 쓴다.
+# 아이콘 배지 — 캡션 박스 옆 픽토그램. AI 이미지 생성에 맡기면 요청하지 않은 텍스트·디테일이
+# 불안정하게 나오므로, 텍스트와 같은 이유로 결정적인 PIL 도형으로 그린다.
 # ─────────────────────────────────────────────────────────────
 _ICON_BADGE_FILL = _NAVY_FILL
 _ICON_STROKE = (255, 255, 255)
@@ -1024,9 +890,7 @@ def _draw_icon_badge(img: Image.Image, icon: str, x0: float, y0: float, d: float
         for dy in (-r * 0.35, r * 0.35):
             draw.ellipse([cx - r, cy + dy - r * 0.42, cx + r, cy + dy + r * 0.42], outline=_ICON_STROKE, width=_ICON_STROKE_W)
     elif icon == "handshake":
-        # 2026-09-09 — 처음엔 지그재그 선으로 "악수"를 표현했는데 실측
-        # 확인 결과 형체를 못 알아봄. "서명된 계약서"(문서+체크마크)로
-        # 바꿈 — 협약·협정·체결 의미를 더 명확하게 전달.
+        # 협약·협정·체결 의미를 서명된 계약서(문서+체크마크)로 표현한다. 지그재그 선 악수는 형체를 알아보기 어렵다.
         draw.rounded_rectangle([cx - r * 0.75, cy - r, cx + r * 0.75, cy + r], radius=r * 0.12, outline=_ICON_STROKE, width=_ICON_STROKE_W)
         for ly in (-r * 0.5, -r * 0.1, r * 0.3):
             draw.line([cx - r * 0.4, cy + ly, cx + r * 0.4, cy + ly], fill=_ICON_STROKE, width=_w(3))
@@ -1057,24 +921,11 @@ def _draw_icon_badge(img: Image.Image, icon: str, x0: float, y0: float, d: float
 def draw_caption(img: Image.Image, text: str, bottom_limit: int | None = None):
     """작은 캡션 박스 — 좌하단, 수치·팩트 표기용.
 
-    2026-09-09 — 사용자가 공유한 원본 GPT-image 레퍼런스 샘플을 다시
-    대조한 결과(셀프피드백), 우리 파이프라인엔 원본에 있던 "아이콘
-    배지"(카메라·돈·악수 등 작은 픽토그램이 색상 원 안에 들어간 것)가
-    완전히 빠져 있었다 — 이게 원본의 정보 밀도·시각적 재미를 만드는
-    핵심 요소 중 하나였는데, AI 이미지 생성 품질과는 별개인 순수
-    레이아웃 요소라 새 이미지 모델 호출 없이 PIL로 바로 추가 가능하다.
-    caption 텍스트에서 키워드를 찾아 어울리는 아이콘을 캡션 박스 왼쪽에
-    붙인다(_pick_icon_for_caption 참고) — 매치되는 키워드가 없으면
-    아이콘 없이 기존과 동일하게 그린다(안전한 폴백).
+    caption 텍스트에서 키워드를 찾아 어울리는 아이콘 배지를 박스 왼쪽에 붙인다(_pick_icon_for_caption).
+    매치되는 키워드가 없으면 아이콘 없이 그린다.
 
-    2026-09-28, 사용자 리포트("좌하단에 흰 박스와 검은 박스가 겹쳐서
-    나와 내용 파악이 어렵습니다") — caption은 항상 화면 맨 밑(y0 =
-    height - bh - 24)에 고정 배치였는데, 같은 컷에 narration/
-    closing_caption(둘 다 하단 텍스트 요소)이 같이 있으면 그 위에
-    그대로 겹쳐 그려졌다. compose()가 narration/closing_caption을
-    먼저 그려 상단 y좌표를 돌려주면 그 값을 bottom_limit으로 받아
-    캡션 박스를 그 위로 띄운다 — draw_title()의 결과를 draw_dialogue()에
-    넘기던 것과 같은 패턴(위 compose() 3차 개편 주석 참고)."""
+    기본 위치는 화면 맨 밑이라 narration/closing_caption과 겹칠 수 있다. compose()가 그 요소를 먼저
+    그려 상단 y좌표를 bottom_limit으로 넘기면 캡션 박스를 그 위로 띄운다."""
     draw = ImageDraw.Draw(img)
     font = _font(26)
     max_width = int(img.width * 0.5)
@@ -1148,32 +999,14 @@ def compose(img_path: Path, cut: dict, faces: list[dict] | None = None, scale: f
 
 
 def _compose_at(img_path: Path, cut: dict, faces: list[dict] | None, scale: float) -> list[dict]:
-    """배경 이미지(img_path) 위에 cut의 title/dialogue/caption/(closing_caption
-    또는 narration)을 순서대로 합성해서 같은 경로에 덮어쓴다. faces —
-    항상 None(2026-09-28, Rekognition 얼굴 감지 제거 — draw_dialogue
-    상단 주석 참고), 균등 분할 폴백만 동작한다.
+    """배경 이미지(img_path) 위에 cut의 title/dialogue/caption/(closing_caption 또는 narration)을
+    순서대로 합성해 같은 경로에 덮어쓰고, 그려진 말풍선 배치를 돌려준다. faces는 항상 None이다
+    (draw_dialogue 참고).
 
-    2026-09-08 — title/closing_caption 추가. closing_caption과 narration은
-    둘 다 하단 텍스트 요소라 시각적으로 겹친다 — closing_caption이 있으면
-    (컷8) 그걸 쓰고 narration은 무시한다(published.md 규칙상 컷8은 둘 중
-    closing_caption만 쓰도록 스크립트 단계에서 이미 나뉘어 있어야 하지만,
-    방어적으로 여기서도 우선순위를 명시).
-
-    2026-09-08(2차) — 컷1은 draw_title() 대신 draw_cover_header()("서울경제
-    웹툰" 브랜드 라벨 + 헤드라인 박스)를 쓴다. 컷2~8은 title_fill_for_cut()
-    으로 계산한 §13 색상표 색을 draw_title()에 넘긴다.
-
-    2026-09-08(3차) — draw_title()/draw_cover_header()가 돌려주는 실제
-    제목 하단 y좌표(title_bottom)를 draw_dialogue()에 넘긴다 — 제목이
-    길어 알약이 예상보다 커지는 컷에서 말풍선이 제목과 겹치던 문제
-    수정(draw_dialogue() 상단 주석 참고).
-
-    2026-09-28 — caption(좌하단 작은 박스)과 narration/closing_caption
-    (하단 전체 밴드)이 같은 컷에 같이 있으면 둘 다 화면 맨 밑을 기준으로
-    독립적으로 그려져 겹쳤다(사용자 리포트 — "좌하단에 흰 박스와 검은
-    박스가 겹쳐서 나와 내용 파악이 어렵습니다"). narration/closing_caption
-    을 caption보다 먼저 그리고 그 상단 y좌표를 받아 caption을 그 위로
-    띄운다 — title_bottom을 draw_dialogue()에 넘기던 것과 같은 패턴."""
+    - closing_caption과 narration은 둘 다 하단 요소라 겹친다. closing_caption이 있으면 그것만 쓴다.
+    - 컷1은 draw_cover_header(브랜드 라벨 + 헤드라인 박스), 컷2~8은 title_fill_for_cut() 색의 draw_title을 쓴다.
+    - 제목 하단 y좌표(title_bottom)를 draw_dialogue()에 넘겨 말풍선이 제목과 겹치지 않게 한다.
+    - narration/closing_caption을 caption보다 먼저 그리고 그 상단 y좌표를 caption에 넘겨, 하단 요소끼리 겹치지 않게 한다."""
     img = Image.open(img_path).convert("RGB")
     if scale != 1.0:
         # 그림은 Lanczos로 키우고 가장자리를 아주 약하게 샤픈(과하면 인공물이 생겨 약하게).
@@ -1206,7 +1039,7 @@ def _compose_at(img_path: Path, cut: dict, faces: list[dict] | None, scale: floa
     bottom_top = None
     band_text = (cut.get("closing_caption") or cut.get("narration") or "").strip()
     margin_mode = bool(cut.get("bubble_margin") and cut.get("dialogue"))
-    # 나레이션을 이미지에 굽지 않고 사이트가 컷 아래 여백에 글자로 보여주는 모드(2026-10-04). 켜져 있으면 검정 띠를 붙이지 않는다.
+    # 나레이션을 이미지에 굽지 않고 사이트가 컷 아래 여백에 글자로 보여주는 모드. 켜져 있으면 검정 띠를 붙이지 않는다.
     narration_as_text = bool(cut.get("narration_as_text"))
     if band_text and not margin_mode:
         if cut.get("closing_caption"):
