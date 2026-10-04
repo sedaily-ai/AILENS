@@ -3,7 +3,7 @@
 import { ATTENTION } from '@/shared/data/timelineAttention.generated';
 
 export const ATT_KEYWORDS = ['IMF', '금리', '환율', '부동산', '주가'] as const;
-export type AttKeyword = (typeof ATT_KEYWORDS)[number];
+type AttKeyword = (typeof ATT_KEYWORDS)[number];
 export type AttKey = AttKeyword | 'TOTAL';
 
 /** 이 건수 미만인 달은 비중이 흔들려 그리지 않는다. */
@@ -24,7 +24,7 @@ export interface AttPoint {
 const months: readonly string[] = ATTENTION.months;
 const totals = ATTENTION.total as readonly (number | null)[];
 
-export function monthYf(month: string): number {
+function monthYf(month: string): number {
   const [y, m] = month.split('-').map((v) => parseInt(v, 10));
   return y + (m - 0.5) / 12;
 }
@@ -48,7 +48,7 @@ export function attentionSeries(key: AttKey): AttPoint[] {
 }
 
 /** 'YYYY-MM-DD' | 'YYYY-MM' → 월 인덱스(없으면 -1). */
-export function monthIndexOf(date: string): number {
+function monthIndexOf(date: string): number {
   return months.indexOf(date.slice(0, 7));
 }
 

@@ -157,7 +157,7 @@ export interface RailSpec {
  * 간격이 3년/4년으로 섞이는데, 시안이 바로 그 모양이다
  * (2003 2006 2010 2013 2016 2019 2023 2026 — 3,4,3,3,3,4,3).
  */
-export function buildRail(fromYear: number, toYear: number, width: number): RailSpec {
+function buildRail(fromYear: number, toYear: number, width: number): RailSpec {
   const span = Math.max(1, fromYear - toYear);
   const inner = Math.max(1, width - PAD_X * 2);
   const pxPerYear = inner / span;

@@ -7,7 +7,7 @@ import { SITE_URL } from '@/shared/constants/site';
 // 이 페이지들의 정본(canonical)을 같은 기사의 lens 페이지로 지정한다. 페이지 자체는 독자를 위해 그대로 둔다.
 
 /** 채널별 접미사(-video / -podcast / -webtoon)가 붙은 옛 ID에서 lens ID를 뽑는다. 접미사가 없으면 그대로. */
-export function lensIdFromChannelId(id: string): string {
+function lensIdFromChannelId(id: string): string {
   return id.replace(/-(video|podcast|webtoon)$/, '');
 }
 

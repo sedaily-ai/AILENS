@@ -11,7 +11,7 @@ import { lensPath } from '@/shared/lib/lensUrl';
 
 export const PAGE_SIZE = 100;
 
-export type Kind = 'letter' | 'trend' | 'column' | 'video' | 'issue_talk' | 'lens';
+type Kind = 'letter' | 'trend' | 'column' | 'video' | 'issue_talk' | 'lens';
 
 export interface ArchiveItem {
   key: string;
@@ -49,9 +49,9 @@ export interface ArchiveItem {
   paperSection?: string | null;
 }
 
-export const TREND_ACCENT = '#dc2626';
-export const COLUMN_ACCENT = '#059669';
-export const VIDEO_ACCENT = '#7c3aed';
+const TREND_ACCENT = '#dc2626';
+const COLUMN_ACCENT = '#059669';
+const VIDEO_ACCENT = '#7c3aed';
 export const ISSUE_TALK_ACCENT = '#0891b2';
 
 // 서버(빌드타임)와 클라이언트(재검증 fetch) 양쪽에서 같은 원본 데이터를 같은

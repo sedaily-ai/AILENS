@@ -8,7 +8,7 @@ export interface Term {
   explain: string;
 }
 
-export function dedupeTerms(all: Term[], limit: number): Term[] {
+function dedupeTerms(all: Term[], limit: number): Term[] {
   const seen = new Map<string, Term>();
   for (const t of all) {
     const key = t.term.trim();

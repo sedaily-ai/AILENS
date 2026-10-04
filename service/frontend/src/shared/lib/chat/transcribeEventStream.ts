@@ -167,7 +167,7 @@ export function decodeMessage(frame: ArrayBuffer): DecodedMessage {
 }
 
 // ── Transcribe transcript event 파싱 helper ───────────────────────────
-export interface TranscribeAlternative {
+interface TranscribeAlternative {
   Transcript: string;
   Items?: Array<{ Content: string; Type: string }>;
 }

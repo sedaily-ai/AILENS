@@ -45,7 +45,7 @@ export interface HeaderTab {
  * (`/timemachine`) 를 들고 있어서 페이지마다 같은 라벨이 다른 곳으로 가는
  * 문제가 있었다. **경로 값만이라도 여기서 한 번만 정의**해 재발을 막는다.
  */
-export const TIMELINE_HREF = '/timeline';
+const TIMELINE_HREF = '/timeline';
 
 /**
  * 표준 헤더 탭. 어느 페이지에서든 buildTabs('xxx') 호출 → active 만 다름.

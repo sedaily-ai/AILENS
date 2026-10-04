@@ -1,10 +1,10 @@
 // 연대기 탐험 화면의 배치 계산 — 날짜 → 가로 위치, 라벨 겹침 피하기, 시대 색. 순수 함수만.
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
 
-export const START_YEAR = 1990;
-export const END_YEAR = 2027; // 2026년 끝까지
-export const PX_PER_YEAR = 150;
-export const PAD_X = 110;
+const START_YEAR = 1990;
+const END_YEAR = 2027; // 2026년 끝까지
+const PX_PER_YEAR = 150;
+const PAD_X = 110;
 
 /** 'YYYY' · 'YYYY-MM' · 'YYYY-MM-DD' → 연 단위 소수(1997.89). 월 단위는 그 달의 가운데로 본다. */
 export function yearFloat(date: string): number {
@@ -16,12 +16,12 @@ export function yearFloat(date: string): number {
   return y + days / 365.25;
 }
 
-export const ROW_COUNT = 4;
+const ROW_COUNT = 4;
 const LABEL_GAP_PX = 132;
 /** 이웃한 사건 사이 최소 가로 간격. 4줄을 돌려 쓰면 같은 줄의 간격이 4배(144px)가 되어 126px 라벨이 겹치지 않는다. */
 const MIN_STEP_PX = 36;
 
-export interface ChronicleLayout {
+interface ChronicleLayout {
   width: number;
   /** 날짜 → 가로 위치. 사건이 몰린 구간(예: IMF 위기)은 사건 사이가 최소 간격 이상이 되도록 축이 늘어난다. */
   xOf: (date: string) => number;
@@ -85,7 +85,7 @@ const ERA_COLORS: Record<string, string> = {
   'rate-surge-2022': '#b7791f',
   'martial-law-2024': '#2f7d5b',
 };
-export const NEUTRAL_COLOR = '#5b6577';
+const NEUTRAL_COLOR = '#5b6577';
 
 export function eraColor(eraSlug?: string): string {
   return (eraSlug && ERA_COLORS[eraSlug]) || NEUTRAL_COLOR;

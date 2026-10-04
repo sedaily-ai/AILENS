@@ -18,7 +18,7 @@ const HAIR = '#2b2f3a';
 const TOP = '#3b5189';
 const PANTS_NEAR = '#8d97a8';
 const PANTS_FAR = '#aab2c0';
-export const STILL_T = 0.3;
+const STILL_T = 0.3;
 const D2R = Math.PI / 180;
 
 export type SetFn = (key: string, value: string, attr?: string) => void;

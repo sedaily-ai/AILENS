@@ -25,14 +25,14 @@ export const MUTED = '#6b7280';
 /** 카드 경계 — /video 와 같은 값. */
 export const HAIRLINE = '#f1f1f0';
 /** 비활성 칩 채움. */
-export const CHIP = '#f3f4f6';
+const CHIP = '#f3f4f6';
 /** 표지가 오기 전 자리를 잡아두는 면. */
-export const PLACEHOLDER = '#f3f4f6';
+const PLACEHOLDER = '#f3f4f6';
 /** 격자 밴드 — 13px MUTED 가 4.63:1 로 통과하는 가장 진한 회색. */
-export const BAND = '#f9fafb';
-export const BAND_EDGE = '#eef0f3';
+const BAND = '#f9fafb';
+const BAND_EDGE = '#eef0f3';
 /** /video 카드와 동일 — 액자 대신 부양감으로 카드를 구분한다. */
-export const CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.04), 0 6px 18px rgba(17,24,39,0.05)';
+const CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.04), 0 6px 18px rgba(17,24,39,0.05)';
 /**
  * 사이트 유일의 파란 액센트 — Header.tsx TAB_ACCENT·BETA 배지와 같은 값
  * (#1d4ed8, 흰 배경·흰 글자 모두 6.70:1). "총 N화" 배지를 이 색으로
@@ -206,7 +206,7 @@ export function SectionHead({
  * 으로 확인한 트레이드오프다 — 세로 비율을 채우는 것이 캡션 보존보다
  * 우선한다.
  */
-export function SeriesPoster({
+function SeriesPoster({
   series,
   size,
   sizes,
@@ -243,7 +243,7 @@ export function SeriesPoster({
 }
 
 /** 시리즈 메타 한 줄 — 카테고리·최신 업데이트 날짜. */
-export function SeriesMeta({ series, showCategory }: { series: WebtoonSeries; showCategory: boolean }) {
+function SeriesMeta({ series, showCategory }: { series: WebtoonSeries; showCategory: boolean }) {
   const parts = [
     showCategory && series.category ? series.category : null,
     `${fmtDate(series.latestDate)} 업데이트`,

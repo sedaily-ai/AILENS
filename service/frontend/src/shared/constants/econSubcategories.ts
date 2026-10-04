@@ -26,7 +26,7 @@
 // 참조), 그 글들이 markets/industry 백필 때 이미 받은 subcategory를
 // 그대로 재사용한다. 그래서 여기엔 markets+industry 전체 값을 합쳐서
 // 둔다 — 새로 분류할 필요 없이 값이 있는 탭만 자동으로 뜬다.
-export const ECON_SUBCATEGORIES: Readonly<Record<string, readonly string[]>> = {
+const ECON_SUBCATEGORIES: Readonly<Record<string, readonly string[]>> = {
   markets: ['국내증시', '해외증시', 'IB&Deal', '펀드·채권', '정책', '증권일반'],
   industry: ['대기업', '중기·IT', '유통·생활', '바이오', '기업인', '투자·재무', '기업일반'],
   property: ['정책', '부동산일반', '건설업계'],

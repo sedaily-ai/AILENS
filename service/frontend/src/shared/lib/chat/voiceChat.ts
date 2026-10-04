@@ -47,7 +47,7 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionAny) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export function isSpeechRecognitionAvailable(): boolean {
+function isSpeechRecognitionAvailable(): boolean {
   return getSpeechRecognitionCtor() !== null;
 }
 
@@ -59,7 +59,7 @@ export interface VoiceRecognizerOptions {
 }
 
 /** 한 번의 마이크 세션을 관리. 사용자가 stop 호출하기 전까지 partial → final 흐름 반복. */
-export class VoiceRecognizer {
+class VoiceRecognizer {
   private recognition: SpeechRecognitionAny | null = null;
   private stopped = false;
 

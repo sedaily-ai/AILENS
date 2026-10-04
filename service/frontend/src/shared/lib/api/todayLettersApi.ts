@@ -19,7 +19,7 @@ export interface LetterChart {
 
 // 본문 중간 이미지. url 만 필수, 나머지 옵션.
 // 여러 장이면 배열 순서대로 세로 스택 렌더.
-export interface LetterImage {
+interface LetterImage {
   url: string;
   alt?: string;
   caption?: string;

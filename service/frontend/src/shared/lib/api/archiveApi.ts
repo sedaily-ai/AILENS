@@ -25,7 +25,7 @@ export interface ArchiveSentenceResponse {
   created_at: string;
 }
 
-export interface SimilarSentence {
+interface SimilarSentence {
   user_id: string;
   sentence_text: string;
   article_id: string;

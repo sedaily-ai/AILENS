@@ -35,7 +35,7 @@ export interface CmsTrendCard {
  * webtoon 채널 응답 — 연재 웹툰 파일럿(2026-08-06). 컷(이미지+캡션) 나열뿐인
  * 가벼운 포맷 (backend cms_posts_public.py _shape_webtoon 과 1:1).
  */
-export interface CmsWebtoonPanel {
+interface CmsWebtoonPanel {
   url: string;
   caption: string;
   /** 2026-10-04 — true면 나레이션 띠가 이미지에 박혀 있지 않고, 컷 아래 흰 여백에 caption을 글자로 보여준다. */
@@ -156,7 +156,7 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
 // 2026-09-03 — ISR 재설계로 [slug] page.tsx들이 `export const revalidate`를
 // 명시할 때 이 값을 그대로 참조하도록 export한다(라우트 레벨 선언과 fetch
 // 레벨 안전망이 서로 다른 숫자로 갈라지는 걸 방지).
-export const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤엔 자동 갱신(안전망).
+const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤엔 자동 갱신(안전망).
 
 // 이 파일의 함수들은 서버 컴포넌트(app/page.tsx의 SSR Promise.all)뿐 아니라
 // TrendingEconomySection/ColumnPreviewSection 등 다수의 'use client' 컴포넌트가

@@ -19,7 +19,7 @@
  * 선행 안내일 뿐이고, 최종 판정은 언제나 Cognito가 한다.
  */
 
-export const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MIN_LENGTH = 8;
 
 /** 화면에 그대로 노출해도 되는 허용 특수문자 안내 문자열. */
 export const PASSWORD_SPECIAL_CHARACTERS =
@@ -35,13 +35,13 @@ const SPECIAL_CHARACTER_PATTERN = /[\^$*.\[\]{}()?"!@#%&\/\\,><':;|_~`=+-]/;
 export const PASSWORD_REQUIREMENT_MESSAGE =
   '비밀번호는 8자 이상이어야 하고 대문자, 소문자, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다.';
 
-export interface PasswordRule {
+interface PasswordRule {
   id: 'length' | 'uppercase' | 'lowercase' | 'number' | 'special';
   label: string;
   test: (password: string) => boolean;
 }
 
-export const PASSWORD_RULES: readonly PasswordRule[] = [
+const PASSWORD_RULES: readonly PasswordRule[] = [
   {
     id: 'length',
     label: `${PASSWORD_MIN_LENGTH}자 이상`,

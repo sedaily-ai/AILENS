@@ -33,7 +33,7 @@ const MIN_TRUSTWORTHY_LENGTH = 20;
  * 판단되면(너무 짧음, 바이라인으로 보임) null을 돌려주므로, 호출부는
  * 항상 자기 폴백 문구를 준비해야 한다: `sanitizeDescription(x) ?? 폴백`.
  */
-export function sanitizeDescription(raw: string | null | undefined): string | null {
+function sanitizeDescription(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (trimmed.length < MIN_TRUSTWORTHY_LENGTH) return null;

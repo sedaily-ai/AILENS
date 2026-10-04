@@ -64,7 +64,7 @@ function isBareOrgName(title: string): boolean {
 }
 
 /** 읽을 기사가 아니라 지면 채움(부고·인사·공시 토막)인가. */
-export function isFiller(a: RankableArticle): boolean {
+function isFiller(a: RankableArticle): boolean {
   const title = a.title ?? '';
   const content = a.content ?? '';
   return (
@@ -103,7 +103,7 @@ const CONTENT_FULL = 140;
  * "실린 분량" 점수. 중요도 점수가 아니다 — 이름을 그렇게 두면 나중에 읽는
  * 사람이 관련도 모델로 오해한다.
  */
-export function bulkScore(a: RankableArticle): number {
+function bulkScore(a: RankableArticle): number {
   const title = (a.title ?? '').trim();
   const content = (a.content ?? '').trim();
   let s = Math.min(title.length, 48);
@@ -117,10 +117,10 @@ export function bulkScore(a: RankableArticle): number {
 /* ══ 카테고리 ════════════════════════════════════════════════════ */
 
 /** 카테고리가 빈 문자열인 기사가 실제로 있다(2003-03-18 에 5건). */
-export const UNCATEGORIZED = '그 외';
+const UNCATEGORIZED = '그 외';
 
 /** 표시명 — API 는 IT_과학 처럼 밑줄로 준다. */
-export function categoryLabel(raw: string): string {
+function categoryLabel(raw: string): string {
   const c = (raw ?? '').trim();
   return c ? c.replaceAll('_', '·') : UNCATEGORIZED;
 }
@@ -146,7 +146,7 @@ export function categoryLabel(raw: string): string {
  */
 const BEAT_ORDER = ['경제', '정치', '국제', '사회', '지역', 'IT·과학', '문화', '스포츠'];
 
-export interface DaySection<T> {
+interface DaySection<T> {
   /** 분야 표시명. */
   label: string;
   /** 이 분야 기사. 지면을 많이 차지한 순. */

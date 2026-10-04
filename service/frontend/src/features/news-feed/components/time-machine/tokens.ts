@@ -6,7 +6,7 @@ export const BODY = '#374151'; // 10.31:1 on #fff
 export const MUTED = '#6b7280'; // 4.83:1 on #fff
 export const BLUE = '#1d4ed8'; // 6.70:1 on #fff
 export const BLUE_TINT = '#dbeafe';
-export const CHIP = '#f3f4f6';
+const CHIP = '#f3f4f6';
 export const PANEL = '#f9fafb';
 export const LINE = 'rgba(17,24,39,0.09)';
 

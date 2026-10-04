@@ -22,7 +22,7 @@ function dateTimeLabel(item: ArchiveItem): string {
   return kstDateTimeLabel(item.publishedAt) ?? (item.date ? dateLabel(item.date) : '');
 }
 
-export function ArticleThumb({ item, aspectRatio = '16 / 9' }: { item: ArchiveItem; aspectRatio?: string }) {
+function ArticleThumb({ item, aspectRatio = '16 / 9' }: { item: ArchiveItem; aspectRatio?: string }) {
   return (
     <span
       className="block-thumb"

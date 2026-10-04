@@ -28,7 +28,7 @@ export type DayKind = 'live' | 'archive';
 const toTimeLabel = (iso: string) => kstTimeLabel(iso)?.slice(-5) ?? '';
 
 /** 시각 열은 "HH:MM"만 쓴다. [시그널] 기사는 속보 목록에서 뺀다(홈 구역의 기존 규칙). */
-export function toLiveRows(articles: Article[]): DayRow[] {
+function toLiveRows(articles: Article[]): DayRow[] {
   return articles
     .filter((a) => !a.title.includes('[시그널]'))
     .sort((a, b) => b.published_at.localeCompare(a.published_at))
@@ -36,7 +36,7 @@ export function toLiveRows(articles: Article[]): DayRow[] {
     .map((a) => ({ id: a.news_id, lead: toTimeLabel(a.published_at), title: a.title, href: a.original_link || null }));
 }
 
-export function toArchiveRows(articles: BigKindsArticle[]): DayRow[] {
+function toArchiveRows(articles: BigKindsArticle[]): DayRow[] {
   return articles.map((a, i) => ({
     id: a.news_id,
     lead: String(i + 1).padStart(2, '0'),

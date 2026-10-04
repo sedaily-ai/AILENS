@@ -15,7 +15,7 @@ export const SITUATION_SHARE: Record<MomentId, number> = {
 };
 
 /** 상황별 "눈이 먼저 가는 곳" 분포(%) — 행마다 합 100. */
-export const GLANCE_BY_SITUATION: Record<MomentId, Record<GlanceId, number>> = {
+const GLANCE_BY_SITUATION: Record<MomentId, Record<GlanceId, number>> = {
   lunch: { text: 38, comic: 16, sound: 8, video: 38 },
   'commute-home': { text: 24, comic: 34, sound: 14, video: 28 },
   walk: { text: 14, comic: 8, sound: 56, video: 22 },

@@ -124,7 +124,7 @@ export function IconTextMinus(props: IconProps) {
 }
 
 /** 레터 — 봉투. */
-export function IconLetter(props: IconProps) {
+function IconLetter(props: IconProps) {
   return (
     <Base {...props}>
       {(f) => (
@@ -138,7 +138,7 @@ export function IconLetter(props: IconProps) {
 }
 
 /** 웹툰 — 세 컷의 칸. */
-export function IconWebtoon(props: IconProps) {
+function IconWebtoon(props: IconProps) {
   return (
     <Base {...props}>
       {(f) => (
@@ -153,7 +153,7 @@ export function IconWebtoon(props: IconProps) {
 }
 
 /** 팟캐스트 — 마이크. */
-export function IconPodcast(props: IconProps) {
+function IconPodcast(props: IconProps) {
   return (
     <Base {...props}>
       {(f) => (
@@ -167,7 +167,7 @@ export function IconPodcast(props: IconProps) {
 }
 
 /** 영상 — 재생. */
-export function IconVideo(props: IconProps) {
+function IconVideo(props: IconProps) {
   return (
     <Base {...props}>
       {(f) => (

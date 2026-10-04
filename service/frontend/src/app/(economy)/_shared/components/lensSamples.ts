@@ -15,7 +15,7 @@ import { lensFormatAt } from '@/shared/constants/lensPerspectives';
  * 이제 <audio>/<video>의 loadedmetadata에서 받은 duration만 표시하고,
  * 아직 모르면 길이 자리를 비워둔다(포맷 이름만 보여준다).
  */
-export function clock(sec: number): string {
+function clock(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;

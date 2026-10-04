@@ -4,18 +4,18 @@
  * (admin·frontend가 별도 Next.js 빌드라 공유 불가 — 이 저장소가 이미
  * cms_posts_ddb_client.py 등에서 감수하는 중복 패턴).
  */
-export function extractYouTubeId(url: string): string | null {
+function extractYouTubeId(url: string): string | null {
   const m = url.match(
     /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
   );
   return m ? m[1] : null;
 }
 
-export function youtubeThumbnailUrl(videoId: string): string {
+function youtubeThumbnailUrl(videoId: string): string {
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
 
-export function youtubeEmbedUrl(videoId: string): string {
+function youtubeEmbedUrl(videoId: string): string {
   return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 }
 
@@ -27,16 +27,16 @@ export function youtubeEmbedUrl(videoId: string): string {
  * 필요) — admin이 직접 넣은 thumbnail_url에 의존한다(admin UI에도 이미
  * 안내돼 있음).
  */
-export function extractNaverTvId(url: string): string | null {
+function extractNaverTvId(url: string): string | null {
   const m = url.match(/tv\.naver\.com\/(?:v|embed)\/(\d+)/);
   return m ? m[1] : null;
 }
 
-export function naverTvEmbedUrl(videoId: string): string {
+function naverTvEmbedUrl(videoId: string): string {
   return `https://tv.naver.com/embed/${videoId}`;
 }
 
-export type VideoPlatform = 'youtube' | 'navertv';
+type VideoPlatform = 'youtube' | 'navertv';
 
 export interface ResolvedVideo {
   platform: VideoPlatform;

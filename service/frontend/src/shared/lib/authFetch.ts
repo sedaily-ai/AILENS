@@ -29,7 +29,7 @@ export interface AuthFetchOptions extends RequestInit {
   requireAuth?: boolean;
 }
 
-export class NotSignedInError extends Error {
+class NotSignedInError extends Error {
   constructor(message = 'Not signed in. This action requires authentication.') {
     super(message);
     this.name = 'NotSignedInError';

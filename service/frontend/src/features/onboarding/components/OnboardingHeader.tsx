@@ -27,7 +27,7 @@ import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
 // 때 살짝 눌리는 스케일 반응(active)과 호버 시 톤 변화를 더해 정적인
 // 아이콘이 아니라 반응하는 요소로 만들었다 — LensPreviewSection.tsx의
 // `.lz-arrow`(원형 배경 화살표 버튼) 패턴과 같은 어휘.
-export const ONBOARDING_TOTAL_STEPS = 6;
+const ONBOARDING_TOTAL_STEPS = 6;
 
 export function OnboardingHeader({
   currentStep = 0,

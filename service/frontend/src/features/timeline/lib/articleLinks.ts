@@ -24,7 +24,7 @@ export function isReadableOriginal(url: string | null | undefined): boolean {
  * 빅카인즈 기사 상세 주소. 서울경제 원문이 끊긴 구간의 대안이다(같은 news_id로 열린다, 2026-08-19 실측).
  * 본문이 로그인 없이 보이는지는 확인하지 못해 화면 라벨은 "빅카인즈에서 보기"로 목적지를 밝힌다. news_id 형식이 아니면 null.
  */
-export function bigkindsArticleUrl(newsId: string | null | undefined): string | null {
+function bigkindsArticleUrl(newsId: string | null | undefined): string | null {
   const id = (newsId ?? '').trim();
   return NEWS_ID_SHAPE.test(id) ? `https://www.bigkinds.or.kr/v2/news/newsDetailView.do?newsId=${encodeURIComponent(id)}` : null;
 }

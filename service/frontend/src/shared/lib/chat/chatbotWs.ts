@@ -14,13 +14,13 @@
  */
 import { WS_URL } from '@/shared/config/apiClient';
 
-export type WsChatEvent =
+type WsChatEvent =
   | { type: 'ai_start'; timestamp: string }
   | { type: 'ai_chunk'; chunk: string; chunk_index: number }
   | { type: 'chat_end'; total_chunks: number; response_length: number; timestamp: string }
   | { type: 'error'; message: string };
 
-export interface SendMessageOptions {
+interface SendMessageOptions {
   message: string;
   conversation_history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   onChunk: (chunk: string, index: number) => void;

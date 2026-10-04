@@ -5,13 +5,13 @@
 
 const STORAGE_KEY = 'mbti-reading-tracker';
 
-export interface DailyReading {
+interface DailyReading {
   date: string; // YYYY-MM-DD
   count: number;
   articleIds: string[];
 }
 
-export interface ReadingStats {
+interface ReadingStats {
   totalArticles: number;
   currentStreak: number;
   longestStreak: number;
