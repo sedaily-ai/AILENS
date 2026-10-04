@@ -42,6 +42,9 @@
 | 37b49f7 | 서버 시드 목록 재조회 effect 5곳 → useServerSeededList 훅 | 경고 15 → 10 |
 | 41232af | LensPreviewSection 지면 로직 lib 분리 + 변천사 주석 worklog 이전 + 테스트 3개 | 764 → 684줄, vitest 13 |
 | 31c3692 | 단어 퀴즈 기능 삭제(사용자 확인) | 프론트 3·백엔드 2 파일 삭제, 홈 퀴즈 API 호출 -1 |
+| 95e40f1·fd8684e·dbad66b·3492499 | 백엔드 clients·services·handlers 도메인 폴더화, utils→common | 평평한 직속 파일 43 → 0 |
+| 3625c22·b2ceae7 | 프론트 shared/ui·lib·economy 공통·news-feed·timeline 컴포넌트 폴더화(90개 이동) | 한 폴더 최대 25 → 9개 |
+| d5b07de | 백엔드 tests를 단위·integration·tools로 | 직속 23 → 13 |
 
 ## 4. 검증
 

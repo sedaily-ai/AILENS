@@ -269,3 +269,10 @@ features/[feature-name]/
   섹션·이전/다음 레터 내비게이션 마크업 정상 렌더, 200). Chrome 확장
   미연결로 실제 인터랙션(문장 선택 팝오버, 용어 툴팁 호버 등)까지의
   브라우저 확인은 못함.
+
+## 2026-10-05 폴더 구조 개편 (파일 12개 이상 폴더를 용도별 하위 폴더로)
+- `shared/ui/` → article · search · media · time-machine · list · form · notice · effects (icons는 기존)
+- `shared/lib/` → date · media · content · auth (api·chat·seo·tracking·rss는 기존, 생성 파일 `webtoonCovers.generated.ts`는 생성기가 경로를 써서 루트 유지)
+- `app/(economy)/_shared/components/` → article · format · icons (배럴 index.ts 유지)
+- `features/news-feed/components/` → sections · cards, `features/timeline/components/` → chronicle · hub · day
+- 새 파일은 가장 가까운 용도 폴더에 넣고, 한 폴더가 10개를 넘기면 다시 나눈다. 테스트는 `vitest`(`npm test`)로 순수 함수 단위만 다룬다
