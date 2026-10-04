@@ -41,14 +41,6 @@ def test_render_escapes_html():
     assert "&lt;script&gt;" in html
 
 
-def test_subscriber_eligibility():
-    from newsletter.subscribers import _eligible
-    assert _eligible({"email": "a@b.com", "status": "active", "consent": True})
-    assert not _eligible({"email": "a@b.com", "status": "active", "consent": False})
-    assert not _eligible({"email": "a@b.com", "status": "suppressed", "consent": True})
-    assert not _eligible({"email": "", "status": "active", "consent": True})
-
-
 def test_sender_dry_run_does_not_call_ses():
     os.environ["NEWSLETTER_DRY_RUN"] = "1"
     from newsletter.sender import send

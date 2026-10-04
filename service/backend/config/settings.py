@@ -148,14 +148,6 @@ class Settings:
             google_credentials_json=os.getenv('GOOGLE_CREDENTIALS_JSON'),
         )
 
-    def is_production(self) -> bool:
-        """Check if running in production environment."""
-        return 'prod' in self.dynamodb_table_articles.lower()
-
-    def get_dynamodb_table(self) -> str:
-        """Get DynamoDB table name."""
-        return self.dynamodb_table_articles
-
 
 @lru_cache()
 def get_settings() -> Settings:

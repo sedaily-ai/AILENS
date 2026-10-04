@@ -57,20 +57,6 @@ class ArchivedSentence:
         ts = self.created_at.replace(':', '-')
         return f"ARCHIVE#{self.article_id}#{ts}"
 
-    def to_item(self) -> Dict[str, Any]:
-        """Convert to DynamoDB item dict."""
-        return {
-            'user_id': self.user_id,
-            'sk': self.sk,
-            'id': self.id,
-            'text': self.text,
-            'article_id': self.article_id,
-            'article_title': self.article_title,
-            'article_published_at': self.article_published_at,
-            'created_at': self.created_at,
-            'item_type': 'archived_sentence',
-        }
-
     @classmethod
     def from_item(cls, item: Dict[str, Any]) -> 'ArchivedSentence':
         """Create from DynamoDB item dict."""
@@ -123,23 +109,6 @@ class UserProfile:
         if not self.last_login:
             self.last_login = self.created_at
 
-    def to_item(self) -> Dict[str, Any]:
-        """Convert to DynamoDB item dict."""
-        item = {
-            'user_id': self.user_id,
-            'sk': self.SK,
-            'email': self.email,
-            'name': self.name,
-            'picture': self.picture,
-            'temperature': str(self.temperature),  # Decimal-safe
-            'badges': self.badges,
-            'title': self.title,
-            'created_at': self.created_at,
-            'last_login': self.last_login,
-            'item_type': 'user_profile',
-        }
-        return {k: v for k, v in item.items() if v is not None}
-
     @classmethod
     def from_item(cls, item: Dict[str, Any]) -> 'UserProfile':
         """Create from DynamoDB item dict."""
@@ -182,18 +151,6 @@ class ReadingRecord:
     def sk(self) -> str:
         """Sort key for DynamoDB."""
         return f"READING#{self.article_id}"
-
-    def to_item(self) -> Dict[str, Any]:
-        """Convert to DynamoDB item dict."""
-        return {
-            'user_id': self.user_id,
-            'sk': self.sk,
-            'article_id': self.article_id,
-            'article_title': self.article_title,
-            'read_at': self.read_at,
-            'read_count': self.read_count,
-            'item_type': 'reading_record',
-        }
 
     @classmethod
     def from_item(cls, item: Dict[str, Any]) -> 'ReadingRecord':

@@ -64,7 +64,3 @@ def unsubscribe_by_token(token: str) -> bool:
         return False
     return bool(resp.get("ok"))
 
-
-def list_active_subscribers() -> List[Dict[str, Any]]:
-    resp = _request("GET", "/internal/subscriptions", query={"active_only": "true"})
-    return resp.get("subscribers", [])
