@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { buildEconomyCategoryMetadata, EconomyCategoryPage } from '@/widgets/CategoryArchiveClient';
-import { CACHE_TTL_FALLBACK_SECONDS } from '@/shared/lib/api/cmsPostsApi';
 
 // 카테고리 아카이브 페이지네이션(2026-09-30, 서울경제 본지 사이트
 // sedaily.com/politics/president 참고 요청) — video/listen/lens와 같은

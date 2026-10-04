@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';
 import { ListeningHeadphoneIllustration } from '@/shared/ui/icons/HandDrawnIcons';

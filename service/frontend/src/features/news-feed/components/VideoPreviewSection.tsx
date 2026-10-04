@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
-import Link from 'next/link';
 import Image from 'next/image';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/videoEmbed';

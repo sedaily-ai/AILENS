@@ -4,7 +4,6 @@ import "./pretendard.css";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ConditionalFooter } from "@/widgets/SiteFooter";
-import { AnnouncementBar } from "@/widgets/AnnouncementBar";
 import { ConditionalTodayNewsPlayer } from "@/widgets/TodayNewsPlayer";
 
 // GA4 Measurement ID — ailens.sedaily.ai 전용 속성.

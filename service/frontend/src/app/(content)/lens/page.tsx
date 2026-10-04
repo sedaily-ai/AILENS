@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchLensPosts, CACHE_TTL_FALLBACK_SECONDS } from '@/shared/lib/api/cmsPostsApi';
+import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { LensListClient } from './LensListClient';
 import { SITE_URL, LENS_LIST_TITLE as TITLE, LENS_LIST_DESCRIPTION as DESCRIPTION, buildLensJsonLd } from './lensListShared';

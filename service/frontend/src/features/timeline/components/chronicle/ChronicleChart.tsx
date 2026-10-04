@@ -4,7 +4,7 @@
 // 라벨은 줄(lane) 단위로 겹치지 않을 때만 붙이고 못 붙인 사건은 점으로만 남는다 → 줌인할수록 라벨이 늘어난다(점진적 공개).
 // 조작: 끌어서 이동, ⌘/Ctrl+휠 또는 핀치로 확대·축소, 아래 개요 막대의 창을 끌거나 가장자리를 당김, 사건 클릭/키보드.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { scaleLinear, scaleLog } from 'd3-scale';
+import { scaleLinear } from 'd3-scale';
 import { area, curveMonotoneX, line } from 'd3-shape';
 import { max } from 'd3-array';
 import type { TimelineEra, TimelineEvent } from '@/shared/data/timelineEvents';

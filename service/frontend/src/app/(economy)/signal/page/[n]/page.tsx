@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { buildEconomyCategoryMetadata, EconomyCategoryPage } from '@/widgets/CategoryArchiveClient';
-import { CACHE_TTL_FALLBACK_SECONDS } from '@/shared/lib/api/cmsPostsApi';
 
 // "시그널" 카테고리 아카이브 페이지네이션 — markets/page/[n]/page.tsx와
 // 완전히 같은 패턴, slug만 고정해서 넘기는 wrapper.

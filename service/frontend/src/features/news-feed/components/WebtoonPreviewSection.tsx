@@ -1,7 +1,7 @@
 'use client';
 
 import { WebtoonSketch } from '@/shared/ui/icons/VideoSketch';
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
