@@ -9,6 +9,7 @@
     "start:ssr": "node .next/standalone/server.js",
     "lint": "eslint",
     "smoke": "bash scripts/smoke.sh",
+    "test": "vitest run",
     "test:lens-blocks": "node --experimental-strip-types scripts/test-lens-blocks.mjs"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "eslint-config-next": "16.2.2",
     "eslint-plugin-boundaries": "^6.0.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
