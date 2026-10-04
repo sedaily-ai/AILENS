@@ -233,6 +233,18 @@ def validate_script(script: dict) -> list[str]:
                         f"{tag}: data.value가 범위/비수치 문자열('{data['value']}') — "
                         "stat이 아니라 highlight 등 수치 없는 타입으로 바꿀 것"
                     )
+        elif cut_type == "compare":
+            b, af = (data or {}).get("before") or {}, (data or {}).get("after") or {}
+            if not (isinstance(b.get("value"), (int, float)) and isinstance(af.get("value"), (int, float)) and b.get("label") and af.get("label")):
+                errors.append(f"{tag}: data.before/after의 label·value(숫자) 누락 — 기준값과 결과값이 원문에 둘 다 없으면 compare 대신 highlight 등으로 바꿀 것")
+        elif cut_type == "donut":
+            v = (data or {}).get("value")
+            if not (isinstance(v, (int, float)) and 0 <= v <= 100 and (data or {}).get("label")):
+                errors.append(f"{tag}: donut data.value(0~100 숫자)/label 누락")
+        elif cut_type == "rank":
+            items = (data or {}).get("items") or []
+            if not (2 <= len(items) <= 5) or not all(isinstance(i.get("value"), (int, float)) for i in items):
+                errors.append(f"{tag}: rank data.items가 2~5개(label·value 숫자)가 아님")
         elif cut_type == "diagram":
             if not data or not data.get("nodes"):
                 errors.append(f"{tag}: data.nodes 누락/비어있음")
@@ -245,6 +257,86 @@ def validate_script(script: dict) -> list[str]:
                 )
 
     return errors
+
+
+_TEXT_ONLY_TYPES = ("opening", "highlight", "closing")
+
+
+def _caption_text(caption) -> str:
+    if isinstance(caption, list):
+        return "".join(seg.get("text", "") for seg in caption if isinstance(seg, dict))
+    return caption or ""
+
+
+def style_issues(script: dict, article: str = "") -> list[str]:
+    """각본 "스타일" 규칙 위반 목록(2026-10-03) — 영상 프롬프트 v3(30초 숏폼)의 숫자 규칙을 코드로 센다.
+
+    모델은 "글자 수를 세어 보라"는 지시를 해도 개수 규칙(20자, 한 방 컷 2개, 글자만 장면 2개 등)을 자주 어긴다.
+    사실을 바꾸는 검사가 아니라 길이·구성 같은 형식 검사라서, 위반이 있으면 한 번만 다시 요청하고
+    그래도 남으면 그대로 간다(막지 않는다 — validate_script()의 "수치 누락" 에러와 성격이 다르다).
+    프롬프트가 30초 숏폼 버전일 때만 호출한다(generate_script 참고) — 옛 60~120초 프롬프트에는 맞지 않는 규칙이라서.
+    """
+    cuts = script.get("cuts", [])
+    issues: list[str] = []
+    n = len(cuts)
+    if not 6 <= n <= 8:
+        issues.append(f"장면(컷) 수가 {n}개 — 6~8개여야 함")
+    total = 0
+    short = 0
+    for i, c in enumerate(cuts, 1):
+        narr = (c.get("narration") or "").strip()
+        total += len(narr)
+        limit = 18 if i == 1 else 20
+        if len(narr) > limit:
+            issues.append(f"[컷{i}] 나레이션 {len(narr)}자 — {limit}자 이하여야 함: \"{narr}\"")
+        if 0 < len(narr) <= 10:
+            short += 1
+        cap = _caption_text(c.get("caption"))
+        if len(cap) > 12:
+            issues.append(f"[컷{i}] 자막 {len(cap)}자 — 12자 이하여야 함: \"{cap}\"")
+        if isinstance(c.get("caption"), list):
+            emph = [seg for seg in c["caption"] if isinstance(seg, dict) and seg.get("emphasis")]
+            if len(emph) != 1:
+                issues.append(f"[컷{i}] 강조어 {len(emph)}개 — 컷마다 정확히 1개여야 함")
+            elif len(emph[0].get("text", "")) > 6:
+                issues.append(f"[컷{i}] 강조어 \"{emph[0]['text']}\" 6자 초과")
+    if not 90 <= total <= 150:
+        issues.append(f"나레이션 합계 {total}자 — 100~140자 범위여야 함")
+    if short < 2:
+        issues.append(f"10자 이하 짧은 한 방 컷이 {short}개 — 2개 이상이어야 함(가장 긴 컷을 줄이거나 쪼갤 것)")
+    # 차트·수치 컷의 값이 원문에 실제로 있는지(지어낸 값 방지) — 원문에서 숫자 토큰을 뽑아 대조한다.
+    # "2만 5천"처럼 풀어 쓴 표기는 못 잡으므로 위반이 아니라 "확인 요청"으로만 쓴다(재요청 한 번, 막지 않음).
+    if article:
+        nums = {m.replace(",", "") for m in re.findall(r"\d[\d,]*\.?\d*", article)}
+        def _has(v) -> bool:
+            if isinstance(v, (int, float)):
+                t = f"{v:g}" if isinstance(v, float) else str(v)
+                return t in nums or t.rstrip("0").rstrip(".") in nums
+            return True
+        for i, c in enumerate(cuts, 1):
+            d = c.get("data") or {}
+            if c.get("type") == "chart":
+                for p in d.get("points", []):
+                    if not _has(p.get("value")):
+                        issues.append(f"[컷{i}] chart 값 {p.get('value')}({p.get('label')})이 원문에 없음 — 지어낸 값이면 chart 대신 diagram·highlight로 바꿀 것")
+            elif c.get("type") == "compare":
+                for k in ("before", "after"):
+                    if not _has((d.get(k) or {}).get("value")):
+                        issues.append(f"[컷{i}] compare {k} 값 {(d.get(k) or {}).get('value')}이 원문에 없음 — 지어낸 값이면 compare 대신 highlight·diagram으로 바꿀 것")
+            elif c.get("type") == "rank":
+                for it in d.get("items", []):
+                    if not _has(it.get("value")):
+                        issues.append(f"[컷{i}] rank 값 {it.get('value')}({it.get('label')})이 원문에 없음")
+            elif c.get("type") == "stat" and not _has(d.get("value")):
+                issues.append(f"[컷{i}] stat 값 {d.get('value')}이 원문에 없음 — 확인할 것")
+    types = [c.get("type") for c in cuts]
+    text_only = sum(1 for t in types if t in _TEXT_ONLY_TYPES)
+    if text_only > 2:
+        issues.append(f"글자만 있는 컷(opening·highlight·closing)이 {text_only}개 — 2개까지여야 함 (종류 순서: {', '.join(map(str, types))})")
+    for i in range(len(types) - 2):
+        if types[i] == types[i + 1] == types[i + 2]:
+            issues.append(f"같은 종류({types[i]})가 컷{i + 1}~{i + 3} 3연속 — 다른 종류로 바꿀 것")
+    return issues
 
 
 def generate_script(
@@ -351,6 +443,36 @@ def generate_script(
                 errors = retry_errors
         except Exception as e:
             print(f"{tag} 재시도 자체가 실패({e}) — 원래 에러로 처리")
+
+    # 2026-10-03 — 스타일(길이·구성) 규칙 위반이 있으면 한 번만 다시 요청한다. 30초 숏폼 프롬프트일 때만.
+    if not errors and "30초 이내" in guide:
+        issues = style_issues(script, article_input)
+        if issues:
+            print(f"{tag} 스타일 규칙 위반 {len(issues)}건 — 1회 재요청")
+            for line in issues:
+                print(f"{tag}   - {line}")
+            issue_text = "\n".join(f"  - {x}" for x in issues)
+            polish_message = (
+                f"방금 만든 아래 각본 JSON이 형식 규칙 몇 가지를 어겼습니다:\n{issue_text}\n\n"
+                "위반한 항목만 고쳐서 전체 JSON을 다시 주세요. 사실·수치·컷의 핵심 내용은 그대로 두고, "
+                "나레이션 문장 줄이기, 자막 줄이기, 짧은 컷 만들기, 컷 종류 바꾸기로만 해결하세요. "
+                "컷 종류를 바꿀 때 없는 수치를 지어내지 마세요(원문에 값이 없으면 highlight나 diagram을 쓰세요). "
+                "각본(검수용) 텍스트 없이 JSON만 주세요.\n\n"
+                f"[원문]\n{article_input}\n\n[방금 만든 JSON]\n{json.dumps(script, ensure_ascii=False)}"
+            )
+            try:
+                polish_raw = call_text(guide, polish_message, max_tokens=4000)
+                polished = extract_json_object(polish_raw)
+                polished, _ = fix_script(polished, photo_url=photo_url, photo_caption=photo_caption)
+                if not validate_script(polished):
+                    left = style_issues(polished, article_input)
+                    if len(left) < len(issues):
+                        print(f"{tag} 재요청으로 위반 {len(issues)}건 → {len(left)}건")
+                        script = polished
+                    else:
+                        print(f"{tag} 재요청해도 개선 없음({len(left)}건) — 원래 결과 유지")
+            except Exception as e:  # noqa: BLE001 — 형식 다듬기 실패가 영상 생성을 막으면 안 된다
+                print(f"{tag} 스타일 재요청 실패({e}) — 원래 결과 유지")
 
     json_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 

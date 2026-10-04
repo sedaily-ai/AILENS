@@ -449,12 +449,32 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     # 값이 재배포 없이 다음 기사부터 바로 반영된다.
     active_model = get_active_image_model()
 
+    # 2026-10-02(QA 요청서 3번) — 기사 단위 seed를 정해 8컷에 같이 쓰고 1_script.json에 남긴다.
+    # 재실행(resume)이면 저장된 값을 다시 써서 같은 조건으로 한 컷만 다시 뽑을 수 있다.
+    import random
+    from webtoon_image import set_run_seed
+    image_seed = script.get("image_seed")
+    if not isinstance(image_seed, int):
+        image_seed = random.randint(1, 2**31 - 1)
+        script["image_seed"] = image_seed
+        script_path.write_text(json.dumps(script, ensure_ascii=False, indent=1), encoding="utf-8")
+    set_run_seed(image_seed)
+    from webtoon_image import set_run_negative
+    set_run_negative(script.get("negative_prompt") if isinstance(script.get("negative_prompt"), str) else "")
+    print(f"{tag} 이미지 seed {image_seed}")
+
     # 2026-09-25 — 여기 있던 GPU 기동 분기("pipeline" 모델일 때만
     # 배치 시작 시 한 번 켜고 끝나면 끄던 로직)를 삭제했다 — pipeline
     # 모델 자체를 뺐다(모듈 상단 주석, webtoon_image.py 참고). manage_gpu
     # 인자는 frontpage_auto/mustknow_auto의 run.py가 여전히 넘기고 있어
     # 시그니처는 남겨뒀지만 이제 아무 분기도 안 탄다(무해한 미사용 인자
     # — 그쪽 두 파일까지 같이 고치는 건 이번 정리 범위 밖).
+
+    # CMS "이미지 설정"의 말풍선 얼굴 회피(Rekognition) 토글 — 기사 처리 시작 때 한 번 읽는다(꺼짐이 기본, 읽기 실패도 꺼짐).
+    from webtoon_image import get_bubble_detect, get_bubble_style
+    bubble_detect = get_bubble_detect()
+    bubble_style_on = get_bubble_style()  # 웹툰식 말풍선(타원·얇은 선·위쪽 여백)
+    print(f"{tag} 말풍선 얼굴 회피: {'켜짐' if bubble_detect else '꺼짐'} / 웹툰식 말풍선: {'켜짐' if bubble_style_on else '꺼짐'}")
 
     for cut in cuts:
         n = cut["cut"]
@@ -475,13 +495,42 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 # 제거 — webtoon_image.py::generate_cut_image() 독스트링
                 # 참고). compose_text.compose()가 균등 분할로 폴백한다.
                 try:
-                    compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
+                    cut_for_compose = cut
+                    if bubble_style_on and cut.get("dialogue"):
+                        cut_for_compose = {**cut_for_compose, "bubble_style": "oval", "bubble_margin": True, "narration_as_text": True}
+                    if bubble_detect and cut.get("dialogue"):
+                        import rekognition_people  # pipelines/common/ — 켜져 있을 때만(권한·비용)
+
+                        detect = rekognition_people.detect_people(img_path.read_bytes())  # 실패하면 None → 고정 배치
+                        if detect:
+                            cut_for_compose = {**cut_for_compose, "detect": detect}
+                    try:
+                        compose_text.compose(img_path, cut_for_compose, faces, scale=compose_text.OUTPUT_SCALE)
+                        # 나레이션을 이미지에 굽지 않은 컷(웹툰식 합성이 성공한 경우만)은 표시 파일을 남긴다 — 발행 단계가 이걸 보고 images[].text_caption을 켠다.
+                        # 합성이 실패해 기본 스타일(나레이션이 이미지에 박힘)로 떨어졌으면 파일이 없어 사이트가 글자를 또 얹지 않는다.
+                        if cut_for_compose.get("narration_as_text") and (cut.get("narration") or "").strip():
+                            (out / f"컷{n}.textcaption").write_text("1", encoding="utf-8")
+                    except Exception as e:  # noqa: BLE001 — 새 스타일 합성이 실패해도 기본 스타일로라도 글자는 얹는다
+                        print(f"{tag} 컷{n} 웹툰식 합성 실패({type(e).__name__}: {e}) — 기본 스타일로 재시도")
+                        compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
                 except Exception as e:
                     print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:
             prompt = build_image_prompt(cut["image_prompt"], cut, characters)
             ok = generate_image(prompt, img_path)
         print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
+
+    # 핵심 정리 카드(웹툰식 모드) — 프롬프트가 key_numbers(핵심 숫자 2~3개와 라벨)를 내면 마지막에 코드로 그린 카드를 한 장 더한다(이미지 모델 호출 없음, 비용 0).
+    if bubble_style_on:
+        try:
+            kn = script.get("key_numbers")
+            if isinstance(kn, list) and len(kn) >= 2:
+                head = script.get("card_title") if isinstance(script.get("card_title"), str) else ""
+                head = head or (script.get("core_question") or "")
+                if compose_text.make_summary_card(out / "컷9.png", head, kn, scale=compose_text.OUTPUT_SCALE):
+                    print(f"{tag} 핵심 정리 카드 생성")
+        except Exception as e:  # noqa: BLE001 — 카드는 덤이라 실패해도 발행을 막지 않는다
+            print(f"{tag} 핵심 정리 카드 생성 실패(건너뜀): {e}")
 
     # 세로 스크롤 합치기
     try:

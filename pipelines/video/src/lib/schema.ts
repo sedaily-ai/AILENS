@@ -111,7 +111,45 @@ export const closingCutSchema = z.object({
   data: z.object({}).partial(),
 });
 
+// 전후 비교(2026-10-03, 프롬프트 §6) — 기준값(before)이 먼저 나타나고, 결과(after)를 말할 때 기준값이 흐려지며 줄이 그어지고 작아진다.
+// 방향 표시(▲ 빨강 / ▼ 파랑)는 두 값의 크기로 렌더러가 정한다 — 모델이 방향을 따로 적지 않는다(값과 어긋날 수 없게).
+const compareValueSchema = z.object({ label: z.string(), value: z.number(), unit: z.string().optional() });
+export const compareCutSchema = z.object({
+  type: z.literal('compare'),
+  ...baseCutFields,
+  data: z.object({
+    before: compareValueSchema,
+    after: compareValueSchema,
+    sourceNote: z.string().optional(),
+  }),
+});
+
+// 도넛 — "전체 중 몇 %"(점유율·비중·응답률). value는 0~100.
+export const donutCutSchema = z.object({
+  type: z.literal('donut'),
+  ...baseCutFields,
+  data: z.object({
+    value: z.number().min(0).max(100),
+    label: z.string(),
+    sourceNote: z.string().optional(),
+  }),
+});
+
+// 순위 — 가로 막대가 위에서부터 차례로 뻗는다. 2~5개, 값이 큰 순서로 적는다.
+export const rankCutSchema = z.object({
+  type: z.literal('rank'),
+  ...baseCutFields,
+  data: z.object({
+    items: z.array(z.object({ label: z.string(), value: z.number() })).min(2).max(5),
+    unit: z.string().optional(),
+    sourceNote: z.string().optional(),
+  }),
+});
+
 export const cutSchema = z.discriminatedUnion('type', [
+  compareCutSchema,
+  donutCutSchema,
+  rankCutSchema,
   openingCutSchema,
   statCutSchema,
   diagramCutSchema,
@@ -132,6 +170,8 @@ export const newsScriptSchema = z.object({
   // 기준 날짜가 필요하다"). 예산안 발표일, 통계 기준월처럼 원문에 명시된
   // 시점 — 없으면 OpeningCut에 아무것도 안 뜬다(지어내지 않음).
   asOfDate: z.string().optional(),
+  // 키워드 라벨(2026-10-03, 프롬프트 §7) — 왼쪽 위에 상시 노출되는 기사 핵심 명사 2~8자. 없으면 brand를 대신 보인다.
+  keyword: z.string().optional(),
 });
 
 export type CaptionSegment = z.infer<typeof captionSegmentSchema>;
@@ -144,6 +184,9 @@ export type ChartCutType = z.infer<typeof chartCutSchema>;
 export type PhotoCutType = z.infer<typeof photoCutSchema>;
 export type HighlightCutType = z.infer<typeof highlightCutSchema>;
 export type ClosingCutType = z.infer<typeof closingCutSchema>;
+export type CompareCutType = z.infer<typeof compareCutSchema>;
+export type DonutCutType = z.infer<typeof donutCutSchema>;
+export type RankCutType = z.infer<typeof rankCutSchema>;
 export type Cut = z.infer<typeof cutSchema>;
 export type NewsScript = z.infer<typeof newsScriptSchema>;
 

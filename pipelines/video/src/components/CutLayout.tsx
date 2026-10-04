@@ -1,36 +1,44 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { SafeArea } from './SafeArea';
 import { CaptionBar } from './CaptionBar';
 import { BrandTag } from './BrandTag';
-import { useScale } from '../lib/layout';
+import { KeywordLabel } from './KeywordLabel';
+import { ScriptMetaContext } from './ScriptMeta';
+import { useIsVertical, useScale } from '../lib/layout';
 import { CaptionValue } from '../lib/schema';
 import { COLORS, FONT_FAMILY, FONT_WEIGHT } from '../styles/tokens';
 import { CAPTION_DELAY_SECONDS, useEntranceStyle } from '../lib/animation';
 
-// 모든 컷 타입이 공유하는 레이아웃: 브랜드 태그(상단) / 본문(중앙, flex) / 자막(하단, 선택) / 출처(자막 아래, 선택).
-// 브랜드+본문은 컷 시작과 동시에, 자막+출처는 0.2초 늦게 각자 페이드인+슬라이드업 한다.
+// 모든 컷이 공유하는 레이아웃(2026-10-03 재디자인): 왼쪽 위 키워드 라벨 / 본문 / 하단 큰 자막(왼쪽 정렬) + 출처.
+// 토스·에듀 인포그래픽처럼 왼쪽 정렬 타이포 한 축으로 세운다. 박스·테두리 장식은 쓰지 않는다.
 export const CutLayout: React.FC<{
   brand: string;
   caption?: CaptionValue;
   sourceNote?: string;
+  /** 본문 세로 정렬: center(기본, 도표·수치) / start(전면 타이포는 위쪽에서 시작) */
+  contentAlign?: 'center' | 'start';
   children: React.ReactNode;
-}> = ({ brand, caption, sourceNote, children }) => {
+}> = ({ brand, caption, sourceNote, contentAlign = 'center', children }) => {
   const scale = useScale();
+  const vertical = useIsVertical();
+  const meta = useContext(ScriptMetaContext);
   const bodyStyle = useEntranceStyle();
   const captionStyle = useEntranceStyle(CAPTION_DELAY_SECONDS);
 
   return (
     <SafeArea>
-      <div style={{ ...bodyStyle, display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <BrandTag text={brand} />
+      <div style={{ ...bodyStyle, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        {meta.keyword ? <KeywordLabel keyword={meta.keyword} asOfDate={meta.asOfDate} /> : <BrandTag text={brand} />}
         <div
           style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 24 * scale,
+            alignItems: vertical ? 'flex-start' : 'center',
+            justifyContent: contentAlign === 'center' ? 'center' : 'flex-start',
+            paddingTop: contentAlign === 'start' ? 150 * scale : 0,
+            textAlign: vertical ? 'left' : 'center',
+            gap: 28 * scale,
           }}
         >
           {children}
@@ -42,12 +50,12 @@ export const CutLayout: React.FC<{
           {sourceNote ? (
             <div
               style={{
-                textAlign: 'center',
-                marginTop: 10 * scale,
+                marginTop: 18 * scale,
                 fontFamily: FONT_FAMILY,
                 fontWeight: FONT_WEIGHT.medium,
-                fontSize: 20 * scale,
+                fontSize: 30 * scale,
                 color: COLORS.muted,
+                textAlign: vertical ? 'left' : 'center',
               }}
             >
               {sourceNote}

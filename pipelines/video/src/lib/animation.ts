@@ -25,8 +25,13 @@ export const useFrames = (seconds: number): number => {
 // (ICON_POP_SPRING, ζ≈0.5 — 확실히 튀어오르는 "짠!" 느낌)을 다른 감쇠비로
 // 분리해서, 텍스트는 과하지 않게 절제하고 아이콘 같은 포인트 요소만
 // 에너지 있게 튀도록 차등을 뒀다.
-const ENTRANCE_SPRING = { damping: 23, stiffness: 260, mass: 0.9 };
-const ICON_POP_SPRING = { damping: 15, stiffness: 260, mass: 0.9 };
+// 2026-10-03 — 프롬프트 §10 스프링 기본값으로 교체: 등장 damping 14 / stiffness 170, 강조 튐 damping 9 / stiffness 180,
+// 지도 카메라·마무리 damping 18 / stiffness 70.
+export const SPRING_ENTRANCE = { damping: 14, stiffness: 170 };
+export const SPRING_EMPHASIS = { damping: 9, stiffness: 180 };
+export const SPRING_SLOW = { damping: 18, stiffness: 70 };
+const ENTRANCE_SPRING = SPRING_ENTRANCE;
+const ICON_POP_SPRING = SPRING_EMPHASIS;
 
 // 컷 진입: 페이드인 + 20px 위로 슬라이드.
 // delaySeconds를 주면 그만큼 늦게 시작한다 (예: 자막의 0.2초 지연).
@@ -78,6 +83,21 @@ export const useCountUp = (targetValue: number, durationSeconds = STAT_COUNT_UP_
     extrapolateRight: 'clamp',
   });
   return Math.round(value);
+};
+
+// 소수 값도 굴린다(예: 2.3362 → 2.3362까지). 목표값의 소수 자릿수(최대 4)에 맞춰 반올림한다.
+export const useCountUpDecimal = (targetValue: number, durationSeconds = STAT_COUNT_UP_SECONDS): number => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const durationFrames = Math.round(durationSeconds * fps);
+  const decimals = Math.min(4, (String(targetValue).split('.')[1] ?? '').length);
+  const value = interpolate(frame, [0, durationFrames], [0, targetValue], {
+    easing: Easing.out(Easing.cubic),
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const f = Math.pow(10, decimals);
+  return Math.round(value * f) / f;
 };
 
 // 특정 시작 프레임 이후 진행되는 0..1 progress (staggered 항목에 사용).

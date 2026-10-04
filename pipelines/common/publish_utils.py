@@ -683,6 +683,8 @@ def publish_article(
                 " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
             ) or cut.get("caption", "")
             webtoon_bullets.append(caption)
+            # 나레이션을 그림에 굽지 않은 컷이면(웹툰 합성이 남긴 표시 파일) 사이트가 컷 아래 여백에 글자로 보여준다(2026-10-04).
+            text_caption_flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}
             # 업로드는 WebP(품질 90)로(2026-10-01) — 1.5배 해상도 PNG(컷당 2MB대) 대신 약 300KB로 줄여 로딩·전송 비용을 낮추고
             # Core Web Vitals에도 유리하다. 로컬 PNG는 세로 합치기(stitch)용으로 그대로 둔다. 변환 실패 시 PNG로 폴백.
             try:
@@ -691,12 +693,24 @@ def publish_article(
                 webp_path = cut_path.with_suffix(".webp")
                 Image.open(cut_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
                 key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.webp"
-                webtoon_images.append({"url": _upload(webp_path, key), "caption": caption})
+                webtoon_images.append({"url": _upload(webp_path, key), "caption": caption, **text_caption_flag})
             except Exception as e:
                 print(f"[{log_prefix}] {name} 컷{n} WebP 변환 실패 — PNG로 업로드: {e}")
                 key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
-                webtoon_images.append({"url": _upload(cut_path, key), "caption": caption})
-        if len(webtoon_images) < MIN_WEBTOON_CUTS:
+                webtoon_images.append({"url": _upload(cut_path, key), "caption": caption, **text_caption_flag})
+        # 핵심 정리 카드(컷9) — 파이프라인이 만들었을 때만 덧붙인다. 최소 컷 수 판정에는 넣지 않는다.
+        n_cut_images = len(webtoon_images)  # 카드는 제외한 컷 수 — 최소 컷 수 판정용
+        card_path = out_dir / name / "컷9.png"
+        if webtoon_images and card_path.exists():
+            try:
+                from PIL import Image
+
+                webp_path = card_path.with_suffix(".webp")
+                Image.open(card_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
+                webtoon_images.append({"url": _upload(webp_path, f"media/{log_prefix}/{name}-webtoon-card.webp"), "caption": "핵심 정리"})
+            except Exception as e:  # noqa: BLE001
+                print(f"[{log_prefix}] {name} 핵심 정리 카드 업로드 실패(건너뜀): {e}")
+        if n_cut_images < MIN_WEBTOON_CUTS:
             raise ValueError(
                 f"컷 {len(webtoon_images)}/{len(webtoon_script['cuts'])}개만 성공 "
                 f"(최소 {MIN_WEBTOON_CUTS}개 필요) — 웹툰 전체 폐기"

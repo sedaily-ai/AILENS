@@ -8,6 +8,7 @@
   python3 scripts/repair_missing_formats.py <source_url>                     # 어떤 포맷이 빠졌는지만 확인(생성·저장 없음)
   python3 scripts/repair_missing_formats.py --apply <source_url>             # 빠진 웹툰·영상을 생성해 저장
   python3 scripts/repair_missing_formats.py --apply --only webtoon <url>     # 웹툰만 (또는 --only video)
+  python3 scripts/repair_missing_formats.py --apply --only webtoon --redo <url>   # 이미 있는 웹툰도 현재 프로덕션 설정(프롬프트·말풍선 스타일)으로 다시 만든다
 
 안전장치:
   - 빠진 포맷만 생성(이미 있으면 건너뜀). 웹툰은 MIN_WEBTOON_CUTS 이상 성공해야 저장.
@@ -32,6 +33,7 @@ import publish_utils as pu  # noqa: E402
 
 APPLY = "--apply" in sys.argv
 ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
+REDO = "--redo" in sys.argv  # 웹툰이 이미 있어도 다시 만든다(2026-10-02, 프롬프트 v34·웹툰식 말풍선 재생성용)
 BACKUP_DIR = HERE / "repair_backup"
 LOG = "mustknow-auto"  # 원래 파이프라인과 같은 S3 경로 접두어
 
@@ -87,10 +89,17 @@ def _make_webtoon(article: dict, article_path: Path, out_dir: Path, upload) -> d
         bullets.append(caption)
         webp = cut_path.with_suffix(".webp")
         Image.open(cut_path).convert("RGB").save(webp, "WEBP", quality=90, method=6)
-        images.append({"url": upload(webp, f"media/{LOG}/{name}-webtoon-cut{n:03d}.webp"), "caption": caption})
+        flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}  # 나레이션을 그림에 굽지 않은 컷(2026-10-04)
+        images.append({"url": upload(webp, f"media/{LOG}/{name}-webtoon-cut{n:03d}.webp"), "caption": caption, **flag})
     if len(images) < min_cuts:
         print(f"   웹툰 컷 {len(images)}/{len(script['cuts'])}개만 성공(최소 {min_cuts}) — 저장 안 함")
         return None
+    # 핵심 정리 카드(컷9) — 웹툰식 말풍선 모드에서 파이프라인이 만들었으면 덧붙인다(최소 컷 수 판정에는 포함하지 않음)
+    card = out_dir / name / "컷9.png"
+    if card.exists():
+        webp = card.with_suffix(".webp")
+        Image.open(card).convert("RGB").save(webp, "WEBP", quality=90, method=6)
+        images.append({"url": upload(webp, f"media/{LOG}/{name}-webtoon-card.webp"), "caption": "핵심 정리"})
     return {"images": images, "bullets": bullets, "question": script.get("core_question")}
 
 
@@ -156,7 +165,7 @@ def main():
             cur = _admin("GET", f"/admin/posts/{admin_id}")["post"]
             body = cur["body_inline"]
             wt, vd = _lens(body, "웹툰"), _lens(body, "영상")
-            need_wt = not (wt.get("images") or []) and ONLY in (None, "webtoon")
+            need_wt = (REDO or not (wt.get("images") or [])) and ONLY in (None, "webtoon")
             need_vd = not vd.get("video_url") and ONLY in (None, "video")
             print(f"대상 {su} | 웹툰 {'없음' if need_wt else '있음/제외'} | 영상 {'없음' if need_vd else '있음/제외'}")
             if not (need_wt or need_vd):
@@ -177,7 +186,7 @@ def main():
             payload = {"channels": ["lens"]}
             if new_wt:
                 t = _lens(new_body, "웹툰")
-                t["images"], t["bullets"] = new_wt["images"], new_wt["bullets"]
+                t["images"], t["bullets"] = new_wt["images"], new_wt["bullets"]  # (카드가 있으면 images가 bullets보다 한 장 많다)
                 if new_wt.get("question"):
                     t["question"] = new_wt["question"]
                 t["pending"] = False

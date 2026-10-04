@@ -42,7 +42,7 @@ export const PhotoCut: React.FC<{ cut: PhotoCutType; brand: string }> = ({ cut, 
                 textAlign: 'right',
                 marginTop: 10 * scale,
                 fontFamily: 'inherit',
-                fontSize: 18 * scale,
+                fontSize: 32 * scale,
                 color: 'rgba(255,255,255,0.75)',
               }}
             >

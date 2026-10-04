@@ -2,23 +2,34 @@ import React from 'react';
 import { AbsoluteFill, Audio, staticFile, useVideoConfig } from 'remotion';
 import { TransitionSeries, linearTiming } from '@remotion/transitions';
 import { fade } from '@remotion/transitions/fade';
+import { slide } from '@remotion/transitions/slide';
+import { interpolate, useCurrentFrame } from 'remotion';
+import { ScriptMetaContext } from '../components/ScriptMeta';
 import { NewsScript } from '../lib/schema';
 import { FONT_FAMILY } from '../styles/tokens';
 import { CutRenderer } from './CutRenderer';
 import { TRANSITION_SECONDS } from '../lib/animation';
 import { BackgroundAtmosphere } from '../components/BackgroundAtmosphere';
-import { GrainOverlay } from '../components/GrainOverlay';
 
 // TTS로 해석된 duration(초)이 프레임 경계에서 딱 떨어지지 않을 수 있어
 // ceil로 반올림한다 — round/floor를 쓰면 오디오 마지막 일부가 잘릴 수 있다.
 const cutFramesOf = (durationSeconds: number, fps: number): number =>
   Math.ceil(durationSeconds * fps);
 
+// 장면마다 화면 전체가 아주 느리게 다가온다(1.00 → 1.03배, 2026-10-03, 프롬프트 §10).
+const SlowZoom: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  const z = interpolate(frame, [0, durationInFrames], [1, 1.03], { extrapolateRight: 'clamp' });
+  return <AbsoluteFill style={{ transform: `scale(${z})` }}>{children}</AbsoluteFill>;
+};
+
 export const NewsVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
   const { fps } = useVideoConfig();
   const transitionFrames = Math.round(TRANSITION_SECONDS * fps);
 
   return (
+    <ScriptMetaContext.Provider value={{ keyword: script.keyword, asOfDate: script.asOfDate }}>
     <AbsoluteFill style={{ fontFamily: FONT_FAMILY }}>
       <BackgroundAtmosphere />
       <TransitionSeries>
@@ -33,25 +44,27 @@ export const NewsVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
                   src={cut.audioFile.startsWith('http') ? cut.audioFile : staticFile(cut.audioFile)}
                 />
               ) : null}
-              <CutRenderer
-                cut={cut}
-                brand={script.brand}
-                source={script.source}
-                disclaimer={script.disclaimer}
-                asOfDate={script.asOfDate}
-              />
+              <SlowZoom>
+                <CutRenderer
+                  cut={cut}
+                  brand={script.brand}
+                  source={script.source}
+                  disclaimer={script.disclaimer}
+                  asOfDate={script.asOfDate}
+                />
+              </SlowZoom>
             </TransitionSeries.Sequence>
             {i < script.cuts.length - 1 ? (
               <TransitionSeries.Transition
                 timing={linearTiming({ durationInFrames: transitionFrames })}
-                presentation={fade()}
+                presentation={i === 0 ? slide({ direction: 'from-right' }) : fade()}
               />
             ) : null}
           </React.Fragment>
         ))}
       </TransitionSeries>
-      <GrainOverlay />
     </AbsoluteFill>
+    </ScriptMetaContext.Provider>
   );
 };
 

@@ -7,6 +7,9 @@ import { ChartCut } from './ChartCut';
 import { PhotoCut } from './PhotoCut';
 import { HighlightCut } from './HighlightCut';
 import { ClosingCut } from './ClosingCut';
+import { CompareCut } from './CompareCut';
+import { DonutCut } from './DonutCut';
+import { RankCut } from './RankCut';
 
 export const CutRenderer: React.FC<{
   cut: Cut;
@@ -28,6 +31,12 @@ export const CutRenderer: React.FC<{
       return <PhotoCut cut={cut} brand={brand} />;
     case 'highlight':
       return <HighlightCut cut={cut} brand={brand} />;
+    case 'compare':
+      return <CompareCut cut={cut} brand={brand} />;
+    case 'donut':
+      return <DonutCut cut={cut} brand={brand} />;
+    case 'rank':
+      return <RankCut cut={cut} brand={brand} />;
     case 'closing':
       return <ClosingCut cut={cut} brand={brand} source={source} disclaimer={disclaimer} />;
     default: {

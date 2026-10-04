@@ -1,33 +1,39 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { COLORS } from '../styles/tokens';
 
-// 2026-09-02 — 톤앤매너 다듬기 3종 세트 중 배경 패럴랙스. 기존엔 완전히
-// 정적인 그라디언트였다 — 영상 전체 길이에 걸쳐 글로우 중심이 아주
-// 느리게 대각선으로 흘러가게 해서 "살아있는" 느낌을 준다. setTimeout/
-// CSS animation 대신 interpolate(frame, ...)로 매 프레임 결정론적으로
-// 계산 — 몇 초짜리 컷이든 영상 전체든 동일하게 순수 함수로 동작한다.
-// 움직임 폭을 작게 잡아(중심 좌표 ±8%) 컷 내용을 방해하지 않는 "은은한
-// 대기감" 정도로 제한.
+// 딥네이비 배경(2026-10-03, 프롬프트 §7): 아주 느린 그라데이션(한 바퀴 12초)과 옅은 점 격자(투명도 8%)가 천천히 흐른다.
+// 배경이 글자보다 눈에 띄면 안 되므로 변화 폭을 작게 잡았다. 모든 값은 frame에서 결정론적으로 계산한다.
+const LOOP_SECONDS = 12;
+const GRID = 56;
+
 export const BackgroundAtmosphere: React.FC = () => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
-
-  const cx = interpolate(frame, [0, durationInFrames], [42, 58], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const cy = interpolate(frame, [0, durationInFrames], [-15, -5], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const { fps } = useVideoConfig();
+  const t = (frame / (LOOP_SECONDS * fps)) * Math.PI * 2;
+  const cx = 50 + Math.cos(t) * 14;
+  const cy = 18 + Math.sin(t) * 10;
+  const drift = (frame / (LOOP_SECONDS * fps)) * GRID; // 격자가 한 바퀴(12초)에 한 칸 흐른다
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        background: `radial-gradient(ellipse 140% 90% at ${cx}% ${cy}%, #FFFFFF 0%, #FEFCF8 55%, #FBF6EC 100%)`,
-      }}
-    />
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `radial-gradient(ellipse 120% 80% at ${cx}% ${cy}%, #1A2B4A 0%, ${COLORS.background} 62%, #0B1424 100%)`,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0.08,
+          backgroundImage: 'radial-gradient(circle at 1.5px 1.5px, #FFFFFF 1.5px, transparent 0)',
+          backgroundSize: `${GRID}px ${GRID}px`,
+          backgroundPosition: `${drift}px ${drift}px`,
+        }}
+      />
+    </>
   );
 };

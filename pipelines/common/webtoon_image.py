@@ -186,13 +186,16 @@ def characters_block(characters: dict | None) -> str:
 # build_style_guide_prompt()는 nova_canvas가 그대로 재사용하므로 남겨뒀다
 # (_generate_cut_once의 nova_canvas 분기 참고).
 _DOC_HEADINGS = ("STYLE", "CHARACTER_FEMALE", "CHARACTER_MALE", "IMAGE_MODEL")
-_DOC_HEADING_RE = re.compile(r"^##\s+(STYLE|CHARACTER_FEMALE|CHARACTER_MALE|IMAGE_MODEL)\s*$")
+# 2026-10-02 — 말풍선 얼굴 회피(Rekognition) 켜기/끄기. 네 값 튜플(parse_prompt_doc)에는 섞지 않고 별도 함수(get_bubble_detect)로 읽는다.
+_BUBBLE_DETECT_HEADING = "BUBBLE_DETECT"
+_BUBBLE_STYLE_HEADING = "BUBBLE_STYLE"  # 웹툰식 말풍선(타원·얇은 선·여백) on/off
+_DOC_HEADING_RE = re.compile(r"^##\s+(STYLE|CHARACTER_FEMALE|CHARACTER_MALE|IMAGE_MODEL|BUBBLE_DETECT|BUBBLE_STYLE)\s*$")
 
 _DEFAULT_IMAGE_MODEL = "sd_ultra"  # 2026-09-20 결정 — "GPU를 꼭 써야할까요?" 이후 admin 기본값과 동일
 _VALID_IMAGE_MODELS = ("sd_ultra", "stable_image_core", "sd35_large")
 
 
-def serialize_prompt_doc(style: str, char_female: str, char_male: str, image_model: str = "") -> str:
+def serialize_prompt_doc(style: str, char_female: str, char_male: str, image_model: str = "", bubble_detect: bool | None = None, bubble_style: bool | None = None) -> str:
     """네 값 → DDB에 저장할 content 문자열. `parse_prompt_doc`의 역함수.
     image_model 생략 시(빈 문자열) IMAGE_MODEL 섹션 자체를 안 쓴다 —
     아직 이 설정을 모르는 옛 화면(WebtoonImageLab.tsx 구버전 등)이
@@ -201,6 +204,10 @@ def serialize_prompt_doc(style: str, char_female: str, char_male: str, image_mod
     chunks = [f"## {h}\n{parts[h]}" for h in _DOC_HEADINGS[:3]]
     if image_model.strip():
         chunks.append(f"## IMAGE_MODEL\n{image_model.strip()}")
+    if bubble_detect is not None:
+        chunks.append(f"## {_BUBBLE_DETECT_HEADING}\n{'on' if bubble_detect else 'off'}")
+    if bubble_style is not None:
+        chunks.append(f"## {_BUBBLE_STYLE_HEADING}\n{'on' if bubble_style else 'off'}")
     return "\n\n".join(chunks)
 
 
@@ -209,7 +216,7 @@ def parse_prompt_doc(content: str) -> tuple[str, str, str, str]:
     CHARACTER_* 헤딩 형식이 예상과 다르면(빈 값 포함) ValueError — 호출부가
     안전망 기본값으로 폴백한다. IMAGE_MODEL은 없거나 모르는 값이면 빈
     문자열을 반환(필수 아님, 호출부가 _DEFAULT_IMAGE_MODEL로 채운다)."""
-    buckets: dict[str, list[str]] = {h: [] for h in _DOC_HEADINGS}
+    buckets: dict[str, list[str]] = {h: [] for h in (*_DOC_HEADINGS, _BUBBLE_DETECT_HEADING, _BUBBLE_STYLE_HEADING)}
     current: str | None = None
     for line in content.split("\n"):
         m = _DOC_HEADING_RE.match(line.strip())
@@ -227,6 +234,39 @@ def parse_prompt_doc(content: str) -> tuple[str, str, str, str]:
     if image_model not in _VALID_IMAGE_MODELS:
         image_model = ""
     return style, female, male, image_model
+
+
+def parse_bubble_detect(content: str) -> bool:
+    """발행 문서의 ## BUBBLE_DETECT 섹션이 on이면 True. 섹션이 없거나 다른 값이면 False(기본 꺼짐 — 비용이 드는 기능이라 명시적으로 켠 경우만)."""
+    m = re.search(r"^##\s+BUBBLE_DETECT\s*\n\s*(\w+)", content, flags=re.MULTILINE)
+    return bool(m and m.group(1).lower() == "on")
+
+
+def parse_bubble_style(content: str) -> bool:
+    """발행 문서의 ## BUBBLE_STYLE이 on이면 True(웹툰식 말풍선). 없거나 다른 값이면 False(기본 — 기존 스타일)."""
+    m = re.search(r"^##\s+BUBBLE_STYLE\s*\n\s*(\w+)", content, flags=re.MULTILINE)
+    return bool(m and m.group(1).lower() == "on")
+
+
+def get_bubble_style() -> bool:
+    try:
+        import ddb_prompt  # pipelines/common/ 내 sibling — flat import
+
+        return parse_bubble_style(ddb_prompt.load_prompt("webtoon-image", "published"))
+    except Exception as e:  # noqa: BLE001 — 웹툰 생성을 막으면 안 됨
+        print(f"[webtoon_image] bubble_style 로드 실패({type(e).__name__}) — 기존 스타일로 진행")
+        return False
+
+
+def get_bubble_detect() -> bool:
+    """실제 발행 파이프라인·CMS 컷 생성이 말풍선 배치에 Rekognition(사람·얼굴 위치)을 쓸지. 읽기 실패는 False(고정 배치로 진행)."""
+    try:
+        import ddb_prompt  # pipelines/common/ 내 sibling — flat import
+
+        return parse_bubble_detect(ddb_prompt.load_prompt("webtoon-image", "published"))
+    except Exception as e:  # noqa: BLE001 — 웹툰 생성을 막으면 안 됨
+        print(f"[webtoon_image] bubble_detect 로드 실패({type(e).__name__}) — 꺼짐으로 진행")
+        return False
 
 
 def _load_prompt_doc() -> tuple[str, str, str, str]:
@@ -524,15 +564,47 @@ def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
 SD_ULTRA_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/htvjnctxyvs1"  # lens-webtoon-image-sd-ultra → stability.stable-image-ultra-v1:1
 
 
+# 2026-10-02(QA 요청서 3번) — 그림에 글자·말풍선이 멋대로 들어가는 걸 막는 금지어는 프롬프트 본문 대신
+# 모델의 negative_prompt 필드로도 보낸다(본문의 CRITICAL 문구는 그대로 둔다 — 둘 다 해서 손해 없음).
+ULTRA_NEGATIVE_PROMPT = "text, letters, words, writing, speech bubble, caption, subtitle, watermark, logo, signature"
+
+# 기사 단위 seed — pipeline.run_article이 기사마다 한 번 정해 넣는다(None이면 모델이 무작위로 정함).
+# 같은 기사의 컷 8장이 같은 seed를 쓰면 노이즈 출발점이 같아 분위기가 조금 더 비슷해지고,
+# 값이 기록되므로 같은 조건으로 한 컷만 다시 뽑을 수 있다. 비용 변화 없음.
+_run_seed: int | None = None
+
+
+# 스크립트(프롬프트 v31)가 기사별로 내는 "negative_prompt" — 있으면 공통 금지어 뒤에 덧붙인다(없으면 공통 금지어만).
+_run_negative: str = ""
+
+
+def set_run_negative(text: str | None) -> None:
+    global _run_negative
+    _run_negative = (text or "").strip()
+
+
+def set_run_seed(seed: int | None) -> None:
+    global _run_seed
+    _run_seed = seed
+
+
+def get_run_seed() -> int | None:
+    return _run_seed
+
+
 def generate_bedrock_sd_ultra_image_bytes(prompt: str) -> bytes:
     """Stable Image Ultra(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
-    계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임."""
-    body = json.dumps({
+    계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임.
+    Ultra는 image-to-image를 지원하지 않는다(2026-10-02 실호출 확인: "Model ultra does not support image-to-image mode")."""
+    req = {
         "prompt": prompt[:9500],
+        "negative_prompt": f"{ULTRA_NEGATIVE_PROMPT}, {_run_negative}"[:9500] if _run_negative else ULTRA_NEGATIVE_PROMPT,
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
-    })
-    return _invoke_and_decode_image(_get_bedrock_image_client(), SD_ULTRA_MODEL_ID, body)
+    }
+    if _run_seed is not None:
+        req["seed"] = _run_seed
+    return _invoke_and_decode_image(_get_bedrock_image_client(), SD_ULTRA_MODEL_ID, json.dumps(req))
 
 
 def _retry_generate_and_write(bytes_fn, out_path: Path, retries: int) -> bool:
