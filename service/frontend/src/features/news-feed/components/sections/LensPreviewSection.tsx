@@ -179,8 +179,6 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates 
     closeGuide();
     if (heroHref) router.push(`${heroHref}?v=${formatIndex + 1}`);
   }
-  const heroPhoto = hero ? pickLensPhoto(hero) : null;
-  const minorArticles = sectionArticles.slice(1, 4);
 
   // 한 면의 내용(히어로 + 보조 카드 3)을 그리는 함수 — 책장 넘김 중에는 두 날짜의 면을 동시에 그려야 해서 분리했다(2026-10-04).
   const pageBody = (sa: CmsLens[]) => {

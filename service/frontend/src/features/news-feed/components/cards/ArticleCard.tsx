@@ -107,38 +107,6 @@ export function ArticleGridCard({ item }: { item: ArchiveItem }) {
   );
 }
 
-/** 레일 카드 — 제목+요약. 카테고리별 레일(증시/부동산/...)에서 사용. */
-export function ArticleRailCard({ item }: { item: ArchiveItem }) {
-  return (
-    <Link href={item.href ?? '#'} className="block group">
-      <ArticleThumb item={item} />
-      <p
-        className="font-bold text-gray-900 group-hover:underline"
-        style={{ marginTop: 10, fontSize: 15.5, lineHeight: 1.4, letterSpacing: '-0.01em' }}
-      >
-        {item.title}
-      </p>
-      {item.excerpt && (
-        <p
-          style={{
-            marginTop: 5,
-            fontSize: 13,
-            color: '#6b7280',
-            lineHeight: 1.55,
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {item.excerpt}
-        </p>
-      )}
-      <CardMeta item={item} />
-    </Link>
-  );
-}
-
 /** 히어로 카드 — 그리드 맨 앞 1건, 이미지+제목+요약을 크게. */
 export function ArticleHeroCard({ item }: { item: ArchiveItem }) {
   return (

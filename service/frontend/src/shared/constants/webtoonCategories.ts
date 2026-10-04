@@ -11,4 +11,3 @@
 // Next.js 앱(각자 package.json)이라 공유 패키지가 없다 — 의도적 중복
 // (econCategories.ts 상단 주석과 같은 이유).
 export const WEBTOON_CATEGORIES = ['증시', '부동산', '산업', '금융·정책', '국제', '문화'] as const;
-export type WebtoonCategory = (typeof WEBTOON_CATEGORIES)[number];

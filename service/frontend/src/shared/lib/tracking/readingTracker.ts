@@ -154,27 +154,3 @@ export function trackArticleRead(articleId: string): void {
 
   saveStorageData(data);
 }
-
-/**
- * 읽기 통계 가져오기
- */
-export function getReadingStats(): ReadingStats {
-  const data = getStorageData();
-  const today = getTodayDate();
-
-  // Recalculate current values
-  data.currentStreak = calculateStreak(data.dailyReadings, today);
-
-  const weekStart = getWeekStart();
-  data.thisWeekArticles = data.dailyReadings
-    .filter(r => r.date >= weekStart)
-    .reduce((sum, r) => sum + r.count, 0);
-
-  const monthStart = getMonthStart();
-  data.thisMonthArticles = data.dailyReadings
-    .filter(r => r.date >= monthStart)
-    .reduce((sum, r) => sum + r.count, 0);
-
-  return data;
-}
-

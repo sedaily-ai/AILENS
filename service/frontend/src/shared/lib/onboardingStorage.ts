@@ -10,17 +10,7 @@
 // shared로 내리는 데 걸리는 게 없었다.
 
 const FORMAT_KEY = 'onboarding-format';
-const INTERESTS_KEY = 'onboarding-interests';
 const COMPLETED_KEY = 'onboarding-completed';
-
-function safeGet(key: string): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
 
 function safeSet(key: string, value: string) {
   if (typeof window === 'undefined') return;
@@ -31,36 +21,10 @@ function safeSet(key: string, value: string) {
   }
 }
 
-export function getSavedFormat(): number | null {
-  const raw = safeGet(FORMAT_KEY);
-  if (raw === null) return null;
-  const n = Number(raw);
-  return Number.isInteger(n) && n >= 0 && n <= 3 ? n : null;
-}
-
 export function saveFormat(index: number) {
   safeSet(FORMAT_KEY, String(index));
 }
 
-export function getSavedInterests(): string[] {
-  const raw = safeGet(INTERESTS_KEY);
-  if (!raw) return [];
-  try {
-    const v = JSON.parse(raw);
-    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveInterests(interests: string[]) {
-  safeSet(INTERESTS_KEY, JSON.stringify(interests));
-}
-
 export function markOnboardingCompleted() {
   safeSet(COMPLETED_KEY, '1');
-}
-
-export function isOnboardingCompleted(): boolean {
-  return safeGet(COMPLETED_KEY) === '1';
 }

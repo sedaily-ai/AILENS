@@ -13,7 +13,6 @@ export { SITE_URL };
 export const LENS_LIST_TITLE = '오늘의 이슈, 4가지 시선';
 export const LENS_LIST_DESCRIPTION =
   '서울경제신문 기자가 취재한 매일의 경제 이슈를 레터·웹툰·팟캐스트·영상 네 가지 형식으로 담았습니다. 같은 뉴스도 읽고, 보고, 듣는 방식을 바꿔 고르면 더 쉽게 이해됩니다. 증시·산업·부동산·금융·국제 이슈를 날짜순으로 모아 보세요.';
-export const LENS_PAGE_SIZE = 8;
 
 export function buildLensJsonLd(items: CmsLens[]) {
   return {

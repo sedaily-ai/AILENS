@@ -34,16 +34,6 @@ export const READING_ACCENT = '#5b8def';
 export const LENS_CARD_BORDER = '1px solid rgba(0,0,0,0.06)';
 export const LENS_CARD_SHADOW = '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)';
 
-/**
- * 홈 히어로(LensPreviewSection)가 캐러셀로 보여주는 최신 lens 글 개수(2026-08-20).
- *
- * app/page.tsx의 "최신 뉴스" 그리드는 이 개수 전부가 아니라 딱 1건(가장 최신)만
- * 제외한다 — 캐러셀은 화살표를 눌러야 2번째 슬라이드부터 보이므로 화면에 항상
- * 동시에 보이는 건 1번째뿐이라, 5건을 통째로 빼면 신규 lens 글이 그날 5건 미만일
- * 때 그리드가 하나도 안 쌓이는 문제가 났다(2026-08-20, 사용자 지적으로 수정).
- */
-export const LENS_HOME_HERO_COUNT = 5;
-
 export interface LensPerspective {
   /** 화면에 크게 박는 서수. */
   ordinal: string;
@@ -195,21 +185,6 @@ export function lensFormatAt(i: number): LensFormat {
 /** 범위를 벗어나도 안전 — lenses 길이가 4가 아닐 수 있다. */
 export function lensPerspectiveAt(i: number): LensPerspective {
   return LENS_PERSPECTIVES[i] ?? LENS_PERSPECTIVES[i % LENS_PERSPECTIVES.length] ?? LENS_PERSPECTIVES[0];
-}
-
-/**
- * 홈·목록 타일에 보여줄 캡션 — 항상 고정 태그라인만 쓴다.
- *
- * 아이템의 `question` 필드는 웹툰 외 포맷(레터/팟캐스트/영상)에서 기사
- * 제목을 그대로 복사한 값이라, 캡션으로 쓰면 헤드라인이 중복 표시된다
- * (2026-08-23 발견). `LensListClient.tsx`는 그날 바로 `p.tagline`으로
- * 고쳐 유지됐지만, `LensPreviewSection.tsx`(홈)는 다음날(2026-08-24) 그리드
- * 레이아웃 재설계 때 `l.question || p.tagline`가 조용히 재도입돼 버그가
- * 재발했었다(2026-09-03 발견·수정). 두 파일 다 `l.question`을 직접 참조하지
- * 말고 반드시 이 함수를 거칠 것 — 세 번째 재발을 막기 위한 단일 진입점.
- */
-export function lensFormatCaption(i: number): string {
-  return lensPerspectiveAt(i).tagline;
 }
 
 /** 홈 티저 칩 → 상세 딥링크(/lens/{id}#lens-2)에서 쓰는 앵커 id. */

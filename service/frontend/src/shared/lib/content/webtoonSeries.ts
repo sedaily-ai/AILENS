@@ -97,8 +97,3 @@ export function episodeNumberInSeries(series: WebtoonSeries, episodeId: string):
   if (idx === -1) return undefined;
   return series.episodes.length - idx;
 }
-
-/** 한 편이 속한 시리즈를 찾는다(상세 페이지의 이웃 탐색·시리즈 배지용). */
-export function findSeriesContaining(items: CmsWebtoon[], episodeId: string): WebtoonSeries | null {
-  return groupIntoSeries(items).find((s) => s.episodes.some((e) => e.id === episodeId)) ?? null;
-}

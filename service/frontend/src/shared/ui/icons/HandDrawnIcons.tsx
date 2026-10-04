@@ -10,63 +10,8 @@ interface IconProps {
 }
 
 // 증시 — 상승 곡선을 보는 작은 황소 캐릭터
-export function StockBullIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <path
-        d="M16 64 L34 48 L46 56 L64 32 L80 20"
-        stroke={accent}
-        strokeWidth={3.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M80 20 L80 32 M80 20 L68 22" stroke={accent} strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" />
-      <ellipse cx="34" cy="72" rx="16" ry="12" stroke="#1a1a1a" strokeWidth={2.6} />
-      <path d="M22 66 Q17 58 22 54" stroke="#1a1a1a" strokeWidth={2.6} strokeLinecap="round" fill="none" />
-      <path d="M46 66 Q51 58 46 54" stroke="#1a1a1a" strokeWidth={2.6} strokeLinecap="round" fill="none" />
-      <circle cx="29" cy="70" r="1.8" fill="#1a1a1a" />
-      <circle cx="39" cy="70" r="1.8" fill="#1a1a1a" />
-      <path d="M31 76 Q34 78 37 76" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
-
 // 환율·금리 — 웃는 동전 캐릭터 + 교환 화살표
-export function CoinExchangeIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <circle cx="42" cy="50" r="24" stroke="#1a1a1a" strokeWidth={2.6} />
-      <path d="M34 44 Q42 38 50 44" stroke="#1a1a1a" strokeWidth={2} fill="none" strokeLinecap="round" />
-      <circle cx="35" cy="48" r="1.8" fill="#1a1a1a" />
-      <circle cx="49" cy="48" r="1.8" fill="#1a1a1a" />
-      <path d="M36 58 Q42 62 48 58" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
-      <path d="M42 34 L42 30 M38 32 L46 30" stroke={accent} strokeWidth={2.6} strokeLinecap="round" />
-      <path d="M66 30 Q78 34 78 46" stroke={accent} strokeWidth={3} strokeLinecap="round" fill="none" />
-      <path d="M78 46 L74 40 M78 46 L72 44" stroke={accent} strokeWidth={3} strokeLinecap="round" fill="none" />
-      <path d="M78 66 Q66 62 66 50" stroke={accent} strokeWidth={3} strokeLinecap="round" fill="none" />
-      <path d="M66 50 L70 56 M66 50 L72 52" stroke={accent} strokeWidth={3} strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
-
 // AI 데이터센터 — 콘센트에 꽂힌 작은 서버 로봇
-export function ServerRobotIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <rect x="30" y="30" width="36" height="44" rx="8" stroke="#1a1a1a" strokeWidth={2.6} />
-      <circle cx="41" cy="46" r="2.2" fill="#1a1a1a" />
-      <circle cx="55" cy="46" r="2.2" fill="#1a1a1a" />
-      <path d="M40 58 Q48 63 56 58" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
-      <path d="M48 30 L48 22" stroke="#1a1a1a" strokeWidth={2.4} strokeLinecap="round" />
-      <circle cx="48" cy="19" r="2.6" fill={accent} />
-      <rect x="36" y="66" width="6" height="8" rx="1.5" stroke="#1a1a1a" strokeWidth={2} />
-      <rect x="54" y="66" width="6" height="8" rx="1.5" stroke="#1a1a1a" strokeWidth={2} />
-      <path d="M66 52 Q76 52 76 62 L76 70" stroke={accent} strokeWidth={3} strokeLinecap="round" fill="none" />
-      <path d="M72 66 L76 70 L80 66" stroke={accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  );
-}
-
 // 투자 인사이트 — 반짝이는 전구 + 상승 곡선
 export function LightbulbIcon({ accent, className }: IconProps) {
   return (
@@ -85,75 +30,9 @@ export function LightbulbIcon({ accent, className }: IconProps) {
 }
 
 // 머니 라이프 — 동전 담긴 유리병 캐릭터
-export function CoinJarIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <path d="M34 30 L34 24 Q34 20 38 20 L58 20 Q62 20 62 24 L62 30" stroke="#1a1a1a" strokeWidth={2.4} strokeLinecap="round" />
-      <path
-        d="M30 30 L66 30 L64 70 Q64 76 58 76 L38 76 Q32 76 32 70 Z"
-        stroke="#1a1a1a"
-        strokeWidth={2.6}
-        strokeLinejoin="round"
-      />
-      <circle cx="44" cy="52" r="6" fill={accent} opacity={0.9} />
-      <circle cx="56" cy="62" r="6" fill={accent} opacity={0.7} />
-      <circle cx="46" cy="66" r="5" fill={accent} opacity={0.5} />
-      <path d="M40 46 Q48 42 56 46" stroke="#1a1a1a" strokeWidth={1.8} strokeLinecap="round" fill="none" opacity={0.5} />
-    </svg>
-  );
-}
-
 // 레터 — 한 통, 웃는 편지봉투 캐릭터
-export function LetterMailIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <rect x="18" y="30" width="60" height="42" rx="6" stroke="#1a1a1a" strokeWidth={2.6} strokeLinejoin="round" />
-      <path d="M20 34 L48 54 L76 34" stroke="#1a1a1a" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="40" cy="60" r="1.8" fill="#1a1a1a" />
-      <circle cx="54" cy="60" r="1.8" fill="#1a1a1a" />
-      <path d="M42 66 Q47 69 52 66" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
-      <path d="M48 16 L48 24 M40 20 L44 24 M56 20 L52 24" stroke={accent} strokeWidth={2.6} strokeLinecap="round" />
-      <circle cx="48" cy="12" r="2.6" fill={accent} />
-    </svg>
-  );
-}
-
 // 잘했어요 도장 — 살짝 삐뚤빼뚤한 손도장 원 + 체크(퀴즈 정답 피드백용)
-export function GoodJobStampIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <path
-        d="M48 14 Q68 12 76 30 Q84 46 72 62 Q62 78 44 80 Q24 82 14 64 Q6 48 16 30 Q26 14 48 14 Z"
-        stroke="#1a1a1a"
-        strokeWidth={3}
-        strokeLinejoin="round"
-      />
-      <path d="M30 48 L43 61 L67 33" stroke={accent} strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M14 14 L16 20 L22 22 L16 24 L14 30 L12 24 L6 22 L12 20 Z" fill={accent} opacity={0.85} />
-      <path d="M80 58 L81.5 62 L85 63.5 L81.5 65 L80 68.5 L78.5 65 L75 63.5 L78.5 62 Z" fill={accent} opacity={0.7} />
-    </svg>
-  );
-}
-
 // 웹툰 — 웃는 말풍선 캐릭터 + 반짝이(컷/이야기 콘텐츠용)
-export function ComicBubbleIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <path
-        d="M20 26 Q20 20 26 20 L70 20 Q76 20 76 26 L76 54 Q76 60 70 60 L42 60 L30 72 L32 60 L26 60 Q20 60 20 54 Z"
-        stroke="#1a1a1a"
-        strokeWidth={2.6}
-        strokeLinejoin="round"
-      />
-      <circle cx="38" cy="40" r="2" fill="#1a1a1a" />
-      <circle cx="58" cy="40" r="2" fill="#1a1a1a" />
-      <path d="M38 48 Q48 54 58 48" stroke="#1a1a1a" strokeWidth={2.2} strokeLinecap="round" fill="none" />
-      <path d="M80 16 L82 22 L88 24 L82 26 L80 32 L78 26 L72 24 L78 22 Z" fill={accent} />
-      <path d="M18 68 L19.5 72 L23 73.5 L19.5 75 L18 78.5 L16.5 75 L13 73.5 L16.5 72 Z" fill={accent} opacity={0.7} />
-    </svg>
-  );
-}
-
 // 히어로 캐러셀 웹툰 슬라이드용 — 기존 ComicBubbleIcon(말풍선+눈코입)이
 // "예술적인 연필 스케치" 느낌과는 거리가 멀고 아이콘처럼 밋밋하다는 지적
 // (2026-08-06)으로 새로 그렸다. 웹툰의 "컷" 2장을 손으로 두 번 겹쳐 그은
@@ -190,75 +69,16 @@ export function WebtoonWindIllustration({
 // 회중시계. "그 날로 돌아간다"는 시간여행 컨셉에 맞춰 다른 캐릭터
 // 아이콘들과 달리 얼굴 없이 빈티지 오브젝트 하나로 — 크림·세리프·먹색
 // 톤의 옛 신문 박스에 캐릭터가 섞이면 톤이 흐트러진다고 판단.
-export function PocketWatchIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <path d="M48 10 L48 17" stroke="#1a1a1a" strokeWidth={3} strokeLinecap="round" />
-      <circle cx="48" cy="8" r="4.2" stroke="#1a1a1a" strokeWidth={2.4} />
-      <circle cx="48" cy="53" r="30" stroke="#1a1a1a" strokeWidth={3} />
-      <circle cx="48" cy="53" r="23.5" stroke={accent} strokeWidth={2} />
-      <path d="M48 53 L48 37 M48 53 L60 59" stroke="#1a1a1a" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="48" cy="53" r="2.6" fill={accent} />
-      <path d="M48 25 L48 29 M76 53 L72 53 M48 81 L48 77 M20 53 L24 53" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" />
-      <path d="M74 20 L76.4 26.6 L83 29 L76.4 31.4 L74 38 L71.6 31.4 L65 29 L71.6 26.6 Z" fill={accent} opacity={0.85} />
-    </svg>
-  );
-}
-
 // 영상(숏폼) — 스마트폰 화면 속 웃는 얼굴 + 재생 버튼. "오늘의 이슈, 4가지
 // 시선" 형식 4종(레터=LetterMailIcon·웹툰=ComicBubbleIcon·팟캐스트=
 // ListeningHeadphoneIllustration) 중 유일하게 빠져 있던 영상 캐릭터
 // (2026-09-30, 메인 리디자인 — LensPreviewSection.tsx 형식 타일에서 사진
 // 아바타 대신 이 4종을 쓴다). 세로 화면(숏폼 특성)에 얼굴 + 재생 삼각형.
-export function VideoPhoneIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <rect x="30" y="12" width="36" height="66" rx="9" stroke="#1a1a1a" strokeWidth={2.6} />
-      <path d="M42 82 L54 82" stroke="#1a1a1a" strokeWidth={2.4} strokeLinecap="round" />
-      <circle cx="40" cy="37" r="2" fill="#1a1a1a" />
-      <circle cx="56" cy="37" r="2" fill="#1a1a1a" />
-      <path d="M40 45 Q48 50 56 45" stroke="#1a1a1a" strokeWidth={2} strokeLinecap="round" fill="none" />
-      <path d="M43 56 L43 68 L54 62 Z" fill={accent} />
-      <path d="M80 16 L82 22 L88 24 L82 26 L80 32 L78 26 L72 24 L78 22 Z" fill={accent} opacity={0.85} />
-      <path d="M14 46 L15.5 50 L19 51.5 L15.5 53 L14 56.5 L12.5 53 L9 51.5 L12.5 50 Z" fill={accent} opacity={0.7} />
-    </svg>
-  );
-}
-
 // 발행 도장 — "오늘의 이슈" 신문 지면 리디자인(2026-09-30)의 데이트라인
 // 옆에 붙이는 잉크 스탬프. 살짝 삐뚤빼뚤한 원(GoodJobStampIcon과 같은
 // 손도장 질감)에 체크마크를 넣어 "오늘 자 발행·검수 완료"를 상징한다 —
 // GoodJobStampIcon(퀴즈 정답 피드백)과는 쓰이는 맥락이 달라 별도로 그렸다.
-export function PublishSealIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <path
-        d="M48 8 Q68 7 75 27 Q82 45 71 59 Q61 73 44 74 Q24 75 15 57 Q7 41 17 24 Q27 8 48 8 Z"
-        stroke="#1a1a1a"
-        strokeWidth={2.6}
-        strokeLinejoin="round"
-      />
-      <circle cx="45" cy="41" r="17" stroke={accent} strokeWidth={2.2} />
-      <path d="M38 41 L43 46 L53 34" stroke={accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M74 18 L76 23 L81 25 L76 27 L74 32 L72 27 L67 25 L72 23 Z" fill={accent} opacity={0.85} />
-    </svg>
-  );
-}
-
 // 오늘의 시선 — 작은 집과 해 (부동산/도시 이슈)
-export function HouseSunIcon({ accent, className }: IconProps) {
-  return (
-    <svg viewBox="0 0 96 96" fill="none" className={className}>
-      <circle cx="68" cy="26" r="9" stroke={accent} strokeWidth={2.6} />
-      <path d="M68 12 L68 15 M68 37 L68 40 M54 26 L57 26 M79 26 L82 26 M58 16 L60 18 M76 34 L78 36 M58 36 L60 34 M76 18 L78 16" stroke={accent} strokeWidth={2} strokeLinecap="round" />
-      <path d="M22 58 L44 40 L66 58" stroke="#1a1a1a" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M28 54 L28 74 L60 74 L60 54" stroke="#1a1a1a" strokeWidth={2.6} strokeLinejoin="round" fill="none" />
-      <rect x="40" y="60" width="10" height="14" stroke="#1a1a1a" strokeWidth={2.2} />
-      <path d="M33 62 L37 62 M33 66 L37 66" stroke="#1a1a1a" strokeWidth={1.8} strokeLinecap="round" />
-    </svg>
-  );
-}
-
 // 하단 오디오 플레이어 재생목록 패널(2026-08-21) — 헤드폰을 쓰고 뉴스를
 // 듣는 캐릭터. 다른 아이콘들과 같은 문법: 얼굴은 먹색(#1a1a1a), 사운드
 // 웨이브·헤드폰 밴드는 accent 하나만.

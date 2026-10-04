@@ -52,8 +52,6 @@ export interface ArchiveItem {
 const TREND_ACCENT = '#dc2626';
 const COLUMN_ACCENT = '#059669';
 const VIDEO_ACCENT = '#7c3aed';
-export const ISSUE_TALK_ACCENT = '#0891b2';
-
 // 서버(빌드타임)와 클라이언트(재검증 fetch) 양쪽에서 같은 원본 데이터를 같은
 // 규칙으로 합치기 위한 순수 함수 — SSG 초기 렌더와 이후 client refresh가
 // 서로 다른 결과를 만들지 않게 한다(2026-08-07, 목록 페이지 SSG 감사).

@@ -43,11 +43,9 @@ const CATEGORY_PAIRS: readonly (readonly string[])[] = [
 function CategoryPairRow({
   slugs,
   archiveItems,
-  first,
 }: {
   slugs: readonly string[];
   archiveItems: ArchiveItem[];
-  first: boolean;
 }) {
   const configs = slugs.map((slug) => ECON_CATEGORIES.find((c) => c.slug === slug)!);
   const itemsBySlug = configs.map((cfg) => archiveItems.filter((it) => it.category === cfg.label));
@@ -219,7 +217,7 @@ export function NewsFeedTab({
                 그 바로 아래 끼워 넣은 뒤 나머지 짝(산업+금융정책, 국제+재테크)을
                 잇는다(2026-08-17, 사용자 확인: "타임라인 이거 산업 부분 위쪽에
                 끼어 넣어주시죠"). */}
-            <CategoryPairRow slugs={CATEGORY_PAIRS[0]} archiveItems={archiveItems} first />
+            <CategoryPairRow slugs={CATEGORY_PAIRS[0]} archiveItems={archiveItems} />
 
             {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
                 뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
@@ -232,7 +230,7 @@ export function NewsFeedTab({
                 위(2026-08-17, 사용자 확인). */}
             <HomeSection><NewsTimeMachineSection /></HomeSection>
 
-            <CategoryPairRow slugs={CATEGORY_PAIRS[1]} archiveItems={archiveItems} first={false} />
+            <CategoryPairRow slugs={CATEGORY_PAIRS[1]} archiveItems={archiveItems} />
 
             {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제
                 콘텐츠처럼 안 보인다"는 피드백으로 카드형으로 교체
@@ -251,7 +249,7 @@ export function NewsFeedTab({
 
             <HomeSection><VideoPreviewSection initialVideos={initialVideos} /></HomeSection>
 
-            <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} first={false} />
+            <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} />
 
             {/* 오디오 섹션(2026-08-21, 사용자 요청 — "오디오 섹션도 메인
                 페이지에 걸어주시죠", 위치는 "문화 섹션 위에"). 기존엔
@@ -266,7 +264,7 @@ export function NewsFeedTab({
                 추가(2026-08-20, 사용자 확인 — 홈에 문화 카테고리가 안 걸려
                 있는 걸 직접 발견). 콘텐츠가 없는 날은 CategoryFeatureSection
                 이 알아서 숨는다. */}
-            <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} first={false} />
+            <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} />
 
             {/* 게임 섹션(2026-08-21, 사용자 요청 — "게임도 섹션을... 메인에다가...
                 웹툰은 트렌디하게 잘 만들어진 것 같은데... 약간 재밌는 게임

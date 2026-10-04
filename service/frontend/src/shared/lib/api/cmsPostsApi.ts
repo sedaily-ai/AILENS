@@ -201,10 +201,6 @@ export async function fetchCmsPosts(
 // 아카이브 페이지들)은 여전히 CmsTrendCard[] 모양을 기대하므로 시그니처는
 // 남기고 몸통만 즉시 빈 배열 — 이제 존재하지 않는 채널로 매 방문마다 400을
 // 받는 대신, 애초에 요청을 보내지 않는다.
-export async function fetchTrendCards(): Promise<CmsTrendCard[]> {
-  return [];
-}
-
 // fetchSectionCards()/CmsSectionCard — ColumnPreviewSection("이번 주 인사이트"
 // 홈 섹션)이 쓰던 fetch 로직이었는데, 2026-08-17 홈 구조 개편(LatestGridSection
 // + CategoryRailSection x6, 뉴닉 홈 참고)으로 그 섹션 자체가 삭제되며 호출자가

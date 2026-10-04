@@ -65,7 +65,6 @@ const FALLBACK: CmsWebtoon[] = [
 // 카드마다 살짝 다른 기울기 — 인쇄물을 아무렇게나 늘어놓은 듯한 코믹 진열대 느낌.
 const TILTS = [-1.6, 1.2, -1, 1.8];
 // 저채도 팔레트로 한 번 톤 다운했다가 "이전(원색) 게 낫다"는 피드백으로 원복.
-const ACCENTS = ['#fde047', '#5eead4', '#fca5a5', '#c4b5fd'];
 const SKETCH_ACCENT = '#a8a29e';
 
 interface Props {
@@ -130,7 +129,6 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
         {cards.map((w, i) => {
           const mock = i >= items.length;
           const tilt = TILTS[i % TILTS.length];
-          const accent = mock ? SKETCH_ACCENT : ACCENTS[i % ACCENTS.length];
           const cardStyle = {
             display: 'block' as const,
             borderRadius: 10,

@@ -23,12 +23,6 @@ export function paperDateLabel(date: string): string {
   return `${year}년 ${month}월 ${day}일`;
 }
 
-/** 날짜 칩용 "10.03 금" */
-export function paperChipLabel(date: string): string {
-  const { month, day, weekday } = parsePaperDate(date);
-  return `${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')} ${weekday}`;
-}
-
 export function paperPath(date: string): string {
   return `/paper/${date}`;
 }

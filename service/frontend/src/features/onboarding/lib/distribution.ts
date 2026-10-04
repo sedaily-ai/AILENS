@@ -4,8 +4,6 @@ import type { GlanceId, MomentId } from './moments';
 // 아직 서버 집계가 없어서 그럴듯한 값을 손으로 넣었다. 실제 서비스에 노출하기 전에 반드시 실제 집계로 바꾸거나 카드를 숨길 것.
 // 화면에도 "샘플 데이터"를 작게 표시한다(DISTRIBUTION_IS_MOCK). 실제 집계를 붙일 때는 이 파일의 세 표를 API 응답으로 대체하고 플래그를 false로 바꾼다.
 // 목표 구조: 선택을 익명으로 서버에 1씩 쌓고(Lambda + DynamoDB 카운터), 표본이 일정 수(예: 50명) 미만이면 카드를 숨긴다.
-export const DISTRIBUTION_IS_MOCK = true;
-
 /** 상황별 비중(%) — 합 100. */
 export const SITUATION_SHARE: Record<MomentId, number> = {
   lunch: 34,
@@ -32,11 +30,6 @@ export const TEMPERAMENT_BY_GLANCE: Record<GlanceId, Record<Temperament, number>
   sound: { NT: 18, NF: 26, ST: 20, SF: 36 },
   video: { NT: 40, NF: 16, ST: 30, SF: 14 },
 };
-
-/** 나와 같은 유형(상황 × 눈이 먼저 가는 곳)이 전체에서 차지하는 비중(%). */
-export function sameTypeShare(moment: MomentId, glance: GlanceId): number {
-  return Math.round((SITUATION_SHARE[moment] * GLANCE_BY_SITUATION[moment][glance]) / 100);
-}
 
 /** 전체에서 각 "눈이 먼저 가는 곳"을 고른 사람의 비중(%) — 상황별 비중 × 상황 안의 분포를 합산한 뒤, 합이 정확히 100이 되도록 최대잔여법으로 반올림한다. */
 function glanceShares(): Record<GlanceId, number> {

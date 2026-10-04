@@ -25,14 +25,6 @@ export interface ArchiveSentenceResponse {
   created_at: string;
 }
 
-interface SimilarSentence {
-  user_id: string;
-  sentence_text: string;
-  article_id: string;
-  distance: number;
-  created_at: string;
-}
-
 /**
  * Save a sentence to the archive.
  * Returns the saved sentence with server-generated ID.
@@ -120,35 +112,6 @@ export async function deleteArchiveSentence(
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || `Archive delete failed: ${res.status}`);
   }
-}
-
-/**
- * Find sentences similar to the given text.
- * Requires pgvector to be configured on the backend.
- * Returns 503 gracefully if pgvector is unavailable.
- */
-export async function searchSimilarSentences(
-  userId: string,
-  text: string,
-  limit: number = 5,
-): Promise<{ similar_sentences: SimilarSentence[]; count: number } | null> {
-  // Similar-search is read-only but scoped to the user's archive — same
-  // auth requirement as listing.
-  const res = await authFetch(`${API_URL}/api/archive/similar`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, text, limit }),
-  });
-
-  // 503 = pgvector not configured — expected in dev
-  if (res.status === 503) return null;
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Similarity search failed: ${res.status}`);
-  }
-
-  return res.json();
 }
 
 // ── 키워드 기반 기사 추천 (raw XML 버킷에서 검색) ──────────────────────

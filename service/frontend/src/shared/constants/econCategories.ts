@@ -59,9 +59,3 @@ export const ECON_CATEGORIES: readonly EconCategoryConfig[] = [
   // 경제가 아니다 — 아래 metaSuffix로 "경제 뉴스" 대신 다르게 표기한다.
   { slug: 'culture', label: '문화', description: '여행, 트렌드, 라이프스타일 — 일상에 스며든 문화 이슈.', accent: '#db2777', metaSuffix: '문화 뉴스' },
 ] as const;
-
-export type EconCategoryLabel = (typeof ECON_CATEGORIES)[number]['label'];
-
-export function econCategoryBySlug(slug: string): EconCategoryConfig | undefined {
-  return ECON_CATEGORIES.find((c) => c.slug === slug);
-}

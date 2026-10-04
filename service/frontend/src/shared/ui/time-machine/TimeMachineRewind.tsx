@@ -122,19 +122,6 @@ const ARRIVAL_MS = 480;
 /** 비행으로 볼 수 있는 최소 이동 거리(px). 이보다 짧으면 날지 않고 바로 앉는다. */
 const MIN_FLIGHT_PX = 28;
 
-/**
- * 연 단위 소수 위치(2026-08-16 → 2026.62).
- * 정수 연도로 축 끝을 잡으면 오늘이 2026.62 라서 출발점이 축 바깥으로
- * 튀어나간다(자체 검증에서 잡음).
- */
-export function yearFloat(s: string): number {
-  const d = new Date(s);
-  const y = d.getFullYear();
-  const start = new Date(y, 0, 1).getTime();
-  const end = new Date(y + 1, 0, 1).getTime();
-  return y + (d.getTime() - start) / (end - start);
-}
-
 export interface RailSpec {
   /** 표시할 라벨. x 는 레일 로컬 좌표(오늘 = 0, 과거는 음수). */
   labels: { year: number; x: number }[];

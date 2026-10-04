@@ -59,11 +59,6 @@ export const MOMENTS: Moment[] = [
     typeLine: '쉬면서 볼 땐 자막과 그래픽으로 훑는 타입이에요.',
   },
 ];
-
-export function momentById(id: string): Moment | undefined {
-  return MOMENTS.find((m) => m.id === id);
-}
-
 // ── 질문 2: "그때 뉴스를 열면, 가장 먼저 눈이 가는 건?" (인지 유형) ──────────────────
 // 눈이 먼저 가는 곳이 포맷을 정하고, 질문 1의 상황이 "그 상황에서 안 되는 포맷"을 걸러 낸다.
 // 어떤 조합이 많은지 자체가 AI LENS의 인지 유형 데이터가 되므로 두 답을 모두 계측한다.
@@ -88,11 +83,6 @@ export const GLANCES: Glance[] = [
   { id: 'sound', label: '소리', hint: '듣는 게 편해서 음성부터 찾아요', name: '소리 먼저파', hook: '귀로 먼저 챙기는 분이시네요.', prefs: [2] },
   { id: 'video', label: '영상', hint: '움직이는 화면과 그래프에 눈이 가요', name: '영상 먼저파', hook: '움직이는 화면에 먼저 눈이 가는 분이시네요.', prefs: [3] },
 ];
-
-export function glanceById(id: string): Glance | undefined {
-  return GLANCES.find((g) => g.id === id);
-}
-
 /** 질문 1 상황에서 쓸 수 없는 포맷(안 되는 이유) — 점심: 소리 불가, 걷기: 눈을 못 씀. */
 const BLOCKED: Record<MomentId, Record<number, string>> = {
   lunch: { 2: '조용한 자리에선 소리를 못 켜니' },
