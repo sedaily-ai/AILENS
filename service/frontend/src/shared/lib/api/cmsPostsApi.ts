@@ -8,7 +8,7 @@
  * (spec §8 fail-open). 호출부는 빈 배열만 다루면 된다.
  */
 import { CMS_API_URL } from '@/shared/config/apiClient';
-import type { ApiLetter } from './todayLettersApi';
+import type { ApiLetter } from './letterTypes';
 
 export type CmsChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens';
 
