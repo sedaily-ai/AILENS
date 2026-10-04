@@ -471,3 +471,4 @@ observability/      → CloudWatch 대시보드 정의 (Bedrock 토큰·비용 p
 ⚠️ `service/backend/MBTI_TRANSFORM_PROMPT.md`(옛 last-resort fallback for
 `clients/mbti_transform_service.py`)는 그 서비스 파일과 함께 삭제됐다 — 더 이상 없다.
 
+**2026-10-05 정정**: 위 서술 중 `clients/personal_db_client.py`·`clients/embedding_client.py`는 호출처가 0이라 삭제했고(`clients/__init__.py`도 재export 제거), `PersonalRepository`는 현재 `personal_pg_client` 기반이다. 현행 clients는 `*_pg_client`(articles·cms_posts·community·newsletter_subscribers·personal)와 `*_ddb_client`(cms_posts·daily_letters·quiz_questions)가 중심이다. 단위 테스트는 `pytest tests common/tests -m "not integration"`만으로 안전하게 돈다. 감사 기록: `docs/worklog/2026-10/2026-10-05-리팩토링/`.
