@@ -7,12 +7,12 @@ import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
-// 이전/다음 기사 이동(2026-10-03) — 시간순(같은 카테고리). "이전"=더 오래된 글, "다음"=더 최근 글.
+// 이전/다음 기사 이동 — 시간순(같은 카테고리). "이전"=더 오래된 글, "다음"=더 최근 글.
 // 눈에 보이는 이동 수단(하단 버튼, 양옆 화살표)이 기본이고, 키보드 ←/→와 폰 좌우 스와이프는 보완이다.
 //   · 폰: 좌우로 밀면 활성 패널이 손가락을 따라 조금 움직이고, 가장자리에 이동할 기사 제목이 점점 진해진다. 기준을 넘기면 이동.
 //   · 읽다가 손이 스치는 오작동을 막으려 기준을 넉넉히(폭의 1/4, 최소 90px) 잡고, 가로가 확실히 우세할 때만 반응한다.
 //   · 오디오·영상·대본 스크롤·슬라이더·자체 스와이프(카드뉴스) 위, 화면 가장자리(iOS 뒤로가기 제스처 영역)에서 시작한 터치는 무시.
-// 트랙패드 두 손가락 밀기는 맥 뒤로가기와 겹쳐 이번엔 넣지 않았다(실기 확인 후 판단).
+// 트랙패드 두 손가락 밀기는 맥 뒤로가기와 겹쳐 지원하지 않는다.
 
 export interface ArticleNeighbor {
   id: string;
@@ -46,7 +46,7 @@ export function ArticleNeighborNav({ articleId, prev, next }: Neighbors & { arti
     [articleId, router],
   );
 
-  // 이전/다음 기사를 한가할 때 미리 받아 둔다 — 스와이프·화살표 키·화살표 버튼이 지연 없이 바로 넘어가게(2026-10-04).
+  // 이전/다음 기사를 한가할 때 미리 받아 둔다 — 스와이프·화살표 키·화살표 버튼이 지연 없이 바로 넘어가게.
   useEffect(() => {
     const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
     const run = () => {

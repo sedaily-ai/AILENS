@@ -1,9 +1,7 @@
 import type { LetterChart } from '@/shared/lib/api/todayLettersApi';
 
-// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해). CMS 글이
-// 배경자료(edragon 등)에 있던 수치 인포그래픽을 재구성해 넣을 때 쓰는
-// 블록. 원본 이미지·캐릭터를 그대로 가져오지 않고, 수치만 가져와 AI LENS
-// 자체 톤(세리프 라벨 없는 담백한 가로 막대)으로 새로 그린다.
+// CMS 글이 배경자료(edragon 등)의 수치 인포그래픽을 재구성해 넣을 때 쓰는 블록. 원본 이미지·캐릭터는 가져오지 않고 수치만 가져와
+// AI LENS 자체 톤(세리프 라벨 없는 담백한 가로 막대)으로 새로 그린다.
 export function LetterChartBlock({ chart, accent }: { chart: LetterChart; accent: string }) {
   const max = Math.max(...chart.series.map((s) => Math.abs(s.value)), 1);
   return (

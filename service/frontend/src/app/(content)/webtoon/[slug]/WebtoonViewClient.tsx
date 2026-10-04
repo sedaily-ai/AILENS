@@ -10,20 +10,12 @@ import { useCutViewTracking } from '@/shared/lib/tracking/useCutViewTracking';
 import { webtoonVariant } from '@/shared/lib/tracking/webtoonVariant';
 
 /**
- * 경로 기반(`/webtoon/[slug]`) 웹툰 상세의 클라이언트 본체(2026-08-07, 쿼리스트링
- * `?id=`에서 전환). 세로 스크롤 하나로 컷을 이어 보여주는 게 전부라 레터
- * 상세보다 훨씬 단순하다.
+ * 경로 기반(`/webtoon/[slug]`) 웹툰 상세의 클라이언트 본체. 세로 스크롤 하나로 컷을 이어 보여주므로 레터 상세보다 단순하다.
  *
- * initialWebtoon은 서버(빌드타임)에서 findWebtoon()으로 이미 가져온 값 —
- * SSG 결과물 HTML에 실제 컷·캡션이 바로 박히게(크롤러가 JS 없이도 볼 수 있게)
- * 초기 상태를 이걸로 채운다. letters 쪽과 달리 이 컴포넌트엔 애초에 mount를
- * 기다리는 게이트가 없어서 initialWebtoon만 내려주면 바로 반영된다.
+ * initialWebtoon은 서버에서 findWebtoon()으로 이미 가져온 값이다. SSG HTML에 실제 컷·캡션이 포함되도록(크롤러가 JS 없이도 볼 수 있게) 초기 상태를 이것으로 채운다.
+ * 이 컴포넌트는 mount를 기다리는 게이트가 없어 initialWebtoon만 내려주면 바로 반영된다.
  *
- * 디자인 리뉴얼 4차(2026-08-11, 전면 재설계) — "웹툰 탭에 들어오면 진짜
- * 만화방에 온 것 같았으면" 요청으로 목록 페이지(WebtoonListClient.tsx)와
- * 함께 어두운 톤으로 전면 재설계. 컷 자체는 여전히 꽉 차게 이어붙이되(웹툰
- * 리더 관행 유지), 그 사이 캡션을 조명 받은 필름 캡션처럼 다듬고 배경을
- * 거의 검정에 가깝게 낮춰 컷 이미지에 시선이 집중되게 했다.
+ * 목록 페이지(WebtoonListClient.tsx)와 같은 어두운 톤이다. 컷은 꽉 차게 이어붙이고(웹툰 리더 관행), 캡션은 조명 받은 필름 캡션처럼, 배경은 거의 검정으로 낮춰 컷에 시선이 집중되게 한다.
  */
 export function WebtoonViewClient({
   slug,
@@ -77,7 +69,7 @@ export function WebtoonViewClient({
 
   return (
     <div style={{ minHeight: '100vh', background: '#0b0b0d' }}>
-      {/* 필름 그레인 — 목록 페이지와 동일한 질감(2026-08-11). */}
+      {/* 필름 그레인 — 목록 페이지와 동일한 질감. */}
       <div
         aria-hidden
         style={{
@@ -191,11 +183,7 @@ export function WebtoonViewClient({
           <div ref={cutsContainerRef} style={{ display: 'flex', flexDirection: 'column' }}>
             {webtoon.panels.map((p, i) => (
               <div key={i} data-cut-index={i + 1}>
-                {/* alt를 실제 대사/캡션으로(2026-09-02, SEO/GEO 감사) — 예전엔
-                    "{제목} 컷 1"처럼 내용 없는 텍스트였다. panel.caption에
-                    이미 그 컷의 대사·상황 설명이 들어있는데(바로 아래에도
-                    같은 텍스트를 화면에 렌더) alt만 이걸 안 쓰고 있었다.
-                    이미지 검색·스크린리더 둘 다에 실질적인 컷 내용이 전달됨. */}
+                {/* alt는 컷의 실제 대사/캡션(panel.caption)을 쓴다. 이미지 검색·스크린리더에 컷 내용이 전달된다. */}
                 {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본, 컷마다 비율이 달라 next/image 불가 */}
                 <img src={p.url} alt={p.caption || `${webtoon.title} 컷 ${i + 1}`} style={{ display: 'block', width: '100%', height: 'auto' }} />
                 {p.caption && (

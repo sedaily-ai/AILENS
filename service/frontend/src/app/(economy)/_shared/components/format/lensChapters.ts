@@ -1,4 +1,4 @@
-// 레터 본문의 소제목을 "구간"으로 뽑는다(2026-10-01, 챕터 내비게이션). 파싱은 렌더러와 같은 parseLetterBlocks를 써서
+// 레터 본문의 소제목을 "구간"으로 뽑는다(챕터 내비게이션). 파싱은 렌더러와 같은 parseLetterBlocks를 써서
 // 목차와 본문 소제목이 항상 일치한다(마크다운 변형·빈 소제목도 같은 규칙으로 처리).
 import { parseLetterBlocks } from './lensBlocks';
 

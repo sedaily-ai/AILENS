@@ -8,14 +8,11 @@ import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from "@/shared/lib/auth
 import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/form/PasswordChecklist";
 
 /**
- * 비밀번호 재설정은 세 단계다: forgot(이메일) → resetCode(코드) →
- * resetPassword(새 비밀번호).
+ * 비밀번호 재설정은 세 단계다: forgot(이메일) → resetCode(코드) → resetPassword(새 비밀번호).
  *
- * 주의 — Cognito 제약: 코드 검증만 하는 API가 없다. `ConfirmForgotPassword`가
- * 코드와 새 비밀번호를 한 번에 받아서 그때 함께 판정한다. 그래서 resetCode
- * 단계의 "다음"은 서버 호출이 아니라 입력 형식만 확인하고 넘어가며, 코드가
- * 틀렸다는 사실은 마지막 제출에서 드러난다. 그 경우 사용자를 resetCode로
- * 되돌린다(`AuthResult.codeInvalid` 참고).
+ * Cognito 제약: 코드 검증만 하는 API가 없고 `ConfirmForgotPassword`가 코드와 새 비밀번호를 한 번에 판정한다.
+ * 따라서 resetCode 단계의 "다음"은 입력 형식만 확인하고, 코드 오류는 마지막 제출에서 드러난다.
+ * 이 경우 사용자를 resetCode로 되돌린다(`AuthResult.codeInvalid` 참고).
  */
 type AuthMode = "login" | "signup" | "confirm" | "forgot" | "resetCode" | "resetPassword";
 
@@ -80,10 +77,8 @@ export function LoginClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  // 로그인 에러가 "가입 도중 이탈(UNCONFIRMED)" 때문일 때만 true — 에러
-  // 문구 아래에 회원가입 화면으로 바로 가는 버튼을 붙인다(이슈 #18, "안내는
-  // 있는데 화면상 가까운 곳에 갈 방법이 없었다"). 이메일은 그대로 유지되므로
-  // (같은 컴포넌트의 email state를 모드 전환에도 공유) 다시 입력할 필요 없다.
+  // 로그인 에러가 "가입 도중 이탈(UNCONFIRMED)" 때문일 때만 true. 에러 문구 아래에 회원가입 화면으로 가는 버튼을 붙인다.
+  // 이메일 state는 모드 전환에도 공유되므로 다시 입력할 필요가 없다.
   const [showResignupCta, setShowResignupCta] = useState(false);
 
   const switchMode = (next: AuthMode) => {
@@ -100,9 +95,7 @@ export function LoginClient() {
     setIsLoading(true);
     const result = await signInWithEmail(email, password);
     setIsLoading(false);
-    // 로그인은 성공하면 바로 홈, 아니면 이 화면에 에러만 띄운다.
-    // 이메일 인증 화면(confirm)으로 넘기는 분기는 의도적으로 없다 — 인증은
-    // 회원가입 흐름 전용이다.
+    // 로그인은 성공하면 홈으로 이동하고, 실패하면 이 화면에 에러만 표시한다. 이메일 인증(confirm)으로 넘기는 분기는 없다(인증은 회원가입 흐름 전용).
     if (result.success) {
       router.replace("/");
       return;
@@ -115,8 +108,7 @@ export function LoginClient() {
     e.preventDefault();
     setError("");
     if (password !== confirmPassword) return setError("비밀번호가 일치하지 않습니다.");
-    // 유저풀 정책 전체를 제출 전에 막는다. 예전엔 길이만 봐서 대소문자·숫자·
-    // 특수문자 누락은 Cognito 왕복 후에야 알 수 있었다.
+    // 유저풀 정책 전체를 제출 전에 검증한다(길이만 보면 대소문자·숫자·특수문자 누락을 Cognito 왕복 후에야 알 수 있다).
     if (!isPasswordValid(password)) return setError(PASSWORD_REQUIREMENT_MESSAGE);
     setIsLoading(true);
     const result = await signUpWithEmail(email, password, name);
@@ -131,9 +123,7 @@ export function LoginClient() {
       setSuccessMessage("이메일로 인증 코드가 전송되었어요.");
       return;
     }
-    // 신규가입은 온보딩(/start)으로 — 순수 로그인(handleEmailLogin)과 갈리는
-    // 지점. 여기서 새 계정이 만들어졌다는 걸 아는 유일한 순간이라 여기서
-    // 분기한다(로그인 후에는 신규/기존 구분 신호가 없음).
+    // 신규가입은 온보딩(/start)으로 보낸다. 새 계정 생성을 아는 유일한 지점이라 여기서 분기한다(로그인 후에는 신규/기존 구분 신호가 없다).
     if (result.signedIn) return router.replace("/start");
     switchMode("login");
     setSuccessMessage("가입이 완료됐어요. 로그인해주세요.");
@@ -150,8 +140,7 @@ export function LoginClient() {
       return;
     }
     setVerificationCode("");
-    // 인증이 끝나면 바로 로그인된 상태로 들어간다. 비밀번호를 한 번 더
-    // 치게 만들지 않는다. 여기도 신규가입 완료 지점이라 /start로.
+    // 인증이 끝나면 바로 로그인된 상태로 진입시킨다(비밀번호 재입력 방지). 신규가입 완료 지점이므로 /start로 보낸다.
     if (result.signedIn) return router.replace("/start");
     // autoSignIn 이 실패한 경우(가입 도중 새로고침 등)만 로그인 폼으로.
     switchMode("login");
@@ -179,8 +168,7 @@ export function LoginClient() {
     } else setError(result.error || "비밀번호 재설정 요청에 실패했습니다.");
   };
 
-  // 코드 입력 단계 → 새 비밀번호 단계. Cognito에 코드만 검증하는 API가 없어서
-  // 여기서는 형식만 보고 넘긴다(실제 판정은 마지막 제출에서).
+  // 코드 입력 단계 → 새 비밀번호 단계. Cognito에 코드만 검증하는 API가 없어 형식만 확인하고 넘긴다(실제 판정은 마지막 제출).
   const handleResetCodeNext = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -196,7 +184,7 @@ export function LoginClient() {
     e.preventDefault();
     setError("");
     if (password !== confirmPassword) return setError("비밀번호가 일치하지 않습니다.");
-    // 재설정 폼에는 정책 검사가 아예 없었다 — 일치 여부만 보고 그대로 보냈다.
+    // 재설정 폼에서도 제출 전에 비밀번호 정책을 검사한다.
     if (!isPasswordValid(password)) return setError(PASSWORD_REQUIREMENT_MESSAGE);
     setIsLoading(true);
     const result = await confirmForgotPassword(email, verificationCode, password);
@@ -209,8 +197,7 @@ export function LoginClient() {
       setVerificationCode("");
       return;
     }
-    // 코드가 틀렸거나 만료된 경우엔 비밀번호 화면에 가둬두지 않고 코드 입력
-    // 단계로 되돌린다. 입력한 비밀번호는 유지해서 다시 타이핑하지 않게 한다.
+    // 코드가 틀렸거나 만료되면 코드 입력 단계로 되돌린다. 입력한 비밀번호는 유지해 다시 타이핑하지 않게 한다.
     if (result.codeInvalid) {
       setVerificationCode("");
       setMode("resetCode");
@@ -300,9 +287,7 @@ export function LoginClient() {
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 
-          {/* Cognito Hosted UI 경유 구글 로그인. 유저풀에 Google IdP 가 이미
-              등록돼 있고(2026-02-03) 앱 클라이언트 콜백에 /auth/callback 이
-              들어가 있어, 프런트는 signInWithRedirect 만 부르면 된다. */}
+          {/* Cognito Hosted UI 경유 구글 로그인. 유저풀에 Google IdP가 등록되어 있고 앱 클라이언트 콜백에 /auth/callback이 있어 signInWithRedirect만 호출하면 된다. */}
           <button
             type="button"
             onClick={signInWithGoogle}

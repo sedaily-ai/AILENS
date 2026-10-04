@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 
-// 스크롤하면 상단 메뉴가 "카테고리 + 기사 제목 + 읽기 진행선"의 얇은 바로 바뀐다(2026-10-01,
-// 영문 사이트 상세 동작을 따름). 헤드라인이 화면 위로 지나간 뒤에 나타나 sticky 헤더
-// (z-100, 높이 약 57px)를 그대로 덮는다 — 아래 형식 탭 바(.fmt-bar)가 쓰는 top 오프셋이
-// 그대로 유효하다. 진행선은 기사 본문(main) 기준으로 계산하고 리렌더 없이 transform으로만 갱신한다.
+// 스크롤하면 상단 메뉴가 "카테고리 + 기사 제목 + 읽기 진행선"의 얇은 바로 바뀐다(영문 사이트 상세 동작을 따름).
+// 헤드라인이 화면 위로 지나간 뒤 나타나 sticky 헤더(z-100, 높이 약 57px)를 그대로 덮으므로 아래 형식 탭 바(.fmt-bar)의 top 오프셋이 유효하다.
+// 진행선은 기사 본문(main) 기준으로 계산하고 리렌더 없이 transform으로만 갱신한다.
 
 const BAR_HEIGHT = 57;
 const MILESTONES = [
@@ -33,7 +32,7 @@ export function ArticleStickyBar({
   const passed = useRef<Set<number> | null>(null);
   const cheerTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const progressRef = useRef<HTMLDivElement>(null);
-  // 챕터별 칸 진행(2026-10-01) — 레터 본문에 소제목이 2개 이상일 때만, 연속 선 대신 챕터 수만큼 칸을 나눠 읽은 만큼 채운다.
+  // 챕터별 칸 진행 — 레터 본문에 소제목이 2개 이상일 때만, 연속 선 대신 챕터 수만큼 칸을 나눠 읽은 만큼 채운다.
   const [segCount, setSegCount] = useState(0);
   const segRefs = useRef<Array<HTMLSpanElement | null>>([]);
 
@@ -54,7 +53,7 @@ export function ArticleStickyBar({
       const bodyEl = document.querySelector('[data-letter-body]');
       const bRect = bodyEl ? bodyEl.getBoundingClientRect() : null;
       const heads = Array.from(document.querySelectorAll('[data-letter-body] .lread > .lread-sub'));
-      // 웹툰 탭이 열려 있으면 컷 하나가 한 칸(2026-10-01) — 컷마다 읽은 만큼 채워져 몇 컷 봤는지 한눈에 보인다.
+      // 웹툰 탭이 열려 있으면 컷 하나가 한 칸 — 컷마다 읽은 만큼 채워져 몇 컷 봤는지 한눈에 보인다.
       const cuts = Array.from(document.querySelectorAll('[data-cut-index]')).filter((c) => c.getBoundingClientRect().height > 0);
       const letterOn = !!bRect && bRect.height > 0 && heads.length >= 2;
       const cutsOn = !letterOn && cuts.length >= 2;
@@ -79,7 +78,7 @@ export function ArticleStickyBar({
         const read = Math.min(br.height, Math.max(0, window.innerHeight * 0.6 - br.top));
         const left = readMin * (1 - read / br.height);
         setRemain(left <= 0.4 ? '다 읽었어요' : `남은 약 ${Math.max(1, Math.ceil(left))}분`);
-        // 가볍게 친근한 격려(2026-10-01) — 절반·거의 끝에 닿는 순간 2.6초만 한 줄. 처음 열 때 이미 지난 구간은 조용히 넘긴다
+        // 가벼운 격려 — 절반·거의 끝에 닿는 순간 2.6초만 한 줄. 처음 열 때 이미 지난 구간은 조용히 넘긴다
         // (이어 읽기로 중간에 들어왔을 때 갑자기 격려하지 않게).
         const frac = read / br.height;
         if (!passed.current) {

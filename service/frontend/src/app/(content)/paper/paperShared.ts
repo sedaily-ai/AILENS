@@ -4,9 +4,8 @@ import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 
-// "지난 지면" 페이지(/paper/[date]) 공용 — 날짜 표기·메타·JSON-LD(2026-10-04, 사용자 요청: "전날·전전날의 지면 4개 유형 기사도 볼 수 있게").
-// 지면 = 홈 "오늘의 이슈, 4가지 시선"의 4개 탭(지면 1면·증권 1면·산업 1면·시그널 1면)에 편성된 기사 — 날짜당 최대 16건.
-// 일반(지면 외) 기사는 이 페이지에 넣지 않는다(사용자 결정).
+// "지난 지면" 페이지(/paper/[date]) 공용 — 날짜 표기·메타·JSON-LD.
+// 지면 = 홈 "오늘의 이슈, 4가지 시선"의 4개 탭(지면 1면·증권 1면·산업 1면·시그널 1면)에 편성된 기사로 날짜당 최대 16건이다. 지면 외 일반 기사는 이 페이지에 넣지 않는다.
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 

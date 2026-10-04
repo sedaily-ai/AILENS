@@ -17,31 +17,18 @@ import {
 } from '@/shared/lib/api/todayLettersApi';
 import { LetterBody, type NeighborLetter } from './components';
 
-// 다른 날짜 letter 를 스캔할 때 훑는 최근 일수 — app/letters/[id]/page.tsx 의
-// SEED_DAYS 와 같은 값(그룹-날짜 합성 id 스킴 폐지 이후 findLetter 와 동일 패턴).
+// 다른 날짜 letter를 스캔할 때 훑는 최근 일수 — app/letters/[id]/page.tsx의 SEED_DAYS와 같은 값.
 const LOOKBACK_DAYS = 14;
 
-// 헤더 메타줄·공유 아이콘 — 처음엔 /lens/[slug]/LensViewClient.tsx에서 만든
-// 걸 이 파일도 로컬 복제해 뒀었는데(2026-08-18, "헤더부분? 공유버튼?
-// 발행일? 카테고리? ... 이거 전체 글들에 동일하게 적용되어야합니다"), 두
-// 페이지가 완전히 동일한 ~150줄을 각자 들고 있는 게 유지보수 부담이라
-// shared/ui로 추출해 합쳤다(같은 날 후속). 글자크기만 CSS 변수·
-// localStorage 키를 페이지별로 다르게 넘긴다 — 본문 fontSize를
-// calc(var())로 배선하는 지점(LetterBlock 여러 분기)이 lens와 달라서.
+// 헤더 메타줄·공유 아이콘은 shared/ui로 추출해 lens 상세와 공유한다. 글자크기만 CSS 변수·localStorage 키를 페이지별로 넘긴다(본문 fontSize를 calc(var())로 배선하는 지점이 lens와 다르다).
 interface Props {
   letterId: string;
-  // 서버(빌드타임)에서 findLetter()로 이미 가져온 글 — SSG 결과물 HTML에 실제
-  // 본문이 바로 박히게(크롤러가 JS 없이도 볼 수 있게) 초기 상태를 이걸로
-  // 채운다. 이후 useEffect는 그대로 재검증용으로 다시 돈다(2026-08-07,
-  // JSON-LD/OG 태그는 있는데 정작 화면 본문은 client fetch 전까지 비어있던
-  // 문제 — /letters/[id]/page.tsx 의 findLetter 결과를 그대로 내려받는다).
+  // 서버에서 findLetter()로 이미 가져온 글. SSG HTML에 본문이 바로 포함되도록(크롤러가 JS 없이도 볼 수 있게) 초기 상태를 이것으로 채우며, 이후 useEffect는 재검증용으로 다시 돈다.
   initialLetter?: DisplayLetter | null;
-  // 이전/다음 레터 내비게이션용(2026-08-21, GEO 재감사) — 서버(page.tsx)가
-  // findNeighbors()로 미리 조회해 내려준다.
+  // 이전/다음 레터 내비게이션용 — 서버(page.tsx)가 findNeighbors()로 미리 조회해 내려준다.
   nextLetter?: NeighborLetter | null;
   prevLetter?: NeighborLetter | null;
-  // 우측 사이드바 "요즘 가장 많이 읽힌 글" 서버 프리페치(2026-08-23) —
-  // SideRail.tsx 참조.
+  // 우측 사이드바 "요즘 가장 많이 읽힌 글" 서버 프리페치 — SideRail.tsx 참조.
   initialHotLetters?: TodayLetterCardLike[];
 }
 
@@ -112,10 +99,8 @@ export function LetterDetailClient({ letterId, initialLetter = null, nextLetter 
         return;
       }
 
-      // 2) CMS 에 없으면 AI 레터 — id 에 더 이상 날짜가 인코딩돼있지 않아
-      //    (그룹-날짜 합성 id 스킴 폐지, 2026-08-07) 최근 LOOKBACK_DAYS 일을
-      //    훑으며 .id 가 일치하는 레터를 찾는다. 개별 날짜 fetch 실패는 건너뛰고
-      //    계속 스캔 — 하나가 실패했다고 전체를 에러로 처리하지 않는다.
+      // 2) CMS에 없으면 AI 레터 — id에 날짜가 인코딩되어 있지 않으므로 최근 LOOKBACK_DAYS일을 훑으며 .id가 일치하는 레터를 찾는다.
+      //    개별 날짜 fetch 실패는 건너뛰고 계속 스캔한다.
       for (const date of recentDatesISO(LOOKBACK_DAYS)) {
         if (cancelled) return;
         try {
@@ -156,25 +141,13 @@ export function LetterDetailClient({ letterId, initialLetter = null, nextLetter 
     );
   }
 
-  // !mounted 만으로 게이트하면 빌드타임(SSG) 렌더는 항상 mounted=false라 이
-  // 블록에 걸려 빈 <div>만 출력된다 — initialLetter로 이미 검증된 데이터가
-  // 있는 경우엔 mount를 기다리지 않고 바로 렌더한다(2026-08-07, 크롤러가
-  // JS 없이 받는 정적 HTML에 실제 본문이 비어있던 원인).
+  // !mounted만으로 게이트하면 SSG 렌더는 항상 mounted=false라 빈 <div>만 출력된다.
+  // initialLetter로 검증된 데이터가 있으면 mount를 기다리지 않고 바로 렌더한다(크롤러가 받는 정적 HTML에 본문 포함).
   if (loadState === 'loading' || !letter || (!mounted && !initialLetter)) {
     return <div className="min-h-screen bg-white" />;
   }
 
-  // 우측 사이드바를 홈/카테고리/lens 페이지와 완전히 동일한 그리드로
-  // 통일했다(2026-08-23, 사용자 지적 — "사이드바 들어가는 모든 경로의
-  // 위치가 x, y 그리고 포지션도 동일한 위치였으면"). 예전엔 이 페이지만
-  // 별도 폭(1040)·별도 컬럼비(720/260)·별도 사이드바 컴포넌트
-  // (SideRail.tsx — HomeSideBar와 별개로 존재하던 구현체, lg:sticky
-  // 까지 걸려있어 다른 페이지와 스크롤 동작 자체가 달랐다)를 썼다.
-  // 2026-09-03 — 이 배선 자체(Header+검색 오버레이+그리드+사이드바)가
-  // LensViewClient·LensListClient·NewsFeedTab과 100% 동일한 코드로
-  // 중복돼 있던 걸 ArticlePageShell로 추출(위 2026-08-23 결정 이후 두 번
-  // 더 불일치가 났던 근본 원인 — worklog에 "다음엔 추출" 남겨두고 실제로
-  // 는 안 했었음).
+  // Header·검색 오버레이·그리드·사이드바 배선은 ArticlePageShell에서 홈/카테고리/lens 페이지와 동일하게 처리한다.
   return (
     <ArticlePageShell
       sidebar={<HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />}

@@ -6,13 +6,10 @@ import { Press_Start_2P } from 'next/font/google';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { GAMES } from '@/shared/data/games';
 
-// next/font로 이 라우트 청크에만 번들 — 예전엔 globals.css 최상단 @import라
-// /games를 안 쓰는 페이지까지 매번 googleapis.com 왕복을 렌더 블로킹으로 물고
-// 있었다.
+// next/font로 이 라우트 청크에만 번들한다. globals.css 최상단 @import는 /games를 쓰지 않는 페이지까지 googleapis.com 왕복을 렌더 블로킹으로 유발한다.
 const arcadeFont = Press_Start_2P({ weight: '400', subsets: ['latin'], display: 'swap' });
 
-// GAMES 배열은 shared/data/games.ts로 이동(2026-08-21, 홈 게임 미리보기
-// 섹션과 공유 — GamesPreviewSection.tsx 참조).
+// GAMES 배열은 홈 게임 미리보기 섹션과 공유하므로 shared/data/games.ts에 있다(GamesPreviewSection.tsx 참조).
 
 const ARCADE_FONT = `${arcadeFont.style.fontFamily}, "Courier New", monospace`;
 

@@ -7,13 +7,10 @@ import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
 
-// 기사 하단 구획(2026-10-01) — 영문 사이트(en.sedaily.com) 상세의 "More in 카테고리 /
-// Related articles / Most read" 구조를 따른다. 오른쪽 사이드바를 걷어낸 대신 여기서
-// 같은 역할(더 읽을거리)을 본문 폭 안에서 한다. 서버 컴포넌트라 JS 없이 초기 HTML에
-// 링크가 들어가 크롤러·내부 링크 구조에도 도움이 된다.
+// 기사 하단 구획 — 영문 사이트(en.sedaily.com) 상세의 "More in 카테고리 / Related articles / Most read" 구조를 따라 본문 폭 안에서 더 읽을거리를 제공한다.
+// 서버 컴포넌트라 JS 없이 초기 HTML에 링크가 들어가 크롤러·내부 링크 구조에 도움이 된다.
 //
-// 스타일 원칙: 박스·그림자 없이 헤어라인과 타이포 위계만. 제목은 세리프(.af-serif),
-// 구역 이름표는 작은 자간 라벨(.af-label).
+// 스타일: 박스·그림자 없이 헤어라인과 타이포 위계만 쓴다. 제목은 세리프(.af-serif), 구역 이름표는 작은 자간 라벨(.af-label).
 
 const SERIF = '"Noto Serif KR", serif';
 
@@ -142,7 +139,7 @@ export function RelatedArticles({ items }: { items: CmsLens[] }) {
   );
 }
 
-/** "많이 읽은 기사" — 기존 사이드바 "요즘 많이 읽힌 글"을 본문 폭 안으로 옮김. */
+/** "많이 읽은 기사" — 본문 폭 안에 배치한 인기 글 목록. */
 export function MostRead({ items }: { items: TodayLetterCardLike[] }) {
   if (!items || items.length === 0) return null;
   return (

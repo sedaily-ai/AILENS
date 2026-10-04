@@ -10,10 +10,8 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-// AboutPage(2026-08-14, SEO 감사 — 이 라우트만 JSON-LD가 없던 걸 발견).
-// Organization을 새로 안 만들고 루트 layout.tsx가 이미 정의한
-// NewsMediaOrganization(#organization)을 mainEntity로 참조 — 같은 실체를
-// 페이지마다 중복 정의하지 않는 게 원칙(lens/letters의 publisher 참조와 동일).
+// AboutPage — Organization을 새로 정의하지 않고 루트 layout.tsx의 NewsMediaOrganization(#organization)을 mainEntity로 참조한다.
+// 같은 실체를 페이지마다 중복 정의하지 않는다(lens/letters의 publisher 참조와 동일).
 const JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'AboutPage',

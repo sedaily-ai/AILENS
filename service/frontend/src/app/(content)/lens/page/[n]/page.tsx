@@ -9,25 +9,14 @@ import {
   buildLensJsonLd,
 } from '../../lensListShared';
 
-// 2026-09-03 — generateStaticParams 제거(SSR 전환, 빌드 시간 감사).
-// 아카이브 뒷장(예: /lens/page/15)은 실사용자가 거의 안 들어가는데도
-// 빌드 때마다 전부 미리 구워서 빌드 시간·릴리스 용량을 불필요하게
-// 늘리고 있었다 — [slug] 상세 페이지(<Link> 프리페치가 중요한 곳)와
-// 달리 페이지네이션은 그 UX 이득이 미미해 완전 동적 렌더로 바꾼다.
-// export const revalidate 명시(2026-09-30) — 없으면 generateMetadata가
-// 동적 함수라는 이유만으로 Next가 이 라우트를 fully dynamic 처리해 캐시가
-// 전혀 안 걸린다(카테고리 페이지네이션에서 실측 확인된 것과 같은 문제).
-export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts) — route segment config는 정적 분석돼 import한 상수를 못 쓴다, 값 바뀌면 여기도 같이 바꿀 것
+// generateStaticParams는 두지 않는다(SSR). 아카이브 뒷장은 방문이 적어 미리 빌드하면 빌드 시간·릴리스 용량만 늘고, [slug] 상세와 달리 <Link> 프리페치 이득이 미미하다.
+// export const revalidate를 명시한다. 없으면 generateMetadata가 동적 함수라는 이유만으로 Next가 이 라우트를 fully dynamic 처리해 캐시가 걸리지 않는다.
+export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts). route segment config는 정적 분석되어 import한 상수를 쓸 수 없으므로 값 변경 시 함께 수정한다.
 
 export const dynamicParams = true;
 
-// generateStaticParams가 아예 없으면 Next가 이 라우트를 통째로 fully
-// dynamic(ƒ) 처리해 캐시가 전혀 안 걸린다 — revalidate를 명시해도 무시됨
-// (실측: 클린 빌드 결과 항상 ƒ, 배포 후 항상 no-store, 2026-09-30). 빈
-// 배열을 반환해 "빌드 시점엔 아무 것도 미리 안 만들지만 요청이 오면 그때
-// 렌더해서 ISR로 캐시해도 된다"는 걸 Next에 알려주는 표준 패턴
-// (dynamicParams:true와 짝 — 빌드 시간·산출물 크기를 늘리지 않으면서도
-// 캐싱은 정상 작동하게 한다).
+// generateStaticParams가 없으면 Next가 이 라우트를 fully dynamic(ƒ) 처리해 revalidate를 명시해도 무시되고 캐시가 걸리지 않는다.
+// 빈 배열을 반환하면 빌드 시점엔 아무것도 만들지 않고 요청 시 렌더해 ISR로 캐시하는 표준 패턴이 된다(dynamicParams:true와 짝).
 export async function generateStaticParams() {
   return [];
 }
@@ -44,7 +33,7 @@ export async function generateMetadata({
     title,
     description: LENS_LIST_DESCRIPTION,
     alternates: { canonical: url },
-    // 뒷장(2페이지 이후)은 얇은 목록이라 색인에서 뺀다(링크는 따라가게 follow) — 기사는 사이트맵·내부 링크로 발견된다(2026-10-01, SEO 감사).
+    // 뒷장(2페이지 이후)은 얇은 목록이라 색인에서 뺀다(링크는 따라가게 follow) — 기사는 사이트맵·내부 링크로 발견된다.
     robots: { index: false, follow: true },
     openGraph: {
       title,
@@ -66,9 +55,7 @@ export async function generateMetadata({
 
 export default async function LensListPageN({ params }: { params: Promise<{ n: string }> }) {
   const { n: rawN } = await params;
-  // n<=1/비정상값 리다이렉트는 middleware.ts가 요청 단계에서 처리한다
-  // (redirect()를 여기 두면 Next가 이 라우트를 캐시 불가로 판정 — 위 주석
-  // 참조). 그래도 혹시 직접 들어오는 경우를 대비해 안전하게 clamp만 한다.
+  // n<=1/비정상값 리다이렉트는 middleware.ts가 요청 단계에서 처리한다(redirect()를 여기 두면 Next가 이 라우트를 캐시 불가로 판정). 직접 들어오는 경우를 대비해 clamp만 한다.
   const parsedN = parseInt(rawN, 10);
   const n = Number.isFinite(parsedN) && parsedN > 1 ? parsedN : 1;
 

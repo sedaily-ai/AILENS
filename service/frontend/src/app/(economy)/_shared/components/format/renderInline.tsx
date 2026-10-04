@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { wrapWithTerms } from '@/shared/ui/notice/TermTooltip';
 
-// 레터 인라인 서식 렌더러(2026-10-01, LensFormatPanel에서 분리 — 30초 핵심 카드도 같은 규칙을 쓰려고).
+// 레터 인라인 서식 렌더러(LensFormatPanel과 30초 핵심 카드가 같은 규칙을 쓴다).
 //
 //  · 마크다운 **굵게** / *기울임* — 기호가 그대로 보이지 않게 푼다.
 //  · 따옴표로 묶인 말(“…” ‘…’ "…" '…')은 기호가 없어도 자동으로 굵게. 홑따옴표는 영어 아포스트로피와 겹치지

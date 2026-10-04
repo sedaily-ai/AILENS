@@ -17,10 +17,9 @@ import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
 import type { RailItem } from '@/shared/ui/list/HotLettersRail';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
-// "최신 뉴스" 목록(/lens, 화면 이름은 홈의 "최신 뉴스 · 전체 보기"와 맞춤) — 카테고리 페이지(/markets 등)와 같은 구조로 재설계(2026-10-04, 사용자 요청: "다른 쪽 작업한 것처럼 맞춰서").
+// "최신 뉴스" 목록(/lens, 홈의 "최신 뉴스 · 전체 보기"와 이름을 맞춤) — 카테고리 페이지(/markets 등)와 같은 구조이다.
 //   [‹ 오늘의 시선 헤더] → [히어로 1건] → [카드 3건] → [날짜별 목록 | 우측 레일]
-// 이전(2026-08-14 설계)의 "히어로에 네 시선 질문 4행 + 목록에 아바타 4개" 구조는 걷었다 — 홈의 지면 영역·기사 상세가 네 형식을 이미 보여 주고,
-// 목록에서는 반복되는 아바타 노이즈가 더 컸다. 페이지 주소(/lens, /lens/page/N)와 서버 페이지네이션은 그대로다.
+// 홈의 지면 영역·기사 상세가 네 형식을 이미 보여 주므로 목록에서는 형식별 요소를 반복하지 않는다. 페이지 주소(/lens, /lens/page/N)와 서버 페이지네이션을 사용한다.
 const PAGE_SIZE = 20;
 
 function toItem(l: CmsLens): ArchiveItem {

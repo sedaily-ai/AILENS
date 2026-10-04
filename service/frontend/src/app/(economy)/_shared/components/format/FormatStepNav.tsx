@@ -3,10 +3,9 @@
 import { LENS_FORMATS, lensPerspectiveAt, lensPanelId, lensTabId } from '@/shared/constants/lensPerspectives';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
-// 형식 이어 보기(2026-10-03, 사용자 요청) — 같은 기사를 레터 → 웹툰 → 팟캐스트 → 영상 순서로 차례대로 넘겨 볼 수 있게,
-// 각 형식 맨 아래에 "← 이전 형식 / 다음 형식 →"을 둔다. 위쪽 형식 탭을 다시 올라가 누르지 않아도 된다.
-// 탭 전환은 기존 방식과 같이 형식 탭 버튼을 대신 눌러(LensViewClient.select가 처리) 상태·계측·스크롤 로직을 한 곳에 둔다.
-// 크롤러 영향 없음: 네 형식 패널은 원래도 항상 DOM에 있고, 여기 요소는 링크가 아니라 버튼이다.
+// 형식 이어 보기 — 같은 기사를 레터 → 웹툰 → 팟캐스트 → 영상 순서로 차례대로 볼 수 있게 각 형식 맨 아래에 "← 이전 형식 / 다음 형식 →"을 둔다.
+// 탭 전환은 형식 탭 버튼을 대신 눌러(LensViewClient.select가 처리) 상태·계측·스크롤 로직을 한 곳에 둔다.
+// 크롤러 영향 없음: 네 형식 패널은 항상 DOM에 있고, 여기 요소는 링크가 아니라 버튼이다.
 export function FormatStepNav({
   index,
   articleId,

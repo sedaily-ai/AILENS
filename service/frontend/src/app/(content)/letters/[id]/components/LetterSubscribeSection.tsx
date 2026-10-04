@@ -6,17 +6,14 @@ import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { API_URL } from '@/shared/config/apiClient';
 import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
 
-// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드).
-// ── 뉴스레터 구독 — 레터 하단 인라인 ─────────────────────────────────
-// 그 레터의 페르소나로 고정. POST /api/newsletter/subscribe 로 DDB 저장.
+// 뉴스레터 구독 — 레터 하단 인라인. POST /api/newsletter/subscribe로 DDB에 저장한다.
 export function LetterSubscribeSection({ letter }: { letter: DisplayLetter }) {
   const [email, setEmail] = useState('');
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 이미 구독 중이면 미리 채워둠 (localStorage 캐시). 페르소나별 그룹 목록 대신
-  // 단일 명의(2026-08-07 MBTI 페르소나 폐지) 이므로 이메일 저장 여부만 본다.
+  // 이미 구독 중이면 미리 채워둔다(localStorage 캐시). 단일 명의이므로 이메일 저장 여부만 본다.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem('newsletter-email');

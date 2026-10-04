@@ -9,7 +9,7 @@ import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { PaperDateNav } from './PaperDateNav';
 import { paperDateLabel, parsePaperDate } from './paperShared';
 
-// 지난 지면 한 날(2026-10-04) — 홈의 4탭 지면 카드를 그 날짜 기사로 보여 주고, 위에서 날짜를 옮긴다.
+// 지난 지면 한 날 — 홈의 4탭 지면 카드를 그 날짜 기사로 보여 주고, 위에서 날짜를 옮긴다.
 // 날짜 이동은 전부 링크(서버가 같은 HTML을 만들어 검색엔진도 따라갈 수 있다). 지면이 편성된 날만 이동 대상이다(dates).
 export function PaperDayClient({
   date,
@@ -29,7 +29,7 @@ export function PaperDayClient({
   return (
     <ArticlePageShell sidebar={<HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} />}>
       <main id="main-content" style={{ paddingBottom: 100, minHeight: '80vh' }}>
-        {/* 눈에 보이는 '지난 지면' 라벨·제목·날짜 띠는 2026-10-05 삭제(사용자 요청) — 카드 안 제호가 날짜를 말하고, 날짜 선택 달력은 카드 머리띠 오른쪽에 둔다. h1은 검색엔진·스크린리더용으로 숨겨 둔다. */}
+        {/* 눈에 보이는 '지난 지면' 라벨·제목·날짜 띠는 두지 않는다. 카드 안 제호가 날짜를 말하고 날짜 선택 달력은 카드 머리띠 오른쪽에 둔다. h1은 검색엔진·스크린리더용으로 숨겨 둔다. */}
         <h1 style={{ position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}>
           {paperDateLabel(date)} ({parsePaperDate(date).weekday}) 지면
         </h1>

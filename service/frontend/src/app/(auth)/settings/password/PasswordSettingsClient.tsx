@@ -7,11 +7,8 @@ import { useAuth } from '@/features/auth';
 import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/auth/passwordPolicy';
 import { PasswordChecklist, PasswordMismatchHint } from '@/shared/ui/form/PasswordChecklist';
 
-// 이슈 #17 — 로그인한 사용자가 비밀번호를 바꿀 방법이 프론트에 전혀 없었다.
-// "비밀번호 찾기"(이메일 왕복, forgotPassword)와는 독립적인 기능이다 — 기존
-// 비밀번호를 요구하므로 메일이 개입하지 않고, 하루 발송 한도(이슈 #15)와도
-// 무관하다. LoginClient.tsx와 같은 톤(흰 배경, 검정 CTA, 절제된 라운드)을
-// 그대로 재사용한다.
+// 로그인한 사용자의 비밀번호 변경. "비밀번호 찾기"(이메일 왕복, forgotPassword)와 독립적인 기능이다 — 기존 비밀번호를 요구하므로 메일이 개입하지 않고 일일 발송 한도와도 무관하다.
+// LoginClient.tsx와 같은 톤(흰 배경, 검정 CTA, 절제된 라운드)을 재사용한다.
 
 const INPUT_CLS =
   'w-full px-4 py-3 text-[14.5px] text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/5 transition-colors';
@@ -52,8 +49,7 @@ export function PasswordSettingsClient() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // 로딩 중에 isAuthenticated를 먼저 판단하면(초기값 false) 로그인된
-  // 사용자도 잠깐 로그인 화면으로 튕긴다 — isLoading이 끝난 뒤에만 판단.
+  // 로딩 중(isAuthenticated 초기값 false)에 인증 여부를 판단하면 로그인된 사용자도 잠깐 로그인 화면으로 이동한다. isLoading이 끝난 뒤에만 판단한다.
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/login');

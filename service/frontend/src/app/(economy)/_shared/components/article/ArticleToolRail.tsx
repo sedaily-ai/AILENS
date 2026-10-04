@@ -4,12 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { SketchListen, SketchPrint, SketchShare, SketchTextMinus, SketchTextPlus } from '@/app/(economy)/_shared/components/icons/SketchIcons';
 import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 
-// 기사 왼쪽 고정 도구 레일(2026-10-01) — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + /
-// Size - / Share / Print" 구조. 항목마다 아이콘 + 라벨 한 세트로, 공유는 아이콘 6개를 펼치지
-// 않고 버튼 하나가 작은 팝오버를 연다.
-//
-// 글자 크기는 ArticleFontSizeControl과 같은 저장 키·단계(작게 0.9 / 보통 1 / 크게 1.15)를
-// 쓴다 — 좁은 화면에서 쓰는 가로 도구 줄과 설정이 공유된다.
+// 기사 왼쪽 고정 도구 레일 — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + / Size - / Share / Print" 구조. 항목마다 아이콘 + 라벨 한 세트이며, 공유는 아이콘을 펼치지 않고 버튼 하나가 작은 팝오버를 연다.
+// 글자 크기는 ArticleFontSizeControl과 같은 저장 키·단계(작게 0.9 / 보통 1 / 크게 1.15)를 써서 좁은 화면의 가로 도구 줄과 설정을 공유한다.
 
 type FontSize = 'small' | 'medium' | 'large';
 const SCALE: Record<FontSize, string> = { small: '0.9', medium: '1', large: '1.15' };

@@ -14,18 +14,11 @@ import type { ArticleNeighbor } from './components/article/ArticleNeighborNav';
 
 import { SITE_URL } from '@/shared/constants/site';
 
-// 카테고리+날짜 경로 감싼 lens 상세 — 7개(markets/property/industry/
-// finance/international/culture/news) 카테고리 폴더가 전부 이 모듈
-// 하나를 공유한다(2026-09-30). 원래 (content)/[slug]/page.tsx에 있던
-// 로직을 그대로 옮겼고, 그 옛 경로는 이제 lensPath()로 계산한 정본
-// 경로로 redirect만 하는 얇은 페이지로 남는다(letters/[id]/page.tsx의
-// lensPost 리다이렉트와 같은 패턴).
+// 카테고리+날짜 경로로 감싼 lens 상세. 7개(markets/property/industry/finance/international/culture/news) 카테고리 폴더가 이 모듈을 공유한다.
+// 옛 경로 (content)/[slug]/page.tsx는 lensPath()로 계산한 정본 경로로 redirect만 하는 얇은 페이지다(letters/[id]/page.tsx의 lensPost 리다이렉트와 같은 패턴).
 //
-// generateStaticParams는 의도적으로 안 둔다 — 원래(단일 세그먼트
-// /lens/[slug]) "Link 프리페치 분류" 목적으로 최소 10건만 정적 생성했는데,
-// 카테고리별로 나뉜 지금 그 값을 그대로 복제하면 7배로 불어나고
-// 실질 이득(prefetch 분류)은 크지 않다 — dynamicParams 기본값(true)+
-// revalidate로 항상 정상 렌더된다.
+// generateStaticParams는 두지 않는다. 카테고리별로 복제하면 정적 생성 수가 7배로 늘고 이득(prefetch 분류)은 작다.
+// dynamicParams 기본값(true)+revalidate로 항상 정상 렌더된다.
 export const revalidate = 300;
 export const dynamicParams = true;
 
@@ -55,7 +48,7 @@ async function findLens(slug: string): Promise<CmsLens | null> {
 
 // 하단 "{카테고리} 더 보기"(같은 카테고리 최신 3건)와 "관련 기사"(같은 하위 카테고리 최대 4건,
 // 앞 3건과 겹치지 않게)를 한 번에 뽑는다 — 이미 받아온 전체 목록에서 거르므로 추가 API 호출 없음.
-// 카테고리가 없는 글(미분류)은 카테고리 무관 최신으로 폴백(2026-10-01, 이전 동작).
+// 카테고리가 없는 글(미분류)은 카테고리 무관 최신으로 폴백.
 async function findOtherLens(
   slug: string,
   current: CmsLens | null,
@@ -71,7 +64,7 @@ async function findOtherLens(
   return { more, related };
 }
 
-// 이전/다음 기사(2026-10-03) — 같은 카테고리 안에서 발행 시각 순. "이전"=더 오래된 글, "다음"=더 최근 글.
+// 이전/다음 기사 — 같은 카테고리 안에서 발행 시각 순. "이전"=더 오래된 글, "다음"=더 최근 글.
 // 카테고리가 없는 글은 전체 목록 기준. 이미 받아온 전체 목록에서 고르므로 추가 API 호출은 없다.
 async function findNeighbors(slug: string, current: CmsLens | null): Promise<{ prev: ArticleNeighbor | null; next: ArticleNeighbor | null }> {
   if (!current) return { prev: null, next: null };
@@ -87,8 +80,8 @@ async function findNeighbors(slug: string, current: CmsLens | null): Promise<{ p
 
 const DEFAULT_COVER = `${SITE_URL}/lens/default-cover.webp`;
 
-/** 검색·공유용 대표 이미지(2026-10-04). 기사 원 사진(운영 CDN, 대부분 보유) → 카드/웹툰 컷 → 기본 커버 순.
- *  이전엔 cover_image_url(웹툰 컷이 들어가는 경우가 많음)만 써서 검색·공유 미리보기가 만화 컷이었다. RSS(buildRssFeed)와 같은 우선순위. */
+/** 검색·공유용 대표 이미지. 기사 원 사진(운영 CDN) → 카드/웹툰 컷 → 기본 커버 순이며 RSS(buildRssFeed)와 같은 우선순위다.
+ *  cover_image_url만 쓰면 웹툰 컷이 들어가 검색·공유 미리보기가 만화 컷이 된다. */
 function pickShareImages(lens: CmsLens): { primary: string; all: string[]; isDefault: boolean } {
   const abs = (u: string | null | undefined) => (u ? (u.startsWith('/') ? `${SITE_URL}${u}` : u) : '');
   const all = [...new Set([abs(pickLensPhoto(lens)), abs(lens.cover_image_url)].filter(Boolean))];
@@ -120,8 +113,7 @@ function articleKeywords(lens: CmsLens): string[] {
 function buildJsonLd(lens: CmsLens) {
   const url = `${SITE_URL}${lensPath(lens)}`;
   const headline = seoHeadline(lens.headline);
-  // 발행 시각(초 단위)이 있으면 그걸 쓴다(2026-10-01, Google 날짜 가이드 —
-  // 정확한 시각+타임존). 옛 글은 date 폴백.
+  // 발행 시각(초 단위)이 있으면 쓴다(Google 날짜 가이드: 정확한 시각+타임존). 옛 글은 date로 폴백한다.
   const published = lens.published_at || `${lens.date}T07:00:00+09:00`;
   const shareImages = pickShareImages(lens);
   const category = breadcrumbCategory(lens);
@@ -140,7 +132,7 @@ function buildJsonLd(lens: CmsLens) {
         description: lens.context,
         articleBody: bodyJoined,
         articleSection: lens.category || '경제',
-        // 2026-10-04 GEO·AEO 보강 — 분류·주제·요약·출처·저작권·읽기 동작을 기계가 그대로 읽도록 명시.
+        // GEO·AEO 보강 — 분류·주제·요약·출처·저작권·읽기 동작을 기계가 읽도록 명시.
         abstract: lens.context,
         keywords: articleKeywords(lens),
         thumbnailUrl: shareImages.primary,
@@ -163,7 +155,7 @@ function buildJsonLd(lens: CmsLens) {
           parentOrganization: { '@id': `${SITE_URL}/#organization` },
         },
         publisher: { '@id': `${SITE_URL}/#organization` },
-        // 실제 크기를 모르는 이미지에 1200×800을 박아 두던 것을 뺐다(2026-10-04). 사진 + 카드/웹툰 컷을 함께 제공.
+        // 실제 크기를 모르는 이미지에 1200×800을 지정하지 않는다. 사진 + 카드/웹툰 컷을 함께 제공한다.
         image: shareImages.all.map((u) => ({ '@type': 'ImageObject', url: u })),
         ...(lens.source_url
           ? {
@@ -191,7 +183,7 @@ function buildJsonLd(lens: CmsLens) {
         },
         isAccessibleForFree: true,
       },
-      // 질문-답변 구조를 FAQPage로도 노출(2026-10-04) — 화면에 실제로 보이는 4가지 시선 Q&A와 같은 내용이라 AI 답변 엔진·리치 결과가 그대로 인용한다.
+      // 질문-답변 구조를 FAQPage로도 노출 — 화면의 4가지 시선 Q&A와 같은 내용이라 AI 답변 엔진·리치 결과가 인용한다.
       ...(faqItems(lens).length > 0
         ? [
             {
@@ -205,7 +197,7 @@ function buildJsonLd(lens: CmsLens) {
         : []),
       {
         '@type': 'BreadcrumbList',
-        // AI LENS > {분류} > 기사 (2026-10-04). 이전 중간 단계 "시선(/lens)"은 분류 단계로 대체. 분류가 없으면 단계를 건너뛴다.
+        // AI LENS > {분류} > 기사. 분류가 없으면 단계를 건너뛴다.
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
           ...(category ? [{ '@type': 'ListItem', position: 2, name: category.name, item: category.url }] : []),
@@ -226,7 +218,7 @@ export async function buildLensArticleMetadata(
   if (!lens) {
     return { title: '이슈를 찾을 수 없어요', robots: { index: false } };
   }
-  // 제목은 정제한 헤드라인만(2026-10-04): 부서 접두사·이모지·"— 4가지 시선"을 뺐다. layout 템플릿이 " | AI LENS"를 붙여 검색 결과에서 잘리지 않는 길이가 된다.
+  // 제목은 정제한 헤드라인만 쓴다(부서 접두사·이모지·"— 4가지 시선" 제외). layout 템플릿이 " | AI LENS"를 붙여도 검색 결과에서 잘리지 않는 길이가 된다.
   const headline = seoHeadline(lens.headline);
   const title = buildPageTitle(headline);
   const description = buildSeoDescription(lens.context, '오늘의 이슈를 4가지 시선으로 짚어드려요.');
@@ -260,7 +252,7 @@ export async function buildLensArticleMetadata(
       description,
       images: [shareImages.primary],
     },
-    // 검색·공유·서지 보강 메타(2026-10-04): 뉴스 키워드, 수정 시각, 분류, Dublin Core, 슬랙·트위터 라벨.
+    // 검색·공유·서지 보강 메타: 뉴스 키워드, 수정 시각, 분류, Dublin Core, 슬랙·트위터 라벨.
     other: {
       news_keywords: articleKeywords(lens).join(', '),
       'og:updated_time': clampModifiedIso(lens.updated_at, lens.published_at || `${lens.date}T07:00:00+09:00`),
@@ -290,15 +282,11 @@ export async function LensArticlePageContent(
   const { more: otherLens, related: relatedLens } = await findOtherLens(slug, lens);
   const neighbors = await findNeighbors(slug, lens);
 
-  // 요청 경로(카테고리/연/월/일)가 실제 글의 정본 경로와 다르면(카테고리
-  // 재분류, 다른 카테고리 폴더로 잘못 들어온 링크 등) 정본으로 리다이렉트
-  // — letters/[id]/page.tsx의 lensPost 리다이렉트와 같은 원칙, 중복
-  // URL로 같은 글이 두 경로에 색인되는 걸 막는다.
+  // 요청 경로(카테고리/연/월/일)가 실제 글의 정본 경로와 다르면(재분류, 잘못된 카테고리 폴더 링크 등) 정본으로 리다이렉트한다.
+  // letters/[id]/page.tsx의 lensPost 리다이렉트와 같은 원칙이며, 같은 글이 두 URL로 색인되는 것을 막는다.
   if (lens) {
     const canonical = lensPath(lens);
-    // lensPath()가 마지막 세그먼트를 encodeURIComponent로 만들어서, 비교
-    // 대상도 같은 인코딩으로 맞춰야 한다 — 안 맞추면 정상 요청도 항상
-    // "다르다"고 판정돼 매 요청마다 리다이렉트되는 버그가 난다.
+    // lensPath()가 마지막 세그먼트를 encodeURIComponent로 만들므로 비교 대상도 같은 인코딩으로 맞춘다. 아니면 정상 요청도 항상 다르다고 판정되어 매번 리다이렉트된다.
     const requested = `/${expectedCategorySlug}/${year}/${month}/${day}/${encodeURIComponent(slug)}`;
     if (requested !== canonical) {
       redirect(canonical);

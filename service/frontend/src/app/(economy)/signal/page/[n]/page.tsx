@@ -5,7 +5,7 @@ import { buildEconomyCategoryMetadata, clampCategoryPage, EconomyCategoryPage } 
 // widgets/CategoryArchiveClient/EconomyCategoryPage.tsx의 clampCategoryPage 주석 참조.
 type Params = Promise<{ n: string }>;
 
-export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS, 값 바뀌면 카테고리 라우트 전체를 같이 바꿀 것
+export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS. 값 변경 시 카테고리 라우트 전체를 함께 수정한다.
 
 export const dynamicParams = true;
 

@@ -6,26 +6,13 @@ import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { FormatIcon } from '@/app/(economy)/_shared/components/icons/LensIcons';
 import { formatAmount } from './lensSamples';
 
-// LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해).
-//
-// ── 형식 선택기 — 2026-08-21 재설계(웹툰 릴론치 PR #10 반영) ──
-// 직전 버전은 인물 일러스트가 들어간 148px 타일 2×2(모바일)였다. 첫
-// 사용자가 이 페이지를 이해하지 못하는 원인이 대부분 이 컨트롤에 있었다:
-//
-//  1. 선택기가 스크롤과 함께 사라졌다. sticky로 고정한다 — 이 페이지에서
-//     유일하게 항상 닿아야 하는 컨트롤이다.
-//  2. 일러스트가 형식을 설명하지 않았다. 형식을 뜻하는 아이콘(BookOpen/
-//     Image/Headphones/Video)으로 바꿨다.
-//  3. 타일이 세로로 320px을 먹었다. 태그라인은 선택기에서 빼고, 고른
-//     형식의 설명은 탭 직후 잠깐 뜨는 토스트(LensViewClient의 #lens-desc)로
-//     보여준다.
-//
-// 2차 개선("너무 일차원적" 피드백):
-//  a. 분량을 탭 안으로 — formatAmount()가 이 기사를 그 형식으로 보면
-//     얼마나 되는지 보여준다(약 2분 / 8컷 / 3:24 / 준비 중).
-//  b. 슬라이딩 인디케이터(.fmt-thumb) — 알약 배경 on/off 대신 하나가
-//     옆으로 미끄러져 형식 간 인접 관계를 나른다.
-//  c. 가로 스와이프(부모의 onPanelTouchStart/End) + 방향성 전환.
+// 형식 선택기 — sticky 세그먼트 탭.
+//  1. sticky로 고정한다. 이 페이지에서 유일하게 항상 닿아야 하는 컨트롤이다.
+//  2. 아이콘은 형식을 뜻하는 것(BookOpen/Image/Headphones/Video)을 쓴다.
+//  3. 태그라인은 선택기에서 빼고, 고른 형식의 설명은 탭 직후 토스트(LensViewClient의 #lens-desc)로 보여준다.
+//  4. 분량을 탭 안에 표시한다. formatAmount()가 이 기사를 그 형식으로 보면 얼마나 되는지 보여준다(약 2분 / 8컷 / 3:24 / 준비 중).
+//  5. 슬라이딩 인디케이터(.fmt-thumb)가 옆으로 미끄러져 형식 간 인접 관계를 나타낸다.
+//  6. 방향성 전환(dir)으로 인디케이터와 본문 진입 방향을 맞춘다.
 export function FormatPicker({
   lens,
   lenses,
@@ -63,10 +50,8 @@ export function FormatPicker({
           } as CSSProperties
         }
       >
-        {/* 슬라이딩 인디케이터 — 탭 뒤에서 움직인다. 형식 색으로 물들며
-            옮겨가므로 "몇 칸 옆으로 갔는지"와 "지금 무슨 형식인지"를
-            한 요소가 같이 말한다. 정보는 이름·분량 텍스트가 나르고
-            이건 관계만 나르므로 aria에서 감춘다. */}
+        {/* 슬라이딩 인디케이터 — 탭 뒤에서 형식 색으로 물들며 움직여 이동 거리와 현재 형식을 함께 나타낸다.
+            정보는 이름·분량 텍스트가 전달하고 이건 관계만 나타내므로 aria에서 감춘다. */}
         <span className="fmt-thumb" aria-hidden />
         {(lenses ?? []).map((l, i) => {
           const p = lensPerspectiveAt(i);
@@ -87,17 +72,12 @@ export function FormatPicker({
               onClick={() => select(i)}
               onKeyDown={(e) => onTabKeyDown(e, i)}
               className="fmt"
-              // 분량 텍스트가 "⋯"이나 "8컷"처럼 짧은 기호·단위라
-              // 그대로 읽히면 뜻이 안 통한다. 이름과 분량을 붙여 한
-              // 문장으로 읽어준다.
+              // 분량 텍스트가 "⋯"이나 "8컷"처럼 짧은 기호·단위라 그대로 읽으면 뜻이 통하지 않는다. 이름과 분량을 붙여 한 문장으로 읽어준다.
               aria-label={`${p.short}, ${amt.spoken}`}
             >
               <span className="fmt-name">{p.short}</span>
-              {/* 분량 — 아이콘을 이 줄에 붙였다. 1행에 아이콘+이름을
-                  같이 넣으면 375px 칸(69.75px)에 "팟캐스트"(56px) +
-                  아이콘(18) + 간격이 안 들어간다. 아이콘이 분량 옆에
-                  오면 "약 2분"이 읽는 시간인지 듣는 시간인지도
-                  아이콘이 구분해준다. */}
+              {/* 분량 — 아이콘을 이 줄에 둔다. 1행에 아이콘+이름을 넣으면 375px 칸(69.75px)에 "팟캐스트"(56px)+아이콘(18)+간격이 들어가지 않는다.
+                  아이콘이 "약 2분"이 읽는 시간인지 듣는 시간인지도 구분해 준다. */}
               <span className="fmt-amt">
                 <span aria-hidden className="fmt-art">
                   <FormatIcon format={lensFormatAt(i)} size={18} />

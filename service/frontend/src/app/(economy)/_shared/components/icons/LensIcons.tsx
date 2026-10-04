@@ -1,10 +1,8 @@
 import type { SVGProps } from 'react';
 
-// 기사 상세 전용 듀오톤 라인 아이콘 세트(2026-10-01).
+// 기사 상세 전용 듀오톤 라인 아이콘 세트.
 //
-// 방향: 귀여운 일러스트(예전에 "고급진 신문 디자인과 안 맞는다"는 피드백을 받은 손그림 캐릭터)가 아니라
-// 절제된 듀오톤 라인 — 24px 격자, 선 1.6, 둥근 끝, 그리고 도형 일부를 옅은 색 면으로 한 겹 깔아 입체감을 준다
-// (Phosphor·Streamline 듀오톤 계열). 한 세트로 일관되게 그려서 모양·두께·여백이 같다.
+// 24px 격자, 선 1.6, 둥근 끝, 도형 일부를 옅은 색 면으로 한 겹 깔아 입체감을 준다(Phosphor·Streamline 듀오톤 계열). 한 세트로 모양·두께·여백을 통일한다.
 // 색: 선은 currentColor(부모 글자색), 면은 tint(기본 currentColor 14%) — 부모 색만 바꾸면 전체가 물든다.
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, 'children'> & { size?: number; tint?: string };

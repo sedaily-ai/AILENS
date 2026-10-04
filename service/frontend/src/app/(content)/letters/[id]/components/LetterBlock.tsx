@@ -1,11 +1,8 @@
 import type { ReactNode } from 'react';
 import { wrapWithTerms } from '@/shared/ui/notice/TermTooltip';
 
-// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드).
-// ── 본문 블록 위계 렌더 ───────────────────────────────────────────────
-// body 는 구조가 텍스트 약속으로만 인코딩된 string[] 이라, 한 줄을
-// 분류해 섹션 헤더 / 소제목 / 인사이트 콜아웃 / 아젠다 / Q&A / 본문으로
-// 시각 위계를 부여한다. 톤은 기존 레터(여백·헤어라인·세리프 본문)를 유지.
+// 본문 블록 위계 렌더. body는 구조가 텍스트 약속으로만 인코딩된 string[]이므로, 한 줄씩 분류해 섹션 헤더 / 소제목 / 인사이트 콜아웃 / 아젠다 / Q&A / 본문으로 시각 위계를 부여한다.
+// 톤은 기존 레터(여백·헤어라인·세리프 본문)를 유지한다.
 const SERIF = '"Noto Serif KR", serif';
 
 export function LetterBlock({

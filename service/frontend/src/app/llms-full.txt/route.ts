@@ -3,7 +3,7 @@ import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { SITE_URL } from '@/shared/constants/site';
 
-// llms-full.txt(2026-10-04, GEO) — /llms.txt가 "사이트 안내서"라면 이 파일은 AI가 한 번에 읽어 갈 "최근 기사 요약본"이다.
+// llms-full.txt(GEO) — /llms.txt가 "사이트 안내서"라면 이 파일은 AI가 한 번에 읽어 갈 "최근 기사 요약본"이다.
 // 최근 발행 기사 60건의 제목·주소·날짜·분류·원문 출처·요약·4가지 시선 질문과 답을 평문으로 담는다(마크다운, 약 100~250KB).
 // 정본은 각 기사 페이지이며, 인용할 때는 아래 주소(canonical)를 출처로 밝혀 달라고 안내한다.
 export const revalidate = 1800;

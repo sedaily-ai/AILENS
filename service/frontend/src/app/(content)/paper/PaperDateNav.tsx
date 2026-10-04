@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { paperPath } from './paperShared';
 
-// 지난 지면 날짜 이동(2026-10-04, 사용자 요청 — "어제 지면은 뭐였지?" 하며 들어온 사람이 원클릭으로 어제·그제로 가고, 원하는 날짜를 바로 고르고, 주·월 단위로 끊어 늘어지지 않게).
-//  - 제목 바로 오른쪽 달력 아이콘: 월 단위 달력(팝업). 먼 날짜를 한 번에 고를 때.
-// 지면이 있는 날만 링크이고 없는 날은 연회색. (제목 아래 한 주 띠는 2026-10-05 사용자 요청으로 삭제)
+// 지난 지면 날짜 이동 — 이전·이후 날짜로 한 번에 이동하고 원하는 날짜를 바로 고를 수 있다.
+//  - 제목 바로 오른쪽 달력 아이콘: 월 단위 달력(팝업). 먼 날짜를 한 번에 고를 때 쓴다.
+// 지면이 있는 날만 링크이고 없는 날은 연회색이다.
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 const ymd = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
@@ -80,7 +80,7 @@ export function PaperDateNav({ date, dates }: { date: string; dates: string[] })
 function MonthGrid({ date, dates, has, onPick }: { date: string; dates: string[]; has: Set<string>; onPick: () => void }) {
   const [year, setYear] = useState(Number(date.slice(0, 4)));
   const [month, setMonth] = useState(Number(date.slice(5, 7)));
-  // 연·월 제목을 눌러 드롭다운(목록)으로 바로 고른다(2026-10-04, 사용자 요청). 목록은 날짜 격자 자리를 잠깐 대신한다.
+  // 연·월 제목을 눌러 드롭다운(목록)으로 바로 고른다. 목록은 날짜 격자 자리를 잠깐 대신한다.
   const [list, setList] = useState<'year' | 'month' | null>(null);
   const key = (s: string) => Number(s.slice(0, 4)) * 12 + Number(s.slice(5, 7));
   const minKey = key(dates[dates.length - 1]);
@@ -162,7 +162,7 @@ function MonthGrid({ date, dates, has, onPick }: { date: string; dates: string[]
   );
 }
 
-// 연·월 드롭다운(2026-10-04, 사용자 요청 — "연도가 십 단위가 되면 찾기 어려우니 스크롤로 찾아가게"): 버튼 아래로 세로 목록이 열리고, 길면 안에서 스크롤한다. 열릴 때 지금 값이 보이는 자리로 간다.
+// 연·월 드롭다운 — 버튼 아래로 세로 목록이 열리고, 길면 안에서 스크롤한다. 열릴 때 현재 값이 보이는 위치로 이동한다.
 function DropMenu({ label, options, selected, open, onToggle, onSelect }: { label: string; options: { value: number; text: string; disabled: boolean }[]; selected: number; open: boolean; onToggle: () => void; onSelect: (v: number) => void }) {
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

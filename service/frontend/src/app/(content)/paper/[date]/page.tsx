@@ -10,13 +10,13 @@ import { SITE_URL } from '@/shared/constants/site';
 import { PaperDayClient } from '../PaperDayClient';
 import { buildPaperDescription, buildPaperJsonLd, paperDateLabel, paperKeywords, paperPath } from '../paperShared';
 
-// "지난 지면"(2026-10-04) — 날짜별로 그날 편성된 지면 4개(최대 16건)를 보여 준다. 일반 기사는 제외(사용자 결정).
-// 서버가 렌더하므로 검색에 노출되고 공유할 수 있다. 지면 데이터(paper_section)는 2026-09-29부터라 그 이전 날짜는 404.
-export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts) — route segment config는 import한 상수를 못 쓴다
+// "지난 지면" — 날짜별로 그날 편성된 지면 4개(최대 16건)를 보여 준다. 일반 기사는 제외한다.
+// 서버가 렌더하므로 검색에 노출되고 공유할 수 있다. 지면 데이터(paper_section)는 2026-09-29부터라 그 이전 날짜는 404이다.
+export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts). route segment config는 import한 상수를 쓸 수 없다.
 export const dynamicParams = true;
 
-// generateStaticParams가 없으면 Next가 이 라우트를 통째로 동적(ƒ)으로 처리해 매 요청이 서버 렌더·no-store가 된다(2026-10-05 실측:
-// 클릭마다 TTFB 약 0.4초, CDN 미캐시). 빈 배열을 돌려 "빌드 땐 만들지 않고 요청이 오면 렌더해 ISR로 캐시"하게 한다(카테고리 라우트와 같은 패턴).
+// generateStaticParams가 없으면 Next가 이 라우트를 통째로 동적(ƒ)으로 처리해 매 요청이 서버 렌더·no-store가 된다(CDN 미캐시).
+// 빈 배열을 돌려 "빌드 땐 만들지 않고 요청이 오면 렌더해 ISR로 캐시"하게 한다(카테고리 라우트와 같은 패턴).
 export async function generateStaticParams() {
   return [];
 }
