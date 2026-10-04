@@ -54,7 +54,7 @@ def load_today_letter(date_str: str) -> tuple[Optional[Dict[str, Any]], str]:
     """
     try:
         from clients.ddb import daily_letters as letters_client# noqa: lazy
-        from handlers.today_letters import shape_letter_response  # noqa: lazy
+        from handlers.content.today_letters import shape_letter_response  # noqa: lazy
 
         rows = letters_client.get_daily_letters(date_str)
         if rows:

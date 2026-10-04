@@ -9,7 +9,7 @@ Run from ``backend/``::
 """
 from __future__ import annotations
 
-from handlers.today_letters import (
+from handlers.content.today_letters import (
     _enrich_body,
     _flatten_mode_a_articles,
     _key_points_from_mode_a,

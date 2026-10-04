@@ -335,7 +335,7 @@ def test_phase4_archive():
     print('── Phase 4: Archive + Similarity Search ──')
     print('')
 
-    from handlers.archive_handler import lambda_handler
+    from handlers.user.archive import lambda_handler
 
     # Save a sentence
     name = 'Archive: save sentence'

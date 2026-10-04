@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
-from handlers import time_machine_handler as tm
+from handlers.timeline import time_machine as tm
 from services.timeline import bigkinds_search as bs
 from utils import date_validation as dv
 

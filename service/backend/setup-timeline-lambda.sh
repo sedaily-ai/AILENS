@@ -37,7 +37,7 @@ REGION="us-east-1"
 API_ID="chzwwtjtgk"
 S3_BUCKET="sedaily-mbti-lambda-packages-dev"
 S3_KEY="lambda_package.zip"
-HANDLER="handlers.timeline_handler.lambda_handler"
+HANDLER="handlers.timeline.timeline.lambda_handler"
 RUNTIME="python3.11"
 # API Gateway HTTP API 의 통합 타임아웃 상한이 30초라 Lambda 도 30초로 맞춘다.
 # (S3 XML 한 파일 조회라 보통 1~2초 안에 끝난다.)

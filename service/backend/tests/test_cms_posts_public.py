@@ -14,8 +14,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from handlers import cms_posts_public
-from handlers.cms_posts_public import lambda_handler
+from handlers.content import cms_posts_public as cms_posts_public
+from handlers.content.cms_posts_public import lambda_handler
 
 
 class _FakePosts:

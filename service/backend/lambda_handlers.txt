@@ -1,0 +1,23 @@
+# Lambda 함수 ↔ 핸들러 모듈 대응표 — deploy.sh가 읽는다. 열: 함수이름  옛모듈  새모듈 (handler 문자열은 "<모듈>.lambda_handler")
+# 2026-10-05 handlers/를 도메인 폴더로 재구성하면서 새 경로로 옮겼다. 옛모듈은 전환용 shim(패키징 때 자동 생성)에만 쓴다.
+sedaily-mbti-article-collector-dev  handlers.article_collector  handlers.articles.collector
+sedaily-mbti-article-dev  handlers.article_handler  handlers.articles.article
+sedaily-mbti-s3-articles-dev  handlers.s3_articles_handler  handlers.articles.s3_articles
+sedaily-mbti-search-dev  handlers.search_handler  handlers.articles.search
+sedaily-mbti-chatbot-dev  handlers.chatbot_handler  handlers.chat.chatbot
+sedaily-mbti-voice-stt-presign-dev  handlers.voice.stt_presign  handlers.chat.voice.stt_presign
+sedaily-mbti-voice-tts-dev  handlers.voice.tts  handlers.chat.voice.tts
+sedaily-mbti-ws-connect-dev  handlers.websocket.connect  handlers.chat.websocket.connect
+sedaily-mbti-ws-disconnect-dev  handlers.websocket.disconnect  handlers.chat.websocket.disconnect
+sedaily-mbti-ws-message-dev  handlers.websocket.message  handlers.chat.websocket.message
+sedaily-mbti-v2-posts-dev  handlers.cms_posts_public  handlers.content.cms_posts_public
+sedaily-mbti-v2-today-letters-dev  handlers.today_letters  handlers.content.today_letters
+sedaily-mbti-briefing-dev  handlers.briefing_handler  handlers.content.briefing
+sedaily-mbti-v2-subscribe-dev  handlers.subscribe  handlers.content.subscribe
+sedaily-mbti-timeline-dev  handlers.timeline_handler  handlers.timeline.timeline
+sedaily-mbti-time-machine-dev  handlers.time_machine_handler  handlers.timeline.time_machine
+sedaily-mbti-user-dev  handlers.user_handler  handlers.user.user
+sedaily-mbti-archive-dev  handlers.archive_handler  handlers.user.archive
+sedaily-mbti-post-dev  handlers.post_handler  handlers.user.community_post
+sedaily-mbti-question-dev  handlers.question_handler  handlers.user.question
+sedaily-mbti-v2-health-dev  handlers.health  handlers.system.health

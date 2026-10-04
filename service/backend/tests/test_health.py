@@ -6,7 +6,7 @@ import json
 
 
 def test_health_get_returns_ok():
-    from handlers.health import lambda_handler
+    from handlers.system.health import lambda_handler
 
     event = {
         'httpMethod': 'GET',
@@ -20,7 +20,7 @@ def test_health_get_returns_ok():
 
 
 def test_health_options_returns_cors_preflight():
-    from handlers.health import lambda_handler
+    from handlers.system.health import lambda_handler
 
     event = {
         'httpMethod': 'OPTIONS',
@@ -35,7 +35,7 @@ def test_health_options_returns_cors_preflight():
 
 def test_health_accepts_http_api_v2_event_format():
     """HTTP API (v2) puts method under requestContext.http.method instead of httpMethod."""
-    from handlers.health import lambda_handler
+    from handlers.system.health import lambda_handler
 
     event = {
         'requestContext': {'http': {'method': 'GET'}},

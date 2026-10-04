@@ -86,6 +86,20 @@ find lambda-build -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || tr
 find lambda-build -type f -name "*.pyc" -delete 2>/dev/null || true
 # infrastructure/ is NOT copied (only used for CloudFormation/Step Functions)
 
+# 옛 핸들러 경로 shim — handlers/를 도메인 폴더로 옮긴(2026-10-05) 뒤에도, 아직 옛 handler 문자열이
+# 설정돼 있는 Lambda가 코드 갱신 직후 깨지지 않게 한다. 저장소에는 두지 않고 패키징 때만 만든다.
+# 아래 Step 3가 코드 갱신 뒤 handler 설정을 새 경로로 바꾸고 나면 이 shim은 호출되지 않는다.
+echo "  -> Generating legacy handler shims..."
+grep -v '^#' lambda_handlers.txt | while read -r _fn OLD_MOD NEW_MOD; do
+  [ -z "$OLD_MOD" ] && continue
+  OLD_PATH="lambda-build/$(echo "$OLD_MOD" | tr . /).py"
+  OLD_DIR="$(dirname "$OLD_PATH")"
+  mkdir -p "$OLD_DIR"
+  # 옛 패키지(handlers/voice, handlers/websocket)가 새 구조엔 없으므로 __init__.py를 만들어 준다
+  [ -f "$OLD_DIR/__init__.py" ] || touch "$OLD_DIR/__init__.py"
+  printf 'from %s import lambda_handler  # noqa: F401  (전환용 shim)\n' "$NEW_MOD" > "$OLD_PATH"
+done
+
 # Create ZIP package
 echo "  -> Creating ZIP package..."
 cd lambda-build
@@ -237,6 +251,19 @@ for FUNCTION_NAME in "${FUNCTIONS[@]}"; do
     > /dev/null 2>&1; then
     echo "    [OK] Updated (runtime: $RUNTIME)"
     ((SUCCESS_COUNT++))
+    # handler 설정을 새 모듈 경로로 맞춘다(이미 같으면 건너뜀). 코드 갱신이 끝난 뒤에 바꿔야 shim이 그 사이를 받친다.
+    NEW_MOD=$(grep -v '^#' lambda_handlers.txt | awk -v f="$FUNCTION_NAME" '$1==f {print $3}')
+    if [ -n "$NEW_MOD" ]; then
+      WANT_HANDLER="$NEW_MOD.lambda_handler"
+      CUR_HANDLER=$(printf '%s' "$CONFIG_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Handler",""))')
+      if [ "$CUR_HANDLER" != "$WANT_HANDLER" ]; then
+        aws lambda wait function-updated --function-name "$FUNCTION_NAME" --region us-east-1
+        aws lambda update-function-configuration --function-name "$FUNCTION_NAME" \
+          --handler "$WANT_HANDLER" --region us-east-1 --output text --query 'Handler' > /dev/null \
+          && echo "    [OK] handler: $CUR_HANDLER -> $WANT_HANDLER" \
+          || echo "    [WARN] handler 갱신 실패(옛 경로 shim으로 계속 동작)"
+      fi
+    fi
   else
     echo "    [FAIL] update-function-code returned error"
     ((FAIL_COUNT++))

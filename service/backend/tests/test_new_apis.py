@@ -162,7 +162,7 @@ def run_cleanup():
 def test_archive_direct():
     """Test archive handler via direct Python invocation."""
 
-    from handlers.archive_handler import lambda_handler
+    from handlers.user.archive import lambda_handler
 
     saved_archive_id = None
 

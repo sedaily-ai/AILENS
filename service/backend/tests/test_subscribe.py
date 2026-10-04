@@ -17,7 +17,7 @@ sys.path.insert(0, BACKEND)
 
 
 def _post(body):
-    from handlers.subscribe import lambda_handler
+    from handlers.content.subscribe import lambda_handler
     return lambda_handler({"httpMethod": "POST", "rawPath": "/api/v2/subscribe",
                            "body": json.dumps(body)}, None)
 
@@ -35,17 +35,17 @@ def test_consent_required_400():
 
 
 def test_unsubscribe_requires_token_400():
-    from handlers.subscribe import lambda_handler
+    from handlers.content.subscribe import lambda_handler
     r = lambda_handler({"httpMethod": "GET", "rawPath": "/api/v2/unsubscribe",
                         "queryStringParameters": {}}, None)
     assert _status(r) == 400
 
 
 def test_email_regex():
-    from handlers.subscribe import _EMAIL_RE
+    from handlers.content.subscribe import _EMAIL_RE
     assert _EMAIL_RE.match("user@naver.com")
     assert not _EMAIL_RE.match("user@bad")
 
 
 def test_handler_syntax_ok():
-    ast.parse(open(os.path.join(BACKEND, "handlers", "subscribe.py"), encoding="utf-8").read())
+    ast.parse(open(os.path.join(BACKEND, "handlers", "content", "subscribe.py"), encoding="utf-8").read())
