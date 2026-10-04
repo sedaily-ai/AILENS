@@ -39,6 +39,9 @@
 | 15f8033 | lens-cms-api 기본 주소 리터럴 8곳 → 상수 1곳 | 8 → 1 |
 | 2dfea27 | 독서 연속일수 테스트 5개 | 백엔드 단위 179 → 184 |
 | ed08534 | shape_lens 포맷 변환 분리 + 특성화 테스트 3개 | 단위 184 → 187 |
+| 37b49f7 | 서버 시드 목록 재조회 effect 5곳 → useServerSeededList 훅 | 경고 15 → 10 |
+| 41232af | LensPreviewSection 지면 로직 lib 분리 + 변천사 주석 worklog 이전 + 테스트 3개 | 764 → 684줄, vitest 13 |
+| 31c3692 | 단어 퀴즈 기능 삭제(사용자 확인) | 프론트 3·백엔드 2 파일 삭제, 홈 퀴즈 API 호출 -1 |
 
 ## 4. 검증
 
@@ -54,6 +57,9 @@
 - 범위 밖 관찰: setup-lambda-warming.sh가 warmup 이벤트를 search/article/post에 보내지만 warmup 분기는 post·question 핸들러에만 있음
 
 ## 6. 다음
+
+- 운영 Lambda sedaily-mbti-v2-quiz-dev와 API Gateway /api/quiz/* 라우트는 수동 정리 대상(코드는 삭제됨)
+- admin의 퀴즈 CRUD(admin/backend/repo/quiz_repo.py 등)는 범위 밖이라 그대로 있음
 
 - 날짜 유틸 잔여(PaperDateNav·DateRangeFilter의 pad 계열), 응답/CORS 빌더 통일, 카테고리 라우트 14개 보일러플레이트 압축
 - 백엔드 CLAUDE.md 구조 서술 갱신(clients가 `*_pg_client` 기반으로 바뀐 점)
