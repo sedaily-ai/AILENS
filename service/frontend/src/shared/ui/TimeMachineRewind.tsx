@@ -54,6 +54,7 @@
 // 그만큼 프레임이 흔들린다. 상태는 "도착했다"와 "지금 지나는 연도"만 바뀔 때
 // 한 번씩 올린다.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { kdate, ymd } from '@/shared/lib/timelineDates';
 
 /* ── 홈 톤 토큰 (NewsTimeMachineSection 과 동일) ─────────────────── */
 const INK = '#111827'; // 17.74:1 on #fff
@@ -120,15 +121,6 @@ const DUR_MAX = 2000;
 const ARRIVAL_MS = 480;
 /** 비행으로 볼 수 있는 최소 이동 거리(px). 이보다 짧으면 날지 않고 바로 앉는다. */
 const MIN_FLIGHT_PX = 28;
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function kdate(s: string): string {
-  const [y, m, d] = s.split('-');
-  return `${y}년 ${parseInt(m, 10)}월 ${parseInt(d, 10)}일`;
-}
 
 /**
  * 연 단위 소수 위치(2026-08-16 → 2026.62).

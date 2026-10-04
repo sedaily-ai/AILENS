@@ -20,6 +20,7 @@ import { QuestionTab, dailyQuestions } from "@/features/question";
 import { NewsFeedTab, type Term } from "@/features/news-feed";
 import { ArchiveTab } from "@/features/archive";
 import { buildHeaderTabs } from "@/shared/lib/headerTabs";
+import { formatDateStr } from "@/shared/utils/dateUtils";
 
 interface Props {
   selectedGroup: MbtiGroupId;
@@ -47,14 +48,6 @@ interface ArchivedSentence {
   articlePublishedAt?: string; // 기사 발행일
   createdAt: Date; // 저장일
 }
-
-// 날짜 헬퍼 함수들
-const formatDateStr = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}${m}${d}`;
-};
 
 const isSameDay = (d1: Date, d2: Date): boolean => {
   return d1.getFullYear() === d2.getFullYear() &&
