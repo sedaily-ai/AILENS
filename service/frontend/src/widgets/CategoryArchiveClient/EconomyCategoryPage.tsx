@@ -56,3 +56,19 @@ export async function EconomyCategoryPage({ slug, page = 1 }: { slug: string; pa
     </>
   );
 }
+
+/**
+ * /{slug}/page/[n]의 n 문자열 → 페이지 번호. n<=1 리다이렉트는 middleware.ts가 처리한다
+ * (redirect()를 페이지에 두면 캐시 불가로 판정됨)이라 여기선 안전하게 1 이상으로만 맞춘다.
+ *
+ * 카테고리 라우트 파일(app/(economy)/{slug}/page.tsx, page/[n]/page.tsx) 공통 규칙 — 일부러 파일마다 둔 설정:
+ * - `revalidate = 300`: CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts)와 같은 값. route segment config는 정적 분석돼
+ *   import한 상수를 못 쓴다. 명시하지 않으면 빌드마다 s-maxage=31536000으로 굳거나(2026-09-30 실측)
+ *   generateMetadata 때문에 fully dynamic(no-store)이 된다.
+ * - `[n]`의 `generateStaticParams() => []` + `dynamicParams = true`: 빌드 때는 아무것도 미리 만들지 않지만
+ *   요청이 오면 렌더해 ISR로 캐시하게 하는 표준 패턴. 없으면 라우트 전체가 ƒ(동적) 처리돼 캐시가 안 걸린다.
+ */
+export function clampCategoryPage(raw: string): number {
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
+}
