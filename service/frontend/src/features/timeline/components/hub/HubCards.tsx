@@ -1,7 +1,7 @@
 // /timeline 입구 — 연대 카드와 시대 카드. 날짜를 몰라도 사건으로 들어갈 수 있게 대표 사건 이름을 미리 보여준다.
 import Link from 'next/link';
 import { DECADES, ERAS, getDecadeEvents } from '@/shared/data/timelineEvents';
-import { SURFACE_SUNKEN, TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, FONT, SPACE, CONTAINER_MAX } from '../lib/tone';
+import { SURFACE_SUNKEN, TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, FONT, SPACE, CONTAINER_MAX } from '@/features/timeline/lib/tone';
 
 const cardStyle = { display: 'block', background: SURFACE_SUNKEN, border: `1px solid ${BORDER_HAIRLINE}`, borderRadius: 14, padding: '16px 18px', textDecoration: 'none' } as const;
 

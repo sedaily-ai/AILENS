@@ -6,8 +6,8 @@ import { fetchRangeArticles, type RangeArticle } from '@/shared/lib/api/timeline
 import { addDays } from '@/shared/lib/date/timelineDates';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
-import { resolveArticleLink } from '../lib/articleLinks';
-import { TEXT_STRONG, TEXT_MUTED, TEXT_BODY, BORDER_HAIRLINE, BORDER_CONTROL, FONT, TOUCH_MIN } from '../lib/tone';
+import { resolveArticleLink } from '@/features/timeline/lib/articleLinks';
+import { TEXT_STRONG, TEXT_MUTED, TEXT_BODY, BORDER_HAIRLINE, BORDER_CONTROL, FONT, TOUCH_MIN } from '@/features/timeline/lib/tone';
 
 /** 사건 기간: 시작일부터 끝(기간 사건) 또는 2주 뒤까지. 월 단위 사건은 그 달 전체. */
 function searchRange(event: TimelineEvent): { from: string; to: string } {

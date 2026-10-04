@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { SketchListen, SketchPrint, SketchShare, SketchTextMinus, SketchTextPlus } from './SketchIcons';
+import { SketchListen, SketchPrint, SketchShare, SketchTextMinus, SketchTextPlus } from '@/app/(economy)/_shared/components/icons/SketchIcons';
 import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 
 // 기사 왼쪽 고정 도구 레일(2026-10-01) — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + /

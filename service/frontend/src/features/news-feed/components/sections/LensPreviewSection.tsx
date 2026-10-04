@@ -14,7 +14,7 @@ import dynamic from 'next/dynamic';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
 // 안내 모달은 칩을 눌렀을 때만 필요하다 — 첫 화면 번들에서 빼고(경량화, 2026-10-04) 눌렀을 때 불러온다. 서버 렌더에는 원래 없는 UI(포털)라 ssr: false.
-const LensFormatGuide = dynamic(() => import('./LensFormatGuide').then((m) => m.LensFormatGuide), { ssr: false });
+const LensFormatGuide = dynamic(() => import('@/features/news-feed/components/cards/LensFormatGuide').then((m) => m.LensFormatGuide), { ssr: false });
 
 // 형식 타일 아이콘 — 2차 리디자인(2026-09-30, 사용자 피드백: "일러스트
 // 구리고요"). 손그림 캐릭터 아이콘(눈코입+반짝이)으로 1차 교체했던 게
@@ -47,7 +47,7 @@ const LENS_ACCENT_STRONG = '#2563eb';
 
 // "오늘의 이슈, 4가지 시선" 홈 티저 — 지면 특별 코너(전체·증권·산업·시그널 4탭, 고른 지면의 기사 최대 4건: 히어로 1 + 작은 카드 3).
 // 지면 로직은 ../lib/paperSections.ts, 구조 변천사(탭→동시 배치→탭 복귀)는 docs/worklog/2026-10/2026-10-05-리팩토링/LensPreviewSection_구조변천사.md.
-import { SECTIONS, pickSection, paperTitle } from '../lib/paperSections';
+import { SECTIONS, pickSection, paperTitle } from '@/features/news-feed/lib/paperSections';
 
 export function LensPreviewSection({ initialItems, variant = 'home', paperDates }: { initialItems?: CmsLens[]; variant?: 'home' | 'archive'; /** 홈 헤더 ◀ ▶로 넘길 수 있는 지면 날짜(최신순, 첫 값 = 지금 보여 주는 날). 없으면 화살표를 그리지 않는다. */ paperDates?: string[] }) {
   // 4개 지면 탭(전체·증권·산업·시그널)이 각각 최신 4건씩만 쓴다 — 최신 100건이면 각 지면 8건 이상 확보. 이 섹션은 bullets를 안 읽어 SSR 요약본으로 충분하다.

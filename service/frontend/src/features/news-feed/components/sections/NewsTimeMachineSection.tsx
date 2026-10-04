@@ -10,13 +10,13 @@ import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { fullYearsAgo } from '@/shared/lib/date/timelineDates';
 import { getFeaturedEvents, type TimelineEvent } from '@/shared/data/timelineEvents';
-import { DatePicker } from './time-machine/DatePicker';
-import { EventCard } from './time-machine/EventCard';
-import { DayRows } from './time-machine/DayRows';
-import { ResultHeader } from './time-machine/ResultHeader';
-import { EmptyDay, ResultSkeleton } from './time-machine/ResultStates';
-import { BLUE, INK, LINE, SR_ONLY, TIME_MACHINE_CSS } from './time-machine/tokens';
-import { useTimeMachineDay } from './time-machine/useTimeMachineDay';
+import { DatePicker } from '@/features/news-feed/components/time-machine/DatePicker';
+import { EventCard } from '@/features/news-feed/components/time-machine/EventCard';
+import { DayRows } from '@/features/news-feed/components/time-machine/DayRows';
+import { ResultHeader } from '@/features/news-feed/components/time-machine/ResultHeader';
+import { EmptyDay, ResultSkeleton } from '@/features/news-feed/components/time-machine/ResultStates';
+import { BLUE, INK, LINE, SR_ONLY, TIME_MACHINE_CSS } from '@/features/news-feed/components/time-machine/tokens';
+import { useTimeMachineDay } from '@/features/news-feed/components/time-machine/useTimeMachineDay';
 
 const SOURCE_LABEL = {
   liveToday: '서울경제 · 실시간',

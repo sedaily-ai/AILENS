@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
-import { ArticleHeroCard, ArticleGridCard } from './ArticleCard';
+import { ArticleHeroCard, ArticleGridCard } from '@/features/news-feed/components/cards/ArticleCard';
 
 // "최신 뉴스" — 히어로 자리 + 4열 그리드 8건 + 전체보기(2026-08-17, 뉴닉 홈
 // 구조 참고). 예전엔 형식 기준 섹션("이슈 톡톡" FollowingFeed, "인사이트"

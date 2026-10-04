@@ -15,7 +15,7 @@
 //    키보드 포커스에 반응하지 않아 마우스 사용자만 피드백을 받았다.
 //  · "◀" 글리프를 aria-hidden 으로 감쌌다. 보조기기가 문자 이름을 읽었다.
 import Link from 'next/link';
-import { SURFACE, TEXT_BODY, BORDER_CONTROL, FONT, SPACE, RADIUS, TOUCH_MIN } from '../lib/tone';
+import { SURFACE, TEXT_BODY, BORDER_CONTROL, FONT, SPACE, RADIUS, TOUCH_MIN } from '@/features/timeline/lib/tone';
 
 export function ExitPill() {
   return (

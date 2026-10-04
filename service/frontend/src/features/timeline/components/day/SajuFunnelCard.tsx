@@ -14,7 +14,7 @@
 // 가벼워 보이지 않는다. 그래서 뉴스 영역에 쓰지 않는 **연한 파랑 면**으로
 // 성격을 표시한다(강조색은 페이지 전체에서 파랑 하나만 쓰므로 색을 늘리는
 // 것은 아니다).
-import { ACCENT, ACCENT_SUNKEN, TEXT_STRONG, TEXT_BODY, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN } from '../lib/tone';
+import { ACCENT, ACCENT_SUNKEN, TEXT_STRONG, TEXT_BODY, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN } from '@/features/timeline/lib/tone';
 
 export function SajuFunnelCard() {
   return (

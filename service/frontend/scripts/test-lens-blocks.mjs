@@ -1,7 +1,7 @@
 // 레터 본문 파서(lensBlocks.ts) 단위 시험 — `node --experimental-strip-types scripts/test-lens-blocks.mjs`
 // 프롬프트가 바뀌어 본문 형식이 달라져도 화면에 마크다운 기호가 새지 않고 구조가 유지되는지 확인한다.
 import assert from 'node:assert/strict';
-import { parseLetterBlocks } from '../src/app/(economy)/_shared/components/lensBlocks.ts';
+import { parseLetterBlocks } from '../src/app/(economy)/_shared/components/format/lensBlocks.ts';
 
 const types = (bs) => bs.map((b) => b.type).join(',');
 let n = 0;

@@ -27,7 +27,7 @@ import { getMonthDays, isSameDay } from '@/shared/utils/dateUtils';
 import {
   SURFACE, SURFACE_SUNKEN, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT,
   BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, RADIUS, TOUCH_MIN,
-} from '../lib/tone';
+} from '@/features/timeline/lib/tone';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 

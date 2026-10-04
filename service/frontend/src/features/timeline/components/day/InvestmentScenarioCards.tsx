@@ -19,7 +19,7 @@ import type { InvestmentScenario } from '@/shared/lib/api/timelineApi';
 import {
   SURFACE_SUNKEN, TEXT_STRONG, TEXT_BODY, TEXT_MUTED,
   BORDER_HAIRLINE, BORDER_STRONG, FONT, LEADING, SPACE, RADIUS,
-} from '../lib/tone';
+} from '@/features/timeline/lib/tone';
 
 export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentScenario[] }) {
   if (scenarios.length === 0) return null;

@@ -1,7 +1,7 @@
 'use client';
 
-import { parseLetterBlocks } from '@/app/(economy)/_shared/components/lensBlocks';
-import { renderInline } from '@/app/(economy)/_shared/components/renderInline';
+import { parseLetterBlocks } from '@/app/(economy)/_shared/components/format/lensBlocks';
+import { renderInline } from '@/app/(economy)/_shared/components/format/renderInline';
 
 // 온보딩 결과 화면의 레터 본문 — 기사 페이지의 `.lread` 스타일은 LensViewClient 안에 갇혀 있어 그대로 못 쓴다.
 // 같은 파서(parseLetterBlocks)로 블록을 읽고, 읽기 좋은 최소 스타일만 입혀 바로 읽게 한다(카드 슬라이더 대신).

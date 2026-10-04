@@ -1,8 +1,8 @@
 // 시대 페이지 — 소개 문단 + 연표. 데이터는 shared/data/timelineEvents.ts.
 import type { TimelineEra } from '@/shared/data/timelineEvents';
-import { Chronicle } from './Chronicle';
-import { ChronicleFrame } from './ChronicleFrame';
-import { TEXT_BODY, FONT, SPACE } from '../lib/tone';
+import { Chronicle } from '@/features/timeline/components/chronicle/Chronicle';
+import { ChronicleFrame } from '@/features/timeline/components/chronicle/ChronicleFrame';
+import { TEXT_BODY, FONT, SPACE } from '@/features/timeline/lib/tone';
 
 export function EraView({ era }: { era: TimelineEra }) {
   return (

@@ -10,7 +10,7 @@ import { formatEventDate, kdate } from '@/shared/lib/date/timelineDates';
 import { eraColor } from '../../lib/chronicleLayout';
 import { kospiOn } from '../../lib/kospiMilestones';
 import { MIN_TOTAL, readMonth } from '../../lib/attention';
-import { EventArticles } from '../EventArticles';
+import { EventArticles } from '@/features/timeline/components/hub/EventArticles';
 
 function MonthReading({ event }: { event: TimelineEvent }) {
   const reading = readMonth(event.date);

@@ -10,7 +10,7 @@ import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';
-import type { ArticleNeighbor } from './components/ArticleNeighborNav';
+import type { ArticleNeighbor } from './components/article/ArticleNeighborNav';
 
 import { SITE_URL } from '@/shared/constants/site';
 

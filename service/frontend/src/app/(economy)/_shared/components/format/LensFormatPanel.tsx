@@ -5,7 +5,7 @@ import { renderInline } from './renderInline';
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import { displayHeadline, seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { chapterId } from './lensChapters';
-import { ReadDone } from './ReadDone';
+import { ReadDone } from '@/app/(economy)/_shared/components/article/ReadDone';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { SITE_URL } from '@/shared/constants/site';
 import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
@@ -15,7 +15,7 @@ import { ArticleAudioPlayer } from '@/shared/ui/article/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/article/ArticleVideoPlayer';
 import { WebtoonCutGallery } from '@/shared/ui/media/WebtoonCutGallery';
 import { FormatStepNav } from './FormatStepNav';
-import { PodcastTranscript } from './PodcastTranscript';
+import { PodcastTranscript } from '@/app/(economy)/_shared/components/article/PodcastTranscript';
 import { podcastScriptParagraphs } from '@/shared/lib/media/podcastScript';
 import { webtoonVariant } from '@/shared/lib/tracking/webtoonVariant';
 

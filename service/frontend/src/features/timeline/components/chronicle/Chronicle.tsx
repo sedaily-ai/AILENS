@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
 import { formatEventDate, kdate } from '@/shared/lib/date/timelineDates';
-import { EventArticles } from './EventArticles';
-import { TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '../lib/tone';
+import { EventArticles } from '@/features/timeline/components/hub/EventArticles';
+import { TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '@/features/timeline/lib/tone';
 
 function ChronicleEvent({ event, showEra }: { event: TimelineEvent; showEra: boolean }) {
   return (

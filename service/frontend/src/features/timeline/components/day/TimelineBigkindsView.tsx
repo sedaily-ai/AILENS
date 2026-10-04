@@ -63,13 +63,13 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { BigKindsArticle, InvestmentScenario } from '@/shared/lib/api/timelineApi';
 import { kdate } from '@/shared/lib/date/timelineDates';
-import { isReadableOriginal, resolveArticleLink } from '../lib/articleLinks';
-import { buildDayLayout } from '../lib/rankArticles';
+import { isReadableOriginal, resolveArticleLink } from '@/features/timeline/lib/articleLinks';
+import { buildDayLayout } from '@/features/timeline/lib/rankArticles';
 import {
   SURFACE, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT,
   BORDER_HAIRLINE, BORDER_STRONG, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN,
   CONTAINER_MAX, PROSE_MAX, SR_ONLY, yearsAgoLabel,
-} from '../lib/tone';
+} from '@/features/timeline/lib/tone';
 import { InvestmentScenarioCards } from './InvestmentScenarioCards';
 import { ShareBar } from './ShareBar';
 import { SajuFunnelCard } from './SajuFunnelCard';

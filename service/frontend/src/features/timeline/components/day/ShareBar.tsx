@@ -15,8 +15,8 @@
 // 브랜드 색(노란 원, 인스타 그라디언트)을 쓰고, 그 외(공유하기)는 절제된
 // 모노톤 라인아이콘으로 남겨 튀지 않게 했다. 이상한 이모지는 안 씀.
 import { useEffect, useState } from 'react';
-import { generateShareCardBlob, type ShareCardData } from '../lib/shareCard';
-import { TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '../lib/tone';
+import { generateShareCardBlob, type ShareCardData } from '@/features/timeline/lib/shareCard';
+import { TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '@/features/timeline/lib/tone';
 
 function KakaoIcon() {
   return (

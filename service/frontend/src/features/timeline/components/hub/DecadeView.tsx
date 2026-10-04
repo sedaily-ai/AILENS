@@ -1,9 +1,9 @@
 // 연대 페이지 — 그 연대의 사건을 연도별 연표로. 위쪽에 다른 연대로 가는 탭.
 import Link from 'next/link';
 import { DECADES, getDecadeEvents, type DecadeKey } from '@/shared/data/timelineEvents';
-import { Chronicle } from './Chronicle';
-import { ChronicleFrame } from './ChronicleFrame';
-import { TEXT_STRONG, TEXT_MUTED, SURFACE_CHIP, TEXT_INVERSE, BORDER_STRONG, FONT, SPACE, TOUCH_MIN } from '../lib/tone';
+import { Chronicle } from '@/features/timeline/components/chronicle/Chronicle';
+import { ChronicleFrame } from '@/features/timeline/components/chronicle/ChronicleFrame';
+import { TEXT_STRONG, TEXT_MUTED, SURFACE_CHIP, TEXT_INVERSE, BORDER_STRONG, FONT, SPACE, TOUCH_MIN } from '@/features/timeline/lib/tone';
 
 export function DecadeView({ decade }: { decade: DecadeKey }) {
   const current = DECADES.find((d) => d.key === decade)!;

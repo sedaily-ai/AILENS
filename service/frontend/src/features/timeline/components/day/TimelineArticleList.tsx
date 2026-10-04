@@ -1,7 +1,7 @@
 // /timeline/[date] 최근 구간의 기사 목록 — 순번·분류·제목·"시각 · 기자".
 import type { Article } from '@/shared/lib/api/timelineApi';
 import { kstTimeLabel } from '@/shared/lib/date/date';
-import { FONT, SPACE, LEADING, SR_ONLY, TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE } from '../lib/tone';
+import { FONT, SPACE, LEADING, SR_ONLY, TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE } from '@/features/timeline/lib/tone';
 
 /**
  * 제목 아래 꼬리줄 — "09:23 · 이현호 기자".

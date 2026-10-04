@@ -7,7 +7,7 @@ import type { Article } from '@/shared/lib/api/timelineApi';
 import { kdate } from '@/shared/lib/date/timelineDates';
 import {
   SURFACE, TEXT_STRONG, TEXT_MUTED, BORDER_CONTROL, BORDER_STRONG, FONT, SPACE, TOUCH_MIN, CONTAINER_MAX,
-} from '../lib/tone';
+} from '@/features/timeline/lib/tone';
 import { ArticleList } from './TimelineArticleList';
 import { SajuFunnelCard } from './SajuFunnelCard';
 

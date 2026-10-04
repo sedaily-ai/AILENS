@@ -6,7 +6,7 @@ import { TimeMachineRewind } from '@/shared/ui/time-machine/TimeMachineRewind';
 import {
   SURFACE, SURFACE_CHIP, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT, ACCENT_HOVER,
   BORDER_CONTROL, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN, CONTAINER_MAX,
-} from '../lib/tone';
+} from '@/features/timeline/lib/tone';
 import { VintageCalendar } from './VintageCalendar';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { kdate } from '@/shared/lib/date/timelineDates';

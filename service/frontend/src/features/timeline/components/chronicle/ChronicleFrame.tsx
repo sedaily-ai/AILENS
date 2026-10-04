@@ -1,6 +1,6 @@
 // 연대·시대 페이지의 공통 틀 — 상단 제목, 본문, 하단 이동. 몰입형이라 공용 헤더 대신 ExitPill을 쓴다(페이지에서 함께 렌더).
 import Link from 'next/link';
-import { SURFACE, TEXT_STRONG, TEXT_MUTED, BORDER_CONTROL, BORDER_STRONG, FONT, SPACE, CONTAINER_MAX, TOUCH_MIN } from '../lib/tone';
+import { SURFACE, TEXT_STRONG, TEXT_MUTED, BORDER_CONTROL, BORDER_STRONG, FONT, SPACE, CONTAINER_MAX, TOUCH_MIN } from '@/features/timeline/lib/tone';
 
 export function ChronicleFrame({
   kicker, title, subtitle, children,

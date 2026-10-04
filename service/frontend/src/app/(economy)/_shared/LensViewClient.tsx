@@ -33,23 +33,23 @@ import { AiDisclaimer } from '@/shared/ui/notice/AiDisclaimer';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
-import { ArticleChapterNav } from './components/ArticleChapterNav';
-import { IconStopwatch } from './components/LensIcons';
-import { ArticleReveal } from './components/ArticleReveal';
-import { letterChapters } from './components/lensChapters';
-import { readMinutes } from './components/lensSamples';
-import { renderInline } from './components/renderInline';
-import { ArticleStickyBar } from './components/ArticleStickyBar';
-import { ArticleToTop } from './components/ArticleToTop';
-import { ArticleToolRail } from './components/ArticleToolRail';
-import { ArticleNeighborLinks, ArticleNeighborNav, type ArticleNeighbor } from './components/ArticleNeighborNav';
+import { ArticleChapterNav } from './components/article/ArticleChapterNav';
+import { IconStopwatch } from './components/icons/LensIcons';
+import { ArticleReveal } from './components/article/ArticleReveal';
+import { letterChapters } from './components/format/lensChapters';
+import { readMinutes } from './components/format/lensSamples';
+import { renderInline } from './components/format/renderInline';
+import { ArticleStickyBar } from './components/article/ArticleStickyBar';
+import { ArticleToTop } from './components/article/ArticleToTop';
+import { ArticleToolRail } from './components/article/ArticleToolRail';
+import { ArticleNeighborLinks, ArticleNeighborNav, type ArticleNeighbor } from './components/article/ArticleNeighborNav';
 import {
   ArticleFooterStyles,
   ArticleTags,
   MoreInCategory,
   MostRead,
   RelatedArticles,
-} from './components/ArticleFooterSections';
+} from './components/article/ArticleFooterSections';
 
 // "오늘의 이슈, 4가지 시선" 상세.
 //

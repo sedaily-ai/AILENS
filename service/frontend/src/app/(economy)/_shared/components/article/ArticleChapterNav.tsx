@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { LensChapter } from './lensChapters';
+import type { LensChapter } from '@/app/(economy)/_shared/components/format/lensChapters';
 
 // 오른쪽 고정 "이 글의 구간" 목차(2026-10-01, 챕터 내비게이션) — 긴 레터 본문에서 지금 어디를 읽는지,
 // 어떤 구간이 있는지 보여 주고 누르면 그 구간으로 부드럽게 이동한다.

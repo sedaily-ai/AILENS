@@ -3,7 +3,7 @@
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject } from 'react';
 import { lensFormatAt, lensPerspectiveAt, lensPanelId, lensTabId } from '@/shared/constants/lensPerspectives';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { FormatIcon } from './LensIcons';
+import { FormatIcon } from '@/app/(economy)/_shared/components/icons/LensIcons';
 import { formatAmount } from './lensSamples';
 
 // LensViewClient.tsx에서 추출(2026-08-24, God 파일 분해).
