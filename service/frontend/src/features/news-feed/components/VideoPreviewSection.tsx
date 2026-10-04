@@ -72,7 +72,6 @@ export function VideoPreviewSection({ initialVideos }: Props) {
 
   useEffect(() => {
     updateNav();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videos]);
 
   if (!videos || videos.length === 0) return null;

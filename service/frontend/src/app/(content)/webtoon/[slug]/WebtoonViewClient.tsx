@@ -191,7 +191,6 @@ export function WebtoonViewClient({
           <div ref={cutsContainerRef} style={{ display: 'flex', flexDirection: 'column' }}>
             {webtoon.panels.map((p, i) => (
               <div key={i} data-cut-index={i + 1}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본, 컷마다 비율이 달라 next/image 불가 */}
                 {/* alt를 실제 대사/캡션으로(2026-09-02, SEO/GEO 감사) — 예전엔
                     "{제목} 컷 1"처럼 내용 없는 텍스트였다. panel.caption에
                     이미 그 컷의 대사·상황 설명이 들어있는데(바로 아래에도

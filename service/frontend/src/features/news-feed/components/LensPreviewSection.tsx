@@ -142,7 +142,6 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates 
   const router = useRouter();
   useEffect(() => {
     try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 SSR에서 못 읽는다(마운트 후 복원)
       setGuideSeen(!!window.localStorage.getItem(GUIDE_SEEN_KEY));
     } catch {
       // 저장소 접근 불가 — 반짝임 없이 둔다.
