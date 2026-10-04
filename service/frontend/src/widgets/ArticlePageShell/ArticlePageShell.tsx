@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 
 // Header/검색 오버레이 배선 + "요즘 많이 읽힌 글" 사이드바 그리드를 4번

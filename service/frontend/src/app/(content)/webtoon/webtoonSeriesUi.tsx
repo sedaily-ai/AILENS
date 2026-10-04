@@ -14,7 +14,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { coverThumb } from '@/shared/lib/webtoonCovers.generated';
 import { WEBTOON_CATEGORIES } from '@/shared/constants/webtoonCategories';
-import type { WebtoonSeries } from '@/shared/lib/webtoonSeries';
+import type { WebtoonSeries } from '@/shared/lib/content/webtoonSeries';
 
 /** 구조색 — 흰 배경과 17.74:1. */
 export const INK = '#111827';

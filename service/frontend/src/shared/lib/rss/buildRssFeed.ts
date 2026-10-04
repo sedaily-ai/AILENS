@@ -1,7 +1,7 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { letterHref } from '@/shared/lib/letterHref';
-import { lensPath } from '@/shared/lib/lensUrl';
-import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { letterHref } from '@/shared/lib/content/letterHref';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
 import { SITE_URL as BASE } from '@/shared/constants/site';

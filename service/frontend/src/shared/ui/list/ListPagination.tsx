@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { buildPageItems } from '@/shared/lib/pagination';
+import { buildPageItems } from '@/shared/lib/content/pagination';
 
 // 목록 페이지(video/listen, 2026-08-28 신설) 공용 페이지네이션 — n개씩
 // 보기 셀렉트 + 페이지 번호. lens(/lens/page/[n])·webtoon(/webtoon?page=)

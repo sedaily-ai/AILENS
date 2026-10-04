@@ -9,10 +9,10 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import Image from 'next/image';
-import { displayHeadline, seoHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline, seoHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import {
   LENS_ACCENT,
@@ -26,13 +26,13 @@ import {
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
-import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
-import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
-import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
-import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
+import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
+import { ArticleFontSizeControl } from '@/shared/ui/article/ArticleFontSizeControl';
+import { ArticlePrintButton } from '@/shared/ui/article/ArticlePrintButton';
+import { AiDisclaimer } from '@/shared/ui/notice/AiDisclaimer';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { SITE_URL } from '@/shared/constants/site';
-import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
+import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
 import { ArticleChapterNav } from './components/ArticleChapterNav';
 import { IconStopwatch } from './components/LensIcons';
 import { ArticleReveal } from './components/ArticleReveal';

@@ -1,7 +1,7 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { resolveVideo } from '@/shared/lib/media/videoEmbed';
 import type { CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 
 // lens 영상은 YouTube/네이버TV 임베드가 아니라 S3에 올린 mp4 원본 파일이라

@@ -6,7 +6,7 @@
  */
 
 import { API_URL } from '@/shared/config/apiClient';
-import { authFetch } from '@/shared/lib/authFetch';
+import { authFetch } from '@/shared/lib/auth/authFetch';
 
 export interface ArchiveSentencePayload {
   user_id: string;

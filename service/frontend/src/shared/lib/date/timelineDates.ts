@@ -1,6 +1,6 @@
 // 타임라인 날짜 계산 — 순수 함수만. "오늘"은 항상 KST 기준(kstTodayStr)이다.
 import { BIGKINDS_MIN_DATE } from '@/shared/constants/timeline';
-import { kstTodayStr } from '@/shared/lib/date';
+import { kstTodayStr } from '@/shared/lib/date/date';
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 

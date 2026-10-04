@@ -22,7 +22,7 @@
  *   // without an account (e.g. recommended feed, public archive search).
  *   const res = await authFetch(url, { requireAuth: false });
  */
-import { loadAmplifyAuth } from '@/shared/lib/amplifyLoader';
+import { loadAmplifyAuth } from '@/shared/lib/auth/amplifyLoader';
 
 export interface AuthFetchOptions extends RequestInit {
   /** When true (default), throws if no valid Cognito session is available. */

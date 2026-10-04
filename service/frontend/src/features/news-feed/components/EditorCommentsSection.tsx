@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Image from 'next/image';
-import { letterHref } from '@/shared/lib/letterHref';
+import { letterHref } from '@/shared/lib/content/letterHref';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 
 interface Props {

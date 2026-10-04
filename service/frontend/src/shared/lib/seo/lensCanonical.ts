@@ -1,5 +1,5 @@
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 import { SITE_URL } from '@/shared/constants/site';
 
 // 한 기사(lens)가 웹툰·영상·오디오 페이지로도 열리는 구조라, 세 페이지는 본문 문장이 기사 페이지와 67~93% 겹친다

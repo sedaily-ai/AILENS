@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Repeat, Bookmark, Check, Volume2, VolumeX, Maximize, ChevronDown } from 'lucide-react';
-import { clock, spoken, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/lib/mediaPlayerFormat';
-import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/useMediaPlayerControls';
+import { clock, spoken, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/lib/media/mediaPlayerFormat';
+import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/media/useMediaPlayerControls';
 
 /**
  * 기사 안에 박아 쓰는 영상 플레이어 — 2026-08-21 신설, 2026-10-03 "극장" 콘셉트로 재설계.

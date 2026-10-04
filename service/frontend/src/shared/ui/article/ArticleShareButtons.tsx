@@ -8,7 +8,7 @@ import {
   LinkedinIcon,
   KakaoIcon,
   InstagramIcon,
-} from './icons/SocialShareIcons';
+} from '@/shared/ui/icons/SocialShareIcons';
 
 // 기사 공유 버튼 행 — lens/[slug]/LensViewClient.tsx의 원본을
 // letters/[id]/LetterDetailClient.tsx가 로컬 복제해 쓰던 걸 하나로

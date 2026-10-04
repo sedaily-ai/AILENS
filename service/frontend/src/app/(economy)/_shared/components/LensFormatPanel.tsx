@@ -3,20 +3,20 @@
 import { renderInline } from './renderInline';
 
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
-import { displayHeadline, seoHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline, seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { chapterId } from './lensChapters';
 import { ReadDone } from './ReadDone';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 import { SITE_URL } from '@/shared/constants/site';
-import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
+import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 import { parseLetterBlocks } from './lensBlocks';
-import { resolveVideo } from '@/shared/lib/videoEmbed';
-import { ArticleAudioPlayer } from '@/shared/ui/ArticleAudioPlayer';
-import { ArticleVideoPlayer } from '@/shared/ui/ArticleVideoPlayer';
-import { WebtoonCutGallery } from '@/shared/ui/WebtoonCutGallery';
+import { resolveVideo } from '@/shared/lib/media/videoEmbed';
+import { ArticleAudioPlayer } from '@/shared/ui/article/ArticleAudioPlayer';
+import { ArticleVideoPlayer } from '@/shared/ui/article/ArticleVideoPlayer';
+import { WebtoonCutGallery } from '@/shared/ui/media/WebtoonCutGallery';
 import { FormatStepNav } from './FormatStepNav';
 import { PodcastTranscript } from './PodcastTranscript';
-import { podcastScriptParagraphs } from '@/shared/lib/podcastScript';
+import { podcastScriptParagraphs } from '@/shared/lib/media/podcastScript';
 import { webtoonVariant } from '@/shared/lib/tracking/webtoonVariant';
 
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';

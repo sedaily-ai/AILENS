@@ -62,7 +62,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { BigKindsArticle, InvestmentScenario } from '@/shared/lib/api/timelineApi';
-import { kdate } from '@/shared/lib/timelineDates';
+import { kdate } from '@/shared/lib/date/timelineDates';
 import { isReadableOriginal, resolveArticleLink } from '../lib/articleLinks';
 import { buildDayLayout } from '../lib/rankArticles';
 import {

@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { useCutViewTracking } from '@/shared/lib/tracking/useCutViewTracking';
 import { webtoonVariant } from '@/shared/lib/tracking/webtoonVariant';
 

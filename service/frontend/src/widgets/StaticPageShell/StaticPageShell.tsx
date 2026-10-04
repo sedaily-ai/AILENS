@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 
 // 개인정보처리방침/이용약관/회사소개/문의처럼 footer에서만 진입하는 순수 텍스트

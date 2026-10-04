@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
+import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
 
 // 카테고리 "전체" 첫 화면의 편집형 상단(2026-10-04) — 영문판(en.sedaily.com) 섹션 홈 구조를 그대로 옮겼다:
 //   ① 헤드라인 영역: 왼쪽 큰 제목+요약, 가운데 큰 사진(최신 1건) / 오른쪽 보조 기사 3건(제목+작은 사진)

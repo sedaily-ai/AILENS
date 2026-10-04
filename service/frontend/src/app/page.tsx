@@ -1,11 +1,11 @@
 import { FeedPage } from "@/widgets/FeedPage";
 import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchPaperDates, fetchCmsPosts, toLensPreviewSummaries, toWebtoonPreviewSummaries, toVideoPreviewSummaries } from "@/shared/lib/api/cmsPostsApi";
-import { buildArchiveItems } from "@/shared/lib/archiveItems";
-import { pickLensPostsForHome, trimArchiveItemsForHome } from "@/shared/lib/homeFeedTrim";
+import { buildArchiveItems } from "@/shared/lib/content/archiveItems";
+import { pickLensPostsForHome, trimArchiveItemsForHome } from "@/shared/lib/content/homeFeedTrim";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
 import { fetchHomePlayerPosts, toAudioPreviewSummaries } from "@/shared/lib/api/homePlayerApi";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
-import type { ArchiveItem } from "@/shared/lib/archiveItems";
+import type { ArchiveItem } from "@/shared/lib/content/archiveItems";
 import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 

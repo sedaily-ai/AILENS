@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
-import { kstDateTimeLabel } from '@/shared/lib/date';
-import { resolveVideo, isDirectVideoUrl } from '@/shared/lib/videoEmbed';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
+import { resolveVideo, isDirectVideoUrl } from '@/shared/lib/media/videoEmbed';
 import { useMediaProgress } from '@/shared/lib/tracking/useMediaProgress';
 
 /**

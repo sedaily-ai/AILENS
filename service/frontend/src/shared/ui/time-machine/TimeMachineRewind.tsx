@@ -54,7 +54,7 @@
 // 그만큼 프레임이 흔들린다. 상태는 "도착했다"와 "지금 지나는 연도"만 바뀔 때
 // 한 번씩 올린다.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { kdate, ymd } from '@/shared/lib/timelineDates';
+import { kdate, ymd } from '@/shared/lib/date/timelineDates';
 
 /* ── 홈 톤 토큰 (NewsTimeMachineSection 과 동일) ─────────────────── */
 const INK = '#111827'; // 17.74:1 on #fff

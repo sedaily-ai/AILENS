@@ -3,8 +3,8 @@
 // "그 무렵 서울경제 기사" — 사건 기간을 사건 키워드로 검색한 관련도 순 기사. 누를 때 한 번만 불러온다.
 import { useEffect, useState } from 'react';
 import { fetchRangeArticles, type RangeArticle } from '@/shared/lib/api/timelineApi';
-import { addDays } from '@/shared/lib/timelineDates';
-import { kstTodayStr } from '@/shared/lib/date';
+import { addDays } from '@/shared/lib/date/timelineDates';
+import { kstTodayStr } from '@/shared/lib/date/date';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
 import { resolveArticleLink } from '../lib/articleLinks';
 import { TEXT_STRONG, TEXT_MUTED, TEXT_BODY, BORDER_HAIRLINE, BORDER_CONTROL, FONT, TOUCH_MIN } from '../lib/tone';

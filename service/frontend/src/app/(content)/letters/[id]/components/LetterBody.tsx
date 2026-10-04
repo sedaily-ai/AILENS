@@ -1,11 +1,11 @@
 import { Fragment } from 'react';
 import { Calendar } from 'lucide-react';
 import { InteractiveBlock } from '@/features/news-feed';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
-import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
-import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
-import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
+import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
+import { ArticleFontSizeControl } from '@/shared/ui/article/ArticleFontSizeControl';
+import { ArticlePrintButton } from '@/shared/ui/article/ArticlePrintButton';
 import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
 import { cleanSubtitle, letterCategoryLabel, splitBodyHtml, injectImageCaptions } from './letterHtmlUtils';
 import { LetterChartBlock } from './LetterChartBlock';

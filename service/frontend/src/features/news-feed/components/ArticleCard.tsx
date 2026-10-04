@@ -6,8 +6,8 @@
 // 요약이 없고 카테고리 레일에만 요약이 붙는다.
 import Link from 'next/link';
 import Image from 'next/image';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 
 function dateLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));

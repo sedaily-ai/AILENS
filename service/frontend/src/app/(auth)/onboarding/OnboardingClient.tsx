@@ -21,7 +21,7 @@
  */
 import Link from 'next/link';
 import Image from 'next/image';
-import { ScrollReveal } from '@/shared/ui/ScrollReveal';
+import { ScrollReveal } from '@/shared/ui/effects/ScrollReveal';
 import { NewsletterCTA } from '@/features/news-feed';
 import { useLatestLetters } from '@/shared/hooks/useLatestLetters';
 

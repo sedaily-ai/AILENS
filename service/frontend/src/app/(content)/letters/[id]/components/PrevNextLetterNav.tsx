@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { letterHref } from '@/shared/lib/letterHref';
+import { letterHref } from '@/shared/lib/content/letterHref';
 
 // LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해). 이전/다음
 // 레터 내비게이션(2026-08-21, GEO 재감사에서 새로 구현) — 예전 버전(MBTI

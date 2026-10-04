@@ -1,14 +1,14 @@
 'use client';
 
 import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
-import { HandUnderline } from '@/shared/ui/HandUnderline';
+import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import { useRef, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
-import { kstDateTimeLabel } from '@/shared/lib/date';
-import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
-import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
+import { isDirectAudioUrl } from '@/shared/lib/media/videoEmbed';
+import { requestPlayHomePlayerItem } from '@/shared/lib/media/audioPlayerBus';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
 // 카드 4개가 전부 "팟캐스트" 캐릭터 하나만 반복돼 단조로워 보인다는

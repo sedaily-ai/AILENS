@@ -1,5 +1,5 @@
 import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
-import { letterHref } from '@/shared/lib/letterHref';
+import { letterHref } from '@/shared/lib/content/letterHref';
 
 // 레터마다 본문 하단에 있던 "단어" 목록을 전부 모아 보여준다 — 새 데이터 구조
 // 없이 이미 있는 letter.keywords 를 모으기만 하면 돼서(레서 참고 — 2026-08-06),

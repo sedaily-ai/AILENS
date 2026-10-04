@@ -1,7 +1,7 @@
 import { ERAS, DECADES } from '@/shared/data/timelineEvents';
 import type { MetadataRoute } from 'next';
 import { fetchAllWebtoons, fetchAllVideos, fetchAllLensPosts, fetchPaperDates } from '@/shared/lib/api/cmsPostsApi';
-import { kstTodayStr } from '@/shared/lib/date';
+import { kstTodayStr } from '@/shared/lib/date/date';
 // 2026-08-25: `./(content)/games/play/[slug]/page` 에서 가져오던 것을 단일 출처로
 // 교체. app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
 // export 자체가 프로덕션 빌드를 막고 있었다(shared/data/games.ts 주석 참조).
@@ -10,7 +10,7 @@ import { GAMES } from '@/shared/data/games';
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
 import { SITE_URL as BASE } from '@/shared/constants/site';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 // Next.js의 MetadataRoute.Sitemap video/image 확장은 title/description 같은
 // 텍스트 필드를 XML에 그대로 꽂아 넣고 자동 이스케이프하지 않는다(실측

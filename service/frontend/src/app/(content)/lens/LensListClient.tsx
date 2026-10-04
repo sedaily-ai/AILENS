@@ -3,18 +3,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
-import { ArchiveList } from '@/shared/ui/ArchiveList';
-import { CategoryCards, CategoryLead } from '@/shared/ui/CategoryLead';
+import { ArchiveList } from '@/shared/ui/list/ArchiveList';
+import { CategoryCards, CategoryLead } from '@/shared/ui/list/CategoryLead';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
-import { buildPageItems } from '@/shared/lib/pagination';
+import { buildPageItems } from '@/shared/lib/content/pagination';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { displayHeadline, headlineSection } from '@/shared/lib/displayHeadline';
+import { displayHeadline, headlineSection } from '@/shared/lib/content/displayHeadline';
 import { LENS_ACCENT, pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { lensPath } from '@/shared/lib/lensUrl';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
-import type { RailItem } from '@/shared/ui/HotLettersRail';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
+import type { RailItem } from '@/shared/ui/list/HotLettersRail';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
 // "최신 뉴스" 목록(/lens, 화면 이름은 홈의 "최신 뉴스 · 전체 보기"와 맞춤) — 카테고리 페이지(/markets 등)와 같은 구조로 재설계(2026-10-04, 사용자 요청: "다른 쪽 작업한 것처럼 맞춰서").

@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TimeMachineRewind } from '@/shared/ui/TimeMachineRewind';
+import { TimeMachineRewind } from '@/shared/ui/time-machine/TimeMachineRewind';
 import {
   SURFACE, SURFACE_CHIP, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT, ACCENT_HOVER,
   BORDER_CONTROL, FONT, LEADING, SPACE, RADIUS, TOUCH_MIN, CONTAINER_MAX,
 } from '../lib/tone';
 import { VintageCalendar } from './VintageCalendar';
-import { kstTodayStr } from '@/shared/lib/date';
-import { kdate } from '@/shared/lib/timelineDates';
+import { kstTodayStr } from '@/shared/lib/date/date';
+import { kdate } from '@/shared/lib/date/timelineDates';
 import { BIGKINDS_MIN_DATE } from '@/shared/constants/timeline';
 
 /**

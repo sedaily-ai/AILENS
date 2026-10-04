@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { NewsletterEmailField, type SubscribeLetterPayload } from '@/shared/ui/NewsletterEmailField';
+import { NewsletterEmailField, type SubscribeLetterPayload } from '@/shared/ui/form/NewsletterEmailField';
 import { useLatestLetters } from '@/shared/hooks/useLatestLetters';
 
 export function NewsletterCTA() {

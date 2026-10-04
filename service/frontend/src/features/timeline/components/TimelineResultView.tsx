@@ -4,7 +4,7 @@
 // 2026-10-04: 항상 비어 있던 "그날의 이슈" 보기와 그 fetch·지표 패널·이슈 카드를 걷어냈다. 목록 렌더는 TimelineArticleList로 뺐다.
 import Link from 'next/link';
 import type { Article } from '@/shared/lib/api/timelineApi';
-import { kdate } from '@/shared/lib/timelineDates';
+import { kdate } from '@/shared/lib/date/timelineDates';
 import {
   SURFACE, TEXT_STRONG, TEXT_MUTED, BORDER_CONTROL, BORDER_STRONG, FONT, SPACE, TOUCH_MIN, CONTAINER_MAX,
 } from '../lib/tone';

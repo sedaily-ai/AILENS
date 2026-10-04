@@ -1,5 +1,5 @@
 // 결과 머리 — 지금 보고 있는 날짜를 항상 박는다. "N년 전" 배지로 얼마나 멀리 왔는지, 과거에서는 "오늘로 돌아가기"를 둔다.
-import { formatDateLabel } from '@/shared/lib/timelineDates';
+import { formatDateLabel } from '@/shared/lib/date/timelineDates';
 import { BLUE, BLUE_TINT, INK, LINE, MUTED } from './tokens';
 
 export function ResultHeader({

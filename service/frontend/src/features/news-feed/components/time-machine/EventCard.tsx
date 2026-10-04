@@ -4,7 +4,7 @@
 // 날짜 조회는 하루 30건이 중요도 순이 아니라 해당 사건 기사가 안 나올 수 있어서(12-04 상위 30건에 IMF 기사 없음), 목록 대신 설명 카드를 보여준다.
 import Link from 'next/link';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
-import { kdate } from '@/shared/lib/timelineDates';
+import { kdate } from '@/shared/lib/date/timelineDates';
 import { BLUE, INK, LINE, MUTED, BODY } from './tokens';
 
 export function EventCard({ event, onOpenDay }: { event: TimelineEvent; onOpenDay: (paperDate: string) => void }) {

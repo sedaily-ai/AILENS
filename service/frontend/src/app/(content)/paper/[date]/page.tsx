@@ -4,7 +4,7 @@ import { fetchLensPostsOnDate, fetchPaperDates, type CmsLens } from '@/shared/li
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { toLensPreviewSummaries } from '@/shared/lib/api/cmsPostsApi';
-import { pickLensPostsForHome } from '@/shared/lib/homeFeedTrim';
+import { pickLensPostsForHome } from '@/shared/lib/content/homeFeedTrim';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { SITE_URL } from '@/shared/constants/site';
 import { PaperDayClient } from '../PaperDayClient';

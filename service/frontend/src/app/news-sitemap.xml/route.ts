@@ -1,8 +1,8 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { letterHref } from '@/shared/lib/letterHref';
-import { lensPath } from '@/shared/lib/lensUrl';
-import { seoHeadline } from '@/shared/lib/displayHeadline';
-import { kstTodayStr } from '@/shared/lib/date';
+import { letterHref } from '@/shared/lib/content/letterHref';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { kstTodayStr } from '@/shared/lib/date/date';
 
 // Google News sitemap (news:news 확장, https://www.google.com/schemas/sitemap-news/0.9) —
 // 2026-08-12, "실시간 뉴스가 검색엔진 노출이 어렵지 않나" 질문에서 시작.

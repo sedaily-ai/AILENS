@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { fetchWebtoons, toWebtoonSeriesListPayload, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
-import { groupIntoSeries, findSeriesBySlug, type WebtoonSeries } from '@/shared/lib/webtoonSeries';
+import { groupIntoSeries, findSeriesBySlug, type WebtoonSeries } from '@/shared/lib/content/webtoonSeries';
 import { SeriesViewClient } from './SeriesViewClient';
 
 import { SITE_URL } from '@/shared/constants/site';

@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
 // 이전/다음 기사 이동(2026-10-03) — 시간순(같은 카테고리). "이전"=더 오래된 글, "다음"=더 최근 글.

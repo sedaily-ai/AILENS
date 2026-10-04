@@ -1,7 +1,7 @@
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { SITE_URL } from '@/shared/constants/site';
-import { seoHeadline } from '@/shared/lib/displayHeadline';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 
 // "지난 지면" 페이지(/paper/[date]) 공용 — 날짜 표기·메타·JSON-LD(2026-10-04, 사용자 요청: "전날·전전날의 지면 4개 유형 기사도 볼 수 있게").

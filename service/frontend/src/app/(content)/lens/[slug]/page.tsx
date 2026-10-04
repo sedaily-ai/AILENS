@@ -1,6 +1,6 @@
 import { permanentRedirect, notFound } from 'next/navigation';
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 // 옛 기사 주소 /lens/{slug} -> 정본 /{category}/{yyyy}/{mm}/{dd}/{slug} 로 한 번에 영구 이동(308)(2026-10-01).
 // 예전엔 next.config의 /lens/:slug -> /:slug(308) 뒤에 /{slug} 라우트의 redirect()(307, 임시)가 이어지는 2단 이동이었다 —

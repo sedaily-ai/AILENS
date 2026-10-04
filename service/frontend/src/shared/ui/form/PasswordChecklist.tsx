@@ -1,4 +1,4 @@
-import { checkPassword, PASSWORD_SPECIAL_CHARACTERS } from '@/shared/lib/passwordPolicy';
+import { checkPassword, PASSWORD_SPECIAL_CHARACTERS } from '@/shared/lib/auth/passwordPolicy';
 
 // LoginClient.tsx(회원가입·비밀번호 재설정)에서 추출(2026-08-25, 이슈 #17) —
 // 비밀번호 변경 화면(/settings/password)도 같은 실시간 체크리스트가 필요해서

@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { wrapWithTerms } from '@/shared/ui/TermTooltip';
+import { wrapWithTerms } from '@/shared/ui/notice/TermTooltip';
 
 // 레터 인라인 서식 렌더러(2026-10-01, LensFormatPanel에서 분리 — 30초 핵심 카드도 같은 규칙을 쓰려고).
 //

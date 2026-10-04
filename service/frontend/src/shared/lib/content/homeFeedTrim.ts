@@ -1,5 +1,5 @@
 import { PAPER_SECTION_VALUES, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
+import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
 
 // 홈이 서버에서 클라이언트로 직렬화하는 기사 데이터를 "화면이 실제로 쓰는 만큼"으로 줄인다(2026-10-04, 검색 점검의 HTML 크기 항목).
 //

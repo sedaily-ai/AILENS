@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { HandUnderline } from '@/shared/ui/HandUnderline';
+import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import Image from 'next/image';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
+import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 
 // 본지(en.sedaily.com, 로컬 참고 경로:
 // 1_ailink/globe/dev/frontend/src/components/home/HeroSection/HeroSection.tsx)

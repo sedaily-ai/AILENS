@@ -6,7 +6,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
 import { decadeOf } from '@/shared/data/timelineEvents';
-import { formatEventDate, kdate } from '@/shared/lib/timelineDates';
+import { formatEventDate, kdate } from '@/shared/lib/date/timelineDates';
 import { eraColor } from '../../lib/chronicleLayout';
 import { kospiOn } from '../../lib/kospiMilestones';
 import { MIN_TOTAL, readMonth } from '../../lib/attention';

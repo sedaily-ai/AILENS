@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import { createPortal } from 'react-dom';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';
 import { ListeningHeadphoneIllustration } from '@/shared/ui/icons/HandDrawnIcons';
-import { onPlayHomePlayerItemRequest } from '@/shared/lib/audioPlayerBus';
+import { onPlayHomePlayerItemRequest } from '@/shared/lib/media/audioPlayerBus';
 import { extractYoutubeVideoId, loadYouTubeIframeApi, type YTPlayer } from './youtube';
 
 // 북마크는 로그인한 사람만 쓸 수 있다(2026-08-21, 사용자 요청 — "로그인하면

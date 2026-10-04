@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/features/auth';
-import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/passwordPolicy';
-import { PasswordChecklist, PasswordMismatchHint } from '@/shared/ui/PasswordChecklist';
+import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/auth/passwordPolicy';
+import { PasswordChecklist, PasswordMismatchHint } from '@/shared/ui/form/PasswordChecklist';
 
 // 이슈 #17 — 로그인한 사용자가 비밀번호를 바꿀 방법이 프론트에 전혀 없었다.
 // "비밀번호 찾기"(이메일 왕복, forgotPassword)와는 독립적인 기능이다 — 기존

@@ -9,17 +9,17 @@
 // 같은 주제면 한 페이지에 같이 모인다.
 import { useEffect, useState } from 'react';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
-import { ArchiveList } from '@/shared/ui/ArchiveList';
-import { ListPagination } from '@/shared/ui/ListPagination';
-import { CategoryLead, CategoryCards } from '@/shared/ui/CategoryLead';
-import type { RailItem } from '@/shared/ui/HotLettersRail';
-import { DateRangeFilter, type DateRange } from '@/shared/ui/DateRangeFilter';
-import { kstTodayStr } from '@/shared/lib/date';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { ArchiveList } from '@/shared/ui/list/ArchiveList';
+import { ListPagination } from '@/shared/ui/list/ListPagination';
+import { CategoryLead, CategoryCards } from '@/shared/ui/list/CategoryLead';
+import type { RailItem } from '@/shared/ui/list/HotLettersRail';
+import { DateRangeFilter, type DateRange } from '@/shared/ui/list/DateRangeFilter';
+import { kstTodayStr } from '@/shared/lib/date/date';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/archiveItems';
+import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/content/archiveItems';
 import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
 import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';

@@ -1,6 +1,6 @@
 import { permanentRedirect, notFound } from 'next/navigation';
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 // 2026-09-30 — 오늘 두 번째 URL 개편: /{slug}(오늘 1차 변경분, 카테고리
 // 없는 평면 구조)를 /{category}/{yyyy}/{mm}/{dd}/{slug}로 다시 감쌌다

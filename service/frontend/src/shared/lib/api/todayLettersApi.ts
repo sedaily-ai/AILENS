@@ -6,9 +6,9 @@
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
-import { displayHeadline, headlineSection } from '@/shared/lib/displayHeadline';
-import { letterHref } from '@/shared/lib/letterHref';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { displayHeadline, headlineSection } from '@/shared/lib/content/displayHeadline';
+import { letterHref } from '@/shared/lib/content/letterHref';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 // 이미지 채널 — 코드 렌더용 차트 데이터 (레터 실수치, AI 생성 아님).
 export interface LetterChart {

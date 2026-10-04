@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { isReadableOriginal } from '@/features/timeline';
 import { fetchBigkindsDay, fetchDayArticles } from '@/shared/lib/api/timelineApi';
 import { isArchiveDate } from '@/shared/constants/timeline';
-import { kdate } from '@/shared/lib/timelineDates';
+import { kdate } from '@/shared/lib/date/timelineDates';
 import { TimelineDayClient } from './TimelineDayClient';
 
 // 날짜별 고유 URL(2026-08-12, GEO 감사) — 예전엔 /timeline이 입력창 하나만

@@ -4,7 +4,7 @@
 import { useId, useState } from 'react';
 import Link from 'next/link';
 import { BIGKINDS_MIN_DATE } from '@/shared/constants/timeline';
-import { digitsToValidDate, formatDateDigits, randomDateInRange, yearsAgoToday } from '@/shared/lib/timelineDates';
+import { digitsToValidDate, formatDateDigits, randomDateInRange, yearsAgoToday } from '@/shared/lib/date/timelineDates';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
 import { INK, LINE, MUTED, PANEL } from './tokens';
 

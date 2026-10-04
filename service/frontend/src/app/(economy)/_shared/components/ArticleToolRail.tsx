@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { SketchListen, SketchPrint, SketchShare, SketchTextMinus, SketchTextPlus } from './SketchIcons';
-import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
+import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 
 // 기사 왼쪽 고정 도구 레일(2026-10-01) — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + /
 // Size - / Share / Print" 구조. 항목마다 아이콘 + 라벨 한 세트로, 공유는 아이콘 6개를 펼치지

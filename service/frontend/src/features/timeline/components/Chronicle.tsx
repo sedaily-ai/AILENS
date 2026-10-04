@@ -1,7 +1,7 @@
 // 연표 — 사건을 연도별로 묶어 세로 타임라인으로 그린다. 연대 페이지와 시대 페이지가 같이 쓴다.
 import Link from 'next/link';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
-import { formatEventDate, kdate } from '@/shared/lib/timelineDates';
+import { formatEventDate, kdate } from '@/shared/lib/date/timelineDates';
 import { EventArticles } from './EventArticles';
 import { TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '../lib/tone';
 

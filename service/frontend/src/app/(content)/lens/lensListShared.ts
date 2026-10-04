@@ -1,7 +1,7 @@
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { SITE_URL } from '@/shared/constants/site';
-import { lensPath } from '@/shared/lib/lensUrl';
-import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 
 export { SITE_URL };
 

@@ -1,11 +1,11 @@
 import Image from 'next/image';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { lensCategorySlug, lensPath } from '@/shared/lib/lensUrl';
+import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
 
 // 기사 하단 구획(2026-10-01) — 영문 사이트(en.sedaily.com) 상세의 "More in 카테고리 /
 // Related articles / Most read" 구조를 따른다. 오른쪽 사이드바를 걷어낸 대신 여기서

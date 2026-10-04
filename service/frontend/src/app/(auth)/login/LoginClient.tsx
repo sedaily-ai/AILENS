@@ -4,8 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth";
-import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from "@/shared/lib/passwordPolicy";
-import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/PasswordChecklist";
+import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from "@/shared/lib/auth/passwordPolicy";
+import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/form/PasswordChecklist";
 
 /**
  * 비밀번호 재설정은 세 단계다: forgot(이메일) → resetCode(코드) →

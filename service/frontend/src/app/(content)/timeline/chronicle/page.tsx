@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ExitPill, ChronicleExplorer, SURFACE, GLOBAL_CSS } from '@/features/timeline';
 import { DECADES, EVENTS, getDecadeEvents } from '@/shared/data/timelineEvents';
-import { formatEventDate } from '@/shared/lib/timelineDates';
+import { formatEventDate } from '@/shared/lib/date/timelineDates';
 import { SITE_URL } from '@/shared/constants/site';
 
 // 연대기 탐험(/timeline/chronicle) — 1990년부터 지금까지 사건을 가로 연표로 훑는 인터랙티브 페이지.

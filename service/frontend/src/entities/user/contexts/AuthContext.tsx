@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { API_URL } from '@/shared/config/apiClient';
-import { authFetch } from '@/shared/lib/authFetch';
-import { loadAmplifyAuth } from '@/shared/lib/amplifyLoader';
-import { PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/passwordPolicy';
+import { authFetch } from '@/shared/lib/auth/authFetch';
+import { loadAmplifyAuth } from '@/shared/lib/auth/amplifyLoader';
+import { PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/auth/passwordPolicy';
 
 // aws-amplify는 처음 쓰는 순간에만 불러온다(2026-10-04 경량화 — 첫 번들에서 약 122KB 제거). 아래 얇은 래퍼는 원래 함수와 이름·인자·반환이
 // 같아서 이 파일의 호출부는 그대로다. Amplify.configure()는 로더가 처음 불러올 때 한 번 한다.

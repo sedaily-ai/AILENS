@@ -4,11 +4,11 @@
 // 구성: 데이터 useTimeMachineDay / 날짜 입력 DatePicker / 결과 ResultHeader + DayRows / 로딩·빈 상태 ResultStates. 날짜 계산은 shared/lib/timelineDates.
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TimeMachineRewind } from '@/shared/ui/TimeMachineRewind';
+import { TimeMachineRewind } from '@/shared/ui/time-machine/TimeMachineRewind';
 import { TimelineSketch } from '@/shared/ui/icons/VideoSketch';
-import { HandUnderline } from '@/shared/ui/HandUnderline';
-import { kstTodayStr } from '@/shared/lib/date';
-import { fullYearsAgo } from '@/shared/lib/timelineDates';
+import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
+import { kstTodayStr } from '@/shared/lib/date/date';
+import { fullYearsAgo } from '@/shared/lib/date/timelineDates';
 import { getFeaturedEvents, type TimelineEvent } from '@/shared/data/timelineEvents';
 import { DatePicker } from './time-machine/DatePicker';
 import { EventCard } from './time-machine/EventCard';

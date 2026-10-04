@@ -4,16 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
-import type { ArchiveItem } from "@/shared/lib/archiveItems";
+import type { ArchiveItem } from "@/shared/lib/content/archiveItems";
 import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/api/questionApi";
 import type { DailyQuestionItem } from "@/features/question";
-import { SmartSearchOverlay } from "@/shared/ui/SmartSearchOverlay";
+import { SmartSearchOverlay } from "@/shared/ui/search/SmartSearchOverlay";
 import { useAuth } from "@/features/auth";
 import { Header } from "@/widgets/Header";
 import { HomeSideBar } from "@/widgets/HomeSideBar";
-import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";
+import { ComingSoonNotice } from "@/shared/ui/notice/ComingSoonNotice";
 
 // Feature Tab Components
 import { QuestionTab, dailyQuestions } from "@/features/question";

@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { fetchBigkindsDay, fetchDayArticles, type Article, type BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import { isArchiveDate } from '@/shared/constants/timeline';
-import { kstTimeLabel, kstTodayStr } from '@/shared/lib/date';
+import { kstTimeLabel, kstTodayStr } from '@/shared/lib/date/date';
 
 /** 홈에서 보여주는 최근 기사 수 상한. */
 const LIVE_ROW_LIMIT = 10;

@@ -4,9 +4,9 @@ import { fetchLensPosts, fetchLensBySlug, type CmsLens } from '@/shared/lib/api/
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
-import { clampModifiedIso } from '@/shared/lib/date';
-import { lensPath } from '@/shared/lib/lensUrl';
-import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { clampModifiedIso } from '@/shared/lib/date/date';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';

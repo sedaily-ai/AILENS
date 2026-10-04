@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 /**
  * 영상·웹툰 상세에 붙이는 "이 이슈 한눈에 보기" 텍스트 섹션(2026-10-01).

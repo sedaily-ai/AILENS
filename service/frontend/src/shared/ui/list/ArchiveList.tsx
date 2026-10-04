@@ -13,8 +13,8 @@
 // 자체를 shared/ui/icons로 승격해 레이어링 위반과 복제 위험을 동시에 해소했다.
 import Link from 'next/link';
 import Image from 'next/image';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 
 // 발행 시각(시:분)만 — 카테고리 태그를 대체한다(2026-10-01, 사용자 지적:
 // 이 컴포넌트는 현재 카테고리 아카이브 페이지에서만 쓰이는데(ArchiveList.tsx

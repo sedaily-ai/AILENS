@@ -4,7 +4,7 @@
 // series_title을 중복 저장하는 가장 얕은 방법을 택했다(cms_posts_public.py
 // _shape_webtoon 참조). 이 파일은 그 평평한 편 목록을 시리즈 단위로 묶는
 // 순수 함수만 담는다 — API 호출도, React도 없다.
-import type { CmsWebtoon } from './api/cmsPostsApi';
+import type { CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 
 export interface WebtoonSeries {
   /**

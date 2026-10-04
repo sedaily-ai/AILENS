@@ -1,6 +1,6 @@
 import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/lensUrl';
-import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { SITE_URL } from '@/shared/constants/site';
 
 // llms-full.txt(2026-10-04, GEO) — /llms.txt가 "사이트 안내서"라면 이 파일은 AI가 한 번에 읽어 갈 "최근 기사 요약본"이다.

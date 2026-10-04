@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { coverThumb } from '@/shared/lib/webtoonCovers.generated';
-import { findSeriesBySlug, episodeNumberInSeries, type WebtoonSeries } from '@/shared/lib/webtoonSeries';
+import { findSeriesBySlug, episodeNumberInSeries, type WebtoonSeries } from '@/shared/lib/content/webtoonSeries';
 import { INK, BODY, MUTED, WEBTOON_GRID_CSS, EP_BLUE, fmtDate } from '../../webtoonSeriesUi';
 
 // /webtoon/series/{slug} — SeriesCard(webtoonSeriesUi.tsx)가 가리키는

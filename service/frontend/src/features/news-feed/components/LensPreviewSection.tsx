@@ -1,15 +1,15 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BookOpen, ChevronLeft, ChevronRight, Headphones, Image as ImageIcon, Video } from 'lucide-react';
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { LENS_ACCENT, pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 import dynamic from 'next/dynamic';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 

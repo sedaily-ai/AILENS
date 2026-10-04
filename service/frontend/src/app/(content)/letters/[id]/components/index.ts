@@ -6,7 +6,7 @@ export {
   letterCategoryLabel,
   type BodyHtmlPart,
 } from './letterHtmlUtils';
-export { TermTooltip, wrapWithTerms } from '@/shared/ui/TermTooltip';
+export { TermTooltip, wrapWithTerms } from '@/shared/ui/notice/TermTooltip';
 export { PrevNextLetterNav, type NeighborLetter } from './PrevNextLetterNav';
 export { LetterChartBlock } from './LetterChartBlock';
 export { LetterBlock } from './LetterBlock';

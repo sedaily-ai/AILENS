@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
-import type { ArchiveItem } from '@/shared/lib/archiveItems';
+import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
 
 // 6개 카테고리 아카이브 페이지(/markets 등)가 구조는 완전히 같고 설정값만
 // 달라서, column/page.tsx·trend/page.tsx가 각자 손으로 쓰던 metadata/JSON-LD

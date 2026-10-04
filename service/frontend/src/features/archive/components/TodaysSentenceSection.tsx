@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchTodayLetters, toTodayLetterCard, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
-import { letterHref } from '@/shared/lib/letterHref';
+import { letterHref } from '@/shared/lib/content/letterHref';
 
 // ── 오늘의 한 문장 ────────────────────────────────────────────────
 // "볼거리"가 실사용자 archive 축적에 의존하지 않도록 하는 항상-채워지는

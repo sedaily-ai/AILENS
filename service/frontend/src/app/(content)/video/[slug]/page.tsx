@@ -1,9 +1,9 @@
-import { seoHeadline } from '@/shared/lib/displayHeadline';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { fetchVideos, fetchVideoBySlug, fetchLensBySlug, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
-import { resolveVideo } from '@/shared/lib/videoEmbed';
+import { resolveVideo } from '@/shared/lib/media/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { VideoViewClient } from './VideoViewClient';

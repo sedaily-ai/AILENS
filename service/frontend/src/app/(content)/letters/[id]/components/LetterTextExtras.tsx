@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
+import { AiDisclaimer } from '@/shared/ui/notice/AiDisclaimer';
 import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
 import { PrevNextLetterNav, type NeighborLetter } from './PrevNextLetterNav';
 

@@ -2,7 +2,7 @@
 
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
-import type { ArchiveItem } from "@/shared/lib/archiveItems";
+import type { ArchiveItem } from "@/shared/lib/content/archiveItems";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";

@@ -5,11 +5,11 @@ import { withDisplayMeta, fetchFollowingLetters } from '@/shared/lib/api/todayLe
 import { fetchCmsPosts, fetchCmsPostBySlug, fetchLensPosts, fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { trimToSnippetLength } from '@/shared/lib/seo/sanitizeDescription';
-import { clampModifiedIso } from '@/shared/lib/date';
+import { clampModifiedIso } from '@/shared/lib/date/date';
 import { LetterDetailClient } from './LetterDetailClient';
 
 import { SITE_URL } from '@/shared/constants/site';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 // 단일 명의 — MBTI 4-페르소나 에디터 체계 폐지(2026-08-07) 이후 모든 레터의
 // 저작자 표시는 이 하나로 고정. todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.

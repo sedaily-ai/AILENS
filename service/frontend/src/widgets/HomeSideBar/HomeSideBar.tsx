@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { HotLettersRail, type RailItem } from '@/shared/ui/HotLettersRail';
+import { HotLettersRail, type RailItem } from '@/shared/ui/list/HotLettersRail';
 import { SajuCard } from './SideCards';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 

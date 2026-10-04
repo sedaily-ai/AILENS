@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Image from 'next/image';
 import { fetchVideos, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
-import { resolveVideo } from '@/shared/lib/videoEmbed';
-import { VideoLightbox } from '@/shared/ui/VideoLightbox';
-import { HandUnderline } from '@/shared/ui/HandUnderline';
+import { resolveVideo } from '@/shared/lib/media/videoEmbed';
+import { VideoLightbox } from '@/shared/ui/media/VideoLightbox';
+import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import { VideoSketch } from '@/shared/ui/icons/VideoSketch';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
