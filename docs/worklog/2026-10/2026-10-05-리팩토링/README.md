@@ -30,7 +30,7 @@
 | 71f67c7 | 타임머신 테스트가 날짜 따라 깨지던 문제 수정 | 74/75 → 75/75 |
 | d06430d | 호출처 없는 clients 2개 삭제 | 3,059 → 2,480줄 |
 | 04f3b3b·db3d487 | 깨진 deploy.bat, 폐기 OpenSearch 의존성 정리 | 배포 진입점 2 → 1 |
-| (conftest) | 실AWS 테스트 7개 파일 integration 마커 | `-m "not integration"`만으로 179 통과 |
+| e0c6510 | 실AWS 테스트 7개 파일 integration 마커 | `-m "not integration"`만으로 179 통과 |
 
 ## 4. 검증
 
