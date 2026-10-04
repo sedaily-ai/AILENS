@@ -1,0 +1,513 @@
+[
+ {
+  "date": "1990-03-02",
+  "title": "시장평균환율제 도입, 환율이 시장에서 정해지다",
+  "shortTitle": "시장평균환율제",
+  "description": "1990년 3월 2일부터 복수통화바스켓제를 대신해 시장평균환율제도가 도입됐고, 출범 당시 기준환율은 달러당 694원이었다.",
+  "era": "시장 개방과 자유화",
+  "eraPeriod": "1990.03 ~ 1992.12",
+  "searchKeywords": [
+   "시장평균환율제",
+   "환율"
+  ],
+  "paperDate": "1990-03-03",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "국가기록원",
+    "url": "https://archives.go.kr/next/newsearch/listSubjectDescription.do?id=006718&pageFlag=&sitePage=",
+    "quote": "1990년 3월 2일부터 시장평균환율제도를 도입하였다."
+   },
+   {
+    "label": "한국일보 1990-03-01",
+    "url": "https://www.hankookilbo.com/news/article/199003010079812577",
+    "quote": "오는 3월2일부터 도입되는 시장평균 환율제가 달러당 6백94원을 출발점으로 시작된다."
+   }
+  ]
+ },
+ {
+  "date": "1992-01-03",
+  "title": "증시 외국인 투자 개방, 첫 거래일에 종합주가지수 급등",
+  "shortTitle": "증시 외국인개방",
+  "description": "1992년 1월 외국인의 국내 상장주식 직접투자가 허용됐다(종목당 외국인 전체 10%, 1인 3% 한도). 첫 거래일인 1월 3일 종합주가지수는 상승 마감했다.",
+  "era": "시장 개방과 자유화",
+  "eraPeriod": "1990.03 ~ 1992.12",
+  "searchKeywords": [
+   "증시 개방",
+   "외국인 주식투자"
+  ],
+  "paperDate": "1992-01-04",
+  "status": "confirmed",
+  "note": "지수 상승폭 표기가 출처마다 다름(MBC 13.3포인트 상승, 한국일보는 이론배당락지수 대비 24.63포인트). 날짜(1월 3일)는 일치. 설명에는 지수 수치를 쓰지 않음.",
+  "evidence": [
+   {
+    "label": "MBC 뉴스데스크 1992",
+    "url": "https://imnews.imbc.com/replay/1992/nwdesk/article/1856210_30556.html",
+    "quote": "주식시장 외국인 개방 첫날, 주가 13포인트 급등"
+   },
+   {
+    "label": "한국일보 1992-01-05",
+    "url": "https://www.hankookilbo.com/news/article/199201050031725094",
+    "quote": "올개장 첫날인 3일에도 종합주가지수가 이론배당락지수(5백99.60)에 비해 24.63포인트(4.1%)나 폭등"
+   },
+   {
+    "label": "한국경제 2021",
+    "url": "https://www.hankyung.com/article/2021123055101",
+    "quote": "외국인의 지분율이 10%를 넘을 수 없게 했고, 외국인 1인당 매수 한도를 3%로 제한했습니다"
+   }
+  ]
+ },
+ {
+  "date": "1992-08-24",
+  "title": "한중 수교, 대사급 외교관계 수립",
+  "shortTitle": "한중 수교",
+  "description": "1992년 8월 24일 베이징에서 양국 외무장관이 한중 수교공동성명에 서명해 대사급 외교관계를 수립했다.",
+  "era": "시장 개방과 자유화",
+  "eraPeriod": "1990.03 ~ 1992.12",
+  "searchKeywords": [
+   "한중 수교",
+   "중국 수교"
+  ],
+  "paperDate": "1992-08-25",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "국가기록원 기록으로 만나는 대한민국",
+    "url": "https://theme.archives.go.kr/next/koreaOfRecord/establishDipl.do",
+    "quote": "1992년 8월 24일 중국의 수도 베이징에서 양국 외무장관이 한-중 수교공동성명에 서명함으로써"
+   },
+   {
+    "label": "아주경제 2022 기고",
+    "url": "https://www.ajunews.com/view/20221005175020718",
+    "quote": "드디어 1992년 8월 24일 한중외무장관이 한·중 '수교공동성명'에 서명하였다"
+   }
+  ]
+ },
+ {
+  "date": "1993-08-12",
+  "title": "금융실명제 전격 실시, 긴급재정경제명령 발동",
+  "shortTitle": "금융실명제",
+  "description": "김영삼 대통령이 1993년 8월 12일 긴급재정경제명령으로 금융실명제 실시를 선포했고, 이날 오후 8시부터 발효됐다.",
+  "era": "금융실명제·세계화",
+  "eraPeriod": "1993.02 ~ 1997.01",
+  "searchKeywords": [
+   "금융실명제",
+   "긴급재정경제명령"
+  ],
+  "paperDate": "1993-08-13",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "우리역사넷(국사편찬위원회)",
+    "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_i501800&code=kc_age_50",
+    "quote": "김영삼 대통령은 1993년 8월 12일 「금융실명거래 및 비밀보장에 관한 긴급재정명령」을 전격적으로 발표함으로써"
+   },
+   {
+    "label": "YTN 역사속오늘",
+    "url": "https://www.ytn.co.kr/_ln/0422_201008120057334173",
+    "quote": "1993년 오늘 김영삼 대통령이 긴급재정경제명령권을 발동해 금융실명제 실시를 선포한다."
+   }
+  ]
+ },
+ {
+  "date": "1993-12-15",
+  "title": "우루과이라운드 타결, 쌀 관세화 10년 유예",
+  "shortTitle": "UR 타결",
+  "description": "1993년 12월 15일 제네바에서 UR 협상이 타결됐다. 한국은 쌀 관세화를 10년 유예받는 대신 최소시장접근 물량을 수입하기로 했다.",
+  "era": "금융실명제·세계화",
+  "eraPeriod": "1993.02 ~ 1997.01",
+  "searchKeywords": [
+   "우루과이라운드",
+   "쌀 시장 개방"
+  ],
+  "paperDate": "1993-12-16",
+  "status": "confirmed",
+  "note": "경향신문 기사 문장은 12월 15일자 보도 사실 기반이며 타결일은 시정일보·한국일보 사설과 일치.",
+  "evidence": [
+   {
+    "label": "경향신문 2014",
+    "url": "https://www.khan.co.kr/article/201406052039205",
+    "quote": "1993년 12월15일자 경향신문은 우루과이라운드(UR) 타결로 우리 정부가 쇠고기·돼지고기, 고추·마늘 등 농축산물 14종의 전면 수입 자유화를 결정했다는 소식을 전하고 있다."
+   },
+   {
+    "label": "시정일보 오늘의 역사",
+    "url": "https://www.sijung.co.kr/news/articleView.html?idxno=67566",
+    "quote": "1993년 12월 15일 117개국이 참가한 가운데 제네바에서 UR 협상 타결"
+   },
+   {
+    "label": "한국일보 1993-12-15 사설",
+    "url": "https://www.hankookilbo.com/news/article/199312150050037616",
+    "quote": "쌀시장개방안은 당초 거론돼 왔던대로 관세화유예기간이 10년으로 확정됐으나"
+   }
+  ]
+ },
+ {
+  "date": "1994-10-21",
+  "title": "성수대교 붕괴",
+  "shortTitle": "성수대교 붕괴",
+  "description": "1994년 10월 21일 아침 성수대교 상판 48m 구간이 무너져 32명이 숨졌다.",
+  "era": "금융실명제·세계화",
+  "eraPeriod": "1993.02 ~ 1997.01",
+  "searchKeywords": [
+   "성수대교 붕괴",
+   "성수대교"
+  ],
+  "paperDate": "1994-10-22",
+  "status": "confirmed",
+  "note": "붕괴 시각이 7시(백과)·7시 40분경(서울시)로 표기 차이. 날짜는 일치.",
+  "evidence": [
+   {
+    "label": "한국민족문화대백과",
+    "url": "https://encykorea.aks.ac.kr/Article/E0068190",
+    "quote": "1994년 10월 21일 오전 7시 성동구 성수동과 강남구 압구정동을 연결하는 성수대교의 상부 트러스 48m가 붕괴한 사건."
+   },
+   {
+    "label": "서울시 열린데이터광장 서울이야기",
+    "url": "https://opengov.seoul.go.kr/mediahub/22104070",
+    "quote": "32명의 사망자와 17명의 부상자가 발생한 사고였다"
+   }
+  ]
+ },
+ {
+  "date": "1995-06-29",
+  "title": "삼풍백화점 붕괴",
+  "shortTitle": "삼풍백화점 붕괴",
+  "description": "1995년 6월 29일 서울 서초구 삼풍백화점이 무너져 501명이 사망하고 937명이 다쳤으며 6명이 실종됐다.",
+  "era": "금융실명제·세계화",
+  "eraPeriod": "1993.02 ~ 1997.01",
+  "searchKeywords": [
+   "삼풍백화점 붕괴",
+   "삼풍백화점"
+  ],
+  "paperDate": "1995-06-30",
+  "status": "confirmed",
+  "note": "YTN은 부상 약 930명으로 서술, 학회지는 937명. 설명은 학회지 수치 사용.",
+  "evidence": [
+   {
+    "label": "YTN 역사속오늘",
+    "url": "https://www.ytn.co.kr/_ln/0422_200906290256360060",
+    "quote": "1995년 6월 29일 삼풍백화점 붕괴"
+   },
+   {
+    "label": "대한건축학회지 특집(DBpia)",
+    "url": "https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE00353134",
+    "quote": "1995년 6월 29일에 발생한 삼풍백화점 붕괴사고 ... 사망 501명, 부상 937명, 실종 6명"
+   }
+  ]
+ },
+ {
+  "date": "1996-07-01",
+  "title": "코스닥시장 개장",
+  "shortTitle": "코스닥 개장",
+  "description": "1996년 7월 1일 중소·벤처기업의 자금조달을 돕는 코스닥시장이 개설됐다. 지수는 1996년 7월 1일 1000(2004년 개편 기준)에서 출발했다.",
+  "era": "금융실명제·세계화",
+  "eraPeriod": "1993.02 ~ 1997.01",
+  "searchKeywords": [
+   "코스닥",
+   "코스닥 개장"
+  ],
+  "paperDate": "1996-07-02",
+  "status": "confirmed",
+  "note": "독립 출처 2개(영문 신문 2건) + 위키 보조. 한국거래소 원문은 열람하지 못함. 개장 당일에 개설되어 paperDate는 7/2.",
+  "evidence": [
+   {
+    "label": "Korea Herald",
+    "url": "https://www.koreaherald.com/article/2546493",
+    "quote": "The Kosdaq began at 1,000 points on July 1, 1996"
+   },
+   {
+    "label": "Korea Times",
+    "url": "https://www.koreatimes.co.kr/amp/economy/20260701/30-years-on-kosdaq-struggles-to-regain-investors-trust",
+    "quote": "it fell below its opening level of 1,000 on July 1, 1996"
+   },
+   {
+    "label": "코스닥 - 위키백과(보조)",
+    "url": "https://ko.wikipedia.org/wiki/%EC%BD%94%EC%8A%A4%EB%8B%A5",
+    "quote": "코스닥은 1996년 7월 1일 증권업협회와 증권사들이 설립한"
+   }
+  ]
+ },
+ {
+  "date": "1996-12-12",
+  "title": "한국, OECD 29번째 회원국 가입",
+  "shortTitle": "OECD 가입",
+  "description": "1996년 12월 12일 한국이 OECD 가입기탁서를 프랑스 외무부에 제출해 29번째 회원국이 됐다.",
+  "era": "금융실명제·세계화",
+  "eraPeriod": "1993.02 ~ 1997.01",
+  "searchKeywords": [
+   "OECD 가입",
+   "경제협력개발기구"
+  ],
+  "paperDate": "1996-12-13",
+  "status": "confirmed",
+  "note": "일 단위는 MBC와 K-공감이 일치, 국가기록원은 월 단위. K-공감 quote는 WebFetch 요약문(번역)이므로 원문 재확인 권장.",
+  "evidence": [
+   {
+    "label": "MBC 오늘 다시보기",
+    "url": "https://imnews.imbc.com/replay/2018/nwtoday/article/5059982_30187.html",
+    "quote": "우리나라는 OECD 가입기탁서를 프랑스 외무부에 제출함으로써 29번째 OECD 회원국이 됐습니다."
+   },
+   {
+    "label": "정책주간지 K-공감",
+    "url": "https://gonggam.korea.kr/newsView.do?newsId=GAJiXefpQDDGJ000",
+    "quote": "South Korea joined the OECD as its 29th member nation on December 12, 1996 (K-공감 기사 요지)"
+   },
+   {
+    "label": "국가기록원 기록으로 만나는 대한민국",
+    "url": "https://theme.archives.go.kr/next/koreaOfRecord/eco.do",
+    "quote": "그 결과 1996년 12월 우리나라는 29번째 OECD 정회원국으로 받아들여졌다"
+   }
+  ]
+ },
+ {
+  "date": "1996-12-26",
+  "title": "노동법·안기부법 새벽 날치기 통과, 노동계 총파업",
+  "shortTitle": "노동법 날치기",
+  "description": "1996년 12월 26일 신한국당이 노동관계법과 안기부법 등 11개 법안을 단독으로 변칙 처리했고, 노동계 총파업이 이어졌다.",
+  "era": "금융실명제·세계화",
+  "eraPeriod": "1993.02 ~ 1997.01",
+  "searchKeywords": [
+   "노동법 개정",
+   "총파업"
+  ],
+  "paperDate": "1996-12-27",
+  "status": "pending",
+  "note": "독립 출처 확인이 약함: 울산대백과가 날짜 단독 확인, 위키는 보조, 97imf는 제목만. 통과 시각 표기가 새벽 4시(울산)와 6시(위키 검색 요약)로 엇갈려 설명에서 시각 제외. 신문 원문 1건 추가 확인 권장.",
+  "evidence": [
+   {
+    "label": "울산대백과(디지털울산문화대전)",
+    "url": "https://ulsan.grandculture.net/Contents/Contents?dataType=01&contents_id=GC80001142&isTreeSpread=Y&RequestBy=%ED%95%AD%EB%AA%A9%EB%A7%81%ED%81%AC",
+    "quote": "신한국당은 국회 본회의를 단독으로 개최하여 노동관계법과 안기부법을 포함한 11개 법안을 '날치기'로 변칙 처리하였다."
+   },
+   {
+    "label": "노동법 날치기 사건 - 위키백과(보조)",
+    "url": "https://ko.wikipedia.org/wiki/%EB%85%B8%EB%8F%99%EB%B2%95_%EB%82%A0%EC%B9%98%EA%B8%B0_%EC%82%AC%EA%B1%B4",
+    "quote": "1996년 12월 26일 신한국당이 노동법 개정안과 안기부법을 날치기로 통과"
+   },
+   {
+    "label": "1997 외환위기아카이브",
+    "url": "https://97imf.kr/items/show/6652",
+    "quote": "[1996.12.26] 양대노조, 노동법 개정안 저지 파업 (페이지 제목, 본문은 열람 불가 403)"
+   }
+  ]
+ },
+ {
+  "date": "1997-07-15",
+  "title": "기아그룹 부도유예협약 적용",
+  "shortTitle": "기아 부도유예",
+  "description": "1997년 7월 15일 기아그룹이 부도방지협약 적용 대상으로 선정돼 일단 도산 위기를 모면했다. 이후 10월 22일 법정관리로 결론이 났다.",
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.07 ~ 2001.08",
+  "searchKeywords": [
+   "기아 부도유예",
+   "기아사태"
+  ],
+  "paperDate": "1997-07-16",
+  "status": "confirmed",
+  "note": "협약 적용 계열사 수가 출처마다 다름(28개/18개 등) 이어서 설명에서 제외.",
+  "evidence": [
+   {
+    "label": "한국일보 1997-07-16",
+    "url": "https://www.hankookilbo.com/news/article/199707160072157459",
+    "quote": "기아그룹은 15일 부도방지협약 적용대상기업으로 선정돼 일단 도산위기는 모면하게 됐지만"
+   },
+   {
+    "label": "이코노미스트 2017",
+    "url": "https://economist.co.kr/article/view/ecn201702050005",
+    "quote": "자금부족으로 기아가 부도유예협약 대상이 된 1997년 7월 15일 이후"
+   }
+  ]
+ },
+ {
+  "date": "1997-12-16",
+  "title": "환율 일일 변동폭 폐지, 자유변동환율제 도입",
+  "shortTitle": "환율 변동폭 폐지",
+  "description": "1997년 12월 16일 원/달러 환율의 일일 변동폭 10%가 완전히 폐지돼 자유변동환율제도가 채택됐다.",
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.07 ~ 2001.08",
+  "searchKeywords": [
+   "환율변동폭 폐지",
+   "자유변동환율제"
+  ],
+  "paperDate": "1997-12-17",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "국가기록원",
+    "url": "https://www.archives.go.kr/next/newsearch/listSubjectDescription.do?id=006719&pageFlag=&sitePage=1-2-1",
+    "quote": "1997년 12월 16일 우리나라는 원/달러 환율의 일일 변동폭 10%를 완전히 폐지함으로써 환율이 시장기능에 따라 움직이는 자유변동환율제도를 채택하였다"
+   },
+   {
+    "label": "한국일보 1997-12-16",
+    "url": "https://www.hankookilbo.com/news/article/199712160011343926",
+    "quote": "16일부터 하루 환율변동제한폭을 폐지하기로 했다"
+   }
+  ]
+ },
+ {
+  "date": "1997-12-18",
+  "title": "제15대 대선, 김대중 당선으로 첫 여야 정권교체",
+  "shortTitle": "15대 대선",
+  "description": "1997년 12월 18일 제15대 대통령선거에서 김대중 후보가 40.3%를 얻어 38.7%의 이회창 후보를 누르고 당선됐다. 헌정사상 처음으로 선거에 의한 여야 간 정권교체였다.",
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.07 ~ 2001.08",
+  "searchKeywords": [
+   "15대 대선",
+   "김대중 당선"
+  ],
+  "paperDate": "1997-12-19",
+  "status": "confirmed",
+  "note": "IMF 구제금융 합의(12/3) 직후 치러진 선거. 선관위 페이지 일자는 WebFetch 요약에서 확인.",
+  "evidence": [
+   {
+    "label": "중앙선관위 사이버선거역사관",
+    "url": "https://museum.nec.go.kr/museum2018/bbs/2/1/1/20170912155756377100_view.do?bbs_id=20170912155756377100&article_id=20171208143552967100&article_category=1&imgNum=%EB%8C%80%ED%86%B5%EB%A0%B9%EC%84%A0%EA%B1%B0%EC%82%AC",
+    "quote": "유효투표 총수의 40.3%를 얻어 38.7%를 얻은 이회창 후보를 1.6% 포인트 차이로"
+   },
+   {
+    "label": "인천투데이 오늘의 역사",
+    "url": "https://www.incheontoday.com/news/articleView.html?idxno=259348",
+    "quote": "1997년 12월 18일 ... 김대중 후보 제15대 대통령 당선 (요지)"
+   }
+  ]
+ },
+ {
+  "date": "1998-02-25",
+  "title": "김대중 대통령 취임, 국민의 정부 출범",
+  "shortTitle": "DJ 취임",
+  "description": "1998년 2월 25일 국회의사당 앞 광장에서 제15대 김대중 대통령 취임식이 거행됐다.",
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.07 ~ 2001.08",
+  "searchKeywords": [
+   "김대중 취임",
+   "국민의 정부"
+  ],
+  "paperDate": "1998-02-26",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "대통령기록관",
+    "url": "https://www.pa.go.kr/online_contents/inauguration/president15.jsp",
+    "quote": "제15대 김대중 대통령 취임식은 1998년 2월 25일 국회의사당 앞 광장에서 거행되었다"
+   },
+   {
+    "label": "한국사 총설 DB(국사편찬위원회)",
+    "url": "https://db.history.go.kr/id/tcct_1998_02_25_0010",
+    "quote": "1998년 2월 25일 김대중 대통령 제15대 취임식 기록"
+   }
+  ]
+ },
+ {
+  "date": "1998-06-16",
+  "title": "정주영 회장 소떼 500마리 몰고 판문점 방북",
+  "shortTitle": "정주영 소떼방북",
+  "description": "1998년 6월 16일 정주영 현대 명예회장이 소 500마리를 트럭에 싣고 판문점을 통해 군사분계선을 넘어 방북했다.",
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.07 ~ 2001.08",
+  "searchKeywords": [
+   "정주영 소떼",
+   "소떼 방북"
+  ],
+  "paperDate": "1998-06-17",
+  "status": "confirmed",
+  "note": "소 마리수는 같은 해 10월 2차 방북(501마리)과 혼동 주의. 일부 매체는 1001마리로 표기(1·2차 합산).",
+  "evidence": [
+   {
+    "label": "한국일보 1998-06-17",
+    "url": "https://www.hankookilbo.com/news/article/199806170067877317",
+    "quote": "현대그룹 정주영(鄭周永) 명예회장이 16일 오전 북한에 제공할 소 500마리를 실은 트럭과 함께 판문점을 통해 군사분계선을 넘어 방북"
+   },
+   {
+    "label": "부산일보 이 주일의 역사",
+    "url": "https://www.busan.com/view/busan/view.php?code=20050613000156",
+    "quote": "1998년 6월 16일 정주영 현대그룹 명예회장이 소 500마리를 끌고 판문점을 통과했다."
+   }
+  ]
+ },
+ {
+  "date": "1998-06-29",
+  "title": "동화·동남·대동·경기·충청 5개 은행 퇴출",
+  "shortTitle": "5개 은행 퇴출",
+  "description": "1998년 6월 29일 정부가 대동·동남·동화·경기·충청은행 등 5개 은행을 퇴출 대상으로 최종 확정했고, 예금은 전액 보장됐다.",
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.07 ~ 2001.08",
+  "searchKeywords": [
+   "5개 은행 퇴출",
+   "은행 퇴출"
+  ],
+  "paperDate": "1998-06-30",
+  "status": "pending",
+  "note": "서울신문은 월 단위(1998년 6월)만 확인됨. 일 단위(6월 29일)는 한국일보 단독 + 위키/나무위키 보조 검색 요약. 독립 출처 2개 일 단위 미충족으로 pending.",
+  "evidence": [
+   {
+    "label": "한국일보 1998-06-29",
+    "url": "https://www.hankookilbo.com/news/article/199806290024438945",
+    "quote": "정부는 대동·동남·동화·경기·충청은행 등 5개 은행을 퇴출대상으로 최종확정했다."
+   },
+   {
+    "label": "서울신문 2014",
+    "url": "https://www.seoul.co.kr/news/economy/2014/09/20/20140920016003",
+    "quote": "5개 은행을 퇴출시키겠다고 발표했다 (1998년 6월)"
+   }
+  ]
+ },
+ {
+  "date": "1999-08-26",
+  "title": "대우 12개 계열사 워크아웃 돌입",
+  "shortTitle": "대우 워크아웃",
+  "description": "1999년 8월 26일 (주)대우, 대우중공업, 대우자동차, 대우전자 등 12개 계열사가 워크아웃에 돌입했다.",
+  "era": "대우 해체·벤처 붐",
+  "eraPeriod": "1999.07 ~ 2000.03",
+  "searchKeywords": [
+   "대우 워크아웃",
+   "대우그룹 해체"
+  ],
+  "paperDate": "1999-08-27",
+  "status": "pending",
+  "note": "일 단위는 한국일보(1999-10-09 기사) 단독 + 위키 보조. 독립 출처 2개 미충족으로 pending. 7/19 대우 유동성 개선대책 발표(한국일보 1999-07-19)와 검색 요약의 '7월 16일 구조조정안 발표'가 엇갈림.",
+  "evidence": [
+   {
+    "label": "한국일보 1999-10-09",
+    "url": "https://www.hankookilbo.com/news/article/199910090013701885",
+    "quote": "정부와 채권단이 8월 26일 대우의 주력계열사 워크아웃에 들어가고 대우쇼크로 금융위기가 심화"
+   },
+   {
+    "label": "대우그룹 - 위키백과(보조)",
+    "url": "https://ko.wikipedia.org/wiki/%EB%8C%80%EC%9A%B0%EA%B7%B8%EB%A3%B9",
+    "quote": "(주)대우, 대우중공업(주), 대우자동차(주), 대우전자(주) 등 12개 회사 워크아웃 돌입"
+   }
+  ]
+ },
+ {
+  "date": "1999-12-28",
+  "title": "1999년 증시 폐장, 종합주가지수 1,028.07 마감",
+  "shortTitle": "99 증시 폐장",
+  "description": "1999년 12월 28일 종합주가지수가 1,028.07로 연중 최고치에서 폐장했다. 대통령이 증권거래소 폐장식에 참석한 것은 처음이었다.",
+  "era": "대우 해체·벤처 붐",
+  "eraPeriod": "1999.07 ~ 2000.03",
+  "searchKeywords": [
+   "종합주가지수 1000",
+   "99년 증시 폐장"
+  ],
+  "paperDate": "1999-12-29",
+  "status": "confirmed",
+  "note": "종합주가지수 1000 첫 회복 시점은 1999-07-07(1,005.98, 검색 요약만 확인)로 별도 미검증. 1989년 1,000 첫 돌파는 시사ON 기사에서 1989-04-01 종가 1000.31로 표기, 1990년대 범위 밖이라 제외. 연말 1000선 안착이 '3년 8개월 만'인지 '4년 8개월 만'인지는 출처에 따라 다름(한국일보 3년 8개월, 검색 요약 4년 8개월).",
+  "evidence": [
+   {
+    "label": "매일신문 1999-12-29",
+    "url": "https://www.imaeil.com/page/view/1999122914042249868",
+    "quote": "연중 최고 경신 99년 증시마감 (종합주가지수 1,028.07)"
+   },
+   {
+    "label": "한국일보 1999-12-29",
+    "url": "https://www.hankookilbo.com/news/article/199912290063301107",
+    "quote": "종합주가지수는 12월 28일 1,028.07로 마감 ... 1,000선을 3년 8개월 만에 넘어"
+   }
+  ]
+ }
+]

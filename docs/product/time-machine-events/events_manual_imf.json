@@ -1,0 +1,141 @@
+[
+ {
+  "date": "1997-01",
+  "title": "한보철강 부도, 대기업 연쇄 부도의 시작",
+  "shortTitle": "한보 부도",
+  "description": "1월 한보철강이 최종 부도로 쓰러진 뒤 3월 삼미, 4월 진로, 5월 대농·한신, 7월 기아가 차례로 부도났습니다.",
+  "searchKeywords": [
+   "한보철강 부도"
+  ],
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "우리역사넷(국사편찬위원회)",
+    "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_i501300&code=kc_age_50",
+    "quote": "1997년 1월 대기업 한보의 부도 사태에서 촉발된 신용경색으로"
+   },
+   {
+    "label": "KDI 경제정보센터 \"IMF 외환위기\"",
+    "url": "https://eiec.kdi.re.kr/material/clickView.do?click_yymm=201512&cidx=1317",
+    "quote": "위기 조짐은 1997년 1월 한보철강이 최종 부도로 쓰러지면서부터 감지됐다."
+   }
+  ],
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.01 ~ 2001.08"
+ },
+ {
+  "date": "1997-11-21",
+  "paperDate": "1997-11-22",
+  "title": "임창열 부총리, IMF에 지원 요청 발표",
+  "shortTitle": "IMF 지원 요청",
+  "description": "밤 10시, 금융·외환시장 어려움을 극복하기 위해 IMF에 유동성 조절 자금 지원을 요청하기로 했다고 밝혔습니다.",
+  "searchKeywords": [
+   "IMF 지원 요청",
+   "IMF"
+  ],
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "우리역사넷(국사편찬위원회)",
+    "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_i501300&code=kc_age_50",
+    "quote": "11월 21일 밤에는 임창열 경제부총리가 IMF 지원요청 계획을 발표"
+   },
+   {
+    "label": "전자신문 \"1만호 100대 사건\"",
+    "url": "https://www.etnews.com/20250716000095",
+    "quote": "1997년 11월 21일 밤 10시"
+   }
+  ],
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.01 ~ 2001.08"
+ },
+ {
+  "date": "1997-12-03",
+  "paperDate": "1997-12-04",
+  "title": "IMF와 협상 타결, 긴급 구제금융 합의",
+  "shortTitle": "IMF 협상 타결",
+  "description": "협상이 타결되면서 IMF의 긴급 구제금융 지원이 합의됐습니다.",
+  "searchKeywords": [
+   "IMF 협상 타결",
+   "IMF"
+  ],
+  "status": "confirmed",
+  "note": "KDI 자료는 이 날짜를 \"구제금융 요청\"으로 적고 있습니다. 요청 발표(11월 21일)와 합의(12월 3일)를 구분하는 자료를 따랐습니다.",
+  "evidence": [
+   {
+    "label": "우리역사넷(국사편찬위원회)",
+    "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_i501300&code=kc_age_50",
+    "quote": "1997년 12월 3일 협상 타결로 인해 IMF의 긴급 구제금융을"
+   },
+   {
+    "label": "위키백과 \"대한민국의 IMF 구제금융 요청\"",
+    "url": "https://ko.wikipedia.org/wiki/대한민국의_IMF_구제금융_요청",
+    "quote": "1997년 12월 3일~2001년 8월 23일"
+   }
+  ],
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.01 ~ 2001.08",
+  "publicNote": "KDI 자료는 이 날짜를 \"구제금융 요청\"으로 적고 있습니다. 요청 발표(11월 21일)와 합의(12월 3일)를 구분하는 자료를 따랐습니다."
+ },
+ {
+  "date": "1998-01-05",
+  "endDate": "1998-03-14",
+  "title": "금 모으기 운동",
+  "shortTitle": "금 모으기",
+  "description": "KBS 금 모으기 캠페인 생방송으로 시작해 3월 14일 공식 종료됐습니다. 약 350만 명이 참여해 약 227톤의 금이 모였습니다.",
+  "searchKeywords": [
+   "금 모으기",
+   "금모으기"
+  ],
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "우리역사넷(국사편찬위원회)",
+    "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_i501300&code=kc_age_50",
+    "quote": "1998년 1월 5일 'KBS 금 모으기 캠페인'이 생방송되면서"
+   },
+   {
+    "label": "위키백과 \"대한민국의 IMF 구제금융 요청\"",
+    "url": "https://ko.wikipedia.org/wiki/대한민국의_IMF_구제금융_요청",
+    "quote": "전국 누계 약 350만 명이 참여한 이 운동으로 약 227톤의 금이 모아졌다"
+   }
+  ],
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.01 ~ 2001.08"
+ },
+ {
+  "date": "2001-08-23",
+  "paperDate": "2001-08-24",
+  "title": "IMF 차입금 전액 상환, 관리체제 종료",
+  "shortTitle": "IMF 졸업",
+  "description": "오전 10시 30분 한국은행 총재가 최종 상환 서류에 결재해 잔액 1억 4천만 달러를 갚았습니다. 1997년 12월 이후 빌린 195억 달러를 예정보다 3년가량 앞당겨 모두 상환했습니다.",
+  "searchKeywords": [
+   "IMF 졸업",
+   "IMF 차입금 상환"
+  ],
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "한국일보 2001-08-24",
+    "url": "https://www.hankookilbo.com/news/article/200108240090189269",
+    "quote": "23일 오전10시30분"
+   },
+   {
+    "label": "위키백과 \"대한민국의 IMF 구제금융 요청\"",
+    "url": "https://ko.wikipedia.org/wiki/대한민국의_IMF_구제금융_요청",
+    "quote": "2001년 8월 23일, 대한민국에 대한 IMF 관리 체제가 공식 종료되었다."
+   },
+   {
+    "label": "KDI 경제정보센터 \"IMF 외환위기\"",
+    "url": "https://eiec.kdi.re.kr/material/clickView.do?click_yymm=201512&cidx=1317",
+    "quote": "2001년 8월에는 IMF로부터의 구제금융 자금을 모두 상환하고"
+   }
+  ],
+  "era": "IMF 외환위기",
+  "eraPeriod": "1997.01 ~ 2001.08"
+ }
+]
