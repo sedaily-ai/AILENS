@@ -196,6 +196,7 @@ export function WebtoonViewClient({
                     이미 그 컷의 대사·상황 설명이 들어있는데(바로 아래에도
                     같은 텍스트를 화면에 렌더) alt만 이걸 안 쓰고 있었다.
                     이미지 검색·스크린리더 둘 다에 실질적인 컷 내용이 전달됨. */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본, 컷마다 비율이 달라 next/image 불가 */}
                 <img src={p.url} alt={p.caption || `${webtoon.title} 컷 ${i + 1}`} style={{ display: 'block', width: '100%', height: 'auto' }} />
                 {p.caption && (
                   <p
