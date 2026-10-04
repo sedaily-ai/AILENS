@@ -1,19 +1,10 @@
-"""Unit tests for chatbot_handler 의 conversation_history 롤 처리.
+"""chatbot_handler 의 conversation_history 롤 처리 단위 테스트 (AWS 미접속).
 
-AWS 를 전혀 부르지 않는 순수 단위 테스트다 — 이 디렉터리의 다른 파일들
-(`test_pipeline`, `test_full_integration` 등)은 실 AWS 를 치는 운영 스모크
-스크립트지만 이것은 pytest 로 그냥 돌아간다.
+프런트가 사주 컨텍스트를 ``conversation_history`` 맨 앞에 ``role: "system"`` 으로 전달한다.
+Bedrock Messages API 는 messages 배열의 system 롤을 거부(``ValidationException``)하므로
+system 롤은 분리해 system 프롬프트에 합쳐야 하며, 이 계약을 고정한다.
 
-Run:
-  cd service/backend && python3 -m pytest tests/test_chatbot_system_turns.py -v
-
-왜 있나: 프런트의 사주 챗(`SajuChat.tsx`)이 사주 컨텍스트를
-``conversation_history`` 맨 앞에 ``role: "system"`` 으로 실어 보낸다. Bedrock
-Messages API 는 messages 배열의 system 롤을 거부하므로
-(``ValidationException: Unexpected role "system"``) 그대로 통과시키면 500 이
-난다. 반대로 그냥 버리면 페르소나가 사주 데이터를 모른 채 답해 기능이
-무의미해진다. 분리해서 system 프롬프트에 합치는 것이 정답이고, 이 파일이 그
-계약을 고정한다.
+실행: cd service/backend && python3 -m pytest tests/test_chatbot_system_turns.py -v
 """
 from __future__ import annotations
 

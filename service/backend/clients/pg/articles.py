@@ -1,19 +1,10 @@
-"""뉴스 기사(articles) — PostgreSQL 상시 서버(lens-cms-api) 경유 (v1.25).
+"""뉴스 기사(articles) — PostgreSQL 상시 서버(lens-cms-api) 경유 클라이언트.
 
-quiz_questions_ddb_client.py(v1.22)/personal_pg_client.py(v1.24)와 같은
-패턴 — 공개 조회는 토큰 없이, 수집기 쓰기 경로만 내부 토큰으로 보호.
+공개 조회는 토큰 없이, 수집기 쓰기 경로만 내부 토큰으로 보호한다.
+Lambda 실행 역할(sedaily-mbti-lambda-execution-dev)이 다른 프로젝트와 공유되어
+SSM 권한을 추가할 수 없으므로, 쓰기 토큰은 환경변수(LENS_CMS_API_TOKEN)로 직접 주입한다.
 
-⚠️ article-dev/search-dev/chatbot-dev/question-dev/article-collector-dev
-Lambda는 모두 `sedaily-mbti-lambda-execution-dev`라는, AI LENS 밖의 다른
-프로젝트(bigkinds/ga4 등)와 공유하는 광범위 실행 역할을 쓴다(personal_pg_
-client.py 도입 때 archive-dev/user-dev에서 이미 확인된 것과 동일 역할).
-이 역할에 SSM 권한을 추가하면 영향 범위가 이 프로젝트 밖으로 새므로,
-쓰기 토큰은 SSM 미경유 평문 환경변수(LENS_CMS_API_TOKEN)로 직접 주입한다
-(dev 단계 리스크 허용 범위로 판단).
-
-DynamoDB는 본문을 S3에 분리 저장했지만(get_article이 DDB 메타데이터+S3
-바디를 merge), Postgres articles.body는 이미 100% 백필돼 있어 그
-인다이렉션이 필요 없다 — get_article()이 항상 완전한 본문을 바로 반환.
+Postgres articles.body 에 본문이 포함되어 있어 S3 병합 없이 get_article() 이 완전한 본문을 반환한다.
 """
 from __future__ import annotations
 

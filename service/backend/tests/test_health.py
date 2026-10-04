@@ -1,6 +1,6 @@
-"""Unit tests for v2 health handler.
+"""v2 health 핸들러 단위 테스트.
 
-Runs from `backend/`: `python3 -m pytest v2/tests/test_health.py -v`.
+실행: cd service/backend && python3 -m pytest tests/test_health.py -v
 """
 import json
 

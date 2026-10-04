@@ -1,7 +1,6 @@
-"""
-Stock Data Service
-Fetches real-time Korean stock data from Naver Finance API.
-Used by the chatbot via Claude Tool Use for stock-related queries.
+"""주식 데이터 서비스.
+
+네이버 증권 API에서 한국 주식·지수 시세를 조회한다. 챗봇의 tool use(주식 질의)에서 호출한다.
 """
 import logging
 import json
@@ -20,7 +19,7 @@ TIMEOUT = 5
 
 
 def _fetch_json(url: str) -> Optional[Dict]:
-    """Fetch JSON from URL with timeout."""
+    """URL에서 JSON을 조회한다. 실패 시 None을 반환한다."""
     try:
         req = Request(url, headers={"User-Agent": USER_AGENT})
         with urlopen(req, timeout=TIMEOUT) as resp:
@@ -87,16 +86,16 @@ STOCK_ALIASES: Dict[str, str] = {
 
 
 def _resolve_alias(query: str) -> str:
-    """축약어를 정식 종목명으로 변환 (매칭 없으면 원본 반환)"""
+    """축약어를 정식 종목명으로 변환한다(매칭이 없으면 원본 반환)."""
     normalized = query.strip().lower().replace(" ", "")
     return STOCK_ALIASES.get(normalized, query.strip())
 
 
 def search_stock(query: str) -> Optional[Dict[str, str]]:
-    """
-    Search for a stock by name or code.
-    Returns the best match: {'code': '005930', 'name': '삼성전자', 'market': '코스피'}
-    축약어('하닉', '삼전' 등)는 사전에 정식 명칭으로 변환 후 검색.
+    """종목명 또는 코드로 종목을 검색해 가장 일치하는 1건을 반환한다.
+
+    반환 예: ``{'code': '005930', 'name': '삼성전자', 'market': '코스피'}``.
+    축약어('하닉', '삼전' 등)는 정식 명칭으로 변환한 뒤 검색한다.
     """
     resolved = _resolve_alias(query)
     url = NAVER_SEARCH_API.format(query=quote(resolved))
@@ -121,10 +120,7 @@ def search_stock(query: str) -> Optional[Dict[str, str]]:
 
 
 def get_stock_price(code: str) -> Optional[Dict[str, Any]]:
-    """
-    Get real-time stock price by code.
-    장중에는 현재가, 장 마감 후에는 종가를 반환합니다.
-    """
+    """종목 코드로 시세를 조회한다. 장중에는 현재가, 장 마감 후에는 종가를 반환한다."""
     url = NAVER_STOCK_API.format(code=code)
     data = _fetch_json(url)
 
@@ -170,11 +166,8 @@ def get_stock_price(code: str) -> Optional[Dict[str, Any]]:
 
 
 def lookup_stock(query: str) -> Optional[Dict[str, Any]]:
-    """
-    Search + get price in one call.
-    Accepts stock name ('삼성전자') or code ('005930').
-    """
-    # If query looks like a stock code (digits only), use directly
+    """종목 검색과 시세 조회를 한 번에 수행한다. 종목명('삼성전자') 또는 코드('005930')를 받는다."""
+    # 숫자만이면 종목 코드로 간주
     if query.strip().isdigit():
         code = query.strip()
     else:
@@ -198,9 +191,7 @@ INDEX_CODES = {
 
 
 def get_market_index(query: str) -> Optional[Dict[str, Any]]:
-    """
-    코스피/코스닥 시장 지수를 조회합니다.
-    """
+    """코스피/코스닥 시장 지수를 조회한다."""
     code = INDEX_CODES.get(query.strip())
     if not code:
         return None

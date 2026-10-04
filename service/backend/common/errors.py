@@ -1,12 +1,11 @@
 """백엔드 공통 예외 계층.
 
-v1 core/exceptions.py 에서 옮겨왔다. core/exceptions.py 는 이 모듈의 이름을
-재수출하는 얇은 층으로 남는다(기존 import 경로 유지).
+core/exceptions.py 는 이 모듈의 이름을 재수출한다(기존 import 경로 유지).
 
-⚠️ EXCEPTION_STATUS_CODES 의 삽입 순서가 동작을 결정한다.
+EXCEPTION_STATUS_CODES 의 삽입 순서가 동작을 결정한다.
 get_status_code_for_exception 이 순서대로 isinstance 를 검사하고 첫 매치를
 반환하므로, BackendError 는 반드시 맨 마지막에 있어야 한다. 앞으로 옮기면
-모든 서브클래스가 500 으로 떨어진다.
+모든 서브클래스가 500 으로 처리된다.
 """
 
 from typing import Optional, Dict, Any

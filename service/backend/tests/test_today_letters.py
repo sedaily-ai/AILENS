@@ -1,11 +1,9 @@
-"""Unit tests for today_letters body enrichment (mode-A → body[] bridge).
+"""today_letters body 변환(mode-A → body[]) 단위 테스트.
 
-Editor Pick 은 편지를 v1 mode-A(``articles[]``)로 저장하고, 프론트는
-``body[]`` 를 렌더한다. ``_enrich_body`` 가 그 간극을 메운다 (2026-07-24).
+편지는 mode-A(``articles[]``)로 저장되고 프론트는 ``body[]`` 를 렌더하므로,
+``_enrich_body`` 가 이 간극을 변환하는지 검증한다.
 
-Run from ``backend/``::
-
-    python3 -m pytest v2/tests/test_today_letters.py -v
+실행: cd service/backend && python3 -m pytest tests/test_today_letters.py -v
 """
 from __future__ import annotations
 

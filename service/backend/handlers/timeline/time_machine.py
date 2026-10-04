@@ -22,22 +22,12 @@ Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경�
   - 502 BIGKINDS_ERROR : 빅카인즈 호출/키 조회/응답 오류. 상세는 로그에만, 응답은 일반 메시지.
   - 400 BAD_REQUEST    : 파라미터 누락/형식 오류/범위 위반. 하루 모드의 미래 날짜는 오늘로 당겨 200.
 
-2026-08-17: 처음엔 issue_ranking(오늘의 이슈 API)으로 토픽+키워드만 보여줬는데,
-그 API의 news_cluster(관련 기사 ID 목록)로 기사 상세를 조회하면 같은 ID인데도
-0건/서버오류(E03)가 섞여 나와 신뢰도가 낮았다(2026-08-17 저녁 재확인 — 심지어
-당일 날짜조차 0건이 나옴). 대신 뉴스 검색 API(`/search/news`)를 ID 조회가 아니라
-날짜 범위 검색(published_at + provider=서울경제)으로 직접 호출하니 1999년 기사도
-본문·바이라인·원본 링크(구 도메인 sednews.com 포함)까지 안정적으로 나와서
-이 방식으로 교체했다 — 다만 발행 "시각"은 어느 시대 기사든 항상 자정(T00:00:00)
-고정이라 제공되지 않는다(프론트에서 시간 대신 순번으로 표시).
-빅카인즈 호출·응답 매핑은 services/bigkinds_search.py 로 분리돼 있다.
+데이터 소스는 빅카인즈 뉴스 검색 API(`/search/news`)이며, 날짜 범위 검색(published_at +
+provider=서울경제)으로 직접 호출한다. 발행 "시각"은 항상 자정(T00:00:00)으로 고정되어 제공되지
+않으므로 프론트는 시간 대신 순번으로 표시한다. 빅카인즈 호출·응답 매핑은
+services/timeline/bigkinds_search.py 에 있다.
 
-/timemachine 프론트(위키피디아+서울경제 스크래핑, "그날의 역사적 사건"이 대부분
-지어낸 가짜 데이터였던 문제로 삭제)가 쓰던 이 Lambda(sedaily-mbti-time-machine-dev)
-를 새 Lambda/API Gateway 라우트 생성 없이 재사용 중.
-
-API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽는다 —
-프론트/로그 어디에도 노출하지 않는다.
+API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽으며 프론트와 로그에 노출하지 않는다.
 """
 import hashlib
 import logging
@@ -68,22 +58,17 @@ RANGE_SIZE_DEFAULT = 10
 RANGE_SIZE_MAX = 20
 RANGE_SORTS = (bigkinds_search.SORT_RELEVANCE, bigkinds_search.SORT_DATE)
 
-# 캐시 테이블 — 옛 위키/스크래핑판 캐시와 같은 테이블 재사용. 키 접두사를
-# timemachine_articles_로 바꿔서(이전 issue_ranking 토픽판 캐시와도 안 섞이게)
-# 응답 스키마가 바뀔 때마다 옛 캐시를 일일이 안 지워도 되게 했다.
-# CACHE_TABLE을 하드코딩해두고 있었는데(2026-08-23 코드 리팩토링 감사에서
-# 발견) settings.dynamodb_table_articles와 완전히 같은 테이블이라 그대로
-# 재사용 — config.settings를 거치지 않는 유일한 예외였다.
+# 캐시 테이블은 기사 테이블을 공유하며, 키 접두사(timemachine_articles_)로 다른 캐시와 구분한다.
+# 응답 스키마가 바뀌면 접두사를 변경해 옛 캐시를 무효화한다.
 CACHE_TABLE = settings.dynamodb_table_articles
 CACHE_TTL_DAYS = 3650  # 과거 지면은 영구히 안 바뀐다 — 사실상 무기한 캐시.
 RANGE_CACHE_TTL_SECONDS = 30 * 86400  # 기간 검색은 키 조합이 많아 30일만 보관.
 
-# 부정 캐시: "조회는 성공했는데 0건"인 날짜(휴간일·빅카인즈 미적재 등)를 짧게 기억해
-# 같은 날짜 재요청마다 빅카인즈를 다시 치지 않게 한다. 키 접두사를 분리해 둬서
-# (a) 이전 버전 Lambda 로 롤백해도 빈 결과를 '캐시 히트'로 오인하지 않고,
-# (b) 나중에 기사가 적재돼 정상 캐시가 생기면 그쪽이 우선한다.
-# 오류(예외)는 절대 부정 캐시하지 않는다 — 오류 시 _fetch_sedaily_articles 가 raise 하므로
-# 저장 경로에 도달하지 않는다. 오늘 날짜는 기사가 계속 쌓이므로 부정 캐시 제외.
+# 부정 캐시: 조회는 성공했으나 0건인 날짜(휴간일, 빅카인즈 미적재 등)를 짧게 기억해
+# 같은 날짜 재요청마다 빅카인즈를 다시 호출하지 않도록 한다.
+# 키 접두사를 분리해 두어 (a) 롤백 시 빈 결과가 캐시 히트로 오인되지 않고,
+# (b) 이후 정상 캐시가 생기면 그쪽이 우선한다.
+# 오류는 부정 캐시하지 않으며(_fetch_sedaily_articles 가 raise), 기사가 계속 쌓이는 오늘 날짜도 제외한다.
 NEGATIVE_CACHE_TTL_SECONDS = 6 * 3600
 
 
@@ -148,8 +133,7 @@ def _put_cache_item(key: str, item_type: str, date: str, data: dict, ttl_seconds
         'date': date,
         'data': data,
         'cached_at': now.isoformat(),
-        # DynamoDB TTL 은 epoch 초(Number) 속성만 인식한다. 예전엔 ISO 문자열로 저장해
-        # TTL 이 동작하지 않았다.
+        # DynamoDB TTL 은 epoch 초(Number) 속성만 인식한다.
         'expires_at': int(now.timestamp()) + ttl_seconds,
     })
 
@@ -205,8 +189,7 @@ def _fetch_sedaily_articles(date: str) -> List[Dict[str, Any]]:
 
 
 def get_time_machine_data(date: str) -> dict:
-    # investments는 순수 로컬 계산(실측 시세 테이블 조회 + 산술)이라 외부 API를
-    # 안 타서 캐시할 필요가 없다 — 캐시 히트/미스와 무관하게 매번 새로 계산.
+    # investments 는 외부 API 없이 로컬에서 계산하므로 캐시 없이 매번 계산한다.
     investments = build_investment_scenarios(date)
 
     cached = _get_cached(date)

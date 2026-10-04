@@ -1,15 +1,8 @@
 """
-User Activity Handler Lambda Function
-Handles user profile, reading history, and statistics.
+사용자 활동 Lambda 핸들러.
 
-Storage: Personal DB (sedaily-mbti-personal-dev) via PersonalRepository.
-Migrated from engagement table to dedicated personal table.
-
-API contract unchanged — all request/response formats preserved.
-
-2026-08-24 — 실제 로직(프로필 생성/조회·읽기 기록·통계·뱃지 계산)은
-services/user_service.py로 뺐다(코드 리팩토링 감사 Track B, God 파일
-분해). 이 파일은 이제 HTTP 라우팅과 인증만 담당한다.
+프로필, 읽기 기록, 통계를 처리한다. 프로필 생성·조회, 읽기 기록, 통계, 뱃지 계산 로직은
+services/user/profile.py 에 있으며, 이 파일은 HTTP 라우팅과 인증만 담당한다.
 """
 import logging
 import json
@@ -66,10 +59,7 @@ def lambda_handler(event: dict, context) -> dict:
         elif not body:
             body = {}
 
-        # Get user_id from the verified Cognito ID token. Previously this
-        # accepted `user_id` from the request body or query string, which
-        # let any caller impersonate any user (read history, sync profile,
-        # etc.). The trusted source is now the JWT signature.
+        # user_id 는 검증된 Cognito ID 토큰에서만 가져온다(요청 바디·쿼리스트링 값은 신뢰하지 않는다).
         try:
             user_id = get_authenticated_user_id(event)
         except AuthenticationError as e:

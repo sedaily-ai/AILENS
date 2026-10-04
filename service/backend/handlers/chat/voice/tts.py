@@ -5,14 +5,11 @@ POST /api/voice/tts
 body = {
     "text": "..."
 }
-(구 프론트가 "mbti_group" 을 실어 보내도 무시한다 — 2026-08-07 MBTI 페르소나 제거로
- 페르소나별 voice 분기 자체가 없다. 단일 기본 voice 로 통일.)
+`mbti_group` 이 포함되어도 무시하며 단일 기본 voice 를 사용한다.
 
-기본 voice: AWS Polly (Seoyeon generative, 실패 시 neural 자동 폴백). 예전에는
-페르소나 성별에 따라 여성(하은/소율)은 Polly, 남성(민철/준서)은 ElevenLabs로
-나눠 썼지만, 페르소나가 없어졌으니 외부 의존성(ElevenLabs API key) 없이 항상
-쓸 수 있는 Polly 로 통일했다. ElevenLabs 연동 코드(`_synth_elevenlabs`)는
-남겨뒀다 — 필요해지면 다시 provider 분기를 붙일 수 있게.
+기본 voice: AWS Polly (Seoyeon generative, 실패 시 neural 자동 폴백). 외부 의존성
+(ElevenLabs API key) 없이 항상 사용할 수 있다. ElevenLabs 연동 코드(`_synth_elevenlabs`)는
+provider 분기를 다시 켤 때를 위해 유지하며 현재는 호출되지 않는다.
 
 응답: { audio (base64 mp3), provider, voice_id, engine }
 """
@@ -50,8 +47,7 @@ def _get_secretsmanager():
     return _secretsmanager
 
 
-# ElevenLabs API key — Secrets Manager (ai-labs/elevenlabs) 에서 5분 TTL 캐시.
-# common/secrets.py 패턴 따름. cold start 후 첫 호출만 SecretsManager hit.
+# ElevenLabs API key: Secrets Manager(ai-labs/elevenlabs)에서 조회하며 5분 TTL 로 캐시한다.
 _ELEVEN_KEY_CACHE: Tuple[Optional[str], float] = (None, 0.0)
 _ELEVEN_KEY_TTL_SEC = 300
 
@@ -74,8 +70,7 @@ def _get_elevenlabs_api_key() -> Optional[str]:
     return None
 
 
-# 단일 기본 챗봇 voice — 2026-08-07 MBTI 페르소나 제거로 그룹별 voice 매핑 대신
-# 이거 하나만 쓴다. Seoyeon generative, 실패 시 _synth_polly 가 neural 로 자동 폴백.
+# 단일 기본 챗봇 voice. Seoyeon generative 를 사용하며 실패 시 _synth_polly 가 neural 로 자동 폴백한다.
 DEFAULT_CHAT_VOICE = {
     'provider': 'polly',
     'voice_id': 'Seoyeon',
@@ -92,8 +87,8 @@ ELEVENLABS_VOICE_SETTINGS = {
 }
 ELEVENLABS_TIMEOUT_SEC = 12
 
-# Polly 가 어색하게 읽는 영어 약어 → 한국식 발음으로 substitute.
-# 단어 경계 (\b) 적용해 단어 일부만 치환되는 사고 방지.
+# Polly 가 어색하게 읽는 영어 약어를 한국식 발음으로 치환한다.
+# 단어 경계(\b)를 적용해 단어 일부만 치환되지 않게 한다.
 import re as _re
 
 _PRONOUNCE_SUBS = [
@@ -130,7 +125,7 @@ _PRONOUNCE_SUBS = [
     (r'%', ' 퍼센트'),
     (r'(\d)\s*bp\b', r'\1 베이시스포인트'),
     (r'\bbp\b', '베이시스포인트'),
-    # 한자 흔한 갈등 표현
+    # 한자 표현
     (r'勞勞', '노노'),
     (r'勞使', '노사'),
     (r'勞', '노'),
@@ -168,9 +163,8 @@ def lambda_handler(event: dict, context) -> dict:
         return json_response(400, {'error': 'text 너무 김 (max 3000자)'})
 
     spec = DEFAULT_CHAT_VOICE
-    # 영어 약어·단위·한자 → 한국식 발음으로 치환. ElevenLabs Multilingual v2
-    # 도 약어 직독 시 어색 (KT → "케이티" 가 자연) — Polly·ElevenLabs 둘 다
-    # 같은 전처리 적용.
+    # 영어 약어·단위·한자를 한국식 발음으로 치환한다. Polly·ElevenLabs 모두 약어를 그대로 읽으면
+    # 어색하므로 동일한 전처리를 적용한다.
     tts_text = preprocess_for_polly(text)
 
     provider = spec.get('provider', 'polly')
@@ -223,10 +217,10 @@ def _synth_polly(text: str, spec: Dict[str, Any]) -> Tuple[bytes, str, str]:
 
 
 def _synth_elevenlabs(text: str, spec: Dict[str, Any]) -> Tuple[bytes, str, str]:
-    """ElevenLabs HTTP 호출. 실패 시 Polly Seoyeon neural fallback — 응답의
-    provider 는 실제로 합성에 쓰인 값을 반영해 'polly'로 내려간다.
-    (기본 voice 는 이미 Polly라 이 함수는 현재 호출되지 않는다 — 위 모듈
-    docstring 참조. ElevenLabs provider 분기가 다시 켜질 때를 위해 남겨둠.)"""
+    """ElevenLabs HTTP 호출. 실패 시 Polly Seoyeon neural 로 폴백하며, 응답의 provider 는 실제 합성에 쓰인 값('polly')을 반영한다.
+
+    기본 voice 가 Polly 이므로 현재는 호출되지 않는다.
+    """
     voice_id = spec['voice_id']
     api_key = _get_elevenlabs_api_key()
     if not api_key:

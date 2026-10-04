@@ -1,15 +1,10 @@
 """
-News Briefing Generator Lambda Function
-Generates a daily news briefing and caches it for the chatbot.
+뉴스 브리핑 생성 Lambda 핸들러.
 
-Runs independently from article_collector — can be triggered by:
-  - EventBridge schedule (e.g., every 1-2 hours)
-  - EventBridge rule chained after article_collector completes
-  - Manual invocation
-
-Reads the latest transformed articles from DynamoDB across ALL categories,
-generates a single briefing via Claude Haiku, and stores it as a single
-cached item (news_briefing_latest) for the chatbot to read.
+챗봇이 참조할 일일 뉴스 브리핑을 생성해 캐시한다. article_collector 와 독립적으로
+EventBridge 스케줄, article_collector 완료 후 연결된 규칙, 수동 호출로 실행할 수 있다.
+전 카테고리의 최신 기사를 읽어 Claude Haiku 로 브리핑 하나를 생성하고
+news_briefing_latest 항목으로 저장한다.
 """
 import logging
 import json

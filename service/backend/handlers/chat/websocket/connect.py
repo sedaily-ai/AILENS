@@ -19,8 +19,7 @@ def lambda_handler(event, context):
     connection_id = event['requestContext']['connectionId']
 
     qs = event.get('queryStringParameters') or {}
-    # 구 프론트가 "mbti_group" 쿼리 파라미터를 실어 보내도 무시한다 —
-    # 2026-08-07 MBTI 페르소나 제거로 connection 별 페르소나 소속 개념 자체가 없다.
+    # `mbti_group` 쿼리 파라미터는 무시한다(연결별 페르소나 개념이 없다).
     user_id = qs.get('user_id') or 'anonymous'
 
     now = datetime.now(timezone.utc)

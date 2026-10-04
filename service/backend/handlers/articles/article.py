@@ -2,10 +2,8 @@
 ArticleHandler Lambda Function
 Handles article detail retrieval.
 
-2026-08-24 — 실제 조회 로직(DynamoDB+S3 병합, 리스트 응답 shaping,
-ArticleHandler/ArticleDetailResponse)은 services/article_service.py로
-뺐다(코드 리팩토링 감사 Track B, God 파일 분해). 이 파일은 이제 HTTP
-라우팅과 응답 조립만 담당한다.
+조회 로직(DynamoDB·S3 병합, 목록 응답 구성)은 services/articles/article.py 에 있으며,
+이 파일은 HTTP 라우팅과 응답 조립만 담당한다.
 """
 import asyncio
 import json
@@ -71,9 +69,8 @@ def lambda_handler(event: dict, context) -> dict:
             "body": "",
         }
 
-    # List route: GET /api/articles (plural). Matched by v2 routeKey first, then by
-    # path-suffix fallback for v1. The singular /api/article/{id} route ends with
-    # the article_id (not "articles"), so endswith disambiguation is safe.
+    # 목록 라우트(GET /api/articles). v2 는 routeKey, v1 은 경로 접미사로 판별한다.
+    # 단건 라우트(/api/article/{id})는 article_id 로 끝나므로 endswith 비교로 구분된다.
     is_list_route = (
         route_key == "GET /api/articles"
         or (http_method == "GET" and path.rstrip("/").endswith("/api/articles"))
@@ -81,7 +78,7 @@ def lambda_handler(event: dict, context) -> dict:
     if is_list_route:
         return list_handler(event, context)
 
-    # Default: legacy detail route, unchanged behavior and response shape.
+    # 기본: 단건 조회 라우트
     return asyncio.run(_async_handler(event, context))
 
 
@@ -97,10 +94,6 @@ async def _async_handler(event: dict, context) -> dict:
         if not article_id:
             return {
                 "statusCode": 400,
-                # 이 응답만 CORS_HEADERS 대신 인라인 딕트를 써서
-                # Access-Control-Allow-Methods/Headers가 빠져 있었다(같은 파일의
-                # 다른 응답 4곳은 전부 CORS_HEADERS를 씀 — 2026-08-23 코드
-                # 리팩토링 감사에서 발견, 통일).
                 "headers": CORS_HEADERS,
                 "body": json.dumps({
                     "error": {

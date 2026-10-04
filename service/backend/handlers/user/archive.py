@@ -9,11 +9,8 @@ Routes:
   GET    /api/archive/popular  — Popular sentences across all users (public, no auth)
   DELETE /api/archive/{id}     — Delete a sentence
 
-Replaces the frontend's Mock data (React state, 8 sample sentences).
-
-2026-08-24 — 실제 라우트 로직(저장/조회/인기목록/삭제)과 응답 헬퍼는
-services/archive_service.py로 뺐다(코드 리팩토링 감사 Track B, God 파일
-분해). 이 파일은 이제 요청 파싱, 인증, 라우팅 분기만 담당한다.
+라우트 로직(저장·조회·인기 목록·삭제)과 응답 헬퍼는 services/user/archive.py 에 있으며,
+이 파일은 요청 파싱, 인증, 라우팅 분기만 담당한다.
 """
 import base64
 import json
@@ -80,33 +77,27 @@ async def lambda_handler(event: dict, context) -> dict:
 
     logger.info(f"Archive request: {method} {path}")
 
-    # GET /api/archive/popular — 완전 공개. 인증 시도조차 안 한다(다른
-    # 라우트처럼 anon_user_id를 붙이면 응답이 그 유저 것으로 스코프된다는
-    # 오해를 살 수 있어 명시적으로 분리).
+    # GET /api/archive/popular: 공개 라우트. 응답이 특정 사용자 기준으로 보이지 않도록 인증을 시도하지 않는다.
     if method == 'GET' and '/popular' in path:
         return await svc.handle_popular(params)
 
-    # All write operations need an authenticated user. Reads (similarity
-    # search, list) accept either an authenticated user (scoped to their
-    # own archive) or anonymous (returns nothing for now). Replace any
-    # client-supplied user_id with the JWT `sub` for write paths.
+    # 쓰기 작업은 인증된 사용자가 필요하며 클라이언트가 보낸 user_id 는 JWT sub 로 덮어쓴다.
+    # 읽기는 인증된 사용자(본인 서랍 범위) 또는 익명(결과 없음)을 허용한다.
     if method in ('POST', 'DELETE'):
         try:
             verified_user_id = get_authenticated_user_id(event)
         except AuthenticationError as e:
             return svc.error(401, str(e))
         body['user_id'] = verified_user_id
-        # Also override query-param user_id since DELETE may use it.
+        # DELETE 는 쿼리 파라미터의 user_id 를 쓸 수 있으므로 함께 덮어쓴다.
         params['user_id'] = verified_user_id
     else:
-        # GET — try to attach a verified user_id but don't require it. The
-        # repository layer scopes to user_id when present.
+        # GET: 검증된 user_id 가 있으면 붙이되 필수는 아니다. 저장소 계층이 user_id 가 있을 때 범위를 제한한다.
         anon_user_id = try_get_authenticated_user_id(event)
         if anon_user_id:
             params['user_id'] = anon_user_id
 
-    # POST /api/archive/similar — 2026-08-06 제거(pgvector RDS 없음). 저장으로
-    # 잘못 떨어지지 않도록 명시적으로 막는다.
+    # POST /api/archive/similar: 제공 종료된 기능이며, 저장 라우트로 잘못 처리되지 않도록 명시적으로 차단한다.
     if '/similar' in path:
         return svc.error(410, '유사 문장 검색 기능은 더 이상 제공되지 않습니다.')
 

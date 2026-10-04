@@ -3,7 +3,7 @@ S3 Article Body Client
 Stores and retrieves article body content (original + MBTI versions) as JSON in S3.
 
 This separates large text data from DynamoDB, which stores only metadata + S3 URI pointer.
-Follows the Article Database architecture: DynamoDB (Article Pointer) + S3 (MBTI 기사 DB).
+Architecture: DynamoDB (article pointer) + S3 (article body).
 
 Key pattern: {prefix}/{news_id}/body.json
 S3 URI format: s3://{bucket}/{prefix}/{news_id}/body.json

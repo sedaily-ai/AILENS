@@ -5,10 +5,8 @@ Collects Seoul Economic articles from S3 XML and saves them to DynamoDB.
 Data Source: S3 XML (s3://sedaily-news-xml-storage/daily-xml/)
 Storage: DynamoDB (sedaily-mbti-articles-dev)
 
-2026-08-24 — 실제 수집 로직(S3 XML fetch·중복/변경 감지·DynamoDB 저장·
-article_data 조립)은 services/article_collection_service.py로 뺐다(코드
-리팩토링 감사 Track B, God 파일 분해). 이 파일은 이제 EventBridge 트리거
-진입점만 담당한다.
+수집 로직(S3 XML 조회, 중복·변경 감지, DynamoDB 저장)은 services/articles/collection.py 에
+있으며, 이 파일은 EventBridge 트리거 진입점만 담당한다.
 """
 import logging
 import asyncio
@@ -26,10 +24,7 @@ def lambda_handler(event: dict, context) -> dict:
     """
     logger.info(f"Article collection triggered: {event}")
     result = asyncio.run(collect_articles(24, event=event))
-    # Reflect collection failure in the HTTP status so any non-EventBridge
-    # caller (or future API Gateway wiring) can detect it. Previously this
-    # always returned 200 even when `collect_articles` had raised internally
-    # and produced `{"status": "error", ...}`.
+    # 수집 실패(status == "error")를 HTTP 상태 코드에 반영해 EventBridge 외 호출자도 감지할 수 있게 한다.
     status_code = 500 if isinstance(result, dict) and result.get("status") == "error" else 200
     return {
         "statusCode": status_code,

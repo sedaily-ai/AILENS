@@ -1,10 +1,7 @@
-"""뉴스레터 구독자 저장 — PostgreSQL 상시 서버(lens-cms-api) 경유 (v1.23).
+"""뉴스레터 구독자 저장 — PostgreSQL 상시 서버(lens-cms-api) 경유 클라이언트.
 
-handlers/subscribe.py의 검증·CAN-SPAM consent 체크·SES 발송 로직은
-그대로 두고, 저장(DynamoDB put_item/scan/update_item)만 여기로 옮겼다.
-공유 시크릿은 SSM SecureString(`/sedaily-mbti/admin/lens-cms-api-token`)
-— admin/backend/repo/posts_repo.py(v1.21)와 같은 파라미터를 그대로 읽는다
-(같은 lens-cms-api 서버를 보므로 토큰도 같다).
+검증·동의 확인·메일 발송은 handlers/content/subscribe.py 가 담당하고, 이 모듈은 저장만 담당한다.
+토큰은 SSM SecureString 에서 읽으며 admin 쪽과 동일한 lens-cms-api 토큰 값을 사용한다.
 """
 from __future__ import annotations
 
@@ -18,10 +15,8 @@ from common.secrets import get_secret
 from config.constants import LENS_CMS_API_DEFAULT_URL
 
 _API_URL = os.environ.get("LENS_CMS_API_URL", LENS_CMS_API_DEFAULT_URL)
-# admin Lambda 쪽 역할은 /sedaily-mbti/admin/* 만 읽을 수 있고, 이 Lambda가
-# 쓰는 공용 역할(sedaily-mbti-v2-collector-dev-role)은 /sedaily-mbti/v2/*
-# 만 읽을 수 있어(V2SecretsAccess 정책) 같은 값을 두 경로에 각각 저장해뒀다
-# — 공용 역할의 IAM 정책 범위를 넓히는 대신, 배포 영향을 이 파일로만 좁힘.
+# admin 역할은 /sedaily-mbti/admin/*, 이 Lambda 의 공용 역할(sedaily-mbti-v2-collector-dev-role)은
+# /sedaily-mbti/v2/* 만 읽을 수 있어 동일한 토큰 값을 두 경로에 각각 저장해 두었다.
 _TOKEN_PARAM = os.environ.get("LENS_CMS_API_TOKEN_PARAM", "/sedaily-mbti/v2/lens-cms-api-token")
 _TIMEOUT_SECONDS = 8
 

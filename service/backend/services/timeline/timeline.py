@@ -1,16 +1,12 @@
-"""Timeline("뉴스 타임머신") 비즈니스 로직 — handlers/timeline_handler.py에서
-추출 (2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
+"""Timeline("뉴스 타임머신") 비즈니스 로직.
 
-데이터 소스는 S3(`sedaily-news-xml-storage/daily-xml/{YYYYMMDD}.xml`) 단일이다
-— 서울경제 원본 수집 피드. `services/s3_articles_service.py`가 같은 버킷·같은
-파서로 배포돼 살아있는 걸 확인하고(2026-08-13) 그 로직을 그대로 재사용한다.
+데이터 소스는 S3(`sedaily-news-xml-storage/daily-xml/{YYYYMMDD}.xml`) 단일이며,
+`services/articles/s3_articles.py`와 같은 버킷·파서를 사용한다.
+허용 mode 는 'flat'(그날 기사를 최신순으로 나열) 하나뿐이다.
 
-허용 mode 는 'flat'(그날 기사를 최신순 한 줄로) 하나뿐이다. 다매체 클러스터링
-("그날의 이슈", mode=issues)은 서울경제 단일 매체 피드로 재현할 수 없어 제거했다.
-
-캐시: 같은 날짜를 페이지/필터만 바꿔 반복 조회할 때마다 날짜 XML 전체를
-다시 내려받지 않도록, 필터(action=D 제외)·정렬까지 끝낸 기사 목록을
-프로세스 메모리에 둔다(`_DayCache`). 정책은 아래 상수 참조.
+캐시: 같은 날짜를 페이지·필터만 바꿔 반복 조회할 때 XML을 다시 내려받지 않도록,
+필터(action=D 제외)·정렬을 마친 기사 목록을 프로세스 메모리에 둔다(`_DayCache`).
+정책은 아래 상수를 따른다.
 """
 import asyncio
 import logging
@@ -43,7 +39,7 @@ _s3_xml_client: Optional[S3XMLClient] = None
 
 
 def _get_s3_xml_client() -> S3XMLClient:
-    """Lambda 컨테이너당 한 번만 생성 (s3_articles_service.py와 같은 패턴)."""
+    """Lambda 컨테이너당 한 번만 생성한다."""
     global _s3_xml_client
     if _s3_xml_client is None:
         _s3_xml_client = S3XMLClient()
@@ -64,9 +60,7 @@ class TimelineRequest:
         return (self.page - 1) * self.page_size
 
 
-# =============================================================================
-# 날짜별 메모리 캐시 (LRU + TTL)
-# =============================================================================
+# ── 날짜별 메모리 캐시 (LRU + TTL) ──────────────────────────────────────────
 
 class _DayCache:
     """date(YYYY-MM-DD) → (만료 monotonic 시각, 정렬 끝난 기사 목록). 스레드 안전."""
@@ -109,9 +103,7 @@ def _ttl_for(date: str, articles: list) -> float:
     return PAST_DATE_TTL_SECONDS if date < today_kst() else TODAY_TTL_SECONDS
 
 
-# =============================================================================
-# S3 XML (서울경제 원본 피드)
-# =============================================================================
+# ── S3 XML (서울경제 원본 피드) ─────────────────────────────────────────────
 
 def _load_day_articles(date: str) -> list:
     """해당 날짜의 (삭제 제외, 최신순) 기사 목록. 메모리 캐시를 먼저 본다."""
@@ -123,7 +115,7 @@ def _load_day_articles(date: str) -> list:
     date_str = date.replace('-', '')  # S3XMLClient는 YYYYMMDD 키를 쓴다
     articles = asyncio.run(client.get_articles_by_date(date_str))
 
-    # 삭제(action='D') 항목 제외 — s3_articles_service.py와 동일 규칙.
+    # 삭제(action='D') 항목 제외
     articles = [a for a in articles if a.action != 'D']
     articles.sort(key=lambda a: a.published_at, reverse=True)
 
@@ -135,7 +127,7 @@ def _filter_articles(articles: list, categories: List[str], query: Optional[str]
     if categories:
         articles = [a for a in articles if a.main_category in categories]
 
-    # query 는 제목/본문 부분 문자열 매칭 (S3 XML엔 검색 엔진이 없음).
+    # query 는 제목·본문 부분 문자열 매칭이다(S3 XML에는 검색 엔진이 없다).
     if query:
         q = query.lower()
         articles = [
@@ -146,10 +138,9 @@ def _filter_articles(articles: list, categories: List[str], query: Optional[str]
 
 
 def fetch_from_s3_xml(req: TimelineRequest) -> dict:
-    """
-    그 날짜 기사를 필터 → 페이지로 잘라 돌려준다. 그 날짜 파일이 없거나
-    기사가 0건이면 articles=[] 를 그대로 반환한다(프론트가 "아직 보관되지
-    않았어요" 빈 상태를 표시).
+    """해당 날짜 기사를 필터링·페이지 분할해 반환한다.
+
+    날짜 파일이 없거나 기사가 0건이면 articles=[] 를 반환한다(프론트가 빈 상태를 표시).
     """
     articles = _filter_articles(_load_day_articles(req.date), req.categories, req.query)
     total_hits = len(articles)
@@ -165,7 +156,7 @@ def fetch_from_s3_xml(req: TimelineRequest) -> dict:
 
 
 def _s3_article_to_response(a) -> dict:
-    """S3Article → 프론트엔드 응답 형태 (s3_articles_service.py의 매핑과 동일)."""
+    """S3Article을 프론트엔드 응답 형태로 변환한다."""
     image_url = None
     if a.images:
         image_url = a.images[0].url
@@ -185,12 +176,10 @@ def _s3_article_to_response(a) -> dict:
     }
 
 
-# =============================================================================
-# Orchestration
-# =============================================================================
+# ── 조합 ───────────────────────────────────────────────────────────────────
 
 def build_timeline(req: TimelineRequest) -> dict:
-    """S3 XML 을 그대로 돌려준다 — 폴백 없음. 응답 필드는 프론트 계약."""
+    """S3 XML 결과로 타임라인 응답을 만든다(대체 소스 없음). 응답 필드는 프론트와의 계약이다."""
     payload = fetch_from_s3_xml(req)
 
     total_hits = payload['total_hits']

@@ -1,12 +1,7 @@
-"""Article 비즈니스 로직 — handlers/article_handler.py에서 추출
-(2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
+"""Article 비즈니스 로직 — 기사 목록·상세 조회.
 
-When user views an article:
-1. Fetch from PostgreSQL (v1.25 — lens-cms-api 경유, 본문 이미 인라인 저장)
-2. Return the article's original content
-
-2026-09-09(v1.25): DynamoDB(+S3 body pointer)에서 PostgreSQL로 전환.
-articles.body가 이미 100% 백필돼 있어 S3 merge 단계 자체가 없어졌다.
+`handlers/articles/article.py`가 호출한다. 기사는 PostgreSQL(lens-cms-api 경유)에서 조회하며,
+본문(articles.body)이 인라인으로 저장돼 있어 별도 S3 조회는 없다.
 """
 import logging
 from typing import Optional
@@ -20,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ArticleDetailResponse:
-    """Article detail response"""
+    """기사 상세 응답 모델."""
     news_id: str
     title_ko: str
     content_ko: str
@@ -45,7 +40,7 @@ class ArticleDetailResponse:
             self.images_caption = []
         if self.content_blocks is None:
             self.content_blocks = []
-        # Extract first image URL if not already set
+        # image_url 이 없으면 첫 이미지에서 추출
         if self.image_url is None and self.images:
             if isinstance(self.images, list) and len(self.images) > 0:
                 first_img = self.images[0]
@@ -56,39 +51,29 @@ class ArticleDetailResponse:
 
 
 class ArticleHandlerError(Exception):
-    """Base exception for ArticleHandler errors"""
+    """ArticleHandler 오류의 기반 예외."""
     pass
 
 
 class ArticleHandler:
-    """
-    Handles article detail retrieval from PostgreSQL (lens-cms-api 경유)
-    """
+    """PostgreSQL(lens-cms-api 경유)에서 기사 상세를 조회한다."""
 
     async def handle_article_detail(
         self,
         article_id: str
     ) -> ArticleDetailResponse:
-        """
-        Handle article detail request.
-
-        Returns the article's original content.
+        """기사 원문 상세를 조회한다.
 
         Args:
-            article_id: Article ID (news_id)
-
-        Returns:
-            ArticleDetailResponse
+            article_id: 기사 ID(news_id).
 
         Raises:
-            ArticleHandlerError: If retrieval fails
+            ArticleHandlerError: 조회 실패 시.
         """
         try:
-            # Validate article_id
             if not article_id or not article_id.strip():
                 raise ArticleHandlerError("Article ID is required")
 
-            # Retrieve from PostgreSQL
             cached_article = articles_client.get_article(article_id)
             if not cached_article:
                 logger.warning(f"Article {article_id} not found in PostgreSQL")
@@ -117,10 +102,8 @@ class ArticleHandler:
             )
 
         except ArticleHandlerError:
-            # Re-raise our own errors
             raise
         except Exception as e:
-            # Catch-all for unexpected errors
             logger.error(f"Unexpected error in article handler: {e}", exc_info=True)
             raise ArticleHandlerError(
                 "An unexpected error occurred. Please try again later."
@@ -128,10 +111,10 @@ class ArticleHandler:
 
 
 def _extract_image_url(images) -> Optional[str]:
-    """Extract first image URL from an article's images field.
+    """기사 images 필드에서 첫 이미지 URL을 추출한다.
 
-    Images can be a list of dicts ({'url': ..., 'caption': ...}) or plain strings.
-    Returns None if nothing usable is present.
+    images 는 ``{'url': ..., 'caption': ...}`` dict 리스트 또는 문자열 리스트이며,
+    사용할 값이 없으면 None을 반환한다.
     """
     if not images or not isinstance(images, list) or len(images) == 0:
         return None
@@ -144,7 +127,7 @@ def _extract_image_url(images) -> Optional[str]:
 
 
 def _transform_article_for_list(article: dict) -> dict:
-    """Shape a DynamoDB+S3-merged article into the /api/articles list item format."""
+    """기사를 /api/articles 목록 항목 형식으로 변환한다."""
     content_ko = article.get('content_ko') or ''
     return {
         'news_id': article.get('news_id', ''),
@@ -161,11 +144,7 @@ def _transform_article_for_list(article: dict) -> dict:
 
 
 async def list_articles(date_str: str, limit: int) -> dict:
-    """
-    GET /api/articles?date=YYYYMMDD&limit=30 의 실제 조회 로직.
-
-    List articles for a given date (PostgreSQL, lens-cms-api 경유).
-    """
+    """GET /api/articles?date=YYYYMMDD&limit=30 의 조회 로직. 날짜별 기사 목록을 반환한다."""
     date_str = (date_str or "").strip() or get_kst_today()
 
     try:
@@ -185,6 +164,6 @@ async def list_articles(date_str: str, limit: int) -> dict:
 
 
 async def get_article_detail(article_id: str) -> ArticleDetailResponse:
-    """GET /api/article/{article_id} 의 실제 조회 로직 (legacy detail route)."""
+    """GET /api/article/{article_id} 의 조회 로직(레거시 상세 라우트)."""
     handler = ArticleHandler()
     return await handler.handle_article_detail(article_id)

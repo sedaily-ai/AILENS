@@ -1,8 +1,7 @@
 """챗봇 시스템 프롬프트/컨텍스트 텍스트 구성 + Bedrock tool 정의.
 
-2026-08-05: `handlers/chatbot_handler.py`(869줄)에서 분리. 이미 조회된 데이터를
-프롬프트 텍스트로 조립하는 책임만 모았다 — 데이터 조회는
-`services/chatbot_context_service.py`, Bedrock 호출은 `services/chatbot_engine.py`.
+조회된 데이터를 프롬프트 텍스트로 조립하는 책임만 담당한다.
+데이터 조회는 `services/chat/context.py`, Bedrock 호출은 `services/chat/engine.py`가 맡는다.
 """
 from typing import List, Dict, Any
 
@@ -10,7 +9,7 @@ from services.content.prompt_loader import load_chatbot_prompt
 
 
 def build_context_prompt(articles: List[Dict[str, Any]]) -> str:
-    """Build context about recent news for the chatbot"""
+    """최근 뉴스 컨텍스트 텍스트를 만든다."""
     if not articles:
         return ""
 
@@ -26,11 +25,11 @@ def build_context_prompt(articles: List[Dict[str, Any]]) -> str:
 
 
 def build_context_from_briefing(briefing_text: str) -> str:
-    """Build context from pre-generated daily briefing."""
+    """사전 생성된 일일 브리핑으로 컨텍스트 텍스트를 만든다."""
     return f"\n\n[오늘의 뉴스 브리핑 - 대화 시 참조]\n{briefing_text}\n"
 
 
-# ── Shared helpers ──────────────────────────────────────────────
+# ── 공용 상수 ──────────────────────────────────────────────
 
 GENERAL_INSTRUCTIONS = """
 
@@ -76,11 +75,9 @@ NO_CONTEXT_INSTRUCTIONS = """
 
 
 def _build_full_system_prompt(recent_articles=None, cached_briefing=None) -> str:
-    """Build complete system prompt with context and instructions."""
-    # Admin-3: prompt source = sedaily-mbti-admin-prompts-dev (DDB) with 5-min TTL
-    # cache, falling back to prompts/chatbot/default.md on DDB miss/error.
-    # MBTI personas were removed site-wide — single default voice for everyone,
-    # no more per-group branching/fallback.
+    """컨텍스트와 지침을 포함한 전체 시스템 프롬프트를 만든다."""
+    # 프롬프트 원본은 sedaily-mbti-admin-prompts-dev(DDB, TTL 5분)이며,
+    # 미존재·오류 시 prompts/chatbot/default.md 로 대체된다.
     prompt = load_chatbot_prompt('default')
 
     if cached_briefing:
@@ -95,7 +92,7 @@ def _build_full_system_prompt(recent_articles=None, cached_briefing=None) -> str
 
 
 def _get_tools() -> list:
-    """Return tool definitions for Claude."""
+    """Claude에 전달할 tool 정의를 반환한다."""
     return [
         {
             "name": "get_stock_price",

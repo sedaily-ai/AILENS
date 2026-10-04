@@ -1,20 +1,14 @@
 #!/bin/bash
 # S3 XML(서울경제 원본 피드) 기반 타임라인 Lambda + API Gateway 라우트 최초 1회 프로비저닝.
 #
-# 왜 필요한가:
-#   handlers/timeline_handler.py 는 레포에 있지만 Lambda 함수와 API Gateway 라우트가
-#   없으면 `POST /api/timeline` 이 404 다. 프론트(타임머신 화면)는 이 라우트로
-#   그 날짜의 지면(mode=flat)을 받는다.
+# 목적: handlers/timeline/timeline.py 는 Lambda 함수와 API Gateway 라우트가 있어야 `POST /api/timeline` 이 동작한다.
+# 프론트(타임머신 화면)는 이 라우트로 해당 날짜의 지면(mode=flat)을 조회한다.
 #
-# 동작 방식(2026-08-13 이후):
-#   s3://sedaily-news-xml-storage/daily-xml/{YYYYMMDD}.xml 을 읽어 필터·정렬·페이지해 돌려준다
-#   (services/timeline_service.py). 빅카인즈·DynamoDB 폴백·BIGKINDS_API_KEY 는 쓰지 않는다
-#   — 별도 환경변수 주입이 필요 없다. 허용 mode 는 'flat' 하나.
+# 동작: s3://sedaily-news-xml-storage/daily-xml/{YYYYMMDD}.xml 을 읽어 필터·정렬·페이지 처리 후 반환한다
+# (services/timeline/timeline.py). 별도 환경변수는 필요 없으며 허용 mode 는 'flat' 뿐이다.
 #
-# 왜 deploy.sh 가 아니라 별도 스크립트인가:
-#   deploy.sh 는 `update-function-code` 만 한다(이미 있는 함수의 코드 갱신).
-#   함수 **생성**은 레포 규칙상 자동화 대상이 아니라 사람이 검토 후 1회 실행한다.
-#   `setup-briefing-lambda.sh` 와 같은 성격의 스크립트다.
+# deploy.sh 는 기존 함수의 코드 갱신(update-function-code)만 수행한다.
+# 함수 생성은 사람이 검토 후 1회 실행하는 것을 원칙으로 하며, setup-briefing-lambda.sh 와 같은 성격이다.
 #
 # 전제:
 #   1. AWS CLI 인증됨 (887078546492 계정)

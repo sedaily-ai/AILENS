@@ -17,15 +17,11 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# Category Normalization
+# 카테고리 정규화
 # =============================================================================
-# S3 XML uses detailed category hierarchy (e.g., "문화·라이프,건강·의료,제약·바이오")
-# We normalize to standard categories for consistent frontend display.
-#
-# PHASE 72: Added 2026-01-15 to fix missing Technology/Culture articles
-# The S3 XML source changed category names:
-# - "IT_과학" → "산업,IT일반" or "산업,인터넷"
-# - "문화" → "문화·라이프"
+# S3 XML 은 세부 카테고리 계층(예: "문화·라이프,건강·의료,제약·바이오")을 사용하므로
+# 프론트엔드 표시용 표준 카테고리로 정규화한다. 원본 카테고리명이 변경된 경우
+# (예: "IT_과학" → "산업,IT일반", "문화" → "문화·라이프")에도 동일 표준값으로 매핑한다.
 # =============================================================================
 
 CATEGORY_NORMALIZATION_MAP = {

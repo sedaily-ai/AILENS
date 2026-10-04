@@ -1,13 +1,7 @@
-"""개인화(내 서랍·읽은 기록·프로필) 저장 — PostgreSQL 상시 서버(lens-cms-api)
-경유 (v1.24).
+"""개인화(내 서랍·읽은 기록·프로필) 저장 — PostgreSQL 상시 서버(lens-cms-api) 경유 클라이언트.
 
-posts_repo.py(v1.21)/quiz_repo.py(v1.22)와 같은 패턴 — 저장만 lens-cms-api
-로 위임하고, repositories/personal_repository.py의 비즈니스 로직(스트릭
-계산 등은 services/user_service.py)은 그대로 둔다.
-
-DynamoDB personal 테이블의 `article_id`는 실제로 news `articles` 테이블
-(cms-posts publications가 아님)을 가리킨다 — v1.24 스키마 변경(article_no
-exclusive-arc FK 추가) 참조.
+저장만 lens-cms-api 에 위임하며, 비즈니스 로직은 repositories/personal_repository.py 와
+services/user 에 둔다. `article_id` 는 news `articles` 테이블을 가리킨다(cms-posts publications 아님).
 """
 from __future__ import annotations
 
@@ -22,13 +16,8 @@ from config.constants import LENS_CMS_API_DEFAULT_URL
 _API_URL = os.environ.get("LENS_CMS_API_URL", LENS_CMS_API_DEFAULT_URL)
 _TIMEOUT_SECONDS = 8
 
-# ⚠️ 다른 클라이언트들(subscribe.py 등)은 SSM SecureString에서 토큰을
-# 읽지만, 이 파일의 유일한 호출자(archive-dev/user-dev Lambda)는
-# `sedaily-mbti-lambda-execution-dev`라는, AI LENS 밖의 다른 프로젝트
-# (bigkinds/ga4 등 인라인 정책 이름으로 확인됨)와 공유하는 광범위 실행
-# 역할을 쓴다 — 이 역할에 SSM 권한을 추가하면 영향 범위가 이 프로젝트
-# 밖으로 샌다. 대신 이 두 함수에만 직접 환경변수로 토큰을 주입한다
-# (SSM 미경유, dev 단계 리스크 허용 범위로 판단).
+# 이 모듈의 호출 Lambda 가 쓰는 실행 역할(sedaily-mbti-lambda-execution-dev)은 다른 프로젝트와
+# 공유되므로 SSM 권한을 추가하지 않고, 토큰을 환경변수로 직접 주입한다.
 _TOKEN = os.environ.get("LENS_CMS_API_TOKEN", "")
 
 

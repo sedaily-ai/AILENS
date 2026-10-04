@@ -1,8 +1,6 @@
-"""User 비즈니스 로직 — handlers/user_handler.py에서 추출
-(2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
+"""User 비즈니스 로직 — 프로필·읽기 기록·통계·뱃지.
 
-Storage: Personal DB (sedaily-mbti-personal-dev) via PersonalRepository.
-API contract unchanged — all request/response formats preserved.
+저장소는 PersonalRepository를 통해 접근한다.
 """
 import json
 import logging
@@ -21,7 +19,7 @@ logger.setLevel(logging.INFO)
 
 
 def decimal_to_float(obj):
-    """Convert Decimal to float for JSON serialization"""
+    """JSON 직렬화를 위해 Decimal을 float으로 변환한다."""
     if isinstance(obj, Decimal):
         return float(obj)
     elif isinstance(obj, dict):
@@ -31,9 +29,7 @@ def decimal_to_float(obj):
     return obj
 
 
-# =============================================================================
-# User Profile
-# =============================================================================
+# ── 프로필 ──
 
 async def get_or_create_user(
     user_id: str,
@@ -41,17 +37,16 @@ async def get_or_create_user(
     name: str = None,
     picture: str = None,
 ) -> Dict[str, Any]:
-    """Get or create user profile"""
+    """사용자 프로필을 조회하고, 없으면 생성한다."""
     repo = get_personal_repository()
 
     profile = await repo.get_user_profile(user_id)
     today = datetime.now(KST).strftime('%Y-%m-%d')
 
     if profile:
-        # Existing user — update last login
+        # 기존 사용자: 마지막 로그인 갱신
         await repo.update_user_profile(user_id, {'last_login': today})
 
-        # Calculate streak
         history = await repo.list_reading_history(user_id, limit=60)
         streak = _calculate_streak(history)
 
@@ -66,7 +61,7 @@ async def get_or_create_user(
             'is_new': False,
         }
     else:
-        # New user
+        # 신규 사용자
         now = datetime.now(KST).isoformat()
         new_profile = UserProfile(
             user_id=user_id,
@@ -90,16 +85,14 @@ async def get_or_create_user(
         }
 
 
-# =============================================================================
-# Reading History
-# =============================================================================
+# ── 읽기 기록 ──
 
 async def record_article_read(
     user_id: str,
     article_id: str,
     article_title: str = None,
 ) -> Dict[str, Any]:
-    """Record that user read an article"""
+    """기사 읽기를 기록하고, 신규 기사면 뱃지 조건을 확인한다."""
     repo = get_personal_repository()
 
     record = ReadingRecord(
@@ -108,58 +101,50 @@ async def record_article_read(
         article_title=article_title or '',
     )
 
-    # save_reading_record handles dedup + increment internally
+    # 중복 제거와 읽은 횟수 증가는 save_reading_record 가 처리한다.
     existing_history = await repo.list_reading_history(user_id, limit=200)
     is_new = not any(r.article_id == article_id for r in existing_history)
 
     success = await repo.save_reading_record(record)
 
     if success and is_new:
-        # Check for badges
         await _check_and_award_badges(user_id)
 
     return {'success': success, 'is_new': is_new}
 
 
 async def get_reading_history(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
-    """Get user's reading history"""
+    """사용자의 읽기 기록을 조회한다."""
     repo = get_personal_repository()
     records = await repo.list_reading_history(user_id, limit=limit)
 
     return [r.to_api() for r in records]
 
 
-# =============================================================================
-# Statistics & Badges
-# =============================================================================
+# ── 통계·뱃지 ──
 
 async def get_user_stats(user_id: str) -> Dict[str, Any]:
-    """Get user statistics"""
+    """사용자 통계를 조회한다."""
     repo = get_personal_repository()
 
-    # Profile
     profile = await repo.get_user_profile(user_id)
 
-    # Reading history
     history = await repo.list_reading_history(user_id, limit=200)
 
-    # Streak
     streak = _calculate_streak(history)
 
-    # This week's count
     now = datetime.now(KST)
     week_start = (now - timedelta(days=now.weekday())).strftime('%Y-%m-%d')
     this_week = sum(1 for r in history if r.read_at[:10] >= week_start)
 
-    # Archived sentences count
     archives = await repo.list_archived_sentences(user_id, limit=200)
 
     total_reads = sum(r.read_count for r in history)
 
     return {
         'total_articles_read': total_reads,
-        'total_comments': 0,  # placeholder — engagement table tracks this
-        'total_reactions': 0,  # placeholder
+        'total_comments': 0,  # 미집계 값(고정 0)
+        'total_reactions': 0,  # 미집계 값(고정 0)
         'streak': streak,
         'this_week_articles': this_week,
         'badges': profile.badges if profile else [],
@@ -169,7 +154,7 @@ async def get_user_stats(user_id: str) -> Dict[str, Any]:
 
 
 def _calculate_streak(history: List[ReadingRecord]) -> int:
-    """Calculate consecutive days with at least one read."""
+    """하루 1건 이상 읽은 연속 일수를 계산한다(최대 365일)."""
     if not history:
         return 0
 
@@ -193,7 +178,7 @@ def _calculate_streak(history: List[ReadingRecord]) -> int:
 
 
 async def _check_and_award_badges(user_id: str) -> List[str]:
-    """Check and award badges based on achievements"""
+    """업적 조건을 확인해 새 뱃지를 부여하고 부여한 뱃지 ID 리스트를 반환한다."""
     repo = get_personal_repository()
     profile = await repo.get_user_profile(user_id)
     if not profile:
@@ -224,14 +209,9 @@ async def _check_and_award_badges(user_id: str) -> List[str]:
     return new_badges
 
 
-# =============================================================================
-# Response helpers
-# =============================================================================
+# ── 응답 헬퍼 ──
 
-# Renamed to non-underscored names since this is now a shared service module
-# (not a handler-private helper) — but kept distinct from
-# `core.response.success_response`/`error_response`, whose signatures differ
-# (`error_response(message, status_code=500, ...)`).
+# `core.response.success_response`/`error_response`와 시그니처가 달라(`error_response(message, status_code=500, ...)`) 별도로 둔다.
 def success_response(data: dict) -> dict:
     return {
         'statusCode': 200,

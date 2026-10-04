@@ -1,11 +1,8 @@
 """
-Community Post Handler Lambda Function
-Handles community post CRUD, voting, and comments.
+커뮤니티 게시글 Lambda 핸들러.
 
-2026-08-24 — 실제 로직(DynamoDB 접근·응답 shaping·투표/댓글 카운터 갱신)은
-services/community_post_service.py로 뺐다(코드 리팩토링 감사 Track B, God
-파일 분해 — 396줄 중 라우팅 순수 로직은 이 파일에 남은 것뿐). 이 파일은
-이제 HTTP 라우팅(메서드/경로 판별, 이벤트 파싱, 인증)만 담당한다.
+게시글 CRUD, 투표, 댓글을 처리한다. DynamoDB 접근, 응답 구성, 투표·댓글 카운터 갱신은
+services/user/community_post.py 에 있으며, 이 파일은 HTTP 라우팅과 인증만 담당한다.
 """
 import json
 import logging
@@ -46,15 +43,12 @@ def lambda_handler(event: dict, context) -> dict:
 
         post_id = path_params.get("post_id") or path_params.get("id")
 
-        # POST /api/posts — action-based dispatch
-        # API Gateway only routes POST to /api/posts (no path param),
-        # so vote/comment use body.action + body.post_id.
+        # POST /api/posts: API Gateway 가 POST 를 경로 파라미터 없이 전달하므로
+        # 투표·댓글은 body.action 과 body.post_id 로 구분한다.
         if method == "POST":
             body = json.loads(event.get("body", "{}"))
-            # All POST routes (create / vote / comment) need a verified user.
-            # The body's `user_id` was previously trusted, allowing trivial
-            # impersonation. Replace it with the JWT `sub` and ignore any
-            # value the client supplied.
+            # 모든 POST 라우트(작성·투표·댓글)는 검증된 사용자가 필요하다.
+            # 클라이언트가 보낸 user_id 는 무시하고 JWT sub 로 덮어쓴다.
             try:
                 body['user_id'] = get_authenticated_user_id(event)
             except AuthenticationError as e:

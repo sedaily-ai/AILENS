@@ -7,7 +7,7 @@ WebSocket sendMessage 핸들러.
     "message": "...",
     "conversation_history": [{role, content}, ...]   // 선택
 }
-(구 프론트가 "mbti_group" 을 실어 보내도 무시한다 — 2026-08-07 MBTI 페르소나 제거.)
+`mbti_group` 이 포함되어도 무시한다.
 
 전송 이벤트:
 - {"type": "ai_start", "timestamp": ...}

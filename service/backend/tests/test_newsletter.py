@@ -16,8 +16,7 @@ sys.path.insert(0, BACKEND)
 def test_render_html_contains_letter_and_unsubscribe():
     from newsletter.render import render_html, subject
 
-    # MBTI 페르소나 폐기(2026-08) 이후 레터는 그룹을 갖지 않는다 — 모든
-    # 구독자에게 동일한 기본 아이덴티티(AI LENS)로 렌더링한다.
+    # 레터는 그룹 구분 없이 모든 구독자에게 동일한 기본 아이덴티티(AI LENS)로 렌더링한다.
     letter = {"id": "l-2026-05-17", "headline": "헤드라인 X",
               "subtitle": "부제", "body": ["문단1", "문단2"],
               "key_points": ["포인트1"], "closing_line": "마무리"}

@@ -1,7 +1,6 @@
 """요청 날짜(`YYYY-MM-DD`, KST) 검증 — time_machine / timeline 핸들러 공용.
 
-두 핸들러가 각자 들고 있던 KST·DATE_FORMAT·_today_kst·_validate_date·BadRequest 를
-한 곳으로 모았다. 정책: 미래 날짜는 오류가 아니라 오늘로 당긴다(빈 지면 대신 오늘 지면).
+KST·DATE_FORMAT·_today_kst·_validate_date·BadRequest 를 두 핸들러가 공유한다. 정책: 미래 날짜는 오류가 아니라 오늘로 당긴다(빈 지면 대신 오늘 지면).
 """
 import logging
 from datetime import datetime, timedelta, timezone

@@ -1,20 +1,8 @@
 """
-Optimized SearchHandler Lambda Function
-Performance improvement: 4.5s -> <1s
-Key optimizations:
-1. Use GSI (category-published_at-index) instead of full table scan
-2. DynamoDB Query instead of Scan - NO MORE SCANS!
-3. Server-side filtering with FilterExpression
-4. Efficient pagination
-5. In-memory caching for repeated requests
+검색 Lambda 핸들러.
 
-PHASE 71: Removed all table.scan() operations to reduce DynamoDB costs
-- Before: $32/day (127M RCU)
-- After: Expected <$15/day (<50M RCU)
-
-2026-08-24 — 실제 검색 로직(GSI 쿼리·중복제거·페이지네이션·warm-container
-캐시)은 services/search_service.py로 뺐다(코드 리팩토링 감사 Track B, God
-파일 분해). 이 파일은 이제 HTTP 요청 파싱과 응답 조립만 담당.
+검색 로직(GSI 쿼리, 중복 제거, 페이지네이션, warm-container 캐시)은 services/articles/search.py 에
+있으며, 이 파일은 HTTP 요청 파싱과 응답 조립만 담당한다. 테이블 Scan 은 비용 문제로 사용하지 않는다.
 """
 import logging
 import json
@@ -28,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 
 def lambda_handler(event: dict, context) -> dict:
-    """Lambda handler - optimized version"""
+    """검색 Lambda 핸들러."""
     try:
         # Parse request body
         body = event.get("body", {})

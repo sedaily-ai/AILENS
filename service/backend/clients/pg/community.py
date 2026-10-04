@@ -1,13 +1,8 @@
-"""커뮤니티 게시판 — PostgreSQL 상시 서버(lens-cms-api) 경유 (v1.26).
+"""커뮤니티 게시판 — PostgreSQL 상시 서버(lens-cms-api) 경유 클라이언트.
 
-articles_pg_client.py(v1.25)/personal_pg_client.py(v1.24)와 같은 패턴 —
-목록/댓글 조회는 공개(원본 DynamoDB 핸들러도 GET은 무인증이었다), 글쓰기/
-투표/댓글 작성은 내부 토큰으로 보호.
-
-⚠️ `sedaily-mbti-post-dev`도 `sedaily-mbti-lambda-execution-dev`(AI LENS
-밖 다른 프로젝트와 공유하는 광범위 실행 역할)를 쓴다 — personal_pg_client.py/
-articles_pg_client.py와 동일 이유로 SSM 미경유, 평문 환경변수
-(LENS_CMS_API_TOKEN)로 토큰을 직접 주입한다.
+목록·댓글 조회는 공개이며, 글쓰기·투표·댓글 작성은 내부 토큰으로 보호한다.
+Lambda 실행 역할(sedaily-mbti-lambda-execution-dev)이 다른 프로젝트와 공유되어
+SSM 권한을 추가할 수 없으므로, 토큰은 환경변수(LENS_CMS_API_TOKEN)로 직접 주입한다.
 """
 from __future__ import annotations
 

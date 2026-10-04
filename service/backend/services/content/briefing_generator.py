@@ -1,7 +1,6 @@
-"""
-News Briefing Generator Service
-Generates a single daily news briefing from collected articles.
-Called after article_collector finishes to cache a briefing for the chatbot.
+"""뉴스 브리핑 생성 서비스.
+
+수집된 기사로 일일 뉴스 브리핑 1건을 생성한다. 챗봇이 참조할 캐시용이다.
 """
 import json
 import logging
@@ -37,7 +36,7 @@ BRIEFING_SYSTEM_PROMPT = """당신은 서울경제신문의 뉴스 브리핑 생
 
 
 class BriefingGenerator:
-    """Generates cached news briefings for the chatbot."""
+    """챗봇용 캐시 뉴스 브리핑을 생성한다."""
 
     def __init__(self, region: str = 'us-east-1'):
         self.client = boto3.client(
@@ -47,7 +46,7 @@ class BriefingGenerator:
         )
 
     def _build_articles_context(self, articles: List[Dict[str, Any]]) -> str:
-        """Build article context grouped by category."""
+        """기사를 카테고리별로 묶어 프롬프트용 컨텍스트 텍스트를 만든다."""
         by_category: Dict[str, List[Dict]] = {}
         for article in articles:
             cat = article.get('category', '기타')
@@ -69,15 +68,13 @@ class BriefingGenerator:
         return '\n'.join(lines)
 
     async def generate_briefing(self, articles: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Generate a single news briefing from the given articles.
+        """기사 목록으로 뉴스 브리핑 1건을 생성한다.
 
         Args:
-            articles: List of article dicts from DynamoDB
+            articles: 기사 dict 리스트.
 
         Returns:
-            Dict with briefing, plus metadata (generated_at, articles_count,
-            source_articles, etc.)
+            briefing 과 메타데이터(generated_at, articles_count, source_articles 등)를 담은 dict.
         """
         kst = timezone(timedelta(hours=9))
         now_kst = datetime.now(kst)
@@ -113,14 +110,13 @@ class BriefingGenerator:
         response_body = json.loads(response['body'].read())
         raw_text = response_body.get('content', [{}])[0].get('text', '{}')
 
-        # Parse JSON from response (handle markdown code blocks)
+        # 응답이 마크다운 코드블록으로 감싸진 경우를 벗겨 JSON 파싱
         cleaned = raw_text.strip()
         if cleaned.startswith('```'):
             cleaned = cleaned.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
 
         briefings = json.loads(cleaned)
 
-        # Build source article references
         source_articles = []
         for a in articles:
             source_articles.append({
@@ -129,7 +125,6 @@ class BriefingGenerator:
                 'category': a.get('category', ''),
             })
 
-        # Collect categories covered
         categories_covered = list(set(a.get('category', '') for a in articles if a.get('category')))
 
         usage = response_body.get('usage', {})

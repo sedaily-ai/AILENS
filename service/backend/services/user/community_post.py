@@ -1,20 +1,9 @@
-"""Community Post 비즈니스 로직 — handlers/post_handler.py에서 추출
-(2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
+"""Community Post 비즈니스 로직 — 게시글·투표·댓글 처리.
 
-핸들러는 이제 라우팅(메서드/경로 판별, 이벤트 파싱)만 담당하고, 저장·응답
-shaping·투표/댓글 카운터 갱신 같은 실제 로직은 전부 여기 있다 — 2026-08-05
-chatbot_handler.py를 context_service/prompt_service/engine으로 쪼갠 것과
-같은 패턴(handler=라우팅, service=로직).
-
-2026-09-09(v1.26): DynamoDB(engagement 테이블 공유, PK=COMMUNITY_POSTS/
-POST#{id}) → PostgreSQL(lens-cms-api, `community_posts`/`community_comments`
-+ `community_post_votes`) 전환. `clients/community_pg_client.py`가 저장을
-전담하고, 이 파일은 원래 하던 응답 shaping(camelCase 변환, timeAgo 계산)만
-그대로 유지 — 서버가 돌려주는 딕셔너리 키(snake_case)가 예전 DynamoDB
-아이템 키와 동일해서 `to_post_response`/`to_comment_response`는 무변경.
-
-post_id가 문자열(cp_YYYYMMDDHHMMSS_hex)에서 Postgres bigint(문자열로 직렬화)
-로 바뀌었다 — dev 단계라 기존 게시글 ID 형식과의 하위호환은 고려하지 않음.
+핸들러(`handlers/user/community_post.py`)는 라우팅만 담당하고, 저장과 응답 shaping
+(camelCase 변환, timeAgo 계산)은 이 모듈이 맡는다. 저장은 `clients/pg/community.py`
+(lens-cms-api의 `community_posts`/`community_comments`/`community_post_votes`)를 사용하며,
+post_id 는 Postgres bigint(문자열로 직렬화)이다.
 """
 import json
 import logging
@@ -45,7 +34,7 @@ def cors(status_code: int, body: Any) -> dict:
 # ── Post CRUD ────────────────────────────────────────────────────────────────
 
 def create_post(body: dict) -> dict:
-    """Create a community post. Any authenticated user."""
+    """커뮤니티 게시글을 생성한다(인증된 사용자 누구나)."""
     user_id = body.get('user_id', '')
     user_name = body.get('user_name', '')
     user_avatar = body.get('user_avatar', '')
@@ -80,7 +69,7 @@ def list_posts(params: dict) -> dict:
 
 
 def to_post_response(item: dict) -> dict:
-    """Convert the storage-layer post dict to API response format."""
+    """저장소 계층의 게시글 dict를 API 응답 형식으로 변환한다."""
     created_at = item.get('created_at', '')
     return {
         'id': item.get('id', ''),
@@ -100,7 +89,7 @@ def to_post_response(item: dict) -> dict:
 
 
 def time_ago(iso_str: str) -> str:
-    """Convert ISO timestamp to Korean relative time string."""
+    """ISO 시각을 한국어 상대 시간 문자열로 변환한다."""
     if not iso_str:
         return ''
     try:
@@ -126,9 +115,9 @@ def time_ago(iso_str: str) -> str:
 # ── Voting ───────────────────────────────────────────────────────────────────
 
 def vote_post(post_id: str, body: dict) -> dict:
-    """Toggle upvote/downvote on a post."""
+    """게시글의 추천/비추천을 토글한다."""
     user_id = body.get('user_id', '')
-    vote_type = body.get('vote_type', 'up')  # 'up' or 'down'
+    vote_type = body.get('vote_type', 'up')  # 'up' 또는 'down'
 
     if not user_id:
         return cors(400, {"error": "user_id is required"})
@@ -147,7 +136,7 @@ def vote_post(post_id: str, body: dict) -> dict:
 # ── Comments ─────────────────────────────────────────────────────────────────
 
 def add_comment(post_id: str, body: dict) -> dict:
-    """Add a comment to a post."""
+    """게시글에 댓글을 추가한다."""
     user_id = body.get('user_id', '')
     user_name = body.get('user_name', '')
     user_avatar = body.get('user_avatar', '')
@@ -170,7 +159,7 @@ def add_comment(post_id: str, body: dict) -> dict:
 
 
 def list_comments(post_id: str, params: dict) -> dict:
-    """List comments for a post, newest first."""
+    """게시글의 댓글을 최신순으로 조회한다."""
     limit = int(params.get('limit', '50'))
     try:
         pid = int(post_id)

@@ -13,8 +13,7 @@ DYNAMODB_TABLE_ARTICLES_PROD = 'sedaily-mbti-articles'
 DYNAMODB_TABLE_PERSONAL_DEV = 'sedaily-mbti-personal-dev'
 DYNAMODB_TABLE_PODCAST_DEV = 'sedaily-mbti-podcast-dev'
 DYNAMODB_TABLE_WS_CONNECTIONS_DEV = 'sedaily-mbti-ws-connections-dev'
-# post_handler.py(커뮤니티 게시글 투표/댓글 집계)·quiz_public.py(퀴즈 응답
-# 집계) 둘 다 각자 하드코딩하고 있던 값 — 2026-08 리팩토링에서 통합.
+# 커뮤니티 게시글 투표·댓글 집계와 퀴즈 응답 집계가 공용으로 사용하는 테이블
 DYNAMODB_TABLE_ENGAGEMENT_DEV = 'sedaily-mbti-engagement-dev'
 
 # S3 Article Body Storage (separated from DynamoDB for large text)
@@ -79,33 +78,19 @@ NAVER_TV_URL_DEFAULT = NAVER_TV_DEFAULT_URL  # Alias for consistency
 # =============================================================================
 
 # AWS Bedrock Claude Models
-# Haiku 4.5 — 저비용 경로 (daily question, podcast script, article filter).
-#
-# 2026-07-30: `us.anthropic.claude-3-5-haiku-20241022-v1:0` 이 Bedrock 에서
-# 수명 종료(end-of-life)돼 InvokeModel 이 ResourceNotFoundException 을 던졌다.
-# `/api/questions` 가 2026-07-28 01:29 UTC 부터 500 이었고 (30일 476회 호출되는
-# 경로), 일 1회 도는 article-collector 도 같은 에러를 내고 있었다.
-# `aws bedrock list-inference-profiles` 에 해당 ID 가 더 이상 없다.
-#
-# 아래 값은 이미 BEDROCK_MODEL_ID_CHATBOT 이 2026-05-24 부터 쓰던 것과 동일하다
-# — chatbot Lambda 만 먼저 옮겨져 있어서 EOL 을 피했고, 나머지가 남아 깨졌다.
+# Haiku 4.5 — 저비용 경로(일일 질문, 팟캐스트 스크립트, 기사 필터).
+# Claude 3.5 Haiku 프로파일은 Bedrock 에서 수명 종료되어 사용할 수 없다.
 BEDROCK_MODEL_ID_DEFAULT = 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
 BEDROCK_MODEL_ID_HAIKU = 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
-# Sonnet 4 — Higher quality for complex rewriting (optional upgrade)
+# Sonnet 4 — 복잡한 재작성용 고품질 모델(선택적 상위 옵션)
 BEDROCK_MODEL_ID_SONNET = 'us.anthropic.claude-sonnet-4-20250514-v1:0'
-# Opus 4.6 — Highest quality for MBTI article transformation (parallel per-group calls).
-# Application inference profile ARN (name: mbti-opus-46, Service=mbti tagged) —
-# replaces the AWS system inference profile `us.anthropic.claude-opus-4-6-v1`
-# so that all Bedrock invocations from MBTI Lambdas (step3, article-collector,
-# v2-transform) carry the application-profile-level tags. Switched 2026-05-13
-# to fix the W22 미지정 비용 ~$1,156/주 issue; runtime/cost/perf identical.
+# Opus 4.6 — MBTI 기사 변환용 최고 품질 모델(그룹별 병렬 호출).
+# 비용 태그(Service=mbti)가 붙는 application inference profile ARN(mbti-opus-46)을 사용한다.
+# 시스템 프로파일을 쓰면 Lambda 호출 비용이 미지정으로 집계된다.
 BEDROCK_MODEL_ID_OPUS = 'arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/t6eh3tnfgr6b'
 
-# Haiku 4.5 — Chatbot / AI 검색 (4 MBTI 페르소나 톤앤매너 응답).
-# 2026-05-24: 음성 통화 latency 최적화 + 비용 절감 위해 Sonnet 4.6 inference
-# profile (mbti-sonnet-46, iqlj0wamhnt3) → Haiku 4.5 cross-region 으로 교체.
-# Sonnet 대비 ~5x 빠르고 ~1/5 비용. 페르소나 톤 유지에는 4.5 면 충분.
-# 비용 태깅 inference profile 은 별도 라운드에서 mbti-haiku-45 신설 예정.
+# Haiku 4.5 — 챗봇·AI 검색(MBTI 페르소나 톤앤매너 응답).
+# 음성 통화 지연 시간과 비용을 줄이기 위해 Sonnet 대비 빠르고 저렴한 모델을 사용한다.
 BEDROCK_MODEL_ID_CHATBOT = 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
 
 # AWS Bedrock Nova Models
@@ -137,8 +122,7 @@ OPENSEARCH_INDEX_DEFAULT = 'sedaily-articles'
 # Categories
 # =============================================================================
 
-# Korean category names - Standard categories for the English site
-# PHASE 72: Updated 2026-01-15 to include all categories from S3 XML
+# 영문 사이트 표준 카테고리(한글명)
 CATEGORIES_KOREAN = [
     '경제',
     'IT_과학',
@@ -190,7 +174,7 @@ VALID_CATEGORIES_ENGLISH = list(CATEGORY_ENGLISH_TO_KOREAN.keys())
 
 CATEGORY_SEARCH_ALIASES = {
     '경제': ['경제', '금융', '증권', '부동산'],
-    'IT_과학': ['IT_과학', '산업', 'IT·과학'],  # 산업 (legacy) + IT·과학 (new since 2026-01-23)
+    'IT_과학': ['IT_과학', '산업', 'IT·과학'],  # 구 카테고리명(산업)과 신 카테고리명(IT·과학)을 함께 조회
     '정치': ['정치'],
     '사회': ['사회', '지역'],
     '문화': ['문화', '문화·라이프'],

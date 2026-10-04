@@ -1,8 +1,7 @@
 """v2 health endpoint — GET /api/v2/health.
 
-Proves the v2 Lambda packaging path end-to-end: v1 + v2 source in one zip,
-v1 decorator reused from `core.decorators`, response shape unchanged by
-`success_response` (no envelope — body is the raw dict).
+Lambda 패키징 경로를 종단 간 확인하는 헬스체크. `core.decorators` 데코레이터를 사용하며,
+`success_response` 는 envelope 없이 raw dict 를 body 로 반환한다.
 """
 from core.decorators import lambda_handler as handler_decorator
 from core.response import success_response

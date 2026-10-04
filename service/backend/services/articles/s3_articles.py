@@ -1,14 +1,7 @@
-"""S3 Articles 비즈니스 로직 — handlers/s3_articles_handler.py에서 추출
-(2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
+"""S3 Articles 비즈니스 로직 — S3 XML 원문 기사 목록·키워드 검색·상세 조회.
 
-Fetches articles directly from S3 XML storage (sedaily-news-xml-storage).
-
-This reads ORIGINAL articles from the raw XML bucket (ap-northeast-2),
-NOT from the Article DB (DynamoDB + S3 body). It serves as the primary list
-data source before MBTI transformation is applied.
-
-For MBTI-transformed article detail, see article_handler.py which reads from
-the split Article DB (DynamoDB metadata + S3 body pointer).
+원본 XML 버킷(sedaily-news-xml-storage, ap-northeast-2)에서 기사를 직접 읽는다.
+PostgreSQL 기사 DB를 읽는 경로는 `services/articles/article.py`를 참조한다.
 """
 import json
 import logging
@@ -22,11 +15,10 @@ from common.dates.date_utils import get_kst_today
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# S3 XML Client (initialized once per Lambda container)
+# Lambda 컨테이너당 1회 초기화하는 S3 XML 클라이언트
 _s3_client: Optional[S3XMLClient] = None
 
 def get_s3_client() -> S3XMLClient:
-    """Get or create S3XMLClient instance"""
     global _s3_client
     if _s3_client is None:
         _s3_client = S3XMLClient(region=settings.s3_region)
@@ -38,16 +30,15 @@ async def get_articles_list(
     limit: int = 30,
     category: Optional[str] = None
 ) -> dict:
-    """
-    Fetch article list from S3 XML
+    """S3 XML에서 기사 목록을 조회한다.
 
     Args:
-        date_str: Date in YYYYMMDD format (default: today)
-        limit: Maximum articles to return
-        category: Filter by category (경제, 정치, 사회, IT_과학, 문화, etc.)
+        date_str: YYYYMMDD(기본: 오늘).
+        limit: 최대 반환 건수.
+        category: 카테고리 필터(경제, 정치, 사회, IT_과학, 문화 등).
 
     Returns:
-        Dict with date, total count, and articles list
+        date, total, articles 를 담은 dict.
     """
     if not date_str:
         date_str = get_kst_today()
@@ -63,23 +54,19 @@ async def get_articles_list(
             "message": f"No articles found for {date_str}"
         }
 
-    # Filter: exclude deleted articles
+    # 삭제(action=D) 기사 제외
     articles = [a for a in articles if a.action != 'D']
 
-    # Filter by category if specified
     if category:
         articles = [a for a in articles if a.main_category == category]
 
-    # Sort by published_at descending
+    # 최신순 정렬
     articles.sort(key=lambda x: x.published_at, reverse=True)
 
-    # Apply limit
     articles = articles[:limit]
 
-    # Transform to response format
     result_articles = []
     for article in articles:
-        # Extract first image URL
         image_url = None
         if article.images:
             image_url = article.images[0].url
@@ -134,7 +121,7 @@ async def search_articles_by_keywords(
     kst = timezone(timedelta(hours=9))
     today = datetime.now(kst)
 
-    # 최근 days 일 XML 모두 fetch — 캐시 hit 가 있을 수 있고 동시 호출 가능
+    # 최근 days 일의 XML을 모두 조회한다.
     all_articles = []
     for d in range(days):
         target = (today - timedelta(days=d)).strftime("%Y%m%d")
@@ -157,7 +144,7 @@ async def search_articles_by_keywords(
     # 삭제된 기사 제외
     all_articles = [a for a in all_articles if a.action != 'D']
 
-    # 점수 매기기 — title + sub_title + content_clean (앞 1000자) 합쳐 키워드 hit 카운트
+    # title + sub_title + content_clean(앞 1000자)에서 키워드 hit 수를 점수로 쓴다.
     scored = []
     for art in all_articles:
         haystack = ' '.join([
@@ -174,10 +161,8 @@ async def search_articles_by_keywords(
     # 점수 desc → 동률은 published_at desc
     scored.sort(key=lambda x: (x[1], x[0].published_at or ''), reverse=True)
 
-    # limit 적용
     scored = scored[:limit]
 
-    # 응답 포맷
     result_articles = []
     for art, matches in scored:
         image_url = None
@@ -211,25 +196,22 @@ async def get_article_detail(
     article_id: str,
     date_str: Optional[str] = None
 ) -> dict:
-    """
-    Fetch single article detail from S3 XML
+    """S3 XML에서 기사 1건의 상세를 조회한다.
 
     Args:
-        article_id: Article ID (nsid)
-        date_str: Date in YYYYMMDD format (optional, searches recent 7 days if not found)
+        article_id: 기사 ID(nsid).
+        date_str: YYYYMMDD(선택). 지정일 → 오늘 → 최근 7일 순으로 찾는다.
 
     Returns:
-        Article detail dict or error
+        기사 상세 dict, 없으면 error dict.
     """
     client = get_s3_client()
 
-    # Try specified date first, then today
     dates_to_try = []
     if date_str:
         dates_to_try.append(date_str)
     dates_to_try.append(get_kst_today())
 
-    # Add last 7 days
     kst = timezone(timedelta(hours=9))
     for days_ago in range(1, 8):
         past_date = (datetime.now(kst) - timedelta(days=days_ago)).strftime("%Y%m%d")
@@ -246,7 +228,6 @@ async def get_article_detail(
     if not article:
         return {"error": "Article not found", "article_id": article_id}
 
-    # Extract first image URL
     image_url = None
     if article.images:
         image_url = article.images[0].url
@@ -282,7 +263,7 @@ async def get_article_detail(
 
 
 def response(status_code: int, body: dict) -> dict:
-    """Create API Gateway response"""
+    """API Gateway 응답을 만든다."""
     return {
         "statusCode": status_code,
         "headers": {

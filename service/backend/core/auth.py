@@ -4,9 +4,8 @@ Lambda handlers that need to know "who is this user" must call
 ``verify_cognito_token(event)`` (or ``get_authenticated_user_id(event)``)
 instead of trusting ``body['user_id']`` or ``queryStringParameters['user_id']``.
 
-Until 2026-04 every authenticated endpoint trusted a client-supplied
-``user_id`` field, so any caller could impersonate any user (post votes,
-read archived content, sync profiles, etc.). The fix is two-sided:
+Client-supplied ``user_id`` values must never be trusted, since any caller
+could then impersonate another user. Authentication is two-sided:
 
 1. Backend verifies the Cognito ID token signature against the Cognito
    JWKS, validates ``iss``/``aud``/``exp``, and uses the resulting

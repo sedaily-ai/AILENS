@@ -8,19 +8,11 @@
 
     batch_size = get_threshold('transform-max-articles', default=20)
 
-2026-09-09(v1.28): DynamoDB(sedaily-mbti-admin-config-dev, pk='CONFIG',
-sk='feature-flag/<name>'|'threshold/<name>')에서 PostgreSQL(lens-cms-api,
-`feature_flags`/`thresholds` 테이블) 경유로 전환. 이 모듈의 실제 프로덕션
-호출자는 `handlers/chatbot_handler.py`/`handlers/question_handler.py`
-(`is_enabled`만 사용, `get_threshold`는 현재 프로덕션 호출자 0 — 테스트
-conftest.py만 참조) 둘뿐이라, 둘 다 v1.25에서 이미 설정된
-`LENS_CMS_API_TOKEN` 평문 env var를 그대로 재사용한다(같은
-`sedaily-mbti-lambda-execution-dev` 공유 역할이라 SSM 미경유).
+값은 lens-cms-api(PostgreSQL `feature_flags`/`thresholds` 테이블)에서 조회한다.
+인증 토큰은 Lambda 환경변수 `LENS_CMS_API_TOKEN` 을 그대로 사용한다(SSM 미경유).
 
 핵심 설계:
-- lens-cms-api HTTP GET per Lambda invoke (cached 5분) — 이전 DDB get_item
-  과 지연시간 특성 동일(같은 VPC 밖 EC2 IP, DDB보다 약간 더 걸릴 수 있지만
-  5분 캐시로 영향 미미).
+- Lambda 컨테이너당 lens-cms-api HTTP GET 을 수행하고 결과를 5분간 캐시한다.
 - 백엔드 에러 시 stale cache → default fallback. fail-open / fail-safe
   (admin 이 의도 변경 안 했으면 default 유지). secrets.py 의 fail-closed
   와 의도적 차이.

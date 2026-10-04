@@ -3,8 +3,7 @@
 검증 분기(invalid email/no-consent)는 DynamoDB 접근 전에 반환되므로
 오프라인에서 그대로 검증. 정상 upsert/unsub 경로는 DDB 필요 → syntax-only.
 
-2026-08: MBTI 페르소나 개념 폐기로 구독 시 그룹 선택이 없다 — mbti_group
-검증(400)은 더 이상 존재하지 않는다.
+구독 시 그룹 선택은 없으므로 mbti_group 검증(400)은 없다.
 """
 import ast
 import json

@@ -1,14 +1,10 @@
 """날짜별 로컬 레터 폴백.
 
-pgvector daily_letters 미적재분 보강. 프런트의
-`features/news-feed/data/letters20260518.ts` (LOCAL_LETTERS_BY_DATE) 와
-동일 내용을 백엔드 패키지에 미러링 — 이메일 발송 내용이 사이트의
-'오늘의 한 통'과 1:1 일치하도록.
-
-`local_letters/{YYYY-MM-DD}.json` (today_letters 응답 shape) 을 읽어 그날의
-레터 1편을 반환한다. 기존 JSON 은 4그룹(NT/NF/ST/SF) 레터를 담고 있을 수
-있는데(MBTI 페르소나 폐기 전 데이터, 그대로 둠), 그중 첫 번째만 골라 쓴다 —
-새 날짜 레터는 letters[0] 하나만 있는 형식으로 추가하면 된다.
+daily_letters 에 없는 날짜를 보강하며, 프런트의 LOCAL_LETTERS_BY_DATE 와 동일한 내용을 미러링해
+이메일 내용이 사이트의 '오늘의 한 통'과 일치하도록 한다.
+`local_letters/{YYYY-MM-DD}.json`(today_letters 응답 shape)을 읽어 해당 날짜 레터 1편을 반환한다.
+기존 JSON 은 4그룹(NT/NF/ST/SF) 레터를 담을 수 있으므로 첫 번째만 사용한다.
+신규 날짜 레터는 letters[0] 하나만 있는 형식으로 추가한다.
 """
 from __future__ import annotations
 

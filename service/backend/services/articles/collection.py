@@ -1,21 +1,11 @@
-"""Article Collector 비즈니스 로직 — handlers/article_collector.py에서 추출
-(2026-08-24, 코드 리팩토링 감사 Track B, God 파일 분해).
+"""Article Collector 비즈니스 로직 — S3 XML 기사를 수집해 PostgreSQL에 저장한다.
 
-Collects Seoul Economic articles from S3 XML and saves them to PostgreSQL.
-
-Data Source: S3 XML (s3://sedaily-news-xml-storage/daily-xml/)
-Storage: PostgreSQL (v1.25 — lens-cms-api 경유, EventBridge 크론이 매일
-23시 KST에 이 함수를 실행)
-
-2026-09-09(v1.25): DynamoDB → PostgreSQL 전환. `save_collection_log`는
-Postgres에 대응 테이블이 없어(수집 실행 로그, 낮은 가치의 관측용 데이터라
-새 인프라를 만들 만큼 우선순위가 아니라고 판단) CloudWatch 로그만 남기는
-스텁으로 대체했다.
-
-⚠️ `batch_get_hash`가 published_at을 반환하지 않는다(DynamoDB 쪽도 원래
-안 넣었다 — article_collection_service.py의 original_published_at 보존
-로직은 발견된 죽은 코드, 이번 전환에서 그 동작을 그대로 보존했다. 상세는
-lens-cms-api/articles_repo.py::batch_get_hash 주석 참조)."""
+- 원천: s3://sedaily-news-xml-storage/daily-xml/
+- 저장: PostgreSQL(lens-cms-api 경유). EventBridge 크론이 매일 23시 KST에 실행한다.
+- 수집 실행 로그는 대응 테이블이 없어 CloudWatch 로그로만 남긴다.
+- `batch_get_hash`가 published_at을 반환하지 않으므로 original_published_at 보존 로직은 실질적으로 동작하지 않는다
+  (lens-cms-api/articles_repo.py::batch_get_hash 참조).
+"""
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
@@ -27,39 +17,34 @@ from common.hash_utils import hash_content, content_changed
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Batch size for saving articles
+# 1회 실행당 저장할 최대 기사 수
 BATCH_SIZE = 50
 
 
 def _build_article_data(article, original_published_at: Dict[str, str]) -> Dict[str, Any]:
-    """S3XMLClient가 파싱한 article → DynamoDB 저장 형태로 변환."""
+    """S3XMLClient가 파싱한 article을 저장용 dict로 변환한다."""
     category = article.main_category or 'news'
     return {
-        # IDs
         'news_id': article.nsid,
         'item_type': 'article',
         'action': article.action,
         'press': article.press,
 
-        # Original content
         'title_ko': article.title,
         'sub_title_ko': article.sub_title or '',
         'content_ko': article.content_clean,
         'content_raw': article.content_raw,
 
-        # Author
         'author': article.author,
         'author_name': article.author_name,
         'author_email': article.author_email,
         'byline': article.author_name or '서울경제',
 
-        # Date/Time
         'date': article.date,
         'time': article.time,
         'published_at': original_published_at.get(article.nsid, article.published_at),
         'updated_at': article.published_at if article.nsid in original_published_at else None,
 
-        # Category
         'category': category,
         'categories': [
             {'code': c.code, 'name': c.name, 'main': c.main_category,
@@ -67,18 +52,15 @@ def _build_article_data(article, original_published_at: Dict[str, str]) -> Dict[
             for c in article.categories
         ],
 
-        # URL
         'url': article.url,
         'original_link': article.url,
 
-        # Images
         'images': [
             {'url': img.url, 'width': img.width, 'height': img.height,
              'caption_title': img.caption_title, 'caption_content': img.caption_content}
             for img in article.images
         ],
 
-        # Content blocks (original structure preserved)
         'content_blocks': [
             {
                 'type': 'text',
@@ -95,41 +77,28 @@ def _build_article_data(article, original_published_at: Dict[str, str]) -> Dict[
             for block in article.content_blocks
         ],
 
-        # Related news
         'related_news': [
             {'title': rel.title, 'url': rel.url, 'nsid': rel.nsid}
             for rel in article.related_news
         ],
 
-        # Breaking news
         'is_breaking_news': article.is_breaking_news,
 
-        # Content hash for change detection
         'content_hash': hash_content(article.content_clean),
 
-        # Collected timestamp
         'collected_at': datetime.now().isoformat(),
     }
 
 
 async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any]:
-    """
-    Collect articles from S3 XML and save to PostgreSQL.
-
-    Flow:
-    1. Fetch today's XML from S3
-    2. Filter new/updated articles
-    3. Save all articles to PostgreSQL
-    """
+    """S3 XML에서 신규·변경 기사를 골라 PostgreSQL에 저장한다."""
     try:
-        # Initialize clients
         s3_xml_client = S3XMLClient(
             bucket_name="sedaily-news-xml-storage",
             prefix="daily-xml",
             region="ap-northeast-2"
         )
 
-        # ==================== Process Articles ====================
         # event.target_date (YYYYMMDD)로 특정 날짜 백필 지원; 없으면 오늘 KST 기준
         kst = timezone(timedelta(hours=9))
         target_date = (event or {}).get("target_date") or datetime.now(kst).strftime("%Y%m%d")
@@ -153,12 +122,12 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                 "mode": "on-demand"
             }
 
-        # Check duplicates
+        # 신규 기사 중복 제거
         new_article_ids = [a.nsid for a in new_articles_xml]
         existing_ids = articles_client.batch_check_exists(new_article_ids)
         articles_to_save = [a for a in new_articles_xml if a.nsid not in existing_ids]
 
-        # Check updated articles for content changes
+        # 갱신 기사는 본문 해시로 실제 변경 여부 확인
         updated_ids = [a.nsid for a in updated_articles_xml]
         actually_changed_count = 0
         skipped_unchanged_count = 0
@@ -183,7 +152,6 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                     articles_to_save.append(article)
                     actually_changed_count += 1
 
-        # Limit batch size
         total_pending = len(articles_to_save)
         if total_pending > BATCH_SIZE:
             logger.info(f"Limiting batch from {total_pending} to {BATCH_SIZE} articles")
@@ -201,14 +169,12 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                 "mode": "on-demand"
             }
 
-        # Counters
         new_articles_count = 0
         updated_articles_count = 0
         failed_articles = 0
         article_details = []
         updated_ids_set = set(a.nsid for a in updated_articles_xml)
 
-        # Process each article
         for idx, article in enumerate(articles_to_save):
             try:
                 if not article.content_clean or not article.content_clean.strip():
@@ -220,7 +186,6 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
                 category = article.main_category or 'news'
                 article_data = _build_article_data(article, original_published_at)
 
-                # Save to PostgreSQL
                 saved = articles_client.save_article(article.nsid, article_data)
 
                 if saved:
@@ -295,6 +260,5 @@ async def collect_articles(hours: int = 24, event: dict = None) -> Dict[str, Any
 
 
 def _log_collection_result(result: Dict[str, Any]) -> None:
-    """수집 실행 로그 — v1.25에서 Postgres에 대응 테이블 없이 CloudWatch
-    로그로만 남기기로 결정(관측용 데이터, 우선순위 낮음)."""
+    """수집 실행 결과를 CloudWatch 로그로 남긴다."""
     logger.info(f"Collection log: {result}")

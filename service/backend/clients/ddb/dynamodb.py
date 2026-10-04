@@ -24,13 +24,9 @@ logger = logging.getLogger(__name__)
 
 
 def drain_query(table, **kwargs) -> List[Dict[str, Any]]:
-    """DynamoDB query()가 1MB 페이지 한도로 나눠 주는 결과를 LastEvaluatedKey를
-    따라가며 전부 모은다 — 안 따라가면 결과가 많을수록 뒷페이지가 조용히
-    잘려나간다. cms_posts_ddb_client.py/daily_letters_ddb_client.py/
-    search_handler.py/이 파일 자체의 _query_category()에 거의 동일한 루프가
-    각자 복사돼 있던 걸 공용화(2026-08-23 코드 리팩토링 감사). limit/필터를
-    루프 중간에 적용하는 personal_db_client.py·quiz_questions_ddb_client.py는
-    제어 흐름이 달라 이 헬퍼로 옮기지 않았다 — 그대로 둠."""
+    """DynamoDB query() 결과를 LastEvaluatedKey 를 따라가며 전 페이지 수집한다.
+
+    1MB 페이지 한도로 분할된 결과를 따라가지 않으면 뒷페이지가 조용히 누락된다."""
     items: List[Dict[str, Any]] = []
     while True:
         resp = table.query(**kwargs)

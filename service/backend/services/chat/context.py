@@ -1,26 +1,12 @@
 """챗봇 컨텍스트 조회 — 브리핑(DynamoDB)·최근기사/연관기사 검색(PostgreSQL).
 
-2026-08-05: `handlers/chatbot_handler.py`(869줄)에서 분리. Bedrock 호출과
-무관한, 순수 데이터 조회 책임만 모았다.
+Bedrock 호출과 무관한 순수 데이터 조회만 담당한다.
 
-⚠️ `get_cached_briefing`은 `clients/dynamodb_client.py`의 `DynamoDBClient`를
-쓰지 않고 boto3를 직접 호출한다. `handlers/briefing_handler.py`가 쓰는
-`DynamoDBClient.save_news_briefing()`과 짝을 이루는 읽기지만, staleness 체크
-로직이 달라 단순 클라이언트 교체가 아니다 — 그대로 둔다(v1.25 기사 전환과도
-무관 — 브리핑은 별도 아이템(`news_briefing_latest`), 기사 자체가 아니다).
-
-2026-08-07: MBTI 페르소나 제거로 그룹별 브리핑 선택 로직은 없앴다. 다만
-`services/briefing_generator.py`(이번 정리 범위 밖)는 아직 DDB 아이템에
-`briefing_NT`/`briefing_NF`/`briefing_ST`/`briefing_SF` 4개 키로 쓰고 있어,
-`get_cached_briefing`은 과도기적으로 그중 채워진 첫 값을 그대로 가져온다 —
-generator 가 단일 키로 정리되면 이 fallback 목록도 함께 정리할 것.
-
-2026-09-09(v1.25): `get_recent_articles`/`search_related_articles`는
-raw boto3 GSI 쿼리에서 PostgreSQL(lens-cms-api, `clients/articles_pg_client.py`)
-경유로 전환. 카테고리 리스트·불용어 필터링·broad-keyword fallback 등
-비즈니스 로직은 그대로 두고, DynamoDB 쿼리 프리미티브만 서버 호출로
-교체했다 — Postgres articles.body가 이미 인라인이라 S3 body fetch
-(`_fetch_article_body`)가 필요 없어져 함께 제거.
+- `get_cached_briefing`은 boto3로 DynamoDB의 브리핑 아이템(`news_briefing_latest`)을
+  직접 읽는다. `briefing_generator.py`가 아직 `briefing_NT`/`briefing_NF`/`briefing_ST`/
+  `briefing_SF` 4개 키로 저장하므로 채워진 첫 값을 사용한다.
+- `get_recent_articles`/`search_related_articles`는 PostgreSQL(`clients/pg/articles.py`)을 조회한다.
+  articles.body가 인라인이라 별도 S3 본문 조회는 없다.
 """
 import logging
 import boto3
@@ -39,14 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 def get_cached_briefing(mbti_group: str = None) -> Optional[str]:
-    """Fetch the cached news briefing.
-    Returns the briefing text if fresh, or None to fall back to article query.
+    """캐시된 뉴스 브리핑을 조회한다.
 
-    ``mbti_group`` is accepted-but-unused for backward compat — `main.py`
-    (local dev FastAPI server, out of this cleanup's scope) still calls this
-    positionally with a group value. MBTI personas were removed site-wide, so
-    the lookup no longer branches on it (see module docstring for the
-    transitional multi-key fallback this uses instead)."""
+    유효 기간 내 브리핑 텍스트를 반환하고, 없거나 오래됐으면 None을 반환한다(기사 조회로 대체).
+    ``mbti_group`` 은 하위 호환용 인자로 사용하지 않는다(`main.py`가 위치 인자로 전달)."""
     try:
         dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
         table = dynamodb.Table(DYNAMODB_TABLE_ARTICLES_DEV)
@@ -57,14 +39,14 @@ def get_cached_briefing(mbti_group: str = None) -> Optional[str]:
         if not item:
             return None
 
-        # Check staleness
+        # 유효 기간 검사
         generated_at = item.get('generated_at', '')
         if generated_at:
             from datetime import timedelta, timezone
             gen_time = datetime.fromisoformat(generated_at)
             kst = timezone(timedelta(hours=9))
             now = datetime.now(kst)
-            # Make gen_time offset-aware if needed
+            # timezone 정보가 없으면 KST로 간주
             if gen_time.tzinfo is None:
                 gen_time = gen_time.replace(tzinfo=kst)
             age_hours = (now - gen_time).total_seconds() / 3600
@@ -72,9 +54,7 @@ def get_cached_briefing(mbti_group: str = None) -> Optional[str]:
                 logger.warning(f"Briefing is stale ({age_hours:.1f}h old), falling back to article query")
                 return None
 
-        # Transitional: briefing_generator.py still writes 4 persona-keyed
-        # fields instead of one default key. No personas left to pick by, so
-        # just take whichever is populated (see module docstring).
+        # briefing_generator 가 아직 4개 키로 저장하므로 채워진 첫 값을 사용한다(모듈 docstring 참조).
         briefing = None
         for key in ('briefing_default', 'briefing_NT', 'briefing_NF', 'briefing_ST', 'briefing_SF'):
             briefing = item.get(key)
@@ -90,11 +70,9 @@ def get_cached_briefing(mbti_group: str = None) -> Optional[str]:
 
 
 def get_recent_articles(limit: int = 5) -> List[Dict[str, Any]]:
-    """Fetch recent articles with body content for context"""
+    """컨텍스트용 최근 기사(본문 앞 500자 포함)를 조회한다."""
     try:
-        # 카테고리별 top-3 쿼리 후 merge — DynamoDB GSI 쿼리 4번(카테고리당
-        # Limit=3)을 그대로 재현. Postgres articles.body가 이미 인라인이라
-        # S3 body fetch가 필요 없다.
+        # 카테고리별 상위 3건을 조회한 뒤 병합한다.
         all_items = []
         for cat in ['경제', '정치', '사회', 'IT_과학']:
             try:
@@ -102,7 +80,7 @@ def get_recent_articles(limit: int = 5) -> List[Dict[str, Any]]:
             except Exception:
                 continue
 
-        # Sort by published_at descending, take top N
+        # 최신순 정렬 후 상위 limit건
         all_items.sort(key=lambda x: x.get('published_at', ''), reverse=True)
         all_items = all_items[:limit]
 
@@ -132,7 +110,7 @@ KOREAN_STOPWORDS = {
 
 
 def search_related_articles(user_message: str, limit: int = 3) -> List[Dict[str, Any]]:
-    """Search PostgreSQL for articles related to the user's message keywords."""
+    """사용자 메시지의 키워드와 관련된 최근 7일 기사를 PostgreSQL에서 검색한다."""
     try:
         keywords = [w for w in user_message.split() if len(w) >= 2 and w not in KOREAN_STOPWORDS][:5]
         if not keywords:
@@ -155,12 +133,11 @@ def search_related_articles(user_message: str, limit: int = 3) -> List[Dict[str,
 
         all_matches.sort(key=lambda x: x.get('published_at', ''), reverse=True)
 
-        # Fallback: 키워드 매칭 없고, 매우 광범위한 뉴스 요청일 때만 최신 기사 반환
-        # '오늘'·'시장'·'경제' 등은 너무 포괄적이라 구체 질문(예: '삼성전자 오늘 주가')까지
-        # 광범위로 분류되어 엉뚱한 기사가 추천되던 문제가 있었음. 엄격한 화이트리스트 사용.
+        # 키워드 매칭이 없고 광범위한 뉴스 요청일 때만 최신 기사로 대체한다.
+        # '오늘'·'시장' 같은 포괄적 단어는 구체 질문까지 광범위로 분류하므로 엄격한 화이트리스트를 쓴다.
         BROAD_KEYWORDS = {'뉴스', '기사', '소식', '이슈', '헤드라인', '브리핑'}
         has_broad = any(bk in user_message for bk in BROAD_KEYWORDS)
-        # 추가 안전장치: 키워드가 3개 이하일 때만 fallback 허용 (구체 질문 제외)
+        # 키워드가 3개 이하인 짧은 질문에만 대체를 허용한다.
         is_short_query = len(keywords) <= 3
         if not all_matches and has_broad and is_short_query:
             for cat in ['경제', '정치', '사회']:

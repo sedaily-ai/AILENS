@@ -1,14 +1,9 @@
-"""core/response.py 의 9개 함수 계약을 박제한다 (characterization).
+"""core/response.py 의 9개 함수 계약을 고정한다 (characterization).
 
-v1 16개 + v2 14개 파일이 이 모듈을 쓴다. common/ 위임 리팩터링 전후로
-statusCode · headers(CORS 포함) · body 가 동일해야 한다.
+v1·v2 다수 파일이 이 모듈을 사용하므로 common/ 위임 리팩터링 전후로
+statusCode · headers(CORS 포함) · body 가 동일해야 한다. 실 AWS 가 필요 없는 순수 함수 테스트다.
 
-기존 service/backend/tests/ 의 통합 테스트와 달리 실 AWS 가 필요 없는
-순수 함수 테스트다.
-
-Run from service/backend/::
-
-    python3 -m pytest tests/test_core_response_contract.py -v
+실행: cd service/backend && python3 -m pytest tests/test_core_response_contract.py -v
 """
 from __future__ import annotations
 

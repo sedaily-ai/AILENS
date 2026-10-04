@@ -19,8 +19,8 @@ Response shape (matches frontend mockTodayFeed expectations):
 }
 ```
 
-empty (no letters today) → returns 200 with letters=[] and mode=null.
-프론트는 이 경우 mock fallback 으로 떨어지면 됨.
+해당 날짜에 레터가 없으면 200 과 함께 letters=[], mode=null 을 반환하며,
+프론트는 mock 데이터로 대체한다.
 """
 from __future__ import annotations
 
@@ -134,8 +134,10 @@ def _enrich_body(letter_row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def shape_letter_response(row: Dict[str, Any]) -> Dict[str, Any]:
-    """DDB row → API 응답 shape. newsletter/today_letter.py도 이 함수를 재사용한다
-    (발송 내용이 라이브 '오늘의 한 통'과 동일해야 하므로) — public API로 취급."""
+    """DDB row 를 API 응답 형태로 변환한다.
+
+    newsletter/today_letter.py 가 재사용하므로(발송 내용이 '오늘의 한 통'과 동일해야 함) public API 로 취급한다.
+    """
     enriched = _enrich_body(row)
     keywords = row.get("keywords") or []
     if isinstance(keywords, str):
@@ -156,8 +158,8 @@ def shape_letter_response(row: Dict[str, Any]) -> Dict[str, Any]:
         "body": enriched["body"],
         "key_points": enriched["key_points"],
         "keywords": keywords,
-        # article_id 기반 자동 생성 파이프라인이 안 되는 레터(빈 article_id 등)를 위해
-        # admin 이 수동 업로드한 팟캐스트 URL — 없으면 None, 프론트가 기존 흐름으로 폴백.
+        # article_id 기반 자동 생성이 불가능한 레터(빈 article_id 등)를 위해 admin 이 수동 업로드한 팟캐스트 URL.
+        # 없으면 None 이며 프론트는 기존 흐름으로 대체한다.
         "podcast_audio_url": row.get("podcast_audio_url"),
     }
 

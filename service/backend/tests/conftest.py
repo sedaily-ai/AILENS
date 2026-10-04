@@ -39,22 +39,14 @@ def pytest_collection_modifyitems(items) -> None:
 
 @pytest.fixture(autouse=True)
 def _block_real_ssm(request, monkeypatch):
-    """유닛 테스트가 실제 SSM 을 호출하지 못하게 막는다.
+    """유닛 테스트가 실제 SSM 을 호출하지 못하도록 차단한다.
 
-    ``PgVectorV2Client`` 는 ``password`` 인자가 없으면
-    ``common.secrets.get_pg_password()`` 를 거쳐 SSM
-    ``/sedaily-mbti/v2/pg-password`` 를 친다 (``pgvector_v2_client.py:159``).
-    개발 워크스테이션에는 AWS 자격증명이 있으므로, 스텁이 없으면 유닛 테스트가
-    **운영 Postgres 비밀번호를 실제로 가져오고** 단언 실패 메시지에 그 값을
-    그대로 찍는다 — 터미널 스크롤백과 CI 로그로 자격증명이 새는 경로다.
+    개발 환경에는 AWS 자격증명이 있어 스텁이 없으면 운영 DB 비밀번호를 실제로 조회하고,
+    단언 실패 메시지를 통해 그 값이 로그에 노출될 수 있다.
+    ``get_pg_password`` 는 호출 시점에 모듈 전역의 ``get_secret`` 을 찾으므로 ``get_secret`` 만 막으면
+    모든 호출 경로가 차단된다. 이미 바인딩된 ``get_pg_password`` 참조는 패치로 막을 수 없다.
 
-    ``get_pg_password`` 는 호출 시점에 모듈 전역에서 ``get_secret`` 를 찾으므로,
-    여기서 ``get_secret`` 하나만 막으면 모든 호출 경로가 덮인다. 클라이언트가
-    ``from common.secrets import get_pg_password`` 로 이름을 바인딩해 두었기
-    때문에 ``get_pg_password`` 자체를 패치하면 이미 바인딩된 참조를 놓친다.
-
-    ``@pytest.mark.integration`` 테스트는 실제 AWS 를 쓰는 것이 목적이므로
-    제외한다.
+    ``@pytest.mark.integration`` 테스트는 실제 AWS 사용이 목적이므로 제외한다.
     """
     if request.node.get_closest_marker("integration"):
         yield
@@ -73,32 +65,15 @@ def _block_real_ssm(request, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _block_real_feature_flags(request, monkeypatch):
-    """유닛 테스트가 운영 feature flag 를 읽지 못하게 **시끄럽게** 막는다.
+    """유닛 테스트가 운영 feature flag 를 읽지 못하도록 차단한다.
 
-    ``common.feature_flag`` 는 DynamoDB 기반이고 row 가 없으면 ``True`` 를
-    돌려주는 fail-open 이다. 스텁 없이 부르면 유닛 테스트 결과가 **운영 플래그
-    상태에 좌우된다** — 실제로 ``collector-paper-mode`` 가 운영에서 enabled 인
-    탓에 ``test_core1_collector`` 의 garbage-filter 테스트 6건이 엉뚱한 이유
-    (``no-paper-element``)로 실패하고 있었고, 정작 검증하려던 필터에는 도달조차
-    못 했다.
+    ``common.feature_flag`` 는 DynamoDB 기반이며 row 가 없으면 ``True`` 를 반환하는 fail-open 이다.
+    스텁 없이 호출하면 테스트 결과가 운영 플래그 상태에 좌우되므로 다음과 같이 처리한다.
 
-    두 함수를 다르게 다룬다 — 결정적 기본값이 있느냐가 갈랐다.
+    * ``is_enabled(name)``: 예외를 발생시킨다. 호출자가 지정할 기본값이 없어 반환값이 임의 선택이 되기 때문이다.
+    * ``get_threshold(name, default)``: 호출자의 ``default`` 를 반환한다. 테스트에서는 관리자가 덮어쓰지 않은 상태가 자연스럽다.
 
-    * ``is_enabled(name)`` → **예외.** 호출자가 줄 수 있는 기본값이 없어서
-      무엇을 돌려주든 임의 선택이 된다. 조용히 ``True``/``False`` 를 주면
-      운영 의존이 그대로 묻힌다. 측정 결과 미스텁 호출자가 0개라 오늘 깨지는
-      것이 없고, 앞으로 플래그에 의존하는 코드를 테스트하려는 사람은 무엇을
-      해야 하는지 즉시 알게 된다.
-    * ``get_threshold(name, default)`` → **호출자의 ``default`` 를 반환.**
-      이 함수의 의미 자체가 "관리자가 덮어쓰지 않았으면 기본값"이고, 테스트
-      에서는 "덮어쓴 적 없음"이 자연스러운 상태다. 예외를 던지면
-      ``core2_transform.py:163`` 처럼 정당하게 부르는 곳 11개가 깨지는데,
-      그 테스트들이 원하는 건 임계값 자체가 아니라 기본 동작이다.
-
-    스텁 방법은 ``test_core1_collector.py`` 의 ``_enable_paper_mode`` /
-    ``_disable_paper_mode`` 참조.
-
-    ``@pytest.mark.integration`` 은 실 AWS 가 목적이므로 제외한다.
+    ``@pytest.mark.integration`` 은 실제 AWS 호출이 목적이므로 제외한다.
     """
     if request.node.get_closest_marker("integration"):
         yield

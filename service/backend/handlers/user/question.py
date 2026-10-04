@@ -1,9 +1,8 @@
 """
-Daily Question Handler Lambda Function
-Generates AI-powered daily questions based on today's news articles.
+일일 질문 Lambda 핸들러.
 
-Questions are generated on-demand (first GET request for a date triggers
-Claude generation) and cached in the Personal DB table.
+당일 뉴스 기사를 바탕으로 AI 질문을 생성한다. 해당 날짜의 첫 GET 요청 시 Claude 로 생성하고
+Personal DB 테이블에 캐시한다.
 
 Storage: Personal DB (sedaily-mbti-personal-dev)
   PK: __questions__    SK: DATE#YYYYMMDD
@@ -77,12 +76,9 @@ def _save_questions(date_str: str, questions: list):
 # ── Article fetching ─────────────────────────────────────────────────────────
 
 def _fetch_article_titles(date_str: str) -> List[str]:
-    """Fetch today's article titles (PostgreSQL, v1.25).
+    """당일 기사 제목을 조회한다.
 
-    DynamoDB 쪽은 카테고리별 GSI 쿼리(Limit=10)를 CATEGORIES_KOREAN 개수만큼
-    돌려 카테고리당 최대 10개, 합계 최대 30개를 모았다. Postgres는 날짜 하나로
-    그 날 전체를 한 번에 가져올 수 있어 서버 호출은 1번으로 줄이고, 카테고리당
-    상한 10개는 클라이언트에서 그대로 재현해 특정 카테고리 쏠림을 막는다."""
+    날짜 기준으로 한 번에 조회한 뒤, 특정 카테고리 쏠림을 막기 위해 카테고리당 최대 10개로 제한한다."""
     try:
         articles = articles_client.get_transformed_articles_by_date(date_str, limit=300)
         per_category: Dict[str, int] = {}

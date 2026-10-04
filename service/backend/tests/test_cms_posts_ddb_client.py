@@ -1,13 +1,9 @@
-"""cms_posts_ddb_client 유닛 테스트 — moto 로 인메모리 DynamoDB 대고 돈다.
+"""cms_posts_ddb_client 유닛 테스트 — moto 로 인메모리 DynamoDB 를 사용한다.
 
-2026-08-04: pgvector RDS 삭제 후 CMS posts 를 DynamoDB 로 재구축하며 신규 작성.
-admin/tests/test_posts_repo.py 와 같은 테이블(sedaily-mbti-cms-posts-dev)을 보는
-공개 조회 전용 클라이언트라, 여기서는 채널·날짜 필터·slug 조회·발행 상태 체크만
-검증한다 (쓰기 경로는 admin 쪽에서 이미 커버).
+admin/tests/test_posts_repo.py 와 같은 테이블(sedaily-mbti-cms-posts-dev)을 읽는 공개 조회 전용 클라이언트이므로
+채널·날짜 필터, slug 조회, 발행 상태 확인만 검증한다(쓰기 경로는 admin 쪽에서 검증).
 
-Run from ``backend/``::
-
-    python3 -m pytest v2/tests/test_cms_posts_ddb_client.py -v
+실행: cd service/backend && python3 -m pytest tests/test_cms_posts_ddb_client.py -v
 """
 from __future__ import annotations
 

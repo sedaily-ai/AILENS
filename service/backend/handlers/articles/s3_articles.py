@@ -8,9 +8,8 @@ Endpoints:
 - GET /s3-articles/keyword?keywords=a,b,c&days=7&limit=20
     └ 키워드(쉼표 구분) hit 카운트로 매칭 + 최신순 정렬. 점수 0 제외.
 
-2026-08-24 — 실제 로직(S3 XML 조회·키워드 매칭·응답 shaping)은
-services/s3_articles_service.py로 뺐다(코드 리팩토링 감사 Track B, God
-파일 분해). 이 파일은 이제 HTTP 라우팅만 담당한다.
+S3 XML 조회·키워드 매칭·응답 구성은 services/articles/s3_articles.py 에 있으며,
+이 파일은 HTTP 라우팅만 담당한다.
 """
 import logging
 import json
@@ -33,10 +32,10 @@ def lambda_handler(event: dict, context) -> dict:
     logger.info(f"S3 Articles event: {json.dumps(event)}")
 
     try:
-        # Parse request — HTTP API v2 (chzwwtjtgk) 와 REST API v1 둘 다 지원
+        # HTTP API v2 와 REST API v1 이벤트 형식을 모두 지원
         request_context = event.get("requestContext", {}) or {}
         if request_context.get("http"):
-            # HTTP API v2 (현재 production)
+            # HTTP API v2
             http_method = request_context["http"].get("method", "GET")
             path = request_context["http"].get("path", "")
         else:
@@ -72,10 +71,7 @@ def lambda_handler(event: dict, context) -> dict:
             article_id = path_params.get("article_id") or path.split("/")[-1]
             date_str = query_params.get("date")
 
-            # `asyncio.get_event_loop()` is deprecated in Python 3.10+ when no
-            # loop is running. `asyncio.run` creates a fresh loop and tears it
-            # down cleanly, which is the right pattern for a sync Lambda entry
-            # point.
+            # 동기 Lambda 진입점이므로 asyncio.run 으로 새 이벤트 루프를 생성·정리한다.
             result = asyncio.run(svc.get_article_detail(article_id, date_str))
 
             if "error" in result:

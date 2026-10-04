@@ -9,23 +9,12 @@ Timeline Handler Lambda Function
     오류 규약: 400 BAD_REQUEST(입력 오류), 500 TIMELINE_ERROR(내부 오류, 상세는 로그에만).
     '그날 기사 없음'은 오류가 아니라 200 + articles=[].
 
-⚠️ 2026-08-13, 빅카인즈(언론진흥재단 OpenAPI) + DynamoDB 폴백 2단계 구조를
-걷어내고 S3 XML 원본 피드 하나로 단순화했다.
-  - 빅카인즈: Lambda(`sedaily-mbti-timeline-dev`)조차 배포된 적이 없어(API
-    Gateway 라우트도 없음) 이 엔드포인트 자체가 늘 404였다("타임라인 API
-    응답 404"로 프론트에 노출). 실질적으로 한 번도 쓰인 적 없는 코드였다.
-  - DynamoDB 폴백: S3 XML은 파이프라인 인덱싱을 기다리지 않고 그날 발행된
-    기사가 실시간으로 반영돼(실측: 8/13 당일 기사가 S3 XML엔 있는데
-    DynamoDB 검색엔 아직 없었음) 폴백이 필요한 상황 자체가 드물고, 폴백이
-    "불러오지 못해 기본 목록을 보여주고 있어요"라는 오해 소지 있는 배너로
-    이어지던 문제도 있었다 — 사용자 판단으로 폴백 없이 단일 소스로 정리.
+데이터 소스는 S3 XML 원본 피드 하나이며, 그날 발행된 기사가 실시간으로 반영된다.
 
 프론트엔드: service/frontend/src/features/timeline/lib/timelineApi.ts
 
-2026-08-24 — 실제 조회 로직(S3 XML fetch·응답 shaping·orchestration)은
-services/timeline_service.py로 뺐다(코드 리팩토링 감사 Track B, God 파일
-분해). 이 파일은 이제 HTTP 요청 파싱(쿼리스트링/바디 → TimelineRequest)과
-라우팅만 담당한다.
+조회 로직은 services/timeline/timeline.py 에 있으며, 이 파일은 HTTP 요청 파싱
+(쿼리스트링·바디 → TimelineRequest)과 라우팅만 담당한다.
 """
 import json
 import logging
@@ -97,7 +86,7 @@ def parse_request(event: dict) -> TimelineRequest:
 
     query = pick('query', default=None)
     query = str(query).strip() if query else None
-    # 프론트엔드가 `/api/search` 관례를 따라 '*' 를 "전체" 의미로 보낸다.
+    # 프론트엔드가 `/api/search` 관례에 따라 '*' 를 "전체" 의미로 전달한다.
     if query in ('*', ''):
         query = None
 

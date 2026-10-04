@@ -4,7 +4,7 @@
     from common.secrets import get_pg_password
     password = get_pg_password()  # 5분 cache, miss 시 SSM fetch
 
-design:
+설계:
 - fail-closed (SSM error 시 raise — DB password 없으면 connection 의미 없음).
   feature_flag.py 와 다름 — flag 는 fail-open (admin 명시 disable 만 차단), 여기는
   fail-closed (붙을 수 없는데 거짓 enabled 로 진행하면 더 위험).

@@ -27,18 +27,13 @@ BIGKINDS_KEY_SSM_PARAM = '/sedaily-mbti/bigkinds-api-key'
 BIGKINDS_TIMEOUT_SECONDS = 15
 BIGKINDS_PROVIDER = '서울경제'
 
-# 검색 결과에 자주 섞여 나오는 저가치 코너 — S3 지면 아카이브(fetchDayArticles)의
-# '[시그널]' 제외 규칙, 옛 time_machine_handler(위키/스크래핑판)의 EXCLUDE_TAGS와
-# 같은 취지.
+# 검색 결과에 자주 섞이는 저가치 코너(부고·인사·사설 등)를 제외하는 제목 마커.
 EXCLUDE_TITLE_MARKERS = ('[부고]', '[인사]', '[사설]', '[마켓아이]', '[시론]', '[발언대]')
 
-# content는 문서상 "200자 제한"이라고 돼 있지만 실측 결과 최대 1,500자 넘는
-# 전체(또는 거의 전체) 본문이 그대로 온다(2026-08-17 확인) — 리스트에 그대로
-# 노출하면 한 줄이 너무 길어져 오히려 안 친절해 보인다는 피드백으로, 여기서
-# 미리보기 길이로 직접 잘라 내려준다(전체는 original_link로).
+# 빅카인즈 content는 문서상 200자 제한이지만 실제로는 전체 본문(1,500자 이상)이 내려온다.
+# 목록 표시용으로 미리보기 길이로 직접 자른다(전체는 original_link 참조).
 CONTENT_PREVIEW_LEN = 150
-# 본문 끝에 흔히 붙는 "이름+기자+이메일" 서명과 "입력시간 : ..." 꼬리 — byline
-# 필드로 이미 따로 내려주고 있어 미리보기에서는 지저분하기만 하다.
+# 본문 끝의 "이름+기자+이메일" 서명과 "입력시간 : ..." 꼬리 — byline 필드로 따로 제공하므로 미리보기에서 제거한다.
 _BYLINE_TAIL_RE = re.compile(r'[가-힣]{2,4}\s*기자\S*@\S+\.(?:CO\.KR|COM)\s*$', re.IGNORECASE)
 _INPUT_TIME_TAIL_RE = re.compile(r'입력시간\s*:\s*\d{4}/\d{2}/\d{2}\s*\d{1,2}:\d{2}\s*$')
 

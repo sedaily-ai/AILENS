@@ -1,15 +1,9 @@
 """
-Chatbot Handler Lambda Function
-Provides AI-powered chat responses using a single default persona/voice.
-Uses Claude API via AWS Bedrock.
+챗봇 Lambda 핸들러.
 
-2026-08-05: 컨텍스트 조회(services/chatbot_context_service.py), 프롬프트 구성
-(services/chatbot_prompt_service.py), Bedrock 호출 엔진(services/chatbot_engine.py)을
-분리 — 이 파일은 이제 HTTP 라우팅/검증/응답 조립만 담당한다.
-(`handlers/briefing_handler.py`가 `services/briefing_generator.py`를 쓰는 것과 같은 패턴.)
-
-2026-08-07: MBTI 페르소나 전체 제거 — 더 이상 그룹별로 분기하지 않는다. 요청
-바디에 `mbti_group`이 실려 와도(구 프론트 잔재) 그냥 무시한다.
+단일 기본 페르소나로 AWS Bedrock Claude 응답을 제공한다. 컨텍스트 조회·프롬프트 구성·
+Bedrock 호출은 services/chat 에 위임하고, 이 파일은 HTTP 라우팅·검증·응답 조립만 담당한다.
+요청 바디의 `mbti_group` 은 무시한다.
 """
 import logging
 import json
@@ -23,7 +17,7 @@ from services.chat.engine import generate_chat_response
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# 페르소나 제거 후 단일 기본 챗봇 아이덴티티.
+# 단일 기본 챗봇 아이덴티티
 DEFAULT_PERSONA = {'name': '서울경제 AI', 'role': 'AI 챗봇', 'emoji': '🤖'}
 
 

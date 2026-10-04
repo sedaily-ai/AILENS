@@ -1,32 +1,25 @@
 """챗봇 Bedrock 호출 엔진 — 동기/스트리밍 응답 생성 + tool-use 루프.
 
-2026-08-05: `handlers/chatbot_handler.py`(869줄)에서 분리. `generate_chat_response_stream`은
-이 파일로 옮기기 전부터 이미 다른 Lambda(`handlers/websocket/message.py`)가
-handler 파일에서 직접 import해 쓰고 있었다 — 사실상 서비스였는데 경계가 없었을 뿐.
-
-2026-08-05(같은 날 후속): `generate_chat_response`(동기)와
-`generate_chat_response_stream`(스트리밍)이 각자 독립 구현하던 tool-use 루프 중
-실제로 동일했던 두 부분(`_build_bedrock_request` — Bedrock 요청 body 조립,
-`_execute_tool_batch` — tool_use 블록 실행+결과 조립)을 공유 헬퍼로 추출했다.
-스트리밍 특유의 증분 yield 흐름 자체는 성격이 달라 억지로 합치지 않고 그대로
-둠 — 진짜 중복이었던 부분만 하나로 합쳤다(순수 추출, 응답 내용 변경 없음).
+동기(`generate_chat_response`)와 스트리밍(`generate_chat_response_stream`) 응답을 생성한다.
+두 경로는 Bedrock 요청 body 조립(`_build_bedrock_request`)과 tool_use 블록 실행
+(`_execute_tool_batch`)을 공유하며, 스트리밍의 증분 yield 흐름만 별도로 유지한다.
+`generate_chat_response_stream`은 WebSocket 핸들러(`handlers/chat/websocket/message.py`)도 직접 import한다.
 """
 import logging
 import boto3
 import json
 from typing import Optional, Dict, Any, List
 
-from config.constants import BEDROCK_MODEL_ID_CHATBOT  # Sonnet 4.6 inference profile (mbti-sonnet-46), single default 챗봇 톤
+from config.constants import BEDROCK_MODEL_ID_CHATBOT  # Sonnet 4.6 inference profile (mbti-sonnet-46)
 from services.chat.context import search_related_articles
 from services.chat.prompt import _build_full_system_prompt, _get_tools
 
 logger = logging.getLogger(__name__)
 
-# Bedrock client (reused across invocations for Lambda warm starts)
+# Lambda warm start 간 재사용하는 Bedrock 클라이언트
 bedrock_client = None
 
 def get_bedrock_client():
-    """Get or create Bedrock client"""
     global bedrock_client
     if bedrock_client is None:
         bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
@@ -34,7 +27,7 @@ def get_bedrock_client():
 
 
 def _execute_tool(tool_name: str, tool_input: dict) -> str:
-    """Execute a single tool and return result as JSON string."""
+    """tool 하나를 실행하고 결과를 JSON 문자열로 반환한다."""
     from services.market.stock import lookup_stock, get_market_index
 
     if tool_name == "get_stock_price":
@@ -98,9 +91,7 @@ def _execute_tool(tool_name: str, tool_input: dict) -> str:
 
 
 def _build_bedrock_request(system_prompt: str, tools: list, messages: list) -> str:
-    """동기(``generate_chat_response``/``_handle_tool_use``)와 스트리밍
-    (``generate_chat_response_stream``) 양쪽이 매 호출마다 만드는 요청 body —
-    3곳에 똑같이 흩어져 있던 걸 하나로 합쳤다(로직 변경 없음, 순수 추출)."""
+    """동기·스트리밍 경로가 공통으로 쓰는 Bedrock 요청 body를 조립한다."""
     return json.dumps({
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 2048,
@@ -117,10 +108,8 @@ def _build_bedrock_request(system_prompt: str, tools: list, messages: list) -> s
 
 
 def _execute_tool_batch(tool_blocks: list) -> list:
-    """``{id, name, input}`` 형태의 tool_use 블록들을 실행하고 Bedrock에 돌려줄
-    ``tool_result`` 콘텐츠 리스트를 만든다. 동기 tool-loop(``_handle_tool_use``)와
-    스트리밍 tool-loop(``generate_chat_response_stream``)이 각자 독립적으로
-    구현하고 있던 동일 로직을 하나로 합쳤다(로직 변경 없음, 순수 추출)."""
+    """``{id, name, input}`` 형태의 tool_use 블록들을 실행해 Bedrock에 돌려줄
+    ``tool_result`` 콘텐츠 리스트를 만든다."""
     tool_results = []
     for block in tool_blocks:
         logger.info(f"Tool call: {block['name']}({block.get('input', {})})")
@@ -136,13 +125,10 @@ def _execute_tool_batch(tool_blocks: list) -> list:
 def _split_system_turns(conversation_history: list) -> tuple:
     """``conversation_history`` 에서 ``role: "system"`` 항목을 분리한다.
 
-    Messages API 는 messages 배열에 system 롤을 허용하지 않는다 —
-    최상위 ``system`` 파라미터를 쓰라며 ``ValidationException`` 을 던진다.
-    그런데 프런트의 사주 챗(``SajuChat.tsx``)은 사주 컨텍스트를
-    ``conversation_history`` 맨 앞에 ``role: "system"`` 으로 실어 보낸다.
-    그대로 통과시키면 500 이 되고, 그냥 버리면 페르소나가 사주 데이터를
-    모른 채 답해 기능이 무의미해진다. 그래서 **분리해서 system 프롬프트에
-    합친다.**
+    Messages API 는 messages 배열의 system 롤을 허용하지 않아 ``ValidationException`` 을
+    던진다. 프런트의 사주 챗(``SajuChat.tsx``)은 사주 컨텍스트를
+    ``conversation_history`` 맨 앞에 ``role: "system"`` 으로 전달하므로,
+    분리한 뒤 최상위 system 프롬프트에 합쳐야 한다.
 
     Returns:
         ``(system_texts, dialog_turns)`` — 앞은 system 롤 본문 리스트,
@@ -162,7 +148,7 @@ def _split_system_turns(conversation_history: list) -> tuple:
 
 
 def _build_messages(conversation_history: list, user_message: str) -> list:
-    """Build messages array for Claude API.
+    """Claude API 용 messages 배열을 만든다(최근 6턴 + 현재 사용자 메시지).
 
     system 롤은 ``_split_system_turns`` 가 걷어내므로 여기 들어오지 않는다.
     """
@@ -179,26 +165,18 @@ async def generate_chat_response(
     recent_articles: List[Dict[str, Any]] = None,
     cached_briefing: Optional[str] = None
 ) -> str:
-    """
-    Generate chat response using Claude API via Bedrock.
+    """Bedrock Claude로 챗봇 응답 텍스트를 생성한다.
 
     Args:
-        user_message: User's input message
-        mbti_group: accepted-but-unused for backward compat — MBTI personas
-            were removed site-wide (single default voice for everyone), but
-            `main.py` (local dev FastAPI server, out of this cleanup's scope)
-            still calls this with a group value.
-        conversation_history: Previous messages in the conversation
-        recent_articles: Recent news articles for context (fallback)
-        cached_briefing: Pre-generated cached briefing text (preferred)
-
-    Returns:
-        AI-generated response text
+        user_message: 사용자 입력.
+        mbti_group: 하위 호환용 인자로 사용하지 않는다(`main.py`가 여전히 전달).
+        conversation_history: 이전 대화.
+        recent_articles: 컨텍스트용 최근 기사(캐시 브리핑이 없을 때의 대체).
+        cached_briefing: 사전 생성한 브리핑 텍스트(우선 사용).
     """
     client = get_bedrock_client()
     system_prompt = _build_full_system_prompt(recent_articles, cached_briefing)
-    # 호출자가 conversation_history 에 실어 보낸 system 롤을 합친다
-    # (사주 챗의 사주 컨텍스트 — _split_system_turns 주석 참조).
+    # conversation_history 의 system 롤을 system 프롬프트에 합친다(_split_system_turns 참조).
     _extra_system, _ = _split_system_turns(conversation_history)
     if _extra_system:
         system_prompt = system_prompt + "\n\n" + "\n\n".join(_extra_system)
@@ -206,7 +184,6 @@ async def generate_chat_response(
     messages = _build_messages(conversation_history, user_message)
 
     try:
-        # Call Claude via Bedrock with tool use support
         request_body = _build_bedrock_request(system_prompt, tools, messages)
 
         response = client.invoke_model(
@@ -218,11 +195,10 @@ async def generate_chat_response(
 
         response_body = json.loads(response['body'].read())
 
-        # Check if Claude wants to use a tool
         if response_body.get("stop_reason") == "tool_use":
             return await _handle_tool_use(client, system_prompt, tools, messages, response_body)
 
-        # Normal text response — find first text block
+        # 첫 text 블록을 응답으로 사용
         for block in response_body.get("content", []):
             if block.get("type") == "text" and block.get("text"):
                 return block["text"]
@@ -235,7 +211,7 @@ async def generate_chat_response(
 
 
 async def _handle_tool_use(client, system_prompt: str, tools: list, messages: list, response_body: dict) -> str:
-    """Handle Claude's tool use request: execute tool(s) and get final response."""
+    """tool 호출 요청을 실행하고 최종 응답 텍스트를 만든다(최대 5회 반복)."""
     max_iterations = 5
     pre_tool_text = []
     current_response = response_body
@@ -275,7 +251,7 @@ async def _handle_tool_use(client, system_prompt: str, tools: list, messages: li
     return "\n\n".join(pre_tool_text) if pre_tool_text else "죄송해요, 응답을 생성하지 못했어요."
 
 
-# ── Streaming support ───────────────────────────────────────────
+# ── 스트리밍 ───────────────────────────────────────────
 
 def generate_chat_response_stream(
     user_message: str,
@@ -284,17 +260,13 @@ def generate_chat_response_stream(
     recent_articles: list = None,
     cached_briefing: str = None
 ):
-    """Synchronous generator yielding text chunks from Bedrock streaming API.
-    Handles tool use transparently — tools are resolved without streaming,
-    then the final text response is streamed to the caller.
+    """Bedrock 스트리밍 API의 텍스트 청크를 yield하는 동기 제너레이터.
 
-    ``mbti_group`` is accepted-but-unused for backward compat — MBTI personas
-    were removed site-wide, but `main.py` (local dev FastAPI server, out of
-    this cleanup's scope) still calls this with a group value."""
+    tool 호출은 스트리밍 없이 처리하고 이후 응답만 스트리밍한다(최대 3회 반복).
+    ``mbti_group`` 은 하위 호환용 인자로 사용하지 않는다."""
     client = get_bedrock_client()
     system_prompt = _build_full_system_prompt(recent_articles, cached_briefing)
-    # 호출자가 conversation_history 에 실어 보낸 system 롤을 합친다
-    # (사주 챗의 사주 컨텍스트 — _split_system_turns 주석 참조).
+    # conversation_history 의 system 롤을 system 프롬프트에 합친다(_split_system_turns 참조).
     _extra_system, _ = _split_system_turns(conversation_history)
     if _extra_system:
         system_prompt = system_prompt + "\n\n" + "\n\n".join(_extra_system)
@@ -356,11 +328,11 @@ def generate_chat_response_stream(
                     current_tool = None
                     current_tool_input = ""
 
-        # No tool use — text was already yielded
+        # tool 호출이 없으면 텍스트는 이미 yield 됨
         if not tool_blocks:
             return
 
-        # Handle tool use, then loop to stream the follow-up
+        # tool 실행 후 다음 루프에서 후속 응답을 스트리밍
         logger.info(f"Stream: handling {len(tool_blocks)} tool calls (iteration {iteration})")
         messages.append({"role": "assistant", "content": content_blocks})
 
