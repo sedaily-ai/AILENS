@@ -1,6 +1,6 @@
 // 자동 생성 파일 — 직접 고치지 말 것. 원본: docs/product/time-machine-events/*.json, 생성기: scripts/build-timeline-events.py
 // 서로 독립된 출처 2개 이상이 같은 날짜를 확인한 사건(confirmed)만 들어 있다. 날짜는 사건일, paperDate는 보통 사건 다음 날 신문이 나온 날.
-import type { TimelineEvent } from './timelineEvents';
+import type { TimelineEvent } from './timelineEventTypes';
 
 export const TIMELINE_EVENTS: TimelineEvent[] = [
   {

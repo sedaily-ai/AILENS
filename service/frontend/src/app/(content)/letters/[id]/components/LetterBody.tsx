@@ -7,14 +7,9 @@ import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
 import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
 import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
-import {
-  cleanSubtitle,
-  letterCategoryLabel,
-  splitBodyHtml,
-  injectImageCaptions,
-  LetterChartBlock,
-  type NeighborLetter,
-} from '.';
+import { cleanSubtitle, letterCategoryLabel, splitBodyHtml, injectImageCaptions } from './letterHtmlUtils';
+import { LetterChartBlock } from './LetterChartBlock';
+import type { NeighborLetter } from './PrevNextLetterNav';
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import { LetterBlock } from './LetterBlock';
 import { LetterTextExtras } from './LetterTextExtras';
