@@ -5,7 +5,7 @@ import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import { createPortal } from 'react-dom';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';
-import { ListeningHeadphoneIllustration } from '@/shared/ui/icons/HandDrawnIcons';
+import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
 import { onPlayHomePlayerItemRequest } from '@/shared/lib/media/audioPlayerBus';
 import { extractYoutubeVideoId, loadYouTubeIframeApi, type YTPlayer } from './youtube';
 
@@ -32,7 +32,11 @@ const BOOKMARK_STORAGE_KEY = 'ailens-player-bookmarks';
 // 못 넣고 있었다. <audio> 엘리먼트를 하나 더 두고 URL 패턴으로 유튜브
 // vs 직접 파일을 갈라 재생 — VideoLightbox의 "직접 파일" 분기와 같은
 // 원리.
-const ACCENT = '#3b82f6';
+const ACCENT = '#3d70de'; // 오디오 섹션(AudioPreviewSection)·신문 카드와 같은 블루
+const PAPER = '#f8f8f6'; // 신문 지면 배경
+const RULE = '#e4e4df';
+const INK = '#1f2937';
+const SERIF = "'Noto Serif KR', Georgia, serif";
 const DIRECT_AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i;
 
 export function TodayNewsPlayer() {
@@ -314,9 +318,9 @@ export function TodayNewsPlayer() {
           right: 0,
           bottom: 0,
           zIndex: 70,
-          background: '#fff',
-          borderTop: '1px solid rgba(0,0,0,0.08)',
-          boxShadow: '0 -2px 16px rgba(17,24,39,0.08)',
+          background: PAPER,
+          borderTop: '1px solid #c4c7cd',
+          boxShadow: '0 -6px 24px -12px rgba(60,55,45,0.22)',
         }}
       >
       {/* 재생목록 패널(2026-08-21, 사용자 요청 — "플레이리스트처럼 누르면
@@ -330,7 +334,7 @@ export function TodayNewsPlayer() {
           style={{
             maxWidth: 1080,
             maxHeight: 320,
-            borderBottom: '1px solid rgba(0,0,0,0.06)',
+            borderBottom: `1px solid ${RULE}`,
           }}
         >
           <div className="flex-1 min-w-0" style={{ overflowY: 'auto', padding: '10px clamp(12px, 3vw, 24px)' }}>
@@ -338,10 +342,11 @@ export function TodayNewsPlayer() {
                 불친절하다") — 목록 위에 뭘 보고 있는지 한 줄로 안내. */}
             <p
               style={{
-                fontSize: 11,
+                fontFamily: SERIF,
+                fontSize: 12,
                 fontWeight: 700,
-                color: '#9ca3af',
-                letterSpacing: '0.04em',
+                color: '#6b7280',
+                letterSpacing: '0.02em',
                 padding: '4px 6px 8px',
               }}
             >
@@ -354,8 +359,8 @@ export function TodayNewsPlayer() {
               return (
                 <div
                   key={it.id}
-                  className="flex items-center hover:bg-gray-50"
-                  style={{ gap: 10, padding: '8px 6px', borderRadius: 8 }}
+                  className="flex items-center hover:bg-black/[0.025]"
+                  style={{ gap: 12, padding: '9px 6px', borderRadius: 6, borderBottom: `1px solid ${RULE}` }}
                 >
                   <button
                     type="button"
@@ -372,10 +377,11 @@ export function TodayNewsPlayer() {
                         width: 22,
                         height: 22,
                         borderRadius: '50%',
-                        fontSize: 11,
+                        fontFamily: SERIF,
+                        fontSize: 12,
                         fontWeight: 700,
-                        color: isCurrent ? '#fff' : '#9ca3af',
-                        background: isCurrent ? ACCENT : '#f3f4f6',
+                        color: isCurrent ? '#fff' : '#8b8f98',
+                        background: isCurrent ? INK : 'transparent',
                       }}
                     >
                       {isCurrent && playing ? (
@@ -390,7 +396,7 @@ export function TodayNewsPlayer() {
                     <span
                       className="flex items-center justify-center flex-shrink-0"
                       aria-hidden
-                      style={{ color: isCurrent ? ACCENT : '#c0c5cc' }}
+                      style={{ color: isCurrent ? ACCENT : '#b8bcc4' }}
                       title={isAudio ? '팟캐스트' : '영상'}
                     >
                       {isAudio ? (
@@ -410,9 +416,11 @@ export function TodayNewsPlayer() {
                     <span
                       className="min-w-0 flex-1"
                       style={{
-                        fontSize: 13.5,
+                        fontFamily: SERIF,
+                        fontSize: 14,
                         fontWeight: isCurrent ? 700 : 500,
-                        color: isCurrent ? '#111827' : '#374151',
+                        letterSpacing: '-0.01em',
+                        color: isCurrent ? INK : '#4b5563',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -456,10 +464,10 @@ export function TodayNewsPlayer() {
           {/* 우측 일러스트 — 좁은 화면에선 숨김(리스트 폭 확보 우선). */}
           <div
             className="hidden sm:flex flex-col items-center justify-center flex-shrink-0"
-            style={{ width: 140, borderLeft: '1px solid rgba(0,0,0,0.06)', padding: 16, background: '#fafbfc' }}
+            style={{ width: 150, borderLeft: `1px solid ${RULE}`, padding: 16 }}
           >
-            <ListeningHeadphoneIllustration accent={ACCENT} className="w-16 h-16" />
-            <p style={{ marginTop: 8, fontSize: 11.5, color: '#9ca3af', fontWeight: 600, textAlign: 'center', lineHeight: 1.5 }}>
+            <PodcastSketch className="w-20 h-16" />
+            <p style={{ marginTop: 8, fontFamily: SERIF, fontSize: 12, color: '#8b8f98', fontWeight: 600, textAlign: 'center', lineHeight: 1.6 }}>
               오늘의 뉴스를
               <br />
               귀로 들어보세요
@@ -473,7 +481,7 @@ export function TodayNewsPlayer() {
       <audio ref={audioRef} style={{ display: 'none' }} />
 
       {/* 진행바 — 상단 얇은 줄 */}
-      <div style={{ height: 3, background: '#f0f0ef' }}>
+      <div style={{ height: 3, background: RULE }}>
         <div
           style={{
             height: '100%',
@@ -488,23 +496,22 @@ export function TodayNewsPlayer() {
         className="mx-auto flex items-center"
         style={{ maxWidth: 1080, height: 60, padding: '0 clamp(12px, 3vw, 24px)', gap: 12 }}
       >
-        <div
-          className="flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105"
-          style={{ width: 36, height: 36, borderRadius: 10, background: '#eff6ff' }}
-        >
-          <ListeningHeadphoneIllustration accent={ACCENT} className="w-6 h-6" />
+        <div className="flex items-center justify-center flex-shrink-0" aria-hidden>
+          <PodcastSketch className="w-12 h-10 -ml-1" />
         </div>
 
         {/* 트랙 정보 */}
         <div className="min-w-0 flex-1">
-          <p style={{ fontSize: 10.5, fontWeight: 700, color: ACCENT, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
-            오늘의 핵심 뉴스 {total > 1 ? `· ${index + 1}/${total}` : ''}
+          <p style={{ fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: '0.04em', marginBottom: 1 }}>
+            오늘의 뉴스를 귀로 {total > 1 ? `· ${index + 1}/${total}` : ''}
           </p>
           <p
-            className="text-gray-900"
             style={{
-              fontSize: 13.5,
-              fontWeight: 600,
+              fontFamily: SERIF,
+              fontSize: 14.5,
+              fontWeight: 700,
+              letterSpacing: '-0.015em',
+              color: INK,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -542,9 +549,10 @@ export function TodayNewsPlayer() {
               // 요소(트랙 배지, 진행바, 재생목록 토글 활성 상태)가 전부
               // ACCENT 파란색인데 정작 가장 눈에 띄는 재생 버튼만 검정이라
               // 톤이 어긋났다.
-              background: ACCENT,
+              background: playing ? ACCENT : INK,
               color: '#fff',
               cursor: 'pointer',
+              transition: 'background .2s ease',
             }}
           >
             {playing ? (
@@ -578,7 +586,7 @@ export function TodayNewsPlayer() {
                 height: 30,
                 borderRadius: '50%',
                 border: 'none',
-                background: expanded ? '#eff6ff' : 'transparent',
+                background: expanded ? 'rgba(61,112,222,0.12)' : 'transparent',
                 color: expanded ? ACCENT : '#6b7280',
                 cursor: 'pointer',
               }}
@@ -590,7 +598,7 @@ export function TodayNewsPlayer() {
             </button>
           )}
 
-          <div style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
+          <div style={{ width: 1, height: 20, background: RULE, margin: '0 4px' }} />
 
           <button
             type="button"
