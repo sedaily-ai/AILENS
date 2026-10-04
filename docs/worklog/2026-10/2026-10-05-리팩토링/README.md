@@ -50,6 +50,8 @@
 | 5aebcfe | 백엔드 호출처 없는 함수·모듈 약 380줄 삭제 | 테스트 이메일 MOCK 포함 |
 | d05b226 | voice 응답 헬퍼 통합 | 중복 2 → 1 |
 | 69d92f2·0c621b9 | 레터·CMS 응답 타입 분리(순환 의존 0, cmsPostsApi 567 → 369줄) | madge 순환 1 → 0 |
+| f44a436 | OnboardingClient 섹션 6개 분리 | 596 → 48줄 |
+| cb09e05 | MomentArt를 rig + 장면 4개로 분리 | 578 → 41줄 |
 
 ## 4. 검증
 
