@@ -5,20 +5,12 @@
 `docs/evaluation/4format-samples/`의 각 샘플 폴더가 이 도구로 만든 영상을
 가리킨다(예: `2026-08-11-빵지순례/라운드2_산출물/영상_각본.md`).
 
-기존에 `~/Documents/회사/서울경제신문/콘텐츠/프로젝트/ailens/video`(dev2
-바깥, 게다가 실수로 홈 디렉터리 전체가 git 루트로 잡혀 있던 위치)에
-따로 있던 걸 2026-08-20에 이 저장소로 옮겼다 — 같은 프로젝트(AI LENS)
-소스인데 커밋·푸시가 안 되는 곳에 있었기 때문. `out/`(렌더된 mp4),
-`public/audio/`(TTS 캐시), `data/*.resolved.json`(TTS 해석 후 캐시)은
-전부 재생성 가능한 산출물이라 `.gitignore`에 있고 이 저장소엔 없다.
+`out/`(렌더된 mp4), `public/audio/`(TTS 캐시), `data/*.resolved.json`(TTS 해석 후 캐시)은 재생성 가능한 산출물이라 `.gitignore`에 있고 저장소에는 없다.
 
 ## 요구사항
 
 - Node.js, `ffmpeg`(로컬 PATH에 있어야 함)
-- Google Cloud TTS 인증 — `gcloud auth application-default login`으로
-  ADC 발급 (또는 `GOOGLE_APPLICATION_CREDENTIALS` 서비스 계정 키 경로).
-  대상 GCP 프로젝트에서 Cloud Text-to-Speech API가 활성화돼 있어야 함
-  (`npm run tts:voices`로 먼저 확인 가능)
+- AWS 자격 증명(Polly, S3) — 기본 음성은 Amazon Polly이며, 발행 설정에서 ElevenLabs를 고르면 해당 API 키가 필요하다.
 
 ## 명령어
 
@@ -32,17 +24,14 @@ npm run render -- --input data/<script>.json --format horizontal --output out/<n
 # TTS만 먼저 확인하고 싶을 때
 npm run tts:resolve -- --input data/<script>.json
 
-# 사용 가능한 한국어 보이스 목록
-npm run tts:voices
-
 # Remotion Studio로 컷 단위 미리보기
 npm run dev
 ```
 
 ## 각본 JSON 스키마
 
-`src/lib/schema.ts` (zod)가 정본. 컷 타입 6종(opening/stat/diagram/chart/
-highlight/closing)과 각 타입별 `data` 필드는 admin 쪽 video 프롬프트
+`src/lib/schema.ts` (zod)가 정본. 컷 타입 10종(opening/stat/diagram/photo/chart/
+highlight/closing/compare/donut/rank)과 각 타입별 `data` 필드는 admin 쪽 video 프롬프트
 (`PROMPT#video/published`, 파일시스템 폴백은
 `service/backend/prompts/video/published.md`)의 "렌더용 JSON" 출력
 형식과 반드시 일치해야 한다 — 프롬프트를 고치면 이 스키마도 같이
