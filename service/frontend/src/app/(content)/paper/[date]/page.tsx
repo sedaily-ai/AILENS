@@ -15,6 +15,12 @@ import { buildPaperDescription, buildPaperJsonLd, paperDateLabel, paperKeywords,
 export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts) — route segment config는 import한 상수를 못 쓴다
 export const dynamicParams = true;
 
+// generateStaticParams가 없으면 Next가 이 라우트를 통째로 동적(ƒ)으로 처리해 매 요청이 서버 렌더·no-store가 된다(2026-10-05 실측:
+// 클릭마다 TTFB 약 0.4초, CDN 미캐시). 빈 배열을 돌려 "빌드 땐 만들지 않고 요청이 오면 렌더해 ISR로 캐시"하게 한다(카테고리 라우트와 같은 패턴).
+export async function generateStaticParams() {
+  return [];
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function load(date: string): Promise<{ dates: string[]; items: CmsLens[] } | null> {
