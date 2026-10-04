@@ -33,8 +33,8 @@ import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from clients.s3_article_client import S3ArticleClient
-from clients.dynamodb_client import DynamoDBClient
+from clients.s3.article_body import S3ArticleClient
+from clients.ddb.dynamodb import DynamoDBClient
 from config.constants import S3_BODY_FIELDS
 
 # ── Configuration ────────────────────────────────────────────────────────────

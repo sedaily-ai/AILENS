@@ -21,7 +21,7 @@ from moto import mock_aws
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from clients import daily_letters_ddb_client as letters_client  # noqa: E402
+from clients.ddb import daily_letters as letters_client# noqa: E402
 
 _TABLE_NAME = "sedaily-mbti-daily-letters-dev-test"
 

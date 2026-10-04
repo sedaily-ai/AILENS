@@ -19,7 +19,7 @@ from typing import Any, Dict, List
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from clients.dynamodb_client import drain_query
+from clients.ddb.dynamodb import drain_query
 
 _TABLE_NAME = os.environ.get("DAILY_LETTERS_TABLE", "sedaily-mbti-daily-letters-dev")
 _REGION = os.environ.get("AWS_REGION", "us-east-1")

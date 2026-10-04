@@ -12,7 +12,7 @@ import logging
 from typing import Optional
 from dataclasses import dataclass
 
-import clients.articles_pg_client as articles_client
+import clients.pg.articles as articles_client
 from utils.date_utils import get_kst_today
 
 logger = logging.getLogger(__name__)

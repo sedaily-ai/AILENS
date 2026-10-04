@@ -18,7 +18,7 @@ import asyncio
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from clients.dynamodb_client import DynamoDBClient
+from clients.ddb.dynamodb import DynamoDBClient
 from services.briefing_generator import BriefingGenerator
 from config.constants import (
     CORS_HEADERS,

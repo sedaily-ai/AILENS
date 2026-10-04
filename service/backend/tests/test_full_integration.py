@@ -137,8 +137,8 @@ def test_phase1_storage():
     print('── Phase 1: Article Storage (DynamoDB + S3) ──')
     print('')
 
-    from clients.s3_article_client import S3ArticleClient
-    from clients.dynamodb_client import DynamoDBClient
+    from clients.s3.article_body import S3ArticleClient
+    from clients.ddb.dynamodb import DynamoDBClient
 
     s3_client = S3ArticleClient(bucket_name=BUCKET, region=REGION)
     db = DynamoDBClient(table_name=TABLE, region=REGION, s3_article_client=s3_client)

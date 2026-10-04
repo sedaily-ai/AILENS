@@ -53,7 +53,7 @@ def load_today_letter(date_str: str) -> tuple[Optional[Dict[str, Any]], str]:
     조회 실패/오프라인이면 로컬 미러 → MOCK 순으로 폴백.
     """
     try:
-        from clients import daily_letters_ddb_client as letters_client  # noqa: lazy
+        from clients.ddb import daily_letters as letters_client# noqa: lazy
         from handlers.today_letters import shape_letter_response  # noqa: lazy
 
         rows = letters_client.get_daily_letters(date_str)

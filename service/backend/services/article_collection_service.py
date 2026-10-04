@@ -20,8 +20,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 
-import clients.articles_pg_client as articles_client
-from clients.s3_xml_client import S3XMLClient
+import clients.pg.articles as articles_client
+from clients.s3.xml_articles import S3XMLClient
 from utils.hash_utils import hash_content, content_changed
 
 logger = logging.getLogger(__name__)

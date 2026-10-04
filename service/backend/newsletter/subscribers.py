@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 
-from clients.newsletter_subscribers_pg_client import list_active_subscribers
+from clients.pg.newsletter_subscribers import list_active_subscribers
 
 logger = logging.getLogger(__name__)
 

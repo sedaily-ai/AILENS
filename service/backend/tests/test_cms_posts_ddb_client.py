@@ -21,7 +21,7 @@ from moto import mock_aws
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from clients import cms_posts_ddb_client as posts_client  # noqa: E402
+from clients.ddb import cms_posts as posts_client# noqa: E402
 
 _TABLE_NAME = "sedaily-mbti-cms-posts-dev-test"
 

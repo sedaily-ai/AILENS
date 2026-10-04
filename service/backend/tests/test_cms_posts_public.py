@@ -2,7 +2,7 @@
 
 2026-08-06: pgvector 방식을 기대하던 옛 버전(PgVectorV2Client monkeypatch)이
 2026-08-04 DynamoDB 이관 이후 계속 AttributeError로 깨져 있던 걸 발견해
-handlers/cms_posts_public.py의 실제 의존성(clients.cms_posts_ddb_client)에
+handlers/cms_posts_public.py의 실제 의존성(clients.ddb.cms_posts)에
 맞춰 다시 썼다 — 그동안 "무관한 사전 존재 실패" 9건으로 넘어가던 것들.
 
 Run from service/backend/::

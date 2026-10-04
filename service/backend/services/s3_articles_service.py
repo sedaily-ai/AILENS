@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
-from clients.s3_xml_client import S3XMLClient
+from clients.s3.xml_articles import S3XMLClient
 from config import settings
 from utils.date_utils import get_kst_today
 

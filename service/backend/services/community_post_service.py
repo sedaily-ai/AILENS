@@ -22,7 +22,7 @@ from typing import Any
 from datetime import datetime
 from utils.date_validation import KST
 
-import clients.community_pg_client as community_client
+import clients.pg.community as community_client
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

@@ -34,7 +34,7 @@ from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
 
-from clients import daily_letters_ddb_client as letters_client
+from clients.ddb import daily_letters as letters_client
 
 
 logger = logging.getLogger(__name__)

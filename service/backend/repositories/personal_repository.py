@@ -16,7 +16,7 @@ schema에 컬럼을 안 만들었다(temperature는 이미 초기 마이그레�
 import logging
 from typing import Optional, Dict, Any, List
 
-from clients import personal_pg_client as client
+from clients.pg import personal as client
 from models.personal import ArchivedSentence, UserProfile, ReadingRecord
 
 logger = logging.getLogger(__name__)

@@ -26,7 +26,7 @@ import logging
 import boto3
 from typing import Optional, Dict, Any, List
 
-import clients.articles_pg_client as articles_client
+import clients.pg.articles as articles_client
 from datetime import datetime
 
 from config.constants import (

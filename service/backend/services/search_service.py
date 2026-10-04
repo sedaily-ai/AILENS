@@ -13,7 +13,7 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 import time
 
-import clients.articles_pg_client as articles_client
+import clients.pg.articles as articles_client
 from config.constants import CATEGORY_SEARCH_ALIASES
 
 logger = logging.getLogger(__name__)

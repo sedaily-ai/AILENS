@@ -43,7 +43,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
-from clients import newsletter_subscribers_pg_client as subscribers_client
+from clients.pg import newsletter_subscribers as subscribers_client
 from common.constants import SITE_URL
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator

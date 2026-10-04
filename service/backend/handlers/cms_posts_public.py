@@ -26,9 +26,9 @@ from core.response import error_response, success_response
 # "postgres"로 바꾸기 전에 clients/cms_posts_pg_client.py 상단의 "알려진
 # 차이"(lens 채널 lenses[] 미이관 등)를 반드시 확인할 것.
 if os.environ.get("CMS_DB_BACKEND") == "postgres":
-    from clients import cms_posts_pg_client as posts_client
+    from clients.pg import cms_posts as posts_client
 else:
-    from clients import cms_posts_ddb_client as posts_client
+    from clients.ddb import cms_posts as posts_client
 from services.cms_posts_shaping import (
     SHAPERS,
     shape_letter,

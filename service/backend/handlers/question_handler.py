@@ -17,7 +17,7 @@ from utils.date_validation import KST
 import boto3
 from botocore.config import Config
 
-import clients.articles_pg_client as articles_client
+import clients.pg.articles as articles_client
 from config import settings
 from config.constants import BEDROCK_MODEL_ID_HAIKU
 from services.prompt_loader import load_prompt

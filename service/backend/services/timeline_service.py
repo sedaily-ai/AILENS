@@ -21,7 +21,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-from clients.s3_xml_client import S3XMLClient
+from clients.s3.xml_articles import S3XMLClient
 from utils.date_validation import today_kst
 
 logger = logging.getLogger(__name__)

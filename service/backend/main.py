@@ -33,7 +33,7 @@ except ImportError:
     print("[local] python-dotenv 없음 — 셸 환경변수만 사용")
 
 from config import settings  # noqa: E402  (.env 로드 이후여야 함)
-from clients.s3_xml_client import S3XMLClient  # noqa: E402
+from clients.s3.xml_articles import S3XMLClient  # noqa: E402
 from handlers.time_machine_handler import lambda_handler as time_machine_lambda_handler  # noqa: E402
 from handlers.timeline_handler import lambda_handler as timeline_lambda_handler  # noqa: E402
 from services.chatbot_engine import (  # noqa: E402

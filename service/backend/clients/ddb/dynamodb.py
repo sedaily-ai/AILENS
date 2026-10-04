@@ -18,7 +18,7 @@ from decimal import Decimal
 from config.constants import S3_BODY_FIELDS
 
 if TYPE_CHECKING:
-    from clients.s3_article_client import S3ArticleClient
+    from clients.s3.article_body import S3ArticleClient
 
 logger = logging.getLogger(__name__)
 
@@ -283,7 +283,7 @@ class DynamoDBClient:
 
             # Store body in S3 if client is configured
             if self._s3_article_client:
-                from clients.s3_article_client import S3ArticleClient
+                from clients.s3.article_body import S3ArticleClient
 
                 body_data = S3ArticleClient.extract_body_fields(article)
                 if body_data:

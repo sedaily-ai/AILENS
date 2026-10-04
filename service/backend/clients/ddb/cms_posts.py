@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
 
-from clients.dynamodb_client import drain_query
+from clients.ddb.dynamodb import drain_query
 
 _TABLE_NAME = os.environ.get("CMS_POSTS_TABLE", "sedaily-mbti-cms-posts-dev")
 _REGION = os.environ.get("AWS_REGION", "us-east-1")
