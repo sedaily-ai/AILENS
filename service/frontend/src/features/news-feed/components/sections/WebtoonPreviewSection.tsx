@@ -1,7 +1,7 @@
 'use client';
 
 import { WebtoonSketch } from '@/shared/ui/icons/VideoSketch';
-import type { MouseEvent } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,6 +9,7 @@ import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
+import { WebtoonLightbox } from '@/shared/ui/media/WebtoonLightbox';
 
 // 홈 상단의 슬림 텍스트 배너로는 "실제 콘텐츠"처럼 안 느껴진다는 피드백
 // (2026-08-06) — 4등분 카드 그리드(두꺼운 테두리·하드 섀도·기울기)로 정착.
@@ -90,6 +91,8 @@ interface Props {
 // 0)는 통째로 삭제.
 export function WebtoonPreviewSection({ initialItems }: Props) {
   const items = useServerSeededList<CmsWebtoon[], null>(initialItems, null, fetchWebtoons);
+  // 카드를 누르면 별도 뷰어 페이지 대신 가운데 모달로 미리 본다(2026-10-05, 사용자 요청). 링크(href)는 남겨 검색엔진·새 탭·공유는 그대로 동작한다.
+  const [openWebtoon, setOpenWebtoon] = useState<CmsWebtoon | null>(null);
 
   if (items === null) return null; // 로딩 중엔 자리 안 차지(스켈레톤 제거 방침과 동일)
 
@@ -224,9 +227,15 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
             <Link
               key={w.id}
               href={w.href ?? `/webtoon/${encodeURIComponent(w.id)}`}
-              prefetch
+              prefetch={false}
               className="group relative"
               style={cardStyle}
+              onClick={(e) => {
+                // 새 탭·창 열기(Cmd/Ctrl/Shift/가운데 버튼)는 링크 그대로, 일반 클릭만 모달
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                setOpenWebtoon(w);
+              }}
               {...hoverProps}
             >
               {cardInner}
@@ -234,6 +243,7 @@ export function WebtoonPreviewSection({ initialItems }: Props) {
           );
         })}
       </div>
+      {openWebtoon && <WebtoonLightbox webtoon={openWebtoon} onClose={() => setOpenWebtoon(null)} />}
     </section>
   );
 }
