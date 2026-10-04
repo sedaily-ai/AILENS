@@ -17,7 +17,7 @@ import { ComingSoonNotice } from "@/shared/ui/ComingSoonNotice";
 
 // Feature Tab Components
 import { QuestionTab, dailyQuestions } from "@/features/question";
-import { NewsFeedTab, type Term } from "@/features/news-feed";
+import { NewsFeedTab } from "@/features/news-feed";
 import { ArchiveTab } from "@/features/archive";
 import { buildHeaderTabs } from "@/shared/lib/headerTabs";
 import { formatDateStr } from "@/shared/utils/dateUtils";
@@ -31,7 +31,6 @@ interface Props {
   // 전달(2026-08-07, 홈 SSG 감사).
   initialWebtoons?: CmsWebtoon[];
   initialVideos?: CmsVideo[];
-  initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
   paperDates?: string[];
   initialArchiveItems?: ArchiveItem[];
@@ -74,7 +73,6 @@ export function FeedPage({
   onMbtiChange,
   initialWebtoons,
   initialVideos,
-  initialWordTerms,
   initialLensPosts,
   paperDates,
   initialArchiveItems,
@@ -274,7 +272,6 @@ export function FeedPage({
             onMbtiChange={onMbtiChange}
             initialWebtoons={initialWebtoons}
             initialVideos={initialVideos}
-            initialWordTerms={initialWordTerms}
             initialLensPosts={initialLensPosts}
             paperDates={paperDates}
             initialArchiveItems={initialArchiveItems}

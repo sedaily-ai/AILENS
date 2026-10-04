@@ -3,10 +3,8 @@
 import type { MbtiGroupId } from "@/shared/data/mbtiGroups";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
-import type { Term } from "../lib/wordsTerms";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 import { WebtoonPreviewSection } from "./WebtoonPreviewSection";
-import { WordsPreviewSection } from "./WordsPreviewSection";
 import { HomeHeroCarousel } from "./HomeHeroCarousel";
 import { VideoPreviewSection } from "./VideoPreviewSection";
 import { GamesPreviewSection } from "./GamesPreviewSection";
@@ -81,7 +79,6 @@ interface Props {
   // (2026-08-07, 홈 SSG 감사). 없으면 각 섹션이 기존처럼 클라이언트에서 로드.
   initialWebtoons?: CmsWebtoon[];
   initialVideos?: CmsVideo[];
-  initialWordTerms?: Term[];
   initialLensPosts?: CmsLens[];
   paperDates?: string[];
   // "최신 뉴스" 그리드 + 카테고리 레일이 공유하는 letters 원본(2026-08-17,
@@ -117,7 +114,6 @@ function HomeSection({ children }: { children: React.ReactNode }) {
 export function NewsFeedTab({
   initialWebtoons,
   initialVideos,
-  initialWordTerms,
   initialLensPosts,
   paperDates,
   initialArchiveItems,
@@ -201,24 +197,13 @@ export function NewsFeedTab({
               heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} paperDates={paperDates} /> : undefined}
             />
 
-            {/* 단어 퀴즈를 "최신 뉴스" 바로 아래로 올렸다(2026-08-20, 사용자
-                확인 — 원래 위치는 카테고리 레일 세 짝을 다 지나서야 나와서
-                스크롤 이탈 전에 못 보고 지나치는 사람이 많았다). 퀴즈는
-                클릭 한 번으로 "맞다/틀렸다"가 바로 나오는 인터랙션이라 지식
-                충족감을 즉시 주는 포맷 — 이탈 전에 걸리는 게 핵심이라 히어로
-                바로 다음 자리로 옮긴다. 영상 섹션은 이미 썸네일이 시각적으로
-                스캔되기 쉬운 포맷이라 원래 자리(카테고리 레일 다음) 유지. */}
-            <HomeSection><WordsPreviewSection initialTerms={initialWordTerms} /></HomeSection>
-
             {/* 홈 히어로 배너(2026-08-06, "신문 읽는 스타일"/웹툰/사주 3슬라이드
                 프로모 캐러셀) — 리디자인(2026-09-30)으로 이 자리로 이동. 원래는
                 헤더 바로 아래, 즉 "오늘의 이슈" 히어로·최신 뉴스 그리드보다도
                 위였다 — 첫 화면에서 실제 제품 가치(오늘의 이슈 4가지 시선)를
                 보여주기 전에 자체 프로모션 배너 3개(신문읽기 이벤트/웹툰
-                파일럿/사주)가 먼저 지나가는 순서였다. 퀴즈(WordsPreviewSection)
-                자리는 "스크롤 이탈 전에 걸려야 한다"는 근거가 있어(위 주석
-                참조) 그대로 두고, 프로모 캐러셀만 그 다음으로 내려 실제 콘텐츠가
-                먼저 보이게 했다. */}
+                파일럿/사주)가 먼저 지나가는 순서였다. (퀴즈 섹션은 2026-10-05 삭제)
+                프로모 캐러셀은 실제 콘텐츠 다음에 둔다. */}
             <HomeHeroCarousel />
 
             {/* 카테고리 섹션(2026-08-17, 본지 en.sedaily.com 스타일 참고 — 사용자

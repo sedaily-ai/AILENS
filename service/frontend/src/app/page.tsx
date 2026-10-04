@@ -2,12 +2,10 @@ import { FeedPage } from "@/widgets/FeedPage";
 import { fetchVideos, fetchWebtoons, fetchLensPosts, fetchPaperDates, fetchCmsPosts, toLensPreviewSummaries, toWebtoonPreviewSummaries, toVideoPreviewSummaries } from "@/shared/lib/api/cmsPostsApi";
 import { buildArchiveItems } from "@/shared/lib/archiveItems";
 import { pickLensPostsForHome, trimArchiveItemsForHome } from "@/shared/lib/homeFeedTrim";
-import { fetchFollowingWordTerms } from "@/features/news-feed";
 import { fetchFollowingLetters } from "@/shared/lib/api/todayLettersApi";
 import { fetchHomePlayerPosts, toAudioPreviewSummaries } from "@/shared/lib/api/homePlayerApi";
 import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi";
 import type { ArchiveItem } from "@/shared/lib/archiveItems";
-import type { Term } from "@/features/news-feed";
 import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
 
@@ -24,7 +22,6 @@ const DEFAULT_GROUP = "SF";
 interface HomeContentProps {
   initialWebtoons: CmsWebtoon[];
   initialVideos: CmsVideo[];
-  initialWordTerms: Term[];
   initialLensPosts: CmsLens[];
   initialArchiveItems: ArchiveItem[];
   initialHotLetters: TodayLetterCardLike[];
@@ -35,7 +32,6 @@ interface HomeContentProps {
 function HomeContent({
   initialWebtoons,
   initialVideos,
-  initialWordTerms,
   initialLensPosts,
   initialArchiveItems,
   initialHotLetters,
@@ -47,7 +43,6 @@ function HomeContent({
       selectedGroup={DEFAULT_GROUP}
       initialWebtoons={initialWebtoons}
       initialVideos={initialVideos}
-      initialWordTerms={initialWordTerms}
       initialLensPosts={initialLensPosts}
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
@@ -59,8 +54,7 @@ function HomeContent({
 
 // 서버 컴포넌트로 전환(2026-08-07, 홈 SSG 감사) — 이전엔 페이지 전체가
 // 'use client'라 정적 HTML에 nav/footer(192자)뿐이었다. 홈 피드가 실제로
-// 렌더하는 섹션들(LatestGridSection/WebtoonPreviewSection/VideoPreviewSection/
-// WordsPreviewSection)의 데이터를 미리 가져와 FeedPage → NewsFeedTab →
+// 렌더하는 섹션들(LatestGridSection/WebtoonPreviewSection/VideoPreviewSection)의 데이터를 미리 가져와 FeedPage → NewsFeedTab →
 // 각 섹션까지 initialX prop으로 내려준다. 나머지 섹션(NewsTimeMachineSection
 // 등)은 의도된 mock/placeholder라 그대로 둔다.
 //
@@ -84,7 +78,6 @@ export default async function HomePage() {
   const [
     initialWebtoons,
     initialVideos,
-    initialWordTerms,
     initialLensPosts,
     letters,
     initialHotLetters,
@@ -92,7 +85,6 @@ export default async function HomePage() {
   ] = await Promise.all([
     fetchWebtoons(),
     fetchVideos(),
-    fetchFollowingWordTerms(),
     // 홈은 최신 100건이면 충분하다(히어로 4지면 탭·카테고리 줄·최신 그리드 모두 최신 몇 건만 씀) — 2026-10-03.
     // 예전엔 기본값 1000건을 통째로 받아 홈 HTML에 약 1.8MB(압축 전)로 심었다. 100건은 LensPreviewSection의 클라이언트 조회와 같은 캐시 키(lens:100)다.
     fetchLensPosts(100),
@@ -162,7 +154,6 @@ export default async function HomePage() {
     <HomeContent
       initialWebtoons={webtoonPreviewItems}
       initialVideos={videoPreviewItems}
-      initialWordTerms={initialWordTerms}
       initialLensPosts={lensPreviewPosts}
       initialArchiveItems={initialArchiveItems}
       initialHotLetters={initialHotLetters}
