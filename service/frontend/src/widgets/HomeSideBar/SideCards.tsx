@@ -39,9 +39,8 @@ export function PaperCard() {
 
 export function SajuCard() {
   return (
-    // /saju는 다른 서비스(rewrite로 마운트)라 Next 소프트 내비가 아니라 일반 링크로 가야 한다(헤더의 hardNav 탭과 같은 이유).
-    // eslint-disable-next-line @next/next/no-html-link-for-pages
-    <a href="/saju" data-fx="own" className="sc-card" style={{ background: '#f4faf6' }}>
+    // 사주는 별도 서비스(saju.sedaily.ai)라 외부 링크로만 연결한다(2026-10-05, 이 코드베이스의 사주 코드는 정리).
+    <a href="https://saju.sedaily.ai" data-fx="own" className="sc-card" style={{ background: '#f4faf6' }}>
       <style>{CSS}</style>
       <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', color: '#111827' }}>나의 이상형, 사주로 풀어보면?</p>
       <p style={{ margin: '5px 0 0', fontSize: 13, lineHeight: 1.55, color: '#4b5563', wordBreak: 'keep-all' }}>

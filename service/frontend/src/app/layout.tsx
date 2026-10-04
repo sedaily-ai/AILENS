@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   description: SITE_DESC,
   keywords: [
     "AI LENS", "AI 경제뉴스", "맞춤 경제뉴스", "서울경제", "오늘의 한 통",
-    "이슈 브리핑", "사주", "오늘의 운세", "사주 궁합", "이상형 역산",
+    "이슈 브리핑",
     "경제뉴스", "투자", "증권", "AI 뉴스레터",
   ],
   authors: [{ name: "서울경제신문", url: "https://www.sedaily.com" }],

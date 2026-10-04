@@ -52,6 +52,5 @@
 - [단어장](https://ailens.sedaily.ai/words): 기사에 나온 경제·시사 용어 해설과 퀴즈
 - [타임라인](https://ailens.sedaily.ai/timeline): 날짜별 경제 이슈의 흐름
 - [게임](https://ailens.sedaily.ai/games): 가볍게 즐기는 H5 미니게임
-- [사주](https://ailens.sedaily.ai/saju): 명리학 기반 오늘의 운세·궁합(재미·참고용, 뉴스와 별개인 외부 서비스 마운트)
 - [서비스 소개](https://ailens.sedaily.ai/onboarding): 읽는 방식에 맞는 형식을 고르는 안내
 - [이용약관](https://ailens.sedaily.ai/terms) · [개인정보처리방침](https://ailens.sedaily.ai/privacy)

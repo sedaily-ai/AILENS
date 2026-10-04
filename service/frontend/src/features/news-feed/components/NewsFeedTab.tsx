@@ -132,29 +132,11 @@ export function NewsFeedTab({
         }
       `}</style>
 
-      {/* 우측 사이드바 재도입(2026-08-17) — "우측 사이드 치우시죠"로 뺐던 걸
-          "넓은 화면에서 오른쪽 여백이 아깝다"는 재검토로 다시 붙였다.
-          처음엔 SideRail.tsx 전체(사주 궁합 미니앱 포함) 대신 "요즘 가장
-          많이 읽힌 글"만 뽑았다(사용자 확인: "인기글만") — 사주 위젯이
-          토스 블루라 색 체계와 부딪히고 캐러셀 사주 배너와 겹친다는 이유.
-          그런데 "사주도 넣긴 넣어주세요, 톤앤매너 맞춰주시고 세련되고
-          트렌디하게"라는 재요청으로 사주 궁합도 다시 넣었다 — 다만 토스
-          블루(#3182F6)는 이 서비스의 violet(검색 아이콘·국제 카테고리
-          accent와 같은 "AI" 신호)로 전부 재색칠(SajuMiniRail.tsx). 인기글
-          (HotLettersRail.tsx) + 사주(SajuMiniRail.tsx)를 HomeSideBar.tsx가
-          하나의 sticky 컨테이너로 묶는다.
+      {/* 우측 사이드바(2026-08-17 재도입) — 인기글(HotLettersRail)과 안내 카드(HomeSideBar)를 sticky 컨테이너로 묶는다.
+          이 컴포넌트(features 레이어)는 widgets를 직접 import할 수 없어 렌더된 사이드바를 `sidebar` prop으로 받는다 — 조립은 widgets/FeedPage/FeedPage.tsx가 한다.
           maxWidth를 1000→1320으로 넓히고 CSS Grid 2열(본문 1fr + 사이드바
           280px)로 바꿨다 — lg 미만에서는 사이드바가 아예 안 뜬다(HomeSideBar
           의 className="hidden lg:block").
-          2026-08-23 — 카테고리 아카이브 페이지에도 이 사이드바를 그대로
-          붙이면서 HomeSideBar/HotLettersRail/SajuMiniRail을
-          features/news-feed에서 shared/ui로 승격했다. 2026-08-24 —
-          SajuMiniRail이 entities/saju(도메인 로직)를 참조해 shared→entities
-          역방향 의존이었던 게 boundaries lint로 드러나, HomeSideBar+
-          SajuMiniRail을 widgets/HomeSideBar/로 다시 이전(HotLettersRail은
-          엔티티 결합 없어 shared/ui에 유지). 이 컴포넌트(features 레이어)는
-          widgets를 직접 import할 수 없어 렌더된 사이드바를 `sidebar` prop으로
-          받는 구조로 바꿨다 — 조립은 widgets/FeedPage/FeedPage.tsx가 한다.
           웹툰 섹션은 처음엔 뷰포트 끝까지 번지는 진짜 full-bleed였는데,
           그러려면 그리드 두 칼럼을 가로질러야 했고(gridColumn:'1 / -1') 그
           과정에서 grid-template-rows를 명시 안 해 사이드바의 gridRow:'1/-1'
@@ -195,13 +177,7 @@ export function NewsFeedTab({
               heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} paperDates={paperDates} /> : undefined}
             />
 
-            {/* 홈 히어로 배너(2026-08-06, "신문 읽는 스타일"/웹툰/사주 3슬라이드
-                프로모 캐러셀) — 리디자인(2026-09-30)으로 이 자리로 이동. 원래는
-                헤더 바로 아래, 즉 "오늘의 이슈" 히어로·최신 뉴스 그리드보다도
-                위였다 — 첫 화면에서 실제 제품 가치(오늘의 이슈 4가지 시선)를
-                보여주기 전에 자체 프로모션 배너 3개(신문읽기 이벤트/웹툰
-                파일럿/사주)가 먼저 지나가는 순서였다. (퀴즈 섹션은 2026-10-05 삭제)
-                프로모 캐러셀은 실제 콘텐츠 다음에 둔다. */}
+            {/* 홈 히어로 배너(프로모 캐러셀 2슬라이드) — 첫 화면에서 실제 콘텐츠(오늘의 이슈 4가지 시선)가 먼저 보이도록 콘텐츠 다음에 둔다(2026-09-30). */}
             <HomeHeroCarousel />
 
             {/* 카테고리 섹션(2026-08-17, 본지 en.sedaily.com 스타일 참고 — 사용자

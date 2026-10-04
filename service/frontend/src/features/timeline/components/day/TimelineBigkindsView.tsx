@@ -72,7 +72,6 @@ import {
 } from '@/features/timeline/lib/tone';
 import { InvestmentScenarioCards } from './InvestmentScenarioCards';
 import { ShareBar } from './ShareBar';
-import { SajuFunnelCard } from './SajuFunnelCard';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -430,7 +429,6 @@ export function TimelineBigkindsView({
 
               <ShareBar cardData={shareCardData} />
 
-              <SajuFunnelCard />
 
               <div style={{ textAlign: 'center', marginTop: SPACE.xxl }}>
                 <Link href="/timeline" className="tl-btn tl-focus">

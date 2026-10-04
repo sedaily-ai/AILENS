@@ -9,7 +9,6 @@ import {
   SURFACE, TEXT_STRONG, TEXT_MUTED, BORDER_CONTROL, BORDER_STRONG, FONT, SPACE, TOUCH_MIN, CONTAINER_MAX,
 } from '@/features/timeline/lib/tone';
 import { ArticleList } from './TimelineArticleList';
-import { SajuFunnelCard } from './SajuFunnelCard';
 
 const OTHER_DATE_LINK_STYLE = {
   display: 'inline-block', padding: '10px 22px', borderRadius: 9999, border: `1px solid ${BORDER_CONTROL}`,
@@ -71,7 +70,6 @@ export function TimelineResultView({ date, initialArticles }: { date: string; in
           ) : (
             <>
               <ArticleList items={initialArticles} />
-              <SajuFunnelCard />
               <div style={{ textAlign: 'center', marginTop: 36 }}>
                 <Link href="/timeline" style={OTHER_DATE_LINK_STYLE}>다른 날짜 보기</Link>
               </div>

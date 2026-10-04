@@ -16,7 +16,6 @@ export type HeaderTabKey =
   | 'culture'
   | 'video'
   | 'listen'
-  | 'fortune'
   | 'timeline'
   | 'games'
   | 'webtoon'
@@ -108,16 +107,6 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     // '에디터' 탭 제거(2026-08-06) — extra 티어 강등을 거쳐 최종적으로 뺐다.
     // 이후 MBTI 페르소나 컨셉 전면 삭제 결정으로 /editors 페이지 자체도
     // 제거됨 — TodayLensClient 등의 잔여 링크도 함께 정리했다.
-    // 2026-08-09 — 자체 미니 사주 위젯을 걷어내고 진짜 사주 서비스(AI-saju
-    // 별도 레포, saju.sedaily.ai)를 CloudFront 경로 라우팅(/saju*)으로 마운트.
-    // en.sedaily.com이 /atlas*를 별도 레포로 라우팅하는 것과 같은 패턴 —
-    // 프로덕션은 이 경로가 AILENS Next.js 라우터를 거치지 않고 CDN 단에서
-    // 바로 다른 origin으로 넘어간다(app/fortune 페이지 자체는 더 이상 없음).
-    // 로컬 dev(2026-08-15, saju 완전 분리 이후)에선 SAJU_ORIGIN rewrite로
-    // 같은 걸 흉내내는데, 이건 완전히 다른 Next.js 앱(zone)이라 next/link
-    // 소프트 내비게이션이 안 먹는다(RSC 포맷이 앱마다 달라서) — hardNav로
-    // 일반 <a> 내비게이션을 쓰게 한다.
-    { key: 'fortune', label: '사주', href: '/saju', active: active === 'fortune', tier: 'more', hardNav: true },
     // 2026-08-05 까지 `/timemachine` 을 가리키고 있었다 — `/timeline` 에 들어왔다가
     // 다른 탭에 다녀온 뒤 이 탭을 누르면 구 페이지로 빠지는 문제의 원인.
     // `/timemachine`(유명인·투자 시뮬레이션 4탭) 은 직접 URL 로 남겨둔다.

@@ -46,21 +46,6 @@ const nextConfig: NextConfig = {
     // 이 값과 무관하다(이건 브라우저 세션 내 클라이언트 캐시일 뿐).
     staleTimes: { dynamic: 30, static: 180 },
   },
-  // 사주(saju/frontend)를 완전히 독립된 Next 앱으로 분리(2026-08-15) —
-  // 프로덕션에선 CloudFront가 엣지에서 /saju*를 별도 origin으로 바로
-  // 보낸다(이 서버까지 안 옴, docs/worklog/2026-08/2026-08-09-saju-cdn-mount.md).
-  //
-  // 로컬 dev에서는 rewrites()로 안 보이게 프록시하는 걸 먼저 시도했는데,
-  // AILENS(trailingSlash 기본값 false)와 saju/frontend(trailingSlash:true,
-  // CDN 함수 때문에 필요)가 서로 반대 방향으로 트레일링 슬래시를 추가/제거하려
-  // 들면서 rewrites()로 감싼 응답이 308 무한 루프에 빠졌다(로그로 saju 서버에
-  // 요청 자체가 전혀 안 들어가는 것까지 확인 — 원인이 AILENS 쪽 자체 리다이렉트
-  // 처리였다). 이 Next 버전은 이런 rewrite-to-external-url + trailingSlash
-  // 조합에서 여러 엣지케이스가 있어(admin/frontend/AGENTS.md의 "이 버전은
-  // breaking change가 있다" 경고와 일치) 안 보이는 프록시 대신 아래
-  // redirects()에 합쳐서 명시적 redirect로 처리한다 — 로컬 dev에서만 URL이
-  // localhost:3010으로 실제로 바뀌는 트레이드오프를 감수(개발 환경이라
-  // 문제없음, 프로덕션은 CDN이라 이 규칙 자체가 도달 안 함).
   // 이미지 최적화(2026-10-01, 모바일 성능) — 예전엔 배포가 "macOS에서 standalone 빌드 -> EC2 업로드" 구조라 sharp 바이너리가 플랫폼
   // 불일치로 못 돌아 unoptimized:true였다(2026-08-13). 지금은 Docker(linux/arm64)에서 빌드해 Fargate로 올리므로 sharp가 맞는 바이너리로
   // 설치된다. 이미지 서버(서울경제 wimg, 우리 S3 미디어 버킷, 유튜브 썸네일)가 크기 변환을 지원하지 않아 163x92 썸네일 칸에도
@@ -80,22 +65,17 @@ const nextConfig: NextConfig = {
     // 변환 결과를 하루 캐시 — CloudFront가 /_next/image를 같은 키로 캐시하면 서버는 같은 변환을 반복하지 않는다.
     minimumCacheTTL: 86400,
   },
-  // 사주 기능이 외부 CDN 마운트(/saju*, AI-saju 별도 서비스)로 옮겨간 뒤
-  // (2026-05, 2026-08-09) /fortune·/saju-match는 이 Next.js 앱에 더는 없는
-  // 라우트다 — 옛 링크·북마크로 들어온 사람이 404를 만나던 걸 발견(2026-08-11)
-  // 하고 새 위치로 리다이렉트 추가. /saju* 자체는 CloudFront가 이 앱을
-  // 건너뛰고 외부 origin으로 바로 보내므로, 여기서 만든 리다이렉트 응답도
-  // 브라우저가 다시 /saju로 요청하면 정상적으로 그쪽에서 처리된다.
+  // 사주는 별도 서비스(saju.sedaily.ai)다. 옛 /fortune·/saju-match 링크·북마크는 그쪽으로 보낸다(2026-10-05 이 코드베이스의 사주 코드 정리).
   async redirects() {
     // /lens?page=N, /webtoon?page=N 옛 링크 정리는 여기(has+쿼리) 대신
     // src/middleware.ts에서 한다 — Next의 redirects()+has 조합은 destination
     // 에 캡처값을 써도 원본 쿼리스트링을 지우지 못해 "/lens/page/2?page=2"
     // 처럼 지저분한 URL이 됐다(미들웨어 파일 상단 주석 참조).
     const rules: Array<{ source: string; destination: string; permanent: boolean }> = [
-      { source: "/fortune", destination: "/saju", permanent: true },
-      { source: "/fortune/:path*", destination: "/saju", permanent: true },
-      { source: "/saju-match", destination: "/saju", permanent: true },
-      { source: "/saju-match/:path*", destination: "/saju", permanent: true },
+      { source: "/fortune", destination: "https://saju.sedaily.ai", permanent: true },
+      { source: "/fortune/:path*", destination: "https://saju.sedaily.ai", permanent: true },
+      { source: "/saju-match", destination: "https://saju.sedaily.ai", permanent: true },
+      { source: "/saju-match/:path*", destination: "https://saju.sedaily.ai", permanent: true },
       // 2026-09-29 — "/archive(형식별 진입 디렉토리)도 /lens와 겹치니 지워도
       // 된다, 전부 /lens로 가게 하라"는 요청으로 /archive 자체를 폐기하고
       // 여기로 모이던 리다이렉트를 전부 /lens로 재조준. /archive에 nav
@@ -144,13 +124,6 @@ const nextConfig: NextConfig = {
       // /lens/:slug -> /:slug 는 걷어냈다(2026-10-01) — 두 번 이동(옛 주소 -> 평면 주소 -> 정본)하던 걸 app/(content)/lens/[slug]/page.tsx가
       // 정본 주소로 한 번에(308) 보낸다. 카테고리를 알아야 해서 설정 파일이 아니라 라우트에서 처리한다.
     ];
-    if (process.env.SAJU_ORIGIN) {
-      const origin = process.env.SAJU_ORIGIN;
-      rules.push(
-        { source: "/saju", destination: `${origin}/saju`, permanent: false },
-        { source: "/saju/:path*", destination: `${origin}/saju/:path*`, permanent: false },
-      );
-    }
     return rules;
   },
 };

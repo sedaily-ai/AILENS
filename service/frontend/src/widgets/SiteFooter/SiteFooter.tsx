@@ -248,7 +248,7 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
             AI LENS는 한국언론진흥재단 지원을 받아 개발한 인지양식 유형별 서비스입니다.
           </p>
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
-            본 서비스는 AI가 생성한 콘텐츠를 제공합니다. 명리학과 결합한 사주 섹션은 재미와 참고용입니다.
+            본 서비스는 AI가 생성한 콘텐츠를 제공합니다.
           </p>
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 12 }}>
             © {year} 서울경제신문. All rights reserved.

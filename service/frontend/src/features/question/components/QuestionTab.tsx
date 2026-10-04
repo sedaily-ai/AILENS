@@ -265,55 +265,6 @@ export function QuestionTab({ onSkip }: Props) {
           </Reveal>
         </section>
 
-        {/* ── 오늘의 운세 티저 ── */}
-        <section className="py-12">
-          <Reveal>
-            <p className="text-center text-[11px] font-bold text-gray-400 tracking-[0.12em] uppercase mb-3">
-              Today&apos;s Fortune
-            </p>
-            <h3 className="text-center text-[22px] md:text-[26px] font-black text-gray-900 mb-8 tracking-tight">
-              {EDITOR.name}이(가) 본 오늘의 운세는...
-            </h3>
-          </Reveal>
-          <Reveal delay={100}>
-            {/* /saju는 다른 Next.js 앱(zone)으로 rewrite되는 경로라 일반 <a>로
-                하드 내비게이션(headerTabs.ts 주석 참조) */}
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- 다른 Next 앱(zone)이라 하드 내비게이션 */}
-            <a
-              href="/saju"
-              className="block max-w-[520px] mx-auto group"
-            >
-              <div className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-amber-50 p-6 md:p-7 transition-all hover:shadow-[0_12px_40px_rgba(139,92,246,0.15)] hover:-translate-y-1">
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-white shadow-md flex items-center justify-center">
-                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2z" fill="url(#fortune-grad-home)" />
-                      <defs>
-                        <linearGradient id="fortune-grad-home" x1="0" y1="0" x2="24" y2="24">
-                          <stop offset="0%" stopColor="#8b5cf6" />
-                          <stop offset="100%" stopColor="#f59e0b" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-gray-500 mb-1.5 leading-relaxed">
-                      생년월일만 입력하면 오늘의 사주를<br />
-                      <span className="font-semibold text-gray-800">{EDITOR.name}</span>의 톤으로 풀어드려요
-                    </p>
-                    <span className="inline-flex items-center gap-1 text-[13px] font-bold text-violet-700 group-hover:text-violet-900 transition-colors">
-                      운세 확인하기
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </a>
-          </Reveal>
-        </section>
-
         {/* ── CTA ── */}
         <section className="py-20 flex flex-col items-center">
           <Reveal>
