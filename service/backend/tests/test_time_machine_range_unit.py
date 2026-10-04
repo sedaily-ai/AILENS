@@ -11,7 +11,7 @@ import pytest
 import requests
 
 from handlers import time_machine_handler as tm
-from services import bigkinds_search as bs
+from services.timeline import bigkinds_search as bs
 from utils import date_validation as dv
 
 

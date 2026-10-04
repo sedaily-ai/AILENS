@@ -19,7 +19,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 from clients.ddb.dynamodb import DynamoDBClient
-from services.briefing_generator import BriefingGenerator
+from services.content.briefing_generator import BriefingGenerator
 from config.constants import (
     CORS_HEADERS,
     DYNAMODB_TABLE_ARTICLES_DEV,

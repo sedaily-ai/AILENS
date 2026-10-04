@@ -20,7 +20,7 @@ from botocore.config import Config
 import clients.pg.articles as articles_client
 from config import settings
 from config.constants import BEDROCK_MODEL_ID_HAIKU
-from services.prompt_loader import load_prompt
+from services.content.prompt_loader import load_prompt
 from common.feature_flag import is_enabled
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response

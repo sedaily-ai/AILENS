@@ -29,7 +29,7 @@ if os.environ.get("CMS_DB_BACKEND") == "postgres":
     from clients.pg import cms_posts as posts_client
 else:
     from clients.ddb import cms_posts as posts_client
-from services.cms_posts_shaping import (
+from services.content.cms_posts_shaping import (
     SHAPERS,
     shape_letter,
     shape_lens_summary,

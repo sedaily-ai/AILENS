@@ -19,7 +19,7 @@ import asyncio
 from core.auth import get_authenticated_user_id
 from core.exceptions import AuthenticationError
 from config.constants import CORS_HEADERS
-from services import user_service as svc
+from services.user import profile as svc
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

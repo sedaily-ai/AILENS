@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 from models.personal import ReadingRecord
-from services import user_service as us
+from services.user import profile as us
 from utils.date_validation import KST
 
 

@@ -1,5 +1,5 @@
-"""services.cms_posts_shaping.shape_lens 특성화 테스트 — 리팩토링 전후 응답 모양이 같음을 고정."""
-from services.cms_posts_shaping import DEFAULT_EDITOR, shape_lens
+"""services.content.cms_posts_shaping.shape_lens 특성화 테스트 — 리팩토링 전후 응답 모양이 같음을 고정."""
+from services.content.cms_posts_shaping import DEFAULT_EDITOR, shape_lens
 
 
 def _post(**over):

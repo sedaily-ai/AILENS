@@ -11,7 +11,7 @@ import pytest
 
 from handlers import time_machine_handler as tm
 from handlers import timeline_handler as th
-from services import timeline_service as ts
+from services.timeline import timeline as ts
 from utils import date_validation as dv
 
 

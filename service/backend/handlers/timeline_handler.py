@@ -34,7 +34,7 @@ from typing import Any, Dict
 from config.constants import MAX_PAGE_SIZE
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, no_content_response, success_response
-from services.timeline_service import (
+from services.timeline.timeline import (
     DEFAULT_PAGE_SIZE,
     ALLOWED_MODES,
     TimelineRequest,

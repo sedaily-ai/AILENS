@@ -17,8 +17,8 @@ import json
 from typing import Optional, Dict, Any, List
 
 from config.constants import BEDROCK_MODEL_ID_CHATBOT  # Sonnet 4.6 inference profile (mbti-sonnet-46), single default 챗봇 톤
-from services.chatbot_context_service import search_related_articles
-from services.chatbot_prompt_service import _build_full_system_prompt, _get_tools
+from services.chat.context import search_related_articles
+from services.chat.prompt import _build_full_system_prompt, _get_tools
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def get_bedrock_client():
 
 def _execute_tool(tool_name: str, tool_input: dict) -> str:
     """Execute a single tool and return result as JSON string."""
-    from services.stock_service import lookup_stock, get_market_index
+    from services.market.stock import lookup_stock, get_market_index
 
     if tool_name == "get_stock_price":
         query = tool_input.get("query", "")

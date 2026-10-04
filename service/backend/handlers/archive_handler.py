@@ -23,7 +23,7 @@ from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.auth import get_authenticated_user_id, try_get_authenticated_user_id
 from core.exceptions import AuthenticationError
-from services import archive_service as svc
+from services.user import archive as svc
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

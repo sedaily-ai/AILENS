@@ -6,7 +6,7 @@
 """
 from typing import List, Dict, Any
 
-from services.prompt_loader import load_chatbot_prompt
+from services.content.prompt_loader import load_chatbot_prompt
 
 
 def build_context_prompt(articles: List[Dict[str, Any]]) -> str:

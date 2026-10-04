@@ -12,7 +12,7 @@ import logging
 
 from core.auth import get_authenticated_user_id
 from core.exceptions import AuthenticationError
-from services import community_post_service as svc
+from services.user import community_post as svc
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

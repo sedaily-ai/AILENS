@@ -21,7 +21,7 @@ import json
 from datetime import datetime
 
 from config.constants import CORS_HEADERS
-from services import search_service as svc
+from services.articles import search as svc
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 import boto3
 
 from config.constants import DYNAMODB_TABLE_WS_CONNECTIONS_DEV
-from services.chatbot_engine import generate_chat_response_stream
+from services.chat.engine import generate_chat_response_stream
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

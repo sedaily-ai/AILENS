@@ -17,8 +17,8 @@ from datetime import datetime
 
 from config.constants import CORS_HEADERS
 from common.feature_flag import is_enabled
-from services.chatbot_context_service import get_cached_briefing, get_recent_articles, search_related_articles
-from services.chatbot_engine import generate_chat_response
+from services.chat.context import get_cached_briefing, get_recent_articles, search_related_articles
+from services.chat.engine import generate_chat_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

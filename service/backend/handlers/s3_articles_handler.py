@@ -16,7 +16,7 @@ import logging
 import json
 import asyncio
 
-from services import s3_articles_service as svc
+from services.articles import s3_articles as svc
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

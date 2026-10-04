@@ -13,7 +13,7 @@ article_data 조립)은 services/article_collection_service.py로 뺐다(코드
 import logging
 import asyncio
 
-from services.article_collection_service import collect_articles
+from services.articles.collection import collect_articles
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

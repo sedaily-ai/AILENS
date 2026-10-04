@@ -14,7 +14,7 @@ import logging
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import success_response
-from services.article_service import ArticleHandlerError, get_article_detail, list_articles
+from services.articles.article import ArticleHandlerError, get_article_detail, list_articles
 
 logger = logging.getLogger(__name__)
 
