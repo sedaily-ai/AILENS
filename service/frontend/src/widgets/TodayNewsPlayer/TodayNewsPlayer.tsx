@@ -7,6 +7,7 @@ import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/h
 import { useAuth } from '@/features/auth';
 import { ListeningHeadphoneIllustration } from '@/shared/ui/icons/HandDrawnIcons';
 import { onPlayHomePlayerItemRequest } from '@/shared/lib/audioPlayerBus';
+import { extractYoutubeVideoId, loadYouTubeIframeApi, type YTPlayer } from './youtube';
 
 // 북마크는 로그인한 사람만 쓸 수 있다(2026-08-21, 사용자 요청 — "로그인하면
 // 북마크 가능하게"). 지금은 클라이언트 localStorage에만 저장한다 — 이
@@ -33,69 +34,6 @@ const BOOKMARK_STORAGE_KEY = 'ailens-player-bookmarks';
 // 원리.
 const ACCENT = '#3b82f6';
 const DIRECT_AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i;
-
-function extractYoutubeVideoId(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    if (u.hostname === 'youtu.be') {
-      return u.pathname.slice(1).split('/')[0] || null;
-    }
-    if (!u.hostname.endsWith('youtube.com')) return null;
-    if (u.pathname === '/watch') return u.searchParams.get('v');
-    const m = u.pathname.match(/^\/(embed|shorts)\/([^/]+)/);
-    return m ? m[2] : null;
-  } catch {
-    return null;
-  }
-}
-
-declare global {
-  interface Window {
-    YT?: {
-      Player: new (
-        el: HTMLElement,
-        opts: {
-          videoId: string;
-          playerVars?: Record<string, number>;
-          events?: {
-            onReady?: () => void;
-            onStateChange?: (e: { data: number }) => void;
-          };
-        },
-      ) => YTPlayer;
-      PlayerState: { ENDED: number; PLAYING: number };
-    };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-interface YTPlayer {
-  playVideo(): void;
-  pauseVideo(): void;
-  loadVideoById(videoId: string): void;
-  getCurrentTime(): number;
-  getDuration(): number;
-  destroy(): void;
-}
-
-let youtubeApiPromise: Promise<void> | null = null;
-function loadYouTubeIframeApi(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve();
-  if (window.YT) return Promise.resolve();
-  if (youtubeApiPromise) return youtubeApiPromise;
-  youtubeApiPromise = new Promise((resolve) => {
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      resolve();
-    };
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    document.head.appendChild(script);
-  });
-  return youtubeApiPromise;
-}
 
 export function TodayNewsPlayer() {
   const { isAuthenticated } = useAuth();
