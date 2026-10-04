@@ -2,13 +2,14 @@
 
 import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
 import { HandUnderline } from '@/shared/ui/HandUnderline';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
 import { isDirectAudioUrl } from '@/shared/lib/videoEmbed';
 import { requestPlayHomePlayerItem } from '@/shared/lib/audioPlayerBus';
+import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
 // 카드 4개가 전부 "팟캐스트" 캐릭터 하나만 반복돼 단조로워 보인다는
 // 지적(2026-08-21, "캐릭터들이 다 동일하네? 서로 다르게 해야하지
@@ -31,7 +32,7 @@ interface Props {
 const PREVIEW_COUNT = 5;
 
 export function AudioPreviewSection({ initialItems }: Props) {
-  const [items, setItems] = useState<HomePlayerPost[] | null>(initialItems ?? null);
+  const items = useServerSeededList<HomePlayerPost[], null>(initialItems, null, fetchHomePlayerPosts);
   const [nowId, setNowId] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState({ t: 0, d: 0 });
@@ -54,20 +55,6 @@ export function AudioPreviewSection({ initialItems }: Props) {
       else a.pause();
     } else playItem(it);
   };
-
-  useEffect(() => {
-  // 서버가 이미 최신 4건을 HTML에 심어 보냈으면 브라우저에서 1000건짜리 전체 목록을 다시 받지 않는다(2026-10-03).
-  // 이 섹션은 앞 4건만 그리는데, 마운트 직후 전체 목록(약 350KB)을 받아 같은 내용으로 바꿔 끼우느라 화면이 한 번 더 그려지고 네트워크만 썼다.
-  // 새 글은 발행 때 서버가 캐시를 무효화(revalidate)해 HTML에 반영된다.
-    if (initialItems && initialItems.length > 0) return;
-    let cancelled = false;
-    fetchHomePlayerPosts().then((rows) => {
-      if (!cancelled) setItems(rows);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   if (!items || items.length === 0) return null;
 

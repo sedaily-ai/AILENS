@@ -1,13 +1,14 @@
 'use client';
 
 import { WebtoonSketch } from '@/shared/ui/icons/VideoSketch';
-import { useEffect, useState, type MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { displayHeadline } from '@/shared/lib/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date';
+import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
 // 홈 상단의 슬림 텍스트 배너로는 "실제 콘텐츠"처럼 안 느껴진다는 피드백
 // (2026-08-06) — 4등분 카드 그리드(두꺼운 테두리·하드 섀도·기울기)로 정착.
@@ -89,21 +90,7 @@ interface Props {
 // lensMediaFeed.ts(buildLensWebtoonItems/buildLensVideoItems 둘 다 호출자
 // 0)는 통째로 삭제.
 export function WebtoonPreviewSection({ initialItems }: Props) {
-  const [items, setItems] = useState<CmsWebtoon[] | null>(initialItems ?? null);
-
-  useEffect(() => {
-  // 서버가 이미 최신 4건을 HTML에 심어 보냈으면 브라우저에서 1000건짜리 전체 목록을 다시 받지 않는다(2026-10-03).
-  // 이 섹션은 앞 4건만 그리는데, 마운트 직후 전체 목록(약 350KB)을 받아 같은 내용으로 바꿔 끼우느라 화면이 한 번 더 그려지고 네트워크만 썼다.
-  // 새 글은 발행 때 서버가 캐시를 무효화(revalidate)해 HTML에 반영된다.
-    if (initialItems && initialItems.length > 0) return;
-    let cancelled = false;
-    fetchWebtoons().then((rows) => {
-      if (!cancelled) setItems(rows);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const items = useServerSeededList<CmsWebtoon[], null>(initialItems, null, fetchWebtoons);
 
   if (items === null) return null; // 로딩 중엔 자리 안 차지(스켈레톤 제거 방침과 동일)
 

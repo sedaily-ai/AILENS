@@ -8,6 +8,7 @@ import { resolveVideo } from '@/shared/lib/videoEmbed';
 import { VideoLightbox } from '@/shared/ui/VideoLightbox';
 import { HandUnderline } from '@/shared/ui/HandUnderline';
 import { VideoSketch } from '@/shared/ui/icons/VideoSketch';
+import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
 // 영상 콘텐츠 섹션(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
 // 여기 자동으로 뜬다. "매거진 고급짐" 톤(TrendingEconomySection과 동일 원칙)
@@ -32,7 +33,7 @@ interface Props {
 // 전부 커버된다 — lens에서 파생해서 섞으면 중복 표시된다. 과거 lens 글도
 // 백필 스크립트로 video 채널 글을 만들어뒀다.
 export function VideoPreviewSection({ initialVideos }: Props) {
-  const [videos, setVideos] = useState<CmsVideo[] | null>(initialVideos ?? null);
+  const videos = useServerSeededList<CmsVideo[], null>(initialVideos, null, fetchVideos);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [nav, setNav] = useState({ prev: false, next: false });
@@ -41,20 +42,6 @@ export function VideoPreviewSection({ initialVideos }: Props) {
     if (t) setNav({ prev: t.scrollLeft > 4, next: t.scrollLeft + t.clientWidth < t.scrollWidth - 4 });
   };
   const scrollBy = (dir: 1 | -1) => trackRef.current?.scrollBy({ left: dir * (trackRef.current.clientWidth + 14) * 0.98, behavior: 'smooth' });
-
-  useEffect(() => {
-  // 서버가 이미 최신 4건을 HTML에 심어 보냈으면 브라우저에서 1000건짜리 전체 목록을 다시 받지 않는다(2026-10-03).
-  // 이 섹션은 앞 4건만 그리는데, 마운트 직후 전체 목록(약 350KB)을 받아 같은 내용으로 바꿔 끼우느라 화면이 한 번 더 그려지고 네트워크만 썼다.
-  // 새 글은 발행 때 서버가 캐시를 무효화(revalidate)해 HTML에 반영된다.
-    if (initialVideos && initialVideos.length > 0) return;
-    let cancelled = false;
-    fetchVideos().then((data) => {
-      if (!cancelled) setVideos(data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // 재생을 카드 안(작은 16:9)이 아니라 모달로 키운다(2026-08-20, 사용자
   // 피드백: "여기서 플레이 되면 좀 작아 보이잖아요, 모달로 커지면 안

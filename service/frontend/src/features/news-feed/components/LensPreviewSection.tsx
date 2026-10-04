@@ -11,6 +11,7 @@ import { kstDateTimeLabel } from '@/shared/lib/date';
 import { LENS_ACCENT, pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { lensPath } from '@/shared/lib/lensUrl';
 import dynamic from 'next/dynamic';
+import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
 // 안내 모달은 칩을 눌렀을 때만 필요하다 — 첫 화면 번들에서 빼고(경량화, 2026-10-04) 눌렀을 때 불러온다. 서버 렌더에는 원래 없는 UI(포털)라 ssr: false.
 const LensFormatGuide = dynamic(() => import('./LensFormatGuide').then((m) => m.LensFormatGuide), { ssr: false });
@@ -129,7 +130,8 @@ function paperTitle(iso?: string): string {
 }
 
 export function LensPreviewSection({ initialItems, variant = 'home', paperDates }: { initialItems?: CmsLens[]; variant?: 'home' | 'archive'; /** 홈 헤더 ◀ ▶로 넘길 수 있는 지면 날짜(최신순, 첫 값 = 지금 보여 주는 날). 없으면 화살표를 그리지 않는다. */ paperDates?: string[] }) {
-  const [items, setItems] = useState<CmsLens[] | null>(initialItems ?? null);
+  // 4개 지면 탭(전체·증권·산업·시그널)이 각각 최신 4건씩만 쓴다 — 최신 100건이면 각 지면 8건 이상 확보. 이 섹션은 bullets를 안 읽어 SSR 요약본으로 충분하다.
+  const items = useServerSeededList<CmsLens[], null>(initialItems, null, () => fetchLensPosts(100), (data) => data.length > 0 /* 빈 응답으로 SSR 프리페치 결과를 덮지 않는다 */);
   const [showGuide, setShowGuide] = useState(false);
   const [guideIndex, setGuideIndex] = useState(0);
   function openGuide(i: number) {
@@ -201,21 +203,6 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- days[1]은 서버가 정한 값, loadDay는 매 렌더 새 함수지만 같은 동작
   }, [days[1], variant]);
-
-  useEffect(() => {
-    // 서버가 이미 최신 100건을 HTML에 심어 보냈다 — 같은 100건을 브라우저가 다시 받아(약 300KB) 갈아 끼우지 않는다(2026-10-03).
-    // 이 섹션은 bullets를 읽지 않아 SSR 요약본으로 충분하다. 새 글은 발행 때 서버 캐시 무효화로 HTML에 반영된다.
-    if (initialItems && initialItems.length > 0) return;
-    let cancelled = false;
-    // 4개 지면 탭(전체·증권·산업·시그널)이 각각 최신 4건씩만 쓴다 — 최신 100건이면 각 지면 8건 이상 확보.
-    fetchLensPosts(100).then((data) => {
-      // 빈 응답으로 SSR 프리페치 결과를 덮지 않는다.
-      if (!cancelled && data.length > 0) setItems(data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // 첫 방문 자동 팝업은 2026-09-29 요청으로 껐다(진입 즉시 모달이 뜨는 게
   // 방해된다는 판단) — GUIDE_SEEN_KEY/closeGuide는 그대로 둬서 ⓘ 버튼으로

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchFollowingLetters, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
+import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
 /** 레일에 그리는 한 줄 — 홈·기사 쪽은 TodayLetterCardLike를, 카테고리 페이지는 그 카테고리의 글(ArchiveItem)을 이 모양으로 바꿔 넘긴다. */
 export interface RailItem {
@@ -18,20 +18,7 @@ export interface RailItem {
 const HOT_LETTERS_LIMIT = 10;
 
 export function HotLettersRail({ initialItems, items, heading = '많이 읽은 글', limit = HOT_LETTERS_LIMIT }: { initialItems?: TodayLetterCardLike[]; items?: RailItem[]; heading?: string; limit?: number }) {
-  const [hotLetters, setHotLetters] = useState<TodayLetterCardLike[]>(initialItems ?? []);
-
-  useEffect(() => {
-    // 서버가 준 인기 글 5건이 있으면 브라우저에서 레터 50건(약 270KB)을 다시 받아 같은 순위를 계산하지 않는다(2026-10-03).
-    // 순위는 서버가 발행 때·최대 5분 주기로 갱신한 HTML에 반영된다.
-    if (initialItems && initialItems.length > 0) return;
-    let cancelled = false;
-    fetchFollowingLetters(HOT_LETTERS_LIMIT).then((cards) => {
-      if (!cancelled) setHotLetters(cards);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const hotLetters = useServerSeededList<TodayLetterCardLike[], never[]>(initialItems, [], () => fetchFollowingLetters(HOT_LETTERS_LIMIT));
 
   const rows: RailItem[] =
     items && items.length > 0
