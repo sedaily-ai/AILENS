@@ -45,6 +45,11 @@
 | 95e40f1·fd8684e·dbad66b·3492499 | 백엔드 clients·services·handlers 도메인 폴더화, utils→common | 평평한 직속 파일 43 → 0 |
 | 3625c22·b2ceae7 | 프론트 shared/ui·lib·economy 공통·news-feed·timeline 컴포넌트 폴더화(90개 이동) | 한 폴더 최대 25 → 9개 |
 | d5b07de | 백엔드 tests를 단위·integration·tools로 | 직속 23 → 13 |
+| 8eea4fe | 사주 엔티티·NavProgress·AnnouncementBar·만세력 의존성 삭제 | 미사용 파일 7 → 0 |
+| 2b266e1 | 프론트 호출처 없는 정의 약 800줄 삭제 | knip 미사용 export 72 → 26 |
+| 5aebcfe | 백엔드 호출처 없는 함수·모듈 약 380줄 삭제 | 테스트 이메일 MOCK 포함 |
+| d05b226 | voice 응답 헬퍼 통합 | 중복 2 → 1 |
+| 69d92f2·0c621b9 | 레터·CMS 응답 타입 분리(순환 의존 0, cmsPostsApi 567 → 369줄) | madge 순환 1 → 0 |
 
 ## 4. 검증
 
