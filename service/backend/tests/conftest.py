@@ -29,6 +29,20 @@ def pytest_configure(config) -> None:
     )
 
 
+# 실제 AWS·배포된 API를 호출하는 파일. 파일마다 마커를 붙이는 대신 여기서 한 번에 붙여서
+# `pytest -m "not integration"`만으로 단위 테스트만 안전하게 돌 수 있게 한다.
+_LIVE_TEST_FILES = frozenset({
+    "test_pipeline.py", "test_regression.py", "test_full_integration.py",
+    "test_full_volume.py", "test_performance.py", "test_split_storage.py", "test_new_apis.py",
+})
+
+
+def pytest_collection_modifyitems(items) -> None:
+    for item in items:
+        if item.path.name in _LIVE_TEST_FILES:
+            item.add_marker(pytest.mark.integration)
+
+
 @pytest.fixture(autouse=True)
 def _block_real_ssm(request, monkeypatch):
     """유닛 테스트가 실제 SSM 을 호출하지 못하게 막는다.
