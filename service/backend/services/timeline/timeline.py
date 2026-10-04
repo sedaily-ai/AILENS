@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from clients.s3.xml_articles import S3XMLClient
-from utils.date_validation import today_kst
+from common.dates.validation import today_kst
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

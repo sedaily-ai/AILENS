@@ -61,7 +61,7 @@ pip3 install \
 # Copy source code modules
 # newsletter/ 는 옛 v2 소스 통합분 (2026-08-05) — handlers/subscribe.py 가 사용.
 echo "  -> Copying source code..."
-for dir in clients handlers config core models repositories services utils common newsletter; do
+for dir in clients handlers config core models repositories services common newsletter; do
   if [ -d "$dir" ]; then
     echo "    -> $dir/"
     cp -r "$dir" lambda-build/

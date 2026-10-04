@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Dict, List
 from datetime import datetime
-from utils.date_validation import KST
+from common.dates.validation import KST
 
 import boto3
 from botocore.config import Config

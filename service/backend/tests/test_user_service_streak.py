@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from models.personal import ReadingRecord
 from services.user import profile as us
-from utils.date_validation import KST
+from common.dates.validation import KST
 
 
 def _rec(days_ago: int) -> ReadingRecord:

@@ -17,7 +17,7 @@ from typing import Optional, List
 
 from clients.s3.xml_articles import S3XMLClient
 from config import settings
-from utils.date_utils import get_kst_today
+from common.dates.date_utils import get_kst_today
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

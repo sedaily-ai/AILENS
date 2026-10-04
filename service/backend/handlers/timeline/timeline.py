@@ -40,7 +40,7 @@ from services.timeline.timeline import (
     TimelineRequest,
     build_timeline,
 )
-from utils.date_validation import BadRequest, validate_date
+from common.dates.validation import BadRequest, validate_date
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

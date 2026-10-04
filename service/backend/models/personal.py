@@ -19,7 +19,7 @@ SK patterns:
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 from datetime import datetime
-from utils.date_validation import KST
+from common.dates.validation import KST
 
 
 def _now_kst_iso() -> str:

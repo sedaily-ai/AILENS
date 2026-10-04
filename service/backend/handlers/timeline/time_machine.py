@@ -53,7 +53,7 @@ from config.settings import settings
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, no_content_response, success_response
 from services.timeline import bigkinds_search as bigkinds_search
-from utils.date_validation import DATE_FORMAT, KST, BadRequest, today_kst, validate_date
+from common.dates.validation import DATE_FORMAT, KST, BadRequest, today_kst, validate_date
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

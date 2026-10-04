@@ -12,7 +12,7 @@ import pytest
 from handlers.timeline import time_machine as tm
 from handlers.timeline import timeline as th
 from services.timeline import timeline as ts
-from utils import date_validation as dv
+from common.dates import validation as dv
 
 
 # ── 공용 픽스처 ──────────────────────────────────────────────────────────────

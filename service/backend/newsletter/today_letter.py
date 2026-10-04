@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from utils.date_validation import KST as _KST
+from common.dates.validation import KST as _KST
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)

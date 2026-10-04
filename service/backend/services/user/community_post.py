@@ -20,7 +20,7 @@ import json
 import logging
 from typing import Any
 from datetime import datetime
-from utils.date_validation import KST
+from common.dates.validation import KST
 
 import clients.pg.community as community_client
 

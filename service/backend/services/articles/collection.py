@@ -22,7 +22,7 @@ from typing import Dict, Any
 
 import clients.pg.articles as articles_client
 from clients.s3.xml_articles import S3XMLClient
-from utils.hash_utils import hash_content, content_changed
+from common.hash_utils import hash_content, content_changed
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

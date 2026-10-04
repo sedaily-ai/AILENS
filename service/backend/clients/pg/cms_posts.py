@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 import os
-from utils.date_validation import KST as _KST
+from common.dates.validation import KST as _KST
 from typing import Any, Dict, List, Optional
 
 import pg8000.dbapi

@@ -217,7 +217,7 @@ class DynamoDBClient:
         Returns:
             True if saved successfully, False otherwise
         """
-        from utils.hash_utils import hash_content
+        from common.hash_utils import hash_content
 
         try:
             news_id = article['news_id']

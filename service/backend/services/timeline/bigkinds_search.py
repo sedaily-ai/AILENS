@@ -18,7 +18,7 @@ from typing import Any, Dict, List, NamedTuple, Optional
 import requests
 
 from common.secrets import get_secret
-from utils.date_validation import DATE_FORMAT
+from common.dates.validation import DATE_FORMAT
 
 logger = logging.getLogger(__name__)
 

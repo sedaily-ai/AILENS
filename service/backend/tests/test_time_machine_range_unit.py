@@ -12,7 +12,7 @@ import requests
 
 from handlers.timeline import time_machine as tm
 from services.timeline import bigkinds_search as bs
-from utils import date_validation as dv
+from common.dates import validation as dv
 
 
 class _FakeTable:
