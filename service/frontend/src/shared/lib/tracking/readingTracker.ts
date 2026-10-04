@@ -62,10 +62,10 @@ function getYesterdayDate(): string {
 function calculateStreak(dailyReadings: DailyReading[], today: string): number {
   if (dailyReadings.length === 0) return 0;
 
-  // Sort by date descending
+
   const sorted = [...dailyReadings].sort((a, b) => b.date.localeCompare(a.date));
 
-  // Check if today or yesterday has reading
+
   const hasToday = sorted.some(r => r.date === today);
   const yesterday = getYesterdayDate();
   const hasYesterday = sorted.some(r => r.date === yesterday);
@@ -78,12 +78,12 @@ function calculateStreak(dailyReadings: DailyReading[], today: string): number {
   for (const reading of sorted) {
     if (reading.date === currentDate && reading.count > 0) {
       streak++;
-      // Move to previous day
+
       const date = new Date(currentDate);
       date.setDate(date.getDate() - 1);
       currentDate = date.toISOString().split('T')[0];
     } else if (reading.date < currentDate) {
-      // Gap in dates, streak broken
+
       break;
     }
   }
@@ -111,7 +111,7 @@ export function trackArticleRead(articleId: string): void {
   const data = getStorageData();
   const today = getTodayDate();
 
-  // Find or create today's reading
+
   let todayReading = data.dailyReadings.find(r => r.date === today);
 
   if (!todayReading) {
@@ -119,7 +119,7 @@ export function trackArticleRead(articleId: string): void {
     data.dailyReadings.push(todayReading);
   }
 
-  // Check if already read this article today
+
   if (!todayReading.articleIds.includes(articleId)) {
     todayReading.articleIds.push(articleId);
     todayReading.count++;
@@ -128,25 +128,25 @@ export function trackArticleRead(articleId: string): void {
 
   data.lastReadDate = today;
 
-  // Recalculate streak
+
   data.currentStreak = calculateStreak(data.dailyReadings, today);
   if (data.currentStreak > data.longestStreak) {
     data.longestStreak = data.currentStreak;
   }
 
-  // Calculate this week articles
+
   const weekStart = getWeekStart();
   data.thisWeekArticles = data.dailyReadings
     .filter(r => r.date >= weekStart)
     .reduce((sum, r) => sum + r.count, 0);
 
-  // Calculate this month articles
+
   const monthStart = getMonthStart();
   data.thisMonthArticles = data.dailyReadings
     .filter(r => r.date >= monthStart)
     .reduce((sum, r) => sum + r.count, 0);
 
-  // Keep only last 90 days of data
+
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - 90);
   const cutoff = cutoffDate.toISOString().split('T')[0];

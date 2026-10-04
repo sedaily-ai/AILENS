@@ -1,31 +1,25 @@
 /**
- * `authFetch` — `fetch` wrapper that attaches the Cognito ID token.
+ * `authFetch` — Cognito ID token을 붙여 호출하는 `fetch` wrapper.
  *
- * Until 2026-04 the backend trusted a client-supplied `user_id` field on
- * every authenticated request, allowing trivial impersonation. The fix is
- * two-sided: the backend now verifies a Cognito JWT via
- * `core/auth.py:verify_cognito_token`, and every authenticated request
- * from the frontend goes through this helper so the `Authorization:
- * Bearer <idToken>` header is always present.
+ * 백엔드는 `core/auth.py:verify_cognito_token`으로 Cognito JWT를 검증하므로, 인증이 필요한 모든 프런트엔드 요청은
+ * 이 헬퍼를 거쳐 `Authorization: Bearer <idToken>` 헤더가 항상 붙도록 한다.
  *
- * Usage
- * -----
- *   // Required-auth (default) — throws if not signed in.
+ * 사용 예
+ *   // 인증 필수(기본): 로그인하지 않았으면 throw한다.
  *   const res = await authFetch(`${API_URL}/api/user/profile`, {
  *     method: 'POST',
  *     headers: { 'Content-Type': 'application/json' },
  *     body: JSON.stringify({ ...payload }),
  *   });
  *
- *   // Optional-auth — sends the token if signed in, omits it otherwise.
- *   // Use only on endpoints that personalise-when-authenticated but work
- *   // without an account (e.g. recommended feed, public archive search).
+ *   // 선택 인증: 로그인했으면 토큰을 보내고 아니면 생략한다.
+ *   // 로그인 시 개인화되지만 계정 없이도 동작하는 엔드포인트(추천 피드, 공개 아카이브 검색 등)에만 쓴다.
  *   const res = await authFetch(url, { requireAuth: false });
  */
 import { loadAmplifyAuth } from '@/shared/lib/auth/amplifyLoader';
 
 export interface AuthFetchOptions extends RequestInit {
-  /** When true (default), throws if no valid Cognito session is available. */
+  /** true(기본)이면 유효한 Cognito 세션이 없을 때 throw한다. */
   requireAuth?: boolean;
 }
 
@@ -58,10 +52,7 @@ export async function authFetch(
     throw new NotSignedInError();
   }
 
-  // Carefully merge headers — caller may have passed a Headers, [string, string][],
-  // or Record<string, string>. We always end up with a plain Record so the
-  // Authorization key wins on overlap (caller-supplied Authorization is rare
-  // but easier to overwrite than to special-case).
+  // 호출자가 Headers, [string, string][], Record<string, string> 중 무엇을 넘겨도 평범한 Record로 합쳐, 겹칠 때 Authorization 키가 우선하게 한다.
   const merged = new Headers(headers as HeadersInit | undefined);
   if (idToken) {
     merged.set('Authorization', `Bearer ${idToken}`);

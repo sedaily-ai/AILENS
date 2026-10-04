@@ -4,11 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
 
-// 카테고리 "전체" 첫 화면의 편집형 상단(2026-10-04) — 영문판(en.sedaily.com) 섹션 홈 구조를 그대로 옮겼다:
+// 카테고리 "전체" 첫 화면의 편집형 상단. 영문판(en.sedaily.com) 섹션 홈 구조를 옮겼다:
 //   ① 헤드라인 영역: 왼쪽 큰 제목+요약, 가운데 큰 사진(최신 1건) / 오른쪽 보조 기사 3건(제목+작은 사진)
 //   ② 카드 3건 줄: 사진 3장 가로 카드(제목+요약)
 // 그 아래는 날짜별 목록(ArchiveList). 하위 탭을 고르거나 기간을 걸면 이 영역은 빠지고 목록만 보인다.
-// 영문판의 흑백 에디토리얼 구조에 우리 톤(세리프 굵은 제목, 호버 시 파랑 제목·사진 확대, 눌림)을 입혔다.
+// 영문판의 흑백 에디토리얼 구조에 서비스 톤(세리프 굵은 제목, 호버 시 파랑 제목·사진 확대, 눌림)을 입혔다.
 const CSS = `
   .cl-card { display: block; text-decoration: none; color: inherit; }
   .cl-card [data-cl-title] { transition: color .18s ease; }
@@ -52,8 +52,7 @@ function TimeText({ item, showCategory }: { item: ArchiveItem; showCategory?: bo
 
 const SERIF = '"Noto Serif KR", serif';
 
-/** ① 히어로 — 가장 중요한 1건을 전체 폭으로(2026-10-04 재설계). 보조 기사 3건은 바로 아래 카드 줄로 내려 위계를 "1 > 3 > 목록" 한 방향으로 정리했다
- *  (오른쪽 열이 길어 왼쪽에 빈 공간이 생기던 문제와, 보조 기사가 레일과 같은 크기로 보이던 문제를 함께 없앤다). 모바일에선 사진이 위, 글이 아래. */
+/** ① 히어로: 가장 중요한 1건을 전체 폭으로 둔다. 보조 기사 3건은 바로 아래 카드 줄로 내려 위계를 "1 > 3 > 목록" 한 방향으로 정리한다. 모바일에서는 사진이 위, 글이 아래다. */
 export function CategoryLead({ lead, showCategory }: { lead: ArchiveItem; showCategory?: boolean }) {
   return (
     <section className="cl-lead" aria-label="주요 기사" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>

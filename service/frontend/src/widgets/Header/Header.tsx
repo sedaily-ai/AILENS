@@ -21,16 +21,11 @@ export type HeaderTab = {
   soon?: boolean;
   href?: string;
   onClick?: () => void;
-  // 'extra' — 무게(굵기·크기·색)만 낮춰서 1차 줄에 그대로 노출(카테고리
-  // 6개가 여기 해당, 2026-08-17). 'more' — 웹툰·영상·사주·타임라인·게임처럼
-  // 콘텐츠 브라우징이 아닌 부가 기능들 — 카테고리 6개가 추가되며 1차 줄이
-  // 12개까지 늘어나 잘리는 문제가 생겨(사용자 확인), "더보기" 드롭다운으로
-  // 옮겼다(2026-08-17, 이전엔 'extra'로 인라인 유지 — 뉴닉 참고해 무게만
-  // 낮추는 전략이었는데 카테고리 탭까지 겹치자 더는 안 버텼다). 생략하면
-  // 기본값 'core'.
+  // 'extra': 무게(굵기·크기·색)만 낮춰 1차 줄에 그대로 노출한다.
+  // 'more': 콘텐츠 브라우징이 아닌 부가 기능(타임라인·게임 등)으로, 1차 줄이 넘치지 않도록 "더보기" 드롭다운으로 옮긴다.
+  // 생략하면 'core'.
   tier?: 'core' | 'extra' | 'more';
-  /** true면 next/link 대신 일반 <a> 하드 내비게이션 — 다른 Next.js 앱(zone)으로
-   *  rewrite되는 경로용 (shared/lib/headerTabs.ts의 HeaderTab과 동일 필드). */
+  /** true면 next/link 대신 일반 <a> 하드 내비게이션을 쓴다. 다른 Next.js 앱(zone)으로 rewrite되는 경로용(shared/lib/headerTabs.ts의 HeaderTab과 동일 필드). */
   hardNav?: boolean;
 };
 
@@ -40,28 +35,18 @@ interface HeaderProps {
   logoHref?: string;
   onLogo?: () => void;
   frosted?: boolean;
-  /** 특정 카테고리 안에 들어와 있을 때(2026-10-04, 영문판 "‹ POLITICS" 구조): 메인 카테고리 메뉴 대신 왼쪽 위에 "‹ 카테고리명"(누르면 href로 돌아감), 가운데 로고, 오른쪽 검색·로그인만 보인다. */
+  /** 특정 카테고리 안에 들어와 있을 때: 메인 카테고리 메뉴 대신 왼쪽 위에 "‹ 카테고리명"(누르면 href로 돌아감), 가운데 로고, 오른쪽 검색·로그인만 보인다. */
   section?: { label: string; href: string };
 }
 
-// 폰트 크기(2026-08-06 확대) — 컬리/밑미/밑미도구상점 등 레퍼런스 대비
-// 기존 12~14px가 위축돼 보인다는 지적. 코어 탭은 15~16px대로 키워
-// 존재감을 준다(레퍼런스들도 탭 텍스트가 다 큼직하고 자신감 있음).
-//
-// 회색 알약(bg-gray-100) active 표시 → 밑줄로 교체(2026-08-16, 사용자 확인) —
-// 에디토리얼 매체 레퍼런스 리서치 결과 "배경을 채우기보다 절제된 밑줄이
-// 매거진 무드에 더 맞는다"는 판단. 액센트 컬러는 로고 옆 BETA 배지와 동일한
-// 파랑(#1d4ed8)으로 통일 — 챗봇 아이콘의 보라(violet-500)와 섞이지 않게
-// 탭 액센트는 이 하나로만 쓴다. 밑줄은 TabUnderline이 그린다(group-hover로
-// 슬라이드인).
+// 코어 탭은 15~16px대로 키워 존재감을 준다. active 표시는 배경 대신 밑줄이며, 액센트 컬러는 로고 옆 BETA 배지와 같은 파랑(#1d4ed8)이다
+// (챗봇 아이콘의 보라(violet-500)와 섞이지 않도록 탭 액센트는 이 하나로만 쓴다). 밑줄은 TabUnderline이 그린다(group-hover로 슬라이드인).
 const TAB_ACCENT = '#1d4ed8';
 const TAB_BASE =
   'group relative px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] font-semibold transition-colors duration-200 whitespace-nowrap flex-shrink-0';
 const TAB_ACTIVE = 'text-gray-900';
 const TAB_IDLE = 'text-gray-600 hover:text-gray-900';
-// tier: 'extra' — 코어보다는 작고 옅지만, 이전만큼 위축되진 않게(11px는
-// 레퍼런스 대비 너무 작았다). 뉴닉의 얇은 텍스트 목차 톤 참고(2026-08-06).
-// letter-spacing을 살짝 벌려(0.01em) 빽빽함 완화(2026-08-16).
+// tier 'extra': 코어보다 작고 옅은 텍스트 목차 톤. letter-spacing을 살짝 벌려(0.01em) 빽빽함을 줄인다.
 const TAB_EXTRA_BASE =
   'group relative px-2 lg:px-3 py-2 text-[12.5px] lg:text-[14px] font-normal tracking-[0.01em] transition-colors duration-200 whitespace-nowrap flex-shrink-0';
 const TAB_EXTRA_IDLE = 'text-gray-400 hover:text-gray-600';
@@ -81,13 +66,9 @@ function TabUnderline({ active }: { active?: boolean }) {
   );
 }
 
-// "시선" 전용 손그림 눈 아이콘 — 점 액센트로는 부족하다는 사용자 피드백
-// (2026-08-16)으로 교체. 9개 탭 전부를 아이콘화하는 대신 서비스 핵심
-// 차별화 탭 하나에만 일러스트 포인트를 준다. features/news-feed의
-// HandDrawnIcons(카드 썸네일용, 96x96·디테일 많음)와 같은 스트로크 톤
-// (검정 라인 + accent 포인트, 그라데이션 없음)을 쓰되, 13~15px 텍스트
-// 옆에 인라인으로 들어가는 크기라 디테일을 최소화해 24x24로 새로 그렸다
-// — 그 아이콘들을 그대로 축소하면 이 크기에서 뭉개져 안 읽힌다.
+// "시선" 전용 손그림 눈 아이콘. 서비스 핵심 차별화 탭 하나에만 일러스트 포인트를 준다.
+// features/news-feed의 HandDrawnIcons(카드 썸네일용, 96x96)와 같은 스트로크 톤(검정 라인 + accent 포인트, 그라데이션 없음)을 쓰되,
+// 13~15px 텍스트 옆에 인라인으로 들어가는 크기라 디테일을 최소화해 24x24로 새로 그렸다(축소하면 뭉개진다).
 function LensEyeIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -173,22 +154,13 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
   );
 }
 
-// "더보기" 드롭다운(2026-08-17) — 웹툰/영상/사주/타임라인/게임처럼
-// 콘텐츠 브라우징이 아닌 부가 기능들을 1차 줄에서 걷어내 한 항목으로
-// 묶는다.
+// "더보기" 드롭다운. 콘텐츠 브라우징이 아닌 부가 기능을 1차 줄에서 걷어내 한 항목으로 묶는다.
 //
-// 버그였던 것(2026-08-17, 실사용 확인 — "더보기는 지금 눌러도 안나와요"):
-// position:absolute 드롭다운을 UserMenu.tsx 패턴 그대로 따라 만들었는데,
-// UserMenu는 overflow 없는 컨테이너 안에 있는 반면 이 버튼은
-// `<nav className="... overflow-x-auto ...">`(탭이 넘칠 때 가로 스크롤
-// 되게 하는 컨테이너) 안에 있다 — CSS 스펙상 overflow-x를 visible이
-// 아닌 값으로 주면 overflow-y도 (명시 안 해도) auto로 계산돼, nav가
-// 사실상 양쪽 축 다 스크롤 컨테이너가 된다. 그 안의 absolute 드롭다운은
-// nav의 얕은 높이(56px) 밖으로 나가는 순간 페이지 위에 떠 보이는 대신
-// 그냥 잘려서 안 보인다. 모바일 드로어(MobileDrawer, 바로 아래)가 이미
-// 쓰던 createPortal(document.body로 포털) 패턴을 그대로 가져와 해결 —
-// 포털된 요소는 버튼의 로컬 상대 위치를 못 쓰므로 getBoundingClientRect로
-// 화면 좌표를 직접 계산해 position:fixed로 배치한다.
+// 드롭다운은 `<nav className="... overflow-x-auto ...">`(탭이 넘칠 때 가로 스크롤) 안에 있다.
+// CSS 스펙상 overflow-x가 visible이 아니면 overflow-y도 auto로 계산되어 nav가 양쪽 축 스크롤 컨테이너가 되므로,
+// 그 안의 absolute 드롭다운은 nav 높이(56px) 밖에서 잘려 보이지 않는다.
+// 모바일 드로어(MobileDrawer)와 같은 createPortal(document.body) 패턴을 쓰고,
+// 포털된 요소는 로컬 상대 위치를 쓸 수 없으므로 getBoundingClientRect로 화면 좌표를 계산해 position:fixed로 배치한다.
 function MoreTabsMenu({ tabs }: { tabs: HeaderTab[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -351,11 +323,7 @@ function MobileDrawer({
             </svg>
           </button>
         </div>
-        {/* 로그인 — 데스크톱은 헤더 우측 UserMenu가 상시 보이지만, 모바일은
-            그 자리가 통째로 숨겨져 있어(md:flex) 로그인으로 갈 방법이 "내
-            서랍" 탭 안 CTA뿐이었다(2026-08-24, 사용자 지적). 드로어 최상단에
-            같은 UserMenu를 그대로 재사용 — 로그인 여부에 따른 버튼/드롭다운
-            분기를 새로 만들 필요 없이 기존 컴포넌트 그대로 끌어왔다. */}
+        {/* 로그인. 데스크톱은 헤더 우측 UserMenu가 상시 보이지만 모바일은 그 자리가 숨겨져(md:flex) 있으므로, 드로어 최상단에 같은 UserMenu를 재사용한다. */}
         <div className="px-5 py-3 border-b border-gray-100">
           <UserMenu />
         </div>
@@ -422,7 +390,7 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
         frosted ? 'bg-white/95 backdrop-blur-md' : 'bg-white'
       }`}
     >
-      {/* 카테고리 모드(section)에서는 아래 본문 컨테이너(maxWidth 1320, 좌우 clamp(24px,3.5vw,44px))와 똑같은 폭·여백을 써서, 왼쪽 "‹ 카테고리"의 화살표 끝이 탭 "전체"의 첫 글자와, 오른쪽 끝이 본문 오른쪽 끝과 한 선에 놓이게 한다(2026-10-04). */}
+      {/* 카테고리 모드(section)에서는 아래 본문 컨테이너(maxWidth 1320, 좌우 clamp(24px,3.5vw,44px))와 같은 폭·여백을 써서, 왼쪽 "‹ 카테고리"의 화살표 끝이 탭 "전체"의 첫 글자와, 오른쪽 끝이 본문 오른쪽 끝과 한 선에 놓이게 한다. */}
       <div className={section ? 'mx-auto' : 'max-w-[1200px] mx-auto px-4 sm:px-6'} style={section ? { maxWidth: 1320, padding: '0 clamp(24px, 3.5vw, 44px)' } : undefined}>
         <div className={section ? 'grid grid-cols-[1fr_auto_1fr] items-center h-[56px] gap-3' : 'flex items-center h-[56px] gap-4 md:gap-10'}>
           {section && (
@@ -445,9 +413,7 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
             </Link>
           )}
 
-          {/* 데스크탑 탭 — core/extra 구분선은 뺐다(2026-08-11) — 탭이 8개로
-              늘면서 "|" 하나로는 굳이 안 나눠도 된다는 피드백, 무게(굵기·색)
-              차이만으로 core/extra 구분은 그대로 유지. */}
+          {/* 데스크탑 탭. core/extra 구분은 무게(굵기·색) 차이만으로 한다. */}
           {!section && (
             <nav className="hidden md:flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
               {primaryTabs.map((tab) => (
@@ -458,18 +424,8 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
           )}
 
           <div className={`flex items-center gap-2 flex-shrink-0 ${section ? 'justify-self-end -mr-3' : 'ml-auto'}`}>
-            {/* 검색창처럼 생긴 입력 바(2026-08-06 설계, Notion/Linear류 "Search or
-                ask AI" 패턴)를 아이콘 전용으로 축소(2026-08-17) — 카테고리 탭
-                6개가 늘면서 1차 줄이 좁아져(사용자 확인), 모바일에서 이미 쓰던
-                아이콘 버튼을 데스크탑까지 확장했다. 클릭하면 여전히 같은
-                SmartSearchOverlay가 뜬다 — "펼쳐지는" 지점이 인라인 입력창이
-                아니라 오버레이로 옮겨갔을 뿐, 기능 손실은 없다. title로 용도
-                힌트는 유지. */}
-            {/* 아이콘을 별(AI 신호)에서 돋보기로 교체(2026-08-17, 사용자 피드백
-                — "검색 돋보기가 낫지 않으려나요") — 아이콘만 보고는 별 모양이
-                뭘 누르는 건지 더 헷갈린다는 지적, 돋보기가 훨씬 직관적. 다만
-                이게 실제로는 검색이 아니라 AI 챗봇이라는 신호는 violet 색으로만
-                남긴다. */}
+            {/* 아이콘 전용 검색 버튼. 클릭하면 SmartSearchOverlay가 뜬다. title로 용도 힌트를 준다. */}
+            {/* 돋보기 아이콘이 직관적이며, 실제로는 검색이 아니라 AI 챗봇이라는 신호는 violet 색으로만 남긴다. */}
             <button
               onClick={onSearch}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
@@ -481,10 +437,7 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
                 <path strokeLinecap="round" d="M21 21l-4.3-4.3" />
               </svg>
             </button>
-            {/* '둘러보기'(서비스 소개) 상시 링크 제거(2026-08-06) — 레퍼런스 7곳
-                (컬리/밑미/밑미도구상점/29CM/올리브영 등) 중 "우리 서비스 소개"를
-                상시 헤더에 두는 곳이 하나도 없었다. 이미 쓰고 있는 사용자에겐
-                군더더기 — /onboarding 랜딩 자체는 남기고 외부 유입 경로로만 쓴다. */}
+            {/* '둘러보기'(서비스 소개) 상시 링크는 두지 않는다. /onboarding 랜딩은 외부 유입 경로로만 쓴다. */}
             {/* 로그인 / 사용자 메뉴 — 미로그인 시 '로그인' 버튼, 로그인 시 드롭다운 */}
             <div className="hidden md:flex items-center">
               <UserMenu />

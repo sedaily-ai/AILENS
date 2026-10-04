@@ -6,7 +6,7 @@ import { clock, spoken, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/li
 import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/media/useMediaPlayerControls';
 
 /**
- * 기사 안에 박아 쓰는 영상 플레이어 — 2026-08-21 신설, 2026-10-03 "극장" 콘셉트로 재설계.
+ * 기사 안에 인라인으로 박히는 영상 플레이어("극장" 콘셉트).
  *
  * 집중이 목적이다. 카드·배지·그라디언트·발광을 걷어내고, 영상 프레임만 무대로 둔다.
  *  - 컨트롤은 프레임 위 하단 막대로 얹고, 재생 중 2.6초 동안 입력이 없으면 숨는다(얇은 진행선만 남는다).
@@ -42,12 +42,12 @@ export function ArticleVideoPlayer({
   byline?: string | null;
   bylineHref?: string | null;
   onDuration?: (sec: number) => void;
-  /** 대본 문단(2026-10-03 팟캐스트 대본과 같은 디자인). 문단별 실제 시각이 없어 글자 수 비율로 어림해 따라간다. */
+  /** 대본 문단(팟캐스트 대본과 같은 디자인). 문단별 실제 시각이 없어 글자 수 비율로 어림해 따라간다. */
   chapters?: { text: string }[];
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [ratio, setRatio] = useState(16 / 9); // 영상 실제 가로/세로 비율 — 세로(9:16) 영상은 가운데에 좁게 세운다(2026-10-03)
+  const [ratio, setRatio] = useState(16 / 9); // 영상 실제 가로/세로 비율 — 세로(9:16) 영상은 가운데에 좁게 세운다
   const [buffered, setBuffered] = useState(0);
   const [looping, setLooping] = useState(false);
   const [muted, setMuted] = useState(false);

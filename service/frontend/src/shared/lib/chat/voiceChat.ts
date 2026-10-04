@@ -1,28 +1,17 @@
 /**
  * 챗봇 음성 통화 클라이언트.
  *
- * 1) STT — 브라우저 Web Speech API (webkitSpeechRecognition / SpeechRecognition)
- *    한국어 ko-KR, 실시간 partial transcript 지원, 브라우저 무료.
- *    Safari 일부 미지원 → 환경 체크 후 fallback 메시지.
- *    (백엔드 Transcribe Streaming presign 도 준비돼 있어 추후 업그레이드 가능)
- *
- * 2) TTS — 백엔드 POST /api/voice/tts (Polly, 단일 기본 voice).
- *    응답 base64 mp3 → Blob → HTMLAudioElement 재생.
- *    단일 명의(AI LENS) 체계(2026-08-07) 이후로는 페르소나별 voice 분기가 없다 —
- *    백엔드가 항상 DEFAULT_CHAT_VOICE 하나로 합성한다
- *    (service/backend/handlers/voice/tts.py 참조).
- *
- * 3) 핸즈프리 — onresult 의 final 결과를 받자마자 자동 send + onaudioend 시
- *    다시 recognition 시작. 사용자가 종료 누르기 전까지 자동 루프.
+ * 1) STT: 브라우저 Web Speech API(webkitSpeechRecognition / SpeechRecognition), 한국어 ko-KR, 실시간 partial transcript 지원.
+ *    Safari 일부 미지원이므로 환경 체크 후 fallback 메시지를 보낸다.
+ * 2) TTS: 백엔드 POST /api/voice/tts(Polly, 단일 기본 voice). 응답 base64 mp3 → Blob → HTMLAudioElement로 재생한다.
+ *    백엔드는 항상 DEFAULT_CHAT_VOICE 하나로 합성한다(service/backend/handlers/voice/tts.py 참조).
+ * 3) 핸즈프리: onresult의 final 결과를 받자마자 자동 send하고 onaudioend 시 recognition을 다시 시작한다. 사용자가 종료할 때까지 반복한다.
  */
 import { API_URL } from '@/shared/config/apiClient';
 import { TranscribeStreamRecognizer } from '@/shared/lib/chat/transcribeStream';
 
-// Web Speech API — webkit prefix 호환을 위해 동적으로 가져옴. TS DOM lib에
-// SpeechRecognition 타입이 있지만 webkit prefix는 없다 — 2026-09-04
-// 리팩토링 감사로 `any`(CLAUDE.md 금지 항목) 대신 실제로 접근하는
-// 프로퍼티/메서드만 담은 최소 인터페이스로 교체(unknown+타입가드보다,
-// 이 API 자체는 형태를 이미 알고 있으니 이쪽이 더 정확하다).
+// Web Speech API는 webkit prefix 호환을 위해 동적으로 가져온다. TS DOM lib에는 SpeechRecognition 타입은 있지만 webkit prefix는 없으므로,
+// `any` 대신 실제로 접근하는 프로퍼티/메서드만 담은 최소 인터페이스를 쓴다.
 interface MinimalSpeechRecognition {
   lang: string;
   continuous: boolean;
@@ -120,14 +109,12 @@ class VoiceRecognizer {
 }
 
 /**
- * STT 환경별 최적 recognizer 인스턴스 반환.
+ * STT 환경별 최적 recognizer 인스턴스를 반환한다.
  *
- * - default: AWS Transcribe Streaming (한국어 정확도 + iOS Safari 지원 + 페르소나
- *   이름·경제 용어 custom vocab 향후 적용 여지)
- * - Web Speech API fallback: 사용 안 함 (Transcribe 가 모든 환경 커버).
- *   localStorage 'stt-prefer-webspeech=1' 설정 시 강제 Web Speech (디버그용).
+ * - 기본: AWS Transcribe Streaming(한국어 정확도, iOS Safari 지원, custom vocab 적용 여지).
+ * - Web Speech API는 쓰지 않는다. localStorage 'stt-prefer-webspeech=1'이면 강제로 쓴다(디버그용).
  *
- * 같은 콜백 인터페이스 (onPartial / onFinal / onError / onEnd) — 호출부 코드 변경 X.
+ * 콜백 인터페이스(onPartial / onFinal / onError / onEnd)는 동일하다.
  */
 export function createRecognizer(opts: VoiceRecognizerOptions): {
   start: () => void | Promise<void>;
@@ -161,9 +148,7 @@ export async function synthesizeSpeech(text: string): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
-/**
- * TTS 전에 텍스트 정제 — Polly 가 어색하게 읽는 부호·이모티콘·마크다운 제거.
- */
+/** TTS 전에 텍스트를 정제한다. Polly가 어색하게 읽는 부호·이모티콘·마크다운을 제거한다. */
 export function sanitizeForTTS(text: string): string {
   return text
     // 이모티콘 (:-) :( :D ;P 등
@@ -188,16 +173,13 @@ export function sanitizeForTTS(text: string): string {
 const SENTENCE_BOUNDARY = /([\s\S]*?[.?!。？！\n])([\s\S]*)$/;
 
 /**
- * 스트리밍 chunk 를 sentence 경계 기준으로 잘라 콜백.
+ * 스트리밍 chunk를 sentence 경계 기준으로 잘라 콜백한다.
  *
- * firstMinChars (기본 25): 첫 phrase 가 이만큼 쌓이면 즉시 flush → 첫 audio
- *   까지 latency 최소화 (사용자가 텍스트 흐름 동시에 음성 시작 들음).
- * restMinChars (기본 60): 이후 phrase 들은 한 호흡으로 묶어 자연 inflection.
+ * firstMinChars(기본 25): 첫 phrase가 이만큼 쌓이면 즉시 flush해 첫 audio까지의 latency를 줄인다.
+ * restMinChars(기본 60): 이후 phrase는 한 호흡으로 묶어 자연스러운 inflection을 유지한다.
+ * 짧은 답(1~2문장)이면 첫 phrase가 보통 전체가 된다.
  *
- * 짧은 답 (1~2문장 60~140자) 이면 보통 첫 phrase 가 전체. 첫 호흡 빠르게 = 진짜
- * streaming 체감. 긴 답이면 첫 호흡만 빠르게 + 나머지는 자연 호흡.
- *
- * end() 로 남은 buf 강제 flush.
+ * end()로 남은 buf를 강제 flush한다.
  */
 export function makeSentenceFlusher(
   onSentence: (s: string) => void,
@@ -206,13 +188,11 @@ export function makeSentenceFlusher(
   push: (chunk: string) => void;
   end: () => void;
 } {
-  // 첫 phrase = 12자 이상 + sentence 경계. 짧은 답 (한 통화 turn 50~120자) 에서는
-  // 첫 호흡이 거의 전체 답이 되므로, 더 빠르게 flush 해야 음성 latency 최소.
+  // 첫 phrase는 12자 이상 + sentence 경계. 짧은 답에서는 첫 호흡이 거의 전체 답이 되므로 빠르게 flush해 음성 latency를 줄인다.
   const firstMin = opts.firstMinChars ?? 12;
   const restMin = opts.restMinChars ?? 40;
-  // 첫 phrase soft timeout — LLM 이 sentence 경계 못 만들고 첫 chunk 부터 길게
-  // 흘리는 경우 (마침표 없이 ~40자 누적 등), 이 ms 안에 sentence boundary 못 만나도
-  // 첫 chunk 강제 flush. 음성 출력 latency 보장.
+  // 첫 phrase soft timeout: LLM이 sentence 경계 없이 길게 흘리는 경우(마침표 없이 ~40자 누적 등)에도
+  // 이 ms 안에 경계를 못 만나면 첫 chunk를 강제 flush해 음성 출력 latency를 보장한다.
   const firstSoftMs = opts.firstSoftMs ?? 800;
   let buf = '';
   let isFirst = true;
@@ -271,8 +251,7 @@ export function makeSentenceFlusher(
   };
 }
 
-// 현재 재생 중인 voice audio 추적 — 외부에서 stopVoiceAudio() 로 즉시 중단.
-// 오버레이 close / 모드 전환 시 음성이 계속 들리는 문제 방지.
+// 현재 재생 중인 voice audio를 추적해 외부에서 stopVoiceAudio()로 즉시 중단할 수 있게 한다(오버레이 close / 모드 전환 시 음성이 계속 들리는 문제 방지).
 let _currentVoiceAudio: HTMLAudioElement | null = null;
 let _currentVoiceUrl: string | null = null;
 

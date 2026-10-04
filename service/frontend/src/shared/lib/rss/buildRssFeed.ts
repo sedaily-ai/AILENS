@@ -6,28 +6,17 @@ import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import type { EconCategoryConfig } from '@/shared/constants/econCategories';
 import { SITE_URL as BASE } from '@/shared/constants/site';
 
-// AI LENS RSS 2.0 피드 — 전체 피드(/rss.xml)와 카테고리별 피드
-// (/{slug}/rss.xml)가 이 빌더 하나를 공유한다(2026-10-01 분리).
+// AI LENS RSS 2.0 피드. 전체 피드(/rss.xml)와 카테고리별 피드(/{slug}/rss.xml)가 이 빌더 하나를 공유한다.
+// 뉴스 애그리게이터·피드 리더가 sitemap 외에 RSS로도 신규 콘텐츠를 빠르게 발견하게 하며(en.sedaily.com/rss/newsall 패턴 참고),
+// 요청마다 동적 생성하므로 admin 발행이 재빌드 없이 반영된다.
 //
-// 배경: en.sedaily.com/rss/newsall 패턴 참고(2026-08-07). 뉴스 애그리게이터·
-// 피드 리더가 sitemap 외에 RSS로도 신규 콘텐츠를 빠르게 발견할 수 있게
-// 한다. SSR(2026-08-08)로 요청마다 동적 생성 — admin 발행이 재빌드 없이
-// 바로 반영된다.
-//
-// 2026-10-01 1차(사용자 요청 "AI나 구글 엔진이 선호하는 rss 형식"):
-//  1. pubDate를 날짜 자정 고정에서 published_at(초 단위)으로 — 같은 날
-//     발행된 글이 전부 같은 타임스탬프라 신선도 신호·정렬이 무의미했다.
-//  2. content:encoded로 "30초 핵심"까지 풍부한 본문 — 전체 4포맷 본문은
-//     아니다(피드 용량, cmsPostsApi.ts의 2MB 캐시 한도 사례 참조).
-//  3. category·대표 이미지(media RSS) 추가.
-// 2026-10-01 2차:
-//  4. description을 30초 핵심 앞 두 항목으로 — 기존엔 context(수십 자,
-//     예: "영업이익률 年 20~30% 수준")라 스니펫이 무슨 기사인지 못 알렸다.
-//  5. lastBuildDate를 요청 시각이 아니라 가장 최신 글의 발행 시각으로 —
-//     요청 시각이면 피드가 매번 "방금 갱신"으로 보여 신선도 신호가 거짓이 된다.
-//  6. content:encoded 하단에 4가지 시선 페이지·원문 기사 링크 — 인용·역링크용.
-//  7. 채널 메타(image·ttl)와 카테고리별 피드.
-// (WebSub 허브 알림은 외부 호출이 필요해 이번 범위에서 제외.)
+// - pubDate는 날짜 자정 고정이 아니라 published_at(초 단위)이다(같은 날 글이 같은 타임스탬프면 신선도 신호·정렬이 무의미하다).
+// - content:encoded는 "30초 핵심"까지 담고 전체 4포맷 본문은 싣지 않는다(피드 용량, cmsPostsApi.ts의 2MB 캐시 한도 참조).
+// - description은 30초 핵심 앞 두 항목이다(context는 수십 자라 스니펫이 기사 내용을 알리지 못한다).
+// - lastBuildDate는 요청 시각이 아니라 가장 최신 글의 발행 시각이다(요청 시각이면 신선도 신호가 거짓이 된다).
+// - content:encoded 하단에 4가지 시선 페이지·원문 기사 링크를 넣어 인용·역링크에 쓴다.
+// - category·대표 이미지(media RSS)와 채널 메타(image·ttl)를 포함한다.
+// WebSub 허브 알림은 외부 호출이 필요해 범위 밖이다.
 
 const FEED_LIMIT = 30;
 
@@ -83,11 +72,8 @@ export async function buildRssResponse(category?: EconCategoryConfig): Promise<R
     fetchLensPosts(),
   ]);
 
-  // v1.32 — channel=letters 조회는 admin_channel='letters'뿐 아니라 letter
-  // 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을 같이 돌려준다
-  // (cms_posts_repo.py — video/webtoon과 같은 설계). 걸러내지 않으면 같은
-  // 글이 "제목"(레터 단독)과 "제목 — 4가지 시선"(lens) 두 항목으로 같이
-  // 실린다 — lens 쪽만 남긴다.
+  // channel=letters 조회는 letter 포맷 rendition이 있는 모든 글(거의 모든 lens 글)을 같이 돌려준다(cms_posts_repo.py, video/webtoon과 같은 설계).
+  // 걸러내지 않으면 같은 글이 레터 단독 항목과 lens 항목으로 중복 실리므로 lens 쪽만 남긴다.
   const lensIds = new Set(lensPosts.map((l) => l.id));
   const dedupedLetters = letters.filter((l) => !lensIds.has(l.id));
 
@@ -139,7 +125,7 @@ export async function buildRssResponse(category?: EconCategoryConfig): Promise<R
         : '') +
       linksHtml(url, l.source_url);
     return {
-      title: seoHeadline(l.headline), // 접두사·이모지·접미사 제거(2026-10-04)
+      title: seoHeadline(l.headline), // 접두사·이모지·접미사 제거
       url,
       date: l.published_at ?? l.date,
       description,

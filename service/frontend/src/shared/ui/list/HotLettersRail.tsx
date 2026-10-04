@@ -26,8 +26,8 @@ export function HotLettersRail({ initialItems, items, heading = '많이 읽은 �
       : hotLetters.filter((l) => l.category).map((l) => ({ key: l.letterId, href: l.href, title: l.title, thumb: l.thumbnailUrl ?? l.editorAvatar, label: l.category ?? '' }));
   if (rows.length === 0) return null;
 
-  // 사이드바 개편(2026-10-04) — 영문판(en.sedaily.com) "{분류} Most Read"를 그대로 따른다: 굵은 제목, 항목마다 굵은 제목(최대 3줄)+아래 작은 분류 라벨,
-  // 오른쪽에 작은 사진과 모서리 번호 배지, 항목 사이 얇은 선. 10건. 마우스를 올리면 제목이 파랗게, 사진이 살짝 커진다.
+  // 영문판(en.sedaily.com) "{분류} Most Read" 구조를 따른다: 굵은 제목, 항목마다 굵은 제목(최대 3줄)+아래 작은 분류 라벨, 오른쪽에 작은 사진과 모서리 번호 배지, 항목 사이 얇은 선.
+  // 10건. 마우스를 올리면 제목이 파랗게, 사진이 살짝 커진다.
   return (
     <section>
       <style>{`

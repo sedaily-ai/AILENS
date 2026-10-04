@@ -1,25 +1,7 @@
-// H5 게임 목록 **단일 출처**.
-//
-// 2026-08-21: /games(GamesClient.tsx)와 홈 미리보기(GamesPreviewSection.tsx)가
-// 같은 목록을 쓰게 여기로 뽑았다.
-//
-// 2026-08-25: `src`(플레이 진입 HTML)를 여기로 합쳤다. 그전까지 목록이 두 벌
-// 이었다 — 이 파일(카드 표시용)과 `app/(content)/games/play/[slug]/page.tsx`가
-// `export const GAMES` 로 들고 있던 것(라우트용). 후자가 **프로덕션 빌드를
-// 막고 있었다**: Next.js 는 page 모듈이 정해진 이름(default·metadata·
-// generateMetadata·generateStaticParams·revalidate 등)만 export 하도록 강제하는데
-// 임의 이름인 `GAMES` 가 섞여 타입 검사가 이 오류로 실패했다.
-//
-//   Type '...' does not satisfy the constraint '{ [x: string]: never; }'
-//   Property 'GAMES' is incompatible with index signature.
-//
-// 부수적으로 `sitemap.ts`·`games/page.tsx` 가 그 page 모듈에서 import 하고
-// 있었는데, 이건 app → app 참조라 FSD boundaries 규칙 위반이기도 했다
-// (eslint.config.mjs 의 app 은 pages/widgets/features/entities/shared 만 허용).
-//
-// **새 게임을 추가하려면 아래 배열에만 항목을 더한다.** 카드 4곳(/games, 홈
-// 미리보기), 라우트(generateStaticParams·메타데이터·JSON-LD), sitemap 이 전부
-// 이 배열에서 파생된다.
+// H5 게임 목록 단일 출처. /games(GamesClient.tsx)와 홈 미리보기(GamesPreviewSection.tsx)가 같은 목록을 쓰며, `src`(플레이 진입 HTML)도 여기에 둔다.
+// page 모듈(`app/(content)/games/play/[slug]/page.tsx`)에서 임의 이름(`GAMES`)을 export하면 Next.js가 허용하지 않아 프로덕션 빌드 타입 검사가 실패하고,
+// sitemap.ts·games/page.tsx가 그 page 모듈을 import하는 것은 app → app 참조라 FSD boundaries 규칙(eslint.config.mjs) 위반이기도 하다.
+// 새 게임을 추가하려면 아래 배열에만 항목을 더한다. 카드(/games, 홈 미리보기), 라우트(generateStaticParams·메타데이터·JSON-LD), sitemap이 모두 이 배열에서 파생된다.
 export interface Game {
   slug: string;
   title: string;

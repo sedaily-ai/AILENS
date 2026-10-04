@@ -10,15 +10,9 @@ import {
   InstagramIcon,
 } from '@/shared/ui/icons/SocialShareIcons';
 
-// 기사 공유 버튼 행 — lens/[slug]/LensViewClient.tsx의 원본을
-// letters/[id]/LetterDetailClient.tsx가 로컬 복제해 쓰던 걸 하나로
-// 합쳤다(2026-08-18). 원래 로직·색·간격은 그대로, import 경로만 shared로.
-//
-// 카카오톡·인스타그램은 SDK/API가 없어 링크 복사로 대체한다(카카오는 JS
-// SDK+앱 키 등록이 필요한데 레포에 없고, 인스타그램은 데스크톱 웹에 임의
-// 링크를 피드/스토리로 보내는 공식 API 자체가 없다 — 앱 인텐트만 가능).
-// features/timeline/components/ShareBar.tsx가 이미 같은 결론을 낸 선례를
-// 따른다.
+// 기사 공유 버튼 행. lens/[slug]/LensViewClient.tsx와 letters/[id]/LetterDetailClient.tsx가 공유한다.
+// 카카오톡·인스타그램은 SDK/API가 없어 링크 복사로 대체한다(카카오는 JS SDK+앱 키 등록이 필요한데 레포에 없고,
+// 인스타그램은 데스크톱 웹에서 임의 링크를 피드/스토리로 보내는 공식 API가 없다). features/timeline/components/ShareBar.tsx와 같은 결론이다.
 export function ArticleShareButtons({ title, url }: { title: string; url: string }) {
   const [copied, setCopied] = useState(false);
   const [kakaoCopied, setKakaoCopied] = useState(false);

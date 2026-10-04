@@ -1,5 +1,4 @@
-// GA4 커스텀 이벤트 전송 — layout.tsx 에서 로드한 gtag.js 가 window.gtag 를 주입.
-// 포팅한 ideal-match / couple-match 컴포넌트가 이 함수를 호출.
+// GA4 커스텀 이벤트 전송. layout.tsx에서 로드한 gtag.js가 window.gtag를 주입한다.
 
 declare global {
   interface Window {
@@ -9,8 +8,8 @@ declare global {
   }
 }
 
-// Clarity 연동(2026-10-03) — GA4로 보내는 이벤트를 Clarity에도 반영해 "이 사용자의 세션 녹화"를 바로 찾게 한다.
-// 이벤트는 목표 행동만(Clarity 이벤트 이름 수가 많아지면 필터가 지저분해진다), 태그는 비교 축(웹툰 방식·카테고리·형식)만 올린다.
+// Clarity 연동: GA4로 보내는 이벤트를 Clarity에도 반영해 "이 사용자의 세션 녹화"를 바로 찾게 한다.
+// 이벤트는 목표 행동만 보내고(이벤트 이름 수가 많아지면 필터가 지저분해진다), 태그는 비교 축(웹툰 방식·카테고리·형식)만 올린다.
 const CLARITY_EVENTS = new Set(['webtoon_complete', 'webtoon_cta_click', 'newsletter_subscribe', 'letter_complete', 'format_switch']);
 const CLARITY_TAG_KEYS = ['variant', 'category', 'to_format', 'format'] as const;
 

@@ -1,24 +1,17 @@
 'use client';
 
 /**
- * 공통 — 뉴스레터 구독 입력 (이메일 + 동의 + 버튼).
+ * 공통 뉴스레터 구독 입력(이메일 + 동의 + 버튼).
  *
- * 단일 명의(AI LENS) 체계(2026-08-07) 이후 구독은 그룹 무관 — 이메일 하나당
- * 구독 신청 1회, 백엔드도 mbti_group 을 더 이상 받지 않는다.
- *
- * 2026-09-04 — `/api/newsletter/subscribe`(handlers/newsletter/subscribe.py)
- * 대신 `/api/v2/subscribe`(handlers/subscribe.py)를 호출한다 — 리팩토링
- * 감사로 두 엔드포인트가 같은 테이블에 독립적으로 upsert하던 중복 구현임이
- * 드러나 하나로 통합했다(subscribe.py가 정본 — unsubscribe 엔드포인트가
- * 있고 공용 이메일 렌더링을 재사용함). format/interests/letter 페이로드는
- * 그쪽으로 이식됐다.
+ * 구독은 그룹과 무관하게 이메일 하나당 신청 1회이며 백엔드도 mbti_group을 받지 않는다.
+ * `/api/v2/subscribe`(handlers/subscribe.py)를 호출한다(unsubscribe 엔드포인트가 있고 공용 이메일 렌더링을 재사용하는 정본).
+ * format/interests/letter 페이로드도 이쪽으로 전달한다.
  */
 import { useEffect, useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { API_URL as API_BASE } from '@/shared/config/apiClient';
 
-// 구독 즉시 최신 letter 한 통을 메일로 함께 발송하고 싶을 때 호출자가 넘긴다.
-// 백엔드가 letter.headline 있으면 발송.
+// 구독 즉시 최신 letter 한 통을 메일로 함께 발송하려면 호출자가 넘긴다. 백엔드는 letter.headline이 있으면 발송한다.
 export interface SubscribeLetterPayload {
   editor_name: string;
   editor_role: string;
@@ -32,9 +25,7 @@ export interface SubscribeLetterPayload {
 
 interface Props {
   letter?: SubscribeLetterPayload | null;
-  /** 온보딩(/start)에서 고른 포맷/관심분야 — 있으면 구독과 함께 저장된다
-   *  (service/backend/handlers/subscribe.py). 발행 로직엔 아직 반영 안 됨
-   *  — 기록만. */
+  /** 온보딩(/start)에서 고른 포맷/관심분야. 있으면 구독과 함께 저장된다(service/backend/handlers/subscribe.py). 발행 로직에는 아직 반영되지 않고 기록만 한다. */
   format?: string;
   interests?: string[];
   accent?: string;

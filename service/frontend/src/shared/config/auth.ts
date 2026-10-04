@@ -20,6 +20,4 @@ export const authConfig = {
   },
 };
 
-// Get current redirect URL based on environment.
-// mbti.sedaily.ai 도메인 폐기(2026-08-08, ailens.sedaily.ai로 통합) — CloudFront
-// alias·Route53 레코드 삭제 완료, 여기 남아있던 참조도 함께 제거.
+// 환경에 따른 현재 redirect URL을 돌려준다.

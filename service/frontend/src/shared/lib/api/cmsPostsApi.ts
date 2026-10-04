@@ -9,16 +9,8 @@
  */
 import { CMS_API_URL } from '@/shared/config/apiClient';
 import type { CmsChannel, CmsLetter, CmsWebtoon, CmsVideo, CmsLens } from "./cmsPostTypes";
-// 진행 중 요청 묶기(in-flight coalescing) — 홈 화면 섹션 다수(트렌드/칼럼/
-// 단어퀴즈/미니헤드라인 등)가 같은 파라미터로 fetchCmsPosts/fetchTrendCards
-// 를 각자 따로 불러서, 동일한 응답을 기다리는 중복 요청이 여러 개 동시에
-// 나가고 있었다(2026-08-07, "섹션들이 한번에 안 뜨고 딜레이 있다" 피드백).
-// **시간 기반 캐시가 아니다** — 요청이 "진행 중"인 동안만 같은 Promise 를
-// 공유하고, 응답이 오는 즉시 캐시에서 지운다. 그 다음 호출은 무조건 새
-// 네트워크 요청이라 admin 발행/수정/삭제가 항상 즉시 반영된다(2026-08-08,
-// "무조건 실시간성" 요구 — sessionStorage 에 결과를 남겨뒀던 이전 버전은
-// 탭을 새로고침해도 옛 값이 몇 분간 남아있어 삭제한 글이 계속 보이는 문제가
-// 있었다).
+// 진행 중 요청 묶기(in-flight coalescing). 같은 파라미터의 요청이 진행 중인 동안만 Promise를 공유하고,
+// 응답이 오면 즉시 캐시에서 지운다. 시간 기반 캐시가 아니므로 admin 발행/수정/삭제가 항상 즉시 반영된다.
 const requestCache = new Map<string, Promise<unknown>>();
 
 function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
@@ -30,39 +22,19 @@ function cached<T>(key: string, run: () => Promise<T>): Promise<T> {
   return p;
 }
 
-// 캐시 정책 v2(2026-08-16, "홈 속도가 느리다" 피드백으로 재도입) — 2026-08-09에
-// 태그 캐시를 완전히 껐던 이유는 캐싱 자체가 문제가 아니라 무효화 호출 한 줄이
-// 버그였다: revalidateTag(tag, 'max')의 'max'는 "즉시·완전 무효화"가 아니라
-// Next 내장 cache-life 프로파일(stale:5분/revalidate:30일/expire:영구) 이름이라
-// admin이 webhook을 한 번만 쏴도 그 태그 캐시가 최대 30일짜리로 재고정되는
-// 사고였다(node_modules/next/cache.d.ts 참조, 실측: /webtoon 이
-// s-maxage=31536000으로 나옴). "그때부터 admin 발행이 반영 안 됨" 재발을 막으려
-// 아예 캐시를 껐던 건데, 그 대가로 매 방문마다 EC2→API(us-east-1) 왕복을
-// 그대로 겪어 홈 TTFB가 1.5~1.7초까지 늘어났다(2026-08-16 실측, CloudWatch
-// 확인 결과 Lambda 실행 자체는 150~300ms로 빠름 — 병목은 no-store로 캐시가
-// 아예 없다는 것 자체).
-// 이번엔 두 번째 인자('max') 없이 revalidateTag(tag)만 호출한다(service/frontend/
-// src/app/api/revalidate/route.ts) — 이건 Next 표준 on-demand 무효화로, 프로파일을
-// 재설정하는 게 아니라 그 태그가 걸린 캐시 항목을 즉시 stale 처리한다. admin이
-// 글을 발행/수정/삭제/발행취소할 때마다(admin/backend/shared/notify.py →
-// admin/backend/routes/posts.py 4곳) 이 webhook이 호출되므로 "즉시 반영"은
-// 캐시를 껐을 때와 동일하게 유지되고, 그 사이 방문자들은 캐시된 응답을 받아
-// EC2→API 왕복 없이 즉시 렌더링된다.
-// 2026-09-03 — ISR 재설계로 [slug] page.tsx들이 `export const revalidate`를
-// 명시할 때 이 값을 그대로 참조하도록 export한다(라우트 레벨 선언과 fetch
-// 레벨 안전망이 서로 다른 숫자로 갈라지는 걸 방지).
-const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤엔 자동 갱신(안전망).
+// 캐시 정책: 태그 캐시(revalidateTag)를 사용한다. 무효화는 두 번째 인자('max') 없이 revalidateTag(tag)만 호출한다
+// (service/frontend/src/app/api/revalidate/route.ts). 'max'는 즉시 무효화가 아니라 cache-life 프로파일
+// (stale 5분 / revalidate 30일 / expire 영구) 이름이라 태그 캐시가 최대 30일로 재고정된다.
+// admin이 글을 발행/수정/삭제/발행취소할 때마다(admin/backend/shared/notify.py → routes/posts.py) 이 webhook이 호출되어
+// 캐시 항목이 즉시 stale 처리되고, 그 사이 방문자는 EC2→API 왕복 없이 캐시된 응답을 받는다.
+// [slug] page.tsx의 `export const revalidate`가 이 값을 그대로 참조하도록 export한다
+// (라우트 레벨 선언과 fetch 레벨 안전망의 숫자 분기 방지).
+const CACHE_TTL_FALLBACK_SECONDS = 300; // 웹훅이 유실돼도 5분 뒤 자동 갱신하는 안전망.
 
-// 이 파일의 함수들은 서버 컴포넌트(app/page.tsx의 SSR Promise.all)뿐 아니라
-// TrendingEconomySection/ColumnPreviewSection 등 다수의 'use client' 컴포넌트가
-// useEffect로 브라우저에서 직접 호출한다(2026-08-16, "요즘 화제의 경제 이슈
-// 이미지가 항상 늦게 최신화" 피드백으로 발견). cache:'force-cache' + next.tags는
-// Next.js가 SSR 중에만 해석하는 확장 옵션이고, 브라우저의 fetch()에서는
-// `next.tags`를 그냥 무시하고 표준 RequestCache 값인 `cache:'force-cache'`만
-// 살아남아 **브라우저 자체 HTTP 캐시**를 켜버린다 — 이건 /api/revalidate가
-// 전혀 손댈 수 없는 별개의 캐시라, admin이 발행해도 그 브라우저에서는 계속
-// 옛 응답이 나온다. 그래서 브라우저에서 호출될 때는 예전처럼 no-store로
-// 완전히 캐시를 끄고, 서버(SSR)에서 호출될 때만 태그 캐시를 쓴다.
+// 이 파일의 함수는 서버 컴포넌트(SSR)뿐 아니라 다수의 'use client' 컴포넌트가 useEffect로 브라우저에서도 호출한다.
+// `cache: 'force-cache'` + `next.tags`는 SSR 중에만 해석되며, 브라우저 fetch()에서는 `next.tags`가 무시되고
+// `force-cache`만 남아 /api/revalidate가 무효화할 수 없는 브라우저 HTTP 캐시가 켜진다.
+// 따라서 브라우저 호출은 no-store로 캐시를 끄고, 서버(SSR) 호출에서만 태그 캐시를 쓴다.
 function cacheOpts(tag: string): RequestInit {
   if (typeof window !== 'undefined') {
     return { cache: 'no-store' };
@@ -90,35 +62,16 @@ export async function fetchCmsPosts(
   });
 }
 
-// trend_card 채널 폐기(2026-08-17) — "요즘 화제의 경제 이슈" 섹션을 "이슈
-// 톡톡"에 흡수 통합하면서, 백엔드 _VALID_CHANNELS에서도 trend_card를 뺐다
-// (실사용 데이터 0건 확인됨). 이 함수를 호출하는 6곳(archive/column/trend
-// 아카이브 페이지들)은 여전히 CmsTrendCard[] 모양을 기대하므로 시그니처는
-// 남기고 몸통만 즉시 빈 배열 — 이제 존재하지 않는 채널로 매 방문마다 400을
-// 받는 대신, 애초에 요청을 보내지 않는다.
-// fetchSectionCards()/CmsSectionCard — ColumnPreviewSection("이번 주 인사이트"
-// 홈 섹션)이 쓰던 fetch 로직이었는데, 2026-08-17 홈 구조 개편(LatestGridSection
-// + CategoryRailSection x6, 뉴닉 홈 참고)으로 그 섹션 자체가 삭제되며 호출자가
-// 0이 됐다 — 같이 삭제(archive/column 아카이브 페이지들은 buildArchiveItems를
-// 직접 쓰지 이 함수를 거치지 않았다).
+// trend_card 채널은 백엔드 _VALID_CHANNELS에서 제거되었다. 호출부가 여전히 CmsTrendCard[] 형태를 기대하므로
+// 시그니처는 유지하고 요청 없이 빈 배열을 돌려준다.
 
-// 홈 웹툰 미리보기(WebtoonPreviewSection) 전용 축약본(2026-09-03, lens/
-// 오디오 축약과 같은 문제) — 그 컴포넌트는 항상 상위 4개만 그리고
-// cover_image_url 하나만 쓰는데(panels는 안 읽음, 컷 갤러리는 상세
-// 페이지 전용), app/page.tsx는 fetchWebtoons()의 최대 1000건 전체
-// (건마다 컷 이미지+캡션 배열 panels 포함)를 그대로 넘기고 있었다.
+// 홈 웹툰 미리보기(WebtoonPreviewSection) 전용 축약본. 상위 4개와 cover_image_url만 쓰므로 panels 등 무거운 필드를 제외한다.
 export function toWebtoonPreviewSummaries(webtoons: CmsWebtoon[]): CmsWebtoon[] {
   return webtoons.slice(0, 4).map((w) => ({ ...w, panels: [] }));
 }
 
-// 웹툰 시리즈 페이지(webtoon/series/[slug]/page.tsx) 전용 축약본
-// (2026-09-03, ISR 재설계 감사로 발견) — 그 페이지는 groupIntoSeries()가
-// "전체 채널 기준 회차 번호"를 정확히 매기기 위해 웹툰 전체 목록(최대
-// 1000건)을 전달받아야 하지만(단순히 series.episodes만 넘기면 번호가
-// 깨짐), panels(컷 이미지+캡션 배열)는 이 페이지가 전혀 안 읽는다(표지
-// 썸네일만 씀) — 개수는 그대로 두고 무거운 필드만 뺀다. 위
-// toWebtoonPreviewSummaries와 달리 slice(0,4)를 하면 안 되는 게 핵심
-// 차이(번호 매김이 전체 목록에 의존).
+// 웹툰 시리즈 페이지 전용 축약본. 전체 채널 기준 회차 번호를 매기려면 전체 목록(최대 1000건)이 필요하므로
+// 개수는 유지하고 panels만 뺀다(표지 썸네일만 사용). 번호가 전체 목록에 의존하므로 slice(0,4)를 적용하면 안 된다.
 export function toWebtoonSeriesListPayload(webtoons: CmsWebtoon[]): CmsWebtoon[] {
   return webtoons.map((w) => ({ ...w, panels: [] }));
 }
@@ -126,12 +79,8 @@ export function toWebtoonSeriesListPayload(webtoons: CmsWebtoon[]): CmsWebtoon[]
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
-      // limit=1000(2026-08-28, 100→1000) — 100은 2026-08-11에 백엔드
-      // 기본값(20) 잘림을 막으려고 넣은 값이었는데, 08-23 웹툰 채널
-      // 분리 이후 발행량이 하루 최대 96건까지 늘면서 100건짜리 상한도
-      // 며칠 만에 다시 뚫려 오래된 화가 목록에서 사라졌다(archive 재설계
-      // 논의 중 발견). 백엔드가 이미 1000까지는 DB 읽기 비용 증가 없이
-      // 지원한다(cms_posts_public.py 참조 — 항상 전체를 읽은 뒤 슬라이스).
+      // limit=1000: 발행량 증가로 100건 상한에서 오래된 회차가 목록에서 사라졌다. 백엔드는 1000건까지 DB 읽기 비용 증가 없이
+      // 지원한다(cms_posts_public.py: 항상 전체를 읽은 뒤 슬라이스).
       const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=webtoon&limit=1000`, cacheOpts('posts:webtoon'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsWebtoon[] };
@@ -153,11 +102,9 @@ export async function fetchWebtoonBySlug(slug: string): Promise<CmsWebtoon | nul
   }
 }
 
-// 홈 영상 미리보기(VideoPreviewSection) 전용 축약본(2026-09-03) — 항상
-// 상위 4개만 쓰는데 최대 1000건 전체를 넘기고 있었다. CmsVideo 자체엔
-// 무거운 필드가 없어(대본 등 없음) 개수만 줄여도 충분하다.
+// 홈 영상 미리보기(VideoPreviewSection) 전용 축약본. 상위 4개만 쓰며 CmsVideo에는 무거운 필드가 없어 개수만 줄인다.
 export function toVideoPreviewSummaries(videos: CmsVideo[], lens: CmsLens[] = []): CmsVideo[] {
-  // 영상 id = 같은 이슈 lens 글의 id(슬러그 동일) — 기사 사진을 포스터로 붙인다.
+  // 영상 id는 같은 이슈 lens 글의 id(슬러그 동일)이며, 기사 사진을 포스터로 붙인다.
   const photoById = new Map(lens.map((l) => [l.id, pickPhoto(l)] as const));
   return videos.slice(0, 4).map((v) => ({ ...v, poster_url: photoById.get(v.id) ?? null }));
 }
@@ -169,7 +116,7 @@ function pickPhoto(l: CmsLens): string | null {
 export async function fetchVideos(): Promise<CmsVideo[]> {
   return cached('video', async () => {
     try {
-      // limit=1000(2026-08-28, 100→1000) — fetchWebtoons()와 같은 이유.
+      // limit=1000: fetchWebtoons()와 같은 이유.
       const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=video&limit=1000`, cacheOpts('posts:video'));
       if (!res.ok) return [];
       const data = (await res.json()) as { posts?: CmsVideo[] };
@@ -191,13 +138,9 @@ export async function fetchVideoBySlug(slug: string): Promise<CmsVideo | null> {
   }
 }
 
-// 홈 "오늘의 이슈, 4가지 시선"(LensPreviewSection) 전용 축약본(2026-09-03,
-// 페이지 속도 감사) — 그 컴포넌트는 포맷당 question 한 줄만 보여주는데,
-// app/page.tsx가 fetchLensPosts() 결과(최대 100건 × 4포맷의 bullets·
-// paragraphs·transcript 등 본문 전체)를 initialItems prop으로 그대로
-// 클라이언트에 직렬화하고 있었다 — Lighthouse 실측 결과 홈 HTML이
-// 6.7MB(gzip 1.78MB)까지 부푼 주된 원인. buildArchiveItems()는 lenses[]를
-// 아예 안 읽어서 이 축약이 영향 없다(archiveItems.ts 참조).
+// 홈 "오늘의 이슈, 4가지 시선"(LensPreviewSection) 전용 축약본. 이 컴포넌트는 포맷당 question 한 줄만 쓰므로
+// 본문(bullets·paragraphs·transcript 등)을 initialItems로 직렬화하지 않는다(홈 HTML 크기 축소).
+// buildArchiveItems()는 lenses[]를 읽지 않으므로 영향이 없다(archiveItems.ts 참조).
 export function toLensPreviewSummaries(lenses: CmsLens[]): CmsLens[] {
   return lenses.map((l) => ({
     ...l,
@@ -205,29 +148,15 @@ export function toLensPreviewSummaries(lenses: CmsLens[]): CmsLens[] {
   }));
 }
 
-// limit 파라미터화(2026-10-01) — 기본 1000(전체 목록: sitemap·카테고리·/lens 목록). 홈 미리보기·
-// 사이드바처럼 최신 몇 건만 쓰는 호출부는 작은 값을 넘긴다. 이유: 전체 목록 응답(~3MB)이
-// 서버(Next 데이터 캐시 한도 2MB 초과 → 렌더마다 재요청)와 방문자 브라우저(캐시 안 됨, 홈
-// 방문마다 전체 수신) 양쪽에서 매번 EC2까지 가고 있었다. 캐시 키·URL이 limit별로 갈린다.
+// limit 파라미터화: 기본 1000(전체 목록: sitemap·카테고리·/lens 목록). 홈 미리보기·사이드바처럼 최신 몇 건만 쓰는 호출부는
+// 작은 값을 넘긴다. 전체 목록 응답(~3MB)은 Next 데이터 캐시 한도(2MB)를 넘어 캐시되지 않기 때문이다. 캐시 키·URL이 limit별로 갈린다.
 export async function fetchLensPosts(limit: number = 1000): Promise<CmsLens[]> {
   return cached(`lens:${limit}`, async () => {
-    // limit=1000(2026-09-03, webtoon/video와 통일) — 100/250이었던 이유는
-    // lens 채널이 글마다 4포맷 전체(문단·웹툰 컷·팟캐스트/영상 대본
-    // 전문)를 통째로 담아 너무 무거워서, 300건 근처만 돼도 백엔드가
-    // Lambda 동기 응답 6MB 한도를 넘겨 500을 던졌기 때문이다(2026-09-02
-    // 홈 "오늘의 지면" 실종 장애 원인). 근본 수정 완료 — 목록(다건)
-    // 응답은 이제 백엔드가 축약판(label/question/bullets만, 나머지 무거운
-    // 필드는 단건 조회에서만)을 돌려준다(cms_posts_shaping.py의
-    // shape_lens_summary 참조, 글당 크기 ~90% 감소 실측). 그 덕에
-    // 상한을 다시 올려도 안전하다 — webtoon/video가 1000에서 정상인 것과
-    // 같은 이유.
+    // limit=1000: 목록(다건) 응답은 백엔드가 축약판(label/question/bullets만)을 돌려주므로(cms_posts_shaping.py의
+    // shape_lens_summary) 상한을 올려도 Lambda 동기 응답 한도(6MB)를 넘지 않는다. webtoon/video와 동일하다.
     const url = `${CMS_API_URL}/api/v2/posts?channel=lens&limit=${limit}`;
-    // 2026-10-01 — 이 fetch가 실패하면(간헐적으로 재현, 원인 미확정) 조용히
-    // 빈 배열을 돌려줘서 홈 "오늘의 이슈, 4가지 시선" 히어로 전체가 아무
-    // 로그도 없이 통째로 사라지는 실제 장애가 반복됐다(2026-09-02에도 같은
-    // 증상 — 주석 기록으로 확인). 재시도 1회 + 실패 시 로그를 남겨
-    // (a) 한 번의 일시적 실패로 전체 섹션이 비는 걸 줄이고 (b) 다음에
-    // 또 발생하면 CloudWatch 로그로 원인 추적이 가능하게 한다.
+    // 이 fetch가 간헐적으로 실패해 빈 배열이 조용히 반환되면 홈 히어로가 통째로 사라진다.
+    // 재시도 1회와 실패 로그로 일시적 실패의 영향을 줄이고 원인을 CloudWatch에서 추적할 수 있게 한다.
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const res = await fetch(url, cacheOpts('posts:lens'));
@@ -266,13 +195,12 @@ function shiftDay(date: string, delta: number): string {
 }
 
 /**
- * 최신 1,000건 상한 밖 과거 글 이어 받기(2026-10-04, sitemap 전용).
+ * 최신 1,000건 상한 밖 과거 글 이어 받기(sitemap 전용).
  *
- * 목록 API는 채널당 최신 1,000건에서 잘린다(백엔드 limit 상한 1000, offset·cursor 없음 — 다음 페이지는 `date=` 조회뿐).
- * 2026-10-04 실측: lens·webtoon·video 모두 최신 1,000건의 가장 오래된 날짜가 2026-09-14인데 그 이전 글(lens 9/13 13건,
- * 9/1 96건, 8/20 5건 …)이 실제로 있어 sitemap에서 통째로 빠져 있었다. 상한에 닿았을 때만 가장 오래된 날짜(그날은 중간에 잘렸을 수
- * 있어 다시 포함)부터 6일씩 병렬로 거슬러 내려가며 받는다. 연속으로 비는 날이 20일 이어지거나 서비스 시작 전(2026-07-01)이면 멈춘다.
- * 카테고리·/lens 목록·이전/다음 이동은 여전히 최신 1,000건 기준이다(HTML 크기 때문에 이번 범위 밖).
+ * 목록 API는 채널당 최신 1,000건에서 잘린다(offset·cursor 없음, 다음 페이지는 `date=` 조회뿐).
+ * 상한에 닿았을 때만 가장 오래된 날짜(그날은 중간에 잘렸을 수 있어 다시 포함)부터 6일씩 병렬로 거슬러 내려가며 받는다.
+ * 연속으로 비는 날이 20일 이어지거나 서비스 시작 전(2026-07-01)이면 멈춘다.
+ * 카테고리·/lens 목록·이전/다음 이동은 여전히 최신 1,000건 기준이다(HTML 크기 때문).
  */
 async function extendBeyondCap<T extends { id: string; date: string }>(channel: 'lens' | 'webtoon' | 'video', recent: T[]): Promise<T[]> {
   if (recent.length < 1000) return recent;
@@ -292,7 +220,7 @@ async function extendBeyondCap<T extends { id: string; date: string }>(channel: 
   return [...byId.values()];
 }
 
-/** 특정 날짜(KST) lens 글 — "지난 지면" 페이지(/paper/[date])용(2026-10-04). */
+/** 특정 날짜(KST) lens 글. "지난 지면" 페이지(/paper/[date])용. */
 export async function fetchLensPostsOnDate(date: string): Promise<CmsLens[]> {
   return fetchChannelOnDate<CmsLens>('lens', date);
 }
@@ -301,12 +229,11 @@ export async function fetchLensPostsOnDate(date: string): Promise<CmsLens[]> {
 export const PAPER_SECTION_VALUES = ['전체', '증권', '산업', '시그널'] as const;
 
 /**
- * 지면이 편성된 날짜 목록(최신순, YYYY-MM-DD) — 4개 지면 중 하나라도 기사가 있는 날.
- * 최신 1,000건 안에서 구한다. 지면(paper_section) 데이터는 2026-09-29부터 있어(그 이전 글엔 값이 없다) 상한 문제가 없다.
+ * 지면이 편성된 날짜 목록(최신순, YYYY-MM-DD). 4개 지면 중 하나라도 기사가 있는 날이며 최신 1,000건 안에서 구한다.
+ * 지면(paper_section) 데이터는 2026-09-29부터 있어 상한 문제가 없다.
  */
 export async function fetchPaperDates(): Promise<string[]> {
-  // 최신 1,000건 응답이 약 3MB라 Next 데이터 캐시 한도(2MB)를 넘어 캐시되지 않는다(2026-10-04 실측 2.96MB) —
-  // 그대로 두면 홈·지난 지면·사이트맵 렌더마다 3MB를 새로 받는다. 날짜 목록(수십 바이트)만 서버 메모리에 5분 보관한다.
+  // 최신 1,000건 응답(~3MB)은 Next 데이터 캐시 한도(2MB)를 넘어 캐시되지 않으므로, 날짜 목록(수십 바이트)만 서버 메모리에 5분 보관한다.
   const now = Date.now();
   if (paperDatesMemo && now - paperDatesMemo.at < CACHE_TTL_FALLBACK_SECONDS * 1000) return paperDatesMemo.dates;
   if (paperDatesInFlight) return paperDatesInFlight;
@@ -350,8 +277,8 @@ export async function fetchLensBySlug(slug: string): Promise<CmsLens | null> {
   }
 }
 
-// mbti_group 없이 발행된 CMS 글(letterHref 가 slug 를 그대로 id 로 씀)을
-// /letters/view?id=<slug> 로 열 때 사용 — 날짜/그룹 기반 목록 조회로는 못 찾는다.
+// mbti_group 없이 발행된 CMS 글(letterHref가 slug를 id로 씀)을 /letters/view?id=<slug>로 열 때 사용한다.
+// 날짜/그룹 기반 목록 조회로는 찾을 수 없다.
 export async function fetchCmsPostBySlug(
   channel: CmsChannel,
   slug: string,

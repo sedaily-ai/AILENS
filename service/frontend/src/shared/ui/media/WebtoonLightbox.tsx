@@ -7,9 +7,8 @@ import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 
 /**
- * 웹툰 미리보기 모달 — 홈 "이슈를 웹툰으로" 카드를 누르면 별도 페이지로 넘어가지 않고 화면 가운데에서 컷을 훑어 본다
- * (2026-10-05, 사용자 요청 — 예전 '1000화' 뷰어 페이지가 어색했음). VideoLightbox와 같은 규칙: body 포털(조상 transform 무관),
- * 배경 클릭·Esc로 닫기, transform 정렬 대신 flex 중앙 정렬.
+ * 웹툰 미리보기 모달. 홈 "이슈를 웹툰으로" 카드를 누르면 별도 페이지로 넘어가지 않고 화면 가운데에서 컷을 훑어 본다.
+ * VideoLightbox와 같은 규칙: body 포털(조상 transform 무관), 배경 클릭·Esc로 닫기, transform 정렬 대신 flex 중앙 정렬.
  *
  * 홈 목록은 용량 때문에 컷(panels)을 비운 요약본이라, 열릴 때 한 번 전체 글을 불러온다(그동안 표지를 보여 준다).
  */

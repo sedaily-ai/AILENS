@@ -27,8 +27,7 @@ interface Props {
   onChangeGroup?: () => void;
   onSwitchToStory?: () => void;
   onMbtiChange?: (group: MbtiGroupId) => void;
-  // 빌드타임(app/page.tsx) 서버 프리페치 값 — NewsFeedTab까지 그대로 하향
-  // 전달(2026-08-07, 홈 SSG 감사).
+  // 빌드타임(app/page.tsx) 서버 프리페치 값. NewsFeedTab까지 그대로 하향 전달한다.
   initialWebtoons?: CmsWebtoon[];
   initialVideos?: CmsVideo[];
   initialLensPosts?: CmsLens[];
@@ -92,26 +91,17 @@ export function FeedPage({
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [aiQuestions, setAiQuestions] = useState<DailyQuestionItem[]>([]);
 
-  // "내 서랍" — 로그인 사용자는 ArchiveTab의 useEffect가 마운트 시
-  // /api/archive에서 실제 서버 데이터로 덮어쓴다(비로그인은 그대로 빈 배열,
-  // ArchiveLoginCta가 로그인을 유도). 이전엔 여기 목업 문장 8개가 하드코딩돼
-  // 있어서, 비로그인 방문자에게도 실제 저장된 것처럼 보이는 가짜 콘텐츠가
-  // 나갔다(2026-08-24, 사용자 지적).
+  // "내 서랍": 로그인 사용자는 ArchiveTab의 useEffect가 마운트 시 /api/archive의 실제 서버 데이터로 덮어쓴다.
+  // 비로그인은 빈 배열 그대로이며 ArchiveLoginCta가 로그인을 유도한다(가짜 콘텐츠를 노출하지 않는다).
   const [archivedSentences, setArchivedSentences] = useState<ArchivedSentence[]>([]);
-  // 탭 상태 - URL에서 초기값 읽기
-  // 정적 export에서 useSearchParams()는 CSR bailout을 유발해 이 컴포넌트 트리
-  // 전체가 정적 HTML에서 Suspense fallback으로만 구워진다(2026-08-07, 홈 SSG
-  // 감사에서 발견 — /timemachine과 같은 원인). 초기값은 항상 "feed"로 고정해
-  // 서버/클라이언트 첫 렌더를 일치시키고, ?tab=... 반영은 아래 mount effect가
+  // 탭 상태: URL에서 초기값을 읽는다.
+  // 정적 export에서 useSearchParams()는 CSR bailout을 유발해 컴포넌트 트리 전체가 Suspense fallback으로만 구워진다.
+  // 따라서 초기값은 항상 "feed"로 고정해 서버/클라이언트 첫 렌더를 일치시키고, ?tab=... 반영은 아래 mount effect가
   // window.location.search를 직접 읽어 처리한다.
   const [activeTab, setActiveTabState] = useState<"question" | "feed" | "archive" | "dna">("feed");
 
-  // 탭 변경 함수 - URL도 함께 업데이트 (replaceState로 히스토리에 안 쌓임)
-  // "feed"는 기본 탭이라 쿼리스트링을 아예 지운다(2026-10-01, 사용자 지적
-  // — 로고를 눌러도 "/?tab=feed"가 남아 SEO에 안 좋아 보인다는 우려).
-  // 이전엔 어떤 탭이든 무조건 ?tab=...을 박아넣어서, 기본값으로 돌아가는
-  // 클릭(로고 등)조차 불필요한 쿼리스트링을 남겼다 — question/archive/dna
-  // 처럼 진짜 비기본 탭은 새로고침 유지를 위해 그대로 남긴다.
+  // 탭 변경 함수. URL도 함께 갱신한다(replaceState로 히스토리에 쌓이지 않는다).
+  // "feed"는 기본 탭이라 쿼리스트링을 지운다("/?tab=feed"가 남지 않게). question/archive/dna처럼 비기본 탭은 새로고침 유지를 위해 남긴다.
   const setActiveTab = useCallback((tab: "question" | "feed" | "archive" | "dna") => {
     setActiveTabState(tab);
     const params = new URLSearchParams(window.location.search);
@@ -128,16 +118,13 @@ export function FeedPage({
     );
   }, [pathname]);
 
-  // 펼친 기사 상태 — 값은 아무도 안 읽지만(렌더에 영향 없음) setter는 자식에
-  // 계속 넘겨주고 있어(423줄) 값 바인딩만 제거(2026-08-23 죽은 코드 정리).
+  // 펼친 기사 상태: 값은 읽지 않지만(렌더에 영향 없음) setter는 자식에 넘긴다.
   const [, setExpandedArticles] = useState<Set<string>>(new Set());
 
   // 내 서랍 날짜 필터
   const [archiveDate, setArchiveDate] = useState<Date>(new Date()); // 오늘부터 시작
 
-  // 저장 완료 토스트 — 값(showSaveToast)을 실제로 렌더에 쓰는 곳이 없어져서
-  // (2026-08-23 죽은 코드 정리) setter만 유지, showToast() 호출부(자식으로
-  // 전달)는 그대로 둠.
+  // 저장 완료 토스트: 값(showSaveToast)을 렌더에 쓰지 않아 setter만 유지하고, showToast() 호출부(자식으로 전달)는 그대로 둔다.
   const [, setShowSaveToast] = useState(false);
 
   // 토스트 표시 함수
@@ -167,14 +154,10 @@ export function FeedPage({
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // /editors 등 다른 라우트에서 ?tab=... 로 진입했을 때 초기 반영 — 마운트 시
-  // 1회, window.location.search를 직접 읽는다(useSearchParams() 대신 — 위 참조).
-  // 다른 라우트에서 오는 진입은 항상 이 컴포넌트의 새 마운트라 1회 실행으로 충분.
-  // useState 지연 초기화로 옮기지 않는 이유(2026-08-23, 죽은 코드 정리 중
-  // set-state-in-effect 린트를 만나 재확인) — 서버 렌더 시점엔 window가 없어
-  // 초기값을 URL 기준으로 계산하면 서버가 그린 HTML과 클라이언트 첫 렌더가
-  // 달라지는 하이드레이션 불일치가 생긴다. "일단 feed로 그리고 마운트 후
-  // 전환"이 의도된 동작.
+  // 다른 라우트에서 ?tab=... 로 진입했을 때의 초기 반영. 마운트 시 1회 window.location.search를 직접 읽는다(useSearchParams() 대신).
+  // 다른 라우트에서 오는 진입은 항상 새 마운트라 1회 실행으로 충분하다.
+  // useState 지연 초기화로 옮기지 않는 이유: 서버 렌더 시점에는 window가 없어 URL 기준으로 초기값을 계산하면
+  // 서버 HTML과 클라이언트 첫 렌더가 달라지는 하이드레이션 불일치가 생긴다. "일단 feed로 그리고 마운트 후 전환"이 의도된 동작이다.
   useEffect(() => {
     const tabParam = new URLSearchParams(window.location.search).get('tab');
     if (tabParam && ['question', 'feed', 'archive', 'dna'].includes(tabParam)) {
@@ -213,15 +196,9 @@ export function FeedPage({
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
       {/* Header - 1단 통합 */}
-      {/* 탭 배열을 여기 따로 하드코딩하지 않고 headerTabs.ts의 buildHeaderTabs()를
-          그대로 쓴다(2026-08-17 근본 수정) — 원래 "FeedPage는 in-page 탭
-          전환이라 buildHeaderTabs()를 못 쓴다"는 이유로 손으로 복제해왔는데,
-          실제로 이 배열의 각 항목은 전부 href 실이동일 뿐 onClick 전환이
-          하나도 없었다(순수 드리프트 위험만 있고 얻는 게 없는 중복). 상단
-          탭 개편(딥다이브 제거, 카테고리 6개 추가) 때마다 이 사본을 깜빡해서
-          라이브에 옛 링크가 남는 사고가 이미 한 번 있었다(SiteFooter.tsx
-          CONTENT_LINKS에서도 같은 사고 발견 — 거기는 여전히 별도 사본이라
-          주의). 홈 화면에서는 어차피 활성 탭이 없어 active 인자도 필요 없다. */}
+      {/* 탭 배열은 headerTabs.ts의 buildHeaderTabs()를 그대로 쓴다. 이 배열의 항목은 모두 href 이동이라 onClick 전환이 없으며,
+          별도 사본을 두면 상단 탭 개편 때 옛 링크가 남는다(SiteFooter.tsx CONTENT_LINKS는 아직 별도 사본이므로 주의).
+          홈 화면에는 활성 탭이 없어 active 인자도 필요 없다. */}
       <Header
         onLogo={() => setActiveTab("feed")}
         onSearch={() => setShowSearch(true)}
@@ -239,11 +216,8 @@ export function FeedPage({
         .tab-fade-in { animation: tabFadeIn 0.25s ease-out both; }
       `}</style>
       <main className="flex-1">
-        {/* 홈(/) h1 부재(2026-08-14, GEO 감사) — widgets/FeedPage, features/news-feed
-            전체에 h1이 0개였다(각 섹션은 h2부터 시작, 의도적으로 동등 weight
-            유지 중이라 그중 하나를 h1으로 승격시키면 시각적 위계가 깨진다).
-            시각 디자인은 그대로 두고 sr-only h1로 페이지 주제 신호만 추가 —
-            title/og:title과 동일 문구, 접근성(스크린리더)에도 도움. */}
+        {/* 홈(/)에는 sr-only h1로 페이지 주제 신호를 준다. 각 섹션이 h2부터 동등한 weight로 시작해 하나를 h1으로 승격하면
+            시각 위계가 깨지므로, title/og:title과 같은 문구를 시각적으로 숨겨 추가한다(GEO·접근성). */}
         <h1 className="sr-only">AI LENS — 서울경제신문의 AI 경제 뉴스</h1>
         <div key={activeTab} className="tab-fade-in">
         {/* 질문 모드 - QuestionTab 컴포넌트 */}

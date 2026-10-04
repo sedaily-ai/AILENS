@@ -3,24 +3,12 @@
 import Link from 'next/link';
 import { buildPageItems } from '@/shared/lib/content/pagination';
 
-// 목록 페이지(video/listen, 2026-08-28 신설) 공용 페이지네이션 — n개씩
-// 보기 셀렉트 + 페이지 번호. lens(/lens/page/[n])·webtoon(/webtoon?page=)
-// 처럼 기본 페이지 크기일 때는 경로 세그먼트 Link로 크롤러·CDN 캐시가
-// 타게 하고, 사용자가 페이지 크기를 바꾸면(이미 브라우저에 다 로드된
-// 전체 목록을 다시 슬라이스만 하면 되므로) 그 세션 한정으로 버튼 기반
-// 클라이언트 상태 페이지네이션으로 전환한다 — 커스텀 크기마다 정적
-// 라우트를 만들 필요가 없다.
-// 번호 버튼 테두리 제거(2026-10-01, 사용자 피드백 — "1~10 블록 전체 노출"
-// 구조(2026-09-30 결정, pagination.ts 주석 참조)는 그대로 두되, 12개
-// 가까운 박스가 테두리까지 둘러 한 줄에 쭉 늘어서니 무겁고 "그런
-// 부분들?"로 지적받았다. 현재 페이지만 채운 원형으로 강조하고 나머지는
-// 테두리 없는 숫자로 — hover는 .lp-num 클래스(아래 <style>)로 처리.
-//
-// 활성 페이지 배경을 accent 꽉 채운 색 대신 10% 알파 톤으로 낮췄다
-// (2026-10-01, "빨간색 버튼이 좀 진하지 않나요" — 증시 카테고리 accent
-// #dc2626을 큰 원 배경으로 꽉 채우니 텍스트 포인트로 쓸 때보다 훨씬
-// 쎄 보였다). ArticleThumb 등 다른 곳에서도 이미 쓰는 `${accent}14`
-// 알파 배경 + accent 텍스트 패턴 그대로 재사용.
+// 목록 페이지(video/listen) 공용 페이지네이션: n개씩 보기 셀렉트 + 페이지 번호.
+// lens(/lens/page/[n])·webtoon(/webtoon?page=)처럼 기본 페이지 크기일 때는 경로 세그먼트 Link로 크롤러·CDN 캐시가 타게 하고,
+// 사용자가 페이지 크기를 바꾸면(이미 로드된 전체 목록을 다시 슬라이스만 하면 되므로) 그 세션 한정으로 버튼 기반 클라이언트 상태 페이지네이션으로 전환한다
+// (커스텀 크기마다 정적 라우트가 필요 없다).
+// 번호 버튼은 테두리 없는 숫자로 두고 현재 페이지만 채운 원형으로 강조한다(hover는 .lp-num 클래스, 아래 <style>).
+// 활성 페이지 배경은 accent를 꽉 채우지 않고 10% 알파 톤(`${accent}14`)을 쓴다(ArticleThumb 등과 같은 패턴). "1~10 블록 전체 노출" 구조는 pagination.ts 주석 참조.
 const PG_STYLE = (active: boolean, disabled: boolean, accent: string): React.CSSProperties => ({
   minWidth: 32,
   height: 32,
@@ -86,10 +74,7 @@ export function ListPagination({
   accentColor?: string;
   totalCount: number;
 }) {
-  // 생략 부호 포함(2026-09-02) — 예전엔 총 페이지 수만큼 무조건 버튼을
-  // 다 그려서, 페이지가 많아지면(웹툰에서 실측 52페이지) 버튼이 수십
-  // 개씩 나열됐다. flex-wrap 덕에 화면 밖으로 안 넘치긴 했지만 그것도
-  // 여러 줄로 접힌 버튼 무더기라 UX가 나빴다.
+  // 생략 부호를 포함한다. 총 페이지 수만큼 버튼을 그리면 페이지가 많을 때(웹툰 52페이지) 버튼이 여러 줄로 쌓인다.
   const pages = buildPageItems(currentPage, totalPages);
 
   return (

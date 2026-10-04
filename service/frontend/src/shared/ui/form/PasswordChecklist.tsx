@@ -1,8 +1,6 @@
 import { checkPassword, PASSWORD_SPECIAL_CHARACTERS } from '@/shared/lib/auth/passwordPolicy';
 
-// LoginClient.tsx(회원가입·비밀번호 재설정)에서 추출(2026-08-25, 이슈 #17) —
-// 비밀번호 변경 화면(/settings/password)도 같은 실시간 체크리스트가 필요해서
-// 로컬 컴포넌트를 shared/ui로 승격했다. 로직·마크업은 그대로, 위치만 이동.
+// LoginClient.tsx(회원가입·비밀번호 재설정)와 비밀번호 변경 화면(/settings/password)이 공유하는 실시간 체크리스트다.
 
 /**
  * 비밀번호를 새로 정하는 화면(회원가입 · 비밀번호 재설정 · 비밀번호 변경)에서

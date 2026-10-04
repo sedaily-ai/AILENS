@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { SITE_URL } from '@/shared/constants/site';
 
-// 웹툰·영상·오디오 상세의 검색·공유·서지 보강 메타(2026-10-04, 기사 상세 lensArticlePageShared와 같은 구성).
-// 기사 쪽에는 있었는데 이 세 페이지에는 빠져 있던 keywords·authors·hreflang·news_keywords·Dublin Core를 한 곳에서 만든다.
+// 웹툰·영상·오디오 상세의 검색·공유·서지 보강 메타(기사 상세 lensArticlePageShared와 같은 구성). keywords·authors·hreflang·news_keywords·Dublin Core를 한 곳에서 만든다.
 export function mediaSeoExtras(input: {
   headline: string; // 정제한 제목(seoHeadline)
   description: string;

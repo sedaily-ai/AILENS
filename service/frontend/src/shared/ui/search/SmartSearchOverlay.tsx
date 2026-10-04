@@ -3,12 +3,10 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// 검색·AI 대화 오버레이 지연 로딩 래퍼(2026-10-04 경량화).
-//
-// 실제 구현(SmartSearchOverlayImpl.tsx, 900줄)은 마크다운 렌더러(react-markdown·remark-gfm ≈175KB 압축 전)와 대화 소켓까지 끌고 와서,
-// 거의 모든 페이지(헤더가 쓴다)의 첫 번들에 실렸다. 검색을 여는 사람만 쓰는 UI라서, 처음 열릴 때 비로소 불러온다.
-// 기존 import 경로와 props(open·onClose)는 그대로라 호출부 12곳은 손대지 않았다.
-// 한 번 열린 뒤에는 닫아도 계속 마운트해 둔다 — 대화 내용·입력이 닫았다 열어도 유지되던 기존 동작(open=false에서도 컴포넌트가 살아 있음)을 보존한다.
+// 검색·AI 대화 오버레이 지연 로딩 래퍼.
+// 실제 구현(SmartSearchOverlayImpl.tsx)은 마크다운 렌더러(react-markdown·remark-gfm)와 대화 소켓까지 끌고 와서 거의 모든 페이지(헤더가 쓴다)의 첫 번들에 실린다.
+// 검색을 여는 사람만 쓰는 UI이므로 처음 열릴 때 비로소 불러온다. import 경로와 props(open·onClose)는 그대로다.
+// 한 번 열린 뒤에는 닫아도 계속 마운트해 둔다(닫았다 열어도 대화 내용·입력이 유지된다).
 const Impl = dynamic(() => import('./SmartSearchOverlayImpl').then((m) => m.SmartSearchOverlay), { ssr: false });
 
 type Props = { open: boolean; onClose: () => void };

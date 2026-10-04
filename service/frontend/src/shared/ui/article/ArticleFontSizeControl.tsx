@@ -2,13 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-// 글자 크기 조절 — lens/[slug]/LensViewClient.tsx와 letters/[id]/
-// LetterDetailClient.tsx가 CSS 변수 이름만 다르게(--lens-font-scale vs
-// --letter-font-scale) 거의 동일한 컴포넌트를 각자 로컬 복제하고 있던 걸
-// 하나로 합쳤다(2026-08-18). 어느 CSS 변수·localStorage 키를 쓸지는 계속
-// 페이지마다 다르게 둔다(본문 fontSize를 calc(Npx * var(...))로 배선하는
-// 지점이 페이지마다 다른 곳에 있어 변수 이름을 강제로 통일하면 그쪽도
-// 같이 손봐야 함 — 지금은 컴포넌트 중복만 없애는 게 목적이라 props로 남김).
+// 글자 크기 조절. lens/[slug]/LensViewClient.tsx와 letters/[id]/LetterDetailClient.tsx가 공유하며, 어느 CSS 변수(--lens-font-scale / --letter-font-scale)·localStorage 키를 쓸지는 페이지마다 props로 받는다
+// (본문 fontSize를 calc(Npx * var(...))로 배선하는 지점이 페이지마다 달라 변수 이름을 통일하면 그쪽도 고쳐야 한다).
 export type ArticleFontSize = 'small' | 'medium' | 'large';
 const FONT_SCALE: Record<ArticleFontSize, string> = { small: '0.9', medium: '1', large: '1.15' };
 
@@ -19,8 +14,7 @@ export function ArticleFontSizeControl({ cssVar, storageKey }: { cssVar: string;
     try {
       const saved = localStorage.getItem(storageKey) as ArticleFontSize | null;
       if (saved && saved in FONT_SCALE) {
-        // localStorage는 SSR에서 못 읽는다 — 저장된 값 복원은 마운트 후
-        // effect가 맞는 자리(2026-08-23, set-state-in-effect 확인).
+        // localStorage는 SSR에서 읽을 수 없어 저장된 값 복원은 마운트 후 effect에서 한다.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setSize(saved);
         document.documentElement.style.setProperty(cssVar, FONT_SCALE[saved]);

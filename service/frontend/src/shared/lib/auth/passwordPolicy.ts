@@ -1,22 +1,15 @@
 /**
- * Cognito 유저풀(`us-east-1_ZS8PgF3iX`)의 비밀번호 정책을 클라이언트에서
- * 그대로 재현한다.
+ * Cognito 유저풀(`us-east-1_ZS8PgF3iX`)의 비밀번호 정책을 클라이언트에서 그대로 재현한다.
  *
- * 왜 필요한가
- * ----------
- * 유저풀 `Policies.PasswordPolicy`는 `MinimumLength: 8` + 대문자/소문자/숫자/
- * 특수문자를 모두 요구한다. 그런데 폼에서는 이걸 알려주지 않아서, 사용자는
- * 제출한 뒤에야 Cognito의 `InvalidPasswordException`을 받아 "뭐가 부족한지"를
- * 역추적해야 했다(회원가입은 길이만 검사, 비밀번호 재설정은 일치 여부만 검사).
- * 규칙을 여기 한 곳에 두고 입력 중 실시간으로 보여주려고 분리했다.
+ * 유저풀 `Policies.PasswordPolicy`는 `MinimumLength: 8` + 대문자/소문자/숫자/특수문자를 모두 요구한다.
+ * 규칙을 한 곳에 두고 입력 중 실시간으로 보여 주어, 제출 후 Cognito의 `InvalidPasswordException`으로 부족한 항목을 역추적하지 않게 한다.
  *
  * 특수문자 목록은 AWS 문서에 명시된 집합을 그대로 옮겼다:
  *   ^ $ * . [ ] { } ( ) ? " ! @ # % & / \ , > < ' : ; | _ ~ ` = + -
  *   (앞뒤가 아닌 위치의 공백도 허용)
  * https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html
  *
- * 유저풀 정책을 바꾸면 이 파일도 같이 바꿔야 한다 — 클라이언트 검증은 UX용
- * 선행 안내일 뿐이고, 최종 판정은 언제나 Cognito가 한다.
+ * 유저풀 정책을 바꾸면 이 파일도 같이 바꿔야 한다. 클라이언트 검증은 UX용 선행 안내이며 최종 판정은 Cognito가 한다.
  */
 
 const PASSWORD_MIN_LENGTH = 8;

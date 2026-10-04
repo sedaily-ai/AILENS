@@ -25,8 +25,7 @@ interface ChatMessage {
   content: string;
 }
 
-// 단일 AI 에디터 — MBTI 4-페르소나 선택 UI 폐지(2026-08-07) 이후 하나의
-// 고정 아이덴티티. shared/lib/todayLettersApi.ts 의 DEFAULT_META 와 같은 톤.
+// 단일 AI 에디터의 고정 아이덴티티. shared/lib/todayLettersApi.ts의 DEFAULT_META와 같은 톤이다.
 const EDITOR = {
   name: 'AI LENS',
   role: '오늘의 뉴스를 정리해드려요',
@@ -44,10 +43,9 @@ export function SmartSearchOverlay({ open, onClose }: Props) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  // 기본 진입 = 음성 통화 모드 (베이스). 공공장소 등에선 텍스트 모드로 전환.
+  // 기본 진입은 음성 통화 모드이며, 공공장소 등에서는 텍스트 모드로 전환한다.
   const [mode, setMode] = useState<'text' | 'voice'>('voice');
-  // 텍스트 모드도 응답을 TTS 로 재생 (페르소나가 채팅 출력한 거 말해줌).
-  // 지하철 등 조용한 곳에서 음소거 필요 시 토글로 OFF — localStorage 기억.
+  // 텍스트 모드도 응답을 TTS로 재생하며, 조용한 곳에서는 토글로 끌 수 있다(localStorage에 기억).
   const [ttsMuted, setTtsMuted] = useState(false);
   // 음성 모드 내부 상태 (핸즈프리는 음성 모드 안의 옵션)
   const [handsFree, setHandsFree] = useState(false);
@@ -75,7 +73,7 @@ export function SmartSearchOverlay({ open, onClose }: Props) {
     }
   }, [ttsMuted]);
 
-  // 오버레이 열릴 때마다 기본 텍스트 모드로 리셋
+  // 오버레이가 열릴 때마다 기본 모드로 리셋
   useEffect(() => {
     if (open) setMode('text');
   }, [open]);

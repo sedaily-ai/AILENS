@@ -1,33 +1,21 @@
 /**
- * 웹툰 표지 썸네일 생성기 — 수동 실행 도구. 빌드에 물려 있지 않다.
+ * 웹툰 표지 썸네일 생성기. 수동 실행 도구이며 빌드에 물려 있지 않다.
  *
- * ══ 왜 필요한가 ══
- * CMS 에 올라오는 웹툰 표지는 1536x1024 PNG **원본**이고 편당 2.3~3.5MB 다
- * (2026-08-19 실측 24편 전부). next.config.ts 의 images.unoptimized 가 true 라
- * next/image 를 써도 리사이즈가 안 돌아서, 목록 페이지가 이 원본을 그대로
- * 받는다. 화면에 실제로 그려지는 크기는 최대 720px(큰 컷) / 112px(작은 컷)다.
+ * 필요한 이유: CMS 웹툰 표지는 1536x1024 PNG 원본(편당 2.3~3.5MB)이라 목록 페이지가 그대로 받으면 대역폭 부담이 크다.
+ * 화면에 실제로 그려지는 크기는 최대 720px(큰 컷) / 112px(작은 컷)다.
  *
- * 즉 목록 레이아웃이 대역폭에 인질로 잡혀 있었다 — 첫 화면에 표지 한 장만
- * 보여도 3MB, 여러 장을 보여주면 장수 x 3MB. 지면 모자이크처럼 컷을 여러 개
- * 늘어놓는 배치가 오히려 더 비싼 구조였다.
+ * public/에 구운 결과를 커밋하는 이유: assets-src/editors/README.md와 같은 방식으로, 원본은 서비스가 받지 않고
+ * 미리 인코딩한 WebP만 public/에 둔다. 빌드에 물리지 않으므로 S3가 안 열려도 빌드가 죽지 않고 클린 체크아웃이 바로 동작한다.
+ * 목록에 없는 새 편은 원본 URL로 폴백한다(느리지만 깨지지 않는다).
  *
- * ══ public/ 에 구운 결과를 커밋하는 이유 ══
- * assets-src/editors/README.md 와 같은 방식이다 — 원본은 서비스가 안 받고,
- * 미리 인코딩한 WebP 만 public/ 에 두고 커밋한다. 빌드에 물리지 않으므로
- * (a) S3 가 안 열려도 빌드가 죽지 않고 (b) 클린 체크아웃이 바로 동작한다.
- * 목록에 없는 새 편은 자동으로 원본 URL 로 폴백한다(느리지만 깨지지 않음).
+ * 근본 해결은 admin 업로드 시점에 리사이즈해 저장하는 것이며, 이 도구는 그때까지의 임시책이다.
  *
- * ══ 근본 해결은 이게 아니다 ══
- * images.unoptimized 를 풀 수 있게 배포 파이프라인에서 sharp 를 해결하거나,
- * admin 업로드 시점에 리사이즈해 저장하는 쪽이 맞다. 이건 그때까지의 임시책.
- *
- * ══ 사용법 ══
+ * 사용법:
  *   cd service/frontend
  *   node scripts/gen-webtoon-covers.mjs          # 새 편만
  *   node scripts/gen-webtoon-covers.mjs --force  # 전부 다시
  *
- * sharp 는 next 가 끌어오는 전이 의존성을 그대로 쓴다(이 스크립트는 로컬
- * 전용이라 package.json 에 따로 올리지 않는다).
+ * sharp는 next가 끌어오는 전이 의존성을 그대로 쓴다(로컬 전용이라 package.json에 따로 올리지 않는다).
  */
 import { mkdirSync, existsSync, writeFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -35,8 +23,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'public/webtoon/covers');
-// shared/ 에 둔다 — /webtoon 페이지와 홈의 WebtoonPreviewSection 이 같이 쓴다.
-// app/ 에 두면 features/ 가 app/ 을 import 하는 역방향 의존이 된다.
+// shared/에 둔다. /webtoon 페이지와 홈의 WebtoonPreviewSection이 함께 쓰며, app/에 두면 features/가 app/을 import하는 역방향 의존이 된다.
 const MANIFEST = join(ROOT, 'src/shared/lib/webtoonCovers.generated.ts');
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev';
 const FORCE = process.argv.includes('--force');

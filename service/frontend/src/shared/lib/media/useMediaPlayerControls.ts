@@ -3,18 +3,10 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 /**
- * ArticleAudioPlayer.tsx/ArticleVideoPlayer.tsx의 비-시각 상태 로직 중복
- * 추출(2026-09-04, P2 리팩토링 감사). mediaPlayerFormat.tsx가 이미 포맷
- * 함수(clock/spoken 등)를 공용화했는데, 두 파일은 그 외에도 북마크
- * localStorage 동기화·배속 드롭다운 열림/닫힘·재생-일시정지-탐색-되감기/
- * 되감기 이벤트 배선을 거의 바이트 단위로 각자 복사해 갖고 있었다 —
- * "복사본 하나만 고치고 하나는 안 고치는" 패턴이 오늘 세션의 다른 곳(펠터
- * 요약 불릿 파서)에서 실제 버그를 냈던 바로 그 클래스라 여기도 추출한다.
- *
- * 반대로 커버아트/파형/대본 탭(오디오 전용), buffered 진행률/음소거/
- * 전체화면(영상 전용)처럼 두 미디어 타입이 실제로 다른 부분은 여기 없다 —
- * 강제로 합치면 CLAUDE.md가 경계하는 과잉 추상화가 된다(각 컴포넌트에
- * 남겨둔 별도 useEffect 참조).
+ * ArticleAudioPlayer.tsx/ArticleVideoPlayer.tsx가 공유하는 비-시각 상태 로직: 북마크 localStorage 동기화, 배속 드롭다운 열림/닫힘,
+ * 재생-일시정지-탐색-되감기 이벤트 배선. 포맷 함수(clock/spoken 등)는 mediaPlayerFormat.tsx에 있다.
+ * 커버아트/파형/대본 탭(오디오 전용), buffered 진행률/음소거/전체화면(영상 전용)처럼 두 미디어 타입이 실제로 다른 부분은
+ * 강제로 합치면 과잉 추상화가 되므로 각 컴포넌트에 둔다.
  */
 
 /** 북마크 상태 + localStorage 동기화. src가 바뀌면(다른 미디어로 전환) 다시 읽는다. */
@@ -99,12 +91,9 @@ export function usePlaybackRateMenu(
 }
 
 /**
- * 재생/일시정지·현재위치·길이·탐색·되감기/앞으로감기·재시도 — audio/video
- * 공용(둘 다 HTMLMediaElement). loadedmetadata/timeupdate/ended/play/pause/
- * error 6개 이벤트만 배선한다 — buffered progress·volumechange·fullscreen
- * 같은 영상 전용 이벤트는 호출부(ArticleVideoPlayer.tsx)가 별도 effect로
- * 얹는다(같은 엘리먼트에 여러 effect가 addEventListener 해도 서로 무관하게
- * 동작한다).
+ * 재생/일시정지·현재위치·길이·탐색·되감기/앞으로감기·재시도(audio/video 공용, HTMLMediaElement).
+ * loadedmetadata/timeupdate/ended/play/pause/error 6개 이벤트만 배선하고, 영상 전용 이벤트(buffered progress·volumechange·fullscreen)는
+ * 호출부(ArticleVideoPlayer.tsx)가 별도 effect로 얹는다.
  */
 export function useMediaTransport(
   ref: RefObject<HTMLMediaElement | null>,

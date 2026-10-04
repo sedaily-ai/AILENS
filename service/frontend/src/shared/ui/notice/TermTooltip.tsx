@@ -2,19 +2,9 @@
 
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
-// letters/[id]/components/TermTooltip.tsx 에서 이전(2026-09-11) — lens
-// 4탭 페이지(레터 탭)도 같은 용어 하이라이트를 쓰게 되면서 두 페이지가
-// 공유하는 컴포넌트로 승격했다(widgets/HomeSideBar 등과 같은 전례 — 처음엔
-// co-locate였다가 두 번째 소비처가 생기면 shared/ui로).
-//
-// 스타일도 이 이전과 함께 바꿨다 — 원래는 회색 점선 밑줄이었는데, 사용자
-// 요청("친근한, 아날로그 형식의... 노란색 형광펜")에 따라 실제 형광펜으로
-// 손으로 그은 듯한 노란 마커로 교체했다. 용어별로 각도를 살짝 다르게 줘서
-// (hashAngle) 전부 기계적으로 똑같지 않게 — "아날로그" 요청의 핵심.
-//
-// 본문 안에서 glossary 의 단어들을 형광펜 마커 + 호버/탭 툴팁(term+explain)
-// 으로 감싼다. 같은 단락 안의 모든 등장에 적용. 가장 긴 단어 먼저 매칭해
-// substring 충돌 방지.
+// 본문 안의 glossary 단어를 형광펜 마커 + 호버/탭 툴팁(term+explain)으로 감싼다. 같은 단락 안의 모든 등장에 적용하며,
+// 가장 긴 단어부터 매칭해 substring 충돌을 막는다. 레터 페이지와 lens 레터 탭이 공유하므로 shared/ui에 둔다.
+// 마커는 손으로 그은 듯한 노란 형광펜이며, 용어별로 각도를 조금씩 달리해(hashAngle) 기계적으로 똑같아 보이지 않게 한다.
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

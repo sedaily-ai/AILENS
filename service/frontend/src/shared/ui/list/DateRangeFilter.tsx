@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
-// "날짜별 보기" 기간 필터(2026-10-04) — 영문판(en.sedaily.com, msp-web-ensedaily "Browse by date")의 날짜 범위 달력을 React로 옮겼다.
+// "날짜별 보기" 기간 필터. 영문판(en.sedaily.com, msp-web-ensedaily "Browse by date")의 날짜 범위 달력을 React로 옮겼다.
 // 첫 클릭=시작일, 둘째 클릭=끝일(앞선 날이면 순서를 자동으로 맞춤), 같은 날 두 번=하루. 시작일만 고르면 "시작일 ~ 오늘".
 // 빠른 선택(오늘·최근 7일·최근 30일·이번 달)은 누르는 즉시 적용한다. 좁은 화면(768px 미만)에서는 아래에서 올라오는 시트로 바뀐다.
 // 색은 영문판의 먹색 대신 서울경제 CI 파랑(#5b8def)으로 맞췄다.

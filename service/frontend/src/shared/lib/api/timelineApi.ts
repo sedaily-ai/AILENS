@@ -44,7 +44,7 @@ export interface BigKindsDayData {
 /**
  * 서버(ISR 페이지)에서는 시간 기준 캐시, 브라우저에서는 no-store.
  * /timeline/[date]는 revalidate + generateStaticParams로 정적/ISR 렌더인데, 서버 fetch가 no-store면 Next가
- * "Page changed from static to dynamic at runtime"을 던져 운영에서 모든 날짜가 500이었다(2026-10-04 로그로 확인).
+ * "Page changed from static to dynamic at runtime"을 던져 운영에서 모든 날짜가 500이었다.
  * generateMetadata와 페이지가 같은 fetch를 두 번 부르는 것도 이 캐시로 합쳐진다.
  */
 function serverCache(seconds: number): RequestInit {

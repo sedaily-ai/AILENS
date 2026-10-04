@@ -5,8 +5,7 @@ import { Header } from '@/widgets/Header';
 import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 
-// 개인정보처리방침/이용약관/회사소개/문의처럼 footer에서만 진입하는 순수 텍스트
-// 페이지 공용 셸(2026-08-07) — Header/검색 오버레이 배선을 4번 반복하지 않는다.
+// 개인정보처리방침/이용약관/회사소개/문의처럼 footer에서만 진입하는 순수 텍스트 페이지 공용 셸. Header/검색 오버레이 배선을 페이지마다 반복하지 않는다.
 interface Props {
   title: string;
   updated?: string;

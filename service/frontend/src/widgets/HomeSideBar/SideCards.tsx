@@ -1,8 +1,7 @@
 import Link from 'next/link';
 
-// 우측 레일의 두 카드(2026-10-04 사이드바 개편) — 이전의 사주 미니 입력 위젯(SajuMiniRail, 746줄)을 걷어내고 가벼운 안내 카드로 바꿨다.
-// 위젯이 사이드바 안에서 입력·결과까지 다 처리하려다 무겁고 어수선했다. 이제 사이드바는 "어디로 가면 뭘 볼 수 있는지"만 알려 주고,
-// 실제 사주 풀이는 /saju(별도 서비스)에서 한다. 카드는 눌림·호버 반응이 있고 서울경제 파랑·앰버 포인트를 쓴다.
+// 우측 레일의 두 카드(지난 지면 / 사주). 사이드바는 "어디로 가면 무엇을 볼 수 있는지"만 알리는 가벼운 안내 카드이며, 실제 사주 풀이는 /saju(별도 서비스)에서 한다.
+// 카드는 눌림·호버 반응이 있고 서울경제 파랑·앰버 포인트를 쓴다.
 const CSS = `
   .sc-card { display: block; text-decoration: none; border-radius: 18px; padding: 18px 18px 16px; transition: transform .18s cubic-bezier(.22,.8,.22,1), box-shadow .18s ease, background .18s ease; }
   .sc-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px -12px rgba(17,24,39,.22); }
@@ -39,7 +38,7 @@ export function PaperCard() {
 
 export function SajuCard() {
   return (
-    // 사주는 별도 서비스(saju.sedaily.ai)라 외부 링크로만 연결한다(2026-10-05, 이 코드베이스의 사주 코드는 정리).
+    // 사주는 별도 서비스(saju.sedaily.ai)라 외부 링크로만 연결한다.
     <a href="https://saju.sedaily.ai" data-fx="own" className="sc-card" style={{ background: '#f4faf6' }}>
       <style>{CSS}</style>
       <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', color: '#111827' }}>나의 이상형, 사주로 풀어보면?</p>
