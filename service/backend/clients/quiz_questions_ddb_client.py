@@ -13,8 +13,9 @@ import os
 import urllib.error
 import urllib.request
 from typing import Any, Dict, List
+from config.constants import LENS_CMS_API_DEFAULT_URL
 
-_API_URL = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
+_API_URL = os.environ.get("LENS_CMS_API_URL", LENS_CMS_API_DEFAULT_URL)
 _TIMEOUT_SECONDS = 5
 
 

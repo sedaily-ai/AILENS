@@ -282,3 +282,6 @@ CORS_HEADERS = {
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization'
 }
+
+# lens-cms-api 기본 주소(환경변수 LENS_CMS_API_URL이 없을 때). 평문 HTTP라 전환 시 이 한 곳만 바꾼다.
+LENS_CMS_API_DEFAULT_URL = 'http://13.223.179.151'

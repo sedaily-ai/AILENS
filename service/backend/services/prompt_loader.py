@@ -24,10 +24,11 @@ import logging
 import os
 import time
 import urllib.request
+from config.constants import LENS_CMS_API_DEFAULT_URL
 
 logger = logging.getLogger(__name__)
 
-_API_URL = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
+_API_URL = os.environ.get("LENS_CMS_API_URL", LENS_CMS_API_DEFAULT_URL)
 _TTL_SECONDS = 300  # 5분 — admin UI 변경 → production 반영 SLA
 _TIMEOUT_SECONDS = 8
 

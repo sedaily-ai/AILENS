@@ -28,11 +28,12 @@ from common.secrets import get_secret
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, success_response
+from config.constants import LENS_CMS_API_DEFAULT_URL
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-_API_URL = "http://13.223.179.151"
+_API_URL = LENS_CMS_API_DEFAULT_URL
 _MAX_QUIZZES = 4
 
 

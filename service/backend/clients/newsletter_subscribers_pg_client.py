@@ -15,8 +15,9 @@ import urllib.request
 from typing import Any, Dict, List, Optional
 
 from common.secrets import get_secret
+from config.constants import LENS_CMS_API_DEFAULT_URL
 
-_API_URL = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
+_API_URL = os.environ.get("LENS_CMS_API_URL", LENS_CMS_API_DEFAULT_URL)
 # admin Lambda 쪽 역할은 /sedaily-mbti/admin/* 만 읽을 수 있고, 이 Lambda가
 # 쓰는 공용 역할(sedaily-mbti-v2-collector-dev-role)은 /sedaily-mbti/v2/*
 # 만 읽을 수 있어(V2SecretsAccess 정책) 같은 값을 두 경로에 각각 저장해뒀다
