@@ -62,13 +62,13 @@ export function WebtoonLightbox({ webtoon, onClose }: { webtoon: CmsWebtoon; onC
       aria-label={`웹툰 미리보기: ${displayHeadline(webtoon.title)}`}
     >
       <style>{`
-        .wl-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.22) transparent; }
+        .wl-scroll { scrollbar-width: thin; scrollbar-color: rgba(17,24,39,.22) transparent; }
         .wl-scroll::-webkit-scrollbar { width: 8px; }
         .wl-scroll::-webkit-scrollbar-track { background: transparent; margin: 8px 0; }
-        .wl-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
-        .wl-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.36); background-clip: padding-box; }
+        .wl-scroll::-webkit-scrollbar-thumb { background: rgba(17,24,39,.2); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+        .wl-scroll::-webkit-scrollbar-thumb:hover { background: rgba(17,24,39,.36); background-clip: padding-box; }
         .wl-close { transition: background .15s ease, color .15s ease, transform .15s ease; }
-        .wl-close:hover { background: rgba(255,255,255,.16); color: #fff; transform: rotate(90deg); }
+        .wl-close:hover { background: rgba(17,24,39,.1); color: #111827; transform: rotate(90deg); }
         @keyframes wl-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
         @media (prefers-reduced-motion: reduce) { .wl-panel { animation: none !important; } .wl-close:hover { transform: none; } }
       `}</style>
@@ -78,34 +78,34 @@ export function WebtoonLightbox({ webtoon, onClose }: { webtoon: CmsWebtoon; onC
           maxWidth: 540,
           height: 'min(100%, 920px)',
           borderRadius: 22,
-          background: 'linear-gradient(180deg, #14171d 0%, #0d0f13 100%)',
-          boxShadow: '0 40px 90px -20px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.06)',
+          background: '#f8f8f6',
+          boxShadow: '0 40px 90px -20px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.08)',
           overflow: 'hidden',
           animation: 'wl-in .22s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 읽기 진행 — 맨 위 가는 선 */}
-        <div aria-hidden style={{ height: 2, background: 'rgba(255,255,255,.08)', flexShrink: 0 }}>
-          <div style={{ height: '100%', width: `${progress * 100}%`, background: '#7aa2ff', transition: 'width .12s linear' }} />
+        <div aria-hidden style={{ height: 2, background: 'rgba(17,24,39,.07)', flexShrink: 0 }}>
+          <div style={{ height: '100%', width: `${progress * 100}%`, background: '#3d70de', transition: 'width .12s linear' }} />
         </div>
 
         <header className="flex items-start" style={{ gap: 14, padding: '20px 22px 16px', flexShrink: 0 }}>
           <div className="min-w-0 flex-1">
-            <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.16em', color: '#7aa2ff', textTransform: 'uppercase' }}>
+            <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.16em', color: '#3d70de', textTransform: 'uppercase' }}>
               서울경제 웹툰{count > 1 ? ` · ${count}컷` : ''}
             </p>
-            <h2 style={{ margin: '8px 0 0', fontFamily: '"Noto Serif KR", serif', fontSize: 19, fontWeight: 700, lineHeight: 1.45, letterSpacing: '-0.02em', color: '#f4f5f7' }}>
+            <h2 style={{ margin: '8px 0 0', fontFamily: '"Noto Serif KR", serif', fontSize: 19, fontWeight: 700, lineHeight: 1.45, letterSpacing: '-0.02em', color: '#1f2937' }}>
               {displayHeadline(webtoon.title)}
             </h2>
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'rgba(255,255,255,.45)' }}>{when}</p>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#9ca3af' }}>{when}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="닫기"
             className="wl-close flex items-center justify-center flex-shrink-0"
-            style={{ width: 34, height: 34, borderRadius: '50%', color: 'rgba(255,255,255,.65)', border: 'none', background: 'rgba(255,255,255,.08)', cursor: 'pointer' }}
+            style={{ width: 34, height: 34, borderRadius: '50%', color: '#6b7280', border: 'none', background: 'rgba(17,24,39,.06)', cursor: 'pointer' }}
           >
             <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
               <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
@@ -116,7 +116,7 @@ export function WebtoonLightbox({ webtoon, onClose }: { webtoon: CmsWebtoon; onC
         <div ref={scrollRef} onScroll={onScroll} className="wl-scroll flex-1" style={{ overflowY: 'auto', padding: '4px 22px 26px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {panels.length > 0 ? (
             panels.map((p, i) => (
-              <figure key={i} style={{ margin: 0, flexShrink: 0, borderRadius: 14, overflow: 'hidden', background: '#fff', boxShadow: '0 6px 22px -10px rgba(0,0,0,.6)' }}>
+              <figure key={i} style={{ margin: 0, flexShrink: 0, borderRadius: 14, overflow: 'hidden', background: '#fff', boxShadow: '0 1px 2px rgba(60,55,45,.08), 0 10px 26px -14px rgba(60,55,45,.35)', border: '1px solid #e4e4df' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 원본, 컷마다 비율이 달라 next/image 불가 */}
                 <img src={p.url} alt={p.caption || `${displayHeadline(webtoon.title)} 컷 ${i + 1}`} style={{ display: 'block', width: '100%', height: 'auto' }} />
               </figure>
@@ -128,10 +128,10 @@ export function WebtoonLightbox({ webtoon, onClose }: { webtoon: CmsWebtoon; onC
             </figure>
           ) : null}
           {!loading && panels.length === 0 && (
-            <p style={{ margin: 0, padding: '28px 0', textAlign: 'center', fontSize: 13.5, color: 'rgba(255,255,255,.5)' }}>컷을 불러오지 못했어요.</p>
+            <p style={{ margin: 0, padding: '28px 0', textAlign: 'center', fontSize: 13.5, color: '#6b7280' }}>컷을 불러오지 못했어요.</p>
           )}
           {panels.length > 0 && (
-            <p style={{ margin: '10px 0 0', flexShrink: 0, textAlign: 'center', fontSize: 11.5, letterSpacing: '0.12em', color: 'rgba(255,255,255,.32)' }}>끝 · AI LENS</p>
+            <p style={{ margin: '10px 0 0', flexShrink: 0, textAlign: 'center', fontSize: 11.5, letterSpacing: '0.12em', color: '#b0b4bb' }}>끝 · AI LENS</p>
           )}
         </div>
       </div>
