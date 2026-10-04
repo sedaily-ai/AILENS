@@ -45,89 +45,9 @@ const WAYS = [
 // 진한 accent"가 필요해지면 lensPerspectives.ts의 공용 토큰으로 승격할 것.
 const LENS_ACCENT_STRONG = '#2563eb';
 
-// "오늘의 이슈, 4가지 시선" 홈 티저 — 지면 특별 코너로 개편(2026-08-21,
-// 사용자 요청: "전체 지면 1면, 증권면 1면, 산업면 1면, 시그널 1면 이렇게
-// 구성하고, 해당 중요한 기사들을 넣는 탭으로 만들겁니다").
-//
-// 구조 변천사(2026-09-30 하루 동안 네 번 — 각 라운드 사용자 확인 인용):
-//  1. 탭+화살표 페이저(2026-08-21) — 탭으로 지면 고르고, 화살표로 그 지면
-//     "안의" 기사 4건을 하나씩 넘겨봄.
-//  2. 신문 지면 탭 스타일링(2026-09-30 오전) — 구조는 1과 같음, 탭을
-//     세리프+잉크 밑줄로 톤만 바꿈("약간 신문 디자인처럼").
-//  3. 4지면 동시 배치(2026-09-30 오후, "신문이 왼쪽 위에서 오른쪽 아래로
-//     내려오는 게 중요한 순서... 4지면 동시 배치로 바꿔주세요") — 탭을
-//     없애고 4개 지면(전체/증권/산업/시그널)을 한 화면에 동시 배치.
-//  4. **현재**(2026-09-30 저녁, 3을 정정 — "4개의 탭으로 분류하고..
-//     증권 탭 가면 레이아웃 유지하면서 4개가 존재하고.. 지금은 한 화면에
-//     4개 유형이 다 들어가있네" — 3은 "동시 배치"라는 시각 언어는 맞았지만
-//     그걸 "지면들 사이"가 아니라 "지면 안 기사들 사이"에 적용했어야 했다).
-//     탭(전체/증권/산업/시그널)은 1·2처럼 유지 — 지면을 고르는 축은
-//     탭이다. 고른 지면 "안의" 기사 최대 4건을 3의 레이아웃(히어로 1 +
-//     작은 카드 3, 왼쪽 위→오른쪽 아래로 작아짐)으로 동시에 보여준다 —
-//     화살표로 하나씩 넘기는 대신 한눈에 다 보인다. 히어로만 레터/웹툰/
-//     팟캐스트/영상 4형식 타일을 갖고, 나머지 3개는 헤드라인만 — 클릭하면
-//     해당 글 상세(4형식 전부 있는 곳)로 이동한다.
-//
-// 지면별 기사는 lens.paper_section 필드로 고른다(2026-08-21, 데이터 모델
-// 수정 — 처음엔 lens.category(/markets 등 일반 카테고리 페이지가 쓰는
-// 같은 필드, 증시/산업/... 7개 값)를 재사용해서 "전체" 탭은 category
-// 무관 최신순으로 구현했었다. 그런데 그러면 산업/증권 카테고리로 새
-// 글을 발행할 때마다 그 글이 "전체" 탭에도 자동으로 같이 떠버리는
-// 문제가 생겼다(사용자 지적: "산업 1면에만 올라가야 하는데 지면
-// 1면에도 들어갔네요... 지면 1면은 지면 1면 기사만 들어가는 겁니다.
-// '전체'가 아니예요"). 한 필드를 두 목적(일반 카테고리 페이지 배치 +
-// 지면 특별 코너 배치)에 같이 쓴 게 근본 원인이라, 지면 특별 코너
-// 전용 필드(paper_section)를 완전히 분리했다 — "전체"/"증권"/"산업"/
-// "시그널" 중 하나를 명시적으로 값으로 가진 글만 이 코너에 뜨고,
-// category(증시/산업 등)와는 이제 아무 관계가 없다. 즉 어떤 글이
-// 지면 특별 코너 어디에도 안 뜨는 게 기본값 — 사람이 명시적으로
-// paper_section을 찍어줘야 노출된다. 기사가 없는 지면은 아래 "준비
-// 중" 빈 상태로 보여준다.
-interface SectionSlot {
-  key: string;
-  label: string;
-  paperSection: string; // lens.paper_section과 매칭 — SECTIONS[0]은 "전체"
-}
-
-// 탭 라벨 자체에 "1면"까지 표기(2026-08-21, 사용자 확인 — 처음엔 탭은
-// 짧게 두고 "1면"을 배지 쪽으로 뺐었는데, 스크린샷으로 "지면 1면/증권
-// 1면/산업 1면/시그널 1면 이라고 표기해주시죠"라고 재요청해 탭 라벨을
-// 그대로 "OO 1면"으로 확정. 배지·빈 상태 문구는 label을 그대로 쓰므로
-// 별도로 "1면"을 덧붙이지 않는다(중복 방지, 아래 참조).
-const SECTIONS: SectionSlot[] = [
-  { key: 'all', label: '지면 1면', paperSection: '전체' },
-  { key: 'markets', label: '증권 1면', paperSection: '증권' },
-  { key: 'industry', label: '산업 1면', paperSection: '산업' },
-  { key: 'signal', label: '시그널 1면', paperSection: '시그널' },
-];
-
-// variant(2026-10-04): 'home'은 기존 그대로(소개 카피·형식 칩 포함). 'archive'는 "지난 지면" 페이지(/paper/[date])용 —
-// 홈의 소개 헤더를 빼고 지면 4탭 카드만 그린다(날짜 제목·날짜 이동은 페이지가 따로 그린다).
-/** "10월 3일 금요일 지면" — 날짜가 없으면 그냥 "오늘의 지면". 요일은 UTC 정오 기준으로 계산해 시간대에 흔들리지 않는다. */
-/** 탭(지면) 하나의 기사 최대 4건 — 날짜 최신 우선, 같은 날은 display_order 오름차순. */
-function pickSection(source: CmsLens[], tabIdx: number): CmsLens[] {
-  const section = SECTIONS[tabIdx].paperSection;
-  return source
-    .filter((l) => l.paper_section === section)
-    .slice()
-    .sort((a, b) => {
-      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
-      const oa = a.display_order;
-      const ob = b.display_order;
-      if (oa != null && ob != null) return oa - ob;
-      if (oa != null) return -1;
-      if (ob != null) return 1;
-      return 0;
-    })
-    .slice(0, 4);
-}
-
-function paperTitle(iso?: string): string {
-  if (!iso) return '오늘의 지면';
-  const [y, m, d] = iso.split('-').map(Number);
-  const wd = ['일', '월', '화', '수', '목', '금', '토'][new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay()];
-  return `${m}월 ${d}일 ${wd}요일 지면`;
-}
+// "오늘의 이슈, 4가지 시선" 홈 티저 — 지면 특별 코너(전체·증권·산업·시그널 4탭, 고른 지면의 기사 최대 4건: 히어로 1 + 작은 카드 3).
+// 지면 로직은 ../lib/paperSections.ts, 구조 변천사(탭→동시 배치→탭 복귀)는 docs/worklog/2026-10/2026-10-05-리팩토링/LensPreviewSection_구조변천사.md.
+import { SECTIONS, pickSection, paperTitle } from '../lib/paperSections';
 
 export function LensPreviewSection({ initialItems, variant = 'home', paperDates }: { initialItems?: CmsLens[]; variant?: 'home' | 'archive'; /** 홈 헤더 ◀ ▶로 넘길 수 있는 지면 날짜(최신순, 첫 값 = 지금 보여 주는 날). 없으면 화살표를 그리지 않는다. */ paperDates?: string[] }) {
   // 4개 지면 탭(전체·증권·산업·시그널)이 각각 최신 4건씩만 쓴다 — 최신 100건이면 각 지면 8건 이상 확보. 이 섹션은 bullets를 안 읽어 SSR 요약본으로 충분하다.
