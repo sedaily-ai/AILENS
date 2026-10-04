@@ -15,12 +15,12 @@ import hmac
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict
 from urllib.parse import quote
 
 import boto3
 
 from config.constants import CORS_HEADERS
+from handlers.chat.voice.responses import json_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -29,14 +29,6 @@ _REGION = 'us-east-1'
 _SERVICE = 'transcribe'
 _HOST = f'transcribestreaming.{_REGION}.amazonaws.com'
 _ENDPOINT = f'{_HOST}:8443'
-
-
-def _resp(status: int, body: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        'statusCode': status,
-        'headers': CORS_HEADERS,
-        'body': json.dumps(body, ensure_ascii=False),
-    }
 
 
 def _sign(key: bytes, msg: str) -> bytes:
@@ -121,7 +113,7 @@ def lambda_handler(event: dict, context) -> dict:
         )
 
         logger.info(f"transcribe presign issued: lang={language} sr={sample_rate}")
-        return _resp(200, {
+        return json_response(200, {
             'url': url,
             'region': _REGION,
             'language': language,
@@ -130,4 +122,4 @@ def lambda_handler(event: dict, context) -> dict:
         })
     except Exception as e:
         logger.exception(f"presign fail: {e}")
-        return _resp(500, {'error': str(e)})
+        return json_response(500, {'error': str(e)})

@@ -27,6 +27,7 @@ from typing import Any, Dict, Optional, Tuple
 import boto3
 
 from config.constants import CORS_HEADERS
+from handlers.chat.voice.responses import json_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -147,14 +148,6 @@ def preprocess_for_polly(text: str) -> str:
     return out
 
 
-def _resp(status: int, body: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        'statusCode': status,
-        'headers': CORS_HEADERS,
-        'body': json.dumps(body, ensure_ascii=False),
-    }
-
-
 def lambda_handler(event: dict, context) -> dict:
     method = event.get('httpMethod') or event.get('requestContext', {}).get('http', {}).get('method', 'POST')
     if method == 'OPTIONS':
@@ -166,13 +159,13 @@ def lambda_handler(event: dict, context) -> dict:
             body_raw = base64.b64decode(body_raw).decode('utf-8')
         body = json.loads(body_raw)
     except json.JSONDecodeError:
-        return _resp(400, {'error': 'invalid JSON body'})
+        return json_response(400, {'error': 'invalid JSON body'})
 
     text = (body.get('text') or '').strip()
     if not text:
-        return _resp(400, {'error': 'text 가 비어있습니다.'})
+        return json_response(400, {'error': 'text 가 비어있습니다.'})
     if len(text) > 3000:
-        return _resp(400, {'error': 'text 너무 김 (max 3000자)'})
+        return json_response(400, {'error': 'text 너무 김 (max 3000자)'})
 
     spec = DEFAULT_CHAT_VOICE
     # 영어 약어·단위·한자 → 한국식 발음으로 치환. ElevenLabs Multilingual v2
@@ -192,7 +185,7 @@ def lambda_handler(event: dict, context) -> dict:
             f"TTS ok: provider={provider} voice={used_voice} "
             f"engine={used_engine} len={len(text)} bytes={len(audio_bytes)}"
         )
-        return _resp(200, {
+        return json_response(200, {
             'audio': audio_b64,
             'content_type': 'audio/mpeg',
             'provider': provider,
@@ -201,7 +194,7 @@ def lambda_handler(event: dict, context) -> dict:
         })
     except Exception as e:
         logger.exception(f"TTS synth fail (provider={provider}): {e}")
-        return _resp(500, {'error': f'TTS synthesize failed: {e}'})
+        return json_response(500, {'error': f'TTS synthesize failed: {e}'})
 
 
 def _synth_polly(text: str, spec: Dict[str, Any]) -> Tuple[bytes, str, str]:
