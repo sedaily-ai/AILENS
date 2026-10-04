@@ -27,7 +27,7 @@ from typing import Dict, Any, List
 
 import requests
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 API_URL = os.getenv('API_URL', 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev')
 REGION = os.getenv('AWS_REGION', 'us-east-1')
@@ -211,7 +211,7 @@ def main():
             print(f'  Error: {emb["error"]}')
 
     # Save report
-    results_dir = os.path.join(os.path.dirname(__file__), 'results')
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'results')
     os.makedirs(results_dir, exist_ok=True)
     filename = f"performance_{TODAY.replace('-', '')}.json"
     filepath = os.path.join(results_dir, filename)

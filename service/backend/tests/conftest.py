@@ -29,17 +29,11 @@ def pytest_configure(config) -> None:
     )
 
 
-# 실제 AWS·배포된 API를 호출하는 파일. 파일마다 마커를 붙이는 대신 여기서 한 번에 붙여서
-# `pytest -m "not integration"`만으로 단위 테스트만 안전하게 돌 수 있게 한다.
-_LIVE_TEST_FILES = frozenset({
-    "test_pipeline.py", "test_regression.py", "test_full_integration.py",
-    "test_full_volume.py", "test_performance.py", "test_split_storage.py", "test_new_apis.py",
-})
-
-
+# 실제 AWS·배포된 API를 호출하는 테스트는 tests/integration/ 아래에 둔다. 폴더 기준으로 한 번에 마커를 붙여
+# `pytest -m "not integration"`만으로 단위 테스트만 안전하게 돌 수 있게 한다(수집 단계 import 오류까지 피하려면 --ignore=tests/integration).
 def pytest_collection_modifyitems(items) -> None:
     for item in items:
-        if item.path.name in _LIVE_TEST_FILES:
+        if "integration" in item.path.parts:
             item.add_marker(pytest.mark.integration)
 
 

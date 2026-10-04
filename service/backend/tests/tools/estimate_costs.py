@@ -379,7 +379,7 @@ def main():
     }
 
     # Save report
-    results_dir = os.path.join(os.path.dirname(__file__), 'results')
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'results')
     os.makedirs(results_dir, exist_ok=True)
     filename = f"cost_estimate_{TODAY.replace('-', '')}.json"
     filepath = os.path.join(results_dir, filename)

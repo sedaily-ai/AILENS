@@ -35,7 +35,7 @@ from datetime import datetime, timezone, timedelta
 import boto3
 import requests as http_requests
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # ── Configuration ────────────────────────────────────────────────────────────
 

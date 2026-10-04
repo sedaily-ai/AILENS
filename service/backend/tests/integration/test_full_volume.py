@@ -38,7 +38,7 @@ from typing import Dict, Any, List
 
 import boto3
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -431,7 +431,7 @@ def main():
     }
 
     # Save report
-    results_dir = os.path.join(os.path.dirname(__file__), 'results')
+    results_dir = os.path.join(os.path.dirname(__file__), '..', 'results')
     os.makedirs(results_dir, exist_ok=True)
     filename = f"volume_test_{today.replace('-', '')}.json"
     filepath = os.path.join(results_dir, filename)

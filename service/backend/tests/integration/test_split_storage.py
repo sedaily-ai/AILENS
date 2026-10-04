@@ -31,7 +31,7 @@ import requests
 
 # ── Add backend root to path ─────────────────────────────────────────────────
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from clients.s3.article_body import S3ArticleClient
 from clients.ddb.dynamodb import DynamoDBClient

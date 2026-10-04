@@ -20,7 +20,7 @@ from datetime import datetime, timezone, timedelta
 import boto3
 import requests
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 API_URL = os.getenv('API_URL', 'https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev')
 REGION = os.getenv('AWS_REGION', 'us-east-1')
@@ -225,7 +225,7 @@ def main():
     print('\n── 비용 (Cost) ──\n')
 
     try:
-        from tests.estimate_costs import estimate_bedrock_cost
+        from tests.tools.estimate_costs import estimate_bedrock_cost
         bedrock = estimate_bedrock_cost(cw, start_cw, end, 1)
         daily = bedrock.get('total_daily', 0)
         ok('Bedrock daily cost', f'${daily:.4f}')

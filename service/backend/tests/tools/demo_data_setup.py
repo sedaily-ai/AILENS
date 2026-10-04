@@ -25,7 +25,7 @@ from datetime import datetime, timezone, timedelta
 
 import boto3
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from repositories.personal_repository import get_personal_repository
 from models.personal import UserProfile, ReadingRecord, ArchivedSentence
