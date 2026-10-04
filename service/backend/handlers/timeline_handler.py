@@ -2,8 +2,12 @@
 Timeline Handler Lambda Function
 `/timeline` (뉴스 타임머신) 화면에 그 날짜의 지면을 돌려준다.
 
-    POST /api/timeline   { "date": "2026-07-31", ... }
-    GET  /api/timeline?date=2026-07-31
+    POST /api/timeline   { "date": "2026-07-31", "mode": "flat", "page_size": 30 }
+    GET  /api/timeline?date=2026-07-31          (로컬 main.py 전용, 운영 라우트는 POST 만)
+
+    mode 는 'flat' 만 허용한다(그 외 400). query/categories/page 는 선택.
+    오류 규약: 400 BAD_REQUEST(입력 오류), 500 TIMELINE_ERROR(내부 오류, 상세는 로그에만).
+    '그날 기사 없음'은 오류가 아니라 200 + articles=[].
 
 ⚠️ 2026-08-13, 빅카인즈(언론진흥재단 OpenAPI) + DynamoDB 폴백 2단계 구조를
 걷어내고 S3 XML 원본 피드 하나로 단순화했다.
@@ -25,59 +29,28 @@ services/timeline_service.py로 뺐다(코드 리팩토링 감사 Track B, God �
 """
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from config.constants import MAX_PAGE_SIZE
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, no_content_response, success_response
 from services.timeline_service import (
-    DEFAULT_ISSUE_COUNT,
     DEFAULT_PAGE_SIZE,
-    DEFAULT_PER_ISSUE,
-    MAX_ISSUE_COUNT,
-    MAX_PER_ISSUE,
+    ALLOWED_MODES,
     TimelineRequest,
     build_timeline,
 )
+from utils.date_validation import BadRequest, validate_date
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-KST = timezone(timedelta(hours=9))
-DATE_FORMAT = '%Y-%m-%d'
-
-
-class BadRequest(Exception):
-    """400 으로 내려보낼 입력 오류."""
 
 
 # =============================================================================
 # Request parsing
 # =============================================================================
 
-def _today_kst() -> str:
-    return datetime.now(KST).strftime(DATE_FORMAT)
-
-
-def _validate_date(raw: str) -> str:
-    """`YYYY-MM-DD` 검증. 미래 날짜는 오늘로 당긴다 (빈 지면 대신 오늘 지면)."""
-    if not raw:
-        raise BadRequest('date 파라미터가 필요합니다. (YYYY-MM-DD)')
-    try:
-        parsed = datetime.strptime(raw, DATE_FORMAT)
-    except (ValueError, TypeError):
-        raise BadRequest(f'날짜 형식이 올바르지 않습니다: {raw} (YYYY-MM-DD 형식으로 입력해주세요)')
-
-    normalized = parsed.strftime(DATE_FORMAT)
-    today = _today_kst()
-    if normalized > today:
-        logger.info('미래 날짜 요청(%s) → 오늘(%s)로 조정', normalized, today)
-        return today
-    return normalized
-
-
-def _parse_list(value: Any) -> List[str]:
+def _parse_list(value: Any) -> list:
     """리스트 또는 콤마 구분 문자열 → 리스트."""
     if not value:
         return []
@@ -108,6 +81,8 @@ def parse_request(event: dict) -> TimelineRequest:
                 raise BadRequest('요청 본문이 올바른 JSON 이 아닙니다.')
         elif isinstance(raw_body, dict):
             body = raw_body
+        if not isinstance(body, dict):
+            raise BadRequest('요청 본문은 JSON 객체여야 합니다.')
     params = event.get('queryStringParameters') or {}
 
     def pick(*names: str, default: Any = None) -> Any:
@@ -118,7 +93,7 @@ def parse_request(event: dict) -> TimelineRequest:
                 return params[name]
         return default
 
-    date = _validate_date(str(pick('date', default='') or '').strip())
+    date = validate_date(str(pick('date', default='') or '').strip())
 
     query = pick('query', default=None)
     query = str(query).strip() if query else None
@@ -131,16 +106,8 @@ def parse_request(event: dict) -> TimelineRequest:
     page_size = max(1, min(page_size, MAX_PAGE_SIZE))
 
     mode = str(pick('mode', default='flat') or 'flat').strip().lower()
-    if mode not in ('flat', 'issues'):
-        raise BadRequest(f"mode 는 flat, issues 중 하나입니다: {mode}")
-
-    issue_count = _parse_int(pick('issue_count', 'issueCount', default=DEFAULT_ISSUE_COUNT),
-                             DEFAULT_ISSUE_COUNT)
-    issue_count = max(1, min(issue_count, MAX_ISSUE_COUNT))
-
-    per_issue = _parse_int(pick('per_issue', 'perIssue', default=DEFAULT_PER_ISSUE),
-                           DEFAULT_PER_ISSUE)
-    per_issue = max(1, min(per_issue, MAX_PER_ISSUE))
+    if mode not in ALLOWED_MODES:
+        raise BadRequest(f"mode 는 {', '.join(ALLOWED_MODES)} 중 하나입니다: {mode}")
 
     return TimelineRequest(
         date=date,
@@ -149,8 +116,6 @@ def parse_request(event: dict) -> TimelineRequest:
         page=page,
         page_size=page_size,
         mode=mode,
-        issue_count=issue_count,
-        per_issue=per_issue,
     )
 
 
@@ -184,4 +149,4 @@ def lambda_handler(event: dict, context) -> dict:
         return success_response(payload)
     except Exception as e:  # noqa: BLE001
         logger.error('timeline 오류: %s', e, exc_info=True)
-        return error_response(str(e), status_code=500, code='TIMELINE_ERROR')
+        return error_response('타임라인을 불러오지 못했습니다.', status_code=500, code='TIMELINE_ERROR')

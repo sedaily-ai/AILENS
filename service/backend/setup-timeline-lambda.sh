@@ -1,10 +1,15 @@
 #!/bin/bash
-# 빅카인즈 기반 타임라인 Lambda + API Gateway 라우트 최초 1회 프로비저닝.
+# S3 XML(서울경제 원본 피드) 기반 타임라인 Lambda + API Gateway 라우트 최초 1회 프로비저닝.
 #
 # 왜 필요한가:
 #   handlers/timeline_handler.py 는 레포에 있지만 Lambda 함수와 API Gateway 라우트가
-#   없어서 `POST /api/timeline` 이 404 다. 그러면 프론트(NewsTimeMachine.tsx)가
-#   구 `/api/search` 로 폴백해 "에디터별 보기"·"그날의 이슈"가 안 나온다.
+#   없으면 `POST /api/timeline` 이 404 다. 프론트(타임머신 화면)는 이 라우트로
+#   그 날짜의 지면(mode=flat)을 받는다.
+#
+# 동작 방식(2026-08-13 이후):
+#   s3://sedaily-news-xml-storage/daily-xml/{YYYYMMDD}.xml 을 읽어 필터·정렬·페이지해 돌려준다
+#   (services/timeline_service.py). 빅카인즈·DynamoDB 폴백·BIGKINDS_API_KEY 는 쓰지 않는다
+#   — 별도 환경변수 주입이 필요 없다. 허용 mode 는 'flat' 하나.
 #
 # 왜 deploy.sh 가 아니라 별도 스크립트인가:
 #   deploy.sh 는 `update-function-code` 만 한다(이미 있는 함수의 코드 갱신).
@@ -19,9 +24,6 @@
 # 사용:
 #   chmod +x setup-timeline-lambda.sh
 #   ./setup-timeline-lambda.sh
-#
-#   빅카인즈 키까지 함께 넣으려면 (권장 — 안 넣으면 폴백만 동작):
-#   BIGKINDS_API_KEY='발급받은-키' ./setup-timeline-lambda.sh
 #
 # 되돌리기:
 #   aws apigatewayv2 delete-route      --api-id chzwwtjtgk --route-id <ID> --region us-east-1
@@ -38,17 +40,16 @@ S3_KEY="lambda_package.zip"
 HANDLER="handlers.timeline_handler.lambda_handler"
 RUNTIME="python3.11"
 # API Gateway HTTP API 의 통합 타임아웃 상한이 30초라 Lambda 도 30초로 맞춘다.
-# (실측: personas 1~5초, issues 3~6초 — 빅카인즈 왕복 2회 포함)
+# (S3 XML 한 파일 조회라 보통 1~2초 안에 끝난다.)
 TIMEOUT=30
 MEMORY=1024
-# 기존 v1 Lambda 들과 같은 실행 역할. DynamoDB 폴백 + S3 본문 조회 권한이 이미 있고,
-# 빅카인즈 호출은 아웃바운드 HTTPS 라 추가 IAM 권한이 필요 없다.
+# 기존 v1 Lambda 들과 같은 실행 역할. S3 XML 버킷 조회 권한이 이미 있다.
 ROLE_ARN="arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev"
-# 프론트는 POST 만 쓴다 (NewsTimeMachine.tsx 의 fetchDayArticles / fetchIssues 둘 다 POST).
+# 프론트는 POST 만 쓴다.
 # GET 은 로컬 main.py 의 curl 편의용이라 운영에 열지 않는다.
 ROUTE_KEY="POST /api/timeline"
 
-echo "=== 타임라인 Lambda + 라우트 프로비저닝 ==="
+echo "=== 타임라인 Lambda + 라우트 프로비저닝 (S3 XML 기반) ==="
 echo "  함수    : $FUNCTION_NAME"
 echo "  라우트  : $ROUTE_KEY  (API $API_ID)"
 echo ""
@@ -76,7 +77,7 @@ else
     --memory-size "$MEMORY" \
     --architectures x86_64 \
     --region "$REGION" \
-    --description "빅카인즈 기반 타임라인 — 에디터별 큐레이션 / 그날의 이슈 / 그 무렵의 지표" \
+    --description "S3 XML 기반 뉴스 타임머신 — 그 날짜의 서울경제 지면(mode=flat)" \
     --output text --query 'FunctionArn'
   echo "     활성화 대기"
   aws lambda wait function-active --function-name "$FUNCTION_NAME" --region "$REGION"
@@ -87,33 +88,7 @@ LAMBDA_ARN=$(aws lambda get-function-configuration \
   --query 'FunctionArn' --output text)
 echo "     ARN: $LAMBDA_ARN"
 
-# ── 2. 빅카인즈 키 (선택) ───────────────────────────────────────────────────
-# ⚠️ 환경변수 딕셔너리는 통째로 교체되므로 기존 값을 먼저 읽어 병합한다.
-if [ -n "${BIGKINDS_API_KEY:-}" ]; then
-  echo "  -> BIGKINDS_API_KEY 주입 (기존 env 병합)"
-  MERGED=$(aws lambda get-function-configuration \
-    --function-name "$FUNCTION_NAME" --region "$REGION" \
-    --query 'Environment.Variables' --output json 2>/dev/null \
-    | BK="$BIGKINDS_API_KEY" python3 -c '
-import json, os, sys
-cur = sys.stdin.read().strip()
-env = json.loads(cur) if cur and cur != "null" else {}
-env["BIGKINDS_API_KEY"] = os.environ["BK"]
-print(json.dumps({"Variables": env}))
-')
-  aws lambda update-function-configuration \
-    --function-name "$FUNCTION_NAME" --region "$REGION" \
-    --environment "$MERGED" \
-    --output text --query 'LastModified' >/dev/null
-  aws lambda wait function-updated --function-name "$FUNCTION_NAME" --region "$REGION"
-  echo "     주입 완료 (값은 출력하지 않음)"
-else
-  echo "  -> BIGKINDS_API_KEY 미지정 — 건너뜀"
-  echo "     이 상태로도 404 는 사라지지만 응답 source 는 'dynamodb' 폴백이다."
-  echo "     나중에 넣으려면 이 스크립트를 키와 함께 다시 실행하면 된다."
-fi
-
-# ── 3. API Gateway 통합 + 라우트 ────────────────────────────────────────────
+# ── 2. API Gateway 통합 + 라우트 ────────────────────────────────────────────
 EXISTING_ROUTE=$(aws apigatewayv2 get-routes --api-id "$API_ID" --region "$REGION" \
   --query "Items[?RouteKey=='$ROUTE_KEY'].RouteId" --output text)
 
@@ -148,14 +123,14 @@ else
     --output text --query 'RouteId'
 fi
 
-# ── 4. 검증 ─────────────────────────────────────────────────────────────────
+# ── 3. 검증 ─────────────────────────────────────────────────────────────────
 echo ""
 echo "=== 검증 ==="
 BASE="https://${API_ID}.execute-api.${REGION}.amazonaws.com/dev"
 sleep 3
 CODE=$(curl -s -o /tmp/timeline_check.json -w '%{http_code}' --max-time 40 \
   -X POST "$BASE/api/timeline" -H 'Content-Type: application/json' \
-  -d '{"date":"2026-08-05","mode":"personas","per_persona":3,"page_size":10}' || echo "000")
+  -d '{"date":"2026-08-05","mode":"flat","page_size":10}' || echo "000")
 echo "  POST /api/timeline -> HTTP $CODE"
 if [ "$CODE" = "200" ]; then
   python3 - <<'PY'
@@ -164,15 +139,10 @@ d = json.load(open('/tmp/timeline_check.json'))
 print(f"  source     : {d.get('source')}")
 print(f"  total_hits : {d.get('total_hits')}")
 print(f"  articles   : {len(d.get('articles') or [])}")
-p = d.get('personas')
-print(f"  personas   : {'있음' if p else '없음'}")
-if d.get('fallback_reason'):
-    print(f"  fallback   : {d['fallback_reason'][:100]}")
-print()
-if d.get('source') == 'bigkinds':
-    print("  => 빅카인즈 정상 연결. 완료.")
+if d.get('source') == 's3_xml':
+    print("  => S3 XML 정상 연결. 완료.")
 else:
-    print("  => 폴백(dynamodb) 동작 중. 404 는 해결됐고, 빅카인즈 키를 넣으면 전환된다.")
+    print("  => 예상과 다른 source — 응답을 확인할 것.")
 PY
 else
   echo "  [확인 필요] 응답 본문:"

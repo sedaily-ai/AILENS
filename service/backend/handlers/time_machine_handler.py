@@ -1,8 +1,26 @@
 """
-Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경제"
+Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경제" + "키워드·기간 검색"
 
-GET /time-machine?date=YYYY-MM-DD
-Response: { "date": "...", "articles": [{"news_id","title","content","byline","original_link"}], "cached": bool }
+두 모드(같은 Lambda·같은 라우트 GET /time-machine, 쿼리 파라미터로 구분):
+
+1) 하루 모드(기본) — `q` 파라미터가 없을 때
+   GET /time-machine?date=YYYY-MM-DD
+   Response: { "date": "...", "articles": [{"news_id","title","content","byline","category","original_link"}],
+               "investments": ..., "cached": bool }
+
+2) 기간 검색 모드 — `q` 파라미터가 있을 때 (예: 1997-11-21~1997-12-31 "IMF" 기간의 서울경제 기사)
+   GET /time-machine?q=IMF&from=1997-11-21&to=1997-12-31[&size=10][&sort=relevance|date]
+   q     필수, 공백 trim 후 1~40자
+   from/to 필수 YYYY-MM-DD, from<=to, 1990-01-01 이후, 미래는 오늘로 당김, 기간 최대 6년(2196일)
+   size  기본 10, 1~20
+   sort  'relevance'(기본) | 'date'. relevance 는 빅카인즈가 거부하면 date 로 자동 대체
+   Response: { "query","from","to","size","sort_applied","articles":[{하루 모드 필드 + "published_at"(날짜만, 있으면)}],
+               "cached": bool }
+
+응답 규약(프론트가 "오류"와 "정말 기사 없음"을 구분하는 기준):
+  - 200 + articles=[]  : 빅카인즈 조회는 성공했고 서울경제 기사가 정말 0건.
+  - 502 BIGKINDS_ERROR : 빅카인즈 호출/키 조회/응답 오류. 상세는 로그에만, 응답은 일반 메시지.
+  - 400 BAD_REQUEST    : 파라미터 누락/형식 오류/범위 위반. 하루 모드의 미래 날짜는 오늘로 당겨 200.
 
 2026-08-17: 처음엔 issue_ranking(오늘의 이슈 API)으로 토픽+키워드만 보여줬는데,
 그 API의 news_cluster(관련 기사 ID 목록)로 기사 상세를 조회하면 같은 ID인데도
@@ -12,6 +30,7 @@ Response: { "date": "...", "articles": [{"news_id","title","content","byline","o
 본문·바이라인·원본 링크(구 도메인 sednews.com 포함)까지 안정적으로 나와서
 이 방식으로 교체했다 — 다만 발행 "시각"은 어느 시대 기사든 항상 자정(T00:00:00)
 고정이라 제공되지 않는다(프론트에서 시간 대신 순번으로 표시).
+빅카인즈 호출·응답 매핑은 services/bigkinds_search.py 로 분리돼 있다.
 
 /timemachine 프론트(위키피디아+서울경제 스크래핑, "그날의 역사적 사건"이 대부분
 지어낸 가짜 데이터였던 문제로 삭제)가 쓰던 이 Lambda(sedaily-mbti-time-machine-dev)
@@ -20,57 +39,34 @@ Response: { "date": "...", "articles": [{"news_id","title","content","byline","o
 API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽는다 —
 프론트/로그 어디에도 노출하지 않는다.
 """
+import hashlib
 import logging
-import re
-from datetime import datetime, timedelta, timezone
+import time
+from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import boto3
-import requests
 
-from common.secrets import get_secret
 from config.investment_scenarios import build_investment_scenarios
 from config.settings import settings
 from core.decorators import lambda_handler as handler_decorator
 from core.response import error_response, no_content_response, success_response
+from services import bigkinds_search
+from utils.date_validation import DATE_FORMAT, KST, BadRequest, today_kst, validate_date
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-KST = timezone(timedelta(hours=9))
-DATE_FORMAT = '%Y-%m-%d'
-
 BIGKINDS_MIN_DATE = '1990-01-01'
-BIGKINDS_SEARCH_URL = 'https://tools.kinds.or.kr/search/news'
-BIGKINDS_KEY_SSM_PARAM = '/sedaily-mbti/bigkinds-api-key'
-BIGKINDS_TIMEOUT_SECONDS = 15
-BIGKINDS_PROVIDER = '서울경제'
 MAX_ARTICLES = 30
 
-# 검색 결과에 자주 섞여 나오는 저가치 코너 — S3 지면 아카이브(fetchDayArticles)의
-# '[시그널]' 제외 규칙, 옛 time_machine_handler(위키/스크래핑판)의 EXCLUDE_TAGS와
-# 같은 취지.
-EXCLUDE_TITLE_MARKERS = ('[부고]', '[인사]', '[사설]', '[마켓아이]', '[시론]', '[발언대]')
-
-# content는 문서상 "200자 제한"이라고 돼 있지만 실측 결과 최대 1,500자 넘는
-# 전체(또는 거의 전체) 본문이 그대로 온다(2026-08-17 확인) — 리스트에 그대로
-# 노출하면 한 줄이 너무 길어져 오히려 안 친절해 보인다는 피드백으로, 여기서
-# 미리보기 길이로 직접 잘라 내려준다(전체는 original_link로).
-CONTENT_PREVIEW_LEN = 150
-# 본문 끝에 흔히 붙는 "이름+기자+이메일" 서명과 "입력시간 : ..." 꼬리 — byline
-# 필드로 이미 따로 내려주고 있어 미리보기에서는 지저분하기만 하다.
-_BYLINE_TAIL_RE = re.compile(r'[가-힣]{2,4}\s*기자\S*@\S+\.(?:CO\.KR|COM)\s*$', re.IGNORECASE)
-_INPUT_TIME_TAIL_RE = re.compile(r'입력시간\s*:\s*\d{4}/\d{2}/\d{2}\s*\d{1,2}:\d{2}\s*$')
-
-
-def _clean_content_preview(raw: str) -> str:
-    text = raw.strip()
-    text = _BYLINE_TAIL_RE.sub('', text).strip()
-    text = _INPUT_TIME_TAIL_RE.sub('', text).strip()
-    text = re.sub(r'\s+', ' ', text)  # 문단 줄바꿈을 미리보기 한 덩어리로
-    if len(text) > CONTENT_PREVIEW_LEN:
-        text = text[:CONTENT_PREVIEW_LEN].rstrip() + '…'
-    return text
+# 기간 검색 모드 제한
+RANGE_QUERY_MAX_LEN = 40
+RANGE_MAX_DAYS = 6 * 366  # "최대 6년" — 윤년 포함 넉넉히 2196일(양끝 포함이 아닌 to-from 일수)
+RANGE_SIZE_DEFAULT = 10
+RANGE_SIZE_MAX = 20
+RANGE_SORTS = (bigkinds_search.SORT_RELEVANCE, bigkinds_search.SORT_DATE)
 
 # 캐시 테이블 — 옛 위키/스크래핑판 캐시와 같은 테이블 재사용. 키 접두사를
 # timemachine_articles_로 바꿔서(이전 issue_ranking 토픽판 캐시와도 안 섞이게)
@@ -80,32 +76,15 @@ def _clean_content_preview(raw: str) -> str:
 # 재사용 — config.settings를 거치지 않는 유일한 예외였다.
 CACHE_TABLE = settings.dynamodb_table_articles
 CACHE_TTL_DAYS = 3650  # 과거 지면은 영구히 안 바뀐다 — 사실상 무기한 캐시.
+RANGE_CACHE_TTL_SECONDS = 30 * 86400  # 기간 검색은 키 조합이 많아 30일만 보관.
 
-
-class BadRequest(Exception):
-    """400 으로 내려보낼 입력 오류."""
-
-
-def _today_kst() -> str:
-    return datetime.now(KST).strftime(DATE_FORMAT)
-
-
-def _validate_date(raw: str) -> str:
-    if not raw:
-        raise BadRequest('date 파라미터가 필요합니다. (YYYY-MM-DD)')
-    try:
-        parsed = datetime.strptime(raw, DATE_FORMAT)
-    except (ValueError, TypeError):
-        raise BadRequest(f'날짜 형식이 올바르지 않습니다: {raw} (YYYY-MM-DD 형식으로 입력해주세요)')
-
-    normalized = parsed.strftime(DATE_FORMAT)
-    today = _today_kst()
-    if normalized > today:
-        logger.info('미래 날짜 요청(%s) → 오늘(%s)로 조정', normalized, today)
-        return today
-    if normalized < BIGKINDS_MIN_DATE:
-        raise BadRequest(f'빅카인즈는 {BIGKINDS_MIN_DATE} 이후 날짜만 지원합니다: {normalized}')
-    return normalized
+# 부정 캐시: "조회는 성공했는데 0건"인 날짜(휴간일·빅카인즈 미적재 등)를 짧게 기억해
+# 같은 날짜 재요청마다 빅카인즈를 다시 치지 않게 한다. 키 접두사를 분리해 둬서
+# (a) 이전 버전 Lambda 로 롤백해도 빈 결과를 '캐시 히트'로 오인하지 않고,
+# (b) 나중에 기사가 적재돼 정상 캐시가 생기면 그쪽이 우선한다.
+# 오류(예외)는 절대 부정 캐시하지 않는다 — 오류 시 _fetch_sedaily_articles 가 raise 하므로
+# 저장 경로에 도달하지 않는다. 오늘 날짜는 기사가 계속 쌓이므로 부정 캐시 제외.
+NEGATIVE_CACHE_TTL_SECONDS = 6 * 3600
 
 
 # ─── DynamoDB 캐시 ──────────────────────────────────────────────────────────
@@ -124,79 +103,105 @@ def _cache_key(date: str) -> str:
     return f'timemachine_articles_{date}'
 
 
-def _get_cached(date: str) -> Optional[dict]:
-    try:
-        res = _get_table().get_item(Key={'news_id': _cache_key(date)})
-        item = res.get('Item')
-        if item:
-            logger.info('캐시 히트: %s', date)
-            return item.get('data')
-    except Exception as e:  # noqa: BLE001
-        logger.warning('캐시 조회 실패(%s): %s', date, e)
+def _negative_cache_key(date: str) -> str:
+    return f'timemachine_empty_{date}'
+
+
+def _range_digest(query: str, from_date: str, to_date: str, size: int, sort: str) -> str:
+    return hashlib.sha1(f'{query}|{from_date}|{to_date}|{size}|{sort}'.encode('utf-8')).hexdigest()
+
+
+def _range_cache_key(digest: str) -> str:
+    return f'timemachine_range_{digest}'
+
+
+def _range_negative_cache_key(digest: str) -> str:
+    return f'timemachine_range_empty_{digest}'
+
+
+def _is_expired(item: dict) -> bool:
+    """expires_at 이 epoch 초(숫자)일 때만 만료 판정한다.
+
+    DynamoDB TTL 삭제는 최대 수십 시간 지연될 수 있어, 짧은 TTL(부정 캐시)은
+    읽는 쪽에서도 직접 확인해야 한다. 이전 버전이 저장한 ISO 문자열 expires_at 은
+    숫자가 아니므로 '만료 없음'(기존 동작)으로 취급해 호환된다.
+    """
+    expires_at = item.get('expires_at')
+    if isinstance(expires_at, (int, float, Decimal)):
+        return float(expires_at) <= time.time()
+    return False
+
+
+def _get_item(key: str) -> Optional[dict]:
+    res = _get_table().get_item(Key={'news_id': key})
+    item = res.get('Item')
+    if item and not _is_expired(item):
+        return item
     return None
 
 
-def _save_cache(date: str, data: dict) -> None:
+def _put_cache_item(key: str, item_type: str, date: str, data: dict, ttl_seconds: int) -> None:
+    now = datetime.now(KST)
+    _get_table().put_item(Item={
+        'news_id': key,
+        'item_type': item_type,
+        'date': date,
+        'data': data,
+        'cached_at': now.isoformat(),
+        # DynamoDB TTL 은 epoch 초(Number) 속성만 인식한다. 예전엔 ISO 문자열로 저장해
+        # TTL 이 동작하지 않았다.
+        'expires_at': int(now.timestamp()) + ttl_seconds,
+    })
+
+
+def _read_cache(key: str, negative_key: str, empty_data: dict, label: str) -> Optional[dict]:
+    """정상 캐시 → 부정 캐시 순으로 조회. 히트하면 저장된 data(부정은 empty_data) 반환."""
     try:
-        now = datetime.now(KST)
-        _get_table().put_item(Item={
-            'news_id': _cache_key(date),
-            'item_type': 'timemachine_articles_cache',
-            'date': date,
-            'data': data,
-            'cached_at': now.isoformat(),
-            'expires_at': (now + timedelta(days=CACHE_TTL_DAYS)).isoformat(),
-        })
-        logger.info('캐시 저장: %s', date)
+        item = _get_item(key)
+        if item:
+            logger.info('캐시 히트: %s', label)
+            return item.get('data')
+        neg = _get_item(negative_key)
+        if neg:
+            logger.info('부정 캐시 히트: %s', label)
+            return neg.get('data') or empty_data
     except Exception as e:  # noqa: BLE001
-        logger.warning('캐시 저장 실패(%s): %s', date, e)
+        logger.warning('캐시 조회 실패(%s): %s', label, e)
+    return None
 
 
-# ─── 빅카인즈 뉴스 검색(날짜 범위) ───────────────────────────────────────────
+def _write_cache(key: str, negative_key: str, item_type: str, negative_item_type: str,
+                 date: str, data: dict, ttl_seconds: int, allow_negative: bool, label: str) -> None:
+    """기사가 있으면 정상 캐시, 0건이면 allow_negative 일 때만 부정 캐시. 실패는 삼킨다."""
+    try:
+        if data.get('articles'):
+            _put_cache_item(key, item_type, date, data, ttl_seconds)
+            logger.info('캐시 저장: %s', label)
+        elif allow_negative:
+            _put_cache_item(negative_key, negative_item_type, date, data, NEGATIVE_CACHE_TTL_SECONDS)
+            logger.info('부정 캐시 저장: %s', label)
+    except Exception as e:  # noqa: BLE001
+        logger.warning('캐시 저장 실패(%s): %s', label, e)
+
+
+def _get_cached(date: str) -> Optional[dict]:
+    return _read_cache(_cache_key(date), _negative_cache_key(date),
+                       {'date': date, 'articles': []}, date)
+
+
+def _save_cache(date: str, data: dict) -> None:
+    _write_cache(_cache_key(date), _negative_cache_key(date),
+                 'timemachine_articles_cache', 'timemachine_empty_cache',
+                 date, data, CACHE_TTL_DAYS * 86400, date < today_kst(), date)
+
+
+# ─── 하루 조회 ───────────────────────────────────────────────────────────────
 
 def _fetch_sedaily_articles(date: str) -> List[Dict[str, Any]]:
-    access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
-    next_day = (datetime.strptime(date, DATE_FORMAT) + timedelta(days=1)).strftime(DATE_FORMAT)
-    payload = {
-        'access_key': access_key,
-        'argument': {
-            'query': '',
-            'published_at': {'from': date, 'until': next_day},
-            'provider': [BIGKINDS_PROVIDER],
-            'sort': {'date': 'desc'},
-            'return_from': 0,
-            'return_size': MAX_ARTICLES,
-            'fields': ['title', 'content', 'byline', 'category', 'provider_link_page'],
-        },
-    }
-    res = requests.post(BIGKINDS_SEARCH_URL, json=payload, timeout=BIGKINDS_TIMEOUT_SECONDS)
-    res.raise_for_status()
-    body = res.json()
-
-    if body.get('result') != 0:
-        raise RuntimeError(f"빅카인즈 search/news 오류: {body.get('reason', '알 수 없는 오류')}")
-
-    docs = (body.get('return_object') or {}).get('documents') or []
-
-    articles = []
-    for d in docs:
-        title = (d.get('title') or '').strip()
-        if not title or any(marker in title for marker in EXCLUDE_TITLE_MARKERS):
-            continue
-        # category는 "경제>산업_기업" 같은 전체 경로 배열 — 배지로 쓸 대분류(맨
-        # 앞 세그먼트)만 뽑는다.
-        raw_categories = d.get('category') or []
-        category = raw_categories[0].split('>')[0] if raw_categories else ''
-        articles.append({
-            'news_id': d.get('news_id', ''),
-            'title': title,
-            'content': _clean_content_preview(d.get('content') or ''),
-            'byline': (d.get('byline') or '').strip(),
-            'category': category,
-            'original_link': d.get('provider_link_page') or None,
-        })
-
-    return articles
+    """그날(KST) 서울경제 기사 최대 MAX_ARTICLES건, 최신순. 오류는 raise."""
+    result = bigkinds_search.search_news('', date, bigkinds_search.next_day(date),
+                                         MAX_ARTICLES, bigkinds_search.SORT_DATE)
+    return result.articles
 
 
 def get_time_machine_data(date: str) -> dict:
@@ -210,16 +215,78 @@ def get_time_machine_data(date: str) -> dict:
 
     articles = _fetch_sedaily_articles(date)
     result = {'date': date, 'articles': articles}
-    if articles:
-        _save_cache(date, result)
+    _save_cache(date, result)
     return {**result, 'investments': investments, 'cached': False}
+
+
+# ─── 키워드 + 기간 검색 ──────────────────────────────────────────────────────
+
+def _parse_range_params(params: dict) -> dict:
+    """기간 검색 파라미터 검증·정규화. 위반은 BadRequest."""
+    query = (params.get('q') or '').strip()
+    if not query:
+        raise BadRequest('q 파라미터가 필요합니다. (1~40자)')
+    if len(query) > RANGE_QUERY_MAX_LEN:
+        raise BadRequest(f'q는 {RANGE_QUERY_MAX_LEN}자 이하여야 합니다.')
+
+    raw_from = (params.get('from') or '').strip()
+    raw_to = (params.get('to') or '').strip()
+    if not raw_from or not raw_to:
+        raise BadRequest('from, to 파라미터가 필요합니다. (YYYY-MM-DD)')
+    from_date = validate_date(raw_from, min_date=BIGKINDS_MIN_DATE)
+    to_date = validate_date(raw_to, min_date=BIGKINDS_MIN_DATE)
+    # 미래 날짜는 오늘로 당겨지므로, 순서는 당기기 전 원본 값으로 비교한다.
+    if datetime.strptime(raw_from, DATE_FORMAT) > datetime.strptime(raw_to, DATE_FORMAT):
+        raise BadRequest('from은 to보다 늦을 수 없습니다.')
+    if (datetime.strptime(to_date, DATE_FORMAT) - datetime.strptime(from_date, DATE_FORMAT)).days > RANGE_MAX_DAYS:
+        raise BadRequest('기간은 최대 6년까지 지원합니다.')
+
+    raw_size = (params.get('size') or '').strip()
+    if raw_size:
+        try:
+            size = int(raw_size)
+        except ValueError:
+            raise BadRequest(f'size는 정수여야 합니다: {raw_size}')
+        if not 1 <= size <= RANGE_SIZE_MAX:
+            raise BadRequest(f'size는 1~{RANGE_SIZE_MAX} 사이여야 합니다.')
+    else:
+        size = RANGE_SIZE_DEFAULT
+
+    sort = (params.get('sort') or '').strip() or bigkinds_search.SORT_RELEVANCE
+    if sort not in RANGE_SORTS:
+        raise BadRequest("sort는 'relevance' 또는 'date'여야 합니다.")
+
+    return {'query': query, 'from': from_date, 'to': to_date, 'size': size, 'sort': sort}
+
+
+def get_range_search_data(query: str, from_date: str, to_date: str, size: int, sort: str) -> dict:
+    digest = _range_digest(query, from_date, to_date, size, sort)
+    label = f'range {digest[:8]} q={query!r} {from_date}~{to_date}'
+    request_part = {'query': query, 'from': from_date, 'to': to_date, 'size': size}
+
+    cached = _read_cache(_range_cache_key(digest), _range_negative_cache_key(digest),
+                         {'sort_applied': sort, 'articles': []}, label)
+    if cached is not None:
+        return {**request_part, 'sort_applied': cached.get('sort_applied', sort),
+                'articles': cached.get('articles', []), 'cached': True}
+
+    found = bigkinds_search.search_news(query, from_date, bigkinds_search.next_day(to_date),
+                                        size, sort, include_published_at=True)
+    logger.info('기간 검색: %s sort_requested=%s sort_applied=%s articles=%s',
+                label, sort, found.sort_applied, len(found.articles))
+    data = {'sort_applied': found.sort_applied, 'articles': found.articles}
+    # 오늘이 포함된 기간은 기사가 계속 쌓이므로 부정 캐시하지 않는다.
+    _write_cache(_range_cache_key(digest), _range_negative_cache_key(digest),
+                 'timemachine_range_cache', 'timemachine_range_empty_cache',
+                 from_date, data, RANGE_CACHE_TTL_SECONDS, to_date < today_kst(), label)
+    return {**request_part, **data, 'cached': False}
 
 
 # ─── Lambda entry point ─────────────────────────────────────────────────────
 
 @handler_decorator
 def lambda_handler(event: dict, context) -> dict:
-    """AWS Lambda / API Gateway 핸들러."""
+    """AWS Lambda / API Gateway 핸들러. `q` 가 있으면 기간 검색, 없으면 하루 조회."""
     method = (
         event.get('requestContext', {}).get('http', {}).get('method')
         or event.get('httpMethod')
@@ -229,18 +296,31 @@ def lambda_handler(event: dict, context) -> dict:
         return no_content_response()
 
     params = event.get('queryStringParameters') or {}
+    range_mode = params.get('q') is not None
     try:
-        date = _validate_date((params.get('date') or '').strip())
+        if range_mode:
+            args = _parse_range_params(params)
+        else:
+            date = validate_date((params.get('date') or '').strip(), min_date=BIGKINDS_MIN_DATE)
     except BadRequest as e:
         return error_response(str(e), status_code=400, code='BAD_REQUEST')
 
     try:
+        if range_mode:
+            result = get_range_search_data(args['query'], args['from'], args['to'],
+                                           args['size'], args['sort'])
+            logger.info(
+                'time-machine 기간 검색 응답: from=%s, to=%s, articles=%s, sort_applied=%s, cached=%s',
+                result['from'], result['to'], len(result['articles']),
+                result['sort_applied'], result['cached'],
+            )
+            return success_response(result)
         result = get_time_machine_data(date)
         logger.info(
             'time-machine 응답: date=%s, articles=%s, cached=%s',
             result.get('date'), len(result.get('articles', [])), result.get('cached'),
         )
         return success_response(result)
-    except Exception as e:  # noqa: BLE001
-        logger.error('time-machine 오류: %s', e, exc_info=True)
+    except Exception:  # noqa: BLE001
+        logger.error('time-machine 오류', exc_info=True)
         return error_response('빅카인즈 데이터를 가져오지 못했습니다.', status_code=502, code='BIGKINDS_ERROR')

@@ -14,6 +14,7 @@ from typing import Optional
 import uvicorn
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 
 # ── .env 로드 (로컬 전용) ────────────────────────────────────────────────────
@@ -33,11 +34,7 @@ except ImportError:
 
 from config import settings  # noqa: E402  (.env 로드 이후여야 함)
 from clients.s3_xml_client import S3XMLClient  # noqa: E402
-from handlers.time_machine_handler import (  # noqa: E402
-    BadRequest as TimeMachineBadRequest,
-    get_time_machine_data,
-    _validate_date as validate_time_machine_date,
-)
+from handlers.time_machine_handler import lambda_handler as time_machine_lambda_handler  # noqa: E402
 from handlers.timeline_handler import lambda_handler as timeline_lambda_handler  # noqa: E402
 from services.chatbot_engine import (  # noqa: E402
     generate_chat_response, generate_chat_response_stream,
@@ -148,27 +145,14 @@ async def chat_stream(request: Request):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@app.get("/time-machine")
-async def time_machine(date: str):
-    """빅카인즈 issue_ranking 기반 "그날의 이슈" 엔드포인트."""
-    try:
-        normalized = validate_time_machine_date(date)
-    except TimeMachineBadRequest as e:
-        return JSONResponse(status_code=400, content={"error": str(e)})
-
-    try:
-        return get_time_machine_data(normalized)
-    except Exception as e:
-        return JSONResponse(status_code=502, content={"error": f"빅카인즈 데이터를 가져오지 못했습니다: {e}"})
-
-
-# ── /api/timeline — S3 XML(서울경제 원본 피드) 기반 타임라인 ─────────────────
-# 운영과 **완전히 같은 코드**를 타도록 Lambda 핸들러를 그대로 호출한다.
+# 두 라우트 모두 운영과 **완전히 같은 코드**를 타도록 Lambda 핸들러를 그대로 호출한다.
 # (로컬에서만 통하는 별도 구현을 두면 로컬 검증이 운영을 보증하지 못한다.)
+# 핸들러는 동기 + 내부에서 asyncio.run / requests 로 블로킹하므로, async 라우트에서
+# 직접 부르면 이벤트 루프 안에서 asyncio.run 이 RuntimeError 를 내고 서버가 막힌다 —
+# def 라우트(스레드풀 실행)이거나 run_in_threadpool 로 부른다.
 
-def _invoke_timeline(event: dict) -> JSONResponse:
+def _to_json_response(result: dict) -> JSONResponse:
     """Lambda 핸들러 응답(statusCode/body)을 FastAPI 응답으로 되돌린다."""
-    result = timeline_lambda_handler(event, None)
     status = result.get("statusCode", 200)
     raw_body = result.get("body") or "{}"
     try:
@@ -178,61 +162,71 @@ def _invoke_timeline(event: dict) -> JSONResponse:
     return JSONResponse(status_code=status, content=payload)
 
 
+@app.get("/time-machine")
+def time_machine(
+    date: Optional[str] = None,
+    q: Optional[str] = None,
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = None,
+    size: Optional[str] = None,
+    sort: Optional[str] = None,
+):
+    """빅카인즈 기반 엔드포인트. q 없으면 하루 조회(date), 있으면 키워드+기간 검색(q/from/to/size/sort).
+
+    파라미터 검증·오류 규약은 핸들러 docstring 참조 — 여기선 받은 값을 그대로 넘긴다.
+    """
+    raw = {"date": date, "q": q, "from": from_, "to": to, "size": size, "sort": sort}
+    query_params = {k: v for k, v in raw.items() if v is not None}
+    result = time_machine_lambda_handler(
+        {"requestContext": {"http": {"method": "GET"}}, "queryStringParameters": query_params},
+        None,
+    )
+    return _to_json_response(result)
+
+
+# ── /api/timeline — S3 XML(서울경제 원본 피드) 기반 타임라인 ─────────────────
+
 @app.post("/api/timeline")
 async def timeline_post(request: Request):
     """
     그 날짜의 지면을 반환한다.
 
-    Body: {"date": "YYYY-MM-DD", "mode"?: flat|personas|issues, "query"?,
-           "categories"?, "providers"?, "all_press"?, "page"?, "page_size"?,
-           "per_persona"?, "issue_count"?, "per_issue"?, "include_trend"?}
+    Body: {"date": "YYYY-MM-DD", "mode"?: "flat", "query"?, "categories"?, "page"?, "page_size"?}
     """
     try:
         body = await request.json()
     except Exception:
         body = {}
-    return _invoke_timeline({
+    event = {
         "requestContext": {"http": {"method": "POST"}},
         "body": json.dumps(body, ensure_ascii=False),
-    })
+    }
+    return _to_json_response(await run_in_threadpool(timeline_lambda_handler, event, None))
 
 
 @app.get("/api/timeline")
-async def timeline_get(
+def timeline_get(
     date: str = Query(..., description="YYYY-MM-DD (KST)"),
-    query: Optional[str] = Query(None, description="검색어 (AND/OR/NOT 지원)"),
+    query: Optional[str] = Query(None, description="검색어 (제목/본문 부분 일치)"),
     categories: Optional[str] = Query(None, description="표준 카테고리, 콤마 구분"),
-    providers: Optional[str] = Query(None, description="언론사명, 콤마 구분"),
-    all_press: bool = Query(False, description="true 면 전체 언론사"),
-    mode: Optional[str] = Query(None, description="flat | personas | issues"),
-    per_persona: Optional[int] = Query(None, description="에디터별 기사 수 (mode=personas)"),
-    pool_size: Optional[int] = Query(None, description="버킷팅 전 수집량 (mode=personas)"),
-    issue_count: Optional[int] = Query(None, description="이슈 카드 수 (mode=issues)"),
-    per_issue: Optional[int] = Query(None, description="이슈별 기사 수 (mode=issues)"),
+    mode: Optional[str] = Query(None, description="flat (기본, 그 외 400)"),
     page: int = Query(1),
     page_size: int = Query(30),
-    include_trend: bool = Query(False, description="키워드 트렌드 동봉 (query 필요)"),
 ):
     """curl 로 바로 찔러볼 수 있는 GET 버전. POST 와 같은 핸들러를 탄다."""
     params = {
         "date": date,
         "query": query,
         "categories": categories,
-        "providers": providers,
-        "all_press": str(all_press).lower(),
         "mode": mode,
-        "per_persona": str(per_persona) if per_persona is not None else None,
-        "pool_size": str(pool_size) if pool_size is not None else None,
-        "issue_count": str(issue_count) if issue_count is not None else None,
-        "per_issue": str(per_issue) if per_issue is not None else None,
         "page": str(page),
         "page_size": str(page_size),
-        "include_trend": str(include_trend).lower(),
     }
-    return _invoke_timeline({
+    result = timeline_lambda_handler({
         "requestContext": {"http": {"method": "GET"}},
         "queryStringParameters": {k: v for k, v in params.items() if v is not None},
-    })
+    }, None)
+    return _to_json_response(result)
 
 
 # S3 XML Client 인스턴스 (S3는 ap-northeast-2 리전에 있음)

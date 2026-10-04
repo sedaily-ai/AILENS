@@ -260,7 +260,7 @@ def test_chatbot():
 
 
 def test_time_machine():
-    """GET /time-machine — historical news for a date"""
+    """GET /time-machine — 그날의 서울경제 기사 (빅카인즈 뉴스 검색 기반)"""
     name = 'GET /time-machine'
     resp, ms = timed_request('get', f'{API_URL}/time-machine?date=2025-01-01')
 
@@ -268,10 +268,9 @@ def test_time_machine():
         results.fail(name, ms, f'Request error: {resp}')
         return
 
-    if resp.status_code == 500:
-        # Time-machine depends on Wikipedia API + 서울경제 아카이브 scraping
-        # External service failures are transient, not a regression
-        results.ok(name, ms, 'Status 500 (external service error — transient, not a regression)')
+    if resp.status_code in (500, 502):
+        # 빅카인즈 외부 API 장애는 502 BIGKINDS_ERROR 로 내려온다 — 일시적, 회귀 아님
+        results.ok(name, ms, f'Status {resp.status_code} (external service error — transient, not a regression)')
         return
 
     if resp.status_code != 200:
@@ -280,15 +279,14 @@ def test_time_machine():
 
     data = resp.json()
 
-    if 'news' not in data:
-        results.fail(name, ms, 'Missing "news" key')
+    if 'articles' not in data:
+        results.fail(name, ms, 'Missing "articles" key')
         return
 
-    news_count = len(data.get('news', []))
-    events_count = len(data.get('events', []))
+    articles_count = len(data.get('articles', []))
     cached = data.get('cached', False)
 
-    results.ok(name, ms, f'{news_count} news, {events_count} events, cached={cached}')
+    results.ok(name, ms, f'{articles_count} articles, cached={cached}')
 
 
 def test_user_profile():
