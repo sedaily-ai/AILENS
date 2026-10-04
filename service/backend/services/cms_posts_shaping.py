@@ -169,50 +169,52 @@ def shape_video(post: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _shape_lens_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """body_inline.lenses의 포맷 1개(레터/웹툰/팟캐스트/영상) → 응답 모양."""
+    return {
+        "label": item.get("label") or "",
+        "question": item.get("question") or "",
+        "bullets": [x for x in (item.get("bullets") or []) if x],
+        # "레터" 포맷 전용 문단 산문(2026-08-19) — 나머지 세 포맷은
+        # bullets만 쓰므로 대개 빈 배열.
+        "paragraphs": [x for x in (item.get("paragraphs") or []) if x],
+        # "웹툰" 포맷 전용 컷(이미지+캡션, 2026-08-19) — webtoon 채널
+        # 글의 body_inline.images와 같은 모양({url, caption}), 저장
+        # 위치만 이 슬롯.
+        "images": [
+            {"url": img.get("url") or "", "caption": img.get("caption") or ""}
+            for img in (item.get("images") or [])
+            if img.get("url")
+        ],
+        # "영상" 포맷 전용 YouTube 등 임베드 URL(2026-08-19).
+        "video_url": item.get("video_url") or None,
+        # "영상" 포맷 전용 썸네일(2026-08-20) — YouTube 링크는
+        # resolveVideo()가 자동으로 썸네일을 뽑아주지만, 우리 파이프라인이
+        # 렌더링해 S3에 올린 mp4 원본은 그 자동 추출이 안 된다(URL 패턴
+        # 기반 판별이라). 렌더된 영상 자체에서 프레임을 떠서 미리
+        # 채워두는 필드 — 없으면 프론트가 기사 사진으로 폴백한다(사용자
+        # 지적: "영상 목록에 기사 사진 말고 영상 프레임 같은 썸네일이
+        # 있어야죠").
+        "thumbnail_url": item.get("thumbnail_url") or None,
+        # "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — home_player
+        # 채널의 media_embed_url과 같은 성격, 저장 위치만 이 슬롯.
+        "media_url": item.get("media_url") or None,
+        # "팟캐스트"·"영상" 포맷 전용 전체 대본 텍스트(2026-08-23, 사용자
+        # 요청 — 청각장애인 접근성용, 타임스탬프 동기화 없이 그냥 본문만).
+        # mustknow_auto/frontpage_auto run.py가 발행 시 채운다 — 레터는
+        # 이미 paragraphs가 그 역할을 하고, 웹툰은 images[].caption이
+        # 컷별 대사를 이미 담고 있어서 별도로 안 채움.
+        "transcript": item.get("transcript") or None,
+    }
+
+
 def shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
     """"오늘의 이슈, 4가지 시선" 슬롯 — 2026-08-19부터 실제로는 4개 출력
     포맷(레터/웹툰/팟캐스트/영상, admin/frontend LensMode.tsx 참조)을 담는
     자리다. admin이 직접 작성(AI 생성은 프롬프트 테스트 실행 보조 — CmsPost
     자체는 여전히 수동 저장, body_inline.lenses 4개를 그대로 저장)."""
     b = post.get("body_inline") or {}
-    lenses = [
-        {
-            "label": item.get("label") or "",
-            "question": item.get("question") or "",
-            "bullets": [x for x in (item.get("bullets") or []) if x],
-            # "레터" 포맷 전용 문단 산문(2026-08-19) — 나머지 세 포맷은
-            # bullets만 쓰므로 대개 빈 배열.
-            "paragraphs": [x for x in (item.get("paragraphs") or []) if x],
-            # "웹툰" 포맷 전용 컷(이미지+캡션, 2026-08-19) — webtoon 채널
-            # 글의 body_inline.images와 같은 모양({url, caption}), 저장
-            # 위치만 이 슬롯.
-            "images": [
-                {"url": img.get("url") or "", "caption": img.get("caption") or ""}
-                for img in (item.get("images") or [])
-                if img.get("url")
-            ],
-            # "영상" 포맷 전용 YouTube 등 임베드 URL(2026-08-19).
-            "video_url": item.get("video_url") or None,
-            # "영상" 포맷 전용 썸네일(2026-08-20) — YouTube 링크는
-            # resolveVideo()가 자동으로 썸네일을 뽑아주지만, 우리 파이프라인이
-            # 렌더링해 S3에 올린 mp4 원본은 그 자동 추출이 안 된다(URL 패턴
-            # 기반 판별이라). 렌더된 영상 자체에서 프레임을 떠서 미리
-            # 채워두는 필드 — 없으면 프론트가 기사 사진으로 폴백한다(사용자
-            # 지적: "영상 목록에 기사 사진 말고 영상 프레임 같은 썸네일이
-            # 있어야죠").
-            "thumbnail_url": item.get("thumbnail_url") or None,
-            # "팟캐스트" 포맷 전용 오디오/영상 링크(2026-08-19) — home_player
-            # 채널의 media_embed_url과 같은 성격, 저장 위치만 이 슬롯.
-            "media_url": item.get("media_url") or None,
-            # "팟캐스트"·"영상" 포맷 전용 전체 대본 텍스트(2026-08-23, 사용자
-            # 요청 — 청각장애인 접근성용, 타임스탬프 동기화 없이 그냥 본문만).
-            # mustknow_auto/frontpage_auto run.py가 발행 시 채운다 — 레터는
-            # 이미 paragraphs가 그 역할을 하고, 웹툰은 images[].caption이
-            # 컷별 대사를 이미 담고 있어서 별도로 안 채움.
-            "transcript": item.get("transcript") or None,
-        }
-        for item in (b.get("lenses") or [])
-    ]
+    lenses = [_shape_lens_item(item) for item in (b.get("lenses") or [])]
     return {
         "id": post["slug"],
         "editor_id": post.get("editor_id") or DEFAULT_EDITOR,
