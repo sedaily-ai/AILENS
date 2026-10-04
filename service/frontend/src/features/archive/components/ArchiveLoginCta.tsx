@@ -1,6 +1,4 @@
-// 비로그인 시 상단 CTA 배너 — 메인 페이지 톤(white bg + gray-200 border +
-// blue primary CTA). ArchiveTab.tsx(893줄)가 너무 길어서 다른 독립
-// 서브컴포넌트들과 함께 분리했다(2026-08-18).
+// 비로그인 시 상단 CTA 배너 — 메인 페이지 톤(white bg + gray-200 border + blue primary CTA)을 따른다.
 import Link from 'next/link';
 
 export function ArchiveLoginCta() {

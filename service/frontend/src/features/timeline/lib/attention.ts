@@ -1,5 +1,5 @@
 // 관심도 곡선 데이터 — 서울경제 기사 중 그 달에 키워드가 들어간 기사의 비중(빅카인즈 월별 total_hits ÷ 월 전체 기사 수).
-// 아카이브 적재량이 달마다 달라 건수 대신 비중으로 그린다. 그 달 전체 기사가 MIN_TOTAL보다 적으면 값을 비우고 화면에 "적재 적음"으로 표시한다(예: 1998년 1~8월).
+// 아카이브 적재량이 달마다 달라 건수 대신 비중을 사용한다. 월 전체 기사가 MIN_TOTAL 미만이면 값을 비우고 "적재 적음"으로 표시한다.
 import { ATTENTION } from '@/shared/data/timelineAttention.generated';
 
 export const ATT_KEYWORDS = ['IMF', '금리', '환율', '부동산', '주가'] as const;

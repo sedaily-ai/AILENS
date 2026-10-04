@@ -12,8 +12,8 @@ import { resultTitle, type Glance, type Moment, type Resolved } from '../lib/mom
 import { OnboardingHeader } from './OnboardingHeader';
 import { LetterInline } from './LetterInline';
 
-// 화면 2/2 — 내 유형 결과 + 그 자리에서 바로 체험. 버튼을 한 번 더 누르게 하지 않고, 오늘 지면 1면 첫 기사를 고른 포맷으로 곧장 보여 준다.
-// 마음에 안 들면 위쪽 "다른 방식" 칩으로 포맷만 바꾼다. 구독·관심분야는 일부러 묻지 않는다(결과 직후엔 이른 요청).
+// 화면 2/2 — 내 유형 결과 + 그 자리에서 바로 체험. 오늘 지면 1면 첫 기사를 고른 포맷으로 곧장 보여 주며, 포맷은 위쪽 "다른 방식" 칩으로 바꿀 수 있다.
+// 구독·관심분야는 결과 직후에 요청하기 이르므로 묻지 않는다.
 export function MomentResult({
   moment,
   glance,
@@ -36,8 +36,7 @@ export function MomentResult({
   const p = lensPerspectiveAt(formatIndex);
   const persona = PERSONAS[moment.id][glance.id];
   const changed = formatIndex !== resolved.formatIndex;
-  // 제목은 항상 "상황 + 눈이 먼저 가는 곳"(예: 퇴근길 그림 먼저파) — 유형·분포는 내가 고른 답에 대한 것이라 어떤 포맷을 보고 있든 그대로 보인다.
-  // 포맷을 직접 바꿨을 때는 아래 한 줄만 "지금은 ○○로 보고 있어요"로 바뀐다.
+  // 제목은 항상 "상황 + 눈이 먼저 가는 곳"(예: 퇴근길 그림 먼저파)이다. 유형·분포는 선택한 답에 대한 것이므로 어떤 포맷을 보고 있든 그대로 보이고, 포맷을 바꿨을 때는 아래 한 줄만 "지금은 ○○로 보고 있어요"로 바뀐다.
   const title = resultTitle(moment, glance);
   const ro = `${p.short}${euro(p.short)}`;
   const line = changed
@@ -49,10 +48,10 @@ export function MomentResult({
   const l = lens?.lenses?.[formatIndex];
   const photo = lens ? pickLensPhoto(lens) : null;
 
-  // 온보딩엔 형식 탭 스와이프가 없다(포맷은 위 칩으로 고른다) — no-op.
+  // 온보딩에는 형식 탭 스와이프가 없으므로(포맷은 위 칩으로 선택) no-op이다.
   const noop = useCallback(() => {}, []);
 
-  // 아래 이전/다음 형식 버튼 — 기사 페이지 FormatStepNav와 같은 순서(레터·웹툰·팟캐스트·영상)·문구. 바꾼 뒤 맨 위로 올라가 새 형식을 처음부터 보게 한다.
+  // 아래 이전/다음 형식 버튼 — 기사 페이지 FormatStepNav와 같은 순서(레터·웹툰·팟캐스트·영상)·문구를 쓴다. 바꾼 뒤 맨 위로 올라가 새 형식을 처음부터 보게 한다.
   const HOOK = ['글로 차분히 다시 읽기', '만화로 가볍게 훑어보기', '귀로 듣고 핵심만 챙기기', '15초 영상으로 한눈에 보기'];
   const goFormat = (to: number, direction: 'prev' | 'next') => {
     trackEvent('format_step_click', { article_id: lens?.id, from_format: LENS_FORMATS[formatIndex], to_format: LENS_FORMATS[to], direction, source: 'onboarding' });
@@ -88,8 +87,7 @@ export function MomentResult({
       </div>
 
       <div className="mm-panel" style={{ flex: 1, padding: '20px 22px 0', maxWidth: 680, margin: '0 auto', width: '100%' }}>
-        {/* 기사 페이지의 형식 이어 보기 버튼(FormatStepNav)은 위쪽 형식 탭을 DOM으로 눌러 전환하는데, 온보딩엔 그 탭이 없어 동작하지 않는다.
-            패널 안의 것은 숨기고 아래에 같은 모양의 이전/다음 버튼을 따로 둔다. */}
+        {/* 기사 페이지의 FormatStepNav는 위쪽 형식 탭을 DOM으로 눌러 전환하는데 온보딩에는 그 탭이 없어 동작하지 않는다. 패널 안의 것은 숨기고 아래에 같은 모양의 이전/다음 버튼을 따로 둔다. */}
         <style>{`
           .mm-panel nav[aria-label="다른 형식으로 이어 보기"] { display: none; }
           .mm-fstep { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 14px 18px; border: 0; border-radius: 16px; background: #f2f3f5; color: #111827; cursor: pointer; transition: background .15s ease, transform .15s ease; font: inherit; }

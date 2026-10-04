@@ -1,18 +1,9 @@
-// 공유용 카드 이미지 생성 — 인스타그램 스토리 비율(1080×1920)로 캔버스에
-// 직접 그린다(2026-08-17, "인스타/카카오톡에 바이럴 공유" 요청). 이 코드베이스는
-// 무거운 라이브러리를 안 들이는 편이라(framer-motion도 없음) html2canvas 같은
-// DOM→이미지 변환 라이브러리 대신 Canvas 2D API로 직접 그린다 — 타이포그래피도
-// 더 정교하게 제어할 수 있다. 폰트는 layout.tsx가 이미 로드해둔 "Noto Serif KR"
-// 웹폰트를 그대로 쓰되, 캔버스는 document.fonts가 준비될 때까지 기다려야
-// 텍스트가 시스템 폰트로 깨져 그려지는 걸 막을 수 있다.
-//
-// 2026-08-17 레이아웃 재작성 — 처음 버전은 baseline(문자 밑선) 기준으로
-// cursorY를 손으로 더해가며 배치했는데, 168px 같은 큰 폰트는 밑선 위로
-// 글자가 훨씬 많이 올라와서(어센트) 바로 위 줄과 겹쳤다("3.6배"가 설명
-// 문구를 덮어버림, 실사용 확인). textBaseline을 'top'으로 통일해 "이
-// Y좌표부터 글자가 시작한다"로 단순화하고, 전체 중간 콘텐츠 블록의 높이를
-// 먼저 계산한 뒤 위/아래 고정 블록 사이 여백 안에서 세로 중앙 정렬한다 —
-// 콘텐츠 길이가 짧을 때 아래쪽에 큰 빈 공간이 남던 문제도 같이 해결.
+// 공유용 카드 이미지 생성 — 인스타그램 스토리 비율(1080×1920)로 Canvas 2D API에 직접 그린다.
+// 의존성을 늘리지 않기 위해 DOM→이미지 변환 라이브러리를 사용하지 않는다.
+// 폰트는 layout.tsx가 로드한 "Noto Serif KR" 웹폰트를 사용하며, 시스템 폰트로 대체되어 그려지지 않도록
+// document.fonts 준비를 기다린 뒤 그린다.
+// 레이아웃: textBaseline을 'top'으로 통일해 큰 폰트의 어센트로 인한 줄 겹침을 방지하고,
+// 중간 콘텐츠 블록 높이를 먼저 계산해 위/아래 고정 블록 사이에서 세로 중앙 정렬한다.
 export interface ShareCardData {
   date: string; // YYYY-MM-DD
   dateLabel: string; // "1997년 11월 21일"
@@ -137,8 +128,7 @@ export async function generateShareCardBlob(data: ShareCardData): Promise<Blob |
   ctx.font = '700 26px "Noto Serif KR", serif';
   ctx.fillText('서울경제 · AI LENS', centerX, H - 160);
 
-  // ── 중간 콘텐츠: 먼저 문단들을 계산하고, 위/아래 고정 블록 사이에서
-  //    세로 중앙 정렬한다 ────────────────────────────────────────────
+  // ── 중간 콘텐츠: 문단 높이를 먼저 계산해 위/아래 고정 블록 사이에서 세로 중앙 정렬 ──
   const middleTop = topRuleY + 60;
   const middleBottom = bottomRuleY - 50;
   const paragraphs: Paragraph[] = [];

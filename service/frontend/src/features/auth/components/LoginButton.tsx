@@ -7,7 +7,7 @@ export function LoginButton() {
   const { user, isLoading, isAuthenticated, signInWithGoogle, logout } = useAuth();
 
   if (isLoading) {
-    // 로그인 버튼과 같은 크기의 자리 — 로딩이 끝나 버튼이 나타날 때 헤더 오른쪽이 밀리지 않게(2026-10-03)
+    // 로그인 버튼과 같은 크기의 자리 — 로딩이 끝나 버튼이 나타날 때 헤더 오른쪽이 밀리지 않게 한다.
     return <div className="h-[32px] w-[82px]" aria-hidden />;
   }
 

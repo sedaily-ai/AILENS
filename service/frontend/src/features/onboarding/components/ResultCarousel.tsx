@@ -8,7 +8,7 @@ import type { Glance, Moment } from '../lib/moments';
 import type { Persona } from '../lib/personas';
 import { DistributionCard } from './DistributionCard';
 
-// 결과의 "유형" 부분(2026-10-04) — 설문 2개에 맞춰 큰 탭 2개로 나누고, 각 탭 안에서 카드를 화살표·스와이프로 넘긴다.
+// 결과의 "유형" 부분 — 설문 2개에 맞춰 큰 탭 2개로 나누고, 각 탭 안에서 카드를 화살표·스와이프로 넘긴다.
 //   [보는 시간]  ① 이 시간대 비중  ② 시간대별 성향 분포
 //   [먼저 보는 것]  ① 먼저 보는 방식의 비중  ② 성향 분포
 // 조합 결과(유형 이름·하루 한 장면·MBTI 예시)는 탭 위에 고정해 어떤 포맷을 보고 있든 항상 보인다.
@@ -34,7 +34,7 @@ export function ResultCarousel({
   line: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(true); // 기본은 펼침(사용자 결정, 2026-10-04) — 접으면 한 줄 요약만 남는다
+  const [open, setOpen] = useState(true); // 기본은 펼침. 접으면 한 줄 요약만 남는다.
   const [tab, setTab] = useState(0);
   const [idx, setIdx] = useState(0);
   const parts = TABS[tab].parts;
@@ -93,7 +93,7 @@ export function ResultCarousel({
         <p style={{ margin: '6px 0 0', fontSize: 13.5, lineHeight: 1.6, color: '#4b5563', wordBreak: 'keep-all' }}>{line}</p>
       )}
 
-      {/* 통계는 기본으로 펼쳐져 있고, 접으면 한 줄 요약만 남는다 — 기사가 더 빨리 보이길 원하는 사람을 위해. */}
+      {/* 통계는 기본으로 펼쳐져 있고, 접으면 한 줄 요약만 남는다(기사를 더 빨리 보고 싶은 사용자를 위해). */}
       <button
         type="button"
         aria-expanded={open}

@@ -1,27 +1,7 @@
-// 커스텀 달력 팝오버 — 네이티브 <input type="date">가 브라우저마다 다른
-// 기본 캘린더 UI(각지고 사이트 톤과 안 맞는 테두리)를 그대로 띄워서
-// "테두리 이상한거 안 되고, 톤앤매너 맞게 예술느낌 나게"라는 피드백으로
-// 직접 만들었다(2026-08-17). 인터랙션은 ArchiveTab.tsx의 커스텀 달력과
-// 같은 패턴(월 그리드, getMonthDays/isSameDay 재사용)이다.
-//
-// ══ 2026-08-19 ══
-// 크림·골드 톤을 걷고 lib/tone.ts 토큰으로 맞췄다. 파일 이름의 "Vintage" 는
-// 이제 톤이 아니라 이 컴포넌트의 정체(앵커형 커스텀 달력)만 가리킨다 —
-// 이름을 바꾸면 import 가 흩어지므로 두되, 크림·세리프는 없다.
-//
-// 고친 것:
-//  · 요일 머리글 #b3aa99 → 1.9:1 이었다. 요일은 날짜를 찾는 좌표축인데
-//    안 읽혔다.
-//  · 월 이동 버튼 ‹ › — 히트 영역이 약 28px 이었다(패딩 6 + 글자 16).
-//    44px 로 넓혔다. 화살표 글리프는 aria-hidden, 이름은 aria-label 로.
-//  · 날짜 칸 43px → 44px. 칸 간격(gap 2)을 없애고 패딩을 줄여 375px 에서도
-//    한 변 46px 이 나온다. 7칸 그리드에서 44px 를 확보하려면 폭이 최소
-//    7x44+패딩 이어야 한다.
-//  · "오늘로" #8a6d3f 12px → 스케일 안의 14px + 44px 히트 영역.
-//  · 오늘 표시가 연한 링(#c9bb98, 1.5:1) 하나뿐이라 안 보였다 → 경계를
-//    3:1 넘는 색으로 올리고 굵기를 2px 로.
-//  · hover 를 인라인 이벤트에서 CSS 로 옮겼다(키보드 포커스 미반응 문제).
-//  · Escape 로 닫기 추가. 바깥 클릭만 있어서 키보드로는 빠져나갈 수 없었다.
+// 커스텀 달력 팝오버 — 네이티브 <input type="date">는 브라우저마다 UI가 달라 사이트 톤과 맞지 않아 직접 구현했다.
+// 인터랙션은 ArchiveTab.tsx의 커스텀 달력과 같은 패턴(월 그리드, getMonthDays/isSameDay 재사용)이며, 색·타이포는 lib/tone.ts 토큰을 사용한다.
+// 접근성: 월 이동 버튼과 날짜 칸은 터치 타겟 44px을 확보하고, 화살표 글리프는 aria-hidden, 이름은 aria-label로 제공한다.
+// hover는 키보드 포커스에도 반응하도록 인라인 이벤트가 아닌 CSS로 처리하며, Escape로 닫을 수 있다.
 import { useEffect, useRef } from 'react';
 import { getMonthDays, isSameDay } from '@/shared/utils/dateUtils';
 import {
@@ -83,7 +63,7 @@ export function VintageCalendar({
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    // 바깥 클릭만 있으면 키보드 사용자는 달력에서 빠져나갈 방법이 없다.
+    // 바깥 클릭만으로는 키보드 사용자가 빠져나갈 수 없으므로 Escape로도 닫는다.
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -110,7 +90,7 @@ export function VintageCalendar({
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 50,
-        // 7칸 x 44px + 좌우 패딩. 375px 화면에서도 한 변 46px 이 나온다.
+        // 7칸 x 44px + 좌우 패딩. 375px 화면에서도 한 변 46px이 확보된다.
         width: `min(360px, calc(100vw - ${SPACE.xl}px))`,
         background: SURFACE,
         border: `1px solid ${BORDER_HAIRLINE}`,
@@ -133,8 +113,7 @@ export function VintageCalendar({
         >
           <span aria-hidden>‹</span>
         </button>
-        {/* 월이 바뀌면 보조기기에 알린다 — 화살표를 눌렀는데 아무 말이 없으면
-            바뀐 줄 모른다. */}
+        {/* 월이 바뀌면 보조기기에 알린다. */}
         <span
           aria-live="polite"
           style={{ fontSize: FONT.body, fontWeight: 700, color: TEXT_STRONG, letterSpacing: '-0.01em' }}
@@ -183,7 +162,7 @@ export function VintageCalendar({
               disabled={disabled}
               aria-pressed={selected}
               data-today={isToday && !selected ? 'true' : undefined}
-              // 화면에는 숫자만 있어서 어느 달의 며칠인지 읽히지 않았다.
+              // 화면에는 숫자만 있으므로 보조기기용으로 몇 월 며칠인지 풀어서 제공한다.
               aria-label={`${viewMonth.getFullYear()}년 ${viewMonth.getMonth() + 1}월 ${day.getDate()}일${isToday ? ' (오늘)' : ''}`}
               onClick={() => onSelect(ymd)}
             >

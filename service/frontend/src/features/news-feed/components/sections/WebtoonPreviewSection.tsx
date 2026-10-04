@@ -11,15 +11,10 @@ import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 import { WebtoonLightbox } from '@/shared/ui/media/WebtoonLightbox';
 
-// 홈 상단의 슬림 텍스트 배너로는 "실제 콘텐츠"처럼 안 느껴진다는 피드백
-// (2026-08-06) — 4등분 카드 그리드(두꺼운 테두리·하드 섀도·기울기)로 정착.
-// 중간에 "히어로+예고 목록" 레이아웃도 시도했으나 나머지 칸이 휑해 보인다는
-// 피드백으로 그리드로 원복 — 리듬감은 동일 크기 4장이 더 좋았다. 다만 원색
-// candy 스티커·이모지 배지는 "촌스럽다/수제 콘셉트와 안 맞는다"는 지적으로
-// 톤 다운된 팔레트(ochre·dusty blue·brick·plum)와 조용한 라벨로 교체했다.
-// 1화가 실제로 발행된 뒤 — 남는 자리는 "연필 스케치" 톤 목업으로 채운다.
-// FALLBACK[0]은 실제 1화와 소재가 겹쳐서 안 쓰고 2~4화만 예고편으로 사용.
-// 목업 카드는 실제 상세가 없으니 클릭은 안 되게(article, Link 아님) 막는다.
+// 웹툰 홈 섹션 — 동일 크기 4장의 카드 그리드(두꺼운 테두리·하드 섀도·기울기).
+// 팔레트는 저채도(ochre·dusty blue·brick·plum)와 조용한 라벨을 사용한다.
+// 실제 발행분이 없는 자리는 "연필 스케치" 톤 목업으로 채운다. FALLBACK[0]은 실제 1화와 소재가 겹쳐 쓰지 않고 2~4화만 예고편으로 사용한다.
+// 목업 카드는 상세가 없으므로 클릭되지 않게(article, Link 아님) 막는다.
 const FALLBACK: CmsWebtoon[] = [
   {
     id: 'webtoon-mock-1',
@@ -63,51 +58,29 @@ const FALLBACK: CmsWebtoon[] = [
   },
 ];
 
-// 카드마다 살짝 다른 기울기 — 인쇄물을 아무렇게나 늘어놓은 듯한 코믹 진열대 느낌.
+// 카드마다 살짝 다른 기울기 — 인쇄물을 늘어놓은 듯한 코믹 진열대 느낌.
 const TILTS = [-1.6, 1.2, -1, 1.8];
-// 저채도 팔레트로 한 번 톤 다운했다가 "이전(원색) 게 낫다"는 피드백으로 원복.
 const SKETCH_ACCENT = '#a8a29e';
 
 interface Props {
-  // 빌드타임(app/page.tsx)에 fetchWebtoons()로 미리 가져온 값 — 정적 HTML에
-  // 실제 카드가 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
+  // 빌드타임(app/page.tsx)에 fetchWebtoons()로 미리 가져온 값 — 정적 HTML에 실제 카드가 바로 포함되게 한다.
   initialItems?: CmsWebtoon[];
 }
 
-// 2026-08-20엔 lens("4가지 시선") 글의 웹툰 서브포맷을 buildLensWebtoonItems로
-// 이 섹션에 섞어 넣었다(당시 webtoon 채널 발행이 뜸해질 것으로 예상해서).
-// 2026-08-23 — mustknow_auto/frontpage_auto가 이제 웹툰 생성 시 webtoon
-// 채널에도 독립 글을 같이 쓰도록 바뀌면서(사용자 지적: "웹툰 카드 누르면
-// 렌즈 4유형 페이지로 가지 말고 웹툰 전용 페이지로 가면 좋겠다" + "만화방에
-// 렌즈발 웹툰이 안 올라온다"), fetchWebtoons() 하나만으로 전부 커버된다 —
-// lens에서 파생해서 섞으면 오늘부터는 같은 기사가 두 장으로 중복 표시된다.
-// 과거 lens 글도 백필 스크립트로 webtoon 채널 글을 만들어뒀다
-// (docs/worklog 2026-08-23 웹툰 채널 분리 참조).
-//
-// 2026-09-04 — 위 주석이 낡아 있었다: "video 파생 쪽은 아직 정리 안 됐다"고
-// 남겨뒀는데, video 쪽(VideoPreviewSection.tsx)도 이미 2026-08-23에 같은
-// 방식으로 fetchVideos()로 이관 완료돼 있었다(리팩토링 감사로 발견) —
-// lensMediaFeed.ts(buildLensWebtoonItems/buildLensVideoItems 둘 다 호출자
-// 0)는 통째로 삭제.
+// 웹툰 카드는 fetchWebtoons() 하나로 구성한다. webtoon 채널에 독립 글이 발행되므로 lens 글에서 파생해 섞지 않는다(같은 기사가 중복 표시되기 때문).
 export function WebtoonPreviewSection({ initialItems }: Props) {
   const items = useServerSeededList<CmsWebtoon[], null>(initialItems, null, fetchWebtoons);
-  // 카드를 누르면 별도 뷰어 페이지 대신 가운데 모달로 미리 본다(2026-10-05, 사용자 요청). 링크(href)는 남겨 검색엔진·새 탭·공유는 그대로 동작한다.
+  // 카드를 누르면 별도 뷰어 페이지 대신 가운데 모달로 미리 본다. 링크(href)는 남겨 검색엔진·새 탭·공유는 그대로 동작한다.
   const [openWebtoon, setOpenWebtoon] = useState<CmsWebtoon | null>(null);
 
-  if (items === null) return null; // 로딩 중엔 자리 안 차지(스켈레톤 제거 방침과 동일)
+  if (items === null) return null; // 로딩 중에는 자리를 차지하지 않는다(스켈레톤 미사용 방침).
 
   const neededMocks = Math.max(0, 4 - items.length);
   const mockFillers = FALLBACK.slice(FALLBACK.length - neededMocks);
   const cards = [...items, ...mockFillers].slice(0, 4);
   const hasMock = mockFillers.length > 0;
 
-  // 색 있는 "하이라이트 밴드"로 감싸봤다가(둥근 카드 → 뷰포트 full-bleed
-  // → 다시 둥근 카드로, 2026-08-17 여러 번 오간 경위는 아래 커밋 이력
-  // 참조) 우측 사이드바(HotLettersRail)가 생긴 뒤로 완전히 걷어냈다 —
-  // 사이드바가 그 높이만큼은 비어 있어서, 본문 폭만 채우는 색 박스가
-  // "옆에 빈 여백만 남기고 붕 뜬" 것처럼 밸런스가 안 맞아 보였다(사용자
-  // 피드백: "보랏빛 박스를 걍 치울까요? 밸런스가 안맞는 느낌이네").
-  // 다른 카테고리 섹션들과 똑같이 배경 없는 일반 섹션으로 되돌렸다.
+  // 배경 없는 일반 섹션으로 둔다. 본문 폭만 채우는 색 박스는 우측 사이드바(HotLettersRail)와 균형이 맞지 않아 사용하지 않는다.
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>
       <header style={{ marginBottom: 18 }}>

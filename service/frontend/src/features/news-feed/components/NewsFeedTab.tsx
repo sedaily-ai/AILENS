@@ -15,23 +15,8 @@ import { CategoryFeatureSection } from "./sections/CategoryFeatureSection";
 import type { ReactNode } from "react";
 import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
 
-// 카테고리 2개씩 짝지어 한 줄(2/3+1/3)로 배치(2026-08-17, 본지 en.sedaily.com
-// 참고 — 로컬 경로 1_ailink/globe/dev/frontend/src/components/home/HeroSection.tsx
-// 의 Markets+Property, Politics+Society, Culture+International 페어링과 동일
-// 원칙). 순서는 ECON_CATEGORIES 정의 순서(증시/부동산/산업/금융·정책/국제)를
-// 그대로 2개씩 묶는다.
-//
-// "문화"는 2026-08-20에 7번째 카테고리로 신설됐지만(경제 카테고리 6개 짝을
-// 다 채운 뒤라) 이 배열에 못 들어가 홈 카테고리 레일에서 통째로 빠져있었다
-// — 상단 nav·푸터·자기 카테고리 페이지(/culture)엔 있는데 홈에만 없는
-// 상태(사용자가 직접 확인 요청). 남는 파트너가 없으니 마지막 줄만 단독
-// (1개짜리) 행으로 추가 — CategoryPairRow가 slugs 1~2개를 모두 받도록
-// 확장했다.
-//
-// 2026-09-11 — "재테크"(investing) 카테고리 자체를 제거(항상 0건이라
-// econCategories.ts 참조)하며 '국제' 짝의 파트너가 사라졌다. 국제·문화를
-// 새로 묶는 대신(그러면 문화 섹션이 오디오 섹션보다 위로 올라가는 위치
-// 변경이 생김 — 이번 요청 범위 밖) '국제'도 문화처럼 단독 줄로 남긴다.
+// 카테고리를 2개씩 짝지어 한 줄(2/3+1/3)로 배치한다. 순서는 ECON_CATEGORIES 정의 순서를 따른다.
+// 짝이 없는 카테고리(문화·국제)는 마지막에 단독(1개짜리) 행으로 둔다. CategoryPairRow는 slugs 1~2개를 모두 받는다.
 const CATEGORY_PAIRS: readonly (readonly string[])[] = [
   ['markets', 'property'],
   ['industry', 'finance'],
@@ -49,10 +34,7 @@ function CategoryPairRow({
   const configs = slugs.map((slug) => ECON_CATEGORIES.find((c) => c.slug === slug)!);
   const itemsBySlug = configs.map((cfg) => archiveItems.filter((it) => it.category === cfg.label));
   if (itemsBySlug.every((items) => items.length === 0)) return null;
-  // 행 사이 구분선(2026-08-17엔 1px 연회색 hairline)을 리디자인(2026-09-30)
-  // 에서 완전히 뺐다 — CategoryFeatureSection 각각이 이제 자기 카드(배경+
-  // 테두리+그림자)를 가지므로, 카드 밖에 또 구분선을 그으면 카드 테두리와
-  // 겹쳐 이중 프레임처럼 보인다. 카드 사이 간격(marginTop)만으로 행 구분.
+  // 행 사이 구분선은 두지 않는다. CategoryFeatureSection이 각각 자기 카드(배경+테두리+그림자)를 가지므로 카드 밖 구분선은 이중 프레임이 되며, 카드 사이 간격(marginTop)만으로 행을 구분한다.
   return (
     <div style={{ marginTop: 'clamp(32px, 4.4vw, 48px)' }}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8" style={{ marginBottom: 8 }}>
@@ -72,33 +54,23 @@ interface Props {
   setShowCalendar: (show: boolean) => void;
   selectedGroup: MbtiGroupId;
   onMbtiChange?: (group: MbtiGroupId) => void;
-  // 빌드타임(app/page.tsx) 서버 프리페치 값 — 각 섹션에 그대로 하향 전달
-  // (2026-08-07, 홈 SSG 감사). 없으면 각 섹션이 기존처럼 클라이언트에서 로드.
+  // 빌드타임(app/page.tsx) 서버 프리페치 값을 각 섹션에 하향 전달한다. 없으면 각 섹션이 클라이언트에서 로드한다.
   initialWebtoons?: CmsWebtoon[];
   initialVideos?: CmsVideo[];
   initialLensPosts?: CmsLens[];
   paperDates?: string[];
-  // "최신 뉴스" 그리드 + 카테고리 레일이 공유하는 letters 원본(2026-08-17,
-  // 홈 구조 개편) — 한 번만 fetch해서 최신순 슬라이스와 카테고리별 필터
-  // 양쪽에 다 쓴다(app/page.tsx 참조).
+  // "최신 뉴스" 그리드와 카테고리 레일이 공유하는 letters 원본. 한 번만 fetch해 최신순 슬라이스와 카테고리별 필터에 함께 사용한다(app/page.tsx 참조).
   initialArchiveItems?: ArchiveItem[];
-  // 우측 사이드바(HomeSideBar) — features 레이어에서 widgets를 직접 import할
-  // 수 없어(FSD 단방향 규칙, 2026-08-24 boundaries lint로 발견) 렌더된
-  // 엘리먼트를 그대로 받는다. 호출부(widgets/FeedPage/FeedPage.tsx)가
-  // initialHotLetters까지 포함해 조립 — 이 컴포넌트는 더 이상 그 데이터를
-  // 직접 안 다룬다.
+  // 우측 사이드바(HomeSideBar) — features 레이어는 widgets를 직접 import할 수 없으므로(FSD 단방향 규칙) 렌더된 엘리먼트를 받는다.
+  // 조립은 호출부(widgets/FeedPage/FeedPage.tsx)가 담당한다.
   sidebar?: ReactNode;
-  // 오디오 섹션(AudioPreviewSection) 서버 프리페치 — home_player 채널
-  // (TodayNewsPlayer.tsx와 같은 소스, 2026-08-21).
+  // 오디오 섹션(AudioPreviewSection) 서버 프리페치 — home_player 채널(TodayNewsPlayer.tsx와 같은 소스).
   initialHomePlayerPosts?: HomePlayerPost[];
-  // 본문 칼럼(gridColumn:1) 맨 위, 히어로 캐러셀 위에 얹는 배너 — sidebar와
-  // 같은 이유(features가 다른 feature를 직접 import 못 함)로 렌더된
-  // 엘리먼트를 그대로 받는다. 2026-09, features/onboarding의
-  // 피드 상단 슬롯(현재 FeedPage는 쓰지 않음 — 2026-10-04 DiscoveryBanner 제거).
+  // 본문 칼럼(gridColumn:1) 맨 위, 히어로 캐러셀 위에 얹는 배너 슬롯. sidebar와 같은 이유로 렌더된 엘리먼트를 받는다.
   topBanner?: ReactNode;
 }
 
-// 홈 구역 구분(2026-10-04, 사용자: "뉴욕타임스처럼 영역별로 선으로 깔끔하게") — 구역마다 위에 가는 먹색 선 한 줄 + 일정한 간격. 각 구역이 따로 갖던 위 여백은 선 아래 16px로 통일한다.
+// 홈 구역 구분 — 구역마다 위에 가는 먹색 선 한 줄 + 일정한 간격. 각 구역의 위 여백은 선 아래 16px로 통일한다.
 function HomeSection({ children }: { children: React.ReactNode }) {
   return (
     <div className="home-sec">
@@ -122,132 +94,71 @@ export function NewsFeedTab({
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Noto Serif KR 로딩은 layout.tsx <head>의 <link> 하나로 통합했다
-          (2026-08-06 폰트 감사 — 이 컴포넌트를 포함해 3곳이 각자 렌더 블로킹
-          @import를 중복 실행하고 있었음). */}
+      {/* Noto Serif KR 로딩은 layout.tsx <head>의 <link> 하나로 통합했으므로 여기서 @import하지 않는다. */}
       <style>{`
         .editorial-title {
           font-family: 'Noto Serif KR', serif;
         }
       `}</style>
 
-      {/* 우측 사이드바(2026-08-17 재도입) — 인기글(HotLettersRail)과 안내 카드(HomeSideBar)를 sticky 컨테이너로 묶는다.
-          이 컴포넌트(features 레이어)는 widgets를 직접 import할 수 없어 렌더된 사이드바를 `sidebar` prop으로 받는다 — 조립은 widgets/FeedPage/FeedPage.tsx가 한다.
-          maxWidth를 1000→1320으로 넓히고 CSS Grid 2열(본문 1fr + 사이드바
-          280px)로 바꿨다 — lg 미만에서는 사이드바가 아예 안 뜬다(HomeSideBar
-          의 className="hidden lg:block").
-          웹툰 섹션은 처음엔 뷰포트 끝까지 번지는 진짜 full-bleed였는데,
-          그러려면 그리드 두 칼럼을 가로질러야 했고(gridColumn:'1 / -1') 그
-          과정에서 grid-template-rows를 명시 안 해 사이드바의 gridRow:'1/-1'
-          이 첫 행 하나로 접히면서 본문과 겹치는 버그가 났었다(2026-08-17,
-          "지금 이렇게 나오는건뭐지?"). 그런데 사이드바가 생긴 뒤로 다시
-          보니 뷰포트 끝까지 번지는 배경 자체가 "사이드바 존재를 무시하고
-          화면을 가로지르는" 것처럼 어색해 보인다는 재피드백("모서리까지
-          색깔 칠하지 마시죠... 밸런스 맞춰주시죠")으로 웹툰을 다시 컨테이너
-          안 둥근 카드로 되돌렸다(WebtoonPreviewSection.tsx 참조) — 그 덕에
-          웹툰도 다른 섹션들과 똑같이 본문 칼럼(gridColumn:1) 안에 그냥
-          두면 되고, 행을 나눠 관리할 필요도, 사이드바를 gridRow로 억지로
-          이어붙일 필요도 없어졌다 — 사이드바는 그냥 gridColumn:2 하나로 본문
-          칼럼 전체 높이만큼 자연스럽게 늘어난다(그리드 기본 동작). */}
+      {/*
+         우측 사이드바 — 인기글(HotLettersRail)과 안내 카드(HomeSideBar)를 sticky 컨테이너로 묶는다.
+         features 레이어는 widgets를 직접 import할 수 없어 `sidebar` prop으로 받으며, 조립은 widgets/FeedPage/FeedPage.tsx가 한다.
+         CSS Grid 2열(본문 1fr + 사이드바 280px)이며 lg 미만에서는 사이드바가 표시되지 않는다(HomeSideBar의 className="hidden lg:block").
+         모든 섹션은 본문 칼럼(gridColumn:1)에 두고, 사이드바는 gridColumn:2 하나로 본문 전체 높이만큼 늘어난다.
+       */}
       <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]" style={{ columnGap: 64 }}>
           <div style={{ gridColumn: 1 }}>
             {topBanner}
 
-            {/* "최신 뉴스" 히어로 자리+그리드+전체보기(2026-08-17, 배너 바로
-                아래 — 사용자가 스크린샷으로 히어로 위치를 정확히 짚어 확인).
-                예전엔 형식 기준으로 "이슈 톡톡"(FollowingFeed)과 "인사이트"
-                (ColumnPreviewSection) 두 섹션이 따로 있었는데, 상단 탭을
-                형식(브리핑/인사이트)에서 주제(증시/부동산/...) 기준으로 갈아
-                엎은 김에 홈도 맞췄다.
-                히어로 자리는 지면 특별 코너로 개편(2026-08-21, 사용자 요청:
-                "전체/증권/산업/시그널 지면 탭") — 단, 시각 구조는 그대로다.
-                처음엔 박스 자체를 "지면 4개 × 기사 4개 리스트"로 완전히
-                새로 만들었다가, 사용자가 스크린샷으로 "이렇게 보이는건
-                유지하는거고"(사진+헤드라인 이슈 하나 + 레터/웹툰/팟캐스트/
-                영상 4행)라고 확인해 되돌렸다 — 실제로 바뀐 건 화살표가
-                넘기는 대상뿐, "최신 lens 5개"에서 "지면 4개 각각의 대표
-                이슈"로. LensPreviewSection.tsx 상단 주석 참조. 그래서
-                넘기는 데이터도 lens 전용 그대로(initialLensPosts) —
-                지면별 캐릭터 4행을 보여주려면 CmsLens.lenses가 필요해서
-                범용 archiveItems로는 불가능하다. */}
+            {/*
+               "최신 뉴스" 히어로 자리 + 그리드 + 전체보기. 히어로 자리는 지면 특별 코너(전체/증권/산업/시그널 탭)이며,
+               지면별 캐릭터 4행을 보여주려면 CmsLens.lenses가 필요하므로 범용 archiveItems가 아닌 lens 전용 데이터(initialLensPosts)를 넘긴다(LensPreviewSection.tsx 상단 주석 참조).
+             */}
             <LatestGridSection
               items={archiveItems}
               heroSlot={initialLensPosts?.length ? <LensPreviewSection initialItems={initialLensPosts} paperDates={paperDates} /> : undefined}
             />
 
-            {/* 카테고리 섹션(2026-08-17, 본지 en.sedaily.com 스타일 참고 — 사용자
-                확인: "본지형식대로 해보시죠"). 한때 카테고리 레일(그리드형)로
-                만들었다가 "레일 헤더와 카드 태그가 완전히 같은 단어라 순수
-                중복"이라는 지적으로 뺐었는데, 본지 스타일은 그 문제가 없다 —
-                카드마다 카테고리 태그를 다시 안 붙이고(헤더 하나로 충분하다고
-                봄) 큰 히어로+작은 리스트 조합으로 "신문 지면"처럼 배치한다
-                (CategoryFeatureSection.tsx 참조). 2개씩 짝지어 2/3+1/3 한 줄에
-                배치, 얇은 가로선으로 구분 — 콘텐츠 없는 카테고리는 자동으로
-                숨는다.
-                첫 번째 짝(증시+부동산)만 여기서 먼저 그리고, 타임머신 섹션을
-                그 바로 아래 끼워 넣은 뒤 나머지 짝(산업+금융정책, 국제+재테크)을
-                잇는다(2026-08-17, 사용자 확인: "타임라인 이거 산업 부분 위쪽에
-                끼어 넣어주시죠"). */}
+            {/*
+               카테고리 섹션 — 큰 히어로 + 작은 리스트 조합으로 신문 지면처럼 배치한다(CategoryFeatureSection.tsx 참조).
+               카드마다 카테고리 태그를 반복하지 않고 헤더 하나로 표시하며, 콘텐츠 없는 카테고리는 자동으로 숨는다.
+               첫 번째 짝(증시+부동산)만 먼저 그리고 타임머신 섹션을 그 아래에 둔 뒤 나머지 짝을 잇는다.
+             */}
             <CategoryPairRow slugs={CATEGORY_PAIRS[0]} archiveItems={archiveItems} />
 
-            {/* 타임머신이 메인 훅(2026-08-17, 사용자 확인: "메인은 타임라인
-                뉴스보다도 생일 뉴스, 타임머신 타고 날아가는 게 메인"). 원래
-                "그날의 지면"(TimelinePreviewSection)과 "생일 뉴스 타임머신"
-                (BirthdayTimeMachineSection)이 따로 있었는데 "통합해야죠, 두
-                개 다 있으면 안 됩니다"(같은 날) 피드백으로 하나로 합쳤다 —
-                최근 날짜는 실시간 S3 지면, 그 이전은 빅카인즈 예시.
-                NewsTimeMachineSection.tsx 상단 주석 참조.
-                위치: 카테고리 섹션 첫 짝(증시+부동산) 바로 아래, 산업 짝 바로
-                위(2026-08-17, 사용자 확인). */}
+            {/*
+               타임머신 섹션 — 홈의 메인 훅이다. 최근 날짜는 실시간 S3 지면, 그 이전은 빅카인즈 예시를 보여 준다(NewsTimeMachineSection.tsx 상단 주석 참조).
+               위치는 카테고리 섹션 첫 짝(증시+부동산) 바로 아래, 산업 짝 바로 위이다.
+             */}
             <HomeSection><NewsTimeMachineSection /></HomeSection>
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[1]} archiveItems={archiveItems} />
 
-            {/* 웹툰 파일럿(2026-08-06) — 처음엔 상단 슬림 배너였는데 "실제
-                콘텐츠처럼 안 보인다"는 피드백으로 카드형으로 교체
-                (WebtoonPreviewSection.tsx). 위치: 원래 국제+재테크 짝
-                바로 위(2026-08-17, 사용자 확인: "웹툰 부분은... 국제..
-                재테크 바로 위쪽으로") — 2026-09-11 재테크 제거 후엔
-                '국제' 단독 줄 바로 위.
-                영상 섹션을 바로 옆에 붙였다(2026-08-20, 사용자 확인 —
-                "영상이 재밌는 콘텐츠인데 맨 아래 있으니 애매하다"). 웹툰과
-                영상 둘 다 "재밌게 훑는 비주얼 콘텐츠"라는 같은 성격인데,
-                영상만 카테고리 레일 3줄을 전부 지나 맨 밑바닥(문화 다음)에
-                떨어져 있어서 단어 퀴즈(§ 오늘 앞서 옮김)와 같은 문제를
-                겪고 있었다 — 웹툰 옆으로 옮겨 "비주얼 콘텐츠" 블록으로
-                묶는다. */}
+            {/*
+               웹툰 섹션(WebtoonPreviewSection.tsx) — '국제' 단독 줄 바로 위에 둔다.
+               영상 섹션을 바로 옆에 붙여 웹툰과 함께 "비주얼 콘텐츠" 블록으로 묶는다.
+             */}
             <HomeSection><WebtoonPreviewSection initialItems={initialWebtoons} /></HomeSection>
 
             <HomeSection><VideoPreviewSection initialVideos={initialVideos} /></HomeSection>
 
             <CategoryPairRow slugs={CATEGORY_PAIRS[2]} archiveItems={archiveItems} />
 
-            {/* 오디오 섹션(2026-08-21, 사용자 요청 — "오디오 섹션도 메인
-                페이지에 걸어주시죠", 위치는 "문화 섹션 위에"). 기존엔
-                TodayNewsPlayer.tsx(하단 고정 미니 플레이어)에만 재생목록이
-                있어서 스크롤되는 본문 콘텐츠 목록엔 전혀 안 걸려있었다 —
-                /listen 목록과 같은 home_player 데이터를 텍스트 리스트로
-                보여준다(AudioPreviewSection.tsx). */}
+            {/* 오디오 섹션 — /listen 목록과 같은 home_player 데이터를 텍스트 리스트로 보여 준다(AudioPreviewSection.tsx). 문화 섹션 위에 둔다. */}
             <HomeSection><AudioPreviewSection initialItems={initialHomePlayerPosts} /></HomeSection>
 
-            {/* 문화(culture) — 경제 카테고리 6개 짝(3줄)을 다 채운 뒤에 생긴
-                7번째 카테고리라 파트너가 없다. 단독 1개짜리 줄로 마지막에
-                추가(2026-08-20, 사용자 확인 — 홈에 문화 카테고리가 안 걸려
-                있는 걸 직접 발견). 콘텐츠가 없는 날은 CategoryFeatureSection
-                이 알아서 숨는다. */}
+            {/*
+               문화(culture) — 경제 카테고리 6개 짝(3줄) 이후에 추가된 카테고리라 파트너가 없어 단독 행으로 마지막에 둔다.
+               콘텐츠가 없는 날은 CategoryFeatureSection이 숨긴다.
+             */}
             <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} />
 
-            {/* 게임 섹션(2026-08-21, 사용자 요청 — "게임도 섹션을... 메인에다가...
-                웹툰은 트렌디하게 잘 만들어진 것 같은데... 약간 재밌는 게임
-                느낌나도록", 위치는 "맨하단에"). 처음엔 웹툰·영상 옆에 붙여
-                "재밌는 비주얼 콘텐츠" 블록으로 묶으려 했으나, 사용자가
-                맨 아래로 옮겨달라고 재요청 — 본문 콘텐츠(카테고리 레일까지)를
-                다 본 뒤 마지막에 만나는 "쉬어가기" 자리로. 톤은 사이트
-                전역의 밝은 에디토리얼과 의도적으로 다르다 — /games 라우트
-                (GamesClient.tsx) 자체가 이미 다크+네온 아케이드 톤이라
-                그대로 가져왔다(GamesPreviewSection.tsx 상단 주석 참조,
-                GAMES 데이터는 shared/data/games.ts 공유). */}
+            {/*
+               게임 섹션 — 본문 콘텐츠를 다 본 뒤 마지막에 만나는 "쉬어가기" 자리에 둔다.
+               톤은 사이트 전역의 밝은 에디토리얼과 의도적으로 다르다. /games 라우트(GamesClient.tsx)가 다크+네온 아케이드 톤이라 그대로 가져왔다(GamesPreviewSection.tsx 상단 주석 참조, GAMES 데이터는 shared/data/games.ts 공유).
+             */}
             <GamesPreviewSection />
           </div>
 
@@ -255,8 +166,7 @@ export function NewsFeedTab({
         </div>
       </div>
 
-      {/* 뉴스레터 구독 섹션 삭제(2026-08-06 피드백) — onboarding 페이지엔
-          NewsletterCTA가 그대로 남아있어 컴포넌트 자체는 안 지웠다. */}
+      {/* 뉴스레터 구독 섹션은 두지 않는다. onboarding 페이지의 NewsletterCTA 컴포넌트는 그대로 사용한다. */}
 
       {/* 하단 여백 */}
       <div className="h-32" />

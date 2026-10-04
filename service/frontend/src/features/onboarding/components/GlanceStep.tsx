@@ -6,7 +6,7 @@ import { GlanceArt } from './GlanceArt';
 import { OnboardingHeader } from './OnboardingHeader';
 
 // 질문 2 — "그때 뉴스를 열면, 가장 먼저 눈이 가는 건?" 같은 상황에서도 눈이 먼저 가는 곳은 사람마다 다르다(인지 유형).
-// 질문 1과 같은 규칙: 한 번 누르면 바로 다음. 선택지는 직관적으로 보이도록 작은 그림 + 이름 + 한 줄.
+// 질문 1과 같은 규칙으로 한 번 누르면 바로 다음으로 넘어가며, 선택지는 작은 그림 + 이름 + 한 줄로 구성한다.
 const BLUE = '#5b8def';
 
 export function GlanceStep({ moment, onSelect, onBack, onSkip }: { moment: Moment; onSelect: (glance: Glance) => void; onBack: () => void; onSkip: () => void }) {

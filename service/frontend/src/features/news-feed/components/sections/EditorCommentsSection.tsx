@@ -7,14 +7,11 @@ import { letterHref } from '@/shared/lib/content/letterHref';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 
 interface Props {
-  // 오늘 함께 발행된, 지금 보고 있는 레터를 제외한 다른 레터들. MBTI 4-페르소나
-  // 체계 폐지(2026-08-07) 이후 "그날 다른 3명의 에디터" 라는 고정 구조가 없어져
-  // 0~N개 어느 쪽도 될 수 있다. 빈 배열이면 섹션 자체를 숨긴다.
+  // 오늘 함께 발행된, 지금 보고 있는 레터를 제외한 다른 레터들이다. 0~N개일 수 있으며, 빈 배열이면 섹션 자체를 숨긴다.
   otherLetters: ApiLetter[];
 }
 
-// 단일 명의 — todayLettersApi.ts 의 DEFAULT_META 와 같은 톤. 페르소나별 아바타/
-// accent lookup 은 폐지, 레터 자체의 cover_image_url 이 있으면 그걸 쓴다.
+// 단일 명의 — todayLettersApi.ts의 DEFAULT_META와 같은 톤을 쓴다. 레터에 cover_image_url이 있으면 그것을 사용한다.
 const ACCENT = '#111827';
 const SOFT = '#f3f4f6';
 

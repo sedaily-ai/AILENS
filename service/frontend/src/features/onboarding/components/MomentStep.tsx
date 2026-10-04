@@ -5,8 +5,8 @@ import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { MOMENTS, MOMENT_MBTI, type Moment } from '../lib/moments';
 import { OnboardingHeader } from './OnboardingHeader';
 
-// 화면 1/2 — 질문 하나, 선택지 넷. 누르는 순간 바로 결과로 넘어간다(다음 버튼·복수 선택 없음).
-// 어려우면 건너뛰어도 되고 언제든 다시 올 수 있다는 걸 질문 바로 아래에 밝힌다 — 이탈 대신 "나중에"로 흘려보낸다.
+// 화면 1/2 — 질문 하나, 선택지 넷. 누르는 즉시 결과로 넘어간다(다음 버튼·복수 선택 없음).
+// 건너뛰어도 되고 언제든 다시 올 수 있음을 질문 바로 아래에 밝혀 이탈 대신 "나중에"로 유도한다.
 const BLUE = '#5b8def';
 
 export function MomentStep({ onSelect, onSkip }: { onSelect: (moment: Moment) => void; onSkip: () => void }) {
@@ -71,7 +71,7 @@ export function MomentStep({ onSelect, onSkip }: { onSelect: (moment: Moment) =>
           ))}
         </div>
 
-        {/* "나중에 할게요" — 선택지 바로 아래, 눈에 잘 띄는 크기로(예전엔 우측 상단의 작은 글씨였다). */}
+        {/* "나중에 할게요" — 선택지 바로 아래에 눈에 띄는 크기로 둔다. */}
         <button
           type="button"
           onClick={onSkip}

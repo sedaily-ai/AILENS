@@ -1,7 +1,7 @@
 'use client';
 
 // 홈 "역사 속 그날" 칩을 눌렀을 때 결과 자리에 보이는 사건 카드 — 검증된 사건 설명 + 출처 + 그날 서울경제 보기 / 시대 연표 보기.
-// 날짜 조회는 하루 30건이 중요도 순이 아니라 해당 사건 기사가 안 나올 수 있어서(12-04 상위 30건에 IMF 기사 없음), 목록 대신 설명 카드를 보여준다.
+// 날짜 조회는 하루 30건이 중요도 순이 아니라 해당 사건 기사가 포함되지 않을 수 있으므로(12-04 상위 30건에 IMF 기사 없음) 목록 대신 설명 카드를 보여 준다.
 import Link from 'next/link';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
 import { kdate } from '@/shared/lib/date/timelineDates';

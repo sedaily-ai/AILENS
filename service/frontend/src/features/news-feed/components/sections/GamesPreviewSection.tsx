@@ -8,21 +8,10 @@ import { GAMES } from '@/shared/data/games';
 const arcadeFont = Press_Start_2P({ weight: '400', subsets: ['latin'], display: 'swap' });
 const ARCADE_FONT = `${arcadeFont.style.fontFamily}, "Courier New", monospace`;
 
-// 게임 섹션(2026-08-21, 사용자 요청 — "게임도 섹션을... 메인에다가...
-// 웹툰은 트렌디하게 잘 만들어진 것 같은데... 약간 재밌는 게임 느낌나도록").
-// 웹툰·영상 섹션과 같은 "재밌게 훑는 비주얼 콘텐츠" 톤이되, 이 섹션만은
-// 의도적으로 사이트 전역의 밝은 에디토리얼 톤을 벗어난다 — /games
-// 라우트(GamesClient.tsx) 자체가 이미 다크+네온 아케이드 톤으로 확립돼
-// 있어서, 홈 티저도 그 톤을 그대로 가져와야 "여기 게임 있구나"가
-// 즉시 전달된다(에디토리얼 톤으로 얌전하게 만들면 오히려 재미 신호가
-// 죽는다). 게임 목록(GAMES)은 GamesClient.tsx와 shared/data/games.ts를
-// 공유 — 새 게임이 추가되면 이 섹션도 자동으로 늘어난다.
-//
-// 게임이 2종뿐이라 웹툰/영상처럼 4열 그리드로 채우면 휑해 보인다는
-// 우려로, 처음엔 "대표 게임 1개 배너"만 검토했으나 실제로 카드 2장을
-// 나란히 놓아도 각 카드가 충분히 크게 보여서(2열, 최소폭 260px) 사용자
-// 확인 없이 2장 전부 노출하는 쪽으로 결정 — 둘 다 실제로 플레이 가능한
-// 완성 콘텐츠라 숨길 이유가 없다.
+// 게임 섹션 — 웹툰·영상 섹션과 같은 "재밌게 훑는 비주얼 콘텐츠" 성격이지만, 의도적으로 사이트 전역의 밝은 에디토리얼 톤을 벗어난다.
+// /games 라우트(GamesClient.tsx)가 다크+네온 아케이드 톤이므로 홈 티저도 같은 톤으로 맞춰 게임임을 즉시 전달한다.
+// 게임 목록(GAMES)은 GamesClient.tsx와 shared/data/games.ts를 공유하므로 새 게임이 추가되면 이 섹션도 자동으로 늘어난다.
+// 게임이 2종이어도 카드 2장(2열, 최소폭 260px)이 충분히 커서 모두 노출한다.
 export function GamesPreviewSection() {
   return (
     <section style={{ padding: 'clamp(28px, 4vw, 40px) 0 0' }}>

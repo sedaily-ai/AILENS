@@ -1,15 +1,13 @@
 'use client';
 
 /**
- * /start — 질문 2개 + 결과 온보딩(2026-10-04 재설계).
+ * /start — 질문 2개 + 결과 온보딩.
  *   1) 상황("뉴스, 주로 언제 보게 되나요?") — 누르면 바로 다음
  *   2) 인지 유형("그때 무엇이 먼저 보이나요?" 숫자·글·그림·소리) — 누르면 바로 결과
  *   3) 내 유형 결과 + 그 자리에서 오늘 기사 바로 체험
- * 예전 6~7단계 위저드(목표→포맷→체험→관심분야→결과→구독→완료)는 이탈이 커서 걷어냈다.
  * 구독·관심분야는 온보딩에서 묻지 않는다.
  *
- * ⚠️ 이름 헷갈림 주의 — `/onboarding` 라우트(`app/(auth)/onboarding/OnboardingClient.tsx`)도 "온보딩"이라는
- * 이름을 쓰지만 서비스 소개용 정적 스크롤 랜딩이고, 이 흐름과는 완전히 다른 화면이다.
+ * 주의: `/onboarding` 라우트(`app/(auth)/onboarding/OnboardingClient.tsx`)는 서비스 소개용 정적 스크롤 랜딩이며 이 흐름과 별개의 화면이다.
  */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';

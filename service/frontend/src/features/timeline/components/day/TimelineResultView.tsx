@@ -1,7 +1,6 @@
 'use client';
 
-// /timeline/[date] 최근 구간(2026-02-01~) 결과 화면 — 서버가 미리 가져온 기사를 그대로 그린다(클라이언트 fetch 없음).
-// 2026-10-04: 항상 비어 있던 "그날의 이슈" 보기와 그 fetch·지표 패널·이슈 카드를 걷어냈다. 목록 렌더는 TimelineArticleList로 뺐다.
+// /timeline/[date] 최근 구간(2026-02-01~) 결과 화면 — 서버가 미리 가져온 기사를 그대로 그린다(클라이언트 fetch 없음). 목록 렌더는 TimelineArticleList가 담당한다.
 import Link from 'next/link';
 import type { Article } from '@/shared/lib/api/timelineApi';
 import { kdate } from '@/shared/lib/date/timelineDates';

@@ -5,8 +5,8 @@ import { GLANCES, MOMENTS, type Glance, type Moment } from '../lib/moments';
 import { GlanceArt } from './GlanceArt';
 import { MomentArt } from './MomentArt';
 
-// 결과 화면 — 나와 같은 유형이 얼마나 되는지, 다른 분들은 이 상황에서 무엇부터 보는지(2026-10-04).
-// 읽는 순서: ① 한 줄 결론(같은 유형 N%) → ② 이 상황에서 사람들이 먼저 보는 것(막대 4개, 내 것 강조) → ③ 나와 같은 선택을 한 분들의 성향.
+// 결과 화면 — 나와 같은 유형이 얼마나 되는지, 다른 사람들은 이 상황에서 무엇부터 보는지 보여 준다.
+// 읽는 순서: ① 한 줄 결론(같은 유형 N%) → ② 이 상황에서 사람들이 먼저 보는 것(막대 4개, 내 것 강조) → ③ 나와 같은 선택을 한 사람들의 성향.
 // 일반 독자가 모르는 약어(NT·NF·ST·SF)는 풀어 쓴 이름을 앞에 두고 약어는 작게 곁들인다.
 // 막대는 마운트 시 자란다(CSS 애니메이션). 수치는 lib/distribution.ts(현재 샘플)에서 온다.
 const BLUE = '#5b8def';

@@ -1,6 +1,6 @@
-// 코스피 이정표 — 데이터에 실린 검증된 사건 설명에서 종가가 확인된 날만 점으로 찍는다.
-// 일부러 이어 그리지 않는다: 이정표 사이의 값은 확인한 적이 없어서 선을 이으면 없는 데이터를 만들게 된다.
-// 값의 출처는 각 사건의 출처(shared/data/timelineEvents.generated.ts의 sources). 종가 기준, 단위 포인트.
+// 코스피 이정표 — 데이터에 실린 검증된 사건 설명에서 종가가 확인된 날만 점으로 표시한다.
+// 이정표 사이의 값은 확인되지 않았으므로 선으로 잇지 않는다.
+// 값의 출처는 각 사건의 sources(shared/data/timelineEvents.generated.ts). 종가 기준, 단위 포인트.
 export interface KospiPoint {
   date: string;
   value: number;

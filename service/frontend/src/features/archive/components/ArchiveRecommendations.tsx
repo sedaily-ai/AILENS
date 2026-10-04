@@ -4,12 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
 import type { ArchivedSentence } from '@/shared/types/mbti';
 import { searchArticlesByKeywords, type KeywordArticle } from '@/shared/lib/api/archiveApi';
 
-// ── 관심사 기반 추천 ──────────────────────────────────────────────
-// 저장한 문장 텍스트 → 토큰화 + stopword 제거 + 빈도 정렬 → top 20 키워드 추출
-// → 기사 title/카테고리에 키워드 hit 카운트 → 점수 desc + 최신순 정렬
-// 초기 3개, "더보기" 누를 때마다 +3 노출.
-// ArchiveTab.tsx(893줄)가 너무 길어서 다른 독립 서브컴포넌트들과 함께
-// 분리했다(2026-08-18).
+// ── 관심사 기반 추천 ──
+// 저장한 문장 텍스트 → 토큰화 + stopword 제거 + 빈도 정렬 → top 20 키워드 추출 → 기사 title/카테고리에 키워드 hit 카운트 → 점수 내림차순 + 최신순 정렬.
+// 초기 3개를 보여 주고 "더보기"를 누를 때마다 3개씩 추가한다.
 const KO_STOPWORDS = new Set([
   '은', '는', '이', '가', '을', '를', '에', '의', '와', '과', '도', '로', '으로', '에서',
   '한', '있', '없', '되', '것', '수', '등', '및', '안', '내', '뿐', '저', '나', '너',
@@ -54,9 +51,7 @@ export function ArchiveRecommendations({
   // 키워드 변경 시 백엔드 호출 — XML 버킷에서 최근 7일분 매칭 검색.
   useEffect(() => {
     if (keywords.length === 0) {
-      // 이전 keywords로 가져온 결과가 남아있으면 지운다(2026-08-23, 죽은
-      // 코드 감사 중 set-state-in-effect 확인 — prop이 async fetch 대상
-      // 자체이므로 렌더 중 파생값으로 못 바꾸고 effect에서 리셋해야 함).
+      // 이전 keywords로 가져온 결과가 남아 있으면 지운다. prop이 async fetch 대상이라 렌더 중 파생값으로 대체할 수 없어 effect에서 리셋한다.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([]);
       setFetchedKeywords([]);

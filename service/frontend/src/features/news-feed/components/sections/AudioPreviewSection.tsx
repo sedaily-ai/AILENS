@@ -11,20 +11,10 @@ import { isDirectAudioUrl } from '@/shared/lib/media/videoEmbed';
 import { requestPlayHomePlayerItem } from '@/shared/lib/media/audioPlayerBus';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
-// 카드 4개가 전부 "팟캐스트" 캐릭터 하나만 반복돼 단조로워 보인다는
-// 지적(2026-08-21, "캐릭터들이 다 동일하네? 서로 다르게 해야하지
-// 않을까요?") — 카드 인덱스로 /lens 형식 선택 UI의 4개 라인아트(레터/
-// 웹툰/팟캐스트/영상)를 순환시켜 매 카드가 다른 캐릭터를 갖게 했다.
-// 처음엔 캐릭터별 브랜드 색(tint/color)까지 입혔는데, "캐릭터는
-// 흑백친구들로 하시죠"라는 후속 피드백으로 아바타·재생 배지 색은
-// 다시 중립 톤으로 되돌리고 캐릭터 종류만 다르게 유지한다.
+// 카드 인덱스로 /lens 형식 선택 UI의 4개 라인아트(레터/웹툰/팟캐스트/영상)를 순환시켜 카드마다 다른 캐릭터를 쓴다. 아바타·재생 배지 색은 중립 톤을 유지한다.
 
-// 오디오 섹션(2026-08-21, 사용자 요청 — "오디오 섹션도 메인 페이지에 걸어주시죠",
-// 위치는 "문화 섹션 위에"). TodayNewsPlayer.tsx(하단 고정 미니 플레이어)에만
-// 있던 재생목록이 스크롤되는 본문 콘텐츠 목록엔 전혀 안 걸려있던 걸 보완 —
-// /listen 목록 페이지(ListenListClient.tsx)와 같은 데이터(home_player 채널)를
-// 쓰고 행 디자인도 그대로 가져왔다. thumbnail이 없는 순수 오디오/짧은 영상
-// 콘텐츠라 웹툰·영상 섹션처럼 이미지 카드가 아니라 텍스트 위주 리스트.
+// 오디오 섹션 — /listen 목록 페이지(ListenListClient.tsx)와 같은 데이터(home_player 채널)와 행 디자인을 쓴다.
+// thumbnail이 없는 순수 오디오/짧은 영상 콘텐츠이므로 이미지 카드가 아닌 텍스트 위주 리스트로 구성한다.
 interface Props {
   initialItems?: HomePlayerPost[];
 }
@@ -38,7 +28,7 @@ export function AudioPreviewSection({ initialItems }: Props) {
   const [progress, setProgress] = useState({ t: 0, d: 0 });
   const audioRef = useRef<HTMLAudioElement>(null);
   const fmt = (sec: number) => (Number.isFinite(sec) && sec > 0 ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : '0:00');
-  // 그 자리 재생(2026-10-04) — 같은 행이면 재생/일시정지, 다른 행이면 그 곡으로 바꿔 재생. 하단 고정 플레이어와 동시에 울리지 않게, 시작할 때 하단 플레이어를 멈추는 신호는 따로 없어 목록 쪽을 한 곡만 허용한다.
+  // 그 자리 재생 — 같은 행이면 재생/일시정지, 다른 행이면 그 곡으로 바꿔 재생한다. 하단 고정 플레이어를 멈추는 신호가 없으므로 목록 쪽에서 한 곡만 재생하도록 제한한다.
   const playItem = (it: HomePlayerPost) => {
     const a = audioRef.current;
     if (!a) return;
@@ -58,7 +48,7 @@ export function AudioPreviewSection({ initialItems }: Props) {
 
   if (!items || items.length === 0) return null;
 
-  // 홈은 미리보기만(2026-10-04) — 최신 5건. 날짜 필터·더 불러오기·전용 목록 페이지는 없앴다(이전 구현: AudioPreviewSection.with-filter.tsx).
+  // 홈은 미리보기만 보여 준다(최신 5건). 날짜 필터·더 불러오기·전용 목록 페이지는 없다.
   const shown = items.slice(0, PREVIEW_COUNT);
 
   return (
@@ -94,8 +84,7 @@ export function AudioPreviewSection({ initialItems }: Props) {
         .ap-more:hover { background: #f1f5f9; color: #111827; }
         @media (prefers-reduced-motion: reduce) { .ap-title, .ap-play, .ap-eq i { transition: none; animation: none; } .ap-eq i { height: 10px; } }
       `}</style>
-      {/* 플레이리스트(2026-10-04, 사용자: "리스트로, 스크롤하면서, 그 영역에서 바로 재생, 재생 타임라인 바도 보이게") — 세로 한 열 목록을 영역 안에서 스크롤한다.
-          행을 누르면 그 자리에서 재생되고, 재생 중인 행 아래에 타임라인(진행 막대·현재/전체 시간)이 펼쳐진다. 다시 누르면 일시정지. 이동은 오른쪽 › 로. */}
+      {/* 플레이리스트 — 세로 한 열 목록을 영역 안에서 스크롤한다. 행을 누르면 그 자리에서 재생되고, 재생 중인 행 아래에 타임라인(진행 막대·현재/전체 시간)이 펼쳐진다. 다시 누르면 일시정지, 이동은 오른쪽 › 로 한다. */}
       <audio
         ref={audioRef}
         preload="none"

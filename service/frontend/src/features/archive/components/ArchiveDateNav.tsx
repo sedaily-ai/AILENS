@@ -1,10 +1,7 @@
 import type { ArchivedSentence } from '@/shared/types/mbti';
 import { getWeekDays, isSameDay } from '@/shared/utils/dateUtils';
 
-// ── 날짜 네비 ── 문장이 있을 때만 보이는 상단 sticky 주간 스트립.
-// ArchiveTab.tsx(893줄)가 너무 길어서 다른 독립 서브컴포넌트들과 함께
-// 분리했다(2026-08-18) — 이 UI 블록은 archiveDate/archivedSentences 외엔
-// 아무것도 필요 없는 완전히 독립적인 조각이었다.
+// ── 날짜 네비 ── 문장이 있을 때만 보이는 상단 sticky 주간 스트립. archiveDate/archivedSentences 외에는 의존하지 않는 독립 컴포넌트이다.
 export function ArchiveDateNav({
   archiveDate,
   setArchiveDate,

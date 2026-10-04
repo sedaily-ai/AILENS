@@ -10,28 +10,16 @@ import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import { VideoSketch } from '@/shared/ui/icons/VideoSketch';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
-// 영상 콘텐츠 섹션(2026-08-06) — admin이 YouTube 링크를 CMS에 붙여넣으면
-// 여기 자동으로 뜬다. "매거진 고급짐" 톤(TrendingEconomySection과 동일 원칙)
-// 을 그대로 따른다 — 이 섹션도 재미보다는 정보 콘텐츠라 톤을 맞췄다.
-// 실제 영상이 하나도 없으면 섹션 자체를 숨긴다 — 가짜 썸네일로 채우지 않는다.
-//
-// 2026-08-07: 3열 그리드 + "채널로 이동" 헤더 링크로 리디자인(경제 매체
-// 홈 화면의 유튜브 섹션 벤치마크 참고). AI LENS 공식 유튜브 채널이 아직
-// 없어 CHANNEL_URL을 비워뒀다 — 채널이 생기면 이 값만 채우면 링크가
-// 자동으로 나타난다(비어있으면 링크 자체가 렌더되지 않는다).
+// 영상 콘텐츠 섹션 — admin이 CMS에 붙여넣은 YouTube 링크가 자동으로 표시된다.
+// 정보 콘텐츠 성격에 맞춰 매거진 톤(TrendingEconomySection과 동일 원칙)을 따르며, 실제 영상이 없으면 섹션 자체를 숨긴다(가짜 썸네일 미사용).
+// CHANNEL_URL이 비어 있으면 "채널로 이동" 링크는 렌더되지 않는다. 채널이 생기면 이 값만 채운다.
 
 interface Props {
-  // 빌드타임(app/page.tsx)에 fetchVideos()로 미리 가져온 값 — 정적 HTML에
-  // 실제 영상 목록이 바로 박히게 한다(2026-08-07, 홈 SSG 감사).
+  // 빌드타임(app/page.tsx)에 fetchVideos()로 미리 가져온 값 — 정적 HTML에 실제 영상 목록이 바로 포함되게 한다.
   initialVideos?: CmsVideo[];
 }
 
-// 2026-08-20엔 lens("4가지 시선") 글의 영상 서브포맷을 buildLensVideoItems로
-// 이 섹션에 섞어 넣었다. 2026-08-23 — mustknow_auto/frontpage_auto가 이제
-// 영상 생성 시 video 채널에도 독립 글을 같이 쓰도록 바뀌면서(웹툰과 같은
-// 이유·같은 패턴, WebtoonPreviewSection.tsx 참조), fetchVideos() 하나만으로
-// 전부 커버된다 — lens에서 파생해서 섞으면 중복 표시된다. 과거 lens 글도
-// 백필 스크립트로 video 채널 글을 만들어뒀다.
+// 영상 카드는 fetchVideos() 하나로 구성한다. video 채널에 독립 글이 발행되므로 lens 글에서 파생해 섞지 않는다(중복 표시 방지, WebtoonPreviewSection.tsx 참조).
 export function VideoPreviewSection({ initialVideos }: Props) {
   const videos = useServerSeededList<CmsVideo[], null>(initialVideos, null, fetchVideos);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -43,10 +31,7 @@ export function VideoPreviewSection({ initialVideos }: Props) {
   };
   const scrollBy = (dir: 1 | -1) => trackRef.current?.scrollBy({ left: dir * (trackRef.current.clientWidth + 14) * 0.98, behavior: 'smooth' });
 
-  // 재생을 카드 안(작은 16:9)이 아니라 모달로 키운다(2026-08-20, 사용자
-  // 피드백: "여기서 플레이 되면 좀 작아 보이잖아요, 모달로 커지면 안
-  // 되냐"). ArchiveCalendarModal.tsx와 같은 관례(fixed inset-0 flex
-  // items-center justify-center, 배경 클릭·Esc로 닫기)를 그대로 따른다.
+  // 재생은 카드 안(작은 16:9)이 아닌 모달에서 크게 한다. ArchiveCalendarModal.tsx와 같은 관례(fixed inset-0 flex items-center justify-center, 배경 클릭·Esc로 닫기)를 따른다.
   useEffect(() => {
     if (!playingId) return;
     const onKey = (e: KeyboardEvent) => {
@@ -64,15 +49,11 @@ export function VideoPreviewSection({ initialVideos }: Props) {
 
   const activeVideo = videos.find((v) => v.id === playingId) ?? null;
 
-  // 홈은 최신 4개만 티저로 — 다른 홈 섹션들과 개수 통일(2026-08-11).
-  // fetchVideos()가 /video 전용 목록 페이지를 위해 limit=100까지 받아오게
-  // 바뀌면서(2026-08-11), 이 슬라이스가 없으면 홈에 영상이 전부 다 쌓여
-  // 나오는 회귀가 있었다.
+  // 홈은 최신 4개만 티저로 보여 다른 홈 섹션과 개수를 맞춘다. fetchVideos()가 /video 목록 페이지용으로 limit=100까지 받아오므로 이 슬라이스가 필요하다.
 
   return (
     <section>
-      {/* NYT "Latest Shows" 구조(2026-10-04, 사용자 제안): 위 가는 선 + 담백한 굵은 구역 제목 → 카드마다 색이 다른 단색 면(왼쪽: 분류·큰 세리프 제목·재생 버튼, 오른쪽 절반: 기사 사진)
-          4열, 오른쪽 아래 ‹ › 로 가로 넘김. 읽는 영역은 세로, 보는 영역은 가로로 훑게 해 구조부터 다르게 느껴지게 한다. 눌러서 모달로 재생하는 동작은 그대로. */}
+      {/* NYT "Latest Shows" 구조 — 위 가는 선 + 굵은 구역 제목, 카드마다 색이 다른 단색 면(왼쪽: 분류·세리프 제목·재생 버튼, 오른쪽 절반: 기사 사진) 4열, 오른쪽 아래 ‹ › 로 가로 넘김. 눌러서 모달로 재생한다. */}
       <header style={{ paddingTop: 2, marginBottom: 14, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 'clamp(17px, 3.6vw, 20px)', fontWeight: 800, letterSpacing: '-0.02em', color: '#111827' }}>
           <VideoSketch className="w-12 h-10 -ml-1" />

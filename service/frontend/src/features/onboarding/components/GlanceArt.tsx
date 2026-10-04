@@ -4,9 +4,8 @@ import { useId } from 'react';
 import type { GlanceId } from '../lib/moments';
 import { BLUE, INK, pulse, smooth, useAnimate, useRig, type SetFn } from './MomentArt';
 
-// 질문 2 선택지 그림 — "화면에서 눈이 먼저 가는 곳"을 보여 준다(2026-10-04).
-// 뉴스 화면 하나에 그 요소만 파랗게 살아 움직이게 한다: 글은 읽는 형광펜이 줄을 따라가고,
-// 그림·영상은 재생 버튼에서 물결이 퍼지고, 소리는 이퀄라이저가 뛴다. 움직임 엔진은 MomentArt와 같다(useRig).
+// 질문 2 선택지 그림 — "화면에서 눈이 먼저 가는 곳"을 보여 준다.
+// 뉴스 화면 하나에서 해당 요소만 파랗게 움직인다: 글은 형광펜이 줄을 따라가고, 그림·영상은 재생 버튼에서 물결이 퍼지고, 소리는 이퀄라이저가 뛴다. 움직임 엔진은 MomentArt와 같다(useRig).
 // 움직임 줄이기 설정이면 한 프레임(정지 그림)만 그린다.
 const FRAME = { x: 10, y: 6, w: 100, h: 68 };
 const GRAY = '#b4bdcc';

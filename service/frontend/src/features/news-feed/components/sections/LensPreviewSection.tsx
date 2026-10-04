@@ -13,24 +13,15 @@ import { lensPath } from '@/shared/lib/content/lensUrl';
 import dynamic from 'next/dynamic';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 
-// 안내 모달은 칩을 눌렀을 때만 필요하다 — 첫 화면 번들에서 빼고(경량화, 2026-10-04) 눌렀을 때 불러온다. 서버 렌더에는 원래 없는 UI(포털)라 ssr: false.
+// 안내 모달은 칩을 눌렀을 때만 필요하므로 첫 화면 번들에서 제외하고 눌렀을 때 불러온다. 포털 UI라 서버 렌더에 없으므로 ssr: false.
 const LensFormatGuide = dynamic(() => import('@/features/news-feed/components/cards/LensFormatGuide').then((m) => m.LensFormatGuide), { ssr: false });
 
-// 형식 타일 아이콘 — 2차 리디자인(2026-09-30, 사용자 피드백: "일러스트
-// 구리고요"). 손그림 캐릭터 아이콘(눈코입+반짝이)으로 1차 교체했던 게
-// "고급진 신문 디자인" 방향과 정면으로 부딪혔다 — 귀여운 캐릭터와 절제된
-// 에디토리얼은 같이 안 간다. lensPerspectives.ts에 처음부터 있었지만 이
-// 타일에서 한 번도 안 쓰이던 p.icon(lucide-react: BookOpen/Image/
-// Headphones/Video)으로 되돌아간다 — 손으로 그린 티가 안 나는, 획 굵기
-// 일정한 미니멀 라인 아이콘.
-
-// 첫 방문자에게 가이드를 자동으로 한 번만 띄운다(2026-08-21, 사용자
-// 요청 — "처음 온 사람들이... 왜 그렇게 봐야하고 각 유형은 어떤 내용을
-// 담고있는지"). localStorage 플래그 하나로 "이미 봤음"을 기기에 남긴다
-// — 서버 저장 없이 충분(재방문마다 다시 뜨면 오히려 방해).
+// 형식 타일 아이콘은 lensPerspectives.ts의 p.icon(lucide-react)을 사용한다. 절제된 에디토리얼 톤에 맞춰 획 굵기가 일정한 미니멀 라인 아이콘으로 통일한다.
+//
+// 가이드 자동 노출 여부는 localStorage 플래그 하나로 기기에 기록한다(서버 저장 불필요).
 const GUIDE_SEEN_KEY = 'ailens-lens-format-guide-seen';
 
-// 헤더의 네 칩(2026-10-04) — 순서는 lensPerspectives(레터·웹툰·팟캐스트·영상)와 같다. 라벨은 "무엇을 하는지"로 짧게.
+// 헤더의 네 칩 — 순서는 lensPerspectives(레터·웹툰·팟캐스트·영상)와 같고, 라벨은 "무엇을 하는지"로 짧게 쓴다.
 const WAYS = [
   { label: '읽기', full: '레터', icon: BookOpen },
   { label: '웹툰', full: '웹툰', icon: ImageIcon },
@@ -38,15 +29,13 @@ const WAYS = [
   { label: '영상', full: '영상', icon: Video },
 ] as const;
 
-// 활성 탭 텍스트 전용 accent(2026-08-24). LENS_ACCENT(#3b82f6)를 14px 텍스트에
-// 그대로 쓰면 흰 배경 대비 3.68:1로 WCAG AA(4.5:1) 미달이라, 같은 계열의 한 단계
-// 진한 셰이드(blue-600)로 5.17:1을 확보한다. 인디케이터 바·배경 틴트는 장식/대형
-// 요소라 LENS_ACCENT를 그대로 쓴다. ⚠️ 임시 로컬 상수 — 다른 화면에서도 "AA용
-// 진한 accent"가 필요해지면 lensPerspectives.ts의 공용 토큰으로 승격할 것.
+// 활성 탭 텍스트 전용 accent. LENS_ACCENT(#3b82f6)는 14px 텍스트에서 흰 배경 대비 3.68:1로 WCAG AA(4.5:1)에 미달하므로
+// 한 단계 진한 blue-600(5.17:1)을 쓴다. 인디케이터·배경 틴트는 장식/대형 요소라 LENS_ACCENT를 유지한다.
+// 다른 화면에서도 필요해지면 lensPerspectives.ts의 공용 토큰으로 승격한다.
 const LENS_ACCENT_STRONG = '#2563eb';
 
 // "오늘의 이슈, 4가지 시선" 홈 티저 — 지면 특별 코너(전체·증권·산업·시그널 4탭, 고른 지면의 기사 최대 4건: 히어로 1 + 작은 카드 3).
-// 지면 로직은 ../lib/paperSections.ts, 구조 변천사(탭→동시 배치→탭 복귀)는 docs/worklog/2026-10/2026-10-05-리팩토링/LensPreviewSection_구조변천사.md.
+// 지면 로직은 ../lib/paperSections.ts.
 import { SECTIONS, pickSection, paperTitle } from '@/features/news-feed/lib/paperSections';
 
 export function LensPreviewSection({ initialItems, variant = 'home', paperDates, headerAction }: { initialItems?: CmsLens[]; variant?: 'home' | 'archive'; /** archive 변형에서 "전체 보기" 자리에 들어가는 요소(지난 지면의 날짜 선택 달력 등). */ headerAction?: ReactNode; /** 홈 헤더 ◀ ▶로 넘길 수 있는 지면 날짜(최신순, 첫 값 = 지금 보여 주는 날). 없으면 화살표를 그리지 않는다. */ paperDates?: string[] }) {
@@ -58,8 +47,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
     setGuideIndex(i);
     setShowGuide(true);
   }
-  // 가이드를 본 적이 있는지(2026-10-04) — 처음 온 사람에게만 안내 버튼이 숨 쉬듯 반짝여 "눌러 보세요"를 알린다.
-  // 서버 HTML과 어긋나지 않게 true(=반짝임 없음)로 시작해 마운트 후 localStorage를 읽는다.
+  // 가이드를 본 적이 있는지 — 처음 온 사람에게만 안내 버튼이 반짝인다. 서버 HTML과 어긋나지 않게 true(=반짝임 없음)로 시작해 마운트 후 localStorage를 읽는다.
   const [guideSeen, setGuideSeen] = useState(true);
   const router = useRouter();
   useEffect(() => {
@@ -69,24 +57,17 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
       // 저장소 접근 불가 — 반짝임 없이 둔다.
     }
   }, []);
-  // 탭(지면 선택) — 4지면 동시 배치(2026-09-30 오후)를 다시 되돌렸다.
-  // 사용자가 원한 건 "4개 지면을 한 화면에"가 아니라 "탭으로 지면을
-  // 고르고, 고른 지면 안에 4개 기사가 신문 1면처럼(큰 히어로+작은 3개)
-  // 동시에 보이는 것"이었다("4개의 탭으로 분류하고.. 증권으로 탭
-  // 가면.. 레이아웃 유지하면서 4개가 존재하고.. 지금은 한 화면에 4개
-  // 유형이 다 들어가있네" — 2026-09-30 저녁, 방금 만든 4지면 동시 배치를
-  // 혼동 없이 정정). 즉 "히어로+작은 카드 3개" 레이아웃 자체는 맞았고,
-  // 그 4개가 "다른 지면들"이 아니라 "같은 지면의 다른 기사들"이어야 했다.
+  // 탭으로 지면을 고르면 고른 지면 안의 기사 4건(히어로 1 + 작은 카드 3)이 신문 1면처럼 동시에 보인다.
   const [activeTab, setActiveTab] = useState(0);
   const [turnDir, setTurnDir] = useState<1 | -1>(1);
 
-  // 홈에서 날짜를 넘기기(2026-10-04, 사용자 요청 — "화살표를 누르면 paper 페이지로 가지 말고 메인에서 바로 보이도록").
+  // 홈에서 날짜를 넘긴다. dayIdx 0 = 서버가 보내 준 오늘의 지면이며, 이전 날짜는 클릭 시 한 번 받아 날짜별로 캐시하고 같은 카드에 갈아 끼운다.
   // dayIdx 0 = 서버가 보내 준 오늘의 지면. 그 앞날들은 눌렀을 때 한 번 받아 두고(날짜별 캐시) 같은 카드에 갈아 끼운다.
   const [dayIdx, setDayIdx] = useState(0);
   const [pastItems, setPastItems] = useState<Record<string, CmsLens[]>>({});
   const bookRef = useRef<HTMLDivElement>(null);
   const days = paperDates ?? [];
-  // 날짜 넘김(2026-10-04): 책장 넘김 연출은 면 일부만 넘어가 어색해서 걷어냈다(사용자 지시). 데이터가 준비되면 면 안의 내용이 부드럽게 갈아 끼워진다.
+  // 날짜 전환은 데이터가 준비되면 면 안의 내용을 부드럽게 갈아 끼우는 방식이다.
   function goDay(next: number) {
     if (next === dayIdx) return;
     const d = days[next];
@@ -124,22 +105,11 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- days[1]은 서버가 정한 값, loadDay는 매 렌더 새 함수지만 같은 동작
   }, [days[1], variant]);
 
-  // 첫 방문 자동 팝업은 2026-09-29 요청으로 껐다(진입 즉시 모달이 뜨는 게
-  // 방해된다는 판단) — GUIDE_SEEN_KEY/closeGuide는 그대로 둬서 ⓘ 버튼으로
-  // 수동으로 여는 경로는 안 건드린다. 되돌릴 땐 아래 useEffect만 복원하면 됨:
-  //   useEffect(() => {
-  //     try {
-  //       if (!window.localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
-  //     } catch {}
-  //   }, []);
+  // 첫 방문 자동 팝업은 사용하지 않는다. 가이드는 ⓘ 버튼으로 수동으로만 연다.
 
-  // 기본 탭은 항상 "지면 1면"(전체)이다(2026-10-03, 사용자 요청). 예전엔 온보딩(/start)에서 고른 관심분야(getSavedInterests)로
-  // 마운트 직후 탭을 바꿨는데, 그러면 (1) 사용자마다 첫 탭이 달라 "산업 1면이 먼저 나온다"는 혼란이 생기고 (2) 서버 HTML은
-  // 지면 1면인데 브라우저가 뜬 뒤 탭이 바뀌어 화면이 한 번 갈아 끼워졌다. 관심분야 저장 자체(onboardingStorage)는 그대로 둔다.
+  // 기본 탭은 항상 "지면 1면"(전체)이다. 관심분야로 마운트 후 탭을 바꾸면 사용자마다 첫 탭이 달라지고 서버 HTML과 어긋나므로 사용하지 않는다.
 
-  // useCallback으로 고정한다 — LensFormatGuide가 이 함수를 ESC 리스너
-  // 의존성으로 쓰기 때문에(2026-08-21 재설계에서 ESC 처리를 모달 안으로
-  // 옮겼다), 매 렌더 재생성되면 리스너가 계속 재구독된다.
+  // LensFormatGuide가 이 함수를 ESC 리스너 의존성으로 쓰므로 useCallback으로 고정해 리스너 재구독을 막는다.
   const closeGuide = useCallback(() => {
     setShowGuide(false);
     setGuideSeen(true);
@@ -155,20 +125,15 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
   const viewDay = dayIdx > 0 ? days[dayIdx] : undefined;
   const allItems = (viewDay && pastItems[viewDay]) || items;
 
-  // 탭 전환 방향(2026-10-04) — 오른쪽 탭으로 가면 지면이 왼쪽으로 "넘어가는" 모션, 왼쪽이면 반대. 종이를 넘기는 감각.
+  // 탭 전환 방향에 따라 지면이 넘어가는 모션 방향을 정한다(오른쪽 탭이면 왼쪽으로).
   function selectTab(i: number) {
     if (i === activeTab) return;
     setTurnDir(i > activeTab ? 1 : -1);
     setActiveTab(i);
   }
 
-  // 탭(지면) 하나 안의 기사 최대 4건 — 정렬 규칙은 기존과 동일
-  // (display_order가 있으면 그 날짜 안에서 오름차순 우선, 날짜는 항상
-  // 최신 우선). 이 4건을 "히어로 1 + 작은 카드 3"으로 동시에 보여준다
-  // (2026-09-30 최종 정리 — "4개의 탭으로 분류하고.. 증권 탭 가면 레이아웃
-  // 유지하면서 4개가 존재하고" 요청. 탭으로 지면을 고르고, 그 지면 "안의"
-  // 4건을 신문 1면 레이아웃으로 동시 배치 — 지면들 사이가 아니라 기사들
-  // 사이의 배치였다).
+  // 탭(지면) 하나 안의 기사 최대 4건 — display_order가 있으면 같은 날짜 안에서 오름차순, 날짜는 최신 우선.
+  // 이 4건을 "히어로 1 + 작은 카드 3"으로 동시에 보여 준다.
   const activeSection = SECTIONS[activeTab];
   const sectionArticles = pickSection(allItems, activeTab);
 
@@ -180,7 +145,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
     if (heroHref) router.push(`${heroHref}?v=${formatIndex + 1}`);
   }
 
-  // 한 면의 내용(히어로 + 보조 카드 3)을 그리는 함수 — 책장 넘김 중에는 두 날짜의 면을 동시에 그려야 해서 분리했다(2026-10-04).
+  // 한 면의 내용(히어로 + 보조 카드 3)을 그리는 함수. 날짜 전환 중 두 날짜의 면을 동시에 그려야 해서 분리했다.
   const pageBody = (sa: CmsLens[]) => {
     const h = sa[0];
     if (!h) return null;
@@ -190,10 +155,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
     return (
       <>
         <div className="lz-hero-col">
-            {/* ── 히어로 기사 ── 이 지면의 대표 기사(최대 4건 중 1번). 사진이
-                위(넓고 크게), 헤드라인·요약이 아래 — 실제 신문 리드 기사가
-                큰 사진을 위에 걸고 그 아래 헤드라인을 넓게 쓰는 것과 같은
-                순서(2026-09-30, "카드 세로 길이를 넓히고.. 지면신문처럼"). */}
+            {/* ── 히어로 기사 ── 이 지면의 대표 기사(최대 4건 중 1번). 사진이 위, 헤드라인·요약이 아래인 신문 리드 기사 구성이다. */}
             <Link href={hHref!} prefetch className="lz-issue block" style={{ textDecoration: 'none' }}>
               {hPhoto && (
                 <span
@@ -276,16 +238,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
             </Link>
         </div>
 
-        {/* ── 같은 지면의 나머지 기사 최대 3건 ── 히어로 아래, 가로 3열
-            (2026-09-30, "카드 세로 길이.. 지면신문처럼" 요청 — 실제 신문은
-            리드 기사가 위쪽 전체를 차지하고 작은 기사들이 그 아래 좁은
-            컬럼으로 나열된다. 세로로 좁게 쌓던 사이드바를 이 배치로
-            바꾸면서 히어로·부기사 두 블록의 폭이 같아져, 사진을 뺐을 때
-            생기던 높이 불일치도 같이 해소됐다). 작은 썸네일을 붙여 3열이
-            허전해 보이지 않게 했다 — 헤드라인 크기는 셋 다 동일(가로
-            나열이라 왼쪽부터 순서대로 읽히므로 크기 차등이 필요 없다,
-            세로 스택일 때와 다른 점). 지면명은 반복 안 함(탭에 이미
-            표시돼 있어 중복). */}
+        {/* ── 같은 지면의 나머지 기사 최대 3건 ── 히어로 아래 가로 3열. 가로 나열이라 헤드라인 크기는 모두 동일하며, 지면명은 탭에 표시되므로 반복하지 않는다. */}
         {minor.length > 0 && (
           <div className="lz-minor-col" style={{ borderTop: '1px solid #e0e0da', paddingTop: 22, columnGap: 'clamp(16px, 2.4vw, 28px)', rowGap: 20 }}>
             {minor.map((article) => {
@@ -332,10 +285,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
                   >
                     {displayHeadline(article.headline)}
                   </span>
-                  {/* 본문 미리보기 1줄 추가(2026-10-01, 사용자 지적 —
-                      히어로엔 article.context가 있는데 이 3개 보조기사엔
-                      빠져있었다). 그리드 카드(ArticleCard.tsx)와 같은
-                      톤·크기로 맞춘다. */}
+                  {/* 본문 미리보기 1줄 — 그리드 카드(ArticleCard.tsx)와 같은 톤·크기를 사용한다. */}
                   {article.context && (
                     <span
                       style={{
@@ -498,16 +448,10 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
 
       {variant === 'home' && (
         <div style={{ marginBottom: 'clamp(28px, 4vw, 40px)' }}>
-        {/* 사용법 설명(무슨 기능인가)과 신뢰 신호(누가·어떻게 만들었나,
-            2026-09-30 메인 리디자인 때 추가 — /about·AiDisclaimer.tsx에만
-            있던 "AI 초안 → 사람 검수" 설명을 핵심 콘텐츠 바로 위에도
-            노출)가 원래 톤·줄 간격이 다른 두 문단으로 따로 떠 있어 어수선해
-            보였다(2026-10-01, 사용자 지적) — 한 문단으로 합쳐 한 호흡에
-            읽히게 했다. 정보 두 가지(기능 설명+제작 방식)는 그대로 유지. */}
-        {/* 카피 구성(2026-10-04): ① 페인포인트를 짚고 곧바로 해결을 말하는 한 줄(큰 글씨) → ② 어떻게 해결하는지(읽고·듣고·보는 네 가지) →
-            제작 방식(AI 요약·편집팀 검수) 고지는 이 자리에서 뺐다(2026-10-04, 사용자 — 여기엔 불필요). 기사 하단 AiDisclaimer·푸터에 그대로 있다. */}
+        {/* 소개 문구 영역 */}
+        {/* 카피 구성: 페인포인트와 해결을 말하는 한 줄(큰 글씨) → 해결 방법(읽고·듣고·보는 네 가지). 제작 방식 고지는 기사 하단 AiDisclaimer·푸터에 있다. */}
         {/* 질문(큰 세리프)과 답(작은 고딕)을 한 줄에 — 넓은 화면에선 기준선을 맞춰 나란히, 좁은 화면에선 자연스럽게 아래로 줄바꿈. */}
-        {/* 소개 영역 압축(2026-10-04): 왼쪽 문구 두 줄, 오른쪽 형식 칩. 한 덩어리로 줄여 기사까지의 거리를 짧게 한다. */}
+        {/* 소개 영역 — 왼쪽 문구 두 줄, 오른쪽 형식 칩. */}
         <div className="lz-intro">
         <div className="lz-intro-text">
         <div className="lz-head">
@@ -522,14 +466,12 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
         </p>
         <p className="lz-sub">당신의 일상에 맞춘 뉴스를 준비했어요.</p>
         </div>
-        {/* "내 일상이 뭐지?"라는 다음 질문에 바로 답하는 진입(2026-10-04) — 하루의 틈 장면을 고르는 /start로 이어진다. 예전 상단 DiscoveryBanner를 대체. */}
+        {/* "내 일상이 뭐지?" 질문에 이어 하루의 틈 장면을 고르는 /start로 진입시킨다. */}
         <Link href="/start" className="lz-find">
           내 일상이 뭔지 모르겠다면, 하루를 같이 떠올려볼까요 <span aria-hidden>→</span>
         </Link>
         </div>
-        {/* 시선의 흐름(질문 → 답 → 다음 행동) 맨 끝에 "어떻게 볼 수 있는지"를 미리 보여 주는 네 칩(2026-10-04, 사용자 — "오른쪽 위 버튼은 시선과
-            멀어서 클릭될지 모르겠다, 같은 흐름에 두거나 미리 보여 달라"). 칩 하나가 곧 버튼이다: 누르면 그 형식부터 움직이는 소개가 열린다.
-            처음 온 사람에게는 첫 칩에 링이 3번 퍼져 "눌러 보세요"를 알린다. */}
+        {/* 헤더 시선 흐름(질문 → 답 → 다음 행동)의 끝에 네 가지 형식 칩을 둔다. 칩 하나가 곧 버튼이며, 누르면 해당 형식의 소개가 열린다. 처음 방문자에게는 첫 칩에 링이 3번 퍼진다. */}
         <div className="lz-ways" role="group" aria-label="네 가지 형식 — 눌러서 소개 보기">
           {/* 칩과 화살표는 한 덩어리(.lz-flow, 줄바꿈 없음) — 좁은 화면에서도 "읽기 → 웹툰 → 듣기 → 영상"이 항상 한 줄로 이어져 보인다. */}
           <div className="lz-flow">
@@ -570,25 +512,15 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
 
       {variant === 'home' && (
       <header style={{ marginBottom: 18, borderTop: '1px solid #e5e7eb' }}>
-        {/* 데이트라인을 "오늘의 지면" 라벨과 한 줄로 합쳤다(2026-10-01,
-            사용자 피드백 — 배너·eyebrow·데이트라인·제목·부제·고지문까지
-            히어로 이미지 전에 7줄이 쌓여 "그러네요"로 지적받음). 도장
-            아이콘+세리프 전용 줄로 따로 뺐던 이전 버전(2026-09-30,
-            "신문사다운 구조")은 그 자체로는 맞는 방향이었지만 줄 수를
-            늘리는 비용이 더 컸다 — 같은 정보(언제 발행)를 라벨 옆 보조
-            텍스트로 압축. */}
-        {/* 2026-10-04 헤더 타이포 재구성 — 제목("오늘의 이슈, 4가지 시선")은 검색·정체성 때문에 그대로 두되 작은 머리글(kicker)로 내리고,
-            그 아래에 페인포인트→해결 한 줄(세리프 큰 글씨)이 주인공이 된다. 매일 아침 같은 자리에서 같은 결로 읽히도록 세리프 + 넉넉한
-            행간 + 따뜻한 먹색으로 차분하게, 핵심 단어("아침 3분")만 손으로 그은 앰버 밑줄(가이드 모달의 스케치 밑줄과 같은 결)로 짚는다. */}
+        {/* 데이트라인을 "오늘의 지면" 라벨과 한 줄로 합쳐 히어로 이미지 이전의 줄 수를 줄인다. */}
+        {/* 헤더 타이포 — 제목("오늘의 이슈, 4가지 시선")은 검색·정체성 때문에 작은 머리글(kicker)로 유지하고, 페인포인트→해결 한 줄(세리프)을 주 카피로 둔다. 핵심 단어만 앰버 밑줄로 강조한다. */}
       </header>
       )}
 
       <div
         className="lz-paper"
         style={{
-          // 2026-10-04 지면 영역 구분 — 장식 없이 연한 종이색 면 하나 + 얇은 테두리 + 둥근 모서리(제호 줄 같은 신문 흉내는 과해서 뺐다).
-          // 종이의 입체감(2026-10-04, 연구 근거: 은은한 깊이·질감은 따뜻함·신뢰를 주지만 과하면 가독성·성능을 해친다 → "알아채지 못하지만 느껴지는" 강도).
-          // 가까운 얇은 그림자 + 넓고 옅은 그림자 + 위쪽 안쪽 하이라이트, 위에 6% 종이결 노이즈(SVG feTurbulence data URI, 네트워크 요청 없음).
+          // 지면 영역 구분 — 연한 종이색 면 + 얇은 테두리 + 둥근 모서리. 가까운 그림자·넓고 옅은 그림자 조합으로 은은한 입체감을 준다.
           backgroundColor: '#f8f8f6',
           boxShadow: '0 1px 2px rgba(60,55,45,.06), 0 8px 24px -14px rgba(60,55,45,.16)',
           border: '1px solid #e4e4df',
@@ -596,17 +528,17 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
           padding: 'clamp(22px, 3vw, 34px) clamp(16px, 2.4vw, 26px) clamp(16px, 2.4vw, 26px)',
         }}
       >
-        {/* 신문 안으로 넣은 제호 줄(2026-10-04) — 이중선 아래 왼쪽 "10월 3일 토요일 지면"(구역 제목), 가운데 제호, 오른쪽 날짜 이동·전체 보기. 면 안에서 이 줄이 머리띠 역할을 한다. */}
+        {/* 지면 안의 제호 줄 — 왼쪽 구역 제목(날짜 지면), 가운데 제호, 오른쪽 날짜 이동·전체 보기. */}
         <div className="lz-mast" style={{ position: 'relative' }}>
           <svg viewBox="0 0 600 6" preserveAspectRatio="none" aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: -3, width: '100%', height: 6, pointerEvents: 'none' }}>
             <path d="M0 3.2 C60 1.8, 120 4.4, 180 3 S300 2, 360 3.4 S480 4.2, 540 2.6 S590 3.2, 600 3" fill="none" stroke="#c4c7cd" strokeWidth={1.6} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
           </svg>
           <span className="lz-mast-brand" aria-hidden>AI LENS · 서울경제신문</span>
           <div className="lz-mast-l">
-            {/* "오늘의"를 빼고 실제 날짜로(2026-10-04, 사용자 제안) — 어제·그제로 넘겨 봐도 제목이 그대로 맞고, 몇 일자 지면인지 바로 읽힌다. */}
+            {/* 실제 날짜를 제목으로 사용해 날짜를 넘겨도 제목이 맞도록 한다. */}
             <h2 className="lz-kick">{paperTitle(viewDay ?? hero?.date)}</h2>
           </div>
-          {/* 지난 날짜의 지면 4개를 볼 수 있는 페이지(2026-10-04, 사용자 요청) — /paper는 리다이렉트라 전환 중 빈 화면에 푸터만 비쳐서(2026-10-04) 홈에서는 지면 날짜로 바로 간다. 다른 섹션("최신 뉴스" 등)과 같은 헤더 우측 "전체 보기 →" 자리·스타일. 날짜 이동은 그 페이지에서 한다. */}
+          {/* 지난 지면 목록 페이지로 이동하는 "전체 보기 →" 링크. /paper는 리다이렉트라 전환 중 빈 화면이 비치므로 지면 날짜로 직접 이동한다. 날짜 이동은 해당 페이지에서 한다. */}
           <div className="flex items-center flex-shrink-0" style={{ gap: 6 }}>
             {/* ◀ 어제 · ▶ 다음 날 — 지면이 있는 날만 오가고(주말 등은 건너뜀) 홈에서 바로 갈아 끼운다. 가장 최근이면 ▶, 가장 오래됐으면 ◀가 비활성. */}
             {days.length > 1 && (
@@ -626,9 +558,8 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
             )}
           </div>
         </div>
-        {/* 지면 탭 — 1단계 선택(2026-09-30 최종). 세리프 라벨 + 잉크색
-            밑줄, 미끄러지는 인디케이터. */}
-        {/* 2026-10-04 탭 재디자인(사용자: "파란 막대 효과가 어색") — 밑줄 막대를 없애고 토스식 세그먼트 알약으로: 연한 회색 트랙 안에서 선택된 탭이 흰 알약으로 떠오른다. */}
+        {/* 지면 탭 */}
+        {/* 연한 회색 트랙 안에서 선택된 탭이 흰 알약으로 표시되는 세그먼트 형태. */}
         <div className="lz-tabs" style={{ display: 'inline-flex', gap: 2, padding: 4, borderRadius: 999, background: 'rgba(17,24,39,0.055)', marginBottom: 16 }}>
           {SECTIONS.map((s, i) => {
             const isActive = i === activeTab;

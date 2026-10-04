@@ -1,9 +1,6 @@
 'use client';
 
-// 홈 화면 "최신 뉴스" 그리드 + 카테고리 레일이 공유하는 카드(2026-08-17,
-// 뉴닉 홈 구조 참고 — 히어로 1건 + 4열 그리드 + 카테고리별 레일). 그리드
-// 카드는 제목만, 레일 카드는 제목+요약까지 — 뉴닉도 최신 뉴스 그리드엔
-// 요약이 없고 카테고리 레일에만 요약이 붙는다.
+// 홈 화면 "최신 뉴스" 그리드와 카테고리 레일이 공유하는 카드. 그리드 카드는 제목+본문 미리보기 1줄, 레일 카드는 제목+요약까지 보여 준다.
 import Link from 'next/link';
 import Image from 'next/image';
 import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
@@ -15,9 +12,7 @@ function dateLabel(iso: string): string {
   return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')}`;
 }
 
-// 2026-08-23 — lens 항목은 published_at(시:분 포함)이 있어서 이 카드에서도
-// "2026.08.22"가 아니라 "2026.08.22 16:37"까지 보여줄 수 있다. 다른 kind는
-// publishedAt이 없어(archiveItems.ts 참조) 자동으로 날짜만 폴백된다.
+// lens 항목은 published_at(시:분 포함)이 있어 "2026.08.22 16:37"까지 표시할 수 있다. 다른 kind는 publishedAt이 없어(archiveItems.ts 참조) 날짜만 표시한다.
 function dateTimeLabel(item: ArchiveItem): string {
   return kstDateTimeLabel(item.publishedAt) ?? (item.date ? dateLabel(item.date) : '');
 }
@@ -62,11 +57,7 @@ function CardMeta({ item }: { item: ArchiveItem }) {
   );
 }
 
-/** 그리드 카드 — 제목+본문 미리보기 1줄(2026-10-01, 어피티 레퍼런스 —
-    "본문 n자 미리보기처럼 나오는게 중요"). 원래는 뉴닉 참고해 제목만
-    보여줬는데, excerpt는 애초에 모든 ArchiveItem에 이미 채워져 있던
-    값이라 그리드에서만 못 쓰게 막아둔 셈이었다 — 레일 카드(아래
-    ArticleRailCard)와 같은 필드를 그냥 숨기고 있던 것. */
+/** 그리드 카드 — 제목 + 본문 미리보기 1줄. excerpt는 모든 ArchiveItem에 채워져 있으므로 레일 카드(ArticleRailCard)와 같은 필드를 그대로 쓴다. */
 export function ArticleGridCard({ item }: { item: ArchiveItem }) {
   return (
     <Link href={item.href ?? '#'} className="block group">
