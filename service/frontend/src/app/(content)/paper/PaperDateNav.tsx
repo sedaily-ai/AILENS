@@ -7,16 +7,8 @@ import { paperDateLabel, paperPath, parsePaperDate } from './paperShared';
 
 // 지난 지면 날짜 이동(2026-10-04, 사용자 요청 — "어제 지면은 뭐였지?" 하며 들어온 사람이 원클릭으로 어제·그제로 가고, 원하는 날짜를 바로 고르고, 주·월 단위로 끊어 늘어지지 않게).
 //  - 제목 바로 오른쪽 달력 아이콘: 월 단위 달력(팝업). 먼 날짜를 한 번에 고를 때.
-//  - 제목 아래 한 주 띠: 일~토 7칸이 화면 폭에 딱 맞는다. 어제·그제는 한 번에 누른다. ◀ ▶는 한 주씩 넘긴다(스크롤 없음 → 날짜가 쌓여도 늘어지지 않는다).
-// 두 곳 모두 지면이 있는 날만 링크이고 없는 날은 연회색.
+// 지면이 있는 날만 링크이고 없는 날은 연회색. (제목 아래 한 주 띠는 2026-10-05 사용자 요청으로 삭제)
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
-const DAY = 86400000;
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
-const utc = (s: string) => {
-  const [y, m, d] = s.split('-').map(Number);
-  return Date.UTC(y, m - 1, d, 12);
-};
-const sundayOf = (s: string) => utc(s) - new Date(utc(s)).getUTCDay() * DAY;
 const ymd = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
 export function PaperDateNav({ date, dates }: { date: string; dates: string[] }) {
@@ -51,14 +43,6 @@ export function PaperDateNav({ date, dates }: { date: string; dates: string[] })
         .pn-arrow { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: #9ca3af; flex-shrink: 0; cursor: pointer; transition: background .15s ease, color .15s ease; }
         .pn-arrow:hover:not(:disabled) { background: #f1f5f9; color: #374151; }
         .pn-arrow:disabled { opacity: .3; cursor: default; }
-        .pn-week { display: grid; grid-template-columns: repeat(7, 1fr); flex: 1; min-width: 0; }
-        .pn-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px 0; text-decoration: none; min-width: 0; }
-        .pn-mo { height: 13px; font-size: 11px; font-weight: 700; color: #3d70de; white-space: nowrap; }
-        .pn-wk { font-size: 11.5px; font-weight: 500; color: #9ca3af; }
-        .pn-num { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; font-size: 14.5px; font-weight: 600; color: #374151; transition: background .12s ease; }
-        a.pn-cell:hover .pn-num { background: #f1f5f9; }
-        .pn-cell.is-off .pn-num { font-weight: 400; color: #d1d5db; }
-        .pn-cell.is-cur .pn-num { background: #5b8def; color: #fff; }
         .pn-drop { display: inline-flex; align-items: center; gap: 3px; height: 32px; padding: 0 8px; border: none; border-radius: 10px; background: transparent; font-size: 14.5px; font-weight: 700; color: #111827; cursor: pointer; transition: background .12s ease; }
         .pn-drop:hover, .pn-drop[aria-expanded='true'] { background: #f1f5f9; }
         .pn-drop svg { color: #9ca3af; }
@@ -93,50 +77,7 @@ export function PaperDateNav({ date, dates }: { date: string; dates: string[] })
           </div>
         )}
       </div>
-      <div style={{ marginTop: 14, marginBottom: 20 }}>
-        <WeekPager key={date} date={date} dates={dates} has={has} />
-      </div>
-    </div>
-  );
-}
-
-function WeekPager({ date, dates, has }: { date: string; dates: string[]; has: Set<string> }) {
-  const [start, setStart] = useState(() => sundayOf(date));
-  const minStart = sundayOf(dates[dates.length - 1]);
-  const maxStart = sundayOf(dates[0]);
-  const days = Array.from({ length: 7 }, (_, i) => iso(start + i * DAY));
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <button type="button" className="pn-arrow" aria-label="이전 주" disabled={start <= minStart} onClick={() => setStart(start - 7 * DAY)}>
-        <ChevronLeft size={17} strokeWidth={2.2} />
-      </button>
-      <div className="pn-week" role="group" aria-label="이 주의 날짜">
-        {days.map((v, i) => {
-          const d = Number(v.slice(8));
-          const showMonth = d === 1 || i === 0;
-          const cls = `pn-cell${v === date ? ' is-cur' : ''}${has.has(v) ? '' : ' is-off'}`;
-          const inner = (
-            <>
-              <span className="pn-mo">{showMonth ? `${Number(v.slice(5, 7))}월` : ''}</span>
-              <span className="pn-wk">{WEEK[i]}</span>
-              <span className="pn-num">{d}</span>
-            </>
-          );
-          return has.has(v) ? (
-            <Link key={v} href={paperPath(v)} prefetch={false} className={cls} aria-current={v === date ? 'date' : undefined} aria-label={`${Number(v.slice(5, 7))}월 ${d}일 지면`}>
-              {inner}
-            </Link>
-          ) : (
-            <span key={v} className={cls} aria-hidden>
-              {inner}
-            </span>
-          );
-        })}
-      </div>
-      <button type="button" className="pn-arrow" aria-label="다음 주" disabled={start >= maxStart} onClick={() => setStart(start + 7 * DAY)}>
-        <ChevronRight size={17} strokeWidth={2.2} />
-      </button>
+      <div style={{ marginBottom: 20 }} />
     </div>
   );
 }
