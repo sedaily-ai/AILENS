@@ -148,6 +148,8 @@ export interface IssueSource {
   /** 'YYYY-MM-DD' 발행일(KST) */
   date: string;
   paper_section?: string | null;
+  /** 편집자가 정한 지면 내 순서 — 작을수록 앞, 없으면 뒤 */
+  display_order?: number | null;
 }
 
 /** 홈 LensPreviewSection의 SECTIONS와 같은 지면 값·순서. */
@@ -167,14 +169,25 @@ export interface TodayIssuesPick<T> {
 /**
  * 오늘의 이슈 고르기(설계 2-④).
  * 1) 최신 발행일 글이 후보. 4건 미만이면 이전 날짜 글을 최신순으로 이어 붙인다(아침 7시 전 등).
+ *    같은 날짜 안에서는 편집자 순서(display_order, 없으면 뒤) → API 순서 — 홈 '오늘의 이슈' 히어로와 같은 정렬이다.
  * 2) 지면 순서 [전체·증권·산업·시그널]마다 1건씩.
  * 3) 빈 자리는 남은 후보를 최신순으로 채운다.
- * 같은 날짜 안에서는 API 순서를 유지하고, 같은 글은 두 번 고르지 않는다.
+ * 같은 글은 두 번 고르지 않는다.
  */
 export function pickTodayIssues<T extends IssueSource>(posts: readonly T[], todayKst: string, count = 4): TodayIssuesPick<T> {
+  // 정렬 규칙은 홈 LensPreviewSection의 지면 탭 정렬과 같다(발행일 최신순 → display_order 오름차순, 숫자 없는 글은 뒤 → API 순서).
+  // 두 화면이 같은 글을 그 지면의 1면으로 고르게 하려는 것이니, 한쪽을 고치면 다른 쪽도 같이 고친다.
   const sorted = posts
     .map((post, i) => ({ post, i }))
-    .sort((x, y) => (x.post.date === y.post.date ? x.i - y.i : x.post.date < y.post.date ? 1 : -1))
+    .sort((x, y) => {
+      if (x.post.date !== y.post.date) return x.post.date < y.post.date ? 1 : -1;
+      const ox = x.post.display_order;
+      const oy = y.post.display_order;
+      if (ox != null && oy != null && ox !== oy) return ox - oy;
+      if (ox != null && oy == null) return -1;
+      if (ox == null && oy != null) return 1;
+      return x.i - y.i;
+    })
     .map((x) => x.post);
   if (sorted.length === 0) return { issues: [], latestDate: null, isToday: false };
 

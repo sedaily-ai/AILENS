@@ -120,6 +120,24 @@ t('오늘의 이슈: 같은 날짜 안에서는 API 순서 유지', () => {
   assert.deepEqual(pickTodayIssues(posts, '2026-10-05').issues.map((p) => p.id), ['b', 'a', 'c', 'd']);
 });
 
+// 편집자 지면 순서(display_order) — 홈 '오늘의 이슈' 히어로(LensPreviewSection)와 같은 정렬이어야 두 화면이 같은 글을 1면으로 고른다.
+const ordered = (id, date, section, display_order) => ({ ...post(id, date, section), display_order });
+
+t('오늘의 이슈: 같은 날짜·같은 지면이면 display_order가 작은 글이 먼저(0 포함), 발행일은 항상 우선', () => {
+  // API 순서로는 3이 앞이지만 편집자는 0을 1면으로 정했다.
+  const sameDay = [ordered('three', '2026-10-05', '증권', 3), ordered('zero', '2026-10-05', '증권', 0)];
+  assert.deepEqual(pickTodayIssues(sameDay, '2026-10-05').issues.map((p) => p.id), ['zero', 'three']);
+  // display_order는 같은 날짜 안에서만 비교한다 — 지난 글의 0이 오늘 글의 9를 이기지 못한다.
+  const crossDay = [ordered('old0', '2026-10-04', '증권', 0), ordered('new9', '2026-10-05', '증권', 9)];
+  assert.deepEqual(pickTodayIssues(crossDay, '2026-10-05').issues.map((p) => p.id), ['new9', 'old0']);
+});
+
+t('오늘의 이슈: display_order가 없는(null·누락) 글은 숫자가 있는 글 뒤, 그래도 보충 후보로는 남는다', () => {
+  const posts = [ordered('none', '2026-10-05', '증권', null), post('absent', '2026-10-05', '증권'), ordered('one', '2026-10-05', '증권', 1)];
+  // 지면 1건은 display_order 1인 글. 순서 없는 글은 빈 자리를 채울 때 API 순서(none → absent)대로 뒤에 붙는다.
+  assert.deepEqual(pickTodayIssues(posts, '2026-10-05').issues.map((p) => p.id), ['one', 'none', 'absent']);
+});
+
 t('오늘의 이슈: 0건', () => {
   const r = pickTodayIssues([], '2026-10-05');
   assert.deepEqual(r, { issues: [], latestDate: null, isToday: false });
