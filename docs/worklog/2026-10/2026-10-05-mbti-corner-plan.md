@@ -1340,7 +1340,7 @@ const page = await newPage();
 await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
 await page.goto(`${BASE}/mbti/sf`, { waitUntil: 'networkidle' });
 await page.evaluate(() => { window.__ev = []; window.gtag = (...a) => window.__ev.push(a); });
-await page.getByRole('button', { name: '링크 복사' }).click();
+await page.getByRole('button', { name: '링크 복사', exact: true }).click();
 const ev = await page.evaluate(() => window.__ev);
 assert.ok(ev.some((e) => e[0] === 'event' && e[1] === 'mbti_share' && e[2].group === 'SF'), JSON.stringify(ev));
 assert.deepEqual(errors, [], errors.join('\n'));
