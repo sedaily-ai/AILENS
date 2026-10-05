@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { lensPerspectiveAt, LENS_ACCENT } from '@/shared/constants/lensPerspectives';
 import { buildResultCopy } from '../lib/resultCopy';
 import { onboardingPrimaryButtonStyle } from '../lib/onboardingButton';
@@ -90,6 +91,10 @@ export function ResultStep({
           이 결과 저장하기 →
         </button>
         <p style={{ margin: '-6px 0 0', fontSize: 11.5, color: '#94a3b8' }}>저장 안 해도 오늘은 계속 볼 수 있어요</p>
+        {/* MBTI 코너 진입(2026-10-05) — 단순 링크라 features/mbti를 import하지 않는다(feature 간 import 금지). */}
+        <Link href="/mbti" style={{ fontSize: 12, color: '#64748b', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+          MBTI로도 찾아보기 →
+        </Link>
       </div>
 
       <div style={{ height: 28 }} />
