@@ -126,6 +126,7 @@ const CONTENT_LINKS: { label: string; href: string }[] = [
   { label: '웹툰', href: '/webtoon' },
   { label: '오디오', href: '/listen' },
   { label: '전체 콘텐츠', href: '/lens' },
+  { label: 'MBTI로 보는 뉴스', href: '/mbti' },
 ];
 
 export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?: boolean }) {
