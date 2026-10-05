@@ -21,7 +21,23 @@ export async function generateMetadata({ params }: { params: Promise<{ group: st
   const info = MBTI_GROUP_INFO[group];
   const title = `${group}형 — ${info.title} · ${CORNER}`;
   const description = `${info.summary}. MBTI 인지유형 ${group}형에게 맞는 ${lensPerspectiveAt(info.formatIndex).short} 형식으로 오늘의 이슈를 골라 드려요.`;
-  return { title, description, alternates: { canonical: `${SITE_URL}/mbti/${groupSlug(group)}` } };
+  const url = `${SITE_URL}/mbti/${groupSlug(group)}`;
+  const image = `${SITE_URL}/mbti/og-${groupSlug(group)}.png`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: 'website',
+      images: [{ url: image, width: 1200, height: 630, alt: `${group}형 — ${info.title}` }],
+      locale: 'ko_KR',
+      siteName: 'AI LENS — 서울경제',
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
+  };
 }
 
 export default async function MbtiGroupPage({ params }: { params: Promise<{ group: string }> }) {

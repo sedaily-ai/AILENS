@@ -7,6 +7,7 @@ import { ResultCard } from './ResultCard';
 import { TodayIssues } from './TodayIssues';
 import { GroupSwitcher } from './GroupSwitcher';
 import { MbtiNotice } from './MbtiNotice';
+import { MbtiShare } from './MbtiShare';
 
 export function MbtiResult({ group }: { group: MbtiGroupId }) {
   const [type, setType] = useState<MbtiType | null>(null);
@@ -19,6 +20,7 @@ export function MbtiResult({ group }: { group: MbtiGroupId }) {
   return (
     <div>
       <ResultCard group={group} type={type} />
+      <MbtiShare group={group} />
       <TodayIssues group={group} />
       <GroupSwitcher current={group} />
       <MbtiNotice />
