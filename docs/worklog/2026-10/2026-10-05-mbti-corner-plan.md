@@ -22,6 +22,17 @@
 
 **Spec:** `docs/worklog/2026-10/2026-10-05-mbti-corner-design.md`
 
+> **구현 후 정정 (2026-10-05)**: 최종 리뷰를 반영한 수정 커밋 `423e9e8`로 아래 부분은 이 계획의 코드와 다르다.
+> 다시 구현하거나 참고할 때는 이 계획의 코드가 아니라 `feat/mbti-corner` 브랜치의 코드를 기준으로 한다.
+> - `pickTodayIssues` 정렬: 같은 날짜 안에서 `display_order` 오름차순(없으면 뒤) → API 순서. 홈 '오늘의 이슈'와 같은 규칙이다.
+>   `IssueSource`에 `display_order`가 추가됐고, Task 1 테스트는 18개다.
+> - `MbtiShare`: GA `platform` 값은 aria-label 문구가 아니라 고정 코드(`kakao`·`instagram`·`facebook`·`x`·`linkedin`·`copy`·`other`)다.
+> - `MbtiNotice` 글자색: `#64748b`.
+> - `sitemap.ts`의 `/games` `lastModified`: `2026-10-05`.
+> - 실행 중 판정: 서버 켜고 끄기는 PID 파일 방식을 쓴다(`kill %1` 대신).
+>   Task 2 저장소 차단 테스트는 코너 전용 키만 막는다. 사이트 공용 부품이 저장소를 방어 없이 읽어서 전체 차단 시 페이지가 깨지는데, 이 기능 범위 밖이다.
+>   macOS에서는 `/mbti/NT` 404를 대소문자 구분 디스크에서 확인한다.
+
 ## Global Constraints
 
 - **비용 0**: Bedrock 호출, AWS 리소스 생성, 백엔드 변경, 새 npm 의존성을 모두 금지한다.
