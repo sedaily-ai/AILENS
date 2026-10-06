@@ -34,11 +34,6 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
   { path: '/games',        priority: 0.5, changeFrequency: 'monthly', lastModified: '2026-10-05' },
-  { path: '/mbti',         priority: 0.5, changeFrequency: 'weekly',  lastModified: '2026-10-05' }, // MBTI 코너 첫 화면
-  { path: '/mbti/nt',      priority: 0.4, changeFrequency: 'daily',   lastModified: '2026-10-05' }, // MBTI 코너 결과 — 오늘의 이슈가 매일 바뀐다
-  { path: '/mbti/nf',      priority: 0.4, changeFrequency: 'daily',   lastModified: '2026-10-05' },
-  { path: '/mbti/st',      priority: 0.4, changeFrequency: 'daily',   lastModified: '2026-10-05' },
-  { path: '/mbti/sf',      priority: 0.4, changeFrequency: 'daily',   lastModified: '2026-10-05' },
   { path: '/words',        priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 단어장 — 레터 키워드 기반, 매일 갱신
   { path: '/style',        priority: 0.3, changeFrequency: 'monthly', lastModified: '2026-08-08' },
   // 서비스 소개 랜딩이며 푸터 링크 대상이므로 색인 대상이다.

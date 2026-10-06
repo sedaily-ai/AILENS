@@ -149,32 +149,6 @@ export default function GamesClient() {
           </p>
         </header>
 
-        {/* MBTI 코너 진입 카드(2026-10-05) — 게임 목록과 같은 아케이드 톤. 설계: docs/worklog/2026-10/2026-10-05-mbti-corner-design.md */}
-        <Link
-          href="/mbti"
-          prefetch
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            marginBottom: 32,
-            padding: '18px 22px',
-            borderRadius: 18,
-            background: '#0a0a18',
-            border: '2px solid #a78bfa55',
-            color: '#e2e8f0',
-            textDecoration: 'none',
-          }}
-        >
-          <span>
-            <span style={{ display: 'block', fontFamily: ARCADE_FONT, fontSize: 11, letterSpacing: '0.2em', color: '#a78bfa', marginBottom: 6 }}>BONUS STAGE</span>
-            <span style={{ display: 'block', fontSize: 16, fontWeight: 700 }}>MBTI로 보는 오늘의 뉴스</span>
-            <span style={{ display: 'block', fontSize: 13, color: '#94a3b8', marginTop: 4 }}>내 유형에 맞는 형식으로 오늘의 이슈를 골라 드려요</span>
-          </span>
-          <span aria-hidden style={{ fontFamily: ARCADE_FONT, color: '#a78bfa' }}>▶</span>
-        </Link>
-
         <div
           style={{
             display: 'grid',
