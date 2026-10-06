@@ -18,6 +18,7 @@ Image Core 단독·style/char_female/char_male 자유 입력) 원조 엔드포�
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
 
 from shared import audit, response, time_utils
@@ -117,25 +118,53 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "sd_
         has_dialogue = bool(cut.get("dialogue")) or cut.get("cut") == 1
         image_bytes, faces = _generate_composed(camera, scene, has_dialogue, model=model)
 
+        bucket = jobs.bucket()
+        if not bucket:
+            raise RuntimeError("CMS_MEDIA_BUCKET not configured")
+        # 글자 없는 원본 그림을 따로 보관한다 — CMS에서 말풍선 위치를 옮긴 뒤 이미지 생성(비용) 없이 다시 합성하려는 용도.
+        bg_key = f"media/webtoon-lab/{job_id}-bg.png"
+        jobs.s3().put_object(Bucket=bucket, Key=bg_key, Body=image_bytes, ContentType="image/png")
+        bg_url = f"https://{bucket}.s3.us-east-1.amazonaws.com/{bg_key}"
+
         tmp_path = Path(f"/tmp/webtoon-lab-{job_id}.png")
         tmp_path.write_bytes(image_bytes)
+        layout: list = []
         try:
-            compose_text.compose(tmp_path, cut, faces)
+            try:
+                # 웹툰식 말풍선(타원·여백) — 테스트 카드가 정한 값(cut.bubble_webtoon)이 있으면 그것을, 없으면 발행 설정을 따른다
+                use_style = cut.get("bubble_webtoon")
+                if use_style is None:
+                    use_style = webtoon_image.get_bubble_style()
+                if use_style:
+                    cut = {**cut, "bubble_style": "oval", "bubble_margin": True}
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"웹툰식 말풍선 설정 읽기 실패(기존 스타일): {type(e).__name__}: {e}")
+            try:
+                # 테스트 카드가 정한 값(cut.bubble_detect)이 있으면 그것을, 없으면 발행 설정을 따른다
+                use_detect = cut.get("bubble_detect")
+                if use_detect is None:
+                    use_detect = webtoon_image.get_bubble_detect()
+                if use_detect:
+                    import rekognition_people  # pipelines/common/ — 켜져 있을 때만 import·호출(권한·비용)
+
+                    detect = rekognition_people.detect_people(image_bytes)
+                    if detect:
+                        cut = {**cut, "detect": detect}
+            except Exception as e:  # noqa: BLE001 — 얼굴 인식이 어떻게 실패해도 글자 합성은 고정 배치로 계속한다
+                logger.warning(f"말풍선 얼굴 회피 건너뜀(고정 배치): {type(e).__name__}: {e}")
+            layout = compose_text.compose(tmp_path, cut, faces) or []
         except Exception as e:  # noqa: BLE001 — 배경은 유지, 합성 실패만 로그
             logger.warning(f"webtoon-lab 컷{cut.get('cut')} 텍스트 합성 실패(배경만 유지): {e}")
         final_bytes = tmp_path.read_bytes()
         tmp_path.unlink(missing_ok=True)
 
-        bucket = jobs.bucket()
-        if not bucket:
-            raise RuntimeError("CMS_MEDIA_BUCKET not configured")
         key = f"media/webtoon-lab/{job_id}.png"
         jobs.s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
         image_url = f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}"
-        jobs.update_job(job_id, {"status": "done", "image_url": image_url, "updated_at": time_utils.now_iso()})
+        jobs.update_job(job_id, {"status": "done", "image_url": image_url, "bg_url": bg_url, "updated_at": time_utils.now_iso()})
         audit.log("webtoon-lab-generate-composed-done", {"job_id": job_id, "cut": cut.get("cut")})
         if push:
-            push({"type": "cut_image", "cut": cut.get("cut"), "test_id": cut.get("test_id"), "image_url": image_url, "model": model})
+            push({"type": "cut_image", "cut": cut.get("cut"), "test_id": cut.get("test_id"), "image_url": image_url, "bg_url": bg_url, "layout": layout, "model": model})
     except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위, 안 잡으면 job이 영원히 pending
         logger.exception(f"webtoon-lab composed generate failed: {job_id}")
         jobs.update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": time_utils.now_iso()})
@@ -158,6 +187,8 @@ def handle_defaults(body: dict, path_params: dict, query_params: dict) -> dict:
         "char_female": chars["A (여성 기자, 설명자)"],
         "char_male": chars["B (남성 청자)"],
         "image_model": image_model,
+        "bubble_detect": webtoon_image.get_bubble_detect(),
+        "bubble_style": webtoon_image.get_bubble_style(),
     })
 
 
@@ -166,3 +197,37 @@ def handle_defaults(body: dict, path_params: dict, query_params: dict) -> dict:
 # char_female/char_male 자유 입력 계약)를 삭제했다. 유일한 프론트
 # 소비자였던 WebtoonImageLab.tsx가 이미 삭제돼 호출부가 없었다(모듈
 # docstring 참고).
+
+
+def handle_recompose(body: dict, path_params: dict, query_params: dict) -> dict:
+    """말풍선 위치·대사·tone을 바꿔 같은 원본 그림 위에 다시 합성한다(2026-10-02, CMS 말풍선 편집).
+    이미지 생성 모델은 호출하지 않아 비용이 들지 않는다.
+
+    body = {"bg_url": 글자 없는 원본 그림 URL(run_composed_generation이 보관한 것), "cut": {cut, title, dialogue[{line, tone, pos?, tail?}], caption ...}}
+    bg_url은 이 서비스 미디어 버킷의 media/webtoon-lab/*-bg.png 만 받는다(임의 URL을 서버가 받아오지 않도록 S3 키로만 읽는다)."""
+    bg_url = (body.get("bg_url") or "").strip()
+    cut = body.get("cut")
+    if not bg_url or not isinstance(cut, dict):
+        return response.err("bg_url과 cut이 필요합니다", 400)
+    bucket = jobs.bucket()
+    prefix = f"https://{bucket}.s3.us-east-1.amazonaws.com/media/webtoon-lab/"
+    if not bucket or not bg_url.startswith(prefix) or not bg_url.endswith("-bg.png") or "/" in bg_url[len(prefix):] or ".." in bg_url:
+        return response.err("허용되지 않는 bg_url", 400)
+    bg_key = bg_url[len(f"https://{bucket}.s3.us-east-1.amazonaws.com/"):]
+    try:
+        bg_bytes = jobs.s3().get_object(Bucket=bucket, Key=bg_key)["Body"].read()
+    except Exception:  # noqa: BLE001
+        return response.err("원본 그림을 찾을 수 없습니다", 404)
+
+    job_id = uuid.uuid4().hex
+    tmp_path = Path(f"/tmp/webtoon-recompose-{job_id}.png")
+    tmp_path.write_bytes(bg_bytes)
+    try:
+        layout = compose_text.compose(tmp_path, cut, None) or []
+        final_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    key = f"media/webtoon-lab/{job_id}.png"
+    jobs.s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
+    audit.log("webtoon-lab-recompose", {"cut": cut.get("cut"), "bg": bg_key})
+    return response.ok({"image_url": f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}", "layout": layout})

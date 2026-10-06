@@ -326,6 +326,10 @@ export function PromptChatLab({
   // WebtoonImageSettingsPanel이 방금 fetch한 defaults.image_model을 여기로
   // 올려보내고, WebtoonCutGenerator에 그대로 내려준다.
   const [productionImageModel, setProductionImageModel] = useState<string | null>(null);
+  const [productionBubbleDetect, setProductionBubbleDetect] = useState(false);
+  const [bubbleDetectDraft, setBubbleDetectDraft] = useState(false);
+  const [productionBubbleStyle, setProductionBubbleStyle] = useState(false);
+  const [bubbleStyleDraft, setBubbleStyleDraft] = useState(false);
   const handleApplyScriptVersion = async () => {
     if (applyingScriptVersion) return;
     setApplyingScriptVersion(true);
@@ -341,7 +345,7 @@ export function PromptChatLab({
   // 통합 "프로덕션에 적용" 버튼(WebtoonCutGenerator.tsx)이 부른다 — 이제
   // 값만 채우는 게 아니라 그 자리에서 바로 발행까지 한다
   // (WebtoonImageSettingsPanel.tsx::applyAndPublish).
-  const handleApplyImageModel = (model: string) => imageSettingsRef.current?.applyAndPublish(model) ?? Promise.resolve();
+  const handleApplyImageModel = (model: string, bubbleDetect?: boolean, bubbleStyle?: boolean) => imageSettingsRef.current?.applyAndPublish(model, bubbleDetect, bubbleStyle) ?? Promise.resolve();
   // 기사 반응 문구가 토큰 단위로 도착하는 동안 임시로 담아두는 곳(완료
   // 전까지는 messages 배열에 안 넣는다 — text_done에서 한 번에 확정).
   const [liveText, setLiveText] = useState<string | null>(null);
@@ -1041,7 +1045,7 @@ export function PromptChatLab({
                         label: "이미지 설정",
                         content: (
                           <>
-                            <WebtoonImageSettingsPanel ref={imageSettingsRef} onProductionModelChange={setProductionImageModel} />
+                            <WebtoonImageSettingsPanel ref={imageSettingsRef} onProductionModelChange={setProductionImageModel} onProductionBubbleDetectChange={setProductionBubbleDetect} onBubbleDetectDraftChange={setBubbleDetectDraft} onProductionBubbleStyleChange={setProductionBubbleStyle} onBubbleStyleDraftChange={setBubbleStyleDraft} />
                             {/* 2026-09-27 — 사용자 지적: "프로덕션 결과물이라는
                                 거를 만드는게 아니고요.. 이미지 설정 단계로
                                 가면 이미지 생성 하도록 되잖아? .. 프로덕션
@@ -1062,6 +1066,8 @@ export function PromptChatLab({
                                 send={wsSend}
                                 subscribe={subscribe}
                                 productionModel={productionImageModel}
+                                bubbleDetectDraft={bubbleDetectDraft}
+                                bubbleStyleDraft={bubbleStyleDraft}
                                 restoredImages={restoredCutImages}
                               />
                             </div>
@@ -1093,6 +1099,8 @@ export function PromptChatLab({
               subscribe={subscribe}
               onApplyModelToProduction={handleApplyImageModel}
               productionModel={productionImageModel}
+              productionBubbleDetect={productionBubbleDetect}
+              productionBubbleStyle={productionBubbleStyle}
               serverVersion={scriptServerVersion}
               promptHistory={promptHistory}
               testVersion={promptVersion}

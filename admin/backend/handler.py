@@ -90,6 +90,8 @@ HANDLERS: dict[str, tuple] = {
     # 이미지 업로드 presign (2026-07-28)
     "POST /admin/media/presign": (media.handle_presign, True),
     "GET /admin/media/download-url": (media.handle_download_url, True),
+    # 여러 컷을 순서대로 zip으로 내려받기(2026-10-02) — ⚠️ API Gateway 라우트(create-route)도 같이 필요
+    "POST /admin/media/zip": (media.handle_zip_download, True),
     # 용어 퀴즈 (2026-08-09)
     "POST /admin/quiz": (quiz.handle_create, True),
     "GET /admin/quiz": (quiz.handle_list, True),
@@ -108,6 +110,8 @@ HANDLERS: dict[str, tuple] = {
     # webtoon_image.py 상단 주석 참고). 남은 건 "발행 모델" 패널이 쓰는
     # defaults뿐.
     "GET /admin/webtoon-lab/defaults": (webtoon_generate.handle_defaults, True),
+    # 말풍선 위치 편집(2026-10-02) — ⚠️ API Gateway 라우트(create-route)도 같이 만들어야 한다(아래 video-lab 주석 참고).
+    "POST /admin/webtoon-lab/recompose": (webtoon_generate.handle_recompose, True),
     # 선정 실험실 (2026-09-28)
     "GET /admin/selection-runs/dates": (selection.handle_list_dates, True),
     "GET /admin/selection-runs": (selection.handle_get_day, True),

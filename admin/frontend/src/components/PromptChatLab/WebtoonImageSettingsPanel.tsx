@@ -24,7 +24,7 @@ export interface WebtoonImageSettingsPanelHandle {
    *  부르면 아직 갱신 안 된 이전 state를 읽는 문제가 있어, override 인자로
    *  값을 직접 넘긴다. 테스트 카드가 이미 확인창을 띄우므로 여기선 더
    *  묻지 않는다. */
-  applyAndPublish: (imageModel: string) => Promise<void>;
+  applyAndPublish: (imageModel: string, bubbleDetect?: boolean, bubbleStyle?: boolean) => Promise<void>;
 }
 
 /* 발행 모델 선택지(2026-09-20 신설) — "관리자가 CMS에서 저장하면 재배포
@@ -91,13 +91,22 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
    *  쓰고 있다"를 판단할 수 있다 — 방금 fetch한 defaults.image_model을
    *  그대로 올려보낸다(방금 발행 직후엔 imageModel과 같아진다). */
   onProductionModelChange?: (model: string | null) => void;
-}>(function WebtoonImageSettingsPanel({ onDirtyChange, onServerVersionChange, onProductionModelChange }, ref) {
+  /** 발행돼 있는 말풍선 얼굴 회피 값 — 테스트 카드가 "프로덕션과 같은가"를 판단하고 새 테스트의 초기값으로 쓴다 */
+  onProductionBubbleDetectChange?: (on: boolean) => void;
+  /** 체크박스의 현재 상태(발행 전 포함) — 프로덕션 컷 생성 그리드가 바로 쓴다 */
+  onBubbleDetectDraftChange?: (on: boolean) => void;
+  /** 발행돼 있는 웹툰식 말풍선 값 / 체크박스 현재 상태(발행 전 포함) */
+  onProductionBubbleStyleChange?: (on: boolean) => void;
+  onBubbleStyleDraftChange?: (on: boolean) => void;
+}>(function WebtoonImageSettingsPanel({ onDirtyChange, onServerVersionChange, onProductionModelChange, onProductionBubbleDetectChange, onBubbleDetectDraftChange, onProductionBubbleStyleChange, onBubbleStyleDraftChange }, ref) {
   const toast = useToast();
 
   const [style, setStyle] = useState("");
   const [charFemale, setCharFemale] = useState("");
   const [charMale, setCharMale] = useState("");
   const [imageModel, setImageModel] = useState("");
+  const [bubbleDetect, setBubbleDetect] = useState(false);
+  const [bubbleStyle, setBubbleStyle] = useState(false);
   const [defaults, setDefaults] = useState<WebtoonLabDefaults | null>(null);
   const [serverVersion, setServerVersion] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,6 +123,8 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
         setCharFemale(d.char_female);
         setCharMale(d.char_male);
         setImageModel(d.image_model);
+        setBubbleDetect(!!d.bubble_detect);
+        setBubbleStyle(!!d.bubble_style);
         const listed = promptList.prompts.find((p) => p.id === "webtoon-image/published");
         setServerVersion(listed ? listed.active_version : null);
       })
@@ -130,14 +141,16 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
   }, []);
 
-  const changed = !!defaults && imageModel !== defaults.image_model;
+  const changed = !!defaults && (imageModel !== defaults.image_model || bubbleDetect !== !!defaults.bubble_detect || bubbleStyle !== !!defaults.bubble_style);
 
   // 2026-09-26(후속) — overrideModel이 있으면 changed 체크·확인창 둘 다
   // 건너뛴다(테스트 카드가 이미 확인받고 직접 값을 넘기는 경로). 사람이
   // 드롭다운을 만져서 부르는 기존 경로(overrideModel 없음)는 그대로
   // confirm + changed 가드를 유지한다.
-  const handlePublish = async (overrideModel?: string) => {
+  const handlePublish = async (overrideModel?: string, overrideBubble?: boolean, overrideStyle?: boolean) => {
     const modelToUse = overrideModel ?? imageModel;
+    const bubbleToUse = overrideBubble ?? bubbleDetect;
+    const styleToUse = overrideStyle ?? bubbleStyle;
     if (publishing) return;
     if (overrideModel === undefined) {
       if (!changed || !defaults) return;
@@ -154,9 +167,11 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
       const r = await adminApi.updatePrompt(
         "webtoon-image",
         "published",
-        buildImagePromptDoc(style.trim(), charFemale.trim(), charMale.trim(), modelToUse)
+        buildImagePromptDoc(style.trim(), charFemale.trim(), charMale.trim(), modelToUse, bubbleToUse, styleToUse)
       );
       setImageModel(modelToUse);
+      setBubbleDetect(bubbleToUse);
+      setBubbleStyle(styleToUse);
       toast.show(`발행했습니다 — v${r.new_version}부터 다음 생성에 적용됩니다`, "success");
       loadDefaults();
     } catch (err) {
@@ -171,7 +186,7 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
 
   useImperativeHandle(ref, () => ({
     publish: () => handlePublish(),
-    applyAndPublish: (model) => handlePublish(model),
+    applyAndPublish: (model, bubble, style) => handlePublish(model, bubble, style),
     applyFromTest: (model) => {
       setImageModel(model);
       toast.show("테스트에서 쓴 모델을 적용했습니다 — 확인 후 발행해 주세요", "success");
@@ -189,6 +204,22 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
   useEffect(() => {
     onProductionModelChange?.(defaults?.image_model ?? null);
   }, [defaults, onProductionModelChange]);
+
+  useEffect(() => {
+    onBubbleStyleDraftChange?.(bubbleStyle);
+  }, [bubbleStyle, onBubbleStyleDraftChange]);
+
+  useEffect(() => {
+    onProductionBubbleStyleChange?.(!!defaults?.bubble_style);
+  }, [defaults, onProductionBubbleStyleChange]);
+
+  useEffect(() => {
+    onBubbleDetectDraftChange?.(bubbleDetect);
+  }, [bubbleDetect, onBubbleDetectDraftChange]);
+
+  useEffect(() => {
+    onProductionBubbleDetectChange?.(!!defaults?.bubble_detect);
+  }, [defaults, onProductionBubbleDetectChange]);
 
   if (loading) {
     return <p className="px-3.5 py-3 text-[11px] text-[var(--text-faint)]">불러오는 중...</p>;
@@ -212,6 +243,36 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
           title="실제 자동 발행 파이프라인(frontpage_auto/mustknow_auto)이 다음 기사부터 이 모델로 컷을 생성합니다."
         >
           실제 자동 발행이 다음 기사부터 쓸 컷 이미지 모델입니다.
+        </p>
+      </div>
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">말풍선 얼굴 회피</p>
+        <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-[var(--text-primary)]">
+          <input
+            type="checkbox"
+            checked={bubbleDetect}
+            onChange={(e) => setBubbleDetect(e.target.checked)}
+            className="cursor-pointer"
+          />
+          {bubbleDetect ? "켜짐" : "꺼짐"}
+        </label>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
+          켜면 AWS Rekognition이 그림 속 인물·얼굴 위치를 찾아, 말풍선이 얼굴을 덮지 않는 자리에 놓고 꼬리를 화자 쪽으로 맞춥니다. 컷 한 장당 약 $0.002(기사 하나 약 $0.016)가 듭니다. 끄면 고정 배치로 돌아가고 비용이 없습니다. 인식에 실패해도 고정 배치로 진행하므로 발행은 막히지 않습니다.
+        </p>
+      </div>
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">웹툰식 말풍선</p>
+        <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-[var(--text-primary)]">
+          <input
+            type="checkbox"
+            checked={bubbleStyle}
+            onChange={(e) => setBubbleStyle(e.target.checked)}
+            className="cursor-pointer"
+          />
+          {bubbleStyle ? "켜짐" : "꺼짐"}
+        </label>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
+          켜면 네이버 웹툰처럼 얇은 선의 타원 말풍선을 쓰고, 컷 위에 흰 여백을 붙여 말풍선을 거기에 놓습니다(그림을 가리지 않음). 컷 이미지가 3:2보다 세로로 길어집니다. 끄면 기존 스타일입니다. 비용은 없습니다.
         </p>
       </div>
       {publishing && <p className="text-[10.5px] text-[var(--text-faint)]">발행 중...</p>}

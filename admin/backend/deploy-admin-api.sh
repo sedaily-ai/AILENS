@@ -46,6 +46,8 @@ JSON_EXTRACT_MODULE="$SCRIPT_DIR/../../pipelines/common/json_extract.py"
 # 같이 삭제돼 복사할 게 없다.
 BEDROCK_CLIENT_MODULE="$SCRIPT_DIR/../../pipelines/common/bedrock_client.py"
 COMPOSE_TEXT_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/compose_text.py"
+# 2026-10-02 — 말풍선 얼굴 회피(Rekognition) 토글용. generate.py가 flat import한다.
+REKOGNITION_PEOPLE_MODULE="$SCRIPT_DIR/../../pipelines/common/rekognition_people.py"
 # webtoon_image.py::_load_prompt_doc()이 flat import로 쓰는
 # pipelines/common/ddb_prompt.py — 2026-09-16까지 이 줄이 빠져있어서
 # get_style()/get_fixed_characters()가 매번 ModuleNotFoundError로 코드
@@ -67,6 +69,8 @@ WEBTOON_PROMPTS_MODULE="$SCRIPT_DIR/../../pipelines/webtoon/prompts.py"
 # style_guide 모델 삭제로 이 이미지를 읽던 코드(webtoon_image.py의
 # STYLE_REFERENCE_IMAGE_PATH)가 없어졌다.
 FONT_ASSET="$SCRIPT_DIR/../../pipelines/webtoon/assets/NotoSansKR-Bold.ttf"
+# 2026-10-02 — 웹툰식 말풍선(보통 굵기 글꼴, Pretendard 가변·OFL). compose_text._REGULAR_FONT_PATH가 같은 assets/에서 찾는다.
+FONT_ASSET_REGULAR="$SCRIPT_DIR/../../pipelines/webtoon/assets/PretendardVariable.ttf"
 # 2026-09-22 — 팟캐스트 음성 설정(routes/prompts.py::handle_update가
 # category="podcast-voice"로 그대로 재사용)과 chat_ws.py의 "음성으로
 # 듣기"(synthesize_audio WS kind, 사용자 요청: "대본만 텍스트로 출력이
@@ -107,9 +111,9 @@ cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
-cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$BUILD_DIR/"
+cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$REKOGNITION_PEOPLE_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$BUILD_DIR/"
 mkdir -p "$BUILD_DIR/assets"
-cp "$FONT_ASSET" "$BUILD_DIR/assets/"
+cp "$FONT_ASSET" "$FONT_ASSET_REGULAR" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"
 
 # --python-version 은 필수다. 워크스테이션 Python 이 Lambda 런타임(3.11)과 다르면

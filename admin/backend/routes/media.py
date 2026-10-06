@@ -7,11 +7,13 @@
 """
 from __future__ import annotations
 
+import io
 import logging
 import os
 import re
 import time
 import uuid
+import zipfile
 
 import boto3
 
@@ -142,3 +144,61 @@ def handle_download_url(body: dict, path_params: dict, query_params: dict) -> di
         ExpiresIn=_DOWNLOAD_EXPIRES,
     )
     return response.ok({"download_url": download_url, "expires_in": _DOWNLOAD_EXPIRES})
+
+
+_ZIP_MAX_FILES = 24
+_ZIP_PREFIX = "media/webtoon-lab/"  # 이 폴더의 파일만 묶는다(임의 키를 서버가 읽지 않도록)
+
+
+def handle_zip_download(body: dict, path_params: dict, query_params: dict) -> dict:
+    """여러 컷 이미지를 컷 순서대로 이름 붙여 zip 하나로 묶어 내려받게 한다(2026-10-02, CMS "전체 다운로드").
+
+    body = {"items": [{"url": 미디어 URL, "name": "컷1.png"}, ...], "zip_name": "웹툰_테스트1.zip"} — items 순서가 zip 안 순서다.
+    브라우저가 버킷에서 직접 못 읽어서(CORS) 서버가 묶어 presigned URL로 돌려준다."""
+    items = (body or {}).get("items") or []
+    if not isinstance(items, list) or not items:
+        return response.err("items가 필요합니다", 400)
+    if len(items) > _ZIP_MAX_FILES:
+        return response.err(f"한 번에 {_ZIP_MAX_FILES}장까지만 묶을 수 있습니다", 400)
+    bucket = _bucket()
+    if not bucket:
+        return response.err("CMS_MEDIA_BUCKET not configured", 500)
+
+    base = f"https://{bucket}.s3.us-east-1.amazonaws.com/"
+    s3 = _s3()
+    buf = io.BytesIO()
+    used: set[str] = set()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:  # 이미지는 이미 압축돼 있어 저장만 한다
+        for it in items:
+            url = (it.get("url") or "").strip() if isinstance(it, dict) else ""
+            if not url.startswith(base) or not url[len(base):].startswith(_ZIP_PREFIX) or ".." in url:
+                return response.err("허용되지 않는 url", 400)
+            name = re.sub(r'[\\/:*?"<>|\r\n]', "", str(it.get("name") or "").strip()) or url.rsplit("/", 1)[-1]
+            if name in used:  # 같은 이름이면 번호를 붙인다
+                stem, dot, ext = name.rpartition(".")
+                name = f"{stem or name}_{len(used)}{dot}{ext}" if dot else f"{name}_{len(used)}"
+            used.add(name)
+            try:
+                data = s3.get_object(Bucket=bucket, Key=url[len(base):])["Body"].read()
+            except Exception:  # noqa: BLE001
+                return response.err(f"이미지를 읽을 수 없습니다: {name}", 404)
+            zf.writestr(name, data)
+
+    key = f"{_ZIP_PREFIX}zips/{uuid.uuid4().hex}.zip"
+    s3.put_object(Bucket=bucket, Key=key, Body=buf.getvalue(), ContentType="application/zip")
+    zip_name = re.sub(r'[\\/:*?"<>|\r\n]', "", str((body or {}).get("zip_name") or "webtoon.zip")) or "webtoon.zip"
+    if not zip_name.lower().endswith(".zip"):
+        zip_name += ".zip"
+    from urllib.parse import quote
+
+    download_url = s3.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": bucket,
+            "Key": key,
+            "ResponseContentDisposition": f"attachment; filename=\"webtoon.zip\"; filename*=UTF-8''{quote(zip_name)}",
+        },
+        ExpiresIn=_DOWNLOAD_EXPIRES,
+    )
+    audit.log("media-zip-download", {"files": len(items), "key": key})
+    return response.ok({"download_url": download_url, "expires_in": _DOWNLOAD_EXPIRES, "files": len(items)})
