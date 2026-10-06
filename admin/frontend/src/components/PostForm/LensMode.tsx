@@ -9,6 +9,7 @@ import { MetaField, MetaDivider } from "./MetaField";
 import { LABEL, type ModeProps } from "./shared";
 import { LineList } from "./LineList";
 import { WebtoonPanelsEditor } from "./WebtoonPanelsEditor";
+import { MediaDownloadButton } from "@/components/MediaDownloadButton";
 import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { ECON_CATEGORIES, type CmsLensItem } from "@/lib/types";
@@ -383,6 +384,7 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
                   className="ui-input w-full rounded-lg px-3 py-2 text-sm"
                 />
                 <MediaPreview url={lens.media_url ?? ""} kind="audio" />
+                <MediaDownloadButton url={lens.media_url ?? ""} className="mt-2" />
               </div>
             )}
 
@@ -397,6 +399,7 @@ export function LensMode({ value, body, patch, patchBody }: ModeProps) {
                   className="ui-input w-full rounded-lg px-3 py-2 text-sm"
                 />
                 <MediaPreview url={lens.video_url ?? ""} kind="video" />
+                <MediaDownloadButton url={lens.video_url ?? ""} className="mt-2" />
               </div>
             )}
 
