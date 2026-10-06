@@ -98,7 +98,6 @@ const NAV: { label: string; href: string }[] = [
 const CONTENT_LINKS: { label: string; href: string }[] = [
   ...ECON_CATEGORIES.map((c) => ({ label: c.label, href: `/${c.slug}` })),
   { label: '전체 콘텐츠', href: '/lens' },
-  { label: 'MBTI로 보는 뉴스', href: '/mbti' },
 ];
 
 export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?: boolean }) {
