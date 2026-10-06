@@ -58,4 +58,25 @@ t('null/빈 배열도 안전', () => {
   assert.deepEqual(parseLetterBlocks(null), []);
   assert.deepEqual(parseLetterBlocks([]), []);
 });
+t('좌우 비교 표기는 compare 블록으로, 한 가지만·에디터 노트는 box로', () => {
+  const bs = parseLetterBlocks([
+    '도입이에요.',
+    '◾ ⚖️ 갈리는 전망: 앞으로는 어떻게 보나요?',
+    '전망이 갈려요. 【A: 올라갈 근거】 첫째예요. 둘째예요. 【B: 반등 어려운 근거】 금리가 높아요. 【/】 결국 금리가 변수예요.',
+    '◾ 💡 한 가지만 기억한다면',
+    '금리를 보세요.',
+    '◾ 🗳️ 투표: 어떻게 보세요',
+    '① 사는 때 ② 대기',
+  ]);
+  const cmp = bs.find((b) => b.type === 'compare');
+  assert.equal(cmp.intro, '전망이 갈려요.');
+  assert.equal(cmp.a.label, '올라갈 근거');
+  assert.equal(cmp.b.text, '금리가 높아요.');
+  assert.equal(cmp.outro, '결국 금리가 변수예요.');
+  assert.deepEqual(bs.filter((b) => b.type === 'box').map((b) => b.kind), ['takeaway', 'vote']);
+});
+t('짝이 안 맞는 표기는 일반 문단으로 둔다', () => {
+  const bs = parseLetterBlocks(['도입', '## 구간: 질문?', '【A: 한쪽만】 내용']);
+  assert.equal(bs.some((b) => b.type === 'compare'), false);
+});
 console.log(`\n${n} tests passed`);

@@ -9,7 +9,7 @@ import { ReadDone } from '@/app/(economy)/_shared/components/article/ReadDone';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { SITE_URL } from '@/shared/constants/site';
 import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
-import { parseLetterBlocks } from './lensBlocks';
+import { BADGE_HEAD, parseLetterBlocks, type LetterBlock } from './lensBlocks';
 import { resolveVideo } from '@/shared/lib/media/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/article/ArticleAudioPlayer';
 import { ArticleVideoPlayer } from '@/shared/ui/article/ArticleVideoPlayer';
@@ -36,6 +36,10 @@ import { CardnewsCarousel } from './CardnewsCarousel';
 // 오디오·영상 플레이어도 hidden 여부와 무관하게 항상 렌더한다. 탭 바(FormatPicker)가 4개 형식의 분량을 미리 보여줘야 하므로
 // 보이지 않는 패널의 플레이어도 메타데이터(길이)만 읽어 onDuration으로 보고한다(preload="metadata", 재생은 사용자 조작 시 시작).
 // 오디오·영상은 실측 재생시간·탐색바·배속을 갖춘 ArticleAudioPlayer/ArticleVideoPlayer를 쓴다.
+
+// 좌우 비교 칸 안의 글은 문장마다 문단으로 나눠 샘플 HTML처럼 짧게 끊어 보여 준다.
+const splitSentences = (text: string) => text.split(/(?<=[.!?다요죠])\s+(?=[가-힣A-Z0-9"'“‘(])/u).map((t) => t.trim()).filter(Boolean);
+
 export function LensFormatPanel({
   lens,
   l,
@@ -87,6 +91,11 @@ export function LensFormatPanel({
       : null;
   // 웹툰 표지 헤드라인 — 오버라이드가 있으면 그 표지 문구를,
   // 없으면 CMS 질문(l.question)을 그대로 쓴다.
+  // 새 레터 틀(배지 소제목·특별 칸) 여부 — 맞으면 .lread에 data-tpl="v2"를 붙여 샘플 HTML 크기·간격으로 그린다. 옛 글은 예전 모양 그대로다.
+  const letterBlocks = letterParagraphs ? parseLetterBlocks(letterParagraphs, { headline: lens.headline }) : null;
+  const isNewFormat = Boolean(
+    letterBlocks?.some((x) => x.type === 'box' || (x.type === 'sub' && BADGE_HEAD.test(x.head) && x.question)),
+  );
   const webtoonHeadline =
     format === 'webtoon' ? ARTICLE_FORMAT_SAMPLES[lens.id]?.webtoonHeadline ?? l.question : l.question;
   // 실제 미디어 보유 여부 — 있으면 정적 목업 대신 실제 콘텐츠를 그린다. 유튜브·네이버TV 판별은 /video 페이지와 같은 resolveVideo를 재사용한다.
@@ -138,15 +147,80 @@ export function LensFormatPanel({
           article[data-letter-body]로 감싸는 이유 — SentenceSelectionPopover가 이 안에서만 selection을 인정한다(letters/[id] 페이지와 동일). */}
       {format === 'letter' && letterParagraphs && (
         <article data-letter-body>
-          <div className="lread" style={{ ['--lc' as string]: READING_ACCENT } as CSSProperties}>
+          <div className="lread" data-tpl={isNewFormat ? 'v2' : undefined} style={{ ['--lc' as string]: READING_ACCENT } as CSSProperties}>
             {/* 본문 블록 렌더 — parseLetterBlocks가 소제목·목록·인용·구분선을 읽어 풀어 주므로 프롬프트 출력 형식이 바뀌어도 기호가 그대로 노출되지 않는다.
                 소제목 id는 오른쪽 구간 목차의 앵커이다. */}
             {(() => {
-              const blocks = parseLetterBlocks(letterParagraphs, { headline: lens.headline });
+              const blocks = letterBlocks ?? [];
               const chTotal = blocks.filter((x) => x.type === 'sub').length;
-              return blocks.map((b, bi) => {
               const kw = l.keywords ?? [];
+              // 새 틀로 발행된 글에서만 1분 요약 박스를 그린다 — 옛 글의 요약 불릿은 다른 화면(30초 핵심)이 쓴다.
+              const renderPlain = (b: LetterBlock, bi: number) => {
+                if (b.type === 'ul' || b.type === 'ol') {
+                  const Tag = b.type;
+                  return (
+                    <Tag key={bi}>
+                      {b.items.map((it, ii) => (
+                        <li key={ii}>{renderInline(it, kw, { numbers: true })}</li>
+                      ))}
+                    </Tag>
+                  );
+                }
+                if (b.type === 'quote') return <blockquote key={bi}>{renderInline(b.text, kw)}</blockquote>;
+                if (b.type === 'p' || b.type === 'lead') return <p key={bi}>{renderInline(b.text, kw, { numbers: true })}</p>;
+                return null;
+              };
+              const summary =
+                isNewFormat && l.bullets.length > 0 ? (
+                  <div key="summary" className="lread-summary">
+                    <div className="lread-box-title">⏱️ 1분 요약</div>
+                    {l.bullets.map((b, bi) => (
+                      <p key={bi}>{renderInline(b, kw)}</p>
+                    ))}
+                    <p className="lread-summary-hint">5분 정도 여유가 있다면 아래 본문도 가볍게 읽어보세요.</p>
+                  </div>
+                ) : null;
+              const rendered = blocks.map((b, bi) => {
               switch (b.type) {
+                case 'compare':
+                  return (
+                    <div key={bi} className="lread-compare">
+                      {b.intro && <p>{renderInline(b.intro, kw)}</p>}
+                      <div className="lread-compare-cols">
+                        <div className="lread-compare-col lread-compare-a">
+                          <div className="lread-box-title">{b.a.label}</div>
+                          {splitSentences(b.a.text).map((t, ti) => (
+                            <p key={ti}>{renderInline(t, kw, { numbers: true })}</p>
+                          ))}
+                        </div>
+                        <div className="lread-compare-col lread-compare-b">
+                          <div className="lread-box-title">{b.b.label}</div>
+                          {splitSentences(b.b.text).map((t, ti) => (
+                            <p key={ti}>{renderInline(t, kw, { numbers: true })}</p>
+                          ))}
+                        </div>
+                      </div>
+                      {b.outro && <p>{renderInline(b.outro, kw)}</p>}
+                    </div>
+                  );
+                case 'box': {
+                  const choices = b.kind === 'vote' ? b.children.flatMap((c) => (c.type === 'p' ? c.text.split(/\n|\s+(?=[①-⑩])/) : [])) : null;
+                  const title = [b.head, b.question].filter(Boolean).join(b.kind === 'vote' ? ' ' : ': ');
+                  if (b.kind === 'more') {
+                    return (
+                      <details key={bi} className="lread-more">
+                        <summary>{title}</summary>
+                        {b.children.map(renderPlain)}
+                      </details>
+                    );
+                  }
+                  return (
+                    <div key={bi} className={`lread-box lread-box-${b.kind}`}>
+                      <div className="lread-box-title">{title}</div>
+                      {choices ? choices.filter(Boolean).map((c, ci) => <p key={ci}>{c}</p>) : b.children.map(renderPlain)}
+                    </div>
+                  );
+                }
                 case 'lead':
                   return (
                     <p key={bi} className="lread-lead">
@@ -155,7 +229,7 @@ export function LensFormatPanel({
                   );
                 case 'sub':
                   return (
-                    <h3 key={bi} id={chapterId(b.no)} className="lread-sub">
+                    <h3 key={bi} id={chapterId(b.no)} className="lread-sub" data-badge={BADGE_HEAD.test(b.head) && b.question ? String(b.no % 4) : undefined}>
                       <span className="ch-no">
                         {String(b.no + 1).padStart(2, '0')}
                         <i>/ {String(chTotal).padStart(2, '0')}</i>
@@ -192,6 +266,12 @@ export function LensFormatPanel({
                   return <p key={bi}>{renderInline(b.text, kw, { numbers: true })}</p>;
               }
               });
+              return (
+                <>
+                  {summary}
+                  {rendered}
+                </>
+              );
             })()}
             {/* 레터 사인오프 — 얇은 룰 + 형식 색 마크 + 발신인 라벨로 뉴스레터 서명처럼 마무리한다. */}
             <ReadDone minutes={readMinutes(letterParagraphs.join('').length)} />

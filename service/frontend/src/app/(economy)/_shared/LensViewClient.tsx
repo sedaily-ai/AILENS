@@ -282,6 +282,55 @@ export function LensViewClient({
         /* 질문 — "이 구간이 답할 질문"을 연한 면 위에 두어 독자가 읽기 전에 목적을 잡게 한다. */
         .lread-sub .ch-q { display: block; width: fit-content; max-width: 100%; margin-top: 12px; padding: 8px 15px; border-radius: 15px 12px 16px 11px / 12px 16px 11px 15px;
           background: #f4f5f7; font-size: calc(15.5px * var(--lens-font-scale, 1)); line-height: 1.5; font-weight: 500; color: #4b5563; word-break: keep-all; }
+        /* 새 레터 틀(2026-10-06) — 배지 소제목·1분 요약·특별 칸. 이모지로 시작하는 라벨 + 질문 소제목 글만 이 모양이고, 옛 글은 위 규칙 그대로다. */
+        .lread-sub[data-badge] .ch-no { display: none; }
+        .lread-sub[data-badge] .ch-t { display: inline-block; margin-bottom: 10px; padding: 4px 11px; border-radius: 12px; font-family: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: 0.01em;
+          line-height: 1.3; color: color-mix(in srgb, var(--lc, #111827) 70%, #1f2a44); background: color-mix(in srgb, var(--lc, #111827) 12%, #fff); }
+        .lread-sub[data-badge] .ch-q { margin-top: 0; padding: 0; border-radius: 0; background: none; font-family: "Noto Serif KR", serif; font-size: calc(22px * var(--lens-font-scale, 1));
+          font-weight: 700; line-height: 1.4; letter-spacing: -0.02em; color: #111827; }
+        .lread > .lread-summary { margin: 0 0 30px; padding: 17px 20px 16px; border-radius: 14px; background: #f3f4f6; }
+        .lread-summary p { margin: 0 0 7px; font-size: calc(15px * var(--lens-font-scale, 1)); line-height: 1.65; color: #1f2937; }
+        .lread-summary p.lread-summary-hint { margin: 11px 0 0; font-size: 12.5px; color: #9ca3af; }
+        .lread-box-title { margin-bottom: 9px; font-size: 13px; font-weight: 700; color: #4b5563; }
+        .lread > .lread-box { margin: 34px 0 0; padding: 18px 20px 17px; border-radius: 14px; background: #f9fafb; }
+        .lread-box p { margin: 0 0 10px; }
+        .lread-box p:last-child { margin-bottom: 0; }
+        .lread > .lread-box-takeaway { background: #eff6ff; }
+        .lread-box-takeaway .lread-box-title { color: #1d4ed8; }
+        .lread > .lread-box-vote { background: #fff; box-shadow: 0 0 0 1px #e5e7eb inset; }
+        .lread-box-vote .lread-box-title { color: #374151; }
+        .lread-box-vote p { margin-bottom: 7px; font-size: calc(15px * var(--lens-font-scale, 1)); }
+        .lread > .lread-more { margin: 18px 0 0; padding: 12px 15px; border-radius: 10px; background: #fffbeb; }
+        .lread-more summary { cursor: pointer; font-size: 14px; font-weight: 700; color: #92400e; }
+        .lread-more p { margin: 10px 0 0; font-size: calc(15px * var(--lens-font-scale, 1)); }
+        /* 새 레터 틀 v2 — 샘플 HTML과 같은 크기·간격(본문 15.5px / 줄간격 1.75 / 문단 간격 12px / 칸 간격 28px / 소제목 19px 산세리프). */
+        .lread[data-tpl="v2"] > p, .lread[data-tpl="v2"] > ul, .lread[data-tpl="v2"] > ol, .lread[data-tpl="v2"] > blockquote { font-size: calc(15.5px * var(--lens-font-scale, 1)); line-height: 1.75; letter-spacing: 0; }
+        .lread[data-tpl="v2"] > p.lread-lead { font-size: calc(15.5px * var(--lens-font-scale, 1)); line-height: 1.75; font-weight: 400; color: #1f2937; }
+        .lread[data-tpl="v2"] > * + * { margin-top: 12px; }
+        .lread[data-tpl="v2"] > .lread-sub { margin-top: 30px; margin-bottom: 12px; }
+        .lread[data-tpl="v2"] > .lread-sub + * { margin-top: 0; }
+        .lread[data-tpl="v2"] .lread-sub[data-badge] .ch-t { margin-bottom: 9px; padding: 3px 9px; font-size: 12px; border-radius: 10px; }
+        .lread[data-tpl="v2"] .lread-sub[data-badge] .ch-q { font-family: inherit; font-size: calc(19px * var(--lens-font-scale, 1)); line-height: 1.45; letter-spacing: -0.01em; }
+        .lread[data-tpl="v2"] .lread-sub[data-badge="0"] .ch-t { color: #4338ca; background: #eef2ff; }
+        .lread[data-tpl="v2"] .lread-sub[data-badge="1"] .ch-t { color: #c2410c; background: #fff7ed; }
+        .lread[data-tpl="v2"] .lread-sub[data-badge="2"] .ch-t { color: #047857; background: #ecfdf5; }
+        .lread[data-tpl="v2"] .lread-sub[data-badge="3"] .ch-t { color: #b91c1c; background: #fef2f2; }
+        .lread[data-tpl="v2"] > .lread-summary { margin: 0 0 24px; padding: 16px 18px; }
+        .lread[data-tpl="v2"] .lread-summary p { font-size: calc(14.5px * var(--lens-font-scale, 1)); line-height: 1.7; }
+        .lread[data-tpl="v2"] > .lread-box { margin-top: 26px; padding: 16px 18px; }
+        .lread[data-tpl="v2"] .lread-box p { font-size: calc(14.5px * var(--lens-font-scale, 1)); line-height: 1.7; margin-bottom: 8px; }
+        .lread[data-tpl="v2"] .lread-box-takeaway p { font-size: calc(15.5px * var(--lens-font-scale, 1)); }
+        .lread[data-tpl="v2"] .lread-box-vote p { font-size: calc(14.5px * var(--lens-font-scale, 1)); margin-bottom: 6px; }
+        .lread[data-tpl="v2"] .lread-more p { font-size: calc(14.5px * var(--lens-font-scale, 1)); line-height: 1.7; }
+        /* 좌우 비교(갈리는 전망) — 초록/빨강 두 칸, 좁은 화면에선 위아래로 쌓인다. */
+        .lread > .lread-compare { margin-top: 12px; }
+        .lread-compare > p { margin: 0 0 12px; }
+        .lread-compare-cols { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+        .lread-compare-col { flex: 1 1 240px; min-width: 0; padding: 14px 16px; border-radius: 10px; }
+        .lread-compare-col p { margin: 0 0 7px; font-size: calc(14.5px * var(--lens-font-scale, 1)); line-height: 1.7; }
+        .lread-compare-col p:last-child { margin-bottom: 0; }
+        .lread-compare-a { background: #f0fdf4; } .lread-compare-a .lread-box-title { color: #15803d; }
+        .lread-compare-b { background: #fef2f2; } .lread-compare-b .lread-box-title { color: #b91c1c; }
         /* 편지 마무리 — 따뜻한 한 줄 + 발신인. 위쪽 룰 없이 여백만. */
         .lread-sign { margin-top: 48px; }
         .lread-thanks { margin: 0 0 14px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; color: #374151; font-weight: 500; }

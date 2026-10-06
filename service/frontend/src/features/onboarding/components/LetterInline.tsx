@@ -54,6 +54,26 @@ export function LetterInline({ paragraphs, headline, keywords }: { paragraphs: s
                 ···
               </div>
             );
+          case 'compare':
+            return (
+              <p key={i} style={p}>
+                {[b.intro, `${b.a.label}: ${b.a.text}`, `${b.b.label}: ${b.b.text}`, b.outro].filter(Boolean).join(' ')}
+              </p>
+            );
+          case 'box':
+            // 새 레터 틀의 특별 칸(한 가지만·에디터 노트 등)은 이 요약 화면에서 제목 + 문단으로 풀어 보여 준다.
+            return (
+              <div key={i}>
+                <p style={{ ...p, fontWeight: 700 }}>{[b.head, b.question].filter(Boolean).join(': ')}</p>
+                {b.children.map((c, ci) =>
+                  c.type === 'p' || c.type === 'lead' ? (
+                    <p key={ci} style={p}>
+                      {renderInline(c.text, keywords, { numbers: true })}
+                    </p>
+                  ) : null,
+                )}
+              </div>
+            );
           default:
             return (
               <p key={i} style={p}>

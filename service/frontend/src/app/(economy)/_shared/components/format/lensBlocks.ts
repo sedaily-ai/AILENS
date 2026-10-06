@@ -14,7 +14,12 @@ export type LetterBlock =
   | { type: 'ul'; items: string[] }
   | { type: 'ol'; items: string[] }
   | { type: 'quote'; text: string }
-  | { type: 'hr' };
+  | { type: 'hr' }
+  | { type: 'box'; kind: BoxKind; head: string; question: string; children: LetterBlock[] }
+  | { type: 'compare'; intro: string; a: { label: string; text: string }; b: { label: string; text: string }; outro: string };
+
+/** 소제목 이름으로 알아보는 특별 칸(2026-10-06 새 레터 틀). 이 이름이 없는 옛 글은 예전 그대로 그려진다. */
+export type BoxKind = 'takeaway' | 'note' | 'vote' | 'more';
 
 const HR = /^(?:-{3,}|\*{3,}|_{3,})$/;
 const HASH = /^#{1,6}\s*(.*)$/;
@@ -37,6 +42,55 @@ function headingText(line: string): string | null {
   const b = BOLD_LINE.exec(line);
   if (b) return b[1].trim();
   return null;
+}
+
+/** 갈리는 전망 같은 좌우 비교 — 본문 한 문단 안에 "【A: 라벨】 … 【B: 라벨】 … 【/】 마무리"로 쓴다(2026-10-06). 표기가 어긋나면 일반 문단으로 둔다. */
+const COMPARE = /^([\s\S]*?)【A[:：]\s*([^】]+)】([\s\S]*?)【B[:：]\s*([^】]+)】([\s\S]*?)(?:【\/】([\s\S]*))?$/;
+
+function parseCompare(text: string): LetterBlock | null {
+  const m = COMPARE.exec(text);
+  if (!m) return null;
+  const [, intro, aLabel, aText, bLabel, bText, outro] = m;
+  if (!aText.trim() || !bText.trim()) return null;
+  return {
+    type: 'compare',
+    intro: intro.trim(),
+    a: { label: aLabel.trim(), text: aText.trim() },
+    b: { label: bLabel.trim(), text: bText.trim() },
+    outro: (outro ?? '').trim(),
+  };
+}
+
+const BOX_KINDS: [RegExp, BoxKind][] = [
+  [/한\s*가지만\s*기억/, 'takeaway'],
+  [/에디터\s*노트/, 'note'],
+  [/투표/, 'vote'],
+  [/더\s*보기/, 'more'],
+];
+
+/** 이모지로 시작하는 라벨("📉 숫자 확인")이면 배지형 소제목이다. */
+export const BADGE_HEAD = /^\p{Extended_Pictographic}/u;
+
+/** 특별 칸 소제목 뒤에 이어지는 일반 블록(다음 소제목 전까지)을 칸 하나로 묶는다. */
+function groupBoxes(blocks: LetterBlock[]): LetterBlock[] {
+  const out: LetterBlock[] = [];
+  for (let i = 0; i < blocks.length; i += 1) {
+    const b = blocks[i];
+    const kind = b.type === 'sub' ? BOX_KINDS.find(([re]) => re.test(b.head))?.[1] : undefined;
+    if (b.type !== 'sub' || !kind) {
+      out.push(b);
+      continue;
+    }
+    const children: LetterBlock[] = [];
+    let j = i + 1;
+    while (j < blocks.length && blocks[j].type !== 'sub' && blocks[j].type !== 'hr') {
+      children.push(blocks[j]);
+      j += 1;
+    }
+    out.push({ type: 'box', kind, head: b.head, question: b.question, children });
+    i = j - 1;
+  }
+  return out;
 }
 
 export function parseLetterBlocks(paragraphs: string[] | null | undefined, opts: { headline?: string } = {}): LetterBlock[] {
@@ -99,7 +153,7 @@ export function parseLetterBlocks(paragraphs: string[] | null | undefined, opts:
       continue;
     }
 
-    blocks.push({ type: 'p', text: line });
+    blocks.push(parseCompare(line) ?? { type: 'p', text: line });
   }
 
   // 첫 일반 문단은 도입(lead)이다. 첫 문단이 "부서 | 제목 + 부제" 한 줄로 나오는 발행분은 맨 위 제목과 겹치는 앞부분(부서명 접두어 + 제목)을 떼고 남는 부제만 도입으로 쓴다. 남는 게 없으면 그 문단은 숨긴다.
@@ -118,5 +172,5 @@ export function parseLetterBlocks(paragraphs: string[] | null | undefined, opts:
       blocks[0] = { type: 'lead', text: t };
     }
   }
-  return blocks;
+  return groupBoxes(blocks);
 }
