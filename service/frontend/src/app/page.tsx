@@ -85,6 +85,7 @@ export default async function HomePage() {
       [],
       [],
       initialLensPosts.slice(1),
+      initialLensPosts,
     ),
   );
 

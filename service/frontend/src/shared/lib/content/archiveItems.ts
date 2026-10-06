@@ -47,7 +47,11 @@ export function buildArchiveItems(
   // lens("4가지 시선") 글을 카테고리 페이지(/markets 등)에 letters와 함께 노출하기 위한 인자다.
   // 인자를 넘기지 않으면 빈 배열이라 기존 호출부(archive 허브, 홈) 동작은 바뀌지 않는다.
   lens: CmsLens[] = [],
+  // 그리드에서는 뺐지만 letters 채널에는 레터 항목으로 남는 lens 글(홈이 히어로 1건을 slice(1)로 빼는 경우). 이 글의 링크를
+  // /letters/{id}로 두면 누를 때 서버 리다이렉트가 끝날 때까지 본문이 비어 푸터만 보인다(2026-10-06) — 처음부터 정본 경로로 보낸다.
+  lensForLinks: CmsLens[] = [],
 ): ArchiveItem[] {
+  const lensLinkById = new Map(lensForLinks.map((l) => [l.id, lensPath(l)]));
   // channel=letters 조회는 admin_channel='letters'뿐 아니라 letter 포맷 rendition이 있는 모든 글(거의 모든 lens 글)을 같이 돌려준다
   // (cms_posts_repo.py의 channel=video/webtoon과 같은 설계). letters·lens를 함께 넘기는 호출부(카테고리 페이지 등)에서
   // 같은 글이 두 번 뜨지 않도록 id(=post slug)가 겹치면 4포맷 전체를 담은 lens 버전만 남긴다.
@@ -73,7 +77,7 @@ export function buildArchiveItems(
       excerpt: card.excerpt,
       date,
       accent: meta.accent,
-      href: letterHref(id),
+      href: lensLinkById.get(id) ?? letterHref(id),
       avatarUrl: card.thumbnailUrl,
       category: letter.category ?? null,
       publishedAt: letter.published_at ?? null,
