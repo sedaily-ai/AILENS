@@ -1,31 +1,32 @@
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
-import { Amplify, type ResourcesConfig } from 'aws-amplify';
-import {
-  signInWithRedirect,
-  signOut,
-  getCurrentUser,
-  fetchAuthSession,
-  signIn,
-  signUp,
-  autoSignIn,
-  confirmSignUp,
-  resendSignUpCode,
-  resetPassword,
-  confirmResetPassword,
-  updatePassword,
-} from 'aws-amplify/auth';
-import { Hub } from 'aws-amplify/utils';
-import { authConfig } from '@/shared/config/auth';
 import { API_URL } from '@/shared/config/apiClient';
-import { authFetch } from '@/shared/lib/authFetch';
-import { PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/passwordPolicy';
+import { authFetch } from '@/shared/lib/auth/authFetch';
+import { loadAmplifyAuth } from '@/shared/lib/auth/amplifyLoader';
+import { PASSWORD_REQUIREMENT_MESSAGE } from '@/shared/lib/auth/passwordPolicy';
 
-// Configure Amplify
-Amplify.configure(authConfig as ResourcesConfig);
+// aws-amplify는 처음 쓰는 순간에만 불러와 첫 번들 크기를 줄인다. 아래 얇은 래퍼는 원래 함수와 이름·인자·반환이 같아 호출부는 그대로이며, Amplify.configure()는 로더가 처음 불러올 때 한 번 호출한다.
+type AuthApi = typeof import('aws-amplify/auth');
+function lazyAuth<K extends keyof AuthApi>(name: K) {
+  type Fn = AuthApi[K] extends (...a: infer A) => infer R ? (...a: A) => R : never;
+  return (async (...args: unknown[]) => {
+    const { auth } = await loadAmplifyAuth();
+    return (auth[name] as unknown as (...a: unknown[]) => unknown)(...args);
+  }) as unknown as Fn extends (...a: infer A) => infer R ? (...a: A) => Promise<Awaited<R>> : never;
+}
+const signInWithRedirect = lazyAuth('signInWithRedirect');
+const signOut = lazyAuth('signOut');
+const getCurrentUser = lazyAuth('getCurrentUser');
+const fetchAuthSession = lazyAuth('fetchAuthSession');
+const signIn = lazyAuth('signIn');
+const signUp = lazyAuth('signUp');
+const autoSignIn = lazyAuth('autoSignIn');
+const confirmSignUp = lazyAuth('confirmSignUp');
+const resendSignUpCode = lazyAuth('resendSignUpCode');
+const resetPassword = lazyAuth('resetPassword');
+const confirmResetPassword = lazyAuth('confirmResetPassword');
+const updatePassword = lazyAuth('updatePassword');
 
-// 이 파일이 다루는 Cognito 예외 이름 — 상수로 모아 문자열 리터럴 오타를 줄인다
-// (이슈 #20). `err.name`은 여전히 string이라 완전한 컴파일 타임 보장은 아니지만,
-// 7개 함수에 흩어져 있던 리터럴을 한 곳에서 자동완성으로 참조하게 한다.
+// 이 파일이 다루는 Cognito 예외 이름 — 상수로 모아 문자열 리터럴 오타를 줄이고 자동완성으로 참조하게 한다(`err.name`은 string이라 완전한 컴파일 타임 보장은 아니다).
 const COGNITO_ERROR = {
   USER_NOT_CONFIRMED: 'UserNotConfirmedException',
   NOT_AUTHORIZED: 'NotAuthorizedException',
@@ -44,11 +45,8 @@ interface User {
   name?: string;
   picture?: string;
   /**
-   * 구글 등 소셜 로그인으로 만들어진 계정인지. 이런 계정은 Cognito에
-   * 비밀번호 자체가 없어서 비밀번호 변경 화면을 보여줄 수 없다(이슈 #17).
-   * ID 토큰의 `identities` 클레임(연동 IdP를 통해 로그인했을 때만 존재)
-   * 유무로 판별한다 — Username이 `Google_...` 형태인 것과 같은 신호지만,
-   * 클레임 쪽이 Amplify 문서가 명시하는 공식 판별 방법이다.
+   * 구글 등 소셜 로그인으로 만들어진 계정인지 여부. 이런 계정은 Cognito에 비밀번호가 없어 비밀번호 변경 화면을 보여줄 수 없다.
+   * ID 토큰의 `identities` 클레임(연동 IdP로 로그인했을 때만 존재) 유무로 판별하며, 이는 Amplify 문서가 명시한 공식 판별 방법이다.
    */
   isFederated: boolean;
 }
@@ -58,24 +56,16 @@ interface AuthResult {
   error?: string;
   needsConfirmation?: boolean;
   /**
-   * 이 호출로 실제 로그인 세션까지 만들어졌는지. 호출자가 곧바로 홈으로
-   * 보낼지, 로그인 폼을 다시 보여줄지 판단하는 데 쓴다. 이메일 인증
-   * (`confirmSignUpCode`)은 성공했지만 autoSignIn 이 실패한 경우처럼
-   * `success: true` 이면서 `signedIn: false` 인 상태가 존재한다.
+   * 이 호출로 실제 로그인 세션까지 만들어졌는지 여부. 호출자가 홈으로 보낼지 로그인 폼을 다시 보여줄지 판단하는 데 쓴다.
+   * 이메일 인증(`confirmSignUpCode`)은 성공했지만 autoSignIn이 실패해 `success: true` 이면서 `signedIn: false`인 경우가 있다.
    */
   signedIn?: boolean;
   /**
-   * 실패 원인이 '인증 코드'인지. 비밀번호 재설정은 코드와 새 비밀번호를
-   * 하나의 API 호출(`ConfirmForgotPassword`)로 함께 보내야 하므로, 코드가
-   * 틀렸다는 사실을 새 비밀번호 화면에서야 알게 된다. 그때 호출자가
-   * 사용자를 코드 입력 단계로 되돌려보내려면 원인 구분이 필요하다.
+   * 실패 원인이 '인증 코드'인지 여부. 비밀번호 재설정은 코드와 새 비밀번호를 하나의 API 호출(`ConfirmForgotPassword`)로 보내므로 코드 오류를 새 비밀번호 화면에서야 알게 된다.
+   * 호출자가 사용자를 코드 입력 단계로 되돌리려면 원인 구분이 필요하다.
    */
   codeInvalid?: boolean;
-  /**
-   * 로그인 실패 원인이 '가입 도중 이탈(UNCONFIRMED)'인지. LoginClient가 이
-   * 값으로 에러 문구 안에 "회원가입 이어하기" 같은 실제 이동 수단을 붙일 수
-   * 있게 한다(이슈 #18 — 안내는 있는데 화면상 가까운 곳에 갈 방법이 없었다).
-   */
+  /** 로그인 실패 원인이 '가입 도중 이탈(UNCONFIRMED)'인지 여부. LoginClient가 이 값으로 에러 문구에 "회원가입 이어하기" 같은 이동 수단을 붙인다. */
   unconfirmedAccount?: boolean;
 }
 
@@ -101,9 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Sync user profile with backend.
-  // The backend now derives `user_id` from the verified JWT (`sub` claim);
-  // the body's `user_id` is ignored server-side but kept here so logs in
-  // earlier pipelines that read the JSON body still see a stable value.
+  // The backend derives `user_id` from the verified JWT (`sub` claim). The body's `user_id` is ignored server-side but kept so that earlier pipelines reading the JSON body still see a stable value.
   const syncUserProfile = useCallback(async (userData: User) => {
     try {
       await authFetch(`${API_URL}/api/user/profile`, {
@@ -134,8 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: idToken.payload.email as string,
           name: idToken.payload.name as string,
           picture: idToken.payload.picture as string,
-          // `identities` 클레임은 Google 등 연동 IdP를 거쳐 로그인했을 때만
-          // ID 토큰에 실린다 — 이메일/비밀번호 직접 가입 계정에는 없다.
+          // `identities` 클레임은 Google 등 연동 IdP로 로그인했을 때만 ID 토큰에 실리며, 이메일/비밀번호 직접 가입 계정에는 없다.
           isFederated: Boolean(idToken.payload.identities),
         };
         setUser(userData);
@@ -152,21 +139,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [syncUserProfile]);
 
   useEffect(() => {
-    checkUser();
+    // 로그인 확인은 화면이 뜬 직후(한가할 때)로 미룬다. aws-amplify를 첫 번들에서 제외했으므로 하이드레이션과 겹쳐 내려받지 않게 한다.
+    // 헤더의 "로그인" 표시는 isLoading 동안 유지되고, 확인이 끝나면 사용자 상태로 바뀐다.
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    const run = () => {
+      if (cancelled) return;
+      checkUser();
+      // Listen for auth events
+      loadAmplifyAuth()
+        .then(({ utils }) => {
+          if (cancelled) return;
+          unsubscribe = utils.Hub.listen('auth', ({ payload }) => {
+            switch (payload.event) {
+              case 'signInWithRedirect':
+                checkUser();
+                break;
+              case 'signedOut':
+                setUser(null);
+                break;
+            }
+          });
+        })
+        .catch(() => {
+          // 로드 실패 시 이벤트 구독만 포기한다. 로그인 확인(checkUser)은 위에서 이미 시도했다.
+        });
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    const idleId = ric ? ric(run, { timeout: 1200 }) : window.setTimeout(run, 300);
 
-    // Listen for auth events
-    const unsubscribe = Hub.listen('auth', ({ payload }) => {
-      switch (payload.event) {
-        case 'signInWithRedirect':
-          checkUser();
-          break;
-        case 'signedOut':
-          setUser(null);
-          break;
-      }
-    });
-
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+      if (!ric) window.clearTimeout(idleId);
+      unsubscribe?.();
+    };
   }, [checkUser]);
 
   const signInWithGoogle = async () => {
@@ -177,26 +183,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 로그인 화면에서는 이메일 인증 단계를 절대 노출하지 않는다.
-  // 인증은 회원가입 흐름에서만 끝낸다(가입 → 코드 입력 → 자동 로그인).
-  // 따라서 로그인 중 UNCONFIRMED 를 만나는 건 '가입 도중 코드 입력을 이탈한
-  // 계정' 뿐이고, 그 경우 코드 화면으로 끌고 가는 대신 회원가입을 다시
-  // 진행하라고 안내한다.
+  // 로그인 화면에서는 이메일 인증 단계를 노출하지 않으며, 인증은 회원가입 흐름(가입 → 코드 입력 → 자동 로그인)에서만 끝낸다.
+  // 따라서 로그인 중 UNCONFIRMED를 만나는 경우는 가입 도중 코드 입력을 이탈한 계정뿐이며, 이때 코드 화면으로 보내지 않고 회원가입을 다시 진행하도록 안내한다.
   //
-  // ⚠️ 2026-08-25 확인(이슈 #18) — 예전 주석은 "Cognito는 UNCONFIRMED
-  // 사용자로 재가입하면 인증 코드를 다시 발송한다"고 적혀 있었는데, 이 가정은
-  // 틀렸다. 실제로 `signUp()`을 같은 이메일로 다시 호출하면 코드 재발송 없이
-  // `UsernameExistsException`이 던져진다(CLI로 직접 재현·확인) — 즉 이 안내를
-  // 그대로 따라가면 로그인→가입→"이미 등록된 이메일"→로그인으로 되돌아가는
-  // 무한 루프에 갇혔다. 실제 자력 복구는 `signUpWithEmail`의
-  // `UsernameExistsException` 분기가 담당한다 — 거기서 `resendSignUpCode`를
-  // 먼저 시도해 UNCONFIRMED면 인증 코드를 재발송하고 인증 화면으로 보낸다.
+  // 주의: 같은 이메일로 `signUp()`을 다시 호출하면 인증 코드 재발송 없이 `UsernameExistsException`이 발생한다.
+  // 실제 복구는 `signUpWithEmail`의 `UsernameExistsException` 분기가 담당하며, 거기서 `resendSignUpCode`를 먼저 시도해 UNCONFIRMED면 인증 코드를 재발송하고 인증 화면으로 보낸다.
   const UNCONFIRMED_LOGIN_MESSAGE =
     '가입이 완료되지 않은 계정이에요. 회원가입을 다시 진행하면 인증 코드를 새로 보내드려요.';
 
-  // 로그인 실패는 항상 이 문구 하나로 통일한다(이슈 #14 — 계정 열거 방지).
-  // "등록되지 않은 이메일입니다"처럼 존재 여부를 알려주는 별도 문구를 두면
-  // 공격자가 이메일 목록을 넣어보며 가입 여부를 하나씩 확인할 수 있다.
+  // 로그인 실패는 항상 이 문구 하나로 통일한다(계정 열거 방지). 존재 여부를 알려주는 별도 문구를 두면 이메일 목록을 대입해 가입 여부를 확인할 수 있다.
   const WRONG_CREDENTIALS_MESSAGE = '이메일 또는 비밀번호가 올바르지 않습니다.';
 
   // Email/Password Sign In
@@ -221,10 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (err.name === COGNITO_ERROR.USER_NOT_CONFIRMED) {
         return { success: false, error: UNCONFIRMED_LOGIN_MESSAGE, unconfirmedAccount: true };
       }
-      // NotAuthorizedException(비밀번호 틀림)과 UserNotFoundException(미가입)을
-      // 같은 문구로 합친다 — 계정 열거 방지(이슈 #14). 그 외 알 수 없는
-      // 예외도 원본 Cognito 메시지를 그대로 노출하지 않고 이 안전한 기본
-      // 문구로 떨어진다(err.message 노출 경로 제거).
+      // NotAuthorizedException(비밀번호 틀림)과 UserNotFoundException(미가입)을 같은 문구로 합쳐 계정 열거를 막는다. 그 외 알 수 없는 예외도 원본 Cognito 메시지를 노출하지 않고 이 기본 문구로 처리한다.
       return { success: false, error: WRONG_CREDENTIALS_MESSAGE };
     }
   };
@@ -240,15 +232,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email,
             name,
           },
-          // 인증 코드 확정(confirmSignUpCode) 직후 그 자리에서 세션을 받기
-          // 위한 옵션. Amplify v6 부터 autoSignIn 은 자동 실행되지 않고
-          // COMPLETE_AUTO_SIGN_IN 단계에서 직접 호출해야 한다.
+          // 인증 코드 확정(confirmSignUpCode) 직후 그 자리에서 세션을 받기 위한 옵션. Amplify v6부터 autoSignIn은 자동 실행되지 않고 COMPLETE_AUTO_SIGN_IN 단계에서 직접 호출해야 한다.
           autoSignIn: true,
         },
       });
 
-      // 정상 경로 — 유저풀 AutoVerifiedAttributes 에 email 이 걸려 있어
-      // 가입은 항상 인증 코드 입력을 요구한다.
+      // 정상 경로 — 유저풀 AutoVerifiedAttributes에 email이 설정되어 있어 가입은 항상 인증 코드 입력을 요구한다.
       if (result.nextStep?.signUpStep === 'CONFIRM_SIGN_UP') {
         return { success: true, needsConfirmation: true };
       }
@@ -263,17 +252,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Sign up error:', error);
 
       if (err.name === COGNITO_ERROR.USERNAME_EXISTS) {
-        // 2026-08-25(이슈 #18) — 이 이메일이 UNCONFIRMED 상태로 가입 도중
-        // 이탈한 계정일 수 있다. signUp()은 UNCONFIRMED라도 무조건
-        // UsernameExistsException을 던지고 코드를 재발송하지 않는다(CLI로
-        // 확인) — signInWithEmail이 그 경우 "회원가입을 다시 진행하라"고
-        // 안내하는데, 여기서 그냥 "이미 등록된 이메일"만 보여주면 로그인↔
-        // 가입을 오가는 무한 루프에 갇힌다. resendSignUpCode를 먼저 시도해
-        // 성공하면(=UNCONFIRMED였다는 뜻) 새 가입과 동일하게 인증 화면으로
-        // 보내 루프를 끊는다 — CONFIRMED 계정에서는 resendSignUpCode 자체가
-        // InvalidParameterException("User is already confirmed")으로 실패하니
-        // "이미 가입됨" 여부를 이 분기가 새로 노출하지 않는다(계정 열거
-        // 방지, 이슈 #14와 같은 원칙).
+        // 이 이메일이 UNCONFIRMED 상태로 가입 도중 이탈한 계정일 수 있다. signUp()은 UNCONFIRMED여도 코드를 재발송하지 않고 UsernameExistsException만 던지므로,
+        // "이미 등록된 이메일"만 보여주면 로그인↔가입을 오가는 루프에 빠진다. resendSignUpCode를 먼저 시도해 성공하면(=UNCONFIRMED) 새 가입과 동일하게 인증 화면으로 보내 루프를 끊는다.
+        // CONFIRMED 계정에서는 resendSignUpCode가 InvalidParameterException("User is already confirmed")으로 실패하므로 이 분기가 가입 여부를 새로 노출하지 않는다(계정 열거 방지).
         try {
           await resendSignUpCode({ username: email });
           return { success: true, needsConfirmation: true };
@@ -296,8 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await confirmSignUp({ username: email, confirmationCode: code });
 
       if (result.isSignUpComplete) {
-        // 인증이 끝났으면 로그인 폼으로 되돌리지 않고 그 자리에서 세션을 만든다.
-        // signUp 을 autoSignIn: true 로 호출했을 때만 이 단계가 온다.
+        // 인증이 끝났으면 로그인 폼으로 되돌리지 않고 그 자리에서 세션을 만든다. signUp을 autoSignIn: true로 호출했을 때만 이 단계가 온다.
         if (result.nextStep?.signUpStep === 'COMPLETE_AUTO_SIGN_IN') {
           try {
             const autoResult = await autoSignIn();
@@ -306,9 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return { success: true, signedIn: true };
             }
           } catch (autoError) {
-            // autoSignIn 은 signUp 을 호출한 브라우저 컨텍스트에 의존한다
-            // (중간에 새로고침/탭 이동 시 실패). 인증 자체는 성공했으므로
-            // 호출자가 로그인 폼으로 돌려보내면 된다.
+            // autoSignIn은 signUp을 호출한 브라우저 컨텍스트에 의존한다(중간에 새로고침/탭 이동 시 실패). 인증 자체는 성공했으므로 호출자가 로그인 폼으로 돌려보내면 된다.
             console.error('Auto sign in after confirmation failed:', autoError);
           }
         }
@@ -351,9 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const err = error instanceof Error ? error : new Error(String(error));
       console.error('Forgot password error:', error);
 
-      // 미가입 이메일도 성공과 동일하게 처리한다(이슈 #14 — 계정 열거 방지).
-      // 코드가 실제로는 발송되지 않지만, 화면·문구는 가입된 이메일과
-      // 구분되지 않는다 — LoginClient가 그대로 resetCode 단계로 넘어간다.
+      // 미가입 이메일도 성공과 동일하게 처리한다(계정 열거 방지). 코드는 실제로 발송되지 않지만 화면·문구는 가입된 이메일과 구분되지 않으며, LoginClient가 그대로 resetCode 단계로 넘어간다.
       if (err.name === COGNITO_ERROR.USER_NOT_FOUND) {
         return { success: true };
       }
@@ -393,10 +369,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Change Password (logged-in user, knows current password) — 이슈 #17.
-  // "비밀번호 찾기"(이메일 왕복, forgotPassword)와 별개 기능이다. 기존
-  // 비밀번호를 요구하므로 메일이 개입하지 않고, Cognito 하루 발송 한도를
-  // 쓰지 않는다.
+  // Change Password (logged-in user, knows current password).
+  // "비밀번호 찾기"(이메일 왕복, forgotPassword)와 별개 기능이다. 기존 비밀번호를 요구하므로 메일이 개입하지 않고 Cognito 하루 발송 한도를 쓰지 않는다.
   const changePassword = async (oldPassword: string, newPassword: string): Promise<AuthResult> => {
     try {
       await updatePassword({ oldPassword, newPassword });

@@ -1,10 +1,9 @@
 import Link from 'next/link';
-import { AiDisclaimer } from '@/shared/ui/AiDisclaimer';
+import { AiDisclaimer } from '@/shared/ui/notice/AiDisclaimer';
 import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
 import { PrevNextLetterNav, type NeighborLetter } from './PrevNextLetterNav';
 
-// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드).
-// ── 본문 본체 이후 — 핵심 정리 + 닫는 줄 + 단어 (LetterBody 가 직접 호출) ──
+// 본문 이후 — 핵심 정리 + 닫는 줄 + 단어(LetterBody가 직접 호출).
 export function LetterTextExtras({
   letter,
   modern,
@@ -74,10 +73,7 @@ export function LetterTextExtras({
         )
       )}
 
-      {/* AI 생성 콘텐츠 고지(2026-08-21, 사용자 요청 — 서울경제 영문
-          CMS의 "AI-translated from Korean..." 박스를 레퍼런스로 "면책조항
-          걸어주세요"). 기존 "원문 보기 — 서울경제 →" 링크는 이 박스 안
-          "원문 기사 보기" 링크로 흡수. */}
+      {/* AI 생성 콘텐츠 고지 — "원문 기사 보기" 링크를 이 박스 안에 둔다. */}
       <div style={{ marginBottom: 24 }}>
         <AiDisclaimer sourceUrl={letter.source_url} articleId={letter.id} format="letter" />
       </div>

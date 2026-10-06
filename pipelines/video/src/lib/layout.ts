@@ -7,3 +7,9 @@ export const useScale = (): number => {
   const { width, height } = useVideoConfig();
   return Math.min(width, height) / BASE_UNIT;
 };
+
+// 세로(쇼츠)면 왼쪽 정렬 에디토리얼 배치, 가로(웹 롱폼)면 가운데 정렬 배치.
+export const useIsVertical = (): boolean => {
+  const { width, height } = useVideoConfig();
+  return height > width;
+};

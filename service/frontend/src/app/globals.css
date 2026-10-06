@@ -110,3 +110,28 @@ body {
     display: none;
   }
 }
+
+/* ── 기본 상호작용 피드백(2026-10-04, "호버 효과가 없는 곳 찾기") ──
+   전수 점검에서 hover 반응이 전혀 없는 링크·버튼이 81개 파일 218곳이었다. 곳곳을 고치기 전에 바닥을 한 번 깔아 둔다.
+   - :where()로 우선순위 0 — 컴포넌트가 자기 hover/active를 가진 곳(Tailwind hover:, 전용 CSS)은 그대로 이긴다.
+   - 마우스가 있는 기기(hover:hover)에서만 hover를 건다(터치에선 "눌린 채 남는 hover"를 막는다). 누름(active)·키보드 포커스는 모든 기기.
+   - 링크: 살짝 투명해지며 반응. 버튼: 살짝 어두워지고, 누르면 눌린 듯 작아진다(토스식 누름 감각).
+   - 이미 전용 hover를 가진 클래스 접두사(ar-/pn-/dr-/lz-/pp-/ah-)와 data-fx="own" 표시는 제외. */
+:where(a[href], button, [role='button'], summary) {
+  transition: opacity .15s ease, filter .15s ease, transform .15s cubic-bezier(.22, .8, .22, 1), background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+:where(button:not(:disabled), [role='button']):not([data-fx='own']):not([class^='ar-'], [class*=' ar-'], [class^='pn-'], [class*=' pn-'], [class^='dr-'], [class*=' dr-'], [class^='lz-'], [class*=' lz-']):active {
+  transform: scale(.97);
+}
+@media (hover: hover) and (pointer: fine) {
+  :where(a[href]):not([data-fx='own'], [class*='hover:'], [class^='ar-'], [class*=' ar-'], [class^='pn-'], [class*=' pn-'], [class^='dr-'], [class*=' dr-'], [class^='lz-'], [class*=' lz-'], [class^='ah-'], [class*=' ah-'], [class^='pp-'], [class*=' pp-'], .skip-link):hover {
+    opacity: .78;
+  }
+  :where(button:not(:disabled)):not([data-fx='own'], [class*='hover:'], [class^='ar-'], [class*=' ar-'], [class^='pn-'], [class*=' pn-'], [class^='dr-'], [class*=' dr-'], [class^='lz-'], [class*=' lz-']):hover {
+    filter: brightness(.94);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(a[href], button, [role='button'], summary) { transition: none; }
+  :where(button, [role='button']):active { transform: none; }
+}

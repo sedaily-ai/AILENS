@@ -16,12 +16,10 @@ function cacheKey(text: string, voice: TtsVoiceConfig): string {
     .slice(0, 24);
 }
 
-// 2026-09-24, Remotion Lambda 전환(render-lambda.ts) — Lambda 렌더는 각
-// 프레임 구간이 별도 함수 인스턴스에서 실행돼 로컬 public/audio/ 번들에
-// 의존할 수 없다(사이트가 배포 시점에 한 번 번들돼 여러 렌더에 재사용되므로
-// 요청마다 생성되는 오디오를 번들에 끼워 넣을 수 없음). S3에 올려 절대
-// URL로 참조하면 어느 Lambda 인스턴스에서든 접근 가능 — 로컬 Fargate 렌더
-// (render.ts)는 기존처럼 staticFile() 상대경로를 그대로 쓴다.
+// Remotion Lambda 렌더(render-lambda.ts)는 프레임 구간마다 별도 함수 인스턴스에서 실행돼 로컬
+// public/audio/ 번들에 의존할 수 없다(사이트는 배포 시점에 한 번 번들돼 여러 렌더에 재사용되므로
+// 요청별 오디오를 끼워 넣을 수 없다). S3에 올려 절대 URL로 참조하면 어느 인스턴스에서든 접근할 수 있다.
+// 로컬 Fargate 렌더(render.ts)는 staticFile() 상대경로를 쓴다.
 export type AudioUploadTarget = { bucket: string; keyPrefix: string };
 
 let cachedS3Client: S3Client | null = null;
@@ -80,13 +78,9 @@ export type ResolveProgress = {
   duration: number;
 };
 
-// 2026-09-24, 사용자 요청("동영상 생성이 더 빨라지면 생성할 맛 날 것
-// 같은데") — 조사로 확인한 실측: 9컷 순차 처리에 58초(컷당 4~10초,
-// 네트워크 왕복 TTS API 호출이라 CPU와 무관하게 그냥 대기 시간). 워커
-// 풀로 동시 처리한다 — 무제한 Promise.all이 아니라 4로 제한한 이유는
-// ElevenLabs(video_settings에서 프로덕션 발행용으로 선택 가능, tts.ts
-// 참고)의 요금제별 동시 요청 한도를 넘겨 429가 나는 걸 피하기 위함
-// (Polly는 이보다 한도가 넉넉해서 문제없음, 더 낮은 공통분모에 맞춤).
+// 컷별 TTS는 네트워크 왕복 대기라 순차 처리하면 느리다(9컷 순차 58초 실측, 컷당 4~10초).
+// 워커 풀로 동시 처리하되, ElevenLabs(tts.ts 참고)의 요금제별 동시 요청 한도를 넘겨 429가 나지
+// 않도록 무제한 Promise.all이 아니라 4로 제한한다(Polly는 한도가 더 넉넉해 낮은 쪽에 맞춘다).
 const TTS_CONCURRENCY = 4;
 
 // script의 각 컷 narration을 TTS로 합성하고(캐시되어 있으면 재사용),

@@ -6,80 +6,11 @@
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
-import { letterHref } from '@/shared/lib/letterHref';
-import { lensPath } from '@/shared/lib/lensUrl';
-
-// 이미지 채널 — 코드 렌더용 차트 데이터 (레터 실수치, AI 생성 아님).
-export interface LetterChart {
-  title: string;
-  unit: string;
-  series: Array<{ label: string; value: number }>;
-}
-
-// 본문 중간 이미지. url 만 필수, 나머지 옵션.
-// 여러 장이면 배열 순서대로 세로 스택 렌더.
-export interface LetterImage {
-  url: string;
-  alt?: string;
-  caption?: string;
-  credit?: string;
-  // 이미지 비율 힌트 (e.g., '16/9', '4/3', '1/1'). 미지정 시 자연 비율.
-  aspect?: string;
-}
-
+import { displayHeadline, headlineSection } from '@/shared/lib/content/displayHeadline';
+import { letterHref } from '@/shared/lib/content/letterHref';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import type { ApiLetter } from "./letterTypes";
 // API 응답 스키마 (backend/v2/handlers/today_letters.py 와 1:1)
-export interface ApiLetter {
-  id: string;
-  editor_id: string;
-  article_id: string;
-  secondary_article_ids: string[];
-  archetype: string | null;
-  theme: string | null;
-  headline: string;
-  subtitle: string | null;
-  closing_line: string | null;
-  body: string[];
-  // CMS 글(admin PostForm "post" 모드)이 Tiptap 리치텍스트로 쓴 경우만 존재.
-  // 있으면 body[] 대신 이 HTML 을 그대로 렌더한다 (굵게·글머리·이미지 위치 보존).
-  body_html?: string | null;
-  key_points: string[];
-  keywords: Array<{ term: string; explain: string }>;
-  chart?: LetterChart; // 이미지 채널 데이터 시각화 (옵션)
-  images?: LetterImage[]; // 본문 중간 실 이미지 (옵션, chart 보다 우선)
-  // article_id 기반 자동 생성이 안 되는 레터를 위해 admin 이 수동 업로드한 팟캐스트 URL.
-  podcast_audio_url?: string | null;
-  // 피드 카드 썸네일 (CMS 글 전용 — admin에서 지정 안 하면 null, 에디터 아바타로 폴백).
-  cover_image_url?: string | null;
-  // 텍스트 없는 순수 기사 사진(v1.32) — channel=letters 조회가 lens 글도
-  // 같이 돌려주는데(letter 포맷 rendition 기준), cover_image_url이 그
-  // 글의 웹툰 첫 컷인 경우가 대부분이라 카드 썸네일에 쓰면 안 된다
-  // (shape_lens의 동일 필드·CmsLens.photo_image_url과 같은 이유).
-  photo_image_url?: string | null;
-  // 원문 기사 URL — 서울경제 원본 취재 기사 링크(2026-08-13, SEO/GEO/AEO 감사 —
-  // "취재된 원본을 바탕으로" 라는 JSON-LD 소개를 실제로 검증 가능하게 만든다).
-  // admin이 안 채우면 null.
-  source_url?: string | null;
-  // 채널 목록 조회(fetchCmsPosts)로 여러 날짜가 섞여 나올 때만 필요 —
-  // fetchTodayLetters(date) 호출부는 이미 date 를 알고 있어 안 씀.
-  publish_date?: string | null;
-  // /letters 아카이브 필터용 가벼운 태그 — channel(letters)은 그대로 두고
-  // "트렌드"/"인기 칼럼"/"이슈 톡톡"으로도 분류하고 싶을 때만 admin 이 지정
-  // (issue_talk 은 2026-08-12 재작업 — 별도 채널에서 이 분류값으로 되돌림,
-  // 2026-08-12 재부활).
-  section?: 'trend' | 'column' | 'issue_talk' | null;
-  // section 이 trend/column 일 때 홈 카드 상단 라벨(예: "증시", "투자 인사이트").
-  // admin PostForm이 지정하지 않으면 null — 호출측이 editor_id 등으로 폴백.
-  category?: string | null;
-  // 마지막 수정 시각(ISO, 2026-08-18 공개 API에 추가) — JSON-LD dateModified가
-  // 항상 datePublished와 같은 값이던 문제를 고치려고 노출. admin이 글을
-  // 만들 때부터 항상 채워지는 필드라(admin/backend/repo/posts_repo.py) CMS
-  // 글이면 사실상 항상 존재한다.
-  updated_at?: string | null;
-  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, kstDateTimeLabel()로 시:분까지
-   *  표기. 없으면(옛 글) publish_date만 폴백. */
-  published_at?: string | null;
-}
 
 export interface ApiTodayLettersResponse {
   date: string;
@@ -96,8 +27,7 @@ export interface DisplayLetter extends ApiLetter {
   accentBg: string;
 }
 
-// 단일 명의 — MBTI 4-페르소나 에디터 체계 폐지(2026-08-07) 이후 모든 레터가
-// 이 표시 정보를 공유한다. 백엔드 EDITORIAL_BYLINE("서울경제 편집부")과 같은 톤.
+// 단일 명의: 모든 레터가 이 표시 정보를 공유한다. 백엔드 EDITORIAL_BYLINE("서울경제 편집부")과 같은 톤이다.
 const DEFAULT_META: Omit<DisplayLetter, keyof ApiLetter> = {
   editorName: 'AI LENS',
   editorRole: '팀이 함께 정리했어요',
@@ -110,13 +40,8 @@ export function withDisplayMeta(letter: ApiLetter): DisplayLetter {
   return { ...letter, ...DEFAULT_META };
 }
 
-// 진행 중 요청 묶기(in-flight coalescing) — 같은 date 를 여러 곳(FollowingFeed
-// lookback, SideRail, NewsletterCTA 등)이 동시에 부를 때 fetch 를 하나로
-// 공유한다. **시간 기반 캐시가 아니다** — 응답이 오는 즉시 지운다. 다음
-// 호출은 항상 새 네트워크 요청이라 admin 발행/수정/삭제가 즉시 반영된다
-// (2026-08-08, "무조건 실시간성" 요구 — sessionStorage 에 결과를 남겨뒀던
-// 이전 버전은 탭을 새로고침해도 옛 값이 몇 분간 남아있어 삭제한 글이 계속
-// 보이는 문제가 있었다. cmsPostsApi.ts 의 동일 패턴 참조).
+// 진행 중 요청 묶기(in-flight coalescing). 같은 date를 여러 곳이 동시에 부를 때 fetch를 하나로 공유하며,
+// 시간 기반 캐시가 아니라 응답이 오면 즉시 지운다(admin 발행/수정/삭제가 즉시 반영된다. cmsPostsApi.ts의 동일 패턴 참조).
 const lettersCache = new Map<string, Promise<ApiTodayLettersResponse>>();
 
 export async function fetchTodayLetters(date?: string): Promise<ApiTodayLettersResponse> {
@@ -131,31 +56,22 @@ export async function fetchTodayLetters(date?: string): Promise<ApiTodayLettersR
 }
 
 async function fetchTodayLettersLive(date: string | undefined): Promise<ApiTodayLettersResponse> {
-  // 라이브 단일 소스 (mock fallback 제거 2026-07-24). 해당 날짜에 레터가
-  // 없으면 letters:[] — 호출측이 빈 상태/직전일 lookback 처리.
+  // 라이브 단일 소스. 해당 날짜에 레터가 없으면 letters:[]이며 호출측이 빈 상태/직전일 lookback을 처리한다.
   //
-  // 2026-09-03 — today-letters API 호출 자체를 제거했다. 이 엔드포인트는
-  // 2026-08-04 RDS 삭제로 영구히 빈 응답만 주는 죽은 경로였고(CLAUDE.md
-  // 참조), 태그 없는 `next: { revalidate: 60 }` fetch라 이 함수를 호출하는
-  // 모든 페이지(홈·/lens·/lens/[slug]·/letters/[id]·카테고리)의 실효 ISR
-  // TTL을 조용히 60초로 깔아뭉개고 있었다(ISR 재설계 감사로 발견) — 실제
-  // 콘텐츠는 옆의 태그 달린 fetchCmsPosts('letters', date) 호출이 이미 전부
-  // 담당하므로, 죽은 fetch를 지우고 빈 응답을 로컬에서 바로 구성한다.
+  // today-letters API는 호출하지 않는다. 이 엔드포인트는 RDS 삭제로 항상 빈 응답이며(CLAUDE.md 참조),
+  // 태그 없는 `next: { revalidate: 60 }` fetch는 이 함수를 쓰는 모든 페이지의 ISR TTL을 60초로 낮춘다.
+  // 실제 콘텐츠는 태그가 달린 fetchCmsPosts('letters', date)가 담당한다.
   const cmsPosts = await fetchCmsPosts('letters', date);
   const data: ApiTodayLettersResponse = { date: date ?? '', mode: null, letters: [] };
 
-  // 관리자가 쓴 글을 앞에 배치 — 편집 의도가 AI 레터보다 우선한다.
+  // 관리자가 쓴 글을 앞에 배치한다(편집 의도가 AI 레터보다 우선).
   return cmsPosts.length
     ? { ...data, letters: [...cmsPosts, ...data.letters] }
     : data;
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// TodayLetterCard 매핑 (mockTodayFeed.ts 와 동일 schema)
-//
-// FollowingFeed / 다른 곳의 mock 자리에 그대로 끼울 수 있도록 1:1 변환.
-// mock 만 알던 deliveryHint 같은 메타는 페르소나별 고정값으로 fallback.
-// ──────────────────────────────────────────────────────────────────────────
+// TodayLetterCard 매핑 (mockTodayFeed.ts 와 동일 schema).
+// mock 자리에 그대로 끼울 수 있도록 1:1 변환하며, mock에만 있던 deliveryHint 같은 메타는 페르소나별 고정값으로 fallback한다.
 
 const DOW_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -201,10 +117,8 @@ function firstProseLine(body: string[]): string {
   return '';
 }
 
-// firstProseLine은 body[] 안에서 마커를 걸러내는데, subtitle 필드 자체에
-// "[주요 이슈 브리핑] ■ ..." 처럼 마커가 그대로 박혀 오는 경우는 안 걸러졌다
-// — "이슈 톡톡" 카드 설명글만 내부 포맷이 그대로 노출돼 정제 안 된 느낌을
-// 준다는 지적(2026-08-06)으로 발견. subtitle에도 같은 마커 제거를 적용.
+// firstProseLine은 body[]의 마커를 거르지만 subtitle 필드에 "[주요 이슈 브리핑] ■ ..." 같은 마커가 그대로 올 수 있다.
+// subtitle에도 같은 마커 제거를 적용한다.
 function stripLeadingMarkers(s: string): string {
   let t = s.trim();
   for (let i = 0; i < 3; i++) {
@@ -228,17 +142,14 @@ function truncate(s: string, max: number): string {
   return t.length <= max ? t : `${t.slice(0, max).trimEnd()}…`;
 }
 
-// CMS(admin PostForm "post" 모드)로 쓴 글은 body[] 가 비어있고 body_html 만
-// 채워진다 — 그 경우 firstProseLine(body) 는 빈 배열이라 항상 '' 를 반환해서
-// excerpt 가 비어 보였다. 태그만 걷어내고 평문으로 붙인다(마커 파싱 불필요 —
-// CMS 는 실제 <h2>/<strong> 태그를 쓰지 텍스트 마커를 안 씀).
+// CMS(admin PostForm "post" 모드) 글은 body[]가 비고 body_html만 채워져 firstProseLine(body)가 항상 ''를 반환한다.
+// 태그만 걷어내고 평문으로 붙인다(CMS는 텍스트 마커 없이 실제 <h2>/<strong> 태그를 쓴다).
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function estimateReadMinutes(body: string[], bodyHtml?: string | null): number {
-  // 한국어 분당 약 600 자. body_html(CMS 리치텍스트)이 있으면 태그를 걷어내고 센다 —
-  // body[] 는 그 경우 비어있어서(admin PostForm "post" 모드) 그대로 두면 항상 최솟값이 나온다.
+  // 한국어 분당 약 600자. body_html(CMS 리치텍스트)이 있으면 태그를 걷어내고 센다(그 경우 body[]가 비어 있다).
   const chars = bodyHtml
     ? bodyHtml.replace(/<[^>]+>/g, '').length
     : body.reduce((sum, p) => sum + p.length, 0);
@@ -247,10 +158,8 @@ function estimateReadMinutes(body: string[], bodyHtml?: string | null): number {
 
 export interface TodayLetterCardLike {
   letterId: string;
-  // 상세로 이동할 링크(2026-09-03, letters→lens 전환) — 소스에 따라
-  // /letters/{id} 또는 /lens/{id}로 갈리므로, 호출부가 letterHref()를
-  // 직접 부르지 않고 이 값을 그대로 쓴다. 어댑터(toTodayLetterCard/
-  // toLensLetterCard)가 채운다.
+  // 상세로 이동할 링크. 소스에 따라 /letters/{id} 또는 /lens/{id}로 갈리므로 호출부는 letterHref()를 직접 부르지 않고
+  // 이 값을 쓴다(어댑터 toTodayLetterCard/toLensLetterCard가 채운다).
   href: string;
   editorId: string;
   editorName: string;
@@ -263,12 +172,14 @@ export interface TodayLetterCardLike {
   accentBg: string;
   title: string;
   subtitle: string;
-  // subtitle 이 있으면 그걸, 없으면 본문 첫 문장을 200자까지 — 카드 요약용.
+  // subtitle이 있으면 그것을, 없으면 본문 첫 문장을 200자까지 쓴다(카드 요약용).
   excerpt: string;
   readMinutes: number;
   deliveryHint: string;
   dateLabel: string;
   newsId: string;
+  /** 분류 라벨(증시·산업 등) — 레일의 작은 라벨용. 분류가 없는 글은 비운다. */
+  category?: string | null;
 }
 
 export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayLetterCardLike {
@@ -280,8 +191,7 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
     editorName: meta.editorName,
     editorRole: meta.editorRole,
     editorAvatar: meta.editorAvatar,
-    // v1.32 — photo_image_url(진짜 기사 사진) 우선, cover_image_url(웹툰
-    // 첫 컷일 수 있음)은 폴백만. toLensLetterCard()와 같은 우선순위.
+    // photo_image_url(실제 기사 사진)을 우선하고 cover_image_url(웹툰 첫 컷일 수 있음)은 폴백으로만 쓴다. toLensLetterCard()와 같은 우선순위.
     thumbnailUrl: letter.photo_image_url || letter.cover_image_url || null,
     archetype: letter.archetype ?? meta.editorRole,
     accent: meta.accent,
@@ -300,13 +210,8 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
   };
 }
 
-// 2026-09-03(ISR 재설계 감사로 발견) — letters 채널은 2026-08-12 이후
-// 자동 파이프라인 신규 발행이 없다(레터 포맷이 lens.lenses[]로 완전히
-// 흡수됨, frontpage_auto/mustknow_auto 둘 다 channels:["lens"]만 씀).
-// HotLettersRail·NewsletterCTA·온보딩 샘플이 위 toTodayLetterCard 경로로
-// 14일 룩백을 쓰고 있었는데, 22일째 신규 발행이 없어 매번 룩백 초과 —
-// 에러 없이 조용히 빈 화면을 렌더링해왔다. lens(내부 letter 포맷, 항상
-// lenses[0] — LENS_FORMATS 순서)를 대체 소스로 쓴다.
+// letters 채널은 자동 파이프라인 신규 발행이 없다(레터 포맷이 lens.lenses[]로 흡수됨). 따라서 룩백 방식은 빈 화면이 되므로
+// lens(내부 letter 포맷, 항상 lenses[0], LENS_FORMATS 순서)를 대체 소스로 쓴다.
 export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
   const meta = DEFAULT_META;
   const letterFormat = lens.lenses?.[0];
@@ -329,28 +234,23 @@ export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
     deliveryHint: '오늘 발행',
     dateLabel: formatDateLabel(lens.date),
     newsId: lens.id,
+    category: lens.category ?? headlineSection(lens.headline),
   };
 }
 
-// 최신 레터 카드 목록 — 지금은 HotLettersRail("요즘 가장 많이 읽힌 글") 하나만
-// 쓴다. 원래 이름·주석은 홈 "이슈 톡톡"(FollowingFeed) 섹션 전용이던 시절
-// 것인데, 그 섹션은 2026-08-17 홈 개편으로 카테고리 기반 구조에 흡수됐다
-// (NewsFeedTab.tsx 참조) — 함수 자체는 그대로 재사용 중이라 이름은 남겨둔다.
+// 최신 레터 카드 목록. 현재 HotLettersRail("요즘 가장 많이 읽힌 글")이 쓴다. 이름은 홈 "이슈 톡톡"(FollowingFeed) 시절의 것이다.
 const FOLLOWING_MAX_DISPLAY = 4;
 
-// limit 파라미터화(2026-08-10) — 홈 "이슈 톡톡" 섹션은 4개, 사이드바 "요즘
-// 가장 많이 읽힌 글"은 같은 이슈 톡톡 분류를 5개까지 보여달라는 요청으로
-// 상한을 호출부가 고를 수 있게 뺐다. 기본값은 기존 FollowingFeed 동작 유지.
-//
-// 2026-09-03 — letters 대신 lens를 소스로 쓴다(toLensLetterCard 주석
-// 참조). fetchLensPosts()가 이미 최신순 정렬로 내려주므로 날짜별
-// 역순 조회 루프 자체가 필요 없어졌다 — 단순 slice.
+// limit은 호출부가 고르며 기본값은 기존 동작을 유지한다.
+// letters 대신 lens를 소스로 쓴다(toLensLetterCard 주석 참조). fetchLensPosts()가 최신순으로 내려주므로 단순 slice로 충분하다.
 export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLAY): Promise<TodayLetterCardLike[]> {
   try {
-    const posts = await fetchLensPosts(limit);
-    return posts.slice(0, limit).map(toLensLetterCard);
+    // 분류(증시·산업 등)가 있는 글만 홈과 같은 최신 100건 캐시에서 고른다(레일 라벨이 항상 붙고 요청도 추가되지 않는다).
+    const posts = await fetchLensPosts(100);
+    return posts.filter((p) => p.category || headlineSection(p.headline)).slice(0, limit).map(toLensLetterCard);
   } catch {
     return [];
   }
 }
 
+export type { LetterChart, LetterImage, ApiLetter } from "./letterTypes";

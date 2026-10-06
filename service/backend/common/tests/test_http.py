@@ -1,8 +1,6 @@
 """common/http.py — CORS 중립 응답 빌더.
 
-Run from service/backend/::
-
-    python3 -m pytest common/tests/test_http.py -v
+실행: cd service/backend && python3 -m pytest common/tests/test_http.py -v
 """
 from __future__ import annotations
 

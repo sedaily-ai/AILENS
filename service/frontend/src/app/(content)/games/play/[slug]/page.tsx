@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import GamePlayClient from './GamePlayClient';
-// 게임 목록은 shared/data/games.ts 가 단일 출처다. 이 파일이 `export const GAMES`
-// 로 들고 있던 걸 옮겼다(2026-08-25) — page 모듈은 Next 가 정한 이름만 export
-// 할 수 있어서 임의 이름 `GAMES` 가 프로덕션 빌드의 타입 검사를 실패시켰다.
-// 자세한 경위는 그 파일 상단 주석 참조.
+// 게임 목록은 shared/data/games.ts가 단일 출처이다. page 모듈은 Next가 정한 이름만 export할 수 있어 임의 이름 `GAMES`를 export하면 프로덕션 빌드의 타입 검사가 실패한다.
 import { GAMES, GAMES_BY_SLUG } from '@/shared/data/games';
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -44,10 +41,7 @@ export async function generateMetadata({
   };
 }
 
-// VideoGame + BreadcrumbList(2026-08-14, SEO 감사 — 이 라우트만 JSON-LD가
-// 없던 걸 발견). 브라우저에서 바로 도는 H5 게임이라 applicationCategory를
-// Game으로, operatingSystem을 "Any"로 명시 — 설치가 아니라 웹에서 즉시
-// 플레이한다는 신호.
+// VideoGame + BreadcrumbList. 브라우저에서 바로 도는 H5 게임이므로 applicationCategory는 Game, operatingSystem은 "Any"로 명시해 설치 없이 웹에서 즉시 플레이한다는 신호를 준다.
 function buildJsonLd(slug: string, title: string) {
   const url = `${SITE_URL}/games/play/${slug}`;
   return {

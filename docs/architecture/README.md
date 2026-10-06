@@ -26,6 +26,8 @@
 | `AWS_BACKEND_ARCHITECTURE.md` | AWS 리소스 전체 인벤토리 |
 | `admin-stack.md` | 어드민 콘솔 스택 |
 | `배포_스크립트_지도.md` | 서비스·CMS·파이프라인 배포 스크립트와 대상, 사용 여부, 옛 Lambda 호출 현황 |
+| `웹툰_합성_파이프라인.md` | 웹툰 생성·합성(말풍선 배치·Rekognition·웹툰식 모드·나레이션/핵심 정리 카드)의 현재 구조, 설정 위치, 운영 메모, 한계. 개발 과정은 worklog `2026-10-02-웹툰-합성-고도화-버전별-개발기록.md` |
+| `웹툰_독자지표_계측.md` | 웹툰 독자 지표(시작·컷별 도달·완주·이어 읽기)를 GA4로 재는 이벤트·정의·설정·해석 주의 |
 | `voice-conversation-architecture.md` | 음성 대화 아키텍처 |
 | `소스-없는-배포본.md` | AWS 에 살아있지만 소스가 이 레포에 없는 정적 사이트 2개 — 어디서 복원하나 |
 | `lens-erd-src/`, `lens-postgres-erd.html` | PostgreSQL 이관 검토용 스키마 설계(개념·논리·물리 단계별) — 아직 프로덕션 미반영, `lens-erd-src/README.md` 참조 |

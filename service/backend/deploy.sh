@@ -1,22 +1,13 @@
 #!/bin/bash
 # Deploy Script for Sedaily-MBTI Backend
 #
-# ⚠ 이름 주의(2026-10-01) — 이 스크립트는 "옛 Lambda API"(sedaily-mbti-*-dev) 배포용이다.
-# 지금 서비스의 공개 API(/api/v2/posts*)는 service/lens-cms-api(EC2, PM2)가 서빙하고
-# 그쪽 배포는 service/lens-cms-api/deploy.sh 다. 이 Lambda들은 일부(검색·피드·타임라인·
-# 퀴즈 등)가 아직 호출되고 있어 현역이다 — 전체 지도는 docs/architecture/배포_스크립트_지도.md.
-# Builds and deploys Lambda functions for MBTI news style transformation.
+# 대상: 레거시 Lambda API(sedaily-mbti-*-dev). 공개 API(/api/v2/posts*)는
+# service/lens-cms-api(EC2, PM2)가 서빙하며 배포는 service/lens-cms-api/deploy.sh 가 담당한다.
+# 이 Lambda 중 검색·피드·타임라인 등 일부는 현재도 호출된다.
+# 전체 배포 스크립트 지도: docs/architecture/배포_스크립트_지도.md
 #
-# 2026-08-05: v1/v2 소스 통합 — 예전에 별도였던 deploy-v2.sh(별도 zip, 별도
-# 함수 그룹)를 이 스크립트 하나로 합쳤다. 소스 트리가 이미 하나로 합쳐졌으니
-# (newsletter/, clients/*_v2_client.py 등이 이 루트로 이동) 배포도 zip 하나,
-# 스크립트 하나면 충분하다. Lambda 함수 이름 자체는 바꾸지 않았다 —
-# `sedaily-mbti-v2-*-dev` 로 이미 배포되어 있는 이름 그대로 사용.
-#
-# 같은 날, 자동 수집→AI 생성 파이프라인(Collector/Editor Pick/Core 3 개인화)이
-# 폐기 결정나며 core25/, core3/ 와 관련 핸들러가 전부 삭제됐다 — 콘텐츠는 이제
-# 관리자 대시보드 수동 업로드(handlers/cms_posts_public.py, DynamoDB 기반)로
-# 대체된다. `cron` 배포 타깃도 그래서 없다.
+# 단일 zip 으로 모든 함수에 배포하며, Lambda 함수 이름은 `sedaily-mbti-v2-*-dev` 등 기존 이름을 유지한다.
+# 콘텐츠는 관리자 대시보드 수동 업로드(handlers/content/cms_posts_public.py)로 공급하므로 `cron` 배포 타깃은 없다.
 #
 # Usage:
 #   ./deploy.sh           — Deploy all functions (= api, 현재는 동의어)
@@ -59,9 +50,9 @@ pip3 install \
   --quiet
 
 # Copy source code modules
-# newsletter/ 는 옛 v2 소스 통합분 (2026-08-05) — handlers/subscribe.py 가 사용.
+# newsletter/ 는 handlers/content/subscribe.py 가 사용한다.
 echo "  -> Copying source code..."
-for dir in clients handlers config core models repositories services utils common newsletter; do
+for dir in clients handlers config core models repositories services common newsletter; do
   if [ -d "$dir" ]; then
     echo "    -> $dir/"
     cp -r "$dir" lambda-build/
@@ -84,7 +75,20 @@ echo "  -> Cleaning up unnecessary files..."
 find lambda-build -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find lambda-build -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 find lambda-build -type f -name "*.pyc" -delete 2>/dev/null || true
-# infrastructure/ is NOT copied (only used for CloudFormation/Step Functions)
+# infrastructure/ 는 패키지에 포함하지 않는다.
+
+# 레거시 핸들러 경로 shim: handler 설정이 아직 이전 경로인 Lambda가 코드 갱신 직후 깨지지 않도록 패키징 시에만 생성한다.
+# Step 3 에서 handler 설정을 새 경로로 변경하면 shim 은 호출되지 않는다.
+echo "  -> Generating legacy handler shims..."
+grep -v '^#' lambda_handlers.txt | while read -r _fn OLD_MOD NEW_MOD; do
+  [ -z "$OLD_MOD" ] && continue
+  OLD_PATH="lambda-build/$(echo "$OLD_MOD" | tr . /).py"
+  OLD_DIR="$(dirname "$OLD_PATH")"
+  mkdir -p "$OLD_DIR"
+  # 레거시 패키지 디렉터리(handlers/voice, handlers/websocket)에 __init__.py 를 생성한다
+  [ -f "$OLD_DIR/__init__.py" ] || touch "$OLD_DIR/__init__.py"
+  printf 'from %s import lambda_handler  # noqa: F401  (전환용 shim)\n' "$NEW_MOD" > "$OLD_PATH"
+done
 
 # Create ZIP package
 echo "  -> Creating ZIP package..."
@@ -120,8 +124,7 @@ API_FUNCTIONS=(
   "sedaily-mbti-article-dev"
   "sedaily-mbti-chatbot-dev"
   "sedaily-mbti-time-machine-dev"
-  # 빅카인즈 기반 타임라인 (handlers/timeline_handler.py). 함수가 아직 없으면
-  # 아래 배포 루프가 [SKIP] 으로 조용히 건너뛴다.
+  # S3 XML 기반 타임라인. 함수가 없으면 배포 루프가 [SKIP] 처리한다.
   "sedaily-mbti-timeline-dev"
   "sedaily-mbti-s3-articles-dev"
   "sedaily-mbti-user-dev"
@@ -135,35 +138,20 @@ API_FUNCTIONS=(
   "sedaily-mbti-voice-stt-presign-dev"
   "sedaily-mbti-voice-tts-dev"
 )
-# 2026-09-04 — "sedaily-mbti-newsletter-subscribe-dev"(handlers/newsletter/
-# subscribe.py) 제거. 리팩토링 감사로 이 핸들러가 handlers/subscribe.py
-# (sedaily-mbti-v2-subscribe-dev, 아래 API_V2_FUNCTIONS)와 완전히 독립된
-# 중복 구현이었던 게 드러나 subscribe.py로 통합하고 소스 파일은 삭제했다.
-# ⚠️ 배포된 Lambda 함수·API Gateway 라우트(/api/newsletter/subscribe)
-# 자체는 아직 안 지웠다 — 이 배포 루프에서 빠졌으니 더 이상 코드 업데이트는
-# 안 되지만, AWS 자원 실삭제는 별도 확인 후 진행할 것.
+# newsletter-subscribe Lambda 는 handlers/content/subscribe.py 로 통합되어 배포 대상에서 제외했다.
+# 배포된 Lambda 함수와 API Gateway 라우트(/api/newsletter/subscribe)는 별도 확인 후 삭제한다.
 
-# --- API Functions (원래 v2 이름, 2026-08-05 소스 통합 — 함수명은 그대로) ---
+# --- API Functions (v2 이름) ---
 API_V2_FUNCTIONS=(
   "sedaily-mbti-v2-health-dev"
-  "sedaily-mbti-v2-today-letters-dev"  # 오늘의 한 통 GET API (handlers/today_letters.py)
-  "sedaily-mbti-v2-subscribe-dev"      # 구독/수신거부 (handlers/subscribe.py)
-  # sedaily-mbti-v2-front-page-dev(지면 1면)는 2026-08-06 소스 삭제 —
-  # pgvector RDS(v1·v2 둘 다) 계정에서 완전히 사라짐 확인, 재구축 필요해지면
-  # 그때 다시 설계. AWS Lambda 함수/API Gateway 라우트 자체는 수동 정리 전까지
-  # 남아있을 수 있음(더 이상 이 배포 대상에서 코드 업데이트 안 됨).
-  "sedaily-mbti-v2-posts-dev"          # CMS 글 공개 조회 (handlers/cms_posts_public.py)
-  "sedaily-mbti-v2-quiz-dev"           # 용어 퀴즈 공개 조회/응답 (handlers/quiz_public.py, 2026-08-09 신규)
+  "sedaily-mbti-v2-today-letters-dev"  # 오늘의 한 통 GET API (handlers/content/today_letters.py)
+  "sedaily-mbti-v2-subscribe-dev"      # 구독/수신거부 (handlers/content/subscribe.py)
+  "sedaily-mbti-v2-posts-dev"          # CMS 글 공개 조회 (handlers/content/cms_posts_public.py)
+  # front-page·quiz Lambda 는 소스가 삭제되어 배포 대상에서 제외했다. 남은 함수와 라우트는 수동 정리한다.
 )
 
 # --- Pipeline Functions ---
-# 2026-07-30: v1 Step Functions 파이프라인(step1~4 + supervisor)과 상태머신
-# sedaily-mbti-transform-pipeline-dev 를 폐기했다.
-# 2026-08-05: 자동 수집→AI 생성 파이프라인(v2 collector/editor-pick/개인화 feed·article)도
-# 전부 폐기 — RDS 삭제로 매일 조용히 실패하고 있었고, 콘텐츠는 관리자 대시보드 수동
-# 업로드로 대체하기로 결정. 관련 Lambda(sedaily-mbti-v2-collector-dev,
-# -editor-pick-dev, -feed-dev, -article-dev)는 이 배포 대상에서 제외됐다 — 소스가
-# 삭제됐을 뿐 AWS 쪽 Lambda 함수 자체는 아직 남아있을 수 있음(수동 정리 필요).
+# 자동 수집·생성 파이프라인 Lambda 는 폐기되어 배포 대상에서 제외했다. 남은 AWS 리소스는 수동 정리한다.
 # 경위와 복원 방법: infrastructure/decommission-2026-07-30/README.md
 PIPELINE_FUNCTIONS=()
 
@@ -186,12 +174,9 @@ case "$DEPLOY_TARGET" in
 esac
 
 # Update each function.
-# Durable Functions 런타임 가드 (옛 deploy-v2.sh에서 흡수, 2026-08-05): AWS Lambda
-# Durable Functions(python3.14-only)는 API Gateway HTTP proxy 통합과 호환되지
-# 않는다 — CloudWatch는 "status 200 completed"인데 호출자는 500 "Invalid Status
-# in invocation output"을 받는다. 이 스크립트는 python3.11 wheel로 빌드하므로
-# 배포 전 런타임을 확인해 이 함정을 피한다. 진단 상세: docs 또는 과거
-# v2/COMMANDS.md 참조.
+# Durable Functions 런타임 가드: python3.14 전용 Durable Functions 는 API Gateway HTTP proxy 통합과
+# 호환되지 않아 호출자가 500 "Invalid Status in invocation output"을 받는다.
+# 이 스크립트는 python3.11 wheel 로 빌드하므로 배포 전에 런타임을 확인한다.
 SUPPORTED_RUNTIMES="python3.11 python3.12"
 
 SUCCESS_COUNT=0
@@ -236,6 +221,19 @@ for FUNCTION_NAME in "${FUNCTIONS[@]}"; do
     > /dev/null 2>&1; then
     echo "    [OK] Updated (runtime: $RUNTIME)"
     ((SUCCESS_COUNT++))
+    # handler 설정을 새 모듈 경로로 맞춘다(이미 같으면 건너뜀). 코드 갱신이 끝난 뒤에 바꿔야 shim이 그 사이를 받친다.
+    NEW_MOD=$(grep -v '^#' lambda_handlers.txt | awk -v f="$FUNCTION_NAME" '$1==f {print $3}')
+    if [ -n "$NEW_MOD" ]; then
+      WANT_HANDLER="$NEW_MOD.lambda_handler"
+      CUR_HANDLER=$(printf '%s' "$CONFIG_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Handler",""))')
+      if [ "$CUR_HANDLER" != "$WANT_HANDLER" ]; then
+        aws lambda wait function-updated --function-name "$FUNCTION_NAME" --region us-east-1
+        aws lambda update-function-configuration --function-name "$FUNCTION_NAME" \
+          --handler "$WANT_HANDLER" --region us-east-1 --output text --query 'Handler' > /dev/null \
+          && echo "    [OK] handler: $CUR_HANDLER -> $WANT_HANDLER" \
+          || echo "    [WARN] handler 갱신 실패(옛 경로 shim으로 계속 동작)"
+      fi
+    fi
   else
     echo "    [FAIL] update-function-code returned error"
     ((FAIL_COUNT++))
@@ -249,10 +247,8 @@ echo ""
 # ============================================
 # Step 4: Health Check
 # ============================================
-# 21개 함수가 같은 zip을 공유하는 구조라, 이 zip 자체가 깨졌으면(의존성 누락 등)
-# 전부 같이 죽는다 — 그 케이스를 잡기 위해 대표로 하나만 호출해본다. 이 함수를
-# 고른 이유: CMS 공개 조회라 인증 없이 바로 확인 가능하고, 오늘 세션에서 가장
-# 최근에 손댄 핸들러라 회귀에 가장 민감하다.
+# 모든 함수가 같은 zip 을 공유하므로 대표 함수 하나만 호출해 패키지 손상(의존성 누락 등)을 확인한다.
+# CMS 공개 조회는 인증 없이 호출할 수 있어 대표 함수로 사용한다.
 echo "Health check (sedaily-mbti-v2-posts-dev)..."
 sleep 2
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \

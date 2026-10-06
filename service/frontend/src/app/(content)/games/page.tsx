@@ -1,16 +1,13 @@
 import type { Metadata } from 'next';
 import GamesClient from './GamesClient';
-// 2026-08-25: `./play/[slug]/page` 에서 가져오던 것을 단일 출처로 교체.
-// app → app 참조라 FSD boundaries 위반이기도 했고, 그 page 모듈의 `GAMES`
-// export 자체가 프로덕션 빌드를 막고 있었다(shared/data/games.ts 주석 참조).
+// 게임 목록은 단일 출처(shared/data/games.ts)에서 가져온다. page 모듈에서 가져오면 FSD 경계를 위반하고 프로덕션 빌드를 막는다.
 import { GAMES } from '@/shared/data/games';
 
 import { SITE_URL } from '@/shared/constants/site';
 const TITLE = 'AI LENS 게임 — 가볍게 한 판';
-const DESCRIPTION = 'AI LENS 가 직접 만든 서울경제 H5 게임. 출근길·점심·잠들기 전 가볍게 한 판.';
+const DESCRIPTION = 'AI LENS가 직접 만든 서울경제 H5 미니게임 모음입니다. 설치 없이 브라우저에서 바로, 출근길·점심시간·잠들기 전에 가볍게 한 판 즐겨 보세요.';
 
-// CollectionPage + ItemList(2026-08-14, SEO 감사) — sitemap.ts와 같은 이유로
-// GAMES를 재사용해 개별 VideoGame 엔트리를 참조한다.
+// CollectionPage + ItemList — sitemap.ts와 같은 이유로 GAMES를 재사용해 개별 VideoGame 엔트리를 참조한다.
 const JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'CollectionPage',

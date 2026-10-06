@@ -107,6 +107,13 @@ if [ "$HTTP_CODE" != "200" ]; then
 fi
 
 echo ""
+echo "=== 스모크 테스트 (운영 주소, CloudFront 무효화 반영까지 재시도) ==="
+# 주요 주소가 기대한 코드를 주는지 확인한다. 실패해도 이미 배포된 뒤라 되돌리지는 않고, 스크립트를 실패로 끝내 놓치지 않게 한다(2026-10-04).
+SMOKE_FAILED=0
+"$(dirname "$0")/scripts/smoke.sh" https://ailens.sedaily.ai || SMOKE_FAILED=1
+
+echo ""
 echo "=== 배포 완료 (총 $(( SECONDS - T0 ))s) ==="
 echo "ALB: http://${ALB_DNS}/"
 echo "실도메인(CloudFront가 이미 ALB를 오리진으로 쓰는 경우만 반영됨): https://ailens.sedaily.ai"
+[ "$SMOKE_FAILED" = "0" ] || { echo "경고: 스모크 테스트 실패 — 위 목록을 확인하고 필요하면 이전 리비전으로 되돌릴 것." >&2; exit 1; }

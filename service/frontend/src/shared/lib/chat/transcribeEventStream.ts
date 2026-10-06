@@ -156,8 +156,7 @@ export function decodeMessage(frame: ArrayBuffer): DecodedMessage {
       headers[name] = dec.decode(buf.subarray(offset, offset + valueLen));
       offset += valueLen;
     } else {
-      // 일단 audio 응답에는 string 만 옴 — 다른 타입은 skip
-      // 안전하게 처리하려면 type 별 길이 lookup 필요
+      // 현재 audio 응답에는 string 헤더만 오므로 다른 타입은 건너뛴다(다른 타입을 안전하게 처리하려면 type별 길이 lookup이 필요하다).
       throw new Error(`unsupported header value type: ${valueType}`);
     }
   }
@@ -167,7 +166,7 @@ export function decodeMessage(frame: ArrayBuffer): DecodedMessage {
 }
 
 // ── Transcribe transcript event 파싱 helper ───────────────────────────
-export interface TranscribeAlternative {
+interface TranscribeAlternative {
   Transcript: string;
   Items?: Array<{ Content: string; Type: string }>;
 }

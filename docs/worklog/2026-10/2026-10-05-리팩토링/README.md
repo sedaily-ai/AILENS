@@ -1,0 +1,76 @@
+# 2026-10-05 service 프론트·백엔드 리팩토링
+
+작업자: 문영광 · 브랜치 `refactor/2026-10-05-lens-cleanup` · 범위 `service/frontend`, `service/backend` (admin·pipelines·lens-cms-api는 다른 작업이 진행 중이라 제외)
+
+원칙: 동작 보존만, 한 커밋 한 목적, 배포·push 없음(커밋까지). 상세 감사 결과는 같은 폴더 `감사_프론트엔드.md`, `감사_백엔드.md`.
+
+## 1. 문제 발견 (Before 지표)
+
+| 구분 | 지표 |
+|---|---|
+| 프론트 | 소스 42,545줄 · 400줄 초과 파일 20개 · 죽은 파일 16개(990줄) · 순환 의존 3 · eslint 경고 40 · 미사용 의존성 6 · 테스트 0 |
+| 백엔드 | 운영 코드 13,383줄 · 60줄 초과 함수 32 · 복잡도 D 7 · 죽은 클라이언트 약 1,000줄 · 커버리지 29% · KST 정의 19곳 · 응답/CORS 빌더 4~5종 |
+| 안전망 | 프론트: SSR 구조 지문 30개 주소(`scripts/ssr-fingerprint.py`) · 백엔드: 단위 테스트 179개 |
+
+## 2. 문제 정의와 왜
+
+- 쓰이지 않는 코드와 의존성이 남아 읽는 사람이 "이것도 쓰이나"를 매번 확인해야 함
+- 테스트가 날짜에 의존해 하루만 지나도 깨지는 곳이 있어 안전망 신뢰도가 낮음
+- 구조 개선(거대 컴포넌트·응답 빌더 통일)은 안전망이 얇아 먼저 작은 정리로 기반을 만드는 순서가 맞음
+
+## 3. 한 일 (커밋 순)
+
+| 커밋 | 내용 | Before → After |
+|---|---|---|
+| fd0c601 | 쓰이지 않는 eslint-disable 3건 제거 | 경고 40 → 37 |
+| 90fb69e | 옛 온보딩 단계 9개 + LensFormatArt 삭제 | 42,545 → 41,433줄, 파일 -10 |
+| 805e754 | 미사용 의존성 4개 제거 | lock 146줄 삭제 |
+| 151abdf | 미사용 import 22개 파일 정리 | 경고 37 → 15 |
+| e19c590 | 순환 의존 2건 해소 | 3 → 1 |
+| 71f67c7 | 타임머신 테스트가 날짜 따라 깨지던 문제 수정 | 74/75 → 75/75 |
+| d06430d | 호출처 없는 clients 2개 삭제 | 3,059 → 2,480줄 |
+| 04f3b3b·db3d487 | 깨진 deploy.bat, 폐기 OpenSearch 의존성 정리 | 배포 진입점 2 → 1 |
+| e0c6510 | 실AWS 테스트 7개 파일 integration 마커 | `-m "not integration"`만으로 179 통과 |
+| 0676371 | vitest 도입 + 날짜 함수 특성화 테스트 | 프론트 테스트 0 → 10 |
+| b43edf7 | 날짜 포맷 함수 중복 3벌 제거 | 중복 3 → 0 |
+| 1de3864 | 백엔드 KST 상수 재정의 8곳 통일 | 운영 코드 11 → 3곳 |
+| 226e4f1 | 카테고리 라우트 14개 복제 주석·n 보정 로직 정리 | 순 -72줄, 라우트 표·캐시 헤더 동일 |
+| 5d54723 | 불필요한 export 68개 제거 | 경고 15 유지, 지문 차이 없음 |
+| 15f8033 | lens-cms-api 기본 주소 리터럴 8곳 → 상수 1곳 | 8 → 1 |
+| 2dfea27 | 독서 연속일수 테스트 5개 | 백엔드 단위 179 → 184 |
+| ed08534 | shape_lens 포맷 변환 분리 + 특성화 테스트 3개 | 단위 184 → 187 |
+| 37b49f7 | 서버 시드 목록 재조회 effect 5곳 → useServerSeededList 훅 | 경고 15 → 10 |
+| 41232af | LensPreviewSection 지면 로직 lib 분리 + 변천사 주석 worklog 이전 + 테스트 3개 | 764 → 684줄, vitest 13 |
+| 31c3692 | 단어 퀴즈 기능 삭제(사용자 확인) | 프론트 3·백엔드 2 파일 삭제, 홈 퀴즈 API 호출 -1 |
+| 95e40f1·fd8684e·dbad66b·3492499 | 백엔드 clients·services·handlers 도메인 폴더화, utils→common | 평평한 직속 파일 43 → 0 |
+| 3625c22·b2ceae7 | 프론트 shared/ui·lib·economy 공통·news-feed·timeline 컴포넌트 폴더화(90개 이동) | 한 폴더 최대 25 → 9개 |
+| d5b07de | 백엔드 tests를 단위·integration·tools로 | 직속 23 → 13 |
+| 8eea4fe | 사주 엔티티·NavProgress·AnnouncementBar·만세력 의존성 삭제 | 미사용 파일 7 → 0 |
+| 2b266e1 | 프론트 호출처 없는 정의 약 800줄 삭제 | knip 미사용 export 72 → 26 |
+| 5aebcfe | 백엔드 호출처 없는 함수·모듈 약 380줄 삭제 | 테스트 이메일 MOCK 포함 |
+| d05b226 | voice 응답 헬퍼 통합 | 중복 2 → 1 |
+| 69d92f2·0c621b9 | 레터·CMS 응답 타입 분리(순환 의존 0, cmsPostsApi 567 → 369줄) | madge 순환 1 → 0 |
+| f44a436 | OnboardingClient 섹션 6개 분리 | 596 → 48줄 |
+| cb09e05 | MomentArt를 rig + 장면 4개로 분리 | 578 → 41줄 |
+
+## 4. 검증
+
+- 프론트: 각 단계마다 tsc, eslint 에러 0, 프로덕션 빌드, SSR 지문 30개 주소 비교. 차이는 웹툰 상세 1건의 ±1 태그뿐인데 같은 서버에서 번갈아 나오는 기존 노이즈(밤새 새로 발행된 사이트맵·/words 3건은 데이터 반영분)
+- 백엔드: 단위 테스트 179 통과, pyflakes
+
+## 5. 판정과 이번에 하지 않은 것
+
+- 가설 "죽은 코드 삭제는 화면·응답에 영향이 없다" → 지문·테스트로 반증되지 않음, 유지
+- 보류(근거): `entities/saju`·`@fullstackfamily/manseryeok`(최근 지연 로딩으로 설계된 코드라 의도 확인 필요), `widgets/NavProgress`(providers 주석에 재도입 의도 명시), todayLettersApi↔cmsPostsApi 타입 순환(ApiLetter 분리 범위 큼)
+- 보류(배포·인프라 얽힘): 평문 HTTP 내부 API·토큰 환경변수 정리, 예외 문구 응답 노출 7곳, 이벤트 전체 로깅, KST 상수 통합, 응답/CORS 빌더 통일, 거대 함수 분해(특성화 테스트 선행 필요)
+- 보류(프론트 위험): 캐시/ISR 정책 통일, 마운트 재조회 제거, server/client 경계 이동, 거대 컴포넌트 분리
+- 범위 밖 관찰: setup-lambda-warming.sh가 warmup 이벤트를 search/article/post에 보내지만 warmup 분기는 post·question 핸들러에만 있음
+
+## 6. 다음
+
+- 운영 Lambda sedaily-mbti-v2-quiz-dev와 API Gateway /api/quiz/* 라우트는 수동 정리 대상(코드는 삭제됨)
+- admin의 퀴즈 CRUD(admin/backend/repo/quiz_repo.py 등)는 범위 밖이라 그대로 있음
+
+- 날짜 유틸 잔여(PaperDateNav·DateRangeFilter의 pad 계열), 응답/CORS 빌더 통일, 카테고리 라우트 14개 보일러플레이트 압축
+- 백엔드 CLAUDE.md 구조 서술 갱신(clients가 `*_pg_client` 기반으로 바뀐 점)
+- 배포는 사용자 허가 후 일괄

@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { adminApi } from "@/lib/adminClient";
 import type { SendResult, WsPushBase } from "@/lib/useAdminChatSocket";
-import type { PromptHistoryEntry, WebtoonStoryboardCut } from "@/lib/types";
+import type { BubbleLayout, PromptHistoryEntry, WebtoonStoryboardCut } from "@/lib/types";
 import { IMAGE_MODELS } from "@/lib/webtoonImageModels";
 import { CustomSelect } from "@/components/CustomSelect";
+import { BubbleEditorModal } from "./BubbleEditorModal";
+import { WebtoonPreviewModal } from "./WebtoonPreviewModal";
 import { CollapsibleSection } from "../PromptChatLab/CollapsibleSection";
 import { PromptVersionReference, type PromptVersionReferenceHandle } from "../PromptChatLab/PromptVersionReference";
 import { ApplyReviewModal } from "../PromptChatLab/ApplyReviewModal";
@@ -87,6 +89,10 @@ interface SlotState {
   sourceCut: WebtoonStoryboardCut | null;
   status: "idle" | "pending" | "done" | "error";
   imageUrl: string | null;
+  /** 글자 없는 원본 그림(말풍선 편집이 이 위에 다시 합성). 이번 세션에서 생성한 컷만 있다(저장본 복원분엔 없음). */
+  bgUrl?: string | null;
+  /** 실제로 그려진 말풍선 위치(말풍선 편집 손잡이의 시작 위치) */
+  layout?: BubbleLayout[] | null;
   error: string | null;
 }
 
@@ -103,6 +109,10 @@ interface TestState {
    *  버튼 하나로 통일 — 여러 모델을 비교하고 싶으면 "+ 테스트 추가"로
    *  카드를 하나 더 만들어 그 카드는 다른 모델로 8컷을 돌리면 된다. */
   model: string;
+  /** 말풍선 얼굴 회피(Rekognition) — 이 테스트 카드가 쓸 값. 새 테스트는 프로덕션 값으로 시작한다. */
+  bubbleDetect: boolean;
+  /** 웹툰식 말풍선(타원·얇은 선·위쪽 흰 여백) */
+  bubbleStyle: boolean;
   slots: Record<number, SlotState>;
 }
 
@@ -156,8 +166,8 @@ function _newTestId(): string {
   return `test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function _emptyTest(cuts: WebtoonStoryboardCut[]): TestState {
-  return { id: _newTestId(), model: IMAGE_MODELS[0].id, slots: _emptySlots(cuts) };
+function _emptyTest(cuts: WebtoonStoryboardCut[], bubbleDetect = false, bubbleStyle = false): TestState {
+  return { id: _newTestId(), model: IMAGE_MODELS[0].id, bubbleDetect, bubbleStyle, slots: _emptySlots(cuts) };
 }
 
 export function WebtoonCutGenerator({
@@ -170,6 +180,8 @@ export function WebtoonCutGenerator({
   send,
   subscribe,
   onApplyModelToProduction,
+  productionBubbleDetect = false,
+  productionBubbleStyle = false,
   productionModel,
   serverVersion,
   promptHistory,
@@ -216,7 +228,10 @@ export function WebtoonCutGenerator({
    *  바로 이미지 모델을 발행까지 한다(WebtoonImageSettingsPanel.tsx::
    *  applyAndPublish). Promise를 돌려줘야 프롬프트 버전 활성화와 함께
    *  묶어 기다릴 수 있다. */
-  onApplyModelToProduction?: (model: string) => Promise<void>;
+  onApplyModelToProduction?: (model: string, bubbleDetect: boolean, bubbleStyle: boolean) => Promise<void>;
+  productionBubbleStyle?: boolean;
+  /** 프로덕션에 발행돼 있는 말풍선 얼굴 회피 값 */
+  productionBubbleDetect?: boolean;
   /** 2026-09-26(후속), 사용자 지적 — "테스트 카드도 마찬가지"(프로덕션
    *  카드에 이어): 지금 실제 발행된 이미지 모델 — 카드의 프롬프트 버전과
    *  모델이 둘 다 이미 이 값과 같으면 "프로덕션에 적용"이 no-op이라
@@ -235,6 +250,10 @@ export function WebtoonCutGenerator({
   name: string;
 }) {
   const [tests, setTests] = useState<TestState[]>(() => [_emptyTest(cuts)]);
+  // 말풍선 편집 모달 대상(2026-10-02)
+  const [editing, setEditing] = useState<{ testId: string; slotIndex: number } | null>(null);
+  // 실제 화면 미리보기 모달 대상(테스트 카드 id)
+  const [previewTestId, setPreviewTestId] = useState<string | null>(null);
   // 2026-09-26, 사용자 지적 — "테스트 카드에 해당 테스트에서 어떤 버전을
   // 활성화 했는지 미리보기처럼 있으면... 지금 테스트 1, 테스트 2 이런식
   // 으로만 되어있으니 정보가 부족": 각 카드의 PromptVersionReference가
@@ -249,7 +268,7 @@ export function WebtoonCutGenerator({
   const promptRefs = useRef<Record<string, PromptVersionReferenceHandle | null>>({});
   const handleApplyTestToProduction = async (t: TestState) => {
     await promptRefs.current[t.id]?.activateIfNeeded();
-    await onApplyModelToProduction?.(t.model);
+    await onApplyModelToProduction?.(t.model, t.bubbleDetect, t.bubbleStyle);
   };
   // 2026-09-26 — window.confirm 한 줄짜리 확인을 검토 모달로 교체(사용자
   // 요청: "현재 설정한 것들 최종적으로 검토를 하도록 하고, 해당 테스트에서
@@ -274,7 +293,7 @@ export function WebtoonCutGenerator({
       // "이미지 설정" 탭 안)가 관리한다. 같은 restoredImages를 공유해서
       // 저장돼 있을 순 있지만, 여기 "테스트 N" 번호 매김에는 안 섞는다.
       const entries = (restoredImages ? Object.entries(restoredImages) : []).filter(([testId]) => testId !== "production");
-      if (entries.length === 0) return [_emptyTest(cuts)];
+      if (entries.length === 0) return [_emptyTest(cuts, productionBubbleDetect, productionBubbleStyle)];
       return entries.map(([testId, cutMap]) => {
         const slots = _emptySlots(cuts);
         for (let idx = 1; idx <= SLOT_COUNT; idx++) {
@@ -287,7 +306,7 @@ export function WebtoonCutGenerator({
             };
           }
         }
-        return { id: testId, model: IMAGE_MODELS[0].id, slots };
+        return { id: testId, model: IMAGE_MODELS[0].id, bubbleDetect: productionBubbleDetect, bubbleStyle: productionBubbleStyle, slots };
       });
     });
   }
@@ -348,7 +367,11 @@ export function WebtoonCutGenerator({
     );
   };
 
-  const addTest = () => setTests((prev) => [...prev, _emptyTest(cuts)]);
+  const addTest = () => setTests((prev) => [...prev, _emptyTest(cuts, productionBubbleDetect, productionBubbleStyle)]);
+  const setTestBubbleStyle = (testId: string, on: boolean) =>
+    setTests((prev) => prev.map((t) => (t.id === testId ? { ...t, bubbleStyle: on } : t)));
+  const setTestBubbleDetect = (testId: string, on: boolean) =>
+    setTests((prev) => prev.map((t) => (t.id === testId ? { ...t, bubbleDetect: on } : t)));
   const removeTest = (testId: string) =>
     setTests((prev) => (prev.length > 1 ? prev.filter((t) => t.id !== testId) : prev));
   const setTestModel = (testId: string, model: string) =>
@@ -372,6 +395,8 @@ export function WebtoonCutGenerator({
           closing_caption: base?.closing_caption ?? "",
           camera: "",
           scene: s.prompt,
+          bubble_detect: t.bubbleDetect,
+          bubble_webtoon: t.bubbleStyle,
         };
         // send()가 소켓 상태 확인과 32KB 프레임 크기 가드를 둘 다 내부에서
         // 처리한다(useAdminChatSocket 참고) — 반환값을 확인 안 하면 슬롯이
@@ -391,11 +416,11 @@ export function WebtoonCutGenerator({
   useEffect(() => {
     return subscribe((msg) => {
       if (msg.type === "cut_image") {
-        const m = msg as unknown as { cut: number; test_id?: string; image_url: string };
+        const m = msg as unknown as { cut: number; test_id?: string; image_url: string; bg_url?: string; layout?: BubbleLayout[] };
         setTests((prev) =>
           prev.map((t) =>
             t.id === m.test_id && t.slots[m.cut]
-              ? { ...t, slots: { ...t.slots, [m.cut]: { ...t.slots[m.cut], status: "done", imageUrl: m.image_url, error: null } } }
+              ? { ...t, slots: { ...t.slots, [m.cut]: { ...t.slots[m.cut], status: "done", imageUrl: m.image_url, bgUrl: m.bg_url ?? null, layout: m.layout ?? null, error: null } } }
               : t
           )
         );
@@ -420,17 +445,26 @@ export function WebtoonCutGenerator({
     sendGenerate(testId, slotIndex);
   };
 
-  const handleDownloadAll = (t: TestState) => {
+  // 전체 다운로드 — 컷 순서대로 이름을 붙여(컷1.png ~ 컷8.png) zip 하나로 받는다(2026-10-02, 낱장 8번 다운로드를 대체).
+  const handleDownloadAll = async (t: TestState) => {
     const doneSlots = Object.values(t.slots)
       .filter((s) => s.status === "done" && s.imageUrl)
       .sort((a, b) => a.index - b.index);
-    // 브라우저가 다운로드를 "여러 파일 요청"으로 한꺼번에 막는 걸 피하려고
-    // 살짝 간격을 두고 순차 트리거한다(동시에 쏘면 Chrome이 일부만 받고
-    // 나머지는 차단 알림만 띄우는 경우가 있음).
-    doneSlots.forEach((s, i) => {
-      if (!s.imageUrl) return;
-      setTimeout(() => downloadImage(s.imageUrl as string, `cut-${s.index}.png`), i * 300);
-    });
+    if (doneSlots.length === 0) return;
+    const testNo = tests.findIndex((x) => x.id === t.id) + 1;
+    try {
+      const { download_url } = await adminApi.createMediaZip(
+        doneSlots.map((s) => ({ url: s.imageUrl as string, name: `컷${s.index}.png` })),
+        `웹툰_테스트${testNo}.zip`
+      );
+      const a = document.createElement("a");
+      a.href = download_url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      console.error("전체 다운로드 실패", err);
+    }
   };
 
   /** 모델 선택 행 + 8컷 그리드 — "테스트 N" 카드마다 이 UI를 쓴다.
@@ -463,6 +497,30 @@ export function WebtoonCutGenerator({
         >
           스토리보드에서 채우기
         </button>
+        <label
+          className="flex cursor-pointer items-center gap-1 text-[10.5px] text-[var(--text-secondary)]"
+          title="켜면 AWS Rekognition으로 인물·얼굴 위치를 찾아 말풍선이 얼굴을 덮지 않게 놓고 꼬리를 화자 쪽으로 맞춥니다(컷당 약 $0.002)"
+        >
+          <input
+            type="checkbox"
+            checked={t.bubbleDetect}
+            onChange={(e) => setTestBubbleDetect(t.id, e.target.checked)}
+            className="cursor-pointer"
+          />
+          말풍선 얼굴 회피
+        </label>
+        <label
+          className="flex cursor-pointer items-center gap-1 text-[10.5px] text-[var(--text-secondary)]"
+          title="켜면 얇은 선의 타원 말풍선을 컷 위쪽 흰 여백에 놓습니다(네이버 웹툰 방식). 컷이 세로로 길어집니다"
+        >
+          <input
+            type="checkbox"
+            checked={t.bubbleStyle}
+            onChange={(e) => setTestBubbleStyle(t.id, e.target.checked)}
+            className="cursor-pointer"
+          />
+          웹툰식 말풍선
+        </label>
       </div>
       <div className={`grid gap-3 px-3.5 pb-2 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"}`}>
         {Object.values(t.slots)
@@ -474,6 +532,16 @@ export function WebtoonCutGenerator({
                 <div className="flex items-center gap-1.5">
                   {s.status === "pending" && <span className="text-[10px] text-[var(--text-muted)]">생성 중</span>}
                   {s.sourceCut && <span className="text-[10px] text-[var(--text-faint)]">스토리보드</span>}
+                  {s.status === "done" && s.imageUrl && s.bgUrl && s.layout && s.layout.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setEditing({ testId: t.id, slotIndex: s.index })}
+                      className="rounded px-1 py-0.5 text-[10px] font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--surface-card)]"
+                      title="말풍선 위치·대사·모양 편집(이미지 재생성 없음, 비용 없음)"
+                    >
+                      말풍선 편집
+                    </button>
+                  )}
                   {s.status === "done" && s.imageUrl && (
                     <button
                       type="button"
@@ -593,7 +661,9 @@ export function WebtoonCutGenerator({
             serverVersion !== null &&
             info.version === serverVersion &&
             productionModel !== null &&
-            t.model === productionModel;
+            t.model === productionModel &&
+            t.bubbleDetect === productionBubbleDetect &&
+            t.bubbleStyle === productionBubbleStyle;
           return (
             <div key={t.id} className="overflow-hidden border-b bg-[var(--surface-card)]" style={{ borderColor: "var(--border-hairline)" }}>
             <CollapsibleSection
@@ -636,6 +706,19 @@ export function WebtoonCutGenerator({
                   </button>
                   {doneCount > 0 && (
                     <span className="text-[10.5px] font-medium text-[var(--text-faint)]">완료 {doneCount}/{SLOT_COUNT}</span>
+                  )}
+                  {doneCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPreviewTestId(t.id);
+                      }}
+                      className="ui-btn ui-btn-ghost rounded-lg px-2 py-1 text-[10.5px] font-semibold"
+                      title="생성한 컷을 실제 서비스 화면처럼 이어서 보기"
+                    >
+                      미리보기
+                    </button>
                   )}
                   {doneCount > 0 && (
                     <button
@@ -761,6 +844,60 @@ export function WebtoonCutGenerator({
           }
         />
       )}
+      {previewTestId && (() => {
+        const t = tests.find((x) => x.id === previewTestId);
+        if (!t) return null;
+        const images = Object.values(t.slots)
+          .filter((s) => s.status === "done" && s.imageUrl)
+          .sort((a, b) => a.index - b.index)
+          .map((s) => ({ index: s.index, url: s.imageUrl as string }));
+        return <WebtoonPreviewModal title={`테스트 ${tests.indexOf(t) + 1}`} images={images} onClose={() => setPreviewTestId(null)} />;
+      })()}
+      {editing && (() => {
+        const t = tests.find((x) => x.id === editing.testId);
+        const s = t?.slots[editing.slotIndex];
+        if (!t || !s || !s.imageUrl || !s.bgUrl || !s.layout) return null;
+        const base = s.sourceCut;
+        return (
+          <BubbleEditorModal
+            cutNumber={s.index}
+            imageUrl={s.imageUrl}
+            bgUrl={s.bgUrl}
+            layout={s.layout}
+            baseCut={{
+              narration: base?.narration ?? "",
+              caption: base?.caption ?? "",
+              title: base?.title ?? "",
+              title_keyword: base?.title_keyword ?? "",
+              closing_caption: base?.closing_caption ?? "",
+            }}
+            dialogue={base?.dialogue ?? []}
+            onClose={() => setEditing(null)}
+            onApply={(url, layout, dialogue) =>
+              setTests((prev) =>
+                prev.map((x) =>
+                  x.id !== editing.testId
+                    ? x
+                    : {
+                        ...x,
+                        slots: {
+                          ...x.slots,
+                          [editing.slotIndex]: {
+                            ...x.slots[editing.slotIndex],
+                            imageUrl: url,
+                            layout,
+                            sourceCut: x.slots[editing.slotIndex].sourceCut
+                              ? { ...(x.slots[editing.slotIndex].sourceCut as WebtoonStoryboardCut), dialogue }
+                              : null,
+                          },
+                        },
+                      }
+                )
+              )
+            }
+          />
+        );
+      })()}
     </>
   );
 }
@@ -789,6 +926,8 @@ export function WebtoonProductionCutGrid({
   send,
   subscribe,
   productionModel,
+  bubbleDetectDraft,
+  bubbleStyleDraft,
   restoredImages,
 }: {
   cuts: WebtoonStoryboardCut[];
@@ -796,6 +935,10 @@ export function WebtoonProductionCutGrid({
   send: (kind: string, data?: unknown) => SendResult;
   subscribe: (listener: (msg: WsPushBase) => void) => () => void;
   productionModel: string | null;
+  /** 이미지 설정 탭의 "말풍선 얼굴 회피" 체크 상태(발행 전 값 포함) — 컷 생성 요청에 실어 체크만 해도 바로 확인할 수 있게 한다 */
+  bubbleDetectDraft?: boolean;
+  /** "웹툰식 말풍선" 체크 상태(발행 전 값 포함) */
+  bubbleStyleDraft?: boolean;
   /** PromptChatLab.tsx가 WebtoonCutGenerator에 넘기는 restoredImages를
    *  그대로 넘기면 된다 — 여기서는 "production" 키만 본다. 부모가
    *  `key={threadId}`로 이 컴포넌트를 마운트해 대화가 바뀔 때마다
@@ -871,6 +1014,8 @@ export function WebtoonProductionCutGrid({
       closing_caption: base?.closing_caption ?? "",
       camera: "",
       scene: s.prompt,
+      bubble_detect: bubbleDetectDraft,
+      bubble_webtoon: bubbleStyleDraft,
     };
     const result = send("cut_image", { cut: cutPayload, model });
     if (!result.sent) {
@@ -884,6 +1029,7 @@ export function WebtoonProductionCutGrid({
   };
 
   const orderedSlots = Object.values(slots).sort((a, b) => a.index - b.index);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
     <>
@@ -908,6 +1054,16 @@ export function WebtoonProductionCutGrid({
         >
           스토리보드에서 채우기
         </button>
+        {orderedSlots.some((s) => s.status === "done" && s.imageUrl) && (
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            title="생성한 컷을 실제 서비스 화면처럼 이어서 보기"
+            className="ui-btn ui-btn-ghost rounded-lg px-2 py-1 text-[10.5px] font-semibold"
+          >
+            미리보기
+          </button>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-3 px-3.5 pb-2">
         {orderedSlots.map((s) => (
@@ -984,6 +1140,13 @@ export function WebtoonProductionCutGrid({
           </div>
         ))}
       </div>
+      {previewOpen && (
+        <WebtoonPreviewModal
+          title="프로덕션"
+          images={orderedSlots.filter((s) => s.status === "done" && s.imageUrl).map((s) => ({ index: s.index, url: s.imageUrl as string }))}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </>
   );
 }

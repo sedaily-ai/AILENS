@@ -1,11 +1,7 @@
 """
 "그날 이걸 샀다면" 카드용 — 실제 조사한 자산가격 시계열.
 
-2026-08-17 리서치(worklog: docs/worklog/2026-08/ 참조) — 전부 출처 있는
-실측치다. 옛 /timemachine 프론트에 있던 동명 기능(shared/data/
-investmentScenarios.ts)은 스스로 "참고용 추정"이라고 밝힌 수기 어림값이라
-그 프론트 전체(가짜 "역사적 사건")와 함께 삭제됐는데, 이번엔 진짜 데이터로
-다시 만든다.
+모든 수치는 출처가 있는 실측치이며 수기 어림값은 사용하지 않는다.
 
 - 코스피: 1995~2025 연말 종가(다토리인디고 정리표) + 2026-08-14 종가(나무위키
   '코스피/역사/2026년'). 1990~1994 연말 종가는 신뢰할 자료를 못 찾아 뺐다 —
@@ -18,9 +14,9 @@ investmentScenarios.ts)은 스스로 "참고용 추정"이라고 밝힌 수기 �
 - 스타벅스 아메리카노(톨): 1999~2025 가격표(뉴스 기사 정리본, 프론트동 등
   교차 확인).
 
-로또는 확률형이라 "샀다면 지금 얼마"(수익률) 프레임을 안 쓴다 — 당첨 확률과
-평균 당첨금을 사실 그대로 보여주고, 같은 돈을 코스피에 넣었으면 어떻게
-됐을지와 대조하는 카드로 구성한다(build_investment_scenarios 참조).
+로또는 확률형이므로 수익률 프레임을 사용하지 않는다. 당첨 확률과 평균
+당첨금을 사실 그대로 제시하고, 같은 금액을 코스피에 투자한 경우와 대조하는
+카드로 구성한다(build_investment_scenarios 참조).
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -40,7 +36,7 @@ KOSPI_CURRENT = 6977.94
 KOSPI_CURRENT_LABEL = '2026-08-14 종가'
 KOSPI_MIN_YEAR = min(KOSPI_YEAR_END)
 
-# 역사적으로 뚜렷한 해 — 있으면 일반 문구 대신 이 스토리를 쓴다.
+# 역사적으로 뚜렷한 연도는 일반 문구 대신 이 문구를 사용한다.
 KOSPI_YEAR_STORY = {
     1997: 'IMF 외환위기로 코스피가 반토막 났던 그해.',
     1999: 'IMF 위기 저점을 지나 코스피가 1,000선을 회복한 그해.',
@@ -85,8 +81,10 @@ COFFEE_MIN_YEAR = min(COFFEE_YEAR_PRICE)
 
 
 def _nearest_year_at_or_before(table: Dict[int, float], year: int) -> Optional[int]:
-    """table에 해당 연도가 없으면 그 이전 중 가장 가까운 연도를 쓴다(그 이후는 안 씀 —
-    미래 가격을 과거 시점 기준값으로 쓰면 안 되니까)."""
+    """table에 해당 연도가 없으면 그 이전 중 가장 가까운 연도를 반환한다.
+
+    미래 가격을 과거 시점의 기준값으로 사용하지 않기 위해 이후 연도는 제외한다.
+    """
     candidates = [y for y in table if y <= year]
     return max(candidates) if candidates else None
 
@@ -96,8 +94,10 @@ def _fmt_won(amount: float) -> str:
 
 
 def build_investment_scenarios(date: str) -> List[Dict[str, Any]]:
-    """그 날짜 기준 '샀다면' 카드 목록. 데이터가 없는 구간(예: 1994년 이전
-    코스피)은 그 카드를 아예 안 만든다 — 추정치로 채우지 않는다."""
+    """해당 날짜 기준 '샀다면' 카드 목록을 생성한다.
+
+    데이터가 없는 구간(예: 1994년 이전 코스피)은 카드를 생성하지 않으며 추정치로 채우지 않는다.
+    """
     year = datetime.strptime(date, DATE_FORMAT).year
     scenarios: List[Dict[str, Any]] = []
 

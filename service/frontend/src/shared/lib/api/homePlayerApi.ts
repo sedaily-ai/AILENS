@@ -1,9 +1,7 @@
 /**
- * 홈 화면 하단 플레이 카드("오늘의 핵심 뉴스")의 재생목록 — 기사와 무관하게
- * admin이 직접 "제목 + 유튜브 링크"로 만드는 독립 콘텐츠(2026-08-16).
- * cms_posts 테이블의 channels:["home_player"] 항목을 그대로 쓴다(관리 UI:
- * admin/frontend home-player 화면, shaping: service/backend/handlers/
- * cms_posts_public.py::_shape_home_player_item).
+ * 홈 화면 하단 플레이 카드("오늘의 핵심 뉴스")의 재생목록. 기사와 무관하게 admin이 "제목 + 유튜브 링크"로 만드는 독립 콘텐츠이며,
+ * cms_posts 테이블의 channels:["home_player"] 항목을 쓴다(관리 UI: admin/frontend home-player 화면,
+ * shaping: service/backend/handlers/cms_posts_public.py::_shape_home_player_item).
  */
 import { CMS_API_URL } from '@/shared/config/apiClient';
 
@@ -14,24 +12,15 @@ export interface HomePlayerItem {
   order: number;
 }
 
-/**
- * /listen 전용 목록·상세 페이지(2026-08-21, GEO 감사 — 이 재생목록이
- * 홈 위젯에만 있어서 고유 URL이 없어 검색엔진에 전혀 안 걸렸다)에서 쓰는
- * 확장 형태 — date/excerpt가 필요해 백엔드 shaper도 같이 확장했다.
- */
+/** /listen 전용 목록·상세 페이지용 확장 형태. 고유 URL로 검색엔진에 노출되도록 date/excerpt를 포함한다(백엔드 shaper도 같이 확장). */
 export interface HomePlayerPost extends HomePlayerItem {
   date: string;
-  /** 발행 완료 시각(ISO, UTC) — 2026-08-23, kstDateTimeLabel()로 시:분까지
-   *  표기. 없으면(옛 글) date만 폴백. */
+  /** 발행 완료 시각(ISO, UTC). kstDateTimeLabel()이 시:분까지 표기하며 없으면(옛 글) date만 폴백한다. */
   publishedAt?: string | null;
-  /** 팟캐스트 전체 대본(2026-08-23, 청각장애인 접근성 + 상세 페이지 빈
-   *  화면 보완). lens 팟캐스트 포맷의 transcript를 그대로 복제. */
+  /** 팟캐스트 전체 대본(접근성 및 상세 페이지 보완). lens 팟캐스트 포맷의 transcript를 그대로 복제한다. */
   transcript?: string | null;
   excerpt: string;
-  /** 경제 카테고리(ECON_CATEGORIES) — 2026-08-21 추가. admin/frontend
-   * home-player 화면에서 선택, 없으면(미분류) null. 홈 오디오 섹션 카드가
-   * 포맷(팟캐스트/영상)만 보여주고 실제 내용 분류가 없다는 지적으로
-   * 도입 — lens/letters와 같은 body_inline.category 저장 위치 재사용. */
+  /** 경제 카테고리(ECON_CATEGORIES). admin/frontend home-player 화면에서 선택하며 없으면(미분류) null이다. lens/letters와 같은 body_inline.category 저장 위치를 재사용한다. */
   category: string | null;
 }
 
@@ -85,24 +74,16 @@ function ssrCacheOpts(tag: string): RequestInit {
   return { cache: 'force-cache', next: { tags: [tag], revalidate: 300 } };
 }
 
-// 홈 "오늘의 뉴스를 귀로" 미리보기(AudioPreviewSection) 전용 축약본
-// (2026-09-03, 페이지 속도 후속 — lens 축약과 같은 문제를 여기서도
-// 발견). 그 컴포넌트는 최대 4장만 보여주고 카드당 id/title/
-// mediaEmbedUrl/category/date만 쓰는데, app/page.tsx는 최대 1000건
-// 전체(각 건마다 팟캐스트 전체 대본 transcript 포함)를 그대로
-// initialItems prop으로 직렬화하고 있었다 — lens와 똑같이 홈 HTML을
-// 불필요하게 부풀리는 원인. 이 섹션의 유일한 소비자(AudioPreviewSection)
-// 라서 서버가 넘기기 전에 미리 4개로 자르고 안 쓰는 필드를 비운다.
+// 홈 "오늘의 뉴스를 귀로" 미리보기(AudioPreviewSection) 전용 축약본. 이 컴포넌트는 최대 4장만 보여주고
+// 카드당 id/title/mediaEmbedUrl/category/date만 쓰므로, 서버가 넘기기 전에 4개로 자르고 안 쓰는 필드(팟캐스트 전체 대본 transcript 등)를 비워 홈 HTML 크기를 줄인다.
 export function toAudioPreviewSummaries(posts: HomePlayerPost[]): HomePlayerPost[] {
-  return posts.slice(0, 4).map((p) => ({ ...p, transcript: null, excerpt: '' }));
+  return posts.slice(0, 5).map((p) => ({ ...p, transcript: null, excerpt: '' }));
 }
 
 /** /listen 목록 페이지용 — 발행일 순 정렬. */
 export async function fetchHomePlayerPosts(): Promise<HomePlayerPost[]> {
   try {
-    // limit=1000(2026-08-28, 100→1000) — cmsPostsApi.ts의 lens/webtoon/video
-    // 목록 fetch와 같은 이유(발행량 급증으로 100건 상한이 뚫려 오래된 글이
-    // 목록에서 사라짐).
+    // limit=1000: cmsPostsApi.ts의 lens/webtoon/video 목록 fetch와 같은 이유(발행량 증가로 100건 상한을 넘으면 오래된 글이 목록에서 사라진다).
     const res = await fetch(`${CMS_API_URL}/api/v2/posts?channel=home_player&limit=1000`, ssrCacheOpts('posts:home_player'));
     if (!res.ok) return [];
     const data = (await res.json()) as { posts?: ApiHomePlayerItem[] };
@@ -115,10 +96,7 @@ export async function fetchHomePlayerPosts(): Promise<HomePlayerPost[]> {
 /** /listen/{id} 상세 페이지용 단건 조회. */
 export async function fetchHomePlayerBySlug(slug: string): Promise<HomePlayerPost | null> {
   try {
-    // channel=home_player 명시(2026-09-09, v1.20) — 이전엔 slug만으로 조회했는데,
-    // Postgres 이관 이후 한 slug가 여러 포맷 렌디션을 가질 수 있어(형제 채널이
-    // 같은 발행물로 묶임) 채널을 안 주면 백엔드가 임의의 렌디션을 반환할 수
-    // 있다(cmsPostsApi.ts의 다른 단건 조회 함수들은 전부 이미 명시하고 있었음).
+    // channel=home_player를 명시한다. 한 slug가 여러 포맷 렌디션을 가질 수 있어(형제 채널이 같은 발행물로 묶임) 채널을 주지 않으면 백엔드가 임의의 렌디션을 반환할 수 있다.
     const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=home_player`, ssrCacheOpts('posts:home_player'));
     if (!res.ok) return null;
     const data = (await res.json()) as { post?: ApiHomePlayerItem };

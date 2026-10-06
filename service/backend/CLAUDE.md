@@ -471,3 +471,11 @@ observability/      → CloudWatch 대시보드 정의 (Bedrock 토큰·비용 p
 ⚠️ `service/backend/MBTI_TRANSFORM_PROMPT.md`(옛 last-resort fallback for
 `clients/mbti_transform_service.py`)는 그 서비스 파일과 함께 삭제됐다 — 더 이상 없다.
 
+**2026-10-05 정정**: 위 서술 중 `clients/personal_db_client.py`·`clients/embedding_client.py`는 호출처가 0이라 삭제했고(`clients/__init__.py`도 재export 제거), `PersonalRepository`는 현재 `personal_pg_client` 기반이다. 현행 clients는 `*_pg_client`(articles·cms_posts·community·newsletter_subscribers·personal)와 `*_ddb_client`(cms_posts·daily_letters·quiz_questions)가 중심이다. 단위 테스트는 `pytest tests common/tests -m "not integration"`만으로 안전하게 돈다. 감사 기록: `docs/worklog/2026-10/2026-10-05-리팩토링/`.
+
+**2026-10-05 폴더 구조 개편**: 위 서술의 평평한 경로는 아래로 바뀌었다(계획·근거: `docs/worklog/2026-10/2026-10-05-리팩토링/구조개편_계획.md`).
+- `clients/` → `pg/`(articles, cms_posts, community, newsletter_subscribers, personal) · `ddb/`(cms_posts, daily_letters, dynamodb) · `s3/`(article_body, xml_articles)
+- `services/` → `articles/` · `chat/` · `content/` · `timeline/` · `user/`(profile, archive, community_post) · `market/`
+- `handlers/` → `articles/` · `chat/`(voice, websocket 포함) · `content/` · `timeline/` · `user/` · `system/`. 파일명에서 `_handler` 접미사 제거
+- `utils/`는 `common/`으로 통합(`common/dates/`, `common/hash_utils`). `tests/`는 직속 단위 테스트 + `integration/`(실AWS) + `tools/`
+- Lambda handler 문자열(예: `handlers.articles.article.lambda_handler`)은 `lambda_handlers.txt`가 정본이고, `deploy.sh`가 코드 갱신 뒤 설정을 맞춘다(전환용 옛 경로 shim은 패키징 때만 생성)

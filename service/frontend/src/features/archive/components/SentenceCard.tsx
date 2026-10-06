@@ -1,10 +1,7 @@
 import type { ArchivedSentence } from '@/shared/types/mbti';
 
 // ── 서랍 문장 카드 — 문장 + 출처 + 복사/삭제 액션.
-// ArchiveTab.tsx(893줄)가 너무 길어서 다른 독립 서브컴포넌트들과 함께
-// 분리했다(2026-08-18). 원문 기사 탐색(articles.find)은 그대로 부모에
-// 남기고 onNavigate 콜백만 받는다 — 이 카드는 articles 배열 전체를
-// 몰라도 된다.
+// 원문 기사 탐색(articles.find)은 부모에 두고 onNavigate 콜백만 받으므로 이 카드는 articles 배열 전체를 알 필요가 없다.
 export function SentenceCard({
   sentence,
   index,

@@ -6,5 +6,4 @@
 import os
 
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-CMS_POSTS_TABLE = os.environ.get("CMS_POSTS_TABLE", "sedaily-mbti-cms-posts-dev")
 CMS_MEDIA_BUCKET = os.environ.get("CMS_MEDIA_BUCKET", "sedaily-mbti-cms-media-dev")

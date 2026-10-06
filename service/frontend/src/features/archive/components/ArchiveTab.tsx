@@ -43,17 +43,8 @@ function toFrontendSentence(s: ArchiveSentenceResponse): ArchivedSentence {
   };
 }
 
-// 2026-08-18: 893줄이던 이 파일을 쪼갰다 — ArchiveLoginCta/TodaysSentenceSection/
-// PopularHighlightsSection/ArchiveRecommendations는 이미 완전히 독립적인
-// 서브컴포넌트로 같은 파일 안에 살고 있던 걸 각자 파일로 옮겼고, 날짜 네비
-// 스트립·캘린더 팝업·서랍 문장 카드는 인라인 JSX 덩어리(각 80줄 안팎)라
-// 새로 컴포넌트로 뽑아냈다(ArchiveDateNav/ArchiveCalendarModal/SentenceCard).
-// 로직·마크업은 그대로 — 구조만 옮겼다.
-//
-// 이 과정에서 handleSimilarSearch/similarResults/similarLoading/
-// similarSentenceId(문장 유사도 검색 — pgvector 기반)가 렌더 어디서도 안 쓰이는
-// 완전한 죽은 코드라 같이 정리했다. handleDelete/deletingId는 다른 문제라
-// 그대로 남겨뒀다 — 아래 handleDelete 주석 참조.
+// 화면 구성은 서브컴포넌트로 분리돼 있다(ArchiveLoginCta, TodaysSentenceSection, PopularHighlightsSection, ArchiveRecommendations, ArchiveDateNav, ArchiveCalendarModal, SentenceCard).
+// 삭제(handleDelete/deletingId) 로직은 아래 handleDelete 주석 참조.
 export function ArchiveTab({
   archiveDate,
   setArchiveDate,
@@ -81,9 +72,7 @@ export function ArchiveTab({
     setTimeout(() => setCopiedId(null), 1500);
   };
 
-  // 삭제 버튼이 로컬 state만 지우고 서버엔 요청을 보낸 적이 없어서, 새로고침하면
-  // "삭제한" 문장이 되살아났다(2026-08-24, 사용자 지적) — 낙관적으로 먼저 지우고
-  // 실제 DELETE 호출, 실패하면 되돌린다.
+  // 삭제 시 낙관적으로 먼저 지우고 서버에 DELETE를 호출하며, 실패하면 되돌린다(로컬 state만 지우면 새로고침 시 문장이 되살아난다).
   const handleDelete = async (sentence: ArchivedSentence) => {
     setArchivedSentences(prev => prev.filter(s => s.id !== sentence.id));
     if (!isAuthenticated || !user?.userId) return;
@@ -158,16 +147,10 @@ export function ArchiveTab({
 
       <div className="max-w-[600px] mx-auto px-6 py-10">
 
-        {/* 오늘의 한 문장 — "다른 사람들이 담은 문장"은 실사용자가 쌓여야
-            나타나므로, 서비스 초기엔 그마저도 비어있을 수 있다(2026-08-06
-            논의). 매일 실제로 발행되는 레터에서 자동으로 뽑아 항상 채워지는
-            층을 하나 더 둔다 — 누가 골라줄 필요 없이 오늘자 레터가 있으면
-            무조건 뜬다. 가짜 데이터 아님: 오늘 실제로 나간 문장 그대로. */}
+        {/* 오늘의 한 문장 — 다른 사람들이 담은 문장은 서비스 초기에 비어 있을 수 있으므로, 오늘자 레터에서 자동으로 뽑은 실제 문장을 항상 채워 둔다. */}
         <TodaysSentenceSection />
 
-        {/* 다른 사람들이 담은 문장 — 커뮤니티 탭(글쓰기 필요) 대체(2026-08-06).
-            로그인/보관 여부와 무관하게 항상 먼저 보여준다 — 빈 서랍일 때도
-            "다들 이런 걸 저장하는구나"가 첫 저장의 동기가 되도록. */}
+        {/* 다른 사람들이 담은 문장 — 로그인/보관 여부와 무관하게 항상 먼저 보여 준다. 빈 서랍일 때도 첫 저장의 동기가 된다. */}
         <PopularHighlightsSection />
 
         {/* Loading placeholder */}

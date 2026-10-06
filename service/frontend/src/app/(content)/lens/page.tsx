@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchLensPosts, CACHE_TTL_FALLBACK_SECONDS } from '@/shared/lib/api/cmsPostsApi';
+import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { LensListClient } from './LensListClient';
 import { SITE_URL, LENS_LIST_TITLE as TITLE, LENS_LIST_DESCRIPTION as DESCRIPTION, buildLensJsonLd } from './lensListShared';
@@ -26,26 +26,16 @@ export const metadata: Metadata = {
   },
 };
 
-// searchParams 제거(2026-08-23, 캐시 복구 — "더 빠르게" 요청) — ?page=N을
-// 서버 컴포넌트가 읽는 순간 Next가 이 라우트 전체를 fully dynamic으로
-// 못박아서 CloudFront가 캐시를 못 걸었다(실측: x-cache 항상 Miss, TTFB
-// 800ms대 — 홈/[slug] 페이지들은 같은 기간 60초~5분 캐시가 정상 작동).
-// 페이지네이션은 /lens/page/[n]/page.tsx로 옮겼다 — 1페이지(=이 파일)는
-// searchParams를 아예 안 읽으므로 [slug] 페이지들과 같은 force-cache+
-// revalidate 캐시를 다시 받는다.
+// searchParams를 읽지 않는다. ?page=N을 서버 컴포넌트가 읽으면 Next가 이 라우트를 fully dynamic으로 고정해 CloudFront 캐시가 걸리지 않는다.
+// 페이지네이션은 /lens/page/[n]/page.tsx에서 처리하며, 1페이지(이 파일)는 [slug] 페이지들과 같은 force-cache+revalidate 캐시를 받는다.
 //
-// export const revalidate 명시(2026-09-30) — fetch 레벨 revalidate:300만
-// 믿고 라우트 세그먼트 config를 안 뒀더니, 카테고리 아카이브(markets 등)
-// 7개 중 일부가 빌드마다 s-maxage=31536000(사실상 영구)으로 굳는 현상이
-// 실측 확인됐다(같은 코드인데 라우트별로 결과가 갈림 — 빌드 시점 fetch
-// 성공/실패에 따라 Next의 Full Route Cache 판정이 달라지는 것으로 추정).
-// 명시적으로 선언해두면 이 판정에 기대지 않고 항상 300초로 고정된다.
-export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts) — route segment config는 정적 분석돼 import한 상수를 못 쓴다, 값 바뀌면 여기도 같이 바꿀 것
+// export const revalidate를 명시한다. fetch 레벨 revalidate:300만 두면 일부 카테고리 아카이브가 빌드마다 s-maxage=31536000(사실상 영구)으로 굳을 수 있다
+// (빌드 시점 fetch 성공/실패에 따라 Full Route Cache 판정이 달라지는 것으로 추정). 명시하면 항상 300초로 고정된다.
+export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts). route segment config는 정적 분석되어 import한 상수를 쓸 수 없으므로 값 변경 시 함께 수정한다.
 
 export default async function LensListPage() {
-  // 우측 사이드바(HomeSideBar) 서버 프리페치(2026-08-23) — 홈/카테고리
-  // 페이지와 같은 이유(economyCategoryPage.tsx 참조).
-  const [items, hotLetters] = await Promise.all([fetchLensPosts(), fetchFollowingLetters(5)]);
+  // 우측 사이드바(HomeSideBar) 서버 프리페치 — 홈/카테고리 페이지와 같은 이유(economyCategoryPage.tsx 참조).
+  const [items, hotLetters] = await Promise.all([fetchLensPosts(), fetchFollowingLetters(10)]);
   const jsonLd = buildLensJsonLd(items);
   return (
     <>

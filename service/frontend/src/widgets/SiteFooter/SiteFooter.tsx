@@ -1,25 +1,13 @@
-// 전역 푸터 — SEO/E-E-A-T 신호 + 발행처 + 소셜.
-// 모든 페이지 하단에 마운트 (app/layout.tsx). 클라이언트 인터랙션 없음 → 서버 컴포넌트.
-//
+// 전역 푸터. SEO/E-E-A-T 신호 + 발행처 + 소셜.
+// 모든 페이지 하단에 마운트(app/layout.tsx)되며 클라이언트 인터랙션이 없어 서버 컴포넌트다.
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
-//
-// 2026-08-07: en.sedaily.com 실제 footer(About/Contact/Terms/Privacy 링크 +
-// 사업자정보 + Copyright)와 대조해 같은 구조로 보강 — 여긴 JSON-LD(구조화
-// 데이터)에만 있던 발행처 관계·사업자정보를 화면에 보이는 텍스트로도 노출해야
-// E-E-A-T 신호가 실제로 힘을 받는다는 걸 확인하고 반영했다. 또한 MBTI
-// 4-페르소나(민철·하은·준서·소율) 폐지(f84fd06) 이후에도 남아있던 그 카피를
-// 여기서 마저 제거.
+// JSON-LD(구조화 데이터)에만 있던 발행처 관계·사업자정보를 화면에 보이는 텍스트로도 노출해야 E-E-A-T 신호가 실제로 작동한다.
 
-// 아이콘 전부 동일 톤(currentColor 라인아트, rounded-square 컨테이너)으로 통일 —
-// 브랜드 원색을 안 쓰는 게 이 사이트에서 이미 확립된 패턴(HandDrawnIcons 등과
-// 동일 원칙). 2026-08-07: 서울경제신문 공식 채널(네이버TV·유튜브·페이스북·X·
-// 네이버플레이스) + RSS 추가 — 기존엔 JSON-LD sameAs에만 있던 채널들을
-// 실제 보이는 링크로도 노출(E-E-A-T).
+// 아이콘은 모두 같은 톤(currentColor 라인아트, rounded-square 컨테이너)으로 통일하며 브랜드 원색은 쓰지 않는다.
+// 서울경제신문 공식 채널과 RSS는 JSON-LD sameAs와 별개로 실제 보이는 링크로도 노출한다(E-E-A-T).
 const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
   {
-    // AI LENS 자체 계정(2026-08-11) — 이전엔 서울경제 부계정(머니컷)이 걸려
-    // 있었는데, 이 푸터는 AI LENS 제품 페이지용이라 방문자와 가장 관련
-    // 있는 계정 하나만 보여주는 게 맞다(sameAs에는 머니컷도 그대로 남아있음).
+    // AI LENS 자체 계정. 이 푸터는 AI LENS 제품 페이지용이라 방문자와 가장 관련 있는 계정 하나만 보여준다(sameAs에는 서울경제 부계정도 남아 있다).
     label: 'Instagram',
     href: 'https://www.instagram.com/lens.sedaily/',
     icon: (
@@ -94,12 +82,8 @@ const SOCIAL: { label: string; href: string; icon: React.ReactElement }[] = [
   },
 ];
 
-// '서비스 소개'(/onboarding, "AI가 매일 아침 그날의 경제 뉴스를 정리해 한 통으로
-// 전합니다")는 헤더 상시 노출은 2026-08-06에 의도적으로 뺐지만(위 Header.tsx
-// 주석 참조 — 참고 서비스 7곳 중 헤더에 상시 노출하는 곳이 없었음) 사이트
-// 어딘가엔 있어야 한다는 지적(2026-08-11)에 따라 푸터에 추가. '회사소개'
-// (/about, 발행처·E-E-A-T 공시)와는 다른 페이지 — 실제 "이 서비스가 뭐하는
-// 곳인지" 소개는 /onboarding, "누가 만들고 어떻게 운영하는지"는 /about.
+// '서비스 소개'(/onboarding)는 헤더 상시 노출 대신 푸터에 둔다. '회사소개'(/about, 발행처·E-E-A-T 공시)와는 다른 페이지다.
+// 서비스가 무엇인지는 /onboarding, 누가 어떻게 운영하는지는 /about이다.
 const NAV: { label: string; href: string }[] = [
   { label: '서비스 소개', href: '/onboarding' },
   { label: '회사소개', href: '/about' },
@@ -108,23 +92,11 @@ const NAV: { label: string; href: string }[] = [
   { label: '개인정보처리방침', href: '/privacy' },
 ];
 
-// 콘텐츠 허브 링크(2026-08-12) — 모든 페이지 하단에 콘텐츠 타입/카테고리
-// 페이지로 가는 링크를 심어서, 크롤러가 어느 글에서 출발하든 몇 클릭 안에
-// 전체 콘텐츠 구조를 발견할 수 있게 한다(사이트맵과는 별개로 "실제 보이는
-// 링크"가 있어야 크롤 우선순위·내부 링크 가중치에 더 잘 잡힌다는 지적).
-//
-// '딥다이브'(/trend)는 2026-08-17 폐기, '이슈 톡톡'(/issue-talk)은
-// 2026-08-19 폐기 — headerTabs.ts 주석 참조. 이 배열이 headerTabs.ts/
-// FeedPage.tsx와 별도로 관리되는 세 번째 사본이라는 걸 /trend 때 뒤늦게
-// 발견했다(앞의 둘만 고치고 배포했다가 라이브에서 이 푸터 링크만 남아있는
-// 걸 확인) — 같은 사고를 또 내지 않도록, 상단 탭 개편(브리핑/인사이트/
-// 이슈톡톡 → 주제 6개)에 맞춰 여기도 ECON_CATEGORIES에서 직접 생성한다 —
-// 손으로 옮겨 적지 않는다.
+// 콘텐츠 허브 링크. 모든 페이지 하단에 카테고리 페이지 링크를 두어 크롤러가 어느 글에서 시작하든 몇 클릭 안에 전체 구조를 발견하게 한다
+// (사이트맵과 별개로 실제 보이는 링크가 있어야 내부 링크 가중치에 유리하다).
+// headerTabs.ts/FeedPage.tsx와 별도로 관리되는 사본이므로, 상단 탭 개편이 누락되지 않도록 ECON_CATEGORIES에서 직접 생성한다.
 const CONTENT_LINKS: { label: string; href: string }[] = [
   ...ECON_CATEGORIES.map((c) => ({ label: c.label, href: `/${c.slug}` })),
-  { label: '영상', href: '/video' },
-  { label: '웹툰', href: '/webtoon' },
-  { label: '오디오', href: '/listen' },
   { label: '전체 콘텐츠', href: '/lens' },
   { label: 'MBTI로 보는 뉴스', href: '/mbti' },
 ];
@@ -137,14 +109,9 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
         marginTop: 48,
         borderTop: '1px solid #f1f3f5',
         background: '#fafbfc',
-        // 하단 패딩에 TodayNewsPlayer.tsx의 고정 높이(진행바 3px + 본문
-        // 60px = 63px)를 더했다(2026-08-17, 사용자 피드백: "하단 오디오
-        // 플레이백 떄문에 서울경제 all right reserved 안보여요" — 플레이어가
-        // position:fixed bottom:0이라 원래 패딩만으로는 저작권 줄이 항상
-        // 가려졌다). 2026-08-19 — 플레이어가 메인 피드('/')에서만 뜨도록
-        // 바뀌면서(ConditionalTodayNewsPlayer.tsx) 다른 모든 페이지에 이
-        // 여백이 불필요하게 남는 문제가 생겨, ConditionalFooter가 넘겨주는
-        // reservePlayerSpace(=pathname==='/')로 그 페이지에서만 여백을 더한다.
+        // 하단 패딩에 TodayNewsPlayer.tsx의 고정 높이(진행바 3px + 본문 60px = 63px)를 더한다.
+        // 플레이어가 position:fixed bottom:0이라 원래 패딩만으로는 저작권 줄이 가려지며, 플레이어는 메인 피드('/')에서만 뜨므로
+        // ConditionalFooter가 넘기는 reservePlayerSpace(pathname==='/')일 때만 여백을 더한다.
         padding: reservePlayerSpace
           ? 'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 32px) calc(clamp(28px, 4vw, 40px) + 64px)'
           : 'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 32px)',
@@ -183,8 +150,7 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
           </div>
         </div>
 
-        {/* 콘텐츠 허브 링크 — 크롤러·독자가 어느 글에서 시작하든 전체 콘텐츠
-            구조를 몇 클릭 안에 발견할 수 있게(2026-08-12). */}
+        {/* 콘텐츠 허브 링크. 크롤러·독자가 어느 글에서 시작하든 전체 콘텐츠 구조를 몇 클릭 안에 발견하게 한다. */}
         <nav
           className="flex flex-wrap"
           style={{ gap: '6px 16px', paddingBottom: 14, marginBottom: 14 }}
@@ -241,18 +207,13 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
               English Edition
             </a>
           </p>
-          {/* 지원사업 공시(2026-08-25) — AI LENS는 한국언론진흥재단 2026년
-              지원사업으로 개발됐다(사업 계보: docs 참조). 다른 서울경제
-              AI 제품(AI NOVA)의 푸터가 이미 같은 방식으로 재단 지원 사실을
-              밝히고 있어 같은 관례를 따른다. "인지양식 유형별"은 이 제품이
-              애초에 제출된 사업계획서상의 표현(사용자 인지 스타일에 맞춰
-              같은 뉴스를 레터/웹툰/팟캐스트/영상 네 형식으로 재구성)이라
-              그대로 쓴다. */}
+          {/* 지원사업 공시. AI LENS는 한국언론진흥재단 지원사업으로 개발되었으며, 다른 서울경제 AI 제품(AI NOVA) 푸터와 같은 관례를 따른다.
+              "인지양식 유형별"은 제출된 사업계획서상의 표현이므로 그대로 쓴다. */}
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
             AI LENS는 한국언론진흥재단 지원을 받아 개발한 인지양식 유형별 서비스입니다.
           </p>
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
-            본 서비스는 AI가 생성한 콘텐츠를 제공합니다. 명리학과 결합한 사주 섹션은 재미와 참고용입니다.
+            본 서비스는 AI가 생성한 콘텐츠를 제공합니다.
           </p>
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 12 }}>
             © {year} 서울경제신문. All rights reserved.

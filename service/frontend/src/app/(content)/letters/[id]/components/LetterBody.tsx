@@ -1,30 +1,22 @@
 import { Fragment } from 'react';
 import { Calendar } from 'lucide-react';
 import { InteractiveBlock } from '@/features/news-feed';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
-import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
-import { ArticleFontSizeControl } from '@/shared/ui/ArticleFontSizeControl';
-import { ArticlePrintButton } from '@/shared/ui/ArticlePrintButton';
+import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
+import { ArticleFontSizeControl } from '@/shared/ui/article/ArticleFontSizeControl';
+import { ArticlePrintButton } from '@/shared/ui/article/ArticlePrintButton';
 import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
-import {
-  cleanSubtitle,
-  letterCategoryLabel,
-  splitBodyHtml,
-  injectImageCaptions,
-  LetterChartBlock,
-  type NeighborLetter,
-} from '.';
+import { cleanSubtitle, letterCategoryLabel, splitBodyHtml, injectImageCaptions } from './letterHtmlUtils';
+import { LetterChartBlock } from './LetterChartBlock';
+import type { NeighborLetter } from './PrevNextLetterNav';
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import { LetterBlock } from './LetterBlock';
 import { LetterTextExtras } from './LetterTextExtras';
 import { LetterSubscribeSection } from './LetterSubscribeSection';
 import { SITE_URL } from '@/shared/constants/site';
 
-// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해 2라운드).
-// production letter inline 렌더
-// - 4개 채널 탭 폐기. 한 페이지에서 자연스러운 흐름으로 통합:
-//     헤더 → (있으면) 팟캐스트 미니 플레이어 → 본문 → 핵심 정리/닫는 줄/단어 → 구독
+// production letter inline 렌더 — 한 페이지에서 헤더 → 본문 → 핵심 정리/닫는 줄/단어 → 구독 순으로 흐른다.
 export function LetterBody({
   letter,
   nextLetter,
@@ -34,18 +26,15 @@ export function LetterBody({
   nextLetter?: NeighborLetter | null;
   prevLetter?: NeighborLetter | null;
 }) {
-  // 본문은 한 흐름으로 렌더 — 중간 mock 이미지는 제거. 하단 4컷 카드가 대체.
+  // 본문은 한 흐름으로 렌더한다.
   const body = letter.body;
 
   // 시각 v2 — 2026-05-23 이후 발행분에만 적용 (용어 툴팁 + 클로징 풀쿼트).
   // letter.id 'l-YYYYMMDD-XX' 에서 날짜 추출 → lexical 비교.
   const dateStr = letter.id.match(/l-(\d{8})/)?.[1] ?? '';
   const isModern = dateStr >= '20260523';
-  // 헤더 메타줄 발행일 표시(2026-08-18) — ApiLetter엔 개별 date 필드가 없다
-  // (date는 배치 응답 ApiTodayLettersResponse 쪽에만 있음, 확인됨). id의
-  // 'l-YYYYMMDD-XX' 패턴에서 이미 뽑아둔 dateStr을 그대로 재사용하고,
-  // 이 패턴을 안 쓰는 CMS 글은 published_at(시:분까지, 2026-08-23 추가)
-  // → publish_date(날짜만) 순으로 폴백한다.
+  // 헤더 메타줄 발행일 — ApiLetter엔 개별 date 필드가 없다(date는 배치 응답 ApiTodayLettersResponse에만 있음).
+  // id의 'l-YYYYMMDD-XX' 패턴에서 뽑은 dateStr을 재사용하고, 이 패턴을 안 쓰는 CMS 글은 published_at(시:분까지) → publish_date(날짜만) 순으로 폴백한다.
   const displayDate = dateStr.length === 8
     ? `${dateStr.slice(0, 4)}.${dateStr.slice(4, 6)}.${dateStr.slice(6, 8)}`
     : kstDateTimeLabel(letter.published_at) ?? letter.publish_date?.replaceAll('-', '.') ?? null;
@@ -70,8 +59,7 @@ export function LetterBody({
       <SentenceSelectionPopover letter={letter} />
 
       <header style={{ marginBottom: 24 }}>
-        {/* 역할 라벨(archetype) 제거(2026-08-09) — "모든 카테고리가 같은 조건"으로
-            에디터 이름 배지 아래 부가 설명 없이 바로 제목. */}
+        {/* 역할 라벨(archetype)은 두지 않는다. 에디터 이름 배지 아래 바로 제목이 온다. */}
         <h1
           data-speakable="headline"
           style={{
@@ -104,13 +92,7 @@ export function LetterBody({
           </p>
         )}
 
-        {/* 배지·발행일·구글 선호 출처 링크 + 공유·글자크기·인쇄 툴바 —
-            lens 상세페이지와 정확히 같은 구성·순서로 맞췄다(2026-08-18,
-            "제목 아래에.. 두 요소가 붙어있어야죠... 기존것처럼" — 처음엔
-            이 메타줄을 제목 "위"에 두고, 그 사이에 부제·팟캐스트 플레이어가
-            끼어들어 공유 툴바가 메타줄과 뚝 떨어져 보였다. lens처럼
-            제목 바로 아래에 메타줄 → 공유 툴바가 붙어서 나오도록 순서를
-            바꾸고, 원래 있던 부제·팟캐스트 플레이어는 툴바 아래로 옮겼다. */}
+        {/* 배지·발행일·구글 선호 출처 링크 + 공유·글자크기·인쇄 툴바 — lens 상세와 같은 구성·순서이다. 제목 바로 아래에 메타줄 → 공유 툴바가 이어지고 부제는 툴바 아래에 둔다. */}
         <div className="flex items-center flex-wrap" style={{ gap: 12, marginBottom: 16 }}>
           <span
             style={{
@@ -158,10 +140,6 @@ export function LetterBody({
           </div>
         </div>
 
-        {/* 팟캐스트 미니 플레이어 제거(2026-08-18, "저거 요소 삭제" — 대부분의
-            레터가 오디오가 없어 "아직 준비 중이에요"만 뜨는 회색 카드로
-            보였다). 이 카드만 쓰던 LetterPodcastPlayer/fmtTime도 같이 삭제 —
-            남겨두면 아무 데서도 안 부르는 죽은 코드가 된다. */}
       </header>
 
       {/* 본문 — 한 흐름. CMS 글(body_html 있음)은 Tiptap 리치텍스트를 그대로

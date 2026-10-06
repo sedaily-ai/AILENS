@@ -20,9 +20,7 @@
 #   ./provision.sh                    # Create all resources
 #   ./provision.sh --dry-run          # Print commands without executing
 #
-# Does NOT provision (Phase 2 — requires AWS engineer):
-#   - OpenSearch domain
-#   - RDS PostgreSQL + pgvector
+# 프로비저닝 대상이 아닌 항목(AWS 담당자 작업 필요): OpenSearch 도메인, RDS PostgreSQL(pgvector)
 # =============================================================================
 
 set -e
@@ -191,7 +189,7 @@ create_lambda() {
     --environment "Variables={AWS_REGION=$REGION,DYNAMODB_TABLE_ARTICLES=sedaily-mbti-articles-dev,DYNAMODB_TABLE_PERSONAL=sedaily-mbti-personal-dev,DYNAMODB_TABLE_PODCAST=sedaily-mbti-podcast-dev,S3_ARTICLE_BODY_BUCKET=sedaily-mbti-article-body-dev,S3_AUDIO_BUCKET=sedaily-mbti-audio-dev}"
 }
 
-# Archive (내 서랍) — sentence archiving with pgvector similarity
+# Archive (내 서랍) — 문장 아카이브
 create_lambda \
   "sedaily-mbti-archive-dev" \
   "handlers.archive_handler.lambda_handler" \
@@ -233,25 +231,3 @@ echo "Phase 2 (not provisioned yet — requires AWS engineer):"
 echo "  - OpenSearch domain (RAG hybrid search)"
 echo "  - RDS PostgreSQL + pgvector extension (similarity search)"
 echo ""
-
-# =============================================================================
-# CLEANUP COMMANDS (uncomment to tear down)
-# =============================================================================
-# echo "Tearing down resources..."
-#
-# # Lambda — API
-# aws lambda delete-function --function-name sedaily-mbti-archive-dev --region $REGION
-# aws lambda delete-function --function-name sedaily-mbti-podcast-dev --region $REGION
-# aws lambda delete-function --function-name sedaily-mbti-recommend-dev --region $REGION
-#
-# # DynamoDB (WARNING: deletes all data)
-# aws dynamodb delete-table --table-name sedaily-mbti-personal-dev --region $REGION
-# aws dynamodb delete-table --table-name sedaily-mbti-podcast-dev --region $REGION
-#
-# # S3 (must empty buckets first)
-# aws s3 rm s3://sedaily-mbti-article-body-dev --recursive
-# aws s3api delete-bucket --bucket sedaily-mbti-article-body-dev --region $REGION
-# aws s3 rm s3://sedaily-mbti-audio-dev --recursive
-# aws s3api delete-bucket --bucket sedaily-mbti-audio-dev --region $REGION
-#
-# echo "Teardown complete."

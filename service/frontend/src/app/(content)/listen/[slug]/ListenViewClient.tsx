@@ -1,23 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchHomePlayerBySlug, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
-import { kstDateTimeLabel } from '@/shared/lib/date';
+import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { useMediaProgress } from '@/shared/lib/tracking/useMediaProgress';
-import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/videoEmbed';
+import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/media/videoEmbed';
 import { ACCENT } from '../accent';
 
 /**
- * 오디오 상세(2026-08-21) — video/[slug]/VideoViewClient.tsx와 같은
- * initialItem 패턴. mp3 등 직접 파일이면 네이티브 <audio controls>, YouTube/
- * 네이버TV면 iframe 임베드 — 둘 다 이 페이지 하나에서 처리한다(홈 하단
- * 미니 플레이어와 달리 진행률 폴링·다음 트랙 자동재생 같은 상태 관리가
- * 필요 없어 브라우저 네이티브 컨트롤로 충분하다).
+ * 오디오 상세 — video/[slug]/VideoViewClient.tsx와 같은 initialItem 패턴. mp3 등 직접 파일이면 네이티브 <audio controls>, YouTube/네이버TV면 iframe 임베드로 한 페이지에서 처리한다.
+ * 홈 하단 미니 플레이어와 달리 진행률 폴링·다음 트랙 자동재생 같은 상태 관리가 필요 없어 브라우저 네이티브 컨트롤로 충분하다.
  */
 export function ListenViewClient({
   slug,
@@ -51,8 +48,8 @@ export function ListenViewClient({
         <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center text-neutral-500">
           <p>오디오를 찾을 수 없어요.</p>
-          <Link href="/listen" className="mt-4 inline-block text-sm underline underline-offset-4 hover:text-neutral-900">
-            오디오 목록으로
+          <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4 hover:text-neutral-900">
+            최신 뉴스로
           </Link>
         </div>
       </div>
@@ -76,11 +73,11 @@ export function ListenViewClient({
       {item && (
         <main style={{ maxWidth: 680, margin: '0 auto', padding: 'clamp(24px, 5vw, 40px) clamp(20px, 5vw, 32px) 80px' }}>
           <Link
-            href="/listen"
+            href="/lens"
             className="text-gray-400 hover:text-gray-900 transition-colors"
             style={{ fontSize: 13, fontWeight: 600, display: 'inline-block', marginBottom: 20 }}
           >
-            ← 오디오 목록으로
+            ← 최신 뉴스로
           </Link>
 
           <div style={{ padding: '4px 0 0' }}>
@@ -152,12 +149,7 @@ export function ListenViewClient({
             <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.65, marginTop: 20 }}>{item.excerpt}</p>
           )}
 
-          {/* 전체 대본(2026-08-23, 사용자 지적 — "들어갈 때 이것만 있으니까
-              너무 허전한데, 텍스트 스크립트 표출하면 어떰?"). 플레이어 +
-              한 줄 요약뿐이던 페이지가 실제로 아래가 텅 비어 있었다 —
-              lens 팟캐스트 포맷이 이미 갖고 있던 접근성용 transcript를
-              그대로 보여준다(타임스탬프 동기화는 없음, LensViewClient.tsx
-              와 같은 패턴). */}
+          {/* 전체 대본 — lens 팟캐스트 포맷이 가진 접근성용 transcript를 그대로 보여준다(타임스탬프 동기화 없음, LensViewClient.tsx와 같은 패턴). */}
           {item.transcript && (
             <div
               style={{

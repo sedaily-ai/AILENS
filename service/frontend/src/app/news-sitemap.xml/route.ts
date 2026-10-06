@@ -1,20 +1,15 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { letterHref } from '@/shared/lib/letterHref';
-import { lensPath } from '@/shared/lib/lensUrl';
-import { kstTodayStr } from '@/shared/lib/date';
+import { letterHref } from '@/shared/lib/content/letterHref';
+import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { kstTodayStr } from '@/shared/lib/date/date';
 
-// Google News sitemap (news:news 확장, https://www.google.com/schemas/sitemap-news/0.9) —
-// 2026-08-12, "실시간 뉴스가 검색엔진 노출이 어렵지 않나" 질문에서 시작.
-// 일반 sitemap.ts는 구글이 페이지를 "보통 웹페이지"로 취급해 크롤링 우선순위가
-// 낮다 — News/Top Stories/Discover가 신규 기사를 몇 분~수시간 단위로 잡아채는
-// 건 이 전용 sitemap 형식이 신호를 준다. Google News 진입은 수동 신청 절차가
-// 2019년경 폐지됐고, 이 sitemap + 콘텐츠 정책 준수만으로 자동 평가 대상이 된다.
+// Google News sitemap(news:news 확장, https://www.google.com/schemas/sitemap-news/0.9).
+// 일반 sitemap.ts는 구글이 "보통 웹페이지"로 취급해 크롤링 우선순위가 낮으므로, News/Top Stories/Discover가 신규 기사를 빠르게 잡도록 전용 형식을 둔다.
+// 별도 수동 신청 없이 이 sitemap과 콘텐츠 정책 준수로 자동 평가 대상이 된다.
 //
-// 스펙상 "최근 2일 이내에 발행된 기사만" 포함해야 한다(오래된 기사를 넣으면
-// 무시되거나 경고 대상) — sitemap.ts의 일반 아카이브용 SEED_DAYS=14와는
-// 성격이 다르다. NewsArticle 마크업이 있는 콘텐츠(letters + lens, 2026-08-13
-// lens를 Article→NewsArticle로 전환하며 함께 포함)만 대상 — webtoon/video는
-// 여전히 VideoObject/오락 콘텐츠라 뉴스 sitemap 성격이 아니다.
+// 스펙상 최근 2일 이내 발행 기사만 포함한다(오래된 기사는 무시되거나 경고 대상). sitemap.ts의 일반 아카이브용 SEED_DAYS=14와 성격이 다르다.
+// NewsArticle 마크업이 있는 콘텐츠(letters + lens)만 대상이며, webtoon/video는 VideoObject/오락 콘텐츠라 제외한다.
 
 import { SITE_URL as BASE } from '@/shared/constants/site';
 const NEWS_NS = 'http://www.google.com/schemas/sitemap-news/0.9';
@@ -43,12 +38,8 @@ export async function GET() {
   const seen = new Set<string>();
   const entries: Array<{ loc: string; headline: string; date: string; publishedAt?: string | null; keywords: string[] }> = [];
 
-  // v1.32 — lens 먼저 채운다. channel=letters 조회는 admin_channel='letters'
-  // 뿐 아니라 letter 포맷 rendition이 있는 모든 글(=거의 모든 lens 글)을
-  // 같이 돌려준다(cms_posts_repo.py — video/webtoon과 같은 설계). 예전엔
-  // letters를 먼저 채워서 lens 글이 /letters/{slug} URL로 먼저 seen에
-  // 들어가 버렸다 — 구글 뉴스에 4탭 페이지 대신 레터 단독 페이지가
-  // 실렸다(사용자 신고: "4개 탭이 안 나온다"가 종종 있었던 원인 중 하나).
+  // lens를 먼저 채운다. channel=letters 조회는 letter 포맷 rendition이 있는 모든 글(거의 모든 lens 글)을 함께 돌려주므로(cms_posts_repo.py),
+  // letters를 먼저 채우면 lens 글이 /letters/{slug}로 먼저 등록되어 구글 뉴스에 4탭 페이지 대신 레터 단독 페이지가 실린다.
   // lens를 먼저 채우면 겹치는 글은 항상 /lens/{slug}가 이긴다.
   try {
     const lensPosts = await fetchLensPosts();
@@ -57,13 +48,10 @@ export async function GET() {
       seen.add(l.id);
       entries.push({
         loc: `${BASE}${lensPath(l)}`,
-        headline: l.headline,
+        headline: seoHeadline(l.headline), // news:title — 부서 접두사·이모지 제거
         date: l.date,
         publishedAt: l.published_at,
-        // 카테고리·하위 카테고리(2026-10-01 econSubcategories.ts 신설) —
-        // 이전엔 항상 빈 배열이라 news:keywords가 lens 글에서 한 번도
-        // 안 찍혔다. letters 쪽(아래)은 실제 용어 키워드를 쓰지만 lens엔
-        // 그런 필드가 없어 가장 가까운 신호(주제 분류)로 채운다.
+        // 카테고리·하위 카테고리(econSubcategories.ts)로 news:keywords를 채운다. lens에는 용어 키워드 필드가 없어 가장 가까운 신호(주제 분류)를 쓴다(letters 쪽은 실제 용어 키워드 사용).
         keywords: [l.category, l.subcategory].filter((k): k is string => !!k),
       });
     }
@@ -92,9 +80,7 @@ export async function GET() {
 
   const urls = entries
     .map(({ loc, headline, date, publishedAt, keywords }) => {
-      // 발행 시각(초 단위)이 있으면 그걸 쓴다(2026-10-01) — 이전엔 전부
-      // 07:00 고정이라 같은 날 글이 전부 같은 시각으로 신고돼 신선도 신호가
-      // 사라졌다(rss.xml pubDate와 같은 문제). 없으면 기존 폴백 유지.
+      // 발행 시각(초 단위)이 있으면 쓴다. 07:00 고정이면 같은 날 글이 모두 같은 시각으로 신고되어 신선도 신호가 사라진다(rss.xml pubDate와 같은 문제). 없으면 기존 폴백을 유지한다.
       const pubDate = publishedAt && !isNaN(new Date(publishedAt).getTime())
         ? new Date(publishedAt).toISOString()
         : `${date}T07:00:00+09:00`;

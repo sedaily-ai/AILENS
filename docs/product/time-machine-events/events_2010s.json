@@ -1,0 +1,590 @@
+[
+  {
+    "date": "2010-05-02",
+    "title": "유로존·IMF, 그리스에 1100억 유로 구제금융 합의",
+    "shortTitle": "그리스 구제금융",
+    "description": "유로존과 IMF가 디폴트를 막기 위해 3년간 1100억 유로(약 1460억 달러) 규모의 대출을 그리스에 제공하기로 했다.",
+    "era": "유럽 재정위기",
+    "eraPeriod": "2010.05 ~ 2012.09",
+    "searchKeywords": [
+      "그리스 구제금융",
+      "유로존 재정위기"
+    ],
+    "paperDate": "2010-05-03",
+    "status": "confirmed",
+    "note": "France24와 CFR 모두 5월 2일(일). EU 집행위 자료는 PDF 텍스트 추출 실패로 교차확인에서 제외. 시대 기간은 편집 판단.",
+    "evidence": [
+      {
+        "label": "France24 (2010-05-04)",
+        "url": "https://www.france24.com/en/20100504-greek-crisis-eu-imf-bailout-debt-economy-germany-france-unions-jobs-euro-markets",
+        "quote": "Eurozone leaders have approved an unprecedented 110 billion euro emergency loan package for Greece"
+      },
+      {
+        "label": "CFR, Greece's Debt Crisis timeline (2010.5.2 항목)",
+        "url": "https://www.cfr.org/articles/greeces-debt-crisis-timeline",
+        "quote": "To avoid default, the International Monetary Fund and EU agree to provide Greece with 110 billion euros ($146 billion) in loans over three years."
+      }
+    ]
+  },
+  {
+    "date": "2010-11-11",
+    "endDate": "2010-11-12",
+    "title": "G20 서울 정상회의 개막",
+    "shortTitle": "G20 서울",
+    "description": "제5차 G20 정상회의가 서울 코엑스에서 11~12일 열렸고, 신흥국이 의장을 맡은 첫 정상회의였다.",
+    "era": "G20 서울 정상회의",
+    "eraPeriod": "2010.11 ~ 2010.11",
+    "searchKeywords": [
+      "G20 서울 정상회의",
+      "G20"
+    ],
+    "paperDate": "2010-11-12",
+    "status": "confirmed",
+    "note": "개막일 11일, 폐막 12일. 두 출처 일치. 신흥국 의장 첫 사례는 위키 외 출처로 별도 확인 못 했으므로 설명에서는 서울신문·Kirton이 확인한 개최 사실을 우선함.",
+    "evidence": [
+      {
+        "label": "서울신문 (2010-11-11)",
+        "url": "https://www.seoul.co.kr/news/politics/seoul_g20/2010/11/11/20101111800046",
+        "quote": "서울 제5차 G20(주요 20개국) 정상회의가 11일 공식 개막한다"
+      },
+      {
+        "label": "G20 Research Group, Kirton",
+        "url": "https://www.g20.utoronto.ca/analysis/kirton-seoul-perf-101113.html",
+        "quote": "The fifth G20 summit, taking place in Seoul, Korea, on November 11-12, 2010"
+      }
+    ]
+  },
+  {
+    "date": "2011-08-05",
+    "title": "S&P, 미국 신용등급 AAA에서 AA+로 강등",
+    "shortTitle": "미국 신용강등",
+    "description": "S&P가 미국의 장기 신용등급을 AAA에서 AA+로 내렸다. 미국이 최고 등급을 잃은 것은 처음이다.",
+    "era": "유럽 재정위기",
+    "eraPeriod": "2010.05 ~ 2012.09",
+    "searchKeywords": [
+      "미국 신용등급 강등",
+      "S&P"
+    ],
+    "paperDate": "2011-08-06",
+    "status": "confirmed",
+    "note": "미국 현지 금요일 밤 발표(한국 시각 토요일). 두 출처 일치.",
+    "evidence": [
+      {
+        "label": "Roll Call (2011-08-05)",
+        "url": "https://rollcall.com/2011/08/05/sp-downgrades-u-s-credit-rating/",
+        "quote": "Standard & Poor's announced Friday night it had lowered the long-term credit rating for the U.S. from AAA to AA+"
+      },
+      {
+        "label": "ABC News (2011-08-05)",
+        "url": "https://abcnews.com/Business/standard-poors-downgrades-us-credit-rating-aaa-aa/story?id=14220820",
+        "quote": "For the first time ever, the United States lost its perfect credit rating"
+      }
+    ]
+  },
+  {
+    "date": "2011-08-08",
+    "title": "코스피 3.82% 급락, 장중 낙폭 역대 최대",
+    "shortTitle": "코스피 폭락",
+    "description": "미국 신용등급 강등 직후 첫 거래일에 코스피가 74.30포인트(3.82%) 내린 1869.45로 마감했고, 장중 최대 하락폭은 143.75포인트로 역대 최대였다.",
+    "era": "유럽 재정위기",
+    "eraPeriod": "2010.05 ~ 2012.09",
+    "searchKeywords": [
+      "코스피 폭락",
+      "신용등급 강등"
+    ],
+    "paperDate": "2011-08-09",
+    "status": "confirmed",
+    "note": "서울신문 후속기사 일부는 장중 수치를 7.81%로 적었으나(1:27pm 1,804.16) 종가 수치는 이투데이와 서울신문 다른 기사가 일치. 종가 기준으로만 기술.",
+    "evidence": [
+      {
+        "label": "서울신문 (2011-08-08)",
+        "url": "https://www.seoul.co.kr/news/economy/2011/08/08/20110808800102",
+        "quote": "8일 코스피는 전날보다 74.30포인트(3.82%) 내린 1,869.45에 거래를 마쳤다"
+      },
+      {
+        "label": "이투데이 (2011-08-08)",
+        "url": "https://www.etoday.co.kr/news/view/467300",
+        "quote": "8일 코스피지수는 전거래일 대비 74.30포인트(3.82%) 하락한 1869.45로 마감했다"
+      }
+    ]
+  },
+  {
+    "date": "2012-03-15",
+    "title": "한미 FTA 공식 발효",
+    "shortTitle": "한미 FTA 발효",
+    "description": "한미 자유무역협정이 3월 15일 0시 공식 발효됐다. 협상은 2006년 6월 개시, 2007년 4월 타결됐다.",
+    "era": "한미 FTA 발효",
+    "eraPeriod": "2012.03 ~ 2012.03",
+    "searchKeywords": [
+      "한미 FTA",
+      "FTA 발효"
+    ],
+    "paperDate": "2012-03-16",
+    "status": "confirmed",
+    "note": "서울신문(2012-02-22)은 예고 기사('발효된다'), 네이트 기사는 발효 사실 서술. 두 출처 날짜 일치.",
+    "evidence": [
+      {
+        "label": "서울신문 (2012-02-22)",
+        "url": "https://www.seoul.co.kr/news/economy/2012/02/22/20120222800001",
+        "quote": "한ㆍ미 자유무역협정(FTA)이 3월15일 0시 공식 발효된다."
+      },
+      {
+        "label": "네이트뉴스 (2012-03-15)",
+        "url": "https://news.nate.com/view/20120315n22871?mid=n0108",
+        "quote": "2012년 3월 15일, 한-미 자유무역협정이 정식 발효했다."
+      }
+    ]
+  },
+  {
+    "date": "2013-05-22",
+    "title": "버냉키 연준 의장, 양적완화 축소 가능성 시사",
+    "shortTitle": "버냉키 발언",
+    "description": "버냉키 의장이 의회 합동경제위원회에서 노동시장 개선이 이어지면 채권매입 속도를 줄일 수 있다고 밝혔고, 이후 긴축발작(taper tantrum)으로 이어졌다.",
+    "era": "양적완화 축소 쇼크",
+    "eraPeriod": "2013.05 ~ 2013.12",
+    "searchKeywords": [
+      "버냉키 양적완화 축소",
+      "긴축발작"
+    ],
+    "paperDate": "2013-05-23",
+    "status": "confirmed",
+    "note": "미국 현지 22일 증언(한국 시각 23일 새벽). 세 출처 일치. 연준 홈페이지 증언 원문은 '속도를 늘리거나 줄일 준비가 돼 있다'고 서술, 'next few meetings' 문구는 질의응답에서 나온 것으로 Yahoo(로이터 타임라인)가 전함.",
+    "evidence": [
+      {
+        "label": "Federal Reserve, Bernanke testimony 2013-05-22",
+        "url": "https://www.federalreserve.gov/newsevents/testimony/bernanke20130522a.htm",
+        "quote": "prepared to increase or reduce the pace"
+      },
+      {
+        "label": "Yahoo Finance (Reuters timeline)",
+        "url": "https://finance.yahoo.com/news/timeline-key-events-fed-2013-taper-tantrum-033850646--business.html",
+        "quote": "we could in the next few meetings ... take a step down in our pace of purchases"
+      },
+      {
+        "label": "서울신문 (2013-05-23)",
+        "url": "https://www.seoul.co.kr/news/international/2013/05/23/20130523800033",
+        "quote": "노동시장 상황이 본격적이고 지속가능한 형태로 개선된다면 채권매입의 속도를 늦출 것"
+      }
+    ]
+  },
+  {
+    "date": "2013-12-18",
+    "title": "연준, 자산매입 규모 축소 결정(테이퍼링 개시)",
+    "shortTitle": "테이퍼링 개시",
+    "description": "FOMC가 2014년 1월부터 월 자산매입 규모를 850억 달러에서 750억 달러로 줄이기로 했다.",
+    "era": "양적완화 축소 쇼크",
+    "eraPeriod": "2013.05 ~ 2013.12",
+    "searchKeywords": [
+      "테이퍼링",
+      "FOMC 자산매입 축소"
+    ],
+    "paperDate": "2013-12-19",
+    "status": "confirmed",
+    "note": "미국 현지 12월 18일 발표(한국 시각 19일 새벽). 두 출처 일치.",
+    "evidence": [
+      {
+        "label": "Federal Reserve FOMC 성명 2013-12-18",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20131218a.htm",
+        "quote": "Beginning in January, the Committee will add to its holdings of agency mortgage-backed securities at a pace of $35 billion per month rather than $40 billion per month"
+      },
+      {
+        "label": "Yahoo Finance (Reuters timeline)",
+        "url": "https://finance.yahoo.com/news/timeline-key-events-fed-2013-taper-tantrum-033850646--business.html",
+        "quote": "decreasing the monthly pace from $85 billion to $75 billion"
+      }
+    ]
+  },
+  {
+    "date": "2014-11-27",
+    "title": "OPEC, 감산 없이 산유량 동결 결정",
+    "shortTitle": "OPEC 감산불발",
+    "description": "OPEC이 빈 석유장관회의에서 하루 3000만 배럴의 산유량 한도를 유지하기로 했고, 국제유가는 급락했다.",
+    "era": "국제유가 급락",
+    "eraPeriod": "2014.06 ~ 2016.02",
+    "searchKeywords": [
+      "OPEC 감산",
+      "국제유가 급락"
+    ],
+    "paperDate": "2014-11-28",
+    "status": "confirmed",
+    "note": "빈 현지 27일 결정. 두 출처 일치. 시대 기간은 편집 판단(검증 대상 아님).",
+    "evidence": [
+      {
+        "label": "이데일리 (2014-11-28)",
+        "url": "https://edaily.co.kr/News/Read?mediaCodeNo=257&newsId=01131606606290312",
+        "quote": "27일(현지시간) 오스트리아 빈에서 개최한 석유장관회의에서 ... 하루 평균 3000만배럴인 기존의 산유량 쿼터(한도)를 종전대로 유지하기로 합의했다."
+      },
+      {
+        "label": "Fortune (2014-11-27)",
+        "url": "https://fortune.com/2014/11/27/oil-prices-in-freefall-as-opec-fails-to-agree-output-cut",
+        "quote": "Oil prices fell to their lowest level in over five years Thursday as the cartel ... failed to agree on measures to tackle the current glut."
+      }
+    ]
+  },
+  {
+    "date": "2015-06-11",
+    "title": "한국은행, 기준금리 연 1.50%로 인하(사상 최저)",
+    "shortTitle": "기준금리 1.5%",
+    "description": "한국은행이 금융통화위원회에서 기준금리를 연 1.75%에서 1.50%로 내렸다. 2009년 2월의 2.00%보다 낮은 사상 최저 수준이었다.",
+    "era": "초저금리 시대",
+    "eraPeriod": "2014.08 ~ 2017.11",
+    "searchKeywords": [
+      "기준금리 인하",
+      "사상 최저 금리"
+    ],
+    "paperDate": "2015-06-12",
+    "status": "confirmed",
+    "note": "두 출처 일치. 메르스 영향 고려 인하라는 배경은 서울신문 보도.",
+    "evidence": [
+      {
+        "label": "서울신문 (2015-06-11)",
+        "url": "https://www.seoul.co.kr/news/economy/2015/06/11/20150611800086",
+        "quote": "한은은 11일 오전 이주열 총재 주재로 금융통화위원회(금통위)를 열어 기준금리를 현재의 연 1.75%에서 1.50%로 내렸다."
+      },
+      {
+        "label": "한국일보 (2015-06-11)",
+        "url": "https://www.hankookilbo.com/news/article/201506111088535495",
+        "quote": "한국은행이 기준금리를 0.25%포인트 전격 인하했다. 석 달 만에 추가 인하가 단행됨에 따라 기준금리는 사상 최저 기록을 갱신했다."
+      }
+    ]
+  },
+  {
+    "date": "2015-08-24",
+    "title": "중국 증시 8.49% 폭락, 글로벌 동반 급락(블랙먼데이)",
+    "shortTitle": "중국 블랙먼데이",
+    "description": "상하이종합지수가 8.49% 떨어진 3,209.91로 마감해 2007년 2월 이후 최대 낙폭을 기록했고 세계 증시가 흔들렸다.",
+    "era": "중국 경기둔화 충격",
+    "eraPeriod": "2015.06 ~ 2016.02",
+    "searchKeywords": [
+      "중국 증시 폭락",
+      "블랙먼데이"
+    ],
+    "paperDate": "2015-08-25",
+    "status": "confirmed",
+    "note": "두 출처 일치. 2007년 2월 이후 최대 낙폭은 검색 요약 기준(서울신문 본문으로는 종가 수치만 직접 확인). 시대 기간은 편집 판단.",
+    "evidence": [
+      {
+        "label": "서울신문 (2015-08-24)",
+        "url": "https://www.seoul.co.kr/news/international/2015/08/24/20150824800062",
+        "quote": "이날 상하이종합지수는 전거래일보다 8.49%(296.84포인트) 떨어진 3,209.91으로 장을 마쳤다."
+      },
+      {
+        "label": "Fortune (2015-08-24)",
+        "url": "https://fortune.com/2015/08/24/chinas-black-monday-as-stock-market-slides-8-5",
+        "quote": "Shanghai stocks fell by 8.5% and have now given up all their gains for 2015."
+      }
+    ]
+  },
+  {
+    "date": "2015-12-16",
+    "title": "미 연준, 9년 반 만에 기준금리 인상",
+    "shortTitle": "연준 금리인상",
+    "description": "연준이 연방기금금리 목표 범위를 0.25~0.50%로 올렸다. 2006년 이후 첫 인상이다.",
+    "era": "미국 금리 정상화",
+    "eraPeriod": "2015.12 ~ 2018.12",
+    "searchKeywords": [
+      "연준 금리 인상",
+      "기준금리 인상"
+    ],
+    "paperDate": "2015-12-17",
+    "status": "confirmed",
+    "note": "미국 현지 16일 결정(한국 시각 17일 새벽). 세 출처 일치. 시대 기간은 편집 판단.",
+    "evidence": [
+      {
+        "label": "Federal Reserve FOMC 성명 2015-12-16",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20151216a.htm",
+        "quote": "The Committee decided to raise the target range for the federal funds rate to 1/4 to 1/2 percent."
+      },
+      {
+        "label": "Al Jazeera (2015-12-16)",
+        "url": "https://www.aljazeera.com/amp/economy/2015/12/16/us-federal-reserve-raises-interest-rates",
+        "quote": "The US Federal Reserve has raised interest rates for the first time since 2006"
+      }
+    ]
+  },
+  {
+    "date": "2016-06-24",
+    "title": "영국 EU 탈퇴 확정, 코스피 3.09% 급락",
+    "shortTitle": "브렉시트",
+    "description": "영국이 국민투표에서 EU 탈퇴(51.9%)를 택했다. 개표 결과가 나온 24일 코스피는 61.47포인트(3.09%) 내린 1925.24로 마감했다.",
+    "era": "브렉시트",
+    "eraPeriod": "2016.06 ~ 2020.01",
+    "searchKeywords": [
+      "브렉시트",
+      "영국 EU 탈퇴"
+    ],
+    "paperDate": "2016-06-25",
+    "status": "confirmed",
+    "note": "투표일은 6월 23일(영국 현지), 결과 확정과 한국 증시 충격은 24일이어서 date는 24일로 둠. 시대 종료 시점은 편집 판단.",
+    "evidence": [
+      {
+        "label": "TIME (2016-06-24)",
+        "url": "https://time.com/4381042/leave-eu-referendum-brexit-vote/",
+        "quote": "The U.K. has voted to leave the European Union, a surprise result that has stunned the political establishment."
+      },
+      {
+        "label": "서울신문 (2016-06-24)",
+        "url": "https://www.seoul.co.kr/news/international/europe/2016/06/24/20160624800037",
+        "quote": "탈퇴와 잔류가 각각 51.6%, 48.4%로 탈퇴가 3.2%포인트 앞서고 있다."
+      },
+      {
+        "label": "이투데이 (2016-06-24)",
+        "url": "https://www.etoday.co.kr/news/view/1348055",
+        "quote": "코스피 지수는 전날보다 61.47포인트(-3.09%) 하락한 1925.24에 장을 마감했다."
+      }
+    ]
+  },
+  {
+    "date": "2016-08-31",
+    "title": "한진해운, 법정관리 신청",
+    "shortTitle": "한진해운 법정관리",
+    "description": "국내 1위 선사 한진해운이 이사회 의결 뒤 31일 서울중앙지법에 기업회생절차(법정관리)를 신청했다.",
+    "era": "해운·조선 구조조정",
+    "eraPeriod": "2016.08 ~ 2017.02",
+    "searchKeywords": [
+      "한진해운 법정관리",
+      "한진해운 파산"
+    ],
+    "paperDate": "2016-09-01",
+    "status": "confirmed",
+    "note": "두 출처 일치. 2017년 2월 파산 선고는 검색 요약에서만 확인(원문 미확인)이라 설명에 넣지 않았고, 시대 종료 시점은 편집 판단.",
+    "evidence": [
+      {
+        "label": "서울신문 (2016-08-31)",
+        "url": "https://www.seoul.co.kr/news/economy/2016/08/31/20160831500114",
+        "quote": "한진해운이 31일 법정관리를 신청하기로 확정하면서"
+      },
+      {
+        "label": "한국일보 (2016-08-31)",
+        "url": "https://www.hankookilbo.com/news/article/201608312020354973",
+        "quote": "한진해운이 결국 31일 법원에 기업회생절차(법정관리)를 신청했다"
+      }
+    ]
+  },
+  {
+    "date": "2016-11-09",
+    "title": "트럼프, 미국 대선 승리 확정, 코스피 2.25% 급락",
+    "shortTitle": "트럼프 당선",
+    "description": "트럼프가 힐러리 클린턴을 꺾고 미국 대통령에 당선됐다(AP는 현지 9일 오전 2시 30분 승리 확정 보도). 9일 코스피는 45.00포인트(2.25%) 내린 1,958.38로 마감했다.",
+    "era": "트럼프 시대 개막",
+    "eraPeriod": "2016.11 ~ 2017.01",
+    "searchKeywords": [
+      "트럼프 당선",
+      "미국 대선"
+    ],
+    "paperDate": "2016-11-10",
+    "status": "confirmed",
+    "note": "투표일은 미국 현지 11월 8일. 승리 확정은 현지 9일 새벽, 한국 증시 충격도 9일이라 date는 9일. 시대 종료 시점은 편집 판단.",
+    "evidence": [
+      {
+        "label": "TIME (2016-11-09)",
+        "url": "https://time.com/4563685/donald-trump-wins/",
+        "quote": "In one of the most shocking U.S. elections in modern political history, Donald Trump has defeated Hillary Clinton."
+      },
+      {
+        "label": "ABC7 New York",
+        "url": "https://abc7ny.com/hillary-clinton-politics-2016-election-campaign/1595659/",
+        "quote": "Donald Trump was elected America's 45th president Tuesday"
+      },
+      {
+        "label": "서울신문 (2016-11-09)",
+        "url": "https://www.seoul.co.kr/news/economy/2016/11/09/20161109800075",
+        "quote": "이날 코스피지수는 전날보다 45.00포인트(2.25%) 떨어진 1,958.38로 거래를 마쳤다."
+      }
+    ]
+  },
+  {
+    "date": "2016-12-09",
+    "title": "국회, 박근혜 대통령 탄핵소추안 가결",
+    "shortTitle": "대통령 탄핵안",
+    "description": "국회가 박근혜 대통령 탄핵소추안을 찬성 234표, 반대 56표, 무효 7표, 기권 2표로 가결했다.",
+    "era": "박근혜 탄핵 정국",
+    "eraPeriod": "2016.10 ~ 2017.05",
+    "searchKeywords": [
+      "박근혜 탄핵",
+      "탄핵소추안 가결"
+    ],
+    "paperDate": "2016-12-10",
+    "status": "confirmed",
+    "note": "두 출처 일치. 경제 맥락은 약하나 한국 독자 기억도가 높은 사회 사건으로 포함. 시대 기간은 편집 판단.",
+    "evidence": [
+      {
+        "label": "서울신문 (2016-12-09)",
+        "url": "https://www.seoul.co.kr/news/politics/congress/2016/12/09/20161209500116",
+        "quote": "탄핵 찬성 234명, 반대 56명, 무효 7명, 기권 2명"
+      },
+      {
+        "label": "경향신문 (2016-12-09)",
+        "url": "https://www.khan.co.kr/article/201612091610001",
+        "quote": "찬성 234표, 반대 56표, 무효 7표, 기권 2표로 가결됐다."
+      }
+    ]
+  },
+  {
+    "date": "2017-05-04",
+    "title": "코스피 2241.24 마감, 6년 박스피 탈출",
+    "shortTitle": "박스피 탈출",
+    "description": "코스피가 종가 2241.24로 사상 최고치를 경신하며 2011년부터 이어진 박스권을 벗어났다.",
+    "era": "코스피 박스권 탈출",
+    "eraPeriod": "2011.04 ~ 2017.05",
+    "searchKeywords": [
+      "코스피 사상 최고",
+      "박스피 탈출"
+    ],
+    "paperDate": "2017-05-05",
+    "status": "confirmed",
+    "note": "두 출처 일치. 시대 시작(2011.04)은 이투데이 서술('2011년 4월 이후 6년')에 의존하며 편집 판단 포함.",
+    "evidence": [
+      {
+        "label": "서울신문 (2017-05-05)",
+        "url": "https://www.seoul.co.kr/news/economy/securities/2017/05/05/20170505002007",
+        "quote": "코스피가 사상 최고치를 기록한 4일 서울 여의도 한국거래소에서 직원들이 색종이를 날리며 축하하고 있다"
+      },
+      {
+        "label": "이투데이 (2017 증시 결산)",
+        "url": "https://www.etoday.co.kr/news/view/1578903",
+        "quote": "5월 4일 종가 2241.24로 6년 만에 사상 최고치를 기록하며 박스피를 벗어났다."
+      }
+    ]
+  },
+  {
+    "date": "2017-10-30",
+    "title": "코스피 사상 첫 종가 2500 돌파",
+    "shortTitle": "코스피 2500",
+    "description": "코스피가 2501.93으로 마감해 처음으로 종가 기준 2500선을 넘었다. 2000 첫 돌파(2007년 7월) 이후 약 10년 3개월 만이다.",
+    "era": "코스피 2500 시대",
+    "eraPeriod": "2017.05 ~ 2018.01",
+    "searchKeywords": [
+      "코스피 2500",
+      "코스피 사상 최고"
+    ],
+    "paperDate": "2017-10-31",
+    "status": "confirmed",
+    "note": "장중 첫 2500 터치는 10월 23일이나 종가 기준 첫 돌파는 30일로 두 출처 일치. 시대 기간은 편집 판단.",
+    "evidence": [
+      {
+        "label": "서울신문 (2017-10-31)",
+        "url": "https://www.seoul.co.kr/news/economy/securities/2017/10/31/20171031020028",
+        "quote": "30일 유가증권시장에서 코스피는 전날보다 5.30포인트(0.21%) 오른 2501.93에 거래를 마쳤다."
+      },
+      {
+        "label": "한국일보 (2017-10-30)",
+        "url": "https://www.hankookilbo.com/news/article/201710301533176672",
+        "quote": "30일 코스피는 전 거래일보다 5.30포인트(0.21%) 오른 2,501.93으로 마감했다"
+      }
+    ]
+  },
+  {
+    "date": "2017-11-30",
+    "title": "한국은행, 6년 5개월 만에 기준금리 인상(1.50%)",
+    "shortTitle": "기준금리 인상",
+    "description": "한국은행이 금융통화위원회에서 기준금리를 연 1.25%에서 1.50%로 올렸다. 2011년 6월 이후 6년 5개월 만의 인상이다.",
+    "era": "통화정책 정상화",
+    "eraPeriod": "2017.11 ~ 2018.11",
+    "searchKeywords": [
+      "기준금리 인상",
+      "한국은행 금통위"
+    ],
+    "paperDate": "2017-12-01",
+    "status": "confirmed",
+    "note": "두 출처 일치. 시대 기간은 편집 판단.",
+    "evidence": [
+      {
+        "label": "서울신문 (2017-11-30)",
+        "url": "https://www.seoul.co.kr/news/economy/2017/11/30/20171130800042",
+        "quote": "기준금리를 연 1.25%에서 연 1.50%로 인상했다"
+      },
+      {
+        "label": "한국일보 (2017-11-30)",
+        "url": "https://www.hankookilbo.com/news/article/201711300982194000",
+        "quote": "한은은 30일 오전 서울 중구 한은 본부에서 금융통화위원회 회의를 열고 기준금리를 연 1.25%에서 연 1.50%로 인상했다."
+      }
+    ]
+  },
+  {
+    "date": "2018-03-22",
+    "title": "트럼프, 중국산 수입품 관세 부과 행정명령 서명",
+    "shortTitle": "대중 관세 서명",
+    "description": "트럼프 대통령이 301조 조사 결과에 따라 중국산 수입품에 대한 관세 부과 등을 지시하는 대통령 각서에 서명했다.",
+    "era": "미중 무역전쟁",
+    "eraPeriod": "2018.03 ~ 2020.01",
+    "searchKeywords": [
+      "미중 무역전쟁",
+      "301조 관세"
+    ],
+    "paperDate": "2018-03-23",
+    "status": "confirmed",
+    "note": "미국 현지 22일 서명. 관세 규모(600억 달러 등)는 보도마다 표현이 달라 설명에서 제외. 시대 종료 시점은 편집 판단.",
+    "evidence": [
+      {
+        "label": "Expeditors",
+        "url": "https://info.expeditors.com/newsflash/u.s.-president-donald-trump-signs-executive-memo-on-section-301-investigation",
+        "quote": "On March 22, 2018, U.S. President Donald Trump signed a Presidential Memorandum regarding the results of a Section 301 Investigation"
+      },
+      {
+        "label": "서울신문 (2018-03-23)",
+        "url": "https://www.seoul.co.kr/news/international/2018/03/23/20180323800008",
+        "quote": "미, 중국산 수입품에 '관세폭탄' 행정명령…미중 무역전쟁 (22일 현지시간 서명)"
+      }
+    ]
+  },
+  {
+    "date": "2018-10-11",
+    "title": "코스피 4.44% 폭락, 2200선 붕괴",
+    "shortTitle": "코스피 검은목요일",
+    "description": "미국 증시 급락 여파로 코스피가 98.94포인트(4.44%) 내린 2,129.67에 마감했다.",
+    "era": "미중 무역전쟁",
+    "eraPeriod": "2018.03 ~ 2020.01",
+    "searchKeywords": [
+      "코스피 폭락",
+      "미국 증시 급락"
+    ],
+    "paperDate": "2018-10-12",
+    "status": "confirmed",
+    "note": "두 출처 일치. '2011년 9월 이후 최대 하락폭' 등 부가 설명은 검색 요약에서만 확인되어 제외.",
+    "evidence": [
+      {
+        "label": "서울신문 (2018-10-11)",
+        "url": "https://www.seoul.co.kr/news/economy/2018/10/11/20181011800038",
+        "quote": "이날 코스피는 전날보다 98.94포인트(4.44%) 내린 2,129.67에 장을 마쳤다."
+      },
+      {
+        "label": "이데일리 (2018-10-11)",
+        "url": "https://edaily.co.kr/News/Read?mediaCodeNo=257&newsId=03985206619371936",
+        "quote": "코스피가 11일 미국 증시 폭락의 여파로 2200선 아래로 떨어지며 전일 대비 98.94p(-4.44%) 하락한 2129.67p에 거래를 마감했다."
+      }
+    ]
+  },
+  {
+    "date": "2019-07-01",
+    "title": "일본, 반도체 핵심소재 3개 품목 대한국 수출규제 발표",
+    "shortTitle": "일본 수출규제",
+    "description": "일본 경제산업성이 불화수소·불화폴리이미드·포토레지스트 등 3개 품목의 한국 수출 규제를 강화한다고 1일 발표했고, 규제는 4일부터 시행됐다.",
+    "era": "한일 무역분쟁",
+    "eraPeriod": "2019.07 ~ 2019.12",
+    "searchKeywords": [
+      "일본 수출규제",
+      "불화수소"
+    ],
+    "paperDate": "2019-07-02",
+    "status": "confirmed",
+    "note": "세 출처 일치(발표 7월 1일, 시행 7월 4일). 시대 종료 시점은 편집 판단.",
+    "evidence": [
+      {
+        "label": "경향신문 (2019-07-01)",
+        "url": "https://www.khan.co.kr/article/201907011042001",
+        "quote": "일본 정부가 반도체 핵심 소재 등 3개 품목에 대해 한국 수출 규제를 강화하겠다고 1일 발표했다"
+      },
+      {
+        "label": "서울신문 (2019-07-01)",
+        "url": "https://www.seoul.co.kr/news/economy/2019/07/01/20190701500053",
+        "quote": "일본 경제산업성은 1일 ... 3개 품목의 수출 규제를 강화한다고 발표했다."
+      },
+      {
+        "label": "Al Jazeera (2019-08-28)",
+        "url": "https://www.aljazeera.com/economy/2019/8/28/why-south-korea-is-no-longer-on-japans-approved-export-list",
+        "quote": "On July 1, the Japanese Ministry of Economy, Trade and Industry (METI) said ..."
+      }
+    ]
+  }
+]

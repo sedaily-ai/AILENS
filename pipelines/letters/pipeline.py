@@ -1,27 +1,9 @@
 """레터 파이프라인 — 기사 1건 → 레터 텍스트.
 
-가장 단순한 파이프라인이다 — GPT-4o 호출 한 번으로 끝난다(webtoon처럼
-여러 단계 없음). 산출물은 텍스트 파일 하나 — S3 업로드나 CMS 반영은
-이 스크립트 범위 밖이다(pipelines/webtoon과 마찬가지로 "생성"까지만).
-
-2026-08-20 신설 — 그 전까지 레터는 매번 스크래치패드에 1회성 스크립트를
-새로 써서 생성했다(webtoon/video는 재사용 가능한 파이프라인이 있었는데
-레터·팟캐스트만 없는 비대칭이 있었음).
-
-2026-08-23 — GPT-4o에서 Bedrock Claude로 이관(video와 같은 이유: 텍스트
-생성은 전부 Bedrock으로 통일하고 GPT는 웹툰 이미지 생성 전용으로만
-남긴다). 전용 inference profile `lens-letters-sonnet-46`
-(arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k)
-사용 — 다른 워크로드와 비용 추적이 섞이지 않도록.
-
-2026-09-03 — 사용자 요청으로 레터 생성만 Opus 5로 승급. 전용 profile
-`lens-letters-opus-5`(arn:aws:bedrock:us-east-1:887078546492:
-application-inference-profile/iqye2pzreccq, us.anthropic.claude-opus-5
-copyFrom, 태그는 기존 sonnet-46 profile과 동일 스키마)를 새로 만들어
-교체 — 웹툰/팟캐스트/영상/mustknow 분류·공통 팩트추출(facts_extract.py,
-letters profile 재사용 중)은 범위 밖이라 안 건드림. Opus는 Sonnet보다
-토큰당 비용이 훨씬 높다 — 매일 자동 실행되는 파이프라인이라 누적된다는
-점을 사용자에게 명시적으로 확인받고 진행.
+Bedrock Claude를 1회 호출해 레터 텍스트 파일 하나를 만든다. S3 업로드와 CMS
+반영은 범위 밖이다. 전용 inference profile `lens-letters-opus-5`를 사용해
+다른 워크로드와 비용 추적이 섞이지 않게 한다. facts_extract.py는 별도로
+sonnet-46 letters profile을 재사용한다.
 """
 import sys
 from pathlib import Path
@@ -44,18 +26,9 @@ def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> 
     guide = ddb_prompt.load_prompt("letters")
 
     print(f"{tag} 레터 생성 중...")
-    # 2026-09-03 — Opus 5 승급 후 첫 실제 프로덕션 실행(IAM 권한 수정 직후)에서
-    # 전량 실패 발견: 응답에 text 블록 없이 reasoningContent만 있음
-    # (call_text()의 "text 키를 가진 블록을 찾는다" 방어 로직도 못 구함 —
-    # 애초에 text 블록 자체가 없었음). Opus 5가 기본 max_tokens=3000을
-    # reasoning만으로 다 써버리고 실제 답변(2000~2800자 목표라 그 자체로도
-    # 3000~4500 토큰 필요) 생성에 도달하지 못한 것으로 보인다 — Sonnet
-    # 계열에선 안 겪던 문제(추론 트레이스가 훨씬 김). reasoning+출력 둘 다
-    # 여유 있게 max_tokens를 크게 올려서 재발 방지.
-    # 2026-09-26 — "다음 기사 원문으로 레터를 만들어주세요"처럼 코드가
-    # 결과물 종류를 못박던 문구를 뺐다(admin/backend/routes/prompts.py::
-    # _CATEGORY_BEDROCK 주석 참고). 무엇을 만들지는 전적으로 guide(저장된
-    # letters 지침, system 메시지)에 맡긴다.
+    # Opus 5는 reasoning만으로 기본 max_tokens를 소진해 text 블록 없이 응답한
+    # 사례가 있어, 목표 분량(2000~2800자) 답변까지 담도록 max_tokens를 크게 둔다.
+    # 결과물 종류는 코드가 아니라 저장된 letters 지침(system)이 정한다.
     output = call_text(guide, f"[입력 기사]\n{article}", model=MODEL, max_tokens=12000)
     out_path.write_text(output, encoding="utf-8")
 

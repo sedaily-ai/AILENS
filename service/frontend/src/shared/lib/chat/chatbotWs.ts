@@ -1,26 +1,25 @@
 /**
  * 챗봇 WebSocket 클라이언트.
  *
- * 백엔드 sedaily-mbti-ws-* (Sonnet 4.6 inference profile) 와 토큰 단위 streaming.
+ * 백엔드 sedaily-mbti-ws-*(Sonnet 4.6 inference profile)와 토큰 단위 streaming을 한다.
  * - 연결: wss://.../dev?user_id=...
  * - 송신: {"action":"sendMessage","message":"...","conversation_history":[...]}
  * - 수신: {"type":"ai_start"|"ai_chunk"|"chat_end"|"error", ...}
  *
- * 단일 명의(AI LENS) 체계(2026-08-07) 이후로는 페르소나 그룹별 연결이 없다 —
- * 연결 하나를 계속 재사용한다. 백엔드도 mbti_group 쿼리 파라미터/필드를 더 이상
- * 요구하지 않고 실려 와도 무시한다 (service/backend/handlers/websocket/{connect,message}.py 참조).
+ * 페르소나 그룹별 연결이 없으며 연결 하나를 계속 재사용한다. 백엔드는 mbti_group 쿼리 파라미터/필드를 요구하지 않고
+ * 실려 와도 무시한다(service/backend/handlers/websocket/{connect,message}.py 참조).
  *
- * 한 번에 한 turn 만 보냄. 다음 turn 보낼 때는 같은 연결 재사용.
+ * 한 번에 한 turn만 보내며, 다음 turn도 같은 연결을 재사용한다.
  */
 import { WS_URL } from '@/shared/config/apiClient';
 
-export type WsChatEvent =
+type WsChatEvent =
   | { type: 'ai_start'; timestamp: string }
   | { type: 'ai_chunk'; chunk: string; chunk_index: number }
   | { type: 'chat_end'; total_chunks: number; response_length: number; timestamp: string }
   | { type: 'error'; message: string };
 
-export interface SendMessageOptions {
+interface SendMessageOptions {
   message: string;
   conversation_history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   onChunk: (chunk: string, index: number) => void;

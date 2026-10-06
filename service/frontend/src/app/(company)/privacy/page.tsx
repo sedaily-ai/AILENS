@@ -4,7 +4,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '개인정보처리방침',
-  description: 'AI LENS(서울경제신문)의 개인정보처리방침.',
+  description: 'AI LENS(서울경제신문)의 개인정보처리방침입니다. 수집하는 개인정보 항목과 이용 목적, 보유 기간, 이용자의 권리와 보호 조치를 안내합니다.',
   alternates: { canonical: `${SITE_URL}/privacy` },
   robots: { index: true, follow: true },
 };
@@ -36,10 +36,6 @@ export default function PrivacyPage() {
         <li><strong>서비스 이용 과정에서 자동 수집</strong>: 읽은 글 목록·문장 저장(&ldquo;내 서랍&rdquo;) 등 이용 기록, 접속 IP, 브라우저·기기 정보, 쿠키, 접속 일시.</li>
         <li><strong>문의 시</strong>: 이메일 주소, 문의 내용.</li>
       </ul>
-      <p style={{ marginTop: 8 }}>
-        서비스 내 사주 콘텐츠(생년월일시 입력)는 별도 계정 정보와 연결해 저장하지 않으며, 결과 계산을
-        위해 일시적으로만 사용됩니다.
-      </p>
 
       <h2 style={h2}>2. 개인정보의 수집·이용 목적</h2>
       <ul style={ul}>

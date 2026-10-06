@@ -1,12 +1,10 @@
 /**
- * Archive API client — "내 서랍" server-side operations.
- *
- * For logged-in users: calls backend API for persistent storage + similarity search.
- * For anonymous users: falls back to localStorage (handled by caller).
+ * Archive API client: "내 서랍" 서버 측 연산.
+ * 로그인 사용자는 백엔드 API로 영구 저장 + 유사도 검색을 하고, 익명 사용자는 localStorage로 폴백한다(호출부가 처리).
  */
 
 import { API_URL } from '@/shared/config/apiClient';
-import { authFetch } from '@/shared/lib/authFetch';
+import { authFetch } from '@/shared/lib/auth/authFetch';
 
 export interface ArchiveSentencePayload {
   user_id: string;
@@ -25,18 +23,7 @@ export interface ArchiveSentenceResponse {
   created_at: string;
 }
 
-export interface SimilarSentence {
-  user_id: string;
-  sentence_text: string;
-  article_id: string;
-  distance: number;
-  created_at: string;
-}
-
-/**
- * Save a sentence to the archive.
- * Returns the saved sentence with server-generated ID.
- */
+/** 문장을 아카이브에 저장하고, 서버가 생성한 ID가 붙은 저장 결과를 돌려준다. */
 export async function saveArchiveSentence(
   payload: ArchiveSentencePayload,
 ): Promise<{ sentence: ArchiveSentenceResponse; vector_status: string }> {
@@ -54,10 +41,7 @@ export async function saveArchiveSentence(
   return res.json();
 }
 
-/**
- * List archived sentences for a user.
- * Returns newest first.
- */
+/** 사용자의 아카이브 문장 목록(최신순). */
 export async function listArchiveSentences(
   userId: string,
   options?: { dateFrom?: string; dateTo?: string; limit?: number },
@@ -67,8 +51,7 @@ export async function listArchiveSentences(
   if (options?.dateTo) params.set('date_to', options.dateTo);
   if (options?.limit) params.set('limit', String(options.limit));
 
-  // Listing is per-user, so it requires auth (anonymous archive lives in
-  // localStorage; the caller decides which path to take).
+  // 목록은 사용자별이라 인증이 필요하다(익명 아카이브는 localStorage에 있고 어느 경로를 쓸지는 호출부가 정한다).
   const res = await authFetch(`${API_URL}/api/archive?${params}`);
 
   if (!res.ok) {
@@ -87,9 +70,8 @@ export interface PopularHighlight {
 }
 
 /**
- * "다른 사람들이 담은 문장" — 전체 유저 아카이브를 텍스트 빈도로 집계한
- * 공개 목록(글쓰기 없이 저장 행위만으로 채워짐, Kindle Popular Highlights
- * 패턴). 로그인 여부와 무관 — 커뮤니티 탭 대체(2026-08-06).
+ * "다른 사람들이 담은 문장": 전체 유저 아카이브를 텍스트 빈도로 집계한 공개 목록(저장 행위만으로 채워지는 Kindle Popular Highlights 패턴).
+ * 로그인 여부와 무관하다.
  */
 export async function fetchPopularArchiveSentences(
   limit: number = 20,
@@ -104,9 +86,7 @@ export async function fetchPopularArchiveSentences(
   }
 }
 
-/**
- * Delete an archived sentence.
- */
+/** 아카이브 문장을 삭제한다. */
 export async function deleteArchiveSentence(
   archiveId: string,
   userId: string,
@@ -120,35 +100,6 @@ export async function deleteArchiveSentence(
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || `Archive delete failed: ${res.status}`);
   }
-}
-
-/**
- * Find sentences similar to the given text.
- * Requires pgvector to be configured on the backend.
- * Returns 503 gracefully if pgvector is unavailable.
- */
-export async function searchSimilarSentences(
-  userId: string,
-  text: string,
-  limit: number = 5,
-): Promise<{ similar_sentences: SimilarSentence[]; count: number } | null> {
-  // Similar-search is read-only but scoped to the user's archive — same
-  // auth requirement as listing.
-  const res = await authFetch(`${API_URL}/api/archive/similar`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, text, limit }),
-  });
-
-  // 503 = pgvector not configured — expected in dev
-  if (res.status === 503) return null;
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Similarity search failed: ${res.status}`);
-  }
-
-  return res.json();
 }
 
 // ── 키워드 기반 기사 추천 (raw XML 버킷에서 검색) ──────────────────────

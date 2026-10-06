@@ -3,20 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
-// "오늘의집처럼 — 사람들이 신문 읽는 스타일을 인스타/카카오스토리 올리듯"
-// 이벤트성 갤러리(2026-08-06). 실제 유저 제출 파이프라인은 아직 없어서, 지금은
-// 커뮤니티 탭으로 유도해 거기서 올리게 하고(기존 기능 재사용) 여기는 "전시
-// 공간" 역할. 실제 사진이 없어 타이포그래피 카드로 — 손그림 아이콘/이모지
-// 남용 대신, 문구 자체가 비주얼이 되게.
-//
-// MBTI 페르소나 개념 폐기(2026-08-07) 이전엔 카드마다 "민철/하은/준서/소율"
-// 이름 + 그 페르소나의 accent color를 붙여 "네 가지 인지 양식"처럼 보여줬다.
-// 이제 특정 인물에게 귀속시키지 않고, 다른 카드형 섹션(Trend/Column)과 같은
-// 공용 브랜드 팔레트(brandAccents.ts)를 카드 순서로 순환 배정한다.
+// 이벤트성 갤러리 — 사람들이 신문 읽는 스타일을 공유하는 "전시 공간"이다. 실제 유저 제출 파이프라인이 없어 커뮤니티 탭으로 유도해 거기서 올리게 한다.
+// 실제 사진이 없어 문구 자체가 비주얼이 되는 타이포그래피 카드로 구성한다.
+// 카드는 특정 인물에 귀속시키지 않고, 다른 카드형 섹션(Trend/Column)과 같은 공용 브랜드 팔레트(brandAccents.ts)를 카드 순서로 순환 배정한다.
 interface StylePost {
   situation: string;
   comment: string;
@@ -75,8 +68,7 @@ export default function StyleClient() {
             청소하다가, 버스에서, 걸으면서 — 저마다 다른 순간에 뉴스를 만나요.
             AI LENS 독자들의 진짜 읽기 스타일을 모아봤어요.
           </p>
-          {/* 커뮤니티 탭 제거(2026-08-06)로 "나도 스타일 올리기"(글쓰기) 목적지가
-              없어졌다 — 대신 다른 사람이 담은 문장을 구경할 수 있는 내 서랍으로. */}
+          {/* "나도 스타일 올리기"(글쓰기) 목적지가 없으므로, 다른 사람이 담은 문장을 볼 수 있는 내 서랍으로 연결한다. */}
           <Link
             href="/?tab=archive"
             className="inline-flex items-center hover:opacity-85 transition-opacity"

@@ -1,30 +1,20 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ARCHIVE_MIN_DATE, fetchBigkindsDay, fetchDayArticles, kdate, isReadableOriginal } from '@/features/timeline';
+import { isReadableOriginal } from '@/features/timeline';
+import { fetchBigkindsDay, fetchDayArticles } from '@/shared/lib/api/timelineApi';
+import { isArchiveDate } from '@/shared/constants/timeline';
+import { kdate } from '@/shared/lib/date/timelineDates';
 import { TimelineDayClient } from './TimelineDayClient';
 
-// 날짜별 고유 URL(2026-08-12, GEO 감사) — 예전엔 /timeline이 입력창 하나만
-// 있고 실제 기사는 사용자가 날짜를 골라야만(클라이언트 fetch) 나타났다.
-// AI 크롤러 상당수는 JS를 안 돌려서 이 페이지가 사실상 빈 화면으로
-// 보였다. 날짜마다 진짜 URL을 주면 하루하루가 쌓일 때마다 색인 가능한
-// 페이지가 늘어나는 아카이브가 된다(NewsTimeMachine.tsx가 되감기 애니메이션
-// 후 여기로 router.push한다).
+// 날짜별 고유 URL. 클라이언트 fetch로만 기사가 나타나는 입력창 페이지는 JS를 실행하지 않는 AI 크롤러에 빈 화면이므로 날짜마다 서버 렌더되는 URL을 둔다.
+// NewsTimeMachine.tsx가 되감기 애니메이션 후 여기로 router.push한다.
 //
-// 2026-08-17: S3 지면 아카이브(ARCHIVE_MIN_DATE=2026-02-01) 이전 날짜는 이
-// 소스가 없다 — 대신 빅카인즈 뉴스 검색(날짜 범위 + provider=서울경제)으로
-// 대체한다(features/news-feed의 NewsTimeMachineSection.tsx 홈 위젯과 같은
-// 백엔드 엔드포인트). 처음엔 issue_ranking(토픽+키워드만)을 썼는데, 그 API의
-// news_cluster로 기사 상세를 찾으면 신뢰도가 낮아서(같은 news_id에 0건/서버
-// 오류가 섞여 나옴, 당일 날짜조차 그랬음) 날짜 범위 직접 검색으로 교체 —
-// 제목·본문 스니펫·바이라인·원본 링크까지 나온다(발행 시각만 없음).
+// S3 지면 아카이브(ARCHIVE_MIN_DATE=2026-02-01) 이전 날짜는 빅카인즈 뉴스 검색(날짜 범위 + provider=서울경제)으로 대체한다(features/news-feed의 NewsTimeMachineSection.tsx 홈 위젯과 같은 엔드포인트).
+// issue_ranking의 news_cluster 기사 상세는 신뢰도가 낮아(같은 news_id에 0건/서버 오류 혼재) 날짜 범위 직접 검색을 쓴다. 제목·본문 스니펫·바이라인·원본 링크가 나오며 발행 시각만 없다.
 import { SITE_URL } from '@/shared/constants/site';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// generateStaticParams/dynamicParams/revalidate 전부 없어서 이 라우트가
-// 빌드에서 계속 ƒ(fully dynamic, 캐시 전혀 안 됨)로 분류돼 있었다 — 카테고리
-// 아카이브·페이지네이션·시선 상세에서 같은 패턴으로 실측 확인된 문제와
-// 동일 원인(2026-09-30). generateStaticParams가 없으면 Next의 'auto' 모드가
-// 이 라우트를 정적/ISR로 렌더할 근거가 아예 없어 통째로 SSR-only가 된다.
+// generateStaticParams가 없으면 Next의 'auto' 모드가 이 라우트를 정적/ISR로 렌더할 근거가 없어 전부 SSR-only(ƒ)가 된다. 아래 설정으로 ISR 렌더를 유도한다.
 export const revalidate = 300;
 export const dynamicParams = true;
 export async function generateStaticParams() {
@@ -40,26 +30,20 @@ export async function generateMetadata({
   if (!DATE_RE.test(date)) return { robots: { index: false } };
 
   const label = kdate(date);
-  const isRecent = date >= ARCHIVE_MIN_DATE;
+  const isRecent = isArchiveDate(date);
   const title = `${label}자 서울경제 — 뉴스 타임라인`;
-  const description = `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 지면 그대로 모아봅니다.`;
+  const description = `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 그대로 모아봅니다.`;
 
   const indexable = isRecent
-    ? (await fetchDayArticles(date)).list.length > 0
+    ? (await fetchDayArticles(date)).length > 0
     : (await fetchBigkindsDay(date)).articles.length > 0;
 
   return {
     title,
     description,
-    // 기사가 없는 날은 색인에서 뺀다 — 얇은 페이지가 검색결과에 잡히는 걸
-    // 막는다(letters/page.tsx 등 다른 페이지의 "가짜 신선도 금지" 원칙과
-    // 같은 이유, sitemap.ts 주석 참조).
+    // 기사가 없는 날은 색인에서 뺀다(얇은 페이지 방지, sitemap.ts 참조).
     //
-    // indexable일 때 robots 키를 아예 안 넣는다 — `robots: undefined`를
-    // 리턴하면 상위 layout.tsx의 robots(index:true, googleBot 옵션 포함)를
-    // "물려받는" 게 아니라 그대로 덮어써서 robots 메타태그 자체가 통째로
-    // 사라졌다(2026-08-17 발견, curl로 직접 확인). 키를 안 넣어야 실제로
-    // 상속된다.
+    // indexable일 때는 robots 키를 넣지 않는다. `robots: undefined`를 리턴하면 상위 layout.tsx의 robots를 상속하지 않고 덮어써 robots 메타태그가 사라진다.
     ...(indexable ? {} : { robots: { index: false } }),
     keywords: ['뉴스 타임라인', '경제 뉴스 아카이브', `${label} 뉴스`, '서울경제', 'AI LENS'],
     alternates: { canonical: `${SITE_URL}/timeline/${date}` },
@@ -89,7 +73,7 @@ function buildJsonLd(date: string, articles: { title: string; original_link: str
     '@id': `${SITE_URL}/timeline/${date}#collection`,
     url: `${SITE_URL}/timeline/${date}`,
     name: `${label}자 서울경제 — 뉴스 타임라인`,
-    description: `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 지면 그대로 모아봅니다.`,
+    description: `${label}, 서울경제를 비롯한 주요 언론이 다룬 경제 뉴스를 그날 그대로 모아봅니다.`,
     inLanguage: 'ko-KR',
     isPartOf: { '@id': `${SITE_URL}/#website` },
     publisher: { '@id': `${SITE_URL}/#organization` },
@@ -102,15 +86,9 @@ function buildJsonLd(date: string, articles: { title: string; original_link: str
     },
     mainEntity: {
       '@type': 'ItemList',
-      // url 은 **실제로 기사에 닿는 것만** 넣는다(isReadableOriginal). 예전엔
-      // "빈 값이 아니면" 통과였는데, 빅카인즈가 2015년 이전 기사에 주는
-      // sednews.com 주소는 지금 기사가 아니라 서울경제 홈으로 리다이렉트된다
-      // (2026-08-19 실측). 그걸 구조화 데이터에 실으면 크롤러에게 "이 기사는
-      // 여기 있다"고 죽은 주소를 알려주는 셈이다.
+      // url은 실제로 기사에 닿는 것만 넣는다(isReadableOriginal). 빅카인즈가 2015년 이전 기사에 주는 sednews.com 주소는 서울경제 홈으로 리다이렉트되어 죽은 주소를 알리게 된다.
       //
-      // 다만 항목 자체를 빼지는 않는다. 그날 그 제목의 기사가 지면에 있었다는
-      // 건 사실이고, schema.org 의 ListItem 은 url 없이 name 만으로도 유효하다.
-      // 링크만 지우고 제목은 남기면 크롤러가 "무엇이 있었나"는 알 수 있다.
+      // 항목 자체는 빼지 않는다. schema.org ListItem은 url 없이 name만으로도 유효하며, 제목만 남기면 크롤러가 "무엇이 있었나"를 알 수 있다.
       itemListElement: articles.slice(0, 30).map((a, i) => ({
         '@type': 'ListItem',
         position: i + 1,
@@ -129,7 +107,7 @@ export default async function TimelineDayPage({
   const { date } = await params;
   if (!DATE_RE.test(date)) notFound();
 
-  if (date < ARCHIVE_MIN_DATE) {
+  if (!isArchiveDate(date)) {
     const { articles, investments } = await fetchBigkindsDay(date);
     const jsonLd = buildJsonLd(date, articles);
     return (
@@ -143,8 +121,8 @@ export default async function TimelineDayPage({
     );
   }
 
-  const { list } = await fetchDayArticles(date);
-  const jsonLd = buildJsonLd(date, list);
+  const articles = await fetchDayArticles(date);
+  const jsonLd = buildJsonLd(date, articles);
 
   return (
     <>
@@ -152,7 +130,7 @@ export default async function TimelineDayPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <TimelineDayClient date={date} initialArticles={list} />
+      <TimelineDayClient date={date} initialArticles={articles} />
     </>
   );
 }

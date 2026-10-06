@@ -1,19 +1,12 @@
 """frontpage_auto/mustknow_auto가 lens-cms-api(Postgres, EC2 상시서버)에
-직접 글을 쓰기 위한 얇은 HTTP 클라이언트 — v1.32.
+글을 쓰기 위한 얇은 HTTP 클라이언트.
 
-기존엔 이 두 파이프라인이 DynamoDB(sedaily-mbti-cms-posts-dev)에
-`table.put_item()`으로 직접 썼다. 그런데 사이트 읽기(v1.20)·admin 콘솔
-쓰기(v1.21)가 이미 전부 Postgres로 전환됐고, admin_posts_repo.py의
-설계 원칙("Postgres 접근을 이 서버 하나로 집중" — 다른 프로세스가 RDS에
-직접 붙으면 admin Lambda가 그랬던 것과 같은 VPC/인터넷 접근 충돌이
-재발한다)이 이미 명시돼 있어서, 이 파이프라인도 직접 psycopg2로 붙는
-대신 admin 콘솔과 완전히 같은 내부 API(`POST /admin/posts` 등)를 탄다.
-그 결과 이 파이프라인이 쓰는 글도 admin_posts_repo.py의 검증된
-트랜잭션(publications INSERT + renditions/webtoon_panels/media_assets/
-rendition_blocks 파생 프로젝션까지 한 번에)을 그대로 물려받는다.
-
-토큰(`/sedaily-mbti/admin/lens-cms-api-token`)은 최초 호출 시 SSM에서
-한 번만 읽어 프로세스 안에 캐시한다 — 절대 로그에 찍지 않는다.
+admin 콘솔과 같은 내부 API(`POST /admin/posts` 등)를 호출한다. Postgres 접근을
+lens-cms-api 한 곳으로 집중해야 하고(다른 프로세스가 RDS에 직접 붙으면 VPC·인터넷
+접근 충돌이 재발한다), admin_posts_repo.py의 트랜잭션(publications INSERT와 파생
+프로젝션)을 그대로 쓰기 위해서다.
+토큰(`/sedaily-mbti/admin/lens-cms-api-token`)은 최초 호출 시 SSM에서 한 번 읽어
+프로세스 안에 캐시하며 로그에 찍지 않는다.
 """
 from __future__ import annotations
 
@@ -72,14 +65,11 @@ def create_post(data: dict[str, Any], created_by: str) -> dict[str, Any]:
 
 
 def list_published_today(date: str, channel: str = "lens", limit: int = 200) -> list[dict[str, Any]]:
-    """오늘(또는 지정일) 이미 발행된 글 목록 — 하루 누적 캡(2026-09-28,
-    mustknow_auto 지면특별코너 4탭+일반 카테고리)에 쓴다. `GET /admin/posts`
-    가 이미 status/channel/date 필터를 지원해서(`admin_posts_repo.list_posts`)
-    새 엔드포인트 없이 재사용 — `date`는 `YYYY-MM-DD`(admin_publish_date
-    컬럼과 동일 형식, `_publish()`의 `publish_date_iso`와 같은 포맷).
-    limit=200은 하루 실제 발행량(현재 실측 최대 ~50건대)에 여유 있는 값.
-    실패 시 빈 리스트 반환(호출부가 "오늘 0건 발행"으로 간주 — fail-open,
-    캡 계산이 실패해도 발행 자체를 막지 않는다는 기존 원칙과 동일)."""
+    """오늘(또는 지정일) 이미 발행된 글 목록 — mustknow_auto의 하루 누적 캡 계산에 쓴다.
+    `GET /admin/posts`의 status/channel/date 필터를 재사용하며 `date`는
+    `YYYY-MM-DD`(admin_publish_date 컬럼과 동일 형식)다. limit=200은 하루 발행량
+    (실측 최대 50건대)에 여유 있는 값이다.
+    실패 시 빈 리스트를 반환한다(fail-open: 캡 계산 실패가 발행을 막지 않는다)."""
     import requests  # noqa: lazy
 
     try:
@@ -105,10 +95,9 @@ def log_selection_run(
     selected: list[dict[str, Any]],
     category: str = "general",
 ) -> None:
-    """"선정 실험실"(admin `/selection-lab`, v1.35) 기록용 — run.py가 매
-    회차(select_general_articles 호출 직후) 부른다. 발행 자체를 막아선
-    안 되는 부가 기록이라 list_published_today()와 같은 fail-open —
-    실패해도 조용히 넘어가고 파이프라인은 계속 진행한다."""
+    """"선정 실험실"(admin `/selection-lab`) 기록용 — run.py가 매 회차
+    select_general_articles 호출 직후 부른다. 부가 기록이라 fail-open이며
+    실패해도 파이프라인은 계속 진행한다."""
     import requests  # noqa: lazy
 
     try:

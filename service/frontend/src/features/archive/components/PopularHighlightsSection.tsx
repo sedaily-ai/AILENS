@@ -3,13 +3,8 @@
 import { useState, useEffect } from 'react';
 import { fetchPopularArchiveSentences, type PopularHighlight } from '@/shared/lib/api/archiveApi';
 
-// ── 다른 사람들이 담은 문장 ────────────────────────────────────────
-// 커뮤니티 탭(업다운보트·댓글·"내 문장 공유하기" 글쓰기) 대체(2026-08-06) —
-// 신생 서비스에서 능동적 글쓰기는 냉스타트로 거의 확실히 실패한다는 판단.
-// 대신 다들 이미 하는 저비용 행동(문장 저장)만으로 채워지는 집계 피드
-// (Kindle Popular Highlights와 같은 패턴) — 유저 식별 정보는 아예 안 보여준다.
-// ArchiveTab.tsx(893줄)가 너무 길어서 다른 독립 서브컴포넌트들과 함께
-// 분리했다(2026-08-18).
+// ── 다른 사람들이 담은 문장 ──
+// 능동적 글쓰기(댓글·공유 글쓰기)가 필요한 커뮤니티 대신, 문장 저장이라는 저비용 행동만으로 채워지는 집계 피드이다(Kindle Popular Highlights와 같은 패턴). 사용자 식별 정보는 노출하지 않는다.
 export function PopularHighlightsSection() {
   const [highlights, setHighlights] = useState<PopularHighlight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,8 +23,7 @@ export function PopularHighlightsSection() {
     };
   }, []);
 
-  // 표본이 아직 작아 집계 결과가 없으면(모두 1건뿐) 조용히 숨긴다 —
-  // 가짜로 채우지 않는다는 세션 전반의 원칙.
+  // 표본이 작아 집계 결과가 없으면(모두 1건뿐) 조용히 숨기고 가짜로 채우지 않는다.
   if (!loading && highlights.length === 0) return null;
 
   return (

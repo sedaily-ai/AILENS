@@ -1,58 +1,9 @@
-"""video-lab 전용 렌더 엔트리포인트 — 사용자 요청("동영상도 가능?" →
-"네.. 진행을 해야합니다")으로 2026-09-23 신설.
+"""video-lab 전용 렌더 엔트리포인트 — CMS 영상 탭이 만든 각본 텍스트를 받아 렌더만 한다.
 
-admin CMS 영상 탭(PromptTextLab.tsx)에서 이미 만든 각본 텍스트를 받아
-"렌더만" 한다 — 기사 조회·Bedrock 각본 생성(같은 폴더 generate_script.py의
-generate_script())은 건너뛴다. 대신 텍스트를 generate_script.py의
-검증·자동수정 파이프라인(extract_json_object → fix_script →
-validate_script)에 그대로 통과시킨다 — CMS 영상 탭이 지금 쓰는
-_CATEGORY_BEDROCK["video"] 단일 Bedrock 호출(admin/backend/routes/
-chat_ws.py::_run_article_text_flow)에는 generate_script.py의 아이콘
-화이트리스트 보정·JSON 파싱 실패 시 재요청 같은 안전망이 전혀 없어서,
-그 안전망 없이 원문 그대로 렌더를 시도하면 실패율이 훨씬 높다.
-
-**별도 ECS 태스크 정의로 실행된다** — `sedaily-lens-video-lab`(cluster는
-`sedaily-lens-frontpage-auto`와 공유, family만 다름). Docker 이미지는
-`frontpage_auto`와 완전히 동일(같은 ECR 리포지토리) — Node+Remotion+
-ffmpeg가 이미 다 들어있어 새로 빌드할 필요가 없고, entryPoint만
-`["python3.11", "/app/pipelines/video/render_from_script.py"]`(절대경로
-— 2026-09-23 상대경로였다가 컨테이너 WORKDIR이 frontpage_auto/라 실제
-파일을 못 찾아 27초 만에 죽던 버그 수정)로 다르게 등록한다(ECS RunTask의
-containerOverrides는 CMD만 바꿀 수 있고 ENTRYPOINT는 못 바꾸므로 —
-frontpage_auto/Dockerfile의 `ENTRYPOINT ["python3.11", "run.py"]`를 못
-우회해 별도 family가 필요했다). 프로덕션 frontpage_auto/mustknow_auto
-태스크 정의·실행에는 전혀 영향 없다.
-
-**완료/실패 신호는 DynamoDB나 콜백 없이 S3 오브젝트 존재 여부로만
-전달한다** — admin Lambda는 이 버킷에 GetObject 권한이 없고(CmsMediaWrite
-정책은 PutObject만) 새 IAM을 더 늘리지 않으려고, admin은 공개 URL로
-plain HTTPS HEAD만 확인한다(웹툰 컷 이미지·팟캐스트 음성과 동일하게
-버킷 자체가 공개 읽기). 성공하면 media/video-lab/{job_id}.mp4
-(+.jpg 썸네일), 실패하면 media/video-lab/{job_id}.error.json이 대신
-올라간다 — admin/backend/routes/video_lab.py::handle_poll이 그 셋을
-그대로 이 순서로 확인한다.
-
-**진행률(2026-09-23 추가)** — 사용자 요청: "진행상황이나... 퍼센테이지로
-볼 수 있거나 하는 UX는 적용할 수 없는건가?? 렌더가 길어서". scripts/
-render.ts는 TTS 합성(컷별 1줄)·렌더링(프레임별 퍼센트) 둘 다 실시간으로
-찍지만, 렌더링 줄은 `process.stdout.write`로 `\r`(캐리지 리턴 — 줄바꿈
-아님)을 써서 완성 대기형 subprocess.run(capture_output=True)으로는 렌더가
-끝나야만 한꺼번에 보인다. Popen으로 바꿔 문자 단위로 읽고 `\r`/`\n` 둘 다
-줄 경계로 취급해야 실시간으로 잡힌다 — media/video-lab/{job_id}.
-progress.json에 2초 간격으로 스로틀해서 덮어쓰고, video_lab.py::
-handle_poll이 이걸 그대로 "pending" 응답에 실어 보낸다.
-
-**JSON 추출 강화(2026-09-23 추가)** — 사용자 리포트: "이 응답 전체 복사"로
-붙여넣었는데도 title/brand/cuts/source가 전부 비어 있는 JSON이 뽑혀
-Remotion 스키마 검증에서 실패("알아서 파싱하게 해주는거 그런거는 없나?").
-원인: json_extract.extract_json_object()의 마지막 폴백("첫 '{'~마지막
-'}' 구간")은 모델이 ```json 코드펜스를 안 지킨 응답에서는 본문 전체를
-한 덩어리로 집어와 전혀 다른(또는 텅 빈) 구조가 될 수 있다 — 이 파일은
-Bedrock 원본 응답(코드펜스를 비교적 잘 지킴)만 다루는 generate_script.py
-와 달리, 사람이 채팅에서 복사해 온 텍스트라 포맷이 덜 보장된다.
-`_extract_render_script()`가 텍스트 안의 모든 균형잡힌 '{...}' 구간을
-찾아 그중 실제로 cuts 배열을 가진 것만 골라 쓴다 — extract_json_object
-하나만 믿지 않는다."""
+별도 ECS 태스크 정의(sedaily-lens-video-lab)로 실행되며, 완료·실패는 S3 오브젝트 존재 여부로만 알린다
+(성공 media/video-lab/{job_id}.mp4·.jpg, 실패 .error.json, 진행률 .progress.json).
+기사 조회·Bedrock 각본 생성은 건너뛰고, 텍스트를 generate_script.py의 fix_script → validate_script에 통과시킨다.
+"""
 import argparse
 import json
 import os
@@ -71,6 +22,14 @@ import boto3  # noqa: E402
 
 from generate_script import fix_script, validate_script  # 같은 폴더(pipelines/video/) — sibling, sys.path 조작 불필요
 
+# ECS 실행 방식: Docker 이미지는 frontpage_auto와 같은 ECR 리포지토리를 쓰므로 새로 빌드하지 않고
+# entryPoint만 ["python3.11", "/app/pipelines/video/render_from_script.py"]로 등록한다(video-lab-taskdef.json).
+# 컨테이너 WORKDIR이 frontpage_auto/라 상대경로는 파일을 못 찾으므로 절대경로여야 한다. ECS RunTask의
+# containerOverrides는 CMD만 바꿀 수 있어 frontpage_auto/Dockerfile의 ENTRYPOINT를 우회하려면 별도 family가 필요하다.
+#
+# 완료·실패 신호를 DynamoDB나 콜백 없이 S3 오브젝트로 전달하는 이유: admin Lambda는 이 버킷에 GetObject
+# 권한이 없고(CmsMediaWrite 정책은 PutObject만) IAM을 더 늘리지 않으려는 것이다. 버킷은 공개 읽기이므로
+# admin은 공개 URL로 HTTPS HEAD만 확인한다(admin/backend/routes/video_lab.py::handle_poll).
 VIDEO_DIR = Path(__file__).parent
 
 
@@ -108,9 +67,12 @@ def _find_balanced_json_objects(text: str) -> list[str]:
 
 
 def _extract_render_script(raw: str) -> dict:
-    """extract_json_object보다 적극적으로 "렌더용 JSON"을 찾는다 — 후보를
-    하나만 믿지 않고, cuts가 실제로 채워진 배열을 가진 첫 후보를 채택한다
-    (모듈 docstring "JSON 추출 강화" 참고)."""
+    """extract_json_object보다 적극적으로 "렌더용 JSON"을 찾는다. cuts가 실제로 채워진 배열을 가진
+    첫 후보를 채택한다.
+
+    extract_json_object()의 마지막 폴백(첫 '{'~마지막 '}')은 코드펜스를 안 지킨 응답에서 본문 전체를
+    한 덩어리로 집어와 title/brand/cuts/source가 빈 JSON이 될 수 있다. 이 입력은 사람이 채팅에서
+    복사한 텍스트라 포맷이 덜 보장되므로 한 후보만 믿지 않는다."""
     try:
         obj = extract_json_object(raw)
         if isinstance(obj, dict) and isinstance(obj.get("cuts"), list) and obj["cuts"]:
@@ -133,10 +95,8 @@ def _extract_render_script(raw: str) -> dict:
 
 
 def _fill_missing_top_level(script: dict) -> list[str]:
-    """title/brand/source는 사실 정보가 아니라 메타·브랜딩 필드다 — cuts
-    (실제 팩트)를 찾는 데는 성공했는데 이 셋만 빠져 Remotion 스키마 검증
-    에서 막히는 걸 막는다(사용자 리포트 재현). cuts 내용은 전혀 안 건드림
-    — §23 원칙(사실을 지어내지 않는다)과 무관한 순수 구조 보정이다."""
+    """title/brand/source는 사실 정보가 아니라 메타·브랜딩 필드다. cuts(실제 팩트)는 찾았는데 이 셋만
+    빠져 Remotion 스키마 검증에서 막히는 것을 막는다. cuts 내용은 건드리지 않는 순수 구조 보정이다."""
     applied: list[str] = []
     if not script.get("brand"):
         script["brand"] = "같은 뉴스, 네 가지 시선 | AILENS"  # 영상 프롬프트 예시 JSON의 고정값과 동일
@@ -170,12 +130,15 @@ def _upload_error(s3, job_id: str, message: str) -> None:
 
 
 def _run_render_streaming(cmd: list[str], cwd: str, s3, job_id: str, env: dict | None = None) -> tuple[int, str]:
-    """render.ts 출력을 실시간으로 읽으며 진행률을 S3에 스로틀 업로드한다.
+    """렌더 출력을 실시간으로 읽으며 진행률을 S3에 스로틀 업로드한다.
     반환값은 (returncode, 전체 출력) — 실패 시 에러 메시지 조립에 쓴다.
 
-    env(2026-09-23 추가) — tts.ts::DEFAULT_VOICE는 엔진을 process.env.
-    TTS_ENGINE에서 읽는다(CLI 플래그가 없음 — voiceId만 --voice로 옴) —
-    CMS video-settings 발행값을 반영하려면 이 방법뿐이다."""
+    로컬 render.ts는 렌더링 줄을 캐리지 리턴(CR, 줄바꿈 아님)으로 갱신하므로, subprocess.run(capture_output=True)
+    으로는 렌더가 끝나야 한꺼번에 보인다. Popen으로 문자 단위로 읽고 CR/LF를 둘 다 줄 경계로 취급한다.
+    진행률은 progress.json에 덮어쓰며 video_lab.py::handle_poll이 pending 응답에 싣는다.
+
+    env — tts.ts::DEFAULT_VOICE는 엔진을 process.env.TTS_ENGINE에서 읽고 CLI 플래그가 없다(voiceId만
+    --voice로 온다). CMS video-settings 발행값을 반영하려면 환경변수로 넘기는 방법뿐이다."""
     proc = subprocess.Popen(
         cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=env,
     )
@@ -247,12 +210,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="이미 생성된 각본 텍스트로 영상만 렌더(CMS 영상 랩 전용)")
     parser.add_argument("--job-id", required=True)
     parser.add_argument("--script-s3-key", required=True)
-    # 2026-09-25 — 사용자 리포트("일레븐 랩스를 선택하고 영상을 생성했는데
-    # ... 영상에 담긴거는 polly 음성이 선택이 되어서 나왔네요") 수정.
-    # CMS 카드(VideoCardGenerator.tsx)가 "성우 미리듣기"에서 고른
-    # provider/voice를 이 렌더 1회에도 그대로 쓰고 싶을 때
-    # chat_ws.py::_run_render_video_flow가 JSON으로 담아 넘긴다 — 없으면
-    # (자동 발행 파이프라인 등) 지금처럼 발행된 설정만 쓴다.
+    # CMS 카드(VideoCardGenerator.tsx)의 "성우 미리듣기"에서 고른 provider/voice를 이 렌더 1회에도 쓰고
+    # 싶을 때 chat_ws.py::_run_render_video_flow가 JSON으로 담아 넘긴다. 없으면(자동 발행 파이프라인 등)
+    # 발행된 설정만 쓴다.
     parser.add_argument("--settings-override", default=None)
     args = parser.parse_args()
     settings_override = json.loads(args.settings_override) if args.settings_override else None
@@ -294,18 +254,11 @@ def main() -> None:
         f"렌더 시작... (provider={settings['provider']}, voice={settings['voice']}, "
         f"engine={settings['engine']}, format={settings['format']})"
     )
-    # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+provider가
-    # elevenlabs면 ELEVENLABS_*)을 만든다 — publish_utils.py::generate_video()
-    # 와 이 로직을 공유한다(2026-09-24, 사용자 요청: "동일한 부분은
-    # 동일하게 로직이나 코드 사용할 수 있도록", video_settings.py
-    # 모듈 docstring 참고).
+    # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+provider가 elevenlabs면 ELEVENLABS_*)을
+    # 만든다. publish_utils.py::generate_video()와 이 로직을 공유한다(video_settings.py 모듈 docstring 참고).
     #
-    # render → render:lambda(2026-09-24) — 단일 Fargate 컨테이너 렌더는
-    # 코어 수 한계를 못 벗어난다는 조사 결과로 Remotion Lambda로 교체
-    # (docs/worklog/2026-09/2026-09-24-영상랩-렌더속도-3배단축.md "다음"
-    # 참고). npm 스크립트 이름과 --job-id 인자만 바뀌고, 나머지 계약
-    # (work_dir/video.mp4가 로컬에 생성됨)은 그대로라 이 함수의 나머지
-    # 로직(썸네일 생성·S3 업로드)은 무변경.
+    # 단일 Fargate 컨테이너 렌더는 코어 수 한계를 못 벗어나므로 Remotion Lambda(render:lambda)로 렌더한다.
+    # 계약(work_dir/video.mp4가 로컬에 생성됨)은 로컬 렌더와 같아 이후 썸네일 생성·S3 업로드는 그대로다.
     returncode, output = _run_render_streaming(
         [
             "npm", "run", "render:lambda", "--",

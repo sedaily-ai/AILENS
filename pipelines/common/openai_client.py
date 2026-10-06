@@ -1,19 +1,8 @@
-"""OpenAI 클라이언트 — `pipelines/` 공용. 이미지 생성(webtoon) 전용.
+"""OpenAI 클라이언트 — `pipelines/` 공용, webtoon 이미지 생성 전용.
 
-API 키는 AWS Secrets Manager `sedaily-mbti/openai-api-key`에서 가져온다
-(마스터DB 뉴스웹툰 파이프라인과 같은 시크릿 재사용 — 신규 키 발급 없음).
-
-get_client()는 2026-08-21 추가 — pipelines/webtoon만 이 공용 모듈이 생기기
-전(2026-08-10) 방식 그대로 로컬 `.env`(OPENAI_API_KEY 평문)를 썼다. 직접
-OpenAI() 인스턴스를 만들던 걸, 여기서 만든 인스턴스를 그대로 받아 쓰도록
-통일했다 — letters/podcast/video와 동일하게 로컬 .env 없이 Secrets
-Manager만으로 동작한다.
-
-2026-08-23 — letters/podcast/webtoon의 텍스트 생성(대본·스크립트)을 전부
-Bedrock Claude로 이관하면서(video와 통일) 이 모듈의 `call_text()`는 더 이상
-쓰는 곳이 없어져 삭제했다. 이제 이 모듈은 webtoon의 실제 컷 이미지
-생성(Responses API `image_generation` 툴 — Bedrock엔 대응 기능 없음)
-전용이다.
+API 키는 AWS Secrets Manager `sedaily-mbti/openai-api-key`에서 가져온다.
+컷 이미지는 Responses API `image_generation` 툴로 생성한다(Bedrock에 대응 기능 없음).
+텍스트 생성은 전부 Bedrock Claude(`bedrock_client.py`)를 쓴다.
 """
 import json
 import os

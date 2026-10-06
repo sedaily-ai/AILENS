@@ -1,102 +1,29 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';
-import { ListeningHeadphoneIllustration } from '@/shared/ui/icons/HandDrawnIcons';
-import { onPlayHomePlayerItemRequest } from '@/shared/lib/audioPlayerBus';
+import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
+import { onPlayHomePlayerItemRequest } from '@/shared/lib/media/audioPlayerBus';
+import { extractYoutubeVideoId, loadYouTubeIframeApi, type YTPlayer } from './youtube';
 
-// 북마크는 로그인한 사람만 쓸 수 있다(2026-08-21, 사용자 요청 — "로그인하면
-// 북마크 가능하게"). 지금은 클라이언트 localStorage에만 저장한다 — 이
-// 재생목록 항목에 대한 "즐겨찾기"를 서버에 영구 저장하는 API/테이블이 아직
-// 없어서, 기기 바꾸면 안 남는다는 한계가 있다(다음에 서버 저장까지 가고
-// 싶으면 personal_db_client.py 쪽에 새 테이블/필드가 필요 — 지금 있는
-// ArchivedSentence는 레터 문장 저장용이라 이 항목과는 다른 도메인).
+// 북마크는 로그인한 사용자만 쓸 수 있다. 서버에 영구 저장하는 API/테이블이 아직 없어 클라이언트 localStorage에만 저장하므로
+// 기기를 바꾸면 남지 않는다(서버 저장이 필요하면 personal_db_client.py에 새 테이블/필드가 필요하다. ArchivedSentence는 레터 문장용이라 다른 도메인이다).
 const BOOKMARK_STORAGE_KEY = 'ailens-player-bookmarks';
 
-// 사이트 하단 고정 오디오 플레이어 — 벅스뮤직 재생바처럼 상시 도킹해 듣는다
-// (2026-08-14, 사용자 레퍼런스: 벅스뮤직 앱 하단 미니플레이어).
-//
-// 2026-08-16: 처음엔 "오늘의 핵심 뉴스"(발행된 레터)를 그 자리에서 TTS로
-// 읽어주는 방식이었는데, admin이 기사와 무관하게 직접 만드는 "제목+유튜브
-// 링크" 재생목록(홈 플레이어 관리 화면)으로 완전히 대체했다 — TTS 합성
-// 로직은 그래서 제거. 유튜브 IFrame Player API를 화면엔 안 보이는 1x1
-// 컨테이너로 띄워서 재생/일시정지/진행률을 제어한다.
-//
-// 2026-08-21: mp3 등 직접 파일 URL 재생 추가(사용자 요청 — "기존 오디오
-// 파일 있는거 플레이북쪽에 넣어주시죠"). lens 팟캐스트 서브포맷이 S3에
-// mp3를 올려두는데, 여태 이 플레이어는 YouTube만 재생 가능해서 목록에
-// 못 넣고 있었다. <audio> 엘리먼트를 하나 더 두고 URL 패턴으로 유튜브
-// vs 직접 파일을 갈라 재생 — VideoLightbox의 "직접 파일" 분기와 같은
-// 원리.
-const ACCENT = '#3b82f6';
+// 사이트 하단에 상시 도킹하는 고정 오디오 플레이어.
+// admin이 직접 만드는 "제목+유튜브 링크" 재생목록(홈 플레이어 관리 화면)을 재생한다.
+// 유튜브 IFrame Player API를 화면에 보이지 않는 1x1 컨테이너로 띄워 재생/일시정지/진행률을 제어한다.
+// mp3 등 직접 파일 URL(lens 팟캐스트 서브포맷이 S3에 올리는 파일)은 <audio> 엘리먼트로 재생하며,
+// URL 패턴으로 유튜브와 직접 파일을 구분한다(VideoLightbox의 "직접 파일" 분기와 같은 원리).
+const ACCENT = '#3d70de'; // 오디오 섹션(AudioPreviewSection)·신문 카드와 같은 블루
+const PAPER = '#f8f8f6'; // 신문 지면 배경
+const RULE = '#e4e4df';
+const INK = '#1f2937';
+const SERIF = "'Noto Serif KR', Georgia, serif";
 const DIRECT_AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i;
-
-function extractYoutubeVideoId(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    if (u.hostname === 'youtu.be') {
-      return u.pathname.slice(1).split('/')[0] || null;
-    }
-    if (!u.hostname.endsWith('youtube.com')) return null;
-    if (u.pathname === '/watch') return u.searchParams.get('v');
-    const m = u.pathname.match(/^\/(embed|shorts)\/([^/]+)/);
-    return m ? m[2] : null;
-  } catch {
-    return null;
-  }
-}
-
-declare global {
-  interface Window {
-    YT?: {
-      Player: new (
-        el: HTMLElement,
-        opts: {
-          videoId: string;
-          playerVars?: Record<string, number>;
-          events?: {
-            onReady?: () => void;
-            onStateChange?: (e: { data: number }) => void;
-          };
-        },
-      ) => YTPlayer;
-      PlayerState: { ENDED: number; PLAYING: number };
-    };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-interface YTPlayer {
-  playVideo(): void;
-  pauseVideo(): void;
-  loadVideoById(videoId: string): void;
-  getCurrentTime(): number;
-  getDuration(): number;
-  destroy(): void;
-}
-
-let youtubeApiPromise: Promise<void> | null = null;
-function loadYouTubeIframeApi(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve();
-  if (window.YT) return Promise.resolve();
-  if (youtubeApiPromise) return youtubeApiPromise;
-  youtubeApiPromise = new Promise((resolve) => {
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      resolve();
-    };
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    document.head.appendChild(script);
-  });
-  return youtubeApiPromise;
-}
 
 export function TodayNewsPlayer() {
   const { isAuthenticated } = useAuth();
@@ -109,14 +36,13 @@ export function TodayNewsPlayer() {
   const [expanded, setExpanded] = useState(false);
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
 
-  // 북마크 localStorage 복원 — 로그인 여부와 무관하게 저장은 항상 기기에
-  // 남지만, 버튼 자체를 로그인 상태에서만 노출한다(요청 그대로).
+  // 북마크 localStorage 복원. 저장은 로그인 여부와 무관하게 기기에 남지만 버튼은 로그인 상태에서만 노출한다.
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
       if (raw) setBookmarked(new Set(JSON.parse(raw)));
     } catch {
-      // localStorage 접근 불가(시크릿 모드 등) — 조용히 무시, 북마크 없이 시작.
+      // localStorage 접근 불가(시크릿 모드 등)면 조용히 무시하고 북마크 없이 시작한다.
     }
   }, []);
 
@@ -128,7 +54,7 @@ export function TodayNewsPlayer() {
       try {
         window.localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify([...next]));
       } catch {
-        // 저장 실패해도 이번 세션 내 UI 상태는 유지.
+        // 저장에 실패해도 이번 세션의 UI 상태는 유지한다.
       }
       return next;
     });
@@ -237,19 +163,13 @@ export function TodayNewsPlayer() {
     setPlaying(false);
   }
 
-  // 외부(AudioPreviewSection의 카드 재생 버튼)에서 특정 항목을 바로 재생
-  // 요청할 때 쓴다(2026-08-21). setIndex()는 비동기 배치라 바로 이어서
-  // play()를 부르면 아직 갱신 안 된 `current`(이전 index 기준)를 읽는
-  // 경쟁 상태가 생긴다 — autoPlayOnIndexRef에 "이 index로 바뀌면 자동
-  // 재생해라" 표시만 남기고, 아래 트랙 전환 effect가 실제 재생을 맡는다.
+  // 외부(AudioPreviewSection의 카드 재생 버튼)에서 특정 항목을 바로 재생 요청할 때 쓴다.
+  // setIndex()는 비동기 배치라 바로 play()를 부르면 갱신 전 `current`(이전 index)를 읽는 경쟁 상태가 생긴다.
+  // 따라서 autoPlayOnIndexRef에 "이 index로 바뀌면 자동 재생" 표시만 남기고, 아래 트랙 전환 effect가 실제 재생을 맡는다.
   const autoPlayOnIndexRef = useRef(false);
-  // TodayNewsPlayer(여기)와 AudioPreviewSection이 같은 home_player API를
-  // 각자 따로 fetch한다(별도 useEffect, 서버 프리페치 vs 클라이언트
-  // fetch) — 카드 재생 버튼을 누른 시점에 이쪽 fetch가 아직 안 끝났으면
-  // items가 null이라 재생 요청이 조용히 무시되던 경쟁 상태가 있었다
-  // (2026-08-21 발견, 드물지만 느린 네트워크에서 재현 가능). items가
-  // null인 동안 들어온 요청은 여기 담아뒀다가, 아래 effect가 items 로드
-  // 완료 시점에 이어서 처리한다.
+  // TodayNewsPlayer와 AudioPreviewSection은 같은 home_player API를 각자 fetch한다. 카드 재생 버튼을 누른 시점에
+  // 이쪽 fetch가 끝나지 않아 items가 null이면 요청이 무시되는 경쟁 상태가 생기므로,
+  // items가 null인 동안 들어온 요청은 여기 담아 두었다가 아래 effect가 items 로드 완료 시점에 이어서 처리한다.
   const pendingPlayIdRef = useRef<string | null>(null);
 
   function playItemById(id: string) {
@@ -262,7 +182,7 @@ export function TodayNewsPlayer() {
     setClosed(false);
     setError(false);
     if (i === index) {
-      // 이미 선택돼 있던 트랙 — index effect가 안 도니 바로 재생.
+      // 이미 선택돼 있던 트랙이면 index effect가 돌지 않으므로 바로 재생한다.
       play();
       return;
     }
@@ -270,16 +190,12 @@ export function TodayNewsPlayer() {
     setIndex(i);
   }
 
-  // playItemById는 매 렌더 재생성되지만 클로저가 담는 items/index는 이미
-  // deps에 있다 — 그 값이 바뀔 때마다 재구독되므로 함수 자체를 deps에
-  // 넣을 필요가 없다(넣으면 매 렌더 재구독만 늘어난다).
+  // playItemById는 매 렌더 재생성되지만 클로저가 담는 items/index는 이미 deps에 있어 값이 바뀔 때마다 재구독된다.
+  // 따라서 함수 자체를 deps에 넣을 필요가 없다(넣으면 매 렌더 재구독만 늘어난다).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => onPlayHomePlayerItemRequest(playItemById), [items, index]);
 
-  // items가 막 로드됐는데 그 사이 재생 요청이 대기 중이었으면 이어서
-  // 처리 — 위와 같은 이유로 playItemById를 deps에 안 넣는다(items가
-  // 바뀔 때 재구독되는 함수라, 이 시점의 playItemById는 이미 새
-  // items를 담고 있다).
+  // items가 막 로드됐을 때 대기 중인 재생 요청이 있으면 이어서 처리한다. 위와 같은 이유로 playItemById는 deps에 넣지 않는다.
   useEffect(() => {
     if (items && pendingPlayIdRef.current) {
       const id = pendingPlayIdRef.current;
@@ -289,7 +205,7 @@ export function TodayNewsPlayer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  // <audio> 진행률·종료 이벤트 — 유튜브처럼 폴링 대신 네이티브 이벤트로.
+  // <audio> 진행률·종료는 폴링 대신 네이티브 이벤트로 처리한다.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -317,11 +233,8 @@ export function TodayNewsPlayer() {
     };
   }, []);
 
-  // 트랙이 바뀌면 재생 중이던 영상은 멈춘다 — 다음 트랙은 버튼을 다시
-  // 눌러야 재생(자동 넘어감은 ended 이벤트에서만, 사용자가 prev/next를
-  // 누른 경우는 명시적으로 다시 재생해야 자연스럽다). 다만
-  // autoPlayOnIndexRef가 서 있으면(playItemById 경유) 멈춘 직후 바로
-  // 새 트랙을 재생한다 — 홈 오디오 카드 재생 버튼용.
+  // 트랙이 바뀌면 재생 중이던 영상은 멈추고 다음 트랙은 버튼을 다시 눌러야 재생한다(자동 넘어감은 ended 이벤트에서만).
+  // 다만 autoPlayOnIndexRef가 서 있으면(playItemById 경유) 멈춘 직후 새 트랙을 바로 재생한다(홈 오디오 카드 재생 버튼용).
   useEffect(() => {
     ytPlayerRef.current?.pauseVideo();
     audioRef.current?.pause();
@@ -349,21 +262,11 @@ export function TodayNewsPlayer() {
 
   return (
     <>
-      {/* 유튜브 플레이어 컨테이너 — 별도 포털로 body에 직접 붙인다
-          (2026-08-21, 실사용 버그 — 재생 시작 후 재생목록 패널을 열고
-          닫으면 "insertBefore ... not a child of this node"로 페이지가
-          죽는 걸 사용자가 재현해서 발견). 원인: 유튜브 IFrame API가
-          `new YT.Player(el, ...)`를 부르면 대상 엘리먼트를 실제 <iframe>
-          으로 통째로 바꿔치기한다(innerHTML만 채우는 게 아니라 엘리먼트
-          자체를 교체) — 그런데 이 컨테이너 div가 재생목록 패널
-          (`{expanded && (...)}`)의 바로 다음 형제 노드로 같은 부모 밑에
-          있었다. 재생을 시작해 div가 이미 iframe으로 바뀐 상태에서
-          `expanded`를 토글하면, React는 여전히 "원래 그 div가 거기
-          있다"고 믿고 그 앞뒤로 패널 노드를 끼워넣거나 빼려다가 실제로는
-          사라진 노드를 참조해 크래시. VideoLightbox.tsx와 같은 이유로
-          같은 해법(createPortal → document.body) — 포털로 완전히
-          분리하면 패널을 여닫아도 이 컨테이너의 형제 관계 자체가 없어져
-          React가 그 주변을 reconcile할 일이 없다. */}
+      {/* 유튜브 플레이어 컨테이너. 별도 포털로 body에 직접 붙인다.
+          유튜브 IFrame API는 `new YT.Player(el, ...)` 호출 시 대상 엘리먼트를 <iframe>으로 교체한다.
+          이 div가 재생목록 패널(`{expanded && (...)}`)의 형제 노드로 있으면 `expanded`를 토글할 때
+          React가 이미 사라진 노드를 참조해 "insertBefore ... not a child of this node"로 크래시한다.
+          VideoLightbox.tsx와 같이 createPortal(document.body)로 분리해 형제 관계 자체를 없앤다. */}
       {typeof document !== 'undefined' &&
         createPortal(
           <div ref={ytContainerRef} style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }} />,
@@ -377,34 +280,31 @@ export function TodayNewsPlayer() {
           right: 0,
           bottom: 0,
           zIndex: 70,
-          background: '#fff',
-          borderTop: '1px solid rgba(0,0,0,0.08)',
-          boxShadow: '0 -2px 16px rgba(17,24,39,0.08)',
+          background: PAPER,
+          borderTop: '1px solid #c4c7cd',
+          boxShadow: '0 -6px 24px -12px rgba(60,55,45,0.22)',
         }}
       >
-      {/* 재생목록 패널(2026-08-21, 사용자 요청 — "플레이리스트처럼 누르면
-          쭉 나오고, 우측에 일러스트로"). 별도 fixed 레이어 대신 이 미니바와
-          같은 컨테이너(bottom:0 고정) 안에 위쪽 형제로 넣는다 — 컨테이너
-          높이가 늘어나면 위로 펼쳐지는 모양이 자연스럽게 나오고, 헤더·
-          하단바 z-index 계산을 새로 안 해도 된다. */}
+      {/* 재생목록 패널. 별도 fixed 레이어 대신 미니바와 같은 컨테이너(bottom:0 고정) 안에 위쪽 형제로 넣어
+          컨테이너 높이가 늘면 위로 펼쳐지고, 헤더·하단바 z-index를 새로 계산할 필요가 없다. */}
       {expanded && (
         <div
           className="mx-auto flex"
           style={{
             maxWidth: 1080,
             maxHeight: 320,
-            borderBottom: '1px solid rgba(0,0,0,0.06)',
+            borderBottom: `1px solid ${RULE}`,
           }}
         >
           <div className="flex-1 min-w-0" style={{ overflowY: 'auto', padding: '10px clamp(12px, 3vw, 24px)' }}>
-            {/* 패널 라벨(2026-08-21, 디자인 개선 — "패널에 제목이 없어서
-                불친절하다") — 목록 위에 뭘 보고 있는지 한 줄로 안내. */}
+            {/* 패널 라벨. 목록 위에 무엇을 보고 있는지 한 줄로 안내한다. */}
             <p
               style={{
-                fontSize: 11,
+                fontFamily: SERIF,
+                fontSize: 12,
                 fontWeight: 700,
-                color: '#9ca3af',
-                letterSpacing: '0.04em',
+                color: '#6b7280',
+                letterSpacing: '0.02em',
                 padding: '4px 6px 8px',
               }}
             >
@@ -417,8 +317,8 @@ export function TodayNewsPlayer() {
               return (
                 <div
                   key={it.id}
-                  className="flex items-center hover:bg-gray-50"
-                  style={{ gap: 10, padding: '8px 6px', borderRadius: 8 }}
+                  className="flex items-center hover:bg-black/[0.025]"
+                  style={{ gap: 12, padding: '9px 6px', borderRadius: 6, borderBottom: `1px solid ${RULE}` }}
                 >
                   <button
                     type="button"
@@ -435,10 +335,11 @@ export function TodayNewsPlayer() {
                         width: 22,
                         height: 22,
                         borderRadius: '50%',
-                        fontSize: 11,
+                        fontFamily: SERIF,
+                        fontSize: 12,
                         fontWeight: 700,
-                        color: isCurrent ? '#fff' : '#9ca3af',
-                        background: isCurrent ? ACCENT : '#f3f4f6',
+                        color: isCurrent ? '#fff' : '#8b8f98',
+                        background: isCurrent ? INK : 'transparent',
                       }}
                     >
                       {isCurrent && playing ? (
@@ -448,12 +349,11 @@ export function TodayNewsPlayer() {
                       )}
                     </span>
 
-                    {/* 포맷 아이콘(2026-08-21, 디자인 개선) — 영상·팟캐스트가
-                        섞이는데 지금까지는 눌러보기 전엔 구분이 안 갔다. */}
+                    {/* 포맷 아이콘. 영상과 팟캐스트를 구분한다. */}
                     <span
                       className="flex items-center justify-center flex-shrink-0"
                       aria-hidden
-                      style={{ color: isCurrent ? ACCENT : '#c0c5cc' }}
+                      style={{ color: isCurrent ? ACCENT : '#b8bcc4' }}
                       title={isAudio ? '팟캐스트' : '영상'}
                     >
                       {isAudio ? (
@@ -473,9 +373,11 @@ export function TodayNewsPlayer() {
                     <span
                       className="min-w-0 flex-1"
                       style={{
-                        fontSize: 13.5,
+                        fontFamily: SERIF,
+                        fontSize: 14,
                         fontWeight: isCurrent ? 700 : 500,
-                        color: isCurrent ? '#111827' : '#374151',
+                        letterSpacing: '-0.01em',
+                        color: isCurrent ? INK : '#4b5563',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -485,9 +387,7 @@ export function TodayNewsPlayer() {
                     </span>
                   </button>
 
-                  {/* 북마크 — 로그인한 사람만(2026-08-21 요청). 비로그인
-                      상태에선 자리 자체를 안 차지하게 숨긴다(그레이아웃
-                      대신 — 어차피 못 누르는 버튼을 계속 보여줄 필요 없음). */}
+                  {/* 북마크. 로그인한 사용자에게만 보이며, 비로그인 상태에서는 자리를 차지하지 않도록 숨긴다. */}
                   {isAuthenticated && (
                     <button
                       type="button"
@@ -516,36 +416,26 @@ export function TodayNewsPlayer() {
             })}
           </div>
 
-          {/* 우측 일러스트 — 좁은 화면에선 숨김(리스트 폭 확보 우선). */}
+          {/* 우측 일러스트. 좁은 화면에서는 숨겨 리스트 폭을 확보한다. */}
           <div
             className="hidden sm:flex flex-col items-center justify-center flex-shrink-0"
-            style={{ width: 140, borderLeft: '1px solid rgba(0,0,0,0.06)', padding: 16, background: '#fafbfc' }}
+            style={{ width: 150, borderLeft: `1px solid ${RULE}`, padding: 16 }}
           >
-            <ListeningHeadphoneIllustration accent={ACCENT} className="w-16 h-16" />
-            <p style={{ marginTop: 8, fontSize: 11.5, color: '#9ca3af', fontWeight: 600, textAlign: 'center', lineHeight: 1.5 }}>
+            <PodcastSketch className="w-20 h-16" />
+            <p style={{ marginTop: 8, fontFamily: SERIF, fontSize: 12, color: '#8b8f98', fontWeight: 600, textAlign: 'center', lineHeight: 1.6 }}>
               오늘의 뉴스를
               <br />
               귀로 들어보세요
             </p>
-            {/* /listen 전용 페이지로(2026-08-21 신설) — 이 미니 플레이어는
-                고유 URL이 없어 검색엔진에 안 걸리니, 실제 콘텐츠 URL로 가는
-                링크를 심어둔다(내부 링크 신호 + 페이지 발견 경로 둘 다). */}
-            <Link
-              href="/listen"
-              style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: ACCENT, textDecoration: 'none' }}
-            >
-              전체 목록 보기 →
-            </Link>
           </div>
         </div>
       )}
 
-      {/* mp3 등 직접 파일용 — 화면엔 안 보임, controls도 안 붙임(재생은
-          이 컴포넌트의 커스텀 컨트롤 버튼으로만). */}
+      {/* mp3 등 직접 파일용. 화면에는 보이지 않으며 controls 없이 커스텀 컨트롤 버튼으로만 재생한다. */}
       <audio ref={audioRef} style={{ display: 'none' }} />
 
       {/* 진행바 — 상단 얇은 줄 */}
-      <div style={{ height: 3, background: '#f0f0ef' }}>
+      <div style={{ height: 3, background: RULE }}>
         <div
           style={{
             height: '100%',
@@ -560,32 +450,22 @@ export function TodayNewsPlayer() {
         className="mx-auto flex items-center"
         style={{ maxWidth: 1080, height: 60, padding: '0 clamp(12px, 3vw, 24px)', gap: 12 }}
       >
-        {/* 아이콘 배지 — /listen 바로가기로(2026-08-21, 사용자 요청 —
-            "플레이북 쪽에도 바로가기 놔주시죠, 일러스트 아이콘으로"). 접힌
-            미니바 상태에서도 전용 페이지로 넘어갈 진입점이 있어야 발견성이
-            생긴다(패널을 펼쳐야만 보이던 §21의 "전체 목록 보기" 링크와
-            별개 경로). 음표 라인아트 대신 패널과 같은 헤드폰 캐릭터
-            일러스트로 통일 — 접힌 상태·펼친 상태가 같은 아이콘을 쓰면
-            "같은 기능"이라는 인식이 자연스럽다. */}
-        <Link
-          href="/listen"
-          aria-label="전체 오디오 목록 보기"
-          className="flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105"
-          style={{ width: 36, height: 36, borderRadius: 10, background: '#eff6ff' }}
-        >
-          <ListeningHeadphoneIllustration accent={ACCENT} className="w-6 h-6" />
-        </Link>
+        <div className="flex items-center justify-center flex-shrink-0" aria-hidden>
+          <PodcastSketch className="w-12 h-10 -ml-1" />
+        </div>
 
         {/* 트랙 정보 */}
         <div className="min-w-0 flex-1">
-          <p style={{ fontSize: 10.5, fontWeight: 700, color: ACCENT, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
-            오늘의 핵심 뉴스 {total > 1 ? `· ${index + 1}/${total}` : ''}
+          <p style={{ fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: '0.04em', marginBottom: 1 }}>
+            오늘의 뉴스를 귀로 {total > 1 ? `· ${index + 1}/${total}` : ''}
           </p>
           <p
-            className="text-gray-900"
             style={{
-              fontSize: 13.5,
-              fontWeight: 600,
+              fontFamily: SERIF,
+              fontSize: 14.5,
+              fontWeight: 700,
+              letterSpacing: '-0.015em',
+              color: INK,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -619,13 +499,11 @@ export function TodayNewsPlayer() {
               height: 38,
               borderRadius: '50%',
               border: 'none',
-              // 검정→블루로(2026-08-21, 디자인 개선) — 이 컴포넌트의 나머지
-              // 요소(트랙 배지, 진행바, 재생목록 토글 활성 상태)가 전부
-              // ACCENT 파란색인데 정작 가장 눈에 띄는 재생 버튼만 검정이라
-              // 톤이 어긋났다.
-              background: ACCENT,
+              // 재생 버튼도 나머지 요소(트랙 배지, 진행바, 재생목록 토글)와 같은 ACCENT 파랑으로 맞춘다.
+              background: playing ? ACCENT : INK,
               color: '#fff',
               cursor: 'pointer',
+              transition: 'background .2s ease',
             }}
           >
             {playing ? (
@@ -659,7 +537,7 @@ export function TodayNewsPlayer() {
                 height: 30,
                 borderRadius: '50%',
                 border: 'none',
-                background: expanded ? '#eff6ff' : 'transparent',
+                background: expanded ? 'rgba(61,112,222,0.12)' : 'transparent',
                 color: expanded ? ACCENT : '#6b7280',
                 cursor: 'pointer',
               }}
@@ -671,7 +549,7 @@ export function TodayNewsPlayer() {
             </button>
           )}
 
-          <div style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
+          <div style={{ width: 1, height: 20, background: RULE, margin: '0 4px' }} />
 
           <button
             type="button"

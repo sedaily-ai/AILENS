@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
-import { buildEconomyCategoryMetadata, EconomyCategoryPage } from '@/widgets/CategoryArchiveClient';
-import { CACHE_TTL_FALLBACK_SECONDS } from '@/shared/lib/api/cmsPostsApi';
+import { buildEconomyCategoryMetadata, clampCategoryPage, EconomyCategoryPage } from '@/widgets/CategoryArchiveClient';
 
-// "시그널" 카테고리 아카이브 페이지네이션 — markets/page/[n]/page.tsx와
-// 완전히 같은 패턴, slug만 고정해서 넘기는 wrapper.
+// 카테고리 아카이브 페이지네이션(/signal/page/[n]) — slug만 고정해 넘기는 wrapper. 라우트 설정 이유는
+// widgets/CategoryArchiveClient/EconomyCategoryPage.tsx의 clampCategoryPage 주석 참조.
 type Params = Promise<{ n: string }>;
 
-export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS(cmsPostsApi.ts) — route segment config는 정적 분석돼 import한 상수를 못 쓴다, 값 바뀌면 여기도 같이 바꿀 것
+export const revalidate = 300; // = CACHE_TTL_FALLBACK_SECONDS. 값 변경 시 카테고리 라우트 전체를 함께 수정한다.
+
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
@@ -19,8 +19,6 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function Page({ params }: { params: Params }) {
-  const { n: rawN } = await params;
-  const parsedN = parseInt(rawN, 10);
-  const n = Number.isFinite(parsedN) && parsedN > 1 ? parsedN : 1;
-  return EconomyCategoryPage({ slug: 'signal', page: n });
+  const { n } = await params;
+  return EconomyCategoryPage({ slug: 'signal', page: clampCategoryPage(n) });
 }

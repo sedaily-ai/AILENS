@@ -1,82 +1,38 @@
 import React from 'react';
-import { interpolate } from 'remotion';
 import { CutLayout } from '../components/CutLayout';
 import { Icon } from '../components/Icon';
-import { CaptionText } from '../components/CaptionText';
+import { KineticText } from '../components/KineticText';
 import { OpeningCutType } from '../lib/schema';
-import { COLORS, FONT_FAMILY, FONT_WEIGHT } from '../styles/tokens';
+import { COLORS } from '../styles/tokens';
 import { useScale } from '../lib/layout';
 import { useEnterProgress } from '../lib/animation';
 
-const TITLE_DELAY_SECONDS = 0.25;
-
-// 첫 컷. caption을 제목 카드처럼 크게 노출하므로 하단 CaptionBar는 쓰지 않는다.
-// 아이콘은 0.8→1 스케일업, 타이틀은 살짝 늦게 페이드인.
-//
-// asOfDate(2026-09 신설) — "첫 화면에 기준 시점을 표시해달라"는 기자
-// 피드백. 굳이 모든 컷에 상시 노출하지 않고 첫 컷에만 한 번 — 시청자가
-// "이게 언제 기준 정보인지" 아는 게 목적이지 매 컷 화면을 잠식할 필요는
-// 없어서(레터/팟캐스트도 기준일을 한 번만 언급하는 것과 같은 원칙).
-//
-// 2026-09-02 — 실제 발행 영상에서 "...가계부채는 2025년 6월 말 기준)
-// 기준"처럼 "기준"이 중복되는 걸 발견. 원인: DDB 비디오 프롬프트의
-// asOfDate 예시("2027년도 예산안 기준", "2026.9.1 발표")는 이미 완결된
-// 문구인데, 여기서 항상 " 기준"을 덧붙이고 있었다. 모델이 완결된 문구를
-// 쓰도록 프롬프트가 설계돼 있으므로, 프롬프트가 아니라 이 렌더 쪽의
-// 덧붙이기를 제거하는 게 맞는 수정.
-export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string; asOfDate?: string }> = ({
-  cut,
-  brand,
-  asOfDate,
-}) => {
+// 첫 컷. 둥근 아이콘 원 대신 부드러운 타일, 제목은 전면 타이포(단어가 하나씩 올라옴).
+// 기준 시점은 왼쪽 위 키워드 라벨 아래에 상시 보인다(없으면 이 컷에서 따로 보이지 않는다).
+export const OpeningCut: React.FC<{ cut: OpeningCutType; brand: string; asOfDate?: string }> = ({ cut, brand }) => {
   const scale = useScale();
-  const iconProgress = useEnterProgress();
-  const iconScale = interpolate(iconProgress, [0, 1], [0.8, 1]);
-  const titleOpacity = useEnterProgress(TITLE_DELAY_SECONDS);
+  const tileIn = useEnterProgress();
+  const tile = 168 * scale;
 
   return (
-    <CutLayout brand={brand}>
+    <CutLayout brand={brand} contentAlign="center">
       <div
         style={{
-          width: 176 * scale,
-          height: 176 * scale,
-          borderRadius: '50%',
-          background: COLORS.backgroundLight,
+          width: tile,
+          height: tile,
+          borderRadius: tile * 0.28,
+          background: 'linear-gradient(160deg, #26385F 0%, #1B2A48 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transform: `scale(${iconScale})`,
+          opacity: tileIn,
+          transform: `scale(${0.85 + 0.15 * tileIn})`,
+          marginBottom: 20 * scale,
         }}
       >
-        <Icon name={cut.data.icon} size={92 * scale} color={COLORS.accent} strokeWidth={1.6} />
+        <Icon name={cut.data.icon} size={tile * 0.46} color={COLORS.accent} strokeWidth={1.8} />
       </div>
-      <div
-        style={{
-          fontFamily: FONT_FAMILY,
-          fontWeight: FONT_WEIGHT.extrabold,
-          fontSize: 64 * scale,
-          color: COLORS.text,
-          textAlign: 'center',
-          lineHeight: 1.35,
-          maxWidth: '92%',
-          opacity: titleOpacity,
-        }}
-      >
-        <CaptionText value={cut.caption} />
-      </div>
-      {asOfDate ? (
-        <div
-          style={{
-            fontFamily: FONT_FAMILY,
-            fontWeight: FONT_WEIGHT.medium,
-            fontSize: 22 * scale,
-            color: COLORS.muted,
-            opacity: titleOpacity,
-          }}
-        >
-          {asOfDate}
-        </div>
-      ) : null}
+      <KineticText value={cut.caption} size={120} />
     </CutLayout>
   );
 };

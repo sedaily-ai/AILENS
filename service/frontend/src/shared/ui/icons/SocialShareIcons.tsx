@@ -1,21 +1,7 @@
-// 기사 공유 아이콘 6종 — lens/[slug]/LensViewClient.tsx와 letters/[id]/
-// LetterDetailClient.tsx가 완전히 동일한 코드를 각자 로컬 복제하고 있던 걸
-// 하나로 합쳤다(2026-08-18). 처음엔 실시간으로 디자인이 여러 번 바뀌는
-// 상황이라 로컬 복제 쪽이 안전했는데, 두 페이지 다 안정된 뒤엔 그 복제가
-// 유지보수 부담(아이콘 하나 고칠 때 두 파일 다 고쳐야 함)만 남긴다.
-//
-// Facebook/Twitter(X)/LinkedIn — 우리 lucide-react 버전(^1.7.0)엔 브랜드
-// 로고 아이콘이 빠져 있어(정책상 제거됨) 실제 en.sedaily.com 렌더 마크업의
-// SVG path를 그대로 옮겼다 — 참고 사이트가 쓰는 lucide 아이콘과 픽셀 단위로
-// 동일.
-//
-// 카카오톡·인스타그램은 처음엔 브랜드 컬러 배지로 넣었다가, 나머지(FB/
-// Twitter/LinkedIn)와 톤이 안 맞는다는 피드백으로 같은 회색 선(스케치)
-// 스타일 SVG로 다시 그렸다.
-//
-// 구글 "G" 아이콘은 Google 브랜드 가이드라인이 공개한 표준 4색 마크 그대로
-// (구글 검색 선호 출처로 추가 링크가 어떤 서비스로 연결되는지 아이콘만
-// 보고도 알 수 있도록).
+// 기사 공유 아이콘 6종. lens/[slug]/LensViewClient.tsx와 letters/[id]/LetterDetailClient.tsx가 공유한다.
+// Facebook/Twitter(X)/LinkedIn: 사용 중인 lucide-react 버전(^1.7.0)에 브랜드 로고 아이콘이 없어(정책상 제거됨) en.sedaily.com 렌더 마크업의 SVG path를 그대로 옮겼다.
+// 카카오톡·인스타그램은 나머지와 톤을 맞추기 위해 같은 회색 선(스케치) 스타일 SVG로 그렸다.
+// 구글 "G" 아이콘은 Google 브랜드 가이드라인이 공개한 표준 4색 마크 그대로다(구글 검색 선호 출처 링크가 어떤 서비스로 연결되는지 아이콘만 보고 알 수 있게 한다).
 
 export function FacebookIcon({ className }: { className?: string }) {
   return (

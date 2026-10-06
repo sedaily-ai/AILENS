@@ -1,27 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/SmartSearchOverlay';
+import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { coverThumb } from '@/shared/lib/webtoonCovers.generated';
-import { findSeriesBySlug, episodeNumberInSeries, type WebtoonSeries } from '@/shared/lib/webtoonSeries';
+import { findSeriesBySlug, episodeNumberInSeries, type WebtoonSeries } from '@/shared/lib/content/webtoonSeries';
 import { INK, BODY, MUTED, WEBTOON_GRID_CSS, EP_BLUE, fmtDate } from '../../webtoonSeriesUi';
 
-// /webtoon/series/{slug} — SeriesCard(webtoonSeriesUi.tsx)가 가리키는
-// 시리즈 상세 페이지. groupIntoSeries()로 시리즈 개념 자체는 2026-08-21에
-// 이미 들어와 있었는데(webtoonSeries.ts), 실제로 이 링크를 받는 페이지가
-// 없어서 눌렀을 때 404였다(2026-08-24, 사용자가 직접 발견) — 그 갭을
-// 메운다.
-//
-// /webtoon/[slug]와 달리 컷을 직접 보여주지 않는다 — 시리즈는 "여러 편의
-// 모음"이라 컷은 각 편 상세로 가야 있다. 이 페이지는 그 편들을 최신순으로
-// 늘어놓는 목록이다(webtoonSeriesUi.tsx의 SeriesCard/grid와 같은 카드
-// 언어를 episode 단위로 재사용).
+// /webtoon/series/{slug} — SeriesCard(webtoonSeriesUi.tsx)가 가리키는 시리즈 상세 페이지. groupIntoSeries()(webtoonSeries.ts)로 묶은 편들을 최신순 목록으로 보여 준다.
+// /webtoon/[slug]와 달리 컷은 직접 보여주지 않고(컷은 각 편 상세에 있다), webtoonSeriesUi.tsx의 SeriesCard/grid와 같은 카드를 episode 단위로 재사용한다.
 export function SeriesViewClient({
   slug,
   initialItems,
@@ -51,8 +43,8 @@ export function SeriesViewClient({
         <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center" style={{ color: MUTED }}>
           <p>시리즈를 찾을 수 없어요.</p>
-          <Link href="/webtoon" className="mt-4 inline-block text-sm underline underline-offset-4" style={{ color: MUTED }}>
-            웹툰 목록으로
+          <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4" style={{ color: MUTED }}>
+            최신 뉴스로
           </Link>
         </div>
       </div>

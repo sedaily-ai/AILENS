@@ -1,21 +1,17 @@
 import Link from 'next/link';
-import { displayHeadline } from '@/shared/lib/displayHeadline';
+import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/lensUrl';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 /**
- * 영상·웹툰 상세에 붙이는 "이 이슈 한눈에 보기" 텍스트 섹션(2026-10-01).
+ * 영상·웹툰 상세에 붙이는 "이 이슈 한눈에 보기" 텍스트 섹션.
  *
- * 왜: 영상 페이지는 제목+excerpt(수십 자)만, 웹툰은 컷 캡션만 초기 HTML에
- * 있어 검색봇·AI 크롤러가 읽을 텍스트가 얇았다(로컬 실측 영상 약 570자,
- * 웹툰 약 1,180자). 같은 이슈를 다룬 lens 글(슬러그 동일)이 이미 요약·
- * 30초 핵심·용어·대본을 갖고 있어서, 그걸 서버에서 가져와 눈에 보이는
- * 텍스트로 그대로 렌더한다(숨김 텍스트 아님 — 클로킹 방지). 서버
- * 컴포넌트라 JS 없이도 초기 HTML에 포함된다.
+ * 영상 페이지는 제목+excerpt, 웹툰은 컷 캡션만 초기 HTML에 있어 검색봇·AI 크롤러가 읽을 텍스트가 얇다.
+ * 같은 이슈를 다룬 lens 글(슬러그 동일)의 요약·30초 핵심·용어·대본을 서버에서 가져와 눈에 보이는 텍스트로 렌더한다(숨김 텍스트 아님 — 클로킹 방지).
+ * 서버 컴포넌트라 JS 없이도 초기 HTML에 포함된다.
  *
- * 중복 콘텐츠 우려로 분량은 의도적으로 제한 — 4포맷 전문(레터 본문·팟캐스트
- * 대본)은 lens 페이지에 두고, 여기는 요약·핵심·용어·(영상일 때) 영상 대본만
- * 싣고 lens 페이지로 링크한다.
+ * 중복 콘텐츠를 피하려고 분량을 제한한다. 4포맷 전문(레터 본문·팟캐스트 대본)은 lens 페이지에 두고,
+ * 여기에는 요약·핵심·용어·(영상일 때) 영상 대본만 싣고 lens 페이지로 링크한다.
  */
 export function IssueContextSection({
   lens,

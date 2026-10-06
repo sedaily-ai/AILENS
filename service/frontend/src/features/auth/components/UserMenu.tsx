@@ -85,14 +85,8 @@ export function UserMenu() {
             <button
               onClick={() => {
                 setIsOpen(false);
-                // router.push는 이미 "/"에 있을 때(홈에서 이 버튼을 누르는
-                // 흔한 경우) 쿼리스트링만 바뀌는 소프트 네비게이션이라 아무
-                // 효과가 없었다 — FeedPage.tsx의 URL→탭 동기화 effect가
-                // 하이드레이션 불일치 방지 때문에 마운트 시 1회만 읽도록
-                // 의도적으로 설계돼 있어(정적 export 대응), 페이지 안에
-                // 머문 채로는 재실행되지 않는다(2026-08-24, 사용자가 "눌러도
-                // 아무것도 안 나온다"고 지적). 하드 네비게이션으로 항상 새
-                // 마운트를 강제한다.
+                // router.push는 이미 "/"에 있을 때 쿼리스트링만 바뀌는 소프트 네비게이션이라 효과가 없다.
+                // FeedPage.tsx의 URL→탭 동기화 effect는 하이드레이션 불일치 방지를 위해 마운트 시 1회만 읽도록 설계되어 있어(정적 export 대응), 하드 네비게이션으로 항상 새 마운트를 강제한다.
                 window.location.href = "/?tab=archive";
               }}
               className="w-full px-4 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-3"
@@ -102,8 +96,7 @@ export function UserMenu() {
               </svg>
               내 서랍
             </button>
-            {/* 구글 로그인 계정은 Cognito에 비밀번호 자체가 없어서 숨긴다
-                (이슈 #17) — 직접 URL로 들어가면 페이지 자체가 안내한다. */}
+            {/* 구글 로그인 계정은 Cognito에 비밀번호가 없어 숨긴다. 직접 URL로 진입하면 페이지가 안내한다. */}
             {!user.isFederated && (
               <button
                 onClick={() => {

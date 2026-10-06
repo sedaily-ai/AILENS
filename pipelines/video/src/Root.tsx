@@ -5,8 +5,7 @@ import { parseNewsScript, FORMAT_DIMENSIONS, COMPOSITION_ID } from './lib/schema
 import { ensureKoreanFontLoaded } from './lib/fonts';
 import sampleJson from '../data/sample.json';
 
-// 렌더 시작 전에 한글 폰트를 반드시 로드해둔다(2026-08-23, lib/fonts.ts
-// 상단 설명 참조 — 이게 없어서 실제 영상에 한글이 군데군데 깨져 나왔다).
+// 렌더 시작 전에 한글 폰트를 반드시 로드한다(lib/fonts.ts 참고). 없으면 한글이 군데군데 깨진다.
 ensureKoreanFontLoaded();
 
 const FPS = 30;

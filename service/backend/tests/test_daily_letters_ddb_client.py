@@ -1,13 +1,9 @@
-"""daily_letters_ddb_client 유닛 테스트 — moto 로 인메모리 DynamoDB 대고 돈다.
+"""daily_letters_ddb_client 유닛 테스트 — moto 로 인메모리 DynamoDB 를 사용한다.
 
-2026-08-04: pgvector RDS 삭제 후 daily_letters 를 DynamoDB 로 재구축하며 신규 작성.
-admin/tests/test_letters_repo.py 와 같은 테이블(sedaily-mbti-daily-letters-dev)을 보는
-공개 조회 전용 클라이언트라, 여기서는 날짜 필터·정렬·소프트삭제 제외만 검증한다
-(쓰기 경로는 이번 마이그레이션 범위 밖 — Editor Pick 은 아직 손대지 않았다).
+admin/tests/test_letters_repo.py 와 같은 테이블(sedaily-mbti-daily-letters-dev)을 읽는 공개 조회 전용 클라이언트이므로
+날짜 필터, 정렬, 소프트 삭제 제외만 검증한다(쓰기 경로는 범위 밖).
 
-Run from ``backend/``::
-
-    python3 -m pytest v2/tests/test_daily_letters_ddb_client.py -v
+실행: cd service/backend && python3 -m pytest tests/test_daily_letters_ddb_client.py -v
 """
 from __future__ import annotations
 
@@ -21,7 +17,7 @@ from moto import mock_aws
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from clients import daily_letters_ddb_client as letters_client  # noqa: E402
+from clients.ddb import daily_letters as letters_client# noqa: E402
 
 _TABLE_NAME = "sedaily-mbti-daily-letters-dev-test"
 

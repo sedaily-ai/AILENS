@@ -2,14 +2,12 @@
 
 /**
  * 메인 피드 하단 — 뉴스레터 구독 CTA.
- * 단일 명의(AI LENS) 체계(2026-08-07) 이후로는 구독할 에디터를 고르는 개념이
- * 없다 — 매일 아침 발행되는 한 통을 그대로 구독한다. 샘플 미리보기 토글 +
- * 이메일 입력만 남긴다.
+ * 단일 명의(AI LENS) 체계이므로 구독할 에디터를 고르지 않고, 매일 아침 발행되는 한 통을 구독한다. 샘플 미리보기 토글과 이메일 입력만 둔다.
  */
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { NewsletterEmailField, type SubscribeLetterPayload } from '@/shared/ui/NewsletterEmailField';
+import { NewsletterEmailField, type SubscribeLetterPayload } from '@/shared/ui/form/NewsletterEmailField';
 import { useLatestLetters } from '@/shared/hooks/useLatestLetters';
 
 export function NewsletterCTA() {
@@ -19,8 +17,7 @@ export function NewsletterCTA() {
   // 샘플 레터 — 가장 최근 발행분 한 통.
   const sampleLetter = cards[0] ?? null;
 
-  // 구독 즉시 발송할 letter payload — 최신 발행분 한 통. 백엔드가
-  // letter.headline 있으면 SES 로 즉시 발송.
+  // 구독 즉시 발송할 letter payload — 최신 발행분 한 통. 백엔드가 letter.headline이 있으면 SES로 즉시 발송한다.
   const letterPayload: SubscribeLetterPayload | null = sampleLetter
     ? {
         editor_name: sampleLetter.editorName,
@@ -120,8 +117,7 @@ export function NewsletterCTA() {
             <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>
               {sampleLetter.editorName}
             </span>
-            {/* 역할 라벨("팀이 함께 정리했어요") 제거(2026-08-09) — 다른 카드
-                섹션들과 동일하게, 이름 옆 부가 라벨 없이 이름만. */}
+            {/* 역할 라벨 없이 이름만 표시한다(다른 카드 섹션과 동일). */}
             <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 'auto' }}>
               {(date ?? '').replace(/-/g, '.')} 발행
             </span>

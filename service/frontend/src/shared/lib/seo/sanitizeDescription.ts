@@ -1,19 +1,10 @@
 /**
  * 콘텐츠 상세 페이지 generateMetadata()의 description(메타 디스크립션) 필드용.
  *
- * 2026-09-02 — Google 공식 가이드(developers.google.com/search/docs/appearance/snippet)
- * 리서치 후 실제 excerpt 데이터를 표본 확인한 결과 두 가지 문제를 발견했다.
- * excerpt는 원본 CMS 기사의 subtitle을 그대로 쓰는데(cms_posts_shaping.py
- * `excerpt = post.get("subtitle") or ""`), 이게 신문 스트레이트 기사의
- * "■"로 시작하는 여러 줄 소제목을 개행 없이 이어붙인 형태이거나
- * (예: "체험공간차세대 TV·비스포크"처럼 단어가 그대로 붙어버림), 드물게
- * 기자 바이라인("김남균 마켓시그널부 기자")이 그대로 들어있는 경우도
- * 있었다(레터 15건 표본 중 2건이 20자 미만, 그중 1건이 바이라인).
- * Google 가이드가 "피해야 할 것"으로 명시한 "키워드 나열식" 패턴과
- * 사실상 같은 모양이라, 노출 전에 여기서 한 번 정제한다.
- *
- * letters/webtoon/video/lens/listen(총 7곳)이 각자 excerpt를 description
- * 폴백으로 쓰고 있어서 — buildPageTitle.ts와 같은 이유로 — 공용화한다.
+ * excerpt는 원본 CMS 기사의 subtitle을 그대로 쓰는데(cms_posts_shaping.py `excerpt = post.get("subtitle") or ""`),
+ * 신문 스트레이트 기사의 "■" 소제목이 개행 없이 이어붙은 형태(예: "체험공간차세대 TV·비스포크")이거나
+ * 기자 바이라인이 그대로 들어 있는 경우가 있다. Google 가이드가 피하라고 한 키워드 나열식 패턴과 같은 모양이므로 노출 전에 정제한다.
+ * letters/webtoon/video/lens/listen 상세 페이지가 공통으로 쓴다.
  */
 
 // 신문 스트레이트 기사 특유의 소제목 불릿 마커. 원본에서 개행이 유실되면
@@ -33,7 +24,7 @@ const MIN_TRUSTWORTHY_LENGTH = 20;
  * 판단되면(너무 짧음, 바이라인으로 보임) null을 돌려주므로, 호출부는
  * 항상 자기 폴백 문구를 준비해야 한다: `sanitizeDescription(x) ?? 폴백`.
  */
-export function sanitizeDescription(raw: string | null | undefined): string | null {
+function sanitizeDescription(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (trimmed.length < MIN_TRUSTWORTHY_LENGTH) return null;
@@ -58,10 +49,8 @@ export function trimToSnippetLength(s: string, max = 155): string {
 }
 
 /**
- * `trimToSnippetLength(sanitizeDescription(raw) ?? fallback)` — 상세 페이지
- * 7곳(letters/webtoon/video/lens/listen 등)이 각자 이 세 줄을 반복하고
- * 있어서(2026-09-02) 한 곳으로 묶었다. 원본이 정제 후에도 신뢰할 만하면
- * 그걸, 아니면 fallback을 자른다.
+ * `trimToSnippetLength(sanitizeDescription(raw) ?? fallback)`를 한 곳으로 묶은 헬퍼.
+ * 원본이 정제 후에도 신뢰할 만하면 그것을, 아니면 fallback을 자른다.
  */
 export function buildSeoDescription(raw: string | null | undefined, fallback: string, max = 155): string {
   return trimToSnippetLength(sanitizeDescription(raw) ?? fallback, max);

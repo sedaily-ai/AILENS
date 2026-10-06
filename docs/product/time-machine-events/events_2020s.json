@@ -1,0 +1,562 @@
+[
+ {
+  "date": "2020-01-20",
+  "title": "국내 첫 코로나19 확진자 발생",
+  "shortTitle": "첫 코로나 확진",
+  "description": "질병관리본부는 1월 19일 중국 우한에서 입국한 35세 중국 국적 여성이 20일 오전 확진자로 확정됐다고 밝혔다.",
+  "era": "코로나 쇼크",
+  "eraPeriod": "2020.01 ~ 2020.06",
+  "searchKeywords": [
+   "코로나19 첫 확진자",
+   "질병관리본부"
+  ],
+  "paperDate": "2020-01-21",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "의협신문(2020-01-20)",
+    "url": "https://www.doctorsnews.co.kr/news/articleView.html?idxno=133009",
+    "quote": "20일 오전 확진자로 확정됐다고 밝혔다."
+   },
+   {
+    "label": "PHWR 질병관리청 보고서",
+    "url": "https://www.phwr.org/journal/view.html?pn=myread&uid=250&vmd=Full",
+    "quote": "우리나라는 2020년 1월 20일 첫 확진자(해외유입, 중국 우한시) 발생 이후"
+   }
+  ]
+ },
+ {
+  "date": "2020-03-16",
+  "title": "한국은행, 임시 금통위 열고 기준금리 0.75%로 긴급 인하",
+  "shortTitle": "긴급 금리인하",
+  "description": "한국은행은 코로나19 대응으로 기준금리를 연 1.25%에서 0.75%로 0.5%p 내렸고, 국내 기준금리가 0%대에 들어선 것은 처음이다.",
+  "era": "코로나 쇼크",
+  "eraPeriod": "2020.01 ~ 2020.06",
+  "searchKeywords": [
+   "한국은행 긴급 금리 인하",
+   "기준금리 0.75%"
+  ],
+  "paperDate": "2020-03-17",
+  "status": "confirmed",
+  "note": "금리 적용 시작은 3월 17일(KDI 경제정보센터 게재 한은 자료).",
+  "evidence": [
+   {
+    "label": "서울신문(2020-03-16)",
+    "url": "https://www.seoul.co.kr/news/economy/finance/2020/03/16/20200316500186",
+    "quote": "기준금리를 연 1.25%에서 0.75%로 인하했다"
+   },
+   {
+    "label": "KDI 경제정보센터(한국은행 자료)",
+    "url": "https://eiec.kdi.re.kr/policy/materialView.do?num=198590&topic=",
+    "quote": "the base rate would be adjusted downward from 1.25% to 0.75% (2020.3.16 게재)"
+   }
+  ]
+ },
+ {
+  "date": "2020-03-19",
+  "title": "코스피 8.39% 폭락, 1457선 마감",
+  "shortTitle": "코스피 폭락",
+  "description": "코스피는 전 거래일보다 133.56포인트(-8.39%) 하락한 1457.64로 마감했고, 2008년 10월 24일 이후 최대 하락률이었다.",
+  "era": "코로나 쇼크",
+  "eraPeriod": "2020.01 ~ 2020.06",
+  "searchKeywords": [
+   "코스피 폭락",
+   "서킷브레이커"
+  ],
+  "paperDate": "2020-03-20",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "이투데이(2020-03-19)",
+    "url": "https://www.etoday.co.kr/news/view/1872453",
+    "quote": "코스피지수는 전 거래일보다 133.56포인트(-8.39%) 하락한 1457.64포인트로 마감했다"
+   },
+   {
+    "label": "이데일리(2020-03-19)",
+    "url": "https://edaily.co.kr/News/Read?mediaCodeNo=257&newsId=03955686625704960",
+    "quote": "코스피지수는 전 거래일 대비 133.56포인트(8.39%) 내린 1457.64에 마감했다"
+   }
+  ]
+ },
+ {
+  "date": "2021-01-06",
+  "title": "코스피, 사상 처음 3000선 돌파",
+  "shortTitle": "코스피 3000",
+  "description": "코스피는 장 초반 3027.16까지 올라 사상 처음 3000을 넘었으나, 외국인·기관 순매도로 전날보다 22.36포인트(0.75%) 내린 2968.21에 마감했다.",
+  "era": "유동성 장세와 코스피 3000",
+  "eraPeriod": "2020.07 ~ 2021.07",
+  "searchKeywords": [
+   "코스피 3000",
+   "동학개미"
+  ],
+  "paperDate": "2021-01-07",
+  "status": "confirmed",
+  "note": "장중 기록 기준. 종가 기준 3000 첫 돌파는 1월 7일이라는 검색 요약이 있었으나 원문 미확인.",
+  "evidence": [
+   {
+    "label": "서울신문(2021-01-07)",
+    "url": "https://www.seoul.co.kr/news/economy/securities/2021/01/07/20210107001039",
+    "quote": "코스피가 3000선을 넘은 것은 사상 최초다. 하지만 ... 전날보다 22.36포인트(0.75%) 내린 2968.21에 장을 마쳤다."
+   },
+   {
+    "label": "아주경제(2021-01-06)",
+    "url": "https://www.ajunews.com/view/20210106152304080",
+    "quote": "이날 오전 9시 9분 코스피 지수는 3027.16포인트를 찍으며 역대 최고를 기록했다"
+   }
+  ]
+ },
+ {
+  "date": "2021-08-26",
+  "title": "한국은행, 15개월 만에 기준금리 0.75%로 인상",
+  "shortTitle": "금리 인상 시작",
+  "description": "금융통화위원회는 기준금리를 0.50%에서 0.75%로 올렸고, 코로나19 대응 이후 15개월 만의 인상이다.",
+  "era": "금리 급등기",
+  "eraPeriod": "2021.08 ~ 2023.01",
+  "searchKeywords": [
+   "기준금리 인상",
+   "한국은행 금통위"
+  ],
+  "paperDate": "2021-08-27",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "한국은행 통화정책방향(2021.8.26)",
+    "url": "https://www.bok.or.kr/portal/bbs/P0000559/view.do?nttId=10066201&menuNo=200690",
+    "quote": "기준금리를 현재의 0.50%에서 0.75%로 상향 조정"
+   },
+   {
+    "label": "뉴데일리(2021-08-26)",
+    "url": "https://biz.newdaily.co.kr/site/data/html/2021/08/26/2021082600048.html",
+    "quote": "한국은행 금융통화위원회는 26일 기준금리를 0.75%로 0.25%p인상했다."
+   }
+  ]
+ },
+ {
+  "date": "2022-05",
+  "title": "테라·루나 폭락",
+  "shortTitle": "테라·루나 폭락",
+  "description": "5월 9일을 서막으로 테라·루나가 일주일 사이 99.99% 하락했고, 국내 투자자 피해와 권도형 대표 고소로 이어졌다.",
+  "era": "가상자산 충격",
+  "eraPeriod": "2022.05 ~ 2022.11",
+  "searchKeywords": [
+   "테라 루나 폭락",
+   "권도형"
+  ],
+  "status": "pending",
+  "note": "경향신문 2건(같은 매체)이 5월 9일 시작과 12일 0.015달러를 말하나, 독립 출처 2개의 일 단위 일치는 확인하지 못했다. 이코노미스트는 5월 11일 유의종목 지정 등 후속 사건만 확인. 5월 9일 시작, 12일 바닥으로 보이나 추가 출처 필요.",
+  "evidence": [
+   {
+    "label": "경향신문(2022-12-18)",
+    "url": "https://www.khan.co.kr/article/202212181627001",
+    "quote": "5월9일은 가상통화 시장 전체에 후폭풍을 불러온 테라·루나 사태의 서막이었다."
+   },
+   {
+    "label": "경향신문(2022-05-28)",
+    "url": "https://www.khan.co.kr/article/202205281035001",
+    "quote": "12일 0.015달러로 일주일 사이 99.99% 줄었다"
+   },
+   {
+    "label": "이코노미스트(2022-05-14)",
+    "url": "https://economist.co.kr/article/view/ecn202205140034",
+    "quote": "오는 20일 12시부터 루나 거래 지원을 종료한다"
+   }
+  ]
+ },
+ {
+  "date": "2022-07-13",
+  "title": "한국은행, 사상 첫 빅스텝 단행 기준금리 2.25%",
+  "shortTitle": "빅스텝",
+  "description": "금통위는 기준금리를 1.75%에서 2.25%로 0.5%p 올렸고, 1999년 기준금리 도입 이후 첫 빅스텝이다.",
+  "era": "금리 급등기",
+  "eraPeriod": "2021.08 ~ 2023.01",
+  "searchKeywords": [
+   "빅스텝",
+   "기준금리 2.25%"
+  ],
+  "paperDate": "2022-07-14",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "아주경제(2022-07-13)",
+    "url": "https://www.ajunews.com/view/20220713142812100",
+    "quote": "금통위가 이날 현재 1.75%인 기준금리를 0.5%포인트 인상하면서 기준금리는 2.25%로 높아지게 됐다"
+   },
+   {
+    "label": "농민신문(2022-07-13)",
+    "url": "https://www.nongmin.com/article/20220713359056",
+    "quote": "한국은행이 사상 처음 기준금리를 0.5％포인트 인상하는 '빅스텝'을 단행했다."
+   }
+  ]
+ },
+ {
+  "date": "2022-09-28",
+  "title": "강원도, 레고랜드 보증 ABCP 채무 불이행 선언",
+  "shortTitle": "레고랜드 사태",
+  "description": "김진태 강원도지사가 시행사 강원중도개발공사의 회생을 신청해 2050억원 ABCP 지급보증 이행 논란이 불거졌고, 채권시장이 급속히 얼어붙었다.",
+  "era": "금리 급등기",
+  "eraPeriod": "2021.08 ~ 2023.01",
+  "searchKeywords": [
+   "레고랜드",
+   "강원중도개발공사",
+   "채권시장 경색"
+  ],
+  "paperDate": "2022-09-29",
+  "status": "confirmed",
+  "note": "10월 21일 강원도가 보증채무 이행을 밝히며 일단락(이코노미스트).",
+  "evidence": [
+   {
+    "label": "이코노미스트(2022-10-26)",
+    "url": "https://economist.co.kr/article/view/ecn202210260033",
+    "quote": "9월 28일 ABCP 만기 하루 전 강원중도개발공사 회생 신청(김진태 지사)"
+   },
+   {
+    "label": "전북일보(2022-11-10)",
+    "url": "https://www.jjan.kr/article/20221110580142",
+    "quote": "지난 9월28일 강원도의 지급보증철회로 인한 부도사태는"
+   }
+  ]
+ },
+ {
+  "date": "2023-01-13",
+  "title": "한국은행, 기준금리 3.50%로 인상",
+  "shortTitle": "금리 3.50%",
+  "description": "금통위는 기준금리를 3.25%에서 3.50%로 올렸고, 2022년 4월 이후 7회 연속 인상이었다. 이후 2024년 10월까지 3.50%를 유지했다.",
+  "era": "금리 급등기",
+  "eraPeriod": "2021.08 ~ 2023.01",
+  "searchKeywords": [
+   "기준금리 3.50%",
+   "금통위 금리인상"
+  ],
+  "paperDate": "2023-01-14",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "한국은행 통화정책방향(2023.1.13)",
+    "url": "https://www.bok.or.kr/portal/bbs/P0000559/view.do?nttId=10074980&menuNo=200690&pageIndex=1",
+    "quote": "한국은행 기준금리를 현재의 3.25%에서 3.50%로 ... 상향 조정"
+   },
+   {
+    "label": "이투데이(2023-01-13)",
+    "url": "https://www.etoday.co.kr/news/view/2212312",
+    "quote": "기준금리를 25bp(1bp=0.01%포인트) 인상한 연 3.50%로 결정했다"
+   }
+  ]
+ },
+ {
+  "date": "2023-03-10",
+  "title": "미국 실리콘밸리은행(SVB) 파산",
+  "shortTitle": "SVB 파산",
+  "description": "SVB가 3월 10일 주가 66% 폭락 후 캘리포니아 주정부로부터 은행업 허가를 취소당했고, 국내 당국은 3월 12일 점검 회의를 열었다.",
+  "era": "가상자산 충격",
+  "eraPeriod": "2022.05 ~ 2023.03",
+  "searchKeywords": [
+   "실리콘밸리은행",
+   "SVB 파산"
+  ],
+  "paperDate": "2023-03-11",
+  "status": "confirmed",
+  "note": "미국 현지시간 기준 날짜. 한국 시각으로는 3월 11일 보도.",
+  "evidence": [
+   {
+    "label": "자본시장연구원 이슈보고서(2023-03-20)",
+    "url": "https://www.kcmi.re.kr/publications/pub_detail_view?syear=2023&zcd=002001016&zno=1712&cno=6086",
+    "quote": "3월 10일에는 SVB의 주가가 66% 폭락하면서 주식거래가 중지되었고, 같은 날 밤 캘리포니아 주정부는 SVB의 은행업허가를 취소"
+   },
+   {
+    "label": "서울신문(2023-03-13)",
+    "url": "https://www.seoul.co.kr/news/economy/finance/2023/03/13/20230313001008",
+    "quote": "10일 뉴욕증시가 1%대 급락한 채 마감 (SVB 파산 보도)"
+   }
+  ]
+ },
+ {
+  "date": "2024-08-05",
+  "title": "코스피 8.77% 폭락 블랙먼데이, 서킷브레이커 발동",
+  "shortTitle": "블랙먼데이",
+  "description": "코스피는 234.64포인트(-8.77%) 하락한 2441.55로 마감해 2008년 10월 24일 이후 최대 하락률, 하락폭 기준 역대 최대를 기록했다.",
+  "era": "엔캐리 쇼크",
+  "eraPeriod": "2024.08 ~ 2024.08",
+  "searchKeywords": [
+   "블랙먼데이",
+   "코스피 폭락"
+  ],
+  "paperDate": "2024-08-06",
+  "status": "pending",
+  "note": "두 출처 모두 이투데이(같은 매체). 독립성 약하므로 거래소 자료 등 추가 확인 권장. 한국거래소 서킷브레이커 발동은 검색 요약상 사실이나 날짜는 위 기사로 확인.",
+  "evidence": [
+   {
+    "label": "이투데이(2024-08-05) 종합",
+    "url": "https://www.etoday.co.kr/news/view/2387611",
+    "quote": "코스피 2441.55, 234.64포인트(8.77%) 하락, 올해 처음 서킷브레이커 발동"
+   },
+   {
+    "label": "이투데이(2024-08-05) 숫자로 본",
+    "url": "https://www.etoday.co.kr/news/view/2387664",
+    "quote": "코스피지수가 전 거래일보다 234.64포인트(-8.77%) 하락한 2441.55로 거래를 마쳤다"
+   }
+  ]
+ },
+ {
+  "date": "2024-12-03",
+  "title": "윤석열 대통령 비상계엄 선포, 환율·증시 급락",
+  "shortTitle": "12·3 계엄",
+  "description": "윤 대통령이 12월 3일 비상계엄을 선포했고, 다음 날 코스피는 36.01포인트(1.44%) 내린 2464.00, 원·달러 환율은 종가 1410.70원이었다.",
+  "era": "12·3 계엄과 정치 격변",
+  "eraPeriod": "2024.12 ~ 2025.06",
+  "searchKeywords": [
+   "비상계엄",
+   "환율 급등"
+  ],
+  "paperDate": "2024-12-04",
+  "status": "confirmed",
+  "note": "시장 수치는 12월 4일 기준(이투데이). 환율 장중 고점은 1442~1446원대(서울신문·경향).",
+  "evidence": [
+   {
+    "label": "서울신문(2024-12-04)",
+    "url": "https://www.seoul.co.kr/news/economy/2024/12/04/20241204500061",
+    "quote": "윤석열 대통령이 12월 3일 계엄을 선포 ... 원·달러 환율 1446.50원"
+   },
+   {
+    "label": "이투데이(2024-12-04)",
+    "url": "https://www.etoday.co.kr/news/view/2425912",
+    "quote": "코스피 지수는 전 거래일보다 36.01(1.44%)포인트 하락한 2464.00 ... 원·달러 환율은 종가 기준 1410.70원"
+   },
+   {
+    "label": "RFA(2025-04-04)",
+    "url": "https://www.rfa.org/korean/in-focus/2025/04/04/south-korean-president-constitutional-dismiss/",
+    "quote": "Yoon declared martial law on December 3, 2024 (요약 번역문)"
+   }
+  ]
+ },
+ {
+  "date": "2025-04-04",
+  "title": "헌법재판소, 윤석열 대통령 파면",
+  "shortTitle": "대통령 파면",
+  "description": "헌법재판소가 재판관 8명 전원일치로 윤석열 대통령을 파면했고, 선고는 오전 11시 22분경이었다.",
+  "era": "12·3 계엄과 정치 격변",
+  "eraPeriod": "2024.12 ~ 2025.06",
+  "searchKeywords": [
+   "윤석열 파면",
+   "헌법재판소 탄핵"
+  ],
+  "paperDate": "2025-04-05",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "한국경제(2025-04-04)",
+    "url": "https://www.hankyung.com/article/2025040405617",
+    "quote": "피청구인 대통령 윤석열을 파면한다"
+   },
+   {
+    "label": "RFA 한국어(2025-04-04)",
+    "url": "https://www.rfa.org/korean/in-focus/2025/04/04/south-korean-president-constitutional-dismiss/",
+    "quote": "헌법재판소는 4월 4일 11시 22분 윤석열 대통령 파면 결정(전원일치)"
+   }
+  ]
+ },
+ {
+  "date": "2025-06-03",
+  "title": "제21대 대통령선거, 이재명 후보 당선",
+  "shortTitle": "21대 대선",
+  "description": "이재명 후보가 1728만 7,513표(49.42%)로 당선됐고 투표율은 약 79.4%였다. 윤 전 대통령 파면에 따른 조기 대선이었다.",
+  "era": "12·3 계엄과 정치 격변",
+  "eraPeriod": "2024.12 ~ 2025.06",
+  "searchKeywords": [
+   "제21대 대통령선거",
+   "이재명 당선"
+  ],
+  "paperDate": "2025-06-04",
+  "status": "confirmed",
+  "note": "MBC 기사는 6월 4일자로 개표 결과를 전하며 선거일(3일)은 직접 명시하지 않음. 선거일은 중앙선관위 선거사 자료가 명시.",
+  "evidence": [
+   {
+    "label": "중앙선거관리위원회 선거사 박물관",
+    "url": "https://museum.nec.go.kr/museum2018/bbs/2/2/1/20170912155756377100_view.do?bbs_id=20170912155756377100&article_id=20260219152313385100&article_category=2&imgNum=%EB%8C%80%ED%86%B5%EB%A0%B9%EC%84%A0%EA%B1%B0%EC%82%AC",
+    "quote": "제21대 대통령선거는...2025년 6월 3일 화요일에 조기 실시되었다."
+   },
+   {
+    "label": "MBC뉴스(2025-06-04)",
+    "url": "https://imnews.imbc.com/replay/2025/nwtoday/article/6722216_36807.html",
+    "quote": "이재명 신임 대통령은 득표율 49.42%로 역대 대통령 중 처음으로 1,700만 표 이상을 득표"
+   }
+  ]
+ },
+ {
+  "date": "2025-10-15",
+  "title": "10·15 주택시장 안정화 대책, 서울 전역 규제지역 지정",
+  "shortTitle": "10·15 대책",
+  "description": "정부는 서울 전역과 경기 12개 지역을 토지거래허가구역과 조정대상지역·투기과열지구로 지정한다고 발표했고, 허가 적용은 10월 20일부터다.",
+  "era": "부동산 규제 강화기",
+  "eraPeriod": "2025.06 ~ 2025.12",
+  "searchKeywords": [
+   "10·15 부동산 대책",
+   "토지거래허가구역"
+  ],
+  "paperDate": "2025-10-16",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "뉴시스(2025-10-15)",
+    "url": "https://www.newsis.com/view/NISX20251015_0003363031",
+    "quote": "서울 전역을 비롯해 과천·성남 등 경기도 일부 지역을 조정대상지역 및 투기과열지구, 토지거래허가구역으로 묶는"
+   },
+   {
+    "label": "경향신문(2025-10-15)",
+    "url": "https://www.khan.co.kr/article/202510151656001",
+    "quote": "서울 전역과 경기도 12개 지역 ... 토지거래허가구역(토허구역)과 조정대상지역·투기과열지구(규제지역)으로 지정된다."
+   }
+  ]
+ },
+ {
+  "date": "2025-10-27",
+  "title": "코스피 사상 처음 종가 4000 돌파",
+  "shortTitle": "코스피 4000",
+  "description": "코스피는 101.24포인트(2.57%) 오른 4042.83으로 마감해 사상 처음 종가 기준 4000선을 넘었다.",
+  "era": "코스피 5000 시대",
+  "eraPeriod": "2025.10 ~ 2026.09",
+  "searchKeywords": [
+   "코스피 4000",
+   "사천피"
+  ],
+  "paperDate": "2025-10-28",
+  "status": "confirmed",
+  "note": "뉴시스 인용 문장은 요약 번역으로 원문 직접 인용 아님. 서울신문은 직접 확인.",
+  "evidence": [
+   {
+    "label": "서울신문(2025-10-27)",
+    "url": "https://www.seoul.co.kr/news/economy/securities/2025/10/27/20251027800006",
+    "quote": "코스피 지수가 사상 처음 종가 기준 4000선을 넘은 27일 ... 4042.83"
+   },
+   {
+    "label": "뉴시스(2025-12-16 연말 기사)",
+    "url": "https://www.newsis.com/view/NISX20251216_0003443254",
+    "quote": "KOSPI broke through the 4000 milestone on October 27, 2025 (요약 번역문)"
+   }
+  ]
+ },
+ {
+  "date": "2026-01-27",
+  "title": "코스피 사상 처음 종가 5000 돌파",
+  "shortTitle": "코스피 5000",
+  "description": "코스피는 135.26포인트(2.73%) 오른 5084.85에 마감해 종가 기준 사상 처음 5000선을 넘었다.",
+  "era": "코스피 5000 시대",
+  "eraPeriod": "2025.10 ~ 2026.09",
+  "searchKeywords": [
+   "코스피 5000",
+   "오천피"
+  ],
+  "paperDate": "2026-01-28",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "데일리안(2026-01-27)",
+    "url": "https://www.dailian.co.kr/news/view/1603122/%E2%80%985000%ED%94%BC1000%EC%8A%A4%EB%8B%A5%E2%80%99-%EC%8B%9C%EB%8C%80%EC%BD%94%EC%8A%A4%ED%94%BC-2026",
+    "quote": "코스피지수는 전 거래일 대비 135.26포인트(2.73%) 오른 5084.85에 거래를 마쳤다."
+   },
+   {
+    "label": "이투데이 via 네이트(2026-01-27)",
+    "url": "https://m.news.nate.com/view/20260127n26071",
+    "quote": "27일 오전 한국거래소에 따르면 코스피 지수는 전장대비 135.26포인트(2.73%) 오른 5084.85로 마감했다."
+   }
+  ]
+ },
+ {
+  "date": "2026-03-04",
+  "title": "코스피 12.06% 폭락, 역대 최대 하락률",
+  "shortTitle": "코스피 12% 폭락",
+  "description": "코스피는 698.37포인트(12.06%) 내린 5093.54로 마감했고, 직전 최대였던 2001년 9월 12일(-12.02%)을 넘어섰다. 미국·이란 전쟁 충격이 반영됐다고 보도됐다.",
+  "era": "미·이란 전쟁 쇼크",
+  "eraPeriod": "2026.03 ~ 2026.03",
+  "searchKeywords": [
+   "코스피 폭락",
+   "미국 이란 전쟁"
+  ],
+  "paperDate": "2026-03-05",
+  "status": "confirmed",
+  "note": "한국일보 기사 요약 중 쿠키뉴스 기사에 '4월 4일'이라는 오기가 있었으나 다른 기사들은 3월 4일로 일치.",
+  "evidence": [
+   {
+    "label": "한국일보 via 네이트(2026-03-04)",
+    "url": "https://news.nate.com/view/20260304n29852",
+    "quote": "코스피는 전장 대비 698.37포인트(12.06%) 내린 5093.54로 마감했다"
+   },
+   {
+    "label": "네이트 종합(2026-03-04)",
+    "url": "https://m.news.nate.com/view/20260304n28429",
+    "quote": "KOSPI declined 698.37 points (12.06%) to close at 5,093.54 on the 4th"
+   },
+   {
+    "label": "파이낸셜뉴스(2026-06-08)",
+    "url": "https://www.fnnews.com/news/202606081832201286",
+    "quote": "서킷브레이커 ... 지난 3월 4일 (이후 첫 발동)"
+   }
+  ]
+ },
+ {
+  "date": "2026-06-08",
+  "title": "코스피 8.29% 급락 '블랙먼데이', 서킷브레이커 발동",
+  "shortTitle": "6월 블랙먼데이",
+  "description": "코스피는 676.18포인트(8.29%) 급락한 7484.41에 마감했다. 6월 2일 장중 최고치(8933.62) 이후 4거래일 만의 급락으로, 브로드컴 실적과 미국 긴축 우려가 겹쳤다.",
+  "era": "AI 반도체 랠리와 긴축 전환",
+  "eraPeriod": "2026.06 ~ 2026.09",
+  "searchKeywords": [
+   "블랙먼데이",
+   "코스피 폭락"
+  ],
+  "paperDate": "2026-06-09",
+  "status": "confirmed",
+  "note": "",
+  "evidence": [
+   {
+    "label": "파이낸셜뉴스(2026-06-08)",
+    "url": "https://www.fnnews.com/news/202606081832201286",
+    "quote": "코스피는 전 거래일 대비 676.18p(8.29%) 급락한 7484.41에 거래를 마쳤다"
+   },
+   {
+    "label": "부산일보(2026-06-08)",
+    "url": "https://mobile.busan.com/view/busan/view.php?code=2026060811150303029",
+    "quote": "반도체 설계업체 브로드컴이 시장 기대에 못 미치는 실적을 발표하자 ... 코스피 장중 8%대 폭락"
+   }
+  ]
+ },
+ {
+  "date": "2026-07-16",
+  "title": "한국은행, 3년 6개월 만에 기준금리 2.75%로 인상",
+  "shortTitle": "금리 인상 전환",
+  "description": "금통위는 기준금리를 2.50%에서 2.75%로 올렸고, 2023년 1월 이후 3년 6개월 만의 인상이다.",
+  "era": "AI 반도체 랠리와 긴축 전환",
+  "eraPeriod": "2026.06 ~ 2026.09",
+  "searchKeywords": [
+   "기준금리 인상",
+   "한국은행 금통위"
+  ],
+  "paperDate": "2026-07-17",
+  "status": "confirmed",
+  "note": "8월 추가 인상(3.00%)은 뉴스핌 한 건으로만 확인해 본 사건에는 포함하지 않음.",
+  "evidence": [
+   {
+    "label": "한국은행 통화정책방향(2026.7.16)",
+    "url": "https://www.bok.or.kr/portal/bbs/P0000559/view.do?nttId=11062942&searchCnd=1&searchKwd=&depth2=200038&depth3=201263&depth=201263&pageUnit=10&pageIndex=1&programType=newsData&menuNo=200690&oldMenuNo=201263",
+    "quote": "한국은행 기준금리를 현재의 2.50% 수준에서 2.75%로 상향 조정"
+   },
+   {
+    "label": "다음뉴스 통화정책방향 전문(2026-07-16)",
+    "url": "https://v.daum.net/v/20260716110353864",
+    "quote": "한국은행 기준금리를 현재의 2.50% 수준에서 2.75%로 상향 조정"
+   },
+   {
+    "label": "파이낸셜뉴스(2026-07-16)",
+    "url": "https://www.fnnews.com/news/202607161824373715",
+    "quote": "한국은행이 2026년 7월 16일 기준금리를 2.75%로 인상, 3년반만의 인상"
+   }
+  ]
+ }
+]

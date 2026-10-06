@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
-"""service/frontend/src/{widgets,features,entities} 바로 아래 폴더의
-대소문자 규칙을 검사한다.
+"""service/frontend/src/{widgets,features,entities} 바로 아래 폴더의 대소문자 규칙을 검사한다.
 
-service/frontend/CLAUDE.md의 "파일 네이밍 컨벤션"이 문서화하는 실제 규칙:
-- widgets/ 바로 아래 폴더는 PascalCase (widgets/FeedPage/, widgets/Header/ 등,
-  2026-09-04 확인 — 12개 전부 예외 없이 이 형태로 굳어져 있었다)
-- features/·entities/ 바로 아래 폴더는 kebab-case (features/news-feed/,
-  entities/saju/ 등)
+service/frontend/CLAUDE.md의 "파일 네이밍 컨벤션"이 문서화하는 규칙:
+- widgets/ 바로 아래 폴더는 PascalCase (widgets/FeedPage/, widgets/Header/ 등)
+- features/·entities/ 바로 아래 폴더는 kebab-case (features/news-feed/, entities/saju/ 등)
 
-이 규칙이 그동안 문서로만 존재해서 위반이 몇 주씩 안 걸리고 넘어간 적이
-있다(리팩토링 감사에서 발견) — ESLint에는 폴더명 대소문자를 검사하는
-표준 규칙이 없어(파일명 케이스는 eslint-plugin-unicorn이 다루지만
+ESLint에는 폴더명 대소문자를 검사하는 표준 규칙이 없어(파일명 케이스는 eslint-plugin-unicorn이 다루지만
 디렉터리명은 다루지 않는다) 새 의존성 없이 이 스크립트로 대신한다.
-pre-commit이 변경된 파일 경로를 인자로 넘긴다 — 파일이 아니라 그 파일이
-속한 첫 번째 폴더 세그먼트만 검사한다.
+pre-commit이 변경된 파일 경로를 인자로 넘기며, 파일이 아니라 그 파일이 속한 첫 번째 폴더 세그먼트만 검사한다.
 """
 import re
 import sys

@@ -1,5 +1,7 @@
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
-import { fetchWebtoons, fetchWebtoonBySlug, fetchLensBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { fetchWebtoons, fetchWebtoonBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
@@ -8,9 +10,7 @@ import { IssueContextSection } from '../../_shared/IssueContextSection';
 
 import { SITE_URL } from '@/shared/constants/site';
 
-// 경로 기반(2026-08-07) 그대로. fetchWebtoons() 단발 실패(API Gateway/Lambda
-// 콜드스타트 등)에 바로 "찾을 수 없어요"로 떨어지지 않도록 가벼운 재시도를
-// 유지한다.
+// fetchWebtoons() 단발 실패(API Gateway/Lambda 콜드스타트 등)에 바로 "찾을 수 없어요"가 되지 않도록 가벼운 재시도를 둔다.
 async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -24,21 +24,10 @@ async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
   return [];
 }
 
-// generateStaticParams 를 다시 붙인다(2026-08-08) — letters/[id]/page.tsx와
-// 동일 이유: 이게 없으면 Next가 이 라우트를 ƒ Dynamic 취급해서 <Link>
-// 프리페치가 안 붙는다("클릭 즉시 이동" 요구와 충돌, 직접 빌드해서 확인함).
-//
-// 최근 STATIC_PARAMS_LIMIT건만(2026-09-03) — lens/[slug]/page.tsx에서
-// 실제 EC2 디스크풀 장애로 확인된 것과 같은 위험: fetchWebtoons()가
-// limit=1000이라 여기서도 706건(실측) 전부를 정적 페이지로 미리
-// 빌드하고 있었다. 목록 API의 limit은 그대로 두고(홈 미리보기·`/webtoon`
-// 목록엔 필요), 빌드 시점에 미리 만드는 개수만 최근 것으로 줄인다 —
-// 오래된 화는 findWebtoon()의 단건 조회(바로 아래)로 요청 시점에
-// 정상 렌더링된다.
-//
-// 2026-09-03 후속(ISR 재설계 감사) — generateMetadata·JSON-LD·사이트맵이
-// 전부 이 함수와 무관하다는 게 확인돼(findWebtoon 단건 조회, sitemap.ts도
-// 별도 목록 호출) 100은 여전히 과하다는 결론 — 10으로 더 낮춘다.
+// generateStaticParams를 둔다. 없으면 Next가 이 라우트를 Dynamic 취급해 <Link> 프리페치가 붙지 않는다(letters/[id]/page.tsx와 동일).
+// 빌드 시점에는 최근 STATIC_PARAMS_LIMIT건만 정적 생성한다. 전체(수백 건)를 미리 빌드하면 빌드 서버 디스크 부족 위험이 있다(lens/[slug]/page.tsx 참조).
+// 목록 API의 limit은 홈 미리보기·/webtoon 목록 때문에 유지하며, 오래된 화는 findWebtoon()의 단건 조회로 요청 시점에 렌더된다.
+// generateMetadata·JSON-LD·사이트맵은 이 함수와 무관하다.
 const STATIC_PARAMS_LIMIT = 10;
 
 export async function generateStaticParams() {
@@ -46,23 +35,15 @@ export async function generateStaticParams() {
   return webtoons.slice(0, STATIC_PARAMS_LIMIT).map((w) => ({ slug: w.id }));
 }
 
-// 위 STATIC_PARAMS_LIMIT 밖 글도 항상 정상 렌더되도록 명시(App Router
-// 기본값이 true라 원래도 동작했지만, ISR 재설계 의도를 코드로 남긴다).
+// STATIC_PARAMS_LIMIT 밖 글도 항상 정상 렌더되도록 명시한다(App Router 기본값이 true이며 ISR 의도를 코드로 남긴다).
 export const dynamicParams = true;
 
-// fetch 레벨(cmsPostsApi.ts의 cacheOpts)에 이미 걸려있던 안전망을 라우트
-// 레벨에도 명문화. ⚠️ 리터럴이어야 함(lens/[slug]/page.tsx 주석 참조) —
-// cmsPostsApi.ts의 CACHE_TTL_FALLBACK_SECONDS와 값이 반드시 같아야 한다.
+// fetch 레벨(cmsPostsApi.ts의 cacheOpts)의 안전망을 라우트 레벨에도 명시한다.
+// ⚠️ 리터럴이어야 하며(lens/[slug]/page.tsx 참조) cmsPostsApi.ts의 CACHE_TTL_FALLBACK_SECONDS와 값이 같아야 한다.
 export const revalidate = 300;
 
-// 2026-09-03 — lens/[slug]/page.tsx와 같은 버그를 여기서도 발견(사용자
-// 질문 "오래된 것들도 SEO 됐나"로 재현). fetchAllWebtoons()(현재 limit
-// 1000)에서 .find()로 찾다 보니, 목록 상한을 넘어가는 순간 실제로 있는
-// 화도 "찾을 수 없어요"가 된다 — 이미 한 번 100→1000으로 상한만 올려
-// 땜질한 이력이 있고(위 주석 참조), 최근 발행량(하루 최대 96건)이면
-// 1000건도 열흘 남짓이면 다시 뚫린다. 단건 조회 API(fetchWebtoonBySlug,
-// WebtoonViewClient.tsx도 이미 클라이언트 폴백으로 쓰고 있었음)로
-// 교체 — 목록 상한과 무관하게 항상 정확히 찾는다.
+// 목록(fetchAllWebtoons)에서 .find()로 찾으면 목록 상한을 넘는 순간 실제 존재하는 화도 "찾을 수 없어요"가 된다.
+// 단건 조회 API(fetchWebtoonBySlug, WebtoonViewClient.tsx도 클라이언트 폴백으로 사용)로 목록 상한과 무관하게 정확히 찾는다.
 async function findWebtoon(slug: string): Promise<CmsWebtoon | null> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const result = await fetchWebtoonBySlug(slug);
@@ -100,27 +81,34 @@ export async function generateMetadata({
   if (!webtoon) {
     return { title: '웹툰을 찾을 수 없어요', robots: { index: false } };
   }
-  const title = buildPageTitle(webtoon.title, '웹툰');
+  const headline = seoHeadline(webtoon.title);
+  const title = buildPageTitle(headline, '웹툰');
   const description = buildSeoDescription(webtoon.excerpt, '요즘 이슈를 컷으로 이어 보여드려요.');
-  // 웹툰 페이지는 자기 자신이 정본이다(2026-10-02 정정) — 한때 기사 페이지로 통합했으나, 그 근거("panels가 비어 있는 얇은 페이지")는
-  // 목록 API가 응답 경량화로 panels를 비워 내려주는 것을 오해한 것이었다. 단건 조회에는 컷 8장이 정상으로 오고 서버 HTML에도 컷이 들어
-  // 있으며, 검색 실적(클릭 29)도 있었다. 중복의 원인은 페이지 아래에 덧붙인 기사 본문(보강 텍스트)이다.
+  // 웹툰 페이지는 자기 자신이 정본이다. 목록 API는 응답 경량화로 panels를 비워 내려주지만 단건 조회에는 컷이 정상으로 오고 서버 HTML에도 컷이 있다.
   // lens 글은 대표 이미지 폴백에만 쓴다.
   const lens = await findLensForChannelSlug(slug);
   const url = `${SITE_URL}/webtoon/${slug}`;
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
+  const extras = mediaSeoExtras({ headline, description, url, publishedIso: webtoon.published_at || `${webtoon.date}T07:00:00+09:00`, kind: '웹툰' });
   return {
     title,
     description,
-    alternates: { canonical: url },
+    keywords: extras.keywords,
+    authors: extras.authors,
+    category: extras.category,
+    other: extras.other,
+    alternates: { canonical: url, languages: extras.languages },
     openGraph: {
       title,
       description,
       url,
       type: 'article',
       publishedTime: webtoon.published_at || `${webtoon.date}T07:00:00+09:00`,
-      images: [{ url: image, width: 1200, height: 800, alt: webtoon.title }],
+      authors: ['AI LENS 편집팀'],
+      section: webtoon.category || '웹툰',
+      tags: extras.keywords,
+      images: [{ url: image, width: 1200, height: 800, alt: headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -139,14 +127,8 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
   const published = webtoon.published_at || `${webtoon.date}T07:00:00+09:00`;
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
-  // SEO/GEO 강화(2026-09-02) — 이전엔 대표 이미지 1장만 image에 담았다.
-  // 실제로는 컷마다 별도 이미지+대사가 있는데 그 구조가 구조화 데이터에
-  // 전혀 안 드러나서, 검색·AI 답변엔진이 이 페이지를 "이미지 1장짜리 기사"
-  // 로만 이해할 수 있었다. panels 전체를 캡션 딸린 ImageObject 배열로,
-  // 캡션을 이어붙인 텍스트를 articleBody로 노출해 실제 스토리 내용을
-  // 구조화 데이터 레벨에서도 읽을 수 있게 한다(페이지 자체엔 이미
-  // panel.caption이 텍스트로 렌더돼 있음 — WebtoonViewClient.tsx 참고,
-  // 이건 그 신호를 JSON-LD에도 반영하는 것).
+  // 컷마다 별도 이미지+대사가 있으므로 panels 전체를 캡션 딸린 ImageObject 배열로, 캡션을 이어붙인 텍스트를 articleBody로 노출한다.
+  // 검색·AI 답변엔진이 이 페이지를 이미지 1장짜리 기사로 오해하지 않게 한다(페이지에는 panel.caption이 이미 텍스트로 렌더됨 — WebtoonViewClient.tsx).
   const panelImages = webtoon.panels.length > 0
     ? webtoon.panels.map((p, i) => ({
         '@type': 'ImageObject' as const,
@@ -166,8 +148,17 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
         '@type': 'Article',
         '@id': `${url}#article`,
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-        headline: webtoon.title,
+        headline: seoHeadline(webtoon.title),
         description: webtoon.excerpt,
+        keywords: [...new Set([seoHeadline(webtoon.title), '웹툰', '경제 웹툰', '오늘의 이슈', 'AI LENS', '서울경제'])],
+        genre: '웹툰',
+        articleSection: '웹툰',
+        thumbnailUrl: image,
+        copyrightHolder: { '@id': `${SITE_URL}/#organization` },
+        copyrightYear: Number(webtoon.date.slice(0, 4)),
+        creditText: '서울경제신문 AI LENS',
+        ...(lens?.source_url ? { isBasedOn: { '@type': 'NewsArticle', url: lens.source_url, publisher: { '@id': `${SITE_URL}/#organization` } } } : {}),
+        potentialAction: { '@type': 'ReadAction', target: [url] },
         ...(articleBody ? { articleBody } : {}),
         datePublished: published,
         dateModified: published,
@@ -185,13 +176,12 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
         associatedMedia: panelImages,
         isAccessibleForFree: true,
       },
-      // 2026-08-21 GEO 재감사 — letters/lens는 이미 있던 BreadcrumbList가
-      // webtoon/video/listen엔 빠져있던 것을 발견해 같은 패턴으로 보강.
+      // BreadcrumbList — letters/lens와 같은 패턴.
       {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          { '@type': 'ListItem', position: 2, name: '웹툰', item: `${SITE_URL}/webtoon` },
+          { '@type': 'ListItem', position: 2, name: '최신 뉴스', item: `${SITE_URL}/lens` },
           { '@type': 'ListItem', position: 3, name: webtoon.title, item: url },
         ],
       },

@@ -1,18 +1,9 @@
 """Bedrock 응답에서 JSON 텍스트를 뽑는 공용부.
 
-webtoon/pipeline.py, video/generate_script.py, mustknow_auto/classify.py
-셋 다 "```json 코드블록 우선 → 언어 태그 없는 ``` 코드블록 중 opener로
-시작하는 마지막 것" 두 단계까지는 완전히 같은 정규식을 각자 복사해 쓰고
-있었다(2026-08-23 코드 리팩토링 감사에서 발견) — `extract_fenced_json_text`/
-`loads_lenient`로 공용화.
-
-그 뒤 폴백은 mustknow_auto/classify.py(배열, `_salvage_truncated_array`로
-잘린 배열을 살림)만 형태가 정말 달라 분리돼 있다. 반면 webtoon/pipeline.py의
-`_extract_json_block`과 video/generate_script.py의 `extract_json_block`은
-둘 다 객체(dict) 응답을 다루는데 폴백 로직까지 바이트 단위로 동일했다
-(2026-09-04 P2 리팩토링 감사에서 재확인 — 애초에 "객체/배열이라 통합 난이도
-있다"고 판단해 안 건드렸던 건데, 실제로는 webtoon·video 둘 다 객체라 통합
-난이도가 없었다). 그래서 이 둘만 `extract_json_object`로 마저 통합한다.
+webtoon/pipeline.py, video/generate_script.py, mustknow_auto/classify.py가 함께 쓴다.
+`extract_fenced_json_text`/`loads_lenient`는 코드블록 추출과 이스케이프 수리를,
+`extract_json_object`는 객체(dict) 응답의 폴백 체인을 담당한다.
+배열 응답의 잘린 출력 복구는 형태가 달라 mustknow_auto/classify.py에 따로 둔다.
 """
 import json
 import re
@@ -42,11 +33,9 @@ _VALID_ESCAPE_CHARS = '"\\/bfnrtu'
 def repair_invalid_escapes(text: str) -> str:
     r"""JSON 문법에 없는 역슬래시 이스케이프를 리터럴 문자로 되돌린다.
 
-    2026-08-24 — 실운영에서 기사가 통째로 스킵되는 실패의 원인. 장면연출
-    프롬프트 출력은 한국어 지문 안에 작은따옴표 문자열을 많이 담는데
-    (캡션 박스 'D+20일'), Claude 가 이걸 종종 \' 로 이스케이프한다.
-    JSON 이 허용하는 건 " \ / b f n r t u 뿐이라 \' 는 파싱 실패다
-    (08-24 08:20 런: Invalid \escape ... char 2550, 기사 1건 유실).
+    장면연출 프롬프트 출력은 한국어 지문 안에 작은따옴표 문자열을 많이 담는데
+    (캡션 박스 'D+20일'), Claude 가 이를 종종 \' 로 이스케이프한다.
+    JSON 이 허용하는 건 " \ / b f n r t u 뿐이라 \' 는 파싱 실패다.
 
     모델이 \' 를 쓸 때 의도한 건 언제나 따옴표 문자 자체이므로 역슬래시만
     떼어낸다. 정상 이스케이프(\n, \", 가 …)와 리터럴 역슬래시(\\)는
@@ -103,14 +92,10 @@ def extract_json_object(text: str) -> dict:
     """Bedrock 응답에서 JSON 객체(dict) 하나를 뽑는다.
 
     코드블록 우선 → 없으면 원문 전체 → 첫 '{'~마지막 '}' 구간 순으로
-    폴백해서 실제로 유효한 JSON이면 형식과 무관하게 파싱되게 한다
-    (2026-08-23, 실운영에서 Claude가 ```json 코드블록 지침을 안 따르고
-    순수 JSON 텍스트만 반환하는 사례로 추가). 펜스를 찾아도 그 안이
-    깨져 있을 수 있어(모델이 \\' 처럼 JSON에 없는 이스케이프를 쓰는 경우,
-    2026-08-24) 각 단계에서 파싱 실패해도 다음 폴백으로 넘어간다.
-
-    webtoon/pipeline.py의 `_extract_json_block`과 video/generate_script.py의
-    `extract_json_block`이 폴백까지 바이트 단위로 동일해서 통합(2026-09-04).
+    폴백해서 유효한 JSON이면 형식과 무관하게 파싱한다. 모델이 코드블록
+    지침을 안 따르고 순수 JSON만 내는 경우가 있고, 펜스 안이 깨져 있을
+    수도 있어(\\' 같은 잘못된 이스케이프) 각 단계가 실패하면 다음
+    폴백으로 넘어간다.
     """
     fenced = extract_fenced_json_text(text, opener="{")
     if fenced is not None:

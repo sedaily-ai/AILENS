@@ -520,6 +520,10 @@ export interface WebtoonLabDefaults {
   char_female: string;
   char_male: string;
   image_model: string;
+  /** 말풍선 얼굴 회피(Rekognition) 사용 여부 — 발행 문서의 ## BUBBLE_DETECT */
+  bubble_detect?: boolean;
+  /** 웹툰식 말풍선(타원·얇은 선·위쪽 흰 여백) 사용 여부 — 발행 문서의 ## BUBBLE_STYLE */
+  bubble_style?: boolean;
 }
 
 /** 화풍·인물 참조 이미지(2026-09-16) — routes/webtoon_lab.py::handle_image_assets_get.
@@ -559,6 +563,20 @@ export interface WebtoonStoryboardDialogueLine {
   speaker: string;
   line: string;
   tone?: string;
+  /** CMS 말풍선 편집(2026-10-02) — 사람이 옮긴 위치(이미지 대비 비율 0~1). x=말풍선 가로 중심, y=말풍선 윗변. 없으면 자동 배치. */
+  pos?: { x: number; y: number };
+  /** 꼬리 끝이 닿을 점(비율). 없으면 화자 위치로 자동. */
+  tail?: { x: number; y: number };
+}
+
+/** compose_text.compose()가 돌려주는, 실제로 그려진 말풍선의 위치·크기(이미지 대비 비율). */
+export interface BubbleLayout {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tip_x: number;
+  tip_y: number;
 }
 
 export interface WebtoonStoryboardCut {

@@ -1,7 +1,7 @@
 'use client';
 
 import type { MbtiGroupId } from '@/shared/data/mbtiGroups';
-import { ArticleShareButtons } from '@/shared/ui/ArticleShareButtons';
+import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { SITE_URL } from '@/shared/constants/site';
 import { MBTI_GROUP_INFO, resultPath } from '../lib/mbtiCorner';

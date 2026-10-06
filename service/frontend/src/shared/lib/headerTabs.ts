@@ -16,7 +16,6 @@ export type HeaderTabKey =
   | 'culture'
   | 'video'
   | 'listen'
-  | 'fortune'
   | 'timeline'
   | 'games'
   | 'webtoon'
@@ -27,25 +26,19 @@ export interface HeaderTab {
   label: string;
   href: string;
   active?: boolean;
-  // 'more' — 콘텐츠 브라우징이 아닌 부가 기능(웹툰/영상/사주/타임라인/게임).
-  // 카테고리 6개가 추가되며 1차 줄이 12개로 늘어 잘리는 문제가 생겨(2026-08-17,
-  // 사용자 확인), Header.tsx가 이 값을 가진 탭만 "더보기" 드롭다운으로 묶는다.
+  // 'more': 콘텐츠 브라우징이 아닌 부가 기능(타임라인/게임). Header.tsx가 이 값을 가진 탭만 "더보기" 드롭다운으로 묶는다.
   tier?: 'core' | 'extra' | 'more';
-  /** true면 next/link 소프트 내비게이션 대신 일반 <a> 하드 내비게이션을 쓴다 —
-   *  이 탭이 별도 Next.js 앱(다른 zone)으로 rewrite되는 경로라, 클라이언트
-   *  라우터가 자기 앱의 RSC 포맷으로 잘못 읽으려다 화면이 안 바뀌는 문제 방지. */
+  /** true면 next/link 소프트 내비게이션 대신 일반 <a> 하드 내비게이션을 쓴다. 이 탭이 별도 Next.js 앱(다른 zone)으로 rewrite되는 경로라, 클라이언트 라우터가 자기 앱의 RSC 포맷으로 읽으려다 화면이 안 바뀌는 문제를 막는다. */
   hardNav?: boolean;
 }
 
 /**
- * '타임라인' 탭이 가리키는 경로 — **단일 출처**.
+ * '타임라인' 탭이 가리키는 경로. 단일 출처.
  *
- * FeedPage 는 in-page 탭 전환(onClick) 때문에 `buildHeaderTabs()`
- * 를 쓰지 못하고 탭 배열을 하드코딩한다. 그 사본이 예전 경로
- * (`/timemachine`) 를 들고 있어서 페이지마다 같은 라벨이 다른 곳으로 가는
- * 문제가 있었다. **경로 값만이라도 여기서 한 번만 정의**해 재발을 막는다.
+ * FeedPage는 in-page 탭 전환(onClick) 때문에 `buildHeaderTabs()`를 쓰지 못하고 탭 배열을 하드코딩하므로,
+ * 경로 값만이라도 여기서 한 번만 정의해 페이지마다 같은 라벨이 다른 곳으로 가는 일을 막는다.
  */
-export const TIMELINE_HREF = '/timeline';
+const TIMELINE_HREF = '/timeline';
 
 /**
  * 표준 헤더 탭. 어느 페이지에서든 buildTabs('xxx') 호출 → active 만 다름.
@@ -55,34 +48,10 @@ export const TIMELINE_HREF = '/timeline';
  */
 export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
   return [
-    // "시선"(4가지 시선) 탭은 2026-08-17에 상단 nav에서 제거했다 — 2026-08-16엔
-    // "서비스 핵심 차별화 포인트"라는 판단으로 유일한 core 탭까지 승격시켰는데,
-    // 바로 다음 라운드에서 "카테고리로서 애매하다"는 사용자 피드백으로 뒤집혔다.
-    // /lens 페이지·홈 화면 "오늘의 이슈, 4가지 시선" 섹션은 그대로 유지 —
-    // nav 진입점만 없앤 것("브리핑"/"인사이트"를 letters/column 페이지는
-    // 남기고 nav에서만 뺀 것과 같은 처리).
-    //
-    // 상단 탭 구조 개편(2026-08-17) — "브리핑"/"인사이트"(형식 기준: 빠른
-    // 요약/개인 관점)를 걷어내고 주제 기준 6개로 교체했다. "독자가 형식
-    // 차이를 구분하기 어렵다"는 판단 + 서울경제 영문사이트(Markets/Property/
-    // Business/Finance/International) 구조를 참고 — 같은 발행사 브랜드 체계와
-    // 맞춘다. "재테크"만 본지엔 없는 섹션인데 AI LENS 자체 차별점(개인 관점
-    // 리라이팅)이라 남겼다. 카테고리 정의는 shared/constants/econCategories.ts
-    // 한 곳 — admin/frontend의 ECON_CATEGORIES(lib/types.ts)와 같은 목록이지만
-    // 별도 Next.js 앱이라 의도적으로 중복.
-    //
-    // /letters, /column 아카이브 목록 페이지는 2026-08-18에 완전히 정리했다
-    // — 처음엔 "색인된 URL 보존" 목적으로 nav에서만 빼고 페이지는 남겨뒀지만,
-    // 카테고리 6개 체계로 완전히 넘어가기로 확정되며 두 페이지 다 사이트 안
-    // 어디서도 도달 불가능한 상태였다("전체 모아보기" 역할은 /archive가 이미
-    // 이어받음). 지금은 "딥다이브"/trend와 동일하게 /archive로 영구
-    // 리다이렉트(next.config.ts) — /letters/[id]·/letters/view 같은 개별
-    // 상세 라우트는 그대로 살아있다.
-    //
-    // tier:'core' — 시선이 빠지면서 유일한 core 탭이 없어졌는데, 카테고리
-    // 6개가 이제 사실상 1차 콘텐츠 내비게이션이라 core로 승격했다(사용자가
-    // 명시로 요청한 건 아니지만, core 탭이 하나도 없는 상태보다 자연스럽다
-    // — 시선처럼 다시 이상하면 되돌리기 쉬운 판단).
+    // 상단 탭은 주제 기준 6개 카테고리(tier 'core')다. 정의는 shared/constants/econCategories.ts 한 곳이며,
+    // admin/frontend의 ECON_CATEGORIES와 같은 목록이지만 별도 Next.js 앱이라 의도적으로 중복한다.
+    // "시선" 탭은 상단 nav에 두지 않는다(/lens 페이지와 홈 "오늘의 이슈, 4가지 시선" 섹션은 유지).
+    // /letters, /column 아카이브 목록은 /lens로 영구 리다이렉트된다(next.config.ts). /letters/[id]·/letters/view 상세 라우트는 유지된다.
     ...ECON_CATEGORIES.map((c) => ({
       key: c.slug as HeaderTabKey,
       label: c.label,
@@ -90,42 +59,9 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
       active: active === c.slug,
       tier: 'core' as const,
     })),
-    // 2026-08-16 — 오락성 탭(웹툰/영상/게임) 중 웹툰이 맨 뒤로 밀려 있던 걸
-    // 앞으로 당김(사용자 확인) — "오락성들보다도 뒤에 있으면 안 된다".
-    // 2026-08-17 — tier를 'extra'에서 'more'로: 카테고리 6개가 추가되며
-    // 1차 줄이 12개까지 늘어 "더보기" 드롭다운으로 옮겼다(Header.tsx 참조).
-    { key: 'webtoon', label: '웹툰', href: '/webtoon', active: active === 'webtoon', tier: 'more' },
-    { key: 'video', label: '영상', href: '/video', active: active === 'video', tier: 'more' },
-    // 오디오 재생목록(2026-08-21) — 지금까지 홈 하단 미니 플레이어에만
-    // 있어서 고유 URL이 없어 검색엔진에 전혀 안 걸렸다(GEO 감사). /video와
-    // 같은 이유로 전용 목록/상세 페이지(/listen)를 신설하며 nav에도 추가.
-    { key: 'listen', label: '오디오', href: '/listen', active: active === 'listen', tier: 'more' },
-    // '내 서랍' 탭도 네비게이션에서 제거(2026-08-06) — 커뮤니티 대체로
-    // "오늘의 한 문장 + 다른 사람들이 담은 문장 + 내 문장" 3단 구조까지
-    // 만들었지만, 워딩(서랍→스크랩) 논의 끝에 상시 탭으로 노출하기보다
-    // 일단 빼기로 결정. 페이지(/?tab=archive)·저장 기능 자체는 그대로
-    // 살아있다 — 다시 노출할 땐 여기 한 줄만 추가하면 된다.
-    // 탭 8개가 전부 같은 무게로 나열돼 "많아 보인다"는 피드백(2026-08-06) —
-    // 뉴닉 참고: 드롭다운으로 숨기면 클릭이 한 번 더 필요해 덜 효율적이니,
-    // 개수는 그대로 두고 tier:'extra'로 굵기·크기·색만 낮춰 "덤"으로 구분한다
-    // (Header.tsx가 core→extra 전환 지점에 구분선을 자동으로 그려준다).
-    //
-    // '에디터' 탭 제거(2026-08-06) — extra 티어 강등을 거쳐 최종적으로 뺐다.
-    // 이후 MBTI 페르소나 컨셉 전면 삭제 결정으로 /editors 페이지 자체도
-    // 제거됨 — TodayLensClient 등의 잔여 링크도 함께 정리했다.
-    // 2026-08-09 — 자체 미니 사주 위젯을 걷어내고 진짜 사주 서비스(AI-saju
-    // 별도 레포, saju.sedaily.ai)를 CloudFront 경로 라우팅(/saju*)으로 마운트.
-    // en.sedaily.com이 /atlas*를 별도 레포로 라우팅하는 것과 같은 패턴 —
-    // 프로덕션은 이 경로가 AILENS Next.js 라우터를 거치지 않고 CDN 단에서
-    // 바로 다른 origin으로 넘어간다(app/fortune 페이지 자체는 더 이상 없음).
-    // 로컬 dev(2026-08-15, saju 완전 분리 이후)에선 SAJU_ORIGIN rewrite로
-    // 같은 걸 흉내내는데, 이건 완전히 다른 Next.js 앱(zone)이라 next/link
-    // 소프트 내비게이션이 안 먹는다(RSC 포맷이 앱마다 달라서) — hardNav로
-    // 일반 <a> 내비게이션을 쓰게 한다.
-    { key: 'fortune', label: '사주', href: '/saju', active: active === 'fortune', tier: 'more', hardNav: true },
-    // 2026-08-05 까지 `/timemachine` 을 가리키고 있었다 — `/timeline` 에 들어왔다가
-    // 다른 탭에 다녀온 뒤 이 탭을 누르면 구 페이지로 빠지는 문제의 원인.
-    // `/timemachine`(유명인·투자 시뮬레이션 4탭) 은 직접 URL 로 남겨둔다.
+    // 부가 기능 탭(tier 'more')은 Header.tsx의 "더보기" 드롭다운으로 묶인다.
+    // '내 서랍' 탭은 노출하지 않는다. 페이지(/?tab=archive)와 저장 기능은 유지되며, 다시 노출하려면 여기에 한 줄만 추가한다.
+    // 타임라인은 `/timeline`을 가리킨다. 옛 `/timemachine`(유명인·투자 시뮬레이션)은 직접 URL로만 남긴다.
     { key: 'timeline', label: '타임라인', href: TIMELINE_HREF, active: active === 'timeline', tier: 'more' },
     { key: 'games', label: '게임', href: '/games', active: active === 'games', tier: 'more' },
   ];

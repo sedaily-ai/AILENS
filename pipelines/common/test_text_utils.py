@@ -1,9 +1,7 @@
 """text_utils 단위 테스트 — FACT_IDS 트레일러 처리.
 
-2026-08-24 — 03_LETTER·04_PODCAST 스펙이 산출물 맨 끝에
-`FACT_IDS: [1, 3, 4]` 를 붙이도록 개정됐다(07_VERIFY 커버리지 대조용).
-이 줄이 본문에 남으면 두 가지가 실제로 깨진다:
-  - 레터: _parse_letters 에 종료 조건이 없어 발행 본문 문단이 된다
+산출물 맨 끝의 `FACT_IDS: [1, 3, 4]` 트레일러가 본문에 남으면 두 가지가 깨진다:
+  - 레터: parse_letters 에 종료 조건이 없어 발행 본문 문단이 된다
   - 팟캐스트: Polly 가 "FACT_IDS 대괄호 일 쉼표 삼" 을 소리 내어 읽는다
 """
 import ast
@@ -22,10 +20,10 @@ def _load_parse_letters(rel: str):
     src = (_PIPELINES / rel).read_text(encoding="utf-8")
     ns = {"re": __import__("re"), "extract_fact_ids": extract_fact_ids}
     body = [n for n in ast.parse(src).body
-            if isinstance(n, ast.FunctionDef) and n.name == "_parse_letters"]
-    assert body, f"{rel}: _parse_letters 없음"
+            if isinstance(n, ast.FunctionDef) and n.name == "parse_letters"]
+    assert body, f"{rel}: parse_letters 없음"
     exec(compile(ast.Module(body=body, type_ignores=[]), rel, "exec"), ns)
-    return ns["_parse_letters"]
+    return ns["parse_letters"]
 
 
 def test_extract_returns_ids_and_strips():
@@ -71,7 +69,7 @@ def test_parse_letters_does_not_publish_trailer():
         "```\n"
         "FACT_IDS: [1, 2]\n"
     )
-    for rel in ("mustknow_auto/run.py", "frontpage_auto/run.py"):
+    for rel in ("common/publish_utils.py",):
         paragraphs = _load_parse_letters(rel)(raw)
         joined = " ".join(paragraphs)
         assert "FACT_IDS" not in joined, f"{rel}: 트레일러가 본문으로 발행됨"

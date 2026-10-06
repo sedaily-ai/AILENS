@@ -40,9 +40,8 @@ export class TranscribeStreamRecognizer {
   private stopped = false;
   // 같은 ResultId 의 partial → final 흐름. 최종 final 텍스트만 onFinal.
   private partialBuf: Record<string, string> = {};
-  // Transcribe 가 자체 silence detection 으로 final 떨굴 때까지 latency 가
-  // 길어 사용자 체감 답답함. partial 텍스트가 마지막 변경 후 1.5초간 안 변하면
-  // 마지막 partial 을 final 로 promote + stop. Phase 3 정식 VAD 도입 전 quick fix.
+  // Transcribe의 자체 silence detection은 final을 내기까지 latency가 길다. partial 텍스트가 마지막 변경 후 1.5초간 변하지 않으면
+  // 마지막 partial을 final로 승격하고 stop한다(정식 VAD 도입 전 임시 조치).
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPartialText = '';
   private silenceMs = 1500;

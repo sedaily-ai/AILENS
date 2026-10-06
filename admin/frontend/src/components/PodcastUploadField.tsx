@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { uploadAudio, AudioUploadError } from "@/lib/uploadAudio";
 import { useToast } from "@/components/Toast";
+import { MediaDownloadButton } from "@/components/MediaDownloadButton";
 
 const ACCEPT = "audio/mpeg,audio/mp4,audio/wav,audio/x-wav";
 
@@ -69,6 +70,7 @@ export function PodcastUploadField({
       {value ? (
         <div className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2">
           <audio controls preload="none" src={value} className="h-9 flex-1" />
+          <MediaDownloadButton url={value} />
           <button
             type="button"
             className="text-xs font-medium text-gray-500 hover:text-red-600"

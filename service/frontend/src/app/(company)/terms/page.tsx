@@ -4,7 +4,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '이용약관',
-  description: 'AI LENS(서울경제신문)의 이용약관.',
+  description: 'AI LENS(서울경제신문)의 이용약관입니다. 서비스 이용 조건과 이용자의 권리·책임, 콘텐츠 이용 범위를 안내합니다.',
   alternates: { canonical: `${SITE_URL}/terms` },
   robots: { index: true, follow: true },
 };
@@ -65,8 +65,7 @@ export default function TermsPage() {
       <p>
         서비스가 제공하는 콘텐츠는 AI가 원본 기사를 재구성해 생성하며, 투자 판단의 근거가 되는 조언이
         아닙니다. 회사는 콘텐츠의 정확성·완전성·최신성을 보장하지 않으며, 중요한 의사결정 전에는 원문
-        확인 등 이용자의 독자적인 검증을 권장합니다. 사주·운세 콘텐츠는 재미와 참고 목적으로 제공되며
-        과학적 사실로 보증하지 않습니다.
+        확인 등 이용자의 독자적인 검증을 권장합니다.
       </p>
 
       <h2 style={h2}>제7조 (외부 링크)</h2>

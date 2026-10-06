@@ -4,7 +4,7 @@
 여기서 주입될 방법이 없다 — v1 은 core/response.py 에서 CORS_HEADERS 를 얹고,
 admin 은 API Gateway 가 CORS 를 처리하므로 얹지 않는다.
 
-직렬화 로직은 core/response.py 의 _json_serializer 를 그대로 옮긴 것이다.
+직렬화 로직은 core/response.py 의 _json_serializer 와 동일하다.
 """
 
 from __future__ import annotations

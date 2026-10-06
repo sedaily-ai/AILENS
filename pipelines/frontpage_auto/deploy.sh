@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# 코드 변경 후 이미지만 다시 빌드·push하고 태스크 정의를 새 리비전으로
-# 등록한다 — EventBridge 규칙은 태스크 정의를 family 이름(리비전 번호
-# 없이)으로 참조하므로 "최신" 리비전을 자동으로 쓴다(별도 갱신 불필요).
+# 코드 변경 후 이미지를 다시 빌드·push하고 태스크 정의를 새 리비전으로 등록한다.
+# EventBridge 규칙은 태스크 정의를 family 이름으로 참조하므로 최신 리비전이 자동 적용된다.
 #
 # 사용법: pipelines/ 에서 실행 — cd pipelines && ./frontpage_auto/deploy.sh
 set -euo pipefail
@@ -20,12 +19,9 @@ docker tag "${REPO}:latest" "${ECR_URI}:latest"
 docker push "${ECR_URI}:latest"
 
 echo "=== 3/3 태스크 정의 새 리비전 등록 ==="
-# --tags 추가(2026-09-03, 비용태깅 감사 — mustknow_auto는 tags-ecs.json으로
-# 태깅되는데 frontpage_auto는 provision.sh 때부터 태그가 아예 없었다).
-# 태스크 정의 태그만으로는 부족하다 — 실제 Fargate 실행 태스크(컴퓨트 비용)에
-# 태그가 붙으려면 eventbridge-target.json의 PropagateTags=TASK_DEFINITION과
-# eventbridge-runtask-policy.json의 ecs:TagResource 권한이 같이 있어야 한다
-# (mustknow_auto/provision.sh 83-92행 주석 참조 — 둘 다 이번에 frontpage_auto에도 추가).
+# 실행 태스크(컴퓨트 비용)에 태그가 붙으려면 태스크 정의 태그 외에
+# eventbridge-target.json의 PropagateTags=TASK_DEFINITION과
+# eventbridge-runtask-policy.json의 ecs:TagResource 권한이 함께 필요하다.
 aws ecs register-task-definition --cli-input-json file://frontpage_auto/taskdef.json --region "$REGION" \
   --tags file://frontpage_auto/tags-ecs.json \
   --query "taskDefinition.{Family:family,Revision:revision}" --output json

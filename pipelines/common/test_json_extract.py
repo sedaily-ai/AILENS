@@ -1,12 +1,8 @@
 r"""json_extract 단위 테스트.
 
-2026-08-24 — 실운영(mustknow_auto)에서 기사가 통째로 스킵되는 실패를 재현하려고
-추가했다. 08-24 08:20 런에서 `json.decoder.JSONDecodeError: Invalid \escape:
-line 41 column 179 (char 2550)` 로 기사 1건이 날아갔다("20일 만에 뒤집힌 종부세…").
-
-원인: 장면연출 프롬프트 출력이 한국어 지문 안에 작은따옴표 문자열을 많이 담는데
-(캡션 박스 'D+20일'), Claude 가 이걸 종종 \' 로 이스케이프한다. JSON 이 허용하는
-이스케이프는 " \ / b f n r t u 뿐이라 \' 는 파싱 실패다.
+실운영 실패 재현: 한국어 지문 안의 작은따옴표 문자열(캡션 박스 'D+20일')을
+Claude 가 \' 로 이스케이프하는데, JSON 이 허용하는 이스케이프는 " \ / b f n r t u
+뿐이라 파싱이 실패하고 기사 1건이 스킵됐다.
 """
 import json
 import sys
@@ -52,7 +48,7 @@ def test_trailing_lone_backslash_dropped():
 
 
 def test_production_payload_shape_parses():
-    """08-24 08:20 실패 페이로드와 같은 모양 — 펜스 + 한국어 지문 + \\' 이스케이프."""
+    """실운영 실패 페이로드와 같은 모양 — 펜스 + 한국어 지문 + \\' 이스케이프."""
     raw = (
         "```json\n"
         "{\n"
@@ -78,9 +74,8 @@ def test_production_payload_shape_parses():
 
 
 # --------------------------------------------------------------------------
-# extract_json_object — webtoon/pipeline.py·video/generate_script.py의
-# 중복 폴백 체인을 2026-09-04 통합한 함수. 두 파일의 실제 실패 사례를 그대로
-# 회귀 테스트로 옮긴다.
+# extract_json_object — webtoon/pipeline.py·video/generate_script.py가 공유하는
+# 폴백 체인. 두 파일의 실제 실패 사례를 회귀 테스트로 둔다.
 
 
 def test_extract_json_object_prefers_json_fence():
@@ -89,7 +84,7 @@ def test_extract_json_object_prefers_json_fence():
 
 
 def test_extract_json_object_falls_back_to_bare_text():
-    # 코드블록 지침을 안 따르고 순수 JSON 텍스트만 반환하는 경우(2026-08-23 실패 사례)
+    # 코드블록 지침을 안 따르고 순수 JSON 텍스트만 반환하는 경우
     assert extract_json_object('  {"a": 1}  ') == {"a": 1}
 
 

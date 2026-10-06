@@ -2,9 +2,7 @@ import type { InteractiveBlockData } from '@/features/news-feed';
 import type { ApiLetter } from '@/shared/lib/api/todayLettersApi';
 import type { DisplayLetter } from '@/shared/lib/api/todayLettersApi';
 
-// LetterDetailClient.tsx에서 추출(2026-08-24, God 파일 분해) — 본문 HTML
-// 가공용 순수 함수들. React 의존 없음(TermTooltip.tsx만 JSX가 필요해서
-// 별도 파일).
+// 본문 HTML 가공용 순수 함수들. React 의존이 없다(JSX가 필요한 TermTooltip.tsx는 별도 파일).
 
 // 본문 안에 AI 퀴즈가 심겨있는 마커 두 가지:
 //   1) <!--AI_QUIZ:{...}-->            — 초기에 DB에 직접 심었던 구형 마커
@@ -24,12 +22,8 @@ export function decodeHtmlEntities(s: string): string {
   return ta.value;
 }
 
-// admin 에디터가 저장하는 이미지는 <img alt="..."> 한 줄뿐이다(에디터
-// 재로딩 시 스키마 불일치를 피하려고 저장 형태 자체는 손대지 않음 —
-// admin/frontend/src/components/resizableImageExtension.tsx 참고). alt를
-// 실제로 사진 밑 캡션처럼 보여주는 건 "읽는 화면"의 몫이라, alt가 있는
-// 이미지를 렌더 시점에만 <figure>+<figcaption>으로 감싼다(네이버 블로그
-// 참고 — admin 미리보기 모달과 같은 방식).
+// admin 에디터는 이미지를 <img alt="..."> 한 줄로만 저장한다(에디터 재로딩 시 스키마 불일치를 피하려고 저장 형태는 바꾸지 않음 — admin/frontend/src/components/resizableImageExtension.tsx 참고).
+// alt를 사진 밑 캡션으로 보여주는 것은 읽는 화면의 몫이므로, alt가 있는 이미지를 렌더 시점에만 <figure>+<figcaption>으로 감싼다(admin 미리보기 모달과 동일).
 export function injectImageCaptions(html: string): string {
   if (typeof document === 'undefined' || !html) return html;
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -75,12 +69,8 @@ export function splitBodyHtml(html: string): BodyHtmlPart[] {
   return parts;
 }
 
-// 부제(letter.subtitle) 정제(2026-08-18, "크기나 레이아웃 개선해쥣죠") —
-// 일부 레터는 subtitle 필드에 본문 마커 문법(■ 섹션헤더, [라벨] 태그)이
-// 그대로 들어있다("■AI 프리즘 [신입 직장인 뉴스] ..."). 헤드라인 바로
-// 아래 노출되는 자리라 마커가 그대로 보이면 파싱 안 된 원본이 새어나온
-// 것처럼 읽힌다 — 데이터 자체는 안 건드리고 표시 시점에만 앞쪽 마커를
-// 걷어낸다.
+// 부제(letter.subtitle) 정제 — 일부 레터는 subtitle에 본문 마커 문법(■ 섹션헤더, [라벨] 태그)이 그대로 들어 있다.
+// 헤드라인 바로 아래에 노출되므로 데이터는 건드리지 않고 표시 시점에만 앞쪽 마커를 제거한다.
 export function cleanSubtitle(raw: string): string {
   return raw
     .replace(/^■\s*/, '')
@@ -88,11 +78,8 @@ export function cleanSubtitle(raw: string): string {
     .trim();
 }
 
-// 헤더 배지 라벨(2026-08-18, "이거 카테고리 뭔가요?") — letter.editorName은
-// MBTI 4-페르소나 폐지(2026-08-07) 이후 모든 레터가 항상 "AI LENS" 한
-// 값이라 카테고리 정보가 전혀 없고, 사이트 로고와 텍스트가 겹쳐 거슬렸다.
-// 실제 분류 필드(category → section)로 교체 — 둘 다 없으면 lens의
-// "4가지 시선"처럼 이 콘텐츠 형식 자체를 가리키는 "AI 레터"로 폴백.
+// 헤더 배지 라벨 — letter.editorName은 모든 레터가 "AI LENS"로 고정이라 카테고리 정보가 없고 사이트 로고와 겹친다.
+// 실제 분류 필드(category → section)를 쓰고, 둘 다 없으면 콘텐츠 형식을 가리키는 "AI 레터"로 폴백한다.
 const SECTION_LABEL: Record<NonNullable<ApiLetter['section']>, string> = {
   trend: '트렌드',
   column: '칼럼',

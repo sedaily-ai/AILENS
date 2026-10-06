@@ -1,32 +1,23 @@
 """
 Personal repository for user-specific data operations.
 
-v1.24 — PostgreSQL(lens-cms-api 경유)로 전환. PersonalDBClient(DynamoDB
-PK=user_id/SK=sk)는 더 이상 쓰지 않는다. 메서드 시그니처와 반환 타입
-(ArchivedSentence/UserProfile/ReadingRecord 모델)은 호출부(archive_service.py/
-user_service.py)가 무수정이도록 그대로 유지 — clients/personal_pg_client.py
-가 실제 HTTP 호출을 담당한다.
+PostgreSQL(lens-cms-api 경유) 기반이며, 실제 HTTP 호출은 clients/pg/personal.py 가 담당한다.
+메서드 시그니처와 반환 타입(ArchivedSentence/UserProfile/ReadingRecord)은 호출부와의 계약이다.
 
-temperature/title은 원본 DynamoDB에 있었지만 폐기 필드로 판단해 Postgres
-schema에 컬럼을 안 만들었다(temperature는 이미 초기 마이그레이션 결정으로
-제외됨, title은 이번 조사에서 실사용 0건 확인) — Model의 기본값(36.5, '')
-으로 그대로 채워진다.
+temperature/title 은 Postgres 스키마에 컬럼이 없으므로 모델 기본값(36.5, '')으로 채워진다.
 """
 
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import timezone, timedelta
 
-from clients import personal_pg_client as client
+from clients.pg import personal as client
 from models.personal import ArchivedSentence, UserProfile, ReadingRecord
 
 logger = logging.getLogger(__name__)
 
-KST = timezone(timedelta(hours=9))
-
 
 class PersonalRepository:
-    """Repository for user-specific personal data — PostgreSQL 기반(v1.24)."""
+    """Repository for user-specific personal data (PostgreSQL 기반)."""
 
     # =========================================================================
     # Archived Sentences
@@ -37,18 +28,15 @@ class PersonalRepository:
             sentence.user_id, sentence.text, article_no=sentence.article_id or None,
         )
         logger.info(f"Archived sentence saved: user={sentence.user_id} article={sentence.article_id}")
-        # 서버가 새로 채번한 id/created_at을 호출자에게 반영(다음 delete가
-        # 이 id를 써야 하므로) — 원본 dataclass는 불변 취급이 아니라 그냥
-        # 속성을 덮어써도 안전하다(post_init에서 이미 한 번 계산된 값 재정의).
+        # 이후 delete 가 서버 채번 id 를 사용하므로 호출자 객체에 id/created_at 을 반영한다.
         sentence.id = item["id"]
         sentence.created_at = item["created_at"] or sentence.created_at
         return True
 
     async def delete_archived_sentence(self, user_id: str, article_id: str, timestamp: str) -> bool:
-        """v1.24부터 archive_id(관계형 PK)로 지운다 — DynamoDB sk 조합
-        (article_id+timestamp)은 더 이상 주소로 안 쓴다. 호출부가 여전히
-        이 3개 인자를 넘기면 article_id 자리에 실제로는 archive_id가
-        들어온다(services/archive_service.py 쪽도 이 변경에 맞춰 호출).
+        """archive_id(관계형 PK)로 삭제한다.
+
+        시그니처 호환을 위해 인자를 유지하며, article_id 인자에 archive_id 가 전달된다.
         """
         archive_id = article_id
         success = client.delete_archived_sentence(user_id, archive_id)
@@ -89,13 +77,9 @@ class PersonalRepository:
         return None
 
     async def update_user_profile(self, user_id: str, updates: Dict[str, Any]) -> Optional[UserProfile]:
-        # user_service.py::get_or_create_user()가 기존 유저 로그인마다
-        # {'last_login': today}만 보낸다 — Postgres 쪽엔 last_login 컬럼을
-        # 직접 갱신하는 UPDATE 경로가 없고, get_or_create_user(신규 email/
-        # name 없이 호출)가 기존 유저 분기에서 정확히 이 일(last_login_at=
-        # now())을 하므로 그걸 재사용한다. 처음엔 이 키를 그냥 무시하도록
-        # 짰다가, 실제로는 로그인 시각이 영원히 안 갱신되는 회귀였음을
-        # 뒤늦게 발견해 수정.
+        # 기존 유저 로그인 시 {'last_login': today} 만 전달된다. Postgres 에는 last_login 을
+        # 직접 갱신하는 UPDATE 경로가 없고, get_or_create_user 의 기존 유저 분기가
+        # last_login_at=now() 를 갱신하므로 이를 재사용한다.
         item = None
         if "last_login" in updates:
             item = client.get_or_create_user(user_id)

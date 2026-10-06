@@ -20,7 +20,9 @@ export function buildImagePromptDoc(
   style: string,
   charFemale: string,
   charMale: string,
-  imageModel: string = ""
+  imageModel: string = "",
+  bubbleDetect?: boolean,
+  bubbleStyle?: boolean
 ): string {
   const chunks = [
     `## STYLE\n${style.trim()}`,
@@ -28,5 +30,9 @@ export function buildImagePromptDoc(
     `## CHARACTER_MALE\n${charMale.trim()}`,
   ];
   if (imageModel.trim()) chunks.push(`## IMAGE_MODEL\n${imageModel.trim()}`);
+  // 말풍선 얼굴 회피 on/off(2026-10-02) — undefined면 섹션을 안 쓴다(모르는 화면이 발행해도 다른 관리자의 설정을 지우지 않게 서버는 없음=꺼짐으로 읽는다)
+  if (bubbleDetect !== undefined) chunks.push(`## BUBBLE_DETECT\n${bubbleDetect ? "on" : "off"}`);
+  // 웹툰식 말풍선(2026-10-02) — 타원·얇은 선·위쪽 흰 여백. undefined면 섹션을 안 쓴다(서버는 없음=꺼짐)
+  if (bubbleStyle !== undefined) chunks.push(`## BUBBLE_STYLE\n${bubbleStyle ? "on" : "off"}`);
   return chunks.join("\n\n");
 }

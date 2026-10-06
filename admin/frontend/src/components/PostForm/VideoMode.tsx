@@ -1,6 +1,7 @@
 import { DatePickerField } from "@/components/DatePickerField";
 import { PostFormShell } from "./PostFormShell";
 import { MetaField } from "./MetaField";
+import { MediaDownloadButton } from "@/components/MediaDownloadButton";
 import { LABEL, type ModeProps } from "./shared";
 
 // 영상 콘텐츠(2026-08-06) — 썸네일 미리보기용. watch?v=, youtu.be/, embed/
@@ -65,6 +66,7 @@ export function VideoMode({ value, body, patch, patchBody }: ModeProps) {
             영상을 재생할 수 없습니다.
           </video>
         ) : null}
+        <MediaDownloadButton url={body.video_url ?? ""} className="mt-2" />
       </div>
     </PostFormShell>
   );

@@ -4,15 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchTodayLetters, toTodayLetterCard, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
-import { letterHref } from '@/shared/lib/letterHref';
+import { letterHref } from '@/shared/lib/content/letterHref';
 
-// ── 오늘의 한 문장 ────────────────────────────────────────────────
-// "볼거리"가 실사용자 archive 축적에 의존하지 않도록 하는 항상-채워지는
-// 층(2026-08-06). 오늘 발행된 실제 레터의 closing_line(없으면 요약 문장)을
-// 그날짜 기준 결정적으로 하나 골라 보여준다 — 단어 퀴즈처럼 매일 자동으로
-// 바뀌는 습관형 콘텐츠지만, 여긴 조작 없이 그냥 보여주기만 한다.
-// ArchiveTab.tsx(893줄)가 너무 길어서 다른 독립 서브컴포넌트들과 함께
-// 분리했다(2026-08-18).
+// ── 오늘의 한 문장 ──
+// "볼거리"가 실사용자의 archive 축적에 의존하지 않도록 항상 채워지는 층이다. 오늘 발행된 실제 레터의 closing_line(없으면 요약 문장)을 날짜 기준으로 결정적으로 하나 골라 보여 준다. 조작 없이 보여 주기만 한다.
 export function TodaysSentenceSection() {
   const [loading, setLoading] = useState(true);
   const [letter, setLetter] = useState<TodayLetterCardLike | null>(null);
@@ -33,8 +28,7 @@ export function TodaysSentenceSection() {
         setLetter(card);
       })
       .catch(() => {
-        // 오늘 레터를 못 불러와도 이 섹션만 조용히 숨는다 — 서랍 나머지는
-        // 정상 동작해야 하므로 여기서 에러를 전파하지 않는다.
+        // 오늘 레터를 못 불러와도 이 섹션만 조용히 숨긴다. 서랍의 나머지는 정상 동작해야 하므로 에러를 전파하지 않는다.
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

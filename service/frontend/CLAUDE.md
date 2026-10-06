@@ -39,9 +39,9 @@ src/
 │   ├── api/                     # Route Handlers
 │   ├── start/                   # 온보딩 6단계 위저드 진입 라우트(features/onboarding 참조)
 │   └── layout.tsx / providers.tsx / sitemap.ts / rss.xml
-├── widgets/                     # AnnouncementBar, ArticlePageShell,
+├── widgets/                     # ArticlePageShell,
 │   │                            # CategoryArchiveClient, FeedPage, Header,
-│   │                            # HomeSideBar, NavProgress, SentenceSelectionPopover,
+│   │                            # HomeSideBar, SentenceSelectionPopover,
 │   │                            # SiteFooter, StaticPageShell, TodayNewsPlayer, WordsPage
 │   │                            # — 폴더명이 PascalCase다(예외, "파일 네이밍
 │   │                            # 컨벤션" 참조 — features/entities는 kebab-case 그대로).
@@ -50,11 +50,10 @@ src/
 │   ├── auth/                    # 로그인 폼
 │   ├── mbti/                    # MBTI 코너(/mbti — 유형 고르기·간단 성향 체크·결과·공유)
 │   ├── news-feed/               # 뉴스 피드 탭
-│   ├── onboarding/              # 온보딩 6단계 위저드(Goal/Interest/Format/Consume/Result)
+│   ├── onboarding/              # 온보딩 위저드(Moment/Glance 흐름)
 │   ├── question/                # AI 질문 탭
 │   └── timeline/                # 타임라인 뉴스
 ├── entities/
-│   ├── saju/                    # 사주 미니 계산(widgets/HomeSideBar/SajuMiniRail 전용)
 │   └── user/                    # AuthContext 등 사용자 도메인
 └── shared/
     ├── ui/                      # 공통 UI (ArticleAudioPlayer, ArticleShareButtons 등)
@@ -271,3 +270,10 @@ features/[feature-name]/
   섹션·이전/다음 레터 내비게이션 마크업 정상 렌더, 200). Chrome 확장
   미연결로 실제 인터랙션(문장 선택 팝오버, 용어 툴팁 호버 등)까지의
   브라우저 확인은 못함.
+
+## 2026-10-05 폴더 구조 개편 (파일 12개 이상 폴더를 용도별 하위 폴더로)
+- `shared/ui/` → article · search · media · time-machine · list · form · notice · effects (icons는 기존)
+- `shared/lib/` → date · media · content · auth (api·chat·seo·tracking·rss는 기존, 생성 파일 `webtoonCovers.generated.ts`는 생성기가 경로를 써서 루트 유지)
+- `app/(economy)/_shared/components/` → article · format · icons (배럴 index.ts 유지)
+- `features/news-feed/components/` → sections · cards, `features/timeline/components/` → chronicle · hub · day
+- 새 파일은 가장 가까운 용도 폴더에 넣고, 한 폴더가 10개를 넘기면 다시 나눈다. 테스트는 `vitest`(`npm test`)로 순수 함수 단위만 다룬다

@@ -3,7 +3,7 @@
 // index.js)이 "환경변수를 안 설정했다"며 먼저 거부한다 — 이후 실제 호출부
 // (getCredentials)는 아무 명시값도 못 찾으면 credentials: undefined로 떨어져
 // AWS SDK 기본 체인(태스크 role 포함)에 맡기므로, 이 사전 점검만 건너뛰면
-// 정상 동작한다(소스 직접 확인, 2026-09-24). 로컬 개발(AWS_PROFILE 사용)은
+// 정상 동작한다(소스 직접 확인). 로컬 개발(AWS_PROFILE 사용)은
 // 이 점검을 이미 통과하므로 영향 없음.
 process.env.REMOTION_SKIP_AWS_CREDENTIALS_CHECK = 'true';
 
@@ -22,17 +22,13 @@ const USAGE =
   '사용법: npm run render:lambda -- --input <script.json> --format <vertical|horizontal> --output <out.mp4> ' +
   '--job-id <id> [--voice <voiceName>]';
 
-// 2026-09-24, Remotion Lambda 마이그레이션(render.ts의 단일 Fargate 컨테이너는
-// 코어 수 한계를 못 벗어난다는 조사 결과 — docs/worklog/2026-09/
-// 2026-09-24-영상랩-렌더속도-3배단축.md "다음" 참고). 아래 3개 상수는
-// `npx remotion lambda functions deploy` / `npx remotion lambda sites create`
-// 로 1회 배포한 리소스를 그대로 가리킨다 — Remotion 버전을 올리면 함수를
-// 다시 배포하고 이 상수도 갱신해야 한다(레포 안에 이 값을 저장하는 config
-// 파일이 없어 코드가 유일한 기록임).
+// 단일 Fargate 컨테이너 렌더(render.ts)는 코어 수 한계를 못 벗어나 Remotion Lambda로 렌더한다.
+// 아래 상수(REGION, FUNCTION_NAME, SERVE_URL)는 `npx remotion lambda functions deploy` /
+// `npx remotion lambda sites create`로 1회 배포한 리소스를 가리킨다. Remotion 버전을 올리면 함수를
+// 다시 배포하고 이 상수도 갱신해야 한다(레포 안에 이 값을 저장하는 config 파일이 없어 코드가 유일한 기록이다).
 const REGION = 'us-east-1' as const;
-// 2026-09-24 — 2048MB(기본값)와 4096MB를 동일 입력(9컷/1672프레임, TTS
-// 캐시로 렌더 시간만 비교)으로 직접 실측: 80초 → 62초(약 23% 단축).
-// Remotion 공식 문서가 밝히는 대로 메모리를 올리면 CPU도 비례해 커진다.
+// 메모리를 올리면 CPU도 비례해 커진다(Remotion 문서). 동일 입력(9컷/1672프레임, TTS 캐시로 렌더
+// 시간만 비교)으로 2048MB(기본값) 80초 → 4096MB 62초(약 23% 단축)를 실측해 4096MB를 쓴다.
 const FUNCTION_NAME = 'remotion-render-4-0-513-mem4096mb-disk2048mb-180sec';
 const SERVE_URL =
   'https://remotionlambda-useast1-criescup5q.s3.us-east-1.amazonaws.com/sites/ailens-video-lab/index.html';

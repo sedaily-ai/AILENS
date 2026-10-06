@@ -25,6 +25,7 @@ import type {
   Quiz,
   QuizInput,
   WebtoonLabDefaults,
+  BubbleLayout,
   PromptTestJob,
   SelectionRunsDayResponse,
   SelectionArticle,
@@ -527,10 +528,24 @@ export const adminApi = {
       `/admin/media/download-url?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
     ),
 
+  // 여러 컷을 순서대로 이름 붙여 zip 하나로 받기(2026-10-02) — 서버가 묶어 presigned URL을 돌려준다.
+  createMediaZip: (items: { url: string; name: string }[], zipName: string) =>
+    request<{ download_url: string; expires_in: number; files: number }>("/admin/media/zip", {
+      method: "POST",
+      body: JSON.stringify({ items, zip_name: zipName }),
+    }),
+
   // 웹툰 발행 모델 기본값(2026-09-25 — STYLE/CHARACTERS 편집·히스토리
   // 갤러리·단계별 생성 화면은 삭제, 발행 모델 선택만 남음. 나머지
   // webtoon-lab 엔드포인트(job/history/image-assets/gpu/stage)는 그
   // 화면들의 전용 호출부라 함께 정리했다).
+  // 말풍선 위치·대사를 바꿔 같은 원본 그림 위에 다시 합성(2026-10-02) — 이미지 생성 비용 없음.
+  recomposeWebtoonCut: (bgUrl: string, cut: Record<string, unknown>) =>
+    request<{ image_url: string; layout: BubbleLayout[] }>("/admin/webtoon-lab/recompose", {
+      method: "POST",
+      body: JSON.stringify({ bg_url: bgUrl, cut }),
+    }),
+
   getWebtoonImageDefaults: () =>
     request<WebtoonLabDefaults>("/admin/webtoon-lab/defaults"),
 

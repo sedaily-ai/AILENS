@@ -1,8 +1,6 @@
 """common/errors.py — 예외 계층과 status code 매핑.
 
-Run from service/backend/::
-
-    python3 -m pytest common/tests/test_errors.py -v
+실행: cd service/backend && python3 -m pytest common/tests/test_errors.py -v
 """
 from __future__ import annotations
 

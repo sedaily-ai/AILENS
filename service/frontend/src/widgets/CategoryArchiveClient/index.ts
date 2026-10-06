@@ -1,2 +1,2 @@
 export { CategoryArchiveClient } from './CategoryArchiveClient';
-export { EconomyCategoryPage, buildEconomyCategoryMetadata } from './EconomyCategoryPage';
+export { EconomyCategoryPage, buildEconomyCategoryMetadata, clampCategoryPage } from './EconomyCategoryPage';
