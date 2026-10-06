@@ -12,11 +12,12 @@
 - 린트: `npx next lint`
 - 타입 체크: `npx tsc --noEmit`
 - 빌드: `npm run build`
+- 순수 함수 테스트: `npm run test:mbti`(MBTI 코너), `npm run test:lens-blocks`(레터 본문 파서)
 - 수정 후 반드시 빌드 확인할 것
 
 ## 아키텍처: Feature-Sliced Design (FSD)
 
-### 실제 폴더 구조 (2026-09-04 재확인 — `find src -maxdepth 2 -type d` 결과
+### 실제 폴더 구조 (2026-10-05 재확인, `features/mbti` 추가 — `find src -maxdepth 2 -type d` 결과
 그대로다. 예전 버전은 `(main)/elderly`·`(main)/timemachine`·
 `(main)/subscription`, `features/community`·`news-dna`·`elderly`·
 `timemachine`·`subscription`·`story`·`admin`, `entities/article`·`post`
@@ -47,6 +48,7 @@ src/
 ├── features/
 │   ├── archive/                 # 내 서랍 (저장 문장)
 │   ├── auth/                    # 로그인 폼
+│   ├── mbti/                    # MBTI 코너(/mbti — 유형 고르기·간단 성향 체크·결과·공유)
 │   ├── news-feed/               # 뉴스 피드 탭
 │   ├── onboarding/              # 온보딩 위저드(Moment/Glance 흐름)
 │   ├── question/                # AI 질문 탭

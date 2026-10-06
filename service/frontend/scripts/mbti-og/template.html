@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  MBTI 코너 공유 미리보기(1200×630) 원본 — public/mbti/og-{nt,nf,st,sf}.png를 만든다.
+  문구는 src/features/mbti/lib/mbtiCorner.ts의 MBTI_GROUP_INFO, 색은 형식 색(lensPerspectiveAt)과 맞출 것.
+  다시 만들기(service/frontend에서, 새 의존성 없이 Chrome 자체 기능으로):
+    for g in nt nf st sf; do
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu --hide-scrollbars \
+        --window-size=1200,630 --screenshot="public/mbti/og-$g.png" "file://$PWD/scripts/mbti-og/template.html?g=$g"
+    done
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>MBTI OG</title>
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #ffffff;
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
+  .wrap { box-sizing: border-box; width: 1200px; height: 630px; padding: 64px 88px; display: flex;
+    flex-direction: column; justify-content: space-between; border-top: 16px solid var(--c); }
+  .kicker { font-size: 30px; font-weight: 700; color: #64748b; }
+  .group { font-size: 128px; font-weight: 800; line-height: 1; color: var(--c); margin: 20px 0 12px; }
+  .title { font-size: 60px; font-weight: 800; letter-spacing: -0.02em; color: #0f172a; }
+  .summary { font-size: 32px; color: #475569; margin-top: 18px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; font-size: 28px; color: #64748b; }
+  .pill { padding: 10px 24px; border-radius: 999px; background: var(--t); color: var(--c); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap" id="w">
+  <div>
+    <div class="kicker">MBTI로 보는 오늘의 뉴스</div>
+    <div class="group" id="g"></div>
+    <div class="title" id="t"></div>
+    <div class="summary" id="s"></div>
+  </div>
+  <div class="foot"><span class="pill" id="f"></span><span>AI LENS · 서울경제</span></div>
+</div>
+<script>
+  const D = {
+    nt: { g: 'NT형', t: '구조부터 보는 분석가형', s: '왜 이렇게 됐고 다음엔 뭐가 올지, 흐름을 짚어 봐요', f: '추천 형식 · 레터', c: '#7c3aed', tint: '#f0edf7' },
+    nf: { g: 'NF형', t: '의미를 찾는 이야기형', s: '이 뉴스가 사람들에게 어떤 의미인지 이야기로 만나요', f: '추천 형식 · 웹툰', c: '#e11d48', tint: '#fdeeee' },
+    sf: { g: 'SF형', t: '사람에 공감하는 대화형', s: '누가 어떻게 겪고 있는지, 대화로 들어요', f: '추천 형식 · 팟캐스트', c: '#059669', tint: '#e6f4ef' },
+    st: { g: 'ST형', t: '사실로 보는 실용형', s: '무엇이 얼마나 바뀌었는지, 핵심만 빠르게 봐요', f: '추천 형식 · 영상', c: '#d97706', tint: '#f7f0e3' },
+  };
+  const d = D[new URLSearchParams(location.search).get('g')] || D.nt;
+  const w = document.getElementById('w');
+  w.style.setProperty('--c', d.c);
+  w.style.setProperty('--t', d.tint);
+  for (const k of ['g', 't', 's', 'f']) document.getElementById(k).textContent = d[k];
+</script>
+</body>
+</html>

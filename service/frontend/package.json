@@ -10,7 +10,8 @@
     "lint": "eslint",
     "smoke": "bash scripts/smoke.sh",
     "test": "vitest run",
-    "test:lens-blocks": "node --experimental-strip-types scripts/test-lens-blocks.mjs"
+    "test:lens-blocks": "node --experimental-strip-types scripts/test-lens-blocks.mjs",
+    "test:mbti": "node --experimental-strip-types scripts/test-mbti.mjs"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
