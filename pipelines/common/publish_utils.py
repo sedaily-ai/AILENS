@@ -547,10 +547,11 @@ def publish_article(
         webtoon_bullets, webtoon_images = [], []
         try:
             # 웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어 한 번 더 생성한다
-            # (이미지 생성 전 단계라 재시도 비용이 작다).
+            # (이미지 생성 전 단계라 재시도 비용이 작다). 재시도는 resume=False로 부른다 —
+            # resume=True면 첫 시도가 저장한 cuts 없는 1_script.json을 그대로 다시 읽어 재시도가 무의미하다.
             webtoon_script = {}
             for _attempt in (1, 2):
-                webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
+                webtoon_mod.run_article(name, str(article_path), out_dir, resume=(_attempt == 1), manage_gpu=manage_gpu)
                 webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
                 if webtoon_script.get("cuts"):
                     break
