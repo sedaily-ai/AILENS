@@ -38,6 +38,9 @@ COPY mustknow_auto/requirements.txt mustknow_auto/requirements.txt
 
 RUN python3.11 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+# stdout을 블록 버퍼링하면 로그가 몰아서 찍혀 CloudWatch 타임스탬프가 실제 시점보다 늦는다
+# (07:00 시작 태스크의 첫 로그가 07:20에 찍혔다). 단계별 소요시간을 로그로 재려면 즉시 출력해야 한다.
+ENV PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir \
     -r letters/requirements.txt \
     -r podcast/requirements.txt \
