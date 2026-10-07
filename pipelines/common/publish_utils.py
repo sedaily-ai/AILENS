@@ -10,6 +10,7 @@ import importlib.util
 import re
 import subprocess
 import sys
+import time
 import traceback
 from pathlib import Path
 
@@ -476,177 +477,214 @@ def publish_article(
     def _upload(local_path: Path, key: str) -> str:
         return upload_media(s3, local_path, key, CMS_MEDIA_BUCKET)
 
-    # 0단계 — 공용 팩트시트(기준일/핵심 숫자/용어/논지)를 원문 뒤에 이어붙여
-    # 4포맷이 같은 파일을 읽게 한다. 실패하면 빈 문자열이라 원문만 쓴다.
-    article_path = out_dir / f"{name}_article.txt"
-    facts = extract_facts(article["content"], today_kst)
-    article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
-    article_path.write_text(article_text, encoding="utf-8")
+    # 단계별 소요시간(초). 기사마다 마지막에 한 줄로 찍어 CloudWatch에서 병목을 찾는다.
+    timings: dict[str, float] = {}
+    started = time.monotonic()
 
-    letters_path = letters_mod.run_article(name, str(article_path), out_dir)
-    letters_raw = letters_path.read_text(encoding="utf-8")
-    paragraphs = parse_letters(letters_raw)
-    # 레터 본문 품질 검사. 생성 응답이 잘리거나 파싱에서 본문이 유실되면 리드 한 줄만 있는
-    # 레터가 발행되므로, 문단이 적으면 최대 MAX_LETTER_RETRIES번 재생성하고 그래도 부족하면
-    # 예외로 발행을 보류한다(seen 표시가 안 되어 다음 회차에 다시 후보가 된다). 정상 글은 10문단 안팎이다.
-    for _attempt in range(1, MAX_LETTER_RETRIES + 1):
-        if len(paragraphs) >= MIN_LETTER_PARAGRAPHS:
-            break
-        print(f"[{log_prefix}] {name} 레터 본문 {len(paragraphs)}문단(최소 {MIN_LETTER_PARAGRAPHS}) — 재생성 {_attempt}/{MAX_LETTER_RETRIES}")
+    def _timed(label: str, fn):
+        t0 = time.monotonic()
+        try:
+            return fn()
+        finally:
+            timings[label] = time.monotonic() - t0
+
+    article_path = out_dir / f"{name}_article.txt"
+
+    def _make_letter() -> tuple[str, list[str]]:
+        """레터 생성 + 본문 품질 검사. 생성 응답이 잘리거나 파싱에서 본문이 유실되면 리드 한 줄만
+        있는 레터가 발행되므로, 문단이 적으면 최대 MAX_LETTER_RETRIES번 재생성하고 그래도 부족하면
+        예외로 발행을 보류한다(seen 표시가 안 되어 다음 회차에 다시 후보가 된다). 정상 글은 10문단 안팎이다."""
         letters_path = letters_mod.run_article(name, str(article_path), out_dir)
         letters_raw = letters_path.read_text(encoding="utf-8")
         paragraphs = parse_letters(letters_raw)
-    if len(paragraphs) < MIN_LETTER_PARAGRAPHS:
-        raise ValueError(f"레터 본문 {len(paragraphs)}문단 — 최소 {MIN_LETTER_PARAGRAPHS}문단 필요, 발행 보류")
-    letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
-    letter_terms = parse_letter_terms(letters_raw)
-    # 프롬프트가 생성하는 "독자 시선 진입형" 제목. [제목] 마커를 못 찾으면
-    # 첫 문단의 이모지 경계로 복구하고, 그것도 실패하면 원문 제목으로 폴백한다.
-    letter_title = (
-        parse_letter_title(letters_raw)
-        or extract_title_from_lead(paragraphs)
-        or article["title"]
-    )
-
-    podcast_mp3 = podcast_mod.run_article(name, str(article_path), out_dir)
-
-    # 웹툰 이미지 생성이 실패해도 이미 성공한 레터·팟캐스트를 버리지 않고 "웹툰 없이 발행"한다.
-    # status는 영상 기준으로만 정한다 — 호출부의 결과 집계와 revalidate 웹훅 분기가 그 값에
-    # 걸려 있어, 새 status를 끼우면 웹툰만 빠진 기사가 SSR 재검증을 건너뛴다.
-    # 컷 단위로도 실패한 컷만 건너뛰고, 남은 컷이 MIN_WEBTOON_CUTS 이상이면 그대로 발행한다.
-    # 그 미만이면 전부 버린다(아래 except).
-    MIN_WEBTOON_CUTS = max(1, webtoon_mod.N_CUTS - 2)
-    webtoon_script: dict = {}
-    webtoon_bullets, webtoon_images = [], []
-    try:
-        # 웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어 한 번 더 생성한다
-        # (이미지 생성 전 단계라 재시도 비용이 작다).
-        webtoon_script = {}
-        for _attempt in (1, 2):
-            webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
-            webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
-            if webtoon_script.get("cuts"):
+        for _attempt in range(1, MAX_LETTER_RETRIES + 1):
+            if len(paragraphs) >= MIN_LETTER_PARAGRAPHS:
                 break
-            print(f"[{log_prefix}] {name} 웹툰 각본에 cuts 없음 — 재생성 {_attempt}/2")
-        for cut in webtoon_script["cuts"]:
-            n = cut["cut"]
-            cut_path = out_dir / name / f"컷{n}.png"
-            if not cut_path.exists():
-                print(f"[{log_prefix}] {name} 컷{n} 파일 없음(생성 실패) — 이 컷만 건너뜀")
-                continue
-            caption = cut.get("narration") or (
-                " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
-            ) or cut.get("caption", "")
-            webtoon_bullets.append(caption)
-            # 나레이션을 그림에 굽지 않은 컷이면(웹툰 합성이 남긴 표시 파일) 사이트가 컷 아래 여백에 글자로 보여준다.
-            text_caption_flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}
-            # 업로드는 WebP(품질 90)로 한다(1.5배 해상도 PNG는 컷당 2MB대, WebP는 약 300KB).
-            # 로컬 PNG는 세로 합치기(stitch)용으로 남기며, 변환 실패 시 PNG로 폴백한다.
-            try:
-                from PIL import Image
+            print(f"[{log_prefix}] {name} 레터 본문 {len(paragraphs)}문단(최소 {MIN_LETTER_PARAGRAPHS}) — 재생성 {_attempt}/{MAX_LETTER_RETRIES}")
+            letters_path = letters_mod.run_article(name, str(article_path), out_dir)
+            letters_raw = letters_path.read_text(encoding="utf-8")
+            paragraphs = parse_letters(letters_raw)
+        if len(paragraphs) < MIN_LETTER_PARAGRAPHS:
+            raise ValueError(f"레터 본문 {len(paragraphs)}문단 — 최소 {MIN_LETTER_PARAGRAPHS}문단 필요, 발행 보류")
+        return letters_raw, paragraphs
 
-                webp_path = cut_path.with_suffix(".webp")
-                Image.open(cut_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
-                key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.webp"
-                webtoon_images.append({"url": _upload(webp_path, key), "caption": caption, **text_caption_flag})
-            except Exception as e:
-                print(f"[{log_prefix}] {name} 컷{n} WebP 변환 실패 — PNG로 업로드: {e}")
-                key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
-                webtoon_images.append({"url": _upload(cut_path, key), "caption": caption, **text_caption_flag})
-        # 핵심 정리 카드(컷9) — 파이프라인이 만들었을 때만 덧붙이며 최소 컷 수 판정에는 넣지 않는다.
-        n_cut_images = len(webtoon_images)  # 카드는 제외한 컷 수 — 최소 컷 수 판정용
-        card_path = out_dir / name / "컷9.png"
-        if webtoon_images and card_path.exists():
-            try:
-                from PIL import Image
+    def _make_podcast() -> Path:
+        return podcast_mod.run_article(name, str(article_path), out_dir)
 
-                webp_path = card_path.with_suffix(".webp")
-                Image.open(card_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
-                webtoon_images.append({"url": _upload(webp_path, f"media/{log_prefix}/{name}-webtoon-card.webp"), "caption": "핵심 정리"})
-            except Exception as e:  # noqa: BLE001
-                print(f"[{log_prefix}] {name} 핵심 정리 카드 업로드 실패(건너뜀): {e}")
-        if n_cut_images < MIN_WEBTOON_CUTS:
-            raise ValueError(
-                f"컷 {len(webtoon_images)}/{len(webtoon_script['cuts'])}개만 성공 "
-                f"(최소 {MIN_WEBTOON_CUTS}개 필요) — 웹툰 전체 폐기"
-            )
-    except Exception:
-        # 부분 성공이어도 MIN_WEBTOON_CUTS 미만이면 통째로 버린다. 부실한 웹툰보다 pending이 낫다.
-        webtoon_script, webtoon_bullets, webtoon_images = {}, [], []
-        if results is not None:
-            results["degraded_no_webtoon"] = results.get("degraded_no_webtoon", 0) + 1
-        print(f"[{log_prefix}] {name} 웹툰 실패 — 웹툰 없이 발행\n{traceback.format_exc()}")
+    def _make_webtoon() -> tuple[dict, list[str], list[dict]]:
+        """웹툰 생성 + 컷 업로드. 실패해도 예외를 내지 않고 빈 결과를 돌려준다.
 
-    podcast_url = _upload(podcast_mp3, f"media/podcast/{log_prefix}/{name}-podcast.mp3")
+        웹툰 이미지 생성이 실패해도 이미 성공한 레터·팟캐스트를 버리지 않고 "웹툰 없이 발행"한다.
+        status는 영상 기준으로만 정한다 — 호출부의 결과 집계와 revalidate 웹훅 분기가 그 값에
+        걸려 있어, 새 status를 끼우면 웹툰만 빠진 기사가 SSR 재검증을 건너뛴다.
+        컷 단위로도 실패한 컷만 건너뛰고, 남은 컷이 MIN_WEBTOON_CUTS 이상이면 그대로 발행한다.
+        그 미만이면 전부 버린다(아래 except)."""
+        MIN_WEBTOON_CUTS = max(1, webtoon_mod.N_CUTS - 2)
+        webtoon_bullets, webtoon_images = [], []
+        try:
+            # 웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어 한 번 더 생성한다
+            # (이미지 생성 전 단계라 재시도 비용이 작다).
+            webtoon_script = {}
+            for _attempt in (1, 2):
+                webtoon_mod.run_article(name, str(article_path), out_dir, manage_gpu=manage_gpu)
+                webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+                if webtoon_script.get("cuts"):
+                    break
+                print(f"[{log_prefix}] {name} 웹툰 각본에 cuts 없음 — 재생성 {_attempt}/2")
+            for cut in webtoon_script["cuts"]:
+                n = cut["cut"]
+                cut_path = out_dir / name / f"컷{n}.png"
+                if not cut_path.exists():
+                    print(f"[{log_prefix}] {name} 컷{n} 파일 없음(생성 실패) — 이 컷만 건너뜀")
+                    continue
+                caption = cut.get("narration") or (
+                    " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
+                ) or cut.get("caption", "")
+                webtoon_bullets.append(caption)
+                # 나레이션을 그림에 굽지 않은 컷이면(웹툰 합성이 남긴 표시 파일) 사이트가 컷 아래 여백에 글자로 보여준다.
+                text_caption_flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}
+                # 업로드는 WebP(품질 90)로 한다(1.5배 해상도 PNG는 컷당 2MB대, WebP는 약 300KB).
+                # 로컬 PNG는 세로 합치기(stitch)용으로 남기며, 변환 실패 시 PNG로 폴백한다.
+                try:
+                    from PIL import Image
 
-    # 팟캐스트/영상 스크립트를 접근성용 텍스트로 같이 저장한다. 팟캐스트는 podcast/pipeline.py가
-    # 저장한 대본.md(코드펜스가 안 벗겨진 원본)를 읽어 벗기고, 영상은 script.json의 컷별
-    # narration을 이어붙인다.
-    podcast_script_path = out_dir / name / "대본.md"
-    podcast_transcript = (
-        strip_code_fence(podcast_script_path.read_text(encoding="utf-8"))
-        if podcast_script_path.exists() else None
-    ) or None
+                    webp_path = cut_path.with_suffix(".webp")
+                    Image.open(cut_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
+                    key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.webp"
+                    webtoon_images.append({"url": _upload(webp_path, key), "caption": caption, **text_caption_flag})
+                except Exception as e:
+                    print(f"[{log_prefix}] {name} 컷{n} WebP 변환 실패 — PNG로 업로드: {e}")
+                    key = f"media/{log_prefix}/{name}-webtoon-cut{n:03d}.png"
+                    webtoon_images.append({"url": _upload(cut_path, key), "caption": caption, **text_caption_flag})
+            # 핵심 정리 카드(컷9) — 파이프라인이 만들었을 때만 덧붙이며 최소 컷 수 판정에는 넣지 않는다.
+            n_cut_images = len(webtoon_images)  # 카드는 제외한 컷 수 — 최소 컷 수 판정용
+            card_path = out_dir / name / "컷9.png"
+            if webtoon_images and card_path.exists():
+                try:
+                    from PIL import Image
 
-    video = generate_video(
-        name, article_path, out_dir,
-        photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
-        log_prefix=log_prefix,
-    )
-    video_url = thumb_url = None
-    video_transcript = None
-    status = "published"
-    if video:
-        video_url = _upload(video["mp4_path"], f"media/video/{log_prefix}/{name}-video.mp4")
-        if video["thumb_path"]:
-            thumb_url = _upload(video["thumb_path"], f"media/video/{log_prefix}/{name}-thumb.jpg")
-        video_script_path = out_dir / name / "script.json"
-        if video_script_path.exists():
-            video_script_data = json.loads(video_script_path.read_text(encoding="utf-8"))
-            video_transcript = "\n\n".join(
-                cut["narration"] for cut in video_script_data.get("cuts", []) if cut.get("narration")
-            ) or None
-    else:
-        status = "published_no_video"
+                    webp_path = card_path.with_suffix(".webp")
+                    Image.open(card_path).convert("RGB").save(webp_path, "WEBP", quality=90, method=6)
+                    webtoon_images.append({"url": _upload(webp_path, f"media/{log_prefix}/{name}-webtoon-card.webp"), "caption": "핵심 정리"})
+                except Exception as e:  # noqa: BLE001
+                    print(f"[{log_prefix}] {name} 핵심 정리 카드 업로드 실패(건너뜀): {e}")
+            if n_cut_images < MIN_WEBTOON_CUTS:
+                raise ValueError(
+                    f"컷 {len(webtoon_images)}/{len(webtoon_script['cuts'])}개만 성공 "
+                    f"(최소 {MIN_WEBTOON_CUTS}개 필요) — 웹툰 전체 폐기"
+                )
+        except Exception:
+            # 부분 성공이어도 MIN_WEBTOON_CUTS 미만이면 통째로 버린다. 부실한 웹툰보다 pending이 낫다.
+            if results is not None:
+                results["degraded_no_webtoon"] = results.get("degraded_no_webtoon", 0) + 1
+            print(f"[{log_prefix}] {name} 웹툰 실패 — 웹툰 없이 발행\n{traceback.format_exc()}")
+            return {}, [], []
+        return webtoon_script, webtoon_bullets, webtoon_images
 
-    lenses = [
-        {"label": "레터", "question": letter_title, "bullets": letter_summary_bullets, "paragraphs": paragraphs,
-         "images": [], "video_url": None, "media_url": None, "keywords": letter_terms},
-        {"label": "웹툰", "question": webtoon_script.get("core_question") or letter_title, "bullets": webtoon_bullets,
-         "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
-         "pending": not webtoon_images},
-        {"label": "팟캐스트", "question": letter_title, "bullets": [], "paragraphs": [],
-         "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
-        {"label": "영상", "question": letter_title, "bullets": [], "paragraphs": [],
-         "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
-         "pending": video_url is None, "transcript": video_transcript},
-    ]
+    def _make_video() -> dict | None:
+        return generate_video(
+            name, article_path, out_dir,
+            photo_url=article.get("photo_url"), photo_caption=article.get("photo_caption"),
+            log_prefix=log_prefix,
+        )
 
-    publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
-    clean_source_url = (source_url or "").split("?")[0]
-    data = {
-        "headline": letter_title,
-        "subtitle": article["sub_title"],
-        "publish_date": publish_date_iso,
-        "channels": ["lens"],
-        "cover_image_url": webtoon_images[0]["url"] if webtoon_images else None,
-        "source_url": clean_source_url,
-        "editor_id": "AI LENS",
-        "display_order": display_order,
-        "body_inline": {
-            "body": [], "key_points": [], "keywords": [], "images": [],
-            "lenses": lenses,
-            "photo_image_url": article["photo_url"],
-            "category": (category := display_category(article)),
-            "subcategory": display_subcategory(category, letter_title, article.get("sub_title") or ""),
-            "paper_section": paper_section,
+    def _publish(letters_raw: str, paragraphs: list[str], podcast_mp3: Path,
+                 webtoon_script: dict, webtoon_bullets: list[str], webtoon_images: list[dict],
+                 video: dict | None) -> str:
+        """생성이 끝난 4포맷을 S3에 올리고 lens 글 하나로 발행한다."""
+        letter_summary_bullets = parse_letter_summary_bullets(letters_raw)
+        letter_terms = parse_letter_terms(letters_raw)
+        # 프롬프트가 생성하는 "독자 시선 진입형" 제목. [제목] 마커를 못 찾으면
+        # 첫 문단의 이모지 경계로 복구하고, 그것도 실패하면 원문 제목으로 폴백한다.
+        letter_title = (
+            parse_letter_title(letters_raw)
+            or extract_title_from_lead(paragraphs)
+            or article["title"]
+        )
+
+        podcast_url = _upload(podcast_mp3, f"media/podcast/{log_prefix}/{name}-podcast.mp3")
+
+        # 팟캐스트/영상 스크립트를 접근성용 텍스트로 같이 저장한다. 팟캐스트는 podcast/pipeline.py가
+        # 저장한 대본.md(코드펜스가 안 벗겨진 원본)를 읽어 벗기고, 영상은 script.json의 컷별
+        # narration을 이어붙인다.
+        podcast_script_path = out_dir / name / "대본.md"
+        podcast_transcript = (
+            strip_code_fence(podcast_script_path.read_text(encoding="utf-8"))
+            if podcast_script_path.exists() else None
+        ) or None
+
+        video_url = thumb_url = None
+        video_transcript = None
+        status = "published"
+        if video:
+            video_url = _upload(video["mp4_path"], f"media/video/{log_prefix}/{name}-video.mp4")
+            if video["thumb_path"]:
+                thumb_url = _upload(video["thumb_path"], f"media/video/{log_prefix}/{name}-thumb.jpg")
+            video_script_path = out_dir / name / "script.json"
+            if video_script_path.exists():
+                video_script_data = json.loads(video_script_path.read_text(encoding="utf-8"))
+                video_transcript = "\n\n".join(
+                    cut["narration"] for cut in video_script_data.get("cuts", []) if cut.get("narration")
+                ) or None
+        else:
+            status = "published_no_video"
+
+        lenses = [
+            {"label": "레터", "question": letter_title, "bullets": letter_summary_bullets, "paragraphs": paragraphs,
+             "images": [], "video_url": None, "media_url": None, "keywords": letter_terms},
+            {"label": "웹툰", "question": webtoon_script.get("core_question") or letter_title, "bullets": webtoon_bullets,
+             "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
+             "pending": not webtoon_images},
+            {"label": "팟캐스트", "question": letter_title, "bullets": [], "paragraphs": [],
+             "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
+            {"label": "영상", "question": letter_title, "bullets": [], "paragraphs": [],
+             "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
+             "pending": video_url is None, "transcript": video_transcript},
+        ]
+
+        publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
+        clean_source_url = (source_url or "").split("?")[0]
+        data = {
+            "headline": letter_title,
+            "subtitle": article["sub_title"],
+            "publish_date": publish_date_iso,
+            "channels": ["lens"],
+            "cover_image_url": webtoon_images[0]["url"] if webtoon_images else None,
+            "source_url": clean_source_url,
+            "editor_id": "AI LENS",
             "display_order": display_order,
-            "needs_video": video is None,
-        },
-    }
-    post = create_post(data, created_by=log_prefix)
-    set_status(post["id"], "published")
-    slug = post["slug"]
+            "body_inline": {
+                "body": [], "key_points": [], "keywords": [], "images": [],
+                "lenses": lenses,
+                "photo_image_url": article["photo_url"],
+                "category": (category := display_category(article)),
+                "subcategory": display_subcategory(category, letter_title, article.get("sub_title") or ""),
+                "paper_section": paper_section,
+                "display_order": display_order,
+                "needs_video": video is None,
+            },
+        }
+        post = create_post(data, created_by=log_prefix)
+        set_status(post["id"], "published")
+        slug = post["slug"]
 
-    print(f"[{log_prefix}] 발행 완료 — {slug} (section={paper_section}, {status})")
-    return status
+        print(f"[{log_prefix}] 발행 완료 — {slug} (section={paper_section}, {status})")
+        return status
+
+    try:
+        # 0단계 — 공용 팩트시트(기준일/핵심 숫자/용어/논지)를 원문 뒤에 이어붙여
+        # 4포맷이 같은 파일을 읽게 한다. 실패하면 빈 문자열이라 원문만 쓴다.
+        facts = _timed("팩트시트", lambda: extract_facts(article["content"], today_kst))
+        article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
+        article_path.write_text(article_text, encoding="utf-8")
+
+        letters_raw, paragraphs = _timed("레터", _make_letter)
+        podcast_mp3 = _timed("팟캐스트", _make_podcast)
+        webtoon_script, webtoon_bullets, webtoon_images = _timed("웹툰", _make_webtoon)
+        video = _timed("영상", _make_video)
+
+        return _timed("업로드·발행", lambda: _publish(letters_raw, paragraphs, podcast_mp3,
+                                                   webtoon_script, webtoon_bullets, webtoon_images, video))
+    finally:
+        parts = " / ".join(f"{k} {v:.0f}초" for k, v in timings.items())
+        print(f"[{log_prefix}] {name} ⏱ {parts} / 합계 {time.monotonic() - started:.0f}초")
