@@ -5,7 +5,8 @@
 중간 결과(JSON)를 파일로 저장하므로 재실행하면 끝난 단계는 건너뛰고 이어서 진행한다(resume).
 텍스트 생성은 Bedrock Claude만 쓰고, GPT는 휴면 상태인 이미지 경로(generate_image)에만 남아 있다.
 """
-import sys, json, base64, re, time
+import sys, json, base64, re, time, os, threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
@@ -27,6 +28,15 @@ IMAGE_MODEL = "gpt-5.5"          # 휴면 GPT 경로용 이미지 생성 모델 
 IMAGE_SIZE = "1536x1024"         # 3:2 가로. 컷당 $0.165 (2026-08 기준, high quality)
 IMAGE_QUALITY = "high"
 N_CUTS = 8
+
+# 컷 이미지를 동시에 몇 장까지 생성할지. 컷끼리는 서로의 그림을 참조하지 않고(기사 단위 seed만 공유)
+# 이미지 API 대기가 대부분이라 동시에 돌리면 컷 수만큼 걸리던 시간이 크게 준다. 이미지 API 동시 호출
+# 한도를 고려해 4로 둔다. PUBLISH_PARALLEL=0(common/publish_utils.py)이면 예전처럼 한 장씩 만든다.
+_CUT_WORKERS = 1 if os.environ.get("PUBLISH_PARALLEL", "1") == "0" else 4
+
+# compose_text.compose()는 글자 크기·말풍선 스타일을 모듈 전역 변수에 잠시 바꿔 넣고 그리므로
+# 두 컷을 동시에 합성하면 서로의 설정을 덮어쓴다. 이미지 생성만 동시에 하고 합성은 이 락으로 한 컷씩 한다.
+_COMPOSE_LOCK = threading.Lock()
 
 # 이미지 모델은 코드 상수가 아니라 admin이 발행한 DDB 문서(webtoon-image/published)의 IMAGE_MODEL
 # 섹션에서 기사 처리 시작 때 읽는다(webtoon_image.get_active_image_model()). 저장하면 재배포 없이
@@ -329,12 +339,12 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     bubble_style_on = get_bubble_style()  # 웹툰식 말풍선(타원·얇은 선·위쪽 여백)
     print(f"{tag} 말풍선 얼굴 회피: {'켜짐' if bubble_detect else '꺼짐'} / 웹툰식 말풍선: {'켜짐' if bubble_style_on else '꺼짐'}")
 
-    for cut in cuts:
+    def _make_cut(cut: dict) -> None:
         n = cut["cut"]
         img_path = out / f"컷{n}.png"
         if resume and img_path.exists():
             print(f"{tag} 컷{n} 스킵(존재)")
-            continue
+            return
         print(f"{tag} 컷{n} 생성 중... ({active_model})")
         if active_model in _PROVIDER_CONFIG:
             cfg = _PROVIDER_CONFIG[active_model]
@@ -346,31 +356,42 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             if ok:
                 # faces는 항상 None이다(얼굴 감지 제거, webtoon_image.generate_cut_image() 참고).
                 # compose_text.compose()가 균등 분할로 폴백한다.
-                try:
-                    cut_for_compose = cut
-                    if bubble_style_on and cut.get("dialogue"):
-                        cut_for_compose = {**cut_for_compose, "bubble_style": "oval", "bubble_margin": True, "narration_as_text": True}
-                    if bubble_detect and cut.get("dialogue"):
-                        import rekognition_people  # pipelines/common/ — 켜져 있을 때만(권한·비용)
-
-                        detect = rekognition_people.detect_people(img_path.read_bytes())  # 실패하면 None → 고정 배치
-                        if detect:
-                            cut_for_compose = {**cut_for_compose, "detect": detect}
+                # 합성(얼굴 회피 감지 포함)은 _COMPOSE_LOCK 안에서 한 컷씩 한다(락 정의부 주석 참고).
+                with _COMPOSE_LOCK:
                     try:
-                        compose_text.compose(img_path, cut_for_compose, faces, scale=compose_text.OUTPUT_SCALE)
-                        # 나레이션을 이미지에 굽지 않은 컷(웹툰식 합성이 성공한 경우만)은 표시 파일을 남긴다 — 발행 단계가 이걸 보고 images[].text_caption을 켠다.
-                        # 합성이 실패해 기본 스타일(나레이션이 이미지에 박힘)로 떨어졌으면 파일이 없어 사이트가 글자를 또 얹지 않는다.
-                        if cut_for_compose.get("narration_as_text") and (cut.get("narration") or "").strip():
-                            (out / f"컷{n}.textcaption").write_text("1", encoding="utf-8")
-                    except Exception as e:  # noqa: BLE001 — 새 스타일 합성이 실패해도 기본 스타일로라도 글자는 얹는다
-                        print(f"{tag} 컷{n} 웹툰식 합성 실패({type(e).__name__}: {e}) — 기본 스타일로 재시도")
-                        compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
-                except Exception as e:
-                    print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
+                        cut_for_compose = cut
+                        if bubble_style_on and cut.get("dialogue"):
+                            cut_for_compose = {**cut_for_compose, "bubble_style": "oval", "bubble_margin": True, "narration_as_text": True}
+                        if bubble_detect and cut.get("dialogue"):
+                            import rekognition_people  # pipelines/common/ — 켜져 있을 때만(권한·비용)
+
+                            detect = rekognition_people.detect_people(img_path.read_bytes())  # 실패하면 None → 고정 배치
+                            if detect:
+                                cut_for_compose = {**cut_for_compose, "detect": detect}
+                        try:
+                            compose_text.compose(img_path, cut_for_compose, faces, scale=compose_text.OUTPUT_SCALE)
+                            # 나레이션을 이미지에 굽지 않은 컷(웹툰식 합성이 성공한 경우만)은 표시 파일을 남긴다 — 발행 단계가 이걸 보고 images[].text_caption을 켠다.
+                            # 합성이 실패해 기본 스타일(나레이션이 이미지에 박힘)로 떨어졌으면 파일이 없어 사이트가 글자를 또 얹지 않는다.
+                            if cut_for_compose.get("narration_as_text") and (cut.get("narration") or "").strip():
+                                (out / f"컷{n}.textcaption").write_text("1", encoding="utf-8")
+                        except Exception as e:  # noqa: BLE001 — 새 스타일 합성이 실패해도 기본 스타일로라도 글자는 얹는다
+                            print(f"{tag} 컷{n} 웹툰식 합성 실패({type(e).__name__}: {e}) — 기본 스타일로 재시도")
+                            compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
+                    except Exception as e:
+                        print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:
             prompt = build_image_prompt(cut["image_prompt"], cut, characters)
             ok = generate_image(prompt, img_path)
         print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
+
+    if _CUT_WORKERS > 1 and active_model in _PROVIDER_CONFIG:
+        # 이미지 클라이언트는 지연 생성이라, 여러 스레드가 동시에 처음 만들지 않게 미리 만든다
+        # (boto3 기본 세션은 스레드 안전하지 않다).
+        import webtoon_image
+        webtoon_image._get_bedrock_image_client()
+    with ThreadPoolExecutor(max_workers=_CUT_WORKERS, thread_name_prefix=f"{name}-cut") as pool:
+        # list()로 결과를 모두 꺼내 컷 하나의 예외가 순차 실행 때처럼 run_article() 밖으로 올라가게 한다.
+        list(pool.map(_make_cut, cuts))
 
     # 핵심 정리 카드(웹툰식 모드) — 프롬프트가 key_numbers(핵심 숫자 2~3개와 라벨)를 내면 마지막에 코드로 그린 카드를 한 장 더한다(이미지 모델 호출 없음, 비용 0).
     if bubble_style_on:

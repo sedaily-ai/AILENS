@@ -7,11 +7,13 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import re
 import subprocess
 import sys
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent  # pipelines/
@@ -116,6 +118,28 @@ def slugify(publish_date: str, headline: str) -> str:
     tail = _NON_SLUG.sub("-", (headline or "").strip()).strip("-")
     base = f"{publish_date}-{tail}" if tail else publish_date
     return base[:80].rstrip("-")
+
+
+# 4포맷(레터/팟캐스트/웹툰/영상)을 동시에 생성할지. 네 포맷은 같은 원문 파일만 읽고 서로의
+# 결과를 쓰지 않아 순서를 바꿔도 결과가 같다. 문제가 생기면 태스크 환경변수 PUBLISH_PARALLEL=0으로
+# 재배포 없이 예전 순차 실행으로 되돌린다(webtoon/pipeline.py의 컷 동시 생성도 같은 값을 따른다).
+PUBLISH_PARALLEL = os.environ.get("PUBLISH_PARALLEL", "1") != "0"
+
+
+def _warm_up_clients() -> None:
+    """병렬 생성 전에, 지연 생성되는 boto3 클라이언트를 메인 스레드에서 미리 만든다.
+    boto3 기본 세션은 스레드 안전하지 않아 여러 스레드가 동시에 처음 client()를 만들면 실패할 수 있다.
+    만들어진 클라이언트 호출 자체는 스레드 안전하다. 실패해도 각 스레드가 원래대로 만들게 둔다."""
+    try:
+        import bedrock_client  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
+        import podcast_voice  # noqa: lazy
+        import webtoon_image  # noqa: lazy
+
+        bedrock_client._get_client()
+        podcast_voice._polly()
+        webtoon_image._get_bedrock_image_client()
+    except Exception as e:  # noqa: BLE001
+        print(f"[publish] boto3 클라이언트 사전 생성 실패(무시하고 진행): {type(e).__name__}: {e}")
 
 
 # 레터 본문 최소 문단 수·재생성 횟수 — publish_article()의 품질 검사에서 쓴다.
@@ -678,13 +702,31 @@ def publish_article(
         article_text = article["content"] + (f"\n\n---\n[공용 팩트시트]\n{facts}" if facts else "")
         article_path.write_text(article_text, encoding="utf-8")
 
-        letters_raw, paragraphs = _timed("레터", _make_letter)
-        podcast_mp3 = _timed("팟캐스트", _make_podcast)
-        webtoon_script, webtoon_bullets, webtoon_images = _timed("웹툰", _make_webtoon)
-        video = _timed("영상", _make_video)
+        if PUBLISH_PARALLEL:
+            _warm_up_clients()
+            with ThreadPoolExecutor(max_workers=4, thread_name_prefix=f"{log_prefix}-format") as pool:
+                f_letter = pool.submit(_timed, "레터", _make_letter)
+                f_podcast = pool.submit(_timed, "팟캐스트", _make_podcast)
+                f_webtoon = pool.submit(_timed, "웹툰", _make_webtoon)
+                f_video = pool.submit(_timed, "영상", _make_video)
+            # with 블록을 빠져나오면 네 작업이 모두 끝난 상태다. 레터·팟캐스트 실패는 순차 실행과 같이
+            # 예외로 올려 기사 발행을 보류한다(웹툰·영상은 각자 실패를 흡수한다). 순차 실행과 달리
+            # 레터가 실패해도 나머지 포맷은 이미 돌고 있어 끝까지 생성된 뒤 버려진다.
+            letters_raw, paragraphs = f_letter.result()
+            podcast_mp3 = f_podcast.result()
+            webtoon_script, webtoon_bullets, webtoon_images = f_webtoon.result()
+            video = f_video.result()
+        else:
+            letters_raw, paragraphs = _timed("레터", _make_letter)
+            podcast_mp3 = _timed("팟캐스트", _make_podcast)
+            webtoon_script, webtoon_bullets, webtoon_images = _timed("웹툰", _make_webtoon)
+            video = _timed("영상", _make_video)
 
         return _timed("업로드·발행", lambda: _publish(letters_raw, paragraphs, podcast_mp3,
                                                    webtoon_script, webtoon_bullets, webtoon_images, video))
     finally:
-        parts = " / ".join(f"{k} {v:.0f}초" for k, v in timings.items())
-        print(f"[{log_prefix}] {name} ⏱ {parts} / 합계 {time.monotonic() - started:.0f}초")
+        # 병렬 실행이면 timings에 끝난 순서대로 쌓이므로, 회차 간 비교가 쉽게 고정 순서로 찍는다.
+        order = ["팩트시트", "레터", "팟캐스트", "웹툰", "영상", "업로드·발행"]
+        parts = " / ".join(f"{k} {timings[k]:.0f}초" for k in order if k in timings)
+        mode = "병렬" if PUBLISH_PARALLEL else "순차"
+        print(f"[{log_prefix}] {name} ⏱ {parts} / 합계 {time.monotonic() - started:.0f}초 ({mode})")
