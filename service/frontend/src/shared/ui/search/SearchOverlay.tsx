@@ -298,10 +298,15 @@ function Panel({ onClose }: { onClose: () => void }) {
         .mm-empty { margin: 16px 0 4px; font-size: 14px; color: #6b7280; }
         @media (min-width: 1024px) {
           .mm-inner { grid-template-columns: minmax(0, 1fr) 360px; column-gap: 56px; padding-top: 32px; }
-          .mm-cats { order: 1; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 30px 24px; align-content: start; }
+          /* 열 폭을 좁혀 데스크톱(왼쪽 영역 약 780px)에서 6열 × 2행으로 보이게 한다(영문 사이트 메뉴와 같은 밀도). 더 좁은 화면은 자동으로 열 수가 줄어든다. */
+          .mm-cats { order: 1; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 32px 20px; align-content: start; }
           .mm-search { order: 2; }
           .mm-cat ul { flex-direction: column; gap: 0; }
           .mm-cat li a { padding: 6px 0; font-size: 15px; }
+        }
+        /* 노트북 폭(1024~1279px)에서는 검색 열을 줄여 카테고리가 5열 × 2행으로 들어가게 한다. */
+        @media (min-width: 1024px) and (max-width: 1279px) {
+          .mm-inner { grid-template-columns: minmax(0, 1fr) 320px; column-gap: 40px; }
         }
         @media (prefers-reduced-motion: reduce) { .mm-scrim, .mm-panel, .mm-sk { animation: none; } }
       `}</style>
