@@ -72,11 +72,13 @@ export function isShareableSize(size: ImageSize): boolean {
 // 실패(null)는 캐시에서 빼서 다음 재검증(revalidate 300초) 때 다시 시도한다.
 const sizeCache = new Map<string, Promise<ImageSize | null>>();
 
+// cache 옵션을 주지 않는다. 'no-store'를 명시하면 ISR 페이지가 런타임에 동적으로 바뀌려다 500이 난다(2026-10-09 배포 사고).
+// 기본값은 정적 렌더 중에도 허용되고 Data Cache에 저장되지 않으며, 중복 요청은 아래 sizeCache(프로세스 메모리)가 막는다.
 async function probeSize(url: string): Promise<ImageSize | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { headers: { Range: `bytes=0-${PROBE_BYTES - 1}` }, cache: 'no-store', signal: ctrl.signal });
+    const res = await fetch(url, { headers: { Range: `bytes=0-${PROBE_BYTES - 1}` }, signal: ctrl.signal });
     if (!res.ok || !res.body) return null;
     // Range를 무시하는 서버가 전체 파일을 보낼 수 있어 PROBE_BYTES까지만 읽고 끊는다.
     const reader = res.body.getReader();
