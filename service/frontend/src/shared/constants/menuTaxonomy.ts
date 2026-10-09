@@ -1,5 +1,5 @@
 // 전체 메뉴(shared/ui/search/SearchOverlay.tsx)가 그리는 분류표.
-// 대분류 8개(2026-10-09 결정): 시그널 · 부동산 · 경제 · 금융 · 산업 · 정치 · 국제 · 문화. 사회·스포츠·오피니언은 글이 적거나 없어 두지 않는다.
+// 대분류 9개(2026-10-09 결정): 시그널 · 부동산 · 경제 · 금융 · 산업 · 정치 · 사회 · 국제 · 문화. 국문·영문 사이트에 모두 있는 사회를 포함한다. 스포츠·오피니언은 글이 없어 두지 않는다.
 // 이름과 순서는 영문 사이트(서울경제 EN Daily)의 카테고리 체계를 따른다(260929_카테고리체계_v0.4.html, 운영 DB 메뉴 2026-09-28 추출).
 // 하위 카테고리는 영문 메뉴를 그대로 옮기지 않고, 지금 AI LENS에 글이 한 건이라도 있는 것만 둔다(2026-10-09 글 수 집계 기준). 개편 계획은 docs/product/분류체계/README.md.
 //
@@ -29,6 +29,8 @@ export const MENU_TAXONOMY: readonly MenuCategory[] = [
   { slug: 'finance', label: '금융', href: '/finance', subs: ['은행', '보험', '카드', '가상자산', '금융일반'], status: 'live' },
   { slug: 'industry', label: '산업', href: '/industry', subs: ['대기업', '중기·IT', '유통·생활', '바이오', '기업인', '투자·재무', '기업일반'], status: 'live' },
   { slug: 'politics', label: '정치', href: '', subs: [], status: 'planned' },
+  // 사회(영문 National)도 분류 값이 없다. 분류 없음 글 중 약 15%로 추정(키워드 기준)이라 재분류 시험 실행 뒤 건수로 하위 분류를 정한다.
+  { slug: 'national', label: '사회', href: '', subs: [], status: 'planned' },
   { slug: 'international', label: '국제', href: '/international', subs: ['미국·중남미', '일본·중국', '아시아·호주', '유럽', '중동·아프리카'], status: 'live' },
   // 전시·공연, 영화·미디어, 출판, 아트씽은 글이 한 건도 없어 뺐다.
   { slug: 'culture', label: '문화', href: '/culture', subs: ['문화일반', '여행·레저'], status: 'live' },
