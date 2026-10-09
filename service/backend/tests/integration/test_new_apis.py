@@ -294,7 +294,7 @@ def cleanup_test_data():
     """Remove all test user data from Personal DB."""
     try:
         import boto3
-        personal_table = os.getenv('DYNAMODB_TABLE_PERSONAL', 'sedaily-mbti-personal-dev')
+        personal_table = os.getenv('DYNAMODB_TABLE_PERSONAL', 'TEST-ONLY-set-DYNAMODB_TABLE_PERSONAL')
         dynamodb = boto3.resource('dynamodb', region_name=REGION)
         table = dynamodb.Table(personal_table)
 
