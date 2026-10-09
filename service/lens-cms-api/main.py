@@ -29,6 +29,7 @@ import cms_posts_repo as posts_client
 import community_repo
 import config_repo
 import daily_questions_repo
+import issue_letters_repo
 import personal_repo
 import prompt_lab_repo
 import prompts_repo
@@ -461,6 +462,102 @@ def internal_daily_questions_put(date: str, payload: Dict[str, Any] = Body(...),
 
 
 # ── 용어 퀴즈 — v1.22, 응답 집계는 v1.26 ─────────────────────────────
+# ── 이슈 레터(모아쓰기 레터) — v1.37 ──────────────────────────────────────
+# 공개: 목록·상세·투표(인증 없음). 관리: X-Internal-Token + 본문 actor(관리자 Lambda가 로그인한 편집자 정보를 실어 보낸다).
+# 설계: docs/architecture/lens-erd-src/17-이슈레터-설계.md. 옛 /admin/letters*(폐기 후보)와 겹치지 않게 issue-letters 를 쓴다.
+
+def _letter_call(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except issue_letters_repo.LetterError as e:
+        raise HTTPException(status_code=e.status, detail=str(e))
+
+
+@app.get("/api/v2/issue-letters")
+def list_issue_letters(category: Optional[str] = Query(default=None), limit: int = Query(default=20),
+                       before: Optional[str] = Query(default=None)):
+    letters = _letter_call(issue_letters_repo.list_published, category, limit, before)
+    return JSONResponse({"letters": letters}, headers={"Cache-Control": "public, max-age=60"})
+
+
+@app.get("/api/v2/issue-letters/{slug}")
+def get_issue_letter(slug: str):
+    letter = _letter_call(issue_letters_repo.get_published, slug)
+    if not letter:
+        raise HTTPException(status_code=404, detail="letter not found")
+    return JSONResponse({"letter": letter}, headers={"Cache-Control": "public, max-age=60"})
+
+
+@app.get("/api/v2/issue-letters/{slug}/vote")
+def get_issue_letter_vote(slug: str, x_voter_id: Optional[str] = Header(default=None)):
+    return JSONResponse(_letter_call(issue_letters_repo.my_vote, slug, x_voter_id or ""), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v2/issue-letters/{slug}/vote")
+def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
+    result, fresh = _letter_call(issue_letters_repo.vote, slug, x_voter_id or "", str(payload.get("option_key") or ""))
+    if not fresh:
+        return JSONResponse({**result, "already_voted": True}, status_code=409, headers={"Cache-Control": "no-store"})
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/admin/issue-letters/candidates")
+def admin_issue_letter_candidates(q: str = Query(...), limit: int = Query(default=20), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"articles": _letter_call(issue_letters_repo.search_candidates, q, limit)}
+
+
+@app.get("/admin/issue-letters")
+def admin_list_issue_letters(status: Optional[str] = Query(default=None), limit: int = Query(default=50),
+                             x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"letters": _letter_call(issue_letters_repo.list_admin, status, limit)}
+
+
+@app.get("/admin/issue-letters/{letter_id}")
+def admin_get_issue_letter(letter_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    letter = _letter_call(issue_letters_repo.get_admin, letter_id)
+    if not letter:
+        raise HTTPException(status_code=404, detail="letter not found")
+    return {"letter": letter, "publish_problems": issue_letters_repo.publish_problems(letter)}
+
+
+@app.post("/admin/issue-letters")
+def admin_create_issue_letter(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    actor = payload.get("actor") or {}
+    return {"letter": _letter_call(issue_letters_repo.create, payload.get("data") or {}, actor.get("employee_no"))}
+
+
+@app.put("/admin/issue-letters/{letter_id}")
+def admin_update_issue_letter(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    letter = _letter_call(issue_letters_repo.update, letter_id, payload.get("data") or {})
+    if not letter:
+        raise HTTPException(status_code=404, detail="letter not found")
+    return {"letter": letter}
+
+
+@app.post("/admin/issue-letters/{letter_id}/submit")
+def admin_submit_issue_letter(letter_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"letter": _letter_call(issue_letters_repo.submit, letter_id)}
+
+
+@app.post("/admin/issue-letters/{letter_id}/publish")
+def admin_publish_issue_letter(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    actor = payload.get("actor") or {}
+    return {"letter": _letter_call(issue_letters_repo.publish, letter_id, str(actor.get("employee_no") or ""), str(actor.get("role") or ""))}
+
+
+@app.post("/admin/issue-letters/{letter_id}/archive")
+def admin_archive_issue_letter(letter_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"letter": _letter_call(issue_letters_repo.archive, letter_id)}
+
+
 @app.get("/api/quiz/today")
 def quiz_today(limit: int = Query(default=4)):
     return {"quizzes": quiz_repo.list_published_quizzes(limit=limit)}

@@ -1,0 +1,518 @@
+"""이슈 레터(모아쓰기 레터) — issue_letters 계열 7개 테이블.
+
+설계: docs/architecture/lens-erd-src/17-이슈레터-설계.md, 변경 이력: db-changelog/postgres/v1.37-이슈레터-신설.md.
+테이블은 이 코드가 아니라 마스터 계정으로 만든다(lens_service_app 에는 DDL 권한이 없다).
+
+규칙(Q1~Q8 결정 — docs/product/모아쓰기레터/README.md)
+  - 본문 인라인 링크는 전부 "쓰인 기사"(sources)에 있어야 하고, 서로 다른 자사 기사 링크가 3개 이상이어야 발행된다.
+  - 자사 기사 출처는 articles 를 참조해 제목·URL 을 DB 에서 읽는다(지어낸 출처 방지). 외부 기사는 승인자가 있어야 한다.
+  - 발행은 편집장(role=admin)만, 작성자 본인은 승인할 수 없다.
+  - 투표는 레터당 한 사람 한 표. 식별자는 서버 솔트를 섞은 SHA-256 해시만 저장한다.
+검증 함수(validate_letter_payload / publish_problems / voter_hash)는 DB 없이 단위 테스트할 수 있게 순수 함수로 둔다.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+from db import get_cursor
+
+AXES = ("news", "substance", "other")
+STATUSES = ("draft", "in_review", "published", "archived")
+POLL_KINDS = ("binary", "emotion")
+FINANCE_CATEGORIES = ("금융", "증권")
+MIN_SECTIONS = 3
+MIN_DISTINCT_INLINE_ARTICLES = 3
+_SLUG_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}-[^\s/?#]{1,200}$")
+_OPTION_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+_MAX_TEXT = 20000
+_MAX_PARAGRAPHS = 30
+_MAX_SOURCES = 20
+
+
+class LetterError(ValueError):
+    """입력·상태 규칙 위반. 라우트가 400/409 로 바꾼다."""
+
+    def __init__(self, message: str, status: int = 400):
+        super().__init__(message)
+        self.status = status
+
+
+def normalize_url(url: str) -> str:
+    """링크 비교용: 쿼리·프래그먼트·끝 슬래시를 뗀다(?ref=sedailyEng 같은 꼬리표 무시)."""
+    return re.split(r"[?#]", (url or "").strip(), maxsplit=1)[0].rstrip("/")
+
+
+def voter_hash(raw_id: str, salt: Optional[str] = None) -> str:
+    salt = os.environ.get("VOTE_HASH_SALT", "") if salt is None else salt
+    if not salt:
+        raise LetterError("투표 해시 솔트가 설정되지 않았습니다", 500)
+    raw = str(raw_id or "").strip()
+    if not raw or len(raw) > 128:
+        raise LetterError("투표자 식별자가 올바르지 않습니다")
+    return hashlib.sha256(f"{salt}:{raw}".encode("utf-8")).hexdigest()
+
+
+def _text(value: Any, name: str, required: bool = False, limit: int = _MAX_TEXT) -> Optional[str]:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        if required:
+            raise LetterError(f"{name}은 필수입니다")
+        return None
+    if not isinstance(value, str) or len(value) > limit:
+        raise LetterError(f"{name}은 {limit}자 이하 문자열이어야 합니다")
+    return value.strip()
+
+
+def _normalize_paragraph(para: Any, where: str) -> List[Any]:
+    """문단 = 조각 배열. 조각은 문자열 또는 {text, href?, article_no?}."""
+    if not isinstance(para, list) or not para:
+        raise LetterError(f"{where}: 문단은 비어 있지 않은 배열이어야 합니다")
+    out: List[Any] = []
+    for seg in para:
+        if isinstance(seg, str):
+            out.append(seg)
+        elif isinstance(seg, dict) and isinstance(seg.get("text"), str) and seg["text"]:
+            item: Dict[str, Any] = {"text": seg["text"]}
+            if seg.get("href"):
+                href = str(seg["href"])
+                if not re.match(r"^https?://", href):
+                    raise LetterError(f"{where}: 링크는 http(s) 주소여야 합니다")
+                item["href"] = href
+            if seg.get("article_no"):
+                item["article_no"] = str(seg["article_no"])[:32]
+            out.append(item)
+        else:
+            raise LetterError(f"{where}: 문단 조각 형식이 올바르지 않습니다")
+    return out
+
+
+def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
+    """저장용 입력을 검증·정규화한다(초안 단계 — 발행 규칙은 publish_problems 가 따로 본다)."""
+    slug = _text(data.get("slug"), "slug", required=True, limit=255)
+    if not _SLUG_RE.match(slug):
+        raise LetterError("slug 는 YYYY-MM-DD-주제 형식이어야 합니다")
+    title = _text(data.get("title"), "title", required=True, limit=300)
+    read_minutes = int(data.get("read_minutes") or 3)
+    if not 1 <= read_minutes <= 60:
+        raise LetterError("read_minutes 는 1~60 이어야 합니다")
+    summary = data.get("summary") or []
+    if not isinstance(summary, list) or any(not isinstance(s, str) or not s.strip() for s in summary) or len(summary) > 6:
+        raise LetterError("summary 는 비어 있지 않은 문장 배열(최대 6)이어야 합니다")
+
+    categories = data.get("categories") or []
+    if not isinstance(categories, list) or not categories or len(categories) > 6:
+        raise LetterError("categories 는 1~6개의 분류 slug 배열이어야 합니다(첫 번째가 주 분류)")
+
+    sections = []
+    for i, sec in enumerate(data.get("sections") or []):
+        if not isinstance(sec, dict) or sec.get("axis") not in AXES:
+            raise LetterError(f"sections[{i}].axis 는 {'/'.join(AXES)} 중 하나여야 합니다")
+        paragraphs = sec.get("paragraphs") or []
+        if not isinstance(paragraphs, list) or len(paragraphs) > _MAX_PARAGRAPHS:
+            raise LetterError(f"sections[{i}].paragraphs 가 올바르지 않습니다")
+        sections.append({
+            "axis": sec["axis"],
+            "axis_label": _text(sec.get("axis_label"), f"sections[{i}].axis_label", limit=100),
+            "heading": _text(sec.get("heading"), f"sections[{i}].heading", required=True, limit=200),
+            "key_line": _text(sec.get("key_line"), f"sections[{i}].key_line", required=True, limit=300),
+            "paragraphs": [_normalize_paragraph(p, f"sections[{i}].paragraphs[{j}]") for j, p in enumerate(paragraphs)],
+        })
+
+    sources = []
+    seen_positions = set()
+    for i, src in enumerate(data.get("sources") or []):
+        if not isinstance(src, dict):
+            raise LetterError(f"sources[{i}] 형식이 올바르지 않습니다")
+        axes = src.get("axes") or []
+        if not isinstance(axes, list) or any(a not in AXES for a in axes):
+            raise LetterError(f"sources[{i}].axes 는 {'/'.join(AXES)} 의 배열이어야 합니다")
+        article_no = src.get("article_no")
+        ext_url = src.get("external_url")
+        if bool(article_no) == bool(ext_url):
+            raise LetterError(f"sources[{i}]: article_no(자사) 또는 external_*(외부) 중 하나만 지정하세요")
+        item: Dict[str, Any] = {"axes": axes, "article_no": None, "external_title": None, "external_outlet": None,
+                                "external_url": None, "approved_by": None}
+        if article_no:
+            item["article_no"] = str(article_no)[:32]
+        else:
+            if not re.match(r"^https?://", str(ext_url)):
+                raise LetterError(f"sources[{i}].external_url 은 http(s) 주소여야 합니다")
+            item["external_url"] = str(ext_url)
+            item["external_title"] = _text(src.get("external_title"), f"sources[{i}].external_title", required=True, limit=300)
+            item["external_outlet"] = _text(src.get("external_outlet"), f"sources[{i}].external_outlet", required=True, limit=64)
+            item["approved_by"] = _text(src.get("approved_by"), f"sources[{i}].approved_by(외부 기사는 편집장 승인 필수)", required=True, limit=32)
+        key = item["article_no"] or normalize_url(item["external_url"])
+        if key in seen_positions:
+            raise LetterError(f"sources[{i}]: 같은 기사가 두 번 들어 있습니다")
+        seen_positions.add(key)
+        sources.append(item)
+    if len(sources) > _MAX_SOURCES:
+        raise LetterError(f"sources 는 최대 {_MAX_SOURCES}개입니다")
+
+    poll = data.get("poll")
+    if poll:
+        if poll.get("kind") not in POLL_KINDS:
+            raise LetterError("poll.kind 는 binary/emotion 중 하나여야 합니다")
+        options = poll.get("options") or []
+        if not 2 <= len(options) <= 5:
+            raise LetterError("poll.options 는 2~5개여야 합니다")
+        keys = [o.get("key") for o in options]
+        if any(not isinstance(k, str) or not _OPTION_KEY_RE.match(k) for k in keys) or len(set(keys)) != len(keys):
+            raise LetterError("poll.options[].key 는 영문 소문자 식별자이며 서로 달라야 합니다")
+        poll = {
+            "kind": poll["kind"],
+            "question": _text(poll.get("question"), "poll.question", required=True, limit=200),
+            "options": [{"key": o["key"], "label": _text(o.get("label"), "poll.options[].label", required=True, limit=100),
+                         "hint": _text(o.get("hint"), "poll.options[].hint", limit=200)} for o in options],
+        }
+
+    return {
+        "slug": slug, "title": title, "deck": _text(data.get("deck"), "deck", limit=500) or "",
+        "summary": [s.strip() for s in summary], "editor_note": _text(data.get("editor_note"), "editor_note", limit=1000),
+        "read_minutes": read_minutes, "categories": [str(c) for c in categories],
+        "sections": sections, "sources": sources, "poll": poll,
+    }
+
+
+def publish_problems(letter: Dict[str, Any]) -> List[str]:
+    """발행 전 검증. letter 는 get_admin() 모양(sources 에 해석된 url 포함). 빈 목록이면 발행 가능."""
+    problems: List[str] = []
+    sections = letter.get("sections") or []
+    if len(sections) < MIN_SECTIONS:
+        problems.append(f"섹션이 {MIN_SECTIONS}개 이상이어야 합니다(현재 {len(sections)}개)")
+    for i, sec in enumerate(sections):
+        if not (sec.get("key_line") or "").strip():
+            problems.append(f"섹션 {i + 1}에 '핵심' 문장이 없습니다")
+        if not sec.get("paragraphs"):
+            problems.append(f"섹션 {i + 1}에 본문 문단이 없습니다")
+    if not letter.get("summary"):
+        problems.append("1분 요약이 없습니다")
+    if not (letter.get("editor_note") or "").strip():
+        problems.append("에디터 한마디가 없습니다")
+
+    sources = letter.get("sources") or []
+    source_urls = {normalize_url(s["url"]) for s in sources if s.get("url")}
+    own_urls = {normalize_url(s["url"]) for s in sources if s.get("article_no") and s.get("url")}
+    for s in sources:
+        title = s.get("title") or ""
+        if title.startswith("(예시)"):
+            problems.append(f"자리표시 출처가 남아 있습니다: {title}")
+        if s.get("article_no") and not s.get("url"):
+            problems.append(f"자사 기사 {s['article_no']} 를 기사 DB에서 찾을 수 없습니다")
+        if not s.get("article_no") and not s.get("approved_by"):
+            problems.append(f"외부 기사에 편집장 승인이 없습니다: {title}")
+
+    inline: List[str] = []
+    for sec in sections:
+        for para in sec.get("paragraphs") or []:
+            for seg in para:
+                if isinstance(seg, dict) and seg.get("href"):
+                    inline.append(normalize_url(seg["href"]))
+    for url in sorted(set(inline) - source_urls):
+        problems.append(f"본문 링크가 '쓰인 기사' 목록에 없습니다: {url}")
+    distinct_own = len(set(inline) & own_urls)
+    if distinct_own < MIN_DISTINCT_INLINE_ARTICLES:
+        problems.append(f"본문에 서로 다른 자사 기사 링크가 {MIN_DISTINCT_INLINE_ARTICLES}개 이상 필요합니다(현재 {distinct_own}개)")
+
+    poll = letter.get("poll")
+    if poll and poll.get("kind") != "emotion" and any(c in FINANCE_CATEGORIES for c in letter.get("category_names") or []):
+        problems.append("금융 소재 레터의 투표는 감정 반응형(emotion)만 허용됩니다")
+    return problems
+
+
+# ── DB: 읽기 ─────────────────────────────────────────────────────────────
+
+_SOURCE_SQL = """
+    SELECT s.position, s.article_no, s.axes, s.approved_by,
+           COALESCE(a.title, s.external_title) AS title,
+           CASE WHEN s.article_no IS NOT NULL THEN 'AI LENS' ELSE s.external_outlet END AS outlet,
+           CASE WHEN s.article_no IS NOT NULL THEN a.source_url ELSE s.external_url END AS url
+    FROM issue_letter_sources s
+    LEFT JOIN articles a ON a.article_no = s.article_no
+    WHERE s.letter_id = %s ORDER BY s.position
+"""
+
+
+def _iso(v: Any) -> Optional[str]:
+    return v.isoformat() if v is not None else None
+
+
+def _load_children(cur, letter_id: int) -> Dict[str, Any]:
+    cur.execute(
+        "SELECT c.name, c.slug, lc.is_primary FROM issue_letter_categories lc JOIN categories c ON c.id = lc.category_id "
+        "WHERE lc.letter_id = %s ORDER BY lc.is_primary DESC, c.sort_order, c.id", (letter_id,))
+    cats = cur.fetchall()
+    cur.execute("SELECT axis, axis_label, heading, key_line, paragraphs FROM issue_letter_sections "
+                "WHERE letter_id = %s ORDER BY position", (letter_id,))
+    sections = cur.fetchall()
+    cur.execute(_SOURCE_SQL, (letter_id,))
+    sources = []
+    for r in cur.fetchall():
+        sources.append({"article_no": r["article_no"], "title": r["title"], "outlet": r["outlet"],
+                        "url": normalize_url(r["url"]) if r["url"] and r["article_no"] else r["url"],
+                        "axes": list(r["axes"] or []), "approved_by": r["approved_by"], "external": r["article_no"] is None})
+    cur.execute("SELECT kind, question FROM issue_letter_polls WHERE letter_id = %s", (letter_id,))
+    poll = cur.fetchone()
+    if poll:
+        cur.execute("SELECT key, label, hint FROM issue_letter_poll_options WHERE letter_id = %s ORDER BY position", (letter_id,))
+        poll = {"kind": poll["kind"], "question": poll["question"], "options": cur.fetchall()}
+    return {"categories": [c["slug"] for c in cats], "category_names": [c["name"] for c in cats],
+            "primary_category": next((c["name"] for c in cats if c["is_primary"]), None),
+            "sections": sections, "sources": sources, "poll": poll}
+
+
+def _letter_row_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {"id": row["id"], "slug": row["slug"], "issue_no": row["issue_no"], "title": row["title"], "deck": row["deck"],
+            "summary": list(row["summary"] or []), "editor_note": row["editor_note"], "read_minutes": row["read_minutes"],
+            "status": row["status"], "author_no": row["author_no"], "reviewer_no": row["reviewer_no"],
+            "reviewed_at": _iso(row["reviewed_at"]), "published_at": _iso(row["published_at"]),
+            "created_at": _iso(row["created_at"]), "updated_at": _iso(row["updated_at"])}
+
+
+def list_published(category: Optional[str] = None, limit: int = 20, before: Optional[str] = None) -> List[Dict[str, Any]]:
+    """발행본 목록(최신순). category 는 분류 slug — 주·보조 모두 매칭. before 는 published_at ISO(다음 페이지)."""
+    limit = max(1, min(int(limit), 50))
+    sql = "SELECT l.* FROM issue_letters l WHERE l.status = 'published' AND l.deleted_at IS NULL"
+    params: List[Any] = []
+    if category:
+        sql += (" AND EXISTS (SELECT 1 FROM issue_letter_categories lc JOIN categories c ON c.id = lc.category_id "
+                "WHERE lc.letter_id = l.id AND c.slug = %s)")
+        params.append(category)
+    if before:
+        sql += " AND l.published_at < %s"
+        params.append(before)
+    sql += " ORDER BY l.published_at DESC LIMIT %s"
+    params.append(limit)
+    with get_cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        out = []
+        for row in rows:
+            child = _load_children(cur, row["id"])
+            card = _letter_row_to_dict(row)
+            for k in ("editor_note", "author_no", "reviewer_no", "reviewed_at", "status", "created_at", "updated_at"):
+                card.pop(k, None)
+            card.update(categories=child["category_names"], primary_category=child["primary_category"],
+                        axes=sorted({a for s in child["sections"] for a in [s["axis"]]}),
+                        source_count=len(child["sources"]))
+            out.append(card)
+        return out
+
+
+def get_published(slug: str) -> Optional[Dict[str, Any]]:
+    with get_cursor() as cur:
+        cur.execute("SELECT * FROM issue_letters WHERE slug = %s AND status = 'published' AND deleted_at IS NULL", (slug,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        letter = _letter_row_to_dict(row)
+        for k in ("author_no", "reviewer_no", "reviewed_at"):
+            letter.pop(k, None)
+        letter.update(_load_children(cur, row["id"]))
+        return letter
+
+
+def get_admin(letter_id: int) -> Optional[Dict[str, Any]]:
+    with get_cursor() as cur:
+        cur.execute("SELECT * FROM issue_letters WHERE id = %s AND deleted_at IS NULL", (letter_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        letter = _letter_row_to_dict(row)
+        letter.update(_load_children(cur, row["id"]))
+        return letter
+
+
+def list_admin(status: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    if status and status not in STATUSES:
+        raise LetterError("status 값이 올바르지 않습니다")
+    sql = "SELECT * FROM issue_letters WHERE deleted_at IS NULL"
+    params: List[Any] = []
+    if status:
+        sql += " AND status = %s"
+        params.append(status)
+    sql += " ORDER BY updated_at DESC LIMIT %s"
+    params.append(max(1, min(int(limit), 200)))
+    with get_cursor() as cur:
+        cur.execute(sql, params)
+        return [_letter_row_to_dict(r) for r in cur.fetchall()]
+
+
+def search_candidates(q: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """출처 후보 자사 기사 검색(제목·본문 부분일치, 최신순). 레터 작성 폼이 article_no 를 고르는 용도."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        raise LetterError("검색어는 2자 이상이어야 합니다")
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT article_no, title, source_url, published_at FROM articles "
+            "WHERE title ILIKE %s OR body ILIKE %s ORDER BY published_at DESC LIMIT %s",
+            (f"%{q}%", f"%{q}%", max(1, min(int(limit), 50))))
+        return [{"article_no": r["article_no"], "title": r["title"], "url": normalize_url(r["source_url"] or ""),
+                 "published_at": _iso(r["published_at"])} for r in cur.fetchall()]
+
+
+# ── DB: 쓰기 ─────────────────────────────────────────────────────────────
+
+def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
+    import json
+    cur.execute("SELECT id, slug FROM categories WHERE slug = ANY(%s)", (v["categories"],))
+    found = {r["slug"]: r["id"] for r in cur.fetchall()}
+    missing = [c for c in v["categories"] if c not in found]
+    if missing:
+        raise LetterError(f"알 수 없는 분류: {', '.join(missing)}")
+    cur.execute("DELETE FROM issue_letter_categories WHERE letter_id = %s", (letter_id,))
+    for i, slug in enumerate(v["categories"]):
+        cur.execute("INSERT INTO issue_letter_categories (letter_id, category_id, is_primary) VALUES (%s,%s,%s)",
+                    (letter_id, found[slug], i == 0))
+    cur.execute("DELETE FROM issue_letter_sections WHERE letter_id = %s", (letter_id,))
+    for i, s in enumerate(v["sections"]):
+        cur.execute(
+            "INSERT INTO issue_letter_sections (letter_id, position, axis, axis_label, heading, key_line, paragraphs) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb)",
+            (letter_id, i, s["axis"], s["axis_label"], s["heading"], s["key_line"], json.dumps(s["paragraphs"], ensure_ascii=False)))
+    cur.execute("DELETE FROM issue_letter_sources WHERE letter_id = %s", (letter_id,))
+    for i, s in enumerate(v["sources"]):
+        if s["article_no"]:
+            cur.execute("SELECT 1 FROM articles WHERE article_no = %s", (s["article_no"],))
+            if not cur.fetchone():
+                raise LetterError(f"자사 기사를 찾을 수 없습니다: {s['article_no']}")
+        cur.execute(
+            "INSERT INTO issue_letter_sources (letter_id, position, article_no, external_title, external_outlet, external_url, axes, approved_by) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            (letter_id, i, s["article_no"], s["external_title"], s["external_outlet"], s["external_url"], s["axes"], s["approved_by"]))
+    cur.execute("DELETE FROM issue_letter_polls WHERE letter_id = %s", (letter_id,))
+    if v["poll"]:
+        cur.execute("INSERT INTO issue_letter_polls (letter_id, kind, question) VALUES (%s,%s,%s)",
+                    (letter_id, v["poll"]["kind"], v["poll"]["question"]))
+        for i, o in enumerate(v["poll"]["options"]):
+            cur.execute("INSERT INTO issue_letter_poll_options (letter_id, key, position, label, hint) VALUES (%s,%s,%s,%s,%s)",
+                        (letter_id, o["key"], i, o["label"], o["hint"]))
+
+
+def create(data: Dict[str, Any], author_no: Optional[str]) -> Dict[str, Any]:
+    v = validate_letter_payload(data)
+    with get_cursor() as cur:
+        cur.execute("SELECT 1 FROM issue_letters WHERE slug = %s", (v["slug"],))
+        if cur.fetchone():
+            raise LetterError("이미 있는 slug 입니다", 409)
+        cur.execute(
+            "INSERT INTO issue_letters (slug, title, deck, summary, editor_note, read_minutes, author_no) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (v["slug"], v["title"], v["deck"], v["summary"], v["editor_note"], v["read_minutes"], author_no))
+        letter_id = cur.fetchone()["id"]
+        _replace_children(cur, letter_id, v)
+    return get_admin(letter_id)  # type: ignore[return-value]
+
+
+def update(letter_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """초안·검수 중에만 수정한다. 발행·내림 상태는 고치지 않는다(slug 도 불변)."""
+    v = validate_letter_payload(data)
+    with get_cursor() as cur:
+        cur.execute("SELECT status, slug FROM issue_letters WHERE id = %s AND deleted_at IS NULL FOR UPDATE", (letter_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        if row["status"] not in ("draft", "in_review"):
+            raise LetterError("발행·내림 상태의 레터는 수정할 수 없습니다", 409)
+        if v["slug"] != row["slug"]:
+            raise LetterError("slug 는 바꿀 수 없습니다", 400)
+        cur.execute(
+            "UPDATE issue_letters SET title=%s, deck=%s, summary=%s, editor_note=%s, read_minutes=%s, updated_at=now() WHERE id=%s",
+            (v["title"], v["deck"], v["summary"], v["editor_note"], v["read_minutes"], letter_id))
+        _replace_children(cur, letter_id, v)
+    return get_admin(letter_id)
+
+
+def submit(letter_id: int) -> Dict[str, Any]:
+    with get_cursor() as cur:
+        cur.execute("UPDATE issue_letters SET status='in_review', updated_at=now() "
+                    "WHERE id=%s AND status='draft' AND deleted_at IS NULL RETURNING id", (letter_id,))
+        if not cur.fetchone():
+            raise LetterError("초안 상태의 레터만 검수 요청할 수 있습니다", 409)
+    return get_admin(letter_id)  # type: ignore[return-value]
+
+
+def publish(letter_id: int, actor_no: str, actor_role: str) -> Dict[str, Any]:
+    """검수 중 → 발행. 편집장(admin)만, 작성자 본인 불가. 발행 규칙 위반 시 사유 목록을 담아 거부한다."""
+    if actor_role != "admin":
+        raise LetterError("발행 승인은 편집장(admin)만 할 수 있습니다", 403)
+    letter = get_admin(letter_id)
+    if not letter:
+        raise LetterError("레터를 찾을 수 없습니다", 404)
+    if letter["status"] != "in_review":
+        raise LetterError("검수 중인 레터만 발행할 수 있습니다", 409)
+    if letter["author_no"] and letter["author_no"] == actor_no:
+        raise LetterError("작성자 본인은 승인할 수 없습니다", 403)
+    problems = publish_problems(letter)
+    if problems:
+        raise LetterError("발행 규칙을 충족하지 못했습니다: " + " / ".join(problems), 422)
+    with get_cursor() as cur:
+        cur.execute("LOCK TABLE issue_letters IN SHARE ROW EXCLUSIVE MODE")
+        cur.execute("SELECT COALESCE(MAX(issue_no), 0) + 1 AS n FROM issue_letters")
+        n = cur.fetchone()["n"]
+        cur.execute(
+            "UPDATE issue_letters SET status='published', issue_no=%s, reviewer_no=%s, reviewed_at=now(), "
+            "published_at=now(), updated_at=now() WHERE id=%s AND status='in_review' RETURNING id", (n, actor_no, letter_id))
+        if not cur.fetchone():
+            raise LetterError("다른 요청이 먼저 상태를 바꿨습니다", 409)
+    return get_admin(letter_id)  # type: ignore[return-value]
+
+
+def archive(letter_id: int) -> Dict[str, Any]:
+    with get_cursor() as cur:
+        cur.execute("UPDATE issue_letters SET status='archived', updated_at=now() "
+                    "WHERE id=%s AND status='published' AND deleted_at IS NULL RETURNING id", (letter_id,))
+        if not cur.fetchone():
+            raise LetterError("발행된 레터만 내릴 수 있습니다", 409)
+    return get_admin(letter_id)  # type: ignore[return-value]
+
+
+# ── DB: 투표 ─────────────────────────────────────────────────────────────
+
+def _tally(cur, letter_id: int) -> Dict[str, int]:
+    cur.execute("SELECT o.key, COUNT(v.voter_hash) AS n FROM issue_letter_poll_options o "
+                "LEFT JOIN issue_letter_votes v ON v.letter_id = o.letter_id AND v.option_key = o.key "
+                "WHERE o.letter_id = %s GROUP BY o.key, o.position ORDER BY o.position", (letter_id,))
+    return {r["key"]: int(r["n"]) for r in cur.fetchall()}
+
+
+def _poll_letter_id(cur, slug: str) -> Optional[int]:
+    cur.execute("SELECT l.id FROM issue_letters l JOIN issue_letter_polls p ON p.letter_id = l.id "
+                "WHERE l.slug = %s AND l.status = 'published' AND l.deleted_at IS NULL", (slug,))
+    row = cur.fetchone()
+    return row["id"] if row else None
+
+
+def vote(slug: str, raw_voter_id: str, option_key: str) -> Tuple[Dict[str, Any], bool]:
+    """투표한다. (결과, 새로 투표했는가) 를 돌려준다. 이미 투표했으면 기존 선택과 집계를 돌려주고 새 투표로 치지 않는다."""
+    h = voter_hash(raw_voter_id)
+    with get_cursor() as cur:
+        letter_id = _poll_letter_id(cur, slug)
+        if letter_id is None:
+            raise LetterError("투표할 수 있는 레터가 아닙니다", 404)
+        cur.execute("SELECT 1 FROM issue_letter_poll_options WHERE letter_id=%s AND key=%s", (letter_id, option_key))
+        if not cur.fetchone():
+            raise LetterError("없는 선택지입니다")
+        cur.execute("INSERT INTO issue_letter_votes (letter_id, voter_hash, option_key) VALUES (%s,%s,%s) "
+                    "ON CONFLICT (letter_id, voter_hash) DO NOTHING RETURNING option_key", (letter_id, h, option_key))
+        fresh = cur.fetchone() is not None
+        cur.execute("SELECT option_key FROM issue_letter_votes WHERE letter_id=%s AND voter_hash=%s", (letter_id, h))
+        mine = cur.fetchone()["option_key"]
+        return {"my_choice": mine, "counts": _tally(cur, letter_id)}, fresh
+
+
+def my_vote(slug: str, raw_voter_id: str) -> Dict[str, Any]:
+    """내 투표 여부. 투표한 사람에게만 집계를 보여준다."""
+    h = voter_hash(raw_voter_id)
+    with get_cursor() as cur:
+        letter_id = _poll_letter_id(cur, slug)
+        if letter_id is None:
+            raise LetterError("투표할 수 있는 레터가 아닙니다", 404)
+        cur.execute("SELECT option_key FROM issue_letter_votes WHERE letter_id=%s AND voter_hash=%s", (letter_id, h))
+        row = cur.fetchone()
+        if not row:
+            return {"my_choice": None, "counts": None}
+        return {"my_choice": row["option_key"], "counts": _tally(cur, letter_id)}
