@@ -98,6 +98,7 @@ const NAV: { label: string; href: string }[] = [
 const CONTENT_LINKS: { label: string; href: string }[] = [
   ...ECON_CATEGORIES.map((c) => ({ label: c.label, href: `/${c.slug}` })),
   { label: '전체 콘텐츠', href: '/lens' },
+  { label: '단어장', href: '/words' },
 ];
 
 export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?: boolean }) {

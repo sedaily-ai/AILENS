@@ -7,6 +7,7 @@ import { toLensPreviewSummaries } from '@/shared/lib/api/cmsPostsApi';
 import { pickLensPostsForHome } from '@/shared/lib/content/homeFeedTrim';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { SITE_URL } from '@/shared/constants/site';
+import { resolveShareImages } from '@/shared/lib/seo/shareImage';
 import { PaperDayClient } from '../PaperDayClient';
 import { buildPaperDescription, buildPaperJsonLd, paperDateLabel, paperKeywords, paperPath } from '../paperShared';
 
@@ -39,14 +40,18 @@ export async function generateMetadata({ params }: { params: Promise<{ date: str
   const description = buildPaperDescription(date, data.items);
   const url = `${SITE_URL}${paperPath(date)}`;
   const hero = data.items.find((l) => l.paper_section === '전체') ?? data.items[0];
-  const photo = pickLensPhoto(hero) || hero.cover_image_url || `${SITE_URL}/og-image.png`;
+  // 대표 이미지는 크기를 재서 폭 1200px 미만·배너형을 건너뛴다(기사 상세와 같은 규칙, shareImage.ts). 대표 기사 사진·컷 → 다른 기사 사진 순으로 최대 5개만 잰다.
+  const candidates = [pickLensPhoto(hero), hero.cover_image_url, ...data.items.filter((l) => l !== hero).slice(0, 3).map((l) => pickLensPhoto(l))].filter((u): u is string => !!u);
+  const share = await resolveShareImages(candidates);
+  const photo = share.primary.url;
+  const photoSize = share.primary.width ? { width: share.primary.width, height: share.primary.height } : {};
   return {
     title,
     description,
     keywords: paperKeywords(date),
     category: 'news',
     alternates: { canonical: url, languages: { 'ko-KR': url } },
-    openGraph: { title, description, url, type: 'website', images: [{ url: photo, alt: title }], locale: 'ko_KR', siteName: 'AI LENS — 서울경제' },
+    openGraph: { title, description, url, type: 'website', images: [{ url: photo, ...photoSize, alt: title }], locale: 'ko_KR', siteName: 'AI LENS — 서울경제' },
     twitter: { card: 'summary_large_image', title, description, images: [photo] },
     other: {
       news_keywords: paperKeywords(date).join(', '),

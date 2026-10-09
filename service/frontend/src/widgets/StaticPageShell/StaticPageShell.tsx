@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 
 // 개인정보처리방침/이용약관/회사소개/문의처럼 footer에서만 진입하는 순수 텍스트 페이지 공용 셸. Header/검색 오버레이 배선을 페이지마다 반복하지 않는다.
@@ -18,7 +18,7 @@ export function StaticPageShell({ title, updated, children }: Props) {
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 96px' }}>
         <header style={{ marginBottom: 32 }}>

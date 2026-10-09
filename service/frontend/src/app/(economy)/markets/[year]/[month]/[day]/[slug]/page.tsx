@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { buildLensArticleMetadata, LensArticlePageContent } from '@/app/(economy)/_shared/lensArticlePageShared';
 
-// 카테고리별 lens 상세 — 로직은 lensArticlePageShared.tsx를 공유한다(7개 카테고리 폴더 중 하나).
+// 카테고리별 lens 상세 — 로직은 lensArticlePageShared.tsx를 공유한다(9개 분류 폴더와 news 폴백 중 하나).
 // 이 파일은 카테고리 슬러그만 고정해 넘기는 wrapper이며 (economy)/markets/page.tsx(아카이브 목록)와 같은 패턴이다.
 type Params = Promise<{ year: string; month: string; day: string; slug: string }>;
 

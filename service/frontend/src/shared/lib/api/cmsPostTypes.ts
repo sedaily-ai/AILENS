@@ -45,11 +45,7 @@ export interface CmsWebtoon {
   display_order?: number | null;
   /** lens("4가지 시선")의 웹툰 포맷에서 파생된 카드일 때만 채워진다(shared/lib/lensMediaFeed.ts). 기본 `/webtoon/{id}` 대신 이 경로로 링크한다. */
   href?: string;
-  /**
-   * 시리즈 제목. 같은 문자열을 쓴 편들이 하나의 시리즈다(admin WebtoonMode의 자유 텍스트 입력, 시리즈 마스터 테이블 없음.
-   * cms_posts_public.py _shape_webtoon 참조). 비어 있으면 그 편 제목을 시리즈명으로 취급하는 "단편" 시리즈로
-   * shared/lib/webtoonSeries.ts가 폴백한다.
-   */
+  /** 시리즈 제목(admin WebtoonMode 자유 입력). 시리즈 화면은 쓰지 않아 표시에 쓰이지 않는다. */
   series_title?: string | null;
 }
 
@@ -116,9 +112,9 @@ export interface CmsLens {
   updated_at?: string | null;
   /** 발행 완료 시각(ISO, UTC, 초 단위). date는 YYYY-MM-DD까지만이라 shared/lib/date.ts의 kstDateTimeLabel()이 이 값으로 KST 시:분까지 표기한다. 옛 글에는 없을 수 있다. */
   published_at?: string | null;
-  /** 경제 카테고리 라벨(증시/부동산/산업/금융·정책/국제/재테크). letters와 같은 6개 값이며 /markets 등 카테고리 페이지에 lens 글도 노출하는 데 쓴다. 없으면(미분류) 어느 카테고리 페이지에도 뜨지 않는다. */
+  /** 대분류 라벨(시그널·부동산·경제·금융·산업·정치·사회·국제·문화, shared/constants/econCategories.ts). 옛 글에는 '증시'·'금융·정책'이 남아 있을 수 있다. 없으면(미분류) 어느 카테고리 페이지에도 뜨지 않는다. */
   category?: string | null;
-  /** 하위 카테고리. category(6개 주제) 안의 한 단계 더 세분된 분류(예: 증시 → 국내증시/해외증시/IB&Deal)이며
+  /** 하위 카테고리. 대분류 안의 한 단계 더 세분된 분류(예: 시그널 → 국내증시/해외증시/IB&Deal)이며
    * shared/constants/econSubcategories.ts의 라벨과 매칭한다. 값이 없으면 하위 탭이 뜨지 않는다(CategoryArchiveClient.tsx). */
   subcategory?: string | null;
   /** "지면 특별 코너" 전용 배치 필드. category와 별개이며 "전체"/"증권"/"산업"/"시그널" 중 하나여야 LensPreviewSection의 해당 탭에 뜬다.

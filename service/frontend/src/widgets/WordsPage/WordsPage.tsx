@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { LightbulbIcon } from '@/shared/ui/icons/HandDrawnIcons';
 import type { Term } from './words';
@@ -28,7 +28,7 @@ export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
     <div className="min-h-screen" style={{ background: '#fdfcfa' }}>
       {/* 'feed' 탭은 상단 nav에 없다(headerTabs.ts 참조). 이 페이지에는 강조할 대응 탭이 없다. */}
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* /letters 아카이브와 같은 헤더 톤. 그라데이션 배경·그림자 아이콘박스 없이 회색 대문자 eyebrow + 서리프 타이틀만 둔다. */}
       <main style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 80px' }}>

@@ -1,6 +1,7 @@
 import { ERAS, DECADES } from '@/shared/data/timelineEvents';
 import type { MetadataRoute } from 'next';
-import { fetchAllWebtoons, fetchAllVideos, fetchAllLensPosts, fetchPaperDates } from '@/shared/lib/api/cmsPostsApi';
+import { fetchAllLensPosts, fetchAllVideos, fetchPaperDates, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
+import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { kstTodayStr } from '@/shared/lib/date/date';
 // 게임 목록은 단일 출처(shared/data/games.ts)에서 가져온다. page 모듈에서 가져오면 FSD 경계를 위반하고 프로덕션 빌드를 막는다.
 import { GAMES } from '@/shared/data/games';
@@ -23,19 +24,20 @@ function escapeXml(s: string): string {
 // lastModified는 라우트 파일의 실제 수정일을 수기로 갱신한다. 요청 시각(new Date())을 쓰면 크롤러에 거짓 신선도 신호가 된다.
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']; lastModified: string }[] = [
   { path: '/',             priority: 1.0, changeFrequency: 'hourly',  lastModified: '2026-08-08' }, // 메인 피드
-  // 경제 버티컬 카테고리 6개. shared/constants/econCategories.ts의 슬러그와 일치해야 한다.
+  // 카테고리 9개(2026-10-09 분류 개편). shared/constants/econCategories.ts의 슬러그와 일치해야 한다.
   // priority/changeFrequency를 개별 판단하므로 .map() 생성 대신 수동 나열한다.
-  { path: '/markets',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 증시
-  { path: '/signal',        priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-01' }, // 시그널(Market Signal)
+  { path: '/markets',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 시그널(옛 증시+시그널)
   { path: '/property',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 부동산
+  { path: '/economy',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 경제
+  { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 금융
   { path: '/industry',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 산업
-  { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 금융·정책
+  { path: '/politics',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 정치
+  { path: '/national',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 사회
   { path: '/international', priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 국제
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
   { path: '/games',        priority: 0.5, changeFrequency: 'monthly', lastModified: '2026-10-05' },
   { path: '/words',        priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 단어장 — 레터 키워드 기반, 매일 갱신
-  { path: '/style',        priority: 0.3, changeFrequency: 'monthly', lastModified: '2026-08-08' },
   // 서비스 소개 랜딩이며 푸터 링크 대상이므로 색인 대상이다.
   { path: '/onboarding',   priority: 0.4, changeFrequency: 'yearly',  lastModified: '2026-08-07' },
   // 사주(/saju)는 별도 서비스(saju.sedaily.ai)이므로 포함하지 않는다.
@@ -67,13 +69,29 @@ function daysBetween(isoDate: string): number {
   return Math.max(0, Math.floor((today - target) / (1000 * 60 * 60 * 24)));
 }
 
+// 기사 목록 API는 응답 경량화로 lenses[].video_url을 비워 내려준다. 영상 정보는 영상 채널 목록에 있으므로 기사 id(채널 접미사 -video 제거)로 연결한다.
+function videoSitemapExtension(l: CmsLens, byLensId: Map<string, CmsVideo>): Pick<MetadataRoute.Sitemap[number], 'videos'> {
+  const v = byLensId.get(l.id);
+  if (!v?.video_url) return {};
+  return {
+    videos: [
+      {
+        title: escapeXml(seoHeadline(l.headline)),
+        // Next는 videos 필드를 이스케이프하지 않으며 `&t=24s` 같은 쿼리가 그대로 나가면 사이트맵 전체가 파싱 오류가 된다.
+        thumbnail_loc: escapeXml(v.thumbnail_url || l.cover_image_url || `${BASE}/og-image.png`),
+        description: escapeXml(l.context || seoHeadline(l.headline)),
+        content_loc: escapeXml(v.video_url),
+        publication_date: v.published_at || l.published_at || `${l.date}T07:00:00+09:00`,
+        family_friendly: 'yes',
+      },
+    ],
+  };
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
-  // 세 채널의 전체 목록(상한 밖 과거 글 포함)을 병렬로 조회한다. 순차 조회 시 첫 생성이 CDN 오리진 대기 한도에 근접한다.
-  // 각 함수는 실패 시 빈 배열을 반환하므로 먼저 시작해도 안전하다.
-  const webtoonsPromise = fetchAllWebtoons();
   const lensPromise = fetchAllLensPosts();
-  const videosPromise = fetchAllVideos();
+  const videosPromise = fetchAllVideos(); // 실패 시 빈 배열을 돌려주므로 먼저 시작해도 안전하다
 
   // 정적 라우트
   for (const r of STATIC_ROUTES) {
@@ -88,28 +106,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 레터 상세는 sitemap에 포함하지 않는다. 신규 발행이 중단되었고 사이트 내 링크가 없는 고아 페이지라 크롤 예산을 낭비한다.
   // 페이지 자체는 기존 백링크·북마크를 위해 유지한다.
 
-  // 웹툰 — 이미지 사이트맵 확장(images)으로 컷 이미지를 모두 알린다. 어느 컷이 검색에 노출될지 알 수 없으므로 전부 포함한다.
-  try {
-    const webtoons = await webtoonsPromise; // 최신 1,000건 상한 밖 과거 글 포함
-    for (const w of webtoons) {
-      const daysOld = daysBetween(w.date);
-      entries.push({
-        url: `${BASE}/webtoon/${w.id}`,
-        lastModified: new Date(w.published_at || w.date + 'T07:00:00+09:00'),
-        changeFrequency: 'never',
-        priority: freshnessPriority(daysOld),
-        // 목록 API는 응답 경량화를 위해 panels를 비워 내려주므로 대표 이미지를 알린다.
-        images: w.panels.length > 0 ? w.panels.map((p) => p.url) : w.cover_image_url ? [w.cover_image_url] : [],
-      });
-    }
-  } catch {
-    /* 웹툰 API 불통이면 생략 — sitemap 나머지는 그대로 반환 */
-  }
+  // 웹툰(/webtoon/{id})·영상(/video/{id}) 상세는 canonical이 기사 페이지라 사이트맵에 넣지 않는다(lensCanonical.ts). 이미지·영상 신호는 아래 기사 항목의 images·videos 확장으로 알린다.
 
   // 오늘의 이슈(4가지 시선) — 하루 하나씩 실제 발행된 글만 존재하므로 전부 포함해도 안전하다.
   try {
     // 최신 1,000건 상한을 넘는 과거 글까지 전부 포함한다(fetchAllLensPosts 참조).
     const lensPosts = await lensPromise;
+    const byLensId = new Map<string, CmsVideo>((await videosPromise).map((v) => [v.id.replace(/-video$/, ''), v]));
     for (const l of lensPosts) {
       const daysOld = daysBetween(l.date);
       entries.push({
@@ -127,6 +130,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             ),
           ),
         ),
+        // 영상 형식이 있으면 기사 페이지에 있는 영상(VideoObject와 같은 값)을 알린다. content_loc가 없으면 넣지 않는다.
+        ...videoSitemapExtension(l, byLensId),
       });
     }
   } catch {
@@ -147,35 +152,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     /* 지면 날짜 조회 실패 시 생략 */
   }
 
-  // 영상 — videos 확장으로 페이지 내 영상을 알린다. 자체 렌더링해 S3에 올린 mp4이므로 video_url을 content_loc(원본 직링크)로 쓸 수 있다.
-  try {
-    const videos = await videosPromise; // 최신 1,000건 상한 밖 과거 글 포함
-    for (const v of videos) {
-      const daysOld = daysBetween(v.date);
-      entries.push({
-        url: `${BASE}/video/${v.id}`,
-        lastModified: new Date(v.published_at || v.date + 'T07:00:00+09:00'),
-        changeFrequency: 'never',
-        priority: freshnessPriority(daysOld),
-        videos: [
-          {
-            title: escapeXml(v.title),
-            // thumbnail_loc·content_loc도 이스케이프한다. Next는 videos 필드를 이스케이프하지 않으며, `&t=24s` 같은 쿼리가 그대로 나가면 사이트맵 전체가 파싱 오류가 된다.
-            thumbnail_loc: escapeXml(v.thumbnail_url || `${BASE}/og-image.png`),
-            description: escapeXml(v.excerpt || v.title),
-            content_loc: escapeXml(v.video_url),
-            publication_date: v.published_at || `${v.date}T07:00:00+09:00`,
-            family_friendly: 'yes',
-          },
-        ],
-      });
-    }
-  } catch {
-    /* 영상 API 불통이면 생략 */
-  }
-
-  // 오디오(/listen/{id})는 본문이 기사 페이지와 대부분 중복이라 canonical을 lens 기사 페이지로 지정하고(lensCanonical.ts) 사이트맵에서 제외한다.
-  // 영상(/video/{id})은 서버 HTML에 <video>와 VideoObject가 있는 정식 시청 페이지이므로 사이트맵·자기 canonical을 유지한다.
+  // 오디오(/listen/{id})·웹툰·영상 상세는 본문이 기사 페이지와 대부분 중복이라 canonical을 lens 기사 페이지로 지정하고(lensCanonical.ts) 사이트맵에서 제외한다.
 
   // 타임라인 날짜별 페이지 — 최근 24개월만 포함한다. 전체(13,000+일)를 넣으면 얇은 페이지가 늘고 sitemap 생성이 느려진다.
   // 기사가 없는 날짜는 [date]/page.tsx의 generateMetadata가 robots:{index:false}로 스스로 제외하므로 sitemap은 발견 경로만 제공한다.

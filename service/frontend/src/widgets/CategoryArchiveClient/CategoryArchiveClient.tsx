@@ -4,7 +4,7 @@
 // 카테고리마다 페이지 구조가 같고 설정값만 달라 하나의 클라이언트 컴포넌트로 공유한다. 형식(kind)과 무관하게 category(주제) 하나로만 필터링한다.
 import { useEffect, useState } from 'react';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { ArchiveList } from '@/shared/ui/list/ArchiveList';
 import { ListPagination } from '@/shared/ui/list/ListPagination';
 import { CategoryLead, CategoryCards } from '@/shared/ui/list/CategoryLead';
@@ -16,7 +16,7 @@ import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/content/archiveItems';
 import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
-import type { EconCategoryConfig } from '@/shared/constants/econCategories';
+import { categoryMatches, type EconCategoryConfig } from '@/shared/constants/econCategories';
 import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
@@ -48,6 +48,13 @@ export function CategoryArchiveClient({
   const [items, setItems] = useState<ArchiveItem[]>(initialItems);
   // 하위 카테고리 탭. econSubcategories.ts에 taxonomy가 있는 카테고리(현재 증시·산업)에서, 실제로 글이 있는 값만 탭으로 뜬다.
   const [activeSub, setActiveSub] = useState<string>('all');
+  // 전체 메뉴(SearchOverlay)의 하위 카테고리 링크는 /{category}?sub=국내증시 로 온다. 서버가 searchParams를 읽으면 이 라우트가 통째로 동적이 되어 캐시가 깨지므로,
+  // 마운트 뒤에 주소를 읽어 탭만 맞춘다(서버 렌더 HTML은 그대로 "전체").
+  useEffect(() => {
+    const sub = new URLSearchParams(window.location.search).get('sub');
+    if (!sub || !econSubcategoriesFor(config.slug).includes(sub)) return;
+    void Promise.resolve().then(() => setActiveSub(sub));
+  }, [config.slug]);
   // 날짜별 보기: 고른 기간(KST 날짜)에 발행된 글만 남긴다. 불러온 글 안에서 거른다.
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [today] = useState(() => kstTodayStr());
@@ -57,18 +64,15 @@ export function CategoryArchiveClient({
     Promise.all([fetchCmsPosts('letters', undefined, PAGE_SIZE), fetchLensPosts()]).then(
       ([letters, lens]) => {
         if (cancelled) return;
-        // "시그널"(filterBy:'paperSection')은 category가 아니라 paperSection으로
-        // 거른다 — EconomyCategoryPage.tsx(서버 최초 fetch)와 같은 규칙.
-        const all = buildArchiveItems(letters, [], [], lens).filter((it) =>
-          config.filterBy === 'paperSection' ? it.paperSection === config.label : it.category === config.label,
-        );
+        // EconomyCategoryPage.tsx(서버 최초 fetch)와 같은 규칙 — 새 이름과 옛 이름이 섞여 있어 categoryMatches로 비교한다.
+        const all = buildArchiveItems(letters, [], [], lens).filter((it) => categoryMatches(config, it.category));
         if (all.length > 0) setItems(all);
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [config.label, config.filterBy]);
+  }, [config]);
 
   const subTabValues = econSubcategoriesFor(config.slug).filter((sub) =>
     items.some((it) => it.subcategory === sub),
@@ -115,7 +119,7 @@ export function CategoryArchiveClient({
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs(tabKey)} frosted section={{ label: config.label, href: '/' }} />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         {/* 영문판처럼 헤더 블록(큰 제목·밑줄·안내 문구) 없이 탭 줄만 둔다. 제목은 검색·스크린리더용으로만 남긴다. */}

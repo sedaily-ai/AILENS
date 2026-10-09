@@ -199,6 +199,7 @@ export function LensFormatGuide({ onClose, onGo, initialIndex }: { onClose: () =
         .gs-panel { position: relative; width: 100%; max-width: 460px; max-height: min(92vh, 800px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
           background: #fff; border-radius: 22px; padding: 28px clamp(16px, 5vw, 26px) 22px;
           box-shadow: 0 40px 80px -32px rgba(17,24,39,0.45); animation: gs-in .32s ${EASE} both; }
+        @supports (height: 100dvh) { .gs-panel { max-height: min(92dvh, 800px); } }
         .gs-panel:focus { outline: none; }
         .gs-head { padding: 0 clamp(4px, 1vw, 8px); }
 
@@ -279,7 +280,8 @@ export function LensFormatGuide({ onClose, onGo, initialIndex }: { onClose: () =
         @keyframes gs-fill { 0%, 14% { stroke-dashoffset: 1; } 86% { stroke-dashoffset: 0; } 96% { stroke-dashoffset: 0; opacity: 0; } 100% { stroke-dashoffset: 1; opacity: 0; } }
         .gs-row[data-active='true'] .gs-spark { animation: gs-blink 1.4s ease-in-out infinite; }
 
-        .gs-done { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 52px; margin-top: 14px; border: none; border-radius: 16px; background: #3d70de; color: #fff; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .15s, transform .15s; }
+        .gs-cta { position: sticky; bottom: -22px; z-index: 2; margin: 2px calc(-1 * clamp(16px, 5vw, 26px)) -22px; padding: 12px clamp(16px, 5vw, 26px) 22px; background: linear-gradient(to top, #fff 78%, rgba(255,255,255,0)); }
+        .gs-done { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 52px; margin-top: 0; border: none; border-radius: 16px; background: #3d70de; color: #fff; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .15s, transform .15s; }
         /* 서울경제 CI 파랑(#5b8def)을 흰 글자 대비 4.5:1이 나오도록 한 단계 깊게 쓴다. */
         .gs-done:hover { background: #3260c8; }
         .gs-done:active { transform: scale(.985); }
@@ -290,6 +292,25 @@ export function LensFormatGuide({ onClose, onGo, initialIndex }: { onClose: () =
         .gs-done:focus-visible { outline: 2px solid #3d70de; outline-offset: 3px; }
 
         @media (max-width: 380px) { .gs-art { width: 76px; height: 60px; } .gs-row { gap: 10px; padding: 10px 8px; } }
+
+        /* 모바일·낮은 화면 — 스크롤 없이 한 화면에 들어오게 줄인다. 시연 중이 아닌 행은 제목·시간만 보이고(설명은 선택된 행에만), 그림·글자·여백이 작아진다. */
+        @media (max-width: 480px), (max-height: 760px) {
+          .gs-panel { padding: 20px clamp(14px, 4.5vw, 22px) 16px; border-radius: 20px; }
+          .gs-close { top: 8px; right: 8px; width: 36px; height: 36px; }
+          .gs-title { font-size: clamp(20px, 5.6vw, 24px); }
+          .gs-lead { margin-top: 8px; font-size: 14px; line-height: 1.5; }
+          .gs-list { margin-top: 8px; gap: 0; }
+          .gs-row { gap: 10px; padding: 7px 8px; border-radius: 16px; }
+          .gs-art { width: 68px; height: 54px; }
+          .gs-name { font-size: 16px; gap: 6px; }
+          .gs-time { font-size: 12px; }
+          .gs-line { margin-top: 2px; font-size: 13.5px; line-height: 1.45; }
+          .gs-row:not([data-active='true']) .gs-line { display: none; }
+          .gs-how { margin-top: 4px; font-size: 12.5px; line-height: 1.4; }
+          .gs-prog-bar { margin-top: 5px; }
+          .gs-cta { bottom: -16px; margin-top: 2px; margin-bottom: -16px; padding: 8px clamp(14px, 4.5vw, 22px) 16px; margin-left: calc(-1 * clamp(14px, 4.5vw, 22px)); margin-right: calc(-1 * clamp(14px, 4.5vw, 22px)); }
+          .gs-done { height: 46px; font-size: 15px; border-radius: 14px; }
+        }
         /* 움직임을 줄여 달라고 한 사용자에게는 반복·자동 넘김 없이 완성된 그림만 보여 준다. */
         @media (prefers-reduced-motion: reduce) {
           .gs-scrim, .gs-panel, .gs-li { animation: none !important; }
@@ -380,14 +401,16 @@ export function LensFormatGuide({ onClose, onGo, initialIndex }: { onClose: () =
             })}
           </ul>
 
-          <button type="button" onClick={() => (onGo ? onGo(active) : onClose())} className="gs-done">
-            <span key={active} className="gs-done-t">
-              {CTA[LENS_PERSPECTIVES[active]?.short ?? ''] ?? '지금 보러 갈래요'}
-            </span>
-            <span aria-hidden className="gs-done-arrow">
-              →
-            </span>
-          </button>
+          <div className="gs-cta">
+            <button type="button" onClick={() => (onGo ? onGo(active) : onClose())} className="gs-done">
+              <span key={active} className="gs-done-t">
+                {CTA[LENS_PERSPECTIVES[active]?.short ?? ''] ?? '지금 보러 갈래요'}
+              </span>
+              <span aria-hidden className="gs-done-arrow">
+                →
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>,

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { ArchiveList } from '@/shared/ui/list/ArchiveList';
 import { CategoryCards, CategoryLead } from '@/shared/ui/list/CategoryLead';
@@ -78,7 +78,7 @@ export function LensListClient({
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted section={{ label: '최신 뉴스', href: '/' }} />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         <h1 className="sr-only">최신 뉴스 — 하나의 이슈, 네 가지 형식으로 읽는 AI LENS</h1>

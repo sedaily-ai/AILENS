@@ -172,7 +172,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
                 >
                   <Image
                     src={hPhoto}
-                    alt=""
+                    alt={displayHeadline(h.headline)}
                     fill
                     sizes="(max-width: 780px) 100vw, 700px"
                     style={{ objectFit: 'cover', objectPosition: 'center' }}
@@ -260,7 +260,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
                     >
                       <Image
                         src={photo}
-                        alt=""
+                        alt={displayHeadline(article.headline)}
                         fill
                         sizes="220px"
                         className="lz-minor-thumb-img"

@@ -235,7 +235,9 @@ export type CmsStatus = "draft" | "published" | "archived";
 // 사실상 없었고, service/frontend의 /investing이 처음부터 계속 0건
 // 이었다(사용자 신고로 발견) — 하위 태그 기반 보조 매칭도 실측 하루
 // 1건 수준이라 카테고리 자체를 없앴다.
-export const ECON_CATEGORIES = ["증시", "부동산", "산업", "금융·정책", "국제", "문화"] as const;
+// 2026-10-09 분류 개편: 대분류 9개(시그널·부동산·경제·금융·산업·정치·사회·국제·문화). 증시는 시그널로 통합, 금융·정책은 금융으로 이름이 바뀌었다.
+// service/frontend/src/shared/constants/econCategories.ts, pipelines/common/taxonomy.py, service/lens-cms-api/admin_posts_repo.py와 같은 값이다(의도적 복제, docs/product/분류체계/README.md).
+export const ECON_CATEGORIES = ["시그널", "부동산", "경제", "금융", "산업", "정치", "사회", "국제", "문화"] as const;
 export type EconCategory = (typeof ECON_CATEGORIES)[number];
 
 // 웹툰 전용 카테고리 — 2026-08-21에 "경제/금융/기업/정치/사회/국제/문화" 7개로
@@ -244,7 +246,7 @@ export type EconCategory = (typeof ECON_CATEGORIES)[number];
 // 되돌렸다("재테크" 제거도 2026-09-11 같이 반영). 값은 서로 같지만 타입을
 // 분리해 둔 이유는 이후 웹툰만 다른 카테고리가 필요해지면 이 한 곳만
 // 바꾸면 되게 하기 위해서다.
-export const WEBTOON_CATEGORIES = ["증시", "부동산", "산업", "금융·정책", "국제", "문화"] as const;
+export const WEBTOON_CATEGORIES = ECON_CATEGORIES;
 export type WebtoonCategory = (typeof WEBTOON_CATEGORIES)[number];
 
 export interface CmsKeyword {

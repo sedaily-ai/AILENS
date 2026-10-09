@@ -13,14 +13,15 @@ import { NewsTimeMachineSection } from "./sections/NewsTimeMachineSection";
 import { LatestGridSection } from "./sections/LatestGridSection";
 import { CategoryFeatureSection } from "./sections/CategoryFeatureSection";
 import type { ReactNode } from "react";
-import { ECON_CATEGORIES } from "@/shared/constants/econCategories";
+import { categoryMatches, ECON_CATEGORIES } from "@/shared/constants/econCategories";
 
 // 카테고리를 2개씩 짝지어 한 줄(2/3+1/3)로 배치한다. 순서는 ECON_CATEGORIES 정의 순서를 따른다.
-// 짝이 없는 카테고리(문화·국제)는 마지막에 단독(1개짜리) 행으로 둔다. CategoryPairRow는 slugs 1~2개를 모두 받는다.
+// 짝이 없는 카테고리(문화)는 마지막에 단독(1개짜리) 행으로 둔다. CategoryPairRow는 slugs 1~2개를 모두 받는다.
 const CATEGORY_PAIRS: readonly (readonly string[])[] = [
   ['markets', 'property'],
-  ['industry', 'finance'],
-  ['international'],
+  ['economy', 'finance'],
+  ['industry', 'politics'],
+  ['national', 'international'],
   ['culture'],
 ];
 
@@ -32,7 +33,7 @@ function CategoryPairRow({
   archiveItems: ArchiveItem[];
 }) {
   const configs = slugs.map((slug) => ECON_CATEGORIES.find((c) => c.slug === slug)!);
-  const itemsBySlug = configs.map((cfg) => archiveItems.filter((it) => it.category === cfg.label));
+  const itemsBySlug = configs.map((cfg) => archiveItems.filter((it) => categoryMatches(cfg, it.category)));
   if (itemsBySlug.every((items) => items.length === 0)) return null;
   // 행 사이 구분선은 두지 않는다. CategoryFeatureSection이 각각 자기 카드(배경+테두리+그림자)를 가지므로 카드 밖 구분선은 이중 프레임이 되며, 카드 사이 간격(marginTop)만으로 행을 구분한다.
   return (
@@ -150,7 +151,7 @@ export function NewsFeedTab({
             <HomeSection><AudioPreviewSection initialItems={initialHomePlayerPosts} /></HomeSection>
 
             {/*
-               문화(culture) — 경제 카테고리 6개 짝(3줄) 이후에 추가된 카테고리라 파트너가 없어 단독 행으로 마지막에 둔다.
+               문화(culture) — 9개 분류를 2개씩 짝지으면 하나가 남아 단독 행으로 마지막에 둔다.
                콘텐츠가 없는 날은 CategoryFeatureSection이 숨긴다.
              */}
             <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} />

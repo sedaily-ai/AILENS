@@ -64,7 +64,7 @@ for kind in "/webtoon/" "/video/" "/listen/"; do
   p=$(pick "$kind")
   [ -n "$p" ] && check "$p" 200
 done
-ARTICLE=$(echo "$SITEMAP" | grep -oE "<loc>[^<]*/(markets|signal|property|industry|finance|international|culture)/20[0-9]{2}/[^<]*</loc>" | head -1 | sed -E "s#<loc>https?://[^/]+##; s#</loc>##")
+ARTICLE=$(echo "$SITEMAP" | grep -oE "<loc>[^<]*/(markets|property|economy|finance|industry|politics|national|international|culture)/20[0-9]{2}/[^<]*</loc>" | head -1 | sed -E "s#<loc>https?://[^/]+##; s#</loc>##")
 [ -n "$ARTICLE" ] && check "$ARTICLE" 200
 
 echo ""

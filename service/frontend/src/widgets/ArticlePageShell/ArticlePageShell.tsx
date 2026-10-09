@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 
 // Header/검색 오버레이 배선 + "요즘 많이 읽힌 글" 사이드바 그리드를 페이지마다 반복하지 않는다
@@ -25,7 +25,7 @@ export function ArticlePageShell({ sidebar, afterContent, children }: Props) {
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>
         {sidebar ? (

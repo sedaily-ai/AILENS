@@ -54,6 +54,13 @@ const nextConfig: NextConfig = {
       { source: "/saju-match", destination: "https://saju.sedaily.ai", permanent: true },
       { source: "/saju-match/:path*", destination: "https://saju.sedaily.ai", permanent: true },
       // 폐기된 아카이브(/trend)는 /lens로 보낸다.
+      // 증시와 시그널을 합친 분류 개편(2026-10-09): 옛 /signal 은 /markets 로 영구 이동한다. 기사 주소(/signal/연/월/일/슬러그)도 /markets 아래로 보내면
+      // 기사 상세가 글의 실제 분류 주소로 한 번 더 정본 이동시킨다.
+      { source: "/signal", destination: "/markets", permanent: true },
+      { source: "/signal/page/1", destination: "/markets", permanent: true },
+      { source: "/signal/page/:n", destination: "/markets/page/:n", permanent: true },
+      { source: "/signal/rss.xml", destination: "/markets/rss.xml", permanent: true },
+      { source: "/signal/:year(\\d{4})/:month/:day/:slug", destination: "/markets/:year/:month/:day/:slug", permanent: true },
       { source: "/trend", destination: "/lens", permanent: true },
       { source: "/trend/:path*", destination: "/lens", permanent: true },
       // /letters, /column, /issue-talk 아카이브 목록은 폐기되어 /lens로 보낸다.
@@ -66,7 +73,9 @@ const nextConfig: NextConfig = {
       // /archive도 색인됐을 수 있어 404 대신 영구 리다이렉트한다.
       { source: "/archive", destination: "/lens", permanent: true },
       // 웹툰·영상·오디오 목록 페이지는 같은 기사의 형식 탭과 중복이라 폐기하고 /lens로 모은다.
-      // 개별 상세(/webtoon/{slug}, /video/{slug}, /listen/{slug}, /webtoon/series/{slug})는 색인·공유 링크가 있어 유지한다.
+      // 개별 상세(/webtoon/{slug}, /video/{slug}, /listen/{slug})는 해당 기사 페이지로 영구 이동하도록 각 page.tsx가 처리한다(기사 없는 글만 렌더).
+      // 시리즈 회차 목록(/webtoon/series/{slug})은 쓰지 않아 페이지를 없애고 /lens로 모은다(2026-10-09).
+      { source: "/webtoon/series/:path*", destination: "/lens", permanent: true },
       { source: "/webtoon", destination: "/lens", permanent: true },
       { source: "/webtoon/all", destination: "/lens", permanent: true },
       { source: "/webtoon/page/:n", destination: "/lens", permanent: true },
