@@ -47,6 +47,8 @@ export function buildCategoryPageNMetadata(config: EconCategoryConfig, page: num
     title,
     description: metaDescription(config),
     alternates: { canonical: url },
+    // 뒷장은 /lens/page/N과 같이 색인하지 않는다(링크는 따라간다). 기사는 사이트맵과 1쪽에서 발견된다.
+    robots: { index: false, follow: true },
     openGraph: {
       title,
       description: metaDescription(config),

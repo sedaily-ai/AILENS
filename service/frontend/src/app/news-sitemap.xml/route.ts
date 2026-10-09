@@ -1,4 +1,5 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { displayCategoryLabel } from '@/shared/constants/econCategories';
 import { letterHref } from '@/shared/lib/content/letterHref';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
@@ -52,7 +53,7 @@ export async function GET() {
         date: l.date,
         publishedAt: l.published_at,
         // 카테고리·하위 카테고리(econSubcategories.ts)로 news:keywords를 채운다. lens에는 용어 키워드 필드가 없어 가장 가까운 신호(주제 분류)를 쓴다(letters 쪽은 실제 용어 키워드 사용).
-        keywords: [l.category, l.subcategory].filter((k): k is string => !!k),
+        keywords: [displayCategoryLabel(l.category), l.subcategory].filter((k): k is string => !!k),
       });
     }
   } catch {

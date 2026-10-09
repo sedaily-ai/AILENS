@@ -3,7 +3,7 @@ import { letterHref } from '@/shared/lib/content/letterHref';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { categoryMatches, type EconCategoryConfig } from '@/shared/constants/econCategories';
+import { categoryMatches, displayCategoryLabel, type EconCategoryConfig } from '@/shared/constants/econCategories';
 import { SITE_URL as BASE } from '@/shared/constants/site';
 
 // AI LENS RSS 2.0 피드. 전체 피드(/rss.xml)와 카테고리별 피드(/{slug}/rss.xml)가 이 빌더 하나를 공유한다.
@@ -99,7 +99,7 @@ export async function buildRssResponse(category?: EconCategoryConfig): Promise<R
       date: l.published_at ?? l.publish_date,
       description,
       contentHtml,
-      categories: [l.category].filter((c): c is string => !!c),
+      categories: [displayCategoryLabel(l.category)].filter((c): c is string => !!c),
       imageUrl: l.photo_image_url || l.cover_image_url,
     };
   });
@@ -121,7 +121,7 @@ export async function buildRssResponse(category?: EconCategoryConfig): Promise<R
       date: l.published_at ?? l.date,
       description,
       contentHtml,
-      categories: [l.category, l.subcategory].filter((c): c is string => !!c),
+      categories: [displayCategoryLabel(l.category), l.subcategory].filter((c): c is string => !!c),
       imageUrl: pickLensPhoto(l) || l.cover_image_url,
       sourceUrl: l.source_url,
     };

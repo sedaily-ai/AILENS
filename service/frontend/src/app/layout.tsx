@@ -14,7 +14,7 @@ import { SITE_URL } from "@/shared/constants/site";
 const SITE_TITLE = "AI LENS — 서울경제신문의 AI 경제 뉴스";
 // 사이트 설명 상수 — 서비스의 차별점(기자 취재 → AI가 레터/웹툰/팟캐스트/영상 4형식으로 재구성 → 편집팀 검수)을 담는다.
 // meta description·OG·Twitter·WebSite 구조화 데이터가 이 상수 하나를 공유한다.
-const SITE_DESC = "서울경제신문 기자가 취재한 경제 뉴스를 AI가 레터·웹툰·팟캐스트·영상 4가지 형식으로 매일 재구성하고 편집팀이 검수합니다. 증시·산업·부동산·금융 등 다양한 분야의 이슈를 구체적인 숫자와 맥락까지 담아 깊이 있게 전합니다.";
+const SITE_DESC = "서울경제신문 기자가 취재한 경제 뉴스를 AI가 레터·웹툰·팟캐스트·영상 4가지 형식으로 매일 재구성하고 편집팀이 검수합니다. 시그널(증시)·부동산·경제·금융·산업·정치·사회·국제·문화 등 다양한 분야의 이슈를 구체적인 숫자와 맥락까지 담아 깊이 있게 전합니다.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -125,7 +125,7 @@ const SITE_JSONLD = {
       publisher: { "@id": `${SITE_URL}/#organization` },
       copyrightHolder: { "@id": `${SITE_URL}/#organization` },
       isAccessibleForFree: true,
-      keywords: "AI 경제뉴스, 경제 뉴스 해설, 증시, 산업, 부동산, 금융, 오늘의 이슈, 4가지 시선, 서울경제",
+      keywords: "AI 경제뉴스, 경제 뉴스 해설, 증시, 시그널, 부동산, 경제, 금융, 산업, 정치, 사회, 국제, 문화, 오늘의 이슈, 4가지 시선, 서울경제",
       potentialAction: {
         "@type": "SearchAction",
         target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/?q={search_term_string}` },
@@ -182,7 +182,7 @@ const SITE_JSONLD = {
       slogan: "그날의 핵심 경제 이슈를 매일 정리해 전합니다",
       description: SITE_DESC,
       areaServed: { "@type": "Country", name: "대한민국" },
-      knowsAbout: ["경제 뉴스", "시그널", "부동산", "경제", "금융", "산업", "정치", "사회", "국제 경제", "경제 용어", "시사 해설"],
+      knowsAbout: ["경제 뉴스", "시그널", "부동산", "경제", "금융", "산업", "정치", "사회", "국제", "문화", "경제 용어", "시사 해설"],
       masthead: `${SITE_URL}/about`,
       actionableFeedbackPolicy: `${SITE_URL}/contact`,
       isAccessibleForFree: true,

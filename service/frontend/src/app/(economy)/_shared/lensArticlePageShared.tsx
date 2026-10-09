@@ -7,18 +7,19 @@ import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date/date';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
-import { categoryForDataLabel } from '@/shared/constants/econCategories';
+import { categoryForDataLabel, displayCategoryLabel } from '@/shared/constants/econCategories';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';
 import type { ArticleNeighbor } from './components/article/ArticleNeighborNav';
 import { resolveShareImages, type ShareImages } from '@/shared/lib/seo/shareImage';
+import { buildLensVideoObject } from '@/shared/lib/seo/lensVideoObject';
 
 import { SITE_URL } from '@/shared/constants/site';
 
-// 카테고리+날짜 경로로 감싼 lens 상세. 7개(markets/property/industry/finance/international/culture/news) 카테고리 폴더가 이 모듈을 공유한다.
+// 카테고리+날짜 경로로 감싼 lens 상세. 9개 분류(+news 폴백) 카테고리 폴더가 이 모듈을 공유한다.
 // 옛 경로 (content)/[slug]/page.tsx는 lensPath()로 계산한 정본 경로로 redirect만 하는 얇은 페이지다(letters/[id]/page.tsx의 lensPost 리다이렉트와 같은 패턴).
 //
-// generateStaticParams는 두지 않는다. 카테고리별로 복제하면 정적 생성 수가 7배로 늘고 이득(prefetch 분류)은 작다.
+// generateStaticParams는 두지 않는다. 카테고리별로 복제하면 정적 생성 수가 카테고리 수만큼 늘고 이득(prefetch 분류)은 작다.
 // dynamicParams 기본값(true)+revalidate로 항상 정상 렌더된다.
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -56,7 +57,8 @@ async function findOtherLens(
 ): Promise<{ more: CmsLens[]; related: CmsLens[] }> {
   const items = (await fetchAllLens()).filter((l) => l.id !== slug);
   if (!current?.category) return { more: items.slice(0, 3), related: [] };
-  const sameCat = items.filter((l) => l.category === current.category);
+  const currentSlug = categoryForDataLabel(current.category)?.slug;
+  const sameCat = items.filter((l) => (currentSlug ? categoryForDataLabel(l.category)?.slug === currentSlug : l.category === current.category));
   const more = sameCat.slice(0, 3);
   const taken = new Set(more.map((l) => l.id));
   const related = current.subcategory
@@ -69,7 +71,8 @@ async function findOtherLens(
 // 카테고리가 없는 글은 전체 목록 기준. 이미 받아온 전체 목록에서 고르므로 추가 API 호출은 없다.
 async function findNeighbors(slug: string, current: CmsLens | null): Promise<{ prev: ArticleNeighbor | null; next: ArticleNeighbor | null }> {
   if (!current) return { prev: null, next: null };
-  const pool = (await fetchAllLens()).filter((l) => (current.category ? l.category === current.category : true));
+  const currentSlug = categoryForDataLabel(current.category)?.slug;
+  const pool = (await fetchAllLens()).filter((l) => (current.category ? (currentSlug ? categoryForDataLabel(l.category)?.slug === currentSlug : l.category === current.category) : true));
   const stamp = (l: CmsLens) => l.published_at ?? l.date;
   const sorted = [...pool].sort((a, b) => (stamp(a) < stamp(b) ? 1 : stamp(a) > stamp(b) ? -1 : 0)); // 최신순
   const i = sorted.findIndex((l) => l.id === slug);
@@ -106,7 +109,7 @@ function faqItems(lens: CmsLens) {
 /** 기사 키워드 — 분류·하위분류를 앞에 두고(검색어 매칭), 서비스 고정어를 뒤에 붙인다. */
 function articleKeywords(lens: CmsLens): string[] {
   const headline = seoHeadline(lens.headline);
-  return [...new Set([lens.category, lens.subcategory, headline, '경제 뉴스', '뉴스 해설', '오늘의 이슈', '4가지 시선', 'AI LENS', '서울경제'].filter((k): k is string => !!k))];
+  return [...new Set([displayCategoryLabel(lens.category), lens.subcategory, headline, '경제 뉴스', '뉴스 해설', '오늘의 이슈', '4가지 시선', 'AI LENS', '서울경제'].filter((k): k is string => !!k))];
 }
 
 function buildJsonLd(lens: CmsLens, shareImages: ShareImages) {
@@ -119,6 +122,7 @@ function buildJsonLd(lens: CmsLens, shareImages: ShareImages) {
     lens.context,
     ...lens.lenses.flatMap((l) => [l.question, ...l.bullets]),
   ].join(' ');
+  const videoNode = buildLensVideoObject(lens, { url, headline, published, fallbackThumbnail: shareImages.primary.url });
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -129,13 +133,13 @@ function buildJsonLd(lens: CmsLens, shareImages: ShareImages) {
         headline,
         description: lens.context,
         articleBody: bodyJoined,
-        articleSection: lens.category || '경제',
+        articleSection: displayCategoryLabel(lens.category) || '경제',
         // GEO·AEO 보강 — 분류·주제·요약·출처·저작권·읽기 동작을 기계가 읽도록 명시.
         abstract: lens.context,
         keywords: articleKeywords(lens),
         thumbnailUrl: shareImages.primary.url,
         genre: '뉴스 해설',
-        about: [{ '@type': 'Thing', name: lens.category || '경제' }, ...(lens.subcategory ? [{ '@type': 'Thing', name: lens.subcategory }] : [])],
+        about: [{ '@type': 'Thing', name: displayCategoryLabel(lens.category) || '경제' }, ...(lens.subcategory ? [{ '@type': 'Thing', name: lens.subcategory }] : [])],
         copyrightHolder: { '@id': `${SITE_URL}/#organization` },
         copyrightYear: Number(lens.date.slice(0, 4)),
         creditText: '서울경제신문 AI LENS',
@@ -184,7 +188,9 @@ function buildJsonLd(lens: CmsLens, shareImages: ShareImages) {
           })),
         },
         isAccessibleForFree: true,
+        ...(videoNode ? { video: { '@id': `${url}#video` } } : {}),
       },
+      ...(videoNode ? [videoNode] : []),
       // 질문-답변 구조를 FAQPage로도 노출 — 화면의 4가지 시선 Q&A와 같은 내용이라 AI 답변 엔진·리치 결과가 인용한다.
       ...(faqItems(lens).length > 0
         ? [
@@ -231,7 +237,7 @@ export async function buildLensArticleMetadata(
     description,
     keywords: articleKeywords(lens),
     authors: [{ name: 'AI LENS 편집팀', url: `${SITE_URL}/about` }],
-    category: lens.category || '경제',
+    category: displayCategoryLabel(lens.category) || '경제',
     alternates: { canonical: url, languages: { 'ko-KR': url } },
     openGraph: {
       title,
@@ -241,7 +247,7 @@ export async function buildLensArticleMetadata(
       publishedTime: lens.published_at || `${lens.date}T07:00:00+09:00`,
       modifiedTime: clampModifiedIso(lens.updated_at, lens.published_at || `${lens.date}T07:00:00+09:00`),
       authors: ['AI LENS 편집팀'],
-      section: '경제',
+      section: displayCategoryLabel(lens.category) || '경제',
       tags: articleKeywords(lens),
       // 잰 크기만 선언한다. 측정에 실패한 이미지엔 값을 박지 않는다.
       images: [{ url: shareImages.primary.url, ...(shareImages.primary.width ? { width: shareImages.primary.width, height: shareImages.primary.height } : {}), alt: headline }],
@@ -267,7 +273,7 @@ export async function buildLensArticleMetadata(
       'DC.identifier': url,
       'DC.source': lens.source_url || url,
       'twitter:label1': '분류',
-      'twitter:data1': lens.category || '경제',
+      'twitter:data1': displayCategoryLabel(lens.category) || '경제',
       'twitter:label2': '발행',
       'twitter:data2': lens.date,
     },

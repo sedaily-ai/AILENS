@@ -25,6 +25,7 @@ import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components'
 import { useLensFormatTabs } from './hooks/useLensFormatTabs';
 import { SITE_URL } from '@/shared/constants/site';
 import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
+import { categoryForDataLabel, displayCategoryLabel } from '@/shared/constants/econCategories';
 import { ArticleChapterNav } from './components/article/ArticleChapterNav';
 import { IconStopwatch } from './components/icons/LensIcons';
 import { ArticleReveal } from './components/article/ArticleReveal';
@@ -374,8 +375,8 @@ export function LensViewClient({
       <main id="main-content" className="art-main">
         <ArticleToTop />
         <ArticleStickyBar
-          category={lens.category ?? null}
-          categoryHref={lens.category ? `/${lensCategorySlug(lens.category)}` : null}
+          category={lens.category ? displayCategoryLabel(lens.category) : null}
+          categoryHref={categoryForDataLabel(lens.category) ? `/${lensCategorySlug(lens.category)}` : null}
           title={lens.headline}
           readMin={readMin}
         />
@@ -404,7 +405,7 @@ export function LensViewClient({
         {/* ── 기사 머리 ── 카테고리 아이브로우 → 세리프 헤드라인 → 부제 → 바이라인/발행시각 → 헤어라인 */}
         <div className="lw" style={{ paddingTop: 'clamp(8px, 2vw, 16px)' }}>
           <p className="eyebrow">
-            {lens.category && <Link href={`/${lensCategorySlug(lens.category)}`}>{lens.category}</Link>}
+            {categoryForDataLabel(lens.category) ? <Link href={`/${lensCategorySlug(lens.category)}`}>{displayCategoryLabel(lens.category)}</Link> : lens.category}
             {lens.subcategory && <> · {lens.subcategory}</>}
             <span className="badge">4가지 시선</span>
           </p>

@@ -2,7 +2,7 @@ import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { fetchVideos, fetchVideoBySlug, fetchLensBySlug, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
+import { fetchVideos, fetchVideoBySlug, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/media/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
@@ -10,6 +10,7 @@ import { VideoViewClient } from './VideoViewClient';
 import { IssueContextSection } from '../../_shared/IssueContextSection';
 
 import { SITE_URL } from '@/shared/constants/site';
+import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 
 // webtoon/[slug]/page.tsx와 같은 이유의 가벼운 재시도 — fetchVideos() 단발 실패(콜드스타트 등)에 바로 "찾을 수 없어요"가 되지 않게 한다.
 async function fetchAllVideos(): Promise<CmsVideo[]> {
@@ -64,8 +65,9 @@ export async function generateMetadata({
   const headline = seoHeadline(video.title);
   const title = buildPageTitle(headline, '영상');
   const description = buildSeoDescription(video.excerpt, '서울경제 AI LENS가 정리한 이슈 영상입니다.');
-  // 영상 시청 페이지는 자기 자신이 정본 — 서버 HTML에 <video>와 VideoObject가 있어 동영상 색인의 대상이다.
-  const url = `${SITE_URL}/video/${slug}`;
+  // 정본은 같은 기사의 lens 페이지다(기사 페이지 JSON-LD에도 VideoObject가 있다). 시청 페이지와 이동 경로는 그대로 둔다. lens가 없으면 자기 주소.
+  const lens = await findLensForChannelSlug(slug);
+  const url = canonicalFromLens(lens, `/video/${slug}`);
   const resolved = resolveVideo(video.video_url);
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
   const extras = mediaSeoExtras({ headline, description, url, publishedIso: video.published_at || `${video.date}T07:00:00+09:00`, kind: '영상' });
@@ -99,6 +101,7 @@ function buildJsonLd(video: CmsVideo, slug: string, lens: CmsLens | null) {
   // VideoObject.transcript — 영상 대본이 있으면 구조화데이터에도 싣는다.
   const transcript = lens?.lenses.find((l) => l.label === '영상')?.transcript?.trim();
   const url = `${SITE_URL}/video/${slug}`;
+  const canonical = canonicalFromLens(lens, `/video/${slug}`);
   const published = video.published_at || `${video.date}T07:00:00+09:00`;
   const resolved = resolveVideo(video.video_url);
   const image = video.thumbnail_url || resolved?.autoThumbnailUrl || `${SITE_URL}/og-image.png`;
@@ -108,7 +111,7 @@ function buildJsonLd(video: CmsVideo, slug: string, lens: CmsLens | null) {
       {
         '@type': 'VideoObject',
         '@id': `${url}#video`,
-        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
         name: seoHeadline(video.title),
         description: buildSeoDescription(video.excerpt, seoHeadline(video.title)),
         keywords: [...new Set([seoHeadline(video.title), '영상', '경제 영상', '오늘의 이슈', 'AI LENS', '서울경제'])],
@@ -163,7 +166,7 @@ export default async function VideoViewPage({
     notFound();
   }
   // 같은 이슈의 lens 글(슬러그 동일)로 텍스트 보강(IssueContextSection 참조).
-  const lens = await fetchLensBySlug(slug);
+  const lens = await findLensForChannelSlug(slug);
   const jsonLd = buildJsonLd(video, slug, lens);
   return (
     <>

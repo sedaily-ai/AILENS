@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // export const revalidate를 명시해도 무시된다. 미들웨어(React 렌더링 파이프라인 밖)에서 처리하면 페이지 컴포넌트에 redirect() 호출이 남지 않아 ISR 캐시(revalidate:300)를 받는다.
 const PAGE_N_BASES = new Set([
   'lens',
-  'markets', 'signal', 'property', 'industry', 'finance', 'international', 'culture',
+  'markets', 'property', 'economy', 'finance', 'industry', 'politics', 'national', 'international', 'culture',
 ]);
 
 // /lens?page=N, /webtoon?page=N 옛 링크 정리. next.config.ts의 redirects()+has 조합은 has로 매칭한 쿼리를 destination에 :page로 넣어도

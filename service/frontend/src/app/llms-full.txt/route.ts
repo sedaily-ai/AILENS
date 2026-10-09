@@ -1,4 +1,5 @@
 import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { displayCategoryLabel } from '@/shared/constants/econCategories';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { SITE_URL } from '@/shared/constants/site';
@@ -31,7 +32,7 @@ export async function GET() {
     lines.push(`### ${seoHeadline(l.headline)}`);
     lines.push(`- 주소: ${SITE_URL}${lensPath(l)}`);
     lines.push(`- 발행: ${l.published_at || l.date}`);
-    if (l.category) lines.push(`- 분류: ${l.category}${l.subcategory ? ` > ${l.subcategory}` : ''}`);
+    if (l.category) lines.push(`- 분류: ${displayCategoryLabel(l.category)}${l.subcategory ? ` > ${l.subcategory}` : ''}`);
     if (l.paper_section) lines.push(`- 지면: ${l.paper_section === '전체' ? '지면 1면' : `${l.paper_section} 1면`}`);
     if (l.source_url) lines.push(`- 원문 취재 기사: ${l.source_url}`);
     if (l.context) lines.push('', l.context.trim());

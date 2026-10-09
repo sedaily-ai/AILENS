@@ -9,7 +9,7 @@ export { SITE_URL };
 // PAGE_SIZE는 LensListClient.tsx의 값과 일치해야 한다(총 페이지 수 계산 기준 — 다르면 generateStaticParams가 존재하지 않는 페이지를 만들거나 마지막 페이지를 빠뜨린다).
 export const LENS_LIST_TITLE = '오늘의 이슈, 4가지 시선';
 export const LENS_LIST_DESCRIPTION =
-  '서울경제신문 기자가 취재한 매일의 경제 이슈를 레터·웹툰·팟캐스트·영상 네 가지 형식으로 담았습니다. 같은 뉴스도 읽고, 보고, 듣는 방식을 바꿔 고르면 더 쉽게 이해됩니다. 증시·산업·부동산·금융·국제 이슈를 날짜순으로 모아 보세요.';
+  '서울경제신문 기자가 취재한 매일의 경제 이슈를 레터·웹툰·팟캐스트·영상 네 가지 형식으로 담았습니다. 같은 뉴스도 읽고, 보고, 듣는 방식을 바꿔 고르면 더 쉽게 이해됩니다. 시그널·부동산·경제·금융·산업·정치·사회·국제·문화 이슈를 날짜순으로 모아 보세요.';
 
 export function buildLensJsonLd(items: CmsLens[]) {
   return {

@@ -57,6 +57,7 @@ const nextConfig: NextConfig = {
       // 증시와 시그널을 합친 분류 개편(2026-10-09): 옛 /signal 은 /markets 로 영구 이동한다. 기사 주소(/signal/연/월/일/슬러그)도 /markets 아래로 보내면
       // 기사 상세가 글의 실제 분류 주소로 한 번 더 정본 이동시킨다.
       { source: "/signal", destination: "/markets", permanent: true },
+      { source: "/signal/page/1", destination: "/markets", permanent: true },
       { source: "/signal/page/:n", destination: "/markets/page/:n", permanent: true },
       { source: "/signal/rss.xml", destination: "/markets/rss.xml", permanent: true },
       { source: "/signal/:year(\\d{4})/:month/:day/:slug", destination: "/markets/:year/:month/:day/:slug", permanent: true },

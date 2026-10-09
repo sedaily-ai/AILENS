@@ -2,7 +2,7 @@ import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
 import { fetchWebtoons, fetchWebtoonBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
-import { findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
+import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { WebtoonViewClient } from './WebtoonViewClient';
@@ -84,10 +84,10 @@ export async function generateMetadata({
   const headline = seoHeadline(webtoon.title);
   const title = buildPageTitle(headline, '웹툰');
   const description = buildSeoDescription(webtoon.excerpt, '요즘 이슈를 컷으로 이어 보여드려요.');
-  // 웹툰 페이지는 자기 자신이 정본이다. 목록 API는 응답 경량화로 panels를 비워 내려주지만 단건 조회에는 컷이 정상으로 오고 서버 HTML에도 컷이 있다.
-  // lens 글은 대표 이미지 폴백에만 쓴다.
+  // 정본은 같은 기사의 lens 페이지다(본문이 기사와 크게 겹쳐 신호를 한 곳으로 모은다). 페이지와 이동 경로는 독자를 위해 그대로 둔다. lens가 없으면 자기 주소.
+  // 목록 API는 응답 경량화로 panels를 비워 내려주지만 단건 조회에는 컷이 정상으로 오고 서버 HTML에도 컷이 있다.
   const lens = await findLensForChannelSlug(slug);
-  const url = `${SITE_URL}/webtoon/${slug}`;
+  const url = canonicalFromLens(lens, `/webtoon/${slug}`);
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
   const extras = mediaSeoExtras({ headline, description, url, publishedIso: webtoon.published_at || `${webtoon.date}T07:00:00+09:00`, kind: '웹툰' });
@@ -122,8 +122,9 @@ export async function generateMetadata({
 }
 
 function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
-  // generateMetadata와 같은 정본 URL(lens 페이지)을 쓴다 — 구조화 데이터의 url이 canonical과 어긋나지 않게.
+  // @id·WatchAction 대상은 이 페이지 자기 주소, mainEntityOfPage는 canonical(기사)로 둔다. 기사 페이지의 #article과 @id가 겹치지 않게 하기 위해서다.
   const url = `${SITE_URL}/webtoon/${slug}`;
+  const canonical = canonicalFromLens(lens, `/webtoon/${slug}`);
   const published = webtoon.published_at || `${webtoon.date}T07:00:00+09:00`;
   const image =
     webtoon.cover_image_url || webtoon.panels[0]?.url || lens?.cover_image_url || `${SITE_URL}/og-image.png`;
@@ -146,8 +147,8 @@ function buildJsonLd(webtoon: CmsWebtoon, slug: string, lens: CmsLens | null) {
     '@graph': [
       {
         '@type': 'Article',
-        '@id': `${url}#article`,
-        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        '@id': `${url}#webtoon`,
+        mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
         headline: seoHeadline(webtoon.title),
         description: webtoon.excerpt,
         keywords: [...new Set([seoHeadline(webtoon.title), '웹툰', '경제 웹툰', '오늘의 이슈', 'AI LENS', '서울경제'])],

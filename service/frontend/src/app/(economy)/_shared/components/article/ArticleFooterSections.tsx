@@ -6,6 +6,7 @@ import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
+import { categoryForDataLabel, displayCategoryLabel } from '@/shared/constants/econCategories';
 
 // 기사 하단 구획 — 영문 사이트(en.sedaily.com) 상세의 "More in 카테고리 / Related articles / Most read" 구조를 따라 본문 폭 안에서 더 읽을거리를 제공한다.
 // 서버 컴포넌트라 JS 없이 초기 HTML에 링크가 들어가 크롤러·내부 링크 구조에 도움이 된다.
@@ -55,8 +56,12 @@ export function ArticleFooterStyles() {
 /** 카테고리·하위 카테고리 해시태그 — 각 카테고리 아카이브로 링크. */
 export function ArticleTags({ lens }: { lens: CmsLens }) {
   const tags: { label: string; href: string }[] = [];
-  if (lens.category) tags.push({ label: lens.category, href: `/${lensCategorySlug(lens.category)}` });
-  if (lens.subcategory) tags.push({ label: lens.subcategory, href: `/${lensCategorySlug(lens.category)}` });
+  // 9개 분류(옛 이름 포함)에 없는 값이면 목록 주소가 없으므로(/news는 404) 태그를 만들지 않는다.
+  const cat = categoryForDataLabel(lens.category);
+  if (cat) {
+    tags.push({ label: cat.label, href: `/${cat.slug}` });
+    if (lens.subcategory) tags.push({ label: lens.subcategory, href: `/${cat.slug}?sub=${encodeURIComponent(lens.subcategory)}` });
+  }
   if (tags.length === 0) return null;
   return (
     <nav aria-label="기사 태그" className="af-tags" style={{ marginTop: 28 }}>
@@ -77,7 +82,7 @@ export function MoreInCategory({ lens, items }: { lens: CmsLens; items: CmsLens[
   return (
     <section className="af-sec" aria-labelledby="af-more">
       <h2 id="af-more" className="af-label">
-        {lens.category} 더 보기
+        {displayCategoryLabel(lens.category)} 더 보기
       </h2>
       <Link href={lensPath(lead)} className="af-more-lead af-link">
         <span>
@@ -102,15 +107,17 @@ export function MoreInCategory({ lens, items }: { lens: CmsLens; items: CmsLens[
                 {displayHeadline(l.headline)}
               </span>
               <span className="af-meta" style={{ display: 'block' }}>
-                {l.subcategory ?? l.category} · {dateShort(l)}
+                {l.subcategory ?? displayCategoryLabel(l.category)} · {dateShort(l)}
               </span>
             </Link>
           ))}
         </div>
       )}
-      <Link href={`/${lensCategorySlug(lens.category)}`} className="af-all">
-        {lens.category} 전체 보기 <span aria-hidden>→</span>
-      </Link>
+      {categoryForDataLabel(lens.category) && (
+        <Link href={`/${lensCategorySlug(lens.category)}`} className="af-all">
+          {displayCategoryLabel(lens.category)} 전체 보기 <span aria-hidden>→</span>
+        </Link>
+      )}
     </section>
   );
 }

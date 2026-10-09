@@ -16,11 +16,12 @@ import type { ReactNode } from "react";
 import { categoryMatches, ECON_CATEGORIES } from "@/shared/constants/econCategories";
 
 // 카테고리를 2개씩 짝지어 한 줄(2/3+1/3)로 배치한다. 순서는 ECON_CATEGORIES 정의 순서를 따른다.
-// 짝이 없는 카테고리(문화·국제)는 마지막에 단독(1개짜리) 행으로 둔다. CategoryPairRow는 slugs 1~2개를 모두 받는다.
+// 짝이 없는 카테고리(문화)는 마지막에 단독(1개짜리) 행으로 둔다. CategoryPairRow는 slugs 1~2개를 모두 받는다.
 const CATEGORY_PAIRS: readonly (readonly string[])[] = [
   ['markets', 'property'],
-  ['industry', 'finance'],
-  ['international'],
+  ['economy', 'finance'],
+  ['industry', 'politics'],
+  ['national', 'international'],
   ['culture'],
 ];
 
