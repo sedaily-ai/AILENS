@@ -57,11 +57,13 @@ def search_candidates(title):
     """제목의 앞부분으로 최근 기사를 검색한다(공개 타임머신 API, 한 번에 최대 20건)."""
     clean = re.sub(r"\s*\[[^\]]*\]\s*$", "", title)
     today = datetime.date.today()
-    for q in (clean[:38], " ".join(clean.split()[:4])[:38]):
-        qs = urllib.parse.urlencode({"q": q, "from": (today - datetime.timedelta(days=700)).isoformat(), "to": today.isoformat(), "size": 20, "sort": "relevance"})
-        with urllib.request.urlopen(f"{TIME_MACHINE}?{qs}", timeout=30) as r:
-            articles = json.loads(r.read()).get("articles", [])
-        yield q, articles
+    # 최근 700일 → 빅카인즈가 한 번에 허용하는 최대(6년 = 2190일) 순으로 넓혀 가며 찾는다(과거 기사 대응).
+    for days in (700, 2190):
+        for q in (clean[:38], " ".join(clean.split()[:4])[:38]):
+            qs = urllib.parse.urlencode({"q": q, "from": (today - datetime.timedelta(days=days)).isoformat(), "to": today.isoformat(), "size": 20, "sort": "relevance"})
+            with urllib.request.urlopen(f"{TIME_MACHINE}?{qs}", timeout=30) as r:
+                articles = json.loads(r.read()).get("articles", [])
+            yield q, articles
 
 
 def find_record(source, search=search_candidates):
