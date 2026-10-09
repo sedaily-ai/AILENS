@@ -35,10 +35,20 @@ echo "[1/5] Packaging..."
 rm -f "/tmp/$TARBALL"
 # .bak.* 에디터 잔재는 애초에 담지 않는다 — __pycache__도 제외(pip install 뒤
 # 원격에서 다시 생김).
+# 이슈 레터 샘플 입력용 파일(스크립트·시드 JSON·DDL)도 같은 묶음에 넣는다 — 서버로 따로 옮기는 단계를 없애려는 것(2026-10-09).
+# 서버에서는 /opt/lens-cms-api/{scripts,seed}/ 에 놓인다. 콘텐츠는 여기 남지 않고 스크립트가 관리 API로 RDB에 저장한다.
+STAGE="$(mktemp -d)"
+chmod 755 "$STAGE"  # mktemp 는 700 으로 만든다 — 묶음의 "." 항목이 서버의 /opt/lens-cms-api 권한을 덮어써 ssm-user 가 못 들어가게 되는 사고(2026-10-09)를 막는다
+cp ./*.py requirements.txt ecosystem.config.js "$STAGE/"
+mkdir -p "$STAGE/scripts" "$STAGE/seed"
+cp scripts/*.py "$STAGE/scripts/"
+cp ../../docs/product/모아쓰기레터/seed/issue_letters_seed.json "$STAGE/seed/"
+cp ../../docs/architecture/lens-erd-src/lens_schema_v1.38_2026-10-09.sql "$STAGE/seed/"
 tar czf "/tmp/$TARBALL" \
   --exclude="__pycache__" \
   --exclude="*.bak.*" \
-  ./*.py requirements.txt ecosystem.config.js
+  -C "$STAGE" .
+rm -rf "$STAGE"
 echo "  [OK] $(du -h "/tmp/$TARBALL" | cut -f1)"
 
 echo "[2/5] Uploading to S3..."
