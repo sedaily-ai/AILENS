@@ -12,6 +12,9 @@ export const LETTER_CSS = `
   .lt-chip[aria-pressed='true'] { background: #111827; color: #fff; }
   .lt-sec-h { margin: 36px 0 14px; font-size: 14px; font-weight: 700; color: #6b7280; }
   .lt-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .ld-sum-peek { margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #374151; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .lt-strip { display: flex; gap: 3px; width: 44px; height: 4px; margin-bottom: 2px; }
+  .lt-strip i { flex: 1; border-radius: 2px; }
   .lt-card { display: flex; flex-direction: column; gap: 10px; padding: 22px 22px 18px; border-radius: 18px; background: #fff; border: 1px solid #eceef2; box-shadow: 0 1px 2px rgba(17,24,39,.04); text-decoration: none; color: inherit; transition: box-shadow .2s ease, transform .2s ease, border-color .2s; }
   .lt-card:hover { box-shadow: 0 10px 28px rgba(17,24,39,.09); transform: translateY(-2px); border-color: #dfe3ea; }
   .lt-card-feat { padding: clamp(24px, 4vw, 36px); background: linear-gradient(180deg, #f7faff 0%, #ffffff 70%); border-color: #dbe6fb; }

@@ -35,7 +35,7 @@ function Sketch({ short, filterId }: { short: string; filterId: string }) {
   const common = { width: '100%', height: '100%', viewBox: '0 0 96 76', 'aria-hidden': true } as const;
 
   switch (short) {
-    case '레터':
+    case '읽기':
       return (
         <svg {...common}>
           <g filter={`url(#${filterId})`}>
@@ -117,7 +117,7 @@ function Sketch({ short, filterId }: { short: string; filterId: string }) {
 
 // 하단 버튼 카피 — 지금 시연 중인 형식의 "행동"으로 바뀐다.
 const CTA: Record<string, string> = {
-  레터: '지금 읽으러 갈래요',
+  읽기: '지금 읽으러 갈래요',
   웹툰: '지금 웹툰 보러 갈래요',
   팟캐스트: '지금 들으러 갈래요',
   영상: '지금 영상 보러 갈래요',

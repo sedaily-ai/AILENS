@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { AxisBadge } from './AxisBadge';
-import type { IssueLetter } from '../data/letterTypes';
+import { AXIS_META, type IssueLetter } from '../data/letterTypes';
 
 export function formatLetterDate(iso: string): string {
   const [y, m, d] = iso.split('-');
@@ -13,6 +13,11 @@ export function LetterCard({ letter, featured = false }: { letter: IssueLetter; 
   const tags = featured || !letter.cardTags ? [...new Set(letter.axisLabels.map((a) => a.axis))].map((axis) => ({ axis, label: undefined as string | undefined })) : letter.cardTags;
   return (
     <Link href={`/letter/${encodeURIComponent(letter.slug)}`} className={`lt-card${featured ? ' lt-card-feat' : ''}`}>
+      <span className="lt-strip" aria-hidden>
+        {[...new Set(letter.axisLabels.map((l) => l.axis))].map((axis) => (
+          <i key={axis} style={{ background: AXIS_META[axis].tone }} />
+        ))}
+      </span>
       <div className="lt-card-cat">
         {featured && <span className="lt-today">오늘의 레터</span>}
         <span className="lt-moa">모아쓰기</span>

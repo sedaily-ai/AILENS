@@ -62,7 +62,7 @@ const LENS_BORDER_TINTS = ['#ddd6fe', '#fecdd3', '#a7f3d0', '#fde68a'] as const;
 export const LENS_PERSPECTIVES: readonly LensPerspective[] = [
   {
     ordinal: '①',
-    short: '레터',
+    short: '읽기',
     full: '차분히 읽고 싶은 사람',
     tagline: '구조와 흐름까지 제대로 알고 싶다면',
     duration: '2분 읽기',

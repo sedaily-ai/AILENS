@@ -32,7 +32,7 @@ function Segments({ parts, letterSlug }: { parts: LetterSegment[]; letterSlug: s
 }
 
 export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: IssueLetter; prevSlug?: string; nextSlug?: string }) {
-  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [ctaMsg, setCtaMsg] = useState(false);
 
   return (
@@ -75,12 +75,14 @@ export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: Issue
             {summaryOpen ? '접기' : '펼치기'}
           </button>
         </div>
-        {summaryOpen && (
+        {summaryOpen ? (
           <ol>
             {letter.summary.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
           </ol>
+        ) : (
+          <p className="ld-sum-peek">{letter.summary[0]}</p>
         )}
       </section>
 
