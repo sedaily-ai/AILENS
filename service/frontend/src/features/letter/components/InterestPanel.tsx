@@ -5,6 +5,7 @@ import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import type { IssueLetter } from '../data/letterTypes';
 import { fetchBundles, fetchMyFeed, fetchMyInterests, fetchTopics, saveMyInterests, type Bundle, type InterestItem, type TopicOption } from '../data/interestApi';
 import { LetterCard } from './LetterCard';
+import { SubscribeForm } from './SubscribeForm';
 
 // 서버 분류 slug(markets 등)와 사이트 분류 이름(시그널 등). 분류 정본은 shared/constants/econCategories.ts 다.
 const CATEGORY_NAMES: Record<string, string> = {
@@ -115,6 +116,7 @@ export function InterestPanel() {
           ) : (
             <p className="lt-empty">지금 관심사와 겹치는 레터가 아직 없어요. 새 레터가 나오면 이곳에 먼저 보여드려요.</p>
           )}
+          <SubscribeForm interests={saved} />
         </>
       )}
 

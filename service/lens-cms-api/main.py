@@ -9,6 +9,7 @@ Lambda 버전과의 차이는 순수 인프라 계층뿐(커넥션 풀 재사용
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import threading
@@ -30,6 +31,7 @@ import community_repo
 import config_repo
 import daily_questions_repo
 import interests_repo
+import letter_subscriptions_repo
 import issue_letters_repo
 import topics_repo
 from letter_errors import LetterError
@@ -516,6 +518,27 @@ def get_my_feed(x_voter_id: Optional[str] = Header(default=None), limit: int = Q
     return JSONResponse(_letter_call(interests_repo.feed_for_reader, _reader(x_voter_id), limit), headers={"Cache-Control": "no-store"})
 
 
+# ── 이메일 구독(Phase 2) ─ 가입 → 메일 확인 → 수신거부. 응답으로 주소의 가입 여부를 알리지 않는다.
+@app.post("/api/v2/issue-letters/subscriptions")
+def post_letter_subscription(payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
+    rh = None
+    if x_voter_id:
+        rh = _letter_call(interests_repo.reader_hash, x_voter_id)
+    result = _letter_call(letter_subscriptions_repo.subscribe, payload.get("email"), payload.get("interests"), payload.get("frequency"),
+                          payload.get("send_hour"), payload.get("consent"), rh)
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v2/issue-letters/subscriptions/confirm")
+def post_letter_subscription_confirm(payload: Dict[str, Any] = Body(...)):
+    return JSONResponse(_letter_call(letter_subscriptions_repo.confirm, payload.get("token")), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v2/issue-letters/subscriptions/unsubscribe")
+def post_letter_subscription_unsubscribe(payload: Dict[str, Any] = Body(...)):
+    return JSONResponse(_letter_call(letter_subscriptions_repo.unsubscribe, payload.get("token")), headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/v2/issue-letters/{slug}")
 def get_issue_letter(slug: str):
     letter = _letter_call(issue_letters_repo.get_published, slug)
@@ -535,6 +558,26 @@ def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_vot
     if not fresh:
         return JSONResponse({**result, "already_voted": True}, status_code=409, headers={"Cache-Control": "no-store"})
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/letter-sends")
+def admin_letter_send(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """다이제스트 발송. dry_run(기본 true)이면 대상과 담길 레터만 보여 주고 아무것도 쓰지·보내지 않는다."""
+    _check_admin_token(x_internal_token)
+    kst = datetime.timezone(datetime.timedelta(hours=9))
+    today = datetime.datetime.now(kst).date()
+    try:
+        send_date = datetime.date.fromisoformat(payload["date"]) if payload.get("date") else today
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date 는 YYYY-MM-DD 형식이어야 합니다")
+    return _letter_call(letter_subscriptions_repo.run_send, str(payload.get("kind") or "daily"), send_date, int(payload.get("hour") or 8),
+                        payload.get("dry_run", True) is not False)
+
+
+@app.post("/admin/email-suppressions")
+def admin_email_suppression(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return _letter_call(letter_subscriptions_repo.add_suppression, payload.get("email"), str(payload.get("reason") or "manual"))
 
 
 @app.put("/admin/interest-bundles")

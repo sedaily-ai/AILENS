@@ -44,6 +44,19 @@ export const LETTER_CSS = `
   .lt-int-details summary { cursor: pointer; font-size: 14px; font-weight: 600; color: #374151; }
   .lt-int-group .lt-int-chips { margin: 8px 0 4px; }
   .lt-int-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+  .lt-sub-box { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 20px 0 8px; padding: 18px 20px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fafbfc; }
+  .lt-sub-box strong { font-size: 15px; color: #111827; }
+  .lt-sub-box p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: #4b5563; }
+  .lt-sub-form { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 14px; }
+  .lt-sub-form { flex-wrap: nowrap; }
+  .lt-sub-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .lt-sub-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: #374151; flex: 1 1 160px; }
+  .lt-sub-form > .lt-sub-field, .lt-sub-form > .lt-sub-row { flex: 0 0 auto; }
+  .lt-sub-field input, .lt-sub-field select { height: 40px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 10px; font: inherit; font-size: 14px; background: #fff; font-weight: 400; }
+  .lt-sub-consent { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.6; color: #4b5563; }
+  .lt-sub-consent input { margin-top: 4px; }
+  .lt-sub-consent a { color: #2563eb; text-decoration: underline; }
+  .lt-sub-result { flex-direction: column; align-items: flex-start; padding: 28px; }
   .lt-int-err { margin: 12px 0 0; font-size: 13px; color: #b91c1c; }
   .lt-reason { margin: 2px 0 0; font-size: 13px; font-weight: 600; color: #1f56c0; }
   .lt-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: -8px 0 24px; }
