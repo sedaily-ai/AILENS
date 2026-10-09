@@ -21,63 +21,8 @@ VIDEO_DIR = _ROOT / "video"
 
 _NON_SLUG = re.compile(r"[^0-9A-Za-z가-힣]+")
 
-# 사이트 6개 카테고리로의 매핑 — display_category()가 쓴다.
-CATEGORY_MAP = {
-    "증권": "증시",
-    "부동산": "부동산",
-    "산업": "산업",
-    "금융": "금융·정책",
-    "국제": "국제",
-    "문화·라이프": "문화",
-}
-
-# "재테크"(사이트 nav 7번째 탭, /investing)는 원문 최상위 카테고리에 없다.
-# "산업,투자·재무,투자·재무"·"Signal,Finance,투자"처럼 하위 세그먼트에만 투자 관련 태그가
-# 붙으므로 display_category()의 2차 패스가 하위 세그먼트에서 찾는다.
-_INVESTING_SUBCATEGORIES = {"투자", "투자·재무", "금융·투자"}
-
-# 하위 카테고리 taxonomy — service/frontend/src/shared/constants/econSubcategories.ts와
-# 같은 값이다(의도적 중복). 본지 GNB 메뉴 구조를 따른다. 원문 XML의 category 2번째
-# 세그먼트(예: "증권,국내증시,...")는 이 taxonomy와 이름이 맞지 않는 옛 체계라
-# 규칙 매핑 대신 LLM으로 분류한다. 탭은 값이 있을 때만 노출되므로 분량이 얇은 분류도 안전하다.
-SUBCATEGORY_MAP = {
-    "증시": ["국내증시", "해외증시", "IB&Deal", "펀드·채권", "정책", "증권일반"],
-    "산업": ["대기업", "중기·IT", "유통·생활", "바이오", "기업인", "투자·재무", "기업일반"],
-    "부동산": ["정책", "부동산일반", "건설업계"],
-    "금융·정책": ["은행", "보험", "카드", "가상자산", "금융일반"],
-    "국제": ["미국·중남미", "일본·중국", "아시아·호주", "유럽", "중동·아프리카"],
-    "문화": ["전시·공연", "영화·미디어", "출판", "여행·레저", "문화일반", "아트씽"],
-}
-
-# 전용 profile 없이 facts_extract.py와 같은 profile(lens-letters-sonnet-46)을 재사용한다.
-_SUBCATEGORY_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"
-
-
-def display_subcategory(category: str | None, headline: str, context: str) -> str | None:
-    """발행 시 body_inline.subcategory에 넣을 하위 카테고리.
-    category가 SUBCATEGORY_MAP에 없으면(또는 None) 분류하지 않고 None을 돌려준다 —
-    빈 탭을 만들지 않기 위한 제한이다. Bedrock 호출이 실패해도 None으로 폴백한다
-    (이 필드가 없어도 발행은 막히면 안 된다)."""
-    options = SUBCATEGORY_MAP.get(category or "")
-    if not options:
-        return None
-    try:
-        sys.path.insert(0, str(Path(__file__).parent))
-        from bedrock_client import call_text  # noqa: lazy — 실패해도 발행이 안 막히게
-
-        system = (
-            f"다음 기사가 '{category}' 카테고리 안에서 어느 하위 분류에 가장 가까운지 "
-            f"선택지 중 딱 하나만 골라 그 단어 그대로만 출력하세요. 다른 설명은 쓰지 마세요.\n"
-            f"선택지: {', '.join(options)}"
-        )
-        user = f"제목: {headline}\n요약: {context}".strip()
-        raw = call_text(system, user, model=_SUBCATEGORY_MODEL, max_tokens=20).strip()
-        for opt in options:
-            if opt in raw:
-                return opt
-    except Exception as e:
-        print(f"[display_subcategory] 분류 실패, 생략: {e}")
-    return None
+# 분류(대분류·하위 분류)는 common/taxonomy.py의 classify_article()이 정한다(2026-10-09 분류 개편, docs/product/분류체계/README.md).
+# 예전의 CATEGORY_MAP·SUBCATEGORY_MAP·display_category()·display_subcategory()는 정치·사회·경제를 분류 없음으로 남기던 규칙이라 없앴다.
 
 
 def load_module(name: str, file_path: Path):
@@ -91,27 +36,6 @@ def load_module(name: str, file_path: Path):
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
-
-
-def display_category(article: dict) -> str | None:
-    """발행 시 body_inline.category에 넣을 사이트 카테고리 라벨.
-
-    top_category는 XML의 첫 번째 category 태그만 보지만 기사는 태그를 여러 개 다는
-    경우가 흔하다(예: "경제,사회,금융,증권,산업,국제"). 그래서 전체 태그
-    (`article["categories"]`)를 순서대로 훑어 사이트 6개 카테고리와 일치하는 첫 값을 쓴다.
-    경제 카테고리 태그가 없는 기사(정치·사회·오피니언)는 대응 페이지가 없으므로 None이다.
-    "재테크"는 1차 패스(최상위 태그)로 찾을 수 없어, 1차에서 걸리지 않으면
-    하위 세그먼트에서 투자 관련 태그를 찾는다."""
-    cats = article.get("categories") or [article.get("top_category", "")]
-    for c in cats:
-        top = c.split(",")[0]
-        if top in CATEGORY_MAP:
-            return CATEGORY_MAP[top]
-    for c in cats:
-        segments = c.split(",")
-        if any(seg in _INVESTING_SUBCATEGORIES for seg in segments[1:]):
-            return "재테크"
-    return None
 
 
 def slugify(publish_date: str, headline: str) -> str:
@@ -669,6 +593,14 @@ def publish_article(
 
         publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"
         clean_source_url = (source_url or "").split("?")[0]
+        # 분류 실패가 발행을 막으면 안 된다 — 모듈을 못 불러오거나 예외가 나도 분류 없음으로 발행하고 나중에 재분류(scripts/reclassify_*.py)로 채운다.
+        try:
+            from taxonomy import classify_article  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
+
+            category, subcategory = classify_article(article, letter_title, article.get("sub_title") or "")
+        except Exception as e:  # noqa: BLE001
+            print(f"[{log_prefix}] 분류 실패 — 분류 없이 발행: {e}")
+            category, subcategory = None, None
         data = {
             "headline": letter_title,
             "subtitle": article["sub_title"],
@@ -682,8 +614,8 @@ def publish_article(
                 "body": [], "key_points": [], "keywords": [], "images": [],
                 "lenses": lenses,
                 "photo_image_url": article["photo_url"],
-                "category": (category := display_category(article)),
-                "subcategory": display_subcategory(category, letter_title, article.get("sub_title") or ""),
+                "category": category,
+                "subcategory": subcategory,
                 "paper_section": paper_section,
                 "display_order": display_order,
                 "needs_video": video is None,
