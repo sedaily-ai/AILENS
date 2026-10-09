@@ -61,8 +61,8 @@ export async function saveMyInterests(items: InterestItem[]): Promise<InterestIt
 }
 
 /** 관심과 겹치는 레터(점수순, 이유 포함). 관심이 없거나 실패하면 빈 배열. */
-export async function fetchMyFeed(): Promise<IssueLetter[]> {
-  const data = await getJson<{ has_interests: boolean; letters: FeedItem[] }>('/me/feed?limit=6', true);
+export async function fetchMyFeed(limit = 6): Promise<IssueLetter[]> {
+  const data = await getJson<{ has_interests: boolean; letters: FeedItem[] }>(`/me/feed?limit=${limit}`, true);
   return (data?.letters ?? []).map((f) => ({
     slug: f.slug, issueNumber: f.issue_no, title: f.title, deck: f.deck,
     axisLabels: AXIS_ORDER.filter((a) => f.axes.includes(a)).map((axis) => ({ axis, label: '' })),
