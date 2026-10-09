@@ -30,6 +30,10 @@ import type {
   SelectionRunsDayResponse,
   SelectionArticle,
   SelectionVerdict,
+  IssueLetterStatus,
+  IssueLetterSummary,
+  IssueLetterDetail,
+  IssueLetterDetailResponse,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -494,6 +498,28 @@ export const adminApi = {
     request<{ ok: boolean }>(`/admin/quiz/${encodeURIComponent(id)}`, {
       method: "DELETE",
     }),
+
+  // 이슈 레터(모아쓰기 레터) — 템플릿 v2 가 만든 저장용 JSON 을 붙여넣어 초안 저장 → 검수 요청 → 발행.
+  // 검증 실패 사유(입력 오류·발행 규칙)는 서버 문장이 AdminApiError.message 로 온다.
+  listIssueLetters: (params?: { status?: IssueLetterStatus; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return request<{ letters: IssueLetterSummary[] }>(`/admin/issue-letters${suffix}`);
+  },
+  getIssueLetter: (id: number) =>
+    request<IssueLetterDetailResponse>(`/admin/issue-letters/${id}`),
+  createIssueLetter: (input: unknown) =>
+    request<{ letter: IssueLetterDetail }>("/admin/issue-letters", { method: "POST", body: JSON.stringify(input) }),
+  updateIssueLetter: (id: number, input: unknown) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+  submitIssueLetter: (id: number) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}/submit`, { method: "POST" }),
+  publishIssueLetter: (id: number) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}/publish`, { method: "POST" }),
+  archiveIssueLetter: (id: number) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}/archive`, { method: "POST" }),
 
   // AI letters — 생성은 없다. 파이프라인 산출물을 사후 편집·내림만 한다.
   listLetters: (date: string) =>
