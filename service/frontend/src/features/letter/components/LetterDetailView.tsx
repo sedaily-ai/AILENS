@@ -49,6 +49,15 @@ export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: Issue
         </div>
         <h1 className="ld-title">{letter.title}</h1>
         <p className="ld-deck">{letter.deck}</p>
+        {letter.topics && letter.topics.length > 0 && (
+          <ul className="ld-topics" aria-label="이 레터의 주제">
+            {letter.topics.map((name) => (
+              <li key={name} className="lt-topic">
+                {name}
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="ld-axlist" aria-label="이 레터의 3가지 관점">
           {letter.axisLabels.map((a) => (
             <li key={a.axis + a.label}>

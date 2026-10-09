@@ -11,7 +11,7 @@ export const LETTER_CSS = `
   .lt-chip:hover { background: #e4e9f2; }
   .lt-chip[aria-pressed='true'] { background: #111827; color: #fff; }
   .lt-sec-h { margin: 36px 0 14px; font-size: 14px; font-weight: 700; color: #6b7280; }
-  .lt-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+  .lt-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
   .ld-sum-peek { margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: #374151; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .lt-strip { display: flex; gap: 3px; width: 44px; height: 4px; margin-bottom: 2px; }
   .lt-strip i { flex: 1; border-radius: 2px; }
@@ -27,6 +27,8 @@ export const LETTER_CSS = `
   .lt-card-deck { margin: 0; font-size: 14.5px; line-height: 1.65; color: #4b5563; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .lt-card-feat .lt-card-deck { font-size: 16px; -webkit-line-clamp: 4; }
   .lt-axes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+  .lt-topic { padding: 3px 10px; border-radius: 999px; background: #f1f5f9; color: #334155; font-size: 12.5px; font-weight: 600; }
+  .ld-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
   .lt-count { font-size: 12.5px; font-weight: 700; color: #374151; padding-left: 4px; }
   .lt-card-meta { display: flex; align-items: center; gap: 6px; margin-top: auto; padding-top: 6px; font-size: 12.5px; color: #6b7280; font-variant-numeric: tabular-nums; }
   .lt-more { margin-left: auto; font-weight: 700; color: #2f5fcf; }

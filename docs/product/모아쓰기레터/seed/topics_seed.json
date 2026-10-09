@@ -1,0 +1,772 @@
+[
+ {
+  "slug": "kospi",
+  "name": "코스피",
+  "kind": "topic",
+  "category_slug": "markets",
+  "aliases": [
+   "코스피지수",
+   "코스닥"
+  ]
+ },
+ {
+  "slug": "samsung-electronics",
+  "name": "삼성전자",
+  "kind": "company",
+  "category_slug": "markets",
+  "aliases": [
+   "삼전"
+  ]
+ },
+ {
+  "slug": "sk-hynix",
+  "name": "SK하이닉스",
+  "kind": "company",
+  "category_slug": "markets",
+  "aliases": [
+   "하이닉스"
+  ]
+ },
+ {
+  "slug": "etf",
+  "name": "ETF",
+  "kind": "topic",
+  "category_slug": "markets",
+  "aliases": [
+   "상장지수펀드"
+  ]
+ },
+ {
+  "slug": "ipo",
+  "name": "공모주·IPO",
+  "kind": "topic",
+  "category_slug": "markets",
+  "aliases": [
+   "공모주",
+   "기업공개",
+   "IPO"
+  ]
+ },
+ {
+  "slug": "dividend",
+  "name": "배당",
+  "kind": "topic",
+  "category_slug": "markets",
+  "aliases": [
+   "배당주",
+   "배당금"
+  ]
+ },
+ {
+  "slug": "earnings",
+  "name": "기업 실적",
+  "kind": "topic",
+  "category_slug": "markets",
+  "aliases": [
+   "영업이익",
+   "분기 실적",
+   "실적 발표",
+   "영업익"
+  ]
+ },
+ {
+  "slug": "theme-stock",
+  "name": "테마주",
+  "kind": "topic",
+  "category_slug": "markets",
+  "aliases": [
+   "묻지마 투자",
+   "관련주"
+  ]
+ },
+ {
+  "slug": "rates",
+  "name": "금리",
+  "kind": "topic",
+  "category_slug": "finance",
+  "aliases": [
+   "기준금리",
+   "금리 인상",
+   "금리 인하",
+   "금리인상",
+   "금리인하"
+  ]
+ },
+ {
+  "slug": "fx",
+  "name": "환율",
+  "kind": "topic",
+  "category_slug": "finance",
+  "aliases": [
+   "원달러",
+   "원/달러",
+   "달러 환율"
+  ]
+ },
+ {
+  "slug": "bank",
+  "name": "은행",
+  "kind": "topic",
+  "category_slug": "finance",
+  "aliases": [
+   "시중은행"
+  ]
+ },
+ {
+  "slug": "insurance",
+  "name": "보험",
+  "kind": "topic",
+  "category_slug": "finance",
+  "aliases": [
+   "보험사"
+  ]
+ },
+ {
+  "slug": "crypto",
+  "name": "가상자산",
+  "kind": "topic",
+  "category_slug": "finance",
+  "aliases": [
+   "암호화폐",
+   "비트코인",
+   "코인"
+  ]
+ },
+ {
+  "slug": "pension",
+  "name": "연금",
+  "kind": "topic",
+  "category_slug": "finance",
+  "aliases": [
+   "국민연금",
+   "퇴직연금"
+  ]
+ },
+ {
+  "slug": "loan",
+  "name": "대출",
+  "kind": "topic",
+  "category_slug": "finance",
+  "aliases": [
+   "가계대출",
+   "주택담보대출",
+   "대출 규제"
+  ]
+ },
+ {
+  "slug": "fed",
+  "name": "연준",
+  "kind": "topic",
+  "category_slug": "international",
+  "aliases": [
+   "Fed",
+   "연방준비제도",
+   "FOMC",
+   "연준 의사록"
+  ]
+ },
+ {
+  "slug": "inflation",
+  "name": "물가",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "소비자물가",
+   "인플레이션"
+  ]
+ },
+ {
+  "slug": "growth",
+  "name": "경제성장률",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "성장률",
+   "GDP"
+  ]
+ },
+ {
+  "slug": "consumption",
+  "name": "소비",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "소비 심리",
+   "소비 동향"
+  ]
+ },
+ {
+  "slug": "employment",
+  "name": "고용",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "일자리",
+   "취업",
+   "채용",
+   "실업률"
+  ]
+ },
+ {
+  "slug": "minimum-wage",
+  "name": "최저임금",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "최저 임금"
+  ]
+ },
+ {
+  "slug": "tax",
+  "name": "세금",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "세제",
+   "세제 개편",
+   "증세",
+   "감세"
+  ]
+ },
+ {
+  "slug": "fiscal",
+  "name": "재정",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "추경",
+   "정부 예산",
+   "국가 재정"
+  ]
+ },
+ {
+  "slug": "energy",
+  "name": "에너지",
+  "kind": "topic",
+  "category_slug": "economy",
+  "aliases": [
+   "전력",
+   "원전",
+   "유가"
+  ]
+ },
+ {
+  "slug": "real-estate",
+  "name": "부동산 시장",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "집값",
+   "주택 시장",
+   "아파트값"
+  ]
+ },
+ {
+  "slug": "jeonse",
+  "name": "전세",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "월세",
+   "전월세",
+   "전세사기"
+  ]
+ },
+ {
+  "slug": "housing-subscription",
+  "name": "청약",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "분양"
+  ]
+ },
+ {
+  "slug": "redevelopment",
+  "name": "재건축·재개발",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "재건축",
+   "재개발"
+  ]
+ },
+ {
+  "slug": "auction",
+  "name": "경매",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "부동산 경매",
+   "낙찰가율"
+  ]
+ },
+ {
+  "slug": "rent",
+  "name": "임대료",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "상가 임대료",
+   "임대차",
+   "권리금"
+  ]
+ },
+ {
+  "slug": "commercial-district",
+  "name": "상권",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "상가",
+   "공실"
+  ]
+ },
+ {
+  "slug": "gentrification",
+  "name": "젠트리피케이션",
+  "kind": "topic",
+  "category_slug": "property",
+  "aliases": [
+   "젠트리"
+  ]
+ },
+ {
+  "slug": "semiconductor",
+  "name": "반도체",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "HBM",
+   "파운드리"
+  ]
+ },
+ {
+  "slug": "ai",
+  "name": "인공지능",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "AI",
+   "생성형 AI",
+   "생성형AI"
+  ]
+ },
+ {
+  "slug": "battery",
+  "name": "배터리",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "2차전지",
+   "이차전지"
+  ]
+ },
+ {
+  "slug": "auto",
+  "name": "자동차",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "전기차",
+   "완성차"
+  ]
+ },
+ {
+  "slug": "bio",
+  "name": "바이오",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "제약",
+   "신약"
+  ]
+ },
+ {
+  "slug": "startup",
+  "name": "스타트업",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "벤처",
+   "창업"
+  ]
+ },
+ {
+  "slug": "venture-investment",
+  "name": "벤처투자",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "투자 유치",
+   "VC"
+  ]
+ },
+ {
+  "slug": "platform",
+  "name": "플랫폼",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "네이버",
+   "카카오"
+  ]
+ },
+ {
+  "slug": "k-beauty",
+  "name": "K뷰티",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "화장품",
+   "뷰티",
+   "코스메틱"
+  ]
+ },
+ {
+  "slug": "amorepacific",
+  "name": "아모레퍼시픽",
+  "kind": "company",
+  "category_slug": "industry",
+  "aliases": [
+   "아모레",
+   "라네즈",
+   "설화수"
+  ]
+ },
+ {
+  "slug": "retail",
+  "name": "유통",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "백화점",
+   "이커머스",
+   "편의점"
+  ]
+ },
+ {
+  "slug": "food-service",
+  "name": "외식업",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "자영업",
+   "프랜차이즈",
+   "카페"
+  ]
+ },
+ {
+  "slug": "global-rebalancing",
+  "name": "글로벌 리밸런싱",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "리밸런싱",
+   "해외 사업 재편"
+  ]
+ },
+ {
+  "slug": "marine",
+  "name": "해양·수산",
+  "kind": "topic",
+  "category_slug": "industry",
+  "aliases": [
+   "수산",
+   "상어",
+   "해수온도"
+  ]
+ },
+ {
+  "slug": "us",
+  "name": "미국",
+  "kind": "place",
+  "category_slug": "international",
+  "aliases": [
+   "美",
+   "미국 경제"
+  ]
+ },
+ {
+  "slug": "china",
+  "name": "중국",
+  "kind": "place",
+  "category_slug": "international",
+  "aliases": [
+   "中"
+  ]
+ },
+ {
+  "slug": "japan",
+  "name": "일본",
+  "kind": "place",
+  "category_slug": "international",
+  "aliases": [
+   "日"
+  ]
+ },
+ {
+  "slug": "india",
+  "name": "인도",
+  "kind": "place",
+  "category_slug": "international",
+  "aliases": [
+   "印"
+  ]
+ },
+ {
+  "slug": "philippines",
+  "name": "필리핀",
+  "kind": "place",
+  "category_slug": "international",
+  "aliases": []
+ },
+ {
+  "slug": "europe",
+  "name": "유럽",
+  "kind": "place",
+  "category_slug": "international",
+  "aliases": [
+   "EU",
+   "유럽연합"
+  ]
+ },
+ {
+  "slug": "middle-east",
+  "name": "중동",
+  "kind": "place",
+  "category_slug": "international",
+  "aliases": []
+ },
+ {
+  "slug": "trade",
+  "name": "무역·통상",
+  "kind": "topic",
+  "category_slug": "international",
+  "aliases": [
+   "수출",
+   "수입",
+   "무역수지",
+   "통상"
+  ]
+ },
+ {
+  "slug": "tariff",
+  "name": "관세",
+  "kind": "topic",
+  "category_slug": "international",
+  "aliases": [
+   "상호관세",
+   "관세 협상"
+  ]
+ },
+ {
+  "slug": "national-assembly",
+  "name": "국회",
+  "kind": "topic",
+  "category_slug": "politics",
+  "aliases": [
+   "여야",
+   "입법"
+  ]
+ },
+ {
+  "slug": "election",
+  "name": "선거",
+  "kind": "topic",
+  "category_slug": "politics",
+  "aliases": [
+   "총선",
+   "지방선거"
+  ]
+ },
+ {
+  "slug": "diplomacy",
+  "name": "외교·안보",
+  "kind": "topic",
+  "category_slug": "politics",
+  "aliases": [
+   "외교",
+   "안보"
+  ]
+ },
+ {
+  "slug": "regulation",
+  "name": "규제",
+  "kind": "topic",
+  "category_slug": "politics",
+  "aliases": [
+   "규제 개혁",
+   "규제 완화"
+  ]
+ },
+ {
+  "slug": "labor",
+  "name": "노동",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "노조",
+   "파업",
+   "노동조합"
+  ]
+ },
+ {
+  "slug": "education",
+  "name": "교육",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "입시",
+   "대학",
+   "교육비"
+  ]
+ },
+ {
+  "slug": "low-birth",
+  "name": "저출생",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "출산",
+   "저출산"
+  ]
+ },
+ {
+  "slug": "aging",
+  "name": "고령화",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "고령",
+   "노후",
+   "은퇴"
+  ]
+ },
+ {
+  "slug": "safety",
+  "name": "안전·재난",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "사고",
+   "재난",
+   "범죄"
+  ]
+ },
+ {
+  "slug": "climate",
+  "name": "환경·기후",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "기후변화",
+   "탄소중립",
+   "기후"
+  ]
+ },
+ {
+  "slug": "local-government",
+  "name": "지방자치",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "지자체",
+   "구청"
+  ]
+ },
+ {
+  "slug": "fake-news",
+  "name": "가짜뉴스",
+  "kind": "topic",
+  "category_slug": "national",
+  "aliases": [
+   "허위정보",
+   "팩트체크",
+   "딥페이크",
+   "AI 가짜"
+  ]
+ },
+ {
+  "slug": "travel",
+  "name": "여행·관광",
+  "kind": "topic",
+  "category_slug": "culture",
+  "aliases": [
+   "관광",
+   "여행",
+   "관광객",
+   "외국인 관광객"
+  ]
+ },
+ {
+  "slug": "neighborhood",
+  "name": "도시·동네",
+  "kind": "topic",
+  "category_slug": "culture",
+  "aliases": [
+   "동네",
+   "핫플",
+   "골목"
+  ]
+ },
+ {
+  "slug": "hanok",
+  "name": "한옥",
+  "kind": "topic",
+  "category_slug": "culture",
+  "aliases": [
+   "전통 한옥"
+  ]
+ },
+ {
+  "slug": "content",
+  "name": "콘텐츠",
+  "kind": "topic",
+  "category_slug": "culture",
+  "aliases": [
+   "K콘텐츠",
+   "드라마",
+   "영화",
+   "K팝"
+  ]
+ },
+ {
+  "slug": "food-culture",
+  "name": "음식·맛집",
+  "kind": "topic",
+  "category_slug": "culture",
+  "aliases": [
+   "맛집",
+   "포장마차",
+   "미식"
+  ]
+ },
+ {
+  "slug": "jongno3ga",
+  "name": "종로3가",
+  "kind": "place",
+  "category_slug": "culture",
+  "aliases": [
+   "종로3가역"
+  ]
+ },
+ {
+  "slug": "ikseon-dong",
+  "name": "익선동",
+  "kind": "place",
+  "category_slug": "culture",
+  "aliases": [
+   "익선동 한옥"
+  ]
+ },
+ {
+  "slug": "seongsu",
+  "name": "성수동",
+  "kind": "place",
+  "category_slug": "property",
+  "aliases": [
+   "성수"
+  ]
+ }
+]

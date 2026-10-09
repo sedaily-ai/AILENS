@@ -44,6 +44,8 @@ mkdir -p "$STAGE/scripts" "$STAGE/seed"
 cp scripts/*.py "$STAGE/scripts/"
 cp ../../docs/product/모아쓰기레터/seed/issue_letters_seed.json "$STAGE/seed/"
 cp ../../docs/architecture/lens-erd-src/lens_schema_v1.38_2026-10-09.sql "$STAGE/seed/"
+cp ../../docs/product/모아쓰기레터/seed/topics_seed.json "$STAGE/seed/"
+cp ../../docs/architecture/lens-erd-src/lens_schema_v1.42_2026-10-09.sql "$STAGE/seed/"
 tar czf "/tmp/$TARBALL" \
   --exclude="__pycache__" \
   --exclude="*.bak.*" \

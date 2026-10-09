@@ -679,6 +679,8 @@ export interface IssueLetterDetail extends IssueLetterSummary {
   /** 사이트 분류 slug (첫 번째가 주 분류) */
   categories: string[];
   category_names: string[];
+  /** 주제 태그(주제 사전 항목). 주 주제가 앞에 온다. */
+  topics: { slug: string; name: string; kind: string; is_primary: boolean }[];
   sections: {
     axis: "news" | "substance" | "other";
     axis_label: string | null;

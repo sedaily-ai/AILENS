@@ -31,6 +31,7 @@ const EXAMPLE = `{
   "editor_note": "에디터 한마디(본문 사실의 연결 정리, 2문장 이내)",
   "read_minutes": 5,
   "categories": ["markets", "national"],
+  "topics": ["금리", "삼성전자"],
   "sections": [
     { "axis": "news", "axis_label": "짧은 설명", "heading": "소제목", "key_line": "핵심 한 줄",
       "paragraphs": [["문장 ", { "text": "링크 걸 문구", "href": "https://www.sedaily.com/article/..." }, " 이어지는 문장"]] }
@@ -51,6 +52,7 @@ function toInputJson(l: IssueLetterDetail): string {
       editor_note: l.editor_note ?? "",
       read_minutes: l.read_minutes,
       categories: l.categories,
+      topics: l.topics.map((t) => t.name),
       sections: l.sections.map((s) => ({ axis: s.axis, axis_label: s.axis_label, heading: s.heading, key_line: s.key_line, paragraphs: s.paragraphs })),
       sources: l.sources.map((s) => ({ url: s.url, axes: s.axes })),
       poll: l.poll
@@ -164,7 +166,7 @@ function IssueLetterEditPage() {
           </Link>
         </div>
         <p className="text-[13px] leading-[1.6]" style={{ color: "var(--text-muted)" }}>
-          레터 생성 프롬프트 템플릿 v2 의 출력(1) &quot;저장용 JSON&quot;을 그대로 붙여넣으세요. 저장하면 초안이 만들어집니다. 출처 주소는 위 검색에서 "후보로 담은" 서울경제 기사와 대조해 연결하고, 담지 않은 주소는 거부됩니다.
+          레터 생성 프롬프트 템플릿 v2 의 출력(1) &quot;저장용 JSON&quot;을 그대로 붙여넣으세요. 저장하면 초안이 만들어집니다. 주제 태그(topics)는 주제 사전의 이름·별칭만 쓸 수 있고, 사전에 없는 태그는 거부됩니다. 출처 주소는 위 검색에서 &quot;후보로 담은&quot; 서울경제 기사와 대조해 연결하고, 담지 않은 주소는 거부됩니다.
         </p>
         <IssueLetterCandidateSearch />
         {error && <ErrorNote message={error} />}
@@ -306,6 +308,18 @@ function IssueLetterEditPage() {
           {letter.category_names.join(" · ")} · 약 {letter.read_minutes}분
         </div>
         <p className="text-[15px] leading-[1.7] text-[var(--text-primary)]">{letter.deck}</p>
+        <div className="flex flex-wrap gap-1.5 items-center" aria-label="주제 태그">
+          <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>주제</span>
+          {letter.topics.length === 0 ? (
+            <span className="text-[12.5px]" style={{ color: "var(--danger)" }}>없음 — 발행 전에 주제 사전의 이름으로 1개 이상 필요합니다</span>
+          ) : (
+            letter.topics.map((t) => (
+              <span key={t.slug} className={`ui-badge ${t.is_primary ? "ui-badge-published" : "ui-badge-draft"}`} title={t.is_primary ? "주 주제" : "보조 주제"}>
+                {t.name}
+              </span>
+            ))
+          )}
+        </div>
 
         <div>
           <h3 className="text-[13px] font-semibold mb-1.5">1분 요약</h3>

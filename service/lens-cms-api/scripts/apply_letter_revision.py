@@ -108,7 +108,7 @@ def main():
 
     code, res = api("GET", "/admin/issue-letters?limit=200")
     cur = next((l for l in res.get("letters", []) if l["slug"] == args.slug), None) if code == 200 else None
-    data = {k: letter[k] for k in ("slug", "title", "deck", "summary", "editor_note", "read_minutes", "categories", "sections", "poll")}
+    data = {k: letter[k] for k in ("slug", "title", "deck", "summary", "editor_note", "read_minutes", "categories", "topics", "sections", "poll") if k in letter}
     data["sources"] = [{"url": s["url"], "axes": s["axes"]} for s in letter["sources"]]
     if cur is None:
         code, res = api("POST", "/admin/issue-letters", {"data": data, "actor": {}})

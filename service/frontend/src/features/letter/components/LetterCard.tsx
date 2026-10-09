@@ -20,16 +20,19 @@ export function LetterCard({ letter, featured = false }: { letter: IssueLetter; 
       </span>
       <div className="lt-card-cat">
         {featured && <span className="lt-today">최신 레터</span>}
-        <span className="lt-moa">모아쓰기</span>
         <span>{letter.categories.join(' · ')}</span>
         <span className="lt-no">제 {letter.issueNumber}호</span>
       </div>
       <h3 className="lt-card-title">{letter.title}</h3>
       <p className="lt-card-deck">{letter.deck}</p>
       <div className="lt-axes">
-        {tags.map((t, i) => (
-          <AxisBadge key={`${t.axis}-${t.label ?? i}`} axis={t.axis} label={t.label} />
-        ))}
+        {letter.topics && letter.topics.length > 0
+          ? letter.topics.slice(0, 4).map((name) => (
+              <span key={name} className="lt-topic">
+                {name}
+              </span>
+            ))
+          : tags.map((t, i) => <AxisBadge key={`${t.axis}-${t.label ?? i}`} axis={t.axis} label={t.label} />)}
         <span className="lt-count">기사 {letter.sourceCount ?? letter.sources.length}건</span>
       </div>
       <div className="lt-card-meta">

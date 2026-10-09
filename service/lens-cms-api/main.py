@@ -30,6 +30,8 @@ import community_repo
 import config_repo
 import daily_questions_repo
 import issue_letters_repo
+import topics_repo
+from letter_errors import LetterError
 import personal_repo
 import prompt_lab_repo
 import prompts_repo
@@ -469,7 +471,7 @@ def internal_daily_questions_put(date: str, payload: Dict[str, Any] = Body(...),
 def _letter_call(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
-    except issue_letters_repo.LetterError as e:
+    except LetterError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
 
 
@@ -499,6 +501,27 @@ def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_vot
     if not fresh:
         return JSONResponse({**result, "already_voted": True}, status_code=409, headers={"Cache-Control": "no-store"})
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/admin/topics")
+def admin_list_topics(include_inactive: bool = Query(default=False), x_internal_token: Optional[str] = Header(default=None)):
+    """주제 사전 조회(레터에 붙이는 통제된 태그 어휘)."""
+    _check_admin_token(x_internal_token)
+    return {"topics": _letter_call(topics_repo.list_topics, not include_inactive)}
+
+
+@app.put("/admin/topics")
+def admin_upsert_topics(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """주제 사전 항목을 slug 기준으로 추가·갱신한다. 이름·별칭이 겹치면 전체를 거부한다."""
+    _check_admin_token(x_internal_token)
+    return _letter_call(topics_repo.upsert_topics, payload.get("topics"))
+
+
+@app.put("/admin/issue-letters/{letter_id}/topics")
+def admin_set_issue_letter_topics(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """레터의 주제 태그만 교체(발행 후에도 가능, 본문은 바뀌지 않는다)."""
+    _check_admin_token(x_internal_token)
+    return {"topics": _letter_call(issue_letters_repo.set_topics, letter_id, payload.get("topics"))}
 
 
 @app.post("/admin/issue-letters/archives")
