@@ -87,8 +87,11 @@ def test_validate_normalizes_valid_payload():
     {"sections": [{"axis": "weird", "heading": "h", "key_line": "k", "paragraphs": []}]},
     {"sections": [{"axis": "news", "heading": "h", "key_line": "", "paragraphs": []}]},
     {"sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [[{"text": "x", "href": "javascript:1"}]]}]},
-    {"sources": [{"article_no": "1", "external_url": "https://a.com", "axes": []}]},
-    {"sources": [{"external_url": "https://a.com", "external_title": "t", "external_outlet": "o", "axes": []}]},  # 승인자 없음
+    {"sources": [{"article_no": "1", "url": "https://www.sedaily.com/article/1", "axes": []}]},  # 번호와 주소를 같이 줌
+    {"sources": [{"axes": []}]},  # 번호도 주소도 없음
+    {"sources": [{"url": "ftp://x", "axes": []}]},
+    {"sources": [{"external_url": "https://a.com", "external_title": "t", "external_outlet": "o", "approved_by": "admin", "axes": []}]},  # 외부 매체 불가
+    {"sources": [{"url": "https://www.sedaily.com/article/1", "axes": []}, {"url": "https://www.sedaily.com/article/1?ref=x", "axes": []}]},  # 같은 기사 중복
     {"sources": [{"article_no": "1", "axes": ["bad"]}]},
     {"sources": [{"article_no": "1", "axes": []}, {"article_no": "1", "axes": []}]},
     {"poll": {"kind": "emotion", "question": "q", "options": [{"key": "a", "label": "x"}]}},
@@ -204,3 +207,24 @@ def test_editor_note_standard_rejects_opinion_and_long(note):
 def test_editor_note_standard_accepts_fact_linking_sentence():
     note = "이 순위는 현지 편집자와 전문가 추천을 바탕으로 정해져요. 같은 기준에서 종로3가는 2021년 3위에서 올해 1위가 됐어요."
     assert _repo().publish_problems(_publishable(editor_note=note)) == []
+
+
+def test_source_can_be_given_by_url_and_resolved_to_article_no():
+    r = _repo()
+    v = r.validate_letter_payload(_payload(sources=[{"url": "https://www.sedaily.com/article/20094994?ref=sedailyEng", "axes": ["news"]}]))
+    assert v["sources"][0]["article_no"] is None and v["sources"][0]["url"].endswith("?ref=sedailyEng")
+
+    class Cur:
+        def __init__(self, rows):
+            self.rows = rows
+            self.sql = None
+        def execute(self, sql, params=None):
+            self.sql = (sql, params)
+        def fetchall(self):
+            return self.rows
+
+    cur = Cur([{"article_no": "2KHNE99S2Q"}])
+    assert r._article_no_by_url(cur, "https://www.sedaily.com/article/20094994?ref=x", 0) == "2KHNE99S2Q"
+    assert cur.sql[1] == ("https://www.sedaily.com/article/20094994", "https://www.sedaily.com/article/20094994?%")
+    with pytest.raises(r.LetterError):  # 기사 DB에 없음 = 서울경제 원문이 아님
+        r._article_no_by_url(Cur([]), "https://example.com/x", 1)

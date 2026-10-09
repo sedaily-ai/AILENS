@@ -170,26 +170,20 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
         axes = src.get("axes") or []
         if not isinstance(axes, list) or any(a not in AXES for a in axes):
             raise LetterError(f"sources[{i}].axes 는 {'/'.join(AXES)} 의 배열이어야 합니다")
-        article_no = src.get("article_no")
-        ext_url = src.get("external_url")
-        if bool(article_no) == bool(ext_url):
-            raise LetterError(f"sources[{i}]: article_no(자사) 또는 external_*(외부) 중 하나만 지정하세요")
-        item: Dict[str, Any] = {"axes": axes, "article_no": None, "external_title": None, "external_outlet": None,
-                                "external_url": None, "approved_by": None}
-        if article_no:
-            item["article_no"] = str(article_no)[:32]
-        else:
-            if not re.match(r"^https?://", str(ext_url)):
-                raise LetterError(f"sources[{i}].external_url 은 http(s) 주소여야 합니다")
-            item["external_url"] = str(ext_url)
-            item["external_title"] = _text(src.get("external_title"), f"sources[{i}].external_title", required=True, limit=300)
-            item["external_outlet"] = _text(src.get("external_outlet"), f"sources[{i}].external_outlet", required=True, limit=64)
-            item["approved_by"] = _text(src.get("approved_by"), f"sources[{i}].approved_by(외부 기사는 편집장 승인 필수)", required=True, limit=32)
-        key = item["article_no"] or normalize_url(item["external_url"])
+        # 출처는 서울경제 원문 기사만 인정한다(2026-10-09 결정). 기사 번호 또는 기사 주소(URL)로 지정하고, 주소는 저장 때 기사 DB에서 번호를 찾는다.
+        if src.get("external_url") or src.get("external_title"):
+            raise LetterError(f"sources[{i}]: 외부 매체 기사는 출처로 쓸 수 없습니다(서울경제 원문 기사만 허용)")
+        article_no = str(src["article_no"])[:32] if src.get("article_no") else None
+        url = str(src["url"]).strip() if src.get("url") else None
+        if bool(article_no) == bool(url):
+            raise LetterError(f"sources[{i}]: article_no 또는 url(서울경제 기사 주소) 중 하나만 지정하세요")
+        if url and not re.match(r"^https?://", url):
+            raise LetterError(f"sources[{i}].url 은 http(s) 주소여야 합니다")
+        key = article_no or normalize_url(url)
         if key in seen_positions:
             raise LetterError(f"sources[{i}]: 같은 기사가 두 번 들어 있습니다")
         seen_positions.add(key)
-        sources.append(item)
+        sources.append({"axes": axes, "article_no": article_no, "url": url})
     if len(sources) > _MAX_SOURCES:
         raise LetterError(f"sources 는 최대 {_MAX_SOURCES}개입니다")
 
@@ -246,8 +240,8 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
             problems.append(f"자리표시 출처가 남아 있습니다: {title}")
         if s.get("article_no") and not s.get("url"):
             problems.append(f"자사 기사 {s['article_no']} 를 기사 DB에서 찾을 수 없습니다")
-        if not s.get("article_no") and not s.get("approved_by"):
-            problems.append(f"외부 기사에 편집장 승인이 없습니다: {title}")
+        if not s.get("article_no"):
+            problems.append(f"서울경제 원문 기사가 아닌 출처는 쓸 수 없습니다: {title}")
 
     inline: List[str] = []
     for sec in sections:
@@ -413,6 +407,16 @@ def search_candidates(q: str, limit: int = 20) -> List[Dict[str, Any]]:
 
 # ── DB: 쓰기 ─────────────────────────────────────────────────────────────
 
+def _article_no_by_url(cur, url: str, idx: int) -> str:
+    """서울경제 기사 주소(쿼리 꼬리표 무시)로 기사 DB 의 기사 번호를 찾는다. 없으면 서울경제 원문 기사가 아니거나 아직 수집되지 않은 것."""
+    base = normalize_url(url)
+    cur.execute("SELECT article_no FROM articles WHERE source_url = %s OR source_url LIKE %s LIMIT 2", (base, base + "?%"))
+    rows = cur.fetchall()
+    if len(rows) != 1:
+        raise LetterError(f"sources[{idx}]: 서울경제 기사 DB에서 이 주소의 기사를 찾을 수 없습니다(서울경제 원문 기사만 인정): {base}")
+    return rows[0]["article_no"]
+
+
 def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
     import json
     cur.execute("DELETE FROM issue_letter_categories WHERE letter_id = %s", (letter_id,))
@@ -426,15 +430,18 @@ def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
             "VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb)",
             (letter_id, i, s["axis"], s["axis_label"], s["heading"], s["key_line"], json.dumps(s["paragraphs"], ensure_ascii=False)))
     cur.execute("DELETE FROM issue_letter_sources WHERE letter_id = %s", (letter_id,))
+    seen_nos = set()
     for i, s in enumerate(v["sources"]):
+        no = s["article_no"] or _article_no_by_url(cur, s["url"], i)
         if s["article_no"]:
-            cur.execute("SELECT 1 FROM articles WHERE article_no = %s", (s["article_no"],))
+            cur.execute("SELECT 1 FROM articles WHERE article_no = %s", (no,))
             if not cur.fetchone():
-                raise LetterError(f"자사 기사를 찾을 수 없습니다: {s['article_no']}")
-        cur.execute(
-            "INSERT INTO issue_letter_sources (letter_id, position, article_no, external_title, external_outlet, external_url, axes, approved_by) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-            (letter_id, i, s["article_no"], s["external_title"], s["external_outlet"], s["external_url"], s["axes"], s["approved_by"]))
+                raise LetterError(f"sources[{i}]: 서울경제 기사 DB에서 기사 번호를 찾을 수 없습니다: {no}")
+        if no in seen_nos:
+            raise LetterError(f"sources[{i}]: 같은 기사가 두 번 들어 있습니다(주소와 번호가 같은 기사)")
+        seen_nos.add(no)
+        cur.execute("INSERT INTO issue_letter_sources (letter_id, position, article_no, axes) VALUES (%s,%s,%s,%s)",
+                    (letter_id, i, no, s["axes"]))
     cur.execute("DELETE FROM issue_letter_polls WHERE letter_id = %s", (letter_id,))
     if v["poll"]:
         cur.execute("INSERT INTO issue_letter_polls (letter_id, kind, question) VALUES (%s,%s,%s)",
