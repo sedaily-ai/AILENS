@@ -19,13 +19,16 @@ from fastapi import Body, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
+import admin_jobs_repo
 import admin_posts_repo
 import articles_repo
 import audit_repo
+import candidate_seen_repo
 import chat_threads_repo
 import cms_posts_repo as posts_client
 import community_repo
 import config_repo
+import daily_questions_repo
 import personal_repo
 import prompt_lab_repo
 import prompts_repo
@@ -349,6 +352,112 @@ def admin_score_selection_article(
     if not article:
         raise HTTPException(status_code=404, detail="article not found")
     return {"article": article}
+
+
+# ── DynamoDB 잔여 이관 — v1.36 (설계: docs/architecture/lens-erd-src/16-ddb-잔여-이관-설계.md) ──────────
+# 세 테이블 모두 호출자(ECS 파이프라인·관리자 Lambda·서비스 Lambda)가 내부 토큰으로만 접근한다.
+def _bad_request(e: Exception) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/internal/candidate-seen/exists")
+def internal_candidate_seen_exists(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return {"seen": candidate_seen_repo.exists_keys(payload.get("pipeline", ""), payload.get("keys") or [])}
+    except ValueError as e:
+        raise _bad_request(e)
+
+
+@app.post("/internal/candidate-seen")
+def internal_candidate_seen_mark(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return candidate_seen_repo.mark_seen(
+            pipeline=payload.get("pipeline", ""),
+            article_key=payload.get("article_key", ""),
+            tab=payload.get("tab"),
+            score=payload.get("score"),
+            reasoning=payload.get("reasoning"),
+            is_manual=bool(payload.get("is_manual", False)),
+            excluded_from_general=bool(payload.get("excluded_from_general", False)),
+            reason=payload.get("reason"),
+            detail=payload.get("detail"),
+        )
+    except ValueError as e:
+        raise _bad_request(e)
+
+
+@app.post("/internal/candidate-seen/bulk")
+def internal_candidate_seen_bulk(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """옛 DynamoDB 항목 일괄 이관용(dry_run 기본). 이미 있는 키는 건너뛴다."""
+    _check_admin_token(x_internal_token)
+    try:
+        return candidate_seen_repo.bulk_import(payload.get("items") or [], dry_run=bool(payload.get("dry_run", True)))
+    except ValueError as e:
+        raise _bad_request(e)
+
+
+@app.get("/internal/candidate-seen/count")
+def internal_candidate_seen_count(pipeline: Optional[str] = Query(default=None), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"count": candidate_seen_repo.count(pipeline)}
+
+
+@app.post("/internal/admin-jobs")
+def internal_admin_job_create(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return {"job": admin_jobs_repo.create_job(payload.get("kind", ""), payload.get("job_id", ""), payload.get("payload"), payload.get("ttl_days", 30))}
+    except ValueError as e:
+        raise _bad_request(e)
+    except LookupError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.patch("/internal/admin-jobs/{kind}/{job_id}")
+def internal_admin_job_update(kind: str, job_id: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        job = admin_jobs_repo.update_job(kind, job_id, payload.get("status"), payload.get("error"), payload.get("result"))
+    except ValueError as e:
+        raise _bad_request(e)
+    if not job:
+        raise HTTPException(status_code=404, detail="job not found")
+    return {"job": job}
+
+
+@app.get("/internal/admin-jobs/{kind}/{job_id}")
+def internal_admin_job_get(kind: str, job_id: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        job = admin_jobs_repo.get_job(kind, job_id)
+    except ValueError as e:
+        raise _bad_request(e)
+    if not job:
+        raise HTTPException(status_code=404, detail="job not found")
+    return {"job": job}
+
+
+@app.get("/internal/daily-questions/{date}")
+def internal_daily_questions_get(date: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        row = daily_questions_repo.get_questions(date)
+    except ValueError as e:
+        raise _bad_request(e)
+    if not row:
+        raise HTTPException(status_code=404, detail="questions not found")
+    return {"daily_questions": row}
+
+
+@app.put("/internal/daily-questions/{date}")
+def internal_daily_questions_put(date: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return {"daily_questions": daily_questions_repo.save_questions(date, payload.get("questions"), payload.get("model"), payload.get("generated_at"))}
+    except ValueError as e:
+        raise _bad_request(e)
 
 
 # ── 용어 퀴즈 — v1.22, 응답 집계는 v1.26 ─────────────────────────────

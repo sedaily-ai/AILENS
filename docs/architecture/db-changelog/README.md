@@ -65,6 +65,8 @@ AI LENS의 데이터 저장 방식이 처음부터 지금까지 어떻게 바뀌
 | 2026-09-10 | postgres | [v1.32 — 자동 콘텐츠 파이프라인 DynamoDB → Postgres 직접 발행 전환(IAM 권한 갭 3건·프론트 버그 3건 발견, 244건 백필)](postgres/v1.32-파이프라인-postgres-직접발행-전환.md) |
 | 2026-09-10 | postgres | [v1.33 — articles.raw_category 인덱스 추가(실측 전/후 비교, count(*) 약 63%↓)](postgres/v1.33-articles-raw_category-인덱스.md) |
 | 2026-09-11 | postgres | [v1.34 — "서랍에 담기" 500 에러 버그 수정(user_archives.article_no FK를 articles→publications(slug)로 재연결)](postgres/v1.34-user_archives-article_no-fk-수정.md) |
+| 2026-09-28 | postgres | [v1.35 — 선정 실험실(selection_runs/selection_articles) 테이블 신설](postgres/v1.35-선정실험실-테이블-신설.md) |
+| 2026-10-09 | postgres | [v1.36 — DynamoDB 잔여 데이터 이관 설계(candidate_seen·admin_jobs·daily_questions)](postgres/v1.36-ddb-잔여-이관.md) |
 
 ## 새 항목 추가 규칙
 
