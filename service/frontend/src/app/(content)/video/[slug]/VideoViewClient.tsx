@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchVideoBySlug, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
@@ -46,7 +46,7 @@ export function VideoViewClient({
     return (
       <div className="min-h-screen bg-white">
         <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('video')} frosted />
-        <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+        <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center text-neutral-500">
           <p>영상을 찾을 수 없어요.</p>
           <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4 hover:text-neutral-900">
@@ -63,7 +63,7 @@ export function VideoViewClient({
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs('video')} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {video === undefined && (
         <div style={{ maxWidth: 780, margin: '0 auto', padding: '40px 20px' }}>

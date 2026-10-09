@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UserMenu } from '@/features/auth';
+import { prefetchSearchIndex } from '@/shared/lib/search/searchIndex';
 
 /**
  * 전 페이지 공용 상단 헤더 (7곳 복붙 통합).
@@ -424,15 +425,17 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
           )}
 
           <div className={`flex items-center gap-2 flex-shrink-0 ${section ? 'justify-self-end -mr-3' : 'ml-auto'}`}>
-            {/* 아이콘 전용 검색 버튼. 클릭하면 SmartSearchOverlay가 뜬다. title로 용도 힌트를 준다. */}
-            {/* 돋보기 아이콘이 직관적이며, 실제로는 검색이 아니라 AI 챗봇이라는 신호는 violet 색으로만 남긴다. */}
+            {/* 아이콘 전용 검색 버튼. 클릭하면 검색 패널(SearchOverlay)이 뜬다. */}
             <button
               onClick={onSearch}
+              onPointerEnter={prefetchSearchIndex}
+              onFocus={prefetchSearchIndex}
+              onTouchStart={prefetchSearchIndex}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-              aria-label="이슈에 대해 물어보세요"
-              title="이슈에 대해 물어보세요 (⌘K)"
+              aria-label="검색"
+              title="검색"
             >
-              <svg className="w-[18px] h-[18px] text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <circle cx="11" cy="11" r="7" />
                 <path strokeLinecap="round" d="M21 21l-4.3-4.3" />
               </svg>

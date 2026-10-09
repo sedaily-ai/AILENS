@@ -5,7 +5,7 @@ import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { fetchWebtoons, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
 import { coverThumb } from '@/shared/lib/webtoonCovers.generated';
@@ -40,7 +40,7 @@ export function SeriesViewClient({
     return (
       <div className="min-h-screen bg-white">
         <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
-        <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+        <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
         <div className="mx-auto max-w-[680px] px-5 py-20 text-center" style={{ color: MUTED }}>
           <p>시리즈를 찾을 수 없어요.</p>
           <Link href="/lens" className="mt-4 inline-block text-sm underline underline-offset-4" style={{ color: MUTED }}>
@@ -56,7 +56,7 @@ export function SeriesViewClient({
       <style>{WEBTOON_GRID_CSS}</style>
 
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main style={{ paddingBottom: 96 }}>
         <div className="wt-wrap" style={{ paddingTop: 'clamp(28px, 5vw, 56px)' }}>

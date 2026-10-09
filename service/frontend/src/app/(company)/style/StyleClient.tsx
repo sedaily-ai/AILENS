@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
-import { SmartSearchOverlay } from '@/shared/ui/search/SmartSearchOverlay';
+import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
@@ -34,7 +34,7 @@ export default function StyleClient() {
   return (
     <div className="min-h-screen bg-white">
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
-      <SmartSearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
+      <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(32px, 6vw, 56px) clamp(20px, 5vw, 32px) 90px' }}>
         <header style={{ textAlign: 'center', marginBottom: 'clamp(28px, 5vw, 44px)' }}>
