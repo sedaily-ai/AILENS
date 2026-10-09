@@ -4,6 +4,9 @@ import type { GlanceId, MomentId } from './moments';
 // 서버 집계가 아직 없어 임의 값을 넣었으므로, 실제 서비스에 노출하기 전에 실제 집계로 교체하거나 카드를 숨겨야 한다. 화면에도 "샘플 데이터"를 작게 표시한다(DISTRIBUTION_IS_MOCK).
 // 실제 집계를 붙일 때는 이 파일의 세 표를 API 응답으로 대체하고 플래그를 false로 바꾼다.
 // 목표 구조: 선택을 익명으로 서버에 1씩 누적(Lambda + DynamoDB 카운터)하고, 표본이 일정 수(예: 50명) 미만이면 카드를 숨긴다.
+/** 분포가 샘플(목업)인지 — true면 결과 카드·요약 줄에 '예시' 표시를 붙인다. 실제 집계로 바꾸면 false. */
+export const DISTRIBUTION_IS_MOCK = true;
+
 /** 상황별 비중(%) — 합 100. */
 export const SITUATION_SHARE: Record<MomentId, number> = {
   lunch: 34,
