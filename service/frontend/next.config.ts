@@ -73,7 +73,9 @@ const nextConfig: NextConfig = {
       // /archive도 색인됐을 수 있어 404 대신 영구 리다이렉트한다.
       { source: "/archive", destination: "/lens", permanent: true },
       // 웹툰·영상·오디오 목록 페이지는 같은 기사의 형식 탭과 중복이라 폐기하고 /lens로 모은다.
-      // 개별 상세(/webtoon/{slug}, /video/{slug}, /listen/{slug}, /webtoon/series/{slug})는 색인·공유 링크가 있어 유지한다.
+      // 개별 상세(/webtoon/{slug}, /video/{slug}, /listen/{slug})는 해당 기사 페이지로 영구 이동하도록 각 page.tsx가 처리한다(기사 없는 글만 렌더).
+      // 시리즈 회차 목록(/webtoon/series/{slug})은 쓰지 않아 페이지를 없애고 /lens로 모은다(2026-10-09).
+      { source: "/webtoon/series/:path*", destination: "/lens", permanent: true },
       { source: "/webtoon", destination: "/lens", permanent: true },
       { source: "/webtoon/all", destination: "/lens", permanent: true },
       { source: "/webtoon/page/:n", destination: "/lens", permanent: true },
