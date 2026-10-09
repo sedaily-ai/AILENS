@@ -34,6 +34,7 @@ import type {
   IssueLetterSummary,
   IssueLetterDetail,
   IssueLetterDetailResponse,
+  IssueLetterCandidate,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -508,6 +509,8 @@ export const adminApi = {
     const suffix = qs.toString() ? `?${qs}` : "";
     return request<{ letters: IssueLetterSummary[] }>(`/admin/issue-letters${suffix}`);
   },
+  searchIssueLetterCandidates: (q: string, limit = 20) =>
+    request<{ articles: IssueLetterCandidate[] }>(`/admin/issue-letters/candidates?q=${encodeURIComponent(q)}&limit=${limit}`),
   getIssueLetter: (id: number) =>
     request<IssueLetterDetailResponse>(`/admin/issue-letters/${id}`),
   createIssueLetter: (input: unknown) =>

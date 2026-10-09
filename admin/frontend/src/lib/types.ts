@@ -695,3 +695,11 @@ export interface IssueLetterDetailResponse {
   /** 서버의 발행 규칙 점검 결과. 비어 있으면 발행 가능. */
   publish_problems: string[];
 }
+
+/** 출처 후보 검색 결과 — 서울경제 기사 DB 의 기사. url 은 쿼리 꼬리표를 뗀 기사 주소. */
+export interface IssueLetterCandidate {
+  article_no: string;
+  title: string;
+  url: string;
+  published_at: string | null;
+}

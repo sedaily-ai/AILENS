@@ -7,6 +7,7 @@ import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { ErrorNote } from "@/components/Feedback";
 import { IssueLetterStatusBadge } from "@/components/IssueLetterStatus";
+import { IssueLetterCandidateSearch } from "@/components/IssueLetterCandidateSearch";
 import type { IssueLetterDetail, IssueLetterSegment } from "@/lib/types";
 
 // 이슈 레터 입력·검수·발행 화면(2026-10-09). 편집자는 레터 생성 프롬프트 템플릿 v2 가 만든 "저장용 JSON"을 붙여넣는다.
@@ -165,6 +166,7 @@ function IssueLetterEditPage() {
         <p className="text-[13px] leading-[1.6]" style={{ color: "var(--text-muted)" }}>
           레터 생성 프롬프트 템플릿 v2 의 출력(1) &quot;저장용 JSON&quot;을 그대로 붙여넣으세요. 저장하면 초안이 만들어지고, 출처 기사는 서울경제 기사 DB에서 찾아 연결됩니다.
         </p>
+        <IssueLetterCandidateSearch />
         {error && <ErrorNote message={error} />}
         <textarea
           value={json}
