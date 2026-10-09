@@ -8,7 +8,7 @@ export function formatLetterDate(iso: string): string {
 }
 
 /** 목록 카드. featured면 "최신 레터" 큰 카드, 아니면 그리드용 카드. 카드에서 "모아쓰기" 표시·3축(또는 키워드) 배지·기사 N건이 바로 보인다. */
-export function LetterCard({ letter, featured = false }: { letter: IssueLetter; featured?: boolean }) {
+export function LetterCard({ letter, featured = false, onTopic }: { letter: IssueLetter; featured?: boolean; onTopic?: (name: string) => void }) {
   // 오늘의 레터는 3축 이름을 고정으로, 지난 레터는 섹션 키워드(방법론·젠트리피케이션 등)가 있으면 그것을 보여 준다.
   const tags = featured || !letter.cardTags ? [...new Set(letter.axisLabels.map((a) => a.axis))].map((axis) => ({ axis, label: undefined as string | undefined })) : letter.cardTags;
   return (
@@ -29,7 +29,15 @@ export function LetterCard({ letter, featured = false }: { letter: IssueLetter; 
       <div className="lt-axes">
         {letter.topics && letter.topics.length > 0
           ? letter.topics.slice(0, 4).map((name) => (
-              <span key={name} className="lt-topic">
+              <span
+                key={name}
+                className={`lt-topic${onTopic ? ' lt-topic-btn' : ''}`}
+                role={onTopic ? 'button' : undefined}
+                tabIndex={onTopic ? 0 : undefined}
+                title={onTopic ? `'${name}' 레터만 보기` : undefined}
+                onClick={onTopic ? (e) => { e.preventDefault(); onTopic(name); } : undefined}
+                onKeyDown={onTopic ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTopic(name); } } : undefined}
+              >
                 {name}
               </span>
             ))

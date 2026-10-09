@@ -3,6 +3,7 @@
 
   python3 seed_topics.py dict  <topics_seed.json>             # 사전 항목을 저장(slug 기준 추가·갱신, 이름·별칭 충돌이면 전체 거부)
   python3 seed_topics.py tag   <issue_letters_seed.json>      # 시드의 레터별 topics 를 이미 있는 레터(발행된 것 포함)에 적용
+  python3 seed_topics.py bundles <interest_bundles_seed.json>  # 관심 묶음 저장(slug 기준 추가·갱신, 항목은 사전·분류와 대조)
   (--apply 없이 실행하면 드라이런: 무엇이 바뀌는지만 보여 준다)
 """
 import json
@@ -40,10 +41,18 @@ def main():
     global TOKEN
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     apply = "--apply" in sys.argv
-    if len(args) != 2 or args[0] not in ("dict", "tag"):
+    if len(args) != 2 or args[0] not in ("dict", "tag", "bundles"):
         sys.exit(__doc__)
     TOKEN = token()
     data = json.load(open(args[1], encoding="utf-8"))
+    if args[0] == "bundles":
+        print(f"관심 묶음 {len(data)}개, 항목 {sum(len(b['items']) for b in data)}개")
+        if not apply:
+            print("드라이런 끝 — 저장하지 않았습니다. --apply 로 저장합니다.")
+            return
+        code, res = api("PUT", "/admin/interest-bundles", {"bundles": data})
+        print("저장 완료" if code == 200 else f"저장 실패 {code}: {res.get('detail')}", res if code == 200 else "")
+        return
     if args[0] == "dict":
         code, cur = api("GET", "/admin/topics?include_inactive=true")
         have = {t["slug"] for t in cur.get("topics", [])} if code == 200 else set()

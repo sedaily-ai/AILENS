@@ -46,6 +46,12 @@ export const LETTER_CSS = `
   .lt-int-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
   .lt-int-err { margin: 12px 0 0; font-size: 13px; color: #b91c1c; }
   .lt-reason { margin: 2px 0 0; font-size: 13px; font-weight: 600; color: #1f56c0; }
+  .lt-search { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: -8px 0 24px; }
+  .lt-search input { flex: 1 1 240px; max-width: 420px; height: 40px; padding: 0 14px; border: 1px solid #e5e7eb; border-radius: 10px; font: inherit; font-size: 14px; background: #fff; }
+  .lt-search input:focus { outline: 2px solid #5b8def; outline-offset: 1px; }
+  .lt-chip-on { background: #111827; color: #fff; }
+  .lt-topic-btn { cursor: pointer; }
+  .lt-topic-btn:hover { background: #e2e8f0; }
   .lt-topic { padding: 3px 10px; border-radius: 999px; background: #f1f5f9; color: #334155; font-size: 12.5px; font-weight: 600; }
   .ld-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
   .lt-count { font-size: 12.5px; font-weight: 700; color: #374151; padding-left: 4px; }
