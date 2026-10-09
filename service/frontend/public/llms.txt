@@ -13,7 +13,7 @@
 - [오늘의 시선 목록](https://ailens.sedaily.ai/lens): 매일의 경제 이슈를 4가지 형식으로 담은 글 모음(2페이지부터 /lens/page/{n})
 - [오늘의 시선 상세](https://ailens.sedaily.ai/lens/{slug}): 기사 한 건. 주소는 /{카테고리}/{YYYY}/{MM}/{DD}/{발행일-제목} 형태로 정리되어 있으며 각 글에 4가지 질문-답변, 요약, 원문 링크가 있다
 - [날짜별 지면](https://ailens.sedaily.ai/paper/{YYYY-MM-DD}): 그날 편집된 지면 4개(지면 1면·증권 1면·산업 1면·시그널 1면)의 기사 모음, 날짜별 최대 16건. /paper 는 가장 최근 지면 날짜로 이동
-- 웹툰·영상·오디오: 별도 목록 없이 각 기사의 형식 탭과 개별 주소로 제공(웹툰 /webtoon/{slug}, 영상 /video/{slug}, 오디오 /listen/{slug}). 목록은 /lens 에서 찾는다
+- 웹툰·영상·오디오: 별도 목록 없이 각 기사의 형식 탭과 개별 주소로 제공(웹툰 /webtoon/{slug}, 영상 /video/{slug}, 오디오는 기사 페이지의 팟캐스트 탭에서 재생하며 /listen/{slug}는 해당 기사 페이지로 영구 이동한다). 목록은 /lens 에서 찾는다
 - [브리핑·인사이트](https://ailens.sedaily.ai/lens): 원본 기사를 AI가 정리한 경제 브리핑과 관점 있는 칼럼(상세 /letters/{slug}). 목록은 아래 카테고리로 모아 본다
 
 ## 카테고리

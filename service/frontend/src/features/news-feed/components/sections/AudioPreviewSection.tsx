@@ -4,7 +4,6 @@ import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
 import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import { useRef, useState } from 'react';
 import { displayHeadline } from '@/shared/lib/content/displayHeadline';
-import Link from 'next/link';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { isDirectAudioUrl } from '@/shared/lib/media/videoEmbed';
@@ -80,8 +79,6 @@ export function AudioPreviewSection({ initialItems }: Props) {
         .ap-eq i { width: 3px; border-radius: 2px; background: #fff; animation: ap-eq .9s ease-in-out infinite; }
         .ap-eq i:nth-child(2) { animation-delay: .2s; } .ap-eq i:nth-child(3) { animation-delay: .4s; }
         @keyframes ap-eq { 0%, 100% { height: 4px; } 50% { height: 16px; } }
-        .ap-more { margin-left: auto; flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #9ca3af; text-decoration: none; }
-        .ap-more:hover { background: #f1f5f9; color: #111827; }
         @media (prefers-reduced-motion: reduce) { .ap-title, .ap-play, .ap-eq i { transition: none; animation: none; } .ap-eq i { height: 10px; } }
       `}</style>
       {/* 플레이리스트 — 세로 한 열 목록을 영역 안에서 스크롤한다. 행을 누르면 그 자리에서 재생되고, 재생 중인 행 아래에 타임라인(진행 막대·현재/전체 시간)이 펼쳐진다. 다시 누르면 일시정지, 이동은 오른쪽 › 로 한다. */}
@@ -128,11 +125,6 @@ export function AudioPreviewSection({ initialItems }: Props) {
                     </span>
                   </span>
                 </button>
-                <Link href={`/listen/${encodeURIComponent(it.id)}`} prefetch={false} className="ap-more" aria-label="상세 보기" title="상세 보기">
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
-                  </svg>
-                </Link>
               </div>
               {on && (
                 <div className="ap-bar">

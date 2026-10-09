@@ -1,13 +1,14 @@
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { fetchHomePlayerPosts, fetchHomePlayerBySlug, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { resolveVideo, isDirectAudioUrl } from '@/shared/lib/media/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { ListenViewClient } from './ListenViewClient';
 import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -161,6 +162,11 @@ export default async function ListenViewPage({
 }) {
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
+  // 오디오 상세는 따로 두지 않는다(2026-10-09). 같은 기사의 lens 페이지가 정본이고 본문이 대부분 겹쳐 검색 신호가 나뉘므로,
+  // 대응하는 기사가 있으면 그 주소로 영구 이동(308)한다. 이미 색인됐거나 공유된 옛 링크를 살리려고 404가 아니라 이동으로 처리한다.
+  // 홈 "오늘의 뉴스를 귀로" 목록은 재생 버튼만 두고 이 페이지로 가는 화살표를 없앴다(AudioPreviewSection.tsx).
+  const lens = await findLensForChannelSlug(slug);
+  if (lens) permanentRedirect(lensPath(lens));
   const item = await findListen(slug);
   // video/[slug]/page.tsx와 같은 이유로 soft-404 대신 실제 404를 준다(3회 재시도 후에도 없으면).
   if (!item) {
