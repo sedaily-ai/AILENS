@@ -21,13 +21,20 @@ from db import get_cursor
 
 AXES = ("news", "substance", "other")
 STATUSES = ("draft", "in_review", "published", "archived")
-POLL_KINDS = ("binary", "emotion")
+POLL_KINDS = ("emotion",)  # 감정 반응형만 허용. DB 에는 옛 값 binary 가 남아 있지만 새 레터는 쓸 수 없다(2026-10-09 편집 원칙)
+# 투표 중립 원칙: 질문·선택지에 평가(합리적·옳다), 권유·결정(해야·맞을까요), 투자 행동(사야·매수) 표현을 쓰지 않는다.
+# 문구 휴리스틱이라 완벽하지 않다 — 자동 방어선일 뿐이고 최종 판단은 편집장 검수다.
+POLL_BIASED_TERMS = ("맞을까", "맞나요", "맞다고", "옳", "틀렸", "해야", "할까요", "좋을까", "좋은 선택", "나쁜 선택", "합리적", "비합리",
+                     "바람직", "현명", "어리석", "찬성", "반대", "지지", "사야", "팔아야", "매수", "매도", "추천", "권해", "보내야", "기다려야",
+                     "지켜봐야", "당연", "분명")
+# 본문·요약·에디터 한마디: 투자·행동 지시 표현만 막는다(인용문 속 당사자 발언까지 막지 않도록 좁게 잡는다).
+BODY_DIRECTIVE_TERMS = ("사세요", "파세요", "하세요", "사야 ", "팔아야", "매수하", "매도하", "추천합니다", "추천해요", "권합니다", "권해요")
+REQUIRED_POLL_NEUTRAL_KEY = "unsure"  # 모든 투표에 "잘 모르겠어요"류 중립 선택지를 둔다
 # 사이트 분류의 정본은 프론트 shared/constants/econCategories.ts 다. DB categories 테이블은 옛 7분류라 쓰지 않는다(v1.38).
 SITE_CATEGORIES = {
     "markets": "시그널", "property": "부동산", "economy": "경제", "finance": "금융", "industry": "산업",
     "politics": "정치", "national": "사회", "international": "국제", "culture": "문화",
 }
-FINANCE_SLUGS = ("finance",)  # 금융 분류 — 투표는 감정 반응형만(시장·주가 소재 전반은 편집 판단)
 MIN_SECTIONS = 3
 MIN_DISTINCT_INLINE_ARTICLES = 3
 _SLUG_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}-[^\s/?#]{1,200}$")
@@ -48,6 +55,29 @@ class LetterError(ValueError):
 def normalize_url(url: str) -> str:
     """링크 비교용: 쿼리·프래그먼트·끝 슬래시를 뗀다(?ref=sedailyEng 같은 꼬리표 무시)."""
     return re.split(r"[?#]", (url or "").strip(), maxsplit=1)[0].rstrip("/")
+
+
+def biased_terms(text: str, terms: Tuple[str, ...]) -> List[str]:
+    return [t for t in terms if t and t in (text or "")]
+
+
+def poll_problems(poll: Optional[Dict[str, Any]]) -> List[str]:
+    """투표 질문·선택지의 중립성 규칙. 저장 때와 발행 때 같은 규칙을 쓴다."""
+    if not poll:
+        return []
+    problems: List[str] = []
+    texts = [("질문", poll.get("question") or "")]
+    for o in poll.get("options") or []:
+        texts.append((f"선택지 '{o.get('label')}'", f"{o.get('label') or ''} {o.get('hint') or ''}"))
+    for where, text in texts:
+        hit = biased_terms(text, POLL_BIASED_TERMS)
+        if hit:
+            problems.append(f"투표 {where}에 평가·권유·결정을 암시하는 표현이 있습니다({', '.join(hit)}) — 감정이나 인지만 묻는 중립 문구로 바꾸세요")
+    if poll.get("kind") != "emotion":
+        problems.append("투표는 감정 반응형(emotion)만 허용됩니다")
+    if not any(o.get("key") == REQUIRED_POLL_NEUTRAL_KEY for o in poll.get("options") or []):
+        problems.append(f"투표에 중립 선택지(key '{REQUIRED_POLL_NEUTRAL_KEY}', 예: 잘 모르겠어요)가 필요합니다")
+    return problems
 
 
 def voter_hash(raw_id: str, salt: Optional[str] = None) -> str:
@@ -176,6 +206,9 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
                          "hint": _text(o.get("hint"), "poll.options[].hint", limit=200)} for o in options],
         }
 
+    bad_poll = poll_problems(poll)
+    if bad_poll:
+        raise LetterError(" / ".join(bad_poll))
     return {
         "slug": slug, "title": title, "deck": _text(data.get("deck"), "deck", limit=500) or "",
         "summary": [s.strip() for s in summary], "editor_note": _text(data.get("editor_note"), "editor_note", limit=1000),
@@ -224,9 +257,16 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
     if distinct_own < MIN_DISTINCT_INLINE_ARTICLES:
         problems.append(f"본문에 서로 다른 자사 기사 링크가 {MIN_DISTINCT_INLINE_ARTICLES}개 이상 필요합니다(현재 {distinct_own}개)")
 
-    poll = letter.get("poll")
-    if poll and poll.get("kind") != "emotion" and any(c in FINANCE_SLUGS for c in letter.get("categories") or []):
-        problems.append("금융 분류 레터의 투표는 감정 반응형(emotion)만 허용됩니다")
+    problems.extend(poll_problems(letter.get("poll")))
+    body_texts = [("에디터 한마디", letter.get("editor_note") or "")] + [("1분 요약", t) for t in letter.get("summary") or []]
+    for i, sec in enumerate(sections):
+        body_texts.append((f"섹션 {i + 1} 핵심", sec.get("key_line") or ""))
+        for para in sec.get("paragraphs") or []:
+            body_texts.append((f"섹션 {i + 1} 본문", "".join(seg if isinstance(seg, str) else seg.get("text", "") for seg in para)))
+    for where, text in body_texts:
+        hit = biased_terms(text, BODY_DIRECTIVE_TERMS)
+        if hit:
+            problems.append(f"{where}에 권유·지시 표현이 있습니다({', '.join(hit)})")
     return problems
 
 

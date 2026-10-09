@@ -65,7 +65,8 @@ def _payload(**over):
         "categories": ["industry"],
         "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["문장 ", {"text": "링크", "href": "https://www.sedaily.com/article/1?ref=x"}]]}],
         "sources": [{"article_no": "1", "axes": ["news"]}],
-        "poll": {"kind": "binary", "question": "q", "options": [{"key": "send", "label": "a"}, {"key": "wait", "label": "b"}]},
+        "poll": {"kind": "emotion", "question": "소식을 들었을 때 어떠셨나요?", "options": [
+            {"key": "send", "label": "신기했어요"}, {"key": "wait", "label": "걱정됐어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
     }
     base.update(over)
     return base
@@ -90,8 +91,12 @@ def test_validate_normalizes_valid_payload():
     {"sources": [{"external_url": "https://a.com", "external_title": "t", "external_outlet": "o", "axes": []}]},  # 승인자 없음
     {"sources": [{"article_no": "1", "axes": ["bad"]}]},
     {"sources": [{"article_no": "1", "axes": []}, {"article_no": "1", "axes": []}]},
-    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "a", "label": "x"}]}},
-    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "A", "label": "x"}, {"key": "b", "label": "y"}]}},
+    {"poll": {"kind": "emotion", "question": "q", "options": [{"key": "a", "label": "x"}]}},
+    {"poll": {"kind": "emotion", "question": "q", "options": [{"key": "A", "label": "x"}, {"key": "b", "label": "y"}]}},
+    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "a", "label": "x"}, {"key": "unsure", "label": "y"}]}},
+    {"poll": {"kind": "emotion", "question": "지금 보내는 게 맞을까요?", "options": [{"key": "a", "label": "보내야 해요"}, {"key": "unsure", "label": "잘 모르겠어요"}]}},
+    {"poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "합리적인 선택"}, {"key": "unsure", "label": "잘 모르겠어요"}]}},
+    {"poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기해요"}, {"key": "b", "label": "걱정돼요"}]}},  # 중립 선택지 없음
 ])
 def test_validate_rejects(bad):
     with pytest.raises(_repo().LetterError):
@@ -105,7 +110,7 @@ def _publishable(**over):
         "summary": ["s"], "editor_note": "e", "categories": ["industry"],
         "sections": [{"key_line": "k", "paragraphs": [[seg(1), seg(2)]]}, {"key_line": "k", "paragraphs": [[seg(3)]]}, {"key_line": "k", "paragraphs": [["x"]]}],
         "sources": [{"article_no": str(n), "title": f"t{n}", "url": url(n)} for n in (1, 2, 3)],
-        "poll": {"kind": "binary"},
+        "poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기했어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
     }
     letter.update(over)
     return letter
@@ -131,10 +136,20 @@ def test_publish_rejects_inline_link_not_in_sources_and_placeholder():
     assert any("자리표시" in p for p in problems)
 
 
-def test_publish_blocks_non_emotion_poll_for_finance():
-    assert any("감정 반응형" in p for p in _repo().publish_problems(_publishable(categories=["finance"])))
-    assert _repo().publish_problems(_publishable(categories=["markets", "national"])) == []  # 시그널·사회는 제한 없음
-    assert _repo().publish_problems(_publishable(categories=["finance"], poll={"kind": "emotion"})) == []
+def test_publish_blocks_biased_poll_and_directive_text_in_any_category():
+    r = _repo()
+    biased = {"kind": "emotion", "question": "지금 사야 할까요?", "options": [{"key": "a", "label": "사야 해요"}, {"key": "unsure", "label": "잘 모르겠어요"}]}
+    assert any("중립" in p for p in r.publish_problems(_publishable(poll=biased)))
+    assert any("권유·지시" in p for p in r.publish_problems(_publishable(editor_note="지금 매수하세요")))
+    # 분류와 상관없이 같은 규칙: 산업·시그널·사회 어디든 통과 조건은 동일
+    for cats in (["industry"], ["markets", "national"], ["finance"]):
+        assert r.publish_problems(_publishable(categories=cats)) == []
+
+
+def test_quoted_opinion_in_body_is_not_blocked():
+    letter = _publishable()
+    letter["sections"][2]["paragraphs"] = [["전문가들은 \"더 늦기 전에 바다로 보내야 한다\"고 말했어요."]]
+    assert _repo().publish_problems(letter) == []
 
 
 def test_publish_requires_admin_and_blocks_self_approval(monkeypatch):

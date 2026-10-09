@@ -27,7 +27,7 @@ export interface LetterSource {
 }
 
 export interface LetterVote {
-  kind: 'emotion' | 'binary';
+  kind: 'emotion';
   question: string;
   options: { key: string; label: string; hint?: string }[];
 }

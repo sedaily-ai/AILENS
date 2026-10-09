@@ -76,7 +76,7 @@ export const MOCK_LETTERS: IssueLetter[] = [
       options: [
         { key: 'no-feel', label: '실감이 안 난다' },
         { key: 'worried', label: '걱정됐다' },
-        { key: 'watch', label: '지켜봐야 한다' },
+        { key: 'unsure', label: '잘 모르겠다' },
       ],
     },
     sources: [
@@ -144,11 +144,12 @@ export const MOCK_LETTERS: IssueLetter[] = [
     editorNote:
       '아모레퍼시픽이 필리핀에서 온라인몰을 닫은 건 브랜드가 밀려서가 아니에요. 직접 운영하는 비용이 외부 채널에 맡기는 것보다 비쌀 때 회사는 창구를 바꿔요. 채널이 넓어지면 접근성은 늘지만 브랜드가 직접 통제할 수 있는 것은 줄어들어요. 그 교환이 어떤 결과를 낳을지는 지금은 알 수 없어요.',
     vote: {
-      kind: 'binary',
-      question: '아모레퍼시픽의 필리핀 직영몰 종료 결정, 어떻게 보세요?',
+      kind: 'emotion',
+      question: '필리핀 직영몰 종료 소식, 처음 들었을 때 어떠셨나요?',
       options: [
-        { key: 'reasonable', label: '합리적인 선택', hint: '성장률 따라 자원을 재배분하고 브랜드는 유지해요' },
-        { key: 'watch', label: '지켜봐야 한다', hint: '채널 통제권을 잃으면 다음 단계가 더 어려울 수 있어요' },
+        { key: 'surprised', label: '의외였어요' },
+        { key: 'expected', label: '예상했어요' },
+        { key: 'unsure', label: '잘 모르겠어요' },
       ],
     },
     sources: [
@@ -229,8 +230,9 @@ export const MOCK_LETTERS: IssueLetter[] = [
       kind: 'emotion',
       question: '1위 소식을 들었을 때, 어느 쪽에 더 가까웠나요?',
       options: [
-        { key: 'glad', label: '반가웠어요', hint: '가볼 이유가 생겼어요' },
-        { key: 'worried', label: '걱정됐어요', hint: '떠서 변해버릴까 봐요' },
+        { key: 'glad', label: '반가웠어요' },
+        { key: 'worried', label: '걱정됐어요' },
+        { key: 'unsure', label: '잘 모르겠어요' },
       ],
     },
     sources: [
@@ -254,7 +256,7 @@ export const MOCK_LETTERS: IssueLetter[] = [
       { axis: 'other', label: '가짜뉴스' },
       { axis: 'other', label: '동물복지' },
     ],
-    categories: ['시그널', '사회'],
+    categories: ['시그널', '사회', '경제'],
     publishedAt: '2026-10-02',
     readMinutes: 7,
     summary: [
@@ -294,11 +296,12 @@ export const MOCK_LETTERS: IssueLetter[] = [
     ],
     editorNote: '부캉이 소동이 재밌는 건 주가·가짜뉴스·동물복지가 하나의 상어 등장에 묶인다는 거예요. 화제성 이슈는 언제나 예상 밖의 경로로 번져요.',
     vote: {
-      kind: 'binary',
-      question: '부캉이, 지금 보내는 게 맞을까요?',
+      kind: 'emotion',
+      question: '부캉이 소식을 처음 들었을 때 어떠셨나요?',
       options: [
-        { key: 'send', label: '지금 보내야 해요', hint: '생존 우선' },
-        { key: 'wait', label: '기다려줘요', hint: '강제로 몰지 말고' },
+        { key: 'curious', label: '신기했어요' },
+        { key: 'worried', label: '걱정됐어요' },
+        { key: 'unsure', label: '잘 모르겠어요' },
       ],
     },
     sources: [
@@ -343,11 +346,11 @@ export const MOCK_LETTERS: IssueLetter[] = [
     editorNote: '목업 카드라 에디터 한마디는 원본 입력 후 채워져요.',
     vote: {
       kind: 'emotion',
-      question: '이 소식을 어떻게 보셨나요?',
+      question: '이 소식을 처음 들었을 때 어떠셨나요?',
       options: [
         { key: 'no-feel', label: '실감이 안 난다' },
         { key: 'worried', label: '걱정됐다' },
-        { key: 'watch', label: '지켜봐야 한다' },
+        { key: 'unsure', label: '잘 모르겠다' },
       ],
     },
     sources: [

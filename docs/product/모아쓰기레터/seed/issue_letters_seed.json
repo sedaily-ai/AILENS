@@ -88,22 +88,23 @@
       }
     ],
     "poll": {
-      "kind": "binary",
-      "question": "아모레퍼시픽의 필리핀 직영몰 종료 결정, 어떻게 보세요?",
+      "kind": "emotion",
+      "question": "필리핀 직영몰 종료 소식, 처음 들었을 때 어떠셨나요?",
       "options": [
         {
-          "key": "reasonable",
-          "label": "합리적인 선택",
-          "hint": "성장률 따라 자원을 재배분하고 브랜드는 유지해요"
+          "key": "surprised",
+          "label": "의외였어요"
         },
         {
-          "key": "watch",
-          "label": "지켜봐야 한다",
-          "hint": "채널 통제권을 잃으면 다음 단계가 더 어려울 수 있어요"
+          "key": "expected",
+          "label": "예상했어요"
+        },
+        {
+          "key": "unsure",
+          "label": "잘 모르겠어요"
         }
       ]
-    },
-    "_published_at": "2026-10-08"
+    }
   },
   {
     "slug": "2026-10-05-종로3가",
@@ -182,17 +183,18 @@
       "options": [
         {
           "key": "glad",
-          "label": "반가웠어요",
-          "hint": "가볼 이유가 생겼어요"
+          "label": "반가웠어요"
         },
         {
           "key": "worried",
-          "label": "걱정됐어요",
-          "hint": "떠서 변해버릴까 봐요"
+          "label": "걱정됐어요"
+        },
+        {
+          "key": "unsure",
+          "label": "잘 모르겠어요"
         }
       ]
-    },
-    "_published_at": "2026-10-05"
+    }
   },
   {
     "slug": "2026-10-02-부캉이",
@@ -207,7 +209,8 @@
     "read_minutes": 7,
     "categories": [
       "markets",
-      "national"
+      "national",
+      "economy"
     ],
     "sections": [
       {
@@ -301,21 +304,22 @@
       }
     ],
     "poll": {
-      "kind": "binary",
-      "question": "부캉이, 지금 보내는 게 맞을까요?",
+      "kind": "emotion",
+      "question": "부캉이 소식을 처음 들었을 때 어떠셨나요?",
       "options": [
         {
-          "key": "send",
-          "label": "지금 보내야 해요",
-          "hint": "생존 우선"
+          "key": "curious",
+          "label": "신기했어요"
         },
         {
-          "key": "wait",
-          "label": "기다려줘요",
-          "hint": "강제로 몰지 말고"
+          "key": "worried",
+          "label": "걱정됐어요"
+        },
+        {
+          "key": "unsure",
+          "label": "잘 모르겠어요"
         }
       ]
-    },
-    "_published_at": "2026-10-02"
+    }
   }
 ]
