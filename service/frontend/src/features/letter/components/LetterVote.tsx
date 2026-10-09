@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import type { LetterVote as Vote } from '../data/letterTypes';
 
 // 목업 집계 — 실제 투표 API가 붙기 전까지 슬러그에서 만든 고정 기준값 위에 내 선택 1표를 더해 보여 준다. 저장은 이 기기(localStorage)뿐이다.
@@ -34,6 +35,7 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
   function pick(key: string) {
     if (choice) return;
     setChoice(key);
+    trackEvent('letter_vote', { letter: slug, option: key });
     try {
       window.localStorage.setItem(storageKey, key);
     } catch {

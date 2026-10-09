@@ -22,6 +22,8 @@ export interface LetterSource {
   axes: LetterAxis[];
   /** 서울경제·AI LENS 기사 여부(역연결 대상). */
   internal: boolean;
+  /** 목업용 자리표시 소스 — 실제 기사를 확인하지 못한 항목. 링크 없이 "예시"로 표시하고 지어낸 매체·제목을 쓰지 않는다. */
+  placeholder?: boolean;
 }
 
 export interface LetterVote {
@@ -36,8 +38,10 @@ export interface IssueLetter {
   title: string;
   /** 목록 카드의 한 줄 요약. */
   deck: string;
-  /** 3축 배지 옆에 붙는 짧은 설명(카드·헤더). */
+  /** 3축 배지 옆에 붙는 짧은 설명(상세 헤더). */
   axisLabels: { axis: LetterAxis; label: string }[];
+  /** 지난 레터 카드의 키워드 배지(기획서 v3: 방법론·젠트리피케이션·가짜뉴스 등). 없으면 3축 이름을 그대로 쓴다. */
+  cardTags?: { axis: LetterAxis; label: string }[];
   /** 주 분류 + 보조 분류(사이트 9개 분류 이름). 첫 값이 주 분류. */
   categories: string[];
   publishedAt: string;
@@ -54,7 +58,8 @@ export interface IssueLetter {
 }
 
 export const AXIS_META: Record<LetterAxis, { label: string; tone: string; soft: string }> = {
-  news: { label: '소식', tone: '#2f6fe0', soft: '#eaf1fd' },
-  substance: { label: '실체', tone: '#0f8a7c', soft: '#e5f5f2' },
-  other: { label: '다른 시각', tone: '#b86a12', soft: '#fdf1e2' },
+  // 글자색은 배경 대비 4.5:1 이상(WCAG AA)으로 맞췄다.
+  news: { label: '소식', tone: '#1f56c0', soft: '#eaf1fd' },
+  substance: { label: '실체', tone: '#0b6b60', soft: '#e5f5f2' },
+  other: { label: '다른 시각', tone: '#8f4f0a', soft: '#fdf1e2' },
 };

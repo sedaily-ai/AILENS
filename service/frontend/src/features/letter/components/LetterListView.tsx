@@ -1,14 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { IssueLetter } from '../data/letterTypes';
 import { LetterCard } from './LetterCard';
 import { LETTER_CSS } from './letterStyles';
 
 export function LetterListView({ letters }: { letters: IssueLetter[] }) {
   const [cat, setCat] = useState('전체');
-  const cats = useMemo(() => ['전체', ...new Set(letters.map((l) => l.categories[0]))], [letters]);
-  const shown = cat === '전체' ? letters : letters.filter((l) => l.categories[0] === cat);
+  // 필터 칩은 사이트 분류 순서대로, 레터가 한 편이라도 있는 분류만. 주 분류와 보조 분류 어느 쪽이든 매칭한다.
+  const cats = useMemo(() => ['전체', ...ECON_CATEGORIES.map((c) => c.label).filter((label) => letters.some((l) => l.categories.includes(label)))], [letters]);
+  const shown = cat === '전체' ? letters : letters.filter((l) => l.categories.includes(cat));
   const featured = shown.find((l) => l.featured) ?? shown[0];
   const rest = shown.filter((l) => l !== featured);
 

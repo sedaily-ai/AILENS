@@ -1,7 +1,8 @@
 // 모아쓰기 레터 목업 데이터(2026-10-09). 백엔드(issue_letters)가 생기기 전까지 화면을 확정하기 위한 것이다.
 // 출처: 마스터DB/06_콘텐츠/레터/ 의 기획서 7종. 샘플 3편(아모레퍼시픽·종로3가·부캉이)은 작성된 본문을 그대로 옮겼고,
 // 삼성전자·경매 레터는 기획서 목업에 나온 문구만으로 짧게 구성했다(mock: true — 상세에 안내 표시).
-// 소스 기사 링크 중 원문 URL을 모르는 것은 사이트 내 검색 링크로 대체했다(실제 연결은 백엔드 단계에서 article_slug로).
+// 소스: 실제로 확인된 기사(기획서·샘플 본문에 제목·링크가 있는 것)만 링크로 두고, 확인하지 못한 항목은 placeholder("(예시)")로 표시한다. 지어낸 매체명·제목을 쓰지 않는다.
+// 삼성전자 3건은 기획서 v3의 제목이고 링크는 사이트 내 검색으로 대체했다(실제 연결은 백엔드 단계에서 article_slug로).
 import type { IssueLetter } from './letterTypes';
 
 const q = (kw: string) => `/search?q=${encodeURIComponent(kw)}`;
@@ -165,7 +166,7 @@ export const MOCK_LETTERS: IssueLetter[] = [
         axes: ['other'],
         internal: true,
       },
-      { title: '아모레퍼시픽 인도법인 프리미엄 사업부 신설', outlet: 'AI LENS', href: q('아모레퍼시픽 인도법인'), axes: ['news'], internal: true },
+      { title: '(예시) 인도 프리미엄 사업부를 다룬 기사', outlet: '', href: '', axes: ['news'], internal: true, placeholder: true },
     ],
   },
   {
@@ -176,6 +177,11 @@ export const MOCK_LETTERS: IssueLetter[] = [
     axisLabels: [
       { axis: 'news', label: '선정 소식' },
       { axis: 'substance', label: '순위의 실체' },
+      { axis: 'other', label: '젠트리피케이션' },
+    ],
+    cardTags: [
+      { axis: 'news', label: '소식' },
+      { axis: 'substance', label: '방법론' },
       { axis: 'other', label: '젠트리피케이션' },
     ],
     categories: ['문화'],
@@ -229,8 +235,8 @@ export const MOCK_LETTERS: IssueLetter[] = [
     },
     sources: [
       { title: '타임아웃 "세계에서 가장 멋진 동네" 1위에 종로3가', outlet: '중앙일보', href: 'https://www.joongang.co.kr/article/25462798', axes: ['news'], internal: false },
-      { title: '타임아웃 선정 방식(현지 에디터 추천 + 본사 심사)', outlet: '타임아웃', href: q('타임아웃 세계에서 가장 멋진 동네 선정 방식'), axes: ['substance'], internal: false },
-      { title: '젠트리피케이션과 뜬 동네의 역설', outlet: '도시계획 매체', href: q('젠트리피케이션 뜬 동네'), axes: ['other'], internal: false },
+      { title: '(예시) 순위 선정 방식을 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: false, placeholder: true },
+      { title: '(예시) 젠트리피케이션을 다룬 기사', outlet: '', href: '', axes: ['other'], internal: false, placeholder: true },
     ],
   },
   {
@@ -242,6 +248,12 @@ export const MOCK_LETTERS: IssueLetter[] = [
       { axis: 'news', label: '부캉이 소동' },
       { axis: 'substance', label: '경제효과·테마주' },
       { axis: 'other', label: '가짜뉴스·동물복지' },
+    ],
+    cardTags: [
+      { axis: 'news', label: '소식' },
+      { axis: 'substance', label: '경제효과' },
+      { axis: 'other', label: '가짜뉴스' },
+      { axis: 'other', label: '동물복지' },
     ],
     categories: ['시그널', '사회'],
     publishedAt: '2026-10-02',
@@ -291,11 +303,11 @@ export const MOCK_LETTERS: IssueLetter[] = [
       ],
     },
     sources: [
-      { title: '부산 북항 수로에 상어 등장', outlet: 'AI LENS', href: q('부캉이 상어 북항'), axes: ['news'], internal: true },
-      { title: '핑크퐁 주가 하루 10% 급등, 묻지마 테마주', outlet: 'AI LENS', href: q('핑크퐁 주가 상어'), axes: ['substance'], internal: true },
-      { title: '상어 관광효과와 인근 상권 매출', outlet: 'AI LENS', href: q('부캉이 관광객 매출'), axes: ['substance'], internal: true },
-      { title: '"새끼 낳았다" 사진은 AI 가짜 — AFP 팩트체크', outlet: 'AI LENS', href: q('부캉이 AI 가짜 새끼'), axes: ['other'], internal: true },
-      { title: '1차 구조 실패, 퇴거 방식 논쟁', outlet: 'AI LENS', href: q('부캉이 구조 퇴거'), axes: ['other'], internal: true },
+      { title: '(예시) 상어 등장 소식을 다룬 기사', outlet: '', href: '', axes: ['news'], internal: true, placeholder: true },
+      { title: '(예시) 주가·테마주를 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: true, placeholder: true },
+      { title: '(예시) 관광·상권 효과를 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: true, placeholder: true },
+      { title: '(예시) AI 가짜뉴스 팩트체크를 다룬 기사', outlet: '', href: '', axes: ['other'], internal: true, placeholder: true },
+      { title: '(예시) 구조·퇴거 논쟁을 다룬 기사', outlet: '', href: '', axes: ['other'], internal: true, placeholder: true },
     ],
   },
   {
@@ -340,8 +352,8 @@ export const MOCK_LETTERS: IssueLetter[] = [
       ],
     },
     sources: [
-      { title: '25억 아파트 경매서 5억 빠진 이유', outlet: 'AI LENS', href: q('25억 아파트 경매'), axes: ['news'], internal: true },
-      { title: '경매 낙찰가율과 매수 심리', outlet: 'AI LENS', href: q('경매 낙찰가율'), axes: ['substance'], internal: true },
+      { title: '(예시) 경매 소식을 다룬 기사', outlet: '', href: '', axes: ['news'], internal: true, placeholder: true },
+      { title: '(예시) 낙찰가율을 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: true, placeholder: true },
     ],
   },
 ];

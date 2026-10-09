@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AXIS_META, type IssueLetter, type LetterSegment } from '../data/letterTypes';
 import { AxisBadge } from './AxisBadge';
 import { formatLetterDate } from './LetterCard';
@@ -9,14 +10,19 @@ import { LetterVote } from './LetterVote';
 import { SourcesPanel } from './SourcesPanel';
 import { LETTER_CSS } from './letterStyles';
 
-function Segments({ parts }: { parts: LetterSegment[] }) {
+function Segments({ parts, letterSlug }: { parts: LetterSegment[]; letterSlug: string }) {
   return (
     <>
       {parts.map((p, i) =>
         typeof p === 'string' ? (
           <span key={i}>{p}</span>
         ) : (
-          <a key={i} href={p.href} {...(p.href.startsWith('http') && !p.href.includes('ailens.sedaily.ai') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+          <a
+            key={i}
+            href={p.href}
+            onClick={() => trackEvent('letter_source_click', { letter: letterSlug, place: 'inline', outbound: p.href.startsWith('http') && !p.href.includes('ailens.sedaily.ai') })}
+            {...(p.href.startsWith('http') && !p.href.includes('ailens.sedaily.ai') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          >
             {p.text}
           </a>
         ),
@@ -27,6 +33,7 @@ function Segments({ parts }: { parts: LetterSegment[] }) {
 
 export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: IssueLetter; prevSlug?: string; nextSlug?: string }) {
   const [summaryOpen, setSummaryOpen] = useState(true);
+  const [ctaMsg, setCtaMsg] = useState(false);
 
   return (
     <div className="ld-wrap">
@@ -56,12 +63,15 @@ export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: Issue
         {letter.mock && <p className="ld-mock">목업 화면입니다. 기획서 예시 문구만으로 구성한 레터라 내용이 실제와 다를 수 있어요.</p>}
       </header>
 
-      <SourcesPanel sources={letter.sources} />
+      <SourcesPanel sources={letter.sources} letterSlug={letter.slug} />
 
       <section className="ld-sum" aria-label="1분 요약">
         <div className="ld-sum-h">
           <strong>1분 요약</strong>
-          <button type="button" className="ld-sum-btn" onClick={() => setSummaryOpen((v) => !v)} aria-expanded={summaryOpen}>
+          <button type="button" className="ld-sum-btn" onClick={() => {
+              trackEvent('letter_summary_toggle', { letter: letter.slug, open: !summaryOpen });
+              setSummaryOpen((v) => !v);
+            }} aria-expanded={summaryOpen}>
             {summaryOpen ? '접기' : '펼치기'}
           </button>
         </div>
@@ -83,7 +93,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: Issue
           <p className="ld-key">핵심: {sec.keyLine}</p>
           {sec.paragraphs.map((para, j) => (
             <p key={j} className="ld-p">
-              <Segments parts={para} />
+              <Segments parts={para} letterSlug={letter.slug} />
             </p>
           ))}
         </section>
@@ -95,6 +105,24 @@ export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: Issue
       </section>
 
       <LetterVote slug={letter.slug} vote={letter.vote} />
+
+      <section className="ld-next" aria-label="다음 레터">
+        <div>
+          <strong>다음 레터는 내일 오전에 도착해요</strong>
+          <p>소식, 실체, 다른 시각으로 엮은 오늘의 핵심 이슈를 매일 받아보세요.</p>
+        </div>
+        <button
+          type="button"
+          className="ld-next-btn"
+          onClick={() => {
+            trackEvent('letter_next_cta_click', { letter: letter.slug });
+            setCtaMsg(true);
+          }}
+        >
+          받아보기
+        </button>
+        {ctaMsg && <p className="ld-next-msg">구독 기능을 준비 중이에요. 열리면 가장 먼저 알려드릴게요.</p>}
+      </section>
 
       <div className="ld-nav">
         <Link href="/letter" className="ld-btn">
