@@ -71,23 +71,41 @@ def test_pick_digest_orders_by_score_skips_sent_and_unrelated():
     cands = [letter(1, 1, topics=[("rates", "금리", True)]), letter(2, 1, cats=[("property", True)]), letter(3, 1, topics=[("kospi", "코스피", True)]),
              letter(4, 1, topics=[("rates", "금리", True)]), letter(5, 1, topics=[("rates", "금리", False)])]
     out = r.pick_digest(interests, cands, {4}, NOW)
-    assert [l["id"] for l in out] == [1, 5, 2]  # 3은 무관, 4는 이미 보냄. 상위 3편
+    assert [l["id"] for l in out] == [1]  # 3은 무관, 4는 이미 보냄. 한 번에 한 편(점수 1위)
+    assert [l["id"] for l in r.pick_digest(interests, cands, {4, 1}, NOW)] == [5]  # 다음 발송에는 다음 편
     assert out[0]["reason_text"] == "관심 주제 '금리'를 다뤘어요"
     assert r.pick_digest(interests, [letter(3, 1, topics=[("kospi", "코스피", True)])], set(), NOW) == []  # 겹침 없으면 보내지 않음
 
 
-def test_digest_mail_has_unsubscribe_and_no_promotional_wording():
-    r = _r()
+LETTER = {"slug": "s1", "issue_no": 4, "title": "제목 <x>", "deck": "한 줄", "category_names": ["시그널", "경제"], "published_at": "2026-10-09T01:00:00+00:00",
+          "read_minutes": 3, "summary": ["첫째 줄 <b>", "둘째 줄"], "editor_note": "에디터 말", "topics": [{"name": "금리"}],
+          "sections": [{"axis": "news", "axis_label": "선정 소식", "heading": "소제목", "key_line": "소식 핵심", "paragraphs": [["앞 ", {"text": "링크", "href": "https://www.sedaily.com/a?x=1&y=2"}, " 뒤"]]},
+                       {"axis": "other", "axis_label": "다른 시각", "heading": "시각", "key_line": "시각 핵심", "paragraphs": [["본문"]]}],
+          "sources": [{"title": "기사 제목", "outlet": "서울경제", "url": "https://www.sedaily.com/a", "axes": ["news"]}],
+          "poll": {"question": "어떠셨나요?", "options": [{"label": "의외"}, {"label": "잘 모르겠어요"}]}}
+
+
+def test_render_letter_follows_site_structure_and_escapes():
+    _r()
     import letter_mail
-    out = r.pick_digest({("topic", "rates")}, [letter(1, 1, topics=[("rates", "금리", True)])], set(), NOW)
-    subject, html_body, text = letter_mail.render_digest(out, "daily", "TOKEN123")
-    assert "unsubscribe?token=TOKEN123" in html_body and "unsubscribe?token=TOKEN123" in text
-    assert "서울특별시 종로구" in html_body and "/letter/l1" in html_body
-    for banned in ("놓치지", "지금 바로", "꼭 ", "필독", "추천"):
-        assert banned not in html_body and banned not in text
-    assert subject.startswith("[AI LENS 레터]")
-    s2, h2, _ = letter_mail.render_digest(out + out, "weekly", "T")
-    assert "외 1편" in s2
+    subject, h, text = letter_mail.render_letter(LETTER, "관심 주제 '금리'를 다뤘어요", "TOKEN123")
+    assert subject == "[AI LENS 레터] 제목 <x>"
+    for needle in ("제목 &lt;x&gt;", "이 레터에 쓰인 기사", "1분 요약", "첫째 줄 &lt;b&gt;", "핵심: 소식 핵심", "핵심: 시각 핵심", "에디터 한마디", "어떠셨나요?", "잘 모르겠어요", "사이트에서 보기"):
+        assert needle in h, needle
+    assert h.index("이 레터에 쓰인 기사") < h.index("1분 요약") < h.index("핵심: 소식 핵심") < h.index("에디터 한마디") < h.index("어떠셨나요?")  # 사이트와 같은 순서
+    assert 'href="https://www.sedaily.com/a?x=1&amp;y=2"' in h  # 본문 인라인 링크 유지
+    assert "unsubscribe?token=TOKEN123" in h and "unsubscribe?token=TOKEN123" in text and "서울특별시 종로구" in h
+    assert "링크(https://www.sedaily.com/a?x=1&y=2)" in text
+    for banned in ("놓치지", "지금 바로", "필독", "추천"):
+        assert banned not in h and banned not in text
+
+
+def test_render_letter_without_optional_parts():
+    _r()
+    import letter_mail
+    bare = {**LETTER, "poll": None, "editor_note": "", "sources": [], "summary": [], "topics": []}
+    _, h, _ = letter_mail.render_letter(bare, "", "T")
+    assert "어떠셨나요?" not in h and "에디터 한마디" not in h and "이 레터에 쓰인 기사" not in h and "1분 요약" not in h
 
 
 def test_confirm_mail_escapes_and_mentions_ignore_if_not_requested():

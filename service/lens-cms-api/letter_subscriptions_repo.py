@@ -14,6 +14,7 @@ import secrets
 from typing import Any, Dict, List, Optional, Tuple
 
 import interests_repo
+import issue_letters_repo
 import letter_mail
 from db import get_cursor
 from letter_errors import LetterError
@@ -24,7 +25,7 @@ CONSENT_VERSION = "2026-10-10"
 FREQUENCIES = ("daily", "weekly")  # DB 는 instant 도 허용하지만 아직 열지 않는다
 CONFIRM_TTL = dt.timedelta(hours=48)
 RESEND_COOLDOWN = dt.timedelta(minutes=10)
-DIGEST_LIMIT = 3
+DIGEST_LIMIT = 1  # 한 통에 레터 한 편(본문 전체)을 보낸다. 겹치는 레터가 여럿이어도 한 번에 한 편씩, 다음 발송에 다음 편
 DIGEST_WINDOW_DAYS = 14
 EMAIL_RE = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]{2,}$")
 KST = dt.timezone(dt.timedelta(hours=9))
@@ -223,8 +224,18 @@ def run_send(kind: str, send_date: dt.date, send_hour: int, dry_run: bool = True
                 cur.execute("INSERT INTO letter_send_item_letters (item_id, letter_id, position) VALUES (%s,%s,%s)", (row["id"], l["id"], pos))
             queued.append((row["id"], s, letters))
     results = {"sent": 0, "failed": 0}
+    full_cache: Dict[str, Optional[Dict[str, Any]]] = {}
     for item_id, s, letters in queued:
-        subject, html_body, text_body = letter_mail.render_digest(letters, kind, s["unsubscribe_token"])
+        slug = letters[0]["slug"]
+        if slug not in full_cache:
+            full_cache[slug] = issue_letters_repo.get_published(slug)
+        full = full_cache[slug]
+        if not full:  # 그새 내려간 레터 — 보내지 않고 실패로 남긴다
+            with get_cursor() as cur:
+                cur.execute("UPDATE letter_send_items SET status='failed', error='letter not published' WHERE id=%s", (item_id,))
+            results["failed"] += 1
+            continue
+        subject, html_body, text_body = letter_mail.render_letter(full, letters[0]["reason_text"], s["unsubscribe_token"])
         try:
             mid = letter_mail.send_mail(s["email_norm"], subject, html_body, text_body, letter_mail.unsubscribe_url(s["unsubscribe_token"]))
             status, err = "sent", None
