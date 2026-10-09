@@ -1,6 +1,6 @@
 import { ERAS, DECADES } from '@/shared/data/timelineEvents';
 import type { MetadataRoute } from 'next';
-import { fetchAllLensPosts, fetchPaperDates, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { fetchAllLensPosts, fetchAllVideos, fetchPaperDates, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { kstTodayStr } from '@/shared/lib/date/date';
 // 게임 목록은 단일 출처(shared/data/games.ts)에서 가져온다. page 모듈에서 가져오면 FSD 경계를 위반하고 프로덕션 빌드를 막는다.
@@ -70,19 +70,19 @@ function daysBetween(isoDate: string): number {
   return Math.max(0, Math.floor((today - target) / (1000 * 60 * 60 * 24)));
 }
 
-function videoSitemapExtension(l: CmsLens): Pick<MetadataRoute.Sitemap[number], 'videos'> {
-  const v = l.lenses?.find((x) => x.label === '영상' && x.video_url);
+// 기사 목록 API는 응답 경량화로 lenses[].video_url을 비워 내려준다. 영상 정보는 영상 채널 목록에 있으므로 기사 id(채널 접미사 -video 제거)로 연결한다.
+function videoSitemapExtension(l: CmsLens, byLensId: Map<string, CmsVideo>): Pick<MetadataRoute.Sitemap[number], 'videos'> {
+  const v = byLensId.get(l.id);
   if (!v?.video_url) return {};
-  const title = seoHeadline(l.headline);
   return {
     videos: [
       {
-        title: escapeXml(title),
+        title: escapeXml(seoHeadline(l.headline)),
         // Next는 videos 필드를 이스케이프하지 않으며 `&t=24s` 같은 쿼리가 그대로 나가면 사이트맵 전체가 파싱 오류가 된다.
         thumbnail_loc: escapeXml(v.thumbnail_url || l.cover_image_url || `${BASE}/og-image.png`),
-        description: escapeXml(l.context || title),
+        description: escapeXml(l.context || seoHeadline(l.headline)),
         content_loc: escapeXml(v.video_url),
-        publication_date: l.published_at || `${l.date}T07:00:00+09:00`,
+        publication_date: v.published_at || l.published_at || `${l.date}T07:00:00+09:00`,
         family_friendly: 'yes',
       },
     ],
@@ -92,6 +92,7 @@ function videoSitemapExtension(l: CmsLens): Pick<MetadataRoute.Sitemap[number], 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
   const lensPromise = fetchAllLensPosts();
+  const videosPromise = fetchAllVideos(); // 실패 시 빈 배열을 돌려주므로 먼저 시작해도 안전하다
 
   // 정적 라우트
   for (const r of STATIC_ROUTES) {
@@ -112,6 +113,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     // 최신 1,000건 상한을 넘는 과거 글까지 전부 포함한다(fetchAllLensPosts 참조).
     const lensPosts = await lensPromise;
+    const byLensId = new Map<string, CmsVideo>((await videosPromise).map((v) => [v.id.replace(/-video$/, ''), v]));
     for (const l of lensPosts) {
       const daysOld = daysBetween(l.date);
       entries.push({
@@ -130,7 +132,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           ),
         ),
         // 영상 형식이 있으면 기사 페이지에 있는 영상(VideoObject와 같은 값)을 알린다. content_loc가 없으면 넣지 않는다.
-        ...videoSitemapExtension(l),
+        ...videoSitemapExtension(l, byLensId),
       });
     }
   } catch {
