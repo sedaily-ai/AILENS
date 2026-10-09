@@ -45,6 +45,7 @@ DynamoDB에서 PostgreSQL로 이관하기 위한 스키마 설계가 어떤 순�
 | [v1.34](v1.34-user_archives-article_no-fk-수정.md) | 2026-09-11 | **버그 수정** — "서랍에 담기" 500 에러. `user_archives.article_no` FK가 옛 `articles`(짧은 코드) 테이블을 가리켜 CMS 슬러그가 매번 FK 위반·길이초과로 실패(한 번도 성공한 적 없었음). `publications(slug)`로 재연결 |
 | [v1.35](v1.35-선정실험실-테이블-신설.md) | 2026-09-28 | **테이블 신설** — `selection_runs`/`selection_articles`. mustknow_auto "일반" 선정 결과를 날짜별로 모아 채점하는 "선정 실험실" admin 화면을 목업에서 실제 저장으로 전환 |
 | [v1.36](v1.36-ddb-잔여-이관.md) | 2026-10-09 | **DynamoDB 잔여 이관 설계** — `candidate_seen`(mustknow 본 후보 11,359건)·`admin_jobs`(관리자 비동기 작업 상태)·`daily_questions`(오늘의 질문 캐시) 신설. 개념·논리·물리·확장성은 `lens-erd-src/16-ddb-잔여-이관-설계.md`. 브리핑·챗봇·웹소켓은 이관하지 않고 폐기 |
+| [v1.37](v1.37-이슈레터-신설.md) | 2026-10-09 | **테이블 신설(초안·미적용)** — 이슈 레터(모아쓰기) 7개: `issue_letters`·분류·섹션·출처(자사 기사 FK 또는 승인된 외부)·투표 질문·선택지·투표(해시). 설계·API는 `lens-erd-src/17-이슈레터-설계.md` |
 
 새 버전을 추가할 땐 `vX.Y-주제.md` 파일을 만들고 이 표에 한 줄, 그리고
 앞뒤 버전 파일의 "이전/다음" 링크도 같이 갱신한다.
