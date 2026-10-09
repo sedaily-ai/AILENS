@@ -11,7 +11,7 @@ import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';
 import type { ArticleNeighbor } from './components/article/ArticleNeighborNav';
-import { resolveShareImages, type ShareImages } from './shareImage';
+import { resolveShareImages, type ShareImages } from '@/shared/lib/seo/shareImage';
 
 import { SITE_URL } from '@/shared/constants/site';
 
