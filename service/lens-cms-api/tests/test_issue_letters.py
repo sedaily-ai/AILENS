@@ -81,6 +81,8 @@ def test_validate_normalizes_valid_payload():
     {"slug": "no-date"},
     {"title": ""},
     {"categories": []},
+    {"categories": ["economics"]},
+    {"categories": ["industry", "industry"]},
     {"sections": [{"axis": "weird", "heading": "h", "key_line": "k", "paragraphs": []}]},
     {"sections": [{"axis": "news", "heading": "h", "key_line": "", "paragraphs": []}]},
     {"sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [[{"text": "x", "href": "javascript:1"}]]}]},
@@ -100,7 +102,7 @@ def _publishable(**over):
     url = lambda n: f"https://www.sedaily.com/article/{n}"
     seg = lambda n: {"text": f"t{n}", "href": url(n) + "?ref=sedailyEng"}
     letter = {
-        "summary": ["s"], "editor_note": "e", "category_names": ["산업"],
+        "summary": ["s"], "editor_note": "e", "categories": ["industry"],
         "sections": [{"key_line": "k", "paragraphs": [[seg(1), seg(2)]]}, {"key_line": "k", "paragraphs": [[seg(3)]]}, {"key_line": "k", "paragraphs": [["x"]]}],
         "sources": [{"article_no": str(n), "title": f"t{n}", "url": url(n)} for n in (1, 2, 3)],
         "poll": {"kind": "binary"},
@@ -130,8 +132,9 @@ def test_publish_rejects_inline_link_not_in_sources_and_placeholder():
 
 
 def test_publish_blocks_non_emotion_poll_for_finance():
-    assert any("감정 반응형" in p for p in _repo().publish_problems(_publishable(category_names=["금융"])))
-    assert _repo().publish_problems(_publishable(category_names=["금융"], poll={"kind": "emotion"})) == []
+    assert any("감정 반응형" in p for p in _repo().publish_problems(_publishable(categories=["finance"])))
+    assert _repo().publish_problems(_publishable(categories=["markets", "national"])) == []  # 시그널·사회는 제한 없음
+    assert _repo().publish_problems(_publishable(categories=["finance"], poll={"kind": "emotion"})) == []
 
 
 def test_publish_requires_admin_and_blocks_self_approval(monkeypatch):

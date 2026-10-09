@@ -22,7 +22,12 @@ from db import get_cursor
 AXES = ("news", "substance", "other")
 STATUSES = ("draft", "in_review", "published", "archived")
 POLL_KINDS = ("binary", "emotion")
-FINANCE_CATEGORIES = ("금융", "증권")
+# 사이트 분류의 정본은 프론트 shared/constants/econCategories.ts 다. DB categories 테이블은 옛 7분류라 쓰지 않는다(v1.38).
+SITE_CATEGORIES = {
+    "markets": "시그널", "property": "부동산", "economy": "경제", "finance": "금융", "industry": "산업",
+    "politics": "정치", "national": "사회", "international": "국제", "culture": "문화",
+}
+FINANCE_SLUGS = ("finance",)  # 금융 분류 — 투표는 감정 반응형만(시장·주가 소재 전반은 편집 판단)
 MIN_SECTIONS = 3
 MIN_DISTINCT_INLINE_ARTICLES = 3
 _SLUG_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}-[^\s/?#]{1,200}$")
@@ -104,6 +109,9 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     categories = data.get("categories") or []
     if not isinstance(categories, list) or not categories or len(categories) > 6:
         raise LetterError("categories 는 1~6개의 분류 slug 배열이어야 합니다(첫 번째가 주 분류)")
+    unknown = [c for c in categories if c not in SITE_CATEGORIES]
+    if unknown or len(set(categories)) != len(categories):
+        raise LetterError(f"알 수 없거나 중복된 분류: {', '.join(map(str, unknown)) or '중복'} (허용: {', '.join(SITE_CATEGORIES)})")
 
     sections = []
     for i, sec in enumerate(data.get("sections") or []):
@@ -217,8 +225,8 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
         problems.append(f"본문에 서로 다른 자사 기사 링크가 {MIN_DISTINCT_INLINE_ARTICLES}개 이상 필요합니다(현재 {distinct_own}개)")
 
     poll = letter.get("poll")
-    if poll and poll.get("kind") != "emotion" and any(c in FINANCE_CATEGORIES for c in letter.get("category_names") or []):
-        problems.append("금융 소재 레터의 투표는 감정 반응형(emotion)만 허용됩니다")
+    if poll and poll.get("kind") != "emotion" and any(c in FINANCE_SLUGS for c in letter.get("categories") or []):
+        problems.append("금융 분류 레터의 투표는 감정 반응형(emotion)만 허용됩니다")
     return problems
 
 
@@ -240,9 +248,8 @@ def _iso(v: Any) -> Optional[str]:
 
 
 def _load_children(cur, letter_id: int) -> Dict[str, Any]:
-    cur.execute(
-        "SELECT c.name, c.slug, lc.is_primary FROM issue_letter_categories lc JOIN categories c ON c.id = lc.category_id "
-        "WHERE lc.letter_id = %s ORDER BY lc.is_primary DESC, c.sort_order, c.id", (letter_id,))
+    cur.execute("SELECT category_slug, is_primary FROM issue_letter_categories "
+                "WHERE letter_id = %s ORDER BY is_primary DESC, category_slug", (letter_id,))
     cats = cur.fetchall()
     cur.execute("SELECT axis, axis_label, heading, key_line, paragraphs FROM issue_letter_sections "
                 "WHERE letter_id = %s ORDER BY position", (letter_id,))
@@ -258,8 +265,9 @@ def _load_children(cur, letter_id: int) -> Dict[str, Any]:
     if poll:
         cur.execute("SELECT key, label, hint FROM issue_letter_poll_options WHERE letter_id = %s ORDER BY position", (letter_id,))
         poll = {"kind": poll["kind"], "question": poll["question"], "options": cur.fetchall()}
-    return {"categories": [c["slug"] for c in cats], "category_names": [c["name"] for c in cats],
-            "primary_category": next((c["name"] for c in cats if c["is_primary"]), None),
+    names = [SITE_CATEGORIES.get(c["category_slug"], c["category_slug"]) for c in cats]
+    return {"categories": [c["category_slug"] for c in cats], "category_names": names,
+            "primary_category": next((SITE_CATEGORIES.get(c["category_slug"]) for c in cats if c["is_primary"]), None),
             "sections": sections, "sources": sources, "poll": poll}
 
 
@@ -277,8 +285,7 @@ def list_published(category: Optional[str] = None, limit: int = 20, before: Opti
     sql = "SELECT l.* FROM issue_letters l WHERE l.status = 'published' AND l.deleted_at IS NULL"
     params: List[Any] = []
     if category:
-        sql += (" AND EXISTS (SELECT 1 FROM issue_letter_categories lc JOIN categories c ON c.id = lc.category_id "
-                "WHERE lc.letter_id = l.id AND c.slug = %s)")
+        sql += " AND EXISTS (SELECT 1 FROM issue_letter_categories lc WHERE lc.letter_id = l.id AND lc.category_slug = %s)"
         params.append(category)
     if before:
         sql += " AND l.published_at < %s"
@@ -358,15 +365,10 @@ def search_candidates(q: str, limit: int = 20) -> List[Dict[str, Any]]:
 
 def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
     import json
-    cur.execute("SELECT id, slug FROM categories WHERE slug = ANY(%s)", (v["categories"],))
-    found = {r["slug"]: r["id"] for r in cur.fetchall()}
-    missing = [c for c in v["categories"] if c not in found]
-    if missing:
-        raise LetterError(f"알 수 없는 분류: {', '.join(missing)}")
     cur.execute("DELETE FROM issue_letter_categories WHERE letter_id = %s", (letter_id,))
     for i, slug in enumerate(v["categories"]):
-        cur.execute("INSERT INTO issue_letter_categories (letter_id, category_id, is_primary) VALUES (%s,%s,%s)",
-                    (letter_id, found[slug], i == 0))
+        cur.execute("INSERT INTO issue_letter_categories (letter_id, category_slug, is_primary) VALUES (%s,%s,%s)",
+                    (letter_id, slug, i == 0))
     cur.execute("DELETE FROM issue_letter_sections WHERE letter_id = %s", (letter_id,))
     for i, s in enumerate(v["sections"]):
         cur.execute(
