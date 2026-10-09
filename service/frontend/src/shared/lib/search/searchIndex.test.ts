@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { countByCategory, DEFAULT_PARAMS, parseTerms, search, splitHighlight, topKeywords, UNCATEGORIZED, type SearchRecord } from './searchIndex';
+import { countByCategory, countBySub, DEFAULT_PARAMS, parseTerms, search, splitHighlight, topKeywords, UNCATEGORIZED, type SearchRecord } from './searchIndex';
 
 const rec = (over: Partial<SearchRecord>): SearchRecord => ({ i: 'x', h: '', s: '', c: '', u: '', d: '2026-10-09', t: '', p: '', ...over });
 
@@ -64,6 +64,36 @@ describe('search', () => {
     expect(counts.get('증시')).toBe(1);
     expect(counts.get('산업')).toBe(1);
     expect(counts.get(UNCATEGORIZED)).toBe(1);
+  });
+});
+
+describe('하위 분류', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-09T03:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+  const subs: SearchRecord[] = [
+    rec({ i: 'p1', h: '삼성전자 반도체 호황', c: '산업', u: '대기업', d: '2026-10-09' }),
+    rec({ i: 'p2', h: '반도체 장비 중소기업', c: '산업', u: '중기·IT', d: '2026-10-08' }),
+    rec({ i: 'p3', h: '반도체 주가 급등', c: '시그널', u: '국내증시', d: '2026-10-07' }),
+    rec({ i: 'p4', h: '반도체 슈퍼사이클', c: '산업', u: '', d: '2026-10-06' }),
+  ];
+  it('sub 필터는 그 하위 분류만 남긴다', () => {
+    const ids = search(subs, { ...DEFAULT_PARAMS, q: '반도체', category: '산업', sub: '대기업' }).map((h) => h.rec.i);
+    expect(ids).toEqual(['p1']);
+  });
+  it('하위 분류별 개수는 sub 필터를 무시하고 센다(하위 없는 글은 세지 않는다)', () => {
+    const counts = countBySub(subs, { ...DEFAULT_PARAMS, q: '반도체', category: '산업', sub: '대기업' });
+    expect([...counts.entries()].sort()).toEqual([['대기업', 1], ['중기·IT', 1]]);
+  });
+  it('대분류를 고르지 않으면 하위 개수를 세지 않는다', () => {
+    expect(countBySub(subs, { ...DEFAULT_PARAMS, q: '반도체' }).size).toBe(0);
+  });
+  it('분류별 개수는 하위 분류 필터를 무시한다', () => {
+    const counts = countByCategory(subs, { ...DEFAULT_PARAMS, q: '반도체', category: '산업', sub: '대기업' });
+    expect(counts.get('산업')).toBe(3);
+    expect(counts.get('시그널')).toBe(1);
   });
 });
 

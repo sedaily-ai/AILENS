@@ -32,12 +32,14 @@ export interface SearchParams {
   period: SearchPeriod;
   /** 분류 라벨. 빈 문자열이면 전체. UNCATEGORIZED는 미분류. */
   category: string;
+  /** 하위 분류. 빈 문자열이면 전체. category가 있을 때만 의미가 있다. */
+  sub: string;
 }
 
 export const UNCATEGORIZED = '기타';
 export const MAX_QUERY_LENGTH = 100;
 
-export const DEFAULT_PARAMS: SearchParams = { q: '', scope: 'all', sort: 'latest', period: 'all', category: '' };
+export const DEFAULT_PARAMS: SearchParams = { q: '', scope: 'all', sort: 'latest', period: 'all', category: '', sub: '' };
 
 let memo: Promise<SearchRecord[]> | null = null;
 
@@ -102,6 +104,7 @@ export function search(items: SearchRecord[], params: SearchParams): SearchHit[]
       const cat = rec.c || UNCATEGORIZED;
       if (cat !== params.category) continue;
     }
+    if (params.sub && rec.u !== params.sub) continue;
     const title = rec.h.toLowerCase();
     const summary = rec.s.toLowerCase();
     let score = 0;
@@ -127,12 +130,22 @@ export function search(items: SearchRecord[], params: SearchParams): SearchHit[]
   return hits;
 }
 
-/** 분류별 결과 수(탭 숫자용). 분류 필터는 무시하고 나머지 조건만 적용한다. */
+/** 분류별 결과 수(탭 숫자용). 분류·하위 분류 필터는 무시하고 나머지 조건만 적용한다. */
 export function countByCategory(items: SearchRecord[], params: SearchParams): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const h of search(items, { ...params, category: '' })) {
+  for (const h of search(items, { ...params, category: '', sub: '' })) {
     const cat = h.rec.c || UNCATEGORIZED;
     counts.set(cat, (counts.get(cat) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** 고른 분류 안의 하위 분류별 결과 수(하위 칩 숫자용). 하위 분류 필터는 무시하고 나머지 조건만 적용한다. 하위 분류가 없는 글은 세지 않는다. */
+export function countBySub(items: SearchRecord[], params: SearchParams): Map<string, number> {
+  const counts = new Map<string, number>();
+  if (!params.category) return counts;
+  for (const h of search(items, { ...params, sub: '' })) {
+    if (h.rec.u) counts.set(h.rec.u, (counts.get(h.rec.u) ?? 0) + 1);
   }
   return counts;
 }

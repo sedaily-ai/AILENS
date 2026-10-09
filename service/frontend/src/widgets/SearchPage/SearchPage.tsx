@@ -6,10 +6,12 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { addRecentSearch, clearRecentSearches, getRecentSearches } from '@/shared/lib/search/recentSearches';
 import {
   countByCategory,
+  countBySub,
   DEFAULT_PARAMS,
   loadSearchIndex,
   MAX_QUERY_LENGTH,
@@ -45,6 +47,7 @@ function paramsFromUrl(sp: URLSearchParams): SearchParams {
     scope: pick(sp.get('scope'), SCOPES, DEFAULT_PARAMS.scope),
     period: pick(sp.get('period'), PERIODS, DEFAULT_PARAMS.period),
     category: sp.get('cat') ?? '',
+    sub: sp.get('cat') ? (sp.get('sub') ?? '') : '', // 하위 분류는 대분류를 골랐을 때만 의미가 있다
   };
 }
 
@@ -55,6 +58,7 @@ function urlFor(p: SearchParams): string {
   if (p.scope !== DEFAULT_PARAMS.scope) qs.set('scope', p.scope);
   if (p.period !== DEFAULT_PARAMS.period) qs.set('period', p.period);
   if (p.category) qs.set('cat', p.category);
+  if (p.category && p.sub) qs.set('sub', p.sub);
   const s = qs.toString();
   return s ? `/search?${s}` : '/search';
 }
@@ -112,6 +116,13 @@ export function SearchPage() {
   const terms = useMemo(() => parseTerms(params.q), [params.q]);
   const hits = useMemo(() => (items ? search(items, params) : []), [items, params]);
   const counts = useMemo(() => (items ? countByCategory(items, params) : new Map<string, number>()), [items, params]);
+  // 고른 대분류의 하위 분류 칩: 정의된 하위 분류 순서대로, 지금 결과가 있는 것만(숫자 포함).
+  const subCounts = useMemo(() => (items ? countBySub(items, params) : new Map<string, number>()), [items, params]);
+  const subChips = useMemo(() => {
+    const cfg = ECON_CATEGORIES.find((c) => c.label === params.category);
+    if (!cfg) return [];
+    return econSubcategoriesFor(cfg.slug).filter((s) => (subCounts.get(s) ?? 0) > 0 || s === params.sub);
+  }, [params.category, params.sub, subCounts]);
   const totalAllCategories = useMemo(() => [...counts.values()].reduce((a, b) => a + b, 0), [counts]);
   const keywords = useMemo(() => (items ? topKeywords(items, 3, 10) : []), [items]);
   const hasQuery = terms.length > 0;
@@ -172,6 +183,12 @@ export function SearchPage() {
           .sp-tab:hover { color: #111827; }
           .sp-tab[aria-selected='true'] { color: #111827; font-weight: 800; border-bottom-color: #111827; }
           .sp-tab small { margin-left: 4px; font-size: 12.5px; font-weight: 500; color: #9ca3af; }
+          .sp-subs { display: flex; gap: 8px; margin-top: 14px; overflow-x: auto; scrollbar-width: none; }
+          .sp-subs::-webkit-scrollbar { display: none; }
+          .sp-sub { flex: none; height: 34px; padding: 0 14px; border: none; border-radius: 999px; background: #f1f3f6; font: inherit; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer; white-space: nowrap; }
+          .sp-sub:hover { background: #e4e9f2; }
+          .sp-sub[aria-pressed='true'] { background: #1f2937; color: #fff; }
+          .sp-sub small { margin-left: 5px; font-size: 12px; font-weight: 500; opacity: .7; }
           .sp-count { margin: 18px 0 0; font-size: 14px; color: #6b7280; }
           .sp-count b { color: #111827; }
           .sp-list { margin: 4px 0 0; padding: 0; list-style: none; }
@@ -245,16 +262,30 @@ export function SearchPage() {
             </dl>
 
             <div role="tablist" aria-label="분류" className="sp-tabs">
-              <button type="button" role="tab" className="sp-tab" aria-selected={params.category === ''} onClick={() => go({ ...params, category: '' }, true)}>
+              <button type="button" role="tab" className="sp-tab" aria-selected={params.category === ''} onClick={() => go({ ...params, category: '', sub: '' }, true)}>
                 전체{items && <small>{totalAllCategories}</small>}
               </button>
               {tabs.map((c) => (
-                <button key={c} type="button" role="tab" className="sp-tab" aria-selected={params.category === c} onClick={() => go({ ...params, category: c }, true)}>
+                <button key={c} type="button" role="tab" className="sp-tab" aria-selected={params.category === c} onClick={() => go({ ...params, category: c, sub: '' }, true)}>
                   {c}
                   <small>{counts.get(c) ?? 0}</small>
                 </button>
               ))}
             </div>
+
+            {subChips.length > 0 && (
+              <div role="group" aria-label="하위 분류" className="sp-subs">
+                <button type="button" className="sp-sub" aria-pressed={params.sub === ''} onClick={() => go({ ...params, sub: '' }, true)}>
+                  전체
+                </button>
+                {subChips.map((s) => (
+                  <button key={s} type="button" className="sp-sub" aria-pressed={params.sub === s} onClick={() => go({ ...params, sub: s }, true)}>
+                    {s}
+                    <small>{subCounts.get(s) ?? 0}</small>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {items === null && !error && (
               <div aria-busy="true" aria-label="검색 중">
