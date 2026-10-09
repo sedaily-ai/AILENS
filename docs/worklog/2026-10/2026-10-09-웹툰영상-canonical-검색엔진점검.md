@@ -59,3 +59,21 @@ Before → After
 - 8월 11일 빵지순례 기사의 -webtoon/-podcast/-video 접미사 중복 lens 글 3건(분류 없음, 원문 링크 없음)을 소프트 삭제(deleted_at). 드라이런 3건 일치 확인 후 실행, 삭제 목록은 2026-10-09-news폴백-중복글3건-삭제목록.json. 복구는 deleted_at을 NULL로.
 - 배포(오후~밤): 5개 커밋 한 번에 배포, CloudFront 전체 무효화, 옛 웹툰·영상·레터 주소 308 라이브 확인.
 - 다음: /news 폴백 라우트(app/(economy)/news)와 lensUrl FALLBACK 제거 가능(분류 없는 기사 0건).
+
+## 봇·AI 크롤러 대응 최적화 (같은 날 밤)
+점검(라이브 실측·코드·CloudFront/ECS 설정·DB DDL) 결과 → 조치
+
+Before → After
+- sitemap.xml 3.1MB 단일 파일·무압축·CDN 미캐시 → 색인 + core + 월별 3개(합계 3,325 URL, 파일 최대 2MB), s-maxage=3600·stale-while-revalidate, 월 파일 CDN Hit 확인.
+- 기사·RSS·뉴스사이트맵·사이트맵이 렌더마다 3MB 전체 목록을 오리진에서 재수신 → 서버 메모리 5분 보관(실패 시 이전 값), 발행 webhook(/api/revalidate)이 즉시 비움.
+- robots/llms/rss/폰트/아이콘 Cache-Control 명시, /api/health 추가, 기사 <time> 태그, llms.txt 사이트맵 안내 갱신.
+- lens-cms-api(EC2 배포): 목록 5초 캐시(동시 만료 단일 쿼리, admin 쓰기 시 비움), 날짜 필터 KST 하루 범위로(결과 동일: 6개 쿼리 전수 비교 차이 0), statement_timeout 20초. 서버 nginx는 이미 gzip.
+- CloudFront: HTTP/3 활성화(http2 → http2and3). 변경 전 설정은 2026-10-09-cloudfront-변경전-설정백업.json.
+
+하지 않은 것(결정)
+- ECS 오토스케일링·WAF·Origin Shield: 현재 트래픽에 과함(사용자 판단, 비용). 트래픽이 늘면 재검토.
+- CloudFront 404/5xx 에러 캐싱: 이번 시도에서 API 형식 오류 후 권한 차단. 항목(404=60s, 5xx=10s)·형식(ResponsePagePath/ResponseCode 빈 문자열 포함) 정리됨, 사용자 허가 시 재시도.
+- ALB 헬스체크 경로를 /api/health로 변경: 미실행(프론트 배포 완료, /api/health 200 확인).
+
+다음
+- 1주 뒤 Search Console 사이트맵 색인(sitemap.xml) 제출·발견 페이지 수 확인(사용자).
