@@ -6,6 +6,29 @@ export const LETTER_CSS = `
   .lt-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .06em; color: #5b8def; }
   .lt-h1 { margin: 8px 0 0; font-family: "Noto Serif KR", serif; font-size: clamp(24px, 4.2vw, 34px); font-weight: 700; line-height: 1.3; letter-spacing: -0.02em; color: #111827; text-wrap: balance; }
   .lt-sub { margin: 10px 0 0; font-size: 15px; line-height: 1.7; color: #4b5563; max-width: 640px; }
+  .lt-editors { margin: 4px 0 28px; }
+  .lt-ed-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .lt-ed-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px; border-radius: 16px; background: #fff; border: 1px solid #eceef2; box-shadow: 0 1px 2px rgba(17,24,39,.04); text-decoration: none; color: inherit; transition: box-shadow .2s, transform .2s; }
+  .lt-ed-card:hover { box-shadow: 0 10px 28px rgba(17,24,39,.09); transform: translateY(-2px); }
+  .lt-avatar { display: inline-grid; place-items: center; border-radius: 50%; font-weight: 700; flex: none; }
+  .lt-ed-name { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: #111827; }
+  .lt-ed-name em { font-style: normal; padding: 1px 7px; border-radius: 999px; background: #f1f3f6; color: #4b5563; font-size: 11px; font-weight: 700; }
+  .lt-ed-title { font-size: 13px; color: #4b5563; }
+  .lt-ed-count { margin-top: 4px; font-size: 12.5px; font-weight: 600; color: #6b7280; }
+  .lt-sec-inline { margin: 0; }
+  .lt-ed-head { display: flex; align-items: flex-start; gap: 18px; padding: 20px 0 6px; flex-wrap: wrap; }
+  .lt-ed-headtext { flex: 1 1 320px; min-width: 0; }
+  .lt-ed-h1 { margin: 0; font-family: "Noto Serif KR", serif; font-size: 26px; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 10px; }
+  .lt-ed-badge { padding: 2px 9px; border-radius: 999px; background: #f1f3f6; color: #4b5563; font-family: inherit; font-size: 12px; font-weight: 700; }
+  .lt-ed-sub { margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4b5563; }
+  .lt-ed-bio { margin: 10px 0 0; max-width: 560px; font-size: 15px; line-height: 1.7; color: #374151; }
+  .lt-ed-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+  .lt-ed-cat { padding: 3px 10px; border-radius: 999px; background: #111827; color: #fff; font-size: 12.5px; font-weight: 700; }
+  .lt-ed-sub-btn { align-self: flex-start; }
+  .lt-ed-note { margin: 12px 0 0; font-size: 12.5px; color: #6b7280; }
+  .ld-editor { margin-left: 6px; padding: 2px 9px; border-radius: 999px; background: #f1f3f6; color: #374151; font-size: 12.5px; font-weight: 700; text-decoration: none; }
+  .ld-editor:hover { background: #e4e9f2; }
+  @media (max-width: 760px) { .lt-ed-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 6px; scroll-snap-type: x proximity; } .lt-ed-card { flex: 0 0 148px; scroll-snap-align: start; } }
   .lt-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin: 0 0 16px; }
   .lt-filters { display: flex; gap: 8px; flex-wrap: wrap; }
   .lt-searchbox { flex: 0 1 240px; min-width: 160px; height: 36px; padding: 0 14px; border: 1px solid #e5e7eb; border-radius: 999px; font: inherit; font-size: 14px; background: #fff; }

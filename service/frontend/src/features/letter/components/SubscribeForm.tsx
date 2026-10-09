@@ -8,7 +8,7 @@ import { subscribeByEmail, type InterestItem } from '../data/interestApi';
 const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i);
 
 /** 선택한 관심사와 겹치는 새 레터를 메일로 받는 신청. 신청 뒤 메일의 확인 링크를 열어야 완료된다(그 전에는 아무것도 보내지 않는다). */
-export function SubscribeForm({ interests, onClose }: { interests: InterestItem[]; onClose: () => void }) {
+export function SubscribeForm({ interests, onClose, heading = '메일로 받기' }: { interests: InterestItem[]; onClose: () => void; heading?: string }) {
   const [email, setEmail] = useState('');
   const [frequency, setFrequency] = useState<'daily' | 'weekly'>('daily');
   const [hour, setHour] = useState(8);
@@ -37,7 +37,7 @@ export function SubscribeForm({ interests, onClose }: { interests: InterestItem[
   };
   return (
     <form className="lt-sub-box lt-sub-form" onSubmit={submit}>
-      <strong>메일로 받기</strong>
+      <strong>{heading}</strong>
       <label className="lt-sub-field">
         <span>이메일</span>
         <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
