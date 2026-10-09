@@ -11,6 +11,7 @@ import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';
 import type { ArticleNeighbor } from './components/article/ArticleNeighborNav';
+import { resolveShareImages, type ShareImages } from './shareImage';
 
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -78,14 +79,12 @@ async function findNeighbors(slug: string, current: CmsLens | null): Promise<{ p
   return { prev: pick(sorted[i + 1]), next: pick(sorted[i - 1]) };
 }
 
-const DEFAULT_COVER = `${SITE_URL}/lens/default-cover.webp`;
-
-/** 검색·공유용 대표 이미지. 기사 원 사진(운영 CDN) → 카드/웹툰 컷 → 기본 커버 순이며 RSS(buildRssFeed)와 같은 우선순위다.
- *  cover_image_url만 쓰면 웹툰 컷이 들어가 검색·공유 미리보기가 만화 컷이 된다. */
-function pickShareImages(lens: CmsLens): { primary: string; all: string[]; isDefault: boolean } {
+/** 검색·공유용 대표 이미지. 후보는 기사 원 사진(운영 CDN) → 카드/웹툰 컷 순이며 RSS(buildRssFeed)와 같은 우선순위다.
+ *  cover_image_url만 쓰면 웹툰 컷이 들어가 검색·공유 미리보기가 만화 컷이 된다.
+ *  후보의 실제 크기를 재서 폭 1200px 미만·배너형은 건너뛰고(shareImage.ts), 모두 미달이면 /og-image.png로 폴백한다. */
+function pickShareImages(lens: CmsLens): Promise<ShareImages> {
   const abs = (u: string | null | undefined) => (u ? (u.startsWith('/') ? `${SITE_URL}${u}` : u) : '');
-  const all = [...new Set([abs(pickLensPhoto(lens)), abs(lens.cover_image_url)].filter(Boolean))];
-  return all.length > 0 ? { primary: all[0], all, isDefault: false } : { primary: DEFAULT_COVER, all: [DEFAULT_COVER], isDefault: true };
+  return resolveShareImages([abs(pickLensPhoto(lens)), abs(lens.cover_image_url)]);
 }
 
 /** 빵부스러기용 분류 단계. 분류가 없거나 정본 분류 목록에 없으면 null(단계 생략) — 미분류 글 경로 /news 는 목록 페이지가 없어 링크하면 404. */
@@ -110,12 +109,11 @@ function articleKeywords(lens: CmsLens): string[] {
   return [...new Set([lens.category, lens.subcategory, headline, '경제 뉴스', '뉴스 해설', '오늘의 이슈', '4가지 시선', 'AI LENS', '서울경제'].filter((k): k is string => !!k))];
 }
 
-function buildJsonLd(lens: CmsLens) {
+function buildJsonLd(lens: CmsLens, shareImages: ShareImages) {
   const url = `${SITE_URL}${lensPath(lens)}`;
   const headline = seoHeadline(lens.headline);
   // 발행 시각(초 단위)이 있으면 쓴다(Google 날짜 가이드: 정확한 시각+타임존). 옛 글은 date로 폴백한다.
   const published = lens.published_at || `${lens.date}T07:00:00+09:00`;
-  const shareImages = pickShareImages(lens);
   const category = breadcrumbCategory(lens);
   const bodyJoined = [
     lens.context,
@@ -135,7 +133,7 @@ function buildJsonLd(lens: CmsLens) {
         // GEO·AEO 보강 — 분류·주제·요약·출처·저작권·읽기 동작을 기계가 읽도록 명시.
         abstract: lens.context,
         keywords: articleKeywords(lens),
-        thumbnailUrl: shareImages.primary,
+        thumbnailUrl: shareImages.primary.url,
         genre: '뉴스 해설',
         about: [{ '@type': 'Thing', name: lens.category || '경제' }, ...(lens.subcategory ? [{ '@type': 'Thing', name: lens.subcategory }] : [])],
         copyrightHolder: { '@id': `${SITE_URL}/#organization` },
@@ -155,8 +153,12 @@ function buildJsonLd(lens: CmsLens) {
           parentOrganization: { '@id': `${SITE_URL}/#organization` },
         },
         publisher: { '@id': `${SITE_URL}/#organization` },
-        // 실제 크기를 모르는 이미지에 1200×800을 지정하지 않는다. 사진 + 카드/웹툰 컷을 함께 제공한다.
-        image: shareImages.all.map((u) => ({ '@type': 'ImageObject', url: u })),
+        // 크기를 잰 이미지만 width/height를 적는다(모르는 이미지에 값을 박지 않는다). 조건을 채운 사진 + 카드/웹툰 컷을 함께 제공한다.
+        image: shareImages.all.map((u) => ({
+          '@type': 'ImageObject',
+          url: u,
+          ...(u === shareImages.primary.url && shareImages.primary.width ? { width: shareImages.primary.width, height: shareImages.primary.height } : {}),
+        })),
         ...(lens.source_url
           ? {
               citation: lens.source_url,
@@ -223,7 +225,7 @@ export async function buildLensArticleMetadata(
   const title = buildPageTitle(headline);
   const description = buildSeoDescription(lens.context, '오늘의 이슈를 4가지 시선으로 짚어드려요.');
   const url = `${SITE_URL}${lensPath(lens)}`;
-  const shareImages = pickShareImages(lens);
+  const shareImages = await pickShareImages(lens);
   return {
     title,
     description,
@@ -241,8 +243,8 @@ export async function buildLensArticleMetadata(
       authors: ['AI LENS 편집팀'],
       section: '경제',
       tags: articleKeywords(lens),
-      // 실제 크기를 모르는 이미지에 1200×800을 박지 않는다. 기본 커버만 알려진 크기를 쓴다.
-      images: shareImages.isDefault ? [{ url: shareImages.primary, width: 1200, height: 800, alt: headline }] : [{ url: shareImages.primary, alt: headline }],
+      // 잰 크기만 선언한다. 측정에 실패한 이미지엔 값을 박지 않는다.
+      images: [{ url: shareImages.primary.url, ...(shareImages.primary.width ? { width: shareImages.primary.width, height: shareImages.primary.height } : {}), alt: headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -250,7 +252,7 @@ export async function buildLensArticleMetadata(
       card: 'summary_large_image',
       title,
       description,
-      images: [shareImages.primary],
+      images: [shareImages.primary.url],
     },
     // 검색·공유·서지 보강 메타: 뉴스 키워드, 수정 시각, 분류, Dublin Core, 슬랙·트위터 라벨.
     other: {
@@ -293,7 +295,7 @@ export async function LensArticlePageContent(
     }
   }
 
-  const jsonLd = lens ? buildJsonLd(lens) : null;
+  const jsonLd = lens ? buildJsonLd(lens, await pickShareImages(lens)) : null;
   return (
     <>
       {jsonLd && (
