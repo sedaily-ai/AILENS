@@ -1,6 +1,5 @@
-import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { displayCategoryLabel } from '@/shared/constants/econCategories';
-import { letterHref } from '@/shared/lib/content/letterHref';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { kstTodayStr } from '@/shared/lib/date/date';
@@ -39,9 +38,7 @@ export async function GET() {
   const seen = new Set<string>();
   const entries: Array<{ loc: string; headline: string; date: string; publishedAt?: string | null; keywords: string[] }> = [];
 
-  // lens를 먼저 채운다. channel=letters 조회는 letter 포맷 rendition이 있는 모든 글(거의 모든 lens 글)을 함께 돌려주므로(cms_posts_repo.py),
-  // letters를 먼저 채우면 lens 글이 /letters/{slug}로 먼저 등록되어 구글 뉴스에 4탭 페이지 대신 레터 단독 페이지가 실린다.
-  // lens를 먼저 채우면 겹치는 글은 항상 /lens/{slug}가 이긴다.
+  // 구글 뉴스에는 기사(lens) 페이지만 싣는다. 레터·웹툰·영상·오디오 전용 주소는 모두 기사로 이동하므로 목록에 두지 않는다.
   try {
     const lensPosts = await fetchLensPosts();
     for (const l of lensPosts) {
@@ -52,31 +49,12 @@ export async function GET() {
         headline: seoHeadline(l.headline), // news:title — 부서 접두사·이모지 제거
         date: l.date,
         publishedAt: l.published_at,
-        // 카테고리·하위 카테고리(econSubcategories.ts)로 news:keywords를 채운다. lens에는 용어 키워드 필드가 없어 가장 가까운 신호(주제 분류)를 쓴다(letters 쪽은 실제 용어 키워드 사용).
+        // 카테고리·하위 카테고리(econSubcategories.ts)로 news:keywords를 채운다. lens에는 용어 키워드 필드가 없어 가장 가까운 신호(주제 분류)를 쓴다.
         keywords: [displayCategoryLabel(l.category), l.subcategory].filter((k): k is string => !!k),
       });
     }
   } catch {
     /* lens API 불통이면 생략 */
-  }
-
-  for (const date of recentDates) {
-    try {
-      const posts = await fetchCmsPosts('letters', date);
-      for (const p of posts) {
-        if (seen.has(p.id)) continue;
-        seen.add(p.id);
-        entries.push({
-          loc: `${BASE}${letterHref(p.id)}`,
-          headline: p.headline,
-          date: p.publish_date ?? date,
-          publishedAt: p.published_at,
-          keywords: (p.keywords ?? []).map((k) => k.term).filter(Boolean),
-        });
-      }
-    } catch {
-      /* 해당 날짜 조회 실패 — 다음 날짜로 계속 (rss.xml/sitemap.ts와 동일 원칙) */
-    }
   }
 
   const urls = entries

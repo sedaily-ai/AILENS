@@ -121,17 +121,6 @@ export async function fetchVideos(): Promise<CmsVideo[]> {
   });
 }
 
-export async function fetchVideoBySlug(slug: string): Promise<CmsVideo | null> {
-  try {
-    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=video`, cacheOpts('posts:video'));
-    if (!res.ok) return null;
-    const data = (await res.json()) as { post?: CmsVideo };
-    return data.post ?? null;
-  } catch {
-    return null;
-  }
-}
-
 // 홈 "오늘의 이슈, 4가지 시선"(LensPreviewSection) 전용 축약본. 이 컴포넌트는 포맷당 question 한 줄만 쓰므로
 // 본문(bullets·paragraphs·transcript 등)을 initialItems로 직렬화하지 않는다(홈 HTML 크기 축소).
 // buildArchiveItems()는 lenses[]를 읽지 않으므로 영향이 없다(archiveItems.ts 참조).

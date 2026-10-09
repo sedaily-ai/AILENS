@@ -112,9 +112,9 @@ export interface CmsLens {
   updated_at?: string | null;
   /** 발행 완료 시각(ISO, UTC, 초 단위). date는 YYYY-MM-DD까지만이라 shared/lib/date.ts의 kstDateTimeLabel()이 이 값으로 KST 시:분까지 표기한다. 옛 글에는 없을 수 있다. */
   published_at?: string | null;
-  /** 경제 카테고리 라벨(증시/부동산/산업/금융·정책/국제/재테크). letters와 같은 6개 값이며 /markets 등 카테고리 페이지에 lens 글도 노출하는 데 쓴다. 없으면(미분류) 어느 카테고리 페이지에도 뜨지 않는다. */
+  /** 대분류 라벨(시그널·부동산·경제·금융·산업·정치·사회·국제·문화, shared/constants/econCategories.ts). 옛 글에는 '증시'·'금융·정책'이 남아 있을 수 있다. 없으면(미분류) 어느 카테고리 페이지에도 뜨지 않는다. */
   category?: string | null;
-  /** 하위 카테고리. category(6개 주제) 안의 한 단계 더 세분된 분류(예: 증시 → 국내증시/해외증시/IB&Deal)이며
+  /** 하위 카테고리. 대분류 안의 한 단계 더 세분된 분류(예: 시그널 → 국내증시/해외증시/IB&Deal)이며
    * shared/constants/econSubcategories.ts의 라벨과 매칭한다. 값이 없으면 하위 탭이 뜨지 않는다(CategoryArchiveClient.tsx). */
   subcategory?: string | null;
   /** "지면 특별 코너" 전용 배치 필드. category와 별개이며 "전체"/"증권"/"산업"/"시그널" 중 하나여야 LensPreviewSection의 해당 탭에 뜬다.

@@ -38,3 +38,19 @@
 - 로컬 프로덕션 빌드에서 두 주소 모두 기사로 308 확인. llms.txt 문구 갱신.
 - 남은 판단: /webtoon/series/{slug}(시리즈 목록)는 그대로 둠 — 회차 링크는 기사로 이동. 시리즈 목록도 없앨지 결정 필요.
 - 이전 canonical 변경(C안)은 기사 없는 글의 폴백으로만 남음.
+
+## 사이트 정리 (같은 날 밤): 옛 페이지·코드 제거
+방침: 지금 사이트가 최종 틀이며 이전 페이지·코드는 쓰지 않는다. 색인됐을 수 있는 옛 URL은 404 대신 308, 코드·자산은 삭제.
+
+Before → After
+- src 파일 362 → 334개(-28), public 7.8MB → 4.3MB, 의존성 3개 제거(react-markdown·remark-gfm·pretendard).
+- 삭제: 챗봇 검색(SmartSearch*·shared/lib/chat), 웹툰 시리즈·표지 생성물, 웹툰·영상·오디오·레터 전용 상세 화면(클라이언트·IssueContextSection), 미사용 헬퍼(fetchVideoBySlug·fetchHomePlayerBySlug·mediaMeta·canonicalFromLens 등), 미참조 public 자산.
+- 308로 대체: /webtoon·/video·/listen/{slug}, /letters/{id}, /letters/view?id= → 대응 기사(없으면 404), /webtoon/series/** → /lens. 공통 helper redirectToLensArticle.
+- noindex·사이트맵 제외: /style(noindex), /login(noindex). 푸터에 /words 링크 추가(고아 방지). news-sitemap은 기사만.
+- llms.txt·낡은 분류 주석·HeaderTabKey 정리.
+- 근거 데이터: 웹툰·영상 옛 주소 샘플 120건, 최신 레터 1,000건 모두 대응 기사 있음(기사 없는 글 0).
+
+유지·보류
+- /news 폴백: 분류 없는 기사 3건(8월, -webtoon/-podcast/-video 접미사 id의 중복 기사)이 있어 라우트 유지. 데이터 정리(삭제/재분류) 후 제거 가능.
+- 옛 분류 이름 호환(dataLabels '증시'·'금융·정책'): 재분류 데이터 검증 전이라 유지.
+- letterHref 호출처(RSS·홈·TodayLetters)는 308 한 번 경유. 직접 기사 주소로 바꾸면 이동 한 번 줄어듦.

@@ -151,7 +151,7 @@ export function NewsFeedTab({
             <HomeSection><AudioPreviewSection initialItems={initialHomePlayerPosts} /></HomeSection>
 
             {/*
-               문화(culture) — 경제 카테고리 6개 짝(3줄) 이후에 추가된 카테고리라 파트너가 없어 단독 행으로 마지막에 둔다.
+               문화(culture) — 9개 분류를 2개씩 짝지으면 하나가 남아 단독 행으로 마지막에 둔다.
                콘텐츠가 없는 날은 CategoryFeatureSection이 숨긴다.
              */}
             <CategoryPairRow slugs={CATEGORY_PAIRS[3]} archiveItems={archiveItems} />

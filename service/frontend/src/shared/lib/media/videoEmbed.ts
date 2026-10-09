@@ -60,11 +60,3 @@ export function resolveVideo(url: string): ResolvedVideo | null {
 export function isDirectAudioUrl(url: string): boolean {
   return /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url);
 }
-
-/**
- * mp4 등 영상 파일 직접 URL 판별. resolveVideo()는 유튜브/네이버TV만 읽으므로, mustknow_auto/frontpage_auto가 자체 렌더링해
- * S3에 올리는 mp4(video 채널 독립 글)를 /video/[slug](VideoViewClient.tsx)에서 재생하려면 이 판별이 필요하다.
- */
-export function isDirectVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov)(\?|$)/i.test(url);
-}

@@ -92,16 +92,3 @@ export async function fetchHomePlayerPosts(): Promise<HomePlayerPost[]> {
     return [];
   }
 }
-
-/** /listen/{id} 상세 페이지용 단건 조회. */
-export async function fetchHomePlayerBySlug(slug: string): Promise<HomePlayerPost | null> {
-  try {
-    // channel=home_player를 명시한다. 한 slug가 여러 포맷 렌디션을 가질 수 있어(형제 채널이 같은 발행물로 묶임) 채널을 주지 않으면 백엔드가 임의의 렌디션을 반환할 수 있다.
-    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=home_player`, ssrCacheOpts('posts:home_player'));
-    if (!res.ok) return null;
-    const data = (await res.json()) as { post?: ApiHomePlayerItem };
-    return data.post ? toItem(data.post) : null;
-  } catch {
-    return null;
-  }
-}
