@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { IssueLetter } from '../data/letterTypes';
+import { InterestPanel } from './InterestPanel';
 import { LetterCard } from './LetterCard';
 import { LETTER_CSS } from './letterStyles';
 
@@ -30,6 +31,8 @@ export function LetterListView({ letters }: { letters: IssueLetter[] }) {
           </button>
         ))}
       </div>
+
+      <InterestPanel />
 
       {featured ? (
         <>

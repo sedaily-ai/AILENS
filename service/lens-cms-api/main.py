@@ -29,6 +29,7 @@ import cms_posts_repo as posts_client
 import community_repo
 import config_repo
 import daily_questions_repo
+import interests_repo
 import issue_letters_repo
 import topics_repo
 from letter_errors import LetterError
@@ -51,7 +52,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Voter-Id"],  # X-Voter-Id: 레터 투표·관심 설정의 기기 식별자(다른 주소에서 호출할 때 사전 확인 요청이 통과해야 한다)
 )
 
 _LIST_SHAPERS = {
@@ -482,6 +483,39 @@ def list_issue_letters(category: Optional[str] = Query(default=None), limit: int
     return JSONResponse({"letters": letters}, headers={"Cache-Control": "public, max-age=60"})
 
 
+# ── 독자 관심(Phase 1) ─ 정적 경로라 `{slug}` 보다 먼저 정의해야 한다. 식별자는 투표와 같은 기기 값(X-Voter-Id)을 관심용으로 따로 해시한다.
+def _reader(x_voter_id: Optional[str]) -> str:
+    return _letter_call(interests_repo.reader_hash, x_voter_id or "")
+
+
+@app.get("/api/v2/issue-letters/bundles")
+def issue_letter_bundles():
+    return JSONResponse({"bundles": _letter_call(interests_repo.list_bundles)}, headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/api/v2/issue-letters/topics")
+def issue_letter_topics():
+    topics = _letter_call(topics_repo.list_topics, True)
+    return JSONResponse({"topics": [{"slug": t["slug"], "name": t["name"], "kind": t["kind"], "category_slug": t["category_slug"]} for t in topics]},
+                        headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/api/v2/issue-letters/me/interests")
+def get_my_interests(x_voter_id: Optional[str] = Header(default=None)):
+    return JSONResponse({"interests": _letter_call(interests_repo.get_interests, _reader(x_voter_id))}, headers={"Cache-Control": "no-store"})
+
+
+@app.put("/api/v2/issue-letters/me/interests")
+def put_my_interests(payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
+    return JSONResponse({"interests": _letter_call(interests_repo.set_interests, _reader(x_voter_id), payload.get("interests"))},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/v2/issue-letters/me/feed")
+def get_my_feed(x_voter_id: Optional[str] = Header(default=None), limit: int = Query(default=10)):
+    return JSONResponse(_letter_call(interests_repo.feed_for_reader, _reader(x_voter_id), limit), headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/v2/issue-letters/{slug}")
 def get_issue_letter(slug: str):
     letter = _letter_call(issue_letters_repo.get_published, slug)
@@ -501,6 +535,13 @@ def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_vot
     if not fresh:
         return JSONResponse({**result, "already_voted": True}, status_code=409, headers={"Cache-Control": "no-store"})
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.put("/admin/interest-bundles")
+def admin_upsert_interest_bundles(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """관심 묶음(페르소나 기획서의 관심 프리셋)을 저장한다. 항목은 사전·분류와 대조해 검증한다."""
+    _check_admin_token(x_internal_token)
+    return _letter_call(interests_repo.upsert_bundles, payload.get("bundles"))
 
 
 @app.get("/admin/topics")

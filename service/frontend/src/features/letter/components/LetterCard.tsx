@@ -24,6 +24,7 @@ export function LetterCard({ letter, featured = false }: { letter: IssueLetter; 
         <span className="lt-no">제 {letter.issueNumber}호</span>
       </div>
       <h3 className="lt-card-title">{letter.title}</h3>
+      {letter.reason && <p className="lt-reason">{letter.reason}</p>}
       <p className="lt-card-deck">{letter.deck}</p>
       <div className="lt-axes">
         {letter.topics && letter.topics.length > 0

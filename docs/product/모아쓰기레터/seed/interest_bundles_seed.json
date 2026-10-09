@@ -1,0 +1,294 @@
+[
+ {
+  "slug": "invest-markets",
+  "name": "주식·ETF·금리·환율",
+  "description": "증시와 금리·환율 흐름, 주요 기업 실적",
+  "sort_order": 1,
+  "items": [
+   {
+    "type": "category",
+    "key": "markets"
+   },
+   {
+    "type": "category",
+    "key": "finance"
+   },
+   {
+    "type": "topic",
+    "key": "kospi"
+   },
+   {
+    "type": "topic",
+    "key": "samsung-electronics"
+   },
+   {
+    "type": "topic",
+    "key": "sk-hynix"
+   },
+   {
+    "type": "topic",
+    "key": "etf"
+   },
+   {
+    "type": "topic",
+    "key": "rates"
+   },
+   {
+    "type": "topic",
+    "key": "fx"
+   },
+   {
+    "type": "topic",
+    "key": "fed"
+   },
+   {
+    "type": "topic",
+    "key": "earnings"
+   }
+  ]
+ },
+ {
+  "slug": "jobs-intro",
+  "name": "취업·경제 입문",
+  "description": "채용·물가·소비 등 경제를 처음 읽는 분을 위한 주제",
+  "sort_order": 2,
+  "items": [
+   {
+    "type": "category",
+    "key": "economy"
+   },
+   {
+    "type": "category",
+    "key": "national"
+   },
+   {
+    "type": "topic",
+    "key": "employment"
+   },
+   {
+    "type": "topic",
+    "key": "inflation"
+   },
+   {
+    "type": "topic",
+    "key": "consumption"
+   },
+   {
+    "type": "topic",
+    "key": "minimum-wage"
+   }
+  ]
+ },
+ {
+  "slug": "small-business",
+  "name": "소비·임대·자영업",
+  "description": "소비 흐름, 임대료·상권, 최저임금, 외식업",
+  "sort_order": 3,
+  "items": [
+   {
+    "type": "category",
+    "key": "economy"
+   },
+   {
+    "type": "topic",
+    "key": "consumption"
+   },
+   {
+    "type": "topic",
+    "key": "rent"
+   },
+   {
+    "type": "topic",
+    "key": "commercial-district"
+   },
+   {
+    "type": "topic",
+    "key": "rates"
+   },
+   {
+    "type": "topic",
+    "key": "minimum-wage"
+   },
+   {
+    "type": "topic",
+    "key": "food-service"
+   }
+  ]
+ },
+ {
+  "slug": "family-housing",
+  "name": "내 집 마련·교육비",
+  "description": "청약·전세·대출, 교육비와 생활 물가",
+  "sort_order": 4,
+  "items": [
+   {
+    "type": "category",
+    "key": "property"
+   },
+   {
+    "type": "category",
+    "key": "national"
+   },
+   {
+    "type": "topic",
+    "key": "real-estate"
+   },
+   {
+    "type": "topic",
+    "key": "housing-subscription"
+   },
+   {
+    "type": "topic",
+    "key": "jeonse"
+   },
+   {
+    "type": "topic",
+    "key": "loan"
+   },
+   {
+    "type": "topic",
+    "key": "education"
+   }
+  ]
+ },
+ {
+  "slug": "startup-ai",
+  "name": "스타트업·AI",
+  "description": "창업·벤처투자, 인공지능과 플랫폼 산업",
+  "sort_order": 5,
+  "items": [
+   {
+    "type": "category",
+    "key": "industry"
+   },
+   {
+    "type": "topic",
+    "key": "startup"
+   },
+   {
+    "type": "topic",
+    "key": "venture-investment"
+   },
+   {
+    "type": "topic",
+    "key": "ai"
+   },
+   {
+    "type": "topic",
+    "key": "platform"
+   },
+   {
+    "type": "topic",
+    "key": "semiconductor"
+   }
+  ]
+ },
+ {
+  "slug": "property-regulation",
+  "name": "부동산·규제",
+  "description": "부동산 시장, 대출 규제, 재건축·경매",
+  "sort_order": 6,
+  "items": [
+   {
+    "type": "category",
+    "key": "property"
+   },
+   {
+    "type": "topic",
+    "key": "real-estate"
+   },
+   {
+    "type": "topic",
+    "key": "loan"
+   },
+   {
+    "type": "topic",
+    "key": "rates"
+   },
+   {
+    "type": "topic",
+    "key": "redevelopment"
+   },
+   {
+    "type": "topic",
+    "key": "auction"
+   },
+   {
+    "type": "topic",
+    "key": "regulation"
+   }
+  ]
+ },
+ {
+  "slug": "retirement-income",
+  "name": "연금·배당·노후",
+  "description": "연금·배당·보험과 고령화",
+  "sort_order": 7,
+  "items": [
+   {
+    "type": "category",
+    "key": "finance"
+   },
+   {
+    "type": "category",
+    "key": "markets"
+   },
+   {
+    "type": "topic",
+    "key": "pension"
+   },
+   {
+    "type": "topic",
+    "key": "dividend"
+   },
+   {
+    "type": "topic",
+    "key": "insurance"
+   },
+   {
+    "type": "topic",
+    "key": "aging"
+   }
+  ]
+ },
+ {
+  "slug": "global-policy",
+  "name": "국제·통상·정책",
+  "description": "미국·중국, 통상·관세, 외교·안보와 통화정책",
+  "sort_order": 8,
+  "items": [
+   {
+    "type": "category",
+    "key": "international"
+   },
+   {
+    "type": "category",
+    "key": "politics"
+   },
+   {
+    "type": "topic",
+    "key": "trade"
+   },
+   {
+    "type": "topic",
+    "key": "tariff"
+   },
+   {
+    "type": "topic",
+    "key": "us"
+   },
+   {
+    "type": "topic",
+    "key": "china"
+   },
+   {
+    "type": "topic",
+    "key": "diplomacy"
+   },
+   {
+    "type": "topic",
+    "key": "fed"
+   }
+  ]
+ }
+]
