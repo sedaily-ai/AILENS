@@ -35,6 +35,7 @@ import { renderInline } from './components/format/renderInline';
 import { ArticleStickyBar } from './components/article/ArticleStickyBar';
 import { ArticleToTop } from './components/article/ArticleToTop';
 import { ArticleToolRail } from './components/article/ArticleToolRail';
+import { CompareCardButton } from './components/article/CompareCardButton';
 import { ArticleNeighborLinks, ArticleNeighborNav, type ArticleNeighbor } from './components/article/ArticleNeighborNav';
 import {
   ArticleFooterStyles,
@@ -578,6 +579,8 @@ export function LensViewClient({
               <p style={{ marginTop: 32, fontSize: 14, color: '#4b5563', lineHeight: 1.65, wordBreak: 'keep-all' }}>
                 네 형식 모두 같은 기사를 바탕으로 만들었어요. 위에서 형식을 바꿔도 다루는 사실은 같습니다.
               </p>
+              {/* 비교 카드(모듈 F) — 네 형식의 첫 마디를 한 장에 모아 저장·공유. */}
+              <CompareCardButton articleId={lens.id} title={seoHeadline(lens.headline)} date={lens.date} />
             </div>
 
             {/* AI 생성 콘텐츠 고지 */}
