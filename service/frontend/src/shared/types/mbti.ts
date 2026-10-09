@@ -20,4 +20,4 @@ export interface ArchivedSentence {
   createdAt: Date;
 }
 
-export type TabType = "question" | "feed" | "archive" | "dna";
+export type TabType = "feed" | "archive" | "dna";
