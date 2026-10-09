@@ -200,8 +200,13 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             """
             params: List[Any] = ["published"]
             if date:
-                sql += " AND (published_at AT TIME ZONE 'Asia/Seoul')::date = %s"
-                params.append(date)
+                # KST 하루를 [자정, 다음 자정) 범위로 비교한다. 컬럼에 함수를 씌우면(…::date = %s) publications_published_idx를
+                # 범위 탐색으로 쓸 수 없어 부분 인덱스를 훑게 되므로, 상수 쪽에서 경계를 계산해 인덱스를 탄다(결과는 같다).
+                sql += (
+                    " AND published_at >= (%s::date)::timestamp AT TIME ZONE 'Asia/Seoul'"
+                    " AND published_at < ((%s::date) + 1)::timestamp AT TIME ZONE 'Asia/Seoul'"
+                )
+                params.extend([date, date])
             sql += " ORDER BY published_at DESC LIMIT %s"
             params.append(limit)
             cur.execute(sql, params)
@@ -212,8 +217,12 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             sql = _BASE_SELECT + " WHERE p.status = %s AND p.deleted_at IS NULL AND r.id IS NOT NULL"
             params = [fmt, "published"]
             if date:
-                sql += " AND (p.published_at AT TIME ZONE 'Asia/Seoul')::date = %s"
-                params.append(date)
+                # 위 lens 분기와 같은 이유로 KST 하루 범위 비교(컬럼에 함수를 씌우지 않는다).
+                sql += (
+                    " AND p.published_at >= (%s::date)::timestamp AT TIME ZONE 'Asia/Seoul'"
+                    " AND p.published_at < ((%s::date) + 1)::timestamp AT TIME ZONE 'Asia/Seoul'"
+                )
+                params.extend([date, date])
             sql += " ORDER BY p.published_at DESC LIMIT %s"
             params.append(limit)
             cur.execute(sql, params)

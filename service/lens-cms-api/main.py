@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 from typing import Any, Dict, Optional
 
 from fastapi import Body, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 import admin_posts_repo
 import articles_repo
@@ -55,6 +57,15 @@ _LIST_SHAPERS = {
 _VALID_CHANNELS = ("letters", "paper", "feed", "webtoon", "video", "lens", "home_player")
 _CACHE_CONTROL = "no-store"
 
+# 목록 응답(1,000건이면 ~3MB)은 봇·SSR 재검증이 몰리면 같은 쿼리와 직렬화를 반복한다. 워커 프로세스 안에서 직렬화된 JSON을 5초만 보관해
+# 같은 순간의 중복 요청을 한 번의 쿼리로 합친다. 5초면 발행 직후 반영이 눈에 띄게 늦지 않고(프론트 webhook이 곧바로 다시 읽어도 안전),
+# admin 쓰기(POST/PUT/DELETE)가 이 워커로 오면 즉시 비운다. 워커가 둘이라 다른 워커는 최대 5초 오래된 목록을 줄 수 있다.
+_LIST_CACHE_TTL = 5.0
+_LIST_CACHE_MAX_KEYS = 64
+_list_cache: Dict[tuple, tuple] = {}
+_list_cache_lock = threading.Lock()
+_list_key_locks: Dict[tuple, threading.Lock] = {}
+
 
 @app.get("/health")
 def health():
@@ -83,13 +94,47 @@ def list_posts(
     if channel not in _VALID_CHANNELS:
         raise HTTPException(status_code=400, detail=f"invalid channel: {channel}")
     limit = max(1, min(limit, 1000))
-    rows = posts_client.list_published_posts(channel, date, limit=limit)
-    payload = {
-        "channel": channel,
-        "date": date,
-        "posts": [_LIST_SHAPERS[channel](r) for r in rows],
-    }
-    return JSONResponse(payload, headers={"Cache-Control": _CACHE_CONTROL})
+    key = (channel, date, limit)
+    body = _list_cache_get(key)
+    if body is None:
+        # 같은 키가 동시에 만료돼도 쿼리는 한 번만 돈다(나머지는 앞선 요청이 채울 때까지 기다렸다 캐시를 읽는다).
+        with _list_cache_lock:
+            key_lock = _list_key_locks.setdefault(key, threading.Lock())
+        with key_lock:
+            body = _list_cache_get(key)
+            if body is None:
+                rows = posts_client.list_published_posts(channel, date, limit=limit)
+                payload = {
+                    "channel": channel,
+                    "date": date,
+                    "posts": [_LIST_SHAPERS[channel](r) for r in rows],
+                }
+                body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8")
+                _list_cache_put(key, body)
+    return Response(content=body, media_type="application/json", headers={"Cache-Control": _CACHE_CONTROL})
+
+
+def _list_cache_get(key: tuple) -> Optional[bytes]:
+    hit = _list_cache.get(key)
+    if hit and time.monotonic() - hit[0] < _LIST_CACHE_TTL:
+        return hit[1]
+    return None
+
+
+def _list_cache_put(key: tuple, body: bytes) -> None:
+    with _list_cache_lock:
+        if len(_list_cache) >= _LIST_CACHE_MAX_KEYS:
+            _list_cache.clear()
+        _list_cache[key] = (time.monotonic(), body)
+
+
+@app.middleware("http")
+async def _invalidate_list_cache_on_write(request, call_next):
+    response = await call_next(request)
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        with _list_cache_lock:
+            _list_cache.clear()
+    return response
 
 
 # ── admin 쓰기(CRUD) — v1.21 ──────────────────────────────────────────
