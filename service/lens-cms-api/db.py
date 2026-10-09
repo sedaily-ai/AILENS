@@ -25,11 +25,17 @@ _PG_MAXCONN = int(os.environ.get("LENS_PG_POOL_MAX", "10"))
 # 넘는 순간 500이 났다(실측 233회/일, 상세 조회·admin 포함).
 _PG_ACQUIRE_TIMEOUT = float(os.environ.get("LENS_PG_ACQUIRE_TIMEOUT", "10"))
 
+# 느린 쿼리가 풀 슬롯을 계속 쥐고 다른 요청을 굶기지 않도록 쿼리 하나의 상한을 둔다(밀리초, 기본 20초).
+# 봇이 몰릴 때 한 쿼리가 길어지면 풀(워커당 10)이 막히고 대기하던 요청이 모두 500이 되던 위험을 줄인다.
+# 0이면 제한 없음(옛 동작). 관리 일괄 작업(재분류 200건 등)은 이 상한 안에 들어온다.
+_PG_STATEMENT_TIMEOUT_MS = int(os.environ.get("LENS_PG_STATEMENT_TIMEOUT_MS", "20000"))
+
 _pool = psycopg2.pool.ThreadedConnectionPool(
     _PG_MINCONN, _PG_MAXCONN,
     host=_PG_HOST, port=5432, dbname=_PG_DATABASE,
     user=_PG_USER, password=_PG_PASSWORD,
     connect_timeout=5,
+    options=f"-c statement_timeout={_PG_STATEMENT_TIMEOUT_MS}",
 )
 
 

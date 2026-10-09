@@ -652,3 +652,65 @@ export interface SelectionRunsDayResponse {
   articles: SelectionArticle[];
 }
 
+
+// 이슈 레터(모아쓰기 레터) — lens-cms-api /admin/issue-letters*. 설계: docs/architecture/lens-erd-src/17-이슈레터-설계.md
+export type IssueLetterStatus = "draft" | "in_review" | "published" | "archived";
+
+export interface IssueLetterSummary {
+  id: number;
+  slug: string;
+  issue_no: number | null;
+  title: string;
+  deck: string;
+  status: IssueLetterStatus;
+  read_minutes: number;
+  author_no: string | null;
+  reviewer_no: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type IssueLetterSegment = string | { text: string; href?: string };
+
+export interface IssueLetterDetail extends IssueLetterSummary {
+  summary: string[];
+  editor_note: string | null;
+  /** 사이트 분류 slug (첫 번째가 주 분류) */
+  categories: string[];
+  category_names: string[];
+  sections: {
+    axis: "news" | "substance" | "other";
+    axis_label: string | null;
+    heading: string;
+    key_line: string;
+    paragraphs: IssueLetterSegment[][];
+  }[];
+  sources: { article_no: string | null; title: string; url: string; axes: string[]; external: boolean }[];
+  poll: { kind: string; question: string; options: { key: string; label: string; hint?: string | null }[] } | null;
+}
+
+export interface IssueLetterDetailResponse {
+  letter: IssueLetterDetail;
+  /** 서버의 발행 규칙 점검 결과. 비어 있으면 발행 가능. */
+  publish_problems: string[];
+}
+
+/** 빅카인즈 검색 결과(타임머신 API)의 기사 항목. 서울경제 기사만 나오며 original_link 가 없는 기사는 출처로 쓸 수 없다. */
+export interface BigKindsArticle {
+  news_id: string;
+  title: string;
+  content?: string;
+  byline?: string;
+  category?: string;
+  original_link: string | null;
+  published_at?: string;
+}
+
+export interface BigKindsSearchResponse {
+  query: string;
+  from: string;
+  to: string;
+  sort_applied: "relevance" | "date";
+  articles: BigKindsArticle[];
+}

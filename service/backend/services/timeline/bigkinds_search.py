@@ -12,6 +12,7 @@ SearchResult.sort_applied 로 돌려주고 로그에도 남긴다. 최초 시도
 """
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, NamedTuple, Optional
 
@@ -46,8 +47,12 @@ _SORT_ARGUMENTS = {
 
 BASE_FIELDS = ['title', 'content', 'byline', 'category', 'provider_link_page']
 
-# None=아직 모름, True=_score 정렬 성공 확인, False=거부당함(이후 바로 date 사용).
+# None=아직 모름, True=_score 정렬 성공 확인.
 _relevance_supported: Optional[bool] = None
+# 관련도 정렬을 거부당한 뒤 이 시각(time.monotonic)까지만 시도를 건너뛴다. 예전에는 한 번 거부당하면 컨테이너가 사라질 때까지
+# 영구히 최신순만 썼는데, 일시적인 오류(호출 한도·순간 장애)에도 관련도순이 몇 시간씩 꺼져 검색 품질이 떨어졌다(2026-10-09 실측).
+_RELEVANCE_RETRY_SECONDS = 300
+_relevance_rejected_until: float = 0.0
 
 
 class BigKindsError(RuntimeError):
@@ -137,29 +142,30 @@ def search_news(query: str, from_date: str, until_date_exclusive: str, size: int
     sort: 'date'(최신순) | 'relevance'(관련도순, 미지원이면 date 로 자동 대체).
     오류는 BigKindsError(거부는 BigKindsRejected)로 raise — 호출 쪽이 502 로 변환한다.
     """
-    global _relevance_supported
+    global _relevance_supported, _relevance_rejected_until
     access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
 
-    if sort == SORT_RELEVANCE and _relevance_supported is not False:
+    if sort == SORT_RELEVANCE and time.monotonic() >= _relevance_rejected_until:
         try:
             docs = _post_search(access_key, query, from_date, until_date_exclusive, size,
                                 _SORT_ARGUMENTS[SORT_RELEVANCE], include_published_at)
             _relevance_supported = True
+            _relevance_rejected_until = 0.0
             logger.info('빅카인즈 정렬: relevance(_score) 적용')
             return SearchResult(_map_documents(docs, include_published_at), SORT_RELEVANCE)
         except BigKindsRejected as e:
             logger.warning('빅카인즈가 relevance 정렬 요청을 거부 → date 로 대체 시도: %s', e)
             docs = _post_search(access_key, query, from_date, until_date_exclusive, size,
                                 _SORT_ARGUMENTS[SORT_DATE], include_published_at)
-            # date 로는 성공 → 거부 원인이 정렬이었다고 보고 기억한다.
-            _relevance_supported = False
-            logger.info('빅카인즈 정렬: date 로 대체 적용(이후 relevance 시도 생략)')
+            # date 로는 성공 → 거부 원인이 정렬이었다고 보고 잠시(5분)만 기억한다. 일시 오류일 수 있어 영구히 끄지 않는다.
+            _relevance_rejected_until = time.monotonic() + _RELEVANCE_RETRY_SECONDS
+            logger.info('빅카인즈 정렬: date 로 대체 적용(%d초간 relevance 시도 생략)', _RELEVANCE_RETRY_SECONDS)
             return SearchResult(_map_documents(docs, include_published_at), SORT_DATE)
 
     docs = _post_search(access_key, query, from_date, until_date_exclusive, size,
                         _SORT_ARGUMENTS[SORT_DATE], include_published_at)
     if sort == SORT_RELEVANCE:
-        logger.info('빅카인즈 정렬: date 로 대체 적용(relevance 미지원으로 기억됨)')
+        logger.info('빅카인즈 정렬: date 로 대체 적용(최근 relevance 거부로 잠시 생략 중)')
     return SearchResult(_map_documents(docs, include_published_at), SORT_DATE)
 
 

@@ -7,20 +7,15 @@ import type { CmsVideo, CmsWebtoon, CmsLens } from "@/shared/lib/api/cmsPostsApi
 import type { ArchiveItem } from "@/shared/lib/content/archiveItems";
 import type { TodayLetterCardLike } from "@/shared/lib/api/todayLettersApi";
 import type { HomePlayerPost } from "@/shared/lib/api/homePlayerApi";
-import { fetchDailyQuestions, saveQuestionAnswer } from "@/shared/lib/api/questionApi";
-import type { DailyQuestionItem } from "@/features/question";
 import { SearchOverlay } from "@/shared/ui/search/SearchOverlay";
-import { useAuth } from "@/features/auth";
 import { Header } from "@/widgets/Header";
 import { HomeSideBar } from "@/widgets/HomeSideBar";
 import { ComingSoonNotice } from "@/shared/ui/notice/ComingSoonNotice";
 
 // Feature Tab Components
-import { QuestionTab, dailyQuestions } from "@/features/question";
 import { NewsFeedTab } from "@/features/news-feed";
 import { ArchiveTab } from "@/features/archive";
 import { buildHeaderTabs } from "@/shared/lib/headerTabs";
-import { formatDateStr } from "@/shared/utils/dateUtils";
 
 interface Props {
   selectedGroup: MbtiGroupId;
@@ -79,7 +74,6 @@ export function FeedPage({
   initialHomePlayerPosts,
 }: Props) {
   const pathname = usePathname();
-  const { user } = useAuth();
 
   // 날짜 관련 상태
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -87,9 +81,6 @@ export function FeedPage({
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
 
   // 질문 관련 상태
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
-  const [aiQuestions, setAiQuestions] = useState<DailyQuestionItem[]>([]);
 
   // "내 서랍": 로그인 사용자는 ArchiveTab의 useEffect가 마운트 시 /api/archive의 실제 서버 데이터로 덮어쓴다.
   // 비로그인은 빈 배열 그대로이며 ArchiveLoginCta가 로그인을 유도한다(가짜 콘텐츠를 노출하지 않는다).
@@ -98,11 +89,11 @@ export function FeedPage({
   // 정적 export에서 useSearchParams()는 CSR bailout을 유발해 컴포넌트 트리 전체가 Suspense fallback으로만 구워진다.
   // 따라서 초기값은 항상 "feed"로 고정해 서버/클라이언트 첫 렌더를 일치시키고, ?tab=... 반영은 아래 mount effect가
   // window.location.search를 직접 읽어 처리한다.
-  const [activeTab, setActiveTabState] = useState<"question" | "feed" | "archive" | "dna">("feed");
+  const [activeTab, setActiveTabState] = useState<"feed" | "archive" | "dna">("feed");
 
   // 탭 변경 함수. URL도 함께 갱신한다(replaceState로 히스토리에 쌓이지 않는다).
-  // "feed"는 기본 탭이라 쿼리스트링을 지운다("/?tab=feed"가 남지 않게). question/archive/dna처럼 비기본 탭은 새로고침 유지를 위해 남긴다.
-  const setActiveTab = useCallback((tab: "question" | "feed" | "archive" | "dna") => {
+  // "feed"는 기본 탭이라 쿼리스트링을 지운다("/?tab=feed"가 남지 않게). archive/dna처럼 비기본 탭은 새로고침 유지를 위해 남긴다.
+  const setActiveTab = useCallback((tab: "feed" | "archive" | "dna") => {
     setActiveTabState(tab);
     const params = new URLSearchParams(window.location.search);
     if (tab === "feed") {
@@ -135,18 +126,12 @@ export function FeedPage({
 
   const [showSearch, setShowSearch] = useState(false);
 
-  // AI 질문 로드
-  useEffect(() => {
-    const dateStr = formatDateStr(selectedDate);
-    fetchDailyQuestions(dateStr).then(qs => setAiQuestions(qs));
-  }, [selectedDate]);
-
   useEffect(() => {
     const handlePopState = () => {
       // URL에서 탭 상태 복원
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['question', 'feed', 'archive', 'dna'].includes(tabParam)) {
+      if (tabParam && ['feed', 'archive', 'dna'].includes(tabParam)) {
         setActiveTabState(tabParam as typeof activeTab);
       }
     };
@@ -160,38 +145,11 @@ export function FeedPage({
   // 서버 HTML과 클라이언트 첫 렌더가 달라지는 하이드레이션 불일치가 생긴다. "일단 feed로 그리고 마운트 후 전환"이 의도된 동작이다.
   useEffect(() => {
     const tabParam = new URLSearchParams(window.location.search).get('tab');
-    if (tabParam && ['question', 'feed', 'archive', 'dna'].includes(tabParam)) {
+    if (tabParam && ['feed', 'archive', 'dna'].includes(tabParam)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTabState(tabParam as typeof activeTab);
     }
   }, []);
-
-  // 질문 답변 선택
-  const activeQuestionsList = aiQuestions.length > 0 ? aiQuestions : dailyQuestions;
-
-  const handleSelectAnswer = (questionId: string, optionId: string, mbti?: MbtiGroupId) => {
-    setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
-
-    // MBTI 변경이 있으면 적용
-    if (mbti && onMbtiChange) {
-      onMbtiChange(mbti);
-      localStorage.setItem("mbti-group", mbti);
-    }
-
-    // 답변 서버 저장 (fire-and-forget)
-    if (user?.userId && mbti) {
-      saveQuestionAnswer({ user_id: user.userId, question_id: questionId, option_id: optionId, mbti });
-    }
-
-    // 다음 질문으로 또는 피드로
-    if (currentQuestionIndex < activeQuestionsList.length - 1) {
-      setTimeout(() => setCurrentQuestionIndex(prev => prev + 1), 300);
-    } else {
-      setTimeout(() => {
-        setActiveTab("feed");
-      }, 500);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
@@ -220,19 +178,6 @@ export function FeedPage({
             시각 위계가 깨지므로, title/og:title과 같은 문구를 시각적으로 숨겨 추가한다(GEO·접근성). */}
         <h1 className="sr-only">AI LENS — 서울경제신문의 AI 경제 뉴스</h1>
         <div key={activeTab} className="tab-fade-in">
-        {/* 질문 모드 - QuestionTab 컴포넌트 */}
-        {activeTab === "question" && (
-          <QuestionTab
-            currentQuestionIndex={currentQuestionIndex}
-            selectedAnswers={selectedAnswers}
-            onSelectAnswer={handleSelectAnswer}
-            onSkip={() => {
-              setActiveTab("feed");
-            }}
-            selectedGroup={selectedGroup}
-          />
-        )}
-
         {/* 피드 모드 - NewsFeedTab 컴포넌트 */}
         {activeTab === "feed" && (
           <NewsFeedTab

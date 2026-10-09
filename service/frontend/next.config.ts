@@ -45,6 +45,28 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 86400,
   },
   // 사주는 별도 서비스(saju.sedaily.ai)다. 옛 /fortune·/saju-match 링크·북마크는 그쪽으로 보낸다.
+  // 봇·AI 크롤러가 자주 가져가는 파일의 CDN 캐시를 명시한다(2026-10-09). 기본값(max-age=0 must-revalidate)이면 CloudFront가 캐시하지 않고 압축도 하지 않아
+  // 요청마다 오리진까지 간다. 사이트맵은 달 단위 파일이라 s-maxage를 길게 둬도 발행 반영(최대 1시간)이 충분하다.
+  async headers() {
+    const swr = (sMaxAge: number, stale: number) => `public, s-maxage=${sMaxAge}, stale-while-revalidate=${stale}`;
+    return [
+      { source: "/sitemap/:path*", headers: [{ key: "Cache-Control", value: swr(3600, 86400) }] },
+      { source: "/news-sitemap.xml", headers: [{ key: "Cache-Control", value: swr(300, 1800) }] },
+      { source: "/rss.xml", headers: [{ key: "Cache-Control", value: swr(600, 1800) }] },
+      { source: "/:slug/rss.xml", headers: [{ key: "Cache-Control", value: swr(600, 1800) }] },
+      { source: "/robots.txt", headers: [{ key: "Cache-Control", value: "public, max-age=300, s-maxage=3600" }] },
+      { source: "/llms.txt", headers: [{ key: "Cache-Control", value: "public, max-age=300, s-maxage=3600" }] },
+      { source: "/fonts/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, s-maxage=604800" }] },
+      { source: "/:file(favicon-32.png|icon-192.png|icon-512.png|apple-touch-icon.png|og-image.png|icon.svg|lens.png)", headers: [{ key: "Cache-Control", value: "public, max-age=86400, s-maxage=86400" }] },
+    ];
+  },
+
+  // /sitemap.xml 은 사이트맵 색인이다. 파일 라우트(app/sitemap.xml/route.ts)로 두면 개발 서버에서 sitemap.ts(generateSitemaps)의 메타데이터 라우트와
+  // "Conflicting route and metadata at /sitemap.xml" 로 충돌해 앱 전체가 500이 되므로, 색인은 /sitemap-index 에 두고 여기서 /sitemap.xml 로 다시 쓴다.
+  async rewrites() {
+    return { beforeFiles: [{ source: "/sitemap.xml", destination: "/sitemap-index" }], afterFiles: [], fallback: [] };
+  },
+
   async redirects() {
     // /lens?page=N, /webtoon?page=N 옛 링크 정리는 has+쿼리 대신 src/middleware.ts에서 한다
     // (redirects()+has 조합은 destination에 캡처값을 써도 원본 쿼리스트링을 지우지 못해 "/lens/page/2?page=2" 같은 URL이 된다).

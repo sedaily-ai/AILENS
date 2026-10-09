@@ -30,6 +30,12 @@ import type {
   SelectionRunsDayResponse,
   SelectionArticle,
   SelectionVerdict,
+  IssueLetterStatus,
+  IssueLetterSummary,
+  IssueLetterDetail,
+  IssueLetterDetailResponse,
+  BigKindsSearchResponse,
+  BigKindsArticle,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -494,6 +500,39 @@ export const adminApi = {
     request<{ ok: boolean }>(`/admin/quiz/${encodeURIComponent(id)}`, {
       method: "DELETE",
     }),
+
+  // 이슈 레터(모아쓰기 레터) — 템플릿 v2 가 만든 저장용 JSON 을 붙여넣어 초안 저장 → 검수 요청 → 발행.
+  // 검증 실패 사유(입력 오류·발행 규칙)는 서버 문장이 AdminApiError.message 로 온다.
+  listIssueLetters: (params?: { status?: IssueLetterStatus; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return request<{ letters: IssueLetterSummary[] }>(`/admin/issue-letters${suffix}`);
+  },
+  // 출처 후보 검색 — 사이트 "타임머신"과 같은 공개 API(빅카인즈, 서울경제만, 1990~, 한 번에 최대 6년). 인증이 필요 없어 토큰을 보내지 않는다.
+  searchBigKinds: (params: { q: string; from: string; to: string; sort: "relevance" | "date"; size?: number }) => {
+    const qs = new URLSearchParams({ q: params.q, from: params.from, to: params.to, sort: params.sort, size: String(params.size ?? 20) });
+    return request<BigKindsSearchResponse>(`/time-machine?${qs}`, { skipAuth: true });
+  },
+  // 고른 기사를 레터 출처 후보로 보관한다. 보관된 기사만 레터 JSON 의 출처 주소가 될 수 있다.
+  saveIssueLetterArchives: (articles: BigKindsArticle[]) =>
+    request<{ archived: { external_id: string; title: string; url: string }[] }>("/admin/issue-letters/archives", {
+      method: "POST",
+      body: JSON.stringify({ articles }),
+    }),
+  getIssueLetter: (id: number) =>
+    request<IssueLetterDetailResponse>(`/admin/issue-letters/${id}`),
+  createIssueLetter: (input: unknown) =>
+    request<{ letter: IssueLetterDetail }>("/admin/issue-letters", { method: "POST", body: JSON.stringify(input) }),
+  updateIssueLetter: (id: number, input: unknown) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+  submitIssueLetter: (id: number) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}/submit`, { method: "POST" }),
+  publishIssueLetter: (id: number) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}/publish`, { method: "POST" }),
+  archiveIssueLetter: (id: number) =>
+    request<{ letter: IssueLetterDetail }>(`/admin/issue-letters/${id}/archive`, { method: "POST" }),
 
   // AI letters — 생성은 없다. 파이프라인 산출물을 사후 편집·내림만 한다.
   listLetters: (date: string) =>

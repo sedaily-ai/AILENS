@@ -9,6 +9,7 @@ Storage: Personal DB (sedaily-mbti-personal-dev)
 """
 import json
 import logging
+import os
 from typing import Dict, List
 from datetime import datetime
 from common.dates.validation import KST
@@ -17,6 +18,7 @@ import boto3
 from botocore.config import Config
 
 import clients.pg.articles as articles_client
+import clients.pg.daily_questions as daily_questions_client
 from config import settings
 from config.constants import BEDROCK_MODEL_ID_HAIKU
 from services.content.prompt_loader import load_prompt
@@ -45,8 +47,19 @@ def _get_personal_table():
     return _personal_table
 
 
+def _use_pg() -> bool:
+    """QUESTIONS_BACKEND=pg 이면 Postgres(daily_questions, v1.36)를 쓴다. 기본은 DynamoDB — 이관 검증이 끝나면 pg 로 바꾼다."""
+    return os.environ.get("QUESTIONS_BACKEND", "ddb").lower() == "pg"
+
+
 def _get_cached_questions(date_str: str) -> list | None:
     """Return cached questions for a date, or None if not generated yet."""
+    if _use_pg():
+        try:
+            return daily_questions_client.get_questions(date_str)
+        except Exception as e:
+            logger.error(f"Failed to read cached questions (pg): {e}")
+            return None
     try:
         resp = _get_personal_table().get_item(
             Key={'user_id': QUESTIONS_USER_ID, 'sk': f'DATE#{date_str}'}
@@ -61,6 +74,14 @@ def _get_cached_questions(date_str: str) -> list | None:
 
 def _save_questions(date_str: str, questions: list):
     """Cache generated questions for a date."""
+    if _use_pg():
+        try:
+            daily_questions_client.save_questions(
+                date_str, questions, model=BEDROCK_MODEL_ID_HAIKU, generated_at=datetime.now(KST).isoformat()
+            )
+        except Exception as e:
+            logger.error(f"Failed to save questions (pg): {e}")
+        return
     try:
         _get_personal_table().put_item(Item={
             'user_id': QUESTIONS_USER_ID,

@@ -37,7 +37,7 @@ import uuid
 import boto3
 from botocore.config import Config as BotoConfig
 
-from repo import prompts_repo
+from repo import admin_jobs_repo, prompts_repo
 from shared import audit, ddb_client, response, time_utils
 
 # LLMOps 테스트 실행(2026-08-19, 2026-09-11 Bedrock로 이관) — 프롬프트
@@ -636,11 +636,22 @@ def _job_table():
     return ddb_client.config_table()
 
 
+def _use_pg() -> bool:
+    """JOBS_BACKEND=pg 이면 Postgres(admin_jobs, v1.36)를 쓴다. 기본은 DynamoDB — 이관 검증이 끝나면 pg 로 바꾼다."""
+    return os.environ.get("JOBS_BACKEND", "ddb").lower() == "pg"
+
+
 def _put_job(pk: str, job_id: str, item: dict) -> None:
+    if _use_pg():
+        admin_jobs_repo.put_job("prompt_test", job_id, item)
+        return
     _job_table().put_item(Item={"pk": pk, "sk": f"job/{job_id}", **item})
 
 
 def _update_job(pk: str, job_id: str, updates: dict) -> None:
+    if _use_pg():
+        admin_jobs_repo.update_job("prompt_test", job_id, updates)
+        return
     expr_names = {f"#{k}": k for k in updates}
     expr_values = {f":{k}": v for k, v in updates.items()}
     update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
@@ -653,6 +664,8 @@ def _update_job(pk: str, job_id: str, updates: dict) -> None:
 
 
 def _get_job(pk: str, job_id: str) -> dict | None:
+    if _use_pg():
+        return admin_jobs_repo.get_job("prompt_test", job_id)
     resp = _job_table().get_item(Key={"pk": pk, "sk": f"job/{job_id}"})
     return resp.get("Item")
 

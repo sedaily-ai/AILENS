@@ -190,7 +190,7 @@ async def cleanup():
     print('  Cleaning up demo user data...')
 
     dynamodb = boto3.resource('dynamodb', region_name=REGION)
-    table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_PERSONAL', 'sedaily-mbti-personal-dev'))
+    table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_PERSONAL', 'TEST-ONLY-set-DYNAMODB_TABLE_PERSONAL'))
 
     from boto3.dynamodb.conditions import Key
     resp = table.query(KeyConditionExpression=Key('user_id').eq(DEMO_USER))

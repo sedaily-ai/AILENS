@@ -44,7 +44,7 @@
 ## 크롤러·AI용 자료
 
 - [llms-full.txt](https://ailens.sedaily.ai/llms-full.txt): 최근 기사 60건의 제목·주소·분류·원문 출처·요약·질문과 답을 한 파일로(30분마다 갱신)
-- [사이트맵](https://ailens.sedaily.ai/sitemap.xml): 전체 URL 목록(기사·지면·분류)
+- [사이트맵 색인](https://ailens.sedaily.ai/sitemap.xml): 달별 기사 사이트맵(/sitemap/YYYY-MM.xml)과 분류·지면·타임라인(/sitemap/core.xml)으로 나뉘며, 기사 항목에 대표 이미지·영상 정보가 붙어 있다
 - [뉴스 사이트맵](https://ailens.sedaily.ai/news-sitemap.xml): 최근 2일 발행 기사
 - [RSS](https://ailens.sedaily.ai/rss.xml): 새 글 피드
 - [robots.txt](https://ailens.sedaily.ai/robots.txt): 크롤링 정책

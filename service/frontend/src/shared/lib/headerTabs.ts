@@ -15,6 +15,7 @@ export type HeaderTabKey =
   | 'national'
   | 'international'
   | 'culture'
+  | 'letter'
   | 'timeline'
   | 'games'
   | 'archive';
@@ -57,6 +58,8 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
       active: active === c.slug,
       tier: 'core' as const,
     })),
+    // 레터 탭(모아쓰기 레터, 2026-10-09 목업): 분류 탭 바로 뒤에 둔다. 발행 기능이 붙기 전까지 화면 확정용.
+    { key: 'letter', label: '레터', href: '/letter', active: active === 'letter', tier: 'core' as const },
     // 부가 기능 탭(tier 'more')은 Header.tsx의 "더보기" 드롭다운으로 묶인다.
     // '내 서랍' 탭은 노출하지 않는다. 페이지(/?tab=archive)와 저장 기능은 유지되며, 다시 노출하려면 여기에 한 줄만 추가한다.
     // 타임라인은 `/timeline`을 가리킨다. 옛 `/timemachine`(유명인·투자 시뮬레이션)은 직접 URL로만 남긴다.
