@@ -193,3 +193,14 @@ def test_vote_rejects_unknown_option():
     STATE["option_ok"] = False
     with pytest.raises(_repo().LetterError):
         _repo().vote("slug", "anon-1", "nope")
+
+
+@pytest.mark.parametrize("note", ["이건 아이러니예요.", "화제성 이슈가 재밌는 경로로 번져요.", "결국 이렇게 됐어요.", "지켜봐야 해요.", "가" * 201])
+def test_editor_note_standard_rejects_opinion_and_long(note):
+    problems = _repo().publish_problems(_publishable(editor_note=note))
+    assert any("에디터 한마디" in p for p in problems)
+
+
+def test_editor_note_standard_accepts_fact_linking_sentence():
+    note = "이 순위는 현지 편집자와 전문가 추천을 바탕으로 정해져요. 같은 기준에서 종로3가는 2021년 3위에서 올해 1위가 됐어요."
+    assert _repo().publish_problems(_publishable(editor_note=note)) == []

@@ -30,6 +30,10 @@ POLL_BIASED_TERMS = ("맞을까", "맞나요", "맞다고", "옳", "틀렸", "�
 # 본문·요약·에디터 한마디: 투자·행동 지시 표현만 막는다(인용문 속 당사자 발언까지 막지 않도록 좁게 잡는다).
 BODY_DIRECTIVE_TERMS = ("사세요", "파세요", "하세요", "사야 ", "팔아야", "매수하", "매도하", "추천합니다", "추천해요", "권합니다", "권해요")
 REQUIRED_POLL_NEUTRAL_KEY = "unsure"  # 모든 투표에 "잘 모르겠어요"류 중립 선택지를 둔다
+# 에디터 한마디: 의견이 아니라 본문 사실의 연결 정리(docs/product/모아쓰기레터/에디터한마디_작성기준.md). 평가어·감탄·단정·판단 요구를 막고 200자로 제한한다.
+EDITOR_NOTE_BANNED_TERMS = ("아이러니", "재밌", "재미있", "놀랍", "흥미", "탁월", "대단", "안타깝", "다행", "충격", "역시", "결국",
+                            "지켜봐야", "주목하", "해야", "분명", "당연", "!")
+EDITOR_NOTE_MAX_CHARS = 200
 # 사이트 분류의 정본은 프론트 shared/constants/econCategories.ts 다. DB categories 테이블은 옛 7분류라 쓰지 않는다(v1.38).
 SITE_CATEGORIES = {
     "markets": "시그널", "property": "부동산", "economy": "경제", "finance": "금융", "industry": "산업",
@@ -258,6 +262,12 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
         problems.append(f"본문에 서로 다른 자사 기사 링크가 {MIN_DISTINCT_INLINE_ARTICLES}개 이상 필요합니다(현재 {distinct_own}개)")
 
     problems.extend(poll_problems(letter.get("poll")))
+    note = (letter.get("editor_note") or "").strip()
+    if len(note) > EDITOR_NOTE_MAX_CHARS:
+        problems.append(f"에디터 한마디가 {EDITOR_NOTE_MAX_CHARS}자를 넘습니다(현재 {len(note)}자)")
+    hit = biased_terms(note, EDITOR_NOTE_BANNED_TERMS)
+    if hit:
+        problems.append(f"에디터 한마디에 평가·감탄·단정·판단 요구 표현이 있습니다({', '.join(hit)}) — 본문 사실의 연결을 정리하는 문장으로 바꾸세요")
     body_texts = [("에디터 한마디", letter.get("editor_note") or "")] + [("1분 요약", t) for t in letter.get("summary") or []]
     for i, sec in enumerate(sections):
         body_texts.append((f"섹션 {i + 1} 핵심", sec.get("key_line") or ""))
