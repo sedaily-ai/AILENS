@@ -71,3 +71,29 @@ export async function fetchMyFeed(): Promise<IssueLetter[]> {
     topics: f.topics, reason: f.reason_text,
   }));
 }
+
+// ── 이메일 구독: 가입 → 메일 확인 → 수신거부. 서버는 주소의 가입 여부를 알려 주지 않는다(항상 같은 응답).
+export type SubscribeResult = { ok: true } | { ok: false; message: string };
+
+async function postJson(path: string, body: unknown, withDevice = false): Promise<SubscribeResult> {
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (withDevice) {
+      const id = getDeviceId();
+      if (id) headers['X-Voter-Id'] = id;
+    }
+    const res = await fetch(`${BASE}${path}`, { method: 'POST', cache: 'no-store', headers, body: JSON.stringify(body) });
+    if (res.ok) return { ok: true };
+    const detail = ((await res.json().catch(() => ({}))) as { detail?: string }).detail;
+    return { ok: false, message: typeof detail === 'string' && detail ? detail : '처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.' };
+  } catch {
+    return { ok: false, message: '네트워크 연결을 확인하고 다시 시도해 주세요.' };
+  }
+}
+
+export function subscribeByEmail(input: { email: string; interests: InterestItem[]; frequency: 'daily' | 'weekly'; sendHour: number }): Promise<SubscribeResult> {
+  return postJson('/subscriptions', { email: input.email, interests: input.interests, frequency: input.frequency, send_hour: input.sendHour, consent: true }, true);
+}
+
+export const confirmSubscription = (token: string) => postJson('/subscriptions/confirm', { token });
+export const unsubscribeByToken = (token: string) => postJson('/subscriptions/unsubscribe', { token });
