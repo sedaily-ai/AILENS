@@ -52,9 +52,9 @@ def _call(method: str, path: str, body: dict | None = None, query: dict | None =
         return e.code, payload
 
 
-def search_candidates(q: str, limit: int) -> tuple[int, dict]:
-    """출처 후보 검색 — 서울경제 기사 DB 에서 제목·본문에 키워드가 들어간 최신 기사(서버가 수행)."""
-    return _call("GET", "/admin/issue-letters/candidates", query={"q": q, "limit": limit})
+def save_archives(articles: list) -> tuple[int, dict]:
+    """빅카인즈 검색 결과에서 고른 서울경제 기사를 보관한다(레터 출처 후보). 보관된 기사만 레터 출처가 될 수 있다."""
+    return _call("POST", "/admin/issue-letters/archives", body={"articles": articles})
 
 
 def list_letters(status: str | None, limit: int) -> tuple[int, dict]:

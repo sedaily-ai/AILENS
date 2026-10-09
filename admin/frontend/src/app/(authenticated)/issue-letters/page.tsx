@@ -55,7 +55,7 @@ export default function IssueLettersPage() {
 
       <p className="text-[13px] leading-[1.6]" style={{ color: "var(--text-muted)" }}>
         사이트 &quot;레터&quot; 탭에 나가는 묶음 레터입니다. 레터 생성 프롬프트 템플릿 v2 가 만든 저장용 JSON 을 붙여넣어 초안으로 저장하고, 발행 전 점검을 통과하면 검수 요청 → 발행합니다.
-        출처는 서울경제 원문 기사만 쓸 수 있습니다.
+        출처는 빅카인즈 검색으로 후보에 담은 서울경제 기사만 쓸 수 있습니다.
       </p>
 
       <div className="flex gap-2 flex-wrap" role="group" aria-label="상태 필터">

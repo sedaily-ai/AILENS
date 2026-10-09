@@ -164,7 +164,7 @@ function IssueLetterEditPage() {
           </Link>
         </div>
         <p className="text-[13px] leading-[1.6]" style={{ color: "var(--text-muted)" }}>
-          레터 생성 프롬프트 템플릿 v2 의 출력(1) &quot;저장용 JSON&quot;을 그대로 붙여넣으세요. 저장하면 초안이 만들어지고, 출처 기사는 서울경제 기사 DB에서 찾아 연결됩니다.
+          레터 생성 프롬프트 템플릿 v2 의 출력(1) &quot;저장용 JSON&quot;을 그대로 붙여넣으세요. 저장하면 초안이 만들어집니다. 출처 주소는 위 검색에서 "후보로 담은" 서울경제 기사와 대조해 연결하고, 담지 않은 주소는 거부됩니다.
         </p>
         <IssueLetterCandidateSearch />
         {error && <ErrorNote message={error} />}

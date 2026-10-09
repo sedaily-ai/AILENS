@@ -34,7 +34,8 @@ import type {
   IssueLetterSummary,
   IssueLetterDetail,
   IssueLetterDetailResponse,
-  IssueLetterCandidate,
+  BigKindsSearchResponse,
+  BigKindsArticle,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
@@ -509,8 +510,17 @@ export const adminApi = {
     const suffix = qs.toString() ? `?${qs}` : "";
     return request<{ letters: IssueLetterSummary[] }>(`/admin/issue-letters${suffix}`);
   },
-  searchIssueLetterCandidates: (q: string, limit = 20) =>
-    request<{ articles: IssueLetterCandidate[] }>(`/admin/issue-letters/candidates?q=${encodeURIComponent(q)}&limit=${limit}`),
+  // 출처 후보 검색 — 사이트 "타임머신"과 같은 공개 API(빅카인즈, 서울경제만, 1990~, 한 번에 최대 6년). 인증이 필요 없어 토큰을 보내지 않는다.
+  searchBigKinds: (params: { q: string; from: string; to: string; sort: "relevance" | "date"; size?: number }) => {
+    const qs = new URLSearchParams({ q: params.q, from: params.from, to: params.to, sort: params.sort, size: String(params.size ?? 20) });
+    return request<BigKindsSearchResponse>(`/time-machine?${qs}`, { skipAuth: true });
+  },
+  // 고른 기사를 레터 출처 후보로 보관한다. 보관된 기사만 레터 JSON 의 출처 주소가 될 수 있다.
+  saveIssueLetterArchives: (articles: BigKindsArticle[]) =>
+    request<{ archived: { external_id: string; title: string; url: string }[] }>("/admin/issue-letters/archives", {
+      method: "POST",
+      body: JSON.stringify({ articles }),
+    }),
   getIssueLetter: (id: number) =>
     request<IssueLetterDetailResponse>(`/admin/issue-letters/${id}`),
   createIssueLetter: (input: unknown) =>

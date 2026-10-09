@@ -696,10 +696,21 @@ export interface IssueLetterDetailResponse {
   publish_problems: string[];
 }
 
-/** 출처 후보 검색 결과 — 서울경제 기사 DB 의 기사. url 은 쿼리 꼬리표를 뗀 기사 주소. */
-export interface IssueLetterCandidate {
-  article_no: string;
+/** 빅카인즈 검색 결과(타임머신 API)의 기사 항목. 서울경제 기사만 나오며 original_link 가 없는 기사는 출처로 쓸 수 없다. */
+export interface BigKindsArticle {
+  news_id: string;
   title: string;
-  url: string;
-  published_at: string | null;
+  content?: string;
+  byline?: string;
+  category?: string;
+  original_link: string | null;
+  published_at?: string;
+}
+
+export interface BigKindsSearchResponse {
+  query: string;
+  from: string;
+  to: string;
+  sort_applied: "relevance" | "date";
+  articles: BigKindsArticle[];
 }

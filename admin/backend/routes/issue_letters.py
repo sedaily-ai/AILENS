@@ -33,16 +33,15 @@ def _pass(status: int, payload: dict, ok_status: int = 200) -> dict:
     return response.err(str(detail or f"upstream error {status}"), status if status in (400, 403, 409, 422) else 502)
 
 
-def handle_candidates(body: dict, path_params: dict, query_params: dict) -> dict:
-    """출처 후보 기사 검색. 편집자가 키워드로 찾은 기사 목록을 레터 생성 템플릿의 후보 목록에 붙여 넣는 용도(선정은 사람이, 연결은 서버가)."""
-    q = ((query_params or {}).get("q") or "").strip()
-    if len(q) < 2:
-        return response.err("검색어는 2자 이상이어야 합니다", 400)
-    try:
-        limit = max(1, min(int((query_params or {}).get("limit", 20)), 50))
-    except (TypeError, ValueError):
-        limit = 20
-    return _pass(*repo.search_candidates(q, limit))
+def handle_archives(body: dict, path_params: dict, query_params: dict) -> dict:
+    """출처 후보 보관 — 편집자가 빅카인즈 검색 결과(타임머신 응답의 기사 항목)에서 고른 기사를 저장한다."""
+    articles = (body or {}).get("articles")
+    if not isinstance(articles, list) or not articles:
+        return response.err("보관할 기사가 없습니다", 400)
+    status, payload = repo.save_archives(articles)
+    if status == 200:
+        audit.log("issue-letter-archive-sources", {"count": len(payload.get("archived") or [])})
+    return _pass(status, payload)
 
 
 def handle_list(body: dict, path_params: dict, query_params: dict) -> dict:

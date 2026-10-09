@@ -91,7 +91,7 @@ HANDLERS: dict[str, tuple] = {
     # 이슈 레터(모아쓰기 레터) 2026-10-09 — routes/issue_letters.py 참고. ⚠️ 이 dict 에 키를 추가하는 것만으로는 부족하다:
     # API Gateway 에 `aws apigatewayv2 create-route`로 아래 8개 라우트를 같이 만들어야 한다(위 video-lab 주석과 같은 함정).
     "GET /admin/issue-letters": (issue_letters.handle_list, True),
-    "GET /admin/issue-letters/candidates": (issue_letters.handle_candidates, True),
+    "POST /admin/issue-letters/archives": (issue_letters.handle_archives, True),
     "POST /admin/issue-letters": (issue_letters.handle_create, True),
     "GET /admin/issue-letters/{id}": (issue_letters.handle_get, True),
     "PUT /admin/issue-letters/{id}": (issue_letters.handle_update, True),
