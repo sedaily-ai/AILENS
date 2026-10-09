@@ -18,6 +18,7 @@ frontpage_auto(지면 1면, 1일 1회)와는 독립이며, 발행 직전
 """
 import difflib
 import json
+import os
 import re
 from decimal import Decimal
 import sys
@@ -117,6 +118,41 @@ _MIN_CONTENT_LEN = 300
 _DUP_TITLE_RATIO = 0.72
 
 
+class _PgSeenTable:
+    """DynamoDB Table 의 get_item/put_item 만 흉내 내는 어댑터 — candidate_seen(Postgres, lens-cms-api 경유).
+    SEEN_BACKEND=pg 일 때만 쓴다(기본 ddb). run.py 의 호출부는 그대로 두고 저장소만 갈아 끼우기 위한 것이다(v1.36)."""
+
+    PIPELINE = "mustknow"
+
+    def __init__(self):
+        self._known: set[str] = set()
+
+    def prefetch(self, keys):
+        """후보 여러 건을 한 번에 확인해 이후 get_item 이 서버를 다시 부르지 않게 한다(옛 코드는 후보마다 get_item)."""
+        self._known |= lens_cms_client.seen_exists(self.PIPELINE, list(keys))
+        self._prefetched = set(keys) | getattr(self, "_prefetched", set())
+
+    def get_item(self, Key):
+        key = Key["article_key"]
+        if key in self._known:
+            return {"Item": {"article_key": key}}
+        if key in getattr(self, "_prefetched", set()):
+            return {}
+        return {"Item": {"article_key": key}} if lens_cms_client.seen_exists(self.PIPELINE, [key]) else {}
+
+    def put_item(self, Item):
+        meta = {k: v for k, v in Item.items() if k not in ("article_key", "seen_at")}
+        lens_cms_client.seen_mark(self.PIPELINE, Item["article_key"], **meta)
+        self._known.add(Item["article_key"])
+
+
+def _open_seen_table(session):
+    """본 후보 이력 저장소. 기본은 DynamoDB, SEEN_BACKEND=pg 이면 Postgres(candidate_seen)."""
+    if os.environ.get("SEEN_BACKEND", "ddb").lower() == "pg":
+        return _PgSeenTable()
+    return session.resource("dynamodb").Table(SEEN_TABLE)
+
+
 def _is_seen(seen_table, article_key: str) -> bool:
     if not article_key:
         return True  # key 없는 기사는 애초에 발행 불가 대상 — 취급 안 함
@@ -196,7 +232,7 @@ def _publish(
 def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
-    seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
+    seen_table = _open_seen_table(session)
     revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
 
     today = datetime.now(KST).strftime("%Y%m%d")
@@ -208,6 +244,8 @@ def main():
     sunday_note = " (일요일 — 지면특별코너 4탭 전부 스킵, 일반만 처리)" if is_sunday else ""
     print(f"[mustknow-auto] 오늘({today}) 전체 후보 {len(all_articles)}건, 지면1면 후보 {len(front_page)}건{sunday_note}")
 
+    if hasattr(seen_table, "prefetch"):
+        seen_table.prefetch([a["key"] for a in all_articles + front_page if a["key"]])
     fresh = [a for a in all_articles if a["key"] and not _is_seen(seen_table, a["key"])]
     fresh = _dedupe_near_identical(fresh)
     fresh = [a for a in fresh if a["content_len"] >= _MIN_CONTENT_LEN]
@@ -376,7 +414,7 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
     일회성 수동 경로이다. 재채점·재정렬 없이 main()의 seen 필터·선정 로직을 거치지 않는다."""
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
-    seen_table = session.resource("dynamodb").Table(SEEN_TABLE)
+    seen_table = _open_seen_table(session)
     revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
     out_dir = Path("/tmp/mustknow_auto_out")
     out_dir.mkdir(parents=True, exist_ok=True)

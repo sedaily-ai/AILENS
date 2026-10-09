@@ -19,6 +19,7 @@ import os
 
 import boto3
 
+from repo import admin_jobs_repo
 from shared import ddb_client
 
 JOB_PK = "WEBTOONLAB"
@@ -49,18 +50,29 @@ def job_table():
     return ddb_client.config_table()
 
 
+def _use_pg() -> bool:
+    """JOBS_BACKEND=pg 이면 Postgres(admin_jobs, v1.36)를 쓴다. 기본은 DynamoDB — 이관 검증이 끝나면 pg 로 바꾼다."""
+    return os.environ.get("JOBS_BACKEND", "ddb").lower() == "pg"
+
+
 def put_job(job_id: str, item: dict) -> None:
     """전체 레코드 생성 — 각 job 종류의 최초 1회 쓰기 전용. `put_item`은
     항목 전체를 덮어쓴다는 점에 주의: 이후 상태 갱신에는 반드시
     `update_job`(부분 갱신)을 써야 한다(로컬 스모크테스트에서 실수로
     `put_job`을 재사용해 scene/camera/prompt_preview/created_at이 통째로
     사라지는 걸 실제로 확인했다)."""
+    if _use_pg():
+        admin_jobs_repo.put_job("webtoon_cut", job_id, item)
+        return
     row = {"pk": JOB_PK, "sk": f"job/{job_id}", **item}
     job_table().put_item(Item=row)
 
 
 def update_job(job_id: str, updates: dict) -> None:
     """부분 갱신 — 지정한 필드만 바꾸고 나머지(scene/camera/style 등)는 보존한다."""
+    if _use_pg():
+        admin_jobs_repo.update_job("webtoon_cut", job_id, updates)
+        return
     expr_names = {f"#{k}": k for k in updates}
     expr_values = {f":{k}": v for k, v in updates.items()}
     update_expr = "SET " + ", ".join(f"#{k} = :{k}" for k in updates)
