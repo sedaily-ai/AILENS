@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
+import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { addRecentSearch, clearRecentSearches, getRecentSearches } from '@/shared/lib/search/recentSearches';
 import {
@@ -31,7 +32,7 @@ const PAGE_SIZE = 20;
 const SORTS: Array<[SearchSort, string]> = [['latest', '최신순'], ['relevance', '정확도순']];
 const SCOPES: Array<[SearchScope, string]> = [['all', '전체'], ['title', '제목'], ['summary', '요약']];
 const PERIODS: Array<[SearchPeriod, string]> = [['all', '전체'], ['today', '오늘'], ['week', '1주'], ['month', '1달']];
-const CATEGORY_ORDER = ['증시', '시그널', '부동산', '산업', '금융·정책', '국제', '문화', UNCATEGORIZED];
+const CATEGORY_ORDER = [...ECON_CATEGORIES.map((c) => c.label), UNCATEGORIZED];
 
 function pick<T extends string>(value: string | null, allowed: Array<[T, string]>, fallback: T): T {
   return allowed.some(([v]) => v === value) ? (value as T) : fallback;

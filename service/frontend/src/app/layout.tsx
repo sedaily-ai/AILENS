@@ -182,7 +182,7 @@ const SITE_JSONLD = {
       slogan: "그날의 핵심 경제 이슈를 매일 정리해 전합니다",
       description: SITE_DESC,
       areaServed: { "@type": "Country", name: "대한민국" },
-      knowsAbout: ["경제 뉴스", "증시", "금융·정책", "산업", "부동산", "국제 경제", "경제 용어", "시사 해설"],
+      knowsAbout: ["경제 뉴스", "시그널", "부동산", "경제", "금융", "산업", "정치", "사회", "국제 경제", "경제 용어", "시사 해설"],
       masthead: `${SITE_URL}/about`,
       actionableFeedbackPolicy: `${SITE_URL}/contact`,
       isAccessibleForFree: true,
@@ -195,8 +195,8 @@ const SITE_JSONLD = {
       "@id": `${SITE_URL}/#navigation`,
       name: "AI LENS 주요 섹션",
       itemListElement: [
-        ["증시", "/markets"], ["시그널", "/signal"], ["부동산", "/property"], ["산업", "/industry"],
-        ["금융·정책", "/finance"], ["국제", "/international"], ["문화", "/culture"],
+        ["시그널", "/markets"], ["부동산", "/property"], ["경제", "/economy"], ["금융", "/finance"], ["산업", "/industry"],
+        ["정치", "/politics"], ["사회", "/national"], ["국제", "/international"], ["문화", "/culture"],
         ["오늘의 시선", "/lens"], ["용어 해설", "/words"],
       ].map(([name, path], i) => ({
         "@type": "SiteNavigationElement",

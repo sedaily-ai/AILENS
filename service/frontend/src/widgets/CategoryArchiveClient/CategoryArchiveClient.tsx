@@ -16,7 +16,7 @@ import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/content/archiveItems';
 import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
-import type { EconCategoryConfig } from '@/shared/constants/econCategories';
+import { categoryMatches, type EconCategoryConfig } from '@/shared/constants/econCategories';
 import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
@@ -64,18 +64,15 @@ export function CategoryArchiveClient({
     Promise.all([fetchCmsPosts('letters', undefined, PAGE_SIZE), fetchLensPosts()]).then(
       ([letters, lens]) => {
         if (cancelled) return;
-        // "시그널"(filterBy:'paperSection')은 category가 아니라 paperSection으로
-        // 거른다 — EconomyCategoryPage.tsx(서버 최초 fetch)와 같은 규칙.
-        const all = buildArchiveItems(letters, [], [], lens).filter((it) =>
-          config.filterBy === 'paperSection' ? it.paperSection === config.label : it.category === config.label,
-        );
+        // EconomyCategoryPage.tsx(서버 최초 fetch)와 같은 규칙 — 새 이름과 옛 이름이 섞여 있어 categoryMatches로 비교한다.
+        const all = buildArchiveItems(letters, [], [], lens).filter((it) => categoryMatches(config, it.category));
         if (all.length > 0) setItems(all);
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [config.label, config.filterBy]);
+  }, [config]);
 
   const subTabValues = econSubcategoriesFor(config.slug).filter((sub) =>
     items.some((it) => it.subcategory === sub),

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { buildEconomyCategoryMetadata, clampCategoryPage, EconomyCategoryPage } from '@/widgets/CategoryArchiveClient';
 
-// 카테고리 아카이브 페이지네이션(/signal/page/[n]) — slug만 고정해 넘기는 wrapper. 라우트 설정 이유는
+// 카테고리 아카이브 페이지네이션(/politics/page/[n]) — slug만 고정해 넘기는 wrapper. 라우트 설정 이유는
 // widgets/CategoryArchiveClient/EconomyCategoryPage.tsx의 clampCategoryPage 주석 참조.
 type Params = Promise<{ n: string }>;
 
@@ -15,10 +15,10 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { n } = await params;
-  return buildEconomyCategoryMetadata('signal', parseInt(n, 10) || 1);
+  return buildEconomyCategoryMetadata('politics', parseInt(n, 10) || 1);
 }
 
 export default async function Page({ params }: { params: Params }) {
   const { n } = await params;
-  return EconomyCategoryPage({ slug: 'signal', page: clampCategoryPage(n) });
+  return EconomyCategoryPage({ slug: 'politics', page: clampCategoryPage(n) });
 }

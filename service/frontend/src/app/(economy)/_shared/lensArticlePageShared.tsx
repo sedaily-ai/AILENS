@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 import { fetchLensPosts, fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
@@ -7,7 +7,7 @@ import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date/date';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { categoryForDataLabel } from '@/shared/constants/econCategories';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';
 import type { ArticleNeighbor } from './components/article/ArticleNeighborNav';
@@ -89,7 +89,7 @@ function pickShareImages(lens: CmsLens): Promise<ShareImages> {
 
 /** 빵부스러기용 분류 단계. 분류가 없거나 정본 분류 목록에 없으면 null(단계 생략) — 미분류 글 경로 /news 는 목록 페이지가 없어 링크하면 404. */
 function breadcrumbCategory(lens: CmsLens): { name: string; url: string } | null {
-  const cat = ECON_CATEGORIES.find((c) => c.label === lens.category);
+  const cat = categoryForDataLabel(lens.category);
   return cat ? { name: cat.label, url: `${SITE_URL}/${cat.slug}` } : null;
 }
 
@@ -291,7 +291,8 @@ export async function LensArticlePageContent(
     // lensPath()가 마지막 세그먼트를 encodeURIComponent로 만들므로 비교 대상도 같은 인코딩으로 맞춘다. 아니면 정상 요청도 항상 다르다고 판정되어 매번 리다이렉트된다.
     const requested = `/${expectedCategorySlug}/${year}/${month}/${day}/${encodeURIComponent(slug)}`;
     if (requested !== canonical) {
-      redirect(canonical);
+      // 영구 이동(308). 분류 개편으로 글의 분류가 바뀌면 주소(/{분류}/…)가 바뀌는데, 임시 이동(307)이면 구글이 옛 주소를 색인에 남긴다.
+      permanentRedirect(canonical);
     }
   }
 

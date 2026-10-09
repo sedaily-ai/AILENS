@@ -30,7 +30,7 @@ export interface ArchiveItem {
   publishedAt?: string | null;
   /** "오늘의 지면" 특별 코너 값(전체/증권/산업/시그널, lens.paper_section 그대로). lens 항목만 값이 있으며 category(주제)와 별개 축이다.
    *  홈 LensPreviewSection.tsx가 이 값으로 4지면 티저 탭을 뽑는다. "시그널"은 본지 GNB의 "Market Signal"에 대응하는 카테고리라
-   *  econCategories.ts에 filterBy: 'paperSection' 카테고리(/signal)로도 등록되어 있으며, category가 아니라 이 필드로 거른다. */
+   *  (옛 /signal 카테고리가 이 값으로 거르던 시절의 필드이며, 2026-10-09 분류 개편으로 /signal은 /markets로 통합됐다.) */
   paperSection?: string | null;
 }
 

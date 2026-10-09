@@ -4,7 +4,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { liveMenuCategories } from '@/shared/constants/menuTaxonomy';
+import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from '@/shared/lib/search/recentSearches';
 import { DEFAULT_PARAMS, loadSearchIndex, parseTerms, search, splitHighlight, topKeywords, type SearchRecord } from '@/shared/lib/search/searchIndex';
@@ -59,6 +60,17 @@ function Panel({ onClose }: { onClose: () => void }) {
   }, []);
 
   const keywords = useMemo(() => (items ? topKeywords(items, 3, 8) : []), [items]);
+  // 검색 목록이 로드되면 글이 실제로 있는 분류·하위 분류만 남긴다(목록 전에는 정의된 전체를 보여 주고, 못 불러오면 그대로 둔다).
+  const menu = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (items) for (const r of items) if (r.c) counts.set(`${r.c}|${r.u}`, (counts.get(`${r.c}|${r.u}`) ?? 0) + 1);
+    return ECON_CATEGORIES.map((cfg) => {
+      const all = econSubcategoriesFor(cfg.slug);
+      const subs = items ? all.filter((s) => (counts.get(`${cfg.label}|${s}`) ?? 0) > 0) : all;
+      const total = items ? all.reduce((n, s) => n + (counts.get(`${cfg.label}|${s}`) ?? 0), 0) + (counts.get(`${cfg.label}|`) ?? 0) : 1;
+      return { cfg, subs, total };
+    }).filter((m) => m.total > 0);
+  }, [items]);
   const suggestions = useMemo(() => (items && q.trim() ? search(items, { ...DEFAULT_PARAMS, q }).slice(0, SUGGEST_MAX) : []), [items, q]);
   const terms = useMemo(() => parseTerms(q), [q]);
 
@@ -297,17 +309,17 @@ function Panel({ onClose }: { onClose: () => void }) {
       <div className="mm-panel" style={{ top, ['--mm-top' as string]: `${top}px` }}>
         <div className="mm-inner">
           <div className="mm-cats">
-            {liveMenuCategories().map((c) => (
-              <section key={c.slug} className="mm-cat" aria-label={c.label}>
+            {menu.map(({ cfg, subs }) => (
+              <section key={cfg.slug} className="mm-cat" aria-label={cfg.label}>
                 <h3>
-                  <Link href={c.href} onClick={onClose}>
-                    {c.label}
+                  <Link href={`/${cfg.slug}`} onClick={onClose}>
+                    {cfg.label}
                   </Link>
                 </h3>
                 <ul>
-                  {c.subs.map((sub) => (
+                  {subs.map((sub) => (
                     <li key={sub}>
-                      <Link href={`${c.href}?sub=${encodeURIComponent(sub)}`} onClick={onClose}>
+                      <Link href={`/${cfg.slug}?sub=${encodeURIComponent(sub)}`} onClick={onClose}>
                         {sub}
                       </Link>
                     </li>

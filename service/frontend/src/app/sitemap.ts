@@ -23,13 +23,15 @@ function escapeXml(s: string): string {
 // lastModified는 라우트 파일의 실제 수정일을 수기로 갱신한다. 요청 시각(new Date())을 쓰면 크롤러에 거짓 신선도 신호가 된다.
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']; lastModified: string }[] = [
   { path: '/',             priority: 1.0, changeFrequency: 'hourly',  lastModified: '2026-08-08' }, // 메인 피드
-  // 경제 버티컬 카테고리 6개. shared/constants/econCategories.ts의 슬러그와 일치해야 한다.
+  // 카테고리 9개(2026-10-09 분류 개편). shared/constants/econCategories.ts의 슬러그와 일치해야 한다.
   // priority/changeFrequency를 개별 판단하므로 .map() 생성 대신 수동 나열한다.
-  { path: '/markets',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 증시
-  { path: '/signal',        priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-01' }, // 시그널(Market Signal)
+  { path: '/markets',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 시그널(옛 증시+시그널)
   { path: '/property',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 부동산
+  { path: '/economy',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 경제
+  { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 금융
   { path: '/industry',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 산업
-  { path: '/finance',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 금융·정책
+  { path: '/politics',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 정치
+  { path: '/national',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 사회
   { path: '/international', priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 국제
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록

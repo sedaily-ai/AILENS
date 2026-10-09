@@ -41,7 +41,7 @@ export const config = {
   matcher: [
     '/lens',
     '/lens/page/:n',
-    '/markets/page/:n', '/signal/page/:n', '/property/page/:n', '/industry/page/:n',
-    '/finance/page/:n', '/international/page/:n', '/culture/page/:n',
+    '/markets/page/:n', '/property/page/:n', '/economy/page/:n', '/finance/page/:n', '/industry/page/:n',
+    '/politics/page/:n', '/national/page/:n', '/international/page/:n', '/culture/page/:n',
   ],
 };

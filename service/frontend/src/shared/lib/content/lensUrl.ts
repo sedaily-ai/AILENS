@@ -15,8 +15,9 @@ import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 
 const FALLBACK_CATEGORY_SLUG = 'news';
 
+// 글에 저장된 category 값(새 이름과 옛 이름 모두)을 주소 슬러그로 바꾼다. 옛 이름('증시', '금융·정책')은 재분류가 끝날 때까지 남아 있을 수 있다.
 const LABEL_TO_SLUG: Record<string, string> = Object.fromEntries(
-  ECON_CATEGORIES.map((c) => [c.label, c.slug]),
+  ECON_CATEGORIES.flatMap((c) => c.dataLabels.map((l) => [l, c.slug] as const)),
 );
 
 export function lensCategorySlug(category?: string | null): string {

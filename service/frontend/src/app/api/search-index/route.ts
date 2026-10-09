@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { fetchAllLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { displayHeadline } from '@/shared/lib/content/displayHeadline';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
+import { displayCategoryLabel } from '@/shared/constants/econCategories';
 import type { SearchRecord } from '@/shared/lib/search/searchIndex';
 
 // 일반 검색용 가벼운 목록 — 제목·요약·분류·날짜·썸네일만 담는다(기사 본문 제외, shared/lib/search/searchIndex.ts 참조).
@@ -20,7 +21,8 @@ export async function GET() {
     i: p.id,
     h: displayHeadline(p.headline),
     s: (p.context ?? '').slice(0, SUMMARY_MAX),
-    c: p.category ?? '',
+    // 글에는 옛 이름('증시', '금융·정책')이 남아 있을 수 있어 새 이름으로 맞춰 내려준다(econCategories.ts).
+    c: displayCategoryLabel(p.category),
     u: p.subcategory ?? '',
     d: p.date,
     t: p.published_at ?? '',

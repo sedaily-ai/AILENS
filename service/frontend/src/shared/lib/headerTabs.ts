@@ -7,10 +7,12 @@ import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 
 export type HeaderTabKey =
   | 'markets'
-  | 'signal'
   | 'property'
-  | 'industry'
+  | 'economy'
   | 'finance'
+  | 'industry'
+  | 'politics'
+  | 'national'
   | 'international'
   | 'investing'
   | 'culture'
@@ -48,7 +50,7 @@ const TIMELINE_HREF = '/timeline';
  */
 export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
   return [
-    // 상단 탭은 주제 기준 6개 카테고리(tier 'core')다. 정의는 shared/constants/econCategories.ts 한 곳이며,
+    // 상단 탭은 주제 기준 9개 카테고리(tier 'core')다. 정의는 shared/constants/econCategories.ts 한 곳이며,
     // admin/frontend의 ECON_CATEGORIES와 같은 목록이지만 별도 Next.js 앱이라 의도적으로 중복한다.
     // "시선" 탭은 상단 nav에 두지 않는다(/lens 페이지와 홈 "오늘의 이슈, 4가지 시선" 섹션은 유지).
     // /letters, /column 아카이브 목록은 /lens로 영구 리다이렉트된다(next.config.ts). /letters/[id]·/letters/view 상세 라우트는 유지된다.

@@ -4,7 +4,7 @@ import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/content/archiveItems';
 import { buildCategoryMetadata, buildCategoryPageNMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
 import { CategoryArchiveClient } from './CategoryArchiveClient';
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { categoryMatches, ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { HeaderTabKey } from '@/shared/lib/headerTabs';
 
 // 카테고리 아카이브(증시/부동산/산업/금융·정책/국제/문화)는 fetch→filter→JSON-LD→렌더 로직이 같고 slug만 다르다.
@@ -29,11 +29,8 @@ export async function EconomyCategoryPage({ slug, page = 1 }: { slug: string; pa
     fetchLensPosts(),
     fetchFollowingLetters(10),
   ]);
-  // "시그널"(filterBy:'paperSection')은 category가 아니라 paperSection으로
-  // 거른다 — econCategories.ts 주석 참조.
-  const items = buildArchiveItems(letters, [], [], lens).filter((it) =>
-    config.filterBy === 'paperSection' ? it.paperSection === config.label : it.category === config.label,
-  );
+  // 글의 category는 새 이름과 옛 이름('증시', '금융·정책')이 섞여 있을 수 있어 categoryMatches로 비교한다(econCategories.ts 참조).
+  const items = buildArchiveItems(letters, [], [], lens).filter((it) => categoryMatches(config, it.category));
   const jsonLd = buildCategoryJsonLd(config, items);
   return (
     <>

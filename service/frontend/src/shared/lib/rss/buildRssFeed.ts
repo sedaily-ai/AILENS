@@ -3,7 +3,7 @@ import { letterHref } from '@/shared/lib/content/letterHref';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import type { EconCategoryConfig } from '@/shared/constants/econCategories';
+import { categoryMatches, type EconCategoryConfig } from '@/shared/constants/econCategories';
 import { SITE_URL as BASE } from '@/shared/constants/site';
 
 // AI LENS RSS 2.0 피드. 전체 피드(/rss.xml)와 카테고리별 피드(/{slug}/rss.xml)가 이 빌더 하나를 공유한다.
@@ -77,19 +77,10 @@ export async function buildRssResponse(category?: EconCategoryConfig): Promise<R
   const lensIds = new Set(lensPosts.map((l) => l.id));
   const dedupedLetters = letters.filter((l) => !lensIds.has(l.id));
 
-  // 카테고리 피드 필터 — 카테고리 아카이브 페이지와 같은 규칙: 일반은 글의
-  // category(주제)로, "시그널"(filterBy:'paperSection')은 paper_section으로
-  // 거른다(econCategories.ts 참조). 시그널은 lens 전용 코너라 letters는 제외.
-  const lensFiltered = category
-    ? lensPosts.filter((l) =>
-        category.filterBy === 'paperSection' ? l.paper_section === category.label : l.category === category.label,
-      )
-    : lensPosts;
-  const lettersFiltered = category
-    ? category.filterBy === 'paperSection'
-      ? []
-      : dedupedLetters.filter((l) => l.category === category.label)
-    : dedupedLetters;
+  // 카테고리 피드 필터 — 카테고리 아카이브 페이지와 같은 규칙: 글의 category(주제)로 거른다.
+  // 새 이름과 옛 이름('증시', '금융·정책')이 섞여 있어 categoryMatches로 비교한다(econCategories.ts 참조).
+  const lensFiltered = category ? lensPosts.filter((l) => categoryMatches(category, l.category)) : lensPosts;
+  const lettersFiltered = category ? dedupedLetters.filter((l) => categoryMatches(category, l.category)) : dedupedLetters;
 
   const letterEntries: FeedEntry[] = lettersFiltered.map((l) => {
     const description = clip(
