@@ -547,6 +547,41 @@ def set_status(admin_post_id: str, status: str) -> Optional[Dict[str, Any]]:
     return get(admin_post_id)
 
 
+def soft_delete_empty_by_slugs(slugs: List[str], dry_run: bool = True) -> Dict[str, Any]:
+    """admin_post_id가 없는 옛 글(v1.4 이관 이전 테스트 글 등)을 slug로 소프트 삭제한다.
+
+    soft_delete()는 admin_post_id로만 찾아서 이런 글을 못 지운다. 대신 범위를 좁게 막는다:
+      - 요청한 slug가 DB에 전부 있어야 하고(오타·누락 방지),
+      - 원문 링크(source_url)가 있는 글(실제 기사)이거나 이미 삭제된 글이 하나라도 섞여 있으면 아무것도 바꾸지 않는다.
+    하나라도 어긋나면 ValueError를 던지고(get_cursor가 롤백), dry_run=True(기본)면 조회만 한다. 복구는 deleted_at을 NULL로 되돌리면 된다."""
+    if not slugs or len(slugs) > 50 or len(set(slugs)) != len(slugs):
+        raise ValueError("slugs는 1~50개, 중복 없이")
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT id, slug, title, status, admin_post_id, source_url, deleted_at FROM publications WHERE slug = ANY(%s) ORDER BY slug",
+            (slugs,),
+        )
+        rows = cur.fetchall()
+        missing = sorted(set(slugs) - {r["slug"] for r in rows})
+        blocked = sorted(r["slug"] for r in rows if r["source_url"] or r["deleted_at"])
+        if missing or blocked:
+            raise ValueError(f"조건 불일치: DB에 없음={missing}, 원문링크 있음/이미 삭제됨={blocked}")
+        matched = [
+            {"slug": r["slug"], "title": (r["title"] or "")[:40], "status": r["status"], "has_admin_post_id": bool(r["admin_post_id"])}
+            for r in rows
+        ]
+        if dry_run:
+            return {"dry_run": True, "matched": len(rows), "posts": matched}
+        cur.execute(
+            "UPDATE publications SET deleted_at = now(), updated_at = now() "
+            "WHERE slug = ANY(%s) AND deleted_at IS NULL AND source_url IS NULL",
+            (slugs,),
+        )
+        if cur.rowcount != len(slugs):
+            raise ValueError(f"삭제 행 수 불일치: {cur.rowcount} != {len(slugs)}")
+        return {"dry_run": False, "deleted": cur.rowcount, "posts": matched}
+
+
 def soft_delete(admin_post_id: str) -> bool:
     with get_cursor() as cur:
         cur.execute(
