@@ -54,3 +54,8 @@ Before → After
 - /news 폴백: 분류 없는 기사 3건(8월, -webtoon/-podcast/-video 접미사 id의 중복 기사)이 있어 라우트 유지. 데이터 정리(삭제/재분류) 후 제거 가능.
 - 옛 분류 이름 호환(dataLabels '증시'·'금융·정책'): 재분류 데이터 검증 전이라 유지.
 - letterHref 호출처(RSS·홈·TodayLetters)는 308 한 번 경유. 직접 기사 주소로 바꾸면 이동 한 번 줄어듦.
+
+## /news 폴백 중복 기사 3건 삭제 (배포 후)
+- 8월 11일 빵지순례 기사의 -webtoon/-podcast/-video 접미사 중복 lens 글 3건(분류 없음, 원문 링크 없음)을 소프트 삭제(deleted_at). 드라이런 3건 일치 확인 후 실행, 삭제 목록은 2026-10-09-news폴백-중복글3건-삭제목록.json. 복구는 deleted_at을 NULL로.
+- 배포(오후~밤): 5개 커밋 한 번에 배포, CloudFront 전체 무효화, 옛 웹툰·영상·레터 주소 308 라이브 확인.
+- 다음: /news 폴백 라우트(app/(economy)/news)와 lensUrl FALLBACK 제거 가능(분류 없는 기사 0건).
