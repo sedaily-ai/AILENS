@@ -199,7 +199,7 @@ export const MOCK_LETTERS: IssueLetter[] = [
         keyLine: '종로3가, 2021년 3위에서 2026년 1위로 올라섰어요.',
         paragraphs: [
           [
-            { text: '중앙일보 보도', href: 'https://www.joongang.co.kr/article/25462798' },
+            { text: '서울경제 보도', href: 'https://www.sedaily.com/article/20092388' },
             '에 따르면 영국 매체 타임아웃이 발표한 "2026 세계에서 가장 멋진 동네"에서 서울 종로3가가 1위를 차지했어요. 익선동 한옥 골목과 종로3가 포장마차 거리가 특히 주목받았어요.',
           ],
           ['타임아웃 여행 에디터 Grace Beard는 "종로3가는 2021년에 우리가 뽑은 3번째로 멋진 동네였는데, 늦은 밤 야외 식사 문화와 독립 가게들이 늘면서 이번엔 1위까지 올라왔다"고 설명했어요.'],
@@ -234,8 +234,7 @@ export const MOCK_LETTERS: IssueLetter[] = [
       ],
     },
     sources: [
-      { title: '타임아웃 "세계에서 가장 멋진 동네" 1위에 종로3가', outlet: '중앙일보', href: 'https://www.joongang.co.kr/article/25462798', axes: ['news'], internal: false },
-      { title: '(예시) 순위 선정 방식을 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: false, placeholder: true },
+      { title: '한국인들은 이런 멋진 데서 놀다니…찾아온 외국인들 깜짝 놀란 포장마차 거리', outlet: '서울경제', href: 'https://www.sedaily.com/article/20092388', axes: ['news'], internal: true },
       { title: '(예시) 젠트리피케이션을 다룬 기사', outlet: '', href: '', axes: ['other'], internal: false, placeholder: true },
     ],
   },
@@ -303,11 +302,11 @@ export const MOCK_LETTERS: IssueLetter[] = [
       ],
     },
     sources: [
-      { title: '(예시) 상어 등장 소식을 다룬 기사', outlet: '', href: '', axes: ['news'], internal: true, placeholder: true },
-      { title: '(예시) 주가·테마주를 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: true, placeholder: true },
-      { title: '(예시) 관광·상권 효과를 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: true, placeholder: true },
-      { title: '(예시) AI 가짜뉴스 팩트체크를 다룬 기사', outlet: '', href: '', axes: ['other'], internal: true, placeholder: true },
-      { title: '(예시) 구조·퇴거 논쟁을 다룬 기사', outlet: '', href: '', axes: ['other'], internal: true, placeholder: true },
+      { title: '부캉이 ‘팬미팅’, 연휴 이틀새 20만명 넘겨', outlet: '서울경제', href: 'https://www.sedaily.com/article/20094994', axes: ['news'], internal: true },
+      { title: '“부캉이 땡큐” 특수 제대로 누린 카페 사장님…“감사합니다” 수익금 100만원 기부', outlet: '서울경제', href: 'https://www.sedaily.com/article/20097833', axes: ['substance'], internal: true },
+      { title: '식지 않는 ‘부캉이’ 인기…관람객 누적 100만 명 돌파', outlet: '서울경제', href: 'https://www.sedaily.com/article/20098260', axes: ['substance'], internal: true },
+      { title: '(예시) AI 가짜뉴스 팩트체크를 다룬 기사', outlet: '', href: '', axes: ['other'], internal: false, placeholder: true },
+      { title: '“부캉이 그냥 두자”는 시민들…전문가들은 “더 늦기 전에 바다로”', outlet: '서울경제', href: 'https://www.sedaily.com/article/20096822', axes: ['other'], internal: true },
     ],
   },
   {
@@ -352,8 +351,8 @@ export const MOCK_LETTERS: IssueLetter[] = [
       ],
     },
     sources: [
-      { title: '(예시) 경매 소식을 다룬 기사', outlet: '', href: '', axes: ['news'], internal: true, placeholder: true },
-      { title: '(예시) 낙찰가율을 다룬 기사', outlet: '', href: '', axes: ['substance'], internal: true, placeholder: true },
+      { title: '“서현진도 당했다” 26억 전세금 못 돌려 받아…경매 넘어간 빌라 낙찰가는', outlet: '서울경제', href: 'https://www.sedaily.com/article/20099864', axes: ['news'], internal: true },
+      { title: '서울 아파트 경매 낙찰가율 넉 달째 100% 돌파', outlet: '서울경제', href: 'https://www.sedaily.com/article/20076662', axes: ['substance'], internal: true },
     ],
   },
 ];
