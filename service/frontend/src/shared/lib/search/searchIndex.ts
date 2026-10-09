@@ -198,9 +198,13 @@ export function topKeywords(items: SearchRecord[], days = 3, limit = 10): string
     }
     for (const t of seen) df.set(t, (df.get(t) ?? 0) + 1);
   }
-  return [...df.entries()]
-    .filter(([, n]) => n >= 2)
-    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
-    .slice(0, limit)
-    .map(([t]) => t);
+  const ranked = [...df.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length);
+  // '삼성'과 '삼성전자'처럼 한쪽이 다른 쪽에 들어 있는 말은 순위가 높은 쪽만 남긴다.
+  const picked: string[] = [];
+  for (const [t] of ranked) {
+    if (picked.some((k) => k.includes(t) || t.includes(k))) continue;
+    picked.push(t);
+    if (picked.length >= limit) break;
+  }
+  return picked;
 }

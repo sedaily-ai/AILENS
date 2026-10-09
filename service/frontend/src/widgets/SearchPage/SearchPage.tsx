@@ -27,7 +27,7 @@ import {
   type SearchSort,
 } from '@/shared/lib/search/searchIndex';
 
-// 일반 검색 결과 — 검색창 → 정렬·범위·기간 → 분류 탭 → 결과(좌) / 요즘 많이 나온 키워드(우).
+// 일반 검색 결과 — 검색창 → 정렬·상세 조건(범위·기간, 접힘) → 분류 탭 → 결과(좌) / 요즘 많이 나온 키워드(우).
 // 검색 조건은 모두 주소(?q=&sort=&scope=&period=&cat=)에 담아 공유·뒤로가기가 되고, 검색은 브라우저에서 바로 한다(shared/lib/search/searchIndex.ts).
 const PAGE_SIZE = 20;
 
@@ -71,6 +71,16 @@ function Mark({ text, terms }: { text: string; terms: string[] }) {
   );
 }
 
+// 로고·와이드 배너처럼 3:2 칸에 크롭하면 잘리는 이미지는 칸 안에 통째로 넣는다(사진은 그대로 꽉 채운다).
+function fitLogo(e: React.SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  const ratio = img.naturalWidth / img.naturalHeight;
+  if (ratio > 2.2 || ratio < 0.8) {
+    img.style.objectFit = 'contain';
+    img.style.background = '#fff';
+  }
+}
+
 function dateLabel(rec: SearchRecord): string {
   return rec.d.replaceAll('-', '.');
 }
@@ -85,6 +95,7 @@ export function SearchPage() {
   const [shown, setShown] = useState(PAGE_SIZE);
   const [recent, setRecent] = useState<string[]>([]);
   const [tipOpen, setTipOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 주소가 바뀌면(뒤로가기·칩 클릭) 입력창과 더 보기 개수를 맞춘다. 같은 렌더에서 보정해 effect 깜빡임을 피한다.
@@ -166,11 +177,13 @@ export function SearchPage() {
           .sp-field input::-webkit-search-cancel-button { display: none; }
           .sp-go { flex: none; width: 48px; height: 48px; border: none; border-radius: 50%; background: #3d70de; color: #fff; display: grid; place-items: center; cursor: pointer; transition: background .15s; }
           .sp-go:hover { background: #3260c8; }
-          .sp-tools { display: flex; justify-content: flex-end; gap: 16px; margin-top: 10px; font-size: 13px; color: #6b7280; }
-          .sp-tools button, .sp-tools a { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: none; }
-          .sp-tools button:hover, .sp-tools a:hover { color: #111827; }
+          .sp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 13.5px; }
+          .sp-bar-r { display: flex; align-items: center; gap: 14px; margin-left: auto; color: #6b7280; }
+          .sp-bar-r button, .sp-bar-r a { display: inline-flex; align-items: center; gap: 4px; border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: none; white-space: nowrap; }
+          .sp-bar-r button:hover, .sp-bar-r a:hover { color: #111827; }
+          .sp-dot { width: 6px; height: 6px; border-radius: 50%; background: #3d70de; }
           .sp-tip { margin: 10px 0 0; padding: 12px 14px; border-radius: 12px; background: #f8fafc; font-size: 13px; line-height: 1.6; color: #475569; }
-          .sp-filters { margin-top: 22px; display: grid; gap: 10px; font-size: 14px; }
+          .sp-filters { margin: 10px 0 0; padding: 12px 14px; display: grid; gap: 6px; font-size: 14px; border-radius: 12px; background: #f8fafc; }
           .sp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
           .sp-row dt { flex: none; width: 44px; font-weight: 700; color: #111827; }
           .sp-row dd { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
@@ -199,7 +212,8 @@ export function SearchPage() {
           .sp-sum { margin: 8px 0 0; font-size: 14.5px; line-height: 1.6; color: #6b7280; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
           .sp-meta { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: #9ca3af; font-variant-numeric: tabular-nums; }
           .sp-cat { padding: 2px 8px; border-radius: 999px; background: #f1f2f4; font-weight: 700; color: #374151; }
-          .sp-thumb { flex: none; width: clamp(96px, 24vw, 184px); aspect-ratio: 3 / 2; border-radius: 6px; overflow: hidden; background: #f3f4f6; }
+          .sp-thumb { position: relative; flex: none; width: clamp(96px, 24vw, 184px); aspect-ratio: 3 / 2; border-radius: 6px; overflow: hidden; background: #f3f4f6; }
+          .sp-thumb::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); pointer-events: none; }
           .sp-title mark, .sp-sum mark { background: rgba(61,112,222,.16); color: inherit; border-radius: 3px; padding: 0 1px; }
           .sp-more { display: block; width: 100%; height: 48px; margin-top: 18px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; font: inherit; font-size: 14.5px; font-weight: 700; color: #374151; cursor: pointer; }
           .sp-more:hover { background: #f8fafc; }
@@ -216,7 +230,7 @@ export function SearchPage() {
             .sp-field { height: 56px; padding: 0 8px 0 20px; }
             .sp-field input { font-size: 18px; }
             .sp-go { width: 40px; height: 40px; }
-            .sp-filters { margin-top: 14px; gap: 2px; }
+            .sp-filters { margin-top: 8px; padding: 8px 10px; gap: 2px; }
             .sp-row { flex-wrap: nowrap; }
             .sp-row dt { width: 40px; font-size: 13px; }
             .sp-row dd { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
@@ -241,11 +255,28 @@ export function SearchPage() {
             </button>
           </div>
         </form>
-        <div className="sp-tools">
-          <Link href="/search">초기화</Link>
-          <button type="button" aria-expanded={tipOpen} onClick={() => setTipOpen((v) => !v)}>
-            검색 팁
-          </button>
+        <div className="sp-bar">
+          {hasQuery && (
+            <div role="group" aria-label="정렬" style={{ display: 'flex', gap: 2 }}>
+              {SORTS.map(([v, text]) => (
+                <button key={v} type="button" className="sp-opt" aria-pressed={params.sort === v} onClick={() => go({ ...params, sort: v }, true)}>
+                  {text}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="sp-bar-r">
+            {hasQuery && (
+              <button type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
+                상세 조건
+                {(params.scope !== DEFAULT_PARAMS.scope || params.period !== DEFAULT_PARAMS.period) && <span className="sp-dot" aria-label="적용 중" />}
+              </button>
+            )}
+            {hasQuery && <Link href="/search">초기화</Link>}
+            <button type="button" aria-expanded={tipOpen} onClick={() => setTipOpen((v) => !v)}>
+              검색 팁
+            </button>
+          </div>
         </div>
         {tipOpen && (
           <p className="sp-tip">
@@ -255,11 +286,12 @@ export function SearchPage() {
 
         {hasQuery && (
           <>
+ {moreOpen && (
             <dl className="sp-filters" aria-label="검색 조건">
-              <FilterRow label="정렬" options={SORTS} value={params.sort} onChange={(v) => go({ ...params, sort: v }, true)} />
               <FilterRow label="범위" options={SCOPES} value={params.scope} onChange={(v) => go({ ...params, scope: v }, true)} />
               <FilterRow label="기간" options={PERIODS} value={params.period} onChange={(v) => go({ ...params, period: v }, true)} />
             </dl>
+            )}
 
             <div role="tablist" aria-label="분류" className="sp-tabs">
               <button type="button" role="tab" className="sp-tab" aria-selected={params.category === ''} onClick={() => go({ ...params, category: '', sub: '' }, true)}>
@@ -336,7 +368,15 @@ export function SearchPage() {
                             </div>
                             {rec.p && (
                               <span className="sp-thumb">
-                                <Image src={rec.p} alt="" width={368} height={245} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <Image
+                                  src={rec.p}
+                                  alt=""
+                                  width={368}
+                                  height={245}
+                                  loading="lazy"
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onLoad={fitLogo}
+                                />
                               </span>
                             )}
                           </Link>

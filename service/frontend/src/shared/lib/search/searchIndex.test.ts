@@ -136,6 +136,12 @@ describe('topKeywords', () => {
     const items = [rec({ h: '금융 3분기 빠졌다고 반도체' }), rec({ h: '금융 3분기 빠졌다고 반도체' })];
     expect(topKeywords(items)).toEqual(['반도체']);
   });
+  it('한쪽이 다른 쪽에 들어 있는 말은 순위 높은 쪽만 남긴다(삼성/삼성전자)', () => {
+    const items = [rec({ h: '삼성전자 영업이익 반도체' }), rec({ h: '삼성전자 반도체 호조' }), rec({ h: '삼성 반도체' })];
+    const out = topKeywords(items);
+    expect(out).toContain('삼성전자');
+    expect(out).not.toContain('삼성');
+  });
   it('불용어·한 글자·숫자만은 제외', () => {
     const items = [rec({ h: '이번 2026 관련 소식' }), rec({ h: '이번 2026 관련 뉴스' })];
     expect(topKeywords(items)).toEqual([]);
