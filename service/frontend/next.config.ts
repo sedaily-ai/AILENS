@@ -88,6 +88,19 @@ const nextConfig: NextConfig = {
     ];
     return rules;
   },
+  // 본지 "MBTI로 읽기" 위젯 스크립트(public/widget) — 본지 기사 페이지마다 불리므로 CDN이 하루 보관한다.
+  // public 파일 기본값(max-age=0)이면 CloudFront가 매 요청을 원본(ECS)까지 보낸다. 스크립트를 바꾸면 배포 뒤 /widget/* 캐시를 무효화한다.
+  async headers() {
+    return [
+      {
+        source: "/widget/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
