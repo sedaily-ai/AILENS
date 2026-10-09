@@ -3,14 +3,28 @@
 import { useMemo, useState } from 'react';
 import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { IssueLetter } from '../data/letterTypes';
+import { InterestPanel } from './InterestPanel';
 import { LetterCard } from './LetterCard';
 import { LETTER_CSS } from './letterStyles';
 
 export function LetterListView({ letters }: { letters: IssueLetter[] }) {
   const [cat, setCat] = useState('전체');
+  const [topic, setTopic] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   // 필터 칩은 사이트 분류 순서대로, 레터가 한 편이라도 있는 분류만. 주 분류와 보조 분류 어느 쪽이든 매칭한다.
   const cats = useMemo(() => ['전체', ...ECON_CATEGORIES.map((c) => c.label).filter((label) => letters.some((l) => l.categories.includes(label)))], [letters]);
-  const shown = cat === '전체' ? letters : letters.filter((l) => l.categories.includes(cat));
+  const q = query.trim().toLowerCase();
+  const shown = letters.filter(
+    (l) =>
+      (cat === '전체' || l.categories.includes(cat)) &&
+      (!topic || (l.topics ?? []).includes(topic)) &&
+      (!q || [l.title, l.deck, ...(l.topics ?? []), ...l.categories].some((t) => t.toLowerCase().includes(q))),
+  );
+  const filtering = cat !== '전체' || !!topic || !!q;
+  const pickTopic = (name: string) => {
+    setTopic(name);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const featured = shown.find((l) => l.featured) ?? shown[0];
   const rest = shown.filter((l) => l !== featured);
 
@@ -31,22 +45,33 @@ export function LetterListView({ letters }: { letters: IssueLetter[] }) {
         ))}
       </div>
 
+      <div className="lt-search">
+        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="제목·주제로 레터 찾기" aria-label="레터 검색" />
+        {topic && (
+          <button type="button" className="lt-chip lt-chip-on" onClick={() => setTopic(null)} aria-label={`${topic} 주제 해제`}>
+            {topic} ✕
+          </button>
+        )}
+      </div>
+
+      <InterestPanel />
+
       {featured ? (
         <>
-          <LetterCard letter={featured} featured />
+          <LetterCard letter={featured} featured onTopic={pickTopic} />
           {rest.length > 0 && (
             <>
               <h2 className="lt-sec-h">지난 레터</h2>
               <div className="lt-grid">
                 {rest.map((l) => (
-                  <LetterCard key={l.slug} letter={l} />
+                  <LetterCard key={l.slug} letter={l} onTopic={pickTopic} />
                 ))}
               </div>
             </>
           )}
         </>
       ) : (
-        <p className="lt-empty">이 분류의 레터가 아직 없어요.</p>
+        <p className="lt-empty">{filtering ? '조건에 맞는 레터가 아직 없어요.' : '레터가 아직 없어요.'}</p>
       )}
 
     </div>

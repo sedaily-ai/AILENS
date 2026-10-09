@@ -4,22 +4,7 @@ import { useEffect, useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import type { LetterVote as Vote } from '../data/letterTypes';
 import { fetchMyVote, postVote, type VoteState } from '../data/letterApi';
-
-const VOTER_KEY = 'lens-voter-id';
-
-/** 이 기기의 익명 투표자 식별자. 서버는 이 값을 솔트와 섞어 해시한 것만 저장한다. 저장소를 못 쓰면 null(투표는 이 방문에서만). */
-function voterId(): string | null {
-  try {
-    let id = window.localStorage.getItem(VOTER_KEY);
-    if (!id) {
-      id = crypto.randomUUID();
-      window.localStorage.setItem(VOTER_KEY, id);
-    }
-    return id;
-  } catch {
-    return null;
-  }
-}
+import { getDeviceId } from '../lib/deviceId';
 
 export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
   // 서버 HTML과 첫 클라이언트 렌더를 같게 두려고 비어 있는 상태로 시작하고, 마운트 뒤에 서버에서 내 투표 여부를 읽는다.
@@ -28,7 +13,7 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const id = voterId();
+    const id = getDeviceId();
     if (!id) return;
     let alive = true;
     fetchMyVote(slug, id).then((s) => {
@@ -41,7 +26,7 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
 
   async function pick(key: string) {
     if (state.my_choice || busy) return;
-    const id = voterId();
+    const id = getDeviceId();
     if (!id) return setFailed(true);
     setBusy(true);
     setFailed(false);
