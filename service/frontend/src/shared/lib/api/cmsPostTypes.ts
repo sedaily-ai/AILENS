@@ -45,11 +45,7 @@ export interface CmsWebtoon {
   display_order?: number | null;
   /** lens("4가지 시선")의 웹툰 포맷에서 파생된 카드일 때만 채워진다(shared/lib/lensMediaFeed.ts). 기본 `/webtoon/{id}` 대신 이 경로로 링크한다. */
   href?: string;
-  /**
-   * 시리즈 제목. 같은 문자열을 쓴 편들이 하나의 시리즈다(admin WebtoonMode의 자유 텍스트 입력, 시리즈 마스터 테이블 없음.
-   * cms_posts_public.py _shape_webtoon 참조). 비어 있으면 그 편 제목을 시리즈명으로 취급하는 "단편" 시리즈로
-   * shared/lib/webtoonSeries.ts가 폴백한다.
-   */
+  /** 시리즈 제목(admin WebtoonMode 자유 입력). 시리즈 화면은 쓰지 않아 표시에 쓰이지 않는다. */
   series_title?: string | null;
 }
 

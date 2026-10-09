@@ -70,12 +70,6 @@ export function toWebtoonPreviewSummaries(webtoons: CmsWebtoon[]): CmsWebtoon[] 
   return webtoons.slice(0, 4).map((w) => ({ ...w, panels: [] }));
 }
 
-// 웹툰 시리즈 페이지 전용 축약본. 전체 채널 기준 회차 번호를 매기려면 전체 목록(최대 1000건)이 필요하므로
-// 개수는 유지하고 panels만 뺀다(표지 썸네일만 사용). 번호가 전체 목록에 의존하므로 slice(0,4)를 적용하면 안 된다.
-export function toWebtoonSeriesListPayload(webtoons: CmsWebtoon[]): CmsWebtoon[] {
-  return webtoons.map((w) => ({ ...w, panels: [] }));
-}
-
 export async function fetchWebtoons(): Promise<CmsWebtoon[]> {
   return cached('webtoon', async () => {
     try {
@@ -258,9 +252,6 @@ let paperDatesInFlight: Promise<string[]> | null = null;
 
 export async function fetchAllLensPosts(): Promise<CmsLens[]> {
   return extendBeyondCap('lens', await fetchLensPosts(1000));
-}
-export async function fetchAllWebtoons(): Promise<CmsWebtoon[]> {
-  return extendBeyondCap('webtoon', await fetchWebtoons());
 }
 export async function fetchAllVideos(): Promise<CmsVideo[]> {
   return extendBeyondCap('video', await fetchVideos());
