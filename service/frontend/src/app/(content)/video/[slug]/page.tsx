@@ -1,7 +1,7 @@
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { fetchVideos, fetchVideoBySlug, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { resolveVideo } from '@/shared/lib/media/videoEmbed';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
@@ -10,6 +10,7 @@ import { VideoViewClient } from './VideoViewClient';
 import { IssueContextSection } from '../../_shared/IssueContextSection';
 
 import { SITE_URL } from '@/shared/constants/site';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 
 // webtoon/[slug]/page.tsx와 같은 이유의 가벼운 재시도 — fetchVideos() 단발 실패(콜드스타트 등)에 바로 "찾을 수 없어요"가 되지 않게 한다.
@@ -160,14 +161,15 @@ export default async function VideoViewPage({
 }) {
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
+  // 영상 전용 상세는 따로 두지 않는다(2026-10-09). 대응하는 기사가 있으면 그 기사 페이지로 영구 이동(308)한다(listen/[slug]/page.tsx와 같은 방식).
+  const lens = await findLensForChannelSlug(slug);
+  if (lens) permanentRedirect(lensPath(lens));
   const video = await findVideo(slug);
   // 3회 재시도(findVideo) 후에도 없으면 진짜 없는 것으로 보고 실제 404를 준다. soft-404(200 + noindex)보다 크롤러에 정확한 신호이다.
   if (!video) {
     notFound();
   }
-  // 같은 이슈의 lens 글(슬러그 동일)로 텍스트 보강(IssueContextSection 참조).
-  const lens = await findLensForChannelSlug(slug);
-  const jsonLd = buildJsonLd(video, slug, lens);
+  const jsonLd = buildJsonLd(video, slug, null);
   return (
     <>
       {jsonLd && (

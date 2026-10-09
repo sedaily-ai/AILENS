@@ -2,6 +2,8 @@ import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { mediaSeoExtras } from '@/shared/lib/seo/mediaMeta';
 import type { Metadata } from 'next';
 import { fetchWebtoons, fetchWebtoonBySlug, type CmsLens, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
+import { permanentRedirect } from 'next/navigation';
+import { lensPath } from '@/shared/lib/content/lensUrl';
 import { canonicalFromLens, findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
 import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
@@ -197,9 +199,11 @@ export default async function WebtoonViewPage({
 }) {
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
+  // 웹툰 전용 상세는 따로 두지 않는다(2026-10-09). 같은 기사의 lens 페이지가 정본이고 웹툰은 그 안의 탭으로 본다 — 대응하는 기사가 있으면 영구 이동(308)한다.
+  // 이미 색인됐거나 공유된 옛 링크를 살리려고 404가 아니라 이동으로 처리하며, 기사가 없는 단독 웹툰 글만 아래에서 그대로 렌더한다(listen/[slug]/page.tsx와 같은 방식).
+  const lens = await findLensForChannelSlug(slug);
+  if (lens) permanentRedirect(lensPath(lens));
   const webtoon = await findWebtoon(slug);
-  // 같은 이슈의 lens 글(슬러그 동일) — 텍스트 보강(IssueContextSection)과 정본 URL 계산에 함께 쓴다.
-  const lens = webtoon ? await findLensForChannelSlug(slug) : null;
   const jsonLd = webtoon ? buildJsonLd(webtoon, slug, lens) : null;
   const { episodeLabel, next, prev } = webtoon
     ? await findNeighbors(slug)
