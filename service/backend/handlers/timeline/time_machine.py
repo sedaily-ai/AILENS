@@ -258,6 +258,11 @@ def get_range_search_data(query: str, from_date: str, to_date: str, size: int, s
     logger.info('기간 검색: %s sort_requested=%s sort_applied=%s articles=%s',
                 label, sort, found.sort_applied, len(found.articles))
     data = {'sort_applied': found.sort_applied, 'articles': found.articles}
+    # 관련도순을 요청했는데 빅카인즈가 거부해 최신순으로 대체된 결과는 캐시하지 않는다. 일시적인 거부가 30일 동안
+    # 같은 조건의 검색을 최신순으로 굳히던 문제(2026-10-09) — 다음 요청이 다시 관련도순을 시도해야 한다.
+    if sort == bigkinds_search.SORT_RELEVANCE and found.sort_applied != bigkinds_search.SORT_RELEVANCE:
+        logger.info('관련도순 대체 결과는 캐시하지 않음: %s', label)
+        return {**request_part, **data, 'cached': False}
     # 오늘이 포함된 기간은 기사가 계속 쌓이므로 부정 캐시하지 않는다.
     _write_cache(_range_cache_key(digest), _range_negative_cache_key(digest),
                  'timemachine_range_cache', 'timemachine_range_empty_cache',

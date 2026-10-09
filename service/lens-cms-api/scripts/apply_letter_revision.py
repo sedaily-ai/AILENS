@@ -48,19 +48,22 @@ def api(method, path, body=None):
 
 
 def article_number(url):
-    m = re.search(r"/article/(\d+)", url)
-    return m.group(1) if m else None
+    """서울경제 기사 주소에서 기사 식별자를 뽑는다. 최근 형식 /article/<번호>, 과거 형식 /NewsView/<ID> 둘 다."""
+    m = re.search(r"/(?:article/(\d+)|NewsView/([A-Za-z0-9]+))", url or "")
+    return (m.group(1) or m.group(2)) if m else None
 
 
 def search_candidates(title):
     """제목의 앞부분으로 최근 기사를 검색한다(공개 타임머신 API, 한 번에 최대 20건)."""
     clean = re.sub(r"\s*\[[^\]]*\]\s*$", "", title)
     today = datetime.date.today()
-    for q in (clean[:38], " ".join(clean.split()[:4])[:38]):
-        qs = urllib.parse.urlencode({"q": q, "from": (today - datetime.timedelta(days=700)).isoformat(), "to": today.isoformat(), "size": 20, "sort": "relevance"})
-        with urllib.request.urlopen(f"{TIME_MACHINE}?{qs}", timeout=30) as r:
-            articles = json.loads(r.read()).get("articles", [])
-        yield q, articles
+    # 최근 700일 → 빅카인즈가 한 번에 허용하는 최대(6년 = 2190일) 순으로 넓혀 가며 찾는다(과거 기사 대응).
+    for days in (700, 2190):
+        for q in (clean[:38], " ".join(clean.split()[:4])[:38]):
+            qs = urllib.parse.urlencode({"q": q, "from": (today - datetime.timedelta(days=days)).isoformat(), "to": today.isoformat(), "size": 20, "sort": "relevance"})
+            with urllib.request.urlopen(f"{TIME_MACHINE}?{qs}", timeout=30) as r:
+                articles = json.loads(r.read()).get("articles", [])
+            yield q, articles
 
 
 def find_record(source, search=search_candidates):
@@ -105,7 +108,7 @@ def main():
 
     code, res = api("GET", "/admin/issue-letters?limit=200")
     cur = next((l for l in res.get("letters", []) if l["slug"] == args.slug), None) if code == 200 else None
-    data = {k: letter[k] for k in ("slug", "title", "deck", "summary", "editor_note", "read_minutes", "categories", "sections", "poll")}
+    data = {k: letter[k] for k in ("slug", "title", "deck", "summary", "editor_note", "read_minutes", "categories", "topics", "sections", "poll") if k in letter}
     data["sources"] = [{"url": s["url"], "axes": s["axes"]} for s in letter["sources"]]
     if cur is None:
         code, res = api("POST", "/admin/issue-letters", {"data": data, "actor": {}})

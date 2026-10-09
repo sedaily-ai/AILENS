@@ -18,6 +18,8 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from db import get_cursor
+from letter_errors import LetterError  # noqa: F401  (다른 모듈·테스트가 이 모듈에서 가져다 쓴다)
+import topics_repo
 
 AXES = ("news", "substance", "other")
 STATUSES = ("draft", "in_review", "published", "archived")
@@ -40,20 +42,14 @@ SITE_CATEGORIES = {
     "politics": "정치", "national": "사회", "international": "국제", "culture": "문화",
 }
 MIN_SECTIONS = 3
+MAX_TOPICS = 8
+PRIMARY_TOPICS = 2  # 앞의 두 개를 주 주제로 본다
 MIN_DISTINCT_INLINE_ARTICLES = 3
 _SLUG_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}-[^\s/?#]{1,200}$")
 _OPTION_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 _MAX_TEXT = 20000
 _MAX_PARAGRAPHS = 30
 _MAX_SOURCES = 20
-
-
-class LetterError(ValueError):
-    """입력·상태 규칙 위반. 라우트가 400/409 로 바꾼다."""
-
-    def __init__(self, message: str, status: int = 400):
-        super().__init__(message)
-        self.status = status
 
 
 def normalize_url(url: str) -> str:
@@ -140,6 +136,14 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(summary, list) or any(not isinstance(s, str) or not s.strip() for s in summary) or len(summary) > 6:
         raise LetterError("summary 는 비어 있지 않은 문장 배열(최대 6)이어야 합니다")
 
+    topics = data.get("topics")
+    if topics is not None:
+        if not isinstance(topics, list) or any(not isinstance(t, str) or not t.strip() or len(t) > 64 for t in topics):
+            raise LetterError("topics 는 주제 사전의 이름·별칭 문자열 배열이어야 합니다")
+        topics = list(dict.fromkeys(t.strip() for t in topics))
+        if len(topics) > MAX_TOPICS:
+            raise LetterError(f"topics 는 최대 {MAX_TOPICS}개입니다")
+
     categories = data.get("categories") or []
     if not isinstance(categories, list) or not categories or len(categories) > 6:
         raise LetterError("categories 는 1~6개의 분류 slug 배열이어야 합니다(첫 번째가 주 분류)")
@@ -207,7 +211,7 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "slug": slug, "title": title, "deck": _text(data.get("deck"), "deck", limit=500) or "",
         "summary": [s.strip() for s in summary], "editor_note": _text(data.get("editor_note"), "editor_note", limit=1000),
-        "read_minutes": read_minutes, "categories": [str(c) for c in categories],
+        "read_minutes": read_minutes, "categories": [str(c) for c in categories], "topics": topics,
         "sections": sections, "sources": sources, "poll": poll,
     }
 
@@ -252,6 +256,11 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
     if distinct_own < MIN_DISTINCT_INLINE_ARTICLES:
         problems.append(f"본문에 서로 다른 자사 기사 링크가 {MIN_DISTINCT_INLINE_ARTICLES}개 이상 필요합니다(현재 {distinct_own}개)")
 
+    topic_count = len(letter.get("topics") or [])
+    if topic_count == 0:
+        problems.append("주제 태그가 1개 이상 필요합니다(주제 사전에서 고르세요)")
+    elif topic_count > MAX_TOPICS:
+        problems.append(f"주제 태그는 최대 {MAX_TOPICS}개입니다(현재 {topic_count}개)")
     problems.extend(poll_problems(letter.get("poll")))
     note = (letter.get("editor_note") or "").strip()
     if len(note) > EDITOR_NOTE_MAX_CHARS:
@@ -294,6 +303,9 @@ def _load_children(cur, letter_id: int) -> Dict[str, Any]:
     cur.execute("SELECT category_slug, is_primary FROM issue_letter_categories "
                 "WHERE letter_id = %s ORDER BY is_primary DESC, category_slug", (letter_id,))
     cats = cur.fetchall()
+    cur.execute("SELECT t.slug, t.name, t.kind, lt.is_primary FROM issue_letter_topics lt JOIN topics t ON t.id = lt.topic_id "
+                "WHERE lt.letter_id = %s ORDER BY lt.is_primary DESC, t.name", (letter_id,))
+    topics = [{"slug": r["slug"], "name": r["name"], "kind": r["kind"], "is_primary": r["is_primary"]} for r in cur.fetchall()]
     cur.execute("SELECT axis, axis_label, heading, key_line, paragraphs FROM issue_letter_sections "
                 "WHERE letter_id = %s ORDER BY position", (letter_id,))
     sections = cur.fetchall()
@@ -312,7 +324,7 @@ def _load_children(cur, letter_id: int) -> Dict[str, Any]:
     names = [SITE_CATEGORIES.get(c["category_slug"], c["category_slug"]) for c in cats]
     return {"categories": [c["category_slug"] for c in cats], "category_names": names,
             "primary_category": next((SITE_CATEGORIES.get(c["category_slug"]) for c in cats if c["is_primary"]), None),
-            "sections": sections, "sources": sources, "poll": poll}
+            "sections": sections, "sources": sources, "poll": poll, "topics": topics}
 
 
 def _letter_row_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -347,7 +359,7 @@ def list_published(category: Optional[str] = None, limit: int = 20, before: Opti
                 card.pop(k, None)
             card.update(categories=child["category_names"], primary_category=child["primary_category"],
                         axes=sorted({a for s in child["sections"] for a in [s["axis"]]}),
-                        source_count=len(child["sources"]))
+                        source_count=len(child["sources"]), topics=[t["name"] for t in child["topics"]][:4])
             out.append(card)
         return out
 
@@ -454,8 +466,19 @@ def _resolve_source(cur, url: str, idx: int) -> Dict[str, Optional[str]]:
         f"sources[{idx}]: 이 주소는 후보로 담은 서울경제 기사가 아닙니다. 관리자 화면의 '출처 후보 기사 검색'에서 기사를 찾아 담은 뒤 사용하세요: {base}")
 
 
+def _replace_topics(cur, letter_id: int, tags: List[str]) -> List[Dict[str, Any]]:
+    """레터의 주제 태그를 사전 항목으로 해석해 통째로 교체한다. 앞의 PRIMARY_TOPICS 개가 주 주제."""
+    resolved = topics_repo.resolve_tags(cur, tags)
+    cur.execute("DELETE FROM issue_letter_topics WHERE letter_id = %s", (letter_id,))
+    for i, t in enumerate(resolved):
+        cur.execute("INSERT INTO issue_letter_topics (letter_id, topic_id, is_primary) VALUES (%s,%s,%s)", (letter_id, t["id"], i < PRIMARY_TOPICS))
+    return resolved
+
+
 def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
     import json
+    if v.get("topics") is not None:  # 입력에 topics 가 있을 때만 바꾼다(없으면 기존 태그 유지)
+        _replace_topics(cur, letter_id, v["topics"])
     cur.execute("DELETE FROM issue_letter_categories WHERE letter_id = %s", (letter_id,))
     for i, slug in enumerate(v["categories"]):
         cur.execute("INSERT INTO issue_letter_categories (letter_id, category_slug, is_primary) VALUES (%s,%s,%s)",
@@ -518,6 +541,19 @@ def update(letter_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             (v["title"], v["deck"], v["summary"], v["editor_note"], v["read_minutes"], letter_id))
         _replace_children(cur, letter_id, v)
     return get_admin(letter_id)
+
+
+def set_topics(letter_id: int, tags: Any) -> List[Dict[str, Any]]:
+    """주제 태그만 교체한다. 본문을 바꾸지 않는 메타데이터라 발행된 레터에도 허용한다(태그 체계 개선·소급 적용용)."""
+    if not isinstance(tags, list) or any(not isinstance(t, str) or not t.strip() for t in tags) or len(tags) > MAX_TOPICS:
+        raise LetterError(f"topics 는 주제 사전의 이름·별칭 문자열 배열(최대 {MAX_TOPICS}개)이어야 합니다")
+    with get_cursor() as cur:
+        cur.execute("SELECT 1 FROM issue_letters WHERE id = %s AND deleted_at IS NULL", (letter_id,))
+        if not cur.fetchone():
+            raise LetterError("레터를 찾을 수 없습니다", 404)
+        resolved = _replace_topics(cur, letter_id, list(dict.fromkeys(t.strip() for t in tags)))
+        cur.execute("UPDATE issue_letters SET updated_at = now() WHERE id = %s", (letter_id,))
+    return [{"slug": t["slug"], "name": t["name"], "kind": t["kind"]} for t in resolved]
 
 
 def submit(letter_id: int) -> Dict[str, Any]:

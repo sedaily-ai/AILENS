@@ -9,12 +9,12 @@ export const LETTER_REVALIDATE_SECONDS = 60;
 
 interface ApiCard {
   slug: string; issue_no: number; title: string; deck: string; read_minutes: number;
-  categories: string[]; axes: string[]; source_count: number; published_at: string;
+  categories: string[]; axes: string[]; source_count: number; published_at: string; topics?: string[];
 }
 interface ApiSection { axis: LetterAxis; axis_label: string | null; heading: string; key_line: string; paragraphs: LetterSegment[][] }
 interface ApiSource { title: string; outlet: string; url: string; axes: LetterAxis[]; external: boolean }
-interface ApiDetail extends Omit<ApiCard, 'axes' | 'source_count' | 'categories'> {
-  summary: string[]; editor_note: string | null; category_names: string[];
+interface ApiDetail extends Omit<ApiCard, 'axes' | 'source_count' | 'categories' | 'topics'> {
+  summary: string[]; editor_note: string | null; category_names: string[]; topics?: { name: string }[];
   sections: ApiSection[]; sources: ApiSource[];
   poll: { kind: 'emotion'; question: string; options: { key: string; label: string; hint?: string | null }[] } | null;
 }
@@ -33,7 +33,7 @@ function mapCard(c: ApiCard): IssueLetter {
     slug: c.slug, issueNumber: c.issue_no, title: c.title, deck: c.deck,
     axisLabels: orderedAxes(c.axes).map((axis) => ({ axis, label: '' })),
     categories: c.categories, publishedAt: kstDate(c.published_at), readMinutes: c.read_minutes,
-    summary: [], sections: [], editorNote: '', vote: null, sources: [], sourceCount: c.source_count,
+    summary: [], sections: [], editorNote: '', vote: null, sources: [], sourceCount: c.source_count, topics: c.topics ?? [],
   };
 }
 
@@ -48,7 +48,7 @@ function mapDetail(d: ApiDetail): IssueLetter {
     slug: d.slug, issueNumber: d.issue_no, title: d.title, deck: d.deck,
     axisLabels: orderedAxes([...labels.keys()]).map((axis) => ({ axis, label: labels.get(axis) ?? '' })),
     categories: d.category_names, publishedAt: kstDate(d.published_at), readMinutes: d.read_minutes,
-    summary: d.summary, sections, editorNote: d.editor_note ?? '', vote,
+    summary: d.summary, sections, editorNote: d.editor_note ?? '', vote, topics: (d.topics ?? []).map((t) => t.name),
     // 자사 기사는 서버가 기사 DB에서 제목·주소를 읽어 준다. 매체명은 서울경제로 표기한다.
     sources: d.sources.map((s) => ({ title: s.title, outlet: s.external ? s.outlet : '서울경제', href: s.url, axes: s.axes, internal: !s.external })),
   };

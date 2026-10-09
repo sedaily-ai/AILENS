@@ -109,7 +109,7 @@ def _publishable(**over):
     url = lambda n: f"https://www.sedaily.com/article/{n}"
     seg = lambda n: {"text": f"t{n}", "href": url(n) + "?ref=sedailyEng"}
     letter = {
-        "summary": ["s"], "editor_note": "e", "categories": ["industry"],
+        "summary": ["s"], "editor_note": "e", "categories": ["industry"], "topics": [{"slug": "rates", "name": "금리"}],
         "sections": [{"key_line": "k", "paragraphs": [[seg(1), seg(2)]]}, {"key_line": "k", "paragraphs": [[seg(3)]]}, {"key_line": "k", "paragraphs": [["x"]]}],
         "sources": [{"article_no": str(n), "title": f"t{n}", "url": url(n)} for n in (1, 2, 3)],
         "poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기했어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
@@ -272,3 +272,19 @@ def test_save_archives_upserts_bigkinds_article(monkeypatch):
 def test_save_archives_rejects_invalid(bad):
     with pytest.raises(_repo().LetterError):
         _repo().save_archives(bad)
+
+
+def test_publish_requires_topic_tags_and_caps_them():
+    r = _repo()
+    assert any("주제 태그가 1개 이상" in p for p in r.publish_problems(_publishable(topics=[])))
+    assert any("최대" in p for p in r.publish_problems(_publishable(topics=[{"slug": f"t{i}"} for i in range(9)])))
+    assert r.publish_problems(_publishable()) == []
+
+
+def test_payload_topics_validation():
+    r = _repo()
+    assert r.validate_letter_payload(_payload(topics=["금리", " 금리 ", "삼성전자"]))["topics"] == ["금리", "삼성전자"]  # 공백 정리·중복 제거
+    assert r.validate_letter_payload(_payload())["topics"] is None  # 입력에 없으면 기존 태그 유지(None)
+    for bad in ("금리", [""], [1], ["가" * 65], [f"t{i}" for i in range(9)]):
+        with pytest.raises(r.LetterError):
+            r.validate_letter_payload(_payload(topics=bad))

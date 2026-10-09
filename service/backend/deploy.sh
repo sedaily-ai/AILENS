@@ -12,6 +12,9 @@
 # Usage:
 #   ./deploy.sh           — Deploy all functions (= api, 현재는 동의어)
 #   ./deploy.sh api       — Deploy API functions only
+#   ./deploy.sh time-machine — 타임머신(빅카인즈 검색) Lambda 하나만. 같은 zip 을 빌드하지만 이 함수에만 올린다
+#                              (2026-10-09 추가 — 한 함수 수정 때문에 21개를 같이 갱신하지 않으려는 것. 다른 함수의
+#                               Handler 설정 함정은 service/backend/CLAUDE.md "Handler 접두사 함정" 참조)
 
 set -euo pipefail
 
@@ -167,8 +170,11 @@ case "$DEPLOY_TARGET" in
   all)
     FUNCTIONS=("${API_FUNCTIONS[@]}" "${API_V2_FUNCTIONS[@]}")
     ;;
+  time-machine)
+    FUNCTIONS=("sedaily-mbti-time-machine-dev")
+    ;;
   *)
-    echo "Unknown target: $DEPLOY_TARGET (use: all, api)"
+    echo "Unknown target: $DEPLOY_TARGET (use: all, api, time-machine)"
     exit 1
     ;;
 esac
