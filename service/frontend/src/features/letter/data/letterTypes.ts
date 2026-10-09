@@ -47,11 +47,14 @@ export interface IssueLetter {
   publishedAt: string;
   readMinutes: number;
   featured?: boolean;
+  /** 목록 카드용 기사 수. 목록 API는 출처 전체를 내려주지 않아 숫자만 받는다(상세는 sources.length). */
+  sourceCount?: number;
   /** 1분 요약(접기 영역). */
   summary: string[];
   sections: LetterSection[];
   editorNote: string;
-  vote: LetterVote;
+  /** 투표가 없는 레터도 있다. */
+  vote: LetterVote | null;
   sources: LetterSource[];
   /** 목업 문구 여부 — 기획서 예시만으로 채운 레터는 true(상세 상단에 안내 표시). */
   mock?: boolean;

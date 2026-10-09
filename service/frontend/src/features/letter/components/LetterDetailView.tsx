@@ -106,7 +106,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: Issue
         <p>{letter.editorNote}</p>
       </section>
 
-      <LetterVote slug={letter.slug} vote={letter.vote} />
+      {letter.vote && <LetterVote slug={letter.slug} vote={letter.vote} />}
 
       <section className="ld-next" aria-label="다음 레터">
         <div>

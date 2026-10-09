@@ -1,4 +1,4 @@
 export { LetterListView } from './components/LetterListView';
 export { LetterDetailView } from './components/LetterDetailView';
-export { MOCK_LETTERS, findMockLetter } from './data/mockLetters';
+export { fetchLetterList, fetchLetterDetail, LETTER_REVALIDATE_SECONDS } from './data/letterApi';
 export type { IssueLetter } from './data/letterTypes';

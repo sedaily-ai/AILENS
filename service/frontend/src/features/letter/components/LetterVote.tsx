@@ -3,65 +3,79 @@
 import { useEffect, useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import type { LetterVote as Vote } from '../data/letterTypes';
+import { fetchMyVote, postVote, type VoteState } from '../data/letterApi';
 
-// 목업 집계 — 실제 투표 API가 붙기 전까지 슬러그에서 만든 고정 기준값 위에 내 선택 1표를 더해 보여 준다. 저장은 이 기기(localStorage)뿐이다.
-function baseCounts(slug: string, n: number): number[] {
-  let h = 0;
-  for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return Array.from({ length: n }, (_, i) => 20 + ((h >> (i * 5)) % 60));
-}
+const VOTER_KEY = 'lens-voter-id';
 
-function readChoice(key: string): string | null {
+/** 이 기기의 익명 투표자 식별자. 서버는 이 값을 솔트와 섞어 해시한 것만 저장한다. 저장소를 못 쓰면 null(투표는 이 방문에서만). */
+function voterId(): string | null {
   try {
-    return window.localStorage.getItem(key);
+    let id = window.localStorage.getItem(VOTER_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      window.localStorage.setItem(VOTER_KEY, id);
+    }
+    return id;
   } catch {
     return null;
   }
 }
 
 export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
-  const storageKey = `letter-vote:${slug}`;
-  // 서버 HTML과 첫 클라이언트 렌더를 같게 두려고 null로 시작하고, 마운트 뒤에 이 기기에 저장된 선택을 읽는다(하이드레이션 불일치 방지).
-  const [choice, setChoice] = useState<string | null>(null);
-  useEffect(() => {
-    const saved = readChoice(storageKey);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (saved) setChoice(saved);
-  }, [storageKey]);
-  const base = baseCounts(slug, vote.options.length);
-  const counts = base.map((c, i) => c + (choice === vote.options[i].key ? 1 : 0));
-  const total = counts.reduce((a, b) => a + b, 0);
+  // 서버 HTML과 첫 클라이언트 렌더를 같게 두려고 비어 있는 상태로 시작하고, 마운트 뒤에 서버에서 내 투표 여부를 읽는다.
+  const [state, setState] = useState<VoteState>({ my_choice: null, counts: null });
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  function pick(key: string) {
-    if (choice) return;
-    setChoice(key);
-    trackEvent('letter_vote', { letter: slug, option: key });
-    try {
-      window.localStorage.setItem(storageKey, key);
-    } catch {
-      /* 저장 실패해도 화면에는 반영 */
-    }
+  useEffect(() => {
+    const id = voterId();
+    if (!id) return;
+    let alive = true;
+    fetchMyVote(slug, id).then((s) => {
+      if (alive && s) setState(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [slug]);
+
+  async function pick(key: string) {
+    if (state.my_choice || busy) return;
+    const id = voterId();
+    if (!id) return setFailed(true);
+    setBusy(true);
+    setFailed(false);
+    const next = await postVote(slug, id, key);
+    setBusy(false);
+    if (!next) return setFailed(true);
+    setState(next);
+    trackEvent('letter_vote', { letter: slug, option: next.my_choice ?? key });
   }
+
+  const counts = state.counts;
+  const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <section className="ld-vote" aria-label="투표">
       <h2>{vote.question}</h2>
       <div className="ld-opts">
-        {vote.options.map((o, i) => {
-          const pct = Math.round((counts[i] / total) * 100);
+        {vote.options.map((o) => {
+          const pct = counts && total > 0 ? Math.round(((counts[o.key] ?? 0) / total) * 100) : 0;
           return (
-            <button key={o.key} type="button" className="ld-opt" aria-pressed={choice === o.key} disabled={!!choice} onClick={() => pick(o.key)}>
-              {choice && <span className="ld-opt-bar" style={{ width: `${pct}%` }} aria-hidden />}
+            <button key={o.key} type="button" className="ld-opt" aria-pressed={state.my_choice === o.key} disabled={!!state.my_choice || busy} onClick={() => pick(o.key)}>
+              {state.my_choice && <span className="ld-opt-bar" style={{ width: `${pct}%` }} aria-hidden />}
               <span className="ld-opt-body">
                 <span className="ld-opt-l">{o.label}</span>
                 {o.hint && <span className="ld-opt-h">{o.hint}</span>}
               </span>
-              {choice && <span className="ld-opt-p">{pct}%</span>}
+              {state.my_choice && <span className="ld-opt-p">{pct}%</span>}
             </button>
           );
         })}
       </div>
-      <p className="ld-vote-note">{choice ? `${total}명이 참여했어요 (목업 집계)` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요'}</p>
+      <p className="ld-vote-note" role="status">
+        {failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : state.my_choice ? `${total}명이 참여했어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요'}
+      </p>
     </section>
   );
 }

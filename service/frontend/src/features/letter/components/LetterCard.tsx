@@ -30,7 +30,7 @@ export function LetterCard({ letter, featured = false }: { letter: IssueLetter; 
         {tags.map((t, i) => (
           <AxisBadge key={`${t.axis}-${t.label ?? i}`} axis={t.axis} label={t.label} />
         ))}
-        <span className="lt-count">기사 {letter.sources.length}건</span>
+        <span className="lt-count">기사 {letter.sourceCount ?? letter.sources.length}건</span>
       </div>
       <div className="lt-card-meta">
         {formatLetterDate(letter.publishedAt)} · 약 {letter.readMinutes}분
