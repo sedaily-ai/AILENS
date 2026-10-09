@@ -48,8 +48,9 @@ def api(method, path, body=None):
 
 
 def article_number(url):
-    m = re.search(r"/article/(\d+)", url)
-    return m.group(1) if m else None
+    """서울경제 기사 주소에서 기사 식별자를 뽑는다. 최근 형식 /article/<번호>, 과거 형식 /NewsView/<ID> 둘 다."""
+    m = re.search(r"/(?:article/(\d+)|NewsView/([A-Za-z0-9]+))", url or "")
+    return (m.group(1) or m.group(2)) if m else None
 
 
 def search_candidates(title):
