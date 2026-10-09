@@ -1,7 +1,7 @@
 import { sitemapIds } from '@/shared/lib/seo/sitemapIds';
 import { SITE_URL } from '@/shared/constants/site';
 
-// 사이트맵 색인. 실제 URL은 /sitemap/{id}.xml(core, YYYY-MM)에 나눠 담겨 있다(app/sitemap.ts 참조).
+// 사이트맵 색인(/sitemap.xml 로 다시 쓰여 서비스된다 — next.config.ts rewrites). 실제 URL은 /sitemap/{id}.xml(core, YYYY-MM)에 나눠 담겨 있다(app/sitemap.ts 참조).
 // CDN이 캐시하도록 s-maxage를 명시한다(봇이 자주 가져가도 오리진에는 시간당 한 번 수준).
 export const revalidate = 3600;
 

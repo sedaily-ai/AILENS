@@ -61,6 +61,12 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  // /sitemap.xml 은 사이트맵 색인이다. 파일 라우트(app/sitemap.xml/route.ts)로 두면 개발 서버에서 sitemap.ts(generateSitemaps)의 메타데이터 라우트와
+  // "Conflicting route and metadata at /sitemap.xml" 로 충돌해 앱 전체가 500이 되므로, 색인은 /sitemap-index 에 두고 여기서 /sitemap.xml 로 다시 쓴다.
+  async rewrites() {
+    return { beforeFiles: [{ source: "/sitemap.xml", destination: "/sitemap-index" }], afterFiles: [], fallback: [] };
+  },
+
   async redirects() {
     // /lens?page=N, /webtoon?page=N 옛 링크 정리는 has+쿼리 대신 src/middleware.ts에서 한다
     // (redirects()+has 조합은 destination에 캡처값을 써도 원본 쿼리스트링을 지우지 못해 "/lens/page/2?page=2" 같은 URL이 된다).
