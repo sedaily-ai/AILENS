@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
-import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { clearLensListMemo, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { pingIndexNow } from '@/shared/lib/seo/indexNow';
 
@@ -34,6 +34,8 @@ export async function POST(request: Request) {
   for (const tag of CONTENT_TAGS) {
     revalidateTag(tag, { expire: 0 });
   }
+  // 서버 메모리에 보관한 큰 기사 목록도 함께 비운다(cmsPostsApi.ts의 lensListMemo).
+  clearLensListMemo();
 
   // IndexNow — 최근 3시간 안에 발행·수정된 기사와 홈·지면을 검색엔진에 바로 알린다(응답을 기다리지 않는다).
   void notifyIndexNow();
