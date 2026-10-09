@@ -170,20 +170,17 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
         axes = src.get("axes") or []
         if not isinstance(axes, list) or any(a not in AXES for a in axes):
             raise LetterError(f"sources[{i}].axes 는 {'/'.join(AXES)} 의 배열이어야 합니다")
-        # 출처는 서울경제 원문 기사만 인정한다(2026-10-09 결정). 기사 번호 또는 기사 주소(URL)로 지정하고, 주소는 저장 때 기사 DB에서 번호를 찾는다.
-        if src.get("external_url") or src.get("external_title"):
-            raise LetterError(f"sources[{i}]: 외부 매체 기사는 출처로 쓸 수 없습니다(서울경제 원문 기사만 허용)")
-        article_no = str(src["article_no"])[:32] if src.get("article_no") else None
-        url = str(src["url"]).strip() if src.get("url") else None
-        if bool(article_no) == bool(url):
-            raise LetterError(f"sources[{i}]: article_no 또는 url(서울경제 기사 주소) 중 하나만 지정하세요")
-        if url and not re.match(r"^https?://", url):
-            raise LetterError(f"sources[{i}].url 은 http(s) 주소여야 합니다")
-        key = article_no or normalize_url(url)
+        # 출처는 서울경제 원문 기사만 인정한다(2026-10-09 결정). 기사 주소(url)로 지정하고, 주소는 저장 때 "후보로 담은 빅카인즈 보관 기사"와 대조한다.
+        if src.get("external_url") or src.get("external_title") or src.get("article_no"):
+            raise LetterError(f"sources[{i}]: 출처는 url(서울경제 기사 주소) 하나만 지정하세요. 외부 매체·기사 번호 지정은 쓸 수 없습니다")
+        url = str(src.get("url") or "").strip()
+        if not re.match(r"^https?://", url):
+            raise LetterError(f"sources[{i}].url 은 서울경제 기사 주소(http/https)여야 합니다")
+        key = normalize_url(url)
         if key in seen_positions:
             raise LetterError(f"sources[{i}]: 같은 기사가 두 번 들어 있습니다")
         seen_positions.add(key)
-        sources.append({"axes": axes, "article_no": article_no, "url": url})
+        sources.append({"axes": axes, "url": url})
     if len(sources) > _MAX_SOURCES:
         raise LetterError(f"sources 는 최대 {_MAX_SOURCES}개입니다")
 
@@ -233,14 +230,14 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
 
     sources = letter.get("sources") or []
     source_urls = {normalize_url(s["url"]) for s in sources if s.get("url")}
-    own_urls = {normalize_url(s["url"]) for s in sources if s.get("article_no") and s.get("url")}
+    own_urls = {normalize_url(s["url"]) for s in sources if (s.get("article_no") or s.get("archive_id")) and s.get("url")}
     for s in sources:
         title = s.get("title") or ""
         if title.startswith("(예시)"):
             problems.append(f"자리표시 출처가 남아 있습니다: {title}")
-        if s.get("article_no") and not s.get("url"):
-            problems.append(f"자사 기사 {s['article_no']} 를 기사 DB에서 찾을 수 없습니다")
-        if not s.get("article_no"):
+        if (s.get("article_no") or s.get("archive_id")) and not s.get("url"):
+            problems.append(f"출처 기사의 주소를 찾을 수 없습니다: {title}")
+        if not (s.get("article_no") or s.get("archive_id")):
             problems.append(f"서울경제 원문 기사가 아닌 출처는 쓸 수 없습니다: {title}")
 
     inline: List[str] = []
@@ -276,13 +273,15 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
 
 # ── DB: 읽기 ─────────────────────────────────────────────────────────────
 
+# 출처의 제목·주소는 항상 DB 에서 읽는다(지어낸 출처 방지). 보관 기사(빅카인즈)가 정식 경로이고, articles 참조는 부캉이 이전(v1.41 정리) 전까지의 전환용이다.
 _SOURCE_SQL = """
-    SELECT s.position, s.article_no, s.axes, s.approved_by,
-           COALESCE(a.title, s.external_title) AS title,
-           CASE WHEN s.article_no IS NOT NULL THEN 'AI LENS' ELSE s.external_outlet END AS outlet,
-           CASE WHEN s.article_no IS NOT NULL THEN a.source_url ELSE s.external_url END AS url
+    SELECT s.position, s.article_no, s.archive_id, s.axes, s.approved_by,
+           COALESCE(e.title, a.title, s.external_title) AS title,
+           CASE WHEN s.external_url IS NOT NULL THEN s.external_outlet ELSE '서울경제' END AS outlet,
+           COALESCE(e.source_url, a.source_url, s.external_url) AS url
     FROM issue_letter_sources s
     LEFT JOIN articles a ON a.article_no = s.article_no
+    LEFT JOIN external_archives e ON e.provider = s.archive_provider AND e.external_id = s.archive_id
     WHERE s.letter_id = %s ORDER BY s.position
 """
 
@@ -301,9 +300,10 @@ def _load_children(cur, letter_id: int) -> Dict[str, Any]:
     cur.execute(_SOURCE_SQL, (letter_id,))
     sources = []
     for r in cur.fetchall():
-        sources.append({"article_no": r["article_no"], "title": r["title"], "outlet": r["outlet"],
-                        "url": normalize_url(r["url"]) if r["url"] and r["article_no"] else r["url"],
-                        "axes": list(r["axes"] or []), "approved_by": r["approved_by"], "external": r["article_no"] is None})
+        own = r["article_no"] is not None or r["archive_id"] is not None  # 서울경제 기사(보관 기사 또는 전환기 articles)
+        sources.append({"article_no": r["article_no"], "archive_id": r["archive_id"], "title": r["title"], "outlet": r["outlet"],
+                        "url": normalize_url(r["url"]) if r["url"] and own else r["url"],
+                        "axes": list(r["axes"] or []), "approved_by": r["approved_by"], "external": not own})
     cur.execute("SELECT kind, question FROM issue_letter_polls WHERE letter_id = %s", (letter_id,))
     poll = cur.fetchone()
     if poll:
@@ -391,30 +391,67 @@ def list_admin(status: Optional[str] = None, limit: int = 50) -> List[Dict[str, 
         return [_letter_row_to_dict(r) for r in cur.fetchall()]
 
 
-def search_candidates(q: str, limit: int = 20) -> List[Dict[str, Any]]:
-    """출처 후보 자사 기사 검색(제목·본문 부분일치, 최신순). 레터 작성 폼이 article_no 를 고르는 용도."""
-    q = (q or "").strip()
-    if len(q) < 2:
-        raise LetterError("검색어는 2자 이상이어야 합니다")
+ARCHIVE_PROVIDER = "bigkinds"
+MAX_ARCHIVE_BATCH = 30
+
+
+def save_archives(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """편집자가 빅카인즈 검색 결과에서 고른 서울경제 기사를 보관한다(external_archives, 같은 기사는 갱신).
+    보관된 기사만 레터 출처가 될 수 있다. 입력은 타임머신 검색 응답의 기사 항목(news_id, title, original_link, published_at, byline, content)."""
+    if not isinstance(items, list) or not items:
+        raise LetterError("보관할 기사가 없습니다")
+    if len(items) > MAX_ARCHIVE_BATCH:
+        raise LetterError(f"한 번에 {MAX_ARCHIVE_BATCH}건까지만 담을 수 있습니다")
+    rows = []
+    for i, it in enumerate(items):
+        if not isinstance(it, dict):
+            raise LetterError(f"articles[{i}] 형식이 올바르지 않습니다")
+        news_id = str(it.get("news_id") or "").strip()
+        title = str(it.get("title") or "").strip()
+        link = str(it.get("original_link") or it.get("source_url") or "").strip()
+        published = str(it.get("published_at") or "").strip()
+        if not news_id or len(news_id) > 128:
+            raise LetterError(f"articles[{i}].news_id 가 올바르지 않습니다")
+        if not title or len(title) > 500:
+            raise LetterError(f"articles[{i}].title 은 1~500자여야 합니다")
+        if not re.match(r"^https?://", link):
+            raise LetterError(f"articles[{i}]: 원문 링크가 없어 출처로 쓸 수 없는 기사입니다")
+        if not re.match(r"^\d{4}-\d{2}-\d{2}", published):
+            raise LetterError(f"articles[{i}].published_at 은 YYYY-MM-DD 형식이어야 합니다")
+        rows.append((ARCHIVE_PROVIDER, news_id, published[:10], title, "서울경제",
+                     (str(it.get("byline") or "")[:64] or None), (str(it.get("content") or "")[:400] or None), link))
+    out = []
     with get_cursor() as cur:
-        cur.execute(
-            "SELECT article_no, title, source_url, published_at FROM articles "
-            "WHERE title ILIKE %s OR body ILIKE %s ORDER BY published_at DESC LIMIT %s",
-            (f"%{q}%", f"%{q}%", max(1, min(int(limit), 50))))
-        return [{"article_no": r["article_no"], "title": r["title"], "url": normalize_url(r["source_url"] or ""),
-                 "published_at": _iso(r["published_at"])} for r in cur.fetchall()]
+        for r in rows:
+            cur.execute(
+                "INSERT INTO external_archives (provider, external_id, published_at, title, press, reporter_name, summary, source_url) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON CONFLICT (provider, external_id) DO UPDATE SET title=EXCLUDED.title, summary=EXCLUDED.summary, "
+                "source_url=EXCLUDED.source_url, fetched_at=now() RETURNING external_id, title, source_url",
+                r)
+            row = cur.fetchone()
+            out.append({"external_id": row["external_id"], "title": row["title"], "url": normalize_url(row["source_url"])})
+    return out
 
 
 # ── DB: 쓰기 ─────────────────────────────────────────────────────────────
 
-def _article_no_by_url(cur, url: str, idx: int) -> str:
-    """서울경제 기사 주소(쿼리 꼬리표 무시)로 기사 DB 의 기사 번호를 찾는다. 없으면 서울경제 원문 기사가 아니거나 아직 수집되지 않은 것."""
+def _resolve_source(cur, url: str, idx: int) -> Dict[str, Optional[str]]:
+    """출처 주소를 "후보로 담은 서울경제 기사"로 해석한다. 쿼리 꼬리표(?ref=)는 무시한다.
+    1순위 보관 기사(빅카인즈 검색에서 편집자가 담은 것), 2순위 전환기 한정 articles(부캉이 이전 전까지). 둘 다 없으면 거부."""
     base = normalize_url(url)
+    cur.execute("SELECT provider, external_id FROM external_archives WHERE url_key = %s LIMIT 2", (base,))
+    rows = cur.fetchall()
+    if len(rows) == 1:
+        return {"archive_provider": rows[0]["provider"], "archive_id": rows[0]["external_id"], "article_no": None}
+    if len(rows) > 1:
+        raise LetterError(f"sources[{idx}]: 같은 주소의 보관 기사가 둘 이상입니다: {base}")
     cur.execute("SELECT article_no FROM articles WHERE source_url = %s OR source_url LIKE %s LIMIT 2", (base, base + "?%"))
     rows = cur.fetchall()
-    if len(rows) != 1:
-        raise LetterError(f"sources[{idx}]: 서울경제 기사 DB에서 이 주소의 기사를 찾을 수 없습니다(서울경제 원문 기사만 인정): {base}")
-    return rows[0]["article_no"]
+    if len(rows) == 1:
+        return {"archive_provider": None, "archive_id": None, "article_no": rows[0]["article_no"]}
+    raise LetterError(
+        f"sources[{idx}]: 이 주소는 후보로 담은 서울경제 기사가 아닙니다. 관리자 화면의 '출처 후보 기사 검색'에서 기사를 찾아 담은 뒤 사용하세요: {base}")
 
 
 def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
@@ -430,18 +467,16 @@ def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
             "VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb)",
             (letter_id, i, s["axis"], s["axis_label"], s["heading"], s["key_line"], json.dumps(s["paragraphs"], ensure_ascii=False)))
     cur.execute("DELETE FROM issue_letter_sources WHERE letter_id = %s", (letter_id,))
-    seen_nos = set()
+    seen = set()
     for i, s in enumerate(v["sources"]):
-        no = s["article_no"] or _article_no_by_url(cur, s["url"], i)
-        if s["article_no"]:
-            cur.execute("SELECT 1 FROM articles WHERE article_no = %s", (no,))
-            if not cur.fetchone():
-                raise LetterError(f"sources[{i}]: 서울경제 기사 DB에서 기사 번호를 찾을 수 없습니다: {no}")
-        if no in seen_nos:
-            raise LetterError(f"sources[{i}]: 같은 기사가 두 번 들어 있습니다(주소와 번호가 같은 기사)")
-        seen_nos.add(no)
-        cur.execute("INSERT INTO issue_letter_sources (letter_id, position, article_no, axes) VALUES (%s,%s,%s,%s)",
-                    (letter_id, i, no, s["axes"]))
+        r = _resolve_source(cur, s["url"], i)
+        key = (r["archive_provider"], r["archive_id"], r["article_no"])
+        if key in seen:
+            raise LetterError(f"sources[{i}]: 같은 기사가 두 번 들어 있습니다(주소는 달라도 같은 기사)")
+        seen.add(key)
+        cur.execute(
+            "INSERT INTO issue_letter_sources (letter_id, position, article_no, archive_provider, archive_id, axes) VALUES (%s,%s,%s,%s,%s,%s)",
+            (letter_id, i, r["article_no"], r["archive_provider"], r["archive_id"], s["axes"]))
     cur.execute("DELETE FROM issue_letter_polls WHERE letter_id = %s", (letter_id,))
     if v["poll"]:
         cur.execute("INSERT INTO issue_letter_polls (letter_id, kind, question) VALUES (%s,%s,%s)",

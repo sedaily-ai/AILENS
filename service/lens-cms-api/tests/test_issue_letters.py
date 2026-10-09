@@ -64,7 +64,7 @@ def _payload(**over):
         "slug": "2026-10-09-테스트", "title": "제목", "deck": "요약", "summary": ["한 줄"], "editor_note": "한마디",
         "categories": ["industry"],
         "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["문장 ", {"text": "링크", "href": "https://www.sedaily.com/article/1?ref=x"}]]}],
-        "sources": [{"article_no": "1", "axes": ["news"]}],
+        "sources": [{"url": "https://www.sedaily.com/article/1", "axes": ["news"]}],
         "poll": {"kind": "emotion", "question": "소식을 들었을 때 어떠셨나요?", "options": [
             {"key": "send", "label": "신기했어요"}, {"key": "wait", "label": "걱정됐어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
     }
@@ -75,7 +75,7 @@ def _payload(**over):
 def test_validate_normalizes_valid_payload():
     v = _repo().validate_letter_payload(_payload())
     assert v["sections"][0]["paragraphs"][0][1]["href"].startswith("https://")
-    assert v["sources"][0]["article_no"] == "1" and v["poll"]["options"][0]["key"] == "send"
+    assert v["sources"][0]["url"].endswith("/article/1") and v["poll"]["options"][0]["key"] == "send"
 
 
 @pytest.mark.parametrize("bad", [
@@ -87,13 +87,12 @@ def test_validate_normalizes_valid_payload():
     {"sections": [{"axis": "weird", "heading": "h", "key_line": "k", "paragraphs": []}]},
     {"sections": [{"axis": "news", "heading": "h", "key_line": "", "paragraphs": []}]},
     {"sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [[{"text": "x", "href": "javascript:1"}]]}]},
-    {"sources": [{"article_no": "1", "url": "https://www.sedaily.com/article/1", "axes": []}]},  # 번호와 주소를 같이 줌
-    {"sources": [{"axes": []}]},  # 번호도 주소도 없음
+    {"sources": [{"article_no": "1", "axes": []}]},  # 기사 번호 직접 지정 불가
+    {"sources": [{"axes": []}]},  # 주소 없음
     {"sources": [{"url": "ftp://x", "axes": []}]},
     {"sources": [{"external_url": "https://a.com", "external_title": "t", "external_outlet": "o", "approved_by": "admin", "axes": []}]},  # 외부 매체 불가
     {"sources": [{"url": "https://www.sedaily.com/article/1", "axes": []}, {"url": "https://www.sedaily.com/article/1?ref=x", "axes": []}]},  # 같은 기사 중복
-    {"sources": [{"article_no": "1", "axes": ["bad"]}]},
-    {"sources": [{"article_no": "1", "axes": []}, {"article_no": "1", "axes": []}]},
+    {"sources": [{"url": "https://www.sedaily.com/article/1", "axes": ["bad"]}]},
     {"poll": {"kind": "emotion", "question": "q", "options": [{"key": "a", "label": "x"}]}},
     {"poll": {"kind": "emotion", "question": "q", "options": [{"key": "A", "label": "x"}, {"key": "b", "label": "y"}]}},
     {"poll": {"kind": "binary", "question": "q", "options": [{"key": "a", "label": "x"}, {"key": "unsure", "label": "y"}]}},
@@ -209,22 +208,67 @@ def test_editor_note_standard_accepts_fact_linking_sentence():
     assert _repo().publish_problems(_publishable(editor_note=note)) == []
 
 
-def test_source_can_be_given_by_url_and_resolved_to_article_no():
+class _Cur:
+    """execute 순서대로 미리 정한 fetchall 결과를 돌려주는 가짜 커서."""
+    def __init__(self, *results):
+        self.results = list(results)
+        self.sql = []
+    def execute(self, sql, params=None):
+        self.sql.append((" ".join(sql.split()), params))
+    def fetchall(self):
+        return self.results.pop(0)
+
+
+def test_source_resolves_to_archive_first_ignoring_query_tag():
     r = _repo()
-    v = r.validate_letter_payload(_payload(sources=[{"url": "https://www.sedaily.com/article/20094994?ref=sedailyEng", "axes": ["news"]}]))
-    assert v["sources"][0]["article_no"] is None and v["sources"][0]["url"].endswith("?ref=sedailyEng")
+    cur = _Cur([{"provider": "bigkinds", "external_id": "N1"}])
+    got = r._resolve_source(cur, "https://www.sedaily.com/article/20099230?ref=kpf", 0)
+    assert got == {"archive_provider": "bigkinds", "archive_id": "N1", "article_no": None}
+    assert cur.sql[0][1] == ("https://www.sedaily.com/article/20099230",)  # 꼬리표 제거 후 url_key 와 대조
+
+
+def test_source_falls_back_to_legacy_articles_then_rejects_unknown():
+    r = _repo()
+    got = r._resolve_source(_Cur([], [{"article_no": "2KHJR4QOYT"}]), "https://www.sedaily.com/article/20092388", 0)
+    assert got["article_no"] == "2KHJR4QOYT" and got["archive_id"] is None
+    with pytest.raises(r.LetterError) as e:  # 담지 않은 주소(AI 가 지어냈거나 검색을 거치지 않은 기사)
+        r._resolve_source(_Cur([], []), "https://example.com/x", 1)
+    assert "후보로 담은" in str(e.value)
+
+
+def _article(**over):
+    base = {"news_id": "N1", "title": "기사", "original_link": "https://www.sedaily.com/article/1?ref=kpf", "published_at": "2026-10-08", "byline": "홍길동", "content": "미리보기"}
+    base.update(over)
+    return base
+
+
+def test_save_archives_upserts_bigkinds_article(monkeypatch):
+    r = _repo()
+    calls = []
 
     class Cur:
-        def __init__(self, rows):
-            self.rows = rows
-            self.sql = None
         def execute(self, sql, params=None):
-            self.sql = (sql, params)
-        def fetchall(self):
-            return self.rows
+            calls.append((" ".join(sql.split()), params))
+        def fetchone(self):
+            p = calls[-1][1]
+            return {"external_id": p[1], "title": p[3], "source_url": p[7]}
 
-    cur = Cur([{"article_no": "2KHNE99S2Q"}])
-    assert r._article_no_by_url(cur, "https://www.sedaily.com/article/20094994?ref=x", 0) == "2KHNE99S2Q"
-    assert cur.sql[1] == ("https://www.sedaily.com/article/20094994", "https://www.sedaily.com/article/20094994?%")
-    with pytest.raises(r.LetterError):  # 기사 DB에 없음 = 서울경제 원문이 아님
-        r._article_no_by_url(Cur([]), "https://example.com/x", 1)
+    @contextlib.contextmanager
+    def cur():
+        yield Cur()
+
+    monkeypatch.setattr(r, "get_cursor", cur)
+    out = r.save_archives([_article()])
+    assert out == [{"external_id": "N1", "title": "기사", "url": "https://www.sedaily.com/article/1"}]  # 응답 주소는 꼬리표 제거
+    sql, params = calls[0]
+    assert "ON CONFLICT (provider, external_id) DO UPDATE" in sql
+    assert params[0] == "bigkinds" and params[4] == "서울경제" and params[7].endswith("?ref=kpf")  # 원문 링크는 그대로 보관
+
+
+@pytest.mark.parametrize("bad", [
+    [], "x", [_article(news_id="")], [_article(title="")], [_article(original_link="")], [_article(original_link="ftp://x")],
+    [_article(published_at="어제")], [_article() for _ in range(31)], ["str"],
+])
+def test_save_archives_rejects_invalid(bad):
+    with pytest.raises(_repo().LetterError):
+        _repo().save_archives(bad)

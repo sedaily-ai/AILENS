@@ -501,10 +501,11 @@ def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_vot
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
 
-@app.get("/admin/issue-letters/candidates")
-def admin_issue_letter_candidates(q: str = Query(...), limit: int = Query(default=20), x_internal_token: Optional[str] = Header(default=None)):
+@app.post("/admin/issue-letters/archives")
+def admin_save_issue_letter_archives(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """빅카인즈 검색 결과에서 고른 서울경제 기사를 보관한다(레터 출처 후보)."""
     _check_admin_token(x_internal_token)
-    return {"articles": _letter_call(issue_letters_repo.search_candidates, q, limit)}
+    return {"archived": _letter_call(issue_letters_repo.save_archives, payload.get("articles") or [])}
 
 
 @app.get("/admin/issue-letters")
