@@ -221,6 +221,21 @@ def admin_soft_delete_by_slug(payload: Dict[str, Any] = Body(...), x_internal_to
         raise HTTPException(status_code=409, detail=str(e))
 
 
+@app.post("/admin/posts/reclassify-by-slug")
+def admin_reclassify_by_slug(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    # 분류 개편(2026-10-09) 일괄 재분류. 관리자 PUT은 admin_post_id가 있는 글(공개 글의 약 62%)만 다뤄서, 8월 글 등 나머지를 같은 방식으로 바꾸려고 slug 기준으로 둔다.
+    # dry_run 기본값이 true라 body에 dry_run:false를 명시해야 실제로 바꾼다. 조건이 어긋나면 409로 아무것도 바꾸지 않는다.
+    _check_admin_token(x_internal_token)
+    items = payload.get("items")
+    if not isinstance(items, list) or not all(isinstance(x, dict) for x in items):
+        raise HTTPException(status_code=400, detail="items는 객체 배열이어야 합니다")
+    dry_run = payload.get("dry_run", True) is not False
+    try:
+        return admin_posts_repo.reclassify_by_slugs(items, dry_run=dry_run)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
 @app.delete("/admin/posts/{post_id}")
 def admin_delete_post(post_id: str, x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)

@@ -582,6 +582,62 @@ def soft_delete_empty_by_slugs(slugs: List[str], dry_run: bool = True) -> Dict[s
         return {"dry_run": False, "deleted": cur.rowcount, "posts": matched}
 
 
+# 분류 개편(2026-10-09) 대분류 9개. service/frontend/src/shared/constants/econCategories.ts·pipelines/common/publish_utils.py와 같은 값이다(의도적 복제).
+_NEW_CATEGORIES = {"시그널", "부동산", "경제", "금융", "산업", "정치", "사회", "국제", "문화"}
+
+
+def reclassify_by_slugs(items: List[Dict[str, Any]], dry_run: bool = True) -> Dict[str, Any]:
+    """글의 분류(category)·하위 분류(subcategory)를 slug 기준으로 바꾼다. admin_post_id가 없는 옛 글도 대상이다.
+
+    저장 위치는 공개 읽기 경로(_apply_admin_extra)가 읽는 admin_extra.body_inline.category/subcategory 이며 다른 필드는 건드리지 않는다.
+    dry_run=True(기본)면 바꿀 내용만 돌려준다. 하나라도 어긋나면(ValueError) 아무것도 바꾸지 않는다(get_cursor가 롤백):
+      - 1~200건, slug 중복 없음, 대분류가 새 9개 중 하나, 하위 분류는 문자열 또는 null
+      - 요청한 slug가 DB에 모두 있고 삭제되지 않은 글일 것"""
+    if not items or len(items) > 200:
+        raise ValueError("items는 1~200건")
+    slugs = [it.get("slug") for it in items]
+    if not all(isinstance(s, str) and s for s in slugs) or len(set(slugs)) != len(slugs):
+        raise ValueError("slug는 비어 있지 않은 문자열이고 중복이 없어야 합니다")
+    for it in items:
+        if it.get("category") not in _NEW_CATEGORIES:
+            raise ValueError(f"대분류가 새 체계에 없음: {it.get('slug')} → {it.get('category')!r}")
+        sub = it.get("subcategory")
+        if sub is not None and (not isinstance(sub, str) or len(sub) > 30):
+            raise ValueError(f"하위 분류 형식 오류: {it.get('slug')}")
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT id, slug, deleted_at, admin_extra->'body_inline'->>'category' AS category, "
+            "admin_extra->'body_inline'->>'subcategory' AS subcategory FROM publications WHERE slug = ANY(%s)",
+            (slugs,),
+        )
+        rows = {r["slug"]: r for r in cur.fetchall()}
+        missing = sorted(set(slugs) - set(rows))
+        gone = sorted(s for s, r in rows.items() if r["deleted_at"])
+        if missing or gone:
+            raise ValueError(f"조건 불일치: DB에 없음={missing}, 이미 삭제됨={gone}")
+        changes = [
+            {
+                "slug": it["slug"],
+                "before": {"category": rows[it["slug"]]["category"], "subcategory": rows[it["slug"]]["subcategory"]},
+                "after": {"category": it["category"], "subcategory": it.get("subcategory")},
+            }
+            for it in items
+        ]
+        if dry_run:
+            return {"dry_run": True, "count": len(changes), "changes": changes}
+        for it in items:
+            cur.execute(
+                "UPDATE publications SET updated_at = now(), admin_extra = jsonb_set("
+                "COALESCE(admin_extra, '{}'::jsonb), '{body_inline}', "
+                "COALESCE(admin_extra->'body_inline', '{}'::jsonb) || jsonb_build_object('category', %s::text, 'subcategory', %s::text)) "
+                "WHERE slug = %s AND deleted_at IS NULL",
+                (it["category"], it.get("subcategory"), it["slug"]),
+            )
+            if cur.rowcount != 1:
+                raise ValueError(f"갱신 실패(행 수 {cur.rowcount}): {it['slug']}")
+        return {"dry_run": False, "count": len(changes), "changes": changes}
+
+
 def soft_delete(admin_post_id: str) -> bool:
     with get_cursor() as cur:
         cur.execute(
