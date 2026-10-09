@@ -35,7 +35,7 @@ function ArticleThumb({ item, aspectRatio = '16 / 9' }: { item: ArchiveItem; asp
       {item.avatarUrl && (
         <Image
           src={item.avatarUrl}
-          alt=""
+          alt={item.title}
           width={400}
           height={225}
           className="block-thumb-img"

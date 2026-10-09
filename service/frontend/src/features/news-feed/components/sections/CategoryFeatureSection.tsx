@@ -26,7 +26,7 @@ function HeroArticle({ item, large }: { item: ArchiveItem; large: boolean }) {
         <div className="relative w-full aspect-video overflow-hidden rounded-xl mb-3" style={{ background: '#f3f4f6' }}>
           <Image
             src={item.avatarUrl}
-            alt=""
+            alt={item.title}
             fill
             sizes={large ? '(max-width: 768px) 100vw, 66vw' : '(max-width: 768px) 100vw, 33vw'}
             className="cf-hero-img"

@@ -112,6 +112,17 @@ function articleKeywords(lens: CmsLens): string[] {
   return [...new Set([displayCategoryLabel(lens.category), lens.subcategory, headline, '경제 뉴스', '뉴스 해설', '오늘의 이슈', '4가지 시선', 'AI LENS', '서울경제'].filter((k): k is string => !!k))];
 }
 
+// 검색 결과 설명 — 요약(context)이 짧은 글(60자 미만)은 핵심 문장이 있는 첫 형식의 문장을 이어 붙여 120~155자 안팎으로 채운다.
+const SHORT_DESCRIPTION = 60;
+function articleDescription(lens: CmsLens): string {
+  const fallback = '오늘의 이슈를 4가지 시선으로 짚어드려요.';
+  const base = buildSeoDescription(lens.context, fallback);
+  if (base.length >= SHORT_DESCRIPTION) return base;
+  const extra = (lens.lenses.find((l) => l.bullets.length > 0)?.bullets ?? []).join(' ').trim();
+  if (!extra) return base;
+  return buildSeoDescription(`${base === fallback ? '' : `${base} `}${extra}`, fallback);
+}
+
 function buildJsonLd(lens: CmsLens, shareImages: ShareImages) {
   const url = `${SITE_URL}${lensPath(lens)}`;
   const headline = seoHeadline(lens.headline);
@@ -229,7 +240,7 @@ export async function buildLensArticleMetadata(
   // 제목은 정제한 헤드라인만 쓴다(부서 접두사·이모지·"— 4가지 시선" 제외). layout 템플릿이 " | AI LENS"를 붙여도 검색 결과에서 잘리지 않는 길이가 된다.
   const headline = seoHeadline(lens.headline);
   const title = buildPageTitle(headline);
-  const description = buildSeoDescription(lens.context, '오늘의 이슈를 4가지 시선으로 짚어드려요.');
+  const description = articleDescription(lens);
   const url = `${SITE_URL}${lensPath(lens)}`;
   const shareImages = await pickShareImages(lens);
   return {

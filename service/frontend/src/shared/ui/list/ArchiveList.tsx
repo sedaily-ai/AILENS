@@ -96,7 +96,7 @@ function ArchiveRow({ item, showCategory }: { item: ArchiveItem; showCategory?: 
         >
           <Image
             src={item.avatarUrl}
-            alt=""
+            alt={item.title}
             width={368}
             height={245}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}

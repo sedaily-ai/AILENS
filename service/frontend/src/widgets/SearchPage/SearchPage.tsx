@@ -370,7 +370,7 @@ export function SearchPage() {
                               <span className="sp-thumb">
                                 <Image
                                   src={rec.p}
-                                  alt=""
+                                  alt={rec.h}
                                   width={368}
                                   height={245}
                                   loading="lazy"

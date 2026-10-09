@@ -34,7 +34,7 @@ const CSS = `
 function Thumb({ item, width, height, sizes, ratio = '3 / 2' }: { item: ArchiveItem; width: number; height: number; sizes: string; ratio?: string }) {
   return (
     <span data-cl-img style={{ display: 'block', borderRadius: 6, aspectRatio: ratio, width: '100%' }}>
-      {item.avatarUrl && <Image src={item.avatarUrl} alt="" width={width} height={height} sizes={sizes} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+      {item.avatarUrl && <Image src={item.avatarUrl} alt={item.title} width={width} height={height} sizes={sizes} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
     </span>
   );
 }
