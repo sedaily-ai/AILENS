@@ -35,9 +35,16 @@ check() {
 echo "=== 스모크 테스트: ${BASE} ==="
 
 # 페이지
-for p in / /lens /markets /signal /property /industry /finance /international /culture /words /timeline /paper/2026-10-02; do
+for p in / /lens /markets /economy /property /industry /finance /politics /national /international /culture /words /timeline /paper/2026-10-02; do
   check "$p" 200
 done
+
+# 분류 개편(2026-10-09)으로 /signal은 /markets로 영구 이동(308)
+check /signal 308
+
+# 비교 카드·본지 위젯(2026-10-09)
+check /widget/mbti-button.js 200
+check /api/widget/lookup/www/1 400
 
 # 날짜 동적 라우트 — 최근(S3 구간)·과거(빅카인즈 구간) 둘 다
 check /timeline/2026-10-02 200

@@ -1,6 +1,6 @@
 'use client';
 
-import { SITUATION_SHARE, TEMPERAMENT_BY_GLANCE, TEMPERAMENT_BY_SITUATION, TEMPERAMENTS, glanceShare, type Temperament } from '../lib/distribution';
+import { DISTRIBUTION_IS_MOCK, SITUATION_SHARE, TEMPERAMENT_BY_GLANCE, TEMPERAMENT_BY_SITUATION, TEMPERAMENTS, glanceShare, type Temperament } from '../lib/distribution';
 import { GLANCES, MOMENTS, type Glance, type Moment } from '../lib/moments';
 import { GlanceArt } from './GlanceArt';
 import { MomentArt } from './MomentArt';
@@ -101,7 +101,7 @@ export function DistributionCard({ moment, glance, part }: { moment: Moment; gla
       {part === 'time' && (
         <>
           {/* 1단계 답: 어떤 시간에 뉴스를 보는지 */}
-          <Head art={<MomentArt id={moment.id} size={84} />} kicker="전체 중" big={`${SITUATION_SHARE[moment.id]}%`} tail="가 이 시간에 뉴스를 봐요" />
+          <Head art={<MomentArt id={moment.id} size={84} />} kicker={DISTRIBUTION_IS_MOCK ? '예시 · 전체 중' : '전체 중'} big={`${SITUATION_SHARE[moment.id]}%`} tail="가 이 시간에 뉴스를 봐요" />
           <p style={{ margin: '14px 0 9px', fontSize: 12.5, fontWeight: 700, color: '#374151' }}>다들 언제 뉴스를 볼까요</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {MOMENTS.map((m, i) => (
@@ -114,7 +114,7 @@ export function DistributionCard({ moment, glance, part }: { moment: Moment; gla
       {part === 'glance' && (
         <>
           {/* 2단계 답: 무엇이 먼저 눈에 들어오는지 */}
-          <Head art={<GlanceArt id={glance.id} size={96} />} kicker="전체 중" big={`${glanceShare(glance.id)}%`} tail={`가 나처럼 ${FIRST[glance.id]} 봐요`} />
+          <Head art={<GlanceArt id={glance.id} size={96} />} kicker={DISTRIBUTION_IS_MOCK ? '예시 · 전체 중' : '전체 중'} big={`${glanceShare(glance.id)}%`} tail={`가 나처럼 ${FIRST[glance.id]} 봐요`} />
           <p style={{ margin: '14px 0 9px', fontSize: 12.5, fontWeight: 700, color: '#374151' }}>다들 무엇부터 볼까요</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {GLANCES.map((g, i) => (
@@ -142,6 +142,10 @@ export function DistributionCard({ moment, glance, part }: { moment: Moment; gla
             rows={GLANCES.map((g) => ({ id: g.id, label: FIRST[g.id], data: TEMPERAMENT_BY_GLANCE[g.id], mine: g.id === glance.id }))}
           />
         </>
+      )}
+
+      {DISTRIBUTION_IS_MOCK && (
+        <p style={{ margin: '12px 0 0', fontSize: 11, fontWeight: 600, color: '#b45309', wordBreak: 'keep-all' }}>※ 예시 수치예요. 실제 이용자 집계가 아니에요.</p>
       )}
     </section>
   );
