@@ -53,7 +53,7 @@ describe('buildCompareCard', () => {
     const card = buildCompareCard(lens(), 200);
     expect(card.headline).toBe('씨젠 3분기 영업이익 93% 늘어난다고?');
     expect(card.date).toBe('2026.10.08');
-    expect(card.entries.map((e) => e.label)).toEqual(['레터', '웹툰', '팟캐스트', '영상']);
+    expect(card.entries.map((e) => e.label)).toEqual(['읽기', '웹툰', '팟캐스트', '영상']);
     expect(card.entries[0].text).toBe('증권사 리포트를 열었다가 한 줄에 눈이 멈추신 적 있나요. 영업이익이 93% 늘어난다는데요.');
     expect(card.entries[1].text).toBe('컷 하나 / 컷 둘');
     expect(card.entries[2].text).toBe('진단키트 회사의 여름은 어떤 계절일까요. 매출이 줄어드는데요. 다음 문단');
@@ -73,7 +73,7 @@ describe('buildCompareCard', () => {
       200,
     );
     expect(card.entries.map((e) => [e.label, e.text])).toEqual([
-      ['레터', '핵심만'],
+      ['읽기', '핵심만'],
       ['웹툰', '웹툰 질문'],
     ]);
   });

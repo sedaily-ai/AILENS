@@ -140,7 +140,7 @@ function CompareCardDialog({ articleId, title, date, onClose }: { articleId: str
             {/* eslint-disable-next-line @next/next/no-img-element -- 서버가 만든 PNG를 그대로 보여 주고 저장한다(이미지 최적화 대상 아님). */}
             <img
               src={imageUrl}
-              alt={`${title} — 레터·웹툰·팟캐스트·영상 비교 카드`}
+              alt={`${title} — 읽기·웹툰·팟캐스트·영상 비교 카드`}
               onLoad={() => setState('ready')}
               onError={() => setState('error')}
               style={{ width: '100%', height: '100%', objectFit: 'contain', display: state === 'error' ? 'none' : 'block' }}

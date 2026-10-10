@@ -29,9 +29,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!lens) return { robots: { index: false } };
   const card = buildCompareCard(lens, CARD_TEXT_MAX.og);
   const title = `${card.headline} — 4가지로 비교`;
-  const description = '같은 기사를 레터·웹툰·팟캐스트·영상으로. 형식마다 어떻게 시작하는지 한 장에 모았어요.';
+  const description = '같은 기사를 읽기·웹툰·팟캐스트·영상으로. 형식마다 어떻게 시작하는지 한 장에 모았어요.';
   const pageUrl = `${SITE_URL}/card/${encodeURIComponent(lens.id)}`;
-  const image = { url: `${pageUrl}/og.png`, ...CARD_SIZES.og, alt: `${card.headline} — 레터·웹툰·팟캐스트·영상 비교 카드` };
+  const image = { url: `${pageUrl}/og.png`, ...CARD_SIZES.og, alt: `${card.headline} — 읽기·웹툰·팟캐스트·영상 비교 카드` };
   return {
     title,
     description,
@@ -42,8 +42,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-/** 형식 이름 + 조사(받침 유무에 맞춘 '로/으로'). */
-const VIEW_AS: Record<string, string> = { letter: '레터로', webtoon: '웹툰으로', podcast: '팟캐스트로', video: '영상으로' };
+/** 형식별 바로가기 문구(사이트 형식 탭 이름: 읽기·웹툰·팟캐스트·영상). */
+const VIEW_AS: Record<string, string> = { letter: '글로 읽기', webtoon: '웹툰으로 보기', podcast: '팟캐스트로 듣기', video: '영상으로 보기' };
 
 const btn: React.CSSProperties = {
   display: 'inline-flex',
@@ -76,7 +76,7 @@ export default async function CompareCardPage({ params }: Params) {
       {/* eslint-disable-next-line @next/next/no-img-element -- 같은 출처의 PNG를 원본 크기 그대로 보여 준다(이미지 최적화 대상 아님). */}
       <img
         src={storyUrl}
-        alt={`${card.headline} — 레터·웹툰·팟캐스트·영상이 각각 어떻게 시작하는지 비교한 카드`}
+        alt={`${card.headline} — 읽기·웹툰·팟캐스트·영상이 각각 어떻게 시작하는지 비교한 카드`}
         width={CARD_SIZES.story.width}
         height={CARD_SIZES.story.height}
         style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 16, border: '1px solid #e5e7eb' }}
@@ -94,13 +94,13 @@ export default async function CompareCardPage({ params }: Params) {
           <span key={e.format}>
             {i > 0 && ' · '}
             <Link href={`${articleHref}?v=${i + 1}`} style={{ color: e.color, fontWeight: 700 }}>
-              {VIEW_AS[e.format]} 보기
+              {VIEW_AS[e.format]}
             </Link>
           </span>
         ))}
       </p>
       <p style={{ marginTop: 18, fontSize: 13, color: '#9ca3af', wordBreak: 'keep-all' }}>
-        카드의 문장은 발행된 레터·웹툰·팟캐스트·영상의 첫 부분을 그대로 옮긴 것이며, 네 형식 모두 같은 서울경제 기사를 바탕으로 합니다.
+        카드의 문장은 발행된 읽기·웹툰·팟캐스트·영상의 첫 부분을 그대로 옮긴 것이며, 네 형식 모두 같은 서울경제 기사를 바탕으로 합니다.
       </p>
     </StaticPageShell>
   );
