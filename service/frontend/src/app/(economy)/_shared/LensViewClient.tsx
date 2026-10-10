@@ -439,7 +439,7 @@ export function LensViewClient({
             <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
               <strong style={{ color: '#111827', fontWeight: 700 }}>AI LENS 편집팀</strong>
               <span aria-hidden> · </span>
-              입력 {kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}
+              입력 <time dateTime={lens.published_at ?? lens.date}>{kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}</time>
               {readMin && (
                 <>
                   <span aria-hidden> · </span>약 {readMin}분 읽기

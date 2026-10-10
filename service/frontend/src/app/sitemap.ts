@@ -3,6 +3,7 @@ import type { MetadataRoute } from 'next';
 import { fetchAllLensPosts, fetchAllVideos, fetchPaperDates, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { kstTodayStr } from '@/shared/lib/date/date';
+import { CORE_SITEMAP_ID, sitemapIds } from '@/shared/lib/seo/sitemapIds';
 // 게임 목록은 단일 출처(shared/data/games.ts)에서 가져온다. page 모듈에서 가져오면 FSD 경계를 위반하고 프로덕션 빌드를 막는다.
 import { GAMES } from '@/shared/data/games';
 
@@ -88,10 +89,17 @@ function videoSitemapExtension(l: CmsLens, byLensId: Map<string, CmsVideo>): Pic
   };
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+// 사이트맵 분할(2026-10-09): /sitemap.xml은 색인(app/sitemap.xml/route.ts), 실제 URL은 /sitemap/{id}.xml 에 나눠 담는다.
+//   core        : 분류·정적 페이지·지면·타임라인·게임(작고 자주 쓰는 진입점)
+//   YYYY-MM     : 그 달에 발행된 기사(기사별 images·videos 확장 포함)
+// 한 파일이 3MB를 넘어 봇이 한 번에 내려받기 부담스럽던 것을 달 단위로 쪼개 파일당 수백 KB로 줄이고, 지난 달 파일은 사실상 바뀌지 않아 캐시 효율이 높다.
+// 파일 id 목록과 색인 항목은 sitemapIds()가 단일 출처다(색인 route와 generateSitemaps가 같이 쓴다).
+export async function generateSitemaps(): Promise<{ id: string }[]> {
+  return (await sitemapIds()).map(({ id }) => ({ id }));
+}
+
+async function coreEntries(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
-  const lensPromise = fetchAllLensPosts();
-  const videosPromise = fetchAllVideos(); // 실패 시 빈 배열을 돌려주므로 먼저 시작해도 안전하다
 
   // 정적 라우트
   for (const r of STATIC_ROUTES) {
@@ -101,41 +109,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: r.changeFrequency,
       priority: r.priority,
     });
-  }
-
-  // 레터 상세는 sitemap에 포함하지 않는다. 신규 발행이 중단되었고 사이트 내 링크가 없는 고아 페이지라 크롤 예산을 낭비한다.
-  // 페이지 자체는 기존 백링크·북마크를 위해 유지한다.
-
-  // 웹툰(/webtoon/{id})·영상(/video/{id}) 상세는 canonical이 기사 페이지라 사이트맵에 넣지 않는다(lensCanonical.ts). 이미지·영상 신호는 아래 기사 항목의 images·videos 확장으로 알린다.
-
-  // 오늘의 이슈(4가지 시선) — 하루 하나씩 실제 발행된 글만 존재하므로 전부 포함해도 안전하다.
-  try {
-    // 최신 1,000건 상한을 넘는 과거 글까지 전부 포함한다(fetchAllLensPosts 참조).
-    const lensPosts = await lensPromise;
-    const byLensId = new Map<string, CmsVideo>((await videosPromise).map((v) => [v.id.replace(/-video$/, ''), v]));
-    for (const l of lensPosts) {
-      const daysOld = daysBetween(l.date);
-      entries.push({
-        url: `${BASE}${lensPath(l)}`,
-        // lastmod는 최초 발행 시각이다. updated_at은 일괄 백필 시 저장 시각으로 덮여 대부분 같은 날짜가 되므로 쓰지 않는다.
-        // 실제 수정일이 아니면 구글이 lastmod를 신뢰하지 않으며, changeFrequency 'never'와도 일관된다.
-        lastModified: new Date(l.published_at || l.date + 'T07:00:00+09:00'),
-        changeFrequency: 'never',
-        priority: freshnessPriority(daysOld),
-        // 웹툰 채널 글은 panels가 비어 있어 images가 나가지 않으므로, lens 글의 웹툰 형식(lenses[].images) 이미지를 대표 이미지와 함께 알린다.
-        images: Array.from(
-          new Set(
-            [l.cover_image_url, ...(l.lenses ?? []).flatMap((x) => (x.images ?? []).map((im) => im.url))].filter(
-              (u): u is string => Boolean(u),
-            ),
-          ),
-        ),
-        // 영상 형식이 있으면 기사 페이지에 있는 영상(VideoObject와 같은 값)을 알린다. content_loc가 없으면 넣지 않는다.
-        ...videoSitemapExtension(l, byLensId),
-      });
-    }
-  } catch {
-    /* lens API 불통이면 생략 */
   }
 
   // 지난 지면 — 편성된 날짜별 페이지. 이후 바뀌지 않으므로 lastmod는 발행일 오전 7시(KST)로 둔다.
@@ -183,4 +156,47 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   return entries;
+}
+
+async function articleEntries(month: string): Promise<MetadataRoute.Sitemap> {
+  const entries: MetadataRoute.Sitemap = [];
+  const lensPromise = fetchAllLensPosts();
+  const videosPromise = fetchAllVideos(); // 실패 시 빈 배열을 돌려주므로 먼저 시작해도 안전하다
+  // 오늘의 이슈(4가지 시선) — 하루 하나씩 실제 발행된 글만 존재하므로 전부 포함해도 안전하다.
+  try {
+    // 최신 1,000건 상한을 넘는 과거 글까지 전부 포함한다(fetchAllLensPosts 참조).
+    const lensPosts = await lensPromise;
+    const byLensId = new Map<string, CmsVideo>((await videosPromise).map((v) => [v.id.replace(/-video$/, ''), v]));
+    for (const l of lensPosts) {
+      if (l.date.slice(0, 7) !== month) continue;
+      const daysOld = daysBetween(l.date);
+      entries.push({
+        url: `${BASE}${lensPath(l)}`,
+        // lastmod는 최초 발행 시각이다. updated_at은 일괄 백필 시 저장 시각으로 덮여 대부분 같은 날짜가 되므로 쓰지 않는다.
+        // 실제 수정일이 아니면 구글이 lastmod를 신뢰하지 않으며, changeFrequency 'never'와도 일관된다.
+        lastModified: new Date(l.published_at || l.date + 'T07:00:00+09:00'),
+        changeFrequency: 'never',
+        priority: freshnessPriority(daysOld),
+        // 웹툰 채널 글은 panels가 비어 있어 images가 나가지 않으므로, lens 글의 웹툰 형식(lenses[].images) 이미지를 대표 이미지와 함께 알린다.
+        images: Array.from(
+          new Set(
+            [l.cover_image_url, ...(l.lenses ?? []).flatMap((x) => (x.images ?? []).map((im) => im.url))].filter(
+              (u): u is string => Boolean(u),
+            ),
+          ),
+        ),
+        // 영상 형식이 있으면 기사 페이지에 있는 영상(VideoObject와 같은 값)을 알린다. content_loc가 없으면 넣지 않는다.
+        ...videoSitemapExtension(l, byLensId),
+      });
+    }
+  } catch {
+    /* lens API 불통이면 생략 */
+  }
+
+  return entries;
+}
+
+export default async function sitemap({ id }: { id: Promise<string> }): Promise<MetadataRoute.Sitemap> {
+  const key = await id;
+  return key === CORE_SITEMAP_ID ? coreEntries() : articleEntries(key);
 }

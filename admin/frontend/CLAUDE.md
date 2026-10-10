@@ -14,12 +14,12 @@ read that first for any cross-cutting changes.
 
 Next.js 16.2.4 + React 19.2.4 + Tailwind v4 + TS, separate `package.json` and lockfile from `service/frontend/`. Static export (`output: "export"` in `next.config.ts`).
 
-Build outputs **23 routes** under `out/` (2026-09-04 재확인 — 이전엔 13개로
+Build outputs **25 routes** under `out/` (2026-09-04 재확인 — 이전엔 13개로
 문서화돼 있었는데 home-player/lens(+edit)/podcast/quiz(+edit)/video(+edit)/
 webtoon(+edit) 9개가 이후 추가되며 안 갱신된 것): `/`, `/login`, `/posts`,
 `/posts/edit`, `/letters`, `/letters/edit`, `/newsletter`, `/cost`,
 `/drivers`, `/prompts`, `/prompts/edit`, `/settings`, `/home-player`,
-`/lens`, `/lens/edit`, `/podcast`, `/quiz`, `/quiz/edit`, `/video`,
+`/lens`, `/lens/edit`, `/issue-letters`, `/issue-letters/edit`(2026-10-09 신설 — 레터 탭 묶음 레터 입력·검수·발행, 옛 `/letters`와 다른 기능), `/podcast`, `/quiz`, `/quiz/edit`, `/video`,
 `/video/edit`, `/webtoon`, `/webtoon/edit`, `/_not-found`.
 
 ## Conventions
@@ -32,7 +32,7 @@ webtoon(+edit) 9개가 이후 추가되며 안 갱신된 것): `/`, `/login`, `/
 - **API client** — single fetch wrapper in `src/lib/adminClient.ts` (`adminApi.login` / `getDrivers` / `updatePrompt` / `getCost` / `getAudit` 등 9 endpoints). `AdminApiError` carries the HTTP status. Base URL from `NEXT_PUBLIC_ADMIN_API_BASE_URL` env var.
 - **Routing — query params, not dynamic segments** — `/prompts/edit?id=<category>/<name>` instead of `/prompts/[category]/[name]`. Reason: `output: "export"` requires `generateStaticParams` for dynamic routes; query params keep every `/edit` page a single static route regardless of how many items exist, and stay static-export friendly. Wrap any `useSearchParams` page in `<Suspense>` (see `prompts/edit/page.tsx`).
 - **Zero-new-dependency policy** — only what `create-next-app --tailwind --typescript --eslint` brought in. Custom impl preferred over deps unless saved code > ~100 lines (e.g. `ToastProvider` is 30 lines, diff preview is line-by-line).
-- **`set-state-in-effect` exemptions** — `AuthGuard.tsx` (mount-detection flag), `drivers/page.tsx` + `newsletter/page.tsx` (initial async fetch), `DatePickerField.tsx` (popover-open interaction trigger), `login/page.tsx` (오늘 날짜 데이트라인 — 정적 export라 빌드 시점에 굳는 걸 피하려 마운트 후에만 채움, AuthGuard.tsx와 동일 패턴), `PromptChatLab/ActivationHistory.tsx` (category/name 바뀔 때 이전 목록 대신 로딩 표시로 리셋 — 초기 비동기 fetch와 동일 패턴), `PromptChatLab/PromptVersionReference.tsx`의 `DraftFieldModal`/`DraftFileModal`(설명·지침·파일 편집 모달 안 "비교 참고" 패널 — 비교 대상 버전 바뀔 때 동일 패턴), `PromptChatLab/LatestPublishedContentLink.tsx`(마운트 시 최근 발행 콘텐츠 조회 — 웹툰/레터/영상/홈오디오플레이어 공용), `selection-lab/page.tsx`(activeDate 바뀔 때 이전 날짜 데이터 대신 로딩 표시로 리셋 — `ActivationHistory.tsx`와 동일 패턴, 2026-09-28). All annotated. `home-player/page.tsx`'s `NewItemForm` (order reset on prop change) was fixed at the root instead — same render-time seed-adjustment pattern as `drivers/page.tsx`'s `ThresholdRow`, no effect/exemption needed (2026-08-23, code refactoring audit). Don't add new exemptions without justifying.
+- **`set-state-in-effect` exemptions** — `AuthGuard.tsx` (mount-detection flag), `drivers/page.tsx` + `newsletter/page.tsx` (initial async fetch), `DatePickerField.tsx` (popover-open interaction trigger), `login/page.tsx` (오늘 날짜 데이트라인 — 정적 export라 빌드 시점에 굳는 걸 피하려 마운트 후에만 채움, AuthGuard.tsx와 동일 패턴), `PromptChatLab/ActivationHistory.tsx` (category/name 바뀔 때 이전 목록 대신 로딩 표시로 리셋 — 초기 비동기 fetch와 동일 패턴), `PromptChatLab/PromptVersionReference.tsx`의 `DraftFieldModal`/`DraftFileModal`(설명·지침·파일 편집 모달 안 "비교 참고" 패널 — 비교 대상 버전 바뀔 때 동일 패턴), `PromptChatLab/LatestPublishedContentLink.tsx`(마운트 시 최근 발행 콘텐츠 조회 — 웹툰/레터/영상/홈오디오플레이어 공용), `issue-letters/edit/page.tsx`(초기 비동기 조회 — drivers/page.tsx 와 동일 패턴, 2026-10-09), `selection-lab/page.tsx`(activeDate 바뀔 때 이전 날짜 데이터 대신 로딩 표시로 리셋 — `ActivationHistory.tsx`와 동일 패턴, 2026-09-28). All annotated. `home-player/page.tsx`'s `NewItemForm` (order reset on prop change) was fixed at the root instead — same render-time seed-adjustment pattern as `drivers/page.tsx`'s `ThresholdRow`, no effect/exemption needed (2026-08-23, code refactoring audit). Don't add new exemptions without justifying.
 
 ## Deploy
 

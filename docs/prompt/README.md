@@ -22,7 +22,7 @@ curl -s http://13.223.179.151/api/v2/prompts/<letters|webtoon|podcast|video>/pub
 | 유형 | 파일 | Bedrock 모델(inference profile) |
 |---|---|---|
 | 레터 | [`letters/published.md`](letters/published.md) | Opus 5 (`lens-letters-opus-5`, mode=system) |
-| 웹툰 | [`webtoon/published.md`](webtoon/published.md) | Sonnet 4.6 (`lens-webtoon-script-sonnet-46`, mode=webtoon_json) |
+| 웹툰 | [`webtoon/published.md`](webtoon/published.md) · [버전 이력](webtoon/README.md) | Sonnet 4.6 (`lens-webtoon-script-sonnet-46`, mode=webtoon_json) |
 | 팟캐스트 | [`podcast/published.md`](podcast/published.md) | Sonnet 4.6 (`lens-podcast-sonnet-46`, mode=system) |
 | 영상 | [`video/published.md`](video/published.md) | Sonnet 4.6 (`lens-video-sonnet-46`, mode=system) |
 

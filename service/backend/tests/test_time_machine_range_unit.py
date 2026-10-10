@@ -55,6 +55,7 @@ def env(monkeypatch):
     monkeypatch.setattr(dv, 'today_kst', lambda: '2026-10-04')
     monkeypatch.setattr(tm, 'today_kst', lambda: '2026-10-04')
     monkeypatch.setattr(bs, '_relevance_supported', None)
+    monkeypatch.setattr(bs, '_relevance_rejected_until', 0.0)  # 거부 후 대기 시각도 테스트마다 초기화(테스트 간 상태 누수 방지)
     monkeypatch.setattr(bs, 'get_secret', lambda name: 'KEY')
     table = _FakeTable()
     monkeypatch.setattr(tm, '_get_table', lambda: table)
@@ -164,7 +165,8 @@ def test_relevance_rejected_falls_back_to_date(env):
     status, body = _call(**BASE)
     assert status == 200 and body['sort_applied'] == 'date'
     assert _sorts(post) == [{'_score': 'desc'}, {'date': 'desc'}]
-    assert bs._relevance_supported is False
+    # 거부는 영구 기억이 아니라 잠시(5분)만 기억한다 — 그 사이에는 관련도를 건너뛰고, 지나면 다시 시도한다(tests/test_bigkinds_relevance_retry.py)
+    assert bs._relevance_rejected_until > time.monotonic()
 
 
 def test_relevance_http_4xx_also_falls_back(env):
@@ -174,7 +176,7 @@ def test_relevance_http_4xx_also_falls_back(env):
     assert body['sort_applied'] == 'date'
 
 
-def test_unsupported_remembered_no_retry(env):
+def test_rejected_relevance_not_retried_during_cooldown(env):
     _, post = env
     post.side_effect = [_resp(result=-1), _resp([_doc(1)]), _resp([_doc(2)])]
     _call(**BASE)
@@ -234,12 +236,21 @@ def test_cache_key_differs_by_param_and_never_collides_with_day_keys(env):
     assert not any(k.startswith(('timemachine_articles_', 'timemachine_empty_')) for k in keys)
 
 
-def test_fallback_result_cached_with_sort_applied(env):
+def test_fallback_result_is_not_cached(env, monkeypatch):
+    """관련도순을 요청했다가 최신순으로 대체된 결과는 캐시하지 않는다 — 다음 요청이 관련도순을 다시 시도해야 한다."""
     table, post = env
     post.side_effect = [_resp(result=-1), _resp([_doc(1)])]
-    _call(**BASE)
+    first = _call(**BASE)[1]
+    assert first['sort_applied'] == 'date' and first['cached'] is False
+    assert table.puts == []  # 저장하지 않음
+    # 대기 시간이 지나 관련도순이 다시 시도되고, 성공하면 그 결과는 캐시된다
+    monkeypatch.setattr(bs, '_relevance_rejected_until', 0.0)
+    post.side_effect = None
+    post.return_value = _resp([_doc(2)])
     again = _call(**BASE)[1]
-    assert again['cached'] is True and again['sort_applied'] == 'date'
+    assert again['sort_applied'] == 'relevance' and again['cached'] is False
+    assert len(table.puts) == 1
+    assert _call(**BASE)[1]['cached'] is True
 
 
 def test_negative_cache_for_past_range(env):

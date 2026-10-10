@@ -18,6 +18,7 @@ from routes import (
     cost,
     drivers,
     elevenlabs,
+    issue_letters,
     letters,
     media,
     newsletter,
@@ -87,6 +88,16 @@ HANDLERS: dict[str, tuple] = {
     "GET /admin/letters/{id}": (letters.handle_get, True),
     "PUT /admin/letters/{id}": (letters.handle_update, True),
     "DELETE /admin/letters/{id}": (letters.handle_delete, True),
+    # 이슈 레터(모아쓰기 레터) 2026-10-09 — routes/issue_letters.py 참고. ⚠️ 이 dict 에 키를 추가하는 것만으로는 부족하다:
+    # API Gateway 에 `aws apigatewayv2 create-route`로 아래 8개 라우트를 같이 만들어야 한다(위 video-lab 주석과 같은 함정).
+    "GET /admin/issue-letters": (issue_letters.handle_list, True),
+    "POST /admin/issue-letters/archives": (issue_letters.handle_archives, True),
+    "POST /admin/issue-letters": (issue_letters.handle_create, True),
+    "GET /admin/issue-letters/{id}": (issue_letters.handle_get, True),
+    "PUT /admin/issue-letters/{id}": (issue_letters.handle_update, True),
+    "POST /admin/issue-letters/{id}/submit": (issue_letters.handle_submit, True),
+    "POST /admin/issue-letters/{id}/publish": (issue_letters.handle_publish, True),
+    "POST /admin/issue-letters/{id}/archive": (issue_letters.handle_archive, True),
     # 이미지 업로드 presign (2026-07-28)
     "POST /admin/media/presign": (media.handle_presign, True),
     "GET /admin/media/download-url": (media.handle_download_url, True),

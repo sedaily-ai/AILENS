@@ -133,7 +133,32 @@ export function toLensPreviewSummaries(lenses: CmsLens[]): CmsLens[] {
 
 // limit 파라미터화: 기본 1000(전체 목록: sitemap·카테고리·/lens 목록). 홈 미리보기·사이드바처럼 최신 몇 건만 쓰는 호출부는
 // 작은 값을 넘긴다. 전체 목록 응답(~3MB)은 Next 데이터 캐시 한도(2MB)를 넘어 캐시되지 않기 때문이다. 캐시 키·URL이 limit별로 갈린다.
+// 큰 목록(limit≥200, 1,000건이면 ~3MB)은 Next 데이터 캐시에 들어가지 않아 기사 첫 렌더·RSS·뉴스 사이트맵·사이트맵·분류 목록이 렌더마다 오리진에서 다시 받았다.
+// 봇이 서로 다른 글을 훑으면 오리진 응답이 폭주하므로, 서버(SSR) 프로세스 메모리에 5분 보관한다. 갱신이 실패하면 오래된 값을 대신 돌려준다(빈 목록보다 낫다).
+// admin 발행·수정·삭제 webhook(/api/revalidate)이 clearLensListMemo()로 즉시 비우므로 반영 속도는 그대로다.
+const BIG_LIST_MIN = 200;
+const lensListMemo = new Map<number, { at: number; posts: CmsLens[] }>();
+export function clearLensListMemo(): void {
+  lensListMemo.clear();
+  allMemo.clear();
+}
+
 export async function fetchLensPosts(limit: number = 1000): Promise<CmsLens[]> {
+  const server = typeof window === 'undefined';
+  if (server && limit >= BIG_LIST_MIN) {
+    const hit = lensListMemo.get(limit);
+    if (hit && Date.now() - hit.at < CACHE_TTL_FALLBACK_SECONDS * 1000) return hit.posts;
+    const fresh = await fetchLensPostsFromApi(limit);
+    if (fresh.length > 0) {
+      lensListMemo.set(limit, { at: Date.now(), posts: fresh });
+      return fresh;
+    }
+    return hit?.posts ?? fresh;
+  }
+  return fetchLensPostsFromApi(limit);
+}
+
+async function fetchLensPostsFromApi(limit: number): Promise<CmsLens[]> {
   return cached(`lens:${limit}`, async () => {
     // limit=1000: 목록(다건) 응답은 백엔드가 축약판(label/question/bullets만)을 돌려주므로(cms_posts_shaping.py의
     // shape_lens_summary) 상한을 올려도 Lambda 동기 응답 한도(6MB)를 넘지 않는다. webtoon/video와 동일하다.
@@ -239,11 +264,23 @@ export async function fetchPaperDates(): Promise<string[]> {
 let paperDatesMemo: { at: number; dates: string[] } | null = null;
 let paperDatesInFlight: Promise<string[]> | null = null;
 
+// 상한(1,000건) 밖 과거 글까지 이어 받는 전체 목록은 날짜별 호출이 수십 번이라 사이트맵·검색 색인이 요청마다 다시 만들면 오리진을 압박한다.
+// 서버 메모리에 5분 보관하고(실패한 빈 결과는 보관하지 않는다) webhook이 clearLensListMemo()로 함께 비운다.
+const allMemo = new Map<string, { at: number; posts: unknown[] }>();
+async function memoAll<T extends { id: string; date: string }>(key: 'lens' | 'video', build: () => Promise<T[]>): Promise<T[]> {
+  if (typeof window !== 'undefined') return build();
+  const hit = allMemo.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_FALLBACK_SECONDS * 1000) return hit.posts as T[];
+  const fresh = await build();
+  if (fresh.length > 0) allMemo.set(key, { at: Date.now(), posts: fresh });
+  return fresh.length > 0 ? fresh : ((hit?.posts as T[] | undefined) ?? fresh);
+}
+
 export async function fetchAllLensPosts(): Promise<CmsLens[]> {
-  return extendBeyondCap('lens', await fetchLensPosts(1000));
+  return memoAll('lens', async () => extendBeyondCap('lens', await fetchLensPosts(1000)));
 }
 export async function fetchAllVideos(): Promise<CmsVideo[]> {
-  return extendBeyondCap('video', await fetchVideos());
+  return memoAll('video', async () => extendBeyondCap('video', await fetchVideos()));
 }
 
 export async function fetchLensBySlug(slug: string): Promise<CmsLens | null> {

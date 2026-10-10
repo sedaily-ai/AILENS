@@ -9,21 +9,32 @@ Lambda 버전과의 차이는 순수 인프라 계층뿐(커넥션 풀 재사용
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
+import threading
+import time
 from typing import Any, Dict, Optional
 
 from fastapi import Body, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
+import admin_jobs_repo
 import admin_posts_repo
 import articles_repo
 import audit_repo
+import candidate_seen_repo
 import chat_threads_repo
 import cms_posts_repo as posts_client
 import community_repo
 import config_repo
+import daily_questions_repo
+import interests_repo
+import letter_subscriptions_repo
+import issue_letters_repo
+import topics_repo
+from letter_errors import LetterError
 import personal_repo
 import prompt_lab_repo
 import prompts_repo
@@ -43,7 +54,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Voter-Id"],  # X-Voter-Id: 레터 투표·관심 설정의 기기 식별자(다른 주소에서 호출할 때 사전 확인 요청이 통과해야 한다)
 )
 
 _LIST_SHAPERS = {
@@ -54,6 +65,15 @@ _LIST_SHAPERS = {
 }
 _VALID_CHANNELS = ("letters", "paper", "feed", "webtoon", "video", "lens", "home_player")
 _CACHE_CONTROL = "no-store"
+
+# 목록 응답(1,000건이면 ~3MB)은 봇·SSR 재검증이 몰리면 같은 쿼리와 직렬화를 반복한다. 워커 프로세스 안에서 직렬화된 JSON을 5초만 보관해
+# 같은 순간의 중복 요청을 한 번의 쿼리로 합친다. 5초면 발행 직후 반영이 눈에 띄게 늦지 않고(프론트 webhook이 곧바로 다시 읽어도 안전),
+# admin 쓰기(POST/PUT/DELETE)가 이 워커로 오면 즉시 비운다. 워커가 둘이라 다른 워커는 최대 5초 오래된 목록을 줄 수 있다.
+_LIST_CACHE_TTL = 5.0
+_LIST_CACHE_MAX_KEYS = 64
+_list_cache: Dict[tuple, tuple] = {}
+_list_cache_lock = threading.Lock()
+_list_key_locks: Dict[tuple, threading.Lock] = {}
 
 
 @app.get("/health")
@@ -83,13 +103,47 @@ def list_posts(
     if channel not in _VALID_CHANNELS:
         raise HTTPException(status_code=400, detail=f"invalid channel: {channel}")
     limit = max(1, min(limit, 1000))
-    rows = posts_client.list_published_posts(channel, date, limit=limit)
-    payload = {
-        "channel": channel,
-        "date": date,
-        "posts": [_LIST_SHAPERS[channel](r) for r in rows],
-    }
-    return JSONResponse(payload, headers={"Cache-Control": _CACHE_CONTROL})
+    key = (channel, date, limit)
+    body = _list_cache_get(key)
+    if body is None:
+        # 같은 키가 동시에 만료돼도 쿼리는 한 번만 돈다(나머지는 앞선 요청이 채울 때까지 기다렸다 캐시를 읽는다).
+        with _list_cache_lock:
+            key_lock = _list_key_locks.setdefault(key, threading.Lock())
+        with key_lock:
+            body = _list_cache_get(key)
+            if body is None:
+                rows = posts_client.list_published_posts(channel, date, limit=limit)
+                payload = {
+                    "channel": channel,
+                    "date": date,
+                    "posts": [_LIST_SHAPERS[channel](r) for r in rows],
+                }
+                body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8")
+                _list_cache_put(key, body)
+    return Response(content=body, media_type="application/json", headers={"Cache-Control": _CACHE_CONTROL})
+
+
+def _list_cache_get(key: tuple) -> Optional[bytes]:
+    hit = _list_cache.get(key)
+    if hit and time.monotonic() - hit[0] < _LIST_CACHE_TTL:
+        return hit[1]
+    return None
+
+
+def _list_cache_put(key: tuple, body: bytes) -> None:
+    with _list_cache_lock:
+        if len(_list_cache) >= _LIST_CACHE_MAX_KEYS:
+            _list_cache.clear()
+        _list_cache[key] = (time.monotonic(), body)
+
+
+@app.middleware("http")
+async def _invalidate_list_cache_on_write(request, call_next):
+    response = await call_next(request)
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        with _list_cache_lock:
+            _list_cache.clear()
+    return response
 
 
 # ── admin 쓰기(CRUD) — v1.21 ──────────────────────────────────────────
@@ -306,7 +360,312 @@ def admin_score_selection_article(
     return {"article": article}
 
 
+# ── DynamoDB 잔여 이관 — v1.36 (설계: docs/architecture/lens-erd-src/16-ddb-잔여-이관-설계.md) ──────────
+# 세 테이블 모두 호출자(ECS 파이프라인·관리자 Lambda·서비스 Lambda)가 내부 토큰으로만 접근한다.
+def _bad_request(e: Exception) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/internal/candidate-seen/exists")
+def internal_candidate_seen_exists(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return {"seen": candidate_seen_repo.exists_keys(payload.get("pipeline", ""), payload.get("keys") or [])}
+    except ValueError as e:
+        raise _bad_request(e)
+
+
+@app.post("/internal/candidate-seen")
+def internal_candidate_seen_mark(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return candidate_seen_repo.mark_seen(
+            pipeline=payload.get("pipeline", ""),
+            article_key=payload.get("article_key", ""),
+            tab=payload.get("tab"),
+            score=payload.get("score"),
+            reasoning=payload.get("reasoning"),
+            is_manual=bool(payload.get("is_manual", False)),
+            excluded_from_general=bool(payload.get("excluded_from_general", False)),
+            reason=payload.get("reason"),
+            detail=payload.get("detail"),
+        )
+    except ValueError as e:
+        raise _bad_request(e)
+
+
+@app.post("/internal/candidate-seen/bulk")
+def internal_candidate_seen_bulk(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """옛 DynamoDB 항목 일괄 이관용(dry_run 기본). 이미 있는 키는 건너뛴다."""
+    _check_admin_token(x_internal_token)
+    try:
+        return candidate_seen_repo.bulk_import(payload.get("items") or [], dry_run=bool(payload.get("dry_run", True)))
+    except ValueError as e:
+        raise _bad_request(e)
+
+
+@app.get("/internal/candidate-seen/count")
+def internal_candidate_seen_count(pipeline: Optional[str] = Query(default=None), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"count": candidate_seen_repo.count(pipeline)}
+
+
+@app.post("/internal/admin-jobs")
+def internal_admin_job_create(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return {"job": admin_jobs_repo.create_job(payload.get("kind", ""), payload.get("job_id", ""), payload.get("payload"), payload.get("ttl_days", 30))}
+    except ValueError as e:
+        raise _bad_request(e)
+    except LookupError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.patch("/internal/admin-jobs/{kind}/{job_id}")
+def internal_admin_job_update(kind: str, job_id: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        job = admin_jobs_repo.update_job(kind, job_id, payload.get("status"), payload.get("error"), payload.get("result"))
+    except ValueError as e:
+        raise _bad_request(e)
+    if not job:
+        raise HTTPException(status_code=404, detail="job not found")
+    return {"job": job}
+
+
+@app.get("/internal/admin-jobs/{kind}/{job_id}")
+def internal_admin_job_get(kind: str, job_id: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        job = admin_jobs_repo.get_job(kind, job_id)
+    except ValueError as e:
+        raise _bad_request(e)
+    if not job:
+        raise HTTPException(status_code=404, detail="job not found")
+    return {"job": job}
+
+
+@app.get("/internal/daily-questions/{date}")
+def internal_daily_questions_get(date: str, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        row = daily_questions_repo.get_questions(date)
+    except ValueError as e:
+        raise _bad_request(e)
+    if not row:
+        raise HTTPException(status_code=404, detail="questions not found")
+    return {"daily_questions": row}
+
+
+@app.put("/internal/daily-questions/{date}")
+def internal_daily_questions_put(date: str, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    try:
+        return {"daily_questions": daily_questions_repo.save_questions(date, payload.get("questions"), payload.get("model"), payload.get("generated_at"))}
+    except ValueError as e:
+        raise _bad_request(e)
+
+
 # ── 용어 퀴즈 — v1.22, 응답 집계는 v1.26 ─────────────────────────────
+# ── 이슈 레터(모아쓰기 레터) — v1.37 ──────────────────────────────────────
+# 공개: 목록·상세·투표(인증 없음). 관리: X-Internal-Token + 본문 actor(관리자 Lambda가 로그인한 편집자 정보를 실어 보낸다).
+# 설계: docs/architecture/lens-erd-src/17-이슈레터-설계.md. 옛 /admin/letters*(폐기 후보)와 겹치지 않게 issue-letters 를 쓴다.
+
+def _letter_call(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except LetterError as e:
+        raise HTTPException(status_code=e.status, detail=str(e))
+
+
+@app.get("/api/v2/issue-letters")
+def list_issue_letters(category: Optional[str] = Query(default=None), limit: int = Query(default=20),
+                       before: Optional[str] = Query(default=None)):
+    letters = _letter_call(issue_letters_repo.list_published, category, limit, before)
+    return JSONResponse({"letters": letters}, headers={"Cache-Control": "public, max-age=60"})
+
+
+# ── 독자 관심(Phase 1) ─ 정적 경로라 `{slug}` 보다 먼저 정의해야 한다. 식별자는 투표와 같은 기기 값(X-Voter-Id)을 관심용으로 따로 해시한다.
+def _reader(x_voter_id: Optional[str]) -> str:
+    return _letter_call(interests_repo.reader_hash, x_voter_id or "")
+
+
+@app.get("/api/v2/issue-letters/bundles")
+def issue_letter_bundles():
+    return JSONResponse({"bundles": _letter_call(interests_repo.list_bundles)}, headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/api/v2/issue-letters/topics")
+def issue_letter_topics():
+    topics = _letter_call(topics_repo.list_topics, True)
+    return JSONResponse({"topics": [{"slug": t["slug"], "name": t["name"], "kind": t["kind"], "category_slug": t["category_slug"]} for t in topics]},
+                        headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/api/v2/issue-letters/me/interests")
+def get_my_interests(x_voter_id: Optional[str] = Header(default=None)):
+    return JSONResponse({"interests": _letter_call(interests_repo.get_interests, _reader(x_voter_id))}, headers={"Cache-Control": "no-store"})
+
+
+@app.put("/api/v2/issue-letters/me/interests")
+def put_my_interests(payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
+    return JSONResponse({"interests": _letter_call(interests_repo.set_interests, _reader(x_voter_id), payload.get("interests"))},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/v2/issue-letters/me/feed")
+def get_my_feed(x_voter_id: Optional[str] = Header(default=None), limit: int = Query(default=10)):
+    return JSONResponse(_letter_call(interests_repo.feed_for_reader, _reader(x_voter_id), limit), headers={"Cache-Control": "no-store"})
+
+
+# ── 이메일 구독(Phase 2) ─ 가입 → 메일 확인 → 수신거부. 응답으로 주소의 가입 여부를 알리지 않는다.
+@app.post("/api/v2/issue-letters/subscriptions")
+def post_letter_subscription(payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
+    rh = None
+    if x_voter_id:
+        rh = _letter_call(interests_repo.reader_hash, x_voter_id)
+    result = _letter_call(letter_subscriptions_repo.subscribe, payload.get("email"), payload.get("interests"), payload.get("frequency"),
+                          payload.get("send_hour"), payload.get("consent"), rh)
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v2/issue-letters/subscriptions/confirm")
+def post_letter_subscription_confirm(payload: Dict[str, Any] = Body(...)):
+    return JSONResponse(_letter_call(letter_subscriptions_repo.confirm, payload.get("token")), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v2/issue-letters/subscriptions/unsubscribe")
+def post_letter_subscription_unsubscribe(payload: Dict[str, Any] = Body(...)):
+    return JSONResponse(_letter_call(letter_subscriptions_repo.unsubscribe, payload.get("token")), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/v2/issue-letters/{slug}")
+def get_issue_letter(slug: str):
+    letter = _letter_call(issue_letters_repo.get_published, slug)
+    if not letter:
+        raise HTTPException(status_code=404, detail="letter not found")
+    return JSONResponse({"letter": letter}, headers={"Cache-Control": "public, max-age=60"})
+
+
+@app.get("/api/v2/issue-letters/{slug}/vote")
+def get_issue_letter_vote(slug: str, x_voter_id: Optional[str] = Header(default=None)):
+    return JSONResponse(_letter_call(issue_letters_repo.my_vote, slug, x_voter_id or ""), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v2/issue-letters/{slug}/vote")
+def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
+    result, fresh = _letter_call(issue_letters_repo.vote, slug, x_voter_id or "", str(payload.get("option_key") or ""))
+    if not fresh:
+        return JSONResponse({**result, "already_voted": True}, status_code=409, headers={"Cache-Control": "no-store"})
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/letter-sends")
+def admin_letter_send(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """다이제스트 발송. dry_run(기본 true)이면 대상과 담길 레터만 보여 주고 아무것도 쓰지·보내지 않는다."""
+    _check_admin_token(x_internal_token)
+    kst = datetime.timezone(datetime.timedelta(hours=9))
+    today = datetime.datetime.now(kst).date()
+    try:
+        send_date = datetime.date.fromisoformat(payload["date"]) if payload.get("date") else today
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date 는 YYYY-MM-DD 형식이어야 합니다")
+    return _letter_call(letter_subscriptions_repo.run_send, str(payload.get("kind") or "daily"), send_date, int(payload.get("hour") or 8),
+                        payload.get("dry_run", True) is not False)
+
+
+@app.post("/admin/email-suppressions")
+def admin_email_suppression(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return _letter_call(letter_subscriptions_repo.add_suppression, payload.get("email"), str(payload.get("reason") or "manual"))
+
+
+@app.put("/admin/interest-bundles")
+def admin_upsert_interest_bundles(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """관심 묶음(페르소나 기획서의 관심 프리셋)을 저장한다. 항목은 사전·분류와 대조해 검증한다."""
+    _check_admin_token(x_internal_token)
+    return _letter_call(interests_repo.upsert_bundles, payload.get("bundles"))
+
+
+@app.get("/admin/topics")
+def admin_list_topics(include_inactive: bool = Query(default=False), x_internal_token: Optional[str] = Header(default=None)):
+    """주제 사전 조회(레터에 붙이는 통제된 태그 어휘)."""
+    _check_admin_token(x_internal_token)
+    return {"topics": _letter_call(topics_repo.list_topics, not include_inactive)}
+
+
+@app.put("/admin/topics")
+def admin_upsert_topics(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """주제 사전 항목을 slug 기준으로 추가·갱신한다. 이름·별칭이 겹치면 전체를 거부한다."""
+    _check_admin_token(x_internal_token)
+    return _letter_call(topics_repo.upsert_topics, payload.get("topics"))
+
+
+@app.put("/admin/issue-letters/{letter_id}/topics")
+def admin_set_issue_letter_topics(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """레터의 주제 태그만 교체(발행 후에도 가능, 본문은 바뀌지 않는다)."""
+    _check_admin_token(x_internal_token)
+    return {"topics": _letter_call(issue_letters_repo.set_topics, letter_id, payload.get("topics"))}
+
+
+@app.post("/admin/issue-letters/archives")
+def admin_save_issue_letter_archives(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """빅카인즈 검색 결과에서 고른 서울경제 기사를 보관한다(레터 출처 후보)."""
+    _check_admin_token(x_internal_token)
+    return {"archived": _letter_call(issue_letters_repo.save_archives, payload.get("articles") or [])}
+
+
+@app.get("/admin/issue-letters")
+def admin_list_issue_letters(status: Optional[str] = Query(default=None), limit: int = Query(default=50),
+                             x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"letters": _letter_call(issue_letters_repo.list_admin, status, limit)}
+
+
+@app.get("/admin/issue-letters/{letter_id}")
+def admin_get_issue_letter(letter_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    letter = _letter_call(issue_letters_repo.get_admin, letter_id)
+    if not letter:
+        raise HTTPException(status_code=404, detail="letter not found")
+    return {"letter": letter, "publish_problems": issue_letters_repo.publish_problems(letter)}
+
+
+@app.post("/admin/issue-letters")
+def admin_create_issue_letter(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    actor = payload.get("actor") or {}
+    return {"letter": _letter_call(issue_letters_repo.create, payload.get("data") or {}, actor.get("employee_no"))}
+
+
+@app.put("/admin/issue-letters/{letter_id}")
+def admin_update_issue_letter(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    letter = _letter_call(issue_letters_repo.update, letter_id, payload.get("data") or {})
+    if not letter:
+        raise HTTPException(status_code=404, detail="letter not found")
+    return {"letter": letter}
+
+
+@app.post("/admin/issue-letters/{letter_id}/submit")
+def admin_submit_issue_letter(letter_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"letter": _letter_call(issue_letters_repo.submit, letter_id)}
+
+
+@app.post("/admin/issue-letters/{letter_id}/publish")
+def admin_publish_issue_letter(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    actor = payload.get("actor") or {}
+    return {"letter": _letter_call(issue_letters_repo.publish, letter_id, str(actor.get("employee_no") or ""), str(actor.get("role") or ""))}
+
+
+@app.post("/admin/issue-letters/{letter_id}/archive")
+def admin_archive_issue_letter(letter_id: int, x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"letter": _letter_call(issue_letters_repo.archive, letter_id)}
+
+
 @app.get("/api/quiz/today")
 def quiz_today(limit: int = Query(default=4)):
     return {"quizzes": quiz_repo.list_published_quizzes(limit=limit)}

@@ -123,6 +123,8 @@ const MENU_GROUPS: MenuGroup[] = [
       // 적절/애매/부적절 채점하는 화면. 팀원이 루틴하게 쓸 예정이라 실험용
       // Artifact가 아니라 정식 admin 탭으로 승격(선정_실험실 워크로그 참고).
       { label: "선정 실험실", href: "/selection-lab", Icon: IconFlask },
+      // 2026-10-09 신설 — 레터 탭(하나의 이슈를 여러 관점으로 엮은 묶음 레터) 입력·검수·발행. 옛 "AI 레터"(/letters)와 다른 기능.
+      { label: "이슈 레터", href: "/issue-letters", Icon: IconPen },
     ],
   },
   {

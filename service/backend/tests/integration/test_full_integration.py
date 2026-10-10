@@ -44,7 +44,7 @@ API_URL = os.getenv('API_URL', 'https://chzwwtjtgk.execute-api.us-east-1.amazona
 OS_ENDPOINT = os.getenv('OPENSEARCH_ENDPOINT', '')
 PG_HOST = os.getenv('PG_HOST', '')
 PG_PASSWORD = os.getenv('PG_PASSWORD', '')
-TABLE = os.getenv('DYNAMODB_TABLE_ARTICLES', 'sedaily-mbti-articles-dev')
+TABLE = os.getenv('DYNAMODB_TABLE_ARTICLES', 'TEST-ONLY-set-DYNAMODB_TABLE_ARTICLES')  # 운영 테이블명을 기본값으로 두지 않는다(2026-10-04 test_integ_* 잔재 사고)
 BUCKET = os.getenv('S3_ARTICLE_BODY_BUCKET', 'sedaily-mbti-article-body-dev')
 KST = timezone(timedelta(hours=9))
 TODAY = datetime.now(KST).strftime('%Y%m%d')

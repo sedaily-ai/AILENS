@@ -131,3 +131,53 @@ def set_status(post_id: str, status: str) -> dict[str, Any]:
     )
     res.raise_for_status()
     return res.json()["post"]
+
+
+# ── 본 후보 이력(candidate_seen, v1.36) ───────────────────────────────
+# 옛 DynamoDB mustknow-seen 을 대체한다. exists 는 후보 여러 건을 한 번에 확인하고, mark 는 판단이 끝난 후보를 기록한다.
+def seen_exists(pipeline: str, keys: list[str]) -> set[str]:
+    """이미 기록된 키만 돌려준다. 한 번에 500개까지(서버 상한) — 넘으면 나눠 보낸다.
+    판단 근거가 되는 조회라 실패하면 예외를 그대로 올린다(조용히 '본 적 없음'으로 처리하면 이미 채점한 기사를 다시 처리한다)."""
+    import requests  # noqa: lazy
+
+    found: set[str] = set()
+    uniq = list(dict.fromkeys(k for k in keys if k))
+    for i in range(0, len(uniq), 500):
+        res = requests.post(
+            f"{LENS_CMS_API_URL}/internal/candidate-seen/exists",
+            json={"pipeline": pipeline, "keys": uniq[i : i + 500]},
+            headers=_headers(),
+            timeout=(5, 30),
+        )
+        res.raise_for_status()
+        found.update(res.json().get("seen", []))
+    return found
+
+
+def seen_mark(pipeline: str, article_key: str, **meta: Any) -> None:
+    """판단이 끝난 후보를 기록한다. 알려진 필드(tab·score·reasoning·manual·excluded_from_general·reason) 외는 detail 로 보낸다."""
+    import requests  # noqa: lazy
+
+    from decimal import Decimal
+
+    known = {"tab", "score", "reasoning", "excluded_from_general", "reason"}
+    body: dict[str, Any] = {"pipeline": pipeline, "article_key": article_key}
+    detail: dict[str, Any] = {}
+    for k, v in meta.items():
+        if isinstance(v, Decimal):  # DynamoDB 용 마킹 코드가 float 를 Decimal 로 바꿔 넘긴다 — JSON 으로 보내려면 되돌린다
+            v = float(v)
+        if k == "manual":
+            body["is_manual"] = bool(v)
+        elif k in known:
+            body[k] = float(v) if k == "score" and v is not None else v
+        else:
+            detail[k] = v
+    if detail:
+        body["detail"] = detail
+    res = requests.post(
+        f"{LENS_CMS_API_URL}/internal/candidate-seen",
+        json=body,
+        headers=_headers(),
+        timeout=(5, 15),
+    )
+    res.raise_for_status()
