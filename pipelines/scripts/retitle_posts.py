@@ -26,12 +26,41 @@ def article_key(url: str) -> str:
     return m.group(1) if m else ""
 
 
+def apply_plan(path, categories, do_apply):
+    plan = json.loads(Path(path).read_text(encoding="utf-8"))
+    ok = [x for x in plan if x["new"] and (not categories or x["category"] in categories)]
+    skipped = [x for x in plan if x["new"] and x not in ok]
+    Path("/tmp/retitle_skipped.json").write_text(json.dumps(skipped, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"적용 대상 {len(ok)}건, 제외 {len(skipped)}건(/tmp/retitle_skipped.json)")
+    if not do_apply:
+        return
+    done = 0
+    for x in ok:
+        c, full = R.api("GET", f"/admin/posts/{x['id']}?channel=lens")
+        if c != 200:
+            print("조회 실패", x["id"], c)
+            continue
+        bi = full["post"]["body_inline"]
+        for l in bi.get("lenses", []):
+            if l.get("label") in KEEP_QUESTION_LABELS and (l.get("question") or "").strip() == x["old"].strip():
+                l["question"] = x["new"]
+        c, _ = R.api("PUT", f"/admin/posts/{x['id']}", {"headline": x["new"], "channels": ["lens"], "body_inline": bi})
+        done += 1 if c == 200 else 0
+        if c != 200:
+            print("실패", x["id"], c)
+    print(f"갱신 {done}/{len(ok)}건")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="start", default="2026-10-09")
     ap.add_argument("--limit", type=int, default=80)
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--from-plan", help="이미 만든 계획 파일(/tmp/retitle_plan.json)을 그대로 적용(재생성 없음, 비용 0)")
+    ap.add_argument("--categories", default="", help="적용할 분류(쉼표). 비우면 전부")
     a = ap.parse_args()
+    if a.from_plan:
+        return apply_plan(a.from_plan, [c for c in a.categories.split(",") if c], a.apply)
     days = (datetime.now() - datetime.strptime(a.start, "%Y-%m-%d")).days + 2
     titles = {x["key"]: x for x in discovery_loader.fetch_recent(days)}
     plan, used = [], {}
