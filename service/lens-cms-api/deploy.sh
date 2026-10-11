@@ -50,6 +50,7 @@ cp ../../docs/product/모아쓰기레터/seed/interest_bundles_seed.json "$STAGE
 cp ../../docs/architecture/lens-erd-src/lens_schema_v1.43_2026-10-09.sql "$STAGE/seed/"
 cp ../../docs/architecture/lens-erd-src/lens_schema_v1.44_2026-10-09.sql "$STAGE/seed/"
 cp ../../docs/architecture/lens-erd-src/lens_schema_v1.45_2026-10-11.sql "$STAGE/seed/"
+cp ../../docs/architecture/lens-erd-src/lens_schema_v1.46_2026-10-12.sql "$STAGE/seed/"
 cp ../../docs/product/모아쓰기레터/seed/editors_seed.json "$STAGE/seed/"
 cp ../../docs/product/모아쓰기레터/seed/editors_topics_seed.json "$STAGE/seed/"
 tar czf "/tmp/$TARBALL" \
