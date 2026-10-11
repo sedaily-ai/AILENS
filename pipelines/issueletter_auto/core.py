@@ -214,7 +214,7 @@ def other_attribution_problem(draft: Dict[str, Any]) -> str:
 
 # ── 키워드 기반 소재 선정(모델 호출 없음) ──────────────────────────────────────────
 GENERIC_WORDS = set("""단독 시그널 확대 최대 최고 추진 출시 시장 내년 올해 지난 이번 서울 한국 정부 기업 투자 글로벌 논란 공급 1위 신규 증가 감소 개최 발표 전망 개선 강화 지원 추가 가능 계획 이후 대한 관련 통해
-위해 따라 중심 이상 이하 전체 일부 주요 새로 다시 처음 오늘 어제 내일 오전 오후 사업 서비스 제품 시대 가격 규모 기준 현황 상승 하락 증시 지수 마감 속보 포토 인사 부고 오늘의 헬시타임 구축 역대 공격 지금 사설 칼럼 기고 인터뷰 종합 영상 이슈 종목""".split())
+위해 따라 중심 이상 이하 전체 일부 주요 새로 다시 처음 오늘 어제 내일 오전 오후 사업 서비스 제품 시대 가격 규모 기준 현황 상승 하락 증시 지수 마감 속보 포토 인사 부고 오늘의 헬시타임 구축 역대 공격 지금 사설 검토 인수 급증 키운다 인프라 에이전트 낙폭 턱밑 칼럼 기고 인터뷰 종합 영상 이슈 종목""".split())
 _JOSA = re.compile(r"(은|는|이|가|을|를|의|에|와|과|도|로|으로|에서|부터|까지|에게|보다)$")
 
 
@@ -222,13 +222,16 @@ def _tokens(title: str) -> Set[str]:
     out: Set[str] = set()
     for w in re.findall(r"[가-힣A-Za-z0-9·]{2,}", title or ""):
         w = _JOSA.sub("", w)
-        if len(w) >= 2 and not w.isdigit() and w not in GENERIC_WORDS and not is_sensitive(w):
+        if len(w) >= 2 and not w[0].isdigit() and w not in GENERIC_WORDS and not is_sensitive(w):  # 숫자로 시작하는 말(1조, 100조)은 사안이 아니라 수량이라 뺀다
             out.add(w)
     return out
 
 
 def _title_tokens(title: str) -> Set[str]:
     return _tokens(re.sub(r"\[[^\]]*\]|\([^)]*\)|【[^】]*】", "", title or ""))  # [단독]·[사설] 같은 말머리·괄호 제거
+
+
+SPECIFIC_DF_MAX = 60  # 이 값 이하로 나오는 단어를 '특정 개체·사안'으로 본다
 
 
 def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = (), min_articles: int = 3, min_chars: int = 5000,
@@ -238,6 +241,12 @@ def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = 
     점수 = 기사 수(최대 12) + 2×게재 일수 + 지면 1면 포함 3 − 권유 표현 많은 본문 감점. 기사가 겹치는 후보는 점수 높은 쪽만 둔다."""
     import itertools
     used = set(used_keys)
+    # 응집도: 쌍의 두 단어가 모두 흔한 말(전체 기사의 상당수에 나옴)이면 서로 다른 사안이 한 묶음이 된다(예: 매출+실적).
+    # 적어도 한 단어는 특정 개체·사안(전체 기사 중 일부에만 나오는 말)이어야 한다.
+    df: Dict[str, int] = {}
+    for a in articles:
+        for w in _title_tokens(a.get("title", "")):
+            df[w] = df.get(w, 0) + 1
     by_pair: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
     for a in articles:
         if not a.get("key") or is_sensitive(a.get("title", "")) or a["key"] in used:
@@ -247,6 +256,8 @@ def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = 
     cands: List[Dict[str, Any]] = []
     for pair, arts in by_pair.items():
         if len(arts) < min_articles:
+            continue
+        if min(df.get(pair[0], 0), df.get(pair[1], 0)) > SPECIFIC_DF_MAX:
             continue
         days = {str(a.get("date") or "")[:10] for a in arts}
         if len(days) < 2:
@@ -321,7 +332,11 @@ _BARE_ID = re.compile(r"(?<![\d/])\d{8}(?![\d])")
 
 
 def _clean_text(t: str) -> str:
-    return _BARE_ID.sub("", _ID_NOTE.sub("", t)).replace("  ", " ").strip() if isinstance(t, str) else t
+    # 앞뒤 공백은 지우지 않는다: 링크 조각 옆 문자열의 공백이 사라지면 "했다고8일"처럼 붙는다
+    if not isinstance(t, str):
+        return t
+    cleaned = _BARE_ID.sub("", _ID_NOTE.sub("", t))
+    return re.sub(r" {2,}", " ", cleaned) if cleaned != t else t
 
 
 def sanitize_draft(draft: Dict[str, Any]) -> Dict[str, Any]:

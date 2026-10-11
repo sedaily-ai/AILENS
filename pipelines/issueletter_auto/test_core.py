@@ -125,3 +125,16 @@ def test_drop_flagged_removes_matching_sentence_and_reports_unmatched():
     d = {"sections": [{"paragraphs": [["수도권 외 점포 매출은 150% 늘었어요. 부산은 별도로 집계됐어요."], [{"block": "callout", "text": "지방 점포가 가장 많이 늘었어요."}]]}]}
     left = core.drop_flagged(d, ["수도권 외 점포 매출은 150% 늘었어요. — 기사와 다름", "본문에 없는 문장입니다 정말로 없어요 — 이유"])
     assert len(left) == 1 and "150%" not in core.para_text(d["sections"][0]["paragraphs"][0]) and "부산은" in core.para_text(d["sections"][0]["paragraphs"][0])
+
+
+def test_keyword_clusters_drop_numeric_and_all_generic_pairs():
+    def art(i, title, day, cat="산업"):
+        return {"key": str(i), "title": title, "date": f"2026-10-{day:02d}", "content_len": 2500, "top_category": cat, "paper_number": "5"}
+    arts = [art(i, f"기업{i} 매출 1조 돌파", 8 + i % 3) for i in range(1, 6)]  # 서로 무관한 기업들이 '1조+매출'만 공유
+    assert all("1조" not in c["keyword"] for c in core.keyword_clusters(arts, min_chars=5000))
+
+
+def test_sanitize_keeps_spaces_around_link_segments():
+    d = {"title": "t", "summary": [], "editor_note": "e", "sections": [{"heading": "h", "key_line": "k", "paragraphs": [["기록했다고 ", {"text": "링크", "href": "https://x/1"}, " 8일 공시했어요."]]}]}
+    core.sanitize_draft(d)
+    assert d["sections"][0]["paragraphs"][0][0] == "기록했다고 " and d["sections"][0]["paragraphs"][0][2] == " 8일 공시했어요."
