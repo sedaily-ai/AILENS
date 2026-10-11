@@ -26,10 +26,11 @@ class FakeCursor:
             return {"id": 7}
         if "FROM issue_letter_poll_options WHERE letter_id=%s AND key=%s" in last:
             return {"?column?": 1} if STATE.get("option_ok", True) else None
-        if "ON CONFLICT (letter_id, voter_hash) DO NOTHING" in last:
-            return {"option_key": "send"} if STATE.get("fresh", True) else None
+        if "ON CONFLICT (letter_id, voter_hash) DO UPDATE" in last:
+            return {"option_key": "wait"} if STATE.get("changed_to") else None
         if "SELECT option_key FROM issue_letter_votes" in last:
-            return {"option_key": "send"}
+            had = STATE.get("had", None)
+            return {"option_key": had} if had else None
         return None
 
     def fetchall(self):
@@ -202,15 +203,18 @@ def test_voter_hash_is_stable_salted_and_hides_raw():
         r.voter_hash("x", salt="")
 
 
-def test_vote_fresh_then_duplicate(monkeypatch):
+def test_vote_first_then_same_then_change(monkeypatch):
     r = _repo()
-    result, fresh = r.vote("slug", "anon-1", "send")
-    assert fresh and result["counts"] == {"send": 3, "wait": 1} and result["my_choice"] == "send"
+    result, changed = r.vote("slug", "anon-1", "send")  # 처음 투표
+    assert changed and result["my_choice"] == "send" and result["counts"] == {"send": 3, "wait": 1}
     inserted = [p for s, p in SQL if s.startswith("INSERT INTO issue_letter_votes")][0]
     assert "anon-1" not in inserted[1] and len(inserted[1]) == 64  # 원문이 아니라 해시만 저장
-    STATE["fresh"] = False
-    _, fresh = r.vote("slug", "anon-1", "send")
-    assert not fresh
+    STATE["had"] = "send"
+    _, changed = r.vote("slug", "anon-1", "send")  # 같은 보기를 다시 눌러도 달라진 게 없다
+    assert not changed
+    STATE["had"] = "send"
+    result2, changed2 = r.vote("slug", "anon-1", "wait")  # 보기를 바꿈
+    assert changed2 and result2["my_choice"] == "wait"
 
 
 def test_vote_rejects_unknown_option():

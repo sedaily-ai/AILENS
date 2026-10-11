@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { applyChoice } from '@/shared/lib/poll/optimisticVote';
 import { PollOptions } from '@/shared/ui/form/PollOptions';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import type { LetterVote as Vote } from '../data/letterTypes';
@@ -26,14 +27,19 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
   }, [slug]);
 
   async function pick(key: string) {
-    if (state.my_choice || pending) return;
+    if (state.my_choice === key || pending) return;
     const id = getDeviceId();
     if (!id) return setFailed(true);
     setFailed(false);
-    setPending(key);
+    const prev = state;
+    if (prev.my_choice) setState(applyChoice(prev, key));
+    else setPending(key);
     const next = await postVote(slug, id, key);
     setPending(null);
-    if (!next) return setFailed(true);
+    if (!next) {
+      setState(prev);
+      return setFailed(true);
+    }
     setState(next);
     trackEvent('letter_vote', { letter: slug, option: next.my_choice ?? key });
   }
@@ -41,7 +47,7 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
   // 보기 색 구분: 우려·걱정류는 앰버, "잘 모르겠어요"는 회색, 나머지는 파랑. 데이터 필드 없이 key 로만 정한다.
   const toneOf = (key: string): 'b' | 'w' | 'n' => (key === 'unsure' ? 'n' : /worr|concern|anx|uneasy|afraid/.test(key) ? 'w' : 'b');
   const total = state.counts ? Object.values(state.counts).reduce((a, b) => a + b, 0) : 0;
-  const note = failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : state.my_choice ? `${total}명이 참여했어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요';
+  const note = failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : state.my_choice ? `${total}명이 참여했어요 · 다른 보기를 눌러 바꿀 수 있어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요';
 
   return (
     <section className="ld-vote" aria-label="투표">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { castPostVote, fetchPostVote, type PostVoteState } from '@/shared/lib/api/postVoteApi';
 import { getVoterId } from '@/shared/lib/device/voterId';
+import { applyChoice } from '@/shared/lib/poll/optimisticVote';
 import { PollOptions } from '@/shared/ui/form/PollOptions';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
@@ -34,20 +35,25 @@ export function PostVote({ slug, title, choices }: { slug: string; title: string
   }, [slug]);
 
   async function pick(key: string) {
-    if (state.my_choice || pending) return;
+    if (state.my_choice === key || pending) return;
     const id = getVoterId();
     if (!id) return setFailed(true);
     setFailed(false);
-    setPending(key); // 고른 즉시 반응하고, 집계가 오면 막대가 차오른다
+    const prev = state;
+    if (prev.my_choice) setState(applyChoice(prev, key)); // 이미 투표했으면 화면을 먼저 옮기고
+    else setPending(key); // 첫 투표는 고른 즉시 체크를 보여 주고, 집계가 오면 막대가 차오른다
     const next = await castPostVote(slug, id, key);
     setPending(null);
-    if (!next) return setFailed(true);
+    if (!next) {
+      setState(prev);
+      return setFailed(true);
+    }
     setState(next);
     trackEvent('post_vote', { post: slug, option: next.my_choice ?? key });
   }
 
   const total = state.counts ? Object.values(state.counts).reduce((a, b) => a + b, 0) : 0;
-  const note = failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : state.my_choice ? `${total}명이 참여했어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요';
+  const note = failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : state.my_choice ? `${total}명이 참여했어요 · 다른 보기를 눌러 바꿀 수 있어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요';
   return (
     <div className="lread-box lread-box-vote">
       <div className="lread-box-title">{title}</div>

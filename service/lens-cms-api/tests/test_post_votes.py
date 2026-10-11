@@ -19,10 +19,10 @@ class FakeCursor:
         last = STATE["last"]
         if "FROM publications" in last:
             return {"?column?": 1} if STATE.get("published", True) else None
-        if "ON CONFLICT (slug, voter_hash) DO NOTHING" in last:
-            return {"option_key": "o2"} if STATE.get("fresh", True) else None
+        if "ON CONFLICT (slug, voter_hash) DO UPDATE" in last:
+            return {"option_key": "o2"}
         if "SELECT option_key FROM post_votes WHERE slug = %s AND voter_hash = %s" in last:
-            return {"option_key": "o2"} if STATE.get("voted", True) else None
+            return {"option_key": STATE["had"]} if STATE.get("had") else None
         return None
 
     def fetchall(self):
@@ -56,18 +56,22 @@ def test_rejects_unknown_option_key_and_unpublished_post(monkeypatch):
     assert "404" in str(getattr(e.value, "status", "")) or "투표할 수 없는" in str(e.value)
 
 
-def test_vote_is_fresh_once_then_returns_existing_choice(monkeypatch):
+def test_vote_first_same_and_change(monkeypatch):
     r = _repo(monkeypatch)
-    res, fresh = r.vote("s", "voter", "o2")
-    assert fresh and res["my_choice"] == "o2" and res["counts"] == {"o1": 3, "o2": 5}
-    STATE["fresh"] = False
-    res2, fresh2 = r.vote("s", "voter", "o1")
-    assert not fresh2 and res2["my_choice"] == "o2"
+    res, changed = r.vote("s", "voter", "o2")
+    assert changed and res["my_choice"] == "o2" and res["counts"] == {"o1": 3, "o2": 5}
+    STATE["had"] = "o2"
+    _, same = r.vote("s", "voter", "o2")  # 같은 보기를 다시 눌러도 달라진 게 없다
+    assert not same
+    STATE["had"] = "o1"
+    res3, changed3 = r.vote("s", "voter", "o2")  # 보기를 바꿈
+    assert changed3 and res3["my_choice"] == "o2"
+    sql = " ".join(q for q, _ in STATE["sql"])
+    assert "DO UPDATE SET option_key = EXCLUDED.option_key" in sql
 
 
 def test_my_vote_hides_counts_until_voted(monkeypatch):
     r = _repo(monkeypatch)
-    STATE["voted"] = False
     assert r.my_vote("s", "voter") == {"my_choice": None, "counts": None}
-    STATE["voted"] = True
+    STATE["had"] = "o2"
     assert r.my_vote("s", "voter")["counts"] == {"o1": 3, "o2": 5}

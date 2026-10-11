@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /** 투표 보기 목록(모아쓰기 레터·1기사 레터 공용). 눌렀을 때 끊기지 않도록: 줄 높이를 고정해 레이아웃이 밀리지 않고,
  *  고른 보기는 즉시 반응하며, 집계가 오면 막대가 왼쪽에서 오른쪽으로 부드럽게 차오르고 숫자가 함께 올라간다. */
@@ -35,10 +35,11 @@ export const POLL_CSS = `
 .pl-row:active:not(:disabled) { transform: scale(0.985); }
 .pl-row:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
 .pl-row:disabled { cursor: default; }
-.pl-fill { position: absolute; inset: 0; z-index: -1; background: #eef0f3; transform: scaleX(0); transform-origin: left center; }
-.pl[data-done='true'] .pl-fill { animation: pl-grow .9s ${EASE} var(--d, 0ms) both; }
-@keyframes pl-grow { from { transform: scaleX(0); } to { transform: scaleX(var(--s, 0)); } }
+.pl[data-wait='true'] .pl-row { cursor: progress; }
+.pl-fill { position: absolute; inset: 0; z-index: -1; background: #eef0f3; transform: scaleX(0); transform-origin: left center; transition: transform .8s ${EASE}, background-color .35s; }
+.pl[data-done='true'] .pl-fill { transform: scaleX(var(--s, 0)); transition-delay: var(--d, 0ms), 0ms; }
 .pl-row[data-mine='true'] .pl-fill { background: var(--ct); }
+.pl-row[data-mine='true'] { cursor: default; }
 .pl-mark { flex: none; width: 20px; height: 20px; border-radius: 999px; border: 1.5px solid #cdd2da; display: grid; place-items: center; transition: background-color .25s, border-color .25s, transform .35s ${EASE}; }
 .pl-mark svg { width: 12px; height: 12px; stroke: #fff; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16; stroke-dashoffset: 16; transition: stroke-dashoffset .4s ${EASE} .08s; }
 .pl-row[data-mine='true'] .pl-mark, .pl-row[data-pending='true'] .pl-mark { background: var(--c); border-color: var(--c); transform: scale(1.06); }
@@ -53,21 +54,28 @@ export const POLL_CSS = `
 .pl[data-wait='true'] .pl-row:not([data-pending='true']) { opacity: 0.62; }
 .pl[data-done='true'] .pl-row:not([data-mine='true']) .pl-l { color: #4b5563; font-weight: 500; }
 .pl-note { margin: 10px 0 0; min-height: 18px; font-size: 12.5px; color: #9ca3af; transition: opacity .25s; }
-@media (prefers-reduced-motion: reduce) { .pl[data-done='true'] .pl-fill { animation-duration: 1ms; animation-delay: 0ms; } .pl-row, .pl-fill, .pl-mark, .pl-mark svg, .pl-p, .pl-l, .pl-note { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .pl-row, .pl-fill, .pl-mark, .pl-mark svg, .pl-p, .pl-l, .pl-note { transition: none !important; } }
 `;
 
-/** 숫자를 0에서 target 까지 부드럽게 올린다(막대와 같은 길이·곡선). 움직임 줄이기 설정이면 한 프레임에 바로 target. setState 는 rAF 콜백에서만 부른다. */
+/** 숫자를 직전 값에서 target 까지 부드럽게 올리거나 내린다(막대와 같은 길이·곡선). 움직임 줄이기 설정이면 한 프레임에 바로 target. setState 는 rAF 콜백에서만 부른다. */
 function useCountUp(target: number, run: boolean, delay: number): number {
   const [v, setV] = useState(0);
+  const last = useRef(0);
   useEffect(() => {
-    if (!run) return;
+    if (!run) {
+      last.current = 0;
+      return;
+    }
+    const from = last.current;
     const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const dur = reduce ? 1 : 900;
+    const dur = reduce ? 1 : 800;
     const begin = performance.now() + (reduce ? 0 : delay);
     let raf = 0;
     const tick = (now: number) => {
       const t = Math.min(1, Math.max(0, (now - begin) / dur));
-      setV(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      const val = Math.round(from + (target - from) * (1 - Math.pow(1 - t, 3)));
+      last.current = val;
+      setV(val);
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -97,13 +105,13 @@ function Row({ opt, i, pct, done, mine, pending, disabled, onPick }: { opt: Poll
 export function PollOptions({ options, myChoice, counts, pending, onPick, note, ariaLabel }: Props) {
   const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0;
   const done = !!myChoice && !!counts; // 집계가 도착하면 CSS 애니메이션이 0%에서 시작해 차오른다
-  const locked = !!myChoice || !!pending;
+  const locked = !!pending; // 투표한 뒤에도 다른 보기를 눌러 바꿀 수 있다(응답을 기다리는 동안만 잠근다)
   return (
     <>
       <style href="poll-options" precedence="default">{POLL_CSS}</style>
       <div className="pl" role="group" aria-label={ariaLabel ?? '투표'} data-done={done} data-wait={!!pending && !myChoice}>
         {options.map((o, i) => (
-          <Row key={o.key} opt={o} i={i} pct={total > 0 ? Math.round(((counts?.[o.key] ?? 0) / total) * 100) : 0} done={done} mine={myChoice === o.key} pending={pending === o.key && !myChoice} disabled={locked} onPick={() => onPick(o.key)} />
+          <Row key={o.key} opt={o} i={i} pct={total > 0 ? Math.round(((counts?.[o.key] ?? 0) / total) * 100) : 0} done={done} mine={myChoice === o.key} pending={pending === o.key && !myChoice} disabled={locked || myChoice === o.key} onPick={() => onPick(o.key)} />
         ))}
       </div>
       <p className="pl-note" role="status" aria-live="polite">{note}</p>
