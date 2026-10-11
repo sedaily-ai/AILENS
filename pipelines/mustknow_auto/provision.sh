@@ -9,9 +9,10 @@
 # (lens-mustknow-sonnet-5)과 DynamoDB seen 테이블(sedaily-lens-mustknow-seen-dev)은
 # 이 스크립트 밖에서 별도로 생성돼 있다.
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 REGION="us-east-1"
-ACCOUNT_ID="887078546492"
+ACCOUNT_ID="$AWS_ACCOUNT_ID"
 CLUSTER="sedaily-lens-frontpage-auto"  # 재사용, 새로 안 만듦
 FAMILY="sedaily-lens-mustknow-auto"
 

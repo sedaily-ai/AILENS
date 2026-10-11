@@ -4,7 +4,8 @@
 # 되돌리기: 같은 방식으로 PriceClass_100 지정. 다른 설정은 건드리지 않는다.
 # 사용: bash cloudfront-price-class.sh [PriceClass_200]
 set -euo pipefail
-DIST="E1QS7PY350VHF6"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/config/resources.env"
+DIST="$SERVICE_CF_DIST_ID"
 CLASS="${1:-PriceClass_200}"
 TMP="$(mktemp -d)"
 aws cloudfront get-distribution-config --id "$DIST" --output json > "$TMP/cur.json"

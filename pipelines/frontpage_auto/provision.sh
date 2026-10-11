@@ -5,9 +5,10 @@
 # 이미 만들어진 리소스에는 "already exists" 에러가 나므로 최초 셋업 기록용이며,
 # 이미지 갱신 배포는 deploy.sh를 쓴다.
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 REGION="us-east-1"
-ACCOUNT_ID="887078546492"
+ACCOUNT_ID="$AWS_ACCOUNT_ID"
 CLUSTER="sedaily-lens-frontpage-auto"
 REPO="sedaily-lens-frontpage-auto"
 

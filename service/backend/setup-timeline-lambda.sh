@@ -25,6 +25,7 @@
 #   aws lambda delete-function --function-name sedaily-mbti-timeline-dev --region us-east-1
 
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 FUNCTION_NAME="sedaily-mbti-timeline-dev"
 REGION="us-east-1"
@@ -38,7 +39,7 @@ RUNTIME="python3.11"
 TIMEOUT=30
 MEMORY=1024
 # 기존 v1 Lambda 들과 같은 실행 역할. S3 XML 버킷 조회 권한이 이미 있다.
-ROLE_ARN="arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev"
+ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/sedaily-mbti-lambda-execution-dev"
 # 프론트는 POST 만 쓴다.
 # GET 은 로컬 main.py 의 curl 편의용이라 운영에 열지 않는다.
 ROUTE_KEY="POST /api/timeline"
