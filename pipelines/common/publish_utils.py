@@ -149,6 +149,9 @@ def parse_letter_title(raw_md: str) -> str | None:
     for line in lines:
         if line.startswith("[제목]"):
             in_block = True
+            rest = line[len("[제목]"):].strip()  # 운영 프롬프트(2026-10-11 GEO 개정)는 "[제목] 제목 한 줄"처럼 같은 줄에 쓴다
+            if rest:
+                buf.append(rest)
             continue
         if line.startswith("[리드"):  # "[리드]"·"[리드 3~5문장]" 둘 다 매칭
             break
