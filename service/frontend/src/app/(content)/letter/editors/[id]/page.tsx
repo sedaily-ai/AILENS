@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
-import { EditorProfileView, fetchLetterList, findEditor, editorsOfLetter } from '@/features/letter';
+import { LetterListView, fetchLetterList, findEditor } from '@/features/letter';
 
-// 레터 에디터 프로필(목업). 정식 오픈 전까지 noindex.
+// 에디터 주소(/letter/editors/{id})는 레터 목록에서 그 에디터를 고른 화면으로 연다. 정식 오픈 전까지 noindex.
 export const revalidate = 60;
 
 type Params = { id: string };
@@ -14,12 +14,12 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 }
 
 export default async function LetterEditorPage({ params }: { params: Promise<Params> }) {
-  const editor = findEditor((await params).id);
-  if (!editor) notFound();
-  const letters = (await fetchLetterList()).filter((l) => editorsOfLetter(l).some((e) => e.id === editor.id));
+  const id = (await params).id;
+  if (!findEditor(id)) notFound();
+  const letters = await fetchLetterList();
   return (
     <ArticlePageShell activeTab="letter">
-      <EditorProfileView editor={editor} letters={letters} />
+      <LetterListView letters={letters} initialEditorId={id} />
     </ArticlePageShell>
   );
 }
