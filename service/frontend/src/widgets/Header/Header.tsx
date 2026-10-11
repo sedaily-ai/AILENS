@@ -399,7 +399,12 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
               title="전체 메뉴 · 검색"
             >
               {/* 서울경제(sedaily.com)의 "통합검색 & 사이트맵" 아이콘처럼 햄버거 막대와 돋보기를 한 아이콘에 담는다: 누르면 전체 메뉴와 검색이 함께 열린다. */}
-              <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+              {/* 모바일은 오른쪽에 햄버거(탭 드로어)가 따로 있으므로 돋보기만 보여 아이콘이 두 개 겹쳐 보이지 않게 한다. */}
+              <svg className="w-[22px] h-[22px] md:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="M16 16 20.5 20.5" />
+              </svg>
+              <svg className="hidden md:block w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
                 <path d="M3 6.5h9.5M3 12h6M3 17.5h9.5" />
                 <circle cx="16.4" cy="11.6" r="4.1" />
                 <path d="M19.4 14.6 21.5 16.7" />
