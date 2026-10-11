@@ -98,7 +98,8 @@ def generate(article_title: str, subtitle: str, body_text: str, category: str = 
     try:
         out = call_text(_load_prompt(), f"[기사]\n제목: {article_title}\n부제: {subtitle or ''}\n\n[레터 본문]\n{body}", model=MODEL, max_tokens=900)
         cands = extract_json_object(out).get("candidates", [])
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        print(f"[headline] 후보 생성 실패: {e}")
         return None
 
     def verifier(title: str) -> bool:
@@ -107,4 +108,8 @@ def generate(article_title: str, subtitle: str, body_text: str, category: str = 
             return bool(r.get("ok"))
         except Exception:  # noqa: BLE001
             return False
-    return pick(cands, f"{body} {article_title} {subtitle or ''}", article_title, used_types, verifier)
+    picked = pick(cands, f"{body} {article_title} {subtitle or ''}", article_title, used_types, verifier)
+    if not picked:
+        why = [f"{c.get('title')} → {'; '.join(problems(str(c.get('title') or ''), f'{body} {article_title} {subtitle or chr(0)}', article_title)) or '사실 확인 탈락'}" for c in cands]
+        print("[headline] 통과 후보 없음 — " + " | ".join(why))
+    return picked
