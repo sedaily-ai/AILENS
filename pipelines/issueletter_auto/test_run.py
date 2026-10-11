@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import core
 import run
 
-ARTS = [{"key": str(i), "title": f"라네즈 소식 {i}", "content": f"인도법인 매출은 176억 원, 265억 원이다. 필리핀은 73억 원. 기사{i}", "date": "2026-10-09"} for i in range(1, 5)]
+ARTS = [{"key": str(i), "title": f"라네즈 소식 {i}", "content": f"인도법인 매출은 176억 원, 265억 원이다. 인도 시장 비중이 크다. 필리핀은 73억 원. 기사{i}", "date": "2026-10-09"} for i in range(1, 5)]
 EDITORS = [{"slug": "mincheol", "name": "민철", "role": "전략", "topic_names": ["글로벌 리밸런싱", "인도"]}, {"slug": "soyul", "name": "소율", "role": "트렌드", "topic_names": ["소비"]}]
 
 

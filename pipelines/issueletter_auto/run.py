@@ -292,8 +292,14 @@ def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:
     articles = fetch_recent_articles()
     log("articles", n=len(articles))
     clusters = pick_clusters(articles, used)
+    c4, ed = api("GET", "/api/v2/issue-letters/editors", public=True)
+    editor_list = ed.get("editors", []) if c4 == 200 else []
+    if editor_list:  # 담당 에디터를 정할 수 없는 소재는 초안을 쓰기 전에 거른다(토큰 낭비 방지)
+        covered = [c for c in clusters if core.editor_covered(c, editor_list)]
+        log("clusters_editor_filter", before=len(clusters), after=len(covered), dropped=[c.get("keyword") or c.get("topic") for c in clusters if c not in covered])
+        clusters = covered
     if not clusters:
-        return {**result, "stopped": "이슈 묶음 없음"}
+        return {**result, "stopped": "이슈 묶음 없음(담당 에디터 분야와 겹치는 소재 없음 포함)"}
     last: Dict[str, Any] = {}
     for cluster in clusters[:MAX_CLUSTERS_TRIED]:
         out = _run_cluster(cluster, result, live)
