@@ -1,8 +1,8 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { EDITORS } from '../data/editors';
-import { EditorAvatar } from './EditorAvatar';
+import { EDITORS } from '../../data/editors';
+import { EditorAvatar } from '../EditorAvatar';
 
 /** 레터 탭의 에디터 선택줄. 원형 프로필 아래 이름·역할만 두는 단순한 형태(요즘IT·Substack 류)이고, 선택하면 프로필에 짙은 테두리가 둘러진다. */
 export function EditorTabs({ selected, onSelect }: { selected: string | null; onSelect: (id: string | null) => void }) {

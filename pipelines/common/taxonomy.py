@@ -1,4 +1,4 @@
-"""AI LENS 분류 체계(대분류 9개·하위 분류) — 발행(publish_utils)과 재분류 시험 실행(scripts/reclassify_dryrun.py)이 같이 쓴다.
+"""AI LENS 분류 체계(대분류 9개·하위 분류) — 발행(publishing)과 재분류 시험 실행(scripts/reclassify_dryrun.py)이 같이 쓴다.
 
 2026-10-09 분류 개편: 시그널·부동산·경제·금융·산업·정치·사회·국제·문화. 결정·근거는 docs/product/분류체계/README.md.
 이 표는 service/frontend/src/shared/constants/econCategories.ts·econSubcategories.ts, service/lens-cms-api/admin_posts_repo.py(_NEW_CATEGORIES)와 같은 값이다(프론트·서버와 의도적 복제).

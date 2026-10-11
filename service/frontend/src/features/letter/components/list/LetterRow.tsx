@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { editorsOfLetter } from '../data/editors';
-import type { IssueLetter } from '../data/letterTypes';
-import { EditorAvatar } from './EditorAvatar';
+import { editorsOfLetter } from '../../data/editors';
+import type { IssueLetter } from '../../data/letterTypes';
+import { EditorAvatar } from '../EditorAvatar';
 import { formatLetterDate } from './LetterCard';
 
 /** 목록의 한 줄. 카드 대신 구분선으로 나눈 읽기 쉬운 행 — 메타(분류·에디터·날짜) → 제목 → 요약 → 3축·주제·기사 수. */

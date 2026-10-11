@@ -1,4 +1,4 @@
-import publish_utils as pu
+import publishing as pu
 
 
 def test_parse_letter_title_accepts_same_line_and_next_line_forms():

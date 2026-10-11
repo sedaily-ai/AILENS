@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { editorsOfLetter } from '../data/editors';
-import type { IssueLetter } from '../data/letterTypes';
-import { EditorAvatar } from './EditorAvatar';
-import { formatLetterDate } from './LetterCard';
+import { editorsOfLetter } from '../../data/editors';
+import type { IssueLetter } from '../../data/letterTypes';
+import { EditorAvatar } from '../EditorAvatar';
+import { formatLetterDate } from '../list/LetterCard';
 
 /** 같은 주제를 가진 다른 레터(겹치는 주제 수가 많은 순, 같으면 최신순). 겹치는 주제가 없으면 아무것도 그리지 않는다. 이유는 겹친 주제 이름만 말한다. */
 export function relatedOf(current: IssueLetter, all: IssueLetter[], limit = 3): { letter: IssueLetter; shared: string[] }[] {

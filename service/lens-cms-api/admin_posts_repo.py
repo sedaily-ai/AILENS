@@ -378,7 +378,7 @@ def _update_lens_bundle_slice(
         # 2026-09-20 — 이 스코프 저장 경로가 images만 바꾸고 pending은 건드리지
         # 않아서, 실제로 컷 이미지를 저장해도 사이트엔 "준비 중"으로 계속 떴다
         # (실사용 백필 중 실측 발견 — 이미지 8장 저장 후 재조회해도 pending
-        # True 그대로). publish_utils.py의 자동 파이프라인 경로는 애초에
+        # True 그대로). publishing.py의 자동 파이프라인 경로는 애초에
         # "pending": not webtoon_images로 매번 새로 계산해서 이 문제가 없었다
         # — 여기도 같은 규칙을 적용한다.
         item["pending"] = not item["images"]
@@ -582,7 +582,7 @@ def soft_delete_empty_by_slugs(slugs: List[str], dry_run: bool = True) -> Dict[s
         return {"dry_run": False, "deleted": cur.rowcount, "posts": matched}
 
 
-# 분류 개편(2026-10-09) 대분류 9개. service/frontend/src/shared/constants/econCategories.ts·pipelines/common/publish_utils.py와 같은 값이다(의도적 복제).
+# 분류 개편(2026-10-09) 대분류 9개. service/frontend/src/shared/constants/econCategories.ts·pipelines/common/publishing.py와 같은 값이다(의도적 복제).
 _NEW_CATEGORIES = {"시그널", "부동산", "경제", "금융", "산업", "정치", "사회", "국제", "문화"}
 
 

@@ -8,7 +8,7 @@ DB·CMS는 읽지도 쓰지도 않는다. 입력은 검색용 목록(/api/search
   python3 scripts/reclassify_dryrun.py --input <search-index.json> --out <출력 폴더>
 
 분류표는 docs/product/분류체계/README.md · service/frontend/src/shared/constants/menuTaxonomy.ts 와 같다.
-Bedrock은 publish_utils.display_subcategory 와 같은 application inference profile(비용 태그가 붙는 경로)로 호출한다.
+Bedrock은 publishing.display_subcategory 와 같은 application inference profile(비용 태그가 붙는 경로)로 호출한다.
 """
 import argparse
 import csv

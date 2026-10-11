@@ -28,7 +28,7 @@ for p in (ROOT / "common", ROOT):
 import requests  # noqa: E402
 
 import lens_cms_client as cms  # noqa: E402
-import publish_utils as pu  # noqa: E402
+import publishing as pu  # noqa: E402
 
 APPLY = "--apply" in sys.argv
 BACKUP_DIR = HERE / "repair_backup"

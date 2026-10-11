@@ -24,7 +24,7 @@ import requests  # noqa: E402
 
 import compose_text  # noqa: E402
 import lens_cms_client as cms  # noqa: E402
-import publish_utils as pu  # noqa: E402
+import publishing as pu  # noqa: E402
 import rekognition_people  # noqa: E402
 
 APPLY = "--apply" in sys.argv

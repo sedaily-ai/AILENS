@@ -255,7 +255,7 @@ def main() -> None:
         f"engine={settings['engine']}, format={settings['format']})"
     )
     # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+provider가 elevenlabs면 ELEVENLABS_*)을
-    # 만든다. publish_utils.py::generate_video()와 이 로직을 공유한다(video_settings.py 모듈 docstring 참고).
+    # 만든다. publishing.py::generate_video()와 이 로직을 공유한다(video_settings.py 모듈 docstring 참고).
     #
     # 단일 Fargate 컨테이너 렌더는 코어 수 한계를 못 벗어나므로 Remotion Lambda(render:lambda)로 렌더한다.
     # 계약(work_dir/video.mp4가 로컬에 생성됨)은 로컬 렌더와 같아 이후 썸네일 생성·S3 업로드는 그대로다.

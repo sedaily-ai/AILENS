@@ -1,4 +1,4 @@
-import { AXIS_META } from '../data/letterTypes';
+import { AXIS_META } from '../../data/letterTypes';
 
 /** "모든 에디터" 보기의 오른쪽 안내: 모아쓰기 레터가 무엇인지(3가지 관점)를 한눈에 보여 준다. */
 export function AllSide() {

@@ -32,7 +32,7 @@ N_CUTS = 8
 
 # 컷 이미지를 동시에 몇 장까지 생성할지. 컷끼리는 서로의 그림을 참조하지 않고(기사 단위 seed만 공유)
 # 이미지 API 대기가 대부분이라 동시에 돌리면 컷 수만큼 걸리던 시간이 크게 준다. 이미지 API 동시 호출
-# 한도를 고려해 4로 둔다. PUBLISH_PARALLEL=0(common/publish_utils.py)이면 예전처럼 한 장씩 만든다.
+# 한도를 고려해 4로 둔다. PUBLISH_PARALLEL=0(common/publishing.py)이면 예전처럼 한 장씩 만든다.
 _CUT_WORKERS = 1 if os.environ.get("PUBLISH_PARALLEL", "1") == "0" else 4
 
 # compose_text.compose()는 글자 크기·말풍선 스타일을 모듈 전역 변수에 잠시 바꿔 넣고 그리므로
@@ -277,7 +277,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     """기사 1건 → 8컷 웹툰 전체 파이프라인. name은 출력 폴더명.
 
     manage_gpu는 호출 호환용으로 남긴 인자이며 현재 어떤 분기도 타지 않는다(GPU 기동 로직은 삭제됨).
-    frontpage_auto/mustknow_auto와 publish_utils가 여전히 이 인자를 넘긴다."""
+    frontpage_auto/mustknow_auto와 publishing가 여전히 이 인자를 넘긴다."""
     out = output_root / name
     out.mkdir(parents=True, exist_ok=True)
     article = Path(article_path).read_text(encoding="utf-8")

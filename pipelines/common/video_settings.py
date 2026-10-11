@@ -8,7 +8,7 @@ render.ts의 `--format vertical|horizontal`이다.
 
 실제 영상 TTS는 Node(pipelines/video/src/lib/tts.ts)가 수행하므로, get_render_env()가 설정을
 `npm run render` 서브프로세스의 환경변수(TTS_*/ELEVENLABS_*)로 변환한다. render_from_script.py와
-publish_utils.py::generate_video()가 이 함수 하나를 공유해 환경변수 조립이 어긋나지 않게 한다.
+publishing.py::generate_video()가 이 함수 하나를 공유해 환경변수 조립이 어긋나지 않게 한다.
 """
 import os
 import re
@@ -147,7 +147,7 @@ def _load_prompt_doc() -> dict:
 
 
 def get_render_settings(override: dict | None = None) -> dict:
-    """렌더(render_from_script.py, publish_utils.py::generate_video)가 지금 써야 할 설정을
+    """렌더(render_from_script.py, publishing.py::generate_video)가 지금 써야 할 설정을
     캐시 없이 매번 조회한다(CMS에서 저장하면 재배포 없이 다음 렌더부터 반영).
 
     반환: provider, voice, engine, format, rate, volume, elevenlabs_voice, elevenlabs_model,

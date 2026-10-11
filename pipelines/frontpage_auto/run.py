@@ -27,13 +27,13 @@ sys.path.insert(0, str(_ROOT / "video"))
 
 import boto3
 # mustknow_auto/run.py와 공유하는 발행 헬퍼(4포맷 생성+업로드+발행 본체 포함).
-import publish_utils
+import publishing
 from config import AWS_REGION
 
-discovery = publish_utils.load_module("frontpage_auto_discovery", _ROOT / "discovery" / "pipeline.py")
-_letters_mod = publish_utils.load_module("frontpage_auto_letters", _ROOT / "letters" / "pipeline.py")
-_podcast_mod = publish_utils.load_module("frontpage_auto_podcast", _ROOT / "podcast" / "pipeline.py")
-_webtoon_mod = publish_utils.load_module("frontpage_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
+discovery = publishing.load_module("frontpage_auto_discovery", _ROOT / "discovery" / "pipeline.py")
+_letters_mod = publishing.load_module("frontpage_auto_letters", _ROOT / "letters" / "pipeline.py")
+_podcast_mod = publishing.load_module("frontpage_auto_podcast", _ROOT / "podcast" / "pipeline.py")
+_webtoon_mod = publishing.load_module("frontpage_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
 
 REGION = AWS_REGION
 
@@ -41,17 +41,17 @@ REGION = AWS_REGION
 def process_article(article: dict, out_dir: Path, s3, today_kst: str) -> str:
     """반환값: "published" | "published_no_video" | "skipped_duplicate" | "failed"
 
-    4포맷 생성·업로드·발행은 publish_utils.publish_article()이 맡고,
+    4포맷 생성·업로드·발행은 publishing.publish_article()이 맡고,
     여기서는 source_url 유효성, 중복 확인, 이름 폴백만 처리한다."""
     source_url = article["url"]
     if not source_url:
         return "failed"
-    if publish_utils.already_published(source_url):
+    if publishing.already_published(source_url):
         print(f"[frontpage-auto] 이미 발행됨, 스킵 — {article['title']}")
         return "skipped_duplicate"
 
-    name = article["key"] or publish_utils.slugify("", article["title"])
-    return publish_utils.publish_article(
+    name = article["key"] or publishing.slugify("", article["title"])
+    return publishing.publish_article(
         article, out_dir, s3, today_kst,
         name=name, source_url=source_url,
         paper_section="전체", display_order=article["_display_order"],
@@ -63,7 +63,7 @@ def process_article(article: dict, out_dir: Path, s3, today_kst: str) -> str:
 def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
-    revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="frontpage-auto")
+    revalidate_secret = publishing.get_revalidate_secret(session, log_prefix="frontpage-auto")
 
     today = datetime.now(KST).strftime("%Y%m%d")
     candidates = discovery.fetch_front_page(today)
@@ -86,7 +86,7 @@ def main():
         # 뒤따르는 기사의 영상 생성(수 분)이 끝날 때까지 프런트 SSR 캐시(300s)가
         # 갱신되지 않아 이미 발행된 글이 "이슈를 찾을 수 없어요"로 보인다.
         if status in ("published", "published_no_video") and revalidate_secret:
-            publish_utils.notify_revalidate(revalidate_secret, log_prefix="frontpage-auto")
+            publishing.notify_revalidate(revalidate_secret, log_prefix="frontpage-auto")
 
     print(f"[frontpage-auto] 완료 — {json.dumps(results, ensure_ascii=False)}")
 

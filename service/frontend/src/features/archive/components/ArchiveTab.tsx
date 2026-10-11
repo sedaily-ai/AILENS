@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { ArchivedSentence, MbtiArticle, TabType } from "@/shared/types/mbti";
-import { isSameDay } from "@/shared/utils/dateUtils";
+import { isSameDay } from "@/shared/lib/date/calendar";
 import { useAuth } from "@/entities/user";
 import {
   listArchiveSentences,

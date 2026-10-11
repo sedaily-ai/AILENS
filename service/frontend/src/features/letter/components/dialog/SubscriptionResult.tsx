@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { confirmSubscription, unsubscribeByToken } from '../data/interestApi';
-import { LETTER_CSS } from './letterStyles';
+import { confirmSubscription, unsubscribeByToken } from '../../data/interestApi';
+import { LETTER_CSS } from '../letterStyles';
 
 const COPY = {
   confirm: { run: confirmSubscription, ok: ['신청이 완료됐어요', '선택한 관심사와 겹치는 레터를 메일로 보내 드릴게요. 모든 메일에서 수신거부할 수 있어요.'], busy: '확인하는 중…' },

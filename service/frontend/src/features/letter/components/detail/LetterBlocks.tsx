@@ -1,6 +1,6 @@
 'use client';
 
-import type { LetterBlock } from '../data/letterTypes';
+import type { LetterBlock } from '../../data/letterTypes';
 
 /** 레터 본문 안의 시각 블록(타임라인·숫자 카드·막대 비교·양측 카드·접기·강조 박스). 색은 섹션 축 색(tone) 하나만 쓴다. */
 export function LetterBlockView({ block, tone }: { block: LetterBlock; tone: string }) {

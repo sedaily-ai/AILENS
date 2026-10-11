@@ -3,22 +3,22 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { AXIS_META, asBlock, type IssueLetter, type LetterSegment, type LetterSource } from '../data/letterTypes';
+import { AXIS_META, asBlock, type IssueLetter, type LetterSegment, type LetterSource } from '../../data/letterTypes';
 import { LetterBlockView } from './LetterBlocks';
-import { AxisBadge } from './AxisBadge';
-import { editorsOfLetter } from '../data/editors';
-import { EditorAvatar } from './EditorAvatar';
+import { AxisBadge } from '../AxisBadge';
+import { editorsOfLetter } from '../../data/editors';
+import { EditorAvatar } from '../EditorAvatar';
 import { LetterToc } from './LetterToc';
 import { RelatedLetters, relatedOf } from './RelatedLetters';
 import { ReadingTools } from './ReadingTools';
-import { SubscribeDialog } from './SubscribeDialog';
-import { unionInterests } from '../data/editors';
+import { SubscribeDialog } from '../dialog/SubscribeDialog';
+import { unionInterests } from '../../data/editors';
 import { TermTooltip } from '@/shared/ui/notice/TermTooltip';
-import { splitByGlossary } from '../data/glossary';
-import { formatLetterDate } from './LetterCard';
+import { splitByGlossary } from '../../data/glossary';
+import { formatLetterDate } from '../list/LetterCard';
 import { LetterVote } from './LetterVote';
 import { SourcesPanel } from './SourcesPanel';
-import { LETTER_CSS } from './letterStyles';
+import { LETTER_CSS } from '../letterStyles';
 
 /** 주소 비교용: 쿼리·해시·끝 슬래시를 떼고 소문자로. 서울경제 기사는 번호가 같으면 같은 기사로 본다. */
 function articleKey(href: string): string {

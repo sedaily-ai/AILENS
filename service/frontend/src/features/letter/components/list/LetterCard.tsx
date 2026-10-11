@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { AxisBadge } from './AxisBadge';
-import { editorsOfLetter } from '../data/editors';
-import { AXIS_META, type IssueLetter } from '../data/letterTypes';
-import { EditorAvatar } from './EditorAvatar';
+import { AxisBadge } from '../AxisBadge';
+import { editorsOfLetter } from '../../data/editors';
+import { AXIS_META, type IssueLetter } from '../../data/letterTypes';
+import { EditorAvatar } from '../EditorAvatar';
 
 /** "2026-10-09" 또는 "2026-10-09T20:48" → "2026.10.09" / "2026.10.09 20:48". */
 export function formatLetterDate(iso: string): string {

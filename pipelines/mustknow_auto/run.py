@@ -10,8 +10,8 @@ select_general_articles()가 최대 20건 선정) 순서로 발행한다. 채점
 배치의 기사는 seen에 남기지 않아 다음 회차에 재시도한다.
 
 frontpage_auto(지면 1면, 1일 1회)와는 독립이며, 발행 직전
-`publish_utils.already_published()`로 이미 발행된 기사를 확인해 중복을 막는다.
-`_publish()`는 4포맷 생성·업로드·발행 본체인 `publish_utils.publish_article()`에 위임하는
+`publishing.already_published()`로 이미 발행된 기사를 확인해 중복을 막는다.
+`_publish()`는 4포맷 생성·업로드·발행 본체인 `publishing.publish_article()`에 위임하는
 얇은 래퍼이다(frontpage_auto/run.py도 같은 함수를 쓴다).
 
 영상 생성이 실패하면 해당 기사는 영상 없이 발행하고 `needs_video: true`로 표시한다.
@@ -38,17 +38,17 @@ import boto3
 import ddb_prompt
 import classify
 # frontpage_auto/run.py와 공유하는 발행 헬퍼(4포맷 생성·업로드·발행 본체 포함).
-import publish_utils
+import publishing
 import lens_cms_client
 from config import AWS_REGION
 
-discovery = publish_utils.load_module("mustknow_auto_discovery", _ROOT / "discovery" / "pipeline.py")
-_letters_mod = publish_utils.load_module("mustknow_auto_letters", _ROOT / "letters" / "pipeline.py")
-_podcast_mod = publish_utils.load_module("mustknow_auto_podcast", _ROOT / "podcast" / "pipeline.py")
-_webtoon_mod = publish_utils.load_module("mustknow_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
+discovery = publishing.load_module("mustknow_auto_discovery", _ROOT / "discovery" / "pipeline.py")
+_letters_mod = publishing.load_module("mustknow_auto_letters", _ROOT / "letters" / "pipeline.py")
+_podcast_mod = publishing.load_module("mustknow_auto_podcast", _ROOT / "podcast" / "pipeline.py")
+_webtoon_mod = publishing.load_module("mustknow_auto_webtoon", _ROOT / "webtoon" / "pipeline.py")
 
 REGION = AWS_REGION
-# 글 발행은 publish_utils.publish_article()이 lens-cms-api(Postgres)로 처리한다.
+# 글 발행은 publishing.publish_article()이 lens-cms-api(Postgres)로 처리한다.
 # seen 테이블은 후보를 이미 봤는지만 추적하는 내부 캐시이며 DynamoDB를 쓴다.
 SEEN_TABLE = "sedaily-lens-mustknow-seen-dev"
 
@@ -217,8 +217,8 @@ def _publish(
     """반환값: "published" | "published_no_video" | "failed"
 
     발행 여부 판단(중복 확인·선정)은 호출부 책임이며 여기서는 하지 않는다.
-    manage_gpu는 publish_utils.publish_article()에 그대로 전달된다."""
-    return publish_utils.publish_article(
+    manage_gpu는 publishing.publish_article()에 그대로 전달된다."""
+    return publishing.publish_article(
         article, out_dir, s3, today_kst,
         name=article["key"], source_url=article["url"],
         paper_section=paper_section, display_order=display_order,
@@ -233,7 +233,7 @@ def main():
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
     seen_table = _open_seen_table(session)
-    revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
+    revalidate_secret = publishing.get_revalidate_secret(session, log_prefix="mustknow-auto")
 
     today = datetime.now(KST).strftime("%Y%m%d")
     # 일요일은 지면(인쇄판)이 나오지 않는다. 4탭은 "오늘의 지면"을 옮기는 기능이므로
@@ -275,7 +275,7 @@ def main():
         if limit and (results["published"] + results["published_no_video"] + results["degraded_no_webtoon"]) >= limit:
             print(f"[mustknow-auto] MUSTKNOW_MAX_PUBLISH={limit} 도달 — 종료 {json.dumps(results, ensure_ascii=False)}")
             sys.exit(0)
-        if publish_utils.already_published(article["url"]):
+        if publishing.already_published(article["url"]):
             print(f"[mustknow-auto] frontpage_auto 등에 이미 발행됨, 스킵 — {article['title']}")
             results["skipped_duplicate"] += 1
             return "skipped_duplicate"
@@ -289,7 +289,7 @@ def main():
         # 생성(수 분) 동안 프런트 SSR 캐시(300s)가 갱신되지 않아 이미 발행된 글이
         # "이슈를 찾을 수 없어요"로 보인다.
         if status in ("published", "published_no_video") and revalidate_secret:
-            publish_utils.notify_revalidate(revalidate_secret, log_prefix="mustknow-auto")
+            publishing.notify_revalidate(revalidate_secret, log_prefix="mustknow-auto")
         return status
 
     # 1) 전체(지면1면) — 점수 불필요, discovery가 정렬한 TOP 배치 순서를 따른다.
@@ -419,7 +419,7 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
     session = boto3.Session(region_name=REGION)
     s3 = session.client("s3")
     seen_table = _open_seen_table(session)
-    revalidate_secret = publish_utils.get_revalidate_secret(session, log_prefix="mustknow-auto")
+    revalidate_secret = publishing.get_revalidate_secret(session, log_prefix="mustknow-auto")
     out_dir = Path("/tmp/mustknow_auto_out")
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -441,7 +441,7 @@ def manual_backfill(source_ymd: str, target_ymd: str, tab: str, keys: list[str])
             published += 1
             # _try_publish()와 같은 이유로 기사 단위로 즉시 무효화한다.
             if revalidate_secret:
-                publish_utils.notify_revalidate(revalidate_secret, log_prefix="mustknow-auto")
+                publishing.notify_revalidate(revalidate_secret, log_prefix="mustknow-auto")
 
     print(f"[mustknow-auto][manual] 완료 — {published}/{len(keys)}건 {tab} 탭에 발행")
 

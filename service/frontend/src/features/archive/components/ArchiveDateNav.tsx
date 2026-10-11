@@ -1,5 +1,5 @@
 import type { ArchivedSentence } from '@/shared/types/mbti';
-import { getWeekDays, isSameDay } from '@/shared/utils/dateUtils';
+import { getWeekDays, isSameDay } from '@/shared/lib/date/calendar';
 
 // ── 날짜 네비 ── 문장이 있을 때만 보이는 상단 sticky 주간 스트립. archiveDate/archivedSentences 외에는 의존하지 않는 독립 컴포넌트이다.
 export function ArchiveDateNav({

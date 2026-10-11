@@ -68,7 +68,7 @@ function clampElevenLabsVoiceSettings(): ElevenLabsVoiceSettings {
 //
 // ElevenLabs도 발행 설정으로 고를 수 있다. 호출부는 pipelines/common/elevenlabs_tts.py(Python)의
 // REST 호출과 의도적으로 같은 모양이다(엔드포인트, 요청 바디 text/model_id/voice_settings, 헤더 xi-api-key).
-// API 키는 Python 쪽(render_from_script.py/publish_utils.py)이 Secrets Manager에서 읽어
+// API 키는 Python 쪽(render_from_script.py/publishing.py)이 Secrets Manager에서 읽어
 // ELEVENLABS_API_KEY 환경변수로 넘긴다. Node가 AWS SDK로 시크릿을 직접 읽으면 새 npm 의존성이 필요해서다.
 export const DEFAULT_VOICE: TtsVoiceConfig = {
   provider: (process.env.TTS_PROVIDER as TtsProvider) ?? 'polly',
