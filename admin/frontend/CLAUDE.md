@@ -12,7 +12,7 @@ read that first for any cross-cutting changes.
 
 ## Stack
 
-Next.js 16.2.4 + React 19.2.4 + Tailwind v4 + TS, separate `package.json` and lockfile from `service/frontend/`. Static export (`output: "export"` in `next.config.ts`).
+Next.js 16.3.8 + React 19.2.4 + Tailwind v4 + TS, separate `package.json` and lockfile from `service/frontend/`. Static export (`output: "export"` in `next.config.ts`).
 
 Build outputs **25 routes** under `out/` (2026-09-04 재확인 — 이전엔 13개로
 문서화돼 있었는데 home-player/lens(+edit)/podcast/quiz(+edit)/video(+edit)/
