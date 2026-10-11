@@ -11,13 +11,14 @@
 #   - AWS CLI default region 무관 (각 명령에 --region 명시)
 #   - aws sts get-caller-identity 로 credential 유효 확인 권장
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-S3_BUCKET="sedaily-mbti-admin-frontend-dev"
+S3_BUCKET="$ADMIN_S3_BUCKET"
 S3_REGION="us-east-1"
-CF_DIST_ID="E1MITYI58DB9UW"
+CF_DIST_ID="$ADMIN_CF_DIST_ID"
 
 echo "=== admin 빌드 ==="
 npm run build

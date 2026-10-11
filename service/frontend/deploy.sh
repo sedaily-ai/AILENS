@@ -25,6 +25,7 @@
 #   - output: "standalone" (next.config.ts) → .next/standalone/ 생성,
 #     Dockerfile이 이걸 그대로 컨테이너 이미지에 담는다.
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 WAIT=1
 [ "${1:-}" = "--no-wait" ] && WAIT=0
@@ -38,7 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 REGION="us-east-1"
-ACCOUNT_ID="887078546492"
+ACCOUNT_ID="$AWS_ACCOUNT_ID"
 REPO="sedaily-lens-frontend"
 CLUSTER="sedaily-lens-frontend"
 ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
@@ -88,7 +89,7 @@ lap "롤링 안정화 대기"
 # CloudFront 캐시 무효화(2026-10-01) — 배포 직후 옛 빌드의 HTML·RSC 페이로드가 캐시에 남아(실측: /start RSC가 12시간 전 것) 옛 폰트 참조 등이
 # 계속 내려갔다. 경로 "/*"는 1경로로 계산되어 월 1,000경로까지 무료다. 실패해도 배포 자체는 성공이므로 경고만 낸다.
 # (이미지 변환 캐시도 같이 비워져 배포 직후 첫 요청은 다시 변환된다 — 서버 디스크 캐시와 CloudFront가 곧 다시 채운다.)
-CF_DIST_ID="E1QS7PY350VHF6"
+CF_DIST_ID="$SERVICE_CF_DIST_ID"
 echo ""
 echo "=== CloudFront 캐시 무효화 ==="
 aws cloudfront create-invalidation --distribution-id "$CF_DIST_ID" --paths "/*" --query 'Invalidation.[Id,Status]' --output text \
