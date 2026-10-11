@@ -138,3 +138,22 @@ def test_sanitize_keeps_spaces_around_link_segments():
     d = {"title": "t", "summary": [], "editor_note": "e", "sections": [{"heading": "h", "key_line": "k", "paragraphs": [["기록했다고 ", {"text": "링크", "href": "https://x/1"}, " 8일 공시했어요."]]}]}
     core.sanitize_draft(d)
     assert d["sections"][0]["paragraphs"][0][0] == "기록했다고 " and d["sections"][0]["paragraphs"][0][2] == " 8일 공시했어요."
+
+
+def test_fit_blocks_truncates_labels_and_drops_overlong_text_blocks():
+    long_label = "가" * 40
+    d = {"sections": [{"paragraphs": [
+        [{"block": "versus", "left": {"label": long_label, "text": "a"}, "right": {"label": "b", "text": "b"}}],
+        [{"block": "callout", "text": "나" * 500}],
+        [{"block": "timeline", "items": [{"label": "d%d" % i, "text": "t"} for i in range(10)]}]]}]}
+    changed = core.fit_blocks(d)
+    paras = d["sections"][0]["paragraphs"]
+    assert changed == 3 and len(paras) == 2
+    assert len(paras[0][0]["left"]["label"]) == 30 and len(paras[1][0]["items"]) == 8
+
+
+def test_trim_to_max_removes_longest_plain_paragraphs_but_keeps_links_and_one_per_section():
+    d = {"sections": [{"paragraphs": [["가" * 1500], ["나" * 1400], [{"text": "링크", "href": "https://x/1"}, "다" * 800]]}, {"paragraphs": [["라" * 200]]}]}
+    removed = core.trim_to_max(d)
+    assert removed >= 1 and core.body_chars(d) <= core.BODY_MAX_CHARS
+    assert len(d["sections"][1]["paragraphs"]) == 1 and any(isinstance(x, dict) for p in d["sections"][0]["paragraphs"] for x in p)

@@ -161,6 +161,7 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             continue
         core.strip_key_line_prefix(draft)
         core.sanitize_draft(draft)
+        core.fit_blocks(draft)
         n_dropped = core.drop_advice(draft) + core.drop_unsupported(draft, sources_text)
         if n_dropped:
             log("advice_sentences_dropped", n=n_dropped)
@@ -169,6 +170,9 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             feedback = "묶음 밖 주소를 링크했습니다: " + ", ".join(outside)
             log("draft_outside_links", attempt=attempt, urls=outside)
             continue
+        trimmed = core.trim_to_max(draft)
+        if trimmed:
+            log("paragraphs_trimmed", n=trimmed)
         too_long_short = core.length_problem(draft)
         if too_long_short:
             feedback = too_long_short

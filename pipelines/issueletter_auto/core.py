@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -17,7 +18,7 @@ SENSITIVE_WORDS = ("대통령", "여당", "야당", "국민의힘", "민주당",
 # 자동 발행 경로에서는 더 넓게 막는다. 걸리면 그 인용을 빼고 사실만 쓰도록 다시 쓴다.
 # 단 "순매도·순매수·매도세·매수세·매도 물량" 같은 시장 동향 보도어는 사실 서술이라 허용한다(허용어를 먼저 지운 뒤 검사한다).
 ALLOWED_MARKET_TERMS = ("순매도", "순매수", "매도세", "매수세", "매도 물량", "매수 물량", "매도 압력", "매수 주체", "매도 주체", "공매도", "매도 우위", "매수 우위", "매수 전환", "매도 전환")
-ADVICE_PATTERNS = ("매수", "매도", "대응해야", "대응하는", "사야", "팔아야", "담아야", "비중 확대", "비중 축소", "비중을 늘", "비중을 줄", "진입해야", "분할", "추천", "유망", "저점", "바닥", "지금이 기회", "투자 기회", "매수 기회")
+ADVICE_PATTERNS = ("매수", "매도", "대응해야", "사야", "팔아야", "담아야", "비중 확대", "비중 축소", "비중을 늘", "비중을 줄", "진입해야", "분할", "추천", "유망", "저점", "바닥", "지금이 기회", "투자 기회", "매수 기회")
 URL_RE = re.compile(r"https?://[^\s\"')\]]+")
 NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
@@ -127,6 +128,24 @@ def body_chars(draft: Dict[str, Any]) -> int:
         for para in sec.get("paragraphs") or []:
             n += len(para_text(para))
     return n
+
+
+def trim_to_max(draft: Dict[str, Any]) -> int:
+    """본문이 상한(BODY_MAX_CHARS)을 넘으면 코드가 줄인다(재생성 금지). 링크가 없는 문단 중 가장 긴 것부터, 섹션마다 문단이 1개 이상 남는 범위에서 뺀다. 뺀 문단 수를 돌려준다."""
+    removed = 0
+    while body_chars(draft) > BODY_MAX_CHARS:
+        cands = []
+        for si, sec in enumerate(draft.get("sections") or []):
+            paras = sec.get("paragraphs") or []
+            plain = [pi for pi, para in enumerate(paras) if not any(isinstance(x, dict) and ("href" in x or "block" in x) for x in para)]
+            if len(paras) - 1 >= 1:
+                cands += [(len(para_text(paras[pi])), si, pi) for pi in plain]
+        if not cands:
+            break
+        _, si, pi = max(cands)
+        del draft["sections"][si]["paragraphs"][pi]
+        removed += 1
+    return removed
 
 
 def length_problem(draft: Dict[str, Any]) -> str:
@@ -370,6 +389,10 @@ def _has_advice(text: str) -> bool:
 def drop_sentences(draft: Dict[str, Any], bad) -> int:
     """bad(text) 가 참인 문장을 코드가 직접 뺀다(재생성은 토큰 낭비). 문단 안의 문자열 조각은 문장 단위로, 시각 블록은 통째로 뺀다. 뺀 개수를 돌려준다."""
     dropped = 0
+    summary = [x for x in draft.get("summary") or [] if not bad(str(x))]
+    if len(summary) >= 2 and len(summary) < len(draft.get("summary") or []):  # 1분 요약은 2줄 이상 남을 때만 줄인다(아니면 발행 규칙이 거른다)
+        dropped += len(draft["summary"]) - len(summary)
+        draft["summary"] = summary
     for sec in draft.get("sections") or []:
         paras = []
         for para in sec.get("paragraphs") or []:
@@ -426,6 +449,62 @@ def drop_unsupported(draft: Dict[str, Any], source_texts: Iterable[str]) -> int:
     for t in source_texts:
         source_nums |= numbers_in(t)
     return drop_sentences(draft, lambda text: bool(numbers_in(text) - source_nums))
+
+
+# 서버 저장 검증(issue_letters_repo._normalize_block)과 같은 한도. 넘치면 저장이 거부되어 재생성이 필요하므로 코드가 먼저 맞춘다.
+_BLOCK_LIMITS = {
+    "timeline": {"max_items": 8, "label": 30, "text": 300},
+    "stats": {"max_items": 4, "label": 40, "value": 20, "sub": 80},
+    "bars": {"max_items": 6, "label": 20, "title": 60, "unit": 10},
+    "versus": {"label": 30, "text": 300},
+    "fold": {"title": 80, "text": 1200},
+    "callout": {"text": 400},
+}
+
+
+def _fit(value: Any, limit: int, soft: bool) -> Optional[str]:
+    """soft(제목·라벨류)는 한도에서 잘라 …을 붙이고, 문장(text)류는 자르면 뜻이 바뀌므로 None(블록 폐기)."""
+    v = str(value or "").strip()
+    if len(v) <= limit:
+        return v
+    return v[: limit - 1].rstrip() + "…" if soft else None
+
+
+def fit_blocks(draft: Dict[str, Any]) -> int:
+    """시각 블록을 서버 한도에 맞춘다. 맞출 수 없는 블록(긴 문장)은 뺀다. 고치거나 뺀 블록 수를 돌려준다."""
+    changed = 0
+    for sec in draft.get("sections") or []:
+        out = []
+        for para in sec.get("paragraphs") or []:
+            blk = para[0] if isinstance(para, list) and para and isinstance(para[0], dict) and "block" in para[0] else None
+            if not blk:
+                out.append(para)
+                continue
+            lim = _BLOCK_LIMITS.get(blk.get("block"))
+            if not lim:
+                out.append(para)
+                continue
+            ok = True
+            before = json.dumps(blk, ensure_ascii=False)
+            if "max_items" in lim and isinstance(blk.get("items"), list):
+                blk["items"] = blk["items"][: lim["max_items"]]
+            for holder in ([blk] + [i for i in blk.get("items") or [] if isinstance(i, dict)] + [blk.get(sd) for sd in ("left", "right") if isinstance(blk.get(sd), dict)]):
+                for k, limit in lim.items():
+                    if k == "max_items" or k not in holder or not isinstance(holder.get(k), str):
+                        continue
+                    fitted = _fit(holder[k], limit, soft=k not in ("text",))
+                    if fitted is None:
+                        ok = False
+                    else:
+                        holder[k] = fitted
+            if not ok:
+                changed += 1
+                continue
+            if json.dumps(blk, ensure_ascii=False) != before:
+                changed += 1
+            out.append(para)
+        sec["paragraphs"] = out
+    return changed
 
 
 def source_advice_score(cluster: Dict[str, Any]) -> int:
