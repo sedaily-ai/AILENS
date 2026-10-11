@@ -17,9 +17,10 @@ import { WebtoonCutGenerator, WebtoonProductionCutGrid } from "../WebtoonCutGene
 import { LatestPublishedContentLink } from "./LatestPublishedContentLink";
 import { CustomSelect } from "@/components/CustomSelect";
 
-import { JsonPath, tryParsePartialJson, normalizeLiveParsed } from "./liveStoryboardJson";
 import { ChatBubble, DumpNode, TypingDots } from "./ChatBubbleParts";
 import type { ChatMessage } from "./chatTypes";
+import { usePanelLayout } from "./usePanelLayout";
+import { useSmoothLiveJson } from "./useSmoothLiveJson";
 // 좌측 채팅창 텍스트 모델 선택지 — 2026-09-22, ./textModels.ts로 이전
 // (PromptTextLab.tsx와 공용, 내용 변경 없음). 원래 주석: "Opus 5.1"·
 // "GPT 최신 모델"도 요청받았지만 정확한 모델명 확인 전이라 이번엔 뺐다 —
@@ -184,109 +185,16 @@ export function PromptChatLab({
   // 키 하나로 묶는다 — 그 글자 자체는 의미 없고, 그냥 restoredImages의
   // Object.entries() 순서상 첫 번째 테스트로 복원되기만 하면 된다.
   const [restoredCutImages, setRestoredCutImages] = useState<Record<string, Record<number, { imageUrl: string; model?: string }>>>({});
-  // 2026-09-16 — 우측은 항상 이미지 생성 패널(WebtoonCutGenerator)을 보여준다
-  // (사용자 요청: "항상 2개 단이 구분되어서 보여지면 좋겠어요" — 텍스트|이미지
-  // 두 칸이 탭으로 서로를 가리는 대신 늘 같이 보여야 한다는 뜻).
-  //
-  // 지침/설명/파일(PromptSectionsPanel)+고정값 설정(WebtoonImageSettingsPanel)은
-  // 처음엔 아이콘을 눌러야 뜨는 오버레이 두 개였는데(같은 날 두 번 다시
-  // 설계), 사용자가 "왔다갔다 하는 것 자체가 비효율... 프리미어 프로
-  // 설정 바처럼 한 화면에서 원클릭으로"라고 다시 요청해 상시 노출되는
-  // 3번째 칼럼(아래 layout)으로 최종 정착했다 — 이제 promptPanelOpen 같은
-  // 토글 state는 필요 없다.
-  //
-  // 2026-09-25 — 화풍/인물(STYLE/CHARACTERS) 설정 삭제 결정(사용자 요청,
-  // 발행된 webtoon-image 문서에 IMAGE_MODEL 섹션이 없어 실제 자동발행도
-  // 기본 모델(sd_ultra)로 떨어지고 있음을 라이브로 확인 — sd_ultra는 이
-  // 값들을 아예 안 읽어 실제로도 죽은 설정이었다)에 따라 이 값들을 편집
-  // 하던 화면(WebtoonImageLab 히스토리 갤러리·WebtoonStageLab 단계별
-  // 생성)도 함께 제거했다 — 삭제된 패널을 여는 유일한 진입점이라 남겨두면
-  // 죽은 코드만 된다. "발행 모델"(어떤 모델을 쓸지) 선택 UI는 팟캐스트의
-  // podcast-voice·영상의 video-settings와 같은 성격(실제 살아있는 프로덕션
-  // 설정)이라 그대로 유지한다.
-  // 2026-09-16, 사용자 요청 — "좌측 사이드바는 접혔다 펼 수 있도록":
-  // 대화 목록이 당장 필요 없을 때 챗 영역을 넓게 쓸 수 있게 한다.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // 2026-09-16, 사용자 요청 — "이미지 생성 부분이 늘렸다 펴졌다.. 직접
-  // 손으로 끌고 갈 수 있도록": 우측 패널 폭을 드래그로 조절한다.
-  // 2026-09-25 — 중간 "이미지 생성" 칼럼과 우측 "설정" 칼럼을 하나로
-  // 합쳤다(사용자 지적: "중간 섹션이랑.. 우측 사이드 섹션.. 이렇게
-  // 두개가 있을 이유가 있을까요? 통합하면 어떨까..") — "설정"을
-  // "프로덕션" 토글로 감싸고, 그 아래 "결과값" 토글에 컷 이미지 그리드를
-  // 담아 한 칼럼에서 스크롤로 다 본다. 폭 state도 하나로 합쳐졌다(이전
-  // imagePanelWidth+settingsPanelWidth 두 개 드래그 핸들 → 하나).
-  const [settingsPanelWidth, setSettingsPanelWidth] = useState(640);
-  const handleSettingsPanelResizeStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = settingsPanelWidth;
-    const onMove = (moveEvent: MouseEvent) => {
-      const delta = startX - moveEvent.clientX;
-      const next = Math.min(900, Math.max(320, startWidth + delta));
-      setSettingsPanelWidth(next);
-    };
-    const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-  // 2026-09-26, 사용자 요청 — "프로덕션 부분은.. 고정하고 싶네요...
-  // 위아래로 잡아당기고 끌 수 있도록" — PromptTextLab.tsx와 동일 패턴,
-  // 그 파일 주석 참고.
-  const [productionHeight, setProductionHeight] = useState(360);
-  // 2026-09-27, 사용자 지적 — "테스트 추가 부분.. 고정해야겠네.. 스크롤
-  // 내리면 사라지네": "테스트" 경계 띠(WebtoonCutGenerator.tsx)가 프로덕션
-  // 카드 밑 일반 흐름에 있어서, 테스트 카드가 많아 아래로 스크롤하면
-  // 화면 밖으로 사라졌다. 프로덕션 카드(sticky top-0)는 이미 고정돼
-  // 있으니, 그 바로 아래에 띠도 같이 고정하면 된다 — 다만 프로덕션 카드는
-  // 접혔다 펴지거나(CollapsibleSection의 <details>, 여기서 제어 못 함)
-  // 드래그로 높이가 바뀌므로(productionHeight) "지금 실제로 화면에서
-  // 차지하는 높이"를 고정값으로 가정할 수 없다 — ResizeObserver로 실측해서
-  // 그 값을 띠의 top으로 넘긴다(WebtoonCutGenerator에 stickyTop prop).
-  const productionCardRef = useRef<HTMLDivElement>(null);
-  const [productionCardHeight, setProductionCardHeight] = useState(0);
-  useEffect(() => {
-    const el = productionCardRef.current;
-    if (!el) return;
-    // 2026-09-27(후속) — 사용자 리포트: "스크롤했는데 테스트 섹션 행이
-    // 프로덕션 카드랑 겹치는데요": ResizeObserver 콜백만 믿었더니, 이
-    // 카드 안의 <details>(CollapsibleSection, 접힘↔펼침) 토글이 이
-    // 중첩된 flex+overflow-hidden+max-height 조합에서 항상 콜백을
-    // 새로 안 태우는 경우가 있었다 — 접힘 상태에서 측정한 작은 높이가
-    // 펼친 뒤에도 안 갱신돼서, "테스트" 띠가 그 낡은(작은) top 값에
-    // 붙어 펼쳐진 프로덕션 카드 아랫부분을 덮어버린 것. ResizeObserver는
-    // 그대로 두되, 이 카드 안의 모든 <details>(중첩 토글 포함)에 직접
-    // toggle 리스너를 걸어 접힘/펼침 "그 즉시" 강제로 다시 잰다 —
-    // 두 경로 중 하나라도 놓치지 않게 이중 방어.
-    const measure = () => setProductionCardHeight(el.getBoundingClientRect().height);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    const detailsEls = Array.from(el.querySelectorAll("details"));
-    detailsEls.forEach((d) => d.addEventListener("toggle", measure));
-    return () => {
-      observer.disconnect();
-      detailsEls.forEach((d) => d.removeEventListener("toggle", measure));
-    };
-  }, []);
-  const handleProductionResizeStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = productionHeight;
-    const onMove = (moveEvent: MouseEvent) => {
-      const delta = moveEvent.clientY - startY;
-      const next = Math.min(720, Math.max(120, startHeight + delta));
-      setProductionHeight(next);
-    };
-    const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
+  const {
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    settingsPanelWidth,
+    handleSettingsPanelResizeStart,
+    productionHeight,
+    productionCardRef,
+    productionCardHeight,
+    handleProductionResizeStart,
+  } = usePanelLayout();
   // 2026-09-26(후속×3), 사용자 요청 — "프로덕션 부분 카드도.. 테스트
   // 카드랑 동일한 구조가 되도록 하면 어떤가요?": PromptSectionsPanel(별도
   // prompt_lab_docs 저장소, VersionSwitcher 드롭다운)을 완전히 걷어내고
@@ -359,75 +267,12 @@ export function PromptChatLab({
       console.error("클립보드 복사 실패", err);
     }
   };
-  const [liveParsed, setLiveParsed] = useState<{ value: unknown; inProgressPath: JsonPath } | null>(null);
-  // 2026-09-18, 사용자 요청 — "타이핑하듯이.. 타닥타닥타닥 이런게 나와야
-  // 하는데.. 지금은 쭉 한번에 끊기듯이 나오잖아요.. 노바 챗봇 서비스는
-  // 어떻게 만들었는지 봐주시고 똑같은 값을 적용" — nova/frontend의
-  // useSmoothStreaming.js를 그대로 포팅한다: 서버에서 온 원문은
-  // fullTextRef(참조)에 즉시 그대로 쌓이고(네트워크 속도와 무관, 싸다),
-  // requestAnimationFrame 루프가 "밀린 양(backlog)에 비례한 속도"로 한
-  // 글자씩 드러낸다(최소 25자/초, 밀릴수록 더 빨리 — nova 원본과 동일
-  // 공식) — 그 "드러난 부분"만 매 프레임 다시 파싱해 DumpNode로 그린다.
-  // 그래서 필드가 통째로 뚝뚝 나타나는 대신 글자 단위로 자연스럽게
-  // 채워진다. nova는 markdown 문자열을 그대로 리빌하지만, 여기는 구조화
-  // 렌더링(DumpNode)이라 "리빌된 원문 prefix"를 매번 다시 파싱해서 쓴다.
-  const fullTextRef = useRef("");
-  const revealedIndexRef = useRef(0);
-  const rafRef = useRef<number | null>(null);
-  const lastTimeRef = useRef(0);
-  // 2026-09-18(같은 날 후속) — 사용자 요청: "스크롤 하고 싶은데 계속
-  // 아래쪽으로.. 그리고 지금 버벅임.. 코드블럭 때문에 그런것 같은데":
-  // liveParsed가 매 프레임(최대 초당 60번) 바뀌면서, (1) 코드블럭 포함된
-  // 트리 전체를 60번/초 리렌더해 버벅이고, (2) 그때마다 스크롤도 같이
-  // 호출돼 사용자가 위로 스크롤해도 다음 프레임에 바로 눌려버렸다.
-  // 리빌 인덱스 계산(revealedIndexRef)은 매 프레임 그대로 하되, 실제
-  // setLiveParsed(=리렌더+스크롤 트리거)는 RENDER_INTERVAL_MS 간격으로만
-  // 묶는다 — nova의 rAF 리빌은 유지하면서 리렌더 빈도만 낮춘다.
-  const lastRenderTimeRef = useRef(0);
-  const RENDER_INTERVAL_MS = 90;
-
-  const revealStep = (timestamp: number) => {
-    if (!lastTimeRef.current) lastTimeRef.current = timestamp;
-    const deltaTime = timestamp - lastTimeRef.current;
-    const targetLength = fullTextRef.current.length;
-    const caughtUp = revealedIndexRef.current >= targetLength;
-    if (!caughtUp && deltaTime > 0) {
-      const backlog = targetLength - revealedIndexRef.current;
-      const cps = Math.max(25, backlog * 2.2); // nova useSmoothStreaming.js와 동일 공식
-      const step = Math.max(1, Math.round((cps * deltaTime) / 1000));
-      revealedIndexRef.current = Math.min(targetLength, revealedIndexRef.current + step);
-      lastTimeRef.current = timestamp;
-    }
-    const justCaughtUp = !caughtUp && revealedIndexRef.current >= targetLength;
-    if (justCaughtUp || timestamp - lastRenderTimeRef.current >= RENDER_INTERVAL_MS) {
-      lastRenderTimeRef.current = timestamp;
-      setLiveParsed(normalizeLiveParsed(tryParsePartialJson(fullTextRef.current.slice(0, revealedIndexRef.current))));
-    }
-    if (revealedIndexRef.current < targetLength) {
-      rafRef.current = requestAnimationFrame(revealStep);
-    } else {
-      rafRef.current = null;
-      lastTimeRef.current = 0;
-    }
-  };
-
-  const appendLiveText = (chunk: string) => {
-    fullTextRef.current += chunk;
-    if (rafRef.current == null) {
-      rafRef.current = requestAnimationFrame(revealStep);
-    }
-  };
-
-  /** 다음 단계(1단계→2단계) 전환 시 버퍼만 비우고 진행 표시는 유지한다. */
-  const resetLiveBuffer = () => {
-    if (rafRef.current != null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    fullTextRef.current = "";
-    revealedIndexRef.current = 0;
-    lastTimeRef.current = 0;
-  };
+  const {
+    liveParsed,
+    setLiveParsed,
+    appendLiveText,
+    resetLiveBuffer,
+  } = useSmoothLiveJson();
   // 요청 보내고 첫 응답이 오기 전까지 "생각 중" 점 세 개(2026-09-15,
   // 사용자 요청 — "기다리는 동안 심심하니까"). 서버에서 뭐든 한 번 오면
   // (반응 스트리밍 첫 토큰이든, 스토리보드 완성이든) 바로 끈다.

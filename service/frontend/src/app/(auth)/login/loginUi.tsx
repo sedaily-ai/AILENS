@@ -39,3 +39,27 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
     </label>
   );
 }
+
+/** 모드별 상단 작은 라벨. */
+export function authEyebrow(mode: AuthMode): string {
+  switch (mode) {
+    case "login": return "LOGIN";
+    case "signup": return "SIGN UP";
+    case "confirm": return "VERIFY";
+    case "forgot": return "RESET";
+    case "resetCode": return "RESET · 1/2";
+    case "resetPassword": return "RESET · 2/2";
+  }
+}
+
+/** 모드별 제목. */
+export function authTitle(mode: AuthMode): string {
+  switch (mode) {
+    case "login": return "로그인";
+    case "signup": return "회원가입";
+    case "confirm": return "이메일 인증";
+    case "forgot": return "비밀번호 찾기";
+    case "resetCode": return "인증 코드 입력";
+    case "resetPassword": return "새 비밀번호 설정";
+  }
+}
