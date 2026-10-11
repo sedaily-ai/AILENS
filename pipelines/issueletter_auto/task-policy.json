@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadNewsXml",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::sedaily-news-xml-storage/daily-xml/*"
+    },
+    {
+      "Sid": "BedrockLettersProfile",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-opus-5",
+        "arn:aws:bedrock:us-east-1:887078546492:inference-profile/*",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-5"
+      ]
+    },
+    {
+      "Sid": "ReadCmsApiToken",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter"],
+      "Resource": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-mbti/admin/lens-cms-api-token"
+    },
+    {
+      "Sid": "DecryptSsmSecureString",
+      "Effect": "Allow",
+      "Action": ["kms:Decrypt"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"kms:ViaService": "ssm.us-east-1.amazonaws.com"}}
+    }
+  ]
+}

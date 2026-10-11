@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "issueletter-auto-fargate-task",
+    "Arn": "arn:aws:ecs:us-east-1:887078546492:cluster/sedaily-lens-frontpage-auto",
+    "RoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-issueletter-auto-eventbridge-role",
+    "EcsParameters": {
+      "TaskDefinitionArn": "arn:aws:ecs:us-east-1:887078546492:task-definition/sedaily-lens-issueletter-auto",
+      "TaskCount": 1,
+      "LaunchType": "FARGATE",
+      "PropagateTags": "TASK_DEFINITION",
+      "NetworkConfiguration": {
+        "awsvpcConfiguration": {
+          "Subnets": ["subnet-0b5a146ca8ed1ddfe"],
+          "SecurityGroups": ["sg-05cb5f7bc29891cf8"],
+          "AssignPublicIp": "ENABLED"
+        }
+      }
+    }
+  }
+]
