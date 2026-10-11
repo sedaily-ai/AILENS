@@ -58,6 +58,15 @@ const nextConfig: NextConfig = {
       { source: "/llms.txt", headers: [{ key: "Cache-Control", value: "public, max-age=300, s-maxage=3600" }] },
       { source: "/fonts/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, s-maxage=604800" }] },
       { source: "/:file(favicon-32.png|icon-192.png|icon-512.png|apple-touch-icon.png|og-image.png|icon.svg|lens.png)", headers: [{ key: "Cache-Control", value: "public, max-age=86400, s-maxage=86400" }] },
+      // 본지 "MBTI로 읽기" 위젯 스크립트(public/widget) — 본지 기사 페이지마다 불리므로 CDN이 하루 보관하고 본지에서 불러 쓸 수 있게 CORS를 연다.
+      // 스크립트를 바꾸면 배포 뒤 /widget/* 캐시를 무효화한다.
+      {
+        source: "/widget/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+        ],
+      },
     ];
   },
 

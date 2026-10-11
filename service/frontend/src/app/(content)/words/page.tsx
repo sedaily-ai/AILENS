@@ -20,7 +20,7 @@ export default async function WordsGlossaryPage() {
       '@type': 'Organization',
       name: 'AI LENS 편집팀',
       description:
-        '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고, 편집팀이 검수해 발행합니다.',
+        '서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 레터·웹툰·팟캐스트·영상을 자동으로 만들어 발행하고, 편집팀이 발행 후 점검해 오류를 바로잡습니다.',
       url: `${SITE_URL}/about`,
       parentOrganization: { '@id': `${SITE_URL}/#organization` },
     },

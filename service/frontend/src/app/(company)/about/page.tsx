@@ -5,7 +5,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 export const metadata: Metadata = {
   title: '회사소개',
-  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스 AI LENS를 소개합니다. 기자가 취재한 기사를 AI가 레터·웹툰·팟캐스트·영상으로 재구성하고 편집팀이 검수하는 제작 방식과 운영 원칙을 안내합니다.',
+  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스 AI LENS를 소개합니다. 기자가 취재한 기사를 AI가 레터·웹툰·팟캐스트·영상으로 자동 재구성해 발행하고 편집팀이 발행 후 점검하는 제작 방식과 운영 원칙을 안내합니다.',
   alternates: { canonical: `${SITE_URL}/about` },
   robots: { index: true, follow: true },
 };
@@ -18,7 +18,7 @@ const JSON_LD = {
   '@id': `${SITE_URL}/about#page`,
   url: `${SITE_URL}/about`,
   name: '회사소개',
-  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스 AI LENS를 소개합니다. 기자가 취재한 기사를 AI가 레터·웹툰·팟캐스트·영상으로 재구성하고 편집팀이 검수하는 제작 방식과 운영 원칙을 안내합니다.',
+  description: '1960년 창간한 서울경제신문이 만드는 AI 경제 뉴스 서비스 AI LENS를 소개합니다. 기자가 취재한 기사를 AI가 레터·웹툰·팟캐스트·영상으로 자동 재구성해 발행하고 편집팀이 발행 후 점검하는 제작 방식과 운영 원칙을 안내합니다.',
   inLanguage: 'ko-KR',
   isPartOf: { '@id': `${SITE_URL}/#website` },
   mainEntity: { '@id': `${SITE_URL}/#organization` },
@@ -76,11 +76,6 @@ export default function AboutPage() {
       </p>
       <div style={awardTable}>
         <div>
-          <strong>APAC Gold — Best AI-driven News Product, Format or Strategy</strong>
-          <br />
-          WAN-IFRA Digital Media Awards APAC 2026 · AI LENS
-        </div>
-        <div>
           <strong>APAC Gold — Best Newsletter</strong>
           <br />
           WAN-IFRA Digital Media Awards APAC 2026 · AI PRISM
@@ -89,11 +84,6 @@ export default function AboutPage() {
           <strong>APAC Silver — Most Innovative Digital Product</strong>
           <br />
           WAN-IFRA Digital Media Awards APAC 2026 · AI NOVA
-        </div>
-        <div>
-          <strong>Finalist — Best AI-driven News Product, Format or Strategy</strong>
-          <br />
-          WAN-IFRA Digital Media Awards 2026 · AI LENS
         </div>
         <div>
           <strong>Finalist — Best Newsletter</strong>
@@ -107,16 +97,16 @@ export default function AboutPage() {
         </div>
       </div>
       <p style={{ marginTop: 10 }}>
-        Best AI-driven News Product 부문 Gold는 지금 보고 계신 AI LENS가, Best Newsletter
-        부문 Gold는 서울경제신문의 영문 뉴스레터 AI PRISM이 받았습니다. Most Innovative
-        Digital Product 부문 Silver는 AI NOVA에 돌아갔습니다 — 한국 경제 저널리즘을
-        디지털로 확장하려는 서울경제신문의 투자가 인정받은 결과입니다.
+        Best Newsletter 부문 Gold는 서울경제신문의 영문 뉴스레터 AI PRISM이, Most Innovative
+        Digital Product 부문 Silver는 AI NOVA가 받았습니다 — 한국 경제 저널리즘을 디지털로
+        확장하려는 서울경제신문의 투자가 인정받은 결과입니다.
       </p>
 
-      <h2 style={h2}>운영 방식 — AI가 돕고, 사람이 검수합니다</h2>
+      <h2 style={h2}>운영 방식 — AI가 만들고, 사람이 점검합니다</h2>
       <p>
-        서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 요약·재구성한 초안을 작성하고,
-        편집팀이 검수해 발행합니다. 매일 쏟아지는 경제 이슈를 놓치지 않고 &ldquo;오늘의 한
+        서울경제신문 기자들이 취재한 원본 기사를 바탕으로 AI가 레터·웹툰·팟캐스트·영상을
+        자동으로 만들어 발행합니다. 발행한 콘텐츠는 편집팀이 점검하고, 오류가 확인되면 바로
+        고치거나 내립니다. 매일 쏟아지는 경제 이슈를 놓치지 않고 &ldquo;오늘의 한
         통&rdquo;으로 정리해 전하는 것이 목표이며, 원하시면 텍스트 대신 팟캐스트(오디오)로도
         들을 수 있습니다.
       </p>
