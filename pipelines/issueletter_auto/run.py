@@ -70,13 +70,17 @@ def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str]) -> List[
     by_key = {a["key"]: a for a in articles if a.get("key")}
     listing = "\n".join(f"{a['key']} | {a['title']}" for a in articles if a.get("key"))[:60000]
     system = (Path(__file__).with_name("cluster_prompt.md")).read_text(encoding="utf-8")
-    raw_text = call_model(system, "기사 목록:\n" + listing, max_tokens=4000)
     from json_extract import extract_fenced_json_text, loads_lenient
-    body = extract_fenced_json_text(raw_text, opener="[") or raw_text[raw_text.find("["): raw_text.rfind("]") + 1]
-    try:
-        raw = loads_lenient(body)
-    except Exception:  # noqa: BLE001
-        log("cluster_parse_failed", head=raw_text[:200])
+    raw = None
+    for _ in range(2):  # 모델이 JSON 앞에 설명을 붙이거나 형식이 깨지는 경우가 있어 한 번 더 시도한다
+        raw_text = call_model(system + "\n\n설명 없이 JSON 배열만 출력하세요.", "기사 목록:\n" + listing, max_tokens=8000)
+        body = extract_fenced_json_text(raw_text, opener="[") or raw_text[raw_text.find("["): raw_text.rfind("]") + 1]
+        try:
+            raw = loads_lenient(body)
+            break
+        except Exception:  # noqa: BLE001
+            log("cluster_parse_failed", head=raw_text[:200])
+    if raw is None:
         return []
     clusters = core.clean_clusters(raw, by_key, used_keys)
     clusters.sort(key=core.source_advice_score)  # 권유 표현이 적은 기사 묶음부터(같으면 기존 크기순 유지)
@@ -95,11 +99,22 @@ def build_prompt(cluster: Dict[str, Any], editors: List[Dict[str, Any]], topics_
 def make_draft(prompt: str, feedback: str = "") -> Optional[Dict[str, Any]]:
     from json_extract import extract_json_object
     text = call_model(prompt + (f"\n\n[직전 시도가 거부된 사유 — 이것만 고쳐서 JSON 전체를 다시 출력]\n{feedback}" if feedback else ""), "위 지시대로 저장용 JSON 하나만 출력하세요.")
+    _dump("raw", text)
     try:
         obj = extract_json_object(text)
     except Exception:  # noqa: BLE001
         return None
     return obj if isinstance(obj, dict) else None
+
+
+def _dump(kind: str, data: Any) -> None:
+    """ISSUELETTER_DUMP_DIR 이 있으면 시도마다 원문·초안을 파일로 남긴다(로컬 점검용)."""
+    d = os.environ.get("ISSUELETTER_DUMP_DIR")
+    if not d:
+        return
+    Path(d).mkdir(parents=True, exist_ok=True)
+    n = len(list(Path(d).glob(f"{kind}_*")))
+    (Path(d) / f"{kind}_{n + 1}.txt").write_text(data if isinstance(data, str) else json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 FACT_CHECK_SYSTEM = (
