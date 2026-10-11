@@ -23,7 +23,7 @@ import core  # noqa: E402
 
 ATTEMPTS_PER_CLUSTER = int(os.environ.get("ISSUELETTER_ATTEMPTS", "1"))  # 묶음당 시도 횟수. 재시도는 토큰 낭비라 기본 한 번에 끝낸다(안 되면 그 묶음은 접는다)
 MAX_CLUSTERS_TRIED = int(os.environ.get("ISSUELETTER_CLUSTERS", "1"))
-LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k")  # lens-letters-sonnet-46 (비용 절감: 소넷 사용, 2026-10-11)
+LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dt2qj8drli0n")  # lens-letters-sonnet-5 (2026-10-11 Sonnet 4.6 → Sonnet 5: 입력 $2/출력 $10, 레터 본문 시험 통과)
 MAX_PER_DAY = int(os.environ.get("ISSUELETTER_MAX_PER_DAY", "1"))
 LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "7"))
 WINDOW = (6, 18)  # 이 시각(KST) 사이에만 발행한다

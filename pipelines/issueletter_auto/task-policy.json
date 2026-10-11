@@ -14,6 +14,9 @@
       "Resource": [
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq",
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dt2qj8drli0n",
+        "arn:aws:bedrock:us-east-1:887078546492:inference-profile/us.anthropic.claude-sonnet-5",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-5",
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-opus-5",
         "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6",
         "arn:aws:bedrock:us-east-1:887078546492:inference-profile/*",
