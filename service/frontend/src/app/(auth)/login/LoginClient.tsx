@@ -8,6 +8,7 @@ import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from "@/shared/lib/auth
 import { takeReturnTo } from "@/shared/lib/auth/returnTo";
 import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/form/PasswordChecklist";
 
+import { AuthMode, VERIFICATION_CODE_LENGTH, INPUT_CLS, PRIMARY_BTN, SECONDARY_LINK, STRONG_LINK, Spinner, FieldLabel } from "./loginUi";
 /**
  * 비밀번호 재설정은 세 단계다: forgot(이메일) → resetCode(코드) → resetPassword(새 비밀번호).
  *
@@ -15,46 +16,6 @@ import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/form/Passwo
  * 따라서 resetCode 단계의 "다음"은 입력 형식만 확인하고, 코드 오류는 마지막 제출에서 드러난다.
  * 이 경우 사용자를 resetCode로 되돌린다(`AuthResult.codeInvalid` 참고).
  */
-type AuthMode = "login" | "signup" | "confirm" | "forgot" | "resetCode" | "resetPassword";
-
-/** Cognito 확인 코드는 항상 6자리 숫자다. */
-const VERIFICATION_CODE_LENGTH = 6;
-
-// 메인 페이지와 동일 톤 — white bg, black CTA, gray-200 보더, 절제된 라운드.
-const INPUT_CLS =
-  "w-full px-4 py-3 text-[14.5px] text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/5 transition-colors";
-const PRIMARY_BTN =
-  "w-full py-3 text-[14.5px] font-semibold text-white bg-gray-900 rounded-lg hover:bg-black disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2";
-const SECONDARY_LINK =
-  "text-[13px] text-gray-500 hover:text-gray-900 transition-colors";
-const STRONG_LINK =
-  "text-[13.5px] font-semibold text-gray-900 hover:underline underline-offset-4";
-
-function Spinner() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.4}
-      style={{ animation: "ailens-spin 0.8s linear infinite" }}
-      aria-hidden="true"
-    >
-      <path strokeLinecap="round" d="M12 3a9 9 0 1 0 9 9" />
-      <style>{`@keyframes ailens-spin{to{transform:rotate(360deg)}}`}</style>
-    </svg>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="block text-[12.5px] font-semibold text-gray-700 mb-2">
-      {children}
-    </label>
-  );
-}
 
 export function LoginClient() {
   const router = useRouter();
