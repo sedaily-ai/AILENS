@@ -302,18 +302,6 @@ export function LensViewClient({
         .lread > .lread-box-vote { background: #fff; box-shadow: 0 0 0 1px #e5e7eb inset; }
         .lread-box-vote .lread-box-title { color: #374151; }
         .lread-box-vote p { margin-bottom: 7px; font-size: calc(15px * var(--lens-font-scale, 1)); }
-        .lvote-opts { display: grid; gap: 8px; }
-        .lvote-opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
-        .lvote-opt:hover:not(:disabled) { border-color: #d1d5db; background: #f9fafb; }
-        .lvote-opt:disabled { cursor: default; }
-        .lvote-opt[aria-pressed='true'] { background: #eef3fd; }
-        .lvote-l { font-size: calc(15px * var(--lens-font-scale, 1)); font-weight: 600; color: #111827; line-height: 1.5; }
-        .lvote-res { display: grid; gap: 4px; min-width: 84px; justify-items: end; }
-        .lvote-p { font-size: 15px; font-weight: 700; color: #2f5fcf; font-variant-numeric: tabular-nums; }
-        .lvote-track { display: block; width: 84px; height: 4px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
-        .lvote-fill { display: block; height: 100%; border-radius: 999px; background: #2f5fcf; transition: width .5s ease; }
-        .lvote-mine { font-size: 11.5px; font-weight: 600; color: #6b7280; }
-        .lvote-note { margin: 10px 0 0; font-size: 12.5px; color: #9ca3af; }
         .lread > .lread-more { margin: 18px 0 0; padding: 12px 15px; border-radius: 10px; background: #fffbeb; }
         .lread-more summary { cursor: pointer; font-size: 14px; font-weight: 700; color: #92400e; }
         .lread-more p { margin: 10px 0 0; font-size: calc(15px * var(--lens-font-scale, 1)); }
