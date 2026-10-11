@@ -113,10 +113,12 @@ def body_chars(draft: Dict[str, Any]) -> int:
 
 def length_problem(draft: Dict[str, Any]) -> str:
     n = body_chars(draft)
+    target = (BODY_MIN_CHARS + BODY_MAX_CHARS) // 2
     if n < BODY_MIN_CHARS:
-        return f"본문이 {n}자로 짧습니다. 기사에 있는 사실만으로 {BODY_MIN_CHARS}~{BODY_MAX_CHARS}자가 되도록 섹션별로 사실·맥락·인용을 더 풀어 쓰세요(지어내기 금지)"
+        return (f"본문이 {n}자로 짧습니다. 목표는 {target}자 안팎입니다(약 {target - n}자 더). 기사에 있는 사실만으로, 섹션마다 문단 3개 이상으로 "
+                "기사 속 수치·인용·경과를 빠짐없이 풀어 쓰세요(지어내기 금지, 같은 말 반복 금지)")
     if n > BODY_MAX_CHARS:
-        return f"본문이 {n}자로 깁니다. {BODY_MIN_CHARS}~{BODY_MAX_CHARS}자로 줄이세요"
+        return f"본문이 {n}자로 깁니다. 목표는 {target}자 안팎입니다(약 {n - target}자 덜). 덜 중요한 문단부터 줄이세요"
     return ""
 
 
@@ -153,6 +155,41 @@ def advice_hits(draft: Dict[str, Any], source_texts: Iterable[str] = ()) -> List
     for allowed in ALLOWED_MARKET_TERMS:
         text = text.replace(allowed, "")
     return sorted({w for w in ADVICE_PATTERNS if w in text})
+
+
+# 주제 태그는 본문에 실제로 나온 것만 둔다(템플릿 v2). 이름이 그대로 없어도 아래 대체 표기가 있으면 나온 것으로 본다.
+TOPIC_ALIASES = {"인공지능": ("AI", "생성형"), "가상자산": ("비트코인", "암호화폐", "코인"), "기업 실적": ("실적", "영업이익"), "시그널(증시)": ("증시",),
+                 "도시·동네": ("동네", "골목"), "음식·맛집": ("식당", "맛집"), "여행·관광": ("관광", "여행"), "무역·통상": ("무역", "통상", "수출"),
+                 "안전·재난": ("사고", "재난", "안전"), "환경·기후": ("환경", "기후"), "경제성장률": ("성장률",)}
+
+
+def prune_topics(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """본문에 나오지 않은 주제 태그를 뺀다. 앞의 두 개(주 주제)가 본문에 없으면 문제로 돌려준다."""
+    text = draft_body_text(draft)
+    keep, dropped = [], []
+    for t in draft.get("topics") or []:
+        forms = (t, *TOPIC_ALIASES.get(t, ()))
+        (keep if any(f in text for f in forms) else dropped).append(t)
+    draft["topics"] = keep
+    return {"dropped": dropped}
+
+
+ATTRIBUTION_MARKS = ("따르면", "밝혔", "말했", "지적", "설명", "주장", "분석", "평가", "전했", "강조", "내놨", "관계자", "전문가", "연구원", "교수", "측은")
+
+
+def other_attribution_problem(draft: Dict[str, Any]) -> str:
+    """'다른 시각' 섹션의 모든 문단에 말한 주체(기사·전문가·기관)를 알리는 표현이 있어야 한다(템플릿 v2)."""
+    bare = []
+    for sec in draft.get("sections") or []:
+        if sec.get("axis") != "other":
+            continue
+        for para in sec.get("paragraphs") or []:
+            txt = "".join(p if isinstance(p, str) else str(p.get("text", "")) for p in para)
+            if txt.strip() and not any(m in txt for m in ATTRIBUTION_MARKS):
+                bare.append(txt[:40])
+    if bare:
+        return "다른 시각 섹션에 말한 주체(기사·전문가·기관)가 밝혀지지 않은 문단이 있습니다. 직접 비판하지 말고 누가 말했는지 귀속해 쓰세요: " + " / ".join(bare)
+    return ""
 
 
 def source_advice_score(cluster: Dict[str, Any]) -> int:

@@ -70,3 +70,13 @@ def test_market_reporting_terms_are_not_flagged_but_advice_is():
     bad = {"title": "t", "deck": "", "summary": ["지금 분할 매수가 필요해요"], "editor_note": "", "sections": []}
     assert "매수" in core.advice_hits(bad) and "분할" in core.advice_hits(bad)
     assert "매도" in core.advice_hits({**ok, "deck": "지금 매도하세요"})
+
+
+def test_prune_topics_and_attribution():
+    d = {"title": "t", "deck": "", "summary": ["AI 도입이 늘었어요"], "editor_note": "", "topics": ["인공지능", "은행", "가상자산"],
+         "sections": [{"axis": "other", "heading": "h", "key_line": "k", "paragraphs": [["은행 관계자는 \"지켜보겠다\"고 말했어요."], ["근거 없는 단정이에요."]]}]}
+    out = core.prune_topics(d)
+    assert d["topics"] == ["인공지능", "은행"] and out["dropped"] == ["가상자산"]
+    assert "근거 없는 단정" in core.other_attribution_problem(d)
+    d["sections"][0]["paragraphs"].pop()
+    assert core.other_attribution_problem(d) == ""
