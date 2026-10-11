@@ -15,7 +15,7 @@
   "containerDefinitions": [
     {
       "name": "issueletter-auto",
-      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-lens-frontpage-auto:issueletter-2",
+      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-lens-frontpage-auto:issueletter-4",
       "workingDirectory": "/app/pipelines/issueletter_auto",
       "essential": true,
       "environment": [

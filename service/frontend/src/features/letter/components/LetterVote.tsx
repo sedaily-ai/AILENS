@@ -38,6 +38,8 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
   }
 
   const counts = state.counts;
+  // 보기 색 구분: 우려·걱정류는 앰버, "잘 모르겠어요"는 회색, 나머지는 파랑. 데이터 필드 없이 key 로만 정한다.
+  const toneOf = (key: string) => (key === 'unsure' ? 'n' : /worr|concern|anx|uneasy|afraid/.test(key) ? 'w' : 'b');
   const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0;
 
   return (
@@ -47,13 +49,19 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
         {vote.options.map((o) => {
           const pct = counts && total > 0 ? Math.round(((counts[o.key] ?? 0) / total) * 100) : 0;
           return (
-            <button key={o.key} type="button" className="ld-opt" aria-pressed={state.my_choice === o.key} disabled={!!state.my_choice || busy} onClick={() => pick(o.key)}>
-              {state.my_choice && <span className="ld-opt-bar" style={{ width: `${pct}%` }} aria-hidden />}
+            <button key={o.key} type="button" className="ld-opt" data-tone={toneOf(o.key)} aria-pressed={state.my_choice === o.key} disabled={!!state.my_choice || busy} onClick={() => pick(o.key)}>
+              <span className="ld-opt-dot" aria-hidden />
               <span className="ld-opt-body">
                 <span className="ld-opt-l">{o.label}</span>
                 {o.hint && <span className="ld-opt-h">{o.hint}</span>}
               </span>
-              {state.my_choice && <span className="ld-opt-p">{pct}%</span>}
+              {state.my_choice && (
+                <span className="ld-opt-res">
+                  <span className="ld-opt-p">{pct}%</span>
+                  <span className="ld-opt-track" aria-hidden><span className="ld-opt-fill" style={{ width: `${pct}%` }} /></span>
+                  {state.my_choice === o.key && <span className="ld-opt-mine">내 선택</span>}
+                </span>
+              )}
             </button>
           );
         })}

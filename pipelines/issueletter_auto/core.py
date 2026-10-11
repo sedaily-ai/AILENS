@@ -98,6 +98,28 @@ def draft_body_text(draft: Dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
+# 템플릿 v2 분량 규칙: 본문 기준 2,500~3,500자(모바일 5~7분). 본문 = 섹션 문단 글자 수(제목·요약·한마디 제외).
+BODY_MIN_CHARS = 2500
+BODY_MAX_CHARS = 3500
+
+
+def body_chars(draft: Dict[str, Any]) -> int:
+    n = 0
+    for sec in draft.get("sections") or []:
+        for para in sec.get("paragraphs") or []:
+            n += len("".join(p if isinstance(p, str) else str(p.get("text", "")) for p in para))
+    return n
+
+
+def length_problem(draft: Dict[str, Any]) -> str:
+    n = body_chars(draft)
+    if n < BODY_MIN_CHARS:
+        return f"본문이 {n}자로 짧습니다. 기사에 있는 사실만으로 {BODY_MIN_CHARS}~{BODY_MAX_CHARS}자가 되도록 섹션별로 사실·맥락·인용을 더 풀어 쓰세요(지어내기 금지)"
+    if n > BODY_MAX_CHARS:
+        return f"본문이 {n}자로 깁니다. {BODY_MIN_CHARS}~{BODY_MAX_CHARS}자로 줄이세요"
+    return ""
+
+
 def numbers_in(text: str) -> Set[str]:
     """본문에 나온 수치(쉼표 제거). 연도·날짜 조각도 포함하되 한 자리 수는 제외한다."""
     out = set()
@@ -131,6 +153,14 @@ def advice_hits(draft: Dict[str, Any], source_texts: Iterable[str] = ()) -> List
     for allowed in ALLOWED_MARKET_TERMS:
         text = text.replace(allowed, "")
     return sorted({w for w in ADVICE_PATTERNS if w in text})
+
+
+def source_advice_score(cluster: Dict[str, Any]) -> int:
+    """묶음 기사 본문에 투자·행동 권유 표현이 얼마나 있는지. 많으면(증권사 전망 인용 위주) 초안이 반복해 걸리므로 뒤로 미룬다."""
+    text = " ".join(str(a.get("content") or "") for a in cluster.get("articles") or [])
+    for allowed in ALLOWED_MARKET_TERMS:
+        text = text.replace(allowed, "")
+    return sum(text.count(w) for w in ADVICE_PATTERNS)
 
 
 def strip_key_line_prefix(draft: Dict[str, Any]) -> Dict[str, Any]:
