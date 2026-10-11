@@ -32,6 +32,7 @@ import community_repo
 import config_repo
 import daily_questions_repo
 import editors_repo
+import post_votes_repo
 import interests_repo
 import letter_subscriptions_repo
 import issue_letters_repo
@@ -478,6 +479,18 @@ def _letter_call(fn, *args, **kwargs):
         return fn(*args, **kwargs)
     except LetterError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
+
+
+@app.get("/api/v2/posts/{slug}/vote")
+def get_post_vote(slug: str, x_voter_id: Optional[str] = Header(default=None)):
+    """1기사 레터 투표: 내 투표 여부(투표한 사람에게만 집계)."""
+    return JSONResponse(_letter_call(post_votes_repo.my_vote, slug, x_voter_id or ""), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/v2/posts/{slug}/vote")
+def post_post_vote(slug: str, payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
+    result, fresh = _letter_call(post_votes_repo.vote, slug, x_voter_id or "", str(payload.get("option_key") or ""))
+    return JSONResponse({**result, **({} if fresh else {"already_voted": True})}, status_code=200 if fresh else 409, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/v2/issue-letters")

@@ -1,5 +1,6 @@
 'use client';
 
+import { PostVote, parseVoteChoices } from './PostVote';
 import { renderInline } from './renderInline';
 
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
@@ -204,7 +205,7 @@ export function LensFormatPanel({
                     </div>
                   );
                 case 'box': {
-                  const choices = b.kind === 'vote' ? b.children.flatMap((c) => (c.type === 'p' ? c.text.split(/\n|\s+(?=[①-⑩])/) : [])) : null;
+                  const choices = b.kind === 'vote' ? parseVoteChoices(b.children.flatMap((c) => (c.type === 'p' ? [c.text] : []))) : null;
                   const title = [b.head, b.question].filter(Boolean).join(b.kind === 'vote' ? ' ' : ': ');
                   if (b.kind === 'more') {
                     return (
@@ -214,6 +215,7 @@ export function LensFormatPanel({
                       </details>
                     );
                   }
+                  if (choices && choices.length >= 2) return <PostVote key={bi} slug={lens.id} title={title} choices={choices} />;
                   return (
                     <div key={bi} className={`lread-box lread-box-${b.kind}`}>
                       <div className="lread-box-title">{title}</div>
