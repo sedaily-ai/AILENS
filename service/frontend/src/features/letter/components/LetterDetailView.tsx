@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { AXIS_META, type IssueLetter, type LetterSegment, type LetterSource } from '../data/letterTypes';
+import { AXIS_META, asBlock, type IssueLetter, type LetterSegment, type LetterSource } from '../data/letterTypes';
+import { LetterBlockView } from './LetterBlocks';
 import { AxisBadge } from './AxisBadge';
 import { editorsOfLetter } from '../data/editors';
 import { EditorAvatar } from './EditorAvatar';
@@ -58,9 +59,9 @@ function Segments({ parts, letterSlug, sources, pieces }: { parts: LetterSegment
           <span key={i}>
             {(pieces.get(p) ?? [{ text: p }]).map((piece, j) => ('term' in piece ? <TermTooltip key={j} term={piece.term.term} explain={piece.term.explain}>{piece.text}</TermTooltip> : <span key={j}>{piece.text}</span>))}
           </span>
-        ) : (
+        ) : 'href' in p ? (
           <InlineLink key={i} part={p} source={byKey.get(articleKey(p.href))} letterSlug={letterSlug} />
-        ),
+        ) : null,
       )}
     </>
   );
@@ -153,11 +154,16 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
           </div>
           <h2 className="ld-sec-h">{sec.heading}</h2>
           <p className="ld-key"><span className="ld-key-l">핵심:</span> {sec.keyLine}</p>
-          {sec.paragraphs.map((para, j) => (
-            <p key={j} className="ld-p">
-              <Segments parts={para} letterSlug={letter.slug} sources={letter.sources} pieces={termPieces} />
-            </p>
-          ))}
+          {sec.paragraphs.map((para, j) => {
+            const block = asBlock(para);
+            return block ? (
+              <LetterBlockView key={j} block={block} tone={AXIS_META[sec.axis].tone} />
+            ) : (
+              <p key={j} className="ld-p">
+                <Segments parts={para} letterSlug={letter.slug} sources={letter.sources} pieces={termPieces} />
+              </p>
+            );
+          })}
         </section>
       ))}
 

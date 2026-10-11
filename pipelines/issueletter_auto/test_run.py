@@ -1,3 +1,4 @@
+import os
 """run.py 전체 흐름을 모델·서버 호출을 가짜로 바꿔 확인한다(실제 호출 없음)."""
 import json
 import sys
@@ -16,7 +17,7 @@ EDITORS = [{"slug": "mincheol", "name": "민철", "role": "전략", "topic_names
 def good_draft():
     L = lambda k: core.sedaily_url(str(k))
     return {"slug": "2026-10-11-x", "title": "t", "deck": "d", "summary": ["매출 176억 원"], "editor_note": "e", "categories": ["industry"], "topics": ["글로벌 리밸런싱", "인도"],
-            "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["a ", {"text": "x", "href": L(1)}, " 265억 원"], ["가" * 2600]]}],
+            "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["a ", {"text": "x", "href": L(1)}, " 265억 원"], ["글로벌 리밸런싱 인도 " + "가" * 2600]]}],
             "sources": [{"url": L(1), "axes": ["news"]}, {"url": L(2), "axes": ["news"]}, {"url": L(3), "axes": ["other"]}],
             "poll": {"kind": "emotion", "question": "q", "options": [{"key": "unsure", "label": "잘 모르겠어요"}]}}
 
@@ -57,7 +58,7 @@ def go(api, drafts, clusters=None, live=True, fact_problems=None):
          mock.patch.object(run, "make_draft", lambda p, f="": next(it, None)), \
          mock.patch.object(run, "call_model", lambda s, u, max_tokens=0: json.dumps(clusters)), \
          mock.patch.object(run, "fact_check", lambda d, c: fact_problems or []), \
-         mock.patch.object(run, "WINDOW", (0, 24)):
+         mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
         return run.run(dry_run=not live)
 
 
@@ -98,6 +99,7 @@ def test_server_rejection_is_fed_back_and_second_try_publishes():
 def test_no_matching_editor_stops():
     d = good_draft()
     d["topics"] = ["한옥"]
+    d["sections"][0]["paragraphs"].append(["한옥 골목 이야기"])  # 본문에 나온 주제여야 태그 정리를 통과한다
     out = go(Api(), [d])
     assert out["published"] == 0 and "에디터" in out["stopped"]
 

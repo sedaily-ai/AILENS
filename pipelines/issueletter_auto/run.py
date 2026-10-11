@@ -21,11 +21,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import core  # noqa: E402
 
-ATTEMPTS_PER_CLUSTER = 2  # 묶음당 시도 횟수(비용 상한: 2묶음 × 2회)
+ATTEMPTS_PER_CLUSTER = 3  # 묶음당 시도 횟수(비용 상한: 2묶음 × 3회)
 MAX_CLUSTERS_TRIED = 2
 LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k")  # lens-letters-sonnet-46 (비용 절감: 소넷 사용, 2026-10-11)
 MAX_PER_DAY = int(os.environ.get("ISSUELETTER_MAX_PER_DAY", "1"))
-LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "3"))
+LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "7"))
 WINDOW = (6, 18)  # 이 시각(KST) 사이에만 발행한다
 API = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
 PROMPT_TEMPLATE = Path(__file__).with_name("draft_prompt.txt")
@@ -54,7 +54,7 @@ def api(method: str, path: str, body: Optional[dict] = None, public: bool = Fals
         return r.status_code, {"detail": r.text[:300]}
 
 
-def call_model(system: str, user: str, max_tokens: int = 8000) -> str:
+def call_model(system: str, user: str, max_tokens: int = 16000) -> str:
     import bedrock_client
     return bedrock_client.call_text(system, user, model=LETTERS_PROFILE, max_tokens=max_tokens)
 
@@ -67,16 +67,24 @@ def fetch_recent_articles() -> List[Dict[str, Any]]:
 # ── 단계 ────────────────────────────────────────────────────────────────────────
 
 def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str]) -> List[Dict[str, Any]]:
+    if os.environ.get("ISSUELETTER_PICK", "keyword") == "keyword":
+        picked = core.keyword_clusters(articles, used_keys)
+        log("clusters", mode="keyword", kept=len(picked), topics=[f"{c['keyword']}({c['n_articles']}건/{c['n_days']}일)" for c in picked])
+        return picked
     by_key = {a["key"]: a for a in articles if a.get("key")}
     listing = "\n".join(f"{a['key']} | {a['title']}" for a in articles if a.get("key"))[:60000]
     system = (Path(__file__).with_name("cluster_prompt.md")).read_text(encoding="utf-8")
-    raw_text = call_model(system, "기사 목록:\n" + listing, max_tokens=4000)
     from json_extract import extract_fenced_json_text, loads_lenient
-    body = extract_fenced_json_text(raw_text, opener="[") or raw_text[raw_text.find("["): raw_text.rfind("]") + 1]
-    try:
-        raw = loads_lenient(body)
-    except Exception:  # noqa: BLE001
-        log("cluster_parse_failed", head=raw_text[:200])
+    raw = None
+    for _ in range(2):  # 모델이 JSON 앞에 설명을 붙이거나 형식이 깨지는 경우가 있어 한 번 더 시도한다
+        raw_text = call_model(system + "\n\n설명 없이 JSON 배열만 출력하세요.", "기사 목록:\n" + listing, max_tokens=8000)
+        body = extract_fenced_json_text(raw_text, opener="[") or raw_text[raw_text.find("["): raw_text.rfind("]") + 1]
+        try:
+            raw = loads_lenient(body)
+            break
+        except Exception:  # noqa: BLE001
+            log("cluster_parse_failed", head=raw_text[:200])
+    if raw is None:
         return []
     clusters = core.clean_clusters(raw, by_key, used_keys)
     clusters.sort(key=core.source_advice_score)  # 권유 표현이 적은 기사 묶음부터(같으면 기존 크기순 유지)
@@ -87,7 +95,7 @@ def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str]) -> List[
 def build_prompt(cluster: Dict[str, Any], editors: List[Dict[str, Any]], topics_text: str) -> str:
     tpl = PROMPT_TEMPLATE.read_text(encoding="utf-8")
     cand = "\n".join(f"- {a['title']} | {core.sedaily_url(a['key'])}" for a in cluster["articles"])
-    bodies = "\n\n".join(f"[기사 {a['key']}] {a['title']}\n{(a.get('content') or '')[:3500]}" for a in cluster["articles"])
+    bodies = "\n\n".join(f"[기사 {a['key']}] {a['title']}\n{(a.get('content') or '')[:6000]}" for a in cluster["articles"])
     eds = "\n".join(f"- {e['slug']}: {e['name']}, {e['role']}, 담당 분야: {'·'.join(e.get('topic_names') or [])}" for e in editors)
     return tpl.replace("{{TOPIC}}", cluster["topic"]).replace("{{CANDIDATES}}", cand).replace("{{BODIES}}", bodies).replace("{{EDITORS}}", eds).replace("{{SLUG_DATE}}", datetime.now(KST).strftime("%Y-%m-%d"))
 
@@ -95,17 +103,31 @@ def build_prompt(cluster: Dict[str, Any], editors: List[Dict[str, Any]], topics_
 def make_draft(prompt: str, feedback: str = "") -> Optional[Dict[str, Any]]:
     from json_extract import extract_json_object
     text = call_model(prompt + (f"\n\n[직전 시도가 거부된 사유 — 이것만 고쳐서 JSON 전체를 다시 출력]\n{feedback}" if feedback else ""), "위 지시대로 저장용 JSON 하나만 출력하세요.")
-    try:
-        obj = extract_json_object(text)
-    except Exception:  # noqa: BLE001
-        return None
-    return obj if isinstance(obj, dict) else None
+    _dump("raw", text)
+    for candidate in (text, core.repair_json_quotes(text)):  # 첫 시도가 깨지면 문자열 속 곧은 따옴표를 고쳐 한 번 더
+        try:
+            obj = extract_json_object(candidate)
+        except Exception:  # noqa: BLE001
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
+
+
+def _dump(kind: str, data: Any) -> None:
+    """ISSUELETTER_DUMP_DIR 이 있으면 시도마다 원문·초안을 파일로 남긴다(로컬 점검용)."""
+    d = os.environ.get("ISSUELETTER_DUMP_DIR")
+    if not d:
+        return
+    Path(d).mkdir(parents=True, exist_ok=True)
+    n = len(list(Path(d).glob(f"{kind}_*")))
+    (Path(d) / f"{kind}_{n + 1}.txt").write_text(data if isinstance(data, str) else json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 FACT_CHECK_SYSTEM = (
     "당신은 서울경제신문의 사실 확인 담당입니다. 아래 [기사]만을 근거로 [초안]의 문장을 대조하세요. "
     "고유명사(사람·기관·기업), 직함, 인용문, 날짜, 인과 주장이 [기사]에 근거가 있는지만 봅니다(문체·의견은 보지 않습니다). "
-    "근거가 없거나 [기사]와 다른 것만 찾으세요. 출력은 JSON 배열 하나만: [\"문제가 있는 초안 문장 그대로 + 이유\"]. 문제가 없으면 []."
+    "근거가 없거나 [기사]와 사실이 다른 것만 찾으세요. 단순 반올림(26만 8000가구를 27만 가구로), 표현 축약, 기사 내용의 일부 생략은 문제가 아닙니다. 문제를 찾지 못하면 목록에 넣지 마세요. 출력은 JSON 배열 하나만: [\"문제가 있는 초안 문장 그대로 + 이유\"]. 문제가 없으면 []."
 )
 
 
@@ -162,6 +184,18 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
         if fact_problems:
             feedback = "기사 본문에서 확인되지 않는 내용이 있습니다. 해당 문장을 빼거나 기사에 있는 표현으로 고치세요: " + " / ".join(fact_problems)[:1500]
             log("draft_fact_check_failed", attempt=attempt, problems=fact_problems[:5])
+            continue
+        attribution = core.other_attribution_problem(draft)
+        if attribution:
+            feedback = attribution
+            log("draft_attribution", attempt=attempt)
+            continue
+        primary = list(draft.get("topics") or [])[:2]
+        pr = core.prune_topics(draft)
+        if pr["dropped"]:
+            log("topics_pruned", dropped=pr["dropped"])
+        if any(t in pr["dropped"] for t in primary):
+            feedback = "주 주제 태그가 본문에 나오지 않습니다. 본문에 실제로 나온 주제를 사전 이름으로 앞의 두 개에 적으세요: " + ", ".join(t for t in primary if t in pr["dropped"])
             continue
         slugs = core.pick_editors(draft.get("topics") or [], editors)
         if not slugs:

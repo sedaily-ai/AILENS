@@ -6,18 +6,18 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 MIN_CLUSTER = 3
 MAX_CLUSTER = 6
 # 갈등 소지가 큰 소재는 자동 선정에서 제외한다(정치·젠더·세대·지역). 사람이 직접 쓰는 경로는 막지 않는다.
-SENSITIVE_WORDS = ("대통령", "여당", "야당", "국민의힘", "민주당", "탄핵", "선거", "총선", "대선", "지방선거", "페미", "젠더", "남녀", "세대 갈등", "호남", "영남", "혐오", "차별 논란",
+SENSITIVE_WORDS = ("대통령", "여당", "야당", "국민의힘", "민주당", "탄핵", "선거", "총선", "대선", "지방선거", "페미", "젠더", "남녀", "세대 갈등", "호남", "영남", "혐오", "차별 논란", "명태균", "김건희", "윤석열", "尹", "北", "북한",
                    "감찰", "검찰", "중수청", "공수처", "특검", "기소", "구속영장", "국정감사", "국감", "국정조사", "청문회", "여야", "정권", "탄핵")
 # 본문(인용 포함)에 실리면 안 되는 투자·행동 권유 표현. 서버의 금지어(BODY_DIRECTIVE_TERMS)는 "매수하" 같은 활용형만 막아 귀속된 인용("분할 매수로 대응해야 한다")이 빠져나가므로,
 # 자동 발행 경로에서는 더 넓게 막는다. 걸리면 그 인용을 빼고 사실만 쓰도록 다시 쓴다.
 # 단 "순매도·순매수·매도세·매수세·매도 물량" 같은 시장 동향 보도어는 사실 서술이라 허용한다(허용어를 먼저 지운 뒤 검사한다).
 ALLOWED_MARKET_TERMS = ("순매도", "순매수", "매도세", "매수세", "매도 물량", "매수 물량", "매도 압력", "매수 주체", "매도 주체", "공매도", "매도 우위", "매수 우위", "매수 전환", "매도 전환")
-ADVICE_PATTERNS = ("매수", "매도", "대응해야", "대응하는", "사야", "팔아야", "담아야", "비중 확대", "비중 축소", "비중을 늘", "비중을 줄", "진입해야", "분할", "추천", "유망", "저점", "바닥", "지금이", "기회")
+ADVICE_PATTERNS = ("매수", "매도", "대응해야", "대응하는", "사야", "팔아야", "담아야", "비중 확대", "비중 축소", "비중을 늘", "비중을 줄", "진입해야", "분할", "추천", "유망", "저점", "바닥", "지금이 기회", "투자 기회", "매수 기회")
 URL_RE = re.compile(r"https?://[^\s\"')\]]+")
 NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
@@ -89,17 +89,35 @@ def restrict_to_cluster(draft: Dict[str, Any], allowed_keys: Iterable[str]) -> L
     return sorted(bad)
 
 
+def block_text(block: Dict[str, Any]) -> str:
+    parts: List[str] = [str(block.get(k) or "") for k in ("title", "text")]
+    for side in ("left", "right"):
+        if isinstance(block.get(side), dict):
+            parts += [str(block[side].get("label") or ""), str(block[side].get("text") or "")]
+    for i in block.get("items") or []:
+        if isinstance(i, dict):
+            parts += [str(i.get(k) or "") for k in ("label", "text", "value", "sub")]
+        else:
+            parts.append(str(i))
+    return " ".join(p for p in parts if p)
+
+
+def para_text(para: Any) -> str:
+    """문단(조각 배열) 또는 시각 블록의 글자. 블록 안의 숫자·문장도 같은 검증(수치 대조·권유 표현)을 받도록 합친다."""
+    return "".join(p if isinstance(p, str) else (block_text(p) if "block" in p else str(p.get("text", ""))) for p in (para or []) if isinstance(p, (str, dict)))
+
+
 def draft_body_text(draft: Dict[str, Any]) -> str:
     parts: List[str] = [str(draft.get("title") or ""), str(draft.get("deck") or ""), *[str(s) for s in draft.get("summary") or []], str(draft.get("editor_note") or "")]
     for sec in draft.get("sections") or []:
         parts += [str(sec.get("heading") or ""), str(sec.get("key_line") or "")]
         for para in sec.get("paragraphs") or []:
-            parts.append("".join(p if isinstance(p, str) else str(p.get("text", "")) for p in para))
+            parts.append(para_text(para))
     return "\n".join(parts)
 
 
 # 템플릿 v2 분량 규칙: 본문 기준 2,500~3,500자(모바일 5~7분). 본문 = 섹션 문단 글자 수(제목·요약·한마디 제외).
-BODY_MIN_CHARS = 2500
+BODY_MIN_CHARS = 2000
 BODY_MAX_CHARS = 3500
 
 
@@ -107,16 +125,18 @@ def body_chars(draft: Dict[str, Any]) -> int:
     n = 0
     for sec in draft.get("sections") or []:
         for para in sec.get("paragraphs") or []:
-            n += len("".join(p if isinstance(p, str) else str(p.get("text", "")) for p in para))
+            n += len(para_text(para))
     return n
 
 
 def length_problem(draft: Dict[str, Any]) -> str:
     n = body_chars(draft)
+    target = (BODY_MIN_CHARS + BODY_MAX_CHARS) // 2
     if n < BODY_MIN_CHARS:
-        return f"본문이 {n}자로 짧습니다. 기사에 있는 사실만으로 {BODY_MIN_CHARS}~{BODY_MAX_CHARS}자가 되도록 섹션별로 사실·맥락·인용을 더 풀어 쓰세요(지어내기 금지)"
+        return (f"본문이 {n}자로 짧습니다. 목표는 {target}자 안팎입니다(약 {target - n}자 더). 기사에 있는 사실만으로, 섹션마다 문단 3개 이상으로 "
+                "기사 속 수치·인용·경과를 빠짐없이 풀어 쓰세요(지어내기 금지, 같은 말 반복 금지)")
     if n > BODY_MAX_CHARS:
-        return f"본문이 {n}자로 깁니다. {BODY_MIN_CHARS}~{BODY_MAX_CHARS}자로 줄이세요"
+        return f"본문이 {n}자로 깁니다. 목표는 {target}자 안팎입니다(약 {n - target}자 덜). 덜 중요한 문단부터 줄이세요"
     return ""
 
 
@@ -153,6 +173,147 @@ def advice_hits(draft: Dict[str, Any], source_texts: Iterable[str] = ()) -> List
     for allowed in ALLOWED_MARKET_TERMS:
         text = text.replace(allowed, "")
     return sorted({w for w in ADVICE_PATTERNS if w in text})
+
+
+# 주제 태그는 본문에 실제로 나온 것만 둔다(템플릿 v2). 이름이 그대로 없어도 아래 대체 표기가 있으면 나온 것으로 본다.
+TOPIC_ALIASES = {"인공지능": ("AI", "생성형"), "가상자산": ("비트코인", "암호화폐", "코인"), "기업 실적": ("실적", "영업이익"), "시그널(증시)": ("증시",),
+                 "도시·동네": ("동네", "골목"), "음식·맛집": ("식당", "맛집"), "여행·관광": ("관광", "여행"), "무역·통상": ("무역", "통상", "수출"),
+                 "안전·재난": ("사고", "재난", "안전"), "환경·기후": ("환경", "기후"), "경제성장률": ("성장률",)}
+
+
+def prune_topics(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """본문에 나오지 않은 주제 태그를 뺀다. 앞의 두 개(주 주제)가 본문에 없으면 문제로 돌려준다."""
+    text = draft_body_text(draft)
+    keep, dropped = [], []
+    for t in draft.get("topics") or []:
+        forms = (t, *TOPIC_ALIASES.get(t, ()))
+        (keep if any(f in text for f in forms) else dropped).append(t)
+    draft["topics"] = keep
+    return {"dropped": dropped}
+
+
+ATTRIBUTION_MARKS = ("따르면", "밝혔", "말했", "지적", "설명", "주장", "분석", "평가", "전했", "강조", "내놨", "관계자", "전문가", "연구원", "교수", "측은", "위원장", "장관", "대표", "센터장", "회장", "원장", "대변인", "총재", "의원", "“", "”", "한국은행", "금융위", "금감원", "부는", "은행연합회")
+
+
+def other_attribution_problem(draft: Dict[str, Any]) -> str:
+    """'다른 시각' 섹션의 모든 문단에 말한 주체(기사·전문가·기관)를 알리는 표현이 있어야 한다(템플릿 v2)."""
+    bare = []
+    for sec in draft.get("sections") or []:
+        if sec.get("axis") != "other":
+            continue
+        for para in sec.get("paragraphs") or []:
+            if para and isinstance(para[0], dict) and "block" in para[0]:
+                continue  # 시각 블록은 문단이 아니라 장식이라 귀속 검사에서 뺀다(블록 안 인용은 본문에서 이미 귀속)
+            txt = para_text(para)
+            if txt.strip() and not any(m in txt for m in ATTRIBUTION_MARKS):
+                bare.append(txt[:40])
+    if bare:
+        return "다른 시각 섹션에 말한 주체(기사·전문가·기관)가 밝혀지지 않은 문단이 있습니다. 직접 비판하지 말고 누가 말했는지 귀속해 쓰세요: " + " / ".join(bare)
+    return ""
+
+
+# ── 키워드 기반 소재 선정(모델 호출 없음) ──────────────────────────────────────────
+GENERIC_WORDS = set("""단독 시그널 확대 최대 최고 추진 출시 시장 내년 올해 지난 이번 서울 한국 정부 기업 투자 글로벌 논란 공급 1위 신규 증가 감소 개최 발표 전망 개선 강화 지원 추가 가능 계획 이후 대한 관련 통해
+위해 따라 중심 이상 이하 전체 일부 주요 새로 다시 처음 오늘 어제 내일 오전 오후 사업 서비스 제품 시대 가격 규모 기준 현황 상승 하락 증시 지수 마감 속보 포토 인사 부고 오늘의 헬시타임 구축 역대 공격 지금 사설 칼럼 기고 인터뷰 종합 영상 이슈 종목""".split())
+_JOSA = re.compile(r"(은|는|이|가|을|를|의|에|와|과|도|로|으로|에서|부터|까지|에게|보다)$")
+
+
+def _tokens(title: str) -> Set[str]:
+    out: Set[str] = set()
+    for w in re.findall(r"[가-힣A-Za-z0-9·]{2,}", title or ""):
+        w = _JOSA.sub("", w)
+        if len(w) >= 2 and not w.isdigit() and w not in GENERIC_WORDS and not is_sensitive(w):
+            out.add(w)
+    return out
+
+
+def _title_tokens(title: str) -> Set[str]:
+    return _tokens(re.sub(r"\[[^\]]*\]|\([^)]*\)|【[^】]*】", "", title or ""))  # [단독]·[사설] 같은 말머리·괄호 제거
+
+
+def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = (), min_articles: int = 3, min_chars: int = 5000,
+                     max_candidates: int = 8) -> List[Dict[str, Any]]:
+    """최근 기사 제목에서 '같이 나오는 단어 쌍'(예: 삼성전자+영업익, AI+보안)으로 소재 후보를 만든다.
+    쌍으로 보면 일반어가 걸러지고 구체적인 사안이 남는다. 기사가 여러 날에 걸쳐 많이 쓰인 소재일수록 재료가 많다.
+    점수 = 기사 수(최대 12) + 2×게재 일수 + 지면 1면 포함 3 − 권유 표현 많은 본문 감점. 기사가 겹치는 후보는 점수 높은 쪽만 둔다."""
+    import itertools
+    used = set(used_keys)
+    by_pair: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    for a in articles:
+        if not a.get("key") or is_sensitive(a.get("title", "")) or a["key"] in used:
+            continue
+        for pair in itertools.combinations(sorted(_title_tokens(a.get("title", ""))), 2):
+            by_pair.setdefault(pair, []).append(a)
+    cands: List[Dict[str, Any]] = []
+    for pair, arts in by_pair.items():
+        if len(arts) < min_articles:
+            continue
+        days = {str(a.get("date") or "")[:10] for a in arts}
+        if len(days) < 2:
+            continue
+        ranked = sorted(arts, key=lambda a: (str(a.get("paper_number") or "") == "1", int(a.get("content_len") or 0)), reverse=True)[:MAX_CLUSTER]
+        if sum(int(a.get("content_len") or 0) for a in ranked) < min_chars:
+            continue
+        body = " ".join(str(a.get("content") or "") for a in ranked)
+        if sum(body.count(w) for w in SENSITIVE_WORDS) >= 4:  # 본문에 정치·갈등 인물·기관 발언이 많은 소재는 제외(제목에 없어도 거른다)
+            continue
+        kw = "+".join(pair)
+        cl = {"topic": f"{kw}: {ranked[0].get('title', '')}"[:40], "keyword": kw, "keys": [a["key"] for a in ranked], "articles": ranked}
+        page1 = any(str(a.get("paper_number") or "") == "1" for a in ranked)
+        adv = source_advice_score(cl)
+        cl["score"] = min(len(arts), 12) + 2 * len(days) + (3 if page1 else 0) - (8 if adv >= 5 else 0)
+        cl["n_articles"], cl["n_days"], cl["advice"] = len(arts), len(days), adv
+        cands.append(cl)
+    cands.sort(key=lambda c: -c["score"])
+    out: List[Dict[str, Any]] = []
+    for c in cands:
+        if any(len(set(c["keys"]) & set(o["keys"])) >= max(2, len(c["keys"]) // 2) for o in out):
+            continue
+        out.append(c)
+        if len(out) >= max_candidates:
+            break
+    return out
+
+
+def repair_json_quotes(text: str) -> str:
+    """모델이 문자열 안에 곧은 큰따옴표를 그대로 쓴 JSON 을 고친다. 문자열 안에서 만난 따옴표 뒤가
+    `, 다음 따옴표/중괄호/대괄호`·`}`·`]`·`:` 가 아니면 문자열의 끝이 아니라 본문 따옴표로 보고 이스케이프한다."""
+    out: List[str] = []
+    in_str = False
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if not in_str:
+            out.append(ch)
+            if ch == '"':
+                in_str = True
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:  # 이미 이스케이프된 문자
+            out.append(ch + text[i + 1])
+            i += 2
+            continue
+        if ch == '"':
+            j = i + 1
+            while j < n and text[j] in " \t\r":
+                j += 1
+            nxt = text[j] if j < n else ""
+            terminator = nxt in ("}", "]", ":", "") or nxt == "\n"
+            if nxt == ",":
+                k = j + 1
+                while k < n and text[k] in " \t\r\n":
+                    k += 1
+                terminator = k >= n or text[k] in '"{[]}'
+            if terminator:
+                out.append(ch)
+                in_str = False
+            else:
+                out.append('\\"')
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def source_advice_score(cluster: Dict[str, Any]) -> int:
