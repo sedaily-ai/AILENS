@@ -681,6 +681,8 @@ export interface IssueLetterDetail extends IssueLetterSummary {
   category_names: string[];
   /** 주제 태그(주제 사전 항목). 주 주제가 앞에 온다. */
   topics: { slug: string; name: string; kind: string; is_primary: boolean }[];
+  /** 작성 에디터 slug. 구독한 에디터가 쓴 레터가 발행되면 그 구독자에게 메일이 간다(비어 있으면 아무에게도 가지 않는다). */
+  editors?: string[];
   sections: {
     axis: "news" | "substance" | "other";
     axis_label: string | null;
