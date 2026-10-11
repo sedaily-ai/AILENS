@@ -31,7 +31,7 @@ export function EditorIntro({ editor, following, onToggleFollow }: { editor: Let
 
   return (
     <section className="lt-eintro" aria-label={`${editor.name} 에디터 소개`} style={{ '--tone-bg': editor.tone.bg, '--tone-fg': editor.tone.fg } as CSSProperties}>
-      <div className="lt-eintro-photo"><EditorAvatar editor={editor} size={132} rounded /></div>
+      <div className="lt-eintro-photo"><EditorAvatar editor={editor} size={168} rounded /></div>
       <div className="lt-eintro-body">
         <div className="lt-eintro-name">
           <h2>{editor.name}</h2>
@@ -47,7 +47,7 @@ export function EditorIntro({ editor, following, onToggleFollow }: { editor: Let
           {editor.voice && <button type="button" className="lt-eintro-btn" aria-pressed={playing} onClick={toggleVoice}>{playing ? '소개 멈추기' : '소개 듣기'}</button>}
         </div>
       </div>
-      <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} interests={editorInterests(editor)} source={`editor:${editor.id}`}
+      <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} interests={editorInterests(editor)} source={`editor:${editor.id}`} editors={[editor]}
         title={`${editor.name} 에디터의 새 레터를 메일로 받기`}
         lead={<>{editor.topics.slice(0, 4).map((t) => t.name).join(' · ')} 등 {editor.name}의 담당 분야와 겹치는 레터를 보내요.</>} />
     </section>

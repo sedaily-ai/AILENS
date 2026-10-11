@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
+import type { LetterEditor } from '../data/editors';
 import { subscribeByEmail, type InterestItem } from '../data/interestApi';
+import { EditorAvatar } from './EditorAvatar';
 
 type Frequency = 'daily' | 'weekly';
 const FREQUENCIES: { id: Frequency; label: string; hint: string }[] = [
@@ -17,7 +19,7 @@ const EMAIL_OK = /^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]{2,}$/;
  * 메일 구독 대화상자. 행동 정의: docs/product/모아쓰기레터/구독_UX_행동정의.md
  * 입력은 이메일 하나가 핵심이고(주기·시각은 기본값이 있어 건드리지 않아도 됨), 동의는 미리 체크하지 않으며, 신청 뒤에는 "메일 확인"까지 안내한다.
  */
-export function SubscribeDialog({ open, onClose, interests, title, lead, source }: { open: boolean; onClose: () => void; interests: InterestItem[]; title: string; lead?: ReactNode; source: string }) {
+export function SubscribeDialog({ open, onClose, interests, title, lead, source, editors = [] }: { open: boolean; onClose: () => void; interests: InterestItem[]; title: string; lead?: ReactNode; source: string; editors?: LetterEditor[] }) {
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('daily');
@@ -77,6 +79,11 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source 
           </div>
         ) : (
           <form onSubmit={submit} noValidate>
+            {editors.length > 0 && (
+              <div className="lt-dlg-faces" aria-hidden>
+                {editors.slice(0, 4).map((e) => <span key={e.id} className="lt-dlg-face"><EditorAvatar editor={e} size={56} /></span>)}
+              </div>
+            )}
             <h2 id="lt-dlg-title" className="lt-dlg-h">{title}</h2>
             {lead && <div className="lt-dlg-lead">{lead}</div>}
             <ul className="lt-dlg-promise" aria-label="약속">

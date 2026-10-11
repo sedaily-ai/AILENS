@@ -1,6 +1,6 @@
 // 레터 에디터(목업, 2026-10-10). 이전 서비스(MBTI 에디터)의 이름·MBTI 그룹·담당 분야·이미지·목소리를 그대로 이어 쓴다 — 출처: legacy/dev_v1/service/frontend/src/app/editors/[id]/editorsData.ts.
 // 8명으로 줄였다(2026-10-11): 담당 분야가 겹치던 수빈·도윤·다은·유나는 하은·준서·소율에 합쳤다.
-// 이미지(public/editors)가 있는 4명(민철 INTJ·하은 INFP·준서 ISTJ·소율 ESFP)을 앞에 두고, 나머지 8명은 이미지 생성 전까지 이니셜 아바타를 쓴다.
+// 이미지(public/editors)가 있는 4명(민철 INTJ·하은 INFP·준서 ISTJ·소율 ESFP)을 앞에 두고, 나머지 4명(지훈·서연·예린·시우)은 손그림풍 졸라맨 선화(scripts/draw_editor_sketches.py)를 임시로 쓴다.
 // 소개 음성(옛 기록: ElevenLabs eleven_multilingual_v2) voiceId — 민철 RU7aSi6lT4uQBXMLgDxK(TeddyNote), 하은 AW5wrnG1jVizOYY7R1Oo(JiYoung), 준서 5XgfKMHL4qnyg2mabE5t(Deck), 소율 QPFsEL6IBxlT15xfiD6C(Hana Lee).
 // 에디터는 "누구의 관심 영역을 맡는가"로 나뉘고, 레터 본문은 모두 같은 중립 편집 원칙(주관·유도·권유 금지)을 따른다. 에디터는 AI 에디터이며 화면에 그렇게 표시한다.
 // 한 레터는 주제가 에디터의 담당 분야와 겹치면 여러 에디터에 속한다. 독자는 에디터를 여러 명 팔로우한다.
@@ -76,6 +76,7 @@ export const EDITORS: readonly LetterEditor[] = [
     id: 'jihoon', name: '지훈', group: 'NT', nickname: '미래탐험가',
     role: 'AI·테크 전략가', forWhom: 'AI·반도체·빅테크의 다음 흐름을 따라가는 분',
     intro: 'AI·반도체·빅테크 — 다음 10년의 변수를 짚습니다. 기술 사이클을 단기 변동보다 산업 전체 흐름으로 봅니다. 글로벌 빅테크와 한국 기술 기업 사이의 격차·기회를 정리합니다.',
+    image: '/editors/jihoon.svg',
     topics: [{ slug: 'ai', name: '인공지능' }, { slug: 'semiconductor', name: '반도체' }, { slug: 'platform', name: '플랫폼' }, { slug: 'startup', name: '스타트업' }, { slug: 'venture-investment', name: '벤처투자' }],
     tone: { bg: '#f5f3ff', fg: '#5b21b6' },
   },
@@ -83,6 +84,7 @@ export const EDITORS: readonly LetterEditor[] = [
     id: 'seoyeon', name: '서연', group: 'NT', nickname: '제도설계자',
     role: '정책·거버넌스 분석가', forWhom: '정책과 규제가 시장에 닿는 경로가 궁금한 분',
     intro: '제도가 시장을 어떻게 움직이는지 추적합니다. 정책 입안부터 시행, 시장 반응까지의 사이클을 분석합니다. 규제 변화가 산업 구도에 미치는 영향을 정리합니다.',
+    image: '/editors/seoyeon.svg',
     topics: [{ slug: 'regulation', name: '규제' }, { slug: 'national-assembly', name: '국회' }, { slug: 'tax', name: '세금' }, { slug: 'fiscal', name: '재정' }, { slug: 'diplomacy', name: '외교·안보' }],
     tone: { bg: '#f5f3ff', fg: '#5b21b6' },
   },
@@ -90,6 +92,7 @@ export const EDITORS: readonly LetterEditor[] = [
     id: 'yerin', name: '예린', group: 'NF', nickname: '세계여행자',
     role: '국제·라이프 에디터', forWhom: '먼 나라의 소식을 사람의 이야기로 읽고 싶은 분',
     intro: '먼 나라 이야기 속의 사람을 봅니다. 국제 뉴스에서 통계와 정책 너머의 일상을 전합니다. 한 도시의 풍경, 한 사람의 결을.',
+    image: '/editors/yerin.svg',
     topics: [{ slug: 'us', name: '미국' }, { slug: 'china', name: '중국' }, { slug: 'japan', name: '일본' }, { slug: 'india', name: '인도' }, { slug: 'philippines', name: '필리핀' }, { slug: 'europe', name: '유럽' }],
     tone: { bg: '#fff1f2', fg: '#9f1239' },
   },
@@ -97,6 +100,7 @@ export const EDITORS: readonly LetterEditor[] = [
     id: 'siu', name: '시우', group: 'ST', nickname: '체크리스트',
     role: '생활경제 큐레이터', forWhom: '세금·부동산·소비 정보를 실생활에 쓰는 분',
     intro: '오늘 알면 내일 돈 되는 정보만. 세금·부동산·소비 혜택 등 실생활에 바로 쓰는 정보를 체크리스트로 정리합니다.',
+    image: '/editors/siu.svg',
     topics: [{ slug: 'real-estate', name: '부동산 시장' }, { slug: 'rent', name: '임대료' }, { slug: 'tax', name: '세금' }, { slug: 'consumption', name: '소비' }, { slug: 'jeonse', name: '전세' }, { slug: 'loan', name: '대출' }],
     tone: { bg: '#ecfdf5', fg: '#047857' },
   },

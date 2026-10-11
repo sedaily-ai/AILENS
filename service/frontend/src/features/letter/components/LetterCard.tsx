@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { AxisBadge } from './AxisBadge';
+import { editorsOfLetter } from '../data/editors';
 import { AXIS_META, type IssueLetter } from '../data/letterTypes';
+import { EditorAvatar } from './EditorAvatar';
 
 export function formatLetterDate(iso: string): string {
   const [y, m, d] = iso.split('-');
@@ -21,6 +23,9 @@ export function LetterCard({ letter, featured = false, onTopic }: { letter: Issu
       <div className="lt-card-cat">
         {featured && <span className="lt-today">최신 레터</span>}
         <span>{letter.categories.join(' · ')}</span>
+        {editorsOfLetter(letter).slice(0, 2).map((ed) => (
+          <span key={ed.id} className="lt-card-ed"><EditorAvatar editor={ed} size={22} />{ed.name}</span>
+        ))}
         <span className="lt-no">제 {letter.issueNumber}호</span>
       </div>
       <h3 className="lt-card-title">{letter.title}</h3>
