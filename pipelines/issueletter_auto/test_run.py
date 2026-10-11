@@ -81,7 +81,7 @@ def test_invented_number_is_retried_then_stops_without_publish():
     bad["summary"] = ["매출 999억 원"]
     api = Api()
     out = go(api, [bad, bad, bad])
-    assert out["published"] == 0 and "모두 검증을 통과하지 못함" in out["stopped"] and "999" in out["last_feedback"]
+    assert out["published"] == 0 and "모두 검증을 통과하지 못함" in out["stopped"] and "고치지 못했습니다" in out["last_feedback"]  # 제목·요약의 가짜 수치는 짧은 재작성으로 고치되, 못 고치면 접는다
     assert api.saved == 0  # 검증을 통과하지 못한 초안은 서버에 저장조차 하지 않는다
 
 
@@ -170,3 +170,18 @@ def test_advice_heavy_cluster_is_deferred_by_source_score():
     assert core.source_advice_score(heavy) > core.source_advice_score(light) == 0
     ordered = sorted([heavy, light], key=core.source_advice_score)
     assert ordered[0] is light
+
+
+def test_header_rewrite_fixes_invented_number_in_summary_without_regenerating():
+    bad = good_draft()
+    bad["summary"] = ["매출 999억 원"]
+    def fake_model(system, user, max_tokens=0):
+        if "고쳐 쓰세요" in system:
+            return json.dumps({"summary:0": "인도법인 매출은 176억 원이에요"}, ensure_ascii=False)
+        return json.dumps([{"topic": "라네즈", "keys": ["1", "2", "3", "4"]}])
+    api = Api()
+    with mock.patch.object(run, "api", api), mock.patch.object(run, "fetch_recent_articles", lambda: ARTS), \
+         mock.patch.object(run, "make_draft", lambda p, f="": bad), mock.patch.object(run, "call_model", fake_model), \
+         mock.patch.object(run, "fact_check", lambda d, c: []), mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
+        out = run.run(dry_run=False)
+    assert out["published"] == 1

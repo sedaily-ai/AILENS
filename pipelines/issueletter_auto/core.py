@@ -507,6 +507,61 @@ def fit_blocks(draft: Dict[str, Any]) -> int:
     return changed
 
 
+# ── 제목·부제·요약·핵심 한 줄 보정(문장을 지울 수 없는 자리) ──────────────────────────
+def header_fields(draft: Dict[str, Any]) -> Dict[str, str]:
+    """코드가 지울 수 없는 필수 자리의 글: id → 글. id 는 title / deck / editor_note / summary:i / heading:i / key_line:i."""
+    out: Dict[str, str] = {"title": str(draft.get("title") or ""), "deck": str(draft.get("deck") or ""), "editor_note": str(draft.get("editor_note") or "")}
+    for i, x in enumerate(draft.get("summary") or []):
+        out[f"summary:{i}"] = str(x)
+    for i, sec in enumerate(draft.get("sections") or []):
+        out[f"heading:{i}"] = str(sec.get("heading") or "")
+        out[f"key_line:{i}"] = str(sec.get("key_line") or "")
+    return out
+
+
+def set_header_field(draft: Dict[str, Any], fid: str, text: str) -> None:
+    kind, _, idx = fid.partition(":")
+    if kind in ("title", "deck", "editor_note"):
+        draft[kind] = text
+    elif kind == "summary":
+        draft["summary"][int(idx)] = text
+    elif kind == "heading":
+        draft["sections"][int(idx)]["heading"] = text
+    elif kind == "key_line":
+        draft["sections"][int(idx)]["key_line"] = text
+
+
+def bad_header_fields(draft: Dict[str, Any], source_texts: Iterable[str]) -> Dict[str, str]:
+    """기사에 없는 수치나 권유 표현이 든 필수 자리: id → 이유."""
+    source_nums: Set[str] = set()
+    for t in source_texts:
+        source_nums |= numbers_in(t)
+    bad: Dict[str, str] = {}
+    for fid, text in header_fields(draft).items():
+        extra = sorted(numbers_in(text) - source_nums)
+        if extra:
+            bad[fid] = "기사에 없는 수치: " + ", ".join(extra)
+        elif _has_advice(text):
+            bad[fid] = "투자·행동 권유로 읽히는 표현"
+    return bad
+
+
+def match_header_fields(draft: Dict[str, Any], problems: List[str]) -> Dict[str, str]:
+    """사실 대조 지적 문장이 들어 있는 필수 자리를 찾는다: id → 지적 내용. 못 찾은 지적은 결과에 없다."""
+    found: Dict[str, str] = {}
+    fields = {fid: _norm(t) for fid, t in header_fields(draft).items()}
+    for prob in problems:
+        head = re.split(r"\s+[—–]\s+| — |\s/\s", str(prob), maxsplit=1)[0]
+        key = _norm(head)
+        if len(key) < 8:
+            continue
+        probes = {key[:14], key[-14:]} if len(key) >= 28 else {key}
+        for fid, t in fields.items():
+            if t and (any(p in t for p in probes) or (len(t) >= 10 and t in key)):
+                found[fid] = str(prob)[:400]
+    return found
+
+
 def source_advice_score(cluster: Dict[str, Any]) -> int:
     """묶음 기사 본문에 투자·행동 권유 표현이 얼마나 있는지. 많으면(증권사 전망 인용 위주) 초안이 반복해 걸리므로 뒤로 미룬다."""
     text = " ".join(str(a.get("content") or "") for a in cluster.get("articles") or [])

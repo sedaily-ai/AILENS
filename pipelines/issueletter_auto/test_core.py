@@ -157,3 +157,11 @@ def test_trim_to_max_removes_longest_plain_paragraphs_but_keeps_links_and_one_pe
     removed = core.trim_to_max(d)
     assert removed >= 1 and core.body_chars(d) <= core.BODY_MAX_CHARS
     assert len(d["sections"][1]["paragraphs"]) == 1 and any(isinstance(x, dict) for p in d["sections"][0]["paragraphs"] for x in p)
+
+
+def test_bad_header_fields_and_matching_for_rewrite():
+    d = {"title": "t 11.8GW 규모", "deck": "정상 문장이에요", "editor_note": "e", "summary": ["a 176억 원", "b"], "sections": [{"heading": "h", "key_line": "엔비디아는 올해 8월 말 실적을 발표했어요", "paragraphs": []}]}
+    bad = core.bad_header_fields(d, ["매출은 176억 원"])
+    assert set(bad) == {"title"} and core.set_header_field(d, "title", "고친 제목") is None and d["title"] == "고친 제목"
+    hit = core.match_header_fields(d, ["엔비디아는 올해 8월 말 실적을 발표했어요 — 시점이 기사와 다름"])
+    assert list(hit) == ["key_line:0"]
