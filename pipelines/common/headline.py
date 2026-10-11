@@ -70,3 +70,41 @@ def pick(candidates: List[Dict[str, Any]], body_text: str, article_title: str, u
         if verifier is None or verifier(c["title"]):
             return c
     return None
+
+
+# ── 생성(모델 호출) ───────────────────────────────────────────────────────────
+MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"  # lens-letters-sonnet-46
+# 정치 소재는 후킹 제목을 쓰지 않고 기사 제목을 유지한다(중립 원칙). 분류 이름 또는 기사 최상위 분류로 판단한다.
+KEEP_ARTICLE_TITLE_CATEGORIES = ("정치",)
+_VERIFY = ("당신은 서울경제신문 팩트체커다. [기사 정보]와 [레터 본문]만 근거로 [제목]이 사실과 다르거나 근거 없는 주장을 담았는지 본다. "
+           "숫자·주체·관계(누가 무엇을 했는지)가 본문과 어긋나거나 본문에 없는 일반론을 덧붙였으면 not ok. 표현이 압축됐을 뿐 사실이 맞으면 ok. "
+           "JSON 하나만: {\"ok\": true|false, \"reason\": \"한 줄\"}")
+
+
+def _load_prompt() -> str:
+    """제목 프롬프트. 이미지에는 pipelines/ 만 들어가므로 같은 폴더의 사본을 읽는다(docs/prompt/letters/title-prompt-v2-*.md 와 같은 내용, 테스트가 일치를 확인)."""
+    from pathlib import Path
+    return (Path(__file__).parent / "headline_prompt.md").read_text(encoding="utf-8").split("## 지침", 1)[1]
+
+
+def generate(article_title: str, subtitle: str, body_text: str, category: str = "", used_types: Optional[Dict[str, int]] = None) -> Optional[Dict[str, Any]]:
+    """레터 제목 한 줄을 만든다. 정치 소재거나 통과한 후보가 없으면 None(→ 호출부가 기사 제목을 쓴다).
+    후보 4개 생성(1회) → 코드 검증 → 사실 확인(후보당 짧은 호출, 최대 점수순으로 첫 통과까지)."""
+    if category in KEEP_ARTICLE_TITLE_CATEGORIES:
+        return None
+    from bedrock_client import call_text
+    from json_extract import extract_json_object
+    body = (body_text or "")[:2800]
+    try:
+        out = call_text(_load_prompt(), f"[기사]\n제목: {article_title}\n부제: {subtitle or ''}\n\n[레터 본문]\n{body}", model=MODEL, max_tokens=900)
+        cands = extract_json_object(out).get("candidates", [])
+    except Exception:  # noqa: BLE001
+        return None
+
+    def verifier(title: str) -> bool:
+        try:
+            r = extract_json_object(call_text(_VERIFY, f"[기사 정보]\n{article_title}\n{subtitle or ''}\n\n[레터 본문]\n{body}\n\n[제목]\n{title}", model=MODEL, max_tokens=300))
+            return bool(r.get("ok"))
+        except Exception:  # noqa: BLE001
+            return False
+    return pick(cands, f"{body} {article_title} {subtitle or ''}", article_title, used_types, verifier)

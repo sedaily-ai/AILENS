@@ -548,11 +548,18 @@ def publish_article(
         letter_terms = parse_letter_terms(letters_raw)
         # 프롬프트가 생성하는 "독자 시선 진입형" 제목. [제목] 마커를 못 찾으면
         # 첫 문단의 이모지 경계로 복구하고, 그것도 실패하면 원문 제목으로 폴백한다.
-        letter_title = (
-            parse_letter_title(letters_raw)
-            or extract_title_from_lead(paragraphs)
-            or article["title"]
-        )
+        # 제목은 전용 프롬프트(docs/prompt/letters/title-prompt-v2)로 따로 만든다: 기사 사실 + 남은 여지, 코드 검증·사실 확인 통과분만.
+        # 정치 소재거나 통과한 후보가 없으면 본문 프롬프트가 쓴 제목, 그것도 없으면 기사 제목으로 폴백한다.
+        letter_title = None
+        try:
+            import headline as _headline  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
+            picked = _headline.generate(article["title"], article.get("sub_title") or "", "\n".join(paragraphs), article.get("top_category") or "")
+            letter_title = picked["title"] if picked else None
+        except Exception as e:  # noqa: BLE001 — 제목 생성이 발행을 막으면 안 된다
+            print(f"[{log_prefix}] 제목 생성 실패 — 폴백: {e}")
+        if not letter_title and (article.get("top_category") or "") not in ("정치",):
+            letter_title = parse_letter_title(letters_raw) or extract_title_from_lead(paragraphs)
+        letter_title = letter_title or article["title"]
 
         podcast_url = _upload(podcast_mp3, f"media/podcast/{log_prefix}/{name}-podcast.mp3")
 
