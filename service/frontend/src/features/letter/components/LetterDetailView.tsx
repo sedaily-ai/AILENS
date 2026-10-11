@@ -152,7 +152,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
             <span className="ld-axis-label" style={{ color: AXIS_META[sec.axis].tone }}>{AXIS_META[sec.axis].label}</span>
           </div>
           <h2 className="ld-sec-h">{sec.heading}</h2>
-          <p className="ld-key">{sec.keyLine}</p>
+          <p className="ld-key"><span className="ld-key-l">핵심:</span> {sec.keyLine}</p>
           {sec.paragraphs.map((para, j) => (
             <p key={j} className="ld-p">
               <Segments parts={para} letterSlug={letter.slug} sources={letter.sources} pieces={termPieces} />

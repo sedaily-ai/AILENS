@@ -16,7 +16,7 @@ EDITORS = [{"slug": "mincheol", "name": "민철", "role": "전략", "topic_names
 def good_draft():
     L = lambda k: core.sedaily_url(str(k))
     return {"slug": "2026-10-11-x", "title": "t", "deck": "d", "summary": ["매출 176억 원"], "editor_note": "e", "categories": ["industry"], "topics": ["글로벌 리밸런싱", "인도"],
-            "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["a ", {"text": "x", "href": L(1)}, " 265억 원"]]}],
+            "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["a ", {"text": "x", "href": L(1)}, " 265억 원"], ["가" * 2600]]}],
             "sources": [{"url": L(1), "axes": ["news"]}, {"url": L(2), "axes": ["news"]}, {"url": L(3), "axes": ["other"]}],
             "poll": {"kind": "emotion", "question": "q", "options": [{"key": "unsure", "label": "잘 모르겠어요"}]}}
 
@@ -80,7 +80,7 @@ def test_invented_number_is_retried_then_stops_without_publish():
     bad["summary"] = ["매출 999억 원"]
     api = Api()
     out = go(api, [bad, bad, bad])
-    assert out["published"] == 0 and "3회" in out["stopped"] and "999" in out["last_feedback"]
+    assert out["published"] == 0 and "모두 검증을 통과하지 못함" in out["stopped"] and "999" in out["last_feedback"]
     assert api.saved == 0  # 검증을 통과하지 못한 초안은 서버에 저장조차 하지 않는다
 
 
@@ -127,7 +127,7 @@ def test_advice_terms_are_rejected_even_when_quoted():
 
 def test_fact_check_problem_blocks_publish():
     out = go(Api(), [good_draft()] * 3, fact_problems=["이경민 연구원 직함이 기사와 다름"])
-    assert out["published"] == 0 and "3회" in out["stopped"]
+    assert out["published"] == 0 and "모두 검증을 통과하지 못함" in out["stopped"]
 
 
 def test_key_line_prefix_is_stripped_before_save():
@@ -143,3 +143,21 @@ def test_key_line_prefix_is_stripped_before_save():
         return orig(method, path, body, public)
 
     assert go(spy, [d])["published"] == 1 and seen["kl"] == "매출이 늘었어요"
+
+
+def test_length_gate_follows_document_range():
+    short = good_draft()
+    short["sections"][0]["paragraphs"] = [["짧아요"]]
+    assert "짧습니다" in core.length_problem(short)
+    long = good_draft()
+    long["sections"][0]["paragraphs"] = [["가" * 3600]]
+    assert "깁니다" in core.length_problem(long)
+    assert core.length_problem(good_draft()) == ""
+
+
+def test_advice_heavy_cluster_is_deferred_by_source_score():
+    heavy = {"articles": [{"content": "분할 매수로 대응해야 한다. 매수 매도 추천"}]}
+    light = {"articles": [{"content": "매출은 176억 원이다. 순매도 규모가 컸다"}]}  # 순매도는 보도어라 점수에 안 잡힌다
+    assert core.source_advice_score(heavy) > core.source_advice_score(light) == 0
+    ordered = sorted([heavy, light], key=core.source_advice_score)
+    assert ordered[0] is light

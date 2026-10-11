@@ -27,6 +27,8 @@ def test_clean_clusters_excludes_sensitive_topics():
     arts = {k: A(k, "야당이 선거 앞두고" if k == "1" else "경제 소식") for k in "123"}
     assert core.clean_clusters([{"topic": "경제", "keys": ["1", "2", "3"]}], arts) == []
     assert core.is_sensitive("대통령실 발표") and not core.is_sensitive("금리 동결")
+    assert core.is_sensitive("임은정 광주중수청장 감찰 지시") and core.is_sensitive("검찰 인사 논란")
+    assert not core.is_sensitive("삼성전자 3분기 실적") and not core.is_sensitive("대구 마트 천장 붕괴 부상")
 
 
 def test_clean_clusters_sorts_by_size_and_caps():

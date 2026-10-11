@@ -21,7 +21,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import core  # noqa: E402
 
-LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq")  # lens-letters-opus-5
+ATTEMPTS_PER_CLUSTER = 2  # 묶음당 시도 횟수(비용 상한: 2묶음 × 2회)
+MAX_CLUSTERS_TRIED = 2
+LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k")  # lens-letters-sonnet-46 (비용 절감: 소넷 사용, 2026-10-11)
 MAX_PER_DAY = int(os.environ.get("ISSUELETTER_MAX_PER_DAY", "1"))
 LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "3"))
 WINDOW = (6, 18)  # 이 시각(KST) 사이에만 발행한다
@@ -64,7 +66,7 @@ def fetch_recent_articles() -> List[Dict[str, Any]]:
 
 # ── 단계 ────────────────────────────────────────────────────────────────────────
 
-def pick_cluster(articles: List[Dict[str, Any]], used_keys: List[str]) -> Optional[Dict[str, Any]]:
+def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str]) -> List[Dict[str, Any]]:
     by_key = {a["key"]: a for a in articles if a.get("key")}
     listing = "\n".join(f"{a['key']} | {a['title']}" for a in articles if a.get("key"))[:60000]
     system = (Path(__file__).with_name("cluster_prompt.md")).read_text(encoding="utf-8")
@@ -75,10 +77,11 @@ def pick_cluster(articles: List[Dict[str, Any]], used_keys: List[str]) -> Option
         raw = loads_lenient(body)
     except Exception:  # noqa: BLE001
         log("cluster_parse_failed", head=raw_text[:200])
-        return None
+        return []
     clusters = core.clean_clusters(raw, by_key, used_keys)
+    clusters.sort(key=core.source_advice_score)  # 권유 표현이 적은 기사 묶음부터(같으면 기존 크기순 유지)
     log("clusters", raw=len(raw) if isinstance(raw, list) else 0, kept=len(clusters), topics=[c["topic"] for c in clusters])
-    return clusters[0] if clusters else None
+    return clusters
 
 
 def build_prompt(cluster: Dict[str, Any], editors: List[Dict[str, Any]], topics_text: str) -> str:
@@ -119,29 +122,7 @@ def fact_check(draft: Dict[str, Any], cluster: Dict[str, Any]) -> List[str]:
     return [str(x) for x in out] if isinstance(out, list) else ["사실 대조 응답 형식 오류(보류)"]
 
 
-def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:
-    now = datetime.now(KST)
-    live = os.environ.get("ISSUELETTER_AUTO") == "1" if dry_run is None else not dry_run
-    result: Dict[str, Any] = {"live": live, "published": 0}
-    if live and not (WINDOW[0] <= now.hour < WINDOW[1]):
-        return {**result, "stopped": f"발행 시각 창({WINDOW[0]}~{WINDOW[1]}시) 밖"}
-    code, existing = api("GET", "/admin/issue-letters?limit=200")
-    letters = existing.get("letters", []) if code == 200 else []
-    today = now.strftime("%Y-%m-%d")
-    if sum(1 for l in letters if str(l.get("published_at") or "").startswith(today) and l.get("status") == "published") >= MAX_PER_DAY:
-        return {**result, "stopped": "오늘 발행 상한 도달"}
-    used: List[str] = []
-    for l in letters:
-        c2, d = api("GET", f"/admin/issue-letters/{l['id']}")
-        for s in (d.get("letter", d).get("sources") or []):
-            k = core.article_key_of(str(s.get("url") or ""))
-            if k:
-                used.append(k)
-    articles = fetch_recent_articles()
-    log("articles", n=len(articles))
-    cluster = pick_cluster(articles, used)
-    if not cluster:
-        return {**result, "stopped": "이슈 묶음 없음"}
+def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) -> Dict[str, Any]:
     c3, arch = api("POST", "/admin/issue-letters/archives", {"articles": [{"news_id": a["key"], "title": a["title"], "original_link": core.sedaily_url(a["key"]), "published_at": (a.get("date") or "")[:10], "content": (a.get("content") or "")[:300]} for a in cluster["articles"]]})
     if c3 != 200:
         return {**result, "stopped": f"보관 기사 저장 실패({c3})", "detail": arch.get("detail")}
@@ -150,7 +131,7 @@ def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:
     prompt = build_prompt(cluster, editors, "")
     sources_text = [a.get("content") or "" for a in cluster["articles"]] + [a["title"] for a in cluster["articles"]]
     feedback = ""
-    for attempt in range(1, 4):
+    for attempt in range(1, ATTEMPTS_PER_CLUSTER + 1):
         draft = make_draft(prompt, feedback)
         if not draft:
             feedback = "JSON 형식이 올바르지 않습니다. 코드블록 없이 JSON 객체 하나만 출력하세요."
@@ -161,6 +142,11 @@ def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:
         if outside:
             feedback = "묶음 밖 주소를 링크했습니다: " + ", ".join(outside)
             log("draft_outside_links", attempt=attempt, urls=outside)
+            continue
+        too_long_short = core.length_problem(draft)
+        if too_long_short:
+            feedback = too_long_short
+            log("draft_length", attempt=attempt, chars=core.body_chars(draft))
             continue
         unsupported = core.unsupported_numbers(draft, sources_text)
         if unsupported:
@@ -196,7 +182,40 @@ def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:
             log("publish_rejected", detail=str(pub.get("detail"))[:300])
             return {**result, "stopped": f"발행 거부({c7})", "detail": pub.get("detail"), "letter_id": letter["id"]}
         return {**result, "published": 1, "letter_id": letter["id"], "slug": letter.get("slug"), "send": pub.get("send")}
-    return {**result, "stopped": "초안 생성이 3회 모두 검증을 통과하지 못함", "last_feedback": feedback}
+    return {**result, "retry_next": True, "last_feedback": feedback}
+
+
+def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:
+    now = datetime.now(KST)
+    live = os.environ.get("ISSUELETTER_AUTO") == "1" if dry_run is None else not dry_run
+    result: Dict[str, Any] = {"live": live, "published": 0}
+    if live and not (WINDOW[0] <= now.hour < WINDOW[1]):
+        return {**result, "stopped": f"발행 시각 창({WINDOW[0]}~{WINDOW[1]}시) 밖"}
+    code, existing = api("GET", "/admin/issue-letters?limit=200")
+    letters = existing.get("letters", []) if code == 200 else []
+    today = now.strftime("%Y-%m-%d")
+    if sum(1 for l in letters if str(l.get("published_at") or "").startswith(today) and l.get("status") == "published") >= MAX_PER_DAY:
+        return {**result, "stopped": "오늘 발행 상한 도달"}
+    used: List[str] = []
+    for l in letters:
+        c2, d = api("GET", f"/admin/issue-letters/{l['id']}")
+        for s in (d.get("letter", d).get("sources") or []):
+            k = core.article_key_of(str(s.get("url") or ""))
+            if k:
+                used.append(k)
+    articles = fetch_recent_articles()
+    log("articles", n=len(articles))
+    clusters = pick_clusters(articles, used)
+    if not clusters:
+        return {**result, "stopped": "이슈 묶음 없음"}
+    last: Dict[str, Any] = {}
+    for cluster in clusters[:MAX_CLUSTERS_TRIED]:
+        out = _run_cluster(cluster, result, live)
+        if not out.get("retry_next"):
+            return out
+        last = out
+        log("cluster_exhausted", topic=cluster["topic"], feedback=str(out.get("last_feedback"))[:200])
+    return {**result, "stopped": f"초안 생성이 {MAX_CLUSTERS_TRIED}개 묶음에서 모두 검증을 통과하지 못함", "last_feedback": last.get("last_feedback")}
 
 
 if __name__ == "__main__":

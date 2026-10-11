@@ -543,4 +543,21 @@ export const LETTER_CSS = `
     .lt-ob-rec li { flex-wrap: wrap; }
     .lt-ob-go { margin-left: auto; }
   }
+  .ld-key-l { margin-right: 4px; font-size: 0.85em; font-weight: 700; color: #2f5fcf; }
+
+  /* 투표 보기: 카드형. 색은 점과 결과 막대에만 쓰고 테두리는 얇은 회색 유지(평면·단순 톤) */
+  .ld-opts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .ld-opt { --t: #2f5fcf; --tb: #eef3fd; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 12px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 14px; overflow: visible; }
+  .ld-opt[data-tone='w'] { --t: #b7791f; --tb: #fdf4e3; }
+  .ld-opt[data-tone='n'] { --t: #6b7280; --tb: #f3f4f6; }
+  .ld-opt:hover:not(:disabled) { border-color: #d1d5db; background: var(--tb); }
+  .ld-opt-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--t); }
+  .ld-opt-l { font-size: 15px; font-weight: 700; color: #111827; }
+  .ld-opt[aria-pressed='true'] { border-color: #e5e7eb; background: var(--tb); }
+  .ld-opt-res { display: grid; gap: 6px; width: 100%; }
+  .ld-opt-track { display: block; height: 4px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+  .ld-opt-fill { display: block; height: 100%; border-radius: 999px; background: var(--t); transition: width .5s ease; }
+  .ld-opt-p { font-size: 18px; font-weight: 700; color: var(--t); }
+  .ld-opt-mine { font-size: 12px; font-weight: 600; color: #6b7280; }
+  @media (max-width: 520px) { .ld-opts { grid-template-columns: 1fr; } .ld-opt { flex-direction: row; align-items: center; flex-wrap: wrap; } .ld-opt-res { width: auto; margin-left: auto; grid-auto-flow: column; align-items: center; } .ld-opt-track { width: 48px; } }
 `;

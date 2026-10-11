@@ -37,6 +37,15 @@ REQUIRED_POLL_NEUTRAL_KEY = "unsure"  # 모든 투표에 "잘 모르겠어요"�
 EDITOR_NOTE_BANNED_TERMS = ("아이러니", "재밌", "재미있", "놀랍", "흥미", "탁월", "대단", "안타깝", "다행", "충격", "역시", "결국",
                             "지켜봐야", "주목하", "해야", "분명", "당연", "!")
 EDITOR_NOTE_MAX_CHARS = 200
+EDITOR_NOTE_MAX_SENTENCES = 2
+# 제목·요약·섹션 제목·핵심 한 줄: 템플릿 v2 금지 표현(평가·감탄). 문장 끝맺음 위주라 인용문과 거의 겹치지 않는 것만 둔다.
+HEADLINE_BANNED_TERMS = ("아이러니", "재밌는", "재미있는", "놀랍게도", "놀라운", "흥미롭게도", "흥미로운", "탁월", "안타깝게도", "다행히", "충격", "!")
+# 본문 문단: 인용문 속 당사자 발언을 막지 않도록 가장 분명한 평가 부사만 막는다.
+BODY_EVAL_TERMS = ("아이러니", "놀랍게도", "흥미롭게도", "안타깝게도", "다행히")
+POLL_MIN_OPTIONS = 3
+POLL_MAX_OPTIONS = 4
+SUMMARY_MIN_LINES = 2
+SUMMARY_MAX_LINES = 3
 # 사이트 분류의 정본은 프론트 shared/constants/econCategories.ts 다. DB categories 테이블은 옛 7분류라 쓰지 않는다(v1.38).
 SITE_CATEGORIES = {
     "markets": "시그널", "property": "부동산", "economy": "경제", "finance": "금융", "industry": "산업",
@@ -235,8 +244,15 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
             problems.append(f"섹션 {i + 1}에 '핵심' 문장이 없습니다")
         if not sec.get("paragraphs"):
             problems.append(f"섹션 {i + 1}에 본문 문단이 없습니다")
-    if not letter.get("summary"):
+    axes_present = {sec.get("axis") for sec in sections}
+    missing_axes = [a for a in AXES if a not in axes_present]
+    if missing_axes:
+        problems.append(f"3축(소식·실체·다른 시각)이 모두 있어야 합니다(빠진 축: {', '.join(missing_axes)})")
+    summary_lines = letter.get("summary") or []
+    if not summary_lines:
         problems.append("1분 요약이 없습니다")
+    elif not SUMMARY_MIN_LINES <= len(summary_lines) <= SUMMARY_MAX_LINES:
+        problems.append(f"1분 요약은 {SUMMARY_MIN_LINES}~{SUMMARY_MAX_LINES}줄이어야 합니다(현재 {len(summary_lines)}줄)")
     if not (letter.get("editor_note") or "").strip():
         problems.append("에디터 한마디가 없습니다")
 
@@ -270,9 +286,14 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
     elif topic_count > MAX_TOPICS:
         problems.append(f"주제 태그는 최대 {MAX_TOPICS}개입니다(현재 {topic_count}개)")
     problems.extend(poll_problems(letter.get("poll")))
+    poll_options = (letter.get("poll") or {}).get("options") or []
+    if letter.get("poll") and not POLL_MIN_OPTIONS <= len(poll_options) <= POLL_MAX_OPTIONS:
+        problems.append(f"투표 선택지는 {POLL_MIN_OPTIONS}~{POLL_MAX_OPTIONS}개여야 합니다(현재 {len(poll_options)}개)")
     note = (letter.get("editor_note") or "").strip()
     if len(note) > EDITOR_NOTE_MAX_CHARS:
         problems.append(f"에디터 한마디가 {EDITOR_NOTE_MAX_CHARS}자를 넘습니다(현재 {len(note)}자)")
+    if len(re.findall(r"[.?!]", note)) > EDITOR_NOTE_MAX_SENTENCES:
+        problems.append(f"에디터 한마디는 {EDITOR_NOTE_MAX_SENTENCES}문장 이내여야 합니다")
     hit = biased_terms(note, EDITOR_NOTE_BANNED_TERMS)
     if hit:
         problems.append(f"에디터 한마디에 평가·감탄·단정·판단 요구 표현이 있습니다({', '.join(hit)}) — 본문 사실의 연결을 정리하는 문장으로 바꾸세요")
@@ -281,7 +302,17 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
         body_texts.append((f"섹션 {i + 1} 핵심", sec.get("key_line") or ""))
         for para in sec.get("paragraphs") or []:
             body_texts.append((f"섹션 {i + 1} 본문", "".join(seg if isinstance(seg, str) else seg.get("text", "") for seg in para)))
+    headline_texts = [("제목", letter.get("title") or ""), ("부제", letter.get("deck") or "")] + [("1분 요약", t) for t in letter.get("summary") or []]
+    for i, sec in enumerate(sections):
+        headline_texts += [(f"섹션 {i + 1} 제목", sec.get("heading") or ""), (f"섹션 {i + 1} 핵심", sec.get("key_line") or "")]
+    for where, text in headline_texts:
+        hit = biased_terms(text, HEADLINE_BANNED_TERMS)
+        if hit:
+            problems.append(f"{where}에 평가·감탄 표현이 있습니다({', '.join(hit)}) — 사실만 쓰세요")
     for where, text in body_texts:
+        hit = biased_terms(text, BODY_EVAL_TERMS)
+        if hit:
+            problems.append(f"{where}에 평가 표현이 있습니다({', '.join(hit)})")
         hit = biased_terms(text, BODY_DIRECTIVE_TERMS)
         if hit:
             problems.append(f"{where}에 권유·지시 표현이 있습니다({', '.join(hit)})")
