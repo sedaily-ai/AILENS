@@ -26,8 +26,9 @@ NEW_NAMES = set(TAXONOMY)
 # 글에 저장돼 있던 옛 이름 → 새 이름
 OLD_TO_NEW = {"증시": "시그널", "금융·정책": "금융"}
 
+from bedrock_models import profile_arn  # noqa: E402
 # 분류 전용 Bedrock application inference profile(비용 태그가 붙는 경로). 베어 모델 ID를 쓰지 않는다.
-CLASSIFY_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"
+CLASSIFY_MODEL = profile_arn("letters_sonnet46")
 
 # 원문 피드의 최상위 태그 → 새 대분류(LLM 호출이 실패했을 때의 대분류 추정용). '경제'는 거의 모든 기사에 붙어 구분력이 없어 넣지 않는다.
 _TAG_FALLBACK = {

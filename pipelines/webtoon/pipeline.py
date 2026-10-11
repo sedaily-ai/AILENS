@@ -21,9 +21,10 @@ from stitch import stitch
 
 client = get_client()
 
+from bedrock_models import profile_arn  # noqa: E402
 # 스크립트·장면 연출 모델(inference profile lens-webtoon-script-sonnet-5, 이전 lens-webtoon-script-opus-5).
 # admin/backend/routes/prompts.py::_CATEGORY_BEDROCK["webtoon"]과 반드시 같은 ARN을 유지한다.
-SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dy1fhtb04pon"  # lens-webtoon-script-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 3건 시험 중 2건 통과·1건은 JSON 문법 오류 → loads_lenient 보강)
+SCRIPT_MODEL = profile_arn("webtoon_script_sonnet5")  # lens-webtoon-script-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 3건 시험 중 2건 통과·1건은 JSON 문법 오류 → loads_lenient 보강)
 IMAGE_MODEL = "gpt-5.5"          # 휴면 GPT 경로용 이미지 생성 모델 (Responses API의 image_generation 툴)
 IMAGE_SIZE = "1536x1024"         # 3:2 가로. 컷당 $0.165 (2026-08 기준, high quality)
 IMAGE_QUALITY = "high"
