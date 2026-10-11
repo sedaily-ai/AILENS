@@ -11,7 +11,8 @@ import headline as H
 from bedrock_client import call_text
 from json_extract import extract_json_object
 
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"  # lens-letters-sonnet-46
+from bedrock_models import profile_arn  # noqa: E402
+MODEL = profile_arn("letters_sonnet46")
 PROMPT = H._load_prompt()
 VERIFY = ("당신은 서울경제신문 팩트체커다. [기사 정보]와 [레터 본문]만 근거로 [제목]이 사실과 다르거나 근거 없는 주장을 담았는지 본다. "
           "숫자·주체·관계(누가 무엇을 했는지)가 본문과 어긋나면 not ok. 표현이 압축됐을 뿐 사실이 맞으면 ok. JSON 하나만: {\"ok\": true|false, \"reason\": \"한 줄\"}")

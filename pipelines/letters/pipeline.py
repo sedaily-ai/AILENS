@@ -12,7 +12,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text
 
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dt2qj8drli0n"  # lens-letters-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 기사 5건 시험: 파싱·수치 동일, 분량 소폭 짧음)
+from bedrock_models import profile_arn  # noqa: E402
+MODEL = profile_arn("letters_sonnet5")  # lens-letters-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 기사 5건 시험: 파싱·수치 동일, 분량 소폭 짧음)
 
 
 def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> Path:

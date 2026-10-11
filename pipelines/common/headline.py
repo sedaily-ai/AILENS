@@ -72,8 +72,9 @@ def pick(candidates: List[Dict[str, Any]], body_text: str, article_title: str, u
     return None
 
 
+from bedrock_models import profile_arn  # noqa: E402
 # ── 생성(모델 호출) ───────────────────────────────────────────────────────────
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"  # lens-letters-sonnet-46
+MODEL = profile_arn("letters_sonnet46")
 # 정치 소재는 후킹 제목을 쓰지 않고 기사 제목을 유지한다(중립 원칙). 분류 이름 또는 기사 최상위 분류로 판단한다.
 KEEP_ARTICLE_TITLE_CATEGORIES = ("정치",)
 _VERIFY = ("당신은 서울경제신문 팩트체커다. [기사 정보]와 [레터 본문]만 근거로 [제목]이 사실과 다르거나 근거 없는 주장을 담았는지 본다. "

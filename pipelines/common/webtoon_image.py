@@ -340,12 +340,13 @@ def build_style_guide_prompt(camera: str, scene: str) -> str:
 # ─────────────────────────────────────────────────────────────
 
 BEDROCK_IMAGE_REGION = "us-west-2"  # us-east-1엔 살아있는 순수 text-to-image 모델이 없음(Nova Canvas만 있는데 막힘)
+from bedrock_models import profile_arn  # noqa: E402
 # 베어 모델 ID(`stability.stable-image-core-v1:1`)로 직접 호출하면 비용할당태그가 붙을 자리가
 # 없어 청구 데이터에서 전량 `Not Applicable`로 새므로(실측 8/18~8/26 $33.08, 월 약 $110)
 # application inference profile ARN을 쓴다. 태그는 소급되지 않는다.
 # 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
 # (2026-09-30 이후 Service는 lens, docs/architecture/비용태깅_규칙.md 참고).
-BEDROCK_IMAGE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/5jauvzgplsjx"  # lens-webtoon-image-stable-core → stability.stable-image-core-v1:1
+BEDROCK_IMAGE_MODEL_ID = profile_arn("image_stable_core")  # lens-webtoon-image-stable-core → stability.stable-image-core-v1:1
 BEDROCK_ASPECT_RATIO = "3:2"
 
 _bedrock_image_client = None
@@ -412,7 +413,7 @@ def generate_bedrock_image_bytes(prompt: str) -> bytes:
 # us-west-2에만 있다(BEDROCK_IMAGE_REGION과 동일).
 # 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
 # (태깅 정책은 비용태깅_규칙.md 참고).
-SD35_LARGE_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/52u16muojn2u"  # lens-webtoon-image-sd35-large → stability.sd3-5-large-v1:0
+SD35_LARGE_MODEL_ID = profile_arn("image_sd35_large")  # lens-webtoon-image-sd35-large → stability.sd3-5-large-v1:0
 
 
 def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
@@ -433,7 +434,7 @@ def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
 # Stability AI 최상위 품질 등급. 요청 스키마는 Stable Image Core와 같다(mode 불필요).
 # 프로파일 태그: Service=atlas4 · Project=Sedaily-LENS · Workload=webtoon-image
 # (태깅 정책은 비용태깅_규칙.md 참고).
-SD_ULTRA_MODEL_ID = "arn:aws:bedrock:us-west-2:887078546492:application-inference-profile/htvjnctxyvs1"  # lens-webtoon-image-sd-ultra → stability.stable-image-ultra-v1:1
+SD_ULTRA_MODEL_ID = profile_arn("image_sd_ultra")  # lens-webtoon-image-sd-ultra → stability.stable-image-ultra-v1:1
 
 
 # 그림에 글자·말풍선이 들어가는 것을 막는 금지어는 본문의 CRITICAL 문구와 별개로
@@ -502,7 +503,7 @@ def _retry_generate_and_write(bytes_fn, out_path: Path, retries: int) -> bool:
 # ─────────────────────────────────────────────────────────────
 
 NOVA_CANVAS_REGION = "us-east-1"
-NOVA_CANVAS_MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/jbnsv603bm7x"  # lens-webtoon-image-nova-canvas → amazon.nova-canvas-v1:0
+NOVA_CANVAS_MODEL_ID = profile_arn("image_nova_canvas")  # lens-webtoon-image-nova-canvas → amazon.nova-canvas-v1:0
 
 _nova_canvas_client = None
 
@@ -610,7 +611,7 @@ def generate_cut_image(
 # 문장으로 재시도해도 매번 같은 방식으로 거부되므로 일반 재시도는 무의미하다. 어떤 단어가
 # 걸렸는지 Bedrock이 알려주지 않아 규칙 기반 사전 필터링도 불가능하다. 그래서 거부 시점에
 # 텍스트 모델로 프롬프트를 한 번 순화한 뒤 재시도한다.
-_PROMPT_HELPER_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/yirjajon82n7"  # lens-webtoon-script-sonnet-46
+_PROMPT_HELPER_MODEL = profile_arn("webtoon_script_sonnet46")  # lens-webtoon-script-sonnet-46
 
 
 def _soften_scene_for_filter(scene: str) -> str:

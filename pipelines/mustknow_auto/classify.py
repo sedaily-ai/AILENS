@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 from bedrock_client import call_text
 from json_extract import extract_fenced_json_text, loads_lenient, extract_json_object
 
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/zmdham3vkj89"  # lens-mustknow-sonnet-5
+from bedrock_models import profile_arn  # noqa: E402
+MODEL = profile_arn("mustknow_sonnet5")
 
 # 한 호출에 넣는 후보 수 상한. 30건 배치에서 max_tokens 안에 응답이 마지막 항목 reasoning
 # 도중 끊겨 JSON이 완성되지 않았다(실측). Sonnet 5는 항목별 reasoning이 길고 토큰 소모가

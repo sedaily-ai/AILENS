@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 import ddb_prompt
 from bedrock_client import call_text
 
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"  # lens-letters-sonnet-46
+from bedrock_models import profile_arn  # noqa: E402
+MODEL = profile_arn("letters_sonnet46")
 
 
 def extract_facts(article_content: str, today_kst: str) -> str:
