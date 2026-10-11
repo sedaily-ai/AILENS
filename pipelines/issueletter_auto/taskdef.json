@@ -29,7 +29,7 @@
         },
         {
           "name": "ISSUELETTER_AUTO",
-          "value": "0"
+          "value": "1"
         },
         {
           "name": "ISSUELETTER_MAX_PER_DAY",
