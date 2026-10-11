@@ -6,6 +6,7 @@ import type { IssueLetter } from '../data/letterTypes';
 import { useFollowedEditors } from '../lib/useFollowedEditors';
 import { useInterests } from '../lib/useInterests';
 import { useLetterShelf } from '../lib/useLetterShelf';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AllSide } from './AllSide';
 import { EditorBar } from './EditorBar';
 import { EditorIntro } from './EditorIntro';
@@ -44,8 +45,26 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
   const editor = editorId ? findEditor(editorId) : undefined;
   const q = query.trim().toLowerCase();
   // 순서는 늘 최신순. 팔로우한 에디터의 세부 분야와 겹치는 레터는 같은 자리에서 이유만 덧붙여 보여 준다.
-  const withReason = useMemo(() => letters.map((l) => (interests.reasons[l.slug] ? { ...l, reason: interests.reasons[l.slug] } : l)), [letters, interests.reasons]);
+  // 이유는 사실만 적는다: 관심 주제와 겹치면 그 주제, 아니면 팔로우한 에디터가 쓴 글이라는 사실.
+  const withReason = useMemo(
+    () =>
+      letters.map((l) => {
+        if (interests.reasons[l.slug]) return { ...l, reason: interests.reasons[l.slug] };
+        const ed = editorsOfLetter(l).find((e) => follow.isFollowing(e.id));
+        return ed ? { ...l, reason: `팔로우한 ${ed.name} 에디터가 쓴 레터예요` } : l;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [letters, interests.reasons, follow.ids],
+  );
   const mine = (l: IssueLetter) => editorsOfLetter(l).some((e) => follow.isFollowing(e.id));
+  const openLetter = (l: IssueLetter, position: number) =>
+    trackEvent('letter_card_click', {
+      slug: l.slug,
+      position,
+      reason_type: !l.reason ? 'none' : l.reason.startsWith('팔로우') ? 'followed_editor' : 'interest_topic',
+      followed_count: follow.ids.length,
+      surface: editor ? 'editor_tab' : 'all',
+    });
   const matchCount = withReason.filter(mine).length;
   const shown = withReason.filter(
     (l) =>
@@ -89,7 +108,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
           )}
           {shown.length > 0 ? (
             <div className="lt-rows">
-              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => shelf.toggleSaved(l.slug)} />)}
+              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => shelf.toggleSaved(l.slug)} />)}
             </div>
           ) : (
             <p className="lt-empty">{editor && !filtering ? `아직 ${editor.name}의 세부 분야와 겹치는 레터가 없어요. 팔로우하거나 구독하면 나오는 대로 알려 드려요.` : filtering ? '조건에 맞는 레터가 아직 없어요.' : '레터가 아직 없어요.'}</p>

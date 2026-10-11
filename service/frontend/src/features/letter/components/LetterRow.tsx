@@ -5,7 +5,7 @@ import { EditorAvatar } from './EditorAvatar';
 import { formatLetterDate } from './LetterCard';
 
 /** 목록의 한 줄. 카드 대신 구분선으로 나눈 읽기 쉬운 행 — 메타(분류·에디터·날짜) → 제목 → 요약 → 3축·주제·기사 수. */
-export function LetterRow({ letter, latest = false, onTopic, read = false, saved = false, onToggleSaved }: { letter: IssueLetter; latest?: boolean; onTopic?: (name: string) => void; read?: boolean; saved?: boolean; onToggleSaved?: () => void }) {
+export function LetterRow({ letter, latest = false, onTopic, read = false, saved = false, onToggleSaved, onOpen }: { onOpen?: () => void; letter: IssueLetter; latest?: boolean; onTopic?: (name: string) => void; read?: boolean; saved?: boolean; onToggleSaved?: () => void }) {
   const lead = editorsOfLetter(letter)[0];
   return (
     <article className={`lt-row${read ? ' lt-row-read' : ''}`}>
@@ -15,7 +15,7 @@ export function LetterRow({ letter, latest = false, onTopic, read = false, saved
         </Link>
       )}
       <div className="lt-row-main">
-      <Link href={`/letter/${encodeURIComponent(letter.slug)}`} className="lt-row-link">
+      <Link href={`/letter/${encodeURIComponent(letter.slug)}`} className="lt-row-link" onClick={onOpen}>
         <div className="lt-row-meta">
           {latest && <span className="lt-row-new">NEW</span>}
           <span>{letter.categories.join(' · ')}</span>
