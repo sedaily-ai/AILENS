@@ -202,6 +202,24 @@ def _normalize_paragraph(para: Any, where: str) -> List[Any]:
     return out
 
 
+def _normalize_sections(raw_sections: Any) -> List[Dict[str, Any]]:
+    sections = []
+    for i, sec in enumerate(raw_sections or []):
+        if not isinstance(sec, dict) or sec.get("axis") not in AXES:
+            raise LetterError(f"sections[{i}].axis 는 {'/'.join(AXES)} 중 하나여야 합니다")
+        paragraphs = sec.get("paragraphs") or []
+        if not isinstance(paragraphs, list) or len(paragraphs) > _MAX_PARAGRAPHS:
+            raise LetterError(f"sections[{i}].paragraphs 가 올바르지 않습니다")
+        sections.append({
+            "axis": sec["axis"],
+            "axis_label": _text(sec.get("axis_label"), f"sections[{i}].axis_label", limit=100),
+            "heading": _text(sec.get("heading"), f"sections[{i}].heading", required=True, limit=200),
+            "key_line": _text(sec.get("key_line"), f"sections[{i}].key_line", required=True, limit=300),
+            "paragraphs": [_normalize_paragraph(p, f"sections[{i}].paragraphs[{j}]") for j, p in enumerate(paragraphs)],
+        })
+    return sections
+
+
 def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     """저장용 입력을 검증·정규화한다(초안 단계 — 발행 규칙은 publish_problems 가 따로 본다)."""
     slug = _text(data.get("slug"), "slug", required=True, limit=255)
@@ -237,21 +255,7 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     if unknown or len(set(categories)) != len(categories):
         raise LetterError(f"알 수 없거나 중복된 분류: {', '.join(map(str, unknown)) or '중복'} (허용: {', '.join(SITE_CATEGORIES)})")
 
-    sections = []
-    for i, sec in enumerate(data.get("sections") or []):
-        if not isinstance(sec, dict) or sec.get("axis") not in AXES:
-            raise LetterError(f"sections[{i}].axis 는 {'/'.join(AXES)} 중 하나여야 합니다")
-        paragraphs = sec.get("paragraphs") or []
-        if not isinstance(paragraphs, list) or len(paragraphs) > _MAX_PARAGRAPHS:
-            raise LetterError(f"sections[{i}].paragraphs 가 올바르지 않습니다")
-        sections.append({
-            "axis": sec["axis"],
-            "axis_label": _text(sec.get("axis_label"), f"sections[{i}].axis_label", limit=100),
-            "heading": _text(sec.get("heading"), f"sections[{i}].heading", required=True, limit=200),
-            "key_line": _text(sec.get("key_line"), f"sections[{i}].key_line", required=True, limit=300),
-            "paragraphs": [_normalize_paragraph(p, f"sections[{i}].paragraphs[{j}]") for j, p in enumerate(paragraphs)],
-        })
-
+    sections = _normalize_sections(data.get("sections"))
     sources = []
     seen_positions = set()
     for i, src in enumerate(data.get("sources") or []):
@@ -654,6 +658,31 @@ def update(letter_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "UPDATE issue_letters SET title=%s, deck=%s, summary=%s, editor_note=%s, read_minutes=%s, updated_at=now() WHERE id=%s",
             (v["title"], v["deck"], v["summary"], v["editor_note"], v["read_minutes"], letter_id))
         _replace_children(cur, letter_id, v)
+    return get_admin(letter_id)
+
+
+def relayout(letter_id: int, raw_sections: Any) -> Optional[Dict[str, Any]]:
+    """발행된 레터의 본문 구성(섹션·문단·시각 블록)만 바꾼다. 제목·요약·한마디·투표·출처는 그대로 둔다.
+    섹션 수와 축 순서는 같아야 하고, 바뀐 본문이 발행 규칙(publish_problems)을 모두 통과해야 한다. 시각 블록 도입 때 기존 레터의 구성을 다시 짜기 위한 경로다."""
+    import json
+    sections = _normalize_sections(raw_sections)
+    current = get_admin(letter_id)
+    if not current:
+        return None
+    if [s["axis"] for s in sections] != [s["axis"] for s in current["sections"]]:
+        raise LetterError("섹션 수와 축 순서는 기존과 같아야 합니다", 400)
+    candidate = {**current, "sections": [{"axis": s["axis"], "heading": s["heading"], "key_line": s["key_line"], "paragraphs": s["paragraphs"]} for s in sections]}
+    # 제목·부제는 이 작업이 바꾸지 않으므로(이미 발행된 문구) 본문 구성에 관한 규칙만 본다.
+    problems = [p for p in publish_problems(candidate) if not p.startswith(("제목", "부제"))]
+    if problems:
+        raise LetterError("; ".join(problems), 400)
+    with get_cursor() as cur:
+        cur.execute("DELETE FROM issue_letter_sections WHERE letter_id = %s", (letter_id,))
+        for i, s in enumerate(sections):
+            cur.execute(
+                "INSERT INTO issue_letter_sections (letter_id, position, axis, axis_label, heading, key_line, paragraphs) VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb)",
+                (letter_id, i, s["axis"], s["axis_label"], s["heading"], s["key_line"], json.dumps(s["paragraphs"], ensure_ascii=False)))
+        cur.execute("UPDATE issue_letters SET updated_at = now() WHERE id = %s", (letter_id,))
     return get_admin(letter_id)
 
 

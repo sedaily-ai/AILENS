@@ -695,6 +695,15 @@ def admin_update_issue_letter(letter_id: int, payload: Dict[str, Any] = Body(...
     return {"letter": letter}
 
 
+@app.put("/admin/issue-letters/{letter_id}/layout")
+def admin_relayout_issue_letter(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    letter = _letter_call(issue_letters_repo.relayout, letter_id, payload.get("sections"))
+    if not letter:
+        raise HTTPException(status_code=404, detail="letter not found")
+    return {"letter": letter}
+
+
 @app.post("/admin/issue-letters/{letter_id}/submit")
 def admin_submit_issue_letter(letter_id: int, x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
