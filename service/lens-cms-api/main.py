@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 import os
 import threading
 import time
@@ -30,6 +31,7 @@ import cms_posts_repo as posts_client
 import community_repo
 import config_repo
 import daily_questions_repo
+import editors_repo
 import interests_repo
 import letter_subscriptions_repo
 import issue_letters_repo
@@ -525,8 +527,28 @@ def post_letter_subscription(payload: Dict[str, Any] = Body(...), x_voter_id: Op
     if x_voter_id:
         rh = _letter_call(interests_repo.reader_hash, x_voter_id)
     result = _letter_call(letter_subscriptions_repo.subscribe, payload.get("email"), payload.get("interests"), payload.get("frequency"),
-                          payload.get("send_hour"), payload.get("consent"), rh)
+                          payload.get("send_hour"), payload.get("consent"), rh, editors=payload.get("editors"))
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/v2/issue-letters/editors")
+def issue_letter_editors():
+    """레터 에디터 목록(공개). 소개·이미지·음성 경로는 관리자 화면에서 고친다."""
+    # 내부 DB 번호(id)는 화면이 쓰지 않으므로 내보내지 않는다.
+    editors = [{k: v for k, v in e.items() if k not in ("id", "is_active", "sort_order")} for e in _letter_call(editors_repo.list_editors)]
+    return JSONResponse({"editors": editors}, headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/api/v2/issue-letters/subscriptions/preview")
+def get_letter_subscription_preview():
+    """구독 대화상자의 "이렇게 와요" 미리보기(가장 최근 레터로 만든 메일 본문). 메일은 보내지 않는다."""
+    return JSONResponse(_letter_call(letter_subscriptions_repo.preview_mail), headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.post("/api/v2/issue-letters/subscriptions/test")
+def post_letter_subscription_test(payload: Dict[str, Any] = Body(...)):
+    """구독 신청 전에 메일이 실제로 오는지 확인하는 샘플 한 통(가장 최근 레터). 주소당 10분 1회·하루 3회."""
+    return JSONResponse(_letter_call(letter_subscriptions_repo.send_test_mail, payload.get("email")), headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/v2/issue-letters/subscriptions/confirm")
@@ -560,6 +582,25 @@ def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_vot
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
 
+@app.get("/admin/letter-editors")
+def admin_list_letter_editors(x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return {"editors": _letter_call(editors_repo.list_editors, True)}
+
+
+@app.put("/admin/letter-editors")
+def admin_upsert_letter_editors(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    _check_admin_token(x_internal_token)
+    return _letter_call(editors_repo.upsert_editors, payload.get("editors"))
+
+
+@app.put("/admin/issue-letters/{letter_id}/editors")
+def admin_set_issue_letter_editors(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    """레터의 작성 에디터를 지정한다(구독한 에디터의 글이 발행되면 그 구독자에게 보낸다)."""
+    _check_admin_token(x_internal_token)
+    return {"editors": _letter_call(editors_repo.set_letter_editors, letter_id, payload.get("editors"))}
+
+
 @app.post("/admin/letter-sends")
 def admin_letter_send(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     """다이제스트 발송. dry_run(기본 true)이면 대상과 담길 레터만 보여 주고 아무것도 쓰지·보내지 않는다."""
@@ -572,6 +613,13 @@ def admin_letter_send(payload: Dict[str, Any] = Body(...), x_internal_token: Opt
         raise HTTPException(status_code=400, detail="date 는 YYYY-MM-DD 형식이어야 합니다")
     return _letter_call(letter_subscriptions_repo.run_send, str(payload.get("kind") or "daily"), send_date, int(payload.get("hour") or 8),
                         payload.get("dry_run", True) is not False)
+
+
+@app.post("/admin/letter-sends/pending")
+def admin_letter_send_pending(x_internal_token: Optional[str] = Header(default=None)):
+    """야간에 발행돼 못 보낸 최근 24시간 레터를 지금 보낸다(8시 이후 크론 또는 수동 호출)."""
+    _check_admin_token(x_internal_token)
+    return _letter_call(letter_subscriptions_repo.run_pending_instant)
 
 
 @app.post("/admin/email-suppressions")
@@ -657,7 +705,14 @@ def admin_submit_issue_letter(letter_id: int, x_internal_token: Optional[str] = 
 def admin_publish_issue_letter(letter_id: int, payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
     actor = payload.get("actor") or {}
-    return {"letter": _letter_call(issue_letters_repo.publish, letter_id, str(actor.get("employee_no") or ""), str(actor.get("role") or ""))}
+    result = {"letter": _letter_call(issue_letters_repo.publish, letter_id, str(actor.get("employee_no") or ""), str(actor.get("role") or ""))}
+    # 발행 직후 구독자에게 바로 보낸다("올라올 때마다"). 자동 발송 설정이 꺼져 있으면 대상만 계산하고, 발송 실패가 발행을 막지 않는다.
+    try:
+        result["send"] = letter_subscriptions_repo.send_for_letter(letter_id)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("letter_subscriptions").exception("send_for_letter failed")
+        result["send"] = {"error": "send failed"}
+    return result
 
 
 @app.post("/admin/issue-letters/{letter_id}/archive")

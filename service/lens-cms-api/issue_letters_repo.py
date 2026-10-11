@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from db import get_cursor
 from letter_errors import LetterError  # noqa: F401  (다른 모듈·테스트가 이 모듈에서 가져다 쓴다)
+import editors_repo
 import topics_repo
 
 AXES = ("news", "substance", "other")
@@ -136,6 +137,13 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(summary, list) or any(not isinstance(s, str) or not s.strip() for s in summary) or len(summary) > 6:
         raise LetterError("summary 는 비어 있지 않은 문장 배열(최대 6)이어야 합니다")
 
+    editors = data.get("editors")
+    if editors is not None:
+        if not isinstance(editors, list) or any(not isinstance(e, str) or not e.strip() or len(e) > 32 for e in editors):
+            raise LetterError("editors 는 에디터 slug 문자열 배열이어야 합니다")
+        editors = list(dict.fromkeys(e.strip().lower() for e in editors))
+        if len(editors) > 8:
+            raise LetterError("editors 는 최대 8명입니다")
     topics = data.get("topics")
     if topics is not None:
         if not isinstance(topics, list) or any(not isinstance(t, str) or not t.strip() or len(t) > 64 for t in topics):
@@ -211,7 +219,7 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "slug": slug, "title": title, "deck": _text(data.get("deck"), "deck", limit=500) or "",
         "summary": [s.strip() for s in summary], "editor_note": _text(data.get("editor_note"), "editor_note", limit=1000),
-        "read_minutes": read_minutes, "categories": [str(c) for c in categories], "topics": topics,
+        "read_minutes": read_minutes, "categories": [str(c) for c in categories], "topics": topics, "editors": editors,
         "sections": sections, "sources": sources, "poll": poll,
     }
 
@@ -322,7 +330,8 @@ def _load_children(cur, letter_id: int) -> Dict[str, Any]:
         cur.execute("SELECT key, label, hint FROM issue_letter_poll_options WHERE letter_id = %s ORDER BY position", (letter_id,))
         poll = {"kind": poll["kind"], "question": poll["question"], "options": cur.fetchall()}
     names = [SITE_CATEGORIES.get(c["category_slug"], c["category_slug"]) for c in cats]
-    return {"categories": [c["category_slug"] for c in cats], "category_names": names,
+    editors = editors_repo.letter_editor_slugs(cur, [letter_id]).get(letter_id, [])
+    return {"editors": editors, "categories": [c["category_slug"] for c in cats], "category_names": names,
             "primary_category": next((SITE_CATEGORIES.get(c["category_slug"]) for c in cats if c["is_primary"]), None),
             "sections": sections, "sources": sources, "poll": poll, "topics": topics}
 
@@ -359,7 +368,7 @@ def list_published(category: Optional[str] = None, limit: int = 20, before: Opti
                 card.pop(k, None)
             card.update(categories=child["category_names"], primary_category=child["primary_category"],
                         axes=sorted({a for s in child["sections"] for a in [s["axis"]]}),
-                        source_count=len(child["sources"]), topics=[t["name"] for t in child["topics"]][:4])
+                        source_count=len(child["sources"]), topics=[t["name"] for t in child["topics"]][:4], editors=child["editors"])
             out.append(card)
         return out
 
@@ -479,6 +488,11 @@ def _replace_children(cur, letter_id: int, v: Dict[str, Any]) -> None:
     import json
     if v.get("topics") is not None:  # 입력에 topics 가 있을 때만 바꾼다(없으면 기존 태그 유지)
         _replace_topics(cur, letter_id, v["topics"])
+    if v.get("editors") is not None:  # 입력에 editors 가 있을 때만 바꾼다(없으면 기존 작성 에디터 유지)
+        ids = editors_repo._resolve(cur, v["editors"])
+        cur.execute("DELETE FROM issue_letter_editors WHERE letter_id = %s", (letter_id,))
+        for pos, eid in enumerate(ids):
+            cur.execute("INSERT INTO issue_letter_editors (letter_id, editor_id, position) VALUES (%s,%s,%s)", (letter_id, eid, pos))
     cur.execute("DELETE FROM issue_letter_categories WHERE letter_id = %s", (letter_id,))
     for i, slug in enumerate(v["categories"]):
         cur.execute("INSERT INTO issue_letter_categories (letter_id, category_slug, is_primary) VALUES (%s,%s,%s)",

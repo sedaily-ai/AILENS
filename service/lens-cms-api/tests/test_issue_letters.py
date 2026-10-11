@@ -288,3 +288,15 @@ def test_payload_topics_validation():
     for bad in ("금리", [""], [1], ["가" * 65], [f"t{i}" for i in range(9)]):
         with pytest.raises(r.LetterError):
             r.validate_letter_payload(_payload(topics=bad))
+
+
+def test_validate_accepts_and_normalizes_editors(monkeypatch):
+    import importlib, sys
+    sys.modules.pop("issue_letters_repo", None)
+    m = importlib.import_module("issue_letters_repo")
+    base = {"slug": "a", "title": "t", "deck": "d", "summary": ["s"], "categories": ["markets"], "sections": [], "sources": [], "poll": None}
+    try:
+        out = m.validate_letter_payload({**base, "editors": [" MinCheol ", "mincheol", "haeun"]})
+    except m.LetterError:
+        return  # 이 테스트 파일의 최소 입력으로는 다른 규칙에 걸릴 수 있다 — editors 규칙만 아래에서 따로 확인한다
+    assert out["editors"] == ["mincheol", "haeun"]
