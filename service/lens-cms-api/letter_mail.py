@@ -69,7 +69,59 @@ def _segments_html(parts: List[Any]) -> str:
     return "".join(out)
 
 
+def _is_block(para: Any) -> bool:
+    return bool(para) and isinstance(para[0], dict) and "block" in para[0]
+
+
+def _block_html(b: Dict[str, Any], tone: str) -> str:
+    """시각 블록의 메일용 표현(표·인라인 스타일만 쓴다). 사이트 화면과 같은 정보를 단순한 모양으로 담는다."""
+    e = html.escape
+    box = "margin:18px 0 0;padding:14px 16px;border:1px solid #e5e7eb;border-radius:12px;background:#fff"
+    kind = b.get("block")
+    if kind == "timeline":
+        rows = "".join(f'<tr><td style="padding:8px 12px 8px 0;vertical-align:top;white-space:nowrap;font-size:13.5px;font-weight:700;color:{tone}">{e(i["label"])}</td>'
+                       f'<td style="padding:8px 0;font-size:15px;line-height:1.7;color:#1f2937;border-bottom:1px solid #f1f3f6">{e(i["text"])}</td></tr>' for i in b["items"])
+        return f'<div style="{box}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows}</table></div>'
+    if kind == "stats":
+        cells = "".join(f'<td style="padding:6px 10px;vertical-align:top"><div style="font-size:12.5px;color:#6b7280">{e(i["label"])}</div>'
+                        f'<div style="margin-top:2px;font-size:24px;font-weight:700;color:{tone}">{e(i["value"])}</div>'
+                        f'<div style="margin-top:2px;font-size:12.5px;color:#6b7280">{e(i.get("sub") or "")}</div></td>' for i in b["items"])
+        return f'<div style="{box}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{cells}</tr></table></div>'
+    if kind == "bars":
+        top = max([i["value"] for i in b["items"]] + [1])
+        unit = e(b.get("unit") or "")
+        rows = "".join(f'<tr><td style="padding:4px 10px 4px 0;width:72px;font-size:13px;color:#374151">{e(i["label"])}</td>'
+                       f'<td style="padding:4px 0"><div style="height:10px;border-radius:999px;background:{tone};width:{max(4, round(i["value"] / top * 100))}%"></div></td>'
+                       f'<td style="padding:4px 0 4px 10px;width:70px;font-size:13px;font-weight:700;color:#111827;text-align:right">{i["value"]:g}{unit}</td></tr>' for i in b["items"])
+        title = f'<div style="margin-bottom:6px;font-size:13.5px;font-weight:700;color:#111827">{e(b["title"])}</div>' if b.get("title") else ""
+        return f'<div style="{box}">{title}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows}</table></div>'
+    if kind == "versus":
+        def side(sd: Dict[str, Any]) -> str:
+            return (f'<td style="width:50%;padding:0 6px;vertical-align:top"><div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fafbfc">'
+                    f'<div style="font-size:13.5px;font-weight:700;color:{tone}">{e(sd["label"])}</div>'
+                    f'<div style="margin-top:6px;font-size:14.5px;line-height:1.7;color:#1f2937">{e(sd["text"])}</div></div></td>')
+        return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px"><tr>{side(b["left"])}{side(b["right"])}</tr></table>'
+    if kind == "fold":
+        return (f'<div style="{box};background:#fafbfc"><div style="font-size:14px;font-weight:700;color:#111827">{e(b["title"])}</div>'
+                f'<div style="margin-top:6px;font-size:14.5px;line-height:1.8;color:#374151">{e(b["text"])}</div></div>')
+    return f'<div style="margin:18px 0 0;padding:12px 16px;border-left:3px solid {tone};background:#fafbfc;font-size:15px;line-height:1.8;color:#1f2937">{e(b.get("text") or "")}</div>'
+
+
+def _block_text(b: Dict[str, Any]) -> str:
+    lines = [b.get("title") or ""]
+    for i in b.get("items") or []:
+        lines.append(" ".join(str(i.get(k) or "") for k in ("label", "value", "text", "sub")).strip())
+    for side in ("left", "right"):
+        if isinstance(b.get(side), dict):
+            lines.append(f"{b[side].get('label', '')}: {b[side].get('text', '')}")
+    if b.get("text"):
+        lines.append(b["text"])
+    return "\n".join(l for l in lines if l)
+
+
 def _segments_text(parts: List[Any]) -> str:
+    if _is_block(parts):
+        return _block_text(parts[0])
     return "".join(p if isinstance(p, str) else (f"{p.get('text', '')}({p['href']})" if p.get("href") else p.get("text", "")) for p in parts)
 
 
@@ -112,7 +164,7 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
     sec_html = []
     for s in sections:
         _, tone, _ = AXIS.get(s["axis"], ("", "#5b8def", ""))
-        paras = "".join(f'<p style="margin:16px 0 0;font-size:16px;line-height:1.95;color:#1f2937">{_segments_html(p)}</p>' for p in s.get("paragraphs") or [])
+        paras = "".join(_block_html(p[0], tone) if _is_block(p) else f'<p style="margin:16px 0 0;font-size:16px;line-height:1.95;color:#1f2937">{_segments_html(p)}</p>' for p in s.get("paragraphs") or [])
         sec_html.append(f'<div style="margin-top:36px">{_badge(s["axis"])}'
                         f'<h2 style="margin:12px 0 0;font-family:{SERIF};font-size:21px;font-weight:700;line-height:1.4;color:#111827">{html.escape(s["heading"])}</h2>'
                         f'<p style="margin:10px 0 0;padding:10px 14px;border-left:3px solid {tone};background:#fafbfc;font-size:15px;font-weight:600;line-height:1.6;color:#1f2937">핵심: {html.escape(s["key_line"])}</p>'

@@ -89,12 +89,30 @@ def restrict_to_cluster(draft: Dict[str, Any], allowed_keys: Iterable[str]) -> L
     return sorted(bad)
 
 
+def block_text(block: Dict[str, Any]) -> str:
+    parts: List[str] = [str(block.get(k) or "") for k in ("title", "text")]
+    for side in ("left", "right"):
+        if isinstance(block.get(side), dict):
+            parts += [str(block[side].get("label") or ""), str(block[side].get("text") or "")]
+    for i in block.get("items") or []:
+        if isinstance(i, dict):
+            parts += [str(i.get(k) or "") for k in ("label", "text", "value", "sub")]
+        else:
+            parts.append(str(i))
+    return " ".join(p for p in parts if p)
+
+
+def para_text(para: Any) -> str:
+    """문단(조각 배열) 또는 시각 블록의 글자. 블록 안의 숫자·문장도 같은 검증(수치 대조·권유 표현)을 받도록 합친다."""
+    return "".join(p if isinstance(p, str) else (block_text(p) if "block" in p else str(p.get("text", ""))) for p in (para or []) if isinstance(p, (str, dict)))
+
+
 def draft_body_text(draft: Dict[str, Any]) -> str:
     parts: List[str] = [str(draft.get("title") or ""), str(draft.get("deck") or ""), *[str(s) for s in draft.get("summary") or []], str(draft.get("editor_note") or "")]
     for sec in draft.get("sections") or []:
         parts += [str(sec.get("heading") or ""), str(sec.get("key_line") or "")]
         for para in sec.get("paragraphs") or []:
-            parts.append("".join(p if isinstance(p, str) else str(p.get("text", "")) for p in para))
+            parts.append(para_text(para))
     return "\n".join(parts)
 
 
@@ -107,7 +125,7 @@ def body_chars(draft: Dict[str, Any]) -> int:
     n = 0
     for sec in draft.get("sections") or []:
         for para in sec.get("paragraphs") or []:
-            n += len("".join(p if isinstance(p, str) else str(p.get("text", "")) for p in para))
+            n += len(para_text(para))
     return n
 
 
@@ -184,7 +202,9 @@ def other_attribution_problem(draft: Dict[str, Any]) -> str:
         if sec.get("axis") != "other":
             continue
         for para in sec.get("paragraphs") or []:
-            txt = "".join(p if isinstance(p, str) else str(p.get("text", "")) for p in para)
+            if para and isinstance(para[0], dict) and "block" in para[0]:
+                continue  # 시각 블록은 문단이 아니라 장식이라 귀속 검사에서 뺀다(블록 안 인용은 본문에서 이미 귀속)
+            txt = para_text(para)
             if txt.strip() and not any(m in txt for m in ATTRIBUTION_MARKS):
                 bare.append(txt[:40])
     if bare:
@@ -234,6 +254,9 @@ def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = 
         ranked = sorted(arts, key=lambda a: (str(a.get("paper_number") or "") == "1", int(a.get("content_len") or 0)), reverse=True)[:MAX_CLUSTER]
         if sum(int(a.get("content_len") or 0) for a in ranked) < min_chars:
             continue
+        body = " ".join(str(a.get("content") or "") for a in ranked)
+        if sum(body.count(w) for w in SENSITIVE_WORDS) >= 4:  # 본문에 정치·갈등 인물·기관 발언이 많은 소재는 제외(제목에 없어도 거른다)
+            continue
         kw = "+".join(pair)
         cl = {"topic": f"{kw}: {ranked[0].get('title', '')}"[:40], "keyword": kw, "keys": [a["key"] for a in ranked], "articles": ranked}
         page1 = any(str(a.get("paper_number") or "") == "1" for a in ranked)
@@ -252,23 +275,45 @@ def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = 
     return out
 
 
-_LINE_STR = re.compile(r'^(\s*(?:"[A-Za-z_]+"\s*:\s*)?")(.*)("\s*,?\s*)$')
-_INLINE_TITLE = re.compile(r'("title"\s*:\s*")(.*?)("\s*,\s*"url")')
-_INLINE_TEXT = re.compile(r'("text"\s*:\s*")(.*?)("\s*,\s*"href")')
-
-
 def repair_json_quotes(text: str) -> str:
-    """모델이 문자열 안에 곧은 큰따옴표를 그대로 쓴 JSON 을 고친다(제목 \"...\" 인용, 출처 title 등). 줄 단위로 값 안쪽의 따옴표만 이스케이프한다."""
-    out = []
-    for line in text.split("\n"):
-        for rx in (_INLINE_TITLE, _INLINE_TEXT):
-            line = rx.sub(lambda m: m.group(1) + re.sub(r'(?<!\\)"', '\\"', m.group(2)) + m.group(3), line)
-        m = _LINE_STR.match(line)
-        if m and '"' in m.group(2):
-            inner = re.sub(r'(?<!\\)"', '\\"', m.group(2))
-            line = m.group(1) + inner + m.group(3)
-        out.append(line)
-    return "\n".join(out)
+    """모델이 문자열 안에 곧은 큰따옴표를 그대로 쓴 JSON 을 고친다. 문자열 안에서 만난 따옴표 뒤가
+    `, 다음 따옴표/중괄호/대괄호`·`}`·`]`·`:` 가 아니면 문자열의 끝이 아니라 본문 따옴표로 보고 이스케이프한다."""
+    out: List[str] = []
+    in_str = False
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if not in_str:
+            out.append(ch)
+            if ch == '"':
+                in_str = True
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:  # 이미 이스케이프된 문자
+            out.append(ch + text[i + 1])
+            i += 2
+            continue
+        if ch == '"':
+            j = i + 1
+            while j < n and text[j] in " \t\r":
+                j += 1
+            nxt = text[j] if j < n else ""
+            terminator = nxt in ("}", "]", ":", "") or nxt == "\n"
+            if nxt == ",":
+                k = j + 1
+                while k < n and text[k] in " \t\r\n":
+                    k += 1
+                terminator = k >= n or text[k] in '"{[]}'
+            if terminator:
+                out.append(ch)
+                in_str = False
+            else:
+                out.append('\\"')
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def source_advice_score(cluster: Dict[str, Any]) -> int:

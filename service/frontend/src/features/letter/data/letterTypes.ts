@@ -5,7 +5,21 @@
 export type LetterAxis = 'news' | 'substance' | 'other';
 
 /** 본문 조각: 문자열 또는 인라인 링크(원문 기사로 이동). 하단에 링크를 몰지 않고 관련 문구에 건다. */
-export type LetterSegment = string | { text: string; href: string };
+export type LetterSegment = string | { text: string; href: string } | LetterBlock;
+
+/** 시각 블록. 문단 자리에 한 조각짜리 배열로 들어간다(서버 BLOCK_KINDS 와 같은 목록). */
+export type LetterBlock =
+  | { block: 'timeline'; items: { label: string; text: string }[] }
+  | { block: 'stats'; items: { label: string; value: string; sub?: string }[] }
+  | { block: 'bars'; title?: string; unit?: string; items: { label: string; value: number }[] }
+  | { block: 'versus'; left: { label: string; text: string }; right: { label: string; text: string } }
+  | { block: 'fold'; title: string; text: string }
+  | { block: 'callout'; text: string };
+
+export function asBlock(para: LetterSegment[]): LetterBlock | null {
+  const first = para[0];
+  return first && typeof first !== 'string' && 'block' in first ? first : null;
+}
 
 export interface LetterSection {
   axis: LetterAxis;

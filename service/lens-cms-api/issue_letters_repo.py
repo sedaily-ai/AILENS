@@ -110,11 +110,80 @@ def _text(value: Any, name: str, required: bool = False, limit: int = _MAX_TEXT)
     return value.strip()
 
 
+# 시각 블록: 문단 자리에 [{"block": 종류, ...}] 한 조각짜리 배열로 들어간다(기존 문단 순회 코드가 깨지지 않도록 문단과 같은 모양을 쓴다).
+BLOCK_KINDS = ("timeline", "stats", "bars", "versus", "fold", "callout")
+
+
+def _short(value: Any, where: str, limit: int, required: bool = True) -> str:
+    if not isinstance(value, str) or not value.strip():
+        if required:
+            raise LetterError(f"{where}: 문자열이 비어 있습니다")
+        return ""
+    if len(value) > limit:
+        raise LetterError(f"{where}: {limit}자 이하여야 합니다")
+    return value.strip()
+
+
+def _items(block: Dict[str, Any], where: str, lo: int, hi: int) -> List[Dict[str, Any]]:
+    items = block.get("items")
+    if not isinstance(items, list) or not lo <= len(items) <= hi or any(not isinstance(i, dict) for i in items):
+        raise LetterError(f"{where}.items 는 {lo}~{hi}개의 객체 배열이어야 합니다")
+    return items
+
+
+def _normalize_block(block: Dict[str, Any], where: str) -> Dict[str, Any]:
+    kind = block.get("block")
+    if kind not in BLOCK_KINDS:
+        raise LetterError(f"{where}: block 은 {'/'.join(BLOCK_KINDS)} 중 하나여야 합니다")
+    out: Dict[str, Any] = {"block": kind}
+    if kind == "timeline":
+        out["items"] = [{"label": _short(i.get("label"), f"{where}.items[{n}].label", 30), "text": _short(i.get("text"), f"{where}.items[{n}].text", 300)}
+                        for n, i in enumerate(_items(block, where, 2, 8))]
+    elif kind == "stats":
+        out["items"] = [{"label": _short(i.get("label"), f"{where}.items[{n}].label", 40), "value": _short(i.get("value"), f"{where}.items[{n}].value", 20),
+                         "sub": _short(i.get("sub"), f"{where}.items[{n}].sub", 80, required=False)} for n, i in enumerate(_items(block, where, 1, 4))]
+    elif kind == "bars":
+        bars = []
+        for n, i in enumerate(_items(block, where, 2, 6)):
+            v = i.get("value")
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+                raise LetterError(f"{where}.items[{n}].value 는 0 이상의 숫자여야 합니다")
+            bars.append({"label": _short(i.get("label"), f"{where}.items[{n}].label", 20), "value": v})
+        out["items"] = bars
+        out["title"] = _short(block.get("title"), f"{where}.title", 60, required=False)
+        out["unit"] = _short(block.get("unit"), f"{where}.unit", 10, required=False)
+    elif kind == "versus":
+        for side in ("left", "right"):
+            sd = block.get(side)
+            if not isinstance(sd, dict):
+                raise LetterError(f"{where}.{side} 가 필요합니다")
+            out[side] = {"label": _short(sd.get("label"), f"{where}.{side}.label", 30), "text": _short(sd.get("text"), f"{where}.{side}.text", 300)}
+    elif kind == "fold":
+        out["title"] = _short(block.get("title"), f"{where}.title", 80)
+        out["text"] = _short(block.get("text"), f"{where}.text", 1200)
+    else:  # callout
+        out["text"] = _short(block.get("text"), f"{where}.text", 400)
+    return out
+
+
+def block_text(block: Dict[str, Any]) -> str:
+    """블록 안의 모든 글자(발행 규칙·글자 수 검사용)."""
+    parts: List[str] = [str(block.get(k) or "") for k in ("title", "text")]
+    for side in ("left", "right"):
+        if isinstance(block.get(side), dict):
+            parts += [str(block[side].get("label") or ""), str(block[side].get("text") or "")]
+    for i in block.get("items") or []:
+        parts += [str(i.get(k) or "") for k in ("label", "text", "value", "sub")]
+    return " ".join(p for p in parts if p)
+
+
 def _normalize_paragraph(para: Any, where: str) -> List[Any]:
     """문단 = 조각 배열. 조각은 문자열 또는 {text, href?, article_no?}."""
     if not isinstance(para, list) or not para:
         raise LetterError(f"{where}: 문단은 비어 있지 않은 배열이어야 합니다")
     out: List[Any] = []
+    if len(para) == 1 and isinstance(para[0], dict) and "block" in para[0]:
+        return [_normalize_block(para[0], where)]
     for seg in para:
         if isinstance(seg, str):
             out.append(seg)
@@ -301,7 +370,7 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
     for i, sec in enumerate(sections):
         body_texts.append((f"섹션 {i + 1} 핵심", sec.get("key_line") or ""))
         for para in sec.get("paragraphs") or []:
-            body_texts.append((f"섹션 {i + 1} 본문", "".join(seg if isinstance(seg, str) else seg.get("text", "") for seg in para)))
+            body_texts.append((f"섹션 {i + 1} 본문", "".join(seg if isinstance(seg, str) else (block_text(seg) if "block" in seg else seg.get("text", "")) for seg in para)))
     headline_texts = [("제목", letter.get("title") or ""), ("부제", letter.get("deck") or "")] + [("1분 요약", t) for t in letter.get("summary") or []]
     for i, sec in enumerate(sections):
         headline_texts += [(f"섹션 {i + 1} 제목", sec.get("heading") or ""), (f"섹션 {i + 1} 핵심", sec.get("key_line") or "")]
