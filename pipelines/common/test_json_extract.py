@@ -105,3 +105,14 @@ def test_extract_json_object_raises_when_nothing_parses():
         raise AssertionError("파싱할 JSON이 없으면 ValueError 여야 한다")
     except ValueError:
         pass
+
+
+def test_loads_lenient_drops_stray_semicolon_after_string_value():
+    from json_extract import loads_lenient
+    assert loads_lenient('{"a": "x";, "b": 1}') == {"a": "x", "b": 1}
+
+
+def test_extract_json_with_key_prefers_block_that_has_the_key():
+    from json_extract import extract_json_with_key
+    raw = '# 0단계\n```json\n{"핵심수치": [1]}\n```\n# 본 각본\n```json\n{"brand": "b", "cuts": [{"n": 1}]}\n```'
+    assert extract_json_with_key(raw, "cuts")["brand"] == "b"

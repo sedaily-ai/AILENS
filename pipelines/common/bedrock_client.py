@@ -10,10 +10,10 @@ import boto3
 from botocore.config import Config
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
-# video/generate_script.py 전용 기본 모델(lens-video-opus-5 프로파일).
+# video/generate_script.py 전용 기본 모델(lens-video-sonnet-5 프로파일, 이전 lens-video-opus-5).
 # admin/backend/routes/prompts.py::_CATEGORY_BEDROCK["video"]와 반드시 같은 ARN을 유지한다.
 # 다른 파이프라인은 각자 model= 인자를 명시한다.
-MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/p28gzlq5kj6s"  # lens-video-opus-5
+MODEL_ID = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/044jm6k57jgh"  # lens-video-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 3건 시험: max_tokens 8000·cuts 블록 선택 적용 시 통과)
 
 # read timeout 300초: 큰 배치(mustknow_auto 분류)는 생성 시간이 길어 boto3 기본값(60초)을 넘는다.
 # 정상 완료를 막지 않고 진짜 hang만 거르는 값이다.
