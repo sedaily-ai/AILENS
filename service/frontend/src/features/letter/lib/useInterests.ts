@@ -1,13 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { fetchBundles, fetchMyFeed, fetchMyInterests, fetchTopics, saveMyInterests, type Bundle, type InterestItem, type TopicOption } from '../data/interestApi';
+import { fetchMyFeed, fetchMyInterests, saveMyInterests, type InterestItem } from '../data/interestApi';
 
-/** 이 기기의 관심 설정 상태. 서버를 못 읽으면 available=false 라 관심 관련 UI를 통째로 숨기고 목록은 그대로 둔다. */
+/** 이 기기의 관심(서버 저장)과 레터별 "왜 맞는지" 문구. 서버를 못 읽으면 available=false 라 표시만 생략하고 목록은 그대로 둔다. */
 export function useInterests() {
   const [ready, setReady] = useState(false);
-  const [bundles, setBundles] = useState<Bundle[]>([]);
-  const [topics, setTopics] = useState<TopicOption[]>([]);
+  const [available, setAvailable] = useState(false);
   const [saved, setSaved] = useState<InterestItem[]>([]);
   const [reasons, setReasons] = useState<Record<string, string>>({}); // 레터 slug → "관심 주제 '금리'를 다뤘어요" 같은 사실형 이유
 
@@ -18,13 +17,11 @@ export function useInterests() {
   }, []);
 
   useEffect(() => {
-    // 마운트 뒤 서버에서 읽는다(서버 렌더 결과와 첫 클라이언트 렌더를 같게 두려는 것).
     let alive = true;
     void (async () => {
-      const [b, t, mine] = await Promise.all([fetchBundles(), fetchTopics(), fetchMyInterests()]);
+      const mine = await fetchMyInterests();
       if (!alive) return;
-      setBundles(b);
-      setTopics(t);
+      setAvailable(mine !== null);
       setSaved(mine ?? []);
       await loadReasons(mine ?? []);
       if (alive) setReady(true);
@@ -36,11 +33,12 @@ export function useInterests() {
     const result = await saveMyInterests(items);
     if (!result) return false;
     setSaved(result);
+    setAvailable(true);
     await loadReasons(result);
     return true;
   }, [loadReasons]);
 
-  return { ready, available: ready && (bundles.length > 0 || topics.length > 0), bundles, topics, saved, reasons, save };
+  return { ready, available, saved, reasons, save };
 }
 
 export type InterestState = ReturnType<typeof useInterests>;

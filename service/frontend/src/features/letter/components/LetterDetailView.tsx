@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AXIS_META, type IssueLetter, type LetterSegment } from '../data/letterTypes';
-import { editorOfLetter } from '../data/editors';
+import { editorsOfLetter } from '../data/editors';
 import { AxisBadge } from './AxisBadge';
 import { formatLetterDate } from './LetterCard';
 import { LetterVote } from './LetterVote';
@@ -46,7 +46,9 @@ export function LetterDetailView({ letter, prevSlug, nextSlug }: { letter: Issue
       <header className="ld-head">
         <div className="ld-cat">
           <span>{letter.categories.join(' · ')}</span>
-          {editorOfLetter(letter) && <Link href={`/letter/editors/${editorOfLetter(letter)?.id}`} className="ld-editor">{editorOfLetter(letter)?.name} 에디터</Link>}
+          {editorsOfLetter(letter).slice(0, 3).map((e) => (
+            <Link key={e.id} href={`/letter/editors/${e.id}`} className="ld-editor">{e.name} 에디터</Link>
+          ))}
           <span style={{ color: '#9ca3af', fontWeight: 500 }}>제 {letter.issueNumber}호</span>
         </div>
         <h1 className="ld-title">{letter.title}</h1>

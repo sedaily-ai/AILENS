@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { EDITORS, editorsOfLetter } from '../data/editors';
 import type { IssueLetter } from '../data/letterTypes';
-import { EDITORS, editorOfLetter } from '../data/editors';
+import { useFollowedEditors } from '../lib/useFollowedEditors';
 import { useInterests } from '../lib/useInterests';
+import { EditorBar } from './EditorBar';
 import { EditorCard } from './EditorCard';
-import { InterestBar } from './InterestBar';
 import { LetterCard } from './LetterCard';
 import { LETTER_CSS } from './letterStyles';
 
@@ -14,15 +15,17 @@ export function LetterListView({ letters }: { letters: IssueLetter[] }) {
   const [query, setQuery] = useState('');
   const [onlyMine, setOnlyMine] = useState(false);
   const interests = useInterests();
+  const follow = useFollowedEditors(interests.save);
 
   const q = query.trim().toLowerCase();
-  // 순서는 늘 최신순. 관심사와 겹치는 레터는 같은 자리에서 이유만 덧붙여 보여 준다.
+  // 순서는 늘 최신순. 팔로우한 에디터의 세부 분야와 겹치는 레터는 같은 자리에서 이유만 덧붙여 보여 준다.
   const withReason = useMemo(() => letters.map((l) => (interests.reasons[l.slug] ? { ...l, reason: interests.reasons[l.slug] } : l)), [letters, interests.reasons]);
-  const matchCount = withReason.filter((l) => l.reason).length;
+  const mine = (l: IssueLetter) => editorsOfLetter(l).some((e) => follow.isFollowing(e.id));
+  const matchCount = withReason.filter(mine).length;
   const shown = withReason.filter(
     (l) =>
       (!topic || (l.topics ?? []).includes(topic)) &&
-      (!onlyMine || l.reason) &&
+      (!onlyMine || mine(l)) &&
       (!q || [l.title, l.deck, ...(l.topics ?? []), ...l.categories].some((t) => t.toLowerCase().includes(q))),
   );
   const filtering = !!topic || !!q || onlyMine;
@@ -45,14 +48,12 @@ export function LetterListView({ letters }: { letters: IssueLetter[] }) {
       <section aria-label="에디터" className="lt-editors">
         <div className="lt-ed-row">
           {EDITORS.map((e) => (
-            <EditorCard key={e.id} editor={e} count={letters.filter((l) => editorOfLetter(l)?.id === e.id).length} />
+            <EditorCard key={e.id} editor={e} count={letters.filter((l) => editorsOfLetter(l).some((x) => x.id === e.id)).length} following={follow.isFollowing(e.id)} onToggle={() => follow.toggle(e.id)} />
           ))}
         </div>
       </section>
 
-      {interests.available && (
-        <InterestBar state={interests} onlyMine={onlyMine} onToggleOnlyMine={() => setOnlyMine((v) => !v)} matchCount={matchCount} />
-      )}
+      {follow.ready && <EditorBar followed={follow.followed} onlyMine={onlyMine} onToggleOnlyMine={() => setOnlyMine((v) => !v)} matchCount={matchCount} />}
 
       <div className="lt-toolbar">
         <h2 className="lt-sec-h lt-sec-inline">최신 레터</h2>

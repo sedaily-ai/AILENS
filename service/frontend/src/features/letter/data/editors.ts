@@ -1,64 +1,100 @@
-// 레터 에디터(목업, 2026-10-09). 에디터는 "문체나 성향"이 아니라 "담당 분야"로만 나눈다 — 모든 레터는 같은 중립 편집 원칙을 따른다(주관·유도·권유 금지).
-// 에디터는 AI 에디터이며 카드에 그렇게 표시한다. 담당 분야는 레터의 주 분류(categories[0])로 정해지고, 구독하면 담당 분야·주제와 겹치는 새 레터가 온다.
+// 레터 에디터(목업, 2026-10-10). 에디터는 "분류 담당"이 아니라 "누구의 관심 영역을 맡는가"(독자 페르소나 × 세부 분야)로 나눈다.
+// 말투·입장은 모두 같다 — 모든 레터는 같은 중립 편집 원칙(주관·유도·권유 금지)을 따른다. 에디터는 AI 에디터이며 카드·프로필에 그렇게 표시한다.
+// 한 레터는 여러 에디터에 속할 수 있다(레터의 주제가 에디터의 세부 분야와 겹치면). 독자는 에디터를 여러 명 팔로우한다.
 import type { InterestItem } from './interestApi';
 import type { IssueLetter } from './letterTypes';
+
+export interface EditorTopic {
+  /** 주제 사전 slug. soon=true 면 사전에 아직 없는 주제(표시만 하고 관심 저장에서는 뺀다). */
+  slug: string;
+  name: string;
+  soon?: boolean;
+}
 
 export interface LetterEditor {
   id: string;
   name: string;
-  title: string;
+  /** 역할명(독자가 이 에디터를 찾는 이유). */
+  role: string;
+  /** "이런 분께" 한 줄. */
+  forWhom: string;
   bio: string;
-  /** 화면에 보이는 분류 이름(레터의 categories[0] 과 비교). */
-  categories: string[];
-  /** 대표 주제(주제 사전 slug). 구독하면 분류와 함께 관심으로 저장된다. */
-  topics: { slug: string; name: string }[];
+  topics: EditorTopic[];
   tone: { bg: string; fg: string };
-  /** 구독 시 관심으로 저장되는 분류 slug. */
-  categorySlugs: string[];
 }
 
 export const EDITORS: readonly LetterEditor[] = [
   {
-    id: 'hajun', name: '하준', title: '시장·경제 에디터', categories: ['시그널', '경제', '금융'], categorySlugs: ['markets', 'economy', 'finance'],
-    bio: '증시와 금리·환율, 물가와 성장 지표를 보도 기준으로 짚어요. 숫자가 어떻게 움직였는지를 먼저 보여 드려요.',
-    topics: [{ slug: 'rates', name: '금리' }, { slug: 'fx', name: '환율' }, { slug: 'kospi', name: '코스피' }, { slug: 'earnings', name: '기업 실적' }],
+    id: 'ian', name: '이안', role: '개인 투자 에디터', forWhom: '삼성전자·ETF 등 직접 투자하는 분',
+    bio: '실적, 금리, 환율이 시장에서 어떻게 확인됐는지를 보도 기준으로 짚어요. 보유 종목이 아니라 발표된 숫자를 중심에 둬요.',
+    topics: [{ slug: 'samsung-electronics', name: '삼성전자' }, { slug: 'sk-hynix', name: 'SK하이닉스' }, { slug: 'etf', name: 'ETF' }, { slug: 'rates', name: '금리' }, { slug: 'fx', name: '환율' }, { slug: 'ipo', name: '공모주·IPO' }, { slug: 'theme-stock', name: '테마주' }],
     tone: { bg: '#e8f0ff', fg: '#1f56c0' },
   },
   {
-    id: 'seoyun', name: '서윤', title: '부동산·상권 에디터', categories: ['부동산'], categorySlugs: ['property'],
-    bio: '전세, 청약, 재건축과 상권의 변화를 다뤄요. 제도가 바뀌면 무엇이 달라지는지를 정리해요.',
-    topics: [{ slug: 'rent', name: '임대료' }, { slug: 'redevelopment', name: '재건축·재개발' }, { slug: 'commercial-district', name: '상권' }, { slug: 'jeonse', name: '전세' }],
-    tone: { bg: '#fdf1e2', fg: '#8f4f0a' },
-  },
-  {
-    id: 'doyun', name: '도윤', title: '산업·기업 에디터', categories: ['산업'], categorySlugs: ['industry'],
-    bio: '반도체와 플랫폼, 소비재까지 기업이 움직이는 방향을 살펴요. 실적과 전략 발표를 나란히 놓고 읽어요.',
-    topics: [{ slug: 'semiconductor', name: '반도체' }, { slug: 'ai', name: '인공지능' }, { slug: 'k-beauty', name: 'K뷰티' }, { slug: 'global-rebalancing', name: '글로벌 리밸런싱' }],
+    id: 'seoa', name: '서아', role: '취업·경제 입문 에디터', forWhom: '경제를 처음 공부하거나 취업을 준비하는 분',
+    bio: '어려운 경제 용어와 기업 소식을 처음 읽는 사람 기준으로 풀어요. 기업의 채용과 사업 변화를 사실 중심으로 정리해요.',
+    topics: [{ slug: 'consumption', name: '소비' }, { slug: 'employment', name: '고용' }, { slug: 'platform', name: '플랫폼' }, { slug: 'content', name: '콘텐츠' }, { slug: 'recruit', name: '대기업 채용', soon: true }, { slug: 'terms', name: '경제 용어', soon: true }],
     tone: { bg: '#e5f5f2', fg: '#0b6b60' },
   },
   {
-    id: 'jia', name: '지아', title: '글로벌·정책 에디터', categories: ['국제', '정치'], categorySlugs: ['international', 'politics'],
-    bio: '해외에서 시작해 우리 경제로 번지는 소식과 정책 변화를 다뤄요. 어느 나라에서 무슨 결정이 나왔는지부터 짚어요.',
-    topics: [{ slug: 'us', name: '미국' }, { slug: 'china', name: '중국' }, { slug: 'trade', name: '무역·통상' }, { slug: 'regulation', name: '규제' }],
+    id: 'ujin', name: '우진', role: '자영업·상권 에디터', forWhom: '가게를 운영하거나 동네 상권을 보는 분',
+    bio: '임대료, 상권 변화, 최저임금과 소비 흐름을 다뤄요. 제도와 수치가 매장 운영과 맞닿는 지점을 보도로 정리해요.',
+    topics: [{ slug: 'rent', name: '임대료' }, { slug: 'commercial-district', name: '상권' }, { slug: 'gentrification', name: '젠트리피케이션' }, { slug: 'seongsu', name: '성수동' }, { slug: 'minimum-wage', name: '최저임금' }, { slug: 'food-service', name: '외식업' }, { slug: 'retail', name: '유통' }, { slug: 'neighborhood', name: '도시·동네' }],
+    tone: { bg: '#fdf1e2', fg: '#8f4f0a' },
+  },
+  {
+    id: 'harin', name: '하린', role: '내 집 마련·교육 에디터', forWhom: '전세·청약·대출과 교육비를 따지는 분',
+    bio: '전세와 청약, 주택 대출, 교육과 육아 정책의 변화를 다뤄요. 제도가 바뀌는 시점과 기준을 먼저 보여 드려요.',
+    topics: [{ slug: 'jeonse', name: '전세' }, { slug: 'housing-subscription', name: '청약' }, { slug: 'loan', name: '대출' }, { slug: 'education', name: '교육' }, { slug: 'low-birth', name: '저출생' }, { slug: 'rates', name: '금리' }],
+    tone: { bg: '#fde8ee', fg: '#b4234f' },
+  },
+  {
+    id: 'siu', name: '시우', role: '창업·스타트업 에디터', forWhom: '창업하거나 투자 흐름을 추적하는 분',
+    bio: '벤처투자 동향, AI와 플랫폼 산업, 대기업의 전략 변화를 다뤄요. 시장 구조가 어떻게 바뀌는지를 사례로 보여 드려요.',
+    topics: [{ slug: 'startup', name: '스타트업' }, { slug: 'venture-investment', name: '벤처투자' }, { slug: 'ai', name: '인공지능' }, { slug: 'platform', name: '플랫폼' }, { slug: 'semiconductor', name: '반도체' }, { slug: 'k-beauty', name: 'K뷰티' }, { slug: 'amorepacific', name: '아모레퍼시픽' }],
     tone: { bg: '#efe9ff', fg: '#5b36c4' },
   },
   {
-    id: 'narin', name: '나린', title: '생활·문화 에디터', categories: ['사회', '문화'], categorySlugs: ['national', 'culture'],
-    bio: '동네와 소비, 여행과 일터의 변화를 다뤄요. 일상에서 보이는 현상을 보도로 풀어 드려요.',
-    topics: [{ slug: 'travel', name: '여행·관광' }, { slug: 'neighborhood', name: '도시·동네' }, { slug: 'labor', name: '노동' }, { slug: 'consumption', name: '소비' }],
-    tone: { bg: '#fde8ee', fg: '#b4234f' },
+    id: 'taeo', name: '태오', role: '부동산·규제 에디터', forWhom: '금리와 규제 속에서 부동산을 살피는 분',
+    bio: '시세와 거래, 재건축, 경매, 규제 변화를 다뤄요. 금리와 정책이 부동산 시장에서 어떻게 확인됐는지 정리해요.',
+    topics: [{ slug: 'real-estate', name: '부동산 시장' }, { slug: 'redevelopment', name: '재건축·재개발' }, { slug: 'auction', name: '경매' }, { slug: 'regulation', name: '규제' }, { slug: 'tax', name: '세금' }, { slug: 'rates', name: '금리' }],
+    tone: { bg: '#fff1d6', fg: '#8a5a00' },
+  },
+  {
+    id: 'eunseo', name: '은서', role: '연금·노후 에디터', forWhom: '노후 현금흐름과 자산을 관리하는 분',
+    bio: '연금 개편, 배당, 보험과 고령화 정책을 다뤄요. 제도가 수령액과 세금에 닿는 부분을 숫자로 정리해요.',
+    topics: [{ slug: 'pension', name: '연금' }, { slug: 'dividend', name: '배당' }, { slug: 'insurance', name: '보험' }, { slug: 'aging', name: '고령화' }, { slug: 'tax', name: '세금' }, { slug: 'medical', name: '의료비', soon: true }],
+    tone: { bg: '#e7f3e8', fg: '#2f6b35' },
+  },
+  {
+    id: 'daon', name: '다온', role: '글로벌·정책 에디터', forWhom: '해외 소식과 통화·통상 정책을 따라가는 분',
+    bio: '연준과 주요국 정책, 무역과 공급망 변화를 다뤄요. 어느 나라에서 무슨 결정이 나왔는지부터 짚어요.',
+    topics: [{ slug: 'fed', name: '연준' }, { slug: 'us', name: '미국' }, { slug: 'china', name: '중국' }, { slug: 'india', name: '인도' }, { slug: 'philippines', name: '필리핀' }, { slug: 'trade', name: '무역·통상' }, { slug: 'tariff', name: '관세' }, { slug: 'global-rebalancing', name: '글로벌 리밸런싱' }],
+    tone: { bg: '#e3f2fb', fg: '#0d5f8f' },
   },
 ];
 
-export function editorOfLetter(letter: Pick<IssueLetter, 'categories'>): LetterEditor | undefined {
-  const primary = letter.categories[0];
-  return EDITORS.find((e) => e.categories.includes(primary));
+/** 레터의 주제 이름이 에디터의 세부 분야와 하나라도 겹치는 에디터들(겹침이 많은 순). */
+export function editorsOfLetter(letter: Pick<IssueLetter, 'topics'>): LetterEditor[] {
+  const names = new Set(letter.topics ?? []);
+  return EDITORS.map((e) => ({ e, n: e.topics.filter((t) => names.has(t.name)).length }))
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .map((x) => x.e);
 }
 
 export function findEditor(id: string): LetterEditor | undefined {
   return EDITORS.find((e) => e.id === id);
 }
 
+/** 팔로우·구독 때 관심으로 저장되는 항목(주제 사전에 있는 주제만). */
 export function editorInterests(e: LetterEditor): InterestItem[] {
-  return [...e.categorySlugs.map((key) => ({ type: 'category' as const, key })), ...e.topics.map((t) => ({ type: 'topic' as const, key: t.slug }))];
+  return e.topics.filter((t) => !t.soon).map((t) => ({ type: 'topic' as const, key: t.slug }));
+}
+
+export function unionInterests(editors: LetterEditor[]): InterestItem[] {
+  const seen = new Set<string>();
+  const out: InterestItem[] = [];
+  for (const e of editors) for (const i of editorInterests(e)) if (!seen.has(i.key)) { seen.add(i.key); out.push(i); }
+  return out;
 }
