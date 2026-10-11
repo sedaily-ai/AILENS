@@ -80,3 +80,20 @@ def test_prune_topics_and_attribution():
     assert "근거 없는 단정" in core.other_attribution_problem(d)
     d["sections"][0]["paragraphs"].pop()
     assert core.other_attribution_problem(d) == ""
+
+
+def test_keyword_clusters_use_word_pairs_and_skip_generic_and_sensitive():
+    def art(i, title, day, cat="산업"):
+        return {"key": str(i), "title": title, "date": f"2026-10-{day:02d}", "content_len": 2500, "top_category": cat, "paper_number": "5"}
+    arts = [art(1, "삼성전자 영업익 107조 돌파", 8), art(2, "삼성전자 영업익 두고 전망 엇갈려", 9), art(3, "[단독] 삼성전자 영업익 비결은", 10),
+            art(4, "여당 국정감사 공방", 8), art(5, "여당 국정감사 공방 이어져", 9), art(6, "여당 국정감사 또 충돌", 10)]
+    out = core.keyword_clusters(arts, min_chars=5000)
+    assert out and "삼성전자" in out[0]["keyword"] and "영업익" in out[0]["keyword"]
+    assert all("국정감사" not in c["keyword"] for c in out)
+
+
+def test_repair_json_quotes_fixes_unescaped_inner_quotes():
+    import json
+    bad = '{\n  "heading": "정부 "투기 아니면 처분 없다"…특별법",\n  "paragraphs": [["장관은 ", {"text": ""농지 후속 조치"", "href": "https://x/1"}, " 라고 했어요"]],\n  "sources": [{ "title": "금융연구원 "집중위험 관리"", "url": "https://x/2" }]\n}'
+    fixed = json.loads(core.repair_json_quotes(bad))
+    assert fixed["heading"].startswith('정부 "투기') and fixed["paragraphs"][0][1]["text"] == '"농지 후속 조치"'

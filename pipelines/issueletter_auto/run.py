@@ -25,7 +25,7 @@ ATTEMPTS_PER_CLUSTER = 3  # 묶음당 시도 횟수(비용 상한: 2묶음 × 3�
 MAX_CLUSTERS_TRIED = 2
 LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k")  # lens-letters-sonnet-46 (비용 절감: 소넷 사용, 2026-10-11)
 MAX_PER_DAY = int(os.environ.get("ISSUELETTER_MAX_PER_DAY", "1"))
-LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "3"))
+LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "7"))
 WINDOW = (6, 18)  # 이 시각(KST) 사이에만 발행한다
 API = os.environ.get("LENS_CMS_API_URL", "http://13.223.179.151")
 PROMPT_TEMPLATE = Path(__file__).with_name("draft_prompt.txt")
@@ -67,6 +67,10 @@ def fetch_recent_articles() -> List[Dict[str, Any]]:
 # ── 단계 ────────────────────────────────────────────────────────────────────────
 
 def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str]) -> List[Dict[str, Any]]:
+    if os.environ.get("ISSUELETTER_PICK", "keyword") == "keyword":
+        picked = core.keyword_clusters(articles, used_keys)
+        log("clusters", mode="keyword", kept=len(picked), topics=[f"{c['keyword']}({c['n_articles']}건/{c['n_days']}일)" for c in picked])
+        return picked
     by_key = {a["key"]: a for a in articles if a.get("key")}
     listing = "\n".join(f"{a['key']} | {a['title']}" for a in articles if a.get("key"))[:60000]
     system = (Path(__file__).with_name("cluster_prompt.md")).read_text(encoding="utf-8")
@@ -100,11 +104,14 @@ def make_draft(prompt: str, feedback: str = "") -> Optional[Dict[str, Any]]:
     from json_extract import extract_json_object
     text = call_model(prompt + (f"\n\n[직전 시도가 거부된 사유 — 이것만 고쳐서 JSON 전체를 다시 출력]\n{feedback}" if feedback else ""), "위 지시대로 저장용 JSON 하나만 출력하세요.")
     _dump("raw", text)
-    try:
-        obj = extract_json_object(text)
-    except Exception:  # noqa: BLE001
-        return None
-    return obj if isinstance(obj, dict) else None
+    for candidate in (text, core.repair_json_quotes(text)):  # 첫 시도가 깨지면 문자열 속 곧은 따옴표를 고쳐 한 번 더
+        try:
+            obj = extract_json_object(candidate)
+        except Exception:  # noqa: BLE001
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
 
 
 def _dump(kind: str, data: Any) -> None:

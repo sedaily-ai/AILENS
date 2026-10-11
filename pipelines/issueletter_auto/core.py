@@ -6,12 +6,12 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 MIN_CLUSTER = 3
 MAX_CLUSTER = 6
 # 갈등 소지가 큰 소재는 자동 선정에서 제외한다(정치·젠더·세대·지역). 사람이 직접 쓰는 경로는 막지 않는다.
-SENSITIVE_WORDS = ("대통령", "여당", "야당", "국민의힘", "민주당", "탄핵", "선거", "총선", "대선", "지방선거", "페미", "젠더", "남녀", "세대 갈등", "호남", "영남", "혐오", "차별 논란",
+SENSITIVE_WORDS = ("대통령", "여당", "야당", "국민의힘", "민주당", "탄핵", "선거", "총선", "대선", "지방선거", "페미", "젠더", "남녀", "세대 갈등", "호남", "영남", "혐오", "차별 논란", "명태균", "김건희", "윤석열", "尹", "北", "북한",
                    "감찰", "검찰", "중수청", "공수처", "특검", "기소", "구속영장", "국정감사", "국감", "국정조사", "청문회", "여야", "정권", "탄핵")
 # 본문(인용 포함)에 실리면 안 되는 투자·행동 권유 표현. 서버의 금지어(BODY_DIRECTIVE_TERMS)는 "매수하" 같은 활용형만 막아 귀속된 인용("분할 매수로 대응해야 한다")이 빠져나가므로,
 # 자동 발행 경로에서는 더 넓게 막는다. 걸리면 그 인용을 빼고 사실만 쓰도록 다시 쓴다.
@@ -174,7 +174,7 @@ def prune_topics(draft: Dict[str, Any]) -> Dict[str, Any]:
     return {"dropped": dropped}
 
 
-ATTRIBUTION_MARKS = ("따르면", "밝혔", "말했", "지적", "설명", "주장", "분석", "평가", "전했", "강조", "내놨", "관계자", "전문가", "연구원", "교수", "측은")
+ATTRIBUTION_MARKS = ("따르면", "밝혔", "말했", "지적", "설명", "주장", "분석", "평가", "전했", "강조", "내놨", "관계자", "전문가", "연구원", "교수", "측은", "위원장", "장관", "대표", "센터장", "회장", "원장", "대변인", "총재", "의원", "“", "”", "한국은행", "금융위", "금감원", "부는", "은행연합회")
 
 
 def other_attribution_problem(draft: Dict[str, Any]) -> str:
@@ -190,6 +190,85 @@ def other_attribution_problem(draft: Dict[str, Any]) -> str:
     if bare:
         return "다른 시각 섹션에 말한 주체(기사·전문가·기관)가 밝혀지지 않은 문단이 있습니다. 직접 비판하지 말고 누가 말했는지 귀속해 쓰세요: " + " / ".join(bare)
     return ""
+
+
+# ── 키워드 기반 소재 선정(모델 호출 없음) ──────────────────────────────────────────
+GENERIC_WORDS = set("""단독 시그널 확대 최대 최고 추진 출시 시장 내년 올해 지난 이번 서울 한국 정부 기업 투자 글로벌 논란 공급 1위 신규 증가 감소 개최 발표 전망 개선 강화 지원 추가 가능 계획 이후 대한 관련 통해
+위해 따라 중심 이상 이하 전체 일부 주요 새로 다시 처음 오늘 어제 내일 오전 오후 사업 서비스 제품 시대 가격 규모 기준 현황 상승 하락 증시 지수 마감 속보 포토 인사 부고 오늘의 헬시타임 구축 역대 공격 지금 사설 칼럼 기고 인터뷰 종합 영상 이슈 종목""".split())
+_JOSA = re.compile(r"(은|는|이|가|을|를|의|에|와|과|도|로|으로|에서|부터|까지|에게|보다)$")
+
+
+def _tokens(title: str) -> Set[str]:
+    out: Set[str] = set()
+    for w in re.findall(r"[가-힣A-Za-z0-9·]{2,}", title or ""):
+        w = _JOSA.sub("", w)
+        if len(w) >= 2 and not w.isdigit() and w not in GENERIC_WORDS and not is_sensitive(w):
+            out.add(w)
+    return out
+
+
+def _title_tokens(title: str) -> Set[str]:
+    return _tokens(re.sub(r"\[[^\]]*\]|\([^)]*\)|【[^】]*】", "", title or ""))  # [단독]·[사설] 같은 말머리·괄호 제거
+
+
+def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = (), min_articles: int = 3, min_chars: int = 5000,
+                     max_candidates: int = 8) -> List[Dict[str, Any]]:
+    """최근 기사 제목에서 '같이 나오는 단어 쌍'(예: 삼성전자+영업익, AI+보안)으로 소재 후보를 만든다.
+    쌍으로 보면 일반어가 걸러지고 구체적인 사안이 남는다. 기사가 여러 날에 걸쳐 많이 쓰인 소재일수록 재료가 많다.
+    점수 = 기사 수(최대 12) + 2×게재 일수 + 지면 1면 포함 3 − 권유 표현 많은 본문 감점. 기사가 겹치는 후보는 점수 높은 쪽만 둔다."""
+    import itertools
+    used = set(used_keys)
+    by_pair: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    for a in articles:
+        if not a.get("key") or is_sensitive(a.get("title", "")) or a["key"] in used:
+            continue
+        for pair in itertools.combinations(sorted(_title_tokens(a.get("title", ""))), 2):
+            by_pair.setdefault(pair, []).append(a)
+    cands: List[Dict[str, Any]] = []
+    for pair, arts in by_pair.items():
+        if len(arts) < min_articles:
+            continue
+        days = {str(a.get("date") or "")[:10] for a in arts}
+        if len(days) < 2:
+            continue
+        ranked = sorted(arts, key=lambda a: (str(a.get("paper_number") or "") == "1", int(a.get("content_len") or 0)), reverse=True)[:MAX_CLUSTER]
+        if sum(int(a.get("content_len") or 0) for a in ranked) < min_chars:
+            continue
+        kw = "+".join(pair)
+        cl = {"topic": f"{kw}: {ranked[0].get('title', '')}"[:40], "keyword": kw, "keys": [a["key"] for a in ranked], "articles": ranked}
+        page1 = any(str(a.get("paper_number") or "") == "1" for a in ranked)
+        adv = source_advice_score(cl)
+        cl["score"] = min(len(arts), 12) + 2 * len(days) + (3 if page1 else 0) - (8 if adv >= 5 else 0)
+        cl["n_articles"], cl["n_days"], cl["advice"] = len(arts), len(days), adv
+        cands.append(cl)
+    cands.sort(key=lambda c: -c["score"])
+    out: List[Dict[str, Any]] = []
+    for c in cands:
+        if any(len(set(c["keys"]) & set(o["keys"])) >= max(2, len(c["keys"]) // 2) for o in out):
+            continue
+        out.append(c)
+        if len(out) >= max_candidates:
+            break
+    return out
+
+
+_LINE_STR = re.compile(r'^(\s*(?:"[A-Za-z_]+"\s*:\s*)?")(.*)("\s*,?\s*)$')
+_INLINE_TITLE = re.compile(r'("title"\s*:\s*")(.*?)("\s*,\s*"url")')
+_INLINE_TEXT = re.compile(r'("text"\s*:\s*")(.*?)("\s*,\s*"href")')
+
+
+def repair_json_quotes(text: str) -> str:
+    """모델이 문자열 안에 곧은 큰따옴표를 그대로 쓴 JSON 을 고친다(제목 \"...\" 인용, 출처 title 등). 줄 단위로 값 안쪽의 따옴표만 이스케이프한다."""
+    out = []
+    for line in text.split("\n"):
+        for rx in (_INLINE_TITLE, _INLINE_TEXT):
+            line = rx.sub(lambda m: m.group(1) + re.sub(r'(?<!\\)"', '\\"', m.group(2)) + m.group(3), line)
+        m = _LINE_STR.match(line)
+        if m and '"' in m.group(2):
+            inner = re.sub(r'(?<!\\)"', '\\"', m.group(2))
+            line = m.group(1) + inner + m.group(3)
+        out.append(line)
+    return "\n".join(out)
 
 
 def source_advice_score(cluster: Dict[str, Any]) -> int:

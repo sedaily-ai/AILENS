@@ -1,3 +1,4 @@
+import os
 """run.py 전체 흐름을 모델·서버 호출을 가짜로 바꿔 확인한다(실제 호출 없음)."""
 import json
 import sys
@@ -57,7 +58,7 @@ def go(api, drafts, clusters=None, live=True, fact_problems=None):
          mock.patch.object(run, "make_draft", lambda p, f="": next(it, None)), \
          mock.patch.object(run, "call_model", lambda s, u, max_tokens=0: json.dumps(clusters)), \
          mock.patch.object(run, "fact_check", lambda d, c: fact_problems or []), \
-         mock.patch.object(run, "WINDOW", (0, 24)):
+         mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
         return run.run(dry_run=not live)
 
 
