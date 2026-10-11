@@ -39,11 +39,11 @@ export function EditorIntro({ editor, following, onToggleFollow }: { editor: Let
       <div className="lt-ed-head">
         <EditorAvatar editor={editor} size={96} />
         <div className="lt-ed-headtext">
-          <h2 className="lt-ed-h1">{editor.name} <span className="lt-ed-badge">AI 에디터</span></h2>
-          <p className="lt-ed-sub">{editor.role} · {editor.forWhom}</p>
+          <h2 className="lt-ed-h1">{editor.name} <span className="lt-ed-badge">AI 에디터</span> <span className="lt-ed-badge lt-ed-mbti">{editor.mbti ?? editor.group}</span></h2>
+          <p className="lt-ed-sub">{editor.role} · {editor.nickname} · {editor.forWhom}</p>
           <p className="lt-ed-bio">{editor.intro}</p>
           <ul className="lt-ed-topics" aria-label="세부 분야">
-            {editor.topics.map((t) => <li key={t.slug} className="lt-topic" data-soon={t.soon ? 'true' : undefined}>{t.name}</li>)}
+            {editor.topics.map((t) => <li key={t.slug} className="lt-topic">{t.name}</li>)}
           </ul>
           <div className="lt-eintro-actions">
             {canSpeak && <button type="button" className="lt-eintro-voice" aria-pressed={playing} onClick={toggleVoice}>{playing ? '소개 멈추기' : '소개 듣기'}</button>}

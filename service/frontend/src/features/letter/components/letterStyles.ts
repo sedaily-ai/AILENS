@@ -8,7 +8,7 @@ export const LETTER_CSS = `
   .lt-sub { margin: 10px 0 0; font-size: 15px; line-height: 1.7; color: #4b5563; max-width: 640px; }
   .lt-etabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 0 10px; margin: 0 0 14px; }
   @media (max-width: 760px) { .lt-etabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; } }
-  .lt-etab { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px 0 8px; border: 1px solid #e5e9f0; border-radius: 999px; background: #fff; font: inherit; color: #374151; cursor: pointer; transition: background .15s, border-color .15s; }
+  .lt-etab { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px 0 8px; border: 1px solid #e5e9f0; border-radius: 999px; background: #fff; font: inherit; color: #374151; cursor: pointer; transition: background .15s, border-color .15s; }
   .lt-etab-all { padding: 0 20px; font-size: 14px; font-weight: 700; }
   .lt-etab:hover { background: #f4f6fa; }
   .lt-etab[aria-pressed='true'] { background: #111827; border-color: #111827; color: #fff; }
@@ -26,12 +26,12 @@ export const LETTER_CSS = `
   .lt-ed-follow[aria-pressed='true'] { background: #1f56c0; border-color: #1f56c0; color: #fff; }
   .lt-ed-follow:disabled { opacity: .5; cursor: default; }
   .lt-ed-follow-lg { height: 40px; padding: 0 20px; font-size: 14px; }
-  .lt-topic[data-soon='true'] { background: #fff; border: 1px dashed #cbd5e1; color: #64748b; }
   .lt-sec-inline { margin: 0; }
   .lt-ed-head { display: flex; align-items: flex-start; gap: 20px; padding: 20px 0 6px; flex-wrap: wrap; }
   .lt-ed-headtext { flex: 1 1 320px; min-width: 0; }
   .lt-ed-h1 { margin: 0; font-family: "Noto Serif KR", serif; font-size: 26px; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 10px; }
   .lt-ed-badge { padding: 2px 9px; border-radius: 999px; background: #f1f3f6; color: #4b5563; font-family: inherit; font-size: 12px; font-weight: 700; }
+  .lt-ed-mbti { background: #111827; color: #fff; letter-spacing: .04em; }
   .lt-ed-sub { margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4b5563; }
   .lt-ed-bio { margin: 10px 0 0; max-width: 560px; font-size: 15px; line-height: 1.7; color: #374151; }
   .lt-ed-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
