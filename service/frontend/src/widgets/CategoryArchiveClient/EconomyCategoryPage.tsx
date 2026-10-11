@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/content/archiveItems';
-import { buildCategoryMetadata, buildCategoryPageNMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/buildCategoryPageMeta';
+import { buildCategoryMetadata, buildCategoryPageNMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/meta/buildCategoryPageMeta';
 import { CategoryArchiveClient } from './CategoryArchiveClient';
 import { categoryMatches, ECON_CATEGORIES } from '@/shared/constants/econCategories';
 import type { HeaderTabKey } from '@/shared/lib/headerTabs';

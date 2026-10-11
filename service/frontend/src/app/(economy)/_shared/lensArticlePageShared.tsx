@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { permanentRedirect } from 'next/navigation';
 import { fetchLensPosts, fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
-import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
-import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
+import { buildPageTitle } from '@/shared/lib/seo/meta/buildPageTitle';
+import { buildSeoDescription } from '@/shared/lib/seo/meta/sanitizeDescription';
 import { clampModifiedIso } from '@/shared/lib/date/date';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
@@ -11,8 +11,8 @@ import { categoryForDataLabel, displayCategoryLabel } from '@/shared/constants/e
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { LensViewClient } from './LensViewClient';
 import type { ArticleNeighbor } from './components/article/ArticleNeighborNav';
-import { resolveShareImages, type ShareImages } from '@/shared/lib/seo/shareImage';
-import { buildLensVideoObject } from '@/shared/lib/seo/lensVideoObject';
+import { resolveShareImages, type ShareImages } from '@/shared/lib/seo/share/shareImage';
+import { buildLensVideoObject } from '@/shared/lib/seo/lens/lensVideoObject';
 
 import { SITE_URL } from '@/shared/constants/site';
 

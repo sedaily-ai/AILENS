@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { fetchLensPostsOnDate, fetchPaperDates, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
-import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
+import { buildPageTitle } from '@/shared/lib/seo/meta/buildPageTitle';
 import { toLensPreviewSummaries } from '@/shared/lib/api/cmsPostsApi';
 import { pickLensPostsForHome } from '@/shared/lib/content/homeFeedTrim';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 import { SITE_URL } from '@/shared/constants/site';
-import { resolveShareImages } from '@/shared/lib/seo/shareImage';
+import { resolveShareImages } from '@/shared/lib/seo/share/shareImage';
 import { PaperDayClient } from '../PaperDayClient';
 import { buildPaperDescription, buildPaperJsonLd, paperDateLabel, paperKeywords, paperPath } from '../paperShared';
 

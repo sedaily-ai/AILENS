@@ -1,6 +1,6 @@
 import { notFound, permanentRedirect } from 'next/navigation';
 import { lensPath } from '@/shared/lib/content/lensUrl';
-import { findLensForChannelSlug } from '@/shared/lib/seo/lensCanonical';
+import { findLensForChannelSlug } from '@/shared/lib/seo/lens/lensCanonical';
 
 /**
  * 웹툰·영상·오디오 전용 상세는 두지 않는다(2026-10-09). 같은 기사(lens)의 페이지가 유일한 정본이므로,

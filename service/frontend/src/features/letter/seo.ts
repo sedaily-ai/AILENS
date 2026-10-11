@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { SITE_URL } from '@/shared/constants/site';
-import { buildPageTitle } from '@/shared/lib/seo/buildPageTitle';
-import { buildSeoDescription } from '@/shared/lib/seo/sanitizeDescription';
+import { buildPageTitle } from '@/shared/lib/seo/meta/buildPageTitle';
+import { buildSeoDescription } from '@/shared/lib/seo/meta/sanitizeDescription';
 import { issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
 import type { IssueLetter } from './data/letterTypes';
 
