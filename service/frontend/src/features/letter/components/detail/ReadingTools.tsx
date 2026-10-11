@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { useLetterShelf } from '../lib/useLetterShelf';
+import { useLetterShelf } from '../../lib/useLetterShelf';
 
 const SIZES = [15.5, 16.5, 18, 19.5] as const;
 const SIZE_KEY = 'lens-letter-font';

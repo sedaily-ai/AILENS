@@ -1,6 +1,6 @@
-export { LetterListView } from './components/LetterListView';
-export { LetterDetailView } from './components/LetterDetailView';
-export { SubscriptionResult } from './components/SubscriptionResult';
+export { LetterListView } from './components/list/LetterListView';
+export { LetterDetailView } from './components/detail/LetterDetailView';
+export { SubscriptionResult } from './components/dialog/SubscriptionResult';
 export { fetchLetterList, fetchLetterDetail, LETTER_REVALIDATE_SECONDS } from './data/letterApi';
 export type { IssueLetter } from './data/letterTypes';
 export { EDITORS, findEditor, editorsOfLetter } from './data/editors';

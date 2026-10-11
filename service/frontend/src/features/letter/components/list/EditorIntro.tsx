@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/entities/user';
-import { editorInterests, type LetterEditor } from '../data/editors';
-import { EditorAvatar } from './EditorAvatar';
-import { LoginPromptDialog } from './LoginPromptDialog';
-import { SubscribeDialog } from './SubscribeDialog';
+import { editorInterests, type LetterEditor } from '../../data/editors';
+import { EditorAvatar } from '../EditorAvatar';
+import { LoginPromptDialog } from '../dialog/LoginPromptDialog';
+import { SubscribeDialog } from '../dialog/SubscribeDialog';
 
 /** 선택한 에디터의 자기소개: 이미지, 역할, 소개 문구(인용), 담당 분야, 소개 음성(미리 만든 mp3), 팔로우, 메일 구독. */
 export function EditorIntro({ editor, following, onToggleFollow }: { editor: LetterEditor; following: boolean; onToggleFollow: () => void }) {

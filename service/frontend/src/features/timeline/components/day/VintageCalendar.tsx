@@ -3,7 +3,7 @@
 // 접근성: 월 이동 버튼과 날짜 칸은 터치 타겟 44px을 확보하고, 화살표 글리프는 aria-hidden, 이름은 aria-label로 제공한다.
 // hover는 키보드 포커스에도 반응하도록 인라인 이벤트가 아닌 CSS로 처리하며, Escape로 닫을 수 있다.
 import { useEffect, useRef } from 'react';
-import { getMonthDays, isSameDay } from '@/shared/utils/dateUtils';
+import { getMonthDays, isSameDay } from '@/shared/lib/date/calendar';
 import {
   SURFACE, SURFACE_SUNKEN, TEXT_STRONG, TEXT_BODY, TEXT_MUTED, ACCENT,
   BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, RADIUS, TOUCH_MIN,

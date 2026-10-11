@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { LetterSection } from '../data/letterTypes';
+import type { LetterSection } from '../../data/letterTypes';
 
 /** 오른쪽(넓은 화면)에 떠 있는 섹션 목차. 지금 읽는 섹션이 굵게 표시되고, 누르면 그 섹션으로 이동한다. */
 export function LetterToc({ sections }: { sections: LetterSection[] }) {

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import type { LetterEditor } from '../data/editors';
-import { unionInterests } from '../data/editors';
-import { SubscribeDialog } from './SubscribeDialog';
+import type { LetterEditor } from '../../data/editors';
+import { unionInterests } from '../../data/editors';
+import { SubscribeDialog } from '../dialog/SubscribeDialog';
 
 /**
  * 내 에디터 바: 팔로우한 에디터를 한 줄로 보여 주고, 같은 목록에서 겹치는 레터만 모아 보거나 메일로 받게 한다.

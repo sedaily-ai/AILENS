@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import type { LetterSource } from '../data/letterTypes';
-import { AxisBadge } from './AxisBadge';
+import type { LetterSource } from '../../data/letterTypes';
+import { AxisBadge } from '../AxisBadge';
 
 /** "이 레터에 쓰인 기사" — 기본은 펼쳐 두고 접을 수 있다. 기사마다 어떤 축(소식·실체·다른 시각)으로 쓰였는지 배지로 보인다. */
 export function SourcesPanel({ sources, letterSlug }: { sources: LetterSource[]; letterSlug: string }) {

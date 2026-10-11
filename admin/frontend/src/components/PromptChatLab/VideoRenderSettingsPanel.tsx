@@ -19,7 +19,7 @@ import { POLLY_VOICE_ENGINE_OPTIONS, POLLY_RATES, POLLY_VOLUMES } from "./PollyV
    주세요" — PodcastVoiceSettingsPanel.tsx와 같은 패턴: 발행 문서를
    "## 헤딩"으로 저장, 저장 버튼 하나가 그대로 발행이라 다음 실제
    렌더부터 CMS 랩(render_from_script.py)과 프로덕션 발행 파이프라인
-   (publish_utils.py::generate_video) 양쪽에 반영된다(admin/backend/
+   (publishing.py::generate_video) 양쪽에 반영된다(admin/backend/
    routes/prompts.py::handle_update가 category/name 무엇이든 받는 범용
    라우트라 새 백엔드 라우트 불필요, category="video-settings"/
    name="published").
@@ -47,7 +47,7 @@ import { POLLY_VOICE_ENGINE_OPTIONS, POLLY_RATES, POLLY_VOLUMES } from "./PollyV
    Python이 직접 Polly/ElevenLabs를 부르지만, 영상은 이 설정이
    pipelines/common/video_settings.py::get_render_env()를 거쳐 환경변수로
    pipelines/video/src/lib/tts.ts(Node)에 전달되고, 거기서 실제 합성이
-   일어난다(render_from_script.py·publish_utils.py::generate_video 둘 다
+   일어난다(render_from_script.py·publishing.py::generate_video 둘 다
    그 함수 하나를 공유 — "동일한 부분은 동일하게"). ElevenLabs 성우/모델
    목록은 CMS 실험 패널과 동일한 GET /admin/elevenlabs/options를 쓴다.
 

@@ -28,7 +28,7 @@ for p in (ROOT / "video", ROOT / "common", ROOT):
 import requests  # noqa: E402
 
 import lens_cms_client as cms  # noqa: E402
-import publish_utils as pu  # noqa: E402
+import publishing as pu  # noqa: E402
 
 APPLY = "--apply" in sys.argv
 ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
@@ -67,7 +67,7 @@ def _article_file(article: dict, out_dir: Path) -> Path:
 
 
 def _make_webtoon(article: dict, article_path: Path, out_dir: Path, upload) -> dict | None:
-    """pipelines/common/publish_utils.publish_article()의 웹툰 단계와 같은 처리. 성공 시 lens 슬라이스 값 반환."""
+    """pipelines/common/publishing.publish_article()의 웹툰 단계와 같은 처리. 성공 시 lens 슬라이스 값 반환."""
     from PIL import Image
 
     mod = pu.load_module("repair_webtoon", ROOT / "webtoon" / "pipeline.py")

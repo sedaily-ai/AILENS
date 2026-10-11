@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { NEEDS, SITUATIONS, recommendEditors, type LetterEditor, type NeedId, type SituationId } from '../data/editors';
-import { fetchMailPreview, sendTestMail, subscribeByEmail, type InterestItem } from '../data/interestApi';
-import { EditorAvatar } from './EditorAvatar';
+import { NEEDS, SITUATIONS, recommendEditors, type LetterEditor, type NeedId, type SituationId } from '../../data/editors';
+import { fetchMailPreview, sendTestMail, subscribeByEmail, type InterestItem } from '../../data/interestApi';
+import { EditorAvatar } from '../EditorAvatar';
 
 const EMAIL_OK = /^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]{2,}$/;
 

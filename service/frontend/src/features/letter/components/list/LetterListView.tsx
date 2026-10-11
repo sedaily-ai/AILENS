@@ -1,18 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { editorsOfLetter, findEditor } from '../data/editors';
-import type { IssueLetter } from '../data/letterTypes';
-import { useFollowedEditors } from '../lib/useFollowedEditors';
-import { useInterests } from '../lib/useInterests';
-import { useLetterShelf } from '../lib/useLetterShelf';
+import { editorsOfLetter, findEditor } from '../../data/editors';
+import type { IssueLetter } from '../../data/letterTypes';
+import { useFollowedEditors } from '../../lib/useFollowedEditors';
+import { useInterests } from '../../lib/useInterests';
+import { useLetterShelf } from '../../lib/useLetterShelf';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AllSide } from './AllSide';
 import { EditorBar } from './EditorBar';
 import { EditorIntro } from './EditorIntro';
 import { EditorTabs } from './EditorTabs';
 import { LetterRow } from './LetterRow';
-import { LETTER_CSS } from './letterStyles';
+import { LETTER_CSS } from '../letterStyles';
 
 /** 레터 목록: 위에 에디터 선택줄, 아래는 왼쪽 레터 목록(메인) + 오른쪽 고정 패널(선택한 에디터의 소개 또는 모아쓰기 안내). */
 export function LetterListView({ letters, initialEditorId = null }: { letters: IssueLetter[]; initialEditorId?: string | null }) {

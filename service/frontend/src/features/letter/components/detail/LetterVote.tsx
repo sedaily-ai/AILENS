@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { applyChoice } from '@/shared/lib/poll/optimisticVote';
 import { PollOptions } from '@/shared/ui/form/PollOptions';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import type { LetterVote as Vote } from '../data/letterTypes';
-import { fetchMyVote, postVote, type VoteState } from '../data/letterApi';
-import { getDeviceId } from '../lib/deviceId';
+import type { LetterVote as Vote } from '../../data/letterTypes';
+import { fetchMyVote, postVote, type VoteState } from '../../data/letterApi';
+import { getDeviceId } from '../../lib/deviceId';
 
 export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
   // 서버 HTML과 첫 클라이언트 렌더를 같게 두려고 비어 있는 상태로 시작하고, 마운트 뒤에 서버에서 내 투표 여부를 읽는다.
