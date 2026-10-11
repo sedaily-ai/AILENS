@@ -172,7 +172,8 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             continue
         unsupported = core.unsupported_numbers(draft, sources_text)
         if unsupported:
-            feedback = "기사 본문에 없는 수치가 있습니다(지어내지 말고 기사에 있는 수치만 쓰세요): " + ", ".join(unsupported)
+            feedback = ("기사 본문에 없는 수치가 있습니다(지어내지 말고 기사에 있는 수치만 쓰세요). 연도는 '지난해'를 2025년으로 바꾸는 식으로 직접 계산하지 말고 기사의 표현 그대로 쓰세요. "
+                        "기사 번호(숫자 ID)는 본문·블록에 쓰지 마세요: " + ", ".join(unsupported))
             log("draft_unsupported_numbers", attempt=attempt, numbers=unsupported)
             continue
         advice = core.advice_hits(draft)
