@@ -69,7 +69,7 @@ def test_parse_letters_does_not_publish_trailer():
         "```\n"
         "FACT_IDS: [1, 2]\n"
     )
-    for rel in ("common/publishing.py",):
+    for rel in ("common/letter_parse.py",):
         paragraphs = _load_parse_letters(rel)(raw)
         joined = " ".join(paragraphs)
         assert "FACT_IDS" not in joined, f"{rel}: 트레일러가 본문으로 발행됨"
