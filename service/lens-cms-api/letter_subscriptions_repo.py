@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import os
 import re
 import secrets
 from typing import Any, Dict, List, Optional, Tuple
 
+import editors_repo
 import interests_repo
 import issue_letters_repo
 import letter_mail
@@ -63,14 +65,15 @@ def new_token() -> str:
 # ── 가입·확인·수신거부 ────────────────────────────────────────────────────────
 
 def subscribe(email: Any, interests: Any, frequency: Any, send_hour: Any, consent: Any, device_id_hash: Optional[str] = None,
-              now: Optional[dt.datetime] = None) -> Dict[str, str]:
+              now: Optional[dt.datetime] = None, editors: Any = None) -> Dict[str, str]:
     if consent is not True:
         raise LetterError("메일 수신에 동의해 주세요")
     addr = normalize_email(email)
     freq, hour = validate_preferences(frequency, send_hour)
-    pairs = interests_repo.validate_interest_items(interests)
-    if not pairs:
-        raise LetterError("관심 분야나 주제를 하나 이상 골라 주세요")
+    pairs = interests_repo.validate_interest_items(interests if interests is not None else [])
+    editor_slugs = editors if editors is not None else []
+    if not pairs and not editor_slugs:
+        raise LetterError("에디터나 관심 주제를 하나 이상 골라 주세요")
     if not letter_mail.mail_available():
         raise LetterError("지금은 메일 신청을 받지 않고 있어요", 503)
     now = now or dt.datetime.now(dt.timezone.utc)
@@ -101,6 +104,8 @@ def subscribe(email: Any, interests: Any, frequency: Any, send_hour: Any, consen
             sub_id = cur.fetchone()["id"]
         for t, k in pairs:
             cur.execute("INSERT INTO letter_subscription_interests (subscription_id, interest_type, interest_key) VALUES (%s,%s,%s)", (sub_id, t, k))
+        if editor_slugs:
+            editors_repo.set_subscription_editors(cur, sub_id, editor_slugs)
     if to_send:
         subject, html_body, text_body = letter_mail.render_confirm(to_send)
         try:
@@ -249,3 +254,141 @@ def run_send(kind: str, send_date: dt.date, send_hour: int, dry_run: bool = True
     with get_cursor() as cur:
         cur.execute("UPDATE letter_sends SET finished_at=now() WHERE id=%s", (send_id,))
     return {"dry_run": False, "send_id": send_id, "targets": out, "mail_enabled": letter_mail.mail_enabled(), **results}
+
+
+# ── 발행 즉시 발송 ─────────────────────────────────────────────────────────────
+# 레터가 발행되면 그 레터와 관심이 겹치는 활성 구독자에게 바로 한 통씩 보낸다("올라올 때마다").
+#  · 구독자마다 이 레터를 이미 받았으면 건너뛴다(letter_send_item_letters 로 확인) → 재실행해도 중복 없음
+#  · 횟수 제한은 두지 않는다(구독한 에디터의 글이 올라오면 그때마다 보낸다)
+#  · 야간(21시~8시)에는 보내지 않는다. 야간에 발행되면 다음날 8시 이후 run_pending_instant 가 보낸다
+#  · LETTER_AUTO_SEND=1 이고 메일 설정이 켜져 있을 때만 실제로 보낸다(아니면 대상만 계산하는 드라이런)
+def _auto_send_enabled() -> bool:
+    return os.environ.get("LETTER_AUTO_SEND") == "1" and letter_mail.mail_enabled()
+
+
+def send_for_letter(letter_id: int, dry_run: Optional[bool] = None, now: Optional[dt.datetime] = None) -> Dict[str, Any]:
+    """발행된 레터 하나를, 그 레터를 쓴 에디터를 구독한 활성 구독자에게 보낸다(구독한 에디터 중 하나라도 쓴 글이면 한 통).
+    dry_run 이 None 이면 자동 발송 설정(_auto_send_enabled)을 따른다. 횟수 제한은 없고, 같은 레터를 같은 구독자에게 두 번 보내지 않는다."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    dry = (not _auto_send_enabled()) if dry_run is None else dry_run
+    kst_now = now.astimezone(KST)
+    if not dry and not 8 <= kst_now.hour <= 20:
+        return {"skipped": "야간에는 보내지 않아요. 다음날 8시 이후에 보내요", "targets": []}
+    with get_cursor() as cur:
+        cur.execute("SELECT slug, title FROM issue_letters WHERE id=%s AND status='published' AND deleted_at IS NULL", (letter_id,))
+        letter_row = cur.fetchone()
+        if not letter_row:
+            raise LetterError("발행된 레터가 아닙니다", 404)
+        # 이 레터를 쓴 에디터를 구독한 활성 구독자. 수신 제외 주소와 이미 이 레터를 받은 구독자는 뺀다.
+        cur.execute(
+            "SELECT DISTINCT s.id, s.email_norm, s.unsubscribe_token, "
+            "       (SELECT string_agg(e.name, '·' ORDER BY le.position) FROM issue_letter_editors le JOIN letter_editors e ON e.id = le.editor_id "
+            "         WHERE le.letter_id = %s AND le.editor_id IN (SELECT editor_id FROM letter_subscription_editors WHERE subscription_id = s.id)) AS editor_names "
+            "FROM letter_subscriptions s "
+            "JOIN letter_subscription_editors se ON se.subscription_id = s.id "
+            "JOIN issue_letter_editors le2 ON le2.editor_id = se.editor_id AND le2.letter_id = %s "
+            "WHERE s.status = 'active' "
+            "  AND NOT EXISTS (SELECT 1 FROM email_suppressions x WHERE x.email_norm = s.email_norm) "
+            "  AND NOT EXISTS (SELECT 1 FROM letter_send_item_letters il JOIN letter_send_items i ON i.id = il.item_id "
+            "                   WHERE i.subscription_id = s.id AND il.letter_id = %s AND i.status IN ('sent','queued')) "
+            "ORDER BY s.id", (letter_id, letter_id, letter_id))
+        subs = cur.fetchall()
+        targets = [{"email": mask_email(s["email_norm"]), "letter": letter_row["title"], "editors": s["editor_names"]} for s in subs]
+        if dry or not subs:
+            return {"dry_run": dry, "targets": targets, "subscribers": len(subs)}
+        cur.execute("INSERT INTO letter_sends (kind, send_date, send_hour, target_count) VALUES ('instant', %s, %s, %s) "
+                    "ON CONFLICT (kind, send_date, send_hour) DO UPDATE SET target_count = letter_sends.target_count + EXCLUDED.target_count RETURNING id",
+                    (kst_now.date(), kst_now.hour, len(subs)))
+        send_id = cur.fetchone()["id"]
+        queued = []
+        for sub in subs:
+            cur.execute("INSERT INTO letter_send_items (send_id, subscription_id, email) VALUES (%s,%s,%s) ON CONFLICT (send_id, subscription_id) DO NOTHING RETURNING id", (send_id, sub["id"], sub["email_norm"]))
+            row = cur.fetchone()
+            if not row:
+                continue
+            cur.execute("INSERT INTO letter_send_item_letters (item_id, letter_id, position) VALUES (%s,%s,1)", (row["id"], letter_id))
+            queued.append((row["id"], sub))
+    full = issue_letters_repo.get_published(letter_row["slug"])
+    results = {"sent": 0, "failed": 0}
+    for item_id, sub in queued:
+        try:
+            if not full:
+                raise RuntimeError("letter not published")
+            reason = f"구독하신 {sub['editor_names']} 에디터의 새 레터예요" if sub["editor_names"] else ""
+            subject, html_body, text_body = letter_mail.render_letter(full, reason, sub["unsubscribe_token"])
+            mid = letter_mail.send_mail(sub["email_norm"], subject, html_body, text_body, letter_mail.unsubscribe_url(sub["unsubscribe_token"]))
+            status, err = "sent", None
+            results["sent"] += 1
+        except Exception as e:  # 한 명의 실패가 나머지를 막지 않는다
+            mid, status, err = None, "failed", str(e)[:500]
+            results["failed"] += 1
+            log.exception("instant send failed item=%s", item_id)
+        with get_cursor() as cur:
+            cur.execute("UPDATE letter_send_items SET status=%s, message_id=%s, error=%s, sent_at=now() WHERE id=%s", (status, mid, err, item_id))
+    with get_cursor() as cur:
+        cur.execute("UPDATE letter_sends SET finished_at=now() WHERE id=%s", (send_id,))
+    return {"dry_run": False, "send_id": send_id, "targets": targets, **results}
+
+
+def run_pending_instant(now: Optional[dt.datetime] = None) -> Dict[str, Any]:
+    """야간에 발행돼 보내지 못한 최근 레터(24시간 이내)를 아침에 보낸다. 크론(또는 수동)으로 8시 이후 호출한다."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    with get_cursor() as cur:
+        cur.execute("SELECT id FROM issue_letters WHERE status='published' AND deleted_at IS NULL AND published_at >= %s ORDER BY published_at", (now - dt.timedelta(hours=24),))
+        ids = [r["id"] for r in cur.fetchall()]
+    return {"letters": [{"id": i, **send_for_letter(i, now=now)} for i in ids]}
+
+
+# ── 테스트 메일(샘플 한 통) ──────────────────────────────────────────────────
+# 구독 신청 전에 "메일이 실제로 오는지" 확인하게 하는 기능이라 구독자가 아닌 주소로도 나간다. 남용을 막으려고
+#  · 같은 주소는 10분에 1회, 하루 3회까지
+#  · 반송·신고(수신 제외) 주소에는 보내지 않는다
+#  · 본문 맨 위에 "테스트 메일"을 표시하고 수신거부 링크를 넣지 않는다(구독이 아니므로 이후 메일이 가지 않는다는 문구를 넣는다)
+# 제한은 프로세스 메모리로 센다(서버 워커 2개라 정확히 지켜지지는 않는다 — 정식 단계에서 테이블이나 Redis 로 옮긴다).
+TEST_COOLDOWN = dt.timedelta(minutes=10)
+TEST_DAILY_MAX = 3
+_test_log: Dict[str, List[dt.datetime]] = {}
+
+
+def preview_mail() -> Dict[str, str]:
+    """"이렇게 와요" 미리보기: 가장 최근 레터로 만든 실제 메일 본문(HTML)을 돌려준다. 메일은 보내지 않는다."""
+    with get_cursor() as cur:
+        cur.execute("SELECT slug FROM issue_letters WHERE status='published' AND deleted_at IS NULL ORDER BY published_at DESC, id DESC LIMIT 1")
+        row = cur.fetchone()
+    letter = issue_letters_repo.get_published(row["slug"]) if row else None
+    if not letter:
+        raise LetterError("보여 드릴 레터가 아직 없어요", 404)
+    subject, html_body, _ = letter_mail.render_letter(letter, "", "", test=True)
+    return {"subject": subject, "html": html_body}
+
+
+def send_test_mail(email: Any, now: Optional[dt.datetime] = None) -> Dict[str, str]:
+    addr = normalize_email(email)
+    if not letter_mail.mail_available():
+        raise LetterError("지금은 테스트 메일을 보내지 않고 있어요", 503)
+    now = now or dt.datetime.now(dt.timezone.utc)
+    recent = [t for t in _test_log.get(addr, []) if now - t < dt.timedelta(days=1)]
+    if recent and now - recent[-1] < TEST_COOLDOWN:
+        raise LetterError("테스트 메일은 10분에 한 번만 받을 수 있어요. 잠시 뒤에 다시 눌러 주세요", 429)
+    if len(recent) >= TEST_DAILY_MAX:
+        raise LetterError("오늘은 테스트 메일을 더 받을 수 없어요", 429)
+    with get_cursor() as cur:
+        cur.execute("SELECT 1 FROM email_suppressions WHERE email_norm = %s", (addr,))
+        if cur.fetchone():
+            return {"status": "sent"}  # 제외 주소는 알리지 않고 보내지도 않는다
+        cur.execute("SELECT slug FROM issue_letters WHERE status='published' AND deleted_at IS NULL ORDER BY published_at DESC, id DESC LIMIT 1")
+        row = cur.fetchone()
+    if not row:
+        raise LetterError("보낼 레터가 아직 없어요", 404)
+    letter = issue_letters_repo.get_published(row["slug"])
+    if not letter:
+        raise LetterError("보낼 레터가 아직 없어요", 404)
+    subject, html_body, text_body = letter_mail.render_letter(letter, "", "", test=True)
+    _test_log[addr] = recent + [now]
+    try:
+        letter_mail.send_mail(addr, subject, html_body, text_body)
+    except Exception:
+        log.exception("test mail failed")
+        _test_log[addr] = recent  # 실패는 횟수에서 뺀다
+        raise LetterError("테스트 메일을 보내지 못했어요. 잠시 뒤 다시 시도해 주세요", 502)
+    return {"status": "sent"}

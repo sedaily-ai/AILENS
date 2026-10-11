@@ -133,3 +133,21 @@ def test_run_send_guards():
         r.run_send("daily", mon, 8, dry_run=False, now=night)
     with pytest.raises(r.LetterError, match="꺼져"):
         r.run_send("daily", mon, 8, dry_run=False, now=NOW)  # 발송 설정이 없으면 실제 발송 불가
+
+
+def test_auto_send_requires_flag_and_mail_config(monkeypatch):
+    r = _r()
+    monkeypatch.delenv("LETTER_AUTO_SEND", raising=False)
+    assert r._auto_send_enabled() is False
+    monkeypatch.setenv("LETTER_AUTO_SEND", "1")
+    assert r._auto_send_enabled() is False  # 메일 설정이 없으면 켜지지 않는다
+    monkeypatch.setenv("LETTER_MAIL_ENABLED", "1")
+    monkeypatch.setenv("LETTER_MAIL_FROM", "a@b.c")
+    assert r._auto_send_enabled() is True
+
+
+def test_send_for_letter_skips_at_night_before_touching_db():
+    r = _r()
+    night = dt.datetime(2026, 10, 12, 14, 0, tzinfo=dt.timezone.utc)  # 23:00 KST
+    out = r.send_for_letter(1, dry_run=False, now=night)
+    assert "야간" in out["skipped"] and out["targets"] == []

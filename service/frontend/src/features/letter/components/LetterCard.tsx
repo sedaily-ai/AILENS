@@ -1,10 +1,14 @@
 import Link from 'next/link';
 import { AxisBadge } from './AxisBadge';
+import { editorsOfLetter } from '../data/editors';
 import { AXIS_META, type IssueLetter } from '../data/letterTypes';
+import { EditorAvatar } from './EditorAvatar';
 
+/** "2026-10-09" 또는 "2026-10-09T20:48" → "2026.10.09" / "2026.10.09 20:48". */
 export function formatLetterDate(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  return `${y}.${m}.${d}`;
+  const [date, time] = iso.split('T');
+  const [y, m, d] = date.split('-');
+  return `${y}.${m}.${d}${time ? ` ${time}` : ''}`;
 }
 
 /** 목록 카드. featured면 "최신 레터" 큰 카드, 아니면 그리드용 카드. 카드에서 "모아쓰기" 표시·3축(또는 키워드) 배지·기사 N건이 바로 보인다. */
@@ -21,6 +25,9 @@ export function LetterCard({ letter, featured = false, onTopic }: { letter: Issu
       <div className="lt-card-cat">
         {featured && <span className="lt-today">최신 레터</span>}
         <span>{letter.categories.join(' · ')}</span>
+        {editorsOfLetter(letter).slice(0, 2).map((ed) => (
+          <span key={ed.id} className="lt-card-ed"><EditorAvatar editor={ed} size={22} />{ed.name}</span>
+        ))}
         <span className="lt-no">제 {letter.issueNumber}호</span>
       </div>
       <h3 className="lt-card-title">{letter.title}</h3>

@@ -4,6 +4,21 @@ import { useState } from "react";
 import { adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import type { BigKindsArticle } from "@/lib/types";
+import { buildIssueLetterPrompt } from "@/lib/issueLetterPrompt";
+
+// 공개 에디터 목록(서버가 정본). 프롬프트의 "작성 에디터" 목록을 채운다. 못 읽으면 에디터 없이 프롬프트를 만든다.
+const PUBLIC_EDITORS_URL = "https://ailens.sedaily.ai/api/v2/issue-letters/editors";
+
+async function fetchEditorsForPrompt(): Promise<{ slug: string; name: string; role: string; topics: string[] }[]> {
+  try {
+    const res = await fetch(PUBLIC_EDITORS_URL);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { editors?: { slug: string; name: string; role: string; topic_names?: string[] }[] };
+    return (data.editors ?? []).map((e) => ({ slug: e.slug, name: e.name, role: e.role, topics: e.topic_names ?? [] }));
+  } catch {
+    return [];
+  }
+}
 
 // 출처 후보 기사 검색(2026-10-09, 빅카인즈). 서울경제 기사를 1990년부터 관련도순으로 찾는다(한 번에 최대 6년 — 더 오래된 기사는 기간을 옮겨 다시 검색).
 // 고른 기사를 "후보로 담고 복사"하면 ① 서버가 보관(이 기사만 레터 출처가 될 수 있다) ② `- 제목 | 주소`가 클립보드에 복사된다.
@@ -31,6 +46,7 @@ export function IssueLetterCandidateSearch() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [flow, setFlow] = useState("");
 
   const range = (): { from: string; to: string } | null => {
     if (period === "custom") {
@@ -79,6 +95,34 @@ export function IssueLetterCandidateSearch() {
       const lines = r.archived.map((a) => `- ${a.title} | ${a.url}`);
       await navigator.clipboard.writeText(lines.join("\n"));
       toast.show(`${lines.length}건을 후보로 담고 복사했습니다. 템플릿의 후보 기사 목록에 붙여 넣으세요`, "success");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 담은 기사로 레터 생성 프롬프트(템플릿 v2)를 한 번에 완성해 복사한다: 주제=검색어, 시드=고른 기사 주소, 후보=고른 기사 목록, 작성 에디터 목록은 서버에서 읽는다.
+  const savePromptAndCopy = async () => {
+    const chosen = (items ?? []).filter((a) => picked.has(a.news_id));
+    if (chosen.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await adminApi.saveIssueLetterArchives(chosen);
+      const editors = await fetchEditorsForPrompt();
+      const candidates = r.archived.map((a) => `- ${a.title} | ${a.url}`).join("\n");
+      const prompt = buildIssueLetterPrompt({
+        topic: q.trim(),
+        seeds: r.archived.slice(0, 2).map((a) => a.url).join(", "),
+        candidates,
+        flow,
+        categories: "",
+        slug: "",
+        editors,
+      });
+      await navigator.clipboard.writeText(prompt);
+      toast.show(`프롬프트를 복사했습니다(후보 ${r.archived.length}건${editors.length ? `, 에디터 ${editors.length}명` : ", 에디터 목록은 불러오지 못함"}). AI에 붙여 넣고 나온 JSON 을 아래에 붙여 넣으세요`, "success");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -169,9 +213,13 @@ export function IssueLetterCandidateSearch() {
               </li>
             ))}
           </ul>
-          <div className="flex items-center gap-3">
+          <input value={flow} onChange={(e) => setFlow(e.target.value)} placeholder="핵심 흐름(선택) — 독자에게 전하고 싶은 질문. 프롬프트에 들어갑니다" aria-label="핵심 흐름" maxLength={200} className="ui-input w-full rounded-lg px-3 py-2 text-[13px]" />
+          <div className="flex items-center gap-3 flex-wrap">
             <button type="button" disabled={picked.size === 0 || busy} onClick={saveAndCopy} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
               선택한 {picked.size}건을 후보로 담고 복사
+            </button>
+            <button type="button" disabled={picked.size === 0 || busy} onClick={savePromptAndCopy} className="ui-btn ui-btn-ghost rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50" title="후보를 담고, 주제·기사·에디터 목록이 채워진 레터 생성 프롬프트 전체를 복사합니다">
+              프롬프트까지 완성해 복사
             </button>
             <button type="button" onClick={() => setPicked(new Set(items.filter((a) => a.original_link).map((a) => a.news_id)))} className="text-[13px] hover:underline" style={{ color: "var(--text-muted)" }}>
               전체 선택

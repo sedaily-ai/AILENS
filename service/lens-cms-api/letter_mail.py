@@ -73,12 +73,12 @@ def _segments_text(parts: List[Any]) -> str:
     return "".join(p if isinstance(p, str) else (f"{p.get('text', '')}({p['href']})" if p.get("href") else p.get("text", "")) for p in parts)
 
 
-def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: str) -> Tuple[str, str, str]:
+def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: str, test: bool = False) -> Tuple[str, str, str]:
     """레터 한 편을 사이트 상세 화면과 같은 순서·구성으로 메일에 담는다: 머리(분류·호수·제목·한 줄·주제·세 관점) → 쓰인 기사 → 1분 요약 → 세 섹션(핵심·본문·인라인 링크)
     → 에디터 한마디 → 투표(사이트로 연결). 메일에서는 투표를 받을 수 없어 사이트의 같은 레터로 안내한다."""
-    unsub = unsubscribe_url(unsubscribe_token)
+    unsub = None if test else unsubscribe_url(unsubscribe_token)
     url = f"{SITE_BASE}/letter/{letter['slug']}"
-    subject = f"[AI LENS 레터] {letter['title']}"
+    subject = f"[테스트] [AI LENS 레터] {letter['title']}" if test else f"[AI LENS 레터] {letter['title']}"
     cats = " · ".join(letter.get("category_names") or [])
     topics = [t["name"] for t in letter.get("topics") or []]
     sections = letter.get("sections") or []
@@ -131,6 +131,8 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
                      '<div style="margin-top:12px;font-size:12.5px;color:#6b7280">선택하면 사이트에서 투표가 반영돼요.</div></div>')
 
     reason_html = f'<div style="margin:0 0 14px;font-size:13px;color:#2563eb">{html.escape(reason_text)}</div>' if reason_text else ""
+    if test:
+        reason_html = '<div style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#f3f4f6;font-size:13px;line-height:1.6;color:#374151">테스트 메일이에요. 가장 최근 레터를 샘플로 보냈어요. 이 주소는 구독 신청 전이라 이후 메일은 보내지 않아요.</div>' + reason_html
     body = (f'{reason_html}<div style="font-size:13.5px;font-weight:600;color:#6b7280">{html.escape(cats)} <span style="color:#9ca3af;font-weight:500">제 {int(letter["issue_no"])}호</span></div>'
             f'<h1 style="margin:12px 0 0;font-family:{SERIF};font-size:27px;font-weight:700;line-height:1.35;letter-spacing:-0.02em;color:#111827">{html.escape(letter["title"])}</h1>'
             f'<p style="margin:14px 0 0;font-size:16.5px;line-height:1.7;color:#4b5563">{html.escape(letter.get("deck") or "")}</p>'
@@ -152,7 +154,7 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
         lines += ["", "[에디터 한마디]", letter["editor_note"]]
     if poll:
         lines += ["", poll["question"], " / ".join(o["label"] for o in poll["options"]) + f"  (투표: {url})"]
-    lines += ["", f"사이트에서 보기: {url}", f"수신거부: {unsub}"] + FOOTER_LINES
+    lines += ["", f"사이트에서 보기: {url}"] + ([] if test else [f"수신거부: {unsub}"]) + FOOTER_LINES
     return subject, _shell(subject, body, unsub), "\n".join(lines)
 
 

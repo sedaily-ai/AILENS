@@ -27,7 +27,7 @@ export default async function LetterDetailPage({ params }: { params: Promise<Par
   const i = list.findIndex((l) => l.slug === slug);
   return (
     <ArticlePageShell activeTab="letter">
-      <LetterDetailView letter={letter} prevSlug={i >= 0 ? list[i + 1]?.slug : undefined} nextSlug={i > 0 ? list[i - 1]?.slug : undefined} />
+      <LetterDetailView letter={letter} prevSlug={i >= 0 ? list[i + 1]?.slug : undefined} nextSlug={i > 0 ? list[i - 1]?.slug : undefined} others={list} />
     </ArticlePageShell>
   );
 }

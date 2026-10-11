@@ -1,0 +1,49 @@
+{
+  "family": "sedaily-lens-issueletter-auto",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "networkMode": "awsvpc",
+  "cpu": "1024",
+  "memory": "2048",
+  "runtimePlatform": {
+    "cpuArchitecture": "ARM64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-frontpage-auto-execution-role",
+  "taskRoleArn": "arn:aws:iam::887078546492:role/sedaily-lens-issueletter-auto-task-role",
+  "containerDefinitions": [
+    {
+      "name": "issueletter-auto",
+      "image": "887078546492.dkr.ecr.us-east-1.amazonaws.com/sedaily-lens-frontpage-auto:issueletter-1",
+      "workingDirectory": "/app/pipelines/issueletter_auto",
+      "essential": true,
+      "environment": [
+        {
+          "name": "AWS_REGION",
+          "value": "us-east-1"
+        },
+        {
+          "name": "BEDROCK_ENDPOINT_URL",
+          "value": "https://vpce-0a3db42bd30a484d1-aqh61lqy.bedrock-runtime.us-east-1.vpce.amazonaws.com"
+        },
+        {
+          "name": "ISSUELETTER_AUTO",
+          "value": "0"
+        },
+        {
+          "name": "ISSUELETTER_MAX_PER_DAY",
+          "value": "1"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sedaily-lens-issueletter-auto",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "run"
+        }
+      }
+    }
+  ]
+}

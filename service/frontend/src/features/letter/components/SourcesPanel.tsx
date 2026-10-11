@@ -1,17 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { AxisBadge } from './AxisBadge';
 import type { LetterSource } from '../data/letterTypes';
+import { AxisBadge } from './AxisBadge';
 
-/** "이 레터에 쓰인 기사" 패널 — 본문 앞에 두어 기사들이 어떤 축으로 쓰였는지 읽기 전에 보이게 한다. */
+/** "이 레터에 쓰인 기사" — 기본은 펼쳐 두고 접을 수 있다. 기사마다 어떤 축(소식·실체·다른 시각)으로 쓰였는지 배지로 보인다. */
 export function SourcesPanel({ sources, letterSlug }: { sources: LetterSource[]; letterSlug: string }) {
+  const [open, setOpen] = useState(true);
   return (
     <section className="ld-panel" aria-label="이 레터에 쓰인 기사">
-      <h2 className="ld-panel-h">
-        이 레터에 쓰인 기사 <small>{sources.length}건</small>
-      </h2>
-      {sources.map((s, i) => {
+      <button type="button" className="ld-panel-h ld-panel-toggle" aria-expanded={open} onClick={() => { trackEvent('letter_sources_toggle', { letter: letterSlug, open: !open }); setOpen((v) => !v); }}>
+        <span>이 레터에 쓰인 기사 <small>{sources.length}건</small></span>
+        <span className="ld-panel-caret" aria-hidden>{open ? "접기" : "펼치기"}</span>
+      </button>
+      {open && sources.map((s, i) => {
         const body = (
           <>
             <span className="ld-src-n">{i + 1}</span>
@@ -31,13 +34,7 @@ export function SourcesPanel({ sources, letterSlug }: { sources: LetterSource[];
             </span>
           </>
         );
-        if (s.placeholder) {
-          return (
-            <div key={i} className="ld-src ld-src-ph">
-              {body}
-            </div>
-          );
-        }
+        if (s.placeholder) return <div key={i} className="ld-src ld-src-ph">{body}</div>;
         return (
           <a
             key={s.href + i}

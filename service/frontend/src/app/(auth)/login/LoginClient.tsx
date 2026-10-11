@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth";
 import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from "@/shared/lib/auth/passwordPolicy";
+import { takeReturnTo } from "@/shared/lib/auth/returnTo";
 import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/form/PasswordChecklist";
 
 /**
@@ -97,7 +98,7 @@ export function LoginClient() {
     setIsLoading(false);
     // 로그인은 성공하면 홈으로 이동하고, 실패하면 이 화면에 에러만 표시한다. 이메일 인증(confirm)으로 넘기는 분기는 없다(인증은 회원가입 흐름 전용).
     if (result.success) {
-      router.replace("/");
+      router.replace(takeReturnTo() ?? "/"); // 레터 팔로우 등에서 로그인으로 넘어온 경우 원래 화면으로 돌아간다
       return;
     }
     setError(result.error || "로그인에 실패했습니다.");
