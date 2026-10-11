@@ -2,13 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { takeReturnTo } from "@/shared/lib/auth/returnTo";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.replace("/");
+      router.replace(takeReturnTo() ?? "/");
     }, 1000);
 
     return () => clearTimeout(timer);

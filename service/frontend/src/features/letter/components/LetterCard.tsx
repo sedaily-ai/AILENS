@@ -4,9 +4,11 @@ import { editorsOfLetter } from '../data/editors';
 import { AXIS_META, type IssueLetter } from '../data/letterTypes';
 import { EditorAvatar } from './EditorAvatar';
 
+/** "2026-10-09" 또는 "2026-10-09T20:48" → "2026.10.09" / "2026.10.09 20:48". */
 export function formatLetterDate(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  return `${y}.${m}.${d}`;
+  const [date, time] = iso.split('T');
+  const [y, m, d] = date.split('-');
+  return `${y}.${m}.${d}${time ? ` ${time}` : ''}`;
 }
 
 /** 목록 카드. featured면 "최신 레터" 큰 카드, 아니면 그리드용 카드. 카드에서 "모아쓰기" 표시·3축(또는 키워드) 배지·기사 N건이 바로 보인다. */

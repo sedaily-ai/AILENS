@@ -15,7 +15,7 @@ export function EditorTabs({ selected, onSelect }: { selected: string | null; on
       {EDITORS.map((e) => (
         <button key={e.id} type="button" className="lt-etab" aria-pressed={selected === e.id} onClick={() => onSelect(e.id)} style={{ '--tone-bg': e.tone.bg } as CSSProperties}>
           <span className="lt-etab-ring"><EditorAvatar editor={e} size={60} fill /></span>
-          <span className="lt-etab-text"><strong>{e.name}</strong><em>{e.role.replace(' 에디터', '')}</em></span>
+          <span className="lt-etab-text"><strong>{e.name}</strong><em>{e.short ?? e.role.replace(' 에디터', '')}</em></span>
         </button>
       ))}
     </div>

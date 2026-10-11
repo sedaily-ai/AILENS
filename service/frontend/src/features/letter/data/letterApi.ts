@@ -9,7 +9,7 @@ export const LETTER_REVALIDATE_SECONDS = 60;
 
 interface ApiCard {
   slug: string; issue_no: number; title: string; deck: string; read_minutes: number;
-  categories: string[]; axes: string[]; source_count: number; published_at: string; topics?: string[];
+  categories: string[]; axes: string[]; source_count: number; published_at: string; topics?: string[]; editors?: string[];
 }
 interface ApiSection { axis: LetterAxis; axis_label: string | null; heading: string; key_line: string; paragraphs: LetterSegment[][] }
 interface ApiSource { title: string; outlet: string; url: string; axes: LetterAxis[]; external: boolean }
@@ -24,6 +24,11 @@ function kstDate(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+/** UTC 발행 시각을 한국 시각 "YYYY-MM-DDTHH:mm"으로(뉴스레터라 시·분까지 보여 준다). */
+function kstDateTime(iso: string): string {
+  return new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 16);
+}
+
 function orderedAxes(axes: string[]): LetterAxis[] {
   return AXIS_ORDER.filter((a) => axes.includes(a));
 }
@@ -32,8 +37,8 @@ function mapCard(c: ApiCard): IssueLetter {
   return {
     slug: c.slug, issueNumber: c.issue_no, title: c.title, deck: c.deck,
     axisLabels: orderedAxes(c.axes).map((axis) => ({ axis, label: '' })),
-    categories: c.categories, publishedAt: kstDate(c.published_at), readMinutes: c.read_minutes,
-    summary: [], sections: [], editorNote: '', vote: null, sources: [], sourceCount: c.source_count, topics: c.topics ?? [],
+    categories: c.categories, publishedAt: kstDateTime(c.published_at), readMinutes: c.read_minutes,
+    summary: [], sections: [], editorNote: '', vote: null, sources: [], sourceCount: c.source_count, topics: c.topics ?? [], editors: c.editors ?? [],
   };
 }
 
@@ -47,7 +52,8 @@ function mapDetail(d: ApiDetail): IssueLetter {
   return {
     slug: d.slug, issueNumber: d.issue_no, title: d.title, deck: d.deck,
     axisLabels: orderedAxes([...labels.keys()]).map((axis) => ({ axis, label: labels.get(axis) ?? '' })),
-    categories: d.category_names, publishedAt: kstDate(d.published_at), readMinutes: d.read_minutes,
+    editors: d.editors ?? [],
+    categories: d.category_names, publishedAt: kstDateTime(d.published_at), readMinutes: d.read_minutes,
     summary: d.summary, sections, editorNote: d.editor_note ?? '', vote, topics: (d.topics ?? []).map((t) => t.name),
     // 자사 기사는 서버가 기사 DB에서 제목·주소를 읽어 준다. 매체명은 서울경제로 표기한다.
     sources: d.sources.map((s) => ({ title: s.title, outlet: s.external ? s.outlet : '서울경제', href: s.url, axes: s.axes, internal: !s.external })),

@@ -45,7 +45,7 @@ interface HeaderProps {
 const TAB_ACCENT = '#1d4ed8';
 const TAB_BASE =
   'group relative px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] font-semibold transition-colors duration-200 whitespace-nowrap flex-shrink-0';
-const TAB_ACTIVE = 'text-gray-900';
+const TAB_ACTIVE = 'text-gray-900 font-bold';
 const TAB_IDLE = 'text-gray-600 hover:text-gray-900';
 // tier 'extra': 코어보다 작고 옅은 텍스트 목차 톤. letter-spacing을 살짝 벌려(0.01em) 빽빽함을 줄인다.
 const TAB_EXTRA_BASE =
@@ -55,16 +55,10 @@ const TAB_EXTRA_IDLE = 'text-gray-400 hover:text-gray-600';
 // active 탭 밑에 항상, idle 탭은 호버 시에만 슬라이드인 되는 밑줄.
 // 부모(DesktopTab의 a/Link/button/span)가 TAB_BASE의 `group relative`를
 // 가지고 있어야 group-hover가 동작한다.
+// 탭 밑줄은 2026-10-11 삭제했다: 선택·호버는 글씨가 검정으로 바뀌고(선택은 굵게) 끝난다. 호출부를 그대로 두려고 빈 컴포넌트만 남긴다.
 function TabUnderline({ active }: { active?: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={`pointer-events-none absolute inset-x-2 lg:inset-x-3 -bottom-px h-[2px] origin-left rounded-full transition-transform duration-200 ${
-        active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-      }`}
-      style={{ background: TAB_ACCENT }}
-    />
-  );
+  void active;
+  return null;
 }
 
 // "시선" 전용 손그림 눈 아이콘. 서비스 핵심 차별화 탭 하나에만 일러스트 포인트를 준다.
@@ -86,13 +80,94 @@ function LensEyeIcon({ className }: { className?: string }) {
   );
 }
 
+// "레터" 전용 손그림 아이콘: 크림색 편지지 + 빨간 우체통. 탭에 마우스를 올리면(부모 TAB_BASE의 group-hover) 한 편의 짧은 연출이 나온다:
+// 편지가 살짝 움츠렸다가 → 곡선으로 날아가 → 우체통 뚜껑이 열리고 → 편지가 들어가며 → 우체통이 눌렸다 돌아오고 → 깃발이 튀어 오르며 작은 반짝임이 터진다(약 1.25초). 마우스를 떼면 편지가 다시 나타난다.
+// 시선 아이콘과 같은 스트로크 톤(검정 라인, 그라데이션 없음)이고, 색은 따뜻한 크림·코랄·빨강·노랑만 쓴다. 외부 라이브러리 없이 CSS 키프레임만 쓴다.
+const LETTER_ICON_CSS = `
+  .lt-mb-env, .lt-mb-lid, .lt-mb-box, .lt-mb-flag, .lt-mb-spark { transform-box: fill-box; }
+  .lt-mb-env { transform-origin: center; transform: rotate(-5deg); animation: lt-env-back .5s cubic-bezier(.3,1.3,.5,1); }
+  .lt-mb-lid { transform-origin: 0% 50%; }
+  .lt-mb-box { transform-origin: 50% 100%; }
+  .lt-mb-flag { transform-origin: 0% 100%; transform: rotate(62deg); animation: lt-flag-back .35s ease-in; }
+  .lt-mb-spark { transform-origin: center; opacity: 0; }
+  .group:hover .lt-mb-env { animation: lt-env-go 1.25s cubic-bezier(.45,.05,.35,1) forwards; }
+  .group:hover .lt-mb-lid { animation: lt-lid 1.25s ease-in-out; }
+  .group:hover .lt-mb-box { animation: lt-box 1.25s ease-out; }
+  .group:hover .lt-mb-flag { animation: lt-flag 1.25s cubic-bezier(.3,1.5,.5,1) forwards; }
+  .group:hover .lt-mb-spark { animation: lt-spark 1.25s ease-out; }
+  @keyframes lt-env-back { 0% { opacity: 0; transform: translate(6px,-2px) rotate(-5deg) scale(.6); } 100% { opacity: 1; transform: rotate(-5deg); } }
+  @keyframes lt-env-go {
+    0% { transform: translate(0,0) rotate(-5deg) scale(1); opacity: 1; }
+    12% { transform: translate(-1.6px,1.2px) rotate(-12deg) scale(1); }
+    40% { transform: translate(10px,-9px) rotate(-18deg) scale(.95); }
+    66% { transform: translate(22px,-8px) rotate(-8deg) scale(.8); }
+    82% { transform: translate(25px,-1px) rotate(0deg) scale(.62); opacity: 1; }
+    96% { transform: translate(25px,5px) rotate(0deg) scale(.5); opacity: 0; }
+    100% { transform: translate(25px,5px) rotate(0deg) scale(.5); opacity: 0; }
+  }
+  @keyframes lt-lid { 0%, 28% { transform: rotate(0deg); } 42%, 80% { transform: rotate(-72deg); } 90% { transform: rotate(5deg); } 100% { transform: rotate(0deg); } }
+  @keyframes lt-box { 0%, 84% { transform: scale(1,1); } 88% { transform: scale(1.08,.9); } 94% { transform: scale(.97,1.04); } 100% { transform: scale(1,1); } }
+  @keyframes lt-flag-back { 0% { transform: rotate(0deg); } 100% { transform: rotate(62deg); } }
+  @keyframes lt-flag { 0%, 84% { transform: rotate(62deg); } 92% { transform: rotate(-14deg); } 100% { transform: rotate(0deg); } }
+  @keyframes lt-spark { 0%, 84% { opacity: 0; transform: scale(.2); } 90% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.5); } }
+  @media (prefers-reduced-motion: reduce) {
+    .lt-mb-env, .lt-mb-flag { animation: none !important; }
+    .group:hover .lt-mb-env, .group:hover .lt-mb-lid, .group:hover .lt-mb-box, .group:hover .lt-mb-flag, .group:hover .lt-mb-spark { animation: none !important; }
+  }
+`;
+function LetterMailboxIcon({ className }: { className?: string }) {
+  const ink = '#1a1a1a';
+  const red = '#e8604c';
+  return (
+    <>
+      <style>{LETTER_ICON_CSS}</style>
+      <svg viewBox="0 0 50 28" fill="none" className={className} aria-hidden>
+        {/* 편지지(우체통 뒤에 그려서, 다가가면 우체통에 가려지며 들어가는 것처럼 보인다) */}
+        <g className="lt-mb-env">
+          <path d="M3 9.2 Q12 8.2 21 9 L20.6 22 Q12 22.9 3.4 22.2 Z" fill="#fff3d4" stroke={ink} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+          <path d="M3.5 9.7 Q12 17.4 20.5 9.5" stroke="#e8735a" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M3.6 21.8 L10 15.6 M20.4 21.6 L14 15.6" stroke={ink} strokeWidth={0.9} strokeLinecap="round" opacity={0.45} />
+          <circle cx="12" cy="15.6" r="1.9" fill="#e8735a" />
+          <path d="M11.3 15 Q11.6 14.5 12.2 14.4" stroke="#fff" strokeWidth={0.7} strokeLinecap="round" opacity={0.85} />
+        </g>
+        {/* 우체통 */}
+        <g className="lt-mb-box">
+          <ellipse cx="37.6" cy="26.3" rx="8.6" ry="1.2" fill={ink} opacity={0.12} />
+          <path d="M33.6 23 V26 M42.2 23 V26" stroke={ink} strokeWidth={1.5} strokeLinecap="round" />
+          <path d="M30.2 23.4 L30 12 Q30 6.6 37.6 6.6 Q45.2 6.6 45 12 L44.8 23.4 Z" fill={red} stroke={ink} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+          <path d="M41.2 7.3 Q44.8 8.3 45 12 L44.8 23.2 H41.4 Z" fill="#c9422f" />
+          <path d="M32.4 10.6 Q32.6 8.6 34.4 7.9" stroke="#fff" strokeWidth={1} strokeLinecap="round" opacity={0.8} />
+          <path d="M32.4 13 Q37.6 12 42.8 13 L42.8 14.7 Q37.6 13.7 32.4 14.7 Z" fill={ink} />
+          <g className="lt-mb-lid">
+            <path d="M31.8 12.5 Q37.6 11.3 43.4 12.5 L43.4 15 Q37.6 13.8 31.8 15 Z" fill="#f08472" stroke={ink} strokeWidth={1.3} strokeLinejoin="round" />
+          </g>
+          <path d="M33.4 17.6 H41.8 V21 H33.4 Z" fill="#fff3d4" stroke={ink} strokeWidth={1} strokeLinejoin="round" />
+          <path d="M35.2 19.3 H40" stroke="#e8735a" strokeWidth={1} strokeLinecap="round" />
+          <path d="M29 23.7 Q37.5 24.3 46 23.7" stroke={ink} strokeWidth={1.5} strokeLinecap="round" />
+        </g>
+        <g className="lt-mb-flag">
+          <path d="M45 14.8 L48.4 15 L48.3 10.8 L45 11.2" fill="#f6c453" stroke={ink} strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
+        </g>
+        {/* 투입 직후 터지는 작은 반짝임 */}
+        <g className="lt-mb-spark">
+          <path d="M37.6 2.2 V4.4 M33.4 3.4 L34.7 5 M41.8 3.4 L40.5 5" stroke="#f6c453" strokeWidth={1.4} strokeLinecap="round" />
+        </g>
+      </svg>
+    </>
+  );
+}
+
 function TabLabel({ tab }: { tab: HeaderTab }) {
   // "시선"만 텍스트 앞에 작은 손그림 눈 아이콘 — 위 LensEyeIcon 참조.
   const isFlagship = tab.key === 'lens';
   return (
     <span className="inline-flex items-center gap-1.5">
       {isFlagship && <LensEyeIcon className="w-[15px] h-[15px] flex-shrink-0 -mt-px" />}
-      {tab.label}
+      <span className="inline-grid">
+        <span className="col-start-1 row-start-1">{tab.label}</span>
+        <span aria-hidden className="col-start-1 row-start-1 invisible font-bold">{tab.label}</span>
+      </span>
+      {tab.key === 'letter' && <LetterMailboxIcon className="w-[40px] h-[22px] flex-shrink-0 -mt-px" />}
       {tab.soon && (
         <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-semibold rounded-full tracking-wide">
           SOON
