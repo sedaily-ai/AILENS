@@ -109,10 +109,10 @@ def _publishable(**over):
     url = lambda n: f"https://www.sedaily.com/article/{n}"
     seg = lambda n: {"text": f"t{n}", "href": url(n) + "?ref=sedailyEng"}
     letter = {
-        "summary": ["s"], "editor_note": "e", "categories": ["industry"], "topics": [{"slug": "rates", "name": "금리"}],
-        "sections": [{"key_line": "k", "paragraphs": [[seg(1), seg(2)]]}, {"key_line": "k", "paragraphs": [[seg(3)]]}, {"key_line": "k", "paragraphs": [["x"]]}],
+        "summary": ["s", "s2"], "editor_note": "e", "categories": ["industry"], "topics": [{"slug": "rates", "name": "금리"}],
+        "sections": [{"axis": "news", "key_line": "k", "paragraphs": [[seg(1), seg(2)]]}, {"axis": "substance", "key_line": "k", "paragraphs": [[seg(3)]]}, {"axis": "other", "key_line": "k", "paragraphs": [["x"]]}],
         "sources": [{"article_no": str(n), "title": f"t{n}", "url": url(n)} for n in (1, 2, 3)],
-        "poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기했어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
+        "poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기했어요"}, {"key": "b", "label": "걱정됐어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
     }
     letter.update(over)
     return letter
@@ -120,6 +120,28 @@ def _publishable(**over):
 
 def test_publish_ok_when_rules_met():
     assert _repo().publish_problems(_publishable()) == []
+
+
+def test_publish_requires_all_three_axes_and_summary_lines():
+    letter = _publishable()
+    letter["sections"][2]["axis"] = "news"
+    assert any("3축" in p and "other" in p for p in _repo().publish_problems(letter))
+    assert any("1분 요약은 2~3줄" in p for p in _repo().publish_problems(_publishable(summary=["s"])))
+
+
+def test_publish_blocks_evaluative_headline_and_two_sentence_note_and_poll_size():
+    r = _repo()
+    assert any("평가·감탄" in p for p in r.publish_problems(_publishable(title="놀라운 결과", deck="d")))
+    letter = _publishable()
+    letter["sections"][0]["key_line"] = "충격적인 숫자"
+    assert any("섹션 1 핵심" in p and "평가·감탄" in p for p in r.publish_problems(letter))
+    assert any("2문장 이내" in p for p in r.publish_problems(_publishable(editor_note="가요. 나요. 다요.")))
+    two = _publishable()
+    two["poll"]["options"] = two["poll"]["options"][1:]
+    assert any("3~4개" in p for p in r.publish_problems(two))
+    body = _publishable()
+    body["sections"][2]["paragraphs"] = [["놀랍게도 올랐어요."]]
+    assert any("평가 표현" in p for p in r.publish_problems(body))
 
 
 def test_publish_requires_three_distinct_own_inline_links():

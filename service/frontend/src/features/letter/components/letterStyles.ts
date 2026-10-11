@@ -543,4 +543,5 @@ export const LETTER_CSS = `
     .lt-ob-rec li { flex-wrap: wrap; }
     .lt-ob-go { margin-left: auto; }
   }
+  .ld-key-l { margin-right: 4px; font-size: 0.85em; font-weight: 700; color: #2f5fcf; }
 `;
