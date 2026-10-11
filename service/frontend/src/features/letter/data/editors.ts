@@ -1,4 +1,5 @@
 // 레터 에디터(목업, 2026-10-10). 이전 서비스(MBTI 에디터)의 이름·MBTI 그룹·담당 분야·이미지·목소리를 그대로 이어 쓴다 — 출처: legacy/dev_v1/service/frontend/src/app/editors/[id]/editorsData.ts.
+// 8명으로 줄였다(2026-10-11): 담당 분야가 겹치던 수빈·도윤·다은·유나는 하은·준서·소율에 합쳤다.
 // 이미지(public/editors)가 있는 4명(민철 INTJ·하은 INFP·준서 ISTJ·소율 ESFP)을 앞에 두고, 나머지 8명은 이미지 생성 전까지 이니셜 아바타를 쓴다.
 // 소개 음성(옛 기록: ElevenLabs eleven_multilingual_v2) voiceId — 민철 RU7aSi6lT4uQBXMLgDxK(TeddyNote), 하은 AW5wrnG1jVizOYY7R1Oo(JiYoung), 준서 5XgfKMHL4qnyg2mabE5t(Deck), 소율 QPFsEL6IBxlT15xfiD6C(Hana Lee).
 // 에디터는 "누구의 관심 영역을 맡는가"로 나뉘고, 레터 본문은 모두 같은 중립 편집 원칙(주관·유도·권유 금지)을 따른다. 에디터는 AI 에디터이며 화면에 그렇게 표시한다.
@@ -68,7 +69,7 @@ export const EDITORS: readonly LetterEditor[] = [
     intro: '안녕! 소율이야. 경제뉴스 어렵지? 나도 처음엔 그랬어. 근데 쉽게 풀면 진짜 재밌거든. 같이 보자!',
     image: '/editors/esfp.webp',
     voice: '/editors/voice/soyul.mp3',
-    topics: [{ slug: 'consumption', name: '소비' }, { slug: 'platform', name: '플랫폼' }, { slug: 'content', name: '콘텐츠' }, { slug: 'travel', name: '여행·관광' }, { slug: 'theme-stock', name: '테마주' }, { slug: 'neighborhood', name: '도시·동네' }],
+    topics: [{ slug: 'consumption', name: '소비' }, { slug: 'platform', name: '플랫폼' }, { slug: 'content', name: '콘텐츠' }, { slug: 'travel', name: '여행·관광' }, { slug: 'theme-stock', name: '테마주' }, { slug: 'neighborhood', name: '도시·동네' }, { slug: 'k-beauty', name: 'K뷰티' }, { slug: 'retail', name: '유통' }],
     tone: { bg: '#fffbeb', fg: '#92400e' },
   },
   {
@@ -86,13 +87,6 @@ export const EDITORS: readonly LetterEditor[] = [
     tone: { bg: '#f5f3ff', fg: '#5b21b6' },
   },
   {
-    id: 'subin', name: '수빈', group: 'NF', nickname: '관찰자',
-    role: '문화·사회 에세이스트', forWhom: '세대와 문화, 가치관의 변화를 천천히 읽는 분',
-    intro: '오늘의 뉴스가 우리 삶에 닿는 결을 천천히 적습니다. 문화와 세대, 가치관의 변화를 에세이 형식으로 풉니다. 빠르지 않게, 깊이 있게.',
-    topics: [{ slug: 'content', name: '콘텐츠' }, { slug: 'neighborhood', name: '도시·동네' }, { slug: 'food-culture', name: '음식·맛집' }, { slug: 'travel', name: '여행·관광' }, { slug: 'low-birth', name: '저출생' }],
-    tone: { bg: '#fff1f2', fg: '#9f1239' },
-  },
-  {
     id: 'yerin', name: '예린', group: 'NF', nickname: '세계여행자',
     role: '국제·라이프 에디터', forWhom: '먼 나라의 소식을 사람의 이야기로 읽고 싶은 분',
     intro: '먼 나라 이야기 속의 사람을 봅니다. 국제 뉴스에서 통계와 정책 너머의 일상을 전합니다. 한 도시의 풍경, 한 사람의 결을.',
@@ -100,32 +94,11 @@ export const EDITORS: readonly LetterEditor[] = [
     tone: { bg: '#fff1f2', fg: '#9f1239' },
   },
   {
-    id: 'doyun', name: '도윤', group: 'ST', nickname: '시장지킴이',
-    role: '금융·증시 전담', forWhom: '장 마감 숫자를 빠르게 확인하는 분',
-    intro: '오늘 장 마감, 핵심만 정리해서 드립니다. 시장 데이터를 빠르고 정확하게. 분석은 길지 않게, 숫자는 정확하게.',
-    topics: [{ slug: 'kospi', name: '코스피' }, { slug: 'etf', name: 'ETF' }, { slug: 'ipo', name: '공모주·IPO' }, { slug: 'fx', name: '환율' }, { slug: 'rates', name: '금리' }, { slug: 'dividend', name: '배당' }],
-    tone: { bg: '#ecfdf5', fg: '#047857' },
-  },
-  {
     id: 'siu', name: '시우', group: 'ST', nickname: '체크리스트',
     role: '생활경제 큐레이터', forWhom: '세금·부동산·소비 정보를 실생활에 쓰는 분',
     intro: '오늘 알면 내일 돈 되는 정보만. 세금·부동산·소비 혜택 등 실생활에 바로 쓰는 정보를 체크리스트로 정리합니다.',
     topics: [{ slug: 'real-estate', name: '부동산 시장' }, { slug: 'rent', name: '임대료' }, { slug: 'tax', name: '세금' }, { slug: 'consumption', name: '소비' }, { slug: 'jeonse', name: '전세' }, { slug: 'loan', name: '대출' }],
     tone: { bg: '#ecfdf5', fg: '#047857' },
-  },
-  {
-    id: 'yuna', name: '유나', group: 'SF', nickname: '인플루언서',
-    role: '브랜드·라이프 에디터', forWhom: '브랜드와 소비 트렌드가 궁금한 분',
-    intro: '소비자 시각으로 브랜드와 마케팅을 봅니다. 무엇이 왜 잘 팔리는지, 사람의 언어로 풀어 전합니다.',
-    topics: [{ slug: 'k-beauty', name: 'K뷰티' }, { slug: 'amorepacific', name: '아모레퍼시픽' }, { slug: 'retail', name: '유통' }, { slug: 'food-service', name: '외식업' }, { slug: 'global-rebalancing', name: '글로벌 리밸런싱' }],
-    tone: { bg: '#fffbeb', fg: '#92400e' },
-  },
-  {
-    id: 'daeun', name: '다은', group: 'SF', nickname: '재미수집가',
-    role: '컬처·엔터 캐스터', forWhom: '엔터·콘텐츠·SNS 화제를 한눈에 보고 싶은 분',
-    intro: '오늘 사람들이 무엇을 보고 무엇을 말하는지. 엔터·콘텐츠·SNS 트렌드를 한눈에 정리합니다.',
-    topics: [{ slug: 'content', name: '콘텐츠' }, { slug: 'platform', name: '플랫폼' }, { slug: 'theme-stock', name: '테마주' }, { slug: 'travel', name: '여행·관광' }, { slug: 'hanok', name: '한옥' }],
-    tone: { bg: '#fffbeb', fg: '#92400e' },
   },
 ];
 

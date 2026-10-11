@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { LetterEditor } from '../data/editors';
 import { unionInterests } from '../data/editors';
-import { SubscribeForm } from './SubscribeForm';
+import { SubscribeDialog } from './SubscribeDialog';
 
 /**
  * 내 에디터 바: 팔로우한 에디터를 한 줄로 보여 주고, 같은 목록에서 겹치는 레터만 모아 보거나 메일로 받게 한다.
@@ -34,7 +34,8 @@ export function EditorBar({ followed, onlyMine, onToggleOnlyMine, matchCount, on
           <button type="button" className="lt-ibar-mail" aria-expanded={mailOpen} onClick={() => setMailOpen((v) => !v)}>메일로 받기</button>
         </div>
       </div>
-      {mailOpen && <SubscribeForm interests={unionInterests(followed)} onClose={() => setMailOpen(false)} heading="팔로우한 에디터의 새 레터를 메일로 받기" />}
+      <SubscribeDialog open={mailOpen} onClose={() => setMailOpen(false)} interests={unionInterests(followed)} source="bar" title="팔로우한 에디터의 새 레터를 메일로 받기"
+        lead={<>{followed.map((e) => e.name).join(' · ')} 에디터의 담당 분야와 겹치는 레터를 보내요.</>} />
     </div>
   );
 }

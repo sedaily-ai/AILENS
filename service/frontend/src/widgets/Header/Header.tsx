@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -155,114 +155,6 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
   );
 }
 
-// "더보기" 드롭다운. 콘텐츠 브라우징이 아닌 부가 기능을 1차 줄에서 걷어내 한 항목으로 묶는다.
-//
-// 드롭다운은 `<nav className="... overflow-x-auto ...">`(탭이 넘칠 때 가로 스크롤) 안에 있다.
-// CSS 스펙상 overflow-x가 visible이 아니면 overflow-y도 auto로 계산되어 nav가 양쪽 축 스크롤 컨테이너가 되므로,
-// 그 안의 absolute 드롭다운은 nav 높이(56px) 밖에서 잘려 보이지 않는다.
-// 모바일 드로어(MobileDrawer)와 같은 createPortal(document.body) 패턴을 쓰고,
-// 포털된 요소는 로컬 상대 위치를 쓸 수 없으므로 getBoundingClientRect로 화면 좌표를 계산해 position:fixed로 배치한다.
-function MoreTabsMenu({ tabs }: { tabs: HeaderTab[] }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (btnRef.current?.contains(target)) return;
-      if (menuRef.current && !menuRef.current.contains(target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
-  if (tabs.length === 0) return null;
-  const hasActive = tabs.some((t) => t.active);
-
-  const toggle = () => {
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 6, left: r.left });
-    }
-    setOpen((v) => !v);
-  };
-
-  return (
-    <div className="relative">
-      <button
-        ref={btnRef}
-        onClick={toggle}
-        className={`${TAB_EXTRA_BASE} inline-flex items-center gap-1 ${hasActive ? TAB_ACTIVE : TAB_EXTRA_IDLE}`}
-      >
-        더보기
-        <svg
-          className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && pos && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 176, zIndex: 200 }}
-          className="bg-white rounded-lg shadow-lg border border-gray-200 py-1.5"
-        >
-          {tabs.map((tab) => {
-            const cls = `w-full px-4 py-2 text-left text-[13.5px] flex items-center gap-2 ${
-              tab.active ? 'text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-50'
-            }`;
-            const close = () => setOpen(false);
-            if (tab.href) {
-              if (tab.hardNav) {
-                return (
-                  <a key={tab.key} href={tab.href} onClick={close} className={cls}>
-                    <TabLabel tab={tab} />
-                  </a>
-                );
-              }
-              return (
-                <Link
-                  key={tab.key}
-                  href={tab.href}
-                  onClick={close}
-                  onMouseEnter={() => {
-                    try { router.prefetch(tab.href!); } catch { /* noop */ }
-                  }}
-                  className={cls}
-                >
-                  <TabLabel tab={tab} />
-                </Link>
-              );
-            }
-            return (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  tab.onClick?.();
-                  close();
-                }}
-                className={cls}
-              >
-                <TabLabel tab={tab} />
-              </button>
-            );
-          })}
-        </div>,
-        document.body,
-      )}
-    </div>
-  );
-}
-
 function MobileDrawer({
   tabs,
   onClose,
@@ -367,11 +259,8 @@ function MobileDrawer({
 
 export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, section }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  // 1차 줄(핵심+카테고리) vs "더보기" 드롭다운(부가 기능) — tier:'more'
-  // 참조(shared/lib/headerTabs.ts). 모바일 드로어는 그대로 전체 목록을
-  // 보여준다(세로 스크롤이라 굳이 또 접을 이유가 없음).
+  // 데스크톱 1차 줄에는 tier:'more'(타임라인·게임) 탭을 두지 않는다("더보기" 드롭다운은 2026-10-11 삭제). 모바일 드로어는 전체 목록을 그대로 보여준다.
   const primaryTabs = tabs.filter((t) => t.tier !== 'more');
-  const moreTabs = tabs.filter((t) => t.tier === 'more');
 
   const logoCls =
     'text-[20px] font-bold tracking-tight flex-shrink-0 transition-colors duration-200 text-gray-900 hover:text-blue-600 inline-flex items-center gap-2';
@@ -420,7 +309,6 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
               {primaryTabs.map((tab) => (
                 <DesktopTab key={tab.key} tab={tab} />
               ))}
-              <MoreTabsMenu tabs={moreTabs} />
             </nav>
           )}
 
