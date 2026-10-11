@@ -4,9 +4,10 @@
 #
 # 사용법: pipelines/ 에서 실행 — cd pipelines && ./frontpage_auto/deploy.sh
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 REGION="us-east-1"
-ACCOUNT_ID="887078546492"
+ACCOUNT_ID="$AWS_ACCOUNT_ID"
 REPO="sedaily-lens-frontpage-auto"
 ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
 

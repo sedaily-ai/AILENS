@@ -19,11 +19,12 @@
 #   cd service/lens-cms-api
 #   ./deploy.sh
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-INSTANCE_ID="i-0e3d04bdb01584833"
+INSTANCE_ID="$CMS_API_INSTANCE_ID"
 REGION="us-east-1"
 S3_BUCKET="ailens-ssr-releases"
 S3_PREFIX="lens-cms-api"
