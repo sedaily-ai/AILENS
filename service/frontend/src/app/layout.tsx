@@ -12,9 +12,9 @@ const GA_ID = "G-BJZ09B6PB6";
 // Pretendard는 동적 서브셋 CSS(pretendard.css)로 로드한다. 글자 조각별 약 12KB 파일을 필요한 만큼만 받아, 전체 글리프 woff2(굵기당 약 780KB)를 받는 것보다 모바일 용량·LCP에 유리하다.
 import { SITE_URL } from "@/shared/constants/site";
 const SITE_TITLE = "AI LENS — 서울경제신문의 AI 경제 뉴스";
-// 사이트 설명 상수 — 서비스의 차별점(기자 취재 → AI가 레터/웹툰/팟캐스트/영상 4형식으로 재구성 → 편집팀 검수)을 담는다.
+// 사이트 설명 상수 — 서비스의 차별점(기자 취재 → AI가 레터/웹툰/팟캐스트/영상 4형식으로 자동 재구성·발행 → 편집팀 발행 후 점검)을 담는다.
 // meta description·OG·Twitter·WebSite 구조화 데이터가 이 상수 하나를 공유한다.
-const SITE_DESC = "서울경제신문 기자가 취재한 경제 뉴스를 AI가 레터·웹툰·팟캐스트·영상 4가지 형식으로 매일 재구성하고 편집팀이 검수합니다. 시그널(증시)·부동산·경제·금융·산업·정치·사회·국제·문화 등 다양한 분야의 이슈를 구체적인 숫자와 맥락까지 담아 깊이 있게 전합니다.";
+const SITE_DESC = "서울경제신문 기자가 취재한 경제 뉴스를 AI가 레터·웹툰·팟캐스트·영상 4가지 형식으로 매일 자동 재구성해 발행하고 편집팀이 발행 후 점검합니다. 시그널(증시)·부동산·경제·금융·산업·정치·사회·국제·문화 등 다양한 분야의 이슈를 구체적인 숫자와 맥락까지 담아 깊이 있게 전합니다.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -174,7 +174,7 @@ const SITE_JSONLD = {
         telephone: "+82-2-724-8600",
         availableLanguage: ["Korean"],
       },
-      // /about이 "AI가 초안, 편집팀이 검수" 운영방식을 설명하므로 해당 페이지를 가리킨다.
+      // /about이 "AI 자동 발행, 편집팀 발행 후 점검" 운영방식을 설명하므로 해당 페이지를 가리킨다.
       // 별도 정정보도 페이지가 없어 correctionsPolicy는 두지 않는다(없는 페이지를 가리키면 깨진 링크가 된다).
       publishingPrinciples: `${SITE_URL}/about`,
       ethicsPolicy: `${SITE_URL}/about`,
@@ -186,7 +186,10 @@ const SITE_JSONLD = {
       masthead: `${SITE_URL}/about`,
       actionableFeedbackPolicy: `${SITE_URL}/contact`,
       isAccessibleForFree: true,
-      award: "WAN-IFRA Digital Media Awards APAC 2026 — Best AI-driven News Product (Gold, AI LENS)",
+      award: [
+        "WAN-IFRA Digital Media Awards APAC 2026 — Best Newsletter (Gold, AI PRISM)",
+        "WAN-IFRA Digital Media Awards APAC 2026 — Most Innovative Digital Product (Silver, AI NOVA)",
+      ],
       taxID: "208-81-10310",
     },
     {

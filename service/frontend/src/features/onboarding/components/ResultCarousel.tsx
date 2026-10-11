@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { glanceShare, SITUATION_SHARE } from '../lib/distribution';
+import { DISTRIBUTION_IS_MOCK, glanceShare, SITUATION_SHARE } from '../lib/distribution';
 import type { Glance, Moment } from '../lib/moments';
 import type { Persona } from '../lib/personas';
 import { DistributionCard } from './DistributionCard';
@@ -103,6 +103,9 @@ export function ResultCarousel({
         }}
         style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 22, padding: '12px 14px', borderRadius: 14, border: '1px solid #e8edf5', background: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}
       >
+        {DISTRIBUTION_IS_MOCK && (
+          <span style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 999, background: '#fef3c7', color: '#b45309', fontSize: 11, fontWeight: 700 }}>예시</span>
+        )}
         <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5, color: '#4b5563', wordBreak: 'keep-all' }}>
           <b style={{ color: BLUE, fontWeight: 700 }}>{SITUATION_SHARE[moment.id]}%</b>가 이 시간에, <b style={{ color: BLUE, fontWeight: 700 }}>{glanceShare(glance.id)}%</b>가 나처럼 봐요
         </span>

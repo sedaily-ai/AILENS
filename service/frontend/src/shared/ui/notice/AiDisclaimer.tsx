@@ -62,7 +62,7 @@ export function AiDisclaimer({
           <Link href="/terms#content-disclaimer" style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7280', textDecoration: 'underline', textUnderlineOffset: 2 }}>
             이용 정책
           </Link>
-          {/* 약관 조항뿐 아니라 편집 프로세스(AI 초안 → 사람 검수)를 설명하는 /about 페이지도 안내해 "누가·어떻게 만들었는지"를 공개한다(E-E-A-T 저자 페이지 링크). */}
+          {/* 약관 조항뿐 아니라 편집 프로세스(AI 자동 발행 → 편집팀 발행 후 점검)를 설명하는 /about 페이지도 안내해 "누가·어떻게 만들었는지"를 공개한다(E-E-A-T 저자 페이지 링크). */}
           <Link href="/about" style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7280', textDecoration: 'underline', textUnderlineOffset: 2 }}>
             AI LENS 소개
           </Link>
