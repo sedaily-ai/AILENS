@@ -271,6 +271,10 @@ def main():
 
     def _try_publish(article, paper_section, display_order):
         """반환값을 호출부가 확인해야 한다. "failed"이면 seen을 마킹하면 안 된다(재시도 대상)."""
+        limit = int(os.environ.get("MUSTKNOW_MAX_PUBLISH", "0") or 0)  # 수동 점검용: 이번 실행에서 발행할 최대 건수(0이면 제한 없음)
+        if limit and (results["published"] + results["published_no_video"] + results["degraded_no_webtoon"]) >= limit:
+            print(f"[mustknow-auto] MUSTKNOW_MAX_PUBLISH={limit} 도달 — 종료 {json.dumps(results, ensure_ascii=False)}")
+            sys.exit(0)
         if publish_utils.already_published(article["url"]):
             print(f"[mustknow-auto] frontpage_auto 등에 이미 발행됨, 스킵 — {article['title']}")
             results["skipped_duplicate"] += 1
