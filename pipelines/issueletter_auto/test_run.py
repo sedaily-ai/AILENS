@@ -58,7 +58,7 @@ def go(api, drafts, clusters=None, live=True, fact_problems=None):
          mock.patch.object(run, "make_draft", lambda p, f="": next(it, None)), \
          mock.patch.object(run, "call_model", lambda s, u, max_tokens=0: json.dumps(clusters)), \
          mock.patch.object(run, "fact_check", lambda d, c: fact_problems or []), \
-         mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
+         mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.object(run, "ATTEMPTS_PER_CLUSTER", 3), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
         return run.run(dry_run=not live)
 
 
@@ -119,9 +119,16 @@ def test_window_blocks_live_publish_outside_hours():
         assert "시각 창" in run.run(dry_run=False)["stopped"]
 
 
-def test_advice_terms_are_rejected_even_when_quoted():
+def test_advice_sentence_is_dropped_by_code_without_retry():
     bad = good_draft()
     bad["sections"][0]["paragraphs"][0].append(" 연구원은 분할 매수로 대응해야 한다고 말했어요")
+    out = go(Api(), [bad])  # 한 번만 준다: 재생성 없이 코드가 해당 문장을 빼고 통과해야 한다
+    assert out["published"] == 1
+
+
+def test_advice_inside_link_text_is_still_rejected():
+    bad = good_draft()
+    bad["sections"][0]["paragraphs"][0][1]["text"] = "분할 매수 전략"  # 링크 문구는 코드가 뺄 수 없다
     api = Api()
     out = go(api, [bad, bad, bad])
     assert out["published"] == 0 and "권유" in out["last_feedback"] and api.saved == 0

@@ -97,3 +97,31 @@ def test_repair_json_quotes_fixes_unescaped_inner_quotes():
     bad = '{\n  "heading": "정부 "투기 아니면 처분 없다"…특별법",\n  "paragraphs": [["장관은 ", {"text": ""농지 후속 조치"", "href": "https://x/1"}, " 라고 했어요"]],\n  "sources": [{ "title": "금융연구원 "집중위험 관리"", "url": "https://x/2" }]\n}'
     fixed = json.loads(core.repair_json_quotes(bad))
     assert fixed["heading"].startswith('정부 "투기') and fixed["paragraphs"][0][1]["text"] == '"농지 후속 조치"'
+
+
+def test_sanitize_draft_removes_article_id_notes_but_keeps_links():
+    d = {"title": "t", "summary": ["a (기사 20099278 근거) b"], "editor_note": "e",
+         "sections": [{"heading": "h", "key_line": "k", "paragraphs": [["문장 (기사 20099278 근거)", {"text": "링크", "href": "https://www.sedaily.com/article/20099278"}],
+                                                                      [{"block": "callout", "text": "아르텍스는 도구예요. (기사 20099278 근거)"}]]}]}
+    core.sanitize_draft(d)
+    assert "20099278" not in d["summary"][0] and "20099278" not in d["sections"][0]["paragraphs"][0][0]
+    assert d["sections"][0]["paragraphs"][0][1]["href"].endswith("20099278") and "20099278" not in d["sections"][0]["paragraphs"][1][0]["text"]
+
+
+def test_drop_advice_removes_sentences_and_blocks_without_regeneration():
+    d = {"sections": [{"paragraphs": [["실적이 늘었어요. 분할 매수가 유효하다고 했어요. 순매도 규모가 컸어요."], [{"block": "callout", "text": "지금이 투자 기회예요."}]]}]}
+    n = core.drop_advice(d)
+    txt = core.draft_body_text({"sections": d["sections"], "title": "", "deck": "", "summary": [], "editor_note": ""})
+    assert n == 2 and "분할" not in txt and "투자 기회" not in txt and "순매도" in txt and "실적이 늘었어요" in txt
+
+
+def test_drop_unsupported_removes_sentences_with_numbers_not_in_sources():
+    d = {"sections": [{"paragraphs": [["매출은 176억 원이에요. 합산하면 10574억 원이에요."]]}]}
+    assert core.drop_unsupported(d, ["매출은 176억 원"]) == 1
+    assert "10574" not in core.para_text(d["sections"][0]["paragraphs"][0]) and "176억" in core.para_text(d["sections"][0]["paragraphs"][0])
+
+
+def test_drop_flagged_removes_matching_sentence_and_reports_unmatched():
+    d = {"sections": [{"paragraphs": [["수도권 외 점포 매출은 150% 늘었어요. 부산은 별도로 집계됐어요."], [{"block": "callout", "text": "지방 점포가 가장 많이 늘었어요."}]]}]}
+    left = core.drop_flagged(d, ["수도권 외 점포 매출은 150% 늘었어요. — 기사와 다름", "본문에 없는 문장입니다 정말로 없어요 — 이유"])
+    assert len(left) == 1 and "150%" not in core.para_text(d["sections"][0]["paragraphs"][0]) and "부산은" in core.para_text(d["sections"][0]["paragraphs"][0])

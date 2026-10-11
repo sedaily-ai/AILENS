@@ -316,6 +316,103 @@ def repair_json_quotes(text: str) -> str:
     return "".join(out)
 
 
+_ID_NOTE = re.compile(r"\s*[\(（]\s*기사\s*\d{6,}[^)）]*[\)）]")
+_BARE_ID = re.compile(r"(?<![\d/])\d{8}(?![\d])")
+
+
+def _clean_text(t: str) -> str:
+    return _BARE_ID.sub("", _ID_NOTE.sub("", t)).replace("  ", " ").strip() if isinstance(t, str) else t
+
+
+def sanitize_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """모델이 자주 남기는 기계적 흠을 재시도 없이 코드로 고친다: 본문·블록의 기사 번호 표기(\"(기사 20099278 근거)\" 등)를 지운다. 링크 주소(href)와 sources 는 건드리지 않는다."""
+    def fix(o: Any) -> Any:
+        if isinstance(o, str):
+            return _clean_text(o)
+        if isinstance(o, list):
+            return [fix(x) for x in o]
+        if isinstance(o, dict):
+            return {k: (v if k in ("href", "url", "block", "axis", "key") else fix(v)) for k, v in o.items()}
+        return o
+    for k in ("title", "deck", "editor_note"):
+        if k in draft:
+            draft[k] = fix(draft[k])
+    draft["summary"] = fix(draft.get("summary") or [])
+    for sec in draft.get("sections") or []:
+        for k in ("heading", "key_line"):
+            sec[k] = fix(sec.get(k))
+        # 블록은 paragraphs 안에 객체 그대로 넣게 했다(배열 겹침 실수 방지). 서버 형식(한 조각짜리 배열)으로 감싼다.
+        sec["paragraphs"] = [[p] if isinstance(p, dict) and "block" in p else p for p in fix(sec.get("paragraphs") or [])]
+    return draft
+
+
+def _has_advice(text: str) -> bool:
+    for allowed in ALLOWED_MARKET_TERMS:
+        text = text.replace(allowed, "")
+    return any(w in text for w in ADVICE_PATTERNS)
+
+
+def drop_sentences(draft: Dict[str, Any], bad) -> int:
+    """bad(text) 가 참인 문장을 코드가 직접 뺀다(재생성은 토큰 낭비). 문단 안의 문자열 조각은 문장 단위로, 시각 블록은 통째로 뺀다. 뺀 개수를 돌려준다."""
+    dropped = 0
+    for sec in draft.get("sections") or []:
+        paras = []
+        for para in sec.get("paragraphs") or []:
+            if isinstance(para, list) and para and isinstance(para[0], dict) and "block" in para[0]:
+                if bad(block_text(para[0])):
+                    dropped += 1
+                    continue
+                paras.append(para)
+                continue
+            new = []
+            for seg in para:
+                if isinstance(seg, str):
+                    sents = re.split(r"(?<=[요다]\.)\s+", seg)
+                    kept = [x for x in sents if not bad(x)]
+                    dropped += len(sents) - len(kept)
+                    if kept:
+                        new.append(" ".join(kept) + (" " if seg.endswith(" ") else ""))
+                else:
+                    new.append(seg)
+            if new and para_text(new).strip():
+                paras.append(new)
+        sec["paragraphs"] = paras
+    return dropped
+
+
+def _norm(t: str) -> str:
+    """대조용 정규화: 공백·따옴표·마침표 계열을 지운다(모델이 지적 문장을 옮겨 적을 때 달라지는 부분)."""
+    return re.sub(r"[\s'\"‘’“”.,·…()\[\]]+", "", str(t))
+
+
+def drop_flagged(draft: Dict[str, Any], problems: List[str]) -> List[str]:
+    """사실 대조가 지적한 문장(문제 문장 + 이유 형식)을 본문·블록에서 코드가 직접 뺀다. 지적을 본문에서 찾지 못한 항목은 돌려준다(→ 이 초안은 접는다)."""
+    unmatched: List[str] = []
+    for prob in problems:
+        head = re.split(r"\s+[—–]\s+| — |\s/\s", str(prob), maxsplit=1)[0]
+        key = _norm(head)
+        if len(key) < 8:
+            unmatched.append(prob)
+            continue
+        probes = {key[:14], key[-14:]} if len(key) >= 28 else {key}
+        n = drop_sentences(draft, lambda text, k=key, ps=probes: (lambda t: any(p in t for p in ps) or (len(t) >= 10 and t in k))(_norm(text)))
+        if n == 0:
+            unmatched.append(prob)
+    return unmatched
+
+
+def drop_advice(draft: Dict[str, Any]) -> int:
+    return drop_sentences(draft, _has_advice)
+
+
+def drop_unsupported(draft: Dict[str, Any], source_texts: Iterable[str]) -> int:
+    """기사 본문에 없는 수치(모델이 단위를 바꿔 계산한 값 등)가 든 문장·블록을 뺀다."""
+    source_nums: Set[str] = set()
+    for t in source_texts:
+        source_nums |= numbers_in(t)
+    return drop_sentences(draft, lambda text: bool(numbers_in(text) - source_nums))
+
+
 def source_advice_score(cluster: Dict[str, Any]) -> int:
     """묶음 기사 본문에 투자·행동 권유 표현이 얼마나 있는지. 많으면(증권사 전망 인용 위주) 초안이 반복해 걸리므로 뒤로 미룬다."""
     text = " ".join(str(a.get("content") or "") for a in cluster.get("articles") or [])

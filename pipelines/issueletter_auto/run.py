@@ -21,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import core  # noqa: E402
 
-ATTEMPTS_PER_CLUSTER = 3  # 묶음당 시도 횟수(비용 상한: 2묶음 × 3회)
-MAX_CLUSTERS_TRIED = 2
+ATTEMPTS_PER_CLUSTER = int(os.environ.get("ISSUELETTER_ATTEMPTS", "1"))  # 묶음당 시도 횟수. 재시도는 토큰 낭비라 기본 한 번에 끝낸다(안 되면 그 묶음은 접는다)
+MAX_CLUSTERS_TRIED = int(os.environ.get("ISSUELETTER_CLUSTERS", "1"))
 LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k")  # lens-letters-sonnet-46 (비용 절감: 소넷 사용, 2026-10-11)
 MAX_PER_DAY = int(os.environ.get("ISSUELETTER_MAX_PER_DAY", "1"))
 LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "7"))
@@ -160,6 +160,10 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             log("draft_unparsed", attempt=attempt)
             continue
         core.strip_key_line_prefix(draft)
+        core.sanitize_draft(draft)
+        n_dropped = core.drop_advice(draft) + core.drop_unsupported(draft, sources_text)
+        if n_dropped:
+            log("advice_sentences_dropped", n=n_dropped)
         outside = core.restrict_to_cluster(draft, cluster["keys"])
         if outside:
             feedback = "묶음 밖 주소를 링크했습니다: " + ", ".join(outside)
@@ -183,20 +187,24 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             continue
         fact_problems = fact_check(draft, cluster)
         if fact_problems:
-            feedback = "기사 본문에서 확인되지 않는 내용이 있습니다. 해당 문장을 빼거나 기사에 있는 표현으로 고치세요: " + " / ".join(fact_problems)[:1500]
-            log("draft_fact_check_failed", attempt=attempt, problems=fact_problems[:5])
-            continue
+            unmatched = core.drop_flagged(draft, fact_problems)  # 지적된 문장은 코드가 뺀다(재생성 없이)
+            log("fact_sentences_dropped", flagged=len(fact_problems), unmatched=len(unmatched), problems=fact_problems[:3])
+            if unmatched:
+                feedback = "기사 본문에서 확인되지 않는 내용이 있습니다: " + " / ".join(unmatched)[:1500]
+                continue
+            too_long_short = core.length_problem(draft)
+            if too_long_short:  # 문장을 뺀 뒤 분량이 모자라면 접는다
+                feedback = too_long_short
+                log("draft_length_after_drop", attempt=attempt, chars=core.body_chars(draft))
+                continue
         attribution = core.other_attribution_problem(draft)
-        if attribution:
-            feedback = attribution
-            log("draft_attribution", attempt=attempt)
-            continue
-        primary = list(draft.get("topics") or [])[:2]
-        pr = core.prune_topics(draft)
+        if attribution:  # 문체 휴리스틱이라 거부 사유로 쓰지 않고 기록만 한다(한 번에 통과를 우선, 사실 대조가 근거 없는 귀속을 따로 거른다)
+            log("draft_attribution_warning", attempt=attempt, detail=attribution[:160])
+        pr = core.prune_topics(draft)  # 본문에 나오지 않은 태그는 코드가 뺀다. 남은 태그가 하나도 없을 때만 접는다
         if pr["dropped"]:
             log("topics_pruned", dropped=pr["dropped"])
-        if any(t in pr["dropped"] for t in primary):
-            feedback = "주 주제 태그가 본문에 나오지 않습니다. 본문에 실제로 나온 주제를 사전 이름으로 앞의 두 개에 적으세요: " + ", ".join(t for t in primary if t in pr["dropped"])
+        if not draft.get("topics"):
+            feedback = "본문에 나온 주제 태그가 없습니다"
             continue
         slugs = core.pick_editors(draft.get("topics") or [], editors)
         if not slugs:
