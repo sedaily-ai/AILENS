@@ -58,7 +58,7 @@ def go(api, drafts, clusters=None, live=True, fact_problems=None):
          mock.patch.object(run, "make_draft", lambda p, f="": next(it, None)), \
          mock.patch.object(run, "call_model", lambda s, u, max_tokens=0: json.dumps(clusters)), \
          mock.patch.object(run, "fact_check", lambda d, c: fact_problems or []), \
-         mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
+         mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.object(run, "ATTEMPTS_PER_CLUSTER", 3), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
         return run.run(dry_run=not live)
 
 
@@ -81,7 +81,7 @@ def test_invented_number_is_retried_then_stops_without_publish():
     bad["summary"] = ["매출 999억 원"]
     api = Api()
     out = go(api, [bad, bad, bad])
-    assert out["published"] == 0 and "모두 검증을 통과하지 못함" in out["stopped"] and "999" in out["last_feedback"]
+    assert out["published"] == 0 and "모두 검증을 통과하지 못함" in out["stopped"] and "고치지 못했습니다" in out["last_feedback"]  # 제목·요약의 가짜 수치는 짧은 재작성으로 고치되, 못 고치면 접는다
     assert api.saved == 0  # 검증을 통과하지 못한 초안은 서버에 저장조차 하지 않는다
 
 
@@ -119,9 +119,16 @@ def test_window_blocks_live_publish_outside_hours():
         assert "시각 창" in run.run(dry_run=False)["stopped"]
 
 
-def test_advice_terms_are_rejected_even_when_quoted():
+def test_advice_sentence_is_dropped_by_code_without_retry():
     bad = good_draft()
     bad["sections"][0]["paragraphs"][0].append(" 연구원은 분할 매수로 대응해야 한다고 말했어요")
+    out = go(Api(), [bad])  # 한 번만 준다: 재생성 없이 코드가 해당 문장을 빼고 통과해야 한다
+    assert out["published"] == 1
+
+
+def test_advice_inside_link_text_is_still_rejected():
+    bad = good_draft()
+    bad["sections"][0]["paragraphs"][0][1]["text"] = "분할 매수 전략"  # 링크 문구는 코드가 뺄 수 없다
     api = Api()
     out = go(api, [bad, bad, bad])
     assert out["published"] == 0 and "권유" in out["last_feedback"] and api.saved == 0
@@ -163,3 +170,18 @@ def test_advice_heavy_cluster_is_deferred_by_source_score():
     assert core.source_advice_score(heavy) > core.source_advice_score(light) == 0
     ordered = sorted([heavy, light], key=core.source_advice_score)
     assert ordered[0] is light
+
+
+def test_header_rewrite_fixes_invented_number_in_summary_without_regenerating():
+    bad = good_draft()
+    bad["summary"] = ["매출 999억 원"]
+    def fake_model(system, user, max_tokens=0):
+        if "고쳐 쓰세요" in system:
+            return json.dumps({"summary:0": "인도법인 매출은 176억 원이에요"}, ensure_ascii=False)
+        return json.dumps([{"topic": "라네즈", "keys": ["1", "2", "3", "4"]}])
+    api = Api()
+    with mock.patch.object(run, "api", api), mock.patch.object(run, "fetch_recent_articles", lambda: ARTS), \
+         mock.patch.object(run, "make_draft", lambda p, f="": bad), mock.patch.object(run, "call_model", fake_model), \
+         mock.patch.object(run, "fact_check", lambda d, c: []), mock.patch.object(run, "WINDOW", (0, 24)), mock.patch.dict(os.environ, {"ISSUELETTER_PICK": "llm"}):
+        out = run.run(dry_run=False)
+    assert out["published"] == 1

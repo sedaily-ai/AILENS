@@ -101,6 +101,9 @@ def parse_letters(raw_md: str) -> list[str]:
         if line.startswith("[리드"):  # "[리드]"·"[리드 3~5문장]" 둘 다 매칭(아래 참고)
             skipping = False
             flush()
+            rest = re.sub(r"^\[리드[^\]]*\]\s*", "", line)  # 운영 프롬프트(2026-10-08 압축판)는 "[리드] 본문"을 같은 줄에 쓴다
+            if rest:
+                buf.append(rest)
             continue
         if line.startswith("◾") or line.startswith("##"):
             # 소제목 줄은 별도 문단으로 살려 둔다. 프론트(LensFormatPanel)가
@@ -109,7 +112,7 @@ def parse_letters(raw_md: str) -> list[str]:
             flush()
             paragraphs.append(line)
             continue
-        if line.startswith("자료:") or line == "—":
+        if line.startswith("자료:") or line == "—" or re.match(r"^[-–—]{1,3}\s*자료\s*[:：]", line):  # 압축판은 "-- 자료: …"로 쓴다
             skipping = False
             flush()
             continue
@@ -149,6 +152,9 @@ def parse_letter_title(raw_md: str) -> str | None:
     for line in lines:
         if line.startswith("[제목]"):
             in_block = True
+            rest = line[len("[제목]"):].strip()  # 운영 프롬프트(2026-10-11 GEO 개정)는 "[제목] 제목 한 줄"처럼 같은 줄에 쓴다
+            if rest:
+                buf.append(rest)
             continue
         if line.startswith("[리드"):  # "[리드]"·"[리드 3~5문장]" 둘 다 매칭
             break
@@ -220,6 +226,21 @@ def parse_letter_summary_bullets(raw_md: str) -> list[str]:
             bullets[-1] = f"{bullets[-1]} {line}".strip()
         # else: 직전 불릿이 문장 종결로 끝났는데 "-" 없는 줄이 오면 줄바꿈 이어쓰기가 아니라
         # 불릿 블록과 "## 본문" 사이의 도입부 문단이다. 무시한다.
+    if not bullets:  # 압축판 프롬프트: [핵심 요약] 아래에 "-" 없이 문장들이 한 문단으로 온다 → 문장 단위로 쪼갠다
+        sents: list[str] = []
+        in_block = False
+        for line in lines:
+            if line.startswith("[핵심 요약]"):
+                in_block = True
+                continue
+            if not in_block:
+                continue
+            if line.startswith("[용어]") or line.startswith("##") or line.startswith("◾"):
+                break
+            if line.startswith("아래로 스크롤") or line.endswith("📖"):
+                continue
+            sents += [x.strip() for x in re.split(r"(?<=[다요]\.)\s+", line) if x.strip()]
+        bullets = sents[:5]
     # "자료: 서울경제신문(...)" 출처 줄은 요약 불릿이 아니다. "자료를 공개한 의원은…" 같은
     # 정상 불릿을 지우지 않도록 콜론이 붙은 출처 줄만 제외한다.
     return [b for b in bullets if not re.match(r"^자료\s*[:：]", b)]
@@ -248,7 +269,9 @@ def parse_letter_terms(raw_md: str) -> list[dict]:
     for line in lines:
         if line.startswith("[용어]"):
             in_block = True
-            continue
+            line = line[len("[용어]"):].strip()  # "[용어] 용어 | 설명"처럼 같은 줄에 올 수 있다
+            if not line:
+                continue
         if not in_block:
             continue
         if "|" not in line:
@@ -545,11 +568,18 @@ def publish_article(
         letter_terms = parse_letter_terms(letters_raw)
         # 프롬프트가 생성하는 "독자 시선 진입형" 제목. [제목] 마커를 못 찾으면
         # 첫 문단의 이모지 경계로 복구하고, 그것도 실패하면 원문 제목으로 폴백한다.
-        letter_title = (
-            parse_letter_title(letters_raw)
-            or extract_title_from_lead(paragraphs)
-            or article["title"]
-        )
+        # 제목은 전용 프롬프트(docs/prompt/letters/title-prompt-v2)로 따로 만든다: 기사 사실 + 남은 여지, 코드 검증·사실 확인 통과분만.
+        # 정치 소재거나 통과한 후보가 없으면 본문 프롬프트가 쓴 제목, 그것도 없으면 기사 제목으로 폴백한다.
+        letter_title = None
+        try:
+            import headline as _headline  # noqa: lazy — 호출부가 sys.path 세팅 완료 후 부름
+            picked = _headline.generate(article["title"], article.get("sub_title") or "", "\n".join(paragraphs), article.get("top_category") or "")
+            letter_title = picked["title"] if picked else None
+        except Exception as e:  # noqa: BLE001 — 제목 생성이 발행을 막으면 안 된다
+            print(f"[{log_prefix}] 제목 생성 실패 — 폴백: {e}")
+        if not letter_title and (article.get("top_category") or "") not in ("정치",):
+            letter_title = parse_letter_title(letters_raw) or extract_title_from_lead(paragraphs)
+        letter_title = letter_title or article["title"]
 
         podcast_url = _upload(podcast_mp3, f"media/podcast/{log_prefix}/{name}-podcast.mp3")
 

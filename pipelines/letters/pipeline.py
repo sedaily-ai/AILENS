@@ -1,7 +1,7 @@
 """레터 파이프라인 — 기사 1건 → 레터 텍스트.
 
 Bedrock Claude를 1회 호출해 레터 텍스트 파일 하나를 만든다. S3 업로드와 CMS
-반영은 범위 밖이다. 전용 inference profile `lens-letters-opus-5`를 사용해
+반영은 범위 밖이다. 전용 inference profile `lens-letters-sonnet-5`(2026-10-11 전환, 이전 lens-letters-opus-5)를 사용해
 다른 워크로드와 비용 추적이 섞이지 않게 한다. facts_extract.py는 별도로
 sonnet-46 letters profile을 재사용한다.
 """
@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text
 
-MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq"  # lens-letters-opus-5
+MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dt2qj8drli0n"  # lens-letters-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 기사 5건 시험: 파싱·수치 동일, 분량 소폭 짧음)
 
 
 def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> Path:

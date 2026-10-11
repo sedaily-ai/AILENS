@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -17,7 +18,7 @@ SENSITIVE_WORDS = ("대통령", "여당", "야당", "국민의힘", "민주당",
 # 자동 발행 경로에서는 더 넓게 막는다. 걸리면 그 인용을 빼고 사실만 쓰도록 다시 쓴다.
 # 단 "순매도·순매수·매도세·매수세·매도 물량" 같은 시장 동향 보도어는 사실 서술이라 허용한다(허용어를 먼저 지운 뒤 검사한다).
 ALLOWED_MARKET_TERMS = ("순매도", "순매수", "매도세", "매수세", "매도 물량", "매수 물량", "매도 압력", "매수 주체", "매도 주체", "공매도", "매도 우위", "매수 우위", "매수 전환", "매도 전환")
-ADVICE_PATTERNS = ("매수", "매도", "대응해야", "대응하는", "사야", "팔아야", "담아야", "비중 확대", "비중 축소", "비중을 늘", "비중을 줄", "진입해야", "분할", "추천", "유망", "저점", "바닥", "지금이 기회", "투자 기회", "매수 기회")
+ADVICE_PATTERNS = ("매수", "매도", "대응해야", "사야", "팔아야", "담아야", "비중 확대", "비중 축소", "비중을 늘", "비중을 줄", "진입해야", "분할", "추천", "유망", "저점", "바닥", "지금이 기회", "투자 기회", "매수 기회")
 URL_RE = re.compile(r"https?://[^\s\"')\]]+")
 NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
@@ -129,6 +130,24 @@ def body_chars(draft: Dict[str, Any]) -> int:
     return n
 
 
+def trim_to_max(draft: Dict[str, Any]) -> int:
+    """본문이 상한(BODY_MAX_CHARS)을 넘으면 코드가 줄인다(재생성 금지). 링크가 없는 문단 중 가장 긴 것부터, 섹션마다 문단이 1개 이상 남는 범위에서 뺀다. 뺀 문단 수를 돌려준다."""
+    removed = 0
+    while body_chars(draft) > BODY_MAX_CHARS:
+        cands = []
+        for si, sec in enumerate(draft.get("sections") or []):
+            paras = sec.get("paragraphs") or []
+            plain = [pi for pi, para in enumerate(paras) if not any(isinstance(x, dict) and ("href" in x or "block" in x) for x in para)]
+            if len(paras) - 1 >= 1:
+                cands += [(len(para_text(paras[pi])), si, pi) for pi in plain]
+        if not cands:
+            break
+        _, si, pi = max(cands)
+        del draft["sections"][si]["paragraphs"][pi]
+        removed += 1
+    return removed
+
+
 def length_problem(draft: Dict[str, Any]) -> str:
     n = body_chars(draft)
     target = (BODY_MIN_CHARS + BODY_MAX_CHARS) // 2
@@ -214,7 +233,7 @@ def other_attribution_problem(draft: Dict[str, Any]) -> str:
 
 # ── 키워드 기반 소재 선정(모델 호출 없음) ──────────────────────────────────────────
 GENERIC_WORDS = set("""단독 시그널 확대 최대 최고 추진 출시 시장 내년 올해 지난 이번 서울 한국 정부 기업 투자 글로벌 논란 공급 1위 신규 증가 감소 개최 발표 전망 개선 강화 지원 추가 가능 계획 이후 대한 관련 통해
-위해 따라 중심 이상 이하 전체 일부 주요 새로 다시 처음 오늘 어제 내일 오전 오후 사업 서비스 제품 시대 가격 규모 기준 현황 상승 하락 증시 지수 마감 속보 포토 인사 부고 오늘의 헬시타임 구축 역대 공격 지금 사설 칼럼 기고 인터뷰 종합 영상 이슈 종목""".split())
+위해 따라 중심 이상 이하 전체 일부 주요 새로 다시 처음 오늘 어제 내일 오전 오후 사업 서비스 제품 시대 가격 규모 기준 현황 상승 하락 증시 지수 마감 속보 포토 인사 부고 오늘의 헬시타임 구축 역대 공격 지금 사설 검토 인수 급증 키운다 인프라 에이전트 낙폭 턱밑 칼럼 기고 인터뷰 종합 영상 이슈 종목""".split())
 _JOSA = re.compile(r"(은|는|이|가|을|를|의|에|와|과|도|로|으로|에서|부터|까지|에게|보다)$")
 
 
@@ -222,13 +241,16 @@ def _tokens(title: str) -> Set[str]:
     out: Set[str] = set()
     for w in re.findall(r"[가-힣A-Za-z0-9·]{2,}", title or ""):
         w = _JOSA.sub("", w)
-        if len(w) >= 2 and not w.isdigit() and w not in GENERIC_WORDS and not is_sensitive(w):
+        if len(w) >= 2 and not w[0].isdigit() and w not in GENERIC_WORDS and not is_sensitive(w):  # 숫자로 시작하는 말(1조, 100조)은 사안이 아니라 수량이라 뺀다
             out.add(w)
     return out
 
 
 def _title_tokens(title: str) -> Set[str]:
     return _tokens(re.sub(r"\[[^\]]*\]|\([^)]*\)|【[^】]*】", "", title or ""))  # [단독]·[사설] 같은 말머리·괄호 제거
+
+
+SPECIFIC_DF_MAX = 60  # 이 값 이하로 나오는 단어를 '특정 개체·사안'으로 본다
 
 
 def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = (), min_articles: int = 3, min_chars: int = 5000,
@@ -238,6 +260,12 @@ def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = 
     점수 = 기사 수(최대 12) + 2×게재 일수 + 지면 1면 포함 3 − 권유 표현 많은 본문 감점. 기사가 겹치는 후보는 점수 높은 쪽만 둔다."""
     import itertools
     used = set(used_keys)
+    # 응집도: 쌍의 두 단어가 모두 흔한 말(전체 기사의 상당수에 나옴)이면 서로 다른 사안이 한 묶음이 된다(예: 매출+실적).
+    # 적어도 한 단어는 특정 개체·사안(전체 기사 중 일부에만 나오는 말)이어야 한다.
+    df: Dict[str, int] = {}
+    for a in articles:
+        for w in _title_tokens(a.get("title", "")):
+            df[w] = df.get(w, 0) + 1
     by_pair: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
     for a in articles:
         if not a.get("key") or is_sensitive(a.get("title", "")) or a["key"] in used:
@@ -247,6 +275,8 @@ def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = 
     cands: List[Dict[str, Any]] = []
     for pair, arts in by_pair.items():
         if len(arts) < min_articles:
+            continue
+        if min(df.get(pair[0], 0), df.get(pair[1], 0)) > SPECIFIC_DF_MAX:
             continue
         days = {str(a.get("date") or "")[:10] for a in arts}
         if len(days) < 2:
@@ -314,6 +344,222 @@ def repair_json_quotes(text: str) -> str:
         out.append(ch)
         i += 1
     return "".join(out)
+
+
+_ID_NOTE = re.compile(r"\s*[\(（]\s*기사\s*\d{6,}[^)）]*[\)）]")
+_BARE_ID = re.compile(r"(?<![\d/])\d{8}(?![\d])")
+
+
+def _clean_text(t: str) -> str:
+    # 앞뒤 공백은 지우지 않는다: 링크 조각 옆 문자열의 공백이 사라지면 "했다고8일"처럼 붙는다
+    if not isinstance(t, str):
+        return t
+    cleaned = _BARE_ID.sub("", _ID_NOTE.sub("", t))
+    return re.sub(r" {2,}", " ", cleaned) if cleaned != t else t
+
+
+def sanitize_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """모델이 자주 남기는 기계적 흠을 재시도 없이 코드로 고친다: 본문·블록의 기사 번호 표기(\"(기사 20099278 근거)\" 등)를 지운다. 링크 주소(href)와 sources 는 건드리지 않는다."""
+    def fix(o: Any) -> Any:
+        if isinstance(o, str):
+            return _clean_text(o)
+        if isinstance(o, list):
+            return [fix(x) for x in o]
+        if isinstance(o, dict):
+            return {k: (v if k in ("href", "url", "block", "axis", "key") else fix(v)) for k, v in o.items()}
+        return o
+    for k in ("title", "deck", "editor_note"):
+        if k in draft:
+            draft[k] = fix(draft[k])
+    draft["summary"] = fix(draft.get("summary") or [])
+    for sec in draft.get("sections") or []:
+        for k in ("heading", "key_line"):
+            sec[k] = fix(sec.get(k))
+        # 블록은 paragraphs 안에 객체 그대로 넣게 했다(배열 겹침 실수 방지). 서버 형식(한 조각짜리 배열)으로 감싼다.
+        sec["paragraphs"] = [[p] if isinstance(p, dict) and "block" in p else p for p in fix(sec.get("paragraphs") or [])]
+    return draft
+
+
+def _has_advice(text: str) -> bool:
+    for allowed in ALLOWED_MARKET_TERMS:
+        text = text.replace(allowed, "")
+    return any(w in text for w in ADVICE_PATTERNS)
+
+
+def drop_sentences(draft: Dict[str, Any], bad) -> int:
+    """bad(text) 가 참인 문장을 코드가 직접 뺀다(재생성은 토큰 낭비). 문단 안의 문자열 조각은 문장 단위로, 시각 블록은 통째로 뺀다. 뺀 개수를 돌려준다."""
+    dropped = 0
+    summary = [x for x in draft.get("summary") or [] if not bad(str(x))]
+    if len(summary) >= 2 and len(summary) < len(draft.get("summary") or []):  # 1분 요약은 2줄 이상 남을 때만 줄인다(아니면 발행 규칙이 거른다)
+        dropped += len(draft["summary"]) - len(summary)
+        draft["summary"] = summary
+    for sec in draft.get("sections") or []:
+        paras = []
+        for para in sec.get("paragraphs") or []:
+            if isinstance(para, list) and para and isinstance(para[0], dict) and "block" in para[0]:
+                if bad(block_text(para[0])):
+                    dropped += 1
+                    continue
+                paras.append(para)
+                continue
+            new = []
+            for seg in para:
+                if isinstance(seg, str):
+                    sents = re.split(r"(?<=[요다]\.)\s+", seg)
+                    kept = [x for x in sents if not bad(x)]
+                    dropped += len(sents) - len(kept)
+                    if kept:
+                        new.append(" ".join(kept) + (" " if seg.endswith(" ") else ""))
+                else:
+                    new.append(seg)
+            if new and para_text(new).strip():
+                paras.append(new)
+        sec["paragraphs"] = paras
+    return dropped
+
+
+def _norm(t: str) -> str:
+    """대조용 정규화: 공백·따옴표·마침표 계열을 지운다(모델이 지적 문장을 옮겨 적을 때 달라지는 부분)."""
+    return re.sub(r"[\s'\"‘’“”.,·…()\[\]]+", "", str(t))
+
+
+def drop_flagged(draft: Dict[str, Any], problems: List[str]) -> List[str]:
+    """사실 대조가 지적한 문장(문제 문장 + 이유 형식)을 본문·블록에서 코드가 직접 뺀다. 지적을 본문에서 찾지 못한 항목은 돌려준다(→ 이 초안은 접는다)."""
+    unmatched: List[str] = []
+    for prob in problems:
+        head = re.split(r"\s+[—–]\s+| — |\s/\s", str(prob), maxsplit=1)[0]
+        key = _norm(head)
+        if len(key) < 8:
+            unmatched.append(prob)
+            continue
+        probes = {key[:14], key[-14:]} if len(key) >= 28 else {key}
+        n = drop_sentences(draft, lambda text, k=key, ps=probes: (lambda t: any(p in t for p in ps) or (len(t) >= 10 and t in k))(_norm(text)))
+        if n == 0:
+            unmatched.append(prob)
+    return unmatched
+
+
+def drop_advice(draft: Dict[str, Any]) -> int:
+    return drop_sentences(draft, _has_advice)
+
+
+def drop_unsupported(draft: Dict[str, Any], source_texts: Iterable[str]) -> int:
+    """기사 본문에 없는 수치(모델이 단위를 바꿔 계산한 값 등)가 든 문장·블록을 뺀다."""
+    source_nums: Set[str] = set()
+    for t in source_texts:
+        source_nums |= numbers_in(t)
+    return drop_sentences(draft, lambda text: bool(numbers_in(text) - source_nums))
+
+
+# 서버 저장 검증(issue_letters_repo._normalize_block)과 같은 한도. 넘치면 저장이 거부되어 재생성이 필요하므로 코드가 먼저 맞춘다.
+_BLOCK_LIMITS = {
+    "timeline": {"max_items": 8, "label": 30, "text": 300},
+    "stats": {"max_items": 4, "label": 40, "value": 20, "sub": 80},
+    "bars": {"max_items": 6, "label": 20, "title": 60, "unit": 10},
+    "versus": {"label": 30, "text": 300},
+    "fold": {"title": 80, "text": 1200},
+    "callout": {"text": 400},
+}
+
+
+def _fit(value: Any, limit: int, soft: bool) -> Optional[str]:
+    """soft(제목·라벨류)는 한도에서 잘라 …을 붙이고, 문장(text)류는 자르면 뜻이 바뀌므로 None(블록 폐기)."""
+    v = str(value or "").strip()
+    if len(v) <= limit:
+        return v
+    return v[: limit - 1].rstrip() + "…" if soft else None
+
+
+def fit_blocks(draft: Dict[str, Any]) -> int:
+    """시각 블록을 서버 한도에 맞춘다. 맞출 수 없는 블록(긴 문장)은 뺀다. 고치거나 뺀 블록 수를 돌려준다."""
+    changed = 0
+    for sec in draft.get("sections") or []:
+        out = []
+        for para in sec.get("paragraphs") or []:
+            blk = para[0] if isinstance(para, list) and para and isinstance(para[0], dict) and "block" in para[0] else None
+            if not blk:
+                out.append(para)
+                continue
+            lim = _BLOCK_LIMITS.get(blk.get("block"))
+            if not lim:
+                out.append(para)
+                continue
+            ok = True
+            before = json.dumps(blk, ensure_ascii=False)
+            if "max_items" in lim and isinstance(blk.get("items"), list):
+                blk["items"] = blk["items"][: lim["max_items"]]
+            for holder in ([blk] + [i for i in blk.get("items") or [] if isinstance(i, dict)] + [blk.get(sd) for sd in ("left", "right") if isinstance(blk.get(sd), dict)]):
+                for k, limit in lim.items():
+                    if k == "max_items" or k not in holder or not isinstance(holder.get(k), str):
+                        continue
+                    fitted = _fit(holder[k], limit, soft=k not in ("text",))
+                    if fitted is None:
+                        ok = False
+                    else:
+                        holder[k] = fitted
+            if not ok:
+                changed += 1
+                continue
+            if json.dumps(blk, ensure_ascii=False) != before:
+                changed += 1
+            out.append(para)
+        sec["paragraphs"] = out
+    return changed
+
+
+# ── 제목·부제·요약·핵심 한 줄 보정(문장을 지울 수 없는 자리) ──────────────────────────
+def header_fields(draft: Dict[str, Any]) -> Dict[str, str]:
+    """코드가 지울 수 없는 필수 자리의 글: id → 글. id 는 title / deck / editor_note / summary:i / heading:i / key_line:i."""
+    out: Dict[str, str] = {"title": str(draft.get("title") or ""), "deck": str(draft.get("deck") or ""), "editor_note": str(draft.get("editor_note") or "")}
+    for i, x in enumerate(draft.get("summary") or []):
+        out[f"summary:{i}"] = str(x)
+    for i, sec in enumerate(draft.get("sections") or []):
+        out[f"heading:{i}"] = str(sec.get("heading") or "")
+        out[f"key_line:{i}"] = str(sec.get("key_line") or "")
+    return out
+
+
+def set_header_field(draft: Dict[str, Any], fid: str, text: str) -> None:
+    kind, _, idx = fid.partition(":")
+    if kind in ("title", "deck", "editor_note"):
+        draft[kind] = text
+    elif kind == "summary":
+        draft["summary"][int(idx)] = text
+    elif kind == "heading":
+        draft["sections"][int(idx)]["heading"] = text
+    elif kind == "key_line":
+        draft["sections"][int(idx)]["key_line"] = text
+
+
+def bad_header_fields(draft: Dict[str, Any], source_texts: Iterable[str]) -> Dict[str, str]:
+    """기사에 없는 수치나 권유 표현이 든 필수 자리: id → 이유."""
+    source_nums: Set[str] = set()
+    for t in source_texts:
+        source_nums |= numbers_in(t)
+    bad: Dict[str, str] = {}
+    for fid, text in header_fields(draft).items():
+        extra = sorted(numbers_in(text) - source_nums)
+        if extra:
+            bad[fid] = "기사에 없는 수치: " + ", ".join(extra)
+        elif _has_advice(text):
+            bad[fid] = "투자·행동 권유로 읽히는 표현"
+    return bad
+
+
+def match_header_fields(draft: Dict[str, Any], problems: List[str]) -> Dict[str, str]:
+    """사실 대조 지적 문장이 들어 있는 필수 자리를 찾는다: id → 지적 내용. 못 찾은 지적은 결과에 없다."""
+    found: Dict[str, str] = {}
+    fields = {fid: _norm(t) for fid, t in header_fields(draft).items()}
+    for prob in problems:
+        head = re.split(r"\s+[—–]\s+| — |\s/\s", str(prob), maxsplit=1)[0]
+        key = _norm(head)
+        if len(key) < 8:
+            continue
+        probes = {key[:14], key[-14:]} if len(key) >= 28 else {key}
+        for fid, t in fields.items():
+            if t and (any(p in t for p in probes) or (len(t) >= 10 and t in key)):
+                found[fid] = str(prob)[:400]
+    return found
 
 
 def source_advice_score(cluster: Dict[str, Any]) -> int:

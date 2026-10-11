@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text
-from json_extract import extract_json_object
+from json_extract import extract_json_object, extract_json_with_key
 
 # src/components/Icon.tsx의 ICON_MAP과 반드시 같이 갱신할 것 — 여기 없는
 # 키는 렌더 시 HelpCircle(물음표)로 조용히 폴백되어 화면이 부실해진다.
@@ -326,14 +326,14 @@ def generate_script(
     print(f"{tag} 각본 생성 중...")
     # 결과물 종류를 못박는 문구는 넣지 않는다(admin/backend/routes/prompts.py::_CATEGORY_BEDROCK 주석 참고).
     # 무엇을 만들지는 저장된 video 지침(guide, system 메시지)에 전적으로 맡긴다.
-    raw = call_text(guide, f"[입력 기사]\n{article_input}", max_tokens=4000)
+    raw = call_text(guide, f"[입력 기사]\n{article_input}", max_tokens=8000)  # Sonnet 5 는 "0단계 사실 추출" 블록을 먼저 내 본 각본이 4000 토큰에서 잘렸다(2026-10-11 시험)
     (out / "raw_response.txt").write_text(raw, encoding="utf-8")
 
     # Claude는 문자열 값 안에 따옴표를 이스케이프 없이 써서(` vs 정부 "법적 근거에 따라 집행"" `)
     # JSON 자체가 깨지는 경우가 있다. validate_script() 이전의 파싱 단계 에러이므로, 내용을 다시
     # 지어내게 하지 않고 형식만 고쳐 달라는 재요청을 1회 한다.
     try:
-        script = extract_json_object(raw)
+        script = extract_json_with_key(raw, "cuts")  # 응답에 JSON 블록이 여럿이면 각본(cuts 보유)을 고른다
     except (ValueError, json.JSONDecodeError) as e:
         print(f"{tag} JSON 파싱 실패({e}), 형식만 고쳐서 1회 재요청 시도...")
         retry_raw = call_text(
@@ -343,7 +343,7 @@ def generate_script(
             "특히 문자열 값 안에 큰따옴표를 그대로 쓰지 말고, 꼭 필요하면 "
             "작은따옴표를 쓰거나 백슬래시로 이스케이프하세요.\n\n"
             f"[방금 만든 응답]\n{raw}",
-            max_tokens=4000,
+            max_tokens=8000,
         )
         (out / "raw_response_retry.txt").write_text(retry_raw, encoding="utf-8")
         script = extract_json_object(retry_raw)
@@ -372,7 +372,7 @@ def generate_script(
             f"[원문]\n{article_input}\n\n[방금 만든 JSON]\n{json.dumps(script, ensure_ascii=False)}"
         )
         try:
-            retry_raw = call_text(guide, retry_message, max_tokens=4000)
+            retry_raw = call_text(guide, retry_message, max_tokens=8000)
             retry_script = extract_json_object(retry_raw)
             retry_script, retry_applied = fix_script(retry_script, photo_url=photo_url, photo_caption=photo_caption)
             for line in retry_applied:
@@ -404,7 +404,7 @@ def generate_script(
                 f"[원문]\n{article_input}\n\n[방금 만든 JSON]\n{json.dumps(script, ensure_ascii=False)}"
             )
             try:
-                polish_raw = call_text(guide, polish_message, max_tokens=4000)
+                polish_raw = call_text(guide, polish_message, max_tokens=8000)
                 polished = extract_json_object(polish_raw)
                 polished, _ = fix_script(polished, photo_url=photo_url, photo_caption=photo_caption)
                 if not validate_script(polished):

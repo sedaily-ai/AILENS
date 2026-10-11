@@ -14,10 +14,10 @@ import podcast_voice
 from bedrock_client import call_text
 from text_utils import strip_code_fence
 
-# 전용 프로파일 lens-podcast-opus-5. admin/backend/routes/prompts.py의
+# 전용 프로파일 lens-podcast-sonnet-5(이전 lens-podcast-opus-5). admin/backend/routes/prompts.py의
 # _CATEGORY_BEDROCK["podcast"]와 반드시 같은 ARN을 유지한다(admin 테스트와
 # 실제 발행의 모델이 어긋나면 안 된다).
-_SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/6bjkzt0icf74"  # lens-podcast-opus-5
+_SCRIPT_MODEL = "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/3qaaegkca5yz"  # lens-podcast-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 3건 시험: 대본 길이·응답 정상)
 
 
 def run_article(

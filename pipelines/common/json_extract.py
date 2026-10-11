@@ -85,7 +85,13 @@ def loads_lenient(text: str) -> Any:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        return json.loads(repair_invalid_escapes(text))
+        pass
+    fixed = repair_invalid_escapes(text)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        # Sonnet 5 가 가끔 값 뒤에 세미콜론을 흘린다(`"...강조";,`). 문자열 끝 따옴표 바로 뒤의 ; 만 지운다.
+        return json.loads(re.sub(r'"\s*;\s*(?=[,}\]])', '"', fixed))
 
 
 def extract_json_object(text: str) -> dict:
@@ -118,3 +124,19 @@ def extract_json_object(text: str) -> dict:
             pass
 
     raise ValueError("Bedrock 응답에서 JSON을 찾지 못했습니다")
+
+
+def extract_json_with_key(text: str, key: str) -> dict:
+    """응답에 JSON 블록이 여럿일 때(예: Sonnet 5 가 '0단계 사실 추출' JSON 을 먼저 내고 본 JSON 을 뒤에 낸다)
+    key 를 가진 마지막 객체를 돌려준다. 못 찾으면 extract_json_object 로 폴백한다."""
+    found = None
+    for m in re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S):
+        try:
+            obj = loads_lenient(m.group(1))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and key in obj:
+            found = obj
+    if found is not None:
+        return found
+    return extract_json_object(text)

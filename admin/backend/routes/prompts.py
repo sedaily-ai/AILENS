@@ -85,8 +85,8 @@ from shared import audit, ddb_client, response, time_utils
 # 도구만 고치고 프로덕션을 안 고치면 괴리가 생긴다는 걸 먼저 확인받았다).
 _CATEGORY_BEDROCK = {
     "letters": {
-        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/iqye2pzreccq",  # lens-letters-opus-5
-        "model_label": "Claude Opus 5",  # 2026-09-24 — 프론트 배지 표시용, 아래 handle_current_model 참고. model 바꿀 때 이 줄도 같이 바꿀 것.
+        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dt2qj8drli0n",  # lens-letters-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, pipelines/letters/pipeline.py와 동일)
+        "model_label": "Claude Sonnet 5",  # 2026-09-24 — 프론트 배지 표시용, 아래 handle_current_model 참고. model 바꿀 때 이 줄도 같이 바꿀 것.
         "mode": "system",
         "user_template": "[입력 기사]\n{article}",
         "max_tokens": 12000,  # pipelines/letters/pipeline.py와 동일 — 비동기라 그대로 맞출 수 있다.
@@ -98,8 +98,8 @@ _CATEGORY_BEDROCK = {
         # 로 교체. pipelines/podcast/pipeline.py의 _SCRIPT_MODEL도 동일하게
         # 바꿨다 — 이 admin 테스트 도구와 실제 발행이 어긋나면 안 된다는
         # 이 세션 기존 원칙 그대로(_run_article_text_flow 독스트링 참고).
-        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/6bjkzt0icf74",  # lens-podcast-opus-5
-        "model_label": "Claude Opus 5",
+        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/3qaaegkca5yz",  # lens-podcast-sonnet-5 (2026-10-11 전환, pipelines/podcast/pipeline.py와 동일)
+        "model_label": "Claude Sonnet 5",
         "mode": "system",
         "user_template": "[입력 기사]\n{article}",
         "max_tokens": 3000,  # pipelines/podcast/pipeline.py — max_tokens 생략(bedrock_client.py 기본값 3000)과 동일.
@@ -108,19 +108,19 @@ _CATEGORY_BEDROCK = {
         # 2026-09-27 — 위 podcast와 동일 결정·동일 이유. 전용 프로파일
         # lens-video-opus-5(신규 생성)로 교체. pipelines/common/bedrock_client.py
         # 의 기본 MODEL_ID(video 전용 — 이 파일 자체 독스트링 참고)도 같이 바꿨다.
-        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/p28gzlq5kj6s",  # lens-video-opus-5
-        "model_label": "Claude Opus 5",
+        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/044jm6k57jgh",  # lens-video-sonnet-5 (2026-10-11 전환, pipelines/common/bedrock_client.py와 동일)
+        "model_label": "Claude Sonnet 5",
         "mode": "system",
         "user_template": "[입력 기사]\n{article}",
-        "max_tokens": 4000,  # pipelines/video/generate_script.py와 동일.
+        "max_tokens": 8000,  # pipelines/video/generate_script.py와 동일(Sonnet 5는 사실 추출 블록을 먼저 내 4000에서 잘렸다).
     },
     "webtoon": {
         # 2026-09-27 — 위 podcast/video와 동일 결정. lens-webtoon-script-opus-5
         # 는 2026-09-20에 TEXT_MODELS 드롭다운용으로 이미 만들어져 있던 걸
         # 그대로 프로덕션 기본값으로 승격했다(새로 안 만듦). pipelines/webtoon/
         # pipeline.py의 SCRIPT_MODEL도 동일하게 바꿨다.
-        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j5kfly25ohjo",  # lens-webtoon-script-opus-5
-        "model_label": "Claude Opus 5",
+        "model": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dy1fhtb04pon",  # lens-webtoon-script-sonnet-5 (2026-10-11 전환, pipelines/webtoon/pipeline.py와 동일)
+        "model_label": "Claude Sonnet 5",
         "mode": "webtoon_json",
         # 2026-09-15 — 저장된 웹툰 프롬프트가 v11(2026-09-14 05:40 UTC)에서
         # 컷당 필드가 훨씬 많은 스키마(scene_type·camera_distance·

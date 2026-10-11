@@ -21,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import core  # noqa: E402
 
-ATTEMPTS_PER_CLUSTER = 3  # 묶음당 시도 횟수(비용 상한: 2묶음 × 3회)
-MAX_CLUSTERS_TRIED = 2
+ATTEMPTS_PER_CLUSTER = int(os.environ.get("ISSUELETTER_ATTEMPTS", "1"))  # 묶음당 시도 횟수. 재시도는 토큰 낭비라 기본 한 번에 끝낸다(안 되면 그 묶음은 접는다)
+MAX_CLUSTERS_TRIED = int(os.environ.get("ISSUELETTER_CLUSTERS", "1"))
 LETTERS_PROFILE = os.environ.get("ISSUELETTER_MODEL", "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k")  # lens-letters-sonnet-46 (비용 절감: 소넷 사용, 2026-10-11)
 MAX_PER_DAY = int(os.environ.get("ISSUELETTER_MAX_PER_DAY", "1"))
 LOOKBACK_DAYS = int(os.environ.get("ISSUELETTER_LOOKBACK_DAYS", "7"))
@@ -160,11 +160,26 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             log("draft_unparsed", attempt=attempt)
             continue
         core.strip_key_line_prefix(draft)
+        core.sanitize_draft(draft)
+        core.fit_blocks(draft)
+        n_dropped = core.drop_advice(draft) + core.drop_unsupported(draft, sources_text)
+        if n_dropped:
+            log("advice_sentences_dropped", n=n_dropped)
+        bad = core.bad_header_fields(draft, sources_text)  # 제목·부제·요약·핵심 한 줄은 지울 수 없어 그 자리만 짧게 다시 쓴다
+        if bad:
+            ok = rewrite_fields(draft, cluster, bad)
+            log("header_rewritten", ok=ok, fields=list(bad), reasons=list(bad.values())[:4])
+            if not ok or core.bad_header_fields(draft, sources_text):
+                feedback = "제목·요약·핵심 한 줄을 고치지 못했습니다"
+                continue
         outside = core.restrict_to_cluster(draft, cluster["keys"])
         if outside:
             feedback = "묶음 밖 주소를 링크했습니다: " + ", ".join(outside)
             log("draft_outside_links", attempt=attempt, urls=outside)
             continue
+        trimmed = core.trim_to_max(draft)
+        if trimmed:
+            log("paragraphs_trimmed", n=trimmed)
         too_long_short = core.length_problem(draft)
         if too_long_short:
             feedback = too_long_short
@@ -172,7 +187,8 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             continue
         unsupported = core.unsupported_numbers(draft, sources_text)
         if unsupported:
-            feedback = "기사 본문에 없는 수치가 있습니다(지어내지 말고 기사에 있는 수치만 쓰세요): " + ", ".join(unsupported)
+            feedback = ("기사 본문에 없는 수치가 있습니다(지어내지 말고 기사에 있는 수치만 쓰세요). 연도는 '지난해'를 2025년으로 바꾸는 식으로 직접 계산하지 말고 기사의 표현 그대로 쓰세요. "
+                        "기사 번호(숫자 ID)는 본문·블록에 쓰지 마세요: " + ", ".join(unsupported))
             log("draft_unsupported_numbers", attempt=attempt, numbers=unsupported)
             continue
         advice = core.advice_hits(draft)
@@ -182,20 +198,28 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             continue
         fact_problems = fact_check(draft, cluster)
         if fact_problems:
-            feedback = "기사 본문에서 확인되지 않는 내용이 있습니다. 해당 문장을 빼거나 기사에 있는 표현으로 고치세요: " + " / ".join(fact_problems)[:1500]
-            log("draft_fact_check_failed", attempt=attempt, problems=fact_problems[:5])
-            continue
+            unmatched = core.drop_flagged(draft, fact_problems)  # 지적된 문장은 코드가 뺀다(재생성 없이)
+            log("fact_sentences_dropped", flagged=len(fact_problems), unmatched=len(unmatched), problems=fact_problems[:3])
+            if unmatched:  # 본문에 없으면 제목·부제·요약·핵심 한 줄 쪽 지적일 수 있다: 그 자리만 다시 쓴다(사실 대조는 다시 하지 않는다)
+                hdr = core.match_header_fields(draft, unmatched)
+                ok = bool(hdr) and rewrite_fields(draft, cluster, hdr)
+                log("header_rewritten_for_fact", ok=ok, fields=list(hdr), unmatched=len(unmatched))
+                if not ok or core.bad_header_fields(draft, sources_text):
+                    feedback = "기사 본문에서 확인되지 않는 내용이 있습니다: " + " / ".join(unmatched)[:1500]
+                    continue
+            too_long_short = core.length_problem(draft)
+            if too_long_short:  # 문장을 뺀 뒤 분량이 모자라면 접는다
+                feedback = too_long_short
+                log("draft_length_after_drop", attempt=attempt, chars=core.body_chars(draft))
+                continue
         attribution = core.other_attribution_problem(draft)
-        if attribution:
-            feedback = attribution
-            log("draft_attribution", attempt=attempt)
-            continue
-        primary = list(draft.get("topics") or [])[:2]
-        pr = core.prune_topics(draft)
+        if attribution:  # 문체 휴리스틱이라 거부 사유로 쓰지 않고 기록만 한다(한 번에 통과를 우선, 사실 대조가 근거 없는 귀속을 따로 거른다)
+            log("draft_attribution_warning", attempt=attempt, detail=attribution[:160])
+        pr = core.prune_topics(draft)  # 본문에 나오지 않은 태그는 코드가 뺀다. 남은 태그가 하나도 없을 때만 접는다
         if pr["dropped"]:
             log("topics_pruned", dropped=pr["dropped"])
-        if any(t in pr["dropped"] for t in primary):
-            feedback = "주 주제 태그가 본문에 나오지 않습니다. 본문에 실제로 나온 주제를 사전 이름으로 앞의 두 개에 적으세요: " + ", ".join(t for t in primary if t in pr["dropped"])
+        if not draft.get("topics"):
+            feedback = "본문에 나온 주제 태그가 없습니다"
             continue
         slugs = core.pick_editors(draft.get("topics") or [], editors)
         if not slugs:
@@ -217,6 +241,31 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             return {**result, "stopped": f"발행 거부({c7})", "detail": pub.get("detail"), "letter_id": letter["id"]}
         return {**result, "published": 1, "letter_id": letter["id"], "slug": letter.get("slug"), "send": pub.get("send")}
     return {**result, "retry_next": True, "last_feedback": feedback}
+
+
+REWRITE_SYSTEM = (
+    "당신은 서울경제신문의 편집자입니다. 아래 [기사]에 있는 사실만으로 [문제 문장]을 고쳐 쓰세요. "
+    "규칙: 수치는 [기사]에 적힌 표기 그대로(단위를 바꾸거나 합산·계산하지 말 것), 시점·말한 주체는 [기사]와 같게, 투자·행동 권유 금지, 해요체, "
+    "원래 문장과 비슷한 길이와 역할(제목은 제목답게). 기사에 근거가 없으면 수치나 주장을 빼고 확인되는 사실만 쓰세요. "
+    "출력은 JSON 객체 하나만: {\"id\": \"고친 문장\", ...} (모든 id 포함)."
+)
+
+
+def rewrite_fields(draft: Dict[str, Any], cluster: Dict[str, Any], bad: Dict[str, str]) -> bool:
+    """지울 수 없는 자리(제목·부제·요약·핵심 한 줄·한마디)만 짧은 호출 한 번으로 다시 쓴다. 성공하면 draft 를 고치고 True."""
+    from json_extract import extract_json_object
+    fields = core.header_fields(draft)
+    articles = "\n\n".join(f"[기사] {a['title']}\n{(a.get('content') or '')[:2500]}" for a in cluster["articles"])
+    items = "\n".join(f"- id={fid} | 이유: {why} | 문장: {fields[fid]}" for fid, why in bad.items())
+    try:
+        out = extract_json_object(call_model(REWRITE_SYSTEM, f"{articles}\n\n[문제 문장]\n{items}", max_tokens=1500))
+    except Exception:  # noqa: BLE001
+        return False
+    if not isinstance(out, dict) or any(not isinstance(out.get(fid), str) or not out[fid].strip() for fid in bad):
+        return False
+    for fid in bad:
+        core.set_header_field(draft, fid, core._clean_text(out[fid].strip()))
+    return True
 
 
 def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:

@@ -97,3 +97,71 @@ def test_repair_json_quotes_fixes_unescaped_inner_quotes():
     bad = '{\n  "heading": "정부 "투기 아니면 처분 없다"…특별법",\n  "paragraphs": [["장관은 ", {"text": ""농지 후속 조치"", "href": "https://x/1"}, " 라고 했어요"]],\n  "sources": [{ "title": "금융연구원 "집중위험 관리"", "url": "https://x/2" }]\n}'
     fixed = json.loads(core.repair_json_quotes(bad))
     assert fixed["heading"].startswith('정부 "투기') and fixed["paragraphs"][0][1]["text"] == '"농지 후속 조치"'
+
+
+def test_sanitize_draft_removes_article_id_notes_but_keeps_links():
+    d = {"title": "t", "summary": ["a (기사 20099278 근거) b"], "editor_note": "e",
+         "sections": [{"heading": "h", "key_line": "k", "paragraphs": [["문장 (기사 20099278 근거)", {"text": "링크", "href": "https://www.sedaily.com/article/20099278"}],
+                                                                      [{"block": "callout", "text": "아르텍스는 도구예요. (기사 20099278 근거)"}]]}]}
+    core.sanitize_draft(d)
+    assert "20099278" not in d["summary"][0] and "20099278" not in d["sections"][0]["paragraphs"][0][0]
+    assert d["sections"][0]["paragraphs"][0][1]["href"].endswith("20099278") and "20099278" not in d["sections"][0]["paragraphs"][1][0]["text"]
+
+
+def test_drop_advice_removes_sentences_and_blocks_without_regeneration():
+    d = {"sections": [{"paragraphs": [["실적이 늘었어요. 분할 매수가 유효하다고 했어요. 순매도 규모가 컸어요."], [{"block": "callout", "text": "지금이 투자 기회예요."}]]}]}
+    n = core.drop_advice(d)
+    txt = core.draft_body_text({"sections": d["sections"], "title": "", "deck": "", "summary": [], "editor_note": ""})
+    assert n == 2 and "분할" not in txt and "투자 기회" not in txt and "순매도" in txt and "실적이 늘었어요" in txt
+
+
+def test_drop_unsupported_removes_sentences_with_numbers_not_in_sources():
+    d = {"sections": [{"paragraphs": [["매출은 176억 원이에요. 합산하면 10574억 원이에요."]]}]}
+    assert core.drop_unsupported(d, ["매출은 176억 원"]) == 1
+    assert "10574" not in core.para_text(d["sections"][0]["paragraphs"][0]) and "176억" in core.para_text(d["sections"][0]["paragraphs"][0])
+
+
+def test_drop_flagged_removes_matching_sentence_and_reports_unmatched():
+    d = {"sections": [{"paragraphs": [["수도권 외 점포 매출은 150% 늘었어요. 부산은 별도로 집계됐어요."], [{"block": "callout", "text": "지방 점포가 가장 많이 늘었어요."}]]}]}
+    left = core.drop_flagged(d, ["수도권 외 점포 매출은 150% 늘었어요. — 기사와 다름", "본문에 없는 문장입니다 정말로 없어요 — 이유"])
+    assert len(left) == 1 and "150%" not in core.para_text(d["sections"][0]["paragraphs"][0]) and "부산은" in core.para_text(d["sections"][0]["paragraphs"][0])
+
+
+def test_keyword_clusters_drop_numeric_and_all_generic_pairs():
+    def art(i, title, day, cat="산업"):
+        return {"key": str(i), "title": title, "date": f"2026-10-{day:02d}", "content_len": 2500, "top_category": cat, "paper_number": "5"}
+    arts = [art(i, f"기업{i} 매출 1조 돌파", 8 + i % 3) for i in range(1, 6)]  # 서로 무관한 기업들이 '1조+매출'만 공유
+    assert all("1조" not in c["keyword"] for c in core.keyword_clusters(arts, min_chars=5000))
+
+
+def test_sanitize_keeps_spaces_around_link_segments():
+    d = {"title": "t", "summary": [], "editor_note": "e", "sections": [{"heading": "h", "key_line": "k", "paragraphs": [["기록했다고 ", {"text": "링크", "href": "https://x/1"}, " 8일 공시했어요."]]}]}
+    core.sanitize_draft(d)
+    assert d["sections"][0]["paragraphs"][0][0] == "기록했다고 " and d["sections"][0]["paragraphs"][0][2] == " 8일 공시했어요."
+
+
+def test_fit_blocks_truncates_labels_and_drops_overlong_text_blocks():
+    long_label = "가" * 40
+    d = {"sections": [{"paragraphs": [
+        [{"block": "versus", "left": {"label": long_label, "text": "a"}, "right": {"label": "b", "text": "b"}}],
+        [{"block": "callout", "text": "나" * 500}],
+        [{"block": "timeline", "items": [{"label": "d%d" % i, "text": "t"} for i in range(10)]}]]}]}
+    changed = core.fit_blocks(d)
+    paras = d["sections"][0]["paragraphs"]
+    assert changed == 3 and len(paras) == 2
+    assert len(paras[0][0]["left"]["label"]) == 30 and len(paras[1][0]["items"]) == 8
+
+
+def test_trim_to_max_removes_longest_plain_paragraphs_but_keeps_links_and_one_per_section():
+    d = {"sections": [{"paragraphs": [["가" * 1500], ["나" * 1400], [{"text": "링크", "href": "https://x/1"}, "다" * 800]]}, {"paragraphs": [["라" * 200]]}]}
+    removed = core.trim_to_max(d)
+    assert removed >= 1 and core.body_chars(d) <= core.BODY_MAX_CHARS
+    assert len(d["sections"][1]["paragraphs"]) == 1 and any(isinstance(x, dict) for p in d["sections"][0]["paragraphs"] for x in p)
+
+
+def test_bad_header_fields_and_matching_for_rewrite():
+    d = {"title": "t 11.8GW 규모", "deck": "정상 문장이에요", "editor_note": "e", "summary": ["a 176억 원", "b"], "sections": [{"heading": "h", "key_line": "엔비디아는 올해 8월 말 실적을 발표했어요", "paragraphs": []}]}
+    bad = core.bad_header_fields(d, ["매출은 176억 원"])
+    assert set(bad) == {"title"} and core.set_header_field(d, "title", "고친 제목") is None and d["title"] == "고친 제목"
+    hit = core.match_header_fields(d, ["엔비디아는 올해 8월 말 실적을 발표했어요 — 시점이 기사와 다름"])
+    assert list(hit) == ["key_line:0"]
