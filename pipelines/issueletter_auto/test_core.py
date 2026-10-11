@@ -165,3 +165,12 @@ def test_bad_header_fields_and_matching_for_rewrite():
     assert set(bad) == {"title"} and core.set_header_field(d, "title", "고친 제목") is None and d["title"] == "고친 제목"
     hit = core.match_header_fields(d, ["엔비디아는 올해 8월 말 실적을 발표했어요 — 시점이 기사와 다름"])
     assert list(hit) == ["key_line:0"]
+
+
+def test_editor_covered_uses_topic_names_and_aliases():
+    editors = [{"slug": "jihoon", "topic_names": ["인공지능", "반도체"]}]
+    ai = {"articles": [{"title": "AI 반도체 수요", "content": ""}]}       # 별칭(AI)으로 겹침
+    bio = {"articles": [{"title": "국산 비만약 출시", "content": "한미약품 신약"}]}
+    assert core.editor_covered(ai, editors) is True
+    assert core.editor_covered(bio, editors) is False
+    assert core.editor_covered(ai, []) is False

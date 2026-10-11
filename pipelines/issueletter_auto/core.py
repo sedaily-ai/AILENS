@@ -186,6 +186,20 @@ def pick_editors(draft_topics: Iterable[str], editors: List[Dict[str, Any]], lim
     return [slug for n, slug in scored if n > 0][:limit]
 
 
+def editor_covered(cluster: Dict[str, Any], editors: List[Dict[str, Any]]) -> bool:
+    """이슈 묶음의 기사 제목·본문에 어느 에디터의 담당 분야(주제 이름 또는 별칭)라도 나오는지.
+    하나도 안 나오면 초안을 써도 작성 에디터를 정할 수 없어 보류되므로(2026-10-12 08시 실행: 국산 비만약), 소재 단계에서 거른다."""
+    titles = " ".join(str(a.get("title") or "") for a in cluster.get("articles", []))
+    body = " ".join(str(a.get("content") or "") for a in cluster.get("articles", []))
+    for e in editors:
+        for name in e.get("topic_names") or []:
+            forms = (name, *TOPIC_ALIASES.get(name, ()))
+            # 제목에 나오거나 본문에 기사당 평균 2번 이상 나와야 한다(곁가지 언급으로는 중심 주제로 보지 않는다)
+            if any(f in titles or body.count(f) >= 2 * len(cluster.get("articles", [])) for f in forms):
+                return True
+    return False
+
+
 def advice_hits(draft: Dict[str, Any], source_texts: Iterable[str] = ()) -> List[str]:
     """초안 본문에 있는 투자·행동 권유 표현. 단, 그 표현이 기사 본문에도 없는 순수 생성이면 더 큰 문제라 같이 반환한다(둘 다 거부 대상)."""
     text = draft_body_text(draft)
