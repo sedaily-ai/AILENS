@@ -760,7 +760,7 @@ def _poll_letter_id(cur, slug: str) -> Optional[int]:
 
 
 def vote(slug: str, raw_voter_id: str, option_key: str) -> Tuple[Dict[str, Any], bool]:
-    """투표한다. (결과, 새로 투표했는가) 를 돌려준다. 이미 투표했으면 기존 선택과 집계를 돌려주고 새 투표로 치지 않는다."""
+    """투표하거나 이미 한 투표의 보기를 바꾼다(한 기기 한 표, v1.47 부터 변경 허용). (결과, 이전과 달라졌는가) 를 돌려준다."""
     h = voter_hash(raw_voter_id)
     with get_cursor() as cur:
         letter_id = _poll_letter_id(cur, slug)
@@ -769,12 +769,14 @@ def vote(slug: str, raw_voter_id: str, option_key: str) -> Tuple[Dict[str, Any],
         cur.execute("SELECT 1 FROM issue_letter_poll_options WHERE letter_id=%s AND key=%s", (letter_id, option_key))
         if not cur.fetchone():
             raise LetterError("없는 선택지입니다")
-        cur.execute("INSERT INTO issue_letter_votes (letter_id, voter_hash, option_key) VALUES (%s,%s,%s) "
-                    "ON CONFLICT (letter_id, voter_hash) DO NOTHING RETURNING option_key", (letter_id, h, option_key))
-        fresh = cur.fetchone() is not None
         cur.execute("SELECT option_key FROM issue_letter_votes WHERE letter_id=%s AND voter_hash=%s", (letter_id, h))
-        mine = cur.fetchone()["option_key"]
-        return {"my_choice": mine, "counts": _tally(cur, letter_id)}, fresh
+        before = cur.fetchone()
+        cur.execute("INSERT INTO issue_letter_votes (letter_id, voter_hash, option_key) VALUES (%s,%s,%s) "
+                    "ON CONFLICT (letter_id, voter_hash) DO UPDATE SET option_key = EXCLUDED.option_key, voted_at = now() "
+                    "WHERE issue_letter_votes.option_key <> EXCLUDED.option_key RETURNING option_key", (letter_id, h, option_key))
+        cur.fetchone()
+        changed = before is None or before["option_key"] != option_key
+        return {"my_choice": option_key, "counts": _tally(cur, letter_id)}, changed
 
 
 def my_vote(slug: str, raw_voter_id: str) -> Dict[str, Any]:

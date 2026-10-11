@@ -489,8 +489,8 @@ def get_post_vote(slug: str, x_voter_id: Optional[str] = Header(default=None)):
 
 @app.post("/api/v2/posts/{slug}/vote")
 def post_post_vote(slug: str, payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
-    result, fresh = _letter_call(post_votes_repo.vote, slug, x_voter_id or "", str(payload.get("option_key") or ""))
-    return JSONResponse({**result, **({} if fresh else {"already_voted": True})}, status_code=200 if fresh else 409, headers={"Cache-Control": "no-store"})
+    result, changed = _letter_call(post_votes_repo.vote, slug, x_voter_id or "", str(payload.get("option_key") or ""))
+    return JSONResponse({**result, "changed": changed}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/v2/issue-letters")
@@ -589,10 +589,8 @@ def get_issue_letter_vote(slug: str, x_voter_id: Optional[str] = Header(default=
 
 @app.post("/api/v2/issue-letters/{slug}/vote")
 def post_issue_letter_vote(slug: str, payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
-    result, fresh = _letter_call(issue_letters_repo.vote, slug, x_voter_id or "", str(payload.get("option_key") or ""))
-    if not fresh:
-        return JSONResponse({**result, "already_voted": True}, status_code=409, headers={"Cache-Control": "no-store"})
-    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+    result, changed = _letter_call(issue_letters_repo.vote, slug, x_voter_id or "", str(payload.get("option_key") or ""))
+    return JSONResponse({**result, "changed": changed}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/admin/letter-editors")

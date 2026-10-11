@@ -21,18 +21,21 @@ def _tally(cur, slug: str) -> Dict[str, int]:
 
 
 def vote(slug: str, raw_voter_id: str, option_key: str) -> Tuple[Dict[str, Any], bool]:
-    """투표한다. (결과, 새로 투표했는가). 이미 투표했으면 기존 선택과 집계를 돌려주고 새 투표로 치지 않는다."""
+    """투표하거나 이미 한 투표의 보기를 바꾼다(한 기기 한 표). (결과, 이전과 달라졌는가) 를 돌려준다."""
     if not _KEY_RE.match(option_key or ""):
         raise LetterError("올바르지 않은 선택지입니다")
     h = voter_hash(raw_voter_id)
     with get_cursor() as cur:
         if not _published(cur, slug):
             raise LetterError("투표할 수 있는 글이 아닙니다", 404)
-        cur.execute("INSERT INTO post_votes (slug, voter_hash, option_key) VALUES (%s,%s,%s) "
-                    "ON CONFLICT (slug, voter_hash) DO NOTHING RETURNING option_key", (slug, h, option_key))
-        fresh = cur.fetchone() is not None
         cur.execute("SELECT option_key FROM post_votes WHERE slug = %s AND voter_hash = %s", (slug, h))
-        return {"my_choice": cur.fetchone()["option_key"], "counts": _tally(cur, slug)}, fresh
+        before = cur.fetchone()
+        cur.execute("INSERT INTO post_votes (slug, voter_hash, option_key) VALUES (%s,%s,%s) "
+                    "ON CONFLICT (slug, voter_hash) DO UPDATE SET option_key = EXCLUDED.option_key, voted_at = now() "
+                    "WHERE post_votes.option_key <> EXCLUDED.option_key RETURNING option_key", (slug, h, option_key))
+        cur.fetchone()
+        changed = before is None or before["option_key"] != option_key
+        return {"my_choice": option_key, "counts": _tally(cur, slug)}, changed
 
 
 def my_vote(slug: str, raw_voter_id: str) -> Dict[str, Any]:
