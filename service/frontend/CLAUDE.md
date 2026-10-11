@@ -1,7 +1,7 @@
 # MBTI 뉴스앱 — 아키텍처 규칙
 
 ## 기술 스택
-- Next.js 16.2.2 (App Router, src/app/)
+- Next.js 16.3.8 (App Router, src/app/)
 - React 19.2.4 + TypeScript 5
 - Tailwind CSS v4
 - 상태 관리: React Context (AuthContext)
