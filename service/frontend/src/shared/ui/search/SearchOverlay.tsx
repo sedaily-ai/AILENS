@@ -16,7 +16,7 @@ import { DEFAULT_PARAMS, loadSearchIndex, parseTerms, search, splitHighlight, to
 type Props = { open: boolean; onClose: () => void };
 
 const SUGGEST_MAX = 5;
-const FOOT_LINKS: Array<[string, string]> = [['서비스 소개', '/about'], ['문의', '/contact'], ['이용약관', '/terms'], ['개인정보처리방침', '/privacy']];
+const FOOT_LINKS: Array<[string, string]> = [['레터', '/letter'], ['서비스 소개', '/about'], ['문의', '/contact'], ['이용약관', '/terms'], ['개인정보처리방침', '/privacy']];
 
 export function SearchOverlay({ open, onClose }: Props) {
   if (!open) return null;

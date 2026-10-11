@@ -395,12 +395,14 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
               onFocus={prefetchSearchIndex}
               onTouchStart={prefetchSearchIndex}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-              aria-label="검색"
-              title="검색"
+              aria-label="전체 메뉴와 검색"
+              title="전체 메뉴 · 검색"
             >
-              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="7" />
-                <path strokeLinecap="round" d="M21 21l-4.3-4.3" />
+              {/* 서울경제(sedaily.com)의 "통합검색 & 사이트맵" 아이콘처럼 햄버거 막대와 돋보기를 한 아이콘에 담는다: 누르면 전체 메뉴와 검색이 함께 열린다. */}
+              <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+                <path d="M3 6.5h9.5M3 12h6M3 17.5h9.5" />
+                <circle cx="16.4" cy="11.6" r="4.1" />
+                <path d="M19.4 14.6 21.5 16.7" />
               </svg>
             </button>
             {/* '둘러보기'(서비스 소개) 상시 링크는 두지 않는다. /onboarding 랜딩은 외부 유입 경로로만 쓴다. */}

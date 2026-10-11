@@ -8,6 +8,8 @@ import { usePathname, useRouter } from 'next/navigation';
 //  2) 한가할 때 앞쪽 기사 링크 몇 개를 순서대로 미리 받는다(첫 화면 밖 링크 포함, 최대 8개, 0.25초 간격).
 // 데이터 절약 모드·2G·느린 3G에서는 켜지 않는다. 같은 링크는 한 번만 요청한다(Next 캐시도 중복 제거).
 const ARTICLE_PATH = /^\/[a-z]+\/\d{4}\/\d{2}\/\d{2}\//;
+// 레터 상세(/letter/<slug>)와 에디터 페이지(/letter/editors/<id>). 목록에서 카드를 눌러 이동하는 경로라 기사와 같이 미리 받는다.
+const LETTER_PATH = /^\/letter\/(?:editors\/)?[^/]+$/;
 const MAX_IDLE = 8;
 const IDLE_GAP_MS = 250;
 const HOVER_DELAY_MS = 80;
@@ -81,7 +83,7 @@ export function LinkPrefetcher() {
       const hrefs: string[] = [];
       for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
         const href = internalHref(a);
-        if (href && ARTICLE_PATH.test(href.split('?')[0]) && !hrefs.includes(href)) hrefs.push(href);
+        if (href && (ARTICLE_PATH.test(href.split('?')[0]) || LETTER_PATH.test(decodeURIComponent(href.split('?')[0]))) && !hrefs.includes(href)) hrefs.push(href);
         if (hrefs.length >= MAX_IDLE) break;
       }
       let i = 0;
