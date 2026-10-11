@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
-import { LetterDetailView, fetchLetterDetail, fetchLetterList } from '@/features/letter';
+import { LetterDetailView, fetchLetterDetail, fetchLetterList, buildLetterMetadata, buildLetterJsonLd } from '@/features/letter';
 
-// 레터 상세. 발행된 레터만 열린다(없거나 초안이면 404). 정식 오픈 전까지 noindex.
+// 레터 상세. 발행된 레터만 열린다(없거나 초안이면 404). 2026-10-12 정식 오픈: 검색엔진 노출(NewsArticle 구조화 데이터 포함).
 export const revalidate = 60;
 export const dynamicParams = true;
 
@@ -19,11 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const { slug } = await params;
   const letter = await fetchLetterDetail(decodeURIComponent(slug));
   if (!letter) return { title: '레터', robots: { index: false } };
-  return {
-    title: `${letter.title} | AI LENS 레터`,
-    description: letter.deck,
-    robots: { index: false, follow: true },
-  };
+  return buildLetterMetadata(letter);
 }
 
 export default async function LetterDetailPage({ params }: { params: Promise<Params> }) {
@@ -34,6 +30,9 @@ export default async function LetterDetailPage({ params }: { params: Promise<Par
   const i = list.findIndex((l) => l.slug === slug);
   return (
     <ArticlePageShell activeTab="letter">
+      {buildLetterJsonLd(letter).map((ld, k) => (
+        <script key={k} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      ))}
       <LetterDetailView letter={letter} prevSlug={i >= 0 ? list[i + 1]?.slug : undefined} nextSlug={i > 0 ? list[i - 1]?.slug : undefined} others={list} />
     </ArticlePageShell>
   );

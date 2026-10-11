@@ -1,5 +1,6 @@
 import { ERAS, DECADES } from '@/shared/data/timelineEvents';
 import type { MetadataRoute } from 'next';
+import { fetchIssueLetterCards, issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
 import { fetchAllLensPosts, fetchAllVideos, fetchPaperDates, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
 import { kstTodayStr } from '@/shared/lib/date/date';
@@ -36,6 +37,7 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/national',      priority: 0.8, changeFrequency: 'daily', lastModified: '2026-10-09' }, // 사회
   { path: '/international', priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 국제
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
+  { path: '/letter',       priority: 0.8, changeFrequency: 'daily',   lastModified: '2026-10-12' }, // 레터(모아쓰기) 목록 — 정식 오픈
   { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
   { path: '/games',        priority: 0.5, changeFrequency: 'monthly', lastModified: '2026-10-05' },
   { path: '/words',        priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 단어장 — 레터 키워드 기반, 매일 갱신
@@ -123,6 +125,20 @@ async function coreEntries(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {
     /* 지면 날짜 조회 실패 시 생략 */
+  }
+
+  // 레터(모아쓰기) 상세 — 발행된 레터만. lastmod 는 발행 시각(수정 이력이 없어 거짓 신선도를 만들지 않는다).
+  try {
+    for (const l of await fetchIssueLetterCards(200)) {
+      entries.push({
+        url: `${BASE}${issueLetterPath(l.slug)}`,
+        lastModified: new Date(l.published_at),
+        changeFrequency: 'never',
+        priority: freshnessPriority(daysBetween(l.published_at.slice(0, 10))),
+      });
+    }
+  } catch {
+    /* 레터 API 불통이면 생략 */
   }
 
   // 오디오(/listen/{id})·웹툰·영상 상세는 본문이 기사 페이지와 대부분 중복이라 canonical을 lens 기사 페이지로 지정하고(lensCanonical.ts) 사이트맵에서 제외한다.

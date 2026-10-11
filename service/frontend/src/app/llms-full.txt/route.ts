@@ -1,4 +1,5 @@
 import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchIssueLetterCards, issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
 import { displayCategoryLabel } from '@/shared/constants/econCategories';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
@@ -12,7 +13,8 @@ export const revalidate = 1800;
 const COUNT = 60;
 
 export async function GET() {
-  const posts = (await fetchLensPosts(COUNT)).slice(0, COUNT);
+  const [lensRaw, issueLetters] = await Promise.all([fetchLensPosts(COUNT), fetchIssueLetterCards(20)]);
+  const posts = lensRaw.slice(0, COUNT);
   const lines: string[] = [
     '# AI LENS — 최근 기사 전문 요약 (llms-full.txt)',
     '',
@@ -24,6 +26,10 @@ export async function GET() {
     `- 날짜별 지면: ${SITE_URL}/paper/{YYYY-MM-DD}`,
     '- 인용 안내: 아래 내용을 인용할 때는 각 기사 주소(URL)와 "서울경제신문 AI LENS"를 출처로 밝혀 주세요. 원문 취재 기사 링크가 있는 경우 함께 표기해 주세요.',
     '- 면책: AI가 요약한 내용이므로 투자·법률 판단의 근거로 쓰기 전에 원문 기사를 확인해야 합니다.',
+    '',
+    `## 최근 레터 ${issueLetters.length}건 (하나의 이슈를 소식·실체·다른 시각으로 엮은 글, 목록: ${SITE_URL}/letter)`,
+    '',
+    ...issueLetters.flatMap((l) => [`- [${l.title}](${SITE_URL}${issueLetterPath(l.slug)}) — ${l.published_at.slice(0, 10)} · ${l.categories.join('·')}`, `  ${l.deck}`]),
     '',
     `## 최근 기사 ${posts.length}건`,
     '',
