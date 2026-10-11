@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
-import { LetterListView, fetchLetterList, findEditor } from '@/features/letter';
+import { LetterListView, fetchLetterList, findEditor, buildLetterEditorMetadata } from '@/features/letter';
 
-// 에디터 주소(/letter/editors/{id})는 레터 목록에서 그 에디터를 고른 화면으로 연다. 정식 오픈 전까지 noindex.
+// 에디터 주소(/letter/editors/{id})는 레터 목록에서 그 에디터를 고른 화면으로 연다. 목록과 내용이 겹쳐 색인에서 뺀다(noindex, follow, canonical=/letter).
 export const revalidate = 60;
 export const dynamicParams = true;
 
@@ -17,7 +17,7 @@ type Params = { id: string };
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const editor = findEditor((await params).id);
-  return { title: editor ? `${editor.name} · ${editor.role} | AI LENS 레터` : '레터 에디터', robots: { index: false, follow: true } };
+  return editor ? buildLetterEditorMetadata(`${editor.name} · ${editor.role}`, editor.pitch) : { title: '레터 에디터', robots: { index: false, follow: true } };
 }
 
 export default async function LetterEditorPage({ params }: { params: Promise<Params> }) {

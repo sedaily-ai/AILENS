@@ -1,4 +1,5 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { fetchIssueLetterCards, issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
 import { letterHref } from '@/shared/lib/content/letterHref';
 import { lensPath } from '@/shared/lib/content/lensUrl';
 import { seoHeadline } from '@/shared/lib/content/displayHeadline';
@@ -67,9 +68,10 @@ function linksHtml(url: string, sourceUrl?: string | null): string {
 }
 
 export async function buildRssResponse(category?: EconCategoryConfig): Promise<Response> {
-  const [letters, lensPosts] = await Promise.all([
+  const [letters, lensPosts, issueLetters] = await Promise.all([
     fetchCmsPosts('letters', undefined, FEED_LIMIT * (category ? 4 : 1)),
     fetchLensPosts(),
+    category ? Promise.resolve([]) : fetchIssueLetterCards(FEED_LIMIT), // 전체 피드에만 모아쓰기 레터를 싣는다
   ]);
 
   // channel=letters 조회는 letter 포맷 rendition이 있는 모든 글(거의 모든 lens 글)을 같이 돌려준다(cms_posts_repo.py, video/webtoon과 같은 설계).
@@ -127,7 +129,19 @@ export async function buildRssResponse(category?: EconCategoryConfig): Promise<R
     };
   });
 
-  const merged = [...letterEntries, ...lensEntries]
+  const issueLetterEntries: FeedEntry[] = issueLetters.map((l) => {
+    const url = `${BASE}${issueLetterPath(l.slug)}`;
+    return {
+      title: l.title,
+      url,
+      date: l.published_at,
+      description: clip(l.deck, 300),
+      contentHtml: `<p>${escapeXml(l.deck)}</p><p><a href="${escapeXml(url)}">레터 전문 보기</a></p>`,
+      categories: ['레터', ...l.categories].filter(Boolean),
+    };
+  });
+
+  const merged = [...issueLetterEntries, ...letterEntries, ...lensEntries]
     .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
     .slice(0, FEED_LIMIT);
 
