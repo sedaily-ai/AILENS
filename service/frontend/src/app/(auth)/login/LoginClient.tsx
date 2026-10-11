@@ -8,7 +8,7 @@ import { isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from "@/shared/lib/auth
 import { takeReturnTo } from "@/shared/lib/auth/returnTo";
 import { PasswordChecklist, PasswordMismatchHint } from "@/shared/ui/form/PasswordChecklist";
 
-import { AuthMode, VERIFICATION_CODE_LENGTH, INPUT_CLS, PRIMARY_BTN, SECONDARY_LINK, STRONG_LINK, Spinner, FieldLabel } from "./loginUi";
+import { AuthMode, VERIFICATION_CODE_LENGTH, INPUT_CLS, PRIMARY_BTN, SECONDARY_LINK, STRONG_LINK, Spinner, FieldLabel, authEyebrow, authTitle } from "./loginUi";
 /**
  * 비밀번호 재설정은 세 단계다: forgot(이메일) → resetCode(코드) → resetPassword(새 비밀번호).
  *
@@ -166,27 +166,6 @@ export function LoginClient() {
       setSuccessMessage("");
     }
     setError(result.error || "비밀번호 재설정에 실패했습니다.");
-  };
-
-  const getEyebrow = () => {
-    switch (mode) {
-      case "login": return "LOGIN";
-      case "signup": return "SIGN UP";
-      case "confirm": return "VERIFY";
-      case "forgot": return "RESET";
-      case "resetCode": return "RESET · 1/2";
-      case "resetPassword": return "RESET · 2/2";
-    }
-  };
-  const getTitle = () => {
-    switch (mode) {
-      case "login": return "로그인";
-      case "signup": return "회원가입";
-      case "confirm": return "이메일 인증";
-      case "forgot": return "비밀번호 찾기";
-      case "resetCode": return "인증 코드 입력";
-      case "resetPassword": return "새 비밀번호 설정";
-    }
   };
 
   const renderForm = () => {
@@ -536,13 +515,13 @@ export function LoginClient() {
               className="mx-auto"
             />
             <p className="mt-5 text-[10.5px] font-bold tracking-[0.22em] text-gray-400 uppercase">
-              {getEyebrow()}
+              {authEyebrow(mode)}
             </p>
             <h1
               className="mt-2 text-[28px] font-bold text-gray-900 tracking-tight"
               style={{ fontFamily: '"Noto Serif KR", serif' }}
             >
-              {getTitle()}
+              {authTitle(mode)}
             </h1>
             <p className="mt-2 text-[13px] text-gray-500">
               같은 뉴스를 네 개의 렌즈로

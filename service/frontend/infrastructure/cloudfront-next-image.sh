@@ -9,8 +9,9 @@
 # 비용: 새 AWS 리소스 비용 없음(정책·동작은 무료). 이미지는 CloudFront에 캐시되어 서버 부하도 줄어든다.
 # 되돌리기: 배포 설정에서 해당 동작을 지우면 된다(프론트 이미지 최적화를 끄지 않으면 이미지가 깨지므로 둘을 같이 되돌릴 것).
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/config/resources.env"
 
-DIST_ID="E1QS7PY350VHF6"
+DIST_ID="$SERVICE_CF_DIST_ID"
 POLICY_NAME="AILens-NextImage"
 PATTERN="/_next/image*"
 

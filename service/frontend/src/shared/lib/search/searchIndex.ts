@@ -62,7 +62,10 @@ export function loadSearchIndex(): Promise<SearchRecord[]> {
 
 /** 검색 버튼에 손이 가는 순간(호버·포커스·터치) 목록을 미리 받아 둔다. 실패해도 조용히 넘어가고, 열렸을 때 다시 시도한다. */
 export function prefetchSearchIndex(): void {
-  void loadSearchIndex().catch(() => undefined);
+  void loadSearchIndex().catch((e) => {
+    // 미리 받기 실패는 화면에 영향이 없다(열릴 때 다시 시도). 원인만 콘솔에 남긴다.
+    console.warn('[search] 목록 미리 받기 실패', e);
+  });
 }
 
 /** "대장암, 전립선암  AI" → ['대장암','전립선암','ai']. 쉼표·공백으로 나누고 소문자로 맞춘다. */

@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT/config/resources.env"
 bad=0
-for v in "$SERVICE_CF_DIST_ID" "$ADMIN_CF_DIST_ID" "$CMS_API_INSTANCE_ID" "$ADMIN_S3_BUCKET"; do
-  hits=$(grep -rln --include='deploy*.sh' -- "\"$v\"" "$ROOT/service" "$ROOT/admin" "$ROOT/pipelines" 2>/dev/null | grep -v 'pip-cache' || true)
+for v in "$AWS_ACCOUNT_ID" "$SERVICE_CF_DIST_ID" "$ADMIN_CF_DIST_ID" "$CMS_API_INSTANCE_ID" "$ADMIN_S3_BUCKET"; do
+  hits=$(grep -rln --include='*.sh' -- "\"$v\"" "$ROOT/service" "$ROOT/admin" "$ROOT/pipelines" 2>/dev/null | grep -v 'pip-cache' || true)
   if [ -n "$hits" ]; then echo "복사된 값 $v:"; echo "$hits"; bad=1; fi
 done
 exit $bad

@@ -7,6 +7,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from typing import Any, Dict, Optional
 from fastapi import Body, Header, HTTPException, Query
+import admin_posts_maintenance
 import admin_posts_repo
 import selection_repo
 from route_guards import _check_admin_token
@@ -104,7 +105,7 @@ def admin_soft_delete_by_slug(payload: Dict[str, Any] = Body(...), x_internal_to
         raise HTTPException(status_code=400, detail="slugs는 문자열 배열이어야 합니다")
     dry_run = payload.get("dry_run", True) is not False
     try:
-        return admin_posts_repo.soft_delete_empty_by_slugs(slugs, dry_run=dry_run)
+        return admin_posts_maintenance.soft_delete_empty_by_slugs(slugs, dry_run=dry_run)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
@@ -119,7 +120,7 @@ def admin_reclassify_by_slug(payload: Dict[str, Any] = Body(...), x_internal_tok
         raise HTTPException(status_code=400, detail="items는 객체 배열이어야 합니다")
     dry_run = payload.get("dry_run", True) is not False
     try:
-        return admin_posts_repo.reclassify_by_slugs(items, dry_run=dry_run)
+        return admin_posts_maintenance.reclassify_by_slugs(items, dry_run=dry_run)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
@@ -127,7 +128,7 @@ def admin_reclassify_by_slug(payload: Dict[str, Any] = Body(...), x_internal_tok
 @router.delete("/admin/posts/{post_id}")
 def admin_delete_post(post_id: str, x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
-    if not admin_posts_repo.soft_delete(post_id):
+    if not admin_posts_maintenance.soft_delete(post_id):
         raise HTTPException(status_code=404, detail="post not found")
     return {"ok": True}
 

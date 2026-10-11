@@ -16,9 +16,10 @@
 # 뒤 별도로 CloudFront 오리진을 스왑한다(README나 worklog의 트래픽 전환
 # 절차 참조). EC2(ailens-ssr-*)는 이 스크립트로 손대지 않는다.
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 REGION="us-east-1"
-ACCOUNT_ID="887078546492"
+ACCOUNT_ID="$AWS_ACCOUNT_ID"
 VPC_ID="vpc-07a3a75110d6594aa"
 # 기본 VPC의 기존 퍼블릭 서브넷 2개(서로 다른 AZ, ALB 최소 요건) — 새로
 # 안 만들고 재사용. us-east-1f는 지금 EC2와 같은 AZ, us-east-1d는
