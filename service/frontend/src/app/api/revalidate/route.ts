@@ -52,7 +52,8 @@ async function notifyIndexNow(): Promise<void> {
     });
     const latestDate = recent.map((l) => l.date).sort().pop();
     await pingIndexNow(['/', ...(latestDate ? [`/paper/${latestDate}`] : []), ...recent.map((l) => lensPath(l))]);
-  } catch {
-    // 무시 — 발행 흐름과 무관.
+  } catch (e) {
+    // 발행 흐름과 무관하므로 응답은 막지 않되, 원인은 로그에 남긴다.
+    console.warn('[revalidate] IndexNow 알림 실패', e);
   }
 }

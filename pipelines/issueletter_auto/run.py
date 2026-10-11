@@ -140,7 +140,8 @@ def fact_check(draft: Dict[str, Any], cluster: Dict[str, Any]) -> List[str]:
         text = call_model(FACT_CHECK_SYSTEM, f"[기사]\n{articles}\n\n[초안]\n{core.draft_body_text(draft)}", max_tokens=3000)
         body = extract_fenced_json_text(text, opener="[") or text[text.find("["): text.rfind("]") + 1]
         out = loads_lenient(body)
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        log("fact_check_failed", error=f"{type(e).__name__}: {e}")
         return ["사실 대조 응답을 해석하지 못함(보류)"]
     return [str(x) for x in out] if isinstance(out, list) else ["사실 대조 응답 형식 오류(보류)"]
 
@@ -260,7 +261,8 @@ def rewrite_fields(draft: Dict[str, Any], cluster: Dict[str, Any], bad: Dict[str
     items = "\n".join(f"- id={fid} | 이유: {why} | 문장: {fields[fid]}" for fid, why in bad.items())
     try:
         out = extract_json_object(call_model(REWRITE_SYSTEM, f"{articles}\n\n[문제 문장]\n{items}", max_tokens=1500))
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        log("rewrite_fields_failed", error=f"{type(e).__name__}: {e}")
         return False
     if not isinstance(out, dict) or any(not isinstance(out.get(fid), str) or not out[fid].strip() for fid in bad):
         return False

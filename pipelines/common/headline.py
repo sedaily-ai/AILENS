@@ -107,7 +107,8 @@ def generate(article_title: str, subtitle: str, body_text: str, category: str = 
         try:
             r = extract_json_object(call_text(_VERIFY, f"[기사 정보]\n{article_title}\n{subtitle or ''}\n\n[레터 본문]\n{body}\n\n[제목]\n{title}", model=MODEL, max_tokens=300))
             return bool(r.get("ok"))
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            print(f"[headline] 사실 확인 호출 실패 — 후보 탈락 처리: {type(e).__name__}: {e}")
             return False
     picked = pick(cands, f"{body} {article_title} {subtitle or ''}", article_title, used_types, verifier)
     if not picked:

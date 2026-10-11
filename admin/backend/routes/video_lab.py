@@ -23,11 +23,14 @@ script.py가 media/video-lab/{job_id}.progress.json에 2초 간격으로 덮어�
 실어 보낸다 — video.mp4/error.json과 마찬가지로 공개 URL GET일 뿐,
 새 IAM 없음."""
 import json
+import logging
 import urllib.error
 import urllib.request
 
 from shared import response
 from routes.webtoon import jobs as webtoon_jobs
+
+logger = logging.getLogger(__name__)
 
 _TIMEOUT_SECONDS = 5
 
@@ -46,7 +49,8 @@ def _get_text(url: str) -> str | None:
         req = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
             return resp.read().decode("utf-8")
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"텍스트 조회 실패(url={url}): {e}")
         return None
 
 
