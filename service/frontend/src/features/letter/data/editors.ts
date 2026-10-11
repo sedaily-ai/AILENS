@@ -28,6 +28,8 @@ export interface LetterEditor {
   intro: string;
   /** 프로필 이미지(public 경로). 없으면 이니셜 아바타. */
   image?: string;
+  /** 자기소개 음성(public 경로, 미리 생성한 mp3). 없으면 "소개 듣기" 버튼을 숨긴다. */
+  voice?: string;
   topics: EditorTopic[];
   tone: { bg: string; fg: string };
 }
@@ -38,6 +40,7 @@ export const EDITORS: readonly LetterEditor[] = [
     role: '전략 분석 에디터', forWhom: '거시경제와 산업 흐름을 구조로 보고 싶은 분',
     intro: '안녕하세요. 민철입니다. 저는요, 뉴스를 볼 때 항상 숫자부터 봐요. 데이터가 뭐라고 하는지, 그게 중요하거든요. 핵심만 딱 전해드릴게요.',
     image: '/editors/intj.webp',
+    voice: '/editors/voice/mincheol.mp3',
     topics: [{ slug: 'growth', name: '경제성장률' }, { slug: 'inflation', name: '물가' }, { slug: 'semiconductor', name: '반도체' }, { slug: 'platform', name: '플랫폼' }, { slug: 'regulation', name: '규제' }, { slug: 'fiscal', name: '재정' }],
     tone: { bg: '#f5f3ff', fg: '#5b21b6' },
   },
@@ -46,6 +49,7 @@ export const EDITORS: readonly LetterEditor[] = [
     role: '오피니언 에디터', forWhom: '숫자 뒤의 사람과 사회의 변화가 궁금한 분',
     intro: '안녕하세요, 하은이에요. 저는 뉴스 읽을 때, 그 뒤에 있는 사람들 이야기가 자꾸 눈에 들어오더라고요. 천천히, 같이 읽어봐요.',
     image: '/editors/infp.webp',
+    voice: '/editors/voice/haeun.mp3',
     topics: [{ slug: 'low-birth', name: '저출생' }, { slug: 'labor', name: '노동' }, { slug: 'education', name: '교육' }, { slug: 'aging', name: '고령화' }, { slug: 'neighborhood', name: '도시·동네' }, { slug: 'climate', name: '환경·기후' }],
     tone: { bg: '#fff1f2', fg: '#9f1239' },
   },
@@ -54,6 +58,7 @@ export const EDITORS: readonly LetterEditor[] = [
     role: '팩트 큐레이터', forWhom: '금융·증시와 기업 소식을 핵심만 보고 싶은 분',
     intro: '준서입니다. 저는 팩트만 전달해요. 언제, 어디서, 뭐가 있었는지. 그게 젤 중요하니까요.',
     image: '/editors/istj.webp',
+    voice: '/editors/voice/junseo.mp3',
     topics: [{ slug: 'kospi', name: '코스피' }, { slug: 'samsung-electronics', name: '삼성전자' }, { slug: 'sk-hynix', name: 'SK하이닉스' }, { slug: 'earnings', name: '기업 실적' }, { slug: 'rates', name: '금리' }, { slug: 'bank', name: '은행' }],
     tone: { bg: '#ecfdf5', fg: '#047857' },
   },
@@ -62,6 +67,7 @@ export const EDITORS: readonly LetterEditor[] = [
     role: '트렌드 캐스터', forWhom: '어려운 경제 뉴스를 가볍게 시작하고 싶은 분',
     intro: '안녕! 소율이야. 경제뉴스 어렵지? 나도 처음엔 그랬어. 근데 쉽게 풀면 진짜 재밌거든. 같이 보자!',
     image: '/editors/esfp.webp',
+    voice: '/editors/voice/soyul.mp3',
     topics: [{ slug: 'consumption', name: '소비' }, { slug: 'platform', name: '플랫폼' }, { slug: 'content', name: '콘텐츠' }, { slug: 'travel', name: '여행·관광' }, { slug: 'theme-stock', name: '테마주' }, { slug: 'neighborhood', name: '도시·동네' }],
     tone: { bg: '#fffbeb', fg: '#92400e' },
   },

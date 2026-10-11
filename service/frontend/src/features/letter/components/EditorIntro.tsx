@@ -5,33 +5,28 @@ import { editorInterests, type LetterEditor } from '../data/editors';
 import { EditorAvatar } from './EditorAvatar';
 import { SubscribeForm } from './SubscribeForm';
 
-/**
- * 선택한 에디터의 자기소개: 이미지, 역할, 소개 문구, 세부 분야, 소개 음성, 팔로우, 메일 구독.
- * 음성은 목업이라 브라우저 음성 합성으로 재생한다 — 서비스 단계에서는 미리 만든 mp3(파일)를 쓴다.
- */
+/** 선택한 에디터의 자기소개: 이미지, 역할, 소개 문구, 세부 분야, 소개 음성(미리 만든 mp3), 팔로우, 메일 구독. */
 export function EditorIntro({ editor, following, onToggleFollow }: { editor: LetterEditor; following: boolean; onToggleFollow: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
-  const utter = useRef<SpeechSynthesisUtterance | null>(null);
-  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  const audio = useRef<HTMLAudioElement | null>(null);
 
-  useEffect(() => () => { if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel(); }, [editor.id]);
+  useEffect(() => () => { audio.current?.pause(); audio.current = null; }, [editor.id]);
 
+  const stop = () => {
+    audio.current?.pause();
+    audio.current = null;
+    setPlaying(false);
+  };
   const toggleVoice = () => {
-    if (!canSpeak) return;
-    if (playing) {
-      window.speechSynthesis.cancel();
-      return setPlaying(false);
-    }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(editor.intro);
-    u.lang = 'ko-KR';
-    u.rate = 1.0;
-    u.onend = () => setPlaying(false);
-    u.onerror = () => setPlaying(false);
-    utter.current = u;
+    if (!editor.voice) return;
+    if (playing) return stop();
+    const el = new Audio(editor.voice);
+    el.addEventListener('ended', () => setPlaying(false));
+    el.addEventListener('error', () => setPlaying(false));
+    audio.current = el;
     setPlaying(true);
-    window.speechSynthesis.speak(u);
+    void el.play().catch(() => setPlaying(false));
   };
 
   return (
@@ -46,7 +41,7 @@ export function EditorIntro({ editor, following, onToggleFollow }: { editor: Let
             {editor.topics.map((t) => <li key={t.slug} className="lt-topic">{t.name}</li>)}
           </ul>
           <div className="lt-eintro-actions">
-            {canSpeak && <button type="button" className="lt-eintro-voice" aria-pressed={playing} onClick={toggleVoice}>{playing ? '소개 멈추기' : '소개 듣기'}</button>}
+            {editor.voice && <button type="button" className="lt-eintro-voice" aria-pressed={playing} onClick={toggleVoice}>{playing ? '소개 멈추기' : '소개 듣기'}</button>}
             <button type="button" className="lt-ed-follow lt-ed-follow-lg" aria-pressed={following} onClick={onToggleFollow}>{following ? '팔로우 중' : '팔로우'}</button>
             <button type="button" className="lt-int-btn" aria-expanded={subOpen} onClick={() => setSubOpen((v) => !v)}>{subOpen ? '닫기' : '메일로 구독'}</button>
           </div>
