@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import logging
 import os
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -20,19 +18,6 @@ SES_REGION = os.environ.get("SES_REGION", "us-east-1")
 
 def _is_dry() -> bool:
     return os.environ.get("NEWSLETTER_DRY_RUN", "1") != "0"
-
-
-def _build_raw(to_addr: str, subject: str, html_body: str, unsubscribe_url: str) -> bytes:
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = FROM_ADDR
-    msg["To"] = to_addr
-    # 1클릭 수신거부 (CAN-SPAM/RFC 8058)
-    msg["List-Unsubscribe"] = f"<{unsubscribe_url}>"
-    msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
-    msg.attach(MIMEText("HTML 이메일입니다. 본문이 보이지 않으면 웹에서 확인하세요.", "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-    return msg.as_bytes()
 
 
 def send(to_addr: str, subject: str, html_body: str, unsubscribe_url: str) -> Dict[str, Any]:
@@ -48,7 +33,15 @@ def send(to_addr: str, subject: str, html_body: str, unsubscribe_url: str) -> Di
         kwargs = {
             "FromEmailAddress": FROM_ADDR,
             "Destination": {"ToAddresses": [to_addr]},
-            "Content": {"Raw": {"Data": _build_raw(to_addr, subject, html_body, unsubscribe_url)}},
+            # 기존 실행 역할의 ses:SendEmail 권한을 사용하는 SESv2 Simple 형식.
+            "Content": {"Simple": {
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {
+                    "Html": {"Data": html_body, "Charset": "UTF-8"},
+                    "Text": {"Data": f"{subject}\n\nHTML 본문에서 기사 요약과 전체 기사 링크를 확인해 주세요.\n수신거부: {unsubscribe_url}", "Charset": "UTF-8"},
+                },
+                "Headers": [{"Name": "List-Unsubscribe", "Value": f"<{unsubscribe_url}>"}],
+            }},
         }
         if CONFIG_SET:  # config set 미생성 시 생략 (없는 set 지정하면 SES 실패)
             kwargs["ConfigurationSetName"] = CONFIG_SET

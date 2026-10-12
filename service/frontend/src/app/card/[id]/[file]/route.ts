@@ -1,5 +1,5 @@
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
-import { buildCompareCard } from '../../compareCard';
+import { buildCompareCard } from '@/shared/lib/content/compareCard';
 import { CARD_TEXT_MAX, renderCompareCard, type CardVariant } from '../../renderCompareCard';
 
 // 비교 카드 이미지 — /card/{기사 id}/og.png(링크 미리보기 1200×630), /card/{기사 id}/story.png(저장용 1080×1350).

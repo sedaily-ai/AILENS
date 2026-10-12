@@ -1,150 +1,45 @@
 'use client';
 
-import { ScrollReveal } from "@/shared/ui/effects/ScrollReveal";
 import Link from 'next/link';
+import { LENS_PERSPECTIVES } from '@/shared/constants/lensPerspectives';
+import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
-// ── Hero ──────────────────────────────────────────────────────────
+// 히어로 — 이게 뭐야? 문구 출처: 헤드라인은 비교 카드 페이지(card/[id]) 설명, 보조문은 홈 첫 화면(LensPreviewSection).
+// 앰버 손밑줄은 단어 하나에만(홈 "어려우시죠?"와 같은 규칙). 주 버튼은 메일 섹션(#newsletter)으로, 보조 버튼은 /start로 간다.
 export function HeroSection() {
   return (
-    <section
-      style={{
-        minHeight: 'min(720px, 92vh)',
-        padding: 'clamp(80px, 14vh, 140px) clamp(20px, 5vw, 32px) clamp(40px, 8vh, 80px)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        textAlign: 'center',
-        background:
-          'radial-gradient(ellipse 60% 50% at 50% 0%, #f0f4ff 0%, transparent 70%), #fff',
-      }}
-    >
-      <ScrollReveal>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 14px',
-            borderRadius: 999,
-            background: '#dbeafe',
-            color: '#1d4ed8',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.14em',
-            marginBottom: 28,
-          }}
-        >
-          AI LENS · BETA
-        </div>
-      </ScrollReveal>
-      <ScrollReveal delay={80}>
-        <h1
-          style={{
-            fontFamily: '"Noto Serif KR", serif',
-            fontSize: 'clamp(36px, 7vw, 64px)',
-            fontWeight: 700,
-            lineHeight: 1.18,
-            letterSpacing: '-0.03em',
-            color: '#0f172a',
-            margin: 0,
-            maxWidth: 760,
-          }}
-        >
-          복잡한 뉴스,
-          <br />
-          한 통으로 정리.
-        </h1>
-      </ScrollReveal>
-      <ScrollReveal delay={160}>
-        <p
-          className="br-desktop-only"
-          style={{
-            fontSize: 'clamp(15px, 2.2vw, 18px)',
-            lineHeight: 1.7,
-            color: '#475569',
-            marginTop: 24,
-            maxWidth: 540,
-          }}
-        >
-          매일 1면 경제 뉴스를 AI가 정리합니다.
-          <br />
-          핵심만 담은 한 통이 매일 아침 도착해요.
-        </p>
-      </ScrollReveal>
-      <ScrollReveal delay={240}>
-        <div
-          style={{
-            display: 'flex',
-            gap: 10,
-            marginTop: 40,
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-          }}
-        >
-          <Link
-            href="/start"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '14px 26px',
-              background: '#0f172a',
-              color: '#fff',
-              borderRadius: 12,
-              fontSize: 14.5,
-              fontWeight: 700,
-              textDecoration: 'none',
-              transition: 'transform 0.12s, box-shadow 0.18s',
-              boxShadow: '0 8px 24px rgba(15,23,42,0.18)',
-            }}
-            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.98)')}
-            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-          >
-            오늘의 한 통 보기 →
-          </Link>
-          <a
-            href="#newsletter"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '14px 26px',
-              background: '#fff',
-              color: '#0f172a',
-              borderRadius: 12,
-              fontSize: 14.5,
-              fontWeight: 700,
-              textDecoration: 'none',
-              border: '1px solid #e5e7eb',
-              transition: 'all 0.18s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#0f172a')}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#e5e7eb')}
-          >
-            매일 받아보기
-          </a>
-        </div>
-      </ScrollReveal>
-      <ScrollReveal delay={400}>
-        <div
-          aria-hidden
-          style={{
-            marginTop: 64,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            color: '#cbd5e1',
-            fontSize: 11,
-            letterSpacing: '0.2em',
-            animation: 'scrollHint 1.8s ease-in-out infinite',
-          }}
-        >
-          SCROLL ↓
-        </div>
-      </ScrollReveal>
-      <style>{`@keyframes scrollHint{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(6px);opacity:1}}`}</style>
+    <section className="ob-hero" aria-labelledby="ob-hero-title">
+      <h1 id="ob-hero-title" className="ob-h1">
+        <span className="ob-mark">
+          같은 기사
+          <svg viewBox="0 0 120 10" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M2 6 C22 2, 44 8, 64 5 S104 3, 118 6" fill="none" stroke="currentColor" strokeWidth={4} strokeLinecap="round" />
+          </svg>
+        </span>
+        를{' '}<span style={{ display: 'inline-block' }}>읽기·웹툰</span>{' '}<span style={{ display: 'inline-block' }}>팟캐스트·영상으로.</span>
+      </h1>
+      <p className="ob-sub">당신의 일상에 맞춘 뉴스를 준비했어요.</p>
+
+      <ul className="ob-formats" aria-label="네 가지 형식">
+        {LENS_PERSPECTIVES.map((p) => {
+          const Icon = p.icon;
+          return (
+            <li key={p.short}>
+              <Icon size={20} strokeWidth={1.8} color={p.color} aria-hidden="true" />
+              {p.short}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="ob-cta">
+        <a className="ob-btn ob-btn-primary" href="#newsletter" onClick={() => trackEvent('onboarding_intro_click', { target: 'newsletter' })}>
+          메일로 받기
+        </a>
+        <Link className="ob-btn ob-btn-ghost" href="/start" onClick={() => trackEvent('onboarding_intro_click', { target: 'start' })}>
+          나에게 맞는 형식 찾기
+        </Link>
+      </div>
     </section>
   );
 }

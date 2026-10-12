@@ -5,7 +5,7 @@ import { StaticPageShell } from '@/widgets/StaticPageShell';
 import { SITE_URL } from '@/shared/constants/site';
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { lensPath } from '@/shared/lib/content/lensUrl';
-import { buildCompareCard } from '../compareCard';
+import { buildCompareCard } from '@/shared/lib/content/compareCard';
 import { CARD_SIZES, CARD_TEXT_MAX } from '../renderCompareCard';
 
 // 비교 카드 공유 페이지 — SNS에 퍼지는 링크(신청서 모듈 F "SNS 공유 링크(OG 태그)").
