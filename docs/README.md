@@ -65,6 +65,7 @@ docs/
 |---|---|
 | 어드민 스택 | `architecture/admin-stack.md` |
 | 배포 스크립트 어디 있고 뭘 배포하나 | `architecture/배포_스크립트_지도.md` |
+| AI LENS 주차별 비용이 마스터DB에 어떻게 쌓이나 | `architecture/비용시트_파이프라인.md` |
 | 음성 대화 아키텍처 | `architecture/voice-conversation-architecture.md` |
 | 4포맷이 왜 이렇게 설계됐나 | `product/4format-persona-system.md` |
 | 레터·4포맷 품질 평가 체계 | `evaluation/letter-evaluation-system.md`, `evaluation/4format-evaluation-system.md` |
