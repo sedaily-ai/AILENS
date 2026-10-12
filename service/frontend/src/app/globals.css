@@ -15,6 +15,24 @@
   --color-border: #e5e7eb;
   --max-container: 1080px;
   --gutter: 20px;
+
+  /* 2026-10-12 소개 화면(/onboarding) 개편 때 추가. 사이트가 이미 쓰는 값에 역할 이름만 붙였다(기존 변수·화면 값은 그대로).
+     글자 크기는 UI 원칙의 스케일(12/13/14/16/18/20/24/32/40)에서만 고른다. */
+  --color-text-primary: #111827;
+  --color-text-secondary: #374151;
+  --color-surface-subtle: #f8f8f6;
+  --color-accent-primary: #2f5fcf;
+  --color-highlight: #ffb020;
+  --color-text-danger: #b91c1c;
+  --font-size-12: 12px;
+  --font-size-13: 13px;
+  --font-size-14: 14px;
+  --font-size-16: 16px;
+  --font-size-18: 18px;
+  --font-size-20: 20px;
+  --font-size-24: 24px;
+  --font-size-32: 32px;
+  --font-size-40: 40px;
 }
 
 @theme inline {
