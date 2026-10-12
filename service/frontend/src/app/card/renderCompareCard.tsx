@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
-import type { CompareCardData } from './compareCard';
+import type { CompareCardData } from '@/shared/lib/content/compareCard';
 
 // 비교 카드 PNG 렌더러(next/og). 두 크기:
 //  · og    1200×630  — 링크 미리보기(카카오톡·페이스북·X)용. card/[id] 페이지의 og:image.
