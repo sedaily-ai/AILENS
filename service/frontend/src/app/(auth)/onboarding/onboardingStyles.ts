@@ -10,6 +10,7 @@ export const ONBOARDING_CSS = `
   .ob-page :focus-visible { outline: 3px solid var(--color-accent-primary); outline-offset: 2px; border-radius: 4px; }
   .ob-main { max-width: 640px; margin: 0 auto; padding: 0 16px 64px; }
   .ob-sec { padding-top: 48px; }
+  #newsletter { scroll-margin-top: 72px; }
   .ob-h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--font-size-20); font-weight: 800; line-height: 1.4; letter-spacing: -0.02em; color: var(--color-text-primary); }
   .ob-h2-icon { flex: none; width: 24px; height: 24px; }
   .ob-lead { margin: 12px 0 0; font-size: var(--font-size-16); line-height: 1.7; color: var(--color-text-secondary); }
@@ -83,6 +84,9 @@ export const ONBOARDING_CSS = `
     .ob-cta { flex-direction: row; }
     .ob-card { padding: 24px; }
     .ob-made { margin-top: 64px; padding: 24px; }
+  }
+  @media (min-width: 1024px) {
+    .ob-main { max-width: 760px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .ob-btn { transition: none; }

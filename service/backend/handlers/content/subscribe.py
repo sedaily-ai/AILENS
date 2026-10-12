@@ -20,7 +20,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime
+from common.dates.validation import KST
 from typing import Any, Dict, Tuple
 
 from clients.pg import newsletter_subscribers as subscribers_client
@@ -104,7 +105,7 @@ async def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     return success_response({
         "ok": True,
         "resubscribed": bool(existing),
-        "welcome_sent": send_status in ("sent", "dry_run"),
+        "welcome_sent": send_status == "sent",
         "send_status": send_status,
     })
 
@@ -121,7 +122,7 @@ def _send_today_letter(email: str, token: str) -> str:
 
         date_str = kst_today()
         letter, src = load_today_letter(date_str)
-        if not letter:
+        if not letter or src == "mock":
             logger.warning('{"event":"welcome_no_letter","src":"%s"}', src)
             return "no_letter"
         unsub = f"{_BASE}/unsubscribe?token={token}"
@@ -145,8 +146,16 @@ def _send_specific_letter(email: str, token: str, payload: Dict[str, Any]) -> st
         from newsletter.render import render_html, subject  # noqa: lazy
         from newsletter.sender import send  # noqa: lazy
 
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date_str = datetime.now(KST).strftime("%Y-%m-%d")
+        published_date = payload.get("published_date")
+        if isinstance(published_date, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", published_date):
+            try:
+                date_str = datetime.strptime(published_date, "%Y-%m-%d").strftime("%Y-%m-%d")
+            except ValueError:
+                logger.warning('{"event":"welcome_invalid_publication_date"}')
         letter = {
+            "id": payload.get("id") if isinstance(payload.get("id"), str) else "",
+            "article_path": payload.get("article_path"),
             "headline": payload.get("headline") or "",
             "subtitle": payload.get("subtitle") or "",
             "body": [b for b in (payload.get("body") or []) if isinstance(b, str)],

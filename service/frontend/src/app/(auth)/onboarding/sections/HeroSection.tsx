@@ -16,7 +16,7 @@ export function HeroSection() {
             <path d="M2 6 C22 2, 44 8, 64 5 S104 3, 118 6" fill="none" stroke="currentColor" strokeWidth={4} strokeLinecap="round" />
           </svg>
         </span>
-        를 읽기·웹툰·팟캐스트·영상으로.
+        를{' '}<span style={{ display: 'inline-block' }}>읽기·웹툰</span>{' '}<span style={{ display: 'inline-block' }}>팟캐스트·영상으로.</span>
       </h1>
       <p className="ob-sub">당신의 일상에 맞춘 뉴스를 준비했어요.</p>
 

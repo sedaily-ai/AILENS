@@ -9,21 +9,25 @@
  *    (2026-10-13 확인: today-letters API가 10/11~10/13 모두 빈 목록) 그래서 보낼 레터를 불러오기 전에는 신청 버튼을 막는다.
  */
 import { NewsletterEmailField, type SubscribeLetterPayload } from '@/shared/ui/form/NewsletterEmailField';
+import Link from 'next/link';
 import { useLatestLetters } from '@/shared/hooks/useLatestLetters';
 
 export function NewsletterCTA() {
-  const { cards, loading } = useLatestLetters();
+  const { cards, loading, date } = useLatestLetters();
   const letter = cards[0] ?? null;
 
-  // 구독 즉시 발송할 레터 — 가장 최근 발행분 한 통. 요약(excerpt)이 부제와 같으면 본문에서 빼서 메일에 같은 문장이 두 번 나오지 않게 한다.
-  const letterPayload: SubscribeLetterPayload | null = letter
+  // 카드 요약임을 명시하고, 실제 발행일·정본 경로를 메일에도 전달한다.
+  const summary = (letter?.excerpt || letter?.subtitle || '').trim();
+  const letterPayload: SubscribeLetterPayload | null = letter && summary && date
     ? {
+        article_path: letter.href,
+        published_date: date,
         editor_name: letter.editorName,
         editor_role: letter.editorRole,
         accent: letter.accent,
         headline: letter.title,
-        subtitle: letter.subtitle,
-        body: letter.excerpt && letter.excerpt !== letter.subtitle ? [letter.excerpt] : [],
+        subtitle: '최근 발행 기사 요약',
+        body: [summary],
         key_points: [],
         closing_line: null,
       }
@@ -32,12 +36,19 @@ export function NewsletterCTA() {
   const blockedReason = letterPayload
     ? undefined
     : loading
-      ? '오늘의 한 통을 불러오는 중이에요'
-      : '지금은 오늘의 한 통을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.';
+      ? '최근 발행 기사를 불러오는 중이에요'
+      : '지금은 기사 요약을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.';
 
   return (
     <div style={{ marginTop: 24 }}>
       <NewsletterEmailField letter={letterPayload} disabledReason={blockedReason} />
+      {letter && date && (
+        <div style={{ marginTop: 16, fontSize: 'var(--font-size-14)', lineHeight: 1.7 }}>
+          <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>메일로 받을 기사 · {date} 발행</p>
+          <Link href={letter.href} className="ob-cmp-link">{letter.title} →</Link>
+          <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>위 비교 기사와 다를 수 있어요. 메일에는 요약과 전체 기사 링크를 담아요.</p>
+        </div>
+      )}
     </div>
   );
 }

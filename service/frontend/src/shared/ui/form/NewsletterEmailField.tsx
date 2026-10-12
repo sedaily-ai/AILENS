@@ -17,6 +17,8 @@ import { API_URL as API_BASE } from '@/shared/config/apiClient';
 
 // 구독 즉시 최신 letter 한 통을 메일로 함께 발송하려면 호출자가 넘긴다. 백엔드는 letter.headline이 있으면 발송한다.
 export interface SubscribeLetterPayload {
+  article_path: string;
+  published_date: string;
   editor_name: string;
   editor_role: string;
   accent: string;
@@ -68,13 +70,17 @@ export function NewsletterEmailField({
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
+  const [mailSent, setMailSent] = useState(false);
+  const [deliveryMessage, setDeliveryMessage] = useState('');
   const [alreadySubscribed, setAlreadySubscribed] = useState(false);
 
   // 이미 구독한 이메일 자동 채움. 단 done 상태 자동 진입은 X(재구독 시에도 항상 재발송 흐름을 막지 않게).
   useEffect(() => {
-    const saved = localStorage.getItem('newsletter-email');
-    if (saved) setEmail(saved);
-    setAlreadySubscribed(localStorage.getItem('newsletter-subscribed') === '1');
+    try {
+      const saved = localStorage.getItem('newsletter-email');
+      if (saved) setEmail(saved);
+      setAlreadySubscribed(localStorage.getItem('newsletter-subscribed') === '1');
+    } catch { /* 저장소 사용이 제한되면 빈 폼으로 시작한다. */ }
   }, []);
 
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
@@ -82,15 +88,13 @@ export function NewsletterEmailField({
   const canSubmit = validEmail && consent && !disabledReason && state !== 'sending';
 
   // 버튼이 눌리지 않는 이유 — 하나만, 가장 먼저 풀어야 할 것부터.
-  const reason = disabledReason
-    ? disabledReason
-    : !validEmail
-      ? showFormatError
-        ? '이메일 주소 형식을 확인해 주세요'
-        : '이메일 주소를 입력해 주세요'
-      : !consent
-        ? '수신 동의에 체크해 주세요'
-        : '';
+  const reason = !validEmail
+    ? showFormatError
+      ? '이메일 주소 형식을 확인해 주세요'
+      : '이메일 주소를 입력해 주세요'
+    : !consent
+      ? '뉴스레터 수신·이메일 저장 동의에 체크해 주세요'
+      : disabledReason ?? '';
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -112,11 +116,25 @@ export function NewsletterEmailField({
       } catch {
         throw new Error('네트워크 연결을 확인하고 다시 시도해 주세요');
       }
-      const d = (await res.json().catch(() => ({}))) as { ok?: boolean };
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; welcome_sent?: boolean; send_status?: string };
       if (!res.ok || !d.ok) throw new Error('신청하지 못했어요. 잠시 후 다시 시도해 주세요');
 
-      localStorage.setItem('newsletter-email', email.trim());
-      localStorage.setItem('newsletter-subscribed', '1');
+      const sent = d.send_status === 'sent' && d.welcome_sent === true;
+      setMailSent(sent);
+      setDeliveryMessage(sent
+        ? '스팸함도 한 번 확인해 주세요.'
+        : d.send_status === 'error'
+          ? '구독은 저장됐지만 메일을 보내지 못했어요. 메일로 받을 기사 링크에서 내용을 확인해 주세요.'
+          : d.send_status === 'no_letter'
+            ? '구독은 저장됐지만 지금 보낼 기사가 없어요.'
+            : d.send_status === 'dry_run'
+              ? '구독은 저장됐지만 현재 메일 발송이 꺼져 있어요.'
+              : '구독은 저장됐지만 메일 발송 여부를 확인하지 못했어요.');
+      // 브라우저 저장소 제한으로 이미 완료된 구독을 실패로 표시하지 않는다.
+      try {
+        localStorage.setItem('newsletter-email', lower);
+        localStorage.setItem('newsletter-subscribed', '1');
+      } catch { /* 저장소 사용이 제한되어도 API 결과는 유지한다. */ }
       trackEvent('newsletter_subscribe');
       setState('done');
       onSuccess?.({ email: email.trim() });
@@ -129,8 +147,8 @@ export function NewsletterEmailField({
   if (state === 'done') {
     return (
       <div role="status" style={{ padding: '24px 16px', borderRadius: 16, background: 'var(--color-surface-subtle)', color: 'var(--color-text-primary)' }}>
-        <p style={{ margin: 0, fontSize: fs(18), fontWeight: 700, lineHeight: 1.5 }}>{email || '입력하신 이메일'}로 오늘의 한 통이 곧 도착해요</p>
-        <p style={{ margin: '8px 0 0', fontSize: fs(14), color: 'var(--color-text-secondary)' }}>스팸함도 한 번 확인해 주세요.</p>
+        <p style={{ margin: 0, fontSize: fs(18), fontWeight: 700, lineHeight: 1.5 }}>{mailSent ? `${email.trim()}로 최근 발행 기사 요약을 보냈어요` : '구독 신청이 완료됐어요'}</p>
+        <p style={{ margin: '8px 0 0', fontSize: fs(14), color: 'var(--color-text-secondary)' }}>{deliveryMessage}</p>
       </div>
     );
   }
@@ -147,7 +165,7 @@ export function NewsletterEmailField({
       <style>{FIELD_CSS}</style>
       {(helperText || alreadySubscribed) && (
         <p style={{ margin: '0 0 4px', fontSize: fs(14), lineHeight: 1.6, color: 'var(--color-text-secondary)' }}>
-          {helperText ?? '이미 구독 중이에요. 구독 신청하기를 다시 누르면 오늘의 한 통을 한 번 더 보내 드려요.'}
+          {helperText ?? '이 브라우저에서 구독한 기록이 있어요. 다시 신청하면 최근 발행 기사 요약의 발송을 요청해요.'}
         </p>
       )}
       <label htmlFor={emailId} style={{ fontSize: fs(14), fontWeight: 700, color: 'var(--color-text-primary)' }}>
@@ -185,7 +203,7 @@ export function NewsletterEmailField({
         <span>
           뉴스레터 수신과 이메일 저장에 동의합니다. (필수){' '}
           <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="nef-link" style={{ display: 'inline-block', padding: '11px 4px', margin: '-11px -4px', color: 'var(--color-accent-primary)', fontWeight: 700 }}>
-            자세히<span className="sr-only">(개인정보처리방침, 새 창)</span>
+            개인정보처리방침 보기<span className="sr-only">(새 창)</span>
           </Link>
         </span>
       </label>
