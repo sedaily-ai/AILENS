@@ -106,11 +106,7 @@ def _invoke_and_decode_image(client, model_id: str, body: str, *, error_key: str
 def generate_bedrock_image_bytes(prompt: str) -> bytes:
     """Stable Image Core(Bedrock) 1회 호출 — 성공 시 PNG bytes, 실패 시 예외.
     재시도 전략이 배치 파이프라인과 admin 실험 도구에서 달라 호출부가 맡는다."""
-    body = json.dumps({
-        "prompt": prompt[:9500],  # Stability 프롬프트 상한(~1만자) 여유 두고 컷
-        "aspect_ratio": BEDROCK_ASPECT_RATIO,
-        "output_format": "png",
-    })
+    body = json.dumps(_stability_request(prompt))
     return _invoke_and_decode_image(_get_bedrock_image_client(), BEDROCK_IMAGE_MODEL_ID, body)
 
 
@@ -128,12 +124,7 @@ SD35_LARGE_MODEL_ID = profile_arn("image_sd35_large")  # lens-webtoon-image-sd35
 def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
     """Stable Diffusion 3.5 Large(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
     계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임."""
-    body = json.dumps({
-        "prompt": prompt[:9500],
-        "mode": "text-to-image",
-        "aspect_ratio": BEDROCK_ASPECT_RATIO,
-        "output_format": "png",
-    })
+    body = json.dumps(_stability_request(prompt, mode="text-to-image"))
     return _invoke_and_decode_image(_get_bedrock_image_client(), SD35_LARGE_MODEL_ID, body)
 
 
@@ -169,19 +160,27 @@ def set_run_seed(seed: int | None) -> None:
     _run_seed = seed
 
 
-def generate_bedrock_sd_ultra_image_bytes(prompt: str) -> bytes:
-    """Stable Image Ultra(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
-    계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임.
-    Ultra는 image-to-image를 지원하지 않는다("Model ultra does not support image-to-image mode")."""
+def _stability_request(prompt: str, mode: str | None = None) -> dict:
+    """Stability 3모델(Core·Large·Ultra) 공통 요청 본문. 금지 문구(negative_prompt)와 기사 단위 seed를
+    세 모델 모두에 보낸다. Core·Large에 빠져 있어 스크립트의 금지 문구가 전달되지 않았다(2026-10-12)."""
     req = {
-        "prompt": prompt[:9500],
+        "prompt": prompt[:9500],  # Stability 프롬프트 상한(~1만자) 여유 두고 컷
         "negative_prompt": f"{ULTRA_NEGATIVE_PROMPT}, {_run_negative}"[:9500] if _run_negative else ULTRA_NEGATIVE_PROMPT,
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
     }
+    if mode:
+        req["mode"] = mode
     if _run_seed is not None:
         req["seed"] = _run_seed
-    return _invoke_and_decode_image(_get_bedrock_image_client(), SD_ULTRA_MODEL_ID, json.dumps(req))
+    return req
+
+
+def generate_bedrock_sd_ultra_image_bytes(prompt: str) -> bytes:
+    """Stable Image Ultra(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
+    계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임.
+    Ultra는 image-to-image를 지원하지 않는다("Model ultra does not support image-to-image mode")."""
+    return _invoke_and_decode_image(_get_bedrock_image_client(), SD_ULTRA_MODEL_ID, json.dumps(_stability_request(prompt)))
 
 
 def _retry_generate_and_write(bytes_fn, out_path: Path, retries: int) -> bool:
