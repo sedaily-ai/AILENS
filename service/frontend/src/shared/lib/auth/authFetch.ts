@@ -1,62 +1,26 @@
 /**
- * `authFetch` — Cognito ID token을 붙여 호출하는 `fetch` wrapper.
+ * 웹용 authFetch — @ailens/auth 의 플랫폼 중립 authFetch 에 Amplify provider 를 바인딩한 것.
  *
- * 백엔드는 `core/auth.py:verify_cognito_token`으로 Cognito JWT를 검증하므로, 인증이 필요한 모든 프런트엔드 요청은
- * 이 헬퍼를 거쳐 `Authorization: Bearer <idToken>` 헤더가 항상 붙도록 한다.
- *
- * 사용 예
- *   // 인증 필수(기본): 로그인하지 않았으면 throw한다.
- *   const res = await authFetch(`${API_URL}/api/user/profile`, {
- *     method: 'POST',
- *     headers: { 'Content-Type': 'application/json' },
- *     body: JSON.stringify({ ...payload }),
- *   });
- *
- *   // 선택 인증: 로그인했으면 토큰을 보내고 아니면 생략한다.
- *   // 로그인 시 개인화되지만 계정 없이도 동작하는 엔드포인트(추천 피드, 공개 아카이브 검색 등)에만 쓴다.
- *   const res = await authFetch(url, { requireAuth: false });
+ * 로직(idToken→Bearer, requireAuth)은 @ailens/auth 로 이동했고, 여기서는 웹 플랫폼의
+ * idToken 공급자(Amplify fetchAuthSession)만 주입한다. 호출부는 기존과 동일하게
+ * `import { authFetch } from '@/shared/lib/auth/authFetch'` 로 쓴다(동작 불변).
  */
+import { createAuthFetch, type AuthProvider } from '@ailens/auth';
 import { loadAmplifyAuth } from '@/shared/lib/auth/amplifyLoader';
 
-export interface AuthFetchOptions extends RequestInit {
-  /** true(기본)이면 유효한 Cognito 세션이 없을 때 throw한다. */
-  requireAuth?: boolean;
-}
+export { NotSignedInError } from '@ailens/auth';
+export type { AuthFetchOptions } from '@ailens/auth';
 
-class NotSignedInError extends Error {
-  constructor(message = 'Not signed in. This action requires authentication.') {
-    super(message);
-    this.name = 'NotSignedInError';
-  }
-}
+const webAuthProvider: AuthProvider = {
+  async getIdToken() {
+    try {
+      const { auth } = await loadAmplifyAuth();
+      const session = await auth.fetchAuthSession();
+      return session.tokens?.idToken?.toString();
+    } catch {
+      return undefined;
+    }
+  },
+};
 
-async function getIdToken(): Promise<string | undefined> {
-  try {
-    const { auth } = await loadAmplifyAuth();
-    const session = await auth.fetchAuthSession();
-    return session.tokens?.idToken?.toString();
-  } catch {
-    return undefined;
-  }
-}
-
-export async function authFetch(
-  input: RequestInfo | URL,
-  options: AuthFetchOptions = {}
-): Promise<Response> {
-  const { requireAuth = true, headers, ...rest } = options;
-
-  const idToken = await getIdToken();
-
-  if (!idToken && requireAuth) {
-    throw new NotSignedInError();
-  }
-
-  // 호출자가 Headers, [string, string][], Record<string, string> 중 무엇을 넘겨도 평범한 Record로 합쳐, 겹칠 때 Authorization 키가 우선하게 한다.
-  const merged = new Headers(headers as HeadersInit | undefined);
-  if (idToken) {
-    merged.set('Authorization', `Bearer ${idToken}`);
-  }
-
-  return fetch(input, { ...rest, headers: merged });
-}
+export const authFetch = createAuthFetch(webAuthProvider);
