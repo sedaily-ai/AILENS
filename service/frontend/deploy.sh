@@ -45,9 +45,13 @@ CLUSTER="sedaily-lens-frontend"
 ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
 
 echo "=== 1/4 이미지 빌드 (linux/arm64 — Fargate 태스크 정의와 일치) ==="
-# 빌드 컨텍스트는 반드시 이 폴더(service/frontend/) — next.config.ts의
-# outputFileTracingRoot가 여기로 고정돼 있다(Dockerfile 상단 주석 참조).
-docker build --platform linux/arm64 -t "${REPO}:latest" .
+# 2026-10-13 모노레포 전환 — 빌드 컨텍스트는 **레포 루트**(../..) 다.
+# service/frontend 가 @ailens/domain(packages/) 에 의존하므로 컨텍스트에 packages/ 가
+# 포함돼야 npm ci(워크스페이스)가 성립한다. Dockerfile 은 -f 로 명시한다
+# (Dockerfile·next.config.ts outputFileTracingRoot 주석 참조).
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+docker build --platform linux/arm64 -t "${REPO}:latest" \
+  -f "$SCRIPT_DIR/Dockerfile" "$REPO_ROOT"
 lap "빌드"
 
 echo ""

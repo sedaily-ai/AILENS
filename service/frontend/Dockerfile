@@ -1,35 +1,38 @@
-# AI LENS 프런트엔드 — ECS Fargate용 컨테이너 이미지.
+# AI LENS 프런트엔드 — ECS Fargate용 컨테이너 이미지 (모노레포 빌드).
 #
-# 2026-09-04 — EC2+PM2 배포(deploy.sh, git 히스토리 참조)에서 전환. 오늘
-# 세션에서 겪은 배포 실패 3종(macOS tar가 만든 xattr을 EC2 GNU tar가
-# 못 읽음, pm2 restart가 최초 등록 경로를 영원히 재사용해 배포가
-# "성공"해도 코드가 안 바뀌는 버그, 실패한 배포 잔해가 /tmp를 채워
-# 다음 배포를 막음)이 전부 "가변 서버에 계속 덧쓰기" 구조의 증상이었다
-# — 매 배포가 컨테이너를 통째로 새로 띄우는 이 방식으로 그 문제 클래스
-# 자체를 없앤다.
+# 2026-10-13 모노레포 전환 — 빌드 컨텍스트가 **레포 루트**로 바뀌었다.
+# service/frontend 가 @ailens/domain(레포 루트 packages/) 에 의존하므로,
+# 예전처럼 service/frontend 만 컨텍스트로 삼으면 npm ci 가 그 워크스페이스
+# 패키지를 찾지 못해 빌드가 깨진다. 그래서:
+#   - deploy.sh 는 `docker build -f service/frontend/Dockerfile <레포루트>` 로 부른다.
+#   - 아래 COPY 경로는 전부 레포 루트 기준이다.
+#   - next.config.ts 의 outputFileTracingRoot 가 레포 루트라, standalone 산출물은
+#     `.next/standalone/service/frontend/server.js` 로 한 단계 중첩돼 나온다 —
+#     runner 스테이지의 COPY 가 이 중첩 경로를 전제한다.
 #
-# 빌드 컨텍스트는 반드시 service/frontend/ 여야 한다(레포 루트 아님) —
-# next.config.ts의 outputFileTracingRoot가 이 폴더(__dirname)로 고정돼
-# 있어서, 다른 루트에서 COPY하면 standalone 산출물 경로가 한 단계
-# 깊어져 아래 COPY 경로가 깨진다(EC2 배포에서 실제로 겪은 문제,
-# next.config.ts 주석 참조).
-#
-# pipelines/frontpage_auto/Dockerfile과 같은 멀티스테이지 컨벤션 —
-# 다만 이쪽은 Node만 필요(Python/Remotion 불필요).
+# 2026-09-04 — EC2+PM2 배포에서 ECS Fargate 멀티스테이지로 전환(사유는 git 히스토리).
 
 FROM node:20-bookworm AS builder
-WORKDIR /app
+WORKDIR /repo
 
+# 1) 워크스페이스 매니페스트만 먼저 복사해 의존성 레이어를 캐시한다.
 COPY package.json package-lock.json ./
-# BuildKit 캐시 마운트(2026-10-01) — npm 다운로드 캐시(~/.npm)와 Next 웹팩
-# 증분 캐시(.next/cache)를 빌드 사이에 유지한다. 이미지 레이어와 달리
-# 소스가 바뀌어(COPY . . 무효화) 빌드가 다시 돌아도 캐시 디렉터리는 남아
-# 변경분만 다시 컴파일한다. 마운트 내용은 최종 이미지에 들어가지 않는다
-# (standalone 산출물은 .next/cache를 쓰지 않는다).
+COPY packages/domain/package.json packages/domain/
+COPY packages/api-client/package.json packages/api-client/
+COPY packages/auth/package.json packages/auth/
+COPY service/frontend/package.json service/frontend/
+# BuildKit 캐시 마운트 — npm 다운로드 캐시를 빌드 사이에 유지(이미지엔 안 들어감).
+# 공유 패키지(@ailens/domain)는 prepare 훅이 없어 install 중 빌드되지 않는다 —
+# 소스 복사 후 아래에서 명시적으로 빌드한다(루트 build:packages 와 동일 경로).
 RUN --mount=type=cache,target=/root/.npm npm ci
 
-COPY . .
-RUN --mount=type=cache,target=/app/.next/cache npm run build
+# 2) 전체 소스 복사 후 공유 패키지 빌드 → 프런트 빌드.
+COPY packages/ packages/
+COPY service/frontend/ service/frontend/
+# @ailens/domain 등 공유 패키지의 dist 를 먼저 만든다(프런트가 dist 를 소비).
+RUN npm run build --workspace @ailens/domain --if-present
+RUN --mount=type=cache,target=/repo/service/frontend/.next/cache \
+    npm run build --workspace service/frontend
 
 # ---
 
@@ -40,12 +43,15 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# standalone 산출물은 client 정적 에셋(.next/static)과 public/을 자체적으로
-# 포함하지 않는다 — Next 문서대로 별도 복사해야 server.js가 정상 서빙한다
-# (deploy.sh의 릴리스 패키징 단계가 하던 cp -r 3줄과 정확히 같은 구조).
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+# outputFileTracingRoot=레포루트라 standalone 이 레포루트 기준 구조로 중첩된다:
+#   /repo/service/frontend/.next/standalone/ (standalone 루트)
+#     └ service/frontend/server.js (실제 엔트리)
+#     └ node_modules/ (@ailens/domain 등 공유 패키지가 트레이싱돼 포함됨)
+# standalone 트리를 통째로 /app 에 펼친 뒤, 정적 에셋·public 을 중첩 경로에 복사한다.
+COPY --from=builder /repo/service/frontend/.next/standalone/ ./
+COPY --from=builder /repo/service/frontend/.next/static ./service/frontend/.next/static
+COPY --from=builder /repo/service/frontend/public ./service/frontend/public
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+# server.js 는 중첩 경로(service/frontend/)에 있다.
+CMD ["node", "service/frontend/server.js"]

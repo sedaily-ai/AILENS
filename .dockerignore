@@ -1,0 +1,34 @@
+# Docker 빌드 컨텍스트 축소 (2026-10-13 모노레포 전환).
+# service/frontend/Dockerfile 은 레포 루트를 컨텍스트로 받는다. 아래를 제외해
+# 데몬 전송량을 프런트 빌드에 필요한 것(packages/, service/frontend/)만으로 좁힌다.
+
+# 의존성·빌드 산출물 (Dockerfile 안에서 npm ci / build 로 다시 만든다)
+**/node_modules
+**/.next
+**/dist
+packages/*/dist
+
+# VCS·에디터
+.git
+.gitignore
+**/.DS_Store
+
+# 프런트 빌드와 무관한 서버/파이프라인/문서/인프라
+service/backend
+service/lens-cms-api
+admin
+pipelines
+mobile
+mobile-capacitor
+docs
+tmp
+**/__pycache__
+**/*.pyc
+**/.venv
+**/venv
+
+# 비밀·환경
+**/.env
+**/.env.*
+!**/.env.example
+.kiro
