@@ -12,18 +12,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ailens/api-client": "*",
     "@ailens/auth": "*",
     "@ailens/domain": "*",
     "expo": "^57.0.0",
-    "expo-constants": "~18.0.0",
-    "expo-linking": "~8.0.0",
+    "expo-constants": "~57.0.21",
+    "expo-linking": "~57.0.12",
     "expo-router": "~57.0.0",
-    "expo-secure-store": "~15.0.0",
-    "expo-status-bar": "~3.0.0",
-    "react": "19.2.0",
-    "react-native": "0.82.0",
-    "react-native-safe-area-context": "~5.0.0",
-    "react-native-screens": "~4.0.0"
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",

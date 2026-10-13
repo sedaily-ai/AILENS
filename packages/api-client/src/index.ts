@@ -1,4 +1,4 @@
-// @ailens/api-client
-// M0-a: 스캐폴드만. 실제 구현은 M0-b에서 service/frontend/src/shared/lib/api 를 이 디렉터리로 이동하며 채운다.
-// 참고: docs/architecture/apps-mobile-Expo-설계.md (packages 소비 섹션)
-export {};
+// @ailens/api-client — 공유 API config/클라이언트(웹·앱 공용).
+// 베이스 URL 은 configureApiClient 로 주입. 상대 import 는 .js(Node ESM).
+// 참고: docs/architecture/auth-env-공유설계-Amplify.md
+export * from './config.js';
