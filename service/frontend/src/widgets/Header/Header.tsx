@@ -1,11 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UserMenu } from '@/features/auth';
 import { prefetchSearchIndex } from '@/shared/lib/search/searchIndex';
+
+function trapDialogTab(e: React.KeyboardEvent<HTMLDialogElement>) {
+  if (e.key !== 'Tab') return;
+  const dialog = e.currentTarget;
+  const controls = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'))
+    .filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden');
+  const first = controls[0];
+  const last = controls.at(-1);
+  const active = document.activeElement;
+  if (!first) { e.preventDefault(); dialog.focus(); return; }
+  if (active === dialog || !dialog.contains(active) || (e.shiftKey ? active === first : active === last)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first)?.focus();
+  }
+}
 
 /**
  * 전 페이지 공용 상단 헤더 (7곳 복붙 통합).
@@ -238,25 +253,43 @@ function MobileDrawer({
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 포털은 클라이언트 마운트 후 1회만(SSR/정적 export 가드)
     setMounted(true);
+  }, []);
+  useEffect(() => {
+    if (!mounted) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const opener = document.activeElement;
     const { overflow } = document.body.style;
     document.body.style.overflow = 'hidden';
+    dialog.showModal();
+    const desktop = window.matchMedia('(min-width: 768px)');
+    const closeOnDesktop = () => { if (desktop.matches) onClose(); };
+    desktop.addEventListener('change', closeOnDesktop);
+    closeOnDesktop();
     return () => {
+      desktop.removeEventListener('change', closeOnDesktop);
+      dialog.close();
       document.body.style.overflow = overflow;
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
-  }, []);
+  }, [mounted, onClose]);
   if (!mounted) return null;
 
   const rowCls =
     'w-full text-left flex items-center gap-2 px-5 py-4 text-[16px] font-semibold rounded-xl transition-colors';
 
   return createPortal(
-    <div
-      className="md:hidden"
-      style={{ position: 'fixed', inset: 0, zIndex: 200 }}
-      role="dialog"
+    <dialog
+      ref={dialogRef}
+      tabIndex={-1}
+      onKeyDown={trapDialogTab}
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
+      className="hdr-drawer md:hidden"
+      style={{ position: 'fixed', inset: 0, zIndex: 200, width: '100%', height: '100%', maxWidth: 'none', maxHeight: 'none', margin: 0, padding: 0, border: 0, background: 'transparent', color: 'inherit' }}
       aria-modal="true"
       aria-label="메뉴"
     >
@@ -278,7 +311,7 @@ function MobileDrawer({
           animation: 'hdr-slide 220ms cubic-bezier(.22,1,.36,1) both',
         }}
       >
-        <style>{`@keyframes hdr-slide{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
+        <style>{`.hdr-drawer::backdrop { background: transparent; } @keyframes hdr-slide{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
         <div className="flex items-center justify-between px-5 h-[56px] border-b border-gray-100">
           <span className="text-[15px] font-bold text-gray-900">메뉴</span>
           <button
@@ -327,13 +360,14 @@ function MobileDrawer({
           })}
         </nav>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }
 
 export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, section }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   // 데스크톱 1차 줄에는 tier:'more'(타임라인·게임) 탭을 두지 않는다("더보기" 드롭다운은 2026-10-11 삭제). 모바일 드로어는 전체 목록을 그대로 보여준다.
   const primaryTabs = tabs.filter((t) => t.tier !== 'more');
 
@@ -428,7 +462,7 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
         </div>
       </div>
 
-      {menuOpen && <MobileDrawer tabs={tabs} onClose={() => setMenuOpen(false)} />}
+      {menuOpen && <MobileDrawer tabs={tabs} onClose={closeMenu} />}
     </header>
   );
 }

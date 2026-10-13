@@ -15,7 +15,7 @@ export function EditorBar({ followed, onlyMine, onToggleOnlyMine, matchCount, on
     return (
       <div className="lt-ibar">
         <div className="lt-ibar-row">
-          <p className="lt-ibar-msg"><strong>에디터를 골라 팔로우하면</strong> 겹치는 레터에 이유와 함께 표시해 드려요. 계정 없이 이 기기에만 저장돼요.</p>
+          <p className="lt-ibar-msg"><strong>에디터를 골라 팔로우하면</strong> 겹치는 레터에 이유와 함께 표시해 드려요. 팔로우하려면 로그인이 필요해요. 이메일 구독은 로그인 없이 할 수 있어요.</p>
         </div>
       </div>
     );

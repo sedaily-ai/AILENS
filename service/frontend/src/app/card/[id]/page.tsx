@@ -43,6 +43,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 /** 형식별 바로가기 문구(사이트 형식 탭 이름: 읽기·웹툰·팟캐스트·영상). */
+const VIEW_INDEX: Record<string, number> = { letter: 1, webtoon: 2, podcast: 3, video: 4 };
 const VIEW_AS: Record<string, string> = { letter: '글로 읽기', webtoon: '웹툰으로 보기', podcast: '팟캐스트로 듣기', video: '영상으로 보기' };
 
 const btn: React.CSSProperties = {
@@ -81,6 +82,20 @@ export default async function CompareCardPage({ params }: Params) {
         height={CARD_SIZES.story.height}
         style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 16, border: '1px solid #e5e7eb' }}
       />
+      <section className="compare-readable" aria-labelledby="compare-readable-title" style={{ marginTop: 28 }}>
+        <h2 id="compare-readable-title" style={{ margin: '0 0 6px', scrollMarginTop: 80, fontSize: 18, fontWeight: 700, color: '#111827' }}>형식별 첫 문장 읽기</h2>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#6b7280', wordBreak: 'keep-all' }}>카드에 담긴 문장을 편한 글자 크기로 읽고, 원하는 형식으로 이어서 보세요.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {card.entries.map((entry) => (
+            <article key={entry.format} className="compare-entry" style={{ minWidth: 0, padding: 20, border: '1px solid #e5e7eb', borderRadius: 12, background: '#fff' }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: entry.color }}>{entry.label}</h3>
+              <p style={{ margin: '4px 0 12px', fontSize: 12, color: '#6b7280', wordBreak: 'keep-all' }}>{entry.who}</p>
+              <p className="compare-opening" style={{ margin: '0 0 12px', fontSize: 16, lineHeight: 1.8, wordBreak: 'keep-all', overflowWrap: 'anywhere', color: '#374151' }}>{entry.text}</p>
+              <Link href={`${articleHref}?v=${VIEW_INDEX[entry.format]}`} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: entry.color, fontWeight: 700, fontSize: 14 }}>{VIEW_AS[entry.format]}</Link>
+            </article>
+          ))}
+        </div>
+      </section>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
         <Link href={articleHref} style={{ ...btn, background: '#111827', color: '#fff' }}>
           이 기사 4가지로 보기
@@ -93,7 +108,7 @@ export default async function CompareCardPage({ params }: Params) {
         {card.entries.map((e, i) => (
           <span key={e.format}>
             {i > 0 && ' · '}
-            <Link href={`${articleHref}?v=${i + 1}`} style={{ color: e.color, fontWeight: 700 }}>
+            <Link href={`${articleHref}?v=${VIEW_INDEX[e.format]}`} style={{ color: e.color, fontWeight: 700 }}>
               {VIEW_AS[e.format]}
             </Link>
           </span>

@@ -80,9 +80,8 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
   const editors = editorsOfLetter(letter).slice(0, 2);
 
   return (
-    <div className="ld-wrap">
+    <div id="main-content" tabIndex={-1} className="ld-wrap">
       <style>{LETTER_CSS}</style>
-      <ReadingTools slug={letter.slug} title={letter.title} />
       <LetterToc sections={letter.sections} />
       <Link href="/letter" className="ld-back">
         ← 레터 목록으로
@@ -91,17 +90,23 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
       <header className="ld-head">
         <div className="ld-cat">
           <span>{letter.categories.join(' · ')}</span>
-          {editorsOfLetter(letter).slice(0, 2).map((e) => (
-            <Link key={e.id} href={`/letter/editors/${e.id}`} className="ld-editor" title={`${e.name} 에디터의 다른 레터 보기`}>
-              <EditorAvatar editor={e} size={22} />
-              {e.name}
-              <span className="ld-editor-arrow" aria-hidden>›</span>
-            </Link>
-          ))}
+          <span className="ld-meta">{formatLetterDate(letter.publishedAt)} · 약 {letter.readMinutes}분 · AI LENS 편집팀</span>
           <span className="ld-cat-no">제 {letter.issueNumber}호</span>
         </div>
         <h1 className="ld-title">{letter.title}</h1>
         <p className="ld-deck">{letter.deck}</p>
+        <div className="ld-byline">
+          <div className="ld-authors">
+          {editorsOfLetter(letter).slice(0, 2).map((e) => (
+            <Link key={e.id} href={`/letter/editors/${e.id}`} className="ld-editor" aria-label={`${e.name} 에디터의 레터 보기`} title={`${e.name} 에디터의 다른 레터 보기`}>
+              <EditorAvatar editor={e} size={22} />
+              <span>{e.name} <span className="ld-editor-action">레터 보기</span></span>
+              <span className="ld-editor-arrow" aria-hidden>›</span>
+            </Link>
+          ))}
+          </div>
+          <ReadingTools slug={letter.slug} title={letter.title} />
+        </div>
         {letter.topics && letter.topics.length > 0 && (
           <ul className="ld-topics" aria-label="이 레터의 주제">
             {letter.topics.slice(0, 4).map((name) => (
@@ -109,6 +114,11 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
             ))}
           </ul>
         )}
+        {letter.mock && <p className="ld-mock">목업 화면입니다. 기획서 예시 문구만으로 구성한 레터라 내용이 실제와 다를 수 있어요.</p>}
+      </header>
+
+      <section className="ld-outline" aria-label="이 레터에서 읽을 내용">
+        <h2>이 레터에서 읽을 내용</h2>
         <ul className="ld-axlist" aria-label="이 레터의 3가지 관점">
           {letter.axisLabels.map((a) => (
             <li key={a.axis + a.label}>
@@ -117,11 +127,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
             </li>
           ))}
         </ul>
-        <div className="ld-meta">
-          {formatLetterDate(letter.publishedAt)} · 약 {letter.readMinutes}분 · AI LENS 편집팀
-        </div>
-        {letter.mock && <p className="ld-mock">목업 화면입니다. 기획서 예시 문구만으로 구성한 레터라 내용이 실제와 다를 수 있어요.</p>}
-      </header>
+      </section>
 
       <SourcesPanel sources={letter.sources} letterSlug={letter.slug} />
 
