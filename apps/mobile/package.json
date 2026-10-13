@@ -1,0 +1,32 @@
+{
+  "name": "@ailens/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "description": "AI LENS 네이티브 앱 (Expo + expo-router). 공유코드 @ailens/{domain,auth} 소비. 설계: docs/architecture/apps-mobile-Expo-설계.md",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ailens/auth": "*",
+    "@ailens/domain": "*",
+    "expo": "^57.0.0",
+    "expo-constants": "~18.0.0",
+    "expo-linking": "~8.0.0",
+    "expo-router": "~57.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-status-bar": "~3.0.0",
+    "react": "19.2.0",
+    "react-native": "0.82.0",
+    "react-native-safe-area-context": "~5.0.0",
+    "react-native-screens": "~4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "^5"
+  }
+}

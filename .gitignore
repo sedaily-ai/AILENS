@@ -28,9 +28,10 @@ lambda_package_admin.zip
 # (lens-cms-api/deploy.sh의 .requirements.sha256 패턴과 동일 원칙).
 admin/backend/.pip-cache-admin/
 
-# Android TWA (mobile/) — 서명 키스토어(비밀값) + Gradle/빌드 산출물.
+# Android TWA (레포 루트 mobile/) — 서명 키스토어(비밀값) + Gradle/빌드 산출물.
 # 전체 디렉터리를 통째로 제외한다(bubblewrap 생성물이라 재현 가능, 커밋 불필요).
-mobile/
+# 루트 앵커(/mobile/) — apps/mobile(Expo 앱)은 제외 대상이 아니므로 삼키지 않는다.
+/mobile/
 
 # ERD 다이어그램 이미지 — 커밋하지 않는다.
 # docs/architecture/lens-erd-src/*.mmd 가 소스이고, 이미지는 매번 좌표가 바뀌는
