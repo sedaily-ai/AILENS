@@ -8,6 +8,9 @@
     "apps/*",
     "service/frontend"
   ],
+  "scripts": {
+    "build:packages": "npm run build --workspace @ailens/domain --if-present"
+  },
   "engines": {
     "node": ">=22"
   }

@@ -5,15 +5,16 @@ const nextConfig: NextConfig = {
   // SSR 모드: admin 발행이 재빌드 없이 즉시 반영되려면 매 요청마다 서버가 렌더링해야 한다.
   output: "standalone",
   // 트레이싱 루트를 이 앱 폴더로 고정한다. 제거하면 배포가 깨진다.
-  // 값이 없으면 Next가 lockfile을 찾아 위로 올라가며 워크스페이스 루트를 추론하므로, 상위 디렉터리에 lockfile이 있는 환경에서는
-  // standalone 산출물이 그 루트부터의 경로를 중첩해 `.next/standalone/<중첩 경로>/service/frontend/server.js`가 된다.
-  // deploy.sh는 `.next/standalone/server.js`가 없으면 배포를 중단하므로 빌드는 성공해도 배포가 막힌다
-  // (빌드 로그의 "inferred your workspace root ... may not be correct" 경고가 신호다).
-  // 레포 루트로 잡아도 산출물이 한 단계 깊어지므로, 앱 폴더로 고정해야 산출물이 평평하고 머신별 lockfile 배치와 무관해진다.
-  outputFileTracingRoot: path.join(__dirname),
+  // 2026-10-13 모노레포 전환 — 레포 루트로 올렸다. service/frontend 가 @ailens/domain
+  // (레포 루트 packages/) 에 의존하므로, 트레이싱 루트를 앱 폴더로 좁히면 standalone 이
+  // 그 공유 패키지를 산출물에 담지 못해 런타임에 모듈이 누락된다. 루트로 잡으면 산출물이
+  // `.next/standalone/service/frontend/server.js` 구조가 되므로, Dockerfile·deploy.sh 의
+  // COPY/검증 경로가 이 중첩을 전제해야 한다(둘 다 그에 맞춰 수정됨).
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   // 로컬 dev 전용. 레포 경로에 한글이 섞여 있으면(회사/서울경제신문/...) Turbopack이 루트를 상위로 추론할 때
   // "start byte index N is not a char boundary" TurbopackInternalError로 죽는다.
   // root를 이 앱 폴더로 고정하면 식별자가 ASCII(src/...) 상대경로로만 남아 패닉을 피한다(admin/frontend와 동일 조치).
+  // (webpack 빌드용 outputFileTracingRoot 와 독립 — 이쪽은 dev 서버 전용이라 앱 폴더 유지)
   turbopack: { root: path.join(__dirname) },
   // ISR 페이지의 Cache-Control `stale-while-revalidate` 길이. 기본값은 약 1년이라, 방문자가 적은 사이트에서는
   // CloudFront가 만료된 낡은 HTML을 먼저 보여 주고 뒤에서 갱신하는 경로를 자주 타 첫 방문자가 오래된 화면을 본다.
