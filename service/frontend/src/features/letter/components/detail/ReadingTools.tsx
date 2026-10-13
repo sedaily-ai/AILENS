@@ -1,30 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { useLetterShelf } from '../../lib/useLetterShelf';
+import { LETTER_SHELF_NOTICE, useLetterShelf } from '../../lib/useLetterShelf';
 
 const SIZES = [15.5, 16.5, 18, 19.5] as const;
 const SIZE_KEY = 'lens-letter-font';
 
-/** 위쪽 읽기 진행 막대(제일 가는 선) + 오른쪽 아래 떠 있는 도구(글자 크기 · 링크 복사). 모바일에서는 막대만 보이고 도구는 하단에 나온다. */
+/** 읽기 진행 막대와 제목 아래의 글자 크기·저장·공유 도구. 글자 크기는 이 레터의 읽는 내용에 적용한다. */
 export function ReadingTools({ slug, title }: { slug: string; title: string }) {
   const [progress, setProgress] = useState(0);
   const [size, setSize] = useState(1);
-  const [copied, setCopied] = useState(false);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'shared' | 'error'>('idle');
+  const [sharing, setSharing] = useState(false);
+  const tools = useRef<HTMLDivElement>(null);
+  const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shelf = useLetterShelf();
 
   useEffect(() => {
     // 저장된 글자 크기를 마운트 뒤에 읽는다(서버 렌더 결과와 첫 클라이언트 렌더를 같게 두려는 것).
     try {
-      const v = Number(localStorage.getItem(SIZE_KEY));
+      const stored = localStorage.getItem(SIZE_KEY);
+      const v = stored !== null && stored.trim() !== '' ? Number(stored) : NaN;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (Number.isInteger(v) && v >= 0 && v < SIZES.length) setSize(v);
     } catch { /* 저장 불가 환경은 기본 크기 */ }
   }, []);
   useEffect(() => {
-    document.documentElement.style.setProperty('--ld-font', `${SIZES[size]}px`);
-    return () => { document.documentElement.style.removeProperty('--ld-font'); };
+    const scope = tools.current?.closest<HTMLElement>('.ld-wrap');
+    scope?.style.setProperty('--ld-font', `${SIZES[size]}px`);
+    return () => { scope?.style.removeProperty('--ld-font'); };
   }, [size]);
   useEffect(() => {
     let raf = 0;
@@ -51,26 +56,43 @@ export function ReadingTools({ slug, title }: { slug: string; title: string }) {
     try { localStorage.setItem(SIZE_KEY, String(next)); } catch { /* 무시 */ }
     trackEvent('letter_font_size', { letter: slug, size: SIZES[next] });
   };
+  useEffect(() => () => { if (shareTimer.current) clearTimeout(shareTimer.current); }, []);
+
+  const showShareStatus = (status: 'copied' | 'shared' | 'error') => {
+    if (shareTimer.current) clearTimeout(shareTimer.current);
+    setShareStatus(status);
+    shareTimer.current = setTimeout(() => setShareStatus('idle'), 2500);
+  };
   const share = async () => {
     const url = `${window.location.origin}/letter/${encodeURIComponent(slug)}`;
     trackEvent('letter_share', { letter: slug });
-    if (typeof navigator.share === 'function' && window.matchMedia('(pointer: coarse)').matches) {
-      try { await navigator.share({ title, url }); return; } catch { /* 취소하면 복사로 넘어가지 않고 끝낸다 */ return; }
-    }
-    try { await navigator.clipboard.writeText(url); } catch { /* 일부 브라우저는 복사 권한이 없다 */ }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    setSharing(true);
+    try {
+      if (typeof navigator.share === 'function' && window.matchMedia('(pointer: coarse)').matches) {
+        try { await navigator.share({ title, url }); showShareStatus('shared'); } catch { /* 공유 취소 시 복사하지 않는다. */ }
+        return;
+      }
+      try { await navigator.clipboard.writeText(url); showShareStatus('copied'); }
+      catch { showShareStatus('error'); }
+    } finally { setSharing(false); }
   };
 
   return (
     <>
       <div className="ld-progress" aria-hidden><i style={{ transform: `scaleX(${progress})` }} /></div>
-      <div className="ld-tools" role="group" aria-label="읽기 도구">
+      <div ref={tools} className="ld-tools" role="group" aria-label="읽기 도구">
         <button type="button" onClick={() => changeSize(-1)} disabled={size === 0} aria-label="글자 작게">가<small>-</small></button>
+        <output className="ld-size" aria-label="현재 글자 크기">{Math.round(SIZES[size] / SIZES[1] * 100)}%</output>
         <button type="button" onClick={() => changeSize(1)} disabled={size === SIZES.length - 1} aria-label="글자 크게">가<small>+</small></button>
-        <button type="button" onClick={() => { trackEvent('letter_save', { letter: slug, saved: !shelf.isSaved(slug) }); shelf.toggleSaved(slug); }} aria-pressed={shelf.isSaved(slug)} aria-label={shelf.isSaved(slug) ? '저장 해제' : '나중에 읽기 저장'}>{shelf.isSaved(slug) ? '저장됨' : '저장'}</button>
-        <button type="button" onClick={share} aria-label="링크 복사">{copied ? '복사됨' : '공유'}</button>
+        <button type="button" onClick={() => { trackEvent('letter_save', { letter: slug, saved: !shelf.isSaved(slug) }); shelf.toggleSaved(slug); }} aria-describedby="ld-save-note" aria-pressed={shelf.isSaved(slug)} aria-label={shelf.isSaved(slug) ? '저장 해제' : '나중에 읽기 저장'}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill={shelf.isSaved(slug) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden><path d="M6 3.5h12v17l-6-4.2-6 4.2z" /></svg>
+        </button>
+        <button type="button" onClick={share} disabled={sharing} aria-label="링크 복사">{sharing ? '공유 중' : shareStatus === 'copied' ? 'URL 복사됨' : shareStatus === 'shared' ? '공유 완료' : shareStatus === 'error' ? '복사 실패' : '공유'}</button>
+        <span className="sr-only" role="status">{shareStatus === 'copied' ? '레터 URL을 복사했어요.' : shareStatus === 'shared' ? '레터를 공유했어요.' : shareStatus === 'error' ? 'URL을 복사하지 못했어요. 브라우저의 복사 권한을 확인해주세요.' : ''}</span>
       </div>
+      <p id="ld-save-note" className="lt-save-note">
+        {LETTER_SHELF_NOTICE.browser} {LETTER_SHELF_NOTICE.sync}
+      </p>
     </>
   );
 }

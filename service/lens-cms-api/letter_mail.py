@@ -29,10 +29,10 @@ def unsubscribe_url(token: str) -> str:
 def _shell(title: str, body_html: str, unsub: Optional[str]) -> str:
     foot = "<br>".join(html.escape(x) for x in FOOTER_LINES)
     unsub_html = f'<p style="margin:12px 0 0"><a href="{html.escape(unsub)}" style="color:#6b7280">수신거부</a></p>' if unsub else ""
-    return (f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>{html.escape(title)}</title></head>'
-            '<body style="margin:0;background:#f6f7f9;font-family:-apple-system,\'Apple SD Gothic Neo\',\'Malgun Gothic\',sans-serif;color:#111827">'
-            '<div style="max-width:640px;margin:0 auto;padding:28px 20px">'
-            f'<div style="font-size:13px;font-weight:700;color:#5b8def;letter-spacing:.04em">{SENDER_NAME}</div>'
+    return (f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{html.escape(title)}</title><style>@media(max-width:480px){{.mail-stat,.mail-side{{display:block!important;width:auto!important;padding:8px 0!important}}}}</style></head>'
+            '<body style="margin:0;background:#fff;word-break:keep-all;overflow-wrap:anywhere;font-family:-apple-system,\'Apple SD Gothic Neo\',\'Malgun Gothic\',sans-serif;color:#111827">'
+            '<div style="max-width:640px;margin:0 auto;padding:24px 20px;overflow-wrap:anywhere">'
+            f'<div style="padding-bottom:16px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:700;color:#111827">{SENDER_NAME}</div>'
             f'{body_html}'
             f'<div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.6;color:#6b7280">{foot}{unsub_html}</div>'
             '</div></body></html>')
@@ -43,7 +43,7 @@ def render_confirm(token: str) -> Tuple[str, str, str]:
     subject = "[AI LENS 레터] 메일 받기 확인"
     body = ('<h1 style="font-size:20px;line-height:1.4;margin:10px 0 12px">메일 받기를 확인해 주세요</h1>'
             '<p style="font-size:15px;line-height:1.7;margin:0 0 18px">AI LENS 레터 메일 받기를 신청하셨어요. 아래 버튼을 누르면 신청이 완료돼요. 직접 신청하지 않으셨다면 이 메일을 무시해 주세요. 확인하지 않으면 메일은 발송되지 않아요.</p>'
-            f'<a href="{html.escape(url)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#111827;color:#fff;text-decoration:none;font-weight:700;font-size:15px">신청 확인하기</a>')
+            f'<a href="{html.escape(url)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2f5fcf;color:#fff;text-decoration:none;font-weight:700;font-size:15px">신청 확인하기</a>')
     text = f"AI LENS 레터 메일 받기를 신청하셨어요. 아래 주소를 열면 신청이 완료돼요. 직접 신청하지 않으셨다면 이 메일을 무시해 주세요.\n\n{url}\n\n" + "\n".join(FOOTER_LINES)
     return subject, _shell(subject, body, None), text
 
@@ -83,7 +83,7 @@ def _block_html(b: Dict[str, Any], tone: str) -> str:
                        f'<td style="padding:8px 0;font-size:15px;line-height:1.7;color:#1f2937;border-bottom:1px solid #f1f3f6">{e(i["text"])}</td></tr>' for i in b["items"])
         return f'<div style="{box}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows}</table></div>'
     if kind == "stats":
-        cells = "".join(f'<td style="padding:6px 10px;vertical-align:top"><div style="font-size:12.5px;color:#6b7280">{e(i["label"])}</div>'
+        cells = "".join(f'<td class="mail-stat" style="padding:6px 10px;vertical-align:top"><div style="font-size:12.5px;color:#6b7280">{e(i["label"])}</div>'
                         f'<div style="margin-top:2px;font-size:24px;font-weight:700;color:{tone}">{e(i["value"])}</div>'
                         f'<div style="margin-top:2px;font-size:12.5px;color:#6b7280">{e(i.get("sub") or "")}</div></td>' for i in b["items"])
         return f'<div style="{box}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{cells}</tr></table></div>'
@@ -97,7 +97,7 @@ def _block_html(b: Dict[str, Any], tone: str) -> str:
         return f'<div style="{box}">{title}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows}</table></div>'
     if kind == "versus":
         def side(sd: Dict[str, Any]) -> str:
-            return (f'<td style="width:50%;padding:0 6px;vertical-align:top"><div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fafbfc">'
+            return (f'<td class="mail-side" style="width:50%;padding:0 6px;vertical-align:top"><div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fafbfc">'
                     f'<div style="font-size:13.5px;font-weight:700;color:{tone}">{e(sd["label"])}</div>'
                     f'<div style="margin-top:6px;font-size:14.5px;line-height:1.7;color:#1f2937">{e(sd["text"])}</div></div></td>')
         return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px"><tr>{side(b["left"])}{side(b["right"])}</tr></table>'
@@ -156,18 +156,18 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
                     f'<table role="presentation" style="width:100%;border-collapse:collapse">{"".join(src_rows)}</table></div>') if src_rows else ""
 
     summary = [x for x in letter.get("summary") or [] if x]
-    summary_html = ('<div style="margin:24px 0 0;padding:20px;border-radius:16px;background:#f4f8ff;border:1px solid #dbe6fb">'
-                    '<div style="font-size:14.5px;font-weight:700;color:#1d3f8f">1분 요약</div>'
+    summary_html = ('<div style="margin:24px 0 0;padding:20px;border-radius:12px;background:#f8f8f6;border:1px solid #e5e7eb">'
+                    '<div style="font-size:14.5px;font-weight:700;color:#111827">1분 요약</div>'
                     '<ol style="margin:12px 0 0;padding-left:22px;font-size:15px;line-height:1.7;color:#1f2937">'
                     + "".join(f'<li style="margin:0 0 8px">{html.escape(x)}</li>' for x in summary) + '</ol></div>') if summary else ""
 
     sec_html = []
-    for s in sections:
+    for index, s in enumerate(sections, 1):
         _, tone, _ = AXIS.get(s["axis"], ("", "#5b8def", ""))
         paras = "".join(_block_html(p[0], tone) if _is_block(p) else f'<p style="margin:16px 0 0;font-size:16px;line-height:1.95;color:#1f2937">{_segments_html(p)}</p>' for p in s.get("paragraphs") or [])
-        sec_html.append(f'<div style="margin-top:36px">{_badge(s["axis"])}'
+        sec_html.append(f'<div style="margin-top:36px;padding-top:24px;border-top:1px solid #e5e7eb"><span style="margin-right:10px;color:#9ca3af;font-size:13px;font-weight:700">{index:02d}</span>{_badge(s["axis"])}'
                         f'<h2 style="margin:12px 0 0;font-family:{SERIF};font-size:21px;font-weight:700;line-height:1.4;color:#111827">{html.escape(s["heading"])}</h2>'
-                        f'<p style="margin:10px 0 0;padding:10px 14px;border-left:3px solid {tone};background:#fafbfc;font-size:15px;font-weight:600;line-height:1.6;color:#1f2937">핵심: {html.escape(s["key_line"])}</p>'
+                        f'<p style="margin:12px 0 0;font-size:16px;font-weight:600;line-height:1.75;color:#374151">핵심: {html.escape(s["key_line"])}</p>'
                         f'{paras}</div>')
 
     note_html = ('<div style="margin-top:40px;padding:22px;border-radius:16px;background:#fff;border:1px solid #eceef2">'
@@ -180,18 +180,18 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
         opts = "".join(f'<a href="{html.escape(url)}#vote" style="display:block;margin:8px 0 0;padding:12px 16px;border:1px solid #dfe3ea;border-radius:12px;background:#fff;color:#111827;text-decoration:none;font-size:15px;font-weight:700">{html.escape(o["label"])}</a>' for o in poll["options"])
         poll_html = ('<div style="margin-top:24px;padding:22px;border-radius:16px;background:#f8fafc;border:1px solid #edf0f5">'
                      f'<div style="font-size:16px;font-weight:700;line-height:1.5;color:#111827">{html.escape(poll["question"])}</div>{opts}'
-                     '<div style="margin-top:12px;font-size:12.5px;color:#6b7280">선택하면 사이트에서 투표가 반영돼요.</div></div>')
+                     '<div style="margin-top:12px;font-size:12.5px;color:#6b7280">사이트에서 선택하고 투표할 수 있어요.</div></div>')
 
     reason_html = f'<div style="margin:0 0 14px;font-size:13px;color:#2563eb">{html.escape(reason_text)}</div>' if reason_text else ""
     if test:
-        reason_html = '<div style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#f3f4f6;font-size:13px;line-height:1.6;color:#374151">테스트 메일이에요. 가장 최근 레터를 샘플로 보냈어요. 이 주소는 구독 신청 전이라 이후 메일은 보내지 않아요.</div>' + reason_html
+        reason_html = '<div style="margin:0 0 16px;padding:12px 0;border-bottom:1px solid #e5e7eb;font-size:13px;line-height:1.6;color:#374151">테스트 메일이에요. 가장 최근 레터를 샘플로 보냈어요. 이 주소는 구독 신청 전이라 이후 메일은 보내지 않아요.</div>' + reason_html
     body = (f'{reason_html}<div style="font-size:13.5px;font-weight:600;color:#6b7280">{html.escape(cats)} <span style="color:#9ca3af;font-weight:500">제 {int(letter["issue_no"])}호</span></div>'
             f'<h1 style="margin:12px 0 0;font-family:{SERIF};font-size:27px;font-weight:700;line-height:1.35;letter-spacing:-0.02em;color:#111827">{html.escape(letter["title"])}</h1>'
             f'<p style="margin:14px 0 0;font-size:16.5px;line-height:1.7;color:#4b5563">{html.escape(letter.get("deck") or "")}</p>'
             f'<div style="margin:12px 0 0">{topic_html}</div>{axlist_html}'
             f'<div style="margin-top:16px;font-size:13px;color:#6b7280">{day} · 약 {int(letter.get("read_minutes") or 0)}분 · AI LENS 편집팀</div>'
             f'{sources_html}{summary_html}{"".join(sec_html)}{note_html}{poll_html}'
-            f'<div style="margin-top:28px"><a href="{html.escape(url)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#111827;color:#fff;text-decoration:none;font-weight:700;font-size:15px">사이트에서 보기</a></div>'
+            f'<div style="margin-top:28px"><a href="{html.escape(url)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2f5fcf;color:#fff;text-decoration:none;font-weight:700;font-size:15px">사이트에서 보기</a></div>'
             '<p style="margin:24px 0 0;font-size:12.5px;line-height:1.7;color:#6b7280">본 레터는 서울경제신문 AI LENS 기사를 바탕으로 작성됐어요. 투자 판단의 근거로 쓰기 전에 원문 기사를 확인하세요.</p>')
 
     lines = [f"{cats} 제 {int(letter['issue_no'])}호", letter["title"], letter.get("deck") or "", ""]

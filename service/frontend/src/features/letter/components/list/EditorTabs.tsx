@@ -1,21 +1,36 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useEffect, useRef } from 'react';
 import { EDITORS } from '../../data/editors';
 import { EditorAvatar } from '../EditorAvatar';
 
-/** 레터 탭의 에디터 선택줄. 원형 프로필 아래 이름·역할만 두는 단순한 형태(요즘IT·Substack 류)이고, 선택하면 프로필에 짙은 테두리가 둘러진다. */
+/** 작은 프로필·이름 선택줄. 주소 진입과 폭 변경에서도 선택된 에디터가 보이게 한다. */
 export function EditorTabs({ selected, onSelect }: { selected: string | null; onSelect: (id: string | null) => void }) {
+  const container = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = container.current;
+    if (!el) return;
+    const reveal = () => {
+      const item = el.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+      if (!item) return;
+      const left = item.offsetLeft;
+      if (left < el.scrollLeft || left + item.offsetWidth > el.scrollLeft + el.clientWidth) {
+        el.scrollTo({ left: Math.max(0, left - (el.clientWidth - item.offsetWidth) / 2), behavior: 'instant' });
+      }
+    };
+    const frame = requestAnimationFrame(reveal);
+    const observer = new ResizeObserver(reveal);
+    observer.observe(el);
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
+  }, [selected]);
+
   return (
-    <div className="lt-etabs" role="group" aria-label="에디터">
-      <button type="button" className="lt-etab lt-etab-all" aria-pressed={selected === null} onClick={() => onSelect(null)}>
-        <span className="lt-etab-ring">전체</span>
-        <span className="lt-etab-text"><strong>모든 에디터</strong></span>
-      </button>
+    <div ref={container} className="lt-etabs" role="group" aria-label="에디터">
+      <button type="button" className="lt-etab lt-etab-all" aria-pressed={selected === null} onClick={() => onSelect(null)}>전체</button>
       {EDITORS.map((e) => (
-        <button key={e.id} type="button" className="lt-etab" aria-pressed={selected === e.id} onClick={() => onSelect(e.id)} style={{ '--tone-bg': e.tone.bg } as CSSProperties}>
-          <span className="lt-etab-ring"><EditorAvatar editor={e} size={60} fill /></span>
-          <span className="lt-etab-text"><strong>{e.name}</strong><em>{e.short ?? e.role.replace(' 에디터', '')}</em></span>
+        <button key={e.id} type="button" className="lt-etab" aria-pressed={selected === e.id} aria-label={`${e.name} · ${e.short ?? e.role}`} title={e.short ?? e.role} onClick={() => onSelect(e.id)}>
+          <span className="lt-etab-ring"><EditorAvatar editor={e} size={28} fill /></span>
+          <span className="lt-etab-text"><strong>{e.name}</strong></span>
         </button>
       ))}
     </div>

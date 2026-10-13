@@ -48,18 +48,22 @@ export function EditorIntro({ editor, following, onToggleFollow }: { editor: Let
             <h2>{editor.name}</h2>
             <span className="lt-ed-badge">{editor.mbti ?? editor.group}</span>
           </div>
-          <p className="lt-eintro-role">{editor.role}</p>
+          <p className="lt-eintro-role">{editor.role} · AI 에디터</p>
         </div>
       </div>
-      <p className="lt-eintro-quote">{editor.intro}</p>
-      <p className="lt-eintro-pitch"><b>{editor.when}에 읽기 좋아요</b>{editor.pitch}</p>
-      <p className="lt-eintro-scope"><span>담당 분야</span>{editor.topics.map((t) => t.name).join(' · ')}</p>
+      <p className="lt-eintro-summary">{editor.forWhom}</p>
       <div className="lt-eintro-actions">
         <button type="button" className="lt-eintro-sub" aria-expanded={subOpen} onClick={() => setSubOpen(true)}>메일로 구독</button>
         <button type="button" className="lt-eintro-btn" aria-pressed={following} onClick={clickFollow}>{following ? '팔로우 중' : '팔로우'}</button>
-        {editor.voice && <button type="button" className="lt-eintro-btn" aria-pressed={playing} onClick={toggleVoice}>{playing ? '멈추기' : '소개 듣기'}</button>}
       </div>
-      <p className="lt-eintro-ai">AI 에디터 · 모든 레터는 같은 중립 편집 원칙을 따라요</p>
+      <p className="lt-eintro-policy">팔로우는 로그인 후, 이메일 구독은 로그인 없이</p>
+      <div className="lt-eintro-details">
+        <p className="lt-eintro-quote">{editor.intro}</p>
+        <p className="lt-eintro-pitch"><b>{editor.when}에 읽기 좋아요</b>{editor.pitch}</p>
+        <p className="lt-eintro-scope"><span>담당 분야</span>{editor.topics.map((t) => t.name).join(' · ')}</p>
+        {editor.voice && <button type="button" className="lt-eintro-btn lt-eintro-voice" aria-pressed={playing} onClick={toggleVoice}>{playing ? '멈추기' : '소개 듣기'}</button>}
+        <p className="lt-eintro-ai">모든 레터는 같은 중립 편집 원칙을 따라요</p>
+      </div>
       <LoginPromptDialog open={loginOpen} onClose={() => setLoginOpen(false)} editorName={editor.name} />
       <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} interests={editorInterests(editor)} source={`editor:${editor.id}`} editors={[editor]}
         title={`${editor.name} 에디터의 새 레터를 메일로 받기`}

@@ -47,7 +47,7 @@ export const BASE_CSS = `
   .lt-ed-cat { padding: 3px 10px; border-radius: 999px; background: #2f5fcf; color: #fff; font-size: 12.5px; font-weight: 700; }
   .lt-ed-note { margin: 14px 0 0; font-size: 12.5px; color: #6b7280; }
   .ld-editor { margin-left: 6px; padding: 2px 9px; border-radius: 999px; background: #f1f3f6; color: #374151; font-size: 12.5px; font-weight: 700; text-decoration: none; }
-  .ld-editor:hover { background: #e4e9f2; }
+  .ld-editor:hover { color: #2f5fcf; }
   .lt-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin: 0 0 16px; }
   .lt-filters { display: flex; gap: 8px; flex-wrap: wrap; }
   .lt-searchbox { flex: 0 1 240px; min-width: 160px; height: 36px; padding: 0 14px; border: 1px solid #e5e7eb; border-radius: 999px; font: inherit; font-size: 14px; background: #fff; }
@@ -72,7 +72,7 @@ export const BASE_CSS = `
   .lt-ibar-mail { height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: #2f5fcf; font: inherit; font-size: 13px; font-weight: 700; color: #fff; cursor: pointer; }
   .lt-ibar .lt-int-edit, .lt-ibar .lt-sub-box { margin: 10px 0 0; }
   .lt-chip { height: 36px; padding: 0 16px; border: none; border-radius: 999px; background: #f1f3f6; font: inherit; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer; transition: background .15s; }
-  .lt-chip:hover { background: #e4e9f2; }
+  .lt-chip:not(.lt-chip-on):not([aria-pressed='true']):hover { color: #2f5fcf; }
   .lt-chip[aria-pressed='true'] { background: #2f5fcf; color: #fff; }
   .lt-sec-h { margin: 36px 0 14px; font-size: 14px; font-weight: 700; color: #6b7280; }
   .lt-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
@@ -80,7 +80,7 @@ export const BASE_CSS = `
   .lt-strip { display: flex; gap: 3px; width: 44px; height: 4px; margin-bottom: 2px; }
   .lt-strip i { flex: 1; border-radius: 2px; }
   .lt-card { display: flex; flex-direction: column; gap: 10px; padding: 22px 22px 18px; border-radius: 18px; background: #fff; border: 1px solid #eceef2; box-shadow: 0 1px 2px rgba(17,24,39,.04); text-decoration: none; color: inherit; transition: box-shadow .2s ease, transform .2s ease, border-color .2s; }
-  .lt-card:hover { box-shadow: 0 10px 28px rgba(17,24,39,.09); transform: translateY(-2px); border-color: #dfe3ea; }
+  .lt-card:hover { border-color: #dfe3ea; }
   .lt-card-feat { padding: clamp(24px, 4vw, 36px); background: linear-gradient(180deg, #f7faff 0%, #ffffff 70%); border-color: #dbe6fb; }
   .lt-card-cat { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #6b7280; }
   .lt-today { padding: 2px 9px; border-radius: 999px; background: #2f5fcf; color: #fff; font-size: 12px; font-weight: 700; }
@@ -110,7 +110,7 @@ export const BASE_CSS = `
   .lt-dlg-back { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(17,24,39,.5); }
   .lt-dlg { position: relative; width: min(500px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 28px 26px 24px; border-radius: 22px; background: #fff; box-shadow: 0 24px 60px rgba(17,24,39,.28); }
   .lt-dlg-x { position: absolute; top: 12px; right: 14px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; font-size: 26px; line-height: 1; color: #6b7280; cursor: pointer; }
-  .lt-dlg-x:hover { background: #f1f3f6; }
+  .lt-dlg-x:hover { color: #111827; }
   .lt-dlg-h { margin: 0 28px 0 0; font-family: "Noto Serif KR", serif; font-size: 21px; font-weight: 700; line-height: 1.4; color: #111827; }
   .lt-dlg-lead { margin: 8px 0 0; font-size: 14px; line-height: 1.65; color: #4b5563; }
   .lt-dlg-promise { margin: 16px 0 0; padding: 14px 16px; list-style: none; display: grid; gap: 6px; border-radius: 14px; background: #f6f8fb; font-size: 13.5px; color: #374151; }
@@ -164,7 +164,7 @@ export const BASE_CSS = `
   .lt-reason { margin: 2px 0 0; font-size: 13px; font-weight: 600; color: #1f56c0; }
   .lt-chip-on { background: #2f5fcf; color: #fff; }
   .lt-topic-btn { cursor: pointer; }
-  .lt-topic-btn:hover { background: #e2e8f0; }
+  .lt-topic-btn:hover { color: #2f5fcf; }
   .lt-topic { padding: 3px 10px; border-radius: 999px; background: #f1f5f9; color: #334155; font-size: 12.5px; font-weight: 600; }
   .ld-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
   .lt-count { font-size: 12.5px; font-weight: 700; color: #374151; padding-left: 4px; }
