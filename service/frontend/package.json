@@ -13,6 +13,7 @@
     "test:lens-blocks": "node --experimental-strip-types scripts/test-lens-blocks.mjs"
   },
   "dependencies": {
+    "@ailens/api-client": "*",
     "@ailens/auth": "*",
     "@ailens/domain": "*",
     "@tailwindcss/typography": "^0.5.19",

@@ -2,11 +2,23 @@
   "name": "@ailens/api-client",
   "version": "0.0.0",
   "private": true,
-  "description": "AI LENS 공유 API 클라이언트 (웹·앱 공용). M0-b에서 service/frontend/src/shared/lib/api 를 여기로 승격한다.",
+  "description": "AI LENS 공유 API config/클라이언트 (웹·앱 공용). 베이스 URL 은 configureApiClient 로 주입(웹=Next env, 앱=Expo extra).",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5"
   }
 }

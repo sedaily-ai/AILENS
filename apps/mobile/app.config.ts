@@ -9,14 +9,12 @@ const config: ExpoConfig = {
   version: '0.0.1',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
-  newArchEnabled: true,
   ios: {
     bundleIdentifier: 'ai.sedaily.lens',
     supportsTablet: true,
   },
   android: {
     package: 'ai.sedaily.lens',
-    edgeToEdgeEnabled: true,
   },
   plugins: ['expo-router', 'expo-secure-store'],
   experiments: {
