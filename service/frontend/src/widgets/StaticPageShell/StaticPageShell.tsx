@@ -17,7 +17,7 @@ export function StaticPageShell({ title, updated, children }: Props) {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
+      <Header searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)} tabs={buildHeaderTabs()} frosted />
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main id="main-content" tabIndex={-1} style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 96px' }}>

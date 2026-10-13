@@ -106,6 +106,7 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
   const year = new Date().getFullYear();
   return (
     <footer
+      className="site-footer"
       style={{
         marginTop: 48,
         borderTop: '1px solid #f1f3f5',
@@ -113,14 +114,29 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
         // 하단 패딩에 TodayNewsPlayer.tsx의 고정 높이(진행바 3px + 본문 60px = 63px)를 더한다.
         // 플레이어가 position:fixed bottom:0이라 원래 패딩만으로는 저작권 줄이 가려지며, 플레이어는 메인 피드('/')에서만 뜨므로
         // ConditionalFooter가 넘기는 reservePlayerSpace(pathname==='/')일 때만 여백을 더한다.
-        padding: reservePlayerSpace
-          ? 'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 32px) calc(clamp(28px, 4vw, 40px) + 64px)'
-          : 'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 32px)',
+        ['--footer-player-space' as string]: reservePlayerSpace ? '64px' : '0px',
       }}
     >
+      <style>{`
+        .site-footer { padding: clamp(32px, 5vw, 48px) clamp(20px, 5vw, 32px); padding-bottom: calc(clamp(28px, 4vw, 40px) + var(--footer-player-space)); }
+        .site-footer-top { margin-bottom: 24px; }
+        .site-footer-content { padding-bottom: 14px; margin-bottom: 14px; }
+        .site-footer-policy { padding-bottom: 20px; margin-bottom: 20px; }
+        .site-footer-details { display: flex; flex-direction: column; gap: 6px; }
+        @media (min-width: 768px) {
+          .site-footer { padding: 28px 32px calc(24px + var(--footer-player-space)); }
+          .site-footer-top { margin-bottom: 16px; }
+          .site-footer-content { padding-bottom: 0; margin-bottom: 14px; }
+          .site-footer-policy { padding-bottom: 14px; margin-bottom: 14px; }
+          .site-footer-details { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); column-gap: 32px; row-gap: 6px; align-items: start; }
+          .site-footer-publisher { grid-row: 1 / 3; }
+          .site-footer-details p { margin-top: 0 !important; }
+          .site-footer-copyright { grid-column: 1 / -1; padding-top: 6px; }
+        }
+      `}</style>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         {/* 상단 — 브랜드 + 한 줄 설명 + 소셜 */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+        <div className="site-footer-top flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div style={{ maxWidth: 480 }}>
             <p style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, letterSpacing: '0.16em', marginBottom: 6 }}>
               AI LENS
@@ -153,8 +169,8 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
 
         {/* 콘텐츠 허브 링크. 크롤러·독자가 어느 글에서 시작하든 전체 콘텐츠 구조를 몇 클릭 안에 발견하게 한다. */}
         <nav
-          className="flex flex-wrap"
-          style={{ gap: '6px 16px', paddingBottom: 14, marginBottom: 14 }}
+          className="site-footer-content flex flex-wrap"
+          style={{ gap: '6px 16px' }}
         >
           {CONTENT_LINKS.map((n) => (
             <a
@@ -169,8 +185,8 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
 
         {/* 정책/회사 링크 — en.sedaily.com footer와 동일 구성(About/Contact/Terms/Privacy) */}
         <nav
-          className="flex flex-wrap"
-          style={{ gap: '6px 16px', paddingBottom: 20, borderBottom: '1px solid #ececec', marginBottom: 20 }}
+          className="site-footer-policy flex flex-wrap"
+          style={{ gap: '6px 16px', borderBottom: '1px solid #ececec' }}
         >
           {NAV.map((n) => (
             <a
@@ -187,16 +203,14 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
             parentOrganization·sameAs·foundingDate)가 주장하는 관계·사업자정보를
             실제 보이는 텍스트로도 노출한다. */}
         <div
+          className="site-footer-details"
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
             fontSize: 12,
             color: '#6b7280',
             lineHeight: 1.7,
           }}
         >
-          <p style={{ fontSize: 11.5, color: '#9ca3af' }}>
+          <p className="site-footer-publisher" style={{ fontSize: 11.5, color: '#9ca3af' }}>
             1960년 창간{' '}
             <a href="https://www.sedaily.com" target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', textDecoration: 'underline', textUnderlineOffset: 2 }}>
               서울경제신문
@@ -216,7 +230,7 @@ export function SiteFooter({ reservePlayerSpace = false }: { reservePlayerSpace?
           <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
             본 서비스는 AI가 생성한 콘텐츠를 제공합니다.
           </p>
-          <p style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 12 }}>
+          <p className="site-footer-copyright" style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 12 }}>
             © {year} 서울경제신문. All rights reserved.
           </p>
         </div>

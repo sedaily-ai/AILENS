@@ -34,7 +34,7 @@ export function ReadDone({ minutes }: { minutes: number | null }) {
   return (
     <>
       <style>{`
-        .rdone { display: flex; align-items: center; gap: 16px; margin-top: 60px; }
+        .rdone { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 48px; text-align: center; }
         .rdone-ico { flex-shrink: 0; width: 52px; height: 52px; }
         .rdone-bg { fill: var(--lc, #6d28d9); fill-opacity: 0.12; transform-origin: center; transform: scale(0.6); opacity: 0; }
         .rdone-ck { fill: none; stroke: var(--lc, #6d28d9); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }

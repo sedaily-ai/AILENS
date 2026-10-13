@@ -7,7 +7,8 @@ export const LENS_VIEW_CSS = `
            좁으면 기존처럼 본문 위 가로 줄(.tools-inline)로 남는다. */
         .lw { max-width: 720px; margin: 0 auto; padding: 0 clamp(20px, 4vw, 28px); }
         .art-main { position: relative; }
-        .rail-host { display: none; }
+        .rail-host { display: none; z-index: 40; }
+        .rail-host[hidden] { display: none !important; }
         @media (min-width: 1100px) {
           .tools-inline { display: none !important; }
           .rail-host { display: block; position: absolute; top: 0; bottom: 0; left: calc(50% - 360px - 120px); width: 76px; }
@@ -208,12 +209,12 @@ export const LENS_VIEW_CSS = `
         .lread-compare-a { background: #f0fdf4; } .lread-compare-a .lread-box-title { color: #15803d; }
         .lread-compare-b { background: #fef2f2; } .lread-compare-b .lread-box-title { color: #b91c1c; }
         /* 편지 마무리 — 따뜻한 한 줄 + 발신인. 위쪽 룰 없이 여백만. */
-        .lread-sign { margin-top: 48px; }
+        .lread-sign { margin-top: 24px; text-align: center; }
         .lread-thanks { margin: 0 0 14px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; color: #374151; font-weight: 500; }
-        .lread-from { display: flex; align-items: center; gap: 10px; margin: 0; }
+        .lread-from { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; }
         .lread-sign-mark { flex-shrink: 0; width: 30px; height: 7px; border-radius: 0; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='1' stroke-width='2.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='1' stroke-width='2.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
         /* 글 끝 공유(2026-10-01) — 모바일엔 왼쪽 도구 레일이 없어 글을 다 읽고도 공유할 곳이 없었다. */
-        .lread-share { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 28px; }
+        .lread-share { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 24px; }
         .lread-share-label { font-size: 13.5px; color: #6b7280; }
         .lread-sign-name { font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: #6b7280; }
 

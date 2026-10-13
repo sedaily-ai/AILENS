@@ -17,7 +17,7 @@ export function LetterRow({ letter, latest = false, onTopic, read = false, saved
         </div>
         {onToggleSaved && (
           <button type="button" className="lt-row-save" aria-describedby={saveNoticeId} aria-pressed={saved} aria-label={saved ? '저장 해제' : '나중에 읽기 저장'} onClick={onToggleSaved}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden><path d="M6 3.5h12v17l-6-4.2-6 4.2z" /></svg>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden><path d="M6 3.5h12v17l-6-4.2-6 4.2z" /></svg>
           </button>
         )}
       </div>

@@ -48,33 +48,23 @@ export type HeaderTab = {
 interface HeaderProps {
   tabs: HeaderTab[];
   onSearch: () => void;
+  searchOpen?: boolean;
   logoHref?: string;
   onLogo?: () => void;
   frosted?: boolean;
-  /** 특정 카테고리 안에 들어와 있을 때: 메인 카테고리 메뉴 대신 왼쪽 위에 "‹ 카테고리명"(누르면 href로 돌아감), 가운데 로고, 오른쪽 검색·로그인만 보인다. */
-  section?: { label: string; href: string };
 }
 
-// 코어 탭은 15~16px대로 키워 존재감을 준다. active 표시는 배경 대신 밑줄이며, 액센트 컬러는 로고 옆 BETA 배지와 같은 파랑(#1d4ed8)이다
-// (챗봇 아이콘의 보라(violet-500)와 섞이지 않도록 탭 액센트는 이 하나로만 쓴다). 밑줄은 TabUnderline이 그린다(group-hover로 슬라이드인).
+// 코어 탭은 15~16px대로 키워 존재감을 준다. active 표시는 파란색·굵기이며, 액센트 컬러는 로고 옆 BETA 배지와 같은 파랑(#1d4ed8)이다
+// (챗봇 아이콘의 보라(violet-500)와 섞이지 않도록 탭 액센트는 이 하나로만 쓴다). 선택 하단선은 사용하지 않는다.
 const TAB_ACCENT = '#1d4ed8';
 const TAB_BASE =
-  'group relative px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] font-semibold transition-colors duration-200 whitespace-nowrap flex-shrink-0';
-const TAB_ACTIVE = 'text-gray-900 font-bold';
-const TAB_IDLE = 'text-gray-600 hover:text-gray-900';
+  'group relative px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] transition-colors duration-200 whitespace-nowrap flex-shrink-0';
+const TAB_ACTIVE = 'text-[#1d4ed8] font-bold';
+const TAB_IDLE = 'font-semibold text-gray-600 hover:text-gray-900';
 // tier 'extra': 코어보다 작고 옅은 텍스트 목차 톤. letter-spacing을 살짝 벌려(0.01em) 빽빽함을 줄인다.
 const TAB_EXTRA_BASE =
-  'group relative px-2 lg:px-3 py-2 text-[12.5px] lg:text-[14px] font-normal tracking-[0.01em] transition-colors duration-200 whitespace-nowrap flex-shrink-0';
-const TAB_EXTRA_IDLE = 'text-gray-400 hover:text-gray-600';
-
-// active 탭 밑에 항상, idle 탭은 호버 시에만 슬라이드인 되는 밑줄.
-// 부모(DesktopTab의 a/Link/button/span)가 TAB_BASE의 `group relative`를
-// 가지고 있어야 group-hover가 동작한다.
-// 탭 밑줄은 2026-10-11 삭제했다: 선택·호버는 글씨가 검정으로 바뀌고(선택은 굵게) 끝난다. 호출부를 그대로 두려고 빈 컴포넌트만 남긴다.
-function TabUnderline({ active }: { active?: boolean }) {
-  void active;
-  return null;
-}
+  'group relative px-2 lg:px-3 py-2 text-[12.5px] lg:text-[14px] tracking-[0.01em] transition-colors duration-200 whitespace-nowrap flex-shrink-0';
+const TAB_EXTRA_IDLE = 'font-normal text-gray-400 hover:text-gray-600';
 
 // "시선" 전용 손그림 눈 아이콘. 서비스 핵심 차별화 탭 하나에만 일러스트 포인트를 준다.
 // features/news-feed의 HandDrawnIcons(카드 썸네일용, 96x96)와 같은 스트로크 톤(검정 라인 + accent 포인트, 그라데이션 없음)을 쓰되,
@@ -205,9 +195,8 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
     // 일반 <a>로 풀 페이지 로드를 강제해서 대상 zone이 처음부터 새로 뜨게 한다.
     if (tab.hardNav) {
       return (
-        <a href={href} className={cls}>
+        <a href={href} className={cls} aria-current={tab.active ? 'page' : undefined}>
           <TabLabel tab={tab} />
-          <TabUnderline active={tab.active} />
         </a>
       );
     }
@@ -219,28 +208,26 @@ function DesktopTab({ tab }: { tab: HeaderTab }) {
     return (
       <Link
         href={href}
+        aria-current={tab.active ? 'page' : undefined}
         className={cls}
         onMouseEnter={warm}
         onFocus={warm}
         onTouchStart={warm}
       >
         <TabLabel tab={tab} />
-        <TabUnderline active={tab.active} />
       </Link>
     );
   }
   if (tab.onClick) {
     return (
-      <button onClick={tab.onClick} className={cls}>
+      <button onClick={tab.onClick} className={cls} aria-current={tab.active ? 'page' : undefined}>
         <TabLabel tab={tab} />
-        <TabUnderline active={tab.active} />
       </button>
     );
   }
   return (
-    <span className={cls}>
+    <span className={cls} aria-current={tab.active ? 'page' : undefined}>
       <TabLabel tab={tab} />
-      <TabUnderline active={tab.active} />
     </span>
   );
 }
@@ -280,7 +267,7 @@ function MobileDrawer({
   if (!mounted) return null;
 
   const rowCls =
-    'w-full text-left flex items-center gap-2 px-5 py-4 text-[16px] font-semibold rounded-xl transition-colors';
+    'w-full text-left flex items-center gap-2 px-5 py-4 text-[16px] rounded-xl transition-colors';
 
   return createPortal(
     <dialog
@@ -303,7 +290,7 @@ function MobileDrawer({
           top: 0,
           right: 0,
           height: '100%',
-          width: 'min(78vw, 320px)',
+          width: 'min(75vw, 320px)',
           background: '#fff',
           boxShadow: '-12px 0 40px -16px rgba(0,0,0,0.25)',
           display: 'flex',
@@ -330,7 +317,7 @@ function MobileDrawer({
         </div>
         <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
           {tabs.map((tab) => {
-            const cls = `${rowCls} ${tab.active ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`;
+            const cls = `${rowCls} ${tab.active ? TAB_ACTIVE : 'font-semibold text-gray-600 hover:text-gray-900'}`;
             // 메뉴 닫기를 다음 frame 으로 미뤄 Link 의 navigation 이 먼저 commit 되도록.
             // (동기로 close 하면 panel unmount → navigation race cancel 가능)
             const deferClose = () => requestAnimationFrame(onClose);
@@ -341,19 +328,19 @@ function MobileDrawer({
             if (tab.href) {
               if (tab.hardNav) {
                 return (
-                  <a key={tab.key} href={tab.href} onClick={deferClose} className={cls}>
+                  <a key={tab.key} href={tab.href} onClick={deferClose} className={cls} aria-current={tab.active ? 'page' : undefined}>
                     <TabLabel tab={tab} />
                   </a>
                 );
               }
               return (
-                <Link key={tab.key} href={tab.href} onClick={deferClose} className={cls}>
+                <Link key={tab.key} href={tab.href} onClick={deferClose} className={cls} aria-current={tab.active ? 'page' : undefined}>
                   <TabLabel tab={tab} />
                 </Link>
               );
             }
             return (
-              <button key={tab.key} onClick={handle} className={cls}>
+              <button key={tab.key} onClick={handle} className={cls} aria-current={tab.active ? 'page' : undefined}>
                 <TabLabel tab={tab} />
               </button>
             );
@@ -365,11 +352,30 @@ function MobileDrawer({
   );
 }
 
-export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, section }: HeaderProps) {
+export function Header({ tabs, onSearch, searchOpen = false, logoHref = '/', onLogo, frosted }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   // 데스크톱 1차 줄에는 tier:'more'(타임라인·게임) 탭을 두지 않는다("더보기" 드롭다운은 2026-10-11 삭제). 모바일 드로어는 전체 목록을 그대로 보여준다.
   const primaryTabs = tabs.filter((t) => t.tier !== 'more');
+  const primaryNavRef = useRef<HTMLElement>(null);
+  const activeKey = primaryTabs.find((tab) => tab.active)?.key;
+  useEffect(() => {
+    const nav = primaryNavRef.current;
+    if (!nav) return;
+    const revealActive = () => {
+      if (!nav.clientWidth) return;
+      const active = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!active) return;
+      const parent = nav.getBoundingClientRect();
+      const item = active.getBoundingClientRect();
+      if (item.left < parent.left) nav.scrollLeft += item.left - parent.left;
+      else if (item.right > parent.right) nav.scrollLeft += item.right - parent.right;
+    };
+    revealActive();
+    const observer = new ResizeObserver(revealActive);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [activeKey]);
 
   const logoCls =
     'text-[20px] font-bold tracking-tight flex-shrink-0 transition-colors duration-200 text-gray-900 hover:text-blue-600 inline-flex items-center gap-2';
@@ -389,17 +395,9 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
         frosted ? 'bg-white/95 backdrop-blur-md' : 'bg-white'
       }`}
     >
-      {/* 카테고리 모드(section)에서는 아래 본문 컨테이너(maxWidth 1320, 좌우 clamp(24px,3.5vw,44px))와 같은 폭·여백을 써서, 왼쪽 "‹ 카테고리"의 화살표 끝이 탭 "전체"의 첫 글자와, 오른쪽 끝이 본문 오른쪽 끝과 한 선에 놓이게 한다. */}
-      <div className={section ? 'mx-auto' : 'max-w-[1200px] mx-auto px-4 sm:px-6'} style={section ? { maxWidth: 1320, padding: '0 clamp(24px, 3.5vw, 44px)' } : undefined}>
-        <div className={section ? 'grid grid-cols-[1fr_auto_1fr] items-center h-[56px] gap-3' : 'flex items-center h-[56px] gap-4 md:gap-10'}>
-          {section && (
-            <Link href={section.href} className="group inline-flex items-center gap-1 min-w-0 justify-self-start" aria-label={`${section.label} — 메인으로 돌아가기`}>
-              <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0 -ml-[5px] transition-transform duration-200 group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M15 5l-7 7 7 7" />
-              </svg>
-              <span className="text-[15px] font-bold text-gray-900 truncate">{section.label}</span>
-            </Link>
-          )}
+      {/* 페이지가 바뀌어도 브랜드·주요 서비스 탭·검색의 위치를 유지한다. */}
+      <div className="mx-auto" style={{ maxWidth: 1320, paddingInline: 'clamp(24px, 3.5vw, 44px)' }}>
+        <div className="flex items-center h-[56px] gap-4 md:gap-10">
           {onLogo ? (
             <button onClick={onLogo} className={logoCls}>
               <span>AI LENS</span>
@@ -412,16 +410,14 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
             </Link>
           )}
 
-          {/* 데스크탑 탭. core/extra 구분은 무게(굵기·색) 차이만으로 한다. */}
-          {!section && (
-            <nav className="hidden md:flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
+          {/* 공통 탐색을 유지하고 현재 탭은 파랑·굵기로 표시한다. */}
+          <nav ref={primaryNavRef} aria-label="주요 서비스" className="hidden md:flex min-w-0 items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">
               {primaryTabs.map((tab) => (
                 <DesktopTab key={tab.key} tab={tab} />
               ))}
-            </nav>
-          )}
+          </nav>
 
-          <div className={`flex items-center gap-2 flex-shrink-0 ${section ? 'justify-self-end -mr-3' : 'ml-auto'}`}>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
             {/* 아이콘 전용 검색 버튼. 클릭하면 검색 패널(SearchOverlay)이 뜬다. */}
             <button
               onClick={onSearch}
@@ -429,20 +425,31 @@ export function Header({ tabs, onSearch, logoHref = '/', onLogo, frosted, sectio
               onFocus={prefetchSearchIndex}
               onTouchStart={prefetchSearchIndex}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
-              aria-label="전체 메뉴와 검색"
-              title="전체 메뉴 · 검색"
+              data-search-toggle
+              aria-haspopup="dialog"
+              aria-expanded={searchOpen}
+              aria-label={searchOpen ? '전체 메뉴와 검색 닫기' : '전체 메뉴와 검색'}
+              title={searchOpen ? '전체 메뉴와 검색 닫기' : '전체 메뉴 · 검색'}
             >
-              {/* 서울경제(sedaily.com)의 "통합검색 & 사이트맵" 아이콘처럼 햄버거 막대와 돋보기를 한 아이콘에 담는다: 누르면 전체 메뉴와 검색이 함께 열린다. */}
-              {/* 모바일은 오른쪽에 햄버거(탭 드로어)가 따로 있으므로 돋보기만 보여 아이콘이 두 개 겹쳐 보이지 않게 한다. */}
-              <svg className="w-[22px] h-[22px] md:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
-                <circle cx="11" cy="11" r="6.5" />
-                <path d="M16 16 20.5 20.5" />
-              </svg>
-              <svg className="hidden md:block w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
-                <path d="M3 6.5h9.5M3 12h6M3 17.5h9.5" />
-                <circle cx="16.4" cy="11.6" r="4.1" />
-                <path d="M19.4 14.6 21.5 16.7" />
-              </svg>
+              {searchOpen ? (
+                <svg className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              ) : (
+                <>
+                  {/* 서울경제(sedaily.com)의 "통합검색 & 사이트맵" 아이콘처럼 햄버거 막대와 돋보기를 한 아이콘에 담는다: 누르면 전체 메뉴와 검색이 함께 열린다. */}
+                  {/* 모바일은 오른쪽에 햄버거(탭 드로어)가 따로 있으므로 돋보기만 보여 아이콘이 두 개 겹쳐 보이지 않게 한다. */}
+                  <svg className="w-[22px] h-[22px] md:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+                    <circle cx="11" cy="11" r="6.5" />
+                    <path d="M16 16 20.5 20.5" />
+                  </svg>
+                  <svg className="hidden md:block w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+                    <path d="M3 6.5h9.5M3 12h6M3 17.5h9.5" />
+                    <circle cx="16.4" cy="11.6" r="4.1" />
+                    <path d="M19.4 14.6 21.5 16.7" />
+                  </svg>
+                </>
+              )}
             </button>
             {/* '둘러보기'(서비스 소개) 상시 링크는 두지 않는다. /onboarding 랜딩은 외부 유입 경로로만 쓴다. */}
             {/* 로그인 / 사용자 메뉴 — 미로그인 시 '로그인' 버튼, 로그인 시 드롭다운 */}

@@ -38,12 +38,21 @@ export function SearchOverlay({ open, onClose }: Props) {
   return <Panel onClose={onClose} />;
 }
 
+// showModal() 밖 헤더는 inert이므로, 모달 안 닫기 버튼을 원래 버튼 위치에 맞춘다.
+function searchToggleRect() {
+  const button = document.querySelector<HTMLElement>('[data-search-toggle]');
+  if (!button) return null;
+  const { left, top, width, height } = button.getBoundingClientRect();
+  return { left, top, width, height };
+}
+
 function Panel({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const uid = useId().replace(/:/g, '');
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [q, setQ] = useState('');
+  const [closeRect, setCloseRect] = useState(searchToggleRect);
   // 패널은 열릴 때만 마운트되므로(서버 렌더 없음) 처음 렌더에서 바로 저장소를 읽어도 된다.
   const [recent, setRecent] = useState<string[]>(() => getRecentSearches());
   const [items, setItems] = useState<SearchRecord[] | null>(null);
@@ -59,15 +68,17 @@ function Panel({ onClose }: { onClose: () => void }) {
     const dialog = dialogRef.current;
     if (!dialog) return;
     const opener = document.activeElement;
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
+    // body 잠금은 sticky 헤더의 스크롤 기준을 바꾸므로 문서 루트를 잠근다.
+    const scrollRoot = document.documentElement;
+    const { overflow } = scrollRoot.style;
+    scrollRoot.style.overflow = 'hidden';
     dialog.showModal();
     // 터치 화면에서는 입력 대신 패널에 포커스를 두어 키보드가 메뉴를 가리지 않게 한다.
     if (window.matchMedia('(hover: hover)').matches) inputRef.current?.focus();
     else dialog.focus();
     return () => {
       dialog.close();
-      document.body.style.overflow = overflow;
+      scrollRoot.style.overflow = overflow;
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
@@ -79,6 +90,23 @@ function Panel({ onClose }: { onClose: () => void }) {
       .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const alignClose = () => {
+      const next = searchToggleRect();
+      setCloseRect((prev) => prev?.left === next?.left && prev?.top === next?.top && prev?.width === next?.width && prev?.height === next?.height ? prev : next);
+    };
+    const observer = new ResizeObserver(alignClose);
+    const header = document.querySelector('header');
+    const button = document.querySelector('[data-search-toggle]');
+    if (header) observer.observe(header);
+    if (button) observer.observe(button);
+    window.addEventListener('resize', alignClose);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', alignClose);
     };
   }, []);
 
@@ -267,6 +295,9 @@ function Panel({ onClose }: { onClose: () => void }) {
     <dialog ref={dialogRef} className="mm-modal" tabIndex={-1} aria-modal="true" aria-label="전체 메뉴와 검색" onCancel={(e) => { e.preventDefault(); onClose(); }} onKeyDown={(e) => { trapDialogTab(e); onKeyDown(e); }} style={{ position: 'fixed', inset: 0, zIndex: 200, width: '100%', height: '100%', maxWidth: 'none', maxHeight: 'none', margin: 0, padding: 0, border: 0, background: 'transparent', color: 'inherit' }}>
       <style>{`
         .mm-modal::backdrop { background: transparent; }
+        .mm-header-close{position:fixed;display:grid;place-items:center;border:0;padding:8px;border-radius:8px;background:#fff;color:#6b7280;cursor:pointer}
+        .mm-header-close:hover{background:#f9fafb;color:#111827}
+        .mm-header-close:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}
         @keyframes mm-fade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes mm-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
         .mm-scrim { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(17,24,39,.4); animation: mm-fade .18s ease both; }
@@ -332,6 +363,19 @@ function Panel({ onClose }: { onClose: () => void }) {
         }
         @media (prefers-reduced-motion: reduce) { .mm-scrim, .mm-panel, .mm-sk { animation: none; } }
       `}</style>
+      <button
+        type="button"
+        className="mm-header-close"
+        style={closeRect ?? { top: 8, right: 24, width: 38, height: 38 }}
+        aria-label="전체 메뉴와 검색 닫기"
+        aria-haspopup="dialog"
+        aria-expanded="true"
+        onClick={onClose}
+      >
+        <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
       <div className="mm-scrim" style={{ top }} onClick={onClose} />
       <div className="mm-panel" style={{ top, ['--mm-top' as string]: `${top}px` }}>
         <div className="mm-inner">

@@ -56,15 +56,25 @@ export function CardnewsCarousel({
 
   return (
     <div data-own-swipe style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <div style={{ position: 'relative', width: '100%', maxWidth: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <style>{`
+        .cardnews-carousel-stage { display: flex; }
+        .cardnews-prev { margin-right: 8px; }
+        .cardnews-next { margin-left: 8px; }
+        @media (max-width: 480px) {
+          .cardnews-carousel-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 8px; }
+          .cardnews-carousel-card { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+          .cardnews-prev { grid-column: 1; grid-row: 2; justify-self: start; margin: 0; }
+          .cardnews-next { grid-column: 2; grid-row: 2; justify-self: end; margin: 0; }
+        }
+      `}</style>
+      <div className="cardnews-carousel-stage" style={{ position: 'relative', width: '100%', maxWidth: 320, alignItems: 'center', justifyContent: 'center' }}>
         {/* 화살표는 44×44(.fmt-arrow) — 터치 타겟 최소치를 맞춘다. 흰 배경 대비 1.1:1 테두리는 "누를 수 있는 것"으로 보이지 않는다. */}
         <button
           type="button"
           aria-label="이전 컷"
           disabled={index === 0}
           onClick={() => go(-1)}
-          className="fmt-arrow"
-          style={{ marginRight: 8 }}
+          className="fmt-arrow cardnews-prev"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M15 18l-6-6 6-6" />
@@ -72,11 +82,13 @@ export function CardnewsCarousel({
         </button>
 
         <div
+          className="cardnews-carousel-card"
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           style={{
             position: 'relative',
             width: 240,
+            maxWidth: '100%',
             aspectRatio: '4/5',
             borderRadius: 14,
             overflow: 'hidden',
@@ -203,8 +215,7 @@ export function CardnewsCarousel({
           aria-label="다음 컷"
           disabled={index === total - 1}
           onClick={() => go(1)}
-          className="fmt-arrow"
-          style={{ marginLeft: 8 }}
+          className="fmt-arrow cardnews-next"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M9 18l6-6-6-6" />
