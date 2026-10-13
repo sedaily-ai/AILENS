@@ -31,7 +31,7 @@ export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* /letters 아카이브와 같은 헤더 톤. 그라데이션 배경·그림자 아이콘박스 없이 회색 대문자 eyebrow + 서리프 타이틀만 둔다. */}
-      <main style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 80px' }}>
+      <main id="main-content" tabIndex={-1} style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 80px' }}>
         <header style={{ marginBottom: 20 }}>
           <p
             className="text-gray-400"

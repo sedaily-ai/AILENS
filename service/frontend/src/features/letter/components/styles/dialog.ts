@@ -24,12 +24,21 @@ export const DIALOG_CSS = `
   .lt-eintro-pitch b { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 700; color: #2f5fcf; }
   .lt-dlg-test { display: grid; gap: 6px; margin-top: 16px; }
   .lt-dlg-testbtn { height: 42px; border: 1px solid #d5dbe6; border-radius: 12px; background: #fff; font: inherit; font-size: 14px; font-weight: 700; color: #374151; cursor: pointer; }
-  .lt-dlg-testbtn:hover:not(:disabled) { background: #f6f7f9; }
+  .lt-dlg-testbtn:hover:not(:disabled) { color: #2f5fcf; }
   .lt-dlg-testbtn:disabled { opacity: .5; cursor: default; }
   .lt-dlg-testnote { font-size: 12.5px; color: #6b7280; }
   .lt-dlg-prevbtn { width: 100%; margin-top: 14px; padding: 10px 0; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 700; color: #2f5fcf; text-align: left; cursor: pointer; }
-  .lt-dlg-prev { margin-top: 4px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: #f6f7f9; }
-  .lt-dlg-prevsub { margin: 0; padding: 10px 14px; border-bottom: 1px solid #e5e7eb; background: #fff; font-size: 12.5px; font-weight: 700; color: #374151; }
+  .lt-dlg-prev { min-height: 0; display: flex; flex-direction: column; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: #fff; }
+  .lt-dlg-prevsub { flex: none; margin: 0; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; background: #fff; font-size: 13px; font-weight: 500; line-height: 1.6; color: #374151; overflow-wrap: anywhere; }
+  .lt-dlg-prevsub span { display: block; margin-bottom: 4px; font-size: 11px; color: #6b7280; }
   .lt-dlg-prevmsg { margin: 0; padding: 18px 14px; font-size: 13px; color: #6b7280; }
-  .lt-dlg-frame { display: block; width: 100%; height: 360px; border: 0; background: #f6f7f9; }
+  .lt-dlg-frame { display: block; flex: 1; min-height: 0; width: 100%; border: 0; background: #fff; }
+  .lt-dlg.lt-dlg-preview { width: min(760px, 100%); height: min(900px, calc(100dvh - 32px)); overflow: hidden; }
+  .lt-mail-preview { height: 100%; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .lt-mail-back { align-self: flex-start; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #2f5fcf; cursor: pointer; }
+  .lt-mail-preview .lt-dlg-h { margin: 0; padding-right: 24px; }
+  .lt-mail-caption { margin: 0; font-size: 12.5px; line-height: 1.6; color: #6b7280; }
+  .lt-mail-preview .lt-dlg-prev { flex: 1; }
+  @media (max-width: 600px) { .lt-dlg.lt-dlg-preview { padding: 18px 16px; } }
+
 `;

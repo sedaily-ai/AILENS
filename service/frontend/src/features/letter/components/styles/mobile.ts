@@ -1,36 +1,35 @@
-/** 레터 CSS — 모바일 최적화. 합치는 순서는 letterStyles.ts(뒤에 오는 규칙이 앞을 덮는다). */
+/** 레터 화면의 좁은 폭 배치. 모달의 포커스·배경 격리 동작은 유지한다. */
 export const MOBILE_CSS = `
-  /* ── 모바일 최적화(2026-10-11) ── */
-  @media (max-width: 900px) {
-    /* 에디터를 고르면 소개 카드가 목록 위, 전체 보기에서는 안내 카드를 목록 아래로 내려 레터가 먼저 보이게 한다 */
-    .lt-aside-editor { order: -1; }
-    .lt-aside-all { order: 2; margin-top: 8px; }
-    .lt-layout { gap: 12px; }
-  }
-  @media (max-width: 640px) {
-    .lt-wrap { padding-left: 16px; padding-right: 16px; }
-    .lt-hero { padding-bottom: 12px; }
-    .lt-etabs { margin-bottom: 14px; }
-    .lt-etab { width: 76px; }
-    .lt-etab-ring { width: 50px; height: 50px; }
-    .lt-toolbar, .lt-main .lt-toolbar { flex-wrap: wrap; row-gap: 8px; }
-    .lt-sec-inline { white-space: nowrap; }
-    .lt-toolbar-r { width: 100%; margin-left: 0; }
-    .lt-toolbar-r .lt-searchbox { flex: 1 1 auto; min-width: 0; }
-    .lt-row { gap: 12px; padding: 18px 0; }
-    .lt-row-title { font-size: 18px; }
-    .lt-row-meta { gap: 4px 8px; }
-    .lt-row-dim { margin-left: 0; width: 100%; }
-    .lt-eintro { padding: 18px; }
-    .lt-eintro-actions { grid-template-columns: 1fr 1fr; }
-    .lt-eintro-sub { grid-column: 1 / -1; }
-    .ld-wrap { padding-left: 16px; padding-right: 16px; }
-    .ld-title { font-size: 25px; }
-    .ld-sec-h { font-size: 22px; }
+  @media (max-width: 767px) {
+    .lt-wrap { padding: 20px 0 48px; }
+    .lt-hero { padding-bottom: 20px; }
+    .lt-h1 { font-size: 24px; }
+    .lt-sub { font-size: 14px; }
+    .lt-etabs { margin-bottom: 20px; }
+    .lt-etab { min-width: 82px; padding: 8px; }
+    .lt-etab-all { min-width: 52px; }
+    .lt-toolbar, .lt-main .lt-toolbar { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: 'search search' 'heading saved'; gap: 12px; }
+    .lt-main .lt-toolbar-r .lt-searchbox { width: 100%; }
+    .lt-layout { gap: 20px; }
+    .lt-eintro { padding-bottom: 12px; }
+    .lt-eintro-summary { margin-top: 8px; }
+    .lt-eintro-policy { margin-top: 4px; }
+    .lt-eintro-details { margin-top: 4px; }
+    .lt-row { padding: 20px 0; }
+    .lt-row-title { font-size: 20px; line-height: 1.5; }
+    .lt-row-meta { gap: 6px 10px; }
+    .lt-row-time { flex-basis: 100%; }
+    .lt-row-authors { flex: 1 1 180px; }
+    .lt-row-byline { align-items: flex-start; }
+    .lt-row .lt-row-save { flex: none; }
+    .ld-wrap { padding: 20px 0 48px; }
+    .ld-title { font-size: 24px; }
+    .ld-deck { font-size: 14px; }
+    .ld-sec { margin-top: 36px; padding-top: 24px; }
+    .ld-wrap .ld-sec-h { font-size: calc(var(--ld-font, 16.5px) * 1.45); }
     .ld-key { font-size: 16.5px; }
     .ld-src { grid-template-columns: 22px minmax(0,1fr); }
     .ld-src-ax { grid-column: 2; justify-content: flex-start; margin-top: 6px; }
-    .ld-tools { right: 10px; bottom: 10px; }
     .ld-related-item { gap: 10px; }
     .ld-link-card, .ld-term-card { width: min(300px, 78vw); }
     .lt-dlg-back { padding: 0; align-items: flex-end; }
@@ -40,6 +39,5 @@ export const MOBILE_CSS = `
     .lt-ob-rec li { flex-wrap: wrap; }
     .lt-ob-go { margin-left: auto; }
   }
-  .ld-key-l { margin-right: 4px; font-size: 0.85em; font-weight: 700; color: #2f5fcf; }
-
+  .ld-key-l { margin-right: 4px; font-size: .85em; font-weight: 700; color: #2f5fcf; }
 `;

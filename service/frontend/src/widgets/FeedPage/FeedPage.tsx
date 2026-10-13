@@ -173,7 +173,7 @@ export function FeedPage({
         }
         .tab-fade-in { animation: tabFadeIn 0.25s ease-out both; }
       `}</style>
-      <main className="flex-1">
+      <main id="main-content" tabIndex={-1} className="flex-1">
         {/* 홈(/)에는 sr-only h1로 페이지 주제 신호를 준다. 각 섹션이 h2부터 동등한 weight로 시작해 하나를 h1으로 승격하면
             시각 위계가 깨지므로, title/og:title과 같은 문구를 시각적으로 숨겨 추가한다(GEO·접근성). */}
         <h1 className="sr-only">AI LENS — 서울경제신문의 AI 경제 뉴스</h1>

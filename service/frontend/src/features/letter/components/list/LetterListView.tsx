@@ -5,7 +5,7 @@ import { editorsOfLetter, findEditor } from '../../data/editors';
 import type { IssueLetter } from '../../data/letterTypes';
 import { useFollowedEditors } from '../../lib/useFollowedEditors';
 import { useInterests } from '../../lib/useInterests';
-import { useLetterShelf } from '../../lib/useLetterShelf';
+import { LETTER_SHELF_NOTICE, useLetterShelf } from '../../lib/useLetterShelf';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AllSide } from './AllSide';
 import { EditorBar } from './EditorBar';
@@ -14,7 +14,7 @@ import { EditorTabs } from './EditorTabs';
 import { LetterRow } from './LetterRow';
 import { LETTER_CSS } from '../letterStyles';
 
-/** 레터 목록: 위에 에디터 선택줄, 아래는 왼쪽 레터 목록(메인) + 오른쪽 고정 패널(선택한 에디터의 소개 또는 모아쓰기 안내). */
+/** 제목 중심 레터 목록. 좁은 화면에서는 에디터 소개를 목록 앞에, 전체 안내를 목록 뒤에 둔다. */
 export function LetterListView({ letters, initialEditorId = null }: { letters: IssueLetter[]; initialEditorId?: string | null }) {
   const [editorId, setEditorId] = useState<string | null>(initialEditorId && findEditor(initialEditorId) ? initialEditorId : null);
   const [topic, setTopic] = useState<string | null>(null);
@@ -101,23 +101,32 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
     <div className="lt-wrap">
       <style>{LETTER_CSS}</style>
       <header className="lt-hero">
-        <div className="lt-eyebrow">AI LENS 레터</div>
-        <h1 className="lt-h1">기사 하나가 아니에요. 하나의 이슈, 여러 관점</h1>
+        <h1 className="lt-h1">소식부터 맥락까지, 한 편에.</h1>
       </header>
 
       <EditorTabs selected={editorId} onSelect={select} />
 
       <div className="lt-layout">
-        <main className="lt-main">
+        {editor && (
+          <aside className="lt-aside lt-aside-editor">
+            <EditorIntro key={editor.id} editor={editor} following={follow.isFollowing(editor.id)} onToggleFollow={() => follow.toggle(editor.id)} />
+          </aside>
+        )}
+        <main id="main-content" tabIndex={-1} className="lt-main">
           <div className="lt-toolbar">
             <h2 className="lt-sec-h lt-sec-inline">{editor ? `${editor.name}의 레터 ${shown.length}편` : `최신 레터 ${shown.length}편`}</h2>
             <div className="lt-toolbar-r">
-              {shelf.ready && shelf.saved.length > 0 && (
-                <button type="button" className="lt-savedtab" aria-pressed={onlySaved} onClick={() => setOnlySaved((v) => !v)}>저장한 레터 {shelf.saved.length}</button>
+              {shelf.ready && (
+                <button type="button" className="lt-savedtab" aria-describedby="lt-save-note" aria-pressed={onlySaved} onClick={() => setOnlySaved((v) => !v)}>저장한 레터 {shelf.saved.length}</button>
               )}
               <input className="lt-searchbox" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="제목·주제 검색" aria-label="레터 검색" />
             </div>
           </div>
+          {shelf.ready && (
+            <p id="lt-save-note" className="lt-save-note">
+              {LETTER_SHELF_NOTICE.browser} {LETTER_SHELF_NOTICE.sync}
+            </p>
+          )}
           {topic && (
             <div className="lt-activefilter">
               주제 <button type="button" className="lt-chip lt-chip-on" onClick={() => setTopic(null)} aria-label={`${topic} 주제 해제`}>{topic} ✕</button>
@@ -132,23 +141,26 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
           )}
           {shown.length > 0 ? (
             <div className="lt-rows">
-              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => shelf.toggleSaved(l.slug)} />)}
+              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => shelf.toggleSaved(l.slug)} saveNoticeId={shelf.ready ? 'lt-save-note' : undefined} />)}
             </div>
           ) : (
-            <p className="lt-empty">{editor && !filtering ? `아직 ${editor.name}의 세부 분야와 겹치는 레터가 없어요. 팔로우하거나 구독하면 나오는 대로 알려 드려요.` : filtering ? '조건에 맞는 레터가 아직 없어요.' : '레터가 아직 없어요.'}</p>
+            <div className="lt-empty" role="status">
+              <p>{onlySaved && shelf.saved.length === 0 && !q && !topic && !onlyMine ? '저장한 레터가 아직 없어요.' : editor && !filtering ? `아직 ${editor.name}의 세부 분야와 겹치는 레터가 없어요.` : filtering ? '조건에 맞는 레터가 없어요.' : '레터가 아직 없어요.'}</p>
+              {editor && !filtering && <p className="lt-empty-help">에디터를 팔로우하거나 메일로 구독하면 새 레터를 확인할 수 있어요.</p>}
+              <div className="lt-empty-actions">
+                {filtering && <button type="button" className="lt-eintro-btn" onClick={() => { setQuery(''); setTopic(null); setOnlyMine(false); setOnlySaved(false); }}>조건 지우기</button>}
+                {(editor || filtering) && <button type="button" className="lt-eintro-btn" onClick={() => { setQuery(''); setTopic(null); setOnlySaved(false); select(null); }}>전체 레터 보기</button>}
+              </div>
+            </div>
           )}
         </main>
 
-        <aside className={`lt-aside${editor ? ' lt-aside-editor' : ' lt-aside-all'}`}>
-          {editor ? (
-            <EditorIntro key={editor.id} editor={editor} following={follow.isFollowing(editor.id)} onToggleFollow={() => follow.toggle(editor.id)} />
-          ) : (
-            <>
-              <AllSide />
-              {follow.ready && <EditorBar followed={follow.followed} onlyMine={onlyMine} onToggleOnlyMine={() => setOnlyMine((v) => !v)} matchCount={matchCount} onSelect={select} />}
-            </>
-          )}
-        </aside>
+        {!editor && (
+          <aside className="lt-aside lt-aside-all">
+            <AllSide />
+            {follow.ready && <EditorBar followed={follow.followed} onlyMine={onlyMine} onToggleOnlyMine={() => setOnlyMine((v) => !v)} matchCount={matchCount} onSelect={select} />}
+          </aside>
+        )}
       </div>
     </div>
   );

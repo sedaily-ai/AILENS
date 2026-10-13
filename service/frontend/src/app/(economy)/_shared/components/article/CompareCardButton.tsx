@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { Check, Download, Layers, Link as LinkIcon, Share2, X } from 'lucide-react';
 import { SITE_URL } from '@/shared/constants/site';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
@@ -148,6 +149,7 @@ function CompareCardDialog({ articleId, title, date, onClose }: { articleId: str
           </div>
         </div>
         <div style={{ padding: '14px 16px 16px' }}>
+          <Link href={`/card/${enc}#compare-readable-title`} prefetch={false} onClick={onClose} style={{ ...action, minHeight: 44, width: '100%', marginBottom: 12 }}>편한 글자 크기로 읽기</Link>
           <div className="flex flex-wrap" style={{ gap: 8 }}>
             <a href={imageUrl} download={fileName} style={{ ...action, background: ACCENT, borderColor: ACCENT, color: '#fff' }} onClick={() => trackEvent('compare_card_download', { article_id: articleId })}>
               <Download size={16} aria-hidden />

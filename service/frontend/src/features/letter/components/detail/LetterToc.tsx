@@ -19,7 +19,7 @@ export function LetterToc({ sections }: { sections: LetterSection[] }) {
     return () => io.disconnect();
   }, [sections]);
   return (
-    <nav className="ld-toc" aria-label="목차">
+    <aside className="ld-toc-rail"><nav className="ld-toc" aria-label="목차">
       <ol>
         {sections.map((s, i) => (
           <li key={i} className={i === active ? 'on' : ''}>
@@ -29,6 +29,6 @@ export function LetterToc({ sections }: { sections: LetterSection[] }) {
           </li>
         ))}
       </ol>
-    </nav>
+    </nav></aside>
   );
 }

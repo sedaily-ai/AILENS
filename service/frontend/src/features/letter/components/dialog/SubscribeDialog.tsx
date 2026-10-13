@@ -9,6 +9,21 @@ import { EditorAvatar } from '../EditorAvatar';
 
 const EMAIL_OK = /^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]{2,}$/;
 
+function trapDialogTab(e: React.KeyboardEvent<HTMLDialogElement>) {
+  if (e.key !== 'Tab') return;
+  const dialog = e.currentTarget;
+  const controls = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'))
+    .filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden');
+  const first = controls[0];
+  const last = controls.at(-1);
+  const active = document.activeElement;
+  if (!first) { e.preventDefault(); dialog.focus(); return; }
+  if (active === dialog || !dialog.contains(active) || (e.shiftKey ? active === first : active === last)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first)?.focus();
+  }
+}
+
 /**
  * 메일 구독 대화상자. 행동 정의: docs/product/모아쓰기레터/구독_UX_행동정의.md
  * 입력은 이메일 하나가 핵심이고(주기·시각은 기본값이 있어 건드리지 않아도 됨), 동의는 미리 체크하지 않으며, 신청 뒤에는 "메일 확인"까지 안내한다.
@@ -30,17 +45,37 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const previewBackRef = useRef<HTMLButtonElement | null>(null);
+  const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const wasPreviewOpen = useRef(false);
+  const previewFrameCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => { previewFrameCleanup.current?.(); previewFrameCleanup.current = null; }, [previewOpen]);
 
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!open) return;
-    trackEvent('letter_sub_open', { source });
-    const prev = document.body.style.overflow;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const opener = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
+    dialog.showModal();
     inputRef.current?.focus();
-    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
-  }, [open, onClose, source]);
+    trackEvent('letter_sub_open', { source });
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [open, source]);
+
+  // 원래 버튼을 기록한 뒤 미리보기 전환 때만 포커스를 옮긴다.
+  useEffect(() => {
+    if (!open) return;
+    if (previewOpen) previewBackRef.current?.focus({ preventScroll: true });
+    else if (wasPreviewOpen.current) previewTriggerRef.current?.focus({ preventScroll: true });
+    wasPreviewOpen.current = previewOpen;
+  }, [open, previewOpen]);
 
   if (!open) return null;
   const valid = EMAIL_OK.test(email.trim());
@@ -55,6 +90,20 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
     setPreviewBusy(true);
     setPreview(await fetchMailPreview());
     setPreviewBusy(false);
+  };
+
+  // 스크립트는 허용하지 않고 같은 출처 문서의 키보드 이벤트만 연결한다.
+  const onPreviewLoad = (event: React.SyntheticEvent<HTMLIFrameElement>) => {
+    previewFrameCleanup.current?.();
+    const doc = event.currentTarget.contentDocument;
+    if (!doc) return;
+    const onKeyDown = (key: KeyboardEvent) => {
+      if (key.key !== 'Tab') return;
+      key.preventDefault();
+      (key.shiftKey ? previewBackRef.current : dialogRef.current?.querySelector<HTMLButtonElement>('.lt-dlg-x'))?.focus();
+    };
+    doc.addEventListener('keydown', onKeyDown);
+    previewFrameCleanup.current = () => doc.removeEventListener('keydown', onKeyDown);
   };
 
   // 신청 전에 메일이 실제로 오는지 보는 테스트 한 통. 구독과 별개이고 이후 메일은 가지 않는다.
@@ -84,8 +133,8 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
   };
 
   return (
-    <div className="lt-dlg-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="lt-dlg" role="dialog" aria-modal="true" aria-labelledby="lt-dlg-title">
+    <dialog ref={dialogRef} tabIndex={-1} onKeyDown={trapDialogTab} className="lt-dlg-back" aria-modal="true" aria-labelledby="lt-dlg-title" style={{ width: '100%', height: '100%', maxWidth: 'none', maxHeight: 'none', margin: 0, border: 0, color: 'inherit' }} onCancel={(e) => { e.preventDefault(); onClose(); }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={`lt-dlg${previewOpen && !sentTo ? ' lt-dlg-preview' : ''}`}>
         <button type="button" className="lt-dlg-x" onClick={onClose} aria-label="닫기">×</button>
         {sentTo ? (
           <div className="lt-dlg-done">
@@ -139,6 +188,18 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
               </div>
             )}
           </div>
+        ) : previewOpen ? (
+          <section className="lt-mail-preview">
+            <button ref={previewBackRef} type="button" className="lt-mail-back" onClick={() => setPreviewOpen(false)}>← 메일 신청으로 돌아가기</button>
+            <h2 id="lt-dlg-title" className="lt-dlg-h">메일 미리보기</h2>
+            <p className="lt-mail-caption">가장 최근 레터의 실제 메일 본문이에요. 메일 앱에 따라 글꼴과 간격이 조금 달라질 수 있어요.</p>
+            {previewBusy ? <p className="lt-dlg-prevmsg" role="status">불러오는 중…</p> : preview ? (
+              <div className="lt-dlg-prev">
+                <p className="lt-dlg-prevsub"><span>메일 제목</span>{preview.subject}</p>
+                <iframe title="메일 미리보기 본문" className="lt-dlg-frame" sandbox="allow-same-origin" onLoad={onPreviewLoad} srcDoc={preview.html} />
+              </div>
+            ) : <p className="lt-dlg-prevmsg" role="status">지금은 미리보기를 불러오지 못했어요. 메일 신청 화면으로 돌아가 다시 열어주세요.</p>}
+          </section>
         ) : (
           <form onSubmit={submit} noValidate>
             {editors.length > 0 && (
@@ -160,21 +221,9 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
                 aria-invalid={showEmailError} aria-describedby={showEmailError ? 'lt-dlg-email-err' : undefined}
                 onChange={(e) => setEmail(e.target.value)} onBlur={() => setTouched(true)} />
             </label>
-            {showEmailError && <p id="lt-dlg-email-err" className="lt-dlg-err" role="alert">이메일 주소 형식을 확인해 주세요</p>}
+            <div style={{ minHeight: 28 }}>{showEmailError && <p id="lt-dlg-email-err" className="lt-dlg-err" role="alert">이메일 주소 형식을 확인해 주세요</p>}</div>
 
-            <button type="button" className="lt-dlg-prevbtn" aria-expanded={previewOpen} onClick={togglePreview}>
-              {previewOpen ? '미리보기 닫기' : '이렇게 와요 · 메일 미리보기'}
-            </button>
-            {previewOpen && (
-              <div className="lt-dlg-prev">
-                {previewBusy ? <p className="lt-dlg-prevmsg">불러오는 중…</p> : preview ? (
-                  <>
-                    <p className="lt-dlg-prevsub">{preview.subject}</p>
-                    <iframe title="메일 미리보기" className="lt-dlg-frame" sandbox="" srcDoc={preview.html} />
-                  </>
-                ) : <p className="lt-dlg-prevmsg">지금은 미리보기를 불러오지 못했어요.</p>}
-              </div>
-            )}
+            <button ref={previewTriggerRef} type="button" className="lt-dlg-prevbtn" aria-expanded={false} onClick={togglePreview}>이렇게 와요 · 메일 미리보기</button>
 
             <div className="lt-dlg-test">
               <button type="button" className="lt-dlg-testbtn" onClick={sendTest} disabled={testState === 'busy' || !valid}>
@@ -197,14 +246,13 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
                 <Link href="/privacy" target="_blank">개인정보처리방침</Link>에서 볼 수 있어요.
               </p>
             )}
-            {touched && !consent && valid && <p className="lt-dlg-err" role="alert">수신 동의에 체크해 주세요</p>}
             {error && <p className="lt-dlg-err" role="alert">{error}</p>}
 
             <button type="submit" className="lt-dlg-primary" disabled={busy || !valid || !consent}>{busy ? '신청하는 중…' : '구독 신청하기'}</button>
-            <p className="lt-dlg-foot">신청하면 확인 메일이 가요. 메일의 버튼을 눌러야 구독이 시작되고, 이후 새 레터가 올라오면 바로 보내 드려요.</p>
+            <p className="lt-dlg-foot">신청하면 확인 메일이 가요. 메일의 버튼을 눌러야 구독이 시작되고,<br />이후 새 레터가 올라오면 바로 보내 드려요.</p>
           </form>
         )}
       </div>
-    </div>
+    </dialog>
   );
 }

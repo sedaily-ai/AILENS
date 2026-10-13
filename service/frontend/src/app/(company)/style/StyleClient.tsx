@@ -59,6 +59,9 @@ export default function StyleClient() {
               fontFamily: '"Noto Serif KR", serif',
               fontSize: 'clamp(26px, 5.5vw, 36px)',
               letterSpacing: '-0.02em',
+              wordBreak: 'keep-all',
+              overflowWrap: 'anywhere',
+              textWrap: 'balance',
               marginBottom: 10,
             }}
           >
@@ -113,6 +116,9 @@ export default function StyleClient() {
                       fontSize: p.size === 'tall' ? 19 : 17,
                       fontWeight: 700,
                       lineHeight: 1.35,
+                      wordBreak: 'keep-all',
+                      overflowWrap: 'anywhere',
+                      textWrap: 'balance',
                       letterSpacing: '-0.01em',
                       marginBottom: 8,
                     }}

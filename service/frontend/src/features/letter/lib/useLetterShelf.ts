@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+// 계정 동기화는 미구현. 활성화 조건: docs/product/모아쓰기레터/북마크_동기화_연동요구사항.md
+export const LETTER_SHELF_NOTICE = {
+  browser: '이 브라우저에 저장돼요.',
+  sync: '로그인 후 기기 간 동기화는 준비 중이에요.',
+} as const;
+
 const SAVED_KEY = 'lens-letter-saved';
 const READ_KEY = 'lens-letter-read';
 
