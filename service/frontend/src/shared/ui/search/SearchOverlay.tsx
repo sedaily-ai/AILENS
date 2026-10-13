@@ -4,9 +4,9 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
-import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { ECON_CATEGORIES } from '@ailens/domain';
+import { econSubcategoriesFor } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
 import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from '@/shared/lib/search/recentSearches';
 import { DEFAULT_PARAMS, loadSearchIndex, parseTerms, search, splitHighlight, topKeywords, type SearchRecord } from '@/shared/lib/search/searchIndex';
 

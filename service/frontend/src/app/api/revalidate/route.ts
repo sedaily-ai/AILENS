@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
 import { clearLensListMemo, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 import { pingIndexNow } from '@/shared/lib/seo/indexNow';
 
 // admin이 글을 발행/수정/삭제하면 이 webhook을 호출한다.

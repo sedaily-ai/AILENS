@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { categoryForDataLabel, categoryMatches, displayCategoryLabel, ECON_CATEGORIES } from './econCategories';
 import { econSubcategoriesFor } from './econSubcategories';
-import { lensCategorySlug } from '../lib/content/lensUrl';
+import { lensCategorySlug } from '../content/lensUrl.js';
 
 // 분류 개편(2026-10-09): 대분류 9개, 글에는 옛 이름('증시', '금융·정책')이 남아 있을 수 있다.
 describe('ECON_CATEGORIES', () => {

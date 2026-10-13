@@ -2,7 +2,7 @@
 
 import { WebtoonSketch } from '@/shared/ui/icons/VideoSketch';
 import { useState, type MouseEvent } from 'react';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import Link from 'next/link';
 import Image from 'next/image';
 import { WebtoonWindIllustration } from '@/shared/ui/icons/HandDrawnIcons';

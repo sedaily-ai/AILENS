@@ -3,7 +3,7 @@
  * 새 탭 추가/순서 변경 시 이 파일 한 곳만 수정.
  */
 
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { ECON_CATEGORIES } from '@ailens/domain';
 
 export type HeaderTabKey =
   | 'markets'

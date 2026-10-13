@@ -1,0 +1,27 @@
+{
+  "name": "@ailens/domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI LENS 공유 도메인 타입·순수 로직 (플랫폼 비의존, 웹·앱 공용). 소비자는 빌드 산출물(dist)만 본다 — 소스 TS를 번들러로 끌어오지 않는다.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

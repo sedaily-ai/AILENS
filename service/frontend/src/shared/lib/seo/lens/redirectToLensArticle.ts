@@ -1,5 +1,5 @@
 import { notFound, permanentRedirect } from 'next/navigation';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 import { findLensForChannelSlug } from '@/shared/lib/seo/lens/lensCanonical';
 
 /**

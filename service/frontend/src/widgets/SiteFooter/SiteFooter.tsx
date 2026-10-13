@@ -1,6 +1,6 @@
 // 전역 푸터. SEO/E-E-A-T 신호 + 발행처 + 소셜.
 // 모든 페이지 하단에 마운트(app/layout.tsx)되며 클라이언트 인터랙션이 없어 서버 컴포넌트다.
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { ECON_CATEGORIES } from '@ailens/domain';
 // JSON-LD(구조화 데이터)에만 있던 발행처 관계·사업자정보를 화면에 보이는 텍스트로도 노출해야 E-E-A-T 신호가 실제로 작동한다.
 
 // 아이콘은 모두 같은 톤(currentColor 라인아트, rounded-square 컨테이너)으로 통일하며 브랜드 원색은 쓰지 않는다.

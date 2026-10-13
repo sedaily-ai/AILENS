@@ -1,7 +1,7 @@
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { SITE_URL } from '@/shared/constants/site';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
 
 // "지난 지면" 페이지(/paper/[date]) 공용 — 날짜 표기·메타·JSON-LD.

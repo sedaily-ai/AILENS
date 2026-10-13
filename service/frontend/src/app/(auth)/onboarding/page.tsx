@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { buildCompareCard } from '@/shared/lib/content/compareCard';
 import { fetchLensBySlug, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 import { pickTopArticle } from '@/shared/lib/content/topArticle';
 import { OnboardingClient, type OnboardingGlance } from './OnboardingClient';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import type { ArchivedSentence } from '@/shared/types/mbti';
+import type { ArchivedSentence } from '@ailens/domain';
 import { searchArticlesByKeywords, type KeywordArticle } from '@/shared/lib/api/archiveApi';
 
 // ── 관심사 기반 추천 ──

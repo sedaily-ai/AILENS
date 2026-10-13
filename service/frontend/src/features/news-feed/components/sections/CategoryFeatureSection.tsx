@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import Image from 'next/image';
 import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
-import type { EconCategoryConfig } from '@/shared/constants/econCategories';
+import type { EconCategoryConfig } from '@ailens/domain';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 
 // 카테고리 섹션 — 왼쪽 큰 히어로(이미지+헤드라인+요약) + 오른쪽(또는 아래) 작은 리스트를 2/3+1/3 비율로 짝지어 한 줄에 배치하는 신문 지면 구성이다.

@@ -1,8 +1,8 @@
 import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchIssueLetterCards, issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
-import { displayCategoryLabel } from '@/shared/constants/econCategories';
-import { lensPath } from '@/shared/lib/content/lensUrl';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayCategoryLabel } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
+import { seoHeadline } from '@ailens/domain';
 import { SITE_URL } from '@/shared/constants/site';
 
 // llms-full.txt(GEO) — /llms.txt가 "사이트 안내서"라면 이 파일은 AI가 한 번에 읽어 갈 "최근 기사 요약본"이다.

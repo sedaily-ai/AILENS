@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -9,7 +9,7 @@ import { BookOpen, ChevronLeft, ChevronRight, Headphones, Image as ImageIcon, Vi
 import { fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { LENS_ACCENT, pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 import dynamic from 'next/dynamic';
 import { useServerSeededList } from '@/shared/hooks/useServerSeededList';
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import type { EconCategoryConfig } from '@/shared/constants/econCategories';
+import type { EconCategoryConfig } from '@ailens/domain';
 import type { ArchiveItem } from '@/shared/lib/content/archiveItems';
 
 // 카테고리 아카이브 페이지(/markets 등)는 구조가 같고 설정값만 달라 metadata/JSON-LD 빌더를 여기 하나로 공유한다.

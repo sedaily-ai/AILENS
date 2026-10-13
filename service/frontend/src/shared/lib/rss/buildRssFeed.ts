@@ -1,10 +1,10 @@
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchIssueLetterCards, issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
-import { letterHref } from '@/shared/lib/content/letterHref';
-import { lensPath } from '@/shared/lib/content/lensUrl';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { letterHref } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
+import { seoHeadline } from '@ailens/domain';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { categoryMatches, displayCategoryLabel, type EconCategoryConfig } from '@/shared/constants/econCategories';
+import { categoryMatches, displayCategoryLabel, type EconCategoryConfig } from '@ailens/domain';
 import { SITE_URL as BASE } from '@/shared/constants/site';
 
 // AI LENS RSS 2.0 피드. 전체 피드(/rss.xml)와 카테고리별 피드(/{slug}/rss.xml)가 이 빌더 하나를 공유한다.

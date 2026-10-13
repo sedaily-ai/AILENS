@@ -1,12 +1,12 @@
 import Image from 'next/image';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import Link from 'next/link';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
-import { categoryForDataLabel, displayCategoryLabel } from '@/shared/constants/econCategories';
+import { lensCategorySlug, lensPath } from '@ailens/domain';
+import { categoryForDataLabel, displayCategoryLabel } from '@ailens/domain';
 
 // 기사 하단 구획 — 영문 사이트(en.sedaily.com) 상세의 "More in 카테고리 / Related articles / Most read" 구조를 따라 본문 폭 안에서 더 읽을거리를 제공한다.
 // 서버 컴포넌트라 JS 없이 초기 HTML에 링크가 들어가 크롤러·내부 링크 구조에 도움이 된다.

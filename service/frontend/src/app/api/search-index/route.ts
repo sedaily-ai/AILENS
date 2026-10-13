@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { fetchAllLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import { pickLensPhoto } from '@/shared/constants/lensPerspectives';
-import { displayCategoryLabel } from '@/shared/constants/econCategories';
+import { displayCategoryLabel } from '@ailens/domain';
 import type { SearchRecord } from '@/shared/lib/search/searchIndex';
 
 // 일반 검색용 가벼운 목록 — 제목·요약·분류·날짜·썸네일만 담는다(기사 본문 제외, shared/lib/search/searchIndex.ts 참조).

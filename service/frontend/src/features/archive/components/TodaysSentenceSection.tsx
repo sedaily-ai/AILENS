@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { fetchTodayLetters, toTodayLetterCard, type TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
-import { letterHref } from '@/shared/lib/content/letterHref';
+import { letterHref } from '@ailens/domain';
 
 // ── 오늘의 한 문장 ──
 // "볼거리"가 실사용자의 archive 축적에 의존하지 않도록 항상 채워지는 층이다. 오늘 발행된 실제 레터의 closing_line(없으면 요약 문장)을 날짜 기준으로 결정적으로 하나 골라 보여 준다. 조작 없이 보여 주기만 한다.

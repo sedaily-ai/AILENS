@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { castPostVote, fetchPostVote, type PostVoteState } from '@/shared/lib/api/postVoteApi';
 import { getVoterId } from '@/shared/lib/device/voterId';
-import { applyChoice } from '@/shared/lib/poll/optimisticVote';
+import { applyChoice } from '@ailens/domain';
 import { PollOptions } from '@/shared/ui/form/PollOptions';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 

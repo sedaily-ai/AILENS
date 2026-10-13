@@ -1,7 +1,7 @@
 import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
-import { displayCategoryLabel } from '@/shared/constants/econCategories';
-import { lensPath } from '@/shared/lib/content/lensUrl';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayCategoryLabel } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
+import { seoHeadline } from '@ailens/domain';
 import { kstTodayStr } from '@/shared/lib/date/date';
 
 // Google News sitemap(news:news 확장, https://www.google.com/schemas/sitemap-news/0.9).

@@ -13,7 +13,7 @@ import { NewsTimeMachineSection } from "./sections/NewsTimeMachineSection";
 import { LatestGridSection } from "./sections/LatestGridSection";
 import { CategoryFeatureSection } from "./sections/CategoryFeatureSection";
 import type { ReactNode } from "react";
-import { categoryMatches, ECON_CATEGORIES } from "@/shared/constants/econCategories";
+import { categoryMatches, ECON_CATEGORIES } from "@ailens/domain";
 
 // 카테고리를 2개씩 짝지어 한 줄(2/3+1/3)로 배치한다. 순서는 ECON_CATEGORIES 정의 순서를 따른다.
 // 짝이 없는 카테고리(문화)는 마지막에 단독(1개짜리) 행으로 둔다. CategoryPairRow는 slugs 1~2개를 모두 받는다.
