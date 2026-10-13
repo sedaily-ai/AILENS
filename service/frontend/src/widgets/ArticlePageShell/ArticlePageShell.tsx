@@ -26,7 +26,7 @@ export function ArticlePageShell({ sidebar, afterContent, activeTab, children }:
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs(activeTab)} />
+      <Header searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)} tabs={buildHeaderTabs(activeTab)} />
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <div className="mx-auto" style={{ maxWidth: 1320, padding: 'clamp(8px, 2vw, 16px) clamp(24px, 3.5vw, 44px) 0' }}>

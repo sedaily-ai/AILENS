@@ -124,8 +124,8 @@ export function WebtoonCutGallery({
       style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(56px, 12vw, 140px)', borderRadius: 18, overflow: 'hidden', background: '#fff', boxShadow: WEBTOON_SHADOW }}
     >
       <style>{`
-        /* 이미지에 집중(2026-10-01) — 웹툰은 본문 칼럼 폭을 벗어나 화면 가운데에서 넓게 보여 준다(최대 920px). */
-        .lm.wcut { max-width: none; width: min(calc(100vw - 32px), 920px); margin-left: 50%; transform: translateX(-50%); }
+        /* 본문 칼럼 안에서 컷을 읽으며 이미지 자체 비율은 유지한다. */
+        .lm.wcut { width: 100%; max-width: 100%; margin-inline: auto; }
         .wcut figure { transition: opacity .5s ease, transform .5s ease; }
         .wcut figure[data-pre] { opacity: 0; transform: translateY(14px); }
       `}</style>
@@ -138,7 +138,7 @@ export function WebtoonCutGallery({
               alt={cut.caption || `${ci + 1}번째 컷`}
               width={1824}
               height={1752}
-              sizes="(min-width: 952px) 920px, calc(100vw - 32px)"
+              sizes="(min-width: 720px) 664px, calc(100vw - 40px)"
               quality={85}
               // 앞 두 컷만 일찍·우선(보이는 중이면 high, 숨겨진 탭이면 한가할 때 low로 미리), 나머지는 low로 뒤에서 받는다.
               loading={ci < 2 && warm ? 'eager' : 'lazy'}

@@ -159,7 +159,7 @@ export function FeedPage({
           홈 화면에는 활성 탭이 없어 active 인자도 필요 없다. */}
       <Header
         onLogo={() => setActiveTab("feed")}
-        onSearch={() => setShowSearch(true)}
+        searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)}
         tabs={buildHeaderTabs()}
       />
 

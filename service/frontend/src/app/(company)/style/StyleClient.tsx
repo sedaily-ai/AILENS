@@ -33,7 +33,7 @@ export default function StyleClient() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
+      <Header searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)} tabs={buildHeaderTabs()} frosted />
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(32px, 6vw, 56px) clamp(20px, 5vw, 32px) 90px' }}>

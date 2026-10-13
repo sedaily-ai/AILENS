@@ -27,7 +27,7 @@ export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
   return (
     <div className="min-h-screen" style={{ background: '#fdfcfa' }}>
       {/* 'feed' 탭은 상단 nav에 없다(headerTabs.ts 참조). 이 페이지에는 강조할 대응 탭이 없다. */}
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
+      <Header searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)} tabs={buildHeaderTabs()} frosted />
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* /letters 아카이브와 같은 헤더 톤. 그라데이션 배경·그림자 아이콘박스 없이 회색 대문자 eyebrow + 서리프 타이틀만 둔다. */}

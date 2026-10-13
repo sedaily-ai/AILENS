@@ -32,7 +32,7 @@ export function OnboardingClient({ glance }: { glance: OnboardingGlance | null }
   return (
     <div className="ob-page">
       <style>{ONBOARDING_CSS}</style>
-      <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
+      <Header searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)} tabs={buildHeaderTabs()} frosted />
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
       <main id="main-content" className="ob-main">
         <HeroSection />

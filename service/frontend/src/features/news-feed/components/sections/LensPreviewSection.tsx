@@ -52,7 +52,8 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
   const router = useRouter();
   useEffect(() => {
     try {
-      setGuideSeen(!!window.localStorage.getItem(GUIDE_SEEN_KEY));
+      const seen = !!window.localStorage.getItem(GUIDE_SEEN_KEY);
+      void Promise.resolve().then(() => setGuideSeen(seen));
     } catch {
       // 저장소 접근 불가 — 반짝임 없이 둔다.
     }
@@ -325,7 +326,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
         .lz-step { border: none; cursor: pointer; padding: 0; }
         .lz-step:hover:not(:disabled) { background: #e2e8f0; color: #374151; }
         .lz-step:disabled { opacity: .4; cursor: default; }
-        .lz-tabs { position: relative; display: flex; }
+        .lz-tabs { position: relative; display: flex; width: max-content; max-width: 100%; }
         /* 탭·날짜 전환: 가벼운 슬라이드 + 페이드 */
         .lz-turn { animation: lz-fade .16s ease-out both; }
         @keyframes lz-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -334,7 +335,14 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
         .lz-mast-l { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
         .lz-mast-brand { font-family: 'Noto Serif KR', serif; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; color: #8a8576; position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; }
         @media (max-width: 900px) { .lz-mast-brand { display: none; } }
-        .lz-tab { position: relative; font-family: inherit; }
+        .lz-tab { position: relative; flex: 1 1 auto; min-width: 0; font-family: inherit; }
+        .lz-tab-label { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 2px 4px; line-height: 1.35; }
+        .lz-tab-label span { white-space: nowrap; }
+        @media (max-width: 480px) {
+          .lz-tabs { width: 100%; }
+          .lz-tab { flex: 1 1 0; padding: 8px 6px !important; }
+          .lz-tab-label { flex-direction: column; flex-wrap: nowrap; }
+        }
         .lz-tab:not(.is-active):hover { color: #111827; }
         .lz-tab:active { transform: scale(.97); }
         .lz-tab:focus-visible { outline: 2px solid ${LENS_ACCENT}; outline-offset: -3px; border-radius: 8px; }
@@ -587,7 +595,10 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
                   transition: 'background .2s ease, box-shadow .2s ease, color .2s ease',
                 }}
               >
-                {s.label}
+                <span className="lz-tab-label">
+                  <span>{s.label.slice(0, s.label.lastIndexOf(' '))}</span>{' '}
+                  <span>1면</span>
+                </span>
               </button>
             );
           })}

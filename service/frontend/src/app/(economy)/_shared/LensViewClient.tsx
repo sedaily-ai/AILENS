@@ -148,7 +148,7 @@ export function LensViewClient({
               url={`${SITE_URL}${lensPath(lens)}`}
               cssVar="--lens-font-scale"
               storageKey="lens-font-size"
-              onListen={podcastIdx >= 0 ? () => select(podcastIdx) : undefined}
+              onListen={podcastIdx >= 0 ? () => select(podcastIdx, 'panel') : undefined}
             />
           </nav>
         </div>

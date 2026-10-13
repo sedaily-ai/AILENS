@@ -52,7 +52,7 @@ export function MomentResult({
   const noop = useCallback(() => {}, []);
 
   // 아래 이전/다음 형식 버튼 — 기사 페이지 FormatStepNav와 같은 순서(레터·웹툰·팟캐스트·영상)·문구를 쓴다. 바꾼 뒤 맨 위로 올라가 새 형식을 처음부터 보게 한다.
-  const HOOK = ['글로 차분히 다시 읽기', '만화로 가볍게 훑어보기', '귀로 듣고 핵심만 챙기기', '15초 영상으로 한눈에 보기'];
+  const HOOK = ['차분히 읽기', '가볍게 훑기', '핵심 듣기', '한눈에 보기'];
   const goFormat = (to: number, direction: 'prev' | 'next') => {
     trackEvent('format_step_click', { article_id: lens?.id, from_format: LENS_FORMATS[formatIndex], to_format: LENS_FORMATS[to], direction, source: 'onboarding' });
     onChangeFormat(to);
@@ -90,8 +90,10 @@ export function MomentResult({
         {/* 기사 페이지의 FormatStepNav는 위쪽 형식 탭을 DOM으로 눌러 전환하는데 온보딩에는 그 탭이 없어 동작하지 않는다. 패널 안의 것은 숨기고 아래에 같은 모양의 이전/다음 버튼을 따로 둔다. */}
         <style>{`
           .mm-panel nav[aria-label="다른 형식으로 이어 보기"] { display: none; }
-          .mm-fstep { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 14px 18px; border: 0; border-radius: 16px; background: #f2f3f5; color: #111827; cursor: pointer; transition: background .15s ease, transform .15s ease; font: inherit; }
-          .mm-fstep:hover { background: #e9ebef; }
+          .mm-fstep { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 14px 18px; border: 1px solid #dbe4f4; border-radius: 12px; background: #fff; color: #111827; cursor: pointer; transition: background .15s ease, transform .15s ease; font: inherit; }
+          .mm-fstep-dir { font-size: 12px; font-weight: 700; color: #6b7280; white-space: nowrap; }
+          @media (max-width: 480px) { .mm-fstep { padding: 14px 12px; } }
+          .mm-fstep:hover { background: #f5f8ff; border-color: #5b8def; }
           .mm-fstep:active { transform: scale(.985); }
           .mm-fstep:focus-visible { outline: 2px solid #5b8def; outline-offset: 2px; }
         `}</style>
@@ -114,7 +116,7 @@ export function MomentResult({
           <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
             {formatIndex > 0 ? (
               <button type="button" className="mm-fstep" style={{ alignItems: 'flex-start', textAlign: 'left' }} onClick={() => goFormat(formatIndex - 1, 'prev')} aria-label={`이전 형식, ${lensPerspectiveAt(formatIndex - 1).short}`}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#6b7280' }}>← {HOOK[formatIndex - 1]}</span>
+                <span className="mm-fstep-dir">← {HOOK[formatIndex - 1]}</span>
                 <span style={{ fontSize: 16, fontWeight: 800 }}>{lensPerspectiveAt(formatIndex - 1).short}</span>
               </button>
             ) : (
@@ -122,7 +124,7 @@ export function MomentResult({
             )}
             {formatIndex < LENS_FORMATS.length - 1 ? (
               <button type="button" className="mm-fstep" style={{ alignItems: 'flex-end', textAlign: 'right' }} onClick={() => goFormat(formatIndex + 1, 'next')} aria-label={`다음 형식, ${lensPerspectiveAt(formatIndex + 1).short}`}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#6b7280' }}>{HOOK[formatIndex + 1]} →</span>
+                <span className="mm-fstep-dir">{HOOK[formatIndex + 1]} →</span>
                 <span style={{ fontSize: 16, fontWeight: 800 }}>{lensPerspectiveAt(formatIndex + 1).short}</span>
               </button>
             ) : (

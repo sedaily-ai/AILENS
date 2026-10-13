@@ -19,6 +19,20 @@ export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | un
   // 형식 설명(.fmt-toast) 표시 여부. 탭을 고르면 표시되고 다른 탭을 고르기 전까지 유지되어 레이아웃이 저절로 움직이지 않는다.
   const [showDesc, setShowDesc] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [scrollRequest, setScrollRequest] = useState<{ index: number; target: 'description' | 'panel' } | null>(null);
+
+  // 탭과 설명이 DOM에 반영된 뒤 이동한다. 같은 탭의 듣기를 다시 눌러도 새 요청으로 처리한다.
+  useEffect(() => {
+    if (!scrollRequest) return;
+    const raf = requestAnimationFrame(() => {
+      const panel = document.getElementById(lensPanelId(scrollRequest.index));
+      const el = scrollRequest.target === 'panel' ? panel : document.getElementById('lens-desc') ?? panel;
+      if (!el || panel?.hidden) return;
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [scrollRequest]);
   const noteDur = useCallback((i: number, raw: number) => {
     if (!Number.isFinite(raw) || raw <= 0) return;
     const sec = Math.round(raw);
@@ -50,7 +64,7 @@ export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | un
 
   // KPI 계측(포맷 전환율)과 방향성 전환·형식 설명 토스트. setActive를 함수형 업데이트로 호출해 deps 없이 직전 active를 읽는다.
   // select는 useCallback([])로 유지해야 tabRefs 등의 참조가 깨지지 않는다.
-  const select = useCallback((i: number) => {
+  const select = useCallback((i: number, scrollTarget: 'description' | 'panel' = 'description') => {
     setActive((prev) => {
       if (prev !== i && lens) {
         trackEvent('format_switch', {
@@ -68,15 +82,7 @@ export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | un
     const url = new URL(window.location.href);
     url.searchParams.set('v', String(i + 1));
     window.history.replaceState(null, '', url);
-    // ⚠️ rAF 안에서 스크롤한다. setActive() 직후 같은 tick에 scrollIntoView를 부르면 대상 패널이 아직 hidden이라 스크롤되지 않는다.
-    // 목적지는 패널(lens-N)이 아니라 형식 설명(#lens-desc)이다. 패널 상단까지만 당기면 탭 아래 설명 문구가 화면 밖에 남을 수 있다.
-    // block:'nearest'는 이미 보이면 움직이지 않고 밖에 있을 때만 최소한으로 당긴다.
-    requestAnimationFrame(() => {
-      const el = document.getElementById('lens-desc') ?? document.getElementById(lensPanelId(i));
-      if (!el) return;
-      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
-    });
+    setScrollRequest({ index: i, target: scrollTarget });
   }, [lens]);
 
   // 좌우 스와이프는 이전/다음 기사 이동(ArticleNeighborNav)이 쓴다. 형식 전환은 상단 탭과 패널 하단 버튼(FormatStepNav)이 맡는다.
