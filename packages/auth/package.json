@@ -2,11 +2,23 @@
   "name": "@ailens/auth",
   "version": "0.0.0",
   "private": true,
-  "description": "AI LENS 공유 인증 (Cognito idToken Bearer 계약). 토큰 저장소는 주입(웹=Amplify 기본, 앱=expo-secure-store). M0-b에서 shared/lib/auth 를 승격한다.",
+  "description": "AI LENS 공유 인증 (Cognito idToken Bearer 계약). authFetch 로직 공유, idToken 공급은 AuthProvider 주입(웹=Amplify, 앱=Amplify RN/expo-secure-store).",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5"
   }
 }
