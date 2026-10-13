@@ -69,6 +69,9 @@ export function ArticleGridCard({ item }: { item: ArchiveItem }) {
           fontSize: 15,
           lineHeight: 1.4,
           letterSpacing: '-0.01em',
+          wordBreak: 'keep-all',
+          overflowWrap: 'anywhere',
+          textWrap: 'pretty',
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -111,6 +114,9 @@ export function ArticleHeroCard({ item }: { item: ArchiveItem }) {
             fontSize: 'clamp(20px, 3.4vw, 26px)',
             lineHeight: 1.35,
             letterSpacing: '-0.015em',
+          wordBreak: 'keep-all',
+          overflowWrap: 'anywhere',
+          textWrap: 'pretty',
           }}
         >
           {item.title}

@@ -10,6 +10,21 @@ import { lensPath } from '@/shared/lib/content/lensUrl';
 import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from '@/shared/lib/search/recentSearches';
 import { DEFAULT_PARAMS, loadSearchIndex, parseTerms, search, splitHighlight, topKeywords, type SearchRecord } from '@/shared/lib/search/searchIndex';
 
+function trapDialogTab(e: React.KeyboardEvent<HTMLDialogElement>) {
+  if (e.key !== 'Tab') return;
+  const dialog = e.currentTarget;
+  const controls = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'))
+    .filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden');
+  const first = controls[0];
+  const last = controls.at(-1);
+  const active = document.activeElement;
+  if (!first) { e.preventDefault(); dialog.focus(); return; }
+  if (active === dialog || !dialog.contains(active) || (e.shiftKey ? active === first : active === last)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first)?.focus();
+  }
+}
+
 // 헤더 돋보기를 누르면 헤더 아래로 펼쳐지는 전체 메뉴 + 검색 패널(참조: 영문판 메가메뉴).
 //   왼쪽: 카테고리와 하위 카테고리 전체 / 오른쪽: 검색창 · 최근 검색어 · 요즘 많이 나온 키워드 / 맨 아래: 서비스 링크
 // 입력하면 오른쪽에 추천 결과가 바로 뜨고, Enter·화살표 버튼·키워드 칩은 결과 페이지(/search?q=)로 보낸다. 이전의 AI 대화형 검색은 일반 검색으로 바뀌었다(2026-10-09).
@@ -27,6 +42,7 @@ function Panel({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const uid = useId().replace(/:/g, '');
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [q, setQ] = useState('');
   // 패널은 열릴 때만 마운트되므로(서버 렌더 없음) 처음 렌더에서 바로 저장소를 읽어도 된다.
   const [recent, setRecent] = useState<string[]>(() => getRecentSearches());
@@ -40,12 +56,19 @@ function Panel({ onClose }: { onClose: () => void }) {
   });
 
   useEffect(() => {
-    // 마우스가 있는 화면에서만 바로 입력할 수 있게 포커스한다. 터치 기기는 키보드가 메뉴를 가리지 않게 눌렀을 때 올린다.
-    if (window.matchMedia?.('(hover: hover)').matches) inputRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const opener = document.activeElement;
     const { overflow } = document.body.style;
     document.body.style.overflow = 'hidden';
+    dialog.showModal();
+    // 터치 화면에서는 입력 대신 패널에 포커스를 두어 키보드가 메뉴를 가리지 않게 한다.
+    if (window.matchMedia('(hover: hover)').matches) inputRef.current?.focus();
+    else dialog.focus();
     return () => {
+      dialog.close();
       document.body.style.overflow = overflow;
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
 
@@ -85,10 +108,8 @@ function Panel({ onClose }: { onClose: () => void }) {
     [onClose, router],
   );
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === 'Escape') {
-      onClose();
-    } else if (e.key === 'ArrowDown' && suggestions.length > 0) {
+  function onKeyDown(e: React.KeyboardEvent<HTMLDialogElement>) {
+    if (e.key === 'ArrowDown' && suggestions.length > 0) {
       e.preventDefault();
       setActive((i) => Math.min(i + 1, suggestions.length - 1));
     } else if (e.key === 'ArrowUp' && suggestions.length > 0) {
@@ -243,8 +264,9 @@ function Panel({ onClose }: { onClose: () => void }) {
   );
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label="전체 메뉴와 검색" onKeyDown={onKeyDown} style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
+    <dialog ref={dialogRef} className="mm-modal" tabIndex={-1} aria-modal="true" aria-label="전체 메뉴와 검색" onCancel={(e) => { e.preventDefault(); onClose(); }} onKeyDown={(e) => { trapDialogTab(e); onKeyDown(e); }} style={{ position: 'fixed', inset: 0, zIndex: 200, width: '100%', height: '100%', maxWidth: 'none', maxHeight: 'none', margin: 0, padding: 0, border: 0, background: 'transparent', color: 'inherit' }}>
       <style>{`
+        .mm-modal::backdrop { background: transparent; }
         @keyframes mm-fade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes mm-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
         .mm-scrim { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(17,24,39,.4); animation: mm-fade .18s ease both; }
@@ -344,7 +366,7 @@ function Panel({ onClose }: { onClose: () => void }) {
           </nav>
         </div>
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }

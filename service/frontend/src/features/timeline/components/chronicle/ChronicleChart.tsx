@@ -52,7 +52,7 @@ function useWidth(ref: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setW(Math.max(320, Math.round(entry.contentRect.width))));
+    const ro = new ResizeObserver(([entry]) => setW(Math.max(1, Math.floor(entry.contentRect.width))));
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref]);

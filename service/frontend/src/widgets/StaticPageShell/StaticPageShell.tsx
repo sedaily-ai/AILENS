@@ -20,7 +20,7 @@ export function StaticPageShell({ title, updated, children }: Props) {
       <Header onSearch={() => setShowSearch(true)} tabs={buildHeaderTabs()} frosted />
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
-      <main style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 96px' }}>
+      <main id="main-content" tabIndex={-1} style={{ maxWidth: 720, margin: '0 auto', padding: 'clamp(28px, 5vw, 56px) clamp(20px, 5vw, 32px) 96px' }}>
         <header style={{ marginBottom: 32 }}>
           <h1
             className="font-medium text-gray-900"

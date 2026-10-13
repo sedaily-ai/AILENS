@@ -399,11 +399,6 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
         .lz-way-arrow { flex: none; width: 20px; height: 12px; }
         .lz-way-arrow-p { stroke-dasharray: 1; stroke-dashoffset: 1; animation: lz-arrow-draw .5s cubic-bezier(.22,.8,.22,1) forwards; }
         @keyframes lz-arrow-draw { to { stroke-dashoffset: 0; } }
-        @media (max-width: 420px) {
-          .lz-flow { gap: 2px; width: 100%; }
-          .lz-way { flex: 1 1 0; min-width: 0; justify-content: center; height: 34px; padding: 0 6px; gap: 4px; font-size: 13.5px; }
-          .lz-way-arrow { width: 12px; }
-        }
         /* 아주 좁은 화면(≈340px 이하)에서는 아이콘을 빼고 글자만 — 한 줄 유지가 우선이다. */
         @media (max-width: 350px) { .lz-way svg { display: none; } }
         /* 흐름 애니메이션(6초 주기, 반복) — 불빛이 읽기 → 웹툰 → 듣기 → 영상 순서로 칩에 차례로 켜지고, 칩 사이 화살표를 따라 이어진다.
@@ -430,6 +425,12 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
         .lz-way { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 15px 0 12px; border: 1px solid #dbe6fb; border-radius: 999px;
           background: #fff; color: #2f5fc4; font-size: 14px; font-weight: 700; font-family: inherit; letter-spacing: -0.01em; cursor: pointer; white-space: nowrap;
           transition: background .2s ease, box-shadow .2s ease, transform .2s ease; }
+        @media (max-width: 420px) {
+          .lz-ways { width: 100%; min-width: 0; }
+          .lz-flow { gap: 2px; width: 100%; }
+          .lz-way { flex: 1 1 0; min-width: 0; justify-content: center; height: 34px; padding: 0 6px; gap: 4px; font-size: 13.5px; }
+          .lz-way-arrow { width: 12px; }
+        }
         .lz-way:hover { background: #ebf1fe; transform: translateY(-1px); }
         .lz-way:active { transform: translateY(0) scale(.97); box-shadow: 0 1px 2px rgba(17,24,39,.06); }
         .lz-way:focus-visible { outline: 2px solid #3d70de; outline-offset: 2px; }

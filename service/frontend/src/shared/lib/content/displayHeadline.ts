@@ -2,7 +2,7 @@
 //
 // 발행 제목이 "산업 | 노로바이러스 백신 개발…"처럼 부서명을 접두어로 달고 나온다(파이프라인 출력 형식).
 // 카테고리 라벨·아이브로우가 이미 같은 정보를 보여 줘서 "산업 산업 |"로 겹쳐 보이므로 뗀다.
-// - displayHeadline: 화면 표시용. 접두어만 뗀다(이모지는 지면의 일부라 유지).
+// - displayHeadline: 화면 표시용. 접두어를 떼고 끝 이모지는 앞 단어와 묶는다.
 // - seoHeadline: <title>·og·JSON-LD·RSS·사이트맵·공유 텍스트·alt처럼 밖으로 나가는 곳용. 접두어 + 이모지를 뗀다(검색 결과 제목이 길게 잘리는 것을 막는다).
 // 원본 데이터(CMS headline)는 건드리지 않아 기존 발행분에도 바로 적용된다.
 //
@@ -22,11 +22,16 @@ export function headlineSection(headline: string): string | null {
 
 export function displayHeadline(headline: string): string {
   const out = headline.replace(SECTION_PREFIX, '');
-  return out.trim() ? out : headline;
+  const visible = out.trim() ? out : headline;
+  // 제목 끝 이모지가 다음 줄에 혼자 남지 않도록 앞 단어와 묶는다. 원문 문구는 유지한다.
+  return visible.replace(
+    /(\S+)\s+((?:[\p{Extended_Pictographic}\p{Regional_Indicator}\uFE0F\u200D\u20E3\u{1F3FB}-\u{1F3FF}]+\s*)+)$/u,
+    (_, word: string, emoji: string) => `${word}\u00a0${emoji.trim().replace(/\s+/g, '\u00a0')}`,
+  );
 }
 
 export function seoHeadline(headline: string): string {
   const base = displayHeadline(headline);
-  const out = base.replace(EMOJI, '').replace(/\s{2,}/g, ' ').trim();
+  const out = base.replace(EMOJI, '').replace(/\u00a0/g, ' ').replace(/\s{2,}/g, ' ').trim();
   return out || base;
 }
