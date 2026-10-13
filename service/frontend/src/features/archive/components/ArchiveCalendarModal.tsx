@@ -1,4 +1,4 @@
-import type { ArchivedSentence } from '@/shared/types/mbti';
+import type { ArchivedSentence } from '@ailens/domain';
 import { getMonthDays, isSameDay } from '@/shared/lib/date/calendar';
 
 // ── 캘린더 팝업 ── 월 달력으로 특정 날짜로 바로 이동한다. archiveDate/archivedSentences/calendarMonth 외에는 의존하지 않는 독립 컴포넌트이다.

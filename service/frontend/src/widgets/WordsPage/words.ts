@@ -1,5 +1,5 @@
 import { fetchCmsPosts } from '@/shared/lib/api/cmsPostsApi';
-import { letterHref } from '@/shared/lib/content/letterHref';
+import { letterHref } from '@ailens/domain';
 
 // 레터마다 본문 하단에 있는 "단어" 목록(letter.keywords)을 모아 보여 준다. 새 데이터 구조 없이 기존 데이터의 다른 진입점이다.
 // 단어를 누르면 그 단어를 다룬 레터(스토리)로 이동하도록 출처를 href로 보존한다. 용어 하나가 여러 레터에 등장하면(중복 dedupe) 설명이 더 긴 쪽의 출처를 쓴다.

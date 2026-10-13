@@ -1,5 +1,5 @@
 import { buildRssResponse } from '@/shared/lib/rss/buildRssFeed';
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { ECON_CATEGORIES } from '@ailens/domain';
 
 // /finance/rss.xml — 카테고리별 RSS. 구현은 shared/lib/rss/buildRssFeed.ts.
 export async function GET() {

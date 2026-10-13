@@ -6,9 +6,9 @@
  * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
  */
 import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
-import { displayHeadline, headlineSection } from '@/shared/lib/content/displayHeadline';
-import { letterHref } from '@/shared/lib/content/letterHref';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { displayHeadline, headlineSection } from '@ailens/domain';
+import { letterHref } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
 import type { ApiLetter } from "./letterTypes";
 // API 응답 스키마 (backend/v2/handlers/today_letters.py 와 1:1)
 

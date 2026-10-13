@@ -5,9 +5,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
-import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { ECON_CATEGORIES } from '@ailens/domain';
+import { econSubcategoriesFor } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
 import { addRecentSearch, clearRecentSearches, getRecentSearches } from '@/shared/lib/search/recentSearches';
 import {
   countByCategory,

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchWebtoonBySlug, type CmsWebtoon } from '@/shared/lib/api/cmsPostsApi';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 
 /**

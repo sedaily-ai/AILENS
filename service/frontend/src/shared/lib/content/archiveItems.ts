@@ -1,11 +1,11 @@
 // buildArchiveItems를 'use client' 파일에 두면 서버 컴포넌트(page.tsx)에서 호출할 수 없다("client function from the server" 에러).
 // 순수 함수·타입만 이 파일로 분리해 서버·클라이언트 양쪽에서 import한다.
-import { letterHref } from '@/shared/lib/content/letterHref';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { letterHref } from '@ailens/domain';
+import { displayHeadline } from '@ailens/domain';
 import { withDisplayMeta, toTodayLetterCard } from '@/shared/lib/api/todayLettersApi';
 import type { CmsLetter, CmsTrendCard, CmsVideo, CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { LENS_ACCENT } from '@/shared/constants/lensPerspectives';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 
 export const PAGE_SIZE = 100;
 

@@ -3,7 +3,7 @@
 import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
 import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import { useRef, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import { fetchHomePlayerPosts, type HomePlayerPost } from '@/shared/lib/api/homePlayerApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { isDirectAudioUrl } from '@/shared/lib/media/videoEmbed';

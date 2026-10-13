@@ -1,0 +1,14 @@
+{
+  "name": "ai-lens-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AI LENS 모노레포 루트 — apps/ packages/ services/ 를 npm workspaces로 묶는다. 상세: docs/architecture/모노레포-정석구조-설계.md",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "service/frontend"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}

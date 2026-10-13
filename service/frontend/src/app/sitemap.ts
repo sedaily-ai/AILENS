@@ -2,7 +2,7 @@ import { ERAS, DECADES } from '@/shared/data/timelineEvents';
 import type { MetadataRoute } from 'next';
 import { fetchIssueLetterCards, issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
 import { fetchAllLensPosts, fetchAllVideos, fetchPaperDates, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { seoHeadline } from '@ailens/domain';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { CORE_SITEMAP_ID, sitemapIds } from '@/shared/lib/seo/sitemapIds';
 // 게임 목록은 단일 출처(shared/data/games.ts)에서 가져온다. page 모듈에서 가져오면 FSD 경계를 위반하고 프로덕션 빌드를 막는다.
@@ -11,7 +11,7 @@ import { GAMES } from '@/shared/data/games';
 // AI LENS sitemap — freshness 기반 우선순위 (en.sedaily.com AEO 보고서 패턴).
 
 import { SITE_URL as BASE } from '@/shared/constants/site';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 
 // MetadataRoute.Sitemap의 video/image 확장은 텍스트 필드를 자동 이스케이프하지 않는다.
 // 제목의 "&"(예: "E&S", "M&A")가 그대로 들어가면 XML 파싱 오류로 사이트맵 전체를 읽을 수 없으므로 직접 이스케이프한다.

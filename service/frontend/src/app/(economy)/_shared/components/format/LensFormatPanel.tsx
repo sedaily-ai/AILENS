@@ -2,7 +2,7 @@
 
 
 import type { TouchEvent as ReactTouchEvent } from 'react';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import { BADGE_HEAD, parseLetterBlocks } from './lensBlocks';
 import { resolveVideo } from '@/shared/lib/media/videoEmbed';
 import { ArticleAudioPlayer } from '@/shared/ui/article/ArticleAudioPlayer';

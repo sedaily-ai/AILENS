@@ -1,6 +1,6 @@
 import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostTypes';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
-import { displayCategoryLabel } from '@/shared/constants/econCategories';
+import { seoHeadline } from '@ailens/domain';
+import { displayCategoryLabel } from '@ailens/domain';
 import { LENS_FORMATS, lensPerspectiveAt, type LensFormat } from '@/shared/constants/lensPerspectives';
 
 // 비교 카드(신청서 모듈 F "텍스트 기반 비교 카드 자동 생성") — 같은 기사가 레터·웹툰·팟캐스트·영상에서 각각 어떻게 시작하는지

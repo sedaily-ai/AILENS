@@ -40,3 +40,19 @@ docs/architecture/lens-erd-img/
 
 # 복구 스크립트가 쓰기 전에 만드는 글 백업(운영 데이터) — 커밋하지 않는다
 pipelines/scripts/repair_backup/
+
+# 로컬 시험 산출물
+tmp/webtoon_core_test/
+
+# 모노레포 루트(2026-10-13 신설) — npm workspaces.
+# 루트 node_modules 는 호이스팅/심링크 산출물이라 커밋하지 않는다.
+# package-lock.json 은 재현성을 위해 커밋한다(제외하지 않음).
+# 각 하위 프로젝트(service/frontend 등)의 node_modules 는 각자 .gitignore 가 덮는다.
+/node_modules/
+# 하위 워크스페이스 패키지의 node_modules(호이스팅 안 된 로컬 설치분)
+node_modules/
+# packages/* 빌드 산출물(tsc outDir)
+packages/*/dist/
+
+# KiroCrew 로컬 세션 설정(에이전트 런타임이 만든 것) — 커밋하지 않는다
+.kiro/settings/

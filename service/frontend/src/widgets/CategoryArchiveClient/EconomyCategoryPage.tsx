@@ -4,7 +4,7 @@ import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildArchiveItems, PAGE_SIZE } from '@/shared/lib/content/archiveItems';
 import { buildCategoryMetadata, buildCategoryPageNMetadata, buildCategoryJsonLd } from '@/shared/lib/seo/meta/buildCategoryPageMeta';
 import { CategoryArchiveClient } from './CategoryArchiveClient';
-import { categoryMatches, ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { categoryMatches, ECON_CATEGORIES } from '@ailens/domain';
 import type { HeaderTabKey } from '@/shared/lib/headerTabs';
 
 // 카테고리 아카이브(증시/부동산/산업/금융·정책/국제/문화)는 fetch→filter→JSON-LD→렌더 로직이 같고 slug만 다르다.

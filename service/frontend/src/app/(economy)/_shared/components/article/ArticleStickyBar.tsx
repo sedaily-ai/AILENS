@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 
 // 스크롤하면 상단 메뉴가 "카테고리 + 기사 제목 + 읽기 진행선"의 얇은 바로 바뀐다(영문 사이트 상세 동작을 따름).
 // 헤드라인이 화면 위로 지나간 뒤 나타나 sticky 헤더(z-100, 높이 약 57px)를 그대로 덮으므로 아래 형식 탭 바(.fmt-bar)의 top 오프셋이 유효하다.

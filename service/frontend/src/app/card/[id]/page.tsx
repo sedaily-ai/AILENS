@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { StaticPageShell } from '@/widgets/StaticPageShell';
 import { SITE_URL } from '@/shared/constants/site';
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 import { buildCompareCard } from '@/shared/lib/content/compareCard';
 import { CARD_SIZES, CARD_TEXT_MAX } from '../renderCompareCard';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import type { ArchivedSentence, MbtiArticle, TabType } from "@/shared/types/mbti";
+import type { ArchivedSentence, MbtiArticle, TabType } from "@ailens/domain";
 import { isSameDay } from "@/shared/lib/date/calendar";
 import { useAuth } from "@/entities/user";
 import {

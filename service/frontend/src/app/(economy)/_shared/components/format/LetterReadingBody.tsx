@@ -3,10 +3,10 @@
 import { PostVote, parseVoteChoices } from './PostVote';
 import { renderInline } from './renderInline';
 import type { CSSProperties } from 'react';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { seoHeadline } from '@ailens/domain';
 import { chapterId } from './lensChapters';
 import { ReadDone } from '@/app/(economy)/_shared/components/article/ReadDone';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 import { SITE_URL } from '@/shared/constants/site';
 import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 import { BADGE_HEAD, type LetterBlock } from './lensBlocks';

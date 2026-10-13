@@ -1,6 +1,6 @@
 import { permanentRedirect, notFound } from 'next/navigation';
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { lensPath } from '@ailens/domain';
 
 // 이 라우트는 렌더링하지 않고 정본 경로(/{category}/{yyyy}/{mm}/{dd}/{slug})로 리다이렉트만 한다.
 // /lens/:slug → /:slug(구 리다이렉트, next.config.ts)를 거쳐 들어오는 요청도 한 번에 정리한다.

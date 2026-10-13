@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { applyChoice } from '@/shared/lib/poll/optimisticVote';
+import { applyChoice } from '@ailens/domain';
 import { PollOptions } from '@/shared/ui/form/PollOptions';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import type { LetterVote as Vote } from '../../data/letterTypes';

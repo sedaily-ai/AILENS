@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import Image from 'next/image';
-import { displayHeadline, seoHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline, seoHeadline } from '@ailens/domain';
 import Link from 'next/link';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
@@ -23,8 +23,8 @@ import { AiDisclaimer } from '@/shared/ui/notice/AiDisclaimer';
 import { coreSummaryBullets, FormatPicker, LensFormatPanel } from './components';
 import { useLensFormatTabs } from './hooks/useLensFormatTabs';
 import { SITE_URL } from '@/shared/constants/site';
-import { lensCategorySlug, lensPath } from '@/shared/lib/content/lensUrl';
-import { categoryForDataLabel, displayCategoryLabel } from '@/shared/constants/econCategories';
+import { lensCategorySlug, lensPath } from '@ailens/domain';
+import { categoryForDataLabel, displayCategoryLabel } from '@ailens/domain';
 import { ArticleChapterNav } from './components/article/ArticleChapterNav';
 import { IconStopwatch } from './components/icons/LensIcons';
 import { ArticleReveal } from './components/article/ArticleReveal';

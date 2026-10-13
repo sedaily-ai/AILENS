@@ -16,8 +16,8 @@ import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
 import { fetchCmsPosts, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/content/archiveItems';
 import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
-import { categoryMatches, type EconCategoryConfig } from '@/shared/constants/econCategories';
-import { econSubcategoriesFor } from '@/shared/constants/econSubcategories';
+import { categoryMatches, type EconCategoryConfig } from '@ailens/domain';
+import { econSubcategoriesFor } from '@ailens/domain';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
 // 카테고리 아카이브 페이지 크기. video(24)·listen(30)과 같은 급의 목록이지만 ArchiveList는 사진 없이 텍스트 행만 그려 한 화면에 더 들어가도 부담이 적어 20으로 잡는다.

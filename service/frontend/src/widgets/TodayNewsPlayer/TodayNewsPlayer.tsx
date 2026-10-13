@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { displayHeadline } from '@/shared/lib/content/displayHeadline';
+import { displayHeadline } from '@ailens/domain';
 import { createPortal } from 'react-dom';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
 import { useAuth } from '@/features/auth';

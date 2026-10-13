@@ -11,7 +11,7 @@
  * 슬러그에서 날짜를 떼려면 lens.id를 파싱/재조합해야 하고 서버 조회 키가 id 전체라 조회 로직도 바꿔야 하므로,
  * lens.id는 그대로 두고 경로만 카테고리+날짜로 감싼다.
  */
-import { ECON_CATEGORIES } from '@/shared/constants/econCategories';
+import { ECON_CATEGORIES } from '../constants/econCategories.js';
 
 const FALLBACK_CATEGORY_SLUG = 'news';
 

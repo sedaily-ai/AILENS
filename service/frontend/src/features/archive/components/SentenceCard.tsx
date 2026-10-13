@@ -1,4 +1,4 @@
-import type { ArchivedSentence } from '@/shared/types/mbti';
+import type { ArchivedSentence } from '@ailens/domain';
 
 // ── 서랍 문장 카드 — 문장 + 출처 + 복사/삭제 액션.
 // 원문 기사 탐색(articles.find)은 부모에 두고 onNavigate 콜백만 받으므로 이 카드는 articles 배열 전체를 알 필요가 없다.

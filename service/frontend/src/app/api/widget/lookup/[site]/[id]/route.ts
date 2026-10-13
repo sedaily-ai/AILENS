@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { fetchAllLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { SITE_URL } from '@/shared/constants/site';
 import { LENS_PERSPECTIVES } from '@/shared/constants/lensPerspectives';
-import { seoHeadline } from '@/shared/lib/content/displayHeadline';
-import { lensPath } from '@/shared/lib/content/lensUrl';
+import { seoHeadline } from '@ailens/domain';
+import { lensPath } from '@ailens/domain';
 import { SEDAILY_SITES, sedailyArticleKey, type SedailySite } from '../../../sedailyArticle';
 
 // 본지 기사 → AI LENS 기사 찾기(신청서 모듈 G "MBTI로 읽기" 위젯이 부른다).
