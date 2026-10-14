@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { HomePlayerPost, LensItem, LensPost } from '@ailens/api-client';
@@ -10,10 +11,10 @@ import { LetterBody } from './LetterBody';
 
 /** 4가지 형식 탭 정의 — 웹 lensPerspectives 의 순서·이름(읽기/웹툰/듣기/영상)과 같다. label 은 API 의 형식 이름. */
 export const FORMATS = [
-  { label: '레터', tab: '읽기', icon: 'book-outline' as const },
-  { label: '웹툰', tab: '웹툰', icon: 'images-outline' as const },
-  { label: '팟캐스트', tab: '듣기', icon: 'headset-outline' as const },
-  { label: '영상', tab: '영상', icon: 'videocam-outline' as const },
+  { label: '레터', key: 'letter' as const, name: '읽기', icon: 'book-outline' as const },
+  { label: '웹툰', key: 'webtoon' as const, name: '웹툰', icon: 'images-outline' as const },
+  { label: '팟캐스트', key: 'podcast' as const, name: '팟캐스트', icon: 'headset-outline' as const },
+  { label: '영상', key: 'video' as const, name: '영상', icon: 'videocam-outline' as const },
 ];
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -62,7 +63,7 @@ function LetterPanel({ lens, item, scale, onSaveText }: { lens: LensPost; item: 
 
 function WebtoonPanel({ item, scale }: { item: LensItem; scale: number }) {
   const cuts = item.images ?? [];
-  if (cuts.length > 0) return <View style={styles.bleed}><WebtoonCuts panels={cuts} /></View>;
+  if (cuts.length > 0) return <WebtoonCuts panels={cuts} />;
   return (
     <View>
       <Note>웹툰 컷은 아직 준비 중이에요. 아래는 컷에 들어갈 대사예요.</Note>
@@ -142,31 +143,19 @@ function Transcript({ text, scale }: { text: string; scale: number }) {
   );
 }
 
-export function PhotoHeader({ uri }: { uri?: string | null }) {
-  if (!uri) return null;
-  return (
-    <View style={styles.photo}>
-      <Image source={{ uri }} style={styles.photoImg} resizeMode="cover" />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   note: { marginTop: 20, fontSize: 14, lineHeight: 21, color: colors.textMuted },
   eyebrow: { marginTop: 8, fontSize: 12, fontWeight: '800', letterSpacing: 1, color: colors.textFaint },
   fact: { flexDirection: 'row', gap: 12, marginTop: 14 },
   factNo: { width: 26, fontSize: 13, fontWeight: '800', color: '#5b8def', marginTop: 4 },
   factText: { flex: 1, color: '#1f2937' },
-  bleed: { marginHorizontal: -20, marginTop: 8 },
   audio: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 16, backgroundColor: '#f0f6ff' },
   audioBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   audioKicker: { fontSize: 12, fontWeight: '800', color: colors.beta.text },
   audioTitle: { marginTop: 3, fontSize: 15.5, lineHeight: 22, fontWeight: '700', color: colors.text },
   audioTime: { marginTop: 4, fontSize: 12, color: colors.textMuted },
-  videoWrap: { marginTop: 16, marginHorizontal: -20, aspectRatio: 16 / 9, backgroundColor: '#000' },
+  videoWrap: { marginTop: 8, aspectRatio: 16 / 9, borderRadius: 10, overflow: 'hidden', backgroundColor: '#0b0c10' },
   video: { width: '100%', height: '100%' },
   transcript: { marginTop: 24, paddingTop: 18, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   tHead: { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: colors.textFaint },
-  photo: { marginHorizontal: -20, aspectRatio: 16 / 10, backgroundColor: colors.imagePlaceholder },
-  photoImg: { width: '100%', height: '100%' },
 });

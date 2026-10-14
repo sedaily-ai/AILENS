@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { TextInput as RNTextInput } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,7 +56,7 @@ export function SearchScreen() {
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [index, setIndex] = useState<IndexState>({ status: 'loading' });
   const [recent, setRecent] = useState<string[]>([]);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<RNTextInput>(null);
 
   const loadIndex = useCallback(() => {
     setIndex({ status: 'loading' });

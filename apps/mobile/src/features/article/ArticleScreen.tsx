@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, type View as RNView } from 'react-native';
+import { Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, View, type View as RNView } from 'react-native';
+import { FONT, Text } from '../../ui/Text';
 import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { categoryForDataLabel, displayCategoryLabel, displayHeadline, letterChapters, lensPath, readMinutes } from '@ailens/domain';
-import type { LensPost } from '@ailens/api-client';
+import type { LensItem, LensPost } from '@ailens/api-client';
 import { AsyncView } from '../../components/AsyncView';
 import { kstDateTime } from '../../lib/format';
 import { colors } from '../../theme';
 import { FONT_SCALES, useFontScale } from './FontScale';
-import { FormatPanel, FORMATS, PhotoHeader } from './FormatPanels';
+import { FormatPanel, FORMATS } from './FormatPanels';
+import { ArticleHeader, ArticlePhoto, coreSummary, FormatPicker, Rule, SummaryCard, type PickerTab } from './ArticleParts';
 import { LetterArticle } from './LetterArticle';
 import { useArticle, type Article } from './useArticle';
 import { ChapterContext } from './chapterContext';
@@ -134,7 +136,7 @@ function Meta({ category, when, readMin }: { category?: string | null; when: str
 
 function LensArticle({ lens, scale, onSaveText, formatParam, onToc }: { lens: LensPost; scale: number; onSaveText: (t: string) => void; formatParam?: string; onToc: () => void }) {
   const items = lens.lenses ?? [];
-  // 형식 이름 → 탭. 데이터에 없는 형식은 탭에서 뺀다(빈 탭으로 길을 막지 않음).
+  // 데이터에 있는 형식만 탭으로(빈 탭으로 길을 막지 않음). 이름·아이콘·분량은 웹 formatAmount 와 같은 규칙.
   const tabs = FORMATS.map((f) => ({ ...f, item: items.find((l) => l.label === f.label) })).filter((t) => t.item);
   // 기본 탭: 온보딩 결과로 넘어온 format 파라미터 → 저장된 선호 형식 → 첫 탭. 형식 인덱스(레터0·웹툰1·팟캐스트2·영상3)를 데이터에 있는 탭 위치로 바꾼다.
   const [active, setActive] = useState(0);
@@ -148,28 +150,18 @@ function LensArticle({ lens, scale, onSaveText, formatParam, onToc }: { lens: Le
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lens.id, formatParam]);
   const current = tabs[Math.min(active, tabs.length - 1)];
-  const letter = items.find((l) => l.label === '레터');
-  const readMin = letter?.paragraphs?.length ? readMinutes(letter.paragraphs.join('').length) : null;
+  const picker: PickerTab[] = tabs.map((t) => ({ key: t.key, name: t.name, icon: t.icon, amount: formatAmount(t.key, t.item!) }));
 
   return (
     <View>
-      <Meta category={lens.category} when={kstDateTime(lens.published_at, lens.date)} readMin={readMin} />
-      <Text style={styles.title}>{displayHeadline(lens.headline)}</Text>
-      <PhotoHeader uri={lens.photo_image_url} />
-
+      <ArticleHeader lens={lens} scale={scale} />
+      <ArticlePhoto lens={lens} />
+      <SummaryCard bullets={coreSummary(lens)} scale={scale} />
       {tabs.length > 0 ? (
-        <>
-          <View style={styles.tabs} accessibilityRole="tablist">
-            {tabs.map((t, i) => {
-              const on = current === t;
-              return (
-                <Pressable key={t.label} style={styles.tab} onPress={() => setActive(i)} accessibilityRole="tab" accessibilityState={{ selected: on }}>
-                  <Ionicons name={t.icon} size={20} color={on ? '#2563eb' : colors.textFaint} />
-                  <Text style={[styles.tabText, on && styles.tabTextOn]}>{t.tab}</Text>
-                  <View style={[styles.ind, on && styles.indOn]} />
-                </Pressable>
-              );
-            })}
+        <View style={{ marginTop: 32 }}>
+          <Rule />
+          <View style={{ marginTop: 10 }}>
+            <FormatPicker tabs={picker} active={Math.min(active, tabs.length - 1)} onSelect={setActive} />
           </View>
           {current.label === '레터' && letterChapters(current.item!.paragraphs).length >= 2 ? (
             <Pressable style={styles.tocBtn} onPress={onToc} accessibilityRole="button">
@@ -177,13 +169,24 @@ function LensArticle({ lens, scale, onSaveText, formatParam, onToc }: { lens: Le
               <Text style={styles.tocText}>목차 {letterChapters(current.item!.paragraphs).length}개 구간</Text>
             </Pressable>
           ) : null}
-          <FormatPanel key={current.label} lens={lens} item={current.item!} scale={scale} onSaveText={onSaveText} />
-        </>
-      ) : lens.context ? (
-        <Text style={[styles.lede, { fontSize: 16 * scale, lineHeight: 26 * scale }]}>{lens.context}</Text>
+          <View style={{ marginTop: 28 }}>
+            <FormatPanel key={current.label} lens={lens} item={current.item!} scale={scale} onSaveText={onSaveText} />
+          </View>
+        </View>
       ) : null}
     </View>
   );
+}
+
+/** 형식 선택기의 분량 표기 — 웹 formatAmount: 레터 약 N분 / 웹툰 N컷 / 팟캐스트·영상은 길이를 파일에서 읽어야 해서 로딩 전에는 "음성"·"영상", 없으면 "준비 중". */
+function formatAmount(key: PickerTab['key'], item: LensItem): string {
+  if (key === 'letter') {
+    const chars = (item.paragraphs?.length ? item.paragraphs : item.bullets).join('').length;
+    return chars > 0 ? `약 ${readMinutes(chars)}분` : '준비 중';
+  }
+  if (key === 'webtoon') return item.images?.length ? `${item.images.length}컷` : '준비 중';
+  if (key === 'podcast') return item.media_url ? '음성' : '준비 중';
+  return item.video_url ? '영상' : '준비 중';
 }
 
 function LetterHead({ post, scale, onSaveText }: { post: Article['post']; scale: number; onSaveText: (t: string) => void }) {
@@ -192,7 +195,7 @@ function LetterHead({ post, scale, onSaveText }: { post: Article['post']; scale:
     <View>
       <Meta category={p.category} when={kstDateTime(p.published_at, p.publish_date)} />
       <Text style={styles.title}>{displayHeadline(p.headline)}</Text>
-      <PhotoHeader uri={p.photo_image_url ?? p.cover_image_url} />
+      <PlainPhoto uri={p.photo_image_url ?? p.cover_image_url} />
       <LetterArticle post={p} scale={scale} onSaveText={onSaveText} />
     </View>
   );
@@ -262,6 +265,11 @@ function Footer({ article }: { article: Article }) {
   );
 }
 
+function PlainPhoto({ uri }: { uri?: string | null }) {
+  if (!uri) return null;
+  return <Image source={{ uri }} style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 16, marginBottom: 16, backgroundColor: colors.imagePlaceholder }} resizeMode="cover" />;
+}
+
 function Neighbor({ label, post }: { label: string; post: LensPost }) {
   return (
     <Link href={{ pathname: '/article/[slug]', params: { slug: post.id } }} asChild>
@@ -293,7 +301,7 @@ const styles = StyleSheet.create({
   aaBig: { fontSize: 19 },
   content: { padding: 20, paddingBottom: 56 },
   meta: { fontSize: 12.5, fontWeight: '700', color: '#2563eb' },
-  title: { marginTop: 8, marginBottom: 16, fontSize: 26, lineHeight: 36, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
+  title: { marginTop: 8, marginBottom: 16, fontFamily: FONT.serif, fontSize: 26, lineHeight: 36, letterSpacing: -0.5, color: colors.text },
   lede: { marginTop: 16, color: '#374151' },
   tabs: { flexDirection: 'row', marginTop: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   tab: { flex: 1, alignItems: 'center', paddingTop: 10, gap: 4 },

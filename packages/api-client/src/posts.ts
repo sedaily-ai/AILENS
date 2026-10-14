@@ -59,6 +59,7 @@ export interface LensPost {
   source_url: string | null;
   published_at?: string | null;
   category?: string | null;
+  subcategory?: string | null;
   /** "오늘의 지면" 특별 코너 값(전체/증권/산업/시그널). 홈 히어로 탭이 이 값으로 고른다. */
   paper_section?: string | null;
   display_order?: number | null;

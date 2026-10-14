@@ -1,4 +1,5 @@
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 import { Link, Stack } from 'expo-router';
 import { listIssueLetters, type IssueLetterCard } from '@ailens/api-client';
 import { AsyncView } from '../../components/AsyncView';

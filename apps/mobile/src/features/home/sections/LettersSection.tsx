@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../../ui/Text';
 import { Link } from 'expo-router';
 import type { IssueLetterCard } from '@ailens/api-client';
 import { colors } from '../../../theme';

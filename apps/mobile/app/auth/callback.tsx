@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/Text';
 import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { colors } from '../../src/theme';

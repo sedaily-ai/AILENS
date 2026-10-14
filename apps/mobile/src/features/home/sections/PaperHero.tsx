@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../../ui/Text';
 import { Link } from 'expo-router';
 import type { LensPost } from '@ailens/api-client';
 import { displayHeadline } from '@ailens/domain';

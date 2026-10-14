@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 import { Link } from 'expo-router';
 import type { FeedItem } from '../features/home/model';
 import { kstDateTime } from '../lib/format';

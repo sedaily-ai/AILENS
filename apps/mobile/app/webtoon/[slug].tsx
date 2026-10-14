@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/Text';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { getPost, type WebtoonPost } from '@ailens/api-client';
 import { displayHeadline } from '@ailens/domain';

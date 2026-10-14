@@ -1,4 +1,5 @@
-import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchBigkindsDay, fetchDayArticles, isArchiveDate, type BigKindsArticle, type DayArticle, type InvestmentScenario } from '@ailens/api-client';

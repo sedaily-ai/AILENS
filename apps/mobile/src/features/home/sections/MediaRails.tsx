@@ -1,4 +1,5 @@
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../../ui/Text';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { HomePlayerPost, VideoPost, WebtoonPost } from '@ailens/api-client';

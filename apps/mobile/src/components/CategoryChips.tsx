@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Text } from '../ui/Text';
 import { Link } from 'expo-router';
 import { ECON_CATEGORIES } from '@ailens/domain';
 import { colors } from '../theme';
