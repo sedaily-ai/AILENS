@@ -9,6 +9,7 @@ import { kstDateTime } from '../../lib/format';
 import { READING_ACCENT, formatColors } from '../../theme';
 import { FONT, Text } from '../../ui/Text';
 import { RichText } from './RichText';
+import { Blob, HandLine } from '../../ui/Hand';
 
 const ACCENT_BLUE = '#3b82f6'; // 웹 LENS_ACCENT(배지)
 
@@ -17,7 +18,7 @@ const photoShadow = { shadowColor: '#111827', shadowOffset: { width: 0, height: 
 
 /** 한 줄 손맛 구분선(웹 .rule 의 손으로 그은 획 근사). */
 export function Rule() {
-  return <View style={styles.rule} />;
+  return <HandLine style={styles.rule} />;
 }
 
 /** 기사 머리 — 카테고리 아이브로우(+4가지 시선 배지) → 세리프 헤드라인 → 리드 → 바이라인. 웹 LensViewClient 의 .lw 머리와 같은 순서·크기. */
@@ -91,7 +92,7 @@ export function coreSummary(lens: LensPost): string[] {
 export function SummaryCard({ bullets, scale }: { bullets: string[]; scale: number }) {
   if (bullets.length === 0) return null;
   return (
-    <View style={styles.sum}>
+    <Blob fill="#f6f7f9" radii={{ h: [26, 22, 28, 20], v: [22, 27, 20, 26] }} style={styles.sum}>
       <View style={styles.sumHead}>
         <Ionicons name="stopwatch-outline" size={22} color={READING_ACCENT} />
         <Text style={styles.sumTitle}>30초 핵심</Text>
@@ -109,7 +110,7 @@ export function SummaryCard({ bullets, scale }: { bullets: string[]; scale: numb
           </View>
         ))}
       </View>
-    </View>
+    </Blob>
   );
 }
 
@@ -153,7 +154,7 @@ export function FormatPicker({ tabs, active, onSelect }: { tabs: PickerTab[]; ac
 }
 
 const styles = StyleSheet.create({
-  rule: { marginTop: 16, height: 2, borderRadius: 1, backgroundColor: 'rgba(17,24,39,0.16)' },
+  rule: { marginTop: 16 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
   eyebrow: { fontSize: 13, fontWeight: '700', letterSpacing: 0.26, color: '#6b7280' },
   badge: { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, backgroundColor: `${ACCENT_BLUE}24` },
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   cap: { fontSize: 11.5, color: '#9ca3af' },
   lnk: { fontSize: 13, fontWeight: '600', color: '#4b5563', textDecorationLine: 'underline', textDecorationColor: 'rgba(17,24,39,0.28)' },
   // 30초 핵심(웹 .sum): 연한 회색 면, 불규칙한 큰 모서리, 번호는 작은 흰 배지.
-  sum: { marginTop: 20, paddingTop: 24, paddingHorizontal: 22, paddingBottom: 26, backgroundColor: '#f6f7f9', borderTopLeftRadius: 26, borderTopRightRadius: 22, borderBottomRightRadius: 28, borderBottomLeftRadius: 20 },
+  sum: { marginTop: 20, paddingTop: 24, paddingHorizontal: 22, paddingBottom: 26 },
   sumHead: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 4 },
   sumTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.24, color: '#111827' },
   sumSub: { marginBottom: 22, marginLeft: 31, fontSize: 14, lineHeight: 21, color: '#6b7280', letterSpacing: -0.14 },

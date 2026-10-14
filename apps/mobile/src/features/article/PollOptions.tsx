@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { Text } from '../../ui/Text';
 
 /**
@@ -22,6 +22,7 @@ const TONES = {
   n: { c: '#6b7280', ct: '#e5e7eb' },
 } as const;
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export function PollOptions({
   options,
@@ -71,6 +72,7 @@ function Row({ opt, index, pct, done, mine, pending, waiting, disabled, onPick }
   const fill = useRef(new Animated.Value(0)).current;
   const press = useRef(new Animated.Value(1)).current;
   const mark = useRef(new Animated.Value(0)).current;
+  const check = useRef(new Animated.Value(0)).current; // 체크 선이 그려지는 진행(0~1)
   const [shown, setShown] = useState(0);
 
   // 집계가 오면 막대(와 숫자)가 차오른다. 집계가 사라지면(투표 전) 0 으로.
@@ -83,8 +85,11 @@ function Row({ opt, index, pct, done, mine, pending, waiting, disabled, onPick }
   }, [done, pct, index, fill]);
   // 체크 표시: 고르는 즉시(또는 응답 대기 중) 튀어 오르며 나타난다.
   useEffect(() => {
-    Animated.spring(mark, { toValue: mine || pending ? 1 : 0, friction: 5, tension: 160, useNativeDriver: true }).start();
-  }, [mine, pending, mark]);
+    const on = mine || pending;
+    Animated.spring(mark, { toValue: on ? 1 : 0, friction: 5, tension: 160, useNativeDriver: true }).start();
+    // 웹 .pl-mark svg: stroke-dashoffset 16→0, .4s, 지연 .08s.
+    Animated.timing(check, { toValue: on ? 1 : 0, duration: on ? 400 : 0, delay: on ? 80 : 0, easing: EASE, useNativeDriver: false }).start();
+  }, [mine, pending, mark, check]);
 
   const width = fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
@@ -101,8 +106,10 @@ function Row({ opt, index, pct, done, mine, pending, waiting, disabled, onPick }
       >
         <Animated.View style={[styles.fill, { width, backgroundColor: mine ? tone.ct : '#eef0f3' }]} />
         <View style={[styles.mark, (mine || pending) && { backgroundColor: tone.c, borderColor: tone.c }]}>
-          <Animated.View style={{ opacity: mark, transform: [{ scale: mark.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }] }}>
-            <Ionicons name="checkmark" size={13} color="#fff" />
+          <Animated.View style={{ transform: [{ scale: mark.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] }}>
+            <Svg width={12} height={12} viewBox="0 0 12 12">
+              <AnimatedPath d="M2.5 6.4 5 8.8 9.6 3.4" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="16" strokeDashoffset={check.interpolate({ inputRange: [0, 1], outputRange: [16, 0] })} />
+            </Svg>
           </Animated.View>
         </View>
         <View style={styles.body}>

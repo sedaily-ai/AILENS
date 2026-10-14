@@ -6,14 +6,12 @@ import { FONT, Text } from '../../ui/Text';
 import { useChapterRegister } from './chapterContext';
 import { PostVote } from './PostVote';
 import { RichText } from './RichText';
+import { Blob, HandLine } from '../../ui/Hand';
 import { TermPopover, type TermAnchor } from './TermPopover';
 
 /** 문장 단위로 쪼갠다(비교 칸의 긴 문단을 읽기 쉽게). 웹 LetterReadingBody 의 splitSentences 와 같은 규칙. */
 const splitSentences = (text: string) =>
   text.split(/(?<=[.!?다요죠])\s+(?=[가-힣A-Z0-9"'“‘(])/u).map((t) => t.trim()).filter(Boolean);
-
-/** 웹의 불규칙한 손맛 모서리(border-radius: a b c d / …)를 모서리별 반지름으로 근사한다. */
-const irregular = (tl: number, tr: number, br: number, bl: number) => ({ borderTopLeftRadius: tl, borderTopRightRadius: tr, borderBottomRightRadius: br, borderBottomLeftRadius: bl });
 
 // 배지 소제목 4색(웹 .lread[data-tpl="v2"] .lread-sub[data-badge="0..3"] .ch-t).
 const BADGE_COLORS = [
@@ -85,10 +83,10 @@ export function LetterBody({
       );
     if (b.type === 'quote')
       return (
-        <View key={key} style={[styles.quote, { marginTop: top + 0.4 * T.size }]}>
+        <Blob key={key} fill="#edf2fd" radii={{ h: [20, 16, 22, 15], v: [16, 21, 15, 20] }} style={[styles.quote, { marginTop: top + 0.4 * T.size }]}>
           <Text style={[styles.quoteMark, { color: READING_ACCENT }]}>“</Text>
           <RichText text={b.text} glossary={glossary} onTerm={onTerm} style={[{ fontFamily: FONT.serif, color: '#111827', letterSpacing: -0.2 }, f(19, 1.7)]} />
-        </View>
+        </Blob>
       );
     if (b.type === 'p' || b.type === 'lead') return <View key={key} style={{ marginTop: top }}>{text(b.text, { numbers: true })}</View>;
     return null;
@@ -135,16 +133,16 @@ export function LetterBody({
                   </>
                 ) : (
                   <>
-                    <View style={[styles.chNo, irregular(16, 11, 15, 10)]}>
+                    <Blob fill="#e6eefd" radii={{ h: [16, 11, 15, 10], v: [11, 16, 10, 15] }} style={styles.chNo}>
                       <Text style={styles.chNoText}>
                         {String(b.no + 1).padStart(2, '0')} <Text style={styles.chNoTotal}>/ {String(total).padStart(2, '0')}</Text>
                       </Text>
-                    </View>
+                    </Blob>
                     <RichText text={b.head} glossary={glossary} onTerm={onTerm} style={[{ fontFamily: FONT.serif, color: '#111827', letterSpacing: -0.5 }, f(25, 1.35)]} />
                     {b.question ? (
-                      <View style={[styles.chQ, irregular(15, 12, 16, 11)]}>
+                      <Blob fill="#f4f5f7" radii={{ h: [15, 12, 16, 11], v: [12, 16, 11, 15] }} style={styles.chQ}>
                         <RichText text={b.question} glossary={glossary} onTerm={onTerm} style={[f(15.5, 1.5), { color: '#4b5563', fontWeight: '500' }]} />
-                      </View>
+                      </Blob>
                     ) : null}
                   </>
                 )}
@@ -152,7 +150,7 @@ export function LetterBody({
             );
           }
           case 'hr':
-            return <View key={bi} style={styles.hr} />;
+            return <HandLine key={bi} style={styles.hr} />;
           case 'compare':
             return (
               <View key={bi} style={{ marginTop: top }}>
@@ -195,7 +193,7 @@ export function LetterBody({
       <View style={styles.sign}>
         <Text style={[styles.thanks, f(17, 1.7)]}>끝까지 읽어주셔서 고마워요.</Text>
         <View style={styles.from}>
-          <View style={styles.signMark} />
+          <HandLine height={7} color={READING_ACCENT} opacity={1} strokeWidth={2.6} style={styles.signMark} />
           <Text style={styles.signName}>AI LENS 편집팀</Text>
         </View>
       </View>
@@ -221,15 +219,15 @@ function MoreBox({ title, top, children }: { title: string; top: number; childre
 
 const styles = StyleSheet.create({
   li: { flexDirection: 'row' },
-  quote: { paddingTop: 18, paddingBottom: 20, paddingHorizontal: 22, backgroundColor: '#edf2fd', borderTopLeftRadius: 20, borderTopRightRadius: 16, borderBottomRightRadius: 22, borderBottomLeftRadius: 15 },
+  quote: { paddingTop: 18, paddingBottom: 20, paddingHorizontal: 22 },
   quoteMark: { fontFamily: FONT.serif, fontSize: 38, lineHeight: 30, marginBottom: 8 },
   badge: { alignSelf: 'flex-start', marginBottom: 10, paddingVertical: 4, paddingHorizontal: 11, borderRadius: 12 },
   // 챕터 번호 알약 "02 / 06": 형식색 15% 면 + 형식색 62% 글자(웹 color-mix 결과값).
-  chNo: { alignSelf: 'flex-start', marginBottom: 12, paddingTop: 3, paddingBottom: 4, paddingHorizontal: 12, backgroundColor: '#e6eefd' },
+  chNo: { alignSelf: 'flex-start', marginBottom: 12, paddingTop: 3, paddingBottom: 4, paddingHorizontal: 12 },
   chNoText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.48, color: '#4467ae' },
   chNoTotal: { fontWeight: '600', opacity: 0.55 },
-  chQ: { alignSelf: 'flex-start', maxWidth: '100%', marginTop: 12, paddingVertical: 8, paddingHorizontal: 15, backgroundColor: '#f4f5f7' },
-  hr: { alignSelf: 'center', width: 84, height: 2, marginTop: 30, marginBottom: 8, borderRadius: 1, backgroundColor: 'rgba(17,24,39,0.26)' },
+  chQ: { alignSelf: 'flex-start', maxWidth: '100%', marginTop: 12, paddingVertical: 8, paddingHorizontal: 15 },
+  hr: { alignSelf: 'center', width: 84, marginTop: 30, marginBottom: 8 },
   summary: { marginBottom: 24, borderRadius: 14, backgroundColor: '#f3f4f6' },
   boxTitle: { marginBottom: 9, fontSize: 13, fontWeight: '700', color: '#4b5563' },
   hint: { marginTop: 11, fontSize: 12.5, color: '#9ca3af' },
@@ -240,6 +238,6 @@ const styles = StyleSheet.create({
   sign: { marginTop: 36, alignItems: 'center' },
   thanks: { color: '#374151', fontWeight: '500', marginBottom: 14, textAlign: 'center' },
   from: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  signMark: { width: 30, height: 3, borderRadius: 2, backgroundColor: READING_ACCENT },
+  signMark: { width: 30 },
   signName: { fontSize: 13, fontWeight: '800', letterSpacing: 0.78, color: '#6b7280' },
 });
