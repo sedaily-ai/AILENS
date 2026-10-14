@@ -22,15 +22,17 @@ COPY packages/api-client/package.json packages/api-client/
 COPY packages/auth/package.json packages/auth/
 COPY service/frontend/package.json service/frontend/
 # BuildKit 캐시 마운트 — npm 다운로드 캐시를 빌드 사이에 유지(이미지엔 안 들어감).
-# 공유 패키지(@ailens/domain)는 prepare 훅이 없어 install 중 빌드되지 않는다 —
-# 소스 복사 후 아래에서 명시적으로 빌드한다(루트 build:packages 와 동일 경로).
+# 공유 패키지는 prepare 훅이 없어 install 중 빌드되지 않는다 —
+# 소스 복사 후 아래에서 프런트가 사용하는 패키지를 모두 명시적으로 빌드한다.
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 # 2) 전체 소스 복사 후 공유 패키지 빌드 → 프런트 빌드.
 COPY packages/ packages/
 COPY service/frontend/ service/frontend/
 # @ailens/domain 등 공유 패키지의 dist 를 먼저 만든다(프런트가 dist 를 소비).
-RUN npm run build --workspace @ailens/domain --if-present
+RUN npm run build --workspace @ailens/domain \
+    && npm run build --workspace @ailens/api-client \
+    && npm run build --workspace @ailens/auth
 RUN --mount=type=cache,target=/repo/service/frontend/.next/cache \
     npm run build --workspace service/frontend
 
