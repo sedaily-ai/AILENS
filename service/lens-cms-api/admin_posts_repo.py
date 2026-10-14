@@ -19,6 +19,7 @@ admin_extra 쪽이다.
 from __future__ import annotations
 
 import json
+import math
 import re
 import uuid
 from typing import Any, Dict, List, Optional
@@ -64,6 +65,15 @@ def _unique_slug(cur, publish_date: str, headline: str) -> str:
     return f"{base}-{n}"
 
 
+def _media_duration(source):
+    value=source.get('duration_seconds')
+    if value is None:
+        return None
+    if type(value) not in (int,float) or not math.isfinite(value) or not 0<value<=86400:
+        raise ValueError('duration_seconds는 측정한 0초 초과 86400초 이하 길이여야 합니다')
+    return value
+
+
 def _write_format_body(cur, rendition_id: int, fmt: str, source: Dict[str, Any],
                         media_embed_url: Optional[str], position_offset: int) -> int:
     """source(=body_inline 또는 lens 항목 하나)에서 fmt에 맞는 자식 행을 쓴다.
@@ -102,18 +112,18 @@ def _write_format_body(cur, rendition_id: int, fmt: str, source: Dict[str, Any],
             # 원래 스키마에 있었지만 이 INSERT가 한 번도 값을 넣은 적이 없어
             # 죽어있었다(v1.30에서 읽기 경로만 먼저 연결, 쓰기는 이번에 마저).
             cur.execute(
-                "INSERT INTO media_assets (rendition_id, media_type, file_url, thumbnail_url, transcript) "
-                "VALUES (%s,'video',%s,%s,%s) ON CONFLICT (rendition_id) DO NOTHING",
-                (rendition_id, video_url, source.get("thumbnail_url"), source.get("transcript")),
+                "INSERT INTO media_assets (rendition_id, media_type, file_url, thumbnail_url, transcript,duration_seconds) "
+                "VALUES (%s,'video',%s,%s,%s,%s) ON CONFLICT (rendition_id) DO NOTHING",
+                (rendition_id, video_url, source.get("thumbnail_url"), source.get("transcript"),_media_duration(source)),
             )
         return position_offset
     if fmt == "podcast":
         audio_url = media_embed_url or source.get("media_url")
         if audio_url:
             cur.execute(
-                "INSERT INTO media_assets (rendition_id, media_type, file_url, transcript) "
-                "VALUES (%s,'audio',%s,%s) ON CONFLICT (rendition_id) DO NOTHING",
-                (rendition_id, audio_url, source.get("transcript")),
+                "INSERT INTO media_assets (rendition_id, media_type, file_url, transcript,duration_seconds) "
+                "VALUES (%s,'audio',%s,%s,%s) ON CONFLICT (rendition_id) DO NOTHING",
+                (rendition_id, audio_url, source.get("transcript"),_media_duration(source)),
             )
         return position_offset
     return position_offset
@@ -373,6 +383,7 @@ def _update_lens_bundle_slice(
     item = dict(lenses[idx]) if idx is not None else {"label": label, "question": "", "bullets": []}
 
     incoming_body = data.get("body_inline") or {}
+    previous_media=item.get('video_url' if fmt=='video' else 'media_url')
     if fmt == "webtoon":
         item["images"] = incoming_body.get("images") or []
         # 2026-09-20 — 이 스코프 저장 경로가 images만 바꾸고 pending은 건드리지
@@ -396,6 +407,13 @@ def _update_lens_bundle_slice(
         # admin_extra(진실의 원천)가 실제 방금 바뀐 URL과 어긋난다.
         item["media_url"] = data.get("media_embed_url") or incoming_body.get("media_url")
         item["transcript"] = incoming_body.get("transcript")
+
+    if fmt in ('video','podcast'):
+        current_media=item.get('video_url' if fmt=='video' else 'media_url')
+        if 'duration_seconds' in incoming_body:
+            item['duration_seconds']=_media_duration(incoming_body)
+        elif current_media!=previous_media:
+            item['duration_seconds']=None
 
     if idx is not None:
         lenses[idx] = item

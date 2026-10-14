@@ -4,12 +4,9 @@ import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 /**
  * "오늘의 이슈, 4가지 시선"(lens) 공용 토큰.
  *
- * 시선별 메타데이터는 반드시 인덱스 기준으로 찾는다. 라벨 문자열은 admin(PostForm/LensMode.tsx의
- * LENS_LABELS)이 저장한 값이 그대로 내려오고 서비스 프런트엔드는 그 taxonomy를 모르므로,
- * 문자열 매칭은 admin 문구 수정만으로 조용히 깨진다. 순서는 레터 → 웹툰 → 팟캐스트 → 영상으로 고정이다.
- *
- * `lenses` 배열이 항상 4개라는 보장은 타입에도 백엔드(_shape_lens는 패딩하지 않음)에도 없다.
- * 따라서 lensPerspectiveAt()은 범위를 벗어난 인덱스에도 항상 값을 돌려준다.
+ * CMS의 실제 format을 우선한다. 제공하지 않는 형식은 배열에서 빠질 수 있어
+ * 실제 콘텐츠의 배열 위치를 고정 4형식의 인덱스로 해석하지 않는다.
+ * format이 없는 이전 응답은 기존 라벨/순서로 호환한다.
  */
 
 export const LENS_ACCENT = '#3b82f6';
@@ -131,6 +128,17 @@ export function lensFormatAt(i: number): LensFormat {
 /** 범위를 벗어나도 안전하다. lenses 길이가 4가 아닐 수 있다. */
 export function lensPerspectiveAt(i: number): LensPerspective {
   return LENS_PERSPECTIVES[i] ?? LENS_PERSPECTIVES[i % LENS_PERSPECTIVES.length] ?? LENS_PERSPECTIVES[0];
+}
+
+/** 실제 제공 항목의 형식. 기존 전체 4슬롯 응답의 위치 fallback을 보존한다. */
+export function lensFormatFor(item: { format?: LensFormat; label?: string } | undefined, index: number): LensFormat {
+  if (item?.format && LENS_FORMATS.includes(item.format)) return item.format;
+  const legacy: Record<string, LensFormat> = { '레터': 'letter', '읽기': 'letter', '웹툰': 'webtoon', '팟캐스트': 'podcast', '듣기': 'podcast', '영상': 'video' };
+  return (item?.label && legacy[item.label]) || lensFormatAt(index);
+}
+
+export function lensPerspectiveFor(item: { format?: LensFormat; label?: string } | undefined, index: number): LensPerspective {
+  return lensPerspectiveAt(LENS_FORMATS.indexOf(lensFormatFor(item, index)));
 }
 
 /** 홈 티저 칩 → 상세 딥링크(/lens/{id}#lens-2)에서 쓰는 앵커 id. */

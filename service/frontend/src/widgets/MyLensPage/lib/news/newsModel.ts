@@ -2,7 +2,7 @@ import { categoryForDataLabel, ECON_CATEGORIES, lensPath } from '@ailens/domain'
 import type { ReadingSignal } from '@/entities/user';
 import type { IssueLetter } from '@/features/letter';
 
-export type NewsArticle = { id: string; title: string; context: string; date: string; category: string; keywords: string[]; href: string };
+export type NewsArticle = { id: string; title: string; context: string; date: string; category: string; keywords: string[]; href: string; preferredFormat?: 'letter'|'webtoon'|'podcast'|'video'|null };
 export type NewsEvidence = Pick<ReadingSignal, 'id' | 'kind' | 'title' | 'categories' | 'keywords'>;
 export type NewsReason = { type: 'category' | 'keyword' | 'sentence'; text: string };
 export type NewsRecommendation = NewsArticle & { reasons: NewsReason[]; score: number };

@@ -3,7 +3,7 @@
 // 이미지(public/editors)가 있는 4명(민철 INTJ·하은 INFP·준서 ISTJ·소율 ESFP)을 앞에 두고, 나머지 4명(지훈·서연·예린·시우)은 손그림풍 졸라맨 선화(scripts/draw_editor_sketches.py)를 임시로 쓴다.
 // 소개 음성(옛 기록: ElevenLabs eleven_multilingual_v2) voiceId — 민철 RU7aSi6lT4uQBXMLgDxK(TeddyNote), 하은 AW5wrnG1jVizOYY7R1Oo(JiYoung), 준서 5XgfKMHL4qnyg2mabE5t(Deck), 소율 QPFsEL6IBxlT15xfiD6C(Hana Lee).
 // 에디터는 "누구의 관심 영역을 맡는가"로 나뉘고, 레터 본문은 모두 같은 중립 편집 원칙(주관·유도·권유 금지)을 따른다. 에디터는 AI 에디터이며 화면에 그렇게 표시한다.
-// 한 레터는 주제가 에디터의 담당 분야와 겹치면 여러 에디터에 속한다. 독자는 에디터를 여러 명 팔로우한다.
+// 작성자 표시는 서버의 작성자 관계를 따른다. 독자는 에디터를 여러 명 팔로우한다.
 import type { InterestItem } from './interestApi';
 import type { IssueLetter } from './letterTypes';
 
@@ -134,17 +134,9 @@ export const EDITORS: readonly LetterEditor[] = [
   },
 ];
 
-/** 레터의 작성 에디터(서버 지정). 지정이 없으면 레터의 주제 이름이 에디터의 담당 분야와 겹치는 에디터들(겹침이 많은 순). */
-export function editorsOfLetter(letter: Pick<IssueLetter, 'topics' | 'editors'>): LetterEditor[] {
-  // 서버가 작성 에디터를 지정했으면 그것을 따른다(구독자에게 메일이 가는 기준과 같다). 지정이 없으면 주제 겹침으로 추정한다.
-  if (letter.editors && letter.editors.length > 0) {
-    return letter.editors.map((id) => EDITORS.find((e) => e.id === id)).filter((e): e is LetterEditor => !!e);
-  }
-  const names = new Set(letter.topics ?? []);
-  return EDITORS.map((e) => ({ e, n: e.topics.filter((t) => names.has(t.name)).length }))
-    .filter((x) => x.n > 0)
-    .sort((a, b) => b.n - a.n)
-    .map((x) => x.e);
+/** 서버에 지정된 작성자만 표시한다. 담당 주제의 겹침을 작성자 근거로 사용하지 않는다. */
+export function editorsOfLetter(letter: Pick<IssueLetter, 'editors'>): LetterEditor[] {
+  return [...new Set(letter.editors ?? [])].map((id) => EDITORS.find((editor) => editor.id === id)).filter((editor): editor is LetterEditor => !!editor);
 }
 
 export function findEditor(id: string): LetterEditor | undefined {

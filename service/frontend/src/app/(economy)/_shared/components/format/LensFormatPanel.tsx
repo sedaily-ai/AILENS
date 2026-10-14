@@ -15,9 +15,9 @@ import { webtoonVariant } from '@/shared/lib/tracking/webtoonVariant';
 
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import {
-  lensFormatAt,
+  lensFormatFor,
   lensPanelId,
-  lensPerspectiveAt,
+  lensPerspectiveFor,
   lensTabId,
   READING_ACCENT,
 } from '@/shared/constants/lensPerspectives';
@@ -55,9 +55,9 @@ export function LensFormatPanel({
   /** 실측 오디오·영상 길이(초) 보고 — 부모가 FormatPicker의 분량 표기에 쓴다. */
   noteDur: (i: number, sec: number) => void;
 }) {
-  const p = lensPerspectiveAt(i);
+  const p = lensPerspectiveFor(l, i);
   const on = i === active;
-  const format = lensFormatAt(i);
+  const format = lensFormatFor(l, i);
   // 웹툰·팟캐스트·영상은 데모 스크립트 오버라이드(특정 기사 하드코딩)가 있으면 그것을, 없으면 admin이 채운 CMS 불릿을 쓴다.
   const scriptBullets =
     format === 'webtoon' || format === 'podcast' || format === 'video'
@@ -65,10 +65,11 @@ export function LensFormatPanel({
       : l.bullets;
   // 팟캐스트 대본 폴백 — CMS 팟캐스트 슬롯(l.bullets)에는 짧은 핵심 요약(3~5줄)만 저장되고 실제 음성 대본 텍스트는 없다.
   // 없는 문장을 지어내지 않기 위해 같은 기사의 가장 긴 완결 산문인 레터 포맷 전체 문단(lenses[0])을 대신 보여준다.
+  const reading = lens.lenses?.find((item, index) => lensFormatFor(item, index) === 'letter');
   const letterFullText =
     articleFormatSample(lens.id, 'letter') ??
-    ((lens.lenses ?? [])[0]?.paragraphs && (lens.lenses ?? [])[0].paragraphs!.length > 0
-      ? (lens.lenses ?? [])[0].paragraphs
+    (reading?.paragraphs && reading.paragraphs.length > 0
+      ? reading.paragraphs
       : null);
   const podcastScript =
     format === 'podcast' && letterFullText && letterFullText.length > 0 ? letterFullText : scriptBullets;
@@ -327,7 +328,7 @@ export function LensFormatPanel({
         </div>
       )}
       {/* 형식 이어 보기 — 이전/다음 형식으로 차례대로 넘긴다. */}
-      <FormatStepNav index={i} articleId={lens.id} category={lens.category ?? null} webtoonVariant={format === 'webtoon' ? webtoonVariant(realWebtoonCuts) : undefined} />
+      <FormatStepNav lenses={lens.lenses ?? []} index={i} articleId={lens.id} category={lens.category ?? null} webtoonVariant={format === 'webtoon' ? webtoonVariant(realWebtoonCuts) : undefined} />
     </section>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject } from 'react';
-import { lensFormatAt, lensPerspectiveAt, lensPanelId, lensTabId } from '@/shared/constants/lensPerspectives';
+import { lensFormatFor, lensPerspectiveFor, lensPanelId, lensTabId } from '@/shared/constants/lensPerspectives';
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { FormatIcon } from '@/app/(economy)/_shared/components/icons/LensIcons';
 import { formatAmount } from './lensSamples';
@@ -32,7 +32,7 @@ export function FormatPicker({
   tabRefs: MutableRefObject<(HTMLButtonElement | null)[]>;
 }) {
   const count = lenses?.length ?? 0;
-  const activeP = lensPerspectiveAt(active);
+  const activeP = lensPerspectiveFor(lenses?.[active], active);
 
   return (
     <div className="fmt-bar">
@@ -54,7 +54,7 @@ export function FormatPicker({
             정보는 이름·분량 텍스트가 전달하고 이건 관계만 나타내므로 aria에서 감춘다. */}
         <span className="fmt-thumb" aria-hidden />
         {(lenses ?? []).map((l, i) => {
-          const p = lensPerspectiveAt(i);
+          const p = lensPerspectiveFor(l, i);
           const on = i === active;
           const amt = formatAmount(lens, i, mediaDur[i]);
           return (
@@ -80,7 +80,7 @@ export function FormatPicker({
                   아이콘이 "약 2분"이 읽는 시간인지 듣는 시간인지도 구분해 준다. */}
               <span className="fmt-amt">
                 <span aria-hidden className="fmt-art">
-                  <FormatIcon format={lensFormatAt(i)} size={18} />
+                  <FormatIcon format={lensFormatFor(l, i)} size={18} />
                 </span>
                 {amt.text}
               </span>

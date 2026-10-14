@@ -1,8 +1,10 @@
 'use client';
+import { LetterShelfStatus } from '../LetterShelfStatus';
+import { LetterBookmarkIcon } from '../LetterBookmarkIcon';
 
 import { useEffect, useRef, useState } from 'react';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { LETTER_SHELF_NOTICE, useLetterShelf } from '../../lib/useLetterShelf';
+import { useLetterShelf } from '../../lib/useLetterShelf';
 
 const SIZES = [15.5, 16.5, 18, 19.5] as const;
 const SIZE_KEY = 'lens-letter-font';
@@ -84,14 +86,14 @@ export function ReadingTools({ slug, title }: { slug: string; title: string }) {
         <button type="button" onClick={() => changeSize(-1)} disabled={size === 0} aria-label="글자 작게">가<small>-</small></button>
         <output className="ld-size" aria-label="현재 글자 크기">{Math.round(SIZES[size] / SIZES[1] * 100)}%</output>
         <button type="button" onClick={() => changeSize(1)} disabled={size === SIZES.length - 1} aria-label="글자 크게">가<small>+</small></button>
-        <button type="button" onClick={() => { trackEvent('letter_save', { letter: slug, saved: !shelf.isSaved(slug) }); shelf.toggleSaved(slug); }} aria-describedby="ld-save-note" aria-pressed={shelf.isSaved(slug)} aria-label={shelf.isSaved(slug) ? '저장 해제' : '나중에 읽기 저장'}>
-          <svg viewBox="0 0 24 24" width="22" height="22" fill={shelf.isSaved(slug) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden><path d="M6 3.5h12v17l-6-4.2-6 4.2z" /></svg>
+        <button type="button" onClick={async () => { const saved = !shelf.isSaved(slug); if (await shelf.toggleSaved(slug)) trackEvent('letter_save', { letter: slug, saved }); }} disabled={!shelf.available || shelf.pending} aria-describedby="ld-save-note" aria-pressed={shelf.isSaved(slug)} aria-label={shelf.isSaved(slug) ? '저장 해제' : '나중에 읽기 저장'}>
+          <LetterBookmarkIcon saved={shelf.isSaved(slug)} />
         </button>
         <button type="button" onClick={share} disabled={sharing} aria-label="링크 복사">{sharing ? '공유 중' : shareStatus === 'copied' ? 'URL 복사됨' : shareStatus === 'shared' ? '공유 완료' : shareStatus === 'error' ? '복사 실패' : '공유'}</button>
         <span className="sr-only" role="status">{shareStatus === 'copied' ? '레터 URL을 복사했어요.' : shareStatus === 'shared' ? '레터를 공유했어요.' : shareStatus === 'error' ? 'URL을 복사하지 못했어요. 브라우저의 복사 권한을 확인해주세요.' : ''}</span>
       </div>
-      <p id="ld-save-note" className="lt-save-note">
-        {LETTER_SHELF_NOTICE.browser} {LETTER_SHELF_NOTICE.sync}
+      <LetterShelfStatus shelf={shelf} /><p id="ld-save-note" className="lt-save-note">
+        {shelf.notice}
       </p>
     </>
   );

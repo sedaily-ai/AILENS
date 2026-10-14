@@ -8,7 +8,7 @@ import { LoginPromptDialog } from '../dialog/LoginPromptDialog';
 import { SubscribeDialog } from '../dialog/SubscribeDialog';
 
 /** 선택한 에디터의 자기소개: 이미지, 역할, 소개 문구(인용), 담당 분야, 소개 음성(미리 만든 mp3), 팔로우, 메일 구독. */
-export function EditorIntro({ editor, following, onToggleFollow }: { editor: LetterEditor; following: boolean; onToggleFollow: () => void }) {
+export function EditorIntro({ editor, following, onToggleFollow, followAvailable=true, followPending=false }: { followAvailable?:boolean; followPending?:boolean; editor: LetterEditor; following: boolean; onToggleFollow: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -17,9 +17,9 @@ export function EditorIntro({ editor, following, onToggleFollow }: { editor: Let
 
   useEffect(() => () => { audio.current?.pause(); audio.current = null; }, [editor.id]);
 
-  // 팔로우는 로그인한 사용자만. 로그인하지 않았으면 안내 대화상자를 띄운다(언팔로우는 항상 가능).
+  // 팔로우·해제는 로그인한 계정으로만 처리한다. 비로그인은 안내 대화상자를 띄운다.
   const clickFollow = () => {
-    if (following || isAuthenticated) return onToggleFollow();
+    if (isAuthenticated) return onToggleFollow();
     if (!isLoading) setLoginOpen(true);
   };
 
@@ -54,7 +54,7 @@ export function EditorIntro({ editor, following, onToggleFollow }: { editor: Let
       <p className="lt-eintro-summary">{editor.forWhom}</p>
       <div className="lt-eintro-actions">
         <button type="button" className="lt-eintro-sub" aria-expanded={subOpen} onClick={() => setSubOpen(true)}>메일로 구독</button>
-        <button type="button" className="lt-eintro-btn" aria-pressed={following} onClick={clickFollow}>{following ? '팔로우 중' : '팔로우'}</button>
+        <button type="button" className="lt-eintro-btn" aria-pressed={following} disabled={isLoading||followPending||isAuthenticated&&!followAvailable} onClick={clickFollow}>{following ? '팔로우 중' : '팔로우'}</button>
       </div>
       <p className="lt-eintro-policy">팔로우는 로그인 후, 이메일 구독은 로그인 없이</p>
       <div className="lt-eintro-details">

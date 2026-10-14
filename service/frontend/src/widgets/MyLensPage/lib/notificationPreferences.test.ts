@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_NOTIFICATION_PREFERENCES as defaults, notificationPreferenceError, parseNotificationPreferences } from './notificationPreferences';
+import { notificationPreferencesEqual, DEFAULT_NOTIFICATION_PREFERENCES as defaults, notificationPreferenceError, parseNotificationPreferences } from './notificationPreferences';
 
 describe('개인화 알림의 브라우저 초안 경계', () => {
   it('기존 초안은 보존하고 저장 문장 기반 발송을 자동 선택하지 않는다', () => {
@@ -30,4 +30,11 @@ describe('개인화 알림의 브라우저 초안 경계', () => {
       expect(parseNotificationPreferences(JSON.stringify({ ...defaults, ...patch }))).toBeNull();
     }
   });
+});
+
+it('DB JSONB 필드 순서가 바뀌어도 저장된 설정을 미저장 변경으로 취급하지 않는다',()=>{
+ const a=defaults;
+ const b=Object.fromEntries(Object.entries(a).reverse()) as typeof a;
+ expect(notificationPreferencesEqual(a,b)).toBe(true);
+ expect(notificationPreferencesEqual(a,{...b,briefing:true})).toBe(false);
 });

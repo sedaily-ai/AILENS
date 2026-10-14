@@ -18,7 +18,7 @@ import logging
 
 from config.constants import CORS_HEADERS
 from core.decorators import lambda_handler as handler_decorator
-from core.auth import get_authenticated_user_id, try_get_authenticated_user_id
+from core.auth import get_authenticated_user_id
 from core.exceptions import AuthenticationError
 from services.user import archive as svc
 
@@ -53,6 +53,7 @@ def _parse_event(event: dict):
     else:
         body = {}
 
+    if not isinstance(body,dict):raise ValueError('JSON object required')
     return method, path, params, path_params, body
 
 
@@ -70,7 +71,10 @@ async def lambda_handler(event: dict, context) -> dict:
       DELETE /api/archive/{id}     — Delete a sentence
       POST   /api/archive/similar  — Find similar sentences
     """
-    method, path, params, path_params, body = _parse_event(event)
+    try:
+        method, path, params, path_params, body = _parse_event(event)
+    except (ValueError,TypeError,UnicodeError):
+        return svc.error(400,'JSON 객체로 요청해 주세요.')
 
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': ''}
@@ -81,9 +85,8 @@ async def lambda_handler(event: dict, context) -> dict:
     if method == 'GET' and '/popular' in path:
         return await svc.handle_popular(params)
 
-    # 쓰기 작업은 인증된 사용자가 필요하며 클라이언트가 보낸 user_id 는 JWT sub 로 덮어쓴다.
-    # 읽기는 인증된 사용자(본인 서랍 범위) 또는 익명(결과 없음)을 허용한다.
-    if method in ('POST', 'DELETE'):
+    # 개인 조회·변경 모두 검증된 JWT sub만 사용한다. 공개 인기 문장은 위에서 분리한다.
+    if method in ('GET', 'POST', 'DELETE'):
         try:
             verified_user_id = get_authenticated_user_id(event)
         except AuthenticationError as e:
@@ -91,11 +94,6 @@ async def lambda_handler(event: dict, context) -> dict:
         body['user_id'] = verified_user_id
         # DELETE 는 쿼리 파라미터의 user_id 를 쓸 수 있으므로 함께 덮어쓴다.
         params['user_id'] = verified_user_id
-    else:
-        # GET: 검증된 user_id 가 있으면 붙이되 필수는 아니다. 저장소 계층이 user_id 가 있을 때 범위를 제한한다.
-        anon_user_id = try_get_authenticated_user_id(event)
-        if anon_user_id:
-            params['user_id'] = anon_user_id
 
     # POST /api/archive/similar: 제공 종료된 기능이며, 저장 라우트로 잘못 처리되지 않도록 명시적으로 차단한다.
     if '/similar' in path:
@@ -107,7 +105,9 @@ async def lambda_handler(event: dict, context) -> dict:
 
     # GET /api/archive — List
     if method == 'GET':
-        return await svc.handle_list(params)
+        response = await svc.handle_list(params)
+        response.setdefault('headers', {})['Cache-Control'] = 'private, no-store'
+        return response
 
     # DELETE /api/archive/{id}
     if method == 'DELETE':

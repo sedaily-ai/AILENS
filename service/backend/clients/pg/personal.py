@@ -21,7 +21,7 @@ _TIMEOUT_SECONDS = 8
 _TOKEN = os.environ.get("LENS_CMS_API_TOKEN", "")
 
 
-def _request(method: str, path: str, body: Optional[dict] = None, query: Optional[dict] = None) -> Any:
+def _request(method: str, path: str, body: Optional[dict] = None, query: Optional[dict] = None, timeout_seconds: int = _TIMEOUT_SECONDS) -> Any:
     url = f"{_API_URL}{path}"
     if query:
         qs = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in query.items() if v is not None)
@@ -37,7 +37,7 @@ def _request(method: str, path: str, body: Optional[dict] = None, query: Optiona
         },
         method=method,
     )
-    with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as res:
+    with urllib.request.urlopen(req, timeout=timeout_seconds) as res:
         return json.loads(res.read())
 
 
@@ -51,8 +51,9 @@ def save_archived_sentence(user_id: str, text: str, article_no: Optional[str] = 
 def delete_archived_sentence(user_id: str, archive_id: str) -> bool:
     try:
         resp = _request("DELETE", f"/internal/personal/archives/{archive_id}", query={"user_id": user_id})
-    except urllib.error.HTTPError:
-        return False
+    except urllib.error.HTTPError as exc:
+        if exc.code==404:return False
+        raise
     return bool(resp.get("ok"))
 
 

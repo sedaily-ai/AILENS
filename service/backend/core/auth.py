@@ -105,6 +105,7 @@ def verify_cognito_token(event: Dict[str, Any]) -> Dict[str, Any]:
             audience=settings.cognito_app_client_id,
             issuer=_issuer(),
             options={
+                "require": ["exp", "sub", "iss", "aud"],
                 "verify_signature": True,
                 "verify_aud": True,
                 "verify_iss": True,
@@ -117,7 +118,7 @@ def verify_cognito_token(event: Dict[str, Any]) -> Dict[str, Any]:
         raise AuthenticationError("Token audience mismatch") from e
     except jwt.InvalidIssuerError as e:
         raise AuthenticationError("Token issuer mismatch") from e
-    except jwt.InvalidTokenError as e:
+    except (jwt.InvalidTokenError, TypeError, ValueError) as e:
         raise AuthenticationError("Invalid token") from e
 
     # Reject access tokens — they don't carry the user identity claims we want.
@@ -125,7 +126,7 @@ def verify_cognito_token(event: Dict[str, Any]) -> Dict[str, Any]:
     if claims.get('token_use') != 'id':
         raise AuthenticationError("Expected an ID token, got token_use=" + str(claims.get('token_use')))
 
-    if 'sub' not in claims:
+    if not isinstance(claims.get('sub'), str) or not claims['sub'].strip() or len(claims['sub']) > 64:
         raise AuthenticationError("Token missing 'sub' claim")
 
     return claims

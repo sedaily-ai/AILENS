@@ -30,6 +30,10 @@ class PersonalRepository:
         logger.info(f"Archived sentence saved: user={sentence.user_id} article={sentence.article_id}")
         # 이후 delete 가 서버 채번 id 를 사용하므로 호출자 객체에 id/created_at 을 반영한다.
         sentence.id = item["id"]
+        sentence.article_id = item.get('article_no') or sentence.article_id
+        sentence.article_title = item.get('article_title') or sentence.article_title
+        sentence.content_key = item.get('content_key')
+        sentence.href = item.get('href')
         sentence.created_at = item["created_at"] or sentence.created_at
         return True
 
@@ -115,6 +119,7 @@ def _to_legacy_archive_item(item: Dict[str, Any]) -> Dict[str, Any]:
         "id": item["id"],
         "user_id": item["user_id"],
         "text": item["text"],
+        "content_key": item.get("content_key"), "href": item.get("href"),
         "article_id": item.get("article_no") or "",
         "article_title": item.get("article_title") or "",
         "article_published_at": item.get("article_published_at") or "",

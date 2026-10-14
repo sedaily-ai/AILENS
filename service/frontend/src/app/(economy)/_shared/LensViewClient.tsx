@@ -8,8 +8,8 @@ import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { kstDateTimeLabel } from '@/shared/lib/date/date';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import {
-  lensFormatAt,
-  lensPerspectiveAt,
+  lensFormatFor,
+  lensPerspectiveFor,
   pickLensPhoto,
   READING_ACCENT,
 } from '@/shared/constants/lensPerspectives';
@@ -92,6 +92,7 @@ export function LensViewClient({
 
   const photo = pickLensPhoto(lens);
   const lenses = lens.lenses ?? [];
+  const activeFormat = lensFormatFor(lenses[active], active);
   // 레일 "듣기" — 팟캐스트 시선 탭으로 이동(없으면 항목 숨김).
   // 원문 링크 — 사진이 있으면 캡션 줄 오른쪽, 없으면 단독 줄.
   const sourceLink = lens.source_url ? (
@@ -101,7 +102,7 @@ export function LensViewClient({
       rel="noopener noreferrer"
       className="lnk"
       style={{ minHeight: 28, fontSize: 13 }}
-      onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: lensFormatAt(active), ...(lens.category ? { category: lens.category } : {}) })}
+      onClick={() => trackEvent('source_link_click', { article_id: lens.id, format: activeFormat, ...(lens.category ? { category: lens.category } : {}) })}
     >
       기사 원문 보기
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -115,12 +116,12 @@ export function LensViewClient({
   ) : null;
   // 레터 본문의 소제목 → 오른쪽 구간 목차(레터 탭일 때만 보임).
   // 레터 예상 읽기 시간(분) — 형식 탭의 "약 N분"과 같은 계산(readMinutes, 분당 500자).
-  const letterParas = lenses.find((l) => l.label === '레터')?.paragraphs;
+  const letterParas = lenses.find((l, index) => lensFormatFor(l, index) === 'letter')?.paragraphs;
   const readMin = letterParas && letterParas.length > 0 ? readMinutes(letterParas.join('').length) : null;
-  const chapters = letterChapters(lenses.find((l) => l.label === '레터')?.paragraphs);
-  const podcastIdx = lenses.findIndex((l) => l.label === '팟캐스트');
+  const chapters = letterChapters(lenses.find((l, index) => lensFormatFor(l, index) === 'letter')?.paragraphs);
+  const podcastIdx = lenses.findIndex((l, index) => lensFormatFor(l, index) === 'podcast');
   // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
-  const activeP = lensPerspectiveAt(active);
+  const activeP = lensPerspectiveFor(lenses[active], active);
   const ActiveIcon = activeP.icon;
 
   // Header·검색 오버레이·그리드·사이드바 배선은 ArticlePageShell에서 공통 처리한다.
@@ -141,7 +142,7 @@ export function LensViewClient({
         <ArticleReveal />
         {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
         {/* 웹툰 탭에서는 도구 레일을 숨겨 이미지에만 집중하게 한다. */}
-        <div className="rail-host" hidden={lensFormatAt(active) === 'webtoon'}>
+        <div className="rail-host" hidden={activeFormat === 'webtoon'}>
           <nav className="rail" aria-label="기사 도구">
             <ArticleToolRail
               title={seoHeadline(lens.headline)}
@@ -155,7 +156,7 @@ export function LensViewClient({
 
         <ArticleChapterNav
           chapters={chapters}
-          show={lensFormatAt(active) === 'letter'}
+          show={activeFormat === 'letter'}
           accent={READING_ACCENT}
         />
 
@@ -340,7 +341,7 @@ export function LensViewClient({
             </div>
 
             {/* AI 생성 콘텐츠 고지 */}
-            <AiDisclaimer sourceUrl={lens.source_url} articleId={lens.id} format={lensFormatAt(active)} />
+            <AiDisclaimer sourceUrl={lens.source_url} articleId={lens.id} format={activeFormat} />
           </div>
           </div>
         )}

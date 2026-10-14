@@ -21,8 +21,8 @@ def _endpoint(method, path):
     return None
 
 
-def test_route_count_unchanged():
-    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 131
+def test_route_count_includes_account_storage():
+    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 163
 
 
 def test_static_paths_win_over_param_paths():
@@ -30,3 +30,5 @@ def test_static_paths_win_over_param_paths():
     assert _endpoint("GET", "/api/v2/issue-letters/editors") == "issue_letter_editors"
     assert _endpoint("GET", "/admin/posts/by-source-url") == "admin_find_post_by_source_url"
     assert _endpoint("GET", "/internal/personal/archives/popular") == "internal_popular_archives"
+    assert _endpoint("GET", "/internal/personal/lens/preferences") == "preferences"
+    assert _endpoint("GET", "/internal/personal/lens/content/resolve") == "resolve"
