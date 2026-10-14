@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  listIssueLetters,
   listPosts,
   type HomePlayerPost,
+  type IssueLetterCard,
   type LensPost,
   type LetterPost,
   type VideoPost,
@@ -16,6 +18,7 @@ export interface HomeData {
   webtoons: WebtoonPost[];
   videos: VideoPost[];
   audio: HomePlayerPost[];
+  issueLetters: IssueLetterCard[];
 }
 
 export type HomeState =
@@ -43,12 +46,13 @@ export function useHomeData(opts: { media?: boolean } = {}) {
     if (silent) setRefreshing(true);
     else setState({ status: 'loading' });
     const { signal } = c;
-    const [letters, lens, webtoons, videos, audio] = await Promise.allSettled([
+    const [letters, lens, webtoons, videos, audio, issue] = await Promise.allSettled([
       listPosts<LetterPost>('letters', { limit: 100, signal }),
       listPosts<LensPost>('lens', { limit: 100, signal }),
       media ? listPosts<WebtoonPost>('webtoon', { limit: 20, signal }) : Promise.resolve([] as WebtoonPost[]),
       media ? listPosts<VideoPost>('video', { limit: 20, signal }) : Promise.resolve([] as VideoPost[]),
       media ? listPosts<HomePlayerPost>('home_player', { limit: 20, signal }) : Promise.resolve([] as HomePlayerPost[]),
+      media ? listIssueLetters(10, signal) : Promise.resolve([] as IssueLetterCard[]),
     ]);
     if (signal.aborted) return;
     setRefreshing(false);
@@ -65,6 +69,7 @@ export function useHomeData(opts: { media?: boolean } = {}) {
         webtoons: ok(webtoons),
         videos: ok(videos),
         audio: ok(audio),
+        issueLetters: ok(issue),
       },
     });
   }, [media]);

@@ -12,6 +12,7 @@ import { FormatPanel, FORMATS, PhotoHeader } from './FormatPanels';
 import { LetterArticle } from './LetterArticle';
 import { useArticle, type Article } from './useArticle';
 import { bookmarks, history } from '../mylens/stores';
+import { getPreferredFormat } from '../onboarding/prefs';
 import { SentenceSheet } from './SentenceSheet';
 
 const SITE = 'https://ailens.sedaily.ai';
@@ -21,7 +22,7 @@ const SITE = 'https://ailens.sedaily.ai';
  * 헤더에 글자 크기·공유, 상단에 읽기 진행바. 하단에 원문 링크와 같은 분류의 다른 글.
  */
 export function ArticleScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug, format } = useLocalSearchParams<{ slug: string; format?: string }>();
   const { state, reload } = useArticle(slug);
   const { scale, idx, cycle } = useFontScale();
   const [progress, setProgress] = useState(0);
@@ -96,7 +97,7 @@ export function ArticleScreen() {
               setProgress(max > 0 ? Math.min(1, Math.max(0, contentOffset.y / max)) : 0);
             }}
           >
-            {article.kind === 'lens' ? <LensArticle lens={article.post} scale={scale} onSaveText={setSentenceText} /> : <LetterHead post={article.post} scale={scale} onSaveText={setSentenceText} />}
+            {article.kind === 'lens' ? <LensArticle lens={article.post} scale={scale} onSaveText={setSentenceText} formatParam={format} /> : <LetterHead post={article.post} scale={scale} onSaveText={setSentenceText} />}
             <Footer article={article} />
           </ScrollView>
         )}
@@ -114,11 +115,21 @@ function Meta({ category, when, readMin }: { category?: string | null; when: str
   );
 }
 
-function LensArticle({ lens, scale, onSaveText }: { lens: LensPost; scale: number; onSaveText: (t: string) => void }) {
+function LensArticle({ lens, scale, onSaveText, formatParam }: { lens: LensPost; scale: number; onSaveText: (t: string) => void; formatParam?: string }) {
   const items = lens.lenses ?? [];
   // 형식 이름 → 탭. 데이터에 없는 형식은 탭에서 뺀다(빈 탭으로 길을 막지 않음).
   const tabs = FORMATS.map((f) => ({ ...f, item: items.find((l) => l.label === f.label) })).filter((t) => t.item);
+  // 기본 탭: 온보딩 결과로 넘어온 format 파라미터 → 저장된 선호 형식 → 첫 탭. 형식 인덱스(레터0·웹툰1·팟캐스트2·영상3)를 데이터에 있는 탭 위치로 바꾼다.
   const [active, setActive] = useState(0);
+  useEffect(() => {
+    const pref = formatParam !== undefined && formatParam !== '' ? Number(formatParam) : null;
+    void (pref !== null && Number.isInteger(pref) ? Promise.resolve(pref) : getPreferredFormat()).then((f) => {
+      const at = f === null ? -1 : tabs.findIndex((t) => t.label === FORMATS[f]?.label);
+      if (at >= 0) setActive(at);
+    });
+    // 글·파라미터가 바뀔 때만 한 번.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lens.id, formatParam]);
   const current = tabs[Math.min(active, tabs.length - 1)];
   const letter = items.find((l) => l.label === '레터');
   const readMin = letter?.paragraphs?.length ? readMinutes(letter.paragraphs.join('').length) : null;

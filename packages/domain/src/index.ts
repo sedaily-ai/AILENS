@@ -19,3 +19,6 @@ export * from './search/searchIndex.js';
 export * from './auth/passwordPolicy.js';
 export * from './content/letterBlocks.js';
 export * from './content/inlineText.js';
+export * from './onboarding/moments.js';
+export * from './onboarding/personas.js';
+export * from './onboarding/korean.js';

@@ -7,6 +7,8 @@ import { useHomeData, type HomeData } from './useHomeData';
 import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
 import { TimeMachineCard } from './sections/TimeMachineCard';
+import { StartCard } from './sections/StartCard';
+import { useOnboardingCompleted } from '../onboarding/prefs';
 
 const LATEST_COUNT = 8;
 
@@ -16,8 +18,9 @@ const LATEST_COUNT = 8;
  */
 type Section = { key: string; render: () => React.ReactElement | null };
 
-function buildSections(data: HomeData): Section[] {
+function buildSections(data: HomeData, showStart: boolean): Section[] {
   return [
+    ...(showStart ? [{ key: 'start', render: () => <StartCard /> }] : []),
     { key: 'paper', render: () => <PaperHero lens={data.lens} /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
     { key: 'timemachine', render: () => <TimeMachineCard /> },
@@ -27,6 +30,7 @@ function buildSections(data: HomeData): Section[] {
 // 홈 화면. 로드 상태와 섹션 조립만 맡고, 데이터 규칙은 model.ts, 조회는 useHomeData.ts, 화면 조각은 sections/* 에 있다.
 export function HomeScreen() {
   const { state, refreshing, reload, refresh } = useHomeData({ media: false });
+  const onboarded = useOnboardingCompleted();
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -45,7 +49,7 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data)}
+            data={buildSections(state.data, onboarded === false)}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}

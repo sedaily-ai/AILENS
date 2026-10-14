@@ -25,7 +25,7 @@ function buildSections(data: HomeData): Section[] {
     { key: 'webtoon', render: () => <WebtoonSection items={data.webtoons} /> },
     { key: 'video', render: () => <VideoSection items={data.videos} /> },
     ...cat(4, 6),
-    { key: 'letters', render: () => <LettersSection items={data.letters} /> },
+    { key: 'letters', render: () => <LettersSection items={data.issueLetters} /> },
     ...cat(6, 9),
   ];
 }
