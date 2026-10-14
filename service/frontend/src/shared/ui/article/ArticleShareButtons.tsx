@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Link as LinkIcon } from 'lucide-react';
 import {
   FacebookIcon,
@@ -71,6 +72,15 @@ export function ArticleShareButtons({ title, url }: { title: string; url: string
       >
         {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
       </button>
+      {(copied || kakaoCopied || igCopied) && createPortal(
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-6 left-1/2 z-[300] -translate-x-1/2 rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium whitespace-nowrap text-white shadow-lg"
+        >
+          링크 복사
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
