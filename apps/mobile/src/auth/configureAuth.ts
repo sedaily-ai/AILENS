@@ -5,8 +5,10 @@ import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 import { secureStorage } from './secureStorage';
 
 // 웹(service/frontend/src/shared/config/auth.ts)과 같은 User Pool·App Client 를 공유한다. 다른 건 redirect 뿐이다.
-// redirect URL 은 Cognito App Client 의 Callback/SignOut URLs 에 등록돼 있어야 한다(docs/architecture/auth-env-공유설계-Amplify.md).
-const APP_SCHEME = 'ailens';
+// redirect 는 인증된 https 링크(RFC 8252 권장: 유니버설 링크/앱 링크)를 쓴다 — 커스텀 스킴은 다른 앱이 가로챌 수 있다.
+// 웹 로그인(/auth/callback)과 겹치지 않게 앱 전용 경로(/app/auth/callback)를 쓰고, Cognito App Client 의
+// Callback/SignOut URLs 에 등록돼 있어야 한다. 절차: docs/architecture/apps-mobile-출시-서명-가이드.md, auth-env-공유설계-Amplify.md
+const APP_LINK_ORIGIN = 'https://ailens.sedaily.ai';
 
 let configured = false;
 
@@ -26,8 +28,8 @@ export function configureAuth(): void {
           oauth: {
             domain: 'sedaily-mbti.auth.us-east-1.amazoncognito.com',
             scopes: ['email', 'profile', 'openid'],
-            redirectSignIn: [`${APP_SCHEME}://auth/callback`],
-            redirectSignOut: [`${APP_SCHEME}://`],
+            redirectSignIn: [`${APP_LINK_ORIGIN}/app/auth/callback`],
+            redirectSignOut: [`${APP_LINK_ORIGIN}/app/auth/signout`],
             responseType: 'code',
             providers: ['Google'],
           },

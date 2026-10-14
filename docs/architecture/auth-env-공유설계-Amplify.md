@@ -68,7 +68,12 @@ packages/api-client 는 baseURL 을 하드코딩/process.env 에서 읽지 않�
 
 ## 인프라 변경 (앱 단계에서)
 
-- Cognito App Client `66c9bq3ovmk007d0eepkle92k3` 의 Callback/SignOut URLs 에 `ailens://auth/callback` 등 앱 딥링크 추가. (콘솔 또는 IaC. 웹 URL 은 유지 — 추가만.)
+- **redirect 는 인증된 https 링크로 확정(2026-10-14, RFC 8252 권장 방식)**. 커스텀 스킴(`ailens://`)은 다른 앱이 가로챌 수 있어 쓰지 않는다.
+  - 로그인 `https://ailens.sedaily.ai/app/auth/callback`, 로그아웃 `https://ailens.sedaily.ai/app/auth/signout`. 웹 로그인(`/auth/callback`)과 겹치면 모바일 브라우저의 웹 로그인이 앱으로 새므로 **앱 전용 경로 `/app/`** 를 쓴다.
+  - Cognito App Client `66c9bq3ovmk007d0eepkle92k3` 의 Callback/SignOut URLs 에 위 두 URL 추가(웹 URL 은 유지 — 추가만).
+  - Android: `app.config.ts` intentFilters(autoVerify) + `service/frontend/public/.well-known/assetlinks.json` 에 Play 앱 서명 키 SHA-256 등록.
+  - iOS: `associatedDomains` + `/.well-known/apple-app-site-association`(Apple Team ID 필요, 미등록).
+  - EAS development/preview 빌드는 서명 키가 달라 앱 링크 검증이 되지 않는다 — 해당 키 지문을 assetlinks 에 추가해 테스트한다.
 
 ## 안 하는 것
 

@@ -13,11 +13,14 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 - `apps/mobile`: 홈(오늘의 레터)·LENS·레터 탭을 목록으로, `article/[slug]`를 letters·lens 공용 상세로 구현. 공통 `AsyncView`(로딩/오류/재시도)·`PostCard`·`useAsync`(abort·재시도).
 - 웹 코드는 건드리지 않음(웹은 기존 `cmsPostsApi` 유지).
 
-- 앱 인증 코드 추가(A안: aws-amplify RN): `src/auth/{configureAuth,secureStorage,authProvider,AuthContext}`, `(tabs)/me.tsx`(로그인/로그아웃 화면), 루트에 `AuthProvider` 연결. 토큰은 SecureStore(Keychain/Keystore)에 저장, 웹과 같은 User Pool·App Client 공유, redirect=`ailens://auth/callback`.
+- 앱 인증 코드 추가(A안: aws-amplify RN): `src/auth/{configureAuth,secureStorage,authProvider,AuthContext}`, `(tabs)/me.tsx`(로그인/로그아웃 화면), 루트에 `AuthProvider` 연결. 토큰은 SecureStore(Keychain/Keystore)에 저장, 웹과 같은 User Pool·App Client 공유, redirect=`https://ailens.sedaily.ai/app/auth/callback`(인증된 https 앱 링크, 아래 결정 참조).
 - 의존성 추가: aws-amplify, @aws-amplify/react-native, @aws-amplify/rtn-web-browser, async-storage, netinfo, react-native-get-random-values(루트 package-lock 갱신).
 - 탭 헤더를 끄고 각 화면이 제목·상단 여백을 직접 그리도록 정리(이중 여백 방지).
 
 ## 결정
+
+- **로그인 redirect 는 커스텀 스킴이 아니라 인증된 https 링크(RFC 8252 권장)로 확정.** 100만 DL 목표라 나중에 바꾸는 비용을 피하려고 처음부터 정석으로 간다. 웹 로그인과 충돌하지 않게 앱 전용 경로 `/app/`을 쓴다.
+- 라이브 `assetlinks.json` 의 지문(`D6:1C:…`)은 현재 Play 앱 서명 키(`41:03:4F:…`, Play Console 값)와 달라 검증이 안 되는 상태였음 → Play 앱 서명 키 지문 추가(기존 유지). 웹 배포 전.
 
 - 단건 조회는 백엔드의 `GET /api/v2/posts/{slug}`(slug=글 id)를 사용(공개·무인증, 라이브 200 확인).
 - 상세는 `lenses` 필드 유무로 letters/lens 를 구분.
@@ -31,7 +34,9 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 
 ## 다음
 
-- Cognito App Client(`66c9bq3ovmk007d0eepkle92k3`)의 Callback/SignOut URLs 에 `ailens://auth/callback`·`ailens://` 추가(현재 웹 3개 URL 만 등록, 공개 클라이언트·code flow 확인). 기존 URL 은 유지하고 추가만. 운영 인증 설정 변경이라 승인 후 실행.
+- Cognito App Client(`66c9bq3ovmk007d0eepkle92k3`)의 Callback/SignOut URLs 에 `https://ailens.sedaily.ai/app/auth/callback`·`/app/auth/signout` 추가(현재 웹 3개 URL 만 등록, 공개 클라이언트·code flow 확인). 기존 URL 은 유지하고 추가만. 운영 인증 설정 변경이라 승인 후 실행.
+- 웹에 `assetlinks.json` 배포(승인 후), iOS 는 Apple Team ID 확보 후 `apple-app-site-association` 추가.
+- Amplify RN 의 https redirect 동작(특히 iOS ASWebAuthenticationSession https 콜백은 iOS 17.4+) 은 개발 빌드에서 실측 필요 — 막히면 `ailens://` 폴백 검토.
 - 로그인은 네이티브 모듈(rtn-web-browser)이 필요해 Expo Go 불가 — EAS development build 로 확인.
 - 에뮬레이터/실기기에서 화면 확인.
 - `apps/mobile` ESLint 설정 추가.
