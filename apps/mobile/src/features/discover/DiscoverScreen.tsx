@@ -9,6 +9,7 @@ import { CategorySection } from '../home/sections/CategorySection';
 import { LettersSection } from '../home/sections/LettersSection';
 import { VideoSection, WebtoonSection } from '../home/sections/MediaRails';
 import { useHomeData, type HomeData } from '../home/useHomeData';
+import { GamesCard } from '../home/sections/GamesCard';
 
 type Section = { key: string; render: () => React.ReactElement | null };
 
@@ -27,6 +28,7 @@ function buildSections(data: HomeData): Section[] {
     ...cat(4, 6),
     { key: 'letters', render: () => <LettersSection items={data.issueLetters} /> },
     ...cat(6, 9),
+    { key: 'games', render: () => <GamesCard /> },
   ];
 }
 

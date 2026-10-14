@@ -22,3 +22,4 @@ export * from './content/inlineText.js';
 export * from './onboarding/moments.js';
 export * from './onboarding/personas.js';
 export * from './onboarding/korean.js';
+export * from './content/games.js';

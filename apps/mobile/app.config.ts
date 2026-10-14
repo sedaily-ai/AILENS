@@ -45,6 +45,8 @@ const config: ExpoConfig = {
     // 듣기(백그라운드 재생·잠금화면 컨트롤)용. 녹음은 쓰지 않으므로 마이크 권한은 요청하지 않는다.
     ['expo-audio', { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: true }],
     'expo-video',
+    // 알림 수신(권한·채널). 서버 발송·FCM(Android) 설정은 별도: docs/architecture/apps-mobile-출시-서명-가이드.md 참조.
+    'expo-notifications',
   ],
   experiments: {
     typedRoutes: true,

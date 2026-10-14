@@ -7,6 +7,7 @@ import Constants from 'expo-constants';
 import { configureApiClient } from '@ailens/api-client';
 import { AuthProvider } from '../src/auth/AuthContext';
 import { PlayerProvider } from '../src/features/player/PlayerContext';
+import { usePushNavigation } from '../src/features/push/pushSetup';
 
 configureAuth();
 
@@ -20,6 +21,7 @@ configureApiClient({
 
 // 루트 레이아웃. 탭 그룹 + 상세 스택 + 인증 컨텍스트. 푸시 등록은 M2 에서 붙인다.
 export default function RootLayout() {
+  usePushNavigation();
   return (
     <SafeAreaProvider>
       <AuthProvider>

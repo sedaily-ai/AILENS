@@ -7,7 +7,7 @@ import { colors } from '../src/theme';
 const SITE = 'https://ailens.sedaily.ai';
 
 // 계정 — 프로필 아이콘의 진입점(햄버거 메뉴를 대신한다): 로그인/로그아웃, 약관·정책, 앱 정보.
-// 약관·개인정보 페이지는 웹 경로를 연다(경로는 웹 라우트 확인 후 조정 필요, 미확인).
+// 약관·개인정보·소개·문의는 웹 (company) 페이지를 앱 안 WebView 로 연다(/info/[page]).
 export default function AccountScreen() {
   const { state, signOut } = useAuth();
   const router = useRouter();
@@ -35,8 +35,12 @@ export default function AccountScreen() {
         )}
       </View>
       {state.status === 'signedIn' ? <Row label="비밀번호 변경" onPress={() => router.push('/settings/password')} /> : null}
-      <Row label="이용약관" onPress={() => Linking.openURL(`${SITE}/terms`)} />
-      <Row label="개인정보처리방침" onPress={() => Linking.openURL(`${SITE}/privacy`)} />
+      <Row label="알림 설정" onPress={() => router.push('/settings/notifications')} />
+      <Row label="게임" onPress={() => router.push('/games')} />
+      <Row label="서비스 소개" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'about' } })} />
+      <Row label="문의하기" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'contact' } })} />
+      <Row label="이용약관" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'terms' } })} />
+      <Row label="개인정보처리방침" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'privacy' } })} />
       <Row label="AI LENS 웹사이트" onPress={() => Linking.openURL(SITE)} />
       <Text style={styles.version}>AI LENS BETA</Text>
     </View>

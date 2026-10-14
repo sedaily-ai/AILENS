@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
+import { Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, type View as RNView } from 'react-native';
 import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { categoryForDataLabel, displayCategoryLabel, displayHeadline, lensPath, readMinutes } from '@ailens/domain';
+import { categoryForDataLabel, displayCategoryLabel, displayHeadline, letterChapters, lensPath, readMinutes } from '@ailens/domain';
 import type { LensPost } from '@ailens/api-client';
 import { AsyncView } from '../../components/AsyncView';
 import { kstDateTime } from '../../lib/format';
@@ -11,11 +12,14 @@ import { FONT_SCALES, useFontScale } from './FontScale';
 import { FormatPanel, FORMATS, PhotoHeader } from './FormatPanels';
 import { LetterArticle } from './LetterArticle';
 import { useArticle, type Article } from './useArticle';
+import { ChapterContext } from './chapterContext';
 import { bookmarks, history } from '../mylens/stores';
 import { getPreferredFormat } from '../onboarding/prefs';
 import { SentenceSheet } from './SentenceSheet';
 
 const SITE = 'https://ailens.sedaily.ai';
+
+
 
 /**
  * 기사 상세 — 웹 LensViewClient / letters 상세 대응. LENS 글은 4가지 형식 탭(읽기·웹툰·듣기·영상), letters 글은 본문 한 벌.
@@ -27,6 +31,15 @@ export function ArticleScreen() {
   const { scale, idx, cycle } = useFontScale();
   const [progress, setProgress] = useState(0);
   const [saved, setSaved] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const chapters = useRef(new Map<number, RNView>());
+  const [tocOpen, setTocOpen] = useState(false);
+  const goChapter = (no: number) => {
+    const node = chapters.current.get(no);
+    const inner = scrollRef.current?.getInnerViewNode?.();
+    setTocOpen(false);
+    if (node && inner) node.measureLayout(inner as never, (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - 16), animated: true }), () => {});
+  };
   const [sentenceText, setSentenceText] = useState<string | null>(null);
 
   // 글이 열리면 열람 기록에 남기고, 저장(북마크) 여부를 읽는다.
@@ -89,6 +102,7 @@ export function ArticleScreen() {
       <AsyncView state={state} onRetry={reload}>
         {(article) => (
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.content}
             scrollEventThrottle={64}
             onScroll={(e) => {
@@ -97,11 +111,14 @@ export function ArticleScreen() {
               setProgress(max > 0 ? Math.min(1, Math.max(0, contentOffset.y / max)) : 0);
             }}
           >
-            {article.kind === 'lens' ? <LensArticle lens={article.post} scale={scale} onSaveText={setSentenceText} formatParam={format} /> : <LetterHead post={article.post} scale={scale} onSaveText={setSentenceText} />}
+            <ChapterContext.Provider value={{ register: (no, node) => (node ? chapters.current.set(no, node) : chapters.current.delete(no)) }}>
+              {article.kind === 'lens' ? <LensArticle lens={article.post} scale={scale} onSaveText={setSentenceText} formatParam={format} onToc={() => setTocOpen(true)} /> : <LetterHead post={article.post} scale={scale} onSaveText={setSentenceText} />}
+            </ChapterContext.Provider>
             <Footer article={article} />
           </ScrollView>
         )}
       </AsyncView>
+      {ready && ready.kind === 'lens' ? <TocSheet open={tocOpen} lens={ready.post} onPick={goChapter} onClose={() => setTocOpen(false)} /> : null}
       {summary ? <SentenceSheet text={sentenceText} article={{ id: summary.id, title: summary.title, publishedAt: ready?.post.published_at }} onClose={() => setSentenceText(null)} /> : null}
     </View>
   );
@@ -115,7 +132,7 @@ function Meta({ category, when, readMin }: { category?: string | null; when: str
   );
 }
 
-function LensArticle({ lens, scale, onSaveText, formatParam }: { lens: LensPost; scale: number; onSaveText: (t: string) => void; formatParam?: string }) {
+function LensArticle({ lens, scale, onSaveText, formatParam, onToc }: { lens: LensPost; scale: number; onSaveText: (t: string) => void; formatParam?: string; onToc: () => void }) {
   const items = lens.lenses ?? [];
   // 형식 이름 → 탭. 데이터에 없는 형식은 탭에서 뺀다(빈 탭으로 길을 막지 않음).
   const tabs = FORMATS.map((f) => ({ ...f, item: items.find((l) => l.label === f.label) })).filter((t) => t.item);
@@ -154,6 +171,12 @@ function LensArticle({ lens, scale, onSaveText, formatParam }: { lens: LensPost;
               );
             })}
           </View>
+          {current.label === '레터' && letterChapters(current.item!.paragraphs).length >= 2 ? (
+            <Pressable style={styles.tocBtn} onPress={onToc} accessibilityRole="button">
+              <Ionicons name="list-outline" size={18} color={colors.text} />
+              <Text style={styles.tocText}>목차 {letterChapters(current.item!.paragraphs).length}개 구간</Text>
+            </Pressable>
+          ) : null}
           <FormatPanel key={current.label} lens={lens} item={current.item!} scale={scale} onSaveText={onSaveText} />
         </>
       ) : lens.context ? (
@@ -175,11 +198,40 @@ function LetterHead({ post, scale, onSaveText }: { post: Article['post']; scale:
   );
 }
 
+function TocSheet({ open, lens, onPick, onClose }: { open: boolean; lens: LensPost; onPick: (no: number) => void; onClose: () => void }) {
+  const chapters = letterChapters(lens.lenses?.find((l) => l.label === '레터')?.paragraphs);
+  return (
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="닫기" />
+      <View style={styles.tocSheet}>
+        <Text style={styles.tocHead}>목차</Text>
+        {chapters.map((c, i) => (
+          <Pressable key={c.id} style={styles.tocRow} onPress={() => onPick(i)} accessibilityRole="button">
+            <Text style={styles.tocNo}>{String(i + 1).padStart(2, '0')}</Text>
+            <Text style={styles.tocLabel} numberOfLines={2}>{c.full}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </Modal>
+  );
+}
+
 function Footer({ article }: { article: Article }) {
   const source = article.post.source_url;
   const category = article.post.category;
+  const [copied, setCopied] = useState(false);
+  const link = article.kind === 'lens' ? `${SITE}${lensPath(article.post)}` : `${SITE}/letters/${encodeURIComponent(article.post.id)}`;
   return (
     <View style={styles.footer}>
+      <Pressable
+        style={styles.sourceBtn}
+        onPress={() => void Clipboard.setStringAsync(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })}
+        accessibilityRole="button"
+      >
+        <Ionicons name={copied ? 'checkmark' : 'link-outline'} size={16} color={colors.text} />
+        <Text style={styles.sourceText}>{copied ? '링크를 복사했어요' : '링크 복사'}</Text>
+      </Pressable>
+      <View style={{ height: 10 }} />
       {source ? (
         <Pressable onPress={() => Linking.openURL(source)} style={styles.sourceBtn} accessibilityRole="link">
           <Text style={styles.sourceText}>기사 원문 보기</Text>
@@ -187,6 +239,12 @@ function Footer({ article }: { article: Article }) {
         </Pressable>
       ) : null}
       <Text style={styles.disclaimer}>AI LENS는 서울경제 기사를 바탕으로 AI가 재구성한 콘텐츠예요. 중요한 판단 전에는 원문을 확인해 주세요.</Text>
+      {article.prev || article.next ? (
+        <View style={styles.neighbors}>
+          {article.next ? <Neighbor label="다음 글(최근)" post={article.next} /> : null}
+          {article.prev ? <Neighbor label="이전 글" post={article.prev} /> : null}
+        </View>
+      ) : null}
       {article.related.length > 0 ? (
         <View style={styles.related}>
           <Text style={styles.relatedHead}>{category && categoryForDataLabel(category) ? `${displayCategoryLabel(category)}의 다른 글` : '다른 글'}</Text>
@@ -204,7 +262,30 @@ function Footer({ article }: { article: Article }) {
   );
 }
 
+function Neighbor({ label, post }: { label: string; post: LensPost }) {
+  return (
+    <Link href={{ pathname: '/article/[slug]', params: { slug: post.id } }} asChild>
+      <Pressable style={styles.neighbor} accessibilityRole="link">
+        <Text style={styles.nbLabel}>{label}</Text>
+        <Text style={styles.nbTitle} numberOfLines={2}>{displayHeadline(post.headline)}</Text>
+      </Pressable>
+    </Link>
+  );
+}
+
 const styles = StyleSheet.create({
+  tocBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 14, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#f3f4f6' },
+  tocText: { fontSize: 13, fontWeight: '700', color: colors.text },
+  scrim: { flex: 1, backgroundColor: 'rgba(17,24,39,0.45)' },
+  tocSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
+  tocHead: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 6 },
+  tocRow: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  tocNo: { width: 24, fontSize: 13, fontWeight: '800', color: '#5b8def', marginTop: 2 },
+  tocLabel: { flex: 1, fontSize: 15, lineHeight: 22, color: colors.text },
+  neighbors: { marginTop: 28, gap: 10 },
+  neighbor: { padding: 14, borderRadius: 12, backgroundColor: '#f9fafb', borderWidth: 1, borderColor: colors.line },
+  nbLabel: { fontSize: 12, fontWeight: '800', color: colors.textFaint },
+  nbTitle: { marginTop: 4, fontSize: 15.5, lineHeight: 22, fontWeight: '700', color: colors.text },
   root: { flex: 1, backgroundColor: colors.bg },
   progress: { height: 2, backgroundColor: '#2563eb', zIndex: 2 },
   tools: { flexDirection: 'row', alignItems: 'center', gap: 18 },

@@ -34,6 +34,8 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 
 - 나머지 웹 기능 이식 1차: 나의 LENS(서랍·저장·읽은 글·관심 분야·읽기 통계), 문장 저장, 비밀번호 변경, 카테고리 하위 분류·페이지네이션, 검색 범위·하위 분류 필터, 그날로 떠나요(타임머신)·지난 지면. 웹 "나의 LENS"는 대부분 브라우저 저장·초안 단계이고 서버(리워드·저장 동기화·개인화 푸시)가 미구현이라 해당 부분은 이식 대상에서 제외(백엔드 인수인계 문서 참고).
 
+- 웹 기능 이식 2차: 시작하기(온보딩), 이슈 레터(목록·상세·투표), 게임(WebView), 안내 페이지(약관·개인정보·소개·문의, WebView), 알림 설정(기기 권한·테스트), 기사 목차·이전/다음·링크 복사. 도메인 승격 추가(온보딩·게임·비밀번호 정책), 웹 tsc·vitest 통과. 서버가 없거나 데이터 원천이 불명확한 항목(용어 해설·레터 구독·리워드·푸시 서버)은 사유와 함께 설계 문서에 보류로 기록.
+
 ## 결정
 
 - **로그인 redirect 는 커스텀 스킴이 아니라 인증된 https 링크(RFC 8252 권장)로 확정.** 100만 DL 목표라 나중에 바꾸는 비용을 피하려고 처음부터 정석으로 간다. 웹 로그인과 충돌하지 않게 앱 전용 경로 `/app/`을 쓴다.
@@ -50,6 +52,10 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 - 인증 코드 추가 후에도 `tsc` 통과, android 번들 성공(3.7MB). 미확인: 실제 로그인 흐름, 실기기·에뮬레이터 렌더링, ESLint(`apps/mobile`에 eslint 설정 없음).
 
 ## 다음
+
+- 네이티브 모듈(webview·notifications·device·clipboard·audio·video) 추가로 EAS 개발 빌드 재생성 후 실기기 검증.
+- 푸시: Firebase 프로젝트·FCM 키(EAS credentials)와 `services/push` 서버 확정 후 토큰 등록·발송 연결.
+- 용어 해설 데이터 원천 확인, 레터 구독 API 확정 후 이식.
 
 - [완료 2026-10-14] Cognito App Client(`66c9bq3ovmk007d0eepkle92k3`)의 Callback/SignOut URLs 에 `https://ailens.sedaily.ai/app/auth/callback`·`/app/auth/signout` 추가(기존 URL 유지, 변경 필드는 CallbackURLs·LogoutURLs 뿐임을 전후 비교로 확인, 사용자가 직접 실행)(현재 웹 3개 URL 만 등록, 공개 클라이언트·code flow 확인). 기존 URL 은 유지하고 추가만. 운영 인증 설정 변경이라 승인 후 실행.
 - [완료 2026-10-14] 웹 `assetlinks.json` 배포(ECS 리비전 114, 라이브에서 지문 2개 확인). 추가한 지문 `41:03:4F:…`은 Play Console 앱 서명 키 SHA-256 과 재대조 필요. iOS 는 Apple Team ID 확보 후 `apple-app-site-association` 추가.

@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BADGE_HEAD, parseLetterBlocks, parseVoteChoices, type GlossaryTerm, type LetterBlock } from '@ailens/domain';
 import { colors } from '../../theme';
 import { PostVote } from './PostVote';
+import { useChapterRegister } from './chapterContext';
 import { RichText } from './RichText';
 
 const ACCENT = '#5b8def'; // 웹 READING_ACCENT
@@ -35,6 +36,7 @@ export function LetterBody({
   /** 본문 문단을 길게 누르면 그 문단 텍스트를 넘긴다(문장 저장). */
   onSaveText?: (text: string) => void;
 }) {
+  const chapter = useChapterRegister();
   const blocks = useMemo(() => parseLetterBlocks(paragraphs, { headline }), [paragraphs, headline]);
   const [term, setTerm] = useState<{ term: string; explain: string } | null>(null);
   const total = blocks.filter((b) => b.type === 'sub').length;
@@ -86,7 +88,7 @@ export function LetterBody({
             return <View key={bi}>{rt(b.text, false, { fontWeight: '600', color: '#111827', marginTop: 4 })}</View>;
           case 'sub':
             return (
-              <View key={bi} style={styles.sub}>
+              <View key={bi} style={styles.sub} ref={(n) => chapter?.register(b.no, n)} collapsable={false}>
                 <Text style={styles.chNo}>
                   {String(b.no + 1).padStart(2, '0')} <Text style={styles.chTotal}>/ {String(total).padStart(2, '0')}</Text>
                 </Text>
