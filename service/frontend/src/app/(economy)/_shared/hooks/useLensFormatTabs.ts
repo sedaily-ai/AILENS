@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { lensFormatAt, lensPanelId, parseLensView } from '@/shared/constants/lensPerspectives';
+import { lensFormatFor, lensPanelId, parseLensView } from '@/shared/constants/lensPerspectives';
 import { useNewsReadingSignal } from '@/entities/user';
 
 /**
@@ -12,12 +12,12 @@ import { useNewsReadingSignal } from '@/entities/user';
  */
 export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | undefined) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
+  const [active, setActive] = useState(0);
   useNewsReadingSignal(lens ? {
     id: lens.id, kind: 'news', title: lens.headline,
     categories: lens.category ? [lens.category] : [],
     keywords: [...new Set((lens.lenses ?? []).flatMap((item) => (item.keywords ?? []).map((word) => word.term)))].slice(0, 30),
-  } : null);
-  const [active, setActive] = useState(0);
+  } : null, lensFormatFor(lens?.lenses?.[active], active));
   // 실제 오디오·영상 길이(초). loadedmetadata에서만 채워 임의의 길이를 표시하지 않는다(lensSamples.ts의 clock() 참조).
   const [mediaDur, setMediaDur] = useState<Record<number, number>>({});
   // 직전 이동 방향(-1 왼쪽 / 0 없음 / +1 오른쪽). 인디케이터와 본문 진입 방향을 맞추는 데만 쓴다.
@@ -61,12 +61,14 @@ export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | un
   // 홈에서 고른 시선(?v=N)을 연다. 제목·사진·리드가 맥락을 주므로 스크롤은 건드리지 않는다.
   useEffect(() => {
     if (count === 0) return;
-    const i = parseLensView(window.location.search);
-    if (i === null || i >= count) return;
+    const explicit = parseLensView(window.location.search);
+    const preferred = new URLSearchParams(window.location.search).get('format');
+    const i = explicit ?? (preferred ? lens?.lenses?.findIndex((item,index)=>lensFormatFor(item,index)===preferred) ?? -1 : -1);
+    if (i < 0 || i >= count) return;
     const raf = requestAnimationFrame(() => setActive(i));
     return () => cancelAnimationFrame(raf);
     // 딥링크 진입에서는 설명(showDesc)을 띄우지 않는다. 탭을 직접 누르면(select()) 표시된다.
-  }, [count]);
+  }, [count, lens]);
 
   // KPI 계측(포맷 전환율)과 방향성 전환·형식 설명 토스트. setActive를 함수형 업데이트로 호출해 deps 없이 직전 active를 읽는다.
   // select는 useCallback([])로 유지해야 tabRefs 등의 참조가 깨지지 않는다.
@@ -75,8 +77,8 @@ export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | un
       if (prev !== i && lens) {
         trackEvent('format_switch', {
           article_id: lens.id,
-          from_format: lensFormatAt(prev),
-          to_format: lensFormatAt(i),
+          from_format: lensFormatFor(lens.lenses?.[prev], prev),
+          to_format: lensFormatFor(lens.lenses?.[i], i),
           ...(lens.category ? { category: lens.category } : {}),
         });
       }

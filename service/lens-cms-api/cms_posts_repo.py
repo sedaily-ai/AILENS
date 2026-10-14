@@ -148,6 +148,7 @@ def _fetch_lens_items(cur, pub_id: int, admin_extra: Optional[Dict[str, Any]] = 
         extra_item = extra_by_label.get(label) or {}
         items.append({
             "label": label,
+            "format": fmt,
             "question": extra_item.get("question") or "",
             "bullets": [b for b in (extra_item.get("bullets") or []) if b],
             # 2026-09-11 — 본문 핵심 용어 하이라이트용(term+explain 쌍).

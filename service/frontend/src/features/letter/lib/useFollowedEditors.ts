@@ -1,38 +1,31 @@
 'use client';
-
-import { useCallback, useEffect, useState } from 'react';
-import { EDITORS, unionInterests } from '../data/editors';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/entities/user';
+import { EDITORS } from '../data/editors';
 import type { InterestItem } from '../data/interestApi';
-
-const KEY = 'lens-letter-editors';
-
-function readIds(): string[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? '[]');
-    return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string' && EDITORS.some((e) => e.id === id)) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** 이 기기에서 팔로우한 에디터(목업: 브라우저에 저장). 바꿀 때마다 에디터들의 세부 분야 합집합을 서버의 이 기기 관심으로 보내, 같은 목록에 "왜 맞는지"가 표시되게 한다. */
-export function useFollowedEditors(syncInterests: (items: InterestItem[]) => Promise<boolean>) {
-  const [ids, setIds] = useState<string[]>([]);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    // 마운트 뒤 브라우저 저장값을 읽는다(서버 렌더 결과와 첫 클라이언트 렌더를 같게 두려는 것).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIds(readIds());
-    setReady(true);
-  }, []);
-
-  const toggle = useCallback((id: string) => {
-    const next = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
-    setIds(next);
-    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* 저장 불가 환경이면 이번 방문에만 유지 */ }
-    void syncInterests(unionInterests(EDITORS.filter((e) => next.includes(e.id))));
-  }, [ids, syncInterests]);
-
-  return { ready, ids, followed: EDITORS.filter((e) => ids.includes(e.id)), isFollowing: (id: string) => ids.includes(id), toggle };
+import { getAccountFollows, isAccountAuthError, setAccountFollow, type AccountFollow } from '../data/accountApi';
+const CHANGED='lens-account-followed-editors-changed';
+export function useFollowedEditors(syncInterests?: (items:InterestItem[])=>Promise<boolean>){
+  void syncInterests; // 호출부 호환 인자. 팔로우로 직접 선택한 관심을 덮어쓰지 않는다.
+  const {user,isLoading}=useAuth(),owner=user?.userId??null;
+  const current=useRef(owner);current.current=owner;
+  const controller=useRef<AbortController|null>(null),inFlight=useRef(false);
+  const [state,setState]=useState<{owner:string|null;items:AccountFollow[];ready:boolean;available:boolean;error:string;authRequired:boolean}>({owner,items:[],ready:false,available:false,error:'',authRequired:false});
+  const [revision,setRevision]=useState(0),[pending,setPending]=useState(false);
+  useEffect(()=>{
+    if(isLoading)return;
+    const abort=new AbortController();controller.current=abort;
+    let sequence=0;
+    const load=async()=>{const seq=++sequence;try{const data=owner?await getAccountFollows(abort.signal):{items:[]};if(!abort.signal.aborted&&seq===sequence)setState({owner,items:data.items,ready:true,available:!!owner,error:'',authRequired:false});}catch(error){if(!abort.signal.aborted&&seq===sequence)setState(previous=>({...previous,owner,items:previous.owner===owner?previous.items:[],ready:true,available:false,error:error instanceof Error?error.message:'팔로우를 불러오지 못했어요.',authRequired:isAccountAuthError(error)}));}};
+    void load();const changed=()=>void load();const storage=(event:StorageEvent)=>{if(event.key==='lens-account-follows-revision'||event.key===null)changed();};
+    for(const event of [CHANGED,'focus','pageshow'])window.addEventListener(event,changed);window.addEventListener('storage',storage);
+    return()=>{abort.abort();for(const event of [CHANGED,'focus','pageshow'])window.removeEventListener(event,changed);window.removeEventListener('storage',storage);};
+  },[owner,isLoading,revision]);
+  const valid=state.owner===owner,items=valid?state.items:[],ids=items.map(item=>item.id);
+  const toggle=async(id:string)=>{
+    if(!owner||isLoading||!valid||!state.available||inFlight.current)return false;
+    inFlight.current=true;setPending(true);
+    try{await setAccountFollow(id,!ids.includes(id),controller.current?.signal);if(current.current!==owner)return false;window.dispatchEvent(new Event(CHANGED));try{localStorage.setItem('lens-account-follows-revision',`${owner}:${Date.now()}`);}catch{/* 포커스 복귀에서 재조회 */}return true;}catch(error){if(current.current===owner)setState(previous=>({...previous,error:error instanceof Error?error.message:'팔로우를 저장하지 못했어요.',authRequired:isAccountAuthError(error)}));return false;}finally{inFlight.current=false;setPending(false);}
+  };
+  return{ready:!isLoading&&valid&&state.ready,available:valid&&state.available,authRequired:valid&&state.authRequired,error:valid?state.error:'',pending,items,ids,followed:EDITORS.filter(e=>ids.includes(e.id)&&items.some(item=>item.id===e.id&&item.active)),isFollowing:(id:string)=>ids.includes(id),toggle,retry:()=>setRevision(n=>n+1)};
 }

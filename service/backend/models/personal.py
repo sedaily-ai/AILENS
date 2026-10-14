@@ -17,7 +17,7 @@ SK patterns:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from common.dates.validation import KST
 
@@ -43,6 +43,8 @@ class ArchivedSentence:
     article_published_at: str = ''  # ISO 8601
     created_at: str = ''
     id: str = ''                    # "{user_id}-{article_id}-{timestamp}" (auto-generated)
+    content_key: Optional[str] = None
+    href: Optional[str] = None
 
     def __post_init__(self):
         if not self.created_at:
@@ -68,6 +70,7 @@ class ArchivedSentence:
             article_title=item.get('article_title', ''),
             article_published_at=item.get('article_published_at', ''),
             created_at=item.get('created_at', ''),
+            content_key=item.get('content_key'), href=item.get('href'),
         )
 
     def to_api(self) -> Dict[str, Any]:
@@ -75,6 +78,7 @@ class ArchivedSentence:
         return {
             'id': self.id,
             'text': self.text,
+            'content_key': self.content_key, 'href': self.href,
             'article_id': self.article_id,
             'article_title': self.article_title,
             'article_published_at': self.article_published_at,

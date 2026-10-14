@@ -130,6 +130,7 @@ import routes_pipeline_state
 import routes_letters
 import routes_quiz
 import routes_users
+import routes_dashboard
 import routes_articles
 import routes_community
 import routes_prompts
@@ -141,6 +142,7 @@ app.include_router(routes_pipeline_state.router)
 app.include_router(routes_letters.router)
 app.include_router(routes_quiz.router)
 app.include_router(routes_users.router)
+app.include_router(routes_dashboard.router)
 app.include_router(routes_articles.router)
 app.include_router(routes_community.router)
 app.include_router(routes_prompts.router)

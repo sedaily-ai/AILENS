@@ -1,5 +1,5 @@
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
-import { lensFormatAt } from '@/shared/constants/lensPerspectives';
+import { lensFormatFor } from '@/shared/constants/lensPerspectives';
 
 // 형식 패널 보조 로직 — 실측 재생시간 계산(clock/readMinutes/formatAmount)과 데모 샘플.
 
@@ -35,7 +35,7 @@ export function formatAmount(
   const l = (lens.lenses ?? [])[i];
   const nope = { text: '준비 중', spoken: '준비 중' };
   if (!l) return nope;
-  const format = lensFormatAt(i);
+  const format = lensFormatFor(l, i);
 
   if (format === 'letter') {
     const paras =
@@ -124,11 +124,12 @@ export function articleFormatSample(
 // "핵심 요약" 불릿 — 실제 lens 데이터 기반이며 인용하기 쉬운 리스트·통계를 상단에 둔다(AI 답변엔진 노출에 유리).
 // 우선순위는 레터(0) → 팟캐스트(2) → 영상(3) → 웹툰(1)(LENS_FORMATS 인덱스 기준). 레터는 [핵심 요약] 전용 불릿이 있어 카드만 보고도 이해된다.
 // 웹툰 컷 캡션은 그림과 함께 볼 때만 뜻이 완결되므로 레터가 비었을 때의 폴백으로만 쓴다.
-const SUMMARY_BULLET_FORMAT_ORDER = [0, 2, 3, 1];
+const SUMMARY_BULLET_FORMAT_ORDER = ['letter', 'podcast', 'video', 'webtoon'] as const;
 
 export function coreSummaryBullets(lens: CmsLens): string[] {
-  for (const i of SUMMARY_BULLET_FORMAT_ORDER) {
-    const bullets = (lens.lenses ?? [])[i]?.bullets?.filter((b) => b && b.trim());
+  for (const format of SUMMARY_BULLET_FORMAT_ORDER) {
+    const item = lens.lenses?.find((value, index) => lensFormatFor(value, index) === format);
+    const bullets = item?.bullets?.filter((b) => b && b.trim());
     if (bullets && bullets.length > 0) return bullets.slice(0, 4);
   }
   return [];

@@ -74,6 +74,8 @@ export interface CmsVideo {
  * (backend cms_posts_public.py _shape_lens 와 1:1).
  */
 export interface CmsLensItem {
+  /** 서버 rendition 식별자. 인덱스가 생략된 콘텐츠도 실제 형식을 알 수 있다. */
+  format?: 'letter' | 'webtoon' | 'podcast' | 'video';
   label: string;
   question: string;
   bullets: string[];

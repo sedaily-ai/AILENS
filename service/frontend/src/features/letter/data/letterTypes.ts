@@ -63,7 +63,7 @@ export interface IssueLetter {
   featured?: boolean;
   /** 레터의 주제 태그(주제 사전의 이름). 주 주제가 앞에 온다. 목록 카드·상세 머리에 보이고, 이후 독자의 관심 설정·추천의 기준이 된다. */
   topics?: string[];
-  /** 서버가 지정한 작성 에디터 slug(없으면 주제 겹침으로 추정). */
+  /** 서버가 지정한 작성 에디터 slug. 없으면 작성자를 추정하지 않는다. */
   editors?: string[];
   /** 독자 관심과 겹친 이유(사실형 한 문장). 관심 기반 추천에서만 있다. */
   reason?: string;

@@ -3,7 +3,7 @@ import { ArrowUpRight, Bookmark, Check, Clock3 } from 'lucide-react';
 import { editorsOfLetter, type IssueLetter } from '@/features/letter';
 
 export function DashboardLetter({ letter, featured = false, saved, read, onSave }: { letter: IssueLetter; featured?: boolean; saved: boolean; read: boolean; onSave: () => void }) {
-  const editors = editorsOfLetter(letter);
+  const editors = letter.editors?.length ? editorsOfLetter(letter) : [];
   return (
     <article className={`ml-letter${featured ? ' ml-featured' : ''}`} data-testid={`letter-${letter.slug}`}>
       <div className="ml-letter-top"><span>{letter.categories.join(' · ') || '레터'}</span><button type="button" className="ml-bookmark" onClick={onSave} aria-label={`${letter.title} ${saved ? '저장 해제' : '저장'}`} aria-pressed={saved} aria-describedby="ml-storage-note"><Bookmark size={19} fill={saved ? 'currentColor' : 'none'} /></button></div>
@@ -11,7 +11,7 @@ export function DashboardLetter({ letter, featured = false, saved, read, onSave 
         <h3>{letter.title}</h3><p className="ml-deck">{letter.deck}</p>
       </Link>
       {letter.reason && <p className="ml-reason">{letter.reason}</p>}
-      <div className="ml-letter-foot"><span>{editors.slice(0, 2).map((editor) => editor.name).join(' · ') || 'AI LENS'} <span className="ml-dim">에디터</span></span><span><Clock3 size={13} /> 약 {Math.max(1, letter.readMinutes || 1)}분 {read && <><Check size={13} /> 열람</>}</span></div>
+      <div className="ml-letter-foot"><span>{editors.slice(0, 2).map((editor) => editor.name).join(' · ') || 'AI LENS'} <span className="ml-dim">에디터</span></span><span><Clock3 size={13} /> {letter.readMinutes > 0 ? `약 ${letter.readMinutes}분` : '소요 시간 확인 중'} {read && <><Check size={13} /> 완료</>}</span></div>
       {featured && <Link href={`/letter/${encodeURIComponent(letter.slug)}`} className="ml-read-link" prefetch={false}>레터 읽기 <ArrowUpRight size={17} /></Link>}
     </article>
   );

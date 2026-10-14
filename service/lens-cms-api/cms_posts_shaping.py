@@ -205,6 +205,7 @@ def shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
     lenses = [
         {
             "label": item.get("label") or "",
+            **({"format": item["format"]} if item.get("format") in ("letter", "webtoon", "podcast", "video") else {}),
             "question": item.get("question") or "",
             "bullets": [x for x in (item.get("bullets") or []) if x],
             # "레터" 포맷 전용 용어 하이라이트(term+explain 쌍, 2026-09-11) —

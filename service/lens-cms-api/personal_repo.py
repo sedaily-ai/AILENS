@@ -26,16 +26,20 @@ user_readings는 다른 호출부(publication_id 경유)가 정상 동작 중이
 from __future__ import annotations
 
 import hashlib
+from urllib.parse import quote
 from typing import Any, Dict, List, Optional
 
 from db import get_cursor
+from content_resolver import resolve_content,ARCHIVE_SOURCE_JOIN_SQL,DashboardError
+from dashboard_repo import _account
 
 
-_ARCHIVE_SELECT = """
+_ARCHIVE_SELECT = f"""
     SELECT ua.id, ua.user_id, ua.article_no, ua.rendition_id, ua.content, ua.saved_at,
-           a.title AS article_title, a.published_at AS article_published_at
+           ap.title AS article_title, ap.published_at AS article_published_at,
+           ap.id AS publication_id, ap.slug AS publication_slug, ap.status AS publication_status, ap.deleted_at AS publication_deleted_at
     FROM user_archives ua
-    LEFT JOIN publications a ON a.slug = ua.article_no
+    {ARCHIVE_SOURCE_JOIN_SQL}
 """
 
 
@@ -46,6 +50,8 @@ def _archive_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
         "article_no": row.get("article_no"),
         "rendition_id": row.get("rendition_id"),
         "text": row["content"],
+        "content_key": f"publication:{row['publication_id']}" if row.get('publication_id') else None,
+        "href": f"/lens/{quote(row['publication_slug'], safe='')}" if row.get('publication_slug') and row.get('publication_status') == 'published' and row.get('publication_deleted_at') is None else None,
         "article_title": row.get("article_title") or "",
         "article_published_at": row["article_published_at"].isoformat() if row.get("article_published_at") else "",
         "created_at": row["saved_at"].isoformat() if row.get("saved_at") else None,
@@ -56,6 +62,11 @@ def save_archived_sentence(user_id: str, text: str, article_no: Optional[str] = 
                             rendition_id: Optional[int] = None) -> Dict[str, Any]:
     sentence_hash = hashlib.sha256(text.encode()).hexdigest()
     with get_cursor() as cur:
+        _account(cur,user_id,create=True)
+        if article_no:
+            key_type = 'id' if article_no.startswith('publication:') else 'slug'
+            key = article_no.removeprefix('publication:') if key_type == 'id' else article_no
+            article_no = resolve_content(cur, 'publication', key_type, key)['slug']
         cur.execute(
             """
             INSERT INTO user_archives (user_id, article_no, rendition_id, sentence_hash, content)
@@ -71,7 +82,10 @@ def save_archived_sentence(user_id: str, text: str, article_no: Optional[str] = 
 
 
 def delete_archived_sentence(user_id: str, archive_id: str) -> bool:
+    if not isinstance(archive_id,str) or not archive_id.isascii() or not archive_id.isdigit() or not 0<int(archive_id)<2**63:
+        raise DashboardError(400,'INVALID_ARGUMENT','문장 ID를 확인해 주세요.')
     with get_cursor() as cur:
+        _account(cur,user_id,write=True)
         cur.execute(
             "DELETE FROM user_archives WHERE id = %s AND user_id = %s RETURNING id",
             (archive_id, user_id),
@@ -81,7 +95,9 @@ def delete_archived_sentence(user_id: str, archive_id: str) -> bool:
 
 def list_archived_sentences(user_id: str, date_from: Optional[str] = None,
                              date_to: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+    if type(limit) is not int or not 1<=limit<=200:raise DashboardError(400,'INVALID_ARGUMENT','조회 개수는1~200이에요.')
     with get_cursor() as cur:
+        _account(cur,user_id)
         sql = _ARCHIVE_SELECT + " WHERE ua.user_id = %s"
         params: List[Any] = [user_id]
         if date_from:

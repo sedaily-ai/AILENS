@@ -23,5 +23,7 @@ describe('문장별 관련 뉴스', () => {
   it('원문 메타데이터가 있으면 정식 기사 주소를 사용하고 없으면 기존 상세 주소를 보존한다', () => {
     expect(sentenceSourceHref(sentence, [article('source', '반도체 원문')], [])).toBe('/industry/2026/10/14/source');
     expect(sentenceSourceHref(sentence, [], [])).toBe('/lens/source');
+    expect(sentenceSourceHref({ ...sentence, href: '/lens/canonical' }, [], [])).toBe('/lens/canonical');
+    expect(sentenceSourceHref({ ...sentence, href: '//external.invalid' }, [], [])).toBe('/lens/source');
   });
 });

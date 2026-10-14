@@ -8,7 +8,7 @@ import { EDITORS, type InterestItem, type TopicOption } from '@/features/letter'
 // 기존 interests_repo.py의 저장 계약. 분야와 주제를 합쳐 최대 40개다.
 const MAX_INTERESTS = 40;
 
-export function InterestDialog({ initial, topics, onSave, onClose }: { initial: InterestItem[]; topics: TopicOption[]; onSave: (items: InterestItem[]) => Promise<boolean>; onClose: () => void }) {
+export function InterestDialog({ initial, topics, onSave, onClose, account = false, error: externalError }: { account?: boolean; error?: string; initial: InterestItem[]; topics: TopicOption[]; onSave: (items: InterestItem[]) => Promise<boolean>; onClose: () => void }) {
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +39,7 @@ export function InterestDialog({ initial, topics, onSave, onClose }: { initial: 
     setBusy(true); setError('');
     try { if (await onSave(items)) { onClose(); return; } }
     catch { /* 선택을 보존하고 같은 저장 버튼으로 재시도한다. */ }
-    setError('관심사를 저장하지 못했어요. 선택은 유지돼요. 다시 시도해 주세요.');
+    setError('관심사를 저장하지 못했어요. 선택은 유지돼요. 아래 안내를 확인해 주세요.');
     setBusy(false);
   };
   return (
@@ -50,8 +50,8 @@ export function InterestDialog({ initial, topics, onSave, onClose }: { initial: 
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
-      <header className="ml-interest-head"><div className="ml-dialog-head"><h2 id="ml-interest-title">나의 관심사</h2><button type="button" className="ml-icon-button" aria-label="관심사 설정 닫기" onClick={onClose} disabled={busy}><X size={21} /></button></div><p id="ml-interest-intro" className="ml-dialog-intro">선택한 분야와 주제를 뉴스·레터 추천에 반영해요.</p><p id="ml-interest-scope" className="ml-interest-scope">이 브라우저의 설정이에요. 기기 간 동기화는 준비 중이며, 알림은 별도로 선택해요.</p></header>
-      <div className="ml-interest-body">
+      <header className="ml-interest-head"><div className="ml-dialog-head"><h2 id="ml-interest-title">나의 관심사</h2><button type="button" className="ml-icon-button" aria-label="관심사 설정 닫기" onClick={onClose} disabled={busy}><X size={21} /></button></div><p id="ml-interest-intro" className="ml-dialog-intro">선택한 분야와 주제를 뉴스·레터 추천에 반영해요.</p><p id="ml-interest-scope" className="ml-interest-scope">{account ? '로그인한 계정에 저장돼요. 알림 수신은 별도 동의가 필요해요.' : '이 브라우저의 설정이에요. 알림은 별도로 선택해요.'}</p></header>
+      <div className="ml-interest-body">{externalError && <p role="alert">{externalError}</p>}
         <section className="ml-interest-selection" aria-labelledby="ml-interest-selected-title"><div className="ml-interest-section-head"><h3 id="ml-interest-selected-title">선택한 관심 <span>{items.length}</span></h3><button type="button" className="ml-text-link" disabled={busy || !items.length} onClick={() => setItems([])}>선택 초기화</button></div>{items.length ? <div className="ml-selected-interests">{items.map((item) => <button type="button" key={`${item.type}:${item.key}`} disabled={busy} onClick={() => toggle(item.type, item.key)} aria-label={`${nameFor(item)} 선택 해제`}>{nameFor(item)}<X size={12} aria-hidden /></button>)}</div> : <p className="ml-interest-empty-selection">아직 고른 관심이 없어요. 아래에서 궁금한 분야부터 골라보세요.</p>}{limitReached && <p className="ml-interest-help" role="status">분야와 주제를 합쳐 최대 {MAX_INTERESTS}개까지 선택할 수 있어요. 기존 선택을 해제하면 다른 관심을 고를 수 있어요.</p>}</section>
         <fieldset disabled={busy}><legend>관심 분야</legend><p className="ml-interest-help">먼저 자주 보고 싶은 뉴스 분야를 골라주세요.</p><div className="ml-check-grid ml-interest-categories">{ECON_CATEGORIES.map((category) => <label key={category.slug}><input type="checkbox" checked={selected('category', category.slug)} disabled={limitReached && !selected('category', category.slug)} onChange={() => toggle('category', category.slug)} /><span>{category.label}</span></label>)}</div></fieldset>
         <fieldset disabled={busy}><legend>관심 주제 <span className="ml-interest-optional">선택 사항</span></legend><p className="ml-interest-help">분야별로 살펴보거나, 모든 주제에서 검색해 보세요.</p>

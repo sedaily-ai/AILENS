@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from typing import Any, Dict, Optional
 from fastapi import Body, Header, HTTPException, Query
 import personal_repo
+from content_resolver import DashboardError
 import subscribers_repo
 from route_guards import _check_admin_token
 
@@ -56,16 +57,22 @@ def internal_list_subscriptions(
 @router.post("/internal/personal/archives")
 def internal_save_archive(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
-    return {"archive": personal_repo.save_archived_sentence(
-        payload["user_id"], payload["text"],
-        article_no=payload.get("article_no"), rendition_id=payload.get("rendition_id"),
-    )}
+    try:
+        return {"archive": personal_repo.save_archived_sentence(
+            payload["user_id"], payload["text"],
+            article_no=payload.get("article_no"), rendition_id=payload.get("rendition_id"),
+        )}
+    except DashboardError as exc:
+        raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
 
 
 @router.delete("/internal/personal/archives/{archive_id}")
 def internal_delete_archive(archive_id: str, user_id: str = Query(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
-    return {"ok": personal_repo.delete_archived_sentence(user_id, archive_id)}
+    try:
+        return {"ok": personal_repo.delete_archived_sentence(user_id, archive_id)}
+    except DashboardError as exc:
+        raise HTTPException(exc.status, detail={"code":exc.code,"message":exc.message}) from exc
 
 
 @router.get("/internal/personal/archives")
@@ -73,11 +80,14 @@ def internal_list_archives(
     user_id: str = Query(...),
     date_from: Optional[str] = Query(default=None),
     date_to: Optional[str] = Query(default=None),
-    limit: int = Query(default=100),
+    limit: int = Query(default=100,ge=1,le=200),
     x_internal_token: Optional[str] = Header(default=None),
 ):
     _check_admin_token(x_internal_token)
-    return {"archives": personal_repo.list_archived_sentences(user_id, date_from, date_to, limit)}
+    try:
+        return {"archives": personal_repo.list_archived_sentences(user_id, date_from, date_to, limit)}
+    except DashboardError as exc:
+        raise HTTPException(exc.status, detail={"code":exc.code,"message":exc.message}) from exc
 
 
 @router.get("/internal/personal/archives/popular")

@@ -15,6 +15,8 @@ export interface ArchiveSentencePayload {
 }
 
 export interface ArchiveSentenceResponse {
+  content_key?: string | null;
+  href?: string | null;
   id: string;
   text: string;
   article_id: string;

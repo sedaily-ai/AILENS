@@ -52,3 +52,8 @@ export function parseNotificationPreferences(raw: string | null): NotificationPr
     return notificationPreferenceError(preferences) ? null : preferences;
   } catch { return null; }
 }
+
+/** PostgreSQL JSONB의 필드 순서가 달라도 같은 설정으로 판단한다. */
+export function notificationPreferencesEqual(a: NotificationPreferences | null | undefined, b: NotificationPreferences | null | undefined): boolean {
+  return !!a && !!b && (Object.keys(DEFAULT_NOTIFICATION_PREFERENCES) as (keyof NotificationPreferences)[]).every(key => a[key] === b[key]);
+}

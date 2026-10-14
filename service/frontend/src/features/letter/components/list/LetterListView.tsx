@@ -1,11 +1,12 @@
 'use client';
+import { LetterShelfStatus } from '../LetterShelfStatus';
 
 import { useEffect, useMemo, useState } from 'react';
 import { editorsOfLetter, findEditor } from '../../data/editors';
 import type { IssueLetter } from '../../data/letterTypes';
 import { useFollowedEditors } from '../../lib/useFollowedEditors';
 import { useInterests } from '../../lib/useInterests';
-import { LETTER_SHELF_NOTICE, useLetterShelf } from '../../lib/useLetterShelf';
+import { useLetterShelf } from '../../lib/useLetterShelf';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AllSide } from './AllSide';
 import { EditorBar } from './EditorBar';
@@ -51,13 +52,13 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
     () =>
       letters.map((l) => {
         if (interests.reasons[l.slug]) return { ...l, reason: interests.reasons[l.slug] };
-        const ed = editorsOfLetter(l).find((e) => follow.isFollowing(e.id));
+        const ed = (l.editors ?? []).flatMap(id => { const editor=findEditor(id); return editor ? [editor] : []; }).find(e => follow.isFollowing(e.id));
         return ed ? { ...l, reason: `팔로우한 ${ed.name} 에디터가 쓴 레터예요` } : l;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [letters, interests.reasons, follow.ids],
   );
-  const mine = (l: IssueLetter) => editorsOfLetter(l).some((e) => follow.isFollowing(e.id));
+  const mine = (l: IssueLetter) => (l.editors ?? []).some(id => follow.isFollowing(id));
   const openLetter = (l: IssueLetter, position: number) =>
     trackEvent('letter_card_click', {
       slug: l.slug,
@@ -81,7 +82,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
     const counts = new Map<string, number>();
     for (const l of letters) {
       if (!shelf.isRead(l.slug)) continue;
-      const lead = editorsOfLetter(l)[0];
+      const lead = l.editors?.[0] ? findEditor(l.editors[0]) : undefined;
       if (lead) counts.set(lead.id, (counts.get(lead.id) ?? 0) + 1);
     }
     const top = [...counts].filter(([id, n]) => n >= 2 && !follow.isFollowing(id) && !dismissed.includes(id)).sort((a, b) => b[1] - a[1])[0];
@@ -109,11 +110,11 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
       <div className="lt-layout">
         {editor && (
           <aside className="lt-aside lt-aside-editor">
-            <EditorIntro key={editor.id} editor={editor} following={follow.isFollowing(editor.id)} onToggleFollow={() => follow.toggle(editor.id)} />
+            <EditorIntro key={editor.id} editor={editor} following={follow.isFollowing(editor.id)} onToggleFollow={() => { void follow.toggle(editor.id); }} followAvailable={follow.available} followPending={follow.pending} />
           </aside>
         )}
         <main id="main-content" tabIndex={-1} className="lt-main">
-          <div className="lt-toolbar">
+          <LetterShelfStatus shelf={shelf} />{follow.error&&<p className="lt-save-note" role="alert">{follow.error} <button type="button" onClick={follow.retry}>팔로우 다시 불러오기</button></p>}<div className="lt-toolbar">
             <h2 className="lt-sec-h lt-sec-inline">{editor ? `${editor.name}의 레터 ${shown.length}편` : `최신 레터 ${shown.length}편`}</h2>
             <div className="lt-toolbar-r">
               {shelf.ready && (
@@ -124,7 +125,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
           </div>
           {shelf.ready && (
             <p id="lt-save-note" className="lt-save-note">
-              {LETTER_SHELF_NOTICE.browser} {LETTER_SHELF_NOTICE.sync}
+              {shelf.notice}
             </p>
           )}
           {topic && (
@@ -141,7 +142,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
           )}
           {shown.length > 0 ? (
             <div className="lt-rows">
-              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => shelf.toggleSaved(l.slug)} saveNoticeId={shelf.ready ? 'lt-save-note' : undefined} />)}
+              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => { void shelf.toggleSaved(l.slug); }} saveNoticeId={shelf.ready ? 'lt-save-note' : undefined} />)}
             </div>
           ) : (
             <div className="lt-empty" role="status">
