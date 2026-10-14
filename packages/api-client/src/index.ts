@@ -3,3 +3,4 @@
 // 참고: docs/architecture/auth-env-공유설계-Amplify.md
 export * from './config.js';
 export * from './posts.js';
+export * from './postVote.js';

@@ -29,10 +29,23 @@ export interface LetterPost {
 }
 
 export interface LensItem {
+  /** 형식 이름: '레터' | '웹툰' | '팟캐스트' | '영상'. */
   label: string;
   question: string;
   bullets: string[];
+  /** 레터 형식의 본문 문단(마크다운 비슷한 표기, domain parseLetterBlocks 가 해석). */
   paragraphs?: string[];
+  /** 레터 형식의 용어집(본문에서 탭하면 설명). */
+  keywords?: Array<{ term: string; explain: string }>;
+  /** 웹툰 형식의 컷. */
+  images?: WebtoonPanel[];
+  /** 영상 형식: mp4(또는 임베드) 주소와 썸네일. */
+  video_url?: string | null;
+  thumbnail_url?: string | null;
+  /** 팟캐스트 형식: 오디오 주소. */
+  media_url?: string | null;
+  /** 팟캐스트·영상 형식의 전체 대본. */
+  transcript?: string | null;
 }
 
 export interface LensPost {

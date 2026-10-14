@@ -30,6 +30,8 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 
 - **로그인 redirect 정정**: 개발 빌드에서 `InvalidAppSchemeException`(앱 시작 시) 발생 → Amplify RN 소스(`getRedirectUrl.native`) 확인 결과 https redirect 불가. 앱 스킴 `ailens://auth/callback`·`ailens://auth/signout` 로 변경, Cognito 콜백·로그아웃 URL 에 추가 필요(스크립트 `cognito-add-app-scheme.sh`, 사용자 실행). 앞서 등록한 https URL·assetlinks 는 향후 자체 PKCE 전환 대비로 유지.
 
+- 기사 상세 고도화: 웹 레터 파서·인라인 서식·용어집 분할 등 순수 로직을 `@ailens/domain` 으로 승격(웹은 재수출·사용으로 전환, 웹 vitest 95·레터 파서 12 통과, eslint 이상 없음). 앱은 4형식 탭·레터 블록·용어 시트·투표·글자 크기·진행바·공유·같은 분류 글·letters 전용 본문(차트·이미지·리치텍스트). 실제 글 20건으로 파서가 예외 없이 도는 것을 확인(소제목 74·비교 8·특별 칸 57).
+
 ## 결정
 
 - **로그인 redirect 는 커스텀 스킴이 아니라 인증된 https 링크(RFC 8252 권장)로 확정.** 100만 DL 목표라 나중에 바꾸는 비용을 피하려고 처음부터 정석으로 간다. 웹 로그인과 충돌하지 않게 앱 전용 경로 `/app/`을 쓴다.

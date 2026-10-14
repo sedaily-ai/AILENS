@@ -31,6 +31,7 @@ src/features/home/
 ├─ useHomeData.ts        5개 채널 병렬 조회(allSettled), 부분 실패 허용
 ├─ model.ts              순수 로직: buildLatest, PAPER_TABS/pickPaperSection/paperTitle, groupByCategory
 └─ sections/             PaperHero, LatestSection, CategorySection, LettersSection, MediaRails(웹툰·영상·오디오), SectionHeader
+src/features/article/    ArticleScreen(상세)·LetterBody(레터 블록 렌더)·FormatPanels(4형식)·RichText(인라인·용어)·PostVote·LetterArticle(letters 전용)
 src/features/player/     PlayerContext — 앱 전체가 공유하는 오디오 플레이어(큐·자동 다음 곡·잠금화면)
 src/features/search/     SearchScreen·searchData(목록 로더)·recentSearches(AsyncStorage)
 src/features/discover/   DiscoverScreen — 카테고리 섹션 + 웹툰·영상 + 레터
@@ -71,3 +72,11 @@ app/listen/[slug].tsx    오디오 상세(전체 플레이어·배속·대본), 
 - **영상**: `video_url`은 S3 mp4. `expo-video` 네이티브 컨트롤(전체화면·PIP).
 - **오디오**: `media_embed_url`은 S3 mp3, 대본은 단건 조회의 `transcript`. 전역 `PlayerProvider` 하나가 큐·재생 상태를 갖고 미니 플레이어·듣기 탭·상세가 같은 상태를 본다. 곡이 끝나면 다음 곡 자동 재생, 영상 재생 시작 시 오디오 일시정지, `doNotMix`+잠금화면 컨트롤+백그라운드 재생.
 - 네이티브 모듈(`expo-audio`, `expo-video`)이 추가돼 **개발 빌드를 새로 만들어야** 한다(JS 핫리로드로는 반영 안 됨).
+
+## 기사 상세
+
+- **웹과 공용으로 승격한 순수 로직(`@ailens/domain`)**: `parseLetterBlocks`(본문 문단 → 소제목·목록·인용·특별 칸·좌우 비교 블록), `inlineSegments`(굵게·기울임·따옴표·금액 강조), `splitByTerms`(용어집), `letterChapters`, `parseVoteChoices`, `readMinutes`. 웹의 `lensBlocks.ts`·`renderInline.tsx`·`lensChapters.ts` 등은 이를 재수출·사용하도록 바꿨고 웹 테스트(95건)·레터 파서 테스트(12건)는 그대로 통과한다.
+- **데이터**: 같은 글이 채널마다 따로 발행되므로 `getPost(id, { channel: 'lens' })`를 먼저 읽고 404면 letters 형태로 읽는다. LENS 글은 `lenses[]`에 형식 4개(레터·웹툰·팟캐스트·영상)가 들어 있고, 형식별로 문단·용어집·컷·mp3·mp4·대본이 있다.
+- **화면**: 형식 탭(읽기·웹툰·듣기·영상, 데이터에 없는 형식은 탭에서 제외) / 레터는 소제목 번호·1분 요약·비교 칸·투표·더 보기 / 용어 탭하면 설명 시트 / 팟캐스트는 전역 오디오 플레이어에 올림 / 영상은 expo-video / 글자 크기 4단계(기기 저장) / 읽기 진행바 / 공유 / 원문 링크 / 같은 분류 다른 글.
+- **letters 전용 글**: 핵심 요약, 문단 본문(또는 리치텍스트 `body_html` — react-native-render-html), 이미지, 수치 차트(가로 막대), 마무리 문장.
+- **미이행**: 문장 선택 팝오버(하이라이트·저장), 이전/다음 글 내비, 챕터 점프 목차, 인쇄, 조회수 기반 "많이 읽힌 글".
