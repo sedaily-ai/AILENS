@@ -7,6 +7,8 @@ import { colors, radius } from '../../../theme';
 import { kstDateTime } from '../../../lib/format';
 import { SectionHeader } from './SectionHeader';
 
+type Pathname = '/webtoon/[slug]' | '/video/[slug]' | '/listen/[slug]';
+
 interface RailItem {
   id: string;
   title: string;
@@ -15,12 +17,16 @@ interface RailItem {
   badge?: 'play';
 }
 
-// 웹툰·영상·오디오 상세 화면은 아직 없어 글 상세(article/[slug])로 보낸다. 전용 화면은 M4.
-function Rail({ title, items, ratio }: { title: string; items: RailItem[]; ratio: number }) {
+// 웹툰·영상은 각자 전용 화면(/webtoon, /video)으로, 오디오는 /listen 으로 연결한다.
+function Rail({ title, items, ratio, detail, list }: { title: string; items: RailItem[]; ratio: number; detail: Pathname; list: '/webtoon' | '/video' }) {
   if (items.length === 0) return null;
   return (
     <View>
-      <SectionHeader title={title} right="전체 보기 →" />
+      <Link href={list} asChild>
+        <Pressable accessibilityRole="link">
+          <SectionHeader title={title} right="전체 보기 →" />
+        </Pressable>
+      </Link>
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -28,7 +34,7 @@ function Rail({ title, items, ratio }: { title: string; items: RailItem[]; ratio
         keyExtractor={(i) => i.id}
         ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
         renderItem={({ item }) => (
-          <Link href={{ pathname: '/article/[slug]', params: { slug: item.id } }} asChild>
+          <Link href={{ pathname: detail, params: { slug: item.id } }} asChild>
             <Pressable style={styles.card} accessibilityRole="link">
               <View style={[styles.thumb, { aspectRatio: ratio }]}>
                 {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.img} resizeMode="cover" /> : null}
@@ -55,6 +61,8 @@ export function WebtoonSection({ items }: { items: WebtoonPost[] }) {
     <Rail
       title="웹툰"
       ratio={4 / 5}
+      detail="/webtoon/[slug]"
+      list="/webtoon"
       items={items.slice(0, 8).map((w) => ({
         id: w.id,
         title: displayHeadline(w.title),
@@ -70,6 +78,8 @@ export function VideoSection({ items }: { items: VideoPost[] }) {
     <Rail
       title="영상"
       ratio={16 / 9}
+      detail="/video/[slug]"
+      list="/video"
       items={items.slice(0, 8).map((v) => ({
         id: v.id,
         title: displayHeadline(v.title),
@@ -86,9 +96,13 @@ export function AudioSection({ items }: { items: HomePlayerPost[] }) {
   if (items.length === 0) return null;
   return (
     <View>
-      <SectionHeader title="오늘의 뉴스를 귀로" right="전체 듣기 →" />
+      <Link href="/listen" asChild>
+        <Pressable accessibilityRole="link">
+          <SectionHeader title="오늘의 뉴스를 귀로" right="전체 듣기 →" />
+        </Pressable>
+      </Link>
       {items.slice(0, 5).map((a, i) => (
-        <Link key={a.id} href={{ pathname: '/article/[slug]', params: { slug: a.id } }} asChild>
+        <Link key={a.id} href={{ pathname: '/listen/[slug]', params: { slug: a.id } }} asChild>
           <Pressable style={styles.audioRow} accessibilityRole="link">
             <Text style={styles.audioNo}>{i + 1}</Text>
             <View style={{ flex: 1 }}>

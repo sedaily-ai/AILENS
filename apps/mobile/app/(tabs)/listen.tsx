@@ -11,7 +11,7 @@ import { kstDateTime } from '../../src/lib/format';
 import { useAsync } from '../../src/lib/useAsync';
 import { colors } from '../../src/theme';
 
-// 듣기 — "오늘의 뉴스를 귀로"(home_player 채널) 전체 목록. 재생은 미니 플레이어 연결(M4, expo-audio)에서 붙인다.
+// 듣기 — "오늘의 뉴스를 귀로"(home_player 채널) 전체 목록. 항목을 누르면 /listen/[slug] 가 열리며 그 곡부터 재생한다(전역 PlayerProvider).
 export default function ListenScreen() {
   const { state, reload } = useAsync((signal) => listPosts<HomePlayerPost>('home_player', { limit: 50, signal }), []);
   return (
@@ -32,7 +32,7 @@ export default function ListenScreen() {
               }
               ListEmptyComponent={<Text style={styles.empty}>아직 올라온 오디오가 없어요.</Text>}
               renderItem={({ item, index }) => (
-                <Link href={{ pathname: '/article/[slug]', params: { slug: item.id } }} asChild>
+                <Link href={{ pathname: '/listen/[slug]', params: { slug: item.id } }} asChild>
                   <Pressable style={styles.row} accessibilityRole="link">
                     <Text style={styles.no}>{index + 1}</Text>
                     <View style={{ flex: 1 }}>

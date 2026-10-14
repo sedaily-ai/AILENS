@@ -31,6 +31,7 @@ src/features/home/
 ├─ useHomeData.ts        5개 채널 병렬 조회(allSettled), 부분 실패 허용
 ├─ model.ts              순수 로직: buildLatest, PAPER_TABS/pickPaperSection/paperTitle, groupByCategory
 └─ sections/             PaperHero, LatestSection, CategorySection, LettersSection, MediaRails(웹툰·영상·오디오), SectionHeader
+src/features/player/     PlayerContext — 앱 전체가 공유하는 오디오 플레이어(큐·자동 다음 곡·잠금화면)
 src/features/search/     SearchScreen·searchData(목록 로더)·recentSearches(AsyncStorage)
 src/features/discover/   DiscoverScreen — 카테고리 섹션 + 웹툰·영상 + 레터
 src/components/          AppHeader, CategoryChips, GridCard, MiniPlayer, AsyncView
@@ -38,6 +39,9 @@ app/(tabs)/              index(홈) · discover · listen · me(나의 LENS)
 app/category/[slug].tsx  카테고리 목록(발견 칩·섹션 "더 보기"가 진입)
 app/account.tsx          계정·약관(프로필 아이콘)
 app/search.tsx           검색(상단바 돋보기)
+app/webtoon/             목록(2열 표지) · [slug] 컷 세로 보기
+app/video/               목록 · [slug] 네이티브 플레이어(expo-video)
+app/listen/[slug].tsx    오디오 상세(전체 플레이어·배속·대본), 듣기 탭·미니 플레이어와 같은 상태
 ```
 
 ## 섹션 (웹 홈의 순서를 홈/발견으로 나눔)
@@ -53,7 +57,6 @@ app/search.tsx           검색(상단바 돋보기)
 - 뉴스 타임머신(S3 지면), 게임, 요즘 많이 읽힌 글(인기 레일, 로그인·집계 API 필요)
 - 검색: 범위(제목/요약)·하위 분류 필터, 디스크 캐시(지금은 세션 메모리) — 웹에만 있음
 - 미니 플레이어 재생(UI만), 약관·개인정보 웹 경로(`/terms`, `/privacy`)는 미확인
-- 웹툰·영상·오디오 전용 상세 화면 — 지금은 글 상세로 연결
 - 카테고리 하위분류·페이지네이션, 가로 칩 활성 표시의 스크롤 연동
 
 ## 검색
@@ -61,3 +64,10 @@ app/search.tsx           검색(상단바 돋보기)
 - 순수 로직(`search`, `countByCategory`, `topKeywords`, `splitHighlight`, `parseTerms`)은 **`@ailens/domain/search`로 승격**해 웹·앱이 공유한다. 웹 `shared/lib/search/searchIndex.ts`는 재수출 + 웹 전용 로더만 남겼고, 기존 웹 테스트 22건이 그대로 통과한다.
 - 데이터: 웹과 같은 `GET /api/search-index`(제목·요약·분류·날짜·썸네일, 약 1.4MB/2,684건)를 세션당 1회 받아 기기에서 거른다. 글이 만 건대로 늘면 서버 검색으로 교체(인터페이스 `loadSearchIndex`/`search` 유지).
 - 화면: 입력 250ms 디바운스, 엔터·최근 검색어·키워드 탭은 즉시 검색+최근 검색어 저장(기기 AsyncStorage, 최대 8개), 정렬(최신/정확도)·기간(전체/오늘/1주/1달)·분류 탭(건수), 20건씩 무한 스크롤, 제목·요약 강조.
+
+## 웹툰·영상·오디오
+
+- **웹툰**: 목록은 표지만 오고 컷(`panels`)은 단건 조회 `getPost(id, { channel: 'webtoon' })`에만 채워진다(같은 글이 채널마다 따로 발행되므로 채널 지정 필요). 컷은 세로로 이어 보고, `text_caption` 컷만 아래에 글자로 보여 준다.
+- **영상**: `video_url`은 S3 mp4. `expo-video` 네이티브 컨트롤(전체화면·PIP).
+- **오디오**: `media_embed_url`은 S3 mp3, 대본은 단건 조회의 `transcript`. 전역 `PlayerProvider` 하나가 큐·재생 상태를 갖고 미니 플레이어·듣기 탭·상세가 같은 상태를 본다. 곡이 끝나면 다음 곡 자동 재생, 영상 재생 시작 시 오디오 일시정지, `doNotMix`+잠금화면 컨트롤+백그라운드 재생.
+- 네이티브 모듈(`expo-audio`, `expo-video`)이 추가돼 **개발 빌드를 새로 만들어야** 한다(JS 핫리로드로는 반영 안 됨).

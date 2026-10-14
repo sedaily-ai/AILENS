@@ -52,6 +52,13 @@ export interface LensPost {
   lenses: LensItem[];
 }
 
+export interface WebtoonPanel {
+  url: string;
+  caption: string;
+  /** true 면 나레이션이 이미지에 박혀 있지 않아 컷 아래에 글자로 보여 준다. */
+  text_caption?: boolean;
+}
+
 export interface WebtoonPost {
   id: string;
   title: string;
@@ -61,6 +68,8 @@ export interface WebtoonPost {
   cover_image_url: string | null;
   category?: string | null;
   display_order?: number | null;
+  /** 목록 조회는 비어 있고, 단건 조회(getPost(id, { channel: 'webtoon' }))에만 컷이 채워진다. */
+  panels?: WebtoonPanel[];
 }
 
 export interface VideoPost {
@@ -83,6 +92,8 @@ export interface HomePlayerPost {
   media_embed_url?: string | null;
   category?: string | null;
   display_order?: number | null;
+  /** 단건 조회에만 채워지는 전체 대본(접근성·읽기용). */
+  transcript?: string | null;
 }
 
 export class ApiError extends Error {
@@ -122,8 +133,14 @@ export async function listPosts<T = LetterPost>(channel: PostChannel, opts: List
   return data.posts ?? [];
 }
 
-/** 단건 조회. 없으면 ApiError(status=404). */
-export async function getPost<T = LetterPost>(id: string, signal?: AbortSignal): Promise<T> {
-  const data = await getJson<{ post: T }>(`${getApiConfig().cmsApiUrl}/api/v2/posts/${encodeURIComponent(id)}`, signal);
+/**
+ * 단건 조회. 없으면 ApiError(status=404).
+ * channel 을 주면 그 채널 모양으로 내려준다(같은 글이 letters·lens·webtoon·video·home_player 로 여러 번 발행되므로, 컷·대본 등 채널 전용 필드가 필요할 때 지정).
+ */
+export async function getPost<T = LetterPost>(id: string, opts: { channel?: PostChannel; signal?: AbortSignal } | AbortSignal = {}): Promise<T> {
+  // 기존 호출부 호환: 두 번째 인자가 AbortSignal 이면 signal 로 본다.
+  const { channel, signal } = opts instanceof AbortSignal ? { channel: undefined, signal: opts } : opts;
+  const qs = channel ? `?channel=${channel}` : '';
+  const data = await getJson<{ post: T }>(`${getApiConfig().cmsApiUrl}/api/v2/posts/${encodeURIComponent(id)}${qs}`, signal);
   return data.post;
 }

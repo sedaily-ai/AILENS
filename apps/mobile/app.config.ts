@@ -39,7 +39,13 @@ const config: ExpoConfig = {
       },
     ],
   },
-  plugins: ['expo-router', 'expo-secure-store'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    // 듣기(백그라운드 재생·잠금화면 컨트롤)용. 녹음은 쓰지 않으므로 마이크 권한은 요청하지 않는다.
+    ['expo-audio', { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: true }],
+    'expo-video',
+  ],
   experiments: {
     typedRoutes: true,
   },
