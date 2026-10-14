@@ -13,6 +13,10 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 - `apps/mobile`: 홈(오늘의 레터)·LENS·레터 탭을 목록으로, `article/[slug]`를 letters·lens 공용 상세로 구현. 공통 `AsyncView`(로딩/오류/재시도)·`PostCard`·`useAsync`(abort·재시도).
 - 웹 코드는 건드리지 않음(웹은 기존 `cmsPostsApi` 유지).
 
+- 앱 인증 코드 추가(A안: aws-amplify RN): `src/auth/{configureAuth,secureStorage,authProvider,AuthContext}`, `(tabs)/me.tsx`(로그인/로그아웃 화면), 루트에 `AuthProvider` 연결. 토큰은 SecureStore(Keychain/Keystore)에 저장, 웹과 같은 User Pool·App Client 공유, redirect=`ailens://auth/callback`.
+- 의존성 추가: aws-amplify, @aws-amplify/react-native, @aws-amplify/rtn-web-browser, async-storage, netinfo, react-native-get-random-values(루트 package-lock 갱신).
+- 탭 헤더를 끄고 각 화면이 제목·상단 여백을 직접 그리도록 정리(이중 여백 방지).
+
 ## 결정
 
 - 단건 조회는 백엔드의 `GET /api/v2/posts/{slug}`(slug=글 id)를 사용(공개·무인증, 라이브 200 확인).
@@ -23,11 +27,13 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 
 - 라이브 API 대상 Node 스모크: letters 3건, lens 3건(렌즈 4개), 상세 id 일치·본문 15문단, 없는 id → `ApiError` 404.
 - `tsc --noEmit` 통과, `expo export --platform android` 번들 성공(2.6MB).
-- 미확인: 실기기·에뮬레이터 렌더링, ESLint(`apps/mobile`에 eslint 설정 없음).
+- 인증 코드 추가 후에도 `tsc` 통과, android 번들 성공(3.7MB). 미확인: 실제 로그인 흐름, 실기기·에뮬레이터 렌더링, ESLint(`apps/mobile`에 eslint 설정 없음).
 
 ## 다음
 
-- 에뮬레이터/실기기에서 화면 확인(development build 또는 Expo Go).
+- Cognito App Client(`66c9bq3ovmk007d0eepkle92k3`)의 Callback/SignOut URLs 에 `ailens://auth/callback`·`ailens://` 추가(현재 웹 3개 URL 만 등록, 공개 클라이언트·code flow 확인). 기존 URL 은 유지하고 추가만. 운영 인증 설정 변경이라 승인 후 실행.
+- 로그인은 네이티브 모듈(rtn-web-browser)이 필요해 Expo Go 불가 — EAS development build 로 확인.
+- 에뮬레이터/실기기에서 화면 확인.
 - `apps/mobile` ESLint 설정 추가.
 - Cognito 로그인(AuthProvider, App Client 콜백 추가는 AWS 권한 필요), M2 푸시.
 - 상세 고도화(body_html·차트·이미지·팟캐스트).
