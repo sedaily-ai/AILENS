@@ -63,6 +63,7 @@ docs/
 
 | 알고 싶은 것 | 문서 |
 |---|---|
+| 나의 LENS 백엔드 개발 인수 | `product/나의LENS/README.md` → 개발 인수인계·API 계약·데이터 구현 설계 |
 | 어드민 스택 | `architecture/admin-stack.md` |
 | 배포 스크립트 어디 있고 뭘 배포하나 | `architecture/배포_스크립트_지도.md` |
 | AI LENS 주차별 비용이 마스터DB에 어떻게 쌓이나 | `architecture/비용시트_파이프라인.md` |

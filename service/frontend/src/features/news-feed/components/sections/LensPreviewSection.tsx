@@ -481,7 +481,7 @@ export function LensPreviewSection({ initialItems, variant = 'home', paperDates,
         </Link>
         </div>
         {/* 헤더 시선 흐름(질문 → 답 → 다음 행동)의 끝에 네 가지 형식 칩을 둔다. 칩 하나가 곧 버튼이며, 누르면 해당 형식의 소개가 열린다. 처음 방문자에게는 첫 칩에 링이 3번 퍼진다. */}
-        <div className="lz-ways" role="group" aria-label="네 가지 형식 — 눌러서 소개 보기">
+        <div id="news-formats" className="lz-ways" role="group" aria-label="네 가지 형식 — 눌러서 소개 보기" style={{ scrollMarginTop: 88 }}>
           {/* 칩과 화살표는 한 덩어리(.lz-flow, 줄바꿈 없음) — 좁은 화면에서도 "읽기 → 웹툰 → 듣기 → 영상"이 항상 한 줄로 이어져 보인다. */}
           <div className="lz-flow">
           {WAYS.map((w, i) => {

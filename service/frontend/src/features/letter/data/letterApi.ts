@@ -72,8 +72,13 @@ async function getJson<T>(url: string): Promise<T | null> {
 
 /** 발행된 레터 목록(최신순). 실패하면 빈 배열. */
 export async function fetchLetterList(limit = 50): Promise<IssueLetter[]> {
+  return (await fetchLetterListResult(limit)).letters;
+}
+
+/** 대시보드에서는 발행 없음과 조회 실패를 구분해 재시도 안내를 제공한다. */
+export async function fetchLetterListResult(limit = 50): Promise<{ letters: IssueLetter[]; available: boolean }> {
   const data = await getJson<{ letters: ApiCard[] }>(`${BASE}?limit=${limit}`);
-  return (data?.letters ?? []).map(mapCard);
+  return { letters: (data?.letters ?? []).map(mapCard), available: data !== null };
 }
 
 /** 발행된 레터 상세. 없거나 실패하면 null. */

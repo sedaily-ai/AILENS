@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/entities/user";
 
 export function UserMenu() {
@@ -82,20 +83,10 @@ export function UserMenu() {
 
           {/* Menu Items */}
           <div className="py-1">
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                // router.push는 이미 "/"에 있을 때 쿼리스트링만 바뀌는 소프트 네비게이션이라 효과가 없다.
-                // FeedPage.tsx의 URL→탭 동기화 effect는 하이드레이션 불일치 방지를 위해 마운트 시 1회만 읽도록 설계되어 있어(정적 export 대응), 하드 네비게이션으로 항상 새 마운트를 강제한다.
-                window.location.href = "/?tab=archive";
-              }}
-              className="w-full px-4 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-            >
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-              내 서랍
-            </button>
+            <Link href="/my-lens" onClick={() => setIsOpen(false)} className="w-full px-4 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-3">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+              나의 LENS
+            </Link>
             {/* 구글 로그인 계정은 Cognito에 비밀번호가 없어 숨긴다. 직접 URL로 진입하면 페이지가 안내한다. */}
             {!user.isFederated && (
               <button

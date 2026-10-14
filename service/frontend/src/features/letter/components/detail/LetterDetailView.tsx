@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useNewsReadingSignal } from '@/entities/user';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AXIS_META, asBlock, type IssueLetter, type LetterSegment, type LetterSource } from '../../data/letterTypes';
@@ -68,6 +69,7 @@ function Segments({ parts, letterSlug, sources, pieces }: { parts: LetterSegment
 }
 
 export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { letter: IssueLetter; prevSlug?: string; nextSlug?: string; others?: IssueLetter[] }) {
+  useNewsReadingSignal({ id: letter.slug, kind: 'letter', title: letter.title, categories: letter.categories.slice(0, 10), keywords: (letter.topics ?? []).slice(0, 30) });
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   // 레터 한 편에서 같은 용어는 처음 한 번만 표시한다. 렌더 중에 부수효과가 없도록 본문 문자열별 조각을 미리 계산해 둔다(서버·클라이언트 결과가 같다).

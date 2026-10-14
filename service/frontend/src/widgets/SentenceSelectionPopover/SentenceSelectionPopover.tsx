@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/entities/user';
+import { notifyArchiveChanged } from '@/features/archive';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
 // 문장 선택 → 서랍 담기 플로팅 버튼. 본문에서 텍스트를 드래그하면 selection 위에 작은 버튼이 뜬다.
@@ -127,6 +129,7 @@ export function SentenceSelectionPopover({
         article_title: letter.headline,
         article_published_at: publishedAt,
       });
+      notifyArchiveChanged(user.userId);
       trackEvent('letter_sentence_archive', {
         letter_id: letter.id,
         text_length: pos.text.length,
@@ -134,7 +137,7 @@ export function SentenceSelectionPopover({
       setToast('서랍에 담았어요');
       setPos(null);
       window.getSelection()?.removeAllRanges();
-      setTimeout(() => setToast(null), 2000);
+      setTimeout(() => setToast(null), 8000);
     } catch (err) {
       console.warn('archive save failed', err);
       setToast('저장 실패 — 잠시 후 다시 시도해주세요');
@@ -246,6 +249,7 @@ export function SentenceSelectionPopover({
           }}
         >
           {toast}
+          {toast === '서랍에 담았어요' && <Link href="/my-lens?tab=archive" style={{ color: '#fff', marginLeft: 14, textDecoration: 'underline', textUnderlineOffset: 3 }}>내 서랍 보기</Link>}
         </div>
       )}
     </>
