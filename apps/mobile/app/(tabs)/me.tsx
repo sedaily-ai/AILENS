@@ -1,40 +1,41 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { AppHeader } from '../../src/components/AppHeader';
 import { useAuth } from '../../src/auth/AuthContext';
+import { colors } from '../../src/theme';
 
-// 내 서랍 진입점. M1 은 로그인/로그아웃과 계정 표시까지. 구독·서랍 목록은 M4.
+// 나의 LENS — 저장·구독한 글(웹 나의 LENS 대응). 목록 자체는 백엔드 연동 후(M4)이고, 지금은 로그인 상태에 따른 안내만 보여 준다.
 export default function MeScreen() {
-  const insets = useSafeAreaInsets();
-  const { state, signIn, signOut } = useAuth();
-
+  const { state, signIn } = useAuth();
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 16 }]}>
-      <Text style={styles.h1}>내 서랍</Text>
-      {state.status === 'loading' ? <Text style={styles.note}>확인 중…</Text> : null}
-      {state.status === 'signedOut' ? (
-        <>
-          <Text style={styles.note}>로그인하면 구독과 저장한 글을 볼 수 있어요.</Text>
-          <Pressable style={styles.btn} onPress={() => void signIn()} accessibilityRole="button">
-            <Text style={styles.btnText}>Google로 로그인</Text>
-          </Pressable>
-        </>
-      ) : null}
-      {state.status === 'signedIn' ? (
-        <>
-          <Text style={styles.note}>{state.email ?? '로그인됨'}</Text>
-          <Pressable style={styles.btn} onPress={() => void signOut()} accessibilityRole="button">
-            <Text style={styles.btnText}>로그아웃</Text>
-          </Pressable>
-        </>
-      ) : null}
-    </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <AppHeader />
+      <View style={styles.body}>
+        <Ionicons name="bookmark-outline" size={44} color={colors.textFaint} />
+        <Text style={styles.title}>나의 LENS</Text>
+        {state.status === 'signedIn' ? (
+          <Text style={styles.note}>저장한 글과 구독 목록이 여기에 모여요.{'\n'}곧 제공됩니다.</Text>
+        ) : (
+          <>
+            <Text style={styles.note}>로그인하면 저장한 글과 구독을{'\n'}한곳에서 볼 수 있어요.</Text>
+            {state.status === 'signedOut' ? (
+              <Pressable style={styles.btn} onPress={() => void signIn()} accessibilityRole="button">
+                <Text style={styles.btnText}>Google로 로그인</Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 16 },
-  h1: { color: '#111827', fontSize: 28, fontWeight: '700' },
-  note: { color: '#6b7280', fontSize: 14, marginTop: 12, lineHeight: 21 },
-  btn: { marginTop: 20, alignSelf: 'flex-start', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 8, backgroundColor: '#f3f4f6' },
-  btnText: { color: '#111827', fontSize: 15, fontWeight: '600' },
+  root: { flex: 1, backgroundColor: colors.bg },
+  body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 6 },
+  note: { fontSize: 14, lineHeight: 22, color: colors.textMuted, textAlign: 'center' },
+  btn: { marginTop: 14, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 10, backgroundColor: colors.brand },
+  btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
