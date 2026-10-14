@@ -33,6 +33,18 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
   const pending = useRef(new Set<string>());
   const [pendingCount, setPendingCount] = useState(0);
   const [revision, setRevision] = useState(0);
+  const [feedback, setFeedback] = useState<{ owner: string; text: string } | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (feedbackTimer.current) clearTimeout(feedbackTimer.current); }, []);
+  const clearFeedback = useCallback(() => {
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = null; setFeedback(null);
+  }, []);
+  const announceSaved = useCallback((saved: boolean) => {
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    setFeedback({ owner, text: saved ? '저장한 레터에 담았어요.' : '저장한 레터에서 제외했어요.' });
+    feedbackTimer.current = setTimeout(() => { setFeedback(null); feedbackTimer.current = null; }, 3000);
+  }, [owner]);
   useEffect(() => {
     if (isLoading) return;
     const controller = new AbortController(); controllerRef.current = controller;
@@ -62,12 +74,15 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
       return false;
     }
     if (snapshot.owner !== owner || !snapshot.ready || !snapshot.available || pending.current.has(key)) return false;
+    clearFeedback();
     pending.current.add(key); setPendingCount(pending.current.size);
     try {
       const wasSaved = explicitId ? snapshot.bookmarks.some(b => b.letter_id === explicitId) : snapshot.saved.includes(slug);
       const id = explicitId ?? snapshot.bookmarks.find(b => b.content.slug === slug)?.letter_id;
-      await setAccountBookmark(slug, !wasSaved, id, controllerRef.current?.signal);
-      if (currentOwner.current !== owner) return false;
+      const signal = controllerRef.current?.signal;
+      await setAccountBookmark(slug, !wasSaved, id, signal);
+      if (signal?.aborted || currentOwner.current !== owner) return false;
+      announceSaved(!wasSaved);
       // 서버 확정 후 모든 같은 화면 훅과 다른 탭을 갱신한다. 원본 공용 키는 변경하지 않는다.
       window.dispatchEvent(new Event(CHANGED));
       try { localStorage.setItem('lens-account-bookmarks-revision', `${owner}:${Date.now()}`); } catch { /* 포커스 복귀 시 다시 조회 */ }
@@ -76,7 +91,7 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
       if (currentOwner.current === owner) setState(previous => ({ ...previous, authRequired: isAccountAuthError(error), loginRequested: isAccountAuthError(error), error: error instanceof Error ? error.message : '레터를 저장하지 못했어요. 다시 시도해 주세요.' }));
       return false;
     } finally { pending.current.delete(key); setPendingCount(pending.current.size); }
-  }, [owner, user, isLoading]);
+  }, [owner, user, isLoading, announceSaved, clearFeedback]);
   const markRead = useCallback((slug: string) => {
     if (stateRef.current.owner !== owner) return;
     const next = [...new Set([...readList(readKey), slug])]; writeList(readKey, next);
@@ -86,6 +101,7 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
   const saved = valid ? state.saved : [], read = valid ? state.read : [];
   const notice = user ? `${LETTER_SHELF_NOTICE.browser} 로그인 전 브라우저 저장과는 자동으로 합치지 않아요.` : `${LETTER_SHELF_NOTICE.guest}${saved.length ? ' 기존 브라우저 저장은 조회만 가능하며 계정 저장과는 별개예요.' : ''}`;
   return { ready: !isLoading && valid && state.ready && state.filter===readFilter, available: valid && state.available, error: valid ? state.error : '', notice,
+    feedback: feedback?.owner === owner ? feedback.text : '',
     authRequired: valid && !!state.authRequired, pending: pendingCount > 0, saved, read, savedLetters: valid ? state.bookmarks.flatMap(bookmarkLetter) : [],
     loginPromptOpen: valid && !!state.loginRequested, closeLoginPrompt: () => setState(previous => ({ ...previous, loginRequested: false })),
     unavailable: valid ? state.bookmarks.filter(b => !b.content.available) : [],

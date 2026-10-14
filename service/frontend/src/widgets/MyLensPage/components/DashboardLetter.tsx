@@ -1,12 +1,12 @@
 import Link from 'next/link';
-import { ArrowUpRight, Bookmark, Check, Clock3 } from 'lucide-react';
-import { editorsOfLetter, type IssueLetter } from '@/features/letter';
+import { ArrowUpRight, Check, Clock3 } from 'lucide-react';
+import { editorsOfLetter, LetterBookmarkIcon, type IssueLetter } from '@/features/letter';
 
 export function DashboardLetter({ letter, featured = false, saved, read, onSave }: { letter: IssueLetter; featured?: boolean; saved: boolean; read: boolean; onSave: () => void }) {
   const editors = letter.editors?.length ? editorsOfLetter(letter) : [];
   return (
     <article className={`ml-letter${featured ? ' ml-featured' : ''}`} data-testid={`letter-${letter.slug}`}>
-      <div className="ml-letter-top"><span>{letter.categories.join(' · ') || '레터'}</span><button type="button" className="ml-bookmark" onClick={onSave} aria-label={`${letter.title} ${saved ? '저장 해제' : '저장'}`} aria-pressed={saved} aria-describedby="ml-storage-note"><Bookmark size={19} fill={saved ? 'currentColor' : 'none'} /></button></div>
+      <div className="ml-letter-top"><span>{letter.categories.join(' · ') || '레터'}</span><button type="button" className="ml-bookmark" onClick={onSave} aria-label={`${letter.title} ${saved ? '저장 해제' : '저장'}`} aria-pressed={saved} aria-describedby="ml-storage-note"><LetterBookmarkIcon saved={saved} /></button></div>
       <Link href={`/letter/${encodeURIComponent(letter.slug)}`} className="ml-letter-link" prefetch={false}>
         <h3>{letter.title}</h3><p className="ml-deck">{letter.deck}</p>
       </Link>

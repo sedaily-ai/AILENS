@@ -17,3 +17,5 @@ export { LETTER_CSS } from './components/letterStyles';
 export { LetterShelfStatus } from './components/LetterShelfStatus';
 
 export { importBrowserBookmarks, type BookmarkImportResult } from './data/accountApi';
+
+export { LetterBookmarkIcon } from './components/LetterBookmarkIcon';

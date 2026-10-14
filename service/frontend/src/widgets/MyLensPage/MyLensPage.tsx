@@ -74,6 +74,11 @@ function MyLensDashboard() {
   const [savedExpanded, setSavedExpanded] = useState(false);
   const [notice, setNotice] = useState('');
   useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+  useEffect(() => {
     let active = true;
     void fetchTopics().then((options) => { if (active) setTopics(options); });
     return () => { active = false; };
@@ -90,7 +95,7 @@ function MyLensDashboard() {
   const categories=profile.categories;
   const homeArchive={...archive,sentences:server.data?.recent_sentences.data?.items??[],loading:server.loading,failed:!!server.error||server.data?.recent_sentences.status==='error',retry:server.retry};
   const preferenceName = (key: string, type: 'category' | 'topic') => type === 'category' ? categoryLabel(key) : topics.find((topic) => topic.slug === key)?.name ?? EDITORS.flatMap((editor) => editor.topics).find((topic) => topic.slug === key)?.name ?? key;
-  const toggleSaved = async (slug: string) => { const wasSaved = shelf.isSaved(slug); const persisted = await shelf.toggleSaved(slug); setNotice(persisted ? wasSaved ? '저장한 레터에서 제외했어요.' : '계정에 레터를 저장했어요.' : '저장하지 못했어요. 기존 상태는 유지돼요.'); };
+  const toggleSaved = (slug: string) => { void shelf.toggleSaved(slug); };
   const changeBudget = async (value: number) => { if (!await interests.saveMinutes(value)) setNotice('읽을 시간을 저장하지 못했어요. 기존 설정은 유지돼요.'); };
   const busy = server.loading || !shelf.ready || !interests.ready || !follow.ready;
   const authRequired = shelf.authRequired || follow.authRequired || interests.authRequired || server.authRequired;
