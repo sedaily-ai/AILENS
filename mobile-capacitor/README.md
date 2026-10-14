@@ -1,5 +1,10 @@
 # mobile-capacitor — AI LENS Android/iOS 앱 (Capacitor)
 
+> **상태 (2026-10-14): Expo(`apps/mobile`)로 대체 예정 — 신규 작업 금지.**
+> 모바일 정본은 `apps/mobile`(Expo)로 확정됐다(근거: `docs/architecture/앱-프레임워크-결정-Expo-vs-Capacitor.md`,
+> `docs/architecture/apps-mobile-Expo-설계.md`). 이 폴더는 Expo 앱 출시 전까지 과도기용으로만 유지하며,
+> 출시 후 `docs/archive`로 옮긴다.
+
 `mobile/`(Bubblewrap TWA, 안드로이드 전용)을 대체하기 위한 Capacitor 프로젝트.
 **원격 URL 모드**로 동작 — 로컬에 웹 빌드를 담지 않고 `capacitor.config.ts`의
 `server.url`이 `https://ailens.sedaily.ai`(service/frontend, SSR)를 직접 가리킨다.

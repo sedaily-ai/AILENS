@@ -10,3 +10,10 @@ web-build/
 
 expo-env.d.ts
 # @end expo-cli
+
+# 서명키·자격증명 — 절대 커밋 금지(백업은 저장소 밖 ~/ailens-secrets/)
+credentials.json
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
