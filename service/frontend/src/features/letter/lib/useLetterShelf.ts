@@ -20,7 +20,7 @@ function readList(key: string): string[] {
   }
 }
 function writeList(key: string, list: string[]) {
-  try { localStorage.setItem(key, JSON.stringify(list.slice(-200))); } catch { /* 저장 불가 환경은 이번 방문에만 유지 */ }
+  try { localStorage.setItem(key, JSON.stringify(list.slice(-200))); return true; } catch { return false; /* 저장 불가 환경은 이번 방문에만 유지 */ }
 }
 
 /** 이 기기에 저장한 레터와 읽은 레터(브라우저 저장). 계정 연동은 백엔드 단계에서 같은 모양으로 옮긴다. */
@@ -35,15 +35,20 @@ export function useLetterShelf() {
     setSaved(readList(SAVED_KEY));
     setRead(readList(READ_KEY));
     setReady(true);
+    const sync = () => { setSaved(readList(SAVED_KEY)); setRead(readList(READ_KEY)); };
+    const onStorage = (event: StorageEvent) => { if (event.key === SAVED_KEY || event.key === READ_KEY || event.key === null) sync(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', sync);
+    window.addEventListener('pageshow', sync);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', sync); window.removeEventListener('pageshow', sync); };
   }, []);
 
   const toggleSaved = useCallback((slug: string) => {
-    setSaved((prev) => {
-      const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug];
-      writeList(SAVED_KEY, next);
-      return next;
-    });
-  }, []);
+    const next = (saved.includes(slug) ? saved.filter((s) => s !== slug) : [...saved, slug]).slice(-200);
+    const persisted = writeList(SAVED_KEY, next);
+    setSaved(next);
+    return persisted;
+  }, [saved]);
   const markRead = useCallback((slug: string) => {
     setRead((prev) => {
       if (prev.includes(slug)) return prev;

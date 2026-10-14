@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import { fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { lensFormatAt, lensPanelId, parseLensView } from '@/shared/constants/lensPerspectives';
+import { useNewsReadingSignal } from '@/entities/user';
 
 /**
  * 기사 상세의 형식(레터·웹툰·팟캐스트·영상) 탭 상태.
@@ -11,6 +12,11 @@ import { lensFormatAt, lensPanelId, parseLensView } from '@/shared/constants/len
  */
 export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | undefined) {
   const [lens, setLens] = useState<CmsLens | null | undefined>(initialLens);
+  useNewsReadingSignal(lens ? {
+    id: lens.id, kind: 'news', title: lens.headline,
+    categories: lens.category ? [lens.category] : [],
+    keywords: [...new Set((lens.lenses ?? []).flatMap((item) => (item.keywords ?? []).map((word) => word.term)))].slice(0, 30),
+  } : null);
   const [active, setActive] = useState(0);
   // 실제 오디오·영상 길이(초). loadedmetadata에서만 채워 임의의 길이를 표시하지 않는다(lensSamples.ts의 clock() 참조).
   const [mediaDur, setMediaDur] = useState<Record<number, number>>({});

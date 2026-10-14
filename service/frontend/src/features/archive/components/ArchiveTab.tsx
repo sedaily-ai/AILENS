@@ -16,6 +16,7 @@ import { SentenceCard } from './SentenceCard';
 import { TodaysSentenceSection } from './TodaysSentenceSection';
 import { PopularHighlightsSection } from './PopularHighlightsSection';
 import { ArchiveRecommendations } from './ArchiveRecommendations';
+import { notifyArchiveChanged } from '../lib/archiveEvents';
 
 type Article = MbtiArticle;
 
@@ -57,7 +58,10 @@ export function ArchiveTab({
   setShowCalendar,
 }: Props) {
   const { user, isAuthenticated } = useAuth();
+  const userId = user?.userId;
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [flashbackFraction] = useState(() => Math.random());
+  const flashback = archivedSentences[Math.floor(flashbackFraction * archivedSentences.length)];
 
   // UI state
   const [showArchiveCalendar, setShowArchiveCalendar] = useState(false);
@@ -78,6 +82,7 @@ export function ArchiveTab({
     if (!isAuthenticated || !user?.userId) return;
     try {
       await deleteArchiveSentence(sentence.id, user.userId);
+      notifyArchiveChanged(user.userId);
     } catch (err) {
       console.warn('Archive delete failed, restoring:', err);
       setArchivedSentences(prev => [...prev, sentence]);
@@ -91,7 +96,8 @@ export function ArchiveTab({
 
   // ── Load from server on mount (logged-in users) ───────────────────────
   useEffect(() => {
-    if (!isAuthenticated || !user?.userId) return;
+    if (!isAuthenticated || !userId) return;
+    const archiveOwner = userId;
 
     let cancelled = false;
 
@@ -99,7 +105,7 @@ export function ArchiveTab({
       setIsLoading(true);
       setError(null);
       try {
-        const data = await listArchiveSentences(user!.userId);
+        const data = await listArchiveSentences(archiveOwner);
         if (!cancelled) {
           const serverSentences = data.sentences.map(toFrontendSentence);
           setArchivedSentences(serverSentences);
@@ -116,7 +122,7 @@ export function ArchiveTab({
 
     loadFromServer();
     return () => { cancelled = true; };
-  }, [isAuthenticated, user?.userId, setArchivedSentences]);
+  }, [isAuthenticated, userId, setArchivedSentences]);
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-white">
@@ -232,7 +238,7 @@ export function ArchiveTab({
               <div className="mb-10 p-6 bg-amber-50/60 rounded-2xl">
                 <p className="text-[11px] text-amber-600/80 font-semibold tracking-wider uppercase mb-3">Flashback</p>
                 <p className="text-[17px] text-gray-800 leading-[1.8] font-medium">
-                  &quot;{archivedSentences[Math.floor(Math.random() * archivedSentences.length)]?.text.slice(0, 100)}{archivedSentences[0]?.text.length > 100 ? '...' : ''}&quot;
+                  &quot;{flashback?.text.slice(0, 100)}{flashback?.text.length > 100 ? '...' : ''}&quot;
                 </p>
               </div>
             )}
