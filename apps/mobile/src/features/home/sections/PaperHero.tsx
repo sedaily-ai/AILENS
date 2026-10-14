@@ -10,7 +10,7 @@ import { PAPER_TABS, paperTitle, pickPaperSection } from '../model';
 const ACCENT = '#2563eb';
 
 /** 오늘의 지면 — 4개 탭(지면/증권/산업/시그널), 고른 지면의 기사 최대 4건: 대표 1 + 작은 카드 3. 웹 LensPreviewSection 의 홈 변형. */
-export function PaperHero({ lens }: { lens: LensPost[] }) {
+export function PaperHero({ lens, linkPast = true }: { lens: LensPost[]; linkPast?: boolean }) {
   const [tab, setTab] = useState(0);
   const picks = useMemo(() => PAPER_TABS.map((t) => pickPaperSection(lens, t.paperSection)), [lens]);
   const items = picks[tab];
@@ -23,6 +23,11 @@ export function PaperHero({ lens }: { lens: LensPost[] }) {
     <View>
       <View style={styles.titleRow}>
         <Text style={styles.eyebrow}>{paperTitle(firstDate)}</Text>
+        {linkPast && firstDate ? (
+          <Link href={{ pathname: '/paper/[date]', params: { date: firstDate } }} asChild>
+            <Pressable accessibilityRole="link"><Text style={styles.past}>지난 지면 →</Text></Pressable>
+          </Link>
+        ) : null}
       </View>
       <View style={styles.tabs}>
         {PAPER_TABS.map((t, i) => (
@@ -77,7 +82,8 @@ export function PaperHero({ lens }: { lens: LensPost[] }) {
 }
 
 const styles = StyleSheet.create({
-  titleRow: { marginBottom: 10 },
+  titleRow: { marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  past: { fontSize: 13, fontWeight: '600', color: colors.textFaint },
   eyebrow: { fontSize: 13, fontWeight: '800', letterSpacing: 0.4, color: colors.text },
   tabs: { flexDirection: 'row', marginBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   tab: { flex: 1, alignItems: 'center', paddingTop: 8 },

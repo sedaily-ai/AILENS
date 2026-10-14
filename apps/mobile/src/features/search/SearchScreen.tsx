@@ -8,6 +8,8 @@ import {
   MAX_QUERY_LENGTH,
   UNCATEGORIZED,
   ECON_CATEGORIES,
+  econSubcategoriesFor,
+  countBySub,
   countByCategory,
   parseTerms,
   search,
@@ -17,6 +19,7 @@ import {
   type SearchParams,
   type SearchPeriod,
   type SearchRecord,
+  type SearchScope,
   type SearchSort,
 } from '@ailens/domain';
 import { kstDateTime } from '../../lib/format';
@@ -27,6 +30,7 @@ import { loadSearchIndex } from './searchData';
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 250;
 const SORTS: Array<[SearchSort, string]> = [['latest', '최신순'], ['relevance', '정확도순']];
+const SCOPES: Array<[SearchScope, string]> = [['all', '전체'], ['title', '제목'], ['summary', '요약']];
 const PERIODS: Array<[SearchPeriod, string]> = [['all', '전체'], ['today', '오늘'], ['week', '1주'], ['month', '1달']];
 const CATEGORY_ORDER = [...ECON_CATEGORIES.map((c) => c.label), UNCATEGORIZED];
 
@@ -35,7 +39,7 @@ type IndexState = { status: 'loading' } | { status: 'error' } | { status: 'ready
 /**
  * 검색 — 웹 SearchPage 의 모바일 판. 목록을 한 번 받아 기기에서 바로 거른다(서버 검색 API 없음).
  * 입력은 250ms 디바운스, 엔터·최근 검색어·키워드 탭은 즉시 검색하고 최근 검색어에 저장한다.
- * 범위(제목/요약)·하위 분류 필터는 웹에만 있고 앱은 정렬·기간·분류까지 둔다.
+ * 정렬·기간·검색 범위(제목/요약)·분류·하위 분류까지 웹과 같은 조건을 지원한다.
  */
 export function SearchScreen() {
   const router = useRouter();
@@ -45,6 +49,8 @@ export function SearchScreen() {
   const [sort, setSort] = useState<SearchSort>(DEFAULT_PARAMS.sort);
   const [period, setPeriod] = useState<SearchPeriod>(DEFAULT_PARAMS.period);
   const [category, setCategory] = useState('');
+  const [scope, setScope] = useState<SearchScope>(DEFAULT_PARAMS.scope);
+  const [subcat, setSubcat] = useState('');
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [index, setIndex] = useState<IndexState>({ status: 'loading' });
   const [recent, setRecent] = useState<string[]>([]);
@@ -68,6 +74,7 @@ export function SearchScreen() {
     const t = setTimeout(() => {
       setQuery(input.trim());
       setCategory('');
+      setSubcat('');
       setLimit(PAGE_SIZE);
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
@@ -78,16 +85,19 @@ export function SearchScreen() {
     setInput(term);
     setQuery(term);
     setCategory('');
+    setSubcat('');
     setLimit(PAGE_SIZE);
     Keyboard.dismiss();
     if (term) void addRecentSearch(term).then(setRecent);
   }, []);
 
   const items = index.status === 'ready' ? index.items : [];
-  const params: SearchParams = useMemo(() => ({ ...DEFAULT_PARAMS, q: query, sort, period, category }), [query, sort, period, category]);
+  const params: SearchParams = useMemo(() => ({ ...DEFAULT_PARAMS, q: query, sort, period, scope, category, sub: category ? subcat : '' }), [query, sort, period, scope, category, subcat]);
   const terms = useMemo(() => parseTerms(query), [query]);
   const hits = useMemo(() => (query ? search(items, params) : []), [items, params, query]);
   const counts = useMemo(() => (query ? countByCategory(items, params) : new Map<string, number>()), [items, params, query]);
+  const catSlug = ECON_CATEGORIES.find((c) => c.label === category)?.slug ?? '';
+  const subCounts = useMemo(() => (query && category ? countBySub(items, params) : new Map<string, number>()), [items, params, query, category]);
   const keywords = useMemo(() => topKeywords(items), [items]);
   const total = useMemo(() => [...counts.values()].reduce((a, b) => a + b, 0), [counts]);
 
@@ -188,12 +198,24 @@ export function SearchScreen() {
                 <Segment options={SORTS} value={sort} onChange={setSort} />
                 <Segment options={PERIODS} value={period} onChange={setPeriod} />
               </View>
+              <View style={styles.scopeRow}>
+                <Text style={styles.scopeLabel}>검색 범위</Text>
+                <Segment options={SCOPES} value={scope} onChange={setScope} />
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
-                <CatTab label="전체" count={total} on={category === ''} onPress={() => { setCategory(''); setLimit(PAGE_SIZE); }} />
+                <CatTab label="전체" count={total} on={category === ''} onPress={() => { setCategory(''); setSubcat(''); setLimit(PAGE_SIZE); }} />
                 {CATEGORY_ORDER.filter((c) => counts.get(c)).map((c) => (
-                  <CatTab key={c} label={c} count={counts.get(c) ?? 0} on={category === c} onPress={() => { setCategory(c); setLimit(PAGE_SIZE); }} />
+                  <CatTab key={c} label={c} count={counts.get(c) ?? 0} on={category === c} onPress={() => { setCategory(c); setSubcat(''); setLimit(PAGE_SIZE); }} />
                 ))}
               </ScrollView>
+              {category && econSubcategoriesFor(catSlug).some((u) => subCounts.get(u)) ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
+                  <CatTab label="하위 전체" count={[...subCounts.values()].reduce((a, b) => a + b, 0)} on={subcat === ''} onPress={() => { setSubcat(''); setLimit(PAGE_SIZE); }} />
+                  {econSubcategoriesFor(catSlug).filter((u) => subCounts.get(u)).map((u) => (
+                    <CatTab key={u} label={u} count={subCounts.get(u) ?? 0} on={subcat === u} onPress={() => { setSubcat(u); setLimit(PAGE_SIZE); }} />
+                  ))}
+                </ScrollView>
+              ) : null}
               <Text style={styles.total}>검색 결과 {hits.length.toLocaleString('ko-KR')}건</Text>
             </View>
           }
@@ -288,6 +310,8 @@ const styles = StyleSheet.create({
   segOn: { backgroundColor: '#fff' },
   segText: { fontSize: 12.5, color: colors.textFaint, fontWeight: '600' },
   segTextOn: { color: colors.text, fontWeight: '800' },
+  scopeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+  scopeLabel: { fontSize: 12.5, color: colors.textFaint },
   catRow: { gap: 8, paddingVertical: 14 },
   cat: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.line },
   catOn: { backgroundColor: colors.brand, borderColor: colors.brand },

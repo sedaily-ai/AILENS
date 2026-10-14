@@ -4,3 +4,4 @@
 export * from './config.js';
 export * from './posts.js';
 export * from './postVote.js';
+export * from './timeline.js';

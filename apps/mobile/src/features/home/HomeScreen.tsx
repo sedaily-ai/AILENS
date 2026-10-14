@@ -6,11 +6,12 @@ import { colors } from '../../theme';
 import { useHomeData, type HomeData } from './useHomeData';
 import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
+import { TimeMachineCard } from './sections/TimeMachineCard';
 
 const LATEST_COUNT = 8;
 
 /**
- * 홈은 "오늘의 핵심"에 집중한다(뉴닉 구조): 오늘의 지면 → 최신 뉴스.
+ * 홈은 "오늘의 핵심"에 집중한다(뉴닉 구조): 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
  * 카테고리 섹션·웹툰·영상·레터는 "발견" 탭(src/features/discover)으로 옮겼다.
  */
 type Section = { key: string; render: () => React.ReactElement | null };
@@ -19,6 +20,7 @@ function buildSections(data: HomeData): Section[] {
   return [
     { key: 'paper', render: () => <PaperHero lens={data.lens} /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
+    { key: 'timemachine', render: () => <TimeMachineCard /> },
   ];
 }
 
