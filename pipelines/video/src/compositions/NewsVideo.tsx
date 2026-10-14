@@ -5,7 +5,7 @@ import { fade } from '@remotion/transitions/fade';
 import { slide } from '@remotion/transitions/slide';
 import { interpolate, useCurrentFrame } from 'remotion';
 import { ScriptMetaContext } from '../components/ScriptMeta';
-import { NewsScript } from '../lib/schema';
+import { NewsScript, cutSeconds } from '../lib/schema';
 import { FONT_FAMILY } from '../styles/tokens';
 import { CutRenderer } from './CutRenderer';
 import { TRANSITION_SECONDS } from '../lib/animation';
@@ -36,7 +36,7 @@ export const NewsVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
         {script.cuts.map((cut, i) => (
           <React.Fragment key={i}>
             <TransitionSeries.Sequence
-              durationInFrames={cutFramesOf(cut.duration, fps)}
+              durationInFrames={cutFramesOf(cutSeconds(cut), fps)}
               layout="none"
             >
               {cut.audioFile ? (
@@ -72,7 +72,7 @@ export const NewsVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
 // calculateMetadata에서 재사용.
 export const scriptDurationInFrames = (script: NewsScript, fps: number): number => {
   const transitionFrames = Math.round(TRANSITION_SECONDS * fps);
-  const cutFrames = script.cuts.reduce((sum, cut) => sum + cutFramesOf(cut.duration, fps), 0);
+  const cutFrames = script.cuts.reduce((sum, cut) => sum + cutFramesOf(cutSeconds(cut), fps), 0);
   const overlap = Math.max(script.cuts.length - 1, 0) * transitionFrames;
   return cutFrames - overlap;
 };
