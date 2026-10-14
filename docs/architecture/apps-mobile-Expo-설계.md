@@ -95,7 +95,7 @@ API 호출 ──packages/auth.authFetch──▶ Authorization: Bearer <idToken
 
 - **EAS Update(OTA)**: JS/자산 변경은 스토어 심사 없이 즉시 배포. 100만 DL에서 핫픽스 리드타임이 치명적이라 1급 기능으로 둔다. 네이티브 변경만 스토어 재제출.
 - **EAS Submit**: App Store/Play 제출 자동화.
-- 서명키: EAS가 관리하거나 기존 `mobile-capacitor`의 keystore 승계(비밀 채널 보관, git 제외). `appId: ai.sedaily.lens` 재사용 검토(미발행이라 자유).
+- 서명키: 기존 `mobile-capacitor`의 업로드 키 keystore 를 EAS 에 등록(Play 앱 서명 사용 중, 새 키 생성 금지). `appId: ai.sedaily.lens` 재사용 확정(Play 에 이미 발행된 앱이라 바꾸면 업데이트가 끊긴다). 절차: `apps-mobile-출시-서명-가이드.md`.
 
 ## 화면 매핑 (웹 라우트 → 앱)
 
