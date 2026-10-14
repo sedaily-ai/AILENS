@@ -34,8 +34,8 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 
 ## 다음
 
-- Cognito App Client(`66c9bq3ovmk007d0eepkle92k3`)의 Callback/SignOut URLs 에 `https://ailens.sedaily.ai/app/auth/callback`·`/app/auth/signout` 추가(현재 웹 3개 URL 만 등록, 공개 클라이언트·code flow 확인). 기존 URL 은 유지하고 추가만. 운영 인증 설정 변경이라 승인 후 실행.
-- 웹에 `assetlinks.json` 배포(승인 후), iOS 는 Apple Team ID 확보 후 `apple-app-site-association` 추가.
+- [완료 2026-10-14] Cognito App Client(`66c9bq3ovmk007d0eepkle92k3`)의 Callback/SignOut URLs 에 `https://ailens.sedaily.ai/app/auth/callback`·`/app/auth/signout` 추가(기존 URL 유지, 변경 필드는 CallbackURLs·LogoutURLs 뿐임을 전후 비교로 확인, 사용자가 직접 실행)(현재 웹 3개 URL 만 등록, 공개 클라이언트·code flow 확인). 기존 URL 은 유지하고 추가만. 운영 인증 설정 변경이라 승인 후 실행.
+- [완료 2026-10-14] 웹 `assetlinks.json` 배포(ECS 리비전 114, 라이브에서 지문 2개 확인). 추가한 지문 `41:03:4F:…`은 Play Console 앱 서명 키 SHA-256 과 재대조 필요. iOS 는 Apple Team ID 확보 후 `apple-app-site-association` 추가.
 - Amplify RN 의 https redirect 동작(특히 iOS ASWebAuthenticationSession https 콜백은 iOS 17.4+) 은 개발 빌드에서 실측 필요 — 막히면 `ailens://` 폴백 검토.
 - 로그인은 네이티브 모듈(rtn-web-browser)이 필요해 Expo Go 불가 — EAS development build 로 확인.
 - 에뮬레이터/실기기에서 화면 확인.
