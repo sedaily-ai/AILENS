@@ -42,12 +42,24 @@ def _get_client():
     return _client
 
 
+def _log_usage(model: str, usage: dict) -> None:
+    """캐시 효과 확인용 사용량 한 줄. cacheRead가 계속 0이면 캐시가 안 맞는 것이다
+    (프롬프트가 최소 길이(Sonnet 4.6·5는 1024토큰) 미만이거나, 호출 간격이 5분을 넘었거나,
+    고정 부분에 매번 바뀌는 값이 섞인 경우)."""
+    print(
+        f"    [bedrock usage] model=...{model[-12:]} in={usage.get('inputTokens', 0)}"
+        f" out={usage.get('outputTokens', 0)} cacheRead={usage.get('cacheReadInputTokens', 0)}"
+        f" cacheWrite={usage.get('cacheWriteInputTokens', 0)}"
+    )
+
+
 def call_text(
     system_prompt: str,
     user_message: str,
     model: str = MODEL_ID,
     max_tokens: int = 3000,
     temperature: float | None = None,
+    cached_user_prefix: str | None = None,
 ) -> str:
     """system_prompt + user_message로 Bedrock Claude를 호출해 텍스트 응답을
     그대로 돌려준다. 코드블록 벗기기는 호출부 책임(포맷마다 후처리가 달라서 여기서 하지 않음).
@@ -59,18 +71,30 @@ def call_text(
     thinking은 항상 끈다. 확장 사고가 max_tokens 예산을 모두 쓰면 답변이 0글자가 되는데,
     podcast(3000)·video(4000) 같은 작은 max_tokens에서 위험이 크다
     (admin/backend/routes/prompts.py::_THINKING_CONFIG 참고). 이 함수의 호출 모델
-    (sonnet-46/opus-5/sonnet-5)은 모두 이 필드를 받으며 단순 생성 작업이라 끄는 쪽이 낫다."""
+    (sonnet-46/opus-5/sonnet-5)은 모두 이 필드를 받으며 단순 생성 작업이라 끄는 쪽이 낫다.
+
+    프롬프트 캐싱(2026-10-15): system 뒤에 cachePoint를 붙인다. 같은 지침으로 5분 안에 다시
+    부르면(기사 여러 건, 배치 분류, 재시도) 지침 부분을 0.1배 단가로 읽는다. 최소 길이보다 짧은
+    프롬프트는 오류 없이 캐시만 안 된다. 긴 지침을 user 칸에 넣는 호출부(웹툰)는
+    cached_user_prefix로 그 고정 부분을 넘기면 [고정 부분][cachePoint][user_message] 순서로 보낸다.
+    캐시는 앞에서부터 바이트가 같아야 맞으므로 고정 부분에 기사·시각 같은 가변값을 넣지 않는다.
+    admin(routes/prompts.py::_call_bedrock)은 2026-09-24부터 같은 방식을 쓴다."""
     client = _get_client()
     inference_config = {"maxTokens": max_tokens}
     if temperature is not None:
         inference_config["temperature"] = temperature
+    user_content: list[dict] = []
+    if cached_user_prefix:
+        user_content += [{"text": cached_user_prefix}, {"cachePoint": {"type": "default"}}]
+    user_content.append({"text": user_message})
     resp = client.converse(
         modelId=model,
-        system=[{"text": system_prompt}],
-        messages=[{"role": "user", "content": [{"text": user_message}]}],
+        system=[{"text": system_prompt}, {"cachePoint": {"type": "default"}}],
+        messages=[{"role": "user", "content": user_content}],
         inferenceConfig=inference_config,
         additionalModelRequestFields={"thinking": {"type": "disabled"}},
     )
+    _log_usage(model, resp.get("usage") or {})
     for block in resp["output"]["message"]["content"]:
         if "text" in block:
             return block["text"]

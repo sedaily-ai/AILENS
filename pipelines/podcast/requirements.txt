@@ -1,1 +1,1 @@
-boto3>=1.34.0
+boto3>=1.43.101  # Converse cachePoint 지원 버전(admin/backend/requirements.txt 참고)

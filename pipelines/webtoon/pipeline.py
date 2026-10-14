@@ -78,7 +78,8 @@ _JSON_INSTRUCTION = (
 _SYSTEM_PROMPT = "지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 
 
-def call_json(prompt: str, debug_path: Path | None = None, max_tokens: int = 4000) -> dict:
+def call_json(prompt: str, debug_path: Path | None = None, max_tokens: int = 4000,
+              cached_prefix: str | None = None) -> dict:
     """Bedrock Claude에 JSON 응답을 요청한다.
 
     max_tokens 기본값 4000은 단순 호출부(generate_meta.py)에 맞춘 값이다. 스크립트+장면 연출은 컷당
@@ -86,8 +87,12 @@ def call_json(prompt: str, debug_path: Path | None = None, max_tokens: int = 400
     debug_path가 주어지면 파싱 실패 시 원문 응답을 저장한다(성공하면 남기지 않는다).
 
     temperature는 보내지 않는다. 일부 모델(Opus 5)이 temperature를 거부하며(ValidationException),
-    call_text()는 None이면 inferenceConfig에 넣지 않는다."""
-    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=max_tokens)
+    call_text()는 None이면 inferenceConfig에 넣지 않는다.
+
+    cached_prefix는 기사마다 같은 고정 지침이다. prompt 앞에 붙여 보내되 그 사이에 cachePoint를 둬서
+    다음 기사부터 지침 부분을 캐시로 읽는다(call_text의 cached_user_prefix)."""
+    raw = call_text(_SYSTEM_PROMPT, prompt + _JSON_INSTRUCTION, model=SCRIPT_MODEL, max_tokens=max_tokens,
+                    cached_user_prefix=cached_prefix)
     try:
         return extract_json_object(raw)
     except ValueError:
@@ -295,9 +300,11 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
         script = json.loads(script_path.read_text(encoding="utf-8"))
     else:
         print(f"{tag} 스크립트+장면 연출 생성")
+        # 지침(기사마다 같음)과 기사 부분을 나눠 보낸다. 모델이 받는 글은 예전 한 문자열과 같고,
+        # 그 사이에 cachePoint만 들어간다(2026-10-15 프롬프트 캐싱).
+        script_guide = _extract_chapters(guide, _SCRIPT_CHAPTERS)
         script_prompt = (
-            _extract_chapters(guide, _SCRIPT_CHAPTERS)
-            + "\n\n---\n[지금 할 일]\n위 지침을 참고해서 스크립트와 장면 연출을"
+            "\n\n---\n[지금 할 일]\n위 지침을 참고해서 스크립트와 장면 연출을"
             " 한 번에 만든다.\n\n[입력 기사]\n"
             + article
             + _SCRIPT_OUTPUT_ADDENDUM
@@ -305,7 +312,8 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
         # Opus 5는 컷당 영/한 image_prompt를 길게 써서 8000 토큰으로도 8컷을 채우기 전에 멀티바이트 문자
         # 중간에서 응답이 잘렸다(extract_json_object가 읽지 못해 웹툰 실패). admin/backend/routes/prompts.py::
         # _CATEGORY_BEDROCK["webtoon"]의 max_tokens도 같은 한도로 맞춰 어긋나지 않게 한다.
-        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt", max_tokens=16000)
+        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt", max_tokens=16000,
+                           cached_prefix=script_guide)
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
     cuts = _normalize_cuts(script)
