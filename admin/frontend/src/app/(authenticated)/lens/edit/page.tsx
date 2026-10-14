@@ -8,6 +8,7 @@ import { PostForm } from "@/components/PostForm";
 import { EMPTY_LENSES } from "@/components/PostForm/LensMode";
 import { ErrorNote, FormSkeleton } from "@/components/Feedback";
 import { publicPostUrl } from "@/lib/publicUrl";
+import { VideoRemakePanel } from "@/components/VideoRemakePanel";
 import type { CmsPost, CmsPostInput } from "@/lib/types";
 
 function todayKST(): string {
@@ -52,6 +53,9 @@ function LensEditPage() {
   const [saved, setSaved] = useState<CmsPost | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [remakeOpen, setRemakeOpen] = useState(false);
+  // 영상 다시 만들기로 영상을 바꾼 뒤 편집 폼이 새 영상 주소를 보여 주도록 다시 불러온다.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -82,7 +86,7 @@ function LensEditPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const save = async () => {
     if (!(draft.headline ?? "").trim()) {
@@ -202,6 +206,16 @@ function LensEditPage() {
           )}
         </div>
         <div className="flex gap-2">
+          {saved && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setRemakeOpen(true)}
+              className="ui-btn ui-btn-ghost rounded-lg px-4 py-2 text-sm font-semibold"
+            >
+              영상 다시 만들기
+            </button>
+          )}
           <button type="button" disabled={busy} onClick={save} className="ui-btn ui-btn-primary rounded-lg px-4 py-2 text-sm font-semibold">
             저장
           </button>
@@ -244,6 +258,14 @@ function LensEditPage() {
         </div>
       ) : (
         <FormSkeleton />
+      )}
+
+      {remakeOpen && saved && (
+        <VideoRemakePanel
+          postId={saved.id}
+          onClose={() => setRemakeOpen(false)}
+          onApplied={() => setReloadKey((k) => k + 1)}
+        />
       )}
     </div>
   );

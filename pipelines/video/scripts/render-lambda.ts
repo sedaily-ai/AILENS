@@ -11,7 +11,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { renderMediaOnLambda, getRenderProgress } from '@remotion/lambda-client';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { parseNewsScript, FORMAT_DIMENSIONS, COMPOSITION_ID, Format } from '../src/lib/schema';
+import { parseNewsScript, compositionFor, isPaperTheme, Format } from '../src/lib/schema';
+import { paperDurationInFrames } from '../src/paper/PaperVideo';
 import { resolveScriptAudio } from '../src/lib/resolveAudio';
 import { scriptDurationInFrames } from '../src/compositions/NewsVideo';
 import { DEFAULT_VOICE } from '../src/lib/tts';
@@ -87,9 +88,9 @@ async function main() {
     },
   });
 
-  const compositionId = COMPOSITION_ID[format];
-  const { width, height } = FORMAT_DIMENSIONS[format];
-  const totalFrames = scriptDurationInFrames(resolved, FPS);
+  // 각본 design.theme가 'paper'면 종이 질감 컴포지션(가로형 고정), 아니면 지금처럼 형식별 기본 컴포지션.
+  const { id: compositionId, width, height } = compositionFor(resolved, format);
+  const totalFrames = isPaperTheme(resolved) ? paperDurationInFrames(resolved, FPS) : scriptDurationInFrames(resolved, FPS);
   console.log(`[2/3] 렌더링 (${compositionId}, ${width}x${height}, ${totalFrames}프레임, Remotion Lambda)`);
 
   const { renderId, bucketName } = await renderMediaOnLambda({

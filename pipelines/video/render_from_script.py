@@ -214,6 +214,10 @@ def main() -> None:
     # 싶을 때 chat_ws.py::_run_render_video_flow가 JSON으로 담아 넘긴다. 없으면(자동 발행 파이프라인 등)
     # 발행된 설정만 쓴다.
     parser.add_argument("--settings-override", default=None)
+    # CMS "영상 다시 만들기"가 기사의 원문 사진을 넘긴다. 없으면 photo 컷은 fix_script가 highlight로 바꾼다
+    # (영상 랩에서 붙여넣은 각본은 어느 기사인지 모르므로 지금처럼 사진 없이 렌더한다).
+    parser.add_argument("--photo-url", default=None)
+    parser.add_argument("--photo-credit", default=None)
     args = parser.parse_args()
     settings_override = json.loads(args.settings_override) if args.settings_override else None
 
@@ -235,7 +239,7 @@ def main() -> None:
     for line in _fill_missing_top_level(script):
         print(f"[자동수정] {line}")
 
-    script, applied = fix_script(script)
+    script, applied = fix_script(script, photo_url=args.photo_url, photo_caption=args.photo_credit)
     for line in applied:
         print(f"[자동수정] {line}")
 

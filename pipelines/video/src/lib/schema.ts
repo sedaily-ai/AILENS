@@ -10,6 +10,44 @@ export const captionSegmentSchema = z.object({
 
 export const captionSchema = z.union([z.string().min(1), z.array(captionSegmentSchema).min(1)]);
 
+// 컷별 디자인 지정(선택). CMS "영상 다시 만들기"의 수작업 프롬프트가 쓰는 항목이다. 메인 자동 발행
+// 프롬프트는 쓰지 않으므로, 없으면 지금 디자인 그대로 그린다. 값이 목록 밖이면 렌더를 멈추지 않고 그 항목만
+// 버린다(.catch) — 장식 항목이라 사실 정보가 아니다.
+export const PAPER_NAMES = ['cream', 'newsprint', 'kraft', 'black', 'spot'] as const;
+export const SPOT_NAMES = ['red', 'orange', 'teal', 'blue', 'yellow'] as const;
+export const TRANSITION_NAMES = ['cover', 'tear', 'flip', 'stampCut', 'zoom'] as const;
+export const PAPER_LAYOUTS = [
+  'newsFront',
+  'stampNumber',
+  'stampDoc',
+  'board',
+  'timeline',
+  'headline',
+  'bars',
+  'beforeAfter',
+  'photo',
+] as const;
+
+const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) => z.enum(values).optional().catch(undefined);
+const optionalText = () => z.string().optional().catch(undefined);
+
+export const cutStyleSchema = z.object({
+  // 종이 질감 테마에서 이 컷을 어떤 화면으로 그릴지. 컷 종류와 맞지 않으면 기본 화면으로 돌아간다.
+  layout: optionalEnum(PAPER_LAYOUTS),
+  paper: optionalEnum(PAPER_NAMES),
+  transition: optionalEnum(TRANSITION_NAMES),
+  emStyle: optionalEnum(['stamp', 'marker'] as const),
+  // 화면에 덧붙이는 작은 글: kicker = 큰 숫자 위 한 줄·문서 제목, sub = 헤드라인 아래 글,
+  // note = 테이프 위 손글씨, tag = 손글씨 감탄 메모, stamp = 문서에 찍는 도장 글자.
+  kicker: optionalText(),
+  sub: optionalText(),
+  note: optionalText(),
+  tag: optionalText(),
+  stamp: optionalText(),
+  // 나레이션이 끝난 뒤 화면을 더 보여 주는 시간(초).
+  holdSeconds: z.number().min(0).max(5).optional().catch(undefined),
+});
+
 const baseCutFields = {
   duration: z.number().positive(),
   narration: z.string().min(1),
@@ -19,6 +57,7 @@ const baseCutFields = {
   // Remotion Lambda 렌더(render-lambda.ts): S3 절대 URL(https://...) — NewsVideo.tsx가
   // "http"로 시작하면 그대로 <Audio src>에 쓰고, 아니면 staticFile()을 거친다.
   audioFile: z.string().optional(),
+  style: cutStyleSchema.optional().catch(undefined),
 };
 
 export const openingCutSchema = z.object({
@@ -47,6 +86,8 @@ const diagramNodeSchema = z.object({
   kind: z.literal('node'),
   icon: z.string(),
   label: z.string(),
+  // 카드 아래 작은 설명(선택). 기본 테마는 쓰지 않는다.
+  sub: z.string().optional().catch(undefined),
 });
 
 const diagramConnectorSchema = z.object({
@@ -170,6 +211,16 @@ export const newsScriptSchema = z.object({
   asOfDate: z.string().optional(),
   // 키워드 라벨(프롬프트 §7) — 왼쪽 위에 상시 노출되는 기사 핵심 명사 2~8자. 없으면 brand를 대신 보인다.
   keyword: z.string().optional(),
+  // 영상 전체 디자인(선택). theme가 'paper'면 종이 질감 컴포지션으로 렌더한다(scripts/render*.ts).
+  design: z
+    .object({
+      theme: optionalEnum(['default', 'paper'] as const),
+      paper: optionalEnum(PAPER_NAMES),
+      spot: optionalEnum(SPOT_NAMES),
+      endCard: z.boolean().optional().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 export type CaptionSegment = z.infer<typeof captionSegmentSchema>;
@@ -187,6 +238,7 @@ export type DonutCutType = z.infer<typeof donutCutSchema>;
 export type RankCutType = z.infer<typeof rankCutSchema>;
 export type Cut = z.infer<typeof cutSchema>;
 export type NewsScript = z.infer<typeof newsScriptSchema>;
+export type CutStyle = z.infer<typeof cutStyleSchema>;
 
 export type Format = 'vertical' | 'horizontal';
 
@@ -200,6 +252,20 @@ export const COMPOSITION_ID: Record<Format, string> = {
   vertical: 'NewsVideo-Vertical',
   horizontal: 'NewsVideo-Horizontal',
 };
+
+// 종이 질감 테마는 가로형(1920×1080)만 있다. 세로형 설정이어도 이 컴포지션으로 렌더한다.
+export const PAPER_COMPOSITION_ID = 'NewsVideo-Paper';
+
+export const isPaperTheme = (script: NewsScript): boolean => script.design?.theme === 'paper';
+
+// 렌더 스크립트(render.ts, render-lambda.ts)가 쓰는 컴포지션 선택.
+export const compositionFor = (script: NewsScript, format: Format): { id: string; width: number; height: number } =>
+  isPaperTheme(script)
+    ? { id: PAPER_COMPOSITION_ID, ...FORMAT_DIMENSIONS.horizontal }
+    : { id: COMPOSITION_ID[format], ...FORMAT_DIMENSIONS[format] };
+
+// 컷이 화면에 머무는 시간(초) = 음성 길이 + 쉬는 시간.
+export const cutSeconds = (cut: Cut): number => cut.duration + (cut.style?.holdSeconds ?? 0);
 
 export function parseNewsScript(json: unknown): NewsScript {
   const result = newsScriptSchema.safeParse(json);

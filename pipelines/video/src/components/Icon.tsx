@@ -51,6 +51,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   car: Car,
 };
 
+export const resolveIcon = (name: string): LucideIcon => ICON_MAP[name] ?? HelpCircle;
+
 export const Icon: React.FC<{
   name: string;
   size?: number;

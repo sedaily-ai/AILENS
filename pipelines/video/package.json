@@ -18,6 +18,7 @@
     "@aws-sdk/client-s3": "^3.1139.0",
     "@remotion/bundler": "4.0.513",
     "@remotion/cli": "4.0.513",
+    "@remotion/google-fonts": "4.0.513",
     "@remotion/lambda": "4.0.513",
     "@remotion/renderer": "4.0.513",
     "@remotion/transitions": "4.0.513",

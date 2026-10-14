@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition } from '@remotion/renderer';
-import { parseNewsScript, FORMAT_DIMENSIONS, COMPOSITION_ID, Format } from '../src/lib/schema';
+import { parseNewsScript, compositionFor, Format } from '../src/lib/schema';
 import { resolveScriptAudio } from '../src/lib/resolveAudio';
 import { DEFAULT_VOICE } from '../src/lib/tts';
 import type { VoiceId } from '@aws-sdk/client-polly';
@@ -68,8 +68,8 @@ async function main() {
     entryPoint: path.resolve(process.cwd(), 'src/index.ts'),
   });
 
-  const compositionId = COMPOSITION_ID[format];
-  const { width, height } = FORMAT_DIMENSIONS[format];
+  // 각본 design.theme가 'paper'면 종이 질감 컴포지션(가로형 고정), 아니면 지금처럼 형식별 기본 컴포지션.
+  const { id: compositionId, width, height } = compositionFor(resolved, format);
   const composition = await selectComposition({
     serveUrl,
     id: compositionId,
