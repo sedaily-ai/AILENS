@@ -17,9 +17,21 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: 'ai.sedaily.lens',
     supportsTablet: true,
+    // 유니버설 링크: 웹 도메인의 /.well-known/apple-app-site-association 에 이 앱(TeamID.번들ID)이 등록돼 있어야 한다.
+    associatedDomains: ['applinks:ailens.sedaily.ai'],
   },
   android: {
     package: 'ai.sedaily.lens',
+    // 앱 링크(autoVerify): /.well-known/assetlinks.json 에 Play 앱 서명 키 지문이 등록돼 있어야 검증된다.
+    // 웹 로그인(/auth/callback)과 충돌하지 않도록 앱 전용 경로(/app/...)만 가로챈다.
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [{ scheme: 'https', host: 'ailens.sedaily.ai', pathPrefix: '/app/' }],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
   },
   plugins: ['expo-router', 'expo-secure-store'],
   experiments: {
