@@ -11,15 +11,18 @@ export function RichText({
   numbers,
   style,
   onTerm,
+  onLongPress,
 }: {
   text: string;
   glossary?: readonly GlossaryTerm[];
   numbers?: boolean;
   style?: StyleProp<TextStyle>;
   onTerm?: (term: string, explain: string) => void;
+  /** 문단을 길게 누르면(문장 저장 시트 열기 등). */
+  onLongPress?: () => void;
 }) {
   return (
-    <Text style={style}>
+    <Text style={style} onLongPress={onLongPress}>
       {inlineSegments(text, { numbers }).map((seg, i) => {
         const pieces = splitByTerms(seg.text, glossary).map((p, j) =>
           p.explain !== undefined ? (

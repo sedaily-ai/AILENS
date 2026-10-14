@@ -23,10 +23,10 @@ function Note({ children }: { children: string }) {
   return <Text style={styles.note}>{children}</Text>;
 }
 
-export function FormatPanel({ lens, item, scale }: { lens: LensPost; item: LensItem; scale: number }) {
+export function FormatPanel({ lens, item, scale, onSaveText }: { lens: LensPost; item: LensItem; scale: number; onSaveText?: (text: string) => void }) {
   switch (item.label) {
     case '레터':
-      return <LetterPanel lens={lens} item={item} scale={scale} />;
+      return <LetterPanel lens={lens} item={item} scale={scale} onSaveText={onSaveText} />;
     case '웹툰':
       return <WebtoonPanel item={item} scale={scale} />;
     case '팟캐스트':
@@ -38,7 +38,7 @@ export function FormatPanel({ lens, item, scale }: { lens: LensPost; item: LensI
   }
 }
 
-function LetterPanel({ lens, item, scale }: { lens: LensPost; item: LensItem; scale: number }) {
+function LetterPanel({ lens, item, scale, onSaveText }: { lens: LensPost; item: LensItem; scale: number; onSaveText?: (text: string) => void }) {
   const paragraphs = item.paragraphs ?? [];
   if (paragraphs.length === 0 && item.bullets.length > 0) {
     // 문단이 없으면 질문에 답하는 사실을 번호 목록으로(웹과 같은 폴백).
@@ -57,7 +57,7 @@ function LetterPanel({ lens, item, scale }: { lens: LensPost; item: LensItem; sc
   if (paragraphs.length === 0) {
     return <Note>이 기사의 레터는 아직 만들지 않았어요. 다른 형식을 골라보거나 아래 원문 기사에서 전체 내용을 확인할 수 있어요.</Note>;
   }
-  return <LetterBody paragraphs={paragraphs} headline={lens.headline} glossary={item.keywords} summaryBullets={item.bullets} slug={lens.id} scale={scale} />;
+  return <LetterBody paragraphs={paragraphs} headline={lens.headline} glossary={item.keywords} summaryBullets={item.bullets} slug={lens.id} scale={scale} onSaveText={onSaveText} />;
 }
 
 function WebtoonPanel({ item, scale }: { item: LensItem; scale: number }) {

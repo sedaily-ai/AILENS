@@ -34,6 +34,7 @@ export default function AccountScreen() {
           </>
         )}
       </View>
+      {state.status === 'signedIn' ? <Row label="비밀번호 변경" onPress={() => router.push('/settings/password')} /> : null}
       <Row label="이용약관" onPress={() => Linking.openURL(`${SITE}/terms`)} />
       <Row label="개인정보처리방침" onPress={() => Linking.openURL(`${SITE}/privacy`)} />
       <Row label="AI LENS 웹사이트" onPress={() => Linking.openURL(SITE)} />

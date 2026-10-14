@@ -5,7 +5,7 @@ import { Hub } from 'aws-amplify/utils';
 export type AuthState =
   | { status: 'loading' }
   | { status: 'signedOut' }
-  | { status: 'signedIn'; email?: string };
+  | { status: 'signedIn'; userId: string; email?: string };
 
 interface AuthContextValue {
   state: AuthState;
@@ -23,9 +23,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      await getCurrentUser();
+      const user = await getCurrentUser();
       const attrs = await fetchUserAttributes().catch(() => undefined);
-      setState({ status: 'signedIn', email: attrs?.email });
+      setState({ status: 'signedIn', userId: user.userId, email: attrs?.email });
     } catch {
       setState({ status: 'signedOut' });
     }

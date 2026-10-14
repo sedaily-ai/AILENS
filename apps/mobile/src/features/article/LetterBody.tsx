@@ -23,6 +23,7 @@ export function LetterBody({
   summaryBullets,
   slug,
   scale = 1,
+  onSaveText,
 }: {
   paragraphs: string[];
   headline?: string;
@@ -31,6 +32,8 @@ export function LetterBody({
   summaryBullets?: string[];
   slug: string;
   scale?: number;
+  /** 본문 문단을 길게 누르면 그 문단 텍스트를 넘긴다(문장 저장). */
+  onSaveText?: (text: string) => void;
 }) {
   const blocks = useMemo(() => parseLetterBlocks(paragraphs, { headline }), [paragraphs, headline]);
   const [term, setTerm] = useState<{ term: string; explain: string } | null>(null);
@@ -40,7 +43,7 @@ export function LetterBody({
   const onTerm = (t: string, explain: string) => setTerm({ term: t, explain });
 
   const rt = (text: string, numbers = false, style?: object) => (
-    <RichText text={text} glossary={glossary} numbers={numbers} onTerm={onTerm} style={[styles.p, fs(16), style]} />
+    <RichText text={text} glossary={glossary} numbers={numbers} onTerm={onTerm} onLongPress={onSaveText ? () => onSaveText(text) : undefined} style={[styles.p, fs(16), style]} />
   );
 
   const plain = (b: LetterBlock, key: number) => {

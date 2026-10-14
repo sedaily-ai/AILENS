@@ -15,7 +15,7 @@ interface LetterFull extends LetterPost {
   closing_line?: string | null;
 }
 
-export function LetterArticle({ post, scale }: { post: LetterPost; scale: number }) {
+export function LetterArticle({ post, scale, onSaveText }: { post: LetterPost; scale: number; onSaveText?: (text: string) => void }) {
   const p = post as LetterFull;
   const { width } = useWindowDimensions();
   return (
@@ -42,7 +42,7 @@ export function LetterArticle({ post, scale }: { post: LetterPost; scale: number
           tagsStyles={{ h2: { fontSize: 21 * scale, marginTop: 28 }, h3: { fontSize: 18 * scale, marginTop: 22 }, p: { marginTop: 14, marginBottom: 0 }, a: { color: '#2563eb' }, blockquote: { borderLeftWidth: 3, borderLeftColor: '#5b8def', paddingLeft: 12, marginLeft: 0 } }}
         />
       ) : (
-        <LetterBody paragraphs={p.body ?? []} headline={p.headline} glossary={p.keywords} slug={p.id} scale={scale} />
+        <LetterBody paragraphs={p.body ?? []} headline={p.headline} glossary={p.keywords} slug={p.id} scale={scale} onSaveText={onSaveText} />
       )}
 
       {p.images?.map((img, i) => (

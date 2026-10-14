@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ import { FONT_SCALES, useFontScale } from './FontScale';
 import { FormatPanel, FORMATS, PhotoHeader } from './FormatPanels';
 import { LetterArticle } from './LetterArticle';
 import { useArticle, type Article } from './useArticle';
+import { bookmarks, history } from '../mylens/stores';
+import { SentenceSheet } from './SentenceSheet';
 
 const SITE = 'https://ailens.sedaily.ai';
 
@@ -23,6 +25,32 @@ export function ArticleScreen() {
   const { state, reload } = useArticle(slug);
   const { scale, idx, cycle } = useFontScale();
   const [progress, setProgress] = useState(0);
+  const [saved, setSaved] = useState(false);
+  const [sentenceText, setSentenceText] = useState<string | null>(null);
+
+  // 글이 열리면 열람 기록에 남기고, 저장(북마크) 여부를 읽는다.
+  const ready = state.status === 'ready' ? state.data : null;
+  const summary = ready
+    ? {
+        id: ready.post.id,
+        title: displayHeadline(ready.post.headline),
+        category: ready.post.category ?? null,
+        imageUrl: ready.post.photo_image_url ?? ('cover_image_url' in ready.post ? ready.post.cover_image_url : null) ?? null,
+      }
+    : null;
+  useEffect(() => {
+    if (!summary) return;
+    void history.add({ ...summary, at: Date.now() });
+    void bookmarks.has(summary.id).then(setSaved);
+    // 글이 바뀔 때만.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary?.id]);
+  const toggleSaved = () => {
+    if (!summary) return;
+    if (saved) void bookmarks.remove(summary.id);
+    else void bookmarks.add({ ...summary, at: Date.now() });
+    setSaved(!saved);
+  };
 
   const share = (article: Article) => {
     const url = article.kind === 'lens' ? `${SITE}${lensPath(article.post)}` : `${SITE}/letters/${encodeURIComponent(article.post.id)}`;
@@ -42,6 +70,11 @@ export function ArticleScreen() {
               <Pressable onPress={cycle} hitSlop={10} accessibilityRole="button" accessibilityLabel={`글자 크기 ${Math.round(FONT_SCALES[idx] * 100)}%`}>
                 <Text style={styles.aa}>가<Text style={styles.aaBig}>가</Text></Text>
               </Pressable>
+              {state.status === 'ready' ? (
+                <Pressable onPress={toggleSaved} hitSlop={10} accessibilityRole="button" accessibilityState={{ selected: saved }} accessibilityLabel={saved ? '저장 취소' : '저장'}>
+                  <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={24} color={saved ? '#2563eb' : colors.text} />
+                </Pressable>
+              ) : null}
               {state.status === 'ready' ? (
                 <Pressable onPress={() => share(state.data)} hitSlop={10} accessibilityRole="button" accessibilityLabel="공유">
                   <Ionicons name="share-outline" size={24} color={colors.text} />
@@ -63,11 +96,12 @@ export function ArticleScreen() {
               setProgress(max > 0 ? Math.min(1, Math.max(0, contentOffset.y / max)) : 0);
             }}
           >
-            {article.kind === 'lens' ? <LensArticle lens={article.post} scale={scale} /> : <LetterHead post={article.post} scale={scale} />}
+            {article.kind === 'lens' ? <LensArticle lens={article.post} scale={scale} onSaveText={setSentenceText} /> : <LetterHead post={article.post} scale={scale} onSaveText={setSentenceText} />}
             <Footer article={article} />
           </ScrollView>
         )}
       </AsyncView>
+      {summary ? <SentenceSheet text={sentenceText} article={{ id: summary.id, title: summary.title, publishedAt: ready?.post.published_at }} onClose={() => setSentenceText(null)} /> : null}
     </View>
   );
 }
@@ -80,7 +114,7 @@ function Meta({ category, when, readMin }: { category?: string | null; when: str
   );
 }
 
-function LensArticle({ lens, scale }: { lens: LensPost; scale: number }) {
+function LensArticle({ lens, scale, onSaveText }: { lens: LensPost; scale: number; onSaveText: (t: string) => void }) {
   const items = lens.lenses ?? [];
   // 형식 이름 → 탭. 데이터에 없는 형식은 탭에서 뺀다(빈 탭으로 길을 막지 않음).
   const tabs = FORMATS.map((f) => ({ ...f, item: items.find((l) => l.label === f.label) })).filter((t) => t.item);
@@ -109,7 +143,7 @@ function LensArticle({ lens, scale }: { lens: LensPost; scale: number }) {
               );
             })}
           </View>
-          <FormatPanel key={current.label} lens={lens} item={current.item!} scale={scale} />
+          <FormatPanel key={current.label} lens={lens} item={current.item!} scale={scale} onSaveText={onSaveText} />
         </>
       ) : lens.context ? (
         <Text style={[styles.lede, { fontSize: 16 * scale, lineHeight: 26 * scale }]}>{lens.context}</Text>
@@ -118,14 +152,14 @@ function LensArticle({ lens, scale }: { lens: LensPost; scale: number }) {
   );
 }
 
-function LetterHead({ post, scale }: { post: Article['post']; scale: number }) {
+function LetterHead({ post, scale, onSaveText }: { post: Article['post']; scale: number; onSaveText: (t: string) => void }) {
   const p = post as import('@ailens/api-client').LetterPost;
   return (
     <View>
       <Meta category={p.category} when={kstDateTime(p.published_at, p.publish_date)} />
       <Text style={styles.title}>{displayHeadline(p.headline)}</Text>
       <PhotoHeader uri={p.photo_image_url ?? p.cover_image_url} />
-      <LetterArticle post={p} scale={scale} />
+      <LetterArticle post={p} scale={scale} onSaveText={onSaveText} />
     </View>
   );
 }
