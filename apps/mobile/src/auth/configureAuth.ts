@@ -5,10 +5,14 @@ import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
 import { secureStorage } from './secureStorage';
 
 // 웹(service/frontend/src/shared/config/auth.ts)과 같은 User Pool·App Client 를 공유한다. 다른 건 redirect 뿐이다.
-// redirect 는 인증된 https 링크(RFC 8252 권장: 유니버설 링크/앱 링크)를 쓴다 — 커스텀 스킴은 다른 앱이 가로챌 수 있다.
-// 웹 로그인(/auth/callback)과 겹치지 않게 앱 전용 경로(/app/auth/callback)를 쓰고, Cognito App Client 의
-// Callback/SignOut URLs 에 등록돼 있어야 한다. 절차: docs/architecture/apps-mobile-출시-서명-가이드.md, auth-env-공유설계-Amplify.md
-const APP_LINK_ORIGIN = 'https://ailens.sedaily.ai';
+// redirect — Amplify RN(aws-amplify v6)은 로그인 시 "http·https 가 아닌 앱 스킴" 주소만 고른다
+// (getRedirectUrl.native: 목록에 앱 스킴이 없으면 InvalidAppSchemeException 으로 앱 시작 시 오류, 로그인 주소를 고르는 옵션도 없음).
+// 그래서 앱 스킴 `ailens://` 를 쓴다. 인증 코드 플로우 + PKCE 라서 스킴을 가로채도 코드만으로는 토큰을 얻지 못한다(RFC 8252 허용 방식, 차선).
+// 이 주소들은 Cognito App Client 의 Callback/SignOut URLs 에 등록돼 있어야 한다.
+// 인증된 https 링크(권장 방식)가 필요해지면 로그인을 expo-auth-session 기반 자체 PKCE 구현으로 바꾼다
+// (Cognito 에 https 콜백이 이미 등록돼 있고 assetlinks·intentFilters 도 준비돼 있다). 근거: docs/architecture/auth-env-공유설계-Amplify.md
+export const OAUTH_REDIRECT_SIGN_IN = 'ailens://auth/callback';
+export const OAUTH_REDIRECT_SIGN_OUT = 'ailens://auth/signout';
 
 let configured = false;
 
@@ -28,8 +32,8 @@ export function configureAuth(): void {
           oauth: {
             domain: 'sedaily-mbti.auth.us-east-1.amazoncognito.com',
             scopes: ['email', 'profile', 'openid'],
-            redirectSignIn: [`${APP_LINK_ORIGIN}/app/auth/callback`],
-            redirectSignOut: [`${APP_LINK_ORIGIN}/app/auth/signout`],
+            redirectSignIn: [OAUTH_REDIRECT_SIGN_IN],
+            redirectSignOut: [OAUTH_REDIRECT_SIGN_OUT],
             responseType: 'code',
             providers: ['Google'],
           },

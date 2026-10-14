@@ -28,6 +28,8 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 
 - 웹툰·영상·오디오 전용 화면: `/webtoon`(목록·컷 세로 보기), `/video`(목록·expo-video 플레이어), `/listen/[slug]`(오디오 상세·배속·대본), 전역 `PlayerProvider`(expo-audio) 로 미니 플레이어·듣기 탭을 연결(큐·자동 다음 곡·잠금화면·백그라운드). `getPost` 에 channel 옵션, api 타입에 panels·transcript 추가. 네이티브 모듈 추가로 EAS 개발 빌드 재생성 필요.
 
+- **로그인 redirect 정정**: 개발 빌드에서 `InvalidAppSchemeException`(앱 시작 시) 발생 → Amplify RN 소스(`getRedirectUrl.native`) 확인 결과 https redirect 불가. 앱 스킴 `ailens://auth/callback`·`ailens://auth/signout` 로 변경, Cognito 콜백·로그아웃 URL 에 추가 필요(스크립트 `cognito-add-app-scheme.sh`, 사용자 실행). 앞서 등록한 https URL·assetlinks 는 향후 자체 PKCE 전환 대비로 유지.
+
 ## 결정
 
 - **로그인 redirect 는 커스텀 스킴이 아니라 인증된 https 링크(RFC 8252 권장)로 확정.** 100만 DL 목표라 나중에 바꾸는 비용을 피하려고 처음부터 정석으로 간다. 웹 로그인과 충돌하지 않게 앱 전용 경로 `/app/`을 쓴다.
