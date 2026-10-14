@@ -16,3 +16,4 @@ export * from './content/lensUrl.js';
 export * from './constants/econCategories.js';
 export * from './constants/econSubcategories.js';
 export * from './search/searchIndex.js';
+export * from './auth/passwordPolicy.js';

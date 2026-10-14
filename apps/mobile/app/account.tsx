@@ -1,5 +1,5 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/auth/AuthContext';
 import { colors } from '../src/theme';
@@ -9,7 +9,8 @@ const SITE = 'https://ailens.sedaily.ai';
 // 계정 — 프로필 아이콘의 진입점(햄버거 메뉴를 대신한다): 로그인/로그아웃, 약관·정책, 앱 정보.
 // 약관·개인정보 페이지는 웹 경로를 연다(경로는 웹 라우트 확인 후 조정 필요, 미확인).
 export default function AccountScreen() {
-  const { state, signIn, signOut } = useAuth();
+  const { state, signOut } = useAuth();
+  const router = useRouter();
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: true, title: '내 계정' }} />
@@ -27,8 +28,8 @@ export default function AccountScreen() {
         ) : (
           <>
             <Text style={styles.name}>로그인이 필요해요</Text>
-            <Pressable style={styles.btn} onPress={() => void signIn()} accessibilityRole="button" disabled={state.status === 'loading'}>
-              <Text style={styles.btnText}>Google로 로그인</Text>
+            <Pressable style={styles.btn} onPress={() => router.push('/login')} accessibilityRole="button" disabled={state.status === 'loading'}>
+              <Text style={styles.btnText}>로그인 · 회원가입</Text>
             </Pressable>
           </>
         )}

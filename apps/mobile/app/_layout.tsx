@@ -27,6 +27,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="category/[slug]" />
           <Stack.Screen name="search" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="account" options={{ headerShown: true, title: '내 계정' }} />
           <Stack.Screen name="article/[slug]" options={{ headerShown: true, title: '기사' }} />
         </Stack>

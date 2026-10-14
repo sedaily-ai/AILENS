@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader } from '../../src/components/AppHeader';
 import { useAuth } from '../../src/auth/AuthContext';
@@ -7,7 +8,8 @@ import { colors } from '../../src/theme';
 
 // 나의 LENS — 저장·구독한 글(웹 나의 LENS 대응). 목록 자체는 백엔드 연동 후(M4)이고, 지금은 로그인 상태에 따른 안내만 보여 준다.
 export default function MeScreen() {
-  const { state, signIn } = useAuth();
+  const { state } = useAuth();
+  const router = useRouter();
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <AppHeader />
@@ -20,8 +22,8 @@ export default function MeScreen() {
           <>
             <Text style={styles.note}>로그인하면 저장한 글과 구독을{'\n'}한곳에서 볼 수 있어요.</Text>
             {state.status === 'signedOut' ? (
-              <Pressable style={styles.btn} onPress={() => void signIn()} accessibilityRole="button">
-                <Text style={styles.btnText}>Google로 로그인</Text>
+              <Pressable style={styles.btn} onPress={() => router.push('/login')} accessibilityRole="button">
+                <Text style={styles.btnText}>로그인 · 회원가입</Text>
               </Pressable>
             ) : null}
           </>
