@@ -599,7 +599,8 @@ export const StampDoc: React.FC<{ stamp: string; docTitle: string; caption: stri
           ))}
         </div>
         <div style={{ position: "absolute", right: 60, bottom: 70 }}>
-          <Stamp text={stamp} at={STAMP_AT} size={170} rotate={-12} color={P.paper} />
+          {/* 원본은 두 글자("미정") 기준 170px 고정. 도장 상자(글자 폭 + 테두리·여백 0.6)가 문서 폭 절반(약 520px)을 넘지 않게 줄인다. */}
+          <Stamp text={stamp} at={STAMP_AT} size={Math.min(170, Math.floor(520 / (textUnits(stamp) + 0.6)))} rotate={-12} color={P.paper} />
         </div>
       </PaperCard>
     </div>
