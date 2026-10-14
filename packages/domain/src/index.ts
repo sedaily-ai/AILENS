@@ -15,3 +15,4 @@ export * from './content/displayHeadline.js';
 export * from './content/lensUrl.js';
 export * from './constants/econCategories.js';
 export * from './constants/econSubcategories.js';
+export * from './search/searchIndex.js';

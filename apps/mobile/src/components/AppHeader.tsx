@@ -7,7 +7,6 @@ import { colors } from '../theme';
 /**
  * 상단바 — 좌: AI LENS + BETA, 우: 검색 · 프로필. 햄버거는 두지 않는다(뉴닉 방식):
  * 주 이동은 하단 탭, 계정·설정·약관·로그인은 프로필 아이콘(/account)이 맡는다.
- * 검색은 동작 연결 전(UI만).
  */
 export function AppHeader() {
   const router = useRouter();
@@ -22,7 +21,7 @@ export function AppHeader() {
         </View>
       </View>
       <View style={styles.icons}>
-        <Pressable hitSlop={10} accessibilityRole="button" accessibilityLabel="검색">
+        <Pressable hitSlop={10} onPress={() => router.push('/search')} accessibilityRole="button" accessibilityLabel="검색">
           <Ionicons name="search-outline" size={24} color={colors.text} />
         </Pressable>
         <Pressable hitSlop={10} onPress={() => router.push('/account')} accessibilityRole="button" accessibilityLabel="내 계정">

@@ -31,11 +31,13 @@ src/features/home/
 ├─ useHomeData.ts        5개 채널 병렬 조회(allSettled), 부분 실패 허용
 ├─ model.ts              순수 로직: buildLatest, PAPER_TABS/pickPaperSection/paperTitle, groupByCategory
 └─ sections/             PaperHero, LatestSection, CategorySection, LettersSection, MediaRails(웹툰·영상·오디오), SectionHeader
+src/features/search/     SearchScreen·searchData(목록 로더)·recentSearches(AsyncStorage)
 src/features/discover/   DiscoverScreen — 카테고리 섹션 + 웹툰·영상 + 레터
 src/components/          AppHeader, CategoryChips, GridCard, MiniPlayer, AsyncView
 app/(tabs)/              index(홈) · discover · listen · me(나의 LENS)
 app/category/[slug].tsx  카테고리 목록(발견 칩·섹션 "더 보기"가 진입)
 app/account.tsx          계정·약관(프로필 아이콘)
+app/search.tsx           검색(상단바 돋보기)
 ```
 
 ## 섹션 (웹 홈의 순서를 홈/발견으로 나눔)
@@ -49,6 +51,13 @@ app/account.tsx          계정·약관(프로필 아이콘)
 ## 미이행 / 자리표시
 
 - 뉴스 타임머신(S3 지면), 게임, 요즘 많이 읽힌 글(인기 레일, 로그인·집계 API 필요)
-- 검색 동작(아이콘은 모양만), 미니 플레이어 재생(UI만), 약관·개인정보 웹 경로(`/terms`, `/privacy`)는 미확인
+- 검색: 범위(제목/요약)·하위 분류 필터, 디스크 캐시(지금은 세션 메모리) — 웹에만 있음
+- 미니 플레이어 재생(UI만), 약관·개인정보 웹 경로(`/terms`, `/privacy`)는 미확인
 - 웹툰·영상·오디오 전용 상세 화면 — 지금은 글 상세로 연결
 - 카테고리 하위분류·페이지네이션, 가로 칩 활성 표시의 스크롤 연동
+
+## 검색
+
+- 순수 로직(`search`, `countByCategory`, `topKeywords`, `splitHighlight`, `parseTerms`)은 **`@ailens/domain/search`로 승격**해 웹·앱이 공유한다. 웹 `shared/lib/search/searchIndex.ts`는 재수출 + 웹 전용 로더만 남겼고, 기존 웹 테스트 22건이 그대로 통과한다.
+- 데이터: 웹과 같은 `GET /api/search-index`(제목·요약·분류·날짜·썸네일, 약 1.4MB/2,684건)를 세션당 1회 받아 기기에서 거른다. 글이 만 건대로 늘면 서버 검색으로 교체(인터페이스 `loadSearchIndex`/`search` 유지).
+- 화면: 입력 250ms 디바운스, 엔터·최근 검색어·키워드 탭은 즉시 검색+최근 검색어 저장(기기 AsyncStorage, 최대 8개), 정렬(최신/정확도)·기간(전체/오늘/1주/1달)·분류 탭(건수), 20건씩 무한 스크롤, 제목·요약 강조.
