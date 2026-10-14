@@ -35,10 +35,11 @@ from typing import Callable
 import boto3
 
 import auth
-from repo import prompt_lab_repo, prompts_repo
+from repo import posts_repo, prompt_lab_repo, prompts_repo
 from routes.webtoon import generate as webtoon_generate
 from routes.webtoon import jobs as webtoon_jobs
 from routes.webtoon import script as webtoon_script
+from routes import video_remake
 from shared import time_utils
 from routes.prompts import (
     _CATEGORY_BEDROCK, _get_bedrock_client, get_thinking_config, model_supports_prompt_cache, resolve_text_model,
@@ -248,7 +249,15 @@ def run_async_job(payload: dict) -> None:
             model_id=data.get("model_id"),
             voice_settings=data.get("voice_settings"),
             polly_settings=data.get("polly_settings"),
+            photo_url=data.get("photo_url"),
+            photo_credit=data.get("photo_credit"),
         )
+    elif kind == "remake_load":
+        video_remake.run_load(push, data.get("post_id") or "")
+    elif kind == "remake_script":
+        _run_remake_script_flow(push, data.get("post_id") or "", data.get("article"), data.get("model"))
+    elif kind == "remake_apply":
+        video_remake.run_apply(push, data.get("post_id") or "", data.get("job_id") or "", data.get("text") or "")
     else:
         push({"type": "error", "message": f"알 수 없는 요청입니다: {kind}"})
 
@@ -730,10 +739,38 @@ def _ecs() -> "boto3.client":
     return _ecs_client
 
 
+def _run_remake_script_flow(push: Push, post_id: str, article_override: str | None, model_id: str | None) -> None:
+    """영상 다시 만들기 — 수작업 프롬프트(video-remake, 화면에서 먼저 저장)와 원문으로 각본을 스트리밍한다.
+    프롬프트·원문은 WebSocket 프레임(32KB)에 싣지 않고 서버가 읽는다. 원문은 사람이 화면에서 고쳤을 때만
+    article_override로 온다. 모델·출력 상한은 영상 탭과 같다(_CATEGORY_BEDROCK["video"])."""
+    article = (article_override or "").strip()
+    if not article:
+        post = posts_repo.get(post_id) if post_id else None
+        if not post:
+            push({"type": "error", "message": "글을 찾을 수 없습니다."})
+            return
+        src = video_remake.article_for_post(post)
+        article = src["article"]
+        if not article:
+            push({"type": "error", "message": src["note"] or "원문이 비어 있습니다 — 직접 붙여넣어 주세요."})
+            return
+    prompt, _ = video_remake.remake_prompt()
+    cfg = _CATEGORY_BEDROCK["video"]
+    user_message = cfg["user_template"].format(article=article)
+    model = resolve_text_model(model_id) if model_id else cfg["model"]
+    _stream_completion(
+        push, prompt, [{"role": "user", "content": [{"text": user_message[:12000]}]}],
+        max_tokens=cfg["max_tokens"], model=model,
+        additional_fields=get_thinking_config(model_id),
+        use_cache=model_supports_prompt_cache(model_id) if model_id else True,
+    )
+
+
 def _run_render_video_flow(
     push: Push, text: str, slot_id: str, provider: str = "polly",
     voice_id: str | None = None, model_id: str | None = None,
     voice_settings: dict | None = None, polly_settings: dict | None = None,
+    photo_url: str | None = None, photo_credit: str | None = None,
 ) -> None:
     """영상 탭 우측 "영상 생성" 패널(VideoRenderGenerator.tsx, 팟캐스트의
     PodcastAudioGenerator.tsx와 같은 슬롯-리스트 구조) 전용. 여기서는 ECS
@@ -792,6 +829,11 @@ def _run_render_video_flow(
     command = ["--job-id", job_id, "--script-s3-key", input_key]
     if settings_override:
         command += ["--settings-override", json.dumps(settings_override, ensure_ascii=False)]
+    # 영상 다시 만들기(video_remake.py)가 넘기는 원문 사진 — photo 컷에 쓰인다(render_from_script.py).
+    if photo_url:
+        command += ["--photo-url", photo_url]
+        if photo_credit:
+            command += ["--photo-credit", photo_credit]
     try:
         _ecs().run_task(
             cluster=_VIDEO_LAB_CLUSTER,
