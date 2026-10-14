@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+from datetime import date, timedelta
 import urllib.error
 import urllib.request
 from typing import Callable
@@ -75,6 +77,39 @@ def _article_no(source_url: str) -> str | None:
     return m.group(1) if m else None
 
 
+# 매일 기사 XML(S3)을 읽어 주는 기존 공개 API(service/backend의 s3-articles Lambda). lens-cms-api 기사 표에는
+# 영문 서비스용으로 모은 일부 기사만 있어 자동 발행 기사 원문이 대부분 없다(2026-10-14 확인) — 이 API를 먼저 쓴다.
+_S3_ARTICLES_API = os.environ.get("S3_ARTICLES_API_URL", "https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev")
+_S3_TIMEOUT_SECONDS = 20
+
+
+def _get_json(url: str) -> dict:
+    with urllib.request.urlopen(urllib.request.Request(url, method="GET"), timeout=_S3_TIMEOUT_SECONDS) as res:
+        return json.loads(res.read()) or {}
+
+
+def _fetch_xml_article(article_no: str, publish_date: str | None) -> dict | None:
+    """발행일(과 그 전날)의 기사 목록에서 기사 번호로 내부 ID를 찾고, 상세(본문·사진)를 받는다."""
+    try:
+        base = date.fromisoformat((publish_date or "")[:10])
+    except ValueError:
+        base = date.today()
+    for d in (base, base - timedelta(days=1)):
+        ymd = d.strftime("%Y%m%d")
+        listing = _get_json(f"{_S3_ARTICLES_API}/s3-articles?date={ymd}&limit=500")
+        hit = next((a for a in listing.get("articles") or [] if f"/article/{article_no}" in (a.get("original_link") or "")), None)
+        if hit:
+            detail = _get_json(f"{_S3_ARTICLES_API}/s3-article/{hit['news_id']}?date={ymd}")
+            if detail.get("content_ko"):
+                return {
+                    "title_ko": detail.get("title_ko") or "",
+                    "sub_title_ko": (detail.get("sub_title") or "").replace("<br/>", " / "),
+                    "content_ko": detail.get("content_ko") or "",
+                    "images": detail.get("images") or [],
+                }
+    return None
+
+
 def _fetch_article(article_no: str) -> dict | None:
     """lens-cms-api 공개 기사 조회(GET /api/v2/articles/{no}). 없으면 None."""
     url = f"{lens_cms_client.API_URL}/api/v2/articles/{article_no}"
@@ -112,11 +147,16 @@ def article_for_post(post: dict) -> dict:
     no = _article_no(post.get("source_url") or "")
     article_note = None
     if no:
-        try:
-            article = _fetch_article(no)
-        except Exception as e:  # noqa: BLE001 — 원문 조회 실패해도 화면에서 직접 붙여넣을 수 있게 계속 진행
-            logger.exception(f"원문 조회 실패(article_no={no})")
-            article, article_note = None, f"원문 조회 실패: {e}"
+        article = None
+        for fetch in (lambda: _fetch_xml_article(no, post.get("publish_date")), lambda: _fetch_article(no)):
+            try:
+                article = fetch()
+            except Exception as e:  # noqa: BLE001 — 원문 조회 실패해도 화면에서 직접 붙여넣을 수 있게 계속 진행
+                logger.exception(f"원문 조회 실패(article_no={no})")
+                article_note = f"원문 조회 실패: {e}"
+            if article:
+                article_note = None
+                break
         if article:
             parts = [article.get("title_ko") or "", article.get("sub_title_ko") or "", article.get("content_ko") or ""]
             article_text = "\n\n".join(p for p in parts if p.strip())
