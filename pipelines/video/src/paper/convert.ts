@@ -7,7 +7,9 @@ import type { Bar, CardNode, EmStyle, PaperScene, Visual } from "./types";
 // 사이트 각본(NewsScript) → 종이 질감 장면 목록.
 // 각본에 디자인 지정(cut.style, script.design)이 있으면 그대로 따르고, 없으면 아래 기본 규칙으로 정한다.
 
-const captionText = (c: CaptionValue): string => (typeof c === "string" ? c : c.map((s) => s.text).join(""));
+// 기본 디자인(KineticText)은 자막 조각을 항상 띄어서 그린다 — 같은 규칙으로 잇는다("AI 활용률" + "70%" → "AI 활용률 70%").
+const captionText = (c: CaptionValue): string =>
+  typeof c === "string" ? c : c.map((s) => s.text.trim()).filter(Boolean).join(" ");
 
 // 강조어 = 자막에서 emphasis로 표시된 구간. 없으면 자막의 마지막 낱말.
 const emphasisOf = (c: CaptionValue, text: string): string => {
