@@ -25,6 +25,7 @@ export default function RootLayout() {
         <StatusBar style="auto" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="category/[slug]" />
           <Stack.Screen name="article/[slug]" options={{ headerShown: true, title: '기사' }} />
         </Stack>
       </AuthProvider>

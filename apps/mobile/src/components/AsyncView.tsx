@@ -15,7 +15,7 @@ export function AsyncView<T>({
   if (state.status === 'loading') {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#8ab4ff" />
+        <ActivityIndicator color="#2563eb" />
       </View>
     );
   }
@@ -34,7 +34,7 @@ export function AsyncView<T>({
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  msg: { color: '#9aa0a6', fontSize: 14, textAlign: 'center' },
-  btn: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, backgroundColor: '#26272b' },
-  btnText: { color: '#f5f5f5', fontSize: 14, fontWeight: '600' },
+  msg: { color: '#6b7280', fontSize: 14, textAlign: 'center' },
+  btn: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, backgroundColor: '#f3f4f6' },
+  btnText: { color: '#111827', fontSize: 14, fontWeight: '600' },
 });

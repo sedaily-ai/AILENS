@@ -33,10 +33,10 @@ export function PostCard({ id, title, summary, category, date, imageUrl }: PostC
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#17181b', borderRadius: 12, borderWidth: 1, borderColor: '#26272b', overflow: 'hidden', marginBottom: 12 },
-  image: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#26272b' },
+  card: { backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden', marginBottom: 12 },
+  image: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#f3f4f6' },
   body: { padding: 14 },
-  meta: { color: '#8ab4ff', fontSize: 12, fontWeight: '600', marginBottom: 6 },
-  title: { color: '#f5f5f5', fontSize: 17, fontWeight: '700', lineHeight: 24 },
-  summary: { color: '#9aa0a6', fontSize: 13, lineHeight: 19, marginTop: 6 },
+  meta: { color: '#2563eb', fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  title: { color: '#111827', fontSize: 17, fontWeight: '700', lineHeight: 24 },
+  summary: { color: '#6b7280', fontSize: 13, lineHeight: 19, marginTop: 6 },
 });

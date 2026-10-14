@@ -32,9 +32,9 @@ export default function MeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0b0b0c', paddingHorizontal: 16 },
-  h1: { color: '#f5f5f5', fontSize: 28, fontWeight: '700' },
-  note: { color: '#9aa0a6', fontSize: 14, marginTop: 12, lineHeight: 21 },
-  btn: { marginTop: 20, alignSelf: 'flex-start', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 8, backgroundColor: '#26272b' },
-  btnText: { color: '#f5f5f5', fontSize: 15, fontWeight: '600' },
+  root: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 16 },
+  h1: { color: '#111827', fontSize: 28, fontWeight: '700' },
+  note: { color: '#6b7280', fontSize: 14, marginTop: 12, lineHeight: 21 },
+  btn: { marginTop: 20, alignSelf: 'flex-start', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 8, backgroundColor: '#f3f4f6' },
+  btnText: { color: '#111827', fontSize: 15, fontWeight: '600' },
 });

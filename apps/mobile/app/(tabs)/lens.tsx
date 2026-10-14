@@ -40,8 +40,8 @@ export default function LensScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0b0b0c' },
+  root: { flex: 1, backgroundColor: '#ffffff' },
   list: { padding: 16 },
-  h1: { color: '#f5f5f5', fontSize: 28, fontWeight: '700', marginBottom: 16 },
-  empty: { color: '#9aa0a6', textAlign: 'center', marginTop: 40 },
+  h1: { color: '#111827', fontSize: 28, fontWeight: '700', marginBottom: 16 },
+  empty: { color: '#6b7280', textAlign: 'center', marginTop: 40 },
 });

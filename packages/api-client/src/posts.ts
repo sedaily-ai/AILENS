@@ -11,7 +11,7 @@
  */
 import { getApiConfig } from './config.js';
 
-export type PostChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens';
+export type PostChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens' | 'home_player';
 
 export interface LetterPost {
   id: string;
@@ -46,7 +46,43 @@ export interface LensPost {
   source_url: string | null;
   published_at?: string | null;
   category?: string | null;
+  /** "오늘의 지면" 특별 코너 값(전체/증권/산업/시그널). 홈 히어로 탭이 이 값으로 고른다. */
+  paper_section?: string | null;
+  display_order?: number | null;
   lenses: LensItem[];
+}
+
+export interface WebtoonPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  published_at?: string | null;
+  cover_image_url: string | null;
+  category?: string | null;
+  display_order?: number | null;
+}
+
+export interface VideoPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  published_at?: string | null;
+  video_url?: string | null;
+  thumbnail_url?: string | null;
+}
+
+/** home_player 채널 — "오늘의 뉴스를 귀로" 오디오 목록. */
+export interface HomePlayerPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  published_at?: string | null;
+  media_embed_url?: string | null;
+  category?: string | null;
+  display_order?: number | null;
 }
 
 export class ApiError extends Error {

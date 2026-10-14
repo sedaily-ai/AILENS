@@ -17,6 +17,8 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 - 의존성 추가: aws-amplify, @aws-amplify/react-native, @aws-amplify/rtn-web-browser, async-storage, netinfo, react-native-get-random-values(루트 package-lock 갱신).
 - 탭 헤더를 끄고 각 화면이 제목·상단 여백을 직접 그리도록 정리(이중 여백 방지).
 
+- 홈 재설계(웹 모바일 홈 구조): 밝은 테마 토큰, 상단바·카테고리 칩·미니 플레이어, 오늘의 지면 히어로, 최신 뉴스 그리드, 카테고리 섹션, 웹툰·영상·오디오. 설계는 `docs/architecture/apps-mobile-홈-설계.md`. `app/category/[slug].tsx` 신설, api-client 에 webtoon·video·home_player 타입 추가.
+
 ## 결정
 
 - **로그인 redirect 는 커스텀 스킴이 아니라 인증된 https 링크(RFC 8252 권장)로 확정.** 100만 DL 목표라 나중에 바꾸는 비용을 피하려고 처음부터 정석으로 간다. 웹 로그인과 충돌하지 않게 앱 전용 경로 `/app/`을 쓴다.

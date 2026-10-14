@@ -77,15 +77,15 @@ function LensBody({ post }: { post: LensPost }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0b0b0c' },
+  root: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 16, paddingBottom: 48 },
-  image: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, backgroundColor: '#26272b', marginBottom: 16 },
-  meta: { color: '#8ab4ff', fontSize: 12, fontWeight: '600' },
-  title: { color: '#f5f5f5', fontSize: 24, fontWeight: '700', lineHeight: 32, marginTop: 8 },
-  subtitle: { color: '#c4c7ca', fontSize: 15, lineHeight: 23, marginTop: 12 },
-  para: { color: '#e4e6e8', fontSize: 16, lineHeight: 26, marginTop: 14 },
-  lensCard: { backgroundColor: '#17181b', borderRadius: 12, borderWidth: 1, borderColor: '#26272b', padding: 14, marginTop: 16 },
-  lensLabel: { color: '#8ab4ff', fontSize: 12, fontWeight: '700' },
-  lensQuestion: { color: '#f5f5f5', fontSize: 17, fontWeight: '700', lineHeight: 25, marginTop: 6 },
-  source: { color: '#8ab4ff', fontSize: 14, marginTop: 28, textDecorationLine: 'underline' },
+  image: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, backgroundColor: '#f3f4f6', marginBottom: 16 },
+  meta: { color: '#2563eb', fontSize: 12, fontWeight: '600' },
+  title: { color: '#111827', fontSize: 24, fontWeight: '700', lineHeight: 32, marginTop: 8 },
+  subtitle: { color: '#4b5563', fontSize: 15, lineHeight: 23, marginTop: 12 },
+  para: { color: '#1f2937', fontSize: 16, lineHeight: 26, marginTop: 14 },
+  lensCard: { backgroundColor: '#f8f9fa', borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb', padding: 14, marginTop: 16 },
+  lensLabel: { color: '#2563eb', fontSize: 12, fontWeight: '700' },
+  lensQuestion: { color: '#111827', fontSize: 17, fontWeight: '700', lineHeight: 25, marginTop: 6 },
+  source: { color: '#2563eb', fontSize: 14, marginTop: 28, textDecorationLine: 'underline' },
 });
