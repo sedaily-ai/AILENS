@@ -17,6 +17,25 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 - 의존성 추가: aws-amplify, @aws-amplify/react-native, @aws-amplify/rtn-web-browser, async-storage, netinfo, react-native-get-random-values(루트 package-lock 갱신).
 - 탭 헤더를 끄고 각 화면이 제목·상단 여백을 직접 그리도록 정리(이중 여백 방지).
 
+- 홈 재설계(웹 모바일 홈 구조): 밝은 테마 토큰, 상단바·카테고리 칩·미니 플레이어, 오늘의 지면 히어로, 최신 뉴스 그리드, 카테고리 섹션, 웹툰·영상·오디오. 설계는 `docs/architecture/apps-mobile-홈-설계.md`. `app/category/[slug].tsx` 신설, api-client 에 webtoon·video·home_player 타입 추가.
+
+- 내비게이션 확정: 햄버거 없이 뉴닉 구조(하단 4탭 홈/발견/듣기/나의 LENS + 상단 검색·프로필). 카테고리 칩·카테고리 섹션·웹툰·영상·레터는 홈에서 발견 탭으로 이동, 프로필 아이콘은 `/account`(로그인·약관). 기존 LENS·레터 탭은 제거.
+
+- 검색 화면(`app/search.tsx`): 웹 검색 순수 로직을 `@ailens/domain` 으로 승격(웹은 재수출로 유지, 웹 테스트 22건 통과), 앱은 웹과 같은 `/api/search-index` 를 받아 기기에서 검색. 최근 검색어·요즘 키워드·정렬·기간·분류 탭·무한 스크롤. 웹 코드 변경이 있어 웹 배포는 별도(동작 불변).
+
+- 로그인 화면(`app/login.tsx`, 모달): Google + 이메일 로그인·회원가입(이름·이메일·비밀번호 정책 체크리스트)·이메일 인증 코드(재전송 30초 쿨다운, 가입 직후 자동 로그인)·비밀번호 찾기/재설정. 규칙·문구는 웹 AuthContext 와 동일(계정 열거 방지 포함)하게 `src/auth/emailAuth.ts` 에 두고, 비밀번호 정책은 `@ailens/domain` 으로 승격(웹은 재수출, 웹 tsc 통과). 진입점은 나의 LENS·내 계정 화면.
+- 서버 검증: Cognito 에 SRP 이메일 로그인 호출이 닿는 것 확인(없는 계정 → UserNotFound → 앱에서 "이메일 또는 비밀번호가 올바르지 않습니다"로 통일). 실제 가입·로그인·Google 흐름은 실기기 미확인.
+
+- 웹툰·영상·오디오 전용 화면: `/webtoon`(목록·컷 세로 보기), `/video`(목록·expo-video 플레이어), `/listen/[slug]`(오디오 상세·배속·대본), 전역 `PlayerProvider`(expo-audio) 로 미니 플레이어·듣기 탭을 연결(큐·자동 다음 곡·잠금화면·백그라운드). `getPost` 에 channel 옵션, api 타입에 panels·transcript 추가. 네이티브 모듈 추가로 EAS 개발 빌드 재생성 필요.
+
+- **로그인 redirect 정정**: 개발 빌드에서 `InvalidAppSchemeException`(앱 시작 시) 발생 → Amplify RN 소스(`getRedirectUrl.native`) 확인 결과 https redirect 불가. 앱 스킴 `ailens://auth/callback`·`ailens://auth/signout` 로 변경, Cognito 콜백·로그아웃 URL 에 추가 필요(스크립트 `cognito-add-app-scheme.sh`, 사용자 실행). 앞서 등록한 https URL·assetlinks 는 향후 자체 PKCE 전환 대비로 유지.
+
+- 기사 상세 고도화: 웹 레터 파서·인라인 서식·용어집 분할 등 순수 로직을 `@ailens/domain` 으로 승격(웹은 재수출·사용으로 전환, 웹 vitest 95·레터 파서 12 통과, eslint 이상 없음). 앱은 4형식 탭·레터 블록·용어 시트·투표·글자 크기·진행바·공유·같은 분류 글·letters 전용 본문(차트·이미지·리치텍스트). 실제 글 20건으로 파서가 예외 없이 도는 것을 확인(소제목 74·비교 8·특별 칸 57).
+
+- 나머지 웹 기능 이식 1차: 나의 LENS(서랍·저장·읽은 글·관심 분야·읽기 통계), 문장 저장, 비밀번호 변경, 카테고리 하위 분류·페이지네이션, 검색 범위·하위 분류 필터, 그날로 떠나요(타임머신)·지난 지면. 웹 "나의 LENS"는 대부분 브라우저 저장·초안 단계이고 서버(리워드·저장 동기화·개인화 푸시)가 미구현이라 해당 부분은 이식 대상에서 제외(백엔드 인수인계 문서 참고).
+
+- 웹 기능 이식 2차: 시작하기(온보딩), 이슈 레터(목록·상세·투표), 게임(WebView), 안내 페이지(약관·개인정보·소개·문의, WebView), 알림 설정(기기 권한·테스트), 기사 목차·이전/다음·링크 복사. 도메인 승격 추가(온보딩·게임·비밀번호 정책), 웹 tsc·vitest 통과. 서버가 없거나 데이터 원천이 불명확한 항목(용어 해설·레터 구독·리워드·푸시 서버)은 사유와 함께 설계 문서에 보류로 기록.
+
 ## 결정
 
 - **로그인 redirect 는 커스텀 스킴이 아니라 인증된 https 링크(RFC 8252 권장)로 확정.** 100만 DL 목표라 나중에 바꾸는 비용을 피하려고 처음부터 정석으로 간다. 웹 로그인과 충돌하지 않게 앱 전용 경로 `/app/`을 쓴다.
@@ -33,6 +52,10 @@ Expo 정본 확정(같은 날 worklog 참조) 후 M1 셸의 남은 항목인 "�
 - 인증 코드 추가 후에도 `tsc` 통과, android 번들 성공(3.7MB). 미확인: 실제 로그인 흐름, 실기기·에뮬레이터 렌더링, ESLint(`apps/mobile`에 eslint 설정 없음).
 
 ## 다음
+
+- 네이티브 모듈(webview·notifications·device·clipboard·audio·video) 추가로 EAS 개발 빌드 재생성 후 실기기 검증.
+- 푸시: Firebase 프로젝트·FCM 키(EAS credentials)와 `services/push` 서버 확정 후 토큰 등록·발송 연결.
+- 용어 해설 데이터 원천 확인, 레터 구독 API 확정 후 이식.
 
 - [완료 2026-10-14] Cognito App Client(`66c9bq3ovmk007d0eepkle92k3`)의 Callback/SignOut URLs 에 `https://ailens.sedaily.ai/app/auth/callback`·`/app/auth/signout` 추가(기존 URL 유지, 변경 필드는 CallbackURLs·LogoutURLs 뿐임을 전후 비교로 확인, 사용자가 직접 실행)(현재 웹 3개 URL 만 등록, 공개 클라이언트·code flow 확인). 기존 URL 은 유지하고 추가만. 운영 인증 설정 변경이라 승인 후 실행.
 - [완료 2026-10-14] 웹 `assetlinks.json` 배포(ECS 리비전 114, 라이브에서 지문 2개 확인). 추가한 지문 `41:03:4F:…`은 Play Console 앱 서명 키 SHA-256 과 재대조 필요. iOS 는 Apple Team ID 확보 후 `apple-app-site-association` 추가.

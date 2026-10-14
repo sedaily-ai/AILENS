@@ -7,14 +7,8 @@ import { applyChoice } from '@ailens/domain';
 import { PollOptions } from '@/shared/ui/form/PollOptions';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 
-/** 본문 투표 칸의 보기 문구를 뽑는다: "① 문구 ② 문구" 한 문단 또는 줄 단위. 끝에 붙은 출처 줄("-- 자료: …")과 번호 기호를 뗀다. */
-export function parseVoteChoices(texts: string[]): string[] {
-  return texts
-    .flatMap((t) => t.split(/\n|\s+(?=[①-⑨])/))
-    .map((t) => t.replace(/\s*[-–—]{1,3}\s*자료\s*[:：][\s\S]*$/, '').replace(/^[①-⑨]\s*/, '').trim())
-    .filter(Boolean)
-    .slice(0, 9);
-}
+// parseVoteChoices 는 웹·앱 공용이라 @ailens/domain 으로 옮겼다(기존 import 경로를 지키는 재수출).
+export { parseVoteChoices } from '@ailens/domain';
 
 export function PostVote({ slug, title, choices }: { slug: string; title: string; choices: string[] }) {
   // 서버 HTML과 첫 클라이언트 렌더를 같게 두려고 투표 전 상태로 시작하고, 마운트 뒤에 내 투표 여부를 읽는다.

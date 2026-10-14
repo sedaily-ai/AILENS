@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { configureApiClient } from '@ailens/api-client';
 import { AuthProvider } from '../src/auth/AuthContext';
+import { PlayerProvider } from '../src/features/player/PlayerContext';
+import { usePushNavigation } from '../src/features/push/pushSetup';
 
 configureAuth();
 
@@ -19,14 +21,21 @@ configureApiClient({
 
 // 루트 레이아웃. 탭 그룹 + 상세 스택 + 인증 컨텍스트. 푸시 등록은 M2 에서 붙인다.
 export default function RootLayout() {
+  usePushNavigation();
   return (
     <SafeAreaProvider>
       <AuthProvider>
+       <PlayerProvider>
         <StatusBar style="auto" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="category/[slug]" />
+          <Stack.Screen name="search" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false, presentation: 'modal' }} />
+          <Stack.Screen name="account" options={{ headerShown: true, title: '내 계정' }} />
           <Stack.Screen name="article/[slug]" options={{ headerShown: true, title: '기사' }} />
         </Stack>
+       </PlayerProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

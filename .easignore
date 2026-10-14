@@ -1,0 +1,16 @@
+# EAS Build 업로드에서 앱 빌드와 무관한 모노레포 영역을 뺀다(아카이브 약 1GB → 축소).
+# 남겨야 하는 것: apps/mobile, packages/, 루트 package*.json, 워크스페이스 멤버의 package.json(npm ci 가 필요로 함).
+pipelines/
+docs/
+admin/
+tmp/
+scripts/
+config/
+mobile-capacitor/
+service/backend/
+service/lens-cms-api/
+service/frontend/src/
+service/frontend/public/
+service/frontend/assets-src/
+service/frontend/out/
+service/frontend/infrastructure/

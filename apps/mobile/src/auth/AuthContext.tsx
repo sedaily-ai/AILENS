@@ -5,13 +5,15 @@ import { Hub } from 'aws-amplify/utils';
 export type AuthState =
   | { status: 'loading' }
   | { status: 'signedOut' }
-  | { status: 'signedIn'; email?: string };
+  | { status: 'signedIn'; userId: string; email?: string };
 
 interface AuthContextValue {
   state: AuthState;
   /** Google 로그인(Cognito Hosted UI, 시스템 브라우저). */
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** 이메일 로그인·인증 직후 등 세션이 바뀐 뒤 상태를 다시 읽는다. */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -21,9 +23,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      await getCurrentUser();
+      const user = await getCurrentUser();
       const attrs = await fetchUserAttributes().catch(() => undefined);
-      setState({ status: 'signedIn', email: attrs?.email });
+      setState({ status: 'signedIn', userId: user.userId, email: attrs?.email });
     } catch {
       setState({ status: 'signedOut' });
     }
@@ -42,12 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       signIn: () => signInWithRedirect({ provider: 'Google' }),
+      refresh,
       signOut: async () => {
         await amplifySignOut();
         setState({ status: 'signedOut' });
       },
     }),
-    [state]
+    [state, refresh]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

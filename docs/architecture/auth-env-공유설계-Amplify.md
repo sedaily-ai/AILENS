@@ -68,7 +68,8 @@ packages/api-client 는 baseURL 을 하드코딩/process.env 에서 읽지 않�
 
 ## 인프라 변경 (앱 단계에서)
 
-- **redirect 는 인증된 https 링크로 확정(2026-10-14, RFC 8252 권장 방식)**. 커스텀 스킴(`ailens://`)은 다른 앱이 가로챌 수 있어 쓰지 않는다.
+- **[정정 2026-10-14] Amplify RN 은 https redirect 로 로그인할 수 없다.** `getRedirectUrl.native` 가 목록에서 http·https 가 아닌 앱 스킴 주소만 고르고(없으면 `InvalidAppSchemeException` 으로 앱 시작 시 오류), 로그인용 preferred 옵션도 없다. 그래서 로그인 redirect 는 앱 스킴 `ailens://auth/callback`(로그아웃 `ailens://auth/signout`)로 바꿨다. PKCE 가 있어 스킴 가로채기 위험은 크게 줄어든다(RFC 8252 허용 방식, 차선). https 앱 링크가 필요해지면 로그인을 expo-auth-session 기반 자체 PKCE 로 교체한다(아래 https 항목은 그때를 위해 남겨 둔 준비물: Cognito https 콜백 등록, assetlinks, intentFilters).
+- (이전 결정, 현재 미사용) **redirect 는 인증된 https 링크로 확정(2026-10-14, RFC 8252 권장 방식)**. 커스텀 스킴(`ailens://`)은 다른 앱이 가로챌 수 있어 쓰지 않는다.
   - 로그인 `https://ailens.sedaily.ai/app/auth/callback`, 로그아웃 `https://ailens.sedaily.ai/app/auth/signout`. 웹 로그인(`/auth/callback`)과 겹치면 모바일 브라우저의 웹 로그인이 앱으로 새므로 **앱 전용 경로 `/app/`** 를 쓴다.
   - Cognito App Client `66c9bq3ovmk007d0eepkle92k3` 의 Callback/SignOut URLs 에 위 두 URL 추가(웹 URL 은 유지 — 추가만).
   - Android: `app.config.ts` intentFilters(autoVerify) + `service/frontend/public/.well-known/assetlinks.json` 에 Play 앱 서명 키 SHA-256 등록.

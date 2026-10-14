@@ -11,7 +11,7 @@
  */
 import { getApiConfig } from './config.js';
 
-export type PostChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens';
+export type PostChannel = 'letters' | 'paper' | 'feed' | 'webtoon' | 'video' | 'lens' | 'home_player';
 
 export interface LetterPost {
   id: string;
@@ -29,10 +29,23 @@ export interface LetterPost {
 }
 
 export interface LensItem {
+  /** 형식 이름: '레터' | '웹툰' | '팟캐스트' | '영상'. */
   label: string;
   question: string;
   bullets: string[];
+  /** 레터 형식의 본문 문단(마크다운 비슷한 표기, domain parseLetterBlocks 가 해석). */
   paragraphs?: string[];
+  /** 레터 형식의 용어집(본문에서 탭하면 설명). */
+  keywords?: Array<{ term: string; explain: string }>;
+  /** 웹툰 형식의 컷. */
+  images?: WebtoonPanel[];
+  /** 영상 형식: mp4(또는 임베드) 주소와 썸네일. */
+  video_url?: string | null;
+  thumbnail_url?: string | null;
+  /** 팟캐스트 형식: 오디오 주소. */
+  media_url?: string | null;
+  /** 팟캐스트·영상 형식의 전체 대본. */
+  transcript?: string | null;
 }
 
 export interface LensPost {
@@ -46,7 +59,54 @@ export interface LensPost {
   source_url: string | null;
   published_at?: string | null;
   category?: string | null;
+  /** "오늘의 지면" 특별 코너 값(전체/증권/산업/시그널). 홈 히어로 탭이 이 값으로 고른다. */
+  paper_section?: string | null;
+  display_order?: number | null;
   lenses: LensItem[];
+}
+
+export interface WebtoonPanel {
+  url: string;
+  caption: string;
+  /** true 면 나레이션이 이미지에 박혀 있지 않아 컷 아래에 글자로 보여 준다. */
+  text_caption?: boolean;
+}
+
+export interface WebtoonPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  published_at?: string | null;
+  cover_image_url: string | null;
+  category?: string | null;
+  display_order?: number | null;
+  /** 목록 조회는 비어 있고, 단건 조회(getPost(id, { channel: 'webtoon' }))에만 컷이 채워진다. */
+  panels?: WebtoonPanel[];
+}
+
+export interface VideoPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  published_at?: string | null;
+  video_url?: string | null;
+  thumbnail_url?: string | null;
+}
+
+/** home_player 채널 — "오늘의 뉴스를 귀로" 오디오 목록. */
+export interface HomePlayerPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  date: string;
+  published_at?: string | null;
+  media_embed_url?: string | null;
+  category?: string | null;
+  display_order?: number | null;
+  /** 단건 조회에만 채워지는 전체 대본(접근성·읽기용). */
+  transcript?: string | null;
 }
 
 export class ApiError extends Error {
@@ -86,8 +146,14 @@ export async function listPosts<T = LetterPost>(channel: PostChannel, opts: List
   return data.posts ?? [];
 }
 
-/** 단건 조회. 없으면 ApiError(status=404). */
-export async function getPost<T = LetterPost>(id: string, signal?: AbortSignal): Promise<T> {
-  const data = await getJson<{ post: T }>(`${getApiConfig().cmsApiUrl}/api/v2/posts/${encodeURIComponent(id)}`, signal);
+/**
+ * 단건 조회. 없으면 ApiError(status=404).
+ * channel 을 주면 그 채널 모양으로 내려준다(같은 글이 letters·lens·webtoon·video·home_player 로 여러 번 발행되므로, 컷·대본 등 채널 전용 필드가 필요할 때 지정).
+ */
+export async function getPost<T = LetterPost>(id: string, opts: { channel?: PostChannel; signal?: AbortSignal } | AbortSignal = {}): Promise<T> {
+  // 기존 호출부 호환: 두 번째 인자가 AbortSignal 이면 signal 로 본다.
+  const { channel, signal } = opts instanceof AbortSignal ? { channel: undefined, signal: opts } : opts;
+  const qs = channel ? `?channel=${channel}` : '';
+  const data = await getJson<{ post: T }>(`${getApiConfig().cmsApiUrl}/api/v2/posts/${encodeURIComponent(id)}${qs}`, signal);
   return data.post;
 }

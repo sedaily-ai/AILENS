@@ -18,9 +18,8 @@ function clock(sec: number): string {
  * 레터 예상 읽기 시간. 한글 묵독 속도를 분당 500자로 잡는다(보수적 추정 — 경제 기사는 수치·고유명사가 많아 통상 600~700자보다 느리다).
  * 추정치이므로 문구에서도 "약 N분"으로 표기한다.
  */
-export function readMinutes(chars: number): number {
-  return Math.max(1, Math.round(chars / 500));
-}
+import { readMinutes } from '@ailens/domain';
+export { readMinutes };
 
 /**
  * 형식 탭에 붙는 실제 분량 — 이 기사를 이 형식으로 보면 얼마나 되는지(약 2분 / 8컷 / 3:24 / 준비 중).
