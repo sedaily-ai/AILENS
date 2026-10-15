@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 import type { LetterBlock, LetterSegment } from '@ailens/api-client';
 import { colors } from '../../theme';
 

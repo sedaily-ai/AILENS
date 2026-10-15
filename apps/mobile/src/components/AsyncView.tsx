@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/Text';
 import type { AsyncState } from '../lib/useAsync';
 
 /** 로딩·오류(재시도)·성공을 한 곳에서 처리한다. */

@@ -13,3 +13,14 @@ export const colors = {
 } as const;
 
 export const radius = { thumb: 12 } as const;
+
+/** 웹 BRAND_ACCENTS / LENS_PERSPECTIVES 와 같은 형식별 색(읽기·웹툰·듣기·영상). */
+export const formatColors = {
+  letter: { accent: '#7c3aed', tint: '#f0edf7' },
+  webtoon: { accent: '#e11d48', tint: '#fdeeee' },
+  podcast: { accent: '#059669', tint: '#e6f4ef' },
+  video: { accent: '#d97706', tint: '#f7f0e3' },
+} as const;
+
+/** 웹 READING_ACCENT — 읽기 지면(레터 본문·요약 카드·소제목 번호)의 포인트색. */
+export const READING_ACCENT = '#5b8def';

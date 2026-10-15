@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 import { useRouter } from 'expo-router';
 import { inlineSegments } from '@ailens/domain';
 import { useAuth } from '../../auth/AuthContext';

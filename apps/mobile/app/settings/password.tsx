@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../../src/ui/Text';
 import { Stack, useRouter } from 'expo-router';
 import { fetchAuthSession, updatePassword } from 'aws-amplify/auth';
 import { Ionicons } from '@expo/vector-icons';

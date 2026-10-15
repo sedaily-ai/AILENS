@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '../../ui/Text';
 import RenderHtml from 'react-native-render-html';
 import type { LetterPost } from '@ailens/api-client';
 import { colors } from '../../theme';

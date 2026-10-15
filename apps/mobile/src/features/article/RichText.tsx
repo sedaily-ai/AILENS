@@ -1,4 +1,5 @@
-import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
+import { StyleSheet, type StyleProp, type TextStyle } from 'react-native';
+import { Text } from '../../ui/Text';
 import { inlineSegments, splitByTerms, type GlossaryTerm } from '@ailens/domain';
 
 /**
@@ -17,7 +18,7 @@ export function RichText({
   glossary?: readonly GlossaryTerm[];
   numbers?: boolean;
   style?: StyleProp<TextStyle>;
-  onTerm?: (term: string, explain: string) => void;
+  onTerm?: (term: string, explain: string, at: { x: number; y: number }) => void;
   /** 문단을 길게 누르면(문장 저장 시트 열기 등). */
   onLongPress?: () => void;
 }) {
@@ -26,7 +27,7 @@ export function RichText({
       {inlineSegments(text, { numbers }).map((seg, i) => {
         const pieces = splitByTerms(seg.text, glossary).map((p, j) =>
           p.explain !== undefined ? (
-            <Text key={j} style={styles.term} onPress={() => onTerm?.(p.text, p.explain ?? '')} accessibilityRole="button" accessibilityHint="용어 설명 보기">
+            <Text key={j} style={styles.term} onPress={(e) => onTerm?.(p.text, p.explain ?? '', { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })} accessibilityRole="button" accessibilityHint="용어 설명 보기">
               {p.text}
             </Text>
           ) : (
@@ -45,7 +46,9 @@ export function RichText({
 }
 
 const styles = StyleSheet.create({
-  bold: { fontWeight: '800' },
+  // 웹 .lread strong: 굵기 600, 색 #111.
+  bold: { fontWeight: '600', color: '#111111' },
   italic: { fontStyle: 'italic' },
-  term: { backgroundColor: '#fef3c7', textDecorationLine: 'underline', textDecorationStyle: 'dotted' },
+  // 웹은 형광펜을 글자 아래 55%에만 긋는다(#ffe066). 글자 일부만 칠하는 스타일이 RN 에 없어, 같은 색을 옅게 깔아 마커 느낌만 낸다.
+  term: { backgroundColor: 'rgba(255,224,102,0.62)' },
 });

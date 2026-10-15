@@ -1,5 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../../src/ui/Text';
 import { GAMES_BY_SLUG } from '@ailens/domain';
 import { WebPage } from '../../src/components/WebPage';
 

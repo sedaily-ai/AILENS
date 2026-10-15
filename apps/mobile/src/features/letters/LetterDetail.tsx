@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Text } from '../../ui/Text';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { castIssueVote, fetchIssueVote, getIssueLetter, type IssueLetterDetail, type LetterVoteState } from '@ailens/api-client';
@@ -12,6 +13,7 @@ import { FONT_SCALES, useFontScale } from '../article/FontScale';
 import { getVoterId } from '../article/voterId';
 import { AXIS_META, orderedAxes } from './axis';
 import { Paragraph } from './Blocks';
+import { PollOptions } from '../article/PollOptions';
 
 const SITE = 'https://ailens.sedaily.ai';
 
@@ -148,20 +150,15 @@ function Poll({ slug, poll }: { slug: string; poll: NonNullable<IssueLetterDetai
     <View style={styles.poll}>
       <Text style={styles.noteHead}>독자 의견</Text>
       <Text style={styles.pollQ}>{poll.question}</Text>
-      {poll.options.map((o) => {
-        const pct = vote.counts && total > 0 ? Math.round(((vote.counts[o.key] ?? 0) / total) * 100) : 0;
-        const mine = vote.my_choice === o.key;
-        return (
-          <Pressable key={o.key} onPress={() => void pick(o.key)} style={[styles.opt, mine && styles.optOn]} accessibilityRole="button" accessibilityState={{ selected: mine }}>
-            {vote.counts ? <View style={[styles.optBar, { width: `${pct}%` }, mine && { backgroundColor: '#dbe4ff' }]} /> : null}
-            <Text style={[styles.optText, mine && { fontWeight: '800' }]}>{o.label}</Text>
-            {vote.counts ? <Text style={styles.pct}>{pct}%</Text> : null}
-          </Pressable>
-        );
-      })}
-      <Text style={[styles.hint, failed && { color: '#dc2626' }]}>
-        {failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : vote.my_choice ? `${total}명이 참여했어요 · 다른 보기를 눌러 바꿀 수 있어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요'}
-      </Text>
+      <PollOptions
+        options={poll.options.map((o) => ({ key: o.key, label: o.label, hint: o.hint, tone: o.key === 'unsure' ? 'n' : /skeptic|worr|concern|doubt/.test(o.key) ? 'w' : 'b' }))}
+        myChoice={vote.my_choice}
+        counts={vote.counts}
+        pending={pending}
+        onPick={(k) => void pick(k)}
+        note={failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : vote.my_choice ? `${total}명이 참여했어요 · 다른 보기를 눌러 바꿀 수 있어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요'}
+        noteError={failed}
+      />
     </View>
   );
 }

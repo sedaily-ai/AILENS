@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '../../../ui/Text';
 import { colors } from '../../../theme';
 
 /** 섹션 공통 헤더 — 웹의 얇은 eyebrow(작은 대문자 라벨) + 우측 보조 문구. */
