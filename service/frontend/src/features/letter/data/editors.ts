@@ -4,7 +4,6 @@
 // 소개 음성(옛 기록: ElevenLabs eleven_multilingual_v2) voiceId — 민철 RU7aSi6lT4uQBXMLgDxK(TeddyNote), 하은 AW5wrnG1jVizOYY7R1Oo(JiYoung), 준서 5XgfKMHL4qnyg2mabE5t(Deck), 소율 QPFsEL6IBxlT15xfiD6C(Hana Lee).
 // 에디터는 "누구의 관심 영역을 맡는가"로 나뉘고, 레터 본문은 모두 같은 중립 편집 원칙(주관·유도·권유 금지)을 따른다. 에디터는 AI 에디터이며 화면에 그렇게 표시한다.
 // 작성자 표시는 서버의 작성자 관계를 따른다. 독자는 에디터를 여러 명 팔로우한다.
-import type { InterestItem } from './interestApi';
 import type { IssueLetter } from './letterTypes';
 
 export type SituationId = 'invest' | 'jobseek' | 'shop' | 'home' | 'startup' | 'retire';
@@ -141,18 +140,6 @@ export function editorsOfLetter(letter: Pick<IssueLetter, 'editors'>): LetterEdi
 
 export function findEditor(id: string): LetterEditor | undefined {
   return EDITORS.find((e) => e.id === id);
-}
-
-/** 팔로우·구독 때 관심으로 저장되는 항목(주제 사전의 주제). */
-export function editorInterests(e: LetterEditor): InterestItem[] {
-  return e.topics.map((t) => ({ type: 'topic' as const, key: t.slug }));
-}
-
-export function unionInterests(editors: LetterEditor[]): InterestItem[] {
-  const seen = new Set<string>();
-  const out: InterestItem[] = [];
-  for (const e of editors) for (const i of editorInterests(e)) if (!seen.has(i.key)) { seen.add(i.key); out.push(i); }
-  return out;
 }
 
 /** 온보딩에서 고르는 상황(초기 가설 6개 — 구독자 선택 데이터로 검증한다). 직업·소득·구체 직무는 묻지 않는다. */

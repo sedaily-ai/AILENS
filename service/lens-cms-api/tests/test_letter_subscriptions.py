@@ -151,3 +151,15 @@ def test_send_for_letter_skips_at_night_before_touching_db():
     night = dt.datetime(2026, 10, 12, 14, 0, tzinfo=dt.timezone.utc)  # 23:00 KST
     out = r.send_for_letter(1, dry_run=False, now=night)
     assert "야간" in out["skipped"] and out["targets"] == []
+
+
+def test_existing_active_subscription_is_not_rewritten_by_editor_only_request(monkeypatch):
+    r = _r()
+    statements = []
+    rows = iter([None, {'id': 9, 'status': 'active', 'created_at': NOW, 'confirm_token': 'existing'}])
+    cursor = types.SimpleNamespace(execute=lambda sql, params: statements.append(sql), fetchone=lambda: next(rows))
+    monkeypatch.setattr(r, 'get_cursor', lambda: contextlib.nullcontext(cursor))
+    monkeypatch.setattr(r.letter_mail, 'mail_available', lambda: True)
+    monkeypatch.setattr(r.letter_mail, 'send_mail', lambda *args: pytest.fail('기존 구독에는 확인 메일을 다시 보내지 않는다'))
+    assert r.subscribe('reader@example.com', None, 'daily', 8, True, editors=['mincheol']) == {'status': 'pending'}
+    assert len(statements) == 2 and all(sql.startswith('SELECT') for sql in statements)

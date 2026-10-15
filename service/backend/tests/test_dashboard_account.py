@@ -53,6 +53,17 @@ def test_account_handler_auth_private_cache_and_invalid_payload(monkeypatch,toke
         assert dashboard.lambda_handler(event(method='PUT',token=tokens(),body=body),None)['statusCode']==400
 
 
+def test_reading_time_update_preserves_legacy_fields_on_storage_side(monkeypatch,tokens):
+    from services.user import dashboard as service
+    seen=[]
+    def call(self,method,path,owner,body=None,query=None):
+        seen.append(body);return {'revision':2,'interests':[{'type':'topic','key':'rates'}],'minutes':10}
+    monkeypatch.setattr(service.DashboardRepository,'request',call)
+    response=dashboard.lambda_handler(event(method='PUT',token=tokens(),body={'revision':1,'minutes':10}),None)
+    assert response['statusCode']==200 and seen==[{'revision':1,'minutes':10}]
+    assert json.loads(response['body'])['interests']==[{'type':'topic','key':'rates'}]
+
+
 def test_account_handler_strips_named_stage_prefix(monkeypatch,tokens):
     # 운영 HTTP API는 스테이지 dev라 rawPath가 /dev/api/v2/me/... 로 들어온다(archive 로그로 확인).
     seen=[]

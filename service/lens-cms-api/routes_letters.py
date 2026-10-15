@@ -40,11 +40,7 @@ def list_issue_letters(category: Optional[str] = Query(default=None), limit: int
     return JSONResponse({"letters": letters}, headers={"Cache-Control": "public, max-age=60"})
 
 
-# ── 독자 관심(Phase 1) ─ 정적 경로라 `{slug}` 보다 먼저 정의해야 한다. 식별자는 투표와 같은 기기 값(X-Voter-Id)을 관심용으로 따로 해시한다.
-def _reader(x_voter_id: Optional[str]) -> str:
-    return _letter_call(interests_repo.reader_hash, x_voter_id or "")
-
-
+# ── 공개 주제 사전 ─ 정적 경로를 `{slug}`보다 먼저 정의한다.
 @router.get("/api/v2/issue-letters/bundles")
 def issue_letter_bundles():
     return JSONResponse({"bundles": _letter_call(interests_repo.list_bundles)}, headers={"Cache-Control": "public, max-age=300"})
@@ -55,22 +51,6 @@ def issue_letter_topics():
     topics = _letter_call(topics_repo.list_topics, True)
     return JSONResponse({"topics": [{"slug": t["slug"], "name": t["name"], "kind": t["kind"], "category_slug": t["category_slug"]} for t in topics]},
                         headers={"Cache-Control": "public, max-age=300"})
-
-
-@router.get("/api/v2/issue-letters/me/interests")
-def get_my_interests(x_voter_id: Optional[str] = Header(default=None)):
-    return JSONResponse({"interests": _letter_call(interests_repo.get_interests, _reader(x_voter_id))}, headers={"Cache-Control": "no-store"})
-
-
-@router.put("/api/v2/issue-letters/me/interests")
-def put_my_interests(payload: Dict[str, Any] = Body(...), x_voter_id: Optional[str] = Header(default=None)):
-    return JSONResponse({"interests": _letter_call(interests_repo.set_interests, _reader(x_voter_id), payload.get("interests"))},
-                        headers={"Cache-Control": "no-store"})
-
-
-@router.get("/api/v2/issue-letters/me/feed")
-def get_my_feed(x_voter_id: Optional[str] = Header(default=None), limit: int = Query(default=10)):
-    return JSONResponse(_letter_call(interests_repo.feed_for_reader, _reader(x_voter_id), limit), headers={"Cache-Control": "no-store"})
 
 
 # ── 이메일 구독(Phase 2) ─ 가입 → 메일 확인 → 수신거부. 응답으로 주소의 가입 여부를 알리지 않는다.

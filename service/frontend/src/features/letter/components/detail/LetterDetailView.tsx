@@ -13,7 +13,6 @@ import { LetterToc } from './LetterToc';
 import { RelatedLetters, relatedOf } from './RelatedLetters';
 import { ReadingTools } from './ReadingTools';
 import { SubscribeDialog } from '../dialog/SubscribeDialog';
-import { unionInterests } from '../../data/editors';
 import { TermTooltip } from '@/shared/ui/notice/TermTooltip';
 import { splitByGlossary } from '../../data/glossary';
 import { formatLetterDate } from '../list/LetterCard';
@@ -208,7 +207,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
           받아보기
         </button>
       </section>
-      <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} interests={unionInterests(editors)} source="letter-end" editors={editors}
+      <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} source="letter-end" editors={editors}
         title={editors.length > 0 ? `${editors.map((e) => e.name).join('·')} 에디터의 새 레터를 메일로 받기` : '새 레터를 메일로 받기'} />
 
       <div className="ld-nav">

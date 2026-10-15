@@ -30,8 +30,8 @@ def get_dashboard(owner,params):
     if minutes not in (0,5,10):raise DashboardError(400,'INVALID_ARGUMENT','읽을 시간은 0/5/10분이에요.')
     return {'schema_version':1,'scope':'account','generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),
             'format_preference':ready(data['format_preference']),'preferences':ready(data['preferences']),'profile':ready(profile(data)),
-            'news':area(lambda:recommend(owner,{'kind':'news','limit':4},inputs=data)) if tab!='records' else unavailable(),
-            'letters':area(lambda:recommend(owner,{'kind':'letter','limit':3,'minutes':minutes},inputs=data)) if tab in (None,'home','archive') else unavailable(),
+            'news':area(lambda:recommend(owner,{'kind':'news','limit':4},inputs=data)) if tab in (None,'home') else unavailable(),
+            'letters':area(lambda:recommend(owner,{'kind':'letter','limit':3,'minutes':minutes},inputs=data)) if tab in (None,'home') else unavailable(),
             'saved_letters':area(lambda:repo.request('GET','/letter-bookmarks',owner,query={'limit':3})) if tab!='settings' else unavailable(),
             'recent_sentences':ready({'items':[{**row,'article_id':row.get('article_no') or ''} for row in data['recent_sentences']],'total':data['sentence_total']}),
             'followed_editors':ready(data['followed_editors']),'weekly_rewards':_weekly(repo,owner) if tab!='records' else unavailable(),

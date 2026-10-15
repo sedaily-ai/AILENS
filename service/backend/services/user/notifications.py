@@ -1,7 +1,7 @@
 """개인 알림 후보 계획. 전송 작업은 내부 DB worker operation이 최종 재검사한다."""
 import datetime as dt
 from repositories.dashboard_repository import DashboardRepository
-from services.user.recommendations import profile,conditions,rank
+from services.user.recommendations import profile,rank
 
 
 def preview(owner,scheduled=False,expected_mode='dry_run'):
@@ -20,22 +20,20 @@ def preview(owner,scheduled=False,expected_mode='dry_run'):
     picks=[];followups=[]
     if p['briefing']:
         data=repo.request('GET','/notifications/inputs',owner)
-        prof=profile(data);cats,terms=conditions(data,prof,'all')
-        for kind in ('publication','issue_letter'):
-            pool=repo.request('POST','/recommendation-candidates',owner,body={'kind':kind,'categories':cats,'terms':terms,'editors':[]})
-            picks.extend(rank([card for card in pool['items'] if eligible(card)],{**data,'followed_editors':{'items':[]}},prof,limit=4)['items'])
+        prof=profile(data)
+        cats=[r['key'] for r in prof['categories']]
+        pool=repo.request('POST','/recommendation-candidates',owner,body={'kind':'publication','categories':cats,'terms':[],'editors':[]})
+        picks.extend(rank([card for card in pool['items'] if eligible(card)],data,prof,limit=4)['items'])
     if p['followups']:
-        from services.user.recommendations import with_format
-        format_preference=repo.request('GET','/format-preference',owner)
-        followups=[with_format(card,format_preference) for card in extra['followups'] if eligible(card)]
+        followups=[card for card in extra['followups'] if eligible(card)]
         picks.extend(followups)
-    picks.sort(key=lambda card:(card.get('interest_score',0),card.get('format_affinity',0)),reverse=True)
+    picks.sort(key=lambda card:(card['published_at'],card['content_key']),reverse=True)
     by_key={}
     for card in picks:by_key.setdefault(card['content_key'],card)
     unique=list(by_key.values())[:4]
     # 후속 글을 함께 선택했다면 브리핑에 밀려 영구 누락되지 않도록 한 자리를 확보한다.
     if followups and not any(card['content_key'] in {f['content_key'] for f in followups} for card in unique):
-        best=max(followups,key=lambda card:card.get('format_affinity',0))
+        best=max(followups,key=lambda card:(card['published_at'],card['content_key']))
         unique=unique[:3]+[best]
     weekly=extra['weekly'] if p['weekly'] and (extra['weekly']['read_days'] or extra['weekly']['saved_contents']) else None
     payload={'types':enabled,'content_keys':[c['content_key'] for c in unique],'weekly_period':{'start':weekly['start'],'end':weekly['end']} if weekly else None}

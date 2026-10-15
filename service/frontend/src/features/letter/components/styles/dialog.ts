@@ -1,5 +1,7 @@
 /** 레터 CSS — 구독 온보딩 다이얼로그. 합치는 순서는 letterStyles.ts(뒤에 오는 규칙이 앞을 덮는다). */
 export const DIALOG_CSS = `
+  .lt-dlg-editors{border:0;padding:0;margin:24px 0;text-align:left}.lt-dlg-editors legend{font-size:14px;font-weight:600}.lt-dlg-editors p{font-size:12px;color:#64748b;margin:8px 0 12px}.lt-dlg-editors>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.lt-dlg-editors label{display:flex;align-items:center;gap:8px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;cursor:pointer;font-size:14px}.lt-dlg-editors label:has(input:checked){background:#f2f5ff;border-color:#94aaf0}.lt-dlg-editors small{display:block;font-size:11px;color:#64748b}.lt-dlg-editors input{accent-color:#315bd5}
+
   /* 구독 온보딩(선택 단계) */
   .lt-ob { margin-top: 18px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: left; }
   .lt-ob-h { margin: 0; font-size: 15px; font-weight: 800; color: #111827; }

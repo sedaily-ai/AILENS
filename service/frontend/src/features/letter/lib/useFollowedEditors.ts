@@ -2,11 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/entities/user';
 import { EDITORS } from '../data/editors';
-import type { InterestItem } from '../data/interestApi';
 import { getAccountFollows, isAccountAuthError, setAccountFollow, type AccountFollow } from '../data/accountApi';
 const CHANGED='lens-account-followed-editors-changed';
-export function useFollowedEditors(syncInterests?: (items:InterestItem[])=>Promise<boolean>,enabled=true){
-  void syncInterests; // 호출부 호환 인자. 팔로우로 직접 선택한 관심을 덮어쓰지 않는다.
+export function useFollowedEditors(enabled=true){
   const {user,isLoading}=useAuth(),owner=user?.userId??null;
   const current=useRef(owner);current.current=owner;
   const controller=useRef<AbortController|null>(null),inFlight=useRef(false);

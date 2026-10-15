@@ -1,4 +1,4 @@
-"""알림 후보 입력. 허용된 관심 source만 쓰며 최근 문장 원문은 반환하지 않는다."""
+"""알림 후보 입력. 허용된 최근 열람 분야를 쓰며 최근 문장 원문은 반환하지 않는다."""
 import datetime as dt
 from db import get_cursor
 from content_resolver import ARCHIVE_SOURCE_JOIN_SQL
@@ -19,11 +19,8 @@ def context(owner):
 def inputs(owner):
     with get_cursor() as cur:
         _account(cur,owner);state=repo.state(cur,owner)
-    p=state['preferences']
-    data=recommendation_inputs(owner,include_sentences=p['sentenceSource'],include_recent=False)
-    data['preferences']['interests']=[item for item in data['preferences']['interests'] if p['categorySource'] and item['type']=='category' or p['keywordSource'] and item['type']=='topic']
-    if not p['categorySource']:data['categories']=[]
-    if not p['keywordSource']:data['keywords']=[];data['selected_topics']=[]
+    data=recommendation_inputs(owner,include_recent=False)
+    if not state['preferences']['categorySource']:data['categories']=[]
     return data
 
 

@@ -37,13 +37,13 @@ def get_preferences(owner):
 
 
 def replace_preferences(owner, payload):
-    if not isinstance(payload, dict) or set(payload) != {'interests', 'minutes', 'revision'}:
-        raise DashboardError(400, 'INVALID_ARGUMENT', '관심·읽을 시간·revision을 보내 주세요.')
+    if not isinstance(payload, dict) or set(payload) not in ({'minutes', 'revision'}, {'interests', 'minutes', 'revision'}):
+        raise DashboardError(400, 'INVALID_ARGUMENT', '읽을 시간·revision을 보내 주세요.')
     revision, minutes = payload['revision'], payload['minutes']
     if type(revision) is not int or revision < 0 or revision >= 2**63 or type(minutes) is not int or minutes not in (0, 5, 10):
         raise DashboardError(400, 'INVALID_ARGUMENT', '설정 값이 올바르지 않아요.')
     try:
-        pairs = validate_interest_items(payload['interests'])
+        pairs = validate_interest_items(payload['interests']) if 'interests' in payload else []
     except LetterError as exc:
         raise DashboardError(400, 'INVALID_ARGUMENT', str(exc)) from exc
     clean = [{'type': t, 'key': k} for t, k in pairs]
@@ -55,6 +55,9 @@ def replace_preferences(owner, payload):
         previous = cur.fetchone()
         if (previous['revision'] if previous else 0) != revision:
             raise DashboardError(409, 'REVISION_CONFLICT', '다른 기기에서 설정이 바뀌었어요. 다시 확인해 주세요.')
+        # 시간만 바꾸는 요청은 기존 관심 데이터를 그대로 보관한다.
+        if 'interests' not in payload:
+            clean = previous['interests'] if previous else []
         old = {(item['type'], item['key']) for item in previous['interests']} if previous else set()
         topics = [key for kind, key in pairs if kind == 'topic']
         if topics:

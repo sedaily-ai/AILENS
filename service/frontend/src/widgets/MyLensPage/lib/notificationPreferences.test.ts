@@ -6,7 +6,7 @@ describe('개인화 알림의 브라우저 초안 경계', () => {
     const old: Record<string, unknown> = { ...defaults };
     delete old.categorySource; delete old.keywordSource; delete old.sentenceSource;
     expect(parseNotificationPreferences(JSON.stringify(old))).toEqual(defaults);
-    expect(notificationPreferenceError({ ...defaults, briefing: true, categorySource: false, keywordSource: false, sentenceSource: false })).toContain('관심 기록');
+    expect(notificationPreferenceError({ ...defaults, briefing: true, categorySource: false, keywordSource: false, sentenceSource: false })).toBeNull();
   });
   it('새 방문에는 모든 유형이 꺼져 있고 수신 동의 필드를 만들지 않는다', () => {
     expect([defaults.briefing, defaults.followups, defaults.weekly, defaults.paused]).toEqual([false, false, false, false]);

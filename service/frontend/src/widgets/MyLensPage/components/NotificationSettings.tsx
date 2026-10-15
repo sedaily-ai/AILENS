@@ -6,16 +6,15 @@ import { notificationStatus, pushEnabled, visiblePushDevices } from '../lib/noti
 import { useNotifications } from '../lib/useNotifications';
 import { Bell, BellOff, Check, ChevronDown, Clock3 } from 'lucide-react';
 import { notificationPreferenceError, type NotificationPreferences } from '../lib/notificationPreferences';
-import type { NewsRecommendation } from '../lib/news/newsModel';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const TYPES = [
-  { key: 'briefing', title: '나를 위한 뉴스 브리핑', description: '자주 본 분야·키워드·저장 문장의 관심으로 새 뉴스를 모아요.' },
+  { key: 'briefing', title: '나를 위한 뉴스 브리핑', description: '최근 열람한 분야의 새 뉴스를 최신순으로 모아요.' },
   { key: 'followups', title: '관심 이슈의 다음 소식', description: '저장한 이슈에 의미 있는 새 변화가 생겼을 때 알려드려요.' },
   { key: 'weekly', title: '한 주의 관심 기록', description: '지난주에 읽고 저장한 이야기를 돌아봐요.' },
 ] as const;
 
-export function NotificationSettings({ recommendedTitle, recommendations, interestSummary }: { recommendedTitle?: string; recommendations?: NewsRecommendation[]; interestSummary?: { categories: string[]; keywords: string[]; sentenceWords: string[] } }) {
+export function NotificationSettings() {
   const feed=useNotifications();
   const [consentChecked,setConsentChecked]=useState(false);
   const draft=feed.draft;
@@ -26,7 +25,6 @@ export function NotificationSettings({ recommendedTitle, recommendations, intere
   const update=<K extends keyof NotificationPreferences>(key:K,value:NotificationPreferences[K])=>feed.setDraft({...draft,[key]:value});
   const validation = notificationPreferenceError(draft);
   const timeInvalid = !/^(?:0[8-9]|1\d|20):[0-5]\d$/.test(draft.time);
-  const previewArticle = recommendations?.find((item) => item.reasons.some((reason) => reason.type === 'category' ? draft.categorySource : reason.type === 'keyword' ? draft.keywordSource : draft.sentenceSource));
   const developerTools = process.env.NODE_ENV === 'development';
   const liveEnabled = pushEnabled(data);
   const devices = visiblePushDevices(data, developerTools);
@@ -39,11 +37,7 @@ export function NotificationSettings({ recommendedTitle, recommendations, intere
         <fieldset className="ml-notification-fields" disabled={!ready}>
           <legend className="ml-sr-only">계정 개인화 푸시 설정</legend>
           <div className="ml-notification-types">{TYPES.map((item) => <label key={item.key} className="ml-notification-type"><span><strong>{item.title}</strong><small>{item.description}</small></span><input type="checkbox" role="switch" aria-label={item.title} checked={draft[item.key]} onChange={(event) => update(item.key, event.target.checked)} /></label>)}</div>
-          <fieldset className="ml-news-alert-sources"><legend>뉴스 브리핑에 활용할 관심 기록</legend><p>새 글을 고를 기준이에요. 저장한 설정에만 반영하며 수신 동의를 자동으로 만들지 않아요.</p>{([
-            { key: 'categorySource', label: '자주 본 뉴스 분야', description: interestSummary?.categories.slice(0, 3).join(' · ') || '분야를 직접 고르거나 뉴스를 살펴보면 반영해요.' },
-            { key: 'keywordSource', label: '열람한 글의 키워드', description: interestSummary?.keywords.slice(0, 4).map((term) => `#${term}`).join(' ') || '등록된 용어가 있는 글을 살펴보면 반영해요.' },
-            { key: 'sentenceSource', label: '내 서랍 문장의 주제', description: interestSummary?.sentenceWords.slice(0, 4).join(' · ') || '로그인 후 저장한 문장을 사용할 수 있어요.' },
-          ] as const).map((item) => <label key={item.key}><input type="checkbox" checked={draft[item.key]} onChange={(event) => update(item.key, event.target.checked)} /><span><strong>{item.label}</strong><small>{item.description}</small></span></label>)}<p>문장 원문은 알림 미리보기에 표시하지 않아요. 이 선택은 계정의 브리핑 후보에 적용돼요. 뉴스 이용 형식이 분석되면 관심이 같은 후보의 순서와 이어볼 형식에도 반영해요.</p></fieldset>
+          <fieldset className="ml-news-alert-sources"><legend>뉴스 브리핑 기준</legend><label><input type="checkbox" checked={draft.categorySource} onChange={event => update('categorySource', event.target.checked)} /><span><strong>최근 열람한 뉴스·레터 분야</strong><small>최근 90일에 만난 분야의 아직 열람하지 않은 뉴스를 최신순으로 모아요.</small></span></label><p>저장 문장으로 관련 글을 찾으려면 내 서랍의 ‘관련 글 보기’를 이용해 주세요. 이용 형식 통계는 추천 순서에 반영하지 않아요. 열람 분야를 선택하지 않으면 뉴스 브리핑 후보를 만들지 않아요.</p></fieldset>
           <div className="ml-delivery-settings">
             <h3><Clock3 size={16} aria-hidden /> 언제 받아볼까요?</h3>
             <fieldset className="ml-choice-field"><legend>브리핑·다음 소식 빈도</legend><div className="ml-frequency-options">
@@ -60,11 +54,11 @@ export function NotificationSettings({ recommendedTitle, recommendations, intere
           <p id="ml-quiet-note" className="ml-settings-help">선택한 시간대의 21:00~08:00은 쉬는 시간이에요. 여러 소식은 하루 최대 한 번으로 묶고, 새로운 내용이 없으면 보내지 않아요.</p>
           <label className="ml-pause-setting"><input type="checkbox" checked={draft.paused} onChange={(event) => update('paused', event.target.checked)} /><span>모든 개인화 푸시 일시 중지<small>선택한 유형과 시간은 그대로 보관해요.</small></span></label>
         </fieldset>
-        <div className="ml-notification-preview" aria-label="알림 설정 미리보기"><div className="ml-preview-label"><Bell size={15} aria-hidden/><span>선택한 유형 · 발송 결과와 별개</span></div>{draft.paused?<h3><BellOff size={17} aria-hidden/>알림 일시 중지</h3>:!enabled.length?<h3>받고 싶은 소식부터 골라보세요</h3>:<><h3>{previewArticle?.title??recommendedTitle??'나의 관심에 맞는 새 소식'}</h3><ul>{enabled.map(item=><li key={item.key}>{item.title}: {item.key==='weekly'?`매주 ${WEEKDAYS[draft.weeklyDay]}요일 ${draft.time}`:schedule}</li>)}</ul><small>{draft.timezone} 기준 · 하루 최대1묶음</small></>}</div>
+        <div className="ml-notification-preview" aria-label="알림 설정 미리보기"><div className="ml-preview-label"><Bell size={15} aria-hidden/><span>선택한 유형 · 발송 결과와 별개</span></div>{draft.paused?<h3><BellOff size={17} aria-hidden/>알림 일시 중지</h3>:!enabled.length?<h3>받고 싶은 소식부터 골라보세요</h3>:<><h3>{'최근 열람한 분야의 새 소식'}</h3><ul>{enabled.map(item=><li key={item.key}>{item.title}: {item.key==='weekly'?`매주 ${WEEKDAYS[draft.weeklyDay]}요일 ${draft.time}`:schedule}</li>)}</ul><small>{draft.timezone} 기준 · 하루 최대1묶음</small></>}</div>
         <div className="ml-settings-actions"><button type="submit" className="ml-button" disabled={!ready||!!validation||!dirty}>계정에 알림 설정 저장</button><button type="button" className="ml-button ml-button-quiet" disabled={!ready||!dirty} onClick={feed.reset}>변경 취소</button><span>{dirty?'저장하지 않은 변경':'계정에 저장된 설정'}</span></div>
       </form>
       <section className="ml-notification-consent" aria-label="개인화 푸시 수신 동의"><h3>개인화 푸시 수신 동의</h3><p className="ml-helper">{data.consent.current?'현재 정책으로 수신에 동의했어요.':'설정 저장과 별도로, 받고 싶은 소식의 수신에 동의해 주세요.'} <Link href="/privacy">개인정보처리방침</Link></p>
-      {!data.consent.current?<><label className="ml-pause-setting"><input type="checkbox" checked={consentChecked} onChange={event=>setConsentChecked(event.target.checked)}/><span>선택한 뉴스·레터 소식과 주간 기록을 개인화 푸시로 받는 데 동의합니다.<small>정책 버전 {data.config.policy_version}. 저장 문장 활용은 위 기준에서 별도로 선택해요.</small></span></label><button type="button" className="ml-button" disabled={!consentChecked||!ready||dirty} onClick={()=>void feed.consent(true)}>수신 동의 저장</button></>:<button type="button" className="ml-button ml-button-quiet" disabled={!ready} onClick={()=>{setConsentChecked(false);void feed.consent(false);}}>수신 동의 철회</button>}
+      {!data.consent.current?<><label className="ml-pause-setting"><input type="checkbox" checked={consentChecked} onChange={event=>setConsentChecked(event.target.checked)}/><span>선택한 뉴스·레터 소식과 주간 기록을 개인화 푸시로 받는 데 동의합니다.<small>정책 버전 {data.config.policy_version}. 뉴스 브리핑은 위에서 선택한 열람 분야를 사용해요.</small></span></label><button type="button" className="ml-button" disabled={!consentChecked||!ready||dirty} onClick={()=>void feed.consent(true)}>수신 동의 저장</button></>:<button type="button" className="ml-button ml-button-quiet" disabled={!ready} onClick={()=>{setConsentChecked(false);void feed.consent(false);}}>수신 동의 철회</button>}
       </section>
       {(liveEnabled || developerTools || devices.length > 0) && <section className="ml-notification-devices" aria-label="푸시 기기 연결"><h3>알림을 받을 기기</h3><p className="ml-helper">권한을 허용한 브라우저의 푸시 구독을 연결해요. 활성 연결 {devices.filter(sub=>!sub.simulated).length}개</p>
       {(liveEnabled || developerTools) && <button type="button" className="ml-button" disabled={!ready||dirty||!data.consent.current||!data.config.supported||devices.some(s=>s.id===feed.currentDevice)} onClick={()=>void feed.connect()}>{data.config.mode==='dry_run'?'개발 검증 기기 연결':'이 브라우저 연결'}</button>}

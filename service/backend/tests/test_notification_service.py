@@ -78,10 +78,9 @@ def test_preview_filters_ineligible_before_cutoff_and_reserves_followup(monkeypa
           'read_minutes':1,'formats':['letter'],'viewed':False,'saved':False,'href':f'/lens/{i}'}
     def request(self,method,path,owner,body=None,query=None):
         if path=='/notifications/context':return {'preferences':{'briefing':True,'followups':True,'weekly':False},'due_types':['briefing','followups'],'revision':1,'config':{'mode':'dry_run','policy_version':'v1'},'notified_keys':notified,'source_fingerprint':'h','delivery':{}}
-        if path=='/notifications/inputs':return {'preferences':{'interests':[{'type':'category','key':'industry'}],'minutes':0},'categories':[], 'keywords':[], 'sentence_words':[], 'selected_topics':[], 'coverage':{'unmatched':0,'news_count':0,'letter_count':0},'sentence_total':0}
+        if path=='/notifications/inputs':return {'preferences':{'interests':[{'type':'category','key':'industry'}],'minutes':0},'categories':[{'key':'industry','n':1}], 'keywords':[], 'sentence_words':[], 'selected_topics':[], 'coverage':{'unmatched':0,'news_count':0,'letter_count':0},'sentence_total':0}
         if path=='/recommendation-candidates':return {'items':[card(i) for i in range(1,9)]+[card(9,80)] if body['kind']=='publication' else [],'latest':[]}
         if path=='/notifications/candidates':return {'server_now':now.isoformat(),'followups':[card(20)],'weekly':{'read_days':0,'saved_contents':0}}
-        if path=='/format-preference':return {'status':'insufficient_data'}
         raise AssertionError(path)
     monkeypatch.setattr(DashboardRepository,'request',request)
     result=notifications.preview('a')

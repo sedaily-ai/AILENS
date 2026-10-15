@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/entities/user';
-import { editorInterests, type LetterEditor } from '../../data/editors';
+import { type LetterEditor } from '../../data/editors';
 import { EditorAvatar } from '../EditorAvatar';
 import { LoginPromptDialog } from '../dialog/LoginPromptDialog';
 import { SubscribeDialog } from '../dialog/SubscribeDialog';
@@ -65,7 +65,7 @@ export function EditorIntro({ editor, following, onToggleFollow, followAvailable
         <p className="lt-eintro-ai">모든 레터는 같은 중립 편집 원칙을 따라요</p>
       </div>
       <LoginPromptDialog open={loginOpen} onClose={() => setLoginOpen(false)} editorName={editor.name} />
-      <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} interests={editorInterests(editor)} source={`editor:${editor.id}`} editors={[editor]}
+      <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} source={`editor:${editor.id}`} editors={[editor]}
         title={`${editor.name} 에디터의 새 레터를 메일로 받기`}
         lead={<>{editor.topics.slice(0, 4).map((t) => t.name).join(' · ')} 등 {editor.name}의 담당 분야와 겹치는 레터를 보내요.</>} />
     </section>

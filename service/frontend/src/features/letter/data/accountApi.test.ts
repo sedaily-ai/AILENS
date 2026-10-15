@@ -6,17 +6,17 @@ import { AccountApiError, getAccountBookmarks, getLensPreferences, putLensPrefer
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 describe('계정 저장 API 어댑터', () => {
   beforeEach(() => request.mockReset());
-  it('관심 저장은 owner 없이 revision과 전체 설정만 보낸다', async () => {
+  it('읽을 시간 저장은 owner와 기존 관심을 보내지 않는다', async () => {
     request.mockResolvedValue(response({ revision: 2, interests: [], minutes: 5 }));
-    await putLensPreferences({ revision: 1, interests: [], minutes: 5, updated_at: null });
+    await putLensPreferences({ revision: 1, minutes: 5, updated_at: null });
     expect(request.mock.calls[0][0]).toBe('http://127.0.0.1:4102/api/v2/me/preferences');
-    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ revision: 1, interests: [], minutes: 5 });
+    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ revision: 1, minutes: 5 });
     expect(request.mock.calls[0][1].cache).toBe('no-store');
   });
   it('충돌·인증·서버 실패는 저장 성공으로 바꾸지 않는다', async () => {
     for (const status of [401,409,503]) {
       request.mockResolvedValue(response({ error: { code: 'FIXTURE', message: 'fixture' } },status));
-      await expect(putLensPreferences({ revision: 0, interests: [], minutes: 0, updated_at: null })).rejects.toMatchObject({ status, code: 'FIXTURE' });
+      await expect(putLensPreferences({ revision: 0, minutes: 0, updated_at: null })).rejects.toMatchObject({ status, code: 'FIXTURE' });
     }
     expect(AccountApiError.prototype).toBeInstanceOf(Error);
   });
@@ -88,7 +88,7 @@ describe('팔로우·관심 설정 조회 복구', () => {
     const operations = [
       () => setAccountFollow('mincheol', true),
       () => setAccountFollow('mincheol', false),
-      () => putLensPreferences({ interests: [], minutes: 5, revision: 3, updated_at: null }),
+      () => putLensPreferences({ minutes: 5, revision: 3, updated_at: null }),
       () => importBrowserBookmarks(['one'], 'local-import'),
     ];
     for (const operation of operations) await expect(operation()).rejects.toThrow('Failed to fetch');

@@ -12,32 +12,39 @@ def inputs():return {'preferences':{'interests':[{'type':'category','key':'indus
 
 
 def card(key='publication:1',minutes=None,keywords=(),date='2026-10-14T00:00:00Z',viewed=False):
- return {'content_key':key,'kind':'publication','id':'1','slug':'article','title':'본문 등록 키워드만 있음','summary':'요약','published_at':date,'category_keys':[],'keywords':list(keywords),'read_minutes':minutes,'formats':['letter'],'viewed':viewed,'saved':False,'href':'/lens/article','completed':False}
+ return {'content_key':key,'kind':key.split(':')[0],'id':'1','slug':'article','title':'본문 등록 키워드만 있음','summary':'요약','published_at':date,'category_keys':[],'keywords':list(keywords),'read_minutes':minutes,'formats':['letter'],'viewed':viewed,'saved':False,'href':'/lens/article','completed':False}
 
 
-def test_registered_keyword_sentence_and_selected_reasons_remain_distinct():
+def test_news_uses_observed_categories_only_and_ignores_other_signals():
+ data=inputs();data['preferences']['interests']=[{'type':'category','key':'culture'}]
+ data['selected_topics']=[{'slug':'rates','name':'금리'}];p=profile(data)
+ observed={**card('publication:1'),'category_keys':['industry']}
+ manual={**card('publication:2',keywords=['반도체','배터리','금리']),'category_keys':['culture']}
+ result=rank([manual,observed],data,p)
+ assert [c['content_key'] for c in result['items']]==['publication:1']
+ assert result['items'][0]['reasons'][0]['origin']=='observed'
+ assert {r['type'] for r in result['items'][0]['reasons']}=={'category'}
+ assert data['preferences']['interests']==[{'type':'category','key':'culture'}]
+
+
+def test_sentence_lookup_is_explicit_and_never_falls_back():
  data=inputs();p=profile(data)
- assert p['sentence_terms']==['배터리'] and p['categories'][0]['distinct_contents']==2
- result=rank([card(keywords=['반도체','배터리'])],data,p)
- reasons=result['items'][0]['reasons']
- assert {r['type'] for r in reasons}=={'keyword','sentence'}
- assert {r['origin'] for r in reasons}=={'observed','saved_sentence'}
- assert all(r['method']=='exact' for r in reasons)
- assert all('배터리가' not in r['text'] for r in reasons)
- data['selected_topics']=[{'slug':'rates','name':'금리'}]
- result=rank([card(keywords=['금리'])],data,p)
- assert result['items'][0]['reasons'][0]['origin']=='selected'
-
-
-def test_reason_filters_do_not_fallback_and_letter_budget_is_sum():
- data=inputs();p=profile(data)
+ assert p['sentence_terms']==['배터리']
+ assert rank([card(keywords=['배터리'])],data,p)['items']==[]
+ result=rank([card(keywords=['배터리'])],data,p,reason='sentence')
+ assert result['items'][0]['reasons'][0]['type']=='sentence'
  assert rank([card()],data,p,reason='sentence',latest=[card()])['items']==[]
+
+
+def test_latest_fallback_and_letter_budget_is_sum():
+ data=inputs();p=profile(data)
  fallback=rank([],data,p,allow_fallback=True,latest=[card()])
  assert fallback['fallback'] and fallback['items'][0]['reasons'][0]['type']=='latest'
- result=rank([card('issue_letter:1',3,['반도체']),card('issue_letter:2',3,['반도체']),card('issue_letter:3',None,['반도체'])],data,p,limit=3,minutes=5)
- assert result['total_minutes']==3 and result['count']==1
+ letters=[card('issue_letter:1',3),card('issue_letter:2',3),card('issue_letter:3',None),card('issue_letter:4',2)]
+ result=rank([],data,p,limit=3,minutes=5,allow_fallback=True,latest=letters)
+ assert result['total_minutes']==5 and result['count']==2
  assert all(c['read_minutes'] is not None for c in result['items'])
- assert rank([card('issue_letter:1',3,['반도체'],viewed=True),card('issue_letter:2',3,['반도체'])],data,p)['items'][0]['content_key']=='issue_letter:2'
+ assert len({c['content_key'] for c in result['items']})==2
 
 
 def test_dashboard_unsupported_areas_not_fake_zero_and_failure_not_empty(monkeypatch):
@@ -57,7 +64,7 @@ def test_dashboard_unsupported_areas_not_fake_zero_and_failure_not_empty(monkeyp
  assert result['news']['status']=='ready'
 
 
-@pytest.mark.parametrize('params',[{'kind':'bad'},{'kind':'news','minutes':'5'},{'kind':'news','reason':'bad'},{'kind':'letter','reason':'sentence'},{'kind':'letter','limit':'4'}])
+@pytest.mark.parametrize('params',[{'kind':'bad'},{'kind':'news','minutes':'5'},{'kind':'news','reason':'bad'},{'kind':'news','reason':'keyword'},{'kind':'news','reason':'sentence'},{'kind':'letter','reason':'sentence'},{'kind':'letter','limit':'4'}])
 def test_invalid_recommendation_query_rejected_before_storage(params):
  with pytest.raises(DashboardError):recommend('a',params)
 
@@ -75,17 +82,30 @@ def test_sentence_default_limit_is_three_and_missing_owner_remains_404(monkeypat
  assert error.value.code==404
 
 
-def test_format_breaks_relevance_ties_only_and_uses_available_link():
+def test_latest_order_and_original_links_are_independent_of_format():
  data=inputs();p=profile(data)
  data['format_preference']={'status':'ready','distribution':[{'format':'webtoon','score':9,'share':.75},{'format':'letter','score':3,'share':.25}]}
- read=card('publication:1',keywords=['반도체'],date='2026-10-14T09:00:00Z')
- toon={**card('publication:2',keywords=['반도체'],date='2026-10-13T09:00:00Z'),'formats':['webtoon']}
- assert rank([read,toon],data,p)['items'][0]['content_key']=='publication:2'
- assert rank([read,toon],data,p)['items'][0]['href']=='/lens/article?format=webtoon'
- stronger={**read,'keywords':['반도체','배터리']}
- assert rank([stronger,toon],data,p)['items'][0]['content_key']=='publication:1'
- data['format_preference']['status']='insufficient_data'
- assert '?format' not in rank([toon],data,p)['items'][0]['href']
+ read={**card('publication:1',date='2026-10-14T09:00:00Z'),'category_keys':['industry']}
+ toon={**card('publication:2',date='2026-10-13T09:00:00Z'),'formats':['webtoon'],'category_keys':['industry']}
+ result=rank([toon,read,read],data,p)
+ assert [c['content_key'] for c in result['items']]==['publication:1','publication:2']
+ assert all(c['href']=='/lens/article' and 'preferred_format' not in c and 'interest_score' not in c for c in result['items'])
+
+
+@pytest.mark.parametrize('with_follow',[False,True])
+def test_letter_request_uses_only_actual_editors_and_latest_when_no_follows(monkeypatch,with_follow):
+ data=inputs();data['preferences']['minutes']=5
+ if with_follow:data['followed_editors']={'items':[{'id':'mincheol','name':'민철','active':True}]}
+ assigned={**card('issue_letter:1',3),'editors':['mincheol']}
+ latest=card('issue_letter:2',2)
+ def request(self,method,path,owner,body=None,query=None):
+  assert path=='/recommendation-candidates' and body=={'kind':'issue_letter','categories':[],'terms':[],'editors':['mincheol'] if with_follow else []}
+  return {'items':[assigned,latest],'latest':[latest],'candidate_limit':200}
+ monkeypatch.setattr(DashboardRepository,'request',request)
+ result=recommend('a',{'kind':'letter'},inputs=data)
+ assert result['items'][0]['content_key']==('issue_letter:1' if with_follow else 'issue_letter:2')
+ assert result['items'][0]['reasons'][0]['type']==('editor' if with_follow else 'latest')
+ assert result['minutes_budget']==5
 
 
 def test_followed_editor_requires_actual_author_and_preserves_direct_interest():
@@ -101,9 +121,9 @@ def test_followed_editor_requires_actual_author_and_preserves_direct_interest():
 @pytest.mark.parametrize(('tab','expected_paths'),[
  (None,['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards','/notifications/preferences']),
  ('home',['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards']),
- ('archive',['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards','/notifications/preferences']),
+ ('archive',['/recommendation-inputs','/letter-bookmarks','/rewards','/notifications/preferences']),
  ('records',['/recommendation-inputs','/letter-bookmarks']),
- ('settings',['/recommendation-inputs','/recommendation-candidates','/rewards']),
+ ('settings',['/recommendation-inputs','/rewards']),
 ])
 def test_dashboard_only_reads_areas_used_by_tab_and_keeps_legacy_default(monkeypatch,tab,expected_paths):
  calls=[]
@@ -125,7 +145,7 @@ def test_dashboard_only_reads_areas_used_by_tab_and_keeps_legacy_default(monkeyp
   assert result['saved_letters']['data']['total']==7
   assert all(result[area]['status']=='unavailable' and result[area]['data'] is None for area in ('news','letters','weekly_rewards','notifications'))
  if tab=='settings':
-  assert result['news']['status']=='ready' and result['weekly_rewards']['status']=='ready'
+  assert result['news']['status']=='unavailable' and result['weekly_rewards']['status']=='ready'
   assert all(result[area]['status']=='unavailable' and result[area]['data'] is None for area in ('letters','saved_letters','notifications'))
 
 
@@ -133,3 +153,18 @@ def test_invalid_dashboard_tab_is_rejected_before_storage(monkeypatch):
  def request(*args,**kwargs):raise AssertionError('storage must not be called')
  monkeypatch.setattr(DashboardRepository,'request',request)
  with pytest.raises(DashboardError):get_dashboard('fixture-a',{'tab':'unknown'})
+
+
+def test_sentence_request_does_not_mix_global_categories_or_followed_editors(monkeypatch):
+ data=inputs();data['followed_editors']={'items':[{'id':'mincheol','name':'민철','active':True}]}
+ seen=[]
+ def request(self,method,path,owner,body=None,query=None):
+  seen.append(path)
+  if path=='/sentence-inputs/42':return data
+  assert body=={'kind':'publication','categories':[],'terms':['배터리'],'editors':[]}
+  return {'items':[card(keywords=['반도체']),card('publication:2',keywords=['배터리'])],'latest':[card()],'candidate_limit':200}
+ monkeypatch.setattr(DashboardRepository,'request',request)
+ result=recommend('a',{'kind':'news','reason':'sentence'},sentence_id='42')
+ assert result['sentence_id']=='42' and not result['fallback']
+ assert [item['content_key'] for item in result['items']]==['publication:2']
+ assert seen==['/sentence-inputs/42','/recommendation-candidates']

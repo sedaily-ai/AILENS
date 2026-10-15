@@ -1,9 +1,8 @@
 import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/auth/authFetch';
 import { authReadFetch } from '@/shared/lib/auth/authReadFetch';
-import type { InterestItem } from './interestApi';
 
-export interface LensPreferences { interests: InterestItem[]; minutes: number; revision: number; updated_at: string | null }
+export interface LensPreferences { minutes: number; revision: number; updated_at: string | null }
 export interface AccountBookmark {
   letter_id: string; saved_at: string; version: number;
   content: { content_key: string; kind: 'issue_letter'; available: boolean; completed?: boolean; slug?: string; title?: string; summary?: string; read_minutes?: number; published_at?: string; href?: string; categories?: string[] };
@@ -27,7 +26,7 @@ async function accountJson<T>(path: string, options: RequestInit = {}): Promise<
 }
 
 export const getLensPreferences = (signal?: AbortSignal) => accountJson<LensPreferences>('/preferences', { signal });
-export const putLensPreferences = (data: LensPreferences, signal?: AbortSignal) => accountJson<LensPreferences>('/preferences', { method: 'PUT', signal, body: JSON.stringify({ interests: data.interests, minutes: data.minutes, revision: data.revision }) });
+export const putLensPreferences = (data: LensPreferences, signal?: AbortSignal) => accountJson<LensPreferences>('/preferences', { method: 'PUT', signal, body: JSON.stringify({ minutes: data.minutes, revision: data.revision }) });
 export async function getAccountBookmarks(signal?: AbortSignal, read: 'all'|'unread'|'completed' = 'all'): Promise<AccountBookmark[]> {
   const all: AccountBookmark[] = [];
   let cursor: string | null = null;

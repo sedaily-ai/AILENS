@@ -185,12 +185,12 @@ def test_dst_schedule_and_quiet_hours(notifications):
     p['frequency']='threeDays';assert r.policy.due_types(p,dt.datetime(2026,11,1,13,0,tzinfo=dt.timezone.utc))==['weekly']
 
 
-def test_changed_interest_or_read_record_cancels_prepared_delivery(notifications):
+def test_legacy_interests_and_reading_time_do_not_cancel_prepared_delivery(notifications):
     r,d,_,cur,dashboard=notifications;setup(r);prepare(r,d,cur)
     claim=d.claim('a');claim.pop('claimed')
     dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[{'type':'category','key':'finance'}]})
-    assert d.send_claim('a',claim)['status']=='canceled'
-    assert r.get('a')['delivery']['last_simulated_at'] is None
+    dashboard.replace_preferences('a',{'revision':1,'minutes':10})
+    assert d.send_claim('a',claim)['status']=='simulated'
 
 
 def test_old_lease_unknown_never_reclaimed_and_timezone_cooldown(notifications):
@@ -268,7 +268,7 @@ def test_delivery_keeps_selected_relevance_order_across_content_kinds(notificati
         assert d.cards(c,'b',keys)[0]['content_key']==keys[0]
 
 
-def test_format_evidence_changes_only_owners_notification_fingerprint(notifications):
+def test_format_statistics_do_not_change_notification_fingerprint(notifications):
     _,d,_,cur,dashboard=notifications
     dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[]})
     activity=importlib.import_module('activity_repo')
@@ -277,18 +277,17 @@ def test_format_evidence_changes_only_owners_notification_fingerprint(notificati
     session=activity.create_session('a',{'content_key':'publication:42','format':'letter'})
     with cur() as c:
         c.execute('UPDATE user_content_sessions SET visible_ms=10000 WHERE id=%s',(session['session_id'],))
-        assert d.fingerprint(c,'a')!=before_a and d.fingerprint(c,'b')==before_b
+        assert d.fingerprint(c,'a')==before_a and d.fingerprint(c,'b')==before_b
 
 
-def test_delivery_cancels_if_owner_changes_format_evidence_after_plan(notifications):
+def test_format_statistics_do_not_cancel_prepared_delivery(notifications):
     r,d,_,cur,_=notifications;setup(r)
     assert prepare(r,d,cur)['planned']
     claim=d.claim('a');claim.pop('claimed')
     activity=importlib.import_module('activity_repo')
     session=activity.create_session('a',{'content_key':'publication:42','format':'letter'})
     with cur() as c:c.execute('UPDATE user_content_sessions SET visible_ms=10000 WHERE id=%s',(session['session_id'],))
-    assert d.send_claim('a',claim)['status']=='canceled'
-    assert r.get('a')['delivery']['last_simulated_at'] is None
+    assert d.send_claim('a',claim)['status']=='simulated'
 
 
 def test_mode_switch_refuses_dry_run_plan_and_claim_without_live_mutation(notifications,monkeypatch):

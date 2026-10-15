@@ -24,7 +24,6 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
 
 export function notificationPreferenceError(value: NotificationPreferences): string | null {
   if (!/^(?:0[8-9]|1\d|20):[0-5]\d$/.test(value.time)) return '알림 시간은 방해 금지 시간을 피해 08:00~20:59 사이로 골라주세요.';
-  if (value.briefing && !value.categorySource && !value.keywordSource && !value.sentenceSource) return '뉴스 브리핑에 활용할 관심 기록을 하나 이상 골라주세요.';
   return null;
 }
 

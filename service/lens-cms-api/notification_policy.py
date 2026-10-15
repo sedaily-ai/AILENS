@@ -50,7 +50,6 @@ def preferences(body):
     p=body['preferences']
     if not isinstance(p,dict) or set(p)!=set(DEFAULT) or type(p['version']) is not int or p['version']!=1 or any(type(p[k]) is not bool for k in BOOLS):invalid()
     if p['frequency'] not in ('daily','threeDays') or p['timezone'] not in ZONES or type(p['weeklyDay']) is not int or not 0<=p['weeklyDay']<=6 or not isinstance(p['time'],str) or not re.fullmatch(r'(?:0[89]|1\d|20):[0-5]\d',p['time']):invalid()
-    if p['briefing'] and not any(p[k] for k in ('categorySource','keywordSource','sentenceSource')):invalid('브리핑에 사용할 관심 기록을 선택해 주세요.')
     return dict(p)
 
 

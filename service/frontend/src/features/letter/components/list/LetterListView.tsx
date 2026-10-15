@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { editorsOfLetter, findEditor } from '../../data/editors';
 import type { IssueLetter } from '../../data/letterTypes';
 import { useFollowedEditors } from '../../lib/useFollowedEditors';
-import { useInterests } from '../../lib/useInterests';
 import { useLetterShelf } from '../../lib/useLetterShelf';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { AllSide } from './AllSide';
@@ -21,8 +20,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
   const [topic, setTopic] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [onlyMine, setOnlyMine] = useState(false);
-  const interests = useInterests();
-  const follow = useFollowedEditors(interests.save);
+  const follow = useFollowedEditors();
   const shelf = useLetterShelf();
   const [onlySaved, setOnlySaved] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -46,24 +44,22 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
 
   const editor = editorId ? findEditor(editorId) : undefined;
   const q = query.trim().toLowerCase();
-  // 순서는 늘 최신순. 팔로우한 에디터의 세부 분야와 겹치는 레터는 같은 자리에서 이유만 덧붙여 보여 준다.
-  // 이유는 사실만 적는다: 관심 주제와 겹치면 그 주제, 아니면 팔로우한 에디터가 쓴 글이라는 사실.
+  // 최신순을 유지하며 실제 팔로우한 저자의 레터에만 이유를 붙인다.
   const withReason = useMemo(
     () =>
       letters.map((l) => {
-        if (interests.reasons[l.slug]) return { ...l, reason: interests.reasons[l.slug] };
         const ed = (l.editors ?? []).flatMap(id => { const editor=findEditor(id); return editor ? [editor] : []; }).find(e => follow.isFollowing(e.id));
         return ed ? { ...l, reason: `팔로우한 ${ed.name} 에디터가 쓴 레터예요` } : l;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [letters, interests.reasons, follow.ids],
+    [letters, follow.ids],
   );
   const mine = (l: IssueLetter) => (l.editors ?? []).some(id => follow.isFollowing(id));
   const openLetter = (l: IssueLetter, position: number) =>
     trackEvent('letter_card_click', {
       slug: l.slug,
       position,
-      reason_type: !l.reason ? 'none' : l.reason.startsWith('팔로우') ? 'followed_editor' : 'interest_topic',
+      reason_type: l.reason?.startsWith('팔로우') ? 'followed_editor' : 'none',
       followed_count: follow.ids.length,
       surface: editor ? 'editor_tab' : 'all',
     });
