@@ -46,6 +46,9 @@ export function UserMenu() {
   return (
     <div className="relative" ref={menuRef}>
       <button
+        type="button"
+        aria-label="계정 메뉴"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >

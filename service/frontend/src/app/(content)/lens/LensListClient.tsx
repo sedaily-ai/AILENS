@@ -118,7 +118,7 @@ export function LensListClient({
             )}
           </main>
 
-          <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} railHeading="많이 읽은 글" railItems={railItems} />
+          <HomeSideBar className="hidden lg:block" initialHotLetters={initialHotLetters} railHeading="최신 글" railItems={railItems} />
         </div>
       </div>
     </div>

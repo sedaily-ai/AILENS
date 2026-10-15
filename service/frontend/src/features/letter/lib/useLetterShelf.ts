@@ -22,7 +22,7 @@ function bookmarkLetter(bookmark: AccountBookmark): IssueLetter[] {
     axisLabels: [], issueNumber: 0, summary: [], sections: [], editorNote: '', vote: null, sources: [] }];
 }
 
-export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
+export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all', enabled = true) {
   const { user, isLoading } = useAuth();
   const owner = user?.userId ?? 'browser';
   const currentOwner = useRef(owner); currentOwner.current = owner;
@@ -46,7 +46,7 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
     feedbackTimer.current = setTimeout(() => { setFeedback(null); feedbackTimer.current = null; }, 3000);
   }, [owner]);
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !enabled) return;
     const controller = new AbortController(); controllerRef.current = controller;
     let loadRevision = 0;
     const sync = async () => {
@@ -64,11 +64,11 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
     const onStorage = (event: StorageEvent) => { if (event.key === 'lens-account-bookmarks-revision' || event.key === SAVED_KEY || event.key === readKey || event.key === null) onChange(); };
     window.addEventListener('lens-account-view-changed', onChange); window.addEventListener(CHANGED, onChange); window.addEventListener('storage', onStorage); window.addEventListener('focus', onChange); window.addEventListener('pageshow', onChange);
     return () => { controller.abort(); window.removeEventListener('lens-account-view-changed', onChange); window.removeEventListener(CHANGED, onChange); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', onChange); window.removeEventListener('pageshow', onChange); };
-  }, [owner, user, isLoading, readKey, revision, readFilter]);
+  }, [owner, user, isLoading, readKey, revision, readFilter, enabled]);
   const toggleSaved = useCallback(async (slug: string, explicitId?: string): Promise<boolean> => {
     const snapshot = stateRef.current;
     const key = explicitId ?? slug;
-    if (isLoading || snapshot.owner !== owner || !snapshot.ready) return false;
+    if (!enabled || isLoading || snapshot.owner !== owner || !snapshot.ready) return false;
     if (!user || snapshot.authRequired) {
       setState(previous => ({ ...previous, loginRequested: true }));
       return false;
@@ -91,7 +91,7 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
       if (currentOwner.current === owner) setState(previous => ({ ...previous, authRequired: isAccountAuthError(error), loginRequested: isAccountAuthError(error), error: error instanceof Error ? error.message : '레터를 저장하지 못했어요. 다시 시도해 주세요.' }));
       return false;
     } finally { pending.current.delete(key); setPendingCount(pending.current.size); }
-  }, [owner, user, isLoading, announceSaved, clearFeedback]);
+  }, [owner, user, isLoading, announceSaved, clearFeedback, enabled]);
   const markRead = useCallback((slug: string) => {
     if (stateRef.current.owner !== owner) return;
     const next = [...new Set([...readList(readKey), slug])]; writeList(readKey, next);
@@ -100,7 +100,7 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all') {
   const valid = state.owner === owner;
   const saved = valid ? state.saved : [], read = valid ? state.read : [];
   const notice = user ? `${LETTER_SHELF_NOTICE.browser} 로그인 전 브라우저 저장과는 자동으로 합치지 않아요.` : `${LETTER_SHELF_NOTICE.guest}${saved.length ? ' 기존 브라우저 저장은 조회만 가능하며 계정 저장과는 별개예요.' : ''}`;
-  return { ready: !isLoading && valid && state.ready && state.filter===readFilter, available: valid && state.available, error: valid ? state.error : '', notice,
+  return { ready: enabled && !isLoading && valid && state.ready && state.filter===readFilter, available: valid && state.available, error: valid ? state.error : '', notice,
     feedback: feedback?.owner === owner ? feedback.text : '',
     authRequired: valid && !!state.authRequired, pending: pendingCount > 0, saved, read, savedLetters: valid ? state.bookmarks.flatMap(bookmarkLetter) : [],
     loginPromptOpen: valid && !!state.loginRequested, closeLoginPrompt: () => setState(previous => ({ ...previous, loginRequested: false })),

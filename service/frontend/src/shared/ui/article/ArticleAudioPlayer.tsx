@@ -77,6 +77,7 @@ export function ArticleAudioPlayer({
   bylineHref,
   chapters: chaptersProp,
   onDuration,
+  active = true,
 }: {
   src: string;
   /** 카드 광원·진행 채움·파형 강조에 쓰는 강조색. 지금 화면의 유일한 강조색을 넘긴다. */
@@ -100,6 +101,8 @@ export function ArticleAudioPlayer({
   chapters?: ArticleAudioChapter[];
   /** loadedmetadata에서 읽은 실제 길이(초). 호출부가 길이를 따로 표기할 때 쓰며, 도착 전에는 추정치를 채우지 않는다. */
   onDuration?: (sec: number) => void;
+  /** 숨겨진 형식 탭에서는 일시정지하고 재생 위치는 보존한다. */
+  active?: boolean;
 }) {
   const ref = useRef<HTMLAudioElement | null>(null);
   const [looping, setLooping] = useState(false);
@@ -121,6 +124,7 @@ export function ArticleAudioPlayer({
     usePlaybackRateMenu(ref, RATES);
   const { playing, cur, dur, failed, toggle, seekTo, nudge, retry } = useMediaTransport(ref, {
     looping,
+    active,
     onDuration,
   });
 

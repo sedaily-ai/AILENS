@@ -44,7 +44,9 @@ export function NotificationSettings({ recommendedTitle, recommendations, intere
             { key: 'keywordSource', label: '열람한 글의 키워드', description: interestSummary?.keywords.slice(0, 4).map((term) => `#${term}`).join(' ') || '등록된 용어가 있는 글을 살펴보면 반영해요.' },
             { key: 'sentenceSource', label: '내 서랍 문장의 주제', description: interestSummary?.sentenceWords.slice(0, 4).join(' · ') || '로그인 후 저장한 문장을 사용할 수 있어요.' },
           ] as const).map((item) => <label key={item.key}><input type="checkbox" checked={draft[item.key]} onChange={(event) => update(item.key, event.target.checked)} /><span><strong>{item.label}</strong><small>{item.description}</small></span></label>)}<p>문장 원문은 알림 미리보기에 표시하지 않아요. 이 선택은 계정의 브리핑 후보에 적용돼요. 뉴스 이용 형식이 분석되면 관심이 같은 후보의 순서와 이어볼 형식에도 반영해요.</p></fieldset>
-          <div className="ml-delivery-settings">
+          <details className="ml-format-method" open={liveEnabled || !!validation}>
+            <summary>{liveEnabled ? '발송 시간 설정' : '발송 시간을 미리 설정할래요'}</summary>
+            <div className="ml-delivery-settings">
             <h3><Clock3 size={16} aria-hidden /> 언제 받아볼까요?</h3>
             <fieldset className="ml-choice-field"><legend>브리핑·다음 소식 빈도</legend><div className="ml-frequency-options">
               <label><input type="radio" name="ml-notification-frequency" value="daily" checked={draft.frequency === 'daily'} onChange={() => update('frequency', 'daily')} aria-label="매일" /><span><strong>매일</strong><small>하루 한 번</small></span><Check size={15} aria-hidden /></label>
@@ -55,7 +57,8 @@ export function NotificationSettings({ recommendedTitle, recommendations, intere
               <div className="ml-setting-field"><label htmlFor="ml-delivery-timezone">시간대</label><div className="ml-select-wrap"><select id="ml-delivery-timezone" value={draft.timezone} onChange={(event) => update('timezone', event.target.value as NotificationPreferences['timezone'])}><option value="Asia/Seoul">서울 · 한국</option><option value="America/New_York">뉴욕 · 미국</option><option value="Europe/London">런던 · 영국</option><option value="UTC">UTC · 세계 표준시</option></select><ChevronDown size={15} aria-hidden /></div></div>
             </div>
             <fieldset className="ml-choice-field ml-weekday-field"><legend>주간 기록 받는 요일</legend><div className="ml-weekday-options">{WEEKDAYS.map((day, index) => <label key={day}><input type="radio" name="ml-notification-weekday" value={index} checked={draft.weeklyDay === index} aria-label={`${day}요일`} onChange={() => update('weeklyDay', index)} /><span>{day}</span></label>)}</div></fieldset>
-          </div>
+            </div>
+          </details>
           {validation && <p id="ml-time-error" className="ml-settings-error" role="alert">{validation}</p>}
           <p id="ml-quiet-note" className="ml-settings-help">선택한 시간대의 21:00~08:00은 쉬는 시간이에요. 여러 소식은 하루 최대 한 번으로 묶고, 새로운 내용이 없으면 보내지 않아요.</p>
           <label className="ml-pause-setting"><input type="checkbox" checked={draft.paused} onChange={(event) => update('paused', event.target.checked)} /><span>모든 개인화 푸시 일시 중지<small>선택한 유형과 시간은 그대로 보관해요.</small></span></label>

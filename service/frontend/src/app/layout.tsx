@@ -223,6 +223,7 @@ export default function RootLayout({
             컴포넌트별 렌더 블로킹 @import 중복을 없애고 preconnect로 왕복을 줄인다. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font -- App Router 루트 layout의 공통 head로 모든 페이지에서 로드한다. pages/_document 전용 규칙의 오탐. */}
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400..900&display=swap"

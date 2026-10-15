@@ -1,4 +1,5 @@
 import { notFound, permanentRedirect } from 'next/navigation';
+import { lensFormatFor } from '@/shared/constants/lensPerspectives';
 import { lensPath } from '@ailens/domain';
 import { findLensForChannelSlug } from '@/shared/lib/seo/lens/lensCanonical';
 
@@ -8,8 +9,11 @@ import { findLensForChannelSlug } from '@/shared/lib/seo/lens/lensCanonical';
  * 색인·공유된 옛 링크를 살리려고 404가 아니라 이동으로 처리하고, 대응하는 기사가 없으면 실제 404를 준다.
  * 채널 접미사(-video/-podcast/-webtoon)가 붙은 옛 ID도 findLensForChannelSlug가 처리한다.
  */
-export async function redirectToLensArticle(rawSlug: string): Promise<never> {
+export async function redirectToLensArticle(rawSlug: string, format?: 'webtoon' | 'podcast' | 'video'): Promise<never> {
   const lens = await findLensForChannelSlug(decodeURIComponent(rawSlug));
-  if (lens) permanentRedirect(lensPath(lens));
+  if (lens) {
+    const index = !format ? -1 : lens.lenses.findIndex((item, i) => lensFormatFor(item, i) === format);
+    permanentRedirect(`${lensPath(lens)}${index >= 0 ? `?v=${index + 1}` : ''}`);
+  }
   notFound();
 }

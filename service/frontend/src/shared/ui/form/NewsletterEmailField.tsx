@@ -10,7 +10,7 @@
  * 화면 규칙(2026-10-12 소개 화면 개편): 라벨은 입력칸 위, 형식 오류는 칸을 벗어난 뒤에만, 버튼이 비활성이면 이유를 버튼 아래에 쓴다.
  * 문구는 레터 구독 행동 정의(docs/product/모아쓰기레터/구독_UX_행동정의.md)와 같은 말을 쓴다. 발송 주기는 약속하지 않는다.
  */
-import { useEffect, useId, useState } from 'react';
+import { useId, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { API_URL as API_BASE } from '@/shared/config/apiClient';
@@ -43,6 +43,15 @@ interface Props {
 
 const fs = (n: number) => `var(--font-size-${n})`;
 
+// 저장값은 SSR에서는 비우고 hydration 후 읽는다. 별도 저장소 변경 구독은 기존과 같이 하지 않는다.
+const subscribeToSavedPreferences = () => () => {};
+function savedEmail(): string {
+  try { return localStorage.getItem('newsletter-email') ?? ''; } catch { return ''; }
+}
+function savedSubscription(): boolean {
+  try { return localStorage.getItem('newsletter-subscribed') === '1'; } catch { return false; }
+}
+
 // 버튼 상태(hover·active·disabled)와 포커스 표시는 인라인 스타일로 쓸 수 없어 이 컴포넌트 안에 둔다(쓰는 화면의 CSS에 기대지 않는다).
 const FIELD_CSS = `
   .nef-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--color-accent-primary); color: var(--color-bg); font: inherit; font-size: var(--font-size-16); font-weight: 700; cursor: pointer; transition: background-color .15s; }
@@ -65,23 +74,17 @@ export function NewsletterEmailField({
   const ids = useId();
   const emailId = `${ids}-email`;
   const reasonId = `${ids}-reason`;
-  const [email, setEmail] = useState('');
+  const initialEmail = useSyncExternalStore(subscribeToSavedPreferences, savedEmail, () => '');
+  const [editedEmail, setEmail] = useState<string | null>(null);
+  const email = editedEmail ?? initialEmail;
   const [touched, setTouched] = useState(false);
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
   const [mailSent, setMailSent] = useState(false);
   const [deliveryMessage, setDeliveryMessage] = useState('');
-  const [alreadySubscribed, setAlreadySubscribed] = useState(false);
-
-  // 이미 구독한 이메일 자동 채움. 단 done 상태 자동 진입은 X(재구독 시에도 항상 재발송 흐름을 막지 않게).
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('newsletter-email');
-      if (saved) setEmail(saved);
-      setAlreadySubscribed(localStorage.getItem('newsletter-subscribed') === '1');
-    } catch { /* 저장소 사용이 제한되면 빈 폼으로 시작한다. */ }
-  }, []);
+  // 이미 구독했어도 완료 상태로 전환하지 않는다. 입력을 지운 경우도 저장값으로 덮어쓰지 않는다.
+  const alreadySubscribed = useSyncExternalStore(subscribeToSavedPreferences, savedSubscription, () => false);
 
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
   const showFormatError = touched && email.trim() !== '' && !validEmail;

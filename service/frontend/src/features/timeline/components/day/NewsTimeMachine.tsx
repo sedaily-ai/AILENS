@@ -47,7 +47,6 @@ export function NewsTimeMachine({ children }: { children?: React.ReactNode }) {
       setTarget(q);
       setPhase('rewinding');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
   }, []);
 
   return (

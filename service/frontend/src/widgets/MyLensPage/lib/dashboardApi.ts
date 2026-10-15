@@ -18,6 +18,7 @@ export interface ServerProfile {
   window_days:number;categories:{key:string;label:string;distinct_contents:number}[];keywords:{key:string;label:string;distinct_contents:number}[];
   sentence_terms:string[];coverage:{legacy_unmatched:number};viewed_news_count:number;viewed_letter_count:number;sentence_total:number;
 }
+export type DashboardTab = 'home' | 'archive' | 'records' | 'settings';
 export interface LensDashboard {
   schema_version:1;scope:'account';format_preference:Area<FormatPreferenceData>;news:Area<Recommendations>;letters:Area<Recommendations>;profile:Area<ServerProfile>;
   recent_sentences:Area<{items:(ArchiveSentenceResponse & {article_no?:string})[];total:number}>;
@@ -36,7 +37,7 @@ export async function get<T>(path:string,signal:AbortSignal):Promise<T>{
     throw error;
   }
 }
-export const fetchLensDashboard=(minutes:number,signal:AbortSignal)=>get<LensDashboard>(`/dashboard?minutes=${minutes}`,signal);
+export const fetchLensDashboard=(minutes:number,signal:AbortSignal,tab?:DashboardTab)=>get<LensDashboard>(`/dashboard?minutes=${minutes}${tab ? `&tab=${tab}` : ''}`,signal);
 export const fetchRecommendations=(filter:NewsFilter,signal:AbortSignal)=>get<Recommendations>(`/recommendations?kind=news&reason=${filter}&limit=4`,signal);
 export const fetchSentenceRecommendations=(id:string,signal:AbortSignal)=>get<Recommendations>(`/sentences/${encodeURIComponent(id)}/recommendations?limit=3`,signal);
 export interface RewardWeek {week_start:string;week_end:string;today:string;coverage_start:string;goal_days:number;stamp_days:number;stamps:{date:string;awarded_at:string}[];badges:{id:string;title:string;earned:boolean;earned_at:string|null;progress:{current:number;target:number}}[]}

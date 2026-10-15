@@ -211,7 +211,7 @@ export function LensFormatPanel({
       {format === 'podcast' && realPodcast && (
         <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 16, background: '#111827' }}>
           <iframe
-            src={realPodcast.embedUrl}
+            src={on ? realPodcast.embedUrl : undefined}
             title={displayHeadline(l.question) || '팟캐스트'}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -225,6 +225,7 @@ export function LensFormatPanel({
       {format === 'podcast' && directPodcastUrl && (
         <ArticleAudioPlayer
           src={directPodcastUrl}
+          active={on}
           accent={READING_ACCENT}
           label={p.short}
           kicker="귀로 듣는 브리핑"
@@ -269,7 +270,7 @@ export function LensFormatPanel({
           {l.question && <p className="fmt-lede">{displayHeadline(l.question)}</p>}
           <div className="aspect-video relative overflow-hidden" style={{ borderRadius: 14, background: '#111827' }}>
             <iframe
-              src={realVideo.embedUrl}
+              src={on ? realVideo.embedUrl : undefined}
               title={displayHeadline(l.question) || '영상'}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -285,10 +286,11 @@ export function LensFormatPanel({
       {format === 'video' && directVideoUrl && (
         <ArticleVideoPlayer
           src={directVideoUrl}
+          active={on}
           poster={l.thumbnail_url}
           accent={p.color}
           label={p.short}
-          kicker="15초 영상 브리핑"
+          kicker="영상 브리핑"
           title={displayHeadline(l.question) || '오늘의 영상'}
           byline={lens.source_url ? '서울경제 원문 기사' : null}
           bylineHref={lens.source_url}

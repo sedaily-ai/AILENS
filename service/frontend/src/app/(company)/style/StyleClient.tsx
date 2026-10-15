@@ -7,9 +7,8 @@ import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { BRAND_ACCENTS } from '@/shared/data/brandAccents';
 
-// 이벤트성 갤러리 — 사람들이 신문 읽는 스타일을 공유하는 "전시 공간"이다. 실제 유저 제출 파이프라인이 없어 커뮤니티 탭으로 유도해 거기서 올리게 한다.
-// 실제 사진이 없어 문구 자체가 비주얼이 되는 타이포그래피 카드로 구성한다.
-// 카드는 특정 인물에 귀속시키지 않고, 다른 카드형 섹션(Trend/Column)과 같은 공용 브랜드 팔레트(brandAccents.ts)를 카드 순서로 순환 배정한다.
+// 다양한 읽기 상황을 보여 주는 고정 예시 갤러리. 실제 독자 제출·후기나 진행 중인 행사를 뜻하지 않는다.
+// 카드는 공용 브랜드 팔레트를 카드 순서로 순환 배정한다.
 interface StylePost {
   situation: string;
   comment: string;
@@ -51,7 +50,7 @@ export default function StyleClient() {
               marginBottom: 14,
             }}
           >
-            EVENT
+            읽기 스타일 예시
           </span>
           <h1
             className="font-medium text-gray-900"
@@ -69,9 +68,9 @@ export default function StyleClient() {
           </h1>
           <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, maxWidth: 480, margin: '0 auto 20px' }}>
             청소하다가, 버스에서, 걸으면서 — 저마다 다른 순간에 뉴스를 만나요.
-            AI LENS 독자들의 진짜 읽기 스타일을 모아봤어요.
+            다양한 읽기 상황을 예시로 소개해요. 아래 카드는 실제 독자 후기나 행사 참여작이 아니에요.
           </p>
-          {/* "나도 스타일 올리기"(글쓰기) 목적지가 없으므로, 다른 사람이 담은 문장을 볼 수 있는 내 서랍으로 연결한다. */}
+          {/* 기존 서랍 진입 동작을 유지한다. */}
           <Link
             href="/?tab=archive"
             className="inline-flex items-center hover:opacity-85 transition-opacity"

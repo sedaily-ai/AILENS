@@ -122,12 +122,16 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
       <section className="ld-outline" aria-label="이 레터에서 읽을 내용">
         <h2>이 레터에서 읽을 내용</h2>
         <ul className="ld-axlist" aria-label="이 레터의 3가지 관점">
-          {letter.axisLabels.map((a) => (
-            <li key={a.axis + a.label}>
-              <AxisBadge axis={a.axis} />
-              <span>{a.label}</span>
-            </li>
-          ))}
+          {letter.axisLabels.map((a) => {
+            const isDefault = a.label.replace(/[^가-힣a-zA-Z0-9]/g, '') === AXIS_META[a.axis].label.replace(/\s/g, '');
+            const detail = isDefault ? letter.sections.find((section) => section.axis === a.axis)?.heading : a.label;
+            return (
+              <li key={a.axis + a.label}>
+                <AxisBadge axis={a.axis} />
+                {detail && <span>{detail}</span>}
+              </li>
+            );
+          })}
         </ul>
       </section>
 

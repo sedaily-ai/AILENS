@@ -145,6 +145,8 @@ export function TimeMachineRewind({
   const travel = Math.abs(xStart - xEnd);
   /** 이동이 눈에 안 보일 만큼 짧으면(최근 날짜) 날지 않고 바로 앉는다. */
   const tooClose = width > 0 && travel < MIN_FLIGHT_PX;
+  const displayedYear = tooClose ? toYear : activeYear;
+  const hasArrived = tooClose || arrived;
 
   /** 네모칸은 가운데에 둔다. 레일이 지금 연도를 여기로 끌어온다. */
   const frameCenter = width > 0 ? width / 2 : 0;
@@ -222,8 +224,6 @@ export function TimeMachineRewind({
     // 목적지가 최근이라 이동 거리가 눈에 안 보이면 비행을 생략한다.
     if (tooClose) {
       if (dateRef.current) dateRef.current.textContent = kdate(toDate);
-      setActiveYear(toYear);
-      setArrived(true);
       const t = setTimeout(finish, ARRIVAL_MS + 200);
       return () => clearTimeout(t);
     }
@@ -296,7 +296,7 @@ export function TimeMachineRewind({
   // 지금 지나는 연도와 가장 가까운 라벨(그 해가 라벨에 없을 수 있다).
   // 네모칸이 이 라벨로 미끄러진다.
   const nearestLabel = labels.reduce(
-    (best, l) => (Math.abs(l.year - activeYear) < Math.abs(best.year - activeYear) ? l : best),
+    (best, l) => (Math.abs(l.year - displayedYear) < Math.abs(best.year - displayedYear) ? l : best),
     labels[0],
   );
 
@@ -360,7 +360,7 @@ export function TimeMachineRewind({
               />
               {/* 출발(오늘)·도착(그날) 지점 */}
               <circle cx={xStart} cy={Y_CRUISE} r="3.5" fill="#fff" stroke={BLUE} strokeWidth="2" />
-              <circle cx={xEnd} cy={yEnd} r="3.5" fill={arrived ? BLUE : '#fff'} stroke={BLUE} strokeWidth="2" />
+              <circle cx={xEnd} cy={yEnd} r="3.5" fill={hasArrived ? BLUE : '#fff'} stroke={BLUE} strokeWidth="2" />
             </svg>
 
             {/* 경로를 타는 비행기 */}
@@ -459,8 +459,8 @@ export function TimeMachineRewind({
       {/* ── 날짜 카운터 / 도착 도장 ── */}
       <p
         ref={dateRef}
-        key={arrived ? 'arrived' : 'moving'}
-        className={arrived ? 'tm-stamp' : undefined}
+        key={hasArrived ? 'arrived' : 'moving'}
+        className={hasArrived ? 'tm-stamp' : undefined}
         style={{
           fontSize: 'clamp(24px, 5vw, 32px)',
           fontWeight: 800,
@@ -471,7 +471,7 @@ export function TimeMachineRewind({
           marginTop: 24,
         }}
       >
-        {kdate(arrived ? toDate : fromDate)}
+        {kdate(hasArrived ? toDate : fromDate)}
       </p>
 
       {/* 건너뛰기. 재방문자가 매번 기다리지 않게 한다. 컨테이너 클릭·Esc도 같은 동작. */}

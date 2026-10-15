@@ -21,7 +21,7 @@ const ul: React.CSSProperties = { paddingLeft: 20, marginTop: 4, marginBottom: 4
 
 export default function PrivacyPage() {
   return (
-    <StaticPageShell title="개인정보처리방침" updated="2026-08-07">
+    <StaticPageShell title="개인정보처리방침" updated="2026-10-15">
       <p>
         서울경제신문(이하 &ldquo;회사&rdquo;)은 AI LENS(ailens.sedaily.ai, 이하 &ldquo;서비스&rdquo;)를 운영하며,
         「개인정보보호법」 등 관계 법령에 따라 이용자의 개인정보를 보호하고 이와 관련한 고충을
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
       <h2 style={h2}>1. 수집하는 개인정보 항목</h2>
       <p>서비스는 다음과 같은 경우에 개인정보를 수집합니다.</p>
       <ul style={ul}>
-        <li><strong>회원가입·로그인 시</strong>: 이메일 주소, 비밀번호(암호화 저장). 구글·카카오 소셜 로그인 이용 시 각 서비스가 제공하는 이메일·이름·프로필 식별자.</li>
+        <li><strong>회원가입·로그인 시</strong>: 이메일 주소, 비밀번호(암호화 저장). 구글 소셜 로그인 이용 시 구글이 제공하는 이메일·이름·프로필 식별자.</li>
         <li><strong>뉴스레터 구독 시</strong>: 이메일 주소.</li>
         <li><strong>서비스 이용 과정에서 자동 수집</strong>: 읽은 글 목록·문장 저장(&ldquo;내 서랍&rdquo;) 등 이용 기록, 접속 IP, 브라우저·기기 정보, 쿠키, 접속 일시.</li>
         <li><strong>문의 시</strong>: 이메일 주소, 문의 내용.</li>
@@ -61,7 +61,6 @@ export default function PrivacyPage() {
       <ul style={ul}>
         <li>Amazon Web Services, Inc.(AWS) — 서버·데이터베이스 인프라 운영(회원 인증, 데이터 저장)</li>
         <li>Google LLC — 로그인(OAuth), 방문 통계 분석(Google Analytics)</li>
-        <li>Kakao Corp. — 로그인(OAuth)</li>
       </ul>
       <p style={{ marginTop: 8 }}>법령에 근거하거나 수사기관의 적법한 요청이 있는 경우를 제외하고 제3자에게 제공하지 않습니다.</p>
 

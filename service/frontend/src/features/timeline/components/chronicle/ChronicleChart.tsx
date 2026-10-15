@@ -202,10 +202,12 @@ export function ChronicleChart({
 
   // ── 끌어서 이동 · 휠/핀치 확대
   const drag = useRef<{ x: number; domain: Domain; moved: boolean } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [hover, setHover] = useState<{ px: number; point: AttPoint } | null>(null);
 
   const onPointerDown = (e: React.PointerEvent<SVGRectElement>) => {
     drag.current = { x: e.clientX, domain, moved: false };
+    setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<SVGRectElement>) => {
@@ -224,7 +226,7 @@ export function ChronicleChart({
     const i = Math.min(pts.length - 1, Math.max(0, Math.round((yf - ATT_START_YEAR) * 12 - 0.5)));
     setHover({ px: x(pts[i].yf), point: pts[i] });
   };
-  const endDrag = () => { drag.current = null; };
+  const endDrag = () => { drag.current = null; setDragging(false); };
 
   useEffect(() => {
     const el = svgRef.current;
@@ -317,10 +319,10 @@ export function ChronicleChart({
 
           {/* 끌기 · 호버 영역 */}
           <rect
-            x={ML} y={plotTop} width={width - ML - MR} height={PLOT_H} fill="transparent" style={{ cursor: drag.current ? 'grabbing' : 'grab' }}
+            x={ML} y={plotTop} width={width - ML - MR} height={PLOT_H} fill="transparent" style={{ cursor: dragging ? 'grabbing' : 'grab' }}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag} onPointerLeave={() => { endDrag(); setHover(null); }}
           />
-          {hover && !drag.current && (
+          {hover && !dragging && (
             <g pointerEvents="none">
               <line x1={hover.px} x2={hover.px} y1={plotTop} y2={plotBottom} stroke={INK} strokeOpacity={0.35} />
               {hover.point.value !== null && <circle cx={hover.px} cy={y(hover.point.value)} r={3.5} fill="#fff" stroke={SERIES} strokeWidth={2} />}
@@ -375,7 +377,7 @@ export function ChronicleChart({
           })}
         </svg>
 
-        {hover && hoverLabel && !drag.current && (
+        {hover && hoverLabel && !dragging && (
           <div className="cc-tip" style={{ left: Math.min(Math.max(hover.px, 110), width - 110), top: plotTop + 6 }}>
             <b>{hoverLabel.head}</b>
             <span>{hoverLabel.body}</span>
@@ -407,7 +409,7 @@ function Overview({
   const left = ox(domain[0]);
   const right = ox(domain[1]);
 
-  const start = (kind: 'move' | 'l' | 'r') => (e: React.PointerEvent) => {
+  const start = (kind: 'move' | 'l' | 'r', e: React.PointerEvent) => {
     e.stopPropagation();
     mode.current = { kind, startX: e.clientX, domain };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
@@ -439,9 +441,9 @@ function Overview({
       ))}
       <rect x={ml} y={0} width={Math.max(0, left - ml)} height={H} fill="#fff" opacity={0.6} pointerEvents="none" />
       <rect x={right} y={0} width={Math.max(0, width - mr - right)} height={H} fill="#fff" opacity={0.6} pointerEvents="none" />
-      <rect x={left} y={1} width={Math.max(8, right - left)} height={H - 2} rx={6} fill={SERIES} opacity={0.08} stroke={SERIES} strokeWidth={1.4} style={{ cursor: 'grab' }} onPointerDown={start('move')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
-      <rect x={left - 4} y={8} width={8} height={H - 16} rx={3} fill={SERIES} style={{ cursor: 'ew-resize' }} onPointerDown={start('l')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
-      <rect x={right - 4} y={8} width={8} height={H - 16} rx={3} fill={SERIES} style={{ cursor: 'ew-resize' }} onPointerDown={start('r')} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+      <rect x={left} y={1} width={Math.max(8, right - left)} height={H - 2} rx={6} fill={SERIES} opacity={0.08} stroke={SERIES} strokeWidth={1.4} style={{ cursor: 'grab' }} onPointerDown={(e) => start('move', e)} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+      <rect x={left - 4} y={8} width={8} height={H - 16} rx={3} fill={SERIES} style={{ cursor: 'ew-resize' }} onPointerDown={(e) => start('l', e)} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
+      <rect x={right - 4} y={8} width={8} height={H - 16} rx={3} fill={SERIES} style={{ cursor: 'ew-resize' }} onPointerDown={(e) => start('r', e)} onPointerMove={move} onPointerUp={end} onPointerCancel={end} />
     </svg>
   );
 }

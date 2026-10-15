@@ -31,3 +31,11 @@ it('선호 형식의 정식 주소와 실제 작성자 사전을 카드에 보�
  expect(newsRecommendations(data([preferred]))[0]).toMatchObject({href:'/lens/one?format=webtoon',preferredFormat:'webtoon'});
  expect(cardLetter(preferred).editors).toEqual(['mincheol']);
 });
+
+it('명시한 탭만 집계하도록 전달하고 기존 호출 URL은 보존한다',async()=>{
+ request.mockReset();request.mockResolvedValue(new Response('{}'));
+ await fetchLensDashboard(5,new AbortController().signal,'records');
+ expect(request.mock.calls[0][0]).toBe('http://127.0.0.1:4102/api/v2/me/dashboard?minutes=5&tab=records');
+ await fetchLensDashboard(5,new AbortController().signal);
+ expect(request.mock.calls[1][0]).toBe('http://127.0.0.1:4102/api/v2/me/dashboard?minutes=5');
+});
