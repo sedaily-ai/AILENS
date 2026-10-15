@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
-import { NEEDS, SITUATIONS, recommendEditors, type LetterEditor, type NeedId, type SituationId } from '../../data/editors';
-import { fetchMailPreview, sendTestMail, subscribeByEmail, type InterestItem } from '../../data/interestApi';
+import { EDITORS, NEEDS, SITUATIONS, recommendEditors, type LetterEditor, type NeedId, type SituationId } from '../../data/editors';
+import { fetchMailPreview, sendTestMail, subscribeByEmail } from '../../data/interestApi';
 import { EditorAvatar } from '../EditorAvatar';
 
 const EMAIL_OK = /^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]{2,}$/;
@@ -28,8 +28,10 @@ function trapDialogTab(e: React.KeyboardEvent<HTMLDialogElement>) {
  * 메일 구독 대화상자. 행동 정의: docs/product/모아쓰기레터/구독_UX_행동정의.md
  * 입력은 이메일 하나가 핵심이고(주기·시각은 기본값이 있어 건드리지 않아도 됨), 동의는 미리 체크하지 않으며, 신청 뒤에는 "메일 확인"까지 안내한다.
  */
-export function SubscribeDialog({ open, onClose, interests, title, lead, source, editors = [] }: { open: boolean; onClose: () => void; interests: InterestItem[]; title: string; lead?: ReactNode; source: string; editors?: LetterEditor[] }) {
+export function SubscribeDialog({ open, onClose, title, lead, source, editors = [] }: { open: boolean; onClose: () => void; title: string; lead?: ReactNode; source: string; editors?: LetterEditor[] }) {
   const [email, setEmail] = useState('');
+  const [chosenIds, setChosenIds] = useState<string[] | null>(null);
+  const selectedIds = chosenIds ?? editors.map(editor => editor.id);
   const [touched, setTouched] = useState(false);
   const [consent, setConsent] = useState(false);
   const [detail, setDetail] = useState(false);
@@ -121,11 +123,11 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (!valid || !consent) return;
+    if (!valid || !consent || !selectedIds.length) return;
     setBusy(true);
     setError('');
     trackEvent('letter_sub_submit', { source });
-    const res = await subscribeByEmail({ email: email.trim(), interests, editors: editors.map((e) => e.id), frequency: 'daily', sendHour: 8 });
+    const res = await subscribeByEmail({ email: email.trim(), editors: selectedIds, frequency: 'daily', sendHour: 8 });
     setBusy(false);
     if (!res.ok) return setError(res.message);
     trackEvent('letter_sub_requested', { source });
@@ -144,7 +146,7 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
             <ol className="lt-dlg-steps">
               <li><b>1</b><span>메일함에서 &quot;[AI LENS 레터] 메일 받기 확인&quot;을 열어요</span></li>
               <li><b>2</b><span>&quot;신청 확인하기&quot; 버튼을 눌러요 (48시간 안에)</span></li>
-              <li><b>3</b><span>끝! 겹치는 레터가 올라오면 바로 도착해요</span></li>
+              <li><b>3</b><span>끝! 선택한 에디터의 새 레터가 도착해요</span></li>
             </ol>
             <p className="lt-dlg-tip">몇 분이 지나도 안 보이면 스팸함을 확인해 주세요. 확인 전에는 아무 메일도 보내지 않아요.</p>
             {!picked ? (
@@ -210,10 +212,12 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
             <h2 id="lt-dlg-title" className="lt-dlg-h">{title}</h2>
             {lead && <div className="lt-dlg-lead">{lead}</div>}
             <ul className="lt-dlg-promise" aria-label="약속">
-              <li>겹치는 레터가 나올 때만 보내요</li>
+              <li>선택한 에디터의 레터가 나올 때만 보내요</li>
               <li>새 레터가 올라오면 바로, 한 통에 한 편</li>
               <li>메일 아래 링크로 언제든 수신거부</li>
             </ul>
+
+            <fieldset className="lt-dlg-editors" disabled={busy}><legend>메일로 만날 에디터</legend><p>한 명 이상 골라주세요. 이 선택은 계정 팔로우와 별도로 저장해요.</p><div>{EDITORS.map(editor => <label key={editor.id}><input type="checkbox" checked={selectedIds.includes(editor.id)} onChange={event => setChosenIds(event.target.checked ? [...selectedIds, editor.id] : selectedIds.filter(id => id !== editor.id))} /><span>{editor.name}<small>{editor.short ?? editor.role}</small></span></label>)}</div></fieldset>
 
             <label className="lt-dlg-field" htmlFor="lt-dlg-email">
               <span>이메일</span>
@@ -242,13 +246,13 @@ export function SubscribeDialog({ open, onClose, interests, title, lead, source,
             </div>
             {detail && (
               <p className="lt-dlg-detail">
-                이메일 주소와 선택한 관심 분야를 레터 메일을 보내는 목적으로만 써요. 수신거부하면 더 보내지 않아요. 자세한 내용은{' '}
+                이메일 주소와 선택한 에디터를 레터 메일을 보내는 목적으로만 써요. 수신거부하면 더 보내지 않아요. 자세한 내용은{' '}
                 <Link href="/privacy" target="_blank">개인정보처리방침</Link>에서 볼 수 있어요.
               </p>
             )}
             {error && <p className="lt-dlg-err" role="alert">{error}</p>}
 
-            <button type="submit" className="lt-dlg-primary" disabled={busy || !valid || !consent}>{busy ? '신청하는 중…' : '구독 신청하기'}</button>
+            <button type="submit" className="lt-dlg-primary" disabled={busy || !valid || !consent || !selectedIds.length}>{busy ? '신청하는 중…' : '구독 신청하기'}</button>
             <p className="lt-dlg-foot">신청하면 확인 메일이 가요. 메일의 버튼을 눌러야 구독이 시작되고,<br />이후 새 레터가 올라오면 바로 보내 드려요.</p>
           </form>
         )}

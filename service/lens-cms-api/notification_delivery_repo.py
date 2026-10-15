@@ -16,19 +16,16 @@ from recommendation_repo import EVIDENCE
 
 def fingerprint(cur,owner):
     cur.execute(f"""SELECT md5(concat_ws('|',
-     (SELECT revision::text FROM user_lens_preferences WHERE user_id=%s),
      (SELECT string_agg(id::text||':'||saved_at::text,',' ORDER BY id) FROM user_archives WHERE user_id=%s),
      (SELECT string_agg(issue_letter_id::text||':'||saved_at::text,',' ORDER BY issue_letter_id) FROM user_letter_bookmarks WHERE user_id=%s),
      (SELECT string_agg(content_key||':'||last_seen_at::text,',' ORDER BY content_key) FROM user_content_views WHERE user_id=%s),
      (SELECT count(*)::text FROM user_content_completions WHERE user_id=%s),
      (SELECT string_agg(f.source_content_key||':'||f.target_content_key||':'||f.editor_approved::text||':'||f.created_at::text,',' ORDER BY f.source_content_key,f.target_content_key) FROM content_followup_links f WHERE f.source_content_key IN(SELECT 'issue_letter:'||issue_letter_id FROM user_letter_bookmarks WHERE user_id=%s UNION SELECT 'publication:'||ap.id FROM user_archives ua {ARCHIVE_SOURCE_JOIN_SQL} WHERE ua.user_id=%s AND ap.id IS NOT NULL))
-    )) AS value""",(owner,owner,owner,owner,owner,owner,owner))
+    )) AS value""",(owner,owner,owner,owner,owner,owner))
     base=cur.fetchone()['value']
-    cur.execute(EVIDENCE+"SELECT md5(COALESCE(string_agg(content_key||':'||cats::text||':'||words::text,',' ORDER BY content_key),'')) AS value FROM meta",(owner,owner))
+    cur.execute(EVIDENCE+"SELECT md5(COALESCE(string_agg(content_key||':'||cats::text,',' ORDER BY content_key),'')) AS value FROM meta",(owner,owner))
     metadata=cur.fetchone()['value']
-    from format_preference_repo import preference
-    formats=json.dumps(preference(cur,owner),sort_keys=True)
-    return hashlib.sha256((base+':'+metadata+':'+formats).encode()).hexdigest()
+    return hashlib.sha256((base+':'+metadata).encode()).hexdigest()
 
 
 def candidate_signature(rows):

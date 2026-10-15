@@ -1,9 +1,4 @@
-"""독자 관심(관심 묶음·기기별 관심 설정)과 "내 관심사" 레터 추천. 설계: docs/architecture/lens-erd-src/19-독자관심-구독-설계.md (Phase 1).
-
-- 계정 없이 시작한다. 독자는 기기 식별자(투표와 같은 값, 브라우저에 저장된 UUID)로 구분하고, 관심용으로는 네임스페이스를 달리해 해시해서
-  투표 기록과 서로 이어지지 않게 한다. 저장하는 것은 해시와 관심 키(분류·주제 slug)뿐이다.
-- 추천은 단순 겹침 점수라 왜 이 순서인지 설명할 수 있다. 이유 문구는 레터에 실제로 붙은 주제·분류 이름만 쓴다(해석·권유 없음).
-"""
+"""기존 이메일 관심 구독의 검증·배달 점수와 관리자 관심 묶음. 기기별 추천은 종료했다."""
 from __future__ import annotations
 
 import datetime as dt
@@ -22,8 +17,6 @@ SITE_CATEGORY_NAMES = {
 INTEREST_TYPES = ("category", "topic")
 MAX_INTERESTS = 40
 MAX_REASONS = 3
-FEED_CANDIDATES = 60   # 최근 발행 레터 중 점수를 매길 후보 수
-FEED_LIMIT = 10
 HALF_LIFE_DAYS = 30.0
 TOPIC_POINTS, TOPIC_PRIMARY_BONUS, CATEGORY_PRIMARY_POINTS, CATEGORY_POINTS = 3, 1, 2, 1
 
@@ -149,25 +142,6 @@ def upsert_bundles(items: Any) -> Dict[str, int]:
     return {"saved": len(clean)}
 
 
-def get_interests(rh: str) -> List[Dict[str, str]]:
-    with get_cursor() as cur:
-        cur.execute("SELECT interest_type, interest_key FROM reader_interests WHERE reader_hash = %s ORDER BY interest_type, interest_key", (rh,))
-        return [{"type": r["interest_type"], "key": r["interest_key"]} for r in cur.fetchall()]
-
-
-def set_interests(rh: str, items: Any) -> List[Dict[str, str]]:
-    """이 기기의 관심을 통째로 교체한다(빈 배열이면 관심을 모두 지운다)."""
-    pairs = validate_interest_items(items)
-    with get_cursor() as cur:
-        missing = _known_keys(cur, pairs)
-        if missing:
-            raise LetterError(f"주제 사전에 없는 관심입니다: {', '.join(missing)}")
-        cur.execute("DELETE FROM reader_interests WHERE reader_hash = %s", (rh,))
-        for t, k in pairs:
-            cur.execute("INSERT INTO reader_interests (reader_hash, interest_type, interest_key) VALUES (%s,%s,%s)", (rh, t, k))
-    return [{"type": t, "key": k} for t, k in pairs]
-
-
 def _load_candidates(cur, limit: int) -> List[Dict[str, Any]]:
     """최근 발행 레터와 점수·카드에 필요한 키를 한꺼번에(질의 5번) 읽는다."""
     cur.execute("SELECT id, slug, issue_no, title, deck, read_minutes, published_at FROM issue_letters "
@@ -194,28 +168,3 @@ def _load_candidates(cur, limit: int) -> List[Dict[str, Any]]:
     for r in cur.fetchall():
         letters[r["letter_id"]]["source_count"] = int(r["n"])
     return [letters[i] for i in ids]
-
-
-def feed_for_reader(rh: str, limit: int = FEED_LIMIT, now: Optional[dt.datetime] = None) -> Dict[str, Any]:
-    """독자의 관심과 겹치는 레터를 점수순으로 돌려준다. 관심이 없으면 빈 목록(화면은 기본 최신순을 그대로 보여 준다)."""
-    now = now or dt.datetime.now(dt.timezone.utc)
-    with get_cursor() as cur:
-        cur.execute("SELECT interest_type, interest_key FROM reader_interests WHERE reader_hash = %s", (rh,))
-        interests = {(r["interest_type"], r["interest_key"]) for r in cur.fetchall()}
-        if not interests:
-            return {"has_interests": False, "letters": []}
-        candidates = _load_candidates(cur, FEED_CANDIDATES)
-        cat_labels = {c["slug"]: SITE_CATEGORY_NAMES.get(c["slug"], c["slug"]) for l in candidates for c in l["category_keys"]}
-    scored = []
-    for l in candidates:
-        score, reasons = score_letter(interests, l, now)
-        if score <= 0:
-            continue
-        by_topic = any(("topic", t["slug"]) in interests for t in l["topics"])
-        scored.append((score, l["published_dt"], {
-            "slug": l["slug"], "issue_no": l["issue_no"], "title": l["title"], "deck": l["deck"], "read_minutes": l["read_minutes"],
-            "categories": [cat_labels[c["slug"]] for c in l["category_keys"]], "axes": sorted(l["axes"]), "source_count": l["source_count"],
-            "published_at": l["published_dt"].isoformat(), "topics": [t["name"] for t in l["topics"]][:4],
-            "score": score, "reasons": reasons, "reason_text": reason_text(reasons, by_topic)}))
-    scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    return {"has_interests": True, "letters": [s[2] for s in scored[:max(1, min(int(limit), 30))]]}

@@ -60,8 +60,8 @@ def test_visible_signal_deduplicated_and_no_reward(modules):
     assert error.value.status==409
     with cursor() as cur:cur.execute('SELECT count(*) AS n FROM user_content_views');assert cur.fetchone()['n']==1
     data=recommendation.inputs('a')
-    assert data['categories'][0]['n']==1 and data['keywords'][0]['key']=='반도체'
-    assert recommendation.inputs('b')['keywords']==[]
+    assert data['categories'][0]['n']==1 and 'keywords' not in data
+    assert recommendation.inputs('b')['categories']==[]
 
 
 def test_rejects_unsupported_expired_and_impossible_progress(modules):
@@ -106,6 +106,7 @@ def test_sentence_owner_source_exclusion_and_delete_invalidation(modules):
     _,_,recommendation,cursor=modules
     with cursor() as cur:
         cur.execute("INSERT INTO user_archives(user_id,article_no,content) VALUES('a','123','반도체가 미래를 바꿉니다') RETURNING id");sid=str(cur.fetchone()['id'])
+    assert recommendation.inputs('a')['sentence_words']==[]
     assert recommendation.inputs('a',sid)['sentence_words']
     with pytest.raises(recommendation.DashboardError) as error:recommendation.inputs('b',sid)
     assert error.value.status==404

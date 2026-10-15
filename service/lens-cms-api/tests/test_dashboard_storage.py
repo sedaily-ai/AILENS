@@ -79,6 +79,19 @@ def test_preferences_owner_revision_and_atomic_validation(repo):
     assert error.value.status == 403
 
 
+def test_reading_time_only_update_preserves_interests_and_revision_conflict(repo):
+    r,cursor=repo
+    legacy=[{'type':'topic','key':'rates'}]
+    r.replace_preferences('a',{'revision':0,'minutes':5,'interests':legacy})
+    with cursor() as cur:cur.execute("UPDATE topics SET is_active=false WHERE slug='rates'")
+    result=r.replace_preferences('a',{'revision':1,'minutes':10})
+    assert result['interests']==legacy and result['minutes']==10 and result['revision']==2
+    assert r.get_preferences('b')['minutes']==0
+    with pytest.raises(r.DashboardError) as error:r.replace_preferences('a',{'revision':1,'minutes':0})
+    assert error.value.status==409 and r.get_preferences('a')==result
+    assert r.replace_preferences('fresh',{'revision':0,'minutes':5})['interests']==[]
+
+
 def test_concurrent_initial_preferences_one_winner(repo):
     r, _ = repo
     body = {'revision':0,'interests':[],'minutes':0}
