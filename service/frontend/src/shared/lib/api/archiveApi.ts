@@ -5,6 +5,7 @@
 
 import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/auth/authFetch';
+import { authReadFetch } from '@/shared/lib/auth/authReadFetch';
 
 export interface ArchiveSentencePayload {
   user_id: string;
@@ -54,7 +55,7 @@ export async function listArchiveSentences(
   if (options?.limit) params.set('limit', String(options.limit));
 
   // 목록은 사용자별이라 인증이 필요하다(익명 아카이브는 localStorage에 있고 어느 경로를 쓸지는 호출부가 정한다).
-  const res = await authFetch(`${API_URL}/api/archive?${params}`, { signal: options?.signal });
+  const res = await authReadFetch(`${API_URL}/api/archive?${params}`, options?.signal);
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

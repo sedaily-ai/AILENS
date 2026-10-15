@@ -1,18 +1,8 @@
 import type { CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { lensFormatFor } from '@/shared/constants/lensPerspectives';
+import { clock, spoken } from '@/shared/lib/media/mediaPlayerFormat';
 
 // 형식 패널 보조 로직 — 실측 재생시간 계산(clock/readMinutes/formatAmount)과 데모 샘플.
-
-/**
- * 재생 길이 표기 — 실측값만 쓴다.
- * <audio>/<video>의 loadedmetadata에서 받은 duration만 표시하고, 아직 모르면 길이 자리를 비워둔다(포맷 이름만 보여준다).
- * 추정치는 화면 표기와 실제 재생 길이를 어긋나게 하므로 지어낸 숫자는 쓰지 않는다.
- */
-function clock(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
 
 /**
  * 레터 예상 읽기 시간. 한글 묵독 속도를 분당 500자로 잡는다(보수적 추정 — 경제 기사는 수치·고유명사가 많아 통상 600~700자보다 느리다).
@@ -54,10 +44,8 @@ export function formatAmount(
   // 스크린리더에는 "길이 확인 중"으로 읽힌다.
   const url = format === 'podcast' ? l.media_url : l.video_url;
   if (!url) return nope;
-  if (!durSec) return { text: '⋯', spoken: '길이 확인 중' };
-  const m = Math.floor(durSec / 60);
-  const s = durSec % 60;
-  return { text: clock(durSec), spoken: s === 0 ? `${m}분` : `${m}분 ${s}초` };
+  if (!durSec || !Number.isFinite(durSec) || durSec < 0) return { text: '⋯', spoken: '길이 확인 중' };
+  return { text: clock(durSec), spoken: spoken(durSec) };
 }
 
 /**

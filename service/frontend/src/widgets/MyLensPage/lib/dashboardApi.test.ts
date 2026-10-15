@@ -39,3 +39,12 @@ it('명시한 탭만 집계하도록 전달하고 기존 호출 URL은 보존한
  await fetchLensDashboard(5,new AbortController().signal);
  expect(request.mock.calls[1][0]).toBe('http://127.0.0.1:4102/api/v2/me/dashboard?minutes=5');
 });
+
+it('게이트웨이 오류의 원문을 노출하지 않고 인증 실패의 상태는 유지한다',async()=>{
+ request.mockReset();request.mockResolvedValue(new Response(JSON.stringify({error:{message:'internal gateway detail'}}),{status:503}));
+ await expect(fetchLensDashboard(5,new AbortController().signal,'archive')).rejects.toMatchObject({status:503,message:'대시보드를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'});
+ expect(request).toHaveBeenCalledTimes(2);
+ request.mockReset();request.mockResolvedValue(new Response('{}',{status:401}));
+ await expect(fetchLensDashboard(5,new AbortController().signal)).rejects.toMatchObject({status:401,message:'로그인이 만료됐어요. 다시 로그인해 주세요.'});
+ expect(request).toHaveBeenCalledTimes(1);
+});

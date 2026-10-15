@@ -23,7 +23,7 @@ export function useServerDashboard(owner:string|undefined,minutes:number,setting
     if(!owner||!enabled)return;
     const controller=new AbortController();
     void fetchLensDashboard(minutes,controller.signal,tab).then(data=>{if(!controller.signal.aborted)setState({owner,key,data,error:'',authRequired:false});}).catch(error=>{
-      if(!controller.signal.aborted)setState({owner,key,data:null,error:error instanceof Error?error.message:'대시보드 연결을 확인해 주세요.',authRequired:error instanceof DashboardApiError&&error.status===401||error instanceof Error&&error.name==='NotSignedInError'});
+      if(!controller.signal.aborted)setState({owner,key,data:null,error:error instanceof DashboardApiError?error.message:'대시보드를 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.',authRequired:error instanceof DashboardApiError&&error.status===401||error instanceof Error&&error.name==='NotSignedInError'});
     });
     return()=>controller.abort();
   },[owner,minutes,key,tab,enabled]);

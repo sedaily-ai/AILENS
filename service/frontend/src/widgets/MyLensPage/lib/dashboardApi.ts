@@ -1,7 +1,7 @@
 import type { NotificationState } from './notificationsApi';
 import { ECON_CATEGORIES } from '@ailens/domain';
 import { API_URL } from '@/shared/config/apiClient';
-import { authFetch } from '@/shared/lib/auth/authFetch';
+import { authReadFetch } from '@/shared/lib/auth/authReadFetch';
 import type { IssueLetter } from '@/features/letter';
 import type { ArchiveSentenceResponse } from '@/shared/lib/api/archiveApi';
 import type { NewsArticle, NewsFilter, NewsRecommendation } from './news/newsModel';
@@ -28,9 +28,9 @@ export class DashboardApiError extends Error { constructor(public status:number,
 export const DASHBOARD_AUTH_REQUIRED='lens-dashboard-auth-required';
 export async function get<T>(path:string,signal:AbortSignal):Promise<T>{
   try {
-    const response=await authFetch(`${API_URL}/api/v2/me${path}`,{signal,cache:'no-store'});
+    const response=await authReadFetch(`${API_URL}/api/v2/me${path}`,signal);
     const data=await response.json().catch(()=>null);
-    if(!response.ok)throw new DashboardApiError(response.status,data?.error?.message??'대시보드를 불러오지 못했어요. 다시 시도해 주세요.');
+    if(!response.ok)throw new DashboardApiError(response.status,response.status===401?'로그인이 만료됐어요. 다시 로그인해 주세요.':'대시보드를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return data as T;
   } catch(error) {
     if (!signal.aborted && typeof window!=='undefined' && (error instanceof DashboardApiError&&error.status===401 || error instanceof Error&&error.name==='NotSignedInError')) window.dispatchEvent(new Event(DASHBOARD_AUTH_REQUIRED));
