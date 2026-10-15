@@ -6,5 +6,5 @@ export const dynamicParams = true;
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return redirectToLensArticle(slug);
+  return redirectToLensArticle(slug, 'webtoon');
 }

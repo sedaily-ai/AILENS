@@ -12,7 +12,7 @@ import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 import { BADGE_HEAD, type LetterBlock } from './lensBlocks';
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import { READING_ACCENT } from '@/shared/constants/lensPerspectives';
-import { readMinutes } from './lensSamples';
+import { coreSummaryBullets, readMinutes } from './lensSamples';
 import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
 
 // 좌우 비교 칸 안의 글은 문장마다 문단으로 나눠 샘플 HTML처럼 짧게 끊어 보여 준다.
@@ -43,7 +43,9 @@ export function LetterReadingBody({
         const blocks = letterBlocks ?? [];
         const chTotal = blocks.filter((x) => x.type === 'sub').length;
         const kw = l.keywords ?? [];
-        // 새 틀로 발행된 글에서만 1분 요약 박스를 그린다 — 옛 글의 요약 불릿은 다른 화면(30초 핵심)이 쓴다.
+        // 상단 핵심 요약과 같은 문장은 다시 표시하지 않는다. 추가 요약 문장은 보존한다.
+        const shownSummary = new Set(coreSummaryBullets(lens));
+        const additionalSummary = l.bullets.filter((bullet) => !shownSummary.has(bullet));
         const renderPlain = (b: LetterBlock, bi: number) => {
           if (b.type === 'ul' || b.type === 'ol') {
             const Tag = b.type;
@@ -60,13 +62,13 @@ export function LetterReadingBody({
           return null;
         };
         const summary =
-          isNewFormat && l.bullets.length > 0 ? (
+          isNewFormat && additionalSummary.length > 0 ? (
             <div key="summary" className="lread-summary">
-              <div className="lread-box-title">⏱️ 1분 요약</div>
-              {l.bullets.map((b, bi) => (
+              <div className="lread-box-title">추가 요약</div>
+              {additionalSummary.map((b, bi) => (
                 <p key={bi}>{renderInline(b, kw)}</p>
               ))}
-              <p className="lread-summary-hint">5분 정도 여유가 있다면 아래 본문도 가볍게 읽어보세요.</p>
+              <p className="lread-summary-hint">자세한 내용은 아래 본문에서 이어 읽어보세요.</p>
             </div>
           ) : null;
         const rendered = blocks.map((b, bi) => {

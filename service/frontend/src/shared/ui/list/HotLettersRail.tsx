@@ -17,11 +17,11 @@ export interface RailItem {
 
 const HOT_LETTERS_LIMIT = 10;
 
-export function HotLettersRail({ initialItems, items, heading = '많이 읽은 글', limit = HOT_LETTERS_LIMIT }: { initialItems?: TodayLetterCardLike[]; items?: RailItem[]; heading?: string; limit?: number }) {
+export function HotLettersRail({ initialItems, items, heading = '최신 글', limit = HOT_LETTERS_LIMIT }: { initialItems?: TodayLetterCardLike[]; items?: RailItem[]; heading?: string; limit?: number }) {
   const hotLetters = useServerSeededList<TodayLetterCardLike[], never[]>(initialItems, [], () => fetchFollowingLetters(HOT_LETTERS_LIMIT));
 
   const rows: RailItem[] =
-    items && items.length > 0
+    items !== undefined
       ? items
       : hotLetters.filter((l) => l.category).map((l) => ({ key: l.letterId, href: l.href, title: l.title, thumb: l.thumbnailUrl ?? l.editorAvatar, label: l.category ?? '' }));
   if (rows.length === 0) return null;

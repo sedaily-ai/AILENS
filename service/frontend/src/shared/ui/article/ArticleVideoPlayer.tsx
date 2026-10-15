@@ -28,6 +28,7 @@ export function ArticleVideoPlayer({
   byline,
   bylineHref,
   onDuration,
+  active = true,
   chapters,
 }: {
   src: string;
@@ -42,6 +43,8 @@ export function ArticleVideoPlayer({
   byline?: string | null;
   bylineHref?: string | null;
   onDuration?: (sec: number) => void;
+  /** 숨겨진 형식 탭에서는 일시정지하고 재생 위치는 보존한다. */
+  active?: boolean;
   /** 대본 문단(팟캐스트 대본과 같은 디자인). 문단별 실제 시각이 없어 글자 수 비율로 어림해 따라간다. */
   chapters?: { text: string }[];
 }) {
@@ -64,6 +67,7 @@ export function ArticleVideoPlayer({
     usePlaybackRateMenu(ref, PLAYBACK_RATES);
   const { playing, cur, dur, failed, toggle, seekTo, retry } = useMediaTransport(ref, {
     looping,
+    active,
     onDuration,
   });
 

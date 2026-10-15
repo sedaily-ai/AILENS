@@ -22,7 +22,8 @@ export default function ContactPage() {
     <StaticPageShell title="문의">
       <p>서비스 이용 중 궁금한 점이나 오류 제보, 제휴·광고 문의는 아래 채널로 연락해 주세요.</p>
 
-      <h2 style={h2}>일반 문의</h2>
+      <h2 style={h2}>공통 문의처</h2>
+      <p>서비스 이용, 콘텐츠 오류 제보, 광고·제휴, 구독 문의를 함께 받고 있어요. 연락하실 때 문의 종류를 알려주세요.</p>
       <p>
         이메일:{' '}
         <a href="mailto:webmaster@sedaily.com" style={{ textDecoration: 'underline' }}>
@@ -36,14 +37,6 @@ export default function ContactPage() {
       <p>
         평일 09:00–18:00 (한국 표준시, UTC+9)<br />
         주말·공휴일 휴무
-      </p>
-
-      <h2 style={h2}>부서별 문의</h2>
-      <p>
-        편집(콘텐츠 오류 제보): 02-724-8600<br />
-        광고·제휴: 02-724-8600<br />
-        구독: 02-724-8600<br />
-        디지털/웹 서비스: <a href="mailto:webmaster@sedaily.com" style={{ textDecoration: 'underline' }}>webmaster@sedaily.com</a>
       </p>
 
       <h2 style={h2}>오시는 길</h2>

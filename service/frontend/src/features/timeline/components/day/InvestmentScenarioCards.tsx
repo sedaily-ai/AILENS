@@ -1,4 +1,4 @@
-// "그날 이걸 샀다면" 카드 — 뉴스(팩트) 다음에 오는 별도 성격의 섹션이다. 눌린 면과 굵은 구분선으로 뉴스와 구분한다.
+// "기준 시점별 가상 투자" 카드 — 뉴스(팩트) 다음에 오는 별도 성격의 섹션이다. 눌린 면과 굵은 구분선으로 뉴스와 구분한다.
 // 로또는 확률형이므로 수익률 대신 확률·평균 당첨금 사실과, 같은 금액을 코스피에 넣었을 때와의 대조 문장으로 구성한다(백엔드 config/investment_scenarios.py 참조).
 // 데이터가 없는 구간은 카드가 배열에서 빠지므로(추정치로 채우지 않음) 있는 것만 렌더링한다.
 import type { InvestmentScenario } from '@/shared/lib/api/timelineApi';
@@ -40,7 +40,7 @@ export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentSc
           marginBottom: SPACE.lg,
         }}
       >
-        그날 이걸 샀다면
+        기준 시점별 가상 투자
       </h2>
       <div
         style={{
@@ -77,7 +77,7 @@ export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentSc
                 wordBreak: 'keep-all',
               }}
             >
-              {s.result}
+              {s.result.replace(/^지금은/, '비교 기준일에는')}
             </p>
             {s.story && (
               <p

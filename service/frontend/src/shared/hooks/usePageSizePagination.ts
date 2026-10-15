@@ -3,20 +3,27 @@
 import { useState } from 'react';
 
 /**
- * 클라이언트 사이드 페이지 크기 조절 페이지네이션. `/video`·`/listen` 목록 페이지가 공유하는 pageSize/clientPage 상태와
- * totalPages/currentPage/pageHref/pageItems 계산이며, `<ListPagination>`이 그대로 받을 수 있는 형태로 반환한다.
- *
- * webtoon/lens 목록처럼 서버(page/[n] 라우트)가 페이지를 나누는 경우는 대상이 아니다.
- * video/listen처럼 전체를 한 번에 받아 클라이언트에서 페이지 크기를 바꿔가며 slice하는 패턴만 해당한다.
+ * 전체 목록을 페이지 크기에 맞춰 나누는 공용 계산.
+ * 카테고리 목록은 URL에서 복원한 controlled 상태·동작을 전달한다.
+ * 인자를 생략한 호출은 기존 로컬 상태를 사용한다.
  */
 export function usePageSizePagination<T>(
   items: T[],
   defaultPageSize: number,
   basePath: string,
   initialPage: number,
+  controlled?: {
+    pageSize: number;
+    page: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+    pageHref: (page: number) => string;
+  },
 ) {
-  const [pageSize, setPageSize] = useState(defaultPageSize);
-  const [clientPage, setClientPage] = useState(initialPage);
+  const [localPageSize, setPageSize] = useState(defaultPageSize);
+  const [localPage, setClientPage] = useState(initialPage);
+  const pageSize = controlled?.pageSize ?? localPageSize;
+  const clientPage = controlled?.page ?? localPage;
 
   const isCustomSize = pageSize !== defaultPageSize;
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
@@ -33,10 +40,10 @@ export function usePageSizePagination<T>(
     pageItems,
     currentPage,
     totalPages,
-    pageHref,
+    pageHref: controlled?.pageHref ?? pageHref,
     isCustomSize,
     pageSize,
-    onPageChange: setClientPage,
-    onPageSizeChange: changePageSize,
+    onPageChange: controlled?.onPageChange ?? setClientPage,
+    onPageSizeChange: controlled?.onPageSizeChange ?? changePageSize,
   };
 }

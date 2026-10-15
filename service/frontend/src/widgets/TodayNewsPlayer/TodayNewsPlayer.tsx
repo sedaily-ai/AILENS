@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState, type SetStateAction } from 'react';
 import { displayHeadline } from '@ailens/domain';
 import { createPortal } from 'react-dom';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth';
 import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
 import { onPlayHomePlayerItemRequest } from '@/shared/lib/media/audioPlayerBus';
 import { extractYoutubeVideoId, loadYouTubeIframeApi, type YTPlayer } from './youtube';
+import { playerReducer } from './playerState';
 
 // 북마크는 로그인한 사용자만 쓸 수 있다. 서버에 영구 저장하는 API/테이블이 아직 없어 클라이언트 localStorage에만 저장하므로
 // 기기를 바꾸면 남지 않는다(서버 저장이 필요하면 personal_db_client.py에 새 테이블/필드가 필요하다. ArchivedSentence는 레터 문장용이라 다른 도메인이다).
@@ -28,23 +29,20 @@ const DIRECT_AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i;
 export function TodayNewsPlayer() {
   const { isAuthenticated } = useAuth();
   const [items, setItems] = useState<HomePlayerItem[] | null>(null);
-  const [index, setIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0); // 0~1
+  const [{ index, playing, progress }, dispatchPlayback] = useReducer(playerReducer, { index: 0, playing: false, progress: 0 });
+  const setIndex = (next: SetStateAction<number>) => dispatchPlayback({ type: 'index', next });
+  const setPlaying = (value: boolean) => dispatchPlayback({ type: 'playing', value });
+  const setProgress = (value: number) => dispatchPlayback({ type: 'progress', value });
   const [closed, setClosed] = useState(false);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
-
-  // 북마크 localStorage 복원. 저장은 로그인 여부와 무관하게 기기에 남지만 버튼은 로그인 상태에서만 노출한다.
-  useEffect(() => {
+  // 목록 로드 전에는 SSR·클라이언트 모두 null을 렌더하므로 초기화에서 저장값을 읽어도 hydration 출력은 같다.
+  const [bookmarked, setBookmarked] = useState<Set<string>>(() => {
     try {
-      const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
-      if (raw) setBookmarked(new Set(JSON.parse(raw)));
-    } catch {
-      // localStorage 접근 불가(시크릿 모드 등)면 조용히 무시하고 북마크 없이 시작한다.
-    }
-  }, []);
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(BOOKMARK_STORAGE_KEY) : null;
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
 
   function toggleBookmark(id: string) {
     setBookmarked((prev) => {
@@ -86,7 +84,6 @@ export function TodayNewsPlayer() {
   }
 
   async function playYoutube(videoId: string) {
-    setError(false);
     await loadYouTubeIframeApi();
     if (!window.YT || !ytContainerRef.current) {
       setError(true);
@@ -127,15 +124,11 @@ export function TodayNewsPlayer() {
   }
 
   async function playDirectAudio(url: string) {
-    setError(false);
     const audio = audioRef.current;
-    if (!audio) {
-      setError(true);
-      return;
-    }
-    if (audio.src !== url) audio.src = url;
     try {
-      await audio.play();
+      if (audio && audio.src !== url) audio.src = url;
+      await audio?.play();
+      if (!audio) throw new Error('Audio element is unavailable');
       setPlaying(true);
     } catch {
       setError(true);
@@ -144,6 +137,7 @@ export function TodayNewsPlayer() {
 
   function play() {
     if (!current) return;
+    setError(false);
     if (DIRECT_AUDIO_RE.test(current.mediaEmbedUrl)) {
       void playDirectAudio(current.mediaEmbedUrl);
       return;
@@ -239,8 +233,6 @@ export function TodayNewsPlayer() {
     ytPlayerRef.current?.pauseVideo();
     audioRef.current?.pause();
     stopYtProgressPolling();
-    setPlaying(false);
-    setProgress(0);
     if (autoPlayOnIndexRef.current) {
       autoPlayOnIndexRef.current = false;
       const target = items && items.length > 0 ? items[Math.min(index, items.length - 1)] : null;

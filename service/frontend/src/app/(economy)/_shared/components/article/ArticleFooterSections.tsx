@@ -146,13 +146,13 @@ export function RelatedArticles({ items }: { items: CmsLens[] }) {
   );
 }
 
-/** "많이 읽은 기사" — 본문 폭 안에 배치한 인기 글 목록. */
+/** "최신 기사" — 본문 폭 안에 배치한 최신 글 목록. */
 export function MostRead({ items }: { items: TodayLetterCardLike[] }) {
   if (!items || items.length === 0) return null;
   return (
     <section className="af-sec" aria-labelledby="af-most">
       <h2 id="af-most" className="af-label">
-        많이 읽은 기사
+        최신 기사
       </h2>
       <ol className="af-most" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {items.map((c, i) => (

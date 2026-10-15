@@ -1,5 +1,6 @@
 'use client';
 
+import { eunneun } from '@ailens/domain';
 import { lensFormatFor, lensPerspectiveFor, lensTabId } from '@/shared/constants/lensPerspectives';
 import type { CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
@@ -46,7 +47,7 @@ export function FormatStepNav({
 
   return (
     <nav aria-label="다른 형식으로 이어 보기" style={{ marginTop: 40 }}>
-      <p style={{ margin: '0 0 12px', textAlign: 'center', fontSize: 13.5, color: '#6b7280' }}>{here}는 어떠셨어요? 같은 이야기를 다른 방식으로도 만나보세요</p>
+      <p style={{ margin: '0 0 12px', textAlign: 'center', fontSize: 13.5, color: '#6b7280' }}>{here}{eunneun(here)} 어떠셨어요? 같은 이야기를 다른 방식으로도 만나보세요</p>
       <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
         {prev !== null ? (
           <button type="button" onClick={() => go(prev, 'prev')} className="fstep fstep-prev" aria-label={`이전 형식, ${lensPerspectiveFor(lenses[prev], prev).short}`}>

@@ -19,6 +19,7 @@ ${MY_LENS_ENGAGEMENT_CSS}
 ${MY_LENS_NEWS_CSS}
 ${MY_LENS_DRAWER_CSS}
 ${MY_LENS_INTEREST_CSS}
+.ml-layout.ml-layout-records{grid-template-columns:minmax(0,1fr)}
 /* 보조 컨트롤의 공통 어두워짐과 링크의 전체 흐림을 줄인다. 선택 상태·포커스·주요 CTA는 유지한다. */
 .ml-page button:not(.ml-button):hover,.ml-page .ml-button-quiet:hover,.ml-dialog button:not(.ml-button):hover,.ml-dialog .ml-button-quiet:hover{filter:none}
 .ml-page a[href]:hover{opacity:1}

@@ -61,17 +61,20 @@ function MyLensDashboard() {
   const router = useRouter();
   const authRedirectStarted = useRef(false);
   const [savedFilter, setSavedFilter] = useState<'all' | 'unread'>('all');
-  const shelf = useLetterShelf(savedFilter);
-  const archive = useDashboardArchive();
   const interests = useInterests();
-  const follow = useFollowedEditors(interests.save);
-  const data = useDashboardLetters(shelf.read, shelf.ready);
   const [topics, setTopics] = useState<TopicOption[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const budget = interests.minutes;
   const [newsFilter, setNewsFilter] = useState<NewsFilter>('all');
-  const server = useServerDashboard(user?.userId, budget, JSON.stringify(interests.saved), newsFilter);
+  // 저장된 시간·관심을 읽은 뒤 한 번만 집계한다. 기록의 저장 개수 조회가 실패하면 기존 전체 목록으로 복구한다.
+  const server = useServerDashboard(user?.userId, budget, JSON.stringify(interests.saved), newsFilter, tab, interests.ready);
+  const needsLetters = tab === 'home' || tab === 'archive';
+  const needsShelf = needsLetters || tab === 'records' && !server.loading && server.data?.saved_letters.status !== 'ready';
+  const shelf = useLetterShelf(savedFilter, needsShelf);
+  const archive = useDashboardArchive(tab === 'archive');
+  const follow = useFollowedEditors(interests.save, tab === 'home' || subscribeOpen);
+  const data = useDashboardLetters(shelf.read, needsLetters && shelf.ready);
   const [savedExpanded, setSavedExpanded] = useState(false);
   const [notice, setNotice] = useState('');
   useEffect(() => {
@@ -121,7 +124,7 @@ function MyLensDashboard() {
 
         <div className="ml-topics" aria-label="설정한 관심사">
           <span className="ml-topics-label">직접 고른 관심</span>
-          {!interests.ready ? <span className="ml-helper">관심사를 불러오고 있어요.</span> : interests.saved.length ? <>{interests.saved.slice(0, 6).map((item) => <button type="button" key={`${item.type}:${item.key}`} className="ml-topic" onClick={() => setSettingsOpen(true)}>{preferenceName(item.key, item.type)}</button>)}{interests.saved.length > 6 && <button className="ml-topic" onClick={() => setSettingsOpen(true)}>+{interests.saved.length - 6}</button>}</> : <button type="button" className="ml-text-link" onClick={() => setSettingsOpen(true)}>{interests.available ? '관심사를 골라 뉴스·레터 추천 받기' : '관심사 연결 확인하고 설정하기'} <ChevronRight size={14} /></button>}
+          {!interests.ready ? <span className="ml-helper">관심사를 불러오고 있어요.</span> : interests.saved.length ? <>{interests.saved.slice(0, 6).map((item) => <span key={`${item.type}:${item.key}`} className="ml-topic">{preferenceName(item.key, item.type)}</span>)}{interests.saved.length > 6 && <span className="ml-topic">외 {interests.saved.length - 6}개</span>}</> : <span className="ml-helper">{interests.available ? '관심사 설정에서 뉴스·레터 추천을 위한 관심을 골라보세요.' : '상단 관심사 설정에서 연결 상태를 확인해 주세요.'}</span>}
         </div>
 
         <nav className="ml-page-nav" aria-label="나의 LENS 메뉴">{([
@@ -131,11 +134,11 @@ function MyLensDashboard() {
           { key: 'settings', label: '관심사·알림', href: '/my-lens?tab=settings' },
         ] as const).map((item) => <Link key={item.key} href={item.href} className={tab === item.key ? 'ml-nav-current' : undefined} aria-current={tab === item.key ? 'page' : undefined}>{item.label}</Link>)}</nav>
 
-        <LetterShelfStatus shelf={shelf} />
+        {needsShelf && <LetterShelfStatus shelf={shelf} />}
         {follow.error && <p role="alert" className="ml-helper">{follow.error} <button type="button" onClick={follow.retry}>팔로우 다시 불러오기</button></p>}
         {server.error && <p role="alert" className="ml-helper">{server.error} <button type="button" onClick={server.retry}>대시보드 다시 불러오기</button></p>}
         {interests.error && <p role="alert" className="ml-helper">{interests.error} <button type="button" onClick={interests.retry}>관심 설정 다시 불러오기</button></p>}
-        <div className={`ml-layout${tab === 'archive' ? ' ml-layout-drawer' : ''}`}>
+        <div className={`ml-layout${tab === 'archive' ? ' ml-layout-drawer' : ''}${tab === 'records' ? ' ml-layout-records' : ''}`}>
           <div className="ml-main">
             {tab === 'home' && <>
             <FormatPreference data={server.data?.format_preference.data} loading={server.loading} onRetry={server.retry} />
@@ -157,13 +160,13 @@ function MyLensDashboard() {
             </>}
             {tab === 'archive' && <><BrowserBookmarksImport owner={user!.userId} letters={letters} onImported={()=>{shelf.retry();server.retry();}} /><DrawerPanel notificationNotice={notificationStatus(server.data?.notifications.status === 'ready' ? server.data.notifications.data : null)} storageNotice={shelf.notice} key={`${archive.owner ?? 'browser'}:${params.get('kind')}`} initialFilter={params.get('kind') === 'letters' ? 'letters' : 'sentences'} archive={archive} articles={news.articles} selectedId={params.get('sentence')} letters={letters} savedSlugs={shelf.saved} lettersLoading={data.loading || !shelf.ready} lettersFailed={!shelf.available} missingLetters={data.missing} retryLetters={()=>{data.retry();shelf.retry();}} isRead={shelf.isCompleted} letterFilter={savedFilter} onLetterFilterChange={setSavedFilter} filteredSavedSlugs={shelf.filteredSaved} onSave={toggleSaved} /></>}
             {tab === 'records' && <>
-            <section className="ml-reading" aria-labelledby="ml-reading-title"><div className="ml-section-title"><div><h2 id="ml-reading-title">내가 읽어온 관심의 흐름</h2><p className="ml-helper">최근 90일 계정 이용 기록의 분야예요. 완료 기록과는 구분해요.</p></div><BookOpen size={20} aria-hidden /></div>{categories.length ? <div className="ml-category-list">{categories.map((category) => <div key={category.slug} className="ml-category-row"><Link href={`/${category.slug}`}>{category.label}</Link><div className="ml-category-track" aria-hidden><span style={{ width: `${category.count / categories[0].count * 100}%` }} /></div><span>{category.count}편</span></div>)}</div> : <p className="ml-helper">레터를 읽으면 자주 만난 분야를 알려드려요.</p>}<div className="ml-record-summary"><span><BookOpen size={15} /> 열람한 레터 <strong>{rawProfile?.viewed_letter_count ?? '·'}편</strong></span><span><Bookmark size={15} /> 저장한 레터 <strong>{shelf.ready ? savedTotal : '·'}편</strong></span></div><p className="ml-storage-note">분야는 계정의 뉴스·레터 유효 열람을 함께 집계해요. 반복 열람은 한 편으로 세며, 완료·스탬프 기록이 아니에요.</p></section>
+            <section className="ml-reading" aria-labelledby="ml-reading-title"><div className="ml-section-title"><div><h2 id="ml-reading-title">내가 읽어온 관심의 흐름</h2><p className="ml-helper">최근 90일 계정 이용 기록의 분야예요. 완료 기록과는 구분해요.</p></div><BookOpen size={20} aria-hidden /></div>{categories.length ? <div className="ml-category-list">{categories.map((category) => <div key={category.slug} className="ml-category-row"><Link href={`/${category.slug}`}>{category.label}</Link><div className="ml-category-track" aria-hidden><span style={{ width: `${category.count / categories[0].count * 100}%` }} /></div><span>{category.count}편</span></div>)}</div> : <p className="ml-helper">레터를 읽으면 자주 만난 분야를 알려드려요.</p>}<div className="ml-record-summary"><span><BookOpen size={15} /> 열람한 레터 <strong>{rawProfile?.viewed_letter_count ?? '·'}편</strong></span><span><Bookmark size={15} /> 저장한 레터 <strong>{server.data?.saved_letters.status === 'ready' || shelf.ready ? savedTotal : '·'}편</strong></span></div><details className="ml-format-method"><summary>분야 집계 기준 보기</summary><p className="ml-storage-note">분야는 계정의 뉴스·레터 유효 열람을 함께 집계해요. 반복 열람은 한 편으로 세며, 완료·스탬프 기록이 아니에요.</p></details></section>
             <ReadingRewards />
             </>}
             {tab === 'settings' && <NotificationSettings key={user?.userId} recommendations={newsRecommendations} interestSummary={{ categories: [...new Set([...profile.categories.map((item) => item.label), ...interests.saved.filter((item) => item.type === 'category').map((item) => categoryLabel(item.key))])], keywords: [...new Set([...profile.keywords.map((item) => item.label), ...selectedTopicLabels])], sentenceWords: profile.sentenceTerms }} />}
           </div>
 
-          <aside className="ml-rail" aria-label="내 기록과 구독">
+          {tab !== 'records' && <aside className="ml-rail" aria-label="내 기록과 구독">
             <WeeklyStampSummary area={server.data?.weekly_rewards} loading={server.loading} onRetry={server.retry} />
             {tab === 'home' && <ArchiveDiscovery archive={homeArchive} articles={news.articles} letters={letters} />}
             {tab === 'archive' && <div className="ml-drawer-guide"><Quote size={21} aria-hidden /><h2>한 문장, 다음 이야기</h2><p>뉴스를 읽다 마음에 남은 문장을 담아보세요. 각 문장의 ‘관련 글 보기’에서 새로운 뉴스를 만날 수 있어요.</p><Link href="/my-lens?tab=settings#ml-notifications" className="ml-text-link">새 글 알림 설정 <ArrowUpRight size={14} /></Link><p className="ml-storage-note">알림은 별도 선택이 필요해요. 설정·동의는 계정에 저장돼요. {notificationStatus(server.data?.notifications.status === 'ready' ? server.data.notifications.data : null)}</p></div>}
@@ -171,7 +174,7 @@ function MyLensDashboard() {
             <section className="ml-editors" aria-labelledby="ml-editors-title"><div className="ml-section-title"><h2 id="ml-editors-title">내가 팔로우한 에디터</h2><span className="ml-heading-count">{follow.ready ? follow.ids.length : '·'}</span></div>{follow.followed.length ? <div className="ml-editor-list">{follow.followed.map((editor) => <Link key={editor.id} href={`/letter/editors/${editor.id}`} className="ml-editor">{editor.image && <Image src={editor.image} alt="" width={38} height={38} />}<span><strong>{editor.name}</strong><small>{editor.short ?? editor.role}</small></span><ChevronRight size={15} /></Link>)}</div> : <p className="ml-helper">관심 분야가 맞는 에디터를 팔로우하면 새 레터를 찾기 쉬워져요.</p>}{follow.items.filter(item=>item.active&&!follow.followed.some(editor=>editor.id===item.id)).map(item=><div key={item.id}><Link href={item.href} className="ml-text-link">{item.name}</Link><button type="button" className="ml-text-link" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></div>)}{follow.items.filter(item=>!item.active).map(item=><p className="ml-helper" key={item.id}>{item.name} · 활동 중지 <button type="button" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></p>)}<Link href="/letter" className="ml-text-link">에디터 만나보기 <ArrowUpRight size={15} /></Link></section>
             <section className="ml-notify" aria-labelledby="ml-notify-title"><Bell size={22} aria-hidden /><h2 id="ml-notify-title">관심 있는 소식,<br />메일로도 만나요.</h2><p>관심사와 팔로우한 에디터의 새 레터를 이메일로 받아보세요.</p><button type="button" className="ml-button" onClick={() => setSubscribeOpen(true)} disabled={!interests.ready || !follow.ready}>레터 이메일 구독</button><p className="ml-storage-note">구독 신청 후 이메일 확인이 필요해요.</p></section>
             </>}
-          </aside>
+          </aside>}
         </div>
         <footer className="ml-footer"><span>AI LENS</span><p>나의 관심을 따라, 뉴스 너머의 맥락까지.</p></footer>
         <p className="ml-status" role="status" aria-live="polite">{notice && <><Check size={15} />{notice}</>}</p>

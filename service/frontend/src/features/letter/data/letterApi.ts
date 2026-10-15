@@ -19,11 +19,6 @@ interface ApiDetail extends Omit<ApiCard, 'axes' | 'source_count' | 'categories'
   poll: { kind: 'emotion'; question: string; options: { key: string; label: string; hint?: string | null }[] } | null;
 }
 
-/** UTC 발행 시각을 한국 날짜(YYYY-MM-DD)로. */
-function kstDate(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-}
-
 /** UTC 발행 시각을 한국 시각 "YYYY-MM-DDTHH:mm"으로(뉴스레터라 시·분까지 보여 준다). */
 function kstDateTime(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 16);

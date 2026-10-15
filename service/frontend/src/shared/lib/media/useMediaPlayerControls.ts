@@ -97,7 +97,7 @@ export function usePlaybackRateMenu(
  */
 export function useMediaTransport(
   ref: RefObject<HTMLMediaElement | null>,
-  opts: { looping: boolean; onDuration?: (sec: number) => void },
+  opts: { looping: boolean; active?: boolean; onDuration?: (sec: number) => void },
 ) {
   const [playing, setPlaying] = useState(false);
   const [cur, setCur] = useState(0);
@@ -147,7 +147,11 @@ export function useMediaTransport(
     el.addEventListener('play', onPlay);
     el.addEventListener('pause', onPause);
     el.addEventListener('error', onErr);
+    // 캐시된 미디어가 effect보다 먼저 로드돼도 탭·플레이어에 실제 길이를 알린다.
+    let alive = true;
+    if (el.readyState >= 1) queueMicrotask(() => { if (alive) onMeta(); });
     return () => {
+      alive = false;
       el.removeEventListener('loadedmetadata', onMeta);
       el.removeEventListener('timeupdate', onTime);
       el.removeEventListener('ended', onEnd);
@@ -156,6 +160,10 @@ export function useMediaTransport(
       el.removeEventListener('error', onErr);
     };
   }, [ref, opts.looping]);
+
+  useEffect(() => {
+    if (opts.active === false) ref.current?.pause();
+  }, [ref, opts.active]);
 
   const toggle = useCallback(() => {
     setFailed(false);

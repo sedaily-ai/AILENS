@@ -2,14 +2,14 @@
 
 // 경제 버티컬 카테고리(증시/부동산/산업/금융·정책/국제) 아카이브. ColumnListClient.tsx와 같은 패턴(Header+ArchiveHeader+ArchiveList)을 쓰며,
 // 카테고리마다 페이지 구조가 같고 설정값만 달라 하나의 클라이언트 컴포넌트로 공유한다. 형식(kind)과 무관하게 category(주제) 하나로만 필터링한다.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Header } from '@/widgets/Header';
 import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { ArchiveList } from '@/shared/ui/list/ArchiveList';
 import { ListPagination } from '@/shared/ui/list/ListPagination';
 import { CategoryLead, CategoryCards } from '@/shared/ui/list/CategoryLead';
 import type { RailItem } from '@/shared/ui/list/HotLettersRail';
-import { DateRangeFilter, type DateRange } from '@/shared/ui/list/DateRangeFilter';
+import { DateRangeFilter } from '@/shared/ui/list/DateRangeFilter';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { HomeSideBar } from '@/widgets/HomeSideBar';
 import { buildHeaderTabs, type HeaderTabKey } from '@/shared/lib/headerTabs';
@@ -18,10 +18,22 @@ import { buildArchiveItems, PAGE_SIZE, type ArchiveItem } from '@/shared/lib/con
 import { usePageSizePagination } from '@/shared/hooks/usePageSizePagination';
 import { categoryMatches, type EconCategoryConfig } from '@ailens/domain';
 import { econSubcategoriesFor } from '@ailens/domain';
+import { categoryArchiveHref, readCategoryArchiveState, type CategoryArchiveState } from './categoryArchiveUrl';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
 // 카테고리 아카이브 페이지 크기. video(24)·listen(30)과 같은 급의 목록이지만 ArchiveList는 사진 없이 텍스트 행만 그려 한 화면에 더 들어가도 부담이 적어 20으로 잡는다.
 const CATEGORY_PAGE_SIZE = 20;
+
+const URL_CHANGE = 'ailens:category-url';
+const locationSnapshot = () => window.location.pathname + window.location.search + window.location.hash;
+function subscribeLocation(onChange: () => void) {
+  window.addEventListener('popstate', onChange);
+  window.addEventListener(URL_CHANGE, onChange);
+  return () => {
+    window.removeEventListener('popstate', onChange);
+    window.removeEventListener(URL_CHANGE, onChange);
+  };
+}
 
 function dateHeaderText(iso: string): string {
   const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
@@ -46,18 +58,19 @@ export function CategoryArchiveClient({
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [items, setItems] = useState<ArchiveItem[]>(initialItems);
-  // 하위 카테고리 탭. econSubcategories.ts에 taxonomy가 있는 카테고리(현재 증시·산업)에서, 실제로 글이 있는 값만 탭으로 뜬다.
-  const [activeSub, setActiveSub] = useState<string>('all');
-  // 전체 메뉴(SearchOverlay)의 하위 카테고리 링크는 /{category}?sub=국내증시 로 온다. 서버가 searchParams를 읽으면 이 라우트가 통째로 동적이 되어 캐시가 깨지므로,
-  // 마운트 뒤에 주소를 읽어 탭만 맞춘다(서버 렌더 HTML은 그대로 "전체").
-  useEffect(() => {
-    const sub = new URLSearchParams(window.location.search).get('sub');
-    if (!sub || !econSubcategoriesFor(config.slug).includes(sub)) return;
-    void Promise.resolve().then(() => setActiveSub(sub));
-  }, [config.slug]);
-  // 날짜별 보기: 고른 기간(KST 날짜)에 발행된 글만 남긴다. 불러온 글 안에서 거른다.
-  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const basePath = `/${config.slug}`;
+  // 서버 HTML은 기존 기본 목록을 유지하고, hydration 뒤에는 URL을 단일 상태로 사용한다.
+  const location = useSyncExternalStore(subscribeLocation, locationSnapshot, () => initialPage > 1 ? `${basePath}/page/${initialPage}` : basePath);
+  const state = readCategoryArchiveState(location, basePath, econSubcategoriesFor(config.slug));
+  const { activeSub, dateRange } = state;
   const [today] = useState(() => kstTodayStr());
+  const hrefFor = (patch: Partial<CategoryArchiveState>) => categoryArchiveHref(location, basePath, { ...state, ...patch });
+  const updateLocation = (patch: Partial<CategoryArchiveState>) => {
+    const href = hrefFor(patch);
+    if (href === locationSnapshot()) return;
+    window.history.pushState(null, '', href);
+    window.dispatchEvent(new Event(URL_CHANGE));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +88,7 @@ export function CategoryArchiveClient({
   }, [config]);
 
   const subTabValues = econSubcategoriesFor(config.slug).filter((sub) =>
-    items.some((it) => it.subcategory === sub),
+    sub === activeSub || items.some((it) => it.subcategory === sub),
   );
   const bySub = activeSub === 'all' ? items : items.filter((it) => it.subcategory === activeSub);
   const filteredItems = dateRange ? bySub.filter((it) => it.date >= dateRange.from && it.date <= dateRange.to) : bySub;
@@ -92,15 +105,21 @@ export function CategoryArchiveClient({
 
   const {
     pageItems, currentPage, totalPages, pageHref, isCustomSize, pageSize, onPageChange, onPageSizeChange,
-  } = usePageSizePagination(listItems, CATEGORY_PAGE_SIZE, `/${config.slug}`, initialPage);
+  } = usePageSizePagination(listItems, CATEGORY_PAGE_SIZE, basePath, initialPage, {
+    pageSize: state.pageSize,
+    page: state.page,
+    onPageChange: (page) => updateLocation({ page }),
+    onPageSizeChange: (pageSize) => updateLocation({ pageSize, page: 1 }),
+    pageHref: (page) => hrefFor({ page }),
+  });
   const firstPage = currentPage === 1;
   const leadMode = showLead && firstPage;
-  // 하위 탭이 있는 카테고리는 하위 탭에서만, 하위 탭이 없는 카테고리(국제 등)는 항상(날짜로 거를 길이 이 줄뿐이라).
-  const showDateRow = activeSub !== 'all' || subTabValues.length === 0;
+  // 하위 탭 또는 URL에 적용된 기간이 있으면 날짜 줄을 보여 주고, 하위 탭이 없으면 항상 표시한다.
+  const showDateRow = !!dateRange || activeSub !== 'all' || subTabValues.length === 0;
   const headDate = pageItems[0]?.date ?? '';
-  // 우측 레일 "{분류} 많이 읽은 글": 지금 보는 분류(하위 탭 포함)의 글 10건. 조회수 집계가 없어 최신 글을 쓴다.
+  // 우측 레일 "{분류} 최신 글": 지금 보는 분류(하위 탭 포함)의 글 10건. 조회수 집계가 없어 최신 글을 쓴다.
   const railItems: RailItem[] = bySub.filter((it) => it.href).slice(0, 10).map((it) => ({ key: it.key, href: it.href as string, title: it.title, thumb: it.avatarUrl, label: it.category ?? config.label }));
-  const railHeading = `${activeSub === 'all' ? config.label : activeSub} 많이 읽은 글`;
+  const railHeading = `${activeSub === 'all' ? config.label : activeSub} 최신 글`;
 
   const dateRow = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '0 0 4px', minHeight: 44 }}>
@@ -109,8 +128,7 @@ export function CategoryArchiveClient({
         value={dateRange}
         today={today}
         onChange={(v) => {
-          setDateRange(v);
-          onPageChange(1);
+          updateLocation({ dateRange: v, page: 1 });
         }}
       />
     </div>
@@ -133,8 +151,7 @@ export function CategoryArchiveClient({
                   key={key}
                   type="button"
                   onClick={() => {
-                    setActiveSub(key);
-                    onPageChange(1);
+                    updateLocation({ activeSub: key, page: 1 });
                   }}
                   style={{
                     padding: '10px 12px',
@@ -168,7 +185,7 @@ export function CategoryArchiveClient({
             <ArchiveList
               items={pageItems}
               skipFirstDate={showDateRow ? headDate : undefined}
-              emptyLabel={dateRange ? '이 기간에 발행된 글이 없어요. 기간을 넓혀 보세요.' : `아직 ${config.label} 글이 없어요.`}
+              emptyLabel={dateRange ? '이 기간에 발행된 글이 없어요. 기간을 넓혀 보세요.' : `아직 ${activeSub === 'all' ? config.label : activeSub} 글이 없어요.`}
             />
             <ListPagination
               currentPage={currentPage}

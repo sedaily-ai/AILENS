@@ -274,7 +274,7 @@ export function LensViewClient({
             <div data-speakable="summary" className="sum" style={{ ['--sum-accent' as string]: READING_ACCENT }}>
               <div className="sum-head">
                 <IconStopwatch size={22} className="sum-ico" />
-                <p className="sum-title">30초 핵심</p>
+                <p className="sum-title">핵심 요약</p>
               </div>
               <p className="sum-sub">바쁘시면 여기까지만 읽어도 돼요</p>
               <ol className="sum-list">
@@ -346,7 +346,7 @@ export function LensViewClient({
           </div>
         )}
 
-        {/* ── 하단 구획 ── 태그 → {카테고리} 더 보기 → 관련 기사 → 많이 읽은 기사. */}
+        {/* ── 하단 구획 ── 태그 → {카테고리} 더 보기 → 관련 기사 → 최신 기사. */}
         <div className="lw" style={{ paddingTop: 8, paddingBottom: 100 }}>
           <ArticleFooterStyles />
           {neighbors && <ArticleNeighborLinks articleId={lens.id} prev={neighbors.prev} next={neighbors.next} />}

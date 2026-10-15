@@ -59,6 +59,7 @@ function CompareCardDialog({ articleId, title, date, onClose }: { articleId: str
   const closeRef = useRef<HTMLButtonElement>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [copied, setCopied] = useState(false);
+  const [actionError, setActionError] = useState('');
   const enc = encodeURIComponent(articleId);
   const imageUrl = `/card/${enc}/story.png`;
   const pageUrl = `${SITE_URL}/card/${enc}`;
@@ -80,20 +81,26 @@ function CompareCardDialog({ articleId, title, date, onClose }: { articleId: str
   }, [onClose]);
 
   const copyLink = async () => {
+    setActionError('');
+    setCopied(false);
     try {
       await navigator.clipboard.writeText(pageUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       trackEvent('compare_card_share', { article_id: articleId, method: 'copy_link' });
     } catch {
-      // 클립보드 권한이 막힌 브라우저 — 조용히 무시.
+      setActionError('링크를 복사하지 못했어요. 브라우저의 클립보드 권한을 확인한 뒤 다시 시도해 주세요.');
     }
   };
 
   const webShare = async () => {
+    setActionError('');
     try {
       // 이미지 파일째 보낼 수 있으면(대부분의 모바일) 카드 이미지를, 아니면 링크를 보낸다.
-      const blob = await (await fetch(imageUrl)).blob();
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error(`Card image HTTP ${response.status}`);
+      const blob = await response.blob();
+      if (blob.type !== 'image/png') throw new Error('Invalid card image');
       const file = new File([blob], fileName, { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: shareTitle, text: `${shareTitle}\n${pageUrl}` });
@@ -101,8 +108,9 @@ function CompareCardDialog({ articleId, title, date, onClose }: { articleId: str
         await navigator.share({ title: shareTitle, url: pageUrl });
       }
       trackEvent('compare_card_share', { article_id: articleId, method: 'web_share' });
-    } catch {
-      // 사용자가 공유 창을 닫은 경우(AbortError) 포함 — 무시.
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      setActionError('카드를 공유하지 못했어요. 다시 시도하거나 링크 복사를 이용해 주세요.');
     }
   };
 
@@ -166,9 +174,10 @@ function CompareCardDialog({ articleId, title, date, onClose }: { articleId: str
               {copied ? '복사됨' : '링크 복사'}
             </button>
           </div>
+          {actionError && <p role="alert" style={{ fontSize: 13, lineHeight: 1.5, color: '#b91c1c', marginTop: 10 }}>{actionError}</p>}
           <div className="flex items-center" style={{ gap: 10, marginTop: 12 }}>
             <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>SNS</span>
-            <ArticleShareButtons title={shareTitle} url={pageUrl} />
+            <ArticleShareButtons title={shareTitle} url={pageUrl} showCopy={false} />
           </div>
         </div>
       </div>

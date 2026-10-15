@@ -8,12 +8,12 @@ export function ReadingRewards() {
   return (
     <section id="ml-rewards" className="ml-extension" aria-labelledby="ml-rewards-title">
       <div className="ml-section-title ml-extension-heading"><div><h2 id="ml-rewards-title">읽는 날이 쌓이면</h2><p className="ml-helper">나의 속도로 읽고, 관심의 폭을 넓혀보세요.</p></div><span className="ml-pending-label">서버 완료 기록</span></div>
-      <p className="ml-connection-note">읽기는 본문 80%와 화면 노출 30초, 웹툰은 컷 80%와 10초, 듣기·영상은 등록 길이의 재생 구간 80%를 확인해요.</p>
       <ReadingPeriodView />
       <div className="ml-reward-actions"><Link href="/my-lens#ml-news" className="ml-text-link">오늘의 뉴스 읽으러 가기</Link></div>
       <details className="ml-reward-rules">
         <summary><span><strong>스탬프와 배지 기준 보기</strong><small>하루 하나씩, 부담 없이 쌓는 읽기 기록</small></span><ChevronDown size={18} aria-hidden /></summary>
         <div className="ml-rule-content">
+          <p className="ml-connection-note">읽기는 본문 80%와 화면 노출 30초, 웹툰은 컷 80%와 10초, 듣기·영상은 등록 길이의 재생 구간 80%를 확인해요.</p>
           <dl className="ml-rule-list">
             <div><dt>하루에 스탬프 하나</dt><dd>보상 그룹을 확인한 새 콘텐츠를 처음 완료한 날, 하루 최대 1개를 받아요.</dd></div>
             <div><dt>같은 이야기는 한 번만</dt><dd>같은 이슈를 다시 열거나 다른 형식으로 봐도 스탬프를 중복 지급하지 않아요.</dd></div>

@@ -46,7 +46,7 @@ export async function saveArchiveSentence(
 /** 사용자의 아카이브 문장 목록(최신순). */
 export async function listArchiveSentences(
   userId: string,
-  options?: { dateFrom?: string; dateTo?: string; limit?: number },
+  options?: { dateFrom?: string; dateTo?: string; limit?: number; signal?: AbortSignal },
 ): Promise<{ sentences: ArchiveSentenceResponse[]; count: number }> {
   const params = new URLSearchParams({ user_id: userId });
   if (options?.dateFrom) params.set('date_from', options.dateFrom);
@@ -54,7 +54,7 @@ export async function listArchiveSentences(
   if (options?.limit) params.set('limit', String(options.limit));
 
   // 목록은 사용자별이라 인증이 필요하다(익명 아카이브는 localStorage에 있고 어느 경로를 쓸지는 호출부가 정한다).
-  const res = await authFetch(`${API_URL}/api/archive?${params}`);
+  const res = await authFetch(`${API_URL}/api/archive?${params}`, { signal: options?.signal });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

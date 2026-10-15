@@ -25,6 +25,7 @@
 //     라우트에서, 카드 클릭 -> 세그먼트 캐시 미스 -> _rsc 폴백 fetch가 순수
 //     HTML을 받아 라우터가 조용히 멈추는 문제가 있었다(콘솔 에러 없음, URL도
 //     안 바뀜). 진단 경위: docs/worklog/2026-08/2026-08-07-cloudfront-rsc-navigation-bug.md
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- CloudFront 런타임이 전역 handler를 진입점으로 호출한다. 모듈 export를 추가하면 실행 형식이 달라진다.
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
