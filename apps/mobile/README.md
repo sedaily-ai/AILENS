@@ -46,5 +46,5 @@ npm run start --workspace @ailens/mobile   # 또는 cd apps/mobile && npm start
 
 ## 안 하는 것
 
-- mobile-capacitor/ (웹뷰 셸) 는 이 앱으로 대체 — 폐기 대상.
+- 옛 mobile-capacitor/ (웹뷰 셸) 는 이 앱으로 대체되어 삭제됨(git 기록에 남아 있음).
 - 웹 UI 컴포넌트 재사용 금지(UI 는 네이티브 신규, 그 아래 @ailens/* 만 공유).

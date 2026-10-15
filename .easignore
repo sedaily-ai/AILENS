@@ -6,7 +6,6 @@ admin/
 tmp/
 scripts/
 config/
-mobile-capacitor/
 service/backend/
 service/lens-cms-api/
 service/frontend/src/

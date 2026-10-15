@@ -2,7 +2,7 @@ import type { ExpoConfig } from 'expo/config';
 
 // AI LENS 네이티브 앱 설정. 딥링크 scheme=ailens (유니버설 링크·Cognito redirect 용).
 // 번들ID(ai.sedaily.lens)는 Play 에 이미 발행된 앱과 동일해야 한다 — 바꾸면 업데이트가 아니라 신규 앱이 된다.
-// 서명: Play 앱 서명 사용 중. 업로드 키는 기존 mobile-capacitor 의 release.keystore(별칭 ailens)를 EAS 에 등록해 쓴다.
+// 서명: Play 앱 서명 사용 중. 업로드 키는 기존(삭제된) mobile-capacitor 의 release.keystore(별칭 ailens)를 EAS 에 등록해 쓴다. 원본은 ~/ailens-secrets/android-signing/ 에 백업.
 // 절차·주의: docs/architecture/apps-mobile-출시-서명-가이드.md
 // versionCode/buildNumber 는 eas.json 의 appVersionSource=remote + autoIncrement 가 관리한다(이 파일에 쓰지 않는다).
 // expo.dev/accounts/seoul-economic-daily/projects/ailens 의 프로젝트 ID(비밀 아님).
