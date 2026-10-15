@@ -1,5 +1,6 @@
 import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/auth/authFetch';
+import { authReadFetch } from '@/shared/lib/auth/authReadFetch';
 import type { InterestItem } from './interestApi';
 
 export interface LensPreferences { interests: InterestItem[]; minutes: number; revision: number; updated_at: string | null }
@@ -12,7 +13,10 @@ export class AccountApiError extends Error {
 }
 async function accountJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
-    const response = await authFetch(`${API_URL}/api/v2/me${path}`, { ...options, cache: 'no-store', headers: { 'Content-Type': 'application/json', ...options.headers } });
+    const url = `${API_URL}/api/v2/me${path}`;
+    const response = !options.method || options.method === 'GET'
+      ? await authReadFetch(url, options.signal ?? undefined)
+      : await authFetch(url, { ...options, cache: 'no-store', headers: { 'Content-Type': 'application/json', ...options.headers } });
     const data = await response.json().catch(() => null);
     if (!response.ok) throw new AccountApiError(response.status, data?.error?.code ?? 'REQUEST_FAILED', data?.error?.message ?? '계정 저장 서버를 사용할 수 없어요. 다시 시도해 주세요.');
     return data as T;
