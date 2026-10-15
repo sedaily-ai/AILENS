@@ -19,6 +19,7 @@
 #   cd service/lens-cms-api
 #   ./deploy.sh
 set -euo pipefail
+umask 077
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,11 +27,15 @@ cd "$SCRIPT_DIR"
 
 INSTANCE_ID="$CMS_API_INSTANCE_ID"
 REGION="us-east-1"
-S3_BUCKET="ailens-ssr-releases"
+S3_BUCKET="$CMS_RELEASE_BUCKET"
 S3_PREFIX="lens-cms-api"
 TARBALL="lens-cms-api-deploy.tar.gz"
 REMOTE_DIR="/opt/lens-cms-api"
 PUBLIC_HEALTH_URL="http://13.223.179.151/health"
+
+# 로컬 계정/SSM 대상 확인은 업로드 이전 읽기 전용 검사다.
+test "$(aws sts get-caller-identity --query Account --output text)" = "$AWS_ACCOUNT_ID"
+test "$(aws ssm describe-instance-information --filters Key=InstanceIds,Values="$INSTANCE_ID" --region "$REGION" --query 'InstanceInformationList[0].PingStatus' --output text)" = Online
 
 echo "[1/5] Packaging..."
 rm -f "/tmp/$TARBALL"
@@ -38,28 +43,7 @@ rm -f "/tmp/$TARBALL"
 # 원격에서 다시 생김).
 # 이슈 레터 샘플 입력용 파일(스크립트·시드 JSON·DDL)도 같은 묶음에 넣는다 — 서버로 따로 옮기는 단계를 없애려는 것(2026-10-09).
 # 서버에서는 /opt/lens-cms-api/{scripts,seed}/ 에 놓인다. 콘텐츠는 여기 남지 않고 스크립트가 관리 API로 RDB에 저장한다.
-STAGE="$(mktemp -d)"
-chmod 755 "$STAGE"  # mktemp 는 700 으로 만든다 — 묶음의 "." 항목이 서버의 /opt/lens-cms-api 권한을 덮어써 ssm-user 가 못 들어가게 되는 사고(2026-10-09)를 막는다
-cp ./*.py requirements.txt ecosystem.config.js "$STAGE/"
-mkdir -p "$STAGE/scripts" "$STAGE/seed"
-cp scripts/*.py "$STAGE/scripts/"
-cp ../../docs/product/모아쓰기레터/seed/issue_letters_seed.json "$STAGE/seed/"
-cp ../../docs/architecture/lens-erd-src/lens_schema_v1.38_2026-10-09.sql "$STAGE/seed/"
-cp ../../docs/product/모아쓰기레터/seed/topics_seed.json "$STAGE/seed/"
-cp ../../docs/architecture/lens-erd-src/lens_schema_v1.42_2026-10-09.sql "$STAGE/seed/"
-cp ../../docs/product/모아쓰기레터/seed/interest_bundles_seed.json "$STAGE/seed/"
-cp ../../docs/architecture/lens-erd-src/lens_schema_v1.43_2026-10-09.sql "$STAGE/seed/"
-cp ../../docs/architecture/lens-erd-src/lens_schema_v1.44_2026-10-09.sql "$STAGE/seed/"
-cp ../../docs/architecture/lens-erd-src/lens_schema_v1.45_2026-10-11.sql "$STAGE/seed/"
-cp ../../docs/architecture/lens-erd-src/lens_schema_v1.46_2026-10-12.sql "$STAGE/seed/"
-cp ../../docs/architecture/lens-erd-src/lens_schema_v1.47_2026-10-12.sql "$STAGE/seed/"
-cp ../../docs/product/모아쓰기레터/seed/editors_seed.json "$STAGE/seed/"
-cp ../../docs/product/모아쓰기레터/seed/editors_topics_seed.json "$STAGE/seed/"
-tar czf "/tmp/$TARBALL" \
-  --exclude="__pycache__" \
-  --exclude="*.bak.*" \
-  -C "$STAGE" .
-rm -rf "$STAGE"
+python3 scripts/package_release.py --output "/tmp/$TARBALL"
 echo "  [OK] $(du -h "/tmp/$TARBALL" | cut -f1)"
 
 echo "[2/5] Uploading to S3..."
@@ -72,8 +56,33 @@ echo "[3/5] Deploying via SSM..."
 # (gpu_ipadapter.py가 brief 텍스트를 S3 경유로 넘기는 것과 같은 이유의 축소판).
 REMOTE_SCRIPT=$(cat <<EOF
 set -e
+umask 077
 cd $REMOTE_DIR
+pm2 describe lens-cms-api >/dev/null
+# 필수 운영 환경은 서버 전용 파일로 공급. PM2 템플릿 덮어쓰기 금지.
+test -r /etc/lens-cms-api.env
+if systemctl is-active --quiet lens-notification-worker.timer; then
+  echo "worker timer를 먼저 중지하세요" >&2
+  exit 1
+fi
+set -a
+. /etc/lens-cms-api.env
+set +a
+: "\${ADMIN_INTERNAL_TOKEN:?내부 인증 토큰 필요}"
+: "\${LENS_PUSH_ENCRYPTION_KEY:?구독 암호화 키 필요}"
+test "\${LENS_PUSH_MODE:-dry_run}" = dry_run
+test "\${LENS_PUSH_LIVE_ENABLED:-false}" != true
+# 새 코드를 풀기 전에 DB 선행 검사 도구만 임시 추출해 실행한다.
 aws s3 cp s3://$S3_BUCKET/$S3_PREFIX/$TARBALL /tmp/$TARBALL
+PREFLIGHT_DIR=\$(mktemp -d)
+tar xzf /tmp/$TARBALL -C "\$PREFLIGHT_DIR" scripts/account_schema.py
+./venv/bin/python "\$PREFLIGHT_DIR/scripts/account_schema.py"
+rm -rf "\$PREFLIGHT_DIR"
+# 코드 복구용 백업: 비밀 파일은 권한을 유지하고 서버 /tmp에만 보관한다.
+BACKUP=/tmp/lens-cms-before-\$(date +%Y%m%dT%H%M%S).tar.gz
+tar czf "\$BACKUP" --exclude=venv --exclude=__pycache__ -C $REMOTE_DIR .
+chmod 600 "\$BACKUP"
+echo "rollback archive: \$BACKUP"
 find $REMOTE_DIR -maxdepth 1 -name '*.bak.*' -delete
 tar xzf /tmp/$TARBALL -C $REMOTE_DIR
 rm -f /tmp/$TARBALL
@@ -88,10 +97,11 @@ else
   echo "requirements.txt 안 바뀜 — pip install 생략"
 fi
 
-pm2 restart lens-cms-api
+pm2 restart lens-cms-api --update-env
 sleep 2
 pm2 list
-curl -s -o /dev/null -w "local health: %{http_code}\n" http://127.0.0.1:8000/health
+curl --fail --silent --show-error http://127.0.0.1:8000/health
+pm2 save
 EOF
 )
 
@@ -142,7 +152,8 @@ echo "[5/5] 헬스체크(외부, CloudFront/공인 IP 우회)..."
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_HEALTH_URL")
 echo "  $PUBLIC_HEALTH_URL → $HTTP_CODE"
 if [ "$HTTP_CODE" != "200" ]; then
-  echo "WARNING: 헬스체크가 200이 아님 — 수동 확인 필요." >&2
+  echo "[FAIL] 헬스체크 실패 — 다음 단계 중단, 서버 /tmp 코드 백업으로 복구 필요." >&2
+  exit 1
 fi
 
 rm -f "/tmp/$TARBALL" /tmp/lens-cms-api-remote.sh "$PARAMS_FILE"

@@ -12,6 +12,7 @@ import type { useDashboardArchive } from '../lib/news/useDashboardArchive';
 
 type Props = {
   storageNotice: string;
+  notificationNotice: string;
   archive: ReturnType<typeof useDashboardArchive>;
   articles: NewsArticle[];
   selectedId: string | null;
@@ -29,7 +30,7 @@ type Props = {
   onSave: (slug: string) => void;
 };
 
-export function DrawerPanel({ storageNotice, archive, articles, selectedId, initialFilter, letters, savedSlugs, lettersLoading, lettersFailed, missingLetters, retryLetters, isRead, onSave, letterFilter, onLetterFilterChange, filteredSavedSlugs }: Props) {
+export function DrawerPanel({ notificationNotice, storageNotice, archive, articles, selectedId, initialFilter, letters, savedSlugs, lettersLoading, lettersFailed, missingLetters, retryLetters, isRead, onSave, letterFilter, onLetterFilterChange, filteredSavedSlugs }: Props) {
   const [filter, setFilter] = useState<'sentences' | 'letters'>(initialFilter);
   const [query, setQuery] = useState('');
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -84,7 +85,7 @@ export function DrawerPanel({ storageNotice, archive, articles, selectedId, init
         <blockquote className="ml-related-quote">{selected.text}</blockquote>
         {!newsAvailable ? <><p className="ml-helper">관련 뉴스를 불러오지 못했어요.</p><button className="ml-text-link" onClick={retryNews}>뉴스 다시 불러오기</button></> : related.length ? <div className="ml-news-list">{related.map((article) => <article key={article.id} className="ml-news-item"><div className="ml-news-meta"><span>{normalizeCategory(article.category)?.label ?? (article.category || '뉴스')}</span><time dateTime={article.date}>{article.date.replaceAll('-', '.')}</time></div><Link href={article.href}><h3>{article.title}</h3><ArrowUpRight size={17} aria-hidden /></Link>{article.context && <p className="ml-news-context">{article.context}</p>}<div className="ml-news-reasons">{article.reasons.filter((reason) => reason.type === 'sentence').map((reason) => <span key={reason.type}>{reason.text}</span>)}</div></article>)}</div> : <p className="ml-helper">현재 공개된 뉴스에서 이 문장의 단어와 맞는 새 글을 찾지 못했어요.</p>}
         <p className="ml-storage-note">현재는 단어 일치 기준이에요. 이미 열람했거나 문장을 담은 원문은 제외해요. 의미가 비슷한 글을 찾는 분석은 준비 중이에요.</p>
-        <div className="ml-drawer-alert"><div><strong>다음 이야기를 소식으로 받아보려면</strong><p>저장 문장 활용과 새 글 알림을 알림 설정에서 별도로 선택해 주세요.</p></div><Link href="/my-lens?tab=settings#ml-notifications" className="ml-text-link">알림 설정 <ArrowUpRight size={14} /></Link><span className="ml-pending-label">운영 푸시 발송 준비 중</span></div>
+        <div className="ml-drawer-alert"><div><strong>다음 이야기를 소식으로 받아보려면</strong><p>저장 문장 활용과 새 글 알림을 알림 설정에서 별도로 선택해 주세요.</p></div><Link href="/my-lens?tab=settings#ml-notifications" className="ml-text-link">알림 설정 <ArrowUpRight size={14} /></Link><span className="ml-pending-label">{notificationNotice}</span></div>
       </>}
     </section>}
   </section>;

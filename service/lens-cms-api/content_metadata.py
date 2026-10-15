@@ -45,7 +45,7 @@ def load_cards(cur, kind, *, owner=None, ids=None, categories=(), terms=(), limi
     if exclude_seen:
         sql += f' AND NOT ({seen}) AND {excluded}'
     if match:
-        sql += f" AND ({cats} && %s::text[] OR EXISTS(SELECT 1 FROM unnest(%s::text[]) AS t(term) WHERE strpos(lower(normalize({words},NFKC)),t.term)>0))"
+        sql += f" AND (({cats})::text[] && %s::text[] OR EXISTS(SELECT 1 FROM unnest(%s::text[]) AS t(term) WHERE strpos(lower(normalize({words},NFKC)),t.term)>0))"
         params += [list(categories), list(terms)]
         if kind=='issue_letter' and editors:
             sql=sql[:-1]+" OR EXISTS(SELECT 1 FROM issue_letter_editors ie JOIN letter_editors e ON e.id=ie.editor_id WHERE ie.letter_id=l.id AND e.is_active AND e.slug=ANY(%s)))"

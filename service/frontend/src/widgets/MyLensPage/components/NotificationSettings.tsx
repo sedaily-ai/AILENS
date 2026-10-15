@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { notificationStatus, pushEnabled, visiblePushDevices } from '../lib/notificationPresentation';
 import { useNotifications } from '../lib/useNotifications';
 import { Bell, BellOff, Check, ChevronDown, Clock3 } from 'lucide-react';
 import { notificationPreferenceError, type NotificationPreferences } from '../lib/notificationPreferences';
@@ -26,11 +27,14 @@ export function NotificationSettings({ recommendedTitle, recommendations, intere
   const validation = notificationPreferenceError(draft);
   const timeInvalid = !/^(?:0[8-9]|1\d|20):[0-5]\d$/.test(draft.time);
   const previewArticle = recommendations?.find((item) => item.reasons.some((reason) => reason.type === 'category' ? draft.categorySource : reason.type === 'keyword' ? draft.keywordSource : draft.sentenceSource));
+  const developerTools = process.env.NODE_ENV === 'development';
+  const liveEnabled = pushEnabled(data);
+  const devices = visiblePushDevices(data, developerTools);
   const schedule = `${draft.frequency === 'daily' ? '매일' : '월·수·금'} ${draft.time}`;
   return (
     <section id="ml-notifications" className="ml-extension" aria-labelledby="ml-notifications-title">
-      <div className="ml-section-title ml-extension-heading"><div><h2 id="ml-notifications-title">소식이 찾아오는 시간</h2><p className="ml-helper">받고 싶은 이야기와 시간을 미리 골라보세요.</p></div><span className="ml-pending-label">{data.config.mode==='dry_run'?'로컬 검증 · 실제 발송 없음':'계정 개인화 푸시'}</span></div>
-      <p id="ml-push-scope" className="ml-connection-note">알림 유형과 시간을 계정에 저장해요. 수신 동의와 기기 연결은 각각 따로 진행하며, 로컬 검증 모드에서는 실제 권한 요청·외부 푸시 등록·발송을 하지 않아요.</p>
+      <div className="ml-section-title ml-extension-heading"><div><h2 id="ml-notifications-title">소식이 찾아오는 시간</h2><p className="ml-helper">받고 싶은 이야기와 시간을 미리 골라보세요.</p></div><span className="ml-pending-label">{liveEnabled?'계정 개인화 푸시':'알림 발송은 아직 활성화되지 않았어요.'}</span></div>
+      <p id="ml-push-scope" className="ml-connection-note">알림 유형과 시간을 계정에 저장해요. 수신 동의와 이 브라우저의 권한·기기 연결은 각각 따로 진행해요.</p>
       <form noValidate aria-describedby="ml-push-scope" onSubmit={event=>{event.preventDefault();if(!validation)void feed.save();}}>
         <fieldset className="ml-notification-fields" disabled={!ready}>
           <legend className="ml-sr-only">계정 개인화 푸시 설정</legend>
@@ -62,16 +66,17 @@ export function NotificationSettings({ recommendedTitle, recommendations, intere
       <section className="ml-notification-consent" aria-label="개인화 푸시 수신 동의"><h3>개인화 푸시 수신 동의</h3><p className="ml-helper">{data.consent.current?'현재 정책으로 수신에 동의했어요.':'설정 저장과 별도로, 받고 싶은 소식의 수신에 동의해 주세요.'} <Link href="/privacy">개인정보처리방침</Link></p>
       {!data.consent.current?<><label className="ml-pause-setting"><input type="checkbox" checked={consentChecked} onChange={event=>setConsentChecked(event.target.checked)}/><span>선택한 뉴스·레터 소식과 주간 기록을 개인화 푸시로 받는 데 동의합니다.<small>정책 버전 {data.config.policy_version}. 저장 문장 활용은 위 기준에서 별도로 선택해요.</small></span></label><button type="button" className="ml-button" disabled={!consentChecked||!ready||dirty} onClick={()=>void feed.consent(true)}>수신 동의 저장</button></>:<button type="button" className="ml-button ml-button-quiet" disabled={!ready} onClick={()=>{setConsentChecked(false);void feed.consent(false);}}>수신 동의 철회</button>}
       </section>
-      <section className="ml-notification-devices" aria-label="푸시 기기 연결"><h3>알림을 받을 기기</h3><p className="ml-helper">{data.config.mode==='dry_run'?'브라우저 권한을 요청하지 않는 로컬 검증 기기예요.':'권한을 허용한 이 브라우저의 푸시 구독을 연결해요.'} 활성 연결 {data.delivery.active_subscriptions}개</p>
-      <button type="button" className="ml-button" disabled={!ready||dirty||!data.consent.current||!data.config.supported||data.subscriptions.some(s=>s.id===feed.currentDevice&&s.active)} onClick={()=>void feed.connect()}>{data.config.mode==='dry_run'?'로컬 검증 기기 연결':'이 브라우저 연결'}</button>
-      <ul className="ml-device-list">{data.subscriptions.filter(s=>s.active).map((sub,index)=><li key={sub.id}><span>{sub.id===feed.currentDevice?'이 기기':`연결 기기 ${index+1}`} · {sub.simulated?'로컬 검증':'Web Push'}</span><button type="button" className="ml-text-link" disabled={!ready} onClick={()=>void feed.disconnect(sub.id)}>연결 해제</button></li>)}</ul>
-      </section>
-      <section className="ml-notification-server" aria-label="서버 알림 상태"><h3>서버 알림 상태</h3><p className="ml-helper">{data.delivery.status==='paused'?'일시 중지':data.delivery.status==='ready'?data.config.mode==='dry_run'?'로컬 검증 준비 완료':'발송 조건 충족':'연결 조건 확인 필요'} · 실제 기기 수신 확인과는 별개예요.</p>{data.delivery.blocked_reasons.length>0&&<p className="ml-helper">{data.delivery.blocked_reasons.map(reason=>({no_types:'알림 유형 선택',no_consent:'수신 동의',policy_pending:'변경 정책 재동의',no_subscription:'기기 연결',provider_unavailable:'서버 발송/암호화 구성'})[reason as 'no_types']??reason).join(' · ')} 확인이 필요해요.</p>}
-      {data.delivery.last_simulated_at&&<p className="ml-helper">최근 로컬 발송 검증: {new Date(data.delivery.last_simulated_at).toLocaleString('ko-KR')}</p>}{data.delivery.last_sent_at&&<p className="ml-helper">최근 제공자 접수: {new Date(data.delivery.last_sent_at).toLocaleString('ko-KR')} · 기기 수신을 보증하지 않아요.</p>}
-      <button type="button" className="ml-button ml-button-quiet" disabled={!ready||dirty} onClick={()=>void feed.loadPreview()}>서버 후보 미리보기</button>{feed.preview&&<div className="ml-notification-preview"><strong>서버 후보 · 실제 발송 없음</strong>{feed.preview.empty?<p>현재 설정에 맞는 새 소식이 없어요. 무관한 최신 글을 채우지 않아요.</p>:<><ul>{feed.preview.items.map(item=><li key={item.href}><Link href={item.href} prefetch={false}>{item.title}</Link></li>)}</ul>{feed.preview.weekly&&<p>지난주 읽은 날 {feed.preview.weekly.read_days}일 · 저장 {feed.preview.weekly.saved_contents}건</p>}</>}</div>}
+      {(liveEnabled || developerTools || devices.length > 0) && <section className="ml-notification-devices" aria-label="푸시 기기 연결"><h3>알림을 받을 기기</h3><p className="ml-helper">권한을 허용한 브라우저의 푸시 구독을 연결해요. 활성 연결 {devices.filter(sub=>!sub.simulated).length}개</p>
+      {(liveEnabled || developerTools) && <button type="button" className="ml-button" disabled={!ready||dirty||!data.consent.current||!data.config.supported||devices.some(s=>s.id===feed.currentDevice)} onClick={()=>void feed.connect()}>{data.config.mode==='dry_run'?'개발 검증 기기 연결':'이 브라우저 연결'}</button>}
+      <ul className="ml-device-list">{devices.map((sub,index)=><li key={sub.id}><span>{sub.simulated?'개발 검증 기기':sub.id===feed.currentDevice?'이 기기':`연결 기기 ${index+1}`}</span><button type="button" className="ml-text-link" disabled={!ready} onClick={()=>void feed.disconnect(sub.id)}>연결 해제</button></li>)}</ul>
+      </section>}
+      <section className="ml-notification-server" aria-label="알림 상태"><h3>알림 상태</h3><p className="ml-helper">{notificationStatus(data)}</p>
+      {liveEnabled && data.delivery.blocked_reasons.length>0&&<p className="ml-helper">{data.delivery.blocked_reasons.map(reason=>({no_types:'알림 유형 선택',no_consent:'수신 동의',policy_pending:'변경 정책 재동의',no_subscription:'기기 연결',provider_unavailable:'서버 발송 구성'})[reason as 'no_types']??'연결 상태').join(' · ')} 확인이 필요해요.</p>}
+      {data.delivery.last_sent_at&&<p className="ml-helper">최근 알림 전송: {new Date(data.delivery.last_sent_at).toLocaleString('ko-KR')} · 기기 상태에 따라 도착이 늦어질 수 있어요.</p>}
+      {developerTools && <><button type="button" className="ml-button ml-button-quiet" disabled={!ready||dirty} onClick={()=>void feed.loadPreview()}>서버 후보 미리보기</button>{data.delivery.last_simulated_at&&<p className="ml-helper">최근 모의 처리: {new Date(data.delivery.last_simulated_at).toLocaleString('ko-KR')}</p>}{feed.preview&&<div className="ml-notification-preview"><strong>개발 검증 · 실제 발송 없음</strong>{feed.preview.empty?<p>현재 설정에 맞는 새 소식이 없어요.</p>:<><ul>{feed.preview.items.map(item=><li key={item.href}><Link href={item.href} prefetch={false}>{item.title}</Link></li>)}</ul>{feed.preview.weekly&&<p>지난주 읽은 날 {feed.preview.weekly.read_days}일 · 저장 {feed.preview.weekly.saved_contents}건</p>}</>}</div>}</>}
       </section>
       <p className="ml-settings-feedback" role="status" aria-live="polite">{feed.message}</p>{feed.error&&<p role="alert" className="ml-settings-error">{feed.error}</p>}
-      <p className="ml-storage-note">설정·동의는 계정 기준, 권한과 구독은 기기 기준이에요. 로컬 검증 결과를 실제 발송으로 표시하지 않아요. 레터 이메일 구독은 별도이며 이 설정으로 바뀌지 않아요.</p>
+      <p className="ml-storage-note">설정·동의는 계정 기준, 권한과 구독은 기기 기준이에요. 레터 이메일 구독은 별도이며 이 설정으로 바뀌지 않아요.</p>
 
 
     </section>

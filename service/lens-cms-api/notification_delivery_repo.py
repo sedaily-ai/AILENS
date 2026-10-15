@@ -139,7 +139,8 @@ def send_claim(owner,body,expected_mode='dry_run'):
         state=repo.state(cur,owner);payload=delivery['payload']
         # 계정 row lock으로 archive/bookmark 변경을 직렬화한다.
         # publication의 slug cascade와 역순인 자식 행 lock을 추가하지 않는다.
-        cur.execute(f"SELECT f.source_content_key FROM content_followup_links f WHERE f.source_content_key IN(SELECT 'issue_letter:'||issue_letter_id FROM user_letter_bookmarks WHERE user_id=%s UNION SELECT 'publication:'||ap.id FROM user_archives ua {ARCHIVE_SOURCE_JOIN_SQL} WHERE ua.user_id=%s AND ap.id IS NOT NULL) FOR SHARE OF f",(owner,owner));cur.fetchall()
+        # 조회 전용 관계 테이블의 UPDATE 권한을 넓히지 않고 동일 트랜잭션에서 잠근다.
+        cur.execute(f"SELECT public.lock_notification_followup_sources(ARRAY(SELECT 'issue_letter:'||issue_letter_id FROM user_letter_bookmarks WHERE user_id=%s UNION SELECT 'publication:'||ap.id FROM user_archives ua {ARCHIVE_SOURCE_JOIN_SQL} WHERE ua.user_id=%s AND ap.id IS NOT NULL)::text[])",(owner,owner));cur.fetchone()
         valid=delivery['mode']==expected_mode and delivery['status'] in ('queued','processing') and sub and sub['user_id']==owner and sub['active'] and (sub['expires_at'] is None or sub['expires_at']>now) and sub['simulated']==(expected_mode=='dry_run')
         valid=bool(valid and set(payload['types'])<=set(policy.due_types(state['preferences'],now)) and eligible(cur,owner,state,now) and state['revision']==delivery['preferences_revision'] and delivery['consent_version']==policy.policy_version() and payload['source_fingerprint']==fingerprint(cur,owner))
         available=[]

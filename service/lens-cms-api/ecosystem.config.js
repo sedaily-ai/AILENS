@@ -1,8 +1,8 @@
 // PM2 프로세스 정의 — lens-cms-api 전용 EC2(단독, 다른 서비스와 공유 안 함)
 //
 // ⚠️ LENS_PG_PASSWORD/ADMIN_INTERNAL_TOKEN은 이 파일(git 추적)에 넣지
-// 않는다 — 서버(/opt/lens-cms-api/ecosystem.config.js)에만 직접 채워
-// 넣어 배포한다. 재배포 시 이 템플릿을 서버로 복사한 뒤 두 줄을 추가할 것.
+// 않는다 — 서버 전용 /etc/lens-cms-api.env로 공급한다. deploy.sh는
+// 기존 서버 ecosystem.config.js를 덮어쓰지 않고 --update-env로 갱신한다.
 // ADMIN_INTERNAL_TOKEN 값은 SSM SecureString
 // /sedaily-mbti/admin/lens-cms-api-token 에 같은 값이 저장돼 있다
 // (admin/backend/repo/posts_repo.py가 이 파라미터를 읽어 요청 헤더에 싣는다).

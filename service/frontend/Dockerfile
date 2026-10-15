@@ -33,6 +33,10 @@ COPY service/frontend/ service/frontend/
 RUN npm run build --workspace @ailens/domain \
     && npm run build --workspace @ailens/api-client \
     && npm run build --workspace @ailens/auth
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_CMS_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_CMS_API_URL=$NEXT_PUBLIC_CMS_API_URL
 RUN --mount=type=cache,target=/repo/service/frontend/.next/cache \
     npm run build --workspace service/frontend
 
