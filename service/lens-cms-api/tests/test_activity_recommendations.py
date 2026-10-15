@@ -91,6 +91,17 @@ def test_old_history_and_registered_keyword_metadata_are_used(modules):
     assert candidates['items'][0]['formats']==['letter']
 
 
+def test_letter_category_matching_accepts_actual_varchar_schema(modules):
+    _,_,recommendation,cursor=modules
+    # v1.38의 실제 category_slug는 VARCHAR(32)이며 최소 fixture의 TEXT와 다르다.
+    with cursor() as cur:
+        cur.execute('ALTER TABLE issue_letter_categories ALTER COLUMN category_slug TYPE varchar(32)')
+    category=recommendation.candidates('a',{'kind':'issue_letter','categories':['finance']})
+    assert [row['content_key'] for row in category['items']]==['issue_letter:1']
+    keyword=recommendation.candidates('a',{'kind':'issue_letter','terms':['레터']})
+    assert {row['content_key'] for row in keyword['items']}=={'issue_letter:1','issue_letter:2'}
+
+
 def test_sentence_owner_source_exclusion_and_delete_invalidation(modules):
     _,_,recommendation,cursor=modules
     with cursor() as cur:

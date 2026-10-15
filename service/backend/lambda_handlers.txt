@@ -21,3 +21,4 @@ sedaily-mbti-archive-dev  handlers.archive_handler  handlers.user.archive
 sedaily-mbti-post-dev  handlers.post_handler  handlers.user.community_post
 sedaily-mbti-question-dev  handlers.question_handler  handlers.user.question
 sedaily-mbti-v2-health-dev  handlers.health  handlers.system.health
+sedaily-lens-dashboard-dev  -  handlers.user.dashboard

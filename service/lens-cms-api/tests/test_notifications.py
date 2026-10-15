@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import uuid
 import base64
+import psycopg2
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 from cryptography.fernet import Fernet
@@ -27,7 +28,9 @@ def notifications(complete,monkeypatch):
     dashboard,_,_,cursor=complete
     monkeypatch.setenv('LENS_PUSH_MODE','dry_run');monkeypatch.setenv('LENS_PUSH_ENCRYPTION_KEY',Fernet.generate_key().decode());monkeypatch.setenv('LENS_PUSH_POLICY_VERSION','fixture-v1')
     with cursor() as c:
+        c.execute("DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='lens_service_app') THEN CREATE ROLE lens_service_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT; END IF; END $$;")
         for version in ('51','52'):c.execute(Path(__file__).resolve().parents[3].joinpath(f'docs/architecture/lens-erd-src/lens_schema_v1.{version}_2026-10-14.sql').read_text())
+        c.execute(Path(__file__).resolve().parents[3].joinpath('docs/architecture/lens-erd-src/lens_schema_v1.55_2026-10-15.sql').read_text())
     for name in ('notification_policy','notifications_repo','notification_delivery_repo','notification_inputs','push_provider'):
         monkeypatch.delitem(sys.modules,name,raising=False)
     return importlib.import_module('notifications_repo'),importlib.import_module('notification_delivery_repo'),importlib.import_module('notification_inputs'),cursor,dashboard
@@ -39,6 +42,34 @@ def setup(r,owner='a'):
     r.consent(owner,{'channel':'web_push','granted':True,'policy_version':r.policy.policy_version()})
     sub=r.register(owner,subscription(f'https://push.invalid/{owner}'))
     return state,sub
+
+
+def test_read_only_app_locks_followups_without_update_permission(notifications):
+    _,_,_,cursor,_=notifications
+    with cursor() as cur:
+        # 최소 fixture는 public 스키마를 재생성하므로 기존 운영 역할의 USAGE도 복원한다.
+        cur.execute('GRANT USAGE ON SCHEMA public TO lens_service_app')
+        cur.execute("INSERT INTO content_followup_links VALUES('publication:42','publication:43',true,now()),('issue_letter:1','publication:43',true,now())")
+    with cursor() as cur:
+        cur.execute('SET LOCAL ROLE lens_service_app')
+        cur.execute("SELECT has_table_privilege(current_user,'content_followup_links','UPDATE') AS writable")
+        assert not cur.fetchone()['writable']
+        cur.execute('SAVEPOINT write_probe')
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+            cur.execute("UPDATE content_followup_links SET editor_approved=false")
+        cur.execute('ROLLBACK TO SAVEPOINT write_probe')
+        cur.execute("SELECT public.lock_notification_followup_sources(ARRAY['publication:42']::text[])")
+        # 동일 source의 승인 변경은 기다리고, 무관한 관계 변경은 막지 않는다.
+        with pytest.raises(psycopg2.errors.LockNotAvailable):
+            with cursor() as other:
+                other.execute("SET LOCAL lock_timeout='50ms'")
+                other.execute("UPDATE content_followup_links SET editor_approved=false WHERE source_content_key='publication:42'")
+        with cursor() as other:
+            other.execute("SET LOCAL lock_timeout='50ms'")
+            other.execute("UPDATE content_followup_links SET editor_approved=false WHERE source_content_key='issue_letter:1'")
+    with cursor() as cur:
+        cur.execute("SELECT EXISTS(SELECT 1 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a WHERE p.oid='public.lock_notification_followup_sources(text[])'::regprocedure AND a.grantee=0 AND a.privilege_type='EXECUTE') AS public_execute")
+        assert not cur.fetchone()['public_execute']
 
 
 def prepare(r,d,cur,owner='a',build_only=False,expected_mode='dry_run'):

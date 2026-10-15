@@ -12,6 +12,7 @@ Routes:
 라우트 로직(저장·조회·인기 목록·삭제)과 응답 헬퍼는 services/user/archive.py 에 있으며,
 이 파일은 요청 파싱, 인증, 라우팅 분기만 담당한다.
 """
+import functools
 import base64
 import json
 import logging
@@ -59,6 +60,20 @@ def _parse_event(event: dict):
 
 # ── Lambda entry point ───────────────────────────────────────────────────────
 
+def _personal_cache(handler):
+    @functools.wraps(handler)
+    def wrapped(event, context):
+        response = handler(event, context)
+        rc = event.get('requestContext') or {}
+        method = (rc.get('http') or {}).get('method', event.get('httpMethod', 'GET'))
+        path = event.get('rawPath') or (rc.get('http') or {}).get('path') or event.get('path', '')
+        if not (method == 'GET' and path.rstrip('/').endswith('/api/archive/popular')):
+            response.setdefault('headers', {})['Cache-Control'] = 'private, no-store'
+        return response
+    return wrapped
+
+
+@_personal_cache
 @handler_decorator
 async def lambda_handler(event: dict, context) -> dict:
     """
@@ -82,7 +97,7 @@ async def lambda_handler(event: dict, context) -> dict:
     logger.info(f"Archive request: {method} {path}")
 
     # GET /api/archive/popular: 공개 라우트. 응답이 특정 사용자 기준으로 보이지 않도록 인증을 시도하지 않는다.
-    if method == 'GET' and '/popular' in path:
+    if method == 'GET' and path.rstrip('/').endswith('/api/archive/popular'):
         return await svc.handle_popular(params)
 
     # 개인 조회·변경 모두 검증된 JWT sub만 사용한다. 공개 인기 문장은 위에서 분리한다.
