@@ -19,7 +19,6 @@ service/lens-cms-api
 admin
 pipelines
 mobile
-mobile-capacitor
 docs
 tmp
 **/__pycache__

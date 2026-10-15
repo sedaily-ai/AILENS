@@ -35,4 +35,4 @@
 
 - 현재 `apps/mobile` 은 M1 셸이다. 프로덕션 트랙에 올리면 기존 Capacitor 사용자에게 기능 퇴보가 된다. 설계 문서 M5 전까지 **내부 테스트 트랙만** 쓴다.
 - 패키지명(`ai.sedaily.lens`)·업로드 키를 바꾸면 업데이트가 끊긴다.
-- `mobile-capacitor/` 는 Expo 출시 후 archive 로 옮길 때 keystore 를 먼저 위 보관 위치에서 확인한다.
+- `mobile-capacitor/` 는 2026-10-15 삭제됨(git 기록에 남음). 키 원본은 위 보관 위치(`~/ailens-secrets/android-signing/capacitor-upload-key/`)가 유일한 사본이므로 2차 백업 필요.
