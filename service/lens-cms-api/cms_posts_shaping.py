@@ -323,10 +323,10 @@ def shape_lens_summary(post: Dict[str, Any]) -> Dict[str, Any]:
     뿐이었다.
 
     그래서 진짜 수정은 응답 자체를 가볍게 만드는 것 — 목록에 필요한
-    필드(label/question/bullets)만 남기고 무거운 필드(paragraphs/images/
+    필드(label/format/question/bullets/keywords)만 남기고 무거운 필드(paragraphs/images/
     video_url/thumbnail_url/media_url/transcript)는 뺀다. 프론트 목록
     소비처(LensPreviewSection.tsx/LensListClient.tsx) 전부 label·question·
-    bullets까지만 쓰는 걸 확인했다 — 4포맷 전체 콘텐츠가 실제로 필요한
+    bullets를 쓰고, 단어장은 keywords를 모은다 — 4포맷 전체 콘텐츠가 실제로 필요한
     곳(온보딩 체험 화면, lens 상세 페이지)은 단건 조회
     (`/api/v2/posts/{id}?channel=lens`, shape_lens 그대로)로 이미 따로
     받는다(service/frontend의 fetchLensBySlug 참조 — 단건 조회는 이 축약
@@ -334,7 +334,13 @@ def shape_lens_summary(post: Dict[str, Any]) -> Dict[str, Any]:
     쓴다)."""
     shaped = shape_lens(post)
     shaped["lenses"] = [
-        {"label": item["label"], "question": item["question"], "bullets": item["bullets"]}
+        {
+            "label": item["label"],
+            **({"format": item["format"]} if "format" in item else {}),
+            "question": item["question"],
+            "bullets": item["bullets"],
+            "keywords": item.get("keywords", []),
+        }
         for item in shaped["lenses"]
     ]
     return shaped

@@ -30,6 +30,8 @@ def build(output):
         (stage / 'seed').mkdir()
         for name in ('issue_letters_seed.json', 'topics_seed.json', 'interest_bundles_seed.json', 'editors_seed.json', 'editors_topics_seed.json'):
             shutil.copy2(ROOT / 'docs/product/모아쓰기레터/seed' / name, stage / 'seed' / name)
+        # 검토한 실제 기사 정정안만 명시적으로 공급한다. 다른 로컬 seed는 포함하지 않는다.
+        shutil.copy2(SERVICE / 'seed/2026-10-15-audit-corrections.json', stage / 'seed/2026-10-15-audit-corrections.json')
         for version in (38, 42, 43, 44, 45, 46, 47):
             for path in (ROOT / 'docs/architecture/lens-erd-src').glob(f'lens_schema_v1.{version}_*.sql'):
                 shutil.copy2(path, stage / 'seed' / path.name)

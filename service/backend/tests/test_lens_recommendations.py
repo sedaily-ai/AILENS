@@ -96,3 +96,40 @@ def test_followed_editor_requires_actual_author_and_preserves_direct_interest():
  result=rank([unrelated,assigned],data,p)
  assert len(result['items'])==1 and result['items'][0]['reasons'][0]['type']=='editor'
  assert data['preferences']['interests']==[{'type':'category','key':'industry'}]
+
+
+@pytest.mark.parametrize(('tab','expected_paths'),[
+ (None,['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards','/notifications/preferences']),
+ ('home',['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards']),
+ ('archive',['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards','/notifications/preferences']),
+ ('records',['/recommendation-inputs','/letter-bookmarks']),
+ ('settings',['/recommendation-inputs','/recommendation-candidates','/rewards']),
+])
+def test_dashboard_only_reads_areas_used_by_tab_and_keeps_legacy_default(monkeypatch,tab,expected_paths):
+ calls=[]
+ def request(self,method,path,owner,body=None,query=None):
+  assert owner=='fixture-a'
+  calls.append(path)
+  if path=='/recommendation-inputs':return inputs()
+  if path=='/recommendation-candidates':return {'items':[card(keywords=['반도체'])],'latest':[],'candidate_limit':200}
+  if path=='/letter-bookmarks':return {'items':[],'total':7}
+  if path=='/notifications/preferences':return {'revision':7}
+  if path=='/rewards':return {'status':'ready','data':{'stamp_days':1},'error':None}
+  raise AssertionError(path)
+ monkeypatch.setattr(DashboardRepository,'request',request)
+ result=get_dashboard('fixture-a',{} if tab is None else {'tab':tab})
+ assert calls==expected_paths
+ assert result['profile']['status']=='ready'
+ assert result['profile']['data']['sentence_total']==1
+ if tab=='records':
+  assert result['saved_letters']['data']['total']==7
+  assert all(result[area]['status']=='unavailable' and result[area]['data'] is None for area in ('news','letters','weekly_rewards','notifications'))
+ if tab=='settings':
+  assert result['news']['status']=='ready' and result['weekly_rewards']['status']=='ready'
+  assert all(result[area]['status']=='unavailable' and result[area]['data'] is None for area in ('letters','saved_letters','notifications'))
+
+
+def test_invalid_dashboard_tab_is_rejected_before_storage(monkeypatch):
+ def request(*args,**kwargs):raise AssertionError('storage must not be called')
+ monkeypatch.setattr(DashboardRepository,'request',request)
+ with pytest.raises(DashboardError):get_dashboard('fixture-a',{'tab':'unknown'})

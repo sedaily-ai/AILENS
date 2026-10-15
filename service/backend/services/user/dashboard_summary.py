@@ -20,6 +20,9 @@ def area(fn):
 
 
 def get_dashboard(owner,params):
+    tab=params.get('tab')
+    if tab not in (None,'home','archive','records','settings'):
+        raise DashboardError(400,'INVALID_ARGUMENT','대시보드 탭을 확인해 주세요.')
     repo=DashboardRepository()
     data=repo.request('GET','/recommendation-inputs',owner)
     try:minutes=int(params.get('minutes',data['preferences']['minutes']))
@@ -27,11 +30,12 @@ def get_dashboard(owner,params):
     if minutes not in (0,5,10):raise DashboardError(400,'INVALID_ARGUMENT','읽을 시간은 0/5/10분이에요.')
     return {'schema_version':1,'scope':'account','generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),
             'format_preference':ready(data['format_preference']),'preferences':ready(data['preferences']),'profile':ready(profile(data)),
-            'news':area(lambda:recommend(owner,{'kind':'news','limit':4},inputs=data)),
-            'letters':area(lambda:recommend(owner,{'kind':'letter','limit':3,'minutes':minutes},inputs=data)),
-            'saved_letters':area(lambda:repo.request('GET','/letter-bookmarks',owner,query={'limit':3})),
+            'news':area(lambda:recommend(owner,{'kind':'news','limit':4},inputs=data)) if tab!='records' else unavailable(),
+            'letters':area(lambda:recommend(owner,{'kind':'letter','limit':3,'minutes':minutes},inputs=data)) if tab in (None,'home','archive') else unavailable(),
+            'saved_letters':area(lambda:repo.request('GET','/letter-bookmarks',owner,query={'limit':3})) if tab!='settings' else unavailable(),
             'recent_sentences':ready({'items':[{**row,'article_id':row.get('article_no') or ''} for row in data['recent_sentences']],'total':data['sentence_total']}),
-            'followed_editors':ready(data['followed_editors']),'weekly_rewards':_weekly(repo,owner),'notifications':area(lambda:repo.request('GET','/notifications/preferences',owner))}
+            'followed_editors':ready(data['followed_editors']),'weekly_rewards':_weekly(repo,owner) if tab!='records' else unavailable(),
+            'notifications':area(lambda:repo.request('GET','/notifications/preferences',owner)) if tab in (None,'archive') else unavailable()}
 
 
 def _weekly(repo,owner):
