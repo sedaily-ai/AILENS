@@ -258,6 +258,10 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
                         "label": label,
                         "question": extra_by_label.get(label, {}).get("question") or "",
                         "bullets": [b for b in (extra_by_label.get(label, {}).get("bullets") or []) if b],
+                        "keywords": [
+                            k for k in (extra_by_label.get(label, {}).get("keywords") or [])
+                            if k.get("term") and k.get("explain")
+                        ],
                     }
                     for label in lens_labels_by_pub.get(row["publication_id"], [])
                 ]
