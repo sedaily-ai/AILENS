@@ -8,6 +8,7 @@ import { LensFormatPanel } from '@/app/(economy)/_shared/components';
 import { PERSONAS } from '../lib/personas';
 import { eunneun, euro } from '../lib/korean';
 import { ResultCarousel } from './ResultCarousel';
+import type { Shares } from '../lib/distribution';
 import { resultTitle, type Glance, type Moment, type Resolved } from '../lib/moments';
 import { OnboardingHeader } from './OnboardingHeader';
 import { LetterInline } from './LetterInline';
@@ -20,6 +21,7 @@ export function MomentResult({
   resolved,
   formatIndex,
   lens,
+  shares,
   onChangeFormat,
   onBack,
   onLater,
@@ -29,6 +31,7 @@ export function MomentResult({
   resolved: Resolved;
   formatIndex: number;
   lens: CmsLens | null;
+  shares: Shares | null;
   onChangeFormat: (index: number) => void;
   onBack: () => void;
   onLater: () => void;
@@ -64,7 +67,7 @@ export function MomentResult({
       <OnboardingHeader hideProgress onBack={onBack} />
 
       <div style={{ padding: '14px 22px 0', maxWidth: 680, margin: '0 auto', width: '100%', textAlign: 'center' }}>
-        <ResultCarousel moment={moment} glance={glance} persona={persona} title={title} line={line} />
+        <ResultCarousel moment={moment} glance={glance} persona={persona} title={title} line={line} shares={shares} />
 
         <p style={{ margin: '30px 0 0', fontSize: 13, fontWeight: 700, color: '#374151' }}>이 기사, 이렇게도 볼 수 있어요</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 10 }}>

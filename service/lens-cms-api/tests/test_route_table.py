@@ -22,7 +22,7 @@ def _endpoint(method, path):
 
 
 def test_route_count_includes_account_storage():
-    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 163
+    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 165
 
 
 def test_static_paths_win_over_param_paths():
