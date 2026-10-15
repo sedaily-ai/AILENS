@@ -41,8 +41,7 @@ export function useLensFormatTabs(slug: string, initialLens: CmsLens | null | un
   }, [scrollRequest]);
   const noteDur = useCallback((i: number, raw: number) => {
     if (!Number.isFinite(raw) || raw <= 0) return;
-    const sec = Math.round(raw);
-    setMediaDur((cur) => (cur[i] === sec ? cur : { ...cur, [i]: sec }));
+    setMediaDur((cur) => (cur[i] === raw ? cur : { ...cur, [i]: raw }));
   }, []);
 
   useEffect(() => {
