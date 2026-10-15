@@ -64,6 +64,9 @@ pip3 install \
 python3 deployment/package.py --stage lambda-build
 find lambda-build -type d -name __pycache__ -exec rm -rf {} +
 find lambda-build -type f -name '*.pyc' -delete
+# umask 077 아래에서 만든 파일은 600이라 Lambda 실행 사용자가 읽지 못해 import가 실패한다.
+# zip에 담는 빌드 폴더만 파일 644·폴더 755로 맞춘다(다른 임시 파일의 umask 보호는 유지).
+chmod -R u=rwX,go=rX lambda-build
 
 # Create ZIP package
 echo "  -> Creating ZIP package..."

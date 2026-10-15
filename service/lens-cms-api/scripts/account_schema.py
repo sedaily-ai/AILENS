@@ -41,14 +41,14 @@ def connection(app=False):
             raise RuntimeError(f'필수 연결 환경변수 누락: {key}')
     return psycopg2.connect(host=os.environ[keys[0]], dbname=os.environ[keys[1]],
                             user=os.environ[keys[2]], password=os.environ[keys[3]],
-                            port=int(os.environ.get('PGPORT', '5432')),
+                            port=int(os.environ.get('PGPORT') or '5432'),  # 템플릿의 빈 PGPORT= 도 기본 포트
                             connect_timeout=5, options='-c lock_timeout=5000 -c statement_timeout=120000')
 
 
 def files():
     root = MIGRATIONS if MIGRATIONS.exists() and list(MIGRATIONS.glob('*.sql')) else SERVICE.parents[1] / 'docs/architecture/lens-erd-src'
     result = []
-    for version in range(48, 56):
+    for version in range(48, 57):  # v1.56 온보딩 집계(#112)까지
         matches = list(root.glob(f'lens_schema_v1.{version}_*.sql'))
         if len(matches) != 1:
             raise RuntimeError(f'v1.{version} SQL 누락/중복')

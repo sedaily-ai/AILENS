@@ -26,6 +26,10 @@ def lambda_handler(event, context):
     rc = event.get('requestContext') or {}
     method = (rc.get('http') or {}).get('method', event.get('httpMethod', 'GET'))
     path = event.get('rawPath') or (rc.get('http') or {}).get('path') or event.get('path', '')
+    # 이름 있는 스테이지(운영 dev)의 HTTP API는 rawPath 앞에 스테이지가 붙는다(/dev/api/v2/me/...).
+    stage = rc.get('stage') or ''
+    if stage and stage != '$default' and path.startswith(f'/{stage}/'):
+        path = path[len(stage) + 1:]
     request_id = rc.get('requestId', '')
     if method == 'OPTIONS':
         return _response(200, {})
