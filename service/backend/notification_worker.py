@@ -36,4 +36,6 @@ if __name__=='__main__':
     if not args.live and host not in ('127.0.0.1','localhost','::1'):raise SystemExit('로컬 검증은 내부 API loopback 주소를 명시해야 합니다.')
     if args.live and os.environ.get('LENS_PUSH_LIVE_ENABLED')!='true':raise SystemExit('실제 발송은 별도 운영 활성화가 필요합니다.')
     if not 1<=args.limit<=100:raise SystemExit('limit은1~100입니다.')
-    print(json.dumps(run(args.limit,args.live),ensure_ascii=False))
+    result=run(args.limit,args.live)
+    print(json.dumps(result,ensure_ascii=False))
+    if any(item.get('error') for item in result):raise SystemExit(1)

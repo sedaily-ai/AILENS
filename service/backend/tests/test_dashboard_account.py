@@ -122,3 +122,14 @@ def test_archive_delete_preserves_dependency_status(monkeypatch,tokens,status):
         raise urllib.error.HTTPError('http://127.0.0.1',status,'fixture',{},None)
     monkeypatch.setattr(archive.svc,'get_personal_repository',lambda:SimpleNamespace(delete_archived_sentence=broken))
     assert archive.lambda_handler(event('/api/archive/1','DELETE',tokens()),None)['statusCode']==(403 if status==403 else 503)
+
+
+def test_archive_personal_errors_are_private_and_popular_is_public(monkeypatch):
+    for method in ('GET','POST','DELETE','PUT'):
+        response=archive.lambda_handler(event('/api/archive',method=method),None)
+        assert response['headers']['Cache-Control']=='private, no-store'
+    response=archive.lambda_handler(event('/api/archive/not-popular/popular'),None)
+    assert response['statusCode']==401
+    async def public(params):return {'statusCode':200,'headers':{},'body':'{}'}
+    monkeypatch.setattr(archive.svc,'handle_popular',public)
+    assert 'Cache-Control' not in archive.lambda_handler(event('/api/archive/popular'),None)['headers']

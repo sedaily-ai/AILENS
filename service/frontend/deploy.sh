@@ -25,6 +25,7 @@
 #   - output: "standalone" (next.config.ts) → .next/standalone/ 생성,
 #     Dockerfile이 이걸 그대로 컨테이너 이미지에 담는다.
 set -euo pipefail
+umask 077
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/resources.env"
 
 WAIT=1
@@ -40,9 +41,40 @@ cd "$SCRIPT_DIR"
 
 REGION="us-east-1"
 ACCOUNT_ID="$AWS_ACCOUNT_ID"
-REPO="sedaily-lens-frontend"
-CLUSTER="sedaily-lens-frontend"
+REPO="$SERVICE_FRONTEND_ECS_SERVICE"
+CLUSTER="$SERVICE_FRONTEND_ECS_CLUSTER"
 ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
+
+# 첫 이미지 push/태스크 등록 전에 계정·기존 서비스·비용 태그를 검사한다.
+test "$(aws sts get-caller-identity --query Account --output text)" = "$AWS_ACCOUNT_ID"
+aws ecs describe-services --cluster "$CLUSTER" --services "$REPO" --region "$REGION" --output json > /tmp/lens-frontend-preflight.json
+python3 - /tmp/lens-frontend-preflight.json tags-ecs.json <<'PYPREFLIGHT'
+import json,sys
+state=json.load(open(sys.argv[1]));tags=json.load(open(sys.argv[2]))
+if state.get('failures') or len(state.get('services',[]))!=1 or state['services'][0].get('status')!='ACTIVE':
+    raise SystemExit('기존 ECS 서비스 확인 실패 — 변경 전에 중단')
+if not any(tag['key']=='Service' and tag['value']=='lens' for tag in tags):
+    raise SystemExit('신규 task definition Service=lens 태그 필요')
+PYPREFLIGHT
+
+# 실행 중인 이전 이미지 digest를 보존한다. latest 태그 재지정 후에도 복구 가능해야 한다.
+BEFORE_TASK=$(python3 -c 'import json;print(json.load(open("/tmp/lens-frontend-preflight.json"))["services"][0]["taskDefinition"])')
+aws ecs describe-task-definition --task-definition "$BEFORE_TASK" --region "$REGION" > /tmp/lens-frontend-before-definition.json
+RUNNING_TASKS=$(aws ecs list-tasks --cluster "$CLUSTER" --service-name "$REPO" --desired-status RUNNING --region "$REGION" --query 'taskArns' --output text)
+test -n "$RUNNING_TASKS"
+aws ecs describe-tasks --cluster "$CLUSTER" --tasks $RUNNING_TASKS --region "$REGION" > /tmp/lens-frontend-before-running.json
+BEFORE_DIGEST=$(python3 - "$BEFORE_TASK" <<'PYDIGEST'
+import json,sys
+state=json.load(open('/tmp/lens-frontend-before-running.json'))
+tasks=state.get('tasks',[])
+if state.get('failures') or not tasks or any(task['taskDefinitionArn']!=sys.argv[1] for task in tasks):
+    raise SystemExit('진행 중인 다른 롤링 배포 — 변경 전에 중단')
+digests={c.get('imageDigest','') for task in tasks for c in task.get('containers',[]) if c['name']=='frontend'}
+if len(digests)!=1:raise SystemExit('이전 실행 이미지가 단일 digest가 아님')
+print(next(iter(digests)))
+PYDIGEST
+)
+python3 scripts/release_task.py --definition /tmp/lens-frontend-before-definition.json --repository "$ECR_URI" --digest "$BEFORE_DIGEST" --output /tmp/lens-frontend-rollback-task.json
 
 echo "=== 1/4 이미지 빌드 (linux/arm64 — Fargate 태스크 정의와 일치) ==="
 # 2026-10-13 모노레포 전환 — 빌드 컨텍스트는 **레포 루트**(../..) 다.
@@ -50,15 +82,27 @@ echo "=== 1/4 이미지 빌드 (linux/arm64 — Fargate 태스크 정의와 일�
 # 포함돼야 npm ci(워크스페이스)가 성립한다. Dockerfile 은 -f 로 명시한다
 # (Dockerfile·next.config.ts outputFileTracingRoot 주석 참조).
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+: "${NEXT_PUBLIC_API_URL:?계정 API 공개 URL을 공급하세요}"
+: "${NEXT_PUBLIC_CMS_API_URL:?CMS 공개 URL을 공급하세요}"
+python3 - "$NEXT_PUBLIC_API_URL" "$NEXT_PUBLIC_CMS_API_URL" <<'PYURL'
+import sys
+from urllib.parse import urlsplit
+for value in sys.argv[1:]:
+    parsed = urlsplit(value)
+    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise SystemExit('공개 API URL은 자격증명 없는 HTTPS 주소여야 합니다.')
+PYURL
 docker build --platform linux/arm64 -t "${REPO}:latest" \
+  --build-arg NEXT_PUBLIC_API_URL --build-arg NEXT_PUBLIC_CMS_API_URL \
   -f "$SCRIPT_DIR/Dockerfile" "$REPO_ROOT"
 lap "빌드"
 
 echo ""
 echo "=== 2/4 ECR push ==="
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
-docker tag "${REPO}:latest" "${ECR_URI}:latest"
-docker push "${ECR_URI}:latest"
+RELEASE_TAG="release-$(date -u +%Y%m%dT%H%M%S)-$(python3 -c 'import uuid;print(uuid.uuid4().hex[:12])')"
+docker tag "${REPO}:latest" "${ECR_URI}:${RELEASE_TAG}"
+docker push "${ECR_URI}:${RELEASE_TAG}"
 lap "ECR push"
 
 echo ""
@@ -66,14 +110,16 @@ echo "=== 3/4 태스크 정의 새 리비전 등록 ==="
 # --tags 필수(비용태깅_규칙.md §5) — task definition은 불변이라 새
 # 리비전은 이전 리비전의 태그를 상속하지 않는다. 매 배포마다 다시 줘야
 # 한다.
-aws ecs register-task-definition --cli-input-json file://taskdef.json --region "$REGION" \
-  --tags file://tags-ecs.json \
-  --query "taskDefinition.{Family:family,Revision:revision}" --output json
+NEW_DIGEST=$(aws ecr describe-images --repository-name "$REPO" --image-ids "imageTag=$RELEASE_TAG" --region "$REGION" --query 'imageDetails[0].imageDigest' --output text)
+python3 scripts/release_task.py --definition taskdef.json --repository "$ECR_URI" --digest "$NEW_DIGEST" --output /tmp/lens-frontend-new-task.json
+NEW_TASK_ARN=$(aws ecs register-task-definition --cli-input-json file:///tmp/lens-frontend-new-task.json --region "$REGION" \
+  --tags file://tags-ecs.json --query 'taskDefinition.taskDefinitionArn' --output text)
+test "$(aws ecs list-tags-for-resource --resource-arn "$NEW_TASK_ARN" --region "$REGION" --query "tags[?key=='Service'].value | [0]" --output text)" = lens
 
 echo ""
 echo "=== 4/4 ECS 서비스 롤링 배포 ==="
 aws ecs update-service --cluster "$CLUSTER" --service "$CLUSTER" \
-  --task-definition "$CLUSTER" --force-new-deployment \
+  --task-definition "$NEW_TASK_ARN" --force-new-deployment \
   --region "$REGION" --query "service.{Status:status,DesiredCount:desiredCount,RunningCount:runningCount}" --output json
 
 lap "태스크 정의·롤링 시작"

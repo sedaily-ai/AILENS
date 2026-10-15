@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+from media_duration import measured_duration
+
 import importlib.util
 import os
 import re
@@ -411,10 +413,12 @@ def publish_article(
              "paragraphs": [], "images": webtoon_images, "video_url": None, "media_url": None,
              "pending": not webtoon_images},
             {"label": "팟캐스트", "question": letter_title, "bullets": [], "paragraphs": [],
-             "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript},
+             "images": [], "video_url": None, "media_url": podcast_url, "transcript": podcast_transcript,
+             "duration_seconds": measured_duration(podcast_mp3)},
             {"label": "영상", "question": letter_title, "bullets": [], "paragraphs": [],
              "images": [], "video_url": video_url, "media_url": None, "thumbnail_url": thumb_url,
-             "pending": video_url is None, "transcript": video_transcript},
+             "pending": video_url is None, "transcript": video_transcript,
+             "duration_seconds": measured_duration(video["mp4_path"]) if video_url else None},
         ]
 
         publish_date_iso = f"{today_kst[:4]}-{today_kst[4:6]}-{today_kst[6:8]}"

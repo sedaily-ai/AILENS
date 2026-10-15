@@ -17,8 +17,16 @@
 #                               Handler 설정 함정은 service/backend/CLAUDE.md "Handler 접두사 함정" 참조)
 
 set -euo pipefail
+umask 077
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+source "$SCRIPT_DIR/../../config/resources.env"
 DEPLOY_TARGET="${1:-all}"
+case "$DEPLOY_TARGET" in all|api|time-machine|account) ;; *) echo "use: all, api, time-machine, account" >&2; exit 1 ;; esac
+if [ "$DEPLOY_TARGET" = account ]; then
+  python3 deployment/account_gateway.py preflight
+fi
 
 echo "Starting Sedaily-MBTI Backend Deployment (target: $DEPLOY_TARGET)..."
 echo ""
@@ -52,46 +60,10 @@ pip3 install \
   --no-cache-dir \
   --quiet
 
-# Copy source code modules
-# newsletter/ 는 handlers/content/subscribe.py 가 사용한다.
-echo "  -> Copying source code..."
-for dir in clients handlers config core models repositories services common newsletter; do
-  if [ -d "$dir" ]; then
-    echo "    -> $dir/"
-    cp -r "$dir" lambda-build/
-  fi
-done
-
-# Copy prompt files (needed by MbtiTransformService)
-if [ -d "prompts" ]; then
-  echo "    -> prompts/"
-  cp -r prompts lambda-build/
-fi
-
-# Copy legacy prompt file (fallback)
-if [ -f "MBTI_TRANSFORM_PROMPT.md" ]; then
-  cp MBTI_TRANSFORM_PROMPT.md lambda-build/
-fi
-
-# Remove files that should NOT be in the Lambda package
-echo "  -> Cleaning up unnecessary files..."
-find lambda-build -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-find lambda-build -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-find lambda-build -type f -name "*.pyc" -delete 2>/dev/null || true
-# infrastructure/ 는 패키지에 포함하지 않는다.
-
-# 레거시 핸들러 경로 shim: handler 설정이 아직 이전 경로인 Lambda가 코드 갱신 직후 깨지지 않도록 패키징 시에만 생성한다.
-# Step 3 에서 handler 설정을 새 경로로 변경하면 shim 은 호출되지 않는다.
-echo "  -> Generating legacy handler shims..."
-grep -v '^#' lambda_handlers.txt | while read -r _fn OLD_MOD NEW_MOD; do
-  [ -z "$OLD_MOD" ] && continue
-  OLD_PATH="lambda-build/$(echo "$OLD_MOD" | tr . /).py"
-  OLD_DIR="$(dirname "$OLD_PATH")"
-  mkdir -p "$OLD_DIR"
-  # 레거시 패키지 디렉터리(handlers/voice, handlers/websocket)에 __init__.py 를 생성한다
-  [ -f "$OLD_DIR/__init__.py" ] || touch "$OLD_DIR/__init__.py"
-  printf 'from %s import lambda_handler  # noqa: F401  (전환용 shim)\n' "$NEW_MOD" > "$OLD_PATH"
-done
+# 소스/worker/shim을 동일한 허용 목록으로 복사한다.
+python3 deployment/package.py --stage lambda-build
+find lambda-build -type d -name __pycache__ -exec rm -rf {} +
+find lambda-build -type f -name '*.pyc' -delete
 
 # Create ZIP package
 echo "  -> Creating ZIP package..."
@@ -111,14 +83,17 @@ echo ""
 # Step 2: Upload to S3
 # ============================================
 echo "Uploading to S3..."
-aws s3 cp lambda_package.zip s3://sedaily-mbti-lambda-packages-dev/ --quiet
-echo "  [OK] Uploaded to s3://sedaily-mbti-lambda-packages-dev/lambda_package.zip"
+aws s3 cp lambda_package.zip s3://$SERVICE_LAMBDA_PACKAGE_BUCKET/ --quiet
+echo "  [OK] Uploaded to s3://$SERVICE_LAMBDA_PACKAGE_BUCKET/lambda_package.zip"
 echo ""
 
 # ============================================
 # Step 3: Update Lambda Functions
 # ============================================
 echo "Updating Lambda functions..."
+if [ "$DEPLOY_TARGET" = account ]; then
+  python3 deployment/account_gateway.py ensure
+fi
 
 # --- API Functions (원래 v1 이름) ---
 API_FUNCTIONS=(
@@ -170,6 +145,9 @@ case "$DEPLOY_TARGET" in
   all)
     FUNCTIONS=("${API_FUNCTIONS[@]}" "${API_V2_FUNCTIONS[@]}")
     ;;
+  account)
+    FUNCTIONS=("$ACCOUNT_DASHBOARD_FUNCTION" "$ACCOUNT_ARCHIVE_FUNCTION")
+    ;;
   time-machine)
     FUNCTIONS=("sedaily-mbti-time-machine-dev")
     ;;
@@ -183,7 +161,7 @@ esac
 # Durable Functions 런타임 가드: python3.14 전용 Durable Functions 는 API Gateway HTTP proxy 통합과
 # 호환되지 않아 호출자가 500 "Invalid Status in invocation output"을 받는다.
 # 이 스크립트는 python3.11 wheel 로 빌드하므로 배포 전에 런타임을 확인한다.
-SUPPORTED_RUNTIMES="python3.11 python3.12"
+SUPPORTED_RUNTIMES="python3.11"
 
 SUCCESS_COUNT=0
 FAIL_COUNT=0
@@ -198,7 +176,8 @@ for FUNCTION_NAME in "${FUNCTIONS[@]}"; do
 
   if [ -z "$CONFIG_JSON" ]; then
     echo "    [SKIP] Function not found"
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$DEPLOY_TARGET" != account ] || exit 1
     continue
   fi
 
@@ -207,26 +186,29 @@ for FUNCTION_NAME in "${FUNCTIONS[@]}"; do
 
   if [ -n "$DURABLE_KEYS" ]; then
     echo "    [SKIP] Durable Functions config detected ($DURABLE_KEYS) — incompatible with API Gateway proxy. Recreate on python3.11 without durable execution."
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$DEPLOY_TARGET" != account ] || exit 1
     continue
   fi
 
   if [[ " $SUPPORTED_RUNTIMES " != *" $RUNTIME "* ]]; then
     echo "    [SKIP] Runtime is '$RUNTIME' — this script builds wheels for python3.11. Change Runtime in AWS console, then re-run."
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$DEPLOY_TARGET" != account ] || exit 1
     continue
   fi
 
   if aws lambda update-function-code \
     --function-name "$FUNCTION_NAME" \
-    --s3-bucket sedaily-mbti-lambda-packages-dev \
+    --s3-bucket "$SERVICE_LAMBDA_PACKAGE_BUCKET" \
     --s3-key lambda_package.zip \
     --region us-east-1 \
     --output json \
     --query 'LastModified' \
     > /dev/null 2>&1; then
     echo "    [OK] Updated (runtime: $RUNTIME)"
-    ((SUCCESS_COUNT++))
+    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    aws lambda wait function-updated --function-name "$FUNCTION_NAME" --region "$AWS_REGION"
     # handler 설정을 새 모듈 경로로 맞춘다(이미 같으면 건너뜀). 코드 갱신이 끝난 뒤에 바꿔야 shim이 그 사이를 받친다.
     NEW_MOD=$(grep -v '^#' lambda_handlers.txt | awk -v f="$FUNCTION_NAME" '$1==f {print $3}')
     if [ -n "$NEW_MOD" ]; then
@@ -237,18 +219,29 @@ for FUNCTION_NAME in "${FUNCTIONS[@]}"; do
         aws lambda update-function-configuration --function-name "$FUNCTION_NAME" \
           --handler "$WANT_HANDLER" --region us-east-1 --output text --query 'Handler' > /dev/null \
           && echo "    [OK] handler: $CUR_HANDLER -> $WANT_HANDLER" \
-          || echo "    [WARN] handler 갱신 실패(옛 경로 shim으로 계속 동작)"
+          || { echo "    [FAIL] handler 갱신 실패" >&2; exit 1; }
+        aws lambda wait function-updated --function-name "$FUNCTION_NAME" --region "$AWS_REGION"
       fi
     fi
   else
     echo "    [FAIL] update-function-code returned error"
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$DEPLOY_TARGET" != account ] || exit 1
   fi
 done
 
 echo ""
 echo "[DONE] Deployment complete! ($SUCCESS_COUNT updated, $FAIL_COUNT skipped)"
 echo ""
+
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  echo "[FAIL] 함수 갱신 실패 — 다음 단계 중단" >&2
+  exit 1
+fi
+if [ "$DEPLOY_TARGET" = account ]; then
+  python3 deployment/account_gateway.py apply
+  exit 0
+fi
 
 # ============================================
 # Step 4: Health Check

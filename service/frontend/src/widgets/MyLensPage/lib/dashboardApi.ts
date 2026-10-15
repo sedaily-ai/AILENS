@@ -1,3 +1,4 @@
+import type { NotificationState } from './notificationsApi';
 import { ECON_CATEGORIES } from '@ailens/domain';
 import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/auth/authFetch';
@@ -20,7 +21,7 @@ export interface ServerProfile {
 export interface LensDashboard {
   schema_version:1;scope:'account';format_preference:Area<FormatPreferenceData>;news:Area<Recommendations>;letters:Area<Recommendations>;profile:Area<ServerProfile>;
   recent_sentences:Area<{items:(ArchiveSentenceResponse & {article_no?:string})[];total:number}>;
-  saved_letters:Area<{total:number}>;weekly_rewards:Area<RewardWeek>;notifications:Area<unknown>;
+  saved_letters:Area<{total:number}>;weekly_rewards:Area<RewardWeek>;notifications:Area<NotificationState>;
 }
 export class DashboardApiError extends Error { constructor(public status:number,message:string){super(message);} }
 export const DASHBOARD_AUTH_REQUIRED='lens-dashboard-auth-required';

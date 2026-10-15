@@ -20,6 +20,19 @@ zip **하나**를 만들어서 `deploy.sh`에 하드코딩된 함수 이름 목�
 3. `__pycache__`/`*.pyc` 정리 후 `lambda_package.zip`으로 압축
 4. 목록의 각 함수에 순차적으로 `update-function-code`
 
+## 나의 LENS 계정 API 배포
+
+```bash
+cd service/backend
+export ACCOUNT_RELEASE_BACKUP_DIR="$(mktemp -d /tmp/lens-account-release.XXXXXX)"
+./deploy.sh account
+```
+
+`account`는 dashboard·archive만 갱신하고 dashboard 신규 함수와 Gateway 경로를 준비한다.
+DB v1.48~55와 CMS 적용이 선행돼야 한다. 환경·인증·복구를 포함한 전체 절차는
+[나의 LENS 배포 실행 명령](../../docs/product/나의LENS/배포실행_명령.md)을 따른다.
+운영 적용 전용 명령이며 로컬 검증 목적으로 실행하지 않는다.
+
 ## ⚠️ 함수 하나만 고쳤을 땐 이 스크립트를 그대로 돌리지 않는다
 
 `deploy.sh`를 실행하면 이번에 안 건드린 19개 함수까지 **같은 zip**으로
@@ -63,6 +76,6 @@ rm -rf lambda-build lambda_package.zip
 - `admin/backend/deploy-admin-api.sh` — admin API Lambda 전용(별도 함수,
   별도 zip 규약 — flat import).
 - `admin/frontend/deploy-admin.sh` — admin 콘솔 프런트엔드(S3+CloudFront).
-- `service/frontend/deploy.sh` — 공개 사이트 SSR(EC2+PM2).
+- `service/frontend/deploy.sh` — 공개 사이트 Next.js SSR(ECS Fargate).
 - `pipelines/frontpage_auto/deploy.sh` — mustknow_auto/frontpage_auto가
   공유하는 Docker 이미지(ECS Fargate) 배포.

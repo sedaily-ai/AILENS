@@ -1,0 +1,19 @@
+[Unit]
+Description=LENS notification dry-run oneshot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=lens-notification
+Group=lens-notification
+WorkingDirectory=/opt/lens-cms-api/notification-worker
+EnvironmentFile=/etc/lens-notification-worker.env
+Environment=LENS_PUSH_MODE=dry_run
+Environment=LENS_PUSH_LIVE_ENABLED=false
+ExecStart=/opt/lens-cms-api/venv/bin/python notification_worker.py --limit 100
+TimeoutStartSec=3600
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
