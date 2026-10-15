@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@/shared/lib/auth/authFetch', () => ({ authFetch: request }));
 vi.mock('@/shared/config/apiClient', () => ({ API_URL: 'http://127.0.0.1:4102' }));
-import { AccountApiError, getAccountBookmarks, putLensPreferences, setAccountBookmark, getAccountFollows, setAccountFollow, importBrowserBookmarks } from './accountApi';
+import { AccountApiError, getAccountBookmarks, getLensPreferences, putLensPreferences, setAccountBookmark, getAccountFollows, setAccountFollow, importBrowserBookmarks } from './accountApi';
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 describe('계정 저장 API 어댑터', () => {
   beforeEach(() => request.mockReset());
@@ -39,6 +39,60 @@ describe('계정 저장 API 어댑터', () => {
     expect(request.mock.calls[1][0]).toContain('cursor=a%2Bb%3D');
     request.mockResolvedValue(response({},503));
     await expect(getAccountBookmarks()).rejects.toBeInstanceOf(AccountApiError);
+  });
+});
+
+describe('팔로우·관심 설정 조회 복구', () => {
+  beforeEach(() => { request.mockReset(); });
+
+  it('팔로우 연결이 한 번 끊기면 같은 GET을 다시 읽어 기존 항목을 반환한다', async () => {
+    const data = { items: [{ id: 'mincheol', active: true }], total: 1 };
+    const signal = new AbortController().signal;
+    request.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(response(data));
+    expect(await getAccountFollows(signal)).toEqual(data);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls.every(([url, options]) => url.endsWith('/followed-editors') && options.method === 'GET' && options.signal === signal && options.cache === 'no-store')).toBe(true);
+  });
+
+  it.each([502, 503, 504])('관심 설정 HTTP %i는 한 번 재조회해 저장된 값을 반환한다', async status => {
+    const data = { interests: [{ type: 'category', key: 'industry' }], minutes: 5, revision: 3, updated_at: null };
+    request.mockResolvedValueOnce(response({}, status)).mockResolvedValueOnce(response(data));
+    expect(await getLensPreferences()).toEqual(data);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('지속적인 연결 실패는 한국어 오류로 끝내고 수동 재조회로 복구한다', async () => {
+    request.mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(getAccountFollows()).rejects.toThrow('연결이 원활하지 않아 불러오지 못했어요.');
+    expect(request).toHaveBeenCalledTimes(2);
+    request.mockResolvedValueOnce(response({ items: [], total: 0 }));
+    expect(await getAccountFollows()).toEqual({ items: [], total: 0 });
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([401, 403, 429])('HTTP %i는 재시도 없이 원래 계정 오류를 유지한다', async status => {
+    request.mockResolvedValue(response({ error: { code: 'FIXTURE', message: 'fixture' } }, status));
+    await expect(getAccountFollows()).rejects.toMatchObject({ status, code: 'FIXTURE' });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('탭 전환으로 취소된 조회는 재시작하지 않는다', async () => {
+    const controller = new AbortController();
+    request.mockImplementationOnce(() => { controller.abort(); throw new TypeError('Failed to fetch'); });
+    await expect(getAccountFollows(controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('팔로우 저장·해제·관심 저장·가져오기 실패는 자동 재시도하지 않는다', async () => {
+    request.mockRejectedValue(new TypeError('Failed to fetch'));
+    const operations = [
+      () => setAccountFollow('mincheol', true),
+      () => setAccountFollow('mincheol', false),
+      () => putLensPreferences({ interests: [], minutes: 5, revision: 3, updated_at: null }),
+      () => importBrowserBookmarks(['one'], 'local-import'),
+    ];
+    for (const operation of operations) await expect(operation()).rejects.toThrow('Failed to fetch');
+    expect(request).toHaveBeenCalledTimes(operations.length);
   });
 });
 
