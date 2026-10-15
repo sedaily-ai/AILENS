@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import type { LetterBlock } from '../../data/letterTypes';
 
 /** 레터 본문 안의 시각 블록(타임라인·숫자 카드·막대 비교·양측 카드·접기·강조 박스). 색은 섹션 축 색(tone) 하나만 쓴다. */
@@ -58,7 +59,7 @@ export function LetterBlockView({ block, tone }: { block: LetterBlock; tone: str
     case 'fold':
       return (
         <details className="lb lb-fold" style={style}>
-          <summary>{block.title}</summary>
+          <summary><span>{block.title}</span><ChevronDown size={18} aria-hidden /></summary>
           <p>{block.text}</p>
         </details>
       );
