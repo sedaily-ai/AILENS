@@ -177,9 +177,24 @@ export const LENS_VIEW_CSS = `
         .lread > .lread-box-vote { background: #fff; box-shadow: 0 0 0 1px #e5e7eb inset; }
         .lread-box-vote .lread-box-title { color: #374151; }
         .lread-box-vote p { margin-bottom: 7px; font-size: calc(15px * var(--lens-font-scale, 1)); }
-        .lread > .lread-more { margin: 18px 0 0; padding: 12px 15px; border-radius: 10px; background: #fffbeb; }
-        .lread-more summary { cursor: pointer; font-size: 14px; font-weight: 700; color: #92400e; }
-        .lread-more p { margin: 10px 0 0; font-size: calc(15px * var(--lens-font-scale, 1)); }
+        .lread > .lread-more { margin: 18px 0 0; border: 1px solid #fde7b0; border-radius: 10px; background: #fffbeb; overflow: hidden; }
+        .lread-more summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 14px 16px; list-style: none; cursor: pointer; font-size: 14px; font-weight: 700; color: #92400e; }
+        .lread-more summary::-webkit-details-marker { display: none; }
+        .lread-more summary::marker { content: ''; }
+        .lread-more summary span { min-width: 0; overflow-wrap: anywhere; }
+        .lread-more summary svg { flex-shrink: 0; }
+        .lread-more summary:hover { background: #fef3c7; }
+        .lread-more summary:focus-visible { outline: 2px solid #92400e; outline-offset: -3px; }
+        .lread-more[open] > summary { border-bottom: 1px solid #fde7b0; }
+        .lread-more[open] > summary svg { transform: rotate(180deg); }
+        .lread-more-content { padding: 16px; }
+        .lread-more-content > * { margin: 0 0 10px; }
+        .lread-more-content > :last-child { margin-bottom: 0; }
+        .lread-more-content ul { list-style: disc; padding-left: 1.35em; }
+        .lread-more-content ol { list-style: decimal; padding-left: 1.5em; }
+        .lread-more-content li + li { margin-top: 6px; }
+        .lread-more-content blockquote { border-left: 2px solid #fde7b0; padding-left: 12px; }
+        .lread-more-content { font-size: calc(15px * var(--lens-font-scale, 1)); line-height: 1.7; }
         /* 새 레터 틀 v2 — 샘플 HTML과 같은 크기·간격(본문 15.5px / 줄간격 1.75 / 문단 간격 12px / 칸 간격 28px / 소제목 19px 산세리프). */
         .lread[data-tpl="v2"] > p, .lread[data-tpl="v2"] > ul, .lread[data-tpl="v2"] > ol, .lread[data-tpl="v2"] > blockquote { font-size: calc(15.5px * var(--lens-font-scale, 1)); line-height: 1.75; letter-spacing: 0; }
         .lread[data-tpl="v2"] > p.lread-lead { font-size: calc(15.5px * var(--lens-font-scale, 1)); line-height: 1.75; font-weight: 400; color: #1f2937; }

@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import { PostVote, parseVoteChoices } from './PostVote';
 import { renderInline } from './renderInline';
 import type { CSSProperties } from 'react';
@@ -100,8 +101,8 @@ export function LetterReadingBody({
             if (b.kind === 'more') {
               return (
                 <details key={bi} className="lread-more">
-                  <summary>{title}</summary>
-                  {b.children.map(renderPlain)}
+                  <summary><span>{title}</span><ChevronDown size={18} aria-hidden /></summary>
+                  <div className="lread-more-content">{b.children.map(renderPlain)}</div>
                 </details>
               );
             }

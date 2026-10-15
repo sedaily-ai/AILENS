@@ -39,9 +39,17 @@ export const VOTE_CSS = `
   .lb-vs-c { display: grid; gap: 6px; padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fafbfc; align-content: start; }
   .lb-vs-l { font-size: 13.5px; font-weight: 700; color: var(--bt); }
   .lb-vs-t { font-size: 15px; line-height: 1.7; color: #1f2937; }
-  .lb-fold { border: 1px solid #e5e7eb; border-radius: 14px; background: #fafbfc; padding: 12px 16px; }
-  .lb-fold summary { cursor: pointer; font-size: 14.5px; font-weight: 700; color: #111827; }
-  .lb-fold p { margin: 8px 0 0; font-size: 15px; line-height: 1.8; color: #374151; }
+  .lb-fold { border: 1px solid #e5e7eb; border-radius: 10px; background: #fafbfc; overflow: hidden; }
+  .lb-fold summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 14px 16px; list-style: none; cursor: pointer; font-size: 14.5px; font-weight: 700; color: #111827; }
+  .lb-fold summary::-webkit-details-marker { display: none; }
+  .lb-fold summary::marker { content: ''; }
+  .lb-fold summary span { min-width: 0; overflow-wrap: anywhere; }
+  .lb-fold summary svg { flex-shrink: 0; color: #647084; }
+  .lb-fold summary:hover { background: #f0f3f8; }
+  .lb-fold summary:focus-visible { outline: 2px solid #2f5fcf; outline-offset: -3px; }
+  .lb-fold[open] > summary { border-bottom: 1px solid #e5e7eb; }
+  .lb-fold[open] > summary svg { transform: rotate(180deg); }
+  .lb-fold p { margin: 0; padding: 16px; font-size: 15px; line-height: 1.8; color: #374151; }
   .lb-call { padding: 12px 16px; border-left: 3px solid var(--bt); background: #fafbfc; font-size: 15.5px; line-height: 1.8; color: #1f2937; }
   @media (max-width: 520px) { .lb-tl li { grid-template-columns: 1fr; gap: 2px; } .lb-vs { grid-template-columns: 1fr; } .lb-bar { grid-template-columns: 52px 1fr 64px; } }
 `;

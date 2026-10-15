@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Copy, Quote, Search, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Copy, Info, Quote, Search, Trash2 } from 'lucide-react';
 import { type IssueLetter } from '@/features/letter';
 import { DashboardLetter } from './DashboardLetter';
 import { sentenceSourceHref } from '../lib/drawerModel';
@@ -84,7 +84,7 @@ export function DrawerPanel({ notificationNotice, storageNotice, archive, articl
       {archive.loading || newsLoading ? <p className="ml-loading" role="status">문장과 관련 뉴스를 살펴보고 있어요.</p> : !archive.owner ? <p className="ml-helper">로그인 후 내 서랍의 문장을 확인할 수 있어요.</p> : archive.failed ? <><p className="ml-helper">문장을 불러오지 못했어요.</p><button className="ml-text-link" onClick={archive.retry}>문장 다시 불러오기</button></> : !selected ? <p className="ml-helper">선택한 문장을 찾지 못했어요. 삭제했거나 현재 불러온 문장에 포함되지 않을 수 있어요.</p> : <>
         <blockquote className="ml-related-quote">{selected.text}</blockquote>
         {!newsAvailable ? <><p className="ml-helper">관련 뉴스를 불러오지 못했어요.</p><button className="ml-text-link" onClick={retryNews}>뉴스 다시 불러오기</button></> : related.length ? <div className="ml-news-list">{related.map((article) => <article key={article.id} className="ml-news-item"><div className="ml-news-meta"><span>{normalizeCategory(article.category)?.label ?? (article.category || '뉴스')}</span><time dateTime={article.date}>{article.date.replaceAll('-', '.')}</time></div><Link href={article.href}><h3>{article.title}</h3><ArrowUpRight size={17} aria-hidden /></Link>{article.context && <p className="ml-news-context">{article.context}</p>}<div className="ml-news-reasons">{article.reasons.filter((reason) => reason.type === 'sentence').map((reason) => <span key={reason.type}>{reason.text}</span>)}</div></article>)}</div> : <p className="ml-helper">현재 공개된 뉴스에서 이 문장의 단어와 맞는 새 글을 찾지 못했어요.</p>}
-        <details className="ml-format-method"><summary>관련 글 추천 기준 보기</summary><p className="ml-storage-note">현재는 단어 일치 기준이에요. 이미 열람했거나 문장을 담은 원문은 제외해요. 의미가 비슷한 글을 찾는 분석은 준비 중이에요.</p></details>
+        <div className="ml-method-note"><Info size={15} aria-hidden /><p>관련 글은 단어 일치로 찾아요. 이미 열람했거나 문장을 담은 원문은 제외해요. 의미가 비슷한 글을 찾는 분석은 준비 중이에요.</p></div>
         <div className="ml-drawer-alert"><div><strong>다음 이야기를 소식으로 받아보려면</strong><p>저장 문장 활용과 새 글 알림을 알림 설정에서 별도로 선택해 주세요.</p></div><Link href="/my-lens?tab=settings#ml-notifications" className="ml-text-link">알림 설정 <ArrowUpRight size={14} /></Link><span className="ml-pending-label">{notificationNotice}</span></div>
       </>}
     </section>}

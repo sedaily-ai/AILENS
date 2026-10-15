@@ -10,7 +10,7 @@ import {
 } from '@/shared/ui/icons/SocialShareIcons';
 
 // 기사 공유 버튼 행. lens/[slug]/LensViewClient.tsx와 letters/[id]/LetterDetailClient.tsx가 공유한다.
-// 같은 링크 복사는 한 곳에 두고, 외부 서비스 공유는 펼쳐서 선택한다.
+// 링크 복사와 외부 서비스 공유를 한 줄에서 바로 선택한다.
 export function ArticleShareButtons({ title, url, showCopy = true }: { title: string; url: string; showCopy?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
@@ -44,14 +44,14 @@ export function ArticleShareButtons({ title, url, showCopy = true }: { title: st
     }
   }, [url, title]);
 
-  const btnCls = 'text-gray-400 hover:text-gray-900 transition-colors';
+  const btnCls = 'inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors';
 
   return (
     <div className="flex flex-wrap items-center" style={{ gap: 12 }}>
       {showCopy && <button
         type="button"
         onClick={handleCopyLink}
-        className={`inline-flex items-center gap-1 ${copied ? 'transition-colors' : btnCls}`}
+        className={`${btnCls} gap-1.5 px-2`}
         style={copied ? { color: '#059669' } : undefined}
         aria-label="링크 복사"
         title={copied ? '복사됨' : '링크 복사'}
@@ -59,14 +59,11 @@ export function ArticleShareButtons({ title, url, showCopy = true }: { title: st
         {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
         <span className="text-[12px]">링크 복사</span>
       </button>}
-      <details className="text-[12px] text-gray-500">
-        <summary className="cursor-pointer py-2">다른 곳에 공유</summary>
-        <div className="flex items-center py-2" style={{ gap: 16 }}>
+      <div className="flex items-center gap-1" role="group" aria-label="다른 곳에 공유">
           <button type="button" onClick={() => handleShare('facebook')} className={btnCls} aria-label="페이스북에 공유" title="Facebook"><FacebookIcon className="w-4 h-4" /></button>
           <button type="button" onClick={() => handleShare('twitter')} className={btnCls} aria-label="X(트위터)에 공유" title="Twitter"><TwitterIcon className="w-4 h-4" /></button>
           <button type="button" onClick={() => handleShare('linkedin')} className={btnCls} aria-label="링크드인에 공유" title="LinkedIn"><LinkedinIcon className="w-4 h-4" /></button>
-        </div>
-      </details>
+      </div>
       {error && <p role="alert" className="w-full text-[12px] text-red-700">{error}</p>}
       {copied && createPortal(
         <div
