@@ -53,6 +53,21 @@ def test_account_handler_auth_private_cache_and_invalid_payload(monkeypatch,toke
         assert dashboard.lambda_handler(event(method='PUT',token=tokens(),body=body),None)['statusCode']==400
 
 
+def test_account_handler_strips_named_stage_prefix(monkeypatch,tokens):
+    # 운영 HTTP API는 스테이지 dev라 rawPath가 /dev/api/v2/me/... 로 들어온다(archive 로그로 확인).
+    seen=[]
+    def call(method, path, owner, body=None, query=None):
+        seen.append(path); return {'revision':1,'interests':[],'minutes':0,'updated_at':None}
+    monkeypatch.setattr(dashboard,'dispatch',call)
+    request=event('/dev/api/v2/me/preferences',token=tokens())
+    request['requestContext']['stage']='dev'
+    assert dashboard.lambda_handler(request,None)['statusCode']==200
+    assert seen[-1]=='/preferences'
+    other=event('/dev/api/v2/me/preferences',token=tokens())
+    other['requestContext']['stage']='prod'
+    assert dashboard.lambda_handler(other,None)['statusCode']==404
+
+
 def test_dependency_error_is_not_empty_success(monkeypatch,tokens):
     def broken(*args,**kwargs): raise RuntimeError('fixture failure')
     monkeypatch.setattr(dashboard,'dispatch',broken)
