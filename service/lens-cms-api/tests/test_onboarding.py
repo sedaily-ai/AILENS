@@ -1,4 +1,4 @@
-"""온보딩 선택 집계(v1.55) 저장소 규칙을 DB 없이 확인한다(가짜 db 모듈)."""
+"""온보딩 선택 집계(v1.56) 저장소 규칙을 DB 없이 확인한다(가짜 db 모듈)."""
 import contextlib
 import sys
 import types
