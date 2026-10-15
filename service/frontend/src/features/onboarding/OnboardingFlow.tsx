@@ -19,6 +19,9 @@ import { resolveFormat, type Glance, type Moment } from './lib/moments';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { GlanceStep } from './components/GlanceStep';
 import { pickTopArticle } from '@/shared/lib/content/topArticle';
+import { getVoterId } from '@/shared/lib/device/voterId';
+import { fetchOnboardingDistribution, recordOnboardingChoice } from '@/shared/lib/api/onboardingApi';
+import { toShares, type Shares } from './lib/distribution';
 
 export function OnboardingFlow() {
   const router = useRouter();
@@ -26,6 +29,7 @@ export function OnboardingFlow() {
   const [glance, setGlance] = useState<Glance | null>(null);
   const [formatIndex, setFormatIndex] = useState(0);
   const [lens, setLens] = useState<CmsLens | null>(null);
+  const [shares, setShares] = useState<Shares | null>(null);
 
   // 결과 화면의 미리보기용 — 목록에서 오늘의 1면을 고른 뒤 단건 조회(목록 API는 축약판이라 headline만 필요해도 단건이 안전하다).
   useEffect(() => {
@@ -63,6 +67,10 @@ export function OnboardingFlow() {
           saveFormat(r.formatIndex);
           markOnboardingCompleted(); // 두 질문에 답했으면 온보딩은 끝난 것 — 결과 화면에서 바로 체험한다.
           trackEvent('onboarding_result', { moment: moment.id, glance: g.id, format: r.formatIndex, adjusted: r.reason !== null });
+          // 선택을 집계에 더하고 그 결과로 분포 카드를 채운다. 기기 식별자를 못 만들면 저장 없이 분포만 본다.
+          setShares(null);
+          const voterId = getVoterId();
+          (voterId ? recordOnboardingChoice(voterId, moment.id, g.id) : fetchOnboardingDistribution()).then((d) => setShares(toShares(d)));
         }}
         onBack={() => setMoment(null)}
         onSkip={exitToHome}
@@ -77,6 +85,7 @@ export function OnboardingFlow() {
       resolved={resolveFormat(moment, glance)}
       formatIndex={formatIndex}
       lens={lens}
+      shares={shares}
       onChangeFormat={(i) => {
         setFormatIndex(i);
         saveFormat(i);

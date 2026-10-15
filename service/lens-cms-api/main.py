@@ -136,6 +136,7 @@ import routes_community
 import routes_prompts
 import routes_chat_threads
 import routes_ops
+import routes_onboarding
 
 app.include_router(routes_admin_posts.router)
 app.include_router(routes_pipeline_state.router)
@@ -148,3 +149,4 @@ app.include_router(routes_community.router)
 app.include_router(routes_prompts.router)
 app.include_router(routes_chat_threads.router)
 app.include_router(routes_ops.router)
+app.include_router(routes_onboarding.router)
