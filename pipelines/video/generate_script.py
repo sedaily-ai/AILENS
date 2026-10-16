@@ -9,6 +9,7 @@ stat/diagram/chart 컷의 data가 비었거나 chart.points가 2개 미만이면
 import json
 import re
 import sys
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
@@ -64,6 +65,16 @@ def _fallback_icon(name: str) -> str:
 def _fix_icon(name: str) -> str:
     return name if name in ICON_WHITELIST else _fallback_icon(name)
 
+def _photo_reachable(url: str) -> bool:
+    """렌더러는 사진을 못 불러오면 렌더 자체가 실패하므로, 첫 컷 사진은 미리 열리는지 확인한다."""
+    try:
+        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "ailens-video"})
+        with urllib.request.urlopen(req, timeout=5) as res:
+            return 200 <= res.status < 400
+    except Exception:  # noqa: BLE001 — 사진이 안 열리면 아이콘으로 그린다(아래 fix_script)
+        return False
+
+
 def fix_script(
     script: dict, *, photo_url: str | None = None, photo_caption: str | None = None
 ) -> tuple[dict, list[str]]:
@@ -95,6 +106,23 @@ def fix_script(
                 cut["type"] = "highlight"
                 cut["data"] = {}
                 applied.append(f"{tag}: 원문 사진이 없는데 photo 컷을 만듦 → highlight로 강등")
+
+        # 첫 컷(opening·stat) 사진: 프롬프트가 data.photo를 url 없이 내면 photo 컷과 같은 방식으로 원문 사진
+        # 주소·출처를 채운다. 원문 사진이 없거나 열리지 않으면 항목을 지워 렌더러가 아이콘으로 그리게 한다.
+        if cut_type in ("opening", "stat") and isinstance(cut.get("data"), dict) and "photo" in cut["data"]:
+            if photo_url and _photo_reachable(photo_url):
+                lead = {"url": photo_url}
+                # credit은 프롬프트가 원문 캡션에서 뽑은 출처만 쓴다(v52: "사진 제공=○○○", 없으면 빈 문자열).
+                # photo_caption은 캡션 제목+내용 전체 문장이라 한 줄짜리 출처 칸에서 잘리므로 쓰지 않는다.
+                ai_photo = cut["data"].get("photo")
+                credit = (ai_photo.get("credit") or "").strip() if isinstance(ai_photo, dict) else ""
+                if credit:
+                    lead["credit"] = credit
+                cut["data"]["photo"] = lead
+                applied.append(f"{tag}: 첫 컷 data.photo.url을 원문 사진 URL로 주입")
+            else:
+                del cut["data"]["photo"]
+                applied.append(f"{tag}: 원문 사진이 없거나 열리지 않음 → data.photo 제거(아이콘으로 그림)")
 
         if cut_type == "opening":
             data = cut.setdefault("data", {})

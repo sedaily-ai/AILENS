@@ -60,11 +60,20 @@ const baseCutFields = {
   style: cutStyleSchema.optional().catch(undefined),
 };
 
+// 첫 컷 사진(선택). 프롬프트는 url을 비워 출력하고, 공장(generate_script.py::fix_script)이 원문 사진
+// 주소로 채운다. 원문 사진이 없거나 열리지 않으면 fix_script가 이 항목을 지워 아이콘으로 그린다.
+// 종이 질감 테마(신문 1면·도장 숫자)에서만 화면에 나온다.
+const leadPhotoSchema = z
+  .object({ url: z.string().min(1), credit: z.string().optional() })
+  .optional()
+  .catch(undefined);
+
 export const openingCutSchema = z.object({
   type: z.literal('opening'),
   ...baseCutFields,
   data: z.object({
     icon: z.string(),
+    photo: leadPhotoSchema,
   }),
 });
 
@@ -77,6 +86,7 @@ export const statCutSchema = z.object({
     label: z.string(),
     // 컷 단위로 캡처/유포될 수 있어 숫자 옆에 출처를 항상 붙인다.
     sourceNote: z.string().optional(),
+    photo: leadPhotoSchema,
   }),
 });
 

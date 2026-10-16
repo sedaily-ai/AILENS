@@ -2,7 +2,7 @@ import type { CaptionValue, Cut, NewsScript } from "../lib/schema";
 import { cutSeconds } from "../lib/schema";
 import type { PaperName, SpotName } from "./theme";
 import type { TransitionName } from "./transitions";
-import type { Bar, CardNode, EmStyle, PaperScene, Visual } from "./types";
+import type { Bar, CardNode, EmStyle, PaperScene, Photo, Visual } from "./types";
 
 // 사이트 각본(NewsScript) → 종이 질감 장면 목록.
 // 각본에 디자인 지정(cut.style, script.design)이 있으면 그대로 따르고, 없으면 아래 기본 규칙으로 정한다.
@@ -68,14 +68,18 @@ const chartBars = (cut: Cut): Bar[] | undefined => {
   return undefined;
 };
 
+// 첫 컷(opening·stat)의 원문 사진. url은 공장 fix_script가 실제 주소로 채운 경우에만 있다.
+const leadPhoto = (cut: Cut): Photo | undefined =>
+  (cut.type === "opening" || cut.type === "stat") && cut.data.photo ? { url: cut.data.photo.url, credit: cut.data.photo.credit } : undefined;
+
 // 지정한 화면(layout)이 이 컷의 데이터로 그릴 수 없으면 undefined → 기본 화면으로 돌아간다.
 const buildVisual = (layout: Visual["type"], cut: Cut, script: NewsScript, caption: string, emphasis: string): Visual | undefined => {
   const st = cut.style ?? {};
   switch (layout) {
     case "newsFront":
-      return { type: "newsFront", headline: st.kicker ?? script.title, icon: cut.type === "opening" ? cut.data.icon : "info", numberNote: st.note };
+      return { type: "newsFront", headline: st.kicker ?? script.title, icon: cut.type === "opening" ? cut.data.icon : "info", numberNote: st.note, photo: leadPhoto(cut) };
     case "stampNumber": {
-      if (cut.type === "stat") return { type: "stampNumber", kicker: st.kicker ?? cut.data.label, number: withUnit(cut.data.value, cut.data.unit), note: st.note, tag: st.tag };
+      if (cut.type === "stat") return { type: "stampNumber", kicker: st.kicker ?? cut.data.label, number: withUnit(cut.data.value, cut.data.unit), note: st.note, tag: st.tag, photo: leadPhoto(cut) };
       if (cut.type === "donut") return { type: "stampNumber", kicker: st.kicker ?? cut.data.label, number: `${formatNumber(cut.data.value)}%`, note: st.note, tag: st.tag };
       // 숫자 컷이 아니면 강조어를 도장으로 찍는다.
       return { type: "stampNumber", kicker: st.kicker ?? caption.replace(emphasis, "").trim(), number: emphasis, note: st.note, tag: st.tag };
