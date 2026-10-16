@@ -42,9 +42,16 @@ def _get_client():
     return _client
 
 
+# 캐시 유지 1시간(2026-10-16). 기본 5분으로는 기사 간격(영상 렌더 포함 약 7분)이 길어 거의 적중하지
+# 않았다(10-15 12시 회차 26호출 중 읽기 1회). 1시간은 저장 단가가 더 높지만 회차 안의 기사들이 지침을
+# 이어 읽어 회차당 기사 2건 이상이면 이득이다. Sonnet 5·4.6 지원(AWS Bedrock 문서). 5분만 지원하는
+# 모델로 바꾸면 ValidationException이 나므로 그때는 "ttl"을 뺀다.
+_CACHE_POINT = {"cachePoint": {"type": "default", "ttl": "1h"}}
+
+
 def _log_usage(model: str, usage: dict) -> None:
     """캐시 효과 확인용 사용량 한 줄. cacheRead가 계속 0이면 캐시가 안 맞는 것이다
-    (프롬프트가 최소 길이(Sonnet 4.6·5는 1024토큰) 미만이거나, 호출 간격이 5분을 넘었거나,
+    (프롬프트가 최소 길이(Sonnet 4.6·5는 1024토큰) 미만이거나, 호출 간격이 1시간을 넘었거나,
     고정 부분에 매번 바뀌는 값이 섞인 경우)."""
     print(
         f"    [bedrock usage] model=...{model[-12:]} in={usage.get('inputTokens', 0)}"
@@ -73,8 +80,8 @@ def call_text(
     (admin/backend/routes/prompts.py::_THINKING_CONFIG 참고). 이 함수의 호출 모델
     (sonnet-46/opus-5/sonnet-5)은 모두 이 필드를 받으며 단순 생성 작업이라 끄는 쪽이 낫다.
 
-    프롬프트 캐싱(2026-10-15): system 뒤에 cachePoint를 붙인다. 같은 지침으로 5분 안에 다시
-    부르면(기사 여러 건, 배치 분류, 재시도) 지침 부분을 0.1배 단가로 읽는다. 최소 길이보다 짧은
+    프롬프트 캐싱(2026-10-15): system 뒤에 cachePoint를 붙인다. 같은 지침으로 1시간 안에 다시
+    부르면(기사 여러 건, 배치 분류, 재시도) 지침 부분을 0.1배 단가로 읽는다(_CACHE_POINT 참고). 최소 길이보다 짧은
     프롬프트는 오류 없이 캐시만 안 된다. 긴 지침을 user 칸에 넣는 호출부(웹툰)는
     cached_user_prefix로 그 고정 부분을 넘기면 [고정 부분][cachePoint][user_message] 순서로 보낸다.
     캐시는 앞에서부터 바이트가 같아야 맞으므로 고정 부분에 기사·시각 같은 가변값을 넣지 않는다.
@@ -85,11 +92,11 @@ def call_text(
         inference_config["temperature"] = temperature
     user_content: list[dict] = []
     if cached_user_prefix:
-        user_content += [{"text": cached_user_prefix}, {"cachePoint": {"type": "default"}}]
+        user_content += [{"text": cached_user_prefix}, _CACHE_POINT]
     user_content.append({"text": user_message})
     resp = client.converse(
         modelId=model,
-        system=[{"text": system_prompt}, {"cachePoint": {"type": "default"}}],
+        system=[{"text": system_prompt}, _CACHE_POINT],
         messages=[{"role": "user", "content": user_content}],
         inferenceConfig=inference_config,
         additionalModelRequestFields={"thinking": {"type": "disabled"}},
