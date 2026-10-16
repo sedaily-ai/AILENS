@@ -34,10 +34,11 @@ def get_dashboard(owner,params):
             'letters':area(lambda:recommend(owner,{'kind':'letter','limit':3,'minutes':minutes},inputs=data)) if tab in (None,'home') else unavailable(),
             'saved_letters':area(lambda:repo.request('GET','/letter-bookmarks',owner,query={'limit':3})) if tab!='settings' else unavailable(),
             'recent_sentences':ready({'items':[{**row,'article_id':row.get('article_no') or ''} for row in data['recent_sentences']],'total':data['sentence_total']}),
-            'followed_editors':ready(data['followed_editors']),'weekly_rewards':_weekly(repo,owner) if tab!='records' else unavailable(),
+            'followed_editors':ready(data['followed_editors']),'weekly_rewards':unavailable(),
+            'weekly_activity':_weekly(repo,owner) if tab in (None,'home','archive','settings') else unavailable(),
             'notifications':area(lambda:repo.request('GET','/notifications/preferences',owner)) if tab in (None,'archive') else unavailable()}
 
 
 def _weekly(repo,owner):
-    response=area(lambda:repo.request('GET','/rewards',owner))
+    response=area(lambda:repo.request('GET','/activity',owner,query={'period':'week'}))
     return response['data'] if response['status']=='ready' else response

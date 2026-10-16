@@ -47,7 +47,7 @@ def modules(repo,monkeypatch):
 def test_visible_signal_deduplicated_and_no_reward(modules):
     _,activity,recommendation,cursor=modules
     session=activity.create_session('a',{'content_key':'publication:42','format':'letter'})
-    assert session['reward_evaluation_enabled']
+    assert not session['reward_evaluation_enabled']
     payload={'event_id':str(uuid.uuid4()),'session_id':session['session_id'],'session_seq':1,'event_type':'progress','visible_ms':10000}
     with cursor() as cur:
         cur.execute("UPDATE user_content_sessions SET started_at=now()-interval '12 seconds',updated_at=now()-interval '12 seconds' WHERE id=%s",(session['session_id'],))

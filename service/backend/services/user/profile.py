@@ -92,7 +92,7 @@ async def record_article_read(
     article_id: str,
     article_title: str = None,
 ) -> Dict[str, Any]:
-    """기사 읽기를 기록하고, 신규 기사면 뱃지 조건을 확인한다."""
+    """기사 읽기를 기록한다. 기존 배지는 보존하며 신규 지급하지 않는다."""
     repo = get_personal_repository()
 
     record = ReadingRecord(
@@ -106,9 +106,6 @@ async def record_article_read(
     is_new = not any(r.article_id == article_id for r in existing_history)
 
     success = await repo.save_reading_record(record)
-
-    if success and is_new:
-        await _check_and_award_badges(user_id)
 
     return {'success': success, 'is_new': is_new}
 
@@ -175,38 +172,6 @@ def _calculate_streak(history: List[ReadingRecord]) -> int:
         check_date -= timedelta(days=1)
 
     return streak
-
-
-async def _check_and_award_badges(user_id: str) -> List[str]:
-    """업적 조건을 확인해 새 뱃지를 부여하고 부여한 뱃지 ID 리스트를 반환한다."""
-    repo = get_personal_repository()
-    profile = await repo.get_user_profile(user_id)
-    if not profile:
-        return []
-
-    stats = await get_user_stats(user_id)
-    existing = set(profile.badges)
-    new_badges = []
-
-    rules = [
-        ('first_login', lambda s: True),
-        ('reader_10', lambda s: s['total_articles_read'] >= 10),
-        ('reader_50', lambda s: s['total_articles_read'] >= 50),
-        ('reader_100', lambda s: s['total_articles_read'] >= 100),
-        ('streak_7', lambda s: s['streak'] >= 7),
-        ('streak_30', lambda s: s['streak'] >= 30),
-        ('weekly_5', lambda s: s['this_week_articles'] >= 5),
-    ]
-
-    for badge_id, condition in rules:
-        if badge_id not in existing and condition(stats):
-            new_badges.append(badge_id)
-
-    if new_badges:
-        all_badges = list(existing) + new_badges
-        await repo.update_user_profile(user_id, {'badges': all_badges})
-
-    return new_badges
 
 
 # ── 응답 헬퍼 ──

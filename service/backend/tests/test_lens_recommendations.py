@@ -54,12 +54,13 @@ def test_dashboard_unsupported_areas_not_fake_zero_and_failure_not_empty(monkeyp
   if path=='/recommendation-candidates':return {'items':[card(keywords=['관계없음'])],'latest':[],'candidate_limit':200}
   if path=='/letter-bookmarks':raise RuntimeError('fake failure')
   if path=='/notifications/preferences':return {'revision':0}
-  if path=='/rewards':return {'status':'ready','data':{'stamp_days':0},'error':None}
+  if path=='/activity':return {'status':'ready','data':{'stamp_days':0},'error':None}
   raise AssertionError(path)
  monkeypatch.setattr(DashboardRepository,'request',request)
  result=get_dashboard('fixture-a',{})
  assert result['saved_letters']['status']=='error' and result['saved_letters']['data'] is None
- assert result['weekly_rewards']['status']=='ready' and result['notifications']['data']=={'revision':0}
+ assert result['weekly_rewards']['status']=='unavailable'
+ assert result['weekly_activity']['status']=='ready' and result['notifications']['data']=={'revision':0}
  assert result['profile']['data']['coverage']['legacy_unmatched']==1
  assert result['news']['status']=='ready'
 
@@ -119,11 +120,11 @@ def test_followed_editor_requires_actual_author_and_preserves_direct_interest():
 
 
 @pytest.mark.parametrize(('tab','expected_paths'),[
- (None,['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards','/notifications/preferences']),
- ('home',['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/rewards']),
- ('archive',['/recommendation-inputs','/letter-bookmarks','/rewards','/notifications/preferences']),
+ (None,['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/activity','/notifications/preferences']),
+ ('home',['/recommendation-inputs','/recommendation-candidates','/recommendation-candidates','/letter-bookmarks','/activity']),
+ ('archive',['/recommendation-inputs','/letter-bookmarks','/activity','/notifications/preferences']),
  ('records',['/recommendation-inputs','/letter-bookmarks']),
- ('settings',['/recommendation-inputs','/rewards']),
+ ('settings',['/recommendation-inputs','/activity']),
 ])
 def test_dashboard_only_reads_areas_used_by_tab_and_keeps_legacy_default(monkeypatch,tab,expected_paths):
  calls=[]
@@ -134,7 +135,7 @@ def test_dashboard_only_reads_areas_used_by_tab_and_keeps_legacy_default(monkeyp
   if path=='/recommendation-candidates':return {'items':[card(keywords=['반도체'])],'latest':[],'candidate_limit':200}
   if path=='/letter-bookmarks':return {'items':[],'total':7}
   if path=='/notifications/preferences':return {'revision':7}
-  if path=='/rewards':return {'status':'ready','data':{'stamp_days':1},'error':None}
+  if path=='/activity':return {'status':'ready','data':{'stamp_days':1},'error':None}
   raise AssertionError(path)
  monkeypatch.setattr(DashboardRepository,'request',request)
  result=get_dashboard('fixture-a',{} if tab is None else {'tab':tab})
@@ -145,7 +146,7 @@ def test_dashboard_only_reads_areas_used_by_tab_and_keeps_legacy_default(monkeyp
   assert result['saved_letters']['data']['total']==7
   assert all(result[area]['status']=='unavailable' and result[area]['data'] is None for area in ('news','letters','weekly_rewards','notifications'))
  if tab=='settings':
-  assert result['news']['status']=='unavailable' and result['weekly_rewards']['status']=='ready'
+  assert result['news']['status']=='unavailable' and result['weekly_activity']['status']=='ready'
   assert all(result[area]['status']=='unavailable' and result[area]['data'] is None for area in ('letters','saved_letters','notifications'))
 
 

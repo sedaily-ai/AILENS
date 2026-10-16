@@ -1,4 +1,4 @@
-"""계정 이용 신호와 completion-v1 원자적 완료·리워드 판정."""
+"""계정 이용 신호와 원자적 완료 기록 (신규 보상 지급 중단)."""
 import hashlib
 import json
 import uuid
@@ -30,7 +30,7 @@ def create_session(owner, payload):
         rules=completion_repo.metadata(cur,content['content_key'],payload['format'],cards[0])
         cur.execute('INSERT INTO user_content_sessions(id,user_id,content_key,format,completion_rules,rule_version) VALUES(%s,%s,%s,%s,%s,%s) RETURNING started_at', (session_id,owner,content['content_key'],payload['format'],Json(rules),completion_rules.VERSION))
         started=cur.fetchone()['started_at'].isoformat()
-    return {'session_id':session_id,'content_key':content['content_key'],'format':payload['format'],'started_at':started,'rule_version':completion_rules.VERSION,'completion':rules,'reward_evaluation_enabled':bool(rules['completion_enabled'] and rules['group_key'])}
+    return {'session_id':session_id,'content_key':content['content_key'],'format':payload['format'],'started_at':started,'rule_version':completion_rules.VERSION,'completion':rules,'reward_evaluation_enabled':False}
 
 
 def accept_event(owner,payload):
@@ -81,14 +81,14 @@ def accept_event(owner,payload):
         resolve_content(cur,kind,'id',lid)  # 전송 중 비공개화한 자료는 새 관심을 만들지 않는다.
         viewed=visible>=10000 and elapsed_ms>=10000
         completed,progress=completion_rules.progress(session,payload,elapsed_ms,delta_ms)
-        reward={'status':'not_eligible','stamp_awarded':False,'pending_reason':session['completion_rules'].get('pending_reason')}
+        reward={'status':'disabled','stamp_awarded':False,'pending_reason':session['completion_rules'].get('pending_reason')}
         awards=[]
         if completed:
             cards=load_cards(cur,kind,owner=owner,ids=[int(lid)],limit=1)
             if not cards or completion_repo.metadata(cur,session['content_key'],session['format'],cards[0])!=session['completion_rules']:
                 raise DashboardError(409,'CONTENT_CHANGED','콘텐츠 기준이 바뀌었어요. 다시 열어 주세요.')
             reward,awards=completion_repo.record(cur,owner,session,now)
-        result={'accepted':True,'event_id':event_id,'session_id':session_id,'session_seq':seq,'viewed':viewed,'completed':completed,'reward':reward,'awards':awards,'rule_version':session['rule_version'],'reward_evaluation_enabled':bool(session['completion_rules'].get('completion_enabled') and session['completion_rules'].get('group_key'))}
+        result={'accepted':True,'event_id':event_id,'session_id':session_id,'session_seq':seq,'viewed':viewed,'completed':completed,'reward':reward,'awards':awards,'rule_version':session['rule_version'],'reward_evaluation_enabled':False}
         cur.execute('INSERT INTO user_content_events(event_id,user_id,session_id,session_seq,payload_hash,result) VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT(event_id) DO NOTHING RETURNING event_id', (event_id,owner,session_id,seq,digest,Json(result)))
         if cur.fetchone() is None:
             raise DashboardError(409,'IDEMPOTENCY_CONFLICT','이벤트가 다른 요청에서 사용됐어요.')
