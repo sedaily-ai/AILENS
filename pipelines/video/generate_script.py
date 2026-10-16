@@ -112,7 +112,10 @@ def fix_script(
         if cut_type in ("opening", "stat") and isinstance(cut.get("data"), dict) and "photo" in cut["data"]:
             if photo_url and _photo_reachable(photo_url):
                 lead = {"url": photo_url}
-                credit = photo_caption or (cut["data"].get("photo") or {}).get("credit")
+                # credit은 프롬프트가 원문 캡션에서 뽑은 출처만 쓴다(v52: "사진 제공=○○○", 없으면 빈 문자열).
+                # photo_caption은 캡션 제목+내용 전체 문장이라 한 줄짜리 출처 칸에서 잘리므로 쓰지 않는다.
+                ai_photo = cut["data"].get("photo")
+                credit = (ai_photo.get("credit") or "").strip() if isinstance(ai_photo, dict) else ""
                 if credit:
                     lead["credit"] = credit
                 cut["data"]["photo"] = lead
