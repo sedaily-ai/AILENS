@@ -1,4 +1,4 @@
-"""실제 loopback 원장: 완료·동시 지급·재열람·KST·전체 기간 조회."""
+"""실제 loopback 원장: 보상 중단·완료·재열람·KST·과거 이력 보존."""
 import datetime as dt
 import importlib
 from concurrent.futures import ThreadPoolExecutor
@@ -36,7 +36,7 @@ def test_reading_threshold_duplicate_same_group_and_owner(complete):
     with cur() as c:c.execute("UPDATE user_content_sessions SET updated_at=now()-interval '6 seconds' WHERE id=%s",(session['session_id'],))
     p={**p,'event_id':str(uuid.uuid4()),'session_seq':2,'visible_ms':36000,'scroll_ratio':.8}
     result=a.accept_event('a',p)
-    assert result['completed'] and result['reward']['stamp_awarded']
+    assert result['completed'] and not result['reward']['stamp_awarded']
     assert a.accept_event('a',p)==result
     with pytest.raises(a.DashboardError) as err:a.accept_event('b',p)
     assert err.value.status==404
@@ -45,20 +45,20 @@ def test_reading_threshold_duplicate_same_group_and_owner(complete):
     result2=a.accept_event('a',p2)
     assert result2['completed'] and not result2['reward']['stamp_awarded']
     data=records.activity('a')['data']
-    assert data['completed_contents']==1 and data['stamp_days']==1
+    assert data['completed_contents']==1 and data['read_days']==1 and data['stamp_days']==0
     assert records.activity('b')['data']['completed_contents']==0
 
 
-def test_simultaneous_completion_one_stamp_and_first_record(complete):
+def test_simultaneous_completion_without_awards_and_single_first_record(complete):
     _,a,records,cur=complete
     pending=[event(a,cur,scroll_ratio=1)[1] for _ in range(2)]
     with ThreadPoolExecutor(max_workers=2) as pool:
         results=list(pool.map(lambda p:a.accept_event('a',p),pending))
-    assert sum(r['reward']['stamp_awarded'] for r in results)==1
+    assert sum(r['reward']['stamp_awarded'] for r in results)==0
     with cur() as c:
         c.execute('SELECT count(*) AS n FROM user_content_first_completions');assert c.fetchone()['n']==1
         c.execute('SELECT count(*) AS n FROM user_content_completions');assert c.fetchone()['n']==2
-    assert records.rewards('a')['data']['stamp_days']==1
+    assert records.rewards('a')['data']['stamp_days']==0
 
 
 def test_media_union_seek_excess_and_missing_duration(complete):
@@ -78,20 +78,20 @@ def test_media_union_seek_excess_and_missing_duration(complete):
     assert not result['completed'] and result['reward']['pending_reason']=='MEDIA_METADATA_REQUIRED'
 
 
-def test_letter_without_mapping_records_pending_then_explicit_mapping(complete):
+def test_letter_completion_without_reward_mapping(complete):
     _,a,records,cur=complete
     _,p=event(a,cur,key='issue_letter:1',scroll_ratio=1)
     r=a.accept_event('a',p)
-    assert r['completed'] and r['reward']['status']=='pending' and not r['awards']
-    assert records.activity('a')['data']['pending_rewards']==1
+    assert r['completed'] and r['reward']['status']=='disabled' and not r['awards']
+    assert records.activity('a')['data']['pending_rewards']==0
     with cur() as c:c.execute("INSERT INTO content_reward_groups VALUES('issue_letter:1','publication:42',now())")
     _,p=event(a,cur,key='issue_letter:1',scroll_ratio=1)
-    assert a.accept_event('a',p)['reward']['stamp_awarded']
+    assert not a.accept_event('a',p)['reward']['stamp_awarded']
     with cur() as c:c.execute('UPDATE issue_letter_categories SET is_primary=false WHERE letter_id=1')
     assert a.create_session('a',{'content_key':'issue_letter:1','format':'letter'})['completion']['primary_category'] is None
 
 
-def test_revisit_two_saved_completed_groups_only_distinct_later_sessions(complete):
+def test_revisit_keeps_completion_without_badges(complete):
     dashboard,a,records,cur=complete
     completion=importlib.import_module('completion_repo')
     for lid in (1,2):
@@ -105,13 +105,13 @@ def test_revisit_two_saved_completed_groups_only_distinct_later_sessions(complet
         _,p=event(a,cur,key=f'issue_letter:{lid}',scroll_ratio=1)
         assert a.accept_event('a',p)['completed']
     badges={b['id']:b for b in records.rewards('a')['data']['badges']}
-    assert badges['revisit_week']['earned'] and badges['revisit_week']['progress']['current']==2
+    assert not badges['revisit_week']['earned'] and badges['revisit_week']['progress']['current']==0
     _,p=event(a,cur,key='issue_letter:1',scroll_ratio=1)
     assert not a.accept_event('a',p)['reward']['stamp_awarded']
-    assert records.rewards('a')['data']['stamp_days']==1
+    assert records.rewards('a')['data']['stamp_days']==0
 
 
-def test_kst_boundary_badges_and_leap_year_full_sql_counts(complete):
+def test_kst_read_days_without_rewards_and_leap_year_full_sql_counts(complete):
     dashboard,a,records,cur=complete
     completion=importlib.import_module('completion_repo')
     dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[]})
@@ -123,8 +123,9 @@ def test_kst_boundary_badges_and_leap_year_full_sql_counts(complete):
             now=dt.datetime(2026,10,11+i,15,0,tzinfo=dt.timezone.utc) # KST 월/화/수
             completion.record(c,'a',s,now)
     week=records.rewards('a','2026-10-12')['data']
-    assert [s['date'] for s in week['stamps']]==['2026-10-12','2026-10-13','2026-10-14']
-    assert all(b['earned'] for b in week['badges'] if b['id']!='revisit_week')
+    assert week['stamps']==[]
+    assert records.activity('a','week','2026-10-12')['data']['read_days']==3
+    assert not any(b['earned'] for b in week['badges'])
     with cur() as c:
         c.execute("INSERT INTO user_content_sessions(id,user_id,content_key,format) SELECT md5(('history-'||i)::text)::uuid,'a','publication:'||i,'letter' FROM generate_series(1,301) i")
         c.execute("INSERT INTO user_content_completions(session_id,user_id,content_key,group_key,format,completed_at,completed_day,rule_version) SELECT id,'a',content_key,content_key,format,'2024-02-29T03:00:00Z','2024-02-29','fixture' FROM user_content_sessions WHERE rule_version='visible-v1'")
@@ -148,19 +149,21 @@ def test_legacy_sessions_never_retroactively_award_and_metadata_change_rejected(
     assert err.value.code=='CONTENT_CHANGED'
 
 
-def test_completion_failure_rolls_back_stamp_and_event(complete,monkeypatch):
+def test_completion_failure_rolls_back_records_and_event(complete,monkeypatch):
     _,a,_,cur=complete
     completion=importlib.import_module('completion_repo')
-    original=completion.weekly_progress
-    def failed(*args):raise RuntimeError('fixture rollback')
+    original=completion.record
+    def failed(*args):
+        original(*args)
+        raise RuntimeError('fixture rollback')
     _,payload=event(a,cur,scroll_ratio=1)
-    monkeypatch.setattr(completion,'weekly_progress',failed)
+    monkeypatch.setattr(completion,'record',failed)
     with pytest.raises(RuntimeError):a.accept_event('a',payload)
     with cur() as c:
         for table in ('user_content_completions','user_content_first_completions','user_daily_stamps','user_content_events'):
             c.execute(f'SELECT count(*) AS n FROM {table}');assert c.fetchone()['n']==0
-    monkeypatch.setattr(completion,'weekly_progress',original)
-    assert a.accept_event('a',payload)['reward']['stamp_awarded']
+    monkeypatch.setattr(completion,'record',original)
+    assert a.accept_event('a',payload)['completed']
 
 
 def test_registered_media_duration_admin_write_and_year_boundary(complete):
@@ -192,3 +195,28 @@ def test_body_edit_invalidates_session_and_empty_letter_unavailable(complete):
     with cur() as c:c.execute('DELETE FROM issue_letter_sections WHERE letter_id=1')
     with pytest.raises(a.DashboardError) as err:a.create_session('a',{'content_key':'issue_letter:1','format':'letter'})
     assert err.value.status==400
+
+
+def test_existing_awards_survive_and_unsaved_revisit_is_recorded(complete):
+    _,a,records,cur=complete
+    completion=importlib.import_module('completion_repo')
+    first,_=event(a,cur,scroll_ratio=1)
+    with cur() as c:
+        c.execute('SELECT *,now() AS current FROM user_content_sessions WHERE id=%s',(first['session_id'],))
+        session=c.fetchone()
+        completion.record(c,'a',session,session['current']-dt.timedelta(days=1))
+        c.execute("INSERT INTO user_daily_stamps(user_id,stamp_day,awarded_at,source_session_id) VALUES('a',(now() AT TIME ZONE 'Asia/Seoul')::date-1,now(),%s)",(first['session_id'],))
+        today=session['current'].astimezone(__import__('zoneinfo').ZoneInfo('Asia/Seoul')).date()
+        week=completion.week_start(today)
+        c.execute("INSERT INTO user_weekly_badges(user_id,week_start,badge_id,earned_at,rule_version) VALUES('a',%s,'steady_week',now(),'completion-v1')",(week,))
+    _,payload=event(a,cur,scroll_ratio=1)
+    result=a.accept_event('a',payload)
+    assert result['completed'] and result['awards']==[] and not result['reward_evaluation_enabled']
+    data=records.activity('a')['data']
+    assert next(d for d in data['days'] if d['date']==today.isoformat())['completed_contents']==1
+    assert not next(d for d in data['days'] if d['date']==today.isoformat())['stamped']
+    legacy=records.rewards('a')['data']
+    assert next(b for b in legacy['badges'] if b['id']=='steady_week')['earned']
+    with cur() as c:
+        c.execute("SELECT count(*) AS n FROM user_daily_stamps WHERE user_id='a'");assert c.fetchone()['n']==1
+        c.execute("SELECT count(*) AS n FROM user_weekly_badges WHERE user_id='a'");assert c.fetchone()['n']==1

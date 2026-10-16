@@ -111,7 +111,7 @@ function MyLensDashboard() {
         <nav className="ml-page-nav" aria-label="나의 LENS 메뉴">{([
           { key: 'home', label: '홈', href: '/my-lens' },
           { key: 'archive', label: '내 서랍', href: '/my-lens?tab=archive' },
-          { key: 'records', label: '이용 기록·리워드', href: '/my-lens?tab=records' },
+          { key: 'records', label: '이용 기록', href: '/my-lens?tab=records' },
           { key: 'settings', label: '알림 설정', href: '/my-lens?tab=settings' },
         ] as const).map((item) => <Link key={item.key} href={item.href} className={tab === item.key ? 'ml-nav-current' : undefined} aria-current={tab === item.key ? 'page' : undefined}>{item.label}</Link>)}</nav>
 
@@ -148,7 +148,7 @@ function MyLensDashboard() {
           </div>
 
           <aside className="ml-rail" aria-label="내 기록과 구독">
-            {tab !== 'records' && <WeeklyStampSummary area={server.data?.weekly_rewards} loading={server.loading} onRetry={server.retry} />}
+            {tab !== 'records' && <WeeklyStampSummary area={server.data?.weekly_activity} loading={server.loading} onRetry={server.retry} />}
             {tab === 'home' && <ArchiveDiscovery archive={homeArchive} articles={news.articles} letters={letters} />}
             {(tab === 'archive' || tab === 'records') && <div className="ml-drawer-guide"><Quote size={21} aria-hidden /><h2>한 문장, 다음 이야기</h2><p>뉴스를 읽다 마음에 남은 문장을 담아보세요. 각 문장의 ‘관련 글 보기’에서 새로운 뉴스를 만날 수 있어요.</p><Link href="/my-lens?tab=settings#ml-notifications" className="ml-text-link">새 글 알림 설정 <ArrowUpRight size={14} /></Link><p className="ml-storage-note">알림은 별도 선택이 필요해요. 설정·동의는 계정에 저장돼요. {notificationStatus(server.data?.notifications.status === 'ready' ? server.data.notifications.data : null)}</p></div>}
             {(tab === 'home' || tab === 'records') && <section className="ml-editors" aria-labelledby="ml-editors-title"><div className="ml-section-title"><h2 id="ml-editors-title">내가 팔로우한 에디터</h2><span className="ml-heading-count">{follow.ready ? follow.ids.length : '·'}</span></div>{!follow.ready ? <p className="ml-helper" role="status">팔로우한 에디터를 불러오고 있어요.</p> : !follow.available ? <p className="ml-helper">에디터 목록을 불러오지 못했어요.</p> : follow.followed.length ? <div className="ml-editor-list">{follow.followed.map((editor) => <Link key={editor.id} href={`/letter/editors/${editor.id}`} className="ml-editor">{editor.image && <Image src={editor.image} alt="" width={38} height={38} />}<span><strong>{editor.name}</strong><small>{editor.short ?? editor.role}</small></span><ChevronRight size={15} /></Link>)}</div> : <p className="ml-helper">관심 분야가 맞는 에디터를 팔로우하면 새 레터를 찾기 쉬워져요.</p>}{follow.items.filter(item=>item.active&&!follow.followed.some(editor=>editor.id===item.id)).map(item=><div key={item.id}><Link href={item.href} className="ml-text-link">{item.name}</Link><button type="button" className="ml-text-link" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></div>)}{follow.items.filter(item=>!item.active).map(item=><p className="ml-helper" key={item.id}>{item.name} · 활동 중지 <button type="button" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></p>)}<Link href="/letter" className="ml-text-link">에디터 만나보기 <ArrowUpRight size={15} /></Link></section>}

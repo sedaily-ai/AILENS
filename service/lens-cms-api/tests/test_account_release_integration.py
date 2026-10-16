@@ -89,17 +89,17 @@ def test_account_recommendation_completion_rewards_notifications_and_dependency(
     call('/preferences','PUT',{'revision':0,'minutes':0,'interests':[{'type':'category','key':'industry'}]})
     # 공개 프론트가 사용하는 조회 계약을 실제 service/router/SQL을 통해 읽는다.
     assert call('/format-preference')['status']=='insufficient_data'
-    assert call('/recommendations',query={'kind':'news','reason':'all','limit':'4'})['algorithm_version']=='exact-format-v2'
+    assert call('/recommendations',query={'kind':'news','reason':'all','limit':'4'})['algorithm_version']=='recent-category-editor-v3'
     session=call('/activity/sessions','POST',{'content_key':'publication:42','format':'letter'},expected=201)
     with cursor() as cur:
         cur.execute("UPDATE user_content_sessions SET started_at=now()-interval '60 seconds',updated_at=now()-interval '60 seconds' WHERE id=%s",(session['session_id'],))
     progress={'session_id':session['session_id'],'event_id':str(uuid.uuid4()),'session_seq':1,'event_type':'progress','visible_ms':30000,'scroll_ratio':1}
     result=call('/activity/events','POST',progress)
-    assert result['completed'] and result['reward']['stamp_awarded']
+    assert result['completed'] and not result['reward']['stamp_awarded']
     assert call('/activity/events','POST',progress)==result
     assert call('/activity',owner='b')['data']['completed_contents']==0
     assert call('/activity')['data']['completed_contents']==1
-    assert call('/rewards')['data']['stamp_days']==1
+    assert call('/rewards')['data']['stamp_days']==0
     state=call('/notifications/preferences')
     call('/notifications/preferences','PUT',{'revision':state['revision'],'preferences':{**state['preferences'],'briefing':True}})
     call('/notifications/consent','PUT',{'channel':'web_push','granted':True,'policy_version':state['config']['policy_version']})
@@ -113,6 +113,9 @@ def test_account_recommendation_completion_rewards_notifications_and_dependency(
     assert not call('/notifications/preferences')['consent']['granted']
     summary=call('/dashboard')
     assert summary['scope']=='account'
+    assert summary['weekly_rewards']['status']=='unavailable'
+    assert summary['weekly_activity']['data']['read_days']==1
+    assert summary['weekly_activity']['data']['days']
     assert all(summary[key]['status']=='ready' for key in ('preferences','format_preference','notifications','news','letters'))
     personal._TOKEN='wrong-test-token'
     call('/preferences',expected=503)

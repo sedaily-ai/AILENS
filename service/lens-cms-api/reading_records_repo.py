@@ -4,7 +4,7 @@ import datetime as dt
 from db import get_cursor
 from dashboard_repo import _account
 from content_resolver import DashboardError
-from completion_repo import BADGES, weekly_progress, week_start
+from completion_repo import BADGES, week_start
 
 
 def server_today(cur):
@@ -56,10 +56,10 @@ def rewards(owner, week=None):
         clock=server_today(cur);today=clock['today']
         start=anchor_date(week,today,clock['coverage_start'],True) if week else week_start(today)
         if start.weekday()!=0:raise DashboardError(400,'INVALID_ARGUMENT','주 시작일은 월요일이에요.')
-        progress=weekly_progress(cur,owner,start)
+
         cur.execute('SELECT badge_id,earned_at,rule_version FROM user_weekly_badges WHERE user_id=%s AND week_start=%s',(owner,start))
         earned={r['badge_id']:r for r in cur.fetchall()}
         cur.execute('SELECT stamp_day,awarded_at FROM user_daily_stamps WHERE user_id=%s AND stamp_day BETWEEN %s AND %s ORDER BY stamp_day',(owner,start,start+dt.timedelta(days=6)))
         stamps=[{'date':r['stamp_day'].isoformat(),'awarded_at':r['awarded_at'].isoformat()} for r in cur.fetchall()]
-        badges=[{'id':bid,'title':title,'rule_version':earned[bid]['rule_version'] if bid in earned else 'completion-v1','period_key':start.isoformat(),'earned':bid in earned,'earned_at':earned[bid]['earned_at'].isoformat() if bid in earned else None,'progress':{'current':progress[bid],'target':target}} for bid,title,target in BADGES]
+        badges=[{'id':bid,'title':title,'rule_version':earned[bid]['rule_version'] if bid in earned else 'completion-v1','period_key':start.isoformat(),'earned':bid in earned,'earned_at':earned[bid]['earned_at'].isoformat() if bid in earned else None,'progress':{'current':target if bid in earned else 0,'target':target}} for bid,title,target in BADGES]
         return {'status':'ready','error':None,'data':{'week_start':start.isoformat(),'week_end':(start+dt.timedelta(days=6)).isoformat(),'today':today.isoformat(),'coverage_start':clock['coverage_start'].isoformat(),'timezone':'Asia/Seoul','goal_days':3,'stamp_days':len(stamps),'stamps':stamps,'badges':badges}}

@@ -1,4 +1,4 @@
-"""완료 메타데이터 snapshot과 동일 트랜잭션의 완료/스탬프/배지 저장."""
+"""완료 메타데이터 snapshot과 완료 기록 저장. 신규 보상은 지급하지 않는다."""
 import datetime as dt
 from zoneinfo import ZoneInfo
 from urllib.parse import urlsplit
@@ -44,53 +44,16 @@ def week_start(day):
     return day-dt.timedelta(days=day.weekday())
 
 
-def weekly_progress(cur, owner, week):
-    end = week+dt.timedelta(days=7)
-    cur.execute('SELECT count(*) AS n FROM user_daily_stamps WHERE user_id=%s AND stamp_day>=%s AND stamp_day<%s',(owner,week,end))
-    steady = cur.fetchone()['n']
-    cur.execute('SELECT count(DISTINCT primary_category) AS n FROM user_content_completions WHERE user_id=%s AND completed_day>=%s AND completed_day<%s AND first_completion AND primary_category IS NOT NULL',(owner,week,end))
-    discovery = cur.fetchone()['n']
-    cur.execute('SELECT count(DISTINCT group_key) AS n FROM user_content_completions WHERE user_id=%s AND completed_day>=%s AND completed_day<%s AND qualifying_revisit',(owner,week,end))
-    return {'steady_week':steady,'discovery_week':discovery,'revisit_week':cur.fetchone()['n']}
-
-
-def saved_before(cur, owner, key, started):
-    kind, lid = key.split(':')
-    if kind=='issue_letter':
-        cur.execute('SELECT 1 FROM user_letter_bookmarks WHERE user_id=%s AND issue_letter_id=%s AND saved_at<%s',(owner,int(lid),started))
-    else:
-        cur.execute('SELECT 1 FROM user_archives a JOIN publications p ON p.id=%s WHERE a.user_id=%s AND a.saved_at<%s AND (a.article_no=p.slug OR a.rendition_id IN(SELECT id FROM renditions WHERE publication_id=p.id)) LIMIT 1',(int(lid),owner,started))
-    return cur.fetchone() is not None
-
-
 def record(cur, owner, session, now):
-    rules = session['completion_rules']; group = rules.get('group_key')
+    """완료·최초 완료만 보존한다. 기존 보상 원장은 수정하지 않는다."""
+    rules = session['completion_rules']
+    group = rules.get('group_key') or session['content_key']
     day = now.astimezone(ZoneInfo('Asia/Seoul')).date()
-    cur.execute('SELECT * FROM user_content_completions WHERE session_id=%s',(session['id'],))
-    previous = cur.fetchone()
-    if previous:
-        return {'status':'already_awarded' if group else 'pending','stamp_awarded':False,'pending_reason':None if group else 'REWARD_GROUP_REQUIRED'},[]
-    cur.execute('INSERT INTO user_content_completions(session_id,user_id,content_key,group_key,format,primary_category,completed_at,completed_day,rule_version) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(session['id'],owner,session['content_key'],group,session['format'],rules.get('primary_category'),now,day,VERSION))
-    if group is None:
-        return {'status':'pending','stamp_awarded':False,'pending_reason':'REWARD_GROUP_REQUIRED'},[]
-    cur.execute('INSERT INTO user_content_first_completions(user_id,group_key,session_id,completed_at) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING session_id',(owner,group,session['id'],now))
-    first = cur.fetchone() is not None
-    revisit = False
-    if not first:
-        cur.execute('SELECT max(completed_at) AS last FROM user_content_completions WHERE user_id=%s AND group_key=%s AND session_id<>%s',(owner,group,session['id']))
-        last = cur.fetchone()['last']
-        revisit = bool(last and last+dt.timedelta(minutes=30)<=session['started_at'] and saved_before(cur,owner,session['content_key'],session['started_at']))
-    cur.execute('UPDATE user_content_completions SET first_completion=%s,qualifying_revisit=%s WHERE session_id=%s',(first,revisit,session['id']))
-    stamped = False
-    awards = []
-    if first:
-        cur.execute('INSERT INTO user_daily_stamps(user_id,stamp_day,awarded_at,source_session_id) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING stamp_day',(owner,day,now,session['id']))
-        stamped = cur.fetchone() is not None
-        if stamped:awards.append({'type':'stamp','date':day.isoformat()})
-    week = week_start(day)
-    progress = weekly_progress(cur,owner,week)
-    for bid,title,target in BADGES:
-        if progress[bid]>=target:
-            cur.execute('INSERT INTO user_weekly_badges(user_id,week_start,badge_id,earned_at,rule_version) VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING badge_id',(owner,week,bid,now,VERSION))
-            if cur.fetchone():awards.append({'type':'badge','id':bid,'title':title,'week_start':week.isoformat()})
-    return {'status':'awarded' if awards else 'already_awarded','stamp_awarded':stamped,'pending_reason':None},awards
+    cur.execute('SELECT 1 FROM user_content_completions WHERE session_id=%s', (session['id'],))
+    if not cur.fetchone():
+        cur.execute('INSERT INTO user_content_completions(session_id,user_id,content_key,group_key,format,primary_category,completed_at,completed_day,rule_version) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)', (session['id'],owner,session['content_key'],group,session['format'],rules.get('primary_category'),now,day,VERSION))
+        cur.execute('INSERT INTO user_content_first_completions(user_id,group_key,session_id,completed_at) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING session_id', (owner,group,session['id'],now))
+        first = cur.fetchone() is not None
+        cur.execute('UPDATE user_content_completions SET first_completion=%s WHERE session_id=%s', (first,session['id']))
+    # 구버전 클라이언트를 위해 응답 필드는 유지하되 신규 보상은 지급하지 않는다.
+    return {'status':'disabled','stamp_awarded':False,'pending_reason':None}, []
