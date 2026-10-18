@@ -1,0 +1,17 @@
+.page { min-height: 100vh; background: #fff; color: #111827; }
+.main { max-width: 1200px; margin: 0 auto; padding: 32px 24px 96px; }
+.main:focus { outline: none; }
+.navigation { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.navigation a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 14px; color: #4b5563; }
+.navigation a:hover { color: #1d4ed8; }
+.navigation a:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 4px; border-radius: 4px; }
+.navigation svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.title { display: flex; align-items: center; gap: 8px; font-size: clamp(24px, 4.4vw, 32px); font-weight: 800; letter-spacing: -.03em; margin-bottom: 28px; }
+.title > svg { flex-shrink: 0; }
+.panel { border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; scroll-margin-top: 88px; }
+@media (max-width: 600px) {
+  .main { padding: 16px 16px 88px; }
+  .navigation { margin-bottom: 18px; gap: 8px; }
+  .navigation a { font-size: 13px; }
+  .title { font-size: 24px; margin-bottom: 24px; }
+}

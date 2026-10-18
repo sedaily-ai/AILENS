@@ -130,7 +130,7 @@ export function NewsFeedTab({
             <CategoryPairRow slugs={CATEGORY_PAIRS[0]} archiveItems={archiveItems} />
 
             {/*
-               타임머신 섹션 — 홈의 메인 훅이다. 최근 날짜는 실시간 S3 지면, 그 이전은 빅카인즈 예시를 보여 준다(NewsTimeMachineSection.tsx 상단 주석 참조).
+               타임머신 섹션 — 생일 시세가 기본 보기이며, 기존 날짜별 기사 탐색은 별도 보기로 유지한다.
                위치는 카테고리 섹션 첫 짝(증시+부동산) 바로 아래, 산업 짝 바로 위이다.
              */}
             <HomeSection><NewsTimeMachineSection /></HomeSection>
