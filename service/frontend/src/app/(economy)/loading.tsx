@@ -1,4 +1,6 @@
-// 글 화면으로 이동하는 동안 헤더·본문이 아직 없을 때 푸터만 위로 끌려 올라와 비치는 것을 막는 높이만 잡는다(스켈레톤 아님). paper/loading.tsx 와 같은 방식.
+// 글 화면으로 이동하는 동안 헤더·본문이 아직 없을 때 푸터만 위로 끌려 올라와 비치는 것을 막는 높이만 잡는다(스켈레톤 아님).
+// 로딩 중에는 스크롤이 이전 화면 위치에 남아 있어서 화면 한 장(100vh)만 잡으면, 홈을 내려가다 누른 경우 그만큼 아래의 푸터가 보인다.
+// 그래서 홈 전체 길이(모바일 약 13,400px)보다 길게 잡는다. 본문이 오면 맨 위로 스크롤되므로 독자에게 이 높이는 보이지 않는다.
 export default function EconomyLoading() {
-  return <div aria-hidden style={{ minHeight: '100vh' }} />;
+  return <div aria-hidden style={{ minHeight: 'calc(100vh + 20000px)' }} />;
 }
