@@ -21,7 +21,7 @@ def build(output):
         # 서버 비밀을 포함한 기존 ecosystem.config.js는 덮어쓰지 않는다.
         shutil.copytree(SERVICE / 'scripts', stage / 'scripts', ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'test_*'))
         (stage / 'migrations').mkdir()
-        for version in range(48, 57):  # v1.56 온보딩 집계(#112)까지
+        for version in range(48, 58):  # v1.57 저장한 기사까지
             matches = list((ROOT / 'docs/architecture/lens-erd-src').glob(f'lens_schema_v1.{version}_*.sql'))
             if len(matches) != 1:
                 raise RuntimeError(f'SQL v1.{version} 누락/중복')
@@ -44,7 +44,7 @@ def build(output):
         with tarfile.open(output, 'w:gz') as bundle:
             for path in sorted(stage.iterdir()):
                 bundle.add(path, arcname=path.name)
-    print('CMS·SQL v1.48~56·worker 패키지 생성 완료')
+    print('CMS·SQL v1.48~57·worker 패키지 생성 완료')
 
 
 if __name__ == '__main__':

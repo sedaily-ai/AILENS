@@ -64,6 +64,10 @@ def lambda_handler(event, context):
                     return _error(exc.code, detail['code'], detail['message'], request_id)
             except (ValueError, TypeError):
                 pass
+        if exc.code == 404 and path.startswith('/api/v2/me/article-bookmarks'):
+            # 저장한 기사 경로가 아직 없는 옛 CMS는 FastAPI 기본 404({"detail":"Not Found"})를 준다.
+            # 배포 사이(계정 API 먼저, CMS 나중) 웹이 저장 버튼을 숨기고 서랍을 빈 목록으로 보이도록 404로 넘긴다.
+            return _error(404, 'NOT_FOUND', '지원하지 않는 개인 API예요.', request_id)
         logger.warning('Dashboard dependency HTTP status=%s', exc.code)
         return _error(503, 'DEPENDENCY_UNAVAILABLE', '저장 서버를 사용할 수 없어요. 다시 시도해 주세요.', request_id)
     except (ValueError, UnicodeError):

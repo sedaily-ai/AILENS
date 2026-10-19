@@ -92,6 +92,19 @@ def test_account_roundtrip_preferences_bookmarks_follows_import_and_expiry(accou
     assert call('/letter-bookmarks')['total']==1
     call('/followed-editors/mincheol','DELETE')
     assert call('/followed-editors')['total']==0
+    # 저장한 기사(v1.57): 계정 API → CMS → DB 실제 경로로 저장·상태·목록·해제가 이어진다.
+    with cursor() as cur:
+        cur.execute(Path(__file__).resolve().parents[3].joinpath('docs/architecture/lens-erd-src/lens_schema_v1.57_2026-10-20.sql').read_text())
+    assert call('/article-bookmarks/42')['saved'] is False
+    assert call('/article-bookmarks/42','PUT')['saved'] is True
+    assert call('/article-bookmarks/42')['saved'] is True and call('/article-bookmarks/42',owner='b')['saved'] is False
+    listed=call('/article-bookmarks')
+    assert listed['total']==1 and listed['items'][0]['content']['content_key']=='publication:42' and listed['items'][0]['content']['available']
+    assert call('/article-bookmarks',owner='b')['total']==0
+    call('/article-bookmarks/123','PUT',expected=404)
+    call('/article-bookmarks/abc','PUT',expected=400)
+    assert call('/article-bookmarks/42','DELETE')['saved'] is False
+    assert call('/article-bookmarks')['total']==0
 
 
 def test_account_recommendation_view_signal_notifications_and_dependency(account_api):

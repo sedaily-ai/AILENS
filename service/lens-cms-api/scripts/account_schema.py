@@ -14,6 +14,7 @@ ACCOUNT_TABLES = {
     'issue_letter_editors': 'SELECT', 'issue_letter_categories': 'SELECT', 'media_assets': 'SELECT',
     'user_lens_preferences': 'SELECT,INSERT,UPDATE,DELETE',
     'user_letter_bookmarks': 'SELECT,INSERT,UPDATE,DELETE',
+    'user_article_bookmarks': 'SELECT,INSERT,UPDATE,DELETE',
     'user_content_views': 'SELECT,INSERT,UPDATE,DELETE',
     'user_content_sessions': 'SELECT,INSERT,UPDATE,DELETE',
     'user_content_events': 'SELECT,INSERT,UPDATE,DELETE',
@@ -48,7 +49,7 @@ def connection(app=False):
 def files():
     root = MIGRATIONS if MIGRATIONS.exists() and list(MIGRATIONS.glob('*.sql')) else SERVICE.parents[1] / 'docs/architecture/lens-erd-src'
     result = []
-    for version in range(48, 57):  # v1.56 온보딩 집계(#112)까지
+    for version in range(48, 58):  # v1.57 저장한 기사까지
         matches = list(root.glob(f'lens_schema_v1.{version}_*.sql'))
         if len(matches) != 1:
             raise RuntimeError(f'v1.{version} SQL 누락/중복')

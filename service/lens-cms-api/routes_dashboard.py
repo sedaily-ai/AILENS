@@ -41,6 +41,27 @@ def remove_bookmark(letter_id: str, user_id: str, x_internal_token: str | None =
     return _call(x_internal_token, dashboard_repo.set_bookmark, user_id, letter_id, False)
 
 
+# 저장한 기사(v1.57) — 기사 화면 '저장'과 나의 LENS 내 서랍 '저장한 기사'.
+@router.get('/article-bookmarks')
+def article_bookmarks(user_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.list_article_bookmarks, user_id, limit, cursor)
+
+
+@router.get('/article-bookmarks/{article_id}')
+def article_bookmark(article_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.get_article_bookmark, user_id, article_id)
+
+
+@router.put('/article-bookmarks/{article_id}')
+def save_article_bookmark(article_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.set_article_bookmark, user_id, article_id, True)
+
+
+@router.delete('/article-bookmarks/{article_id}')
+def remove_article_bookmark(article_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.set_article_bookmark, user_id, article_id, False)
+
+
 @router.get('/content/resolve')
 def resolve(user_id: str, kind: str, key_type: str, key: str, x_internal_token: str | None = Header(default=None)):
     return _call(x_internal_token, dashboard_repo.resolve, user_id, kind, key_type, key)
