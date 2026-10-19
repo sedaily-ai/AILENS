@@ -6,7 +6,7 @@ export function DashboardLetter({ letter, featured = false, saved, read, onSave 
   const editors = letter.editors?.length ? editorsOfLetter(letter) : [];
   return (
     <article className={`ml-letter${featured ? ' ml-featured' : ''}`} data-testid={`letter-${letter.slug}`}>
-      <div className="ml-letter-top"><span>{letter.categories.join(' · ') || '레터'}</span><button type="button" className="ml-bookmark" onClick={onSave} aria-label={`${letter.title} ${saved ? '저장 해제' : '저장'}`} aria-pressed={saved} aria-describedby="ml-storage-note"><LetterBookmarkIcon saved={saved} /></button></div>
+      <div className="ml-letter-top"><span>{letter.categories.join(' · ') || '레터'}</span><button type="button" className="ml-bookmark" onClick={onSave} aria-label={`${letter.title} ${saved ? '저장 해제' : '저장'}`} aria-pressed={saved}><LetterBookmarkIcon saved={saved} /></button></div>
       <Link href={`/letter/${encodeURIComponent(letter.slug)}`} className="ml-letter-link" prefetch={false}>
         <h3>{letter.title}</h3><p className="ml-deck">{letter.deck}</p>
       </Link>

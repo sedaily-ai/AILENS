@@ -13,7 +13,6 @@ export const MOBILE_CSS = `
     .lt-layout { gap: 20px; }
     .lt-eintro { padding-bottom: 12px; }
     .lt-eintro-summary { margin-top: 8px; }
-    .lt-eintro-policy { margin-top: 4px; }
     .lt-eintro-details { margin-top: 4px; }
     .lt-row { padding: 20px 0; }
     .lt-row-title { font-size: 20px; line-height: 1.5; }
