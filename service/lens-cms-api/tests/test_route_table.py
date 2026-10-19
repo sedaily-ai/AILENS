@@ -25,7 +25,15 @@ def test_route_count_includes_account_storage():
     # 165 → 162: 관심사 설정 제거(7d573c50)로 /api/v2/issue-letters/me/interests GET·PUT, /me/feed 3개가 빠졌다.
     # 162 → 159: 완료 판정 다이어트로 /internal/personal/lens/activity·/rewards·/format-preference 3개가 빠졌다.
     # 159 → 158: 저장 문장 관련 글 다이어트로 /internal/personal/lens/sentence-inputs/{sentence_id}가 빠졌다.
-    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 158
+    # 158 → 162: 저장한 기사(v1.57) /internal/personal/lens/article-bookmarks 목록·상태·저장·해제 4개가 생겼다.
+    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 162
+
+
+def test_article_bookmark_routes():
+    assert _endpoint("GET", "/internal/personal/lens/article-bookmarks") == "article_bookmarks"
+    assert _endpoint("GET", "/internal/personal/lens/article-bookmarks/42") == "article_bookmark"
+    assert _endpoint("PUT", "/internal/personal/lens/article-bookmarks/42") == "save_article_bookmark"
+    assert _endpoint("DELETE", "/internal/personal/lens/article-bookmarks/42") == "remove_article_bookmark"
 
 
 def test_removed_record_routes_are_gone_but_view_reporting_stays():

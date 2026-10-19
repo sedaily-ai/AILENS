@@ -51,6 +51,22 @@ def dispatch(method, path, owner, body, params):
         if not lid.isascii() or not lid.isdigit() or not 0 < int(lid) < 2**63:
             raise DashboardError(400, 'INVALID_ARGUMENT', '레터 ID를 확인해 주세요.')
         return repo.request(method, path, owner)
+    # 저장한 기사(2026-10-20) — 기사 화면 '저장'과 나의 LENS 내 서랍 '저장한 기사'. 레터 북마크와 같은 모양이다.
+    if path == '/article-bookmarks' and method == 'GET':
+        if set(params)-{'limit','cursor'}:
+            raise DashboardError(400,'INVALID_ARGUMENT','저장 기사 조회 조건을 확인해 주세요.')
+        try:
+            limit = int(params.get('limit', '50'))
+        except (ValueError, TypeError) as exc:
+            raise DashboardError(400, 'INVALID_ARGUMENT', 'limit을 확인해 주세요.') from exc
+        if not 1 <= limit <= 200:
+            raise DashboardError(400, 'INVALID_ARGUMENT', 'limit은 1~200이에요.')
+        return repo.request(method, path, owner, query={k: params[k] for k in ('limit', 'cursor') if k in params})
+    if path.startswith('/article-bookmarks/') and method in ('GET', 'PUT', 'DELETE'):
+        aid = path.removeprefix('/article-bookmarks/')
+        if not aid.isascii() or not aid.isdigit() or not 0 < int(aid) < 2**63:
+            raise DashboardError(400, 'INVALID_ARGUMENT', '기사 ID를 확인해 주세요.')
+        return repo.request(method, path, owner)
     if path == '/content/resolve' and method == 'GET':
         if set(params) != {'kind', 'key_type', 'key'}:
             raise DashboardError(400, 'INVALID_ARGUMENT', '콘텐츠 식별자를 확인해 주세요.')

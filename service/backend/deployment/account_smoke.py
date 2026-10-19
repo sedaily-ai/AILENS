@@ -22,7 +22,7 @@ def request(base, path, method='GET', token=None):
         return response.status, response.headers, response.read(1_000_000)
 
 
-def smoke(base, token):
+def smoke(base, token, after_cms=False):
     for path in ('/api/v2/me/preferences', '/api/v2/me/dashboard', '/api/archive'):
         status, headers, _ = request(base, path)
         if status != 401 or 'no-store' not in headers.get('Cache-Control', '') or 'private' not in headers.get('Cache-Control', ''):
@@ -42,12 +42,21 @@ def smoke(base, token):
     status, headers, _ = request(base, '/api/v2/me/preferences', method='OPTIONS')
     if status not in (200, 204) or headers.get('Access-Control-Allow-Origin') not in ('*', 'https://ailens.sedaily.ai') or 'PUT' not in headers.get('Access-Control-Allow-Methods', '') or 'authorization' not in headers.get('Access-Control-Allow-Headers', '').lower():
         raise RuntimeError('실제 origin PUT/Authorization CORS 확인 실패')
+    if after_cms:
+        # 저장한 기사(v1.57, 2026-10-20)는 CMS 배포 뒤에야 열린다. 그 전에는 404가 정상이라 CMS 배포 뒤 단계에서만 본다.
+        status, headers, body = request(base, '/api/v2/me/article-bookmarks', token=token)
+        if status != 200 or 'no-store' not in headers.get('Cache-Control', '') or not isinstance(json.loads(body).get('items'), list):
+            raise RuntimeError('저장한 기사 목록(계정 API→CMS→v1.57) 확인 실패')
+        status, headers, _ = request(base, '/api/v2/me/article-bookmarks/1', method='OPTIONS')
+        if status not in (200, 204) or 'DELETE' not in headers.get('Access-Control-Allow-Methods', ''):
+            raise RuntimeError('저장 해제(DELETE) CORS 확인 실패')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--base', required=True)
     parser.add_argument('--token-file', type=Path, required=True)
+    parser.add_argument('--after-cms', action='store_true', help='CMS 배포 뒤: 저장한 기사 경로까지 확인')
     args = parser.parse_args()
     try:
         url = urlsplit(args.base)
@@ -58,7 +67,7 @@ if __name__ == '__main__':
         token = args.token_file.read_text().strip()
         if not token or len(token) > 16384:
             raise RuntimeError('실제 Cognito ID token 필요')
-        smoke(args.base, token)
+        smoke(args.base, token, after_cms=args.after_cms)
         print('공개 계정 API 인증·CORS·private/no-store 확인 통과')
     except Exception:
         raise SystemExit('공개 API 인수 실패 — 프론트 배포 중단. 인증·경로·헤더·Lambda 로그를 확인하세요.') from None

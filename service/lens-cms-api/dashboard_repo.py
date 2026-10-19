@@ -7,6 +7,7 @@ import os
 from urllib.parse import quote
 
 from psycopg2.extras import Json
+import psycopg2.errors
 from db import get_cursor
 from content_resolver import DashboardError, resolve_content
 from interests_repo import validate_interest_items
@@ -83,7 +84,7 @@ def _encode_cursor(data):
     return base64.urlsafe_b64encode(raw + hmac.digest(_cursor_key(), raw, 'sha256')).decode()
 
 
-def _decode_cursor(cursor, owner, query):
+def _decode_cursor(cursor, owner, query, kind=None):
     try:
         if not isinstance(cursor, str) or len(cursor) > 2048:
             raise ValueError()
@@ -95,6 +96,9 @@ def _decode_cursor(cursor, owner, query):
         # 읽음 필터는 제거됐다. 옛 커서의 read 키는 'all'이면 지금 목록과 같은 순서라 그대로 받고,
         # unread/completed로 거른 목록의 커서는 이어 붙이면 섞이므로 처음부터 다시 받게 한다.
         if data['owner'] != owner or data['q'] != query or data.get('read', 'all') != 'all' or not 0 < int(data['id']) < 2**63:
+            raise ValueError()
+        # 목록 종류(레터=None, 기사='article')가 다른 커서는 섞지 않는다.
+        if data.get('kind') != kind:
             raise ValueError()
         when = dt.datetime.fromisoformat(data['at'])
         if when.tzinfo is None:
@@ -162,6 +166,80 @@ def set_bookmark(owner, letter_id, saved):
             cur.execute('DELETE FROM user_letter_bookmarks WHERE user_id=%s AND issue_letter_id=%s RETURNING saved_at,version', (owner, int(letter_id)))
             row = cur.fetchone()
         return {'letter_id': letter_id, 'saved': saved, 'saved_at': row['saved_at'].isoformat() if row else None, 'version': row['version'] if row else 0}
+
+
+# ── 저장한 기사(v1.57 user_article_bookmarks) ─────────────────────────────
+# 기사 화면의 '저장' 버튼과 나의 LENS 내 서랍 '저장한 기사'가 쓴다. 레터 북마크와 같은 규칙:
+# 새 저장은 공개 중인 기사만, 해제는 비공개·삭제된 기사도 허용, 목록은 최신 저장순 커서 페이지.
+
+def _article_id(article_id):
+    if not isinstance(article_id, str) or not article_id.isascii() or not article_id.isdigit() or not 0 < int(article_id) < 2**63:
+        raise DashboardError(400, 'INVALID_ARGUMENT', '기사 ID를 확인해 주세요.')
+    return int(article_id)
+
+
+def list_article_bookmarks(owner, limit=50, cursor=None):
+    from content_metadata import load_cards
+    if type(limit) is not int or not 1 <= limit <= 200:
+        raise DashboardError(400, 'INVALID_ARGUMENT', '목록 조회 조건을 확인해 주세요.')
+    after = _decode_cursor(cursor, owner, '', kind='article') if cursor else None
+    with get_cursor() as cur:
+        _account(cur, owner)
+        cur.execute('SELECT count(*) AS total FROM user_article_bookmarks WHERE user_id=%s', (owner,))
+        total = cur.fetchone()['total']
+        sql = 'SELECT publication_id,saved_at FROM user_article_bookmarks WHERE user_id=%s'
+        params = [owner]
+        if after:
+            sql += ' AND (saved_at,publication_id)<(%s,%s)'
+            params += list(after)
+        cur.execute(sql + ' ORDER BY saved_at DESC,publication_id DESC LIMIT %s', params + [limit + 1])
+        rows = cur.fetchall()
+        more = len(rows) > limit
+        rows = rows[:limit]
+        # 공개 중이고 볼 수 있는 형식이 있는 기사만 카드 정보를 싣는다. 나머지는 해제만 할 수 있게 available=false로 남긴다.
+        cards = {int(card['id']): card for card in load_cards(cur, 'publication', owner=owner, ids=[r['publication_id'] for r in rows], limit=len(rows))} if rows else {}
+        items = []
+        for r in rows:
+            card = cards.get(r['publication_id'])
+            content = {'content_key': f"publication:{r['publication_id']}", 'kind': 'publication', 'available': card is not None}
+            if card:
+                content.update(slug=card['slug'], title=card['title'], summary=card['summary'], published_at=card['published_at'],
+                               href=card['canonical_href'], categories=card['category_keys'], formats=card['formats'])
+            items.append({'article_id': str(r['publication_id']), 'saved_at': r['saved_at'].isoformat(), 'content': content})
+        next_cursor = _encode_cursor({'owner': owner, 'q': '', 'kind': 'article', 'at': rows[-1]['saved_at'].isoformat(), 'id': str(rows[-1]['publication_id'])}) if more else None
+        return {'items': items, 'count': len(items), 'total': total, 'next_cursor': next_cursor}
+
+
+def get_article_bookmark(owner, article_id):
+    pid = _article_id(article_id)
+    with get_cursor() as cur:
+        _account(cur, owner)
+        cur.execute('SELECT saved_at FROM user_article_bookmarks WHERE user_id=%s AND publication_id=%s', (owner, pid))
+        row = cur.fetchone()
+        return {'article_id': str(pid), 'saved': row is not None, 'saved_at': row['saved_at'].isoformat() if row else None}
+
+
+def set_article_bookmark(owner, article_id, saved):
+    from content_metadata import load_cards
+    pid = _article_id(article_id)
+    with get_cursor() as cur:
+        _account(cur, owner, create=saved)
+        if saved:
+            resolve_content(cur, 'publication', 'id', str(pid))
+            # 목록(list_article_bookmarks)이 카드로 보여 줄 수 있는 기사만 새로 저장한다 — 저장하자마자 '볼 수 없는 기사'로 나오지 않게.
+            if not load_cards(cur, 'publication', owner=owner, ids=[pid], limit=1):
+                raise DashboardError(404, 'NOT_FOUND', '공개된 콘텐츠를 찾을 수 없어요.')
+            # 이미 저장했으면 처음 저장한 시각을 유지한다(목록 순서가 다시 누를 때마다 바뀌지 않게).
+            try:
+                cur.execute('INSERT INTO user_article_bookmarks(user_id,publication_id) VALUES(%s,%s) '
+                            'ON CONFLICT(user_id,publication_id) DO UPDATE SET saved_at=user_article_bookmarks.saved_at RETURNING saved_at', (owner, pid))
+            except psycopg2.errors.ForeignKeyViolation as exc:
+                # 확인과 저장 사이에 기사가 실제로 지워진 경우.
+                raise DashboardError(404, 'NOT_FOUND', '공개된 콘텐츠를 찾을 수 없어요.') from exc
+            row = cur.fetchone()
+            return {'article_id': str(pid), 'saved': True, 'saved_at': row['saved_at'].isoformat()}
+        cur.execute('DELETE FROM user_article_bookmarks WHERE user_id=%s AND publication_id=%s', (owner, pid))
+        return {'article_id': str(pid), 'saved': False, 'saved_at': None}
 
 
 def resolve(owner, kind, key_type, key):

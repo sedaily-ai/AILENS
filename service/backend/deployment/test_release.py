@@ -85,7 +85,7 @@ class ReleaseTests(unittest.TestCase):
                 names = bundle.getnames()
                 self.assertEqual(bundle.getmember('notification-worker').mode,0o755)
                 self.assertEqual(bundle.getmember('notification-worker/notification_worker.py').mode,0o644)
-            self.assertEqual(len([n for n in names if n.startswith('migrations/lens_schema_')]), 9)  # v1.48~56
+            self.assertEqual(len([n for n in names if n.startswith('migrations/lens_schema_')]), 10)  # v1.48~57
             self.assertIn('notification-worker/notification_worker.py', names)
             self.assertIn('notification-worker.timer', names)
             self.assertNotIn('ecosystem.config.js', names)

@@ -218,3 +218,43 @@ def test_archive_personal_errors_are_private_and_popular_is_public(monkeypatch):
     monkeypatch.setattr(archive.svc,'handle_popular',public)
     assert 'Cache-Control' not in archive.lambda_handler(event('/api/archive/popular'),None)['headers']
 
+
+def test_article_bookmarks_validate_and_forward_to_storage(monkeypatch,tokens):
+    # 저장한 기사(2026-10-20): 목록·상태·저장·해제. 잘못된 ID·조건은 저장 계층에 닿기 전에 400이다.
+    from services.user import dashboard as service
+    seen=[]
+    def call(self,method,path,owner,body=None,query=None):
+        seen.append((method,path,owner,query));return {'items':[],'count':0,'total':0,'next_cursor':None} if path=='/article-bookmarks' else {'article_id':'42','saved':method=='PUT','saved_at':None}
+    monkeypatch.setattr(service.DashboardRepository,'request',call)
+    assert dashboard.lambda_handler(event('/api/v2/me/article-bookmarks',token=tokens(),params={'limit':'200','cursor':'c','user_id':'victim'}),None)['statusCode']==400
+    response=dashboard.lambda_handler(event('/api/v2/me/article-bookmarks',token=tokens(),params={'limit':'200','cursor':'c'}),None)
+    assert response['statusCode']==200 and response['headers']['Cache-Control']=='private, no-store'
+    assert seen[-1]==('GET','/article-bookmarks','fixture-a',{'limit':'200','cursor':'c'})
+    for params in ({'limit':'0'},{'limit':'201'},{'limit':'x'},{'sort':'old'}):
+        assert dashboard.lambda_handler(event('/api/v2/me/article-bookmarks',token=tokens(),params=params),None)['statusCode']==400
+    for method in ('GET','PUT','DELETE'):
+        assert dashboard.lambda_handler(event('/api/v2/me/article-bookmarks/42',method,tokens()),None)['statusCode']==200
+        assert seen[-1][:3]==(method,'/article-bookmarks/42','fixture-a')
+    count=len(seen)
+    for bad in ('0','abc','4.2','9'*30,'%EF%BC%91'):
+        assert dashboard.lambda_handler(event(f'/api/v2/me/article-bookmarks/{bad}','PUT',tokens()),None)['statusCode']==400
+    assert dashboard.lambda_handler(event('/api/v2/me/article-bookmarks/42','POST',tokens()),None)['statusCode']==404
+    assert len(seen)==count
+    assert dashboard.lambda_handler(event('/api/v2/me/article-bookmarks/42','PUT'),None)['statusCode']==401
+
+
+
+def test_article_bookmarks_old_cms_default_404_stays_404(monkeypatch,tokens):
+    # 배포 사이(계정 API 먼저, CMS 나중): 옛 CMS에는 저장한 기사 경로가 없어 FastAPI 기본 404({"detail":"Not Found"})를 준다.
+    # 웹이 버튼을 숨기고 서랍을 빈 목록으로 보이려면 503이 아닌 404여야 한다. 다른 경로의 같은 응답은 그대로 503이다.
+    import io
+    import urllib.error
+    from services.user import dashboard as service
+    def old_cms(self,method,path,owner,body=None,query=None):
+        raise urllib.error.HTTPError('http://127.0.0.1'+path,404,'Not Found',{},io.BytesIO(b'{"detail":"Not Found"}'))
+    monkeypatch.setattr(service.DashboardRepository,'request',old_cms)
+    for path,method in (('/api/v2/me/article-bookmarks','GET'),('/api/v2/me/article-bookmarks/42','GET'),('/api/v2/me/article-bookmarks/42','PUT')):
+        result=dashboard.lambda_handler(event(path,method,tokens()),None)
+        assert result['statusCode']==404 and json.loads(result['body'])['error']['code']=='NOT_FOUND'
+    result=dashboard.lambda_handler(event('/api/v2/me/letter-bookmarks',token=tokens()),None)
+    assert result['statusCode']==503
