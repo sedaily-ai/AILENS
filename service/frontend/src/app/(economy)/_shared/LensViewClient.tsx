@@ -33,6 +33,7 @@ import { renderInline } from './components/format/renderInline';
 import { ArticleStickyBar } from './components/article/ArticleStickyBar';
 import { ArticleToTop } from './components/article/ArticleToTop';
 import { ArticleToolRail } from './components/article/ArticleToolRail';
+import { ArticleSaveButton, ArticleSaveToast, useArticleSaveAction } from './components/article/ArticleSaveButton';
 import { ArticleNeighborLinks, ArticleNeighborNav, type ArticleNeighbor } from './components/article/ArticleNeighborNav';
 import { LENS_VIEW_CSS } from './lensViewStyles';
 import {
@@ -70,6 +71,8 @@ export function LensViewClient({
   initialHotLetters?: TodayLetterCardLike[];
 }) {
   const { lens, active, count, dir, showDesc, mediaDur, noteDur, tabRefs, select, onTabKeyDown } = useLensFormatTabs(slug, initialLens);
+  // 기사 저장 — 레일과 좁은 화면 도구 줄이 같은 상태를 쓰도록 한 번만 만든다(상태 확인 요청도 한 번).
+  const save = useArticleSaveAction(lens?.id ?? '');
 
   if (!slug || lens === null) {
     return (
@@ -134,11 +137,13 @@ export function LensViewClient({
         />
         {neighbors && <ArticleNeighborNav articleId={lens.id} prev={neighbors.prev} next={neighbors.next} />}
         <ArticleReveal />
-        {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
-        {/* 웹툰 탭에서는 도구 레일을 숨겨 이미지에만 집중하게 한다. */}
-        <div className="rail-host" hidden={activeFormat === 'webtoon'}>
+        {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·저장·공유·인쇄. */}
+        {/* 웹툰 탭에서는 그림에 집중하도록 저장·공유만 남긴다(레일은 본문 칸 바깥이라 그림과 겹치지 않는다). */}
+        <div className="rail-host">
           <nav className="rail" aria-label="기사 도구">
             <ArticleToolRail
+              save={save}
+              compact={activeFormat === 'webtoon'}
               title={seoHeadline(lens.headline)}
               url={`${SITE_URL}${lensPath(lens)}`}
               cssVar="--lens-font-scale"
@@ -147,6 +152,7 @@ export function LensViewClient({
             />
           </nav>
         </div>
+        <ArticleSaveToast save={save} />
 
         <ArticleChapterNav
           chapters={chapters}
@@ -210,7 +216,10 @@ export function LensViewClient({
             className="tools-inline flex items-center justify-between flex-wrap"
             style={{ marginTop: 14, gap: 12, paddingBottom: 14 }}
           >
-            <ArticleShareButton title={seoHeadline(lens.headline)} url={`${SITE_URL}${lensPath(lens)}`} />
+            <div className="flex items-center" style={{ gap: 4 }}>
+              <ArticleSaveButton save={save} />
+              <ArticleShareButton title={seoHeadline(lens.headline)} url={`${SITE_URL}${lensPath(lens)}`} />
+            </div>
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
               <div style={{ width: 1, alignSelf: 'stretch', background: '#e5e7eb' }} aria-hidden />

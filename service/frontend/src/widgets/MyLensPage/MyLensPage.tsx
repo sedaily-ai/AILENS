@@ -14,6 +14,7 @@ import { DrawerPanel } from './components/DrawerPanel';
 import { DashboardLetter } from './components/DashboardLetter';
 import { PersonalNews } from './components/PersonalNews';
 import { useDashboardArchive } from './lib/news/useDashboardArchive';
+import { useArticleShelf } from './lib/news/useArticleShelf';
 import { useServerDashboard } from './lib/useServerDashboard';
 import { cardLetter, newsRecommendations as mapNewsRecommendations } from './lib/dashboardApi';
 import { mergeLetters } from './lib/dashboardModel';
@@ -73,6 +74,7 @@ function MyLensDashboard() {
   const needsShelf = needsLetters;
   const shelf = useLetterShelf(needsShelf);
   const archive = useDashboardArchive(tab === 'archive');
+  const articleShelf = useArticleShelf(tab === 'archive');
   const follow = useFollowedEditors(tab === 'home' || subscribeOpen);
   const data = useDashboardLetters(needsLetters && shelf.ready);
   const [savedExpanded, setSavedExpanded] = useState(false);
@@ -130,7 +132,7 @@ function MyLensDashboard() {
             </section>
 
             </>}
-            {tab === 'archive' && <><BrowserBookmarksImport owner={user!.userId} letters={letters} onImported={()=>{shelf.retry();server.retry();}} /><DrawerPanel key={`${archive.owner ?? 'browser'}:${params.get('kind')}`} initialFilter={params.get('kind') === 'letters' ? 'letters' : 'sentences'} archive={archive} articles={news.articles} letters={letters} savedSlugs={shelf.saved} lettersLoading={data.loading || !shelf.ready} lettersFailed={!shelf.available} retryLetters={()=>{data.retry();shelf.retry();}} onSave={toggleSaved} /></>}
+            {tab === 'archive' && <><BrowserBookmarksImport owner={user!.userId} letters={letters} onImported={()=>{shelf.retry();server.retry();}} /><DrawerPanel key={`${archive.owner ?? 'browser'}:${params.get('kind')}`} initialFilter={params.get('kind') === 'letters' ? 'letters' : params.get('kind') === 'articles' ? 'articles' : 'sentences'} articleShelf={articleShelf} archive={archive} articles={news.articles} letters={letters} savedSlugs={shelf.saved} lettersLoading={data.loading || !shelf.ready} lettersFailed={!shelf.available} retryLetters={()=>{data.retry();shelf.retry();}} onSave={toggleSaved} /></>}
           </div>
 
           {tab === 'home' && <aside className="ml-rail" aria-label="내 기록과 구독">
