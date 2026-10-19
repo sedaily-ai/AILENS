@@ -1,5 +1,13 @@
 # 나의 LENS — 백엔드 API 계약
 
+> **2026-10-19 기능 다이어트 이후 현재 상태(이 블록이 아래 내용보다 우선)** — 경위: [작업 기록](../worklog/2026-10/2026-10-19-기능-다이어트.md)
+> - 제거: API-06의 시간 예산(`minutes`), API-07의 `GET /sentences/{id}/recommendations`(404), API-09 `GET /activity`·`GET /rewards`(404), API-13 `GET /format-preference`(404). CMS 내부 `/activity`·`/rewards`·`/format-preference`·`/sentence-inputs`도 제거.
+> - API-01 홈 집계: `format_preference`·`weekly_activity`·`weekly_rewards`·`notifications`는 조회하지 않고 `{"status":"unavailable"}`로만 남는다(옛 웹 호환, 다음 정리 때 제거). 웹은 `minutes=0`을 붙여 부른다(옛 계정 API 호환).
+> - API-02 preferences: 저장은 `{revision,interests}`만. 옛 웹의 `{minutes,revision}`은 쓰지 않고 현재 설정을, `{interests,minutes,revision}`은 minutes를 버리고 저장한다. 응답의 `minutes`는 옛 계정 API 호환용 DB 값이다.
+> - API-04 저장 레터: 읽음 필터 `read`는 받기만 하고 거르지 않는다. 카드에 `completed`·`read_minutes`가 없다(CMS 내부 카드에는 옛 계정 API 호환용 `read_minutes`가 남음).
+> - API-08 이용 세션·이벤트: 보기 신호(`visible_ms`)만 판정하고 완료·스탬프·배지를 만들지 않는다.
+> - 웹은 알림 설정·동의·기기 구독(API-10~12)을 부르지 않는다. 경로와 알림 워커는 남아 있다(운영 dry_run).
+
 > 2026-10-14 추가 구현: 계정별 형식 선호·추천/알림 연결, 에디터 팔로우, 서버 완료 읽음 필터, 사용자 선택 북마크 가져오기를 로컬 구현했다. 현재 계약은 [형식 선호·계정 연결](../product/나의LENS/형식선호·계정연결_구현상태.md)과 [최신 전체 리뷰 보완](../product/나의LENS/백엔드_리뷰_보완.md)의 v1.54 계약을 따른다. 아래 이전 단계의 미구현 표시는 해당 구현으로 대체하며 운영은 미반영이다.
 
 > 2026-10-14 레터 북마크 정책 보완: 저장·해제는 로그인 필수이며 목록·상세·나의 LENS가 계정 API를 공유한다. 기존 브라우저 데이터는 조회용으로 보존하고 자동 병합하지 않는다. 실제 API·보존·화면 흐름은 [최신 북마크 계약](../product/모아쓰기레터/북마크_동기화_연동요구사항.md)을 따른다. 운영 미반영이다.
