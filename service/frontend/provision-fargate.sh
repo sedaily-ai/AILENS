@@ -99,9 +99,11 @@ ALB_ARN=$(aws elbv2 create-load-balancer --name sedaily-lens-frontend-alb \
   --scheme internet-facing --type application --region "$REGION" \
   --tags $TAGS_KV --query "LoadBalancers[0].LoadBalancerArn" --output text)
 
+# 헬스체크는 홈(/)이 아니라 /api/health(렌더 없이 즉시 200). 홈을 렌더하면 과부하 때 5초를 넘겨
+# 유일한 태스크가 교체되고 캐시가 사라지는 고리가 생긴다(2026-10-19 운영 대상 그룹도 같은 값으로 변경).
 TG_ARN=$(aws elbv2 create-target-group --name sedaily-lens-frontend-tg \
   --protocol HTTP --port 3000 --vpc-id "$VPC_ID" --target-type ip \
-  --health-check-path / --health-check-protocol HTTP \
+  --health-check-path /api/health --health-check-protocol HTTP \
   --region "$REGION" --tags $TAGS_KV --query "TargetGroups[0].TargetGroupArn" --output text)
 
 aws elbv2 create-listener --load-balancer-arn "$ALB_ARN" \
