@@ -11,8 +11,8 @@ def test_preview_uses_exact_interest_without_latest_fallback_or_quote_exposure(m
     def request(self,method,path,owner,body=None,query=None):
         assert owner=='a';seen.append(path)
         if path=='/notifications/context':return {'preferences':{'briefing':True,'followups':False,'weekly':False},'due_types':['briefing'],'revision':1,'config':{'mode':'dry_run','policy_version':'v1'},'notified_keys':[], 'source_fingerprint':'hash','delivery':{}}
-        if path=='/notifications/inputs':return {'preferences':{'interests':[],'minutes':0},'categories':[], 'keywords':[], 'sentence_words':[], 'selected_topics':[], 'coverage':{'unmatched':0,'news_count':0,'letter_count':0},'sentence_total':0,'recent_sentences':[]}
-        if path=='/recommendation-candidates':return {'items':[{'content_key':'publication:1','kind':'publication','id':'1','title':'관계없는 제목','summary':'','published_at':now,'category_keys':[],'keywords':[],'read_minutes':1,'formats':['letter'],'viewed':False,'saved':False,'href':'/lens/one'}], 'latest':[]}
+        if path=='/notifications/inputs':return {'preferences':{'interests':[]},'categories':[], 'keywords':[], 'selected_topics':[], 'coverage':{'unmatched':0,'news_count':0,'letter_count':0},'sentence_total':0,'recent_sentences':[]}
+        if path=='/recommendation-candidates':return {'items':[{'content_key':'publication:1','kind':'publication','id':'1','title':'관계없는 제목','summary':'','published_at':now,'category_keys':[],'keywords':[],'formats':['letter'],'viewed':False,'saved':False,'href':'/lens/one'}], 'latest':[]}
         if path=='/notifications/candidates':return {'server_now':now,'followups':[], 'weekly':{'read_days':0,'saved_contents':0}}
         raise AssertionError(path)
     monkeypatch.setattr(DashboardRepository,'request',request)
@@ -75,10 +75,10 @@ def test_preview_filters_ineligible_before_cutoff_and_reserves_followup(monkeypa
     def card(i,age=0):
         return {'content_key':f'publication:{i}','kind':'publication','id':str(i),'title':str(i),'summary':'',
           'published_at':(now-dt.timedelta(hours=age)).isoformat(),'category_keys':['industry'],'keywords':[],
-          'read_minutes':1,'formats':['letter'],'viewed':False,'saved':False,'href':f'/lens/{i}'}
+          'formats':['letter'],'viewed':False,'saved':False,'href':f'/lens/{i}'}
     def request(self,method,path,owner,body=None,query=None):
         if path=='/notifications/context':return {'preferences':{'briefing':True,'followups':True,'weekly':False},'due_types':['briefing','followups'],'revision':1,'config':{'mode':'dry_run','policy_version':'v1'},'notified_keys':notified,'source_fingerprint':'h','delivery':{}}
-        if path=='/notifications/inputs':return {'preferences':{'interests':[{'type':'category','key':'industry'}],'minutes':0},'categories':[{'key':'industry','n':1}], 'keywords':[], 'sentence_words':[], 'selected_topics':[], 'coverage':{'unmatched':0,'news_count':0,'letter_count':0},'sentence_total':0}
+        if path=='/notifications/inputs':return {'preferences':{'interests':[{'type':'category','key':'industry'}]},'categories':[{'key':'industry','n':1}], 'keywords':[], 'selected_topics':[], 'coverage':{'unmatched':0,'news_count':0,'letter_count':0},'sentence_total':0}
         if path=='/recommendation-candidates':return {'items':[card(i) for i in range(1,9)]+[card(9,80)] if body['kind']=='publication' else [],'latest':[]}
         if path=='/notifications/candidates':return {'server_now':now.isoformat(),'followups':[card(20)],'weekly':{'read_days':0,'saved_contents':0}}
         raise AssertionError(path)

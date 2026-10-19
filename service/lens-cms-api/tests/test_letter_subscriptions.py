@@ -78,7 +78,7 @@ def test_pick_digest_orders_by_score_skips_sent_and_unrelated():
 
 
 LETTER = {"slug": "s1", "issue_no": 4, "title": "제목 <x>", "deck": "한 줄", "category_names": ["시그널", "경제"], "published_at": "2026-10-09T01:00:00+00:00",
-          "read_minutes": 3, "summary": ["첫째 줄 <b>", "둘째 줄"], "editor_note": "에디터 말", "topics": [{"name": "금리"}],
+          "summary": ["첫째 줄 <b>", "둘째 줄"], "editor_note": "에디터 말", "topics": [{"name": "금리"}],
           "sections": [{"axis": "news", "axis_label": "선정 소식", "heading": "소제목", "key_line": "소식 핵심", "paragraphs": [["앞 ", {"text": "링크", "href": "https://www.sedaily.com/a?x=1&y=2"}, " 뒤"]]},
                        {"axis": "other", "axis_label": "다른 시각", "heading": "시각", "key_line": "시각 핵심", "paragraphs": [["본문"]]}],
           "sources": [{"title": "기사 제목", "outlet": "서울경제", "url": "https://www.sedaily.com/a", "axes": ["news"]}],
@@ -96,6 +96,9 @@ def test_render_letter_follows_site_structure_and_escapes():
     assert 'href="https://www.sedaily.com/a?x=1&amp;y=2"' in h  # 본문 인라인 링크 유지
     assert "unsubscribe?token=TOKEN123" in h and "unsubscribe?token=TOKEN123" in text and "서울특별시 종로구" in h
     assert "링크(https://www.sedaily.com/a?x=1&y=2)" in text
+    # 읽을 시간('약 N분')은 표시하지 않는다(편집 입력값이라 실제 측정값이 아님).
+    assert "· AI LENS 편집팀" in h and "분 · AI LENS 편집팀" not in h
+    assert "분 · AI LENS 편집팀" not in letter_mail.render_letter({**LETTER, "read_minutes": 3}, "", "T")[1]
     for banned in ("놓치지", "지금 바로", "필독", "추천"):
         assert banned not in h and banned not in text
 

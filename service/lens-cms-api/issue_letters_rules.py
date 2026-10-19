@@ -215,9 +215,7 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     if not _SLUG_RE.match(slug):
         raise LetterError("slug 는 YYYY-MM-DD-주제 형식이어야 합니다")
     title = _text(data.get("title"), "title", required=True, limit=300)
-    read_minutes = int(data.get("read_minutes") or 3)
-    if not 1 <= read_minutes <= 60:
-        raise LetterError("read_minutes 는 1~60 이어야 합니다")
+    # read_minutes(읽을 시간)는 제거된 기능이다. 옛 admin·파이프라인이 보내도 거부하지 않고 무시한다.
     summary = data.get("summary") or []
     if not isinstance(summary, list) or any(not isinstance(s, str) or not s.strip() for s in summary) or len(summary) > 6:
         raise LetterError("summary 는 비어 있지 않은 문장 배열(최대 6)이어야 합니다")
@@ -290,7 +288,7 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "slug": slug, "title": title, "deck": _text(data.get("deck"), "deck", limit=500) or "",
         "summary": [s.strip() for s in summary], "editor_note": _text(data.get("editor_note"), "editor_note", limit=1000),
-        "read_minutes": read_minutes, "categories": [str(c) for c in categories], "topics": topics, "editors": editors,
+        "categories": [str(c) for c in categories], "topics": topics, "editors": editors,
         "sections": sections, "sources": sources, "poll": poll,
     }
 

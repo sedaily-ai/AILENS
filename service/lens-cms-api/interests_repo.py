@@ -144,14 +144,14 @@ def upsert_bundles(items: Any) -> Dict[str, int]:
 
 def _load_candidates(cur, limit: int) -> List[Dict[str, Any]]:
     """최근 발행 레터와 점수·카드에 필요한 키를 한꺼번에(질의 5번) 읽는다."""
-    cur.execute("SELECT id, slug, issue_no, title, deck, read_minutes, published_at FROM issue_letters "
+    cur.execute("SELECT id, slug, issue_no, title, deck, published_at FROM issue_letters "
                 "WHERE status = 'published' AND deleted_at IS NULL ORDER BY published_at DESC LIMIT %s", (limit,))
     rows = cur.fetchall()
     if not rows:
         return []
     ids = [r["id"] for r in rows]
     letters = {r["id"]: {"id": r["id"], "slug": r["slug"], "issue_no": r["issue_no"], "title": r["title"], "deck": r["deck"],
-                         "read_minutes": r["read_minutes"], "published_dt": r["published_at"], "topics": [], "category_keys": [],
+                         "published_dt": r["published_at"], "topics": [], "category_keys": [],
                          "axes": [], "source_count": 0} for r in rows}
     cur.execute("SELECT lt.letter_id, t.slug, t.name, lt.is_primary FROM issue_letter_topics lt JOIN topics t ON t.id = lt.topic_id "
                 "WHERE lt.letter_id = ANY(%s) ORDER BY lt.is_primary DESC, t.name", (ids,))

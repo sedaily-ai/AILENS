@@ -14,12 +14,13 @@ FORMATS_SQL = f"""ARRAY(SELECT r.format FROM renditions r WHERE r.publication_id
 ) ORDER BY r.format)"""
 
 
-def load_cards(cur, kind, *, owner=None, ids=None, categories=(), terms=(), limit=200, exclude_seen=False, match=False, editors=()):
+def load_cards(cur, kind, *, owner=None, ids=None, categories=(), limit=200, exclude_seen=False, match=False, editors=()):
+    # read_minutes: 읽을 시간 기능은 2026-10-19에 지웠지만 옛 계정 API의 rank()가 card['read_minutes']를 바로 읽는다
+    # (계정 API만 되돌리는 롤백·배포 사이). DB 값을 그대로 싣고 새 코드는 읽지 않는다. 다음 정리 때 제거.
     if kind == 'publication':
         table, alias = 'publications', 'p'
         select = f"p.id,p.slug,p.title,COALESCE(p.subtitle,'') AS summary,p.published_at,ARRAY[{CATEGORY_SQL}] AS category_keys,{KEYWORDS_SQL} AS keywords,{FORMATS_SQL} AS formats,NULL::int AS read_minutes,p.admin_extra#>>'{{body_inline,category}}' AS canonical_category"
         join = ' LEFT JOIN categories c ON c.id=p.category_id'
-        words = f"p.title||' '||COALESCE(p.subtitle,'')||' '||({KEYWORDS_SQL})::text"
         cats = f"ARRAY[{CATEGORY_SQL}]"
         saved = "false"
         seen = "EXISTS(SELECT 1 FROM user_content_views v WHERE v.user_id=(SELECT owner FROM actor) AND v.content_key='publication:'||p.id) OR EXISTS(SELECT 1 FROM user_readings h WHERE h.user_id=(SELECT owner FROM actor) AND h.publication_id=p.id)"
@@ -28,14 +29,13 @@ def load_cards(cur, kind, *, owner=None, ids=None, categories=(), terms=(), limi
         table, alias = 'issue_letters', 'l'
         select = "l.id,l.slug,l.title,l.deck AS summary,l.published_at,ARRAY(SELECT category_slug FROM issue_letter_categories WHERE letter_id=l.id ORDER BY is_primary DESC,category_slug) AS category_keys,ARRAY(SELECT t.name FROM issue_letter_topics lt JOIN topics t ON t.id=lt.topic_id WHERE lt.letter_id=l.id ORDER BY lt.is_primary DESC,t.name) AS keywords,ARRAY['letter']::text[] AS formats,l.read_minutes,NULL::text AS canonical_category"
         join = ''
-        words = "l.title||' '||l.deck||' '||COALESCE((SELECT string_agg(t.name,' ') FROM issue_letter_topics lt JOIN topics t ON t.id=lt.topic_id WHERE lt.letter_id=l.id),'')"
         cats = 'ARRAY(SELECT category_slug FROM issue_letter_categories WHERE letter_id=l.id)'
         saved = "EXISTS(SELECT 1 FROM user_letter_bookmarks b WHERE b.user_id=(SELECT owner FROM actor) AND b.issue_letter_id=l.id)"
         seen = "EXISTS(SELECT 1 FROM user_content_views v WHERE v.user_id=(SELECT owner FROM actor) AND v.content_key='issue_letter:'||l.id)"
         excluded = 'true'
     params = [owner]
-    completed=f"EXISTS(SELECT 1 FROM user_content_completions ce WHERE ce.user_id=(SELECT owner FROM actor) AND ce.content_key='{kind}:'||{alias}.id)"
-    sql = f"WITH actor AS (SELECT %s::varchar AS owner) SELECT {select},({saved}) AS saved,({seen}) AS viewed,({completed}) AS completed FROM {table} {alias}{join} WHERE {alias}.status='published' AND {alias}.deleted_at IS NULL AND {alias}.published_at<=clock_timestamp()"
+    # 읽음 표시(completed)는 화면에서 제거돼 카드에 싣지 않는다. 완료 기록 자체는 user_content_completions에 남는다.
+    sql = f"WITH actor AS (SELECT %s::varchar AS owner) SELECT {select},({saved}) AS saved,({seen}) AS viewed FROM {table} {alias}{join} WHERE {alias}.status='published' AND {alias}.deleted_at IS NULL AND {alias}.published_at<=clock_timestamp()"
     if kind == 'publication':
         sql += f' AND cardinality({FORMATS_SQL})>0'
     else:
@@ -45,11 +45,13 @@ def load_cards(cur, kind, *, owner=None, ids=None, categories=(), terms=(), limi
     if exclude_seen:
         sql += f' AND NOT ({seen}) AND {excluded}'
     if match:
-        sql += f" AND (({cats})::text[] && %s::text[] OR EXISTS(SELECT 1 FROM unnest(%s::text[]) AS t(term) WHERE strpos(lower(normalize({words},NFKC)),t.term)>0))"
-        params += [list(categories), list(terms)]
+        # 분야가 겹치거나(뉴스·레터) 팔로우 에디터가 쓴 레터만 후보다. 단어 일치(저장 문장 관련 글)는 2026-10-19에 제거했다.
+        cond = f"({cats})::text[] && %s::text[]"
+        params.append(list(categories))
         if kind=='issue_letter' and editors:
-            sql=sql[:-1]+" OR EXISTS(SELECT 1 FROM issue_letter_editors ie JOIN letter_editors e ON e.id=ie.editor_id WHERE ie.letter_id=l.id AND e.is_active AND e.slug=ANY(%s)))"
+            cond += " OR EXISTS(SELECT 1 FROM issue_letter_editors ie JOIN letter_editors e ON e.id=ie.editor_id WHERE ie.letter_id=l.id AND e.is_active AND e.slug=ANY(%s))"
             params.append(list(editors))
+        sql += f" AND ({cond})"
     sql += f' ORDER BY {alias}.published_at DESC,{alias}.id DESC LIMIT %s'; params.append(limit)
     cur.execute(sql, params)
     rows = cur.fetchall()

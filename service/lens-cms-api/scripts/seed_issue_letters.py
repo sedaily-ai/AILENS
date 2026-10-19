@@ -95,7 +95,7 @@ def main():
             else:
                 skipped.append(s["title"])
                 print(f"  건너뜀(기사 DB에 없음)  {s['title'][:40]}")
-        data = {k: l[k] for k in ("slug", "title", "deck", "summary", "editor_note", "read_minutes", "categories", "sections", "poll")}
+        data = {k: l[k] for k in ("slug", "title", "deck", "summary", "editor_note", "categories", "sections", "poll")}
         data["sources"] = sources
         if not args.apply:
             continue

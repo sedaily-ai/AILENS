@@ -78,13 +78,13 @@ def test_rejects_unsupported_expired_and_impossible_progress(modules):
 
 def test_old_history_and_registered_keyword_metadata_are_used(modules):
     dashboard,_,recommendation,cursor=modules
-    dashboard.replace_preferences('a',{'revision':0,'minutes':5,'interests':[]})
+    dashboard.replace_preferences('a',{'revision':0,'interests':[]})
     with cursor() as cur:
         cur.execute("INSERT INTO user_content_views VALUES('a','publication:42',now(),'observed')")
         cur.execute("INSERT INTO user_readings VALUES('a',42,now()),('a',null,now())")
     data=recommendation.inputs('a')
     assert data['categories'][0]['n']==1 and data['coverage']['unmatched']==1
-    candidates=recommendation.candidates('a',{'kind':'publication','categories':[],'terms':['반도체']})
+    candidates=recommendation.candidates('a',{'kind':'publication','categories':['industry']})
     assert [row['content_key'] for row in candidates['items']]==['publication:43']
     assert '반도체' in candidates['items'][0]['keywords']
     assert '반도체' not in candidates['items'][0]['title']
@@ -98,22 +98,22 @@ def test_letter_category_matching_accepts_actual_varchar_schema(modules):
         cur.execute('ALTER TABLE issue_letter_categories ALTER COLUMN category_slug TYPE varchar(32)')
     category=recommendation.candidates('a',{'kind':'issue_letter','categories':['finance']})
     assert [row['content_key'] for row in category['items']]==['issue_letter:1']
-    keyword=recommendation.candidates('a',{'kind':'issue_letter','terms':['레터']})
-    assert {row['content_key'] for row in keyword['items']}=={'issue_letter:1','issue_letter:2'}
 
 
-def test_sentence_owner_source_exclusion_and_delete_invalidation(modules):
+def test_saved_sentence_words_never_match_and_source_stays_excluded(modules):
     _,_,recommendation,cursor=modules
     with cursor() as cur:
-        cur.execute("INSERT INTO user_archives(user_id,article_no,content) VALUES('a','123','반도체가 미래를 바꿉니다') RETURNING id");sid=str(cur.fetchone()['id'])
-    assert recommendation.inputs('a')['sentence_words']==[]
-    assert recommendation.inputs('a',sid)['sentence_words']
-    with pytest.raises(recommendation.DashboardError) as error:recommendation.inputs('b',sid)
-    assert error.value.status==404
-    assert [row['content_key'] for row in recommendation.candidates('a',{'kind':'publication','categories':[],'terms':['반도체']})['items']]==['publication:43']
+        cur.execute("INSERT INTO user_archives(user_id,article_no,content) VALUES('a','123','10월 반도체가 미래를 바꿉니다') RETURNING id");sid=str(cur.fetchone()['id'])
+    # 저장 문장 관련 글(문장 단어 일치)은 제거됐다. 입력에 문장 단어가 없고, 문장을 넣어 부르는 길도 없다.
+    assert 'sentence_words' not in recommendation.inputs('a')
+    with pytest.raises(TypeError):recommendation.inputs('a',sid)
+    # 예전 service/backend가 보내는 terms는 받기만 하고 쓰지 않는다: '10월'·'반도체' 단어만으로는 후보가 생기지 않는다.
+    for kind in ('publication','issue_letter'):
+        assert recommendation.candidates('a',{'kind':kind,'categories':[],'terms':['10월','반도체','레터']})['items']==[]
+    # 문장을 담은 원문은 계속 뉴스 추천 후보에서 빠지고, 문장을 지우면 다시 후보가 된다.
+    assert [row['content_key'] for row in recommendation.candidates('a',{'kind':'publication','categories':['industry']})['items']]==['publication:43']
     with cursor() as cur:cur.execute('DELETE FROM user_archives WHERE id=%s',(sid,))
-    assert recommendation.inputs('a')['sentence_words']==[]
-    with pytest.raises(recommendation.DashboardError):recommendation.inputs('a',sid)
+    assert {row['content_key'] for row in recommendation.candidates('a',{'kind':'publication','categories':['industry']})['items']}=={'publication:42','publication:43'}
 
 
 def test_no_view_before_server_threshold_and_sequence_is_monotonic(modules):
@@ -146,15 +146,15 @@ def test_no_candidates_without_actual_ready_content(modules):
     _,_,recommendation,cursor=modules
     with cursor() as cur:
         cur.execute("UPDATE renditions SET status='processing' WHERE publication_id=43")
-    assert [row['content_key'] for row in recommendation.candidates('a',{'kind':'publication','categories':[],'terms':['반도체']})['items']]==['publication:42']
+    assert [row['content_key'] for row in recommendation.candidates('a',{'kind':'publication','categories':['industry']})['items']]==['publication:42']
     with cursor() as cur:cur.execute('DELETE FROM rendition_blocks')
-    result=recommendation.candidates('a',{'kind':'publication','categories':[],'terms':['반도체']})
+    result=recommendation.candidates('a',{'kind':'publication','categories':['industry']})
     assert result['items']==[] and result['latest']==[]
 
 
 def test_session_creation_rate_limit_serialized_per_account(modules):
     dashboard,activity,_,cursor=modules
-    dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[]})
+    dashboard.replace_preferences('a',{'revision':0,'interests':[]})
     with cursor() as cur:
         cur.execute("INSERT INTO user_content_sessions(id,user_id,content_key,format) SELECT md5(i::text)::uuid,'a','publication:42','letter' FROM generate_series(1,500) i")
     with pytest.raises(activity.DashboardError) as error:

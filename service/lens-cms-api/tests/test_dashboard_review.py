@@ -4,21 +4,18 @@ import json
 import sys
 from test_dashboard_storage import repo
 from test_activity_recommendations import modules
-from test_completion_rewards import complete
+from test_view_only_activity import formats
 from test_notifications import notifications,setup,prepare,subscription
 import pytest
 
 
-def test_empty_bodies_not_recommended_or_reward_eligible(modules):
+def test_empty_bodies_not_recommended(modules):
     _,_,recommendation,cur=modules
-    completion=importlib.import_module('completion_repo')
     with cur() as c:
         c.execute("UPDATE rendition_blocks SET content='   ',image_url=NULL")
         c.execute("UPDATE issue_letter_sections SET paragraphs='[[\"   \"]]'")
-        assert not completion.metadata(c,'publication:42','letter',{'category_keys':[]})['completion_enabled']
-        assert not completion.metadata(c,'issue_letter:1','letter',{'category_keys':[]})['completion_enabled']
-    assert recommendation.candidates('a',{'kind':'publication','categories':['industry'],'terms':[]})['items']==[]
-    assert recommendation.candidates('a',{'kind':'issue_letter','categories':['finance'],'terms':[]})['items']==[]
+    assert recommendation.candidates('a',{'kind':'publication','categories':['industry']})['items']==[]
+    assert recommendation.candidates('a',{'kind':'issue_letter','categories':['finance']})['items']==[]
 
 
 def test_future_content_not_recommended(modules):
@@ -26,8 +23,8 @@ def test_future_content_not_recommended(modules):
     with cur() as c:
         c.execute("UPDATE publications SET published_at=now()+interval '1 day' WHERE id=43")
         c.execute("UPDATE issue_letters SET published_at=now()+interval '1 day'")
-    assert [r['id'] for r in recommendation.candidates('a',{'kind':'publication','categories':['industry'],'terms':[]})['items']]==['42']
-    assert recommendation.candidates('a',{'kind':'issue_letter','categories':['finance'],'terms':[]})['items']==[]
+    assert [r['id'] for r in recommendation.candidates('a',{'kind':'publication','categories':['industry']})['items']]==['42']
+    assert recommendation.candidates('a',{'kind':'issue_letter','categories':['finance']})['items']==[]
 
 
 def test_legacy_rendition_sentence_resolves_source_in_dashboard(modules):
@@ -65,7 +62,7 @@ def test_lock_clock_uses_wall_time(notifications):
 
 def test_blocked_account_cannot_use_archive_crud(modules,monkeypatch):
     dashboard,_,_,cur=modules
-    dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[]})
+    dashboard.replace_preferences('a',{'revision':0,'interests':[]})
     with cur() as c:c.execute("UPDATE users SET status='blocked' WHERE id='a'")
     monkeypatch.delitem(__import__('sys').modules,'personal_repo',raising=False)
     personal=importlib.import_module('personal_repo')
@@ -118,7 +115,7 @@ def test_notification_metadata_edit_cancels_stale_recommendation(notifications,t
 
 def test_existing_reading_history_and_save_keep_articles_alias(repo,monkeypatch):
     dashboard,cur=repo
-    dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[]})
+    dashboard.replace_preferences('a',{'revision':0,'interests':[]})
     with cur() as c:
         c.execute("""CREATE TABLE articles(article_no text PRIMARY KEY,title text);
         INSERT INTO articles VALUES('original-news','기존 기사');

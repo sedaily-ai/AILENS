@@ -12,7 +12,7 @@ import pytest
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding,PublicFormat
-from test_completion_rewards import complete
+from test_view_only_activity import formats
 from test_activity_recommendations import modules
 from test_dashboard_storage import repo
 
@@ -24,8 +24,8 @@ def subscription(endpoint='https://push.invalid/local-device'):
 
 
 @pytest.fixture
-def notifications(complete,monkeypatch):
-    dashboard,_,_,cursor=complete
+def notifications(formats,monkeypatch):
+    dashboard,_,_,cursor=formats
     monkeypatch.setenv('LENS_PUSH_MODE','dry_run');monkeypatch.setenv('LENS_PUSH_ENCRYPTION_KEY',Fernet.generate_key().decode());monkeypatch.setenv('LENS_PUSH_POLICY_VERSION','fixture-v1')
     with cursor() as c:
         c.execute("DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='lens_service_app') THEN CREATE ROLE lens_service_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT; END IF; END $$;")
@@ -171,11 +171,11 @@ def test_inputs_exclude_unconsented_sentences_and_followup_requires_approval(not
     with cur() as c:
         c.execute("INSERT INTO user_archives(user_id,article_no,content) VALUES('a','123','반도체와 민감한 원문')")
         c.execute("INSERT INTO content_followup_links VALUES('publication:42','publication:43',false,now()+interval '1 second')")
-    assert i.inputs('a')['sentence_words']==[] and i.inputs('a')['recent_sentences']==[]
+    assert 'sentence_words' not in i.inputs('a') and i.inputs('a')['recent_sentences']==[]
     assert i.candidates('a')['followups']==[]
     with cur() as c:c.execute('UPDATE content_followup_links SET editor_approved=true')
     assert i.candidates('a')['followups'][0]['content_key']=='publication:43'
-    assert i.inputs('b')['sentence_words']==[]
+    assert 'sentence_words' not in i.inputs('b')
 
 
 def test_dst_schedule_and_quiet_hours(notifications):
@@ -185,11 +185,11 @@ def test_dst_schedule_and_quiet_hours(notifications):
     p['frequency']='threeDays';assert r.policy.due_types(p,dt.datetime(2026,11,1,13,0,tzinfo=dt.timezone.utc))==['weekly']
 
 
-def test_legacy_interests_and_reading_time_do_not_cancel_prepared_delivery(notifications):
+def test_legacy_interests_updates_do_not_cancel_prepared_delivery(notifications):
     r,d,_,cur,dashboard=notifications;setup(r);prepare(r,d,cur)
     claim=d.claim('a');claim.pop('claimed')
-    dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[{'type':'category','key':'finance'}]})
-    dashboard.replace_preferences('a',{'revision':1,'minutes':10})
+    dashboard.replace_preferences('a',{'revision':0,'interests':[{'type':'category','key':'finance'}]})
+    dashboard.replace_preferences('a',{'revision':1,'interests':[]})
     assert d.send_claim('a',claim)['status']=='simulated'
 
 
@@ -261,7 +261,7 @@ def test_editor_relation_revocation_cancels_before_transport(notifications):
 
 def test_delivery_keeps_selected_relevance_order_across_content_kinds(notifications):
     _,d,_,cur,dashboard=notifications
-    dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[]})
+    dashboard.replace_preferences('a',{'revision':0,'interests':[]})
     keys=['issue_letter:2','publication:43','publication:42','issue_letter:1']
     with cur() as c:
         assert [card['content_key'] for card in d.cards(c,'a',keys)]==keys
@@ -270,7 +270,7 @@ def test_delivery_keeps_selected_relevance_order_across_content_kinds(notificati
 
 def test_format_statistics_do_not_change_notification_fingerprint(notifications):
     _,d,_,cur,dashboard=notifications
-    dashboard.replace_preferences('a',{'revision':0,'minutes':0,'interests':[]})
+    dashboard.replace_preferences('a',{'revision':0,'interests':[]})
     activity=importlib.import_module('activity_repo')
     with cur() as c:
         before_a=d.fingerprint(c,'a');before_b=d.fingerprint(c,'b')

@@ -33,7 +33,9 @@ def smoke(base, token):
         data=json.loads(body)
         if path.endswith('/preferences') and (type(data.get('revision')) is not int or not isinstance(data.get('interests'),list)):
             raise RuntimeError('계정 설정 응답 계약 확인 실패')
-        if path.endswith('/dashboard') and (data.get('scope') != 'account' or data.get('schema_version') != 1 or any(data.get(key,{}).get('status') != 'ready' for key in ('preferences','format_preference','notifications'))):
+        # format_preference·notifications는 조회하지 않는 호환용 키(unavailable)라 연결 확인 대상이 아니다.
+        # saved_letters는 계정 API가 CMS에 따로 묻는 영역이라, ready면 계정 API→CMS 연결이 살아 있다는 뜻이다.
+        if path.endswith('/dashboard') and (data.get('scope') != 'account' or data.get('schema_version') != 1 or any(data.get(key,{}).get('status') != 'ready' for key in ('preferences','saved_letters'))):
             raise RuntimeError('대시보드 주요 영역 연결 확인 실패')
         if path=='/api/archive' and not isinstance(data.get('sentences'),list):
             raise RuntimeError('서랍 응답 계약 확인 실패')

@@ -189,7 +189,7 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
             f'<h1 style="margin:12px 0 0;font-family:{SERIF};font-size:27px;font-weight:700;line-height:1.35;letter-spacing:-0.02em;color:#111827">{html.escape(letter["title"])}</h1>'
             f'<p style="margin:14px 0 0;font-size:16.5px;line-height:1.7;color:#4b5563">{html.escape(letter.get("deck") or "")}</p>'
             f'<div style="margin:12px 0 0">{topic_html}</div>{axlist_html}'
-            f'<div style="margin-top:16px;font-size:13px;color:#6b7280">{day} · 약 {int(letter.get("read_minutes") or 0)}분 · AI LENS 편집팀</div>'
+            f'<div style="margin-top:16px;font-size:13px;color:#6b7280">{day} · AI LENS 편집팀</div>'
             f'{sources_html}{summary_html}{"".join(sec_html)}{note_html}{poll_html}'
             f'<div style="margin-top:28px"><a href="{html.escape(url)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2f5fcf;color:#fff;text-decoration:none;font-weight:700;font-size:15px">사이트에서 보기</a></div>'
             '<p style="margin:24px 0 0;font-size:12.5px;line-height:1.7;color:#6b7280">본 레터는 서울경제신문 AI LENS 기사를 바탕으로 작성됐어요. 투자 판단의 근거로 쓰기 전에 원문 기사를 확인하세요.</p>')

@@ -42,33 +42,62 @@ def test_account_handler_auth_private_cache_and_invalid_payload(monkeypatch,toke
     from services.user import dashboard as service
     seen=[]
     def call(self, method, path, owner, body=None, query=None):
-        seen.append((owner,body)); return {'revision':1,'interests':[],'minutes':0,'updated_at':None}
+        seen.append((owner,body)); return {'revision':1,'interests':[],'updated_at':None}
     monkeypatch.setattr(service.DashboardRepository,'request',call)
     for token in [None,'bad',tokens(exp=0)]:
         assert dashboard.lambda_handler(event(token=token),None)['statusCode']==401
     response=dashboard.lambda_handler(event(token=tokens(),params={'user_id':'victim'}),None)
     assert response['statusCode']==200 and response['headers']['Cache-Control']=='private, no-store'
     assert seen[-1][0]=='fixture-a'
-    for body in [{'revision':True,'minutes':0,'interests':[]},{'revision':0,'minutes':7,'interests':[]},{'revision':0,'minutes':0,'interests':[{'type':'wrong','key':'x'}]}, {'user_id':'victim','revision':0,'minutes':0,'interests':[]}]:
+    for body in [{'revision':True,'interests':[]},{'revision':0,'interests':[{'type':'wrong','key':'x'}]}, {'user_id':'victim','revision':0,'interests':[]}]:
         assert dashboard.lambda_handler(event(method='PUT',token=tokens(),body=body),None)['statusCode']==400
 
 
-def test_reading_time_update_preserves_legacy_fields_on_storage_side(monkeypatch,tokens):
+def test_preferences_put_ignores_legacy_reading_time(monkeypatch,tokens):
+    # 읽을 시간(minutes)은 제거됐다. 예전 웹이 보내도 400 없이 값을 버리고, 시간만 바꾸는 요청은 아무것도 쓰지 않는다.
+    from services.user import dashboard as service
+    seen=[]
+    current={'revision':2,'interests':[{'type':'topic','key':'rates'}],'updated_at':None}
+    def call(self,method,path,owner,body=None,query=None):
+        seen.append((method,body));return current
+    monkeypatch.setattr(service.DashboardRepository,'request',call)
+    for body in [{'revision':1},{'interests':[]},{'revision':'1','minutes':10},{'revision':1,'minutes':10,'interests':[],'extra':1}]:
+        assert dashboard.lambda_handler(event(method='PUT',token=tokens(),body=body),None)['statusCode']==400
+    assert seen==[]
+    # 예전 읽을 시간 저장: 쓰기 없이 현재 설정(관심 포함)을 그대로 돌려준다.
+    for minutes in (5,10,0):
+        seen.clear()
+        response=dashboard.lambda_handler(event(method='PUT',token=tokens(),body={'revision':1,'minutes':minutes}),None)
+        assert response['statusCode']==200 and seen==[('GET',None)]
+        assert json.loads(response['body'])==current
+    # 관심과 함께 온 minutes는 버리고 관심·revision만 저장 계층으로 보낸다.
+    for body in [{'revision':1,'minutes':5,'interests':[{'type':'topic','key':'rates'}]},{'revision':1,'interests':[{'type':'topic','key':'rates'}]}]:
+        seen.clear()
+        response=dashboard.lambda_handler(event(method='PUT',token=tokens(),body=body),None)
+        assert response['statusCode']==200 and seen==[('PUT',{'revision':1,'interests':[{'type':'topic','key':'rates'}]})]
+        assert json.loads(response['body'])['interests']==[{'type':'topic','key':'rates'}]
+
+
+def test_saved_letters_ignore_legacy_read_filter(monkeypatch,tokens):
+    # 읽음 필터는 제거됐다. 옛 화면이 보내는 read는 값과 관계없이 400 없이 무시하고 CMS로 넘기지 않는다.
     from services.user import dashboard as service
     seen=[]
     def call(self,method,path,owner,body=None,query=None):
-        seen.append(body);return {'revision':2,'interests':[{'type':'topic','key':'rates'}],'minutes':10}
+        seen.append(query);return {'items':[],'count':0,'total':0,'next_cursor':None}
     monkeypatch.setattr(service.DashboardRepository,'request',call)
-    response=dashboard.lambda_handler(event(method='PUT',token=tokens(),body={'revision':1,'minutes':10}),None)
-    assert response['statusCode']==200 and seen==[{'revision':1,'minutes':10}]
-    assert json.loads(response['body'])['interests']==[{'type':'topic','key':'rates'}]
+    for read in ('unread','completed','all','bogus'):
+        response=dashboard.lambda_handler(event('/api/v2/me/letter-bookmarks',token=tokens(),params={'read':read,'limit':'200','cursor':'c'}),None)
+        assert response['statusCode']==200
+    assert seen==[{'limit':'200','cursor':'c'}]*4
+    assert dashboard.lambda_handler(event('/api/v2/me/letter-bookmarks',token=tokens(),params={'sort':'old'}),None)['statusCode']==400
+    assert len(seen)==4
 
 
 def test_account_handler_strips_named_stage_prefix(monkeypatch,tokens):
     # 운영 HTTP API는 스테이지 dev라 rawPath가 /dev/api/v2/me/... 로 들어온다(archive 로그로 확인).
     seen=[]
     def call(method, path, owner, body=None, query=None):
-        seen.append(path); return {'revision':1,'interests':[],'minutes':0,'updated_at':None}
+        seen.append(path); return {'revision':1,'interests':[],'updated_at':None}
     monkeypatch.setattr(dashboard,'dispatch',call)
     request=event('/dev/api/v2/me/preferences',token=tokens())
     request['requestContext']['stage']='dev'
@@ -87,7 +116,6 @@ def test_dependency_error_is_not_empty_success(monkeypatch,tokens):
 
 
 @pytest.mark.parametrize('path,method,status',[
-    ('/api/v2/me/format-preference','GET',200),
     ('/api/v2/me/followed-editors','GET',200),
     ('/api/v2/me/followed-editors/mincheol','PUT',200),
     ('/api/v2/me/followed-editors/mincheol','DELETE',200),
@@ -101,10 +129,7 @@ def test_dependency_error_is_not_empty_success(monkeypatch,tokens):
     ('/api/v2/me/activity/sessions','POST',201),
     ('/api/v2/me/activity/events','POST',200),
     ('/api/v2/me/dashboard','GET',200),
-    ('/api/v2/me/activity','GET',200),
-    ('/api/v2/me/rewards','GET',200),
     ('/api/v2/me/recommendations','GET',200),
-    ('/api/v2/me/sentences/1/recommendations','GET',200),
 ])
 def test_second_bundle_endpoints_require_owner_auth(monkeypatch,tokens,path,method,status):
     seen=[]
@@ -116,6 +141,39 @@ def test_second_bundle_endpoints_require_owner_auth(monkeypatch,tokens,path,meth
     response=dashboard.lambda_handler(event(path,method,tokens(),params={'user_id':'victim'}),None)
     assert response['statusCode']==status and seen==['fixture-a']
     assert response['headers']['Cache-Control']=='private, no-store'
+
+
+@pytest.mark.parametrize('path,params',[
+    ('/api/v2/me/format-preference',{}),
+    ('/api/v2/me/activity',{'period':'week'}),
+    ('/api/v2/me/activity',{}),
+    ('/api/v2/me/rewards',{'week':'2026-10-12'}),
+    # 저장 문장 관련 글(2026-10-19 제거). 예전 화면은 404를 '관련 뉴스를 불러오지 못했어요'로만 보여 준다.
+    ('/api/v2/me/sentences/1/recommendations',{}),
+    ('/api/v2/me/sentences/1/recommendations',{'limit':'3'}),
+])
+def test_removed_record_routes_are_404_without_dependency_call(monkeypatch,tokens,path,params):
+    # 형식 비율·기간 기록·리워드·저장 문장 관련 글 조회는 제거됐다. 저장 계층을 부르지 않고 기존 방식대로 404다.
+    from services.user import dashboard as service
+    monkeypatch.setattr(service.DashboardRepository,'request',lambda *a,**k:pytest.fail('removed route must not call storage'))
+    response=dashboard.lambda_handler(event(path,'GET',tokens(),params=params),None)
+    assert response['statusCode']==404 and json.loads(response['body'])['error']['code']=='NOT_FOUND'
+
+
+@pytest.mark.parametrize('path,body',[
+    ('/api/v2/me/activity/sessions',{'content_key':'publication:42','format':'letter'}),
+    ('/api/v2/me/activity/events',{'event_id':'e','session_id':'s','session_seq':1,'event_type':'progress','visible_ms':10000,'scroll_ratio':1}),
+])
+def test_view_reporting_routes_still_forward_body_unchanged(monkeypatch,tokens,path,body):
+    # 열람 보고는 경로가 비슷하지만 유지한다. 예전 웹의 완료용 값도 그대로 CMS로 넘기고 CMS가 무시한다.
+    from services.user import dashboard as service
+    seen=[]
+    def call(self,method,internal,owner,body=None,query=None):
+        seen.append((method,internal,owner,body));return {'session_id':'s'}
+    monkeypatch.setattr(service.DashboardRepository,'request',call)
+    response=dashboard.lambda_handler(event(path,'POST',tokens(),body=body),None)
+    assert response['statusCode']==(201 if path.endswith('/sessions') else 200)
+    assert seen==[('POST',path.removeprefix('/api/v2/me'),'fixture-a',body)]
 
 
 @pytest.mark.parametrize('path', ['/api/v2/me/activity/events','/api/v2/me/push-subscriptions'])
@@ -159,3 +217,4 @@ def test_archive_personal_errors_are_private_and_popular_is_public(monkeypatch):
     async def public(params):return {'statusCode':200,'headers':{},'body':'{}'}
     monkeypatch.setattr(archive.svc,'handle_popular',public)
     assert 'Cache-Control' not in archive.lambda_handler(event('/api/archive/popular'),None)['headers']
+

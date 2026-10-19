@@ -151,7 +151,7 @@ class ReleaseTests(unittest.TestCase):
         import account_smoke
         def request(base,path,method='GET',token=None):
             if method=='OPTIONS':return 204,{'Access-Control-Allow-Origin':'https://ailens.sedaily.ai','Access-Control-Allow-Methods':'GET,PUT','Access-Control-Allow-Headers':'authorization,content-type'},b''
-            body={'revision':1,'interests':[]} if path.endswith('/preferences') else {'scope':'account','schema_version':1,**{key:{'status':'ready'} for key in ('preferences','format_preference','notifications')}} if path.endswith('/dashboard') else {'sentences':[]}
+            body={'revision':1,'interests':[]} if path.endswith('/preferences') else {'scope':'account','schema_version':1,'format_preference':{'status':'unavailable'},'notifications':{'status':'unavailable'},**{key:{'status':'ready'} for key in ('preferences','saved_letters')}} if path.endswith('/dashboard') else {'sentences':[]}
             return (200 if token else 401),{'Cache-Control':'private, no-store'},json.dumps(body).encode()
         with patch.object(account_smoke,'request',side_effect=request):account_smoke.smoke('https://example.test','fixture')
 

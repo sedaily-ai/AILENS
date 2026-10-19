@@ -26,8 +26,9 @@ def replace_preferences(user_id: str, payload: dict = Body(...), x_internal_toke
 
 
 @router.get('/letter-bookmarks')
-def bookmarks(user_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, q: str = '', read: str = 'all', x_internal_token: str | None = Header(default=None)):
-    return _call(x_internal_token, dashboard_repo.list_bookmarks, user_id, limit, cursor, q, read)
+def bookmarks(user_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, q: str = '', x_internal_token: str | None = Header(default=None)):
+    # 읽음 필터(read)는 제거됐다. 옛 호출이 read를 붙여도 선언하지 않은 쿼리라 무시되고 전체 목록을 돌려준다.
+    return _call(x_internal_token, dashboard_repo.list_bookmarks, user_id, limit, cursor, q)
 
 
 @router.put('/letter-bookmarks/{letter_id}')
@@ -63,28 +64,10 @@ def recommendation_inputs(user_id: str, x_internal_token: str | None = Header(de
     return _call(x_internal_token, recommendation_repo.inputs, user_id)
 
 
-@router.get('/sentence-inputs/{sentence_id}')
-def sentence_inputs(sentence_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
-    import recommendation_repo
-    return _call(x_internal_token, recommendation_repo.inputs, user_id, sentence_id)
-
-
 @router.post('/recommendation-candidates')
 def recommendation_candidates(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
     import recommendation_repo
     return _call(x_internal_token, recommendation_repo.candidates, user_id, payload)
-
-
-@router.get('/activity')
-def reading_activity(user_id: str, period: str = 'week', anchor: str | None = None, x_internal_token: str | None = Header(default=None)):
-    import reading_records_repo
-    return _call(x_internal_token, reading_records_repo.activity, user_id, period, anchor)
-
-
-@router.get('/rewards')
-def reading_rewards(user_id: str, week: str | None = None, x_internal_token: str | None = Header(default=None)):
-    import reading_records_repo
-    return _call(x_internal_token, reading_records_repo.rewards, user_id, week)
 
 
 @router.get('/notifications/preferences')
@@ -179,17 +162,6 @@ def claim_notifications_due(payload: dict = Body(...), x_internal_token: str | N
         if set(payload)!={'mode','limit'} or payload['mode'] not in ('dry_run','live'):invalid()
         return notification_inputs.due(payload['limit'],payload['mode'])
     return _call(x_internal_token,claim)
-
-
-@router.get('/format-preference')
-def format_preference(user_id: str, x_internal_token: str | None = Header(default=None)):
-    import format_preference_repo
-    from db import get_cursor
-    def load():
-        with get_cursor() as cur:
-            dashboard_repo._account(cur,user_id)
-            return format_preference_repo.preference(cur,user_id)
-    return _call(x_internal_token,load)
 
 
 @router.get('/followed-editors')
