@@ -7,6 +7,12 @@
 > - API-04 저장 레터: 읽음 필터 `read`는 받기만 하고 거르지 않는다. 카드에 `completed`·`read_minutes`가 없다(CMS 내부 카드에는 옛 계정 API 호환용 `read_minutes`가 남음).
 > - API-08 이용 세션·이벤트: 보기 신호(`visible_ms`)만 판정하고 완료·스탬프·배지를 만들지 않는다.
 > - 웹은 알림 설정·동의·기기 구독(API-10~12)을 부르지 않는다. 경로와 알림 워커는 남아 있다(운영 dry_run).
+> - **추가(2026-10-20) API-14 저장한 기사** — [작업 기록](../worklog/2026-10/2026-10-20-저장한-기사.md), SQL v1.57 `user_article_bookmarks`
+>   - `GET /api/v2/me/article-bookmarks?limit=1~200&cursor=` → 200 `{items:[{article_id,saved_at,content}],count,total,next_cursor}`. 최신 저장순. 다른 쿼리는 400.
+>   - `content`: `{content_key:"publication:{id}",kind:"publication",available}`. available이면 `slug,title,summary,published_at,href(정규 기사 주소),categories,formats`도 싣는다. 비공개·삭제·형식 없는 기사는 `available:false`로 남아 해제만 할 수 있다.
+>   - `GET /api/v2/me/article-bookmarks/{id}` → `{article_id,saved,saved_at}`. `PUT` 저장(공개 중이고 볼 수 있는 형식이 있는 기사만, 아니면 404. 다시 저장해도 처음 시각 유지), `DELETE` 해제(언제든 200). id는 숫자만(아니면 400).
+>   - 웹은 기사 slug를 `GET /api/v2/me/content/resolve?kind=publication&key_type=slug&key=`로 ID로 바꾼 뒤 부른다. 404를 받으면 저장 버튼을 숨기고 서랍은 빈 목록으로 보여 준다(배포 사이 CMS에 경로가 없을 때도 계정 API가 404로 넘긴다).
+>   - 커서는 레터 북마크 커서와 섞이지 않는다(서명 안에 목록 종류). 계정·기사를 실제로 지우면 저장 행도 함께 지워진다.
 
 > 2026-10-14 추가 구현: 계정별 형식 선호·추천/알림 연결, 에디터 팔로우, 서버 완료 읽음 필터, 사용자 선택 북마크 가져오기를 로컬 구현했다. 현재 계약은 [형식 선호·계정 연결](../product/나의LENS/형식선호·계정연결_구현상태.md)과 [최신 전체 리뷰 보완](../product/나의LENS/백엔드_리뷰_보완.md)의 v1.54 계약을 따른다. 아래 이전 단계의 미구현 표시는 해당 구현으로 대체하며 운영은 미반영이다.
 
@@ -104,7 +110,8 @@ rate limit은 기존에 구현됐다고 확인한 값이 아니다. 신규 요�
 | API-10 | GET/PUT `/api/v2/me/notifications/preferences` | 계정 알림 설정 |
 | API-11 | PUT `/api/v2/me/notifications/consent` | Web Push 별도 동의·철회 |
 | API-12 | POST `/api/v2/me/push-subscriptions`; DELETE `/api/v2/me/push-subscriptions/{id}` | 현재 기기 구독 등록·해제 |
-| API-13 | GET `/api/v2/me/format-preference` | 후속 형식 선호. 최초 UI 연결은 별도 범위 |
+| API-13 | GET `/api/v2/me/format-preference` | 후속 형식 선호. 최초 UI 연결은 별도 범위 (2026-10-19 제거) |
+| API-14 | GET `/api/v2/me/article-bookmarks`; GET/PUT/DELETE `/api/v2/me/article-bookmarks/{article_id}` | 저장한 기사 목록·상태·저장·해제 (2026-10-20, 상단 요약 참고) |
 
 신규 경로에 중복된 ‘북마크 조회용’ API를 또 만들지 않는다. 기존 북마크 문서와 여기의 API-04/05를 하나의 계약으로 확정한다. 위 경로명은 구현 제안이며 운영에 이미 있는 경로와 충돌하는지 등록 전에 확인한다.
 
