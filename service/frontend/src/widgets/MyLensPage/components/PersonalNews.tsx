@@ -21,7 +21,7 @@ export function PersonalNews({ recommendations, categories, loading, available, 
         <div className="ml-rule-content"><dl className="ml-rule-list">
           <div><dt>최근 90일의 열람 분야</dt><dd>계정에서 열람한 뉴스·레터의 상위 5개 분야를 사용해요. 같은 글은 한 편으로 세요.</dd></div>
           <div><dt>새 글부터 차례로</dt><dd>해당 분야의 아직 열람하지 않은 뉴스를 최신순으로 보여드려요. 맞는 새 글이 없으면 전체 최신 뉴스로 이어져요.</dd></div>
-        </dl><p className="ml-method-footer">저장 문장으로 글을 찾으려면 <Link href="/my-lens?tab=archive">내 서랍</Link>에서 ‘관련 글 보기’를 눌러주세요.</p></div>
+        </dl></div>
       </details>
       {!loading && !historyAvailable && <p>계정 열람 분야를 불러오지 못했어요. <button className="ml-text-link" onClick={onRetry}>다시 불러오기</button></p>}{unmatched > 0 && <p>이전 자료 {unmatched}편은 등록 정보를 확인하지 못해 집계에서 제외했어요.</p>}
     </div>

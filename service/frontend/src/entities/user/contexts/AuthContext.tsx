@@ -1,4 +1,3 @@
-import { detachPushBeforeLogout } from '../data/pushDevice';
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/auth/authFetch';
@@ -397,7 +396,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      if(user?.userId)await detachPushBeforeLogout(user.userId);
       await signOut();
       setUser(null);
     } catch (error) {

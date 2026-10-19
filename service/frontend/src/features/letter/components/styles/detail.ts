@@ -57,10 +57,8 @@ export const DETAIL_CSS = `
   @media (min-width: 1280px) { .ld-toc-rail { display: block; } }
   .lt-dlg-back::backdrop { background: transparent; }
   .lt-dlg, .lt-dlg-back { --blue: #2f5fcf; --line: #e5e7eb; --soft: #f6f7f9; --ink: #111827; }
-  /* 저장·읽음(2026-10-11) */
+  /* 저장(2026-10-11) */
   .lt-savedtab[aria-pressed='true'] { background: #111827; border-color: #111827; color: #fff; }
-  .lt-row-read .lt-row-title { color: #6b7280; }
-  .lt-row-readmark { padding: 1px 6px; border-radius: 4px; background: #f3f4f6; font-size: 12px; color: #6b7280; }
   .lt-row-save:hover { color: #2f5fcf; }
   .lt-row-save[aria-pressed='true'], .ld-tools button[aria-pressed='true'] { color: #2f5fcf; }
   /* 관련 레터 */

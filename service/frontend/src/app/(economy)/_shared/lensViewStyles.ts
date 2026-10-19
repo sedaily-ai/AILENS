@@ -16,16 +16,14 @@ export const LENS_VIEW_CSS = `
         }
         .rail-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 64px; padding: 6px 0;
           border: none; background: none; cursor: pointer; color: #374151; }
-        .rail-btn:hover:not(:disabled) { color: #111827; }
-        .rail-btn:disabled { opacity: .35; cursor: default; }
+        .rail-btn:hover:not(:disabled):not([aria-disabled='true']) { color: #111827; }
+        .rail-btn:disabled, .rail-btn[aria-disabled='true'] { opacity: .35; cursor: default; }
         .rail-btn:focus-visible { outline: 2px solid #111827; outline-offset: 2px; border-radius: 6px; }
         .rail-ico { display: flex; align-items: center; justify-content: center; height: 24px; }
         .rail-ico .sk { transition: transform .25s cubic-bezier(.2,0,0,1); }
         .rail-btn:hover:not(:disabled) .sk { transform: rotate(-6deg) translateY(-1px); }
         @media (prefers-reduced-motion: reduce) { .rail-ico .sk { transition: none; } .rail-btn:hover:not(:disabled) .sk { transform: none; } }
         .rail-cap { font-size: 12px; color: #6b7280; white-space: nowrap; }
-        .rail-pop { position: absolute; left: calc(100% + 8px); top: 0; z-index: 30; padding: 12px 14px;
-          background: #fff; border-radius: 14px; box-shadow: 0 12px 32px rgba(15,23,42,0.14), 0 1px 3px rgba(15,23,42,0.08); }
         .badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px;
           font-size: 11.5px; font-weight: 700; color: ${LENS_ACCENT}; background: ${LENS_ACCENT}14; vertical-align: 1px; }
         /* "30초 핵심" 요약 카드(2026-10-01 재디자인) — 굵은 윗선·베이지 박스·■ 마커·"AI 요약" 문구를 걷어내고
@@ -228,9 +226,6 @@ export const LENS_VIEW_CSS = `
         .lread-thanks { margin: 0 0 14px; font-size: calc(17px * var(--lens-font-scale, 1)); line-height: 1.7; color: #374151; font-weight: 500; }
         .lread-from { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; }
         .lread-sign-mark { flex-shrink: 0; width: 30px; height: 7px; border-radius: 0; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='1' stroke-width='2.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 8' preserveAspectRatio='none'%3E%3Cpath d='M2 4.6 C 90 1.8, 170 6.6, 280 3.4 S 450 5.8, 560 3.2 S 650 4.6, 698 3.6' fill='none' stroke='%23111827' stroke-opacity='1' stroke-width='2.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
-        /* 글 끝 공유(2026-10-01) — 모바일엔 왼쪽 도구 레일이 없어 글을 다 읽고도 공유할 곳이 없었다. */
-        .lread-share { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 24px; }
-        .lread-share-label { font-size: 13.5px; color: #6b7280; }
         .lread-sign-name { font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: #6b7280; }
 
         .hang { display: flex; flex-direction: column; gap: 20px;

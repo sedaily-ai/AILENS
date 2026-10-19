@@ -1,22 +1,13 @@
 /**
- * Today Letters API client.
+ * 레터 표시용 변환(카드·표시 메타)과 홈·목록의 "이어 볼 글" 조회.
  *
- * GET /api/v2/today-letters?date=YYYY-MM-DD
- *
- * 호출하는 곳: letters/[id], archive, news-feed 등 — fetchTodayLetters 참조.
+ * 날짜별 레터 조회 fetchTodayLetters는 2026-10-20 기능 다이어트에서 지웠다(호출하는 곳이 없었다). 레터 목록은 fetchCmsPosts('letters', …)를 쓴다.
  */
-import { fetchCmsPosts, fetchLensPosts, type CmsLens } from './cmsPostsApi';
+import { fetchLensPosts, type CmsLens } from './cmsPostsApi';
 import { displayHeadline, headlineSection } from '@ailens/domain';
 import { letterHref } from '@ailens/domain';
 import { lensPath } from '@ailens/domain';
 import type { ApiLetter } from "./letterTypes";
-// API 응답 스키마 (backend/v2/handlers/today_letters.py 와 1:1)
-
-export interface ApiTodayLettersResponse {
-  date: string;
-  mode: 'A' | 'C' | null;
-  letters: ApiLetter[];
-}
 
 // 프론트 표시용 — TodayLetterCard 와 호환되는 확장형
 export interface DisplayLetter extends ApiLetter {
@@ -38,36 +29,6 @@ const DEFAULT_META: Omit<DisplayLetter, keyof ApiLetter> = {
 
 export function withDisplayMeta(letter: ApiLetter): DisplayLetter {
   return { ...letter, ...DEFAULT_META };
-}
-
-// 진행 중 요청 묶기(in-flight coalescing). 같은 date를 여러 곳이 동시에 부를 때 fetch를 하나로 공유하며,
-// 시간 기반 캐시가 아니라 응답이 오면 즉시 지운다(admin 발행/수정/삭제가 즉시 반영된다. cmsPostsApi.ts의 동일 패턴 참조).
-const lettersCache = new Map<string, Promise<ApiTodayLettersResponse>>();
-
-export async function fetchTodayLetters(date?: string): Promise<ApiTodayLettersResponse> {
-  const key = date ?? '__today__';
-  const inFlight = lettersCache.get(key);
-  if (inFlight) return inFlight;
-
-  const promise = fetchTodayLettersLive(date);
-  lettersCache.set(key, promise);
-  promise.finally(() => lettersCache.delete(key));
-  return promise;
-}
-
-async function fetchTodayLettersLive(date: string | undefined): Promise<ApiTodayLettersResponse> {
-  // 라이브 단일 소스. 해당 날짜에 레터가 없으면 letters:[]이며 호출측이 빈 상태/직전일 lookback을 처리한다.
-  //
-  // today-letters API는 호출하지 않는다. 이 엔드포인트는 RDS 삭제로 항상 빈 응답이며(CLAUDE.md 참조),
-  // 태그 없는 `next: { revalidate: 60 }` fetch는 이 함수를 쓰는 모든 페이지의 ISR TTL을 60초로 낮춘다.
-  // 실제 콘텐츠는 태그가 달린 fetchCmsPosts('letters', date)가 담당한다.
-  const cmsPosts = await fetchCmsPosts('letters', date);
-  const data: ApiTodayLettersResponse = { date: date ?? '', mode: null, letters: [] };
-
-  // 관리자가 쓴 글을 앞에 배치한다(편집 의도가 AI 레터보다 우선).
-  return cmsPosts.length
-    ? { ...data, letters: [...cmsPosts, ...data.letters] }
-    : data;
 }
 
 // TodayLetterCard 매핑 (mockTodayFeed.ts 와 동일 schema).
@@ -148,14 +109,6 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function estimateReadMinutes(body: string[], bodyHtml?: string | null): number {
-  // 한국어 분당 약 600자. body_html(CMS 리치텍스트)이 있으면 태그를 걷어내고 센다(그 경우 body[]가 비어 있다).
-  const chars = bodyHtml
-    ? bodyHtml.replace(/<[^>]+>/g, '').length
-    : body.reduce((sum, p) => sum + p.length, 0);
-  return Math.max(2, Math.min(5, Math.round(chars / 600)));
-}
-
 export interface TodayLetterCardLike {
   letterId: string;
   // 상세로 이동할 링크. 소스에 따라 /letters/{id} 또는 /lens/{id}로 갈리므로 호출부는 letterHref()를 직접 부르지 않고
@@ -174,7 +127,6 @@ export interface TodayLetterCardLike {
   subtitle: string;
   // subtitle이 있으면 그것을, 없으면 본문 첫 문장을 200자까지 쓴다(카드 요약용).
   excerpt: string;
-  readMinutes: number;
   deliveryHint: string;
   dateLabel: string;
   newsId: string;
@@ -203,7 +155,6 @@ export function toTodayLetterCard(letter: ApiLetter, letterDate: string): TodayL
         (letter.body_html ? stripHtml(letter.body_html) : firstProseLine(letter.body)),
       200,
     ),
-    readMinutes: estimateReadMinutes(letter.body, letter.body_html),
     deliveryHint: '오늘 발행',
     dateLabel: formatDateLabel(letterDate),
     newsId: letter.article_id,
@@ -230,7 +181,6 @@ export function toLensLetterCard(lens: CmsLens): TodayLetterCardLike {
     title: displayHeadline(lens.headline),
     subtitle,
     excerpt: truncate(subtitle || stripLeadingMarkers(letterFormat?.paragraphs?.[0] || ''), 200),
-    readMinutes: estimateReadMinutes(letterFormat?.paragraphs || []),
     deliveryHint: '오늘 발행',
     dateLabel: formatDateLabel(lens.date),
     newsId: lens.id,

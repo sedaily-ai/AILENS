@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Repeat, Bookmark, Check, Volume2, VolumeX, Maximize, ChevronDown } from 'lucide-react';
+import { Repeat, Check, Volume2, VolumeX, Maximize, ChevronDown } from 'lucide-react';
 import { clock, spoken, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/lib/media/mediaPlayerFormat';
-import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/media/useMediaPlayerControls';
+import { usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/media/useMediaPlayerControls';
 
 /**
  * 기사 안에 인라인으로 박히는 영상 플레이어("극장" 콘셉트).
@@ -13,10 +13,9 @@ import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shar
  *  - 재생을 시작하면 프레임 바깥이 어두워진다(조명이 꺼지는 극장). 어두운 바탕을 누르면 일시정지한다.
  *  - 제목·출처는 영상 아래 캡션으로 내렸다 — 영상 위에서 시선을 빼앗지 않는다.
  *  - 없는 기능을 지어내지 않는다: 자막 데이터가 파이프라인에 없어 자막 버튼은 노출하지 않는다(생기면 추가).
- * 북마크·배속·반복·재생/탐색 로직은 useMediaPlayerControls에서 팟캐스트 플레이어와 공유한다.
+ * 배속·반복·재생/탐색 로직은 useMediaPlayerControls에서 팟캐스트 플레이어와 공유한다.
  */
 
-const BOOKMARK_STORAGE_KEY = 'ailens-video-bookmarks';
 
 export function ArticleVideoPlayer({
   src,
@@ -62,7 +61,6 @@ export function ArticleVideoPlayer({
   const scriptRef = useRef<HTMLOListElement | null>(null);
   const sleepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { bookmarked, toggleBookmark } = useMediaBookmark(src, BOOKMARK_STORAGE_KEY);
   const { rateIdx, rateMenuOpen, setRateMenuOpen, selectRate, rateMenuRef, rateTriggerRef } =
     usePlaybackRateMenu(ref, PLAYBACK_RATES);
   const { playing, cur, dur, failed, toggle, seekTo, retry } = useMediaTransport(ref, {
@@ -307,9 +305,6 @@ export function ArticleVideoPlayer({
                 </div>
                 <button type="button" className="avp-ib avp-ib-opt" aria-pressed={looping} aria-label={looping ? '반복 재생 끄기' : '반복 재생 켜기'} title={looping ? '반복 재생 끄기' : '반복 재생 켜기'} onClick={() => setLooping((v) => !v)}>
                   <Repeat size={17} aria-hidden />
-                </button>
-                <button type="button" className="avp-ib avp-ib-opt" aria-pressed={bookmarked} aria-label={bookmarked ? '북마크 해제' : '북마크에 저장'} title={bookmarked ? '북마크 해제' : '북마크에 저장'} onClick={toggleBookmark}>
-                  <Bookmark size={17} aria-hidden fill={bookmarked ? 'currentColor' : 'none'} />
                 </button>
                 <button type="button" className="avp-ib" aria-pressed={muted} aria-label={muted ? '음소거 해제' : '음소거'} title={muted ? '음소거 해제' : '음소거'} onClick={toggleMute}>
                   {muted ? <VolumeX size={18} aria-hidden /> : <Volume2 size={18} aria-hidden />}

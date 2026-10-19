@@ -36,15 +36,5 @@ export async function setInterests(slugs: string[]): Promise<void> {
   }
 }
 
-const DAY = 24 * 3600 * 1000;
-const kstDay = (ms: number) => Math.floor((ms + 9 * 3600 * 1000) / DAY);
-
-/** 읽은 글 기록으로 이번 주(최근 7일) 읽은 글 수와 연속 읽기 일수를 센다. 열람 기준이며 웹의 "70% 읽음" 보상 기준과는 다르다. */
-export function readingStats(items: SavedArticle[], now = Date.now()) {
-  const today = kstDay(now);
-  const days = new Set(items.map((i) => kstDay(i.at)));
-  let streak = 0;
-  for (let d = days.has(today) ? today : today - 1; days.has(d); d -= 1) streak += 1;
-  const week = items.filter((i) => kstDay(i.at) > today - 7).length;
-  return { week, streak, total: items.length };
-}
+// 이번 주 읽은 글·연속 읽은 날 요약(readingStats)은 2026-10-19 기능 다이어트로 제거했다(웹의 이용 기록·완료 요약 제거와 같은 결정).
+// 읽은 글 목록(history)은 '읽은 글' 탭이 그대로 쓴다.

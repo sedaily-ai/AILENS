@@ -23,7 +23,6 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
   const follow = useFollowedEditors();
   const shelf = useLetterShelf();
   const [onlySaved, setOnlySaved] = useState(false);
-  const [dismissed, setDismissed] = useState<string[]>([]);
 
   useEffect(() => {
     // 주소의 ?editor= 로 들어온 경우 해당 에디터를 고른다(마운트 뒤 한 번).
@@ -72,22 +71,6 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
       (!onlySaved || shelf.isSaved(l.slug)) &&
       (!q || [l.title, l.deck, ...(l.topics ?? []), ...l.categories].some((t) => t.toLowerCase().includes(q))),
   );
-  // 단계 1 제안: 읽은 레터에서 2편 이상 같은 에디터가 쓴 글이면 그 사실을 알리고 팔로우를 묻는다(추정이 아니라 읽은 횟수만 말한다).
-  const suggest = useMemo(() => {
-    if (!shelf.ready || !follow.ready) return null;
-    const counts = new Map<string, number>();
-    for (const l of letters) {
-      if (!shelf.isRead(l.slug)) continue;
-      const lead = l.editors?.[0] ? findEditor(l.editors[0]) : undefined;
-      if (lead) counts.set(lead.id, (counts.get(lead.id) ?? 0) + 1);
-    }
-    const top = [...counts].filter(([id, n]) => n >= 2 && !follow.isFollowing(id) && !dismissed.includes(id)).sort((a, b) => b[1] - a[1])[0];
-    return top ? { editor: findEditor(top[0])!, n: top[1] } : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [letters, shelf.read, shelf.ready, follow.ids, follow.ready, dismissed]);
-  useEffect(() => {
-    if (suggest) trackEvent('onboarding_suggest_shown', { step: 1, editor: suggest.editor.id });
-  }, [suggest?.editor.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const filtering = !!topic || !!q || onlyMine || onlySaved;
   const pickTopic = (name: string) => {
     setTopic(name);
@@ -129,16 +112,9 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
               주제 <button type="button" className="lt-chip lt-chip-on" onClick={() => setTopic(null)} aria-label={`${topic} 주제 해제`}>{topic} ✕</button>
             </div>
           )}
-          {suggest && !editor && !filtering && (
-            <div className="lt-suggest">
-              <span>{suggest.editor.name} 에디터의 레터를 {suggest.n}편 읽으셨어요. 팔로우하면 새 레터에 표시해 드려요.</span>
-              <button type="button" className="lt-suggest-ok" onClick={() => { trackEvent('onboarding_suggest_accepted', { step: 1, editor: suggest.editor.id }); follow.toggle(suggest.editor.id); }}>팔로우</button>
-              <button type="button" className="lt-suggest-no" onClick={() => { trackEvent('onboarding_suggest_dismissed', { step: 1, editor: suggest.editor.id }); setDismissed((d) => [...d, suggest.editor.id]); }}>다음에</button>
-            </div>
-          )}
           {shown.length > 0 ? (
             <div className="lt-rows">
-              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => { void shelf.toggleSaved(l.slug); }} saveNoticeId={shelf.ready && shelf.notice ? 'lt-save-note' : undefined} />)}
+              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} saved={shelf.isSaved(l.slug)} onToggleSaved={() => { void shelf.toggleSaved(l.slug); }} saveNoticeId={shelf.ready && shelf.notice ? 'lt-save-note' : undefined} />)}
             </div>
           ) : (
             <div className="lt-empty" role="status">

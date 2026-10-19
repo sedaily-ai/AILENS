@@ -3,7 +3,7 @@ import type { IssueLetter } from '@/features/letter';
 import { mergeLetters } from './dashboardModel';
 
 function letter(slug: string, overrides: Partial<IssueLetter> = {}): IssueLetter {
-  return { slug, issueNumber: 1, title: slug, deck: '', axisLabels: [], categories: ['산업'], publishedAt: '2026-10-14', readMinutes: 3, summary: [], sections: [], editorNote: '', vote: null, sources: [], ...overrides };
+  return { slug, issueNumber: 1, title: slug, deck: '', axisLabels: [], categories: ['산업'], publishedAt: '2026-10-14', summary: [], sections: [], editorNote: '', vote: null, sources: [], ...overrides };
 }
 
 describe('나의 LENS 추천과 기록', () => {

@@ -52,10 +52,6 @@ export const BASE_CSS = `
   .lt-filters { display: flex; gap: 8px; flex-wrap: wrap; }
   .lt-searchbox { flex: 0 1 240px; min-width: 160px; height: 36px; padding: 0 14px; border: 1px solid #e5e7eb; border-radius: 999px; font: inherit; font-size: 14px; background: #fff; }
   .lt-searchbox:focus { outline: 2px solid #5b8def; outline-offset: 1px; }
-  .lt-suggest { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 0 0 16px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #f9fafb; font-size: 13px; color: #374151; }
-  .lt-suggest span { flex: 1 1 220px; }
-  .lt-suggest-ok { border: 0; border-radius: 8px; padding: 6px 12px; background: #1f56c0; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .lt-suggest-no { border: 0; background: none; padding: 6px 4px; color: #6b7280; font-size: 13px; cursor: pointer; }
   .lt-activefilter { display: flex; align-items: center; gap: 8px; margin: -4px 0 16px; font-size: 13px; font-weight: 600; color: #6b7280; }
   .lt-ibar { margin: 0 0 24px; }
   .lt-ibar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding: 12px 16px; border-radius: 14px; background: #f6f8fb; border: 1px solid #e8ecf2; }
