@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Bookmark } from 'lucide-react';
 import { useAuth } from '@/entities/user';
 import { notifyArchiveChanged } from '@/features/archive';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
@@ -221,9 +222,8 @@ export function SentenceSelectionPopover({
               </button>
             )}
             <button type="button" onClick={save} disabled={saving} style={pillStyle(saving, '#111827')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-              </svg>
+              {/* 레터 저장(LetterBookmarkIcon)과 같은 lucide Bookmark 모양을 쓴다. */}
+              <Bookmark size={13} strokeWidth={2.4} aria-hidden="true" />
               {isAuthenticated ? (saving ? '담는 중…' : '서랍에 담기') : '로그인하고 담기'}
             </button>
           </div>

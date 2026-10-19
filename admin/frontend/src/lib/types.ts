@@ -663,7 +663,6 @@ export interface IssueLetterSummary {
   title: string;
   deck: string;
   status: IssueLetterStatus;
-  read_minutes: number;
   author_no: string | null;
   reviewer_no: string | null;
   published_at: string | null;

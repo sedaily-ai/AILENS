@@ -22,7 +22,7 @@ def preview(owner,scheduled=False,expected_mode='dry_run'):
         data=repo.request('GET','/notifications/inputs',owner)
         prof=profile(data)
         cats=[r['key'] for r in prof['categories']]
-        pool=repo.request('POST','/recommendation-candidates',owner,body={'kind':'publication','categories':cats,'terms':[],'editors':[]})
+        pool=repo.request('POST','/recommendation-candidates',owner,body={'kind':'publication','categories':cats,'editors':[]})
         picks.extend(rank([card for card in pool['items'] if eligible(card)],data,prof,limit=4)['items'])
     if p['followups']:
         followups=[card for card in extra['followups'] if eligible(card)]

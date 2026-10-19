@@ -59,7 +59,6 @@ export interface IssueLetter {
   /** 주 분류 + 보조 분류(사이트 9개 분류 이름). 첫 값이 주 분류. */
   categories: string[];
   publishedAt: string;
-  readMinutes: number;
   featured?: boolean;
   /** 레터의 주제 태그(주제 사전의 이름). 주 주제가 앞에 온다. 목록 카드·상세 머리에 보이고, 이후 독자의 관심 설정·추천의 기준이 된다. */
   topics?: string[];

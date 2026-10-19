@@ -82,7 +82,7 @@ def _load_children(cur, letter_id: int) -> Dict[str, Any]:
 
 def _letter_row_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
     return {"id": row["id"], "slug": row["slug"], "issue_no": row["issue_no"], "title": row["title"], "deck": row["deck"],
-            "summary": list(row["summary"] or []), "editor_note": row["editor_note"], "read_minutes": row["read_minutes"],
+            "summary": list(row["summary"] or []), "editor_note": row["editor_note"],
             "status": row["status"], "author_no": row["author_no"], "reviewer_no": row["reviewer_no"],
             "reviewed_at": _iso(row["reviewed_at"]), "published_at": _iso(row["published_at"]),
             "created_at": _iso(row["created_at"]), "updated_at": _iso(row["updated_at"])}
@@ -273,10 +273,11 @@ def create(data: Dict[str, Any], author_no: Optional[str]) -> Dict[str, Any]:
         cur.execute("SELECT 1 FROM issue_letters WHERE slug = %s", (v["slug"],))
         if cur.fetchone():
             raise LetterError("이미 있는 slug 입니다", 409)
+        # read_minutes 칸은 쓰지 않는다(DB 기본값). 읽을 시간 표시는 제거됐다.
         cur.execute(
-            "INSERT INTO issue_letters (slug, title, deck, summary, editor_note, read_minutes, author_no) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-            (v["slug"], v["title"], v["deck"], v["summary"], v["editor_note"], v["read_minutes"], author_no))
+            "INSERT INTO issue_letters (slug, title, deck, summary, editor_note, author_no) "
+            "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+            (v["slug"], v["title"], v["deck"], v["summary"], v["editor_note"], author_no))
         letter_id = cur.fetchone()["id"]
         _replace_children(cur, letter_id, v)
     return get_admin(letter_id)  # type: ignore[return-value]
@@ -295,8 +296,8 @@ def update(letter_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if v["slug"] != row["slug"]:
             raise LetterError("slug 는 바꿀 수 없습니다", 400)
         cur.execute(
-            "UPDATE issue_letters SET title=%s, deck=%s, summary=%s, editor_note=%s, read_minutes=%s, updated_at=now() WHERE id=%s",
-            (v["title"], v["deck"], v["summary"], v["editor_note"], v["read_minutes"], letter_id))
+            "UPDATE issue_letters SET title=%s, deck=%s, summary=%s, editor_note=%s, updated_at=now() WHERE id=%s",
+            (v["title"], v["deck"], v["summary"], v["editor_note"], letter_id))
         _replace_children(cur, letter_id, v)
     return get_admin(letter_id)
 

@@ -4,15 +4,12 @@ import { useEffect, useReducer, useRef, useState, type SetStateAction } from 're
 import { displayHeadline } from '@ailens/domain';
 import { createPortal } from 'react-dom';
 import { fetchHomePlayerPlaylist, type HomePlayerItem } from '@/shared/lib/api/homePlayerApi';
-import { useAuth } from '@/features/auth';
 import { PodcastSketch } from '@/shared/ui/icons/VideoSketch';
 import { onPlayHomePlayerItemRequest } from '@/shared/lib/media/audioPlayerBus';
 import { extractYoutubeVideoId, loadYouTubeIframeApi, type YTPlayer } from './youtube';
 import { playerReducer } from './playerState';
 
-// 북마크는 로그인한 사용자만 쓸 수 있다. 서버에 영구 저장하는 API/테이블이 아직 없어 클라이언트 localStorage에만 저장하므로
-// 기기를 바꾸면 남지 않는다(서버 저장이 필요하면 personal_db_client.py에 새 테이블/필드가 필요하다. ArchivedSentence는 레터 문장용이라 다른 도메인이다).
-const BOOKMARK_STORAGE_KEY = 'ailens-player-bookmarks';
+// 기사 저장은 플레이어가 아니라 기사 화면의 '저장'(계정의 '저장한 기사')이 맡는다. 플레이어 북마크는 2026-10-19 기능 다이어트로 제거했다.
 
 // 사이트 하단에 상시 도킹하는 고정 오디오 플레이어.
 // admin이 직접 만드는 "제목+유튜브 링크" 재생목록(홈 플레이어 관리 화면)을 재생한다.
@@ -27,7 +24,6 @@ const SERIF = "'Noto Serif KR', Georgia, serif";
 const DIRECT_AUDIO_RE = /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i;
 
 export function TodayNewsPlayer() {
-  const { isAuthenticated } = useAuth();
   const [items, setItems] = useState<HomePlayerItem[] | null>(null);
   const [{ index, playing, progress }, dispatchPlayback] = useReducer(playerReducer, { index: 0, playing: false, progress: 0 });
   const setIndex = (next: SetStateAction<number>) => dispatchPlayback({ type: 'index', next });
@@ -36,27 +32,6 @@ export function TodayNewsPlayer() {
   const [closed, setClosed] = useState(false);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  // 목록 로드 전에는 SSR·클라이언트 모두 null을 렌더하므로 초기화에서 저장값을 읽어도 hydration 출력은 같다.
-  const [bookmarked, setBookmarked] = useState<Set<string>>(() => {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(BOOKMARK_STORAGE_KEY) : null;
-      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
-    } catch { return new Set<string>(); }
-  });
-
-  function toggleBookmark(id: string) {
-    setBookmarked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      try {
-        window.localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify([...next]));
-      } catch {
-        // 저장에 실패해도 이번 세션의 UI 상태는 유지한다.
-      }
-      return next;
-    });
-  }
 
   const ytContainerRef = useRef<HTMLDivElement | null>(null);
   const ytPlayerRef = useRef<YTPlayer | null>(null);
@@ -304,7 +279,6 @@ export function TodayNewsPlayer() {
             </p>
             {items.map((it, i) => {
               const isCurrent = i === index;
-              const isBookmarked = bookmarked.has(it.id);
               const isAudio = DIRECT_AUDIO_RE.test(it.mediaEmbedUrl);
               return (
                 <div
@@ -379,30 +353,6 @@ export function TodayNewsPlayer() {
                     </span>
                   </button>
 
-                  {/* 북마크. 로그인한 사용자에게만 보이며, 비로그인 상태에서는 자리를 차지하지 않도록 숨긴다. */}
-                  {isAuthenticated && (
-                    <button
-                      type="button"
-                      onClick={() => toggleBookmark(it.id)}
-                      aria-label={isBookmarked ? '북마크 해제' : '북마크'}
-                      aria-pressed={isBookmarked}
-                      className="flex items-center justify-center flex-shrink-0"
-                      style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'none', cursor: 'pointer' }}
-                    >
-                      <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill={isBookmarked ? ACCENT : 'none'}
-                        stroke={isBookmarked ? ACCENT : '#9ca3af'}
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M6 4h12v17l-6-4-6 4z" />
-                      </svg>
-                    </button>
-                  )}
                 </div>
               );
             })}

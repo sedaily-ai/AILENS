@@ -30,7 +30,7 @@ export function RelatedLetters({ items }: { items: { letter: IssueLetter; shared
                 <span className="ld-related-body">
                   <span className="ld-related-why">{shared.slice(0, 3).join(' · ')}</span>
                   <span className="ld-related-title">{letter.title}</span>
-                  <span className="ld-related-meta">{formatLetterDate(letter.publishedAt)} · 약 {letter.readMinutes}분</span>
+                  <span className="ld-related-meta">{formatLetterDate(letter.publishedAt)}</span>
                 </span>
               </Link>
             </li>

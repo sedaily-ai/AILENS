@@ -35,7 +35,7 @@ export function LetterList() {
                   </View>
                   <Text style={styles.title}>{item.title}</Text>
                   <Text style={styles.deck} numberOfLines={2}>{item.deck}</Text>
-                  <Text style={styles.meta}>{[item.categories?.[0], `${item.read_minutes}분`, `기사 ${item.source_count}건`, kstDateTime(item.published_at)].filter(Boolean).join('  ·  ')}</Text>
+                  <Text style={styles.meta}>{[item.categories?.[0], `기사 ${item.source_count}건`, kstDateTime(item.published_at)].filter(Boolean).join('  ·  ')}</Text>
                 </Pressable>
               </Link>
             )}

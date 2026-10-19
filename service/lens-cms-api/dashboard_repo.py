@@ -25,6 +25,8 @@ def _account(cur, owner, create=False, write=False):
 
 
 def _preferences(row):
+    # 읽을 시간(minutes) 기능은 2026-10-19에 지웠다. 다만 옛 계정 API가 data['preferences']['minutes']를 바로 읽으므로
+    # (계정 API만 되돌리는 롤백·배포 사이) DB에 남은 값을 그대로 실어 보낸다. 새 계정 API·웹은 읽지 않는다. 다음 정리 때 제거.
     return {'interests': row['interests'] if row else [], 'minutes': row['minutes'] if row else 0,
             'revision': row['revision'] if row else 0, 'updated_at': row['updated_at'].isoformat() if row else None}
 
@@ -37,13 +39,13 @@ def get_preferences(owner):
 
 
 def replace_preferences(owner, payload):
-    if not isinstance(payload, dict) or set(payload) not in ({'minutes', 'revision'}, {'interests', 'minutes', 'revision'}):
-        raise DashboardError(400, 'INVALID_ARGUMENT', '읽을 시간·revision을 보내 주세요.')
-    revision, minutes = payload['revision'], payload['minutes']
-    if type(revision) is not int or revision < 0 or revision >= 2**63 or type(minutes) is not int or minutes not in (0, 5, 10):
+    if not isinstance(payload, dict) or set(payload) != {'interests', 'revision'}:
+        raise DashboardError(400, 'INVALID_ARGUMENT', '관심·revision을 보내 주세요.')
+    revision = payload['revision']
+    if type(revision) is not int or revision < 0 or revision >= 2**63:
         raise DashboardError(400, 'INVALID_ARGUMENT', '설정 값이 올바르지 않아요.')
     try:
-        pairs = validate_interest_items(payload['interests']) if 'interests' in payload else []
+        pairs = validate_interest_items(payload['interests'])
     except LetterError as exc:
         raise DashboardError(400, 'INVALID_ARGUMENT', str(exc)) from exc
     clean = [{'type': t, 'key': k} for t, k in pairs]
@@ -55,9 +57,6 @@ def replace_preferences(owner, payload):
         previous = cur.fetchone()
         if (previous['revision'] if previous else 0) != revision:
             raise DashboardError(409, 'REVISION_CONFLICT', '다른 기기에서 설정이 바뀌었어요. 다시 확인해 주세요.')
-        # 시간만 바꾸는 요청은 기존 관심 데이터를 그대로 보관한다.
-        if 'interests' not in payload:
-            clean = previous['interests'] if previous else []
         old = {(item['type'], item['key']) for item in previous['interests']} if previous else set()
         topics = [key for kind, key in pairs if kind == 'topic']
         if topics:
@@ -65,9 +64,10 @@ def replace_preferences(owner, payload):
             states = {r['slug']: r['is_active'] for r in cur.fetchall()}
             if any(key not in states or (not states[key] and ('topic', key) not in old) for key in topics):
                 raise DashboardError(400, 'UNKNOWN_INTEREST', '현재 선택할 수 없는 주제가 포함돼 있어요.')
-        cur.execute('INSERT INTO user_lens_preferences(user_id,interests,minutes,revision) VALUES (%s,%s,%s,1) '
-                    'ON CONFLICT(user_id) DO UPDATE SET interests=EXCLUDED.interests,minutes=EXCLUDED.minutes,'
-                    'revision=user_lens_preferences.revision+1,updated_at=now() RETURNING *', (owner, Json(clean), minutes))
+        # minutes 칸은 쓰지 않는다: 새 행은 DB 기본값, 기존 행은 저장된 값을 그대로 둔다.
+        cur.execute('INSERT INTO user_lens_preferences(user_id,interests,revision) VALUES (%s,%s,1) '
+                    'ON CONFLICT(user_id) DO UPDATE SET interests=EXCLUDED.interests,'
+                    'revision=user_lens_preferences.revision+1,updated_at=now() RETURNING *', (owner, Json(clean)))
         return _preferences(cur.fetchone())
 
 
@@ -83,7 +83,7 @@ def _encode_cursor(data):
     return base64.urlsafe_b64encode(raw + hmac.digest(_cursor_key(), raw, 'sha256')).decode()
 
 
-def _decode_cursor(cursor, owner, query, read="all"):
+def _decode_cursor(cursor, owner, query):
     try:
         if not isinstance(cursor, str) or len(cursor) > 2048:
             raise ValueError()
@@ -92,7 +92,9 @@ def _decode_cursor(cursor, owner, query, read="all"):
         if not hmac.compare_digest(signature, hmac.digest(_cursor_key(), raw, 'sha256')):
             raise ValueError()
         data = json.loads(raw)
-        if data['owner'] != owner or data['q'] != query or data.get('read','all') != read or not 0 < int(data['id']) < 2**63:
+        # 읽음 필터는 제거됐다. 옛 커서의 read 키는 'all'이면 지금 목록과 같은 순서라 그대로 받고,
+        # unread/completed로 거른 목록의 커서는 이어 붙이면 섞이므로 처음부터 다시 받게 한다.
+        if data['owner'] != owner or data['q'] != query or data.get('read', 'all') != 'all' or not 0 < int(data['id']) < 2**63:
             raise ValueError()
         when = dt.datetime.fromisoformat(data['at'])
         if when.tzinfo is None:
@@ -102,17 +104,15 @@ def _decode_cursor(cursor, owner, query, read="all"):
         raise DashboardError(400, 'INVALID_CURSOR', '목록을 처음부터 다시 확인해 주세요.') from exc
 
 
-def list_bookmarks(owner, limit=50, cursor=None, q='', read='all'):
-    if type(limit) is not int or not 1 <= limit <= 200 or not isinstance(q, str) or len(q.strip()) > 120 or read not in ('all','unread','completed'):
+def list_bookmarks(owner, limit=50, cursor=None, q=''):
+    if type(limit) is not int or not 1 <= limit <= 200 or not isinstance(q, str) or len(q.strip()) > 120:
         raise DashboardError(400, 'INVALID_ARGUMENT', '목록 조회 조건을 확인해 주세요.')
     q = q.strip()
-    after = _decode_cursor(cursor, owner, q, read) if cursor else None
+    after = _decode_cursor(cursor, owner, q) if cursor else None
     with get_cursor() as cur:
         _account(cur, owner)
         base = 'FROM user_letter_bookmarks b JOIN issue_letters l ON l.id=b.issue_letter_id WHERE b.user_id=%s'
         params = [owner]
-        completed="EXISTS(SELECT 1 FROM user_content_completions ce WHERE ce.user_id=b.user_id AND ce.content_key='issue_letter:'||l.id)"
-        if read!='all':base += ' AND '+('NOT ' if read=='unread' else '')+completed
         if q:
             # 비공개 자료의 제목으로 검색할 수 없다.
             base += " AND l.status='published' AND l.deleted_at IS NULL AND l.published_at<=clock_timestamp() AND position(lower(%s) in lower(l.title))>0"
@@ -122,8 +122,8 @@ def list_bookmarks(owner, limit=50, cursor=None, q='', read='all'):
         if after:
             base += ' AND (b.saved_at,b.issue_letter_id)<(%s,%s)'
             params += list(after)
-        cur.execute('SELECT b.issue_letter_id,b.saved_at,b.version,l.slug,l.title,l.deck,l.read_minutes,l.published_at,'
-                    f'l.status,l.deleted_at,(l.published_at<=clock_timestamp()) AS publish_due,({completed}) AS completed ' + base + ' ORDER BY b.saved_at DESC,b.issue_letter_id DESC LIMIT %s', params + [limit + 1])
+        cur.execute('SELECT b.issue_letter_id,b.saved_at,b.version,l.slug,l.title,l.deck,l.published_at,'
+                    'l.status,l.deleted_at,(l.published_at<=clock_timestamp()) AS publish_due ' + base + ' ORDER BY b.saved_at DESC,b.issue_letter_id DESC LIMIT %s', params + [limit + 1])
         rows = cur.fetchall()
         more = len(rows) > limit
         rows = rows[:limit]
@@ -137,12 +137,12 @@ def list_bookmarks(owner, limit=50, cursor=None, q='', read='all'):
         for r in rows:
             lid = str(r['issue_letter_id'])
             available = r['status'] == 'published' and r['deleted_at'] is None and bool(r['publish_due'])
-            content = {'content_key': f'issue_letter:{lid}', 'kind': 'issue_letter', 'available': available, 'completed': bool(r['completed'])}
+            content = {'content_key': f'issue_letter:{lid}', 'kind': 'issue_letter', 'available': available}
             if available:
-                content.update(slug=r['slug'], title=r['title'], summary=r['deck'], read_minutes=r['read_minutes'],
+                content.update(slug=r['slug'], title=r['title'], summary=r['deck'],
                                published_at=r['published_at'].isoformat(), href=f"/letter/{quote(r['slug'], safe='')}", categories=categories[r['issue_letter_id']])
             items.append({'letter_id': lid, 'saved_at': r['saved_at'].isoformat(), 'version': r['version'], 'content': content})
-        next_cursor = _encode_cursor({'owner': owner, 'q': q, 'at': rows[-1]['saved_at'].isoformat(), 'id': str(rows[-1]['issue_letter_id']), 'read':read}) if more else None
+        next_cursor = _encode_cursor({'owner': owner, 'q': q, 'at': rows[-1]['saved_at'].isoformat(), 'id': str(rows[-1]['issue_letter_id'])}) if more else None
         return {'items': items, 'count': len(items), 'total': total, 'next_cursor': next_cursor}
 
 

@@ -52,7 +52,7 @@ export function LetterCard({ letter, featured = false, onTopic }: { letter: Issu
         <span className="lt-count">기사 {letter.sourceCount ?? letter.sources.length}건</span>
       </div>
       <div className="lt-card-meta">
-        {formatLetterDate(letter.publishedAt)} · 약 {letter.readMinutes}분
+        {formatLetterDate(letter.publishedAt)}
         <span className="lt-more">읽기 →</span>
       </div>
     </Link>

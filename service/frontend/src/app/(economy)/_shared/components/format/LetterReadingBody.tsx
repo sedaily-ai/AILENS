@@ -4,16 +4,11 @@ import { ChevronDown } from 'lucide-react';
 import { PostVote, parseVoteChoices } from './PostVote';
 import { renderInline } from './renderInline';
 import type { CSSProperties } from 'react';
-import { seoHeadline } from '@ailens/domain';
 import { chapterId } from './lensChapters';
-import { ReadDone } from '@/app/(economy)/_shared/components/article/ReadDone';
-import { lensPath } from '@ailens/domain';
-import { SITE_URL } from '@/shared/constants/site';
-import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
 import { BADGE_HEAD, type LetterBlock } from './lensBlocks';
 import { SentenceSelectionPopover } from '@/widgets/SentenceSelectionPopover';
 import { READING_ACCENT } from '@/shared/constants/lensPerspectives';
-import { coreSummaryBullets, readMinutes } from './lensSamples';
+import { coreSummaryBullets } from './lensSamples';
 import type { CmsLens, CmsLensItem } from '@/shared/lib/api/cmsPostsApi';
 
 // 좌우 비교 칸 안의 글은 문장마다 문단으로 나눠 샘플 HTML처럼 짧게 끊어 보여 준다.
@@ -25,14 +20,12 @@ export function LetterReadingBody({
   l,
   on,
   letterBlocks,
-  letterParagraphs,
   isNewFormat,
 }: {
   lens: CmsLens;
   l: CmsLensItem;
   on: boolean;
   letterBlocks: LetterBlock[] | null;
-  letterParagraphs: string[];
   isNewFormat: boolean;
 }) {
   return (
@@ -167,17 +160,12 @@ export function LetterReadingBody({
         );
       })()}
       {/* 레터 사인오프 — 얇은 룰 + 형식 색 마크 + 발신인 라벨로 뉴스레터 서명처럼 마무리한다. */}
-      <ReadDone minutes={readMinutes(letterParagraphs.join('').length)} />
       <div className="lread-sign">
         <p className="lread-thanks">끝까지 읽어주셔서 고마워요.</p>
         <p className="lread-from">
           <span className="lread-sign-mark" style={{ background: READING_ACCENT }} aria-hidden />
           <span className="lread-sign-name">AI LENS 편집팀</span>
         </p>
-        <div className="lread-share">
-          <span className="lread-share-label">친구에게 공유하기</span>
-          <ArticleShareButtons title={seoHeadline(lens.headline)} url={`${SITE_URL}${lensPath(lens)}`} />
-        </div>
       </div>
     </div>
     {on && <SentenceSelectionPopover letter={{ id: lens.id, headline: lens.headline, publishedAt: lens.date }} glossary={l.keywords} />}

@@ -22,7 +22,18 @@ def _endpoint(method, path):
 
 
 def test_route_count_includes_account_storage():
-    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 165
+    # 165 → 162: 관심사 설정 제거(7d573c50)로 /api/v2/issue-letters/me/interests GET·PUT, /me/feed 3개가 빠졌다.
+    # 162 → 159: 완료 판정 다이어트로 /internal/personal/lens/activity·/rewards·/format-preference 3개가 빠졌다.
+    # 159 → 158: 저장 문장 관련 글 다이어트로 /internal/personal/lens/sentence-inputs/{sentence_id}가 빠졌다.
+    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 158
+
+
+def test_removed_record_routes_are_gone_but_view_reporting_stays():
+    for path in ("/internal/personal/lens/activity", "/internal/personal/lens/rewards", "/internal/personal/lens/format-preference"):
+        assert _endpoint("GET", path) is None
+    assert _endpoint("POST", "/internal/personal/lens/activity/sessions") == "session"
+    assert _endpoint("POST", "/internal/personal/lens/activity/events") == "event"
+    assert _endpoint("GET", "/internal/personal/lens/recommendation-inputs") == "recommendation_inputs"
 
 
 def test_static_paths_win_over_param_paths():

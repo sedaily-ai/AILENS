@@ -88,6 +88,7 @@ export function aapCss(waveBarCount: number): string {
     .aap-time-row span:last-child { color: var(--ink-3); font-weight: 500; }
 
     .aap-transport { display: flex; align-items: center; justify-content: center; gap: clamp(14px, 5vw, 26px); margin-top: 16px; }
+    .aap-transport-spacer { flex: none; width: 46px; height: 46px; }
     .aap-icon-btn { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 999px; border: none; background: none;
       color: var(--ink-2); cursor: pointer; transition: background-color .2s cubic-bezier(.2,0,0,1), color .2s cubic-bezier(.2,0,0,1); }
     .aap-icon-btn:hover { background: #eceef2; color: var(--ink); }

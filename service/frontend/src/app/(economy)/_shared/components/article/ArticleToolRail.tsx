@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SketchListen, SketchPrint, SketchShare, SketchTextMinus, SketchTextPlus } from '@/app/(economy)/_shared/components/icons/SketchIcons';
-import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
+import { ShareOutcomeToast, useArticleShare } from '@/shared/ui/article/ArticleShareButton';
 
-// 기사 왼쪽 고정 도구 레일 — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + / Size - / Share / Print" 구조. 항목마다 아이콘 + 라벨 한 세트이며, 공유는 아이콘을 펼치지 않고 버튼 하나가 작은 팝오버를 연다.
+// 기사 왼쪽 고정 도구 레일 — 영문 사이트(en.sedaily.com) 상세의 "Listen / Size + / Size - / Share / Print" 구조. 항목마다 아이콘 + 라벨 한 세트이다.
+// 공유는 버튼 하나가 바로 동작한다(터치 기기는 기기 공유 창, 컴퓨터는 링크 복사 — ArticleShareButton과 같은 동작).
 // 글자 크기는 ArticleFontSizeControl과 같은 저장 키·단계(작게 0.9 / 보통 1 / 크게 1.15)를 써서 좁은 화면의 가로 도구 줄과 설정을 공유한다.
 
 type FontSize = 'small' | 'medium' | 'large';
@@ -16,21 +17,24 @@ function ToolButton({
   onClick,
   children,
   disabled,
-  expanded,
+  pending,
 }: {
   label: string;
   onClick: () => void;
   children: React.ReactNode;
+  /** 더 누를 수 없는 상태(글자 크기 끝 단계). */
   disabled?: boolean;
-  expanded?: boolean;
+  /** 처리 중 — 누름은 받지 않지만 키보드 포커스는 지킨다(disabled를 쓰면 포커스가 페이지 맨 위로 튄다). */
+  pending?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={pending ? undefined : onClick}
       disabled={disabled}
+      aria-disabled={pending || undefined}
+      aria-busy={pending || undefined}
       aria-label={label}
-      aria-expanded={expanded}
       className="rail-btn"
     >
       <span className="rail-ico">{children}</span>
@@ -54,8 +58,7 @@ export function ArticleToolRail({
   onListen?: () => void;
 }) {
   const [size, setSize] = useState<FontSize>('medium');
-  const [shareOpen, setShareOpen] = useState(false);
-  const shareRef = useRef<HTMLDivElement>(null);
+  const { share, busy: sharing, outcome: shareOutcome } = useArticleShare(title, url);
 
   useEffect(() => {
     try {
@@ -69,22 +72,6 @@ export function ArticleToolRail({
       // localStorage 접근 불가 — 기본값 유지.
     }
   }, [cssVar, storageKey]);
-
-  useEffect(() => {
-    if (!shareOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShareOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [shareOpen]);
 
   const step = (delta: 1 | -1) => {
     const idx = ORDER.indexOf(size);
@@ -112,16 +99,10 @@ export function ArticleToolRail({
       <ToolButton label="글자 −" onClick={() => step(-1)} disabled={size === 'small'}>
         <SketchTextMinus size={24} />
       </ToolButton>
-      <div ref={shareRef} style={{ position: 'relative' }}>
-        <ToolButton label="공유" onClick={() => setShareOpen((v) => !v)} expanded={shareOpen}>
-          <SketchShare size={24} />
-        </ToolButton>
-        {shareOpen && (
-          <div role="dialog" aria-label="공유" className="rail-pop">
-            <ArticleShareButtons title={title} url={url} />
-          </div>
-        )}
-      </div>
+      <ToolButton label="공유" onClick={() => void share()} pending={sharing}>
+        <SketchShare size={24} />
+      </ToolButton>
+      <ShareOutcomeToast outcome={shareOutcome} />
       <ToolButton label="인쇄" onClick={() => window.print()}>
         <SketchPrint size={24} />
       </ToolButton>

@@ -136,7 +136,7 @@ paragraphs 배열 안에 문단(배열)과 나란히, 블록 객체를 배열로
 {
   "slug": "YYYY-MM-DD-주제",
   "title": "...", "deck": "한두 문장 요약", "summary": ["1분 요약 2~3줄"],
-  "editor_note": "에디터 한마디", "read_minutes": 5,
+  "editor_note": "에디터 한마디",
   "categories": ["주 분류 slug", "보조 분류 slug"],
   "topics": ["주제 사전의 이름 1~8개, 앞의 두 개가 주 주제"],
   "sections": [

@@ -1,4 +1,4 @@
-"""계정 이용 신호와 원자적 완료 기록 (신규 보상 지급 중단)."""
+"""계정 이용 신호. 추천에 쓰는 10초 열람(viewed)만 판정하고 완료·보상은 판정하지 않는다."""
 import hashlib
 import json
 import uuid
@@ -7,8 +7,15 @@ from db import get_cursor
 from dashboard_repo import _account
 from content_resolver import DashboardError, resolve_content
 from content_metadata import load_cards
-import completion_repo
-import completion_rules
+
+# 완료 판정을 없앤 뒤의 세션 규칙. 완료 판정이 있던 completion-v1·그 전의 visible-v1 세션과 구분한다.
+VERSION = 'view-only-v1'
+
+
+def _legacy_completion():
+    # 예전 웹 호환용 빈 완료 기준. 예전 웹은 session.completion.panel_ids[index] 등을 직접 읽고,
+    # completion_enabled=false면 첫 보고 뒤 보고를 멈춘다. 다음 정리 때 제거.
+    return {'completion_enabled':False,'group_key':None,'panel_ids':[],'panel_urls':[],'duration_seconds':None,'media_url':None,'pending_reason':None}
 
 
 def create_session(owner, payload):
@@ -27,14 +34,16 @@ def create_session(owner, payload):
         if cur.fetchone()['n']>=500:
             raise DashboardError(429,'RATE_LIMITED','오늘의 이용 신호 한도를 넘었어요.')
         session_id=str(uuid.uuid4())
-        rules=completion_repo.metadata(cur,content['content_key'],payload['format'],cards[0])
-        cur.execute('INSERT INTO user_content_sessions(id,user_id,content_key,format,completion_rules,rule_version) VALUES(%s,%s,%s,%s,%s,%s) RETURNING started_at', (session_id,owner,content['content_key'],payload['format'],Json(rules),completion_rules.VERSION))
+        # completion_rules는 열 기본값({})으로 둔다. 컷 목록·재생 길이 같은 완료 기준을 만들지 않는다.
+        cur.execute('INSERT INTO user_content_sessions(id,user_id,content_key,format,rule_version) VALUES(%s,%s,%s,%s,%s) RETURNING started_at', (session_id,owner,content['content_key'],payload['format'],VERSION))
         started=cur.fetchone()['started_at'].isoformat()
-    return {'session_id':session_id,'content_key':content['content_key'],'format':payload['format'],'started_at':started,'rule_version':completion_rules.VERSION,'completion':rules,'reward_evaluation_enabled':False}
+    return {'session_id':session_id,'content_key':content['content_key'],'format':payload['format'],'started_at':started,'rule_version':VERSION,'completion':_legacy_completion(),'reward_evaluation_enabled':False}
 
 
 def accept_event(owner,payload):
     required={'event_id','session_id','session_seq','event_type','visible_ms'}
+    # active_ms·scroll_ratio·viewed_panel_ids·consumed_ranges는 예전 웹이 보내는 완료용 값이다.
+    # 400 없이 받되 검사·저장하지 않는다. 새 웹은 visible_ms만 보낸다. 다음 정리 때 제거.
     allowed=required|{'active_ms','scroll_ratio','viewed_panel_ids','consumed_ranges','client_occurred_at'}
     if not isinstance(payload,dict) or not required<=set(payload) or not set(payload)<=allowed:
         raise DashboardError(400,'INVALID_ARGUMENT','진행 신호 형식을 확인해 주세요.')
@@ -45,9 +54,6 @@ def accept_event(owner,payload):
     seq,visible=payload['session_seq'],payload['visible_ms']
     if type(seq) is not int or not 0<seq<2**31 or type(visible) is not int or not 0<=visible<=86400000 or payload['event_type'] not in ('progress','ended'):
         raise DashboardError(400,'INVALID_ARGUMENT','진행 값을 확인해 주세요.')
-    ratio=payload.get('scroll_ratio',0)
-    if type(ratio) not in (int,float) or not 0<=ratio<=1:
-        raise DashboardError(400,'INVALID_ARGUMENT','스크롤 값을 확인해 주세요.')
     digest=hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     with get_cursor() as cur:
         _account(cur,owner,write=True)
@@ -80,20 +86,13 @@ def accept_event(owner,payload):
         kind,lid=session['content_key'].split(':')
         resolve_content(cur,kind,'id',lid)  # 전송 중 비공개화한 자료는 새 관심을 만들지 않는다.
         viewed=visible>=10000 and elapsed_ms>=10000
-        completed,progress=completion_rules.progress(session,payload,elapsed_ms,delta_ms)
-        reward={'status':'disabled','stamp_awarded':False,'pending_reason':session['completion_rules'].get('pending_reason')}
-        awards=[]
-        if completed:
-            cards=load_cards(cur,kind,owner=owner,ids=[int(lid)],limit=1)
-            if not cards or completion_repo.metadata(cur,session['content_key'],session['format'],cards[0])!=session['completion_rules']:
-                raise DashboardError(409,'CONTENT_CHANGED','콘텐츠 기준이 바뀌었어요. 다시 열어 주세요.')
-            reward,awards=completion_repo.record(cur,owner,session,now)
-        result={'accepted':True,'event_id':event_id,'session_id':session_id,'session_seq':seq,'viewed':viewed,'completed':completed,'reward':reward,'awards':awards,'rule_version':session['rule_version'],'reward_evaluation_enabled':False}
+        # completed·reward·awards는 예전 웹이 읽는 응답 키라 남긴다. 완료 판정·완료 기록·보상 평가는 하지 않는다.
+        result={'accepted':True,'event_id':event_id,'session_id':session_id,'session_seq':seq,'viewed':viewed,'completed':False,
+                'reward':{'status':'disabled','stamp_awarded':False,'pending_reason':None},'awards':[],'rule_version':session['rule_version'],'reward_evaluation_enabled':False}
         cur.execute('INSERT INTO user_content_events(event_id,user_id,session_id,session_seq,payload_hash,result) VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT(event_id) DO NOTHING RETURNING event_id', (event_id,owner,session_id,seq,digest,Json(result)))
         if cur.fetchone() is None:
             raise DashboardError(409,'IDEMPOTENCY_CONFLICT','이벤트가 다른 요청에서 사용됐어요.')
         cur.execute('UPDATE user_content_sessions SET visible_ms=%s,last_seq=%s,updated_at=now(),ended_at=%s WHERE id=%s', (visible,seq,now if payload['event_type']=='ended' else None,session_id))
-        cur.execute('UPDATE user_content_sessions SET active_ms=%s,scroll_ratio=%s,viewed_panel_ids=%s,consumed_ranges=%s WHERE id=%s',(progress['active_ms'],progress['scroll_ratio'],Json(progress['viewed_panel_ids']),Json(progress['consumed_ranges']),session_id))
         if viewed:
             cur.execute("INSERT INTO user_content_views(user_id,content_key,last_seen_at) VALUES(%s,%s,now()) ON CONFLICT(user_id,content_key) DO UPDATE SET last_seen_at=EXCLUDED.last_seen_at", (owner,session['content_key']))
     return result

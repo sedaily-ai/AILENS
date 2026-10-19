@@ -2,10 +2,9 @@ import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/auth/authFetch';
 import { authReadFetch } from '@/shared/lib/auth/authReadFetch';
 
-export interface LensPreferences { minutes: number; revision: number; updated_at: string | null }
 export interface AccountBookmark {
   letter_id: string; saved_at: string; version: number;
-  content: { content_key: string; kind: 'issue_letter'; available: boolean; completed?: boolean; slug?: string; title?: string; summary?: string; read_minutes?: number; published_at?: string; href?: string; categories?: string[] };
+  content: { content_key: string; kind: 'issue_letter'; available: boolean; slug?: string; title?: string; summary?: string; published_at?: string; href?: string; categories?: string[] };
 }
 export class AccountApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -25,13 +24,11 @@ async function accountJson<T>(path: string, options: RequestInit = {}): Promise<
   }
 }
 
-export const getLensPreferences = (signal?: AbortSignal) => accountJson<LensPreferences>('/preferences', { signal });
-export const putLensPreferences = (data: LensPreferences, signal?: AbortSignal) => accountJson<LensPreferences>('/preferences', { method: 'PUT', signal, body: JSON.stringify({ minutes: data.minutes, revision: data.revision }) });
-export async function getAccountBookmarks(signal?: AbortSignal, read: 'all'|'unread'|'completed' = 'all'): Promise<AccountBookmark[]> {
+export async function getAccountBookmarks(signal?: AbortSignal): Promise<AccountBookmark[]> {
   const all: AccountBookmark[] = [];
   let cursor: string | null = null;
   do {
-    const page: { items: AccountBookmark[]; next_cursor: string | null } = await accountJson(`/letter-bookmarks?limit=200&read=${read}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { signal });
+    const page: { items: AccountBookmark[]; next_cursor: string | null } = await accountJson(`/letter-bookmarks?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { signal });
     all.push(...page.items); cursor = page.next_cursor;
   } while (cursor);
   return all;

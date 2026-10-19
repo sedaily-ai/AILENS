@@ -4,10 +4,12 @@ export const LIST_CSS = `
   .lt-hero { padding: 0 0 24px; }
   .lt-h1 { margin: 0; font-family: "Noto Serif KR", serif; font-size: 32px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; color: var(--ink); }
   .lt-sub { margin: 8px 0 0; font-size: 16px; line-height: 1.6; color: #6b7280; }
-  .lt-etabs { position: relative; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #d1d5db transparent; margin: 0 0 24px; padding: 0; border-bottom: 1px solid #d3d6db; }
+  /* 세로 스크롤 막대 제거(2026-10-20): 선택 밑줄이 바닥 선을 덮도록 버튼에 margin-bottom:-1px을 줬더니 1px이 상자 밖으로 넘쳐 세로 스크롤이 생겼다.
+     바닥 선을 상자 안쪽 그림자로 그리고(버튼 밑줄이 그 위를 덮는다) 세로 넘침은 숨긴다. 가로 스크롤(좁은 화면)은 그대로. */
+  .lt-etabs { position: relative; display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: #d1d5db transparent; margin: 0 0 24px; padding: 0; box-shadow: inset 0 -1px 0 #d3d6db; }
   .lt-etabs::-webkit-scrollbar { height: 3px; }
   .lt-etabs::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
-  .lt-etab { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; flex: none; width: auto; min-width: 88px; min-height: 52px; padding: 8px 12px; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; border-radius: 0; background: transparent; font: inherit; color: #6b7280; cursor: pointer; opacity: 1; font-size: 14.5px; font-weight: 500; }
+  .lt-etab { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; flex: none; width: auto; min-width: 88px; min-height: 52px; padding: 8px 12px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; font: inherit; color: #6b7280; cursor: pointer; opacity: 1; font-size: 14.5px; font-weight: 500; }
   .lt-etab-all { min-width: 60px; font-size: 14.5px; font-weight: 500; }
   .lt-etab:hover { color: var(--blue); }
   .lt-etab[aria-pressed='true'] { color: var(--ink); font-weight: 700; border-bottom-color: #5b8def; background: transparent; }

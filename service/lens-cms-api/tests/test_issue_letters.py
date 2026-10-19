@@ -79,6 +79,13 @@ def test_validate_normalizes_valid_payload():
     assert v["sources"][0]["url"].endswith("/article/1") and v["poll"]["options"][0]["key"] == "send"
 
 
+@pytest.mark.parametrize("legacy", [3, 0, 999, "bad", None])
+def test_validate_ignores_legacy_read_minutes(legacy):
+    # 읽을 시간 기능 제거 후에도 옛 admin·파이프라인 payload는 거부하지 않고 값만 버린다.
+    v = _repo().validate_letter_payload(_payload(read_minutes=legacy))
+    assert "read_minutes" not in v
+
+
 @pytest.mark.parametrize("bad", [
     {"slug": "no-date"},
     {"title": ""},

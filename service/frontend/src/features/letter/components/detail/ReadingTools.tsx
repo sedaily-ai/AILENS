@@ -48,10 +48,6 @@ export function ReadingTools({ slug, title }: { slug: string; title: string }) {
     return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
   }, []);
 
-  // 70% 이상 읽으면 읽음으로 기록한다(열기만 한 레터는 읽은 것으로 보지 않는다).
-  const { markRead } = shelf;
-  useEffect(() => { if (progress >= 0.7) markRead(slug); }, [progress, slug, markRead]);
-
   const changeSize = (delta: number) => {
     const next = Math.max(0, Math.min(SIZES.length - 1, size + delta));
     setSize(next);

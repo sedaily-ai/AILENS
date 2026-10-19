@@ -7,30 +7,20 @@ import { displayHeadline } from '@ailens/domain';
 // 스크롤하면 상단 메뉴가 "카테고리 + 기사 제목 + 읽기 진행선"의 얇은 바로 바뀐다(영문 사이트 상세 동작을 따름).
 // 헤드라인이 화면 위로 지나간 뒤 나타나 sticky 헤더(z-100, 높이 약 57px)를 그대로 덮으므로 아래 형식 탭 바(.fmt-bar)의 top 오프셋이 유효하다.
 // 진행선은 기사 본문(main) 기준으로 계산하고 리렌더 없이 transform으로만 갱신한다.
+// 남은 읽기 시간·"다 읽었어요"·중간 격려 문구는 스크롤 위치만으로 읽음을 단정해 2026-10-19 기능 다이어트로 제거했다. 남은 양은 진행선·챕터 칸이 보여 준다.
 
 const BAR_HEIGHT = 57;
-const MILESTONES = [
-  { at: 0.5, text: '절반 읽었어요' },
-  { at: 0.85, text: '거의 다 왔어요' },
-];
 
 export function ArticleStickyBar({
   category,
   categoryHref,
   title,
-  readMin,
 }: {
   category: string | null;
   categoryHref: string | null;
   title: string;
-  /** 레터 예상 읽기 시간(분). 있으면 레터 본문을 읽는 동안 "남은 약 N분"을 보여 준다. */
-  readMin?: number | null;
 }) {
   const [show, setShow] = useState(false);
-  const [remain, setRemain] = useState<string | null>(null);
-  const [cheer, setCheer] = useState<string | null>(null);
-  const passed = useRef<Set<number> | null>(null);
-  const cheerTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const progressRef = useRef<HTMLDivElement>(null);
   // 챕터별 칸 진행 — 레터 본문에 소제목이 2개 이상일 때만, 연속 선 대신 챕터 수만큼 칸을 나눠 읽은 만큼 채운다.
   const [segCount, setSegCount] = useState(0);
@@ -71,31 +61,6 @@ export function ArticleStickyBar({
           el.style.transform = `scaleX(${f})`;
         });
       }
-      // 남은 읽기 시간 — 레터 본문(보이는 동안)만. 본문 위치 기준: 화면 60% 지점까지 읽었다고 본다.
-      const body = document.querySelector('[data-letter-body]');
-      const br = body ? body.getBoundingClientRect() : null;
-      if (readMin && br && br.height > 0 && br.top < window.innerHeight) {
-        const read = Math.min(br.height, Math.max(0, window.innerHeight * 0.6 - br.top));
-        const left = readMin * (1 - read / br.height);
-        setRemain(left <= 0.4 ? '다 읽었어요' : `남은 약 ${Math.max(1, Math.ceil(left))}분`);
-        // 가벼운 격려 — 절반·거의 끝에 닿는 순간 2.6초만 한 줄. 처음 열 때 이미 지난 구간은 조용히 넘긴다
-        // (이어 읽기로 중간에 들어왔을 때 갑자기 격려하지 않게).
-        const frac = read / br.height;
-        if (!passed.current) {
-          passed.current = new Set(MILESTONES.filter((m) => frac >= m.at).map((m) => m.at));
-        } else {
-          for (const m of MILESTONES) {
-            if (frac >= m.at && !passed.current.has(m.at)) {
-              passed.current.add(m.at);
-              setCheer(m.text);
-              if (cheerTimer.current) clearTimeout(cheerTimer.current);
-              cheerTimer.current = setTimeout(() => setCheer(null), 2600);
-            }
-          }
-        }
-      } else {
-        setRemain(null);
-      }
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
@@ -108,15 +73,11 @@ export function ArticleStickyBar({
       window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [readMin]);
+  }, []);
 
   return (
     <>
       <style>{`
-        .sbar-cheer { color: #111827; font-weight: 800; }
-        @media (prefers-reduced-motion: no-preference) { .sbar-cheer { animation: sbar-cheer-in .35s cubic-bezier(.22,.85,.2,1); }
-          @keyframes sbar-cheer-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } } }
-        .sbar-remain { flex-shrink: 0; margin-left: 4px; font-size: 12.5px; font-weight: 600; color: #6b7280; font-variant-numeric: tabular-nums; }
         .sbar { position: fixed; top: 0; left: 0; right: 0; height: ${BAR_HEIGHT}px; z-index: 110; background: #fff;
           border-bottom: 1px solid #e5e7eb; transform: translateY(-100%); visibility: hidden;
           transition: transform .22s ease, visibility 0s linear .22s; }
@@ -156,11 +117,6 @@ export function ArticleStickyBar({
           >
             {displayHeadline(title)}
           </button>
-          {(cheer ?? remain) && (
-            <span key={cheer ?? 'remain'} className={cheer ? 'sbar-remain sbar-cheer' : 'sbar-remain'}>
-              {cheer ?? remain}
-            </span>
-          )}
         </div>
         {segCount > 0 && (
           <div className="sbar-segs" aria-hidden>

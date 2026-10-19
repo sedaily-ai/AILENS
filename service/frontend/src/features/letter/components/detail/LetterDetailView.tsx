@@ -91,7 +91,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
       <header className="ld-head">
         <div className="ld-cat">
           <span>{letter.categories.join(' · ')}</span>
-          <span className="ld-meta">{formatLetterDate(letter.publishedAt)} · 약 {letter.readMinutes}분 · AI LENS 편집팀</span>
+          <span className="ld-meta">{formatLetterDate(letter.publishedAt)} · AI LENS 편집팀</span>
           <span className="ld-cat-no">제 {letter.issueNumber}호</span>
         </div>
         <h1 className="ld-title">{letter.title}</h1>

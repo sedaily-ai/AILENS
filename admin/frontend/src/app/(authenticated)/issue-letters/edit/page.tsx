@@ -29,7 +29,6 @@ const EXAMPLE = `{
   "deck": "한두 문장 요약",
   "summary": ["1분 요약 1", "1분 요약 2"],
   "editor_note": "에디터 한마디(본문 사실의 연결 정리, 2문장 이내)",
-  "read_minutes": 5,
   "categories": ["markets", "national"],
   "topics": ["금리", "삼성전자"],
   "editors": ["mincheol"],
@@ -51,7 +50,6 @@ function toInputJson(l: IssueLetterDetail): string {
       deck: l.deck,
       summary: l.summary,
       editor_note: l.editor_note ?? "",
-      read_minutes: l.read_minutes,
       categories: l.categories,
       topics: l.topics.map((t) => t.name),
       editors: l.editors ?? [],
@@ -307,7 +305,7 @@ function IssueLetterEditPage() {
       {/* 미리보기 */}
       <div className="ui-card rounded-xl p-6 space-y-5">
         <div className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-          {letter.category_names.join(" · ")} · 약 {letter.read_minutes}분
+          {letter.category_names.join(" · ")}
         </div>
         <p className="text-[15px] leading-[1.7] text-[var(--text-primary)]">{letter.deck}</p>
         <div className="flex flex-wrap gap-1.5 items-center" aria-label="주제 태그">
