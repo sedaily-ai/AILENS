@@ -5,7 +5,7 @@ import { useAuth } from '@/entities/user';
 import { getAccountBookmarks, isAccountAuthError, setAccountBookmark, type AccountBookmark } from '../data/accountApi';
 import type { IssueLetter } from '../data/letterTypes';
 
-export const LETTER_SHELF_NOTICE = { browser: '로그인한 계정의 레터 저장은 서버에 보관돼요.', guest: '레터를 저장하려면 로그인해 주세요.', sync: '열람 기록은 이 브라우저에 남아요.' } as const;
+export const LETTER_SHELF_NOTICE = { guest: '레터를 저장하려면 로그인해 주세요.', sync: '열람 기록은 이 브라우저에 남아요.' } as const;
 const SAVED_KEY = 'lens-letter-saved';
 const READ_KEY = 'lens-letter-read';
 const CHANGED = 'lens-account-bookmarks-changed';
@@ -99,7 +99,8 @@ export function useLetterShelf(readFilter: 'all'|'unread'|'completed' = 'all', e
   }, [owner, readKey]);
   const valid = state.owner === owner;
   const saved = valid ? state.saved : [], read = valid ? state.read : [];
-  const notice = user ? `${LETTER_SHELF_NOTICE.browser} 로그인 전 브라우저 저장과는 자동으로 합치지 않아요.` : `${LETTER_SHELF_NOTICE.guest}${saved.length ? ' 기존 브라우저 저장은 조회만 가능하며 계정 저장과는 별개예요.' : ''}`;
+  // 로그인 상태에서는 저장 안내를 띄우지 않는다(빈 문자열이면 화면에서 안내 줄을 그리지 않는다).
+  const notice = user ? '' : `${LETTER_SHELF_NOTICE.guest}${saved.length ? ' 기존 브라우저 저장은 조회만 가능하며 계정 저장과는 별개예요.' : ''}`;
   return { ready: enabled && !isLoading && valid && state.ready && state.filter===readFilter, available: valid && state.available, error: valid ? state.error : '', notice,
     feedback: feedback?.owner === owner ? feedback.text : '',
     authRequired: valid && !!state.authRequired, pending: pendingCount > 0, saved, read, savedLetters: valid ? state.bookmarks.flatMap(bookmarkLetter) : [],

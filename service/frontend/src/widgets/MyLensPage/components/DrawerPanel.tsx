@@ -11,7 +11,6 @@ import { useSentenceRecommendations } from '../lib/useSentenceRecommendations';
 import type { useDashboardArchive } from '../lib/news/useDashboardArchive';
 
 type Props = {
-  storageNotice: string;
   notificationNotice: string;
   archive: ReturnType<typeof useDashboardArchive>;
   articles: NewsArticle[];
@@ -30,7 +29,7 @@ type Props = {
   onSave: (slug: string) => void;
 };
 
-export function DrawerPanel({ notificationNotice, storageNotice, archive, articles, selectedId, initialFilter, letters, savedSlugs, lettersLoading, lettersFailed, missingLetters, retryLetters, isRead, onSave, letterFilter, onLetterFilterChange, filteredSavedSlugs }: Props) {
+export function DrawerPanel({ notificationNotice, archive, articles, selectedId, initialFilter, letters, savedSlugs, lettersLoading, lettersFailed, missingLetters, retryLetters, isRead, onSave, letterFilter, onLetterFilterChange, filteredSavedSlugs }: Props) {
   const [filter, setFilter] = useState<'sentences' | 'letters'>(initialFilter);
   const [query, setQuery] = useState('');
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -77,7 +76,6 @@ export function DrawerPanel({ notificationNotice, storageNotice, archive, articl
       <p className="ml-helper">로그인 계정의 서버 완료 기록을 기준으로 구분해요.</p>
       {lettersLoading ? <p className="ml-loading" role="status">저장한 레터를 불러오고 있어요.</p> : lettersFailed ? <div className="ml-saved-empty"><h3>저장한 레터를 불러오지 못했어요</h3><p>연결을 확인하고 다시 불러와 주세요. 저장 기록은 유지돼요.</p><button type="button" className="ml-text-link" onClick={retryLetters}>저장 레터 다시 불러오기</button></div> : savedLetters.length ? <div className="ml-saved-list">{savedLetters.map((letter) => <DashboardLetter key={letter.slug} letter={letter} saved read={isRead(letter.slug)} onSave={() => onSave(letter.slug)} />)}</div> : <div className="ml-saved-empty"><h3>{needle ? '검색한 레터를 찾지 못했어요' : savedSlugs.length ? letterFilter==='unread' ? '아직 안 읽은 레터가 없어요' : '저장 레터의 내용을 불러오지 못했어요' : '마음에 드는 레터를 담아보세요'}</h3><p>{needle ? '다른 제목으로 찾아보세요.' : '레터 북마크를 누르면 이곳에서도 이어볼 수 있어요.'}</p><Link href="/letter" className="ml-text-link">레터 둘러보기 <ArrowUpRight size={14} /></Link></div>}
       {missingLetters > 0 && <div className="ml-missing"><p>이전 레터 {missingLetters}편의 정보를 불러오지 못했어요. 저장 기록은 유지돼요.</p><button type="button" className="ml-text-link" onClick={retryLetters}>레터 다시 불러오기</button></div>}
-      <p id="ml-storage-note" className="ml-storage-note">{storageNotice}</p>
     </>}
     <p role="status" aria-live="polite" className="ml-drawer-message">{message}</p>
     {selectedId && <section id="ml-sentence-related" className="ml-sentence-related" aria-labelledby="ml-sentence-related-title"><div className="ml-section-title"><div><h2 id="ml-sentence-related-title">이 문장에서 이어지는 뉴스</h2><p className="ml-helper">선택한 문장에 담긴 단어로 새 이야기를 찾아요.</p></div></div>

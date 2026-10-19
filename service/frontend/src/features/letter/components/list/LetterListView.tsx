@@ -114,12 +114,12 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
             <h2 className="lt-sec-h lt-sec-inline">{editor ? `${editor.name}의 레터 ${shown.length}편` : `최신 레터 ${shown.length}편`}</h2>
             <div className="lt-toolbar-r">
               {shelf.ready && (
-                <button type="button" className="lt-savedtab" aria-describedby="lt-save-note" aria-pressed={onlySaved} onClick={() => setOnlySaved((v) => !v)}>저장한 레터 {shelf.saved.length}</button>
+                <button type="button" className="lt-savedtab" aria-describedby={shelf.notice ? 'lt-save-note' : undefined} aria-pressed={onlySaved} onClick={() => setOnlySaved((v) => !v)}>저장한 레터 {shelf.saved.length}</button>
               )}
               <input className="lt-searchbox" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="제목·주제 검색" aria-label="레터 검색" />
             </div>
           </div>
-          {shelf.ready && (
+          {shelf.ready && shelf.notice && (
             <p id="lt-save-note" className="lt-save-note">
               {shelf.notice}
             </p>
@@ -138,7 +138,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
           )}
           {shown.length > 0 ? (
             <div className="lt-rows">
-              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => { void shelf.toggleSaved(l.slug); }} saveNoticeId={shelf.ready ? 'lt-save-note' : undefined} />)}
+              {shown.map((l, i) => <LetterRow key={l.slug} letter={l} onOpen={() => openLetter(l, i + 1)} latest={!editor && !filtering && i === 0} onTopic={pickTopic} read={shelf.isRead(l.slug)} saved={shelf.isSaved(l.slug)} onToggleSaved={() => { void shelf.toggleSaved(l.slug); }} saveNoticeId={shelf.ready && shelf.notice ? 'lt-save-note' : undefined} />)}
             </div>
           ) : (
             <div className="lt-empty" role="status">
