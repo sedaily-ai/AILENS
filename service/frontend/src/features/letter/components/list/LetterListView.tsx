@@ -101,7 +101,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
         <h1 className="lt-h1">소식부터 맥락까지, 한 편에.</h1>
       </header>
 
-      <EditorTabs selected={editorId} onSelect={select} publishedEditorIds={letters.flatMap(letter => (letter.editors ?? []))} />
+      <EditorTabs selected={editorId} onSelect={select} />
 
       <div className="lt-layout">
         {editor && (
