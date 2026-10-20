@@ -1,3 +1,4 @@
+import { markStep } from '../home/dailyProgress';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { applyChoice } from '@ailens/domain';
@@ -39,6 +40,7 @@ export function PostVote({ slug, title, choices }: { slug: string; title: string
       return setFailed(true);
     }
     setState(next);
+    void markStep('save');
   }
 
   const total = state.counts ? Object.values(state.counts).reduce((a, b) => a + b, 0) : 0;

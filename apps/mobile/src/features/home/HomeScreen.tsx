@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,20 +9,26 @@ import { useHomeData, type HomeData } from './useHomeData';
 import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
 import { TimeMachineCard } from './sections/TimeMachineCard';
-import { HomeIntro } from './sections/HomeIntro';
+import { BriefingTop } from './sections/BriefingTop';
+import { PickCards } from './sections/PickCards';
+import { pickBriefing } from './briefing';
+import { useDailyProgress } from './dailyProgress';
+import { getPreferredFormat } from '../onboarding/prefs';
+import { bookmarks, getInterests, history } from '../mylens/stores';
+import { useListStore } from '../mylens/listStore';
 
 const LATEST_COUNT = 8;
 
 /**
- * 홈은 "오늘의 핵심"에 집중한다(뉴닉 구조): 소개(질문·형식 칩) → 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
- * 소개 영역이 /start(하루 장면 고르기) 진입을 상시 제공하므로 첫 방문 온보딩 카드는 따로 두지 않는다.
- * 카테고리 섹션·웹툰·영상·레터는 "발견" 탭(src/features/discover)으로 옮겼다.
+ * 홈은 "오늘 내 몫을 끝내는 곳"이다: 오늘의 브리핑(인사 · 진행 · 이번 주) → 오늘 챙길 3가지 → 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
+ * 카테고리 섹션·웹툰·영상·레터는 "발견" 탭(src/features/discover)에 있다.
  */
 type Section = { key: string; render: () => React.ReactElement | null };
 
-function buildSections(data: HomeData): Section[] {
+function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDailyProgress>; picks: ReturnType<typeof pickBriefing>; fmt: number | null; readToday: Set<string> }): Section[] {
   return [
-    { key: 'intro', render: () => <HomeIntro /> },
+    { key: 'briefing', render: () => <BriefingTop progress={ctx.progress} picks={ctx.picks} preferredFormat={ctx.fmt} /> },
+    { key: 'picks', render: () => <PickCards picks={ctx.picks} readToday={ctx.readToday} /> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
     { key: 'timemachine', render: () => <TimeMachineCard /> },
@@ -31,6 +38,23 @@ function buildSections(data: HomeData): Section[] {
 // 홈 화면. 로드 상태와 섹션 조립만 맡고, 데이터 규칙은 model.ts, 조회는 useHomeData.ts, 화면 조각은 sections/* 에 있다.
 export function HomeScreen() {
   const { state, refreshing, reload, refresh } = useHomeData({ media: false });
+  const progress = useDailyProgress();
+  const read = useListStore(history);
+  useListStore(bookmarks);
+  const [interests, setInterests] = useState<string[]>([]);
+  const [fmt, setFmt] = useState<number | null>(null);
+  useEffect(() => {
+    void getInterests().then(setInterests);
+    void getPreferredFormat().then(setFmt);
+  }, []);
+  // 오늘 읽은 글은 목록에서 빼지 않고 "읽었어요"로 남긴다(읽을수록 카드가 바뀌면 오늘 챙길 3가지가 흔들리므로). 어제까지 읽은 글만 후보에서 뺀다.
+  const startOfToday = useMemo(() => new Date().setHours(0, 0, 0, 0), []);
+  const readToday = useMemo(() => new Set(read.items.filter((r) => r.at >= startOfToday).map((r) => r.id)), [read.items, startOfToday]);
+  const readBefore = useMemo(() => new Set(read.items.filter((r) => r.at < startOfToday).map((r) => r.id)), [read.items, startOfToday]);
+  const picks = useMemo(
+    () => (state.status === 'ready' ? pickBriefing(state.data.lens, state.data.latest, interests, readBefore) : []),
+    [state, interests, readBefore]
+  );
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -49,7 +73,7 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data)}
+            data={buildSections(state.data, { progress, picks, fmt, readToday })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}

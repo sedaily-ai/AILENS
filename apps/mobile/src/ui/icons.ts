@@ -25,3 +25,7 @@ export { VideoCamera } from 'phosphor-react-native/src/icons/VideoCamera';
 export { ShareNetwork } from 'phosphor-react-native/src/icons/ShareNetwork';
 export { Trash } from 'phosphor-react-native/src/icons/Trash';
 export { X } from 'phosphor-react-native/src/icons/X';
+export { Check } from 'phosphor-react-native/src/icons/Check';
+export { Fire } from 'phosphor-react-native/src/icons/Fire';
+export { ArrowRight } from 'phosphor-react-native/src/icons/ArrowRight';
+export { Play } from 'phosphor-react-native/src/icons/Play';
