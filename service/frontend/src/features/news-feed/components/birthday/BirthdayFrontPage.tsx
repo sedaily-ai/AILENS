@@ -82,7 +82,7 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
       {!state ? <div className={styles.paperEmpty}><strong>출생연도만 담긴 공유 링크예요</strong><p>내 생일을 넣으면 그날 1면을 볼 수 있어요.</p><button type="button" className={styles.sceneAction} onClick={onUseBirthday}>내 생일로 보기</button></div>
         : state.status === 'loading' ? <div className={styles.skeleton} aria-hidden="true"><span /><span /><span /></div>
         // 실패 원인(네트워크·보관본 응답·형식)을 화면에서는 가릴 수 없어 단정하지 않는다.
-        : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>{`잠시 연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>
+        : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>{`연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>
         : state.status === 'notice' ? <div className={styles.paperEmpty}><strong>{NOTICES[state.notice].title}</strong><p>{NOTICES[state.notice].body}</p></div>
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>
         : <Headlines articles={state.data.articles} />}
