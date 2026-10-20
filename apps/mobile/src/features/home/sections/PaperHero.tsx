@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   heroThumb: { width: '100%', aspectRatio: 21 / 9, borderRadius: 3, overflow: 'hidden', backgroundColor: '#f3f4f6' },
   heroBody: { paddingTop: 16, paddingBottom: 20 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
-  chip: { backgroundColor: 'rgba(37,99,235,0.08)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  chip: { alignSelf: 'flex-start', backgroundColor: 'rgba(37,99,235,0.08)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
   chipText: { fontSize: 11.5, fontWeight: '800', letterSpacing: 0.23, color: ACCENT_STRONG },
   heroDate: { fontSize: 13, fontWeight: '600', color: '#9ca3af' },
   heroTitle: { fontFamily: 'NotoSerifKR-Bold', fontSize: 24, lineHeight: 29, letterSpacing: -0.72, color: INK },
