@@ -39,12 +39,6 @@ export function MyInterests({ items, onAdd }: { items: Interest[]; onAdd: () => 
   }
   return (
     <View>
-      <View style={styles.head}>
-        <Text style={styles.title}>내 관심</Text>
-        <Pressable onPress={onAdd} hitSlop={8} accessibilityRole="button" accessibilityLabel="관심 담기·편집">
-          <Text style={styles.edit}>편집</Text>
-        </Pressable>
-      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>
         {items.map((it) => {
           const n = counts.get(keyOf(it)) ?? 0;
@@ -80,13 +74,13 @@ const styles = StyleSheet.create({
   edit: { fontSize: 13.5, fontWeight: '700', color: colors.textFaint },
   scroll: { marginHorizontal: -20 },
   row: { paddingHorizontal: 20, gap: 8 },
-  chip: { ...surface.card, flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, paddingHorizontal: 16, borderRadius: 999 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 16, borderRadius: 999, backgroundColor: '#f4f6f9' },
   chipText: { fontSize: 15, fontWeight: '800', color: colors.text },
   badge: { minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 12, fontWeight: '800', color: '#fff' },
   add: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 46, paddingHorizontal: 16, borderRadius: 999, backgroundColor: accent.soft },
   addText: { fontSize: 14.5, fontWeight: '800', color: accent.ink },
-  empty: { ...surface.card, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
+  empty: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   plusBig: { width: 44, height: 44, borderRadius: 22, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 15.5, fontWeight: '800', letterSpacing: -0.3, color: colors.text },
   emptySub: { marginTop: 3, fontSize: 13, lineHeight: 19, color: colors.textMuted },

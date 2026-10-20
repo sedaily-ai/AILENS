@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { EditorPicker } from './sections/EditorPicker';
 import { FormatCarousel } from './sections/FormatCarousel';
 import { Continues } from './sections/Continues';
 import { MyInterests } from './sections/MyInterests';
+import { Block } from './sections/Block';
 import { InterestPicker } from '../interests/InterestPicker';
 import { useInterestItems } from '../interests/store';
 import { connections } from './connections';
@@ -51,6 +53,7 @@ function buildSections(data: HomeData, c: Ctx): Section[] {
     {
       key: 'chat',
       render: () => (
+        <Block>
         <EditorChat
           editor={c.myEditor.editor}
           picked={c.myEditor.picked}
@@ -63,14 +66,15 @@ function buildSections(data: HomeData, c: Ctx): Section[] {
           onOpenSettings={c.openSettings}
           onOpened={c.scrollToChat}
         />
+        </Block>
       ),
     },
-    { key: 'interests', render: () => <MyInterests items={c.interestItems} onAdd={c.openInterests} /> },
-    { key: 'continues', render: () => <Continues items={c.continues} /> },
-    { key: 'formats', render: () => <FormatCarousel situation={c.prefs.situation} /> },
+    { key: 'interests', render: () => <Block title="내 관심" right={c.interestItems.length > 0 ? <Pressable hitSlop={8} onPress={c.openInterests} accessibilityRole="button"><Text style={styles.more}>편집</Text></Pressable> : undefined}><MyInterests items={c.interestItems} onAdd={c.openInterests} /></Block> },
+    { key: 'continues', render: () => (c.continues.length > 0 ? <Block title="이어서 볼까요?"><Continues items={c.continues} /></Block> : null) },
+    { key: 'formats', render: () => <Block title="지금은 이렇게 볼까요?"><FormatCarousel situation={c.prefs.situation} /></Block> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
-    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} moreHref="/discover" /> },
-    { key: 'timemachine', render: () => <TimeMachineCard /> },
+    { key: 'latest', render: () => <Block title="방금 올라온 소식" right={<Link href="/discover" asChild><Pressable hitSlop={8} accessibilityRole="link"><Text style={styles.more}>더 보기</Text></Pressable></Link>}><LatestSection items={data.latest.slice(0, LATEST_COUNT)} /></Block> },
+    { key: 'timemachine', render: () => <Block><TimeMachineCard /></Block> },
   ];
 }
 
@@ -144,7 +148,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: surface.page },
   body: { flex: 1 },
   list: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
-  divider: { height: 28 },
+  divider: { height: 16 },
+  more: { fontSize: 13.5, fontWeight: '700', color: colors.textMuted },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   msg: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
   btn: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, backgroundColor: '#f3f4f6' },

@@ -13,8 +13,7 @@ export function LatestSection({ items, title = '방금 올라온 소식', moreHr
   if (items.length === 0) return null;
   return (
     <View>
-      <SectionHeader title={title} right={moreHref ? '더 보기' : undefined} href={moreHref} />
-      <View style={styles.list}>
+      <View>
         {items.map((item, i) => (
           <NewsRow key={item.id} item={item} divider={i > 0} />
         ))}
@@ -24,5 +23,4 @@ export function LatestSection({ items, title = '방금 올라온 소식', moreHr
 }
 
 const styles = StyleSheet.create({
-  list: { ...surface.card, paddingHorizontal: 16, paddingVertical: 2 },
 });

@@ -10,8 +10,7 @@ export function Continues({ items }: { items: Connection[] }) {
   if (items.length === 0) return null;
   return (
     <View>
-      <Text style={styles.title}>이어서 볼까요?</Text>
-      <View style={styles.list}>
+      <View>
         {items.map((c, i) => (
           <Link key={c.post.id} href={{ pathname: '/article/[slug]', params: { slug: c.post.id } }} asChild>
             <Pressable style={StyleSheet.flatten([styles.row, i > 0 && styles.divider])} accessibilityRole="link">
@@ -36,7 +35,6 @@ export function Continues({ items }: { items: Connection[] }) {
 
 const styles = StyleSheet.create({
   title: { marginBottom: 12, fontSize: 20, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
-  list: { ...surface.card, paddingHorizontal: 16, paddingVertical: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   reason: { fontSize: 12.5, fontWeight: '800', color: accent.ink },
