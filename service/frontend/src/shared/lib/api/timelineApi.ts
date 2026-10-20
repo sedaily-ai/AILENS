@@ -104,21 +104,38 @@ export async function fetchBigkindsDay(date: string): Promise<BigKindsDayData> {
   }
 }
 
-/** 그날의 서울경제 1면(백엔드 time_machine.py front 모드). 면 번호가 있는 시기만 'ok'가 될 수 있다. */
+/** front = 1면(면 번호 1), day = 면 번호가 없는 시기의 그날 서울경제 기사, none = 생일 무렵 보관본에 신문이 없음. */
+export type FrontPageKind = 'front' | 'day' | 'none';
+/** 생일 당일 신문이 아닌 것을 보여 준 까닭. null이면 생일 당일 신문이다. */
+export type FrontPageReason = 'sunday' | 'no_paper' | 'archive_missing';
+const FRONT_KINDS: readonly string[] = ['front', 'day', 'none'];
+const FRONT_REASONS: readonly string[] = ['sunday', 'no_paper', 'archive_missing'];
+
+/** 생일 date에 보여 줄 서울경제(백엔드 time_machine.py front 모드). 생일에 신문이 없으면 서버가 직전 발행일(shown_date)을 골라 준다. */
 export interface FrontPageData {
-  status: 'ok' | 'no_paper' | 'no_page_info';
-  reason: 'sunday' | 'holiday' | null;
+  date: string;
+  shown_date: string | null;
+  kind: FrontPageKind;
+  reason: FrontPageReason | null;
   articles: BigKindsArticle[];
 }
 
-/** 인쇄일 date 신문의 1면 기사(본문이 긴 순). 브라우저에서 호출하며 실패하면 null(빈 결과와 구분). */
+/** 생일 date의 그날 신문(기사는 본문이 긴 순). 브라우저에서 호출하며 실패하거나 형식이 다르면 null(빈 결과와 구분). */
 export async function fetchFrontPage(date: string): Promise<FrontPageData | null> {
   try {
     const res = await fetch(`${API_URL}/time-machine?front=${encodeURIComponent(date)}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
-    if (!['ok', 'no_paper', 'no_page_info'].includes(data?.status)) return null;
-    return { status: data.status, reason: data.reason ?? null, articles: Array.isArray(data.articles) ? data.articles : [] };
+    if (!FRONT_KINDS.includes(data?.kind)) return null;
+    const shown = typeof data.shown_date === 'string' ? data.shown_date : null;
+    if (data.kind !== 'none' && !shown) return null;
+    return {
+      date,
+      shown_date: shown,
+      kind: data.kind,
+      reason: FRONT_REASONS.includes(data.reason) ? data.reason : null,
+      articles: Array.isArray(data.articles) ? data.articles : [],
+    };
   } catch {
     return null;
   }

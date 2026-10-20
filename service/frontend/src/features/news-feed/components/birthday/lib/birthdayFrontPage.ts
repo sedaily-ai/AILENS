@@ -1,43 +1,81 @@
 'use client';
 
-// 그날의 서울경제 1면. 면 번호가 없는 시기·휴간일·발행 전 시기는 서버에 날짜를 보내지 않고 이 기기에서 안내한다.
-// 기간 값은 백엔드 handlers/timeline/time_machine.py 의 FRONT_PAGE_ERAS·SUNDAY_CLOSED_FROM(2026-10-19 빅카인즈 실측)과 같아야 한다.
+// 그날의 서울경제. 생일에 신문이 없으면(일요일 휴간·명절·보관본 누락) 서버가 직전 발행일을 골라 주고,
+// 면 번호가 없는 시기(1990~1993, 1996.8~2017.11.12)는 1면 대신 그날 기사를 준다(백엔드 time_machine.py front 모드).
+// 이 기기에서는 자료가 아예 없는 날(창간 전·지면 공백·보관본 시작 전)만 판단하고 그 날짜는 서버에 보내지 않는다.
 import { useEffect, useState } from 'react';
-import { fetchFrontPage, type BigKindsArticle } from '@/shared/lib/api/timelineApi';
+import { fetchFrontPage, type BigKindsArticle, type FrontPageData } from '@/shared/lib/api/timelineApi';
+import { dateLabel } from './birthdayModel';
+import { nb } from './keepTogether';
 
 export const FRONT_PAGE_RULES = {
   founded: '1960-08-01',
   /** 기획안 v3의 서울경제 지면 공백 기간. */
   suspended: ['1980-11-26', '1988-07-31'] as const,
+  /** 빅카인즈 보관본 시작일. 백엔드 BIGKINDS_MIN_DATE와 같은 값. */
   archiveFrom: '1990-01-01',
-  pageInfo: [['1994-01-01', '1996-07-31'], ['2017-11-13', null]] as const,
-  sundayClosedFrom: '1996-09-29',
 };
+/** 생일에 신문이 없을 때 서버가 거슬러 찾는 날 수(백엔드 FRONT_LOOKBACK_DAYS와 같은 값, 안내 문구용). */
+export const FRONT_LOOKBACK_DAYS = 10;
 
-export type FrontPageNotice = 'before-founding' | 'suspended' | 'before-archive' | 'no-page-info' | 'sunday' | 'holiday';
+export type FrontPageNotice = 'before-founding' | 'suspended' | 'before-archive';
 export type FrontPageState =
   | { status: 'loading'; date: string }
-  | { status: 'ok'; date: string; articles: BigKindsArticle[] }
+  | { status: 'ok'; date: string; data: FrontPageData }
   | { status: 'notice'; date: string; notice: FrontPageNotice }
   | { status: 'error'; date: string };
 
-const isSunday = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay() === 0;
+/** 생일 당일 1면이 아닌 것을 보여 줄 때 지면 위에 붙이는 안내. */
+export interface FrontNotice { title: string; lines: string[] }
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+export const weekdayOf = (date: string) => WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
 
 /** 서버에 묻지 않아도 답이 정해진 날짜면 안내 종류, 아니면 null(조회 필요). */
 export function frontPageNotice(date: string): FrontPageNotice | null {
-  const { founded, suspended, archiveFrom, pageInfo, sundayClosedFrom } = FRONT_PAGE_RULES;
+  const { founded, suspended, archiveFrom } = FRONT_PAGE_RULES;
   if (date < founded) return 'before-founding';
   if (date >= suspended[0] && date <= suspended[1]) return 'suspended';
   if (date < archiveFrom) return 'before-archive';
-  if (isSunday(date) && date >= sundayClosedFrom) return 'sunday';
-  if (!pageInfo.some(([start, end]) => date >= start && (end === null || date <= end))) return 'no-page-info';
   return null;
 }
 
-export function previousDay(date: string) {
-  const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() - 1);
-  return value.toISOString().slice(0, 10);
+/**
+ * 생일 당일 1면을 보여 주지 못할 때의 안내 — 왜 못 보여 주는지, 대신 무엇을 보여 주는지.
+ * 생일 당일 1면이거나 아무것도 찾지 못했으면(kind none, 지면 안에서 따로 안내) null.
+ */
+export function frontNotice(data: FrontPageData): FrontNotice | null {
+  const shown = data.shown_date;
+  if (data.kind === 'none' || !shown) return null;
+  const sameDay = shown === data.date;
+  if (data.kind === 'front' && sameDay) return null;
+  const count = nb(`${data.articles.length}건`);
+  const lines: string[] = [];
+  let title = '이 시기는 1면 기록이 없어요';
+  if (!sameDay) {
+    const birthday = nb(dateLabel(data.date));
+    if (data.reason === 'sunday') {
+      title = '생일에는 신문이 나오지 않았어요';
+      lines.push(`${birthday}은 일요일이라 서울경제가 나오지 ${nb('않았어요.')}`);
+    } else {
+      title = '생일 당일 신문을 찾지 못했어요';
+      lines.push(`${birthday}자 서울경제${data.kind === 'front' ? ' 1면이' : '가'} 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 ${nb('빠진 날이에요.')}`);
+    }
+    lines.push(`대신 가장 가까운 지난 신문인 ${nb(`${dateLabel(shown)} ${weekdayOf(shown)}요일자`)} ${data.kind === 'front' ? '1면을' : '기사를'} ${nb('보여 줘요.')}`);
+  }
+  if (data.kind === 'day') {
+    lines.push(sameDay
+      ? `빅카인즈 보관본에는 이 무렵 신문이 몇 면에 실렸는지 기록이 없어요. 그래서 1면 대신 그날 서울경제 기사 중 본문이 긴 ${count}을 ${nb('보여 줘요.')}`
+      : `이 무렵 신문은 몇 면에 실린 기사인지 기록이 없어, 1면 대신 본문이 긴 기사 ${count}을 ${nb('골랐어요.')}`);
+  }
+  return { title, lines };
+}
+
+/** 공유 카드("내가 태어난 날 서울경제 1면")에 넣을 기사 — 생일 당일 1면일 때만. 대체한 신문·그날 기사는 넣지 않는다. */
+export function shareableFront(state: FrontPageState | null): BigKindsArticle[] {
+  if (state?.status !== 'ok') return [];
+  const { data } = state;
+  return data.kind === 'front' && data.shown_date === state.date ? data.articles : [];
 }
 
 /**
@@ -51,32 +89,28 @@ export function frontArticleHref(article: Pick<BigKindsArticle, 'original_link' 
   return /^\d+\.\d+$/.test(article.news_id ?? '') ? `https://www.bigkinds.or.kr/v2/news/newsDetailView.do?newsId=${encodeURIComponent(article.news_id)}` : null;
 }
 
-/** date가 null이면(연도만 공유된 결과) 조회하지 않는다. show(다른 날짜)는 휴간일의 "하루 전 신문 1면 보기"에 쓴다. */
+/** birthDate가 null이면(연도만 공유된 결과) 조회하지 않는다. */
 export function useFrontPage(birthDate: string | null) {
-  const [requested, setRequested] = useState(birthDate);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<FrontPageState | null>(null);
-  const notice = requested ? frontPageNotice(requested) : null;
+  const notice = birthDate ? frontPageNotice(birthDate) : null;
 
   useEffect(() => {
-    if (!requested || notice) return;
+    if (!birthDate || notice) return;
     let cancelled = false;
-    void fetchFrontPage(requested).then(data => {
+    void fetchFrontPage(birthDate).then(data => {
       if (cancelled) return;
-      if (!data) setLoaded({ status: 'error', date: requested });
-      else if (data.status === 'ok') setLoaded({ status: 'ok', date: requested, articles: data.articles });
-      else setLoaded({ status: 'notice', date: requested, notice: data.status === 'no_page_info' ? 'no-page-info' : data.reason === 'sunday' ? 'sunday' : 'holiday' });
+      setLoaded(data ? { status: 'ok', date: birthDate, data } : { status: 'error', date: birthDate });
     });
     return () => { cancelled = true; };
-  }, [requested, notice, attempt]);
+  }, [birthDate, notice, attempt]);
 
-  const state: FrontPageState | null = !requested ? null
-    : notice ? { status: 'notice', date: requested, notice }
-    : loaded && loaded.date === requested ? loaded
-    : { status: 'loading', date: requested };
+  const state: FrontPageState | null = !birthDate ? null
+    : notice ? { status: 'notice', date: birthDate, notice }
+    : loaded && loaded.date === birthDate ? loaded
+    : { status: 'loading', date: birthDate };
   return {
     state,
-    show: (date: string) => setRequested(date),
     retry: () => { setLoaded(null); setAttempt(value => value + 1); },
   };
 }
