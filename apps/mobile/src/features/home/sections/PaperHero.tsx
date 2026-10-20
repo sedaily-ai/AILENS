@@ -6,6 +6,7 @@ import { Link } from 'expo-router';
 import type { LensPost } from '@ailens/api-client';
 import { displayHeadline } from '@ailens/domain';
 import { kstDateTime } from '../../../lib/format';
+import { CaretRight } from '../../../ui/icons';
 import { PAPER_TABS, paperTitle, pickPaperSection } from '../model';
 
 // 웹 LensPreviewSection(.lz-paper)의 지면 카드를 그대로 옮긴 것: 종이색 면 + 얇은 테두리 + 둥근 모서리,
@@ -30,7 +31,10 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
         {linkPast && firstDate ? (
           <Link href={{ pathname: '/paper/[date]', params: { date: firstDate } }} asChild>
             <Pressable accessibilityRole="link" hitSlop={8}>
-              <Text style={styles.all}>전체 보기 →</Text>
+              <View style={styles.allRow}>
+                <Text style={styles.all}>지난 지면</Text>
+                <CaretRight size={13} color="#4b5563" weight="bold" />
+              </View>
             </Pressable>
           </Link>
         ) : null}
@@ -147,8 +151,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     // 웹 box-shadow: 0 1px 2px rgba(60,55,45,.06), 0 8px 24px -14px rgba(60,55,45,.16) 의 근사.
-    elevation: 1.5,
-    shadowColor: '#3c372d',
   },
   mast: {
     flexDirection: 'row',
@@ -160,12 +162,13 @@ const styles = StyleSheet.create({
     borderTopColor: '#b8bbc2',
   },
   kick: { fontSize: 18, fontWeight: '800', letterSpacing: -0.36, color: INK },
-  all: { fontSize: 14, fontWeight: '700', color: '#4b5563' },
+  allRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  all: { fontSize: 13.5, fontWeight: '700', color: '#4b5563' },
   mastLine: { marginBottom: 12 },
 
   tabs: { flexDirection: 'row', gap: 2, padding: 4, borderRadius: 999, backgroundColor: 'rgba(17,24,39,0.055)', marginBottom: 16 },
   tab: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderRadius: 999 },
-  tabOn: { backgroundColor: '#fff', elevation: 2, shadowColor: INK },
+  tabOn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e9f0' },
   tabText: { fontSize: 13.5, fontWeight: '600', letterSpacing: -0.14, color: '#6b7280' },
   tabTextOn: { fontWeight: '700', color: INK },
 

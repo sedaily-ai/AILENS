@@ -32,7 +32,7 @@ export default function ListenScreen() {
                 <View style={styles.head}>
                   <View style={styles.hero}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.title}>오늘의 뉴스를 귀로</Text>
+                      <Text style={styles.title}>귀로 듣는 오늘의 기사</Text>
                       <Text style={styles.sub}>출근길에 듣는 오늘의 핵심 {items.length}건</Text>
                     </View>
                     <Pressable style={({ pressed }) => [styles.playAll, pressed && { opacity: 0.85 }]} onPress={() => void playDefault()} accessibilityRole="button" accessibilityLabel="전체 재생">

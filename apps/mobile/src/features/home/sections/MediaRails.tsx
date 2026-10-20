@@ -25,7 +25,7 @@ function Rail({ title, items, ratio, detail, list }: { title: string; items: Rai
     <View>
       <Link href={list} asChild>
         <Pressable accessibilityRole="link">
-          <SectionHeader title={title} right="전체 보기 →" />
+          <SectionHeader title={title} right="더 보기" />
         </Pressable>
       </Link>
       <FlatList
@@ -92,14 +92,14 @@ export function VideoSection({ items }: { items: VideoPost[] }) {
   );
 }
 
-/** 오디오 — 웹 AudioPreviewSection 처럼 텍스트 목록. 재생은 하단 플레이어가 연결되는 M4 에서 붙인다. */
+/** 오디오 — 웹 AudioPreviewSection 처럼 텍스트 목록. 항목을 누르면 재생이 시작되고 하단 미니 플레이어가 이어 준다. */
 export function AudioSection({ items }: { items: HomePlayerPost[] }) {
   if (items.length === 0) return null;
   return (
     <View>
       <Link href="/listen" asChild>
         <Pressable accessibilityRole="link">
-          <SectionHeader title="오늘의 뉴스를 귀로" right="전체 듣기 →" />
+          <SectionHeader title="귀로 듣는 오늘의 기사" right="더 보기" />
         </Pressable>
       </Link>
       {items.slice(0, 5).map((a, i) => (

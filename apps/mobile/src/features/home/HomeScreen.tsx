@@ -4,22 +4,22 @@ import { Text } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
 import { MiniPlayer } from '../../components/MiniPlayer';
-import { colors } from '../../theme';
+import { colors, surface } from '../../theme';
 import { useHomeData, type HomeData } from './useHomeData';
 import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
 import { TimeMachineCard } from './sections/TimeMachineCard';
-import { BriefingTop } from './sections/BriefingTop';
-import { PickCards } from './sections/PickCards';
-import { pickBriefing } from './briefing';
-import { PAPER_TABS, pickPaperSection } from './model';
+import { EditorChat } from './sections/EditorChat';
+import { EditorPicker } from './sections/EditorPicker';
+import { FormatCarousel } from './sections/FormatCarousel';
+import { BriefingSettings } from './sections/BriefingSettings';
+import { useMyEditor } from './myEditor';
 import { useDailyProgress } from './dailyProgress';
-import { PICK_COUNT, useBriefingPrefs } from './briefingPrefs';
-import { getPreferredFormat } from '../onboarding/prefs';
+import { useBriefingPrefs } from './briefingPrefs';
 import { bookmarks, getInterests, history } from '../mylens/stores';
 import { useListStore } from '../mylens/listStore';
 
-const LATEST_COUNT = 6;
+const LATEST_COUNT = 3;
 
 /**
  * 홈은 "오늘 내 몫을 끝내는 곳"이다: 오늘의 브리핑(인사 · 진행 · 이번 주) → 오늘 챙길 3가지 → 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
@@ -27,12 +27,37 @@ const LATEST_COUNT = 6;
  */
 type Section = { key: string; render: () => React.ReactElement | null };
 
-function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDailyProgress>; picks: ReturnType<typeof pickBriefing>; fmt: number | null; readToday: Set<string>; prefs: ReturnType<typeof useBriefingPrefs>; interests: string[]; setInterests: (s: string[]) => void }): Section[] {
+interface Ctx {
+  progress: ReturnType<typeof useDailyProgress>;
+  prefs: ReturnType<typeof useBriefingPrefs>;
+  interests: string[];
+  myEditor: ReturnType<typeof useMyEditor>;
+  readIds: Set<string>;
+  openPicker: () => void;
+  openSettings: () => void;
+}
+
+function buildSections(data: HomeData, c: Ctx): Section[] {
   return [
-    { key: 'briefing', render: () => <BriefingTop progress={ctx.progress} picks={ctx.picks} preferredFormat={ctx.fmt} prefs={ctx.prefs} interests={ctx.interests} onInterests={ctx.setInterests} /> },
-    { key: 'picks', render: () => <PickCards picks={ctx.picks} readToday={ctx.readToday} /> },
+    {
+      key: 'chat',
+      render: () => (
+        <EditorChat
+          editor={c.myEditor.editor}
+          picked={c.myEditor.picked}
+          lens={data.lens}
+          interests={c.interests}
+          readIds={c.readIds}
+          situation={c.prefs.situation}
+          streak={c.progress.streak}
+          onChangeEditor={c.openPicker}
+          onOpenSettings={c.openSettings}
+        />
+      ),
+    },
+    { key: 'formats', render: () => <FormatCarousel situation={c.prefs.situation} /> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
-    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
+    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} moreHref="/discover" /> },
     { key: 'timemachine', render: () => <TimeMachineCard /> },
   ];
 }
@@ -45,21 +70,14 @@ export function HomeScreen() {
   const read = useListStore(history);
   useListStore(bookmarks);
   const [interests, setInterests] = useState<string[]>([]);
-  const [fmt, setFmt] = useState<number | null>(null);
+  const myEditor = useMyEditor(interests);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
     void getInterests().then(setInterests);
-    void getPreferredFormat().then(setFmt);
   }, []);
-  // 오늘 읽은 글은 목록에서 빼지 않고 "읽었어요"로 남긴다(읽을수록 카드가 바뀌면 오늘 챙길 3가지가 흔들리므로). 어제까지 읽은 글만 후보에서 뺀다.
-  const startOfToday = useMemo(() => new Date().setHours(0, 0, 0, 0), []);
-  const readToday = useMemo(() => new Set(read.items.filter((r) => r.at >= startOfToday).map((r) => r.id)), [read.items, startOfToday]);
-  const readBefore = useMemo(() => new Set(read.items.filter((r) => r.at < startOfToday).map((r) => r.id)), [read.items, startOfToday]);
-  // 아래 "오늘의 지면" 카드가 첫 화면에 크게 보여 주는 지면 1면 기사는 3가지에서 뺀다(같은 기사가 두 번 나오지 않게).
-  const picks = useMemo(() => {
-    if (state.status !== 'ready') return [];
-    const paperHero = pickPaperSection(state.data.lens, PAPER_TABS[0].paperSection)[0]?.id;
-    return pickBriefing(state.data.lens, state.data.latest, interests, readBefore, new Set(paperHero ? [paperHero] : []), PICK_COUNT[prefs.minutes]);
-  }, [state, interests, readBefore, prefs.minutes]);
+  // 이미 읽은 기사는 질문 후보에서 뒤로 밀린다(읽을수록 질문이 새로워진다).
+  const readIds = useMemo(() => new Set(read.items.map((r) => r.id)), [read.items]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -78,7 +96,7 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data, { progress, picks, fmt, readToday, prefs, interests, setInterests })}
+            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true) })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}
@@ -90,6 +108,8 @@ export function HomeScreen() {
           />
         )}
       </View>
+      <EditorPicker open={pickerOpen} onClose={() => setPickerOpen(false)} editor={myEditor.editor} />
+      <BriefingSettings hideTrigger open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} interests={interests} onInterests={setInterests} />
       <MiniPlayer />
     </SafeAreaView>
   );
@@ -100,10 +120,10 @@ function Divider() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: surface.page },
   body: { flex: 1 },
-  list: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: 32 },
+  list: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  divider: { height: 28 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   msg: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
   btn: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, backgroundColor: '#f3f4f6' },

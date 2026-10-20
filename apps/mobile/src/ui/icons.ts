@@ -39,3 +39,5 @@ export { ForkKnife } from 'phosphor-react-native/src/icons/ForkKnife';
 export { Moon } from 'phosphor-react-native/src/icons/Moon';
 export { Coffee } from 'phosphor-react-native/src/icons/Coffee';
 export { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
+export { CaretDown } from 'phosphor-react-native/src/icons/CaretDown';
+export { CaretUp } from 'phosphor-react-native/src/icons/CaretUp';

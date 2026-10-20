@@ -23,3 +23,4 @@ export * from './onboarding/moments.js';
 export * from './onboarding/personas.js';
 export * from './onboarding/korean.js';
 export * from './content/games.js';
+export * from './letters/editors.js';

@@ -7,13 +7,14 @@ import { usePlayer } from '../features/player/PlayerContext';
 import { colors } from '../theme';
 
 /**
- * 하단 "오늘의 뉴스를 귀로" 미니 플레이어(웹 TodayNewsPlayer 대응). 전역 PlayerProvider 상태를 그대로 보여 준다.
- * 재생 전: 재생 버튼이 오늘의 오디오 목록을 받아 1번부터 시작. 재생 중: 제목·진행 표시, 이전/재생·일시정지/다음/닫기. 본체를 누르면 상세 플레이어.
+ * 하단 미니 플레이어. 전역 PlayerProvider 상태를 그대로 보여 준다. 재생을 시작한 뒤에만 나타나고(제목·진행·재생/일시정지·다음·닫기), 본체를 누르면 상세 플레이어가 열린다.
  */
 export function MiniPlayer() {
   const router = useRouter();
   const { current, queue, index, playing, loading, position, duration, playDefault, toggle, next, close } = usePlayer();
   const progress = duration > 0 ? Math.min(1, position / duration) : 0;
+  // 재생 중이 아닐 때는 화면을 차지하지 않는다. 재생은 홈 브리핑(듣기)·발견의 오디오 줄·듣기 목록에서 시작하고, 시작되면 이 바가 모든 화면에서 이어 준다.
+  if (!current) return null;
 
   return (
     <View style={styles.bar}>
@@ -27,7 +28,7 @@ export function MiniPlayer() {
       >
         <Headphones size={30} color={colors.brand} weight="duotone" />
         <View style={styles.text}>
-          <Text style={styles.label}>오늘의 뉴스를 귀로{current ? ` · ${index + 1}/${queue.length}` : ''}</Text>
+          <Text style={styles.label}>귀로 듣는 중 · {index + 1}/{queue.length}</Text>
           <Text style={styles.title} numberOfLines={1}>
             {current ? displayHeadline(current.title) : '눌러서 오늘의 뉴스를 들어 보세요'}
           </Text>

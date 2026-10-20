@@ -8,24 +8,27 @@ import { colors } from '../../theme';
 import { groupByCategory } from '../home/model';
 import { CategorySection } from '../home/sections/CategorySection';
 import { LettersSection } from '../home/sections/LettersSection';
-import { VideoSection, WebtoonSection } from '../home/sections/MediaRails';
+import { AudioSection, VideoSection, WebtoonSection } from '../home/sections/MediaRails';
 import { useHomeData, type HomeData } from '../home/useHomeData';
 import { GamesCard } from '../home/sections/GamesCard';
+import { LatestSection } from '../home/sections/LatestSection';
 
 type Section = { key: string; render: () => React.ReactElement | null };
 
 /**
  * 발견 — 카테고리 탐색의 출발점(뉴닉의 "발견" 탭에 해당). 상단 카테고리 칩 아래에
- * 카테고리 섹션(웹의 짝 배치 순서) 사이사이로 웹툰·영상 레일과 레터를 끼운다.
+ * 맨 위 "최신 기사"(홈의 더 보기가 여기로 온다), 그 아래 카테고리 섹션(웹의 짝 배치 순서) 사이사이로 웹툰·영상 레일과 레터를 끼운다.
  */
 function buildSections(data: HomeData): Section[] {
   const groups = groupByCategory(data.latest);
   const cat = (from: number, to: number): Section[] =>
     groups.slice(from, to).map((g) => ({ key: `cat-${g.category.slug}`, render: () => <CategorySection group={g} /> }));
   return [
+    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, 5)} title="방금 올라온 소식" /> },
     ...cat(0, 4),
     { key: 'webtoon', render: () => <WebtoonSection items={data.webtoons} /> },
     { key: 'video', render: () => <VideoSection items={data.videos} /> },
+    { key: 'audio', render: () => <AudioSection items={data.audio} /> },
     ...cat(4, 6),
     { key: 'letters', render: () => <LettersSection items={data.issueLetters} /> },
     ...cat(6, 9),

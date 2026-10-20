@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ECON_CATEGORIES } from '@ailens/domain';
 import { Text } from '../../../ui/Text';
 import { Bus, Coffee, ForkKnife, Moon, SlidersHorizontal, X } from '../../../ui/icons';
-import { colors } from '../../../theme';
+import { colors, surface } from '../../../theme';
 import { MINUTES, saveBriefingPrefs, type BriefingPrefs, type Minutes, type Situation } from '../briefingPrefs';
 import { setInterests } from '../../mylens/stores';
 
@@ -18,8 +18,12 @@ const SITUATIONS: { key: Situation; label: string; hint: string; Icon: typeof Bu
   { key: 'weekend', label: '주말', hint: '깊이 있는 레터', Icon: Coffee },
 ];
 
-export function BriefingSettings({ prefs, interests, onInterests }: { prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void }) {
-  const [open, setOpen] = useState(false);
+export function BriefingSettings({ prefs, interests, onInterests, open: openProp, onClose, hideTrigger }: { prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void; open?: boolean; onClose?: () => void; hideTrigger?: boolean }) {
+  // 제어형(open·onClose 를 넘기면 호출한 쪽이 열고 닫는다) 또는 스스로 여닫는 한 줄 요약 칩 형태 둘 다 지원한다.
+  const [openSelf, setOpenSelf] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openSelf;
+  const setOpen = (v: boolean) => (controlled ? (v ? undefined : onClose?.()) : setOpenSelf(v));
   const situation = SITUATIONS.find((s) => s.key === prefs.situation);
   const labels = ECON_CATEGORIES.filter((c) => interests.includes(c.slug)).map((c) => c.label);
   const summary = [`${prefs.minutes}분`, situation?.label, labels.length ? labels.slice(0, 2).join('·') + (labels.length > 2 ? ` 외 ${labels.length - 2}` : '') : null].filter(Boolean);
@@ -32,7 +36,7 @@ export function BriefingSettings({ prefs, interests, onInterests }: { prefs: Bri
 
   return (
     <>
-      <Pressable style={({ pressed }) => [styles.summary, pressed && { opacity: 0.85 }]} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="오늘 브리핑 설정 열기">
+      {hideTrigger ? null : <Pressable style={({ pressed }) => [styles.summary, pressed && { opacity: 0.85 }]} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="오늘 브리핑 설정 열기">
         <SlidersHorizontal size={18} color={colors.textSub} />
         <Text style={styles.summaryLabel}>오늘 설정</Text>
         <View style={styles.chips}>
@@ -41,7 +45,7 @@ export function BriefingSettings({ prefs, interests, onInterests }: { prefs: Bri
           ))}
         </View>
         <Text style={styles.edit}>바꾸기</Text>
-      </Pressable>
+      </Pressable>}
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} statusBarTranslucent>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="닫기" />
@@ -100,10 +104,10 @@ export function BriefingSettings({ prefs, interests, onInterests }: { prefs: Bri
 }
 
 const styles = StyleSheet.create({
-  summary: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 48, borderRadius: 16, backgroundColor: '#f4f6fa' },
+  summary: { ...surface.card, marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 52, borderRadius: 18 },
   summaryLabel: { fontSize: 13, fontWeight: '800', color: colors.textSub },
   chips: { flex: 1, flexDirection: 'row', gap: 6, overflow: 'hidden' },
-  chip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: '#fff' },
+  chip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: '#f1f3f6' },
   chipText: { fontSize: 12.5, fontWeight: '700', color: colors.text },
   edit: { fontSize: 13, fontWeight: '700', color: '#2563eb' },
 
@@ -116,7 +120,7 @@ const styles = StyleSheet.create({
 
   seg: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: 16, backgroundColor: 'rgba(17,24,39,0.055)' },
   segItem: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  segOn: { backgroundColor: '#fff', elevation: 2, shadowColor: '#111827' },
+  segOn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e9f0' },
   segText: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
   segTextOn: { fontWeight: '800', color: colors.text },
 

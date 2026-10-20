@@ -13,7 +13,7 @@ export function LettersSection({ items }: { items: IssueLetterCard[] }) {
     <View>
       <Link href="/letter" asChild>
         <Pressable accessibilityRole="link">
-          <SectionHeader title="이슈 레터" right="전체 보기 →" />
+          <SectionHeader title="이슈 레터" right="더 보기" />
         </Pressable>
       </Link>
       {items.slice(0, 6).map((l) => (
