@@ -16,6 +16,7 @@ import { deleteSentence, listArchive, type ArchiveSentence } from './archiveApi'
 import { useListStore } from './listStore';
 import { bookmarks, getInterests, history, setInterests, type SavedArticle } from './stores';
 import { KnowledgeMap } from './KnowledgeMap';
+import { InterestFlow } from './InterestFlow';
 
 const SITE = 'https://ailens.sedaily.ai';
 type Tab = 'drawer' | 'saved' | 'read' | 'interest';
@@ -54,6 +55,7 @@ export function MyLensScreen() {
       ) : (
         <>
           <KnowledgeMap items={read.items} />
+          <InterestFlow />
           <View style={styles.tabs}>
             {TABS.map(([k, label]) => (
               <Pressable key={k} style={[styles.tab, tab === k && styles.tabOnBg]} onPress={() => setTab(k)} accessibilityRole="tab" accessibilityState={{ selected: tab === k }}>

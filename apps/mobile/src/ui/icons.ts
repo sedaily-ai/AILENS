@@ -45,3 +45,5 @@ export { Plus } from 'phosphor-react-native/src/icons/Plus';
 export { Star } from 'phosphor-react-native/src/icons/Star';
 export { MagnifyingGlass as SearchIcon } from 'phosphor-react-native/src/icons/MagnifyingGlass';
 export { Sparkle as SparkleIcon } from 'phosphor-react-native/src/icons/Sparkle';
+export { TrendUp } from 'phosphor-react-native/src/icons/TrendUp';
+export { TrendDown } from 'phosphor-react-native/src/icons/TrendDown';

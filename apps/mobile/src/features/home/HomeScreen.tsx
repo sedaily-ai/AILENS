@@ -16,6 +16,7 @@ import { FormatCarousel } from './sections/FormatCarousel';
 import { Continues } from './sections/Continues';
 import { MyInterests } from './sections/MyInterests';
 import { Block } from './sections/Block';
+import { RisingTopics } from './sections/RisingTopics';
 import { InterestPicker } from '../interests/InterestPicker';
 import { useInterestItems } from '../interests/store';
 import { connections } from './connections';
@@ -71,6 +72,7 @@ function buildSections(data: HomeData, c: Ctx): Section[] {
       ),
     },
     { key: 'interests', render: () => <Block title="내 관심" right={c.interestItems.length > 0 ? <Pressable hitSlop={8} onPress={c.openInterests} accessibilityRole="button"><Text style={styles.more}>편집</Text></Pressable> : undefined}><MyInterests items={c.interestItems} onAdd={c.openInterests} /></Block> },
+    { key: 'rising', render: () => <Block title="요즘 많이 나오는 이야기"><RisingTopics /></Block> },
     { key: 'continues', render: () => (c.continues.length > 0 ? <Block title="이어서 볼까요?"><Continues items={c.continues} /></Block> : null) },
     { key: 'formats', render: () => <Block title="지금은 이렇게 볼까요?"><FormatCarousel situation={c.prefs.situation} /></Block> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
