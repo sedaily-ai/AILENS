@@ -10,7 +10,7 @@ import { loadSearchIndex } from '../search/searchData';
 import { catalog, slugOfCategory } from './dictionary';
 import { freshCount, keyOf, type Interest, type RecLike } from './match';
 import { searchEntries, suggest, type Entry } from './suggest';
-import { CATEGORY_EMOJI, emojiFor, SHOW_EMOJI } from './emoji';
+import { categoryIcon, topicIcon } from './topicIcons';
 import { MAX_INTERESTS, toggleInterest, useInterestItems } from './store';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -135,10 +135,10 @@ export function InterestPicker({ open, onClose }: { open: boolean; onClose: () =
   const chip = (e: Entry, opts: { fresh?: boolean; wide?: boolean } = {}) => {
     const on = picked.has(keyOf(e.it));
     const f = fresh.get(keyOf(e.it)) ?? 0;
-    const emoji = SHOW_EMOJI ? emojiFor(e.it.label, e.cat) : '';
+    const Icon = e.it.type === 'category' ? categoryIcon(e.it.key) : topicIcon(e.it.label, e.cat);
     return (
       <Pop key={keyOf(e.it)} on={on} onPress={() => void toggle(e.it)} label={`${e.it.label} ${on ? '빼기' : '담기'}`} style={[styles.chip, on && styles.chipOn]}>
-        {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
+        <Icon size={18} color={on ? '#fff' : colors.textSub} weight={on ? 'bold' : 'regular'} />
         <Text style={[styles.chipText, on && { color: '#fff' }]}>{e.it.type === 'category' ? `${e.it.label} 전체` : e.it.label}</Text>
         {opts.fresh && f > 0 ? <Text style={[styles.chipFresh, on && { color: 'rgba(255,255,255,0.85)' }]}>{f}</Text> : null}
         {on ? <Check size={14} color="#fff" weight="bold" /> : null}
@@ -196,7 +196,7 @@ export function InterestPicker({ open, onClose }: { open: boolean; onClose: () =
                     <View style={styles.chips}>
                       {items.map((it) => (
                         <Pop key={keyOf(it)} on label={`${it.label} 빼기`} onPress={() => void toggle(it)} style={styles.mine}>
-                          {SHOW_EMOJI ? <Text style={styles.emoji}>{it.type === 'category' ? CATEGORY_EMOJI[it.key] ?? '✨' : emojiFor(it.label, it.category)}</Text> : null}
+                          {(() => { const I = it.type === 'category' ? categoryIcon(it.key) : topicIcon(it.label, it.category); return <I size={17} color={accent.ink} weight="bold" />; })()}
                           <Text style={styles.mineText}>{it.label}</Text>
                           <X size={13} color={accent.ink} weight="bold" />
                         </Pop>
@@ -206,14 +206,17 @@ export function InterestPicker({ open, onClose }: { open: boolean; onClose: () =
                 ) : null}
                 {suggestions.length > 0 ? (
                   <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>✨ 이런 주제는 어때요?</Text>
+                    <Text style={styles.sectionTitle}>이런 주제는 어때요?</Text>
                     <Text style={styles.sectionSub}>숫자는 오늘 올라온 새 소식이에요</Text>
                     <View style={styles.chips}>{suggestions.map((e) => chip(e, { fresh: true }))}</View>
                   </View>
                 ) : null}
                 {sections.map((g) => (
                   <View key={g.slug} style={styles.section}>
-                    <Text style={styles.sectionTitle}>{CATEGORY_EMOJI[g.slug] ?? '✨'} {g.label}</Text>
+                    <View style={styles.secHead}>
+                      <View style={styles.secIcon}>{(() => { const I = categoryIcon(g.slug); return <I size={18} color={accent.ink} weight="duotone" />; })()}</View>
+                      <Text style={styles.sectionTitle}>{g.label}</Text>
+                    </View>
                     <View style={styles.chips}>
                       {g.head ? chip({ ...g.head, catLabel: '분야' }) : null}
                       {g.list.map((e) => chip(e, { fresh: true }))}
@@ -259,7 +262,8 @@ const styles = StyleSheet.create({
   chips: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   chip: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#dfe4ec' },
   chipOn: { backgroundColor: accent.main, borderColor: accent.main },
-  emoji: { fontSize: 16 },
+  secHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  secIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: accent.soft, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontSize: 15, fontWeight: '700', color: colors.text },
   chipFresh: { minWidth: 18, paddingHorizontal: 5, height: 18, borderRadius: 9, overflow: 'hidden', textAlign: 'center', lineHeight: 18, fontSize: 11.5, fontWeight: '800', color: accent.ink, backgroundColor: accent.soft },
   mine: { height: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: accent.soft, borderWidth: 1.5, borderColor: accent.line },
