@@ -10,6 +10,7 @@ import { loadSearchIndex } from '../search/searchData';
 import { catalog, slugOfCategory } from './dictionary';
 import { freshCount, keyOf, type Interest, type RecLike } from './match';
 import { searchEntries, suggest, type Entry } from './suggest';
+import { CATEGORY_EMOJI, emojiFor, SHOW_EMOJI } from './emoji';
 import { MAX_INTERESTS, toggleInterest, useInterestItems } from './store';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -116,162 +117,156 @@ export function InterestPicker({ open, onClose }: { open: boolean; onClose: () =
   };
 
   const n = items.length;
-  const sub = n === 0 ? '관심 주제를 3개만 골라 보세요' : n < GOAL ? `${GOAL - n}개만 더 고르면 맞춤 소식이 시작돼요` : '좋아요! 더 담아도 되고, 바로 시작해도 돼요';
+  const sub = full ? `최대 ${MAX_INTERESTS}개까지 담을 수 있어요` : n >= GOAL ? '좋아요! 더 담을수록 소식이 더 잘 맞아요' : `${GOAL}개 이상 고르면 맞춤 소식이 시작돼요`;
   const searching = q.trim().length > 0;
 
-  const chip = (e: Entry, withFresh = true) => {
+  // 분야별 섹션(분야 순서 고정). 섹터·화두를 한데 섞어 칩으로 보여 준다(분야 전체 받기 칩이 맨 앞).
+  const sections = useMemo(() => {
+    const order = [...cats.map((c) => c.it.key), 'etc'];
+    return order
+      .map((slug) => {
+        const head = cats.find((c) => c.it.key === slug);
+        const list = entries.filter((e) => e.it.type !== 'category' && (e.cat ?? 'etc') === slug);
+        return { slug, label: head?.it.label ?? '기타', head, list: list.sort((a, b) => (fresh.get(keyOf(b.it)) ?? 0) - (fresh.get(keyOf(a.it)) ?? 0) || a.it.label.localeCompare(b.it.label, 'ko')) };
+      })
+      .filter((g) => g.list.length > 0);
+  }, [entries, cats, fresh]);
+
+  const chip = (e: Entry, opts: { fresh?: boolean; wide?: boolean } = {}) => {
     const on = picked.has(keyOf(e.it));
     const f = fresh.get(keyOf(e.it)) ?? 0;
+    const emoji = SHOW_EMOJI ? emojiFor(e.it.label, e.cat) : '';
     return (
       <Pop key={keyOf(e.it)} on={on} onPress={() => void toggle(e.it)} label={`${e.it.label} ${on ? '빼기' : '담기'}`} style={[styles.chip, on && styles.chipOn]}>
+        {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
+        <Text style={[styles.chipText, on && { color: '#fff' }]}>{e.it.type === 'category' ? `${e.it.label} 전체` : e.it.label}</Text>
+        {opts.fresh && f > 0 ? <Text style={[styles.chipFresh, on && { color: 'rgba(255,255,255,0.85)' }]}>{f}</Text> : null}
         {on ? <Check size={14} color="#fff" weight="bold" /> : null}
-        <Text style={[styles.chipText, on && { color: '#fff' }]}>{e.it.label}</Text>
-        {withFresh && f > 0 ? <Text style={[styles.chipFresh, on && { color: 'rgba(255,255,255,0.85)' }]}>오늘 {f}건</Text> : null}
       </Pop>
     );
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="닫기" />
-      <View style={styles.sheet}>
-        <View style={styles.grab} />
-        <View style={styles.head}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>어떤 소식이 궁금하세요?</Text>
-            <Text style={[styles.sub, full && { color: '#dc2626' }]}>{full ? `최대 ${MAX_INTERESTS}개까지 담을 수 있어요` : sub}</Text>
-          </View>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="닫기">
-            <X size={22} color={colors.textMuted} />
+    <Modal visible={open} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.screen}>
+        <View style={styles.top}>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="닫기">
+            <X size={24} color={colors.text} />
+          </Pressable>
+          <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">
+            <Text style={styles.skip}>{n === 0 ? '건너뛰기' : '나중에'}</Text>
           </Pressable>
         </View>
-        <Progress n={n} />
 
-        <View style={styles.search}>
-          <MagnifyingGlass size={20} color={colors.textFaint} />
-          <TextInput value={q} onChangeText={setQ} placeholder="반도체, 금리, 부동산처럼 검색해 보세요" placeholderTextColor={colors.textFaint} style={styles.input} returnKeyType="search" onSubmitEditing={Keyboard.dismiss} autoCorrect={false} accessibilityLabel="관심 주제 검색" />
-          {q ? (
-            <Pressable onPress={() => setQ('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="지우기">
-              <XCircle size={20} color={colors.textFaint} weight="fill" />
-            </Pressable>
-          ) : null}
-        </View>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: 130 }}>
+          <View style={styles.hero}>
+            <Text style={styles.title}>{'관심 있는 주제를\n골라 주세요'}</Text>
+            <Text style={[styles.sub, full && { color: '#dc2626' }]}>{sub}</Text>
+          </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 12 }}>
-          {n > 0 ? (
-            <View style={styles.block}>
-              <Text style={styles.label}>담은 주제 {n}</Text>
-              <View style={styles.chips}>
-                {items.map((it) => (
-                  <Pop key={keyOf(it)} on label={`${it.label} 빼기`} onPress={() => void toggle(it)} style={styles.mine}>
-                    <Text style={styles.mineText}>{it.label}</Text>
-                    <X size={13} color={accent.ink} weight="bold" />
-                  </Pop>
-                ))}
-              </View>
+          {/* 고정 머리: 진행 막대와 검색창이 스크롤해도 위에 남는다. */}
+          <View style={styles.sticky}>
+            <View style={styles.counterRow}>
+              <Progress n={n} />
+              <Text style={styles.counter}>{n}<Text style={styles.counterMax}> / {GOAL}+</Text></Text>
             </View>
-          ) : null}
-
-          {searching ? (
-            <View style={styles.block}>
-              <Text style={styles.label}>{results.length > 0 ? `'${q.trim()}' 검색 결과` : '찾는 주제가 없어요'}</Text>
-              <View style={styles.list}>
-                {results.map((e) => {
-                  const on = picked.has(keyOf(e.it));
-                  return (
-                    <Pressable key={keyOf(e.it)} onPress={() => void toggle(e.it)} style={styles.row} accessibilityRole="button" accessibilityState={{ selected: on }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rowTitle}>{e.it.label}</Text>
-                        <Text style={styles.rowSub}>{e.catLabel}{(fresh.get(keyOf(e.it)) ?? 0) > 0 ? ` · 오늘 ${fresh.get(keyOf(e.it))}건` : ''}</Text>
-                      </View>
-                      <View style={[styles.round, on && styles.roundOn]}>{on ? <Check size={14} color="#fff" weight="bold" /> : null}</View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {results.length === 0 ? <Text style={styles.empty}>다른 말로 검색해 보세요. 예: 금리, 반도체, 전세</Text> : null}
-            </View>
-          ) : (
-            <>
-              {suggestions.length > 0 ? (
-                <View style={styles.block}>
-                  <Text style={styles.label}>이런 주제는 어때요?</Text>
-                  <View style={styles.chips}>{suggestions.map((e) => chip(e))}</View>
-                </View>
+            <View style={styles.search}>
+              <MagnifyingGlass size={20} color={colors.textFaint} />
+              <TextInput value={q} onChangeText={setQ} placeholder="반도체, 금리, 부동산처럼 검색해 보세요" placeholderTextColor={colors.textFaint} style={styles.input} returnKeyType="search" onSubmitEditing={Keyboard.dismiss} autoCorrect={false} accessibilityLabel="관심 주제 검색" />
+              {q ? (
+                <Pressable onPress={() => setQ('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="지우기">
+                  <XCircle size={20} color={colors.textFaint} weight="fill" />
+                </Pressable>
               ) : null}
-              <View style={styles.block}>
-                <Text style={styles.label}>둘러보기</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters} style={{ marginHorizontal: -20 }}>
-                  {[{ slug: 'all', label: '전체' }, ...cats.map((c) => ({ slug: c.it.key, label: c.it.label }))].map((f) => (
-                    <Pressable key={f.slug} onPress={() => { ease(); setFilter(f.slug); }} style={[styles.filter, filter === f.slug && styles.filterOn]} accessibilityRole="button" accessibilityState={{ selected: filter === f.slug }}>
-                      <Text style={[styles.filterText, filter === f.slug && { color: '#fff' }]}>{f.label}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-                <View style={[styles.chips, { marginTop: 12 }]}>{browse.map((e) => chip(e))}</View>
-                {filter !== 'all' ? (
-                  <View style={{ marginTop: 14 }}>
-                    {(() => {
-                      const c = cats.find((x) => x.it.key === filter);
-                      if (!c) return null;
-                      const on = picked.has(keyOf(c.it));
-                      return (
-                        <Pop on={on} onPress={() => void toggle(c.it)} label={`${c.it.label} 분야 전체 ${on ? '빼기' : '담기'}`} style={[styles.wide, on && styles.wideOn]}>
-                          {on ? <Check size={16} color="#fff" weight="bold" /> : null}
-                          <Text style={[styles.wideText, on && { color: '#fff' }]}>{c.it.label} 분야 소식 전체 받기</Text>
+            </View>
+          </View>
+
+          <View style={styles.body}>
+            {searching ? (
+              <View>
+                <Text style={styles.label}>{results.length > 0 ? `'${q.trim()}' 검색 결과` : '찾는 주제가 없어요'}</Text>
+                <View style={styles.chips}>{results.map((e) => chip(e, { fresh: true }))}</View>
+                {results.length === 0 ? <Text style={styles.empty}>다른 말로 검색해 보세요. 예: 금리, 반도체, 전세</Text> : null}
+              </View>
+            ) : (
+              <>
+                {n > 0 ? (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>담은 주제 {n}</Text>
+                    <View style={styles.chips}>
+                      {items.map((it) => (
+                        <Pop key={keyOf(it)} on label={`${it.label} 빼기`} onPress={() => void toggle(it)} style={styles.mine}>
+                          {SHOW_EMOJI ? <Text style={styles.emoji}>{it.type === 'category' ? CATEGORY_EMOJI[it.key] ?? '✨' : emojiFor(it.label, it.category)}</Text> : null}
+                          <Text style={styles.mineText}>{it.label}</Text>
+                          <X size={13} color={accent.ink} weight="bold" />
                         </Pop>
-                      );
-                    })()}
+                      ))}
+                    </View>
                   </View>
                 ) : null}
-              </View>
-            </>
-          )}
+                {suggestions.length > 0 ? (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>✨ 이런 주제는 어때요?</Text>
+                    <Text style={styles.sectionSub}>숫자는 오늘 올라온 새 소식이에요</Text>
+                    <View style={styles.chips}>{suggestions.map((e) => chip(e, { fresh: true }))}</View>
+                  </View>
+                ) : null}
+                {sections.map((g) => (
+                  <View key={g.slug} style={styles.section}>
+                    <Text style={styles.sectionTitle}>{CATEGORY_EMOJI[g.slug] ?? '✨'} {g.label}</Text>
+                    <View style={styles.chips}>
+                      {g.head ? chip({ ...g.head, catLabel: '분야' }) : null}
+                      {g.list.map((e) => chip(e, { fresh: true }))}
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
         </ScrollView>
 
-        <Pressable style={({ pressed }) => [styles.done, n === 0 && styles.doneIdle, pressed && { opacity: 0.9 }]} onPress={onClose} accessibilityRole="button">
-          <Text style={[styles.doneText, n === 0 && { color: colors.textSub }]}>{n === 0 ? '나중에 할게요' : n < GOAL ? `${n}개 담았어요 · 시작하기` : `${n}개로 시작하기`}</Text>
-        </Pressable>
+        {/* 하단 고정 버튼: 3개 전에는 회색으로 몇 개 남았는지, 3개부터 파랑으로 바뀐다. */}
+        <View style={styles.bar}>
+          <Pressable style={({ pressed }) => [styles.done, n < GOAL && styles.doneIdle, pressed && { opacity: 0.9 }]} onPress={onClose} accessibilityRole="button">
+            <Text style={[styles.doneText, n < GOAL && { color: colors.textSub }]}>{n === 0 ? '주제를 골라 주세요' : n < GOAL ? `${GOAL - n}개 더 고르면 시작할 수 있어요` : `${n}개로 시작하기`}</Text>
+          </Pressable>
+        </View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(17,24,39,0.45)' },
-  sheet: { maxHeight: '92%', backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 },
-  grab: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#dfe3ea', marginBottom: 14 },
-  head: { flexDirection: 'row', alignItems: 'flex-start' },
-  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: colors.text },
-  sub: { marginTop: 4, fontSize: 14, color: colors.textMuted },
-  progress: { marginTop: 14, flexDirection: 'row', gap: 6 },
-  seg: { flex: 1, height: 5, borderRadius: 3 },
-  search: { marginTop: 14, height: 48, borderRadius: 16, backgroundColor: '#f1f3f6', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14 },
+  screen: { flex: 1, backgroundColor: '#fff', paddingTop: 44 },
+  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, height: 52 },
+  skip: { fontSize: 15, fontWeight: '700', color: colors.textMuted },
+  hero: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 10, backgroundColor: '#fff' },
+  title: { fontSize: 28, lineHeight: 37, fontWeight: '800', letterSpacing: -0.9, color: colors.text },
+  sub: { marginTop: 8, fontSize: 15, color: colors.textMuted },
+  sticky: { backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eceff4' },
+  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  counter: { fontSize: 18, fontWeight: '800', color: accent.main },
+  counterMax: { fontSize: 13, fontWeight: '700', color: colors.textFaint },
+  progress: { flex: 1, flexDirection: 'row', gap: 6 },
+  seg: { flex: 1, height: 6, borderRadius: 3 },
+  search: { marginTop: 12, height: 48, borderRadius: 16, backgroundColor: '#f1f3f6', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14 },
   input: { flex: 1, fontSize: 15, color: colors.text, paddingVertical: 0 },
-  block: { marginTop: 20 },
-  label: { marginBottom: 10, fontSize: 14, fontWeight: '800', color: colors.textSub },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 15, borderRadius: 999, backgroundColor: '#f1f3f6' },
-  chipOn: { backgroundColor: accent.main },
-  chipText: { fontSize: 14.5, fontWeight: '800', color: colors.text },
-  chipFresh: { fontSize: 12, fontWeight: '700', color: colors.textFaint },
-  mine: { height: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, borderRadius: 999, backgroundColor: accent.soft },
-  mineText: { fontSize: 14, fontWeight: '800', color: accent.ink },
-  list: { borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eceff4' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eceff4' },
-  rowTitle: { fontSize: 15.5, fontWeight: '800', color: colors.text },
-  rowSub: { marginTop: 2, fontSize: 12.5, color: colors.textMuted },
-  round: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: '#d3d9e3', alignItems: 'center', justifyContent: 'center' },
-  roundOn: { backgroundColor: accent.main, borderColor: accent.main },
-  empty: { marginTop: 8, fontSize: 13.5, color: colors.textMuted },
-  filters: { paddingHorizontal: 20, gap: 8 },
-  filter: { height: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e1e5ec', alignItems: 'center', justifyContent: 'center' },
-  filterOn: { backgroundColor: colors.brand, borderColor: colors.brand },
-  filterText: { fontSize: 13.5, fontWeight: '800', color: '#4b5563' },
-  wide: { height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: accent.line, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  wideOn: { backgroundColor: accent.main, borderColor: accent.main },
-  wideText: { fontSize: 14.5, fontWeight: '800', color: accent.ink },
-  done: { marginTop: 10, height: 54, borderRadius: 16, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
+  body: { paddingHorizontal: 20, paddingTop: 0 },
+  section: { marginTop: 22 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.4, color: colors.text },
+  sectionSub: { marginTop: 3, fontSize: 12.5, color: colors.textMuted },
+  label: { marginTop: 14, fontSize: 14, fontWeight: '800', color: colors.textSub },
+  chips: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  chip: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#dfe4ec' },
+  chipOn: { backgroundColor: accent.main, borderColor: accent.main },
+  emoji: { fontSize: 16 },
+  chipText: { fontSize: 15, fontWeight: '700', color: colors.text },
+  chipFresh: { minWidth: 18, paddingHorizontal: 5, height: 18, borderRadius: 9, overflow: 'hidden', textAlign: 'center', lineHeight: 18, fontSize: 11.5, fontWeight: '800', color: accent.ink, backgroundColor: accent.soft },
+  mine: { height: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: accent.soft, borderWidth: 1.5, borderColor: accent.line },
+  mineText: { fontSize: 14.5, fontWeight: '800', color: accent.ink },
+  empty: { marginTop: 10, fontSize: 13.5, color: colors.textMuted },
+  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 26, backgroundColor: 'rgba(255,255,255,0.97)', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#eceff4' },
+  done: { height: 56, borderRadius: 18, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   doneIdle: { backgroundColor: '#eef1f6' },
-  doneText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  doneText: { fontSize: 16.5, fontWeight: '800', color: '#fff' },
 });
