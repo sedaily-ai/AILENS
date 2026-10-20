@@ -1,23 +1,21 @@
-import { Fragment } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Link, useRouter, type Href } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
+import { IllustIcon, type IllustKind } from '../../../ui/IllustIcon';
 import { Text } from '../../../ui/Text';
 
 /**
- * 홈 소개 영역 — 웹 LensPreviewSection 의 .lz-intro 를 앱 폭(좁은 화면 규격: .lz-way 가 칸을 균등 분할)으로 옮긴 것.
- * 질문(큰 세리프, 핵심어 앰버 밑줄) → 답(작은 고딕) → /start 진입 링크 → "읽기 → 웹툰 → 듣기 → 영상" 칩.
- * 웹은 칩을 누르면 형식 소개 모달이 열리지만, 앱은 곧바로 그 형식을 볼 수 있는 화면으로 보낸다.
+ * 홈 소개 영역 — 웹 LensPreviewSection 의 .lz-intro(질문 → 답 → /start 진입 링크)에, 앱 방식의 바로가기 아이콘 줄을 더한 것.
+ * 웹은 칩을 누르면 형식 소개 모달이 열리지만, 앱은 일러스트 아이콘을 누르면 곧바로 그 형식을 볼 수 있는 화면으로 간다.
  */
-const WAYS: { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; href: Href }[] = [
-  { label: '읽기', icon: 'book-outline', href: '/letter' },
-  { label: '웹툰', icon: 'image-outline', href: '/discover' },
-  { label: '듣기', icon: 'headset-outline', href: '/listen' },
-  { label: '영상', icon: 'videocam-outline', href: '/discover' },
+const SHORTCUTS: { label: string; kind: IllustKind; href: Href }[] = [
+  { label: '읽기', kind: 'read', href: '/letter' },
+  { label: '웹툰', kind: 'webtoon', href: '/discover' },
+  { label: '듣기', kind: 'listen', href: '/listen' },
+  { label: '영상', kind: 'video', href: '/discover' },
+  { label: '타임머신', kind: 'time', href: '/timeline' },
+  { label: '게임', kind: 'game', href: '/games' },
 ];
-
-const WAY_COLOR = '#2f5fc4';
 
 export function HomeIntro() {
   const router = useRouter();
@@ -38,23 +36,20 @@ export function HomeIntro() {
         </Pressable>
       </Link>
 
-      <View style={styles.flow} accessibilityRole="menu">
-        {WAYS.map((w, i) => (
-          <Fragment key={w.label}>
-            {i > 0 ? <Arrow /> : null}
-            <Pressable
-              onPress={() => router.push(w.href)}
-              accessibilityRole="button"
-              accessibilityLabel={`${w.label} 보기`}
-              style={({ pressed }) => [styles.way, pressed && styles.wayPressed]}
-            >
-              <Ionicons name={w.icon} size={16} color={WAY_COLOR} />
-              <Text style={styles.wayText}>{w.label}</Text>
-            </Pressable>
-          </Fragment>
+      <View style={styles.shortcuts}>
+        {SHORTCUTS.map((w) => (
+          <Pressable
+            key={w.label}
+            onPress={() => router.push(w.href)}
+            accessibilityRole="button"
+            accessibilityLabel={`${w.label} 보기`}
+            style={({ pressed }) => [styles.shortcut, pressed && styles.shortcutPressed]}
+          >
+            <IllustIcon kind={w.kind} size={52} />
+            <Text style={styles.shortcutLabel} numberOfLines={1}>{w.label}</Text>
+          </Pressable>
         ))}
       </View>
-      <Text style={styles.hint}>눌러서 바로 보기</Text>
     </View>
   );
 }
@@ -70,22 +65,6 @@ function MarkLine() {
   );
 }
 
-/** 칩 사이 손그림 화살표(웹 .lz-way-arrow 와 같은 경로). */
-function Arrow() {
-  return (
-    <Svg width={12} height={12} viewBox="0 0 20 12">
-      <Path
-        d="M1.5 6.4 C5 5.2, 9 7, 17 6 M13 2.2 L17.4 6 L13.2 9.8"
-        fill="none"
-        stroke="#8fb0ee"
-        strokeWidth={1.7}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 const styles = StyleSheet.create({
   lead: { fontFamily: 'NotoSerifKR-Bold', fontSize: 24, lineHeight: 34, letterSpacing: -0.6, color: '#1f2937' },
   leadRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
@@ -94,24 +73,8 @@ const styles = StyleSheet.create({
   sub: { marginTop: 8, fontSize: 15, lineHeight: 24, fontWeight: '600', color: '#4b5563' },
   findWrap: { alignSelf: 'flex-start', marginTop: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(61,112,222,0.3)', paddingBottom: 1 },
   find: { fontSize: 13.5, fontWeight: '500', color: '#3d70de' },
-  flow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  way: {
-    flex: 1,
-    minWidth: 0,
-    height: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    borderWidth: 1,
-    borderColor: '#dbe6fb',
-    borderRadius: 999,
-    backgroundColor: '#fff',
-    // 웹 .lz-way 의 은은한 그림자(안드로이드 elevation 으로 근사).
-    elevation: 1,
-  },
-  wayPressed: { backgroundColor: '#ebf1fe', transform: [{ scale: 0.97 }] },
-  wayText: { fontSize: 13.5, fontWeight: '700', letterSpacing: -0.15, color: WAY_COLOR },
-  hint: { marginTop: 8, marginLeft: 2, fontSize: 12.5, fontWeight: '600', color: '#9ca3af' },
+  shortcuts: { marginTop: 22, flexDirection: 'row' },
+  shortcut: { flex: 1, alignItems: 'center', gap: 7 },
+  shortcutPressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
+  shortcutLabel: { fontSize: 12, fontWeight: '600', letterSpacing: -0.2, color: '#374151' },
 });
