@@ -19,7 +19,7 @@ import { getPreferredFormat } from '../onboarding/prefs';
 import { bookmarks, getInterests, history } from '../mylens/stores';
 import { useListStore } from '../mylens/listStore';
 
-const LATEST_COUNT = 6;
+const LATEST_COUNT = 3;
 
 /**
  * 홈은 "오늘 내 몫을 끝내는 곳"이다: 오늘의 브리핑(인사 · 진행 · 이번 주) → 오늘 챙길 3가지 → 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
