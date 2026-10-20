@@ -22,7 +22,7 @@ import { connections } from './connections';
 import { BriefingSettings } from './sections/BriefingSettings';
 import { useMyEditor } from './myEditor';
 import { useDailyProgress } from './dailyProgress';
-import { useBriefingPrefs } from './briefingPrefs';
+import { PICK_COUNT, useBriefingPrefs } from './briefingPrefs';
 import { bookmarks, history } from '../mylens/stores';
 import { useListStore } from '../mylens/listStore';
 
@@ -61,6 +61,7 @@ function buildSections(data: HomeData, c: Ctx): Section[] {
           interests={c.interests}
           readIds={c.readIds}
           situation={c.prefs.situation}
+          questionCount={PICK_COUNT[c.prefs.minutes]}
           streak={c.progress.streak}
           onChangeEditor={c.openPicker}
           onOpenSettings={c.openSettings}
@@ -133,7 +134,7 @@ export function HomeScreen() {
         )}
       </View>
       <EditorPicker open={pickerOpen} onClose={() => setPickerOpen(false)} editor={myEditor.editor} />
-      <BriefingSettings hideTrigger open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} />
+      <BriefingSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} editor={myEditor.editor} />
       <InterestPicker open={interestsOpen} onClose={() => setInterestsOpen(false)} />
       <MiniPlayer />
     </SafeAreaView>

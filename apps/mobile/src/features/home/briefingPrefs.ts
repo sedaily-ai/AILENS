@@ -6,19 +6,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * 관심 분야는 따로 저장되는 mylens/stores 의 interests 를 그대로 쓴다.
  */
 export type Minutes = 3 | 5 | 10;
-export type Situation = 'commute' | 'lunch' | 'evening' | 'weekend';
+export type Situation = 'commute' | 'lunch' | 'evening' | 'night' | 'weekend';
 export interface BriefingPrefs {
   minutes: Minutes;
   situation: Situation | null;
 }
 
 export const MINUTES: Minutes[] = [3, 5, 10];
+/** 볼 시간 → 홈에 보여 줄 질문 개수. 3분은 가볍게 2개, 10분은 5개까지. */
 export const PICK_COUNT: Record<Minutes, number> = { 3: 2, 5: 3, 10: 5 };
 /** 상황별로 어울리는 형식 화면. 출근길=듣기, 점심=웹툰(짧게), 퇴근 후=읽기(정독), 주말=레터(깊게). */
 export const SITUATION_ROUTE: Record<Situation, '/listen' | '/webtoon' | '/letter'> = {
   commute: '/listen',
   lunch: '/webtoon',
   evening: '/letter',
+  night: '/listen',
   weekend: '/letter',
 };
 

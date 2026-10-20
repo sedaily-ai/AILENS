@@ -17,7 +17,6 @@ import { EditorVoice } from './EditorVoice';
  *  에디터 말풍선(시간·상황 인사) → 추천 질문 칩 → 칩을 누르면 같은 카드 안에서 풀이(핵심 정리·용어·더 자세히) → 근거 기사·다른 형식으로 이어가기.
  * 질문과 풀이는 모두 기사(lenses 의 question·bullets·keywords)에서 가져온다 — 생성한 문장은 없다. 에디터는 말투와 고르는 기준만 바꾼다.
  */
-const chipsCount = 4;
 
 function Face({ editor, size }: { editor: LetterEditor; size: number }) {
   const uri = editor.image ? `${getApiConfig().cmsApiUrl}${editor.image}` : null;
@@ -37,6 +36,7 @@ export function EditorChat({
   interests,
   readIds,
   situation,
+  questionCount,
   streak,
   onChangeEditor,
   onOpenSettings,
@@ -48,6 +48,8 @@ export function EditorChat({
   interests: string[];
   readIds: Set<string>;
   situation: SituationKey | null;
+  /** 보여 줄 질문 개수(오늘 설정의 볼 시간에서 온다). */
+  questionCount: number;
   streak: number;
   onChangeEditor: () => void;
   onOpenSettings: () => void;
@@ -71,7 +73,7 @@ export function EditorChat({
         editorTopics: editor.topics.map((t) => t.name),
         readIds,
         slugOf: (c) => categoryForDataLabel(c)?.slug ?? null,
-        count: chipsCount,
+        count: questionCount,
       }),
     [lens, interests, editor, readIds]
   );

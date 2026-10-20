@@ -1,123 +1,126 @@
-import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import type { LetterEditor } from '@ailens/domain';
 import { Text } from '../../../ui/Text';
-import { Bus, Coffee, ForkKnife, Moon, SlidersHorizontal, X } from '../../../ui/icons';
-import { colors, surface } from '../../../theme';
-import { MINUTES, saveBriefingPrefs, type BriefingPrefs, type Minutes, type Situation } from '../briefingPrefs';
+import { Bus, Check, Coffee, ForkKnife, Moon, X } from '../../../ui/icons';
+import { accent, colors } from '../../../theme';
+import { MINUTES, PICK_COUNT, saveBriefingPrefs, type BriefingPrefs, type Minutes, type Situation } from '../briefingPrefs';
+import { formatCards, momentOf, openingLine, voiceOf } from '../editorVoice';
 
 /**
- * 오늘의 브리핑 설정 — 한 줄 요약 칩("5분 · 출근길 · 증권·산업")과 그 칩을 누르면 열리는 아래 시트.
- * 시간, 지금 상황, 관심 분야를 고르면 "오늘 챙길 N가지"의 개수와 추천 순서가 바로 바뀐다. 모두 이 기기에 저장된다.
+ * 오늘 설정 — 두 가지만 묻는다. "지금 어떤 때예요?"(상황)와 "얼마나 볼까요?"(시간).
+ *  · 상황은 인사 말투와 "지금은 이렇게 볼까요?"의 첫 형식을 바꾼다. 고르지 않으면 시각에 맞춰 자동으로 정한다.
+ *  · 시간은 홈에 보여 줄 질문 개수(3분 2개 · 5분 3개 · 10분 5개)를 바꾼다.
+ * 고르는 즉시 적용되고(저장 버튼 없음), 아래 미리 보기에서 바뀐 결과를 바로 확인할 수 있다.
  */
-const SITUATIONS: { key: Situation; label: string; hint: string; Icon: typeof Bus }[] = [
+const SITUATIONS: { key: Situation | null; label: string; hint: string; Icon: typeof Bus | null }[] = [
+  { key: null, label: '지금 시각에 맞춰요', hint: '자동', Icon: null },
   { key: 'commute', label: '출근길', hint: '귀로 듣기', Icon: Bus },
   { key: 'lunch', label: '점심시간', hint: '웹툰으로 가볍게', Icon: ForkKnife },
-  { key: 'evening', label: '퇴근 후', hint: '차분히 읽기', Icon: Moon },
-  { key: 'weekend', label: '주말', hint: '깊이 있는 레터', Icon: Coffee },
+  { key: 'evening', label: '퇴근 후', hint: '차분히 읽기', Icon: Coffee },
+  { key: 'night', label: '잠들기 전', hint: '소리로 정리', Icon: Moon },
 ];
+const TIME_HINT: Record<Minutes, string> = { 3: '가볍게 훑어요', 5: '핵심만 챙겨요', 10: '깊이 있게 봐요' };
 
-export function BriefingSettings({ prefs, open: openProp, onClose, hideTrigger }: { prefs: BriefingPrefs; open?: boolean; onClose?: () => void; hideTrigger?: boolean }) {
-  // 제어형(open·onClose 를 넘기면 호출한 쪽이 열고 닫는다) 또는 스스로 여닫는 한 줄 요약 칩 형태 둘 다 지원한다.
-  const [openSelf, setOpenSelf] = useState(false);
-  const controlled = openProp !== undefined;
-  const open = controlled ? openProp : openSelf;
-  const setOpen = (v: boolean) => (controlled ? (v ? undefined : onClose?.()) : setOpenSelf(v));
-  const situation = SITUATIONS.find((s) => s.key === prefs.situation);
-  const summary = [`${prefs.minutes}분`, situation?.label].filter(Boolean);
+export function BriefingSettings({ prefs, editor, open, onClose }: { prefs: BriefingPrefs; editor: LetterEditor; open: boolean; onClose: () => void }) {
+  const moment = momentOf(new Date(), prefs.situation);
+  const first = formatCards(moment)[0];
 
   return (
-    <>
-      {hideTrigger ? null : <Pressable style={({ pressed }) => [styles.summary, pressed && { opacity: 0.85 }]} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="오늘 브리핑 설정 열기">
-        <SlidersHorizontal size={18} color={colors.textSub} />
-        <Text style={styles.summaryLabel}>오늘 설정</Text>
-        <View style={styles.chips}>
-          {summary.map((s) => (
-            <View key={s} style={styles.chip}><Text style={styles.chipText}>{s}</Text></View>
-          ))}
-        </View>
-        <Text style={styles.edit}>바꾸기</Text>
-      </Pressable>}
-
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} statusBarTranslucent>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="닫기" />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHead}>
-            <Text style={styles.sheetTitle}>오늘 브리핑 설정</Text>
-            <Pressable onPress={() => setOpen(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="닫기">
-              <X size={22} color={colors.textMuted} />
-            </Pressable>
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-            <Text style={styles.label}>시간</Text>
-            <View style={styles.seg}>
-              {MINUTES.map((m: Minutes) => (
-                <Pressable key={m} style={[styles.segItem, prefs.minutes === m && styles.segOn]} onPress={() => void saveBriefingPrefs({ ...prefs, minutes: m })} accessibilityRole="button" accessibilityState={{ selected: prefs.minutes === m }}>
-                  <Text style={[styles.segText, prefs.minutes === m && styles.segTextOn]}>{m}분</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.label}>지금은 어떤 때예요?</Text>
-            <View style={styles.grid}>
-              {SITUATIONS.map(({ key, label, hint, Icon }) => {
-                const on = prefs.situation === key;
-                return (
-                  <Pressable key={key} style={[styles.tile, on && styles.tileOn]} onPress={() => void saveBriefingPrefs({ ...prefs, situation: on ? null : key })} accessibilityRole="button" accessibilityState={{ selected: on }}>
-                    <View style={[styles.tileIcon, on && styles.tileIconOn]}>
-                      <Icon size={22} color={on ? '#fff' : colors.textSub} weight={on ? 'fill' : 'regular'} />
-                    </View>
-                    <Text style={styles.tileLabel}>{label}</Text>
-                    <Text style={styles.tileHint}>{hint}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-          </ScrollView>
-          <Pressable style={({ pressed }) => [styles.done, pressed && { opacity: 0.88 }]} onPress={() => setOpen(false)} accessibilityRole="button">
-            <Text style={styles.doneText}>이대로 시작</Text>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="닫기" />
+      <View style={styles.sheet}>
+        <View style={styles.grab} />
+        <View style={styles.head}>
+          <Text style={styles.title}>오늘은 어떻게 볼까요?</Text>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="닫기">
+            <X size={22} color={colors.textMuted} />
           </Pressable>
         </View>
-      </Modal>
-    </>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+          <Text style={styles.label}>지금 어떤 때예요?</Text>
+          <View style={styles.list}>
+            {SITUATIONS.map((s, i) => {
+              const on = prefs.situation === s.key;
+              return (
+                <Pressable
+                  key={s.key ?? 'auto'}
+                  onPress={() => void saveBriefingPrefs({ ...prefs, situation: s.key })}
+                  style={({ pressed }) => [styles.row, i > 0 && styles.rule, pressed && { backgroundColor: '#f7f9fc' }]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                >
+                  <View style={[styles.iconBox, on && styles.iconBoxOn]}>
+                    {s.Icon ? <s.Icon size={20} color={on ? '#fff' : colors.textSub} weight={on ? 'fill' : 'regular'} /> : <Text style={[styles.auto, on && { color: '#fff' }]}>A</Text>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{s.label}</Text>
+                    <Text style={styles.rowHint}>{s.hint}</Text>
+                  </View>
+                  <View style={[styles.radio, on && styles.radioOn]}>{on ? <Check size={13} color="#fff" weight="bold" /> : null}</View>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.label}>얼마나 볼까요?</Text>
+          <View style={styles.seg}>
+            {MINUTES.map((m: Minutes) => {
+              const on = prefs.minutes === m;
+              return (
+                <Pressable key={m} style={[styles.segItem, on && styles.segOn]} onPress={() => void saveBriefingPrefs({ ...prefs, minutes: m })} accessibilityRole="radio" accessibilityState={{ selected: on }}>
+                  <Text style={[styles.segText, on && styles.segTextOn]}>{m}분</Text>
+                  <Text style={[styles.segSub, on && { color: accent.ink }]}>질문 {PICK_COUNT[m]}개</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.timeHint}>{TIME_HINT[prefs.minutes]}</Text>
+
+          <View style={styles.preview}>
+            <Text style={styles.previewLabel}>이렇게 바뀌어요</Text>
+            <Text style={styles.previewLine}>“{openingLine(voiceOf(editor.group), moment)}”</Text>
+            <Text style={styles.previewSub}>첫 형식은 <Text style={styles.previewStrong}>{first.label}</Text> · 질문 {PICK_COUNT[prefs.minutes]}개</Text>
+          </View>
+        </ScrollView>
+
+        <Pressable style={({ pressed }) => [styles.done, pressed && { opacity: 0.9 }]} onPress={onClose} accessibilityRole="button">
+          <Text style={styles.doneText}>완료</Text>
+        </Pressable>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  summary: { ...surface.card, marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 52, borderRadius: 18 },
-  summaryLabel: { fontSize: 13, fontWeight: '800', color: colors.textSub },
-  chips: { flex: 1, flexDirection: 'row', gap: 6, overflow: 'hidden' },
-  chip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: '#f1f3f6' },
-  chipText: { fontSize: 12.5, fontWeight: '700', color: colors.text },
-  edit: { fontSize: 13, fontWeight: '700', color: '#2563eb' },
-
   backdrop: { flex: 1, backgroundColor: 'rgba(17,24,39,0.45)' },
-  sheet: { maxHeight: '86%', backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 28 },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  sheetTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
-  label: { marginTop: 20, marginBottom: 10, fontSize: 14, fontWeight: '800', color: colors.text },
-  optional: { fontSize: 12.5, fontWeight: '500', color: colors.textFaint },
-
-  seg: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: 16, backgroundColor: 'rgba(17,24,39,0.055)' },
-  segItem: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  segOn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e9f0' },
-  segText: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
-  segTextOn: { fontWeight: '800', color: colors.text },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { width: '48%', flexGrow: 1, padding: 14, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e6e9f0' },
-  tileOn: { borderColor: colors.brand, backgroundColor: '#f4f6fb' },
-  tileIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f3f6', alignItems: 'center', justifyContent: 'center' },
-  tileIconOn: { backgroundColor: colors.brand },
-  tileLabel: { marginTop: 10, fontSize: 15, fontWeight: '800', color: colors.text },
-  tileHint: { marginTop: 2, fontSize: 12.5, color: colors.textMuted },
-
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: '#f1f3f6' },
-  pillOn: { backgroundColor: colors.brand },
-  pillText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
-  pillTextOn: { color: '#fff', fontWeight: '700' },
-
-  done: { marginTop: 16, height: 54, borderRadius: 16, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  sheet: { maxHeight: '90%', backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 22 },
+  grab: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#dfe3ea', marginBottom: 14 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.6, color: colors.text },
+  label: { marginTop: 22, marginBottom: 10, fontSize: 14, fontWeight: '800', color: colors.textSub },
+  list: { borderRadius: 20, borderWidth: 1, borderColor: '#e6eaf1', overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#fff' },
+  rule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e6eaf1' },
+  iconBox: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f3f6', alignItems: 'center', justifyContent: 'center' },
+  iconBoxOn: { backgroundColor: accent.main },
+  auto: { fontSize: 15, fontWeight: '800', color: colors.textSub },
+  rowTitle: { fontSize: 15.5, fontWeight: '800', color: colors.text },
+  rowHint: { marginTop: 2, fontSize: 12.5, color: colors.textMuted },
+  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#d3d9e3', alignItems: 'center', justifyContent: 'center' },
+  radioOn: { backgroundColor: accent.main, borderColor: accent.main },
+  seg: { flexDirection: 'row', gap: 8 },
+  segItem: { flex: 1, paddingVertical: 12, borderRadius: 16, borderWidth: 1.5, borderColor: '#e6eaf1', alignItems: 'center', backgroundColor: '#fff' },
+  segOn: { borderColor: accent.main, backgroundColor: accent.soft },
+  segText: { fontSize: 17, fontWeight: '800', color: colors.textSub },
+  segTextOn: { color: accent.ink },
+  segSub: { marginTop: 2, fontSize: 12.5, fontWeight: '600', color: colors.textMuted },
+  timeHint: { marginTop: 8, fontSize: 13, color: colors.textMuted },
+  preview: { marginTop: 22, padding: 16, borderRadius: 18, backgroundColor: '#f6f8fb' },
+  previewLabel: { fontSize: 12.5, fontWeight: '800', color: accent.ink },
+  previewLine: { marginTop: 6, fontSize: 15, lineHeight: 22, fontWeight: '600', color: colors.text },
+  previewSub: { marginTop: 8, fontSize: 13, color: colors.textMuted },
+  previewStrong: { fontWeight: '800', color: colors.text },
+  done: { marginTop: 14, height: 54, borderRadius: 16, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   doneText: { fontSize: 16, fontWeight: '800', color: '#fff' },
 });
