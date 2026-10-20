@@ -1,0 +1,11 @@
+.page { min-height: 100vh; background: #fff; color: #111827; }
+/* 위 여백 = ExitPill 위치(16px) + 높이(44px) + 간격. 고정된 버튼 밑에 제목이 깔리지 않게 한다. */
+.main { max-width: 1200px; margin: 0 auto; padding: 92px 24px 96px; }
+.main:focus { outline: none; }
+.title { display: flex; align-items: center; gap: 8px; font-size: clamp(24px, 4.4vw, 32px); font-weight: 800; letter-spacing: -.03em; margin-bottom: 28px; }
+.title > svg { flex-shrink: 0; }
+.panel { border: 1px solid #e5e7eb; border-radius: 16px; overflow: clip; scroll-margin-top: 88px; }
+@media (max-width: 600px) {
+  .main { padding: 76px 16px 88px; }
+  .title { font-size: 24px; margin-bottom: 24px; }
+}

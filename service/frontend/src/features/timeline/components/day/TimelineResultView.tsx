@@ -45,9 +45,10 @@ export function TimelineResultView({ date, initialArticles }: { date: string; in
           padding-top: ${SPACE.xxl}px; padding-bottom: ${SPACE.xl}px;
           animation: tmHead .5s ease; }
 
-        /* 좁은 화면에서는 좌상단 ExitPill(fixed, top ${SPACE.lg} + 높이 ${TOUCH_MIN})이
-           붙어 있는 머리와 같은 줄에 온다. 그만큼 아래에서 시작해 겹침을 피한다. */
-        @media (max-width: 640px) {
+        /* 좁은 화면에서는 맨 위 줄 알약(왼쪽 ExitPill, 오른쪽 OtherDatePill — top ${SPACE.lg} + 높이 ${TOUCH_MIN})이
+           머리 글자와 같은 줄에 온다. 그만큼 아래에서 시작해 겹침을 피한다. 오른쪽 알약까지 생기면서
+           641~900px에서도 32px 제목 끝이 알약 줄에 닿을 수 있어 기준을 640 → 900px로 올렸다. */
+        @media (max-width: 900px) {
           .tm-head { padding-top: ${SPACE.lg + TOUCH_MIN + SPACE.sm}px; }
         }
 
@@ -69,9 +70,7 @@ export function TimelineResultView({ date, initialArticles }: { date: string; in
           ) : (
             <>
               <ArticleList items={initialArticles} />
-              <div style={{ textAlign: 'center', marginTop: 36 }}>
-                <Link href="/timeline" style={OTHER_DATE_LINK_STYLE}>다른 날짜 보기</Link>
-              </div>
+              {/* '다른 날짜 보기'는 맨 위 줄 오른쪽(OtherDatePill, TimelineDayClient)에 있다. */}
             </>
           )}
         </div>

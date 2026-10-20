@@ -74,7 +74,8 @@ export function NewsTimeMachine({ children }: { children?: React.ReactNode }) {
         }
       `}</style>
 
-      <div style={{ maxWidth: CONTAINER_MAX, margin: '0 auto', padding: 'clamp(40px, 8vw, 88px) clamp(20px, 5vw, 32px)' }}>
+      {/* 위 여백 최소값은 맨 위 줄 ExitPill(top 16 + 높이 44) 아래 16px — 좁은 화면에서 머리말("NEWS TIME MACHINE")이 버튼에 가리던 것을 막는다. */}
+      <div style={{ maxWidth: CONTAINER_MAX, margin: '0 auto', padding: `clamp(${SPACE.lg + TOUCH_MIN + SPACE.lg}px, 8vw, 88px) clamp(20px, 5vw, 32px) clamp(40px, 8vw, 88px)` }}>
 
         {/* ── 입력 ── */}
         {phase === 'input' && (

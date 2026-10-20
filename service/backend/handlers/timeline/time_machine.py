@@ -1,9 +1,9 @@
 """
-Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경제" + "키워드·기간 검색"
+Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경제" + "키워드·기간 검색" + "그날의 1면"
 
-두 모드(같은 Lambda·같은 라우트 GET /time-machine, 쿼리 파라미터로 구분):
+세 모드(같은 Lambda·같은 라우트 GET /time-machine, 쿼리 파라미터로 구분):
 
-1) 하루 모드(기본) — `q` 파라미터가 없을 때
+1) 하루 모드(기본) — `q`·`front` 파라미터가 없을 때
    GET /time-machine?date=YYYY-MM-DD
    Response: { "date": "...", "articles": [{"news_id","title","content","byline","category","original_link"}],
                "investments": ..., "cached": bool }
@@ -16,6 +16,13 @@ Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경�
    sort  'relevance'(기본) | 'date'. relevance 는 빅카인즈가 거부하면 date 로 자동 대체
    Response: { "query","from","to","size","sort_applied","articles":[{하루 모드 필드 + "published_at"(날짜만, 있으면)}],
                "cached": bool }
+
+3) 그날의 1면 모드 — `front` 파라미터가 있을 때(`q` 가 없을 때만)
+   GET /time-machine?front=YYYY-MM-DD   (인쇄일, 1990-01-01 이후, 미래는 오늘로 당김)
+   Response: { "date", "status": "ok"|"no_paper"|"no_page_info", "reason": "sunday"|"holiday"|null,
+               "articles": [{"news_id","title","content","byline","category","original_link"}], "cached": bool }
+   면 번호가 있는 기간과 일요일 휴간 규칙은 FRONT_PAGE_ERAS·SUNDAY_CLOSED_FROM 참조.
+   생일 타임머신이 부르며, 응답 로그에는 날짜를 남기지 않는다.
 
 응답 규약(프론트가 "오류"와 "정말 기사 없음"을 구분하는 기준):
   - 200 + articles=[]  : 빅카인즈 조회는 성공했고 서울경제 기사가 정말 0건.
@@ -202,6 +209,68 @@ def get_time_machine_data(date: str) -> dict:
     return {**result, 'investments': investments, 'cached': False}
 
 
+# ─── 그날의 1면 ──────────────────────────────────────────────────────────────
+# 빅카인즈 서울경제 보관본에서 면 번호(printing_page)가 채워진 기간과 그 시기의 신문 판별 기준(2026-10-19 날짜별 실측,
+# 경계는 일 단위로 확인. 기준 설명은 bigkinds_search.search_front_page). 이 밖은 면 번호가 비어 1면을 특정할 수 없다 —
+# 그날 다른 기사로 1면을 대신하지 않는다.
+FRONT_PAGE_ERAS = (
+    ('1994-01-01', '1996-07-31', bigkinds_search.FRONT_MATCH_PUBLISHED),
+    ('2017-11-13', None, bigkinds_search.FRONT_MATCH_SENT),
+)
+# 1996-09-22 일요일자까지는 기사가 있고 1996-09-29 부터 일요일자 신문이 없다(같은 실측). 이 날 이후 일요일은 조회하지 않는다.
+SUNDAY_CLOSED_FROM = '1996-09-29'
+# 생일 타임머신이 사용자의 생일로 부르는 모드라 로그에 날짜를 남기지 않는다.
+FRONT_LOG_LABEL = 'front'
+
+
+def _front_cache_key(date: str) -> str:
+    return f'timemachine_front_{date}'
+
+
+def _front_negative_cache_key(date: str) -> str:
+    return f'timemachine_front_empty_{date}'
+
+
+def _front_page_match(date: str) -> Optional[str]:
+    """면 번호가 있는 시기면 신문 판별 기준, 아니면 None."""
+    for start, end, match in FRONT_PAGE_ERAS:
+        if start <= date and (end is None or date <= end):
+            return match
+    return None
+
+
+def get_front_page_data(date: str) -> dict:
+    """인쇄일 date 의 서울경제 1면.
+
+    status: 'ok'(1면 기사 있음) | 'no_paper'(신문이 나오지 않은 날, reason 'sunday'|'holiday') | 'no_page_info'(면 번호가 없는 시기).
+    일요일 휴간과 면 번호가 없는 시기는 빅카인즈를 부르지 않는다.
+    """
+    base = {'date': date, 'articles': [], 'cached': False}
+    if datetime.strptime(date, DATE_FORMAT).weekday() == 6 and date >= SUNDAY_CLOSED_FROM:
+        return {**base, 'status': 'no_paper', 'reason': 'sunday'}
+    match = _front_page_match(date)
+    if match is None:
+        return {**base, 'status': 'no_page_info', 'reason': None}
+
+    def shape(articles: list, cached: bool) -> dict:
+        if articles:
+            return {'date': date, 'status': 'ok', 'reason': None, 'articles': articles, 'cached': cached}
+        return {'date': date, 'status': 'no_paper', 'reason': 'holiday', 'articles': [], 'cached': cached}
+
+    cached = _read_cache(_front_cache_key(date), _front_negative_cache_key(date),
+                         {'date': date, 'articles': []}, FRONT_LOG_LABEL)
+    if cached is not None:
+        return shape(cached.get('articles', []), True)
+
+    articles = bigkinds_search.search_front_page(date, match)
+    # 오늘 인쇄분은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 지난 날짜의 0건(휴간)은 짧게만 기억한다.
+    if date < today_kst():
+        _write_cache(_front_cache_key(date), _front_negative_cache_key(date),
+                     'timemachine_front_cache', 'timemachine_front_empty_cache',
+                     date, {'date': date, 'articles': articles}, CACHE_TTL_DAYS * 86400, True, FRONT_LOG_LABEL)
+    return shape(articles, False)
+
+
 # ─── 키워드 + 기간 검색 ──────────────────────────────────────────────────────
 
 def _parse_range_params(params: dict) -> dict:
@@ -285,15 +354,23 @@ def lambda_handler(event: dict, context) -> dict:
 
     params = event.get('queryStringParameters') or {}
     range_mode = params.get('q') is not None
+    front_mode = not range_mode and params.get('front') is not None
     try:
         if range_mode:
             args = _parse_range_params(params)
+        elif front_mode:
+            date = validate_date((params.get('front') or '').strip(), min_date=BIGKINDS_MIN_DATE)
         else:
             date = validate_date((params.get('date') or '').strip(), min_date=BIGKINDS_MIN_DATE)
     except BadRequest as e:
         return error_response(str(e), status_code=400, code='BAD_REQUEST')
 
     try:
+        if front_mode:
+            result = get_front_page_data(date)
+            logger.info('time-machine 1면 응답: status=%s, articles=%s, cached=%s',
+                        result['status'], len(result['articles']), result['cached'])
+            return success_response(result)
         if range_mode:
             result = get_range_search_data(args['query'], args['from'], args['to'],
                                            args['size'], args['sort'])

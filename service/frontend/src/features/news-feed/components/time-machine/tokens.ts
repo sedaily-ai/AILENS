@@ -48,6 +48,17 @@ export const TIME_MACHINE_CSS = `
     text-decoration: underline; text-underline-offset: 3px; transition: color .15s ease; }
   .ntm-sub:hover { color: ${INK}; }
 
+  /* 그날의 기사 날짜 선택(DatePicker) 배치. 넓은 칸은 왼쪽 안내·직접 입력, 오른쪽 칩 묶음. */
+  .ntm-picker { container-type: inline-size; }
+  .ntm-picker-grid, .ntm-picker-chips { display: grid; gap: 12px; }
+  @container (min-width: 720px) {
+    .ntm-picker-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); grid-template-areas: 'lead chips' 'go chips'; grid-template-rows: auto 1fr; column-gap: 32px; }
+    .ntm-picker-lead { grid-area: lead; }
+    .ntm-picker-chips { grid-area: chips; }
+    .ntm-picker-go { grid-area: go; align-self: end; }
+    .ntm-picker-label { flex-basis: 100%; }
+  }
+
   .ntm-row { transition: background .14s ease; }
   .ntm-row:hover { background: ${PANEL}; }
   .ntm-row:hover .ntm-title { color: ${BLUE}; }
