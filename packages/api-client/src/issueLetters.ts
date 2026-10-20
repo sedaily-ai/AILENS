@@ -25,7 +25,6 @@ export interface IssueLetterCard {
   issue_no: number;
   title: string;
   deck: string;
-  read_minutes: number;
   categories: string[];
   axes: LetterAxis[];
   source_count: number;

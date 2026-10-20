@@ -1,9 +1,6 @@
 export { NewsFeedTab } from './components/NewsFeedTab';
-export { fetchFollowingWordTerms } from './lib/wordsTerms';
-export type { Term } from './lib/wordsTerms';
-
-// app/letters/[id]/LetterDetailClient.tsx와 app/onboarding/OnboardingClient.tsx가 컴포넌트 경로를 직접 import(딥임포트)하지 않고 이 배럴을 거치도록 export를 제공한다.
-export { EditorCommentsSection } from './components/sections/EditorCommentsSection';
+// 레터 본문 퀴즈·투표 블록. 관리자 에디터의 AI 퀴즈(admin aiQuizExtension·AiQuizFields)가 이 모양에 맞춰 저장한다.
+// 지금 웹에서 렌더하는 곳은 없지만, 관리자 기능이 기대하는 렌더러라 2026-10-20 기능 다이어트에서 남겼다.
 export { InteractiveBlock } from './components/cards/InteractiveBlock';
 export type { InteractiveBlockData } from './components/cards/InteractiveBlock';
 export { NewsletterCTA } from './components/NewsletterCTA';

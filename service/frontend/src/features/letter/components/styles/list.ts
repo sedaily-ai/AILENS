@@ -4,10 +4,12 @@ export const LIST_CSS = `
   .lt-hero { padding: 0 0 24px; }
   .lt-h1 { margin: 0; font-family: "Noto Serif KR", serif; font-size: 32px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; color: var(--ink); }
   .lt-sub { margin: 8px 0 0; font-size: 16px; line-height: 1.6; color: #6b7280; }
-  .lt-etabs { position: relative; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: #d1d5db transparent; margin: 0 0 24px; padding: 0; border-bottom: 1px solid #d3d6db; }
+  /* 세로 스크롤 막대 제거(2026-10-20): 선택 밑줄이 바닥 선을 덮도록 버튼에 margin-bottom:-1px을 줬더니 1px이 상자 밖으로 넘쳐 세로 스크롤이 생겼다.
+     바닥 선을 상자 안쪽 그림자로 그리고(버튼 밑줄이 그 위를 덮는다) 세로 넘침은 숨긴다. 가로 스크롤(좁은 화면)은 그대로. */
+  .lt-etabs { position: relative; display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: #d1d5db transparent; margin: 0 0 24px; padding: 0; box-shadow: inset 0 -1px 0 #d3d6db; }
   .lt-etabs::-webkit-scrollbar { height: 3px; }
   .lt-etabs::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
-  .lt-etab { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; flex: none; width: auto; min-width: 88px; min-height: 52px; padding: 8px 12px; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; border-radius: 0; background: transparent; font: inherit; color: #6b7280; cursor: pointer; opacity: 1; font-size: 14.5px; font-weight: 500; }
+  .lt-etab { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; flex: none; width: auto; min-width: 88px; min-height: 52px; padding: 8px 12px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; font: inherit; color: #6b7280; cursor: pointer; opacity: 1; font-size: 14.5px; font-weight: 500; }
   .lt-etab-all { min-width: 60px; font-size: 14.5px; font-weight: 500; }
   .lt-etab:hover { color: var(--blue); }
   .lt-etab[aria-pressed='true'] { color: var(--ink); font-weight: 700; border-bottom-color: #5b8def; background: transparent; }
@@ -70,15 +72,36 @@ export const LIST_CSS = `
   .lt-eintro-btn { height: auto; min-height: 44px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #374151; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
   .lt-eintro-btn:hover { color: var(--blue); border-color: #cbd5e1; }
   .lt-eintro-btn[aria-pressed='true'] { background: var(--soft); border-color: #cbd5e1; color: var(--ink); }
-  .lt-eintro-policy { margin: 8px 0 0; font-size: 12px; line-height: 1.6; color: #6b7280; }
   .lt-eintro-details { margin-top: 8px; }
   .lt-eintro-quote { margin: 12px 0 0; padding: 0; border: 0; font-size: 14px; line-height: 1.8; color: #374151; }
   .lt-eintro-pitch { margin: 12px 0 0; font-size: 14px; line-height: 1.7; }
   .lt-eintro-pitch b { display: block; margin-bottom: 4px; color: #374151; }
   .lt-eintro-scope { font-size: 13px; line-height: 1.7; }
   .lt-eintro-scope span { display: block; padding: 0; background: none; color: #374151; }
-  .lt-eintro-voice { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; padding: 8px 0; border: 0; border-radius: 0; color: var(--blue); text-decoration: underline; text-underline-offset: 4px; }
-  .lt-eintro-voice[aria-pressed='true'] { background: transparent; }
+  /* 소개 음성 막대(2026-10-19): 막대 전체가 재생·멈춤 버튼. 원형 아이콘은 흰 바탕을 유지해 주 버튼(메일로 구독)과 경쟁하지 않고, 파랑은 진행 막대에만 쓴다. */
+  .lt-voice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; margin-top: 12px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .lt-voice:hover { border-color: #cbd5e1; }
+  .lt-voice:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .lt-voice-icon { flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #d5dbe6; border-radius: 50%; background: #fff; color: var(--ink); transition: transform .15s ease; }
+  .lt-voice:active .lt-voice-icon { transform: scale(.94); }
+  .lt-voice[data-playing] .lt-voice-icon { background: #eef3ff; border-color: #b7cdf5; color: var(--blue); }
+  .lt-voice-body { flex: 1; min-width: 0; }
+  .lt-voice-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .lt-voice-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.6; }
+  .lt-voice-time { flex-shrink: 0; font-size: 13px; line-height: 1.6; color: var(--color-text-muted, #6b7280); font-variant-numeric: tabular-nums; }
+  .lt-voice-track { display: block; height: 4px; margin-top: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .lt-voice-fill { display: block; height: 100%; background: var(--blue); transform-origin: left center; transition: transform .25s linear; }
+  .lt-voice-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+  .lt-voice-eq i { display: block; width: 3px; height: 4px; border-radius: 2px; background: var(--blue); animation: lt-voice-eq .9s ease-in-out infinite; }
+  .lt-voice-eq i:nth-child(2) { animation-delay: .2s; }
+  .lt-voice-eq i:nth-child(3) { animation-delay: .4s; }
+  @keyframes lt-voice-eq { 0%, 100% { height: 4px; } 50% { height: 12px; } }
+  .lt-voice-error { margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: var(--color-text-danger, #b91c1c); }
+  @media (prefers-reduced-motion: reduce) {
+    .lt-voice-icon, .lt-voice-fill { transition: none; }
+    .lt-voice:active .lt-voice-icon { transform: none; }
+    .lt-voice-eq i { animation: none; height: 8px; }
+  }
   .lt-eintro-ai { margin-top: 12px; font-size: 12px; line-height: 1.6; color: #6b7280; }
   .lt-aside .lt-ibar { margin: 0; }
   .lt-ibar-row { padding: 0; border: 0; border-radius: 0; background: #fff; }

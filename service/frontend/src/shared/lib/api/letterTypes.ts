@@ -45,8 +45,7 @@ export interface ApiLetter {
   photo_image_url?: string | null;
   // 원문 기사 URL. 서울경제 원본 취재 기사 링크이며 admin이 채우지 않으면 null이다(JSON-LD의 "취재된 원본을 바탕으로" 소개를 검증 가능하게 한다).
   source_url?: string | null;
-  // 채널 목록 조회(fetchCmsPosts)로 여러 날짜가 섞여 나올 때만 필요 —
-  // fetchTodayLetters(date) 호출부는 이미 date 를 알고 있어 안 씀.
+  // 채널 목록 조회(fetchCmsPosts)로 여러 날짜가 섞여 나올 때 카드 날짜로 쓴다.
   publish_date?: string | null;
   // /letters 아카이브 필터용 가벼운 태그. channel(letters)은 그대로 두고 "트렌드"/"인기 칼럼"/"이슈 톡톡"으로도 분류하고 싶을 때만 admin이 지정한다.
   section?: 'trend' | 'column' | 'issue_talk' | null;

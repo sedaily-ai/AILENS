@@ -21,7 +21,7 @@ export function LettersSection({ items }: { items: IssueLetterCard[] }) {
           <Pressable style={styles.row} accessibilityRole="link">
             <Text style={styles.title} numberOfLines={2}>{l.title}</Text>
             <Text style={styles.deck} numberOfLines={1}>{l.deck}</Text>
-            <Text style={styles.meta}>{[l.categories?.[0], `${l.read_minutes}분`, kstDateTime(l.published_at)].filter(Boolean).join('  ')}</Text>
+            <Text style={styles.meta}>{[l.categories?.[0], kstDateTime(l.published_at)].filter(Boolean).join('  ')}</Text>
           </Pressable>
         </Link>
       ))}

@@ -26,8 +26,9 @@ def replace_preferences(user_id: str, payload: dict = Body(...), x_internal_toke
 
 
 @router.get('/letter-bookmarks')
-def bookmarks(user_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, q: str = '', read: str = 'all', x_internal_token: str | None = Header(default=None)):
-    return _call(x_internal_token, dashboard_repo.list_bookmarks, user_id, limit, cursor, q, read)
+def bookmarks(user_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, q: str = '', x_internal_token: str | None = Header(default=None)):
+    # 읽음 필터(read)는 제거됐다. 옛 호출이 read를 붙여도 선언하지 않은 쿼리라 무시되고 전체 목록을 돌려준다.
+    return _call(x_internal_token, dashboard_repo.list_bookmarks, user_id, limit, cursor, q)
 
 
 @router.put('/letter-bookmarks/{letter_id}')
@@ -38,6 +39,27 @@ def save_bookmark(letter_id: str, user_id: str, x_internal_token: str | None = H
 @router.delete('/letter-bookmarks/{letter_id}')
 def remove_bookmark(letter_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
     return _call(x_internal_token, dashboard_repo.set_bookmark, user_id, letter_id, False)
+
+
+# 저장한 기사(v1.57) — 기사 화면 '저장'과 나의 LENS 내 서랍 '저장한 기사'.
+@router.get('/article-bookmarks')
+def article_bookmarks(user_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.list_article_bookmarks, user_id, limit, cursor)
+
+
+@router.get('/article-bookmarks/{article_id}')
+def article_bookmark(article_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.get_article_bookmark, user_id, article_id)
+
+
+@router.put('/article-bookmarks/{article_id}')
+def save_article_bookmark(article_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.set_article_bookmark, user_id, article_id, True)
+
+
+@router.delete('/article-bookmarks/{article_id}')
+def remove_article_bookmark(article_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
+    return _call(x_internal_token, dashboard_repo.set_article_bookmark, user_id, article_id, False)
 
 
 @router.get('/content/resolve')
@@ -63,133 +85,16 @@ def recommendation_inputs(user_id: str, x_internal_token: str | None = Header(de
     return _call(x_internal_token, recommendation_repo.inputs, user_id)
 
 
-@router.get('/sentence-inputs/{sentence_id}')
-def sentence_inputs(sentence_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
-    import recommendation_repo
-    return _call(x_internal_token, recommendation_repo.inputs, user_id, sentence_id)
-
-
 @router.post('/recommendation-candidates')
 def recommendation_candidates(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
     import recommendation_repo
     return _call(x_internal_token, recommendation_repo.candidates, user_id, payload)
 
 
-@router.get('/activity')
-def reading_activity(user_id: str, period: str = 'week', anchor: str | None = None, x_internal_token: str | None = Header(default=None)):
-    import reading_records_repo
-    return _call(x_internal_token, reading_records_repo.activity, user_id, period, anchor)
-
-
-@router.get('/rewards')
-def reading_rewards(user_id: str, week: str | None = None, x_internal_token: str | None = Header(default=None)):
-    import reading_records_repo
-    return _call(x_internal_token, reading_records_repo.rewards, user_id, week)
-
-
-@router.get('/notifications/preferences')
-@router.get('/notifications/consent')
-def notification_settings(user_id: str, x_internal_token: str | None = Header(default=None)):
-    import notifications_repo
-    return _call(x_internal_token, notifications_repo.get, user_id)
-
-
-@router.put('/notifications/preferences')
-def notification_preferences(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
-    import notifications_repo
-    return _call(x_internal_token, notifications_repo.save, user_id, payload)
-
-
-@router.put('/notifications/consent')
-def notification_consent(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
-    import notifications_repo
-    return _call(x_internal_token, notifications_repo.consent, user_id, payload)
-
-
-@router.post('/push-subscriptions')
-def push_subscription(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
-    import notifications_repo
-    return _call(x_internal_token, notifications_repo.register, user_id, payload)
-
-
-@router.delete('/push-subscriptions/{subscription_id}')
-def push_unsubscribe(subscription_id: str, user_id: str, x_internal_token: str | None = Header(default=None)):
-    import notifications_repo
-    return _call(x_internal_token, notifications_repo.remove, user_id, subscription_id)
-
-
-@router.get('/notifications/context')
-def notification_context(user_id: str, x_internal_token: str | None = Header(default=None)):
-    import notification_inputs
-    return _call(x_internal_token, notification_inputs.context, user_id)
-
-
-@router.get('/notifications/inputs')
-def notification_recommendation_inputs(user_id: str, x_internal_token: str | None = Header(default=None)):
-    import notification_inputs
-    return _call(x_internal_token, notification_inputs.inputs, user_id)
-
-
-@router.get('/notifications/candidates')
-def notification_candidates(user_id: str, x_internal_token: str | None = Header(default=None)):
-    import notification_inputs
-    return _call(x_internal_token, notification_inputs.candidates, user_id)
-
-
-@router.get('/notifications/due')
-def notifications_due(x_internal_token: str | None = Header(default=None)):
-    import notification_inputs
-    return _call(x_internal_token, notification_inputs.due)
-
-
-@router.post('/notifications/plans')
-def notification_plan(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
-    import notification_delivery_repo
-    def plan():
-        if 'mode' not in payload:notification_delivery_repo.policy.invalid()
-        body=dict(payload);mode=body.pop('mode')
-        return notification_delivery_repo.plan(user_id,body,expected_mode=mode)
-    return _call(x_internal_token,plan)
-
-
-@router.post('/notifications/claim')
-def notification_claim(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
-    import notification_delivery_repo
-    def claim():
-        if set(payload)!={'mode'}:notification_delivery_repo.policy.invalid()
-        return notification_delivery_repo.claim(user_id,expected_mode=payload['mode'])
-    return _call(x_internal_token,claim)
-
-
-@router.post('/notifications/send-claim')
-def notification_send_claim(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
-    import notification_delivery_repo
-    def send():
-        if 'mode' not in payload:notification_delivery_repo.policy.invalid()
-        body=dict(payload);mode=body.pop('mode')
-        return notification_delivery_repo.send_claim(user_id,body,expected_mode=mode)
-    return _call(x_internal_token,send)
-
-
-@router.post('/notifications/due')
-def claim_notifications_due(payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
-    import notification_inputs
-    from notification_policy import invalid
-    def claim():
-        if set(payload)!={'mode','limit'} or payload['mode'] not in ('dry_run','live'):invalid()
-        return notification_inputs.due(payload['limit'],payload['mode'])
-    return _call(x_internal_token,claim)
-
-
-@router.get('/format-preference')
-def format_preference(user_id: str, x_internal_token: str | None = Header(default=None)):
-    import format_preference_repo
-    from db import get_cursor
-    def load():
-        with get_cursor() as cur:
-            dashboard_repo._account(cur,user_id)
-            return format_preference_repo.preference(cur,user_id)
-    return _call(x_internal_token,load)
+# 알림 설정·동의 조회·변경(/notifications/preferences·/consent)과 웹 푸시 기기 등록·해제(/push-subscriptions)는
+# 계정 API 공개 경로와 함께 지웠다(2026-10-20 기능 다이어트).
+# 알림 워커가 쓰던 /notifications/due·context·inputs·candidates·plans·claim·send-claim도
+# 워커와 함께 지웠다(2026-10-20 기능 다이어트로 알림 워커 제거). 알림 테이블과 데이터는 그대로 둔다.
 
 
 @router.get('/followed-editors')

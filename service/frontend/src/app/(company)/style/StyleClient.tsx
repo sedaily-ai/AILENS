@@ -70,9 +70,9 @@ export default function StyleClient() {
             청소하다가, 버스에서, 걸으면서 — 저마다 다른 순간에 뉴스를 만나요.
             다양한 읽기 상황을 예시로 소개해요. 아래 카드는 실제 독자 후기나 행사 참여작이 아니에요.
           </p>
-          {/* 기존 서랍 진입 동작을 유지한다. */}
+          {/* 서랍은 나의 LENS 내 서랍 하나다(옛 홈 서랍 /?tab=archive는 2026-10-19 제거). */}
           <Link
-            href="/?tab=archive"
+            href="/my-lens?tab=archive"
             className="inline-flex items-center hover:opacity-85 transition-opacity"
             style={{
               gap: 8,

@@ -62,9 +62,10 @@ def repo(monkeypatch):
 def test_preferences_owner_revision_and_atomic_validation(repo):
     r, cur = repo
     assert r.get_preferences('a')['revision'] == 0
-    body = {'revision': 0, 'minutes': 5, 'interests': [{'type':'topic','key':'rates'}]}
+    body = {'revision': 0, 'interests': [{'type':'topic','key':'rates'}]}
     first = r.replace_preferences('a', body)
-    assert first['revision'] == 1 and first['minutes'] == 5
+    # minutes는 옛 계정 API 호환으로 DB 값을 그대로 싣는다(새 코드는 쓰지 않는다. 다음 정리 때 제거).
+    assert first['revision'] == 1 and first['minutes'] == 0
     assert r.get_preferences('b')['interests'] == []
     with pytest.raises(r.DashboardError) as error:
         r.replace_preferences('a', body)
@@ -79,22 +80,33 @@ def test_preferences_owner_revision_and_atomic_validation(repo):
     assert error.value.status == 403
 
 
-def test_reading_time_only_update_preserves_interests_and_revision_conflict(repo):
+def test_reading_time_removed_keeps_stored_minutes_and_inactive_interest(repo):
     r,cursor=repo
     legacy=[{'type':'topic','key':'rates'}]
-    r.replace_preferences('a',{'revision':0,'minutes':5,'interests':legacy})
-    with cursor() as cur:cur.execute("UPDATE topics SET is_active=false WHERE slug='rates'")
-    result=r.replace_preferences('a',{'revision':1,'minutes':10})
-    assert result['interests']==legacy and result['minutes']==10 and result['revision']==2
-    assert r.get_preferences('b')['minutes']==0
-    with pytest.raises(r.DashboardError) as error:r.replace_preferences('a',{'revision':1,'minutes':0})
+    r.replace_preferences('a',{'revision':0,'interests':legacy})
+    # 기존 계정에 남은 읽을 시간 값은 DB에 그대로 두고 읽거나 덮어쓰지 않는다.
+    with cursor() as cur:
+        cur.execute("UPDATE user_lens_preferences SET minutes=10 WHERE user_id='a'")
+        cur.execute("UPDATE topics SET is_active=false WHERE slug='rates'")
+    for body in ({'revision':1,'minutes':10},{'revision':1,'minutes':0,'interests':legacy},{'revision':1}):
+        with pytest.raises(r.DashboardError) as error:r.replace_preferences('a',body)
+        assert error.value.status==400
+    # 이미 고른 비활성 주제는 다시 저장할 수 있다.
+    result=r.replace_preferences('a',{'revision':1,'interests':legacy})
+    # 관심만 바꾸고, 저장된 읽을 시간(10분)은 덮지 않는다. 응답의 minutes는 옛 계정 API 호환용 DB 값이다.
+    assert result['interests']==legacy and result['revision']==2 and result['minutes']==10
+    assert r.get_preferences('a')['minutes']==10 and r.get_preferences('b')['minutes']==0
+    with pytest.raises(r.DashboardError) as error:r.replace_preferences('a',{'revision':1,'interests':[]})
     assert error.value.status==409 and r.get_preferences('a')==result
-    assert r.replace_preferences('fresh',{'revision':0,'minutes':5})['interests']==[]
+    assert r.replace_preferences('fresh',{'revision':0,'interests':[]})['interests']==[]
+    with cursor() as cur:
+        cur.execute("SELECT user_id,minutes FROM user_lens_preferences WHERE user_id IN ('a','fresh') ORDER BY user_id")
+        assert [tuple(row.values()) for row in cur.fetchall()]==[('a',10),('fresh',0)]
 
 
 def test_concurrent_initial_preferences_one_winner(repo):
     r, _ = repo
-    body = {'revision':0,'interests':[],'minutes':0}
+    body = {'revision':0,'interests':[]}
     def save(_):
         try:
             return r.replace_preferences('race',body)['revision']
@@ -107,11 +119,11 @@ def test_concurrent_initial_preferences_one_winner(repo):
 def test_inactive_existing_interest_preserved_but_new_rejected(repo):
     r, cursor = repo
     with pytest.raises(r.DashboardError):
-        r.replace_preferences('a', {'revision':0,'minutes':0,'interests':[{'type':'topic','key':'old'}]})
-    r.replace_preferences('a', {'revision':0,'minutes':0,'interests':[{'type':'topic','key':'rates'}]})
+        r.replace_preferences('a', {'revision':0,'interests':[{'type':'topic','key':'old'}]})
+    r.replace_preferences('a', {'revision':0,'interests':[{'type':'topic','key':'rates'}]})
     with cursor() as cur:
         cur.execute("UPDATE topics SET is_active=false WHERE slug='rates'")
-    assert r.replace_preferences('a', {'revision':1,'minutes':10,'interests':[{'type':'topic','key':'rates'}]})['revision'] == 2
+    assert r.replace_preferences('a', {'revision':1,'interests':[{'type':'topic','key':'rates'}]})['revision'] == 2
 
 
 def test_bookmarks_idempotent_private_cursor_and_unpublished_removal(repo):
@@ -125,6 +137,7 @@ def test_bookmarks_idempotent_private_cursor_and_unpublished_removal(repo):
         cur.execute("UPDATE user_letter_bookmarks SET saved_at='2026-10-14T00:00:00Z'")
     page = r.list_bookmarks('a',1)
     assert page['total'] == 2 and page['items'][0]['letter_id'] == '2'
+    assert page['items'][0]['content']['available'] and 'read_minutes' not in page['items'][0]['content']
     next_page = r.list_bookmarks('a',1,page['next_cursor'])
     assert next_page['items'][0]['letter_id'] == '1' and next_page['next_cursor'] is None
     for owner, q, token in [('b','',page['next_cursor']),('a','one',page['next_cursor']),('a','',page['next_cursor'][:-4]+'abcd')]:
@@ -145,7 +158,8 @@ def test_resolver_explicit_namespaces_and_old_slug(repo):
     r, _ = repo
     assert r.resolve('a','publication','slug','123')['content_key'] == 'publication:42'
     assert r.resolve('a','publication','slug','past')['content_key'] == 'publication:42'
-    assert r.resolve('a','issue_letter','id','1')['content_key'] == 'issue_letter:1'
+    letter = r.resolve('a','issue_letter','id','1')
+    assert letter['content_key'] == 'issue_letter:1' and 'read_minutes' not in letter
     for kind, typ, key in [('publication','id','123'),('publication','article_no','123'),('issue_letter','id','3'),('issue_letter','id','-1')]:
         with pytest.raises(r.DashboardError):
             r.resolve('a',kind,typ,key)
@@ -166,7 +180,8 @@ def test_internal_routes_require_token_and_preserve_conflict(repo,monkeypatch):
     assert client.get(url).status_code==401
     headers={'X-Internal-Token':'test-local-internal'}
     assert client.get(url,headers=headers).json()['revision']==0
-    payload={'revision':0,'interests':[],'minutes':5}
+    payload={'revision':0,'interests':[]}
+    assert client.put(url,headers=headers,json={**payload,'minutes':5}).status_code==400
     assert client.put(url,headers=headers,json=payload).status_code==200
     conflict=client.put(url,headers=headers,json=payload)
     assert conflict.status_code==409 and conflict.json()['detail']['code']=='REVISION_CONFLICT'
@@ -175,7 +190,7 @@ def test_internal_routes_require_token_and_preserve_conflict(repo,monkeypatch):
 
 def test_archive_uses_same_publication_resolver_and_returns_stable_key(repo,monkeypatch):
     r, cursor = repo
-    r.replace_preferences('a', {'revision':0,'interests':[],'minutes':0})
+    r.replace_preferences('a', {'revision':0,'interests':[]})
     with cursor() as cur:
         cur.execute("CREATE TABLE renditions(id bigint PRIMARY KEY,publication_id bigint)")
         cur.execute("CREATE TABLE user_archives(id bigserial PRIMARY KEY,user_id varchar(64) REFERENCES users(id),article_no text REFERENCES publications(slug),rendition_id bigint,sentence_hash text,content text,saved_at timestamptz DEFAULT now(),UNIQUE(user_id,sentence_hash))")

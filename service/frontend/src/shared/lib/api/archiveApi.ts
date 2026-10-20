@@ -1,6 +1,6 @@
 /**
- * Archive API client: "내 서랍" 서버 측 연산.
- * 로그인 사용자는 백엔드 API로 영구 저장 + 유사도 검색을 하고, 익명 사용자는 localStorage로 폴백한다(호출부가 처리).
+ * Archive API client: "내 서랍" 저장 문장의 저장·목록·삭제. 모두 로그인 계정 기준이다.
+ * (저장 문장 관련 글·인기 문장·키워드 추천은 2026-10-19 기능 다이어트로 제거했다.)
  */
 
 import { API_URL } from '@/shared/config/apiClient';
@@ -65,30 +65,6 @@ export async function listArchiveSentences(
   return res.json();
 }
 
-export interface PopularHighlight {
-  text: string;
-  article_id: string;
-  article_title: string;
-  count: number;
-}
-
-/**
- * "다른 사람들이 담은 문장": 전체 유저 아카이브를 텍스트 빈도로 집계한 공개 목록(저장 행위만으로 채워지는 Kindle Popular Highlights 패턴).
- * 로그인 여부와 무관하다.
- */
-export async function fetchPopularArchiveSentences(
-  limit: number = 20,
-): Promise<PopularHighlight[]> {
-  try {
-    const res = await fetch(`${API_URL}/api/archive/popular?limit=${limit}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.highlights ?? [];
-  } catch {
-    return [];
-  }
-}
-
 /** 아카이브 문장을 삭제한다. */
 export async function deleteArchiveSentence(
   archiveId: string,
@@ -104,45 +80,3 @@ export async function deleteArchiveSentence(
     throw new Error(err?.error?.message || `Archive delete failed: ${res.status}`);
   }
 }
-
-// ── 키워드 기반 기사 추천 (raw XML 버킷에서 검색) ──────────────────────
-// 백엔드 GET /s3-articles/keyword?keywords=...&days=N&limit=N
-// 사용자 저장 문장에서 추출한 키워드 → 최근 N일 XML 의 title+content 매칭.
-
-export interface KeywordArticle {
-  news_id: string;
-  title: string;
-  sub_title?: string;
-  published_at: string;
-  category: string;
-  provider?: string;
-  byline?: string;
-  image_url?: string | null;
-  original_link?: string;
-  matches: number;
-}
-
-export interface KeywordSearchResponse {
-  keywords: string[];
-  days_searched: number;
-  total: number;
-  articles: KeywordArticle[];
-}
-
-export async function searchArticlesByKeywords(
-  keywords: string[],
-  options?: { days?: number; limit?: number },
-): Promise<KeywordSearchResponse> {
-  const params = new URLSearchParams();
-  params.set('keywords', keywords.join(','));
-  params.set('days', String(options?.days ?? 7));
-  params.set('limit', String(options?.limit ?? 20));
-
-  // 인증 불필요 — 공개 read 엔드포인트
-  const res = await fetch(`${API_URL}/s3-articles/keyword?${params}`);
-  if (!res.ok) {
-    throw new Error(`Keyword article search failed: ${res.status}`);
-  }
-  return res.json();
-}
-

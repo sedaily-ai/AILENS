@@ -35,6 +35,36 @@ function splitHeading(text: string): { head: string; question: string } {
   return { head: head.trim(), question: rest.join(':').trim() };
 }
 
+// 소제목 줄 뒤에 본문이 줄바꿈 없이 붙어 오는 발행분(2026-10-12~)을 소제목과 본문으로 나눈다.
+// 프롬프트 골격이 "◾ 이모지 라벨: 질문형 소제목 본문"처럼 한 줄로 적혀 있어 모델이 그대로 붙여 쓰는 경우가 있다.
+// 정상 소제목(라벨 40자 이하 + 질문 80자 이하, 내용 없는 칸 이름)은 건드리지 않는다.
+// "한 가지만 기억한다면"·"에디터 노트" 칸은 소제목 뒤에 질문이 없으므로, 뒤에 붙은 것은 길이와 상관없이 본문이다.
+const MERGED_BOX_NAME = /^(?:\p{Extended_Pictographic}\uFE0F?\s*)?(?:한\s*가지만\s*기억한다면|에디터\s*노트)\s*[:：]?\s+(?=\S)/u;
+const MAX_LABEL = 40;
+const MAX_QUESTION = 80;
+const MAX_PLAIN_HEADING = 60;
+const QUESTION_END_WITHIN = 60;
+
+function splitMergedHeading(text: string): { heading: string; body: string } | null {
+  const box = MERGED_BOX_NAME.exec(text);
+  if (box) return { heading: box[0].replace(/[:：]?\s*$/, '').trim(), body: text.slice(box[0].length).trim() };
+  const colon = text.search(/[:：]/);
+  const label = colon >= 0 ? text.slice(0, colon).trim() : '';
+  if (colon >= 0 && label.length <= MAX_LABEL && !label.includes('【')) {
+    // "라벨: 질문? 본문" — 물음표까지를 질문으로 남기고, "라벨: 본문"이면 라벨만 소제목으로 쓴다.
+    const rest = text.slice(colon + 1).trim();
+    if (rest.length <= MAX_QUESTION) return null;
+    const qm = rest.indexOf('?');
+    if (qm >= 0 && qm < QUESTION_END_WITHIN) return { heading: `${label}: ${rest.slice(0, qm + 1)}`, body: rest.slice(qm + 1).trim() };
+    return { heading: label, body: rest };
+  }
+  // 콜론 없이 "질문형 소제목? 본문".
+  if (text.length <= MAX_PLAIN_HEADING) return null;
+  const qm = text.indexOf('?');
+  if (qm >= 0 && qm < QUESTION_END_WITHIN) return { heading: text.slice(0, qm + 1).trim(), body: text.slice(qm + 1).trim() };
+  return null;
+}
+
 /** 소제목 줄이면 그 내용을, 아니면 null. 소제목 표식인데 내용이 비면 ''(= 무시 대상). */
 function headingText(line: string): string | null {
   const h = HASH.exec(line) ?? SQUARE.exec(line);
@@ -110,9 +140,12 @@ export function parseLetterBlocks(paragraphs: string[] | null | undefined, opts:
     const ht = headingText(line);
     if (ht !== null) {
       if (!ht) continue; // 표식만 있고 내용이 없는 소제목은 건너뛴다.
-      const { head, question } = splitHeading(ht);
-      blocks.push({ type: 'sub', no: subNo, head: head || ht, question });
+      const merged = splitMergedHeading(ht);
+      const headingLine = merged ? merged.heading : ht;
+      const { head, question } = splitHeading(headingLine);
+      blocks.push({ type: 'sub', no: subNo, head: head || headingLine, question });
       subNo += 1;
+      if (merged?.body) blocks.push(parseCompare(merged.body) ?? { type: 'p', text: merged.body });
       continue;
     }
 

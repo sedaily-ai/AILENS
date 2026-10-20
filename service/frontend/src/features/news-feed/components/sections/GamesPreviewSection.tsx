@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { Press_Start_2P } from 'next/font/google';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { GAMES } from '@/shared/data/games';
+import { SajuPromoCard } from './SajuPromoCard';
 
 const arcadeFont = Press_Start_2P({ weight: '400', subsets: ['latin'], display: 'swap' });
 const ARCADE_FONT = `${arcadeFont.style.fontFamily}, "Courier New", monospace`;
 
-// 게임 섹션 — 웹툰·영상 섹션과 같은 "재밌게 훑는 비주얼 콘텐츠" 성격이지만, 의도적으로 사이트 전역의 밝은 에디토리얼 톤을 벗어난다.
+// 게임 섹션('쉬어가기') — 웹툰·영상 섹션과 같은 "재밌게 훑는 비주얼 콘텐츠" 성격이지만, 의도적으로 사이트 전역의 밝은 에디토리얼 톤을 벗어난다.
+// 사주 안내(SajuPromoCard)도 이 구역에 함께 둔다 — 엔터테인먼트는 홈 맨 아래 한 곳에만 있다(2026-10-19).
 // /games 라우트(GamesClient.tsx)가 다크+네온 아케이드 톤이므로 홈 티저도 같은 톤으로 맞춰 게임임을 즉시 전달한다.
 // 게임 목록(GAMES)은 GamesClient.tsx와 shared/data/games.ts를 공유하므로 새 게임이 추가되면 이 섹션도 자동으로 늘어난다.
 // 게임이 2종이어도 카드 2장(2열, 최소폭 260px)이 충분히 커서 모두 노출한다.
@@ -29,7 +31,7 @@ export function GamesPreviewSection() {
             className="text-gray-400"
             style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}
           >
-            게임
+            쉬어가기
           </p>
           <h2 className="text-gray-900" style={{ fontSize: 'clamp(20px, 4.4vw, 24px)', fontWeight: 800, letterSpacing: '-0.02em' }}>
             잠깐, 한 판 하고 갈까요?
@@ -40,7 +42,7 @@ export function GamesPreviewSection() {
           className="text-gray-500 hover:text-gray-900 flex-shrink-0"
           style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
         >
-          더 보기
+          게임 더 보기
           <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
           </svg>
@@ -149,6 +151,11 @@ export function GamesPreviewSection() {
             </div>
           </Link>
         ))}
+      </div>
+
+      {/* 사주 안내 — 게임과 같은 '쉬어가기' 구역에 둔다(오른쪽 레일에서 옮김, SajuPromoCard.tsx 상단 주석 참조). */}
+      <div style={{ marginTop: 'clamp(12px, 2.4vw, 20px)' }}>
+        <SajuPromoCard />
       </div>
     </section>
   );

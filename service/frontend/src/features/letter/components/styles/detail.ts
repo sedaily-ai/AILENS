@@ -45,8 +45,8 @@ export const DETAIL_CSS = `
   .ld-tools { position: static; flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; max-width: 100%; width: fit-content; margin: 0; padding: 2px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; box-shadow: none; }
   .ld-tools button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer; }
   .ld-tools button small { font-size: 11px; margin-left: 1px; }
-  .ld-tools button:hover:not(:disabled) { color: #2f5fcf; }
-  .ld-tools button:disabled { opacity: .35; cursor: default; }
+  .ld-tools button:hover:not(:disabled):not([aria-disabled='true']) { color: #2f5fcf; }
+  .ld-tools button:disabled, .ld-tools button[aria-disabled='true'] { opacity: .35; cursor: default; }
   .ld-toc-rail { position: absolute; top: 56px; bottom: 72px; left: calc(100% + 36px); width: 180px; display: none; }
   .ld-toc { position: sticky; top: 84px; max-height: calc(100dvh - 108px); overflow-y: auto; overscroll-behavior: contain; }
   .ld-toc ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; border-left: 1px solid #e5e7eb; }
@@ -57,10 +57,8 @@ export const DETAIL_CSS = `
   @media (min-width: 1280px) { .ld-toc-rail { display: block; } }
   .lt-dlg-back::backdrop { background: transparent; }
   .lt-dlg, .lt-dlg-back { --blue: #2f5fcf; --line: #e5e7eb; --soft: #f6f7f9; --ink: #111827; }
-  /* 저장·읽음(2026-10-11) */
+  /* 저장(2026-10-11) */
   .lt-savedtab[aria-pressed='true'] { background: #111827; border-color: #111827; color: #fff; }
-  .lt-row-read .lt-row-title { color: #6b7280; }
-  .lt-row-readmark { padding: 1px 6px; border-radius: 4px; background: #f3f4f6; font-size: 12px; color: #6b7280; }
   .lt-row-save:hover { color: #2f5fcf; }
   .lt-row-save[aria-pressed='true'], .ld-tools button[aria-pressed='true'] { color: #2f5fcf; }
   /* 관련 레터 */
@@ -85,7 +83,7 @@ export const DETAIL_CSS = `
   .ld-editor .lt-avatar { width: 22px !important; height: 22px !important; flex: none; }
   .ld-editor .lt-avatar-img { object-fit: cover; border-radius: 50% !important; }
   /* 에디터 알약은 항상 둥글게 */
-  .lt-card-ed, .lt-card-ed-badge, .ld-editor { border-radius: 999px !important; }
+  .lt-card-ed-badge, .ld-editor { border-radius: 999px !important; }
   .lt-card-ed-badge { display: inline-flex; align-items: center; gap: 6px; }
   /* 2026-10-13: 목록과 같은 바깥 여백, 제목 아래 작성자·읽기 도구. */
   .ld-wrap { position: relative; --blue: var(--color-accent-primary, #2f5fcf); max-width: 720px; padding: 28px 0 72px; }

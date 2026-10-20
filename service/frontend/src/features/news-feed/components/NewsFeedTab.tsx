@@ -47,12 +47,6 @@ function CategoryPairRow({
 }
 
 interface Props {
-  selectedDate: Date;
-  setSelectedDate: (date: Date) => void;
-  calendarMonth: Date;
-  setCalendarMonth: (date: Date) => void;
-  showCalendar: boolean;
-  setShowCalendar: (show: boolean) => void;
   selectedGroup: MbtiGroupId;
   onMbtiChange?: (group: MbtiGroupId) => void;
   // 빌드타임(app/page.tsx) 서버 프리페치 값을 각 섹션에 하향 전달한다. 없으면 각 섹션이 클라이언트에서 로드한다.

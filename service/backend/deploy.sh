@@ -60,7 +60,7 @@ pip3 install \
   --no-cache-dir \
   --quiet
 
-# 소스/worker/shim을 동일한 허용 목록으로 복사한다.
+# 소스/shim을 동일한 허용 목록으로 복사한다(알림 워커는 2026-10-20 기능 다이어트로 제거).
 python3 deployment/package.py --stage lambda-build
 find lambda-build -type d -name __pycache__ -exec rm -rf {} +
 find lambda-build -type f -name '*.pyc' -delete

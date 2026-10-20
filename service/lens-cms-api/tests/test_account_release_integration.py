@@ -17,16 +17,16 @@ import pytest
 
 from test_dashboard_storage import repo
 from test_activity_recommendations import modules
-from test_completion_rewards import complete
-from test_notifications import notifications, subscription
+from test_view_only_activity import formats
 
 
-__all__ = ['repo','modules','complete','notifications']
+__all__ = ['repo','modules','formats']
 
 
 @pytest.fixture
 def account_api(request, monkeypatch):
-    _, _, _, cursor, dashboard_repo = request.getfixturevalue('notifications')
+    # 예전에는 알림 fixture가 DB를 준비했다. 알림 워커 제거(2026-10-20 기능 다이어트) 뒤 같은 기반 fixture를 직접 쓴다.
+    dashboard_repo, _, _, cursor = request.getfixturevalue('formats')
     backend=Path(__file__).resolve().parents[2]/'backend'
     monkeypatch.syspath_prepend(str(backend))
     import route_guards
@@ -62,13 +62,23 @@ def account_api(request, monkeypatch):
 
 
 def test_account_roundtrip_preferences_bookmarks_follows_import_and_expiry(account_api):
-    call,_,_=account_api
-    saved=call('/preferences','PUT',{'revision':0,'minutes':5,'interests':[{'type':'category','key':'industry'}]})
-    assert saved['revision']==1
+    call,cursor,_=account_api
+    saved=call('/preferences','PUT',{'revision':0,'interests':[{'type':'category','key':'industry'}]})
+    assert saved['revision']==1 and saved['minutes']==0  # minutes: 옛 계정 API 호환용 DB 값(다음 정리 때 제거)
     assert call('/preferences',owner='b')['revision']==0
-    call('/preferences','PUT',{'revision':0,'minutes':10,'interests':[]},expected=409)
+    call('/preferences','PUT',{'revision':0,'interests':[]},expected=409)
+    # 예전에 5분을 고른 계정: 예전 웹이 읽을 시간을 저장해도 400 없이 아무것도 쓰지 않는다(관심·revision·저장된 5분 그대로).
+    with cursor() as cur:
+        cur.execute("UPDATE user_lens_preferences SET minutes=5 WHERE user_id='a'")
+    assert call('/preferences','PUT',{'revision':1,'minutes':10})=={**saved,'minutes':5}
+    with cursor() as cur:
+        cur.execute("SELECT minutes,revision FROM user_lens_preferences WHERE user_id='a'");assert dict(cur.fetchone())=={'minutes':5,'revision':1}
     call('/preferences',expired=True,expected=401)
-    assert call('/preferences')['minutes']==5
+    assert call('/preferences')=={**saved,'minutes':5}
+    # 시간 제한이 남아 있어도 레터 추천은 비지 않는다(예전 웹의 minutes 질의도 무시).
+    for query in ({'tab':'home'},{'tab':'home','minutes':'5'}):
+        letters=call('/dashboard',query=query)['letters']
+        assert letters['status']=='ready' and 'minutes_budget' not in letters['data']
     call('/letter-bookmarks/1','PUT')
     assert call('/letter-bookmarks')['total']==1
     assert call('/letter-bookmarks',owner='b')['total']==0
@@ -82,40 +92,50 @@ def test_account_roundtrip_preferences_bookmarks_follows_import_and_expiry(accou
     assert call('/letter-bookmarks')['total']==1
     call('/followed-editors/mincheol','DELETE')
     assert call('/followed-editors')['total']==0
+    # 저장한 기사(v1.57): 계정 API → CMS → DB 실제 경로로 저장·상태·목록·해제가 이어진다.
+    with cursor() as cur:
+        cur.execute(Path(__file__).resolve().parents[3].joinpath('docs/architecture/lens-erd-src/lens_schema_v1.57_2026-10-20.sql').read_text())
+    assert call('/article-bookmarks/42')['saved'] is False
+    assert call('/article-bookmarks/42','PUT')['saved'] is True
+    assert call('/article-bookmarks/42')['saved'] is True and call('/article-bookmarks/42',owner='b')['saved'] is False
+    listed=call('/article-bookmarks')
+    assert listed['total']==1 and listed['items'][0]['content']['content_key']=='publication:42' and listed['items'][0]['content']['available']
+    assert call('/article-bookmarks',owner='b')['total']==0
+    call('/article-bookmarks/123','PUT',expected=404)
+    call('/article-bookmarks/abc','PUT',expected=400)
+    assert call('/article-bookmarks/42','DELETE')['saved'] is False
+    assert call('/article-bookmarks')['total']==0
 
 
-def test_account_recommendation_completion_rewards_notifications_and_dependency(account_api):
+def test_account_recommendation_view_signal_notifications_and_dependency(account_api):
     call,cursor,personal=account_api
-    call('/preferences','PUT',{'revision':0,'minutes':0,'interests':[{'type':'category','key':'industry'}]})
+    call('/preferences','PUT',{'revision':0,'interests':[{'type':'category','key':'industry'}]})
     # 공개 프론트가 사용하는 조회 계약을 실제 service/router/SQL을 통해 읽는다.
-    assert call('/format-preference')['status']=='insufficient_data'
-    assert call('/recommendations',query={'kind':'news','reason':'all','limit':'4'})['algorithm_version']=='recent-category-editor-v3'
+    # 형식 비율·기간 기록·리워드 조회는 제거돼 공개 API에서 404다.
+    for removed in ('/format-preference','/activity','/rewards'):
+        assert call(removed,expected=404)['error']['code']=='NOT_FOUND'
+    # 대시보드와 같은 계산을 따로 주던 /recommendations는 2026-10-20 기능 다이어트로 지웠다. 같은 추천은 대시보드 news로 확인한다.
+    assert call('/recommendations',query={'kind':'news','reason':'all','limit':'4'},expected=404)['error']['code']=='NOT_FOUND'
+    assert call('/dashboard',query={'tab':'home'})['news']['data']['algorithm_version']=='recent-category-editor-v3'
     session=call('/activity/sessions','POST',{'content_key':'publication:42','format':'letter'},expected=201)
+    assert session['completion']['completion_enabled'] is False and session['completion']['panel_ids']==[]
     with cursor() as cur:
         cur.execute("UPDATE user_content_sessions SET started_at=now()-interval '60 seconds',updated_at=now()-interval '60 seconds' WHERE id=%s",(session['session_id'],))
+    # 예전 웹 payload(scroll_ratio 포함)도 400 없이 받고, 열람만 판정한다.
     progress={'session_id':session['session_id'],'event_id':str(uuid.uuid4()),'session_seq':1,'event_type':'progress','visible_ms':30000,'scroll_ratio':1}
     result=call('/activity/events','POST',progress)
-    assert result['completed'] and not result['reward']['stamp_awarded']
+    assert result['viewed'] and result['completed'] is False and not result['reward']['stamp_awarded']
     assert call('/activity/events','POST',progress)==result
-    assert call('/activity',owner='b')['data']['completed_contents']==0
-    assert call('/activity')['data']['completed_contents']==1
-    assert call('/rewards')['data']['stamp_days']==0
-    state=call('/notifications/preferences')
-    call('/notifications/preferences','PUT',{'revision':state['revision'],'preferences':{**state['preferences'],'briefing':True}})
-    call('/notifications/consent','PUT',{'channel':'web_push','granted':True,'policy_version':state['config']['policy_version']})
-    device=call('/push-subscriptions','POST',subscription(),expected=201)
-    assert call('/notifications/preferences')['delivery']['active_subscriptions']==1
-    assert call('/notifications/preferences',owner='b')['delivery']['active_subscriptions']==0
-    preview=call('/notifications/preview')
-    assert preview['mode']=='dry_run' and not preview['actual_sent']
-    call('/push-subscriptions/'+device['id'],'DELETE')
-    call('/notifications/consent','PUT',{'channel':'web_push','granted':False,'policy_version':state['config']['policy_version']})
-    assert not call('/notifications/preferences')['consent']['granted']
+    with cursor() as cur:
+        cur.execute('SELECT count(*) AS n FROM user_content_completions');assert cur.fetchone()['n']==0
+    # 공개 알림 설정·동의·미리보기와 웹 푸시 기기는 2026-10-20 기능 다이어트로 지웠다. CMS를 거치지 않고 계정 API가 404를 준다.
+    for path,method in (('/notifications/preferences','GET'),('/notifications/preferences','PUT'),('/notifications/consent','PUT'),
+                        ('/notifications/preview','GET'),('/push-subscriptions','POST'),('/push-subscriptions/'+str(uuid.uuid4()),'DELETE')):
+        assert call(path,method,{},expected=404)['error']['code']=='NOT_FOUND'
     summary=call('/dashboard')
     assert summary['scope']=='account'
-    assert summary['weekly_rewards']['status']=='unavailable'
-    assert summary['weekly_activity']['data']['read_days']==1
-    assert summary['weekly_activity']['data']['days']
-    assert all(summary[key]['status']=='ready' for key in ('preferences','format_preference','notifications','news','letters'))
+    # 예전 화면 호환용 키만 남고 계산·조회하지 않는다. 알림 설정은 웹이 쓰지 않아 대시보드에서 묻지 않는다.
+    assert all(summary[key]=={'status':'unavailable','data':None,'error':None} for key in ('format_preference','weekly_activity','weekly_rewards','notifications'))
+    assert all(summary[key]['status']=='ready' for key in ('preferences','saved_letters','news','letters'))
     personal._TOKEN='wrong-test-token'
     call('/preferences',expected=503)

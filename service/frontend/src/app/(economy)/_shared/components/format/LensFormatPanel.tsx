@@ -139,7 +139,7 @@ export function LensFormatPanel({
       {/* 레터 본문 — 편집 지면 톤(읽기 폭 620px 상한 + 첫 문단 리드인 + 문단 간격 24px). 문체는 AI LENS 편집장 프롬프트 가이드(-했어요체, 문단당 2~3문장)를 따른다.
           article[data-letter-body]로 감싸는 이유 — SentenceSelectionPopover가 이 안에서만 selection을 인정한다(letters/[id] 페이지와 동일). */}
       {format === 'letter' && letterParagraphs && (
-        <LetterReadingBody lens={lens} l={l} on={on} letterBlocks={letterBlocks} letterParagraphs={letterParagraphs} isNewFormat={isNewFormat} />
+        <LetterReadingBody lens={lens} l={l} on={on} letterBlocks={letterBlocks} isNewFormat={isNewFormat} />
       )}
 
       {/* 불릿에 라벨을 붙여 질문과의 관계를 명시한다. 데모 문단 오버라이드가 없는 기사는 CMS 불릿을 그대로 쓴다. */}

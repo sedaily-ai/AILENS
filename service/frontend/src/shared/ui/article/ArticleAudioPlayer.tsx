@@ -1,16 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Repeat, RotateCcw, RotateCw, Bookmark, ChevronDown, Check } from 'lucide-react';
+import { Repeat, RotateCcw, RotateCw, ChevronDown, Check } from 'lucide-react';
 import { clock, spoken, boldenQuotes, PLAYBACK_RATES, PLAYBACK_RATE_LABELS } from '@/shared/lib/media/mediaPlayerFormat';
-import { useMediaBookmark, usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/media/useMediaPlayerControls';
+import { usePlaybackRateMenu, useMediaTransport } from '@/shared/lib/media/useMediaPlayerControls';
 import { aapCss } from './articleAudioPlayerStyles';
 
 /**
  * 기사 안에 인라인으로 박히는 오디오 플레이어 카드.
  *
  * 구조: 커버 아트 → 배지+제목 → 바이라인 → 대본 탭 → 대본 패널(재생 위치 하이라이트) → 파형 → 하단 컨트롤
- * (반복/±5초/재생/북마크). 스타일은 articleAudioPlayerStyles.ts에 있다.
+ * (반복/±5초/재생). 스타일은 articleAudioPlayerStyles.ts에 있다.
  *
  * 동작하지 않는 기능을 활성화된 것처럼 두지 않는다.
  * - 순위 배지는 없다(실제 순위 데이터가 없다). 형식 이름("팟캐스트")을 배지로 쓴다.
@@ -28,7 +28,6 @@ const RATE_LABELS = PLAYBACK_RATE_LABELS;
 const WAVE_BAR_COUNT = 96;
 
 // 하단 팟캐스트 상시 재생 바(TodayNewsPlayer.tsx)와 같은 storage key 프리픽스 규칙을 따르되, 기사별 오디오이므로 src를 키로 쓴다.
-const BOOKMARK_STORAGE_KEY = 'ailens-audio-bookmarks';
 
 type TabKey = 'script';
 // 확장 지점: 스크립트/챕터 데이터가 생기면(예: Q&A 세그먼트) 여기에 추가한다. 데이터 없는 탭은 만들지 않는다.
@@ -117,9 +116,8 @@ export function ArticleAudioPlayer({
   const scriptListRef = useRef<HTMLOListElement | null>(null);
   const autoTrackResumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 북마크·배속 메뉴·재생 전송(재생/일시정지/탐색/±5초/재시도) 상태 로직은
+  // 배속 메뉴·재생 전송(재생/일시정지/탐색/±5초/재시도) 상태 로직은
   // ArticleVideoPlayer.tsx와 같아서 shared/lib/media/useMediaPlayerControls.ts로 추출했다.
-  const { bookmarked, toggleBookmark } = useMediaBookmark(src, BOOKMARK_STORAGE_KEY);
   const { rateIdx, rateMenuOpen, setRateMenuOpen, selectRate, rateMenuRef, rateTriggerRef } =
     usePlaybackRateMenu(ref, RATES);
   const { playing, cur, dur, failed, toggle, seekTo, nudge, retry } = useMediaTransport(ref, {
@@ -474,16 +472,8 @@ export function ArticleAudioPlayer({
               <button type="button" className="aap-icon-btn" onClick={() => nudge(5)} aria-label="5초 앞으로" title="5초 앞으로">
                 <RotateCw size={20} strokeWidth={1.5} aria-hidden />
               </button>
-              <button
-                type="button"
-                className="aap-icon-btn"
-                aria-pressed={bookmarked}
-                aria-label={bookmarked ? '북마크 해제' : '북마크에 저장'}
-                title={bookmarked ? '북마크 해제' : '북마크에 저장'}
-                onClick={toggleBookmark}
-              >
-                <Bookmark size={19} strokeWidth={1.5} aria-hidden fill={bookmarked ? 'currentColor' : 'none'} />
-              </button>
+              {/* 왼쪽 '반복'과 같은 폭의 빈 칸 — 오른쪽 북마크를 지운 뒤에도 재생 버튼이 가운데에 오게 한다. */}
+              <span className="aap-transport-spacer" aria-hidden />
             </div>
 
           </>

@@ -126,10 +126,10 @@ export function ArticleScreen() {
   );
 }
 
-function Meta({ category, when, readMin }: { category?: string | null; when: string; readMin?: number | null }) {
+function Meta({ category, when }: { category?: string | null; when: string }) {
   return (
     <Text style={styles.meta}>
-      {[category ? displayCategoryLabel(category) : null, when, readMin ? `약 ${readMin}분` : null].filter(Boolean).join('  ·  ')}
+      {[category ? displayCategoryLabel(category) : null, when].filter(Boolean).join('  ·  ')}
     </Text>
   );
 }

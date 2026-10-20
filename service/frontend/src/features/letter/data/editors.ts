@@ -2,7 +2,7 @@
 // 8명으로 줄였다(2026-10-11): 담당 분야가 겹치던 수빈·도윤·다은·유나는 하은·준서·소율에 합쳤다.
 // 이미지(public/editors)가 있는 4명(민철 INTJ·하은 INFP·준서 ISTJ·소율 ESFP)을 앞에 두고, 나머지 4명(지훈·서연·예린·시우)은 손그림풍 졸라맨 선화(scripts/draw_editor_sketches.py)를 임시로 쓴다.
 // 소개 음성(옛 기록: ElevenLabs eleven_multilingual_v2) voiceId — 민철 RU7aSi6lT4uQBXMLgDxK(TeddyNote), 하은 AW5wrnG1jVizOYY7R1Oo(JiYoung), 준서 5XgfKMHL4qnyg2mabE5t(Deck), 소율 QPFsEL6IBxlT15xfiD6C(Hana Lee).
-// 에디터는 "누구의 관심 영역을 맡는가"로 나뉘고, 레터 본문은 모두 같은 중립 편집 원칙(주관·유도·권유 금지)을 따른다. 에디터는 AI 에디터이며 화면에 그렇게 표시한다.
+// 에디터는 "누구의 관심 영역을 맡는가"로 나뉘고, 레터 본문은 모두 같은 중립 편집 원칙(주관·유도·권유 금지)을 따른다. 에디터는 AI 에디터지만 소개 카드에 "AI 에디터" 문구는 표시하지 않는다(2026-10-19, 사용자 지시).
 // 작성자 표시는 서버의 작성자 관계를 따른다. 독자는 에디터를 여러 명 팔로우한다.
 import type { IssueLetter } from './letterTypes';
 

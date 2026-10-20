@@ -3,7 +3,7 @@ import { Animated, Easing, Linking, Pressable, StyleSheet, View } from 'react-na
 import { Image } from 'react-native';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { displayCategoryLabel, categoryForDataLabel, displayHeadline, readMinutes } from '@ailens/domain';
+import { displayCategoryLabel, categoryForDataLabel, displayHeadline } from '@ailens/domain';
 import type { LensPost } from '@ailens/api-client';
 import { kstDateTime } from '../../lib/format';
 import { READING_ACCENT, formatColors } from '../../theme';
@@ -23,8 +23,6 @@ export function Rule() {
 
 /** 기사 머리 — 카테고리 아이브로우(+4가지 시선 배지) → 세리프 헤드라인 → 리드 → 바이라인. 웹 LensViewClient 의 .lw 머리와 같은 순서·크기. */
 export function ArticleHeader({ lens, scale }: { lens: LensPost; scale: number }) {
-  const letter = lens.lenses?.find((l) => l.label === '레터');
-  const readMin = letter?.paragraphs?.length ? readMinutes(letter.paragraphs.join('').length) : null;
   const cat = lens.category ? displayCategoryLabel(lens.category) : null;
   return (
     <View>
@@ -50,7 +48,6 @@ export function ArticleHeader({ lens, scale }: { lens: LensPost; scale: number }
         <Text style={styles.bylineStrong}>AI LENS 편집팀</Text>
         {' · 입력 '}
         {kstDateTime(lens.published_at, lens.date)}
-        {readMin ? ` · 약 ${readMin}분 읽기` : ''}
       </Text>
       <Rule />
     </View>

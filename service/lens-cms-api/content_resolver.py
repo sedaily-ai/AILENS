@@ -24,7 +24,7 @@ def resolve_content(cur, kind: str, key_type: str, key: str) -> dict:
                         "(SELECT publication_id FROM publication_slug_history WHERE old_slug=%s)))", (key, key, key))
     else:
         field = 'id' if key_type == 'id' else 'slug'  # allowlist only
-        cur.execute(f"SELECT id,slug,title,published_at,deck,read_minutes FROM issue_letters WHERE {field}=%s "
+        cur.execute(f"SELECT id,slug,title,published_at,deck FROM issue_letters WHERE {field}=%s "
                     "AND status='published' AND deleted_at IS NULL AND published_at<=clock_timestamp()", (int(key) if key_type == 'id' else key,))
     row = cur.fetchone()
     if row is None:

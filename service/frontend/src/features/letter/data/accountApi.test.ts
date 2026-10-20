@@ -2,21 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@/shared/lib/auth/authFetch', () => ({ authFetch: request }));
 vi.mock('@/shared/config/apiClient', () => ({ API_URL: 'http://127.0.0.1:4102' }));
-import { AccountApiError, getAccountBookmarks, getLensPreferences, putLensPreferences, setAccountBookmark, getAccountFollows, setAccountFollow, importBrowserBookmarks } from './accountApi';
+import { AccountApiError, getAccountBookmarks, setAccountBookmark, getAccountFollows, setAccountFollow, importBrowserBookmarks } from './accountApi';
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 describe('계정 저장 API 어댑터', () => {
   beforeEach(() => request.mockReset());
-  it('읽을 시간 저장은 owner와 기존 관심을 보내지 않는다', async () => {
-    request.mockResolvedValue(response({ revision: 2, interests: [], minutes: 5 }));
-    await putLensPreferences({ revision: 1, minutes: 5, updated_at: null });
-    expect(request.mock.calls[0][0]).toBe('http://127.0.0.1:4102/api/v2/me/preferences');
-    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ revision: 1, minutes: 5 });
-    expect(request.mock.calls[0][1].cache).toBe('no-store');
-  });
   it('충돌·인증·서버 실패는 저장 성공으로 바꾸지 않는다', async () => {
     for (const status of [401,409,503]) {
       request.mockResolvedValue(response({ error: { code: 'FIXTURE', message: 'fixture' } },status));
-      await expect(putLensPreferences({ revision: 0, minutes: 0, updated_at: null })).rejects.toMatchObject({ status, code: 'FIXTURE' });
+      await expect(setAccountFollow('mincheol', true)).rejects.toMatchObject({ status, code: 'FIXTURE' });
     }
     expect(AccountApiError.prototype).toBeInstanceOf(Error);
   });
@@ -42,7 +35,7 @@ describe('계정 저장 API 어댑터', () => {
   });
 });
 
-describe('팔로우·관심 설정 조회 복구', () => {
+describe('팔로우·계정 조회 복구', () => {
   beforeEach(() => { request.mockReset(); });
 
   it('팔로우 연결이 한 번 끊기면 같은 GET을 다시 읽어 기존 항목을 반환한다', async () => {
@@ -54,10 +47,10 @@ describe('팔로우·관심 설정 조회 복구', () => {
     expect(request.mock.calls.every(([url, options]) => url.endsWith('/followed-editors') && options.method === 'GET' && options.signal === signal && options.cache === 'no-store')).toBe(true);
   });
 
-  it.each([502, 503, 504])('관심 설정 HTTP %i는 한 번 재조회해 저장된 값을 반환한다', async status => {
-    const data = { interests: [{ type: 'category', key: 'industry' }], minutes: 5, revision: 3, updated_at: null };
+  it.each([502, 503, 504])('계정 조회 HTTP %i는 한 번 재조회해 저장된 값을 반환한다', async status => {
+    const data = { items: [{ id: 'mincheol', active: true }], total: 1 };
     request.mockResolvedValueOnce(response({}, status)).mockResolvedValueOnce(response(data));
-    expect(await getLensPreferences()).toEqual(data);
+    expect(await getAccountFollows()).toEqual(data);
     expect(request).toHaveBeenCalledTimes(2);
   });
 
@@ -83,12 +76,11 @@ describe('팔로우·관심 설정 조회 복구', () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
-  it('팔로우 저장·해제·관심 저장·가져오기 실패는 자동 재시도하지 않는다', async () => {
+  it('팔로우 저장·해제·가져오기 실패는 자동 재시도하지 않는다', async () => {
     request.mockRejectedValue(new TypeError('Failed to fetch'));
     const operations = [
       () => setAccountFollow('mincheol', true),
       () => setAccountFollow('mincheol', false),
-      () => putLensPreferences({ minutes: 5, revision: 3, updated_at: null }),
       () => importBrowserBookmarks(['one'], 'local-import'),
     ];
     for (const operation of operations) await expect(operation()).rejects.toThrow('Failed to fetch');
@@ -98,10 +90,11 @@ describe('팔로우·관심 설정 조회 복구', () => {
 
 describe('계정 연결 API',()=>{
  beforeEach(()=>request.mockReset());
- it('서버 완료 필터를 모든 cursor 페이지에 유지한다',async()=>{
+ it('저장 목록은 모든 cursor 페이지에서 읽음 필터를 보내지 않는다',async()=>{
   request.mockResolvedValueOnce(response({items:[{letter_id:'1'}],next_cursor:'next'})).mockResolvedValueOnce(response({items:[],next_cursor:null}));
-  await getAccountBookmarks(undefined,'unread');
-  expect(request.mock.calls.every(call=>call[0].includes('read=unread'))).toBe(true);
+  await getAccountBookmarks();
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(request.mock.calls.every(call=>call[0].includes('/letter-bookmarks?limit=200')&&!call[0].includes('read='))).toBe(true);
  });
  it('팔로우는 계정 API만 호출하고 관심 전체를 다시 저장하지 않는다',async()=>{
   request.mockResolvedValue(response({items:[],following:true}));await getAccountFollows();await setAccountFollow('mincheol',true);

@@ -62,8 +62,22 @@ def _fallback_icon(name: str) -> str:
     return "info"
 
 
-def _fix_icon(name: str) -> str:
-    return name if name in ICON_WHITELIST else _fallback_icon(name)
+# AI PRISM 테마(design.theme "prism") 아이콘 — src/prism/icons.tsx의 ICONS 키와 반드시 같이 갱신할 것.
+# PRISM 그림은 따로 그리므로 rocket·chip·flask 같은 이름을 기본 테마 목록으로 바꾸지 않는다.
+PRISM_ICON_WHITELIST = {
+    "rocket", "building", "office", "flask", "science", "chip", "cpu", "moneybag", "money-bag",
+    "store", "shop", "flag", "quote", "users", "people", "bank", "landmark", "calendar",
+    "trending-up", "chart", "trending-down", "robot", "bot", "briefcase", "factory", "shield",
+    "shield-alert", "smartphone", "phone", "phone-call", "coins", "coin", "credit-card",
+    "alert-triangle", "alert", "file-warning", "megaphone", "map-pin", "pin", "scale", "car", "info",
+}
+
+
+def _fix_icon(name: str, allowed: set[str] = ICON_WHITELIST) -> str:
+    if name in allowed:
+        return name
+    fixed = _fallback_icon(name)
+    return fixed if fixed in allowed else "info"
 
 def _photo_reachable(url: str) -> bool:
     """렌더러는 사진을 못 불러오면 렌더 자체가 실패하므로, 첫 컷 사진은 미리 열리는지 확인한다."""
@@ -81,6 +95,8 @@ def fix_script(
     """안전한 결함(장식성 필드)만 자동 수정. 반환: (수정된 script, 적용된 수정 로그)"""
     applied: list[str] = []
     fixed_cuts = []
+    is_prism = (script.get("design") or {}).get("theme") == "prism"
+    allowed_icons = PRISM_ICON_WHITELIST if is_prism else ICON_WHITELIST
     for i, cut in enumerate(script.get("cuts", [])):
         cut_type = cut.get("type")
         tag = f"cut[{i}]({cut_type})"
@@ -129,15 +145,15 @@ def fix_script(
             if not data.get("icon"):
                 data["icon"] = "info"
                 applied.append(f"{tag}: data.icon 누락 → 'info' 기본값")
-            elif data["icon"] not in ICON_WHITELIST:
-                fixed = _fix_icon(data["icon"])
+            elif data["icon"] not in allowed_icons:
+                fixed = _fix_icon(data["icon"], allowed_icons)
                 applied.append(f"{tag}: 아이콘 '{data['icon']}' → '{fixed}'(화이트리스트 밖)")
                 data["icon"] = fixed
 
         if cut_type == "diagram":
             for node in cut.get("data", {}).get("nodes", []):
-                if node.get("kind") == "node" and node.get("icon") and node["icon"] not in ICON_WHITELIST:
-                    fixed = _fix_icon(node["icon"])
+                if node.get("kind") == "node" and node.get("icon") and node["icon"] not in allowed_icons:
+                    fixed = _fix_icon(node["icon"], allowed_icons)
                     applied.append(f"{tag}: 노드 아이콘 '{node['icon']}' → '{fixed}'(화이트리스트 밖)")
                     node["icon"] = fixed
                 # 스키마상 connector.variant는 'arrow' 하나뿐이다(schema.ts z.enum(['arrow'])).

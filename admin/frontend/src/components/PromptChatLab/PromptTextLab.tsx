@@ -198,7 +198,11 @@ export function PromptTextLab({
   const videoRenderRef = useRef<VideoRenderSettingsPanelHandle>(null);
   const [scriptServerVersion, setScriptServerVersion] = useState<number | null>(null);
   const [applyingScriptVersion, setApplyingScriptVersion] = useState(false);
-  const hasCompanionPanel = category === "podcast" || category === "video";
+  // PRISM(2026-10-20) — 영상 탭 복제. 같은 영상 카드·렌더를 쓰되, LENS 영상 발행 설정(video-settings)을
+  // 저장하는 "음성 설정·영상 설정" 단계와 카드의 "프로덕션에 적용"은 띄우지 않는다(누르면 LENS 영상이 바뀐다).
+  const isPrism = category === "prism";
+  const isVideoLike = category === "video" || isPrism;
+  const hasCompanionPanel = category === "podcast" || isVideoLike;
   const handleApplyScriptVersion = async () => {
     if (applyingScriptVersion) return;
     setApplyingScriptVersion(true);
@@ -471,7 +475,7 @@ export function PromptTextLab({
                       </svg>
                     )}
                     {copiedId === m.id
-                      ? category === "podcast" || category === "video"
+                      ? category === "podcast" || isVideoLike
                         ? "복사됨 — 우측 패널에 붙여넣으세요"
                         : "복사됨"
                       : "복사"}
@@ -649,7 +653,9 @@ export function PromptTextLab({
                       {/* 2026-09-27 — PromptChatLab.tsx와 동일 요청 대응,
                           그 파일 주석 참고. 팟캐스트는 channel="podcast"가
                           없어(LatestPublishedContentLink.tsx 주석 참고)
-                          home_player/listen으로 대체한다. */}
+                          home_player/listen으로 대체한다. PRISM은 LENS 사이트에
+                          발행물이 없어 붙이지 않는다. */}
+                      {!isPrism && (
                       <ActivationHistoryButton
                         category={category}
                         name={PROMPT_NAME}
@@ -661,6 +667,7 @@ export function PromptTextLab({
                             : undefined
                         }
                       />
+                      )}
                     </span>
                   ) : undefined
                 }
@@ -778,6 +785,8 @@ export function PromptTextLab({
                                   />
                                 ),
                               },
+                              // PRISM은 아래 두 단계를 띄우지 않는다 — 저장하면 LENS 영상 발행 설정이 바뀐다(위 isPrism 주석).
+                              ...(isPrism ? [] : [
                               { key: "voice", label: "음성 설정", content: voiceSection },
                               {
                                 key: "video",
@@ -805,6 +814,7 @@ export function PromptTextLab({
                                   </>
                                 ),
                               },
+                              ]),
                             ]}
                           />
                         )}
@@ -869,7 +879,7 @@ export function PromptTextLab({
                 합쳐지고... 음성쪽처럼... 카드를 추가 하면서 만드는
                 방향이거든요" — VideoCardGenerator.tsx(신설, 구 VoicePreviewGenerator
                 format="video" + VideoRenderGenerator를 카드 단위로 병합)로 교체. */}
-            {category === "video" && (
+            {isVideoLike && (
               <VideoCardGenerator
                 stickyTop={productionCardHeight}
                 threadId={threadId}
@@ -878,7 +888,7 @@ export function PromptTextLab({
                 wsOpen={wsOpen}
                 send={wsSend}
                 subscribe={subscribe}
-                onApplyToProduction={handleApplyVideoTest}
+                onApplyToProduction={isPrism ? undefined : handleApplyVideoTest}
                 productionDefaults={productionVideoDefaults}
                 serverVersion={scriptServerVersion}
                 promptHistory={promptHistory}

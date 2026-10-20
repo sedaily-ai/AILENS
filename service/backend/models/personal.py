@@ -155,23 +155,4 @@ class ReadingRecord:
     def sk(self) -> str:
         """Sort key for DynamoDB."""
         return f"READING#{self.article_id}"
-
-    @classmethod
-    def from_item(cls, item: Dict[str, Any]) -> 'ReadingRecord':
-        """Create from DynamoDB item dict."""
-        return cls(
-            user_id=item.get('user_id', ''),
-            article_id=item.get('article_id', ''),
-            article_title=item.get('article_title', ''),
-            read_at=item.get('read_at', ''),
-            read_count=int(item.get('read_count', 1)),
-        )
-
-    def to_api(self) -> Dict[str, Any]:
-        """Convert to API response format."""
-        return {
-            'article_id': self.article_id,
-            'article_title': self.article_title,
-            'read_at': self.read_at,
-            'read_count': self.read_count,
-        }
+    # from_item·to_api는 읽기 이력 조회(/api/user/history·stats)만 써서 지웠다(2026-10-20 기능 다이어트).

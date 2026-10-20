@@ -3,46 +3,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 /**
- * ArticleAudioPlayer.tsx/ArticleVideoPlayer.tsx가 공유하는 비-시각 상태 로직: 북마크 localStorage 동기화, 배속 드롭다운 열림/닫힘,
+ * ArticleAudioPlayer.tsx/ArticleVideoPlayer.tsx가 공유하는 비-시각 상태 로직: 배속 드롭다운 열림/닫힘,
  * 재생-일시정지-탐색-되감기 이벤트 배선. 포맷 함수(clock/spoken 등)는 mediaPlayerFormat.tsx에 있다.
  * 커버아트/파형/대본 탭(오디오 전용), buffered 진행률/음소거/전체화면(영상 전용)처럼 두 미디어 타입이 실제로 다른 부분은
  * 강제로 합치면 과잉 추상화가 되므로 각 컴포넌트에 둔다.
+ * (플레이어별 로컬 북마크 useMediaBookmark는 2026-10-19 기능 다이어트로 제거했다. 기사 저장은 계정의 '저장한 기사'를 쓴다.)
  */
-
-/** 북마크 상태 + localStorage 동기화. src가 바뀌면(다른 미디어로 전환) 다시 읽는다. */
-export function useMediaBookmark(src: string, storageKey: string) {
-  const [bookmarked, setBookmarked] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (raw) {
-        const set: string[] = JSON.parse(raw);
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- 외부 저장소(localStorage) 동기화, src 변경 시 재확인 필요
-        setBookmarked(set.includes(src));
-      }
-    } catch {
-      // localStorage 접근 불가(시크릿 모드 등) — 조용히 무시, 기본값(false) 유지.
-    }
-  }, [src, storageKey]);
-
-  const toggleBookmark = useCallback(() => {
-    setBookmarked((prev) => {
-      const next = !prev;
-      try {
-        const raw = window.localStorage.getItem(storageKey);
-        const set: string[] = raw ? JSON.parse(raw) : [];
-        const updated = next ? [...new Set([...set, src])] : set.filter((s) => s !== src);
-        window.localStorage.setItem(storageKey, JSON.stringify(updated));
-      } catch {
-        // 저장 실패해도 이번 세션 내 UI 상태는 유지.
-      }
-      return next;
-    });
-  }, [src, storageKey]);
-
-  return { bookmarked, toggleBookmark };
-}
 
 /** 배속 선택 드롭다운 — 열림 상태, 바깥 클릭·Escape로 닫기, 선택 시 el.playbackRate 반영. */
 export function usePlaybackRateMenu(

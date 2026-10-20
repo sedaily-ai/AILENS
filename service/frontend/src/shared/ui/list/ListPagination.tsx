@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ChevronDown } from 'lucide-react';
 import { buildPageItems } from '@/shared/lib/content/pagination';
 
 // 목록 페이지(video/listen) 공용 페이지네이션: n개씩 보기 셀렉트 + 페이지 번호.
@@ -84,26 +85,34 @@ export function ListPagination({
     >
       <label className="flex items-center" style={{ gap: 8, fontSize: 13, color: '#6b7280' }}>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>총 {totalCount}개</span>
-        <select
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          style={{
-            height: 32,
-            padding: '0 8px',
-            borderRadius: 8,
-            border: '1px solid rgba(17,24,39,0.14)',
-            fontSize: 13,
-            color: '#374151',
-            background: '#fff',
-          }}
-          aria-label="한 페이지에 보일 개수"
-        >
-          {pageSizeOptions.map((n) => (
-            <option key={n} value={n}>
-              {n}개씩 보기
-            </option>
-          ))}
-        </select>
+        {/* 브라우저 기본 화살표는 OS마다 위치·여백이 달라 테두리에 붙거나 밖으로 밀려 보인다 — 기본 화살표를 끄고 상자 안 오른쪽에 같은 아이콘을 그린다. */}
+        <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="lp-size"
+            style={{
+              height: 32,
+              padding: '0 32px 0 12px',
+              borderRadius: 8,
+              border: '1px solid rgba(17,24,39,0.14)',
+              fontSize: 13,
+              color: '#374151',
+              background: '#fff',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              cursor: 'pointer',
+            }}
+            aria-label="한 페이지에 보일 개수"
+          >
+            {pageSizeOptions.map((n) => (
+              <option key={n} value={n}>
+                {n}개씩 보기
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={16} aria-hidden style={{ position: 'absolute', right: 8, color: '#6b7280', pointerEvents: 'none' }} />
+        </span>
       </label>
 
       {totalPages > 1 && (
@@ -190,6 +199,8 @@ export function ListPagination({
       )}
       <style>{`
         .lp-num:hover { background: rgba(17,24,39,0.06); color: #111827; }
+        .lp-size:hover { border-color: rgba(17,24,39,0.32) !important; }
+        .lp-size:focus-visible { outline: 2px solid #2f5fcf; outline-offset: 2px; }
       `}</style>
     </div>
   );

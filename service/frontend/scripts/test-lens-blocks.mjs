@@ -79,4 +79,39 @@ t('짝이 안 맞는 표기는 일반 문단으로 둔다', () => {
   const bs = parseLetterBlocks(['도입', '## 구간: 질문?', '【A: 한쪽만】 내용']);
   assert.equal(bs.some((b) => b.type === 'compare'), false);
 });
+const LONG_BODY = '코스피는 10월 6일부터 15일까지 7거래일 연속 하락했어요. 2024년 9월 이후 처음 있는 일이에요. 15일에는 삼성전자가 9.48% 급락했어요.';
+t('소제목 줄에 본문이 붙어 오면 "라벨: 본문"을 소제목과 문단으로 나눈다', () => {
+  const bs = parseLetterBlocks(['도입', `◾ 📉 증시 얼마나 떨어졌나: ${LONG_BODY}`]);
+  assert.equal(types(bs), 'lead,sub,p');
+  assert.deepEqual(bs[1], { type: 'sub', no: 0, head: '📉 증시 얼마나 떨어졌나', question: '' });
+  assert.equal(bs[2].text, LONG_BODY);
+});
+t('"라벨: 질문? 본문"은 물음표까지 질문으로 남긴다', () => {
+  const bs = parseLetterBlocks(['도입', `◾ 📉 예산 확인: 왜 빠졌나? ${LONG_BODY}`]);
+  assert.deepEqual(bs[1], { type: 'sub', no: 0, head: '📉 예산 확인', question: '왜 빠졌나?' });
+  assert.equal(bs[2].text, LONG_BODY);
+});
+t('콜론 없이 "질문? 본문"도 나눈다', () => {
+  const bs = parseLetterBlocks(['도입', `◾ 📉 평화 전망, 왜 이렇게 떨어졌나? ${LONG_BODY}`]);
+  assert.equal(types(bs), 'lead,sub,p');
+  assert.equal(bs[1].head, '📉 평화 전망, 왜 이렇게 떨어졌나?');
+});
+t('붙어 온 본문 속 비교 표기는 비교 칸이 된다', () => {
+  const bs = parseLetterBlocks(['도입', `◾ ⚖️ 바닥이냐 더 빠지냐: 저점인데 수급은 끊긴 상황을 어떻게 봐야 할까요. 시장의 시각이 둘로 갈려요. 【A: 저평가론】 실적 전망은 올랐어요 【B: 수급론】 외국인이 계속 팔아요 【/】 둘 다 근거가 있어요.`]);
+  assert.equal(types(bs), 'lead,sub,compare');
+  assert.equal(bs[2].a.label, '저평가론');
+});
+t('칸 이름 뒤에 붙은 본문은 칸 안으로 들어간다', () => {
+  const bs = parseLetterBlocks(['도입', '◾ 💡 한 가지만 기억한다면 핵심은 수급이에요.', '◾ ✍️ 에디터 노트: 숫자만으로는 반등을 설명할 수 없어요.']);
+  assert.equal(types(bs), 'lead,box,box');
+  assert.equal(bs[1].head, '💡 한 가지만 기억한다면');
+  assert.deepEqual(bs[1].children, [{ type: 'p', text: '핵심은 수급이에요.' }]);
+  assert.equal(bs[2].head, '✍️ 에디터 노트');
+  assert.equal(bs[2].question, '');
+});
+t('정상 소제목은 그대로 둔다', () => {
+  const bs = parseLetterBlocks(['도입', '◾ 🔍 뭐가 바뀌나: 산업부가 직접 수사까지 하게 되나요?', '본문', '◾ 💡 한 가지만 기억한다면', '끝']);
+  assert.equal(types(bs), 'lead,sub,p,box');
+  assert.deepEqual(bs[1], { type: 'sub', no: 0, head: '🔍 뭐가 바뀌나', question: '산업부가 직접 수사까지 하게 되나요?' });
+});
 console.log(`\n${n} tests passed`);

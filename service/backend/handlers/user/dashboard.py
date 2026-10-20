@@ -49,7 +49,7 @@ def lambda_handler(event, context):
         if method in ('POST','PUT') and not isinstance(body,dict):
             raise DashboardError(400,'INVALID_ARGUMENT','JSON 객체로 요청해 주세요.')
         result = dispatch(method, path.removeprefix('/api/v2/me'), owner, body, event.get('queryStringParameters') or {})
-        status=201 if method=='POST' and (path.endswith('/activity/sessions') or path.endswith('/push-subscriptions') and result.get('created')) else 200
+        status=201 if method=='POST' and path.endswith('/activity/sessions') else 200
         return _response(status, result)
     except AuthenticationError:
         return _error(401, 'AUTH_REQUIRED', '로그인을 다시 확인해 주세요.', request_id)
@@ -64,6 +64,10 @@ def lambda_handler(event, context):
                     return _error(exc.code, detail['code'], detail['message'], request_id)
             except (ValueError, TypeError):
                 pass
+        if exc.code == 404 and path.startswith('/api/v2/me/article-bookmarks'):
+            # 저장한 기사 경로가 아직 없는 옛 CMS는 FastAPI 기본 404({"detail":"Not Found"})를 준다.
+            # 배포 사이(계정 API 먼저, CMS 나중) 웹이 저장 버튼을 숨기고 서랍을 빈 목록으로 보이도록 404로 넘긴다.
+            return _error(404, 'NOT_FOUND', '지원하지 않는 개인 API예요.', request_id)
         logger.warning('Dashboard dependency HTTP status=%s', exc.code)
         return _error(503, 'DEPENDENCY_UNAVAILABLE', '저장 서버를 사용할 수 없어요. 다시 시도해 주세요.', request_id)
     except (ValueError, UnicodeError):

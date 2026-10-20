@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { colors } from '../../theme';
 import { buildLatest } from '../home/model';
 import { deleteSentence, listArchive, type ArchiveSentence } from './archiveApi';
 import { useListStore } from './listStore';
-import { bookmarks, getInterests, history, readingStats, setInterests, type SavedArticle } from './stores';
+import { bookmarks, getInterests, history, setInterests, type SavedArticle } from './stores';
 
 const SITE = 'https://ailens.sedaily.ai';
 type Tab = 'drawer' | 'saved' | 'read' | 'interest';
@@ -33,7 +33,6 @@ export function MyLensScreen() {
   const [tab, setTab] = useState<Tab>('drawer');
   const saved = useListStore(bookmarks);
   const read = useListStore(history);
-  const stats = useMemo(() => readingStats(read.items), [read.items]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -56,8 +55,6 @@ export function MyLensScreen() {
           <View style={styles.summary}>
             <Text style={styles.hello} numberOfLines={1}>{state.email ?? '나의 LENS'}</Text>
             <View style={styles.stats}>
-              <Stat n={stats.week} label="이번 주 읽은 글" />
-              <Stat n={stats.streak} label="연속 읽은 날" />
               <Stat n={saved.items.length} label="저장한 글" />
             </View>
           </View>

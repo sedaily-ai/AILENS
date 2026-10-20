@@ -16,7 +16,7 @@ import {
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { GoogleIcon } from '@/shared/ui/icons/SocialShareIcons';
-import { ArticleShareButtons } from '@/shared/ui/article/ArticleShareButtons';
+import { ArticleShareButton } from '@/shared/ui/article/ArticleShareButton';
 import { ArticleFontSizeControl } from '@/shared/ui/article/ArticleFontSizeControl';
 import { ArticlePrintButton } from '@/shared/ui/article/ArticlePrintButton';
 import { AiDisclaimer } from '@/shared/ui/notice/AiDisclaimer';
@@ -29,12 +29,11 @@ import { ArticleChapterNav } from './components/article/ArticleChapterNav';
 import { IconStopwatch } from './components/icons/LensIcons';
 import { ArticleReveal } from './components/article/ArticleReveal';
 import { letterChapters } from './components/format/lensChapters';
-import { readMinutes } from './components/format/lensSamples';
 import { renderInline } from './components/format/renderInline';
 import { ArticleStickyBar } from './components/article/ArticleStickyBar';
 import { ArticleToTop } from './components/article/ArticleToTop';
 import { ArticleToolRail } from './components/article/ArticleToolRail';
-import { CompareCardButton } from './components/article/CompareCardButton';
+import { ArticleSaveButton, ArticleSaveToast, useArticleSaveAction } from './components/article/ArticleSaveButton';
 import { ArticleNeighborLinks, ArticleNeighborNav, type ArticleNeighbor } from './components/article/ArticleNeighborNav';
 import { LENS_VIEW_CSS } from './lensViewStyles';
 import {
@@ -72,6 +71,8 @@ export function LensViewClient({
   initialHotLetters?: TodayLetterCardLike[];
 }) {
   const { lens, active, count, dir, showDesc, mediaDur, noteDur, tabRefs, select, onTabKeyDown } = useLensFormatTabs(slug, initialLens);
+  // 기사 저장 — 레일과 좁은 화면 도구 줄이 같은 상태를 쓰도록 한 번만 만든다(상태 확인 요청도 한 번).
+  const save = useArticleSaveAction(lens?.id ?? '');
 
   if (!slug || lens === null) {
     return (
@@ -115,9 +116,6 @@ export function LensViewClient({
     </a>
   ) : null;
   // 레터 본문의 소제목 → 오른쪽 구간 목차(레터 탭일 때만 보임).
-  // 레터 예상 읽기 시간(분) — 형식 탭의 "약 N분"과 같은 계산(readMinutes, 분당 500자).
-  const letterParas = lenses.find((l, index) => lensFormatFor(l, index) === 'letter')?.paragraphs;
-  const readMin = letterParas && letterParas.length > 0 ? readMinutes(letterParas.join('').length) : null;
   const chapters = letterChapters(lenses.find((l, index) => lensFormatFor(l, index) === 'letter')?.paragraphs);
   const podcastIdx = lenses.findIndex((l, index) => lensFormatFor(l, index) === 'podcast');
   // 지금 고른 형식 — 형식 설명 토스트(#lens-desc)가 쓴다.
@@ -136,15 +134,16 @@ export function LensViewClient({
           category={lens.category ? displayCategoryLabel(lens.category) : null}
           categoryHref={categoryForDataLabel(lens.category) ? `/${lensCategorySlug(lens.category)}` : null}
           title={lens.headline}
-          readMin={readMin}
         />
         {neighbors && <ArticleNeighborNav articleId={lens.id} prev={neighbors.prev} next={neighbors.next} />}
         <ArticleReveal />
-        {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·공유·인쇄. */}
-        {/* 웹툰 탭에서는 도구 레일을 숨겨 이미지에만 집중하게 한다. */}
-        <div className="rail-host" hidden={activeFormat === 'webtoon'}>
+        {/* 왼쪽 도구 레일(≥1100px) — 듣기·글자 크기·저장·공유·인쇄. */}
+        {/* 웹툰 탭에서는 그림에 집중하도록 저장·공유만 남긴다(레일은 본문 칸 바깥이라 그림과 겹치지 않는다). */}
+        <div className="rail-host">
           <nav className="rail" aria-label="기사 도구">
             <ArticleToolRail
+              save={save}
+              compact={activeFormat === 'webtoon'}
               title={seoHeadline(lens.headline)}
               url={`${SITE_URL}${lensPath(lens)}`}
               cssVar="--lens-font-scale"
@@ -153,6 +152,7 @@ export function LensViewClient({
             />
           </nav>
         </div>
+        <ArticleSaveToast save={save} />
 
         <ArticleChapterNav
           chapters={chapters}
@@ -197,11 +197,6 @@ export function LensViewClient({
               <strong style={{ color: '#111827', fontWeight: 700 }}>AI LENS 편집팀</strong>
               <span aria-hidden> · </span>
               입력 <time dateTime={lens.published_at ?? lens.date}>{kstDateTimeLabel(lens.published_at) ?? lens.date.replaceAll('-', '.')}</time>
-              {readMin && (
-                <>
-                  <span aria-hidden> · </span>약 {readMin}분 읽기
-                </>
-              )}
             </p>
             <a
               href={`https://www.google.com/preferences/source?q=${new URL(SITE_URL).host}`}
@@ -221,9 +216,9 @@ export function LensViewClient({
             className="tools-inline flex items-center justify-between flex-wrap"
             style={{ marginTop: 14, gap: 12, paddingBottom: 14 }}
           >
-            <div className="flex items-center" style={{ gap: 8 }}>
-              <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>공유하기</span>
-              <ArticleShareButtons title={seoHeadline(lens.headline)} url={`${SITE_URL}${lensPath(lens)}`} />
+            <div className="flex items-center" style={{ gap: 4 }}>
+              <ArticleSaveButton save={save} />
+              <ArticleShareButton title={seoHeadline(lens.headline)} url={`${SITE_URL}${lensPath(lens)}`} />
             </div>
             <div className="flex items-center border border-gray-200 rounded" style={{ padding: 2 }}>
               <ArticleFontSizeControl cssVar="--lens-font-scale" storageKey="lens-font-size" />
@@ -336,8 +331,6 @@ export function LensViewClient({
               <p style={{ marginTop: 32, fontSize: 14, color: '#4b5563', lineHeight: 1.65, wordBreak: 'keep-all' }}>
                 네 형식 모두 같은 기사를 바탕으로 만들었어요. 위에서 형식을 바꿔도 다루는 사실은 같습니다.
               </p>
-              {/* 비교 카드(모듈 F) — 네 형식의 첫 마디를 한 장에 모아 저장·공유. */}
-              <CompareCardButton articleId={lens.id} title={seoHeadline(lens.headline)} date={lens.date} />
             </div>
 
             {/* AI 생성 콘텐츠 고지 */}

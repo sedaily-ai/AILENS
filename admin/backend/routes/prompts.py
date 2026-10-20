@@ -141,6 +141,9 @@ _CATEGORY_BEDROCK = {
         "max_tokens": 16000,
     },
 }
+# PRISM(2026-10-20) — CMS 실험실 영상 탭 복제. 같은 영상 틀로 렌더하므로 모델·출력 상한도 영상과 같게 두고,
+# 프롬프트만 "prism" 카테고리에 따로 저장한다(LENS 영상 프롬프트와 분리). 아직 발행 파이프라인은 없다.
+_CATEGORY_BEDROCK["prism"] = {**_CATEGORY_BEDROCK["video"]}
 
 # 2026-09-20, 사용자 요청 — "좌측 채팅창에도 텍스트 모델 선택 가능하게
 # 해주시죠": 웹툰 스크립트·장면 연출(build_script_call) + 일반 대화

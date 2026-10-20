@@ -58,7 +58,7 @@ function Body({ letter: l, scale }: { letter: IssueLetterDetail; scale: number }
   const axes = orderedAxes(l.sections.map((s) => s.axis));
   return (
     <View>
-      <Text style={styles.meta}>No.{l.issue_no}  ·  {[l.category_names?.[0], `${l.read_minutes}분`, kstDateTime(l.published_at)].filter(Boolean).join('  ·  ')}</Text>
+      <Text style={styles.meta}>No.{l.issue_no}  ·  {[l.category_names?.[0], kstDateTime(l.published_at)].filter(Boolean).join('  ·  ')}</Text>
       <Text style={styles.title}>{l.title}</Text>
       <Text style={[styles.deck, { fontSize: 16 * scale, lineHeight: 25 * scale }]}>{l.deck}</Text>
       <View style={styles.axes}>

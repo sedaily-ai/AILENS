@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { HotLettersRail, type RailItem } from '@/shared/ui/list/HotLettersRail';
-import { SajuCard } from './SideCards';
 import type { TodayLetterCardLike } from '@/shared/lib/api/todayLettersApi';
 
-// 홈 우측 사이드바: 인기글(HotLettersRail)과 안내 카드를 하나의 컨테이너로 묶는다. lg 미만에서는 렌더하지 않는다(NewsFeedTab.tsx에서 className="hidden lg:block").
+// 홈 우측 사이드바: 인기글(HotLettersRail). lg 미만에서는 렌더하지 않는다(NewsFeedTab.tsx에서 className="hidden lg:block").
+// 사주 안내 카드는 뉴스 목록 옆을 따라다니지 않도록 2026-10-19에 홈 맨 아래 '쉬어가기'(features/news-feed GamesPreviewSection)로 옮겼다.
 // 본문이 사이드바보다 훨씬 길어 스크롤할수록 사이드바 아래 여백만 커지므로 position:sticky로 따라오게 하며, top은 헤더(56px, sticky) 아래에 자리 잡도록 헤더 높이만큼 띄운다.
 // 그리드 부모가 기본 align-items:stretch라 alignSelf:'start'가 없으면 sticky가 동작하지 않는다(그리드 아이템이 이미 행 전체 높이로 늘어나 있어서).
 export function HomeSideBar({
@@ -59,9 +59,6 @@ export function HomeSideBar({
       }}
     >
       <HotLettersRail initialItems={initialHotLetters} heading={railHeading} items={railItems} limit={railLimit} />
-      <div style={{ borderTop: '1px solid #ececec' }} aria-hidden />
-      {/* 안내 카드 둘(지난 지면 / 사주). 영문판의 "Most Read + 시리즈 카드" 구조를 따른다. */}
-      <SajuCard />
     </aside>
   );
 }
