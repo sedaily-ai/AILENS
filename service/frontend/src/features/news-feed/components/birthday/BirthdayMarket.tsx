@@ -7,13 +7,17 @@ import { EVENTS } from '@/shared/data/timelineEvents';
 import snapshot from './data/birthdaySnapshot.json';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { useBirthdayToday } from './lib/useBirthdayToday';
-import type { Sex, ViewMode } from './data/birthdayTypes';
+import type { ViewMode } from './data/birthdayTypes';
 import { BIRTHDAY_MARKET_PATH } from './data/birthdayRoutes';
 import { calculate, dateLabel, parseDate, sharedYear } from './lib/birthdayModel';
 import { getBirthdaySelection, getServerBirthdaySelection, rememberBirthdaySelection, subscribeBirthdaySelection, type BirthdaySelection } from './lib/birthdaySession';
 import { BirthdayResults } from './BirthdayResults';
 import { BirthdayDateDial } from './BirthdayDateDial';
+import { nb } from './lib/keepTogether';
 import styles from './birthdayMarket.module.css';
+
+/** 생년월일 다이얼이 처음 가리키는 날. 예시 생일 기능은 2026-10-20 요청으로 없앴고, 다이얼 시작 위치로만 남겼다. */
+const DIAL_START = '1996-06-01';
 
 const data = { ...snapshot, events: EVENTS };
 const readYear = () => sharedYear(window.location.hash) ?? '';
@@ -28,7 +32,7 @@ export default function BirthdayMarket({ variant = 'page' }: { variant?: 'entry'
   const router = useRouter();
   const year = useSyncExternalStore(subscribeYear, readYear, serverYear);
   const remembered = useSyncExternalStore(subscribeBirthdaySelection, getBirthdaySelection, getServerBirthdaySelection);
-  const initialSelection: BirthdaySelection | null = year ? { date: `${year}-01-01`, sex: 'all', mode: 'year' } : remembered;
+  const initialSelection: BirthdaySelection | null = year ? { date: `${year}-01-01`, mode: 'year' } : remembered;
   useEffect(() => {
     // 기존 홈의 연도 공유 링크도 새 결과 페이지로 이어 준다.
     // 클라이언트 전환 중에는 이전 페이지의 fragment가 잠깐 남을 수 있다.
@@ -36,68 +40,100 @@ export default function BirthdayMarket({ variant = 'page' }: { variant?: 'entry'
       router.replace(`${BIRTHDAY_MARKET_PATH}#birthday-year=${year}`);
     }
   }, [year, variant, router]);
-  const key = initialSelection ? `${initialSelection.date}-${initialSelection.sex}-${initialSelection.mode}` : 'empty';
-  return <BirthdayForm key={`${variant}-${key}`} variant={variant} initialSelection={initialSelection} />;
+  const key = initialSelection ? `${initialSelection.date}-${initialSelection.mode}` : 'empty';
+  return variant === 'entry' ? <BirthdayEntry key={key} /> : <BirthdayForm key={key} initialSelection={initialSelection} />;
 }
 
-function BirthdayForm({ variant, initialSelection }: { variant: 'entry' | 'page'; initialSelection: BirthdaySelection | null }) {
+function useDeparture() {
   const router = useRouter();
+  const [error, setError] = useState('');
+  function depart(date: string, mode: ViewMode, open: (selection: BirthdaySelection) => void = () => router.push(BIRTHDAY_MARKET_PATH)) {
+    if (!date) { setError('생일을 넣어주세요.'); return; }
+    if (!parseDate(date)) { setError(`1900년 1월 1일부터 ${dateLabel(kstTodayStr())}까지의 날짜를 넣어주세요.`); return; }
+    setError('');
+    const next = { date, mode };
+    rememberBirthdaySelection(next);
+    open(next);
+  }
+  return { error, setError, depart };
+}
+
+/**
+ * 생일 입력 — 홈 진입(그날로 떠나요)과 결과 페이지가 같은 다이얼·숫자 입력 구조를 쓴다.
+ * 홈은 생일만 받아 결과 페이지로 넘기며 여기서 자료를 부르지 않는다.
+ */
+function BirthdayIntro({ heading: Heading, formId, initialDate, error, onDateChange, onDepart }: {
+  heading: 'h2' | 'h3'; formId: string; initialDate: string; error: string;
+  onDateChange: () => void; onDepart: (date: string, mode: ViewMode) => void;
+}) {
   const id = useId();
   const today = useBirthdayToday();
+  const [birthday, setBirthday] = useState(initialDate);
+  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); onDepart(birthday, 'personal'); }
+  // 넓은 화면은 왼쪽에 소개·출발 버튼, 오른쪽에 다이얼을 둬 빈 칸 없이 한 덩어리로 보이게 한다(좁은 화면은 소개 → 다이얼 → 출발 순으로 쌓인다).
+  return <div className={styles.intro}>
+    <form id={formId} tabIndex={-1} onSubmit={submit} autoComplete="off" className={styles.form}>
+      <div className={styles.introCopy}>
+        <p className={styles.eyebrow}>내 생일 타임머신</p>
+        <Heading className={styles.introTitle}>내 생일에 샀다면,<br />지금은?</Heading>
+        <p className={styles.description}>그날 서울경제 1면부터 최저시급, 연금 달력까지.<br />생일을 넣고 그날로 돌아가 보세요.</p>
+      </div>
+      <BirthdayDateDial today={today} value={birthday} onChange={date => { setBirthday(date); onDateChange(); }} errorId={`${id}-error`} />
+      <div className={styles.departure}>
+        <p className={styles.note}>생일은 이 탭에만 남고 탭을 닫으면 지워져요. 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요.</p>
+        <p id={`${id}-error`} role="alert" className={styles.error}>{error}</p>
+        <button type="submit" className={styles.primary}>타임머신 타기</button>
+      </div>
+    </form>
+  </div>;
+}
+
+function BirthdayEntry() {
+  const id = useId();
+  const { error, setError, depart } = useDeparture();
+  return <div className={styles.market} data-clarity-mask="true">
+    <BirthdayIntro heading="h3" formId={`${id}-form`} initialDate={DIAL_START} error={error} onDateChange={() => setError('')} onDepart={(date, mode) => depart(date, mode)} />
+  </div>;
+}
+
+/** 결과 페이지. 홈에서 고른 생일이 있으면 바로 결과를, 없으면(새로고침·직접 방문) 다이얼 입력을 보여 준다. */
+function BirthdayForm({ initialSelection }: { initialSelection: BirthdaySelection | null }) {
+  const id = useId();
   const resultRef = useRef<HTMLDivElement>(null);
-  const [birthday, setBirthday] = useState(initialSelection?.date ?? '1988-02-03');
-  const [sex, setSex] = useState<Sex>(initialSelection?.sex ?? 'all');
-  const [error, setError] = useState('');
-  const [selection, setSelection] = useState<BirthdaySelection | null>(variant === 'page' ? initialSelection : null);
+  const initialDate = initialSelection?.mode === 'year' ? DIAL_START : initialSelection?.date ?? DIAL_START;
+  const [selection, setSelection] = useState<BirthdaySelection | null>(initialSelection);
   const [editing, setEditing] = useState(!selection);
-  const result = selection ? calculate(selection.date, selection.sex, data) : null;
-  const IntroHeading = variant === 'entry' ? 'h3' : 'h2';
+  const { error, setError, depart } = useDeparture();
+  const result = selection ? calculate(selection.date, data, selection.mode) : null;
 
   useEffect(() => {
     if (!editing) resultRef.current?.focus({ preventScroll: true });
   }, [editing]);
 
   function show(date: string, mode: ViewMode) {
-    if (!parseDate(date)) { setError(`1900년 1월 1일부터 ${dateLabel(kstTodayStr())}까지의 날짜를 넣어주세요.`); return; }
-    setError('');
-    const next = { date, sex, mode };
-    if (variant === 'page' && window.location.hash) {
-      // 공유 화면에서 다른 생일을 조회하면 이전 공유 연도를 남기지 않는다.
-      window.history.replaceState(window.history.state, '', BIRTHDAY_MARKET_PATH);
-    }
-    rememberBirthdaySelection(next);
-    if (variant === 'entry') { router.push(BIRTHDAY_MARKET_PATH); return; }
-    setSelection(next);
-    setEditing(false);
+    depart(date, mode, next => {
+      if (window.location.hash) {
+        // 공유 화면에서 다른 생일을 조회하면 이전 공유 연도를 남기지 않는다.
+        window.history.replaceState(window.history.state, '', BIRTHDAY_MARKET_PATH);
+      }
+      setSelection(next);
+      setEditing(false);
+    });
   }
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); show(birthday, 'personal'); }
+  function edit() {
+    setEditing(true);
+    requestAnimationFrame(() => {
+      const form = document.getElementById(`${id}-form`);
+      form?.focus({ preventScroll: true });
+      form?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    });
+  }
 
   return (
     <div className={styles.market} data-clarity-mask="true">
-      {editing ? <div className={styles.intro}>
-        <p className={styles.eyebrow}>생일 시세 타임머신</p>
-        <IntroHeading className={styles.introTitle}>내가 태어난 날,<br />경제는 얼마였을까요?</IntroHeading>
-        <p className={styles.description}>그날의 1억 원부터 한 시간의 일, 미래의 연금까지.<br />생일을 넣고 달라진 경제를 만나보세요.</p>
-        <form id={`${id}-form`} tabIndex={-1} onSubmit={submit} autoComplete="off" className={styles.form}>
-          <BirthdayDateDial today={today} value={birthday} onChange={date => { setBirthday(date); setError(''); }} errorId={`${id}-error`} />
-          <div className={styles.departure}>
-            <fieldset className={styles.sexField} aria-describedby={`${id}-help`}>
-              <legend>성별 <span>선택</span></legend>
-              <div className={styles.sexOptions}>{([{ value: 'all', label: '선택 안 함' }, { value: 'female', label: '여성' }, { value: 'male', label: '남성' }] as const).map(option =>
-                <label key={option.value}><input type="radio" name={`${id}-sex`} value={option.value} checked={sex === option.value} onChange={() => setSex(option.value)} /><span>{option.label}</span></label>
-              )}</div>
-            </fieldset>
-            <p id={`${id}-help`} className={styles.note}>생일은 저장하지 않아요.<br />성별은 기대수명에만 사용해요.</p>
-            <p id={`${id}-error`} role="alert" className={styles.error}>{error}</p>
-            <button type="submit" className={styles.primary}>내 생일 시세 보기</button>
-          </div>
-        </form>
-      </div> : <div className={styles.editBar}><p>선택한 날의 경제를 살펴보세요.</p><button type="button" className={styles.secondary} onClick={() => {
-        setEditing(true);
-        requestAnimationFrame(() => document.getElementById(`${id}-form`)?.focus({ preventScroll: true }));
-      }}>생일 바꾸기</button></div>}
-      {editing && <div className={styles.dataNotice}><strong>18개 항목으로 보는 경제의 변화</strong><span>확인된 자료부터 보여드려요. 준비 중인 항목도 함께 담았어요. 자료 확인 {snapshot.retrievedAt.replaceAll('-', '.')}</span></div>}
-      {!editing && result && selection && <div ref={resultRef} tabIndex={-1} className={styles.results} aria-label="생일 시세 결과"><BirthdayResults result={result} mode={selection.mode} /></div>}
+      {editing ? <BirthdayIntro heading="h2" formId={`${id}-form`} initialDate={initialDate} error={error} onDateChange={() => setError('')} onDepart={show} />
+        : <div className={styles.editBar}><button type="button" className={styles.secondary} onClick={edit}>← 다른 생일 입력</button><p>{selection?.mode === 'year' ? '출생연도로 공유된 결과예요.' : '선택한 날로 돌아왔어요.'}</p></div>}
+      {!editing && result && selection && <div ref={resultRef} tabIndex={-1} className={styles.results} aria-label="내 생일 타임머신 결과"><BirthdayResults key={`${selection.date}-${selection.mode}`} result={result} mode={selection.mode} onEdit={edit} /></div>}
     </div>
   );
 }

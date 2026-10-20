@@ -104,6 +104,26 @@ export async function fetchBigkindsDay(date: string): Promise<BigKindsDayData> {
   }
 }
 
+/** 그날의 서울경제 1면(백엔드 time_machine.py front 모드). 면 번호가 있는 시기만 'ok'가 될 수 있다. */
+export interface FrontPageData {
+  status: 'ok' | 'no_paper' | 'no_page_info';
+  reason: 'sunday' | 'holiday' | null;
+  articles: BigKindsArticle[];
+}
+
+/** 인쇄일 date 신문의 1면 기사(본문이 긴 순). 브라우저에서 호출하며 실패하면 null(빈 결과와 구분). */
+export async function fetchFrontPage(date: string): Promise<FrontPageData | null> {
+  try {
+    const res = await fetch(`${API_URL}/time-machine?front=${encodeURIComponent(date)}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!['ok', 'no_paper', 'no_page_info'].includes(data?.status)) return null;
+    return { status: data.status, reason: data.reason ?? null, articles: Array.isArray(data.articles) ? data.articles : [] };
+  } catch {
+    return null;
+  }
+}
+
 /** 키워드+기간 검색 결과의 기사 한 건(발행일은 날짜만, 없을 수 있다). */
 export interface RangeArticle extends BigKindsArticle {
   published_at?: string;

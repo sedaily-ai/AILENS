@@ -62,7 +62,7 @@ export function BirthdayDateInput({ initialValue, today, onChange, errorId, hint
           }} />
       </label>)}
     </div>
-    <p id={hintId} className={styles.directHint}>연도 4자리, 월·일 순서로 입력해 주세요.<br />19880203처럼 8자리를 붙여넣어도 돼요.</p>
+    <p id={hintId} className={styles.directHint}>연도 4자리, 월·일 순서로 입력해 주세요.<br />19960601처럼 8자리를 붙여넣어도 돼요.</p>
     {invalid && <p id={`${id}-invalid`} role="alert" className={styles.directError}>{FIRST_YEAR}년부터 {lastDate[0]}년 {lastDate[1]}월 {lastDate[2]}일 사이의 실제 날짜를 입력해 주세요.</p>}
   </div>;
 }

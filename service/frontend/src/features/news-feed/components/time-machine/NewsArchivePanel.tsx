@@ -1,6 +1,6 @@
 'use client';
 
-// 기존 기사 탐색 보기. 생일 시세의 입력과 별도 상태를 유지한다.
+// 기존 기사 탐색 보기. 내 생일 타임머신의 입력과 별도 상태를 유지한다.
 // 구성: 데이터 useTimeMachineDay / 날짜 입력 DatePicker / 결과 ResultHeader + DayRows / 로딩·빈 상태 ResultStates. 날짜 계산은 shared/lib/timelineDates.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';

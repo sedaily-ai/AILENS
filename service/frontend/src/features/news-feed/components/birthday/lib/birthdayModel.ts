@@ -1,11 +1,18 @@
-import type { AnnualPoint, AnnualComparison, BirthdayDate, BirthdayResult, MarketRow, MarketSnapshot, Sex } from '../data/birthdayTypes';
+import type { AgeEvent, AgeMonths, BirthdayDate, BirthdayResult, MarketSnapshot, PensionCalendar, ViewMode } from '../data/birthdayTypes';
 import { kstTodayStr } from '@/shared/lib/date/date';
-import { AS_OF, CPI_LATEST, CPI_MONTHLY, CATALOG, WAGES } from '../data/birthdayCatalog';
+import { AS_OF, CPI_LATEST, CPI_MONTHLY, WAGES } from '../data/birthdayCatalog';
 import { BIRTHDAY_MARKET_PATH } from '../data/birthdayRoutes';
+import { BIRTHDAY_MOMENTS, HERO_MOMENT_ID } from '../data/birthdayMoments';
 
 export const number = (value: number, digits = 0) => Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits });
 export const won = (value: number) => `${number(value)}원`;
-export const percent = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${number(Math.abs(value), 1)}%`;
+/** 금액을 만 원 단위로 반올림해 읽기 쉽게 쓴다(기획안 v3 표시 규칙). 1억 이상은 억·만을 함께 쓴다. */
+export function manwon(value: number) {
+  const man = Math.round(value / 10000);
+  if (man >= 10000) { const eok = Math.floor(man / 10000), rest = man % 10000; return `${number(eok)}억${rest ? ` ${number(rest)}만` : ''} 원`; }
+  return man >= 1 ? `${number(man)}만 원` : won(value);
+}
+export const times = (value: number) => `${number(value, 1)}배`;
 
 export function parseDate(value: string, today = kstTodayStr()): BirthdayDate | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -25,22 +32,43 @@ export function wageAt(date: string) {
   return WAGES.findLast(([start]) => start <= date)?.[1] ?? null;
 }
 
-export function pensionAt(year: number) {
-  if (year < 1988) return null;
-  return {
-    contribution: year < 1993 ? 3 : year < 1998 ? 6 : year < 2026 ? 9 : Math.min(13, 9.5 + (year - 2026) * 0.5),
-    replacement: year <= 1998 ? 70 : year <= 2007 ? 60 : year <= 2025 ? 50 - (year - 2008) * 0.5 : 43,
-  };
+/** 그 날짜의 CPI. 확보한 달은 월별 값, 없으면 그해 연평균. */
+export function cpiAt(date: string, snapshot: Pick<MarketSnapshot, 'cpi'>) {
+  return CPI_MONTHLY[date.slice(0, 7)] ?? snapshot.cpi.find(point => point.period === date.slice(0, 4))?.value ?? null;
 }
 
-export function pensionCalendar(date: BirthdayDate) {
+const PENSION_EARLY = 70;
+const PENSION_LATE = 136;
+const PENSION_SHIFT_YEARS = 5;
+
+/**
+ * 정상(100) 대비 ratio로 shift년 일찍(음수)·늦게(양수) 받기 시작했을 때 누적액이 같아지는 시점(정상 개시 후 개월).
+ * r(x − s) = x → x = r·s ÷ (r − 1). 물가 연동·세금·건강보험료는 뺀 단순 계산(기획안 v3).
+ */
+function breakEvenMonths(ratio: number, shiftYears: number) {
+  return Math.round(shiftYears * (ratio / 100) / (ratio / 100 - 1) * 12);
+}
+const plusMonths = (age: number, months: number): AgeMonths => ({ years: age + Math.floor(months / 12), months: months % 12 });
+
+/** 기획안 v3 §5 모드 A — 개시 연월(해당 나이 생일의 다음 달), 정상 100 대비 비율, 손익분기 나이. 개인 수령액이 아니다. */
+export function pensionCalendar(date: BirthdayDate): PensionCalendar | null {
   if (date.year < 1953) return null;
   const age = date.year <= 1956 ? 61 : date.year <= 1960 ? 62 : date.year <= 1964 ? 63 : date.year <= 1968 ? 64 : 65;
-  return [
-    { label: '당겨 받기', age: age - 5, date: anniversary(date, age - 5), change: '최대 −30%', changeValue: -30 },
-    { label: '정상', age, date: anniversary(date, age), change: '기준', changeValue: 0 },
-    { label: '미뤄 받기', age: age + 5, date: anniversary(date, age + 5), change: '최대 +36%', changeValue: 36 },
-  ];
+  const start = (years: number) => {
+    const [year, month] = anniversary(date, years).split('-').map(Number);
+    return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
+  };
+  return {
+    points: [
+      { label: '당겨 받기', age: age - PENSION_SHIFT_YEARS, start: start(age - PENSION_SHIFT_YEARS), ratio: PENSION_EARLY },
+      { label: '정상', age, start: start(age), ratio: 100 },
+      { label: '미뤄 받기', age: age + PENSION_SHIFT_YEARS, start: start(age + PENSION_SHIFT_YEARS), ratio: PENSION_LATE },
+    ],
+    breakEven: {
+      early: plusMonths(age, breakEvenMonths(PENSION_EARLY, -PENSION_SHIFT_YEARS)),
+      late: plusMonths(age, breakEvenMonths(PENSION_LATE, PENSION_SHIFT_YEARS)),
+    },
+  };
 }
 
 export function ageOn(birthDate: string, eventDate: string) {
@@ -49,63 +77,70 @@ export function ageOn(birthDate: string, eventDate: string) {
   return age;
 }
 
-function annual(series: AnnualPoint[], year: number) { return series.find(point => point.period === String(year)); }
-function comparison(before: number | undefined, after: number | undefined): number | null {
-  return typeof before === 'number' && Number.isFinite(before) && before > 0 && typeof after === 'number' && Number.isFinite(after) ? (after / before - 1) * 100 : null;
+/** 2026년 최저시급(원). */
+export const WAGE_NOW = 10320;
+/** 그때 1억 원을 오늘 물가로 바꾼 금액(원). */
+export const hundredMillionNow = (cpi: number) => 100_000_000 * CPI_LATEST.value / cpi;
+/** "그 순간, 나는 몇 살" 장면에 쓰는 순간 수와, 순간끼리 떨어뜨릴 햇수("만 5세, 만 5세"처럼 겹치지 않게). */
+const MOMENT_LIMIT = 3;
+const MOMENT_GAP_YEARS = 2;
+/** 월드컵을 겪지 않았으면 이 나이에 가장 가까운 순간을 제목으로 쓴다 — 십 대 무렵의 기억이 가장 또렷하다. */
+const HERO_AGE = 12;
+
+/** 순간 하나를 날짜·링크로 푼다. 연대기 사건은 연대기의 날짜와 주소, 그 밖의 행사는 직접 확인한 날짜와 그날 신문. */
+function resolveMoment(moment: (typeof BIRTHDAY_MOMENTS)[number], byId: Map<string, MarketSnapshot['events'][number]>) {
+  if ('chronicleId' in moment) {
+    const event = byId.get(moment.chronicleId);
+    return event ? { id: event.id, date: event.date, link: { href: `/timeline/chronicle?e=${encodeURIComponent(event.id)}`, label: '연대기에서 보기' as const } } : null;
+  }
+  return { id: `moment-${moment.date}`, date: moment.date, link: moment.paperDate ? { href: `/timeline/${moment.paperDate}`, label: '그날 신문 보기' as const } : null };
 }
 
-export function calculate(birthDate: string, sex: Sex, snapshot: MarketSnapshot): BirthdayResult {
+/**
+ * 생일 뒤 만 1세 이상에 겪은 국민적 순간(data/birthdayMoments.ts) 중 최대 3개, 날짜 순.
+ * 대표(제목)는 2002 월드컵을 겪었으면 월드컵, 아니면 만 12세에 가장 가까운 순간.
+ * 나머지는 가장 최근 순간 → 가장 이른 순간 → 고른 범위의 한가운데에 가까운 순간 순으로, 이미 고른 것과 MOMENT_GAP_YEARS년 이상
+ * 떨어진 것만 더한다. 그래서 어릴 때·자라서·최근이 고루 나온다.
+ */
+export function pickMoments(birthDate: string, birthYear: number, events: MarketSnapshot['events'], mode: ViewMode) {
+  const byId = new Map(events.map(event => [event.id, event]));
+  const lived: AgeEvent[] = BIRTHDAY_MOMENTS.flatMap(moment => {
+    const resolved = resolveMoment(moment, byId);
+    if (!resolved || resolved.date < birthDate || resolved.date > AS_OF) return [];
+    const age = mode === 'year' ? null : ageOn(birthDate, resolved.date);
+    const yearsAfter = Number(resolved.date.slice(0, 4)) - birthYear;
+    return (age ?? yearsAfter) >= 1 ? [{ ...resolved, title: moment.label, age, yearsAfter }] : [];
+  }).sort((a, b) => a.date.localeCompare(b.date));
+  if (!lived.length) return { ages: [], heroAge: null };
+  const ageValue = (moment: AgeEvent) => moment.age ?? moment.yearsAfter;
+  const heroAge = lived.find(moment => moment.id === HERO_MOMENT_ID)
+    ?? lived.reduce((best, moment) => Math.abs(ageValue(moment) - HERO_AGE) <= Math.abs(ageValue(best) - HERO_AGE) ? moment : best);
+  const yearOf = (moment: AgeEvent) => Number(moment.date.slice(0, 4));
+  const picked = [heroAge];
+  const fits = (moment: AgeEvent) => !picked.includes(moment) && picked.every(other => Math.abs(yearOf(moment) - yearOf(other)) >= MOMENT_GAP_YEARS);
+  for (const moment of [lived[lived.length - 1], lived[0]]) if (picked.length < MOMENT_LIMIT && fits(moment)) picked.push(moment);
+  while (picked.length < MOMENT_LIMIT) {
+    const years = picked.map(yearOf);
+    const middle = (Math.min(...years) + Math.max(...years)) / 2;
+    // 한가운데에서 가까운 순, 같으면 이른 순간(lived가 날짜 순이라 sort가 순서를 지킨다).
+    const next = lived.filter(fits).sort((a, b) => Math.abs(yearOf(a) - middle) - Math.abs(yearOf(b) - middle))[0];
+    if (!next) break;
+    picked.push(next);
+  }
+  return { ages: picked.sort((a, b) => a.date.localeCompare(b.date)), heroAge };
+}
+
+export function calculate(birthDate: string, snapshot: MarketSnapshot, mode: ViewMode = 'personal'): BirthdayResult {
   const today = kstTodayStr();
   const date = parseDate(birthDate, today);
   if (!date) throw new Error('1900년 1월 1일부터 오늘까지의 실제 날짜를 입력해 주세요.');
   const cpiMonth = CPI_MONTHLY[birthDate.slice(0, 7)];
-  const cpiYear = annual(snapshot.cpi, date.year);
-  const cpi = cpiMonth ?? cpiYear?.value ?? null;
-  const cpiPeriod = cpiMonth ? `${date.year}년 ${date.month}월` : `${date.year}년 연평균`;
-  const wage = wageAt(birthDate);
-  const gni = annual(snapshot.gni, date.year);
-  const gniNow = snapshot.gni[snapshot.gni.length - 1];
-  const pension = pensionAt(date.year);
-  const calendar = pensionCalendar(date);
-  const purchasingPower = cpi ? 1000000 * cpi / CPI_LATEST.value : null;
-  const rows: MarketRow[] = CATALOG.map(item => ({ ...item, state: 'pending', before: '자료 연결 전', after: '자료 연결 전', change: '—', changeValue: null, period: '', detail: '' }));
-  const set = (id: string, values: Partial<MarketRow>) => { const row = rows.find(row => row.id === id); if (row) Object.assign(row, values); };
-  const unavailable = (id: string, reason: string) => set(id, { state: 'unavailable', before: reason, after: '—', availability: reason });
-
-  set('front-page', { before: '그날의 1면', after: '지면 확인 중', detail: '과거 지면에서 실제 인쇄일과 1면 머리기사를 확인하고 있어요.' });
-  set('market-snapshot', { state: 'partial', before: birthDate === '1988-02-03' ? '780.5원 / 달러' : '해당일 환율 연결 전', after: `${number(snapshot.fx[0].value, 1)}원 / 달러`, period: '환율 최근값 2026.10.16', changeValue: birthDate === '1988-02-03' ? comparison(780.5, snapshot.fx[0].value) : null, change: birthDate === '1988-02-03' ? percent(comparison(780.5, snapshot.fx[0].value) ?? 0) : '일부 확인', detail: '코스피·금리는 아직 연결하지 않았습니다. 최근 환율은 실시간이 아닌 공표 시점의 고정 자료입니다.' });
-  if (cpi) set('cpi', { state: 'ready', before: '1억 원', after: `약 ${number(10000 * CPI_LATEST.value / cpi)}만 원`, change: `${number(CPI_LATEST.value / cpi, 2)}배`, changeValue: comparison(cpi, CPI_LATEST.value), period: `${cpiPeriod} → 2026년 9월`, detail: `CPI ${number(cpi, 3)} → ${number(CPI_LATEST.value, 2)}. ${cpiMonth ? '해당 월의 실제 통계' : '해당 월 자료를 연결하기 전, 출생연도 평균으로 비교'}합니다.` });
-  else unavailable('cpi', date.year < 1965 ? '1965년 이전 자료 없음' : '출생연도 통계 미연결');
-  if (wage) set('minimum-wage', { state: 'ready', before: `${number(wage, 1)}원`, after: '10,320원', change: `${number(10320 / wage, 2)}배`, changeValue: comparison(wage, 10320), period: '출생일 적용액 → 2026년 적용액', detail: date.year === 1988 ? '1988년 2그룹 기준입니다. 당시 1그룹은 462.5원입니다.' : '시행일을 기준으로 계산합니다. 2027년 고시액은 미리 적용하지 않습니다.' });
-  else unavailable('minimum-wage', '최저임금 시행 전');
-  if (anniversary(date, 1) > today) unavailable('gold-ring', '아직 첫돌 전');
-  set('million-won', { state: cpi ? 'partial' : 'pending', before: '현금 100만 원', after: purchasingPower !== null ? `구매력 ${number(purchasingPower / 10000, 2)}만 원` : '구매력 자료 없음', change: '아래에서 보기', changeValue: comparison(1000000, purchasingPower ?? undefined), period: cpi ? `${cpiPeriod}의 구매력 기준` : '', detail: '명목 잔액은 그대로 100만 원입니다. 물가를 반영한 구매력만 달라집니다.' });
-  if (gni) set('national-economy', { state: 'partial', before: `$${number(gni.value, 1)}`, after: `$${number(gniNow.value, 1)}`, change: percent(comparison(gni.value, gniNow.value) ?? 0), changeValue: comparison(gni.value, gniNow.value), period: `1인당 GNI · ${date.year}년 → ${gniNow.period}년`, detail: '명목 달러 기준입니다. 수출액은 아직 원 통계 응답을 연결하지 않았습니다.' });
-  else set('national-economy', { state: 'partial', before: '출생연도 자료 없음', after: `$${number(gniNow.value, 1)}`, period: `최근 GNI ${gniNow.period}년` });
-  set('life-expectancy', { detail: `선택: ${{ all: '전체', female: '여성', male: '남성' }[sex] ?? '전체'}. 해당 성별의 검증된 원 통계가 연결되면 계산합니다.` });
-  if (pension) set('pension-rules', { state: 'ready', before: `${pension.contribution}% / ${pension.replacement}%`, after: '9.5% / 43%', change: '제도값 비교', period: '보험료율 / 소득대체율', detail: `보험료율 ${number(9.5 - pension.contribution, 1)}%p 변화, 소득대체율 ${number(43 - pension.replacement, 1)}%p 변화. 개인 연금액이 아닙니다.` });
-  else unavailable('pension-rules', '국민연금 시행 전');
-  if (calendar) set('pension-calendar', { state: 'ready', before: `${calendar[0].date.slice(0, 4)}년부터`, after: `${calendar[1].date.slice(0, 4)}년 정상`, change: '달력 보기', period: '현행 제도 · 연령에 해당하는 생일' });
-  else unavailable('pension-calendar', '1953년 이전 규칙 미연결');
-  const chart = snapshot.cpi.filter(point => Number(point.period) >= date.year);
-  set('history-chart', { state: chart.length ? 'partial' : 'unavailable', before: chart.length ? `${chart[0].period}년` : '출생연도 연간값 없음', after: chart.length ? `${chart[chart.length - 1].period}년` : '—', change: '그래프 보기', period: '연평균 CPI · 코스피 연결 전' });
-
-  return { birthDate, sex, date, rows, cpi, cpiPeriod, purchasingPower, calendar, chart, events: snapshot.events.filter(event => event.date >= birthDate && event.date <= AS_OF), snapshot };
+  const { ages, heroAge } = pickMoments(birthDate, date.year, snapshot.events, mode);
+  return { birthDate, date, cpi: cpiAt(birthDate, snapshot), cpiPeriod: cpiMonth ? `${date.year}년 ${date.month}월` : `${date.year}년 연평균`,
+    wage: wageAt(birthDate), calendar: pensionCalendar(date), ages, heroAge, snapshot };
 }
 
-// 공유 순위는 같은 출생연도~2025년의 연간 자료만 비교한다.
-export function comparableAnnual(result: BirthdayResult): AnnualComparison[] {
-  const year = result.date.year;
-  const seriesList: [string, AnnualPoint[], string][] = [['cpi', result.snapshot.cpi, '물가 전체'], ['national-economy', result.snapshot.gni, '1인당 국민총소득']];
-  return seriesList.flatMap(([id, series, title]) => {
-    const before = annual(series, year);
-    const after = annual(series, 2025);
-    const change = comparison(before?.value, after?.value);
-    return change === null || !before || !after ? [] : [{ id, title, before: before.value, after: after.value, change, unit: before.unit, period: `${year}년 → 2025년 · 연간 기준` }];
-  }).sort((a, b) => b.change - a.change);
-}
-
-// 서비스 공유 링크에는 월·일/성별을 넣지 않는다. 월·일 공개는 저장 이미지에서만 선택한다.
+// 서비스 공유 링크에는 월·일을 넣지 않는다. 월·일 공개는 저장 이미지에서만 선택한다.
 export function shareUrl(base: string, result: BirthdayResult) {
   const url = new URL(base);
   url.pathname = BIRTHDAY_MARKET_PATH;
@@ -122,4 +157,13 @@ export function sharedYear(hash: string): string | null {
 export function dateLabel(iso: string) {
   const [year, month, day] = iso.split('-');
   return `${year}년 ${Number(month)}월 ${Number(day)}일`;
+}
+
+/** 오늘까지 지난 기간 — "26년 7개월". */
+export function elapsedLabel(birthDate: string, today = kstTodayStr()) {
+  const [by, bm, bd] = birthDate.split('-').map(Number), [ty, tm, td] = today.split('-').map(Number);
+  let months = (ty - by) * 12 + (tm - bm);
+  if (td < bd) months--;
+  const years = Math.floor(months / 12), rest = months % 12;
+  return years ? `${years}년${rest ? ` ${rest}개월` : ''}` : `${rest}개월`;
 }

@@ -1,19 +1,52 @@
-import { CPI_LATEST } from './data/birthdayCatalog';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import { dateLabel, number } from './lib/birthdayModel';
-import { BirthdayLedger } from './BirthdayLedger';
-import { BirthdayDetails } from './BirthdayDetails';
+import { defaultAssetResults } from './lib/birthdayAssets';
+import { useFrontPage } from './lib/birthdayFrontPage';
+import type { ShareVariant } from './lib/birthdayShare';
+import { AgesScene, ArrivalScene, AssetScene, AssetSoon, MoneyScene, WageScene } from './BirthdayScenes';
+import { BirthdayFrontPage } from './BirthdayFrontPage';
+import { BirthdayPension } from './BirthdayPension';
 import { BirthdayShare } from './BirthdayShare';
-import styles from './birthdayMarket.module.css';
+import { nb } from './lib/keepTogether';
+import styles from './birthdayStory.module.css';
 
-export function BirthdayResults({ result, mode }: { result: BirthdayResult; mode: ViewMode }) {
-  return (
-    <>
-      <div className={styles.resultHeading}><p className={styles.eyebrow}>{mode === 'example' ? '예시로 보는 생일 시세' : mode === 'year' ? '출생연도로 보는 시세' : '나의 생일 시세'}</p><h3>{mode === 'year' ? `${result.date.year}년에 태어난 당신의 시세` : dateLabel(result.birthDate)}</h3><p className={styles.description}>{result.cpi ? `그때의 1억 원은 물가를 반영하면 약 ${number(10000 * CPI_LATEST.value / result.cpi)}만 원이에요.` : '해당 연도의 통계는 확인 중이에요. 비교할 수 있는 항목부터 살펴보세요.'}</p>{mode === 'year' && <p className={styles.note}>월·일을 공개하지 않은 공유예요. 날짜가 필요한 항목은 1월 1일을 기준으로 보고, 연금은 연도만 표시해요.</p>}</div>
-      <BirthdayLedger result={result} />
-      <BirthdayDetails key={result.birthDate} result={result} mode={mode} />
-      <BirthdayShare key={`${result.birthDate}-${mode}`} result={result} mode={mode} />
-      <p className={styles.footerNote}>한국은행 ECOS·최저임금위원회·국민연금공단의 확인된 자료를 사용했어요. 항목을 누르면 출처와 실제 기준 시점을 볼 수 있어요. 실시간 시세는 아니며, 확인 전 자료로 수익률을 만들지 않아요. 자료 확인 {result.snapshot.retrievedAt.replaceAll('-', '.')}</p>
-    </>
-  );
+/**
+ * 결과 — 한 장면에 숫자 하나. 순서: 도착 → (자산 시세가 있으면) 오늘 1등 자산 → 그날 1면 → 최저시급 → 1억 원
+ * → 그때 나는 몇 살 → 연금 달력 → 공유(생일 카드). 공유는 화면 폭과 관계없이 맨 아래에 둔다.
+ */
+export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResult; mode: ViewMode; onEdit: () => void }) {
+  const assets = useMemo(() => defaultAssetResults(result), [result]);
+  const hasAssets = assets.some(asset => asset.state === 'ready');
+  const front = useFrontPage(mode === 'year' ? null : result.birthDate);
+  const frontArticles = useMemo(() => front.state?.status === 'ok' && front.state.date === result.birthDate ? front.state.articles : [], [front.state, result.birthDate]);
+  const [variant, setVariant] = useState<ShareVariant>('receipt');
+
+  function shareFront() {
+    setVariant('front');
+    const target = document.getElementById('birthday-share');
+    target?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  }
+
+  return <div className={styles.story}>
+    <div className={styles.scenes}>
+      <ArrivalScene result={result} mode={mode} />
+      {hasAssets && <AssetScene assets={assets} />}
+      <BirthdayFrontPage state={front.state} birthDate={result.birthDate} onShow={front.show} onRetry={front.retry} onUseBirthday={onEdit} onShare={shareFront} />
+      <WageScene result={result} />
+      <MoneyScene result={result} />
+      {!hasAssets && <AssetSoon />}
+      <AgesScene result={result} mode={mode} />
+      <BirthdayPension result={result} mode={mode} />
+      {/* 고지 세 가지(참고 정보·상담 아님·기준 시점)는 그대로 두고, '-이며'로 길게 잇던 첫 문장과 명사로 끝나던 출처 줄을 문장으로 풀었다.
+          성격별로 세 줄(고지 / 기준 시점·오류 알리기 / 출처·확인일)로 끊는다(.notice > span). */}
+      <p className={styles.notice}>
+        <span>공개 자료로 계산한 참고 정보예요. 투자 권유나 재무·연금 상담이 아니에요.</span>{' '}
+        {/* '잘못된 내용 알리기'는 출처 줄 끝에 두면 560px 폭에서 넘쳐 4줄이 돼서, '실제와 다를 수 있어요' 바로 뒤에 둔다. */}
+        <span>자료의 기준 시점에 따라 실제와 {nb('다를 수 있어요')}. <Link href="/contact" prefetch={false}>{nb('잘못된 내용 알리기')}</Link></span>{' '}
+        <span>{`출처는 최저임금위원회·${nb('한국은행 ECOS')}·국민연금공단·빅카인즈이고 ${result.snapshot.retrievedAt.replaceAll('-', '.')}에 ${nb('확인했어요.')}`}</span>
+      </p>
+    </div>
+    <BirthdayShare result={result} mode={mode} assets={assets} front={frontArticles} variant={variant} onVariant={setVariant} onTryFriend={onEdit} />
+  </div>;
 }
