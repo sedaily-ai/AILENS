@@ -25,7 +25,7 @@ function Rail({ title, items, ratio, detail, list }: { title: string; items: Rai
     <View>
       <Link href={list} asChild>
         <Pressable accessibilityRole="link">
-          <SectionHeader title={title} right="전체 보기 →" />
+          <SectionHeader title={title} right="더 보기" />
         </Pressable>
       </Link>
       <FlatList
@@ -99,7 +99,7 @@ export function AudioSection({ items }: { items: HomePlayerPost[] }) {
     <View>
       <Link href="/listen" asChild>
         <Pressable accessibilityRole="link">
-          <SectionHeader title="오늘의 뉴스를 귀로" right="전체 듣기 →" />
+          <SectionHeader title="오늘의 뉴스를 귀로" right="더 보기" />
         </Pressable>
       </Link>
       {items.slice(0, 5).map((a, i) => (

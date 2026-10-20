@@ -6,6 +6,7 @@ import { Link } from 'expo-router';
 import type { LensPost } from '@ailens/api-client';
 import { displayHeadline } from '@ailens/domain';
 import { kstDateTime } from '../../../lib/format';
+import { CaretRight } from '../../../ui/icons';
 import { PAPER_TABS, paperTitle, pickPaperSection } from '../model';
 
 // 웹 LensPreviewSection(.lz-paper)의 지면 카드를 그대로 옮긴 것: 종이색 면 + 얇은 테두리 + 둥근 모서리,
@@ -30,7 +31,10 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
         {linkPast && firstDate ? (
           <Link href={{ pathname: '/paper/[date]', params: { date: firstDate } }} asChild>
             <Pressable accessibilityRole="link" hitSlop={8}>
-              <Text style={styles.all}>전체 보기 →</Text>
+              <View style={styles.allRow}>
+                <Text style={styles.all}>지난 지면</Text>
+                <CaretRight size={13} color="#4b5563" weight="bold" />
+              </View>
             </Pressable>
           </Link>
         ) : null}
@@ -160,7 +164,8 @@ const styles = StyleSheet.create({
     borderTopColor: '#b8bbc2',
   },
   kick: { fontSize: 18, fontWeight: '800', letterSpacing: -0.36, color: INK },
-  all: { fontSize: 14, fontWeight: '700', color: '#4b5563' },
+  allRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  all: { fontSize: 13.5, fontWeight: '700', color: '#4b5563' },
   mastLine: { marginBottom: 12 },
 
   tabs: { flexDirection: 'row', gap: 2, padding: 4, borderRadius: 999, backgroundColor: 'rgba(17,24,39,0.055)', marginBottom: 16 },

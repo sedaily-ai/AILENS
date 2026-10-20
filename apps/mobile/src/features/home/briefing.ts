@@ -61,7 +61,7 @@ export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: st
     const hero = pickPaperSection(lens, t.paperSection)[0];
     if (hero) put(fromLens(hero, t.key === 'all' ? 2.5 : 1.5, t.key === 'all' ? '오늘 지면 1면이에요' : `오늘 ${t.label}이에요`));
   });
-  latest.slice(0, 30).forEach((i, idx) => put(fromFeed(i, 0.5 + (30 - idx) / 100, '방금 올라온 소식이에요')));
+  latest.slice(0, 30).forEach((i, idx) => put(fromFeed(i, 0.5 + (30 - idx) / 100, '방금 올라온 기사예요')));
 
   // 관심 분야 가점과 이유 문구.
   const scored = [...pool.values()].map((c) => {

@@ -230,9 +230,9 @@ function Interests() {
               );
             })}
           </View>
-          <Text style={[styles.sec, { marginTop: 24 }]}>내 관심 분야 최신 글</Text>
+          <Text style={[styles.sec, { marginTop: 24 }]}>내 관심 분야 최신 기사</Text>
           {state.status === 'loading' ? <ActivityIndicator color="#2563eb" style={{ marginTop: 16 }} /> : null}
-          {picked && picked.length === 0 ? <Text style={styles.empty}>분야를 고르면 해당 분야의 최신 글을 모아 보여 줘요.</Text> : null}
+          {picked && picked.length === 0 ? <Text style={styles.empty}>분야를 고르면 해당 분야의 최신 기사를 모아 보여 줘요.</Text> : null}
         </View>
       }
       renderItem={({ item }) => (
