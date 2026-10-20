@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { categoryForDataLabel, type LetterEditor } from '@ailens/domain';
 import { getApiConfig, type LensPost } from '@ailens/api-client';
 import { Text } from '../../../ui/Text';
-import { ArrowRight, CaretDown, CaretUp, ChatCircleDots, Fire, GearSix } from '../../../ui/icons';
+import { ArrowRight, CaretDown, CaretUp, Fire, GearSix } from '../../../ui/icons';
 import { accent, colors, surface } from '../../../theme';
 import { answerLead, momentOf, nextLead, openingLine, voiceOf, type SituationKey } from '../editorVoice';
 import { categoriesOf } from '../myEditor';
@@ -93,43 +93,43 @@ export function EditorChat({
   const voiceUri = editor.voice ? `${getApiConfig().cmsApiUrl}${editor.voice}` : null;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.top}>
-        <Pressable onPress={onChangeEditor} style={styles.who} accessibilityRole="button" accessibilityLabel={`${picked ? '내' : '오늘의'} 에디터 ${editor.name}, 바꾸기`}>
-          <Face editor={editor} size={52} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={styles.kickerRow}>
-              <Text style={styles.kicker}>{picked ? '내 에디터' : '오늘의 에디터'}</Text>
-              <View style={styles.changePill}>
-                <Text style={styles.changeText}>바꾸기</Text>
-              </View>
-            </View>
-            <Text style={styles.name} numberOfLines={1}>{editor.name}</Text>
-          </View>
+    <View>
+      {/* 바깥 카드·테두리 없이 페이지 바탕 위에 대화가 바로 놓인다. 위에는 에디터 이름 줄(바꾸기 · 연속 일수 · 설정), 아래는 말풍선 대화. */}
+      <View style={styles.metaRow}>
+        <Pressable onPress={onChangeEditor} style={styles.metaWho} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${picked ? '내' : '오늘의'} 에디터 ${editor.name}, 바꾸기`}>
+          <Text style={styles.metaName} numberOfLines={1}>{editor.name}</Text>
+          <CaretDown size={13} color={colors.textMuted} weight="bold" />
         </Pressable>
         {streak > 0 ? (
           <View style={styles.streak}>
-            <Fire size={14} color="#ea580c" weight="fill" />
-            <Text style={styles.streakText}>{streak}일</Text>
+            <Fire size={13} color="#ea580c" weight="fill" />
+            <Text style={styles.streakText}>{streak}일째</Text>
           </View>
         ) : null}
         <Pressable onPress={onOpenSettings} hitSlop={10} accessibilityRole="button" accessibilityLabel="오늘 설정 열기" style={styles.gear}>
-          <GearSix size={22} color={colors.textMuted} />
+          <GearSix size={21} color={colors.textMuted} />
         </Pressable>
       </View>
 
-      <View style={styles.bubble}>
-        <Text style={styles.bubbleText}>{openingLine(voice, moment)}</Text>
-      </View>
-      {voiceUri ? (
-        <View style={styles.voiceRow}>
-          <EditorVoice key={editor.id} src={voiceUri} name={editor.name} tint={{ bg: accent.soft, fg: accent.ink }} compact />
+      <View style={styles.chatRow}>
+        <Pressable onPress={onChangeEditor} accessibilityRole="button" accessibilityLabel="에디터 바꾸기">
+          <Face editor={editor} size={46} />
+        </Pressable>
+        <View style={styles.bubbleCol}>
+          <View style={styles.bubble}>
+            <Text style={styles.bubbleText}>{openingLine(voice, moment)}</Text>
+          </View>
+          {voiceUri ? (
+            <View style={styles.voiceRow}>
+              <EditorVoice key={editor.id} src={voiceUri} name={editor.name} tint={{ bg: accent.soft, fg: accent.ink }} compact />
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </View>
 
       {chips.length > 0 ? (
         <>
-          <Text style={styles.label}>궁금한 걸 눌러 보세요</Text>
+          <Text style={styles.label}>이런 게 궁금하실 것 같아요</Text>
           {/* 질문은 제자리에서 펼쳐지고 접힌다(아코디언). 다른 질문을 열면 이전 질문이 접히고, 목록 순서는 바뀌지 않는다. */}
           <View style={styles.chips} onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
             {chips.map((c) => {
@@ -143,7 +143,6 @@ export function EditorChat({
                     accessibilityState={{ expanded: on }}
                     accessibilityLabel={`${c.question} ${on ? '접기' : '펼치기'}`}
                   >
-                    <ChatCircleDots size={18} color={on ? '#fff' : accent.main} weight="fill" />
                     <Text style={[styles.chipText, on && { color: '#fff' }]} numberOfLines={on ? 4 : 2}>{c.question}</Text>
                     {on ? <CaretUp size={16} color="#fff" weight="bold" /> : <CaretDown size={16} color={accent.main} weight="bold" />}
                   </Pressable>
@@ -214,28 +213,32 @@ export function EditorChat({
 }
 
 const styles = StyleSheet.create({
-  card: { ...surface.card, padding: 16 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  metaWho: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaName: { flexShrink: 1, fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: colors.text },
+  chatRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  bubbleCol: { flex: 1, minWidth: 0 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   who: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   ring: { alignItems: 'center', justifyContent: 'center' },
   kicker: { fontSize: 12.5, fontWeight: '800', color: accent.ink },
   name: { marginTop: 3, fontSize: 17, fontWeight: '800', letterSpacing: -0.4, color: colors.text },
-  streak: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, height: 26, borderRadius: 999, backgroundColor: '#fff3e8' },
+  streak: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, height: 26, borderRadius: 999, backgroundColor: '#fff3e8' },
   streakText: { fontSize: 12, fontWeight: '800', color: '#c2410c' },
   gear: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   changePill: { paddingHorizontal: 8, height: 22, borderRadius: 999, backgroundColor: accent.soft, alignItems: 'center', justifyContent: 'center' },
   changeText: { fontSize: 12, fontWeight: '800', color: accent.ink },
 
-  bubble: { marginTop: 14, padding: 14, borderRadius: 18, borderTopLeftRadius: 6, backgroundColor: accent.soft },
+  bubble: { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 20, borderTopLeftRadius: 6, backgroundColor: accent.soft },
   bubbleText: { fontSize: 15.5, lineHeight: 24, fontWeight: '600', color: colors.text },
-  voiceRow: { marginTop: 10 },
+  voiceRow: { marginTop: 8 },
 
-  label: { marginTop: 20, marginBottom: 10, fontSize: 13.5, fontWeight: '800', color: colors.textSub },
+  label: { marginTop: 22, marginBottom: 10, marginLeft: 2, fontSize: 13.5, fontWeight: '800', color: colors.textMuted },
   chips: { gap: 8 },
-  item: { borderRadius: 16, borderWidth: 1.5, borderColor: accent.line, backgroundColor: '#fff', overflow: 'hidden' },
-  itemOn: { borderColor: accent.main },
-  chip: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  item: { borderRadius: 18, borderWidth: 1, borderColor: '#e6eaf1', backgroundColor: '#fff', overflow: 'hidden' },
+  itemOn: { borderColor: accent.main, borderWidth: 1.5 },
+  chip: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16, paddingRight: 14, paddingVertical: 12 },
   chipOn: { backgroundColor: accent.main },
   chipText: { flex: 1, fontSize: 14.5, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2, color: colors.text },
 
