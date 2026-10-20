@@ -7,6 +7,8 @@ import { greeting, type BriefingPick } from '../briefing';
 import type { DailyProgress, StepKey } from '../dailyProgress';
 import { SITUATION_ROUTE, type BriefingPrefs } from '../briefingPrefs';
 import { BriefingSettings } from './BriefingSettings';
+import { EditorCard } from './EditorCard';
+import type { LetterEditor } from '@ailens/domain';
 
 /**
  * 홈 맨 위 — 오늘의 브리핑.
@@ -22,7 +24,7 @@ const STEPS: { key: StepKey; label: string; hint: string; cta: string }[] = [
 // 온보딩에서 고른 방식(레터 0·웹툰 1·팟캐스트 2·영상 3)이 가리키는 화면. 아직 안 골랐으면 고르는 화면으로 보낸다.
 const FORMAT_ROUTE: Href[] = ['/letter', '/webtoon', '/listen', '/video'];
 
-export function BriefingTop({ progress, picks, preferredFormat, prefs, interests, onInterests }: { progress: DailyProgress; picks: BriefingPick[]; preferredFormat: number | null; prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void }) {
+export function BriefingTop({ progress, picks, preferredFormat, prefs, interests, onInterests, editor, editorPicked }: { progress: DailyProgress; picks: BriefingPick[]; preferredFormat: number | null; prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void; editor: LetterEditor; editorPicked: boolean }) {
   const router = useRouter();
   const all = progress.doneCount === STEPS.length;
   const next = STEPS.find((s) => !progress.today[s.key]);
@@ -50,6 +52,10 @@ export function BriefingTop({ progress, picks, preferredFormat, prefs, interests
             <Text style={styles.streakText}>{progress.streak}일 연속</Text>
           </View>
         ) : null}
+      </View>
+
+      <View style={styles.editorWrap}>
+        <EditorCard editor={editor} picked={editorPicked} />
       </View>
 
       <View style={styles.card}>
@@ -107,7 +113,8 @@ const styles = StyleSheet.create({
   streak: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: '#fff3e8', marginTop: 2 },
   streakText: { fontSize: 12.5, fontWeight: '800', color: '#c2410c' },
 
-  card: { marginTop: 18, padding: 18, borderRadius: 22, backgroundColor: '#f4f6fa' },
+  editorWrap: { marginTop: 16 },
+  card: { marginTop: 14, padding: 18, borderRadius: 22, backgroundColor: '#f4f6fa' },
   stepsRow: { flexDirection: 'row' },
   step: { flex: 1, alignItems: 'center', gap: 8 },
   circle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#d9dee8' },

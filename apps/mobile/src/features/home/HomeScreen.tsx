@@ -10,6 +10,7 @@ import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
 import { TimeMachineCard } from './sections/TimeMachineCard';
 import { BriefingTop } from './sections/BriefingTop';
+import { useMyEditor } from './myEditor';
 import { PickCards } from './sections/PickCards';
 import { pickBriefing } from './briefing';
 import { PAPER_TABS, pickPaperSection } from './model';
@@ -27,9 +28,9 @@ const LATEST_COUNT = 3;
  */
 type Section = { key: string; render: () => React.ReactElement | null };
 
-function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDailyProgress>; picks: ReturnType<typeof pickBriefing>; fmt: number | null; readToday: Set<string>; prefs: ReturnType<typeof useBriefingPrefs>; interests: string[]; setInterests: (s: string[]) => void }): Section[] {
+function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDailyProgress>; picks: ReturnType<typeof pickBriefing>; fmt: number | null; readToday: Set<string>; prefs: ReturnType<typeof useBriefingPrefs>; interests: string[]; setInterests: (s: string[]) => void; myEditor: ReturnType<typeof useMyEditor> }): Section[] {
   return [
-    { key: 'briefing', render: () => <BriefingTop progress={ctx.progress} picks={ctx.picks} preferredFormat={ctx.fmt} prefs={ctx.prefs} interests={ctx.interests} onInterests={ctx.setInterests} /> },
+    { key: 'briefing', render: () => <BriefingTop progress={ctx.progress} picks={ctx.picks} preferredFormat={ctx.fmt} prefs={ctx.prefs} interests={ctx.interests} onInterests={ctx.setInterests} editor={ctx.myEditor.editor} editorPicked={ctx.myEditor.picked} /> },
     { key: 'picks', render: () => <PickCards picks={ctx.picks} readToday={ctx.readToday} /> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} moreHref="/discover" /> },
@@ -45,6 +46,7 @@ export function HomeScreen() {
   const read = useListStore(history);
   useListStore(bookmarks);
   const [interests, setInterests] = useState<string[]>([]);
+  const myEditor = useMyEditor(interests);
   const [fmt, setFmt] = useState<number | null>(null);
   useEffect(() => {
     void getInterests().then(setInterests);
@@ -78,7 +80,7 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data, { progress, picks, fmt, readToday, prefs, interests, setInterests })}
+            data={buildSections(state.data, { progress, picks, fmt, readToday, prefs, interests, setInterests, myEditor })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}
