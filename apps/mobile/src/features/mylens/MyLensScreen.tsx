@@ -15,6 +15,7 @@ import { buildLatest } from '../home/model';
 import { deleteSentence, listArchive, type ArchiveSentence } from './archiveApi';
 import { useListStore } from './listStore';
 import { bookmarks, getInterests, history, setInterests, type SavedArticle } from './stores';
+import { KnowledgeMap } from './KnowledgeMap';
 
 const SITE = 'https://ailens.sedaily.ai';
 type Tab = 'drawer' | 'saved' | 'read' | 'interest';
@@ -52,6 +53,7 @@ export function MyLensScreen() {
         </View>
       ) : (
         <>
+          <KnowledgeMap items={read.items} />
           <View style={styles.tabs}>
             {TABS.map(([k, label]) => (
               <Pressable key={k} style={[styles.tab, tab === k && styles.tabOnBg]} onPress={() => setTab(k)} accessibilityRole="tab" accessibilityState={{ selected: tab === k }}>

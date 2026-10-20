@@ -12,6 +12,8 @@ import { TimeMachineCard } from './sections/TimeMachineCard';
 import { EditorChat } from './sections/EditorChat';
 import { EditorPicker } from './sections/EditorPicker';
 import { FormatCarousel } from './sections/FormatCarousel';
+import { Continues } from './sections/Continues';
+import { connections } from './connections';
 import { BriefingSettings } from './sections/BriefingSettings';
 import { useMyEditor } from './myEditor';
 import { useDailyProgress } from './dailyProgress';
@@ -33,6 +35,7 @@ interface Ctx {
   interests: string[];
   myEditor: ReturnType<typeof useMyEditor>;
   readIds: Set<string>;
+  continues: ReturnType<typeof connections>;
   openPicker: () => void;
   openSettings: () => void;
   scrollToChat: (yInCard: number) => void;
@@ -57,6 +60,7 @@ function buildSections(data: HomeData, c: Ctx): Section[] {
         />
       ),
     },
+    { key: 'continues', render: () => <Continues items={c.continues} /> },
     { key: 'formats', render: () => <FormatCarousel situation={c.prefs.situation} /> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} moreHref="/discover" /> },
@@ -83,6 +87,11 @@ export function HomeScreen() {
   }, []);
   // 이미 읽은 기사는 질문 후보에서 뒤로 밀린다(읽을수록 질문이 새로워진다).
   const readIds = useMemo(() => new Set(read.items.map((r) => r.id)), [read.items]);
+  // 이어서 볼 소식: 최근 읽은 글과 같은 분야의 안 읽은 기사(기기 안 읽은 기록 기준).
+  const continues = useMemo(
+    () => (state.status === 'ready' ? connections(state.data.lens, read.items.map((r) => ({ id: r.id, title: r.title, category: r.category, at: r.at })), 2) : []),
+    [state, read.items]
+  );
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -102,7 +111,7 @@ export function HomeScreen() {
         ) : (
           <FlatList
             ref={listRef}
-            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true), scrollToChat })}
+            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, continues, openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true), scrollToChat })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}
