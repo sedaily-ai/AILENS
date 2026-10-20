@@ -11,7 +11,7 @@ import { colors } from '../../../theme';
  */
 const clock = (s: number) => `0:${String(Math.max(0, Math.round(s))).padStart(2, '0')}`;
 
-export function EditorVoice({ src, name, tint }: { src: string; name: string; tint: { bg: string; fg: string } }) {
+export function EditorVoice({ src, name, tint, compact }: { src: string; name: string; tint: { bg: string; fg: string }; compact?: boolean }) {
   const news = usePlayer();
   const player = useAudioPlayer({ uri: src });
   const status = useAudioPlayerStatus(player);
@@ -29,6 +29,15 @@ export function EditorVoice({ src, name, tint }: { src: string; name: string; ti
   const ratio = finished || status.duration <= 0 ? 0 : Math.min(1, status.currentTime / status.duration);
   const started = status.playing || (status.currentTime > 0 && !finished);
 
+  if (compact) {
+    // 말풍선 아래에 붙는 작은 알약: 재생 아이콘 + 라벨 + 시간.
+    return (
+      <Pressable style={({ pressed }) => [styles.mini, { backgroundColor: tint.bg }, pressed && { opacity: 0.85 }]} onPress={toggle} accessibilityRole="button" accessibilityLabel={`${name} 자기소개 ${status.playing ? '멈추기' : '듣기'}`}>
+        {status.playing ? <Pause size={14} color={tint.fg} weight="fill" /> : <Play size={14} color={tint.fg} weight="fill" />}
+        <Text style={[styles.miniText, { color: tint.fg }]}>{status.playing ? `듣는 중 ${clock(status.currentTime)}` : `자기소개 듣기 ${status.duration > 0 ? clock(status.duration) : ''}`.trim()}</Text>
+      </Pressable>
+    );
+  }
   return (
     <Pressable style={({ pressed }) => [styles.bar, { backgroundColor: tint.bg }, pressed && { opacity: 0.9 }]} onPress={toggle} accessibilityRole="button" accessibilityLabel={`${name} 자기소개 ${status.playing ? '멈추기' : '듣기'}`}>
       <View style={[styles.icon, { backgroundColor: tint.fg }]}>
@@ -46,6 +55,8 @@ export function EditorVoice({ src, name, tint }: { src: string; name: string; ti
 }
 
 const styles = StyleSheet.create({
+  mini: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 32, borderRadius: 999 },
+  miniText: { fontSize: 12.5, fontWeight: '800' },
   bar: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingLeft: 10, paddingRight: 16, borderRadius: 999, },
   icon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   mid: { flex: 1, gap: 6 },

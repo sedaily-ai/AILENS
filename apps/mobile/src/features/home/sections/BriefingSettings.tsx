@@ -18,8 +18,12 @@ const SITUATIONS: { key: Situation; label: string; hint: string; Icon: typeof Bu
   { key: 'weekend', label: '주말', hint: '깊이 있는 레터', Icon: Coffee },
 ];
 
-export function BriefingSettings({ prefs, interests, onInterests }: { prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void }) {
-  const [open, setOpen] = useState(false);
+export function BriefingSettings({ prefs, interests, onInterests, open: openProp, onClose, hideTrigger }: { prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void; open?: boolean; onClose?: () => void; hideTrigger?: boolean }) {
+  // 제어형(open·onClose 를 넘기면 호출한 쪽이 열고 닫는다) 또는 스스로 여닫는 한 줄 요약 칩 형태 둘 다 지원한다.
+  const [openSelf, setOpenSelf] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openSelf;
+  const setOpen = (v: boolean) => (controlled ? (v ? undefined : onClose?.()) : setOpenSelf(v));
   const situation = SITUATIONS.find((s) => s.key === prefs.situation);
   const labels = ECON_CATEGORIES.filter((c) => interests.includes(c.slug)).map((c) => c.label);
   const summary = [`${prefs.minutes}분`, situation?.label, labels.length ? labels.slice(0, 2).join('·') + (labels.length > 2 ? ` 외 ${labels.length - 2}` : '') : null].filter(Boolean);
@@ -32,7 +36,7 @@ export function BriefingSettings({ prefs, interests, onInterests }: { prefs: Bri
 
   return (
     <>
-      <Pressable style={({ pressed }) => [styles.summary, pressed && { opacity: 0.85 }]} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="오늘 브리핑 설정 열기">
+      {hideTrigger ? null : <Pressable style={({ pressed }) => [styles.summary, pressed && { opacity: 0.85 }]} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="오늘 브리핑 설정 열기">
         <SlidersHorizontal size={18} color={colors.textSub} />
         <Text style={styles.summaryLabel}>오늘 설정</Text>
         <View style={styles.chips}>
@@ -41,7 +45,7 @@ export function BriefingSettings({ prefs, interests, onInterests }: { prefs: Bri
           ))}
         </View>
         <Text style={styles.edit}>바꾸기</Text>
-      </Pressable>
+      </Pressable>}
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} statusBarTranslucent>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="닫기" />
