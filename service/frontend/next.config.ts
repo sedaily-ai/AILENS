@@ -68,6 +68,15 @@ const nextConfig: NextConfig = {
           { key: "Access-Control-Allow-Origin", value: "*" },
         ],
       },
+      // sedaily.ai 가 iframe 으로 넣는 위젯 페이지 — 이 경로만 프레임 삽입을 허용한다(나머지는 CloudFront 의 X-Frame-Options: SAMEORIGIN 유지).
+      // 위젯 페이지는 문안·모드가 바뀌면 바로 반영돼야 하므로 /widget/* 의 1시간 보관(위)보다 짧게 둔다.
+      {
+        source: "/widget/frame.html",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, s-maxage=300, must-revalidate" },
+          { key: "Content-Security-Policy", value: `frame-ancestors 'self' https://sedaily.ai https://www.sedaily.ai${process.env.NODE_ENV === "production" ? "" : " http://localhost:*"}` },
+        ],
+      },
     ];
   },
 
