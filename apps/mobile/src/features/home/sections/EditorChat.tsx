@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Image, LayoutAnimation, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { categoryForDataLabel, type LetterEditor } from '@ailens/domain';
@@ -40,6 +40,7 @@ export function EditorChat({
   streak,
   onChangeEditor,
   onOpenSettings,
+  onOpened,
 }: {
   editor: LetterEditor;
   picked: boolean;
@@ -50,12 +51,17 @@ export function EditorChat({
   streak: number;
   onChangeEditor: () => void;
   onOpenSettings: () => void;
+  /** 질문이 열렸을 때 호출 — 열린 칩의 맨 위가 카드 안 어디인지(px)를 알려 홈이 그 자리로 스크롤한다. */
+  onOpened?: (yInCard: number) => void;
 }) {
   const router = useRouter();
   const voice = voiceOf(editor.group);
   const moment = momentOf(new Date(), situation);
   const [openId, setOpenId] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  // 칩 목록과 각 칩의 위치(레이아웃). 칩이 열리면 그 칩의 맨 위가 화면 위쪽에 오도록 홈에 알린다.
+  const listY = useRef(0);
+  const itemY = useRef<Record<string, number>>({});
 
   const chips = useMemo(
     () =>
@@ -78,6 +84,8 @@ export function EditorChat({
     if (openId === qa.id) return setOpenId(null);
     setOpenId(qa.id);
     void markStep('read');
+    // 이전 질문이 접히며 높이가 바뀐 뒤의 위치를 쓰도록 한 프레임 뒤에 알린다.
+    setTimeout(() => onOpened?.(listY.current + (itemY.current[qa.id] ?? 0)), 260);
   };
   const openArticle = (qa: QA, index?: number) =>
     router.push({ pathname: '/article/[slug]', params: index === undefined ? { slug: qa.id } : { slug: qa.id, format: String(index) } });
@@ -123,11 +131,11 @@ export function EditorChat({
         <>
           <Text style={styles.label}>궁금한 걸 눌러 보세요</Text>
           {/* 질문은 제자리에서 펼쳐지고 접힌다(아코디언). 다른 질문을 열면 이전 질문이 접히고, 목록 순서는 바뀌지 않는다. */}
-          <View style={styles.chips}>
+          <View style={styles.chips} onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
             {chips.map((c) => {
               const on = c.id === openId;
               return (
-                <View key={c.id} style={[styles.item, on && styles.itemOn]}>
+                <View key={c.id} style={[styles.item, on && styles.itemOn]} onLayout={(e) => (itemY.current[c.id] = e.nativeEvent.layout.y)}>
                   <Pressable
                     onPress={() => select(c)}
                     style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && !on && { backgroundColor: accent.soft }]}

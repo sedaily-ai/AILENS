@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,6 +35,7 @@ interface Ctx {
   readIds: Set<string>;
   openPicker: () => void;
   openSettings: () => void;
+  scrollToChat: (yInCard: number) => void;
 }
 
 function buildSections(data: HomeData, c: Ctx): Section[] {
@@ -52,6 +53,7 @@ function buildSections(data: HomeData, c: Ctx): Section[] {
           streak={c.progress.streak}
           onChangeEditor={c.openPicker}
           onOpenSettings={c.openSettings}
+          onOpened={c.scrollToChat}
         />
       ),
     },
@@ -71,6 +73,9 @@ export function HomeScreen() {
   useListStore(bookmarks);
   const [interests, setInterests] = useState<string[]>([]);
   const myEditor = useMyEditor(interests);
+  const listRef = useRef<FlatList<{ key: string; render: () => React.ReactElement | null }>>(null);
+  // 질문을 열면 그 질문이 상단바 바로 아래에 오도록 스크롤한다(풀이가 길어도 맨 위부터 읽게). 목록 위 여백(16) + 카드 안 위치.
+  const scrollToChat = (yInCard: number) => listRef.current?.scrollToOffset({ offset: Math.max(0, 16 + yInCard - 8), animated: true });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
@@ -96,7 +101,8 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true) })}
+            ref={listRef}
+            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true), scrollToChat })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}
