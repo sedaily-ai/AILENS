@@ -8,6 +8,7 @@ import { yearFloat } from '../../lib/chronicleLayout';
 import { ATT_KEYWORDS, ATT_LABEL, type AttKey } from '../../lib/attention';
 import { ChronicleChart, FULL_DOMAIN, clampDomain } from './ChronicleChart';
 import { EventDetailPanel } from './EventDetailPanel';
+import { ACCENT, ACCENT_HOVER, BORDER_CONTROL, BORDER_HAIRLINE, BORDER_STRONG, FONT, SURFACE, SURFACE_CHIP, SURFACE_SUNKEN, TEXT_BODY, TEXT_INVERSE, TEXT_MUTED, TEXT_STRONG, TOUCH_MIN } from '../../lib/tone';
 
 type Domain = [number, number];
 const DEFAULT_EVENT_ID = '1997-11-21-1';
@@ -120,23 +121,22 @@ export function ChronicleExplorer() {
     <div onKeyDown={onKeyDown}>
       <style>{CSS}</style>
 
-      <section className="cx-hero">
-        <div className="cx-hero-in">
-          <p className="cx-eyebrow">그날로 떠나요 · 연대기</p>
-          <h1 className="cx-hero-title"><span>1990</span><i aria-hidden /><span>2026</span></h1>
-          <p className="cx-hero-sub">서울경제 기사가 가장 많이 다룬 말로 읽는 한국 경제 36년. 곡선 위의 사건을 눌러 그 무렵의 기사로 들어가 보세요.</p>
-          <ul className="cx-stats">
-            <li><b>{events.length}</b><span>검증한 사건</span></li>
-            <li><b>{ERAS.length}</b><span>묶음 시대</span></li>
-            <li><b>2+</b><span>사건당 출처</span></li>
-            <li><b>{(FULL_DOMAIN[1] - FULL_DOMAIN[0] - 1).toFixed(0)}</b><span>년의 아카이브</span></li>
-          </ul>
-        </div>
-      </section>
+      {/* 연대별·시대별(ChronicleFrame)과 같은 머리 — 흰 바탕, 가운데 정렬, 굵은 밑줄. 숫자 4개는 한 줄로 둔다. */}
+      <header className="cx-head">
+        <p className="cx-eyebrow">그날로 떠나요 · 연대기</p>
+        <h1 className="cx-head-title"><span>1990</span><i aria-hidden /><span>2026</span></h1>
+        <p className="cx-head-sub">서울경제 기사가 가장 많이 다룬 말로 읽는 한국 경제 36년. 곡선 위의 사건을 눌러 그 무렵의 기사로 들어가 보세요.</p>
+        <ul className="cx-stats">
+          <li><b>{events.length}</b>검증한 사건</li>
+          <li><b>{ERAS.length}</b>묶음 시대</li>
+          <li><b>2+</b>사건당 출처</li>
+          <li><b>{(FULL_DOMAIN[1] - FULL_DOMAIN[0] - 1).toFixed(0)}</b>년의 아카이브</li>
+        </ul>
+      </header>
 
       <section className="cx-stage" aria-label="연대기 차트">
         <div className="cx-in">
-          <div className="cx-row">
+          <div className="cx-row cx-row-keys">
             <div className="cx-seg" role="group" aria-label="곡선으로 볼 말">
               {KEYS.map((k) => (
                 <button key={k} type="button" aria-pressed={attKey === k} onClick={() => setAttKey(k)}>{ATT_LABEL[k]}</button>
@@ -146,16 +146,21 @@ export function ChronicleExplorer() {
           </div>
 
           <div className="cx-row cx-row-tools">
-            <div className="cx-chips" role="group" aria-label="구간 이동">
-              {DECADE_JUMPS.map((d) => (
-                <button key={d} type="button" onClick={() => animateTo([d - 0.4, d + 10.4])}>{d}년대</button>
-              ))}
-              <button type="button" onClick={() => animateTo(FULL_DOMAIN)}>전체</button>
-              <span className="cx-zoom">
-                <button type="button" onClick={() => zoom(0.6)} aria-label="확대">+</button>
-                <button type="button" onClick={() => zoom(1 / 0.6)} aria-label="축소">−</button>
-              </span>
-              <button type="button" onClick={randomEvent} className="is-solid"><DiceIcon />아무 사건으로</button>
+            {/* 구간 칩과 확대·무작위 버튼을 나눠 둔다 — 좁은 화면에서 칩 줄만 옆으로 넘기고, '아무 사건으로'는 늘 보이게. */}
+            <div className="cx-row-left">
+              <div className="cx-chips" role="group" aria-label="구간 이동">
+                {DECADE_JUMPS.map((d) => (
+                  <button key={d} type="button" onClick={() => animateTo([d - 0.4, d + 10.4])}>{d}년대</button>
+                ))}
+                <button type="button" onClick={() => animateTo(FULL_DOMAIN)}>전체</button>
+              </div>
+              <div className="cx-chips cx-chips-tools">
+                <span className="cx-zoom">
+                  <button type="button" onClick={() => zoom(0.6)} aria-label="확대">+</button>
+                  <button type="button" onClick={() => zoom(1 / 0.6)} aria-label="축소">−</button>
+                </span>
+                <button type="button" onClick={randomEvent} className="is-solid"><DiceIcon />아무 사건으로</button>
+              </div>
             </div>
             <label className="cx-search">
               <span className="sr-only">사건 검색</span>
@@ -190,60 +195,85 @@ export function ChronicleExplorer() {
   );
 }
 
-const SERIF = "'Noto Serif KR','Nanum Myeongjo','AppleMyungjo',Georgia,serif";
+// Lens 톤 — 색·글자 크기·간격은 tone.ts 토큰만 쓴다. 시대 색(--ev)만 사건이 속한 시대를 구분하는 정보라 그대로 둔다.
+// 버튼·칩은 높이 44px(터치 타겟), 글자는 13px 이상, 컨트롤 경계는 BORDER_CONTROL(4.83:1).
 const CSS = `
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.cx-hero{background:#0d1726;color:#fff;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px);background-size:100% 44px}
-.cx-hero-in{max-width:1180px;margin:0 auto;padding:clamp(60px,8vw,88px) clamp(20px,4vw,36px) clamp(26px,4vw,40px)}
-.cx-eyebrow{font-size:12px;letter-spacing:.22em;color:#8fa3c4;margin-bottom:14px;text-transform:uppercase}
-.cx-hero-title{display:flex;align-items:center;gap:clamp(14px,2.6vw,30px);font-family:${SERIF};font-size:clamp(46px,9vw,92px);font-weight:700;letter-spacing:-.02em;line-height:1}
-.cx-hero-title i{display:block;width:clamp(36px,8vw,96px);height:1px;background:linear-gradient(90deg,#8fa3c4,#e7ecf5)}
-.cx-hero-sub{margin-top:18px;max-width:560px;font-size:clamp(14px,1.8vw,16.5px);line-height:1.75;color:#c3cde0;word-break:keep-all}
-.cx-stats{display:flex;flex-wrap:wrap;gap:6px clamp(22px,4vw,44px);margin:26px 0 0;padding:20px 0 0;list-style:none;border-top:1px solid rgba(255,255,255,.14)}
-.cx-stats li{display:flex;align-items:baseline;gap:8px}.cx-stats b{font-family:${SERIF};font-size:24px;font-weight:700}.cx-stats span{font-size:12.5px;color:#8fa3c4}
-.cx-stage{background:#fafaf7;border-bottom:1px solid #e6e3da;padding:24px 0 16px}
+.cx-head{max-width:1180px;margin:0 auto;padding:${TOUCH_MIN + 32}px clamp(20px,4vw,36px) 24px;text-align:center}
+.cx-eyebrow{font-size:${FONT.caption}px;letter-spacing:.2em;color:${TEXT_MUTED};margin-bottom:8px}
+.cx-head-title{display:flex;align-items:center;justify-content:center;gap:16px;font-size:clamp(${FONT.pageTitleLg}px,6vw,40px);font-weight:800;letter-spacing:-.02em;line-height:1.2;color:${TEXT_STRONG};font-variant-numeric:tabular-nums}
+.cx-head-title i{display:block;width:clamp(24px,5vw,48px);height:2px;background:${TEXT_STRONG}}
+.cx-head-sub{max-width:560px;margin:12px auto 0;font-size:${FONT.body}px;line-height:1.7;color:${TEXT_BODY};word-break:keep-all}
+.cx-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 24px;margin:16px 0 0;padding:0 0 24px;list-style:none;border-bottom:2px solid ${BORDER_STRONG};font-size:${FONT.caption}px;color:${TEXT_MUTED}}
+.cx-stats li{display:flex;align-items:baseline;gap:4px}.cx-stats b{font-size:${FONT.sectionTitle}px;font-weight:800;color:${TEXT_STRONG};font-variant-numeric:tabular-nums}
+.cx-stage{background:${SURFACE};border-bottom:1px solid ${BORDER_HAIRLINE};padding:8px 0 16px}
 .cx-in{max-width:1180px;margin:0 auto;padding:0 clamp(16px,3vw,28px)}
-.cx-row{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;margin-bottom:14px}
-.cx-seg{display:inline-flex;padding:3px;background:#eceae3;border-radius:999px}
-.cx-seg button{min-height:34px;padding:0 15px;border:none;background:transparent;border-radius:999px;font-size:13.5px;font-weight:700;color:#4a5566;cursor:pointer;transition:background .18s,color .18s,box-shadow .18s}
-.cx-seg button[aria-pressed="true"]{background:#14202f;color:#fff;box-shadow:0 2px 8px rgba(20,32,47,.25)}
-.cx-seg button:not([aria-pressed="true"]):hover{background:rgba(20,32,47,.07)}
-.cx-cap{font-size:13px;color:#5f6b7c}
-.cx-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.cx-chips>button,.cx-zoom button{min-height:36px;padding:0 14px;border-radius:999px;border:1px solid #d3d0c6;background:#fff;color:#14202f;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .15s,border-color .15s,transform .12s}
-.cx-chips>button:hover,.cx-zoom button:hover{background:#f2f0e9;border-color:#b9b5a8}.cx-chips>button:active{transform:scale(.97)}
-.cx-chips .is-solid{background:#14202f;border-color:#14202f;color:#fff}.cx-chips .is-solid:hover{background:#243247}
-.cx-zoom{display:inline-flex;gap:0}.cx-zoom button{min-width:36px;padding:0;justify-content:center;font-size:16px}.cx-zoom button:first-child{border-radius:999px 0 0 999px}.cx-zoom button:last-child{border-radius:0 999px 999px 0;border-left:none}
+.cx-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cx-chips,.cx-row-left{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cx-row-left{min-width:0}
+/* 1줄(곡선으로 볼 말)은 하나만 고르는 스위치라 회색 홈 안의 세그먼트로, 2줄(구간 이동·확대)은 누르는 버튼이라 테두리 버튼으로 모양을 나눈다. */
+.cx-seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:${SURFACE_CHIP}}
+.cx-seg button{display:inline-flex;align-items:center;justify-content:center;min-height:${TOUCH_MIN}px;padding:0 16px;border:none;border-radius:999px;background:transparent;color:${TEXT_BODY};font-size:${FONT.meta}px;font-weight:600;font-family:inherit;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s}
+.cx-seg button:not([aria-pressed="true"]):hover{background:#e5e7eb;color:${TEXT_STRONG}}
+.cx-seg button[aria-pressed="true"]{background:${TEXT_STRONG};color:${TEXT_INVERSE};font-weight:700;box-shadow:0 1px 4px rgba(17,24,39,.24)}
+.cx-chips>button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:${TOUCH_MIN}px;padding:0 16px;border:1px solid ${BORDER_CONTROL};border-radius:999px;background:${SURFACE};color:${TEXT_BODY};font-size:${FONT.meta}px;font-weight:600;font-family:inherit;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s}
+.cx-chips>button:hover{background:${SURFACE_SUNKEN};color:${TEXT_STRONG}}
+.cx-chips .is-solid{background:${ACCENT};border-color:${ACCENT};color:${TEXT_INVERSE};font-weight:700}.cx-chips .is-solid:hover{background:${ACCENT_HOVER};color:${TEXT_INVERSE}}
+.cx-cap{font-size:${FONT.caption}px;color:${TEXT_MUTED}}
+.cx-zoom{display:inline-flex}.cx-zoom button{min-width:${TOUCH_MIN}px;min-height:${TOUCH_MIN}px;padding:0;border:1px solid ${BORDER_CONTROL};background:${SURFACE};color:${TEXT_STRONG};font-size:${FONT.sectionTitle}px;font-family:inherit;cursor:pointer}
+.cx-zoom button:hover{background:${SURFACE_SUNKEN}}.cx-zoom button:first-child{border-radius:999px 0 0 999px}.cx-zoom button:last-child{border-radius:0 999px 999px 0;border-left:none}
 .cx-search{position:relative;display:flex;align-items:center;gap:8px}
-.cx-search input{min-height:36px;width:min(260px,72vw);padding:0 14px;border-radius:999px;border:1px solid #d3d0c6;background:#fff;font-size:13.5px;font-family:inherit}
-.cx-search em{font-style:normal;font-size:12px;color:#5f6b7c}
-.cx-hint{max-width:1180px;margin:10px auto 0;padding:0 clamp(16px,3vw,28px);font-size:12px;line-height:1.6;color:#7a8494}
-.cx-panel{max-width:1180px;margin:0 auto;padding:clamp(26px,4vw,44px) clamp(16px,3vw,28px) clamp(56px,8vw,96px);animation:cx-in .38s ease}
-@keyframes cx-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.cx-panel-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;padding-bottom:12px;border-bottom:1px solid #d9d6cc;position:relative}
-.cx-panel-top:after{content:'';position:absolute;left:0;bottom:-1px;width:72px;height:3px;background:var(--ev,#244a78)}
-.cx-count{font-size:12.5px;color:#7a8494;font-variant-numeric:tabular-nums}.cx-count b{font-family:${SERIF};font-size:20px;color:#14202f;margin-right:2px}
-.cx-nav{display:flex;gap:6px}.cx-nav button{min-height:34px;padding:0 16px;border-radius:999px;border:1px solid #d3d0c6;background:#fff;font-size:13px;font-weight:700;cursor:pointer}.cx-nav button:hover{background:#f2f0e9}
-.cx-panel-grid{display:grid;grid-template-columns:1.12fr 1fr;gap:clamp(24px,5vw,60px)}
+.cx-search input{min-height:${TOUCH_MIN}px;width:min(280px,100%);padding:0 16px;border-radius:999px;border:1px solid ${BORDER_CONTROL};background:${SURFACE};color:${TEXT_STRONG};font-size:${FONT.meta}px;font-family:inherit}
+.cx-search em{font-style:normal;font-size:${FONT.caption}px;color:${TEXT_MUTED};white-space:nowrap}
+.cx-hint{max-width:1180px;margin:12px auto 0;padding:0 clamp(16px,3vw,28px);font-size:${FONT.caption}px;line-height:1.6;color:${TEXT_MUTED}}
+.cx-panel{max-width:1180px;margin:0 auto;padding:clamp(24px,4vw,48px) clamp(16px,3vw,28px) clamp(48px,8vw,96px);animation:cx-in .38s ease}
+@keyframes cx-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.cx-panel-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid ${BORDER_HAIRLINE};position:relative}
+.cx-panel-top:after{content:'';position:absolute;left:0;bottom:-1px;width:72px;height:3px;background:var(--ev,${ACCENT})}
+.cx-count{font-size:${FONT.caption}px;color:${TEXT_MUTED};font-variant-numeric:tabular-nums}.cx-count b{font-size:${FONT.pageTitle}px;font-weight:800;color:${TEXT_STRONG};margin-right:4px}
+.cx-nav{display:flex;gap:8px}
+.cx-nav button{min-height:${TOUCH_MIN}px;padding:0 20px;border-radius:999px;border:1px solid ${BORDER_CONTROL};background:${SURFACE};color:${TEXT_BODY};font-size:${FONT.meta}px;font-weight:700;font-family:inherit;cursor:pointer}
+.cx-nav button:hover{background:${SURFACE_SUNKEN};color:${TEXT_STRONG}}
+.cx-panel-grid{display:grid;grid-template-columns:1.12fr 1fr;gap:clamp(24px,5vw,64px)}
+.cx-date{font-size:${FONT.meta}px;font-weight:800;color:var(--ev,${ACCENT});font-variant-numeric:tabular-nums}
+.cx-era-chip{display:inline-flex;align-items:center;gap:8px;margin-top:4px;font-size:${FONT.caption}px;font-weight:800}.cx-era-chip span{width:8px;height:8px;border-radius:50%}.cx-era-chip a{display:inline-flex;align-items:center;min-height:${TOUCH_MIN}px;color:inherit;text-decoration:underline;text-underline-offset:3px}
+.cx-title{margin:4px 0 16px;font-size:clamp(${FONT.pageTitle}px,3.6vw,${FONT.pageTitleLg}px);font-weight:800;letter-spacing:-.02em;line-height:1.35;color:${TEXT_STRONG};word-break:keep-all}
+.cx-kospi-pill{display:inline-block;margin-bottom:16px;padding:8px 12px;border-radius:999px;background:${SURFACE_CHIP};color:${TEXT_BODY};font-size:${FONT.caption}px}.cx-kospi-pill b{font-size:${FONT.meta}px;color:${TEXT_STRONG};margin-left:4px}.cx-kospi-pill small{margin-left:8px;font-size:${FONT.caption}px;color:${TEXT_MUTED}}
+.cx-desc{font-size:${FONT.body}px;line-height:1.75;color:${TEXT_BODY};word-break:keep-all}
+.cx-note{margin-top:12px;font-size:${FONT.caption}px;line-height:1.6;color:${TEXT_MUTED}}
+.cx-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.cx-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:${TOUCH_MIN}px;padding:0 24px;border-radius:999px;border:1px solid ${BORDER_CONTROL};background:transparent;color:${TEXT_BODY};font-size:${FONT.meta}px;font-weight:700;font-family:inherit;text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
+.cx-btn:hover{background:${SURFACE_SUNKEN};color:${TEXT_STRONG}}
+.cx-btn-primary{background:${ACCENT};border-color:${ACCENT};color:${TEXT_INVERSE}}.cx-btn-primary:hover{background:${ACCENT_HOVER};color:${TEXT_INVERSE}}
+.cx-btn svg{flex-shrink:0}
+/* 링크 복사는 이동 버튼(신문·연표)과 성격이 달라 넓은 화면에서는 줄 오른쪽 끝으로 떼어 둔다. 좁은 화면은 줄이 바뀌면 떨어져 보여서 순서만 맨 끝. */
+@media (min-width:641px){.cx-btn-copy{margin-left:auto}}
+.cx-reading{margin-top:24px;padding:16px 20px;border:1px solid ${BORDER_HAIRLINE};border-radius:16px;background:${SURFACE_SUNKEN}}
+.cx-reading h3{font-size:${FONT.meta}px;font-weight:800;color:${TEXT_STRONG};margin-bottom:12px}
+.cx-reading ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cx-reading li{display:grid;grid-template-columns:56px 1fr 52px;align-items:center;gap:12px;font-size:${FONT.caption}px}
+.cx-r-key{font-weight:700;color:${TEXT_BODY}}.cx-r-bar{height:8px;border-radius:99px;background:#e5e7eb;overflow:hidden}.cx-r-bar i{display:block;height:100%;border-radius:99px;background:var(--ev,${ACCENT});transition:width .6s cubic-bezier(.22,.8,.22,1)}
+.cx-r-val{text-align:right;font-variant-numeric:tabular-nums;color:${TEXT_MUTED}}
+.cx-reading-note{margin-top:12px;font-size:${FONT.caption}px;line-height:1.6;color:${TEXT_MUTED}}
+.cx-sources{margin-top:16px;font-size:${FONT.caption}px;line-height:1.7;color:${TEXT_MUTED}}.cx-sources a{color:${TEXT_MUTED};text-decoration:underline;text-underline-offset:3px}
+.cx-articles h3{font-size:${FONT.body}px;font-weight:800;color:${TEXT_STRONG};margin-bottom:12px}
+.cx-seg button:focus-visible,.cx-chips>button:focus-visible,.cx-zoom button:focus-visible,.cx-search input:focus-visible,.cx-nav button:focus-visible,.cx-btn:focus-visible,.cx-era-chip a:focus-visible,.cx-sources a:focus-visible{outline:2px solid ${ACCENT};outline-offset:3px}
 @media (max-width:860px){.cx-panel-grid{grid-template-columns:1fr}}
-.cx-date{font-size:14px;font-weight:800;color:var(--ev,#244a78);font-variant-numeric:tabular-nums;letter-spacing:.02em}
-.cx-era-chip{display:inline-flex;align-items:center;gap:7px;margin-top:6px;font-size:12.5px;font-weight:800}.cx-era-chip span{width:7px;height:7px;border-radius:50%}.cx-era-chip a{color:inherit;text-decoration:underline;text-underline-offset:3px}
-.cx-title{margin:12px 0 14px;font-family:${SERIF};font-size:clamp(26px,4.4vw,40px);font-weight:700;letter-spacing:-.02em;line-height:1.28;color:#14202f;word-break:keep-all}
-.cx-kospi-pill{display:inline-block;margin-bottom:14px;padding:6px 13px;border-radius:999px;background:#eef2f8;color:#1e3a62;font-size:12.5px}.cx-kospi-pill b{font-size:14.5px;margin-left:2px}.cx-kospi-pill small{margin-left:6px;color:#5f6b7c}
-.cx-desc{font-size:16px;line-height:1.85;color:#2f3a4a;word-break:keep-all}
-.cx-note{margin-top:10px;font-size:13px;line-height:1.6;color:#7a8494}
-.cx-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
-.cx-btn{display:inline-flex;align-items:center;min-height:44px;padding:0 20px;border-radius:999px;border:1px solid #b9b5a8;background:#fff;color:#14202f;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;transition:background .15s,transform .12s}
-.cx-btn:hover{background:#f2f0e9}.cx-btn:active{transform:scale(.98)}
-.cx-btn-primary{background:#14202f;border-color:#14202f;color:#fff}.cx-btn-primary:hover{background:#243247}
-.cx-reading{margin-top:26px;padding:18px 20px;border:1px solid #e1ded4;border-radius:14px;background:#fff}
-.cx-reading h3{font-size:13.5px;font-weight:800;color:#14202f;margin-bottom:12px}
-.cx-reading ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
-.cx-reading li{display:grid;grid-template-columns:54px 1fr 50px;align-items:center;gap:10px;font-size:13px}
-.cx-r-key{font-weight:700;color:#2f3a4a}.cx-r-bar{height:8px;border-radius:99px;background:#eeece5;overflow:hidden}.cx-r-bar i{display:block;height:100%;border-radius:99px;background:var(--ev,#244a78);transition:width .6s cubic-bezier(.22,.8,.22,1)}
-.cx-r-val{text-align:right;font-variant-numeric:tabular-nums;color:#5f6b7c}
-.cx-reading-note{margin-top:10px;font-size:12px;line-height:1.55;color:#7a8494}
-.cx-sources{margin-top:18px;font-size:12px;line-height:1.7;color:#7a8494}.cx-sources a{color:#7a8494;text-decoration:underline;text-underline-offset:2px}
-.cx-articles h3{font-size:14px;font-weight:800;color:#14202f;margin-bottom:10px;letter-spacing:.01em}
-@media (prefers-reduced-motion:reduce){.cx-panel{animation:none}.cx-r-bar i,.cx-seg button,.cx-chips>button{transition:none}}
+/* 좁은 화면 — 키워드 탭과 구간 칩은 옆으로 넘기는 한 줄로 둬서 글자가 세로로 꺾이지 않게 한다. */
+@media (max-width:640px){
+  .cx-head{padding-top:${TOUCH_MIN + 32}px}
+  /* 세그먼트는 화면 폭을 꽉 채우고 6개를 나눠 담는다(375px에서 한 줄에 들어감, 더 좁으면 홈 안에서 옆으로 넘김). */
+  .cx-row-keys{flex-direction:column;align-items:stretch}
+  .cx-seg{display:flex;overflow-x:auto;scrollbar-width:none}
+  .cx-seg button{flex:1 0 auto;padding:0 8px}
+  .cx-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 calc(-1 * clamp(16px,3vw,28px));padding:2px clamp(16px,3vw,28px)}
+  .cx-seg::-webkit-scrollbar,.cx-chips::-webkit-scrollbar{display:none}
+  /* 한 줄(nowrap) 세로 배치여야 자식이 화면 폭으로 늘어난다 — wrap이면 칩 줄 길이만큼 넓어져 화면이 옆으로 넘친다. */
+  .cx-row-tools,.cx-row-left{flex-direction:column;flex-wrap:nowrap;align-items:stretch}
+  /* 확대·무작위 버튼은 두 개뿐이라 넘기지 않고 그대로 보인다. */
+  .cx-chips-tools{flex-wrap:wrap;overflow:visible;margin:0;padding:0}
+  .cx-search input{width:100%}
+}
+@media (max-width:360px){.cx-seg button{padding:0 4px}}
+@media (prefers-reduced-motion:reduce){.cx-panel{animation:none}.cx-r-bar i,.cx-seg button,.cx-chips>button,.cx-btn{transition:none}}
 `;

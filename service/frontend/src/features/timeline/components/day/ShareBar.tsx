@@ -1,192 +1,124 @@
 'use client';
 
-// 공유 바 — 카카오톡은 SDK 키(계정·도메인 등록 필요)가 없어 링크 복사로 대체하고, 인스타그램은 웹에서 직접 올리는 API가 없어 카드 이미지를 다운로드해 수동으로 올리는 방식을 쓴다.
-// 인스타 스토리·카카오톡 사진 전송은 이미지만 지원하므로 PDF가 아닌 PNG를 유지한다.
-// 카카오톡·인스타그램만 각자 브랜드 색을 쓰고, 그 외(공유하기)는 절제된 모노톤 라인 아이콘으로 구성한다.
-import { useEffect, useState } from 'react';
+// 이 날 공유하기 — 그날 지면을 세로형 카드 이미지(1080×1920)와 이 페이지 링크로 보낸다(2026-10-20 개편).
+//
+// 예전 버튼은 이름과 동작이 달랐다. '카카오톡'은 링크만 복사했고(카카오 SDK 키 없음), '인스타그램'은 이미지만 내려받았고(웹에서 올리는 API 없음),
+// '더보기'는 누른 뒤에 카드를 그리고 나서 공유 창을 열어 iOS Safari처럼 사용자 동작 제한이 엄격한 브라우저에서 아무 반응 없이 끝났다.
+// 지금은 동작 그대로 이름 붙인 버튼만 둔다 — 공유하기(공유 창을 지원하는 기기만), 이미지 저장, 링크 복사.
+// 카드는 이 영역이 화면에 가까워지면 미리 그려 둬서 '공유하기'를 누른 순간 바로 공유 창을 연다(카드용 세리프 글꼴을 모든 방문자에게 미리 받게 하지 않으려고 첫 화면에서는 그리지 않는다).
+import { useEffect, useRef, useState } from 'react';
+import { Check, Download, Link2, Share } from 'lucide-react';
 import { generateShareCardBlob, type ShareCardData } from '@/features/timeline/lib/shareCard';
-import { TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, BORDER_CONTROL, FONT, SPACE, TOUCH_MIN } from '@/features/timeline/lib/tone';
+import { TEXT_STRONG, TEXT_MUTED, BORDER_HAIRLINE, FONT, LEADING, SPACE } from '@/features/timeline/lib/tone';
 
-function KakaoIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="12" fill="#FEE500" />
-      <path
-        d="M12 6.2c-3.6 0-6.5 2.3-6.5 5.2 0 1.85 1.22 3.47 3.06 4.4-.13.47-.5 1.8-.57 2.08-.09.35.13.34.27.25.11-.07 1.78-1.2 2.5-1.7.4.06.82.09 1.24.09 3.6 0 6.5-2.32 6.5-5.12s-2.9-5.22-6.5-5.22z"
-        fill="#391B1B"
-      />
-    </svg>
-  );
-}
-
-function InstagramIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <defs>
-        <linearGradient id="igGrad" x1="0" y1="24" x2="24" y2="0">
-          <stop offset="0" stopColor="#FFD776" />
-          <stop offset="0.35" stopColor="#F6635C" />
-          <stop offset="0.68" stopColor="#CC2A9F" />
-          <stop offset="1" stopColor="#7B3FE4" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width="24" height="24" rx="7" fill="url(#igGrad)" />
-      <rect x="6" y="6" width="12" height="12" rx="3.4" stroke="#fff" strokeWidth="1.5" />
-      <circle cx="12" cy="12" r="3.2" stroke="#fff" strokeWidth="1.5" />
-      <circle cx="16.1" cy="7.9" r="0.9" fill="#fff" />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="18" cy="5" r="2.6" />
-      <circle cx="6" cy="12" r="2.6" />
-      <circle cx="18" cy="19" r="2.6" />
-      <path d="M8.3 10.6l7.4-4.2" />
-      <path d="M8.3 13.4l7.4 4.2" />
-    </svg>
-  );
-}
-
-function ShareBarButton({
-  icon,
-  label,
-  feedback,
-  onClick,
-  bare,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  feedback: string | null;
-  onClick: () => void;
-  /** 카카오톡·인스타그램은 아이콘 자체가 원형 배지이므로 회색 테두리 원을 추가하지 않는다. */
-  bare?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 8,
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        // 아이콘이 24px뿐이므로 패딩으로 히트 영역을 44px까지 넓힌다.
-        minHeight: TOUCH_MIN,
-        padding: `${SPACE.sm}px ${SPACE.sm}px`,
-        color: TEXT_STRONG,
-        minWidth: 72,
-      }}
-    >
-      {bare ? (
-        icon
-      ) : (
-        <span
-          style={{
-            width: TOUCH_MIN,
-            height: TOUCH_MIN,
-            borderRadius: '50%',
-            // 컨트롤 경계는 대비 3:1 이상을 유지한다.
-            border: `1px solid ${BORDER_CONTROL}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {icon}
-        </span>
-      )}
-      {/* 대비 4.83:1을 만족하는 회색, 스케일 안의 13px. */}
-      <span style={{ fontSize: FONT.caption, color: TEXT_MUTED, fontWeight: 600, whiteSpace: 'nowrap' }}>
-        {feedback ?? label}
-      </span>
-    </button>
-  );
-}
+const COPIED_MS = 2000;
 
 export function ShareBar({ cardData }: { cardData: ShareCardData }) {
-  const [kakaoFeedback, setKakaoFeedback] = useState<string | null>(null);
-  const [igFeedback, setIgFeedback] = useState<string | null>(null);
-  // 브라우저 공유 지원 여부는 마운트 뒤에 정한다. 렌더 중에 navigator를 읽으면 서버(미지원)와 브라우저(지원)의 출력이 달라 하이드레이션 오류(#418)가 발생한다.
-  const [canNativeShare, setCanNativeShare] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  const blob = useRef<Blob | null>(null);
+  // 브라우저 공유 지원 여부는 마운트 뒤에 정한다. 렌더 중에 navigator를 읽으면 서버(미지원)와 브라우저(지원)의 출력이 달라 하이드레이션 오류(#418)가 난다.
+  const [canShare, setCanShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState('');
+  const fileName = `ailens-timemachine-${cardData.date}.png`;
+  // 부모가 렌더마다 새 객체를 넘기므로 내용으로 비교한다.
+  const cardKey = JSON.stringify(cardData);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회 기능 감지
-    setCanNativeShare(typeof navigator.share === 'function');
+    setCanShare(typeof navigator.share === 'function');
   }, []);
 
-  const flash = (setter: (v: string | null) => void, text: string) => {
-    setter(text);
-    setTimeout(() => setter(null), 1800);
-  };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let active = true;
+    blob.current = null;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      observer.disconnect();
+      void generateShareCardBlob(JSON.parse(cardKey) as ShareCardData).then((made) => { if (active) blob.current = made; });
+    }, { rootMargin: '400px 0px' });
+    observer.observe(el);
+    return () => { active = false; observer.disconnect(); };
+  }, [cardKey]);
 
-  const handleKakao = async () => {
+  async function copyLink(message?: string) {
     try {
       await navigator.clipboard.writeText(cardData.url);
-      flash(setKakaoFeedback, '링크 복사됨');
+      setCopied(true);
+      setTimeout(() => setCopied(false), COPIED_MS);
+      setStatus(message ?? '');
     } catch {
-      flash(setKakaoFeedback, '실패했어요');
+      window.prompt('이 주소를 복사하세요', cardData.url);
     }
-  };
+  }
 
-  const handleInstagram = async () => {
-    setIgFeedback('만드는 중…');
-    const blob = await generateShareCardBlob(cardData);
-    if (!blob) {
-      flash(setIgFeedback, '실패했어요');
-      return;
-    }
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = `ailens-timemachine-${cardData.date}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-    flash(setIgFeedback, '이미지 저장됨');
-  };
+  async function save() {
+    const made = blob.current ?? await generateShareCardBlob(cardData);
+    if (!made) { setStatus('카드 이미지를 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.'); return; }
+    blob.current = made;
+    const url = URL.createObjectURL(made);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setStatus('카드 이미지를 저장했어요.');
+  }
 
-  const handleNativeShare = async () => {
+  // 누른 순간 바로 공유 창을 연다 — 사이에 이미지 생성처럼 오래 걸리는 일을 두면 브라우저가 공유 창을 막는다.
+  // 카드가 아직 없으면 링크만 보낸다.
+  async function share() {
+    const data: ShareData = { title: 'AI LENS 타임머신', text: `${cardData.dateLabel}, 그날의 서울경제`, url: cardData.url };
+    const file = blob.current ? new File([blob.current], fileName, { type: 'image/png' }) : null;
     try {
-      const blob = await generateShareCardBlob(cardData);
-      const shareData: ShareData = {
-        title: 'AI LENS 타임머신',
-        text: `${cardData.dateLabel}, 그날의 서울경제`,
-        url: cardData.url,
-      };
-      if (blob) {
-        const file = new File([blob], `ailens-timemachine-${cardData.date}.png`, { type: 'image/png' });
-        if (navigator.canShare?.({ files: [file] })) {
-          shareData.files = [file];
-        }
-      }
-      await navigator.share(shareData);
-    } catch {
-      // 사용자가 공유 시트를 취소한 경우를 포함해 조용히 무시한다.
+      await navigator.share(file && navigator.canShare?.({ files: [file] }) ? { ...data, files: [file] } : data);
+      setStatus('');
+    } catch (error) {
+      if ((error as DOMException).name === 'AbortError') return; // 공유 창을 닫은 경우
+      await copyLink('공유 창을 열 수 없어 링크를 복사했어요.');
     }
-  };
+  }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        gap: SPACE.xl,
-        marginTop: SPACE.xxl,
-        paddingTop: SPACE.xl,
-        borderTop: `1px solid ${BORDER_HAIRLINE}`,
-      }}
+    <section
+      ref={ref}
+      aria-labelledby="tl-share-title"
+      style={{ marginTop: SPACE.xxl, paddingTop: SPACE.xl, borderTop: `1px solid ${BORDER_HAIRLINE}` }}
     >
-      <ShareBarButton bare icon={<KakaoIcon />} label="카카오톡" feedback={kakaoFeedback} onClick={handleKakao} />
-      <ShareBarButton bare icon={<InstagramIcon />} label="인스타그램" feedback={igFeedback} onClick={handleInstagram} />
-      {canNativeShare && (
-        <ShareBarButton icon={<ShareIcon />} label="더보기" feedback={null} onClick={handleNativeShare} />
-      )}
-    </div>
+      <h2 id="tl-share-title" style={{ fontSize: FONT.sectionTitle, fontWeight: 700, color: TEXT_STRONG, letterSpacing: '-0.02em' }}>
+        이 날 공유하기
+      </h2>
+      <p style={{ marginTop: SPACE.xs, fontSize: FONT.caption, color: TEXT_MUTED, lineHeight: LEADING.body, wordBreak: 'keep-all' }}>
+        세로형 카드 이미지로 저장하거나 링크로 보낼 수 있어요.
+      </p>
+      {/* 좁은 화면은 세 버튼이 한 줄에 안 들어가 '링크 복사'만 둘째 줄에 떨어졌다 — 공유하기를 한 줄 전체로, 나머지 둘을 반씩 나눈다. */}
+      <style>{`
+        .tl-share-actions { display:flex; flex-wrap:wrap; gap:${SPACE.sm}px; margin-top:${SPACE.lg}px; }
+        @media (max-width:640px) {
+          .tl-share-actions { display:grid; grid-template-columns:1fr 1fr; }
+          .tl-share-actions .tl-btn { padding:0 ${SPACE.lg}px; }
+          .tl-share-actions .tl-btn-primary { grid-column:1 / -1; }
+        }
+      `}</style>
+      <div className="tl-share-actions">
+        {canShare && (
+          <button type="button" className="tl-btn tl-btn-primary tl-focus" onClick={share}>
+            <Share size={16} aria-hidden />공유하기
+          </button>
+        )}
+        <button type="button" className="tl-btn tl-focus" onClick={save}>
+          <Download size={16} aria-hidden />이미지 저장
+        </button>
+        <button type="button" className="tl-btn tl-focus" onClick={() => copyLink()} aria-label={copied ? '링크를 복사했어요' : '이 페이지 링크 복사'}>
+          {copied ? <Check size={16} aria-hidden /> : <Link2 size={16} aria-hidden />}
+          {copied ? '복사했어요' : '링크 복사'}
+        </button>
+      </div>
+      <p role="status" style={{ minHeight: FONT.caption * LEADING.body, marginTop: SPACE.sm, fontSize: FONT.caption, color: TEXT_MUTED, lineHeight: LEADING.body }}>
+        {status}
+      </p>
+    </section>
   );
 }

@@ -29,77 +29,80 @@ export function DatePicker({
   const typedDate = digitsToValidDate(digits);
   const typedInvalid = digits.length === 8 && typedDate === null;
 
+  // 넓은 화면은 "내 생일에 샀다면" 탭과 같은 구조 — 왼쪽에 안내 문장과 날짜 직접 입력, 오른쪽에 칩 묶음.
+  // 좁은 화면은 안내 → 칩 → 직접 입력 순으로 쌓인다(배치는 tokens.ts 의 .ntm-picker-* 규칙).
   return (
-    <div
-      style={{
-        display: hidden ? 'none' : undefined, background: PANEL, borderBottom: `1px solid ${LINE}`,
-        padding: 'clamp(16px, 3vw, 20px) clamp(16px, 4vw, 24px)', textAlign: 'center',
-      }}
-    >
-      <p style={{ fontSize: 16, fontWeight: 700, color: INK, letterSpacing: '-0.01em', lineHeight: 1.5, wordBreak: 'keep-all' }}>
-        오늘이든, 내가 태어난 날이든 — 그날 세상은 이랬어요
-      </p>
-
-      {/* 칩은 스스로 "10년 전 오늘"이라 말하므로 줄 이름이 없다. "랜덤 날짜"는 선택 토글이 아니라 매번 다른 날짜를 뽑는 동작이라 aria-pressed가 없다. */}
-      <div className="flex items-center justify-center" style={{ flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-        {REWIND_YEARS.map((n) => {
-          const date = yearsAgoToday(n);
-          return (
-            <button key={n} type="button" aria-pressed={pickedDate === date} onClick={() => { setDigits(''); onPick(date); }} className="ntm-chip ntm-focus">
-              {n}년 전 오늘
-            </button>
-          );
-        })}
-        <button type="button" onClick={() => { setDigits(''); onPick(randomDateInRange()); }} className="ntm-chip ntm-focus">
-          랜덤 날짜
-        </button>
-      </div>
-
-      {events.length > 0 && (
-        <div className="flex items-center justify-center" style={{ flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap' }}>역사 속 그날</span>
-          {events.map((f) => (
-            <button key={f.id} type="button" aria-pressed={activeEventKey === f.id} onClick={() => { setDigits(''); onPickEvent(f); }} className="ntm-chip ntm-focus">
-              {f.date.slice(0, 4)} {f.shortTitle}
-            </button>
-          ))}
-          <Link href="/timeline/chronicle" className="ntm-chip ntm-focus" style={{ textDecoration: 'none', background: '#dbeafe', color: '#1d4ed8' }}>
-            전체 연대기 →
-          </Link>
-        </div>
-      )}
-
-      <div className="flex items-center justify-center" style={{ flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-        <label htmlFor={inputId} style={{ fontSize: 13, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap' }}>날짜 직접 입력</label>
-        <span
-          style={{
-            display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 16px', background: '#fff',
-            border: `1px solid ${typedInvalid ? '#b91c1c' : LINE}`, borderRadius: 999,
-          }}
-        >
-          <input
-            id={inputId}
-            type="text"
-            inputMode="numeric"
-            value={formatDateDigits(digits)}
-            onChange={(e) => setDigits(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
-            onKeyDown={(e) => { if (e.key === 'Enter' && typedDate) onDepart(typedDate); }}
-            placeholder="1999 / 11 / 17"
-            maxLength={14}
-            aria-invalid={typedInvalid}
-            aria-describedby={typedInvalid ? `${inputId}-err` : undefined}
-            className="ntm-focus"
-            style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: INK, fontFamily: 'inherit', width: 112, fontVariantNumeric: 'tabular-nums' }}
-          />
-        </span>
-        <button type="button" onClick={() => onDepart(typedDate)} className="ntm-go ntm-focus">이날 보기 →</button>
-      </div>
-
-      {typedInvalid && (
-        <p id={`${inputId}-err`} role="alert" style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: '#b91c1c' }}>
-          {BIGKINDS_MIN_DATE.slice(0, 4)}년 1월 1일부터 오늘 사이의 날짜를 넣어주세요.
+    <div className="ntm-picker" style={{ display: hidden ? 'none' : undefined, background: PANEL, borderBottom: `1px solid ${LINE}`, padding: 'clamp(16px, 3vw, 20px) clamp(16px, 4vw, 24px)' }}>
+      <div className="ntm-picker-grid">
+        <p className="ntm-picker-lead" style={{ fontSize: 16, fontWeight: 700, color: INK, letterSpacing: '-0.01em', lineHeight: 1.5, wordBreak: 'keep-all' }}>
+          오늘이든,<br />내가 태어난 날이든 — 그날 세상은 이랬어요
         </p>
-      )}
+
+        <div className="ntm-picker-chips">
+          {/* 칩은 스스로 "10년 전 오늘"이라 말하므로 줄 이름이 없다. "랜덤 날짜"는 선택 토글이 아니라 매번 다른 날짜를 뽑는 동작이라 aria-pressed가 없다. */}
+          <div className="flex items-center" style={{ flexWrap: 'wrap', gap: 8 }}>
+            {REWIND_YEARS.map((n) => {
+              const date = yearsAgoToday(n);
+              return (
+                <button key={n} type="button" aria-pressed={pickedDate === date} onClick={() => { setDigits(''); onPick(date); }} className="ntm-chip ntm-focus">
+                  {n}년 전 오늘
+                </button>
+              );
+            })}
+            <button type="button" onClick={() => { setDigits(''); onPick(randomDateInRange()); }} className="ntm-chip ntm-focus">
+              랜덤 날짜
+            </button>
+          </div>
+
+          {events.length > 0 && (
+            <div className="flex items-center" style={{ flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap' }}>역사 속 그날</span>
+              {events.map((f) => (
+                <button key={f.id} type="button" aria-pressed={activeEventKey === f.id} onClick={() => { setDigits(''); onPickEvent(f); }} className="ntm-chip ntm-focus">
+                  {f.date.slice(0, 4)} {f.shortTitle}
+                </button>
+              ))}
+              <Link href="/timeline/chronicle" className="ntm-chip ntm-focus" style={{ textDecoration: 'none', background: '#dbeafe', color: '#1d4ed8' }}>
+                전체 연대기 →
+              </Link>
+            </div>
+          )}
+        </div>
+
+        <div className="ntm-picker-go">
+          <div className="flex items-center" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <label htmlFor={inputId} className="ntm-picker-label" style={{ fontSize: 13, fontWeight: 600, color: MUTED, whiteSpace: 'nowrap' }}>날짜 직접 입력</label>
+            <span
+              style={{
+                display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 16px', background: '#fff',
+                border: `1px solid ${typedInvalid ? '#b91c1c' : LINE}`, borderRadius: 999,
+              }}
+            >
+              <input
+                id={inputId}
+                type="text"
+                inputMode="numeric"
+                value={formatDateDigits(digits)}
+                onChange={(e) => setDigits(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
+                onKeyDown={(e) => { if (e.key === 'Enter' && typedDate) onDepart(typedDate); }}
+                placeholder="1999 / 11 / 17"
+                maxLength={14}
+                aria-invalid={typedInvalid}
+                aria-describedby={typedInvalid ? `${inputId}-err` : undefined}
+                className="ntm-focus"
+                style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: INK, fontFamily: 'inherit', width: 112, fontVariantNumeric: 'tabular-nums' }}
+              />
+            </span>
+            <button type="button" onClick={() => onDepart(typedDate)} className="ntm-go ntm-focus">이날 보기 →</button>
+          </div>
+
+          {typedInvalid && (
+            <p id={`${inputId}-err`} role="alert" style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: '#b91c1c' }}>
+              {BIGKINDS_MIN_DATE.slice(0, 4)}년 1월 1일부터 오늘 사이의 날짜를 넣어주세요.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

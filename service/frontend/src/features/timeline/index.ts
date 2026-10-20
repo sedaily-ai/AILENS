@@ -2,6 +2,7 @@ export { NewsTimeMachine } from './components/day/NewsTimeMachine';
 export { TimelineResultView } from './components/day/TimelineResultView';
 export { TimelineBigkindsView } from './components/day/TimelineBigkindsView';
 export { ExitPill } from './components/day/ExitPill';
+export { OtherDatePill } from './components/day/OtherDatePill';
 export { EraView } from './components/hub/EraView';
 export { DecadeView } from './components/hub/DecadeView';
 export { HubCards } from './components/hub/HubCards';

@@ -11,14 +11,22 @@ import type { TimelineEra, TimelineEvent } from '@/shared/data/timelineEvents';
 import { yearFloat, eraColor } from '../../lib/chronicleLayout';
 import { ATT_LABEL, ATT_START_YEAR, attentionSeries, type AttKey, type AttPoint } from '../../lib/attention';
 import { KOSPI_GUIDES, KOSPI_MILESTONES, kospiRatio } from '../../lib/kospiMilestones';
+import { ACCENT, SURFACE_CHIP, TEXT_MUTED, TEXT_STRONG } from '../../lib/tone';
 
 export const FULL_DOMAIN: [number, number] = [1990, 2027];
 const MIN_SPAN = 1.6;
 
-const INK = '#14202f';
-const MUTED = '#6b7686';
-const HAIR = '#dfe3e9';
-const SERIES = '#244a78';
+// Lens 톤(tone.ts). 곡선·개요·코스피는 액센트 파랑, 시대 띠와 사건 점은 시대 색(eraColor)을 쓴다.
+const INK = TEXT_STRONG;
+const MUTED = TEXT_MUTED;
+const HAIR = '#e5e7eb';
+const AXIS = '#d1d5db';
+const SERIES = ACCENT;
+/** 차트 글자 — 사건 이름·시대 이름은 13px, 촘촘한 눈금 숫자만 12px. */
+const LABEL_FONT = 13;
+const TICK_FONT = 12;
+/** 시대 이름 줄 — 한 줄 20px, 넓은 화면 2줄·좁은 화면 3줄. 넘치는 이름은 확대하면 나타난다. */
+const ERA_ROW_H = 20;
 
 type Domain = [number, number];
 
@@ -34,6 +42,13 @@ export function clampDomain([a, b]: Domain): Domain {
 function textWidth(text: string): number {
   let w = 0;
   for (const ch of text) w += /[ㄱ-힝一-鿿]/.test(ch) ? 12.6 : 6.8;
+  return w * LABEL_FONT / 12;
+}
+
+/** 시대 이름(13px 굵게) 폭 — 겹침 판정용이라 실제보다 조금 넉넉하게. 실측: '12·3 계엄과 정치 격변' 117px → 추정 124px. */
+function eraTextWidth(text: string): number {
+  let w = 0;
+  for (const ch of text) w += /[ㄱ-힝一-鿿]/.test(ch) ? 11.8 : /[0-9A-Za-z]/.test(ch) ? 8 : ch === ' ' ? 4 : 5;
   return w;
 }
 
@@ -85,12 +100,17 @@ export function ChronicleChart({
   const width = useWidth(wrapRef);
   const narrow = width < 640;
 
-  const ML = narrow ? 36 : 48;
+  // 왼쪽 여백은 눈금 숫자(12px) '7,000'·'8,000'이 ML-8 자리에서 잘리지 않을 만큼 둔다.
+  const ML = narrow ? 44 : 48;
   const MR = 16;
   const LANES = narrow ? 3 : 4;
-  const LANE_STEP = 36;
-  const LABEL_H = 30;
-  const TOP = 10 + LANES * LANE_STEP;
+  const LANE_STEP = 40;
+  const LABEL_H = 34;
+  // 사건 라벨 줄 아래, 곡선 영역 위에 시대 이름 줄을 따로 둔다 — 격자선·곡선과 겹치지 않게.
+  // 좁은 화면은 2020년대에 시대 셋(코로나·금리·계엄)이 몰려 3줄이 있어야 다 보인다. 줄 수는 화면 폭으로만 정해 끌거나 확대해도 차트 높이가 변하지 않는다.
+  const ERA_ROWS = narrow ? 3 : 2;
+  const ERA_STRIP = ERA_ROWS * ERA_ROW_H + 4;
+  const TOP = 10 + LANES * LANE_STEP + ERA_STRIP;
   const PLOT_H = narrow ? 170 : 220;
   const AXIS_H = 34;
   const H = TOP + PLOT_H + AXIS_H;
@@ -167,23 +187,33 @@ export function ChronicleChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- valueAt은 pts에만 의존
   }, [events, domain, selectedId, x, y, width, pts, LANES, ML]);
 
-  // 시대 띠 — 이름이 서로 겹치면 아랫줄로 내린다(줄 번호 row)
-  const eraBands = useMemo(() => {
-    const bands = eras.map((era) => {
-      const first = era.events[0];
-      const last = era.events[era.events.length - 1];
-      return { era, from: yearFloat(first.date) - 1 / 24, to: yearFloat(last.endDate ?? last.date) + 1 / 24, color: eraColor(era.slug), row: 0 };
-    });
+  // 시대 띠
+  const eraBands = useMemo(() => eras.map((era) => {
+    const first = era.events[0];
+    const last = era.events[era.events.length - 1];
+    return { era, from: yearFloat(first.date) - 1 / 24, to: yearFloat(last.endDate ?? last.date) + 1 / 24, color: eraColor(era.slug) };
+  }).sort((p, q) => p.from - q.from), [eras]);
+
+  // 시대 이름 — 띠 윗선보다 위 전용 줄에 둔다. 보이는 띠만, 화면 안쪽으로 당겨 붙이고(왼쪽·오른쪽 끝에서 잘리지 않게),
+  // 같은 줄에서 겹치면 윗줄로, ERA_ROWS줄을 넘으면 이름을 숨긴다(사건 라벨처럼 확대할수록 더 보인다).
+  const eraLabels = useMemo(() => {
+    const left = ML + 4;
+    const right = width - MR - 4;
     const ends: number[] = [];
-    for (const b of bands.sort((p, q) => p.from - q.from)) {
-      const left = x(b.from) + 6;
-      let row = ends.findIndex((e) => left >= e + 8);
-      if (row === -1) row = ends.length;
-      ends[row] = left + textWidth(b.era.title) * 0.9;
-      b.row = row;
+    const out: { slug: string; title: string; color: string; lx: number; tw: number; row: number }[] = [];
+    for (const b of eraBands) {
+      const x0 = x(b.from);
+      if (x(b.to) <= ML || x0 >= width - MR) continue;
+      const tw = eraTextWidth(b.era.title);
+      const lx = Math.max(left, Math.min(x0 + 4, right - tw));
+      const row = ends.findIndex((e) => lx >= e + 12);
+      const r = row === -1 ? ends.length : row;
+      if (r >= ERA_ROWS) continue;
+      ends[r] = lx + tw;
+      out.push({ slug: b.era.slug, title: b.era.title, color: b.color, lx, tw, row: r });
     }
-    return bands;
-  }, [eras, x]);
+    return out;
+  }, [eraBands, x, ML, width, ERA_ROWS]);
 
   // 눈금
   const ticks = useMemo(() => {
@@ -278,26 +308,25 @@ export function ChronicleChart({
               <stop offset="100%" stopColor={SERIES} stopOpacity="0.02" />
             </linearGradient>
             <pattern id="cc-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <rect width="6" height="6" fill="#f3f4f6" />
-              <line x1="0" y1="0" x2="0" y2="6" stroke="#d6dae1" strokeWidth="2" />
+              <rect width="6" height="6" fill={SURFACE_CHIP} />
+              <line x1="0" y1="0" x2="0" y2="6" stroke={AXIS} strokeWidth="2" />
             </pattern>
             <clipPath id="cc-clip"><rect x={ML} y={plotTop - 2} width={width - ML - MR} height={PLOT_H + 4} /></clipPath>
           </defs>
 
           {/* 시대 띠 */}
           <g clipPath="url(#cc-clip)">
-            {eraBands.map(({ era, from, to, color, row }) => (
+            {eraBands.map(({ era, from, to, color }) => (
               <g key={era.slug}>
                 <rect x={x(from)} y={plotTop} width={Math.max(2, x(to) - x(from))} height={PLOT_H} fill={color} opacity={0.07} />
                 <rect x={x(from)} y={plotTop} width={Math.max(2, x(to) - x(from))} height={2} fill={color} opacity={0.65} />
-                <text x={x(from) + 6} y={plotTop + 16 + row * 14} fontSize={10.5} fontWeight={700} fill={color} letterSpacing="0.02em">{era.title}</text>
               </g>
             ))}
             {gaps.map((g, i) => (
               <g key={i}>
                 <rect x={x(g.from)} y={plotTop} width={Math.max(0, x(g.to) - x(g.from))} height={PLOT_H} fill="url(#cc-hatch)" opacity={0.85} />
                 {x(g.to) - x(g.from) > 70 && (
-                  <text x={(x(g.from) + x(g.to)) / 2} y={plotBottom - 8} textAnchor="middle" fontSize={10} fill="#8b94a3">기사 적재 적음</text>
+                  <text x={(x(g.from) + x(g.to)) / 2} y={plotBottom - 8} textAnchor="middle" fontSize={TICK_FONT} fill={MUTED}>기사 적재 적음</text>
                 )}
               </g>
             ))}
@@ -307,7 +336,7 @@ export function ChronicleChart({
           {yTicks.map((t) => (
             <g key={t}>
               <line x1={ML} x2={width - MR} y1={y(t)} y2={y(t)} stroke={HAIR} strokeDasharray={t === 0 ? undefined : '2 4'} />
-              <text x={ML - 8} y={y(t) + 3.5} textAnchor="end" fontSize={10.5} fill={MUTED}>{t.toLocaleString()}{yUnit}</text>
+              <text x={ML - 8} y={y(t) + 4} textAnchor="end" fontSize={TICK_FONT} fill={MUTED}>{t.toLocaleString()}{yUnit}</text>
             </g>
           ))}
 
@@ -330,11 +359,11 @@ export function ChronicleChart({
           )}
 
           {/* 축 */}
-          <line x1={ML} x2={width - MR} y1={plotBottom} y2={plotBottom} stroke="#aab2bf" />
+          <line x1={ML} x2={width - MR} y1={plotBottom} y2={plotBottom} stroke={AXIS} />
           {ticks.map((t) => (
             <g key={t.v}>
-              <line x1={x(t.v)} x2={x(t.v)} y1={plotBottom} y2={plotBottom + (t.major ? 9 : 5)} stroke={t.major ? INK : '#aab2bf'} />
-              <text x={x(t.v)} y={plotBottom + 22} textAnchor="middle" fontSize={t.major ? 12 : 10.5} fontWeight={t.major ? 800 : 500} fill={t.major ? INK : MUTED}>{t.label}</text>
+              <line x1={x(t.v)} x2={x(t.v)} y1={plotBottom} y2={plotBottom + (t.major ? 9 : 5)} stroke={t.major ? INK : AXIS} />
+              <text x={x(t.v)} y={plotBottom + 22} textAnchor="middle" fontSize={t.major ? LABEL_FONT : TICK_FONT} fontWeight={t.major ? 800 : 500} fill={t.major ? INK : MUTED}>{t.label}</text>
             </g>
           ))}
 
@@ -345,6 +374,19 @@ export function ChronicleChart({
               const selected = event.id === selectedId;
               const labelTop = 6 + (LANES - 1 - lane) * LANE_STEP;
               return <line key={event.id} x1={ex} x2={ex} y1={labelTop + LABEL_H} y2={ey} stroke={eraColor(event.eraSlug)} strokeOpacity={selected ? 0.9 : 0.32} strokeWidth={selected ? 1.6 : 1} />;
+            })}
+          </g>
+
+          {/* 시대 이름 — 연결선 위에 흰 바탕을 깔고 얹어, 선이 글자를 가로지르지 않게 한다. 0줄이 띠 윗선 바로 위. */}
+          <g aria-hidden pointerEvents="none">
+            {eraLabels.map(({ slug, title, color, lx, tw, row }) => {
+              const bottom = plotTop - 4 - row * ERA_ROW_H;
+              return (
+                <g key={slug}>
+                  <rect x={lx - 4} y={bottom - ERA_ROW_H + 2} width={tw + 8} height={ERA_ROW_H - 2} rx={4} fill="#fff" />
+                  <text x={lx} y={bottom - 5} fontSize={LABEL_FONT} fontWeight={700} fill={color}>{title}</text>
+                </g>
+              );
             })}
           </g>
           {placed.map(({ event, x: ex, y: ey, lane, x0, width: lw, text }) => {
@@ -364,9 +406,9 @@ export function ChronicleChart({
               >
                 {labelTop !== null && (
                   <>
-                    <rect x={x0} y={labelTop} width={lw} height={LABEL_H} rx={7} fill="#fff" stroke={selected ? color : HAIR} strokeWidth={selected ? 1.6 : 1} className="cc-label-bg" />
-                    <text x={x0 + 10} y={labelTop + 12} fontSize={9.5} fontWeight={700} fill={color}>{event.date.replace(/-/g, '.')}</text>
-                    <text x={x0 + 10} y={labelTop + 25} fontSize={12} fontWeight={700} fill={INK}>{text}</text>
+                    <rect x={x0} y={labelTop} width={lw} height={LABEL_H} rx={8} fill="#fff" stroke={selected ? color : HAIR} strokeWidth={selected ? 1.6 : 1} className="cc-label-bg" />
+                    <text x={x0 + 10} y={labelTop + 14} fontSize={TICK_FONT} fontWeight={700} fill={color}>{event.date.replace(/-/g, '.')}</text>
+                    <text x={x0 + 10} y={labelTop + 28} fontSize={LABEL_FONT} fontWeight={700} fill={INK}>{text}</text>
                   </>
                 )}
                 <circle cx={ex} cy={ey} r={14} fill="transparent" />
@@ -435,7 +477,7 @@ function Overview({
           onDomainChange(clampDomain([c - half, c + half]));
         }}
       />
-      <path d={path} fill="#c5d0e0" />
+      <path d={path} fill="#bfdbfe" />
       {events.map((ev) => (
         <line key={ev.id} x1={ox(yearFloat(ev.date))} x2={ox(yearFloat(ev.date))} y1={H - 6} y2={H - 11} stroke={eraColor(ev.eraSlug)} strokeOpacity={0.7} />
       ))}
@@ -454,9 +496,18 @@ function KospiStrip({
 }: {
   x: (v: number) => number; width: number; ml: number; mr: number; selectedId: string; onSelect: (id: string) => void; events: TimelineEvent[];
 }) {
-  const H = 112;
-  const ky = (v: number) => H - 20 - kospiRatio(v) * (H - 40);
+  // 좁은 화면은 13px 제목이 한 줄에 다 들어가지 않아 두 줄로 나누고, 그만큼 점 영역을 아래로 내린다.
+  const twoLine = width < 560;
+  const top = twoLine ? 40 : 22;
+  const H = 112 + (twoLine ? 18 : 0);
+  const ky = (v: number) => H - 20 - kospiRatio(v) * (H - 20 - top);
   const ids = new Set(events.map((e) => e.id));
+  // 로그 눈금은 위쪽 간격이 좁다(5,000↔7,000 ≈ 10px). 격자선은 모두 긋고, 눈금 숫자는 위에서부터 글자 높이+2px 이상 떨어진 것만 붙인다.
+  const guideLabels = new Set([...KOSPI_GUIDES].sort((a, b) => b - a).reduce<number[]>((acc, g) => {
+    const last = acc[acc.length - 1];
+    if (last === undefined || ky(g) - ky(last) >= TICK_FONT + 2) acc.push(g);
+    return acc;
+  }, []));
   // 숫자 라벨은 직전에 라벨을 붙인 점에서 44px 이상 떨어진 것만(렌더 중 변수를 바꾸지 않도록 미리 계산)
   const pointsInView = KOSPI_MILESTONES.map((p) => ({ p, px: x(yearFloat(p.date)) }))
     .filter(({ px }) => px >= ml - 4 && px <= width - mr + 4)
@@ -467,11 +518,14 @@ function KospiStrip({
     }, []);
   return (
     <svg width={width} height={H} className="cc-kospi" role="group" aria-label="코스피 종가 이정표">
-      <text x={ml} y={11} fontSize={10.5} fontWeight={700} fill={MUTED} letterSpacing="0.04em">코스피 종가 이정표 · 확인된 날만 점으로 찍고 사이는 잇지 않았어요</text>
+      {twoLine ? <>
+        <text x={ml} y={13} fontSize={LABEL_FONT} fontWeight={700} fill={MUTED}>코스피 종가 이정표</text>
+        <text x={ml} y={31} fontSize={LABEL_FONT} fontWeight={700} fill={MUTED}>확인된 날만 점으로 찍고 사이는 잇지 않았어요</text>
+      </> : <text x={ml} y={13} fontSize={LABEL_FONT} fontWeight={700} fill={MUTED}>코스피 종가 이정표 · 확인된 날만 점으로 찍고 사이는 잇지 않았어요</text>}
       {KOSPI_GUIDES.map((g) => (
         <g key={g}>
           <line x1={ml} x2={width - mr} y1={ky(g)} y2={ky(g)} stroke={HAIR} strokeDasharray="2 4" />
-          <text x={ml - 8} y={ky(g) + 3.5} textAnchor="end" fontSize={10} fill={MUTED}>{g.toLocaleString()}</text>
+          {guideLabels.has(g) && <text x={ml - 8} y={ky(g) + 4} textAnchor="end" fontSize={TICK_FONT} fill={MUTED}>{g.toLocaleString()}</text>}
         </g>
       ))}
       {pointsInView.map(({ p, px, showLabel }) => {
@@ -483,7 +537,7 @@ function KospiStrip({
             <title>{`${p.date} 코스피 종가 ${p.value.toLocaleString()}`}</title>
             <line x1={px} x2={px} y1={H - 20} y2={py} stroke={SERIES} strokeOpacity={0.25} />
             <circle cx={px} cy={py} r={selected ? 6 : 4} fill={selected ? SERIES : '#fff'} stroke={SERIES} strokeWidth={2} />
-            {showLabel && <text x={px} y={py - 10} fontSize={10.5} fontWeight={700} textAnchor="middle" fill={INK}>{Math.round(p.value).toLocaleString()}</text>}
+            {showLabel && <text x={px} y={py - 10} fontSize={TICK_FONT} fontWeight={700} textAnchor="middle" fill={INK}>{Math.round(p.value).toLocaleString()}</text>}
           </g>
         );
       })}
@@ -497,14 +551,15 @@ const CSS = `
 .cc-wrap text{font-variant-numeric:tabular-nums}
 .cc-pin{cursor:pointer;outline:none}
 .cc-pin .cc-label-bg{transition:stroke .15s,filter .15s}
-.cc-pin:hover .cc-label-bg,.cc-pin:focus-visible .cc-label-bg{filter:drop-shadow(0 3px 8px rgba(20,32,47,.18))}
-.cc-pin:focus-visible circle:last-of-type{stroke:#14202f}
+.cc-pin:hover .cc-label-bg{filter:drop-shadow(0 4px 8px rgba(17,24,39,.16))}
+.cc-pin:focus-visible .cc-label-bg{stroke:${ACCENT};stroke-width:2.5px}
+.cc-pin:focus-visible circle:last-of-type{stroke:${ACCENT};stroke-width:3px}
 .cc-halo{animation:cc-halo 2.2s ease-out infinite;transform-box:fill-box;transform-origin:center}
 @keyframes cc-halo{0%{transform:scale(.7);opacity:.35}100%{transform:scale(1.7);opacity:0}}
-.cc-tip{position:absolute;transform:translateX(-50%);pointer-events:none;background:#14202f;color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;line-height:1.5;white-space:nowrap;box-shadow:0 6px 18px rgba(20,32,47,.25);display:flex;flex-direction:column;gap:1px}
-.cc-tip b{font-size:12px;letter-spacing:.02em;color:#c8d3e6}
-.cc-overview{display:block;margin-top:6px;touch-action:none}
-.cc-kospi{display:block;margin-top:10px}
+.cc-tip{position:absolute;transform:translateX(-50%);pointer-events:none;background:${TEXT_STRONG};color:#fff;border-radius:8px;padding:8px 12px;font-size:13px;line-height:1.5;white-space:nowrap;box-shadow:0 8px 24px rgba(17,24,39,.24);display:flex;flex-direction:column;gap:2px}
+.cc-tip b{font-size:13px;color:#d1d5db}
+.cc-overview{display:block;margin-top:8px;touch-action:none}
+.cc-kospi{display:block;margin-top:12px}
 .cc-kp.is-link{cursor:pointer}.cc-kp.is-link:hover circle{stroke-width:3}
 @media (prefers-reduced-motion:reduce){.cc-halo{animation:none}}
 `;

@@ -1,6 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ExitPill, ChronicleExplorer, SURFACE, GLOBAL_CSS } from '@/features/timeline';
+
+// 전체 사건 목록 — Lens 톤(features/timeline/lib/tone.ts 와 같은 값).
+const TEXT_STRONG = '#111827';
+const TEXT_BODY = '#374151';
+const TEXT_MUTED = '#6b7280';
 import { DECADES, EVENTS, getDecadeEvents } from '@/shared/data/timelineEvents';
 import { formatEventDate } from '@/shared/lib/date/timelineDates';
 import { SITE_URL } from '@/shared/constants/site';
@@ -18,6 +23,13 @@ export const metadata: Metadata = {
   alternates: { canonical: URL },
   openGraph: { title: TITLE, description: DESCRIPTION, url: URL, type: 'website', locale: 'ko_KR', siteName: 'AI LENS — 서울경제' },
 };
+
+// 연대 묶음을 넓은 화면에서 2열(1990·2000년대 / 2010·2020년대)로 놓는다. 한 열 약 540px ≈ 14px 한글 38자라 한 줄 길이 기준(25~40자)에 맞는다.
+// 좁은 화면은 2열이면 한 줄이 10자 남짓이 돼 1열로 둔다.
+const LIST_CSS = `
+.cl-decades{display:grid;grid-template-columns:minmax(0,1fr);gap:24px 48px}
+@media (min-width:860px){.cl-decades{grid-template-columns:repeat(2,minmax(0,1fr))}}
+`;
 
 export default function ChroniclePage() {
   const jsonLd = {
@@ -46,27 +58,31 @@ export default function ChroniclePage() {
     <div style={{ background: SURFACE, minHeight: '100vh' }}>
       <style>{GLOBAL_CSS}</style>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <ExitPill />
+      {/* 연대기는 1180px 컨테이너(좌우 28px) — 알약을 조작 줄·차트 왼쪽 끝(1124px 폭)에 맞춘다. */}
+      <ExitPill column={1124} />
       <ChronicleExplorer />
 
-      <section aria-labelledby="all-events" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 clamp(16px,4vw,28px) 72px' }}>
-        <h2 id="all-events" style={{ fontSize: 20, fontWeight: 800, margin: '8px 0 16px', color: '#0f172a' }}>전체 사건 목록</h2>
-        {DECADES.map((d) => (
-          <div key={d.key} style={{ marginBottom: 20 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 800, color: '#334155', marginBottom: 8 }}>
-              <Link href={`/timeline/decade/${d.key}`} style={{ color: 'inherit' }}>{d.label}</Link>
-            </h3>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, fontSize: 14, lineHeight: 1.9, color: '#334155' }}>
-              {getDecadeEvents(d.key).map((e) => (
-                <li key={e.id}>
-                  <span style={{ color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{formatEventDate(e.date, e.endDate)}</span>
-                  {' · '}
-                  {e.title}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+      <section aria-labelledby="all-events" style={{ maxWidth: 1180, margin: '0 auto', padding: '0 clamp(16px,3vw,28px) 72px' }}>
+        <style>{LIST_CSS}</style>
+        <h2 id="all-events" style={{ fontSize: 20, fontWeight: 800, margin: '8px 0 16px', color: TEXT_STRONG }}>전체 사건 목록</h2>
+        <div className="cl-decades">
+          {DECADES.map((d) => (
+            <div key={d.key}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: TEXT_STRONG, marginBottom: 8 }}>
+                <Link href={`/timeline/decade/${d.key}`} className="tl-focus" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 4 }}>{d.label}</Link>
+              </h3>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, fontSize: 14, lineHeight: 1.9, color: TEXT_BODY, wordBreak: 'keep-all' }}>
+                {getDecadeEvents(d.key).map((e) => (
+                  <li key={e.id}>
+                    <span style={{ color: TEXT_MUTED, fontVariantNumeric: 'tabular-nums' }}>{formatEventDate(e.date, e.endDate)}</span>
+                    {' · '}
+                    {e.title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );

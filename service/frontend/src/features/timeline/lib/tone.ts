@@ -143,6 +143,9 @@ export const GLOBAL_CSS = `
     font-size:${FONT.meta}px; font-weight:700; font-family:inherit; cursor:pointer;
     text-decoration:none; transition: background .15s ease, color .15s ease; }
   .tl-btn:hover { background:${SURFACE_SUNKEN}; color:${TEXT_STRONG}; }
+  /* 화면의 주 동작 하나(이 날 공유하기의 '공유하기')만 액센트로 채운다. */
+  .tl-btn-primary { background:${ACCENT}; border-color:${ACCENT}; color:${TEXT_INVERSE}; }
+  .tl-btn-primary:hover { background:${ACCENT_HOVER}; color:${TEXT_INVERSE}; }
 
   /* 목록 안 "더 보기" — 테두리 없는 텍스트+화살표(2026-08-24). 분야마다
      하나씩 붙는 보조 동작이라 .tl-btn 알약이 여러 개 쌓이면 목록보다 버튼이
@@ -155,9 +158,23 @@ export const GLOBAL_CSS = `
     text-decoration:none; transition: color .15s ease; }
   .tl-more:hover { color:${TEXT_STRONG}; text-decoration:underline; text-underline-offset:3px; }
 
+  /* 묶음 하나를 통째로 접는 줄(빅카인즈 지면의 부고·인사·공시) — 위아래 가는 선 사이의 한 줄.
+     화면 폭을 채운 알약(.tl-btn)은 주요 동작처럼 보여서 쓰지 않는다. 왼쪽 이름·건수, 오른쪽 펼치기/접기. */
+  .tl-fold { display:flex; align-items:center; justify-content:space-between; gap:${SPACE.md}px; width:100%;
+    min-height:${TOUCH_MIN + SPACE.md}px; padding:0 ${SPACE.sm}px; text-align:left;
+    border:none; border-top:1px solid ${BORDER_HAIRLINE}; border-bottom:1px solid ${BORDER_HAIRLINE};
+    background:transparent; font-family:inherit; cursor:pointer; transition: background .15s ease; }
+  .tl-fold:hover { background:${SURFACE_SUNKEN}; }
+  .tl-fold:active { background:${SURFACE_CHIP}; }
+  .tl-fold-action { display:inline-flex; align-items:center; gap:${SPACE.xs}px; flex-shrink:0;
+    font-size:${FONT.meta}px; font-weight:700; color:${TEXT_MUTED}; transition: color .15s ease; }
+  .tl-fold:hover .tl-fold-action { color:${TEXT_STRONG}; }
+  .tl-fold-icon { display:inline-block; transition: transform .2s ease; }
+  .tl-fold[aria-expanded="true"] .tl-fold-icon { transform: rotate(180deg); }
+
   @media (prefers-reduced-motion: reduce) {
     .tl-enter { animation: none; }
-    .tl-row, .tl-chip, .tl-btn, .tl-more, .tl-exit { transition: none; }
+    .tl-row, .tl-chip, .tl-btn, .tl-more, .tl-exit, .tl-fold, .tl-fold-action, .tl-fold-icon { transition: none; }
   }
 `;
 

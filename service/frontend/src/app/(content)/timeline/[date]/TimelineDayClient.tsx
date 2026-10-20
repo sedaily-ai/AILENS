@@ -1,6 +1,6 @@
 'use client';
 
-import { TimelineResultView, TimelineBigkindsView, ExitPill, SURFACE, GLOBAL_CSS } from '@/features/timeline';
+import { TimelineResultView, TimelineBigkindsView, ExitPill, OtherDatePill, SURFACE, GLOBAL_CSS } from '@/features/timeline';
 import type { Article, BigKindsArticle, InvestmentScenario } from '@/shared/lib/api/timelineApi';
 
 type Props =
@@ -11,11 +11,13 @@ type Props =
 // EXIT 필 경계는 4.83:1 회색을 쓴다(WCAG 1.4.11 인터랙티브 요소 경계 3:1). hover는 인라인 이벤트 대신 CSS 클래스(.tl-exit)로 처리해 키보드 포커스에도 반응한다.
 //
 // 전역 CSS(포커스 링·행 hover·reduced-motion)는 두 뷰가 공유하므로 각 뷰가 아니라 이 껍데기에서 한 번만 심는다.
+// '다른 날짜 보기'도 두 뷰 공통이라 여기서 한 번 둔다 — 기사 목록 맨 아래가 아니라 ExitPill과 같은 맨 위 줄 오른쪽(2026-10-20).
 export function TimelineDayClient({ date, initialArticles, initialBigkindsArticles, initialInvestments }: Props) {
   return (
-    <div className="min-h-screen" style={{ background: SURFACE }}>
+    <div className="min-h-screen" style={{ position: 'relative', background: SURFACE }}>
       <style>{GLOBAL_CSS}</style>
       <ExitPill />
+      <OtherDatePill />
       {initialBigkindsArticles ? (
         <TimelineBigkindsView date={date} articles={initialBigkindsArticles} investments={initialInvestments} />
       ) : (

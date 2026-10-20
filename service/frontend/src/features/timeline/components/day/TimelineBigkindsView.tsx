@@ -101,7 +101,7 @@ export function TimelineBigkindsView({
   const layout = useMemo(() => buildDayLayout(articles), [articles]);
   const [fillerOpen, setFillerOpen] = useState(false);
   // 분야별로 처음 몇 건만 펼치고 나머지는 접는다. 분야 목록은 한눈에 보여야 하므로 분야 자체는 접지 않으며,
-  // 접힘 UI는 부고·인사·공시와 같은 관례(.tl-btn + ▾)를 따른다.
+  // 접힘 UI는 테두리 없는 텍스트 + ▾(.tl-more)다. 맨 아래 부고·인사·공시 묶음은 분야 하나를 통째로 접는 줄(.tl-fold)이다.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const yearsAgo = yearsAgoLabel(date);
@@ -132,7 +132,8 @@ export function TimelineBigkindsView({
         style={{
           maxWidth: CONTAINER_MAX,
           margin: '0 auto',
-          padding: 'clamp(32px, 7vw, 72px) clamp(20px, 5vw, 32px) clamp(48px, 8vw, 80px)',
+          // 위 여백은 맨 위 줄 알약(ExitPill·OtherDatePill, top 16 + 높이 44) 아래 16px — 좁은 화면에서 머리말("N년 전")이 알약에 가리던 것을 막는다.
+          padding: `${SPACE.lg + TOUCH_MIN + SPACE.lg}px clamp(20px, 5vw, 32px) clamp(48px, 8vw, 80px)`,
         }}
       >
         <div className="tl-enter">
@@ -285,65 +286,65 @@ export function TimelineBigkindsView({
                 );
               })}
 
-              {/* ── 부고·인사·공시 ── 제외하지 않고 접어서 제공한다. */}
+              {/* ── 부고·인사·공시 ── 제외하지 않고 접어서 제공한다.
+                  화면 폭을 채운 알약 버튼은 주요 동작처럼 보여서, 위아래 가는 선 사이의 접힘 줄(.tl-fold)로 둔다 —
+                  왼쪽은 분야 이름·건수(위 분야 제목과 같은 짜임), 오른쪽은 펼치기/접기. */}
               {layout.filler.length > 0 && (
                 <section style={{ marginBottom: SPACE.xxl }}>
                   <button
                     type="button"
-                    className="tl-btn tl-focus"
+                    className="tl-fold tl-focus"
+                    // 전역 버튼 효과(어둡게·누르면 97% 축소, globals.css)를 끈다 — 화면 폭 줄이 눌릴 때마다 줄어들면 어색하고, hover·누름은 .tl-fold가 직접 그린다.
+                    data-fx="own"
                     aria-expanded={fillerOpen}
                     aria-controls="tl-filler"
                     onClick={() => setFillerOpen((v) => !v)}
-                    style={{ width: '100%' }}
                   >
-                    부고 · 인사 · 공시 {layout.filler.length}건
-                    <span aria-hidden style={{ transform: fillerOpen ? 'rotate(180deg)' : undefined, transition: 'transform .2s ease' }}>
-                      ▾
+                    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: SPACE.sm }}>
+                      <span style={{ fontSize: FONT.body, fontWeight: 700, color: TEXT_BODY }}>부고 · 인사 · 공시</span>
+                      <span style={{ fontSize: FONT.caption, fontWeight: 600, color: TEXT_MUTED }}>{layout.filler.length}건</span>
+                    </span>
+                    <span className="tl-fold-action">
+                      {fillerOpen ? '접기' : '펼치기'}
+                      <span aria-hidden className="tl-fold-icon">▾</span>
                     </span>
                   </button>
-                  {fillerOpen && (
-                    <ul id="tl-filler" style={{ listStyle: 'none', margin: `${SPACE.md}px 0 0`, padding: 0 }}>
-                      {layout.filler.map((a, i) => {
-                        const href = resolveArticleLink(a)?.href;
-                        const Wrapper = href ? 'a' : 'div';
-                        return (
-                          <li key={a.news_id || `filler-${i}`} style={{ borderTop: `1px solid ${BORDER_HAIRLINE}` }}>
-                            <Wrapper
-                              {...(href ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}
-                              className={href ? 'tl-row tl-focus' : undefined}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                minHeight: TOUCH_MIN,
-                                padding: `${SPACE.sm}px`,
-                                fontSize: FONT.meta,
-                                color: TEXT_BODY,
-                                lineHeight: LEADING.title,
-                                textDecoration: 'none',
-                                wordBreak: 'keep-all',
-                              }}
-                            >
-                              {a.title}
-                              {href && <span style={SR_ONLY}>새 창에서 열립니다</span>}
-                            </Wrapper>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                  {/* 닫혀 있어도 목록을 그려 두고 hidden으로 숨긴다 — aria-controls가 가리킬 대상이 늘 있어야 한다. */}
+                  <ul id="tl-filler" hidden={!fillerOpen} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    {layout.filler.map((a, i) => {
+                      const href = resolveArticleLink(a)?.href;
+                      const Wrapper = href ? 'a' : 'div';
+                      return (
+                        <li key={a.news_id || `filler-${i}`} style={{ borderBottom: `1px solid ${BORDER_HAIRLINE}` }}>
+                          <Wrapper
+                            {...(href ? { href, target: '_blank', rel: 'noopener noreferrer' } : {})}
+                            className={href ? 'tl-row tl-focus' : undefined}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              minHeight: TOUCH_MIN,
+                              padding: `${SPACE.sm}px`,
+                              fontSize: FONT.meta,
+                              color: TEXT_BODY,
+                              lineHeight: LEADING.title,
+                              textDecoration: 'none',
+                              wordBreak: 'keep-all',
+                            }}
+                          >
+                            {a.title}
+                            {href && <span style={SR_ONLY}>새 창에서 열립니다</span>}
+                          </Wrapper>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </section>
               )}
 
               <InvestmentScenarioCards scenarios={investments} />
 
               <ShareBar cardData={shareCardData} />
-
-
-              <div style={{ textAlign: 'center', marginTop: SPACE.xxl }}>
-                <Link href="/timeline" className="tl-btn tl-focus">
-                  다른 날짜로 또 떠나기
-                </Link>
-              </div>
+              {/* '다른 날짜 보기'는 맨 위 줄 오른쪽(OtherDatePill, TimelineDayClient)에 있다. */}
             </>
           )}
         </div>
