@@ -27,12 +27,15 @@ def test_missing_or_broken_file_covers_nothing(tmp_path, text):
     assert fc.load_calendar(path).known_front('2018-04-20') is None
 
 
-def test_bundled_calendar_is_valid_when_present():
-    # 수집 결과(작업 3)가 저장소에 있으면 형식이 맞아야 한다 — 깨지면 서버가 조용히 느려진다.
-    if not fc.CALENDAR_PATH.exists():
-        pytest.skip('수집 전')
+def test_bundled_calendar_is_valid():
+    # Lambda zip 에 함께 들어가는 수집 결과. 없거나 깨지면 서버가 조용히 느려지므로(모든 날짜를 빅카인즈로 확인) 테스트로 막는다.
+    assert fc.CALENDAR_PATH.exists(), 'scripts/build_front_page_calendar.py 로 수집한 목록이 필요하다'
     raw = json.loads(fc.CALENDAR_PATH.read_text(encoding='utf-8'))
     cal = fc.load_calendar()
     assert cal.ranges and cal is not fc.EMPTY_CALENDAR
     assert raw['no_front'] == sorted(raw['no_front'])
     assert all(cal.known_front(date) is False for date in raw['no_front'])
+    assert raw['unknown'] == []  # 남은 unknown 은 --recheck-unknown 으로 비운 뒤 커밋한다
+    # 2026-10-20 실측과 같은지: 명절·보관본 누락은 없음, 평범한 발행일은 있음.
+    assert {'2018-04-21', '2025-10-06', '2025-10-09', '1995-03-05'} <= set(raw['no_front'])
+    assert {'1996-06-01', '2018-02-15', '2024-09-19', '2024-10-12'}.isdisjoint(raw['no_front'])
