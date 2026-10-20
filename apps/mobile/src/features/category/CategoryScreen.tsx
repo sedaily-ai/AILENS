@@ -54,7 +54,7 @@ export function CategoryScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
-      <AppHeader />
+      <AppHeader title={category?.label ?? '카테고리'} back />
       <CategoryChips active={slug} />
       <View style={styles.body}>
         {failed ? (
@@ -75,7 +75,6 @@ export function CategoryScreen() {
             onEndReached={() => setLimit((n) => (n < items.length ? n + PAGE : n))}
             ListHeaderComponent={
               <View style={styles.head}>
-                <Text style={[styles.title, category && { color: category.accent }]}>{category?.label ?? '카테고리'}</Text>
                 {category ? <Text style={styles.desc}>{category.description}</Text> : null}
                 {subs.length > 0 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subRow}>
@@ -116,12 +115,11 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
   row: { flexDirection: 'row', gap: 16, marginBottom: 28 },
   head: { marginBottom: 20 },
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  desc: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: colors.textMuted },
-  subRow: { gap: 8, paddingTop: 16 },
-  sub: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.line },
-  subOn: { backgroundColor: colors.brand, borderColor: colors.brand },
-  subText: { fontSize: 13, fontWeight: '600', color: colors.textSub },
+  desc: { fontSize: 14, lineHeight: 21, color: colors.textMuted },
+  subRow: { gap: 8, paddingTop: 14 },
+  sub: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f3f6' },
+  subOn: { backgroundColor: colors.brand },
+  subText: { fontSize: 13.5, fontWeight: '600', color: '#6b7280' },
   subTextOn: { color: '#fff', fontWeight: '700' },
   empty: { textAlign: 'center', color: colors.textMuted, marginTop: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8 },

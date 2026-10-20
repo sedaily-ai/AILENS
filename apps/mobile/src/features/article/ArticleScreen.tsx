@@ -1,3 +1,4 @@
+import { markStep } from '../home/dailyProgress';
 import { useEffect, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { Image, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, View, type View as RNView } from 'react-native';
@@ -57,6 +58,7 @@ export function ArticleScreen() {
   useEffect(() => {
     if (!summary) return;
     void history.add({ ...summary, at: Date.now() });
+    void markStep('read');
     void bookmarks.has(summary.id).then(setSaved);
     // 글이 바뀔 때만.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +66,10 @@ export function ArticleScreen() {
   const toggleSaved = () => {
     if (!summary) return;
     if (saved) void bookmarks.remove(summary.id);
-    else void bookmarks.add({ ...summary, at: Date.now() });
+    else {
+      void bookmarks.add({ ...summary, at: Date.now() });
+      void markStep('save');
+    }
     setSaved(!saved);
   };
 

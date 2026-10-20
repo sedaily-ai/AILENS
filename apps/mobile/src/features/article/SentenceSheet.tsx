@@ -1,3 +1,4 @@
+import { markStep } from '../home/dailyProgress';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
@@ -49,6 +50,7 @@ export function SentenceSheet({
     try {
       await saveSentence({ user_id: state.userId, text: s, article_id: article.id, article_title: article.title, article_published_at: article.publishedAt ?? undefined });
       setDone((d) => new Set(d).add(s));
+      void markStep('save');
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장하지 못했어요.');
     } finally {

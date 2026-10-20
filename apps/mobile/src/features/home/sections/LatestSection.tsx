@@ -1,28 +1,28 @@
 import { StyleSheet, View } from 'react-native';
-import { GridCard } from '../../../components/GridCard';
+import type { Href } from 'expo-router';
+import { NewsRow } from '../../../components/NewsRow';
+import { colors, surface } from '../../../theme';
 import type { FeedItem } from '../model';
 import { SectionHeader } from './SectionHeader';
 
-/** "최신 뉴스" 2열 그리드. 홀수 개면 마지막 칸을 비워 폭을 맞춘다. */
-export function LatestSection({ items }: { items: FeedItem[] }) {
+/**
+ * 최신 소식 목록. 홈("방금 올라온 소식")에는 3건 + 머리의 "더 보기 >"로 발견 탭에 연결하고,
+ * 발견 탭에는 맨 위에 같은 섹션(더 보기 없음)으로 둔다. 아래에 따로 버튼을 두지 않는다(링크가 한 곳이어야 헷갈리지 않는다). 카테고리 필터는 발견 탭의 칩이 맡는다.
+ */
+export function LatestSection({ items, title = '방금 올라온 소식', moreHref }: { items: FeedItem[]; title?: string; moreHref?: Href }) {
   if (items.length === 0) return null;
-  const rows: FeedItem[][] = [];
-  for (let i = 0; i < items.length; i += 2) rows.push(items.slice(i, i + 2));
   return (
     <View>
-      <SectionHeader title="최신 뉴스" right="전체 보기 →" />
-      {rows.map((row, idx) => (
-        <View key={idx} style={styles.row}>
-          {row.map((item) => (
-            <GridCard key={item.id} item={item} />
-          ))}
-          {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
-        </View>
-      ))}
+      <SectionHeader title={title} right={moreHref ? '더 보기' : undefined} href={moreHref} />
+      <View style={styles.list}>
+        {items.map((item, i) => (
+          <NewsRow key={item.id} item={item} divider={i > 0} />
+        ))}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 16, marginBottom: 28 },
+  list: { ...surface.card, paddingHorizontal: 16, paddingVertical: 2 },
 });

@@ -1,29 +1,63 @@
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
 import { MiniPlayer } from '../../components/MiniPlayer';
-import { colors } from '../../theme';
+import { colors, surface } from '../../theme';
 import { useHomeData, type HomeData } from './useHomeData';
 import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
 import { TimeMachineCard } from './sections/TimeMachineCard';
-import { StartCard } from './sections/StartCard';
-import { useOnboardingCompleted } from '../onboarding/prefs';
+import { EditorChat } from './sections/EditorChat';
+import { EditorPicker } from './sections/EditorPicker';
+import { FormatCarousel } from './sections/FormatCarousel';
+import { BriefingSettings } from './sections/BriefingSettings';
+import { useMyEditor } from './myEditor';
+import { useDailyProgress } from './dailyProgress';
+import { useBriefingPrefs } from './briefingPrefs';
+import { bookmarks, getInterests, history } from '../mylens/stores';
+import { useListStore } from '../mylens/listStore';
 
-const LATEST_COUNT = 8;
+const LATEST_COUNT = 3;
 
 /**
- * 홈은 "오늘의 핵심"에 집중한다(뉴닉 구조): 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
- * 카테고리 섹션·웹툰·영상·레터는 "발견" 탭(src/features/discover)으로 옮겼다.
+ * 홈은 "오늘 내 몫을 끝내는 곳"이다: 오늘의 브리핑(인사 · 진행 · 이번 주) → 오늘 챙길 3가지 → 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
+ * 카테고리 섹션·웹툰·영상·레터는 "발견" 탭(src/features/discover)에 있다.
  */
 type Section = { key: string; render: () => React.ReactElement | null };
 
-function buildSections(data: HomeData, showStart: boolean): Section[] {
+interface Ctx {
+  progress: ReturnType<typeof useDailyProgress>;
+  prefs: ReturnType<typeof useBriefingPrefs>;
+  interests: string[];
+  myEditor: ReturnType<typeof useMyEditor>;
+  readIds: Set<string>;
+  openPicker: () => void;
+  openSettings: () => void;
+}
+
+function buildSections(data: HomeData, c: Ctx): Section[] {
   return [
-    ...(showStart ? [{ key: 'start', render: () => <StartCard /> }] : []),
-    { key: 'paper', render: () => <PaperHero lens={data.lens} /> },
-    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
+    {
+      key: 'chat',
+      render: () => (
+        <EditorChat
+          editor={c.myEditor.editor}
+          picked={c.myEditor.picked}
+          lens={data.lens}
+          interests={c.interests}
+          readIds={c.readIds}
+          situation={c.prefs.situation}
+          streak={c.progress.streak}
+          onChangeEditor={c.openPicker}
+          onOpenSettings={c.openSettings}
+        />
+      ),
+    },
+    { key: 'formats', render: () => <FormatCarousel situation={c.prefs.situation} /> },
+    { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
+    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} moreHref="/discover" /> },
     { key: 'timemachine', render: () => <TimeMachineCard /> },
   ];
 }
@@ -31,7 +65,19 @@ function buildSections(data: HomeData, showStart: boolean): Section[] {
 // 홈 화면. 로드 상태와 섹션 조립만 맡고, 데이터 규칙은 model.ts, 조회는 useHomeData.ts, 화면 조각은 sections/* 에 있다.
 export function HomeScreen() {
   const { state, refreshing, reload, refresh } = useHomeData({ media: false });
-  const onboarded = useOnboardingCompleted();
+  const progress = useDailyProgress();
+  const prefs = useBriefingPrefs();
+  const read = useListStore(history);
+  useListStore(bookmarks);
+  const [interests, setInterests] = useState<string[]>([]);
+  const myEditor = useMyEditor(interests);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => {
+    void getInterests().then(setInterests);
+  }, []);
+  // 이미 읽은 기사는 질문 후보에서 뒤로 밀린다(읽을수록 질문이 새로워진다).
+  const readIds = useMemo(() => new Set(read.items.map((r) => r.id)), [read.items]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -50,7 +96,7 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data, onboarded === false)}
+            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true) })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}
@@ -62,6 +108,8 @@ export function HomeScreen() {
           />
         )}
       </View>
+      <EditorPicker open={pickerOpen} onClose={() => setPickerOpen(false)} editor={myEditor.editor} />
+      <BriefingSettings hideTrigger open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} interests={interests} onInterests={setInterests} />
       <MiniPlayer />
     </SafeAreaView>
   );
@@ -72,10 +120,10 @@ function Divider() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: surface.page },
   body: { flex: 1 },
-  list: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: 32 },
+  list: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  divider: { height: 28 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   msg: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
   btn: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, backgroundColor: '#f3f4f6' },

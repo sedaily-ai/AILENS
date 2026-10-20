@@ -1,3 +1,4 @@
+import { markStep } from '../home/dailyProgress';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createAudioPlayer, setAudioModeAsync, useAudioPlayerStatus, type AudioPlayer } from 'expo-audio';
 import { listPosts, type HomePlayerPost } from '@ailens/api-client';
@@ -57,6 +58,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       player.replace({ uri: item.media_embed_url });
       player.setPlaybackRate(rate);
       player.play();
+      void markStep('format');
       player.setActiveForLockScreen(true, { title: displayHeadline(item.title), artist: 'AI LENS · 오늘의 뉴스를 귀로' });
     },
     [player, rate]

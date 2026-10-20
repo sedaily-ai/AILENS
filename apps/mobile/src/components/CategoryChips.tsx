@@ -11,14 +11,12 @@ export function CategoryChips({ active }: { active?: string }) {
       <Link href="/" asChild>
         <Pressable style={styles.chip} accessibilityRole="link">
           <Text style={[styles.text, !active && styles.on]}>전체</Text>
-          <Underline on={!active} />
         </Pressable>
       </Link>
       {ECON_CATEGORIES.map((c) => (
         <Link key={c.slug} href={{ pathname: '/category/[slug]', params: { slug: c.slug } }} asChild>
           <Pressable style={styles.chip} accessibilityRole="link">
             <Text style={[styles.text, active === c.slug && styles.on]}>{c.label}</Text>
-            <Underline on={active === c.slug} />
           </Pressable>
         </Link>
       ))}
@@ -26,16 +24,10 @@ export function CategoryChips({ active }: { active?: string }) {
   );
 }
 
-function Underline({ on }: { on: boolean }) {
-  return <Text style={[styles.bar, on && styles.barOn]}>{' '}</Text>;
-}
-
 const styles = StyleSheet.create({
-  wrap: { flexGrow: 0, backgroundColor: colors.bg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
-  row: { paddingHorizontal: 12, gap: 4 },
-  chip: { paddingHorizontal: 10, paddingTop: 12, alignItems: 'center' },
-  text: { fontSize: 15, fontWeight: '600', color: colors.textFaint },
-  on: { color: colors.text, fontWeight: '800' },
-  bar: { height: 2, marginTop: 8, alignSelf: 'stretch', backgroundColor: 'transparent' },
-  barOn: { backgroundColor: colors.text },
+  wrap: { flexGrow: 0, backgroundColor: colors.bg },
+  row: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  chip: {},
+  text: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f3f6', fontSize: 14, fontWeight: '600', color: '#6b7280' },
+  on: { backgroundColor: colors.brand, color: '#fff', fontWeight: '700' },
 });

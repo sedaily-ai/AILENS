@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../../ui/Text';
 import { Link } from 'expo-router';
 import { colors, radius } from '../../../theme';
+import { CaretRight } from '../../../ui/icons';
 import { kstDateTime } from '../../../lib/format';
 import type { CategoryGroup } from '../model';
 
@@ -15,7 +16,10 @@ export function CategorySection({ group }: { group: CategoryGroup }) {
       <Link href={{ pathname: '/category/[slug]', params: { slug: category.slug } }} asChild>
         <Pressable style={styles.head} accessibilityRole="link">
           <Text style={[styles.title, { color: category.accent }]}>{category.label}</Text>
-          <Text style={styles.more}>더 보기 →</Text>
+          <View style={styles.moreRow}>
+            <Text style={styles.more}>더 보기</Text>
+            <CaretRight size={13} color={colors.textFaint} weight="bold" />
+          </View>
         </Pressable>
       </Link>
       <Link href={{ pathname: '/article/[slug]', params: { slug: hero.id } }} asChild>
@@ -52,8 +56,9 @@ export function CategorySection({ group }: { group: CategoryGroup }) {
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
-  more: { fontSize: 13, fontWeight: '600', color: colors.textFaint },
+  title: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
+  moreRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  more: { fontSize: 13.5, fontWeight: '600', color: colors.textFaint },
   thumb: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colors.imagePlaceholder, marginBottom: 10 },
   img: { width: '100%', height: '100%' },
   heroTitle: { fontSize: 18, lineHeight: 26, fontWeight: '800', letterSpacing: -0.3, color: colors.text },

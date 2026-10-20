@@ -1,6 +1,8 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/ui/Text';
+import { useEffect } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { markStep } from '../../src/features/home/dailyProgress';
 import { getPost, type WebtoonPost } from '@ailens/api-client';
 import { displayHeadline } from '@ailens/domain';
 import { AsyncView } from '../../src/components/AsyncView';
@@ -13,6 +15,9 @@ import { colors } from '../../src/theme';
 export default function WebtoonView() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { state, reload } = useAsync((signal) => getPost<WebtoonPost>(slug, { channel: 'webtoon', signal }), [slug]);
+  useEffect(() => {
+    if (state.status === 'ready') void markStep('format');
+  }, [state.status]);
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: true, title: '웹툰' }} />
