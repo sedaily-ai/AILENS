@@ -24,9 +24,9 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
   const [hero, ...rest] = items;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.mast}>
-        <Text style={styles.kick}>{paperTitle(firstDate)}</Text>
+    <View style={[styles.card, compact && styles.cCard]}>
+      <View style={[styles.mast, compact && styles.cMast]}>
+        <Text style={[styles.kick, compact && styles.cKick]}>{paperTitle(firstDate)}</Text>
         {linkPast && firstDate ? (
           <Link href={{ pathname: '/paper/[date]', params: { date: firstDate } }} asChild>
             <Pressable accessibilityRole="link" hitSlop={8}>
@@ -37,18 +37,18 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
       </View>
       <HandLine height={6} color="#c4c7cd" opacity={1} strokeWidth={1.6} style={styles.mastLine} />
 
-      <View style={styles.tabs}>
+      <View style={[styles.tabs, compact && styles.cTabs]}>
         {PAPER_TABS.map((t, i) => {
           const on = tab === i;
           return (
             <Pressable
               key={t.key}
               onPress={() => setTab(i)}
-              style={[styles.tab, on && styles.tabOn]}
+              style={[styles.tab, compact && styles.cTab, on && styles.tabOn]}
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
             >
-              <Text style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
+              <Text style={[styles.tabText, compact && styles.cTabText, on && styles.tabTextOn]} numberOfLines={1}>
                 {t.label}
               </Text>
             </Pressable>
@@ -71,7 +71,6 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
                   <Text style={styles.cHeroTitle} numberOfLines={3}>
                     {displayHeadline(hero.headline)}
                   </Text>
-                  <Text style={styles.heroDate}>{kstDateTime(hero.published_at, hero.date)}</Text>
                 </View>
                 {hero.photo_image_url ? (
                   <View style={styles.cHeroThumb}>
@@ -115,9 +114,9 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
 
           {rest.map((l, idx) => (
             <Link key={l.id} href={{ pathname: '/article/[slug]', params: { slug: l.id } }} asChild>
-              <Pressable style={StyleSheet.flatten([styles.minor, idx > 0 && styles.minorDivider])} accessibilityRole="link">
+              <Pressable style={StyleSheet.flatten([styles.minor, compact && styles.cMinor, idx > 0 && styles.minorDivider])} accessibilityRole="link">
                 <View style={styles.minorText}>
-                  <Text style={styles.minorTitle} numberOfLines={2}>
+                  <Text style={[styles.minorTitle, compact && styles.cMinorTitle]} numberOfLines={2}>
                     {displayHeadline(l.headline)}
                   </Text>
                   {!compact && l.context ? (
@@ -125,10 +124,10 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
                       {l.context}
                     </Text>
                   ) : null}
-                  <Text style={styles.minorDate}>{kstDateTime(l.published_at, l.date)}</Text>
+                  {!compact ? <Text style={styles.minorDate}>{kstDateTime(l.published_at, l.date)}</Text> : null}
                 </View>
                 {l.photo_image_url ? (
-                  <View style={styles.minorThumb}>
+                  <View style={[styles.minorThumb, compact && styles.cMinorThumb]}>
                     <Image source={{ uri: l.photo_image_url }} style={styles.img} resizeMode="cover" />
                   </View>
                 ) : null}
@@ -184,10 +183,19 @@ const styles = StyleSheet.create({
   heroTitle: { fontFamily: 'NotoSerifKR-Bold', fontSize: 24, lineHeight: 29, letterSpacing: -0.72, color: INK },
   heroDesc: { marginTop: 10, fontSize: 15, lineHeight: 25, color: '#6b7280' },
 
-  cHero: { flexDirection: 'row', gap: 14, alignItems: 'flex-start', paddingBottom: 14 },
+  cCard: { paddingTop: 8, paddingHorizontal: 14, paddingBottom: 10 },
+  cMast: { paddingTop: 6, paddingBottom: 8 },
+  cKick: { fontSize: 16 },
+  cTabs: { marginBottom: 10, padding: 3 },
+  cTab: { minHeight: 32 },
+  cTabText: { fontSize: 13 },
+  cMinor: { paddingTop: 10, gap: 12 },
+  cMinorTitle: { fontSize: 14, lineHeight: 19 },
+  cMinorThumb: { width: 64, height: 48, borderRadius: 8 },
+  cHero: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', paddingBottom: 10 },
   cHeroText: { flex: 1, minWidth: 0 },
-  cHeroTitle: { marginTop: 8, fontFamily: 'NotoSerifKR-Bold', fontSize: 19, lineHeight: 26, letterSpacing: -0.5, color: INK },
-  cHeroThumb: { width: 108, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f3f4f6' },
+  cHeroTitle: { marginTop: 6, fontFamily: 'NotoSerifKR-Bold', fontSize: 17, lineHeight: 24, letterSpacing: -0.4, color: INK },
+  cHeroThumb: { width: 88, height: 66, borderRadius: 10, overflow: 'hidden', backgroundColor: '#f3f4f6' },
   doubleRule: { gap: 1.4 },
   ruleLine: { height: 1.3, backgroundColor: '#b9b9b1' },
 
