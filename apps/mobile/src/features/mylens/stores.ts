@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createListStore } from './listStore';
 
 export interface SavedArticle {
@@ -15,25 +14,15 @@ export const bookmarks = createListStore<SavedArticle>('ailens:bookmarks', 200);
 /** 읽은 글(열람 기록). 최대 200건, 같은 글을 다시 열면 맨 앞·시각 갱신. */
 export const history = createListStore<SavedArticle>('ailens:history', 200);
 
-const INTEREST_KEY = 'ailens:interest-categories';
+import { getInterestItems, replaceCategories } from '../interests/store';
 
-/** 관심 분야(카테고리 slug 목록). 이 기기에만 저장한다. */
+/** 관심 분야(카테고리 slug 목록). 새 "내 관심"(분야·섹터·화두) 저장소의 분야 항목만 돌려준다 — 분야만 고르는 옛 화면용. */
 export async function getInterests(): Promise<string[]> {
-  try {
-    const raw = await AsyncStorage.getItem(INTEREST_KEY);
-    const list = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
+  return (await getInterestItems()).filter((i) => i.type === 'category').map((i) => i.key);
 }
 
 export async function setInterests(slugs: string[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(INTEREST_KEY, JSON.stringify(slugs));
-  } catch {
-    // 저장이 막혀도 이번 실행에서는 화면 상태로 동작한다.
-  }
+  await replaceCategories(slugs);
 }
 
 // 이번 주 읽은 글·연속 읽은 날 요약(readingStats)은 2026-10-19 기능 다이어트로 제거했다(웹의 이용 기록·완료 요약 제거와 같은 결정).

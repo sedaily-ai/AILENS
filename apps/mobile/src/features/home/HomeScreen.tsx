@@ -13,12 +13,15 @@ import { EditorChat } from './sections/EditorChat';
 import { EditorPicker } from './sections/EditorPicker';
 import { FormatCarousel } from './sections/FormatCarousel';
 import { Continues } from './sections/Continues';
+import { MyInterests } from './sections/MyInterests';
+import { InterestPicker } from '../interests/InterestPicker';
+import { useInterestItems } from '../interests/store';
 import { connections } from './connections';
 import { BriefingSettings } from './sections/BriefingSettings';
 import { useMyEditor } from './myEditor';
 import { useDailyProgress } from './dailyProgress';
 import { useBriefingPrefs } from './briefingPrefs';
-import { bookmarks, getInterests, history } from '../mylens/stores';
+import { bookmarks, history } from '../mylens/stores';
 import { useListStore } from '../mylens/listStore';
 
 const LATEST_COUNT = 3;
@@ -36,6 +39,8 @@ interface Ctx {
   myEditor: ReturnType<typeof useMyEditor>;
   readIds: Set<string>;
   continues: ReturnType<typeof connections>;
+  interestItems: ReturnType<typeof useInterestItems>['items'];
+  openInterests: () => void;
   openPicker: () => void;
   openSettings: () => void;
   scrollToChat: (yInCard: number) => void;
@@ -60,6 +65,7 @@ function buildSections(data: HomeData, c: Ctx): Section[] {
         />
       ),
     },
+    { key: 'interests', render: () => <MyInterests items={c.interestItems} onAdd={c.openInterests} /> },
     { key: 'continues', render: () => <Continues items={c.continues} /> },
     { key: 'formats', render: () => <FormatCarousel situation={c.prefs.situation} /> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
@@ -75,16 +81,15 @@ export function HomeScreen() {
   const prefs = useBriefingPrefs();
   const read = useListStore(history);
   useListStore(bookmarks);
-  const [interests, setInterests] = useState<string[]>([]);
+  const interestState = useInterestItems();
+  const interests = interestState.slugs;
+  const [interestsOpen, setInterestsOpen] = useState(false);
   const myEditor = useMyEditor(interests);
   const listRef = useRef<FlatList<{ key: string; render: () => React.ReactElement | null }>>(null);
   // 질문을 열면 그 질문이 상단바 바로 아래에 오도록 스크롤한다(풀이가 길어도 맨 위부터 읽게). 목록 위 여백(16) + 카드 안 위치.
   const scrollToChat = (yInCard: number) => listRef.current?.scrollToOffset({ offset: Math.max(0, 16 + yInCard - 8), animated: true });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  useEffect(() => {
-    void getInterests().then(setInterests);
-  }, []);
   // 이미 읽은 기사는 질문 후보에서 뒤로 밀린다(읽을수록 질문이 새로워진다).
   const readIds = useMemo(() => new Set(read.items.map((r) => r.id)), [read.items]);
   // 이어서 볼 소식: 최근 읽은 글과 같은 분야의 안 읽은 기사(기기 안 읽은 기록 기준).
@@ -111,7 +116,7 @@ export function HomeScreen() {
         ) : (
           <FlatList
             ref={listRef}
-            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, continues, openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true), scrollToChat })}
+            data={buildSections(state.data, { progress, prefs, interests, myEditor, readIds, continues, interestItems: interestState.items, openInterests: () => setInterestsOpen(true), openPicker: () => setPickerOpen(true), openSettings: () => setSettingsOpen(true), scrollToChat })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}
@@ -124,7 +129,8 @@ export function HomeScreen() {
         )}
       </View>
       <EditorPicker open={pickerOpen} onClose={() => setPickerOpen(false)} editor={myEditor.editor} />
-      <BriefingSettings hideTrigger open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} interests={interests} onInterests={setInterests} />
+      <BriefingSettings hideTrigger open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} />
+      <InterestPicker open={interestsOpen} onClose={() => setInterestsOpen(false)} />
       <MiniPlayer />
     </SafeAreaView>
   );

@@ -1,5 +1,7 @@
 // 인증 설정은 Amplify·난수 폴리필 때문에 다른 import 보다 먼저 로드한다.
 import { configureAuth } from '../src/auth/configureAuth';
+import { configureLabels } from '../src/features/interests/store';
+import { labelOfCategory } from '../src/features/interests/dictionary';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +13,7 @@ import { PlayerProvider } from '../src/features/player/PlayerContext';
 import { usePushNavigation } from '../src/features/push/pushSetup';
 
 configureAuth();
+configureLabels(labelOfCategory);
 
 // api-client 공용화: 웹은 Next env, 앱은 app.config extra 로 같은 홀더에 베이스 URL 을 주입한다.
 // 모듈 로드 시 1회(앱 진입점). 웹의 shared/config/apiClient.ts 와 동일 역할.

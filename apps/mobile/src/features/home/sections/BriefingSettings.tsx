@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ECON_CATEGORIES } from '@ailens/domain';
 import { Text } from '../../../ui/Text';
 import { Bus, Coffee, ForkKnife, Moon, SlidersHorizontal, X } from '../../../ui/icons';
 import { colors, surface } from '../../../theme';
 import { MINUTES, saveBriefingPrefs, type BriefingPrefs, type Minutes, type Situation } from '../briefingPrefs';
-import { setInterests } from '../../mylens/stores';
 
 /**
  * 오늘의 브리핑 설정 — 한 줄 요약 칩("5분 · 출근길 · 증권·산업")과 그 칩을 누르면 열리는 아래 시트.
@@ -18,21 +16,14 @@ const SITUATIONS: { key: Situation; label: string; hint: string; Icon: typeof Bu
   { key: 'weekend', label: '주말', hint: '깊이 있는 레터', Icon: Coffee },
 ];
 
-export function BriefingSettings({ prefs, interests, onInterests, open: openProp, onClose, hideTrigger }: { prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void; open?: boolean; onClose?: () => void; hideTrigger?: boolean }) {
+export function BriefingSettings({ prefs, open: openProp, onClose, hideTrigger }: { prefs: BriefingPrefs; open?: boolean; onClose?: () => void; hideTrigger?: boolean }) {
   // 제어형(open·onClose 를 넘기면 호출한 쪽이 열고 닫는다) 또는 스스로 여닫는 한 줄 요약 칩 형태 둘 다 지원한다.
   const [openSelf, setOpenSelf] = useState(false);
   const controlled = openProp !== undefined;
   const open = controlled ? openProp : openSelf;
   const setOpen = (v: boolean) => (controlled ? (v ? undefined : onClose?.()) : setOpenSelf(v));
   const situation = SITUATIONS.find((s) => s.key === prefs.situation);
-  const labels = ECON_CATEGORIES.filter((c) => interests.includes(c.slug)).map((c) => c.label);
-  const summary = [`${prefs.minutes}분`, situation?.label, labels.length ? labels.slice(0, 2).join('·') + (labels.length > 2 ? ` 외 ${labels.length - 2}` : '') : null].filter(Boolean);
-
-  const toggleInterest = (slug: string) => {
-    const next = interests.includes(slug) ? interests.filter((x) => x !== slug) : [...interests, slug];
-    onInterests(next);
-    void setInterests(next);
-  };
+  const summary = [`${prefs.minutes}분`, situation?.label].filter(Boolean);
 
   return (
     <>
@@ -82,17 +73,6 @@ export function BriefingSettings({ prefs, interests, onInterests, open: openProp
               })}
             </View>
 
-            <Text style={styles.label}>관심 분야 <Text style={styles.optional}>여러 개 골라도 돼요</Text></Text>
-            <View style={styles.pills}>
-              {ECON_CATEGORIES.map((c) => {
-                const on = interests.includes(c.slug);
-                return (
-                  <Pressable key={c.slug} style={[styles.pill, on && styles.pillOn]} onPress={() => toggleInterest(c.slug)} accessibilityRole="button" accessibilityState={{ selected: on }}>
-                    <Text style={[styles.pillText, on && styles.pillTextOn]}>{c.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
           </ScrollView>
           <Pressable style={({ pressed }) => [styles.done, pressed && { opacity: 0.88 }]} onPress={() => setOpen(false)} accessibilityRole="button">
             <Text style={styles.doneText}>이대로 시작</Text>
