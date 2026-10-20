@@ -38,6 +38,5 @@ export async function fetchMailPreview(): Promise<{ subject: string; html: strin
   }
 }
 
-export const sendTestMail = (email: string) => postJson('/subscriptions/test', { email });
 export const confirmSubscription = (token: string) => postJson('/subscriptions/confirm', { token });
 export const unsubscribeByToken = (token: string) => postJson('/subscriptions/unsubscribe', { token });

@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { importBrowserBookmarks, type BookmarkImportResult, type IssueLetter } from '@/features/letter';
+// 일회성 이전 도구: 계정 저장(2026-10-14) 전에 이 브라우저에만 저장한 레터를 계정으로 옮긴다.
+// 2026-10-20 기능 다이어트에서 기한을 정했다 — 2026-12-31 이후 이 컴포넌트와 서버 가져오기 경로(`/api/v2/me/imports/bookmarks`)를 함께 지운다.
 export function BrowserBookmarksImport({owner,letters,onImported}:{owner:string;letters:IssueLetter[];onImported:()=>void}){
  const [legacy,setLegacy]=useState<string[]>([]),[selected,setSelected]=useState<string[]>([]),[open,setOpen]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<BookmarkImportResult|null>(null);
  const abort=useRef<AbortController|null>(null),busy=useRef(false),request=useRef<{selection:string;id:string}|null>(null);

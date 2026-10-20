@@ -18,11 +18,7 @@ import { SITE_URL } from '@/shared/constants/site';
 
 // 카테고리+날짜 경로로 감싼 lens 상세. 9개 분류(+news 폴백) 카테고리 폴더가 이 모듈을 공유한다.
 // 옛 경로 (content)/[slug]/page.tsx는 lensPath()로 계산한 정본 경로로 redirect만 하는 얇은 페이지다(letters/[id]/page.tsx의 lensPost 리다이렉트와 같은 패턴).
-//
-// generateStaticParams는 두지 않는다. 카테고리별로 복제하면 정적 생성 수가 카테고리 수만큼 늘고 이득(prefetch 분류)은 작다.
-// dynamicParams 기본값(true)+revalidate로 항상 정상 렌더된다.
-export const revalidate = 300;
-export const dynamicParams = true;
+// revalidate·dynamicParams 같은 라우트 설정은 Next가 page.tsx에서만 읽으므로 각 카테고리 page.tsx에 둔다.
 
 type RouteParams = { year: string; month: string; day: string; slug: string };
 

@@ -1,5 +1,5 @@
-// 링크 공유 한 번의 결과를 정한다. 기사 '공유' 버튼(ArticleShareButton)이 쓴다.
-// 레터 상세의 '공유'(features/letter/components/detail/ReadingTools.tsx)와 같은 규칙이다:
+// 링크 공유 한 번의 결과를 정한다. 기사 '공유'(ArticleShareButton·ArticleToolRail)와 레터 상세 '공유'
+// (features/letter/components/detail/ReadingTools.tsx)가 useArticleShare를 거쳐 같이 쓴다:
 // 터치 기기는 기기 공유 창, 그 밖에는 링크 복사. 공유 창을 닫은 경우(취소)와 복사 실패는 성공으로 표시하지 않는다.
 
 export type ShareOutcome = 'shared' | 'cancelled' | 'copied' | 'failed';

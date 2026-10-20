@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
 import { EDITORS, NEEDS, SITUATIONS, recommendEditors, type LetterEditor, type NeedId, type SituationId } from '../../data/editors';
-import { fetchMailPreview, sendTestMail, subscribeByEmail } from '../../data/interestApi';
+import { fetchMailPreview, subscribeByEmail } from '../../data/interestApi';
 import { EditorAvatar } from '../EditorAvatar';
 
 const EMAIL_OK = /^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]{2,}$/;
@@ -41,8 +41,6 @@ export function SubscribeDialog({ open, onClose, title, lead, source, editors = 
   const [sits, setSits] = useState<SituationId[]>([]);
   const [needs, setNeeds] = useState<NeedId[]>([]);
   const [picked, setPicked] = useState(false);
-  const [testState, setTestState] = useState<'idle' | 'busy' | 'sent'>('idle');
-  const [testError, setTestError] = useState('');
   const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -106,18 +104,6 @@ export function SubscribeDialog({ open, onClose, title, lead, source, editors = 
     };
     doc.addEventListener('keydown', onKeyDown);
     previewFrameCleanup.current = () => doc.removeEventListener('keydown', onKeyDown);
-  };
-
-  // 신청 전에 메일이 실제로 오는지 보는 테스트 한 통. 구독과 별개이고 이후 메일은 가지 않는다.
-  const sendTest = async () => {
-    setTouched(true);
-    if (!valid) return;
-    setTestState('busy');
-    setTestError('');
-    trackEvent('letter_sub_test', { source });
-    const res = await sendTestMail(email.trim());
-    if (!res.ok) { setTestState('idle'); return setTestError(res.message); }
-    setTestState('sent');
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -228,14 +214,6 @@ export function SubscribeDialog({ open, onClose, title, lead, source, editors = 
             <div style={{ minHeight: 28 }}>{showEmailError && <p id="lt-dlg-email-err" className="lt-dlg-err" role="alert">이메일 주소 형식을 확인해 주세요</p>}</div>
 
             <button ref={previewTriggerRef} type="button" className="lt-dlg-prevbtn" aria-expanded={false} onClick={togglePreview}>이렇게 와요 · 메일 미리보기</button>
-
-            <div className="lt-dlg-test">
-              <button type="button" className="lt-dlg-testbtn" onClick={sendTest} disabled={testState === 'busy' || !valid}>
-                {testState === 'busy' ? '보내는 중…' : testState === 'sent' ? '보냈어요. 다시 받기' : '테스트로 한 통 먼저 받아보기'}
-              </button>
-              <span className="lt-dlg-testnote">{testState === 'sent' ? '메일함(스팸함 포함)을 확인해 주세요. 구독 신청과는 별개예요.' : '실제 레터 한 편을 샘플로 보내 드려요. 구독 신청과는 별개예요.'}</span>
-              {testError && <span className="lt-dlg-err" role="alert">{testError}</span>}
-            </div>
 
             <div className="lt-dlg-consent">
               <label>
