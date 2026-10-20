@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Image, LayoutAnimation, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { categoryForDataLabel, type LetterEditor } from '@ailens/domain';
 import { getApiConfig, type LensPost } from '@ailens/api-client';
 import { Text } from '../../../ui/Text';
-import { ArrowRight, CaretDown, CaretUp, ChatCircleDots, Fire, GearSix } from '../../../ui/icons';
+import { ArrowRight, CaretDown, CaretUp, Fire, GearSix } from '../../../ui/icons';
 import { accent, colors, surface } from '../../../theme';
 import { answerLead, momentOf, nextLead, openingLine, voiceOf, type SituationKey } from '../editorVoice';
 import { categoriesOf } from '../myEditor';
@@ -17,7 +17,6 @@ import { EditorVoice } from './EditorVoice';
  *  에디터 말풍선(시간·상황 인사) → 추천 질문 칩 → 칩을 누르면 같은 카드 안에서 풀이(핵심 정리·용어·더 자세히) → 근거 기사·다른 형식으로 이어가기.
  * 질문과 풀이는 모두 기사(lenses 의 question·bullets·keywords)에서 가져온다 — 생성한 문장은 없다. 에디터는 말투와 고르는 기준만 바꾼다.
  */
-const chipsCount = 4;
 
 function Face({ editor, size }: { editor: LetterEditor; size: number }) {
   const uri = editor.image ? `${getApiConfig().cmsApiUrl}${editor.image}` : null;
@@ -37,9 +36,11 @@ export function EditorChat({
   interests,
   readIds,
   situation,
+  questionCount,
   streak,
   onChangeEditor,
   onOpenSettings,
+  onOpened,
 }: {
   editor: LetterEditor;
   picked: boolean;
@@ -47,15 +48,22 @@ export function EditorChat({
   interests: string[];
   readIds: Set<string>;
   situation: SituationKey | null;
+  /** 보여 줄 질문 개수(오늘 설정의 볼 시간에서 온다). */
+  questionCount: number;
   streak: number;
   onChangeEditor: () => void;
   onOpenSettings: () => void;
+  /** 질문이 열렸을 때 호출 — 열린 칩의 맨 위가 카드 안 어디인지(px)를 알려 홈이 그 자리로 스크롤한다. */
+  onOpened?: (yInCard: number) => void;
 }) {
   const router = useRouter();
   const voice = voiceOf(editor.group);
   const moment = momentOf(new Date(), situation);
   const [openId, setOpenId] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  // 칩 목록과 각 칩의 위치(레이아웃). 칩이 열리면 그 칩의 맨 위가 화면 위쪽에 오도록 홈에 알린다.
+  const listY = useRef(0);
+  const itemY = useRef<Record<string, number>>({});
 
   const chips = useMemo(
     () =>
@@ -65,7 +73,7 @@ export function EditorChat({
         editorTopics: editor.topics.map((t) => t.name),
         readIds,
         slugOf: (c) => categoryForDataLabel(c)?.slug ?? null,
-        count: chipsCount,
+        count: questionCount,
       }),
     [lens, interests, editor, readIds]
   );
@@ -78,6 +86,8 @@ export function EditorChat({
     if (openId === qa.id) return setOpenId(null);
     setOpenId(qa.id);
     void markStep('read');
+    // 이전 질문이 접히며 높이가 바뀐 뒤의 위치를 쓰도록 한 프레임 뒤에 알린다.
+    setTimeout(() => onOpened?.(listY.current + (itemY.current[qa.id] ?? 0)), 260);
   };
   const openArticle = (qa: QA, index?: number) =>
     router.push({ pathname: '/article/[slug]', params: index === undefined ? { slug: qa.id } : { slug: qa.id, format: String(index) } });
@@ -85,49 +95,49 @@ export function EditorChat({
   const voiceUri = editor.voice ? `${getApiConfig().cmsApiUrl}${editor.voice}` : null;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.top}>
-        <Pressable onPress={onChangeEditor} style={styles.who} accessibilityRole="button" accessibilityLabel={`${picked ? '내' : '오늘의'} 에디터 ${editor.name}, 바꾸기`}>
-          <Face editor={editor} size={52} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={styles.kickerRow}>
-              <Text style={styles.kicker}>{picked ? '내 에디터' : '오늘의 에디터'}</Text>
-              <View style={styles.changePill}>
-                <Text style={styles.changeText}>바꾸기</Text>
-              </View>
-            </View>
-            <Text style={styles.name} numberOfLines={1}>{editor.name}</Text>
-          </View>
+    <View>
+      {/* 바깥 카드·테두리 없이 페이지 바탕 위에 대화가 바로 놓인다. 위에는 에디터 이름 줄(바꾸기 · 연속 일수 · 설정), 아래는 말풍선 대화. */}
+      <View style={styles.metaRow}>
+        <Pressable onPress={onChangeEditor} style={styles.metaWho} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${picked ? '내' : '오늘의'} 에디터 ${editor.name}, 바꾸기`}>
+          <Text style={styles.metaName} numberOfLines={1}>{editor.name}</Text>
+          <CaretDown size={13} color={colors.textMuted} weight="bold" />
         </Pressable>
         {streak > 0 ? (
           <View style={styles.streak}>
-            <Fire size={14} color="#ea580c" weight="fill" />
-            <Text style={styles.streakText}>{streak}일</Text>
+            <Fire size={13} color="#ea580c" weight="fill" />
+            <Text style={styles.streakText}>{streak}일째</Text>
           </View>
         ) : null}
         <Pressable onPress={onOpenSettings} hitSlop={10} accessibilityRole="button" accessibilityLabel="오늘 설정 열기" style={styles.gear}>
-          <GearSix size={22} color={colors.textMuted} />
+          <GearSix size={21} color={colors.textMuted} />
         </Pressable>
       </View>
 
-      <View style={styles.bubble}>
-        <Text style={styles.bubbleText}>{openingLine(voice, moment)}</Text>
-      </View>
-      {voiceUri ? (
-        <View style={styles.voiceRow}>
-          <EditorVoice key={editor.id} src={voiceUri} name={editor.name} tint={{ bg: accent.soft, fg: accent.ink }} compact />
+      <View style={styles.chatRow}>
+        <Pressable onPress={onChangeEditor} accessibilityRole="button" accessibilityLabel="에디터 바꾸기">
+          <Face editor={editor} size={46} />
+        </Pressable>
+        <View style={styles.bubbleCol}>
+          <View style={styles.bubble}>
+            <Text style={styles.bubbleText}>{openingLine(voice, moment)}</Text>
+          </View>
+          {voiceUri ? (
+            <View style={styles.voiceRow}>
+              <EditorVoice key={editor.id} src={voiceUri} name={editor.name} tint={{ bg: accent.soft, fg: accent.ink }} compact />
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </View>
 
       {chips.length > 0 ? (
         <>
-          <Text style={styles.label}>궁금한 걸 눌러 보세요</Text>
+          <Text style={styles.label}>이런 게 궁금하실 것 같아요</Text>
           {/* 질문은 제자리에서 펼쳐지고 접힌다(아코디언). 다른 질문을 열면 이전 질문이 접히고, 목록 순서는 바뀌지 않는다. */}
-          <View style={styles.chips}>
-            {chips.map((c) => {
+          <View style={styles.chips} onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
+            {chips.map((c, idx) => {
               const on = c.id === openId;
               return (
-                <View key={c.id} style={[styles.item, on && styles.itemOn]}>
+                <View key={c.id} style={[styles.item, on && styles.itemOn, !on && idx > 0 && styles.itemRule]} onLayout={(e) => (itemY.current[c.id] = e.nativeEvent.layout.y)}>
                   <Pressable
                     onPress={() => select(c)}
                     style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && !on && { backgroundColor: accent.soft }]}
@@ -135,7 +145,6 @@ export function EditorChat({
                     accessibilityState={{ expanded: on }}
                     accessibilityLabel={`${c.question} ${on ? '접기' : '펼치기'}`}
                   >
-                    <ChatCircleDots size={18} color={on ? '#fff' : accent.main} weight="fill" />
                     <Text style={[styles.chipText, on && { color: '#fff' }]} numberOfLines={on ? 4 : 2}>{c.question}</Text>
                     {on ? <CaretUp size={16} color="#fff" weight="bold" /> : <CaretDown size={16} color={accent.main} weight="bold" />}
                   </Pressable>
@@ -206,30 +215,35 @@ export function EditorChat({
 }
 
 const styles = StyleSheet.create({
-  card: { ...surface.card, padding: 16 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  metaWho: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaName: { flexShrink: 1, fontSize: 15, fontWeight: '800', letterSpacing: -0.3, color: colors.text },
+  chatRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  bubbleCol: { flex: 1, minWidth: 0 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   who: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   ring: { alignItems: 'center', justifyContent: 'center' },
   kicker: { fontSize: 12.5, fontWeight: '800', color: accent.ink },
   name: { marginTop: 3, fontSize: 17, fontWeight: '800', letterSpacing: -0.4, color: colors.text },
-  streak: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, height: 26, borderRadius: 999, backgroundColor: '#fff3e8' },
+  streak: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 9, height: 26, borderRadius: 999, backgroundColor: '#fff3e8' },
   streakText: { fontSize: 12, fontWeight: '800', color: '#c2410c' },
   gear: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   changePill: { paddingHorizontal: 8, height: 22, borderRadius: 999, backgroundColor: accent.soft, alignItems: 'center', justifyContent: 'center' },
   changeText: { fontSize: 12, fontWeight: '800', color: accent.ink },
 
-  bubble: { marginTop: 14, padding: 14, borderRadius: 18, borderTopLeftRadius: 6, backgroundColor: accent.soft },
+  bubble: { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 20, borderTopLeftRadius: 6, backgroundColor: accent.soft },
   bubbleText: { fontSize: 15.5, lineHeight: 24, fontWeight: '600', color: colors.text },
-  voiceRow: { marginTop: 10 },
+  voiceRow: { marginTop: 8 },
 
-  label: { marginTop: 20, marginBottom: 10, fontSize: 13.5, fontWeight: '800', color: colors.textSub },
-  chips: { gap: 8 },
-  item: { borderRadius: 16, borderWidth: 1.5, borderColor: accent.line, backgroundColor: '#fff', overflow: 'hidden' },
-  itemOn: { borderColor: accent.main },
-  chip: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  chipOn: { backgroundColor: accent.main },
-  chipText: { flex: 1, fontSize: 14.5, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2, color: colors.text },
+  label: { marginTop: 22, marginBottom: 10, marginLeft: 2, fontSize: 13.5, fontWeight: '800', color: colors.textMuted },
+  chips: { marginTop: 2 },
+  item: { backgroundColor: '#fff', overflow: 'hidden' },
+  itemOn: { borderRadius: 18, borderWidth: 1.5, borderColor: accent.main, marginVertical: 6 },
+  itemRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e6eaf1' },
+  chip: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 2, paddingVertical: 12 },
+  chipOn: { backgroundColor: accent.main, paddingLeft: 16, paddingRight: 14 },
+  chipText: { flex: 1, fontSize: 15, lineHeight: 22, fontWeight: '600', letterSpacing: -0.2, color: colors.text },
 
   answer: { padding: 14, backgroundColor: '#f6f9ff', gap: 10 },
   lead: { fontSize: 13.5, fontWeight: '800', color: accent.ink },

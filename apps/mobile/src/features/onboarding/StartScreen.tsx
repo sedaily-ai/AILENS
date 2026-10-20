@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { GLANCES, MOMENTS, PERSONAS, euro, resolveFormat, resultTitle, type Glance, type Moment } from '@ailens/domain';
 import { listPosts, type LensPost } from '@ailens/api-client';
-import { colors } from '../../theme';
+import { accent, colors } from '../../theme';
 import { FORMATS } from '../article/FormatPanels';
 import { pickPaperSection } from '../home/model';
 import { markOnboardingCompleted, saveFormat } from './prefs';
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: BLUE, borderColor: BLUE },
   chipText: { fontSize: 14, fontWeight: '600', color: colors.textSub },
   chipTextOn: { color: '#fff', fontWeight: '700' },
-  cta: { marginTop: 24, height: 54, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  cta: { marginTop: 24, height: 54, borderRadius: 12, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   preview: { marginTop: 12, fontSize: 13.5, lineHeight: 20, color: colors.textMuted, textAlign: 'center' },
 });

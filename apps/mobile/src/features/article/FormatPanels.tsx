@@ -5,7 +5,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import type { HomePlayerPost, LensItem, LensPost } from '@ailens/api-client';
 import { displayHeadline } from '@ailens/domain';
 import { WebtoonCuts } from '../../components/WebtoonCuts';
-import { colors } from '../../theme';
+import { accent, colors } from '../../theme';
 import { usePlayer } from '../player/PlayerContext';
 import { LetterBody } from './LetterBody';
 
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   factNo: { width: 26, fontSize: 13, fontWeight: '800', color: '#5b8def', marginTop: 4 },
   factText: { flex: 1, color: '#1f2937' },
   audio: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 16, backgroundColor: '#f0f6ff' },
-  audioBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  audioBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   audioKicker: { fontSize: 12, fontWeight: '800', color: colors.beta.text },
   audioTitle: { marginTop: 3, fontSize: 15.5, lineHeight: 22, fontWeight: '700', color: colors.text },
   audioTime: { marginTop: 4, fontSize: 12, color: colors.textMuted },

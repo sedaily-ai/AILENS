@@ -9,7 +9,7 @@ import { AsyncView } from '../../src/components/AsyncView';
 import { usePlayer } from '../../src/features/player/PlayerContext';
 import { kstDateTime } from '../../src/lib/format';
 import { useAsync } from '../../src/lib/useAsync';
-import { colors } from '../../src/theme';
+import { accent, colors } from '../../src/theme';
 
 const RATES = [1, 1.25, 1.5, 2];
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -121,14 +121,14 @@ const styles = StyleSheet.create({
   seekWrap: { marginTop: 28 },
   trackHit: { paddingVertical: 12 },
   track: { height: 6, borderRadius: 3, backgroundColor: '#e5e7eb', overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors.brand },
+  fill: { height: '100%', backgroundColor: accent.main },
   times: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   time: { fontSize: 12, color: colors.textFaint },
   controls: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
-  big: { width: 68, height: 68, borderRadius: 34, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  big: { width: 68, height: 68, borderRadius: 34, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   rates: { marginTop: 22, flexDirection: 'row', justifyContent: 'center', gap: 8 },
   rate: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f3f4f6' },
-  rateOn: { backgroundColor: colors.brand },
+  rateOn: { backgroundColor: accent.main },
   rateText: { fontSize: 13, fontWeight: '700', color: colors.textSub },
   rateTextOn: { color: '#fff' },
   transcript: { marginTop: 32, paddingTop: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },

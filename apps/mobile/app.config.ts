@@ -17,6 +17,8 @@ const config: ExpoConfig = {
   version: '0.0.1',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
+  // 앱 아이콘 — 웹 브랜드 마크(4 페르소나 4색 원). 재생성: scripts/gen-icons.sh
+  icon: './assets/images/icon.png',
   // OTA(EAS Update)는 네이티브 호환 버전(version) 단위로 묶는다.
   runtimeVersion: { policy: 'appVersion' },
   updates: { url: `https://u.expo.dev/${EAS_PROJECT_ID}` },
@@ -28,6 +30,11 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'ai.sedaily.lens',
+    adaptiveIcon: {
+      foregroundImage: './assets/images/adaptive-foreground.png',
+      monochromeImage: './assets/images/adaptive-monochrome.png',
+      backgroundColor: '#FFFFFF',
+    },
     // 앱 링크(autoVerify): /.well-known/assetlinks.json 에 Play 앱 서명 키 지문이 등록돼 있어야 검증된다.
     // 웹 로그인(/auth/callback)과 충돌하지 않도록 앱 전용 경로(/app/...)만 가로챈다.
     intentFilters: [
@@ -45,8 +52,10 @@ const config: ExpoConfig = {
     // 듣기(백그라운드 재생·잠금화면 컨트롤)용. 녹음은 쓰지 않으므로 마이크 권한은 요청하지 않는다.
     ['expo-audio', { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: true }],
     'expo-video',
+    // 스플래시: 흰 바탕 가운데 브랜드 마크. 앱은 라이트 화면 고정이라 다크 변형을 두지 않는다.
+    ['expo-splash-screen', { backgroundColor: '#FFFFFF', image: './assets/images/splash-icon.png', imageWidth: 168 }],
     // 알림 수신(권한·채널). 서버 발송·FCM(Android) 설정은 별도: docs/architecture/apps-mobile-출시-서명-가이드.md 참조.
-    'expo-notifications',
+    ['expo-notifications', { icon: './assets/images/notification-icon.png', color: '#3B82F6' }],
   ],
   experiments: {
     typedRoutes: true,

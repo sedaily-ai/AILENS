@@ -39,7 +39,7 @@ export const READING_ACCENT = '#5b8def';
  * 그림자를 쓰면 안드로이드에서 둔탁한 회색 띠로 보여 촌스러워지므로 쓰지 않는다.
  */
 export const surface = {
-  page: '#f8f9fb',
+  page: '#f4f6f9',
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 22,

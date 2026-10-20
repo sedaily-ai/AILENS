@@ -23,8 +23,8 @@ export function TimeMachineCard() {
 }
 
 const styles = StyleSheet.create({
-  row: { ...surface.card, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, height: 68, borderRadius: 20 },
-  icon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f3f6', alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  icon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#f4f6f9', alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2, color: colors.text },
   sub: { marginTop: 2, fontSize: 12.5, color: colors.textMuted },
 });

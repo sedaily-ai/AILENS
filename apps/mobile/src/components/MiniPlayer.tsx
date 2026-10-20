@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Headphones, Pause, Play, SkipForward, X } from '../ui/icons';
 import { displayHeadline } from '@ailens/domain';
 import { usePlayer } from '../features/player/PlayerContext';
-import { colors } from '../theme';
+import { accent, colors } from '../theme';
 
 /**
  * 하단 미니 플레이어. 전역 PlayerProvider 상태를 그대로 보여 준다. 재생을 시작한 뒤에만 나타나고(제목·진행·재생/일시정지·다음·닫기), 본체를 누르면 상세 플레이어가 열린다.
@@ -72,5 +72,5 @@ const styles = StyleSheet.create({
   text: { flex: 1 },
   label: { fontSize: 12, fontWeight: '700', color: colors.beta.text },
   title: { marginTop: 2, fontSize: 15, color: colors.text },
-  play: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  play: { width: 46, height: 46, borderRadius: 23, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
 });

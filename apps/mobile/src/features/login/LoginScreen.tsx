@@ -15,7 +15,7 @@ import {
   signUpWithEmail,
   type AuthResult,
 } from '../../auth/emailAuth';
-import { colors } from '../../theme';
+import { accent, colors } from '../../theme';
 
 type Mode = 'login' | 'signup' | 'confirm' | 'forgot' | 'reset';
 
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   ruleText: { fontSize: 12.5, color: colors.textFaint },
   error: { marginTop: 14, fontSize: 13.5, lineHeight: 20, color: '#dc2626' },
   notice: { marginTop: 14, fontSize: 13.5, lineHeight: 20, color: '#2563eb' },
-  cta: { marginTop: 20, height: 52, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  cta: { marginTop: 20, height: 52, borderRadius: 10, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   linkWrap: { marginTop: 16, alignItems: 'center' },
   links: { marginTop: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

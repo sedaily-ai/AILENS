@@ -10,11 +10,12 @@ import { AppHeader } from '../../components/AppHeader';
 import { useAuth } from '../../auth/AuthContext';
 import { kstDateTime } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
-import { colors } from '../../theme';
+import { accent, colors } from '../../theme';
 import { buildLatest } from '../home/model';
 import { deleteSentence, listArchive, type ArchiveSentence } from './archiveApi';
 import { useListStore } from './listStore';
 import { bookmarks, getInterests, history, setInterests, type SavedArticle } from './stores';
+import { KnowledgeMap } from './KnowledgeMap';
 
 const SITE = 'https://ailens.sedaily.ai';
 type Tab = 'drawer' | 'saved' | 'read' | 'interest';
@@ -52,6 +53,7 @@ export function MyLensScreen() {
         </View>
       ) : (
         <>
+          <KnowledgeMap items={read.items} />
           <View style={styles.tabs}>
             {TABS.map(([k, label]) => (
               <Pressable key={k} style={[styles.tab, tab === k && styles.tabOnBg]} onPress={() => setTab(k)} accessibilityRole="tab" accessibilityState={{ selected: tab === k }}>
@@ -256,7 +258,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 10 },
   h1: { fontSize: 22, fontWeight: '800', color: colors.text, marginTop: 6 },
   note: { fontSize: 14, lineHeight: 22, color: colors.textMuted, textAlign: 'center' },
-  cta: { marginTop: 14, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 10, backgroundColor: colors.brand },
+  cta: { marginTop: 14, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 10, backgroundColor: accent.main },
   ctaText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   retry: { marginTop: 8, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, backgroundColor: '#f3f4f6' },
   retryText: { fontSize: 14, fontWeight: '600', color: colors.text },
@@ -273,7 +275,7 @@ const styles = StyleSheet.create({
   emptyBox: { alignItems: 'center', paddingTop: 56, paddingHorizontal: 24 },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#f1f3f6', alignItems: 'center', justifyContent: 'center' },
   emptyText: { marginTop: 16, fontSize: 14.5, lineHeight: 23, color: colors.textMuted, textAlign: 'center' },
-  emptyBtn: { marginTop: 18, paddingHorizontal: 20, height: 44, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  emptyBtn: { marginTop: 18, paddingHorizontal: 20, height: 44, borderRadius: 14, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   emptyBtnText: { fontSize: 14.5, fontWeight: '700', color: '#fff' },
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 14, backgroundColor: '#f1f3f6', paddingHorizontal: 14, marginBottom: 6 },
   searchInput: { flex: 1, fontSize: 15, color: colors.text, paddingVertical: 0 },

@@ -17,7 +17,6 @@ export function FormatCarousel({ situation }: { situation: SituationKey | null }
   const cards = formatCards(momentOf(new Date(), situation));
   return (
     <View>
-      <Text style={styles.title}>지금은 이렇게 볼까요?</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>
         {cards.map((c, i) => {
           const Icon = ICON[c.index];
@@ -41,7 +40,7 @@ const styles = StyleSheet.create({
   title: { marginBottom: 12, fontSize: 20, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
   scroll: { marginHorizontal: -20 },
   row: { paddingHorizontal: 20, gap: 10 },
-  card: { ...surface.card, width: 150, padding: 14, borderRadius: 20 },
+  card: { width: 150, padding: 14, borderRadius: 20, backgroundColor: '#f4f6f9' },
   first: { backgroundColor: accent.main, borderColor: accent.main },
   icon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f3f6', alignItems: 'center', justifyContent: 'center' },
   iconFirst: { backgroundColor: 'rgba(255,255,255,0.2)' },

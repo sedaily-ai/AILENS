@@ -2,7 +2,7 @@
 // 에디터 8명을 성격 그룹(NT·ST=분석형, NF=이야기형, SF=친근형) 3가지 말투로 묶었다. 콘텐츠 담당 검수 후 에디터별로 더 나눌 수 있다.
 export type Voice = 'analyst' | 'story' | 'friend';
 export type Moment = 'commute' | 'lunch' | 'evening' | 'night' | 'weekend' | 'day';
-export type SituationKey = 'commute' | 'lunch' | 'evening' | 'weekend';
+export type SituationKey = 'commute' | 'lunch' | 'evening' | 'night' | 'weekend';
 
 export function voiceOf(group: 'NT' | 'NF' | 'ST' | 'SF' | string): Voice {
   if (group === 'NF') return 'story';

@@ -25,7 +25,7 @@ import {
   type SearchSort,
 } from '@ailens/domain';
 import { kstDateTime } from '../../lib/format';
-import { colors, radius } from '../../theme';
+import { accent, colors, radius } from '../../theme';
 import { addRecentSearch, clearRecentSearches, getRecentSearches, removeRecentSearch } from './recentSearches';
 import { loadSearchIndex } from './searchData';
 
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   scopeLabel: { fontSize: 12.5, color: colors.textFaint },
   catRow: { gap: 8, paddingVertical: 14 },
   cat: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f3f6' },
-  catOn: { backgroundColor: colors.brand },
+  catOn: { backgroundColor: accent.main },
   catText: { fontSize: 13.5, color: '#6b7280', fontWeight: '600' },
   catTextOn: { color: '#fff', fontWeight: '700' },
   total: { fontSize: 12.5, color: colors.textFaint, marginBottom: 6 },
