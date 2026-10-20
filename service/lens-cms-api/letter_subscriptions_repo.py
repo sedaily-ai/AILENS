@@ -339,16 +339,8 @@ def run_pending_instant(now: Optional[dt.datetime] = None) -> Dict[str, Any]:
     return {"letters": [{"id": i, **send_for_letter(i, now=now)} for i in ids]}
 
 
-# ── 테스트 메일(샘플 한 통) ──────────────────────────────────────────────────
-# 구독 신청 전에 "메일이 실제로 오는지" 확인하게 하는 기능이라 구독자가 아닌 주소로도 나간다. 남용을 막으려고
-#  · 같은 주소는 10분에 1회, 하루 3회까지
-#  · 반송·신고(수신 제외) 주소에는 보내지 않는다
-#  · 본문 맨 위에 "테스트 메일"을 표시하고 수신거부 링크를 넣지 않는다(구독이 아니므로 이후 메일이 가지 않는다는 문구를 넣는다)
-# 제한은 프로세스 메모리로 센다(서버 워커 2개라 정확히 지켜지지는 않는다 — 정식 단계에서 테이블이나 Redis 로 옮긴다).
-TEST_COOLDOWN = dt.timedelta(minutes=10)
-TEST_DAILY_MAX = 3
-_test_log: Dict[str, List[dt.datetime]] = {}
-
+# ── 미리보기 ──────────────────────────────────────────────────────────────────
+# 테스트 메일(send_test_mail, 주소당 10분 1회·하루 3회)은 지웠다(2026-10-20 기능 다이어트). 미리보기는 남긴다.
 
 def preview_mail() -> Dict[str, str]:
     """"이렇게 와요" 미리보기: 가장 최근 레터로 만든 실제 메일 본문(HTML)을 돌려준다. 메일은 보내지 않는다."""
@@ -360,35 +352,3 @@ def preview_mail() -> Dict[str, str]:
         raise LetterError("보여 드릴 레터가 아직 없어요", 404)
     subject, html_body, _ = letter_mail.render_letter(letter, "", "", test=True)
     return {"subject": subject, "html": html_body}
-
-
-def send_test_mail(email: Any, now: Optional[dt.datetime] = None) -> Dict[str, str]:
-    addr = normalize_email(email)
-    if not letter_mail.mail_available():
-        raise LetterError("지금은 테스트 메일을 보내지 않고 있어요", 503)
-    now = now or dt.datetime.now(dt.timezone.utc)
-    recent = [t for t in _test_log.get(addr, []) if now - t < dt.timedelta(days=1)]
-    if recent and now - recent[-1] < TEST_COOLDOWN:
-        raise LetterError("테스트 메일은 10분에 한 번만 받을 수 있어요. 잠시 뒤에 다시 눌러 주세요", 429)
-    if len(recent) >= TEST_DAILY_MAX:
-        raise LetterError("오늘은 테스트 메일을 더 받을 수 없어요", 429)
-    with get_cursor() as cur:
-        cur.execute("SELECT 1 FROM email_suppressions WHERE email_norm = %s", (addr,))
-        if cur.fetchone():
-            return {"status": "sent"}  # 제외 주소는 알리지 않고 보내지도 않는다
-        cur.execute("SELECT slug FROM issue_letters WHERE status='published' AND deleted_at IS NULL ORDER BY published_at DESC, id DESC LIMIT 1")
-        row = cur.fetchone()
-    if not row:
-        raise LetterError("보낼 레터가 아직 없어요", 404)
-    letter = issue_letters_repo.get_published(row["slug"])
-    if not letter:
-        raise LetterError("보낼 레터가 아직 없어요", 404)
-    subject, html_body, text_body = letter_mail.render_letter(letter, "", "", test=True)
-    _test_log[addr] = recent + [now]
-    try:
-        letter_mail.send_mail(addr, subject, html_body, text_body)
-    except Exception:
-        log.exception("test mail failed")
-        _test_log[addr] = recent  # 실패는 횟수에서 뺀다
-        raise LetterError("테스트 메일을 보내지 못했어요. 잠시 뒤 다시 시도해 주세요", 502)
-    return {"status": "sent"}

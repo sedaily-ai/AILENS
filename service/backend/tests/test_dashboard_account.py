@@ -120,16 +120,9 @@ def test_dependency_error_is_not_empty_success(monkeypatch,tokens):
     ('/api/v2/me/followed-editors/mincheol','PUT',200),
     ('/api/v2/me/followed-editors/mincheol','DELETE',200),
     ('/api/v2/me/imports/bookmarks','POST',200),
-    ('/api/v2/me/notifications/preferences','GET',200),
-    ('/api/v2/me/notifications/preferences','PUT',200),
-    ('/api/v2/me/notifications/consent','PUT',200),
-    ('/api/v2/me/notifications/preview','GET',200),
-    ('/api/v2/me/push-subscriptions','POST',200),
-    ('/api/v2/me/push-subscriptions/fixture','DELETE',200),
     ('/api/v2/me/activity/sessions','POST',201),
     ('/api/v2/me/activity/events','POST',200),
     ('/api/v2/me/dashboard','GET',200),
-    ('/api/v2/me/recommendations','GET',200),
 ])
 def test_second_bundle_endpoints_require_owner_auth(monkeypatch,tokens,path,method,status):
     seen=[]
@@ -160,6 +153,26 @@ def test_removed_record_routes_are_404_without_dependency_call(monkeypatch,token
     assert response['statusCode']==404 and json.loads(response['body'])['error']['code']=='NOT_FOUND'
 
 
+@pytest.mark.parametrize('path,method',[
+    # 2026-10-20 기능 다이어트: 공개 알림 설정·동의·미리보기, 웹 푸시 기기, 대시보드와 겹치던 추천 조회.
+    ('/api/v2/me/notifications/preferences','GET'),
+    ('/api/v2/me/notifications/preferences','PUT'),
+    ('/api/v2/me/notifications/consent','GET'),
+    ('/api/v2/me/notifications/consent','PUT'),
+    ('/api/v2/me/notifications/preview','GET'),
+    ('/api/v2/me/push-subscriptions','POST'),
+    ('/api/v2/me/push-subscriptions/fixture','DELETE'),
+    ('/api/v2/me/recommendations','GET'),
+])
+def test_removed_notification_and_recommendation_routes_are_404(monkeypatch,tokens,path,method):
+    # CMS를 부르지 않고 계정 API가 바로 404를 준다(CMS 404→503 변환을 타지 않는다). 웹 푸시 기기 등록의 201도 없다.
+    from services.user import dashboard as service
+    monkeypatch.setattr(service.DashboardRepository,'request',lambda *a,**k:pytest.fail('removed route must not call storage'))
+    params={'kind':'news'} if path.endswith('/recommendations') else None
+    response=dashboard.lambda_handler(event(path,method,tokens(),params=params,body={'subscription':{}}),None)
+    assert response['statusCode']==404 and json.loads(response['body'])['error']['code']=='NOT_FOUND'
+
+
 @pytest.mark.parametrize('path,body',[
     ('/api/v2/me/activity/sessions',{'content_key':'publication:42','format':'letter'}),
     ('/api/v2/me/activity/events',{'event_id':'e','session_id':'s','session_seq':1,'event_type':'progress','visible_ms':10000,'scroll_ratio':1}),
@@ -176,7 +189,7 @@ def test_view_reporting_routes_still_forward_body_unchanged(monkeypatch,tokens,p
     assert seen==[('POST',path.removeprefix('/api/v2/me'),'fixture-a',body)]
 
 
-@pytest.mark.parametrize('path', ['/api/v2/me/activity/events','/api/v2/me/push-subscriptions'])
+@pytest.mark.parametrize('path', ['/api/v2/me/activity/events','/api/v2/me/imports/bookmarks'])
 def test_non_object_request_is_400_without_dependency_call(monkeypatch,tokens,path):
     monkeypatch.setattr(dashboard,'dispatch',lambda *a:pytest.fail('invalid body must not call dependency'))
     request=event(path,'POST',tokens());request['body']='[]'

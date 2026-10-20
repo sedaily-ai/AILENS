@@ -24,11 +24,6 @@ export const DIALOG_CSS = `
   .lt-dlg-done .lt-ob .lt-dlg-primary { margin-top: 14px; }
   .lt-eintro-pitch { margin: 12px 0 0; font-size: 13.5px; line-height: 1.7; color: #4b5563; }
   .lt-eintro-pitch b { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 700; color: #2f5fcf; }
-  .lt-dlg-test { display: grid; gap: 6px; margin-top: 16px; }
-  .lt-dlg-testbtn { height: 42px; border: 1px solid #d5dbe6; border-radius: 12px; background: #fff; font: inherit; font-size: 14px; font-weight: 700; color: #374151; cursor: pointer; }
-  .lt-dlg-testbtn:hover:not(:disabled) { color: #2f5fcf; }
-  .lt-dlg-testbtn:disabled { opacity: .5; cursor: default; }
-  .lt-dlg-testnote { font-size: 12.5px; color: #6b7280; }
   .lt-dlg-prevbtn { width: 100%; margin-top: 14px; padding: 10px 0; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 700; color: #2f5fcf; text-align: left; cursor: pointer; }
   .lt-dlg-prev { min-height: 0; display: flex; flex-direction: column; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: #fff; }
   .lt-dlg-prevsub { flex: none; margin: 0; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; background: #fff; font-size: 13px; font-weight: 500; line-height: 1.6; color: #374151; overflow-wrap: anywhere; }

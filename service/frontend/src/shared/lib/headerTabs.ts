@@ -25,10 +25,8 @@ export interface HeaderTab {
   label: string;
   href: string;
   active?: boolean;
-  // 'more': 콘텐츠 브라우징이 아닌 부가 기능(타임라인/게임). Header.tsx가 이 값을 가진 탭만 "더보기" 드롭다운으로 묶는다.
-  tier?: 'core' | 'extra' | 'more';
-  /** true면 next/link 소프트 내비게이션 대신 일반 <a> 하드 내비게이션을 쓴다. 이 탭이 별도 Next.js 앱(다른 zone)으로 rewrite되는 경로라, 클라이언트 라우터가 자기 앱의 RSC 포맷으로 읽으려다 화면이 안 바뀌는 문제를 막는다. */
-  hardNav?: boolean;
+  // 'more': 콘텐츠 브라우징이 아닌 부가 기능(타임라인/게임). Header.tsx가 데스크톱 1차 줄에서 이 값을 가진 탭을 뺀다.
+  tier?: 'core' | 'more';
 }
 
 /**

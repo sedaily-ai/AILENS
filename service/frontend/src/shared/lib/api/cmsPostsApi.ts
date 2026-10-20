@@ -294,20 +294,4 @@ export async function fetchLensBySlug(slug: string): Promise<CmsLens | null> {
   }
 }
 
-// mbti_group 없이 발행된 CMS 글(letterHref가 slug를 id로 씀)을 /letters/view?id=<slug>로 열 때 사용한다.
-// 날짜/그룹 기반 목록 조회로는 찾을 수 없다.
-export async function fetchCmsPostBySlug(
-  channel: CmsChannel,
-  slug: string,
-): Promise<CmsLetter | null> {
-  try {
-    const res = await fetch(`${CMS_API_URL}/api/v2/posts/${encodeURIComponent(slug)}?channel=${channel}`, cacheOpts(`posts:${channel}`));
-    if (!res.ok) return null;
-    const data = (await res.json()) as { post?: CmsLetter };
-    return data.post ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export type { CmsChannel, CmsLetter, CmsTrendCard, CmsWebtoon, CmsVideo, CmsLensItem, CmsLens } from "./cmsPostTypes";

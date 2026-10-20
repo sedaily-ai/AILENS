@@ -1,4 +1,7 @@
-"""공개 Lambda/oneshot worker 공용 소스 패키징. 비밀·테스트는 포함하지 않는다."""
+"""공개 Lambda 소스 패키징. 비밀·테스트는 포함하지 않는다.
+
+알림 워커(notification_worker.py)는 더 담지 않는다(2026-10-20 기능 다이어트로 알림 워커 제거).
+"""
 import argparse
 from pathlib import Path
 import shutil
@@ -17,7 +20,6 @@ def copy_sources(stage):
             shutil.copytree(source, stage / module, dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'tests',
                                                          'test_*', '.env*', '*.bak*', '.pytest_cache', '*.log', '*.dump', '*.zip', '*.tar*'))
-    shutil.copy2(BACKEND / 'notification_worker.py', stage / 'notification_worker.py')
     for line in (BACKEND / 'lambda_handlers.txt').read_text().splitlines():
         if not line.strip() or line.startswith('#'):
             continue

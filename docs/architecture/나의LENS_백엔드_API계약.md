@@ -6,7 +6,10 @@
 > - API-02 preferences: 저장은 `{revision,interests}`만. 옛 웹의 `{minutes,revision}`은 쓰지 않고 현재 설정을, `{interests,minutes,revision}`은 minutes를 버리고 저장한다. 응답의 `minutes`는 옛 계정 API 호환용 DB 값이다.
 > - API-04 저장 레터: 읽음 필터 `read`는 받기만 하고 거르지 않는다. 카드에 `completed`·`read_minutes`가 없다(CMS 내부 카드에는 옛 계정 API 호환용 `read_minutes`가 남음).
 > - API-08 이용 세션·이벤트: 보기 신호(`visible_ms`)만 판정하고 완료·스탬프·배지를 만들지 않는다.
-> - 웹은 알림 설정·동의·기기 구독(API-10~12)을 부르지 않는다. 경로와 알림 워커는 남아 있다(운영 dry_run).
+> - **2026-10-20 2차** — [작업 기록](../worklog/2026-10/2026-10-20-기능-다이어트-2차.md)
+>   - 제거(404): API-06 `GET /recommendations`(대시보드와 중복), API-10~12 알림 설정·동의·미리보기·기기 구독(`/notifications/*`·`/push-subscriptions`), `/api/user/read`·`history`·`stats`와 GET `/api/user/profile`. POST `/api/user/profile`(로그인 프로필 동기화)만 남고 응답에 `streak`이 없다.
+>   - 알림 워커와 CMS 워커 경로(`/internal/personal/lens/notifications/*`)도 제거했다. 알림 테이블·데이터는 그대로다.
+>   - CMS `POST /api/v2/issue-letters/subscriptions/test`(테스트 메일) 제거.
 > - **추가(2026-10-20) API-14 저장한 기사** — [작업 기록](../worklog/2026-10/2026-10-20-저장한-기사.md), SQL v1.57 `user_article_bookmarks`
 >   - `GET /api/v2/me/article-bookmarks?limit=1~200&cursor=` → 200 `{items:[{article_id,saved_at,content}],count,total,next_cursor}`. 최신 저장순. 다른 쿼리는 400.
 >   - `content`: `{content_key:"publication:{id}",kind:"publication",available}`. available이면 `slug,title,summary,published_at,href(정규 기사 주소),categories,formats`도 싣는다. 비공개·삭제·형식 없는 기사는 `available:false`로 남아 해제만 할 수 있다.
@@ -103,13 +106,13 @@ rate limit은 기존에 구현됐다고 확인한 값이 아니다. 신규 요�
 | API-03 | GET `/api/v2/me/followed-editors`; PUT/DELETE `/api/v2/me/followed-editors/{editor_id}` | 팔로우 분리 저장 |
 | API-04 | GET `/api/v2/me/letter-bookmarks`; PUT/DELETE `/api/v2/me/letter-bookmarks/{letter_id}` | 계정 레터 목록·저장·해제 |
 | API-05 | POST `/api/v2/me/import` | 명시적으로 검토한 브라우저 자료 가져오기 |
-| API-06 | GET `/api/v2/me/recommendations` | 뉴스/레터·이유 필터·시간 예산 |
+| API-06 | GET `/api/v2/me/recommendations` | 뉴스/레터·이유 필터·시간 예산 (2026-10-20 제거) |
 | API-07 | GET `/api/v2/me/sentences`; GET `/api/v2/me/sentences/{id}/recommendations` | 서랍 페이지/검색·문장별 관련 뉴스. 저장·삭제는 기존 API |
 | API-08 | POST `/api/v2/me/activity/sessions`; POST `/api/v2/me/activity/events` | 유효 이용 세션·진행 보고 |
 | API-09 | GET `/api/v2/me/activity`; GET `/api/v2/me/rewards` | 기간 집계·스탬프·배지 |
-| API-10 | GET/PUT `/api/v2/me/notifications/preferences` | 계정 알림 설정 |
-| API-11 | PUT `/api/v2/me/notifications/consent` | Web Push 별도 동의·철회 |
-| API-12 | POST `/api/v2/me/push-subscriptions`; DELETE `/api/v2/me/push-subscriptions/{id}` | 현재 기기 구독 등록·해제 |
+| API-10 | GET/PUT `/api/v2/me/notifications/preferences` | 계정 알림 설정 (2026-10-20 제거) |
+| API-11 | PUT `/api/v2/me/notifications/consent` | Web Push 별도 동의·철회 (2026-10-20 제거) |
+| API-12 | POST `/api/v2/me/push-subscriptions`; DELETE `/api/v2/me/push-subscriptions/{id}` | 현재 기기 구독 등록·해제 (2026-10-20 제거) |
 | API-13 | GET `/api/v2/me/format-preference` | 후속 형식 선호. 최초 UI 연결은 별도 범위 (2026-10-19 제거) |
 | API-14 | GET `/api/v2/me/article-bookmarks`; GET/PUT/DELETE `/api/v2/me/article-bookmarks/{article_id}` | 저장한 기사 목록·상태·저장·해제 (2026-10-20, 상단 요약 참고) |
 

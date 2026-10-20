@@ -26,68 +26,36 @@ function trapDialogTab(e: React.KeyboardEvent<HTMLDialogElement>) {
  * 전 페이지 공용 상단 헤더 (7곳 복붙 통합).
  * - 데스크탑(md+): 기존 마크업 그대로 — 가로 탭바.
  * - 모바일(<md): 탭은 햄버거 드로어로 접음(잘림/가로스크롤 해소).
- * 탭의 동작(상태형 onClick / 라우트형 href / 비라우트 active span)은
- * 호출부가 tabs 배열로 그대로 넘겨 페이지별 동작을 보존한다.
+ * 탭은 호출부가 buildHeaderTabs()(shared/lib/headerTabs.ts)로 만든 href 이동 탭 배열을 넘긴다.
  */
 
 export type HeaderTab = {
   key: string;
   label: string;
   active?: boolean;
-  soon?: boolean;
-  href?: string;
-  onClick?: () => void;
-  // 'extra': 무게(굵기·크기·색)만 낮춰 1차 줄에 그대로 노출한다.
-  // 'more': 콘텐츠 브라우징이 아닌 부가 기능(타임라인·게임 등)으로, 1차 줄이 넘치지 않도록 "더보기" 드롭다운으로 옮긴다.
+  href: string;
+  // 'more': 콘텐츠 브라우징이 아닌 부가 기능(타임라인·게임 등)으로, 데스크톱 1차 줄에는 두지 않는다.
   // 생략하면 'core'.
-  tier?: 'core' | 'extra' | 'more';
-  /** true면 next/link 대신 일반 <a> 하드 내비게이션을 쓴다. 다른 Next.js 앱(zone)으로 rewrite되는 경로용(shared/lib/headerTabs.ts의 HeaderTab과 동일 필드). */
-  hardNav?: boolean;
+  tier?: 'core' | 'more';
 };
 
 interface HeaderProps {
   tabs: HeaderTab[];
   onSearch: () => void;
   searchOpen?: boolean;
-  logoHref?: string;
-  onLogo?: () => void;
   frosted?: boolean;
 }
 
 // 코어 탭은 15~16px대로 키워 존재감을 준다. active 표시는 파란색·굵기이며, 액센트 컬러는 로고 옆 BETA 배지와 같은 파랑(#1d4ed8)이다
 // (챗봇 아이콘의 보라(violet-500)와 섞이지 않도록 탭 액센트는 이 하나로만 쓴다). 선택 하단선은 사용하지 않는다.
-const TAB_ACCENT = '#1d4ed8';
 const TAB_BASE =
   'group relative px-2.5 lg:px-4 py-2 text-[13px] lg:text-[15px] transition-colors duration-200 whitespace-nowrap flex-shrink-0';
 const TAB_ACTIVE = 'text-[#1d4ed8] font-bold';
 const TAB_IDLE = 'font-semibold text-gray-600 hover:text-gray-900';
-// tier 'extra': 코어보다 작고 옅은 텍스트 목차 톤. letter-spacing을 살짝 벌려(0.01em) 빽빽함을 줄인다.
-const TAB_EXTRA_BASE =
-  'group relative px-2 lg:px-3 py-2 text-[12.5px] lg:text-[14px] tracking-[0.01em] transition-colors duration-200 whitespace-nowrap flex-shrink-0';
-const TAB_EXTRA_IDLE = 'font-normal text-gray-400 hover:text-gray-600';
-
-// "시선" 전용 손그림 눈 아이콘. 서비스 핵심 차별화 탭 하나에만 일러스트 포인트를 준다.
-// features/news-feed의 HandDrawnIcons(카드 썸네일용, 96x96)와 같은 스트로크 톤(검정 라인 + accent 포인트, 그라데이션 없음)을 쓰되,
-// 13~15px 텍스트 옆에 인라인으로 들어가는 크기라 디테일을 최소화해 24x24로 새로 그렸다(축소하면 뭉개진다).
-function LensEyeIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <path
-        d="M2 12 Q12 3.5 22 12 Q12 20.5 2 12 Z"
-        stroke="#1a1a1a"
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <circle cx="12" cy="12" r="3.4" stroke={TAB_ACCENT} strokeWidth={1.5} />
-      <circle cx="12.9" cy="10.9" r="1" fill={TAB_ACCENT} />
-    </svg>
-  );
-}
 
 // "레터" 전용 손그림 아이콘: 크림색 편지지 + 빨간 우체통. 탭에 마우스를 올리면(부모 TAB_BASE의 group-hover) 한 편의 짧은 연출이 나온다:
 // 편지가 살짝 움츠렸다가 → 곡선으로 날아가 → 우체통 뚜껑이 열리고 → 편지가 들어가며 → 우체통이 눌렸다 돌아오고 → 깃발이 튀어 오르며 작은 반짝임이 터진다(약 1.25초). 마우스를 떼면 편지가 다시 나타난다.
-// 시선 아이콘과 같은 스트로크 톤(검정 라인, 그라데이션 없음)이고, 색은 따뜻한 크림·코랄·빨강·노랑만 쓴다. 외부 라이브러리 없이 CSS 키프레임만 쓴다.
+// 손그림 스트로크 톤(검정 라인, 그라데이션 없음)이고, 색은 따뜻한 크림·코랄·빨강·노랑만 쓴다. 외부 라이브러리 없이 CSS 키프레임만 쓴다.
 const LETTER_ICON_CSS = `
   .lt-mb-env, .lt-mb-lid, .lt-mb-box, .lt-mb-flag, .lt-mb-spark { transform-box: fill-box; }
   .lt-mb-env { transform-origin: center; transform: rotate(-5deg); animation: lt-env-back .5s cubic-bezier(.3,1.3,.5,1); }
@@ -163,72 +131,37 @@ function LetterMailboxIcon({ className }: { className?: string }) {
 }
 
 function TabLabel({ tab }: { tab: HeaderTab }) {
-  // "시선"만 텍스트 앞에 작은 손그림 눈 아이콘 — 위 LensEyeIcon 참조.
-  const isFlagship = tab.key === 'lens';
   return (
     <span className="inline-flex items-center gap-1.5">
-      {isFlagship && <LensEyeIcon className="w-[15px] h-[15px] flex-shrink-0 -mt-px" />}
       <span className="inline-grid">
         <span className="col-start-1 row-start-1">{tab.label}</span>
         <span aria-hidden className="col-start-1 row-start-1 invisible font-bold">{tab.label}</span>
       </span>
       {tab.key === 'letter' && <LetterMailboxIcon className="w-[40px] h-[22px] flex-shrink-0 -mt-px" />}
-      {tab.soon && (
-        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-semibold rounded-full tracking-wide">
-          SOON
-        </span>
-      )}
     </span>
   );
 }
 
 function DesktopTab({ tab }: { tab: HeaderTab }) {
   const router = useRouter();
-  const base = tab.tier === 'extra' ? TAB_EXTRA_BASE : TAB_BASE;
-  const idle = tab.tier === 'extra' ? TAB_EXTRA_IDLE : TAB_IDLE;
-  const cls = `${base} ${tab.active ? TAB_ACTIVE : idle}`;
-  if (tab.href) {
-    const href = tab.href;
-    // hardNav 탭(다른 zone으로 rewrite되는 경로)은 next/link 소프트
-    // 내비게이션을 쓰면 안 된다 — 클라이언트 라우터가 이 앱의 RSC 포맷으로
-    // 응답을 해석하려다 화면이 안 바뀌는 채로 URL만 바뀌는 문제가 생긴다.
-    // 일반 <a>로 풀 페이지 로드를 강제해서 대상 zone이 처음부터 새로 뜨게 한다.
-    if (tab.hardNav) {
-      return (
-        <a href={href} className={cls} aria-current={tab.active ? 'page' : undefined}>
-          <TabLabel tab={tab} />
-        </a>
-      );
-    }
-    // hover/touch 시점에 router.prefetch — viewport 자동 prefetch 위에
-    // 강한 의도 신호로 청크/RSC 가 더 빨리 따뜻해진다.
-    const warm = () => {
-      try { router.prefetch(href); } catch { /* noop */ }
-    };
-    return (
-      <Link
-        href={href}
-        aria-current={tab.active ? 'page' : undefined}
-        className={cls}
-        onMouseEnter={warm}
-        onFocus={warm}
-        onTouchStart={warm}
-      >
-        <TabLabel tab={tab} />
-      </Link>
-    );
-  }
-  if (tab.onClick) {
-    return (
-      <button onClick={tab.onClick} className={cls} aria-current={tab.active ? 'page' : undefined}>
-        <TabLabel tab={tab} />
-      </button>
-    );
-  }
+  const cls = `${TAB_BASE} ${tab.active ? TAB_ACTIVE : TAB_IDLE}`;
+  const href = tab.href;
+  // hover/touch 시점에 router.prefetch — viewport 자동 prefetch 위에
+  // 강한 의도 신호로 청크/RSC 가 더 빨리 따뜻해진다.
+  const warm = () => {
+    try { router.prefetch(href); } catch { /* noop */ }
+  };
   return (
-    <span className={cls} aria-current={tab.active ? 'page' : undefined}>
+    <Link
+      href={href}
+      aria-current={tab.active ? 'page' : undefined}
+      className={cls}
+      onMouseEnter={warm}
+      onFocus={warm}
+      onTouchStart={warm}
+    >
       <TabLabel tab={tab} />
-    </span>
+    </Link>
   );
 }
 
@@ -321,28 +254,10 @@ function MobileDrawer({
             // 메뉴 닫기를 다음 frame 으로 미뤄 Link 의 navigation 이 먼저 commit 되도록.
             // (동기로 close 하면 panel unmount → navigation race cancel 가능)
             const deferClose = () => requestAnimationFrame(onClose);
-            const handle = () => {
-              tab.onClick?.();
-              deferClose();
-            };
-            if (tab.href) {
-              if (tab.hardNav) {
-                return (
-                  <a key={tab.key} href={tab.href} onClick={deferClose} className={cls} aria-current={tab.active ? 'page' : undefined}>
-                    <TabLabel tab={tab} />
-                  </a>
-                );
-              }
-              return (
-                <Link key={tab.key} href={tab.href} onClick={deferClose} className={cls} aria-current={tab.active ? 'page' : undefined}>
-                  <TabLabel tab={tab} />
-                </Link>
-              );
-            }
             return (
-              <button key={tab.key} onClick={handle} className={cls} aria-current={tab.active ? 'page' : undefined}>
+              <Link key={tab.key} href={tab.href} onClick={deferClose} className={cls} aria-current={tab.active ? 'page' : undefined}>
                 <TabLabel tab={tab} />
-              </button>
+              </Link>
             );
           })}
         </nav>
@@ -352,7 +267,7 @@ function MobileDrawer({
   );
 }
 
-export function Header({ tabs, onSearch, searchOpen = false, logoHref = '/', onLogo, frosted }: HeaderProps) {
+export function Header({ tabs, onSearch, searchOpen = false, frosted }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   // 데스크톱 1차 줄에는 tier:'more'(타임라인·게임) 탭을 두지 않는다("더보기" 드롭다운은 2026-10-11 삭제). 모바일 드로어는 전체 목록을 그대로 보여준다.
@@ -398,17 +313,10 @@ export function Header({ tabs, onSearch, searchOpen = false, logoHref = '/', onL
       {/* 페이지가 바뀌어도 브랜드·주요 서비스 탭·검색의 위치를 유지한다. */}
       <div className="mx-auto" style={{ maxWidth: 1320, paddingInline: 'clamp(24px, 3.5vw, 44px)' }}>
         <div className="flex items-center h-[56px] gap-4 md:gap-10">
-          {onLogo ? (
-            <button onClick={onLogo} className={logoCls}>
-              <span>AI LENS</span>
-              {betaBadge}
-            </button>
-          ) : (
-            <Link href={logoHref} className={logoCls}>
-              <span>AI LENS</span>
-              {betaBadge}
-            </Link>
-          )}
+          <Link href="/" className={logoCls}>
+            <span>AI LENS</span>
+            {betaBadge}
+          </Link>
 
           {/* 공통 탐색을 유지하고 현재 탭은 파랑·굵기로 표시한다. */}
           <nav ref={primaryNavRef} aria-label="주요 서비스" className="hidden md:flex min-w-0 items-center gap-1 flex-1 overflow-x-auto scrollbar-hide">

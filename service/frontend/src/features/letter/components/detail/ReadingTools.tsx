@@ -3,7 +3,10 @@ import { LetterShelfStatus } from '../LetterShelfStatus';
 import { LetterBookmarkIcon } from '../LetterBookmarkIcon';
 
 import { useEffect, useRef, useState } from 'react';
+import { SITE_URL } from '@/shared/constants/site';
+import { issueLetterPath } from '@/shared/lib/api/issueLettersSeoApi';
 import { trackEvent } from '@/shared/lib/tracking/trackEvent';
+import { ShareOutcomeToast, useArticleShare } from '@/shared/ui/article/ArticleShareButton';
 import { useLetterShelf } from '../../lib/useLetterShelf';
 
 const SIZES = [15.5, 16.5, 18, 19.5] as const;
@@ -13,11 +16,11 @@ const SIZE_KEY = 'lens-letter-font';
 export function ReadingTools({ slug, title }: { slug: string; title: string }) {
   const [progress, setProgress] = useState(0);
   const [size, setSize] = useState(1);
-  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'shared' | 'error'>('idle');
-  const [sharing, setSharing] = useState(false);
   const tools = useRef<HTMLDivElement>(null);
-  const shareTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shelf = useLetterShelf();
+  // 공유는 기사 '공유'와 같은 규칙·안내를 쓴다(2026-10-20 기능 다이어트): 터치 기기는 기기 공유 창, 컴퓨터는 링크 복사.
+  // 공유 창을 닫으면(취소) 아무것도 알리지 않고, 다른 이유로 실패하면 복사로 넘어간다. 결과는 화면 아래 안내로 알린다.
+  const { share, busy: sharing, outcome: shareOutcome } = useArticleShare(title, `${SITE_URL}${issueLetterPath(slug)}`);
 
   useEffect(() => {
     // 저장된 글자 크기를 마운트 뒤에 읽는다(서버 렌더 결과와 첫 클라이언트 렌더를 같게 두려는 것).
@@ -54,25 +57,10 @@ export function ReadingTools({ slug, title }: { slug: string; title: string }) {
     try { localStorage.setItem(SIZE_KEY, String(next)); } catch { /* 무시 */ }
     trackEvent('letter_font_size', { letter: slug, size: SIZES[next] });
   };
-  useEffect(() => () => { if (shareTimer.current) clearTimeout(shareTimer.current); }, []);
-
-  const showShareStatus = (status: 'copied' | 'shared' | 'error') => {
-    if (shareTimer.current) clearTimeout(shareTimer.current);
-    setShareStatus(status);
-    shareTimer.current = setTimeout(() => setShareStatus('idle'), 2500);
-  };
-  const share = async () => {
-    const url = `${window.location.origin}/letter/${encodeURIComponent(slug)}`;
+  const onShare = () => {
+    if (sharing) return;
     trackEvent('letter_share', { letter: slug });
-    setSharing(true);
-    try {
-      if (typeof navigator.share === 'function' && window.matchMedia('(pointer: coarse)').matches) {
-        try { await navigator.share({ title, url }); showShareStatus('shared'); } catch { /* 공유 취소 시 복사하지 않는다. */ }
-        return;
-      }
-      try { await navigator.clipboard.writeText(url); showShareStatus('copied'); }
-      catch { showShareStatus('error'); }
-    } finally { setSharing(false); }
+    void share();
   };
 
   return (
@@ -85,9 +73,10 @@ export function ReadingTools({ slug, title }: { slug: string; title: string }) {
         <button type="button" onClick={async () => { const saved = !shelf.isSaved(slug); if (await shelf.toggleSaved(slug)) trackEvent('letter_save', { letter: slug, saved }); }} disabled={!shelf.available || shelf.pending} aria-describedby={shelf.notice ? 'ld-save-note' : undefined} aria-pressed={shelf.isSaved(slug)} aria-label={shelf.isSaved(slug) ? '저장 해제' : '나중에 읽기 저장'}>
           <LetterBookmarkIcon saved={shelf.isSaved(slug)} />
         </button>
-        <button type="button" onClick={share} disabled={sharing} aria-label="링크 복사">{sharing ? '공유 중' : shareStatus === 'copied' ? 'URL 복사됨' : shareStatus === 'shared' ? '공유 완료' : shareStatus === 'error' ? '복사 실패' : '공유'}</button>
-        <span className="sr-only" role="status">{shareStatus === 'copied' ? '레터 URL을 복사했어요.' : shareStatus === 'shared' ? '레터를 공유했어요.' : shareStatus === 'error' ? 'URL을 복사하지 못했어요. 브라우저의 복사 권한을 확인해주세요.' : ''}</span>
+        {/* 처리 중에도 disabled 대신 aria-disabled로 막아 키보드 포커스가 튀지 않게 한다(기사 '공유'와 같다). */}
+        <button type="button" onClick={onShare} aria-disabled={sharing} aria-busy={sharing}>공유</button>
       </div>
+      <ShareOutcomeToast outcome={shareOutcome} />
       <LetterShelfStatus shelf={shelf} />{shelf.notice && <p id="ld-save-note" className="lt-save-note">
         {shelf.notice}
       </p>}

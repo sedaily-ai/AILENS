@@ -78,10 +78,8 @@ def get_letter_subscription_preview():
     return JSONResponse(_letter_call(letter_subscriptions_repo.preview_mail), headers={"Cache-Control": "public, max-age=300"})
 
 
-@router.post("/api/v2/issue-letters/subscriptions/test")
-def post_letter_subscription_test(payload: Dict[str, Any] = Body(...)):
-    """구독 신청 전에 메일이 실제로 오는지 확인하는 샘플 한 통(가장 최근 레터). 주소당 10분 1회·하루 3회."""
-    return JSONResponse(_letter_call(letter_subscriptions_repo.send_test_mail, payload.get("email")), headers={"Cache-Control": "no-store"})
+# POST /api/v2/issue-letters/subscriptions/test(테스트 메일 한 통)는 웹 버튼과 함께 지웠다(2026-10-20 기능 다이어트).
+# 구독자가 아닌 주소로도 메일이 나가는 경로였다. 이제 이 주소는 기본 404(경로 없음)다.
 
 
 @router.post("/api/v2/issue-letters/subscriptions/confirm")

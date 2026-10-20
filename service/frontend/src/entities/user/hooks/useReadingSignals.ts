@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { startContentSession, reportContentProgress, ACCOUNT_VIEW_CHANGED, type ContentSession, type ContentFormat } from '../data/activityApi';
 import { useAuth } from '../contexts/AuthContext';
-import { parseReadingSignals, readingSignalKey, READING_SIGNAL_EVENT, saveReadingSignal, type ReadingSignal } from '../lib/readingSignals';
+import { saveReadingSignal, type ReadingSignal } from '../lib/readingSignals';
 
 export function useReadingSignalScope() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -56,23 +56,4 @@ export function useNewsReadingSignal(article: Omit<ReadingSignal, 'seenAt'> | nu
     },250);
     return()=>{window.clearInterval(timer);controller.abort();document.removeEventListener('visibilitychange',onVisibility);};
   },[key,scope,format]);
-}
-
-export function useReadingSignals() {
-  const scope = useReadingSignalScope();
-  const [state, setState] = useState<{ scope: string; records: ReadingSignal[]; available: boolean } | null>(null);
-  useEffect(() => {
-    if (!scope) return;
-    const sync = () => {
-      try { setState({ scope, records: parseReadingSignals(localStorage.getItem(readingSignalKey(scope))), available: true }); }
-      catch { setState({ scope, records: [], available: false }); }
-    };
-    sync();
-    window.addEventListener('storage', sync);
-    window.addEventListener('focus', sync);
-    window.addEventListener(READING_SIGNAL_EVENT, sync);
-    return () => { window.removeEventListener('storage', sync); window.removeEventListener('focus', sync); window.removeEventListener(READING_SIGNAL_EVENT, sync); };
-  }, [scope]);
-  const mine = state?.scope === scope ? state : null;
-  return { records: mine?.records ?? [], ready: !!mine, available: mine?.available ?? true, scope };
 }

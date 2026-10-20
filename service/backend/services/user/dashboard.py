@@ -14,18 +14,14 @@ def dispatch(method, path, owner, body, params):
         return repo.request(method,path,owner)
     if path=='/imports/bookmarks' and method=='POST':
         return repo.request(method,path,owner,body=body)
-    if path.startswith('/notifications/') or path.startswith('/push-subscriptions'):
-        from services.user.notifications import dispatch as notifications
-        return notifications(owner,method,path,body,params)
+    # 알림 설정·동의·미리보기(/notifications/*)와 웹 푸시 기기(/push-subscriptions)는 2026-10-20 기능 다이어트로 지웠다.
+    # 대시보드 추천만 따로 주던 /recommendations도 지웠다(대시보드 news·letters와 같은 계산, 웹 호출 0). 끝의 404로 간다.
     if method == 'POST' and path in ('/activity/sessions','/activity/events'):
         from services.user.activity import dispatch as activity
         return activity(owner,path,body)
     if method == 'GET' and path == '/dashboard':
         from services.user.dashboard_summary import get_dashboard
         return get_dashboard(owner,params)
-    if method == 'GET' and path == '/recommendations':
-        from services.user.recommendations import recommend
-        return recommend(owner,params)
     # 저장 문장 관련 글(/sentences/{id}/recommendations)은 2026-10-19 기능 다이어트로 제거했다. 단어 하나만 겹쳐도
     # 무관한 글이 추천됐다. 예전 화면이 부르면 아래 404로 끝나고, 예전 화면은 '관련 뉴스를 불러오지 못했어요'만 보여 준다.
 

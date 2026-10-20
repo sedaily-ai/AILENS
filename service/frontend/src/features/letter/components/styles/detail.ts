@@ -45,8 +45,8 @@ export const DETAIL_CSS = `
   .ld-tools { position: static; flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; max-width: 100%; width: fit-content; margin: 0; padding: 2px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; box-shadow: none; }
   .ld-tools button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: 14px; font-weight: 600; color: #374151; cursor: pointer; }
   .ld-tools button small { font-size: 11px; margin-left: 1px; }
-  .ld-tools button:hover:not(:disabled) { color: #2f5fcf; }
-  .ld-tools button:disabled { opacity: .35; cursor: default; }
+  .ld-tools button:hover:not(:disabled):not([aria-disabled='true']) { color: #2f5fcf; }
+  .ld-tools button:disabled, .ld-tools button[aria-disabled='true'] { opacity: .35; cursor: default; }
   .ld-toc-rail { position: absolute; top: 56px; bottom: 72px; left: calc(100% + 36px); width: 180px; display: none; }
   .ld-toc { position: sticky; top: 84px; max-height: calc(100dvh - 108px); overflow-y: auto; overscroll-behavior: contain; }
   .ld-toc ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; border-left: 1px solid #e5e7eb; }
@@ -83,7 +83,7 @@ export const DETAIL_CSS = `
   .ld-editor .lt-avatar { width: 22px !important; height: 22px !important; flex: none; }
   .ld-editor .lt-avatar-img { object-fit: cover; border-radius: 50% !important; }
   /* 에디터 알약은 항상 둥글게 */
-  .lt-card-ed, .lt-card-ed-badge, .ld-editor { border-radius: 999px !important; }
+  .lt-card-ed-badge, .ld-editor { border-radius: 999px !important; }
   .lt-card-ed-badge { display: inline-flex; align-items: center; gap: 6px; }
   /* 2026-10-13: 목록과 같은 바깥 여백, 제목 아래 작성자·읽기 도구. */
   .ld-wrap { position: relative; --blue: var(--color-accent-primary, #2f5fcf); max-width: 720px; padding: 28px 0 72px; }

@@ -203,4 +203,3 @@ export async function fetchFollowingLetters(limit: number = FOLLOWING_MAX_DISPLA
   }
 }
 
-export type { LetterChart, LetterImage, ApiLetter } from "./letterTypes";

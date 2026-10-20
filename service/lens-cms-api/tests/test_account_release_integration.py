@@ -18,15 +18,15 @@ import pytest
 from test_dashboard_storage import repo
 from test_activity_recommendations import modules
 from test_view_only_activity import formats
-from test_notifications import notifications, subscription
 
 
-__all__ = ['repo','modules','formats','notifications']
+__all__ = ['repo','modules','formats']
 
 
 @pytest.fixture
 def account_api(request, monkeypatch):
-    _, _, _, cursor, dashboard_repo = request.getfixturevalue('notifications')
+    # 예전에는 알림 fixture가 DB를 준비했다. 알림 워커 제거(2026-10-20 기능 다이어트) 뒤 같은 기반 fixture를 직접 쓴다.
+    dashboard_repo, _, _, cursor = request.getfixturevalue('formats')
     backend=Path(__file__).resolve().parents[2]/'backend'
     monkeypatch.syspath_prepend(str(backend))
     import route_guards
@@ -114,7 +114,9 @@ def test_account_recommendation_view_signal_notifications_and_dependency(account
     # 형식 비율·기간 기록·리워드 조회는 제거돼 공개 API에서 404다.
     for removed in ('/format-preference','/activity','/rewards'):
         assert call(removed,expected=404)['error']['code']=='NOT_FOUND'
-    assert call('/recommendations',query={'kind':'news','reason':'all','limit':'4'})['algorithm_version']=='recent-category-editor-v3'
+    # 대시보드와 같은 계산을 따로 주던 /recommendations는 2026-10-20 기능 다이어트로 지웠다. 같은 추천은 대시보드 news로 확인한다.
+    assert call('/recommendations',query={'kind':'news','reason':'all','limit':'4'},expected=404)['error']['code']=='NOT_FOUND'
+    assert call('/dashboard',query={'tab':'home'})['news']['data']['algorithm_version']=='recent-category-editor-v3'
     session=call('/activity/sessions','POST',{'content_key':'publication:42','format':'letter'},expected=201)
     assert session['completion']['completion_enabled'] is False and session['completion']['panel_ids']==[]
     with cursor() as cur:
@@ -126,20 +128,13 @@ def test_account_recommendation_view_signal_notifications_and_dependency(account
     assert call('/activity/events','POST',progress)==result
     with cursor() as cur:
         cur.execute('SELECT count(*) AS n FROM user_content_completions');assert cur.fetchone()['n']==0
-    state=call('/notifications/preferences')
-    call('/notifications/preferences','PUT',{'revision':state['revision'],'preferences':{**state['preferences'],'briefing':True}})
-    call('/notifications/consent','PUT',{'channel':'web_push','granted':True,'policy_version':state['config']['policy_version']})
-    device=call('/push-subscriptions','POST',subscription(),expected=201)
-    assert call('/notifications/preferences')['delivery']['active_subscriptions']==1
-    assert call('/notifications/preferences',owner='b')['delivery']['active_subscriptions']==0
-    preview=call('/notifications/preview')
-    assert preview['mode']=='dry_run' and not preview['actual_sent']
-    call('/push-subscriptions/'+device['id'],'DELETE')
-    call('/notifications/consent','PUT',{'channel':'web_push','granted':False,'policy_version':state['config']['policy_version']})
-    assert not call('/notifications/preferences')['consent']['granted']
+    # 공개 알림 설정·동의·미리보기와 웹 푸시 기기는 2026-10-20 기능 다이어트로 지웠다. CMS를 거치지 않고 계정 API가 404를 준다.
+    for path,method in (('/notifications/preferences','GET'),('/notifications/preferences','PUT'),('/notifications/consent','PUT'),
+                        ('/notifications/preview','GET'),('/push-subscriptions','POST'),('/push-subscriptions/'+str(uuid.uuid4()),'DELETE')):
+        assert call(path,method,{},expected=404)['error']['code']=='NOT_FOUND'
     summary=call('/dashboard')
     assert summary['scope']=='account'
-    # 예전 화면 호환용 키만 남고 계산·조회하지 않는다. 알림 설정은 웹이 쓰지 않아 대시보드에서 묻지 않는다(/notifications/*는 그대로).
+    # 예전 화면 호환용 키만 남고 계산·조회하지 않는다. 알림 설정은 웹이 쓰지 않아 대시보드에서 묻지 않는다.
     assert all(summary[key]=={'status':'unavailable','data':None,'error':None} for key in ('format_preference','weekly_activity','weekly_rewards','notifications'))
     assert all(summary[key]['status']=='ready' for key in ('preferences','saved_letters','news','letters'))
     personal._TOKEN='wrong-test-token'
