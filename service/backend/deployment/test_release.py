@@ -68,26 +68,31 @@ class ReleaseTests(unittest.TestCase):
         self.env.start()
         self.addCleanup(self.env.stop)
 
-    def test_package_contains_worker_and_dashboard_without_secrets(self):
+    def test_package_contains_dashboard_without_worker_or_secrets(self):
         with tempfile.TemporaryDirectory() as directory:
             stage = Path(directory)
             package.copy_sources(stage)
-            self.assertTrue((stage / 'notification_worker.py').is_file())
+            # 알림 워커는 2026-10-20 기능 다이어트로 제거했다.
+            self.assertFalse((stage / 'notification_worker.py').exists())
+            self.assertFalse((stage / 'services/user/notifications.py').exists())
             self.assertTrue((stage / 'handlers/user/dashboard.py').is_file())
             self.assertFalse((stage / '-.py').exists())
             self.assertFalse(any(p.name.startswith('.env') or p.name == 'tests' for p in stage.rglob('*')))
 
-    def test_cms_contains_ordered_sql_and_worker_no_ecosystem_overwrite(self):
+    def test_cms_contains_ordered_sql_without_worker_no_ecosystem_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'cms.tar.gz'
             cms_package.build(output)
             with tarfile.open(output) as bundle:
                 names = bundle.getnames()
-                self.assertEqual(bundle.getmember('notification-worker').mode,0o755)
-                self.assertEqual(bundle.getmember('notification-worker/notification_worker.py').mode,0o644)
+                self.assertEqual(bundle.getmember('main.py').mode,0o644)
+                self.assertEqual(bundle.getmember('migrations').mode,0o755)
             self.assertEqual(len([n for n in names if n.startswith('migrations/lens_schema_')]), 10)  # v1.48~57
-            self.assertIn('notification-worker/notification_worker.py', names)
-            self.assertIn('notification-worker.timer', names)
+            # 알림 워커 소스·유닛과 워커 전용 CMS 모듈은 더 담지 않는다(2026-10-20 기능 다이어트).
+            self.assertFalse(any(n.startswith('notification-worker') for n in names))
+            for name in ('notification_inputs.py','notification_delivery_repo.py','notifications_repo.py','notification_policy.py','push_provider.py','completion_repo.py'):
+                self.assertNotIn(name, names)
+            self.assertIn('routes_dashboard.py', names)
             self.assertNotIn('ecosystem.config.js', names)
             self.assertFalse(any('.env' in n or '__pycache__' in n for n in names))
 

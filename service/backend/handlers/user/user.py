@@ -1,8 +1,8 @@
 """
-사용자 활동 Lambda 핸들러.
+사용자 Lambda 핸들러.
 
-프로필, 읽기 기록, 통계를 처리한다. 프로필 생성·조회, 읽기 기록, 통계, 뱃지 계산 로직은
-services/user/profile.py 에 있으며, 이 파일은 HTTP 라우팅과 인증만 담당한다.
+로그인 때 프로필 생성·동기화(POST /api/user/profile)만 처리한다. 로직은 services/user/profile.py 에 있으며,
+이 파일은 HTTP 라우팅과 인증만 담당한다.
 """
 import logging
 import json
@@ -24,9 +24,9 @@ def lambda_handler(event: dict, context) -> dict:
 
     Routes:
     - POST /api/user/profile - Get or create user profile (requires auth)
-    - POST /api/user/read - Record article read
-    - GET /api/user/history - Get reading history
-    - GET /api/user/stats - Get user statistics
+
+    POST /api/user/read, GET /api/user/history, GET /api/user/stats 는 2026-10-20 기능 다이어트로 지웠다
+    (웹·앱 호출 0). API Gateway 경로가 남아 있어도 아래 404로 끝난다.
     """
     try:
         # Parse request
@@ -68,39 +68,17 @@ def lambda_handler(event: dict, context) -> dict:
         logger.info(f"User request: {http_method} {path} user={user_id}")
 
         # Route handling
-        if '/profile' in path:
-            if http_method == 'POST':
-                email = body.get('email')
-                name = body.get('name')
-                picture = body.get('picture')
-
-                result = asyncio.run(
-                    svc.get_or_create_user(user_id, email, name, picture)
-                )
-                return svc.success_response(result)
-
-        elif '/read' in path and http_method == 'POST':
-            article_id = body.get('article_id')
-            article_title = body.get('article_title')
-
-            if not article_id:
-                return svc.error_response(400, 'article_id is required')
+        if '/profile' in path and http_method == 'POST':
+            email = body.get('email')
+            name = body.get('name')
+            picture = body.get('picture')
 
             result = asyncio.run(
-                svc.record_article_read(user_id, article_id, article_title)
+                svc.get_or_create_user(user_id, email, name, picture)
             )
             return svc.success_response(result)
 
-        elif '/history' in path and http_method == 'GET':
-            history = asyncio.run(svc.get_reading_history(user_id))
-            return svc.success_response({'history': history})
-
-        elif '/stats' in path:
-            stats = asyncio.run(svc.get_user_stats(user_id))
-            return svc.success_response(stats)
-
-        else:
-            return svc.error_response(404, 'Not found')
+        return svc.error_response(404, 'Not found')
 
     except ValueError as e:
         return svc.error_response(400, str(e))

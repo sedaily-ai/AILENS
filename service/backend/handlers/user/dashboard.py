@@ -49,7 +49,7 @@ def lambda_handler(event, context):
         if method in ('POST','PUT') and not isinstance(body,dict):
             raise DashboardError(400,'INVALID_ARGUMENT','JSON 객체로 요청해 주세요.')
         result = dispatch(method, path.removeprefix('/api/v2/me'), owner, body, event.get('queryStringParameters') or {})
-        status=201 if method=='POST' and (path.endswith('/activity/sessions') or path.endswith('/push-subscriptions') and result.get('created')) else 200
+        status=201 if method=='POST' and path.endswith('/activity/sessions') else 200
         return _response(status, result)
     except AuthenticationError:
         return _error(401, 'AUTH_REQUIRED', '로그인을 다시 확인해 주세요.', request_id)

@@ -52,8 +52,8 @@ def internal_list_subscriptions(
 
 
 # ── 개인화(내 서랍·읽은 기록·프로필) — v1.24 ────────────────────────────
-# 스트릭·뱃지 계산 등 비즈니스 로직은 그대로 service/backend/services/
-# user_service.py에 남는다 — 여기는 순수 저장 primitive만.
+# 비즈니스 로직은 service/backend/services/user/ 에 남는다 — 여기는 순수 저장 primitive만.
+# (스트릭 계산은 2026-10-20 기능 다이어트로 계정 API에서 지웠다.)
 @router.post("/internal/personal/archives")
 def internal_save_archive(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
     _check_admin_token(x_internal_token)
@@ -124,6 +124,8 @@ def internal_update_user(user_id: str, updates: Dict[str, Any] = Body(...), x_in
 
 @router.post("/internal/personal/readings")
 def internal_save_reading(payload: Dict[str, Any] = Body(...), x_internal_token: Optional[str] = Header(default=None)):
+    # 읽기 기록 두 경로는 계정 API의 /api/user/read·history·stats·streak 제거(2026-10-20 기능 다이어트) 뒤 새 계정 API가 부르지 않는다.
+    # 옛 계정 API(되돌릴 때)는 로그인마다 GET으로 streak을 계산하므로 404→500이 나지 않게 남긴다. 다음 정리 때 제거.
     _check_admin_token(x_internal_token)
     try:
         return {"reading": personal_repo.save_reading_record(

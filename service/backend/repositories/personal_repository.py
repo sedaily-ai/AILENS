@@ -107,11 +107,8 @@ class PersonalRepository:
         logger.info(f"Reading record saved: user={record.user_id} article={record.article_id}")
         return True
 
-    async def list_reading_history(self, user_id: str, limit: int = 50) -> List[ReadingRecord]:
-        items = client.list_reading_history(user_id, limit)
-        records = [ReadingRecord.from_item(_to_legacy_reading_item(i)) for i in items]
-        records.sort(key=lambda r: r.read_at, reverse=True)
-        return records
+    # list_reading_history는 지운 streak·/api/user/read·history·stats만 썼다(2026-10-20 기능 다이어트).
+    # save_reading_record는 tests/tools/demo_data_setup.py가 아직 불러 남긴다.
 
 
 def _to_legacy_archive_item(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -136,16 +133,6 @@ def _to_legacy_profile_item(item: Dict[str, Any]) -> Dict[str, Any]:
         "badges": item.get("badges") or [],
         "created_at": item.get("created_at") or "",
         "last_login": item.get("last_login") or "",
-    }
-
-
-def _to_legacy_reading_item(item: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "user_id": item["user_id"],
-        "article_id": item.get("article_no") or "",
-        "article_title": item.get("article_title") or "",
-        "read_at": item.get("read_at") or "",
-        "read_count": item.get("read_count", 1),
     }
 
 

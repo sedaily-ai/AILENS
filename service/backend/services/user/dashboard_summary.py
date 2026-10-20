@@ -28,7 +28,7 @@ def get_dashboard(owner,params):
     # 옛 화면이 보내는 minutes(읽을 시간)는 기능 제거 후에도 거부하지 않고 무시한다.
     # format_preference·weekly_activity·weekly_rewards·notifications는 예전 화면 호환용 키다(예전 웹은 server.data?.format_preference.data,
     # server.data?.notifications.status를 바로 읽어 키가 없으면 화면이 죽는다). 계산·조회 없이 unavailable로만 둔다. 다음 정리 때 제거.
-    # 알림 설정은 웹 푸시 제거(2026-10-19) 뒤 웹이 쓰지 않아 CMS에 묻지 않는다. 알림 기능 자체는 /notifications/* 경로에 남아 있다.
+    # 알림 설정은 웹 푸시 제거(2026-10-19) 뒤 웹이 쓰지 않아 CMS에 묻지 않는다. 공개 알림 경로는 2026-10-20에 지웠다(알림 워커만 남음).
     return {'schema_version':1,'scope':'account','generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),
             'format_preference':unavailable(),'preferences':ready(data['preferences']),'profile':ready(profile(data)),
             'news':area(lambda:recommend(owner,{'kind':'news','limit':4},inputs=data)) if tab in (None,'home') else unavailable(),

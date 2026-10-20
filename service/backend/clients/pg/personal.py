@@ -105,6 +105,4 @@ def save_reading_record(user_id: str, article_no: Optional[str] = None) -> Dict[
     return resp["reading"]
 
 
-def list_reading_history(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-    resp = _request("GET", "/internal/personal/readings", query={"user_id": user_id, "limit": limit})
-    return resp.get("readings", [])
+# list_reading_history(GET /internal/personal/readings)는 부르는 곳이 없어 지웠다(2026-10-20 기능 다이어트, streak 계산 제거).

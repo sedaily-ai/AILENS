@@ -1,17 +1,19 @@
-"""User 비즈니스 로직 — 프로필·읽기 기록·통계·뱃지.
+"""User 비즈니스 로직 — 로그인 때 프로필 생성·동기화.
 
 저장소는 PersonalRepository를 통해 접근한다.
+읽기 기록(/api/user/read)·이력(/history)·통계(/stats)와 연속 읽기 일수(streak) 계산은 지웠다(2026-10-20 기능 다이어트).
+웹·앱 어디에서도 부르거나 읽지 않았고, streak 때문에 로그인마다 CMS 읽기 이력을 한 번 더 조회했다.
 """
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from common.dates.validation import KST
 from decimal import Decimal
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from config.constants import CORS_HEADERS
 from repositories.personal_repository import get_personal_repository
-from models.personal import UserProfile, ReadingRecord
+from models.personal import UserProfile
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -47,9 +49,6 @@ async def get_or_create_user(
         # 기존 사용자: 마지막 로그인 갱신
         await repo.update_user_profile(user_id, {'last_login': today})
 
-        history = await repo.list_reading_history(user_id, limit=60)
-        streak = _calculate_streak(history)
-
         return {
             'user_id': user_id,
             'email': profile.email,
@@ -57,7 +56,6 @@ async def get_or_create_user(
             'picture': profile.picture,
             'created_at': profile.created_at,
             'last_login': today,
-            'streak': streak,
             'is_new': False,
         }
     else:
@@ -80,98 +78,8 @@ async def get_or_create_user(
             'picture': picture,
             'created_at': now,
             'last_login': today,
-            'streak': 1,
             'is_new': True,
         }
-
-
-# ── 읽기 기록 ──
-
-async def record_article_read(
-    user_id: str,
-    article_id: str,
-    article_title: str = None,
-) -> Dict[str, Any]:
-    """기사 읽기를 기록한다. 기존 배지는 보존하며 신규 지급하지 않는다."""
-    repo = get_personal_repository()
-
-    record = ReadingRecord(
-        user_id=user_id,
-        article_id=article_id,
-        article_title=article_title or '',
-    )
-
-    # 중복 제거와 읽은 횟수 증가는 save_reading_record 가 처리한다.
-    existing_history = await repo.list_reading_history(user_id, limit=200)
-    is_new = not any(r.article_id == article_id for r in existing_history)
-
-    success = await repo.save_reading_record(record)
-
-    return {'success': success, 'is_new': is_new}
-
-
-async def get_reading_history(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
-    """사용자의 읽기 기록을 조회한다."""
-    repo = get_personal_repository()
-    records = await repo.list_reading_history(user_id, limit=limit)
-
-    return [r.to_api() for r in records]
-
-
-# ── 통계·뱃지 ──
-
-async def get_user_stats(user_id: str) -> Dict[str, Any]:
-    """사용자 통계를 조회한다."""
-    repo = get_personal_repository()
-
-    profile = await repo.get_user_profile(user_id)
-
-    history = await repo.list_reading_history(user_id, limit=200)
-
-    streak = _calculate_streak(history)
-
-    now = datetime.now(KST)
-    week_start = (now - timedelta(days=now.weekday())).strftime('%Y-%m-%d')
-    this_week = sum(1 for r in history if r.read_at[:10] >= week_start)
-
-    archives = await repo.list_archived_sentences(user_id, limit=200)
-
-    total_reads = sum(r.read_count for r in history)
-
-    return {
-        'total_articles_read': total_reads,
-        'total_comments': 0,  # 미집계 값(고정 0)
-        'total_reactions': 0,  # 미집계 값(고정 0)
-        'streak': streak,
-        'this_week_articles': this_week,
-        'badges': profile.badges if profile else [],
-        'member_since': profile.created_at[:10] if profile and profile.created_at else None,
-        'archived_sentences': len(archives),
-    }
-
-
-def _calculate_streak(history: List[ReadingRecord]) -> int:
-    """하루 1건 이상 읽은 연속 일수를 계산한다(최대 365일)."""
-    if not history:
-        return 0
-
-    read_dates = set()
-    for r in history:
-        if r.read_at:
-            read_dates.add(r.read_at[:10])
-
-    streak = 0
-    check_date = datetime.now(KST)
-
-    for _ in range(365):
-        date_str = check_date.strftime('%Y-%m-%d')
-        if date_str in read_dates:
-            streak += 1
-        else:
-            break
-        check_date -= timedelta(days=1)
-
-    return streak
 
 
 # ── 응답 헬퍼 ──

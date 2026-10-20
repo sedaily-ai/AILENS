@@ -61,17 +61,20 @@ cd $REMOTE_DIR
 pm2 describe lens-cms-api >/dev/null
 # 필수 운영 환경은 서버 전용 파일로 공급. PM2 템플릿 덮어쓰기 금지.
 test -r /etc/lens-cms-api.env
-if systemctl is-active --quiet lens-notification-worker.timer; then
-  echo "worker timer를 먼저 중지하세요" >&2
+# 2026-10-20 기능 다이어트로 알림 워커를 지웠다. 새 CMS에는 워커 경로가 없어 옛 워커가 1분마다 404로 실패한다.
+# 옛 타이머·서비스가 켜져 있거나 유닛 파일이 남아 있으면 배포를 멈추고 정리 명령을 안내한다.
+if systemctl is-active --quiet lens-notification-worker.timer || systemctl is-enabled --quiet lens-notification-worker.timer 2>/dev/null || [ -e /etc/systemd/system/lens-notification-worker.timer ] || [ -e /etc/systemd/system/lens-notification-worker.service ]; then
+  echo "옛 알림 워커가 남아 있습니다. 먼저 아래 명령으로 정리한 뒤 다시 배포하세요." >&2
+  echo "  sudo systemctl disable --now lens-notification-worker.timer lens-notification-worker.service" >&2
+  echo "  sudo rm -f /etc/systemd/system/lens-notification-worker.timer /etc/systemd/system/lens-notification-worker.service" >&2
+  echo "  sudo systemctl daemon-reload; sudo systemctl reset-failed lens-notification-worker.service lens-notification-worker.timer" >&2
   exit 1
 fi
 set -a
 . /etc/lens-cms-api.env
 set +a
 : "\${ADMIN_INTERNAL_TOKEN:?내부 인증 토큰 필요}"
-: "\${LENS_PUSH_ENCRYPTION_KEY:?구독 암호화 키 필요}"
-test "\${LENS_PUSH_MODE:-dry_run}" = dry_run
-test "\${LENS_PUSH_LIVE_ENABLED:-false}" != true
+# 푸시 암호화 키·발송 모드 검사는 알림 워커와 함께 지웠다(2026-10-20 기능 다이어트). 서버 env의 키 값은 지우지 않는다.
 # 새 코드를 풀기 전에 DB 선행 검사 도구만 임시 추출해 실행한다.
 aws s3 cp s3://$S3_BUCKET/$S3_PREFIX/$TARBALL /tmp/$TARBALL
 PREFLIGHT_DIR=\$(mktemp -d)

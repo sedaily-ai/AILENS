@@ -2,6 +2,4 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 psycopg2-binary==2.9.10
 boto3==1.35.0
-# Web Push + encrypted device subscriptions (oneshot worker; default dry_run)
-cryptography==50.0.2
-pywebpush==2.5.0
+# 웹 푸시용 cryptography·pywebpush는 알림 워커와 함께 뺐다(2026-10-20 기능 다이어트).
