@@ -91,6 +91,13 @@ const SceneBody: React.FC<{ cut: Cut; i: number; paper: PaperName; spot: string;
           kicker={st.kicker}
           before={{ text: withUnit(cut.data.before.value, cut.data.before.unit), label: cut.data.before.label }}
           after={{ text: withUnit(cut.data.after.value, cut.data.after.unit), label: cut.data.after.label }}
+          direction={
+            (cut.data.before.unit ?? "").trim() === (cut.data.after.unit ?? "").trim()
+              ? cut.data.after.value >= cut.data.before.value
+                ? "up"
+                : "down"
+              : null
+          }
         />
       );
     case "chart":
@@ -122,7 +129,8 @@ const SceneBody: React.FC<{ cut: Cut; i: number; paper: PaperName; spot: string;
       const scene = st.scene ?? "split";
       if (scene === "title") return <TitleScene tone={tone} kicker={st.kicker} segs={segs} sub={st.sub} />;
       if (scene === "date") return <DateScene tone={tone} segs={segs} />;
-      if (scene === "hero") return <HeroScene tone={tone} kicker={st.kicker} big={emphasisOf(cut.caption)} tag={st.sub} note={st.note} icon={st.icon} />;
+      if (scene === "hero")
+        return <HeroScene tone={tone} kicker={st.kicker} big={emphasisOf(cut.caption)} segs={segs} tag={st.sub} note={st.note} icon={st.icon} />;
       const icon = st.icon ?? (cut.type === "opening" ? cut.data.icon : scene === "quote" ? "quote" : undefined);
       return (
         <SplitScene

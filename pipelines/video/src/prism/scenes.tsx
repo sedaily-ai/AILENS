@@ -27,12 +27,42 @@ const splitNumber = (text: string): { sign: string; num: string; unit: string; s
 };
 
 // ── 큰 숫자 / 큰 글자 ─────────────────────────────────────────────
-export const HeroScene: React.FC<{ tone: Tone; kicker?: string; big: string; tag?: string; note?: string; icon?: string }> = ({ tone, kicker, big, tag, note, icon }) => {
+/** segs가 여러 조각이면(모델이 큰 글자를 "Practice AI tools" + "before Oct. 23"처럼 나눈 경우) 전체를 보여주고 강조 조각만 강조색. */
+export const HeroScene: React.FC<{ tone: Tone; kicker?: string; big: string; segs?: Seg[]; tag?: string; note?: string; icon?: string }> = ({
+  tone,
+  kicker,
+  big,
+  segs,
+  tag,
+  note,
+  icon,
+}) => {
   const stamp = useStamp(4);
   const iconIn = useEnter(10);
-  const n = splitNumber(big);
   const withIcon = hasPrismIcon(icon);
   const maxW = W - 2 * MARGIN - (withIcon ? 260 : 0);
+  if (segs && segs.length > 1) {
+    const full = segs.map((s) => s.text).join("").trim();
+    const size = fitDisplay(full, maxW, 230, 90);
+    return (
+      <AbsoluteFill style={{ top: TOP, height: CONTENT_H, justifyContent: "center", alignItems: "center", gap: 18 }}>
+        <Kicker text={kicker} color={textColor(tone)} dash={tone.dark ? "#fff" : tone.spot} />
+        <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+          {withIcon ? (
+            <div style={iconIn}>
+              <PrismIcon name={icon} color={tone.spot} size={180} />
+            </div>
+          ) : null}
+          <div style={{ ...stamp, maxWidth: maxW }}>
+            <DisplayText segs={segs} size={size} color={textColor(tone)} em={tone.spot} align="center" />
+          </div>
+        </div>
+        <PaperTag text={tag} />
+        {note ? <Hand text={note} tone={tone} delay={16} /> : null}
+      </AbsoluteFill>
+    );
+  }
+  const n = splitNumber(big);
   const size = fitDisplay(big, maxW, 300, 120);
   const numColor = tone.dark ? tone.spot : INK;
   return (
@@ -294,19 +324,21 @@ export const DonutScene: React.FC<{ tone: Tone; value: number; center: string; k
 };
 
 // ── 전후 비교 ─────────────────────────────────────────────────────
-export const BeforeAfterScene: React.FC<{ tone: Tone; kicker?: string; before: { text: string; label: string }; after: { text: string; label: string } }> = ({
-  tone,
-  kicker,
-  before,
-  after,
-}) => {
+/** direction은 단위가 같을 때만 렌더러가 값으로 정한다(단위가 다르면 null → 화살표 없음). */
+export const BeforeAfterScene: React.FC<{
+  tone: Tone;
+  kicker?: string;
+  before: { text: string; label: string };
+  after: { text: string; label: string };
+  direction: "up" | "down" | null;
+}> = ({ tone, kicker, before, after, direction }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const head = useEnter(2);
   const left = useEnter(8);
   const strike = interpolate(frame, [22, 34], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const rp = spring({ frame: frame - 30, fps, config: { damping: 14, stiffness: 170 } });
-  const up = Number.parseFloat(after.text.replace(/[^\d.\-]/g, "")) >= Number.parseFloat(before.text.replace(/[^\d.\-]/g, ""));
+  const cardText = Math.min(fitDisplay(before.text, 560, 170, 70), fitDisplay(after.text, direction ? 470 : 560, 170, 70));
   const card = (bg: string): React.CSSProperties => ({
     position: "relative",
     width: 700,
@@ -328,7 +360,7 @@ export const BeforeAfterScene: React.FC<{ tone: Tone; kicker?: string; before: {
       </div>
       <div style={{ display: "flex", gap: 70, marginTop: 40, alignItems: "center" }}>
         <div style={{ ...card("#F7F2E8"), ...left, transform: `${left.transform} rotate(-1.5deg)` }}>
-          <div style={{ position: "relative", fontFamily: FONT.display, fontSize: 170, color: "#8E877B", lineHeight: 1 }}>
+          <div style={{ position: "relative", fontFamily: FONT.display, fontSize: cardText, color: "#8E877B", lineHeight: 1, whiteSpace: "nowrap" }}>
             {before.text}
             <div style={{ position: "absolute", left: -10, top: "52%", height: 12, width: `${strike * 104}%`, background: tone.spot, transform: "rotate(-6deg)" }} />
           </div>
@@ -341,9 +373,9 @@ export const BeforeAfterScene: React.FC<{ tone: Tone; kicker?: string; before: {
             transform: `translateX(${(1 - rp) * 120}px) rotate(1.5deg)`,
           }}
         >
-          <div style={{ fontFamily: FONT.display, fontSize: 170, color: INK, lineHeight: 1, display: "flex", alignItems: "center", gap: 20 }}>
+          <div style={{ fontFamily: FONT.display, fontSize: cardText, color: INK, lineHeight: 1, display: "flex", alignItems: "center", gap: 20, whiteSpace: "nowrap" }}>
             {after.text}
-            <span style={{ fontSize: 90 }}>{up ? "▲" : "▼"}</span>
+            {direction ? <span style={{ fontSize: Math.round(cardText * 0.53) }}>{direction === "up" ? "▲" : "▼"}</span> : null}
           </div>
           <div style={{ fontFamily: FONT.body, fontWeight: 700, fontSize: 32, color: INK, marginTop: 14 }}>{after.label}</div>
         </div>

@@ -50,10 +50,13 @@ export const spotFor = (paper: PaperName, section?: number, fallbackIndex = 0): 
   return SPOTS[SECTION_SPOTS[((i % SECTION_SPOTS.length) + SECTION_SPOTS.length) % SECTION_SPOTS.length]];
 };
 
-/** Anton은 폭이 좁은 글꼴이라 글자 수로 크기를 정해도 거의 맞는다(평균 글자 폭 ≈ 0.43em). */
+/** Anton은 폭이 좁은 글꼴이라 글자 수로 크기를 정한다. 대문자·숫자는 약 0.43em, w·m 같은 넓은 소문자가 섞이면
+ *  더 넓어지므로(2026-10-20 "worth watching" 잘림) 넓은 글자 비율만큼 여유를 더 둔다. */
 export const fitDisplay = (text: string, maxWidth: number, maxSize: number, minSize = 60): number => {
   const chars = Math.max(1, text.length);
-  return Math.round(Math.max(minSize, Math.min(maxSize, maxWidth / (chars * 0.43))));
+  const wide = (text.match(/[mwMW]/g) ?? []).length / chars;
+  const perChar = 0.45 + wide * 0.35;
+  return Math.round(Math.max(minSize, Math.min(maxSize, maxWidth / (chars * perChar))));
 };
 
 /** 여러 줄로 감쌀 큰 제목 — 가장 긴 줄 기준으로 크기를 정한다. */

@@ -7,8 +7,15 @@ import { FONT, INK, MARGIN, MUTED, PAPERS, type PaperName } from "./theme";
 
 export type Seg = { text: string; em: boolean };
 
-export const segsOf = (caption: CaptionValue): Seg[] =>
-  typeof caption === "string" ? [{ text: caption, em: false }] : caption.map((s) => ({ text: s.text, em: !!s.emphasis }));
+/** 세그먼트를 이어 붙일 때 모델이 경계 띄어쓰기를 빠뜨리면("reshapes"+"jobs") 붙어 보이므로, 앞뒤가 모두 글자·숫자면 한 칸 넣는다. */
+export const segsOf = (caption: CaptionValue): Seg[] => {
+  if (typeof caption === "string") return [{ text: caption, em: false }];
+  return caption.map((s, i) => {
+    const prev = i > 0 ? caption[i - 1].text : "";
+    const needsSpace = i > 0 && /[A-Za-z0-9.,)]$/.test(prev) && /^[A-Za-z0-9(₩$+]/.test(s.text);
+    return { text: needsSpace ? ` ${s.text}` : s.text, em: !!s.emphasis };
+  });
+};
 
 export const plainOf = (caption: CaptionValue): string => segsOf(caption).map((s) => s.text).join("").trim();
 
