@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Text } from '../../../ui/Text';
 import { BookOpenText, Headphones, ImageSquare, VideoCamera } from '../../../ui/icons';
-import { colors, surface } from '../../../theme';
+import { accent, colors, surface } from '../../../theme';
 import { formatCards, momentOf, type SituationKey } from '../editorVoice';
 
 /**
@@ -28,7 +28,7 @@ export function FormatCarousel({ situation }: { situation: SituationKey | null }
                 <Icon size={22} color={first ? '#fff' : colors.textSub} weight={first ? 'fill' : 'regular'} />
               </View>
               <Text style={[styles.label, first && { color: '#fff' }]}>{c.label}</Text>
-              <Text style={[styles.line, first && { color: 'rgba(255,255,255,0.78)' }]} numberOfLines={2}>{c.line}</Text>
+              <Text style={[styles.line, first && { color: 'rgba(255,255,255,0.92)' }]} numberOfLines={2}>{c.line}</Text>
             </Pressable>
           );
         })}
@@ -42,9 +42,9 @@ const styles = StyleSheet.create({
   scroll: { marginHorizontal: -20 },
   row: { paddingHorizontal: 20, gap: 10 },
   card: { ...surface.card, width: 150, padding: 14, borderRadius: 20 },
-  first: { backgroundColor: colors.brand, borderColor: colors.brand },
+  first: { backgroundColor: accent.main, borderColor: accent.main },
   icon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f3f6', alignItems: 'center', justifyContent: 'center' },
-  iconFirst: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  iconFirst: { backgroundColor: 'rgba(255,255,255,0.2)' },
   label: { marginTop: 12, fontSize: 16, fontWeight: '800', color: colors.text },
   line: { marginTop: 3, fontSize: 12.5, lineHeight: 18, color: colors.textMuted },
 });

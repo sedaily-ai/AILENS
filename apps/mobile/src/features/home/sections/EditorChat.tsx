@@ -5,7 +5,7 @@ import { categoryForDataLabel, type LetterEditor } from '@ailens/domain';
 import { getApiConfig, type LensPost } from '@ailens/api-client';
 import { Text } from '../../../ui/Text';
 import { ArrowRight, CaretDown, CaretUp, Fire, GearSix } from '../../../ui/icons';
-import { colors, surface } from '../../../theme';
+import { accent, colors, surface } from '../../../theme';
 import { answerLead, momentOf, nextLead, openingLine, voiceOf, type SituationKey } from '../editorVoice';
 import { categoriesOf } from '../myEditor';
 import { pickQuestions, type QA } from '../questions';
@@ -22,7 +22,7 @@ const chipsCount = 4;
 function Face({ editor, size }: { editor: LetterEditor; size: number }) {
   const uri = editor.image ? `${getApiConfig().cmsApiUrl}${editor.image}` : null;
   return (
-    <View style={[styles.ring, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, backgroundColor: editor.tone.bg }]}>
+    <View style={[styles.ring, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, backgroundColor: accent.soft }]}>
       <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
         {uri ? <Image source={{ uri }} style={{ width: size, height: size }} resizeMode="cover" /> : <Text style={{ fontSize: size * 0.4, fontWeight: '800', color: editor.tone.fg }}>{editor.name.charAt(0)}</Text>}
       </View>
@@ -88,7 +88,12 @@ export function EditorChat({
         <Pressable onPress={onChangeEditor} style={styles.who} accessibilityRole="button" accessibilityLabel={`${picked ? '내' : '오늘의'} 에디터 ${editor.name}, 바꾸기`}>
           <Face editor={editor} size={52} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[styles.kicker, { color: editor.tone.fg }]}>{picked ? '내 에디터' : '오늘의 에디터'} · 바꾸기</Text>
+            <View style={styles.kickerRow}>
+              <Text style={styles.kicker}>{picked ? '내 에디터' : '오늘의 에디터'}</Text>
+              <View style={styles.changePill}>
+                <Text style={styles.changeText}>바꾸기</Text>
+              </View>
+            </View>
             <Text style={styles.name} numberOfLines={1}>{editor.name}</Text>
           </View>
         </Pressable>
@@ -103,12 +108,12 @@ export function EditorChat({
         </Pressable>
       </View>
 
-      <View style={[styles.bubble, { backgroundColor: editor.tone.bg }]}>
+      <View style={styles.bubble}>
         <Text style={styles.bubbleText}>{openingLine(voice, moment)}</Text>
       </View>
       {voiceUri ? (
         <View style={styles.voiceRow}>
-          <EditorVoice key={editor.id} src={voiceUri} name={editor.name} tint={editor.tone} compact />
+          <EditorVoice key={editor.id} src={voiceUri} name={editor.name} tint={{ bg: accent.soft, fg: accent.ink }} compact />
         </View>
       ) : null}
 
@@ -132,10 +137,10 @@ export function EditorChat({
             <Text style={styles.userText}>{current.question}</Text>
           </Pressable>
           <View style={styles.answer}>
-            <Text style={[styles.lead, { color: editor.tone.fg }]}>{answerLead(voice)}</Text>
+            <Text style={styles.lead}>{answerLead(voice)}</Text>
             {current.points.map((p, i) => (
               <View key={i} style={styles.point}>
-                <Text style={[styles.num, { color: editor.tone.fg }]}>{i + 1}</Text>
+                <Text style={styles.num}>{i + 1}</Text>
                 <Text style={styles.pointText}>{p}</Text>
               </View>
             ))}
@@ -186,40 +191,43 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   who: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   ring: { alignItems: 'center', justifyContent: 'center' },
-  kicker: { fontSize: 12, fontWeight: '800' },
-  name: { marginTop: 2, fontSize: 17, fontWeight: '800', letterSpacing: -0.4, color: colors.text },
+  kicker: { fontSize: 12.5, fontWeight: '800', color: accent.ink },
+  name: { marginTop: 3, fontSize: 17, fontWeight: '800', letterSpacing: -0.4, color: colors.text },
   streak: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, height: 26, borderRadius: 999, backgroundColor: '#fff3e8' },
   streakText: { fontSize: 12, fontWeight: '800', color: '#c2410c' },
-  gear: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  gear: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  changePill: { paddingHorizontal: 8, height: 22, borderRadius: 999, backgroundColor: accent.soft, alignItems: 'center', justifyContent: 'center' },
+  changeText: { fontSize: 12, fontWeight: '800', color: accent.ink },
 
-  bubble: { marginTop: 14, padding: 14, borderRadius: 18, borderTopLeftRadius: 6 },
+  bubble: { marginTop: 14, padding: 14, borderRadius: 18, borderTopLeftRadius: 6, backgroundColor: accent.soft },
   bubbleText: { fontSize: 15.5, lineHeight: 24, fontWeight: '600', color: colors.text },
   voiceRow: { marginTop: 10 },
 
-  label: { marginTop: 18, marginBottom: 10, fontSize: 13, fontWeight: '800', color: colors.textMuted },
+  label: { marginTop: 18, marginBottom: 10, fontSize: 13.5, fontWeight: '800', color: colors.textSub },
   chips: { gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 16, backgroundColor: '#f6f8fb', borderWidth: 1, borderColor: '#e8ecf3' },
+  chip: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, backgroundColor: '#fff', borderWidth: 1.5, borderColor: accent.line },
   chipText: { fontSize: 14.5, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2, color: colors.text },
 
   thread: { marginTop: 16, gap: 10 },
-  userBubble: { alignSelf: 'flex-end', maxWidth: '88%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, borderBottomRightRadius: 6, backgroundColor: colors.brand },
+  userBubble: { alignSelf: 'flex-end', maxWidth: '88%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, borderBottomRightRadius: 6, backgroundColor: accent.main },
   userText: { fontSize: 14.5, lineHeight: 21, fontWeight: '700', color: '#fff' },
-  answer: { padding: 14, borderRadius: 18, borderTopLeftRadius: 6, backgroundColor: '#f6f8fb', gap: 10 },
-  lead: { fontSize: 13, fontWeight: '800' },
+  answer: { padding: 14, borderRadius: 18, borderTopLeftRadius: 6, backgroundColor: '#f6f9ff', borderWidth: 1, borderColor: accent.line, gap: 10 },
+  lead: { fontSize: 13.5, fontWeight: '800', color: accent.ink },
   point: { flexDirection: 'row', gap: 10 },
-  num: { width: 16, fontSize: 14, fontWeight: '800', lineHeight: 22 },
+  num: { width: 16, fontSize: 14, fontWeight: '800', lineHeight: 22, color: accent.ink },
   pointText: { flex: 1, fontSize: 14.5, lineHeight: 22, color: colors.text },
   terms: { gap: 6 },
   term: { padding: 10, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e8ecf3' },
-  termName: { fontSize: 12.5, fontWeight: '800', color: colors.brand },
+  termName: { fontSize: 13, fontWeight: '800', color: accent.ink },
   termExplain: { marginTop: 2, fontSize: 13, lineHeight: 19, color: colors.textSub },
   moreBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 },
   moreText: { fontSize: 13, fontWeight: '700', color: colors.textSub },
   detail: { fontSize: 13.5, lineHeight: 21, color: colors.textSub },
   source: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  sourceText: { fontSize: 14, fontWeight: '800', color: colors.brand },
-  next: { marginBottom: 8, fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  sourceText: { fontSize: 14.5, fontWeight: '800', color: accent.ink },
+  next: { marginBottom: 8, fontSize: 13.5, fontWeight: '700', color: colors.textSub },
   followRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  follow: { paddingHorizontal: 14, height: 38, borderRadius: 999, borderWidth: 1, borderColor: '#d9dee8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  followText: { fontSize: 13.5, fontWeight: '700', color: colors.text },
+  follow: { paddingHorizontal: 14, height: 44, borderRadius: 999, borderWidth: 1.5, borderColor: accent.line, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  followText: { fontSize: 14, fontWeight: '700', color: accent.ink },
 });

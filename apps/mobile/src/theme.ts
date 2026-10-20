@@ -4,12 +4,21 @@ export const colors = {
   surface: '#f8f9fa',
   text: '#111827', // gray-900
   textSub: '#374151', // gray-700
-  textMuted: '#6b7280', // gray-500
-  textFaint: '#9ca3af', // gray-400
+  // 작은 글씨(날짜·보조 문구)가 흰 바탕에서 읽히도록 한 단계씩 진하게 잡았다. #6b7280 on #fff = 4.8:1(AA), 기존 #9ca3af 는 2.5:1 로 미달이었다.
+  textMuted: '#4b5563', // gray-600
+  textFaint: '#6b7280', // gray-500
   line: '#e5e7eb', // gray-200
   brand: '#101c3d',
   beta: { bg: '#e0ebff', text: '#2563eb' },
   imagePlaceholder: '#f3f4f6',
+} as const;
+
+/** 앱의 포인트 색 — 파랑 계열 한 가지로 통일한다(에디터마다 색을 달리하면 화면이 알록달록해진다). 에디터는 얼굴로 구분한다. */
+export const accent = {
+  main: '#2563eb', // 흰 글씨 5.2:1
+  soft: '#eef4ff', // 말풍선·알약 바탕
+  line: '#d6e4fb',
+  ink: '#1d4ed8', // soft 바탕 위 글씨 5.9:1
 } as const;
 
 export const radius = { thumb: 12 } as const;
