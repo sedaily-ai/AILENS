@@ -8,20 +8,20 @@ import { useHomeData, type HomeData } from './useHomeData';
 import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
 import { TimeMachineCard } from './sections/TimeMachineCard';
-import { StartCard } from './sections/StartCard';
-import { useOnboardingCompleted } from '../onboarding/prefs';
+import { HomeIntro } from './sections/HomeIntro';
 
 const LATEST_COUNT = 8;
 
 /**
- * 홈은 "오늘의 핵심"에 집중한다(뉴닉 구조): 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
+ * 홈은 "오늘의 핵심"에 집중한다(뉴닉 구조): 소개(질문·형식 칩) → 오늘의 지면 → 최신 뉴스 → 그날로 떠나요.
+ * 소개 영역이 /start(하루 장면 고르기) 진입을 상시 제공하므로 첫 방문 온보딩 카드는 따로 두지 않는다.
  * 카테고리 섹션·웹툰·영상·레터는 "발견" 탭(src/features/discover)으로 옮겼다.
  */
 type Section = { key: string; render: () => React.ReactElement | null };
 
-function buildSections(data: HomeData, showStart: boolean): Section[] {
+function buildSections(data: HomeData): Section[] {
   return [
-    ...(showStart ? [{ key: 'start', render: () => <StartCard /> }] : []),
+    { key: 'intro', render: () => <HomeIntro /> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
     { key: 'timemachine', render: () => <TimeMachineCard /> },
@@ -31,7 +31,6 @@ function buildSections(data: HomeData, showStart: boolean): Section[] {
 // 홈 화면. 로드 상태와 섹션 조립만 맡고, 데이터 규칙은 model.ts, 조회는 useHomeData.ts, 화면 조각은 sections/* 에 있다.
 export function HomeScreen() {
   const { state, refreshing, reload, refresh } = useHomeData({ media: false });
-  const onboarded = useOnboardingCompleted();
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -50,7 +49,7 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data, onboarded === false)}
+            data={buildSections(state.data)}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}
