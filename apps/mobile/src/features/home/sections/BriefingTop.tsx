@@ -13,10 +13,10 @@ import { BriefingSettings } from './BriefingSettings';
  *  인사(시간대별) → 오늘 진행 카드(세 단계 + 진행 막대 + 다음 할 일 버튼) → 이번 주 7일.
  * 단계 정의와 기록은 dailyProgress.ts, 오늘 챙길 글은 briefing.ts. 한 화자의 말투로 통일해 두었다(나중에 캐릭터가 이 자리를 맡는다).
  */
-const STEPS: { key: StepKey; label: string; hint: string }[] = [
-  { key: 'read', label: '핵심 읽기', hint: '오늘 글 하나 읽기' },
-  { key: 'format', label: '내 방식으로', hint: '웹툰·듣기·영상 보기' },
-  { key: 'save', label: '남기기', hint: '문장 담기 · 투표' },
+const STEPS: { key: StepKey; label: string; hint: string; cta: string }[] = [
+  { key: 'read', label: '핵심 읽기', hint: '오늘 가장 중요한 글 하나', cta: '오늘 브리핑, 시작해 볼까요?' },
+  { key: 'format', label: '내 방식으로', hint: '웹툰·듣기·영상 중에 골라서', cta: '이번엔 내 방식으로 볼까요?' },
+  { key: 'save', label: '남기기', hint: '마음에 든 문장 담기 · 투표', cta: '마음에 든 문장을 남겨 볼까요?' },
 ];
 
 // 온보딩에서 고른 방식(레터 0·웹툰 1·팟캐스트 2·영상 3)이 가리키는 화면. 아직 안 골랐으면 고르는 화면으로 보낸다.
@@ -35,7 +35,7 @@ export function BriefingTop({ progress, picks, preferredFormat, prefs, interests
     return router.push('/discover');
   };
 
-  const cta = all ? '오늘 챙길 건 다 챙겼어요' : progress.doneCount === 0 ? '오늘 브리핑 시작' : `다음은 '${next?.label}'`;
+  const cta = all ? '오늘 챙길 건 다 챙겼어요' : (next?.cta ?? '오늘 브리핑, 시작해 볼까요?');
 
   return (
     <View>

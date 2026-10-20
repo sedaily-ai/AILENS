@@ -14,7 +14,7 @@ export function TimeMachineCard() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>그날로 떠나요</Text>
-          <Text style={styles.sub}>1990년부터 오늘까지, 궁금한 날의 신문</Text>
+          <Text style={styles.sub}>궁금한 그날의 신문, 지금 열어 볼까요?</Text>
         </View>
         <CaretRight size={16} color={colors.textFaint} weight="bold" />
       </Pressable>

@@ -5,7 +5,7 @@ import { relativeTime } from '../lib/format';
 import { colors } from '../theme';
 import type { FeedItem } from '../features/home/model';
 
-/** 뉴스 한 줄 — 분야 · 몇 분 전 / 제목 2줄 / 오른쪽 작은 썸네일. 홈·발견의 "최신 기사"가 함께 쓴다. */
+/** 뉴스 한 줄 — 분야 · 몇 분 전 / 제목 2줄 / 오른쪽 작은 썸네일. 홈·발견의 "방금 올라온 소식"이 함께 쓴다. */
 export function NewsRow({ item, divider }: { item: FeedItem; divider?: boolean }) {
   return (
     <Link href={{ pathname: '/article/[slug]', params: { slug: item.id } }} asChild>

@@ -24,7 +24,7 @@ function buildSections(data: HomeData): Section[] {
   const cat = (from: number, to: number): Section[] =>
     groups.slice(from, to).map((g) => ({ key: `cat-${g.category.slug}`, render: () => <CategorySection group={g} /> }));
   return [
-    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, 5)} title="최신 기사" /> },
+    { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, 5)} title="방금 올라온 소식" /> },
     ...cat(0, 4),
     { key: 'webtoon', render: () => <WebtoonSection items={data.webtoons} /> },
     { key: 'video', render: () => <VideoSection items={data.videos} /> },
