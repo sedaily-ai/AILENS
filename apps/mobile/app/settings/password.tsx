@@ -6,7 +6,7 @@ import { fetchAuthSession, updatePassword } from 'aws-amplify/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { checkPassword, isPasswordValid, PASSWORD_REQUIREMENT_MESSAGE } from '@ailens/domain';
 import { useAuth } from '../../src/auth/AuthContext';
-import { colors } from '../../src/theme';
+import { accent, colors } from '../../src/theme';
 
 // 비밀번호 변경(웹 /settings/password 대응) — 현재 비밀번호를 아는 로그인 사용자용. 메일 왕복이 없어 Cognito 하루 발송 한도를 쓰지 않는다.
 // Google 등 소셜 로그인 계정은 Cognito 에 비밀번호가 없어 변경 화면 대신 안내를 보여 준다(ID 토큰의 `identities` 클레임 유무로 판별 — Amplify 문서의 공식 방법).
@@ -117,6 +117,6 @@ const styles = StyleSheet.create({
   rule: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   ruleText: { fontSize: 12.5, color: colors.textFaint },
   error: { marginTop: 14, fontSize: 13.5, lineHeight: 20, color: '#dc2626' },
-  cta: { marginTop: 20, height: 52, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  cta: { marginTop: 20, height: 52, borderRadius: 10, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

@@ -121,6 +121,6 @@ const styles = StyleSheet.create({
   previewLine: { marginTop: 6, fontSize: 15, lineHeight: 22, fontWeight: '600', color: colors.text },
   previewSub: { marginTop: 8, fontSize: 13, color: colors.textMuted },
   previewStrong: { fontWeight: '800', color: colors.text },
-  done: { marginTop: 14, height: 54, borderRadius: 16, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  done: { marginTop: 14, height: 54, borderRadius: 16, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   doneText: { fontSize: 16, fontWeight: '800', color: '#fff' },
 });

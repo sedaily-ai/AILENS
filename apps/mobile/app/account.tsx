@@ -7,7 +7,7 @@ import { useAuth } from '../src/auth/AuthContext';
 import { bookmarks, history } from '../src/features/mylens/stores';
 import { useListStore } from '../src/features/mylens/listStore';
 import { getPreferredFormat } from '../src/features/onboarding/prefs';
-import { colors, formatColors } from '../src/theme';
+import { accent, colors, formatColors } from '../src/theme';
 
 const SITE = 'https://ailens.sedaily.ai';
 
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   helloSub: { marginTop: 6, fontSize: 15, lineHeight: 22, color: colors.textMuted },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
   avatarText: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  cta: { marginBottom: 12, height: 52, borderRadius: 16, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  cta: { marginBottom: 12, height: 52, borderRadius: 16, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontSize: 16, fontWeight: '800', color: '#fff' },
   way: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, borderRadius: 22 },
   wayIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

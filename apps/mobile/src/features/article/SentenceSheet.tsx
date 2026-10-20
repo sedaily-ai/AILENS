@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { inlineSegments } from '@ailens/domain';
 import { useAuth } from '../../auth/AuthContext';
 import { saveSentence } from '../mylens/archiveApi';
-import { colors } from '../../theme';
+import { accent, colors } from '../../theme';
 
 /** 마크다운 표기(**굵게** 등)를 걷어 낸 평문. */
 export const plainText = (raw: string) => inlineSegments(raw).map((s) => s.text).join('').trim();
@@ -99,11 +99,11 @@ const styles = StyleSheet.create({
   msg: { fontSize: 14, lineHeight: 21, color: colors.textMuted },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   sentence: { flex: 1, fontSize: 15, lineHeight: 23, color: colors.text },
-  btn: { minWidth: 56, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  btn: { minWidth: 56, height: 36, borderRadius: 18, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   btnDone: { backgroundColor: '#f3f4f6' },
   btnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   error: { marginTop: 10, fontSize: 13, color: '#dc2626' },
-  cta: { marginTop: 14, height: 48, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  cta: { marginTop: 14, height: 48, borderRadius: 10, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   ctaText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   close: { marginTop: 14, alignItems: 'center', paddingVertical: 8 },
   closeText: { fontSize: 14, color: colors.textMuted },

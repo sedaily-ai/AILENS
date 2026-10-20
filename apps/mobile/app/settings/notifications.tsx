@@ -5,7 +5,7 @@ import { Stack } from 'expo-router';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { colors } from '../../src/theme';
+import { accent, colors } from '../../src/theme';
 
 type Perm = 'checking' | 'granted' | 'denied' | 'undetermined';
 
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: 14, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
   label: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
   status: { marginTop: 6, fontSize: 18, fontWeight: '800', color: colors.text },
-  btn: { marginTop: 14, height: 48, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  btn: { marginTop: 14, height: 48, borderRadius: 10, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   ghost: { marginTop: 10, height: 46, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   ghostText: { fontSize: 14.5, fontWeight: '600', color: colors.text },

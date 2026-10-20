@@ -11,7 +11,7 @@ import { AsyncView } from '../../src/components/AsyncView';
 import { MiniPlayer } from '../../src/components/MiniPlayer';
 import { kstDateTime } from '../../src/lib/format';
 import { useAsync } from '../../src/lib/useAsync';
-import { colors } from '../../src/theme';
+import { accent, colors } from '../../src/theme';
 
 // 듣기 — "오늘의 뉴스를 귀로"(home_player 채널) 전체 목록. 항목을 누르면 /listen/[slug] 가 열리며 그 곡부터 재생한다(전역 PlayerProvider).
 export default function ListenScreen() {
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   list: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
   head: { marginBottom: 14 },
-  hero: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, borderRadius: 22, backgroundColor: colors.brand },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, borderRadius: 22, backgroundColor: accent.main },
   title: { fontSize: 19, fontWeight: '800', letterSpacing: -0.4, color: '#fff' },
   sub: { marginTop: 4, fontSize: 13.5, color: 'rgba(255,255,255,0.72)' },
   playAll: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: 14, borderRadius: 999, backgroundColor: '#fff' },

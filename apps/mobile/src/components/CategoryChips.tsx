@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Text } from '../ui/Text';
 import { Link } from 'expo-router';
 import { ECON_CATEGORIES } from '@ailens/domain';
-import { colors } from '../theme';
+import { accent, colors } from '../theme';
 
 /** 상단 카테고리 줄 — 웹 헤더의 카테고리 탭에 해당. 홈이 "전체", 나머지는 카테고리 목록 화면으로 간다. */
 export function CategoryChips({ active }: { active?: string }) {
@@ -29,5 +29,5 @@ const styles = StyleSheet.create({
   row: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   chip: {},
   text: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f3f6', fontSize: 14, fontWeight: '600', color: '#6b7280' },
-  on: { backgroundColor: colors.brand, color: '#fff', fontWeight: '700' },
+  on: { backgroundColor: accent.main, color: '#fff', fontWeight: '700' },
 });

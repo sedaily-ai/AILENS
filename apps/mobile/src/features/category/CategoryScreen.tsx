@@ -8,7 +8,7 @@ import { AppHeader } from '../../components/AppHeader';
 import { CategoryChips } from '../../components/CategoryChips';
 import { GridCard } from '../../components/GridCard';
 import { MiniPlayer } from '../../components/MiniPlayer';
-import { colors } from '../../theme';
+import { accent, colors } from '../../theme';
 import type { FeedItem } from '../home/model';
 import { loadSearchIndex } from '../search/searchData';
 
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   desc: { fontSize: 14, lineHeight: 21, color: colors.textMuted },
   subRow: { gap: 8, paddingTop: 14 },
   sub: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f3f6' },
-  subOn: { backgroundColor: colors.brand },
+  subOn: { backgroundColor: accent.main },
   subText: { fontSize: 13.5, fontWeight: '600', color: '#6b7280' },
   subTextOn: { color: '#fff', fontWeight: '700' },
   empty: { textAlign: 'center', color: colors.textMuted, marginTop: 40 },

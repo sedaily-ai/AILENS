@@ -3,7 +3,7 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '../../ui/Text';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
+import { accent, colors } from '../../theme';
 import { clampDate, isValidDate, kstToday, longDate, shiftDate } from './dates';
 import { DECADES, eventsInDecade } from './events';
 
@@ -88,14 +88,14 @@ const styles = StyleSheet.create({
   input: { flex: 1, height: 52, borderRadius: 12, borderWidth: 1, borderColor: colors.line, textAlign: 'center', fontSize: 20, fontWeight: '700', color: colors.text, letterSpacing: 1 },
   preview: { marginTop: 10, textAlign: 'center', fontSize: 14, color: colors.textMuted },
   btnRow: { marginTop: 16, flexDirection: 'row', gap: 10 },
-  go: { flex: 1, height: 50, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  go: { flex: 1, height: 50, borderRadius: 10, backgroundColor: accent.main, alignItems: 'center', justifyContent: 'center' },
   goText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   today: { width: 72, height: 50, borderRadius: 10, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
   todayText: { fontSize: 15, fontWeight: '700', color: colors.text },
   sec: { marginTop: 32, fontSize: 17, fontWeight: '800', color: colors.text },
   decades: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, marginBottom: 6 },
   dec: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.line },
-  decOn: { backgroundColor: colors.brand, borderColor: colors.brand },
+  decOn: { backgroundColor: accent.main, borderColor: accent.main },
   decText: { fontSize: 13.5, fontWeight: '600', color: colors.textSub },
   decTextOn: { color: '#fff', fontWeight: '700' },
   empty: { textAlign: 'center', color: colors.textMuted, marginTop: 30 },
