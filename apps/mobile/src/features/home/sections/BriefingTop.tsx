@@ -5,6 +5,8 @@ import { ArrowRight, Check, Fire } from '../../../ui/icons';
 import { colors } from '../../../theme';
 import { greeting, type BriefingPick } from '../briefing';
 import type { DailyProgress, StepKey } from '../dailyProgress';
+import { SITUATION_ROUTE, type BriefingPrefs } from '../briefingPrefs';
+import { BriefingSettings } from './BriefingSettings';
 
 /**
  * 홈 맨 위 — 오늘의 브리핑.
@@ -20,14 +22,15 @@ const STEPS: { key: StepKey; label: string; hint: string }[] = [
 // 온보딩에서 고른 방식(레터 0·웹툰 1·팟캐스트 2·영상 3)이 가리키는 화면. 아직 안 골랐으면 고르는 화면으로 보낸다.
 const FORMAT_ROUTE: Href[] = ['/letter', '/webtoon', '/listen', '/video'];
 
-export function BriefingTop({ progress, picks, preferredFormat }: { progress: DailyProgress; picks: BriefingPick[]; preferredFormat: number | null }) {
+export function BriefingTop({ progress, picks, preferredFormat, prefs, interests, onInterests }: { progress: DailyProgress; picks: BriefingPick[]; preferredFormat: number | null; prefs: BriefingPrefs; interests: string[]; onInterests: (slugs: string[]) => void }) {
   const router = useRouter();
   const all = progress.doneCount === STEPS.length;
   const next = STEPS.find((s) => !progress.today[s.key]);
 
   const open = (key: StepKey) => {
     const first = picks[0];
-    if (key === 'format') return router.push(preferredFormat === null ? '/start' : FORMAT_ROUTE[preferredFormat]);
+    // 지금 상황(출근길 등)을 골랐다면 그 상황에 어울리는 형식으로, 아니면 온보딩에서 고른 방식으로 보낸다.
+    if (key === 'format') return router.push(prefs.situation ? SITUATION_ROUTE[prefs.situation] : preferredFormat === null ? '/start' : FORMAT_ROUTE[preferredFormat]);
     if (first) return router.push({ pathname: '/article/[slug]', params: { slug: first.id } });
     return router.push('/discover');
   };
@@ -39,7 +42,7 @@ export function BriefingTop({ progress, picks, preferredFormat }: { progress: Da
       <View style={styles.greetRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.hello}>{greeting()}</Text>
-          <Text style={styles.sub}>{all ? '내일 아침에 또 만나요' : '오늘 챙길 3가지, 5분이면 돼요'}</Text>
+          <Text style={styles.sub}>{all ? '내일 아침에 또 만나요' : `오늘 챙길 ${Math.max(picks.length, 1)}가지, ${prefs.minutes}분이면 돼요`}</Text>
         </View>
         {progress.streak > 0 ? (
           <View style={styles.streak}>
@@ -78,6 +81,8 @@ export function BriefingTop({ progress, picks, preferredFormat }: { progress: Da
         </Pressable>
         {progress.doneCount < STEPS.length && next ? <Text style={styles.hint}>{next.hint}</Text> : null}
       </View>
+
+      <BriefingSettings prefs={prefs} interests={interests} onInterests={onInterests} />
 
       <View style={styles.week}>
         {progress.week.map((d) => (

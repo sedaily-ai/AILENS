@@ -14,6 +14,7 @@ import { PickCards } from './sections/PickCards';
 import { pickBriefing } from './briefing';
 import { PAPER_TABS, pickPaperSection } from './model';
 import { useDailyProgress } from './dailyProgress';
+import { PICK_COUNT, useBriefingPrefs } from './briefingPrefs';
 import { getPreferredFormat } from '../onboarding/prefs';
 import { bookmarks, getInterests, history } from '../mylens/stores';
 import { useListStore } from '../mylens/listStore';
@@ -26,9 +27,9 @@ const LATEST_COUNT = 8;
  */
 type Section = { key: string; render: () => React.ReactElement | null };
 
-function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDailyProgress>; picks: ReturnType<typeof pickBriefing>; fmt: number | null; readToday: Set<string> }): Section[] {
+function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDailyProgress>; picks: ReturnType<typeof pickBriefing>; fmt: number | null; readToday: Set<string>; prefs: ReturnType<typeof useBriefingPrefs>; interests: string[]; setInterests: (s: string[]) => void }): Section[] {
   return [
-    { key: 'briefing', render: () => <BriefingTop progress={ctx.progress} picks={ctx.picks} preferredFormat={ctx.fmt} /> },
+    { key: 'briefing', render: () => <BriefingTop progress={ctx.progress} picks={ctx.picks} preferredFormat={ctx.fmt} prefs={ctx.prefs} interests={ctx.interests} onInterests={ctx.setInterests} /> },
     { key: 'picks', render: () => <PickCards picks={ctx.picks} readToday={ctx.readToday} /> },
     { key: 'paper', render: () => <PaperHero lens={data.lens} /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
@@ -40,6 +41,7 @@ function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDai
 export function HomeScreen() {
   const { state, refreshing, reload, refresh } = useHomeData({ media: false });
   const progress = useDailyProgress();
+  const prefs = useBriefingPrefs();
   const read = useListStore(history);
   useListStore(bookmarks);
   const [interests, setInterests] = useState<string[]>([]);
@@ -56,8 +58,8 @@ export function HomeScreen() {
   const picks = useMemo(() => {
     if (state.status !== 'ready') return [];
     const paperHero = pickPaperSection(state.data.lens, PAPER_TABS[0].paperSection)[0]?.id;
-    return pickBriefing(state.data.lens, state.data.latest, interests, readBefore, new Set(paperHero ? [paperHero] : []));
-  }, [state, interests, readBefore]);
+    return pickBriefing(state.data.lens, state.data.latest, interests, readBefore, new Set(paperHero ? [paperHero] : []), PICK_COUNT[prefs.minutes]);
+  }, [state, interests, readBefore, prefs.minutes]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -76,7 +78,7 @@ export function HomeScreen() {
           </View>
         ) : (
           <FlatList
-            data={buildSections(state.data, { progress, picks, fmt, readToday })}
+            data={buildSections(state.data, { progress, picks, fmt, readToday, prefs, interests, setInterests })}
             keyExtractor={(s) => s.key}
             renderItem={({ item }) => item.render()}
             ItemSeparatorComponent={Divider}

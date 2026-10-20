@@ -1,7 +1,7 @@
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 import { Headphones, Play } from '../../src/ui/icons';
 import { usePlayer } from '../../src/features/player/PlayerContext';
 import { listPosts, type HomePlayerPost } from '@ailens/api-client';
@@ -19,7 +19,8 @@ export default function ListenScreen() {
   const { state, reload } = useAsync((signal) => listPosts<HomePlayerPost>('home_player', { limit: 50, signal }), []);
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <AppHeader title="듣기" />
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader title="듣기" back />
       <View style={styles.body}>
         <AsyncView state={state} onRetry={reload}>
           {(items: HomePlayerPost[]) => (

@@ -49,7 +49,7 @@ const labelOf = (slug: string) => ECON_CATEGORIES.find((c) => c.slug === slug)?.
  * 오늘 챙길 3가지. 점수: 관심 분야 일치 +3, 오늘 지면 1면 +2.5, 다른 코너 1면 +1.5, 최신 글 +0.5(최신일수록 약간 더).
  * 이미 읽은 글과 excludeIds(홈의 지면 카드가 이미 크게 보여 주는 기사)는 뺀다. 같은 분야가 겹치지 않게 분야별로 하나씩 고른 뒤 모자라면 채운다.
  */
-export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: string[], readIds: Set<string>, excludeIds: Set<string> = new Set()): BriefingPick[] {
+export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: string[], readIds: Set<string>, excludeIds: Set<string> = new Set(), size: number = BRIEFING_SIZE): BriefingPick[] {
   const pool = new Map<string, Candidate>();
   const put = (c: Candidate) => {
     if (readIds.has(c.id) || excludeIds.has(c.id)) return;
@@ -73,13 +73,13 @@ export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: st
   const picks: Candidate[] = [];
   const usedSlug = new Set<string>();
   for (const c of scored) {
-    if (picks.length >= BRIEFING_SIZE) break;
+    if (picks.length >= size) break;
     if (c.slug && usedSlug.has(c.slug)) continue;
     picks.push(c);
     if (c.slug) usedSlug.add(c.slug);
   }
   for (const c of scored) {
-    if (picks.length >= BRIEFING_SIZE) break;
+    if (picks.length >= size) break;
     if (!picks.includes(c)) picks.push(c);
   }
   return picks.map(({ score: _s, slug: _g, ...p }) => p);

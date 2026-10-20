@@ -34,3 +34,8 @@ export { SkipForward } from 'phosphor-react-native/src/icons/SkipForward';
 export { CaretLeft } from 'phosphor-react-native/src/icons/CaretLeft';
 export { XCircle } from 'phosphor-react-native/src/icons/XCircle';
 export { ClockCounterClockwise as ClockIcon } from 'phosphor-react-native/src/icons/ClockCounterClockwise';
+export { Bus } from 'phosphor-react-native/src/icons/Bus';
+export { ForkKnife } from 'phosphor-react-native/src/icons/ForkKnife';
+export { Moon } from 'phosphor-react-native/src/icons/Moon';
+export { Coffee } from 'phosphor-react-native/src/icons/Coffee';
+export { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
