@@ -1,0 +1,27 @@
+// 앱 아이콘 모음 — Phosphor Icons(MIT)에서 쓰는 것만 골라 가져온다.
+// 전체(수천 개)를 한 번에 불러오면 번들이 무거워지므로, 사용하는 아이콘만 이 파일에서 한 곳으로 모은다.
+// 두께(weight)는 상태에 따라 바꾼다: 평소 regular, 선택 시 fill, 강조 면은 duotone.
+export { House } from 'phosphor-react-native/src/icons/House';
+export { Compass } from 'phosphor-react-native/src/icons/Compass';
+export { Headphones } from 'phosphor-react-native/src/icons/Headphones';
+export { BookmarkSimple } from 'phosphor-react-native/src/icons/BookmarkSimple';
+export { MagnifyingGlass } from 'phosphor-react-native/src/icons/MagnifyingGlass';
+export { GearSix } from 'phosphor-react-native/src/icons/GearSix';
+export { User } from 'phosphor-react-native/src/icons/User';
+export { LockKey } from 'phosphor-react-native/src/icons/LockKey';
+export { Bell } from 'phosphor-react-native/src/icons/Bell';
+export { GameController } from 'phosphor-react-native/src/icons/GameController';
+export { Sparkle } from 'phosphor-react-native/src/icons/Sparkle';
+export { ChatCircleDots } from 'phosphor-react-native/src/icons/ChatCircleDots';
+export { FileText } from 'phosphor-react-native/src/icons/FileText';
+export { ShieldCheck } from 'phosphor-react-native/src/icons/ShieldCheck';
+export { Globe } from 'phosphor-react-native/src/icons/Globe';
+export { ClockCounterClockwise } from 'phosphor-react-native/src/icons/ClockCounterClockwise';
+export { CaretRight } from 'phosphor-react-native/src/icons/CaretRight';
+export { BookOpenText } from 'phosphor-react-native/src/icons/BookOpenText';
+export { Quotes } from 'phosphor-react-native/src/icons/Quotes';
+export { ImageSquare } from 'phosphor-react-native/src/icons/ImageSquare';
+export { VideoCamera } from 'phosphor-react-native/src/icons/VideoCamera';
+export { ShareNetwork } from 'phosphor-react-native/src/icons/ShareNetwork';
+export { Trash } from 'phosphor-react-native/src/icons/Trash';
+export { X } from 'phosphor-react-native/src/icons/X';

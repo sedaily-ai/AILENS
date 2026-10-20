@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../src/ui/Text';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { BookOpenText, Headphones, ImageSquare, VideoCamera, BookmarkSimple, Bell, CaretRight, ChatCircleDots, ClockCounterClockwise, FileText, GameController, Globe, LockKey, ShieldCheck, Sparkle, User } from '../src/ui/icons';
 import { useAuth } from '../src/auth/AuthContext';
 import { bookmarks, history } from '../src/features/mylens/stores';
 import { useListStore } from '../src/features/mylens/listStore';
@@ -13,14 +13,14 @@ const SITE = 'https://ailens.sedaily.ai';
 
 // 온보딩에서 고른 선호 형식(레터 0·웹툰 1·팟캐스트 2·영상 3). 형식마다 앱 전체에서 같은 색을 쓴다(theme.formatColors).
 const FORMATS = [
-  { label: '읽기', desc: '글로 차분히 읽는 걸 좋아해요', icon: 'book' as const, tone: formatColors.letter },
-  { label: '웹툰', desc: '만화로 쉽게 이해하는 걸 좋아해요', icon: 'image' as const, tone: formatColors.webtoon },
-  { label: '듣기', desc: '이동 중에 귀로 듣는 걸 좋아해요', icon: 'headset' as const, tone: formatColors.podcast },
-  { label: '영상', desc: '영상으로 한눈에 보는 걸 좋아해요', icon: 'videocam' as const, tone: formatColors.video },
+  { label: '읽기', desc: '글로 차분히 읽는 걸 좋아해요', icon: BookOpenText, tone: formatColors.letter },
+  { label: '웹툰', desc: '만화로 쉽게 이해하는 걸 좋아해요', icon: ImageSquare, tone: formatColors.webtoon },
+  { label: '듣기', desc: '이동 중에 귀로 듣는 걸 좋아해요', icon: Headphones, tone: formatColors.podcast },
+  { label: '영상', desc: '영상으로 한눈에 보는 걸 좋아해요', icon: VideoCamera, tone: formatColors.video },
 ];
 const PAGE_BG = '#f4f6fa';
 
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
+type IconName = typeof Bell;
 // 아이콘은 한 가지 잉크 톤으로 통일한다(색을 늘어놓지 않고 웹의 차분한 에디토리얼 톤을 따른다).
 const TONE = {
   ink: { bg: '#f1f3f6', fg: '#374151' },
@@ -63,7 +63,7 @@ export default function AccountScreen() {
             )}
           </View>
           <View style={styles.avatar}>
-            {signedIn && email ? <Text style={styles.avatarText}>{initial}</Text> : <Ionicons name="person" size={26} color="#fff" />}
+            {signedIn && email ? <Text style={styles.avatarText}>{initial}</Text> : <User size={26} color="#fff" weight="fill" />}
           </View>
         </View>
         {!signedIn ? (
@@ -83,35 +83,35 @@ export default function AccountScreen() {
           accessibilityRole="button"
         >
           <View style={[styles.wayIcon, { backgroundColor: pref ? pref.tone.accent : colors.brand }]}>
-            <Ionicons name={pref ? pref.icon : 'sparkles'} size={22} color="#fff" />
+            {pref ? <pref.icon size={24} color="#fff" weight="fill" /> : <Sparkle size={24} color="#fff" weight="fill" />}
           </View>
           <View style={styles.wayText}>
             <Text style={styles.wayLabel}>내 읽기 방식</Text>
             <Text style={styles.wayTitle}>{pref ? pref.label : '나에게 맞는 방식 찾기'}</Text>
             <Text style={styles.wayDesc}>{pref ? pref.desc : '질문 2개로 읽기·웹툰·듣기·영상 중 골라 드려요'}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#9aa3b2" />
+          <CaretRight size={18} color="#9aa3b2" weight="bold" />
         </Pressable>
 
         <View style={styles.tiles}>
-          <Tile icon="bookmark" tone="ink" label="저장한 글" count={saved.items.length} onPress={() => router.navigate('/me')} />
-          <Tile icon="time" tone="ink" label="읽은 글" count={read.items.length} onPress={() => router.navigate('/me')} />
+          <Tile icon={BookmarkSimple} tone="ink" label="저장한 글" count={saved.items.length} onPress={() => router.navigate('/me')} />
+          <Tile icon={ClockCounterClockwise} tone="ink" label="읽은 글" count={read.items.length} onPress={() => router.navigate('/me')} />
         </View>
 
         <Text style={styles.groupTitle}>설정</Text>
         <View style={styles.group}>
-          {signedIn ? <Row icon="lock-closed" tone="ink" label="비밀번호 변경" onPress={() => router.push('/settings/password')} /> : null}
-          <Row icon="notifications" tone="ink" label="알림 설정" onPress={() => router.push('/settings/notifications')} last />
+          {signedIn ? <Row icon={LockKey} tone="ink" label="비밀번호 변경" onPress={() => router.push('/settings/password')} /> : null}
+          <Row icon={Bell} tone="ink" label="알림 설정" onPress={() => router.push('/settings/notifications')} last />
         </View>
 
         <Text style={styles.groupTitle}>더 보기</Text>
         <View style={styles.group}>
-          <Row icon="game-controller" tone="ink" label="게임" onPress={() => router.push('/games')} />
-          <Row icon="sparkles" tone="ink" label="서비스 소개" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'about' } })} />
-          <Row icon="chatbubble-ellipses" tone="ink" label="문의하기" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'contact' } })} />
-          <Row icon="document-text" tone="ink" label="이용약관" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'terms' } })} />
-          <Row icon="shield-checkmark" tone="ink" label="개인정보처리방침" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'privacy' } })} />
-          <Row icon="globe" tone="ink" label="AI LENS 웹사이트" onPress={() => Linking.openURL(SITE)} last />
+          <Row icon={GameController} tone="ink" label="게임" onPress={() => router.push('/games')} />
+          <Row icon={Sparkle} tone="ink" label="서비스 소개" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'about' } })} />
+          <Row icon={ChatCircleDots} tone="ink" label="문의하기" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'contact' } })} />
+          <Row icon={FileText} tone="ink" label="이용약관" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'terms' } })} />
+          <Row icon={ShieldCheck} tone="ink" label="개인정보처리방침" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'privacy' } })} />
+          <Row icon={Globe} tone="ink" label="AI LENS 웹사이트" onPress={() => Linking.openURL(SITE)} last />
         </View>
 
         {signedIn ? (
@@ -129,7 +129,7 @@ function Tile({ icon, tone, label, count, onPress }: { icon: IconName; tone: Ton
   return (
     <Pressable style={({ pressed }) => [styles.tile, pressed && styles.pressed]} onPress={onPress} accessibilityRole="button">
       <View style={[styles.tileIcon, { backgroundColor: TONE[tone].bg }]}>
-        <Ionicons name={icon} size={20} color={TONE[tone].fg} />
+        {(() => { const I = icon; return <I size={22} color={TONE[tone].fg} weight="duotone" />; })()}
       </View>
       <Text style={styles.tileCount}>{count}</Text>
       <Text style={styles.tileLabel}>{label}</Text>
@@ -141,10 +141,10 @@ function Row({ icon, tone, label, onPress, last }: { icon: IconName; tone: Tone;
   return (
     <Pressable style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && styles.rowPressed]} onPress={onPress} accessibilityRole="link">
       <View style={[styles.rowIcon, { backgroundColor: TONE[tone].bg }]}>
-        <Ionicons name={icon} size={18} color={TONE[tone].fg} />
+        {(() => { const I = icon; return <I size={20} color={TONE[tone].fg} weight="duotone" />; })()}
       </View>
       <Text style={styles.rowText}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color="#b4bcc9" />
+      <CaretRight size={16} color="#b4bcc9" weight="bold" />
     </Pressable>
   );
 }

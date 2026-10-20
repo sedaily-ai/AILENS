@@ -36,6 +36,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-updates": "~57.0.26",
     "expo-video": "~57.0.5",
+    "phosphor-react-native": "^3.0.6",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-get-random-values": "~1.11.0",

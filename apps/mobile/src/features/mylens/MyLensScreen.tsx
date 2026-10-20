@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, FlatList, Image, Pressable, Share, StyleSheet
 import { Text, TextInput } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { BookmarkSimple, ChatCircleDots, ClockCounterClockwise, MagnifyingGlass, ShareNetwork, Trash, X } from '../../ui/icons';
 import { categoryForDataLabel, ECON_CATEGORIES } from '@ailens/domain';
 import { listPosts, type LensPost, type LetterPost } from '@ailens/api-client';
 import { AppHeader } from '../../components/AppHeader';
@@ -43,7 +43,7 @@ export function MyLensScreen() {
         </View>
       ) : state.status === 'signedOut' ? (
         <View style={styles.center}>
-          <Ionicons name="bookmark-outline" size={44} color={colors.textFaint} />
+          <BookmarkSimple size={44} color={colors.textFaint} weight="duotone" />
           <Text style={styles.h1}>나의 LENS</Text>
           <Text style={styles.note}>로그인하면 담은 문장과 저장한 글,{'\n'}관심 분야를 한곳에서 볼 수 있어요.</Text>
           <Pressable style={styles.cta} onPress={() => router.push('/login')} accessibilityRole="button">
@@ -61,8 +61,8 @@ export function MyLensScreen() {
           </View>
           <View style={{ flex: 1 }}>
             {tab === 'drawer' ? <Drawer userId={state.userId} /> : null}
-            {tab === 'saved' ? <ArticleList items={saved.items} icon="bookmark-outline" empty={'저장한 글이 없어요.\n기사 상단의 북마크 아이콘으로 저장해 보세요.'} onRemove={(id) => void bookmarks.remove(id)} /> : null}
-            {tab === 'read' ? <ArticleList items={read.items} icon="time-outline" empty={'아직 읽은 글이 없어요.\n오늘의 지면에서 하나 골라 읽어 보세요.'} onRemove={(id) => void history.remove(id)} showTime /> : null}
+            {tab === 'saved' ? <ArticleList items={saved.items} icon={BookmarkSimple} empty={'저장한 글이 없어요.\n기사 상단의 북마크 아이콘으로 저장해 보세요.'} onRemove={(id) => void bookmarks.remove(id)} /> : null}
+            {tab === 'read' ? <ArticleList items={read.items} icon={ClockCounterClockwise} empty={'아직 읽은 글이 없어요.\n오늘의 지면에서 하나 골라 읽어 보세요.'} onRemove={(id) => void history.remove(id)} showTime /> : null}
             {tab === 'interest' ? <Interests /> : null}
           </View>
         </>
@@ -71,12 +71,12 @@ export function MyLensScreen() {
   );
 }
 
-function Empty({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
+function Empty({ icon: Icon, text }: { icon: typeof BookmarkSimple; text: string }) {
   const router = useRouter();
   return (
     <View style={styles.emptyBox}>
       <View style={styles.emptyIcon}>
-        <Ionicons name={icon} size={28} color="#6b7280" />
+        <Icon size={30} color="#6b7280" weight="duotone" />
       </View>
       <Text style={styles.emptyText}>{text}</Text>
       <Pressable style={styles.emptyBtn} onPress={() => router.navigate('/')} accessibilityRole="button">
@@ -130,13 +130,13 @@ function Drawer({ userId }: { userId: string }) {
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <View style={styles.search}>
-          <Ionicons name="search-outline" size={18} color={colors.textFaint} />
+          <MagnifyingGlass size={20} color={colors.textFaint} />
           <TextInput value={q} onChangeText={setQ} placeholder="담은 문장 검색" placeholderTextColor={colors.textFaint} style={styles.searchInput} accessibilityLabel="담은 문장 검색" />
         </View>
       }
       ListEmptyComponent={
         <Empty
-          icon="chatbox-ellipses-outline"
+          icon={ChatCircleDots}
           text={state.data.length === 0 ? '담은 문장이 없어요.\n기사 본문의 문단을 길게 눌러 마음에 드는 문장을 담아 보세요.' : '검색 결과가 없어요.'}
         />
       }
@@ -152,10 +152,10 @@ function Drawer({ userId }: { userId: string }) {
             <Text style={styles.date}>{kstDateTime(s.created_at)}</Text>
             <View style={styles.actRow}>
               <Pressable onPress={() => void Share.share({ message: `“${s.text}”\n— ${s.article_title}\n${SITE}/lens/${encodeURIComponent(s.article_id)}` })} hitSlop={8} accessibilityRole="button" accessibilityLabel="공유">
-                <Ionicons name="share-outline" size={20} color={colors.textMuted} />
+                <ShareNetwork size={22} color={colors.textMuted} />
               </Pressable>
               <Pressable onPress={() => confirmDelete(s)} hitSlop={8} accessibilityRole="button" accessibilityLabel="삭제">
-                <Ionicons name="trash-outline" size={20} color={colors.textMuted} />
+                <Trash size={22} color={colors.textMuted} />
               </Pressable>
             </View>
           </View>
@@ -165,7 +165,7 @@ function Drawer({ userId }: { userId: string }) {
   );
 }
 
-function ArticleList({ items, empty, icon, onRemove, showTime }: { items: SavedArticle[]; empty: string; icon: React.ComponentProps<typeof Ionicons>['name']; onRemove: (id: string) => void; showTime?: boolean }) {
+function ArticleList({ items, empty, icon, onRemove, showTime }: { items: SavedArticle[]; empty: string; icon: typeof BookmarkSimple; onRemove: (id: string) => void; showTime?: boolean }) {
   return (
     <FlatList
       data={items}
@@ -185,7 +185,7 @@ function ArticleList({ items, empty, icon, onRemove, showTime }: { items: SavedA
             </Pressable>
           </Link>
           <Pressable onPress={() => onRemove(item.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="목록에서 지우기" style={styles.x}>
-            <Ionicons name="close" size={18} color={colors.textFaint} />
+            <X size={18} color={colors.textFaint} />
           </Pressable>
         </View>
       )}

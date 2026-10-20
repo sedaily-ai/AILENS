@@ -1,10 +1,11 @@
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme';
+import { BookmarkSimple, Compass, Headphones, House } from '../../src/ui/icons';
 
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
-const icon = (on: IconName, off: IconName) => ({ focused, color }: { focused: boolean; color: import('react-native').ColorValue }) => (
-  <Ionicons name={focused ? on : off} size={24} color={color as string} />
+type PhosphorIcon = typeof House;
+// 선택된 탭은 면을 채운(fill) 굵기, 나머지는 가는(regular) 선으로 보여 준다.
+const icon = (Icon: PhosphorIcon) => ({ focused, color }: { focused: boolean; color: import('react-native').ColorValue }) => (
+  <Icon size={25} color={color as string} weight={focused ? 'fill' : 'regular'} />
 );
 
 // 하단 탭 4개(뉴닉 구조를 따름): 홈 / 발견 / 듣기 / 나의 LENS. 햄버거 메뉴는 없다.
@@ -19,10 +20,10 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: '홈', tabBarIcon: icon('home', 'home-outline') }} />
-      <Tabs.Screen name="discover" options={{ title: '발견', tabBarIcon: icon('compass', 'compass-outline') }} />
-      <Tabs.Screen name="listen" options={{ title: '듣기', tabBarIcon: icon('headset', 'headset-outline') }} />
-      <Tabs.Screen name="me" options={{ title: '나의 LENS', tabBarIcon: icon('bookmark', 'bookmark-outline') }} />
+      <Tabs.Screen name="index" options={{ title: '홈', tabBarIcon: icon(House) }} />
+      <Tabs.Screen name="discover" options={{ title: '발견', tabBarIcon: icon(Compass) }} />
+      <Tabs.Screen name="listen" options={{ title: '듣기', tabBarIcon: icon(Headphones) }} />
+      <Tabs.Screen name="me" options={{ title: '나의 LENS', tabBarIcon: icon(BookmarkSimple) }} />
     </Tabs>
   );
 }

@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { GearSix, MagnifyingGlass, User } from '../ui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { colors } from '../theme';
 
@@ -30,17 +30,17 @@ export function AppHeader({ title, settings }: { title?: string; settings?: bool
       <View style={styles.icons}>
         {settings ? (
           <Pressable hitSlop={10} onPress={() => router.push('/account')} accessibilityRole="button" accessibilityLabel="계정 · 설정">
-            <Ionicons name="settings-outline" size={24} color={colors.text} />
+            <GearSix size={26} color={colors.text} weight="regular" />
           </Pressable>
         ) : (
           <>
             <Pressable hitSlop={10} onPress={() => router.push('/search')} accessibilityRole="button" accessibilityLabel="검색">
-              <Ionicons name="search-outline" size={24} color={colors.text} />
+              <MagnifyingGlass size={26} color={colors.text} weight="regular" />
             </Pressable>
             {title ? null : (
               <Pressable hitSlop={10} onPress={() => router.push('/account')} accessibilityRole="button" accessibilityLabel="내 계정">
                 <View style={[styles.avatar, signedIn && styles.avatarOn]}>
-                  <Ionicons name="person" size={18} color={signedIn ? '#fff' : colors.textFaint} />
+                  <User size={18} color={signedIn ? '#fff' : colors.textFaint} weight="fill" />
                 </View>
               </Pressable>
             )}
