@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Text } from '../../../ui/Text';
 import { ArrowRight, Check, Fire } from '../../../ui/icons';
-import { colors } from '../../../theme';
+import { colors, surface } from '../../../theme';
 import { greeting, type BriefingPick } from '../briefing';
 import type { DailyProgress, StepKey } from '../dailyProgress';
 import { SITUATION_ROUTE, type BriefingPrefs } from '../briefingPrefs';
@@ -114,25 +114,25 @@ const styles = StyleSheet.create({
   streakText: { fontSize: 12.5, fontWeight: '800', color: '#c2410c' },
 
   editorWrap: { marginTop: 16 },
-  card: { marginTop: 14, padding: 18, borderRadius: 22, backgroundColor: '#f4f6fa' },
+  card: { ...surface.card, marginTop: 14, padding: 18 },
   stepsRow: { flexDirection: 'row' },
   step: { flex: 1, alignItems: 'center', gap: 8 },
-  circle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#d9dee8' },
+  circle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f5f9', borderWidth: 1.5, borderColor: '#d9dee8' },
   circleCurrent: { borderColor: colors.brand },
   circleDone: { backgroundColor: colors.brand, borderColor: colors.brand },
   circleNum: { fontSize: 14, fontWeight: '800', color: '#9aa3b2' },
   stepLabel: { fontSize: 12.5, fontWeight: '700', color: colors.textSub },
   stepLabelDone: { color: colors.textFaint },
-  bar: { marginTop: 16, height: 6, borderRadius: 3, backgroundColor: '#dfe4ee', overflow: 'hidden' },
+  bar: { marginTop: 16, height: 6, borderRadius: 3, backgroundColor: '#e8ecf3', overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 3, backgroundColor: colors.brand },
   cta: { marginTop: 16, height: 52, borderRadius: 16, backgroundColor: colors.brand, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  ctaDone: { backgroundColor: '#e8ebf2' },
+  ctaDone: { backgroundColor: '#eef1f6' },
   ctaText: { fontSize: 16, fontWeight: '800', color: '#fff' },
   ctaTextDone: { color: colors.textMuted },
   pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
   hint: { marginTop: 10, textAlign: 'center', fontSize: 12.5, color: colors.textFaint },
 
-  sep: { marginTop: 16, height: StyleSheet.hairlineWidth, backgroundColor: '#dfe4ee' },
+  sep: { marginTop: 16, height: StyleSheet.hairlineWidth, backgroundColor: '#e4e8f0' },
   weekIn: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
   day: { alignItems: 'center', gap: 6 },
   dayLabel: { fontSize: 12, fontWeight: '600', color: colors.textFaint },

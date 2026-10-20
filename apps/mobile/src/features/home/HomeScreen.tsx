@@ -4,7 +4,7 @@ import { Text } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/AppHeader';
 import { MiniPlayer } from '../../components/MiniPlayer';
-import { colors } from '../../theme';
+import { colors, surface } from '../../theme';
 import { useHomeData, type HomeData } from './useHomeData';
 import { LatestSection } from './sections/LatestSection';
 import { PaperHero } from './sections/PaperHero';
@@ -60,8 +60,8 @@ export function HomeScreen() {
   const picks = useMemo(() => {
     if (state.status !== 'ready') return [];
     const paperHero = pickPaperSection(state.data.lens, PAPER_TABS[0].paperSection)[0]?.id;
-    return pickBriefing(state.data.lens, state.data.latest, interests, readBefore, new Set(paperHero ? [paperHero] : []), PICK_COUNT[prefs.minutes]);
-  }, [state, interests, readBefore, prefs.minutes]);
+    return pickBriefing(state.data.lens, state.data.latest, interests, readBefore, new Set(paperHero ? [paperHero] : []), PICK_COUNT[prefs.minutes], myEditor.editor);
+  }, [state, interests, readBefore, prefs.minutes, myEditor.editor]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -102,10 +102,10 @@ function Divider() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: surface.page },
   body: { flex: 1 },
-  list: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: 32 },
+  list: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  divider: { height: 28 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   msg: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
   btn: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, backgroundColor: '#f3f4f6' },

@@ -24,3 +24,17 @@ export const formatColors = {
 
 /** 웹 READING_ACCENT — 읽기 지면(레터 본문·요약 카드·소제목 번호)의 포인트색. */
 export const READING_ACCENT = '#5b8def';
+
+/**
+ * 홈 계열 화면의 바탕과 카드 면. Unmute 처럼 아주 연한 바탕 위에 흰 카드를 얇은 선으로만 구분한다(그림자 없음).
+ * 그림자를 쓰면 안드로이드에서 둔탁한 회색 띠로 보여 촌스러워지므로 쓰지 않는다.
+ */
+export const surface = {
+  page: '#f8f9fb',
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#eceff4',
+  },
+} as const;

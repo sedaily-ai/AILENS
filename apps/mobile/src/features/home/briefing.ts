@@ -2,7 +2,9 @@
 // 서버 추천 API 가 생기면 이 파일의 pickBriefing 만 바꿔 끼우면 된다.
 import type { LensPost } from '@ailens/api-client';
 import { categoryForDataLabel, displayHeadline, ECON_CATEGORIES } from '@ailens/domain';
+import type { LetterEditor } from '@ailens/domain';
 import { PAPER_TABS, pickPaperSection, type FeedItem } from './model';
+import { categoriesOf } from './myEditor';
 
 export interface BriefingPick {
   id: string;
@@ -49,7 +51,7 @@ const labelOf = (slug: string) => ECON_CATEGORIES.find((c) => c.slug === slug)?.
  * 오늘 챙길 3가지. 점수: 관심 분야 일치 +3, 오늘 지면 1면 +2.5, 다른 코너 1면 +1.5, 최신 글 +0.5(최신일수록 약간 더).
  * 이미 읽은 글과 excludeIds(홈의 지면 카드가 이미 크게 보여 주는 기사)는 뺀다. 같은 분야가 겹치지 않게 분야별로 하나씩 고른 뒤 모자라면 채운다.
  */
-export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: string[], readIds: Set<string>, excludeIds: Set<string> = new Set(), size: number = BRIEFING_SIZE): BriefingPick[] {
+export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: string[], readIds: Set<string>, excludeIds: Set<string> = new Set(), size: number = BRIEFING_SIZE, editor?: LetterEditor | null): BriefingPick[] {
   const pool = new Map<string, Candidate>();
   const put = (c: Candidate) => {
     if (readIds.has(c.id) || excludeIds.has(c.id)) return;
@@ -63,9 +65,17 @@ export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: st
   });
   latest.slice(0, 30).forEach((i, idx) => put(fromFeed(i, 0.5 + (30 - idx) / 100, '방금 올라온 소식이에요')));
 
-  // 관심 분야 가점과 이유 문구.
+  // 가점과 이유 문구. 내 에디터가 맡는 분야(+3.5)나 담당 주제어가 제목에 있으면(+2.5) 에디터의 시선으로, 관심 분야(+3)면 관심 분야로 골랐다고 알려 준다.
+  const edSlugs = editor ? categoriesOf(editor.id) : [];
+  const edTopics = editor ? editor.topics.map((t) => t.name) : [];
   const scored = [...pool.values()].map((c) => {
-    if (c.slug && interests.includes(c.slug)) return { ...c, score: c.score + 3, reason: `관심 분야 '${labelOf(c.slug)}'라서 골랐어요` };
+    const inEditorCat = !!c.slug && edSlugs.includes(c.slug);
+    const inEditorTopic = !!editor && edTopics.some((t) => c.title.includes(t) || c.excerpt.includes(t));
+    const inInterest = !!c.slug && interests.includes(c.slug);
+    if (editor && (inEditorCat || inEditorTopic)) {
+      return { ...c, score: c.score + (inEditorCat ? 3.5 : 2.5) + (inInterest ? 1 : 0), reason: `${editor.nickname} 에디터 시선으로 골랐어요` };
+    }
+    if (inInterest && c.slug) return { ...c, score: c.score + 3, reason: `관심 분야 '${labelOf(c.slug)}'라서 골랐어요` };
     return c;
   });
   scored.sort((a, b) => b.score - a.score);

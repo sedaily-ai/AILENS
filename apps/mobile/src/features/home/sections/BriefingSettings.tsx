@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ECON_CATEGORIES } from '@ailens/domain';
 import { Text } from '../../../ui/Text';
 import { Bus, Coffee, ForkKnife, Moon, SlidersHorizontal, X } from '../../../ui/icons';
-import { colors } from '../../../theme';
+import { colors, surface } from '../../../theme';
 import { MINUTES, saveBriefingPrefs, type BriefingPrefs, type Minutes, type Situation } from '../briefingPrefs';
 import { setInterests } from '../../mylens/stores';
 
@@ -100,10 +100,10 @@ export function BriefingSettings({ prefs, interests, onInterests }: { prefs: Bri
 }
 
 const styles = StyleSheet.create({
-  summary: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 48, borderRadius: 16, backgroundColor: '#f4f6fa' },
+  summary: { ...surface.card, marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 52, borderRadius: 18 },
   summaryLabel: { fontSize: 13, fontWeight: '800', color: colors.textSub },
   chips: { flex: 1, flexDirection: 'row', gap: 6, overflow: 'hidden' },
-  chip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: '#fff' },
+  chip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: '#f1f3f6' },
   chipText: { fontSize: 12.5, fontWeight: '700', color: colors.text },
   edit: { fontSize: 13, fontWeight: '700', color: '#2563eb' },
 
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
 
   seg: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: 16, backgroundColor: 'rgba(17,24,39,0.055)' },
   segItem: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  segOn: { backgroundColor: '#fff', elevation: 2, shadowColor: '#111827' },
+  segOn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e9f0' },
   segText: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
   segTextOn: { fontWeight: '800', color: colors.text },
 

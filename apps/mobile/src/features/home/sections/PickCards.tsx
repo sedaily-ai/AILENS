@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Link } from 'expo-router';
 import { Text } from '../../../ui/Text';
-import { colors } from '../../../theme';
+import { colors, surface } from '../../../theme';
 import type { BriefingPick } from '../briefing';
 
 /**
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 },
   title: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
   count: { fontSize: 13, fontWeight: '700', color: colors.textFaint },
-  card: { borderRadius: 22, backgroundColor: '#fff', overflow: 'hidden', borderWidth: 1, borderColor: '#e8ebf1' },
+  card: { ...surface.card, overflow: 'hidden' },
   thumb: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.imagePlaceholder },
   img: { width: '100%', height: '100%' },
   body: { padding: 16, paddingTop: 14 },

@@ -4,8 +4,9 @@ import { EDITORS, type LetterEditor } from '@ailens/domain';
 import { getApiConfig } from '@ailens/api-client';
 import { Text } from '../../../ui/Text';
 import { CaretRight, Check, X } from '../../../ui/icons';
-import { colors } from '../../../theme';
+import { colors, surface } from '../../../theme';
 import { chooseEditor } from '../myEditor';
+import { EditorVoice } from './EditorVoice';
 
 /**
  * 홈 맨 위 "내 에디터" 카드 — 웹 레터의 에디터 프로필을 그대로 쓴다(packages/domain 의 EDITORS).
@@ -31,22 +32,33 @@ export function EditorCard({ editor, picked }: { editor: LetterEditor; picked: b
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`내 에디터 ${editor.name}, 바꾸기`}>
-        <Face editor={editor} size={64} />
-        <View style={styles.body}>
-          <Text style={styles.kicker}>{picked ? '내 에디터' : '오늘의 에디터'}</Text>
-          <Text style={styles.name} numberOfLines={1}>{editor.name}</Text>
-          <Text style={styles.nick} numberOfLines={1}>
-            {editor.nickname}
-            {editor.mbti ? ` · ${editor.mbti}` : ''}
-          </Text>
-        </View>
-        <View style={styles.change}>
-          <Text style={styles.changeText}>바꾸기</Text>
-          <CaretRight size={13} color={colors.textMuted} weight="bold" />
-        </View>
-      </Pressable>
-      <Text style={styles.summary} numberOfLines={2}>{editor.summary}</Text>
+      <View style={styles.card}>
+        <Pressable style={styles.top} onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`내 에디터 ${editor.name}, 바꾸기`}>
+          <View style={[styles.ring, { backgroundColor: editor.tone.bg }]}>
+            <Face editor={editor} size={72} />
+          </View>
+          <View style={styles.body}>
+            <Text style={[styles.kicker, { color: editor.tone.fg }]}>{picked ? '내 에디터' : '오늘의 에디터'}</Text>
+            <Text style={styles.name} numberOfLines={1}>{editor.name}</Text>
+            <View style={styles.chips}>
+              <View style={[styles.chip, { backgroundColor: editor.tone.bg }]}>
+                <Text style={[styles.chipText, { color: editor.tone.fg }]}>{editor.nickname}</Text>
+              </View>
+              {editor.mbti ? (
+                <View style={styles.chipGray}>
+                  <Text style={styles.chipGrayText}>{editor.mbti}</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+          <View style={styles.change}>
+            <Text style={styles.changeText}>바꾸기</Text>
+            <CaretRight size={13} color={colors.textMuted} weight="bold" />
+          </View>
+        </Pressable>
+        <Text style={styles.summary}>{editor.summary}</Text>
+        {editor.voice ? <EditorVoice key={editor.id} src={`${getApiConfig().cmsApiUrl}${editor.voice}`} name={editor.name} tint={editor.tone} /> : null}
+      </View>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} statusBarTranslucent>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="닫기" />
@@ -90,14 +102,20 @@ export function EditorCard({ editor, picked }: { editor: LetterEditor; picked: b
 
 const styles = StyleSheet.create({
   face: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: 22, backgroundColor: '#f4f6fa' },
+  card: { ...surface.card, padding: 16 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  ring: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
-  kicker: { fontSize: 12, fontWeight: '800', color: '#2563eb' },
-  name: { marginTop: 2, fontSize: 18, fontWeight: '800', letterSpacing: -0.4, color: colors.text },
-  nick: { marginTop: 2, fontSize: 13, color: colors.textMuted },
-  change: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  kicker: { fontSize: 12, fontWeight: '800' },
+  name: { marginTop: 2, fontSize: 19, fontWeight: '800', letterSpacing: -0.5, color: colors.text },
+  chips: { marginTop: 7, flexDirection: 'row', gap: 6 },
+  chip: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 },
+  chipText: { fontSize: 12, fontWeight: '800' },
+  chipGray: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: '#f1f3f6' },
+  chipGrayText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  change: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   changeText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
-  summary: { marginTop: 10, paddingHorizontal: 4, fontSize: 14, lineHeight: 21, color: colors.textSub },
+  summary: { marginTop: 14, fontSize: 14.5, lineHeight: 22, color: colors.textSub },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(17,24,39,0.45)' },
   sheet: { maxHeight: '82%', backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },

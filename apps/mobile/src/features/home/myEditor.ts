@@ -45,6 +45,11 @@ export async function chooseEditor(id: string): Promise<void> {
   listeners.forEach((l) => l());
 }
 
+/** 이 에디터가 맡는 분야(카테고리 slug). 분야→에디터 표의 역방향이다. */
+export function categoriesOf(editorId: string): string[] {
+  return Object.entries(INTEREST_EDITOR).filter(([, id]) => id === editorId).map(([slug]) => slug);
+}
+
 export function defaultEditorFor(interests: string[]): LetterEditor {
   for (const slug of interests) {
     const e = findEditor(INTEREST_EDITOR[slug] ?? '');
