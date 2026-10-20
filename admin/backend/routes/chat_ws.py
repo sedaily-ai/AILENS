@@ -83,7 +83,7 @@ _CHAT_SYSTEM = (
     " 대화하듯 짧게 답하세요."
 )
 
-_CATEGORY_LABEL = {"letters": "레터", "webtoon": "웹툰", "podcast": "팟캐스트", "video": "영상"}
+_CATEGORY_LABEL = {"letters": "레터", "webtoon": "웹툰", "podcast": "팟캐스트", "video": "영상", "prism": "PRISM"}
 
 _CHAT_SYSTEM_GENERIC = (
     "당신은 AI LENS {label} 프롬프트 실험 챗봇입니다. 사용자와 자연스러운"
