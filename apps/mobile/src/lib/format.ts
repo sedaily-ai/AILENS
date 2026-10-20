@@ -23,3 +23,20 @@ export function kstDateTime(iso?: string | null, fallbackDate?: string | null): 
   const m = fallbackDate ? /^(\d{4})-(\d{2})-(\d{2})/.exec(fallbackDate) : null;
   return m ? `${m[1]}.${m[2]}.${m[3]}` : '';
 }
+
+/**
+ * ISO(UTC) → "방금 / 12분 전 / 3시간 전 / 어제 / 10월 14일". 하루 넘게 지난 글은 날짜로 보여 준다.
+ * 파싱에 실패하면 date('YYYY-MM-DD')로, 그것도 없으면 빈 문자열을 돌려준다.
+ */
+export function relativeTime(iso?: string | null, fallbackDate?: string | null, now: number = Date.now()): string {
+  const t = iso ? Date.parse(iso.replace(/\.\d+/, '')) : NaN;
+  if (!Number.isNaN(t)) {
+    const min = Math.floor((now - t) / 60000);
+    if (min < 1) return '방금';
+    if (min < 60) return `${min}분 전`;
+    const hour = Math.floor(min / 60);
+    if (hour < 24) return `${hour}시간 전`;
+    if (hour < 48) return '어제';
+  }
+  return dateLabel(iso ?? fallbackDate);
+}

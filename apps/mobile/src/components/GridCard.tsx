@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   thumb: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: radius.thumb,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: colors.imagePlaceholder,
     borderWidth: StyleSheet.hairlineWidth,
@@ -45,6 +45,6 @@ const styles = StyleSheet.create({
   title: { marginTop: 10, fontSize: 15, lineHeight: 21, fontWeight: '700', letterSpacing: -0.15, color: colors.text },
   excerpt: { marginTop: 5, fontSize: 12.5, lineHeight: 19, color: colors.textMuted },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  cat: { fontSize: 12, fontWeight: '700', color: colors.textSub },
+  cat: { fontSize: 12, fontWeight: '800', color: '#2563eb' },
   date: { fontSize: 12, color: colors.textFaint },
 });

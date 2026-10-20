@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Headphones, Pause, Play, SkipForward, X } from '../ui/icons';
 import { displayHeadline } from '@ailens/domain';
 import { usePlayer } from '../features/player/PlayerContext';
 import { colors } from '../theme';
@@ -25,7 +25,7 @@ export function MiniPlayer() {
         accessibilityRole="button"
         accessibilityLabel="재생 화면 열기"
       >
-        <Ionicons name="headset-outline" size={28} color={colors.brand} />
+        <Headphones size={30} color={colors.brand} weight="duotone" />
         <View style={styles.text}>
           <Text style={styles.label}>오늘의 뉴스를 귀로{current ? ` · ${index + 1}/${queue.length}` : ''}</Text>
           <Text style={styles.title} numberOfLines={1}>
@@ -39,15 +39,15 @@ export function MiniPlayer() {
         accessibilityRole="button"
         accessibilityLabel={playing ? '일시정지' : '재생'}
       >
-        {loading && !playing ? <ActivityIndicator color="#fff" /> : <Ionicons name={playing ? 'pause' : 'play'} size={22} color="#fff" style={{ marginLeft: playing ? 0 : 2 }} />}
+        {loading && !playing ? <ActivityIndicator color="#fff" /> : (playing ? <Pause size={22} color="#fff" weight="fill" /> : <Play size={22} color="#fff" weight="fill" />)}
       </Pressable>
       {current ? (
         <>
           <Pressable onPress={next} hitSlop={8} disabled={index >= queue.length - 1} accessibilityRole="button" accessibilityLabel="다음 곡">
-            <Ionicons name="play-skip-forward" size={22} color={index >= queue.length - 1 ? colors.textFaint : colors.text} />
+            <SkipForward size={22} color={index >= queue.length - 1 ? colors.textFaint : colors.text} weight="fill" />
           </Pressable>
           <Pressable onPress={close} hitSlop={8} accessibilityRole="button" accessibilityLabel="닫기">
-            <Ionicons name="close" size={22} color={colors.textFaint} />
+            <X size={20} color={colors.textFaint} />
           </Pressable>
         </>
       ) : null}

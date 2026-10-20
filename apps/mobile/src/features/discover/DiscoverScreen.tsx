@@ -37,7 +37,7 @@ export function DiscoverScreen() {
   const { state, refreshing, reload, refresh } = useHomeData({ media: true });
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <AppHeader />
+      <AppHeader title="발견" />
       <CategoryChips />
       <View style={styles.body}>
         {state.status === 'loading' ? (

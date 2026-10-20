@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, ScrollView, St
 import { Text, TextInput } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { CaretLeft, ClockIcon, MagnifyingGlass, X, XCircle } from '../../ui/icons';
 import {
   DEFAULT_PARAMS,
   MAX_QUERY_LENGTH,
@@ -110,10 +110,10 @@ export function SearchScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.bar}>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel="뒤로">
-          <Ionicons name="chevron-back" size={26} color={colors.text} />
+          <CaretLeft size={26} color={colors.text} weight="bold" />
         </Pressable>
         <View style={styles.inputWrap}>
-          <Ionicons name="search-outline" size={18} color={colors.textFaint} />
+          <MagnifyingGlass size={20} color={colors.textFaint} />
           <TextInput
             ref={inputRef}
             value={input}
@@ -130,7 +130,7 @@ export function SearchScreen() {
           />
           {input ? (
             <Pressable onPress={() => { setInput(''); inputRef.current?.focus(); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="지우기">
-              <Ionicons name="close-circle" size={18} color={colors.textFaint} />
+              <XCircle size={20} color={colors.textFaint} weight="fill" />
             </Pressable>
           ) : null}
         </View>
@@ -156,11 +156,11 @@ export function SearchScreen() {
               {recent.map((r) => (
                 <View key={r} style={styles.recentRow}>
                   <Pressable style={styles.recentMain} onPress={() => commit(r)} accessibilityRole="button">
-                    <Ionicons name="time-outline" size={18} color={colors.textFaint} />
+                    <ClockIcon size={20} color={colors.textFaint} />
                     <Text style={styles.recentText}>{r}</Text>
                   </Pressable>
                   <Pressable onPress={() => void removeRecentSearch(r).then(setRecent)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`${r} 삭제`}>
-                    <Ionicons name="close" size={18} color={colors.textFaint} />
+                    <X size={18} color={colors.textFaint} />
                   </Pressable>
                 </View>
               ))}
@@ -287,7 +287,7 @@ function ResultRow({ hit, terms }: { hit: SearchHit; terms: string[] }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
-  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f3f4f6', borderRadius: 10, paddingHorizontal: 12, height: 42 },
+  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f1f3f6', borderRadius: 14, paddingHorizontal: 14, height: 46 },
   input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: 0 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8 },
   msg: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
@@ -296,28 +296,28 @@ const styles = StyleSheet.create({
   idle: { padding: 20, gap: 28 },
   block: { gap: 10 },
   blockHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  blockTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
+  blockTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.4, color: colors.text },
   clear: { fontSize: 13, color: colors.textFaint },
   hint: { fontSize: 12.5, color: colors.textFaint },
   recentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
   recentMain: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   recentText: { fontSize: 15.5, color: colors.text },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f3f4f6' },
+  chip: { paddingHorizontal: 15, paddingVertical: 9, borderRadius: 999, backgroundColor: '#f1f3f6' },
   chipText: { fontSize: 14, color: colors.textSub, fontWeight: '600' },
   list: { paddingHorizontal: 20, paddingBottom: 32 },
   filters: { flexDirection: 'row', gap: 10, justifyContent: 'space-between', marginTop: 14 },
-  seg: { flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 8, padding: 2 },
-  segItem: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  seg: { flexDirection: 'row', backgroundColor: 'rgba(17,24,39,0.055)', borderRadius: 999, padding: 3 },
+  segItem: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
   segOn: { backgroundColor: '#fff' },
   segText: { fontSize: 12.5, color: colors.textFaint, fontWeight: '600' },
   segTextOn: { color: colors.text, fontWeight: '800' },
   scopeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
   scopeLabel: { fontSize: 12.5, color: colors.textFaint },
   catRow: { gap: 8, paddingVertical: 14 },
-  cat: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.line },
-  catOn: { backgroundColor: colors.brand, borderColor: colors.brand },
-  catText: { fontSize: 13, color: colors.textSub, fontWeight: '600' },
+  cat: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#f1f3f6' },
+  catOn: { backgroundColor: colors.brand },
+  catText: { fontSize: 13.5, color: '#6b7280', fontWeight: '600' },
   catTextOn: { color: '#fff', fontWeight: '700' },
   total: { fontSize: 12.5, color: colors.textFaint, marginBottom: 6 },
   row: { flexDirection: 'row', gap: 14, paddingVertical: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },

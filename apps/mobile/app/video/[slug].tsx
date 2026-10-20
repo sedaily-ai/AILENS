@@ -1,6 +1,8 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '../../src/ui/Text';
+import { useEffect } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { markStep } from '../../src/features/home/dailyProgress';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { getPost, type VideoPost } from '@ailens/api-client';
 import { displayHeadline } from '@ailens/domain';
@@ -24,6 +26,9 @@ export default function VideoDetail() {
 
 function Player({ post }: { post: VideoPost }) {
   const audio = usePlayer();
+  useEffect(() => {
+    void markStep('format');
+  }, []);
   const player = useVideoPlayer(post.video_url ?? null, (p) => {
     p.loop = false;
     // 영상 소리와 오디오(듣기)가 겹치지 않게 영상 재생 시작 전에 오디오를 멈춘다.
