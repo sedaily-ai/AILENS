@@ -8,7 +8,7 @@ import { colors } from '../../theme';
 import { groupByCategory } from '../home/model';
 import { CategorySection } from '../home/sections/CategorySection';
 import { LettersSection } from '../home/sections/LettersSection';
-import { VideoSection, WebtoonSection } from '../home/sections/MediaRails';
+import { AudioSection, VideoSection, WebtoonSection } from '../home/sections/MediaRails';
 import { useHomeData, type HomeData } from '../home/useHomeData';
 import { GamesCard } from '../home/sections/GamesCard';
 import { LatestSection } from '../home/sections/LatestSection';
@@ -28,6 +28,7 @@ function buildSections(data: HomeData): Section[] {
     ...cat(0, 4),
     { key: 'webtoon', render: () => <WebtoonSection items={data.webtoons} /> },
     { key: 'video', render: () => <VideoSection items={data.videos} /> },
+    { key: 'audio', render: () => <AudioSection items={data.audio} /> },
     ...cat(4, 6),
     { key: 'letters', render: () => <LettersSection items={data.issueLetters} /> },
     ...cat(6, 9),
