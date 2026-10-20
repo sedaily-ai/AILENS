@@ -14,7 +14,7 @@ import logging
 import re
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import requests
 
@@ -29,7 +29,8 @@ BIGKINDS_TIMEOUT_SECONDS = 15
 BIGKINDS_PROVIDER = '서울경제'
 
 # 검색 결과에 자주 섞이는 저가치 코너(부고·인사·사설 등)를 제외하는 제목 마커.
-EXCLUDE_TITLE_MARKERS = ('[부고]', '[인사]', '[사설]', '[마켓아이]', '[시론]', '[발언대]')
+# 1990년대 보관본은 코너 이름을 한자로 쓴다('[社說] 大企業의 役割', 2026-10-20 확인) — 한글 마커에 걸리지 않아 함께 둔다.
+EXCLUDE_TITLE_MARKERS = ('[부고]', '[인사]', '[사설]', '[마켓아이]', '[시론]', '[발언대]', '[社說]', '[人事]', '[訃告]')
 
 # 빅카인즈 content는 문서상 200자 제한이지만 실제로는 전체 본문(1,500자 이상)이 내려온다.
 # 목록 표시용으로 미리보기 길이로 직접 자른다(전체는 original_link 참조).
@@ -186,6 +187,11 @@ def previous_day(date: str) -> str:
 FRONT_PAGE_FIELDS = ['title', 'content', 'byline', 'category', 'provider_link_page', 'printing_page', 'enveloped_at']
 FRONT_PAGE_FETCH_SIZE = 5000
 FRONT_PAGE_TIMEOUT_SECONDS = 20
+# 1면이 있는지만 볼 때(본문 없이 면 번호·송고 시각만) — 생일 1면 대체의 거슬러 찾기와 1면 없는 날 목록 수집이 쓴다.
+FRONT_COUNT_FIELDS = ['printing_page', 'enveloped_at']
+FRONT_COUNT_TIMEOUT_SECONDS = 10
+# 1면에 함께 실리는 사진 설명 기사. 본문 길이로 줄 세우면 맨 위 기사가 될 수 있어 뒤로 보낸다.
+PHOTO_TITLE_PREFIXES = ('[사진]', '[포토]')
 
 
 def _sent_minute(doc: dict) -> str:
@@ -198,24 +204,119 @@ FRONT_MATCH_PUBLISHED = 'published'
 FRONT_MATCH_SENT = 'sent'
 
 
-def search_front_page(print_date: str, match: str) -> List[Dict[str, Any]]:
-    """인쇄일 print_date 신문의 서울경제 1면(printing_page '1') 기사. 본문이 긴 순(분량 순 — 중요도 판단이 아니다).
+def _cap(default: float, timeout: Optional[float]) -> float:
+    """호출 쪽 남은 시간(timeout)이 기본 제한보다 짧으면 그만큼만 기다린다."""
+    return default if timeout is None else min(default, timeout)
+
+
+def _front_docs(print_date: str, match: str, fields: List[str], timeout: float) -> List[dict]:
+    """인쇄일 print_date 신문의 1면(printing_page '1') 원문서.
 
     어느 기사가 그날 신문인지 시기마다 판별 기준이 다르다(2026-10-19 실측).
     - match='published': published_at 날짜가 인쇄일인 기사(1994~1996 보관본). 송고 시각은 보관 작업 시각이라 쓰지 않는다.
     - match='sent': 인쇄 전날 12시 ~ 인쇄일 12시에 송고(enveloped_at)된 기사(2017-11 이후). published_at 은
       2019-10-08 인쇄분부터 전날 날짜가 붙다가 2026년에는 다시 인쇄일이라, 날짜 대신 전날 저녁 송고 시각으로 고른다.
       다음 날 신문은 인쇄일 오후에 송고돼 섞이지 않는다.
-    오류는 BigKindsError 로 raise.
     """
     access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
     start = previous_day(print_date) if match == FRONT_MATCH_SENT else print_date
     docs = _post_search(access_key, '', start, next_day(print_date), FRONT_PAGE_FETCH_SIZE,
-                        _SORT_ARGUMENTS[SORT_DATE], False, fields=FRONT_PAGE_FIELDS,
-                        timeout=FRONT_PAGE_TIMEOUT_SECONDS)
+                        _SORT_ARGUMENTS[SORT_DATE], False, fields=fields, timeout=timeout)
     window_start, window_end = f'{start}T12:00', f'{print_date}T12:00'
-    front = [d for d in docs
-             if str(d.get('printing_page') or '').strip() == '1'
-             and (match != FRONT_MATCH_SENT or window_start <= _sent_minute(d) < window_end)]
-    front.sort(key=lambda d: len(d.get('content') or ''), reverse=True)
-    return _map_documents(front, include_published_at=False)
+    return [d for d in docs
+            if str(d.get('printing_page') or '').strip() == '1'
+            and (match != FRONT_MATCH_SENT or window_start <= _sent_minute(d) < window_end)]
+
+
+def _longest_first(docs: List[dict]) -> List[dict]:
+    """본문이 긴 순(분량 순 — 중요도 판단이 아니다). 사진 설명 기사는 맨 뒤. 미리보기로 자르기 전 원문 길이로 잰다."""
+    return sorted(docs, key=lambda d: ((d.get('title') or '').strip().startswith(PHOTO_TITLE_PREFIXES),
+                                       -len(d.get('content') or '')))
+
+
+def count_front_page(print_date: str, match: str, timeout: Optional[float] = None) -> int:
+    """인쇄일 신문의 1면 기사 수 — 본문 없이 면 번호·송고 시각만 받아 센다. 오류는 BigKindsError 로 raise."""
+    return len(_front_docs(print_date, match, FRONT_COUNT_FIELDS, _cap(FRONT_COUNT_TIMEOUT_SECONDS, timeout)))
+
+
+def search_front_page(print_date: str, match: str, timeout: Optional[float] = None) -> List[Dict[str, Any]]:
+    """인쇄일 print_date 신문의 서울경제 1면 기사. 본문이 긴 순, 사진 설명 기사는 뒤. 오류는 BigKindsError 로 raise."""
+    docs = _front_docs(print_date, match, FRONT_PAGE_FIELDS, _cap(FRONT_PAGE_TIMEOUT_SECONDS, timeout))
+    return _map_documents(_longest_first(docs), include_published_at=False)
+
+
+# ─── 면 번호가 없는 시기의 '그날 서울경제' ──────────────────────────────────────
+# 1990~1993, 1996-08~2017-11-12 보관본은 면 번호가 비어 1면을 특정할 수 없다. 대신 빅카인즈 이슈 순위(그날 언론사 전체
+# 기사를 주제로 묶어 기사가 많은 순으로 준다)에서 서울경제 기사가 묶인 이슈를 골라 '그날 가장 많이 보도된 소식'의
+# 서울경제 기사를 보여 준다. 기사 제목·본문은 원문 그대로이고, 이슈 이름(기계가 뽑은 낱말 묶음)은 쓰지 않는다.
+# 이슈의 기사 번호는 그날 받은 서울경제 기사 목록과 번호로만 맞춘다 — 번호로 기사 상세를 따로 조회하면 0건이 섞인다
+# (timeline/[date]/page.tsx 주석). 키워드로 맞추는 방법은 번호가 맞는 날과 비교해 엉뚱한 기사를 자주 골라 쓰지 않는다
+# (2026-10-20 실측: 2008-09-16 넷째 이슈 '월가 위기'에 '재외공관장 임명장').
+BIGKINDS_ISSUE_URL = 'https://tools.kinds.or.kr/issue_ranking'
+ISSUE_TIMEOUT_SECONDS = 10
+
+DAY_BASIS_ISSUE = 'issue'                    # 많이 보도된 이슈의 서울경제 기사
+DAY_BASIS_NO_RANKING = 'no_ranking'          # 그날 이슈 순위가 비어 있음(예: 2014-04-16) → 본문이 긴 순
+DAY_BASIS_NO_MATCH = 'no_match'              # 이슈에 서울경제 기사를 연결하지 못함(1990~1993, 2016년 무렵) → 본문이 긴 순
+DAY_BASIS_RANKING_FAILED = 'ranking_failed'  # 이슈 순위 조회 실패 → 본문이 긴 순(짧게만 캐시)
+# 그날 서울경제에서만 더 빼는 코너 — 방송 편성표는 본문이 길어 '본문이 긴 순'의 맨 위로 올라온다(1993-09-29 실측).
+DAY_EXCLUDE_TITLE_MARKERS = ('[TV하이라이트]', '[TV 하이라이트]', '[TV프로]', '[방송가이드]')
+
+
+def search_day_docs(date: str, timeout: Optional[float] = None) -> List[dict]:
+    """published_at 이 date 인 서울경제 원문서(본문 포함). 오류는 BigKindsError 로 raise."""
+    access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
+    return _post_search(access_key, '', date, next_day(date), FRONT_PAGE_FETCH_SIZE,
+                        _SORT_ARGUMENTS[SORT_DATE], False, fields=BASE_FIELDS,
+                        timeout=_cap(FRONT_PAGE_TIMEOUT_SECONDS, timeout))
+
+
+def fetch_issue_clusters(date: str, timeout: Optional[float] = None) -> List[List[str]]:
+    """그날 언론사 전체 이슈 순위 — 이슈마다 묶인 기사 번호 목록, 기사가 많은 이슈부터. 오류는 BigKindsError 로 raise."""
+    access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
+    res = requests.post(BIGKINDS_ISSUE_URL, json={'access_key': access_key, 'argument': {'date': date}},
+                        timeout=_cap(ISSUE_TIMEOUT_SECONDS, timeout))
+    try:
+        res.raise_for_status()
+    except requests.HTTPError as e:
+        raise BigKindsError(f'빅카인즈 issue_ranking HTTP {getattr(e.response, "status_code", None)}') from e
+    body = res.json()
+    if body.get('result') != 0:
+        raise BigKindsRejected(f"빅카인즈 issue_ranking 오류: {body.get('reason', '알 수 없는 오류')}")
+    topics = (body.get('return_object') or {}).get('topics') or []
+    clusters = [[str(i) for i in (t.get('news_cluster') or [])] for t in topics if isinstance(t, dict)]
+    return sorted((c for c in clusters if c), key=len, reverse=True)
+
+
+def pick_day_articles(docs: List[dict], clusters: List[List[str]], limit: int) -> Tuple[List[Dict[str, Any]], str]:
+    """그날 서울경제 원문서에서 보여 줄 limit 건과 고른 기준(DAY_BASIS_*).
+
+    기사가 많은 이슈부터 그 이슈에 묶인 서울경제 기사 중 본문이 가장 긴 1건씩 고르고(이슈마다 1건),
+    기사마다 coverage(그 이슈에 묶인 언론사 기사 수)를 붙인다. 모자라면 남은 기사를 본문이 긴 순으로 채운다(coverage 없음).
+    이슈에 연결된 기사가 하나도 없으면 전부 본문이 긴 순이다. 제외 코너(부고·인사·사설 등)는 고르지 않는다.
+    """
+    usable = [d for d in docs if (d.get('title') or '').strip()
+              and not any(marker in d['title'] for marker in EXCLUDE_TITLE_MARKERS + DAY_EXCLUDE_TITLE_MARKERS)]
+    by_id = {d.get('news_id'): d for d in usable}
+    picked: List[Tuple[dict, Optional[int]]] = []
+    used = set()
+    for cluster in clusters:
+        mine = [by_id[i] for i in cluster if i in by_id and i not in used]
+        if not mine:
+            continue
+        best = _longest_first(mine)[0]
+        used.add(best.get('news_id'))
+        picked.append((best, len(cluster)))
+        if len(picked) == limit:
+            break
+    basis = DAY_BASIS_ISSUE if picked else (DAY_BASIS_NO_MATCH if clusters else DAY_BASIS_NO_RANKING)
+    for doc in _longest_first([d for d in usable if d.get('news_id') not in used]):
+        if len(picked) == limit:
+            break
+        picked.append((doc, None))
+    articles = []
+    for doc, coverage in picked:
+        article = _map_documents([doc], include_published_at=False)[0]
+        article['coverage'] = coverage
+        articles.append(article)
+    return articles, basis

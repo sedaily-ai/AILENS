@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
 import { defaultAssetResults } from './lib/birthdayAssets';
-import { useFrontPage } from './lib/birthdayFrontPage';
+import { shareableFront, useFrontPage } from './lib/birthdayFrontPage';
 import type { ShareVariant } from './lib/birthdayShare';
 import { AgesScene, ArrivalScene, AssetScene, AssetSoon, MoneyScene, WageScene } from './BirthdayScenes';
 import { BirthdayFrontPage } from './BirthdayFrontPage';
@@ -19,7 +19,8 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
   const assets = useMemo(() => defaultAssetResults(result), [result]);
   const hasAssets = assets.some(asset => asset.state === 'ready');
   const front = useFrontPage(mode === 'year' ? null : result.birthDate);
-  const frontArticles = useMemo(() => front.state?.status === 'ok' && front.state.date === result.birthDate ? front.state.articles : [], [front.state, result.birthDate]);
+  // 공유 카드에는 생일 당일 1면만 넣는다. 대체한 신문이나 그날 기사를 "내가 태어난 날 1면"으로 찍지 않는다.
+  const frontArticles = useMemo(() => shareableFront(front.state), [front.state]);
   const [variant, setVariant] = useState<ShareVariant>('receipt');
 
   function shareFront() {
@@ -32,7 +33,7 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
     <div className={styles.scenes}>
       <ArrivalScene result={result} mode={mode} />
       {hasAssets && <AssetScene assets={assets} />}
-      <BirthdayFrontPage state={front.state} birthDate={result.birthDate} onShow={front.show} onRetry={front.retry} onUseBirthday={onEdit} onShare={shareFront} />
+      <BirthdayFrontPage state={front.state} birthDate={result.birthDate} onRetry={front.retry} onUseBirthday={onEdit} onShare={shareFront} />
       <WageScene result={result} />
       <MoneyScene result={result} />
       {!hasAssets && <AssetSoon />}
