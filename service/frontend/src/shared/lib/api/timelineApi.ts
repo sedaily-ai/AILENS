@@ -22,6 +22,8 @@ export interface BigKindsArticle {
   byline: string;
   category: string;
   original_link: string | null;
+  /** 생일 타임머신 '그날 서울경제'(front 모드 kind=day)에서만: 이 기사가 속한 그날 이슈를 다룬 언론사 기사 수. 이슈로 고르지 않은 기사는 null. */
+  coverage?: number | null;
 }
 
 /** "그날 이걸 샀다면" 카드 — 백엔드가 조사된 시계열로 그 자리에서 계산한다. 데이터가 없는 구간은 카드 자체가 빠진다(추정치로 채우지 않는다). */
@@ -108,6 +110,12 @@ export async function fetchBigkindsDay(date: string): Promise<BigKindsDayData> {
 export type FrontPageKind = 'front' | 'day' | 'none';
 /** 생일 당일 신문이 아닌 것을 보여 준 까닭. null이면 생일 당일 신문이다. not_yet은 생일이 오늘이라 아직 보관본에 없는 경우. */
 export type FrontPageReason = 'sunday' | 'no_paper' | 'not_yet' | 'archive_missing';
+/**
+ * kind=day 기사를 고른 기준. issue = 그날 언론이 가장 많이 다룬 이슈의 서울경제 기사.
+ * 나머지는 본문이 긴 순으로 대신한 까닭 — no_ranking 그날 이슈 순위가 없음, no_match 이슈에 서울경제 기사를 연결하지 못함, ranking_failed 이슈 순위 조회 실패.
+ */
+export type FrontDayBasis = 'issue' | 'no_ranking' | 'no_match' | 'ranking_failed';
+const FRONT_DAY_BASES: readonly string[] = ['issue', 'no_ranking', 'no_match', 'ranking_failed'];
 const FRONT_KINDS: readonly string[] = ['front', 'day', 'none'];
 const FRONT_REASONS: readonly string[] = ['sunday', 'no_paper', 'not_yet', 'archive_missing'];
 
@@ -119,6 +127,8 @@ export interface FrontPageData {
   shown_date: string | null;
   kind: FrontPageKind;
   reason: FrontPageReason | null;
+  /** kind=day일 때만. 그 밖은 null. */
+  basis: FrontDayBasis | null;
   articles: BigKindsArticle[];
 }
 
@@ -130,7 +140,7 @@ export function parseFrontPage(date: string, data: unknown): FrontPageData | nul
   // 구버전 백엔드(직전 발행일 대체 전, status만 준다) — 롤백 중에도 생일 당일 1면은 보이게 한다. 나머지는 형식 불일치로 본다.
   if (body.kind === undefined) {
     return body.status === 'ok' && articles.length
-      ? { date, date_kind: 'front', shown_date: date, kind: 'front', reason: null, articles }
+      ? { date, date_kind: 'front', shown_date: date, kind: 'front', reason: null, basis: null, articles }
       : null;
   }
   if (typeof body.kind !== 'string' || !FRONT_KINDS.includes(body.kind)) return null;
@@ -143,6 +153,8 @@ export function parseFrontPage(date: string, data: unknown): FrontPageData | nul
     shown_date: shown,
     kind,
     reason: typeof body.reason === 'string' && FRONT_REASONS.includes(body.reason) ? body.reason as FrontPageReason : null,
+    // 기준을 모르는 kind=day(형식이 다른 응답)는 이슈로 골랐다고 말하지 않도록 본문이 긴 순으로 본다.
+    basis: kind !== 'day' ? null : typeof body.basis === 'string' && FRONT_DAY_BASES.includes(body.basis) ? body.basis as FrontDayBasis : 'no_ranking',
     articles,
   };
 }

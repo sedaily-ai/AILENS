@@ -20,11 +20,13 @@ Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경�
 3) 그날의 1면 모드 — `front` 파라미터가 있을 때(`q` 가 없을 때만). 생일 타임머신이 부른다.
    GET /time-machine?front=YYYY-MM-DD   (생일, 1990-01-01 이후, 미래는 오늘로 당김)
    Response: { "date", "date_kind": 생일 시기의 kind("front"|"day"), "shown_date": 보여 준 신문 날짜|null,
-               "kind": "front"|"day"|"none", "reason": null|"sunday"|"no_paper"|"not_yet"|"archive_missing",
+               "kind": "front"|"day"|"none", "reason": null|"sunday"|"no_paper"|"not_yet"|"archive_missing", "basis",
                "articles": [{"news_id","title","content","byline","category","original_link"}],
                "status": "ok"|"no_paper"|"no_page_info"(구버전 웹 호환), "cached": bool }
    - kind=front : 1면(면 번호 1). 면 번호가 있는 시기(FRONT_PAGE_ERAS)만.
-   - kind=day   : 면 번호가 없는 시기의 그날 서울경제 기사(본문이 긴 FRONT_DAY_ARTICLES 건). 1면이라고 부르지 않는다.
+   - kind=day   : 면 번호가 없는 시기의 그날 서울경제 기사 FRONT_DAY_ARTICLES 건. 1면이라고 부르지 않는다.
+                  "basis": "issue"(그날 언론이 가장 많이 다룬 이슈의 서울경제 기사, 기사마다 "coverage"=그 이슈의 기사 수)
+                  | "no_ranking"|"no_match"|"ranking_failed"(본문이 긴 순으로 대신한 까닭). front·none 이면 null.
    - kind=none  : 생일과 그 전 FRONT_LOOKBACK_DAYS 일 동안 보관본에 신문이 없다(reason=archive_missing).
    생일에 신문이 없으면(일요일 휴간·명절·보관본 누락) 하루씩 거슬러 직전 발행일을 보여 주고 reason 에 까닭을 적는다.
    응답 로그에는 요청 날짜도 보여 준 날짜도 남기지 않는다.
@@ -46,7 +48,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import boto3
 
@@ -273,8 +275,34 @@ def _remaining(deadline: float) -> float:
     return left
 
 
-def _resolve_front_page(date: str) -> Tuple[Optional[str], str, List[Dict[str, Any]], bool]:
-    """생일 date 부터 하루씩 거슬러 보여 줄 신문을 찾는다. (보여 줄 날짜, kind, 기사, 실시간 조회로 건너뛴 날이 있었는지).
+class _Resolved(NamedTuple):
+    shown: Optional[str]
+    kind: str
+    articles: List[Dict[str, Any]]
+    # 그때 조회한 0건으로 건너뛰었거나 이슈 순위를 못 받아 대신 고른 결과 — 캐시를 짧게 둔다.
+    provisional: bool
+    # kind=day 일 때 기사를 고른 기준(bigkinds_search.DAY_BASIS_*), 그 밖은 None.
+    basis: Optional[str] = None
+
+
+def _day_highlights(day: str, deadline: float) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """면 번호가 없는 시기의 그날 기사와 고른 기준. 기사가 없으면 ([], None). 이슈 순위 실패는 본문이 긴 순으로 대신한다."""
+    docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
+    if not docs:
+        return [], None
+    try:
+        # 시간이 다 됐으면(_remaining 이 raise) 이미 받은 그날 기사를 버리지 않고 본문이 긴 순으로 보여 준다.
+        clusters = bigkinds_search.fetch_issue_clusters(day, timeout=_remaining(deadline))
+        failed = False
+    except Exception as e:  # noqa: BLE001 — 이슈 순위는 고르는 기준일 뿐이라 실패해도 그날 기사는 보여 준다
+        logger.warning('빅카인즈 이슈 순위 조회 실패, 본문이 긴 순으로 대신: %s', type(e).__name__)
+        clusters, failed = [], True
+    articles, basis = bigkinds_search.pick_day_articles(docs, clusters, FRONT_DAY_ARTICLES)
+    return articles, (bigkinds_search.DAY_BASIS_RANKING_FAILED if failed else basis)
+
+
+def _resolve_front_page(date: str) -> _Resolved:
+    """생일 date 부터 하루씩 거슬러 보여 줄 신문을 찾는다.
 
     면 번호가 있는 시기는 1면, 없는 시기는 그날 기사. 1면이 없는 날은 목록(front_calendar)으로 바로 건너뛰고,
     목록 밖 날짜는 거슬러 찾는 날(생일 다음 날짜들)만 본문 없는 가벼운 조회로 먼저 확인한다. 생일 당일은 대개
@@ -293,9 +321,10 @@ def _resolve_front_page(date: str) -> Tuple[Optional[str], str, List[Dict[str, A
             continue
         match = _front_page_match(day)
         if match is None:
-            articles = bigkinds_search.search_day_articles(day, FRONT_DAY_ARTICLES, timeout=_remaining(deadline))
+            articles, basis = _day_highlights(day, deadline)
             if articles:
-                return day, KIND_DAY, articles, live_skip
+                return _Resolved(day, KIND_DAY, articles,
+                                 live_skip or basis == bigkinds_search.DAY_BASIS_RANKING_FAILED, basis)
             live_skip = True
             continue
         known = calendar.known_front(day)
@@ -306,9 +335,9 @@ def _resolve_front_page(date: str) -> Tuple[Optional[str], str, List[Dict[str, A
             continue
         articles = bigkinds_search.search_front_page(day, match, timeout=_remaining(deadline))
         if articles:
-            return day, KIND_FRONT, articles, live_skip
+            return _Resolved(day, KIND_FRONT, articles, live_skip)
         live_skip = True
-    return None, KIND_NONE, [], live_skip
+    return _Resolved(None, KIND_NONE, [], live_skip)
 
 
 def _front_reason(date: str, shown: Optional[str], kind: str) -> Optional[str]:
@@ -335,17 +364,17 @@ def get_front_page_data(date: str) -> dict:
     date_kind = KIND_FRONT if _front_page_match(date) else KIND_DAY
     cached = _read_cache(_front_cache_key(date), _front_negative_cache_key(date),
                          {'date': date, 'date_kind': date_kind, 'shown_date': None, 'kind': KIND_NONE,
-                          'reason': REASON_ARCHIVE_MISSING, 'articles': []}, FRONT_LOG_LABEL)
+                          'reason': REASON_ARCHIVE_MISSING, 'basis': None, 'articles': []}, FRONT_LOG_LABEL)
     if cached is not None:
         data = cached
     else:
-        shown, kind, articles, live_skip = _resolve_front_page(date)
-        data = {'date': date, 'date_kind': date_kind, 'shown_date': shown, 'kind': kind,
-                'reason': _front_reason(date, shown, kind), 'articles': articles}
+        found = _resolve_front_page(date)
+        data = {'date': date, 'date_kind': date_kind, 'shown_date': found.shown, 'kind': found.kind,
+                'reason': _front_reason(date, found.shown, found.kind), 'basis': found.basis, 'articles': found.articles}
         # 오늘 신문은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 찾지 못한 결과(kind=none)는 짧게만 기억하고,
-        # 그때 조회한 0건으로 건너뛰어 대체한 결과는 적재 지연이 굳지 않게 FRONT_LIVE_FALLBACK_TTL_SECONDS 만 둔다.
+        # 그때 조회한 0건으로 건너뛰었거나 이슈 순위를 못 받아 대신 고른 결과는 굳지 않게 FRONT_LIVE_FALLBACK_TTL_SECONDS 만 둔다.
         if date < today_kst():
-            ttl = FRONT_LIVE_FALLBACK_TTL_SECONDS if live_skip else CACHE_TTL_DAYS * 86400
+            ttl = FRONT_LIVE_FALLBACK_TTL_SECONDS if found.provisional else CACHE_TTL_DAYS * 86400
             _write_cache(_front_cache_key(date), _front_negative_cache_key(date),
                          'timemachine_frontv2_cache', 'timemachine_frontv2_none_cache',
                          date, data, ttl, True, FRONT_LOG_LABEL)

@@ -14,7 +14,7 @@ from services.timeline import bigkinds_search as bs
 from services.timeline import front_calendar as fc
 from common.dates import validation as dv
 
-FRONT_KEYS = {'date', 'date_kind', 'shown_date', 'kind', 'reason', 'articles', 'status', 'cached'}
+FRONT_KEYS = {'date', 'date_kind', 'shown_date', 'kind', 'reason', 'basis', 'articles', 'status', 'cached'}
 
 
 class _FakeTable:
@@ -42,6 +42,31 @@ def _resp(docs):
     r.raise_for_status.return_value = None
     r.json.return_value = {'result': 0, 'return_object': {'documents': docs}}
     return r
+
+
+def _issue(*clusters):
+    """빅카인즈 이슈 순위 응답 — 이슈마다 묶인 기사 번호 목록."""
+    r = MagicMock()
+    r.raise_for_status.return_value = None
+    r.json.return_value = {'result': 0, 'return_object': {'topics': [{'topic': '낱말 묶음', 'news_cluster': list(c)} for c in clusters]}}
+    return r
+
+
+def _route(post, search, issue=None):
+    """검색과 이슈 순위 요청을 주소로 나눠 응답한다. search 는 응답 하나(계속 같은 것) 또는 목록(차례로)."""
+    queue = list(search) if isinstance(search, list) else None
+
+    def answer(url, **kwargs):
+        if url == bs.BIGKINDS_ISSUE_URL:
+            if isinstance(issue, Exception):
+                raise issue
+            return issue or _issue()
+        return queue.pop(0) if queue is not None else search
+    post.side_effect = answer
+
+
+def _searches(post):
+    return [c for c in post.call_args_list if c.args[0] == bs.BIGKINDS_SEARCH_URL]
 
 
 def _calendar(no_front=(), until='2026-10-18', unknown=()):
@@ -100,14 +125,38 @@ def test_photo_caption_never_leads(env):
     assert [a['news_id'] for a in bs.search_front_page('2019-10-09', bs.FRONT_MATCH_SENT)] == ['n1', 'n2']
 
 
-def test_day_articles_longest_first_without_page_filter(env):
-    _, post = env
+def test_pick_day_articles_follows_most_covered_issues(env):
     docs = [_doc(i, page='', content='가' * n) for i, n in [(1, 10), (2, 50), (3, 30), (4, 40), (5, 20)]]
-    post.return_value = _resp(docs + [_doc(6, page='', title='[부고] 홍길동', content='가' * 99)])
-    assert [a['news_id'] for a in bs.search_day_articles('2010-05-12', 4)] == ['n2', 'n4', 'n3', 'n5']
-    argument = post.call_args.kwargs['json']['argument']
-    assert argument['published_at'] == {'from': '2010-05-12', 'until': '2010-05-13'}
-    assert 'printing_page' not in argument['fields']
+    docs.append(_doc(6, page='', title='[社說] 大企業의 役割', content='가' * 99))
+    docs.append(_doc(7, page='', title='[TV하이라이트]', content='가' * 99))  # 편성표는 본문이 길어도 고르지 않는다
+    # 기사가 많은 이슈부터, 이슈마다 서울경제 기사 중 본문이 가장 긴 1건. 한자 사설은 고르지 않는다.
+    clusters = [['x1', 'n1', 'n3', 'x2', 'x3'], ['n6', 'x4', 'x5', 'x6'], ['n5', 'x7'], ['y1']]
+    articles, basis = bs.pick_day_articles(docs, clusters, 4)
+    assert basis == bs.DAY_BASIS_ISSUE
+    assert [(a['news_id'], a['coverage']) for a in articles] == [('n3', 5), ('n5', 2), ('n2', None), ('n4', None)]
+
+
+def test_pick_day_articles_without_ranking_or_match(env):
+    docs = [_doc(i, page='', content='가' * n) for i, n in [(1, 10), (2, 50)]]
+    articles, basis = bs.pick_day_articles(docs, [], 4)
+    assert basis == bs.DAY_BASIS_NO_RANKING and [a['news_id'] for a in articles] == ['n2', 'n1']
+    articles, basis = bs.pick_day_articles(docs, [['x1', 'x2']], 4)
+    assert basis == bs.DAY_BASIS_NO_MATCH and [a['coverage'] for a in articles] == [None, None]
+
+
+def test_fetch_issue_clusters_sorts_by_size(env):
+    _, post = env
+    post.return_value = _issue(['a'], ['b', 'c', 'd'], [], ['e', 'f'])
+    assert bs.fetch_issue_clusters('2010-05-12') == [['b', 'c', 'd'], ['e', 'f'], ['a']]
+    assert post.call_args.args[0] == bs.BIGKINDS_ISSUE_URL
+    assert post.call_args.kwargs['json']['argument'] == {'date': '2010-05-12'}
+    assert post.call_args.kwargs['timeout'] == bs.ISSUE_TIMEOUT_SECONDS
+    rejected = MagicMock()
+    rejected.raise_for_status.return_value = None
+    rejected.json.return_value = {'result': 1, 'reason': 'x'}
+    post.return_value = rejected
+    with pytest.raises(bs.BigKindsRejected):
+        bs.fetch_issue_clusters('2010-05-12')
 
 
 def test_longest_first_measures_full_body_not_preview(env):
@@ -229,9 +278,9 @@ def test_today_without_paper_yet_is_not_called_holiday(env):
 def test_timeouts_shrink_to_remaining_budget(env, monkeypatch):
     _, post = env
     monkeypatch.setattr(tm, 'FRONT_SEARCH_BUDGET_SECONDS', 5)
-    post.return_value = _resp([_doc(1, page='')])
+    _route(post, _resp([_doc(1, page='')]))
     _call(front='2010-05-12')
-    assert 0 < post.call_args.kwargs['timeout'] <= 5
+    assert all(0 < c.kwargs['timeout'] <= 5 for c in post.call_args_list) and len(post.call_args_list) == 2
 
 
 def test_front_with_only_excluded_corners_moves_on(env):
@@ -245,26 +294,58 @@ def test_front_with_only_excluded_corners_moves_on(env):
 
 # ─── 면 번호가 없는 시기 → 그날 서울경제 ─────────────────────────────────────
 
-def test_no_page_era_returns_day_articles(env):
+def test_no_page_era_returns_most_covered_issue_articles(env):
     _, post = env
-    post.return_value = _resp([_doc(i, page='', content='가' * i) for i in range(1, 6)])
+    _route(post, _resp([_doc(i, page='', content='가' * i) for i in range(1, 6)]), _issue(['x'] * 96 + ['n2'], ['n4', 'x']))
     _, body = _call(front='2010-05-12')
-    assert (body['kind'], body['shown_date'], body['reason'], body['status']) == ('day', '2010-05-12', None, 'no_page_info')
-    assert [a['news_id'] for a in body['articles']] == ['n5', 'n4', 'n3', 'n2']
+    assert (body['kind'], body['shown_date'], body['reason'], body['basis'], body['status']) == ('day', '2010-05-12', None, 'issue', 'no_page_info')
+    assert [(a['news_id'], a['coverage']) for a in body['articles']] == [('n2', 97), ('n4', 2), ('n5', None), ('n3', None)]
+    search = _searches(post)[0].kwargs['json']['argument']
+    assert search['published_at'] == {'from': '2010-05-12', 'until': '2010-05-13'} and 'printing_page' not in search['fields']
+
+
+def test_no_page_era_without_ranking_uses_longest(env):
+    _, post = env
+    _route(post, _resp([_doc(i, page='', content='가' * i) for i in range(1, 6)]))
+    _, body = _call(front='2014-04-16')
+    assert body['basis'] == 'no_ranking' and [a['news_id'] for a in body['articles']] == ['n5', 'n4', 'n3', 'n2']
+
+
+def test_ranking_failure_still_shows_day_and_caches_briefly(env):
+    table, post = env
+    _route(post, _resp([_doc(1, page='')]), RuntimeError('issue down'))
+    status, body = _call(front='2010-05-12')
+    assert status == 200 and body['basis'] == 'ranking_failed' and [a['news_id'] for a in body['articles']] == ['n1']
+    left = table.puts[0]['expires_at'] - time.time()
+    assert left <= tm.FRONT_LIVE_FALLBACK_TTL_SECONDS
+
+
+def test_issue_based_day_is_cached_long(env):
+    table, post = env
+    _route(post, _resp([_doc(1, page='')]), _issue(['n1', 'x']))
+    _call(front='2010-05-12')
+    assert table.puts[0]['expires_at'] - time.time() > 3000 * 86400
+
+
+def test_empty_day_does_not_ask_ranking(env):
+    _, post = env
+    _call(front='1990-01-02')
+    assert all(c.args[0] == bs.BIGKINDS_SEARCH_URL for c in post.call_args_list)
 
 
 def test_no_page_era_sunday_skips_to_saturday(env):
     _, post = env
-    post.return_value = _resp([_doc(1, page='')])
+    _route(post, _resp([_doc(1, page='')]))
     _, body = _call(front='2005-03-06')
     assert (body['kind'], body['shown_date'], body['reason']) == ('day', '2005-03-05', 'sunday')
-    assert post.call_count == 1 and _range(post, 0) == {'from': '2005-03-05', 'until': '2005-03-06'}
+    searches = _searches(post)
+    assert len(searches) == 1 and searches[0].kwargs['json']['argument']['published_at'] == {'from': '2005-03-05', 'until': '2005-03-06'}
 
 
 def test_empty_archive_walks_back_then_gives_up(env):
     table, post = env
     _, body = _call(front='1998-07-15')
-    assert body == {'date': '1998-07-15', 'date_kind': 'day', 'shown_date': None, 'kind': 'none', 'reason': 'archive_missing',
+    assert body == {'date': '1998-07-15', 'date_kind': 'day', 'shown_date': None, 'kind': 'none', 'reason': 'archive_missing', 'basis': None,
                     'articles': [], 'status': 'no_page_info', 'cached': False}
     assert post.call_count == 9  # 생일 포함 11일 중 휴간 일요일(7.12·7.5) 2일은 묻지 않는다
     assert [p['news_id'] for p in table.puts] == ['timemachine_frontv2_none_1998-07-15']
@@ -287,7 +368,7 @@ def test_walk_stops_at_archive_start(env):
 def test_crossing_era_boundary(env, monkeypatch, date, no_front, responses, expected):
     _, post = env
     _set_calendar(monkeypatch, no_front=no_front)
-    post.side_effect = [_resp(docs) for docs in responses]
+    _route(post, [_resp(docs) for docs in responses])
     _, body = _call(front=date)
     # date_kind 는 생일 쪽 시기 — 화면 안내가 '1면이 없어요'와 '서울경제가 없어요'를 이것으로 가른다.
     assert (body['date_kind'], body['kind'], body['shown_date'], body['reason'], body['status']) == expected

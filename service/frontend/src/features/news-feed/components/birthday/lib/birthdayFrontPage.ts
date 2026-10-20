@@ -66,14 +66,29 @@ export function frontNotice(data: FrontPageData): FrontNotice | null {
       title = '생일 당일 신문을 찾지 못했어요';
       lines.push(`${birthday}자 ${missing} 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 ${nb('빠진 날이에요.')}`);
     }
-    lines.push(`대신 가장 가까운 지난 신문인 ${nb(`${dateLabel(shown)} ${weekdayOf(shown)}요일자`)} ${data.kind === 'front' ? '1면을' : '기사를'} ${nb('보여 줘요.')}`);
+    const shownLabel = nb(`${dateLabel(shown)} ${weekdayOf(shown)}요일자`);
+    lines.push(data.kind === 'front'
+      ? `대신 가장 가까운 지난 신문인 ${shownLabel} 1면을 ${nb('보여 줘요.')}`
+      : `대신 가장 가까운 지난 날짜인 ${shownLabel} 서울경제를 ${nb('찾았어요.')}`);
   }
   if (data.kind === 'day') {
-    lines.push(sameDay
-      ? `빅카인즈 보관본에는 이 무렵 신문이 몇 면에 실렸는지 기록이 없어요. 그래서 1면 대신 그날 서울경제 기사 중 본문이 긴 ${count}을 ${nb('보여 줘요.')}`
-      : `이 무렵 신문은 몇 면에 실린 기사인지 기록이 없어, 1면 대신 본문이 긴 기사 ${count}을 ${nb('골랐어요.')}`);
+    // 1면을 못 보여 주는 까닭(면 번호 기록이 없는 시기)과, 그 대신 무엇을 어떤 기준으로 골랐는지를 함께 적는다.
+    // '~' 앞에서 줄이 갈라져('1996년 8월 / ~2017년') 기간을 '부터 … 까지'로 쓴다. 2017-11-13부터는 면 번호가 있다.
+    lines.push(`1990~1993년, ${nb('1996년 8월부터')} ${nb('2017년 11월 12일까지')} 신문은 빅카인즈 보관본에 몇 면 기사인지 기록이 없어 1면을 가려낼 수 ${nb('없어요.')}`);
+    lines.push(dayBasisLine(data.basis, count));
   }
   return { title, lines };
+}
+
+/** 그날 기사를 고른 기준. 이슈 순위로 고르지 못했으면 왜 본문이 긴 순으로 대신했는지 적는다. */
+function dayBasisLine(basis: FrontPageData['basis'], count: string) {
+  const longest = `1면 대신 본문이 긴 서울경제 기사 ${count}을 ${nb('보여 줘요.')}`;
+  switch (basis) {
+    case 'issue': return `그래서 1면 대신, 그날 여러 언론이 가장 많이 다룬 소식을 서울경제 기사로 ${nb('보여 줘요.')}`;
+    case 'no_match': return `그날 많이 보도된 소식에 서울경제 기사가 연결되지 않아, ${longest}`;
+    case 'ranking_failed': return `지금은 그날 언론 이슈 순위를 불러오지 못해, ${longest}`;
+    default: return `그날은 언론 이슈 순위 자료가 없어, ${longest}`;
+  }
 }
 
 /** 공유 카드("내가 태어난 날 서울경제 1면")에 넣을 기사 — 생일 당일 1면일 때만. 대체한 신문·그날 기사는 넣지 않는다. */

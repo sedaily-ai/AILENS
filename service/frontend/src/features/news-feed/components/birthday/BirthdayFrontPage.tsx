@@ -52,9 +52,22 @@ function Headlines({ articles }: { articles: FrontPageData['articles'] }) {
     const title = <>{article.title}{href && <ExternalLink size={14} aria-hidden="true" />}</>;
     return <li key={article.news_id || index} data-lead={index === 0 || undefined}>
       {href ? <a href={href} target="_blank" rel="noopener noreferrer">{title}<span className="sr-only"> (새 창)</span></a> : <span>{article.title}</span>}
+      {/* 그날 서울경제(면 번호 없는 시기)를 이슈 순위로 골랐을 때 — 왜 이 기사인지 근거를 기사마다 붙인다. */}
+      {/* li > span 은 링크 없는 제목 줄(44px) 규칙이라 small 을 쓴다. */}
+      {article.coverage ? <small className={styles.coverage}>{`그날 언론 기사 ${article.coverage.toLocaleString('ko-KR')}건이 다룬 소식`}</small> : null}
       {index === 0 && article.content && <p>{article.content}</p>}
     </li>;
   })}</ol>;
+}
+
+/** 지면 아래 출처 — 기사를 어떤 자료와 기준으로 골랐는지. */
+function sourceNote(data: FrontPageData | null) {
+  if (data?.kind === 'day' && data.basis === 'issue') {
+    const filled = data.articles.some(article => !article.coverage);
+    return <>빅카인즈 보관본과 {nb('언론 이슈 순위')} 기준이에요. 기사 수는 그날 여러 언론사가 같은 소식을 다룬 {nb('기사 수예요.')}{filled ? <> 이슈로 고르지 못한 칸은 본문이 긴 {nb('기사로 채워요.')}</> : null}</>;
+  }
+  if (data?.kind === 'day') return <>빅카인즈 보관본 기준이에요. 기사는 본문이 긴 순서로, 사진 설명은 맨 뒤에 {nb('보여 줘요.')}</>;
+  return <>빅카인즈 보관본의 면 번호 기준이라 실제 지면 배치·순서와 {nb('다를 수 있어요')}. 기사는 본문이 긴 순서로, 사진 설명은 맨 뒤에 {nb('보여 줘요.')}</>;
 }
 
 /** ② 그날 1면 — 이 페이지에서 유일하게 지면 모양으로 힘을 주는 장면. 생일에 신문이 없으면 서버가 고른 직전 발행일을 보여 준다. */
@@ -94,6 +107,6 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
     {/* 서로 다른 사실(보여 주는 순서·날짜 전송)을 '-고,'로 한 문장에 잇던 것을 나눴다.
         '그날 신문 전체 보기'도 주소에 날짜를 담아 서버에 묻기 때문에 '1면을'이 아니라 '그날 신문을 찾을 때'로 쓴다.
         그날 기사(면 번호 없는 시기)는 면 번호 기준이 아니라서 첫 문장을 바꾼다. */}
-    <p className={styles.source}>{isDay ? '빅카인즈 보관본 기준이에요.' : <>빅카인즈 보관본의 면 번호 기준이라 실제 지면 배치·순서와 {nb('다를 수 있어요')}.</>} 기사는 본문이 긴 순서로, 사진 설명은 맨 뒤에 {nb('보여 줘요')}. 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요.</p>
+    <p className={styles.source}>{sourceNote(data)} 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요.</p>
   </section>;
 }
