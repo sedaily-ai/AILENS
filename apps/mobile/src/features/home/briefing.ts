@@ -47,12 +47,12 @@ const labelOf = (slug: string) => ECON_CATEGORIES.find((c) => c.slug === slug)?.
 
 /**
  * 오늘 챙길 3가지. 점수: 관심 분야 일치 +3, 오늘 지면 1면 +2.5, 다른 코너 1면 +1.5, 최신 글 +0.5(최신일수록 약간 더).
- * 이미 읽은 글은 뺀다. 같은 분야가 겹치지 않게 분야별로 하나씩 고른 뒤 모자라면 채운다.
+ * 이미 읽은 글과 excludeIds(홈의 지면 카드가 이미 크게 보여 주는 기사)는 뺀다. 같은 분야가 겹치지 않게 분야별로 하나씩 고른 뒤 모자라면 채운다.
  */
-export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: string[], readIds: Set<string>): BriefingPick[] {
+export function pickBriefing(lens: LensPost[], latest: FeedItem[], interests: string[], readIds: Set<string>, excludeIds: Set<string> = new Set()): BriefingPick[] {
   const pool = new Map<string, Candidate>();
   const put = (c: Candidate) => {
-    if (readIds.has(c.id)) return;
+    if (readIds.has(c.id) || excludeIds.has(c.id)) return;
     const prev = pool.get(c.id);
     if (!prev || c.score > prev.score) pool.set(c.id, c);
   };

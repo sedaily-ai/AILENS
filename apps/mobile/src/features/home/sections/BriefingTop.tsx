@@ -3,7 +3,6 @@ import { useRouter, type Href } from 'expo-router';
 import { Text } from '../../../ui/Text';
 import { ArrowRight, Check, Fire } from '../../../ui/icons';
 import { colors } from '../../../theme';
-import { useAuth } from '../../../auth/AuthContext';
 import { greeting, type BriefingPick } from '../briefing';
 import type { DailyProgress, StepKey } from '../dailyProgress';
 
@@ -23,8 +22,6 @@ const FORMAT_ROUTE: Href[] = ['/letter', '/webtoon', '/listen', '/video'];
 
 export function BriefingTop({ progress, picks, preferredFormat }: { progress: DailyProgress; picks: BriefingPick[]; preferredFormat: number | null }) {
   const router = useRouter();
-  const { state } = useAuth();
-  const name = state.status === 'signedIn' && state.email ? `${state.email.split('@')[0]}님` : '';
   const all = progress.doneCount === STEPS.length;
   const next = STEPS.find((s) => !progress.today[s.key]);
 
@@ -42,7 +39,7 @@ export function BriefingTop({ progress, picks, preferredFormat }: { progress: Da
       <View style={styles.greetRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.hello}>{greeting()}</Text>
-          <Text style={styles.sub}>{name ? `${name}, ` : ''}{all ? '내일 아침에 또 만나요' : '오늘 챙길 3가지, 5분이면 돼요'}</Text>
+          <Text style={styles.sub}>{all ? '내일 아침에 또 만나요' : '오늘 챙길 3가지, 5분이면 돼요'}</Text>
         </View>
         {progress.streak > 0 ? (
           <View style={styles.streak}>

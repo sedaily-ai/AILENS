@@ -12,6 +12,7 @@ import { TimeMachineCard } from './sections/TimeMachineCard';
 import { BriefingTop } from './sections/BriefingTop';
 import { PickCards } from './sections/PickCards';
 import { pickBriefing } from './briefing';
+import { PAPER_TABS, pickPaperSection } from './model';
 import { useDailyProgress } from './dailyProgress';
 import { getPreferredFormat } from '../onboarding/prefs';
 import { bookmarks, getInterests, history } from '../mylens/stores';
@@ -51,10 +52,12 @@ export function HomeScreen() {
   const startOfToday = useMemo(() => new Date().setHours(0, 0, 0, 0), []);
   const readToday = useMemo(() => new Set(read.items.filter((r) => r.at >= startOfToday).map((r) => r.id)), [read.items, startOfToday]);
   const readBefore = useMemo(() => new Set(read.items.filter((r) => r.at < startOfToday).map((r) => r.id)), [read.items, startOfToday]);
-  const picks = useMemo(
-    () => (state.status === 'ready' ? pickBriefing(state.data.lens, state.data.latest, interests, readBefore) : []),
-    [state, interests, readBefore]
-  );
+  // 아래 "오늘의 지면" 카드가 첫 화면에 크게 보여 주는 지면 1면 기사는 3가지에서 뺀다(같은 기사가 두 번 나오지 않게).
+  const picks = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    const paperHero = pickPaperSection(state.data.lens, PAPER_TABS[0].paperSection)[0]?.id;
+    return pickBriefing(state.data.lens, state.data.latest, interests, readBefore, new Set(paperHero ? [paperHero] : []));
+  }, [state, interests, readBefore]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
