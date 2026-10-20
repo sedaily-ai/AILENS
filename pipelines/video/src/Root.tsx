@@ -1,8 +1,9 @@
 import React from 'react';
 import { Composition } from 'remotion';
 import { NewsVideo, scriptDurationInFrames } from './compositions/NewsVideo';
-import { parseNewsScript, FORMAT_DIMENSIONS, COMPOSITION_ID, PAPER_COMPOSITION_ID } from './lib/schema';
+import { parseNewsScript, FORMAT_DIMENSIONS, COMPOSITION_ID, PAPER_COMPOSITION_ID, PRISM_COMPOSITION_ID } from './lib/schema';
 import { PaperVideo, paperDurationInFrames } from './paper/PaperVideo';
+import { PrismVideo, prismDurationInFrames } from './prism/PrismVideo';
 import { ensureKoreanFontLoaded } from './lib/fonts';
 import sampleJson from '../data/sample.json';
 
@@ -49,6 +50,18 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{ script: { ...sampleScript, design: { theme: 'paper' as const } } }}
         calculateMetadata={async ({ props }) => ({
           durationInFrames: paperDurationInFrames(props.script, FPS),
+        })}
+      />
+      <Composition
+        id={PRISM_COMPOSITION_ID}
+        component={PrismVideo}
+        fps={FPS}
+        width={FORMAT_DIMENSIONS.horizontal.width}
+        height={FORMAT_DIMENSIONS.horizontal.height}
+        durationInFrames={prismDurationInFrames(sampleScript, FPS)}
+        defaultProps={{ script: { ...sampleScript, design: { theme: 'prism' as const } } }}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: prismDurationInFrames(props.script, FPS),
         })}
       />
     </>

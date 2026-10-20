@@ -1,0 +1,210 @@
+import React from "react";
+import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import type { CaptionValue } from "../lib/schema";
+import { FONT, INK, MARGIN, MUTED, PAPERS, type PaperName } from "./theme";
+
+// PRISM 공통 부품 — 화면 틀(배경·그룹 태그·섹션 번호·출처·자막 막대)과 등장 움직임.
+
+export type Seg = { text: string; em: boolean };
+
+export const segsOf = (caption: CaptionValue): Seg[] =>
+  typeof caption === "string" ? [{ text: caption, em: false }] : caption.map((s) => ({ text: s.text, em: !!s.emphasis }));
+
+export const plainOf = (caption: CaptionValue): string => segsOf(caption).map((s) => s.text).join("").trim();
+
+/** 강조 구간 글자(없으면 전체). */
+export const emphasisOf = (caption: CaptionValue): string => {
+  const em = segsOf(caption).filter((s) => s.em).map((s) => s.text.trim()).join(" ").trim();
+  return em || plainOf(caption);
+};
+
+/** 등장 — 아래에서 살짝 올라오며 나타난다(스프링 14/170). */
+export const useEnter = (delay = 0) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const p = spring({ frame: frame - delay, fps, config: { damping: 14, stiffness: 170 } });
+  return { opacity: interpolate(p, [0, 0.4], [0, 1], { extrapolateRight: "clamp" }), transform: `translateY(${(1 - p) * 40}px)`, p };
+};
+
+/** 도장처럼 쾅 — 1.15배에서 1.0으로 내려앉고 놓일 때 3프레임 흔들린다(스프링 9/180). */
+export const useStamp = (delay = 0) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const p = spring({ frame: frame - delay, fps, config: { damping: 9, stiffness: 180 } });
+  const scale = interpolate(p, [0, 1], [1.15, 1]);
+  const landed = frame - delay;
+  const shake = landed >= 5 && landed < 8 ? (landed % 2 === 0 ? 2 : -2) : 0;
+  return { opacity: interpolate(p, [0, 0.25], [0, 1], { extrapolateRight: "clamp" }), transform: `translateX(${shake}px) scale(${scale})` };
+};
+
+const Vignette: React.FC<{ dark: boolean }> = ({ dark }) => (
+  <AbsoluteFill
+    style={{
+      background: dark
+        ? "radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.28) 100%)"
+        : "radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(70,50,20,0.12) 100%)",
+    }}
+  />
+);
+
+const Header: React.FC<{ group?: string; date?: string }> = ({ group, date }) => (
+  <div style={{ position: "absolute", left: 72, top: 36, display: "flex", alignItems: "center", gap: 14 }}>
+    {group ? (
+      <div
+        style={{
+          background: "#F2EBDD",
+          padding: "4px 14px 6px",
+          transform: "rotate(-1.5deg)",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.18)",
+          fontFamily: FONT.display,
+          fontSize: 26,
+          color: INK,
+          letterSpacing: 0.3,
+        }}
+      >
+        {group}
+      </div>
+    ) : null}
+    {date ? (
+      <div style={{ background: INK, color: "#fff", padding: "5px 12px", fontFamily: FONT.body, fontWeight: 800, fontSize: 18 }}>{date}</div>
+    ) : null}
+  </div>
+);
+
+const SectionNo: React.FC<{ section: number; total: number; spot: string; dark: boolean }> = ({ section, total, spot, dark }) => (
+  <div style={{ position: "absolute", right: 76, top: 30, fontFamily: FONT.display, color: spot, display: "flex", alignItems: "baseline", gap: 6 }}>
+    <span style={{ fontSize: 50 }}>{String(section).padStart(2, "0")}</span>
+    <span style={{ fontSize: 24, color: dark ? "rgba(255,255,255,0.6)" : MUTED }}>/ {String(total).padStart(2, "0")}</span>
+  </div>
+);
+
+const Subtitle: React.FC<{ text: string; spot: string }> = ({ text, spot }) => {
+  const size = text.length > 170 ? 22 : text.length > 110 ? 24 : 26;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: MARGIN - 36,
+        right: MARGIN - 36,
+        bottom: 26,
+        background: "rgba(247,242,232,0.97)",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+        padding: "13px 24px 14px 28px",
+        borderLeft: `6px solid ${spot}`,
+        fontFamily: FONT.body,
+        fontWeight: 600,
+        fontSize: size,
+        lineHeight: 1.32,
+        color: INK,
+      }}
+    >
+      {text}
+    </div>
+  );
+};
+
+const Source: React.FC<{ text: string; dark: boolean; hasSubtitle: boolean }> = ({ text, dark, hasSubtitle }) => (
+  <div
+    style={{
+      position: "absolute",
+      right: MARGIN - 36,
+      bottom: hasSubtitle ? 128 : 36,
+      fontFamily: FONT.body,
+      fontWeight: 500,
+      fontSize: 15,
+      color: dark ? "rgba(255,255,255,0.62)" : MUTED,
+    }}
+  >
+    {/^source/i.test(text) ? text : `Source: ${text}`}
+  </div>
+);
+
+export type ShellProps = {
+  paper: PaperName;
+  spot: string;
+  group?: string;
+  date?: string;
+  section?: { no: number; total: number };
+  source?: string;
+  line?: string;
+  durationInFrames: number;
+  children: React.ReactNode;
+};
+
+/** 화면 틀 — 배경, 고정 요소, 그리고 본문은 장면 동안 1.00→1.03배로 천천히 다가온다. */
+export const Shell: React.FC<ShellProps> = ({ paper, spot, group, date, section, source, line, durationInFrames, children }) => {
+  const frame = useCurrentFrame();
+  const { dark, bg } = PAPERS[paper];
+  const zoom = interpolate(frame, [0, Math.max(1, durationInFrames)], [1, 1.03], { extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill style={{ background: bg }}>
+      <Vignette dark={dark} />
+      <AbsoluteFill style={{ transform: `scale(${zoom})` }}>{children}</AbsoluteFill>
+      <Header group={group} date={date} />
+      {section ? <SectionNo section={section.no} total={section.total} spot={spot} dark={dark} /> : null}
+      {source ? <Source text={source} dark={dark} hasSubtitle={!!line} /> : null}
+      {line ? <Subtitle text={line} spot={spot} /> : null}
+    </AbsoluteFill>
+  );
+};
+
+/** "— 작은 제목" 한 줄(강조색 대시). */
+export const Kicker: React.FC<{ text?: string; color: string; dash: string; size?: number; delay?: number; align?: "left" | "center" }> = ({
+  text,
+  color,
+  dash,
+  size = 30,
+  delay = 0,
+  align = "center",
+}) => {
+  const e = useEnter(delay);
+  if (!text) return null;
+  return (
+    <div style={{ ...e, display: "flex", justifyContent: align === "center" ? "center" : "flex-start", alignItems: "center", gap: 14, fontFamily: FONT.body, fontWeight: 700, fontSize: size, color }}>
+      <span style={{ display: "inline-block", width: 24, height: 5, background: dash }} />
+      {text}
+    </div>
+  );
+};
+
+/** 종이 띠 라벨 — 큰 숫자 아래에 비스듬히 붙는다. */
+export const PaperTag: React.FC<{ text?: string; delay?: number; size?: number }> = ({ text, delay = 6, size = 34 }) => {
+  const e = useEnter(delay);
+  if (!text) return null;
+  return (
+    <div style={{ ...e, display: "flex", justifyContent: "center" }}>
+      <div
+        style={{
+          background: "#F7F0DF",
+          padding: "8px 22px 10px",
+          transform: `${e.transform} rotate(-1.2deg)`,
+          boxShadow: "0 3px 6px rgba(0,0,0,0.2)",
+          fontFamily: FONT.body,
+          fontWeight: 700,
+          fontSize: size,
+          color: INK,
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+};
+
+/** 큰 제목 — 강조 구간만 강조색. Anton. */
+export const DisplayText: React.FC<{ segs: Seg[]; size: number; color: string; em: string; align?: "left" | "center"; lineHeight?: number }> = ({
+  segs,
+  size,
+  color,
+  em,
+  align = "left",
+  lineHeight = 1.02,
+}) => (
+  <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight, color, textAlign: align, letterSpacing: 0.5 }}>
+    {segs.map((s, i) => (
+      <span key={i} style={{ color: s.em ? em : color }}>
+        {s.text}
+      </span>
+    ))}
+  </div>
+);
