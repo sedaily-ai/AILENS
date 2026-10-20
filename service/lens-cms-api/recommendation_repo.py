@@ -35,7 +35,8 @@ def inputs(owner, *, include_recent=True):
         total=cur.fetchone()['n']
         recent=[]
         if include_recent:
-            cur.execute(_ARCHIVE_SELECT+' WHERE ua.user_id=%s ORDER BY ua.saved_at DESC,ua.id DESC LIMIT 3',(owner,))
+            # 응답 키는 호환을 위해 유지한다. 재발견 후보는 최근 3개가 아닌 전체 저장 문장에서 뽑는다.
+            cur.execute(_ARCHIVE_SELECT+' WHERE ua.user_id=%s ORDER BY random() LIMIT 3',(owner,))
             recent=[_archive_to_dict(row) for row in cur.fetchall()]
         from account_connections_repo import followed
         followed_editors=followed(cur,owner)

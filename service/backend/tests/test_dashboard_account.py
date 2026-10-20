@@ -53,6 +53,25 @@ def test_account_handler_auth_private_cache_and_invalid_payload(monkeypatch,toke
         assert dashboard.lambda_handler(event(method='PUT',token=tokens(),body=body),None)['statusCode']==400
 
 
+def test_clear_reading_history_requires_confirmation_and_authenticated_owner(monkeypatch, tokens):
+    from services.user import dashboard as service
+    seen = []
+    def call(self, method, path, owner, body=None, query=None):
+        seen.append((method, path, owner, body))
+        return {'deleted': True, 'cleared_at': '2026-10-20T00:00:00Z'}
+    monkeypatch.setattr(service.DashboardRepository, 'request', call)
+    path = '/api/v2/me/activity/history'
+    assert dashboard.lambda_handler(event(path, 'DELETE', body={'confirm': True}), None)['statusCode'] == 401
+    for body in ({}, {'confirm': False}, {'confirm': 1}, {'confirm': True, 'user_id': 'victim'}):
+        assert dashboard.lambda_handler(event(path, 'DELETE', tokens(), body=body), None)['statusCode'] == 400
+    assert dashboard.lambda_handler(event(path, 'DELETE', tokens(), body={'confirm': True}, params={'user_id': 'victim'}), None)['statusCode'] == 400
+    assert seen == []
+    response = dashboard.lambda_handler(event(path, 'DELETE', tokens(), body={'confirm': True}), None)
+    assert response['statusCode'] == 200 and json.loads(response['body'])['deleted']
+    assert response['headers']['Cache-Control'] == 'private, no-store'
+    assert seen == [('DELETE', '/activity/history', 'fixture-a', {'confirm': True})]
+
+
 def test_preferences_put_ignores_legacy_reading_time(monkeypatch,tokens):
     # 읽을 시간(minutes)은 제거됐다. 예전 웹이 보내도 400 없이 값을 버리고, 시간만 바꾸는 요청은 아무것도 쓰지 않는다.
     from services.user import dashboard as service

@@ -28,7 +28,8 @@ def test_route_count_includes_account_storage():
     # 158 → 162: 저장한 기사(v1.57) /internal/personal/lens/article-bookmarks 목록·상태·저장·해제 4개가 생겼다.
     # 162 → 155: 기능 다이어트 2차(2026-10-20)로 레터 테스트 메일 1개, 알림 설정·동의 GET·PUT 4개, 웹 푸시 기기 등록·해제 2개가 빠졌다.
     # 155 → 147: 알림 워커 제거(2026-10-20 기능 다이어트)로 /notifications/due GET·POST, context·inputs·candidates·plans·claim·send-claim 8개가 빠졌다.
-    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 147
+    # 열람 기록 전체 삭제 추가.
+    assert len([r for r in main.app.routes if hasattr(r, "methods")]) == 148
 
 
 def test_feature_diet_2_routes_are_gone():
@@ -66,7 +67,24 @@ def test_removed_record_routes_are_gone_but_view_reporting_stays():
         assert _endpoint("GET", path) is None
     assert _endpoint("POST", "/internal/personal/lens/activity/sessions") == "session"
     assert _endpoint("POST", "/internal/personal/lens/activity/events") == "event"
+    assert _endpoint("DELETE", "/internal/personal/lens/activity/history") == "clear_reading_history"
     assert _endpoint("GET", "/internal/personal/lens/recommendation-inputs") == "recommendation_inputs"
+
+
+def test_history_clear_requires_internal_token(monkeypatch):
+    from fastapi.testclient import TestClient
+    import activity_repo
+    import route_guards
+    monkeypatch.setattr(route_guards, '_ADMIN_TOKEN', 'fixture-internal')
+    called = []
+    monkeypatch.setattr(activity_repo, 'clear_history', lambda owner, payload: called.append((owner, payload)) or {'deleted': True})
+    client = TestClient(main.app)
+    url = '/internal/personal/lens/activity/history?user_id=fixture-a'
+    for headers in ({}, {'X-Internal-Token': 'wrong'}):
+        assert client.request('DELETE', url, headers=headers, json={'confirm': True}).status_code == 401
+    assert called == []
+    assert client.request('DELETE', url, headers={'X-Internal-Token': 'fixture-internal'}, json={'confirm': True}).status_code == 200
+    assert called == [('fixture-a', {'confirm': True})]
 
 
 def test_static_paths_win_over_param_paths():

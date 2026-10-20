@@ -4,7 +4,7 @@ import { authReadFetch } from '@/shared/lib/auth/authReadFetch';
 
 export interface AccountBookmark {
   letter_id: string; saved_at: string; version: number;
-  content: { content_key: string; kind: 'issue_letter'; available: boolean; slug?: string; title?: string; summary?: string; published_at?: string; href?: string; categories?: string[] };
+  content: { content_key: string; kind: 'issue_letter'; available: boolean; slug?: string; title?: string; summary?: string; published_at?: string; href?: string; categories?: string[]; editors?: string[] };
 }
 export class AccountApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }

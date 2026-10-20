@@ -133,10 +133,15 @@ def list_bookmarks(owner, limit=50, cursor=None, q=''):
         rows = rows[:limit]
         ids = [r['issue_letter_id'] for r in rows if r['status'] == 'published' and r['deleted_at'] is None and bool(r['publish_due'])]
         categories = {i: [] for i in ids}
+        editors = {i: [] for i in ids}
         if ids:
             cur.execute('SELECT letter_id,category_slug FROM issue_letter_categories WHERE letter_id=ANY(%s) ORDER BY is_primary DESC,category_slug', (ids,))
             for r in cur.fetchall():
                 categories[r['letter_id']].append(r['category_slug'])
+            cur.execute('SELECT ie.letter_id,e.slug FROM issue_letter_editors ie JOIN letter_editors e ON e.id=ie.editor_id '
+                        'WHERE ie.letter_id=ANY(%s) AND e.is_active ORDER BY ie.position,e.slug', (ids,))
+            for r in cur.fetchall():
+                editors[r['letter_id']].append(r['slug'])
         items = []
         for r in rows:
             lid = str(r['issue_letter_id'])
@@ -144,7 +149,8 @@ def list_bookmarks(owner, limit=50, cursor=None, q=''):
             content = {'content_key': f'issue_letter:{lid}', 'kind': 'issue_letter', 'available': available}
             if available:
                 content.update(slug=r['slug'], title=r['title'], summary=r['deck'],
-                               published_at=r['published_at'].isoformat(), href=f"/letter/{quote(r['slug'], safe='')}", categories=categories[r['issue_letter_id']])
+                               published_at=r['published_at'].isoformat(), href=f"/letter/{quote(r['slug'], safe='')}",
+                               categories=categories[r['issue_letter_id']], editors=editors[r['issue_letter_id']])
             items.append({'letter_id': lid, 'saved_at': r['saved_at'].isoformat(), 'version': r['version'], 'content': content})
         next_cursor = _encode_cursor({'owner': owner, 'q': q, 'at': rows[-1]['saved_at'].isoformat(), 'id': str(rows[-1]['issue_letter_id'])}) if more else None
         return {'items': items, 'count': len(items), 'total': total, 'next_cursor': next_cursor}

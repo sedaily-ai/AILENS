@@ -10,6 +10,7 @@ SERVICE = Path(__file__).resolve().parents[1]
 MIGRATIONS = SERVICE / 'migrations'
 ACCOUNT_TABLES = {
     'users': 'SELECT,INSERT,UPDATE', 'user_archives': 'SELECT,INSERT,DELETE',
+    'user_readings': 'SELECT,DELETE',
     'publications': 'SELECT', 'issue_letters': 'SELECT', 'letter_editors': 'SELECT',
     'issue_letter_editors': 'SELECT', 'issue_letter_categories': 'SELECT', 'media_assets': 'SELECT',
     'user_lens_preferences': 'SELECT,INSERT,UPDATE,DELETE',

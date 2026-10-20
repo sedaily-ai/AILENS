@@ -3,6 +3,7 @@
 알림 워커 재현 사례는 워커와 함께 지웠다(2026-10-20 기능 다이어트로 알림 워커 제거).
 """
 import importlib
+from contextlib import contextmanager
 import sys
 from test_dashboard_storage import repo
 from test_activity_recommendations import modules
@@ -32,6 +33,31 @@ def test_legacy_rendition_sentence_resolves_source_in_dashboard(modules):
     with cur() as c:c.execute("INSERT INTO user_archives(user_id,rendition_id,content) VALUES('a',10,'담은 문장')")
     row=recommendation.inputs('a')['recent_sentences'][0]
     assert row['content_key']=='publication:42' and row['href']=='/lens/123'
+
+
+def test_rediscovery_samples_all_saved_sentences_with_owner_isolation(modules,monkeypatch):
+    _,_,recommendation,cursor=modules
+    assert recommendation.inputs('a')['recent_sentences']==[]
+    with cursor() as cur:
+        cur.execute("INSERT INTO user_archives(user_id,article_no,content) VALUES('a','123','문장 하나'),('a','123','문장 둘'),('b','123','다른 계정 문장')")
+    data=recommendation.inputs('a')
+    assert data['sentence_total']==2
+    assert {row['text'] for row in data['recent_sentences']}=={'문장 하나','문장 둘'}
+    with cursor() as cur:
+        cur.execute("INSERT INTO user_archives(user_id,article_no,content,saved_at) SELECT 'a','123','오래된 문장 '||n,now()-interval '1 year' FROM generate_series(1,40) n")
+    @contextmanager
+    def seeded_cursor():
+        with cursor() as cur:
+            cur.execute('SELECT setseed(0.42)')
+            yield cur
+    monkeypatch.setattr(recommendation,'get_cursor',seeded_cursor)
+    data=recommendation.inputs('a')
+    assert data['sentence_total']==42 and len(data['recent_sentences'])==3
+    assert len({row['id'] for row in data['recent_sentences']})==3
+    assert any(row['text'].startswith('오래된 문장') for row in data['recent_sentences'])
+    assert all(row['user_id']=='a' and row['href']=='/lens/123' for row in data['recent_sentences'])
+    assert [row['text'] for row in recommendation.inputs('b')['recent_sentences']]==['다른 계정 문장']
+    assert recommendation.inputs('a',include_recent=False)['recent_sentences']==[]
 
 
 def test_blocked_account_cannot_use_archive_crud(modules,monkeypatch):

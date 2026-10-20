@@ -132,6 +132,8 @@ def test_bookmarks_idempotent_private_cursor_and_unpublished_removal(repo):
     assert r.set_bookmark('a','1',True) == first
     assert r.set_bookmark('a','0001',True) == first
     r.set_bookmark('a','2',True)
+    with cursor() as cur:
+        cur.execute("INSERT INTO issue_letter_editors VALUES(1,1,0),(1,2,1),(1,3,2)")
     assert r.list_bookmarks('b')['total'] == 0
     with cursor() as cur:
         cur.execute("UPDATE user_letter_bookmarks SET saved_at='2026-10-14T00:00:00Z'")
@@ -140,6 +142,7 @@ def test_bookmarks_idempotent_private_cursor_and_unpublished_removal(repo):
     assert page['items'][0]['content']['available'] and 'read_minutes' not in page['items'][0]['content']
     next_page = r.list_bookmarks('a',1,page['next_cursor'])
     assert next_page['items'][0]['letter_id'] == '1' and next_page['next_cursor'] is None
+    assert next_page['items'][0]['content']['editors'] == ['mincheol','haeun']
     for owner, q, token in [('b','',page['next_cursor']),('a','one',page['next_cursor']),('a','',page['next_cursor'][:-4]+'abcd')]:
         with pytest.raises(r.DashboardError) as err:
             r.list_bookmarks(owner,1,token,q)
@@ -147,7 +150,7 @@ def test_bookmarks_idempotent_private_cursor_and_unpublished_removal(repo):
     with cursor() as cur:
         cur.execute("UPDATE issue_letters SET status='archived' WHERE id=1")
     content = next(x for x in r.list_bookmarks('a')['items'] if x['letter_id']=='1')['content']
-    assert not content['available'] and 'title' not in content
+    assert not content['available'] and 'title' not in content and 'editors' not in content
     assert r.set_bookmark('a','1',False)['saved'] is False
     assert r.set_bookmark('a','1',False)['saved'] is False
     with pytest.raises(r.DashboardError):

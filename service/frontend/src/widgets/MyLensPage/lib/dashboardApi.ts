@@ -1,7 +1,7 @@
 import { ECON_CATEGORIES } from '@ailens/domain';
 import { API_URL } from '@/shared/config/apiClient';
 import { authReadFetch } from '@/shared/lib/auth/authReadFetch';
-import type { IssueLetter } from '@/features/letter';
+import { kstDateTime, type IssueLetter } from '@/features/letter';
 import type { ArchiveSentenceResponse } from '@/shared/lib/api/archiveApi';
 import type { NewsArticle, NewsRecommendation } from './news/newsModel';
 
@@ -69,6 +69,6 @@ export function cardNews(card:ServerCard):NewsArticle {
 }
 export function newsRecommendations(data:Recommendations|undefined|null):NewsRecommendation[]{return (data?.items??[]).map(card=>({...cardNews(card),reasons:card.reasons.filter(reason=>reason.type!=='latest'&&reason.type!=='editor').map(reason=>({type:reason.type as 'category'|'sentence',text:reason.text}))}));}
 export function cardLetter(card:ServerCard):IssueLetter{
-  return {slug:card.slug,title:card.title,deck:card.summary,issueNumber:0,publishedAt:card.published_at,
+  return {slug:card.slug,title:card.title,deck:card.summary,issueNumber:0,publishedAt:kstDateTime(card.published_at),
     categories:card.category_keys.map(key=>ECON_CATEGORIES.find(category=>category.slug===key)?.label??key),topics:card.keywords,editors:card.editors??[],axisLabels:[],summary:[],sections:[],editorNote:'',vote:null,sources:[],reason:card.reasons.map(reason=>reason.text).join(' · ')};
 }
