@@ -31,7 +31,7 @@ function buildSections(data: HomeData, ctx: { progress: ReturnType<typeof useDai
   return [
     { key: 'briefing', render: () => <BriefingTop progress={ctx.progress} picks={ctx.picks} preferredFormat={ctx.fmt} prefs={ctx.prefs} interests={ctx.interests} onInterests={ctx.setInterests} /> },
     { key: 'picks', render: () => <PickCards picks={ctx.picks} readToday={ctx.readToday} /> },
-    { key: 'paper', render: () => <PaperHero lens={data.lens} /> },
+    { key: 'paper', render: () => <PaperHero lens={data.lens} compact /> },
     { key: 'latest', render: () => <LatestSection items={data.latest.slice(0, LATEST_COUNT)} /> },
     { key: 'timemachine', render: () => <TimeMachineCard /> },
   ];

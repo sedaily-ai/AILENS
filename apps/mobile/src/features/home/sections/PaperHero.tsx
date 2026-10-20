@@ -14,7 +14,7 @@ const INK = '#111827';
 const ACCENT_STRONG = '#2563eb';
 
 /** 오늘의 지면 — 4개 탭(지면/증권/산업/시그널), 고른 지면의 기사 최대 4건: 대표 1 + 작은 카드 3. */
-export function PaperHero({ lens, linkPast = true }: { lens: LensPost[]; linkPast?: boolean }) {
+export function PaperHero({ lens, linkPast = true, compact = false }: { lens: LensPost[]; linkPast?: boolean; compact?: boolean }) {
   const [tab, setTab] = useState(0);
   const picks = useMemo(() => PAPER_TABS.map((t) => pickPaperSection(lens, t.paperSection)), [lens]);
   const items = picks[tab];
@@ -60,6 +60,27 @@ export function PaperHero({ lens, linkPast = true }: { lens: LensPost[]; linkPas
         <Text style={styles.empty}>{PAPER_TABS[tab].label}에 올라온 기사가 아직 없어요.</Text>
       ) : (
         <>
+          {compact ? (
+            // 앱 홈용 압축형: 큰 사진 대신 제목(세리프)과 작은 썸네일을 한 줄에 둔다. 화면을 덜 차지하고 4개 코너를 한눈에 훑는다.
+            <Link href={{ pathname: '/article/[slug]', params: { slug: hero.id } }} asChild>
+              <Pressable style={styles.cHero} accessibilityRole="link">
+                <View style={styles.cHeroText}>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>{PAPER_TABS[tab].label}</Text>
+                  </View>
+                  <Text style={styles.cHeroTitle} numberOfLines={3}>
+                    {displayHeadline(hero.headline)}
+                  </Text>
+                  <Text style={styles.heroDate}>{kstDateTime(hero.published_at, hero.date)}</Text>
+                </View>
+                {hero.photo_image_url ? (
+                  <View style={styles.cHeroThumb}>
+                    <Image source={{ uri: hero.photo_image_url }} style={styles.img} resizeMode="cover" />
+                  </View>
+                ) : null}
+              </Pressable>
+            </Link>
+          ) : (
           <Link href={{ pathname: '/article/[slug]', params: { slug: hero.id } }} asChild>
             <Pressable accessibilityRole="link">
               {hero.photo_image_url ? (
@@ -85,6 +106,7 @@ export function PaperHero({ lens, linkPast = true }: { lens: LensPost[]; linkPas
               </View>
             </Pressable>
           </Link>
+          )}
           {/* 웹 .lz-hero-col 의 4px double 밑줄(RN 은 double 테두리가 없어 가는 선 두 줄로 그린다). */}
           <View style={styles.doubleRule}>
             <View style={styles.ruleLine} />
@@ -98,7 +120,7 @@ export function PaperHero({ lens, linkPast = true }: { lens: LensPost[]; linkPas
                   <Text style={styles.minorTitle} numberOfLines={2}>
                     {displayHeadline(l.headline)}
                   </Text>
-                  {l.context ? (
+                  {!compact && l.context ? (
                     <Text style={styles.minorDesc} numberOfLines={1}>
                       {l.context}
                     </Text>
@@ -162,6 +184,10 @@ const styles = StyleSheet.create({
   heroTitle: { fontFamily: 'NotoSerifKR-Bold', fontSize: 24, lineHeight: 29, letterSpacing: -0.72, color: INK },
   heroDesc: { marginTop: 10, fontSize: 15, lineHeight: 25, color: '#6b7280' },
 
+  cHero: { flexDirection: 'row', gap: 14, alignItems: 'flex-start', paddingBottom: 14 },
+  cHeroText: { flex: 1, minWidth: 0 },
+  cHeroTitle: { marginTop: 8, fontFamily: 'NotoSerifKR-Bold', fontSize: 19, lineHeight: 26, letterSpacing: -0.5, color: INK },
+  cHeroThumb: { width: 108, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f3f4f6' },
   doubleRule: { gap: 1.4 },
   ruleLine: { height: 1.3, backgroundColor: '#b9b9b1' },
 
