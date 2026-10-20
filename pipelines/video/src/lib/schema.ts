@@ -16,6 +16,7 @@ export const captionSchema = z.union([z.string().min(1), z.array(captionSegmentS
 export const PAPER_NAMES = ['cream', 'newsprint', 'kraft', 'black', 'spot'] as const;
 export const SPOT_NAMES = ['red', 'orange', 'teal', 'blue', 'yellow'] as const;
 export const TRANSITION_NAMES = ['cover', 'tear', 'flip', 'stampCut', 'zoom'] as const;
+export const PRISM_SCENES = ['hero', 'title', 'date', 'split', 'quote'] as const;
 export const PAPER_LAYOUTS = [
   'newsFront',
   'stampNumber',
@@ -46,6 +47,12 @@ export const cutStyleSchema = z.object({
   stamp: optionalText(),
   // 나레이션이 끝난 뒤 화면을 더 보여 주는 시간(초).
   holdSeconds: z.number().min(0).max(5).optional().catch(undefined),
+  // ↓ PRISM 테마(src/prism) 전용. 다른 테마는 읽지 않는다.
+  // scene = 화면 모양(hero 큰 글자 / title 섹션 제목 / date 날짜 카드 / split 좌우 분할 / quote 인용),
+  // icon = 큰 그림 이름(src/prism/icons.tsx), section = 오른쪽 위 "01 / 05" 번호.
+  scene: optionalEnum(PRISM_SCENES),
+  icon: optionalText(),
+  section: z.number().int().min(1).max(9).optional().catch(undefined),
 });
 
 const baseCutFields = {
@@ -221,10 +228,10 @@ export const newsScriptSchema = z.object({
   asOfDate: z.string().optional(),
   // 키워드 라벨(프롬프트 §7) — 왼쪽 위에 상시 노출되는 기사 핵심 명사 2~8자. 없으면 brand를 대신 보인다.
   keyword: z.string().optional(),
-  // 영상 전체 디자인(선택). theme가 'paper'면 종이 질감 컴포지션으로 렌더한다(scripts/render*.ts).
+  // 영상 전체 디자인(선택). theme가 'paper'면 종이 질감, 'prism'이면 AI PRISM 컴포지션으로 렌더한다(scripts/render*.ts).
   design: z
     .object({
-      theme: optionalEnum(['default', 'paper'] as const),
+      theme: optionalEnum(['default', 'paper', 'prism'] as const),
       paper: optionalEnum(PAPER_NAMES),
       spot: optionalEnum(SPOT_NAMES),
       endCard: z.boolean().optional().catch(undefined),
@@ -266,13 +273,19 @@ export const COMPOSITION_ID: Record<Format, string> = {
 // 종이 질감 테마는 가로형(1920×1080)만 있다. 세로형 설정이어도 이 컴포지션으로 렌더한다.
 export const PAPER_COMPOSITION_ID = 'NewsVideo-Paper';
 
+// AI PRISM(서울경제 영문 데일리 팟캐스트) 영상 — 가로형(1920×1080)만 있다(src/prism).
+export const PRISM_COMPOSITION_ID = 'AiPrismHorizontal';
+
 export const isPaperTheme = (script: NewsScript): boolean => script.design?.theme === 'paper';
+export const isPrismTheme = (script: NewsScript): boolean => script.design?.theme === 'prism';
 
 // 렌더 스크립트(render.ts, render-lambda.ts)가 쓰는 컴포지션 선택.
 export const compositionFor = (script: NewsScript, format: Format): { id: string; width: number; height: number } =>
-  isPaperTheme(script)
-    ? { id: PAPER_COMPOSITION_ID, ...FORMAT_DIMENSIONS.horizontal }
-    : { id: COMPOSITION_ID[format], ...FORMAT_DIMENSIONS[format] };
+  isPrismTheme(script)
+    ? { id: PRISM_COMPOSITION_ID, ...FORMAT_DIMENSIONS.horizontal }
+    : isPaperTheme(script)
+      ? { id: PAPER_COMPOSITION_ID, ...FORMAT_DIMENSIONS.horizontal }
+      : { id: COMPOSITION_ID[format], ...FORMAT_DIMENSIONS[format] };
 
 // 컷이 화면에 머무는 시간(초) = 음성 길이 + 쉬는 시간.
 export const cutSeconds = (cut: Cut): number => cut.duration + (cut.style?.holdSeconds ?? 0);
