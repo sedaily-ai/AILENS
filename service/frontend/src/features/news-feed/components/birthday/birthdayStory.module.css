@@ -44,12 +44,12 @@
 .headlines svg { display: inline; margin-left: 4px; vertical-align: -1px; color: #6b7280; }
 .headlines p { margin: 0 0 16px !important; font-family: inherit; font-size: 14px; font-weight: 400; letter-spacing: 0; color: #374151; line-height: 1.7; }
 /* 지면 위 안내(새 패턴) — 생일 당일 1면이 아닌 신문을 보여 줄 때, 지면보다 먼저 까닭과 대신 보여 주는 날짜를 읽게 한다.
-   지면(흰 바탕·회색 테두리)과 구분되게 옅은 바탕을 쓰고, 글자 크기는 지면 안 안내(.paperEmpty)와 같은 14px이다. */
+   지면(흰 바탕·회색 테두리)과 구분되게 옅은 바탕을 쓴다. 대체 사실을 알리는 본문이라 본문 최소 크기 16px을 지킨다. */
 .frontNote { display: flex; gap: 12px; margin-top: 16px; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; background: #f9fafb; }
 .frontNote > svg { flex-shrink: 0; margin-top: 2px; color: #1d4ed8; }
 .frontNote > div { min-width: 0; }
 .frontNote strong { display: block; font-size: 16px; font-weight: 700; color: #111827; line-height: 1.5; }
-.frontNote p { margin-top: 4px !important; font-size: 14px; color: #374151; line-height: 1.7; }
+.frontNote p { margin-top: 4px !important; font-size: 16px; color: #374151; line-height: 1.7; }
 .paperEmpty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 0 24px; text-align: center; }
 .paperEmpty strong { font-size: 18px; color: #111827; }
 .paperEmpty p { font-size: 14px; color: #4b5563; line-height: 1.7; }

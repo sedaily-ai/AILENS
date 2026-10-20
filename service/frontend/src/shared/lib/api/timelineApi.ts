@@ -106,18 +106,45 @@ export async function fetchBigkindsDay(date: string): Promise<BigKindsDayData> {
 
 /** front = 1면(면 번호 1), day = 면 번호가 없는 시기의 그날 서울경제 기사, none = 생일 무렵 보관본에 신문이 없음. */
 export type FrontPageKind = 'front' | 'day' | 'none';
-/** 생일 당일 신문이 아닌 것을 보여 준 까닭. null이면 생일 당일 신문이다. */
-export type FrontPageReason = 'sunday' | 'no_paper' | 'archive_missing';
+/** 생일 당일 신문이 아닌 것을 보여 준 까닭. null이면 생일 당일 신문이다. not_yet은 생일이 오늘이라 아직 보관본에 없는 경우. */
+export type FrontPageReason = 'sunday' | 'no_paper' | 'not_yet' | 'archive_missing';
 const FRONT_KINDS: readonly string[] = ['front', 'day', 'none'];
-const FRONT_REASONS: readonly string[] = ['sunday', 'no_paper', 'archive_missing'];
+const FRONT_REASONS: readonly string[] = ['sunday', 'no_paper', 'not_yet', 'archive_missing'];
 
 /** 생일 date에 보여 줄 서울경제(백엔드 time_machine.py front 모드). 생일에 신문이 없으면 서버가 직전 발행일(shown_date)을 골라 준다. */
 export interface FrontPageData {
   date: string;
+  /** 생일 시기에 신문이 있었다면 무엇이었을지 — 면 번호가 있는 시기면 front, 없으면 day. */
+  date_kind: Exclude<FrontPageKind, 'none'>;
   shown_date: string | null;
   kind: FrontPageKind;
   reason: FrontPageReason | null;
   articles: BigKindsArticle[];
+}
+
+/** 응답을 FrontPageData로 읽는다. 형식이 다르면 null. */
+export function parseFrontPage(date: string, data: unknown): FrontPageData | null {
+  if (!data || typeof data !== 'object') return null;
+  const body = data as Record<string, unknown>;
+  const articles = Array.isArray(body.articles) ? body.articles as BigKindsArticle[] : [];
+  // 구버전 백엔드(직전 발행일 대체 전, status만 준다) — 롤백 중에도 생일 당일 1면은 보이게 한다. 나머지는 형식 불일치로 본다.
+  if (body.kind === undefined) {
+    return body.status === 'ok' && articles.length
+      ? { date, date_kind: 'front', shown_date: date, kind: 'front', reason: null, articles }
+      : null;
+  }
+  if (typeof body.kind !== 'string' || !FRONT_KINDS.includes(body.kind)) return null;
+  const kind = body.kind as FrontPageKind;
+  const shown = typeof body.shown_date === 'string' ? body.shown_date : null;
+  if (kind !== 'none' && !shown) return null;
+  return {
+    date,
+    date_kind: body.date_kind === 'day' || body.date_kind === 'front' ? body.date_kind : kind === 'day' ? 'day' : 'front',
+    shown_date: shown,
+    kind,
+    reason: typeof body.reason === 'string' && FRONT_REASONS.includes(body.reason) ? body.reason as FrontPageReason : null,
+    articles,
+  };
 }
 
 /** 생일 date의 그날 신문(기사는 본문이 긴 순). 브라우저에서 호출하며 실패하거나 형식이 다르면 null(빈 결과와 구분). */
@@ -125,17 +152,7 @@ export async function fetchFrontPage(date: string): Promise<FrontPageData | null
   try {
     const res = await fetch(`${API_URL}/time-machine?front=${encodeURIComponent(date)}`, { cache: 'no-store' });
     if (!res.ok) return null;
-    const data = await res.json();
-    if (!FRONT_KINDS.includes(data?.kind)) return null;
-    const shown = typeof data.shown_date === 'string' ? data.shown_date : null;
-    if (data.kind !== 'none' && !shown) return null;
-    return {
-      date,
-      shown_date: shown,
-      kind: data.kind,
-      reason: FRONT_REASONS.includes(data.reason) ? data.reason : null,
-      articles: Array.isArray(data.articles) ? data.articles : [],
-    };
+    return parseFrontPage(date, await res.json());
   } catch {
     return null;
   }

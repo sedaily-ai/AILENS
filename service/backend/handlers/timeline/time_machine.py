@@ -19,8 +19,8 @@ Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경�
 
 3) 그날의 1면 모드 — `front` 파라미터가 있을 때(`q` 가 없을 때만). 생일 타임머신이 부른다.
    GET /time-machine?front=YYYY-MM-DD   (생일, 1990-01-01 이후, 미래는 오늘로 당김)
-   Response: { "date", "shown_date": 보여 준 신문 날짜|null, "kind": "front"|"day"|"none",
-               "reason": null|"sunday"|"no_paper"|"archive_missing",
+   Response: { "date", "date_kind": 생일 시기의 kind("front"|"day"), "shown_date": 보여 준 신문 날짜|null,
+               "kind": "front"|"day"|"none", "reason": null|"sunday"|"no_paper"|"not_yet"|"archive_missing",
                "articles": [{"news_id","title","content","byline","category","original_link"}],
                "status": "ok"|"no_paper"|"no_page_info"(구버전 웹 호환), "cached": bool }
    - kind=front : 1면(면 번호 1). 면 번호가 있는 시기(FRONT_PAGE_ERAS)만.
@@ -234,9 +234,11 @@ FRONT_LOOKBACK_DAYS = 10
 FRONT_DAY_ARTICLES = 4
 # 거슬러 찾기 전체에 쓰는 시간. 빅카인즈 호출마다 남은 시간만큼만 기다려 Lambda 제한시간(30초) 안에 끝낸다.
 FRONT_SEARCH_BUDGET_SECONDS = 20
+# 그때 조회한 0건으로 생일(또는 그 사이 날짜)을 건너뛰어 대체한 결과의 캐시 기간. 휴간 규칙·목록으로 건너뛴 결과는 CACHE_TTL_DAYS.
+FRONT_LIVE_FALLBACK_TTL_SECONDS = 7 * 86400
 
 KIND_FRONT, KIND_DAY, KIND_NONE = 'front', 'day', 'none'
-REASON_SUNDAY, REASON_NO_PAPER, REASON_ARCHIVE_MISSING = 'sunday', 'no_paper', 'archive_missing'
+REASON_SUNDAY, REASON_NO_PAPER, REASON_NOT_YET, REASON_ARCHIVE_MISSING = 'sunday', 'no_paper', 'not_yet', 'archive_missing'
 
 
 def _front_cache_key(date: str) -> str:
@@ -271,15 +273,18 @@ def _remaining(deadline: float) -> float:
     return left
 
 
-def _resolve_front_page(date: str) -> Tuple[Optional[str], str, List[Dict[str, Any]]]:
-    """생일 date 부터 하루씩 거슬러 보여 줄 신문을 찾는다. (보여 줄 날짜, kind, 기사).
+def _resolve_front_page(date: str) -> Tuple[Optional[str], str, List[Dict[str, Any]], bool]:
+    """생일 date 부터 하루씩 거슬러 보여 줄 신문을 찾는다. (보여 줄 날짜, kind, 기사, 실시간 조회로 건너뛴 날이 있었는지).
 
     면 번호가 있는 시기는 1면, 없는 시기는 그날 기사. 1면이 없는 날은 목록(front_calendar)으로 바로 건너뛰고,
-    목록 밖 날짜만 본문 없는 가벼운 조회로 확인한다. 시기 경계를 넘어가도 그 날짜의 시기 규칙을 따른다.
+    목록 밖 날짜는 거슬러 찾는 날(생일 다음 날짜들)만 본문 없는 가벼운 조회로 먼저 확인한다. 생일 당일은 대개
+    신문이 있어 확인 없이 바로 본문을 받는다. 시기 경계를 넘어가도 그 날짜의 시기 규칙을 따른다.
+    마지막 값은 캐시 기간을 정한다 — 휴간 규칙·목록이 아니라 그때 조회한 0건으로 건너뛴 결과는 빅카인즈 적재 지연일 수 있다.
     """
     calendar = _front_calendar()
     deadline = time.monotonic() + FRONT_SEARCH_BUDGET_SECONDS
     birthday = datetime.strptime(date, DATE_FORMAT)
+    live_skip = False
     for offset in range(FRONT_LOOKBACK_DAYS + 1):
         day = (birthday - timedelta(days=offset)).strftime(DATE_FORMAT)
         if day < BIGKINDS_MIN_DATE:
@@ -290,17 +295,20 @@ def _resolve_front_page(date: str) -> Tuple[Optional[str], str, List[Dict[str, A
         if match is None:
             articles = bigkinds_search.search_day_articles(day, FRONT_DAY_ARTICLES, timeout=_remaining(deadline))
             if articles:
-                return day, KIND_DAY, articles
+                return day, KIND_DAY, articles, live_skip
+            live_skip = True
             continue
         known = calendar.known_front(day)
         if known is False:
             continue
-        if known is None and bigkinds_search.count_front_page(day, match, timeout=_remaining(deadline)) == 0:
+        if known is None and offset > 0 and bigkinds_search.count_front_page(day, match, timeout=_remaining(deadline)) == 0:
+            live_skip = True
             continue
         articles = bigkinds_search.search_front_page(day, match, timeout=_remaining(deadline))
         if articles:
-            return day, KIND_FRONT, articles
-    return None, KIND_NONE, []
+            return day, KIND_FRONT, articles, live_skip
+        live_skip = True
+    return None, KIND_NONE, [], live_skip
 
 
 def _front_reason(date: str, shown: Optional[str], kind: str) -> Optional[str]:
@@ -308,7 +316,10 @@ def _front_reason(date: str, shown: Optional[str], kind: str) -> Optional[str]:
         return REASON_ARCHIVE_MISSING
     if shown == date:
         return None
-    return REASON_SUNDAY if _closed_sunday(date) else REASON_NO_PAPER
+    if _closed_sunday(date):
+        return REASON_SUNDAY
+    # 오늘 신문은 아직 보관본에 들어오지 않았을 수 있다 — 휴간이라고 단정하지 않는다.
+    return REASON_NOT_YET if date >= today_kst() else REASON_NO_PAPER
 
 
 def _legacy_status(date: str, shown: Optional[str], kind: str) -> str:
@@ -321,20 +332,23 @@ def _legacy_status(date: str, shown: Optional[str], kind: str) -> str:
 
 def get_front_page_data(date: str) -> dict:
     """생일 date 에 보여 줄 서울경제 신문(1면 또는 그날 기사). 결과는 생일 날짜 키로 캐시한다."""
+    date_kind = KIND_FRONT if _front_page_match(date) else KIND_DAY
     cached = _read_cache(_front_cache_key(date), _front_negative_cache_key(date),
-                         {'date': date, 'shown_date': None, 'kind': KIND_NONE,
+                         {'date': date, 'date_kind': date_kind, 'shown_date': None, 'kind': KIND_NONE,
                           'reason': REASON_ARCHIVE_MISSING, 'articles': []}, FRONT_LOG_LABEL)
     if cached is not None:
         data = cached
     else:
-        shown, kind, articles = _resolve_front_page(date)
-        data = {'date': date, 'shown_date': shown, 'kind': kind,
+        shown, kind, articles, live_skip = _resolve_front_page(date)
+        data = {'date': date, 'date_kind': date_kind, 'shown_date': shown, 'kind': kind,
                 'reason': _front_reason(date, shown, kind), 'articles': articles}
-        # 오늘 신문은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 찾지 못한 결과(kind=none)는 짧게만 기억한다.
+        # 오늘 신문은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 찾지 못한 결과(kind=none)는 짧게만 기억하고,
+        # 그때 조회한 0건으로 건너뛰어 대체한 결과는 적재 지연이 굳지 않게 FRONT_LIVE_FALLBACK_TTL_SECONDS 만 둔다.
         if date < today_kst():
+            ttl = FRONT_LIVE_FALLBACK_TTL_SECONDS if live_skip else CACHE_TTL_DAYS * 86400
             _write_cache(_front_cache_key(date), _front_negative_cache_key(date),
                          'timemachine_frontv2_cache', 'timemachine_frontv2_none_cache',
-                         date, data, CACHE_TTL_DAYS * 86400, True, FRONT_LOG_LABEL)
+                         date, data, ttl, True, FRONT_LOG_LABEL)
     return {**data, 'status': _legacy_status(date, data.get('shown_date'), data.get('kind')),
             'cached': cached is not None}
 

@@ -4,6 +4,7 @@
 실행: cd service/backend && python3 -m pytest tests/test_time_machine_front_unit.py -q
 """
 import json
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,7 +14,7 @@ from services.timeline import bigkinds_search as bs
 from services.timeline import front_calendar as fc
 from common.dates import validation as dv
 
-FRONT_KEYS = {'date', 'shown_date', 'kind', 'reason', 'articles', 'status', 'cached'}
+FRONT_KEYS = {'date', 'date_kind', 'shown_date', 'kind', 'reason', 'articles', 'status', 'cached'}
 
 
 class _FakeTable:
@@ -187,22 +188,50 @@ def test_sunday_without_paper_before_closure_is_not_called_sunday(env, monkeypat
 
 
 def test_dates_after_calendar_are_checked_lightly(env, monkeypatch):
-    _, post = env
+    table, post = env
     _set_calendar(monkeypatch, until='2026-10-10')
     front = _resp([_doc(1, sent='2026-10-14T18:00:00.000+09:00')])
     post.side_effect = [_resp([]), front, front]
     _, body = _call(front='2026-10-16')
     assert (body['kind'], body['shown_date'], body['reason']) == ('front', '2026-10-15', 'no_paper')
+    # 생일 당일은 확인 없이 바로 본문, 거슬러 찾는 날만 본문 없는 확인을 먼저 한다.
     fields = [c.kwargs['json']['argument']['fields'] for c in post.call_args_list]
-    assert fields[:2] == [bs.FRONT_COUNT_FIELDS, bs.FRONT_COUNT_FIELDS] and 'content' in fields[2]
+    assert 'content' in fields[0] and fields[1] == bs.FRONT_COUNT_FIELDS and 'content' in fields[2]
+    # 그때 조회한 0건으로 생일을 건너뛴 결과는 적재 지연일 수 있어 짧게만 저장한다.
+    left = table.puts[0]['expires_at'] - time.time()
+    assert tm.FRONT_LIVE_FALLBACK_TTL_SECONDS - 60 < left <= tm.FRONT_LIVE_FALLBACK_TTL_SECONDS
 
 
-def test_unknown_calendar_day_is_checked_lightly(env, monkeypatch):
+def test_rule_skipped_fallback_is_cached_long(env):
+    table, post = env
+    post.return_value = _resp([_doc(1, sent='2024-10-11T18:00:00.000+09:00')])
+    _call(front='2024-10-13')
+    assert table.puts[0]['expires_at'] - time.time() > 3000 * 86400
+
+
+def test_unknown_calendar_day_is_fetched_directly_on_the_birthday(env, monkeypatch):
     _, post = env
     _set_calendar(monkeypatch, unknown={'2019-10-09'})
     post.return_value = _resp([_doc(1)])
     _, body = _call(front='2019-10-09')
-    assert body['shown_date'] == '2019-10-09' and post.call_count == 2
+    assert body['shown_date'] == '2019-10-09' and post.call_count == 1
+
+
+def test_today_without_paper_yet_is_not_called_holiday(env):
+    table, post = env
+    # 2026-10-19(월, 오늘) 1면이 아직 없으면 일요일 10-18 은 건너뛰고 10-17 토요일자를 보여 주되 휴간이라 하지 않는다.
+    post.side_effect = [_resp([]), _resp([_doc(1, sent='2026-10-16T18:00:00.000+09:00')])]
+    _, body = _call(front='2026-10-19')
+    assert (body['shown_date'], body['reason']) == ('2026-10-17', 'not_yet')
+    assert table.puts == []
+
+
+def test_timeouts_shrink_to_remaining_budget(env, monkeypatch):
+    _, post = env
+    monkeypatch.setattr(tm, 'FRONT_SEARCH_BUDGET_SECONDS', 5)
+    post.return_value = _resp([_doc(1, page='')])
+    _call(front='2010-05-12')
+    assert 0 < post.call_args.kwargs['timeout'] <= 5
 
 
 def test_front_with_only_excluded_corners_moves_on(env):
@@ -235,7 +264,7 @@ def test_no_page_era_sunday_skips_to_saturday(env):
 def test_empty_archive_walks_back_then_gives_up(env):
     table, post = env
     _, body = _call(front='1998-07-15')
-    assert body == {'date': '1998-07-15', 'shown_date': None, 'kind': 'none', 'reason': 'archive_missing',
+    assert body == {'date': '1998-07-15', 'date_kind': 'day', 'shown_date': None, 'kind': 'none', 'reason': 'archive_missing',
                     'articles': [], 'status': 'no_page_info', 'cached': False}
     assert post.call_count == 9  # 생일 포함 11일 중 휴간 일요일(7.12·7.5) 2일은 묻지 않는다
     assert [p['news_id'] for p in table.puts] == ['timemachine_frontv2_none_1998-07-15']
@@ -251,16 +280,23 @@ def test_walk_stops_at_archive_start(env):
 
 @pytest.mark.parametrize('date, no_front, responses, expected', [
     # 1994-01-01(신정)은 면 번호 시기지만 1면이 없어, 면 번호가 없는 1993-12-31 그날 기사로 간다.
-    ('1994-01-01', {'1994-01-01'}, [[_doc(1, page='')]], ('day', '1993-12-31', 'no_paper')),
+    ('1994-01-01', {'1994-01-01'}, [[_doc(1, page='')]], ('front', 'day', '1993-12-31', 'no_paper', 'no_paper')),
     # 1996-08-01은 면 번호가 없는 시기인데 그날 기사가 없어, 면 번호가 있는 1996-07-31 1면으로 간다.
-    ('1996-08-01', set(), [[], [_doc(1)]], ('front', '1996-07-31', 'no_paper')),
+    ('1996-08-01', set(), [[], [_doc(1)]], ('day', 'front', '1996-07-31', 'no_paper', 'no_page_info')),
 ])
 def test_crossing_era_boundary(env, monkeypatch, date, no_front, responses, expected):
     _, post = env
     _set_calendar(monkeypatch, no_front=no_front)
     post.side_effect = [_resp(docs) for docs in responses]
     _, body = _call(front=date)
-    assert (body['kind'], body['shown_date'], body['reason']) == expected
+    # date_kind 는 생일 쪽 시기 — 화면 안내가 '1면이 없어요'와 '서울경제가 없어요'를 이것으로 가른다.
+    assert (body['date_kind'], body['kind'], body['shown_date'], body['reason'], body['status']) == expected
+
+
+def test_front_era_none_keeps_legacy_holiday_status(env):
+    _, post = env
+    _, body = _call(front='2019-10-09')
+    assert (body['date_kind'], body['kind'], body['status']) == ('front', 'none', 'no_paper')
 
 
 # ─── 캐시·오류 ──────────────────────────────────────────────────────────────

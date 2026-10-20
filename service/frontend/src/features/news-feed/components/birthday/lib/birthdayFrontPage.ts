@@ -54,12 +54,17 @@ export function frontNotice(data: FrontPageData): FrontNotice | null {
   let title = '이 시기는 1면 기록이 없어요';
   if (!sameDay) {
     const birthday = nb(dateLabel(data.date));
+    // 생일 쪽에서 없었던 것은 생일 시기(date_kind)로 말한다 — 면 번호 시기면 '1면', 아니면 '서울경제'(그날 기사 전체).
+    const missing = data.date_kind === 'front' ? '서울경제 1면이' : '서울경제가';
     if (data.reason === 'sunday') {
       title = '생일에는 신문이 나오지 않았어요';
       lines.push(`${birthday}은 일요일이라 서울경제가 나오지 ${nb('않았어요.')}`);
+    } else if (data.reason === 'not_yet') {
+      title = '오늘 신문은 아직 보관본에 없어요';
+      lines.push(`오늘(${birthday})자 ${missing} 빅카인즈 보관본에 아직 들어오지 ${nb('않았어요.')}`);
     } else {
       title = '생일 당일 신문을 찾지 못했어요';
-      lines.push(`${birthday}자 서울경제${data.kind === 'front' ? ' 1면이' : '가'} 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 ${nb('빠진 날이에요.')}`);
+      lines.push(`${birthday}자 ${missing} 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 ${nb('빠진 날이에요.')}`);
     }
     lines.push(`대신 가장 가까운 지난 신문인 ${nb(`${dateLabel(shown)} ${weekdayOf(shown)}요일자`)} ${data.kind === 'front' ? '1면을' : '기사를'} ${nb('보여 줘요.')}`);
   }

@@ -3,6 +3,7 @@ import { ExternalLink, Info } from 'lucide-react';
 import type { FrontPageData } from '@/shared/lib/api/timelineApi';
 import type { FrontPageNotice, FrontPageState } from './lib/birthdayFrontPage';
 import { FRONT_LOOKBACK_DAYS, frontArticleHref, frontNotice, shareableFront, weekdayOf } from './lib/birthdayFrontPage';
+import { dateLabel } from './lib/birthdayModel';
 import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
@@ -67,15 +68,21 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
   const isDay = data?.kind === 'day';
   const canShare = shareableFront(state).length > 0;
   const [, month, day] = shown.split('-').map(Number);
-  return <section id="birthday-front" className={styles.scene} aria-labelledby="birthday-front-title" aria-busy={state?.status === 'loading'}>
+  // 화면 낭독기용 상태 문장 — 늘 있는 요소의 글만 갈아 끼워야 읽힌다(로딩이 끝나 요소가 사라지면 결과가 알려지지 않는다).
+  const spoken = state?.status === 'loading' ? '그날 신문을 찾고 있어요.'
+    : data && data.kind !== 'none' && !sameDay ? `생일 당일 신문이 없어 ${dateLabel(shown)}자 신문을 보여 줘요.` : '';
+  return <section id="birthday-front" className={styles.scene} aria-labelledby="birthday-front-title">
     <p className={styles.kicker}>{kicker(state)}</p>
     <h3 id="birthday-front-title" className="sr-only">{isDay ? '그날의 서울경제' : '그날의 서울경제 1면'}</h3>
+    <p className="sr-only" role="status">{spoken}</p>
     {data && <FrontNote data={data} />}
-    <div className={styles.paper}>
-      <div className={styles.masthead}><strong>서울경제</strong>{state && <span>{masthead(shown, !isDay)}</span>}</div>
+    <div className={styles.paper} aria-busy={state?.status === 'loading'}>
+      {/* '· 1면'은 1면을 보여 줄 때만. 그날 기사(면 번호 없는 시기)와 보관본에 없는 경우에는 붙이지 않는다. 로딩·오류는 1면을 찾는 중이라 붙인다. */}
+      <div className={styles.masthead}><strong>서울경제</strong>{state && <span>{masthead(shown, data ? data.kind === 'front' : true)}</span>}</div>
       {!state ? <div className={styles.paperEmpty}><strong>출생연도만 담긴 공유 링크예요</strong><p>내 생일을 넣으면 그날 1면을 볼 수 있어요.</p><button type="button" className={styles.sceneAction} onClick={onUseBirthday}>내 생일로 보기</button></div>
-        : state.status === 'loading' ? <><div className={styles.skeleton} aria-hidden="true"><span /><span /><span /></div><span className="sr-only" role="status">그날 신문을 찾고 있어요.</span></>
-        : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>신문 보관본(빅카인즈)에서 답이 오지 않았어요. 잠시 뒤 다시 불러와 주세요.</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>
+        : state.status === 'loading' ? <div className={styles.skeleton} aria-hidden="true"><span /><span /><span /></div>
+        // 실패 원인(네트워크·보관본 응답·형식)을 화면에서는 가릴 수 없어 단정하지 않는다.
+        : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>{`잠시 연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>
         : state.status === 'notice' ? <div className={styles.paperEmpty}><strong>{NOTICES[state.notice].title}</strong><p>{NOTICES[state.notice].body}</p></div>
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>
         : <Headlines articles={state.data.articles} />}
@@ -87,6 +94,6 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
     {/* 서로 다른 사실(보여 주는 순서·날짜 전송)을 '-고,'로 한 문장에 잇던 것을 나눴다.
         '그날 신문 전체 보기'도 주소에 날짜를 담아 서버에 묻기 때문에 '1면을'이 아니라 '그날 신문을 찾을 때'로 쓴다.
         그날 기사(면 번호 없는 시기)는 면 번호 기준이 아니라서 첫 문장을 바꾼다. */}
-    <p className={styles.source}>{isDay ? '빅카인즈 보관본 기준이에요.' : <>빅카인즈 보관본의 면 번호 기준이라 실제 지면 배치·순서와 {nb('다를 수 있어요')}.</>} 기사는 본문이 긴 순서로 {nb('보여 줘요')}. 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요.</p>
+    <p className={styles.source}>{isDay ? '빅카인즈 보관본 기준이에요.' : <>빅카인즈 보관본의 면 번호 기준이라 실제 지면 배치·순서와 {nb('다를 수 있어요')}.</>} 기사는 본문이 긴 순서로, 사진 설명은 맨 뒤에 {nb('보여 줘요')}. 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요.</p>
   </section>;
 }
