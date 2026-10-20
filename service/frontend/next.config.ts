@@ -68,13 +68,38 @@ const nextConfig: NextConfig = {
           { key: "Access-Control-Allow-Origin", value: "*" },
         ],
       },
+      // sedaily.ai 가 iframe 으로 넣는 위젯 페이지 — 이 경로만 프레임 삽입을 허용한다(나머지는 CloudFront 의 X-Frame-Options: SAMEORIGIN 유지).
+      // 위젯 페이지는 문안·모드가 바뀌면 바로 반영돼야 하므로 /widget/* 의 1시간 보관(위)보다 짧게 둔다.
+      {
+        source: "/widget/frame.html",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, s-maxage=300, must-revalidate" },
+          { key: "Content-Security-Policy", value: `frame-ancestors 'self' https://sedaily.ai https://www.sedaily.ai${process.env.NODE_ENV === "production" ? "" : " http://localhost:*"}` },
+        ],
+      },
+      // sedaily.ai 의 "AI LENS 미리보기" iframe 이 띄우는 홈(/embed/home → 홈으로 rewrite). 이 경로만 프레임 삽입을 허용하고 검색에는 노출하지 않는다.
+      {
+        source: "/embed/home",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Content-Security-Policy", value: `frame-ancestors 'self' https://sedaily.ai https://www.sedaily.ai${process.env.NODE_ENV === "production" ? "" : " http://localhost:*"}` },
+        ],
+      },
     ];
   },
 
   // /sitemap.xml 은 사이트맵 색인이다. 파일 라우트(app/sitemap.xml/route.ts)로 두면 개발 서버에서 sitemap.ts(generateSitemaps)의 메타데이터 라우트와
   // "Conflicting route and metadata at /sitemap.xml" 로 충돌해 앱 전체가 500이 되므로, 색인은 /sitemap-index 에 두고 여기서 /sitemap.xml 로 다시 쓴다.
   async rewrites() {
-    return { beforeFiles: [{ source: "/sitemap.xml", destination: "/sitemap-index" }], afterFiles: [], fallback: [] };
+    return {
+      beforeFiles: [
+        { source: "/sitemap.xml", destination: "/sitemap-index" },
+        // 홈을 iframe 미리보기용 주소로도 내보낸다. 주소가 따로 있어야 CloudFront 가 이 경로에만 프레임 허용 헤더를 붙일 수 있다.
+        { source: "/embed/home", destination: "/" },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 
   async redirects() {

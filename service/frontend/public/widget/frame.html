@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>AI LENS MBTI로 읽기 위젯</title>
+<link rel="stylesheet" href="/widget/pretendard.css">
+<style>html,body{margin:0;padding:0;background:transparent}#w{padding:8px 16px 28px}</style>
+</head>
+<body>
+<!--
+  iframe 용 위젯 페이지 — 부모(sedaily.ai)가 이렇게 붙인다.
+    <iframe src="https://ailens.sedaily.ai/widget/frame.html?url={서울경제 기사 주소}"
+            title="AI LENS MBTI로 읽기" width="100%" height="160" scrolling="no" loading="lazy"
+            style="border:0"></iframe>
+  · url 이 없거나 AI LENS 에 없는 기사면 최신 AI LENS 기사로 같은 위젯을 보여 준다(그것도 못 가져오면 '오늘의 지면' 링크).
+  · 높이는 위젯이 부모에 postMessage({ailensWidgetHeight, id})로 알려 준다(id 는 ?id= 로 받은 값). 못 받으면 고정 160px.
+  · src 로 utm_source 를 바꿀 수 있다(기본 sedaily.ai). 링크는 부모 창(_top)으로 열린다.
+-->
+<div id="w" data-ailens-widget data-target="_top" data-compact data-preview data-roll data-illust data-footer="letter" data-fallback="latest" data-utm-source="sedaily.ai" data-desc="이 기사를 읽기·웹툰·팟캐스트·영상 중 편한 방식으로 볼 수 있어요."></div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search), el = document.getElementById('w');
+  var url = q.get('url'), src = q.get('src');
+  if (url) el.setAttribute('data-article-url', url);
+  if (src && /^[a-z0-9.\-]{1,40}$/i.test(src)) el.setAttribute('data-utm-source', src);
+
+  // 부모가 iframe 높이를 내용에 맞출 수 있게 높이를 알려 준다(버튼이 줄바꿈되면 높이가 달라진다). 높이 숫자만 보낸다.
+  var id = q.get('id') || '', last = 0;
+  function report() {
+    var h = Math.ceil(el.getBoundingClientRect().height);
+    if (!h || h === last || window.parent === window) return;
+    last = h;
+    window.parent.postMessage({ ailensWidgetHeight: h, id: id }, '*');
+  }
+  if (window.ResizeObserver) new ResizeObserver(report).observe(el);
+  window.addEventListener('load', report);
+  window.addEventListener('resize', report);
+})();
+</script>
+<script src="/widget/mbti-button.js?v=1.7.0"></script>
+</body>
+</html>

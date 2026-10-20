@@ -244,6 +244,8 @@ export default function RootLayout({
         />
         <Script id="ga4-init" strategy="afterInteractive">
           {`
+            // sedaily.ai 가 /embed/home 을 iframe 미리보기로 띄울 때는 집계하지 않는다(본지 화면을 볼 때마다 AI LENS 방문으로 잡히는 것을 막는다).
+            if (window.top !== window.self) window['ga-disable-${GA_ID}'] = true;
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
@@ -254,7 +256,7 @@ export default function RootLayout({
             GA4 이벤트·세션 태그 연동은 shared/lib/tracking/trackEvent.ts(스니펫이 없으면 아무 일도 안 한다). */}
         <Script id="clarity-init" strategy="lazyOnload">
           {`
-            (function(c,l,a,r,i,t,y){
+            if (window.top === window.self) (function(c,l,a,r,i,t,y){
               c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
               t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
               y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
