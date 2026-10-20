@@ -11,14 +11,9 @@ const SITE = 'https://ailens.sedaily.ai';
 const PAGE_BG = '#f4f6fa';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-// 항목마다 옅은 색 면 + 진한 아이콘(에듀테크 앱의 설정 목록 톤).
+// 아이콘은 한 가지 잉크 톤으로 통일한다(색을 늘어놓지 않고 웹의 차분한 에디토리얼 톤을 따른다).
 const TONE = {
-  blue: { bg: '#e8f0ff', fg: '#2563eb' },
-  amber: { bg: '#fff3dc', fg: '#d97706' },
-  green: { bg: '#e2f6ec', fg: '#059669' },
-  rose: { bg: '#ffe8ea', fg: '#e11d48' },
-  violet: { bg: '#efe9ff', fg: '#7c3aed' },
-  slate: { bg: '#eceff4', fg: '#475569' },
+  ink: { bg: '#f1f3f6', fg: '#374151' },
 } as const;
 type Tone = keyof typeof TONE;
 
@@ -39,8 +34,7 @@ export default function AccountScreen() {
       <Stack.Screen options={{ headerShown: true, title: '내 계정', headerShadowVisible: false, headerStyle: { backgroundColor: PAGE_BG } }} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <View style={styles.heroBand} />
-          <View style={styles.avatar}>
+              <View style={styles.avatar}>
             {signedIn && email ? <Text style={styles.avatarText}>{initial}</Text> : <Ionicons name="person" size={30} color="#fff" />}
           </View>
           {signedIn ? (
@@ -65,24 +59,24 @@ export default function AccountScreen() {
         </View>
 
         <View style={styles.tiles}>
-          <Tile icon="bookmark" tone="blue" label="저장한 글" count={saved.items.length} onPress={() => router.navigate('/me')} />
-          <Tile icon="time" tone="amber" label="읽은 글" count={read.items.length} onPress={() => router.navigate('/me')} />
+          <Tile icon="bookmark" tone="ink" label="저장한 글" count={saved.items.length} onPress={() => router.navigate('/me')} />
+          <Tile icon="time" tone="ink" label="읽은 글" count={read.items.length} onPress={() => router.navigate('/me')} />
         </View>
 
         <Text style={styles.groupTitle}>설정</Text>
         <View style={styles.group}>
-          {signedIn ? <Row icon="lock-closed" tone="violet" label="비밀번호 변경" onPress={() => router.push('/settings/password')} /> : null}
-          <Row icon="notifications" tone="rose" label="알림 설정" onPress={() => router.push('/settings/notifications')} last />
+          {signedIn ? <Row icon="lock-closed" tone="ink" label="비밀번호 변경" onPress={() => router.push('/settings/password')} /> : null}
+          <Row icon="notifications" tone="ink" label="알림 설정" onPress={() => router.push('/settings/notifications')} last />
         </View>
 
         <Text style={styles.groupTitle}>더 보기</Text>
         <View style={styles.group}>
-          <Row icon="game-controller" tone="green" label="게임" onPress={() => router.push('/games')} />
-          <Row icon="sparkles" tone="blue" label="서비스 소개" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'about' } })} />
-          <Row icon="chatbubble-ellipses" tone="amber" label="문의하기" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'contact' } })} />
-          <Row icon="document-text" tone="slate" label="이용약관" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'terms' } })} />
-          <Row icon="shield-checkmark" tone="slate" label="개인정보처리방침" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'privacy' } })} />
-          <Row icon="globe" tone="violet" label="AI LENS 웹사이트" onPress={() => Linking.openURL(SITE)} last />
+          <Row icon="game-controller" tone="ink" label="게임" onPress={() => router.push('/games')} />
+          <Row icon="sparkles" tone="ink" label="서비스 소개" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'about' } })} />
+          <Row icon="chatbubble-ellipses" tone="ink" label="문의하기" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'contact' } })} />
+          <Row icon="document-text" tone="ink" label="이용약관" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'terms' } })} />
+          <Row icon="shield-checkmark" tone="ink" label="개인정보처리방침" onPress={() => router.push({ pathname: '/info/[page]', params: { page: 'privacy' } })} />
+          <Row icon="globe" tone="ink" label="AI LENS 웹사이트" onPress={() => Linking.openURL(SITE)} last />
         </View>
 
         {signedIn ? (
@@ -127,13 +121,12 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 40 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
 
-  hero: { ...CARD, alignItems: 'center', paddingTop: 44, paddingBottom: 24, paddingHorizontal: 20, overflow: 'hidden' },
-  heroBand: { position: 'absolute', top: 0, left: 0, right: 0, height: 76, backgroundColor: '#e3ecff' },
-  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#fff', marginBottom: 12 },
+  hero: { ...CARD, alignItems: 'center', paddingTop: 28, paddingBottom: 24, paddingHorizontal: 20, overflow: 'hidden' },
+  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
   name: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3, color: colors.text, textAlign: 'center' },
   email: { marginTop: 4, fontSize: 13.5, lineHeight: 20, color: colors.textMuted, textAlign: 'center' },
-  cta: { marginTop: 18, alignSelf: 'stretch', height: 50, borderRadius: 14, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' },
+  cta: { marginTop: 18, alignSelf: 'stretch', height: 50, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontSize: 16, fontWeight: '800', color: '#fff' },
 
   tiles: { flexDirection: 'row', gap: 12, marginTop: 12 },
@@ -148,9 +141,9 @@ const styles = StyleSheet.create({
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eceff4' },
   rowPressed: { backgroundColor: '#f7f9fc' },
   rowIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  rowText: { flex: 1, fontSize: 15.5, fontWeight: '600', color: colors.text },
+  rowText: { flex: 1, fontSize: 15.5, fontWeight: '500', color: colors.text },
 
   signOut: { marginTop: 20, height: 48, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  signOutText: { fontSize: 15, fontWeight: '700', color: '#e11d48' },
+  signOutText: { fontSize: 15, fontWeight: '700', color: colors.textMuted },
   version: { marginTop: 20, textAlign: 'center', fontSize: 12, color: colors.textFaint },
 });
