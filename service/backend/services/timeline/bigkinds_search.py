@@ -186,6 +186,11 @@ def previous_day(date: str) -> str:
 FRONT_PAGE_FIELDS = ['title', 'content', 'byline', 'category', 'provider_link_page', 'printing_page', 'enveloped_at']
 FRONT_PAGE_FETCH_SIZE = 5000
 FRONT_PAGE_TIMEOUT_SECONDS = 20
+# 1면이 있는지만 볼 때(본문 없이 면 번호·송고 시각만) — 생일 1면 대체의 거슬러 찾기와 1면 없는 날 목록 수집이 쓴다.
+FRONT_COUNT_FIELDS = ['printing_page', 'enveloped_at']
+FRONT_COUNT_TIMEOUT_SECONDS = 10
+# 1면에 함께 실리는 사진 설명 기사. 본문 길이로 줄 세우면 맨 위 기사가 될 수 있어 뒤로 보낸다.
+PHOTO_TITLE_PREFIXES = ('[사진]', '[포토]')
 
 
 def _sent_minute(doc: dict) -> str:
@@ -198,24 +203,55 @@ FRONT_MATCH_PUBLISHED = 'published'
 FRONT_MATCH_SENT = 'sent'
 
 
-def search_front_page(print_date: str, match: str) -> List[Dict[str, Any]]:
-    """인쇄일 print_date 신문의 서울경제 1면(printing_page '1') 기사. 본문이 긴 순(분량 순 — 중요도 판단이 아니다).
+def _cap(default: float, timeout: Optional[float]) -> float:
+    """호출 쪽 남은 시간(timeout)이 기본 제한보다 짧으면 그만큼만 기다린다."""
+    return default if timeout is None else min(default, timeout)
+
+
+def _front_docs(print_date: str, match: str, fields: List[str], timeout: float) -> List[dict]:
+    """인쇄일 print_date 신문의 1면(printing_page '1') 원문서.
 
     어느 기사가 그날 신문인지 시기마다 판별 기준이 다르다(2026-10-19 실측).
     - match='published': published_at 날짜가 인쇄일인 기사(1994~1996 보관본). 송고 시각은 보관 작업 시각이라 쓰지 않는다.
     - match='sent': 인쇄 전날 12시 ~ 인쇄일 12시에 송고(enveloped_at)된 기사(2017-11 이후). published_at 은
       2019-10-08 인쇄분부터 전날 날짜가 붙다가 2026년에는 다시 인쇄일이라, 날짜 대신 전날 저녁 송고 시각으로 고른다.
       다음 날 신문은 인쇄일 오후에 송고돼 섞이지 않는다.
-    오류는 BigKindsError 로 raise.
     """
     access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
     start = previous_day(print_date) if match == FRONT_MATCH_SENT else print_date
     docs = _post_search(access_key, '', start, next_day(print_date), FRONT_PAGE_FETCH_SIZE,
-                        _SORT_ARGUMENTS[SORT_DATE], False, fields=FRONT_PAGE_FIELDS,
-                        timeout=FRONT_PAGE_TIMEOUT_SECONDS)
+                        _SORT_ARGUMENTS[SORT_DATE], False, fields=fields, timeout=timeout)
     window_start, window_end = f'{start}T12:00', f'{print_date}T12:00'
-    front = [d for d in docs
-             if str(d.get('printing_page') or '').strip() == '1'
-             and (match != FRONT_MATCH_SENT or window_start <= _sent_minute(d) < window_end)]
-    front.sort(key=lambda d: len(d.get('content') or ''), reverse=True)
-    return _map_documents(front, include_published_at=False)
+    return [d for d in docs
+            if str(d.get('printing_page') or '').strip() == '1'
+            and (match != FRONT_MATCH_SENT or window_start <= _sent_minute(d) < window_end)]
+
+
+def _longest_first(docs: List[dict]) -> List[dict]:
+    """본문이 긴 순(분량 순 — 중요도 판단이 아니다). 사진 설명 기사는 맨 뒤. 미리보기로 자르기 전 원문 길이로 잰다."""
+    return sorted(docs, key=lambda d: ((d.get('title') or '').strip().startswith(PHOTO_TITLE_PREFIXES),
+                                       -len(d.get('content') or '')))
+
+
+def count_front_page(print_date: str, match: str, timeout: Optional[float] = None) -> int:
+    """인쇄일 신문의 1면 기사 수 — 본문 없이 면 번호·송고 시각만 받아 센다. 오류는 BigKindsError 로 raise."""
+    return len(_front_docs(print_date, match, FRONT_COUNT_FIELDS, _cap(FRONT_COUNT_TIMEOUT_SECONDS, timeout)))
+
+
+def search_front_page(print_date: str, match: str, timeout: Optional[float] = None) -> List[Dict[str, Any]]:
+    """인쇄일 print_date 신문의 서울경제 1면 기사. 본문이 긴 순, 사진 설명 기사는 뒤. 오류는 BigKindsError 로 raise."""
+    docs = _front_docs(print_date, match, FRONT_PAGE_FIELDS, _cap(FRONT_PAGE_TIMEOUT_SECONDS, timeout))
+    return _map_documents(_longest_first(docs), include_published_at=False)
+
+
+def search_day_articles(date: str, limit: int, timeout: Optional[float] = None) -> List[Dict[str, Any]]:
+    """면 번호가 없는 시기의 '그날 서울경제' — published_at 이 date 인 기사 중 본문이 긴 limit 건.
+
+    1990~1993, 1996-08~2017-11-12 보관본은 면 번호가 비어 1면을 특정할 수 없다. 그날 실린 기사를 그대로 보여 주고
+    1면이라고 부르지 않는다. 부고·인사·사설 등 제외 코너는 뺀다. 오류는 BigKindsError 로 raise.
+    """
+    access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
+    docs = _post_search(access_key, '', date, next_day(date), FRONT_PAGE_FETCH_SIZE,
+                        _SORT_ARGUMENTS[SORT_DATE], False, fields=BASE_FIELDS,
+                        timeout=_cap(FRONT_PAGE_TIMEOUT_SECONDS, timeout))
+    return _map_documents(_longest_first(docs), include_published_at=False)[:limit]
