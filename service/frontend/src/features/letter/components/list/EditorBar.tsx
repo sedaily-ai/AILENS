@@ -25,7 +25,7 @@ export function EditorBar({ followed, onlyMine, onToggleOnlyMine, matchCount, on
         <div className="lt-ibar-mine">
           <span className="lt-ibar-label">내 에디터</span>
           <ul className="lt-ibar-chips" aria-label="팔로우한 에디터">
-            {followed.map((e) => <li key={e.id}><button type="button" className="lt-topic lt-topic-btn" onClick={() => onSelect(e.id)}>{e.name} · {e.role.replace(' 에디터', '')}</button></li>)}
+            {followed.map((e) => <li key={e.id}><button type="button" className="lt-topic lt-topic-btn" onClick={() => onSelect(e.id)}>{e.name}</button></li>)}
           </ul>
         </div>
         <div className="lt-ibar-actions">
@@ -34,7 +34,7 @@ export function EditorBar({ followed, onlyMine, onToggleOnlyMine, matchCount, on
         </div>
       </div>
       <SubscribeDialog open={mailOpen} onClose={() => setMailOpen(false)} source="bar" editors={followed} title="팔로우한 에디터의 새 레터를 메일로 받기"
-        lead={<>{followed.map((e) => e.name).join(' · ')} 에디터의 담당 분야와 겹치는 레터를 보내요.</>} />
+        lead={<>{followed.map((e) => e.name).join(' · ')}의 담당 분야와 겹치는 레터를 보내요.</>} />
     </div>
   );
 }

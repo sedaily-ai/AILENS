@@ -6,8 +6,8 @@ export const MOBILE_CSS = `
     .lt-h1 { font-size: 24px; }
     .lt-sub { font-size: 14px; }
     .lt-etabs { margin-bottom: 20px; }
-    .lt-etab { min-width: 82px; padding: 8px; }
-    .lt-etab-all { min-width: 52px; }
+    .lt-etab { flex-basis: 112px; width: 112px; min-width: 112px; padding: 10px 6px; }
+    .lt-etab-all { flex-basis: 88px; width: 88px; min-width: 88px; }
     .lt-toolbar, .lt-main .lt-toolbar { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: 'search search' 'heading saved'; gap: 12px; }
     .lt-main .lt-toolbar-r .lt-searchbox { width: 100%; }
     .lt-layout { gap: 20px; }

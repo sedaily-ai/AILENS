@@ -48,7 +48,7 @@ export function buildLetterMetadata(letter: IssueLetter): Metadata {
 
 export function buildLetterEditorMetadata(name: string, intro: string): Metadata {
   return {
-    title: `${name} 에디터의 레터`,
+    title: `${name}의 레터`,
     description: intro,
     robots: { index: false, follow: true },
     alternates: { canonical: `${SITE_URL}/letter` },

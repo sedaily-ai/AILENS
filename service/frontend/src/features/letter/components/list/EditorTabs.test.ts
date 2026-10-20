@@ -9,7 +9,7 @@ it('에디터는 목록에 글이 있는지와 관계없이 모두 보이고 목
     renderToStaticMarkup(createElement(EditorTabs, { selected, onSelect: vi.fn() }));
 
   for (const html of [render(null), render('junseo')]) {
-    for (const e of EDITORS) expect(html).toContain(`${e.name} · ${e.short ?? e.role}`);
+    for (const e of EDITORS) expect(html).toContain(`aria-label="${e.name}"`);
     expect(html).not.toContain('전체 에디터');
     expect(html).not.toContain('현재 목록 에디터');
   }

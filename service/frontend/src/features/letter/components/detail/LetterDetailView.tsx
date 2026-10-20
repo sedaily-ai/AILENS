@@ -99,7 +99,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
         <div className="ld-byline">
           <div className="ld-authors">
           {editorsOfLetter(letter).slice(0, 2).map((e) => (
-            <Link key={e.id} href={`/letter/editors/${e.id}`} className="ld-editor" aria-label={`${e.name} 에디터의 레터 보기`} title={`${e.name} 에디터의 다른 레터 보기`}>
+            <Link key={e.id} href={`/letter/editors/${e.id}`} className="ld-editor" aria-label={`${e.name}의 레터 보기`} title={`${e.name}의 다른 레터 보기`}>
               <EditorAvatar editor={e} size={22} />
               <span>{e.name} <span className="ld-editor-action">레터 보기</span></span>
               <span className="ld-editor-arrow" aria-hidden>›</span>
@@ -183,10 +183,10 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
           const ed = editorsOfLetter(letter)[0];
           return (
             <div className="ld-note-head">
-              {ed && <Link href={`/letter/editors/${ed.id}`} className="ld-note-ava" aria-label={`${ed.name} 에디터`}><EditorAvatar editor={ed} size={36} /></Link>}
+              {ed && <Link href={`/letter/editors/${ed.id}`} className="ld-note-ava" aria-label={ed.name}><EditorAvatar editor={ed} size={36} /></Link>}
               <div>
                 <h2>에디터 한마디</h2>
-                {ed && <span className="ld-note-by">{ed.name} · {ed.role}</span>}
+                {ed && <span className="ld-note-by">{ed.name}</span>}
               </div>
             </div>
           );
@@ -201,14 +201,14 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
       <section className="ld-next" aria-label="다음 레터">
         <div>
           <strong>이런 레터를 메일로 받아보세요</strong>
-          <p>{editors.length > 0 ? `${editors.map((e) => e.name).join('·')} 에디터의 담당 분야와 겹치는 새 레터가 나오면 보내 드려요.` : '새 레터가 나오면 메일로 보내 드려요.'}</p>
+          <p>{editors.length > 0 ? `${editors.map((e) => e.name).join(' · ')}의 담당 분야와 겹치는 새 레터가 나오면 보내 드려요.` : '새 레터가 나오면 메일로 보내 드려요.'}</p>
         </div>
         <button type="button" className="ld-next-btn" onClick={() => { trackEvent('letter_next_cta_click', { letter: letter.slug }); setSubOpen(true); }}>
           받아보기
         </button>
       </section>
       <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} source="letter-end" editors={editors}
-        title={editors.length > 0 ? `${editors.map((e) => e.name).join('·')} 에디터의 새 레터를 메일로 받기` : '새 레터를 메일로 받기'} />
+        title={editors.length > 0 ? `${editors.map((e) => e.name).join(' · ')}의 새 레터를 메일로 받기` : '새 레터를 메일로 받기'} />
 
       <div className="ld-nav">
         <Link href="/letter" className="ld-btn">
