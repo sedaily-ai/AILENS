@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../ui/Text';
 import { useRouter } from 'expo-router';
-import { GearSix, MagnifyingGlass, User } from '../ui/icons';
+import { CaretLeft, GearSix, MagnifyingGlass, User } from '../ui/icons';
 import { useAuth } from '../auth/AuthContext';
 import { colors } from '../theme';
 
@@ -11,14 +11,21 @@ import { colors } from '../theme';
  *  · 그 밖의 탭(title 지정): 좌 화면 이름(큰 글씨), 우 검색. 로고와 화면 이름이 겹쳐 보이지 않게 한다.
  *  · 나의 LENS(settings): 우 검색 대신 계정·설정(/account) 진입 아이콘 — 프로필이 곧 나의 LENS 이므로.
  */
-export function AppHeader({ title, settings }: { title?: string; settings?: boolean }) {
+export function AppHeader({ title, settings, back }: { title?: string; settings?: boolean; back?: boolean }) {
   const router = useRouter();
   const { state } = useAuth();
   const signedIn = state.status === 'signedIn';
   return (
     <View style={styles.bar}>
       {title ? (
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleRow}>
+          {back ? (
+            <Pressable hitSlop={10} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="뒤로">
+              <CaretLeft size={26} color={colors.text} weight="bold" />
+            </Pressable>
+          ) : null}
+          <Text style={styles.title}>{title}</Text>
+        </View>
       ) : (
         <View style={styles.brandRow}>
           <Text style={styles.brand}>AI LENS</Text>
@@ -63,6 +70,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
   },
   title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.6, color: colors.text },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   brand: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: colors.brand },
   beta: { backgroundColor: colors.beta.bg, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 3 },

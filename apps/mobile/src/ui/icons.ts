@@ -29,3 +29,8 @@ export { Check } from 'phosphor-react-native/src/icons/Check';
 export { Fire } from 'phosphor-react-native/src/icons/Fire';
 export { ArrowRight } from 'phosphor-react-native/src/icons/ArrowRight';
 export { Play } from 'phosphor-react-native/src/icons/Play';
+export { Pause } from 'phosphor-react-native/src/icons/Pause';
+export { SkipForward } from 'phosphor-react-native/src/icons/SkipForward';
+export { CaretLeft } from 'phosphor-react-native/src/icons/CaretLeft';
+export { XCircle } from 'phosphor-react-native/src/icons/XCircle';
+export { ClockCounterClockwise as ClockIcon } from 'phosphor-react-native/src/icons/ClockCounterClockwise';
