@@ -2,7 +2,9 @@
 import { configureAuth } from '../src/auth/configureAuth';
 import { configureLabels } from '../src/features/interests/store';
 import { labelOfCategory } from '../src/features/interests/dictionary';
+import { useEffect } from 'react';
 import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -14,6 +16,9 @@ import { usePushNavigation } from '../src/features/push/pushSetup';
 
 configureAuth();
 configureLabels(labelOfCategory);
+
+// 글꼴이 준비될 때까지 스플래시를 유지한다(빈 화면이 번쩍 보이지 않게).
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // api-client 공용화: 웹은 Next env, 앱은 app.config extra 로 같은 홀더에 베이스 URL 을 주입한다.
 // 모듈 로드 시 1회(앱 진입점). 웹의 shared/config/apiClient.ts 와 동일 역할.
@@ -36,7 +41,11 @@ export default function RootLayout() {
     'Pretendard-ExtraBold': require('../assets/fonts/Pretendard-ExtraBold.otf'),
     'NotoSerifKR-Bold': require('../assets/fonts/NotoSerifKR-Bold.ttf'),
   });
-  if (!fontsLoaded && !fontError) return null;
+  const ready = fontsLoaded || !!fontError;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+  if (!ready) return null;
   return (
     <SafeAreaProvider>
       <AuthProvider>
