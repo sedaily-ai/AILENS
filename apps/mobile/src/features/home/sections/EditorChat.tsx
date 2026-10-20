@@ -132,10 +132,10 @@ export function EditorChat({
           <Text style={styles.label}>이런 게 궁금하실 것 같아요</Text>
           {/* 질문은 제자리에서 펼쳐지고 접힌다(아코디언). 다른 질문을 열면 이전 질문이 접히고, 목록 순서는 바뀌지 않는다. */}
           <View style={styles.chips} onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
-            {chips.map((c) => {
+            {chips.map((c, idx) => {
               const on = c.id === openId;
               return (
-                <View key={c.id} style={[styles.item, on && styles.itemOn]} onLayout={(e) => (itemY.current[c.id] = e.nativeEvent.layout.y)}>
+                <View key={c.id} style={[styles.item, on && styles.itemOn, !on && idx > 0 && styles.itemRule]} onLayout={(e) => (itemY.current[c.id] = e.nativeEvent.layout.y)}>
                   <Pressable
                     onPress={() => select(c)}
                     style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && !on && { backgroundColor: accent.soft }]}
@@ -235,12 +235,13 @@ const styles = StyleSheet.create({
   voiceRow: { marginTop: 8 },
 
   label: { marginTop: 22, marginBottom: 10, marginLeft: 2, fontSize: 13.5, fontWeight: '800', color: colors.textMuted },
-  chips: { gap: 8 },
-  item: { borderRadius: 18, borderWidth: 1, borderColor: '#e6eaf1', backgroundColor: '#fff', overflow: 'hidden' },
-  itemOn: { borderColor: accent.main, borderWidth: 1.5 },
-  chip: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16, paddingRight: 14, paddingVertical: 12 },
-  chipOn: { backgroundColor: accent.main },
-  chipText: { flex: 1, fontSize: 14.5, lineHeight: 21, fontWeight: '700', letterSpacing: -0.2, color: colors.text },
+  chips: { marginTop: 2 },
+  item: { backgroundColor: '#fff', overflow: 'hidden' },
+  itemOn: { borderRadius: 18, borderWidth: 1.5, borderColor: accent.main, marginVertical: 6 },
+  itemRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e6eaf1' },
+  chip: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 2, paddingVertical: 12 },
+  chipOn: { backgroundColor: accent.main, paddingLeft: 16, paddingRight: 14 },
+  chipText: { flex: 1, fontSize: 15, lineHeight: 22, fontWeight: '600', letterSpacing: -0.2, color: colors.text },
 
   answer: { padding: 14, backgroundColor: '#f6f9ff', gap: 10 },
   lead: { fontSize: 13.5, fontWeight: '800', color: accent.ink },
