@@ -1,6 +1,7 @@
 import { ECON_CATEGORIES, EDITORS, econSubcategoriesFor, categoryForDataLabel } from '@ailens/domain';
 import { getApiConfig } from '@ailens/api-client';
 import type { Interest } from './match';
+import type { Entry } from './suggest';
 
 /**
  * 관심 사전: 분야(9) → 섹터(분야의 세부 분류) → 화두(주제어). 화두는 공개 API(/api/v2/issue-letters/topics, 75개, 분야 연결 포함)에서 받고,
@@ -75,3 +76,15 @@ function fallbackTopics(): ApiTopic[] {
 
 export const slugOfCategory = (label?: string | null): string | null => categoryForDataLabel(label ?? '')?.slug ?? null;
 export const labelOfCategory = (slug: string): string | undefined => ECON_CATEGORIES.find((c) => c.slug === slug)?.label;
+
+/** 분야·섹터·화두를 한 목록(주제)으로 평탄화한다 — 담기 시트의 검색·추천이 쓴다. */
+export async function catalog(): Promise<Entry[]> {
+  const topics = await topicGroups();
+  const out: Entry[] = [];
+  for (const it of categoryItems()) out.push({ it, cat: it.key, catLabel: '분야' });
+  for (const g of subGroups()) for (const it of g.items) out.push({ it, cat: g.slug, catLabel: g.label });
+  for (const g of topics) for (const it of g.items) out.push({ it, cat: g.slug === 'etc' ? null : g.slug, catLabel: g.label });
+  // 섹터와 화두가 같은 이름('바이오')이면 사용자에게는 같은 주제이므로 하나만 둔다(먼저 나온 섹터를 유지 — 분류가 더 정확하다).
+  const seen = new Set<string>();
+  return out.filter((e) => (seen.has(e.it.label) ? false : (seen.add(e.it.label), true)));
+}
