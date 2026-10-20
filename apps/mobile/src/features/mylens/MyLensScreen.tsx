@@ -36,7 +36,7 @@ export function MyLensScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <AppHeader />
+      <AppHeader title="나의 LENS" settings />
       {state.status === 'loading' ? (
         <View style={styles.center}>
           <ActivityIndicator color="#2563eb" />

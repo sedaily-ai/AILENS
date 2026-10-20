@@ -6,30 +6,46 @@ import { useAuth } from '../auth/AuthContext';
 import { colors } from '../theme';
 
 /**
- * 상단바 — 좌: AI LENS + BETA, 우: 검색 · 프로필. 햄버거는 두지 않는다(뉴닉 방식):
- * 주 이동은 하단 탭, 계정·설정·약관·로그인은 프로필 아이콘(/account)이 맡는다.
+ * 상단바. 햄버거는 두지 않는다(뉴닉 방식): 주 이동은 하단 탭, 계정·설정·약관·로그인은 /account 가 맡는다.
+ *  · 홈(기본): 좌 AI LENS + BETA, 우 검색 · 프로필 — 로고는 홈에만 둔다.
+ *  · 그 밖의 탭(title 지정): 좌 화면 이름(큰 글씨), 우 검색. 로고와 화면 이름이 겹쳐 보이지 않게 한다.
+ *  · 나의 LENS(settings): 우 검색 대신 계정·설정(/account) 진입 아이콘 — 프로필이 곧 나의 LENS 이므로.
  */
-export function AppHeader() {
+export function AppHeader({ title, settings }: { title?: string; settings?: boolean }) {
   const router = useRouter();
   const { state } = useAuth();
   const signedIn = state.status === 'signedIn';
   return (
     <View style={styles.bar}>
-      <View style={styles.brandRow}>
-        <Text style={styles.brand}>AI LENS</Text>
-        <View style={styles.beta}>
-          <Text style={styles.betaText}>BETA</Text>
-        </View>
-      </View>
-      <View style={styles.icons}>
-        <Pressable hitSlop={10} onPress={() => router.push('/search')} accessibilityRole="button" accessibilityLabel="검색">
-          <Ionicons name="search-outline" size={24} color={colors.text} />
-        </Pressable>
-        <Pressable hitSlop={10} onPress={() => router.push('/account')} accessibilityRole="button" accessibilityLabel="내 계정">
-          <View style={[styles.avatar, signedIn && styles.avatarOn]}>
-            <Ionicons name="person" size={18} color={signedIn ? '#fff' : colors.textFaint} />
+      {title ? (
+        <Text style={styles.title}>{title}</Text>
+      ) : (
+        <View style={styles.brandRow}>
+          <Text style={styles.brand}>AI LENS</Text>
+          <View style={styles.beta}>
+            <Text style={styles.betaText}>BETA</Text>
           </View>
-        </Pressable>
+        </View>
+      )}
+      <View style={styles.icons}>
+        {settings ? (
+          <Pressable hitSlop={10} onPress={() => router.push('/account')} accessibilityRole="button" accessibilityLabel="계정 · 설정">
+            <Ionicons name="settings-outline" size={24} color={colors.text} />
+          </Pressable>
+        ) : (
+          <>
+            <Pressable hitSlop={10} onPress={() => router.push('/search')} accessibilityRole="button" accessibilityLabel="검색">
+              <Ionicons name="search-outline" size={24} color={colors.text} />
+            </Pressable>
+            {title ? null : (
+              <Pressable hitSlop={10} onPress={() => router.push('/account')} accessibilityRole="button" accessibilityLabel="내 계정">
+                <View style={[styles.avatar, signedIn && styles.avatarOn]}>
+                  <Ionicons name="person" size={18} color={signedIn ? '#fff' : colors.textFaint} />
+                </View>
+              </Pressable>
+            )}
+          </>
+        )}
       </View>
     </View>
   );
@@ -46,6 +62,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
+  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.6, color: colors.text },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   brand: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5, color: colors.brand },
   beta: { backgroundColor: colors.beta.bg, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 3 },

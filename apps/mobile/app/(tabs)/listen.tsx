@@ -17,7 +17,7 @@ export default function ListenScreen() {
   const { state, reload } = useAsync((signal) => listPosts<HomePlayerPost>('home_player', { limit: 50, signal }), []);
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <AppHeader />
+      <AppHeader title="듣기" />
       <View style={styles.body}>
         <AsyncView state={state} onRetry={reload}>
           {(items: HomePlayerPost[]) => (
