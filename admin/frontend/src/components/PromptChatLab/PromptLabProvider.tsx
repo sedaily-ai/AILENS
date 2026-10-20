@@ -38,6 +38,8 @@ export const TABS = [
   { id: "webtoon", label: "웹툰" },
   { id: "podcast", label: "팟캐스트" },
   { id: "video", label: "영상" },
+  // PRISM — 영상 탭 복제(2026-10-20). 같은 영상 틀·렌더를 쓰고 프롬프트만 "prism" 카테고리로 따로 둔다.
+  { id: "prism", label: "PRISM" },
 ] as const;
 
 export type PromptLabCategory = (typeof TABS)[number]["id"];

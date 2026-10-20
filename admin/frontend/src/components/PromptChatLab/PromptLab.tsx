@@ -84,7 +84,7 @@ export function PromptLab() {
             <PromptChatLab open={isOpen} onClose={close} embedded />
           </div>
         )}
-        {(["letters", "podcast", "video"] as const).map(
+        {(["letters", "podcast", "video", "prism"] as const).map(
           (id) =>
             visited.has(id) && (
               <div key={id} className={category === id ? "h-full" : "hidden"}>
