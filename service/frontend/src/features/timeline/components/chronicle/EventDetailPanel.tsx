@@ -1,9 +1,10 @@
 'use client';
 
-// 선택한 사건 패널 — 날짜 · 시대 · 제목(세리프) · 설명 · 코스피 종가 · "그 달 서울경제가 다룬 것"(키워드별 기사 비중 막대) · 그 무렵 기사(자동 로드) · 그날 신문 · 링크 복사 · 출처.
+// 선택한 사건 패널 — 날짜 · 시대 · 제목 · 설명 · 코스피 종가 · "그 달 서울경제가 다룬 것"(키워드별 기사 비중 막대) · 그 무렵 기사(자동 로드) · 그날 신문 · 링크 복사 · 출처.
 // 부모가 key={event.id}로 다시 마운트해서 사건이 바뀔 때 기사 목록과 애니메이션이 새로 시작한다.
 import { useState } from 'react';
 import Link from 'next/link';
+import { Check, Link2 } from 'lucide-react';
 import type { TimelineEvent } from '@/shared/data/timelineEvents';
 import { decadeOf } from '@/shared/data/timelineEvents';
 import { formatEventDate, kdate } from '@/shared/lib/date/timelineDates';
@@ -95,14 +96,18 @@ export function EventDetailPanel({
           <p className="cx-desc">{event.description}</p>
           {event.note && <p className="cx-note">{event.note}</p>}
 
+          {/* 이동(신문·연표)을 앞에, 링크 복사는 맨 끝(넓은 화면은 오른쪽 끝)에 둔다. 링크 아이콘으로 무엇을 복사하는지 보이고, 누르면 체크와 '복사했어요'로 바뀐다. */}
           <div className="cx-actions">
             {event.paperDate && (
               <Link href={`/timeline/${event.paperDate}`} className="cx-btn cx-btn-primary">
                 {kdate(event.paperDate)} 신문 보기
               </Link>
             )}
-            <button type="button" className="cx-btn" onClick={copyLink}>{copied ? '링크를 복사했어요' : '이 사건 링크 복사'}</button>
             <Link href={`/timeline/decade/${decade}`} className="cx-btn">{decade.slice(0, 4)}년대 연표</Link>
+            <button type="button" className="cx-btn cx-btn-copy" onClick={copyLink} aria-label={copied ? '이 사건 링크를 복사했어요' : '이 사건 링크 복사'}>
+              {copied ? <Check size={16} aria-hidden /> : <Link2 size={16} aria-hidden />}
+              {copied ? '복사했어요' : '링크 복사'}
+            </button>
           </div>
 
           <MonthReading event={event} />

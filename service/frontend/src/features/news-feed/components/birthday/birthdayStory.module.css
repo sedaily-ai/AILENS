@@ -1,0 +1,153 @@
+/*
+ * 내 생일 타임머신 결과 — 한 장면에 숫자 하나(Spotify Wrapped식). 장면은 세로로 이어지고 그대로 캡처해 올릴 수 있는 크기다.
+ * 힘을 주는 곳은 "그날 1면" 장면 하나(지면 제호·세리프 제목). 나머지는 큰 숫자와 짧은 문장으로 조용히 둔다.
+ * .market 이 h·p·ol·ul·figure 여백을 0으로 두므로 여백이 필요한 곳은 !important 로 다시 준다.
+ * 강조색은 서울경제 파랑 하나. 글자 크기는 13/14/16/18/20/24/32/40, 간격은 4의 배수만 쓴다.
+ */
+.story { display: block; }
+.scenes { min-width: 0; max-width: 560px; margin: 0 auto; }
+.scene { padding: 48px 0; border-top: 1px solid #e5e7eb; scroll-margin-top: 96px; }
+.scene:first-child { border-top: 0; padding-top: 24px; }
+.kicker { font-size: 14px; font-weight: 600; color: #4b5563; }
+.title { margin-top: 8px !important; font-size: 32px; font-weight: 800; letter-spacing: -.03em; line-height: 1.3; color: #111827; }
+.figure { margin-top: 8px !important; font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1.2; color: #111827; font-variant-numeric: tabular-nums; }
+.figure[data-accent] { color: #1d4ed8; }
+.lead { margin-top: 16px !important; font-size: 16px; color: #374151; line-height: 1.7; }
+.source { margin-top: 12px !important; font-size: 13px; color: #6b7280; line-height: 1.6; }
+.textButton { min-height: 44px; padding: 0; border: 0; background: transparent; color: #1d4ed8; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+.sceneAction { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 24px; padding: 0 16px; border: 1px solid #6b7280; border-radius: 999px; background: #fff; color: #1d4ed8; font-size: 14px; font-weight: 700; text-decoration: none; }
+.sceneAction:hover { border-color: #1d4ed8; background: #eff6ff; }
+/* button.sceneAction은 '.market button { font: inherit }'(birthdayMarket.module.css)이 크기·굵기를 덮어써 16px 보통 굵기로 보였다.
+   같은 줄의 링크(그날 신문 전체 보기)와 모양이 갈려서 한 단계 높여 맞춘다. */
+.story .sceneAction { font-size: 14px; font-weight: 700; }
+/* 장면 끝 버튼이 둘일 때(1면: 그날 신문 전체 보기·이 1면 공유하기). 좁은 화면에서는 다음 줄로 넘긴다. */
+.sceneActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.sceneActions > .sceneAction { margin-top: 0; }
+
+/* ① 도착 — 연도 숫자판이 오늘에서 생일 연도로 한 번 되감긴다. */
+.odometer { display: flex; gap: 8px; margin-top: 16px; }
+.odometer span { display: flex; align-items: center; justify-content: center; width: 48px; height: 64px; border-radius: 12px; background: #111827; color: #fff; font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.arrival .title { margin-top: 24px !important; font-size: 40px; }
+
+/* ② 그날 1면 — 지면 제호와 겹줄, 세리프 제목. */
+.paper { margin-top: 16px; padding: 24px 20px 8px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; }
+.masthead { text-align: center; padding-bottom: 12px; border-bottom: 4px double #111827; }
+.masthead strong { display: block; font-family: 'Noto Serif KR', serif; font-size: 32px; font-weight: 900; letter-spacing: -.02em; line-height: 1.2; }
+.masthead span { display: block; margin-top: 4px; font-size: 13px; color: #4b5563; }
+.headlines { margin: 0; padding: 0; list-style: none; }
+.headlines li { border-bottom: 1px solid #e5e7eb; font-family: 'Noto Serif KR', serif; font-size: 18px; font-weight: 700; line-height: 1.5; }
+.headlines li:last-child { border-bottom: 0; }
+.headlines li[data-lead] { font-size: 32px; font-weight: 900; letter-spacing: -.02em; line-height: 1.3; }
+.headlines a, .headlines li > span { display: block; min-height: 44px; padding: 12px 0; color: #111827; text-decoration: none; }
+.headlines li[data-lead] a, .headlines li[data-lead] > span { padding: 20px 0 8px; }
+.headlines a:hover { color: #1d4ed8; text-decoration: underline; text-underline-offset: 4px; }
+.headlines svg { display: inline; margin-left: 4px; vertical-align: -1px; color: #6b7280; }
+.headlines p { margin: 0 0 16px !important; font-family: inherit; font-size: 14px; font-weight: 400; letter-spacing: 0; color: #374151; line-height: 1.7; }
+.paperEmpty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 0 24px; text-align: center; }
+.paperEmpty strong { font-size: 18px; color: #111827; }
+.paperEmpty p { font-size: 14px; color: #4b5563; line-height: 1.7; }
+.skeleton { display: grid; gap: 12px; padding: 24px 0 16px; }
+.skeleton span { display: block; height: 20px; border-radius: 4px; background: #f3f4f6; }
+.skeleton span:first-child { height: 40px; width: 85%; }
+.skeleton span:last-child { width: 60%; }
+
+/* ③ 숫자 장면 */
+/* 화살표는 연도+금액 두 줄 전체가 아니라 금액 줄의 세로 중앙에 둔다 — 가운데 정렬이면 연도와 금액 사이 빈 곳을 가리켰다.
+   그래서 아래쪽으로 맞추고 화살표 상자를 금액 줄 높이(20px × 행간 1.5 = 30px)로 잡는다. .flow b 글자 크기를 바꾸면 이 높이도 같이 바꾼다.
+   점선은 화살촉 꼭짓점 2px 앞에서 끊어 각진 선 끝이 꼭짓점 밖으로 삐져나오지 않게 한다. */
+.flow { display: flex; align-items: flex-end; gap: 12px; margin-top: 24px; font-size: 14px; color: #4b5563; line-height: 1.5; }
+.flow > span:last-child { text-align: right; }
+.flow b { display: block; font-size: 20px; color: #111827; font-variant-numeric: tabular-nums; }
+.flowArrow { position: relative; flex: 1; min-width: 24px; height: 30px; }
+.flowArrow::before { content: ''; position: absolute; left: 0; right: 2px; top: 50%; border-top: 2px dashed #1d4ed8; transform: translateY(-50%); }
+.flowArrow::after { content: ''; position: absolute; right: 2px; top: 50%; width: 8px; height: 8px; border-top: 2px solid #1d4ed8; border-right: 2px solid #1d4ed8; transform: translateY(-50%) rotate(45deg); }
+.soon { margin: 0 0 48px !important; padding: 16px; border: 1px dashed #6b7280; border-radius: 12px; background: #f9fafb; font-size: 14px; color: #374151; line-height: 1.6; }
+/* 제목은 띄어쓰기 없는 '삼성전자·아파트·비트코인·금을'이 길어 끝의 '금을 샀다면?'만 둘째 줄로 밀리던 것을 두 줄 길이가 비슷하게 나눈다. */
+.soon strong { display: block; font-size: 16px; color: #111827; text-wrap: balance; }
+.bars { margin: 24px 0 0 !important; padding: 0; list-style: none; }
+.bars li { padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+.barRow { display: grid; grid-template-columns: 96px minmax(0, 1fr) 72px; align-items: center; gap: 12px; font-size: 14px; }
+.barTrack { display: block; height: 12px; border-radius: 8px; background: #eff6ff; overflow: hidden; }
+.barTrack > span { display: block; height: 100%; border-radius: 8px; background: #1d4ed8; }
+.barRow strong { text-align: right; font-variant-numeric: tabular-nums; }
+.barRow[data-state='pending'] strong { font-size: 13px; font-weight: 500; color: #6b7280; }
+.barDetail { margin-top: 4px !important; font-size: 13px; color: #6b7280; }
+.links { display: flex; flex-wrap: wrap; gap: 0 16px; margin-top: 12px !important; }
+.links a { display: inline-flex; align-items: center; min-height: 44px; color: #1d4ed8; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+
+/* ④ 그 순간, 나는 몇 살 — 줄 전체가 연대기 사건·그날 신문으로 가는 링크. 오른쪽 화살표(›)로 누를 수 있음을 알린다.
+   그날 신문이 없는 줄은 같은 모양의 div(화살표 없음). 화살표 자리(20px + 간격)만큼 오른쪽을 띄워 나이 숫자 열을 맞춘다. */
+.ages { margin: 24px 0 0 !important; padding: 0; list-style: none; }
+.ages li { border-bottom: 1px solid #e5e7eb; }
+.ages li > a, .ages li > div { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 16px 4px; color: inherit; text-decoration: none; }
+.ages li > div { padding-right: 36px; }
+.ages a { transition: background .15s ease; }
+.ages a:hover { background: #f9fafb; }
+.ages a:hover span:first-child { color: #1d4ed8; }
+.ages li > * > span:first-child { flex: 1; min-width: 0; font-size: 18px; font-weight: 700; color: #111827; word-break: keep-all; }
+.ages small { display: block; font-size: 13px; font-weight: 400; color: #6b7280; }
+.ages strong { flex-shrink: 0; font-size: 24px; font-weight: 800; color: #1d4ed8; font-variant-numeric: tabular-nums; }
+.ages a > svg { flex-shrink: 0; color: #6b7280; }
+@media (prefers-reduced-motion: reduce) { .ages a { transition: none; } }
+
+/* ⑤ 연금 달력 */
+.pension { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 24px 0 0 !important; padding: 0; list-style: none; border-top: 2px solid #1d4ed8; background: #f9fafb; }
+.pension li { padding: 16px 12px; font-size: 13px; color: #4b5563; }
+.pension li + li { border-left: 1px solid #e5e7eb; }
+.pension strong { display: block; margin: 4px 0; font-size: 20px; font-weight: 800; color: #111827; font-variant-numeric: tabular-nums; }
+.pension li[data-normal], .pension li[data-normal] strong { color: #1d4ed8; }
+.official { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-top: 8px; color: #1d4ed8; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+
+.notice { padding: 16px 0 24px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; line-height: 1.7; }
+/* 링크는 글줄 안에 둔다 — inline-flex 44px 상자는 그 줄만 높여 위 줄과의 간격이 벌어졌다. 터치 영역 44px은 위아래 안쪽 여백(15px)으로 잡는다(인라인 요소의 세로 여백은 줄 높이를 바꾸지 않는다). */
+.notice a { display: inline; padding: 15px 0; color: #1d4ed8; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+/* 맨 아래 고지는 성격별 세 줄(고지 / 기준 시점·오류 알리기 / 출처·확인일)을 화면 폭과 관계없이 지킨다 — 이어 흐르게 두면 좁은 화면에서 '잘못된 내용 알리기' 뒤에 출처 문장이 바로 붙는다. */
+.notice > span { display: block; }
+/* 공유 안내는 뜻 단위 줄(span)로 나눈다 — 한 줄에 다 들어가는 넓은 화면에서만. 좁은 화면은 이어서 흐르게 둬야 줄 수가 덜 늘어난다. */
+.lines > span { display: inline; }
+@container (min-width: 600px) { .lines > span { display: block; } }
+
+/* ⑥ 공유 — 모바일은 마지막 장면, 데스크톱은 오른쪽에 고정된 카드. */
+.share { max-width: 720px; margin: 0 auto; padding: 48px 0 24px; border-top: 1px solid #e5e7eb; scroll-margin-top: 48px; }
+.shareBody { display: block; }
+.shareControls { min-width: 0; }
+.variants { display: flex; gap: 8px; margin-top: 16px; }
+.variants button { min-height: 44px; padding: 0 16px; border: 1px solid #6b7280; border-radius: 999px; background: #fff; color: #374151; font-size: 14px; font-weight: 600; }
+.variants button[aria-pressed='true'] { border-color: #1d4ed8; background: #1d4ed8; color: #fff; }
+.preview { display: block; width: min(240px, 70%); margin: 16px auto 0 !important; }
+.preview canvas { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: 0 1px 2px #1118270f, 0 8px 24px #11182729; }
+.checkbox { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 12px; font-size: 14px; color: #374151; }
+.checkbox input { width: 20px; height: 20px; accent-color: #1d4ed8; }
+.shareActions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.shareActions > :last-child { grid-column: 1 / -1; }
+.shareActions button, .shareActions a { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 16px; border: 1px solid #6b7280; border-radius: 999px; background: #fff; color: #374151; font-size: 14px; font-weight: 700; text-decoration: none; }
+.shareActions button:hover, .shareActions a:hover { border-color: #1d4ed8; color: #1d4ed8; }
+.shareActions .primary { border-color: #1d4ed8; background: #1d4ed8; color: #fff; }
+.shareActions .primary:hover { background: #1a44bd; color: #fff; }
+.shareActions .friend { border-color: #1d4ed8; color: #1d4ed8; }
+.status { margin-top: 8px !important; min-height: 20px; font-size: 13px; color: #4b5563; }
+.status:empty { min-height: 0; }
+
+.story button:focus-visible, .story a:focus-visible, .story input:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 3px; }
+.story button { cursor: pointer; }
+
+@container (min-width: 640px) {
+  /* 넓은 화면은 카드 미리보기 왼쪽, 고르기·공유 버튼 오른쪽. */
+  .shareBody { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 32px; align-items: start; margin-top: 16px; }
+  .preview { width: 100%; margin: 0 !important; }
+  .shareControls > .variants:first-child { margin-top: 0; }
+}
+@container (max-width: 420px) {
+  .title { font-size: 24px; }
+  .arrival .title { font-size: 32px; }
+  .figure { font-size: 32px; }
+  .headlines li[data-lead] { font-size: 24px; }
+  .pension { grid-template-columns: minmax(0, 1fr); }
+  /* 좁은 화면은 왼쪽에 '방식·나이'와 '매달 몇 % 덜/더'를 두 줄로 쌓고 오른쪽에 개시 시점을 둔다 — 세 개를 한 줄에 두면 320px에서 글자가 서너 줄로 쪼개졌다. */
+  .pension li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 16px; word-break: keep-all; }
+  .pension li > span:first-child { grid-area: 1 / 1; }
+  .pension li > span:last-child { grid-area: 2 / 1; }
+  .pension strong { grid-area: 1 / 2 / 3 / 3; margin: 0; }
+  .pension li + li { border-left: 0; border-top: 1px solid #e5e7eb; }
+  .barRow { grid-template-columns: 80px minmax(0, 1fr) 64px; gap: 8px; }
+}

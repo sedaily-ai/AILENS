@@ -14,10 +14,10 @@ const ERA_COLORS: Record<string, string> = {
   'imf-1997': '#b4432f',
   'global-financial-crisis-2008': '#5a4a8c',
   'covid-2020': '#2a7b8c',
-  'rate-surge-2022': '#b7791f',
+  'rate-surge-2022': '#a16207', // 흰 바탕 글자 4.92:1(기존 #b7791f는 3.64:1로 미달)
   'martial-law-2024': '#2f7d5b',
 };
-const NEUTRAL_COLOR = '#5b6577';
+const NEUTRAL_COLOR = '#6b7280'; // Lens 보조 회색(TEXT_MUTED), 흰 바탕 4.83:1
 
 export function eraColor(eraSlug?: string): string {
   return (eraSlug && ERA_COLORS[eraSlug]) || NEUTRAL_COLOR;

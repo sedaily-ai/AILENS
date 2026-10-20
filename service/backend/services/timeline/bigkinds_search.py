@@ -105,8 +105,11 @@ def _map_documents(docs: List[dict], include_published_at: bool) -> List[Dict[st
 
 
 def _post_search(access_key: str, query: str, from_date: str, until_date_exclusive: str,
-                 size: int, sort_argument: dict, include_published_at: bool) -> List[dict]:
-    fields = BASE_FIELDS + (['published_at'] if include_published_at else [])
+                 size: int, sort_argument: dict, include_published_at: bool,
+                 fields: Optional[List[str]] = None,
+                 timeout: int = BIGKINDS_TIMEOUT_SECONDS) -> List[dict]:
+    if fields is None:
+        fields = BASE_FIELDS + (['published_at'] if include_published_at else [])
     payload = {
         'access_key': access_key,
         'argument': {
@@ -119,7 +122,7 @@ def _post_search(access_key: str, query: str, from_date: str, until_date_exclusi
             'fields': fields,
         },
     }
-    res = requests.post(BIGKINDS_SEARCH_URL, json=payload, timeout=BIGKINDS_TIMEOUT_SECONDS)
+    res = requests.post(BIGKINDS_SEARCH_URL, json=payload, timeout=timeout)
     try:
         res.raise_for_status()
     except requests.HTTPError as e:
@@ -171,3 +174,48 @@ def search_news(query: str, from_date: str, until_date_exclusive: str, size: int
 
 def next_day(date: str) -> str:
     return (datetime.strptime(date, DATE_FORMAT) + timedelta(days=1)).strftime(DATE_FORMAT)
+
+
+def previous_day(date: str) -> str:
+    return (datetime.strptime(date, DATE_FORMAT) - timedelta(days=1)).strftime(DATE_FORMAT)
+
+
+# ─── 그날의 1면 ───────────────────────────────────────────────────────────────
+# 빅카인즈 검색이 면 번호 필터를 지원하는지 확인되지 않아 이틀치 서울경제 전체를 받아 1면만 거른다.
+# 2026-10-19 실측: 무거운 날(2018-03-05~06) 3,182건·본문 포함 6.25MB·4.5초, 최근 이틀 969건·3.3MB·2초.
+FRONT_PAGE_FIELDS = ['title', 'content', 'byline', 'category', 'provider_link_page', 'printing_page', 'enveloped_at']
+FRONT_PAGE_FETCH_SIZE = 5000
+FRONT_PAGE_TIMEOUT_SECONDS = 20
+
+
+def _sent_minute(doc: dict) -> str:
+    """enveloped_at('2019-10-08T17:11:00.000+09:00', KST)을 분 단위 문자열로 자른다. 형식이 다르면 빈 문자열."""
+    raw = doc.get('enveloped_at')
+    return raw[:16] if isinstance(raw, str) and len(raw) >= 16 else ''
+
+
+FRONT_MATCH_PUBLISHED = 'published'
+FRONT_MATCH_SENT = 'sent'
+
+
+def search_front_page(print_date: str, match: str) -> List[Dict[str, Any]]:
+    """인쇄일 print_date 신문의 서울경제 1면(printing_page '1') 기사. 본문이 긴 순(분량 순 — 중요도 판단이 아니다).
+
+    어느 기사가 그날 신문인지 시기마다 판별 기준이 다르다(2026-10-19 실측).
+    - match='published': published_at 날짜가 인쇄일인 기사(1994~1996 보관본). 송고 시각은 보관 작업 시각이라 쓰지 않는다.
+    - match='sent': 인쇄 전날 12시 ~ 인쇄일 12시에 송고(enveloped_at)된 기사(2017-11 이후). published_at 은
+      2019-10-08 인쇄분부터 전날 날짜가 붙다가 2026년에는 다시 인쇄일이라, 날짜 대신 전날 저녁 송고 시각으로 고른다.
+      다음 날 신문은 인쇄일 오후에 송고돼 섞이지 않는다.
+    오류는 BigKindsError 로 raise.
+    """
+    access_key = get_secret(BIGKINDS_KEY_SSM_PARAM)
+    start = previous_day(print_date) if match == FRONT_MATCH_SENT else print_date
+    docs = _post_search(access_key, '', start, next_day(print_date), FRONT_PAGE_FETCH_SIZE,
+                        _SORT_ARGUMENTS[SORT_DATE], False, fields=FRONT_PAGE_FIELDS,
+                        timeout=FRONT_PAGE_TIMEOUT_SECONDS)
+    window_start, window_end = f'{start}T12:00', f'{print_date}T12:00'
+    front = [d for d in docs
+             if str(d.get('printing_page') or '').strip() == '1'
+             and (match != FRONT_MATCH_SENT or window_start <= _sent_minute(d) < window_end)]
+    front.sort(key=lambda d: len(d.get('content') or ''), reverse=True)
+    return _map_documents(front, include_published_at=False)
