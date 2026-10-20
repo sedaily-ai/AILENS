@@ -133,7 +133,7 @@ export function HomeScreen() {
           />
         )}
       </View>
-      <EditorPicker open={pickerOpen} onClose={() => setPickerOpen(false)} editor={myEditor.editor} />
+      <EditorPicker open={pickerOpen} onClose={() => setPickerOpen(false)} editor={myEditor.editor} interests={interests} />
       <BriefingSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} prefs={prefs} editor={myEditor.editor} />
       <InterestPicker open={interestsOpen} onClose={() => setInterestsOpen(false)} />
       <MiniPlayer />
