@@ -18,7 +18,7 @@
   · 높이는 위젯이 부모에 postMessage({ailensWidgetHeight, id})로 알려 준다(id 는 ?id= 로 받은 값). 못 받으면 고정 160px.
   · src 로 utm_source 를 바꿀 수 있다(기본 sedaily.ai). 링크는 부모 창(_top)으로 열린다.
 -->
-<div id="w" data-ailens-widget data-target="_top" data-compact data-roll data-illust data-footer="letter" data-fallback="latest" data-utm-source="sedaily.ai" data-desc="같은 기사를 읽기·웹툰·팟캐스트·영상 중 편한 방식으로 볼 수 있어요."></div>
+<div id="w" data-ailens-widget data-target="_top" data-compact data-preview data-roll data-illust data-footer="letter" data-fallback="latest" data-utm-source="sedaily.ai" data-desc="이 기사를 읽기·웹툰·팟캐스트·영상 중 편한 방식으로 볼 수 있어요."></div>
 <script>
 (function () {
   var q = new URLSearchParams(location.search), el = document.getElementById('w');
@@ -39,6 +39,6 @@
   window.addEventListener('resize', report);
 })();
 </script>
-<script src="/widget/mbti-button.js?v=1.6.1"></script>
+<script src="/widget/mbti-button.js?v=1.7.0"></script>
 </body>
 </html>

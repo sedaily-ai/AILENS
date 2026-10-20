@@ -17,6 +17,7 @@
  *   data-compact               바깥 여백·테두리를 없애고 sedaily.ai 톤으로 그린다(iframe 용)
  *   data-desc="..."            설명 문장을 바꾼다
  *   data-roll                  제목을 'MBTI로 읽기' ↔ 'AI LENS' 로 마우스를 올리면 굴러 바뀌는 링크로 그린다(우측 상단 AI LENS 표시는 없앤다)
+ *   data-preview               형식 버튼 위에 기사 미리보기(썸네일·날짜·제목)를 보인다
  *   data-illust                형식 이름 옆에 AI LENS 역할 일러스트를 보인다
  *   data-footer="letter"       하단 링크를 '내 유형 찾기' 대신 '레터 보러가기'로 바꾼다
  *
@@ -25,7 +26,7 @@
  */
 (function () {
   'use strict';
-  var VERSION = '1.6.1';
+  var VERSION = '1.7.0';
   // 스크립트를 불러온 주소의 origin 을 따른다 — 로컬·스테이징에서도 같은 origin 의 API 를 부르게 한다.
   var ORIGIN = 'https://ailens.sedaily.ai';
   try {
@@ -89,10 +90,15 @@
     '.x .h{flex-wrap:nowrap}.x .t{font-size:20px;font-weight:700;letter-spacing:-.02em}' +
     '.x .b{font-size:12px;font-weight:600;color:#999;letter-spacing:.04em}' +
     '.x .d{margin:6px 0 18px;font-size:14px;color:#666}' +
+    '.x .a{display:flex;align-items:center;gap:14px;margin:0 0 14px;color:inherit;text-decoration:none}' +
+    '.x .th{flex:none;width:104px;height:70px;border-radius:10px;object-fit:cover;background:#f6f7f9}' +
+    '.x .at{display:block;min-width:0}.x .at small{display:block;font-size:12px;font-weight:600;color:#999;margin-bottom:4px}' +
+    '.x .at b{display:-webkit-box;font-size:16px;font-weight:700;line-height:1.4;letter-spacing:-.02em;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
+    '.x .a:hover b{color:#006cff}' +
     '.x .c{display:grid;grid-template-columns:repeat(4,1fr);gap:0 12px}' +
     '.x .f{position:relative;display:flex;align-items:center;gap:10px;min-height:0;padding:12px 0;border:0;border-radius:0;background:none;color:#1c1c1c;font-size:16px;font-weight:700;line-height:1.35}' +
     '.x .i{flex:none;width:52px;height:52px;border-radius:12px;object-fit:cover;mix-blend-mode:multiply}.x .tx{display:block;min-width:0}' +
-    '.x .f small{display:block;margin-top:3px;font-size:12px;letter-spacing:-.02em;font-weight:400;color:#666;opacity:1}' +
+    '.x .f small{display:block;margin-top:3px;font-size:11.5px;letter-spacing:-.03em;font-weight:400;color:#666;opacity:1}' +
     '.x .f:hover,.x .f:focus-visible{background:none;color:var(--c);outline:none}.x .f:hover::after{color:var(--c)}' +
     '.x .k{margin-top:8px;font-size:13px;font-weight:600;color:#006cff;text-decoration:none}.x .k:hover{text-decoration:underline}' +
     '@media (max-width:720px){.x .c{grid-template-columns:repeat(2,1fr)}.w.x{padding:20px}}' +
@@ -124,6 +130,16 @@
         ' aria-label="' + esc(f.label + ' 형식으로 보기 — ' + f.who) + '">' + illust +
         (illust ? '<span class="tx">' + esc(f.label) + '<small>' + esc(f.who) + '</small></span>' : esc(f.label) + ' <small>' + esc(f.who) + '</small>') + '</a>';
     }
+    // 기사 미리보기(data-preview): 썸네일·날짜·제목 — AI LENS 가 이 기사를 어떻게 보여 주는지 맛보게 한다. 누르면 해당 기사로 간다.
+    var preview = '';
+    if (el.hasAttribute('data-preview') && data.headline) {
+      var d = /^(\d{4})-(\d{2})-(\d{2})/.exec(data.date || '');
+      var meta = (data.latest ? '오늘의 AI LENS' : 'AI LENS에서 보기') + (d ? ' · ' + d[1] + '.' + d[2] + '.' + d[3] : '');
+      preview =
+        '<a class="a" href="' + esc(withUtm(data.url, 'preview', src)) + '" target="' + target + '"' + rel + '>' +
+        (data.image ? '<img class="th" src="' + esc(data.image) + '" alt="" width="104" height="70" loading="lazy">' : '') +
+        '<span class="at"><small>' + esc(meta) + '</small><b>' + esc(data.headline) + '</b></span></a>';
+    }
     var html =
       '<style>' + CSS + '</style>' +
       '<section class="w' + (el.hasAttribute('data-compact') ? ' x' : '') + '" aria-label="' + esc(label + ' — AI LENS') + '">' +
@@ -134,6 +150,7 @@
         : '<div class="h"><p class="t">' + esc(label) + '</p>' +
           '<a class="b" href="' + esc(withUtm(data.url, 'brand', src)) + '" target="' + target + '"' + rel + '>AI LENS</a></div>') +
       '<p class="d">' + esc(el.getAttribute('data-desc') || '같은 기사를 내 인지 스타일에 맞는 방식으로 — 읽고, 보고, 듣는 4가지 형식으로 만나 보세요.') + '</p>' +
+      preview +
       '<div class="c">' + chips + '</div>' +
       (el.getAttribute('data-footer') === 'letter'
         ? '<a class="k" href="' + esc(withUtm(ORIGIN + '/letter', 'letter', src)) + '" target="' + target + '"' + rel + '>레터 보러가기 →</a>'
@@ -167,6 +184,7 @@
     if (mode === 'latest' && !noLatest) {
       fetchJson(ORIGIN + '/api/widget/latest').then(function (data) {
         if (data && data.found && data.formats && data.formats.length) {
+          data.latest = true;
           render(el, data);
           el.setAttribute('data-ailens-state', 'latest');
         } else miss(el, state, true);
