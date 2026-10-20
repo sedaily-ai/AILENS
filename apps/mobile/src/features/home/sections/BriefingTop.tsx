@@ -80,20 +80,22 @@ export function BriefingTop({ progress, picks, preferredFormat, prefs, interests
           {all ? <Check size={18} color={colors.textMuted} weight="bold" /> : <ArrowRight size={18} color="#fff" weight="bold" />}
         </Pressable>
         {progress.doneCount < STEPS.length && next ? <Text style={styles.hint}>{next.hint}</Text> : null}
+
+        <View style={styles.sep} />
+        <View style={styles.weekIn}>
+          {progress.week.map((d) => (
+            <View key={d.key} style={styles.day}>
+              <Text style={[styles.dayLabel, d.isToday && styles.dayLabelToday]}>{d.label}</Text>
+              <View style={[styles.dot, d.complete && styles.dotComplete, !d.complete && d.active && styles.dotActive, d.isToday && !d.complete && styles.dotToday, d.isFuture && styles.dotFuture]}>
+                {d.complete ? <Check size={13} color="#fff" weight="bold" /> : d.active ? <View style={styles.dotInner} /> : null}
+              </View>
+            </View>
+          ))}
+        </View>
       </View>
 
       <BriefingSettings prefs={prefs} interests={interests} onInterests={onInterests} />
 
-      <View style={styles.week}>
-        {progress.week.map((d) => (
-          <View key={d.key} style={styles.day}>
-            <Text style={[styles.dayLabel, d.isToday && styles.dayLabelToday]}>{d.label}</Text>
-            <View style={[styles.dot, d.complete && styles.dotComplete, !d.complete && d.active && styles.dotActive, d.isToday && !d.complete && styles.dotToday, d.isFuture && styles.dotFuture]}>
-              {d.complete ? <Check size={13} color="#fff" weight="bold" /> : d.active ? <View style={styles.dotInner} /> : null}
-            </View>
-          </View>
-        ))}
-      </View>
     </View>
   );
 }
@@ -123,11 +125,12 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
   hint: { marginTop: 10, textAlign: 'center', fontSize: 12.5, color: colors.textFaint },
 
-  week: { marginTop: 16, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 },
+  sep: { marginTop: 16, height: StyleSheet.hairlineWidth, backgroundColor: '#dfe4ee' },
+  weekIn: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
   day: { alignItems: 'center', gap: 6 },
   dayLabel: { fontSize: 12, fontWeight: '600', color: colors.textFaint },
   dayLabelToday: { color: colors.text, fontWeight: '800' },
-  dot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef1f6' },
+  dot: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef1f6' },
   dotComplete: { backgroundColor: colors.brand },
   dotActive: { backgroundColor: '#dbe3f5' },
   dotInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },

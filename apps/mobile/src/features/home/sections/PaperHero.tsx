@@ -65,9 +65,6 @@ export function PaperHero({ lens, linkPast = true, compact = false }: { lens: Le
             <Link href={{ pathname: '/article/[slug]', params: { slug: hero.id } }} asChild>
               <Pressable style={styles.cHero} accessibilityRole="link">
                 <View style={styles.cHeroText}>
-                  <View style={styles.chip}>
-                    <Text style={styles.chipText}>{PAPER_TABS[tab].label}</Text>
-                  </View>
                   <Text style={styles.cHeroTitle} numberOfLines={3}>
                     {displayHeadline(hero.headline)}
                   </Text>
@@ -194,7 +191,7 @@ const styles = StyleSheet.create({
   cMinorThumb: { width: 64, height: 48, borderRadius: 8 },
   cHero: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', paddingBottom: 10 },
   cHeroText: { flex: 1, minWidth: 0 },
-  cHeroTitle: { marginTop: 6, fontFamily: 'NotoSerifKR-Bold', fontSize: 17, lineHeight: 24, letterSpacing: -0.4, color: INK },
+  cHeroTitle: { marginTop: 0, fontFamily: 'NotoSerifKR-Bold', fontSize: 17, lineHeight: 24, letterSpacing: -0.4, color: INK },
   cHeroThumb: { width: 88, height: 66, borderRadius: 10, overflow: 'hidden', backgroundColor: '#f3f4f6' },
   doubleRule: { gap: 1.4 },
   ruleLine: { height: 1.3, backgroundColor: '#b9b9b1' },
