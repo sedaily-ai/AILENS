@@ -29,7 +29,7 @@ export function LetterRow({ letter, latest = false, onTopic, saved = false, onTo
       <div className="lt-row-byline">
         <div className="lt-row-authors">
           {editorsOfLetter(letter).slice(0, 2).map((ed) => (
-            <Link key={ed.id} href={`/letter/editors/${ed.id}`} className="lt-row-author" title={`${ed.name} · ${ed.role}`}>
+            <Link key={ed.id} href={`/letter/editors/${ed.id}`} className="lt-row-author" title={ed.name}>
               <EditorAvatar editor={ed} size={22} />{ed.name}
             </Link>
           ))}

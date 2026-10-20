@@ -46,7 +46,7 @@ export function LoginPromptDialog({ open, onClose, editorName, purpose = 'follow
       <div className="lt-dlg lt-dlg-sm">
         <button type="button" className="lt-dlg-x" onClick={onClose} aria-label="닫기">×</button>
         <h2 id="lt-login-title" className="lt-dlg-h">로그인이 필요해요</h2>
-        <p className="lt-dlg-lead">{purpose === 'bookmark' ? '레터를 저장하려면 로그인해 주세요. 계정에 저장한 레터는 나의 LENS에서 다시 볼 수 있어요.' : `${editorName} 에디터를 팔로우하려면 로그인해 주세요. 팔로우하면 담당 분야와 겹치는 레터를 목록에서 먼저 확인할 수 있어요.`}</p>
+        <p className="lt-dlg-lead">{purpose === 'bookmark' ? '레터를 저장하려면 로그인해 주세요. 계정에 저장한 레터는 나의 LENS에서 다시 볼 수 있어요.' : `${editorName}를 팔로우하려면 로그인해 주세요. 팔로우하면 담당 분야와 겹치는 레터를 목록에서 먼저 확인할 수 있어요.`}</p>
         <Link href="/login" className="lt-dlg-primary lt-dlg-link" onClick={() => rememberReturnTo(window.location.pathname + window.location.search + window.location.hash)}>로그인하기</Link>
         <p className="lt-dlg-foot">{purpose === 'bookmark' ? '로그인 후 저장 버튼을 다시 눌러 주세요. 기존 브라우저 저장은 그대로 보존돼요.' : '로그인 없이도 이메일로 새 레터를 받을 수 있어요.'}</p>
       </div>

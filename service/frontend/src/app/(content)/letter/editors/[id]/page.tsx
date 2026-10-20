@@ -17,7 +17,7 @@ type Params = { id: string };
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const editor = findEditor((await params).id);
-  return editor ? buildLetterEditorMetadata(`${editor.name} · ${editor.role}`, editor.pitch) : { title: '레터 에디터', robots: { index: false, follow: true } };
+  return editor ? buildLetterEditorMetadata(editor.name, editor.pitch) : { title: '레터 에디터', robots: { index: false, follow: true } };
 }
 
 export default async function LetterEditorPage({ params }: { params: Promise<Params> }) {

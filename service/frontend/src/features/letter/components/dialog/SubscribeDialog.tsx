@@ -163,7 +163,7 @@ export function SubscribeDialog({ open, onClose, title, lead, source, editors = 
                     {recommendEditors(sits, needs).map(({ editor, why }) => (
                       <li key={editor.id}>
                         <EditorAvatar editor={editor} size={44} />
-                        <div><strong>{editor.name} <small>{editor.role}</small></strong><p>{why}</p></div>
+                        <div><strong>{editor.name}</strong><p>{why}</p></div>
                         <a href={`/letter/editors/${editor.id}`} className="lt-ob-go">보러 가기</a>
                       </li>
                     ))}
@@ -203,7 +203,7 @@ export function SubscribeDialog({ open, onClose, title, lead, source, editors = 
               <li>메일 아래 링크로 언제든 수신거부</li>
             </ul>
 
-            <fieldset className="lt-dlg-editors" disabled={busy}><legend>메일로 만날 에디터</legend><p>한 명 이상 골라주세요. 이 선택은 계정 팔로우와 별도로 저장해요.</p><div>{EDITORS.map(editor => <label key={editor.id}><input type="checkbox" checked={selectedIds.includes(editor.id)} onChange={event => setChosenIds(event.target.checked ? [...selectedIds, editor.id] : selectedIds.filter(id => id !== editor.id))} /><span>{editor.name}<small>{editor.short ?? editor.role}</small></span></label>)}</div></fieldset>
+            <fieldset className="lt-dlg-editors" disabled={busy}><legend>메일로 만날 에디터</legend><p>한 명 이상 골라주세요. 이 선택은 계정 팔로우와 별도로 저장해요.</p><div>{EDITORS.map(editor => <label key={editor.id}><input type="checkbox" checked={selectedIds.includes(editor.id)} onChange={event => setChosenIds(event.target.checked ? [...selectedIds, editor.id] : selectedIds.filter(id => id !== editor.id))} /><span>{editor.name}</span></label>)}</div></fieldset>
 
             <label className="lt-dlg-field" htmlFor="lt-dlg-email">
               <span>이메일</span>

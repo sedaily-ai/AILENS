@@ -48,7 +48,7 @@ export function LetterListView({ letters, initialEditorId = null }: { letters: I
     () =>
       letters.map((l) => {
         const ed = (l.editors ?? []).flatMap(id => { const editor=findEditor(id); return editor ? [editor] : []; }).find(e => follow.isFollowing(e.id));
-        return ed ? { ...l, reason: `팔로우한 ${ed.name} 에디터가 쓴 레터예요` } : l;
+        return ed ? { ...l, reason: `팔로우한 ${ed.name}가 쓴 레터예요` } : l;
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [letters, follow.ids],

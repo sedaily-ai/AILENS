@@ -85,7 +85,7 @@ export function EditorIntro({ editor, following, onToggleFollow, followAvailable
   };
 
   return (
-    <section className="lt-eintro" aria-label={`${editor.name} 에디터 소개`}>
+    <section className="lt-eintro" aria-label={`${editor.name} 소개`}>
       <div className="lt-eintro-head">
         <div className="lt-eintro-photo"><EditorAvatar editor={editor} size={72} /></div>
         <div>
@@ -93,7 +93,6 @@ export function EditorIntro({ editor, following, onToggleFollow, followAvailable
             <h2>{editor.name}</h2>
             <span className="lt-ed-badge">{editor.mbti ?? editor.group}</span>
           </div>
-          <p className="lt-eintro-role">{editor.role}</p>
         </div>
       </div>
       <p className="lt-eintro-summary">{editor.forWhom}</p>
@@ -102,7 +101,9 @@ export function EditorIntro({ editor, following, onToggleFollow, followAvailable
         <button type="button" className="lt-eintro-btn" aria-pressed={following} disabled={isLoading||followPending||isAuthenticated&&!followAvailable} onClick={clickFollow}>{following ? '팔로우 중' : '팔로우'}</button>
       </div>
       <div className="lt-eintro-details">
-        <p className="lt-eintro-quote">{editor.intro}</p>
+        <div className="lt-eintro-quote">
+          {editor.intro.split('\n\n').map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+        </div>
         <p className="lt-eintro-pitch"><b>{editor.when}에 읽기 좋아요</b>{editor.pitch}</p>
         <p className="lt-eintro-scope"><span>담당 분야</span>{editor.topics.map((t) => t.name).join(' · ')}</p>
         {editor.voice && <EditorVoiceBar key={editor.voice} name={editor.name} src={editor.voice} />}
@@ -110,7 +111,7 @@ export function EditorIntro({ editor, following, onToggleFollow, followAvailable
       </div>
       <LoginPromptDialog open={loginOpen} onClose={() => setLoginOpen(false)} editorName={editor.name} />
       <SubscribeDialog open={subOpen} onClose={() => setSubOpen(false)} source={`editor:${editor.id}`} editors={[editor]}
-        title={`${editor.name} 에디터의 새 레터를 메일로 받기`}
+        title={`${editor.name}의 새 레터를 메일로 받기`}
         lead={<>{editor.topics.slice(0, 4).map((t) => t.name).join(' · ')} 등 {editor.name}의 담당 분야와 겹치는 레터를 보내요.</>} />
     </section>
   );
