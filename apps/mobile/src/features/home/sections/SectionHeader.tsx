@@ -1,18 +1,28 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Link, type Href } from 'expo-router';
 import { Text } from '../../../ui/Text';
 import { CaretRight } from '../../../ui/icons';
 import { colors } from '../../../theme';
 
 /** 섹션 공통 머리 — 큰 굵은 제목 + 오른쪽 "전체 보기 >". 오른쪽 문구 끝의 화살표 글자(→)는 아이콘으로 바꿔 그린다. */
-export function SectionHeader({ title, right, accent }: { title: string; right?: string; accent?: string }) {
+export function SectionHeader({ title, right, accent, href }: { title: string; right?: string; accent?: string; href?: Href }) {
   return (
     <View style={styles.row}>
       <Text style={[styles.title, accent ? { color: accent } : null]}>{title}</Text>
       {right ? (
-        <View style={styles.more}>
-          <Text style={styles.right}>{right.replace(/\s*→\s*$/, '')}</Text>
-          <CaretRight size={13} color={colors.textFaint} weight="bold" />
-        </View>
+        href ? (
+          <Link href={href} asChild>
+            <Pressable style={styles.more} hitSlop={8} accessibilityRole="link">
+              <Text style={styles.right}>{right.replace(/\s*→\s*$/, '')}</Text>
+              <CaretRight size={13} color={colors.textFaint} weight="bold" />
+            </Pressable>
+          </Link>
+        ) : (
+          <View style={styles.more}>
+            <Text style={styles.right}>{right.replace(/\s*→\s*$/, '')}</Text>
+            <CaretRight size={13} color={colors.textFaint} weight="bold" />
+          </View>
+        )
       ) : null}
     </View>
   );
