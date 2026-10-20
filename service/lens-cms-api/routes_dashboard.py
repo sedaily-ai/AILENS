@@ -79,6 +79,12 @@ def event(user_id: str, payload: dict = Body(...), x_internal_token: str | None 
     return _call(x_internal_token, activity_repo.accept_event, user_id, payload)
 
 
+@router.delete('/activity/history')
+def clear_reading_history(user_id: str, payload: dict = Body(...), x_internal_token: str | None = Header(default=None)):
+    import activity_repo
+    return _call(x_internal_token, activity_repo.clear_history, user_id, payload)
+
+
 @router.get('/recommendation-inputs')
 def recommendation_inputs(user_id: str, x_internal_token: str | None = Header(default=None)):
     import recommendation_repo

@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ECON_CATEGORIES } from '@ailens/domain';
 import { useAuth } from '@/entities/user';
 import { getAccountBookmarks, isAccountAuthError, setAccountBookmark, type AccountBookmark } from '../data/accountApi';
 import type { IssueLetter } from '../data/letterTypes';
+import { kstDateTime } from '../data/letterApi';
 
 export const LETTER_SHELF_NOTICE = { guest: '레터를 저장하려면 로그인해 주세요.' } as const;
 const SAVED_KEY = 'lens-letter-saved';
@@ -11,10 +13,12 @@ const CHANGED = 'lens-account-bookmarks-changed';
 function readList(key: string): string[] {
   try { const raw = JSON.parse(localStorage.getItem(key) ?? '[]'); return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : []; } catch { return []; }
 }
-function bookmarkLetter(bookmark: AccountBookmark): IssueLetter[] {
+export function bookmarkLetter(bookmark: AccountBookmark): IssueLetter[] {
   const c = bookmark.content;
   if (!c.available || !c.slug) return [];
-  return [{ slug: c.slug, title: c.title ?? '', deck: c.summary ?? '', categories: c.categories ?? [], publishedAt: c.published_at ?? '',
+  return [{ slug: c.slug, title: c.title ?? '', deck: c.summary ?? '',
+    categories: (c.categories ?? []).map((key) => ECON_CATEGORIES.find((category) => category.slug === key)?.label ?? key),
+    publishedAt: c.published_at ? kstDateTime(c.published_at) : '', editors: c.editors ?? [],
     axisLabels: [], issueNumber: 0, summary: [], sections: [], editorNote: '', vote: null, sources: [] }];
 }
 

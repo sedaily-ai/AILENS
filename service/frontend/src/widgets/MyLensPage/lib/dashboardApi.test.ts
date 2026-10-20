@@ -1,7 +1,7 @@
 import { describe,it,expect,vi,beforeEach } from 'vitest';
 const request=vi.hoisted(()=>vi.fn());
 vi.mock('@/shared/lib/auth/authFetch',()=>({authFetch:request}));
-vi.mock('@/shared/config/apiClient',()=>({API_URL:'http://127.0.0.1:4102'}));
+vi.mock('@/shared/config/apiClient',()=>({API_URL:'http://127.0.0.1:4102',CMS_API_URL:'http://127.0.0.1:4103'}));
 import { fetchLensDashboard,newsRecommendations,cardLetter,normalizeDashboard,DashboardApiError,type ServerCard,type Recommendations } from './dashboardApi';
 const card:ServerCard={content_key:'publication:42',kind:'publication',id:'42',slug:'one',title:'뉴스',summary:'요약',published_at:'2026-10-13T16:00:00Z',category_keys:['industry'],keywords:['반도체'],formats:['letter'],href:'/lens/one',viewed:false,saved:false,reasons:[{type:'category',origin:'observed',method:'exact',text:'열람한 산업 분야'}]};
 const data=(items:ServerCard[]):Recommendations=>({items,count:items.length,algorithm_version:'exact-v1',fallback:false,coverage:{window_days:90,legacy_unmatched:0}});
@@ -31,6 +31,10 @@ it('서버의 원래 주소와 실제 작성자 사전을 카드에 보존한다
  const authored={...card,editors:['mincheol']};
  expect(newsRecommendations(data([authored]))[0].href).toBe('/lens/one');
  expect(cardLetter(authored).editors).toEqual(['mincheol']);
+});
+
+it.each(['2026-10-15T23:02:00Z','2026-10-15T23:02:00+00:00','2026-10-16T08:02:00+09:00'])('추천 레터 발행 시각 %s를 레터 목록과 같은 한국 시각으로 바꾼다',published_at=>{
+ expect(cardLetter({...card,published_at}).publishedAt).toBe('2026-10-16T08:02');
 });
 
 it('명시한 탭만 집계하도록 전달하고 시간 제한 없음(minutes=0)을 붙인다',async()=>{

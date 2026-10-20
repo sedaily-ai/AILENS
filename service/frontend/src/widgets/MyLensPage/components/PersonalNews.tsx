@@ -3,18 +3,21 @@
 import Link from 'next/link';
 import { ArrowUpRight, BookOpen, ChevronDown } from 'lucide-react';
 import { normalizeCategory, type NewsRecommendation } from '../lib/news/newsModel';
+import { ReadingHistoryControls } from './ReadingHistoryControls';
 
-export function PersonalNews({ recommendations, categories, loading, available, historyAvailable, unmatched, onRetry }: {
+export function PersonalNews({ recommendations, categories, loading, available, historyAvailable, unmatched, onRetry, owner }: {
   recommendations: NewsRecommendation[]; categories: {slug:string;label:string;count:number}[];
   loading: boolean; available: boolean; historyAvailable: boolean; unmatched: number; onRetry: () => void;
+  owner?: string;
 }) {
   return <section id="ml-news" className="ml-personal-news" aria-labelledby="ml-news-title" aria-busy={loading}>
-    <div className="ml-section-title ml-extension-heading"><div><h2 id="ml-news-title">최근 본 분야의 새로운 뉴스</h2><p className="ml-helper">열람한 분야의 새 글을 최신순으로 모았어요.</p></div></div>
+    <div className="ml-section-title ml-extension-heading"><div><h2 id="ml-news-title">나를 위한 추천 뉴스</h2><p className="ml-helper">최근 읽은 분야를 바탕으로 새 소식을 추천해요.</p></div></div>
     <div className="ml-news-categories" aria-label="최근 열람한 분야">
       <h3><BookOpen size={14} aria-hidden /> 최근 90일에 만난 분야</h3>
-      {categories.length ? <div className="ml-evidence-chips">{categories.map(item => <Link key={item.slug} href={`/${item.slug}`}>{item.label}<span>{item.count}편</span></Link>)}</div> : <p className="ml-helper">열람한 분야가 없으면 최근 발행된 뉴스를 보여드려요.</p>}
+      {categories.length ? <dl className="ml-evidence-chips">{categories.map(item => <div key={item.slug}><dt>{item.label}</dt><dd>{item.count}편</dd></div>)}</dl> : <p className="ml-helper">열람한 분야가 없으면 최근 발행된 뉴스를 보여드려요.</p>}
+      {owner && <ReadingHistoryControls key={owner} owner={owner} />}
     </div>
-    {loading ? <p className="ml-loading" role="status">새 뉴스를 불러오고 있어요.</p> : !available ? <div className="ml-saved-empty"><h3>새 뉴스를 불러오지 못했어요</h3><button className="ml-button ml-button-quiet" onClick={onRetry}>뉴스 다시 불러오기</button></div> : recommendations.length ? <div className="ml-news-list">{recommendations.slice(0, 4).map(article => <article key={article.id} className="ml-news-item"><div className="ml-news-meta"><span>{normalizeCategory(article.category)?.label ?? (article.category || '뉴스')}</span><time dateTime={article.date}>{article.date.replaceAll('-', '.')}</time></div><Link href={article.href}><h3>{article.title}</h3><ArrowUpRight size={17} aria-hidden /></Link>{article.context && <p className="ml-news-context">{article.context}</p>}<div className="ml-news-reasons">{article.reasons.length ? article.reasons.map(reason => <span key={reason.type}>{reason.text}</span>) : <span>최근 발행된 뉴스예요.</span>}</div></article>)}</div> : <div className="ml-saved-empty"><h3>지금 볼 수 있는 새 뉴스가 없어요</h3><p>이미 열람한 글은 새 뉴스 목록에서 제외해요.</p><Link href="/lens" className="ml-text-link">전체 뉴스 둘러보기 <ArrowUpRight size={14} /></Link></div>}
+    {loading ? <p className="ml-loading" role="status">새 뉴스를 불러오고 있어요.</p> : !available ? <div className="ml-saved-empty"><h3>새 뉴스를 불러오지 못했어요</h3><button className="ml-button ml-button-quiet" onClick={onRetry}>뉴스 다시 불러오기</button></div> : recommendations.length ? <div className="ml-news-list">{recommendations.slice(0, 4).map(article => <article key={article.id} className="ml-news-item"><div className="ml-news-meta"><span>{normalizeCategory(article.category)?.label ?? (article.category || '뉴스')}</span><time dateTime={article.date}>{article.date.replaceAll('-', '.')}</time></div><Link href={article.href}><h3>{article.title}</h3><ArrowUpRight size={17} aria-hidden /></Link>{article.context && <p className="ml-news-context">{article.context}</p>}<div className="ml-news-reasons"><span className="ml-news-reason-label">추천 이유</span><div>{article.reasons.length ? article.reasons.map(reason => <span key={reason.type}>{reason.type === 'category' ? '최근 읽은 분야를 바탕으로 추천했어요.' : reason.text}</span>) : <span>최근 발행된 소식 중에서 골랐어요.</span>}</div></div></article>)}</div> : <div className="ml-saved-empty"><h3>지금 볼 수 있는 새 뉴스가 없어요</h3><p>이미 열람한 글은 새 뉴스 목록에서 제외해요.</p><Link href="/lens" className="ml-text-link">전체 뉴스 둘러보기 <ArrowUpRight size={14} /></Link></div>}
     <div className="ml-news-scope">
       <details className="ml-format-method">
         <summary><span><strong>추천 기준 보기</strong><small>최근 열람한 분야와 발행일을 확인해요.</small></span><ChevronDown size={18} aria-hidden /></summary>

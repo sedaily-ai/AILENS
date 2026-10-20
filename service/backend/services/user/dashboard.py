@@ -7,6 +7,10 @@ def dispatch(method, path, owner, body, params):
     repo = DashboardRepository()
     # 형식 비율(/format-preference)·기간 기록(/activity)·리워드(/rewards) 조회는 제거됐다. 끝의 404로 간다.
     # 열람 보고(/activity/sessions·/activity/events)는 아래에서 그대로 전달한다.
+    if path == '/activity/history' and method == 'DELETE':
+        if params or not isinstance(body, dict) or set(body) != {'confirm'} or body['confirm'] is not True:
+            raise DashboardError(400, 'CONFIRMATION_REQUIRED', '열람 기록 전체 삭제를 확인해 주세요.')
+        return repo.request(method, path, owner, body=body)
     if path == '/followed-editors' and method=='GET':
         if params:raise DashboardError(400,'INVALID_ARGUMENT','조회 조건을 확인해 주세요.')
         return repo.request(method,path,owner)

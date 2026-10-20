@@ -12,6 +12,25 @@ from content_metadata import load_cards
 VERSION = 'view-only-v1'
 
 
+def clear_history(owner, payload):
+    if not isinstance(payload, dict) or set(payload) != {'confirm'} or payload['confirm'] is not True:
+        raise DashboardError(400, 'CONFIRMATION_REQUIRED', '열람 기록 전체 삭제를 확인해 주세요.')
+    with get_cursor() as cur:
+        # 세션 생성·보고와 같은 계정 행을 잠근다. 삭제 전에 시작한 세션은 다시 보고할 수 없다.
+        _account(cur, owner, write=True)
+        # 예전 완료 원장의 FK도 먼저 정리해야 세션을 실제로 삭제할 수 있다.
+        # 북마크·저장 문장·팔로우·관심 설정은 삭제 대상이 아니다.
+        for table in (
+            'user_daily_stamps', 'user_content_first_completions', 'user_weekly_badges',
+            'user_content_completions', 'user_content_events', 'user_content_sessions',
+            'user_content_views', 'user_readings',
+        ):
+            cur.execute(f'DELETE FROM {table} WHERE user_id=%s', (owner,))
+        cur.execute('SELECT clock_timestamp() AS cleared_at')
+        cleared_at = cur.fetchone()['cleared_at'].isoformat()
+    return {'deleted': True, 'cleared_at': cleared_at}
+
+
 def _legacy_completion():
     # 예전 웹 호환용 빈 완료 기준. 예전 웹은 session.completion.panel_ids[index] 등을 직접 읽고,
     # completion_enabled=false면 첫 보고 뒤 보고를 멈춘다. 다음 정리 때 제거.

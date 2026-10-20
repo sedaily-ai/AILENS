@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowUpRight, Bell, Bookmark, BookOpen, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, Bookmark, BookOpen, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/entities/user';
 import { rememberReturnTo } from '@/shared/lib/auth/returnTo';
-import { LETTER_CSS, LetterShelfStatus, SubscribeDialog, useFollowedEditors, useLetterShelf } from '@/features/letter';
+import { LetterShelfStatus, useFollowedEditors, useLetterShelf } from '@/features/letter';
 import { ArticlePageShell } from '@/widgets/ArticlePageShell';
 import { ArchiveDiscovery } from './components/ArchiveDiscovery';
 import { DrawerPanel } from './components/DrawerPanel';
@@ -67,7 +67,6 @@ function MyLensDashboard() {
     router.replace(`/my-lens${qs ? `?${qs}` : ''}`);
   }, [requestedTab, params, router]);
   const authRedirectStarted = useRef(false);
-  const [subscribeOpen, setSubscribeOpen] = useState(false);
   // 대시보드 집계는 홈에서만 쓴다. 내 서랍은 문장(/api/archive)·저장 레터를 따로 불러오므로 요청하지 않는다.
   const server = useServerDashboard(user?.userId, 'home', tab === 'home');
   const needsLetters = tab === 'home' || tab === 'archive';
@@ -75,7 +74,7 @@ function MyLensDashboard() {
   const shelf = useLetterShelf(needsShelf);
   const archive = useDashboardArchive(tab === 'archive');
   const articleShelf = useArticleShelf(tab === 'archive');
-  const follow = useFollowedEditors(tab === 'home' || subscribeOpen);
+  const follow = useFollowedEditors(tab === 'home');
   const data = useDashboardLetters(needsLetters && shelf.ready);
   const [savedExpanded, setSavedExpanded] = useState(false);
   const rawProfile = server.data?.profile.data;
@@ -102,7 +101,6 @@ function MyLensDashboard() {
   return (
     <ArticlePageShell>
       <style>{MY_LENS_CSS}</style>
-      {subscribeOpen && <style>{LETTER_CSS}</style>}
       <main id="main-content" tabIndex={-1} className="ml-page">
         <header className="ml-intro">
           <div><p className="ml-greeting">{user?.name ? `${user.name}님을 위한 뉴스 공간` : '나의 관심이 이어지는 곳'}</p><h1>나의 LENS<span className="ml-title-dot" aria-hidden /></h1><p className="ml-intro-copy">궁금했던 이야기부터, 다시 읽고 싶은 한 편까지.</p></div>
@@ -119,7 +117,7 @@ function MyLensDashboard() {
         <div className={`ml-layout${tab === 'archive' ? ' ml-layout-drawer' : ''}`}>
           <div className="ml-main">
             {tab === 'home' && <>
-            <PersonalNews recommendations={newsRecommendations} categories={profile.categories} loading={news.loading} available={news.available} historyAvailable={server.data?.profile.status === 'ready'} unmatched={rawProfile?.coverage.legacy_unmatched ?? 0} onRetry={news.retry} />
+            <PersonalNews owner={user?.userId} recommendations={newsRecommendations} categories={profile.categories} loading={news.loading} available={news.available} historyAvailable={server.data?.profile.status === 'ready'} unmatched={rawProfile?.coverage.legacy_unmatched ?? 0} onRetry={news.retry} />
             <section id="ml-today" className="ml-today" aria-labelledby="ml-today-title" aria-busy={busy}>
               <div className="ml-section-title"><div><h2 id="ml-today-title">오늘, 나를 위한 레터</h2><p className="ml-helper">팔로우한 에디터의 최신 레터예요. 팔로우가 없으면 최근 발행된 레터를 보여드려요.</p></div></div>
               {busy ? <div className="ml-loading" role="status">나에게 맞는 레터를 불러오고 있어요.</div> : recommended.length ? <div className="ml-recommend-grid">{recommended.map((letter, index) => <DashboardLetter key={letter.slug} letter={letter} featured={index === 0} saved={shelf.isSaved(letter.slug)} onSave={() => toggleSaved(letter.slug)} />)}</div> : <div className="ml-empty"><BookOpen size={25} aria-hidden /><h3>{server.data?.letters.status === 'error' ? '레터를 불러오지 못했어요' : '아직 새 레터가 없어요'}</h3><p>{server.data?.letters.status === 'error' ? '연결을 확인한 뒤 다시 불러와 주세요.' : '팔로우한 에디터의 새 레터를 기다리거나 전체 레터를 둘러보세요.'}</p>{server.data?.letters.status === 'error' ? <button className="ml-button" onClick={server.retry}>레터 다시 불러오기</button> : <Link className="ml-button ml-button-quiet" href="/letter">레터 둘러보기</Link>}</div>}
@@ -128,21 +126,19 @@ function MyLensDashboard() {
 
             <section id="ml-saved" className="ml-saved" aria-labelledby="ml-saved-title">
               <div className="ml-section-title"><div><h2 id="ml-saved-title">다시 펼쳐볼 레터 <span className="ml-heading-count">{shelf.ready ? savedTotal : ''}</span></h2><p className="ml-helper">읽고 싶어 담아둔 이야기를 모았어요.</p></div><Link href="/my-lens?tab=archive&kind=letters" className="ml-text-link">내 서랍에서 보기 <ChevronRight size={14} /></Link></div>
-              {data.loading || !shelf.ready ? <p className="ml-loading" role="status">저장한 레터를 불러오고 있어요.</p> : !shelf.available ? <div className="ml-saved-empty"><h3>저장한 레터를 불러오지 못했어요</h3><p>연결을 확인하고 다시 불러와 주세요. 저장 기록은 유지돼요.</p><button type="button" className="ml-text-link" onClick={shelf.retry}>저장 레터 다시 불러오기</button></div> : savedLetters.length ? <><div className="ml-saved-list">{savedLetters.slice(0, savedExpanded ? undefined : 3).map((letter) => <DashboardLetter key={letter.slug} letter={letter} saved onSave={() => toggleSaved(letter.slug)} />)}</div>{savedLetters.length > 3 && <button className="ml-more" onClick={() => setSavedExpanded((value) => !value)}>{savedExpanded ? '접기' : `저장한 레터 ${savedLetters.length}편 모두 보기`}</button>}</> : <div className="ml-saved-empty"><Bookmark size={23} aria-hidden /><h3>{shelf.saved.length ? '저장 레터의 내용을 불러오지 못했어요' : '마음에 드는 레터를 담아보세요'}</h3><p>{shelf.saved.length ? '전체 목록을 확인하거나 새로운 레터를 만나보세요.' : '레터 옆의 북마크를 누르면 이곳에서 이어볼 수 있어요.'}</p><Link href="/letter" className="ml-text-link">레터 둘러보기 <ArrowUpRight size={15} /></Link></div>}
+              {data.loading || !shelf.ready ? <p className="ml-loading" role="status">저장한 레터를 불러오고 있어요.</p> : !shelf.available ? <div className="ml-saved-empty"><h3>저장한 레터를 불러오지 못했어요</h3><p>연결을 확인하고 다시 불러와 주세요. 저장 기록은 유지돼요.</p><button type="button" className="ml-text-link" onClick={shelf.retry}>저장 레터 다시 불러오기</button></div> : savedLetters.length ? <><div className="ml-saved-list">{savedLetters.slice(0, savedExpanded ? undefined : 3).map((letter) => <DashboardLetter key={letter.slug} letter={letter} expanded saved onSave={() => toggleSaved(letter.slug)} />)}</div>{savedLetters.length > 3 && <button className="ml-more" onClick={() => setSavedExpanded((value) => !value)}>{savedExpanded ? '접기' : `저장한 레터 ${savedLetters.length}편 모두 보기`}</button>}</> : <div className="ml-saved-empty"><Bookmark size={23} aria-hidden /><h3>{shelf.saved.length ? '저장 레터의 내용을 불러오지 못했어요' : '마음에 드는 레터를 담아보세요'}</h3><p>{shelf.saved.length ? '전체 목록을 확인하거나 새로운 레터를 만나보세요.' : '레터 옆의 북마크를 누르면 이곳에서 이어볼 수 있어요.'}</p><Link href="/letter" className="ml-text-link">레터 둘러보기 <ArrowUpRight size={15} /></Link></div>}
             </section>
 
             </>}
             {tab === 'archive' && <><BrowserBookmarksImport owner={user!.userId} letters={letters} onImported={()=>{shelf.retry();server.retry();}} /><DrawerPanel key={`${archive.owner ?? 'browser'}:${params.get('kind')}`} initialFilter={params.get('kind') === 'letters' ? 'letters' : params.get('kind') === 'articles' ? 'articles' : 'sentences'} articleShelf={articleShelf} archive={archive} articles={news.articles} letters={letters} savedSlugs={shelf.saved} lettersLoading={data.loading || !shelf.ready} lettersFailed={!shelf.available} retryLetters={()=>{data.retry();shelf.retry();}} onSave={toggleSaved} /></>}
           </div>
 
-          {tab === 'home' && <aside className="ml-rail" aria-label="내 기록과 구독">
+          {tab === 'home' && <aside className="ml-rail" aria-label="내 기록과 팔로우">
             <ArchiveDiscovery archive={homeArchive} articles={news.articles} letters={letters} />
-            <section className="ml-editors" aria-labelledby="ml-editors-title"><div className="ml-section-title"><h2 id="ml-editors-title">내가 팔로우한 에디터</h2><span className="ml-heading-count">{follow.ready ? follow.ids.length : '·'}</span></div>{!follow.ready ? <p className="ml-helper" role="status">팔로우한 에디터를 불러오고 있어요.</p> : !follow.available ? <p className="ml-helper">에디터 목록을 불러오지 못했어요.</p> : follow.followed.length ? <div className="ml-editor-list">{follow.followed.map((editor) => <Link key={editor.id} href={`/letter/editors/${editor.id}`} className="ml-editor">{editor.image && <Image src={editor.image} alt="" width={38} height={38} />}<span><strong>{editor.name}</strong></span><ChevronRight size={15} /></Link>)}</div> : <p className="ml-helper">관심 분야가 맞는 에디터를 팔로우하면 새 레터를 찾기 쉬워져요.</p>}{follow.items.filter(item=>item.active&&!follow.followed.some(editor=>editor.id===item.id)).map(item=><div key={item.id}><Link href={item.href} className="ml-text-link">{item.name}</Link><button type="button" className="ml-text-link" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></div>)}{follow.items.filter(item=>!item.active).map(item=><p className="ml-helper" key={item.id}>{item.name} · 활동 중지 <button type="button" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></p>)}<Link href="/letter" className="ml-text-link">에디터 만나보기 <ArrowUpRight size={15} /></Link></section>
-            <section className="ml-notify" aria-labelledby="ml-notify-title"><Bell size={22} aria-hidden /><h2 id="ml-notify-title">관심 있는 소식,<br />메일로도 만나요.</h2><p>선택한 에디터의 새 레터를 이메일로 받아보세요. 기존 이메일 구독은 그대로 유지돼요.</p><button type="button" className="ml-button" onClick={() => setSubscribeOpen(true)} disabled={!follow.ready || !follow.available}>레터 이메일 구독</button><p className="ml-storage-note">구독 신청 후 이메일 확인이 필요해요.</p></section>
+            <section className="ml-editors" aria-labelledby="ml-editors-title"><div className="ml-section-title"><h2 id="ml-editors-title">내가 팔로우한 에디터</h2><span className="ml-heading-count">{follow.ready ? follow.ids.length : '·'}</span></div>{!follow.ready ? <p className="ml-helper" role="status">팔로우한 에디터를 불러오고 있어요.</p> : !follow.available ? <p className="ml-helper">에디터 목록을 불러오지 못했어요.</p> : follow.followed.length ? <div className="ml-editor-list">{follow.followed.map((editor) => <Link key={editor.id} href={`/letter/editors/${editor.id}`} className="ml-editor">{editor.image && <Image src={editor.image} alt="" width={38} height={38} />}<span><strong>{editor.name}</strong></span><ChevronRight size={15} /></Link>)}</div> : <p className="ml-helper">관심 분야가 맞는 에디터를 팔로우하면 새 레터를 찾기 쉬워져요.</p>}{follow.items.filter(item=>item.active&&!follow.followed.some(editor=>editor.id===item.id)).map(item=><div key={item.id}><Link href={item.href} className="ml-text-link">{item.name}</Link><button type="button" className="ml-text-link" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></div>)}{follow.items.filter(item=>!item.active).map(item=><p className="ml-helper" key={item.id}>{item.name} · 활동 중지 <button type="button" disabled={follow.pending} onClick={()=>void follow.toggle(item.id)}>팔로우 해제</button></p>)}<Link href="/letter" className="ml-text-link">다른 에디터 만나보기 <ArrowUpRight size={15} /></Link></section>
           </aside>}
         </div>
         <footer className="ml-footer"><span>AI LENS</span><p>나의 관심을 따라, 뉴스 너머의 맥락까지.</p></footer>
-        <SubscribeDialog open={subscribeOpen} onClose={() => setSubscribeOpen(false)} editors={follow.followed} title="에디터의 새 레터를 이메일로 받아보세요" source="my_lens" />
       </main>
     </ArticlePageShell>
   );

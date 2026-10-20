@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { startContentSession, reportContentProgress, ACCOUNT_VIEW_CHANGED, type ContentSession, type ContentFormat } from '../data/activityApi';
 import { useAuth } from '../contexts/AuthContext';
-import { saveReadingSignal, type ReadingSignal } from '../lib/readingSignals';
+import { saveReadingSignal, READING_HISTORY_CLEARED, readingHistoryResetKey, type ReadingSignal } from '../lib/readingSignals';
 
 export function useReadingSignalScope() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -23,6 +23,11 @@ export function useNewsReadingSignal(article: Omit<ReadingSignal, 'seenAt'> | nu
     let previousTick=performance.now(),localSaved=false,inFlight=false,finished=false;
     const onVisibility=()=>{previousTick=performance.now();};
     document.addEventListener('visibilitychange',onVisibility);
+    const stop=()=>{finished=true;controller.abort();};
+    const onClear=(event:Event)=>{if((event as CustomEvent<string>).detail===scope)stop();};
+    const onStorage=(event:StorageEvent)=>{if(event.key===readingHistoryResetKey(scope))stop();};
+    window.addEventListener(READING_HISTORY_CLEARED,onClear);
+    window.addEventListener('storage',onStorage);
     if(scope!=='browser')void startContentSession(signal.kind,signal.id,format,controller.signal).then(value=>{
       if(!controller.signal.aborted){session=value;previousTick=performance.now();}
     }).catch(()=>{finished=true;});
@@ -35,7 +40,11 @@ export function useNewsReadingSignal(article: Omit<ReadingSignal, 'seenAt'> | nu
           const result=await reportContentProgress(session.session_id,eventId,next,{visible_ms:Math.floor(visibleMs)},controller.signal);
           if(controller.signal.aborted)break;
           seq=next;
-          if(result.viewed){finished=true;window.dispatchEvent(new Event(ACCOUNT_VIEW_CHANGED));}
+          if(result.viewed){
+            finished=true;
+            saveReadingSignal(scope,{...signal,seenAt:new Date().toISOString()});
+            window.dispatchEvent(new Event(ACCOUNT_VIEW_CHANGED));
+          }
           inFlight=false;return;
         }catch{
           if(attempt===0&&!controller.signal.aborted)await new Promise(resolve=>window.setTimeout(resolve,5000));
@@ -51,9 +60,9 @@ export function useNewsReadingSignal(article: Omit<ReadingSignal, 'seenAt'> | nu
       const rect=root?.getBoundingClientRect();
       if(document.visibilityState!=='visible'||!rect||rect.bottom<=0||rect.top>=innerHeight)return;
       visibleMs+=elapsed;
-      if(visibleMs>=10000&&!localSaved){localSaved=true;saveReadingSignal(scope,{...signal,seenAt:new Date().toISOString()});if(scope==='browser')finished=true;}
+      if(scope==='browser'&&visibleMs>=10000&&!localSaved){localSaved=true;saveReadingSignal(scope,{...signal,seenAt:new Date().toISOString()});finished=true;}
       if(scope!=='browser'&&visibleMs-lastReported>=10000)void report();
     },250);
-    return()=>{window.clearInterval(timer);controller.abort();document.removeEventListener('visibilitychange',onVisibility);};
+    return()=>{window.clearInterval(timer);controller.abort();document.removeEventListener('visibilitychange',onVisibility);window.removeEventListener(READING_HISTORY_CLEARED,onClear);window.removeEventListener('storage',onStorage);};
   },[key,scope,format]);
 }

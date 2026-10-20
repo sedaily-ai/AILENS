@@ -1,5 +1,6 @@
 import { API_URL } from '@/shared/config/apiClient';
 import { authFetch } from '@/shared/lib/auth/authFetch';
+import { clearReadingSignals } from '../lib/readingSignals';
 export type ContentFormat = 'letter' | 'webtoon' | 'podcast' | 'video';
 export const ACCOUNT_VIEW_CHANGED = 'lens-account-view-changed';
 export interface ContentSession {session_id:string}
@@ -16,4 +17,25 @@ export async function startContentSession(kind: 'news' | 'letter', slug: string,
 }
 export function reportContentProgress(sessionId:string,eventId:string,seq:number,progress:ContentProgress,signal:AbortSignal){
   return json<{viewed:boolean}>('/activity/events','POST',{session_id:sessionId,event_id:eventId,session_seq:seq,event_type:'progress',...progress},signal);
+}
+
+export class ReadingHistoryError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
+
+export async function clearAccountReadingHistory(owner: string, signal: AbortSignal): Promise<void> {
+  const response = await authFetch(`${API_URL}/api/v2/me/activity/history`, {
+    method: 'DELETE', signal, cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: true }),
+  });
+  const result: unknown = await response.json().catch(() => null);
+  if (!response.ok) throw new ReadingHistoryError(response.status, response.status === 401
+    ? '로그인이 만료됐어요. 다시 로그인해 주세요.'
+    : '열람 기록을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  if (!result || typeof result !== 'object' || !('deleted' in result) || result.deleted !== true) {
+    throw new ReadingHistoryError(503, '삭제 결과를 확인하지 못했어요. 다시 시도해 주세요.');
+  }
+  signal.throwIfAborted();
+  clearReadingSignals(`account:${owner}`);
+  window.dispatchEvent(new Event(ACCOUNT_VIEW_CHANGED));
 }

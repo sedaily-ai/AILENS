@@ -8,7 +8,9 @@ export type ReadingSignal = {
 };
 
 export const READING_SIGNAL_EVENT = 'lens-reading-signals-changed';
+export const READING_HISTORY_CLEARED = 'lens-reading-history-cleared';
 export const readingSignalKey = (scope: string) => `lens-reading-signals-v1:${scope}`;
+export const readingHistoryResetKey = (scope: string) => `lens-reading-history-reset:${scope}`;
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 
 export function parseReadingSignals(raw: string | null, now = Date.now()): ReadingSignal[] {
@@ -39,4 +41,14 @@ export function saveReadingSignal(scope: string, signal: ReadingSignal): boolean
     window.dispatchEvent(new CustomEvent(READING_SIGNAL_EVENT));
     return true;
   } catch { return false; }
+}
+
+/** 서버 삭제가 확인된 뒤에만 호출한다. 다른 탭도 이전 세션의 보고·로컬 저장을 멈춘다. */
+export function clearReadingSignals(scope: string): void {
+  try {
+    localStorage.removeItem(readingSignalKey(scope));
+    localStorage.setItem(readingHistoryResetKey(scope), crypto.randomUUID());
+  } catch { /* 브라우저 저장소가 차단돼도 서버 삭제 결과는 유지한다. */ }
+  window.dispatchEvent(new CustomEvent(READING_HISTORY_CLEARED, { detail: scope }));
+  window.dispatchEvent(new Event(READING_SIGNAL_EVENT));
 }

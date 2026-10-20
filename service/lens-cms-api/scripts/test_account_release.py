@@ -13,6 +13,9 @@ class AccountReleaseTests(unittest.TestCase):
     def test_files_are_all_ordered(self):
         self.assertEqual([p.name.split('_')[2] for p in account_schema.files()], [f'v1.{v}' for v in range(48,58)])
 
+    def test_history_clear_checks_legacy_reading_delete_privilege(self):
+        self.assertIn('DELETE', account_schema.ACCOUNT_TABLES['user_readings'].split(','))
+
     def test_missing_env_does_not_connect(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(account_schema.psycopg2, 'connect') as connect:
             with self.assertRaises(RuntimeError): account_schema.connection()
