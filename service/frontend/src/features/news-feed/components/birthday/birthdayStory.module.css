@@ -55,7 +55,8 @@
 .frontNote p { margin-top: 4px !important; font-size: 16px; color: #374151; line-height: 1.7; }
 .paperEmpty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 0 24px; text-align: center; }
 .paperEmpty strong { font-size: 18px; color: #111827; }
-.paperEmpty p { font-size: 14px; color: #4b5563; line-height: 1.7; }
+/* 빈 상태·오류 상자의 설명은 다음에 할 일을 알리는 본문이라 본문 최소 크기 16px을 지킨다(그날 1면·100만 원 장면 공통). */
+.paperEmpty p { font-size: 16px; color: #4b5563; line-height: 1.7; }
 .skeleton { display: grid; gap: 12px; padding: 24px 0 16px; }
 .skeleton span { display: block; height: 20px; border-radius: 4px; background: #f3f4f6; }
 .skeleton span:first-child { height: 40px; width: 85%; }
@@ -71,7 +72,7 @@
 .flowArrow { position: relative; flex: 1; min-width: 24px; height: 30px; }
 .flowArrow::before { content: ''; position: absolute; left: 0; right: 2px; top: 50%; border-top: 2px dashed #1d4ed8; transform: translateY(-50%); }
 .flowArrow::after { content: ''; position: absolute; right: 2px; top: 50%; width: 8px; height: 8px; border-top: 2px solid #1d4ed8; border-right: 2px solid #1d4ed8; transform: translateY(-50%) rotate(45deg); }
-.soon { margin: 0 0 48px !important; padding: 16px; border: 1px dashed #6b7280; border-radius: 12px; background: #f9fafb; font-size: 14px; color: #374151; line-height: 1.6; }
+.soon { margin: 0 0 48px !important; padding: 16px; border: 1px dashed #6b7280; border-radius: 12px; background: #f9fafb; font-size: 16px; color: #374151; line-height: 1.6; }
 /* 100만 원 장면 대신 두는 한 줄 안내(기준일이 1964-05-04보다 앞서거나, 기준일 자료가 아직 발표되지 않아 칸이 없을 때). 굵은 첫 문장은 끝의 낱말 하나만 다음 줄로 밀리지 않게 줄 길이를 고르게 나눈다. */
 .soon strong { display: block; font-size: 16px; color: #111827; text-wrap: balance; }
 .bars { margin: 24px 0 0 !important; padding: 0; list-style: none; }

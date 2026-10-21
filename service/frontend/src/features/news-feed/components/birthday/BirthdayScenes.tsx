@@ -75,7 +75,7 @@ export function AssetScene({ base, mode, state, cells, onRetry }: {
 }) {
   if (state.status === 'off') {
     const when = mode === 'year' ? '스무 살이 된 해의 1월 1일' : base.kind === 'twentieth' ? '스무 살 생일' : '기준일';
-    return <p className={styles.soon}><strong>{`${when}(${nb(dateLabel(base.date))})이 공식 환율 기록이 시작된 ${nb('1964년 5월 4일')}보다 앞서 ${nb('100만 원')} 계산은 하지 않았어요.`}</strong>물가·환율 같은 공식 통계가 그 뒤부터 있어요.</p>;
+    return <p className={styles.soon}><strong>{`${when}(${nb(dateLabel(base.date))})이 공식 환율 기록이 시작된 ${nb('1964년 5월 4일')}보다 앞서 ${nb('100만 원')} 계산은 하지 않았어요.`}</strong>{`물가·환율 같은 공식 통계가 ${nb('그 뒤부터')} 있어요.`}</p>;
   }
   if (state.status === 'ready' && !cells.length) {
     return <p className={styles.soon}><strong>이 날짜는 아직 계산할 자료가 없어요.</strong>물가·환율 같은 공식 통계가 발표되면 계산해요.</p>;
