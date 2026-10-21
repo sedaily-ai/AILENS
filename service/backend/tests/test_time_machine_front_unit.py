@@ -439,6 +439,24 @@ def test_later_walk_days_ask_ranking_after_docs(env):
     assert ranking_at > search_at  # 처음 묻는 날이 아니면 그날 기사를 받은 뒤에만 순위를 묻는다
 
 
+def test_early_1990s_skip_ranking(env):
+    table, post = env
+    # 1990~1993은 이슈 순위에 서울경제 기사가 묶이지 않아(2026-10-21 13일 확인) 순위를 묻지 않고 같은 결과(no_match)를 낸다.
+    _answer(post, {'1992-03-17': [_doc(i, page='', content='가' * i) for i in range(1, 6)]})
+    _, body = _call(front='1992-03-17')
+    assert (body['kind'], body['shown_date'], body['basis']) == ('day', '1992-03-17', 'no_match')
+    assert [(a['news_id'], a['coverage']) for a in body['articles']] == [('n5', None), ('n4', None), ('n3', None), ('n2', None)]
+    assert _rankings(post) == [] and len(_searches(post)) == 1
+    assert table.puts[0]['expires_at'] - time.time() > 3000 * 86400
+
+
+def test_1996_day_era_still_asks_ranking(env):
+    _, post = env
+    _answer(post, {'1996-08-02': [_doc(1, page='')]}, _issue(['n1', 'x']))
+    _, body = _call(front='1996-08-02')
+    assert body['basis'] == 'issue' and [c.kwargs['json']['argument']['date'] for c in _rankings(post)] == ['1996-08-02']
+
+
 def test_empty_day_asks_ranking_only_on_first_day(env):
     _, post = env
     asked = threading.Event()

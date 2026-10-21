@@ -320,6 +320,11 @@ def _own_paper_from_cache(day: str) -> Optional[_Resolved]:
 
 # 그날 기사와 함께 부른 이슈 순위를 그날 기사가 없어 버렸을 때 남기는 줄(날짜 없음). 늘어난 빅카인즈 호출을 로그·미리 채우기 스크립트가 센다.
 RANKING_DISCARDED_LOG = '그날 기사가 없어 함께 부른 이슈 순위를 버림'
+# 이 날짜까지(1990~1993)는 이슈 순위에 서울경제 기사가 묶이지 않아 순위를 묻지 않고 no_match(본문이 긴 순)로 낸다.
+# 2026-10-21 실호출 확인: 1990-01-09·05-15·10-17, 1991-02-26·07-10·11-21, 1992-03-17·06-24·10-08,
+# 1993-01-19·05-26·09-29·12-14 평일 13일 모두 이슈 30개를 받았지만 그날 서울경제 기사(02100311.*)와 번호가 맞는 것이 0건이었다.
+# 순위가 있고 연결이 0건일 때(no_match)와 같은 기사·같은 coverage(None)가 나온다.
+NO_ISSUE_MATCH_UNTIL = '1993-12-31'
 
 
 def _ranking_failed(e: Exception) -> Tuple[List[List[str]], bool]:
@@ -333,7 +338,14 @@ def _day_highlights(day: str, deadline: float, parallel: bool) -> Tuple[List[Dic
 
     parallel 이면 이슈 순위를 다른 스레드로 먼저 보내고 그날 기사를 받는다 — 두 요청의 제한 시간이 모두 남은 예산 이하라
     직렬(합)보다 짧은 쪽(최대값)에서 끝난다. 그날 기사가 없으면 순위는 기다리지 않고 버린다(그만큼 빅카인즈 호출이 하나 는다).
+    NO_ISSUE_MATCH_UNTIL 까지는 순위를 묻지 않는다.
     """
+    if day <= NO_ISSUE_MATCH_UNTIL:
+        docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
+        if not docs:
+            return [], None
+        articles, _ = bigkinds_search.pick_day_articles(docs, [], FRONT_DAY_ARTICLES)
+        return articles, bigkinds_search.DAY_BASIS_NO_MATCH
     if not parallel:
         docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
         if not docs:
