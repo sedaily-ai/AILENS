@@ -5,6 +5,7 @@
   웹은 기준일 연도 파일과 latest.json 두 개만 받아 기기에서 계산한다. 서버에는 연도만 드러나고 생일 날짜는 가지 않는다.
 - 출처는 한국은행 ECOS 네 계열이다: 소비자물가(901Y009, 국가데이터처), 정기예금 신규취급액 금리(121Y002),
   원/달러 종가 일별(731Y003)·매매기준율 월평균(731Y004), 서울 아파트 실거래가격지수(901Y089, 한국부동산원).
+  금 한 돈은 세계은행 Pink Sheet 월별 엑셀의 Gold(CC BY 4.0)를 웹이 731Y004 월평균 환율로 바꾼다(--pink-sheet 필요).
   이용 근거가 확인된 출처만 수집한다(SOURCES 의 allowed). 근거는 docs/product/birthday-assets/출처_이용조건.md.
   허용된 출처가 하나도 없으면 파일을 쓰지 않는다.
 - 정기예금은 금리를 매달 그달 금리로 굴린 누적지수(세전 월복리, deposit_index)로 바꿔 넣는다.
@@ -13,7 +14,9 @@
 
 실행: cd service/backend && AWS_DEFAULT_REGION=us-east-1 uv run --no-project --with boto3==1.35.0 \\
         --with requests==2.32.3 --with openpyxl==3.1.5 python scripts/build_birthday_assets.py \\
-        [--until YYYY-MM-DD] [--pink-sheet <세계은행 CMO-Historical-Data-Monthly.xlsx 경로 또는 URL>]
+        [--until YYYY-MM-DD] --pink-sheet <세계은행 CMO-Historical-Data-Monthly.xlsx 경로 또는 URL>
+  Pink Sheet 주소(문서 ID)는 해가 바뀌면 달라진다 — 실행 전에
+  https://www.worldbank.org/en/research/commodity-markets 의 'Monthly prices' 링크를 확인해 쓴다.
 ECOS 인증키는 SSM(/sedaily-mbti/ecos-api-key)에서만 읽고 출력·기록하지 않는다.
 """
 import argparse
@@ -57,8 +60,10 @@ SOURCES: Dict[str, Source] = {
     'deposit': Source('한국은행 예금은행 정기예금 신규취급액 가중평균금리(한국은행 ECOS 121Y002)', True),
     'usdkrw': Source('한국은행 원/달러 환율 종가·매매기준율 월평균(한국은행 ECOS 731Y003·731Y004)', True),
     'apartment': Source('한국부동산원 서울 아파트 실거래가격지수(한국은행 ECOS 901Y089)', True),
-    # 법무 확인 전: 원자료(Bloomberg·Kitco·IMF IFS·LBM) 권리 확인이 남아 꺼 둔다.
-    'gold': Source('세계은행 Pink Sheet 금 월평균', False, requires=('usdkrw',)),
+    # 2026-10-21 켬(사용자 요청). 세계은행 Pink Sheet 는 CC BY 4.0 이라 상업 이용이 되고 출처 표시가 의무다
+    # (화면 출처 줄에 '세계은행 Pink Sheet(CC BY 4.0)'). 원자료(Bloomberg·Kitco·IMF IFS·LBM 등)의 제3자 권리는
+    # 세계은행이 보증하지 않아 법무 확인 대상이다 — 출시(웹 배포) 전에 확인한다.
+    'gold': Source('세계은행 Pink Sheet 금 월평균(CC BY 4.0)', True, requires=('usdkrw',)),
 }
 
 # ECOS 계열: (통계표, 주기, 시작, 끝(None 이면 --until), 항목 코드 경로). 2026-10-21 ECOS 로 확인한 값.
