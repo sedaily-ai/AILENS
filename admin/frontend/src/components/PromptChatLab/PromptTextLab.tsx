@@ -15,6 +15,7 @@ import { VoicePreviewGenerator } from "./VoicePreviewGenerator";
 import { VoiceProductionPanel } from "./VoiceProductionPanel";
 import { VideoCardGenerator } from "./VideoCardGenerator";
 import { VideoProductionPanel } from "./VideoProductionPanel";
+import { PrismScenePromptStep } from "./PrismScenePromptStep";
 import { VideoRenderSettingsPanel, type VideoRenderSettingsPanelHandle, type ParsedDoc as VideoParsedDoc } from "./VideoRenderSettingsPanel";
 import { LENS_POLLY_PROFILE, PRISM_POLLY_PROFILE } from "./PollyVoiceSettingsFields";
 import { CustomSelect } from "@/components/CustomSelect";
@@ -776,7 +777,7 @@ export function PromptTextLab({
                             steps={[
                               {
                                 key: "prompt",
-                                label: "생성 프롬프트",
+                                label: isPrism ? "대본 작성 프롬프트" : "생성 프롬프트",
                                 content: (
                                   <PromptVersionReference
                                     ref={scriptPromptRef}
@@ -793,6 +794,8 @@ export function PromptTextLab({
                                   />
                                 ),
                               },
+                              // PRISM(2026-10-21) — 채팅 프롬프트는 대본 작성용, 카드 대본을 장면으로 나누는 프롬프트는 따로 둔다.
+                              ...(isPrism ? [{ key: "scene", label: "장면 변환 프롬프트", content: <PrismScenePromptStep /> }] : []),
                               // 음성 설정은 탭마다 다른 문서에 저장된다(영상 video-settings / PRISM prism-settings).
                               { key: "voice", label: "음성 설정", content: voiceSection },
                               // PRISM은 가로 고정이라 "영상 설정"(포맷·프로덕션 렌더) 단계를 띄우지 않는다(위 isPrism 주석).
