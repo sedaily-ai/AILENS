@@ -10,6 +10,7 @@ import { PromptVersionReference, type PromptVersionReferenceHandle } from "./Pro
 import { ApplyReviewModal } from "./ApplyReviewModal";
 import { StepTabs } from "./StepTabs";
 import { VoiceProviderFields } from "./VoiceProviderFields";
+import { VideoDownloadButton } from "./VideoDownloadButton";
 import {
   ELEVENLABS_FALLBACK_VOICE_SETTINGS,
   ELEVENLABS_FALLBACK_RANGES,
@@ -752,6 +753,9 @@ export function VideoCardGenerator({
                           )}
                           {c.renderStatus === "done" && c.videoUrl && (
                             <video controls preload="none" poster={c.thumbUrl ?? undefined} src={c.videoUrl} className="w-full rounded-lg" />
+                          )}
+                          {c.renderStatus === "done" && c.videoUrl && c.jobId && (
+                            <VideoDownloadButton jobId={c.jobId} filePrefix={audioFormat === "prism" ? "ai_prism_EN" : "ailens_video"} />
                           )}
                           {c.renderStatus === "error" && c.renderError && <p className="text-[11px] text-[var(--danger)]">{c.renderError}</p>}
                         </div>

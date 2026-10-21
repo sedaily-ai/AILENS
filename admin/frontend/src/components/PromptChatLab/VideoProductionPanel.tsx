@@ -8,6 +8,7 @@ import { ELEVENLABS_FALLBACK_VOICE_SETTINGS, ELEVENLABS_FALLBACK_RANGES, type El
 import { POLLY_VOICES, POLLY_VOICE_ENGINE_OPTIONS } from "./PollyVoiceSettingsFields";
 import { FORMATS } from "./VideoRenderSettingsPanel";
 import { extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard } from "./videoCardModel";
+import { VideoDownloadButton } from "./VideoDownloadButton";
 
 /* 2026-09-27 — 사용자 요청: "프로덕션 카드에도, 테스트 카드와 동일하게,
    산출물 생성 가능하도록.. 4개 유형 전부요" → 이어서 지적: "프로덕션
@@ -277,6 +278,7 @@ export function VideoProductionPanel({
           {card.renderStatus === "done" && card.videoUrl && (
             <video controls preload="none" poster={card.thumbUrl ?? undefined} src={card.videoUrl} className="w-full rounded-lg" />
           )}
+          {card.renderStatus === "done" && card.videoUrl && card.jobId && <VideoDownloadButton jobId={card.jobId} filePrefix="ailens_video" />}
           {card.renderStatus === "error" && card.renderError && <p className="text-[11px] text-[var(--danger)]">{card.renderError}</p>}
         </div>
       )}
