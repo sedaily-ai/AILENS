@@ -375,6 +375,10 @@ export function VideoCardGenerator({
       } else if (msg.type === "audio_error") {
         const m = msg as unknown as { slot_id: string; message: string };
         setCards((prev) => prev.map((c) => (c.id === m.slot_id ? { ...c, voiceStatus: "error", voiceError: m.message } : c)));
+      } else if (msg.type === "render_stage") {
+        // PRISM 대본 → 장면 변환 중(chat_ws.py::_prism_script_to_render_json). 끝나면 render_started가 온다.
+        const m = msg as unknown as { slot_id: string; stage: "scene" };
+        setCards((prev) => prev.map((c) => (c.id === m.slot_id ? { ...c, progress: { stage: m.stage } } : c)));
       } else if (msg.type === "render_started") {
         const m = msg as unknown as { slot_id: string; job_id: string };
         setCards((prev) => prev.map((c) => (c.id === m.slot_id ? { ...c, renderStatus: "rendering", jobId: m.job_id } : c)));
@@ -444,7 +448,8 @@ export function VideoCardGenerator({
     if (c.voiceStatus === "pending" || c.renderStatus === "starting" || c.renderStatus === "rendering") return;
 
     const patch: Partial<CardState> = { ownerThreadId: threadId };
-    const narration = extractNarration(c.input);
+    const isPrism = audioFormat === "prism";
+    const narration = extractNarration(c.input, { stripScriptMarkup: isPrism });
     if (narration) {
       const voiceResult = send(
         "synthesize_audio",
@@ -471,15 +476,18 @@ export function VideoCardGenerator({
     // 정보를 같이 보내 카드 선택대로 실제 영상도 렌더되게 한다. format도
     // 같은 이유로 같이 보낸다(2026-09-25 후속, 사용자 지적: "동영상
     // 부분도.. 영상 탭에.. 추가되어야하는거 아닌가요?").
+    // script_format(2026-10-21) — PRISM은 영어 대본을 그대로 보내고, 서버가 장면 변환 프롬프트로 JSON을 만든다.
+    const scriptFormat = isPrism ? { script_format: "prism" } : {};
     const renderResult = send(
       "render_video",
       c.provider === "elevenlabs"
-        ? { text: c.input, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: c.format }
-        : { text: c.input, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: c.format }
+        ? { text: c.input, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: c.format, ...scriptFormat }
+        : { text: c.input, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: c.format, ...scriptFormat }
     );
     if (renderResult.sent) {
       patch.renderStatus = "starting";
       patch.renderError = null;
+      patch.progress = null;
     } else {
       patch.renderStatus = "error";
       patch.renderError = renderResult.tooLarge
@@ -705,7 +713,11 @@ export function VideoCardGenerator({
                       <textarea
                         value={c.input}
                         onChange={(e) => updateCard(c.id, { input: e.target.value })}
-                        placeholder="왼쪽에서 만든 각본(렌더용 JSON)을 붙여넣으세요 — 순수 텍스트만 넣으면 성우 미리듣기만 됩니다"
+                        placeholder={
+                          audioFormat === "prism"
+                            ? "왼쪽에서 만든 영어 대본(응답 전체 복사 그대로)을 붙여넣으세요 — 서버가 장면으로 나눠 영상을 만듭니다"
+                            : "왼쪽에서 만든 각본(렌더용 JSON)을 붙여넣으세요 — 순수 텍스트만 넣으면 성우 미리듣기만 됩니다"
+                        }
                         rows={6}
                         className="ui-input w-full resize-none rounded-lg px-2.5 py-2 text-[12px] leading-relaxed"
                       />

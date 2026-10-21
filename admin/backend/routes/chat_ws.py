@@ -251,6 +251,7 @@ def run_async_job(payload: dict) -> None:
             polly_settings=data.get("polly_settings"),
             photo_url=data.get("photo_url"),
             photo_credit=data.get("photo_credit"),
+            script_format=data.get("script_format"),
         )
     elif kind == "remake_load":
         video_remake.run_load(push, data.get("post_id") or "")
@@ -516,8 +517,11 @@ def _run_article_text_flow(
     # 건너뛰고 있었다 — get_thinking_config가 이제 model_id 없을 때도
     # "opus-5" 설정으로 폴백하므로(routes/prompts.py 참고) 그냥 항상 불러도
     # 된다.
+    # PRISM(2026-10-21)은 기사 3~6건 묶음을 한 번에 넣는다 — 실제 부동산 6건 묶음이 12,854자라 12,000자에서
+    # 마지막 기사 뒷부분이 잘렸다. PRISM만 20,000자까지 넘긴다(화면 쪽 WS 프레임 30KB 제한이 그보다 먼저 걸린다).
+    char_limit = 20000 if category == "prism" else 12000
     _stream_completion(
-        push, content, [{"role": "user", "content": [{"text": user_message[:12000]}]}],
+        push, content, [{"role": "user", "content": [{"text": user_message[:char_limit]}]}],
         max_tokens=cfg["max_tokens"], model=model,
         additional_fields=get_thinking_config(model_id),
         use_cache=model_supports_prompt_cache(model_id) if model_id else True,
@@ -731,6 +735,10 @@ _VIDEO_LAB_CONTAINER = "video-lab"
 _VIDEO_LAB_SUBNETS = ["subnet-0b5a146ca8ed1ddfe"]
 _VIDEO_LAB_SECURITY_GROUPS = ["sg-05cb5f7bc29891cf8"]
 _MAX_RENDER_TEXT_BYTES = 20000  # _MAX_SYNTHESIZE_TEXT_BYTES와 같은 이유 — 과금 폭주 방지
+# PRISM 장면 변환(2026-10-21) — 사용자 요청: "원문기사를 붙여넣으면 영문 대본이 나오고, 그 대본 붙여넣으면
+# 영상 만들어지고". PRISM 카드에 렌더용 JSON이 아닌 영어 대본이 오면, 이 카테고리에 발행된 "장면 변환"
+# 프롬프트로 먼저 JSON을 만든 뒤 렌더한다(채팅의 "prism" 프롬프트는 대본 작성용으로 분리).
+_PRISM_SCENE_CATEGORY = "prism-scene"
 
 _ecs_client = None
 
@@ -769,11 +777,60 @@ def _run_remake_script_flow(push: Push, post_id: str, article_override: str | No
     )
 
 
+def _has_render_json(text: str) -> bool:
+    """렌더 태스크(render_from_script.py)가 그대로 쓸 수 있는 JSON(cuts가 채워진 객체)이 있는가."""
+    try:
+        obj = extract_json_object(text)
+    except Exception:  # noqa: BLE001 — JSON이 없거나 깨졌으면 "없음"
+        return False
+    return isinstance(obj, dict) and isinstance(obj.get("cuts"), list) and len(obj["cuts"]) > 0
+
+
+def _prism_script_to_render_json(push: Push, slot_id: str, script: str) -> str | None:
+    """PRISM 영어 대본 → 렌더용 JSON 텍스트. 발행된 prism-scene 프롬프트를 system으로, 대본을 영상 탭과 같은
+    "[입력 기사]" 템플릿으로 넘긴다(모델·출력 상한도 PRISM 채팅과 같다). 실패하면 render_error를 보내고 None."""
+    prompt = prompts_repo.get_prompt(_PRISM_SCENE_CATEGORY, "published")
+    content = (prompt or {}).get("active_content") or ""
+    if not content.strip():
+        push({
+            "type": "render_error", "slot_id": slot_id,
+            "message": "장면 변환 프롬프트가 없습니다 — PRISM 탭 \"장면 변환 프롬프트\"에서 저장 후 적용해 주세요.",
+        })
+        return None
+    push({"type": "render_stage", "slot_id": slot_id, "stage": "scene"})
+    cfg = _CATEGORY_BEDROCK["prism"]
+    kwargs: dict = {
+        "modelId": cfg["model"],
+        "system": [{"text": content}],
+        "messages": [{"role": "user", "content": [{"text": cfg["user_template"].format(article=script)}]}],
+        "inferenceConfig": {"maxTokens": cfg["max_tokens"]},
+    }
+    thinking = get_thinking_config(None)
+    if thinking:
+        kwargs["additionalModelRequestFields"] = thinking
+    try:
+        resp = _get_bedrock_client().converse(**kwargs)
+    except Exception as e:  # noqa: BLE001 — 사용자에게 실패를 알려야 함
+        logger.exception("PRISM 장면 변환 Bedrock 호출 실패")
+        push({"type": "render_error", "slot_id": slot_id, "message": f"장면 변환 실패: {e}"[:300]})
+        return None
+    raw = "".join(b.get("text", "") for b in resp.get("output", {}).get("message", {}).get("content", []))
+    if resp.get("stopReason") == "max_tokens":
+        push({"type": "render_error", "slot_id": slot_id, "message": "장면 변환 결과가 너무 길어 잘렸습니다 — 대본을 줄이거나 다시 시도해 주세요."})
+        return None
+    if not _has_render_json(raw):
+        logger.warning(f"PRISM 장면 변환 결과에 렌더용 JSON 없음(앞부분): {raw[:300]!r}")
+        push({"type": "render_error", "slot_id": slot_id, "message": "장면 변환 결과에서 영상용 JSON을 찾지 못했습니다 — 다시 시도해 주세요."})
+        return None
+    return raw
+
+
 def _run_render_video_flow(
     push: Push, text: str, slot_id: str, provider: str = "polly",
     voice_id: str | None = None, model_id: str | None = None,
     voice_settings: dict | None = None, polly_settings: dict | None = None,
     photo_url: str | None = None, photo_credit: str | None = None,
+    script_format: str | None = None,
 ) -> None:
     """영상 탭 우측 "영상 생성" 패널(VideoRenderGenerator.tsx, 팟캐스트의
     PodcastAudioGenerator.tsx와 같은 슬롯-리스트 구조) 전용. 여기서는 ECS
@@ -795,7 +852,10 @@ def _run_render_video_flow(
     항상 CMS에 발행된 설정(대개 Polly)으로 나갔다 — 사용자 확인 후
     "카드 선택대로 실제 영상도 렌더"하도록 바꾼다. video_settings.
     get_render_settings()의 override 인자와 같은 모양으로 조립해
-    render_from_script.py에 --settings-override로 전달한다."""
+    render_from_script.py에 --settings-override로 전달한다.
+
+    script_format="prism"(2026-10-21) — PRISM 카드는 영어 대본을 그대로 넣는다. 렌더용 JSON이 없으면
+    _prism_script_to_render_json으로 먼저 장면 JSON을 만든다(이미 JSON이면 예전처럼 그대로 렌더)."""
     if not text.strip():
         push({"type": "render_error", "slot_id": slot_id, "message": "렌더할 각본이 없습니다."})
         return
@@ -805,6 +865,11 @@ def _run_render_video_flow(
             "message": f"각본이 너무 깁니다 (최대 {_MAX_RENDER_TEXT_BYTES // 1000}KB)",
         })
         return
+    if script_format == "prism" and not _has_render_json(text):
+        converted = _prism_script_to_render_json(push, slot_id, text)
+        if converted is None:
+            return
+        text = converted
     job_id = uuid.uuid4().hex[:16]
     input_key = f"media/video-lab/input/{job_id}.txt"
     try:
