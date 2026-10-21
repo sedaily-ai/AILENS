@@ -1,0 +1,395 @@
+"""생일 1면 캐시 미리 채우기 스크립트(scripts/warm_front_page_cache.py) 단위 테스트. 서버 코드·DynamoDB·빅카인즈는 전부 가짜.
+실행: cd service/backend && uv run --no-project --with pytest==8.3.3 --with requests==2.32.3 --with boto3==1.35.0 \\
+        python -m pytest tests/test_warm_front_page_cache_unit.py -q
+"""
+import importlib.util
+import io
+import json
+import logging
+import os
+import time
+from datetime import date
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
+
+_PATH = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'warm_front_page_cache.py')
+_spec = importlib.util.spec_from_file_location('warm_front_page_cache', _PATH)
+wf = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(wf)
+
+TODAY = date(2026, 10, 21)
+DISCARDED = '버린 순위'
+TEN_YEARS, WEEK = 3650, 7
+
+
+class _Res:
+    def __init__(self, status=200, body=None):
+        self.status_code = status
+        self.content = json.dumps(body if body is not None else {'result': 0}).encode()
+
+
+class _FakeBs:
+    BIGKINDS_SEARCH_URL = 'https://bk/search'
+    BIGKINDS_ISSUE_URL = 'https://bk/issue'
+    FRONT_COUNT_FIELDS = ['printing_page', 'enveloped_at']
+
+    def __init__(self, respond=None):
+        self.sent = []
+        self.respond = respond or (lambda url, payload: _Res())
+        self._SESSION = SimpleNamespace(post=self._post)
+
+    def _post(self, url, json=None, timeout=None):
+        self.sent.append((url, json))
+        return self.respond(url, json)
+
+
+class _FakeTm:
+    """get_front_page_data 흉내 — 표에 있으면 cached, 없으면 빅카인즈 1회 + PutItem. plan[날짜] = (kind, 보관 일수, basis) 또는 예외."""
+    CACHE_TABLE = 'sedaily-mbti-articles-dev'
+    RANKING_DISCARDED_LOG = DISCARDED
+
+    def __init__(self, bs, plan):
+        self.bs, self.plan, self.called = bs, plan, []
+        self.logger = logging.getLogger('fake_time_machine')
+        self.logger.setLevel(logging.INFO)
+
+    def _get_table(self):
+        raise AssertionError('스크립트가 표를 바꿔 끼워야 한다')
+
+    def get_front_page_data(self, day):
+        self.called.append(day)
+        table = self._get_table()
+        item = table.get_item(Key={'news_id': f'timemachine_frontv2_{day}'}).get('Item')
+        if item:
+            return {**item['data'], 'status': 'ok', 'cached': True}
+        res = self.bs._SESSION.post(self.bs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['title']}}, timeout=1)
+        if getattr(res, 'status_code', 200) != 200:
+            raise RuntimeError('빅카인즈 HTTP 오류')
+        outcome = self.plan.get(day, ('front', TEN_YEARS, None))
+        if isinstance(outcome, Exception):
+            raise outcome
+        kind, days, basis = outcome
+        if basis == 'discard':
+            self.logger.info(DISCARDED)
+            basis = None
+        data = {'date': day, 'date_kind': kind, 'shown_date': day, 'kind': kind, 'reason': None, 'basis': basis,
+                'articles': [{'news_id': f'a-{day}', 'title': 't', 'content': 'c', 'coverage': None}]}
+        table.put_item(Item={'news_id': f'timemachine_frontv2_{day}', 'item_type': 'timemachine_frontv2_cache', 'date': day,
+                             'data': data, 'cached_at': 'now', 'expires_at': int(time.time()) + days * 86400})
+        return {**data, 'status': 'ok', 'cached': False}
+
+
+class _ConditionFailed(Exception):
+    response = {'Error': {'Code': 'ConditionalCheckFailedException'}}
+
+
+class _FakeDynamoTable:
+    """조건부 PutItem 을 흉내 내는 boto3 Table."""
+
+    def __init__(self, items=()):
+        self.items = {i['news_id']: i for i in items}
+        self.puts = []
+
+    def get_item(self, Key):
+        item = self.items.get(Key['news_id'])
+        return {'Item': item} if item else {}
+
+    def put_item(self, Item, ConditionExpression=None, ExpressionAttributeValues=None):
+        self.puts.append({'Item': Item, 'ConditionExpression': ConditionExpression})
+        old = self.items.get(Item['news_id'])
+        if old and old['expires_at'] >= ExpressionAttributeValues[':now']:
+            raise _ConditionFailed()
+        self.items[Item['news_id']] = Item
+
+
+def _dynamodb(mode='PAY_PER_REQUEST', **table):
+    client = MagicMock()
+    client.describe_table.return_value = {'Table': {'TableArn': 'arn:table', 'BillingModeSummary': {'BillingMode': mode}, **table}}
+    client.list_tags_of_resource.return_value = {'Tags': [{'Key': 'Service', 'Value': 'atlas4'}]}
+    return client
+
+
+def _args(tmp_path, *extra):
+    return wf.parse_args(['--state-dir', str(tmp_path / 'state'), *extra], today=TODAY)
+
+
+def _range(start, end):
+    return ['--from', start, '--to', end]
+
+
+def _read(tmp_path, name):
+    with open(tmp_path / 'state' / name, encoding='utf-8') as fp:
+        return fp.read()
+
+
+def _rows(tmp_path):
+    return [json.loads(line) for line in _read(tmp_path, 'results.jsonl').splitlines()]
+
+
+def _existing(day):
+    return {'news_id': f'timemachine_frontv2_{day}', 'item_type': 'timemachine_frontv2_cache', 'date': day,
+            'data': {'date': day, 'kind': 'front', 'shown_date': day, 'articles': [{'news_id': 'old'}]},
+            'cached_at': 'before', 'expires_at': int(time.time()) + 100 * 86400}
+
+
+# ─── 인자·구간 ──────────────────────────────────────────────────────────────
+
+def test_default_range_and_argument_checks(tmp_path):
+    args = _args(tmp_path)
+    assert (args.start, args.end, args.workers, args.dry_run) == ('1990-01-01', '2026-10-14', 3, False)
+    assert len(args.days) == (date(2026, 10, 14) - date(1990, 1, 1)).days + 1
+    for bad in (['--to', '2026-10-21'], ['--to', '2026-10-22'], ['--code-root', '/old'], ['--from', '1989-12-31'],
+                ['--from', '2000-01-02', '--to', '2000-01-01'], ['--workers', '0']):
+        with pytest.raises(SystemExit):
+            _args(tmp_path, *bad)
+    assert _args(tmp_path, '--dry-run', '--code-root', '/old').code_root == '/old'
+    dates = tmp_path / 'dates.txt'
+    dates.write_text('2024-10-13\n\n2024-10-12\n2024-10-12\n')
+    assert _args(tmp_path, '--dates', str(dates)).days == ['2024-10-12', '2024-10-13']
+
+
+def test_chunks_are_contiguous_ascending_and_complete():
+    for count, workers in ((10, 3), (2, 3), (13436, 3), (1, 1)):
+        chunks = wf.plan_chunks(count, workers)
+        assert len(chunks) == min(count, workers)
+        assert chunks[0][0] == 0 and chunks[-1][1] == count - 1
+        assert all(a <= b for a, b in chunks) and all(chunks[i][1] + 1 == chunks[i + 1][0] for i in range(len(chunks) - 1))
+
+
+# ─── 멈춤 조건 ──────────────────────────────────────────────────────────────
+
+def test_stop_after_five_consecutive_failures():
+    guard = wf.Guard()
+    for failed in (True, True, True, True, False, True, True, True, True):
+        guard.record(failed)
+    assert guard.reason is None  # 성공 한 번이 연속을 끊는다
+    guard.record(True)
+    assert guard.reason == '연속 실패 5회'
+
+
+def test_stop_when_recent_failures_exceed_ten_percent():
+    guard = wf.Guard()
+    for i in range(100):
+        guard.record(i % 10 == 9)  # 100건 중 10건(10%)은 멈추지 않는다
+    assert guard.reason is None
+    guard.record(True)  # 최근 100건 중 11건
+    assert guard.reason.startswith('최근 시도 100건 중 실패 11건')
+
+
+@pytest.mark.parametrize('res, stops', [
+    (_Res(429), True), (_Res(403), True), (_Res(401), True),
+    (_Res(200, {'result': 9, 'reason': '일일 호출 한도 초과'}), True),
+    (_Res(200, {'result': 9, 'reason': 'Quota exceeded'}), True),
+    (_Res(200, {'result': 1, 'reason': 'invalid argument'}), False),
+    (_Res(200, {'result': 0}), False),
+    (_Res(500), False),
+])
+def test_response_classification(res, stops):
+    assert (wf.stop_reason_for(res) is not None) is stops
+
+
+def test_quota_reason_never_keeps_key_like_values():
+    reason = wf.stop_reason_for(_Res(200, {'result': 9, 'reason': 'limit exceeded for 0123456789abcdef0123456789abcdef'}))
+    assert '0123456789abcdef' not in reason and '***' in reason
+    big = _Res(200, {'result': 9, 'reason': '한도 초과', 'pad': 'x' * 5000})
+    assert wf.stop_reason_for(big) is None  # 큰 응답은 정상 응답으로 보고 열지 않는다
+
+
+def test_stopped_guard_blocks_requests_and_writes(tmp_path):
+    guard, calls, original = wf.Guard(), wf.Calls(), MagicMock()
+    post = wf.counting_post(original, _FakeBs(), calls, guard)
+    post(_FakeBs.BIGKINDS_ISSUE_URL, json={})
+    guard.stop('빅카인즈 HTTP 429')
+    with pytest.raises(wf.StopRequested):
+        post(_FakeBs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['title']}})
+    assert original.call_count == 1 and calls.snapshot()['ranking'] == 1
+    table = _FakeDynamoTable()
+    store = wf.DynamoStore(table, guard, wf.Limiter(None), wf.Limiter(None), str(tmp_path / 'keys.txt'))
+    store.put_item(_existing('2010-05-12'))
+    assert table.puts == [] and store.pop('2010-05-12')[0] == 'blocked'
+
+
+def test_call_kinds_are_counted_by_request_shape():
+    calls, guard = wf.Calls(), wf.Guard()
+    post = wf.counting_post(lambda url, **kw: _Res(), _FakeBs(), calls, guard)
+    post(_FakeBs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['title', 'content']}})
+    post(_FakeBs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['title', 'printing_page', 'enveloped_at']}})
+    post(_FakeBs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['printing_page', 'enveloped_at']}})
+    post(_FakeBs.BIGKINDS_ISSUE_URL, json={'argument': {'date': '2010-05-12'}})
+    assert calls.snapshot() == {'day': 1, 'ranking': 1, 'front': 1, 'front_count': 1, 'http_error': 0}
+    post_429 = wf.counting_post(lambda url, **kw: _Res(429), _FakeBs(), calls, guard)
+    post_429(_FakeBs.BIGKINDS_ISSUE_URL, json={})
+    assert guard.reason == '빅카인즈 HTTP 429'
+
+
+# ─── 표 대리 객체 ────────────────────────────────────────────────────────────
+
+def test_real_table_writes_conditionally_and_records_keys(tmp_path):
+    table, keys = _FakeDynamoTable([_existing('2010-05-11')]), tmp_path / 'keys.txt'
+    store = wf.DynamoStore(table, wf.Guard(), wf.Limiter(None), wf.Limiter(None), str(keys))
+    long_item = {**_existing('2010-05-12'), 'expires_at': int(time.time()) + TEN_YEARS * 86400}
+    store.put_item(long_item)
+    assert table.puts[0]['ConditionExpression'] == 'attribute_not_exists(news_id) OR expires_at < :now'
+    assert store.pop('2010-05-12')[0] == 'written' and keys.read_text() == 'timemachine_frontv2_2010-05-12\n'
+    # 살아 있는 항목은 덮어쓰지 않는다(조건 실패 = 이미 있음).
+    store.put_item({**_existing('2010-05-11'), 'expires_at': int(time.time()) + TEN_YEARS * 86400})
+    assert store.pop('2010-05-11')[0] == 'exists' and table.items['timemachine_frontv2_2010-05-11']['cached_at'] == 'before'
+    # 보관 1년 미만(잠정)은 쓰지 않는다.
+    store.put_item({**_existing('2010-05-10'), 'expires_at': int(time.time()) + WEEK * 86400})
+    assert store.pop('2010-05-10')[0] == 'provisional' and len(table.puts) == 2
+    assert store.writes == 1 and keys.read_text().splitlines() == ['timemachine_frontv2_2010-05-12']
+
+
+def test_limiter_never_exceeds_rate():
+    now, slept = [0.0], []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        now[0] += seconds
+
+    limiter = wf.Limiter(2, clock=lambda: now[0], sleep=sleep)
+    for _ in range(10):
+        limiter.take(1)
+    # 처음 1초 몫(2단위)을 빼면 초당 2단위 — 10단위에 4초 이상.
+    assert now[0] >= 4 - 1e-9 and 10 <= 2 * now[0] + 2
+    wf.Limiter(None, clock=lambda: now[0], sleep=sleep).take(100)
+    assert len(slept) == 8
+
+
+def test_provisioned_table_limits_half_capacity():
+    client = _dynamodb('PROVISIONED', ProvisionedThroughput={'ReadCapacityUnits': 20, 'WriteCapacityUnits': 10},
+                       GlobalSecondaryIndexes=[
+                           {'KeySchema': [{'AttributeName': 'item_type'}, {'AttributeName': 'date'}],
+                            'ProvisionedThroughput': {'WriteCapacityUnits': 4}},
+                           {'KeySchema': [{'AttributeName': 'user_id'}], 'ProvisionedThroughput': {'WriteCapacityUnits': 1}}])
+    limits = wf.capacity_limits(client, 'sedaily-mbti-articles-dev')
+    assert (limits['billing_mode'], limits['write_limit'], limits['read_limit']) == ('PROVISIONED', 2, 10)
+    on_demand = wf.capacity_limits(_dynamodb(), 'sedaily-mbti-articles-dev')
+    assert (on_demand['billing_mode'], on_demand['write_limit']) == ('PAY_PER_REQUEST', None)
+
+
+# ─── 실행 전체 ──────────────────────────────────────────────────────────────
+
+def test_ten_day_run_counts_and_summary(tmp_path):
+    bs = _FakeBs()
+    tm = _FakeTm(bs, {'2010-05-04': ('day', WEEK, 'ranking_failed'), '2010-05-06': RuntimeError('boom'),
+                      '2010-05-08': ('none', TEN_YEARS, 'discard')})
+    table = _FakeDynamoTable([_existing('2010-05-02'), _existing('2010-05-09')])
+    err = io.StringIO()
+    code = wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-10')), tm, bs, table=table, dynamodb=_dynamodb(), err=err)
+    assert code == 0
+    summary = json.loads(_read(tmp_path, 'summary.json'))
+    assert {k: summary[k] for k in ('processed', 'written', 'exists', 'failed', 'provisional', 'writes', 'calls_total',
+                                    'ranking_discarded', 'stop_reason')} == {
+        'processed': 10, 'written': 6, 'exists': 2, 'failed': 1, 'provisional': 1, 'writes': 6, 'calls_total': 8,
+        'ranking_discarded': 1, 'stop_reason': None}
+    # 이미 있던 날은 GetItem 만 하고 넘어가며 덮어쓰지 않는다.
+    assert {p['Item']['date'] for p in table.puts}.isdisjoint({'2010-05-02', '2010-05-09'})
+    assert table.items['timemachine_frontv2_2010-05-02']['cached_at'] == 'before'
+    assert len(_read(tmp_path, 'written-keys.txt').splitlines()) == 6
+    assert _read(tmp_path, 'retry-dates.txt').splitlines() == ['2010-05-04', '2010-05-06']
+    rows = {r['date']: r for r in _rows(tmp_path)}
+    assert len(rows) == 10 and rows['2010-05-06'] == {**rows['2010-05-06'], 'outcome': 'failed', 'error': 'RuntimeError'}
+    assert rows['2010-05-01']['article_ids'] == ['a-2010-05-01'] and len(rows['2010-05-01']['data_sha1']) == 40
+    assert json.loads(_read(tmp_path, 'notable.jsonl'))['date'] == '2010-05-08'
+    log = err.getvalue()
+    assert '과금 모드 PAY_PER_REQUEST' in log and 'Service 태그 atlas4' in log and '동시 빅카인즈 요청 최대 6' in log
+    assert '처리 10/10 · 새로 씀 6 · 이미 있음 2 · 실패 1 · 잠정 1 · 빅카인즈 8회' in log and '버린 순위 1' in log
+    assert bs._SESSION.post == bs._post  # 끝나면 감싼 함수를 되돌린다
+
+
+def test_stop_on_429_then_resume_from_checkpoint(tmp_path):
+    def respond(url, payload):
+        return _Res(429) if len(bs.sent) == 4 else _Res()
+
+    bs = _FakeBs(respond)
+    tm = _FakeTm(bs, {})
+    table = _FakeDynamoTable()
+    args = _args(tmp_path, *_range('2010-05-01', '2010-05-10'), '--workers', '1')
+    assert wf.run(args, tm, bs, table=table, dynamodb=_dynamodb(), err=io.StringIO()) == wf.EXIT_STOPPED
+    summary = json.loads(_read(tmp_path, 'summary.json'))
+    assert summary['stop_reason'] == '빅카인즈 HTTP 429' and summary['written'] == 3
+    assert json.loads(_read(tmp_path, 'checkpoint.json'))['chunks'][0]['next'] == 3  # 멈춘 날(05-04)부터 다시
+    assert '멈춤: 빅카인즈 HTTP 429' in _read(tmp_path, 'progress.log')
+    # 다시 실행하면 멈춘 날부터 이어 간다. 앞서 쓴 날은 다시 부르지 않는다.
+    bs2 = _FakeBs()
+    tm2 = _FakeTm(bs2, {})
+    assert wf.run(args, tm2, bs2, table=table, dynamodb=_dynamodb(), err=io.StringIO()) == 0
+    assert tm2.called == [f'2010-05-{d:02d}' for d in range(4, 11)]
+    assert len(_read(tmp_path, 'written-keys.txt').splitlines()) == 10 and len(table.items) == 10
+    # 범위나 workers 가 다르면 --restart 없이는 이어 가지 않는다.
+    with pytest.raises(SystemExit):
+        wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-10')), tm2, bs2, table=table, dynamodb=_dynamodb())
+    assert wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-10'), '--restart'), _FakeTm(bs2, {}), bs2,
+                  table=table, dynamodb=_dynamodb(), err=io.StringIO()) == 0
+
+
+def test_dry_run_never_touches_real_table(tmp_path):
+    bs = _FakeBs()
+    tm = _FakeTm(bs, {})
+    real = MagicMock()
+    args = _args(tmp_path, *_range('2010-05-01', '2010-05-03'), '--dry-run', '--workers', '1')
+    assert wf.run(args, tm, bs, table=real, dynamodb=None, err=io.StringIO()) == 0
+    assert real.mock_calls == []
+    summary = json.loads(_read(tmp_path, 'summary.json'))
+    assert summary['dry_run'] is True and summary['writes'] == 0 and summary['written'] == 3
+    assert not (tmp_path / 'state' / 'written-keys.txt').exists()
+    assert [r['calls'] for r in _rows(tmp_path)] == [{'day': 1}] * 3  # workers 1 이면 날짜별 호출 수도 남긴다
+
+
+def test_stop_after_consecutive_failures_in_run(tmp_path):
+    bs = _FakeBs()
+    tm = _FakeTm(bs, {f'2010-05-{d:02d}': RuntimeError('x') for d in range(1, 11)})
+    args = _args(tmp_path, *_range('2010-05-01', '2010-05-10'), '--workers', '1')
+    assert wf.run(args, tm, bs, table=_FakeDynamoTable(), dynamodb=_dynamodb(), err=io.StringIO()) == wf.EXIT_STOPPED
+    assert json.loads(_read(tmp_path, 'summary.json'))['stop_reason'] == '연속 실패 5회'
+    assert tm.called == [f'2010-05-{d:02d}' for d in range(1, 6)]  # 다섯 번째 실패 뒤 새 날짜를 시작하지 않는다
+
+
+def test_real_run_refuses_without_billing_mode(tmp_path):
+    client = MagicMock()
+    client.describe_table.side_effect = RuntimeError('denied')
+    bs = _FakeBs()
+    tm = _FakeTm(bs, {})
+    assert wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-02')), tm, bs, table=MagicMock(), dynamodb=client,
+                  err=io.StringIO()) == 1
+    assert tm.called == [] and bs.sent == []
+
+
+# ─── 비교 ────────────────────────────────────────────────────────────────────
+
+def _results(path, rows):
+    os.makedirs(path, exist_ok=True)
+    with open(os.path.join(path, 'results.jsonl'), 'w', encoding='utf-8') as fp:
+        fp.write(''.join(json.dumps(r) + '\n' for r in rows))
+    return os.path.join(path, 'results.jsonl')
+
+
+def _row(day, **over):
+    return {'date': day, 'outcome': 'written', 'kind': 'front', 'date_kind': 'front', 'shown_date': day, 'reason': None,
+            'basis': None, 'article_ids': ['a'], 'coverage': [None], 'data_sha1': 'x', 'ttl_days': 3650,
+            'calls': {'front': 1}, **over}
+
+
+def test_compare_reports_content_differences_only(tmp_path):
+    old = _results(str(tmp_path / 'old'), [_row('2024-10-12'), _row('2024-10-13', ttl_days=0.25, calls={'front': 1}),
+                                           _row('2010-05-12', basis='ranking_failed')])
+    same = _results(str(tmp_path / 'same'), [_row('2024-10-12'), _row('2024-10-13', calls={}),
+                                             _row('2010-05-12', basis='issue', article_ids=['b'])])
+    out = io.StringIO()
+    assert wf.compare(old, same, out) == 0  # 저장 기간 차이와 ranking_failed 쪽은 다름으로 세지 않는다
+    assert '같음 2 · 다름 0 · 비교 제외(실패·멈춤·ranking_failed) 1' in out.getvalue() and '저장 기간이 달라진 날 1' in out.getvalue()
+    differ = _results(str(tmp_path / 'differ'), [_row('2024-10-12', article_ids=['b'], calls={'front': 1, 'ranking': 1}),
+                                                 _row('2024-10-13')])
+    out = io.StringIO()
+    assert wf.compare(old, differ, out) == wf.EXIT_DIFF
+    assert '다름 2024-10-12: article_ids ["a"] → ["b"]' in out.getvalue()
+    assert '새 로직이 더 많이 부른 날 1일 · 그 합 +1회' in out.getvalue()
+
+
+def test_help_runs_without_aws(capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        wf.parse_args(['--help'], today=TODAY)
+    assert exit_info.value.code == 0 and '--dry-run' in capsys.readouterr().out
