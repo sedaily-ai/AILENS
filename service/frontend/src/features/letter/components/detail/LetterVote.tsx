@@ -44,8 +44,10 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
     trackEvent('letter_vote', { letter: slug, option: next.my_choice ?? key });
   }
 
-  // 보기 색 구분: 우려·걱정류는 앰버, "잘 모르겠어요"는 회색, 나머지는 파랑. 데이터 필드 없이 key 로만 정한다.
-  const toneOf = (key: string): 'b' | 'w' | 'n' => (key === 'unsure' ? 'n' : /worr|concern|anx|uneasy|afraid/.test(key) ? 'w' : 'b');
+  // 보기 색 구분. 2지 입장형(binary)은 두 입장을 파랑·앰버로 나눈다(어느 쪽도 기본값처럼 보이지 않게 순서로만 정한다).
+  // 이전 감정형(emotion)은 우려·걱정류 앰버, "잘 모르겠어요" 회색, 나머지 파랑. 데이터 필드 없이 key·순서로만 정한다.
+  const toneOf = (key: string, index: number): 'b' | 'w' | 'n' =>
+    vote.kind === 'binary' ? (index === 0 ? 'b' : 'w') : key === 'unsure' ? 'n' : /worr|concern|anx|uneasy|afraid/.test(key) ? 'w' : 'b';
   const total = state.counts ? Object.values(state.counts).reduce((a, b) => a + b, 0) : 0;
   const note = failed ? '지금은 투표를 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요' : state.my_choice ? `${total}명이 참여했어요 · 다른 보기를 눌러 바꿀 수 있어요` : '하나를 고르면 다른 독자들의 선택을 볼 수 있어요';
 
@@ -53,7 +55,7 @@ export function LetterVote({ slug, vote }: { slug: string; vote: Vote }) {
     <section className="ld-vote" aria-label="투표">
       <h2>{vote.question}</h2>
       <PollOptions
-        options={vote.options.map((o) => ({ key: o.key, label: o.label, hint: o.hint, tone: toneOf(o.key) }))}
+        options={vote.options.map((o, i) => ({ key: o.key, label: o.label, hint: o.hint, tone: toneOf(o.key, i) }))}
         myChoice={state.my_choice}
         counts={state.counts}
         pending={pending}

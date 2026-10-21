@@ -126,8 +126,8 @@ def _segments_text(parts: List[Any]) -> str:
 
 
 def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: str, test: bool = False) -> Tuple[str, str, str]:
-    """레터 한 편을 사이트 상세 화면과 같은 순서·구성으로 메일에 담는다: 머리(분류·호수·제목·한 줄·주제·세 관점) → 쓰인 기사 → 1분 요약 → 세 섹션(핵심·본문·인라인 링크)
-    → 에디터 한마디 → 투표(사이트로 연결). 메일에서는 투표를 받을 수 없어 사이트의 같은 레터로 안내한다."""
+    """레터 한 편을 사이트 상세 화면과 같은 순서·구성으로 메일에 담는다: 머리(분류·호수·제목·한 줄·주제) → 1분 요약(+웹에서 이어 읽기) → 세 관점
+    → 세 섹션(핵심·본문·인라인 링크) → 에디터 한마디 → 투표(+투표 결과 보기) → 쓰인 기사. 메일에서는 투표를 받을 수 없어 사이트의 같은 레터로 안내한다(레터탭 피드백 2026-10-20)."""
     unsub = None if test else unsubscribe_url(unsubscribe_token)
     url = f"{SITE_BASE}/letter/{letter['slug']}"
     subject = f"[테스트] [AI LENS 레터] {letter['title']}" if test else f"[AI LENS 레터] {letter['title']}"
@@ -159,7 +159,9 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
     summary_html = ('<div style="margin:24px 0 0;padding:20px;border-radius:12px;background:#f8f8f6;border:1px solid #e5e7eb">'
                     '<div style="font-size:14.5px;font-weight:700;color:#111827">1분 요약</div>'
                     '<ol style="margin:12px 0 0;padding-left:22px;font-size:15px;line-height:1.7;color:#1f2937">'
-                    + "".join(f'<li style="margin:0 0 8px">{html.escape(x)}</li>' for x in summary) + '</ol></div>') if summary else ""
+                    + "".join(f'<li style="margin:0 0 8px">{html.escape(x)}</li>' for x in summary) + '</ol>'
+                    # 본문 전체를 다 읽기 전에도 사이트로 갈 수 있게 1분 요약 바로 뒤에 작은 링크를 둔다(피드백 E1)
+                    f'<a href="{html.escape(url)}" style="display:inline-block;margin-top:4px;font-size:14px;font-weight:700;color:#2f5fcf;text-decoration:underline">웹에서 이어 읽기 →</a></div>') if summary else ""
 
     sec_html = []
     for index, s in enumerate(sections, 1):
@@ -180,7 +182,8 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
         opts = "".join(f'<a href="{html.escape(url)}#vote" style="display:block;margin:8px 0 0;padding:12px 16px;border:1px solid #dfe3ea;border-radius:12px;background:#fff;color:#111827;text-decoration:none;font-size:15px;font-weight:700">{html.escape(o["label"])}</a>' for o in poll["options"])
         poll_html = ('<div style="margin-top:24px;padding:22px;border-radius:16px;background:#f8fafc;border:1px solid #edf0f5">'
                      f'<div style="font-size:16px;font-weight:700;line-height:1.5;color:#111827">{html.escape(poll["question"])}</div>{opts}'
-                     '<div style="margin-top:12px;font-size:12.5px;color:#6b7280">사이트에서 선택하고 투표할 수 있어요.</div></div>')
+                     f'<a href="{html.escape(url)}#vote" style="display:inline-block;margin-top:14px;padding:10px 16px;border-radius:10px;background:#2f5fcf;color:#fff;text-decoration:none;font-weight:700;font-size:14.5px">투표 결과 보기</a>'
+                     '<div style="margin-top:8px;font-size:12.5px;color:#6b7280">선택지를 누르면 사이트에서 투표하고 결과를 볼 수 있어요.</div></div>')
 
     reason_html = f'<div style="margin:0 0 14px;font-size:13px;color:#2563eb">{html.escape(reason_text)}</div>' if reason_text else ""
     if test:
@@ -188,24 +191,26 @@ def render_letter(letter: Dict[str, Any], reason_text: str, unsubscribe_token: s
     body = (f'{reason_html}<div style="font-size:13.5px;font-weight:600;color:#6b7280">{html.escape(cats)} <span style="color:#9ca3af;font-weight:500">제 {int(letter["issue_no"])}호</span></div>'
             f'<h1 style="margin:12px 0 0;font-family:{SERIF};font-size:27px;font-weight:700;line-height:1.35;letter-spacing:-0.02em;color:#111827">{html.escape(letter["title"])}</h1>'
             f'<p style="margin:14px 0 0;font-size:16.5px;line-height:1.7;color:#4b5563">{html.escape(letter.get("deck") or "")}</p>'
-            f'<div style="margin:12px 0 0">{topic_html}</div>{axlist_html}'
+            f'<div style="margin:12px 0 0">{topic_html}</div>'
             f'<div style="margin-top:16px;font-size:13px;color:#6b7280">{day} · AI LENS 편집팀</div>'
-            f'{sources_html}{summary_html}{"".join(sec_html)}{note_html}{poll_html}'
+            f'{summary_html}<div style="margin-top:18px">{axlist_html}</div>{"".join(sec_html)}{note_html}{poll_html}{sources_html}'
             f'<div style="margin-top:28px"><a href="{html.escape(url)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#2f5fcf;color:#fff;text-decoration:none;font-weight:700;font-size:15px">사이트에서 보기</a></div>'
             '<p style="margin:24px 0 0;font-size:12.5px;line-height:1.7;color:#6b7280">본 레터는 서울경제신문 AI LENS 기사를 바탕으로 작성됐어요. 투자 판단의 근거로 쓰기 전에 원문 기사를 확인하세요.</p>')
 
     lines = [f"{cats} 제 {int(letter['issue_no'])}호", letter["title"], letter.get("deck") or "", ""]
     if reason_text:
         lines.insert(0, reason_text)
-    lines.append("[이 레터에 쓰인 기사]")
-    lines += [f"{i}. {x.get('title')} {x.get('url') or ''}" for i, x in enumerate(letter.get("sources") or [], 1)]
-    lines += ["", "[1분 요약]"] + [f"{i}. {x}" for i, x in enumerate(summary, 1)]
+    lines += ["[1분 요약]"] + [f"{i}. {x}" for i, x in enumerate(summary, 1)]
+    if summary:
+        lines.append(f"웹에서 이어 읽기: {url}")
     for s in sections:
         lines += ["", f"[{AXIS.get(s['axis'], (s['axis'],))[0]}] {s['heading']}", f"핵심: {s['key_line']}"] + [_segments_text(p) for p in s.get("paragraphs") or []]
     if letter.get("editor_note"):
         lines += ["", "[에디터 한마디]", letter["editor_note"]]
     if poll:
-        lines += ["", poll["question"], " / ".join(o["label"] for o in poll["options"]) + f"  (투표: {url})"]
+        lines += ["", poll["question"], " / ".join(o["label"] for o in poll["options"]), f"투표 결과 보기: {url}#vote"]
+    if letter.get("sources"):
+        lines += ["", "[이 레터에 쓰인 기사]"] + [f"{i}. {x.get('title')} {x.get('url') or ''}" for i, x in enumerate(letter.get("sources") or [], 1)]
     lines += ["", f"사이트에서 보기: {url}"] + ([] if test else [f"수신거부: {unsub}"]) + FOOTER_LINES
     return subject, _shell(subject, body, unsub), "\n".join(lines)
 

@@ -41,7 +41,8 @@ export interface LetterSource {
 }
 
 export interface LetterVote {
-  kind: 'emotion';
+  /** binary: 2지 입장형(2026-10-20부터 새 레터 기본). emotion: 이전에 발행된 감정형 */
+  kind: 'binary' | 'emotion';
   question: string;
   options: { key: string; label: string; hint?: string }[];
 }

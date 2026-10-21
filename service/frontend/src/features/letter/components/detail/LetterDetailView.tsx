@@ -118,24 +118,7 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
         {letter.mock && <p className="ld-mock">목업 화면입니다. 기획서 예시 문구만으로 구성한 레터라 내용이 실제와 다를 수 있어요.</p>}
       </header>
 
-      <section className="ld-outline" aria-label="이 레터에서 읽을 내용">
-        <h2>이 레터에서 읽을 내용</h2>
-        <ul className="ld-axlist" aria-label="이 레터의 3가지 관점">
-          {letter.axisLabels.map((a) => {
-            const isDefault = a.label.replace(/[^가-힣a-zA-Z0-9]/g, '') === AXIS_META[a.axis].label.replace(/\s/g, '');
-            const detail = isDefault ? letter.sections.find((section) => section.axis === a.axis)?.heading : a.label;
-            return (
-              <li key={a.axis + a.label}>
-                <AxisBadge axis={a.axis} />
-                {detail && <span>{detail}</span>}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      <SourcesPanel sources={letter.sources} letterSlug={letter.slug} />
-
+      {/* 순서: 제목 → 1분 요약 → 관점 3개 → 본문 → (한마디·투표) → 쓰인 기사. 레터탭 피드백 01(2026-10-20) */}
       <section className="ld-sum" aria-label="1분 요약">
         <div className="ld-sum-h">
           <strong>1분 요약</strong>
@@ -155,6 +138,22 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
         ) : (
           <p className="ld-sum-peek">{letter.summary[0]}</p>
         )}
+      </section>
+
+      <section className="ld-outline" aria-label="이 레터에서 읽을 내용">
+        <h2>이 레터에서 읽을 내용</h2>
+        <ul className="ld-axlist" aria-label="이 레터의 3가지 관점">
+          {letter.axisLabels.map((a) => {
+            const isDefault = a.label.replace(/[^가-힣a-zA-Z0-9]/g, '') === AXIS_META[a.axis].label.replace(/\s/g, '');
+            const detail = isDefault ? letter.sections.find((section) => section.axis === a.axis)?.heading : a.label;
+            return (
+              <li key={a.axis + a.label}>
+                <AxisBadge axis={a.axis} />
+                {detail && <span>{detail}</span>}
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       {letter.sections.map((sec, i) => (
@@ -195,6 +194,8 @@ export function LetterDetailView({ letter, prevSlug, nextSlug, others = [] }: { 
       </section>
 
       {letter.vote && <LetterVote slug={letter.slug} vote={letter.vote} />}
+
+      <SourcesPanel sources={letter.sources} letterSlug={letter.slug} />
 
       <RelatedLetters items={relatedOf(letter, others)} />
 
