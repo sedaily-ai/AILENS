@@ -6,6 +6,7 @@ import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
 import { assetSourceLine, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
 import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW, won } from './lib/birthdayModel';
 import type { AssetLoadState } from './lib/useBirthdayAssets';
+import { frontPageNotice } from './lib/birthdayFrontPage';
 import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
@@ -40,7 +41,9 @@ export function ArrivalScene({ result, mode }: { result: BirthdayResult; mode: V
     <p className={styles.kicker}>{mode === 'year' ? `${year}년으로 왔어요` : `${elapsedLabel(result.birthDate)}을 거슬러 왔어요`}</p>
     <div className={styles.odometer} aria-hidden="true">{String(shown).split('').map((digit, index) => <span key={index}>{digit}</span>)}</div>
     <h2 id="birthday-arrival" className={styles.title}>{mode === 'year' ? `${year}년생` : <>{month}월 {day}일<br />{weekday}요일</>}<span className="sr-only">{mode === 'year' ? '' : `, ${dateLabel(result.birthDate)}`}</span></h2>
-    <p className={styles.lead}>{mode === 'year' ? '그해와 지금을 비교했어요. 날짜가 필요한 값은 1월 1일 기준이에요.' : `내가 태어난 날, 서울경제는 ${nb('이런 소식을')} 실었어요.`}</p>
+    {/* 그날 신문이 없는 날(창간 전·지면 공백·보관본 시작 전)은 '서울경제는 이런 소식을 실었어요'라고 쓰지 않는다. */}
+    <p className={styles.lead}>{mode === 'year' ? '그해와 지금을 비교했어요. 날짜가 필요한 값은 1월 1일 기준이에요.'
+      : frontPageNotice(result.birthDate) ? '내가 태어난 날과 지금을 비교했어요.' : `내가 태어난 날, 서울경제는 ${nb('이런 소식을')} 실었어요.`}</p>
   </section>;
 }
 
@@ -134,7 +137,8 @@ export function MoneyScene({ result }: { result: BirthdayResult }) {
     <h3 id="birthday-money" className={styles.figure}>{manwon(hundredMillionNow(result.cpi))}</h3>
     <p className={styles.lead}>같은 {nb('1억 원으로')} 살 수 있는 것이 그때의 {number(result.cpi / CPI_LATEST.value * 100)}% 수준이 됐어요.</p>
     {/* 문장 한가운데 괄호(기간·출처)가 끼어 'ECOS) / 로'처럼 엉뚱한 데서 꺾여서, 무엇을 무엇으로 바꿨는지를 한 문장으로 풀었다. */}
-    <p className={styles.source}>{nb('한국은행 ECOS')} 소비자물가지수로 {nb(result.cpiPeriod)} {nb('물가로 본')} {nb('1억 원을')} {nb('2026년 9월')} 가치로 환산했어요. {nb('실제 생활비')} 변화와는 {nb('다를 수 있어요')}.</p>
+    {/* 작성기관(국가데이터처)을 제공처(한국은행 ECOS)와 함께 적는다 — 'ECOS 소비자물가지수'만 쓰면 한국은행 통계로 읽힌다. */}
+    <p className={styles.source}>{nb('한국은행 ECOS')}에서 받은 {nb('국가데이터처 소비자물가지수로')} {nb(result.cpiPeriod)} {nb('물가로 본')} {nb('1억 원을')} {nb('2026년 9월')} 가치로 환산했어요. {nb('실제 생활비')} 변화와는 {nb('다를 수 있어요')}.</p>
   </section>;
 }
 

@@ -103,7 +103,7 @@ test('정기예금: 기준월 지수 → 다음 달 지수, 금리가 없는 달
   const cell = depositCell(base('2010-05-15'), file2010, latest())!;
   expect(cell.nowAmount).toBe(1_500_000);
   expect(cell.now).toEqual({ period: '2026-09', label: '2026년 8월 금리까지' });
-  expect(cell.notes[0]).toContain('세전');
+  expect(cell.notes).toEqual(['세전 월복리로, 매달 그달 신규 정기예금 금리를 적용했어요.']);
   expect(depositCell(base('2010-06-15'), file2010, latest())).toBeNull();
   expect(depositCell(base('1995-12-01'), { year: 1995, deposit: [] }, latest())).toBeNull();
   // 마지막 금리 달(2026-08) 뒤의 달은 금리가 아직 없다.

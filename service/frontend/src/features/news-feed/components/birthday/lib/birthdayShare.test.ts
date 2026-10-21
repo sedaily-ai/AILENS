@@ -4,7 +4,7 @@ import { EVENTS } from '@/shared/data/timelineEvents';
 import { calculate } from './birthdayModel';
 import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
 import { assetCells, type AssetBase } from './birthdayAssets';
-import { receiptAssetHeading, receiptAssetLines, receiptElapsed, receiptLines, receiptSourceLine } from './birthdayShare';
+import { FRONT_CARD_SOURCE, receiptAssetHeading, receiptAssetLines, receiptElapsed, receiptLines, receiptSourceLine } from './birthdayShare';
 import { RECEIPT_QR_ROWS, RECEIPT_QR_URL } from '../data/birthdayQr';
 import { BIRTHDAY_MARKET_PATH } from '../data/birthdayRoutes';
 import { SITE_URL } from '@/shared/constants/site';
@@ -58,18 +58,24 @@ test('금이 켜져도 100만 원 줄은 최대 4줄(예금·달러·아파트·
   expect(lines.some(line => line.label.includes('물가'))).toBe(false);
 });
 
-test('영수증 출처 한 줄: ECOS 외로 묶는다 — 금도 ECOS 계열이라 따로 적지 않는다', () => {
+test('영수증 출처 한 줄: ECOS 제공과 찍힌 줄의 작성기관, 나머지는 외로 묶는다', () => {
   const result = calculate('1990-05-15', snapshot);
   const cells = assetCells(base2010, file2010, latest);
   const withGold = assetCells(base2010, { ...file2010, gold: [['2010-05', 70]] }, { ...latest, gold: ['2026-09', 280] });
-  expect(receiptSourceLine(result, withGold, true)).toBe('출처 한국은행 ECOS 외');
-  expect(receiptSourceLine(result, cells, false)).toBe('출처 한국은행 ECOS 외');
-  // 1억 원 줄만 있어도 ECOS, 시급·연금이 없고 1면 제목도 없으면 '외'를 붙이지 않는다.
-  expect(receiptSourceLine({ ...result, wage: null, calendar: null }, [], false)).toBe('출처 한국은행 ECOS');
+  expect(receiptSourceLine(result, withGold, true)).toBe('출처 한국은행 ECOS(한국은행·국가데이터처·한국부동산원 작성) 외');
+  expect(receiptSourceLine(result, cells, false)).toBe('출처 한국은행 ECOS(한국은행·국가데이터처·한국부동산원 작성) 외');
+  // 아파트 줄이 없으면 한국부동산원도 빠진다.
+  expect(receiptSourceLine(result, assetCells(base2010, { ...file2010, apartment: [] }, latest), false)).toBe('출처 한국은행 ECOS(한국은행·국가데이터처 작성) 외');
+  // 1억 원 줄만 있으면 국가데이터처만, 시급·연금이 없고 1면 제목도 없으면 '외'를 붙이지 않는다.
+  expect(receiptSourceLine({ ...result, wage: null, calendar: null }, [], false)).toBe('출처 한국은행 ECOS(국가데이터처 작성)');
   // 1940년생은 그때 나이 줄뿐이라 밝힐 출처가 없다. ECOS 숫자 없이 다른 줄만 있으면 그 출처만 적는다.
   const old = calculate('1940-01-01', snapshot);
   expect(receiptSourceLine(old, [], false)).toBe('');
   expect(receiptSourceLine(old, [], true)).toBe('출처 빅카인즈');
+});
+
+test('1면 카드에는 빅카인즈 보관본 기준이라는 출처 한 줄이 들어간다', () => {
+  expect(FRONT_CARD_SOURCE).toBe('출처 빅카인즈 보관본(면 번호 기준)');
 });
 
 test('100만 원 묶음 소제목은 기준일 종류에 따라 바뀐다', () => {

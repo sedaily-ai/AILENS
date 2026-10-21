@@ -88,7 +88,7 @@ export const depositCell: CellOf = (base, file, latest) => {
   const multiple = now[1] / then[1];
   return { id: 'deposit', name: '정기예금', multiple, nowAmount: ASSET_STAKE * multiple,
     then: { period: then[0], monthlyAverage: false }, now: { period: now[0], label: `${periodLabel(rateMonth)} 금리까지` },
-    notes: ['세전, 매달 그달 신규 정기예금 금리로 굴린 값이에요.'] };
+    notes: ['세전 월복리로, 매달 그달 신규 정기예금 금리를 적용했어요.'] };
 };
 
 export const usdCell: CellOf = (base, file, latest) => {
