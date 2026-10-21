@@ -1,5 +1,6 @@
-// "기준 시점별 가상 투자" 카드 — 뉴스(팩트) 다음에 오는 별도 성격의 섹션이다. 눌린 면과 굵은 구분선으로 뉴스와 구분한다.
-// 로또는 확률형이므로 수익률 대신 확률·평균 당첨금 사실과, 같은 금액을 코스피에 넣었을 때와의 대조 문장으로 구성한다(백엔드 config/investment_scenarios.py 참조).
+// "그때와 지금의 숫자" 카드 — 뉴스(팩트) 다음에 오는 별도 성격의 섹션이다. 눌린 면과 굵은 구분선으로 뉴스와 구분한다.
+// 로또(동행복권 공식 통계)와 스타벅스 아메리카노 가격(뉴스 보도 기준)만 사실 그대로 보여 주고, 수익률·배수는 쓰지 않는다
+// (백엔드 config/investment_scenarios.py 참조, 2026-10-22 지수·가상자산 카드 제거).
 // 데이터가 없는 구간은 카드가 배열에서 빠지므로(추정치로 채우지 않음) 있는 것만 렌더링한다.
 import type { InvestmentScenario } from '@/shared/lib/api/timelineApi';
 import {
@@ -19,17 +20,6 @@ export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentSc
         borderTop: `2px solid ${BORDER_STRONG}`,
       }}
     >
-      <p
-        style={{
-          fontSize: FONT.caption,
-          fontWeight: 700,
-          letterSpacing: '0.14em',
-          color: TEXT_MUTED,
-          marginBottom: SPACE.xs,
-        }}
-      >
-        만약에
-      </p>
       <h2
         id="tl-invest-heading"
         style={{
@@ -40,7 +30,7 @@ export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentSc
           marginBottom: SPACE.lg,
         }}
       >
-        기준 시점별 가상 투자
+        그때와 지금의 숫자
       </h2>
       <div
         style={{
@@ -77,7 +67,7 @@ export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentSc
                 wordBreak: 'keep-all',
               }}
             >
-              {s.result.replace(/^지금은/, '비교 기준일에는')}
+              {s.result}
             </p>
             {s.story && (
               <p
@@ -87,6 +77,7 @@ export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentSc
                   lineHeight: LEADING.body,
                   paddingLeft: SPACE.md,
                   borderLeft: `2px solid ${BORDER_HAIRLINE}`,
+                  wordBreak: 'keep-all',
                 }}
               >
                 {s.story}
@@ -100,6 +91,8 @@ export function InvestmentScenarioCards({ scenarios }: { scenarios: InvestmentSc
                 paddingTop: SPACE.sm,
                 borderTop: `1px solid ${BORDER_HAIRLINE}`,
                 lineHeight: LEADING.body,
+                // 375px에서 출처 줄이 '한 게 / 임'처럼 낱말 가운데서 갈라지지 않게 한다(이야기 줄도 같다).
+                wordBreak: 'keep-all',
               }}
             >
               {s.source_label}

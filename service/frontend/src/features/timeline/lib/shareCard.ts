@@ -4,13 +4,11 @@
 // document.fonts 준비를 기다린 뒤 그린다.
 // 레이아웃: textBaseline을 'top'으로 통일해 큰 폰트의 어센트로 인한 줄 겹침을 방지하고,
 // 중간 콘텐츠 블록 높이를 먼저 계산해 위/아래 고정 블록 사이에서 세로 중앙 정렬한다.
+// 가운데에는 그날 대표 헤드라인만 둔다. 수익률·배수 같은 숫자는 넣지 않는다(2026-10-22 지수·가상자산 카드 제거와 함께 정리).
 export interface ShareCardData {
   date: string; // YYYY-MM-DD
   dateLabel: string; // "1997년 11월 21일"
-  heroLabel?: string; // "코스피에 100만원을 넣었다면"
-  heroValue?: string; // "18.6배"
-  story?: string | null; // "IMF 외환위기로 코스피가 반토막 났던 그해."
-  headline?: string; // 대표 헤드라인 1건(투자 시나리오가 없을 때 대신 씀)
+  headline?: string; // 대표 헤드라인 1건(첫 분야의 첫 기사)
   url: string; // ailens.sedaily.ai/timeline/{date}
 }
 
@@ -30,7 +28,6 @@ async function ensureFontsReady(): Promise<void> {
       document.fonts.load('700 160px "Noto Serif KR"'),
       document.fonts.load('600 56px "Noto Serif KR"'),
       document.fonts.load('500 34px "Noto Serif KR"'),
-      document.fonts.load('400 28px "Noto Serif KR"'),
       document.fonts.ready,
     ]);
   } catch {
@@ -53,18 +50,6 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   }
   if (current) lines.push(current);
   return lines;
-}
-
-/** 지정한 너비 안에 한 줄로 들어올 때까지 폰트 크기를 줄인다 — "1/8,145,060"
- * 처럼 긴 하이라이트 값이 168px에서 카드 밖으로 삐져나가는 걸 막는다. */
-function fitFontSize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, startSize: number, weight: number, minSize = 72): number {
-  let size = startSize;
-  while (size > minSize) {
-    ctx.font = `${weight} ${size}px "Noto Serif KR", serif`;
-    if (ctx.measureText(text).width <= maxWidth) break;
-    size -= 6;
-  }
-  return size;
 }
 
 interface Paragraph {
@@ -133,39 +118,7 @@ export async function generateShareCardBlob(data: ShareCardData): Promise<Blob |
   const middleBottom = bottomRuleY - 50;
   const paragraphs: Paragraph[] = [];
 
-  if (data.heroLabel && data.heroValue) {
-    ctx.font = '500 34px "Noto Serif KR", serif';
-    paragraphs.push({
-      lines: wrapLines(ctx, data.heroLabel, CONTENT_WIDTH),
-      fontSize: 34,
-      weight: 500,
-      color: MUTED,
-      lineHeight: 1.45,
-      marginTopBefore: 0,
-    });
-
-    const heroFontSize = fitFontSize(ctx, data.heroValue, CONTENT_WIDTH, 168, 700);
-    paragraphs.push({
-      lines: [data.heroValue],
-      fontSize: heroFontSize,
-      weight: 700,
-      color: INK,
-      lineHeight: 1.15,
-      marginTopBefore: 56,
-    });
-
-    if (data.story) {
-      ctx.font = '400 28px "Noto Serif KR", serif';
-      paragraphs.push({
-        lines: wrapLines(ctx, data.story, CONTENT_WIDTH - 40),
-        fontSize: 28,
-        weight: 400,
-        color: MUTED,
-        lineHeight: 1.55,
-        marginTopBefore: 56,
-      });
-    }
-  } else if (data.headline) {
+  if (data.headline) {
     ctx.font = '600 44px "Noto Serif KR", serif';
     paragraphs.push({
       lines: wrapLines(ctx, data.headline, CONTENT_WIDTH),

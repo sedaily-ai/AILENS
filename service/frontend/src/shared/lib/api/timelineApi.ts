@@ -26,14 +26,16 @@ export interface BigKindsArticle {
   coverage?: number | null;
 }
 
-/** "그날 이걸 샀다면" 카드 — 백엔드가 조사된 시계열로 그 자리에서 계산한다. 데이터가 없는 구간은 카드 자체가 빠진다(추정치로 채우지 않는다). */
+/**
+ * "그때와 지금의 숫자" 카드(로또 공식 통계·스타벅스 아메리카노 가격) — 백엔드 config/investment_scenarios.py가 만든다.
+ * 응답 키 이름(investments)은 백엔드와의 호환을 위해 그대로다. 데이터가 없는 구간은 카드 자체가 빠진다(추정치로 채우지 않는다).
+ */
 export interface InvestmentScenario {
   id: string;
   emoji: string;
   label: string;
   description: string;
   result: string;
-  highlight: string;
   story: string | null;
   source_label: string;
 }
@@ -90,7 +92,7 @@ export async function fetchDayArticles(date: string): Promise<Article[]> {
   }
 }
 
-/** 과거 구간(빅카인즈)의 그날 기사와 투자 시나리오. 실패하면 빈 값. */
+/** 과거 구간(빅카인즈)의 그날 기사와 '그때와 지금의 숫자' 카드. 실패하면 빈 값. */
 export async function fetchBigkindsDay(date: string): Promise<BigKindsDayData> {
   const empty: BigKindsDayData = { articles: [], investments: [] };
   try {
