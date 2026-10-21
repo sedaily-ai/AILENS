@@ -6,6 +6,7 @@
 import json
 import threading
 import time
+from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,8 +23,10 @@ class _FakeTable:
     def __init__(self):
         self.items = {}
         self.puts = []
+        self.gets = []
 
     def get_item(self, Key):
+        self.gets.append(Key['news_id'])
         item = self.items.get(Key['news_id'])
         return {'Item': item} if item else {}
 
@@ -466,6 +469,8 @@ def test_empty_archive_walks_back_then_gives_up(env):
     assert len(_searches(post)) == 9  # 생일 포함 11일 중 휴간 일요일(7.12·7.5) 2일은 묻지 않는다
     assert len(_rankings(post)) == 1  # 첫 날 함께 보낸 순위 1회만 버려진다
     assert [p['news_id'] for p in table.puts] == ['timemachine_frontv2_none_1998-07-15']
+    # 오래전 날짜의 보관본 공백은 일시적이지 않아 6시간이 아니라 오래 둔다.
+    assert table.puts[0]['expires_at'] - time.time() > 3000 * 86400
     _, again = _call(front='1998-07-15')
     assert again['cached'] is True and again['kind'] == 'none' and post.call_count == 10
 
@@ -508,6 +513,103 @@ def test_resolved_result_cached_under_requested_date(env):
     assert {k: v for k, v in second.items() if k != 'cached'} == {k: v for k, v in first.items() if k != 'cached'}
     assert post.call_count == 1
     assert [p['news_id'] for p in table.puts] == ['timemachine_frontv2_2024-10-13']
+
+
+def _cached(table, day, shown, kind='front', basis=None, articles=None):
+    """day 를 생일로 조회해 저장된 캐시 항목을 미리 넣는다."""
+    articles = articles if articles is not None else [{'news_id': f'c-{day}', 'title': '저장된 기사', 'content': '', 'byline': '',
+                                                       'category': '', 'original_link': None}]
+    table.items[f'timemachine_frontv2_{day}'] = {
+        'news_id': f'timemachine_frontv2_{day}', 'item_type': 'timemachine_frontv2_cache', 'date': day,
+        'data': {'date': day, 'date_kind': kind, 'shown_date': shown, 'kind': kind, 'reason': None if shown == day else 'no_paper',
+                 'basis': basis, 'articles': articles},
+        'cached_at': '2026-10-20T22:58:00+09:00', 'expires_at': int(time.time()) + 3000 * 86400}
+    return articles
+
+
+def test_walk_back_reuses_cached_own_paper(env):
+    table, post = env
+    saved = _cached(table, '2024-10-12', '2024-10-12')
+    _, body = _call(front='2024-10-13')
+    assert (body['kind'], body['shown_date'], body['reason']) == ('front', '2024-10-12', 'sunday')
+    assert body['articles'] == saved and post.call_count == 0
+    assert table.puts[-1]['news_id'] == 'timemachine_frontv2_2024-10-13'
+    assert table.puts[-1]['expires_at'] - time.time() > 3000 * 86400
+
+
+def test_walk_back_ignores_fallback_or_ranking_failed_cache(env):
+    table, post = env
+    # 다른 날 신문으로 대신한 결과는 그날 자기 신문이 아니다.
+    _cached(table, '2024-10-12', '2024-10-11')
+    post.return_value = _resp([_doc(1, sent='2024-10-11T18:00:00.000+09:00')])
+    _, body = _call(front='2024-10-13')
+    assert body['shown_date'] == '2024-10-12' and [a['news_id'] for a in body['articles']] == ['n1'] and post.call_count == 1
+    # 이슈 순위를 못 받아 본문이 긴 순으로 대신 고른 결과도 다시 묻는다.
+    _cached(table, '2005-03-05', '2005-03-05', kind='day', basis='ranking_failed')
+    _answer(post, {'2005-03-05': [_doc(2, page='')]}, _issue(['n2']))
+    _, body = _call(front='2005-03-06')
+    assert (body['shown_date'], body['basis']) == ('2005-03-05', 'issue') and [a['news_id'] for a in body['articles']] == ['n2']
+
+
+def test_walk_back_reuse_keeps_live_skip(env):
+    table, post = env
+    # 생일(그날 기사 시기)이 그때 조회한 0건이라 건너뛴 사실은 재사용한 결과에도 남는다.
+    _cached(table, '2010-05-11', '2010-05-11', kind='day', basis='issue')
+    found = tm._resolve_front_page('2010-05-12')
+    assert (found.shown, found.kind, found.basis, found.live_skip) == ('2010-05-11', 'day', 'issue', True)
+    assert len(_searches(post)) == 1
+
+
+def test_settled_live_skip_fallback_is_cached_long(env):
+    table, post = env
+    # 그날 기사 시기의 명절 생일: 그날 0건 → 전날 기사. 오래전 날짜라 적재 지연이 아니어서 오래 둔다.
+    _answer(post, {'2010-05-11': [_doc(1, page='')]}, _issue(['n1']))
+    _, body = _call(front='2010-05-12')
+    assert (body['shown_date'], body['reason']) == ('2010-05-11', 'no_paper')
+    assert table.puts[0]['expires_at'] - time.time() > 3000 * 86400
+
+
+def test_recent_none_is_kept_briefly(env, monkeypatch):
+    table, post = env
+    _set_calendar(monkeypatch, until='2026-09-30')
+    _, body = _call(front='2026-10-12')
+    assert body['kind'] == 'none'
+    assert [p['news_id'] for p in table.puts] == ['timemachine_frontv2_none_2026-10-12']
+    assert table.puts[0]['expires_at'] - time.time() <= tm.NEGATIVE_CACHE_TTL_SECONDS
+
+
+def test_cache_item_shape_is_unchanged(env):
+    table, post = env
+    post.return_value = _resp([_doc(1, sent='2024-10-11T18:00:00.000+09:00')])
+    _call(front='2024-10-13')
+    post.return_value = _resp([])
+    _call(front='2019-10-09')
+    front, none = table.puts
+    for item, key, item_type in ((front, 'timemachine_frontv2_2024-10-13', 'timemachine_frontv2_cache'),
+                                 (none, 'timemachine_frontv2_none_2019-10-09', 'timemachine_frontv2_none_cache')):
+        assert set(item) == {'news_id', 'item_type', 'date', 'data', 'cached_at', 'expires_at'}
+        assert (item['news_id'], item['item_type']) == (key, item_type)
+        assert isinstance(item['expires_at'], int) and isinstance(item['cached_at'], str)
+        assert set(item['data']) == FRONT_KEYS - {'status', 'cached'}
+
+
+def test_reads_item_written_by_deployed_lambda(env):
+    table, post = env
+    # c041fba4 Lambda가 저장한 모양 그대로(DynamoDB가 돌려주는 수는 Decimal).
+    article = {'news_id': '02100311.20100511000001', 'title': '저장된 기사', 'content': '미리보기', 'byline': '홍길동',
+               'category': '경제', 'original_link': None, 'coverage': Decimal('76')}
+    data = {'date': '2010-05-11', 'date_kind': 'day', 'shown_date': '2010-05-11', 'kind': 'day', 'reason': None,
+            'basis': 'issue', 'articles': [article]}
+    table.items['timemachine_frontv2_2010-05-11'] = {
+        'news_id': 'timemachine_frontv2_2010-05-11', 'item_type': 'timemachine_frontv2_cache', 'date': '2010-05-11',
+        'data': data, 'cached_at': '2026-10-20T22:58:00+09:00', 'expires_at': Decimal(int(time.time()) + 3000 * 86400)}
+    _, body = _call(front='2010-05-11')
+    assert body['cached'] is True and post.call_count == 0
+    assert {k: v for k, v in body.items() if k not in ('status', 'cached')} == {**data, 'articles': [{**article, 'coverage': 76}]}
+    # 같은 항목을 거슬러 간 날의 자기 신문으로도 쓴다(생일 05-12는 그날 기사가 0건).
+    _, walked = _call(front='2010-05-12')
+    assert (walked['shown_date'], walked['basis'], walked['articles'][0]['coverage']) == ('2010-05-11', 'issue', 76)
+    assert len(_searches(post)) == 1
 
 
 def test_today_is_not_cached(env):

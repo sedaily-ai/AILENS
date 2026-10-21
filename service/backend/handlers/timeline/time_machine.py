@@ -172,14 +172,15 @@ def _read_cache(key: str, negative_key: str, empty_data: dict, label: str) -> Op
 
 
 def _write_cache(key: str, negative_key: str, item_type: str, negative_item_type: str,
-                 date: str, data: dict, ttl_seconds: int, allow_negative: bool, label: str) -> None:
+                 date: str, data: dict, ttl_seconds: int, allow_negative: bool, label: str,
+                 negative_ttl_seconds: int = NEGATIVE_CACHE_TTL_SECONDS) -> None:
     """기사가 있으면 정상 캐시, 0건이면 allow_negative 일 때만 부정 캐시. 실패는 삼킨다."""
     try:
         if data.get('articles'):
             _put_cache_item(key, item_type, date, data, ttl_seconds)
             logger.info('캐시 저장: %s', label)
         elif allow_negative:
-            _put_cache_item(negative_key, negative_item_type, date, data, NEGATIVE_CACHE_TTL_SECONDS)
+            _put_cache_item(negative_key, negative_item_type, date, data, negative_ttl_seconds)
             logger.info('부정 캐시 저장: %s', label)
     except Exception as e:  # noqa: BLE001
         logger.warning('캐시 저장 실패(%s): %s', label, e)
@@ -238,8 +239,12 @@ FRONT_LOOKBACK_DAYS = 10
 FRONT_DAY_ARTICLES = 4
 # 거슬러 찾기 전체에 쓰는 시간. 빅카인즈 호출마다 남은 시간만큼만 기다려 Lambda 제한시간(30초) 안에 끝낸다.
 FRONT_SEARCH_BUDGET_SECONDS = 20
-# 그때 조회한 0건으로 생일(또는 그 사이 날짜)을 건너뛰어 대체한 결과의 캐시 기간. 휴간 규칙·목록으로 건너뛴 결과는 CACHE_TTL_DAYS.
+# 짧게만 두는 결과의 캐시 기간 — 이슈 순위를 못 받아 대신 고른 결과, 최근(FRONT_SETTLED_DAYS 안) 날짜에서 그때 조회한 0건으로
+# 생일(또는 그 사이 날짜)을 건너뛰어 대체한 결과. 휴간 규칙·목록으로 건너뛴 결과는 CACHE_TTL_DAYS.
 FRONT_LIVE_FALLBACK_TTL_SECONDS = 7 * 86400
+# 생일이 오늘보다 이만큼 지난 날짜면 빅카인즈 적재가 끝났다고 본다. 그 0건(보관본 공백·명절)은 일시적이지 않아 결과를
+# CACHE_TTL_DAYS 동안 둔다(1998-01~08 공백 생일이 6시간마다, 그날 기사 시기 명절 생일이 7일마다 다시 느려지지 않게).
+FRONT_SETTLED_DAYS = 30
 
 KIND_FRONT, KIND_DAY, KIND_NONE = 'front', 'day', 'none'
 REASON_SUNDAY, REASON_NO_PAPER, REASON_NOT_YET, REASON_ARCHIVE_MISSING = 'sunday', 'no_paper', 'not_yet', 'archive_missing'
@@ -266,6 +271,12 @@ def _closed_sunday(date: str) -> bool:
     return date >= SUNDAY_CLOSED_FROM and datetime.strptime(date, DATE_FORMAT).weekday() == 6
 
 
+def _settled(date: str) -> bool:
+    """오늘(KST)보다 FRONT_SETTLED_DAYS 일 이상 지난 날짜인가."""
+    settled_until = datetime.strptime(today_kst(), DATE_FORMAT) - timedelta(days=FRONT_SETTLED_DAYS)
+    return date <= settled_until.strftime(DATE_FORMAT)
+
+
 def _front_calendar() -> front_calendar.FrontCalendar:
     return front_calendar.get_calendar()
 
@@ -281,10 +292,30 @@ class _Resolved(NamedTuple):
     shown: Optional[str]
     kind: str
     articles: List[Dict[str, Any]]
-    # 그때 조회한 0건으로 건너뛰었거나 이슈 순위를 못 받아 대신 고른 결과 — 캐시를 짧게 둔다.
-    provisional: bool
+    # 휴간 규칙·목록이 아니라 그때 조회한 0건으로 건너뛴 날이 있었는가 — 캐시 기간을 정한다(get_front_page_data).
+    live_skip: bool
     # kind=day 일 때 기사를 고른 기준(bigkinds_search.DAY_BASIS_*), 그 밖은 None.
     basis: Optional[str] = None
+
+
+def _own_paper_from_cache(day: str) -> Optional[_Resolved]:
+    """거슬러 간 날 day 를 생일로 조회해 저장한 캐시가 그날 자기 신문이면 그 결과. 아니면 None.
+
+    그날 자기 신문(shown_date == day)인 결과는 day 를 생일로 풀었을 때와 같은 빅카인즈 조회(같은 함수·같은 인자)라
+    다시 묻지 않고 쓴다. 대체 결과(다른 날 신문)·찾지 못한 결과·이슈 순위를 못 받아 대신 고른 결과는 쓰지 않는다.
+    조회 실패는 삼키고 빅카인즈로 간다.
+    """
+    try:
+        item = _get_item(_front_cache_key(day))
+    except Exception as e:  # noqa: BLE001
+        logger.warning('거슬러 간 날 캐시 조회 실패: %s', type(e).__name__)
+        return None
+    data = (item or {}).get('data') or {}
+    kind, articles, basis = data.get('kind'), data.get('articles'), data.get('basis')
+    if (data.get('shown_date') != day or kind not in (KIND_FRONT, KIND_DAY) or not articles
+            or basis == bigkinds_search.DAY_BASIS_RANKING_FAILED):
+        return None
+    return _Resolved(day, kind, articles, False, basis)
 
 
 # 그날 기사와 함께 부른 이슈 순위를 그날 기사가 없어 버렸을 때 남기는 줄(날짜 없음). 늘어난 빅카인즈 호출을 로그·미리 채우기 스크립트가 센다.
@@ -341,7 +372,8 @@ def _resolve_front_page(date: str) -> _Resolved:
     면 번호가 있는 시기는 1면, 없는 시기는 그날 기사. 1면이 없는 날은 목록(front_calendar)으로 바로 건너뛰고,
     목록 밖 날짜는 거슬러 찾는 날(생일 다음 날짜들)만 본문 없는 가벼운 조회로 먼저 확인한다. 생일 당일은 대개
     신문이 있어 확인 없이 바로 본문을 받는다. 시기 경계를 넘어가도 그 날짜의 시기 규칙을 따른다.
-    마지막 값은 캐시 기간을 정한다 — 휴간 규칙·목록이 아니라 그때 조회한 0건으로 건너뛴 결과는 빅카인즈 적재 지연일 수 있다.
+    거슬러 간 날의 자기 신문 캐시가 있으면 그것을 쓴다(_own_paper_from_cache).
+    live_skip 은 캐시 기간을 정한다 — 휴간 규칙·목록이 아니라 그때 조회한 0건으로 건너뛴 결과는 빅카인즈 적재 지연일 수 있다.
     """
     calendar = _front_calendar()
     deadline = time.monotonic() + FRONT_SEARCH_BUDGET_SECONDS
@@ -357,16 +389,19 @@ def _resolve_front_page(date: str) -> _Resolved:
         if _closed_sunday(day):
             continue
         match = _front_page_match(day)
+        known = calendar.known_front(day) if match is not None else None
+        if known is False:
+            continue
+        # 거슬러 간 날을 누군가 생일로 조회해 둔 자기 신문이 있으면 빅카인즈에 다시 묻지 않는다(일요일 생일 → 토요일 캐시 등).
+        own = _own_paper_from_cache(day) if offset > 0 else None
+        if own is not None:
+            return own._replace(live_skip=live_skip)
         if match is None:
             articles, basis = _day_highlights(day, deadline, parallel=not asked)
             asked = True
             if articles:
-                return _Resolved(day, KIND_DAY, articles,
-                                 live_skip or basis == bigkinds_search.DAY_BASIS_RANKING_FAILED, basis)
+                return _Resolved(day, KIND_DAY, articles, live_skip, basis)
             live_skip = True
-            continue
-        known = calendar.known_front(day)
-        if known is False:
             continue
         if known is None and offset > 0:
             asked = True
@@ -412,13 +447,19 @@ def get_front_page_data(date: str) -> dict:
         found = _resolve_front_page(date)
         data = {'date': date, 'date_kind': date_kind, 'shown_date': found.shown, 'kind': found.kind,
                 'reason': _front_reason(date, found.shown, found.kind), 'basis': found.basis, 'articles': found.articles}
-        # 오늘 신문은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 찾지 못한 결과(kind=none)는 짧게만 기억하고,
-        # 그때 조회한 0건으로 건너뛰었거나 이슈 순위를 못 받아 대신 고른 결과는 굳지 않게 FRONT_LIVE_FALLBACK_TTL_SECONDS 만 둔다.
+        # 오늘 신문은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 이슈 순위를 못 받아 대신 고른 결과는 굳지 않게
+        # FRONT_LIVE_FALLBACK_TTL_SECONDS 만 둔다. 최근 FRONT_SETTLED_DAYS 일 안의 날짜는 0건이 빅카인즈 적재 지연일 수 있어
+        # 그때 조회한 0건으로 건너뛴 결과도 그만큼, 찾지 못한 결과(kind=none)는 NEGATIVE_CACHE_TTL_SECONDS 만 둔다.
+        # 그보다 오래된 날짜의 0건은 보관본에 정말 없는 것으로 보고 CACHE_TTL_DAYS 동안 둔다.
         if date < today_kst():
-            ttl = FRONT_LIVE_FALLBACK_TTL_SECONDS if found.provisional else CACHE_TTL_DAYS * 86400
+            settled = _settled(date)
+            provisional = (found.basis == bigkinds_search.DAY_BASIS_RANKING_FAILED
+                           or (found.live_skip and not settled))
+            ttl = FRONT_LIVE_FALLBACK_TTL_SECONDS if provisional else CACHE_TTL_DAYS * 86400
             _write_cache(_front_cache_key(date), _front_negative_cache_key(date),
                          'timemachine_frontv2_cache', 'timemachine_frontv2_none_cache',
-                         date, data, ttl, True, FRONT_LOG_LABEL)
+                         date, data, ttl, True, FRONT_LOG_LABEL,
+                         negative_ttl_seconds=CACHE_TTL_DAYS * 86400 if settled else NEGATIVE_CACHE_TTL_SECONDS)
     return {**data, 'status': _legacy_status(date, data.get('shown_date'), data.get('kind')),
             'cached': cached is not None}
 
