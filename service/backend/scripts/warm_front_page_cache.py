@@ -20,7 +20,8 @@
 - 시작 전에 캐시 표의 과금 모드를 describe 로 확인한다. PROVISIONED 면 쓰기·읽기를 용량의 절반 이하로 늦춘다(다른 기능도 쓰는 표).
   실제 실행에서 확인하지 못하면 시작하지 않는다.
 - --dry-run: DynamoDB 를 읽지도 쓰지도 않고 메모리 표로 돌려 결과만 results.jsonl 에 남긴다. --code-root 로 다른 트리(예: 옛 커밋을
-  git archive 로 푼 service/backend)의 로직을 돌리고, --compare OLD.jsonl NEW.jsonl 로 두 결과를 날짜별로 비교한다.
+  git archive 로 푼 service/backend)의 로직을 돌리고, --compare OLD.jsonl NEW.jsonl 로 두 결과를 날짜별로 비교한다(내용이 다른 날이나
+  한쪽에만 있는 날이 있으면 종료 코드 3).
 빅카인즈 API 키는 서버 코드가 SSM 에서만 읽는다. 이 스크립트는 요청 본문·인자·키를 어디에도 기록하지 않는다.
 """
 import argparse
@@ -616,7 +617,8 @@ def _short(value) -> str:
 
 
 def compare(old_path: str, new_path: str, out=None) -> int:
-    """두 results.jsonl 을 날짜별(마지막 줄)로 비교한다. 내용이 다른 날이 있으면 3. 저장 기간 차이는 정보로만 낸다."""
+    """두 results.jsonl 을 날짜별(마지막 줄)로 비교한다. 내용이 다른 날이나 한쪽에만 있는 날(잘린 결과)이 있으면 3.
+    저장 기간 차이는 정보로만 낸다."""
     out = out or sys.stdout
     old, new = _last_by_date(old_path), _last_by_date(new_path)
     same, differ, excluded, ttl_changed = 0, [], 0, 0
@@ -650,7 +652,7 @@ def compare(old_path: str, new_path: str, out=None) -> int:
                 s = json.load(fp)
             print(f"{label} 로직: 빅카인즈 {s.get('calls_total')}회 {s.get('calls')} · 버린 순위 {s.get('ranking_discarded')}", file=out)
     print(f'새 로직이 더 많이 부른 날 {more_calls}일 · 그 합 +{extra}회(날짜별 호출 수가 있는 날만)', file=out)
-    return EXIT_DIFF if differ else 0
+    return EXIT_DIFF if differ or one_side else 0
 
 
 # ─── 진입점 ──────────────────────────────────────────────────────────────────

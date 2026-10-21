@@ -490,6 +490,15 @@ def test_compare_reports_content_differences_only(tmp_path):
     assert '새 로직이 더 많이 부른 날 1일 · 그 합 +1회' in out.getvalue()
 
 
+def test_compare_fails_when_a_date_is_missing(tmp_path):
+    old = _results(str(tmp_path / 'old'), [_row('2024-10-12'), _row('2024-10-13'), _row('1992-03-17')])
+    cut = _results(str(tmp_path / 'cut'), [_row('2024-10-12'), _row('2024-10-13')])
+    out = io.StringIO()
+    assert wf.compare(old, cut, out) == wf.EXIT_DIFF  # 공통 날짜가 모두 같아도 잘린 결과는 통과시키지 않는다
+    assert '같음 2 · 다름 0' in out.getvalue() and '한쪽에만 있음: 1992-03-17' in out.getvalue()
+    assert wf.compare(cut, old, io.StringIO()) == wf.EXIT_DIFF
+
+
 def test_help_runs_without_aws(capsys):
     with pytest.raises(SystemExit) as exit_info:
         wf.parse_args(['--help'], today=TODAY)
