@@ -36,6 +36,7 @@ ECOS_KEY_PARAM = '/sedaily-mbti/ecos-api-key'
 ECOS_URL = 'https://ecos.bok.or.kr/api/StatisticSearch/{key}/json/kr/{first}/{last}/{table}/{cycle}/{start}/{end}/{items}'
 ECOS_PAGE = 100000  # 2026-10-20 실측: 일별 17,529건도 한 번에 내려왔다.
 ECOS_TIMEOUT_SECONDS = 60
+_ECOS_CODE = re.compile(r'^[A-Z]+-\d{3}$')  # ECOS RESULT.CODE 형식(INFO-200, ERROR-300 등)
 OUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'public', 'data', 'birthday-assets'))
 FIRST_YEAR = 1964  # 원/달러 기록 시작(1964-05-04)
 TAIL_DAYS = 10
@@ -133,9 +134,12 @@ def fetch_ecos(table: str, cycle: str, start: str, end: str, items: str, key: st
         found = body.get('StatisticSearch')
         if not found:
             result = body.get('RESULT') or {}
-            if result.get('CODE') == 'INFO-200':  # 해당하는 데이터가 없음
+            code = result.get('CODE')
+            if code == 'INFO-200':  # 해당하는 데이터가 없음
                 return points
-            raise EcosError(f"ECOS {table} 오류: {result.get('CODE')} {result.get('MESSAGE')}")
+            # MESSAGE 는 요청 값(인증키 포함)을 되풀이할 수 있어 넣지 않는다. CODE 도 ECOS 형식(INFO-100 등)일 때만 쓴다.
+            shown = code if isinstance(code, str) and _ECOS_CODE.match(code) else '알 수 없는 코드'
+            raise EcosError(f'ECOS {table} 오류: {shown}')
         rows = found.get('row') or []
         for row in rows:
             value = row.get('DATA_VALUE')

@@ -150,7 +150,22 @@ def test_fetch_ecos_no_data_and_error_never_leak_key():
     bad.json.return_value = {'RESULT': {'CODE': 'INFO-100', 'MESSAGE': '인증키가 유효하지 않습니다.'}}
     with pytest.raises(ba.EcosError) as caught:
         ba.fetch_ecos('731Y003', 'D', '19900302', '19900305', '0000003', KEY, get=MagicMock(return_value=bad))
-    assert KEY not in str(caught.value)
+    assert KEY not in str(caught.value) and 'INFO-100' in str(caught.value)
+
+
+def test_ecos_error_message_echoing_key_never_leaks(tmp_path, capsys):
+    # ECOS 오류 응답의 MESSAGE·CODE 가 요청 인증키를 되풀이해도 예외 문자열·traceback·출력 어디에도 남지 않는다.
+    for result in ({'CODE': 'INFO-100', 'MESSAGE': f'bad key {KEY}'}, {'CODE': f'ERR {KEY}', 'MESSAGE': KEY}):
+        echo = MagicMock()
+        echo.json.return_value = {'RESULT': result}
+        with pytest.raises(ba.EcosError) as caught:
+            ba.main(['--out', str(tmp_path), '--until', '2026-10-19'],
+                    get=MagicMock(return_value=echo), secret=lambda name: KEY)
+        error = caught.value
+        assert KEY not in str(error) and '901Y009' in str(error)
+        assert KEY not in ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+        captured = capsys.readouterr()
+        assert KEY not in captured.out and KEY not in captured.err and list(tmp_path.iterdir()) == []
 
 
 def test_fetch_ecos_request_error_never_leaks_key():
