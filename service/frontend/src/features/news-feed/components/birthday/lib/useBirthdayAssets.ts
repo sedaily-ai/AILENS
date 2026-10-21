@@ -44,7 +44,7 @@ export function parseAssetLatest(raw: unknown): AssetLatest | null {
   if (typeof generatedAt !== 'string' || !generatedAt || !isPeriod(until)
     || !isStrings(sources, item => typeof item === 'string') || !isStrings(last, isPeriod)) return null;
   const latest: AssetLatest = { generatedAt, until, sources, last };
-  for (const key of ['cpi', 'deposit', 'apartment'] as const) {
+  for (const key of ['cpi', 'deposit', 'apartment', 'gold'] as const) {
     const point = raw[key];
     if (point === undefined) continue;
     if (!isPoint(point)) return null;
@@ -54,11 +54,6 @@ export function parseAssetLatest(raw: unknown): AssetLatest | null {
     const usdkrw = raw.usdkrw;
     if (!isRecord(usdkrw) || !isPoint(usdkrw.daily) || !isPoint(usdkrw.monthly)) return null;
     latest.usdkrw = { daily: usdkrw.daily, monthly: usdkrw.monthly };
-  }
-  if (raw.gold !== undefined) {
-    const gold = raw.gold;
-    if (!isRecord(gold) || !isPoint(gold.usd) || !isPoint(gold.usdkrw)) return null;
-    latest.gold = { usd: gold.usd, usdkrw: gold.usdkrw };
   }
   return latest;
 }

@@ -3,7 +3,6 @@ import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import { SITE_URL } from '@/shared/constants/site';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { RECEIPT_QR_ROWS } from '../data/birthdayQr';
-import { ASSET_SOURCE_INFO, GOLD_SOURCE } from '../data/birthdayAssets';
 import type { AssetBase, AssetCell } from './birthdayAssets';
 import { elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './birthdayModel';
 
@@ -50,15 +49,13 @@ export function receiptAssetLines(cells: AssetCell[]): ReceiptLine[] {
 
 /**
  * 영수증 출처 한 줄 — 이미지만 따로 퍼져도 출처가 남게 한다. 숫자 대부분(1억 원·100만 원 줄)이 ECOS라 '한국은행 ECOS'를 앞에 두고
- * 시급(최저임금위원회)·연금(국민연금공단)·1면(빅카인즈)은 '외'로 묶는다. 금 줄이 있으면 CC BY 4.0이라 자료 이름과 라이선스를 적는다(이미지라 링크는 없다).
- * ECOS 숫자가 없으면 찍힌 줄의 출처만 적고, 출처를 밝힐 줄이 없으면 ''.
+ * 시급(최저임금위원회)·연금(국민연금공단)·1면(빅카인즈)은 '외'로 묶는다. ECOS 숫자가 없으면 찍힌 줄의 출처만 적고, 출처를 밝힐 줄이 없으면 ''.
  */
 export function receiptSourceLine(result: BirthdayResult, assets: AssetCell[], headline: boolean) {
   // receiptLines와 같은 조건(시급·연금 줄), 1면은 제목이 찍힐 때만.
   const others = [...(result.wage ? ['최저임금위원회'] : []), ...(result.calendar?.points[1] ? ['국민연금공단'] : []), ...(headline ? ['빅카인즈'] : [])];
   const main = result.cpi || assets.length ? `한국은행 ECOS${others.length ? ' 외' : ''}` : others.join('·');
-  const gold = assets.some(cell => cell.id === 'gold') ? ` · ${ASSET_SOURCE_INFO.gold.org} ${GOLD_SOURCE.dataset}(${GOLD_SOURCE.license})` : '';
-  return main ? `출처 ${main}${gold}` : '';
+  return main ? `출처 ${main}` : '';
 }
 
 /** 100만 원 묶음 소제목 — 기준일이 스무 살 생일인지 태어난 날인지. */

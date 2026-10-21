@@ -3,9 +3,9 @@
 결과: service/frontend/public/data/birthday-assets/{YYYY}.json, latest.json
 - 기준일은 서른 살 생일이 지났으면 스무 살 생일, 아직이면 태어난 날이다. 연도 파일 YYYY 는 기준일의 연도다.
   웹은 기준일 연도 파일과 latest.json 두 개만 받아 기기에서 계산한다. 서버에는 연도만 드러나고 생일 날짜는 가지 않는다.
-- 출처는 한국은행 ECOS 네 계열이다: 소비자물가(901Y009, 국가데이터처), 정기예금 신규취급액 금리(121Y002),
-  원/달러 종가 일별(731Y003)·매매기준율 월평균(731Y004), 서울 아파트 실거래가격지수(901Y089, 한국부동산원).
-  금 한 돈은 세계은행 Pink Sheet 월별 엑셀의 Gold(CC BY 4.0)를 웹이 731Y004 월평균 환율로 바꾼다(--pink-sheet 필요).
+- 출처는 모두 한국은행 ECOS 다: 소비자물가(901Y009, 국가데이터처), 정기예금 신규취급액 금리(121Y002),
+  원/달러 종가 일별(731Y003)·매매기준율 월평균(731Y004), 서울 아파트 실거래가격지수(901Y089, 한국부동산원),
+  생산자물가지수 품목별 금괴(404Y016, 한국은행).
   이용 근거가 확인된 출처만 수집한다(SOURCES 의 allowed). 근거는 docs/product/birthday-assets/출처_이용조건.md.
   허용된 출처가 하나도 없으면 파일을 쓰지 않는다.
 - 정기예금은 금리를 매달 그달 금리로 굴린 누적지수(세전 월복리, deposit_index)로 바꿔 넣는다.
@@ -13,14 +13,10 @@
 - 연도 파일에는 생성 시각을 넣지 않는다(매달 갱신 때 지난 해 파일이 바뀌지 않게). 생성 시각은 latest.json 에만.
 
 실행: cd service/backend && AWS_DEFAULT_REGION=us-east-1 uv run --no-project --with boto3==1.35.0 \\
-        --with requests==2.32.3 --with openpyxl==3.1.5 python scripts/build_birthday_assets.py \\
-        [--until YYYY-MM-DD] --pink-sheet <세계은행 CMO-Historical-Data-Monthly.xlsx 경로 또는 URL>
-  Pink Sheet 주소(문서 ID)는 해가 바뀌면 달라진다 — 실행 전에
-  https://www.worldbank.org/en/research/commodity-markets 의 'Monthly prices' 링크를 확인해 쓴다.
+        --with requests==2.32.3 python scripts/build_birthday_assets.py [--until YYYY-MM-DD]
 ECOS 인증키는 SSM(/sedaily-mbti/ecos-api-key)에서만 읽고 출력·기록하지 않는다.
 """
 import argparse
-import io
 import json
 import os
 import re
@@ -49,9 +45,8 @@ Point = Tuple[str, float]
 
 @dataclass(frozen=True)
 class Source:
-    label: str                      # 화면 출처 표기
-    allowed: bool                   # 출처_이용조건.md 판정이 '가능'일 때만 True
-    requires: Tuple[str, ...] = ()  # 계산에 함께 쓰는 다른 출처(금의 원화 환산 → 환율)
+    label: str      # 화면 출처 표기
+    allowed: bool   # 출처_이용조건.md 판정이 '가능'일 때만 True
 
 
 # 판정이 바뀌면 여기와 출처_이용조건.md 를 함께 고친다(2026-10-21 승인안).
@@ -60,10 +55,8 @@ SOURCES: Dict[str, Source] = {
     'deposit': Source('한국은행 예금은행 정기예금 신규취급액 가중평균금리(한국은행 ECOS 121Y002)', True),
     'usdkrw': Source('한국은행 원/달러 환율 종가·매매기준율 월평균(한국은행 ECOS 731Y003·731Y004)', True),
     'apartment': Source('한국부동산원 서울 아파트 실거래가격지수(한국은행 ECOS 901Y089)', True),
-    # 2026-10-21 켬(사용자 요청). 세계은행 Pink Sheet 는 CC BY 4.0 이라 상업 이용이 되고 출처 표시가 의무다
-    # (화면 출처 줄에 '세계은행 Pink Sheet(CC BY 4.0)'). 원자료(Bloomberg·Kitco·IMF IFS·LBM 등)의 제3자 권리는
-    # 세계은행이 보증하지 않아 법무 확인 대상이다 — 출시(웹 배포) 전에 확인한다.
-    'gold': Source('세계은행 Pink Sheet 금 월평균(CC BY 4.0)', True, requires=('usdkrw',)),
+    # 2026-10-21 금은 한국은행이 작성한 금괴 생산자물가지수로 바꿨다(국제 금 기준가는 원자료에 제3자 권리가 있어 쓰지 않는다).
+    'gold': Source('한국은행 생산자물가지수 품목별 금괴(한국은행 ECOS 404Y016)', True),
 }
 
 # ECOS 계열: (통계표, 주기, 시작, 끝(None 이면 --until), 항목 코드 경로). 2026-10-21 ECOS 로 확인한 값.
@@ -73,12 +66,14 @@ ECOS_SERIES = {
     'usdkrw_daily': ('731Y003', 'D', '19900302', None, '0000003'),           # 원/달러 종가 15:30
     'usdkrw_monthly': ('731Y004', 'M', '196405', None, '0000001/0000100'),   # 0000100 = 평균자료
     'apartment': ('901Y089', 'M', '200601', None, '200'),                    # 서울 아파트 실거래가격지수(2026.06=100)
+    'gold': ('404Y016', 'M', '196501', None, '30721401AA'),                  # 생산자물가지수 품목별 금괴(2020=100)
 }
 SERIES_OF = {
     'cpi': ('cpi',),
     'deposit': ('deposit_rate',),
     'usdkrw': ('usdkrw_daily', 'usdkrw_monthly'),
     'apartment': ('apartment',),
+    'gold': ('gold',),
 }
 
 
@@ -87,10 +82,9 @@ class EcosError(RuntimeError):
 
 
 def allowed_items(sources: Optional[Dict[str, Source]] = None) -> List[str]:
-    """허용된 출처 중 함께 쓰는 출처까지 허용된 것만."""
+    """허용된 출처만."""
     sources = SOURCES if sources is None else sources
-    return [name for name, source in sources.items()
-            if source.allowed and all(sources[need].allowed for need in source.requires)]
+    return [name for name, source in sources.items() if source.allowed]
 
 
 def _period(raw: str, cycle: str) -> str:
@@ -156,43 +150,6 @@ def fetch_ecos(table: str, cycle: str, start: str, end: str, items: str, key: st
             return sorted(points)
 
 
-_PINK_MONTH = re.compile(r'^(\d{4})M(\d{2})$')
-
-
-def parse_pink_sheet_gold(data: bytes) -> List[Point]:
-    """세계은행 CMO Historical Data Monthly 엑셀의 'Monthly Prices' 시트에서 금(달러/트로이온스) 월평균.
-    열 위치는 매달 바뀔 수 있어 열 제목이 'Gold' 인 열을 찾는다. 행은 '1960M01' 형식."""
-    from openpyxl import load_workbook
-
-    sheet = load_workbook(io.BytesIO(data), read_only=True, data_only=True)['Monthly Prices']
-    rows = list(sheet.iter_rows(values_only=True))
-    column = None
-    for row in rows:
-        for index, cell in enumerate(row):
-            if isinstance(cell, str) and cell.strip() == 'Gold':
-                column = index
-                break
-        if column is not None:
-            break
-    if column is None:
-        raise ValueError("'Monthly Prices' 시트에서 'Gold' 열을 찾지 못했다")
-    points = []
-    for row in rows:
-        match = _PINK_MONTH.match(str(row[0]).strip()) if row and row[0] is not None else None
-        if match and column < len(row) and isinstance(row[column], (int, float)):
-            points.append((f'{match.group(1)}-{match.group(2)}', float(row[column])))
-    return sorted(points)
-
-
-def read_source(path_or_url: str, get: Callable = requests.get) -> bytes:
-    if re.match(r'^https?://', path_or_url):
-        res = get(path_or_url, timeout=ECOS_TIMEOUT_SECONDS)
-        res.raise_for_status()
-        return res.content
-    with open(path_or_url, 'rb') as fp:
-        return fp.read()
-
-
 def _daily_slice(points: Sequence[Point], year: int) -> List[Point]:
     start = f'{year}-01-01'
     before = [p for p in points if p[0] < start][-TAIL_DAYS:]
@@ -247,15 +204,11 @@ def build_latest(series: dict, items: Sequence[str], generated_at: str, until: s
         latest['apartment'] = point('apartment')
     if 'gold' in items:
         last['gold'] = period('gold')
-        fx = dict(series.get('usdkrw_monthly', []))
-        common = [p for p in series.get('gold', []) if p[0] in fx]  # 금·환율 월평균이 둘 다 있는 마지막 달
-        latest['gold'] = ({'usd': list(common[-1]), 'usdkrw': [common[-1][0], fx[common[-1][0]]]}
-                          if common else None)
+        latest['gold'] = point('gold')
     return latest
 
 
-def collect(items: Sequence[str], until: str, key: Optional[str], pink_sheet: Optional[str],
-            get: Callable = requests.get) -> dict:
+def collect(items: Sequence[str], until: str, key: Optional[str], get: Callable = requests.get) -> dict:
     """허용된 항목에 필요한 계열만 받는다. 정기예금은 누적지수(deposit_index·deposit_next)도 함께 둔다."""
     series: dict = {}
     for item in items:
@@ -266,10 +219,6 @@ def collect(items: Sequence[str], until: str, key: Optional[str], pink_sheet: Op
             series[name] = fetch_ecos(table, cycle, start, end, codes, key, get=get)
         if item == 'deposit':
             series['deposit_index'], series['deposit_next'] = deposit_index(series['deposit_rate'])
-    if 'gold' in items:
-        if not pink_sheet:
-            raise SystemExit('금을 수집하려면 --pink-sheet 로 세계은행 월별 엑셀 경로나 URL 을 넘겨야 한다')
-        series['gold'] = [p for p in parse_pink_sheet_gold(read_source(pink_sheet, get=get)) if p[0] <= until[:7]]
     return series
 
 
@@ -295,7 +244,6 @@ def main(argv=None, get: Callable = requests.get, secret: Callable[[str], str] =
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--until', default=(now - timedelta(days=1)).strftime('%Y-%m-%d'))
     parser.add_argument('--out', default=OUT_DIR)
-    parser.add_argument('--pink-sheet', default=None)
     args = parser.parse_args(argv)
 
     items = allowed_items()
@@ -304,11 +252,11 @@ def main(argv=None, get: Callable = requests.get, secret: Callable[[str], str] =
         return 0
     needs_ecos = any(item in SERIES_OF for item in items)
     key = secret(ECOS_KEY_PARAM) if needs_ecos else None
-    series = collect(items, args.until, key, args.pink_sheet, get=get)
+    series = collect(items, args.until, key, get=get)
     last_year = max(int(args.until[:4]), now.year)  # 1월 초 실행에도 올해 파일(전년 꼬리)이 있게
     files = build_year_files(series, items, FIRST_YEAR, last_year)
     sizes = write_files(args.out, files, build_latest(series, items, now.isoformat(timespec='seconds'), args.until))
-    raw = [name for item in items for name in SERIES_OF.get(item, ())] + (['gold'] if 'gold' in items else [])
+    raw = [name for item in items for name in SERIES_OF.get(item, ())]
     summary = ', '.join(f'{name} {len(series[name])}건({series[name][0][0]}~{series[name][-1][0]})'
                         if series[name] else f'{name} 0건' for name in raw)
     print(f'items={",".join(items)} years={FIRST_YEAR}~{last_year} {summary} '
