@@ -184,8 +184,9 @@ test('출처 문장: ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관�
   expect(noInflation).not.toContain('물가');
   const goldFile = { ...file2010, gold: [['2010-05', 1200]] } satisfies AssetYearFile;
   const gold = assetCells(base('2010-05-15'), goldFile, latest({ gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } }));
-  expect(assetSourceLine(gold, inflation)).toContain('국가데이터처 소비자물가지수와 세계은행 Pink Sheet 국제 금값 월평균으로 계산했어요.');
-  expect(assetSourceLine(gold, null)).toContain('실거래가격지수와 세계은행 Pink Sheet 국제 금값 월평균으로 계산했어요.');
+  // CC BY 4.0 — 금 칸이 보이면 라이선스 이름이 함께 드러난다.
+  expect(assetSourceLine(gold, inflation)).toContain(`국가데이터처 소비자물가지수와 세계은행 ${nb('Pink Sheet(CC BY 4.0)')} 국제 금값 월평균으로 계산했어요.`);
+  expect(assetSourceLine(gold, null)).toContain(`실거래가격지수와 세계은행 ${nb('Pink Sheet(CC BY 4.0)')} 국제 금값 월평균으로 계산했어요.`);
   expect(assetSourceLine([], inflation)).toBe('');
   expect(periodLabel('2026-09')).toBe('2026년 9월');
   expect(periodLabel('2026-10-20')).toBe('2026년 10월 20일');

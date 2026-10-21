@@ -168,7 +168,11 @@ export function inflationLine({ multiple }: AssetInflation) {
 /** 자산 장면 출처 문장 — ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관·통계, 그때·지금 기준 시점. 칸이 없으면 ''. */
 export function assetSourceLine(cells: AssetCell[], inflation: AssetInflation | null) {
   if (!cells.length) return '';
-  const statOf = (id: keyof typeof ASSET_SOURCE_INFO) => `${ASSET_SOURCE_INFO[id].org} ${ASSET_SOURCE_INFO[id].name}`;
+  // 자료 이름(라이선스 포함)은 'Pink Sheet(CC / BY 4.0)'처럼 갈라지지 않게 한 덩어리로 둔다.
+  const statOf = (id: keyof typeof ASSET_SOURCE_INFO) => {
+    const { org, dataset, name } = ASSET_SOURCE_INFO[id];
+    return `${org} ${dataset ? `${nb(dataset)} ` : ''}${name}`;
+  };
   // 물가 줄은 칸 목록 아래에 있어 ECOS 통계 목록과 지금 시점 목록 모두 칸 뒤에 둔다.
   const ecos = [...cells.filter(cell => cell.id !== 'gold').map(cell => statOf(cell.id)), ...(inflation ? [statOf('cpi')] : [])].join(', ');
   const gold = cells.find(cell => cell.id === 'gold');

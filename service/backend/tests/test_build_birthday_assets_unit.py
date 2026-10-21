@@ -102,9 +102,11 @@ def test_only_allowed_items_are_written():
     assert latest['last'] == {'apartment': '2026-07'} and 'usdkrw' not in latest and 'gold' not in latest
 
 
-def test_default_sources_are_the_approved_four():
-    assert ba.allowed_items() == ['cpi', 'deposit', 'usdkrw', 'apartment']
-    assert 'kospi' not in ba.SOURCES and ba.SOURCES['gold'].allowed is False
+def test_default_sources_are_the_approved_ones():
+    # 금은 2026-10-21 켬(CC BY 4.0, 출처 표시). 원/달러가 꺼지면 금도 빠진다(test_gold_needs_exchange_rate_source).
+    assert ba.allowed_items() == ['cpi', 'deposit', 'usdkrw', 'apartment', 'gold']
+    assert 'kospi' not in ba.SOURCES and ba.SOURCES['gold'].allowed is True
+    assert 'CC BY 4.0' in ba.SOURCES['gold'].label
     assert {series[0] for series in ba.ECOS_SERIES.values()} == {'901Y009', '121Y002', '731Y003', '731Y004', '901Y089'}
     with open(_PATH, encoding='utf-8') as fp:
         text = fp.read()
@@ -182,7 +184,7 @@ def test_fetch_ecos_request_error_never_leaks_key():
         assert KEY not in ''.join(traceback.format_exception(type(error), error, error.__traceback__))
 
 
-def test_pink_sheet_finds_gold_by_header():
+def _pink_sheet(rows):
     from openpyxl import Workbook
 
     book = Workbook()
@@ -191,12 +193,16 @@ def test_pink_sheet_finds_gold_by_header():
     sheet.append(['World Bank Commodity Price Data'])
     sheet.append([None, 'Crude oil, average', 'Silver', 'Gold'])  # 열 순서가 바뀌어도 제목으로 찾는다
     sheet.append([None, '($/bbl)', '($/troy oz)', '($/troy oz)'])
-    sheet.append(['1960M01', 1.63, 0.91, 35.27])
-    sheet.append(['1960M02', 1.63, 0.91, '..'])
-    sheet.append(['2026M09', 102.3, 64.6, 4319.0])
+    for row in rows:
+        sheet.append(row)
     data = io.BytesIO()
     book.save(data)
-    assert ba.parse_pink_sheet_gold(data.getvalue()) == [('1960-01', 35.27), ('2026-09', 4319.0)]
+    return data.getvalue()
+
+
+def test_pink_sheet_finds_gold_by_header():
+    data = _pink_sheet([['1960M01', 1.63, 0.91, 35.27], ['1960M02', 1.63, 0.91, '..'], ['2026M09', 102.3, 64.6, 4319.0]])
+    assert ba.parse_pink_sheet_gold(data) == [('1960-01', 35.27), ('2026-09', 4319.0)]
 
 
 def test_nothing_allowed_writes_nothing(monkeypatch, tmp_path, capsys):
@@ -216,25 +222,37 @@ def test_main_writes_year_files_and_never_prints_key(tmp_path, capsys):
         '901Y089': [('200601', '28.8'), ('202607', '101.9')],
     }
 
+    pink = 'https://thedocs.worldbank.org/en/doc/x/related/CMO-Historical-Data-Monthly.xlsx'
+    sheet = _pink_sheet([['1960M01', 1.63, 0.91, 35.27], ['2026M08', 100.0, 60.0, 4100.0], ['2026M09', 102.3, 64.6, 4319.0]])
+
     def get(url, timeout):
+        if url == pink:
+            return MagicMock(content=sheet)
         table = next(t for t in responses if f'/{t}/' in url)
         return _ecos(responses[table])
 
-    assert ba.main(['--out', str(tmp_path), '--until', '2026-10-19'], get=get, secret=lambda name: KEY) == 0
+    # 금이 켜져 있으면 Pink Sheet 없이 돌렸을 때 아무 파일도 쓰지 않고 멈춘다.
+    with pytest.raises(SystemExit):
+        ba.main(['--out', str(tmp_path), '--until', '2026-10-19'], get=get, secret=lambda name: KEY)
+    assert list(tmp_path.iterdir()) == []
+    assert ba.main(['--out', str(tmp_path), '--until', '2026-10-19', '--pink-sheet', pink], get=get, secret=lambda name: KEY) == 0
     out = capsys.readouterr().out
-    assert KEY not in out and 'items=cpi,deposit,usdkrw,apartment' in out and 'files=' in out and 'max=' in out
+    assert KEY not in out and 'items=cpi,deposit,usdkrw,apartment,gold' in out and 'files=' in out and 'max=' in out
     years = max(2026, datetime.now(ba.KST).year) - 1964 + 1
     assert len(list(tmp_path.glob('*.json'))) == years + 1
     latest = json.loads((tmp_path / 'latest.json').read_text(encoding='utf-8'))
     assert latest['generatedAt'].endswith('+09:00') and latest['until'] == '2026-10-19'
     assert latest['last'] == {'cpi': '2026-09', 'deposit_rate': '2026-08', 'usdkrw_daily': '2026-10-19',
-                              'usdkrw_monthly': '2026-09', 'apartment': '2026-07'}
+                              'usdkrw_monthly': '2026-09', 'apartment': '2026-07', 'gold': '2026-09'}
+    assert latest['gold'] == {'usd': ['2026-09', 4319.0], 'usdkrw': ['2026-09', 1359.0]}
+    assert 'CC BY 4.0' in latest['sources']['gold']
     assert latest['cpi'] == ['2026-09', 120.43]
     assert latest['deposit'][0] == '2026-09' and latest['deposit'][1] == pytest.approx((1 + 3.2 / 1200) * (1 + 3.14 / 1200))
     assert latest['usdkrw'] == {'daily': ['2026-10-19', 1332.1], 'monthly': ['2026-09', 1359.0]}
     assert latest['apartment'] == ['2026-07', 101.9]
     year_2026 = json.loads((tmp_path / '2026.json').read_text(encoding='utf-8'))
-    assert set(year_2026) == {'year', 'cpi', 'deposit', 'usdkrw', 'apartment'}
+    assert set(year_2026) == {'year', 'cpi', 'deposit', 'usdkrw', 'apartment', 'gold'}
     assert year_2026['deposit'] == [['2026-07', 1.0], ['2026-08', pytest.approx(1 + 3.2 / 1200)]]
+    assert year_2026['gold'] == [['2026-08', 4100.0], ['2026-09', 4319.0]]
     for path in tmp_path.glob('*.json'):
         assert KEY not in path.read_text(encoding='utf-8')
