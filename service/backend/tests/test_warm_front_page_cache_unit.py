@@ -245,13 +245,77 @@ def test_real_table_writes_conditionally_and_records_keys(tmp_path):
     store.put_item(long_item)
     assert table.puts[0]['ConditionExpression'] == 'attribute_not_exists(news_id) OR expires_at < :now'
     assert store.pop('2010-05-12')[0] == 'written' and keys.read_text() == 'timemachine_frontv2_2010-05-12\n'
-    # 살아 있는 항목은 덮어쓰지 않는다(조건 실패 = 이미 있음).
+    # 살아 있는 항목은 덮어쓰지 않는다(조건 실패 = 이미 있음). 키는 PutItem 전에 남기므로 이때도 목록에 들어간다(넓어도 안전 — 캐시).
     store.put_item({**_existing('2010-05-11'), 'expires_at': int(time.time()) + TEN_YEARS * 86400})
     assert store.pop('2010-05-11')[0] == 'exists' and table.items['timemachine_frontv2_2010-05-11']['cached_at'] == 'before'
     # 보관 1년 미만(잠정)은 쓰지 않는다.
     store.put_item({**_existing('2010-05-10'), 'expires_at': int(time.time()) + WEEK * 86400})
     assert store.pop('2010-05-10')[0] == 'provisional' and len(table.puts) == 2
-    assert store.writes == 1 and keys.read_text().splitlines() == ['timemachine_frontv2_2010-05-12']
+    assert store.writes == 1
+    assert keys.read_text().splitlines() == ['timemachine_frontv2_2010-05-12', 'timemachine_frontv2_2010-05-11']
+
+
+class _Killed(BaseException):
+    """PutItem 이 서버에서 끝난 직후 프로세스가 끊긴 것을 흉내 낸다(스크립트의 어떤 except 에도 잡히지 않는다)."""
+
+
+@pytest.mark.parametrize('lost', ['killed', 'timeout'])
+def test_key_is_listed_before_put_even_when_result_is_lost(tmp_path, lost):
+    """PutItem 이 서버에서는 성공했는데 응답 직후 끊기거나(killed) 응답 없이 시간이 넘어도(timeout) 키가 되돌릴 목록에 있다."""
+    from botocore.exceptions import ReadTimeoutError
+
+    class LosingTable(_FakeDynamoTable):
+        def put_item(self, **kwargs):
+            assert keys.read_text() == 'timemachine_frontv2_2010-05-12\n'  # 보내기 전에 이미 디스크에 있다
+            super().put_item(**kwargs)
+            raise _Killed() if lost == 'killed' else ReadTimeoutError(endpoint_url='https://dynamodb.us-east-1.amazonaws.com')
+
+    table, keys = LosingTable(), tmp_path / 'keys.txt'
+    store = wf.DynamoStore(table, wf.Guard(), wf.Limiter(None), wf.Limiter(None), str(keys))
+    item = {**_existing('2010-05-12'), 'expires_at': int(time.time()) + TEN_YEARS * 86400}
+    if lost == 'killed':
+        with pytest.raises(_Killed):
+            store.put_item(item)
+    else:
+        store.put_item(item)
+        assert store.pop('2010-05-12')[0] == 'write_failed'  # 결과를 모르면 실패로 세고 다시 시도 목록에 둔다
+    assert 'timemachine_frontv2_2010-05-12' in table.items  # 서버에는 쓰였다
+    assert keys.read_text().splitlines() == ['timemachine_frontv2_2010-05-12'] and store.writes == 0
+
+
+def test_key_file_failure_stops_before_put(tmp_path):
+    keys = tmp_path / 'keys.txt'
+    keys.mkdir()  # 키를 덧붙일 수 없다
+    table, guard = _FakeDynamoTable(), wf.Guard()
+    store = wf.DynamoStore(table, guard, wf.Limiter(None), wf.Limiter(None), str(keys))
+    store.put_item({**_existing('2010-05-12'), 'expires_at': int(time.time()) + TEN_YEARS * 86400})
+    assert table.puts == [] and store.pop('2010-05-12')[0] == 'blocked'
+    assert guard.reason.startswith('written-keys.txt 에 키를 남기지 못함(')
+
+
+def test_stop_while_waiting_for_write_capacity_blocks_put(tmp_path):
+    """worker A 가 첫 확인을 지나 PROVISIONED 쓰기 한도에서 기다리는 동안 worker B 의 빅카인즈 응답이 429 면 A 는 PutItem 을 보내지 않는다."""
+    waiting, release = threading.Event(), threading.Event()
+
+    def sleep(seconds):
+        waiting.set()
+        assert release.wait(5)
+
+    guard, table, keys = wf.Guard(), _FakeDynamoTable(), tmp_path / 'keys.txt'
+    store = wf.DynamoStore(table, guard, wf.Limiter(None), wf.Limiter(0.5, clock=lambda: 0.0, sleep=sleep), str(keys))
+    item = {**_existing('2010-05-12'), 'expires_at': int(time.time()) + TEN_YEARS * 86400}
+    writer = threading.Thread(target=store.put_item, args=(item,))
+    writer.start()
+    try:
+        assert waiting.wait(5)  # A 는 한도에서 기다린다(첫 확인 때는 멈춤 전)
+        post = wf.counting_post(lambda url, *args, **kwargs: _Res(429), _FakeBs(), wf.Calls(), guard)
+        post(_FakeBs.BIGKINDS_ISSUE_URL, json={})  # B 의 순위 응답이 429
+    finally:
+        release.set()
+        writer.join(5)
+    assert not writer.is_alive() and guard.reason == '빅카인즈 HTTP 429'
+    assert table.puts == [] and store.pop('2010-05-12')[0] == 'blocked' and store.writes == 0
+    assert not keys.exists()
 
 
 def test_limiter_never_exceeds_rate():
@@ -331,6 +395,15 @@ def test_stop_on_429_then_resume_from_checkpoint(tmp_path):
     assert wf.run(args, tm2, bs2, table=table, dynamodb=_dynamodb(), err=io.StringIO()) == 0
     assert tm2.called == [f'2010-05-{d:02d}' for d in range(4, 11)]
     assert len(_read(tmp_path, 'written-keys.txt').splitlines()) == 10 and len(table.items) == 10
+    # 요약은 두 실행의 누적이다: 처리 10 = 대상, 새로 씀 10, 빅카인즈 4(멈춘 429 포함) + 7.
+    summary = json.loads(_read(tmp_path, 'summary.json'))
+    assert summary['processed'] == summary['targets'] == 10
+    assert {k: summary[k] for k in ('written', 'exists', 'failed', 'writes', 'calls_total', 'runs', 'calls_partial',
+                                    'stop_reason')} == {
+        'written': 10, 'exists': 0, 'failed': 0, 'writes': 10, 'calls_total': 11, 'runs': 2, 'calls_partial': False,
+        'stop_reason': None}
+    assert summary['calls']['day'] == 11 and summary['this_run'] == {**summary['this_run'], 'processed': 7, 'calls_total': 7}
+    assert '누적(실행 2회): 처리 10/10 · 새로 씀 10' in _read(tmp_path, 'progress.log')
     # 범위나 workers 가 다르면 --restart 없이는 이어 가지 않는다.
     with pytest.raises(SystemExit, match='workers'):
         wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-10')), tm2, bs2, table=table, dynamodb=_dynamodb())
@@ -338,9 +411,27 @@ def test_stop_on_429_then_resume_from_checkpoint(tmp_path):
                   table=table, dynamodb=_dynamodb(), err=io.StringIO()) == 0
     # --restart 는 앞 실행 줄을 섞지 않는다(앞 실행 파일은 previous/ 로). 되돌릴 키 목록은 이어 쓴다.
     assert [r['outcome'] for r in _rows(tmp_path)] == ['exists'] * 10
+    restarted = json.loads(_read(tmp_path, 'summary.json'))
+    assert {k: restarted[k] for k in ('processed', 'written', 'exists', 'calls_total', 'runs')} == {
+        'processed': 10, 'written': 0, 'exists': 10, 'calls_total': 0, 'runs': 1}
     (previous,) = (tmp_path / 'state' / 'previous').iterdir()
     assert len((previous / 'results.jsonl').read_text().splitlines()) == 10
     assert len(_read(tmp_path, 'written-keys.txt').splitlines()) == 10
+
+
+def test_resume_after_run_without_summary_recounts_results(tmp_path):
+    """앞 실행이 요약을 남기지 못하고 끊겼으면(강제 종료) 처리·새로 씀은 results.jsonl 에서 다시 세고, 알 수 없는 호출 수는 표시한다."""
+    bs = _FakeBs(lambda url, payload: _Res(429) if len(bs.sent) == 4 else _Res())
+    table = _FakeDynamoTable()
+    args = _args(tmp_path, *_range('2010-05-01', '2010-05-10'), '--workers', '1')
+    assert wf.run(args, _FakeTm(bs, {}), bs, table=table, dynamodb=_dynamodb(), err=io.StringIO()) == wf.EXIT_STOPPED
+    os.remove(tmp_path / 'state' / 'summary.json')
+    bs2 = _FakeBs()
+    assert wf.run(args, _FakeTm(bs2, {}), bs2, table=table, dynamodb=_dynamodb(), err=io.StringIO()) == 0
+    summary = json.loads(_read(tmp_path, 'summary.json'))
+    assert {k: summary[k] for k in ('processed', 'targets', 'written', 'calls_total', 'calls_partial', 'runs')} == {
+        'processed': 10, 'targets': 10, 'written': 10, 'calls_total': 7, 'calls_partial': True, 'runs': 2}
+    assert '(요약 없이 끊긴 앞 실행 몫 빠짐)' in _read(tmp_path, 'progress.log')
 
 
 @pytest.mark.parametrize('crash_at', ['row', 'checkpoint'])
@@ -378,6 +469,9 @@ def test_interrupted_record_resumes_from_same_date(tmp_path, monkeypatch, crash_
     assert tm2.called == [f'2010-05-{d:02d}' for d in range(3, 7)]
     assert _read(tmp_path, 'retry-dates.txt').splitlines() == ['2010-05-03']
     assert 'timemachine_frontv2_2010-05-03' not in table.items and len(table.items) == 5
+    # 05-03 줄이 두 번 있어도(checkpoint) 날짜로 센다.
+    summary = json.loads(_read(tmp_path, 'summary.json'))
+    assert (summary['processed'], summary['written'], summary['provisional'], summary['runs']) == (6, 5, 1, 2)
 
 
 def test_checkpoint_identity_keeps_dry_run_and_real_runs_apart(tmp_path):

@@ -11,15 +11,24 @@
   재사용이 걸린다). 동시 빅카인즈 요청은 최대 workers×2 — worker 마다 1 + 이슈 순위 자리(time_machine._ranking_slots) workers 개.
   그날 기사가 없어 버린 순위 요청도 끝날 때까지 자리를 쥐고, 자리가 없으면 그날 기사부터 묻는다. 끝내기 전에 남은 순위 요청이
   모두 끝나기를 기다려(호출 제한 + 5초까지) 그 응답의 한도·차단도 멈춤 이유와 종료 코드에 넣는다.
-- 상태 폴더(--state-dir): checkpoint.json(구간별 다음 날짜 — 다시 실행하면 이어 간다), written-keys.txt(새로 쓴 키 — 되돌릴 때 이
+- 상태 폴더(--state-dir): checkpoint.json(구간별 다음 날짜 — 다시 실행하면 이어 간다), written-keys.txt(쓰려 한 키 — 되돌릴 때 이
   키만 지운다), results.jsonl(날짜별 결과, 제목·본문 없음), retry-dates.txt, notable.jsonl(kind=none·no_paper 결과, 사람이 훑어볼 것),
   progress.log, summary.json. 날짜마다 results·notable 줄을 디스크까지 내린 뒤에 체크포인트를 올린다 — 그 사이에 끊기면 이어 갈 때
   같은 날을 다시 한다(쓴 캐시는 조건부 PutItem 이 지킨다). 그 기록이 실패하면 멈춘다.
+- written-keys.txt 는 PutItem 을 보내기 *전에* 키를 덧붙이고 디스크까지 내린다. 그래서 PutItem 이 성공한 직후 끊기거나 응답 없이
+  시간이 넘어도(서버에서는 썼을 수 있다) 키가 목록에 있다. 대신 실제로는 쓰지 않은 키(조건 실패로 이미 있던 항목, 실패한 쓰기)도
+  들어가 목록이 실제보다 넓을 수 있다 — 대상이 캐시라 더 지워도 다음 조회 때 서버가 다시 만들 뿐이라 이 쪽을 골랐다(쓰기 전 기록과
+  항목 대조로 정확히 가르는 방법은 쓰지 않는다). 같은 날을 다시 쓰면 키가 두 번 들어갈 수 있으니 되돌릴 때 sort -u 로 지운다.
+  키를 남기지 못하면 PutItem 을 보내지 않고 멈춘다.
+- summary.json 은 이어 간 실행 전체의 누적이다. 처리·새로 씀·이미 있음·실패·잠정은 results.jsonl(날짜별)에서 다시 세고, 빅카인즈
+  호출·쓰기·버린 순위·경과는 지난 summary.json 에 이번 실행 몫을 더한다(이번 실행 몫만은 this_run). 앞 실행이 요약을 남기지 못하고
+  끊겼으면 그 실행의 호출 수를 알 수 없어 calls_partial 이 true 다.
 - 체크포인트 신원: 날짜 목록·workers·dry-run 여부·서버 코드(CODE_FILES 내용의 SHA-1)가 하나라도 다르면 이어 가지 않는다. --restart 는
   이전 실행 파일(체크포인트·results·notable·retry-dates·summary·progress)을 previous/<시각>/ 로 옮기고 새로 시작한다.
-  written-keys.txt 는 옮기지 않고 이어 쓴다(이 폴더에서 실제로 쓴 키 전체가 되돌릴 목록).
+  written-keys.txt 는 옮기지 않고 이어 쓴다(이 폴더에서 쓰려 한 키 전체가 되돌릴 목록).
 - 멈춤(즉시): 연속 실패 5회, 최근 시도 100건 중 실패 11건 이상(10% 초과), 빅카인즈 HTTP 429·403·401 또는 한도·쿼터로 보이는 응답,
-  Ctrl-C. 멈추면 새 날짜를 시작하지 않고 진행 중인 날짜의 다음 빅카인즈 요청과 쓰기도 막는다. 이유는 progress.log·summary.json 에
+  Ctrl-C. 멈추면 새 날짜를 시작하지 않고 진행 중인 날짜의 다음 빅카인즈 요청과 쓰기도 막는다(쓰기 한도에서 기다리던 쓰기도 기다린
+  뒤 다시 확인해 보내지 않는다). 이유는 progress.log·summary.json 에
   남고 종료 코드는 2. 실패 = 예외 또는 basis ranking_failed(이미 있음은 세지 않는다).
 - 시작 전에 캐시 표의 과금 모드를 describe 로 확인한다. PROVISIONED 면 쓰기·읽기를 용량의 절반 이하로 늦춘다(다른 기능도 쓰는 표).
   실제 실행에서 확인하지 못하면 시작하지 않는다.
@@ -313,7 +322,7 @@ class MemoryStore(_Store):
 
 
 class DynamoStore(_Store):
-    """실제 표. 읽기·쓰기 한도를 지키고, 살아 있는 항목은 덮어쓰지 않으며, 새로 쓴 키를 바로 파일에 덧붙인다."""
+    """실제 표. 읽기·쓰기 한도를 지키고, 살아 있는 항목은 덮어쓰지 않으며, 쓰려는 키를 PutItem 전에 파일에 남긴다."""
 
     def __init__(self, table, guard: Guard, reads: Limiter, writes: Limiter, keys_path: str,
                  clock: Callable[[], float] = time.time):
@@ -326,6 +335,18 @@ class DynamoStore(_Store):
 
     def _write(self, item: dict) -> str:
         self.write_limit.take(item_units(item))
+        if self.guard.reason:  # 쓰기 한도에서 기다리는 동안 다른 worker 가 멈춤을 정했으면 보내지 않는다
+            return 'blocked'
+        # 키를 먼저 디스크까지 남기고 PutItem 을 보낸다. 성공 직후 끊기거나 결과를 모르는 시간 초과여도 되돌릴 목록에 남는다.
+        # 조건 실패·실패한 쓰기의 키도 남아 목록이 실제보다 넓어질 수 있다 — 캐시라 더 지워도 다음 조회가 다시 만든다(모듈 설명).
+        try:
+            with self._lock, open(self.keys_path, 'a', encoding='utf-8') as fp:
+                fp.write(item['news_id'] + '\n')
+                fp.flush()
+                os.fsync(fp.fileno())
+        except OSError as e:
+            self.guard.stop(f'written-keys.txt 에 키를 남기지 못함({type(e).__name__})')
+            return 'blocked'
         try:
             self.table.put_item(Item=item, ConditionExpression='attribute_not_exists(news_id) OR expires_at < :now',
                                 ExpressionAttributeValues={':now': int(self.clock())})
@@ -337,8 +358,6 @@ class DynamoStore(_Store):
             return 'write_failed'
         with self._lock:
             self.writes += 1
-            with open(self.keys_path, 'a', encoding='utf-8') as fp:
-                fp.write(item['news_id'] + '\n')
         return 'written'
 
 
@@ -485,7 +504,13 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
     os.makedirs(args.state_dir, exist_ok=True)
     path = lambda name: os.path.join(args.state_dir, name)  # noqa: E731
     archived = _archive_run_files(args.state_dir) if args.restart else None
+    resumed = os.path.exists(path('checkpoint.json'))
     checkpoint = _load_checkpoint(path('checkpoint.json'), args.days, args.workers, args.dry_run, code_digest(args.code_root))
+    # 이어 가면 요약을 앞 실행들과 합친다. 앞 요약이 없거나 그 뒤의 결과 줄이 있으면 요약 없이 끊긴 실행이 있었다는 뜻이다.
+    previous = _read_summary(path('summary.json')) if resumed else None
+    calls_partial = resumed and (previous is None or bool(previous.get('calls_partial')) or
+                                 previous.get('processed') != tally_results(path('results.jsonl'), args.days)['processed'])
+    prev = previous or {}
     progress = open(path('progress.log'), 'a', encoding='utf-8')
 
     def say(line: str) -> None:
@@ -628,17 +653,29 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
 
     _write_retry_dates(path('results.jsonl'), path('retry-dates.txt'))
     say(progress_line())
+    snap, elapsed = calls.snapshot(), time.monotonic() - started
+    counts = tally_results(path('results.jsonl'), args.days)
+    total_calls = {k: (prev.get('calls') or {}).get(k, 0) + snap[k] for k in snap}
+    calls_total = sum(total_calls[k] for k in CALL_KINDS)
+    runs = prev.get('runs', 1) + 1 if resumed else 1
+    total_elapsed = prev.get('elapsed_seconds', 0) + elapsed
+    if resumed:
+        say(f"누적(실행 {runs}회): 처리 {counts['processed']}/{len(args.days)} · 새로 씀 {counts['written']} · "
+            f"이미 있음 {counts['exists']} · 실패 {counts['failed']} · 잠정 {counts['provisional']} · 빅카인즈 {calls_total}회"
+            f"{'(요약 없이 끊긴 앞 실행 몫 빠짐)' if calls_partial else ''} · 경과 {_elapsed(total_elapsed)}")
     if guard.reason:
         say(f'멈춤: {guard.reason}')
-    snap = calls.snapshot()
     _write_json(path('summary.json'), {
         'dry_run': args.dry_run, 'code': _code_version(args.code_root), 'from': args.days[0], 'to': args.days[-1],
-        'targets': len(args.days), 'workers': args.workers, 'processed': done[0],
-        'written': outcomes['written'], 'exists': outcomes['exists'], 'failed': outcomes['failed'],
-        'provisional': outcomes['provisional'], 'writes': store.writes, 'calls': snap,
-        'calls_total': sum(snap[k] for k in CALL_KINDS), 'ranking_discarded': discarded.count,
-        'rankings_unfinished': unfinished_rankings, 'stop_reason': guard.reason,
-        'elapsed_seconds': round(time.monotonic() - started, 1),
+        'targets': len(args.days), 'workers': args.workers, 'processed': counts['processed'],
+        'written': counts['written'], 'exists': counts['exists'], 'failed': counts['failed'],
+        'provisional': counts['provisional'], 'writes': prev.get('writes', 0) + store.writes, 'calls': total_calls,
+        'calls_total': calls_total, 'calls_partial': calls_partial,
+        'ranking_discarded': prev.get('ranking_discarded', 0) + discarded.count,
+        'rankings_unfinished': prev.get('rankings_unfinished', 0) + unfinished_rankings, 'stop_reason': guard.reason,
+        'elapsed_seconds': round(total_elapsed, 1), 'runs': runs,
+        'this_run': {'processed': done[0], 'written': outcomes['written'], 'writes': store.writes,
+                     'calls_total': sum(snap[k] for k in CALL_KINDS), 'elapsed_seconds': round(elapsed, 1)},
         'finished_at': datetime.now(KST).isoformat(timespec='seconds'),
         'table': {k: limits.get(k) for k in ('table', 'billing_mode', 'write_limit', 'read_limit')}, 'service_tag': tag,
     })
@@ -655,6 +692,30 @@ def _last_by_date(path: str) -> Dict[str, dict]:
                     row = json.loads(line)
                     rows[row['date']] = row
     return rows
+
+
+def tally_results(results_path: str, days: List[str]) -> Counter:
+    """results.jsonl 에서 대상 날짜별 결과를 센다(이어 간 실행 전체). processed 는 결과를 남긴 날짜 수. 같은 날 줄이 여럿이면(결과를
+    남긴 뒤 체크포인트 전에 끊겨 다시 한 날 — 두 번째는 앞서 쓴 캐시를 읽어 '이미 있음'이 된다) 한 번이라도 쓴 날은 written."""
+    wanted, final = set(days), {}
+    if os.path.exists(results_path):
+        with open(results_path, encoding='utf-8') as fp:
+            for line in fp:
+                if line.strip():
+                    row = json.loads(line)
+                    if row['date'] in wanted and final.get(row['date']) != 'written':
+                        final[row['date']] = row.get('outcome')
+    counts = Counter(final.values())
+    counts['processed'] = len(final)
+    return counts
+
+
+def _read_summary(path: str) -> Optional[dict]:
+    try:
+        with open(path, encoding='utf-8') as fp:
+            return json.load(fp)
+    except (FileNotFoundError, ValueError):
+        return None
 
 
 def _write_retry_dates(results_path: str, out_path: str) -> None:
