@@ -4,6 +4,7 @@
 실행: cd service/backend && python3 -m pytest tests/test_time_machine_front_unit.py -q
 """
 import json
+import threading
 import time
 from unittest.mock import MagicMock
 
@@ -65,8 +66,33 @@ def _route(post, search, issue=None):
     post.side_effect = answer
 
 
+def _answer(post, days, issue=None, before_search=None, before_ranking=None):
+    """그날 기사 요청은 published_at 시작 날짜로 days[날짜](없으면 0건)를, 이슈 순위는 issue 를 준다.
+    before_* 는 다른 스레드에서 나가는 이슈 순위 요청과 맞추는 데 쓴다(인자는 그 요청의 날짜)."""
+    def answer(url, **kwargs):
+        argument = kwargs['json']['argument']
+        if url == bs.BIGKINDS_ISSUE_URL:
+            if before_ranking:
+                before_ranking(argument['date'])
+            if isinstance(issue, Exception):
+                raise issue
+            return issue or _issue()
+        if before_search:
+            before_search(argument['published_at']['from'])
+        return _resp(days.get(argument['published_at']['from'], []))
+    post.side_effect = answer
+
+
 def _searches(post):
     return [c for c in post.call_args_list if c.args[0] == bs.BIGKINDS_SEARCH_URL]
+
+
+def _rankings(post):
+    return [c for c in post.call_args_list if c.args[0] == bs.BIGKINDS_ISSUE_URL]
+
+
+def _no_direct_post(*args, **kwargs):
+    raise AssertionError('빅카인즈는 bigkinds_search._SESSION 으로만 부른다')
 
 
 def _calendar(no_front=(), until='2026-10-18', unknown=()):
@@ -87,8 +113,14 @@ def env(monkeypatch):
     table = _FakeTable()
     monkeypatch.setattr(tm, '_get_table', lambda: table)
     post = MagicMock(return_value=_resp([]))
-    monkeypatch.setattr(bs.requests, 'post', post)
-    return table, post
+    monkeypatch.setattr(bs._SESSION, 'post', post)
+    monkeypatch.setattr(bs, '_session_last_used', 0.0)
+    monkeypatch.setattr(bs.requests, 'post', _no_direct_post)
+    yield table, post
+    # 함께 부른 이슈 순위 스레드가 끝난 뒤에 가짜 응답을 되돌린다 — 뒤에 남은 스레드가 실제 빅카인즈로 나가지 않게.
+    for thread in threading.enumerate():
+        if thread.name.startswith('bigkinds-issue'):
+            thread.join(2)
 
 
 def _call(**params):
@@ -157,6 +189,23 @@ def test_fetch_issue_clusters_sorts_by_size(env):
     post.return_value = rejected
     with pytest.raises(bs.BigKindsRejected):
         bs.fetch_issue_clusters('2010-05-12')
+
+
+def test_session_is_closed_only_after_idle(env, monkeypatch):
+    _, post = env
+    close = MagicMock()
+    monkeypatch.setattr(bs._SESSION, 'close', close)
+    now = [1000.0]
+    monkeypatch.setattr(bs.time, 'monotonic', lambda: now[0])
+    bs.fetch_issue_clusters('2010-05-12')
+    bs.search_day_docs('2010-05-12')
+    now[0] += 59  # 1분 안쪽의 다음 호출은 남은 연결을 그대로 쓴다
+    bs.search_day_docs('2010-05-12')
+    close.assert_not_called()
+    now[0] += 61  # 오래 쉰 연결은 끊겨 있을 수 있어 풀을 비우고 새로 맺는다
+    bs.search_day_docs('2010-05-12')
+    close.assert_called_once()
+    assert post.call_count == 4 and {c.args[0] for c in post.call_args_list} == {bs.BIGKINDS_ISSUE_URL, bs.BIGKINDS_SEARCH_URL}
 
 
 def test_longest_first_measures_full_body_not_preview(env):
@@ -327,10 +376,75 @@ def test_issue_based_day_is_cached_long(env):
     assert table.puts[0]['expires_at'] - time.time() > 3000 * 86400
 
 
-def test_empty_day_does_not_ask_ranking(env):
+def test_day_docs_and_ranking_run_together(env):
     _, post = env
-    _call(front='1990-01-02')
-    assert all(c.args[0] == bs.BIGKINDS_SEARCH_URL for c in post.call_args_list)
+    asked, seen = threading.Event(), []
+    # 그날 기사 응답이 오기 전에 이슈 순위 요청이 이미 나가 있어야 한다(직렬이면 2초를 기다려도 오지 않는다).
+    _answer(post, {'2010-05-12': [_doc(1, page='')]}, _issue(['n1', 'x']),
+            before_search=lambda day: seen.append(asked.wait(2)), before_ranking=lambda day: asked.set())
+    _, body = _call(front='2010-05-12')
+    assert seen == [True] and body['basis'] == 'issue'
+    assert [a['coverage'] for a in body['articles']] == [2]
+
+
+def test_empty_first_day_discards_ranking_without_waiting(env, caplog):
+    _, post = env
+    asked, hold, first = threading.Event(), threading.Event(), []
+
+    def ranking(day):
+        asked.set()
+        if not first:
+            first.append(day)
+            hold.wait(3)  # 버릴 순위 응답은 늦게 온다 — 응답이 그것을 기다리면 안 된다
+
+    _answer(post, {'2010-05-11': [_doc(1, page='')]}, before_search=lambda day: asked.wait(2), before_ranking=ranking)
+    try:
+        started = time.monotonic()
+        with caplog.at_level('INFO'):
+            _, body = _call(front='2010-05-12')
+        assert time.monotonic() - started < 1
+    finally:
+        hold.set()
+    assert (body['shown_date'], body['reason']) == ('2010-05-11', 'no_paper')
+    assert first == ['2010-05-12'] and caplog.text.count(tm.RANKING_DISCARDED_LOG) == 1
+
+
+def test_slow_ranking_past_budget_is_ranking_failed(env, monkeypatch):
+    table, post = env
+    monkeypatch.setattr(tm, 'FRONT_SEARCH_BUDGET_SECONDS', 1)
+    hold = threading.Event()
+    _answer(post, {'2010-05-12': [_doc(1, page='')]}, _issue(['n1']), before_ranking=lambda day: hold.wait(3))
+    try:
+        status, body = _call(front='2010-05-12')
+    finally:
+        hold.set()
+    # 예산이 다 되면 순위를 더 기다리지 않고, 받은 그날 기사를 본문이 긴 순으로 보여 준 뒤 짧게만 저장한다.
+    assert status == 200 and body['basis'] == 'ranking_failed' and [a['news_id'] for a in body['articles']] == ['n1']
+    assert table.puts[0]['expires_at'] - time.time() <= tm.FRONT_LIVE_FALLBACK_TTL_SECONDS
+
+
+def test_later_walk_days_ask_ranking_after_docs(env):
+    _, post = env
+    _answer(post, {'2010-05-11': [_doc(1, page='')]}, _issue(['n1']))
+    _, body = _call(front='2010-05-12')
+    assert body['shown_date'] == '2010-05-11' and body['basis'] == 'issue'
+    calls = post.call_args_list
+    search_at = next(i for i, c in enumerate(calls) if c.args[0] == bs.BIGKINDS_SEARCH_URL
+                     and c.kwargs['json']['argument']['published_at']['from'] == '2010-05-11')
+    ranking_at = next(i for i, c in enumerate(calls) if c.args[0] == bs.BIGKINDS_ISSUE_URL
+                      and c.kwargs['json']['argument']['date'] == '2010-05-11')
+    assert ranking_at > search_at  # 처음 묻는 날이 아니면 그날 기사를 받은 뒤에만 순위를 묻는다
+
+
+def test_empty_day_asks_ranking_only_on_first_day(env):
+    _, post = env
+    asked = threading.Event()
+    # 첫 날은 순위를 함께 보내(여기서는 나간 것을 확인한 뒤 0건을 준다) 버리고, 그 뒤 빈 날들은 순위를 묻지 않는다.
+    _answer(post, {}, before_search=lambda day: asked.wait(2), before_ranking=lambda day: asked.set())
+    _, body = _call(front='2010-05-12')
+    assert body['kind'] == 'none'
+    assert [c.kwargs['json']['argument']['date'] for c in _rankings(post)] == ['2010-05-12']
+    assert len(_searches(post)) == 9  # 생일 포함 11일 중 휴간 일요일(5.9·5.2) 2일은 묻지 않는다
 
 
 def test_no_page_era_sunday_skips_to_saturday(env):
@@ -344,19 +458,22 @@ def test_no_page_era_sunday_skips_to_saturday(env):
 
 def test_empty_archive_walks_back_then_gives_up(env):
     table, post = env
+    asked = threading.Event()
+    _answer(post, {}, before_search=lambda day: asked.wait(2), before_ranking=lambda day: asked.set())
     _, body = _call(front='1998-07-15')
     assert body == {'date': '1998-07-15', 'date_kind': 'day', 'shown_date': None, 'kind': 'none', 'reason': 'archive_missing', 'basis': None,
                     'articles': [], 'status': 'no_page_info', 'cached': False}
-    assert post.call_count == 9  # 생일 포함 11일 중 휴간 일요일(7.12·7.5) 2일은 묻지 않는다
+    assert len(_searches(post)) == 9  # 생일 포함 11일 중 휴간 일요일(7.12·7.5) 2일은 묻지 않는다
+    assert len(_rankings(post)) == 1  # 첫 날 함께 보낸 순위 1회만 버려진다
     assert [p['news_id'] for p in table.puts] == ['timemachine_frontv2_none_1998-07-15']
     _, again = _call(front='1998-07-15')
-    assert again['cached'] is True and again['kind'] == 'none' and post.call_count == 9
+    assert again['cached'] is True and again['kind'] == 'none' and post.call_count == 10
 
 
 def test_walk_stops_at_archive_start(env):
     _, post = env
     _, body = _call(front='1990-01-03')
-    assert body['kind'] == 'none' and post.call_count == 3  # 1.3·1.2·1.1 — 1989년은 보관본 밖
+    assert body['kind'] == 'none' and len(_searches(post)) == 3  # 1.3·1.2·1.1 — 1989년은 보관본 밖
 
 
 @pytest.mark.parametrize('date, no_front, responses, expected', [

@@ -29,6 +29,7 @@ Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경�
                   | "no_ranking"|"no_match"|"ranking_failed"(본문이 긴 순으로 대신한 까닭). front·none 이면 null.
    - kind=none  : 생일과 그 전 FRONT_LOOKBACK_DAYS 일 동안 보관본에 신문이 없다(reason=archive_missing).
    생일에 신문이 없으면(일요일 휴간·명절·보관본 누락) 하루씩 거슬러 직전 발행일을 보여 주고 reason 에 까닭을 적는다.
+   그날 기사 시기는 처음 빅카인즈에 묻는 날에만 그날 기사와 이슈 순위를 함께 부르고, 기사가 없으면 순위 결과를 버린다.
    응답 로그에는 요청 날짜도 보여 준 날짜도 남기지 않는다.
 
 응답 규약(프론트가 "오류"와 "정말 기사 없음"을 구분하는 기준):
@@ -46,6 +47,7 @@ API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽으며 
 import hashlib
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
@@ -285,18 +287,50 @@ class _Resolved(NamedTuple):
     basis: Optional[str] = None
 
 
-def _day_highlights(day: str, deadline: float) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-    """면 번호가 없는 시기의 그날 기사와 고른 기준. 기사가 없으면 ([], None). 이슈 순위 실패는 본문이 긴 순으로 대신한다."""
-    docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
-    if not docs:
-        return [], None
-    try:
-        # 시간이 다 됐으면(_remaining 이 raise) 이미 받은 그날 기사를 버리지 않고 본문이 긴 순으로 보여 준다.
-        clusters = bigkinds_search.fetch_issue_clusters(day, timeout=_remaining(deadline))
-        failed = False
-    except Exception as e:  # noqa: BLE001 — 이슈 순위는 고르는 기준일 뿐이라 실패해도 그날 기사는 보여 준다
-        logger.warning('빅카인즈 이슈 순위 조회 실패, 본문이 긴 순으로 대신: %s', type(e).__name__)
-        clusters, failed = [], True
+# 그날 기사와 함께 부른 이슈 순위를 그날 기사가 없어 버렸을 때 남기는 줄(날짜 없음). 늘어난 빅카인즈 호출을 로그·미리 채우기 스크립트가 센다.
+RANKING_DISCARDED_LOG = '그날 기사가 없어 함께 부른 이슈 순위를 버림'
+
+
+def _ranking_failed(e: Exception) -> Tuple[List[List[str]], bool]:
+    # 이슈 순위는 고르는 기준일 뿐이라 실패해도 그날 기사는 보여 준다.
+    logger.warning('빅카인즈 이슈 순위 조회 실패, 본문이 긴 순으로 대신: %s', type(e).__name__)
+    return [], True
+
+
+def _day_highlights(day: str, deadline: float, parallel: bool) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """면 번호가 없는 시기의 그날 기사와 고른 기준. 기사가 없으면 ([], None). 이슈 순위 실패는 본문이 긴 순으로 대신한다.
+
+    parallel 이면 이슈 순위를 다른 스레드로 먼저 보내고 그날 기사를 받는다 — 두 요청의 제한 시간이 모두 남은 예산 이하라
+    직렬(합)보다 짧은 쪽(최대값)에서 끝난다. 그날 기사가 없으면 순위는 기다리지 않고 버린다(그만큼 빅카인즈 호출이 하나 는다).
+    """
+    if not parallel:
+        docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
+        if not docs:
+            return [], None
+        try:
+            # 시간이 다 됐으면(_remaining 이 raise) 이미 받은 그날 기사를 버리지 않고 본문이 긴 순으로 보여 준다.
+            clusters, failed = bigkinds_search.fetch_issue_clusters(day, timeout=_remaining(deadline)), False
+        except Exception as e:  # noqa: BLE001
+            clusters, failed = _ranking_failed(e)
+    else:
+        bigkinds_search.warm_up()  # 두 스레드가 처음 SSM 클라이언트를 함께 만들지 않게 키를 먼저 읽어 둔다
+        # 요청마다 새 풀 — 얼었던 컨테이너에 남은 순위 요청이 다음 요청의 자리를 막지 않게 모듈 수준 풀을 쓰지 않는다.
+        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='bigkinds-issue')
+        try:
+            ranking = pool.submit(bigkinds_search.fetch_issue_clusters, day, timeout=_remaining(deadline))
+            docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
+            if not docs:
+                if not ranking.cancel():  # 아직 보내지 않았으면 취소돼 호출이 늘지 않는다
+                    logger.info(RANKING_DISCARDED_LOG)
+                return [], None
+            try:
+                # 남은 예산만 기다린다. 시간이 다 됐거나 순위 조회가 실패하면 받은 그날 기사를 본문이 긴 순으로 보여 준다.
+                clusters, failed = ranking.result(timeout=_remaining(deadline)), False
+            except Exception as e:  # noqa: BLE001
+                clusters, failed = _ranking_failed(e)
+        finally:
+            # 응답은 남은 순위 요청을 기다리지 않는다. 그 요청은 자기 제한 시간 안에 끝나고 결과는 버려진다.
+            pool.shutdown(wait=False, cancel_futures=True)
     articles, basis = bigkinds_search.pick_day_articles(docs, clusters, FRONT_DAY_ARTICLES)
     return articles, (bigkinds_search.DAY_BASIS_RANKING_FAILED if failed else basis)
 
@@ -313,6 +347,9 @@ def _resolve_front_page(date: str) -> _Resolved:
     deadline = time.monotonic() + FRONT_SEARCH_BUDGET_SECONDS
     birthday = datetime.strptime(date, DATE_FORMAT)
     live_skip = False
+    # 빅카인즈에 이미 물었는가. 그날 기사와 이슈 순위는 처음 묻는 날에만 함께 부른다 — 그 뒤에 묻는 날은 앞에서 빈 날이 나온 경우라
+    # 다시 비어 있을 수 있고(예: 1998-01~08 보관본 공백), 그때마다 순위 요청을 버리면 호출만 는다.
+    asked = False
     for offset in range(FRONT_LOOKBACK_DAYS + 1):
         day = (birthday - timedelta(days=offset)).strftime(DATE_FORMAT)
         if day < BIGKINDS_MIN_DATE:
@@ -321,7 +358,8 @@ def _resolve_front_page(date: str) -> _Resolved:
             continue
         match = _front_page_match(day)
         if match is None:
-            articles, basis = _day_highlights(day, deadline)
+            articles, basis = _day_highlights(day, deadline, parallel=not asked)
+            asked = True
             if articles:
                 return _Resolved(day, KIND_DAY, articles,
                                  live_skip or basis == bigkinds_search.DAY_BASIS_RANKING_FAILED, basis)
@@ -330,10 +368,13 @@ def _resolve_front_page(date: str) -> _Resolved:
         known = calendar.known_front(day)
         if known is False:
             continue
-        if known is None and offset > 0 and bigkinds_search.count_front_page(day, match, timeout=_remaining(deadline)) == 0:
-            live_skip = True
-            continue
+        if known is None and offset > 0:
+            asked = True
+            if bigkinds_search.count_front_page(day, match, timeout=_remaining(deadline)) == 0:
+                live_skip = True
+                continue
         articles = bigkinds_search.search_front_page(day, match, timeout=_remaining(deadline))
+        asked = True
         if articles:
             return _Resolved(day, KIND_FRONT, articles, live_skip)
         live_skip = True
