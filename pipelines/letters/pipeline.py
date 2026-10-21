@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 from bedrock_client import call_text
+from text_utils import fix_hangul_typos
 
 from bedrock_models import profile_arn  # noqa: E402
 MODEL = profile_arn("letters_sonnet5")  # lens-letters-sonnet-5 (2026-10-11 Opus 5 → Sonnet 5, 기사 5건 시험: 파싱·수치 동일, 분량 소폭 짧음)
@@ -31,6 +32,9 @@ def run_article(name: str, article_path: str, output_root: Path = Path(".")) -> 
     # 사례가 있어, 목표 분량(2000~2800자) 답변까지 담도록 max_tokens를 크게 둔다.
     # 결과물 종류는 코드가 아니라 저장된 letters 지침(system)이 정한다.
     output = call_text(guide, f"[입력 기사]\n{article}", model=MODEL, max_tokens=12000)
+    output, rare = fix_hangul_typos(output)  # 남은 후보는 publishing._make_letter가 재생성으로 처리
+    if rare:
+        print(f"{tag} 오타 후보 음절: {''.join(rare)}")
     out_path.write_text(output, encoding="utf-8")
 
     print(f"{tag} 완료 — {out_path}")

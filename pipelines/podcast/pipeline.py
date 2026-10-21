@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt
 import podcast_voice
 from bedrock_client import call_text
-from text_utils import strip_code_fence
+from text_utils import fix_hangul_typos, strip_code_fence
 
 from bedrock_models import profile_arn  # noqa: E402
 # 전용 프로파일 lens-podcast-sonnet-5(이전 lens-podcast-opus-5). admin/backend/routes/prompts.py의
@@ -41,6 +41,10 @@ def run_article(
         script = call_text(
             guide, f"[입력 기사]\n{article}", model=_SCRIPT_MODEL
         )
+        # 음성 합성 전에 고쳐야 mp3와 접근성 텍스트(transcript)가 같이 맞는다
+        script, rare = fix_hangul_typos(script)
+        if rare:
+            print(f"{tag} 대본 오타 후보 음절(사람 확인 필요): {''.join(rare)}")
         script_path.write_text(script, encoding="utf-8")
 
     mp3_path = out / "팟캐스트.mp3"
