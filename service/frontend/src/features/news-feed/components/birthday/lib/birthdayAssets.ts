@@ -30,7 +30,7 @@ export const FX_START = ASSET_SERIES_FROM.fx;
 export type AssetCellId = 'cash' | 'deposit' | 'usd' | 'apartment' | 'gold';
 export const ASSET_CELL_ORDER: readonly AssetCellId[] = ['cash', 'deposit', 'usd', 'apartment', 'gold'];
 
-/** 기준일 — 스무 살 생일이 지났으면 그날, 아직이면 태어난 날. */
+/** 기준일 — 서른 살 생일이 지났으면(당일 포함) 스무 살 생일, 아직이면 태어난 날. */
 export interface AssetBase { date: string; kind: 'twentieth' | 'birthday' }
 
 export interface AssetCell {
@@ -52,9 +52,13 @@ export interface AssetCell {
 
 type CellOf = (base: AssetBase, file: AssetYearFile, latest: AssetLatest) => AssetCell | null;
 
+/**
+ * 서른 살 생일부터 스무 살 생일 기준이라 비교 기간이 늘 10년 이상(그 전은 태어난 뒤 전체)이다.
+ * 스무 살 생일 기준이면 21살은 1년 치만 비교돼서 바꿨다(2026-10-21). 2월 29일생은 anniversary 규칙대로 그해 말일.
+ * 연도만 공유된 결과는 date가 그해 1월 1일이라 서른 살이 되는 해의 1월 1일부터 스무 살이 된 해의 1월 1일 기준이다.
+ */
 export function assetBase(date: BirthdayDate, today = kstTodayStr()): AssetBase {
-  const twentieth = anniversary(date, 20);
-  return twentieth <= today ? { date: twentieth, kind: 'twentieth' } : { date: date.iso, kind: 'birthday' };
+  return anniversary(date, 30) <= today ? { date: anniversary(date, 20), kind: 'twentieth' } : { date: date.iso, kind: 'birthday' };
 }
 
 /** 기준일이 공식 환율 기록 시작(1964-05-04) 이후인가. 아니면 칸도 파일 요청도 없다. */

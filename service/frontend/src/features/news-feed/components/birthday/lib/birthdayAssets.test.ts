@@ -30,14 +30,25 @@ const file2010: AssetYearFile = {
   usdkrw: { daily: [['2010-05-14', 1000], ['2010-05-17', 1010]], monthly: [['2010-05', 1005]] }, apartment: [['2010-05', 40]],
 };
 
-test('기준일: 스무 살 생일이 지났으면(당일 포함) 그날, 아직이면 태어난 날', () => {
-  expect(assetBase(birth('1990-05-15'), TODAY)).toEqual({ date: '2010-05-15', kind: 'twentieth' });
+test('기준일: 서른 살 생일이 지났으면(당일 포함) 스무 살 생일, 아직이면 태어난 날', () => {
+  // 스무 살 전·21살·29살은 태어난 날 — 비교 기간이 1년 치로 줄지 않는다.
   expect(assetBase(birth('2010-08-20'), TODAY)).toEqual({ date: '2010-08-20', kind: 'birthday' });
-  expect(assetBase(birth('2006-10-21'), TODAY)).toEqual({ date: '2026-10-21', kind: 'twentieth' });
-  expect(assetBase(birth('2006-10-22'), TODAY)).toEqual({ date: '2006-10-22', kind: 'birthday' });
-  // 연도 공유는 YYYY-01-01이 들어온다.
+  expect(assetBase(birth('2005-03-10'), TODAY)).toEqual({ date: '2005-03-10', kind: 'birthday' });
+  expect(assetBase(birth('2006-10-21'), TODAY)).toEqual({ date: '2006-10-21', kind: 'birthday' });
+  expect(assetBase(birth('1997-01-15'), TODAY)).toEqual({ date: '1997-01-15', kind: 'birthday' });
+  // 서른 살 생일 하루 전은 태어난 날, 당일부터 스무 살 생일.
+  expect(assetBase(birth('1996-10-22'), TODAY)).toEqual({ date: '1996-10-22', kind: 'birthday' });
+  expect(assetBase(birth('1996-10-21'), TODAY)).toEqual({ date: '2016-10-21', kind: 'twentieth' });
+  expect(assetBase(birth('1996-05-01'), TODAY)).toEqual({ date: '2016-05-01', kind: 'twentieth' });
+  expect(assetBase(birth('1990-05-15'), TODAY)).toEqual({ date: '2010-05-15', kind: 'twentieth' });
+  // 2월 29일생: 서른 살 생일은 anniversary 규칙대로 2월 28일, 스무 살 생일은 윤년이라 2월 29일.
+  expect(assetBase(birth('1996-02-29'), '2026-02-27')).toEqual({ date: '1996-02-29', kind: 'birthday' });
+  expect(assetBase(birth('1996-02-29'), '2026-02-28')).toEqual({ date: '2016-02-29', kind: 'twentieth' });
+  expect(assetBase(birth('2004-02-29'), TODAY)).toEqual({ date: '2004-02-29', kind: 'birthday' });
+  // 연도 공유는 YYYY-01-01이 들어온다 — 서른 살이 되는 해의 1월 1일부터 스무 살이 된 해의 1월 1일.
+  expect(assetBase(birth('1997-01-01'), TODAY)).toEqual({ date: '1997-01-01', kind: 'birthday' });
+  expect(assetBase(birth('1996-01-01'), TODAY)).toEqual({ date: '2016-01-01', kind: 'twentieth' });
   expect(assetBase(birth('1990-01-01'), TODAY)).toEqual({ date: '2010-01-01', kind: 'twentieth' });
-  expect(assetBase(birth('2004-02-29'), TODAY)).toEqual({ date: '2024-02-29', kind: 'twentieth' });
 });
 
 test('기준일이 1964-05-04보다 앞서면 칸이 없다', () => {
