@@ -319,7 +319,7 @@ def _own_paper_from_cache(day: str) -> Optional[_Resolved]:
     return _Resolved(day, kind, articles, False, basis)
 
 
-# 그날 기사와 함께 부른 이슈 순위를 그날 기사가 없어 버렸을 때 남기는 줄(날짜 없음). 늘어난 빅카인즈 호출을 로그·미리 채우기 스크립트가 센다.
+# 그날 기사와 함께 부른 이슈 순위를 그날 기사가 없어 버렸을 때 남기는 줄(날짜 없음). 늘어난 빅카인즈 호출을 로그로 센다.
 RANKING_DISCARDED_LOG = '그날 기사가 없어 함께 부른 이슈 순위를 버림'
 # 이 날짜까지(1990~1993)는 이슈 순위에 서울경제 기사가 묶이지 않아 순위를 묻지 않고 no_match(본문이 긴 순)로 낸다.
 # 2026-10-21 실호출 확인: 1990-01-09·05-15·10-17, 1991-02-26·07-10·11-21, 1992-03-17·06-24·10-08,
@@ -337,7 +337,7 @@ def _ranking_failed(e: Exception) -> Tuple[List[List[str]], bool]:
 # 그날 기사와 함께 다른 스레드로 보내는 이슈 순위 요청의 자리. 순위 요청이 끝나거나 취소돼야 돌려받는다 — 그날 기사가 없어 버렸거나
 # 예산을 넘겨 기다리지 않은 순위 요청도 끝날 때까지 자리를 쥔다. 자리가 없으면 그날 기사부터 묻고 기사가 있을 때만 순위를 묻는다(직렬).
 # 그래서 남은 순위 요청이 날짜마다 쌓이지 않는다. Lambda 컨테이너는 요청을 하나씩 받으므로 1 — 앞 요청에서 버린 순위가 아직 돌면
-# 이번 요청은 직렬로 간다. 미리 채우기 스크립트는 worker 수만큼 자리를 둔 것으로 바꿔 끼우고, 끝내기 전에 모두 돌려받는다.
+# 이번 요청은 직렬로 간다.
 _ranking_slots = threading.BoundedSemaphore(1)
 
 
@@ -345,7 +345,7 @@ def _send_ranking(day: str, deadline: float) -> Optional[Future]:
     """이슈 순위를 다른 스레드로 먼저 보낸다. 자리가 없으면 보내지 않고 None."""
     bigkinds_search.warm_up()  # 두 스레드가 처음 SSM 클라이언트를 함께 만들지 않게 키를 먼저 읽어 둔다
     timeout = _remaining(deadline)
-    slots = _ranking_slots  # 빌린 곳에 돌려준다(스크립트가 그 사이 바꿔 끼워도)
+    slots = _ranking_slots  # 빌린 곳에 돌려준다(그 사이 모듈 값이 바뀌어도)
     if not slots.acquire(blocking=False):
         return None
     # 요청마다 새 풀 — 얼었던 컨테이너에 남은 순위 요청이 다음 요청의 스레드를 막지 않게 모듈 수준 풀을 쓰지 않는다.
