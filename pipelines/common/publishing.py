@@ -98,10 +98,16 @@ def sanitize_video_script(script_path: Path) -> int:
     """영상 각본의 자막 배열에서 빈 조각({"text": ""})을 걸러낸다.
     모델이 "강조" 컷의 caption을 빈 text 조각으로 시작하는 배열로 내는 경우가 있고,
     렌더러(Remotion 스키마)는 text 최소 1자를 요구해 렌더 전 검증에서 거부한다.
-    빈 조각만 빼면 의미는 그대로다. 걸러낸 조각 수를 돌려준다."""
+    빈 조각만 빼면 의미는 그대로다. 걸러낸 조각 수를 돌려준다.
+    받침 오타(text_utils.fix_hangul_typos)도 여기서 고친다 — 렌더 전이라 자막·음성·transcript가 같이 맞는다."""
     import json  # noqa: lazy
+    from text_utils import fix_hangul_typos  # noqa: lazy
 
-    data = json.loads(script_path.read_text(encoding="utf-8"))
+    raw = script_path.read_text(encoding="utf-8")
+    fixed, rare = fix_hangul_typos(raw)
+    if rare:
+        print(f"[video] {script_path.parent.name} 각본 오타 후보 음절(사람 확인 필요): {''.join(rare)}")
+    data = json.loads(fixed)
     removed = 0
     for cut in data.get("cuts", []):
         cap = cut.get("caption")
@@ -112,7 +118,7 @@ def sanitize_video_script(script_path: Path) -> int:
                 cut["caption"] = kept
             else:
                 cut["caption"] = cut.get("narration") or "—"
-    if removed:
+    if removed or fixed != raw:
         script_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return removed
 
@@ -262,19 +268,28 @@ def publish_article(
     def _make_letter() -> tuple[str, list[str]]:
         """레터 생성 + 본문 품질 검사. 생성 응답이 잘리거나 파싱에서 본문이 유실되면 리드 한 줄만
         있는 레터가 발행되므로, 문단이 적으면 최대 MAX_LETTER_RETRIES번 재생성하고 그래도 부족하면
-        예외로 발행을 보류한다(seen 표시가 안 되어 다음 회차에 다시 후보가 된다). 정상 글은 10문단 안팎이다."""
+        예외로 발행을 보류한다(seen 표시가 안 되어 다음 회차에 다시 후보가 된다). 정상 글은 10문단 안팎이다.
+        표로 못 고친 오타 후보 음절(text_utils.fix_hangul_typos)이 남아도 재생성하되, 끝까지 남으면 로그만 남기고 발행한다."""
+        from text_utils import find_rare_hangul  # noqa: lazy
+
         letters_path = letters_mod.run_article(name, str(article_path), out_dir)
         letters_raw = letters_path.read_text(encoding="utf-8")
         paragraphs = parse_letters(letters_raw)
+        rare = find_rare_hangul(letters_raw)
         for _attempt in range(1, MAX_LETTER_RETRIES + 1):
-            if len(paragraphs) >= MIN_LETTER_PARAGRAPHS:
+            if len(paragraphs) >= MIN_LETTER_PARAGRAPHS and not rare:
                 break
-            print(f"[{log_prefix}] {name} 레터 본문 {len(paragraphs)}문단(최소 {MIN_LETTER_PARAGRAPHS}) — 재생성 {_attempt}/{MAX_LETTER_RETRIES}")
+            reason = (f"본문 {len(paragraphs)}문단(최소 {MIN_LETTER_PARAGRAPHS})" if len(paragraphs) < MIN_LETTER_PARAGRAPHS
+                      else f"오타 후보 음절 {''.join(rare)}")
+            print(f"[{log_prefix}] {name} 레터 {reason} — 재생성 {_attempt}/{MAX_LETTER_RETRIES}")
             letters_path = letters_mod.run_article(name, str(article_path), out_dir)
             letters_raw = letters_path.read_text(encoding="utf-8")
             paragraphs = parse_letters(letters_raw)
+            rare = find_rare_hangul(letters_raw)
         if len(paragraphs) < MIN_LETTER_PARAGRAPHS:
             raise ValueError(f"레터 본문 {len(paragraphs)}문단 — 최소 {MIN_LETTER_PARAGRAPHS}문단 필요, 발행 보류")
+        if rare:
+            print(f"[{log_prefix}] {name} 레터 오타 후보 음절이 남은 채 발행(사람 확인 필요): {''.join(rare)}")
         return letters_raw, paragraphs
 
     def _make_podcast() -> Path:

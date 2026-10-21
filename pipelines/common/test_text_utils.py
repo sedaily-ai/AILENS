@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from text_utils import extract_fact_ids, strip_code_fence  # noqa: E402
+from text_utils import extract_fact_ids, find_rare_hangul, fix_hangul_typos, strip_code_fence  # noqa: E402
 
 _PIPELINES = Path(__file__).resolve().parent.parent
 
@@ -74,3 +74,24 @@ def test_parse_letters_does_not_publish_trailer():
         joined = " ".join(paragraphs)
         assert "FACT_IDS" not in joined, f"{rel}: 트레일러가 본문으로 발행됨"
         assert "본문 문단입니다." in joined, f"{rel}: 본문이 사라짐"
+
+
+# ── 받침 오타(Sonnet 5 전환 뒤 발행본에서 실제로 나온 사례) ──
+
+def test_known_typos_fixed():
+    text = "한 번쯜 보셨나요? 언제쯘 풀릴까요. 한 번쯌 들어보셨나요? 정면으로 부딫혀요."
+    fixed, rare = fix_hangul_typos(text)
+    assert fixed == "한 번쯤 보셨나요? 언제쯤 풀릴까요. 한 번쯤 들어보셨나요? 정면으로 부딪혀요."
+    assert rare == []
+
+
+def test_unknown_typo_reported_not_changed():
+    text = "알려졐어요. 이 여섷 곳은 더 심각합니다."
+    fixed, rare = fix_hangul_typos(text)
+    assert fixed == text
+    assert rare == ["졐", "섷"]
+
+
+def test_common_text_has_no_rare_hangul():
+    text = "퀭한 눈, 갉아먹다, 읊조리다, 뾰족한, 쨩, 휑하다. 1500억 달러 MASGA·R&D 🪖"
+    assert find_rare_hangul(text) == []
