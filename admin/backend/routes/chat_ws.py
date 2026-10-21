@@ -49,6 +49,7 @@ from json_extract import extract_json_object  # pipelines/common/ — deploy 시
 import podcast_voice  # pipelines/common/ — 배포 시 zip 루트에 복사됨(webtoon_image.py와 동일 패턴)
 import video_settings  # pipelines/common/ — 위와 동일 패턴, "성우 미리듣기"(2026-09-24)
 import elevenlabs_tts  # pipelines/common/ — 위와 동일 패턴, CMS 실험 전용(2026-09-24)
+import google_tts  # pipelines/common/ — 위와 동일 패턴, 영상·PRISM 탭 Google 성우(2026-10-22)
 
 logger = logging.getLogger(__name__)
 
@@ -680,7 +681,11 @@ def _run_synthesize_audio_flow(
     URL, 발행 미디어와 구분되는 별도 lab 접두사)으로 S3에 올려 URL을
     돌려준다. admin Lambda 역할의 polly:SynthesizeSpeech 권한은
     2026-09-22 사용자 승인 후 추가 완료(AdminPodcastVoicePolly),
-    secretsmanager:GetSecretValue(ai-labs/elevenlabs)는 2026-09-24 추가."""
+    secretsmanager:GetSecretValue(ai-labs/elevenlabs)는 2026-09-24 추가.
+
+    provider="google"(2026-10-22) — 영상·PRISM 탭의 Google 성우. voice_id가 Google 성우 이름이다.
+    Google은 WAV를 돌려주므로 .wav·audio/wav로 올린다(브라우저가 그대로 재생). 권한은
+    secretsmanager:GetSecretValue(ai-labs/google-tts)."""
     if not text.strip():
         push({"type": "audio_error", "slot_id": slot_id, "message": "합성할 텍스트가 없습니다."})
         return
@@ -694,6 +699,8 @@ def _run_synthesize_audio_flow(
         ps = polly_settings or {}
         if provider == "elevenlabs":
             audio = elevenlabs_tts.synthesize(text, voice_id, model_id, voice_settings)
+        elif provider == "google":
+            audio = google_tts.synthesize(text, voice_id)
         elif format in ("video", "prism"):
             # PRISM 탭(format="prism")은 PRISM 음성 설정(prism-settings, 영어 성우)으로 합성한다.
             category = video_settings.PRISM_SETTINGS_CATEGORY if format == "prism" else video_settings.SETTINGS_CATEGORY
@@ -710,9 +717,13 @@ def _run_synthesize_audio_flow(
         push({"type": "audio_error", "slot_id": slot_id, "message": f"음성 합성 실패: {e}"})
         return
     job_id = uuid.uuid4().hex[:16]
-    key = f"media/{format}-lab/{job_id}.mp3"
+    # Google(또는 발행 provider가 google인 video_settings.synthesize())은 WAV를 돌려준다.
+    is_wav = audio[:4] == b"RIFF"
+    key = f"media/{format}-lab/{job_id}.{'wav' if is_wav else 'mp3'}"
     try:
-        webtoon_jobs.s3().put_object(Bucket=webtoon_jobs.bucket(), Key=key, Body=audio, ContentType="audio/mpeg")
+        webtoon_jobs.s3().put_object(
+            Bucket=webtoon_jobs.bucket(), Key=key, Body=audio, ContentType="audio/wav" if is_wav else "audio/mpeg"
+        )
     except Exception as e:  # noqa: BLE001 — 업로드 실패도 사용자에게 알림
         logger.exception("음성 미리듣기 S3 업로드 실패")
         push({"type": "audio_error", "slot_id": slot_id, "message": f"업로드 실패: {e}"})
@@ -888,6 +899,9 @@ def _run_render_video_flow(
             "elevenlabs_model": model_id,
             "elevenlabs_voice_settings": voice_settings or {},
         }
+    elif provider == "google":
+        # Polly 성우는 발행 설정 그대로 둔다 — Google이 실패한 컷을 그 성우로 대신 읽는다(tts.ts).
+        settings_override = {"provider": "google", "google_voice": voice_id}
     elif polly_settings:
         settings_override = {
             "provider": "polly",

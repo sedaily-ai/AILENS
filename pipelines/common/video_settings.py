@@ -7,7 +7,7 @@ podcast_voice.py와 같으며(Polly 한국어 보이스 제약, SSML <prosody> �
 render.ts의 `--format vertical|horizontal`이다.
 
 실제 영상 TTS는 Node(pipelines/video/src/lib/tts.ts)가 수행하므로, get_render_env()가 설정을
-`npm run render` 서브프로세스의 환경변수(TTS_*/ELEVENLABS_*)로 변환한다. render_from_script.py와
+`npm run render` 서브프로세스의 환경변수(TTS_*/ELEVENLABS_*/GOOGLE_TTS_*)로 변환한다. render_from_script.py와
 publishing.py::generate_video()가 이 함수 하나를 공유해 환경변수 조립이 어긋나지 않게 한다.
 """
 import os
@@ -21,13 +21,15 @@ import boto3
 _DOC_HEADINGS = (
     "PROVIDER", "VOICE", "ENGINE", "FORMAT", "RATE", "VOLUME", "ELEVENLABS_VOICE", "ELEVENLABS_MODEL",
     "ELEVENLABS_STABILITY", "ELEVENLABS_SIMILARITY_BOOST", "ELEVENLABS_STYLE", "ELEVENLABS_SPEED", "ELEVENLABS_SPEAKER_BOOST",
+    "GOOGLE_VOICE",
 )
 _DOC_HEADING_RE = re.compile(
     r"^##\s+(PROVIDER|VOICE|ENGINE|FORMAT|RATE|VOLUME|ELEVENLABS_VOICE|ELEVENLABS_MODEL|"
-    r"ELEVENLABS_STABILITY|ELEVENLABS_SIMILARITY_BOOST|ELEVENLABS_STYLE|ELEVENLABS_SPEED|ELEVENLABS_SPEAKER_BOOST)\s*$"
+    r"ELEVENLABS_STABILITY|ELEVENLABS_SIMILARITY_BOOST|ELEVENLABS_STYLE|ELEVENLABS_SPEED|ELEVENLABS_SPEAKER_BOOST|GOOGLE_VOICE)\s*$"
 )
 
-_VALID_PROVIDERS = ("polly", "elevenlabs")
+# google(2026-10-22) — CMS 영상·PRISM 탭은 Polly/Google만 보여 준다(ElevenLabs는 화면에서 숨김, 코드는 유지).
+_VALID_PROVIDERS = ("polly", "elevenlabs", "google")
 _DEFAULT_PROVIDER = "polly"  # 설정이 없으면 Polly
 
 # 실제 AWS 지원 조합(podcast_voice.py::_VOICE_ENGINE_OPTIONS와 동일).
@@ -101,6 +103,7 @@ def serialize_prompt_doc(
     elevenlabs_voice: str = "", elevenlabs_model: str = "",
     elevenlabs_stability: str = "", elevenlabs_similarity_boost: str = "",
     elevenlabs_style: str = "", elevenlabs_speed: str = "", elevenlabs_speaker_boost: str = "",
+    google_voice: str = "",
 ) -> str:
     """DDB에 저장할 content 문자열. parse_prompt_doc의 역함수."""
     parts = {
@@ -117,15 +120,18 @@ def serialize_prompt_doc(
         "ELEVENLABS_STYLE": elevenlabs_style.strip(),
         "ELEVENLABS_SPEED": elevenlabs_speed.strip(),
         "ELEVENLABS_SPEAKER_BOOST": elevenlabs_speaker_boost.strip(),
+        "GOOGLE_VOICE": google_voice.strip(),
     }
     return "\n\n".join(f"## {h}\n{parts[h]}" for h in _DOC_HEADINGS)
 
 
 def parse_prompt_doc(content: str, category: str = SETTINGS_CATEGORY) -> dict:
     """content → {"provider","voice","engine","format",
-    "elevenlabs_voice","elevenlabs_model","elevenlabs_voice_settings"}.
+    "elevenlabs_voice","elevenlabs_model","elevenlabs_voice_settings","google_voice"}.
     값이 없어도 예외 없이 빈 값으로 채우며 기본값은 호출부가 적용한다.
     VOICE는 그 카테고리의 성우 목록에 있을 때만 받는다(PRISM 문서에 Seoyeon이 있으면 빈 값)."""
+    import google_tts  # pipelines/common/ 내 sibling — flat import(admin)/같은 디렉터리(ECS)
+
     voices, _ = _profile(category)
     buckets: dict[str, list[str]] = {h: [] for h in _DOC_HEADINGS}
     current: str | None = None
@@ -168,6 +174,7 @@ def parse_prompt_doc(content: str, category: str = SETTINGS_CATEGORY) -> dict:
         "elevenlabs_voice": values["ELEVENLABS_VOICE"],
         "elevenlabs_model": values["ELEVENLABS_MODEL"],
         "elevenlabs_voice_settings": voice_settings,
+        "google_voice": values["GOOGLE_VOICE"] if values["GOOGLE_VOICE"] in google_tts.VOICE_IDS else "",
     }
 
 
@@ -187,7 +194,7 @@ def _load_prompt_doc(category: str = SETTINGS_CATEGORY) -> dict:
         )
         return {
             "provider": "", "voice": "", "engine": "", "format": "", "rate": "", "volume": "",
-            "elevenlabs_voice": "", "elevenlabs_model": "", "elevenlabs_voice_settings": {},
+            "elevenlabs_voice": "", "elevenlabs_model": "", "elevenlabs_voice_settings": {}, "google_voice": "",
         }
 
 
@@ -196,7 +203,7 @@ def get_render_settings(override: dict | None = None, category: str = SETTINGS_C
     캐시 없이 매번 조회한다(CMS에서 저장하면 재배포 없이 다음 렌더부터 반영).
 
     반환: provider, voice, engine, format, rate, volume, elevenlabs_voice, elevenlabs_model,
-    elevenlabs_voice_settings. 마지막 항목 외에는 항상 채워진 값이며, voice_settings의 빠진
+    elevenlabs_voice_settings, google_voice. 마지막 항목 외에는 항상 채워진 값이며, voice_settings의 빠진
     키는 tts.ts가 자기 기본값으로 채운다. 환경변수 형태가 필요하면 get_render_env()를 쓴다.
 
     override는 None이 아닌 키만 발행값 위에 덮어쓴다. CMS 영상 탭 카드가 "성우 미리듣기"에서
@@ -219,6 +226,7 @@ def get_render_settings(override: dict | None = None, category: str = SETTINGS_C
         "elevenlabs_voice": doc["elevenlabs_voice"],
         "elevenlabs_model": doc["elevenlabs_model"],
         "elevenlabs_voice_settings": doc["elevenlabs_voice_settings"],
+        "google_voice": doc["google_voice"],
     }
     if override:
         settings.update({k: v for k, v in override.items() if v is not None})
@@ -235,6 +243,10 @@ def get_render_env(override: dict | None = None, category: str = SETTINGS_CATEGO
     넘긴다(tts.ts는 AWS SDK 없이 헤더에 그대로 사용). FORMAT은 render.ts가 --format 인자로
     따로 받으므로 넣지 않는다. voice_settings 5개는 저장된 키만 넘기고, 없는 키는 tts.ts가
     기본값·범위 클램프를 적용한다.
+
+    provider가 "google"이면 GOOGLE_TTS_VOICE·GOOGLE_TTS_API_KEY를 넘긴다. Polly 성우(TTS_VOICE_ID 등)도
+    그대로 넘기는 이유는 tts.ts가 Google 합성에 실패한 컷을 Polly로 대신 읽기 때문이다. 키를 못 읽어도
+    (권한 누락 등) 렌더를 막지 않고 빈 키로 넘겨 tts.ts가 Polly로 대신하게 한다.
     """
     settings = get_render_settings(override, category)
     env = {
@@ -262,6 +274,16 @@ def get_render_env(override: dict | None = None, category: str = SETTINGS_CATEGO
             env["ELEVENLABS_SPEED"] = str(vs["speed"])
         if "use_speaker_boost" in vs:
             env["ELEVENLABS_SPEAKER_BOOST"] = "true" if vs["use_speaker_boost"] else "false"
+    elif settings["provider"] == "google":
+        import google_tts  # pipelines/common/ 내 sibling — flat import(admin)/같은 디렉터리(ECS)
+
+        env["GOOGLE_TTS_VOICE"] = settings["google_voice"] or google_tts.DEFAULT_VOICE
+        env["GOOGLE_TTS_MODEL"] = google_tts.MODEL_ID
+        try:
+            env["GOOGLE_TTS_API_KEY"] = google_tts.get_api_key()
+        except Exception as e:  # noqa: BLE001 — 키를 못 읽어도 영상은 Polly로 나가야 함
+            print(f"[video_settings] Google TTS 키 조회 실패({type(e).__name__}: {e}) — Polly로 대신 읽음")
+            env["GOOGLE_TTS_API_KEY"] = ""
     return env
 
 
@@ -295,7 +317,7 @@ def synthesize(
     text: str, voice: str | None = None, engine: str | None = None,
     rate: str | None = None, volume: str | None = None, category: str = SETTINGS_CATEGORY,
 ) -> bytes:
-    """text → mp3 bytes. CMS "성우 미리듣기"(admin/backend/routes/chat_ws.py) 전용이다.
+    """text → mp3 bytes(발행 provider가 google이면 WAV bytes). CMS "성우 미리듣기"(admin/backend/routes/chat_ws.py) 전용이다.
 
     Polly 경로는 실제 렌더(tts.ts)와 같은 SSML <prosody> 방식으로 호출해 미리듣기가 렌더 결과와
     같은 소리를 내게 한다. voice/engine을 명시하면(CMS "Polly" 카드의 일회성 실험) 발행 설정의
@@ -322,6 +344,10 @@ def synthesize(
             text, settings["elevenlabs_voice"], settings["elevenlabs_model"],
             voice_settings=settings["elevenlabs_voice_settings"],
         )
+    if settings["provider"] == "google":
+        import google_tts  # pipelines/common/ 내 sibling — flat import(admin)/같은 디렉터리(ECS)
+
+        return google_tts.synthesize(text, settings["google_voice"])
     return _synthesize_polly(text, settings)
 
 

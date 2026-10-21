@@ -5,7 +5,8 @@ import { AdminApiError, adminApi } from "@/lib/adminClient";
 import { useToast } from "@/components/Toast";
 import { CustomSelect } from "@/components/CustomSelect";
 import { CollapsibleSection } from "./CollapsibleSection";
-import { VoiceProviderFields } from "./VoiceProviderFields";
+import { VoiceProviderFields, type VoiceProvider } from "./VoiceProviderFields";
+import { GOOGLE_DEFAULT_VOICE, GOOGLE_VOICES, VIDEO_PROVIDERS } from "./googleVoices";
 import {
   ELEVENLABS_FALLBACK_VOICE_SETTINGS,
   ELEVENLABS_FALLBACK_RANGES,
@@ -79,16 +80,17 @@ const defaultsFor = (profile: PollyVoiceProfile): ParsedDoc => ({
   elevenlabsVoice: "",
   elevenlabsModel: "",
   elevenlabsSettings: ELEVENLABS_FALLBACK_VOICE_SETTINGS,
+  googleVoice: "",
 });
 
 const HEADING_RE =
-  /^##\s+(PROVIDER|VOICE|ENGINE|FORMAT|RATE|VOLUME|ELEVENLABS_VOICE|ELEVENLABS_MODEL|ELEVENLABS_STABILITY|ELEVENLABS_SIMILARITY_BOOST|ELEVENLABS_STYLE|ELEVENLABS_SPEED|ELEVENLABS_SPEAKER_BOOST)\s*$/;
+  /^##\s+(PROVIDER|VOICE|ENGINE|FORMAT|RATE|VOLUME|ELEVENLABS_VOICE|ELEVENLABS_MODEL|ELEVENLABS_STABILITY|ELEVENLABS_SIMILARITY_BOOST|ELEVENLABS_STYLE|ELEVENLABS_SPEED|ELEVENLABS_SPEAKER_BOOST|GOOGLE_VOICE)\s*$/;
 
 /** 2026-09-26 — export해서 VideoCardGenerator.tsx("테스트 N" 카드)가
  *  "프로덕션에 적용" 버튼으로 넘길 payload 타입으로도 쓴다(PodcastVoiceSettingsPanel.tsx
  *  ::ParsedDoc과 같은 이유). */
 export interface ParsedDoc {
-  provider: "polly" | "elevenlabs";
+  provider: VoiceProvider;
   voice: string;
   engine: string;
   format: string;
@@ -97,13 +99,15 @@ export interface ParsedDoc {
   elevenlabsVoice: string;
   elevenlabsModel: string;
   elevenlabsSettings: ElevenLabsVoiceSettings;
+  /** Google 성우(2026-10-22). provider가 google이 아니면 빈 값. */
+  googleVoice: string;
 }
 
 function parseDoc(content: string, profile: PollyVoiceProfile): ParsedDoc {
   const DEFAULTS = defaultsFor(profile);
   const buckets: Record<string, string[]> = {
     PROVIDER: [], VOICE: [], ENGINE: [], FORMAT: [], RATE: [], VOLUME: [], ELEVENLABS_VOICE: [], ELEVENLABS_MODEL: [],
-    ELEVENLABS_STABILITY: [], ELEVENLABS_SIMILARITY_BOOST: [], ELEVENLABS_STYLE: [], ELEVENLABS_SPEED: [], ELEVENLABS_SPEAKER_BOOST: [],
+    ELEVENLABS_STABILITY: [], ELEVENLABS_SIMILARITY_BOOST: [], ELEVENLABS_STYLE: [], ELEVENLABS_SPEED: [], ELEVENLABS_SPEAKER_BOOST: [], GOOGLE_VOICE: [],
   };
   let current: string | null = null;
   for (const line of content.split("\n")) {
@@ -120,6 +124,7 @@ function parseDoc(content: string, profile: PollyVoiceProfile): ParsedDoc {
   const formatRaw = buckets.FORMAT.join("\n").trim();
   const rate = buckets.RATE.join("\n").trim();
   const volume = buckets.VOLUME.join("\n").trim();
+  const googleVoiceRaw = buckets.GOOGLE_VOICE.join("\n").trim();
   const voice = voiceRaw in profile.engines ? voiceRaw : DEFAULTS.voice;
   const validEngines = profile.engines[voice].map((e) => e.id);
   const numOr = (raw: string, fallback: number) => {
@@ -127,7 +132,7 @@ function parseDoc(content: string, profile: PollyVoiceProfile): ParsedDoc {
     return Number.isFinite(n) ? n : fallback;
   };
   return {
-    provider: providerRaw === "elevenlabs" ? "elevenlabs" : DEFAULTS.provider,
+    provider: providerRaw === "elevenlabs" || providerRaw === "google" ? providerRaw : DEFAULTS.provider,
     voice,
     engine: validEngines.includes(engineRaw) ? engineRaw : validEngines[0],
     format: FORMATS.some((f) => f.id === formatRaw) ? formatRaw : DEFAULTS.format,
@@ -142,6 +147,7 @@ function parseDoc(content: string, profile: PollyVoiceProfile): ParsedDoc {
       speed: numOr(buckets.ELEVENLABS_SPEED.join("\n").trim(), ELEVENLABS_FALLBACK_VOICE_SETTINGS.speed),
       use_speaker_boost: buckets.ELEVENLABS_SPEAKER_BOOST.join("\n").trim() === "false" ? false : ELEVENLABS_FALLBACK_VOICE_SETTINGS.use_speaker_boost,
     },
+    googleVoice: GOOGLE_VOICES.some((v) => v.id === googleVoiceRaw) ? googleVoiceRaw : "",
   };
 }
 
@@ -154,7 +160,8 @@ function buildDoc(d: ParsedDoc): string {
     `## ELEVENLABS_SIMILARITY_BOOST\n${d.elevenlabsSettings.similarity_boost}\n\n` +
     `## ELEVENLABS_STYLE\n${d.elevenlabsSettings.style}\n\n` +
     `## ELEVENLABS_SPEED\n${d.elevenlabsSettings.speed}\n\n` +
-    `## ELEVENLABS_SPEAKER_BOOST\n${d.elevenlabsSettings.use_speaker_boost}`
+    `## ELEVENLABS_SPEAKER_BOOST\n${d.elevenlabsSettings.use_speaker_boost}\n\n` +
+    `## GOOGLE_VOICE\n${d.googleVoice}`
   );
 }
 
@@ -229,7 +236,8 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
 ) {
   const toast = useToast();
   const DEFAULTS = defaultsFor(pollyProfile);
-  const [provider, setProvider] = useState<"polly" | "elevenlabs">(DEFAULTS.provider);
+  const [provider, setProviderState] = useState<VoiceProvider>(DEFAULTS.provider);
+  const [googleVoice, setGoogleVoice] = useState(DEFAULTS.googleVoice);
   const [voice, setVoiceState] = useState(DEFAULTS.voice);
   const [engine, setEngine] = useState(DEFAULTS.engine);
   const [format, setFormat] = useState(DEFAULTS.format);
@@ -252,6 +260,12 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
 
   // 성우를 바꾸면 그 성우가 지원 안 하는 엔진을 고르고 있을 수 있어 항상
   // 그 성우의 첫 번째(가장 권장) 엔진으로 같이 맞춘다(PodcastVoiceSettingsPanel과 동일).
+  // Google을 처음 고르면 기본 성우로 채운다(발행 문서에 성우가 없던 경우).
+  const setProvider = (next: VoiceProvider) => {
+    setProviderState(next);
+    if (next === "google" && !googleVoice) setGoogleVoice(GOOGLE_DEFAULT_VOICE);
+  };
+
   const setVoice = (next: string) => {
     setVoiceState(next);
     setEngine(pollyProfile.engines[next][0].id);
@@ -270,7 +284,8 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
       .getPrompt(settingsCategory, "published")
       .then((r) => {
         const parsed = parseDoc(r.active_content, pollyProfile);
-        setProvider(parsed.provider);
+        setProviderState(parsed.provider);
+        setGoogleVoice(parsed.googleVoice);
         setVoiceState(parsed.voice);
         setEngine(parsed.engine);
         setFormat(parsed.format);
@@ -285,7 +300,8 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
       .catch(() => {
         // 아직 한 번도 발행 안 된 상태(문서 없음) — 파이프라인 기본값과
         // 같은 값을 보여준다(video_settings.py의 _DEFAULT_*와 일치).
-        setProvider(DEFAULTS.provider);
+        setProviderState(DEFAULTS.provider);
+        setGoogleVoice(DEFAULTS.googleVoice);
         setVoiceState(DEFAULTS.voice);
         setEngine(DEFAULTS.engine);
         setFormat(DEFAULTS.format);
@@ -313,7 +329,7 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
     // eslint-disable-next-line react-hooks/exhaustive-deps -- elevenlabsVoice가 채워지면 이 effect가 다시 안 돌아도 되므로 의도적으로 뺌
   }, [provider, elevenVoices]);
 
-  const current: ParsedDoc = { provider, voice, engine, format, rate, volume, elevenlabsVoice, elevenlabsModel, elevenlabsSettings };
+  const current: ParsedDoc = { provider, voice, engine, format, rate, volume, elevenlabsVoice, elevenlabsModel, elevenlabsSettings, googleVoice };
   const changed = JSON.stringify(current) !== JSON.stringify(defaults);
 
   // 2026-09-26(후속) — overrideData가 있으면 changed 체크·확인창 둘 다
@@ -326,14 +342,17 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
       const confirmMsg =
         provider === "elevenlabs"
           ? "이 설정을 발행하면 다음 실제 영상 생성부터 ElevenLabs로 합성됩니다 — Polly보다 비용이 훨씬 높습니다(2026-08-27에 비용 때문에 Polly로 전환했던 이력 있음). 계속 발행할까요?"
-          : "이 설정을 발행하면 다음 실제 영상 생성부터 프로덕션에 바로 적용됩니다. 발행할까요?";
+          : provider === "google"
+            ? "이 설정을 발행하면 다음 실제 영상 생성부터 Google 성우로 합성됩니다(Google이 실패한 컷은 Polly로 대신 읽습니다). 발행할까요?"
+            : "이 설정을 발행하면 다음 실제 영상 생성부터 프로덕션에 바로 적용됩니다. 발행할까요?";
       if (!window.confirm(confirmMsg)) return;
     }
     setPublishing(true);
     try {
       const r = await adminApi.updatePrompt(settingsCategory, "published", buildDoc(dataToUse));
       toast.show(`발행했습니다 — v${r.new_version}부터 다음 생성에 적용됩니다`, "success");
-      setProvider(dataToUse.provider);
+      setProviderState(dataToUse.provider);
+      setGoogleVoice(dataToUse.googleVoice);
       setVoiceState(dataToUse.voice);
       setEngine(dataToUse.engine);
       setFormat(dataToUse.format);
@@ -355,7 +374,8 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
     publish: () => handlePublish(),
     applyAndPublish: (data) => handlePublish(data),
     applyFromTest: (data) => {
-      setProvider(data.provider);
+      setProviderState(data.provider);
+      setGoogleVoice(data.googleVoice);
       setVoiceState(data.voice);
       setEngine(data.engine);
       setFormat(data.format);
@@ -389,6 +409,9 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
       <VoiceProviderFields
         provider={provider}
         onProviderChange={setProvider}
+        providers={VIDEO_PROVIDERS}
+        googleVoice={googleVoice}
+        onGoogleVoiceChange={setGoogleVoice}
         pollyVoice={voice}
         pollyEngine={engine}
         onPollyVoiceChange={setVoice}

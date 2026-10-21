@@ -1,7 +1,7 @@
 /** 영상 카드 상태·저장·각본 파싱 헬퍼 — VideoCardGenerator.tsx 에서 리팩토링 7단계에서 분리(내용 불변). */
 import { ChatThreadMessage } from "@/lib/types";
 import { ELEVENLABS_FALLBACK_VOICE_SETTINGS, type ElevenLabsVoiceSettings } from "./ElevenLabsVoiceSettingsFields";
-import { FORMATS } from "./VideoRenderSettingsPanel";
+import { FORMATS, type ParsedDoc } from "./VideoRenderSettingsPanel";
 
 export const CARDS_STORAGE_PREFIX = "ailens-video-lab-cards";
 
@@ -122,7 +122,7 @@ export function stripScriptMarkup(text: string): string {
     .trim();
 }
 
-export type Provider = "polly" | "elevenlabs";
+export type Provider = "polly" | "elevenlabs" | "google";
 
 // 성우·엔진 조합표는 PollyVoiceSettingsFields.tsx에서 가져온다(위 import 참고).
 // rate/volume(2026-09-25 추가) — 사용자 요청: "팟캐스트 부분처럼.. 동일하게
@@ -216,6 +216,24 @@ export function newCard(
     renderError: null,
     progress: null,
     ownerThreadId: null,
+  };
+}
+
+/** 카드 → 발행 설정 모양("프로덕션에 적용" 값·프로덕션과 같은지 비교). 키 순서는
+ *  VideoRenderSettingsPanel.tsx::parseDoc과 같아야 한다(JSON.stringify로 비교). voiceId는
+ *  provider가 google이면 Google 성우, 아니면 ElevenLabs 성우(Polly면 빈 값)다. */
+export function cardToParsedDoc(c: CardState): ParsedDoc {
+  return {
+    provider: c.provider,
+    voice: c.pollySettings.voice,
+    engine: c.pollySettings.engine,
+    format: c.format,
+    rate: c.pollySettings.rate,
+    volume: c.pollySettings.volume,
+    elevenlabsVoice: c.provider === "google" ? "" : c.voiceId,
+    elevenlabsModel: c.modelId,
+    elevenlabsSettings: c.voiceSettings,
+    googleVoice: c.provider === "google" ? c.voiceId : "",
   };
 }
 
