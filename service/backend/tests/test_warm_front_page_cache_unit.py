@@ -332,10 +332,84 @@ def test_stop_on_429_then_resume_from_checkpoint(tmp_path):
     assert tm2.called == [f'2010-05-{d:02d}' for d in range(4, 11)]
     assert len(_read(tmp_path, 'written-keys.txt').splitlines()) == 10 and len(table.items) == 10
     # 범위나 workers 가 다르면 --restart 없이는 이어 가지 않는다.
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit, match='workers'):
         wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-10')), tm2, bs2, table=table, dynamodb=_dynamodb())
     assert wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-10'), '--restart'), _FakeTm(bs2, {}), bs2,
                   table=table, dynamodb=_dynamodb(), err=io.StringIO()) == 0
+    # --restart 는 앞 실행 줄을 섞지 않는다(앞 실행 파일은 previous/ 로). 되돌릴 키 목록은 이어 쓴다.
+    assert [r['outcome'] for r in _rows(tmp_path)] == ['exists'] * 10
+    (previous,) = (tmp_path / 'state' / 'previous').iterdir()
+    assert len((previous / 'results.jsonl').read_text().splitlines()) == 10
+    assert len(_read(tmp_path, 'written-keys.txt').splitlines()) == 10
+
+
+@pytest.mark.parametrize('crash_at', ['row', 'checkpoint'])
+def test_interrupted_record_resumes_from_same_date(tmp_path, monkeypatch, crash_at):
+    """05-03(이슈 순위 실패 — 캐시에 쓰지 않고 retry-dates 로만 남는 날)의 결과 줄을 쓰기 직전(row) 또는 그 줄을 쓴 뒤 체크포인트를
+    올리기 직전(checkpoint)에 끊긴다. 디스크의 체크포인트는 05-03 에 머물고, 이어 가면 05-03 부터 다시 해 retry-dates 에 남는다."""
+    plan = {'2010-05-03': ('day', WEEK, 'ranking_failed')}
+    append, write_json = wf._append_line, wf._write_json
+
+    def broken_append(handle, value):
+        if crash_at == 'row' and value.get('date') == '2010-05-03' and 'outcome' in value:
+            raise OSError('디스크 오류')
+        append(handle, value)
+
+    def broken_write_json(target, value):
+        if crash_at == 'checkpoint' and target.endswith('checkpoint.json') and value['chunks'][0]['next'] == 3:
+            raise OSError('디스크 오류')
+        write_json(target, value)
+
+    monkeypatch.setattr(wf, '_append_line', broken_append)
+    monkeypatch.setattr(wf, '_write_json', broken_write_json)
+    bs, table = _FakeBs(), _FakeDynamoTable()
+    tm = _FakeTm(bs, plan)
+    args = _args(tmp_path, *_range('2010-05-01', '2010-05-06'), '--workers', '1')
+    assert wf.run(args, tm, bs, table=table, dynamodb=_dynamodb(), err=io.StringIO()) == wf.EXIT_STOPPED
+    assert tm.called == ['2010-05-01', '2010-05-02', '2010-05-03']  # 남기지 못하면 다음 날짜로 가지 않는다
+    assert json.loads(_read(tmp_path, 'checkpoint.json'))['chunks'][0]['next'] == 2
+    assert json.loads(_read(tmp_path, 'summary.json'))['stop_reason'] == '2010-05-03 결과를 남기지 못함(OSError)'
+    assert [r['date'] for r in _rows(tmp_path)] == ['2010-05-01', '2010-05-02'] + (['2010-05-03'] if crash_at == 'checkpoint' else [])
+
+    monkeypatch.setattr(wf, '_append_line', append)
+    monkeypatch.setattr(wf, '_write_json', write_json)
+    tm2 = _FakeTm(bs, plan)
+    assert wf.run(args, tm2, bs, table=table, dynamodb=_dynamodb(), err=io.StringIO()) == 0
+    assert tm2.called == [f'2010-05-{d:02d}' for d in range(3, 7)]
+    assert _read(tmp_path, 'retry-dates.txt').splitlines() == ['2010-05-03']
+    assert 'timemachine_frontv2_2010-05-03' not in table.items and len(table.items) == 5
+
+
+def test_checkpoint_identity_keeps_dry_run_and_real_runs_apart(tmp_path):
+    rng = _range('2010-05-01', '2010-05-03')
+    bs = _FakeBs()
+    assert wf.run(_args(tmp_path, *rng, '--workers', '1', '--dry-run'), _FakeTm(bs, {}), bs, table=None, dynamodb=None,
+                  err=io.StringIO()) == 0
+    dry = json.loads(_read(tmp_path, 'checkpoint.json'))
+    assert dry['dry_run'] is True and dry['code_sha1'] == wf.code_digest(None) and dry['chunks'][0]['next'] == 3
+    # dry-run 을 끝낸 폴더에서 --dry-run 만 빼면 완료된 체크포인트로 0건 성공하지 않고 거부한다.
+    table, tm = _FakeDynamoTable(), _FakeTm(bs, {})
+    with pytest.raises(SystemExit, match='dry-run 여부'):
+        wf.run(_args(tmp_path, *rng, '--workers', '1'), tm, bs, table=table, dynamodb=_dynamodb(), err=io.StringIO())
+    assert tm.called == [] and table.puts == []
+    # 다른 코드 트리의 dry-run 결과도 섞지 않는다.
+    with pytest.raises(SystemExit, match='서버 코드'):
+        wf.run(_args(tmp_path, *rng, '--workers', '1', '--dry-run', '--code-root', str(tmp_path / 'old')), tm, bs,
+               table=None, dynamodb=None, err=io.StringIO())
+    assert wf.code_digest(str(tmp_path / 'old')) != wf.code_digest(None)
+    # --restart: dry-run 파일은 previous/ 로 옮기고 실제 실행 결과만 남긴다.
+    assert wf.run(_args(tmp_path, *rng, '--workers', '1', '--restart'), tm, bs, table=table, dynamodb=_dynamodb(),
+                  err=io.StringIO()) == 0
+    assert tm.called == ['2010-05-01', '2010-05-02', '2010-05-03'] and len(table.items) == 3
+    assert [r['outcome'] for r in _rows(tmp_path)] == ['written'] * 3
+    assert json.loads(_read(tmp_path, 'summary.json'))['dry_run'] is False
+    assert json.loads(_read(tmp_path, 'checkpoint.json'))['dry_run'] is False
+    (previous,) = (tmp_path / 'state' / 'previous').iterdir()
+    assert sorted(p.name for p in previous.iterdir()) == ['checkpoint.json', 'notable.jsonl', 'progress.log', 'results.jsonl',
+                                                          'retry-dates.txt', 'summary.json']
+    assert json.loads((previous / 'summary.json').read_text())['dry_run'] is True
+    assert '[dry-run]' not in _read(tmp_path, 'progress.log') and '--restart: 이전 실행 파일을' in _read(tmp_path, 'progress.log')
+    assert len(_read(tmp_path, 'written-keys.txt').splitlines()) == 3
 
 
 def test_dry_run_never_touches_real_table(tmp_path):

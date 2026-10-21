@@ -13,7 +13,11 @@
   모두 끝나기를 기다려(호출 제한 + 5초까지) 그 응답의 한도·차단도 멈춤 이유와 종료 코드에 넣는다.
 - 상태 폴더(--state-dir): checkpoint.json(구간별 다음 날짜 — 다시 실행하면 이어 간다), written-keys.txt(새로 쓴 키 — 되돌릴 때 이
   키만 지운다), results.jsonl(날짜별 결과, 제목·본문 없음), retry-dates.txt, notable.jsonl(kind=none·no_paper 결과, 사람이 훑어볼 것),
-  progress.log, summary.json.
+  progress.log, summary.json. 날짜마다 results·notable 줄을 디스크까지 내린 뒤에 체크포인트를 올린다 — 그 사이에 끊기면 이어 갈 때
+  같은 날을 다시 한다(쓴 캐시는 조건부 PutItem 이 지킨다). 그 기록이 실패하면 멈춘다.
+- 체크포인트 신원: 날짜 목록·workers·dry-run 여부·서버 코드(CODE_FILES 내용의 SHA-1)가 하나라도 다르면 이어 가지 않는다. --restart 는
+  이전 실행 파일(체크포인트·results·notable·retry-dates·summary·progress)을 previous/<시각>/ 로 옮기고 새로 시작한다.
+  written-keys.txt 는 옮기지 않고 이어 쓴다(이 폴더에서 실제로 쓴 키 전체가 되돌릴 목록).
 - 멈춤(즉시): 연속 실패 5회, 최근 시도 100건 중 실패 11건 이상(10% 초과), 빅카인즈 HTTP 429·403·401 또는 한도·쿼터로 보이는 응답,
   Ctrl-C. 멈추면 새 날짜를 시작하지 않고 진행 중인 날짜의 다음 빅카인즈 요청과 쓰기도 막는다. 이유는 progress.log·summary.json 에
   남고 종료 코드는 2. 실패 = 예외 또는 basis ranking_failed(이미 있음은 세지 않는다).
@@ -32,6 +36,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from collections import Counter, deque
@@ -59,6 +64,12 @@ CALL_KINDS = ('day', 'ranking', 'front', 'front_count')
 PROGRESS_EVERY = 50
 EXIT_STOPPED, EXIT_DIFF = 2, 3
 COMPARE_FIELDS = ('kind', 'date_kind', 'shown_date', 'reason', 'basis', 'article_ids', 'coverage', 'data_sha1')
+# 결과를 정하는 서버 파일(코드 루트 기준). 체크포인트 신원에 내용 SHA-1 로 들어간다 — 저장소의 다른 커밋에는 흔들리지 않는다.
+CODE_FILES = ('handlers/timeline/time_machine.py', 'services/timeline/bigkinds_search.py',
+              'services/timeline/front_calendar.py', 'services/timeline/front_page_calendar.json')
+CHECKPOINT_IDENTITY = (('dates_sha1', '날짜 범위'), ('workers', 'workers'), ('dry_run', 'dry-run 여부'), ('code_sha1', '서버 코드'))
+# 실행마다 따로인 파일. --restart 는 이것들을 previous/ 아래로 옮긴다(written-keys.txt 는 이어 쓴다).
+RUN_FILES = ('checkpoint.json', 'results.jsonl', 'notable.jsonl', 'retry-dates.txt', 'summary.json', 'progress.log')
 
 
 class StopRequested(RuntimeError):
@@ -86,7 +97,8 @@ def parse_args(argv=None, today: Optional[Date] = None) -> argparse.Namespace:
     parser.add_argument('--code-root', help='(dry-run 전용) 이 service/backend 트리의 로직을 쓴다')
     parser.add_argument('--budget', type=float, default=60, help='날짜당 찾기 예산 초(서버 20초 대신)')
     parser.add_argument('--call-timeout', type=float, default=40, help='빅카인즈 호출당 제한 초(서버 10~20초 대신)')
-    parser.add_argument('--restart', action='store_true', help='범위·workers 가 달라도 체크포인트를 새로 시작')
+    parser.add_argument('--restart', action='store_true',
+                        help='체크포인트를 새로 시작(이전 실행 파일은 previous/ 로 옮기고 written-keys.txt 는 이어 씀)')
     parser.add_argument('--compare', nargs=2, metavar=('OLD', 'NEW'), help='두 results.jsonl 비교만 하고 끝')
     parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args(argv)
@@ -381,19 +393,58 @@ def _write_json(path: str, value) -> None:
     with open(tmp, 'w', encoding='utf-8') as fp:
         json.dump(value, fp, ensure_ascii=False, indent=1)
         fp.write('\n')
+        fp.flush()
+        os.fsync(fp.fileno())
     os.replace(tmp, path)
 
 
-def _load_checkpoint(path: str, days: List[str], workers: int, restart: bool) -> dict:
-    digest = hashlib.sha1('\n'.join(days).encode()).hexdigest()
-    if os.path.exists(path) and not restart:
-        with open(path, encoding='utf-8') as fp:
-            saved = json.load(fp)
-        if saved.get('dates_sha1') == digest and saved.get('workers') == workers:
-            return saved
-        raise SystemExit(f'체크포인트의 날짜 범위·workers 가 다릅니다({path}). 이어 가려면 같은 인자로, 새로 하려면 --restart')
-    return {'from': days[0], 'to': days[-1], 'dates_sha1': digest, 'count': len(days), 'workers': workers,
-            'chunks': [{'first': a, 'last': b, 'next': a} for a, b in plan_chunks(len(days), workers)]}
+def _append_line(handle, value) -> None:
+    """JSON 한 줄을 덧붙이고 디스크까지 내린다(체크포인트를 올리기 전에 부른다)."""
+    handle.write(json.dumps(value, ensure_ascii=False) + '\n')
+    handle.flush()
+    os.fsync(handle.fileno())
+
+
+def code_digest(code_root: Optional[str]) -> str:
+    """CODE_FILES 내용의 SHA-1(없는 파일은 없음으로 넣는다)."""
+    root = code_root or BACKEND_DIR
+    digest = hashlib.sha1()
+    for rel in CODE_FILES:
+        digest.update(rel.encode() + b'\0')
+        try:
+            with open(os.path.join(root, rel), 'rb') as fp:
+                digest.update(fp.read())
+        except FileNotFoundError:
+            digest.update(b'missing')
+        digest.update(b'\0')
+    return digest.hexdigest()
+
+
+def _archive_run_files(state_dir: str) -> Optional[str]:
+    """--restart: 이전 실행 파일을 previous/<시각>-*/ 로 옮긴다. 옮긴 폴더(없으면 None)."""
+    present = [name for name in RUN_FILES if os.path.exists(os.path.join(state_dir, name))]
+    if not present:
+        return None
+    os.makedirs(os.path.join(state_dir, 'previous'), exist_ok=True)
+    dest = tempfile.mkdtemp(prefix=datetime.now(KST).strftime('%Y%m%dT%H%M%S-'), dir=os.path.join(state_dir, 'previous'))
+    for name in present:
+        os.replace(os.path.join(state_dir, name), os.path.join(dest, name))
+    return dest
+
+
+def _load_checkpoint(path: str, days: List[str], workers: int, dry_run: bool, code_sha1: str) -> dict:
+    fresh = {'from': days[0], 'to': days[-1], 'dates_sha1': hashlib.sha1('\n'.join(days).encode()).hexdigest(),
+             'count': len(days), 'workers': workers, 'dry_run': dry_run, 'code_sha1': code_sha1,
+             'chunks': [{'first': a, 'last': b, 'next': a} for a, b in plan_chunks(len(days), workers)]}
+    if not os.path.exists(path):
+        return fresh
+    with open(path, encoding='utf-8') as fp:
+        saved = json.load(fp)
+    differ = [label for key, label in CHECKPOINT_IDENTITY if saved.get(key) != fresh[key]]
+    if differ:
+        raise SystemExit(f"체크포인트와 다릅니다: {', '.join(differ)}({path}). 이어 가려면 같은 인자·코드로, 새로 하려면 "
+                         '--restart(이전 실행 파일은 previous/ 로 옮긴다) 또는 새 --state-dir')
+    return saved
 
 
 def wait_for_rankings(slots, count: int, timeout: float, say: Callable[[str], None]) -> int:
@@ -433,7 +484,8 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
     err = err or sys.stderr
     os.makedirs(args.state_dir, exist_ok=True)
     path = lambda name: os.path.join(args.state_dir, name)  # noqa: E731
-    checkpoint = _load_checkpoint(path('checkpoint.json'), args.days, args.workers, args.restart)
+    archived = _archive_run_files(args.state_dir) if args.restart else None
+    checkpoint = _load_checkpoint(path('checkpoint.json'), args.days, args.workers, args.dry_run, code_digest(args.code_root))
     progress = open(path('progress.log'), 'a', encoding='utf-8')
 
     def say(line: str) -> None:
@@ -441,6 +493,9 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
         print(line, file=err, flush=True)
         progress.write(f'{datetime.now(KST).isoformat(timespec="seconds")} {line}\n')
         progress.flush()
+
+    if archived:
+        say(f'--restart: 이전 실행 파일을 {archived} 로 옮김(written-keys.txt 는 이어 씀)')
 
     try:
         limits = capacity_limits(dynamodb, tm.CACHE_TABLE)
@@ -528,22 +583,26 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
 
     def run_chunk(chunk: dict) -> None:
         while chunk['next'] <= chunk['last'] and not guard.reason:
-            record = process(args.days[chunk['next']])
-            if record['outcome'] == 'stopped':
+            day = args.days[chunk['next']]
+            try:
+                record = process(day)
+                if record['outcome'] == 'stopped':
+                    return
+                with lock:
+                    # 결과 줄을 먼저 디스크에 남기고 체크포인트를 올린다. 거꾸로 하면 그 사이에 끊긴 날짜가 캐시에도
+                    # retry-dates 에도 없이 완료로 넘어간다.
+                    _append_line(results, record)
+                    if record.get('kind') == 'none' or record.get('reason') == 'no_paper':
+                        _append_line(notable, {k: record.get(k) for k in ('date', 'kind', 'reason', 'shown_date', 'basis', 'outcome')})
+                    chunk['next'] += 1
+                    _write_json(path('checkpoint.json'), checkpoint)
+                    outcomes[record['outcome']] += 1
+                    done[0] += 1
+                    if done[0] % PROGRESS_EVERY == 0:
+                        say(progress_line())
+            except Exception as e:  # noqa: BLE001 — 남기지 못한 날짜는 완료로 치지 않고 멈춘다(이어 갈 때 그날부터)
+                guard.stop(f'{day} 결과를 남기지 못함({type(e).__name__})')
                 return
-            with lock:
-                chunk['next'] += 1
-                _write_json(path('checkpoint.json'), checkpoint)
-                results.write(json.dumps(record, ensure_ascii=False) + '\n')
-                results.flush()
-                if record.get('kind') == 'none' or record.get('reason') == 'no_paper':
-                    notable.write(json.dumps({k: record.get(k) for k in ('date', 'kind', 'reason', 'shown_date', 'basis', 'outcome')},
-                                             ensure_ascii=False) + '\n')
-                    notable.flush()
-                outcomes[record['outcome']] += 1
-                done[0] += 1
-                if done[0] % PROGRESS_EVERY == 0:
-                    say(progress_line())
 
     with ThreadPoolExecutor(max_workers=len(checkpoint['chunks']), thread_name_prefix='warm') as pool:
         futures = [pool.submit(run_chunk, c) for c in checkpoint['chunks'] if c['next'] <= c['last']]
