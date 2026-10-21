@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { CPI_LATEST } from './data/birthdayCatalog';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import type { AssetResult } from './lib/birthdayAssets';
-import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './lib/birthdayModel';
+import { assetSourceLine, changeOf, type AssetBase, type AssetCell } from './lib/birthdayAssets';
+import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW, won } from './lib/birthdayModel';
+import type { AssetLoadState } from './lib/useBirthdayAssets';
 import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
@@ -43,25 +44,72 @@ export function ArrivalScene({ result, mode }: { result: BirthdayResult; mode: V
   </section>;
 }
 
-/** 자산 시세가 하나라도 있을 때 — 1등 자산과 다섯 자산의 배수(기획안 v3 S2·배수 한눈에). */
-export function AssetScene({ assets }: { assets: AssetResult[] }) {
-  const ready = assets.filter(asset => asset.state === 'ready' && asset.multiple !== null).sort((a, b) => b.multiple! - a.multiple!);
-  const top = ready[0];
-  const max = top?.multiple ?? 1;
-  if (!top) return null;
+/** 100만 원을 넣었다고 보는 날의 설명 — 기준일 종류(스무 살 생일·태어난 날)와 연도 공유 여부에 따라. */
+function assetLead(base: AssetBase, mode: ViewMode) {
+  const day = nb(dateLabel(base.date));
+  if (mode === 'year') return base.kind === 'twentieth'
+    ? `출생연도만 공유된 결과라 스무 살이 된 해의 1월 1일(${day})에 넣었다고 보고 계산했어요.`
+    : `출생연도만 공유된 결과라 ${day}에 넣었다고 보고 계산했어요.`;
+  return base.kind === 'twentieth'
+    ? `스무 살 생일인 ${day}에 넣었다고 보고 계산했어요.`
+    : `아직 스무 살 생일 전이라 태어난 날(${day})에 넣었다고 보고 계산했어요.`;
+}
+
+/** 칸 아래 첫 줄 — 지금 금액과 증감. 증감은 색 없이 화살표(낭독 제외)와 부호로 읽히게 한다. */
+function cellDetail(cell: AssetCell) {
+  if (cell.id === 'cash') return <>그대로 {nb('100만 원')}{cell.purchase !== undefined && <> · 그때 {nb('100만 원어치를')} 지금 사려면 {nb(manwon(cell.purchase))}</>}</>;
+  const change = changeOf(cell.multiple);
+  const arrow = change.arrow && <><span aria-hidden="true">{change.arrow}</span>{' '}</>;
+  if (cell.nowAmount === null) return <>{arrow}서울 아파트값 {nb(`${times(cell.multiple)}(${change.signed})`)}</>;
+  const price = cell.unit?.label === '1돈' ? manwon : won;
+  return <>{arrow}지금 {nb(`${manwon(cell.nowAmount)}(${change.signed})`)}{cell.unit && <> · {nb(`${cell.unit.label} = 그때 ${price(cell.unit.then)}`)} → {nb(`지금 ${price(cell.unit.now)}`)}</>}</>;
+}
+
+/**
+ * 그때 100만 원, 지금은 — 스무 살 생일(전이면 태어난 날)에 100만 원을 현금·정기예금·달러·서울 아파트(·금)에 뒀다면.
+ * 칸은 고정 순서이고 1등 강조·정렬이 없다(투자 권유로 읽히지 않게). 주인공은 제목 문장이다.
+ * 기준일이 공식 환율 기록 시작(1964-05-04)보다 앞서면(off) 장면 대신 한 줄 안내만 둔다.
+ */
+export function AssetScene({ base, mode, state, cells, onRetry }: {
+  base: AssetBase; mode: ViewMode; state: AssetLoadState; cells: AssetCell[]; onRetry: () => void;
+}) {
+  if (state.status === 'off') {
+    const when = mode === 'year' ? '스무 살이 된 해의 1월 1일' : base.kind === 'twentieth' ? '스무 살 생일' : '기준일';
+    return <p className={styles.soon}><strong>{`${when}(${nb(dateLabel(base.date))})이 공식 환율 기록이 시작된 ${nb('1964년 5월 4일')}보다 앞서 ${nb('100만 원')} 계산은 하지 않았어요.`}</strong>물가·환율 같은 공식 통계가 그 뒤부터 있어요.</p>;
+  }
+  if (state.status === 'ready' && !cells.length) {
+    return <p className={styles.soon}><strong>이 날짜는 아직 계산할 자료가 없어요.</strong>물가·환율 같은 공식 통계가 발표되면 계산해요.</p>;
+  }
+  // 막대는 로그 눈금 — 보이는 칸 중 가장 큰 배수를 100%로.
+  const max = Math.max(...cells.map(cell => cell.multiple));
   return <section className={styles.scene} aria-labelledby="birthday-assets">
-    <p className={styles.kicker}>태어난 날 그때 샀다면, 오늘 1등은</p>
-    <h3 id="birthday-assets" className={styles.figure} data-accent="">{top.name} {times(top.multiple!)}</h3>
-    <ol className={styles.bars}>{assets.map(asset => <li key={asset.id}>
-      <div className={styles.barRow} data-state={asset.state}>
-        <span>{asset.name}</span>
-        <span className={styles.barTrack} aria-hidden="true">{asset.multiple !== null && <span style={{ width: `${Math.max(4, Math.log10(1 + asset.multiple) / Math.log10(1 + max) * 100)}%` }} />}</span>
-        <strong>{asset.multiple !== null ? times(asset.multiple) : asset.state === 'pending' ? '준비 중' : '계산 불가'}</strong>
+    <p className={styles.kicker}>그때 100만 원, 지금은</p>
+    <h3 id="birthday-assets" className={styles.title}>{base.kind === 'twentieth' ? '스무 살의 내가' : '태어난 날'} {nb('100만 원을')} 어디에 뒀다면</h3>
+    <p className={styles.lead}>{assetLead(base, mode)}</p>
+    {state.status === 'loading' ? <>
+      <div className={styles.skeleton} aria-hidden="true"><span /><span /><span /></div>
+      <p className="sr-only" role="status">100만 원 계산 자료를 불러오는 중이에요.</p>
+    </>
+      // 실패 원인(네트워크·배포 직후 캐시·형식)을 화면에서는 가릴 수 없어 단정하지 않는다. 다른 장면은 그대로 둔다.
+      : state.status === 'error' ? <div className={styles.paperEmpty} role="alert">
+        <strong>100만 원 계산 자료를 불러오지 못했어요</strong>
+        <p>{`연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p>
+        <button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button>
       </div>
-      {asset.start && asset.now && <p className={styles.barDetail}>{shortDate(asset.start.date)} {asset.start.label} {manwon(asset.start.amount)} → 오늘 {asset.now.label} {manwon(asset.now.amount)}{asset.notes.length ? ` · ${asset.notes[0]}` : ''}</p>}
-    </li>)}</ol>
-    <p className={styles.source}>과거 시세로 계산한 가정이에요. 특정 자산을 사거나 팔라는 권유가 아니에요. 수수료·세금·배당은 빼고 계산했고 막대는 로그 눈금이에요.</p>
-    <p className={styles.links}><Link href="/search?q=%EB%B0%98%EB%8F%84%EC%B2%B4" prefetch={false}>반도체 기사 보기</Link><Link href="/search?q=%EB%B6%80%EB%8F%99%EC%82%B0" prefetch={false}>부동산 기사 보기</Link></p>
+      : <>
+        <ol className={styles.bars}>{cells.map(cell => <li key={cell.id}>
+          <div className={styles.barRow}>
+            <span>{cell.name}</span>
+            <span className={styles.barTrack} aria-hidden="true"><span style={{ width: `${Math.max(4, Math.log10(1 + cell.multiple) / Math.log10(1 + max) * 100)}%` }} /></span>
+            <strong>{times(cell.multiple)}</strong>
+          </div>
+          <p className={styles.barDetail}>{cellDetail(cell)}</p>
+          {cell.notes.length > 0 && <p className={styles.barDetail}>{cell.notes.join(' ')}</p>}
+        </li>)}</ol>
+        <p className={styles.source}>{assetSourceLine(cells, state.latest)}</p>
+        <p className={styles.source}>과거 자료로 계산한 가정이에요. 특정 자산을 사거나 팔라는 권유가 아니에요. 세금·수수료는 빼고 계산했고 막대는 로그 눈금이에요.</p>
+        <p className={styles.links}><Link href={`/search?q=${encodeURIComponent('환율')}`} prefetch={false}>환율 기사 보기</Link><Link href="/search?q=%EB%B6%80%EB%8F%99%EC%82%B0" prefetch={false}>부동산 기사 보기</Link></p>
+      </>}
   </section>;
 }
 

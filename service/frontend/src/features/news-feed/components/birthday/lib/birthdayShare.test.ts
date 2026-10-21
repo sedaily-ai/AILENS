@@ -2,8 +2,9 @@ import { expect, test } from 'vitest';
 import raw from '../data/birthdaySnapshot.json';
 import { EVENTS } from '@/shared/data/timelineEvents';
 import { calculate } from './birthdayModel';
-import { defaultAssetResults } from './birthdayAssets';
-import { receiptAssetLines, receiptElapsed, receiptLines } from './birthdayShare';
+import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
+import { assetCells, type AssetBase } from './birthdayAssets';
+import { receiptAssetHeading, receiptAssetLines, receiptElapsed, receiptLines } from './birthdayShare';
 import { RECEIPT_QR_ROWS, RECEIPT_QR_URL } from '../data/birthdayQr';
 import { BIRTHDAY_MARKET_PATH } from '../data/birthdayRoutes';
 import { SITE_URL } from '@/shared/constants/site';
@@ -24,10 +25,35 @@ test('생일 영수증은 확인된 숫자만 찍는다 — 최저시급·1억 �
   expect(receiptLines(calculate('1940-01-01', snapshot), 'personal').map(line => line.label)).toEqual(['2002 한일 월드컵 개막 때']);
 });
 
-test('시세가 없는 자산은 이름만 찍고 값은 준비 중으로 둔다', () => {
-  const lines = receiptAssetLines(defaultAssetResults(calculate('1996-06-01', snapshot)));
-  expect(lines.map(line => line.label)).toEqual(['삼성전자', 'SK하이닉스', '서울 아파트', '비트코인 적립', '금 1돈']);
-  expect(lines.every(line => line.value === '준비 중' && line.pending)).toBe(true);
+// 100만 원 칸 픽스처 — 2010-05-15 기준 연도 파일과 latest.json 모양만 흉내 낸다(실제 파일은 읽지 않는다).
+const latest: AssetLatest = {
+  generatedAt: '2026-10-21T13:40:20+09:00', until: '2026-10-20', sources: {},
+  last: { cpi: '2026-09', deposit_rate: '2026-08', usdkrw_daily: '2026-10-20', usdkrw_monthly: '2026-09', apartment: '2026-07' },
+  cpi: ['2026-09', 100], deposit: ['2026-09', 3], usdkrw: { daily: ['2026-10-20', 900], monthly: ['2026-09', 1400] }, apartment: ['2026-07', 120],
+};
+const file2010: AssetYearFile = {
+  year: 2010, cpi: [['2010-05', 50]], deposit: [['2010-05', 2]],
+  usdkrw: { daily: [['2010-05-14', 1000]], monthly: [['2010-05', 1005]] }, apartment: [['2010-05', 40]],
+};
+const base2010: AssetBase = { date: '2010-05-15', kind: 'twentieth' };
+
+test('100만 원 칸은 계산된 칸만 고정 순서로 찍는다 — 준비 중 줄은 없다', () => {
+  const lines = receiptAssetLines(assetCells(base2010, file2010, latest));
+  expect(lines).toEqual([
+    { label: '현금', value: '그대로 100만 원' },
+    { label: '정기예금', value: '150만 원' },
+    { label: '달러', value: '90만 원' },
+    { label: '서울 아파트', value: '3배' },
+  ]);
+  // 아파트 지수가 없는 달(2006년 전)이면 그 줄만 빠진다.
+  const noApartment = receiptAssetLines(assetCells(base2010, { ...file2010, apartment: [] }, latest));
+  expect(noApartment.map(line => line.label)).toEqual(['현금', '정기예금', '달러']);
+  expect(noApartment.some(line => line.value === '준비 중' || line.pending)).toBe(false);
+});
+
+test('100만 원 묶음 소제목은 기준일 종류에 따라 바뀐다', () => {
+  expect(receiptAssetHeading({ date: '2010-05-15', kind: 'twentieth' })).toBe('스무 살에 100만 원을 뒀다면');
+  expect(receiptAssetHeading({ date: '2010-08-20', kind: 'birthday' })).toBe('태어난 날 100만 원을 뒀다면');
 });
 
 test('영수증 QR은 결과 페이지 주소(영수증 유입 표시 포함)를 담은 37×37 무늬다', () => {

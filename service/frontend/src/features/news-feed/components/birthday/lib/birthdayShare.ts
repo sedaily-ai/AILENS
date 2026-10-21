@@ -3,7 +3,7 @@ import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import { SITE_URL } from '@/shared/constants/site';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { RECEIPT_QR_ROWS } from '../data/birthdayQr';
-import type { AssetResult } from './birthdayAssets';
+import type { AssetBase, AssetCell } from './birthdayAssets';
 import { elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './birthdayModel';
 
 /** 인스타 스토리·카톡에 바로 올리는 9:16 카드. */
@@ -18,7 +18,10 @@ export interface ShareContent {
   includeDay: boolean;
   /** 그날 1면 기사(본문이 긴 순). 영수증에는 월·일을 표시할 때만 첫 제목을 담는다. */
   front: BigKindsArticle[];
-  assets: AssetResult[];
+  /** 계산된 100만 원 칸(고정 순서). 없으면 묶음을 그리지 않는다. */
+  assets: AssetCell[];
+  /** 100만 원 묶음 소제목의 기준일(스무 살 생일·태어난 날). 칸이 없으면 null. */
+  assetBase: AssetBase | null;
 }
 
 /** 영수증 한 줄. pending은 아직 자료가 없어 "준비 중"으로 찍히는 줄. */
@@ -36,11 +39,17 @@ export function receiptLines(result: BirthdayResult, mode: ViewMode): ReceiptLin
   return lines;
 }
 
-/** "그때 샀다면" 줄 — 시세가 없는 자산도 이름은 찍고 값은 "준비 중"으로 둔다(숫자를 지어내지 않는다). */
-export function receiptAssetLines(assets: AssetResult[]): ReceiptLine[] {
-  return assets.map(asset => asset.state === 'ready' && asset.multiple !== null
-    ? { label: asset.name, value: times(asset.multiple) }
-    : { label: asset.name, value: '준비 중', pending: true });
+/** 100만 원 줄 — 계산된 칸만, 받은 순서(고정 순서) 그대로. 서울 아파트는 지수 비율이라 배수, 현금은 명목 그대로. */
+export function receiptAssetLines(cells: AssetCell[]): ReceiptLine[] {
+  return cells.map(cell => ({
+    label: cell.name,
+    value: cell.id === 'cash' ? '그대로 100만 원' : cell.nowAmount === null ? times(cell.multiple) : manwon(cell.nowAmount),
+  }));
+}
+
+/** 100만 원 묶음 소제목 — 기준일이 스무 살 생일인지 태어난 날인지. */
+export function receiptAssetHeading(base: AssetBase) {
+  return base.kind === 'twentieth' ? '스무 살에 100만 원을 뒀다면' : '태어난 날 100만 원을 뒀다면';
 }
 
 /** 영수증 합계 — 태어난 날부터 오늘까지. 연도만 공유된 결과는 연 단위. */
@@ -157,7 +166,8 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
   const drawReceipt = () => {
     const left = 120, right = 960, inLeft = 176, inRight = 904, width = inRight - inLeft;
     const lines = receiptLines(result, content.mode);
-    const assetLines = receiptAssetLines(content.assets);
+    const assetLines = content.assetBase ? receiptAssetLines(content.assets) : [];
+    const assetHeading = content.assetBase ? receiptAssetHeading(content.assetBase) : '';
     const headline = content.includeDay && hasFront ? wrap(content.front[0].title, 40, 900, SERIF, width, 2) : [];
     const birth = content.includeDay ? `${year}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')} (${weekday(year, month, day)})` : `${year}년생`;
     const issued = kstTodayStr().replaceAll('-', '.');
@@ -187,7 +197,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
       if (assetLines.length) {
         at(() => dashed(inLeft, inRight, y - 24));
         y += 40;
-        at(() => text('그때 샀다면, 지금은', inLeft, y, 28, GRAY, 700));
+        at(() => text(assetHeading, inLeft, y, 28, GRAY, 700));
         y += 60;
         for (const line of assetLines) {
           at(() => {

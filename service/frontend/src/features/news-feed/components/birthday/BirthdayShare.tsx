@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import type { AssetResult } from './lib/birthdayAssets';
+import type { AssetBase, AssetCell } from './lib/birthdayAssets';
 import { shareUrl } from './lib/birthdayModel';
 import { drawShare, shareText, type ShareVariant } from './lib/birthdayShare';
 import { nb } from './lib/keepTogether';
@@ -11,8 +11,8 @@ import styles from './birthdayStory.module.css';
 const FONTS = ['800 60px Pretendard', '900 60px Pretendard', '900 64px "Noto Serif KR"', '700 36px "Noto Serif KR"'];
 
 /** ⑥ 공유 — 결과 맨 아래. 9:16 생일 영수증·1면 카드. 휴대폰은 시스템 공유 창(카톡·인스타)으로 바로 보내고, 안 되면 이미지로 저장한다. */
-export function BirthdayShare({ result, mode, assets, front, variant, onVariant, onTryFriend }: {
-  result: BirthdayResult; mode: ViewMode; assets: AssetResult[]; front: BigKindsArticle[];
+export function BirthdayShare({ result, mode, assets, assetBase, front, variant, onVariant, onTryFriend }: {
+  result: BirthdayResult; mode: ViewMode; assets: AssetCell[]; assetBase: AssetBase | null; front: BigKindsArticle[];
   variant: ShareVariant; onVariant: (variant: ShareVariant) => void; onTryFriend: () => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -28,7 +28,7 @@ export function BirthdayShare({ result, mode, assets, front, variant, onVariant,
     // 공유 창은 누른 순간에 열어야 해서(브라우저의 사용자 동작 제한) 그릴 때마다 이미지를 미리 만들어 둔다.
     const paint = () => {
       if (!active || !canvas.current) return;
-      drawShare(canvas.current, result, { variant: current, mode, includeDay: dayShown, front, assets });
+      drawShare(canvas.current, result, { variant: current, mode, includeDay: dayShown, front, assets, assetBase });
       canvas.current.toBlob(made => { if (active) blob.current = made; }, 'image/png');
     };
     paint();
@@ -36,7 +36,7 @@ export function BirthdayShare({ result, mode, assets, front, variant, onVariant,
     const titles = front.slice(0, 5).map(article => article.title).join('') || '서울경제';
     void Promise.all(FONTS.map(font => document.fonts.load(font, titles))).then(paint, paint);
     return () => { active = false; };
-  }, [result, current, mode, dayShown, front, assets]);
+  }, [result, current, mode, dayShown, front, assets, assetBase]);
 
   function save() {
     if (!blob.current) { setStatus('이미지를 만드는 중이에요. 잠시 뒤 다시 눌러 주세요.'); return; }
