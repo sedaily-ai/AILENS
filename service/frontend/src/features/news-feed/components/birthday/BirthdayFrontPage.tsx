@@ -25,10 +25,10 @@ function masthead(date: string, front: boolean) {
   return `${year}년 ${month}월 ${day}일 ${weekdayOf(date)}요일${front ? ' · 1면' : ''}`;
 }
 
-/** 장면 이름 — 생일 당일 신문이 아니면 '내 생일 무렵', 1면이 아니면 '서울경제'라고 부른다. */
+/** 장면 이름 — 생일 당일 신문이 아니면 '내 생일 무렵', 1면이 아니면 '서울경제'라고 부른다. '1면'은 1면을 보여 줄 때만 쓴다(찾는 중·오류·안내에는 쓰지 않는다). */
 function kicker(state: FrontPageState | null) {
-  if (!state) return '그날 신문 1면';
-  if (state.status !== 'ok' || state.data.kind === 'none') return '내가 태어난 날 신문 1면';
+  if (!state) return '그날 신문';
+  if (state.status !== 'ok' || state.data.kind === 'none') return '내가 태어난 날 신문';
   const when = state.data.shown_date === state.date ? '내가 태어난 날' : '내 생일 무렵';
   return state.data.kind === 'day' ? `${when} 서울경제` : `${when} 신문 1면`;
 }
@@ -78,7 +78,7 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
   const data = state?.status === 'ok' ? state.data : null;
   const shown = data?.shown_date ?? birthDate;
   const sameDay = shown === birthDate;
-  const isDay = data?.kind === 'day';
+  const isFront = data?.kind === 'front';
   const canShare = shareableFront(state).length > 0;
   const [, month, day] = shown.split('-').map(Number);
   // 화면 낭독기용 상태 문장 — 늘 있는 요소의 글만 갈아 끼워야 읽힌다(로딩이 끝나 요소가 사라지면 결과가 알려지지 않는다).
@@ -86,13 +86,13 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
     : data && data.kind !== 'none' && !sameDay ? `생일 당일 신문이 없어 ${dateLabel(shown)}자 신문을 보여 줘요.` : '';
   return <section id="birthday-front" className={styles.scene} aria-labelledby="birthday-front-title">
     <p className={styles.kicker}>{kicker(state)}</p>
-    <h3 id="birthday-front-title" className="sr-only">{isDay ? '그날의 서울경제' : '그날의 서울경제 1면'}</h3>
+    <h3 id="birthday-front-title" className="sr-only">{isFront ? '그날의 서울경제 1면' : '그날의 서울경제'}</h3>
     <p className="sr-only" role="status">{spoken}</p>
     {data && <FrontNote data={data} />}
     <div className={styles.paper} aria-busy={state?.status === 'loading'}>
-      {/* '· 1면'은 1면을 보여 줄 때만. 그날 기사(면 번호 없는 시기)와 보관본에 없는 경우에는 붙이지 않는다. 로딩·오류는 1면을 찾는 중이라 붙인다. */}
-      <div className={styles.masthead}><strong>서울경제</strong>{state && <span>{masthead(shown, data ? data.kind === 'front' : true)}</span>}</div>
-      {!state ? <div className={styles.paperEmpty}><strong>출생연도만 담긴 공유 링크예요</strong><p>내 생일을 넣으면 그날 1면을 볼 수 있어요.</p><button type="button" className={styles.sceneAction} onClick={onUseBirthday}>내 생일로 보기</button></div>
+      {/* '· 1면'은 1면을 보여 줄 때만. 그날 기사(면 번호 없는 시기)·보관본에 없는 경우와, 어느 쪽인지 모르는 로딩·오류에는 붙이지 않는다. */}
+      <div className={styles.masthead}><strong>서울경제</strong>{state && <span>{masthead(shown, isFront)}</span>}</div>
+      {!state ? <div className={styles.paperEmpty}><strong>출생연도만 담긴 공유 링크예요</strong><p>내 생일을 넣으면 그날 신문을 볼 수 있어요.</p><button type="button" className={styles.sceneAction} onClick={onUseBirthday}>내 생일로 보기</button></div>
         : state.status === 'loading' ? <div className={styles.skeleton} aria-hidden="true"><span /><span /><span /></div>
         // 실패 원인(네트워크·보관본 응답·형식)을 화면에서는 가릴 수 없어 단정하지 않는다.
         : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>{`연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>

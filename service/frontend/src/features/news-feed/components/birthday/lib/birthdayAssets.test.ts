@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
 import {
-  apartmentCell, assetBase, assetCells, assetInflation, assetsAvailable, assetSourceLine, assetSourceParts, changeOf, depositCell, ecosOrgs,
-  goldSourceParts, inflationLine, onOrBefore, periodLabel, sourceText, usdCell, type AssetBase,
+  apartmentCell, assetBase, assetCells, assetInflation, assetsAvailable, assetSourceLine, changeOf, depositCell, ecosOrgs,
+  goldCell, inflationLine, onOrBefore, periodLabel, usdCell, type AssetBase,
 } from './birthdayAssets';
 import { parseDate } from './birthdayModel';
 import { nb } from './keepTogether';
@@ -103,7 +103,7 @@ test('정기예금: 기준월 지수 → 다음 달 지수, 금리가 없는 달
   const cell = depositCell(base('2010-05-15'), file2010, latest())!;
   expect(cell.nowAmount).toBe(1_500_000);
   expect(cell.now).toEqual({ period: '2026-09', label: '2026년 8월 금리까지' });
-  expect(cell.notes[0]).toContain('세전');
+  expect(cell.notes).toEqual(['세전 월복리로, 매달 그달 신규 정기예금 금리를 적용했어요.']);
   expect(depositCell(base('2010-06-15'), file2010, latest())).toBeNull();
   expect(depositCell(base('1995-12-01'), { year: 1995, deposit: [] }, latest())).toBeNull();
   // 마지막 금리 달(2026-08) 뒤의 달은 금리가 아직 없다.
@@ -145,21 +145,23 @@ test('서울 아파트: 지수 비율만(원 금액 없음), 2005-12·미발표 
   expect(apartmentCell(base('2026-08-10'), { year: 2026, apartment: [['2026-07', 101.9]] }, latest())).toBeNull();
 });
 
-test('금 한 돈: latest에 금이 있을 때만 다섯째 칸, 국제 금값 × 그달 평균 환율', () => {
-  const file = { ...file2010, gold: [['2010-05', 1200]] } satisfies AssetYearFile;
-  const withGold = latest({ gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } });
+test('금: 금괴 생산자물가지수 비율, latest에 금이 있을 때만 넷째 칸, 100만 원 기준 금액', () => {
+  const file = { ...file2010, gold: [['2010-05', 69.37]] } satisfies AssetYearFile;
+  const withGold = latest({ gold: ['2026-09', 281.92] });
   const cells = assetCells(base('2010-05-15'), file, withGold);
   expect(cells.map(cell => cell.id)).toEqual(['deposit', 'usd', 'apartment', 'gold']);
   const gold = cells[3];
-  const don = (usd: number, krw: number) => usd / 31.1034768 * 3.75 * krw;
-  expect(gold.unit!.label).toBe('1돈');
-  expect(gold.unit!.then).toBeCloseTo(don(1200, 1005), 6);
-  expect(gold.unit!.now).toBeCloseTo(don(4000, 1400), 6);
-  expect(gold.multiple).toBeCloseTo(don(4000, 1400) / don(1200, 1005), 9);
-  expect(gold.then.monthlyAverage).toBe(true);
-  // 원화·1돈 환산(변경 표시)과 국내 시세와의 차이를 한 문장으로.
-  expect(gold.notes).toEqual([`국제 금값 월평균을 그달 평균 환율로 바꾼 값이라 ${nb('국내 금 시세와는')} ${nb('다를 수 있어요.')}`]);
+  expect(gold.name).toBe('금');
+  expect(gold.multiple).toBeCloseTo(281.92 / 69.37, 12);
+  expect(gold.nowAmount).toBeCloseTo(1_000_000 * 281.92 / 69.37, 6);
+  expect(gold.unit).toBeUndefined();
+  expect(gold.then).toEqual({ period: '2010-05', monthlyAverage: false });
+  expect(gold.now).toEqual({ period: '2026-09', label: '2026년 9월 금괴 지수' });
+  expect(gold.notes).toEqual(['한국은행 생산자물가지수의 금괴 가격 변화로 계산했어요. 금은방 판매가와는 다를 수 있어요.']);
+  // latest에 금이 없거나 기준월 지수가 없으면(1964년·미발표 달) 칸이 없다 — 다른 달로 대신하지 않는다.
   expect(assetCells(base('2010-05-15'), file, latest()).map(cell => cell.id)).toEqual(['deposit', 'usd', 'apartment']);
+  expect(goldCell(base('2010-06-15'), file, withGold)).toBeNull();
+  expect(goldCell(base('1964-06-01'), { year: 1964, gold: [] }, withGold)).toBeNull();
 });
 
 test('증감은 화살표와 부호로 — 감소는 U+2212', () => {
@@ -178,36 +180,20 @@ test('출처 문장: ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관�
   expect(line).toContain('한국은행 예금은행 정기예금 신규취급액 가중평균 금리, 한국은행 원/달러 환율, 한국부동산원 서울 아파트 실거래가격지수, 국가데이터처 소비자물가지수로 계산했어요.');
   for (const cell of cells) expect(line).toContain(nb(cell.now.label));
   expect(line).toContain(`${nb('2026년 7월 지수')}, ${nb('2026년 9월 물가')} 기준이에요.`);
-  expect(line).not.toContain('세계은행');
   // 물가 줄이 없으면 소비자물가지수와 물가 시점도 빠진다.
   const noInflation = assetSourceLine(cells, null);
   expect(noInflation).toContain('한국부동산원 서울 아파트 실거래가격지수로 계산했어요.');
   expect(noInflation).not.toContain('소비자물가지수');
   expect(noInflation).not.toContain('물가');
-  const goldFile = { ...file2010, gold: [['2010-05', 1200]] } satisfies AssetYearFile;
-  const gold = assetCells(base('2010-05-15'), goldFile, latest({ gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } }));
-  // CC BY 4.0 — 금 칸이 보이면 라이선스 이름이 함께 드러난다.
-  expect(assetSourceLine(gold, inflation)).toContain(`국가데이터처 소비자물가지수와 세계은행 ${nb('Pink Sheet(CC BY 4.0)')} 국제 금값 월평균으로 계산했어요.`);
-  expect(assetSourceLine(gold, null)).toContain(`실거래가격지수와 세계은행 ${nb('Pink Sheet(CC BY 4.0)')} 국제 금값 월평균으로 계산했어요.`);
+  // 금도 ECOS 한 계열이라 다른 칸처럼 작성기관·통계 이름과 지금 시점이 들어간다.
+  const goldFile = { ...file2010, gold: [['2010-05', 69.37]] } satisfies AssetYearFile;
+  const gold = assetCells(base('2010-05-15'), goldFile, latest({ gold: ['2026-09', 281.92] }));
+  expect(assetSourceLine(gold, inflation)).toContain('한국부동산원 서울 아파트 실거래가격지수, 한국은행 생산자물가지수(금괴), 국가데이터처 소비자물가지수로 계산했어요.');
+  expect(assetSourceLine(gold, inflation)).toContain(`${nb('2026년 7월 지수')}, ${nb('2026년 9월 금괴 지수')}, ${nb('2026년 9월 물가')} 기준이에요.`);
+  expect(assetSourceLine(gold, null)).toContain('한국은행 생산자물가지수(금괴)로 계산했어요.');
   expect(assetSourceLine([], inflation)).toBe('');
-  expect(assetSourceParts([], inflation)).toEqual([]);
-  // 링크는 금 칸이 있을 때만 — 자료 이름은 세계은행 안내, 라이선스 이름은 라이선스 본문.
-  expect(assetSourceParts(cells, inflation).every(part => typeof part === 'string')).toBe(true);
-  expect(assetSourceParts(gold, inflation).filter(part => typeof part !== 'string')).toEqual([
-    { text: `세계은행 ${nb('Pink Sheet')}`, href: 'https://www.worldbank.org/en/research/commodity-markets' },
-    { text: nb('CC BY 4.0'), href: 'https://creativecommons.org/licenses/by/4.0/deed.ko' },
-  ]);
-  expect(sourceText(assetSourceParts(gold, inflation))).toBe(assetSourceLine(gold, inflation));
   expect(periodLabel('2026-09')).toBe('2026년 9월');
   expect(periodLabel('2026-10-20')).toBe('2026년 10월 20일');
-});
-
-test('하단 출처 줄의 금 표기는 세계은행까지 한 덩어리, 링크 두 개', () => {
-  const parts = goldSourceParts(true);
-  expect(sourceText(parts)).toBe(nb('세계은행 Pink Sheet(CC BY 4.0)'));
-  expect(parts.flatMap(part => typeof part === 'string' ? [] : [part.href])).toEqual([
-    'https://www.worldbank.org/en/research/commodity-markets', 'https://creativecommons.org/licenses/by/4.0/deed.ko',
-  ]);
 });
 
 test('하단 출처 작성기관: 국가데이터처는 물가를 보일 때, 한국부동산원은 아파트 칸이 있을 때만', () => {

@@ -79,8 +79,8 @@ function BirthdayIntro({ heading: Heading, formId, initialDate, error, onDateCha
     <form id={formId} tabIndex={-1} onSubmit={submit} autoComplete="off" className={styles.form}>
       <div className={styles.introCopy}>
         <p className={styles.eyebrow}>내 생일 타임머신</p>
-        <Heading className={styles.introTitle}>내 생일에 샀다면,<br />지금은?</Heading>
-        <p className={styles.description}>그날 서울경제 1면부터 최저시급, 연금 달력까지.<br />생일을 넣고 그날로 돌아가 보세요.</p>
+        <Heading className={styles.introTitle}>내가 태어난 날,<br />그때와 지금</Heading>
+        <p className={styles.description}>그날 서울경제부터 최저시급, 연금 달력까지.<br />생일을 넣고 그날로 돌아가 보세요.</p>
       </div>
       <BirthdayDateDial today={today} value={birthday} onChange={date => { setBirthday(date); onDateChange(); }} errorId={`${id}-error`} />
       <div className={styles.departure}>

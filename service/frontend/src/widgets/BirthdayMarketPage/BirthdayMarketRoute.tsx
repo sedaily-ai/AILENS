@@ -3,8 +3,8 @@ import { SITE_URL } from '@/shared/constants/site';
 import { BIRTHDAY_MARKET_PATH } from '@/features/news-feed';
 import { BirthdayMarketPage } from './BirthdayMarketPage';
 
-const title = '내 생일에 샀다면, 지금은? — 내 생일 타임머신';
-const description = '내 생일의 서울경제 1면부터 최저시급, 큰 사건과 그때 내 나이, 국민연금 달력까지. 생일을 넣고 그날로 돌아가 보세요.';
+const title = '내가 태어난 날, 그때와 지금 — 내 생일 타임머신';
+const description = '내 생일의 서울경제부터 최저시급, 큰 사건과 그때 내 나이, 국민연금 달력까지. 생일을 넣고 그날로 돌아가 보세요.';
 const url = `${SITE_URL}${BIRTHDAY_MARKET_PATH}`;
 
 export const metadata: Metadata = {

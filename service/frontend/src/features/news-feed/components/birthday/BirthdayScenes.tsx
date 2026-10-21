@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { CPI_LATEST } from './data/birthdayCatalog';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import { assetSourceParts, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation, type SourcePart } from './lib/birthdayAssets';
+import { assetSourceLine, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
 import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW, won } from './lib/birthdayModel';
 import type { AssetLoadState } from './lib/useBirthdayAssets';
+import { frontPageNotice } from './lib/birthdayFrontPage';
 import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
@@ -40,7 +41,9 @@ export function ArrivalScene({ result, mode }: { result: BirthdayResult; mode: V
     <p className={styles.kicker}>{mode === 'year' ? `${year}년으로 왔어요` : `${elapsedLabel(result.birthDate)}을 거슬러 왔어요`}</p>
     <div className={styles.odometer} aria-hidden="true">{String(shown).split('').map((digit, index) => <span key={index}>{digit}</span>)}</div>
     <h2 id="birthday-arrival" className={styles.title}>{mode === 'year' ? `${year}년생` : <>{month}월 {day}일<br />{weekday}요일</>}<span className="sr-only">{mode === 'year' ? '' : `, ${dateLabel(result.birthDate)}`}</span></h2>
-    <p className={styles.lead}>{mode === 'year' ? '그해와 지금을 비교했어요. 날짜가 필요한 값은 1월 1일 기준이에요.' : `내가 태어난 날, 서울경제는 ${nb('이런 소식을')} 실었어요.`}</p>
+    {/* 그날 신문이 없는 날(창간 전·지면 공백·보관본 시작 전)은 '서울경제는 이런 소식을 실었어요'라고 쓰지 않는다. */}
+    <p className={styles.lead}>{mode === 'year' ? '그해와 지금을 비교했어요. 날짜가 필요한 값은 1월 1일 기준이에요.'
+      : frontPageNotice(result.birthDate) ? '내가 태어난 날과 지금을 비교했어요.' : `내가 태어난 날, 서울경제는 ${nb('이런 소식을')} 실었어요.`}</p>
   </section>;
 }
 
@@ -56,23 +59,16 @@ function assetLead(base: AssetBase, mode: ViewMode) {
     : `서른 살 전이라 태어난 날(${day})에 넣었다고 보고 계산했어요.`;
 }
 
-/** 출처 줄 조각 — 링크(자료·라이선스 원문)는 새 탭으로 연다. 글줄 안 링크라 모양·터치 영역은 .source a·.notice a가 맡는다. */
-export function SourceParts({ parts }: { parts: SourcePart[] }) {
-  return <>{parts.map((part, index) => typeof part === 'string' ? part
-    : <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}<span className="sr-only"> (새 창)</span></a>)}</>;
-}
-
 /** 칸 아래 첫 줄 — 지금 금액과 증감. 증감은 색 없이 화살표(낭독 제외)와 부호로 읽히게 한다. */
 function cellDetail(cell: AssetCell) {
   const change = changeOf(cell.multiple);
   const arrow = change.arrow && <><span aria-hidden="true">{change.arrow}</span>{' '}</>;
   if (cell.nowAmount === null) return <>{arrow}서울 아파트값 {nb(`${times(cell.multiple)}(${change.signed})`)}</>;
-  const price = cell.unit?.label === '1돈' ? manwon : won;
-  return <>{arrow}지금 {nb(`${manwon(cell.nowAmount)}(${change.signed})`)}{cell.unit && <> · {nb(`${cell.unit.label} = 그때 ${price(cell.unit.then)}`)} → {nb(`지금 ${price(cell.unit.now)}`)}</>}</>;
+  return <>{arrow}지금 {nb(`${manwon(cell.nowAmount)}(${change.signed})`)}{cell.unit && <> · {nb(`${cell.unit.label} = 그때 ${won(cell.unit.then)}`)} → {nb(`지금 ${won(cell.unit.now)}`)}</>}</>;
 }
 
 /**
- * 그때 100만 원, 지금은 — 서른 살이 지났으면 스무 살 생일, 아니면 태어난 날에 100만 원을 정기예금·달러·서울 아파트(·금)에 뒀다면.
+ * 그때 100만 원, 지금은 — 서른 살이 지났으면 스무 살 생일, 아니면 태어난 날에 100만 원을 정기예금·달러·서울 아파트·금에 뒀다면.
  * 칸은 고정 순서이고 1등 강조·정렬이 없다(투자 권유로 읽히지 않게). 주인공은 제목 문장이다.
  * 칸 목록 아래 물가 한 줄은 칸을 읽는 기준이라 같은 기간(기준일이 속한 달 → 최신 물가)으로 쓴다. 그달 물가가 없으면 줄을 그리지 않는다.
  * 기준일이 공식 환율 기록 시작(1964-05-04)보다 앞서면(off) 장면 대신 한 줄 안내만 둔다.
@@ -116,7 +112,7 @@ export function AssetScene({ base, mode, state, cells, inflation, onRetry }: {
           {cell.notes.length > 0 && <p className={styles.barDetail}>{cell.notes.join(' ')}</p>}
         </li>)}</ol>
         {inflation && <p className={styles.lead}>{inflationLine(inflation)}</p>}
-        <p className={styles.source}><SourceParts parts={assetSourceParts(cells, inflation)} /></p>
+        <p className={styles.source}>{assetSourceLine(cells, inflation)}</p>
         <p className={styles.source}>과거 자료로 계산한 가정이에요. 특정 자산을 사거나 팔라는 권유가 아니에요. 세금·수수료는 빼고 계산했고 막대는 로그 눈금이에요.</p>
         <p className={styles.links}><Link href={`/search?q=${encodeURIComponent('환율')}`} prefetch={false}>환율 기사 보기</Link><Link href="/search?q=%EB%B6%80%EB%8F%99%EC%82%B0" prefetch={false}>부동산 기사 보기</Link></p>
       </>}
@@ -141,7 +137,8 @@ export function MoneyScene({ result }: { result: BirthdayResult }) {
     <h3 id="birthday-money" className={styles.figure}>{manwon(hundredMillionNow(result.cpi))}</h3>
     <p className={styles.lead}>같은 {nb('1억 원으로')} 살 수 있는 것이 그때의 {number(result.cpi / CPI_LATEST.value * 100)}% 수준이 됐어요.</p>
     {/* 문장 한가운데 괄호(기간·출처)가 끼어 'ECOS) / 로'처럼 엉뚱한 데서 꺾여서, 무엇을 무엇으로 바꿨는지를 한 문장으로 풀었다. */}
-    <p className={styles.source}>{nb('한국은행 ECOS')} 소비자물가지수로 {nb(result.cpiPeriod)} {nb('물가로 본')} {nb('1억 원을')} {nb('2026년 9월')} 가치로 환산했어요. {nb('실제 생활비')} 변화와는 {nb('다를 수 있어요')}.</p>
+    {/* 작성기관(국가데이터처)을 제공처(한국은행 ECOS)와 함께 적는다 — 'ECOS 소비자물가지수'만 쓰면 한국은행 통계로 읽힌다. */}
+    <p className={styles.source}>{nb('한국은행 ECOS')}에서 받은 {nb('국가데이터처 소비자물가지수로')} {nb(result.cpiPeriod)} {nb('물가로 본')} {nb('1억 원을')} {nb('2026년 9월')} 가치로 환산했어요. {nb('실제 생활비')} 변화와는 {nb('다를 수 있어요')}.</p>
   </section>;
 }
 

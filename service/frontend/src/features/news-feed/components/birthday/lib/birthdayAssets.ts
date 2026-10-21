@@ -1,12 +1,9 @@
 // "스무 살의 내가 100만 원을 어디에 뒀다면" 칸 계산. 값은 수집 스크립트가 만든 연도 파일·latest.json(data/birthdayAssets.ts 형식)에서만 읽는다.
 import { kstTodayStr } from '@/shared/lib/date/date';
-import { ASSET_SERIES_FROM, ASSET_SOURCE_INFO, GOLD_SOURCE, type AssetLatest, type AssetPoint, type AssetYearFile } from '../data/birthdayAssets';
+import { ASSET_SERIES_FROM, ASSET_SOURCE_INFO, type AssetLatest, type AssetPoint, type AssetYearFile } from '../data/birthdayAssets';
 import type { BirthdayDate } from '../data/birthdayTypes';
 import { anniversary, dateLabel, number, times } from './birthdayModel';
 import { nb } from './keepTogether';
-
-const GRAMS_PER_DON = 3.75;
-const GRAMS_PER_TROY_OUNCE = 31.1034768;
 
 /** 오름차순 배열에서 key 이하인 마지막 원소(휴장일이면 직전 영업일). */
 export function onOrBefore<T>(points: T[], key: string, keyOf: (point: T) => string): T | null {
@@ -45,7 +42,7 @@ export interface AssetCell {
   then: { period: string; monthlyAverage: boolean };
   /** 지금 값의 시점과 출처 줄 표기('2026년 8월 금리까지' 등). */
   now: { period: string; label: string };
-  unit?: { label: '1달러' | '1돈'; then: number; now: number };
+  unit?: { label: '1달러'; then: number; now: number };
   notes: string[];
 }
 
@@ -91,7 +88,7 @@ export const depositCell: CellOf = (base, file, latest) => {
   const multiple = now[1] / then[1];
   return { id: 'deposit', name: '정기예금', multiple, nowAmount: ASSET_STAKE * multiple,
     then: { period: then[0], monthlyAverage: false }, now: { period: now[0], label: `${periodLabel(rateMonth)} 금리까지` },
-    notes: ['세전, 매달 그달 신규 정기예금 금리로 굴린 값이에요.'] };
+    notes: ['세전 월복리로, 매달 그달 신규 정기예금 금리를 적용했어요.'] };
 };
 
 export const usdCell: CellOf = (base, file, latest) => {
@@ -118,21 +115,15 @@ export const apartmentCell: CellOf = (base, file, latest) => {
     notes: ['집값(원)이 아니라 가격지수의 비율이에요.'] };
 };
 
-/** 금 1돈(원) = 달러/트로이온스 ÷ 31.1034768 × 3.75 × 원/달러. */
-const donPrice = (usdPerOunce: number, krwPerUsd: number) => usdPerOunce / GRAMS_PER_TROY_OUNCE * GRAMS_PER_DON * krwPerUsd;
-
+/** 금 — 한국은행 생산자물가지수 품목별 금괴(404Y016)의 비율. 금은 소액으로도 살 수 있어 아파트와 달리 100만 원 기준 금액을 쓴다. */
 export const goldCell: CellOf = (base, file, latest) => {
-  const month = monthOf(base);
-  const ounce = exact(file.gold, month), fx = exact(file.usdkrw?.monthly, month), now = latest.gold;
-  if (!ounce || !fx || !now) return null;
-  const then = donPrice(ounce[1], fx[1]), today = donPrice(now.usd[1], now.usdkrw[1]);
-  const multiple = today / then;
-  return { id: 'gold', name: '금 한 돈', multiple, nowAmount: ASSET_STAKE * multiple,
-    then: { period: month, monthlyAverage: true }, now: { period: now.usd[0], label: `${periodLabel(now.usd[0])} 월평균` },
-    unit: { label: '1돈', then, now: today },
-    // 원화·1돈으로 바꿨다는 변경 표시(CC BY 4.0)이자, 이 값을 국내 금 시세로 읽지 않게 하는 메모.
-    // 375px에서 '국내 금 / 시세와는'으로 '금 시세'가 갈라져서 묶는다.
-    notes: [`국제 금값 월평균을 그달 평균 환율로 바꾼 값이라 ${nb('국내 금 시세와는')} ${nb('다를 수 있어요.')}`] };
+  const then = exact(file.gold, monthOf(base)), now = latest.gold;
+  if (!then || !now) return null;
+  const multiple = now[1] / then[1];
+  return { id: 'gold', name: '금', multiple, nowAmount: ASSET_STAKE * multiple,
+    then: { period: then[0], monthlyAverage: false }, now: { period: now[0], label: `${periodLabel(now[0])} 금괴 지수` },
+    // 생산자 가격 지수라 소매 금값(금은방 판매가)과 다르다는 것을 함께 적는다.
+    notes: ['한국은행 생산자물가지수의 금괴 가격 변화로 계산했어요. 금은방 판매가와는 다를 수 있어요.'] };
 };
 
 const CELL_OF: Record<AssetCellId, CellOf> = { deposit: depositCell, usd: usdCell, apartment: apartmentCell, gold: goldCell };
@@ -158,7 +149,6 @@ function finalConsonant(word: string) {
   return { has: jong > 0, rieul: jong === 8 };
 }
 const withRo = (word: string) => { const end = finalConsonant(word); return `${word}${end.has && !end.rieul ? '으로' : '로'}`; };
-const withWa = (word: string) => `${word}${finalConsonant(word).has ? '과' : '와'}`;
 
 /** 물가 줄 문장. 1배로 반올림되는 짧은 기간(올해 태어난 날 등)은 '1배 올랐어요'가 되지 않게 %로 쓴다. */
 export function inflationLine({ multiple }: AssetInflation) {
@@ -168,37 +158,16 @@ export function inflationLine({ multiple }: AssetInflation) {
   return `같은 기간 물가는 ${nb(change)}`;
 }
 
-/** 출처 줄 조각 — 글자, 또는 새 탭으로 여는 링크(자료·라이선스 원문). */
-export type SourcePart = string | { text: string; href: string };
-
-/** 조각을 이은 문장(화면에 보이는 글자와 같다). */
-export const sourceText = (parts: SourcePart[]) => parts.map(part => typeof part === 'string' ? part : part.text).join('');
-
-/**
- * 금 자료 표기 '세계은행 Pink Sheet(CC BY 4.0)' — '세계은행 Pink Sheet'는 원자료 안내, 'CC BY 4.0'은 라이선스 본문 링크.
- * 'Pink Sheet(CC BY 4.0)'은 'CC / BY 4.0'처럼 갈라지지 않게 붙여 둔다(링크 경계는 줄바꿈 자리가 아니다). together면 '세계은행'까지 붙인다.
- */
-export function goldSourceParts(together = false): SourcePart[] {
-  const { org } = ASSET_SOURCE_INFO.gold, { dataset, datasetHref, license, licenseHref } = GOLD_SOURCE;
-  return [{ text: together ? nb(`${org} ${dataset}`) : `${org} ${nb(dataset)}`, href: datasetHref }, '(', { text: nb(license), href: licenseHref }, ')'];
-}
-
-/** 자산 장면 출처 문장 조각 — ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관·통계, 그때·지금 기준 시점. 금 칸이 있으면 세계은행 자료·라이선스 링크. 칸이 없으면 []. */
-export function assetSourceParts(cells: AssetCell[], inflation: AssetInflation | null): SourcePart[] {
-  if (!cells.length) return [];
+/** 자산 장면 출처 문장 — ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관·통계, 그때·지금 기준 시점. 칸이 없으면 ''. */
+export function assetSourceLine(cells: AssetCell[], inflation: AssetInflation | null) {
+  if (!cells.length) return '';
   const statOf = (id: keyof typeof ASSET_SOURCE_INFO) => `${ASSET_SOURCE_INFO[id].org} ${ASSET_SOURCE_INFO[id].name}`;
   // 물가 줄은 칸 목록 아래에 있어 ECOS 통계 목록과 지금 시점 목록 모두 칸 뒤에 둔다.
-  const ecos = [...cells.filter(cell => cell.id !== 'gold').map(cell => statOf(cell.id)), ...(inflation ? [statOf('cpi')] : [])].join(', ');
+  const ecos = [...cells.map(cell => statOf(cell.id)), ...(inflation ? [statOf('cpi')] : [])].join(', ');
   const nowLabels = [...cells.map(cell => cell.now.label), ...(inflation ? [`${periodLabel(inflation.now)} 물가`] : [])];
-  const lead = `${nb('한국은행 ECOS')}에서 받은 `;
-  const rest = ' 계산했어요. 그때 값은 기준일이 속한 달(달러는 그날 또는 직전 영업일 종가, 1990년 3월 이전은 월평균) 기준이고, '
+  return `${nb('한국은행 ECOS')}에서 받은 ${withRo(ecos)} 계산했어요. 그때 값은 기준일이 속한 달(달러는 그날 또는 직전 영업일 종가, 1990년 3월 이전은 월평균) 기준이고, `
     + `지금 값은 ${nowLabels.map(nb).join(', ')} 기준이에요.`;
-  if (!cells.some(cell => cell.id === 'gold')) return [`${lead}${withRo(ecos)}${rest}`];
-  return [`${lead}${withWa(ecos)} `, ...goldSourceParts(), ` ${withRo(ASSET_SOURCE_INFO.gold.name)}${rest}`];
 }
-
-/** 출처 문장 글자만. */
-export const assetSourceLine = (cells: AssetCell[], inflation: AssetInflation | null) => sourceText(assetSourceParts(cells, inflation));
 
 /** 하단 출처 줄의 ECOS 작성기관 — 한국은행은 항상, 국가데이터처는 물가(1억 원 장면·물가 줄)를 보일 때, 한국부동산원은 아파트 칸이 있을 때. */
 export function ecosOrgs(cells: AssetCell[], cpiShown: boolean) {

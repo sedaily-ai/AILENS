@@ -23,6 +23,7 @@ test('요청 주소는 연도 파일과 latest.json뿐이고 연도만 담는다
 
 test('연도 파일: 정상 형식은 그대로, 자료 시작 전 빈 배열도 받는다', () => {
   expect(parseAssetYear(yearFile, 2010)).toEqual(yearFile);
+  expect(parseAssetYear({ ...yearFile, gold: [['2010-05', 69.37]] }, 2010)?.gold).toEqual([['2010-05', 69.37]]);
   expect(parseAssetYear({ year: 1964, cpi: [], usdkrw: { daily: [], monthly: [['1964-05', 255.77]] } }, 1964))
     .toEqual({ year: 1964, cpi: [], usdkrw: { daily: [], monthly: [['1964-05', 255.77]] } });
 });
@@ -41,8 +42,9 @@ test('연도 파일: 연도 불일치·점 형식·시점 형식·순서·환율
 
 test('latest.json: 정상 형식은 그대로, 필수 값이 없거나 점 형식이 틀리면 null', () => {
   expect(parseAssetLatest(latestFile)).toEqual(latestFile);
-  expect(parseAssetLatest({ ...latestFile, gold: { usd: ['2026-09', 4319], usdkrw: ['2026-09', 1359] } })?.gold)
-    .toEqual({ usd: ['2026-09', 4319], usdkrw: ['2026-09', 1359] });
+  // 금은 다른 계열처럼 [시점, 값] 한 점(생산자물가지수 금괴). 예전 묶음 모양은 형식 오류로 본다.
+  expect(parseAssetLatest({ ...latestFile, gold: ['2026-09', 281.92] })?.gold).toEqual(['2026-09', 281.92]);
+  expect(parseAssetLatest({ ...latestFile, gold: { usd: ['2026-09', 4319], usdkrw: ['2026-09', 1359] } })).toBeNull();
   const noGeneratedAt: Record<string, unknown> = { ...latestFile };
   delete noGeneratedAt.generatedAt;
   expect(parseAssetLatest(noGeneratedAt)).toBeNull();

@@ -109,9 +109,8 @@
 .official { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-top: 8px; color: #1d4ed8; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
 
 .notice { padding: 16px 0 24px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; line-height: 1.7; }
-/* 링크는 글줄 안에 둔다 — inline-flex 44px 상자는 그 줄만 높여 위 줄과의 간격이 벌어졌다. 터치 영역 44px은 위아래 안쪽 여백(15px)으로 잡는다(인라인 요소의 세로 여백은 줄 높이를 바꾸지 않는다).
-   장면 출처 줄(.source)의 자료·라이선스 링크(금 칸)도 같은 글줄 안 링크라 같은 규칙을 쓴다. */
-.notice a, .source a { display: inline; padding: 15px 0; color: #1d4ed8; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+/* 링크는 글줄 안에 둔다 — inline-flex 44px 상자는 그 줄만 높여 위 줄과의 간격이 벌어졌다. 터치 영역 44px은 위아래 안쪽 여백(15px)으로 잡는다(인라인 요소의 세로 여백은 줄 높이를 바꾸지 않는다). */
+.notice a { display: inline; padding: 15px 0; color: #1d4ed8; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
 /* 맨 아래 고지는 성격별 세 줄(고지 / 기준 시점·오류 알리기 / 출처·확인일)을 화면 폭과 관계없이 지킨다 — 이어 흐르게 두면 좁은 화면에서 '잘못된 내용 알리기' 뒤에 출처 문장이 바로 붙는다. */
 .notice > span { display: block; }
 /* 공유 안내는 뜻 단위 줄(span)로 나눈다 — 한 줄에 다 들어가는 넓은 화면에서만. 좁은 화면은 이어서 흐르게 둬야 줄 수가 덜 늘어난다. */

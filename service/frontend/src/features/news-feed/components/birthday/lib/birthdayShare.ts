@@ -3,7 +3,6 @@ import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import { SITE_URL } from '@/shared/constants/site';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { RECEIPT_QR_ROWS } from '../data/birthdayQr';
-import { ASSET_SOURCE_INFO, GOLD_SOURCE } from '../data/birthdayAssets';
 import type { AssetBase, AssetCell } from './birthdayAssets';
 import { elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './birthdayModel';
 
@@ -49,17 +48,24 @@ export function receiptAssetLines(cells: AssetCell[]): ReceiptLine[] {
 }
 
 /**
- * 영수증 출처 한 줄 — 이미지만 따로 퍼져도 출처가 남게 한다. 숫자 대부분(1억 원·100만 원 줄)이 ECOS라 '한국은행 ECOS'를 앞에 두고
- * 시급(최저임금위원회)·연금(국민연금공단)·1면(빅카인즈)은 '외'로 묶는다. 금 줄이 있으면 CC BY 4.0이라 자료 이름과 라이선스를 적는다(이미지라 링크는 없다).
- * ECOS 숫자가 없으면 찍힌 줄의 출처만 적고, 출처를 밝힐 줄이 없으면 ''.
+ * 영수증 출처 한 줄 — 이미지만 따로 퍼져도 출처가 남게 한다. 숫자 대부분(1억 원·100만 원 줄)이 ECOS라 '한국은행 ECOS'와 찍힌 줄의
+ * 작성기관(정기예금·달러·금 한국은행, 1억 원 국가데이터처, 아파트 한국부동산원)을 앞에 두고, 시급(최저임금위원회)·연금(국민연금공단)·
+ * 1면(빅카인즈)은 '외'로 묶는다. ECOS 숫자가 없으면 찍힌 줄의 출처만 적고, 출처를 밝힐 줄이 없으면 ''.
  */
 export function receiptSourceLine(result: BirthdayResult, assets: AssetCell[], headline: boolean) {
+  const orgs = [
+    ...(assets.some(cell => cell.id !== 'apartment') ? ['한국은행'] : []),
+    ...(result.cpi ? ['국가데이터처'] : []),
+    ...(assets.some(cell => cell.id === 'apartment') ? ['한국부동산원'] : []),
+  ];
   // receiptLines와 같은 조건(시급·연금 줄), 1면은 제목이 찍힐 때만.
   const others = [...(result.wage ? ['최저임금위원회'] : []), ...(result.calendar?.points[1] ? ['국민연금공단'] : []), ...(headline ? ['빅카인즈'] : [])];
-  const main = result.cpi || assets.length ? `한국은행 ECOS${others.length ? ' 외' : ''}` : others.join('·');
-  const gold = assets.some(cell => cell.id === 'gold') ? ` · ${ASSET_SOURCE_INFO.gold.org} ${GOLD_SOURCE.dataset}(${GOLD_SOURCE.license})` : '';
-  return main ? `출처 ${main}${gold}` : '';
+  const main = orgs.length ? `한국은행 ECOS(${orgs.join('·')} 작성)${others.length ? ' 외' : ''}` : others.join('·');
+  return main ? `출처 ${main}` : '';
 }
+
+/** 1면 카드 출처 한 줄 — 서울경제 기사 제목을 빅카인즈 보관본의 면 번호로 골랐다는 것(화면 1면 장면 출처 줄과 같은 기준). */
+export const FRONT_CARD_SOURCE = '출처 빅카인즈 보관본(면 번호 기준)';
 
 /** 100만 원 묶음 소제목 — 기준일이 스무 살 생일인지 태어난 날인지. */
 export function receiptAssetHeading(base: AssetBase) {
@@ -149,7 +155,8 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
     const lead = wrap(content.front[0].title, 64, 900, SERIF, 776, 3);
     const rest = content.front.slice(1, 5).map(article => wrap(article.title, 36, 700, SERIF, 776, 1)[0]);
     const top = 500, leadTop = top + 300;
-    const bottom = leadTop + (lead.length - 1) * 84 + rest.length * 84 + 72;
+    // 지면 맨 아래에 출처 한 줄(영수증 출처 줄과 같은 24px·SOFT)을 두는 자리 40px을 더한다. 제목이 가장 많아도(3줄 + 4줄) 1416px.
+    const bottom = leadTop + (lead.length - 1) * 84 + rest.length * 84 + 112;
     tilted(0.012, (top + bottom) / 2, () => {
       shadow(true); context.fillStyle = '#fff'; context.fillRect(96, top, 888, bottom - top); shadow(false);
       context.textAlign = 'center';
@@ -165,6 +172,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
         cursor += 84;
         context.fillStyle = INK; font(36, 700, SERIF); context.fillText(title, 152, cursor);
       }
+      text(FRONT_CARD_SOURCE, 152, cursor + 68, 24, SOFT, 500, 776);
     });
     if (bottom + 140 < 1500) text(String(year), 56, 1660, 320, BACKDROP_DEEP, 900, 680);
     // QR은 흰 칸(사방 4칸 이상 여백) 위에 둔다 — 노란 바탕 위에서는 판독기가 테두리를 잘못 잡을 수 있다.
@@ -172,7 +180,8 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
     context.fillStyle = '#fff';
     context.beginPath(); context.roundRect(1008 - box, 1848 - box, box, box, 16); context.fill();
     qr(1008 - box + pad, 1848 - box + pad, box - pad * 2);
-    text('내 생일 1면도 찾아보기', 72, 1780, 40, INK, 800, 680);
+    // 받는 사람의 생일은 1면이 없는 시기(그날 기사)일 수 있어 '1면'이 아니라 '신문'으로 권한다.
+    text('내 생일 신문도 찾아보기', 72, 1780, 40, INK, 800, 680);
     text('QR을 찍으면 바로 열려요', 72, 1836, 28, GRAY, 500, 680);
   };
 
@@ -283,6 +292,6 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
 
   if (content.variant === 'front' && hasFront) {
     drawFront();
-    canvas.setAttribute('aria-label', `AI LENS 내 생일 타임머신 1면 카드. ${shareText(result, 'front')}. ${content.front.slice(0, 4).map(article => article.title).join(', ')}`);
+    canvas.setAttribute('aria-label', `AI LENS 내 생일 타임머신 1면 카드. ${shareText(result, 'front')}. ${content.front.slice(0, 4).map(article => article.title).join(', ')}. ${FRONT_CARD_SOURCE}`);
   } else drawReceipt();
 }

@@ -1,9 +1,8 @@
-"""생일 자산 공식 통계 수집 스크립트(scripts/build_birthday_assets.py) 단위 테스트. 외부 호출(ECOS·세계은행·SSM)은 전부 가짜.
+"""생일 자산 공식 통계 수집 스크립트(scripts/build_birthday_assets.py) 단위 테스트. 외부 호출(ECOS·SSM)은 전부 가짜.
 실행: cd service/backend && uv run --no-project --with pytest==8.3.0 --with requests==2.32.3 --with boto3==1.35.0 \\
-        --with openpyxl==3.1.5 python -m pytest tests/test_build_birthday_assets_unit.py -q
+        python -m pytest tests/test_build_birthday_assets_unit.py -q
 """
 import importlib.util
-import io
 import json
 import os
 import traceback
@@ -51,7 +50,7 @@ def _series():
         'usdkrw_daily': [('1990-03-02', 693.0)] + daily,
         'usdkrw_monthly': [('1964-05', 255.77), ('1996-01', 785.2)],
         'apartment': [('2006-01', 28.8), ('2026-07', 101.9)],
-        'gold': [('1964-05', 35.0), ('1996-01', 399.5)],
+        'gold': [('1965-01', 0.51), ('1996-01', 8.12)],
     }
 
 
@@ -103,11 +102,12 @@ def test_only_allowed_items_are_written():
 
 
 def test_default_sources_are_the_approved_ones():
-    # 금은 2026-10-21 켬(CC BY 4.0, 출처 표시). 원/달러가 꺼지면 금도 빠진다(test_gold_needs_exchange_rate_source).
+    # 금은 한국은행 생산자물가지수 품목별 금괴(404Y016) — 다른 칸처럼 ECOS 한 계열이다.
     assert ba.allowed_items() == ['cpi', 'deposit', 'usdkrw', 'apartment', 'gold']
     assert 'kospi' not in ba.SOURCES and ba.SOURCES['gold'].allowed is True
-    assert 'CC BY 4.0' in ba.SOURCES['gold'].label
-    assert {series[0] for series in ba.ECOS_SERIES.values()} == {'901Y009', '121Y002', '731Y003', '731Y004', '901Y089'}
+    assert ba.ECOS_SERIES['gold'] == ('404Y016', 'M', '196501', None, '30721401AA')
+    assert '404Y016' in ba.SOURCES['gold'].label and ba.SERIES_OF['gold'] == ('gold',)
+    assert {series[0] for series in ba.ECOS_SERIES.values()} == {'901Y009', '121Y002', '731Y003', '731Y004', '901Y089', '404Y016'}
     with open(_PATH, encoding='utf-8') as fp:
         text = fp.read()
     assert 'kospi' not in text.lower()
@@ -115,24 +115,15 @@ def test_default_sources_are_the_approved_ones():
         assert table not in text
 
 
-def test_gold_needs_exchange_rate_source(monkeypatch):
+def test_gold_is_its_own_ecos_series(monkeypatch):
     _allow(monkeypatch, 'gold')
-    assert ba.allowed_items() == []
-    _allow(monkeypatch, 'gold', 'usdkrw')
-    assert ba.allowed_items() == ['usdkrw', 'gold']
-
-
-def test_latest_gold_uses_common_month():
+    assert ba.allowed_items() == ['gold']
     series = _series()
-    series['usdkrw_monthly'] = [('2026-07', 1380.0), ('2026-08', 1390.0)]
-    series['gold'] = [('2026-07', 4000.0), ('2026-08', 4100.0), ('2026-09', 4319.0)]  # 금이 환율보다 앞섬
-    latest = ba.build_latest(series, ['usdkrw', 'gold'], '2026-10-21T00:00:00+09:00', '2026-10-20')
-    assert latest['gold'] == {'usd': ['2026-08', 4100.0], 'usdkrw': ['2026-08', 1390.0]}
-    assert latest['last']['gold'] == '2026-09' and 'gold' in latest['sources']
-    series['usdkrw_monthly'].append(('2026-09', 1359.0))
-    series['gold'] = series['gold'][:2]  # 환율이 금보다 앞섬
-    latest = ba.build_latest(series, ['usdkrw', 'gold'], '2026-10-21T00:00:00+09:00', '2026-10-20')
-    assert latest['gold'] == {'usd': ['2026-08', 4100.0], 'usdkrw': ['2026-08', 1390.0]}
+    files = ba.build_year_files(series, ['gold'], 1964, 1965)
+    assert files[1964] == {'year': 1964, 'gold': []} and files[1965]['gold'] == [('1965-01', 0.51)]
+    latest = ba.build_latest(series, ['gold'], '2026-10-21T00:00:00+09:00', '2026-10-20')
+    assert latest['gold'] == ['1996-01', 8.12] and latest['last'] == {'gold': '1996-01'}
+    assert set(latest['sources']) == {'gold'} and 'usdkrw' not in latest
 
 
 def test_fetch_ecos_normalizes_and_paginates(monkeypatch):
@@ -184,27 +175,6 @@ def test_fetch_ecos_request_error_never_leaks_key():
         assert KEY not in ''.join(traceback.format_exception(type(error), error, error.__traceback__))
 
 
-def _pink_sheet(rows):
-    from openpyxl import Workbook
-
-    book = Workbook()
-    sheet = book.active
-    sheet.title = 'Monthly Prices'
-    sheet.append(['World Bank Commodity Price Data'])
-    sheet.append([None, 'Crude oil, average', 'Silver', 'Gold'])  # 열 순서가 바뀌어도 제목으로 찾는다
-    sheet.append([None, '($/bbl)', '($/troy oz)', '($/troy oz)'])
-    for row in rows:
-        sheet.append(row)
-    data = io.BytesIO()
-    book.save(data)
-    return data.getvalue()
-
-
-def test_pink_sheet_finds_gold_by_header():
-    data = _pink_sheet([['1960M01', 1.63, 0.91, 35.27], ['1960M02', 1.63, 0.91, '..'], ['2026M09', 102.3, 64.6, 4319.0]])
-    assert ba.parse_pink_sheet_gold(data) == [('1960-01', 35.27), ('2026-09', 4319.0)]
-
-
 def test_nothing_allowed_writes_nothing(monkeypatch, tmp_path, capsys):
     _allow(monkeypatch)
     secret = MagicMock()
@@ -220,22 +190,19 @@ def test_main_writes_year_files_and_never_prints_key(tmp_path, capsys):
         '731Y003': [('19900302', '693'), ('20261019', '1332.1')],
         '731Y004': [('196405', '255.77'), ('202609', '1359')],
         '901Y089': [('200601', '28.8'), ('202607', '101.9')],
+        '404Y016': [('196501', '0.51'), ('202608', '275.1'), ('202609', '281.92')],
     }
-
-    pink = 'https://thedocs.worldbank.org/en/doc/x/related/CMO-Historical-Data-Monthly.xlsx'
-    sheet = _pink_sheet([['1960M01', 1.63, 0.91, 35.27], ['2026M08', 100.0, 60.0, 4100.0], ['2026M09', 102.3, 64.6, 4319.0]])
+    urls = []
 
     def get(url, timeout):
-        if url == pink:
-            return MagicMock(content=sheet)
+        urls.append(url)
         table = next(t for t in responses if f'/{t}/' in url)
         return _ecos(responses[table])
 
-    # 금이 켜져 있으면 Pink Sheet 없이 돌렸을 때 아무 파일도 쓰지 않고 멈춘다.
-    with pytest.raises(SystemExit):
-        ba.main(['--out', str(tmp_path), '--until', '2026-10-19'], get=get, secret=lambda name: KEY)
-    assert list(tmp_path.iterdir()) == []
-    assert ba.main(['--out', str(tmp_path), '--until', '2026-10-19', '--pink-sheet', pink], get=get, secret=lambda name: KEY) == 0
+    assert ba.main(['--out', str(tmp_path), '--until', '2026-10-19'], get=get, secret=lambda name: KEY) == 0
+    # 외부 요청은 ECOS 뿐이고, 금은 404Y016 금괴 항목 하나다.
+    assert all(url.startswith('https://ecos.bok.or.kr/api/StatisticSearch/') for url in urls) and len(urls) == 6
+    assert any('/404Y016/M/196501/202610/30721401AA' in url for url in urls)
     out = capsys.readouterr().out
     assert KEY not in out and 'items=cpi,deposit,usdkrw,apartment,gold' in out and 'files=' in out and 'max=' in out
     years = max(2026, datetime.now(ba.KST).year) - 1964 + 1
@@ -244,8 +211,8 @@ def test_main_writes_year_files_and_never_prints_key(tmp_path, capsys):
     assert latest['generatedAt'].endswith('+09:00') and latest['until'] == '2026-10-19'
     assert latest['last'] == {'cpi': '2026-09', 'deposit_rate': '2026-08', 'usdkrw_daily': '2026-10-19',
                               'usdkrw_monthly': '2026-09', 'apartment': '2026-07', 'gold': '2026-09'}
-    assert latest['gold'] == {'usd': ['2026-09', 4319.0], 'usdkrw': ['2026-09', 1359.0]}
-    assert 'CC BY 4.0' in latest['sources']['gold']
+    assert latest['gold'] == ['2026-09', 281.92]
+    assert '404Y016' in latest['sources']['gold']
     assert latest['cpi'] == ['2026-09', 120.43]
     assert latest['deposit'][0] == '2026-09' and latest['deposit'][1] == pytest.approx((1 + 3.2 / 1200) * (1 + 3.14 / 1200))
     assert latest['usdkrw'] == {'daily': ['2026-10-19', 1332.1], 'monthly': ['2026-09', 1359.0]}
@@ -253,6 +220,7 @@ def test_main_writes_year_files_and_never_prints_key(tmp_path, capsys):
     year_2026 = json.loads((tmp_path / '2026.json').read_text(encoding='utf-8'))
     assert set(year_2026) == {'year', 'cpi', 'deposit', 'usdkrw', 'apartment', 'gold'}
     assert year_2026['deposit'] == [['2026-07', 1.0], ['2026-08', pytest.approx(1 + 3.2 / 1200)]]
-    assert year_2026['gold'] == [['2026-08', 4100.0], ['2026-09', 4319.0]]
+    assert year_2026['gold'] == [['2026-08', 275.1], ['2026-09', 281.92]]
+    assert json.loads((tmp_path / '1964.json').read_text(encoding='utf-8'))['gold'] == []  # 금괴 지수는 1965-01부터
     for path in tmp_path.glob('*.json'):
         assert KEY not in path.read_text(encoding='utf-8')
