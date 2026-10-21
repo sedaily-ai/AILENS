@@ -3,6 +3,7 @@ import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import { SITE_URL } from '@/shared/constants/site';
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { RECEIPT_QR_ROWS } from '../data/birthdayQr';
+import { ASSET_SOURCE_INFO, GOLD_SOURCE } from '../data/birthdayAssets';
 import type { AssetBase, AssetCell } from './birthdayAssets';
 import { elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './birthdayModel';
 
@@ -45,6 +46,19 @@ export function receiptAssetLines(cells: AssetCell[]): ReceiptLine[] {
     label: cell.name,
     value: cell.nowAmount === null ? times(cell.multiple) : manwon(cell.nowAmount),
   }));
+}
+
+/**
+ * 영수증 출처 한 줄 — 이미지만 따로 퍼져도 출처가 남게 한다. 숫자 대부분(1억 원·100만 원 줄)이 ECOS라 '한국은행 ECOS'를 앞에 두고
+ * 시급(최저임금위원회)·연금(국민연금공단)·1면(빅카인즈)은 '외'로 묶는다. 금 줄이 있으면 CC BY 4.0이라 자료 이름과 라이선스를 적는다(이미지라 링크는 없다).
+ * ECOS 숫자가 없으면 찍힌 줄의 출처만 적고, 출처를 밝힐 줄이 없으면 ''.
+ */
+export function receiptSourceLine(result: BirthdayResult, assets: AssetCell[], headline: boolean) {
+  // receiptLines와 같은 조건(시급·연금 줄), 1면은 제목이 찍힐 때만.
+  const others = [...(result.wage ? ['최저임금위원회'] : []), ...(result.calendar?.points[1] ? ['국민연금공단'] : []), ...(headline ? ['빅카인즈'] : [])];
+  const main = result.cpi || assets.length ? `한국은행 ECOS${others.length ? ' 외' : ''}` : others.join('·');
+  const gold = assets.some(cell => cell.id === 'gold') ? ` · ${ASSET_SOURCE_INFO.gold.org} ${GOLD_SOURCE.dataset}(${GOLD_SOURCE.license})` : '';
+  return main ? `출처 ${main}${gold}` : '';
 }
 
 /** 100만 원 묶음 소제목 — 기준일이 스무 살 생일인지 태어난 날인지. */
@@ -162,19 +176,24 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
     text('QR을 찍으면 바로 열려요', 72, 1836, 28, GRAY, 500, 680);
   };
 
-  /** 생일 영수증 — 높이를 먼저 재고(draw=false) 가운데에 맞춰 그린다. 넘치면 줄 간격을 줄인다(compact). */
+  /**
+   * 생일 영수증 — 높이를 먼저 재고(draw=false) 가운데에 맞춰 그린다. 넘치면 줄 간격과 QR 앞뒤 간격을 줄인다(compact).
+   * 줄이 가장 많은 경우(본문 4줄·100만 원 4줄·1면 제목 2줄)에도 맨 아래 고지와 출처 줄이 영수증 안에 들도록 compact 간격을 잡았다(1792 ≤ 1800).
+   */
   const drawReceipt = () => {
     const left = 120, right = 960, inLeft = 176, inRight = 904, width = inRight - inLeft;
     const lines = receiptLines(result, content.mode);
-    const assetLines = content.assetBase ? receiptAssetLines(content.assets) : [];
+    const assets = content.assetBase ? content.assets : [];
+    const assetLines = receiptAssetLines(assets);
     const assetHeading = content.assetBase ? receiptAssetHeading(content.assetBase) : '';
     const headline = content.includeDay && hasFront ? wrap(content.front[0].title, 40, 900, SERIF, width, 2) : [];
+    const source = receiptSourceLine(result, assets, headline.length > 0);
     const birth = content.includeDay ? `${year}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')} (${weekday(year, month, day)})` : `${year}년생`;
     const issued = kstTodayStr().replaceAll('-', '.');
 
     const layout = (draw: boolean, compact: boolean) => {
       let y = 0;
-      const gap = compact ? 8 : 0;
+      const gap = compact ? 12 : 0;
       const at = (fn: () => void) => { if (draw) fn(); };
       y += 104;
       at(() => { context.textAlign = 'center'; text('AI LENS', 540, y, 64, INK, 800); });
@@ -219,7 +238,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
       at(() => { context.save(); context.fillStyle = INK; context.fillRect(inLeft, y - 20, width, 4); context.fillRect(inLeft, y - 10, width, 2); context.restore(); });
       y += 72;
       at(() => { text('지나온 시간', inLeft, y, 36, INK, 800); context.textAlign = 'right'; text(receiptElapsed(result, content.mode), inRight, y, 56, INK, 900, width * 0.6); context.textAlign = 'left'; });
-      y += 64;
+      y += 64 - gap;
       // QR 줄 — 왼쪽 QR(흰 영수증 바탕이 여백 구실을 한다), 오른쪽 안내. QR과 글자 사이는 4칸 이상 띄운다.
       const code = 208;
       at(() => {
@@ -229,8 +248,13 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
         text('내 생일 영수증 뽑기', textLeft, y + 112, 32, INK, 800, textWidth);
         text('QR을 찍으면 바로 열려요', textLeft, y + 164, 26, SOFT, 500, textWidth);
       });
-      y += code + 56;
+      y += code + 56 - gap;
       at(() => { context.textAlign = 'center'; text('과거 자료로 계산한 가정이며 투자 권유가 아니에요.', 540, y, 24, SOFT, 500, width); context.textAlign = 'left'; });
+      // 출처는 고지 바로 아래, 같은 크기·색(작은 글씨 두 줄이 한 묶음).
+      if (source) {
+        y += 32;
+        at(() => { context.textAlign = 'center'; text(source, 540, y, 24, SOFT, 500, width); context.textAlign = 'left'; });
+      }
       y += 64;
       return y;
     };
@@ -254,7 +278,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
       context.translate(0, top);
       layout(true, compact);
     });
-    canvas.setAttribute('aria-label', `AI LENS 내 생일 영수증. 출생 ${birth}. ${[...lines, ...assetLines].map(line => `${line.label} ${line.value}`).join(', ')}${headline.length ? `. 그날 서울경제 1면 ${content.front[0].title}` : ''}. 지나온 시간 ${receiptElapsed(result, content.mode)}`);
+    canvas.setAttribute('aria-label', `AI LENS 내 생일 영수증. 출생 ${birth}. ${[...lines, ...assetLines].map(line => `${line.label} ${line.value}`).join(', ')}${headline.length ? `. 그날 서울경제 1면 ${content.front[0].title}` : ''}. 지나온 시간 ${receiptElapsed(result, content.mode)}${source ? `. ${source}` : ''}`);
   };
 
   if (content.variant === 'front' && hasFront) {

@@ -36,15 +36,23 @@ export interface AssetLatest {
   gold?: { usd: AssetPoint; usdkrw: AssetPoint };
 }
 
-/** 칸별·물가 줄(cpi) 작성기관과 통계 이름(출처 줄). dataset은 작성기관 뒤에 한 덩어리로 붙여 쓰는 자료 이름이다. */
-export const ASSET_SOURCE_INFO: Record<'cpi' | 'deposit' | 'usd' | 'apartment' | 'gold', { org: string; name: string; dataset?: string }> = {
+/** 칸별·물가 줄(cpi) 작성기관과 통계 이름(출처 줄). 금은 작성기관과 통계 이름 사이에 자료 이름·라이선스(GOLD_SOURCE)가 들어간다. */
+export const ASSET_SOURCE_INFO: Record<'cpi' | 'deposit' | 'usd' | 'apartment' | 'gold', { org: string; name: string }> = {
   cpi: { org: '국가데이터처', name: '소비자물가지수' },
   deposit: { org: '한국은행', name: '예금은행 정기예금 신규취급액 가중평균 금리' },
   usd: { org: '한국은행', name: '원/달러 환율' },
   apartment: { org: '한국부동산원', name: '서울 아파트 실거래가격지수' },
-  // CC BY 4.0은 출처와 라이선스 표시가 의무라 자료 이름에 라이선스를 함께 둔다(하단 출처 줄도 이 값을 쓴다, BirthdayResults).
-  gold: { org: '세계은행', dataset: 'Pink Sheet(CC BY 4.0)', name: '국제 금값 월평균' },
+  gold: { org: '세계은행', name: '국제 금값 월평균' },
 };
+
+/**
+ * 금 자료 이름과 라이선스. CC BY 4.0은 출처·라이선스 이름과 함께 라이선스 주소(링크)를 밝혀야 해서(제3조) 화면 출처 줄은
+ * 자료 이름을 세계은행 원자료 안내로, 라이선스 이름을 라이선스 본문(한국어)으로 잇는다. 공유 영수증은 링크 대신 이름만 적는다.
+ */
+export const GOLD_SOURCE = {
+  dataset: 'Pink Sheet', datasetHref: 'https://www.worldbank.org/en/research/commodity-markets',
+  license: 'CC BY 4.0', licenseHref: 'https://creativecommons.org/licenses/by/4.0/deed.ko',
+} as const;
 
 /** 자료 시작일. fx: 원/달러 월평균(731Y004) 시작 — 이보다 앞선 기준일은 칸을 만들지 않는다. usdDaily: 일별 종가(731Y003) 시작. */
 export const ASSET_SERIES_FROM = { fx: '1964-05-04', usdDaily: '1990-03-02' } as const;
