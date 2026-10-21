@@ -36,9 +36,9 @@ export interface AssetLatest {
   gold?: { usd: AssetPoint; usdkrw: AssetPoint };
 }
 
-/** 칸별 작성기관과 통계 이름(출처 줄). */
-export const ASSET_SOURCE_INFO: Record<'cash' | 'deposit' | 'usd' | 'apartment' | 'gold', { org: string; name: string }> = {
-  cash: { org: '국가데이터처', name: '소비자물가지수' },
+/** 칸별·물가 줄(cpi) 작성기관과 통계 이름(출처 줄). */
+export const ASSET_SOURCE_INFO: Record<'cpi' | 'deposit' | 'usd' | 'apartment' | 'gold', { org: string; name: string }> = {
+  cpi: { org: '국가데이터처', name: '소비자물가지수' },
   deposit: { org: '한국은행', name: '예금은행 정기예금 신규취급액 가중평균 금리' },
   usd: { org: '한국은행', name: '원/달러 환율' },
   apartment: { org: '한국부동산원', name: '서울 아파트 실거래가격지수' },

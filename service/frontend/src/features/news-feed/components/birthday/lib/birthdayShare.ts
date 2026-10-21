@@ -39,11 +39,11 @@ export function receiptLines(result: BirthdayResult, mode: ViewMode): ReceiptLin
   return lines;
 }
 
-/** 100만 원 줄 — 계산된 칸만, 받은 순서(고정 순서) 그대로. 서울 아파트는 지수 비율이라 배수, 현금은 명목 그대로. */
+/** 100만 원 줄 — 계산된 칸만, 받은 순서(고정 순서) 그대로. 서울 아파트는 지수 비율이라 배수. 물가 줄은 넣지 않는다(위에 '그때 1억 원' 줄이 있다). */
 export function receiptAssetLines(cells: AssetCell[]): ReceiptLine[] {
   return cells.map(cell => ({
     label: cell.name,
-    value: cell.id === 'cash' ? '그대로 100만 원' : cell.nowAmount === null ? times(cell.multiple) : manwon(cell.nowAmount),
+    value: cell.nowAmount === null ? times(cell.multiple) : manwon(cell.nowAmount),
   }));
 }
 
