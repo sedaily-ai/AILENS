@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ASSET_SOURCE_INFO } from './data/birthdayAssets';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import { assetBase, assetCells, assetInflation, assetsAvailable, ecosOrgs } from './lib/birthdayAssets';
+import { assetBase, assetCells, assetInflation, assetsAvailable, ecosOrgs, goldSourceParts } from './lib/birthdayAssets';
 import { shareableFront, useFrontPage } from './lib/birthdayFrontPage';
 import type { ShareVariant } from './lib/birthdayShare';
 import { useBirthdayAssets } from './lib/useBirthdayAssets';
-import { AgesScene, ArrivalScene, AssetScene, MoneyScene, WageScene } from './BirthdayScenes';
+import { AgesScene, ArrivalScene, AssetScene, MoneyScene, SourceParts, WageScene } from './BirthdayScenes';
 import { BirthdayFrontPage } from './BirthdayFrontPage';
 import { BirthdayPension } from './BirthdayPension';
 import { BirthdayShare } from './BirthdayShare';
@@ -53,8 +52,8 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
         {/* '잘못된 내용 알리기'는 출처 줄 끝에 두면 560px 폭에서 넘쳐 4줄이 돼서, '실제와 다를 수 있어요' 바로 뒤에 둔다. */}
         <span>자료의 기준 시점에 따라 실제와 {nb('다를 수 있어요')}. <Link href="/contact" prefetch={false}>{nb('잘못된 내용 알리기')}</Link></span>{' '}
         {/* ECOS는 제공처라 통계를 만든 기관(작성기관)을 함께 적는다. 국가데이터처는 물가(1억 원 장면·물가 줄)를 보일 때 한 번만,
-            한국부동산원은 아파트 칸, 세계은행 Pink Sheet는 금 칸이 보일 때만(CC BY 4.0이라 라이선스 이름도 적는다). */}
-        <span>{`출처는 최저임금위원회·${nb('한국은행 ECOS')}(${ecosOrgs(cells, Boolean(result.cpi) || inflation !== null).join('·')} 작성)·국민연금공단·빅카인즈${cells.some(cell => cell.id === 'gold') ? `·${nb(`${ASSET_SOURCE_INFO.gold.org} ${ASSET_SOURCE_INFO.gold.dataset}`)}` : ''}이고 ${result.snapshot.retrievedAt.replaceAll('-', '.')}에 ${nb('확인했어요.')}`}</span>
+            한국부동산원은 아파트 칸, 세계은행 Pink Sheet는 금 칸이 보일 때만(CC BY 4.0이라 라이선스 이름과 링크도 단다). */}
+        <span>{`출처는 최저임금위원회·${nb('한국은행 ECOS')}(${ecosOrgs(cells, Boolean(result.cpi) || inflation !== null).join('·')} 작성)·국민연금공단·빅카인즈`}{cells.some(cell => cell.id === 'gold') && <>·<SourceParts parts={goldSourceParts(true)} /></>}{`이고 ${result.snapshot.retrievedAt.replaceAll('-', '.')}에 ${nb('확인했어요.')}`}</span>
       </p>
     </div>
     <BirthdayShare result={result} mode={mode} assets={cells} assetBase={cells.length ? base : null} front={frontArticles} variant={variant} onVariant={setVariant} onTryFriend={onEdit} />

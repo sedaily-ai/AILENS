@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { CPI_LATEST } from './data/birthdayCatalog';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import { assetSourceLine, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
+import { assetSourceParts, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation, type SourcePart } from './lib/birthdayAssets';
 import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW, won } from './lib/birthdayModel';
 import type { AssetLoadState } from './lib/useBirthdayAssets';
 import { nb } from './lib/keepTogether';
@@ -54,6 +54,12 @@ function assetLead(base: AssetBase, mode: ViewMode) {
   return base.kind === 'twentieth'
     ? `서른 살부터는 스무 살 생일 기준이에요. ${day}에 넣었다고 보고 계산했어요.`
     : `서른 살 전이라 태어난 날(${day})에 넣었다고 보고 계산했어요.`;
+}
+
+/** 출처 줄 조각 — 링크(자료·라이선스 원문)는 새 탭으로 연다. 글줄 안 링크라 모양·터치 영역은 .source a·.notice a가 맡는다. */
+export function SourceParts({ parts }: { parts: SourcePart[] }) {
+  return <>{parts.map((part, index) => typeof part === 'string' ? part
+    : <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}<span className="sr-only"> (새 창)</span></a>)}</>;
 }
 
 /** 칸 아래 첫 줄 — 지금 금액과 증감. 증감은 색 없이 화살표(낭독 제외)와 부호로 읽히게 한다. */
@@ -110,7 +116,7 @@ export function AssetScene({ base, mode, state, cells, inflation, onRetry }: {
           {cell.notes.length > 0 && <p className={styles.barDetail}>{cell.notes.join(' ')}</p>}
         </li>)}</ol>
         {inflation && <p className={styles.lead}>{inflationLine(inflation)}</p>}
-        <p className={styles.source}>{assetSourceLine(cells, inflation)}</p>
+        <p className={styles.source}><SourceParts parts={assetSourceParts(cells, inflation)} /></p>
         <p className={styles.source}>과거 자료로 계산한 가정이에요. 특정 자산을 사거나 팔라는 권유가 아니에요. 세금·수수료는 빼고 계산했고 막대는 로그 눈금이에요.</p>
         <p className={styles.links}><Link href={`/search?q=${encodeURIComponent('환율')}`} prefetch={false}>환율 기사 보기</Link><Link href="/search?q=%EB%B6%80%EB%8F%99%EC%82%B0" prefetch={false}>부동산 기사 보기</Link></p>
       </>}

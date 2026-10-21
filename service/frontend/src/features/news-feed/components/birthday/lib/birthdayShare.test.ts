@@ -4,7 +4,7 @@ import { EVENTS } from '@/shared/data/timelineEvents';
 import { calculate } from './birthdayModel';
 import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
 import { assetCells, type AssetBase } from './birthdayAssets';
-import { receiptAssetHeading, receiptAssetLines, receiptElapsed, receiptLines } from './birthdayShare';
+import { receiptAssetHeading, receiptAssetLines, receiptElapsed, receiptLines, receiptSourceLine } from './birthdayShare';
 import { RECEIPT_QR_ROWS, RECEIPT_QR_URL } from '../data/birthdayQr';
 import { BIRTHDAY_MARKET_PATH } from '../data/birthdayRoutes';
 import { SITE_URL } from '@/shared/constants/site';
@@ -55,6 +55,20 @@ test('금이 켜져도 100만 원 줄은 최대 4줄(예금·달러·아파트·
   const lines = receiptAssetLines(assetCells(base2010, { ...file2010, gold: [['2010-05', 1200]] }, withGold));
   expect(lines.map(line => line.label)).toEqual(['정기예금', '달러', '서울 아파트', '금 한 돈']);
   expect(lines.some(line => line.label.includes('물가'))).toBe(false);
+});
+
+test('영수증 출처 한 줄: ECOS 외로 묶고, 금 줄이 있으면 세계은행 Pink Sheet(CC BY 4.0)', () => {
+  const result = calculate('1990-05-15', snapshot);
+  const cells = assetCells(base2010, file2010, latest);
+  const withGold = assetCells(base2010, { ...file2010, gold: [['2010-05', 1200]] }, { ...latest, gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } });
+  expect(receiptSourceLine(result, withGold, true)).toBe('출처 한국은행 ECOS 외 · 세계은행 Pink Sheet(CC BY 4.0)');
+  expect(receiptSourceLine(result, cells, false)).toBe('출처 한국은행 ECOS 외');
+  // 1억 원 줄만 있어도 ECOS, 시급·연금이 없고 1면 제목도 없으면 '외'를 붙이지 않는다.
+  expect(receiptSourceLine({ ...result, wage: null, calendar: null }, [], false)).toBe('출처 한국은행 ECOS');
+  // 1940년생은 그때 나이 줄뿐이라 밝힐 출처가 없다. ECOS 숫자 없이 다른 줄만 있으면 그 출처만 적는다.
+  const old = calculate('1940-01-01', snapshot);
+  expect(receiptSourceLine(old, [], false)).toBe('');
+  expect(receiptSourceLine(old, [], true)).toBe('출처 빅카인즈');
 });
 
 test('100만 원 묶음 소제목은 기준일 종류에 따라 바뀐다', () => {

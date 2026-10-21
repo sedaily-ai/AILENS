@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
 import {
-  apartmentCell, assetBase, assetCells, assetInflation, assetsAvailable, assetSourceLine, changeOf, depositCell, ecosOrgs,
-  inflationLine, onOrBefore, periodLabel, usdCell, type AssetBase,
+  apartmentCell, assetBase, assetCells, assetInflation, assetsAvailable, assetSourceLine, assetSourceParts, changeOf, depositCell, ecosOrgs,
+  goldSourceParts, inflationLine, onOrBefore, periodLabel, sourceText, usdCell, type AssetBase,
 } from './birthdayAssets';
 import { parseDate } from './birthdayModel';
 import { nb } from './keepTogether';
@@ -157,6 +157,8 @@ test('금 한 돈: latest에 금이 있을 때만 다섯째 칸, 국제 금값 �
   expect(gold.unit!.now).toBeCloseTo(don(4000, 1400), 6);
   expect(gold.multiple).toBeCloseTo(don(4000, 1400) / don(1200, 1005), 9);
   expect(gold.then.monthlyAverage).toBe(true);
+  // 원화·1돈 환산(변경 표시)과 국내 시세와의 차이를 한 문장으로.
+  expect(gold.notes).toEqual([`국제 금값 월평균을 그달 평균 환율로 바꾼 값이라 ${nb('국내 금 시세와는')} ${nb('다를 수 있어요.')}`]);
   expect(assetCells(base('2010-05-15'), file, latest()).map(cell => cell.id)).toEqual(['deposit', 'usd', 'apartment']);
 });
 
@@ -188,8 +190,24 @@ test('출처 문장: ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관�
   expect(assetSourceLine(gold, inflation)).toContain(`국가데이터처 소비자물가지수와 세계은행 ${nb('Pink Sheet(CC BY 4.0)')} 국제 금값 월평균으로 계산했어요.`);
   expect(assetSourceLine(gold, null)).toContain(`실거래가격지수와 세계은행 ${nb('Pink Sheet(CC BY 4.0)')} 국제 금값 월평균으로 계산했어요.`);
   expect(assetSourceLine([], inflation)).toBe('');
+  expect(assetSourceParts([], inflation)).toEqual([]);
+  // 링크는 금 칸이 있을 때만 — 자료 이름은 세계은행 안내, 라이선스 이름은 라이선스 본문.
+  expect(assetSourceParts(cells, inflation).every(part => typeof part === 'string')).toBe(true);
+  expect(assetSourceParts(gold, inflation).filter(part => typeof part !== 'string')).toEqual([
+    { text: `세계은행 ${nb('Pink Sheet')}`, href: 'https://www.worldbank.org/en/research/commodity-markets' },
+    { text: nb('CC BY 4.0'), href: 'https://creativecommons.org/licenses/by/4.0/deed.ko' },
+  ]);
+  expect(sourceText(assetSourceParts(gold, inflation))).toBe(assetSourceLine(gold, inflation));
   expect(periodLabel('2026-09')).toBe('2026년 9월');
   expect(periodLabel('2026-10-20')).toBe('2026년 10월 20일');
+});
+
+test('하단 출처 줄의 금 표기는 세계은행까지 한 덩어리, 링크 두 개', () => {
+  const parts = goldSourceParts(true);
+  expect(sourceText(parts)).toBe(nb('세계은행 Pink Sheet(CC BY 4.0)'));
+  expect(parts.flatMap(part => typeof part === 'string' ? [] : [part.href])).toEqual([
+    'https://www.worldbank.org/en/research/commodity-markets', 'https://creativecommons.org/licenses/by/4.0/deed.ko',
+  ]);
 });
 
 test('하단 출처 작성기관: 국가데이터처는 물가를 보일 때, 한국부동산원은 아파트 칸이 있을 때만', () => {
