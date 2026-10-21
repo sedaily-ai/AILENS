@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { CPI_LATEST } from './data/birthdayCatalog';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import { assetSourceLine, changeOf, type AssetBase, type AssetCell } from './lib/birthdayAssets';
+import { assetSourceLine, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
 import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW, won } from './lib/birthdayModel';
 import type { AssetLoadState } from './lib/useBirthdayAssets';
 import { nb } from './lib/keepTogether';
@@ -58,7 +58,6 @@ function assetLead(base: AssetBase, mode: ViewMode) {
 
 /** 칸 아래 첫 줄 — 지금 금액과 증감. 증감은 색 없이 화살표(낭독 제외)와 부호로 읽히게 한다. */
 function cellDetail(cell: AssetCell) {
-  if (cell.id === 'cash') return <>그대로 {nb('100만 원')}{cell.purchase !== undefined && <> · 그때 {nb('100만 원어치를')} 지금 사려면 {nb(manwon(cell.purchase))}</>}</>;
   const change = changeOf(cell.multiple);
   const arrow = change.arrow && <><span aria-hidden="true">{change.arrow}</span>{' '}</>;
   if (cell.nowAmount === null) return <>{arrow}서울 아파트값 {nb(`${times(cell.multiple)}(${change.signed})`)}</>;
@@ -67,12 +66,13 @@ function cellDetail(cell: AssetCell) {
 }
 
 /**
- * 그때 100만 원, 지금은 — 서른 살이 지났으면 스무 살 생일, 아니면 태어난 날에 100만 원을 현금·정기예금·달러·서울 아파트(·금)에 뒀다면.
+ * 그때 100만 원, 지금은 — 서른 살이 지났으면 스무 살 생일, 아니면 태어난 날에 100만 원을 정기예금·달러·서울 아파트(·금)에 뒀다면.
  * 칸은 고정 순서이고 1등 강조·정렬이 없다(투자 권유로 읽히지 않게). 주인공은 제목 문장이다.
+ * 칸 목록 아래 물가 한 줄은 칸을 읽는 기준이라 같은 기간(기준일이 속한 달 → 최신 물가)으로 쓴다. 그달 물가가 없으면 줄을 그리지 않는다.
  * 기준일이 공식 환율 기록 시작(1964-05-04)보다 앞서면(off) 장면 대신 한 줄 안내만 둔다.
  */
-export function AssetScene({ base, mode, state, cells, onRetry }: {
-  base: AssetBase; mode: ViewMode; state: AssetLoadState; cells: AssetCell[]; onRetry: () => void;
+export function AssetScene({ base, mode, state, cells, inflation, onRetry }: {
+  base: AssetBase; mode: ViewMode; state: AssetLoadState; cells: AssetCell[]; inflation: AssetInflation | null; onRetry: () => void;
 }) {
   if (state.status === 'off') {
     const when = base.kind === 'twentieth'
@@ -109,7 +109,8 @@ export function AssetScene({ base, mode, state, cells, onRetry }: {
           <p className={styles.barDetail}>{cellDetail(cell)}</p>
           {cell.notes.length > 0 && <p className={styles.barDetail}>{cell.notes.join(' ')}</p>}
         </li>)}</ol>
-        <p className={styles.source}>{assetSourceLine(cells, state.latest)}</p>
+        {inflation && <p className={styles.lead}>{inflationLine(inflation)}</p>}
+        <p className={styles.source}>{assetSourceLine(cells, inflation)}</p>
         <p className={styles.source}>과거 자료로 계산한 가정이에요. 특정 자산을 사거나 팔라는 권유가 아니에요. 세금·수수료는 빼고 계산했고 막대는 로그 눈금이에요.</p>
         <p className={styles.links}><Link href={`/search?q=${encodeURIComponent('환율')}`} prefetch={false}>환율 기사 보기</Link><Link href="/search?q=%EB%B6%80%EB%8F%99%EC%82%B0" prefetch={false}>부동산 기사 보기</Link></p>
       </>}

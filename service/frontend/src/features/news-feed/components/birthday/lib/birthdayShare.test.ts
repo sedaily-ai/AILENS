@@ -40,15 +40,21 @@ const base2010: AssetBase = { date: '2010-05-15', kind: 'twentieth' };
 test('100만 원 칸은 계산된 칸만 고정 순서로 찍는다 — 준비 중 줄은 없다', () => {
   const lines = receiptAssetLines(assetCells(base2010, file2010, latest));
   expect(lines).toEqual([
-    { label: '현금', value: '그대로 100만 원' },
     { label: '정기예금', value: '150만 원' },
     { label: '달러', value: '90만 원' },
     { label: '서울 아파트', value: '3배' },
   ]);
   // 아파트 지수가 없는 달(2006년 전)이면 그 줄만 빠진다.
   const noApartment = receiptAssetLines(assetCells(base2010, { ...file2010, apartment: [] }, latest));
-  expect(noApartment.map(line => line.label)).toEqual(['현금', '정기예금', '달러']);
+  expect(noApartment.map(line => line.label)).toEqual(['정기예금', '달러']);
   expect(noApartment.some(line => line.value === '준비 중')).toBe(false);
+});
+
+test('금이 켜져도 100만 원 줄은 최대 4줄(예금·달러·아파트·금)이고 물가 줄은 없다', () => {
+  const withGold: AssetLatest = { ...latest, gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } };
+  const lines = receiptAssetLines(assetCells(base2010, { ...file2010, gold: [['2010-05', 1200]] }, withGold));
+  expect(lines.map(line => line.label)).toEqual(['정기예금', '달러', '서울 아파트', '금 한 돈']);
+  expect(lines.some(line => line.label.includes('물가'))).toBe(false);
 });
 
 test('100만 원 묶음 소제목은 기준일 종류에 따라 바뀐다', () => {

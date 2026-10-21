@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
 import {
-  apartmentCell, assetBase, assetCells, assetsAvailable, assetSourceLine, cashCell, changeOf, depositCell, ecosOrgs,
-  onOrBefore, periodLabel, usdCell, type AssetBase,
+  apartmentCell, assetBase, assetCells, assetInflation, assetsAvailable, assetSourceLine, changeOf, depositCell, ecosOrgs,
+  inflationLine, onOrBefore, periodLabel, usdCell, type AssetBase,
 } from './birthdayAssets';
 import { parseDate } from './birthdayModel';
 import { nb } from './keepTogether';
@@ -62,20 +62,41 @@ test('기준일이 1964-05-04보다 앞서면 칸이 없다', () => {
   expect(assetCells(first, file1964, latest()).map(cell => cell.id)).toEqual(['usd']);
 });
 
-test('칸은 배수와 상관없이 현금 → 정기예금 → 달러 → 서울 아파트 고정 순서', () => {
+test('칸은 배수와 상관없이 정기예금 → 달러 → 서울 아파트 고정 순서', () => {
   const cells = assetCells(base('2010-05-15'), file2010, latest());
-  expect(cells.map(cell => cell.id)).toEqual(['cash', 'deposit', 'usd', 'apartment']);
-  expect(cells.map(cell => cell.name)).toEqual(['현금', '정기예금', '달러', '서울 아파트']);
+  expect(cells.map(cell => cell.id)).toEqual(['deposit', 'usd', 'apartment']);
+  expect(cells.map(cell => cell.name)).toEqual(['정기예금', '달러', '서울 아파트']);
   // 달러(3배)가 예금(1.5배)보다 커도 순서는 그대로다.
-  expect(cells[2].multiple).toBe(3);
-  expect(cells[1].multiple).toBe(1.5);
+  expect(cells[1].multiple).toBe(3);
+  expect(cells[0].multiple).toBe(1.5);
 });
 
-test('현금: 명목 그대로, 그때 100만 원어치를 지금 사려면 물가 비율만큼', () => {
-  const cell = cashCell(base('2010-05-15'), file2010, latest())!;
-  expect(cell).toMatchObject({ multiple: 1, nowAmount: 1_000_000, purchase: 2_000_000, then: { period: '2010-05', monthlyAverage: false } });
-  expect(cell.now).toEqual({ period: '2026-09', label: '2026년 9월 물가' });
-  expect(cashCell(base('2010-07-01'), file2010, latest())).toBeNull();
+test('물가 줄: 기준일이 속한 달 → 최신 물가, 그달 지수가 없으면 null', () => {
+  expect(assetInflation(base('2010-05-15'), file2010, latest())).toEqual({ multiple: 2, then: '2010-05', now: '2026-09' });
+  // 그달 지수가 없으면 다른 달로 대신하지 않는다.
+  expect(assetInflation(base('2010-07-01'), file2010, latest())).toBeNull();
+  expect(assetInflation(base('2010-05-15'), file2010, latest({ cpi: undefined }))).toBeNull();
+  // 1964-05-04 이전 기준일은 칸과 같이 물가 줄도 없다.
+  expect(assetInflation(base('1964-05-03'), { year: 1964, cpi: [['1964-05', 1]] }, latest())).toBeNull();
+});
+
+test('1964-05~12 기준일은 달러(월평균) 칸만 있고 물가 줄이 없다 — 물가는 1965-01부터', () => {
+  const file1964: AssetYearFile = { year: 1964, cpi: [], deposit: [], usdkrw: { daily: [], monthly: [['1964-06', 255.77]] }, apartment: [] };
+  const june = assetBase(birth('1944-06-01'), TODAY);
+  expect(june).toEqual({ date: '1964-06-01', kind: 'twentieth' });
+  const cells = assetCells(june, file1964, latest());
+  expect(cells.map(cell => cell.id)).toEqual(['usd']);
+  expect(cells[0].then).toEqual({ period: '1964-06', monthlyAverage: true });
+  expect(assetInflation(june, file1964, latest())).toBeNull();
+  expect(assetSourceLine(cells, null)).not.toContain('소비자물가지수');
+});
+
+test('물가 줄 문장: 배수는 times(), 1배로 반올림되면 %로', () => {
+  expect(inflationLine({ multiple: 120.43 / 86.128, then: '2010-05', now: '2026-09' })).toBe(`같은 기간 물가는 ${nb('1.4배 올랐어요.')}`);
+  expect(inflationLine({ multiple: 12.775, then: '1975-06', now: '2026-09' })).toBe(`같은 기간 물가는 ${nb('12.8배 올랐어요.')}`);
+  expect(inflationLine({ multiple: 1.03, then: '2026-03', now: '2026-09' })).toBe(`같은 기간 물가는 ${nb('3% 올랐어요.')}`);
+  expect(inflationLine({ multiple: 1.002, then: '2026-08', now: '2026-09' })).toBe(`같은 기간 물가는 ${nb('거의 그대로예요.')}`);
+  expect(inflationLine({ multiple: 0.99, then: '2026-08', now: '2026-09' })).toBe(`같은 기간 물가는 ${nb('1% 내렸어요.')}`);
 });
 
 test('정기예금: 기준월 지수 → 다음 달 지수, 금리가 없는 달은 칸이 없다', () => {
@@ -128,15 +149,15 @@ test('금 한 돈: latest에 금이 있을 때만 다섯째 칸, 국제 금값 �
   const file = { ...file2010, gold: [['2010-05', 1200]] } satisfies AssetYearFile;
   const withGold = latest({ gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } });
   const cells = assetCells(base('2010-05-15'), file, withGold);
-  expect(cells.map(cell => cell.id)).toEqual(['cash', 'deposit', 'usd', 'apartment', 'gold']);
-  const gold = cells[4];
+  expect(cells.map(cell => cell.id)).toEqual(['deposit', 'usd', 'apartment', 'gold']);
+  const gold = cells[3];
   const don = (usd: number, krw: number) => usd / 31.1034768 * 3.75 * krw;
   expect(gold.unit!.label).toBe('1돈');
   expect(gold.unit!.then).toBeCloseTo(don(1200, 1005), 6);
   expect(gold.unit!.now).toBeCloseTo(don(4000, 1400), 6);
   expect(gold.multiple).toBeCloseTo(don(4000, 1400) / don(1200, 1005), 9);
   expect(gold.then.monthlyAverage).toBe(true);
-  expect(assetCells(base('2010-05-15'), file, latest()).map(cell => cell.id)).toEqual(['cash', 'deposit', 'usd', 'apartment']);
+  expect(assetCells(base('2010-05-15'), file, latest()).map(cell => cell.id)).toEqual(['deposit', 'usd', 'apartment']);
 });
 
 test('증감은 화살표와 부호로 — 감소는 U+2212', () => {
@@ -147,21 +168,31 @@ test('증감은 화살표와 부호로 — 감소는 U+2212', () => {
   expect(changeOf(0.996)).toEqual({ arrow: '', signed: '0%' });
 });
 
-test('출처 문장: ECOS 제공, 보이는 칸의 작성기관·통계, 칸별 지금 시점', () => {
+test('출처 문장: ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관·통계, 지금 시점', () => {
   const cells = assetCells(base('2010-05-15'), file2010, latest());
-  const line = assetSourceLine(cells, latest());
+  const inflation = assetInflation(base('2010-05-15'), file2010, latest());
+  const line = assetSourceLine(cells, inflation);
   expect(line.startsWith(`${nb('한국은행 ECOS')}에서 받은 `)).toBe(true);
-  for (const text of ['국가데이터처 소비자물가지수', '한국은행 예금은행 정기예금 신규취급액 가중평균 금리', '한국은행 원/달러 환율', '한국부동산원 서울 아파트 실거래가격지수로 계산했어요.']) expect(line).toContain(text);
+  expect(line).toContain('한국은행 예금은행 정기예금 신규취급액 가중평균 금리, 한국은행 원/달러 환율, 한국부동산원 서울 아파트 실거래가격지수, 국가데이터처 소비자물가지수로 계산했어요.');
   for (const cell of cells) expect(line).toContain(nb(cell.now.label));
+  expect(line).toContain(`${nb('2026년 7월 지수')}, ${nb('2026년 9월 물가')} 기준이에요.`);
   expect(line).not.toContain('세계은행');
-  const gold = assetCells(base('2010-05-15'), { ...file2010, gold: [['2010-05', 1200]] }, latest({ gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } }));
-  expect(assetSourceLine(gold, latest())).toContain('실거래가격지수와 세계은행 Pink Sheet 국제 금값 월평균으로 계산했어요.');
-  expect(assetSourceLine([], latest())).toBe('');
+  // 물가 줄이 없으면 소비자물가지수와 물가 시점도 빠진다.
+  const noInflation = assetSourceLine(cells, null);
+  expect(noInflation).toContain('한국부동산원 서울 아파트 실거래가격지수로 계산했어요.');
+  expect(noInflation).not.toContain('소비자물가지수');
+  expect(noInflation).not.toContain('물가');
+  const goldFile = { ...file2010, gold: [['2010-05', 1200]] } satisfies AssetYearFile;
+  const gold = assetCells(base('2010-05-15'), goldFile, latest({ gold: { usd: ['2026-09', 4000], usdkrw: ['2026-09', 1400] } }));
+  expect(assetSourceLine(gold, inflation)).toContain('국가데이터처 소비자물가지수와 세계은행 Pink Sheet 국제 금값 월평균으로 계산했어요.');
+  expect(assetSourceLine(gold, null)).toContain('실거래가격지수와 세계은행 Pink Sheet 국제 금값 월평균으로 계산했어요.');
+  expect(assetSourceLine([], inflation)).toBe('');
   expect(periodLabel('2026-09')).toBe('2026년 9월');
   expect(periodLabel('2026-10-20')).toBe('2026년 10월 20일');
 });
 
-test('하단 출처 작성기관: 한국부동산원은 아파트 칸이 있을 때만', () => {
-  expect(ecosOrgs(assetCells(base('2010-05-15'), file2010, latest()))).toEqual(['한국은행', '국가데이터처', '한국부동산원']);
-  expect(ecosOrgs(assetCells(base('2000-03-01'), { year: 2000, cpi: [['2000-03', 62.962]] }, latest()))).toEqual(['한국은행', '국가데이터처']);
+test('하단 출처 작성기관: 국가데이터처는 물가를 보일 때, 한국부동산원은 아파트 칸이 있을 때만', () => {
+  expect(ecosOrgs(assetCells(base('2010-05-15'), file2010, latest()), true)).toEqual(['한국은행', '국가데이터처', '한국부동산원']);
+  expect(ecosOrgs(assetCells(base('2000-03-01'), { year: 2000, cpi: [['2000-03', 62.962]] }, latest()), true)).toEqual(['한국은행', '국가데이터처']);
+  expect(ecosOrgs([], false)).toEqual(['한국은행']);
 });
