@@ -647,7 +647,7 @@ def _run_synthesize_audio_flow(
     돌려줘서 PodcastAudioGenerator.tsx가 동시에 여러 슬롯을 돌려도 어느
     응답이 어느 슬롯 것인지 구분한다.
 
-    format(2026-09-24 추가) — "podcast"|"video". provider="polly"일 때
+    format(2026-09-24 추가) — "podcast"|"video"|"prism"(2026-10-21, PRISM 탭 영어 성우). provider="polly"일 때
     어느 모듈을 부를지 이걸로 고른다: podcast_voice.synthesize() 또는
     video_settings.synthesize() — 2026-09-25부터 둘 다 SSML <prosody>로
     속도/음량을 반영한다(video는 tts.ts에 prosody 지원을 새로 추가하면서
@@ -690,9 +690,12 @@ def _run_synthesize_audio_flow(
         ps = polly_settings or {}
         if provider == "elevenlabs":
             audio = elevenlabs_tts.synthesize(text, voice_id, model_id, voice_settings)
-        elif format == "video":
+        elif format in ("video", "prism"):
+            # PRISM 탭(format="prism")은 PRISM 음성 설정(prism-settings, 영어 성우)으로 합성한다.
+            category = video_settings.PRISM_SETTINGS_CATEGORY if format == "prism" else video_settings.SETTINGS_CATEGORY
             audio = video_settings.synthesize(
                 text, voice=ps.get("voice"), engine=ps.get("engine"), rate=ps.get("rate"), volume=ps.get("volume"),
+                category=category,
             )
         else:
             audio = podcast_voice.synthesize(

@@ -11,7 +11,7 @@ import {
   ELEVENLABS_FALLBACK_RANGES,
   type ElevenLabsVoiceSettings,
 } from "./ElevenLabsVoiceSettingsFields";
-import { POLLY_VOICE_ENGINE_OPTIONS, POLLY_RATES, POLLY_VOLUMES } from "./PollyVoiceSettingsFields";
+import { LENS_POLLY_PROFILE, POLLY_RATES, POLLY_VOLUMES, type PollyVoiceProfile } from "./PollyVoiceSettingsFields";
 
 /* 영상 렌더 설정 — 2026-09-23 신설. 사용자 요청: "팟캐스트 부분처럼 성우
    선택하고 값 설정하는 거 대본 프롬프트 아래에 동일하게 넣으면 되지
@@ -68,17 +68,18 @@ export const FORMATS = [
   { id: "horizontal", label: "가로 — 유튜브·웹 게시용(기본)" },
   { id: "vertical", label: "세로 — 쇼츠·릴스용" },
 ];
-const DEFAULTS: ParsedDoc = {
+/** 아직 한 번도 발행 안 된 상태의 기본값 — video_settings.py의 _DEFAULT_*·_PRISM_DEFAULT_VOICE와 일치. */
+const defaultsFor = (profile: PollyVoiceProfile): ParsedDoc => ({
   provider: "polly",
-  voice: "Seoyeon",
-  engine: "generative",
+  voice: profile.defaultVoice,
+  engine: profile.engines[profile.defaultVoice][0].id,
   format: "horizontal",
   rate: "100%",
   volume: "+0dB",
   elevenlabsVoice: "",
   elevenlabsModel: "",
   elevenlabsSettings: ELEVENLABS_FALLBACK_VOICE_SETTINGS,
-};
+});
 
 const HEADING_RE =
   /^##\s+(PROVIDER|VOICE|ENGINE|FORMAT|RATE|VOLUME|ELEVENLABS_VOICE|ELEVENLABS_MODEL|ELEVENLABS_STABILITY|ELEVENLABS_SIMILARITY_BOOST|ELEVENLABS_STYLE|ELEVENLABS_SPEED|ELEVENLABS_SPEAKER_BOOST)\s*$/;
@@ -98,7 +99,8 @@ export interface ParsedDoc {
   elevenlabsSettings: ElevenLabsVoiceSettings;
 }
 
-function parseDoc(content: string): ParsedDoc {
+function parseDoc(content: string, profile: PollyVoiceProfile): ParsedDoc {
+  const DEFAULTS = defaultsFor(profile);
   const buckets: Record<string, string[]> = {
     PROVIDER: [], VOICE: [], ENGINE: [], FORMAT: [], RATE: [], VOLUME: [], ELEVENLABS_VOICE: [], ELEVENLABS_MODEL: [],
     ELEVENLABS_STABILITY: [], ELEVENLABS_SIMILARITY_BOOST: [], ELEVENLABS_STYLE: [], ELEVENLABS_SPEED: [], ELEVENLABS_SPEAKER_BOOST: [],
@@ -118,8 +120,8 @@ function parseDoc(content: string): ParsedDoc {
   const formatRaw = buckets.FORMAT.join("\n").trim();
   const rate = buckets.RATE.join("\n").trim();
   const volume = buckets.VOLUME.join("\n").trim();
-  const voice = voiceRaw in POLLY_VOICE_ENGINE_OPTIONS ? voiceRaw : DEFAULTS.voice;
-  const validEngines = POLLY_VOICE_ENGINE_OPTIONS[voice].map((e) => e.id);
+  const voice = voiceRaw in profile.engines ? voiceRaw : DEFAULTS.voice;
+  const validEngines = profile.engines[voice].map((e) => e.id);
   const numOr = (raw: string, fallback: number) => {
     const n = parseFloat(raw);
     return Number.isFinite(n) ? n : fallback;
@@ -217,8 +219,16 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
    *  마운트는 이 컴포넌트가 계속 한 번만 한다 — 안 넘기면(기존 호출부)
    *  예전처럼 자체 CollapsibleSection 2개로 그린다. */
   children?: (sections: { voiceSection: ReactNode; formatSection: ReactNode }) => ReactNode;
-}>(function VideoRenderSettingsPanel({ onDirtyChange, onServerVersionChange, onDefaultsChange, children }, ref) {
+  /** 2026-10-21 — 읽고 발행할 설정 문서. 영상 탭은 video-settings(기본), PRISM 탭은 prism-settings. */
+  settingsCategory?: string;
+  /** 고를 수 있는 Polly 성우 목록. 영상 탭은 LENS(기본), PRISM 탭은 PRISM_POLLY_PROFILE. */
+  pollyProfile?: PollyVoiceProfile;
+}>(function VideoRenderSettingsPanel(
+  { onDirtyChange, onServerVersionChange, onDefaultsChange, children, settingsCategory = "video-settings", pollyProfile = LENS_POLLY_PROFILE },
+  ref
+) {
   const toast = useToast();
+  const DEFAULTS = defaultsFor(pollyProfile);
   const [provider, setProvider] = useState<"polly" | "elevenlabs">(DEFAULTS.provider);
   const [voice, setVoiceState] = useState(DEFAULTS.voice);
   const [engine, setEngine] = useState(DEFAULTS.engine);
@@ -244,7 +254,7 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
   // 그 성우의 첫 번째(가장 권장) 엔진으로 같이 맞춘다(PodcastVoiceSettingsPanel과 동일).
   const setVoice = (next: string) => {
     setVoiceState(next);
-    setEngine(POLLY_VOICE_ENGINE_OPTIONS[next][0].id);
+    setEngine(pollyProfile.engines[next][0].id);
   };
 
   useEffect(() => {
@@ -257,9 +267,9 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
       })
       .catch((err) => console.error("ElevenLabs 옵션 조회 실패", err));
     adminApi
-      .getPrompt("video-settings", "published")
+      .getPrompt(settingsCategory, "published")
       .then((r) => {
-        const parsed = parseDoc(r.active_content);
+        const parsed = parseDoc(r.active_content, pollyProfile);
         setProvider(parsed.provider);
         setVoiceState(parsed.voice);
         setEngine(parsed.engine);
@@ -288,6 +298,7 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
         setServerVersion(null);
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 탭마다 고정값(settingsCategory·pollyProfile)이라 마운트 때 한 번만 읽는다
   }, []);
 
   // ElevenLabs를 처음 고르는데 아직 아무 성우도 안 정해져 있으면(발행
@@ -320,7 +331,7 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
     }
     setPublishing(true);
     try {
-      const r = await adminApi.updatePrompt("video-settings", "published", buildDoc(dataToUse));
+      const r = await adminApi.updatePrompt(settingsCategory, "published", buildDoc(dataToUse));
       toast.show(`발행했습니다 — v${r.new_version}부터 다음 생성에 적용됩니다`, "success");
       setProvider(dataToUse.provider);
       setVoiceState(dataToUse.voice);
@@ -382,6 +393,7 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
         pollyEngine={engine}
         onPollyVoiceChange={setVoice}
         onPollyEngineChange={setEngine}
+        pollyProfile={pollyProfile}
         pollyAdvanced={{ rate, volume, onRateChange: setRate, onVolumeChange: setVolume }}
         elevenVoiceId={elevenlabsVoice}
         elevenModelId={elevenlabsModel}

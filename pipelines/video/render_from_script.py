@@ -252,11 +252,13 @@ def main() -> None:
     script_path = work_dir / "script.json"
     script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
 
-    settings = video_settings.get_render_settings(settings_override)  # admin CMS에서 fresh 조회(캐시 없음), --settings-override가 있으면 그 위에 덮어씀
+    # PRISM 디자인 각본은 PRISM 음성 설정(prism-settings, 영어 성우)을, 그 밖은 LENS 영상 설정을 읽는다.
+    settings_category = video_settings.settings_category_for(script)
+    settings = video_settings.get_render_settings(settings_override, settings_category)  # admin CMS에서 fresh 조회(캐시 없음), --settings-override가 있으면 그 위에 덮어씀
     mp4_path = work_dir / "video.mp4"
     print(
-        f"렌더 시작... (provider={settings['provider']}, voice={settings['voice']}, "
-        f"engine={settings['engine']}, format={settings['format']})"
+        f"렌더 시작... (settings={settings_category}, provider={settings['provider']}, voice={settings['voice']}, "
+        f"engine={settings['engine']}, language={settings['language']}, format={settings['format']})"
     )
     # get_render_env()가 TTS_PROVIDER/TTS_VOICE_ID/TTS_ENGINE(+provider가 elevenlabs면 ELEVENLABS_*)을
     # 만든다. publishing.py::generate_video()와 이 로직을 공유한다(video_settings.py 모듈 docstring 참고).
@@ -275,7 +277,7 @@ def main() -> None:
         cwd=str(VIDEO_DIR),
         s3=s3,
         job_id=args.job_id,
-        env={**os.environ, **video_settings.get_render_env(settings_override)},
+        env={**os.environ, **video_settings.get_render_env(settings_override, settings_category)},
     )
     if returncode != 0 or not mp4_path.exists():
         _upload_error(s3, args.job_id, f"렌더 실패(returncode={returncode}): {output[-1000:]}")

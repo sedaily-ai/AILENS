@@ -35,6 +35,39 @@ export const POLLY_VOICE_ENGINE_OPTIONS: Record<string, { id: string; label: str
   Jihye: [{ id: "neural", label: "뉴럴(지혜가 지원하는 유일한 엔진)" }],
 };
 
+/* AI PRISM(영문 영상) 성우 — 2026-10-21. pipelines/common/video_settings.py의
+   _PRISM_VOICE_ENGINE_OPTIONS와 반드시 같은 값이어야 한다(위 LENS 목록과 같은 이중관리). */
+const ENGINE_GENERATIVE = { id: "generative", label: "생성형 — 가장 자연스러움(기본)" };
+const ENGINE_NEURAL = { id: "neural", label: "뉴럴" };
+const ENGINE_STANDARD = { id: "standard", label: "스탠다드 — 가장 저렴, 기계적인 톤" };
+export const PRISM_POLLY_VOICES = [
+  { id: "Joanna", label: "Joanna — 미국 여성(기본)" },
+  { id: "Matthew", label: "Matthew — 미국 남성" },
+  { id: "Ruth", label: "Ruth — 미국 여성" },
+  { id: "Stephen", label: "Stephen — 미국 남성" },
+  { id: "Danielle", label: "Danielle — 미국 여성" },
+  { id: "Amy", label: "Amy — 영국 여성" },
+  { id: "Brian", label: "Brian — 영국 남성" },
+] as const;
+export const PRISM_POLLY_VOICE_ENGINE_OPTIONS: Record<string, { id: string; label: string }[]> = {
+  Joanna: [ENGINE_GENERATIVE, ENGINE_NEURAL, ENGINE_STANDARD],
+  Matthew: [ENGINE_GENERATIVE, ENGINE_NEURAL, ENGINE_STANDARD],
+  Ruth: [ENGINE_GENERATIVE, ENGINE_NEURAL],
+  Stephen: [ENGINE_GENERATIVE, ENGINE_NEURAL],
+  Danielle: [ENGINE_GENERATIVE, ENGINE_NEURAL],
+  Amy: [ENGINE_GENERATIVE, ENGINE_NEURAL, ENGINE_STANDARD],
+  Brian: [ENGINE_GENERATIVE, ENGINE_NEURAL, ENGINE_STANDARD],
+};
+
+/** 탭마다 쓰는 성우 목록 묶음. 영상 탭은 LENS(한국어), PRISM 탭은 PRISM(영어). */
+export interface PollyVoiceProfile {
+  voices: readonly { id: string; label: string }[];
+  engines: Record<string, { id: string; label: string }[]>;
+  defaultVoice: string;
+}
+export const LENS_POLLY_PROFILE: PollyVoiceProfile = { voices: POLLY_VOICES, engines: POLLY_VOICE_ENGINE_OPTIONS, defaultVoice: "Seoyeon" };
+export const PRISM_POLLY_PROFILE: PollyVoiceProfile = { voices: PRISM_POLLY_VOICES, engines: PRISM_POLLY_VOICE_ENGINE_OPTIONS, defaultVoice: "Joanna" };
+
 function rateToNum(rate: string): number {
   const n = parseInt(rate, 10);
   return POLLY_RATES.includes(rate) ? n : 100;

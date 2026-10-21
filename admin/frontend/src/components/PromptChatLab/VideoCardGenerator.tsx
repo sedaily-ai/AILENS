@@ -15,7 +15,7 @@ import {
   ELEVENLABS_FALLBACK_RANGES,
   type ElevenLabsVoiceSettings,
 } from "./ElevenLabsVoiceSettingsFields";
-import { POLLY_VOICES, POLLY_VOICE_ENGINE_OPTIONS } from "./PollyVoiceSettingsFields";
+import { LENS_POLLY_PROFILE, type PollyVoiceProfile } from "./PollyVoiceSettingsFields";
 import { FORMATS, type ParsedDoc as VideoParsedDoc } from "./VideoRenderSettingsPanel";
 
 import { cardsStorageKey, loadStoredCards, extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard, restoredCard } from "./videoCardModel";
@@ -108,6 +108,8 @@ export function VideoCardGenerator({
   onPromptHistoryRefresh,
   category,
   name,
+  pollyProfile = LENS_POLLY_PROFILE,
+  audioFormat = "video",
 }: {
   /** 2026-09-27 — "테스트 추가" 띠 sticky 고정용, WebtoonCutGenerator.tsx
    *  주석 참고(프로덕션 카드 실측 높이). */
@@ -151,7 +153,17 @@ export function VideoCardGenerator({
   onPromptHistoryRefresh: () => void;
   category: string;
   name: string;
+  /** 2026-10-21 — 카드에서 고를 Polly 성우 목록. 영상 탭은 LENS(기본), PRISM 탭은 PRISM_POLLY_PROFILE(영어). */
+  pollyProfile?: PollyVoiceProfile;
+  /** 성우 미리듣기(synthesize_audio)의 format — "prism"이면 서버가 PRISM 성우 목록·설정으로 합성한다. */
+  audioFormat?: "video" | "prism";
 }) {
+  // 새 카드의 Polly 기본값 — 탭의 기본 성우와 그 성우의 첫(권장) 엔진.
+  const pollyDefaults: PollySettings = {
+    ...POLLY_DEFAULTS,
+    voice: pollyProfile.defaultVoice,
+    engine: pollyProfile.engines[pollyProfile.defaultVoice][0].id,
+  };
   const [elevenVoices, setElevenVoices] = useState<{ id: string; label: string; gender: string; sample_url: string }[]>([]);
   const [elevenModels, setElevenModels] = useState<{ id: string; label: string; supports_style: boolean; supports_speaker_boost: boolean }[]>([]);
   const [voiceSettingsDefaults, setVoiceSettingsDefaults] = useState<ElevenLabsVoiceSettings>(ELEVENLABS_FALLBACK_VOICE_SETTINGS);
@@ -160,7 +172,7 @@ export function VideoCardGenerator({
   const [cards, setCards] = useState<CardState[]>(
     () =>
       loadStoredCards(threadId) ?? [
-        newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: ELEVENLABS_FALLBACK_VOICE_SETTINGS, pollySettings: POLLY_DEFAULTS, format: FORMATS[0].id }),
+        newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: ELEVENLABS_FALLBACK_VOICE_SETTINGS, pollySettings: pollyDefaults, format: FORMATS[0].id }),
       ]
   );
   // 2026-09-26, 사용자 지적(WebtoonCutGenerator.tsx/VoicePreviewGenerator.tsx와
@@ -336,7 +348,7 @@ export function VideoCardGenerator({
       if (stillActive.length > 0) return [...stillActive, ...restored];
       return restored.length > 0
         ? restored
-        : [newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: POLLY_DEFAULTS, format: FORMATS[0].id })];
+        : [newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: pollyDefaults, format: FORMATS[0].id })];
     });
   }
 
@@ -391,7 +403,7 @@ export function VideoCardGenerator({
       voiceId: provider === "elevenlabs" ? elevenVoices[0]?.id ?? "" : "",
       modelId: provider === "elevenlabs" ? elevenModels[0]?.id ?? "" : "",
       voiceSettings: voiceSettingsDefaults,
-      pollySettings: POLLY_DEFAULTS,
+      pollySettings: pollyDefaults,
     });
   };
 
@@ -404,7 +416,7 @@ export function VideoCardGenerator({
       prev.map((c) => {
         if (c.id !== id) return c;
         const next = { ...c.pollySettings, [key]: value };
-        if (key === "voice") next.engine = POLLY_VOICE_ENGINE_OPTIONS[next.voice][0].id;
+        if (key === "voice") next.engine = (pollyProfile.engines[next.voice] ?? pollyProfile.engines[pollyProfile.defaultVoice])[0].id;
         return { ...c, pollySettings: next };
       })
     );
@@ -412,9 +424,9 @@ export function VideoCardGenerator({
 
   const summarizeVoice = (c: CardState): string => {
     if (c.provider === "polly") {
-      const voiceLabel = POLLY_VOICES.find((v) => v.id === c.pollySettings.voice)?.label ?? c.pollySettings.voice;
+      const voiceLabel = pollyProfile.voices.find((v) => v.id === c.pollySettings.voice)?.label ?? c.pollySettings.voice;
       const engineLabel =
-        POLLY_VOICE_ENGINE_OPTIONS[c.pollySettings.voice]?.find((e) => e.id === c.pollySettings.engine)?.label ?? c.pollySettings.engine;
+        pollyProfile.engines[c.pollySettings.voice]?.find((e) => e.id === c.pollySettings.engine)?.label ?? c.pollySettings.engine;
       return `Polly · ${voiceLabel} · ${engineLabel}`;
     }
     const voiceLabel = elevenVoices.find((v) => v.id === c.voiceId)?.label ?? c.voiceId;
@@ -436,8 +448,8 @@ export function VideoCardGenerator({
       const voiceResult = send(
         "synthesize_audio",
         c.provider === "elevenlabs"
-          ? { text: narration, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: "video" }
-          : { text: narration, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: "video" }
+          ? { text: narration, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: audioFormat }
+          : { text: narration, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: audioFormat }
       );
       if (voiceResult.sent) {
         patch.voiceStatus = "pending";
@@ -485,7 +497,7 @@ export function VideoCardGenerator({
         newCard(
           last
             ? { provider: last.provider, voiceId: last.voiceId, modelId: last.modelId, voiceSettings: last.voiceSettings, pollySettings: last.pollySettings, format: last.format }
-            : { provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: POLLY_DEFAULTS, format: FORMATS[0].id }
+            : { provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: pollyDefaults, format: FORMATS[0].id }
         ),
       ];
     });
@@ -652,6 +664,7 @@ export function VideoCardGenerator({
                         compact
                         provider={c.provider}
                         onProviderChange={(p) => setCardProvider(c.id, p)}
+                        pollyProfile={pollyProfile}
                         pollyVoice={c.pollySettings.voice}
                         pollyEngine={c.pollySettings.engine}
                         onPollyVoiceChange={(v) => updatePollySetting(c.id, "voice", v)}
