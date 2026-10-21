@@ -91,6 +91,8 @@ export const usdCell: CellOf = (base, file, latest) => {
   const now = latest.usdkrw?.daily;
   if (!now || !file.usdkrw) return null;
   const daily = base.date >= ASSET_SERIES_FROM.usdDaily;
+  // 수집 끝 날짜(latest.until) 뒤의 기준일은 그날 종가가 아직 없다. 마지막 값을 '직전 영업일'로 대신하지 않는다.
+  if (daily && base.date > latest.until) return null;
   const then = daily ? onOrBefore(file.usdkrw.daily, base.date, atOf) : exact(file.usdkrw.monthly, monthOf(base));
   if (!then) return null;
   const multiple = now[1] / then[1];

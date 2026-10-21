@@ -72,7 +72,7 @@
 .flowArrow::before { content: ''; position: absolute; left: 0; right: 2px; top: 50%; border-top: 2px dashed #1d4ed8; transform: translateY(-50%); }
 .flowArrow::after { content: ''; position: absolute; right: 2px; top: 50%; width: 8px; height: 8px; border-top: 2px solid #1d4ed8; border-right: 2px solid #1d4ed8; transform: translateY(-50%) rotate(45deg); }
 .soon { margin: 0 0 48px !important; padding: 16px; border: 1px dashed #6b7280; border-radius: 12px; background: #f9fafb; font-size: 14px; color: #374151; line-height: 1.6; }
-/* 100만 원 장면 대신 두는 한 줄 안내(기준일이 1964-05-04보다 앞설 때). 굵은 첫 문장은 끝의 낱말 하나만 다음 줄로 밀리지 않게 줄 길이를 고르게 나눈다. */
+/* 100만 원 장면 대신 두는 한 줄 안내(기준일이 1964-05-04보다 앞서거나, 기준일 자료가 아직 발표되지 않아 칸이 없을 때). 굵은 첫 문장은 끝의 낱말 하나만 다음 줄로 밀리지 않게 줄 길이를 고르게 나눈다. */
 .soon strong { display: block; font-size: 16px; color: #111827; text-wrap: balance; }
 .bars { margin: 24px 0 0 !important; padding: 0; list-style: none; }
 .bars li { padding: 12px 0; border-bottom: 1px solid #e5e7eb; }

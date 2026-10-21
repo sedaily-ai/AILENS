@@ -96,6 +96,12 @@ test('달러: 1990-03-02부터는 그날(또는 직전 영업일) 종가, 그 �
   // 1월 1일은 연도 파일의 전년 꼬리에서 찾는다.
   const file2011: AssetYearFile = { year: 2011, usdkrw: { daily: [['2010-12-30', 1134.8], ['2011-01-03', 1120]], monthly: [] } };
   expect(usdCell(base('2011-01-01'), file2011, latest())!.then.period).toBe('2010-12-30');
+  // 수집 끝 날짜(until 2026-10-20) 뒤의 기준일은 종가가 없어 칸이 없다 — 마지막 종가를 휴일 대체로 쓰지 않는다.
+  const file2026: AssetYearFile = { year: 2026, cpi: [['2026-09', 100]], usdkrw: { daily: [['2026-10-20', 3000]], monthly: [['2026-09', 1400]] } };
+  const newborn: AssetBase = { date: '2026-10-21', kind: 'birthday' };
+  expect(usdCell(newborn, file2026, latest())).toBeNull();
+  expect(assetCells(newborn, file2026, latest())).toEqual([]);
+  expect(usdCell({ date: '2026-10-20', kind: 'birthday' }, file2026, latest())!.notes).toEqual([]);
 });
 
 test('서울 아파트: 지수 비율만(원 금액 없음), 2005-12·미발표 달은 칸이 없다', () => {
