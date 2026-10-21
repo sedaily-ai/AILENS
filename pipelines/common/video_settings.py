@@ -37,6 +37,48 @@ _VOICE_ENGINE_OPTIONS = {
 }
 _DEFAULT_VOICE = "Seoyeon"  # tts.ts::DEFAULT_VOICE와 동일
 _DEFAULT_ENGINE = "generative"
+
+# AI PRISM(영문 영상) 성우 — 2026-10-21 `aws polly describe-voices`로 확인한 영어 보이스 중
+# generative 엔진을 지원하는 것만 둔다. 엔진 튜플 순서가 곧 기본 우선순위다.
+_PRISM_VOICE_ENGINE_OPTIONS = {
+    "Joanna": ("generative", "neural", "standard"),
+    "Matthew": ("generative", "neural", "standard"),
+    "Ruth": ("generative", "neural"),
+    "Stephen": ("generative", "neural"),
+    "Danielle": ("generative", "neural"),
+    "Amy": ("generative", "neural", "standard"),
+    "Brian": ("generative", "neural", "standard"),
+}
+_PRISM_DEFAULT_VOICE = "Joanna"
+
+# Polly LanguageCode — 예전엔 "ko-KR" 고정이었다. 영어 보이스에 ko-KR을 넘기면 안 되므로 보이스로 정한다.
+_VOICE_LANGUAGE = {
+    "Seoyeon": "ko-KR", "Jihye": "ko-KR",
+    "Joanna": "en-US", "Matthew": "en-US", "Ruth": "en-US", "Stephen": "en-US", "Danielle": "en-US",
+    "Amy": "en-GB", "Brian": "en-GB",
+}
+
+# 설정 문서(카테고리)별 성우 목록·기본 성우. LENS 영상은 video-settings, PRISM 영상은 prism-settings —
+# 렌더는 각본 design.theme으로 고른다(settings_category_for). 인자를 안 넘기면 지금처럼 LENS 설정이다.
+SETTINGS_CATEGORY = "video-settings"
+PRISM_SETTINGS_CATEGORY = "prism-settings"
+_PROFILES = {
+    SETTINGS_CATEGORY: (_VOICE_ENGINE_OPTIONS, _DEFAULT_VOICE),
+    PRISM_SETTINGS_CATEGORY: (_PRISM_VOICE_ENGINE_OPTIONS, _PRISM_DEFAULT_VOICE),
+}
+
+
+def _profile(category: str) -> tuple[dict, str]:
+    return _PROFILES.get(category, _PROFILES[SETTINGS_CATEGORY])
+
+
+def settings_category_for(script: dict) -> str:
+    """각본이 PRISM 디자인(design.theme "prism")이면 prism-settings, 아니면 video-settings."""
+    return PRISM_SETTINGS_CATEGORY if (script.get("design") or {}).get("theme") == "prism" else SETTINGS_CATEGORY
+
+
+def language_for(voice: str) -> str:
+    return _VOICE_LANGUAGE.get(voice, "ko-KR")
 _VALID_FORMATS = ("horizontal", "vertical")
 _DEFAULT_FORMAT = "horizontal"  # render_from_script.py 기본값과 동일
 
@@ -79,10 +121,12 @@ def serialize_prompt_doc(
     return "\n\n".join(f"## {h}\n{parts[h]}" for h in _DOC_HEADINGS)
 
 
-def parse_prompt_doc(content: str) -> dict:
+def parse_prompt_doc(content: str, category: str = SETTINGS_CATEGORY) -> dict:
     """content → {"provider","voice","engine","format",
     "elevenlabs_voice","elevenlabs_model","elevenlabs_voice_settings"}.
-    값이 없어도 예외 없이 빈 값으로 채우며 기본값은 호출부가 적용한다."""
+    값이 없어도 예외 없이 빈 값으로 채우며 기본값은 호출부가 적용한다.
+    VOICE는 그 카테고리의 성우 목록에 있을 때만 받는다(PRISM 문서에 Seoyeon이 있으면 빈 값)."""
+    voices, _ = _profile(category)
     buckets: dict[str, list[str]] = {h: [] for h in _DOC_HEADINGS}
     current: str | None = None
     for line in content.split("\n"):
@@ -94,8 +138,8 @@ def parse_prompt_doc(content: str) -> dict:
             buckets[current].append(line)
     values = {h: ("\n".join(buckets[h])).strip() for h in _DOC_HEADINGS}
     provider = values["PROVIDER"] if values["PROVIDER"] in _VALID_PROVIDERS else ""
-    voice = values["VOICE"] if values["VOICE"] in _VOICE_ENGINE_OPTIONS else ""
-    engine = values["ENGINE"] if voice and values["ENGINE"] in _VOICE_ENGINE_OPTIONS.get(voice, ()) else ""
+    voice = values["VOICE"] if values["VOICE"] in voices else ""
+    engine = values["ENGINE"] if voice and values["ENGINE"] in voices.get(voice, ()) else ""
     fmt = values["FORMAT"] if values["FORMAT"] in _VALID_FORMATS else ""
     rate = values["RATE"] if values["RATE"] in _VALID_RATES else ""
     volume = values["VOLUME"] if values["VOLUME"] in _VALID_VOLUMES else ""
@@ -127,17 +171,18 @@ def parse_prompt_doc(content: str) -> dict:
     }
 
 
-def _load_prompt_doc() -> dict:
-    """DDB(PROMPT#video-settings/published)를 캐시 없이 매번 읽는다. 문서가 없거나
-    조회가 실패해도 영상 생성을 막으면 안 되므로 빈 값으로 폴백한다."""
+def _load_prompt_doc(category: str = SETTINGS_CATEGORY) -> dict:
+    """DDB(PROMPT#{category}/published)를 캐시 없이 매번 읽는다. 문서가 없거나
+    조회가 실패해도 영상 생성을 막으면 안 되므로 빈 값으로 폴백한다(PRISM 설정을 아직
+    한 번도 저장하지 않았으면 여기로 와서 PRISM 기본 성우를 쓴다)."""
     try:
         import ddb_prompt  # pipelines/common/ 내 sibling — flat import
 
-        content = ddb_prompt.load_prompt("video-settings", "published")
-        return parse_prompt_doc(content)
+        content = ddb_prompt.load_prompt(category, "published")
+        return parse_prompt_doc(content, category)
     except Exception as e:  # noqa: BLE001 — 영상 생성 자체를 절대 막으면 안 됨
         print(
-            f"[video_settings] video-settings/published 로드 실패"
+            f"[video_settings] {category}/published 로드 실패"
             f"({type(e).__name__}: {e}) — 코드 내 기본값 사용"
         )
         return {
@@ -146,7 +191,7 @@ def _load_prompt_doc() -> dict:
         }
 
 
-def get_render_settings(override: dict | None = None) -> dict:
+def get_render_settings(override: dict | None = None, category: str = SETTINGS_CATEGORY) -> dict:
     """렌더(render_from_script.py, publishing.py::generate_video)가 지금 써야 할 설정을
     캐시 없이 매번 조회한다(CMS에서 저장하면 재배포 없이 다음 렌더부터 반영).
 
@@ -156,10 +201,14 @@ def get_render_settings(override: dict | None = None) -> dict:
 
     override는 None이 아닌 키만 발행값 위에 덮어쓴다. CMS 영상 탭 카드가 "성우 미리듣기"에서
     고른 provider/voice를 실제 렌더에도 반영할 때 chat_ws.py가 --settings-override로 넘기며,
-    매일 자동 발행(generate_video)은 override 없이 발행 설정만 쓴다."""
-    doc = _load_prompt_doc()
-    voice = doc["voice"] or _DEFAULT_VOICE
-    engine = doc["engine"] or (_DEFAULT_ENGINE if voice == _DEFAULT_VOICE else _VOICE_ENGINE_OPTIONS[voice][0])
+    매일 자동 발행(generate_video)은 override 없이 발행 설정만 쓴다.
+
+    category는 읽을 설정 문서(video-settings / prism-settings). "language"(Polly LanguageCode)는
+    override까지 반영한 최종 성우로 정한다."""
+    voices, default_voice = _profile(category)
+    doc = _load_prompt_doc(category)
+    voice = doc["voice"] or default_voice
+    engine = doc["engine"] or (_DEFAULT_ENGINE if _DEFAULT_ENGINE in voices[voice] else voices[voice][0])
     settings = {
         "provider": doc["provider"] or _DEFAULT_PROVIDER,
         "voice": voice,
@@ -173,10 +222,11 @@ def get_render_settings(override: dict | None = None) -> dict:
     }
     if override:
         settings.update({k: v for k, v in override.items() if v is not None})
+    settings["language"] = language_for(settings["voice"])
     return settings
 
 
-def get_render_env(override: dict | None = None) -> dict:
+def get_render_env(override: dict | None = None, category: str = SETTINGS_CATEGORY) -> dict:
     """get_render_settings()를 `npm run render`(render.ts → tts.ts) 서브프로세스에 넘길
     환경변수 딕셔너리로 변환한다. 진입점이 두 곳(render_from_script.py, generate_video)이라
     각자 조립하지 않고 이 함수를 공유한다. override는 get_render_settings()에 그대로 전달된다.
@@ -186,11 +236,12 @@ def get_render_env(override: dict | None = None) -> dict:
     따로 받으므로 넣지 않는다. voice_settings 5개는 저장된 키만 넘기고, 없는 키는 tts.ts가
     기본값·범위 클램프를 적용한다.
     """
-    settings = get_render_settings(override)
+    settings = get_render_settings(override, category)
     env = {
         "TTS_PROVIDER": settings["provider"],
         "TTS_VOICE_ID": settings["voice"],
         "TTS_ENGINE": settings["engine"],
+        "TTS_LANGUAGE": settings["language"],
         "TTS_RATE": settings["rate"],
         "TTS_VOLUME": settings["volume"],
     }
@@ -242,7 +293,7 @@ def _split_for_polly(text: str) -> list[str]:
 
 def synthesize(
     text: str, voice: str | None = None, engine: str | None = None,
-    rate: str | None = None, volume: str | None = None,
+    rate: str | None = None, volume: str | None = None, category: str = SETTINGS_CATEGORY,
 ) -> bytes:
     """text → mp3 bytes. CMS "성우 미리듣기"(admin/backend/routes/chat_ws.py) 전용이다.
 
@@ -251,8 +302,10 @@ def synthesize(
     provider와 무관하게 그 값으로 Polly 합성하고, 잘못된 조합이면 발행 설정으로 폴백한다.
     rate/volume이 없거나 유효하지 않으면 기본값을 쓴다. 오버라이드가 없고 발행 provider가
     "elevenlabs"면 elevenlabs_tts로 위임한다(실제 렌더의 ElevenLabs 경로는 tts.ts가 별도 수행).
+    category는 성우 목록·발행 설정을 고를 문서(CMS PRISM 탭은 prism-settings).
     """
-    if voice and voice in _VOICE_ENGINE_OPTIONS and engine in _VOICE_ENGINE_OPTIONS[voice]:
+    voices, _ = _profile(category)
+    if voice and voice in voices and engine in voices[voice]:
         settings = {
             "voice": voice,
             "engine": engine,
@@ -261,7 +314,7 @@ def synthesize(
         }
         return _synthesize_polly(text, settings)
 
-    settings = get_render_settings()  # admin CMS에서 fresh 조회(캐시 없음)
+    settings = get_render_settings(category=category)  # admin CMS에서 fresh 조회(캐시 없음)
     if settings["provider"] == "elevenlabs":
         import elevenlabs_tts  # pipelines/common/ 내 sibling — flat import(admin)/같은 디렉터리(ECS)
 
@@ -289,7 +342,7 @@ def _synthesize_polly(text: str, settings: dict) -> bytes:
             OutputFormat="mp3",
             VoiceId=settings["voice"],
             Engine=settings["engine"],
-            LanguageCode="ko-KR",
+            LanguageCode=language_for(settings["voice"]),
         )
         audio += resp["AudioStream"].read()
     return audio

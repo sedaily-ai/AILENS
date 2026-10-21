@@ -16,6 +16,7 @@ import { VoiceProductionPanel } from "./VoiceProductionPanel";
 import { VideoCardGenerator } from "./VideoCardGenerator";
 import { VideoProductionPanel } from "./VideoProductionPanel";
 import { VideoRenderSettingsPanel, type VideoRenderSettingsPanelHandle, type ParsedDoc as VideoParsedDoc } from "./VideoRenderSettingsPanel";
+import { LENS_POLLY_PROFILE, PRISM_POLLY_PROFILE } from "./PollyVoiceSettingsFields";
 import { CustomSelect } from "@/components/CustomSelect";
 import { TEXT_MODELS } from "./textModels";
 import { useChatLabThread } from "./useChatLabThread";
@@ -198,8 +199,10 @@ export function PromptTextLab({
   const videoRenderRef = useRef<VideoRenderSettingsPanelHandle>(null);
   const [scriptServerVersion, setScriptServerVersion] = useState<number | null>(null);
   const [applyingScriptVersion, setApplyingScriptVersion] = useState(false);
-  // PRISM(2026-10-20) — 영상 탭 복제. 같은 영상 카드·렌더를 쓰되, LENS 영상 발행 설정(video-settings)을
-  // 저장하는 "음성 설정·영상 설정" 단계와 카드의 "프로덕션에 적용"은 띄우지 않는다(누르면 LENS 영상이 바뀐다).
+  // PRISM(2026-10-20) — 영상 탭 복제. 같은 영상 카드·렌더를 쓴다.
+  // 2026-10-21 — 음성 설정을 LENS(video-settings)와 분리한 prism-settings(영어 성우)로 저장하므로
+  // "음성 설정" 단계와 카드의 "프로덕션에 적용"을 PRISM에도 다시 띄운다. "영상 설정"(가로·세로)은
+  // PRISM 디자인이 가로 고정이라 띄우지 않는다.
   const isPrism = category === "prism";
   const isVideoLike = category === "video" || isPrism;
   const hasCompanionPanel = category === "podcast" || isVideoLike;
@@ -762,7 +765,12 @@ export function PromptTextLab({
                         ]}
                       />
                     ) : (
-                      <VideoRenderSettingsPanel ref={videoRenderRef} onDefaultsChange={setProductionVideoDefaults}>
+                      <VideoRenderSettingsPanel
+                        ref={videoRenderRef}
+                        onDefaultsChange={setProductionVideoDefaults}
+                        settingsCategory={isPrism ? "prism-settings" : "video-settings"}
+                        pollyProfile={isPrism ? PRISM_POLLY_PROFILE : LENS_POLLY_PROFILE}
+                      >
                         {({ voiceSection, formatSection }) => (
                           <StepTabs
                             steps={[
@@ -785,9 +793,10 @@ export function PromptTextLab({
                                   />
                                 ),
                               },
-                              // PRISM은 아래 두 단계를 띄우지 않는다 — 저장하면 LENS 영상 발행 설정이 바뀐다(위 isPrism 주석).
-                              ...(isPrism ? [] : [
+                              // 음성 설정은 탭마다 다른 문서에 저장된다(영상 video-settings / PRISM prism-settings).
                               { key: "voice", label: "음성 설정", content: voiceSection },
+                              // PRISM은 가로 고정이라 "영상 설정"(포맷·프로덕션 렌더) 단계를 띄우지 않는다(위 isPrism 주석).
+                              ...(isPrism ? [] : [
                               {
                                 key: "video",
                                 label: "영상 설정",
@@ -888,8 +897,10 @@ export function PromptTextLab({
                 wsOpen={wsOpen}
                 send={wsSend}
                 subscribe={subscribe}
-                onApplyToProduction={isPrism ? undefined : handleApplyVideoTest}
+                onApplyToProduction={handleApplyVideoTest}
                 productionDefaults={productionVideoDefaults}
+                pollyProfile={isPrism ? PRISM_POLLY_PROFILE : LENS_POLLY_PROFILE}
+                audioFormat={isPrism ? "prism" : "video"}
                 serverVersion={scriptServerVersion}
                 promptHistory={promptHistory}
                 testVersion={promptVersion}

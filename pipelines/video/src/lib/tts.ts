@@ -1,4 +1,4 @@
-import { PollyClient, SynthesizeSpeechCommand, Engine, VoiceId } from '@aws-sdk/client-polly';
+import { PollyClient, SynthesizeSpeechCommand, Engine, LanguageCode, VoiceId } from '@aws-sdk/client-polly';
 
 export type TtsProvider = 'polly' | 'elevenlabs';
 
@@ -19,6 +19,9 @@ export type TtsVoiceConfig = {
   // ("100%"/"+0dB")이며 값을 그대로 <prosody rate volume> 속성에 넣는다.
   rate?: string;
   volume?: string;
+  // Polly LanguageCode. video_settings.py::get_render_env()가 성우에 맞춰 TTS_LANGUAGE로 넘긴다
+  // (Seoyeon·Jihye ko-KR, PRISM 영어 성우 en-US·en-GB). 없으면 예전처럼 ko-KR.
+  languageCode?: LanguageCode;
   // ElevenLabs(provider === 'elevenlabs'일 때만 의미 있음)
   elevenLabsVoiceId?: string;
   elevenLabsModelId?: string;
@@ -78,6 +81,7 @@ export const DEFAULT_VOICE: TtsVoiceConfig = {
   // 기본값은 podcast_voice.py의 _DEFAULT_RATE/_DEFAULT_VOLUME과 같다("100%"/"+0dB" = 변화 없음).
   rate: process.env.TTS_RATE ?? '100%',
   volume: process.env.TTS_VOLUME ?? '+0dB',
+  languageCode: (process.env.TTS_LANGUAGE as LanguageCode) ?? 'ko-KR',
   elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID,
   elevenLabsModelId: process.env.ELEVENLABS_MODEL_ID,
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY,
@@ -121,7 +125,7 @@ async function synthesizeSpeechPolly(text: string, voice: TtsVoiceConfig): Promi
         OutputFormat: 'mp3',
         VoiceId: voice.voiceId,
         Engine: voice.engine ?? 'generative',
-        LanguageCode: 'ko-KR',
+        LanguageCode: voice.languageCode ?? 'ko-KR',
       })
     );
     audioStream = resp.AudioStream;

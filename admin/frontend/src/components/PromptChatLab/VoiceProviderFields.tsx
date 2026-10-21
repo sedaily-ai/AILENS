@@ -9,7 +9,7 @@ import {
   ELEVENLABS_FALLBACK_RANGES,
   type ElevenLabsVoiceSettings,
 } from "./ElevenLabsVoiceSettingsFields";
-import { PollyAdvancedFields, POLLY_VOICES, POLLY_VOICE_ENGINE_OPTIONS } from "./PollyVoiceSettingsFields";
+import { PollyAdvancedFields, LENS_POLLY_PROFILE, type PollyVoiceProfile } from "./PollyVoiceSettingsFields";
 
 /* 제공자(Polly/ElevenLabs) 선택 + 성우/엔진(모델) + 세부 설정 — 4곳
    (VoicePreviewGenerator 실험 카드, VideoCardGenerator 실험 카드,
@@ -59,6 +59,8 @@ export interface VoiceProviderFieldsProps {
   };
   /** Polly 엔진 아래에 붙는 안내 문구(예: 영상 탭의 속도·음량 미지원 고지). */
   pollyNote?: ReactNode;
+  /** Polly 성우 목록 — 기본은 LENS(한국어). PRISM 탭은 PRISM_POLLY_PROFILE(영어). */
+  pollyProfile?: PollyVoiceProfile;
 
   elevenVoiceId: string;
   elevenModelId: string;
@@ -81,6 +83,7 @@ export function VoiceProviderFields({
   onPollyEngineChange,
   pollyAdvanced,
   pollyNote,
+  pollyProfile = LENS_POLLY_PROFILE,
   elevenVoiceId,
   elevenModelId,
   onElevenVoiceChange,
@@ -146,14 +149,14 @@ export function VoiceProviderFields({
         <>
           <div className={fieldWrapClass}>
             <Label className={labelClass}>성우</Label>
-            <CustomSelect value={pollyVoice} onChange={onPollyVoiceChange} options={POLLY_VOICES.map((v) => ({ value: v.id, label: v.label }))} />
+            <CustomSelect value={pollyVoice} onChange={onPollyVoiceChange} options={pollyProfile.voices.map((v) => ({ value: v.id, label: v.label }))} />
           </div>
           <div className={fieldWrapClass}>
             <Label className={labelClass}>엔진</Label>
             <CustomSelect
               value={pollyEngine}
               onChange={onPollyEngineChange}
-              options={POLLY_VOICE_ENGINE_OPTIONS[pollyVoice].map((e) => ({ value: e.id, label: e.label }))}
+              options={(pollyProfile.engines[pollyVoice] ?? pollyProfile.engines[pollyProfile.defaultVoice]).map((e) => ({ value: e.id, label: e.label }))}
             />
           </div>
           {pollyNote}
