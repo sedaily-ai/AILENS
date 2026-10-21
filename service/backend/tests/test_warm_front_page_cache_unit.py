@@ -7,12 +7,14 @@ import io
 import json
 import logging
 import os
+import threading
 import time
+from collections import Counter, defaultdict
 from datetime import date
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 
 _PATH = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'warm_front_page_cache.py')
 _spec = importlib.util.spec_from_file_location('warm_front_page_cache', _PATH)
@@ -27,10 +29,19 @@ TEN_YEARS, WEEK = 3650, 7
 class _Res:
     def __init__(self, status=200, body=None):
         self.status_code = status
-        self.content = json.dumps(body if body is not None else {'result': 0}).encode()
+        self._body = body if body is not None else {'result': 0}
+        self.content = json.dumps(self._body).encode()
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f'HTTP {self.status_code}', response=self)
+
+    def json(self):
+        return self._body
 
 
 class _FakeBs:
+    """bigkinds_search 흉내 — 빅카인즈 POST 는 모두 _post(url, payload, timeout) 로 나간다."""
     BIGKINDS_SEARCH_URL = 'https://bk/search'
     BIGKINDS_ISSUE_URL = 'https://bk/issue'
     FRONT_COUNT_FIELDS = ['printing_page', 'enveloped_at']
@@ -38,11 +49,11 @@ class _FakeBs:
     def __init__(self, respond=None):
         self.sent = []
         self.respond = respond or (lambda url, payload: _Res())
-        self._SESSION = SimpleNamespace(post=self._post)
+        self._post = self._send
 
-    def _post(self, url, json=None, timeout=None):
-        self.sent.append((url, json))
-        return self.respond(url, json)
+    def _send(self, url, payload, timeout):
+        self.sent.append((url, payload))
+        return self.respond(url, payload)
 
 
 class _FakeTm:
@@ -64,7 +75,7 @@ class _FakeTm:
         item = table.get_item(Key={'news_id': f'timemachine_frontv2_{day}'}).get('Item')
         if item:
             return {**item['data'], 'status': 'ok', 'cached': True}
-        res = self.bs._SESSION.post(self.bs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['title']}}, timeout=1)
+        res = self.bs._post(self.bs.BIGKINDS_SEARCH_URL, {'argument': {'fields': ['title']}}, 1)
         if getattr(res, 'status_code', 200) != 200:
             raise RuntimeError('빅카인즈 HTTP 오류')
         outcome = self.plan.get(day, ('front', TEN_YEARS, None))
@@ -213,12 +224,13 @@ def test_stopped_guard_blocks_requests_and_writes(tmp_path):
 
 def test_call_kinds_are_counted_by_request_shape():
     calls, guard = wf.Calls(), wf.Guard()
-    post = wf.counting_post(lambda url, **kw: _Res(), _FakeBs(), calls, guard)
+    post = wf.counting_post(lambda url, *args, **kw: _Res(), _FakeBs(), calls, guard)
     post(_FakeBs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['title', 'content']}})
     post(_FakeBs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['title', 'printing_page', 'enveloped_at']}})
     post(_FakeBs.BIGKINDS_SEARCH_URL, json={'argument': {'fields': ['printing_page', 'enveloped_at']}})
     post(_FakeBs.BIGKINDS_ISSUE_URL, json={'argument': {'date': '2010-05-12'}})
-    assert calls.snapshot() == {'day': 1, 'ranking': 1, 'front': 1, 'front_count': 1, 'http_error': 0}
+    post(_FakeBs.BIGKINDS_SEARCH_URL, {'argument': {'fields': ['title']}}, 10)  # bigkinds_search._post(url, payload, timeout)
+    assert calls.snapshot() == {'day': 2, 'ranking': 1, 'front': 1, 'front_count': 1, 'http_error': 0}
     post_429 = wf.counting_post(lambda url, **kw: _Res(429), _FakeBs(), calls, guard)
     post_429(_FakeBs.BIGKINDS_ISSUE_URL, json={})
     assert guard.reason == '빅카인즈 HTTP 429'
@@ -297,7 +309,7 @@ def test_ten_day_run_counts_and_summary(tmp_path):
     log = err.getvalue()
     assert '과금 모드 PAY_PER_REQUEST' in log and 'Service 태그 atlas4' in log and '동시 빅카인즈 요청 최대 6' in log
     assert '처리 10/10 · 새로 씀 6 · 이미 있음 2 · 실패 1 · 잠정 1 · 빅카인즈 8회' in log and '버린 순위 1' in log
-    assert bs._SESSION.post == bs._post  # 끝나면 감싼 함수를 되돌린다
+    assert bs._post == bs._send  # 끝나면 감싼 함수를 되돌린다
 
 
 def test_stop_on_429_then_resume_from_checkpoint(tmp_path):
@@ -356,6 +368,95 @@ def test_real_run_refuses_without_billing_mode(tmp_path):
     assert wf.run(_args(tmp_path, *_range('2010-05-01', '2010-05-02')), tm, bs, table=MagicMock(), dynamodb=client,
                   err=io.StringIO()) == 1
     assert tm.called == [] and bs.sent == []
+
+
+def _no_network(*args, **kwargs):
+    raise AssertionError('시험이 실제 HTTP 요청을 보냄')
+
+
+def test_wait_for_rankings_reports_unfinished():
+    slots, lines = threading.BoundedSemaphore(2), []
+    assert wf.wait_for_rankings(slots, 2, 0.05, lines.append) == 0 and lines == []  # 남은 요청이 없으면 기다리지 않는다
+    slots.acquire()  # 끝나지 않는 순위 요청 하나
+    assert wf.wait_for_rankings(slots, 2, 0.05, lines.append) == 1
+    assert lines == ['남은 이슈 순위 요청 1개가 끝나기를 기다림(최대 0.05초)']
+    assert slots.acquire(blocking=False) and not slots.acquire(blocking=False)  # 받은 자리는 돌려 둔다
+
+
+def test_left_rankings_stay_within_slots_and_late_429_stops(tmp_path, monkeypatch):
+    """실제 time_machine 으로 1998년 보관본 공백(그날 기사 0건)인 생일 6일을 workers 2 로 채운다. 생일마다 첫 날 함께 보낸 순위는
+    버려지고, 그 응답(429)은 모든 날짜를 처리한 뒤 남은 순위 요청을 기다리기 시작해야 온다. 빅카인즈·DynamoDB·SSM 은 가짜."""
+    from handlers.timeline import time_machine as tm
+    # time_machine 이 실제로 쓰는 모듈을 고친다. 다른 시험(test_bigkinds_relevance_retry)이 bigkinds_search 를 다시 import 하면
+    # `from services.timeline import bigkinds_search` 는 새 모듈을 주고 가짜가 비켜 간다 — 그래서 실제 네트워크도 막는다.
+    bs = tm.bigkinds_search
+    monkeypatch.setattr(requests.Session, 'send', _no_network)
+    for name in ('FRONT_PAGE_TIMEOUT_SECONDS', 'ISSUE_TIMEOUT_SECONDS', 'FRONT_COUNT_TIMEOUT_SECONDS'):
+        monkeypatch.setattr(bs, name, getattr(bs, name))  # run 이 바꾸는 값을 시험 뒤 되돌린다
+    monkeypatch.setattr(tm, 'FRONT_SEARCH_BUDGET_SECONDS', tm.FRONT_SEARCH_BUDGET_SECONDS)
+    monkeypatch.setattr(bs, 'get_secret', lambda name: 'KEY')
+    monkeypatch.setattr(bs, '_idle_sessions', [])
+    original_slots = tm._ranking_slots
+    draining, lock, flight, peak = threading.Event(), threading.Lock(), Counter(), Counter()
+    sent, posted = {}, defaultdict(threading.Event)
+    send = tm._send_ranking
+
+    def send_ranking(day, deadline):  # 함께 보냈는지 적어 두고, 그 순위 요청이 나간 뒤에야 그날 기사(0건)를 준다
+        future = send(day, deadline)
+        sent[day] = future is not None
+        return future
+
+    class Session:
+        def post(self, url, json=None, timeout=None):
+            kind = 'ranking' if url == bs.BIGKINDS_ISSUE_URL else 'search'
+            with lock:
+                for k in (kind, 'all'):
+                    flight[k] += 1
+                    peak[k] = max(peak[k], flight[k])
+            try:
+                if kind == 'ranking':
+                    posted[json['argument']['date']].set()
+                    draining.wait(5)
+                    return _Res(429)
+                day = json['argument']['published_at']['from']
+                if sent.get(day):
+                    posted[day].wait(2)
+                return _Res(200, {'result': 0, 'return_object': {'documents': []}})
+            finally:
+                with lock:
+                    for k in (kind, 'all'):
+                        flight[k] -= 1
+
+        def close(self):
+            pass
+
+    class Err(io.StringIO):
+        def write(self, text):
+            if '남은 이슈 순위 요청' in text:
+                draining.set()
+            return super().write(text)
+
+    monkeypatch.setattr(tm, '_send_ranking', send_ranking)
+    monkeypatch.setattr(bs, '_new_session', Session)
+    args = _args(tmp_path, *_range('1998-07-13', '1998-07-18'), '--workers', '2', '--dry-run')
+    try:
+        code = wf.run(args, tm, bs, table=None, dynamodb=None, err=Err())
+    finally:
+        draining.set()
+        for thread in threading.enumerate():
+            if thread.name.startswith('bigkinds-issue'):
+                thread.join(5)
+    summary = json.loads(_read(tmp_path, 'summary.json'))
+    # 늦게 온 429 도 멈춤 이유와 종료 코드에 들어간다.
+    assert code == wf.EXIT_STOPPED and summary['stop_reason'] == '빅카인즈 HTTP 429'
+    assert {k: summary[k] for k in ('processed', 'written', 'failed', 'rankings_unfinished')} == {
+        'processed': 6, 'written': 6, 'failed': 0, 'rankings_unfinished': 0}
+    # 생일 6일이 모두 첫 날 순위를 함께 보내려 했지만, 자리 2개가 버린 순위로 차자 나머지는 그날 기사부터 물어 순위를 묻지 않았다.
+    assert (summary['calls']['ranking'], summary['ranking_discarded'], peak['ranking']) == (2, 2, 2)
+    assert list(sent.values()).count(True) == 2 and peak['all'] <= 2 * 2
+    log = _read(tmp_path, 'progress.log')
+    assert '남은 이슈 순위 요청 2개가 끝나기를 기다림' in log and '멈춤: 빅카인즈 HTTP 429' in log
+    assert tm._ranking_slots is original_slots and bs._post.__name__ == '_post'
 
 
 # ─── 비교 ────────────────────────────────────────────────────────────────────

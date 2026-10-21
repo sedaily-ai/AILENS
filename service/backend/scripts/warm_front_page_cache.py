@@ -8,7 +8,9 @@
   넘어간다. 쓰기는 조건부 PutItem 이라 살아 있는 항목을 덮어쓰지 않는다. 보관 1년 미만 결과(이슈 순위 실패, 최근 날짜의 0건)는
   쓰지 않고 retry-dates.txt 에 남긴다.
 - 날짜를 --workers 개의 연속 구간으로 나눠 구간마다 오름차순으로 돈다(토요일이 일요일보다 먼저 끝나야 거슬러 간 날의 캐시
-  재사용이 걸린다). 동시 빅카인즈 요청은 최대 workers×2(그날 기사와 이슈 순위를 함께 부르는 날).
+  재사용이 걸린다). 동시 빅카인즈 요청은 최대 workers×2 — worker 마다 1 + 이슈 순위 자리(time_machine._ranking_slots) workers 개.
+  그날 기사가 없어 버린 순위 요청도 끝날 때까지 자리를 쥐고, 자리가 없으면 그날 기사부터 묻는다. 끝내기 전에 남은 순위 요청이
+  모두 끝나기를 기다려(호출 제한 + 5초까지) 그 응답의 한도·차단도 멈춤 이유와 종료 코드에 넣는다.
 - 상태 폴더(--state-dir): checkpoint.json(구간별 다음 날짜 — 다시 실행하면 이어 간다), written-keys.txt(새로 쓴 키 — 되돌릴 때 이
   키만 지운다), results.jsonl(날짜별 결과, 제목·본문 없음), retry-dates.txt, notable.jsonl(kind=none·no_paper 결과, 사람이 훑어볼 것),
   progress.log, summary.json.
@@ -194,10 +196,11 @@ def call_kind(bs, url: str, payload: Optional[dict]) -> str:
 
 
 def counting_post(original: Callable, bs, calls: Calls, guard: Guard) -> Callable:
-    """빅카인즈 POST 를 감싼다 — 멈춘 뒤에는 보내지 않고, 보내기 직전에 종류별로 세고, 한도 응답이면 멈춘다."""
+    """빅카인즈 POST 를 감싼다 — 멈춘 뒤에는 보내지 않고, 보내기 직전에 종류별로 세고, 한도 응답이면 멈춘다.
+    bigkinds_search._post(url, payload, timeout) 와 옛 코드의 requests.post(url, json=payload, timeout=…) 를 함께 받는다."""
     def post(url, *args, **kwargs):
         guard.check()
-        calls.add(call_kind(bs, url, kwargs.get('json')))
+        calls.add(call_kind(bs, url, kwargs.get('json', args[0] if args else None)))
         try:
             res = original(url, *args, **kwargs)
         except Exception:
@@ -392,6 +395,22 @@ def _load_checkpoint(path: str, days: List[str], workers: int, restart: bool) ->
             'chunks': [{'first': a, 'last': b, 'next': a} for a, b in plan_chunks(len(days), workers)]}
 
 
+def wait_for_rankings(slots, count: int, timeout: float, say: Callable[[str], None]) -> int:
+    """남은 이슈 순위 요청(버렸거나 예산을 넘겨 기다리지 않은 것)이 모두 끝나 자리 count 개가 돌아올 때까지 timeout 초까지 기다린다.
+    끝나지 않은 요청 수를 돌려준다. 받은 자리는 다시 돌려 둔다."""
+    taken = 0
+    while taken < count and slots.acquire(blocking=False):
+        taken += 1
+    if taken < count:
+        say(f'남은 이슈 순위 요청 {count - taken}개가 끝나기를 기다림(최대 {timeout:g}초)')
+        deadline = time.monotonic() + timeout
+        while taken < count and slots.acquire(timeout=max(deadline - time.monotonic(), 0)):
+            taken += 1
+    for _ in range(taken):
+        slots.release()
+    return count - taken
+
+
 def _elapsed(seconds: float) -> str:
     s = int(seconds)
     return f'{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}'
@@ -447,9 +466,16 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
     tm._get_table = lambda: store
     tm.FRONT_SEARCH_BUDGET_SECONDS = args.budget
     bs.FRONT_PAGE_TIMEOUT_SECONDS = bs.ISSUE_TIMEOUT_SECONDS = bs.FRONT_COUNT_TIMEOUT_SECONDS = args.call_timeout
-    holder = bs._SESSION if hasattr(bs, '_SESSION') else bs.requests  # 옛 코드는 requests.post 를 바로 부른다
-    original_post = holder.post
-    holder.post = counting_post(original_post, bs, calls, guard)
+    # 새 코드는 빅카인즈 POST 를 모두 bigkinds_search._post 로 보내고, 옛 코드는 requests.post 를 바로 부른다.
+    holder, post_name = (bs, '_post') if hasattr(bs, '_post') else (bs.requests, 'post')
+    original_post = getattr(holder, post_name)
+    setattr(holder, post_name, counting_post(original_post, bs, calls, guard))
+    # 이슈 순위 자리를 worker 수만큼 둔다(동시 요청 최대 workers×2). 옛 코드에는 없다(순위를 함께 부르지 않는다).
+    original_slots = getattr(tm, '_ranking_slots', None)
+    slots = threading.BoundedSemaphore(args.workers)
+    if original_slots is not None:
+        tm._ranking_slots = slots
+    unfinished_rankings = 0
     discarded = _DiscardCounter(getattr(tm, 'RANKING_DISCARDED_LOG', None))
     tm_logger = getattr(tm, 'logger', None)
     if tm_logger is not None:
@@ -527,11 +553,18 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
             guard.stop('사용자 중단(Ctrl-C)')
             for future in futures:
                 future.result()
+    if original_slots is not None:
+        # 늦게 온 순위 응답의 한도·차단도 멈춤 이유에 넣는다. 감싼 POST 는 그 뒤에 되돌린다.
+        unfinished_rankings = wait_for_rankings(slots, args.workers, args.call_timeout + 5, say)
+        if unfinished_rankings:
+            say(f'끝나지 않은 이슈 순위 요청 {unfinished_rankings}개(결과는 버려진다)')
+        tm._ranking_slots = original_slots
     for handle in (results, notable):
         handle.close()
     if tm_logger is not None:
         tm_logger.removeHandler(discarded)
-    holder.post, tm._get_table = original_post, original_table
+    setattr(holder, post_name, original_post)
+    tm._get_table = original_table
 
     _write_retry_dates(path('results.jsonl'), path('retry-dates.txt'))
     say(progress_line())
@@ -544,7 +577,8 @@ def run(args, tm, bs, *, table=None, dynamodb=None, err=None) -> int:
         'written': outcomes['written'], 'exists': outcomes['exists'], 'failed': outcomes['failed'],
         'provisional': outcomes['provisional'], 'writes': store.writes, 'calls': snap,
         'calls_total': sum(snap[k] for k in CALL_KINDS), 'ranking_discarded': discarded.count,
-        'stop_reason': guard.reason, 'elapsed_seconds': round(time.monotonic() - started, 1),
+        'rankings_unfinished': unfinished_rankings, 'stop_reason': guard.reason,
+        'elapsed_seconds': round(time.monotonic() - started, 1),
         'finished_at': datetime.now(KST).isoformat(timespec='seconds'),
         'table': {k: limits.get(k) for k in ('table', 'billing_mode', 'write_limit', 'read_limit')}, 'service_tag': tag,
     })

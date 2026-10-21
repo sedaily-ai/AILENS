@@ -10,7 +10,8 @@ SearchResult.sort_applied 로 돌려주고 로그에도 남긴다. 최초 시도
 변수(_relevance_supported)로 기억해 이후 요청에서 불필요한 재시도를 피한다.
 타임아웃·5xx·네트워크 오류는 정렬 문제가 아니므로 대체하지 않고 그대로 raise 한다.
 
-연결: 두 빅카인즈 주소(search/news, issue_ranking)는 모듈 수준 Session 하나로 TLS 연결을 재사용한다(_post).
+연결: 두 빅카인즈 주소(search/news, issue_ranking)는 모듈 수준 Session 풀로 TLS 연결을 재사용한다(_post).
+요청마다 쉬는 Session 하나를 빌려 혼자 쓰고 돌려주므로 동시에 나가는 요청이 한 Session 을 함께 쓰지 않는다.
 """
 import logging
 import re
@@ -60,22 +61,30 @@ _relevance_rejected_until: float = 0.0
 
 
 # 빅카인즈 연결 재사용. 호출마다 새로 맺던 TLS 연결(us-east-1 → 한국, 0.4~0.6초)을 한 요청 안의 연속 호출과 가까운 다음 요청이
-# 함께 쓴다. 웜 컨테이너가 오래 쉬면 남은 keep-alive 연결이 중간에서 소리 없이 끊겨 있을 수 있고, POST 는 urllib3 가 다시
-# 시도하지 않아 바로 오류가 된다. 그래서 마지막 사용 뒤 _SESSION_IDLE_SECONDS 가 지났으면 연결 풀을 비우고 새로 맺는다.
-_SESSION = requests.Session()
+# 함께 쓴다. requests.Session 은 여러 스레드가 함께 쓰도록 만들어지지 않아(쿠키·어댑터 상태) 요청마다 쉬는 Session 하나를 빌려
+# 그 요청 동안 혼자 쓰고 돌려준다 — 동시에 나가는 요청(그날 기사와 이슈 순위, 앞 요청에서 버린 순위, 미리 채우기 worker)은 저마다
+# 다른 Session 을 쓴다. Session 수는 가장 많이 겹친 요청 수까지만 는다.
+# 웜 컨테이너가 오래 쉬면 남은 keep-alive 연결이 중간에서 소리 없이 끊겨 있을 수 있고, POST 는 urllib3 가 다시 시도하지 않아 바로
+# 오류가 된다. 그래서 빌린 Session 이 마지막 사용 뒤 _SESSION_IDLE_SECONDS 가 지났으면 그 연결 풀을 비우고 새로 맺는다. 비우는 것은
+# 빌린 스레드만 하므로 쓰는 중인 Session 은 닫히지 않는다.
 _SESSION_IDLE_SECONDS = 60
-_session_lock = threading.Lock()
-_session_last_used = 0.0  # time.monotonic(), 0 이면 아직 안 씀
+_new_session = requests.Session
+_idle_sessions: List[Tuple[requests.Session, float]] = []  # (Session, 마지막 사용 time.monotonic()) — 끝이 가장 최근
+_sessions_lock = threading.Lock()
 
 
 def _post(url: str, payload: dict, timeout: float) -> requests.Response:
-    global _session_last_used
-    with _session_lock:
-        now = time.monotonic()
-        if _session_last_used and now - _session_last_used > _SESSION_IDLE_SECONDS:
-            _SESSION.close()  # 풀만 비운다 — Session 은 계속 쓸 수 있고 다음 요청이 새 연결을 맺는다
-        _session_last_used = now
-    return _SESSION.post(url, json=payload, timeout=timeout)
+    with _sessions_lock:
+        session, last_used = _idle_sessions.pop() if _idle_sessions else (None, 0.0)
+    if session is None:
+        session = _new_session()
+    elif time.monotonic() - last_used > _SESSION_IDLE_SECONDS:
+        session.close()  # 풀만 비운다 — Session 은 계속 쓸 수 있고 이 요청이 새 연결을 맺는다
+    try:
+        return session.post(url, json=payload, timeout=timeout)
+    finally:
+        with _sessions_lock:
+            _idle_sessions.append((session, time.monotonic()))
 
 
 def warm_up() -> None:

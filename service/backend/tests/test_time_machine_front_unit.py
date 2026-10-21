@@ -95,7 +95,46 @@ def _rankings(post):
 
 
 def _no_direct_post(*args, **kwargs):
-    raise AssertionError('빅카인즈는 bigkinds_search._SESSION 으로만 부른다')
+    raise AssertionError('빅카인즈는 bigkinds_search._post(빌린 Session)로만 부른다')
+
+
+class _Sessions:
+    """bigkinds_search._new_session 대신. 만든 Session 의 응답은 공용 post mock 이 준다. 두 요청이 한 Session 을 함께 쓰거나
+    쓰는 중인 Session 을 닫으면 problems 에 남긴다(다른 스레드에서 난 예외는 순위 실패로 삼켜지므로 따로 모아 fixture 가 본다)."""
+
+    def __init__(self, post):
+        self.post, self.made, self.problems = post, [], []
+
+    def __call__(self):
+        session = _FakeSession(self)
+        self.made.append(session)
+        return session
+
+
+class _FakeSession:
+    def __init__(self, owner):
+        self.owner, self.busy, self.closed, self.urls = owner, threading.Lock(), 0, []
+
+    def post(self, url, **kwargs):
+        if not self.busy.acquire(blocking=False):
+            self.owner.problems.append(f'한 Session 을 함께 씀: {url}')
+            return self.owner.post(url, **kwargs)
+        try:
+            self.urls.append(url)
+            return self.owner.post(url, **kwargs)
+        finally:
+            self.busy.release()
+
+    def close(self):
+        if self.busy.locked():
+            self.owner.problems.append('쓰는 중인 Session 을 닫음')
+        self.closed += 1
+
+
+def _join_ranking_threads():
+    for thread in threading.enumerate():
+        if thread.name.startswith('bigkinds-issue'):
+            thread.join(2)
 
 
 def _calendar(no_front=(), until='2026-10-18', unknown=()):
@@ -116,14 +155,15 @@ def env(monkeypatch):
     table = _FakeTable()
     monkeypatch.setattr(tm, '_get_table', lambda: table)
     post = MagicMock(return_value=_resp([]))
-    monkeypatch.setattr(bs._SESSION, 'post', post)
-    monkeypatch.setattr(bs, '_session_last_used', 0.0)
+    sessions = _Sessions(post)
+    monkeypatch.setattr(bs, '_new_session', sessions)
+    monkeypatch.setattr(bs, '_idle_sessions', [])
     monkeypatch.setattr(bs.requests, 'post', _no_direct_post)
+    monkeypatch.setattr(tm, '_ranking_slots', threading.BoundedSemaphore(1))
     yield table, post
     # 함께 부른 이슈 순위 스레드가 끝난 뒤에 가짜 응답을 되돌린다 — 뒤에 남은 스레드가 실제 빅카인즈로 나가지 않게.
-    for thread in threading.enumerate():
-        if thread.name.startswith('bigkinds-issue'):
-            thread.join(2)
+    _join_ranking_threads()
+    assert sessions.problems == []
 
 
 def _call(**params):
@@ -196,18 +236,17 @@ def test_fetch_issue_clusters_sorts_by_size(env):
 
 def test_session_is_closed_only_after_idle(env, monkeypatch):
     _, post = env
-    close = MagicMock()
-    monkeypatch.setattr(bs._SESSION, 'close', close)
+    sessions = bs._new_session
     now = [1000.0]
     monkeypatch.setattr(bs.time, 'monotonic', lambda: now[0])
     bs.fetch_issue_clusters('2010-05-12')
     bs.search_day_docs('2010-05-12')
     now[0] += 59  # 1분 안쪽의 다음 호출은 남은 연결을 그대로 쓴다
     bs.search_day_docs('2010-05-12')
-    close.assert_not_called()
+    assert [s.closed for s in sessions.made] == [0]  # 차례로 부르면 Session 하나를 돌려 쓴다
     now[0] += 61  # 오래 쉰 연결은 끊겨 있을 수 있어 풀을 비우고 새로 맺는다
     bs.search_day_docs('2010-05-12')
-    close.assert_called_once()
+    assert [s.closed for s in sessions.made] == [1]
     assert post.call_count == 4 and {c.args[0] for c in post.call_args_list} == {bs.BIGKINDS_ISSUE_URL, bs.BIGKINDS_SEARCH_URL}
 
 
@@ -466,6 +505,48 @@ def test_empty_day_asks_ranking_only_on_first_day(env):
     assert body['kind'] == 'none'
     assert [c.kwargs['json']['argument']['date'] for c in _rankings(post)] == ['2010-05-12']
     assert len(_searches(post)) == 9  # 생일 포함 11일 중 휴간 일요일(5.9·5.2) 2일은 묻지 않는다
+
+
+def test_left_ranking_keeps_its_slot_and_session(env, monkeypatch):
+    _, post = env
+    sessions = bs._new_session
+    monkeypatch.setattr(bs, '_SESSION_IDLE_SECONDS', -1)  # 쉬던 Session 은 빌릴 때마다 비운다 — 쓰는 중인 것을 닫는지 본다
+    asked, hold, senders = threading.Event(), threading.Event(), []
+
+    def ranking(day):
+        senders.append((day, threading.current_thread().name.startswith('bigkinds-issue')))
+        asked.set()
+        if day == '2010-05-12':
+            hold.wait(3)  # 버린 순위 응답이 다음 요청이 끝날 때까지 오지 않는다
+
+    _answer(post, {'2010-05-11': [_doc(1, page='')], '2010-06-15': [_doc(2, page='')], '2010-06-16': [_doc(3, page='')]},
+            _issue(['n2'], ['n3']), before_search=lambda day: asked.wait(2), before_ranking=ranking)
+    try:
+        _, first = _call(front='2010-05-12')  # 생일 0건 — 함께 보낸 순위는 버려지고 아직 돈다
+        # 그 순위가 자리를 쥐고 있어 다음 요청은 그날 기사부터 묻고, 기사가 있어서 순위를 묻는다(직렬).
+        _, second = _call(front='2010-06-15')
+        assert (first['shown_date'], second['shown_date'], second['basis']) == ('2010-05-11', '2010-06-15', 'issue')
+        assert senders == [('2010-05-12', True), ('2010-05-11', False), ('2010-06-15', False)]
+        assert sessions.problems == [] and len(sessions.made) == 2  # 남은 순위 요청의 Session 은 함께 쓰지도 닫지도 않는다
+    finally:
+        hold.set()
+    _join_ranking_threads()
+    # 순위 요청이 끝나면 자리가 돌아와 다시 함께 보낸다.
+    _, third = _call(front='2010-06-16')
+    assert third['basis'] == 'issue' and senders[-1] == ('2010-06-16', True)
+
+
+def test_busy_slot_empty_day_asks_no_ranking(env, caplog):
+    _, post = env
+    assert tm._ranking_slots.acquire(blocking=False)  # 앞 요청에서 버린 순위가 아직 돈다
+    try:
+        with caplog.at_level('INFO'):
+            _, body = _call(front='2010-05-12')
+    finally:
+        tm._ranking_slots.release()
+    # 자리가 없으면 빈 날에는 순위를 아예 묻지 않는다 — 버린 순위가 날짜마다 쌓이지 않는다.
+    assert body['kind'] == 'none' and _rankings(post) == [] and len(_searches(post)) == 9
+    assert tm.RANKING_DISCARDED_LOG not in caplog.text
 
 
 def test_no_page_era_sunday_skips_to_saturday(env):

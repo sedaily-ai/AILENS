@@ -5,6 +5,7 @@
 """
 import json
 import time
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -61,14 +62,14 @@ def env(monkeypatch):
     monkeypatch.setattr(tm, '_get_table', lambda: table)
     monkeypatch.setattr(tm, 'build_investment_scenarios', lambda date: {'stub': date})
     post = MagicMock(return_value=_resp([_doc(1), _doc(2)]))
-    monkeypatch.setattr(bs._SESSION, 'post', post)
-    monkeypatch.setattr(bs, '_session_last_used', 0.0)
+    monkeypatch.setattr(bs, '_new_session', lambda: SimpleNamespace(post=post, close=lambda: None))
+    monkeypatch.setattr(bs, '_idle_sessions', [])
     monkeypatch.setattr(bs.requests, 'post', _no_direct_post)
     return table, post
 
 
 def _no_direct_post(*args, **kwargs):
-    raise AssertionError('빅카인즈는 bigkinds_search._SESSION 으로만 부른다')
+    raise AssertionError('빅카인즈는 bigkinds_search._post(빌린 Session)로만 부른다')
 
 
 def _ev(**params):

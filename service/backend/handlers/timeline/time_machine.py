@@ -46,8 +46,9 @@ API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽으며 
 """
 import hashlib
 import logging
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
@@ -333,12 +334,39 @@ def _ranking_failed(e: Exception) -> Tuple[List[List[str]], bool]:
     return [], True
 
 
+# 그날 기사와 함께 다른 스레드로 보내는 이슈 순위 요청의 자리. 순위 요청이 끝나거나 취소돼야 돌려받는다 — 그날 기사가 없어 버렸거나
+# 예산을 넘겨 기다리지 않은 순위 요청도 끝날 때까지 자리를 쥔다. 자리가 없으면 그날 기사부터 묻고 기사가 있을 때만 순위를 묻는다(직렬).
+# 그래서 남은 순위 요청이 날짜마다 쌓이지 않는다. Lambda 컨테이너는 요청을 하나씩 받으므로 1 — 앞 요청에서 버린 순위가 아직 돌면
+# 이번 요청은 직렬로 간다. 미리 채우기 스크립트는 worker 수만큼 자리를 둔 것으로 바꿔 끼우고, 끝내기 전에 모두 돌려받는다.
+_ranking_slots = threading.BoundedSemaphore(1)
+
+
+def _send_ranking(day: str, deadline: float) -> Optional[Future]:
+    """이슈 순위를 다른 스레드로 먼저 보낸다. 자리가 없으면 보내지 않고 None."""
+    bigkinds_search.warm_up()  # 두 스레드가 처음 SSM 클라이언트를 함께 만들지 않게 키를 먼저 읽어 둔다
+    timeout = _remaining(deadline)
+    slots = _ranking_slots  # 빌린 곳에 돌려준다(스크립트가 그 사이 바꿔 끼워도)
+    if not slots.acquire(blocking=False):
+        return None
+    # 요청마다 새 풀 — 얼었던 컨테이너에 남은 순위 요청이 다음 요청의 스레드를 막지 않게 모듈 수준 풀을 쓰지 않는다.
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='bigkinds-issue')
+    try:
+        ranking = pool.submit(bigkinds_search.fetch_issue_clusters, day, timeout=timeout)
+    except BaseException:
+        slots.release()
+        raise
+    finally:
+        pool.shutdown(wait=False)  # 받은 요청은 그대로 보내고, 끝나면 스레드도 끝난다. 응답은 그것을 기다리지 않는다.
+    ranking.add_done_callback(lambda _: slots.release())
+    return ranking
+
+
 def _day_highlights(day: str, deadline: float, parallel: bool) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     """면 번호가 없는 시기의 그날 기사와 고른 기준. 기사가 없으면 ([], None). 이슈 순위 실패는 본문이 긴 순으로 대신한다.
 
-    parallel 이면 이슈 순위를 다른 스레드로 먼저 보내고 그날 기사를 받는다 — 두 요청의 제한 시간이 모두 남은 예산 이하라
-    직렬(합)보다 짧은 쪽(최대값)에서 끝난다. 그날 기사가 없으면 순위는 기다리지 않고 버린다(그만큼 빅카인즈 호출이 하나 는다).
-    NO_ISSUE_MATCH_UNTIL 까지는 순위를 묻지 않는다.
+    parallel 이고 순위 자리(_ranking_slots)가 비어 있으면 이슈 순위를 다른 스레드로 먼저 보내고 그날 기사를 받는다 — 두 요청의
+    제한 시간이 모두 남은 예산 이하라 직렬(합)보다 짧은 쪽(최대값)에서 끝난다. 그날 기사가 없으면 순위는 기다리지 않고 버린다
+    (그만큼 빅카인즈 호출이 하나 는다). 자리가 없으면 직렬과 같다. NO_ISSUE_MATCH_UNTIL 까지는 순위를 묻지 않는다.
     """
     if day <= NO_ISSUE_MATCH_UNTIL:
         docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
@@ -346,34 +374,27 @@ def _day_highlights(day: str, deadline: float, parallel: bool) -> Tuple[List[Dic
             return [], None
         articles, _ = bigkinds_search.pick_day_articles(docs, [], FRONT_DAY_ARTICLES)
         return articles, bigkinds_search.DAY_BASIS_NO_MATCH
-    if not parallel:
+    ranking = _send_ranking(day, deadline) if parallel else None
+    try:
         docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
-        if not docs:
-            return [], None
-        try:
+    except BaseException:
+        if ranking is not None:
+            ranking.cancel()
+        raise
+    if not docs:
+        if ranking is not None and not ranking.cancel():  # 아직 보내지 않았으면 취소돼 호출이 늘지 않는다
+            logger.info(RANKING_DISCARDED_LOG)
+        return [], None
+    try:
+        if ranking is None:
             # 시간이 다 됐으면(_remaining 이 raise) 이미 받은 그날 기사를 버리지 않고 본문이 긴 순으로 보여 준다.
-            clusters, failed = bigkinds_search.fetch_issue_clusters(day, timeout=_remaining(deadline)), False
-        except Exception as e:  # noqa: BLE001
-            clusters, failed = _ranking_failed(e)
-    else:
-        bigkinds_search.warm_up()  # 두 스레드가 처음 SSM 클라이언트를 함께 만들지 않게 키를 먼저 읽어 둔다
-        # 요청마다 새 풀 — 얼었던 컨테이너에 남은 순위 요청이 다음 요청의 자리를 막지 않게 모듈 수준 풀을 쓰지 않는다.
-        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='bigkinds-issue')
-        try:
-            ranking = pool.submit(bigkinds_search.fetch_issue_clusters, day, timeout=_remaining(deadline))
-            docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
-            if not docs:
-                if not ranking.cancel():  # 아직 보내지 않았으면 취소돼 호출이 늘지 않는다
-                    logger.info(RANKING_DISCARDED_LOG)
-                return [], None
-            try:
-                # 남은 예산만 기다린다. 시간이 다 됐거나 순위 조회가 실패하면 받은 그날 기사를 본문이 긴 순으로 보여 준다.
-                clusters, failed = ranking.result(timeout=_remaining(deadline)), False
-            except Exception as e:  # noqa: BLE001
-                clusters, failed = _ranking_failed(e)
-        finally:
-            # 응답은 남은 순위 요청을 기다리지 않는다. 그 요청은 자기 제한 시간 안에 끝나고 결과는 버려진다.
-            pool.shutdown(wait=False, cancel_futures=True)
+            clusters = bigkinds_search.fetch_issue_clusters(day, timeout=_remaining(deadline))
+        else:
+            # 남은 예산만 기다린다. 넘으면 순위 요청은 자기 제한 시간 안에 끝나고 결과는 버려진다.
+            clusters = ranking.result(timeout=_remaining(deadline))
+        failed = False
+    except Exception as e:  # noqa: BLE001
+        clusters, failed = _ranking_failed(e)
     articles, basis = bigkinds_search.pick_day_articles(docs, clusters, FRONT_DAY_ARTICLES)
     return articles, (bigkinds_search.DAY_BASIS_RANKING_FAILED if failed else basis)
 
