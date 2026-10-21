@@ -330,8 +330,10 @@ class DynamoStore(_Store):
         self.table, self.reads, self.write_limit, self.keys_path = table, reads, writes, keys_path
 
     def get_item(self, Key):
-        self.reads.take(0.5)  # 4KB 이하 일관성 없는 읽기
-        return self.table.get_item(Key=Key)
+        # 강한 일관성 읽기(4KB 이하 1단위). 토요일을 쓴 직후 일요일이 그 항목을 못 보면 거슬러 간 날 재사용을 놓치고
+        # 빅카인즈를 다시 부른다. 서버(time_machine)의 읽기는 그대로다.
+        self.reads.take(1)
+        return self.table.get_item(Key=Key, ConsistentRead=True)
 
     def _write(self, item: dict) -> str:
         self.write_limit.take(item_units(item))
@@ -346,6 +348,8 @@ class DynamoStore(_Store):
                 os.fsync(fp.fileno())
         except OSError as e:
             self.guard.stop(f'written-keys.txt 에 키를 남기지 못함({type(e).__name__})')
+            return 'blocked'
+        if self.guard.reason:  # 키를 디스크에 내리는 동안 다른 worker 가 멈춤을 정했으면 보내지 않는다(키는 남아도 안전 — 캐시)
             return 'blocked'
         try:
             self.table.put_item(Item=item, ConditionExpression='attribute_not_exists(news_id) OR expires_at < :now',

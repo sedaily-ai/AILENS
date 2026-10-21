@@ -102,8 +102,10 @@ class _FakeDynamoTable:
     def __init__(self, items=()):
         self.items = {i['news_id']: i for i in items}
         self.puts = []
+        self.reads = []  # get_item 의 ConsistentRead 값
 
-    def get_item(self, Key):
+    def get_item(self, Key, ConsistentRead=False):
+        self.reads.append(ConsistentRead)
         item = self.items.get(Key['news_id'])
         return {'Item': item} if item else {}
 
@@ -316,6 +318,50 @@ def test_stop_while_waiting_for_write_capacity_blocks_put(tmp_path):
     assert not writer.is_alive() and guard.reason == '빅카인즈 HTTP 429'
     assert table.puts == [] and store.pop('2010-05-12')[0] == 'blocked' and store.writes == 0
     assert not keys.exists()
+
+
+def test_stop_while_syncing_key_blocks_put(tmp_path, monkeypatch):
+    """worker A 가 written-keys.txt 를 fsync 하는 동안 worker B 의 빅카인즈 응답이 429 면 A 는 PutItem 을 보내지 않는다."""
+    syncing, release = threading.Event(), threading.Event()
+    fsync = os.fsync
+
+    def slow_fsync(fd):
+        fsync(fd)
+        syncing.set()
+        assert release.wait(5)
+
+    guard, table, keys = wf.Guard(), _FakeDynamoTable(), tmp_path / 'keys.txt'
+    store = wf.DynamoStore(table, guard, wf.Limiter(None), wf.Limiter(None), str(keys))
+    item = {**_existing('2010-05-12'), 'expires_at': int(time.time()) + TEN_YEARS * 86400}
+    monkeypatch.setattr(wf.os, 'fsync', slow_fsync)
+    writer = threading.Thread(target=store.put_item, args=(item,))
+    writer.start()
+    try:
+        assert syncing.wait(5)  # A 는 키를 디스크에 내리는 중(쓰기 한도 뒤 확인 때는 멈춤 전)
+        post = wf.counting_post(lambda url, *args, **kwargs: _Res(429), _FakeBs(), wf.Calls(), guard)
+        post(_FakeBs.BIGKINDS_ISSUE_URL, json={})  # B 의 순위 응답이 429
+    finally:
+        release.set()
+        writer.join(5)
+    assert not writer.is_alive() and guard.reason == '빅카인즈 HTTP 429'
+    assert table.puts == [] and store.pop('2010-05-12')[0] == 'blocked' and store.writes == 0
+    assert keys.read_text() == 'timemachine_frontv2_2010-05-12\n'  # 키는 남아도 된다(되돌릴 목록이 넓을 뿐)
+
+
+def test_real_table_reads_strongly_consistent_at_one_unit(tmp_path):
+    """실제 표 읽기는 ConsistentRead=True 이고 읽기 한도에서 1단위로 센다 — 직전에 쓴 토요일 항목을 일요일 처리에서 바로 본다."""
+    taken = []
+
+    class Recording(wf.Limiter):
+        def take(self, units):
+            taken.append(units)
+
+    table = _FakeDynamoTable()
+    store = wf.DynamoStore(table, wf.Guard(), Recording(None), wf.Limiter(None), str(tmp_path / 'keys.txt'))
+    store.put_item({**_existing('2024-10-12'), 'expires_at': int(time.time()) + TEN_YEARS * 86400})
+    assert store.get_item(Key={'news_id': 'timemachine_frontv2_2024-10-12'})['Item']['date'] == '2024-10-12'
+    assert store.get_item(Key={'news_id': 'timemachine_frontv2_2024-10-13'}) == {}
+    assert table.reads == [True, True] and taken == [1, 1]
 
 
 def test_limiter_never_exceeds_rate():
