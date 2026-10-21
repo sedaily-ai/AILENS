@@ -594,18 +594,20 @@ export const adminApi = {
   // progress(같은 날 추가, 사용자 요청 — "진행상황... 퍼센테이지로 볼 수
   // 있거나 하는 UX는 적용할 수 없는건가?? 렌더가 길어서")는 pending 상태일
   // 때만 채워진다.
-  pollVideoLab: (jobId: string) =>
+  // filename(2026-10-21)은 내려받기용 — done 응답의 download_url(서명 URL, 10분)이 이 이름으로 저장된다.
+  pollVideoLab: (jobId: string, filename?: string) =>
     request<{
       status: "pending" | "done" | "error";
       video_url?: string;
       thumb_url?: string | null;
+      download_url?: string | null;
       message?: string;
       progress?:
         | { stage: "tts"; current: number; total: number }
         | { stage: "bundling" }
         | { stage: "rendering"; percent: number; renderedFrames: number; totalFrames: number; encodedFrames: number }
         | null;
-    }>(`/admin/video-lab/${encodeURIComponent(jobId)}`),
+    }>(`/admin/video-lab/${encodeURIComponent(jobId)}${filename ? `?filename=${encodeURIComponent(filename)}` : ""}`),
 
   // 선정 실험실(2026-09-28) — mustknow_auto "일반" 선정 결과를 날짜별로
   // 모아 채점. 날짜 탭은 실제 회차가 있었던 날짜만(getSelectionDates) —
