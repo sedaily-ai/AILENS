@@ -169,6 +169,14 @@ def numbers_in(text: str) -> Set[str]:
     return out
 
 
+def article_date_text(article: Dict[str, Any]) -> str:
+    """기사 웹 게재일을 "게재일 2026년 10월 16일"로. XML date 는 20261016 또는 2026-10-16 꼴이다. 알 수 없으면 빈 문자열."""
+    digits = re.sub(r"\D", "", str(article.get("date") or ""))[:8]
+    if len(digits) != 8:
+        return ""
+    return f"게재일 {int(digits[:4])}년 {int(digits[4:6])}월 {int(digits[6:])}일"
+
+
 def unsupported_numbers(draft: Dict[str, Any], source_texts: Iterable[str]) -> List[str]:
     """초안에는 있는데 묶음 기사 본문 어디에도 없는 수치. 지어낸 숫자를 잡는 1차 대조(문자열 기반, 모델 판단 없음)."""
     source_nums: Set[str] = set()
@@ -267,13 +275,38 @@ def _title_tokens(title: str) -> Set[str]:
 SPECIFIC_DF_MAX = 60  # 이 값 이하로 나오는 단어를 '특정 개체·사안'으로 본다
 
 
+RECENT_LETTERS = 3  # 최근 발행 레터 몇 편의 주제와 겹치는지 본다
+RECENT_TOPIC_PENALTY = 5  # 겹친 주제 하나당 감점(최대 2개까지 센다)
+
+
+def recent_topic_hits(cluster: Dict[str, Any], recent_topics: Iterable[str]) -> List[str]:
+    """묶음 기사 제목에 최근 레터 주제(이름 또는 별칭)가 나오면 그 주제 이름을 돌려준다.
+    2026-10-13~17 자동 발행 4편이 모두 산업, 그중 3편이 인공지능이라(레터탭 피드백 2026-10-20) 같은 주제가 연달아 뽑히지 않게 쓴다."""
+    titles = " ".join(str(a.get("title") or "") for a in cluster.get("articles", []))
+    return [name for name in dict.fromkeys(recent_topics) if any(f in titles for f in (name, *TOPIC_ALIASES.get(name, ())))]
+
+
+def recent_letter_topics(letters: List[Dict[str, Any]], n: int = RECENT_LETTERS) -> List[str]:
+    """발행된 레터 상세 목록에서 최근 n편의 주제 이름. topics 는 이름 문자열 또는 {name} 꼴 둘 다 받는다."""
+    pub = sorted((l for l in letters if l.get("status") == "published"), key=lambda l: str(l.get("published_at") or ""), reverse=True)[:n]
+    out: List[str] = []
+    for l in pub:
+        for t in l.get("topics") or []:
+            name = t.get("name") if isinstance(t, dict) else t
+            if name:
+                out.append(str(name))
+    return list(dict.fromkeys(out))
+
+
 def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = (), min_articles: int = 3, min_chars: int = 5000,
-                     max_candidates: int = 8) -> List[Dict[str, Any]]:
+                     max_candidates: int = 8, recent_topics: Iterable[str] = ()) -> List[Dict[str, Any]]:
     """최근 기사 제목에서 '같이 나오는 단어 쌍'(예: 삼성전자+영업익, AI+보안)으로 소재 후보를 만든다.
     쌍으로 보면 일반어가 걸러지고 구체적인 사안이 남는다. 기사가 여러 날에 걸쳐 많이 쓰인 소재일수록 재료가 많다.
-    점수 = 기사 수(최대 12) + 2×게재 일수 + 지면 1면 포함 3 − 권유 표현 많은 본문 감점. 기사가 겹치는 후보는 점수 높은 쪽만 둔다."""
+    점수 = 기사 수(최대 12) + 2×게재 일수 + 지면 1면 포함 3 − 권유 표현 많은 본문 감점 − 최근 레터 주제와 겹치면 주제당 5(최대 10).
+    기사가 겹치는 후보는 점수 높은 쪽만 둔다."""
     import itertools
     used = set(used_keys)
+    recent = list(recent_topics)
     # 응집도: 쌍의 두 단어가 모두 흔한 말(전체 기사의 상당수에 나옴)이면 서로 다른 사안이 한 묶음이 된다(예: 매출+실적).
     # 적어도 한 단어는 특정 개체·사안(전체 기사 중 일부에만 나오는 말)이어야 한다.
     df: Dict[str, int] = {}
@@ -305,8 +338,10 @@ def keyword_clusters(articles: List[Dict[str, Any]], used_keys: Iterable[str] = 
         cl = {"topic": f"{kw}: {ranked[0].get('title', '')}"[:40], "keyword": kw, "keys": [a["key"] for a in ranked], "articles": ranked}
         page1 = any(str(a.get("paper_number") or "") == "1" for a in ranked)
         adv = source_advice_score(cl)
-        cl["score"] = min(len(arts), 12) + 2 * len(days) + (3 if page1 else 0) - (8 if adv >= 5 else 0)
-        cl["n_articles"], cl["n_days"], cl["advice"] = len(arts), len(days), adv
+        repeat = recent_topic_hits(cl, recent)
+        cl["score"] = (min(len(arts), 12) + 2 * len(days) + (3 if page1 else 0) - (8 if adv >= 5 else 0)
+                       - RECENT_TOPIC_PENALTY * min(len(repeat), 2))
+        cl["n_articles"], cl["n_days"], cl["advice"], cl["recent_repeat"] = len(arts), len(days), adv, repeat
         cands.append(cl)
     cands.sort(key=lambda c: -c["score"])
     out: List[Dict[str, Any]] = []

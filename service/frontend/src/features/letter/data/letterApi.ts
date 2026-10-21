@@ -16,7 +16,7 @@ interface ApiSource { title: string; outlet: string; url: string; axes: LetterAx
 interface ApiDetail extends Omit<ApiCard, 'axes' | 'source_count' | 'categories' | 'topics'> {
   summary: string[]; editor_note: string | null; category_names: string[]; topics?: { name: string }[];
   sections: ApiSection[]; sources: ApiSource[];
-  poll: { kind: 'emotion'; question: string; options: { key: string; label: string; hint?: string | null }[] } | null;
+  poll: { kind: 'binary' | 'emotion'; question: string; options: { key: string; label: string; hint?: string | null }[] } | null;
 }
 
 /** UTC 발행 시각을 한국 시각 "YYYY-MM-DDTHH:mm"으로(뉴스레터라 시·분까지 보여 준다). */

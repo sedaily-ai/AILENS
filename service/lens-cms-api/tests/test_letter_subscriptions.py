@@ -92,7 +92,12 @@ def test_render_letter_follows_site_structure_and_escapes():
     assert subject == "[AI LENS 레터] 제목 <x>"
     for needle in ("제목 &lt;x&gt;", "이 레터에 쓰인 기사", "1분 요약", "첫째 줄 &lt;b&gt;", "핵심: 소식 핵심", "핵심: 시각 핵심", "에디터 한마디", "어떠셨나요?", "잘 모르겠어요", "사이트에서 보기"):
         assert needle in h, needle
-    assert h.index("이 레터에 쓰인 기사") < h.index("1분 요약") < h.index("핵심: 소식 핵심") < h.index("에디터 한마디") < h.index("어떠셨나요?")  # 사이트와 같은 순서
+    # 사이트와 같은 순서: 1분 요약 → 본문 → 한마디 → 투표 → 쓰인 기사(레터탭 피드백 01)
+    assert h.index("1분 요약") < h.index("핵심: 소식 핵심") < h.index("에디터 한마디") < h.index("어떠셨나요?") < h.index("이 레터에 쓰인 기사")
+    # 1분 요약 바로 뒤 '웹에서 이어 읽기', 투표 뒤 '투표 결과 보기'(피드백 E1)
+    assert h.index("1분 요약") < h.index("웹에서 이어 읽기") < h.index("핵심: 소식 핵심")
+    assert h.index("어떠셨나요?") < h.index("투표 결과 보기") and "/letter/s1#vote" in h
+    assert text.index("[1분 요약]") < text.index("[에디터 한마디]") < text.index("[이 레터에 쓰인 기사]")
     assert 'href="https://www.sedaily.com/a?x=1&amp;y=2"' in h  # 본문 인라인 링크 유지
     assert "unsubscribe?token=TOKEN123" in h and "unsubscribe?token=TOKEN123" in text and "서울특별시 종로구" in h
     assert "링크(https://www.sedaily.com/a?x=1&y=2)" in text

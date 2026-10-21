@@ -174,3 +174,31 @@ def test_editor_covered_uses_topic_names_and_aliases():
     assert core.editor_covered(ai, editors) is True
     assert core.editor_covered(bio, editors) is False
     assert core.editor_covered(ai, []) is False
+
+
+def test_article_date_text_and_dates_are_not_invented_numbers():
+    assert core.article_date_text({"date": "20261016"}) == "게재일 2026년 10월 16일"
+    assert core.article_date_text({"date": "2026-10-09"}) == "게재일 2026년 10월 9일"
+    assert core.article_date_text({"date": ""}) == ""
+    draft = {"sections": [{"paragraphs": [[{"block": "timeline", "items": [{"label": "2026년 9월 29일", "text": "항소법원 판결"}]}]]}]}
+    sources = ["지난달 29일 항소법원이 판결했다."]
+    assert "2026" in core.unsupported_numbers(draft, sources)  # 게재일이 없으면 연도는 지어낸 숫자로 잡힌다
+    assert core.unsupported_numbers(draft, sources + [core.article_date_text({"date": "20261016"})]) == []
+
+
+def test_keyword_clusters_penalize_topics_of_recent_letters():
+    def art(i, title, day):
+        return {"key": str(i), "title": title, "date": f"2026-10-{day:02d}", "content_len": 2500, "paper_number": "5"}
+    arts = [art(1, "오픈AI 보안모델 공개", 8), art(2, "오픈AI 보안모델 확대", 9), art(3, "오픈AI 보안모델 논의", 10), art(4, "오픈AI 보안모델 출시", 10),
+            art(5, "라네즈 인도법인 성장", 8), art(6, "라네즈 인도법인 확장", 9), art(7, "라네즈 인도법인 매출", 10)]
+    assert "오픈AI" in core.keyword_clusters(arts)[0]["keyword"]  # 감점이 없으면 기사가 많은 AI 소재가 1위
+    out = core.keyword_clusters(arts, recent_topics=["인공지능"])  # 최근 레터가 인공지능이면('AI' 별칭) 감점
+    assert "라네즈" in out[0]["keyword"] and any(c["recent_repeat"] == ["인공지능"] for c in out)
+
+
+def test_recent_letter_topics_takes_latest_published_only():
+    letters = [{"status": "published", "published_at": "2026-10-17", "topics": [{"name": "반도체"}, {"name": "인공지능"}]},
+               {"status": "draft", "published_at": None, "topics": ["유럽"]},
+               {"status": "published", "published_at": "2026-10-09", "topics": ["종로3가"]},
+               {"status": "published", "published_at": "2026-10-16", "topics": ["인공지능", "미국"]}]
+    assert core.recent_letter_topics(letters, n=2) == ["반도체", "인공지능", "미국"]

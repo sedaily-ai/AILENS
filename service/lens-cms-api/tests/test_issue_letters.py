@@ -66,8 +66,8 @@ def _payload(**over):
         "categories": ["industry"],
         "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["문장 ", {"text": "링크", "href": "https://www.sedaily.com/article/1?ref=x"}]]}],
         "sources": [{"url": "https://www.sedaily.com/article/1", "axes": ["news"]}],
-        "poll": {"kind": "emotion", "question": "소식을 들었을 때 어떠셨나요?", "options": [
-            {"key": "send", "label": "신기했어요"}, {"key": "wait", "label": "걱정됐어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
+        "poll": {"kind": "binary", "question": "AI 학습을 위한 저작물 사용, 어떻게 보세요?", "options": [
+            {"key": "send", "label": "창작자 권리 침해다"}, {"key": "wait", "label": "보상 체계로 풀어야 한다"}]},
     }
     base.update(over)
     return base
@@ -101,12 +101,13 @@ def test_validate_ignores_legacy_read_minutes(legacy):
     {"sources": [{"external_url": "https://a.com", "external_title": "t", "external_outlet": "o", "approved_by": "admin", "axes": []}]},  # 외부 매체 불가
     {"sources": [{"url": "https://www.sedaily.com/article/1", "axes": []}, {"url": "https://www.sedaily.com/article/1?ref=x", "axes": []}]},  # 같은 기사 중복
     {"sources": [{"url": "https://www.sedaily.com/article/1", "axes": ["bad"]}]},
-    {"poll": {"kind": "emotion", "question": "q", "options": [{"key": "a", "label": "x"}]}},
-    {"poll": {"kind": "emotion", "question": "q", "options": [{"key": "A", "label": "x"}, {"key": "b", "label": "y"}]}},
-    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "a", "label": "x"}, {"key": "unsure", "label": "y"}]}},
-    {"poll": {"kind": "emotion", "question": "지금 보내는 게 맞을까요?", "options": [{"key": "a", "label": "보내야 해요"}, {"key": "unsure", "label": "잘 모르겠어요"}]}},
-    {"poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "합리적인 선택"}, {"key": "unsure", "label": "잘 모르겠어요"}]}},
-    {"poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기해요"}, {"key": "b", "label": "걱정돼요"}]}},  # 중립 선택지 없음
+    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "a", "label": "x"}]}},  # 선택지 1개
+    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "a", "label": "x"}, {"key": "b", "label": "y"}, {"key": "c", "label": "z"}]}},  # 3개
+    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "A", "label": "x"}, {"key": "b", "label": "y"}]}},
+    {"poll": {"kind": "binary", "question": "q", "options": [{"key": "a", "label": "x"}, {"key": "unsure", "label": "잘 모르겠어요"}]}},  # 중립 선택지 금지
+    {"poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기해요"}, {"key": "b", "label": "걱정돼요"}]}},  # 감정형은 새로 쓸 수 없다
+    {"poll": {"kind": "binary", "question": "지금 보내는 게 맞을까요?", "options": [{"key": "a", "label": "보내야 해요"}, {"key": "b", "label": "기다려야 해요"}]}},
+    {"poll": {"kind": "binary", "question": "어떻게 보세요?", "options": [{"key": "a", "label": "합리적인 선택"}, {"key": "b", "label": "무리한 선택"}]}},
 ])
 def test_validate_rejects(bad):
     with pytest.raises(_repo().LetterError):
@@ -120,7 +121,7 @@ def _publishable(**over):
         "summary": ["s", "s2"], "editor_note": "e", "categories": ["industry"], "topics": [{"slug": "rates", "name": "금리"}],
         "sections": [{"axis": "news", "key_line": "k", "paragraphs": [[seg(1), seg(2)]]}, {"axis": "substance", "key_line": "k", "paragraphs": [[seg(3)]]}, {"axis": "other", "key_line": "k", "paragraphs": [["x"]]}],
         "sources": [{"article_no": str(n), "title": f"t{n}", "url": url(n)} for n in (1, 2, 3)],
-        "poll": {"kind": "emotion", "question": "어떠셨나요?", "options": [{"key": "a", "label": "신기했어요"}, {"key": "b", "label": "걱정됐어요"}, {"key": "unsure", "label": "잘 모르겠어요"}]},
+        "poll": {"kind": "binary", "question": "AI 학습을 위한 저작물 사용, 어떻게 보세요?", "options": [{"key": "a", "label": "창작자 권리 침해다"}, {"key": "b", "label": "보상 체계로 풀어야 한다"}]},
     }
     letter.update(over)
     return letter
@@ -144,9 +145,12 @@ def test_publish_blocks_evaluative_headline_and_two_sentence_note_and_poll_size(
     letter["sections"][0]["key_line"] = "충격적인 숫자"
     assert any("섹션 1 핵심" in p and "평가·감탄" in p for p in r.publish_problems(letter))
     assert any("2문장 이내" in p for p in r.publish_problems(_publishable(editor_note="가요. 나요. 다요.")))
-    two = _publishable()
-    two["poll"]["options"] = two["poll"]["options"][1:]
-    assert any("3~4개" in p for p in r.publish_problems(two))
+    one = _publishable()
+    one["poll"]["options"] = one["poll"]["options"][1:]
+    assert any("2개여야" in p for p in r.publish_problems(one))
+    neutral = _publishable()
+    neutral["poll"]["options"] = neutral["poll"]["options"] + [{"key": "unsure", "label": "잘 모르겠어요"}]
+    assert any("중립 선택지" in p for p in r.publish_problems(neutral))
     body = _publishable()
     body["sections"][2]["paragraphs"] = [["놀랍게도 올랐어요."]]
     assert any("평가 표현" in p for p in r.publish_problems(body))
@@ -170,8 +174,8 @@ def test_publish_rejects_inline_link_not_in_sources_and_placeholder():
 
 def test_publish_blocks_biased_poll_and_directive_text_in_any_category():
     r = _repo()
-    biased = {"kind": "emotion", "question": "지금 사야 할까요?", "options": [{"key": "a", "label": "사야 해요"}, {"key": "unsure", "label": "잘 모르겠어요"}]}
-    assert any("중립" in p for p in r.publish_problems(_publishable(poll=biased)))
+    biased = {"kind": "binary", "question": "지금 사야 할까요?", "options": [{"key": "a", "label": "사야 해요"}, {"key": "b", "label": "팔아야 해요"}]}
+    assert any("중립 문구" in p for p in r.publish_problems(_publishable(poll=biased)))
     assert any("권유·지시" in p for p in r.publish_problems(_publishable(editor_note="지금 매수하세요")))
     # 분류와 상관없이 같은 규칙: 산업·시그널·사회 어디든 통과 조건은 동일
     for cats in (["industry"], ["markets", "national"], ["finance"]):
