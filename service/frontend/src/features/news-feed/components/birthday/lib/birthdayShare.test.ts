@@ -48,7 +48,7 @@ test('100만 원 칸은 계산된 칸만 고정 순서로 찍는다 — 준비 �
   // 아파트 지수가 없는 달(2006년 전)이면 그 줄만 빠진다.
   const noApartment = receiptAssetLines(assetCells(base2010, { ...file2010, apartment: [] }, latest));
   expect(noApartment.map(line => line.label)).toEqual(['현금', '정기예금', '달러']);
-  expect(noApartment.some(line => line.value === '준비 중' || line.pending)).toBe(false);
+  expect(noApartment.some(line => line.value === '준비 중')).toBe(false);
 });
 
 test('100만 원 묶음 소제목은 기준일 종류에 따라 바뀐다', () => {

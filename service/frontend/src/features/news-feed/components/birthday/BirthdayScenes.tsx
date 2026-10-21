@@ -113,11 +113,6 @@ export function AssetScene({ base, mode, state, cells, onRetry }: {
   </section>;
 }
 
-/** 자산 시세가 아직 없을 때 — 장면 대신 한 줄 안내. */
-export function AssetSoon() {
-  return <p className={styles.soon}><strong>그때 삼성전자·아파트·비트코인·금을 샀다면?</strong>시세를 연결하고 있어요. 들어오면 이 이야기가 맨 앞 장면이 돼요.</p>;
-}
-
 export function WageScene({ result }: { result: BirthdayResult }) {
   if (!result.wage) return null;
   return <section className={styles.scene} aria-labelledby="birthday-wage">

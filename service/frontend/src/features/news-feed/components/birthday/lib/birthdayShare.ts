@@ -24,8 +24,8 @@ export interface ShareContent {
   assetBase: AssetBase | null;
 }
 
-/** 영수증 한 줄. pending은 아직 자료가 없어 "준비 중"으로 찍히는 줄. */
-export interface ReceiptLine { label: string; detail?: string; value: string; pending?: boolean }
+/** 영수증 한 줄. */
+export interface ReceiptLine { label: string; detail?: string; value: string }
 
 /** 영수증 본문 — 확인된 숫자만. 날짜 일부만 공유된 결과(연도 공유)는 연 단위로 쓴다. */
 export function receiptLines(result: BirthdayResult, mode: ViewMode): ReceiptLine[] {
@@ -202,7 +202,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
         for (const line of assetLines) {
           at(() => {
             text(line.label, inLeft, y, 32, INK, 600, width * 0.6);
-            context.textAlign = 'right'; text(line.value, inRight, y, 32, line.pending ? SOFT : INK, line.pending ? 500 : 800, width * 0.38); context.textAlign = 'left';
+            context.textAlign = 'right'; text(line.value, inRight, y, 32, INK, 800, width * 0.38); context.textAlign = 'left';
           });
           y += 56 - gap;
         }
