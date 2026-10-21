@@ -13,6 +13,7 @@ LAMBDA_FUNCTIONS=(
   "sedaily-mbti-search-dev"
   "sedaily-mbti-article-dev"
   "sedaily-mbti-post-dev"
+  "sedaily-mbti-time-machine-dev"
 )
 
 echo "Setting up Lambda Warming..."

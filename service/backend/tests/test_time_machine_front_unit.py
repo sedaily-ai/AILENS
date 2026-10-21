@@ -663,6 +663,43 @@ def test_log_never_contains_dates(env, caplog):
     assert '2024-10-1' not in caplog.text
 
 
+# ─── warmup ────────────────────────────────────────────────────────────────
+
+def _warm(event, monkeypatch):
+    secret = MagicMock(return_value='KEY')
+    monkeypatch.setattr(bs, 'get_secret', secret)
+    res = tm.lambda_handler(event, None)
+    return res['statusCode'], json.loads(res['body']), secret
+
+
+def test_warmup_returns_early_and_prepares(env, monkeypatch, caplog):
+    table, post = env
+    with caplog.at_level('INFO'):
+        status, body, secret = _warm({'warmup': True}, monkeypatch)
+    assert (status, body) == (200, {'status': 'warm'})
+    # DynamoDB 연결과 API 키만 미리 만들고 빅카인즈는 부르지 않는다.
+    assert table.gets == ['timemachine_warmup'] and table.puts == []
+    secret.assert_called_once_with(bs.BIGKINDS_KEY_SSM_PARAM)
+    post.assert_not_called()
+    assert 'warmup' in caplog.text
+
+
+def test_scheduled_event_is_warmup(env, monkeypatch):
+    table, post = env
+    status, body, _ = _warm({'source': 'aws.events', 'detail-type': 'Scheduled Event'}, monkeypatch)
+    assert (status, body) == (200, {'status': 'warm'}) and table.gets == ['timemachine_warmup']
+    post.assert_not_called()
+
+
+def test_warmup_failure_still_returns_200(env, monkeypatch):
+    table, post = env
+    monkeypatch.setattr(table, 'get_item', MagicMock(side_effect=RuntimeError('ddb down')))
+    status, body, secret = _warm({'warmup': True}, monkeypatch)
+    assert (status, body) == (200, {'status': 'warm'})
+    secret.assert_called_once()  # 한 단계가 실패해도 나머지 준비는 한다
+    post.assert_not_called()
+
+
 def test_q_takes_precedence_over_front(env):
     _, post = env
     post.return_value = _resp([])

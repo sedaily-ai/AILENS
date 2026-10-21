@@ -546,9 +546,28 @@ def get_range_search_data(query: str, from_date: str, to_date: str, size: int, s
 
 # ─── Lambda entry point ─────────────────────────────────────────────────────
 
+# warmup 때 읽어 보는 없는 키(날짜 아님) — DynamoDB 리소스·자격 증명·TLS 연결까지 미리 만든다.
+WARMUP_CACHE_KEY = 'timemachine_warmup'
+
+
+def _warm_up() -> None:
+    """5분 워밍 호출(setup-lambda-warming.sh, 입력 {"warmup": true})이 컨테이너를 데울 때 첫 요청이 할 준비를 미리 한다.
+    빅카인즈는 부르지 않는다. 준비 중 오류는 형식 이름만 남긴다."""
+    steps = (lambda: _get_table().get_item(Key={'news_id': WARMUP_CACHE_KEY}), bigkinds_search.warm_up, _front_calendar)
+    for step in steps:
+        try:
+            step()
+        except Exception as e:  # noqa: BLE001
+            logger.warning('warmup 준비 실패: %s', type(e).__name__)
+    logger.info('warmup')
+
+
 @handler_decorator
 def lambda_handler(event: dict, context) -> dict:
-    """AWS Lambda / API Gateway 핸들러. `q` 가 있으면 기간 검색, 없으면 하루 조회."""
+    """AWS Lambda / API Gateway 핸들러. `q` 가 있으면 기간 검색, 없으면 하루 조회. 워밍 호출은 준비만 하고 바로 반환한다."""
+    if event.get('source') == 'aws.events' or event.get('warmup'):
+        _warm_up()
+        return success_response({'status': 'warm'})
     method = (
         event.get('requestContext', {}).get('http', {}).get('method')
         or event.get('httpMethod')
