@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
 import { assetBase, assetCells, assetInflation, assetsAvailable, ecosOrgs } from './lib/birthdayAssets';
+import { itemMultiples } from './lib/birthdayItemPrices';
 import { shareableFront, useFrontPage } from './lib/birthdayFrontPage';
 import type { ShareVariant } from './lib/birthdayShare';
 import { useBirthdayAssets } from './lib/useBirthdayAssets';
@@ -25,6 +26,8 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
   const cells = useMemo(() => assetsReady ? assetCells(base, assetsReady.file, assetsReady.latest) : [], [base, assetsReady]);
   // 물가 줄은 칸이 하나라도 있을 때만 장면에 보인다(칸이 0개면 안내 한 줄뿐).
   const inflation = useMemo(() => assetsReady && cells.length ? assetInflation(base, assetsReady.file, assetsReady.latest) : null, [base, assetsReady, cells.length]);
+  // 1억 원 장면의 품목 배수 — 번들에 든 자료로 이 기기에서 계산한다(요청 없음). 1억 원 장면이 없으면 목록도 없다.
+  const items = useMemo(() => result.cpi ? itemMultiples(result.birthDate) : [], [result.cpi, result.birthDate]);
   const front = useFrontPage(mode === 'year' ? null : result.birthDate);
   // 공유 카드에는 생일 당일 1면만 넣는다. 대체한 신문이나 그날 기사를 "내가 태어난 날 1면"으로 찍지 않는다.
   const frontArticles = useMemo(() => shareableFront(front.state), [front.state]);
@@ -42,7 +45,7 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
       <AssetScene base={base} mode={mode} state={assetLoad.state} cells={cells} inflation={inflation} onRetry={assetLoad.retry} />
       <BirthdayFrontPage state={front.state} birthDate={result.birthDate} onRetry={front.retry} onUseBirthday={onEdit} onShare={shareFront} />
       <WageScene result={result} />
-      <MoneyScene result={result} />
+      <MoneyScene result={result} items={items} />
       <AgesScene result={result} mode={mode} />
       <BirthdayPension result={result} mode={mode} />
       {/* 고지 세 가지(참고 정보·상담 아님·기준 시점)는 그대로 두고, '-이며'로 길게 잇던 첫 문장과 명사로 끝나던 출처 줄을 문장으로 풀었다.
@@ -52,8 +55,8 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
         {/* '잘못된 내용 알리기'는 출처 줄 끝에 두면 560px 폭에서 넘쳐 4줄이 돼서, '실제와 다를 수 있어요' 바로 뒤에 둔다. */}
         <span>자료의 기준 시점에 따라 실제와 {nb('다를 수 있어요')}. <Link href="/contact" prefetch={false}>{nb('잘못된 내용 알리기')}</Link></span>{' '}
         {/* ECOS는 제공처라 통계를 만든 기관(작성기관)을 함께 적는다. 국가데이터처는 물가(1억 원 장면·물가 줄)를 보일 때 한 번만,
-            한국부동산원은 아파트 칸이 보일 때만. 금(생산자물가지수 금괴)은 한국은행 작성이다. */}
-        <span>{`출처는 최저임금위원회·${nb('한국은행 ECOS')}(${ecosOrgs(cells, Boolean(result.cpi) || inflation !== null).join('·')} 작성)·국민연금공단·빅카인즈이고 ${result.snapshot.retrievedAt.replaceAll('-', '.')}에 ${nb('확인했어요.')}`}</span>
+            한국부동산원은 아파트 칸이 보일 때만. 금(생산자물가지수 금괴)은 한국은행 작성이다. KOSIS는 1억 원 장면의 품목 목록이 보일 때만. */}
+        <span>{`출처는 최저임금위원회·${nb('한국은행 ECOS')}(${ecosOrgs(cells, Boolean(result.cpi) || inflation !== null).join('·')} 작성)·${items.length ? `${nb('국가데이터처 KOSIS')}·` : ''}국민연금공단·빅카인즈이고 ${result.snapshot.retrievedAt.replaceAll('-', '.')}에 ${nb('확인했어요.')}`}</span>
       </p>
     </div>
     <BirthdayShare result={result} mode={mode} assets={cells} assetBase={cells.length ? base : null} front={frontArticles} variant={variant} onVariant={setVariant} onTryFriend={onEdit} />
