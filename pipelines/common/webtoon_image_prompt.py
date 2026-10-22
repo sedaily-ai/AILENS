@@ -274,10 +274,15 @@ def build_background_prompt(
     문구를 끄고 시험할 수 있게 하는 옵션이다."""
     if style is None:
         style = get_style()
-    style_block = f"{style}\n" if style else ""
-    style_block += f"Camera: {camera}. 3:2 horizontal."
+    if not style and not camera and not characters:
+        # CMS의 완성형 프롬프트는 첫 화풍 문장부터 공급자에 전달한다.
+        visual = scene
+    else:
+        style_block = f"{style}\n" if style else ""
+        style_block += f"Camera: {camera}. 3:2 horizontal."
+        visual = style_block + characters_block(characters) + f"\n\n[SCENE]\n{scene}"
     return (
-        style_block + characters_block(characters) + f"\n\n[SCENE]\n{scene}"
+        visual
         + (SCENE_REINFORCEMENT if include_scene_reinforcement else "")
         + (CHARACTER_REINFORCEMENT if (characters and include_character_reinforcement) else "")
         + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "

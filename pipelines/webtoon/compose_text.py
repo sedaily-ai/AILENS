@@ -637,7 +637,7 @@ def _plan_with_people(img, dialogue, detect, min_top_y, max_bottom=0.85):
     return plans
 
 
-def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | None = None, min_top_y: float | None = None, detect: dict | None = None, max_bottom: float = 0.85):
+def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | None = None, min_top_y: float | None = None, detect: dict | None = None, max_bottom: float = 0.85, tail_target_y: float | None = None):
     """dialogue = [{"speaker":..., "line":..., "tone":"보통"|"격앙"|"속삭임"|"생각"}, ...]
 
     faces는 항상 None으로 호출된다(얼굴 감지 제거). use_faces 분기는 faces가 대사 수와 같은 길이일
@@ -677,13 +677,15 @@ def draw_dialogue(img: Image.Image, dialogue: list[dict], faces: list[dict] | No
     by_speaker = n == 2 and not use_faces and {d.get("speaker") for d in dialogue} == {"A", "B"}
     if by_speaker:
         anchors_x = [int(img.width * (0.25 if d.get("speaker") == "A" else 0.75)) for d in dialogue]
+    elif n == 1 and not use_faces and dialogue[0].get("speaker") in ("A", "B"):
+        anchors_x = [int(img.width * (0.25 if dialogue[0]["speaker"] == "A" else 0.75))]
 
     # 두 말풍선이 겹쳐 글자가 가려지는 것을 막는다. 앵커 간격만 보는 고정 비율 검사는, 긴 대사로 넓어진
     # 말풍선이 화면 끝에서 안쪽으로 밀리며(_draw_bubble의 x0 clamp) 다시 가까워지는 경우를 놓친다.
     # 그래서 실제 텍스트로 말풍선 폭(half-width)을 측정해 (1) 그 폭 기준 최소 간격으로 앵커를 벌리고
     # (2) 벌린 쌍 전체를 화면 안으로 함께 이동한다. 각자 따로 clamp하면 간격이 도로 좁아진다.
     # 꼬리가 가리킬 화자 위치 — 균등분할과 같은 관례(첫 대사=오른쪽 화자). 얼굴이 감지되면 그 얼굴 중심.
-    target_y = img.height * _TAIL_TARGET_Y_RATIO
+    target_y = tail_target_y if tail_target_y is not None else img.height * _TAIL_TARGET_Y_RATIO
     targets = [(x, target_y) for x in anchors_x]
     if n == 2 and not use_faces:
         if by_speaker:
@@ -950,20 +952,30 @@ def draw_caption(img: Image.Image, text: str, bottom_limit: int | None = None):
         ty += draw.textbbox((0, 0), ln, font=font)[3] + _LINE_SPACING
 
 
+class NarrationOverflowError(ValueError):
+    """원문을 잘라내지 않고 자막을 배치할 수 없는 경우."""
+
+
 def draw_narration(img: Image.Image, text: str) -> int:
-    """다큐 타이틀 카드 스타일 — 하단 1/3에 어두운 스크림 + 흰 텍스트."""
+    """하단 22% 안에 자막을 배치한다. 긴 문구는 실제 높이를 재며 축소한다."""
+    draw = ImageDraw.Draw(img)
+    band_h = int(img.height * 0.22)
+    max_width = int(img.width * 0.82)
+    for size in range(38, 15, -1):
+        font = _font(size)
+        lines = _wrap_text(draw, text, font, max_width)
+        block_w, block_h = _measure_block(draw, lines, font)
+        if block_h <= band_h - _k(16) and block_w <= max_width:
+            break
+    else:
+        raise NarrationOverflowError("자막이 하단 영역에 들어가지 않습니다. 문구를 줄여 주세요.")
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     odraw = ImageDraw.Draw(overlay)
-    band_h = int(img.height * 0.22)
     y0 = img.height - band_h
     odraw.rectangle([0, y0, img.width, img.height], fill=(0, 0, 0, 150))
     img.paste(Image.alpha_composite(img.convert("RGBA").crop((0, y0, img.width, img.height)), overlay.crop((0, y0, img.width, img.height))).convert("RGB"), (0, y0))
 
     draw = ImageDraw.Draw(img)
-    font = _font(38)
-    max_width = int(img.width * 0.82)
-    lines = _wrap_text(draw, text, font, max_width)
-    block_w, block_h = _measure_block(draw, lines, font)
     ty = y0 + (band_h - block_h) / 2
     for ln in lines:
         tw = draw.textlength(ln, font=font)
@@ -1017,6 +1029,7 @@ def _compose_at(img_path: Path, cut: dict, faces: list[dict] | None, scale: floa
     # 말풍선 여백 모드(bubble_margin) — 그림 위에 흰 여백을 붙여 말풍선을 그 여백에 둔다(레퍼런스 웹툰 방식: 그림을 가리지 않는다).
     detect_in = cut.get("detect")
     max_bottom_in = 0.85
+    tail_target_y = None
     if cut.get("bubble_margin") and cut.get("dialogue"):
         H0 = img.height
         margin_px = int(round(H0 * (_MARGIN_RATIO + (0.16 if cut.get("cut") == 1 and cut.get("title") else 0.0))))  # 표지는 제목 띠 자리까지 더한다
@@ -1027,6 +1040,7 @@ def _compose_at(img_path: Path, cut: dict, faces: list[dict] | None, scale: floa
             shift = lambda b: {**b, "t": (b["t"] * H0 + margin_px) / img.height, "h": b["h"] * H0 / img.height}  # noqa: E731
             detect_in = {"persons": [shift(b) for b in detect_in.get("persons", [])], "faces": [shift(b) for b in detect_in.get("faces", [])]}
         max_bottom_in = (margin_px + 0.10 * H0) / img.height  # 여백 + 그림 윗부분 조금까지만
+        tail_target_y = margin_px + 0.04 * H0  # 기본 꼬리가 얼굴 중앙을 덮지 않게 그림 상단에서 멈춘다.
     cut_no = cut.get("cut")
     title_bottom = None
     if cut_no == 1 and cut.get("title"):
@@ -1035,7 +1049,7 @@ def _compose_at(img_path: Path, cut: dict, faces: list[dict] | None, scale: floa
         title_bottom = draw_title(img, cut["title"], fill=title_fill_for_cut(cut_no))
     layout: list[dict] = []
     if cut.get("dialogue"):
-        layout = draw_dialogue(img, cut["dialogue"], faces, title_bottom, detect_in, max_bottom_in) or []
+        layout = draw_dialogue(img, cut["dialogue"], faces, title_bottom, detect_in, max_bottom_in, tail_target_y) or []
     bottom_top = None
     band_text = (cut.get("closing_caption") or cut.get("narration") or "").strip()
     margin_mode = bool(cut.get("bubble_margin") and cut.get("dialogue"))

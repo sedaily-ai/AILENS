@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — letters/podcast와 공용
 from openai_client import get_client  # pipelines/common/ — 이미지 생성 전용
 from bedrock_client import call_text  # 스크립트·장면 연출용
+from webtoon_contract import SCRIPT_OUTPUT_ADDENDUM as _SCRIPT_OUTPUT_ADDENDUM, cut_metadata, validate_storyboard
 from json_extract import extract_json_object  # pipelines/common/ — 공용
 
 import prompts
@@ -145,18 +146,6 @@ def _extract_chapters(content: str, chapter_numbers: list[int]) -> str:
 # 뺀다(admin script.py SCRIPT_CHAPTERS와 동일).
 _SCRIPT_CHAPTERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22]
 
-_SCRIPT_OUTPUT_ADDENDUM = (
-    "\n\n---\n### 출력 형식 (코드 보강)\n"
-    "위 \"Stage 1 Script Output Format\" JSON 스키마 그대로 컷 8개를 채우되,"
-    " 각 cuts 원소마다 다음 필드를 추가한다:\n"
-    '- "image_prompt": 이 컷의 배경 이미지를 그대로 생성할 수 있는 완성된'
-    " 한국어 프롬프트 문장 하나. 어떤 장면 포맷(12장 Scene Design 목록)을"
-    " 쓸지, 카메라를 어떻게 잡을지는 기사 내용에 맞춰 자유롭게 판단한다 —"
-    " 코드가 카메라 거리/앵글/구도 등을 항목별로 강제하지 않는다, 12장"
-    " 지침(연속 구도 금지·요소 다양화)만 따르면 된다.\n"
-    "다른 설명 없이 JSON 객체 하나만 응답한다."
-)
-
 
 def _cut_number(d: dict) -> int | None:
     """v11 스키마는 컷 번호를 정수 "cut" 대신 문자열 "cut_id"("cut_01")로 주기도 한다. 둘 다 받으며,
@@ -206,10 +195,12 @@ def _normalize_cuts(script: dict) -> list[dict]:
     camera/scene 2필드는 image_prompt 하나로 합쳤다(admin script.py::normalize_cuts와 같은 결정).
     _cut_number()가 None이면 배열 순서를 쓴다. 컷 파일명이 `컷{n}.png`라 n이 None이면 8컷이 같은
     파일명에 덮어써진다."""
+    validate_storyboard(script)
     cuts = []
     for idx, c in enumerate(script.get("cuts") or [], start=1):
         cut_number = _cut_number(c)
         cuts.append({
+            **cut_metadata(script, c),
             "cut": cut_number if cut_number is not None else idx,
             "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
             "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
@@ -316,6 +307,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                            cached_prefix=script_guide)
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    validate_storyboard(script, article)
     cuts = _normalize_cuts(script)
 
     # 3단계: 이미지 생성
@@ -386,6 +378,8 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                         except Exception as e:  # noqa: BLE001 — 새 스타일 합성이 실패해도 기본 스타일로라도 글자는 얹는다
                             print(f"{tag} 컷{n} 웹툰식 합성 실패({type(e).__name__}: {e}) — 기본 스타일로 재시도")
                             compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
+                    except compose_text.NarrationOverflowError:
+                        raise
                     except Exception as e:
                         print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:

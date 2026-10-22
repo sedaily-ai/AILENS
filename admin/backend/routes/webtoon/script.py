@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import re
 
+from webtoon_contract import SCRIPT_OUTPUT_ADDENDUM as _SCRIPT_OUTPUT_ADDENDUM, cut_metadata, validate_storyboard
 from routes.prompts import _CATEGORY_BEDROCK, _WEBTOON_JSON_INSTRUCTION, _WEBTOON_SYSTEM_PROMPT, resolve_text_model
 
 _CHAPTER_HEADER_RE = re.compile(r"^##\s*(\d+)\.\s*.+$", re.MULTILINE)
@@ -80,18 +81,6 @@ def extract_chapters(content: str, chapter_numbers: list[int]) -> str:
 
 
 SCRIPT_CHAPTERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22]
-
-_SCRIPT_OUTPUT_ADDENDUM = (
-    "\n\n---\n### 출력 형식 (코드 보강)\n"
-    "위 \"Stage 1 Script Output Format\" JSON 스키마 그대로 컷 8개를 채우되,"
-    " 각 cuts 원소마다 다음 필드를 추가한다:\n"
-    '- "image_prompt": 이 컷의 배경 이미지를 그대로 생성할 수 있는 완성된'
-    " 한국어 프롬프트 문장 하나. 어떤 장면 포맷(위 12장 Scene Design 목록)을"
-    " 쓸지, 카메라를 어떻게 잡을지는 기사 내용에 맞춰 자유롭게 판단한다 —"
-    " 코드가 카메라 거리/앵글/구도 등을 항목별로 강제하지 않는다, 12장"
-    " 지침(연속 구도 금지·요소 다양화)만 따르면 된다.\n"
-    "다른 설명 없이 JSON 객체 하나만 응답한다."
-)
 
 
 def build_script_call(content: str, article: str, model_id: str | None = None) -> tuple[str, str, str, int]:
@@ -198,10 +187,12 @@ def normalize_cuts(script: dict) -> list[dict]:
     항상 컷 1~8을 순서대로 담으라고 명시돼 있어 순서가 어긋난 적이
     실측상 없었다. 사용자 지적으로 발견: 실제 저장된 storyboard가 8컷
     전부 "cut": None이라 "스토리보드에서 채우기"가 항상 빈손이었다."""
+    validate_storyboard(script)
     cuts = []
     for idx, c in enumerate(script.get("cuts") or [], start=1):
         cut_number = _cut_number(c)
         cuts.append({
+            **cut_metadata(script, c),
             "cut": cut_number if cut_number is not None else idx,
             "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
             "caption": _first_nonempty(c.get("caption"), c.get("keyword")),

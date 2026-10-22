@@ -282,7 +282,7 @@ def model_supports_prompt_cache(model_id: str | None) -> bool:
 # 실제로 필요하다.
 _WEBTOON_SYSTEM_PROMPT = "지시받은 JSON 스키마를 정확히 지켜 응답합니다."
 _WEBTOON_JSON_INSTRUCTION = (
-    "\n\n[응답 형식]\n다른 설명 없이 ```json 코드블록 하나 안에 JSON 객체만 담아 응답한다."
+    "\n\n[응답 형식]\n다른 설명이나 코드블록 없이 JSON 객체 하나만 응답한다."
 )
 
 # 2026-09-11 — 처음엔 API Gateway·Lambda 30초 벽 안에서 동기 응답하려고

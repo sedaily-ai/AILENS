@@ -103,13 +103,14 @@ def _invoke_and_decode_image(client, model_id: str, body: str, *, error_key: str
     return base64.b64decode(images[0])
 
 
-def generate_bedrock_image_bytes(prompt: str) -> bytes:
+def generate_bedrock_image_bytes(prompt: str, generation_options: dict | None = None) -> bytes:
     """Stable Image Core(Bedrock) 1회 호출 — 성공 시 PNG bytes, 실패 시 예외.
     재시도 전략이 배치 파이프라인과 admin 실험 도구에서 달라 호출부가 맡는다."""
     body = json.dumps({
         "prompt": prompt[:9500],  # Stability 프롬프트 상한(~1만자) 여유 두고 컷
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
+        **_stability_options(generation_options),
     })
     return _invoke_and_decode_image(_get_bedrock_image_client(), BEDROCK_IMAGE_MODEL_ID, body)
 
@@ -125,7 +126,7 @@ def generate_bedrock_image_bytes(prompt: str) -> bytes:
 SD35_LARGE_MODEL_ID = profile_arn("image_sd35_large")  # lens-webtoon-image-sd35-large → stability.sd3-5-large-v1:0
 
 
-def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
+def generate_bedrock_sd35_image_bytes(prompt: str, generation_options: dict | None = None) -> bytes:
     """Stable Diffusion 3.5 Large(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
     계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임."""
     body = json.dumps({
@@ -133,6 +134,7 @@ def generate_bedrock_sd35_image_bytes(prompt: str) -> bytes:
         "mode": "text-to-image",
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
+        **_stability_options(generation_options),
     })
     return _invoke_and_decode_image(_get_bedrock_image_client(), SD35_LARGE_MODEL_ID, body)
 
@@ -169,18 +171,31 @@ def set_run_seed(seed: int | None) -> None:
     _run_seed = seed
 
 
-def generate_bedrock_sd_ultra_image_bytes(prompt: str) -> bytes:
+def _stability_options(options: dict | None) -> dict:
+    from webtoon_contract import image_options
+
+    # 배치는 기존 기사별 설정을 유지한다. CMS는 빈 값도 명시해 다른 요청의
+    # 모듈 전역 설정을 상속하지 않는다.
+    parsed = image_options(options if options is not None else {
+        "negative_prompt": _run_negative, "image_seed": _run_seed,
+    })
+    negative = parsed["negative_prompt"]
+    result = {"negative_prompt": ULTRA_NEGATIVE_PROMPT + (", " + negative if negative else "")}
+    if parsed["image_seed"] is not None:
+        result["seed"] = parsed["image_seed"]
+    return result
+
+
+def generate_bedrock_sd_ultra_image_bytes(prompt: str, generation_options: dict | None = None) -> bytes:
     """Stable Image Ultra(Bedrock) 1회 호출 — generate_bedrock_image_bytes와
     계약 동일(성공 시 PNG bytes 반환, 실패 시 예외), 재시도는 호출부 책임.
     Ultra는 image-to-image를 지원하지 않는다("Model ultra does not support image-to-image mode")."""
     req = {
         "prompt": prompt[:9500],
-        "negative_prompt": f"{ULTRA_NEGATIVE_PROMPT}, {_run_negative}"[:9500] if _run_negative else ULTRA_NEGATIVE_PROMPT,
+        **_stability_options(generation_options),
         "aspect_ratio": BEDROCK_ASPECT_RATIO,
         "output_format": "png",
     }
-    if _run_seed is not None:
-        req["seed"] = _run_seed
     return _invoke_and_decode_image(_get_bedrock_image_client(), SD_ULTRA_MODEL_ID, json.dumps(req))
 
 
@@ -267,6 +282,7 @@ def _generate_cut_once(
     camera: str,
     scene: str,
     model: str,
+    generation_options: dict | None = None,
 ) -> bytes:
     """model 하나로 이미지 1장 생성한다. 모델별 프롬프트 조립만 다르고 재시도는
     호출부(generate_cut_image)가 맡는다.
@@ -279,14 +295,14 @@ def _generate_cut_once(
             camera, scene, style="",
             include_scene_reinforcement=False, include_character_reinforcement=False,
         )
-        return generate_bedrock_image_bytes(prompt)
+        return generate_bedrock_image_bytes(prompt, generation_options)
 
     if model == "sd35_large":
         prompt = build_background_prompt(
             camera, scene, style="",
             include_scene_reinforcement=False, include_character_reinforcement=False,
         )
-        return generate_bedrock_sd35_image_bytes(prompt)
+        return generate_bedrock_sd35_image_bytes(prompt, generation_options)
 
     if model == "nova_canvas":
         # 스타일 힌트가 포함된 짧은 프롬프트를 쓴다(참고 이미지 컨디셔닝이 없는 순수 text-to-image).
@@ -298,7 +314,7 @@ def _generate_cut_once(
         camera, scene, style="",
         include_scene_reinforcement=False, include_character_reinforcement=False,
     )
-    return generate_bedrock_sd_ultra_image_bytes(prompt)
+    return generate_bedrock_sd_ultra_image_bytes(prompt, generation_options)
 
 
 def generate_cut_image(
@@ -307,12 +323,13 @@ def generate_cut_image(
     model: str = "sd_ultra",
     *,
     has_dialogue: bool = True,
+    generation_options: dict | None = None,
 ) -> tuple[bytes, list | None]:
     """컷 이미지 1장 생성 — admin 실험 패널과 발행 파이프라인이 공유하는 단일 디스패치.
     반환값은 (image_bytes, faces)이며 faces는 항상 None이다. 얼굴 감지 기반 말풍선 배치는
     제거되었고, compose_text.py는 faces가 None이면 균등분할로 배치한다. faces 값은
     compose_text.py 시그니처 호환을 위해 남겼다."""
-    image_bytes = _generate_cut_once(camera, scene, model)
+    image_bytes = _generate_cut_once(camera, scene, model, generation_options)
     return image_bytes, None
 
 
