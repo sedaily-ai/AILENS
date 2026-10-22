@@ -114,14 +114,10 @@ export function TimelineBigkindsView({
     [articles, total],
   );
 
-  // 공유 카드는 코스피를 우선 사용하고, 없으면 첫 시나리오, 그것도 없으면(예: 1994년 이전) 헤드라인만으로 구성한다.
-  const heroScenario = investments.find((s) => s.id === 'kospi') ?? investments[0];
+  // 공유 카드는 그날 대표 헤드라인(첫 분야의 첫 기사)으로 만든다. '그때와 지금의 숫자' 카드는 공유 카드에 넣지 않는다.
   const shareCardData = {
     date,
     dateLabel: kdate(date),
-    heroLabel: heroScenario?.description,
-    heroValue: heroScenario?.highlight,
-    story: heroScenario?.story,
     headline: layout.sections[0]?.items[0]?.title,
     url: `${SITE_URL}/timeline/${date}`,
   };
