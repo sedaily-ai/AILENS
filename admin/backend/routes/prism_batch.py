@@ -7,7 +7,7 @@
 저장은 전부 S3 media/prism-batch/ (DB 테이블 없음, 영상 랩과 같은 방식):
   {batch_id}/input/{NN}.txt       기사 원본(브라우저가 서명 URL로 직접 PUT)
   {batch_id}/manifest.json        이 라우트가 쓴다 — 파일 이름·그룹·날짜·job_id
-  {batch_id}/{NN}.status.json     태스크가 쓴다 — stage(queued/script/scene/render/done/error)
+  {batch_id}/{NN}.status.json     태스크가 쓴다 — stage(queued/script/scene/render/upload/done/error), youtube_url
   {batch_id}/{NN}.script.txt      태스크가 쓴다 — 영어 대본(EL Script + Block D)
   index.json                      최근 배치 목록(화면의 "지난 제작")
 admin Lambda는 이 버킷에 GetObject 권한이 없어(routes/video_lab.py 참고) 읽기는 공개 URL GET으로 한다.
@@ -206,7 +206,8 @@ def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
     items = []
     for item in manifest.get("items", []):
         status = _read_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json") or {"stage": "queued"}
-        row = {**item, "stage": status.get("stage"), "message": status.get("message"), "title": status.get("title")}
+        row = {**item, "stage": status.get("stage"), "message": status.get("message"), "title": status.get("title"),
+               "youtube_url": status.get("youtube_url"), "youtube_error": status.get("youtube_error")}
         if row["stage"] in ("scene", "render", "done"):  # 대본은 장면 단계에 들어갈 때 저장된다
             row["script_url"] = f"{base}/{_PREFIX}/{batch_id}/{item['item_id']}.script.txt"
         if status.get("job_id") and status.get("job_id") != item.get("job_id"):
