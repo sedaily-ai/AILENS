@@ -157,6 +157,22 @@ test("공유 문구·카드 이미지 글·화면 낭독용 이름에 '1면'이 
   }
 });
 
+test("면 번호가 없는 시기의 그날 기사(coverage 포함, 4건)도 카드·영수증 제목으로 그리고 '1면'이 없다", () => {
+  // 백엔드 FRONT_DAY_ARTICLES(4건)는 카드가 쓰는 최대 5건보다 적다.
+  const day = ['이슈 첫 기사', '이슈 둘째 기사', '이슈 셋째 기사', '본문이 긴 기사'].map((title, index) => ({ ...headlines[0], news_id: `d${index}`, title, coverage: index < 3 ? 300 - index * 50 : null }));
+  const result = calculate('2005-05-11', snapshot);
+  const card = draw({ variant: 'front', front: day }, result);
+  expect(card.texts).toEqual(expect.arrayContaining(['5월 11일, 내가 태어난 날', '서울경제는', '2005년 5월 11일 수요일', '이슈 첫 기사', '이슈 둘째 기사', '본문이 긴 기사', FRONT_CARD_SOURCE]));
+  expect(card.attrs['aria-label']).toContain('이슈 첫 기사, 이슈 둘째 기사, 이슈 셋째 기사, 본문이 긴 기사. 출처 빅카인즈 보관본');
+  const receipt = draw({ front: day }, result);
+  expect(receipt.attrs['aria-label']).toContain('그날 서울경제 이슈 첫 기사');
+  expect(receipt.texts).toEqual(expect.arrayContaining(['그날 서울경제', '이슈 첫 기사']));
+  for (const fake of [card, receipt]) {
+    expect(fake.attrs['aria-label']).not.toContain(FRONT_WORD);
+    expect(fake.texts.filter(text => text.includes(FRONT_WORD) || text.includes('면 번호'))).toEqual([]);
+  }
+});
+
 test('100만 원 묶음 소제목은 기준일 종류에 따라 바뀐다', () => {
   expect(receiptAssetHeading({ date: '2010-05-15', kind: 'twentieth' })).toBe('스무 살에 100만 원을 뒀다면');
   expect(receiptAssetHeading({ date: '2010-08-20', kind: 'birthday' })).toBe('태어난 날 100만 원을 뒀다면');
