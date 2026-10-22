@@ -16,8 +16,11 @@ test('서버에 묻지 않는 날짜는 자료가 아예 없는 시기뿐 — �
   for (const date of ['1990-01-01', '1993-12-31', '1996-08-01', '2000-03-19', '2010-05-12', '2024-12-08']) expect(frontPageNotice(date)).toBeNull();
 });
 
-test('생일 당일 1면이면 안내가 없다', () => {
+test('생일 당일 신문이면 면 번호가 있든 없든 안내가 없다', () => {
   expect(frontNotice(data({}))).toBeNull();
+  // 면 번호가 없는 시기(kind day)도 생일 당일이면 안내 상자 없이, 고른 기준은 지면 아래 출처 줄에 둔다.
+  expect(frontNotice(data({ date: '2010-05-12', date_kind: 'day', shown_date: '2010-05-12', kind: 'day', basis: 'issue' }))).toBeNull();
+  expect(frontNotice(data({ date: '2014-04-16', date_kind: 'day', shown_date: '2014-04-16', kind: 'day', basis: 'no_match' }))).toBeNull();
   expect(frontNotice(data({ kind: 'none', shown_date: null, reason: 'archive_missing', articles: [] }))).toBeNull();
 });
 
@@ -26,42 +29,29 @@ test('일요일·보관본에 없는 날은 까닭과 대신 보여 주는 신�
   expect(sunday?.title).toBe('생일에는 신문이 나오지 않았어요');
   expect(plain(sunday?.lines)).toEqual([
     '2024년 10월 13일은 일요일이라 서울경제가 나오지 않았어요.',
-    '대신 가장 가까운 지난 신문인 2024년 10월 12일 토요일자 1면을 보여 줘요.',
+    '대신 가장 가까운 지난 신문인 2024년 10월 12일 토요일자 서울경제를 보여 줘요.',
   ]);
   const missing = frontNotice(data({ date: '2025-10-09', shown_date: '2025-10-03', reason: 'no_paper' }));
   expect(missing?.title).toBe('생일 당일 신문을 찾지 못했어요');
   expect(plain(missing?.lines)).toEqual([
-    '2025년 10월 9일자 서울경제 1면이 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 빠진 날이에요.',
-    '대신 가장 가까운 지난 신문인 2025년 10월 3일 금요일자 1면을 보여 줘요.',
+    '2025년 10월 9일자 서울경제가 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 빠진 날이에요.',
+    '대신 가장 가까운 지난 신문인 2025년 10월 3일 금요일자 서울경제를 보여 줘요.',
   ]);
 });
 
-const ERA_LINE = '1990~1993년, 1996년 8월부터 2017년 11월 12일까지 신문은 빅카인즈 보관본에 몇 면 기사인지 기록이 없어 1면을 가려낼 수 없어요.';
-
-test('면 번호가 없는 시기는 1면이 아니라고 밝히고, 1면을 못 가져오는 까닭과 고른 기준을 적는다', () => {
-  const four = [article, article, article, article];
-  const issue = frontNotice(data({ date: '2010-05-12', date_kind: 'day', shown_date: '2010-05-12', kind: 'day', basis: 'issue', articles: four }));
-  expect(issue?.title).toBe('이 시기는 1면 기록이 없어요');
-  expect(plain(issue?.lines)).toEqual([ERA_LINE, '그래서 1면 대신, 그날 여러 언론이 가장 많이 다룬 소식을 서울경제 기사로 보여 줘요.']);
-  // 이슈 순위로 고르지 못한 날은 그 까닭을 밝히고 본문이 긴 기사라고 적는다.
-  const day = (basis: FrontPageData['basis']) => plain(frontNotice(data({ date: '2014-04-16', date_kind: 'day', shown_date: '2014-04-16', kind: 'day', basis, articles: four }))?.lines)?.[1];
-  expect(day('no_ranking')).toBe('그날은 언론 이슈 순위 자료가 없어, 1면 대신 본문이 긴 서울경제 기사 4건을 보여 줘요.');
-  expect(day('no_match')).toBe('그날 많이 보도된 소식에 서울경제 기사가 연결되지 않아, 1면 대신 본문이 긴 서울경제 기사 4건을 보여 줘요.');
-  expect(day('ranking_failed')).toBe('지금은 그날 언론 이슈 순위를 불러오지 못해, 1면 대신 본문이 긴 서울경제 기사 4건을 보여 줘요.');
-  // 1994-01-01은 면 번호 시기라 생일 쪽에서 없었던 것은 '1면'이다(보여 주는 것은 면 번호 없는 1993-12-31 그날 기사).
+test('대신 보여 주는 날짜의 안내는 면 번호 시기와 관계없이 같은 말을 쓴다', () => {
+  // 1994-01-01은 면 번호 시기, 보여 주는 1993-12-31은 면 번호가 없는 시기(그날 기사)다. 고른 기준은 출처 줄에 둔다.
   const fallback = frontNotice(data({ date: '1994-01-01', shown_date: '1993-12-31', kind: 'day', reason: 'no_paper', basis: 'issue', articles: [article, article] }));
   expect(fallback?.title).toBe('생일 당일 신문을 찾지 못했어요');
   expect(plain(fallback?.lines)).toEqual([
-    '1994년 1월 1일자 서울경제 1면이 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 빠진 날이에요.',
-    '대신 가장 가까운 지난 날짜인 1993년 12월 31일 금요일자 서울경제를 찾았어요.',
-    ERA_LINE,
-    '그래서 1면 대신, 그날 여러 언론이 가장 많이 다룬 소식을 서울경제 기사로 보여 줘요.',
+    '1994년 1월 1일자 서울경제가 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 빠진 날이에요.',
+    '대신 가장 가까운 지난 신문인 1993년 12월 31일 금요일자 서울경제를 보여 줘요.',
   ]);
-  // 1996-08-01은 면 번호가 없는 시기라 '1면'이 아니라 그날 서울경제 자체가 없었다고 말한다.
+  // 1996-08-01은 면 번호가 없는 시기, 보여 주는 1996-07-31은 면 번호 시기다.
   const toFront = frontNotice(data({ date: '1996-08-01', date_kind: 'day', shown_date: '1996-07-31', reason: 'no_paper' }));
   expect(plain(toFront?.lines)).toEqual([
     '1996년 8월 1일자 서울경제가 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 빠진 날이에요.',
-    '대신 가장 가까운 지난 신문인 1996년 7월 31일 수요일자 1면을 보여 줘요.',
+    '대신 가장 가까운 지난 신문인 1996년 7월 31일 수요일자 서울경제를 보여 줘요.',
   ]);
 });
 
@@ -69,8 +59,8 @@ test('생일이 오늘이고 아직 보관본에 없으면 휴간이라고 하�
   const today = frontNotice(data({ date: '2026-10-19', shown_date: '2026-10-17', reason: 'not_yet' }));
   expect(today?.title).toBe('오늘 신문은 아직 보관본에 없어요');
   expect(plain(today?.lines)).toEqual([
-    '오늘(2026년 10월 19일)자 서울경제 1면이 빅카인즈 보관본에 아직 들어오지 않았어요.',
-    '대신 가장 가까운 지난 신문인 2026년 10월 17일 토요일자 1면을 보여 줘요.',
+    '오늘(2026년 10월 19일)자 서울경제가 빅카인즈 보관본에 아직 들어오지 않았어요.',
+    '대신 가장 가까운 지난 신문인 2026년 10월 17일 토요일자 서울경제를 보여 줘요.',
   ]);
 });
 
@@ -91,7 +81,7 @@ test('응답 읽기 — 새 형식, 구버전 백엔드(롤백 중), 형식 불�
     .toEqual({ date: '1998-07-15', date_kind: 'day', shown_date: null, kind: 'none', reason: 'archive_missing', basis: null, articles: [] });
 });
 
-test('공유 카드에는 생일 당일 1면만 넣는다', () => {
+test('그날 신문 카드에는 생일 당일 kind front 기사만 넣는다', () => {
   const ok = (over: Partial<FrontPageData>): FrontPageState => ({ status: 'ok', date: '2024-10-13', data: data(over) });
   expect(shareableFront(ok({}))).toEqual([article]);
   expect(shareableFront(ok({ shown_date: '2024-10-12', reason: 'sunday' }))).toEqual([]);

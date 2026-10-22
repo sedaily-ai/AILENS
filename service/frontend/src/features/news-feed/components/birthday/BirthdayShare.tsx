@@ -2,25 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import type { AssetResult } from './lib/birthdayAssets';
+import type { AssetBase, AssetCell } from './lib/birthdayAssets';
 import { shareUrl } from './lib/birthdayModel';
-import { drawShare, shareText, type ShareVariant } from './lib/birthdayShare';
+import { DAY_TOGGLE_LABEL, dayToggleShown, drawShare, INCLUDE_DAY_DEFAULT, shareDayNotice, shareText, type ShareVariant } from './lib/birthdayShare';
 import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
 const FONTS = ['800 60px Pretendard', '900 60px Pretendard', '900 64px "Noto Serif KR"', '700 36px "Noto Serif KR"'];
 
-/** ⑥ 공유 — 결과 맨 아래. 9:16 생일 영수증·1면 카드. 휴대폰은 시스템 공유 창(카톡·인스타)으로 바로 보내고, 안 되면 이미지로 저장한다. */
-export function BirthdayShare({ result, mode, assets, front, variant, onVariant, onTryFriend }: {
-  result: BirthdayResult; mode: ViewMode; assets: AssetResult[]; front: BigKindsArticle[];
+/** ⑥ 공유 — 결과 맨 아래. 9:16 생일 영수증·그날 신문 카드. 휴대폰은 시스템 공유 창(카톡·인스타)으로 바로 보내고, 안 되면 이미지로 저장한다. */
+export function BirthdayShare({ result, mode, assets, assetBase, front, variant, onVariant, onTryFriend }: {
+  result: BirthdayResult; mode: ViewMode; assets: AssetCell[]; assetBase: AssetBase | null; front: BigKindsArticle[];
   variant: ShareVariant; onVariant: (variant: ShareVariant) => void; onTryFriend: () => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const blob = useRef<Blob | null>(null);
-  const [includeDay, setIncludeDay] = useState(false);
+  const [includeDay, setIncludeDay] = useState(INCLUDE_DAY_DEFAULT);
   const [status, setStatus] = useState('');
   const current: ShareVariant = variant === 'front' && front.length ? 'front' : 'receipt';
   const dayShown = includeDay && mode !== 'year';
+  const dayNotice = shareDayNotice(current, mode, includeDay);
   const fileName = `lens-birthday-${result.date.year}${current === 'front' ? '-front' : ''}.png`;
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export function BirthdayShare({ result, mode, assets, front, variant, onVariant,
     // 공유 창은 누른 순간에 열어야 해서(브라우저의 사용자 동작 제한) 그릴 때마다 이미지를 미리 만들어 둔다.
     const paint = () => {
       if (!active || !canvas.current) return;
-      drawShare(canvas.current, result, { variant: current, mode, includeDay: dayShown, front, assets });
+      drawShare(canvas.current, result, { variant: current, mode, includeDay: dayShown, front, assets, assetBase });
       canvas.current.toBlob(made => { if (active) blob.current = made; }, 'image/png');
     };
     paint();
@@ -36,7 +37,7 @@ export function BirthdayShare({ result, mode, assets, front, variant, onVariant,
     const titles = front.slice(0, 5).map(article => article.title).join('') || '서울경제';
     void Promise.all(FONTS.map(font => document.fonts.load(font, titles))).then(paint, paint);
     return () => { active = false; };
-  }, [result, current, mode, dayShown, front, assets]);
+  }, [result, current, mode, dayShown, front, assets, assetBase]);
 
   function save() {
     if (!blob.current) { setStatus('이미지를 만드는 중이에요. 잠시 뒤 다시 눌러 주세요.'); return; }
@@ -65,19 +66,22 @@ export function BirthdayShare({ result, mode, assets, front, variant, onVariant,
     <div className={styles.shareControls}>
     {front.length > 0 && <div className={styles.variants} role="group" aria-label="카드 종류">
       <button type="button" aria-pressed={current === 'receipt'} onClick={() => onVariant('receipt')}>생일 영수증</button>
-      <button type="button" aria-pressed={current === 'front'} onClick={() => onVariant('front')}>1면 카드</button>
+      <button type="button" aria-pressed={current === 'front'} onClick={() => onVariant('front')}>그날 신문 카드</button>
     </div>}
-    {current === 'receipt' && mode !== 'year' && <label className={styles.checkbox}><input type="checkbox" checked={includeDay} onChange={event => { setIncludeDay(event.target.checked); setStatus(''); }} />내 생일 넣기</label>}
+    {dayToggleShown(current, mode) && <label className={styles.checkbox}><input type="checkbox" checked={includeDay} onChange={event => { setIncludeDay(event.target.checked); setStatus(''); }} />{DAY_TOGGLE_LABEL}</label>}
+    {/* 날짜가 찍힐 때는 공유·이미지 저장 버튼 바로 위에서 늘 알린다. */}
+    {dayNotice && <p className={styles.source}>{dayNotice}</p>}
     <div className={styles.shareActions}>
       <button type="button" className={styles.primary} onClick={share}>공유하기</button>
       <button type="button" onClick={save}>이미지 저장</button>
       <button type="button" className={styles.friend} onClick={onTryFriend}>친구 생일로 해보기</button>
     </div>
     <p role="status" className={styles.status}>{status}</p>
-    {/* 넓은 화면은 '무엇이 찍히나 / 누가 보나 / 그래서 동의' 세 줄로 끊는다(.lines). */}
+    {/* 날짜가 찍히면 '찍힌다'는 말은 버튼 위 안내가 하므로 여기서는 '누가 보나 / 그래서 동의'만, 아니면 무엇이 찍히는지 한 줄.
+        넓은 화면은 덩어리마다 줄을 끊는다(.lines). */}
     <p className={`${styles.source} ${styles.lines}`}>
-      <span>{current === 'front' ? '1면 카드에는 생일 날짜가 들어가요.' : mode === 'year' ? '출생연도로 공유된 결과라 출생연도만 찍혀요.' : `내 생일을 넣으면 월·일${front.length ? '과 그날 1면 제목' : ''}이 찍히고, ${nb('넣지 않으면 출생연도만 보여요.')}`}</span>
-      {(current === 'front' || dayShown) && <>{' '}<span>생일이 들어간 이미지는 {nb('받은 사람')} 누구나 {nb('볼 수 있으니')}</span>{' '}<span>다른 사람 생일이라면 먼저 동의를 {nb('받아 주세요')}.</span></>}
+      {dayNotice ? <><span>생일이 들어간 이미지는 {nb('받은 사람')} 누구나 {nb('볼 수 있으니')}</span>{' '}<span>다른 사람 생일이라면 먼저 동의를 {nb('받아 주세요')}.</span></>
+        : <span>{mode === 'year' ? '출생연도로 공유된 결과라 출생연도만 찍혀요.' : `내 생일을 넣으면 월·일${front.length ? '과 그날 기사 제목' : ''}이 찍히고, ${nb('넣지 않으면 출생연도만 보여요.')}`}</span>}
     </p>
     <Link className={styles.official} href="/onboarding#newsletter" prefetch={false}>서울경제 뉴스레터 받기</Link>
     </div>

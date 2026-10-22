@@ -27,7 +27,7 @@ export function NewsTimeMachineSection() {
       </header>
       <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 2px rgba(17,24,39,0.03), 0 3px 10px rgba(17,24,39,0.04)' }}>
         <div aria-label="그날로 떠나요 보기 선택" style={{ display: 'flex', gap: 8, padding: '16px 20px', borderBottom: `1px solid ${LINE}` }}>
-          <button type="button" className="ntm-chip ntm-focus" aria-pressed={view === 'birthday'} aria-controls={`${id}-birthday`} onClick={() => setView('birthday')}>내 생일에 샀다면</button>
+          <button type="button" className="ntm-chip ntm-focus" aria-pressed={view === 'birthday'} aria-controls={`${id}-birthday`} onClick={() => setView('birthday')}>내 생일 타임머신</button>
           <button type="button" className="ntm-chip ntm-focus" aria-pressed={view === 'news'} aria-controls={`${id}-news`} onClick={() => setView('news')}>그날의 기사</button>
         </div>
         <div id={`${id}-birthday`} hidden={view !== 'birthday'}><BirthdayMarket variant="entry" /></div>

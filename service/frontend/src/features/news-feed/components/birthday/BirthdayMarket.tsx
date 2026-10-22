@@ -75,12 +75,12 @@ function BirthdayIntro({ heading: Heading, formId, initialDate, error, onDateCha
     <form id={formId} tabIndex={-1} onSubmit={submit} autoComplete="off" className={styles.form}>
       <div className={styles.introCopy}>
         <p className={styles.eyebrow}>내 생일 타임머신</p>
-        <Heading className={styles.introTitle}>내 생일에 샀다면,<br />지금은?</Heading>
-        <p className={styles.description}>그날 서울경제 1면부터 최저시급, 연금 달력까지.<br />생일을 넣고 그날로 돌아가 보세요.</p>
+        <Heading className={styles.introTitle}>내가 태어난 날,<br />그때와 지금</Heading>
+        <p className={styles.description}>그날 서울경제부터 최저시급, 연금 달력까지.<br />생일을 넣고 그날로 돌아가 보세요.</p>
       </div>
       <BirthdayDateDial today={today} value={birthday} onChange={date => { setBirthday(date); onDateChange(); }} errorId={`${id}-error`} />
       <div className={styles.departure}>
-        <p className={styles.note}>생일은 이 탭에만 남고 탭을 닫으면 지워져요. 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요.</p>
+        <p className={styles.note}>생일은 이 탭에만 남고 탭을 닫으면 지워져요. 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요. 100만 원 계산은 {nb('연도별 자료만')} 받아 {nb('이 기기에서')} 해요.</p>
         <p id={`${id}-error`} role="alert" className={styles.error}>{error}</p>
         <button type="submit" className={styles.primary}>타임머신 타기</button>
       </div>
