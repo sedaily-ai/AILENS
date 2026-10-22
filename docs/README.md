@@ -72,6 +72,7 @@ docs/
 | 레터·4포맷 품질 평가 체계 | `evaluation/letter-evaluation-system.md`, `evaluation/4format-evaluation-system.md` |
 | 뉴스 선별 파이프라인 설계(Step1+지면특별코너) | `worklog/2026-08/2026-08-22-news-selection-pipeline-design.pdf` |
 | 디자인 시스템(캐릭터·컬러·폰트) | `design-system/README.txt` |
+| 생일 타임머신 자료 출처·ECOS 키 교체 | `product/birthday-assets/출처_이용조건.md`, `product/birthday-assets/자료갱신_키교체.md` |
 
 ## 이력
 
