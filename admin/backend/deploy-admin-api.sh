@@ -112,6 +112,7 @@ cp handler.py auth.py __init__.py openai_image.py "$BUILD_DIR/"
 cp -r routes shared "$BUILD_DIR/"
 cp -r "$COMMON_DIR" "$BUILD_DIR/"   # common/http.py · common/errors.py (CORS 중립 코어)
 cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (위 주석 참고)
+cp "$SCRIPT_DIR/../../pipelines/common/webtoon_contract.py" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/../../pipelines/common/webtoon_image_prompt.py" "$SCRIPT_DIR/../../pipelines/common/bedrock_models.py" "$BUILD_DIR/"   # webtoon_image.py·bedrock_client.py 가 flat import 하는 모듈(2026-10-12 분리)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
 cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$REKOGNITION_PEOPLE_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$GOOGLE_TTS_MODULE" "$BUILD_DIR/"

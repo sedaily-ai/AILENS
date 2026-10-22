@@ -586,6 +586,7 @@ def _run_article_flow(
             # 다시 던져 바깥 except가 사용자에게 안내하게 둔다.
             logger.error(f"script JSON 파싱 실패(model_id={model_id!r}) 원문(최대 2000자): {raw[:2000]!r}")
             raise
+        webtoon_script.validate_storyboard(script, article)
         cuts = webtoon_script.normalize_cuts(script)
         push({
             "type": "storyboard",

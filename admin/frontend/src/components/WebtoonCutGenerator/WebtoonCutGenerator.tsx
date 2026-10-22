@@ -395,6 +395,8 @@ export function WebtoonCutGenerator({
           closing_caption: base?.closing_caption ?? "",
           camera: "",
           scene: s.prompt,
+          negative_prompt: base?.negative_prompt ?? "",
+          image_seed: base?.image_seed ?? null,
           bubble_detect: t.bubbleDetect,
           bubble_webtoon: t.bubbleStyle,
         };
@@ -1014,6 +1016,8 @@ export function WebtoonProductionCutGrid({
       closing_caption: base?.closing_caption ?? "",
       camera: "",
       scene: s.prompt,
+      negative_prompt: base?.negative_prompt ?? "",
+      image_seed: base?.image_seed ?? null,
       bubble_detect: bubbleDetectDraft,
       bubble_webtoon: bubbleStyleDraft,
     };

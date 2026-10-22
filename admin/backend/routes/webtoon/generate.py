@@ -57,6 +57,7 @@ def _generate_composed(
     scene: str,
     has_dialogue: bool,
     model: str = "sd_ultra",
+    generation_options: dict | None = None,
 ) -> tuple[bytes, list | None]:
     """webtoon_image.generate_cut_image()의 얇은 wrapper — openai_dalle3만
     여기서 먼저 분기한다(admin 전용 모듈이라 공유 함수엔 안 넣음, 위
@@ -80,13 +81,13 @@ def _generate_composed(
         return openai_image.generate_image_bytes(prompt), None
 
     try:
-        return webtoon_image.generate_cut_image(camera, scene, model, has_dialogue=has_dialogue)
+        return webtoon_image.generate_cut_image(camera, scene, model, has_dialogue=has_dialogue, generation_options=generation_options)
     except ValueError as e:
         if "Filter reason: prompt" not in str(e):
             raise
         logger.warning("컷 이미지 콘텐츠 필터 거부 — 프롬프트 순화 후 재시도")
         softened_scene = webtoon_image._soften_scene_for_filter(scene)
-        return webtoon_image.generate_cut_image(camera, softened_scene, model, has_dialogue=has_dialogue)
+        return webtoon_image.generate_cut_image(camera, softened_scene, model, has_dialogue=has_dialogue, generation_options=generation_options)
 
 
 def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "sd_ultra") -> None:
@@ -116,7 +117,9 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "sd_
         camera = (cut.get("camera") or "").strip()
         scene = (cut.get("scene") or "").strip()
         has_dialogue = bool(cut.get("dialogue")) or cut.get("cut") == 1
-        image_bytes, faces = _generate_composed(camera, scene, has_dialogue, model=model)
+        from webtoon_contract import image_options
+        options = image_options(cut)
+        image_bytes, faces = _generate_composed(camera, scene, has_dialogue, model=model, generation_options=options)
 
         bucket = jobs.bucket()
         if not bucket:
@@ -153,6 +156,9 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "sd_
             except Exception as e:  # noqa: BLE001 — 얼굴 인식이 어떻게 실패해도 글자 합성은 고정 배치로 계속한다
                 logger.warning(f"말풍선 얼굴 회피 건너뜀(고정 배치): {type(e).__name__}: {e}")
             layout = compose_text.compose(tmp_path, cut, faces) or []
+        except compose_text.NarrationOverflowError:
+            tmp_path.unlink(missing_ok=True)
+            raise
         except Exception as e:  # noqa: BLE001 — 배경은 유지, 합성 실패만 로그
             logger.warning(f"webtoon-lab 컷{cut.get('cut')} 텍스트 합성 실패(배경만 유지): {e}")
         final_bytes = tmp_path.read_bytes()

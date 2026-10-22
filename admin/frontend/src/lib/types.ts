@@ -583,6 +583,12 @@ export interface BubbleLayout {
 }
 
 export interface WebtoonStoryboardCut {
+  negative_prompt?: string;
+  image_seed?: number | null;
+  fact_ids?: string[];
+  cut_function?: string;
+  location_id?: string;
+  selected_facts?: { fact_id: string; fact_korean?: string; source_excerpt?: string; importance?: number; certainty?: string }[];
   cut: number;
   narration: string;
   caption: string;
