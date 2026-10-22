@@ -81,12 +81,19 @@ test('응답 읽기 — 새 형식, 구버전 백엔드(롤백 중), 형식 불�
     .toEqual({ date: '1998-07-15', date_kind: 'day', shown_date: null, kind: 'none', reason: 'archive_missing', basis: null, articles: [] });
 });
 
-test('그날 신문 카드에는 생일 당일 kind front 기사만 넣는다', () => {
+test('그날 신문 카드에는 생일 당일 신문 기사만 넣는다 — 면 번호가 있든(kind front) 없든(kind day)', () => {
   const ok = (over: Partial<FrontPageData>): FrontPageState => ({ status: 'ok', date: '2024-10-13', data: data(over) });
   expect(shareableFront(ok({}))).toEqual([article]);
+  // 면 번호가 없는 시기(1990~1993, 1996.8~2017.11.12)의 생일 당일 기사도 카드에 넣는다.
+  const dayArticle = { ...article, coverage: 120 };
+  expect(shareableFront(ok({ date_kind: 'day', kind: 'day', basis: 'issue', articles: [dayArticle] }))).toEqual([dayArticle]);
+  // 대체한 날짜의 신문(일요일·명절 등)은 시기와 관계없이 넣지 않는다.
   expect(shareableFront(ok({ shown_date: '2024-10-12', reason: 'sunday' }))).toEqual([]);
-  expect(shareableFront(ok({ kind: 'day' }))).toEqual([]);
+  expect(shareableFront(ok({ date_kind: 'day', kind: 'day', shown_date: '2024-10-12', reason: 'sunday', basis: 'issue' }))).toEqual([]);
+  expect(shareableFront(ok({ kind: 'none', shown_date: null, reason: 'archive_missing', articles: [] }))).toEqual([]);
   expect(shareableFront({ status: 'loading', date: '2024-10-13' })).toEqual([]);
+  expect(shareableFront({ status: 'error', date: '2024-10-13' })).toEqual([]);
+  expect(shareableFront({ status: 'notice', date: '1985-03-02', notice: 'before-archive' })).toEqual([]);
   expect(shareableFront(null)).toEqual([]);
 });
 

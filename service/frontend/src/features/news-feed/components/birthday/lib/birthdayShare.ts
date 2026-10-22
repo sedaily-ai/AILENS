@@ -17,7 +17,7 @@ export interface ShareContent {
   mode: ViewMode;
   /** 영수증에 월·일까지 표시할지(사용자가 고른 경우만). 그날 신문 카드는 항상 날짜를 쓴다. */
   includeDay: boolean;
-  /** 그날 1면 기사(본문이 긴 순). 영수증에는 월·일을 표시할 때만 첫 제목을 담는다. */
+  /** 생일 당일 서울경제 기사(지면에 보인 순서). 영수증에는 월·일을 표시할 때만 첫 제목을 담는다. */
   front: BigKindsArticle[];
   /** 계산된 100만 원 칸(고정 순서). 없으면 묶음을 그리지 않는다. */
   assets: AssetCell[];

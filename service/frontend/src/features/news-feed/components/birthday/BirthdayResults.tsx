@@ -29,7 +29,7 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
   // 1억 원 장면의 품목 배수 — 번들에 든 자료로 이 기기에서 계산한다(요청 없음). 1억 원 장면이 없으면 목록도 없다.
   const items = useMemo(() => result.cpi ? itemMultiples(result.birthDate) : [], [result.cpi, result.birthDate]);
   const front = useFrontPage(mode === 'year' ? null : result.birthDate);
-  // 그날 신문 카드에는 생일 당일 kind front 기사만 넣는다. 대체한 날짜의 신문이나 kind day 기사는 카드로 찍지 않는다(동작 그대로).
+  // 그날 신문 카드에는 생일 당일 신문 기사(kind front·day)만 넣는다. 대체한 날짜의 신문은 카드로 찍지 않는다.
   const frontArticles = useMemo(() => shareableFront(front.state), [front.state]);
   const [variant, setVariant] = useState<ShareVariant>('receipt');
 
