@@ -23,6 +23,7 @@ from routes import (
     media,
     newsletter,
     posts,
+    prism_batch,
     prompt_lab,
     prompts,
     quiz,
@@ -134,6 +135,10 @@ HANDLERS: dict[str, tuple] = {
     # 등록 시 겪은 것과 같은 함정, 2026-09-21 프롬프트 버전 히스토리
     # 라우트에서도 반복됨).
     "GET /admin/video-lab/{job_id}": (video_lab.handle_poll, True),
+    # PRISM 일괄 제작(2026-10-22) — routes/prism_batch.py. 위 영상 랩과 같이 API Gateway create-route 3개 필요.
+    "POST /admin/prism-batch": (prism_batch.handle_post, True),
+    "GET /admin/prism-batch": (prism_batch.handle_list, True),
+    "GET /admin/prism-batch/{batch_id}": (prism_batch.handle_get, True),
 }
 
 
