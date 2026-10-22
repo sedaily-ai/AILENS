@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { parseFrontPage, type FrontPageData } from '@/shared/lib/api/timelineApi';
-import { frontArticleHref, frontNotice, frontPageNotice, shareableFront, weekdayOf, type FrontPageState } from './birthdayFrontPage';
+import { frontArticleHref, frontNotice, frontPageNotice, loadFrontPage, prefetchFrontPage, shareableFront, weekdayOf, type FrontPageState } from './birthdayFrontPage';
 
 // nb()가 붙인 줄바꿈 없는 공백을 보통 공백으로 바꿔 문장만 비교한다.
 const plain = (lines: string[] | undefined) => lines?.map(line => line.replaceAll('\u00a0', ' '));
@@ -88,6 +88,41 @@ test('그날 신문 카드에는 생일 당일 kind front 기사만 넣는다', 
   expect(shareableFront(ok({ kind: 'day' }))).toEqual([]);
   expect(shareableFront({ status: 'loading', date: '2024-10-13' })).toEqual([]);
   expect(shareableFront(null)).toEqual([]);
+});
+
+// 요청 공유 표는 모듈 수준이라 시험마다 다른 날짜를 쓴다.
+test('같은 날짜는 요청을 한 번만 보내고 결과를 함께 쓴다(StrictMode 두 번 실행·미리 요청)', async () => {
+  const fetcher = vi.fn(async (date: string) => data({ date, shown_date: date }));
+  const [first, second] = await Promise.all([loadFrontPage('2001-02-03', fetcher), loadFrontPage('2001-02-03', fetcher)]);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(second).toBe(first);
+  expect(await loadFrontPage('2001-02-03', fetcher)).toBe(first);
+  // 날짜가 다르면 따로 묻는다.
+  await loadFrontPage('2001-02-04', fetcher);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+test('실패한 요청은 기억하지 않아 다시 불러오기가 새로 묻는다', async () => {
+  const failing = vi.fn(async () => null);
+  expect(await loadFrontPage('2002-03-04', failing)).toBeNull();
+  expect(await loadFrontPage('2002-03-04', failing)).toBeNull();
+  expect(failing).toHaveBeenCalledTimes(2);
+  const throwing = vi.fn(async (): Promise<FrontPageData | null> => { throw new Error('network'); });
+  expect(await loadFrontPage('2002-03-05', throwing)).toBeNull();
+  const ok = vi.fn(async (date: string) => data({ date, shown_date: date }));
+  expect((await loadFrontPage('2002-03-05', ok))?.date).toBe('2002-03-05');
+  expect(ok).toHaveBeenCalledTimes(1);
+});
+
+test('미리 요청은 서버에 묻는 날짜만 보내고, 결과 화면 요청과 하나로 묶인다', async () => {
+  const fetcher = vi.fn(async (date: string) => data({ date, shown_date: date }));
+  prefetchFrontPage('1985-03-02', fetcher);  // 보관본 시작 전 — 안내만 하고 서버에 보내지 않는다
+  prefetchFrontPage('1975-06-15', fetcher);
+  expect(fetcher).not.toHaveBeenCalled();
+  prefetchFrontPage('2003-05-12', fetcher);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect((await loadFrontPage('2003-05-12', fetcher))?.date).toBe('2003-05-12');
+  expect(fetcher).toHaveBeenCalledTimes(1);
 });
 
 test('요일과 기사 링크 규칙', () => {

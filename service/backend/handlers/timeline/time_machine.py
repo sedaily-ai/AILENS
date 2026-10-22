@@ -29,6 +29,7 @@ Time Machine Handler — 빅카인즈 뉴스 검색 기반 "그날의 서울경�
                   | "no_ranking"|"no_match"|"ranking_failed"(본문이 긴 순으로 대신한 까닭). front·none 이면 null.
    - kind=none  : 생일과 그 전 FRONT_LOOKBACK_DAYS 일 동안 보관본에 신문이 없다(reason=archive_missing).
    생일에 신문이 없으면(일요일 휴간·명절·보관본 누락) 하루씩 거슬러 직전 발행일을 보여 주고 reason 에 까닭을 적는다.
+   그날 기사 시기는 처음 빅카인즈에 묻는 날에만 그날 기사와 이슈 순위를 함께 부르고, 기사가 없으면 순위 결과를 버린다.
    응답 로그에는 요청 날짜도 보여 준 날짜도 남기지 않는다.
 
 응답 규약(프론트가 "오류"와 "정말 기사 없음"을 구분하는 기준):
@@ -45,7 +46,9 @@ API 키는 SSM(/sedaily-mbti/bigkinds-api-key, SecureString)에서만 읽으며 
 """
 import hashlib
 import logging
+import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
@@ -170,14 +173,15 @@ def _read_cache(key: str, negative_key: str, empty_data: dict, label: str) -> Op
 
 
 def _write_cache(key: str, negative_key: str, item_type: str, negative_item_type: str,
-                 date: str, data: dict, ttl_seconds: int, allow_negative: bool, label: str) -> None:
+                 date: str, data: dict, ttl_seconds: int, allow_negative: bool, label: str,
+                 negative_ttl_seconds: int = NEGATIVE_CACHE_TTL_SECONDS) -> None:
     """기사가 있으면 정상 캐시, 0건이면 allow_negative 일 때만 부정 캐시. 실패는 삼킨다."""
     try:
         if data.get('articles'):
             _put_cache_item(key, item_type, date, data, ttl_seconds)
             logger.info('캐시 저장: %s', label)
         elif allow_negative:
-            _put_cache_item(negative_key, negative_item_type, date, data, NEGATIVE_CACHE_TTL_SECONDS)
+            _put_cache_item(negative_key, negative_item_type, date, data, negative_ttl_seconds)
             logger.info('부정 캐시 저장: %s', label)
     except Exception as e:  # noqa: BLE001
         logger.warning('캐시 저장 실패(%s): %s', label, e)
@@ -236,8 +240,12 @@ FRONT_LOOKBACK_DAYS = 10
 FRONT_DAY_ARTICLES = 4
 # 거슬러 찾기 전체에 쓰는 시간. 빅카인즈 호출마다 남은 시간만큼만 기다려 Lambda 제한시간(30초) 안에 끝낸다.
 FRONT_SEARCH_BUDGET_SECONDS = 20
-# 그때 조회한 0건으로 생일(또는 그 사이 날짜)을 건너뛰어 대체한 결과의 캐시 기간. 휴간 규칙·목록으로 건너뛴 결과는 CACHE_TTL_DAYS.
+# 짧게만 두는 결과의 캐시 기간 — 이슈 순위를 못 받아 대신 고른 결과, 최근(FRONT_SETTLED_DAYS 안) 날짜에서 그때 조회한 0건으로
+# 생일(또는 그 사이 날짜)을 건너뛰어 대체한 결과. 휴간 규칙·목록으로 건너뛴 결과는 CACHE_TTL_DAYS.
 FRONT_LIVE_FALLBACK_TTL_SECONDS = 7 * 86400
+# 생일이 오늘보다 이만큼 지난 날짜면 빅카인즈 적재가 끝났다고 본다. 그 0건(보관본 공백·명절)은 일시적이지 않아 결과를
+# CACHE_TTL_DAYS 동안 둔다(1998-01~08 공백 생일이 6시간마다, 그날 기사 시기 명절 생일이 7일마다 다시 느려지지 않게).
+FRONT_SETTLED_DAYS = 30
 
 KIND_FRONT, KIND_DAY, KIND_NONE = 'front', 'day', 'none'
 REASON_SUNDAY, REASON_NO_PAPER, REASON_NOT_YET, REASON_ARCHIVE_MISSING = 'sunday', 'no_paper', 'not_yet', 'archive_missing'
@@ -264,6 +272,12 @@ def _closed_sunday(date: str) -> bool:
     return date >= SUNDAY_CLOSED_FROM and datetime.strptime(date, DATE_FORMAT).weekday() == 6
 
 
+def _settled(date: str) -> bool:
+    """오늘(KST)보다 FRONT_SETTLED_DAYS 일 이상 지난 날짜인가."""
+    settled_until = datetime.strptime(today_kst(), DATE_FORMAT) - timedelta(days=FRONT_SETTLED_DAYS)
+    return date <= settled_until.strftime(DATE_FORMAT)
+
+
 def _front_calendar() -> front_calendar.FrontCalendar:
     return front_calendar.get_calendar()
 
@@ -279,24 +293,108 @@ class _Resolved(NamedTuple):
     shown: Optional[str]
     kind: str
     articles: List[Dict[str, Any]]
-    # 그때 조회한 0건으로 건너뛰었거나 이슈 순위를 못 받아 대신 고른 결과 — 캐시를 짧게 둔다.
-    provisional: bool
+    # 휴간 규칙·목록이 아니라 그때 조회한 0건으로 건너뛴 날이 있었는가 — 캐시 기간을 정한다(get_front_page_data).
+    live_skip: bool
     # kind=day 일 때 기사를 고른 기준(bigkinds_search.DAY_BASIS_*), 그 밖은 None.
     basis: Optional[str] = None
 
 
-def _day_highlights(day: str, deadline: float) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-    """면 번호가 없는 시기의 그날 기사와 고른 기준. 기사가 없으면 ([], None). 이슈 순위 실패는 본문이 긴 순으로 대신한다."""
-    docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
+def _own_paper_from_cache(day: str) -> Optional[_Resolved]:
+    """거슬러 간 날 day 를 생일로 조회해 저장한 캐시가 그날 자기 신문이면 그 결과. 아니면 None.
+
+    그날 자기 신문(shown_date == day)인 결과는 day 를 생일로 풀었을 때와 같은 빅카인즈 조회(같은 함수·같은 인자)라
+    다시 묻지 않고 쓴다. 대체 결과(다른 날 신문)·찾지 못한 결과·이슈 순위를 못 받아 대신 고른 결과는 쓰지 않는다.
+    조회 실패는 삼키고 빅카인즈로 간다.
+    """
+    try:
+        item = _get_item(_front_cache_key(day))
+    except Exception as e:  # noqa: BLE001
+        logger.warning('거슬러 간 날 캐시 조회 실패: %s', type(e).__name__)
+        return None
+    data = (item or {}).get('data') or {}
+    kind, articles, basis = data.get('kind'), data.get('articles'), data.get('basis')
+    if (data.get('shown_date') != day or kind not in (KIND_FRONT, KIND_DAY) or not articles
+            or basis == bigkinds_search.DAY_BASIS_RANKING_FAILED):
+        return None
+    return _Resolved(day, kind, articles, False, basis)
+
+
+# 그날 기사와 함께 부른 이슈 순위를 그날 기사가 없어 버렸을 때 남기는 줄(날짜 없음). 늘어난 빅카인즈 호출을 로그로 센다.
+RANKING_DISCARDED_LOG = '그날 기사가 없어 함께 부른 이슈 순위를 버림'
+# 이 날짜까지(1990~1993)는 이슈 순위에 서울경제 기사가 묶이지 않아 순위를 묻지 않고 no_match(본문이 긴 순)로 낸다.
+# 2026-10-21 실호출 확인: 1990-01-09·05-15·10-17, 1991-02-26·07-10·11-21, 1992-03-17·06-24·10-08,
+# 1993-01-19·05-26·09-29·12-14 평일 13일 모두 이슈 30개를 받았지만 그날 서울경제 기사(02100311.*)와 번호가 맞는 것이 0건이었다.
+# 순위가 있고 연결이 0건일 때(no_match)와 같은 기사·같은 coverage(None)가 나온다.
+NO_ISSUE_MATCH_UNTIL = '1993-12-31'
+
+
+def _ranking_failed(e: Exception) -> Tuple[List[List[str]], bool]:
+    # 이슈 순위는 고르는 기준일 뿐이라 실패해도 그날 기사는 보여 준다.
+    logger.warning('빅카인즈 이슈 순위 조회 실패, 본문이 긴 순으로 대신: %s', type(e).__name__)
+    return [], True
+
+
+# 그날 기사와 함께 다른 스레드로 보내는 이슈 순위 요청의 자리. 순위 요청이 끝나거나 취소돼야 돌려받는다 — 그날 기사가 없어 버렸거나
+# 예산을 넘겨 기다리지 않은 순위 요청도 끝날 때까지 자리를 쥔다. 자리가 없으면 그날 기사부터 묻고 기사가 있을 때만 순위를 묻는다(직렬).
+# 그래서 남은 순위 요청이 날짜마다 쌓이지 않는다. Lambda 컨테이너는 요청을 하나씩 받으므로 1 — 앞 요청에서 버린 순위가 아직 돌면
+# 이번 요청은 직렬로 간다.
+_ranking_slots = threading.BoundedSemaphore(1)
+
+
+def _send_ranking(day: str, deadline: float) -> Optional[Future]:
+    """이슈 순위를 다른 스레드로 먼저 보낸다. 자리가 없으면 보내지 않고 None."""
+    bigkinds_search.warm_up()  # 두 스레드가 처음 SSM 클라이언트를 함께 만들지 않게 키를 먼저 읽어 둔다
+    timeout = _remaining(deadline)
+    slots = _ranking_slots  # 빌린 곳에 돌려준다(그 사이 모듈 값이 바뀌어도)
+    if not slots.acquire(blocking=False):
+        return None
+    # 요청마다 새 풀 — 얼었던 컨테이너에 남은 순위 요청이 다음 요청의 스레드를 막지 않게 모듈 수준 풀을 쓰지 않는다.
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='bigkinds-issue')
+    try:
+        ranking = pool.submit(bigkinds_search.fetch_issue_clusters, day, timeout=timeout)
+    except BaseException:
+        slots.release()
+        raise
+    finally:
+        pool.shutdown(wait=False)  # 받은 요청은 그대로 보내고, 끝나면 스레드도 끝난다. 응답은 그것을 기다리지 않는다.
+    ranking.add_done_callback(lambda _: slots.release())
+    return ranking
+
+
+def _day_highlights(day: str, deadline: float, parallel: bool) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """면 번호가 없는 시기의 그날 기사와 고른 기준. 기사가 없으면 ([], None). 이슈 순위 실패는 본문이 긴 순으로 대신한다.
+
+    parallel 이고 순위 자리(_ranking_slots)가 비어 있으면 이슈 순위를 다른 스레드로 먼저 보내고 그날 기사를 받는다 — 두 요청의
+    제한 시간이 모두 남은 예산 이하라 직렬(합)보다 짧은 쪽(최대값)에서 끝난다. 그날 기사가 없으면 순위는 기다리지 않고 버린다
+    (그만큼 빅카인즈 호출이 하나 는다). 자리가 없으면 직렬과 같다. NO_ISSUE_MATCH_UNTIL 까지는 순위를 묻지 않는다.
+    """
+    if day <= NO_ISSUE_MATCH_UNTIL:
+        docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
+        if not docs:
+            return [], None
+        articles, _ = bigkinds_search.pick_day_articles(docs, [], FRONT_DAY_ARTICLES)
+        return articles, bigkinds_search.DAY_BASIS_NO_MATCH
+    ranking = _send_ranking(day, deadline) if parallel else None
+    try:
+        docs = bigkinds_search.search_day_docs(day, timeout=_remaining(deadline))
+    except BaseException:
+        if ranking is not None:
+            ranking.cancel()
+        raise
     if not docs:
+        if ranking is not None and not ranking.cancel():  # 아직 보내지 않았으면 취소돼 호출이 늘지 않는다
+            logger.info(RANKING_DISCARDED_LOG)
         return [], None
     try:
-        # 시간이 다 됐으면(_remaining 이 raise) 이미 받은 그날 기사를 버리지 않고 본문이 긴 순으로 보여 준다.
-        clusters = bigkinds_search.fetch_issue_clusters(day, timeout=_remaining(deadline))
+        if ranking is None:
+            # 시간이 다 됐으면(_remaining 이 raise) 이미 받은 그날 기사를 버리지 않고 본문이 긴 순으로 보여 준다.
+            clusters = bigkinds_search.fetch_issue_clusters(day, timeout=_remaining(deadline))
+        else:
+            # 남은 예산만 기다린다. 넘으면 순위 요청은 자기 제한 시간 안에 끝나고 결과는 버려진다.
+            clusters = ranking.result(timeout=_remaining(deadline))
         failed = False
-    except Exception as e:  # noqa: BLE001 — 이슈 순위는 고르는 기준일 뿐이라 실패해도 그날 기사는 보여 준다
-        logger.warning('빅카인즈 이슈 순위 조회 실패, 본문이 긴 순으로 대신: %s', type(e).__name__)
-        clusters, failed = [], True
+    except Exception as e:  # noqa: BLE001
+        clusters, failed = _ranking_failed(e)
     articles, basis = bigkinds_search.pick_day_articles(docs, clusters, FRONT_DAY_ARTICLES)
     return articles, (bigkinds_search.DAY_BASIS_RANKING_FAILED if failed else basis)
 
@@ -307,12 +405,16 @@ def _resolve_front_page(date: str) -> _Resolved:
     면 번호가 있는 시기는 1면, 없는 시기는 그날 기사. 1면이 없는 날은 목록(front_calendar)으로 바로 건너뛰고,
     목록 밖 날짜는 거슬러 찾는 날(생일 다음 날짜들)만 본문 없는 가벼운 조회로 먼저 확인한다. 생일 당일은 대개
     신문이 있어 확인 없이 바로 본문을 받는다. 시기 경계를 넘어가도 그 날짜의 시기 규칙을 따른다.
-    마지막 값은 캐시 기간을 정한다 — 휴간 규칙·목록이 아니라 그때 조회한 0건으로 건너뛴 결과는 빅카인즈 적재 지연일 수 있다.
+    거슬러 간 날의 자기 신문 캐시가 있으면 그것을 쓴다(_own_paper_from_cache).
+    live_skip 은 캐시 기간을 정한다 — 휴간 규칙·목록이 아니라 그때 조회한 0건으로 건너뛴 결과는 빅카인즈 적재 지연일 수 있다.
     """
     calendar = _front_calendar()
     deadline = time.monotonic() + FRONT_SEARCH_BUDGET_SECONDS
     birthday = datetime.strptime(date, DATE_FORMAT)
     live_skip = False
+    # 빅카인즈에 이미 물었는가. 그날 기사와 이슈 순위는 처음 묻는 날에만 함께 부른다 — 그 뒤에 묻는 날은 앞에서 빈 날이 나온 경우라
+    # 다시 비어 있을 수 있고(예: 1998-01~08 보관본 공백), 그때마다 순위 요청을 버리면 호출만 는다.
+    asked = False
     for offset in range(FRONT_LOOKBACK_DAYS + 1):
         day = (birthday - timedelta(days=offset)).strftime(DATE_FORMAT)
         if day < BIGKINDS_MIN_DATE:
@@ -320,20 +422,27 @@ def _resolve_front_page(date: str) -> _Resolved:
         if _closed_sunday(day):
             continue
         match = _front_page_match(day)
-        if match is None:
-            articles, basis = _day_highlights(day, deadline)
-            if articles:
-                return _Resolved(day, KIND_DAY, articles,
-                                 live_skip or basis == bigkinds_search.DAY_BASIS_RANKING_FAILED, basis)
-            live_skip = True
-            continue
-        known = calendar.known_front(day)
+        known = calendar.known_front(day) if match is not None else None
         if known is False:
             continue
-        if known is None and offset > 0 and bigkinds_search.count_front_page(day, match, timeout=_remaining(deadline)) == 0:
+        # 거슬러 간 날을 누군가 생일로 조회해 둔 자기 신문이 있으면 빅카인즈에 다시 묻지 않는다(일요일 생일 → 토요일 캐시 등).
+        own = _own_paper_from_cache(day) if offset > 0 else None
+        if own is not None:
+            return own._replace(live_skip=live_skip)
+        if match is None:
+            articles, basis = _day_highlights(day, deadline, parallel=not asked)
+            asked = True
+            if articles:
+                return _Resolved(day, KIND_DAY, articles, live_skip, basis)
             live_skip = True
             continue
+        if known is None and offset > 0:
+            asked = True
+            if bigkinds_search.count_front_page(day, match, timeout=_remaining(deadline)) == 0:
+                live_skip = True
+                continue
         articles = bigkinds_search.search_front_page(day, match, timeout=_remaining(deadline))
+        asked = True
         if articles:
             return _Resolved(day, KIND_FRONT, articles, live_skip)
         live_skip = True
@@ -371,13 +480,19 @@ def get_front_page_data(date: str) -> dict:
         found = _resolve_front_page(date)
         data = {'date': date, 'date_kind': date_kind, 'shown_date': found.shown, 'kind': found.kind,
                 'reason': _front_reason(date, found.shown, found.kind), 'basis': found.basis, 'articles': found.articles}
-        # 오늘 신문은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 찾지 못한 결과(kind=none)는 짧게만 기억하고,
-        # 그때 조회한 0건으로 건너뛰었거나 이슈 순위를 못 받아 대신 고른 결과는 굳지 않게 FRONT_LIVE_FALLBACK_TTL_SECONDS 만 둔다.
+        # 오늘 신문은 송고가 끝나지 않았을 수 있어 저장하지 않는다. 이슈 순위를 못 받아 대신 고른 결과는 굳지 않게
+        # FRONT_LIVE_FALLBACK_TTL_SECONDS 만 둔다. 최근 FRONT_SETTLED_DAYS 일 안의 날짜는 0건이 빅카인즈 적재 지연일 수 있어
+        # 그때 조회한 0건으로 건너뛴 결과도 그만큼, 찾지 못한 결과(kind=none)는 NEGATIVE_CACHE_TTL_SECONDS 만 둔다.
+        # 그보다 오래된 날짜의 0건은 보관본에 정말 없는 것으로 보고 CACHE_TTL_DAYS 동안 둔다.
         if date < today_kst():
-            ttl = FRONT_LIVE_FALLBACK_TTL_SECONDS if found.provisional else CACHE_TTL_DAYS * 86400
+            settled = _settled(date)
+            provisional = (found.basis == bigkinds_search.DAY_BASIS_RANKING_FAILED
+                           or (found.live_skip and not settled))
+            ttl = FRONT_LIVE_FALLBACK_TTL_SECONDS if provisional else CACHE_TTL_DAYS * 86400
             _write_cache(_front_cache_key(date), _front_negative_cache_key(date),
                          'timemachine_frontv2_cache', 'timemachine_frontv2_none_cache',
-                         date, data, ttl, True, FRONT_LOG_LABEL)
+                         date, data, ttl, True, FRONT_LOG_LABEL,
+                         negative_ttl_seconds=CACHE_TTL_DAYS * 86400 if settled else NEGATIVE_CACHE_TTL_SECONDS)
     return {**data, 'status': _legacy_status(date, data.get('shown_date'), data.get('kind')),
             'cached': cached is not None}
 
@@ -452,9 +567,28 @@ def get_range_search_data(query: str, from_date: str, to_date: str, size: int, s
 
 # ─── Lambda entry point ─────────────────────────────────────────────────────
 
+# warmup 때 읽어 보는 없는 키(날짜 아님) — DynamoDB 리소스·자격 증명·TLS 연결까지 미리 만든다.
+WARMUP_CACHE_KEY = 'timemachine_warmup'
+
+
+def _warm_up() -> None:
+    """5분 워밍 호출(setup-lambda-warming.sh, 입력 {"warmup": true})이 컨테이너를 데울 때 첫 요청이 할 준비를 미리 한다.
+    빅카인즈는 부르지 않는다. 준비 중 오류는 형식 이름만 남긴다."""
+    steps = (lambda: _get_table().get_item(Key={'news_id': WARMUP_CACHE_KEY}), bigkinds_search.warm_up, _front_calendar)
+    for step in steps:
+        try:
+            step()
+        except Exception as e:  # noqa: BLE001
+            logger.warning('warmup 준비 실패: %s', type(e).__name__)
+    logger.info('warmup')
+
+
 @handler_decorator
 def lambda_handler(event: dict, context) -> dict:
-    """AWS Lambda / API Gateway 핸들러. `q` 가 있으면 기간 검색, 없으면 하루 조회."""
+    """AWS Lambda / API Gateway 핸들러. `q` 가 있으면 기간 검색, 없으면 하루 조회. 워밍 호출은 준비만 하고 바로 반환한다."""
+    if event.get('source') == 'aws.events' or event.get('warmup'):
+        _warm_up()
+        return success_response({'status': 'warm'})
     method = (
         event.get('requestContext', {}).get('http', {}).get('method')
         or event.get('httpMethod')

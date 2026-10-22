@@ -10,6 +10,7 @@ import { useBirthdayToday } from './lib/useBirthdayToday';
 import type { ViewMode } from './data/birthdayTypes';
 import { BIRTHDAY_MARKET_PATH } from './data/birthdayRoutes';
 import { calculate, dateLabel, parseDate, sharedYear } from './lib/birthdayModel';
+import { prefetchFrontPage } from './lib/birthdayFrontPage';
 import { getBirthdaySelection, getServerBirthdaySelection, rememberBirthdaySelection, subscribeBirthdaySelection, type BirthdaySelection } from './lib/birthdaySession';
 import { BirthdayResults } from './BirthdayResults';
 import { BirthdayDateDial } from './BirthdayDateDial';
@@ -53,6 +54,9 @@ function useDeparture() {
     setError('');
     const next = { date, mode };
     rememberBirthdaySelection(next);
+    // 그날 신문은 '타임머신 타기'를 누른 지금부터 받기 시작한다(홈에서는 결과 페이지로 넘어가는 동안).
+    // 다이얼을 돌리는 동안에는 보내지 않는다 — 날짜는 그날 신문을 찾을 때만 서버로 간다.
+    if (mode === 'personal') prefetchFrontPage(date);
     open(next);
   }
   return { error, setError, depart };

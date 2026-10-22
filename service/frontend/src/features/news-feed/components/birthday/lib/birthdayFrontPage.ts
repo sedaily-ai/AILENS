@@ -98,6 +98,31 @@ export function frontArticleHref(article: Pick<BigKindsArticle, 'original_link' 
   return /^\d+\.\d+$/.test(article.news_id ?? '') ? `https://www.bigkinds.or.kr/v2/news/newsDetailView.do?newsId=${encodeURIComponent(article.news_id)}` : null;
 }
 
+type FrontPageFetcher = (date: string) => Promise<FrontPageData | null>;
+
+// 같은 날짜 요청을 한 번만 보낸다 — 개발 모드 StrictMode의 효과 두 번 실행, '타임머신 타기' 직후 미리 보낸 요청과
+// 결과 화면의 요청을 하나로 묶는다. 이 탭 메모리에만 있고(새로고침·탭 닫기로 사라짐) 브라우저 HTTP 캐시는 쓰지 않는다.
+const frontPageRequests = new Map<string, Promise<FrontPageData | null>>();
+
+/** 생일 date의 그날 신문. 진행 중이거나 성공한 같은 날짜 요청이 있으면 그것을 함께 쓴다. */
+export function loadFrontPage(date: string, fetcher: FrontPageFetcher = fetchFrontPage) {
+  const known = frontPageRequests.get(date);
+  if (known) return known;
+  const request = fetcher(date).catch(() => null).then(data => {
+    // 실패는 기억하지 않는다 — '다시 불러오기'가 새 요청을 보낸다.
+    if (!data) frontPageRequests.delete(date);
+    return data;
+  });
+  frontPageRequests.set(date, request);
+  return request;
+}
+
+/** '타임머신 타기'를 누른 뒤에만 부른다. 서버에 묻지 않는 날짜(창간 전·지면 공백·보관본 전)는 보내지 않는다. */
+export function prefetchFrontPage(date: string, fetcher?: FrontPageFetcher) {
+  if (frontPageNotice(date)) return;
+  void loadFrontPage(date, fetcher);
+}
+
 /** birthDate가 null이면(연도만 공유된 결과) 조회하지 않는다. */
 export function useFrontPage(birthDate: string | null) {
   const [attempt, setAttempt] = useState(0);
@@ -107,7 +132,7 @@ export function useFrontPage(birthDate: string | null) {
   useEffect(() => {
     if (!birthDate || notice) return;
     let cancelled = false;
-    void fetchFrontPage(birthDate).then(data => {
+    void loadFrontPage(birthDate).then(data => {
       if (cancelled) return;
       setLoaded(data ? { status: 'ok', date: birthDate, data } : { status: 'error', date: birthDate });
     });
