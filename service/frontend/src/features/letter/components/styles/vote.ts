@@ -27,6 +27,7 @@ export const VOTE_CSS = `
   .lb-stat { display: grid; gap: 2px; padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; }
   .lb-stat-l { font-size: 12.5px; color: #6b7280; }
   .lb-stat-v { font-size: 26px; font-weight: 700; color: var(--bt); font-variant-numeric: tabular-nums; }
+.lb-stat-vp { display: inline-block; }
   .lb-stat-s { font-size: 12.5px; color: #6b7280; }
   .lb-bars { padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; display: grid; gap: 8px; }
   .lb-bars-t { margin: 0; font-size: 13.5px; font-weight: 700; color: #111827; }

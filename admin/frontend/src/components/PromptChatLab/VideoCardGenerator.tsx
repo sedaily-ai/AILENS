@@ -10,15 +10,17 @@ import { PromptVersionReference, type PromptVersionReferenceHandle } from "./Pro
 import { ApplyReviewModal } from "./ApplyReviewModal";
 import { StepTabs } from "./StepTabs";
 import { VoiceProviderFields } from "./VoiceProviderFields";
+import { VideoDownloadButton } from "./VideoDownloadButton";
 import {
   ELEVENLABS_FALLBACK_VOICE_SETTINGS,
   ELEVENLABS_FALLBACK_RANGES,
   type ElevenLabsVoiceSettings,
 } from "./ElevenLabsVoiceSettingsFields";
-import { POLLY_VOICES, POLLY_VOICE_ENGINE_OPTIONS } from "./PollyVoiceSettingsFields";
+import { LENS_POLLY_PROFILE, type PollyVoiceProfile } from "./PollyVoiceSettingsFields";
 import { FORMATS, type ParsedDoc as VideoParsedDoc } from "./VideoRenderSettingsPanel";
+import { GOOGLE_DEFAULT_VOICE, GOOGLE_VOICES, VIDEO_PROVIDERS } from "./googleVoices";
 
-import { cardsStorageKey, loadStoredCards, extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard, restoredCard } from "./videoCardModel";
+import { cardsStorageKey, loadStoredCards, extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard, restoredCard, cardToParsedDoc } from "./videoCardModel";
 /* 영상 탭 중간 칼럼 "성우 미리듣기" + "영상 생성" 통합 카드 — 2026-09-24
    신설. 원래 VoicePreviewGenerator(format="video")와 VideoRenderGenerator가
    위/아래로 따로 떨어진 두 개의 독립 목록(각자 "+추가"로 따로 늘어남)
@@ -108,6 +110,8 @@ export function VideoCardGenerator({
   onPromptHistoryRefresh,
   category,
   name,
+  pollyProfile = LENS_POLLY_PROFILE,
+  audioFormat = "video",
 }: {
   /** 2026-09-27 — "테스트 추가" 띠 sticky 고정용, WebtoonCutGenerator.tsx
    *  주석 참고(프로덕션 카드 실측 높이). */
@@ -151,7 +155,17 @@ export function VideoCardGenerator({
   onPromptHistoryRefresh: () => void;
   category: string;
   name: string;
+  /** 2026-10-21 — 카드에서 고를 Polly 성우 목록. 영상 탭은 LENS(기본), PRISM 탭은 PRISM_POLLY_PROFILE(영어). */
+  pollyProfile?: PollyVoiceProfile;
+  /** 성우 미리듣기(synthesize_audio)의 format — "prism"이면 서버가 PRISM 성우 목록·설정으로 합성한다. */
+  audioFormat?: "video" | "prism";
 }) {
+  // 새 카드의 Polly 기본값 — 탭의 기본 성우와 그 성우의 첫(권장) 엔진.
+  const pollyDefaults: PollySettings = {
+    ...POLLY_DEFAULTS,
+    voice: pollyProfile.defaultVoice,
+    engine: pollyProfile.engines[pollyProfile.defaultVoice][0].id,
+  };
   const [elevenVoices, setElevenVoices] = useState<{ id: string; label: string; gender: string; sample_url: string }[]>([]);
   const [elevenModels, setElevenModels] = useState<{ id: string; label: string; supports_style: boolean; supports_speaker_boost: boolean }[]>([]);
   const [voiceSettingsDefaults, setVoiceSettingsDefaults] = useState<ElevenLabsVoiceSettings>(ELEVENLABS_FALLBACK_VOICE_SETTINGS);
@@ -160,7 +174,7 @@ export function VideoCardGenerator({
   const [cards, setCards] = useState<CardState[]>(
     () =>
       loadStoredCards(threadId) ?? [
-        newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: ELEVENLABS_FALLBACK_VOICE_SETTINGS, pollySettings: POLLY_DEFAULTS, format: FORMATS[0].id }),
+        newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: ELEVENLABS_FALLBACK_VOICE_SETTINGS, pollySettings: pollyDefaults, format: FORMATS[0].id }),
       ]
   );
   // 2026-09-26, 사용자 지적(WebtoonCutGenerator.tsx/VoicePreviewGenerator.tsx와
@@ -336,7 +350,7 @@ export function VideoCardGenerator({
       if (stillActive.length > 0) return [...stillActive, ...restored];
       return restored.length > 0
         ? restored
-        : [newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: POLLY_DEFAULTS, format: FORMATS[0].id })];
+        : [newCard({ provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: pollyDefaults, format: FORMATS[0].id })];
     });
   }
 
@@ -362,6 +376,10 @@ export function VideoCardGenerator({
       } else if (msg.type === "audio_error") {
         const m = msg as unknown as { slot_id: string; message: string };
         setCards((prev) => prev.map((c) => (c.id === m.slot_id ? { ...c, voiceStatus: "error", voiceError: m.message } : c)));
+      } else if (msg.type === "render_stage") {
+        // PRISM 대본 → 장면 변환 중(chat_ws.py::_prism_script_to_render_json). 끝나면 render_started가 온다.
+        const m = msg as unknown as { slot_id: string; stage: "scene" };
+        setCards((prev) => prev.map((c) => (c.id === m.slot_id ? { ...c, progress: { stage: m.stage } } : c)));
       } else if (msg.type === "render_started") {
         const m = msg as unknown as { slot_id: string; job_id: string };
         setCards((prev) => prev.map((c) => (c.id === m.slot_id ? { ...c, renderStatus: "rendering", jobId: m.job_id } : c)));
@@ -384,14 +402,15 @@ export function VideoCardGenerator({
     setCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   };
 
+  // voiceId는 ElevenLabs 성우 id 또는 Google 성우 이름(2026-10-22, provider로 구분)이다.
   const setCardProvider = (id: string, provider: Provider) => {
     if (provider === "elevenlabs") ensureElevenOptions();
     updateCard(id, {
       provider,
-      voiceId: provider === "elevenlabs" ? elevenVoices[0]?.id ?? "" : "",
+      voiceId: provider === "elevenlabs" ? elevenVoices[0]?.id ?? "" : provider === "google" ? GOOGLE_DEFAULT_VOICE : "",
       modelId: provider === "elevenlabs" ? elevenModels[0]?.id ?? "" : "",
       voiceSettings: voiceSettingsDefaults,
-      pollySettings: POLLY_DEFAULTS,
+      pollySettings: pollyDefaults,
     });
   };
 
@@ -404,7 +423,7 @@ export function VideoCardGenerator({
       prev.map((c) => {
         if (c.id !== id) return c;
         const next = { ...c.pollySettings, [key]: value };
-        if (key === "voice") next.engine = POLLY_VOICE_ENGINE_OPTIONS[next.voice][0].id;
+        if (key === "voice") next.engine = (pollyProfile.engines[next.voice] ?? pollyProfile.engines[pollyProfile.defaultVoice])[0].id;
         return { ...c, pollySettings: next };
       })
     );
@@ -412,10 +431,13 @@ export function VideoCardGenerator({
 
   const summarizeVoice = (c: CardState): string => {
     if (c.provider === "polly") {
-      const voiceLabel = POLLY_VOICES.find((v) => v.id === c.pollySettings.voice)?.label ?? c.pollySettings.voice;
+      const voiceLabel = pollyProfile.voices.find((v) => v.id === c.pollySettings.voice)?.label ?? c.pollySettings.voice;
       const engineLabel =
-        POLLY_VOICE_ENGINE_OPTIONS[c.pollySettings.voice]?.find((e) => e.id === c.pollySettings.engine)?.label ?? c.pollySettings.engine;
+        pollyProfile.engines[c.pollySettings.voice]?.find((e) => e.id === c.pollySettings.engine)?.label ?? c.pollySettings.engine;
       return `Polly · ${voiceLabel} · ${engineLabel}`;
+    }
+    if (c.provider === "google") {
+      return `Google · ${GOOGLE_VOICES.find((v) => v.id === c.voiceId)?.label ?? c.voiceId}`;
     }
     const voiceLabel = elevenVoices.find((v) => v.id === c.voiceId)?.label ?? c.voiceId;
     const modelLabel = elevenModels.find((m) => m.id === c.modelId)?.label ?? c.modelId;
@@ -431,13 +453,16 @@ export function VideoCardGenerator({
     if (c.voiceStatus === "pending" || c.renderStatus === "starting" || c.renderStatus === "rendering") return;
 
     const patch: Partial<CardState> = { ownerThreadId: threadId };
-    const narration = extractNarration(c.input);
+    const isPrism = audioFormat === "prism";
+    const narration = extractNarration(c.input, { stripScriptMarkup: isPrism });
     if (narration) {
       const voiceResult = send(
         "synthesize_audio",
         c.provider === "elevenlabs"
-          ? { text: narration, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: "video" }
-          : { text: narration, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: "video" }
+          ? { text: narration, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: audioFormat }
+          : c.provider === "google"
+            ? { text: narration, slot_id: id, provider: c.provider, voice_id: c.voiceId, format: audioFormat }
+            : { text: narration, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: audioFormat }
       );
       if (voiceResult.sent) {
         patch.voiceStatus = "pending";
@@ -458,15 +483,20 @@ export function VideoCardGenerator({
     // 정보를 같이 보내 카드 선택대로 실제 영상도 렌더되게 한다. format도
     // 같은 이유로 같이 보낸다(2026-09-25 후속, 사용자 지적: "동영상
     // 부분도.. 영상 탭에.. 추가되어야하는거 아닌가요?").
+    // script_format(2026-10-21) — PRISM은 영어 대본을 그대로 보내고, 서버가 장면 변환 프롬프트로 JSON을 만든다.
+    const scriptFormat = isPrism ? { script_format: "prism" } : {};
     const renderResult = send(
       "render_video",
       c.provider === "elevenlabs"
-        ? { text: c.input, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: c.format }
-        : { text: c.input, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: c.format }
+        ? { text: c.input, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: c.format, ...scriptFormat }
+        : c.provider === "google"
+          ? { text: c.input, slot_id: id, provider: c.provider, voice_id: c.voiceId, format: c.format, ...scriptFormat }
+          : { text: c.input, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: c.format, ...scriptFormat }
     );
     if (renderResult.sent) {
       patch.renderStatus = "starting";
       patch.renderError = null;
+      patch.progress = null;
     } else {
       patch.renderStatus = "error";
       patch.renderError = renderResult.tooLarge
@@ -485,7 +515,7 @@ export function VideoCardGenerator({
         newCard(
           last
             ? { provider: last.provider, voiceId: last.voiceId, modelId: last.modelId, voiceSettings: last.voiceSettings, pollySettings: last.pollySettings, format: last.format }
-            : { provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: POLLY_DEFAULTS, format: FORMATS[0].id }
+            : { provider: "polly", voiceId: "", modelId: "", voiceSettings: voiceSettingsDefaults, pollySettings: pollyDefaults, format: FORMATS[0].id }
         ),
       ];
     });
@@ -500,17 +530,7 @@ export function VideoCardGenerator({
   const handleApplyTestToProduction = async (c: CardState) => {
     if (!onApplyToProduction) return;
     await promptRefs.current[c.id]?.activateIfNeeded();
-    await onApplyToProduction({
-      provider: c.provider,
-      voice: c.pollySettings.voice,
-      engine: c.pollySettings.engine,
-      format: c.format,
-      rate: c.pollySettings.rate,
-      volume: c.pollySettings.volume,
-      elevenlabsVoice: c.voiceId,
-      elevenlabsModel: c.modelId,
-      elevenlabsSettings: c.voiceSettings,
-    });
+    await onApplyToProduction(cardToParsedDoc(c));
   };
   const reviewingCard = cards.find((c) => c.id === reviewCardId) ?? null;
 
@@ -551,17 +571,7 @@ export function VideoCardGenerator({
             serverVersion !== null &&
             info.version === serverVersion &&
             productionDefaults !== null &&
-            JSON.stringify({
-              provider: c.provider,
-              voice: c.pollySettings.voice,
-              engine: c.pollySettings.engine,
-              format: c.format,
-              rate: c.pollySettings.rate,
-              volume: c.pollySettings.volume,
-              elevenlabsVoice: c.voiceId,
-              elevenlabsModel: c.modelId,
-              elevenlabsSettings: c.voiceSettings,
-            }) === JSON.stringify(productionDefaults);
+            JSON.stringify(cardToParsedDoc(c)) === JSON.stringify(productionDefaults);
           return (
           <div key={c.id} className="overflow-hidden border-b bg-[var(--surface-card)]" style={{ borderColor: "var(--border-hairline)" }}>
           <CollapsibleSection
@@ -652,6 +662,10 @@ export function VideoCardGenerator({
                         compact
                         provider={c.provider}
                         onProviderChange={(p) => setCardProvider(c.id, p)}
+                        providers={VIDEO_PROVIDERS}
+                        googleVoice={c.voiceId}
+                        onGoogleVoiceChange={(v) => updateCard(c.id, { voiceId: v })}
+                        pollyProfile={pollyProfile}
                         pollyVoice={c.pollySettings.voice}
                         pollyEngine={c.pollySettings.engine}
                         onPollyVoiceChange={(v) => updatePollySetting(c.id, "voice", v)}
@@ -691,7 +705,11 @@ export function VideoCardGenerator({
                       <textarea
                         value={c.input}
                         onChange={(e) => updateCard(c.id, { input: e.target.value })}
-                        placeholder="왼쪽에서 만든 각본(렌더용 JSON)을 붙여넣으세요 — 순수 텍스트만 넣으면 성우 미리듣기만 됩니다"
+                        placeholder={
+                          audioFormat === "prism"
+                            ? "왼쪽에서 만든 영어 대본(응답 전체 복사 그대로)을 붙여넣으세요 — 서버가 장면으로 나눠 영상을 만듭니다"
+                            : "왼쪽에서 만든 각본(렌더용 JSON)을 붙여넣으세요 — 순수 텍스트만 넣으면 성우 미리듣기만 됩니다"
+                        }
                         rows={6}
                         className="ui-input w-full resize-none rounded-lg px-2.5 py-2 text-[12px] leading-relaxed"
                       />
@@ -739,6 +757,9 @@ export function VideoCardGenerator({
                           )}
                           {c.renderStatus === "done" && c.videoUrl && (
                             <video controls preload="none" poster={c.thumbUrl ?? undefined} src={c.videoUrl} className="w-full rounded-lg" />
+                          )}
+                          {c.renderStatus === "done" && c.videoUrl && c.jobId && (
+                            <VideoDownloadButton jobId={c.jobId} filePrefix={audioFormat === "prism" ? "ai_prism_EN" : "ailens_video"} />
                           )}
                           {c.renderStatus === "error" && c.renderError && <p className="text-[11px] text-[var(--danger)]">{c.renderError}</p>}
                         </div>

@@ -9,7 +9,11 @@ import {
   ELEVENLABS_FALLBACK_RANGES,
   type ElevenLabsVoiceSettings,
 } from "./ElevenLabsVoiceSettingsFields";
-import { PollyAdvancedFields, POLLY_VOICES, POLLY_VOICE_ENGINE_OPTIONS } from "./PollyVoiceSettingsFields";
+import { PollyAdvancedFields, LENS_POLLY_PROFILE, type PollyVoiceProfile } from "./PollyVoiceSettingsFields";
+import { GOOGLE_VOICES } from "./googleVoices";
+
+export type VoiceProvider = "polly" | "elevenlabs" | "google";
+const PROVIDER_LABEL: Record<VoiceProvider, string> = { polly: "Polly", elevenlabs: "ElevenLabs", google: "Google" };
 
 /* 제공자(Polly/ElevenLabs) 선택 + 성우/엔진(모델) + 세부 설정 — 4곳
    (VoicePreviewGenerator 실험 카드, VideoCardGenerator 실험 카드,
@@ -40,10 +44,16 @@ import { PollyAdvancedFields, POLLY_VOICES, POLLY_VOICE_ENGINE_OPTIONS } from ".
    대상은 "워딩"과 "컨트롤 종류"였지, 카드/패널 밀도까지 맞추라는 지적은
    아니었다. */
 
-export interface VoiceProviderFieldsProps {
+// P — 호출부가 쓰는 제공자 타입. 팟캐스트는 "polly" | "elevenlabs" 그대로, 영상·PRISM은 Google까지.
+export interface VoiceProviderFieldsProps<P extends VoiceProvider = VoiceProvider> {
   compact?: boolean;
-  provider: "polly" | "elevenlabs";
-  onProviderChange: (provider: "polly" | "elevenlabs") => void;
+  provider: P;
+  onProviderChange: (provider: P) => void;
+  /** 보여 줄 제공자 버튼(2026-10-22). 기본은 팟캐스트처럼 Polly/ElevenLabs, 영상·PRISM 탭은 VIDEO_PROVIDERS(Polly/Google). */
+  providers?: readonly P[];
+  /** Google 성우 — provider가 "google"일 때만 쓰인다. */
+  googleVoice?: string;
+  onGoogleVoiceChange?: (voice: string) => void;
 
   pollyVoice: string;
   pollyEngine: string;
@@ -59,6 +69,8 @@ export interface VoiceProviderFieldsProps {
   };
   /** Polly 엔진 아래에 붙는 안내 문구(예: 영상 탭의 속도·음량 미지원 고지). */
   pollyNote?: ReactNode;
+  /** Polly 성우 목록 — 기본은 LENS(한국어). PRISM 탭은 PRISM_POLLY_PROFILE(영어). */
+  pollyProfile?: PollyVoiceProfile;
 
   elevenVoiceId: string;
   elevenModelId: string;
@@ -71,16 +83,22 @@ export interface VoiceProviderFieldsProps {
   elevenRanges: typeof ELEVENLABS_FALLBACK_RANGES;
 }
 
-export function VoiceProviderFields({
+const DEFAULT_PROVIDERS = ["polly", "elevenlabs"] as const;
+
+export function VoiceProviderFields<P extends VoiceProvider = VoiceProvider>({
   compact = false,
   provider,
   onProviderChange,
+  providers = DEFAULT_PROVIDERS as unknown as readonly P[],
+  googleVoice = "",
+  onGoogleVoiceChange,
   pollyVoice,
   pollyEngine,
   onPollyVoiceChange,
   onPollyEngineChange,
   pollyAdvanced,
   pollyNote,
+  pollyProfile = LENS_POLLY_PROFILE,
   elevenVoiceId,
   elevenModelId,
   onElevenVoiceChange,
@@ -90,7 +108,7 @@ export function VoiceProviderFields({
   elevenVoiceSettings,
   onElevenVoiceSettingChange,
   elevenRanges,
-}: VoiceProviderFieldsProps) {
+}: VoiceProviderFieldsProps<P>) {
   const labelClass = compact
     ? "text-[10.5px] font-medium text-[var(--text-faint)]"
     : "mb-1.5 text-[11px] font-semibold text-[var(--text-secondary)]";
@@ -124,7 +142,7 @@ export function VoiceProviderFields({
       <div className={fieldWrapClass}>
         <Label className={labelClass}>제공자</Label>
         <div className="flex overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-hairline)" }}>
-          {(["polly", "elevenlabs"] as const).map((p) => (
+          {providers.map((p) => (
             <button
               key={p}
               type="button"
@@ -136,7 +154,7 @@ export function VoiceProviderFields({
                   : { color: "var(--text-muted)" }
               }
             >
-              {p === "polly" ? "Polly" : "ElevenLabs"}
+              {PROVIDER_LABEL[p]}
             </button>
           ))}
         </div>
@@ -146,18 +164,28 @@ export function VoiceProviderFields({
         <>
           <div className={fieldWrapClass}>
             <Label className={labelClass}>성우</Label>
-            <CustomSelect value={pollyVoice} onChange={onPollyVoiceChange} options={POLLY_VOICES.map((v) => ({ value: v.id, label: v.label }))} />
+            <CustomSelect value={pollyVoice} onChange={onPollyVoiceChange} options={pollyProfile.voices.map((v) => ({ value: v.id, label: v.label }))} />
           </div>
           <div className={fieldWrapClass}>
             <Label className={labelClass}>엔진</Label>
             <CustomSelect
               value={pollyEngine}
               onChange={onPollyEngineChange}
-              options={POLLY_VOICE_ENGINE_OPTIONS[pollyVoice].map((e) => ({ value: e.id, label: e.label }))}
+              options={(pollyProfile.engines[pollyVoice] ?? pollyProfile.engines[pollyProfile.defaultVoice]).map((e) => ({ value: e.id, label: e.label }))}
             />
           </div>
           {pollyNote}
         </>
+      ) : provider === "google" ? (
+        <div className={fieldWrapClass}>
+          <Label className={labelClass}>성우</Label>
+          <CustomSelect
+            value={googleVoice}
+            onChange={(v) => onGoogleVoiceChange?.(v)}
+            options={GOOGLE_VOICES.map((v) => ({ value: v.id, label: v.label }))}
+          />
+          <span className="mt-1 block text-[10px] text-[var(--text-faint)]">같은 성우가 대본 언어(영어·한국어)대로 읽습니다.</span>
+        </div>
       ) : (
         <>
           <div className={fieldWrapClass}>

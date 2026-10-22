@@ -13,7 +13,9 @@ from letter_errors import LetterError
 
 AXES = ("news", "substance", "other")
 STATUSES = ("draft", "in_review", "published", "archived")
-POLL_KINDS = ("emotion",)  # 감정 반응형만 허용. DB 에는 옛 값 binary 가 남아 있지만 새 레터는 쓸 수 없다(2026-10-09 편집 원칙)
+# 2지 입장형(binary)만 허용. 감정형(emotion)은 감정·입장·무반응이 한 투표에 섞여 응답 기준이 달라진다는 레터탭 피드백 07(2026-10-20)에 따라
+# 새 레터에서 쓰지 않는다. 이미 발행된 emotion 투표는 DB 에 그대로 남고 화면·집계도 그대로 동작한다.
+POLL_KINDS = ("binary",)
 # 투표 중립 원칙: 질문·선택지에 평가(합리적·옳다), 권유·결정(해야·맞을까요), 투자 행동(사야·매수) 표현을 쓰지 않는다.
 # 문구 휴리스틱이라 완벽하지 않다 — 자동 방어선일 뿐이고 최종 판단은 편집장 검수다.
 POLL_BIASED_TERMS = ("맞을까", "맞나요", "맞다고", "옳", "틀렸", "해야", "할까요", "좋을까", "좋은 선택", "나쁜 선택", "합리적", "비합리",
@@ -21,7 +23,7 @@ POLL_BIASED_TERMS = ("맞을까", "맞나요", "맞다고", "옳", "틀렸", "�
                      "지켜봐야", "당연", "분명")
 # 본문·요약·에디터 한마디: 투자·행동 지시 표현만 막는다(인용문 속 당사자 발언까지 막지 않도록 좁게 잡는다).
 BODY_DIRECTIVE_TERMS = ("사세요", "파세요", "하세요", "사야 ", "팔아야", "매수하", "매도하", "추천합니다", "추천해요", "권합니다", "권해요")
-REQUIRED_POLL_NEUTRAL_KEY = "unsure"  # 모든 투표에 "잘 모르겠어요"류 중립 선택지를 둔다
+POLL_NEUTRAL_KEY = "unsure"  # 2지 입장형에는 "잘 모르겠어요"류 중립 선택지를 두지 않는다(두 입장 중 하나를 고른다)
 # 에디터 한마디: 의견이 아니라 본문 사실의 연결 정리(docs/product/모아쓰기레터/에디터한마디_작성기준.md). 평가어·감탄·단정·판단 요구를 막고 200자로 제한한다.
 EDITOR_NOTE_BANNED_TERMS = ("아이러니", "재밌", "재미있", "놀랍", "흥미", "탁월", "대단", "안타깝", "다행", "충격", "역시", "결국",
                             "지켜봐야", "주목하", "해야", "분명", "당연", "!")
@@ -31,8 +33,8 @@ EDITOR_NOTE_MAX_SENTENCES = 2
 HEADLINE_BANNED_TERMS = ("아이러니", "재밌는", "재미있는", "놀랍게도", "놀라운", "흥미롭게도", "흥미로운", "탁월", "안타깝게도", "다행히", "충격", "!")
 # 본문 문단: 인용문 속 당사자 발언을 막지 않도록 가장 분명한 평가 부사만 막는다.
 BODY_EVAL_TERMS = ("아이러니", "놀랍게도", "흥미롭게도", "안타깝게도", "다행히")
-POLL_MIN_OPTIONS = 3
-POLL_MAX_OPTIONS = 4
+POLL_MIN_OPTIONS = 2
+POLL_MAX_OPTIONS = 2
 SUMMARY_MIN_LINES = 2
 SUMMARY_MAX_LINES = 3
 # 사이트 분류의 정본은 프론트 shared/constants/econCategories.ts 다. DB categories 테이블은 옛 7분류라 쓰지 않는다(v1.38).
@@ -71,11 +73,14 @@ def poll_problems(poll: Optional[Dict[str, Any]]) -> List[str]:
     for where, text in texts:
         hit = biased_terms(text, POLL_BIASED_TERMS)
         if hit:
-            problems.append(f"투표 {where}에 평가·권유·결정을 암시하는 표현이 있습니다({', '.join(hit)}) — 감정이나 인지만 묻는 중립 문구로 바꾸세요")
-    if poll.get("kind") != "emotion":
-        problems.append("투표는 감정 반응형(emotion)만 허용됩니다")
-    if not any(o.get("key") == REQUIRED_POLL_NEUTRAL_KEY for o in poll.get("options") or []):
-        problems.append(f"투표에 중립 선택지(key '{REQUIRED_POLL_NEUTRAL_KEY}', 예: 잘 모르겠어요)가 필요합니다")
+            problems.append(f"투표 {where}에 평가·권유·결정을 암시하는 표현이 있습니다({', '.join(hit)}) — 기사에 나온 두 입장을 사실 그대로 옮긴 중립 문구로 바꾸세요")
+    if poll.get("kind") not in POLL_KINDS:
+        problems.append("투표는 2지 입장형(binary)만 허용됩니다")
+    options = poll.get("options") or []
+    if any(o.get("key") == POLL_NEUTRAL_KEY for o in options):
+        problems.append("2지 입장형 투표에는 '잘 모르겠어요' 같은 중립 선택지를 넣지 않습니다 — 두 입장만 두세요")
+    if not POLL_MIN_OPTIONS <= len(options) <= POLL_MAX_OPTIONS:
+        problems.append(f"투표 선택지는 {POLL_MIN_OPTIONS}개여야 합니다(현재 {len(options)}개)")
     return problems
 
 
@@ -268,7 +273,7 @@ def validate_letter_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     poll = data.get("poll")
     if poll:
         if poll.get("kind") not in POLL_KINDS:
-            raise LetterError("poll.kind 는 binary/emotion 중 하나여야 합니다")
+            raise LetterError("poll.kind 는 binary 여야 합니다(2지 입장형)")
         options = poll.get("options") or []
         if not 2 <= len(options) <= 5:
             raise LetterError("poll.options 는 2~5개여야 합니다")
@@ -345,10 +350,7 @@ def publish_problems(letter: Dict[str, Any]) -> List[str]:
         problems.append("주제 태그가 1개 이상 필요합니다(주제 사전에서 고르세요)")
     elif topic_count > MAX_TOPICS:
         problems.append(f"주제 태그는 최대 {MAX_TOPICS}개입니다(현재 {topic_count}개)")
-    problems.extend(poll_problems(letter.get("poll")))
-    poll_options = (letter.get("poll") or {}).get("options") or []
-    if letter.get("poll") and not POLL_MIN_OPTIONS <= len(poll_options) <= POLL_MAX_OPTIONS:
-        problems.append(f"투표 선택지는 {POLL_MIN_OPTIONS}~{POLL_MAX_OPTIONS}개여야 합니다(현재 {len(poll_options)}개)")
+    problems.extend(poll_problems(letter.get("poll")))  # 종류(binary)·선택지 2개·중립 선택지 없음까지 여기서 본다
     note = (letter.get("editor_note") or "").strip()
     if len(note) > EDITOR_NOTE_MAX_CHARS:
         problems.append(f"에디터 한마디가 {EDITOR_NOTE_MAX_CHARS}자를 넘습니다(현재 {len(note)}자)")

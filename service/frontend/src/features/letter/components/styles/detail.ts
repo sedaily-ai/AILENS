@@ -13,8 +13,7 @@ export const DETAIL_CSS = `
   .ld-axis-label { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
   .ld-sec-top { margin-bottom: 2px; }
   .ld-key { margin: 8px 0 0; padding: 0; border: 0; background: none; border-radius: 0; font-size: 17px; font-weight: 700; line-height: 1.7; color: #111827; }
-  .ld-p a { color: #111827; text-decoration-color: #9ca3af; font-weight: 600; }
-  .ld-p a:hover { text-decoration-color: #111827; }
+  /* 본문 링크는 base.ts의 파란색+밑줄(#2f5fcf)을 그대로 쓴다. 검은색 덮어쓰기는 레터탭 피드백 02(2026-10-20)에 따라 제거 */
   /* 읽기 리듬(2026-10-11): 섹션 번호·구분선·도입문 위계·에디터 프로필 */
   .ld-sec { scroll-margin-top: 84px; margin-top: 52px; padding-top: 28px; border-top: 1px solid #e5e7eb; }
   .ld-sec-top { display: flex; align-items: baseline; gap: 10px; }

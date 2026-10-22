@@ -19,7 +19,7 @@ def good_draft():
     return {"slug": "2026-10-11-x", "title": "t", "deck": "d", "summary": ["매출 176억 원"], "editor_note": "e", "categories": ["industry"], "topics": ["글로벌 리밸런싱", "인도"],
             "sections": [{"axis": "news", "heading": "h", "key_line": "k", "paragraphs": [["a ", {"text": "x", "href": L(1)}, " 265억 원"], ["글로벌 리밸런싱 인도 " + "가" * 2600]]}],
             "sources": [{"url": L(1), "axes": ["news"]}, {"url": L(2), "axes": ["news"]}, {"url": L(3), "axes": ["other"]}],
-            "poll": {"kind": "emotion", "question": "q", "options": [{"key": "unsure", "label": "잘 모르겠어요"}]}}
+            "poll": {"kind": "binary", "question": "q", "options": [{"key": "keep", "label": "현행 유지"}, {"key": "change", "label": "제도 변경"}]}}
 
 
 class Api:

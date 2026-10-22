@@ -21,9 +21,18 @@ URL로 순수 HTTPS HEAD/GET만 쏜다 — 이 기능을 위해 새 S3 읽기 IA
 script.py가 media/video-lab/{job_id}.progress.json에 2초 간격으로 덮어쓴
 {"stage": "tts"|"bundling"|"rendering", ...}를 "pending" 응답에 그대로
 실어 보낸다 — video.mp4/error.json과 마찬가지로 공개 URL GET일 뿐,
-새 IAM 없음."""
+새 IAM 없음.
+
+**내려받기(2026-10-21 추가)** — 사용자 요청: "영상 cms페이지에서 다운로드라도
+가능하게". 공개 URL은 CMS와 출처가 달라 `<a download>`가 무시되고 새 탭 재생이
+된다. 그래서 "done" 응답에 Content-Disposition: attachment를 붙인 서명 URL
+(download_url)을 같이 싣는다. 서명은 이 Lambda 역할로 하지만 GetObject IAM은
+여전히 늘리지 않는다 — 버킷 정책 PublicReadMedia(Principal "*", media/*)가
+같은 계정의 서명 요청도 허용하기 때문. 서명 URL은 자격 증명 만료와 함께
+끊기므로 프런트는 버튼을 누를 때마다 이 라우트를 다시 불러 새 URL을 받는다."""
 import json
 import logging
+import re
 import urllib.error
 import urllib.request
 
@@ -33,6 +42,31 @@ from routes.webtoon import jobs as webtoon_jobs
 logger = logging.getLogger(__name__)
 
 _TIMEOUT_SECONDS = 5
+_DOWNLOAD_URL_TTL_SECONDS = 600
+_SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _download_filename(query_params: dict, job_id: str) -> str:
+    """?filename= 값을 헤더에 안전한 ASCII 파일명으로 줄인다(없으면 job_id.mp4)."""
+    raw = (query_params or {}).get("filename") or job_id
+    name = _SAFE_FILENAME.sub("_", raw).strip("._")[:100] or "video"
+    return name if name.lower().endswith(".mp4") else f"{name}.mp4"
+
+
+def _download_url(bucket: str, job_id: str, filename: str) -> str | None:
+    try:
+        return webtoon_jobs.s3().generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": bucket,
+                "Key": f"media/video-lab/{job_id}.mp4",
+                "ResponseContentDisposition": f'attachment; filename="{filename}"',
+            },
+            ExpiresIn=_DOWNLOAD_URL_TTL_SECONDS,
+        )
+    except Exception as e:  # noqa: BLE001 — 내려받기 주소가 없어도 재생·폴링은 그대로 돼야 한다
+        logger.warning(f"내려받기 URL 서명 실패(job_id={job_id}): {e}")
+        return None
 
 
 def _head_ok(url: str) -> bool:
@@ -64,7 +98,12 @@ def handle_poll(body: dict, path_params: dict, query_params: dict) -> dict:
     base = f"https://{bucket}.s3.us-east-1.amazonaws.com/media/video-lab/{job_id}"
     if _head_ok(f"{base}.mp4"):
         thumb_url = f"{base}.jpg" if _head_ok(f"{base}.jpg") else None
-        return response.ok({"status": "done", "video_url": f"{base}.mp4", "thumb_url": thumb_url})
+        return response.ok({
+            "status": "done",
+            "video_url": f"{base}.mp4",
+            "thumb_url": thumb_url,
+            "download_url": _download_url(bucket, job_id, _download_filename(query_params, job_id)),
+        })
     error_raw = _get_text(f"{base}.error.json")
     if error_raw:
         try:

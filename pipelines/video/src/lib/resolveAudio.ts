@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseFile } from 'music-metadata';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Cut, NewsScript } from './schema';
-import { DEFAULT_VOICE, synthesizeSpeech, TtsVoiceConfig } from './tts';
+import { DEFAULT_VOICE, GoogleTtsUnavailableError, synthesizeSpeech, TtsVoiceConfig } from './tts';
 
 const AUDIO_DIR = path.join(process.cwd(), 'public', 'audio');
 
@@ -85,17 +85,37 @@ const TTS_CONCURRENCY = 4;
 
 // script의 각 컷 narration을 TTS로 합성하고(캐시되어 있으면 재사용),
 // 실제 오디오 길이로 duration을 덮어써서 반환한다. JSON에 적힌 duration은 참고값일 뿐이다.
+//
+// Google(2026-10-22)은 한 컷이라도 끝내 못 읽으면(하루 할당량 소진 등) 영상 전체를 발행 설정의 Polly 성우로
+// 다시 읽는다 — 컷마다 따로 바꾸면 한 영상 안에서 목소리가 섞인다. 이미 Polly로 읽은 컷은 없으므로 낭비는
+// Google로 먼저 만든 컷뿐이다.
 export async function resolveScriptAudio(
   script: NewsScript,
   options?: { voice?: TtsVoiceConfig; onProgress?: (progress: ResolveProgress) => void; upload?: AudioUploadTarget }
 ): Promise<NewsScript> {
   const voice = options?.voice ?? DEFAULT_VOICE;
+  try {
+    return await resolveWithVoice(script, voice, options);
+  } catch (err) {
+    if (voice.provider !== 'google' || !(err instanceof GoogleTtsUnavailableError)) throw err;
+    console.warn(`[tts] Google 합성 실패 — 영상 전체를 Polly(${voice.voiceId})로 다시 읽습니다: ${err.message}`);
+    return resolveWithVoice(script, { ...voice, provider: 'polly' }, options);
+  }
+}
+
+async function resolveWithVoice(
+  script: NewsScript,
+  voice: TtsVoiceConfig,
+  options?: { onProgress?: (progress: ResolveProgress) => void; upload?: AudioUploadTarget }
+): Promise<NewsScript> {
   const total = script.cuts.length;
   const resolvedCuts: Cut[] = new Array(total);
 
   let nextIndex = 0;
+  let failed = false; // 한 컷이 실패하면 나머지 워커도 새 컷을 집지 않는다(헛된 호출 방지)
   async function worker(): Promise<void> {
     for (;;) {
+      if (failed) return;
       const i = nextIndex++;
       if (i >= total) return;
       const cut = script.cuts[i];
@@ -104,6 +124,8 @@ export async function resolveScriptAudio(
         options?.onProgress?.({ index: i, total, cutType: cut.type, cached, duration });
         resolvedCuts[i] = { ...cut, duration, audioFile };
       } catch (err) {
+        failed = true;
+        if (err instanceof GoogleTtsUnavailableError) throw err;
         const reason = err instanceof Error ? err.message : String(err);
         throw new Error(`컷 ${i + 1}/${total} (${cut.type}) 오디오 처리 실패: ${reason}`);
       }

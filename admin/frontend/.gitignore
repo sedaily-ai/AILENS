@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 빌드에 박히는 공개 주소(API Gateway·웹소켓)만 담는다 — 비밀값이 아니고, 빠지면 로그인이 "네트워크 오류"가 난다(2026-10-21).
+!.env.production
 
 # vercel
 .vercel

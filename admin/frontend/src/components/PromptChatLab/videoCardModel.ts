@@ -1,7 +1,7 @@
 /** 영상 카드 상태·저장·각본 파싱 헬퍼 — VideoCardGenerator.tsx 에서 리팩토링 7단계에서 분리(내용 불변). */
 import { ChatThreadMessage } from "@/lib/types";
 import { ELEVENLABS_FALLBACK_VOICE_SETTINGS, type ElevenLabsVoiceSettings } from "./ElevenLabsVoiceSettingsFields";
-import { FORMATS } from "./VideoRenderSettingsPanel";
+import { FORMATS, type ParsedDoc } from "./VideoRenderSettingsPanel";
 
 export const CARDS_STORAGE_PREFIX = "ailens-video-lab-cards";
 
@@ -77,7 +77,7 @@ export function parseCuts(jsonText: string): unknown[] | null {
  *  같은 순서로 JSON을 찾아서 이 문제가 없다. 셋 다 실패해야만(narration이
  *  하나도 없음) 원문 그대로를 내레이션으로 쓴다(순수 텍스트만 붙여넣어
  *  음성만 빠르게 테스트하는 경우를 위해 남겨둠). */
-export function extractNarration(raw: string): string {
+export function extractNarration(raw: string, opts: { stripScriptMarkup?: boolean } = {}): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
 
@@ -103,10 +103,26 @@ export function extractNarration(raw: string): string {
     if (joined.trim()) return joined;
   }
 
-  return trimmed;
+  return opts.stripScriptMarkup ? stripScriptMarkup(trimmed) : trimmed;
 }
 
-export type Provider = "polly" | "elevenlabs";
+/** PRISM 카드(2026-10-21) — JSON 대신 왼쪽 채팅의 영어 대본 응답을 그대로 붙여넣는다. 성우 미리듣기가
+ *  "# SG7 … — EL Script" 같은 머리글·업로드 안내(Block D)·[pause] 같은 꺾쇠 표시까지 읽지 않도록,
+ *  대본 코드블록이 있으면 그 안만 쓰고 머리글 줄과 꺾쇠 표시를 지운다(장면 변환 프롬프트가 렌더 때
+ *  하는 정리와 같은 방향). */
+export function stripScriptMarkup(text: string): string {
+  const block = [...text.matchAll(/```[^\n]*\n([\s\S]*?)```/g)].map((m) => m[1]).find((b) => !b.trim().startsWith("{"));
+  return (block ?? text)
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"))
+    .join("\n")
+    .replace(/\[[^\]\n]{1,30}\]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export type Provider = "polly" | "elevenlabs" | "google";
 
 // 성우·엔진 조합표는 PollyVoiceSettingsFields.tsx에서 가져온다(위 import 참고).
 // rate/volume(2026-09-25 추가) — 사용자 요청: "팟캐스트 부분처럼.. 동일하게
@@ -121,12 +137,14 @@ export interface PollySettings {
 export const POLLY_DEFAULTS: PollySettings = { voice: "Seoyeon", engine: "generative", rate: "100%", volume: "+0dB" };
 
 export type RenderProgress =
+  | { stage: "scene" }
   | { stage: "tts"; current: number; total: number }
   | { stage: "bundling" }
   | { stage: "rendering"; percent: number; renderedFrames: number; totalFrames: number; encodedFrames: number };
 
 export function progressLabel(p: RenderProgress | null | undefined): string {
   if (!p) return "렌더 준비 중...";
+  if (p.stage === "scene") return "대본을 장면으로 나누는 중... (1~2분)";
   if (p.stage === "tts") return p.total > 0 ? `음성 합성 중 (${p.current}/${p.total}컷)` : "음성 합성 중...";
   if (p.stage === "bundling") return "렌더 환경 준비 중...";
   return `렌더링 중 (${p.renderedFrames}/${p.totalFrames}프레임)`;
@@ -134,6 +152,7 @@ export function progressLabel(p: RenderProgress | null | undefined): string {
 
 export function progressPercent(p: RenderProgress | null | undefined): number {
   if (!p) return 2;
+  if (p.stage === "scene") return 3;
   if (p.stage === "tts") return 5;
   if (p.stage === "bundling") return 10;
   return 15 + Math.round(p.percent * 0.85);
@@ -197,6 +216,24 @@ export function newCard(
     renderError: null,
     progress: null,
     ownerThreadId: null,
+  };
+}
+
+/** 카드 → 발행 설정 모양("프로덕션에 적용" 값·프로덕션과 같은지 비교). 키 순서는
+ *  VideoRenderSettingsPanel.tsx::parseDoc과 같아야 한다(JSON.stringify로 비교). voiceId는
+ *  provider가 google이면 Google 성우, 아니면 ElevenLabs 성우(Polly면 빈 값)다. */
+export function cardToParsedDoc(c: CardState): ParsedDoc {
+  return {
+    provider: c.provider,
+    voice: c.pollySettings.voice,
+    engine: c.pollySettings.engine,
+    format: c.format,
+    rate: c.pollySettings.rate,
+    volume: c.pollySettings.volume,
+    elevenlabsVoice: c.provider === "google" ? "" : c.voiceId,
+    elevenlabsModel: c.modelId,
+    elevenlabsSettings: c.voiceSettings,
+    googleVoice: c.provider === "google" ? c.voiceId : "",
   };
 }
 

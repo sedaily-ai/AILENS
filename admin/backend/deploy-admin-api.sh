@@ -85,6 +85,8 @@ ELEVENLABS_TTS_MODULE="$SCRIPT_DIR/../../pipelines/common/elevenlabs_tts.py"
 # 2026-09-24 — 영상 탭 "성우 미리듣기"(synthesize_audio, format="video")가
 # flat import하는 pipelines/common/video_settings.py — 위와 같은 이유.
 VIDEO_SETTINGS_MODULE="$SCRIPT_DIR/../../pipelines/common/video_settings.py"
+# pipelines/common/google_tts.py — 영상·PRISM 탭 Google 성우 미리듣기(2026-10-22). 위와 같은 이유로 zip 루트에 복사.
+GOOGLE_TTS_MODULE="$SCRIPT_DIR/../../pipelines/common/google_tts.py"
 
 FUNCTION_NAME="sedaily-mbti-admin-api-dev"
 PYTHON_VERSION="3.11"          # Lambda 런타임과 반드시 일치시킬 것
@@ -113,7 +115,7 @@ cp "$WEBTOON_IMAGE_MODULE" "$BUILD_DIR/"   # pipelines/common/webtoon_image.py (
 cp "$SCRIPT_DIR/../../pipelines/common/webtoon_contract.py" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/../../pipelines/common/webtoon_image_prompt.py" "$SCRIPT_DIR/../../pipelines/common/bedrock_models.py" "$BUILD_DIR/"   # webtoon_image.py·bedrock_client.py 가 flat import 하는 모듈(2026-10-12 분리)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
-cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$REKOGNITION_PEOPLE_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$BUILD_DIR/"
+cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$REKOGNITION_PEOPLE_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$GOOGLE_TTS_MODULE" "$BUILD_DIR/"
 mkdir -p "$BUILD_DIR/assets"
 cp "$FONT_ASSET" "$FONT_ASSET_REGULAR" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"

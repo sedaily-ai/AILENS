@@ -125,6 +125,8 @@ const MENU_GROUPS: MenuGroup[] = [
       { label: "선정 실험실", href: "/selection-lab", Icon: IconFlask },
       // 2026-10-09 신설 — 레터 탭(하나의 이슈를 여러 관점으로 엮은 묶음 레터) 입력·검수·발행. 옛 "AI 레터"(/letters)와 다른 기능.
       { label: "이슈 레터", href: "/issue-letters", Icon: IconPen },
+      // 2026-10-22 신설 — PRISM 영상 일괄 제작(기사 파일 여러 개 → 대본·영상 자동). 프롬프트 실험실 PRISM 탭은 시험용으로 남는다.
+      { label: "PRISM 제작", href: "/prism-batch", Icon: IconMusic },
     ],
   },
   {

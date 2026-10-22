@@ -1,25 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '../../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, useRouter } from 'expo-router';
 import { BookmarkSimple, ChatCircleDots, ClockCounterClockwise, MagnifyingGlass, ShareNetwork, Trash, X } from '../../ui/icons';
-import { categoryForDataLabel, ECON_CATEGORIES } from '@ailens/domain';
-import { listPosts, type LensPost, type LetterPost } from '@ailens/api-client';
 import { AppHeader } from '../../components/AppHeader';
 import { useAuth } from '../../auth/AuthContext';
 import { kstDateTime } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import { accent, colors } from '../../theme';
-import { buildLatest } from '../home/model';
 import { deleteSentence, listArchive, type ArchiveSentence } from './archiveApi';
 import { useListStore } from './listStore';
-import { bookmarks, getInterests, history, setInterests, type SavedArticle } from './stores';
-import { KnowledgeMap } from './KnowledgeMap';
+import { bookmarks, history, type SavedArticle } from './stores';
+import { InterestPicker } from '../interests/InterestPicker';
+import { MyInterestCard } from './MyInterestCard';
 
 const SITE = 'https://ailens.sedaily.ai';
-type Tab = 'drawer' | 'saved' | 'read' | 'interest';
-const TABS: Array<[Tab, string]> = [['drawer', '내 서랍'], ['saved', '저장한 글'], ['read', '읽은 글'], ['interest', '관심 분야']];
+type Tab = 'drawer' | 'saved' | 'read';
+const TABS: Array<[Tab, string]> = [['drawer', '내 서랍'], ['saved', '저장한 글'], ['read', '읽은 글']];
 
 /**
  * 나의 LENS — 웹 /my-lens 대응(앱 판). 로그인 필수.
@@ -34,6 +32,7 @@ export function MyLensScreen() {
   const [tab, setTab] = useState<Tab>('drawer');
   const saved = useListStore(bookmarks);
   const read = useListStore(history);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -53,7 +52,7 @@ export function MyLensScreen() {
         </View>
       ) : (
         <>
-          <KnowledgeMap items={read.items} />
+          <MyInterestCard read={read.items.map((r) => ({ id: r.id, title: r.title, category: r.category, at: r.at }))} onEdit={() => setPickerOpen(true)} />
           <View style={styles.tabs}>
             {TABS.map(([k, label]) => (
               <Pressable key={k} style={[styles.tab, tab === k && styles.tabOnBg]} onPress={() => setTab(k)} accessibilityRole="tab" accessibilityState={{ selected: tab === k }}>
@@ -65,10 +64,10 @@ export function MyLensScreen() {
             {tab === 'drawer' ? <Drawer userId={state.userId} /> : null}
             {tab === 'saved' ? <ArticleList items={saved.items} icon={BookmarkSimple} empty={'저장한 글이 없어요.\n기사 상단의 북마크 아이콘으로 저장해 보세요.'} onRemove={(id) => void bookmarks.remove(id)} /> : null}
             {tab === 'read' ? <ArticleList items={read.items} icon={ClockCounterClockwise} empty={'아직 읽은 글이 없어요.\n오늘의 지면에서 하나 골라 읽어 보세요.'} onRemove={(id) => void history.remove(id)} showTime /> : null}
-            {tab === 'interest' ? <Interests /> : null}
           </View>
         </>
       )}
+      <InterestPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -190,64 +189,6 @@ function ArticleList({ items, empty, icon, onRemove, showTime }: { items: SavedA
             <X size={18} color={colors.textFaint} />
           </Pressable>
         </View>
-      )}
-    />
-  );
-}
-
-function Interests() {
-  const [picked, setPicked] = useState<string[] | null>(null);
-  useEffect(() => {
-    void getInterests().then(setPicked);
-  }, []);
-  const toggle = useCallback((slug: string) => {
-    setPicked((p) => {
-      const cur = p ?? [];
-      const next = cur.includes(slug) ? cur.filter((x) => x !== slug) : [...cur, slug];
-      void setInterests(next);
-      return next;
-    });
-  }, []);
-  const { state } = useAsync(async (signal) => {
-    const [letters, lens] = await Promise.all([listPosts<LetterPost>('letters', { limit: 100, signal }), listPosts<LensPost>('lens', { limit: 100, signal })]);
-    return buildLatest(letters, lens);
-  }, []);
-
-  const feed = state.status === 'ready' && picked ? state.data.filter((i) => picked.includes(categoryForDataLabel(i.category)?.slug ?? '')).slice(0, 12) : [];
-  return (
-    <FlatList
-      data={feed}
-      keyExtractor={(i) => i.id}
-      contentContainerStyle={styles.list}
-      ListHeaderComponent={
-        <View>
-          <Text style={styles.sec}>관심 있는 분야를 골라 보세요</Text>
-          <View style={styles.chips}>
-            {ECON_CATEGORIES.map((c) => {
-              const on = picked?.includes(c.slug) ?? false;
-              return (
-                <Pressable key={c.slug} onPress={() => toggle(c.slug)} style={[styles.chip, on && { backgroundColor: c.accent, borderColor: c.accent }]} accessibilityRole="button" accessibilityState={{ selected: on }}>
-                  <Text style={[styles.chipText, on && { color: '#fff' }]}>{c.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={[styles.sec, { marginTop: 24 }]}>내 관심 분야 새 소식</Text>
-          {state.status === 'loading' ? <ActivityIndicator color="#2563eb" style={{ marginTop: 16 }} /> : null}
-          {picked && picked.length === 0 ? <Text style={styles.empty}>분야를 고르면 해당 분야의 새 소식을 모아 보여 줘요.</Text> : null}
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Link href={{ pathname: '/article/[slug]', params: { slug: item.id } }} asChild>
-          <Pressable style={styles.row} accessibilityRole="link">
-            <View style={{ flex: 1 }}>
-              {item.category ? <View style={styles.cat}><Text style={styles.catText}>{item.category}</Text></View> : null}
-              <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
-              <Text style={styles.rowMeta}>{kstDateTime(item.publishedAt, item.date)}</Text>
-            </View>
-            <View style={styles.thumb}>{item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.img} resizeMode="cover" /> : null}</View>
-          </Pressable>
-        </Link>
       )}
     />
   );

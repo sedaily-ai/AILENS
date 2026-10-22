@@ -67,10 +67,11 @@ def fetch_recent_articles() -> List[Dict[str, Any]]:
 
 # ── 단계 ────────────────────────────────────────────────────────────────────────
 
-def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str]) -> List[Dict[str, Any]]:
+def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str], recent_topics: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     if os.environ.get("ISSUELETTER_PICK", "keyword") == "keyword":
-        picked = core.keyword_clusters(articles, used_keys)
-        log("clusters", mode="keyword", kept=len(picked), topics=[f"{c['keyword']}({c['n_articles']}건/{c['n_days']}일)" for c in picked])
+        picked = core.keyword_clusters(articles, used_keys, recent_topics=recent_topics or [])
+        log("clusters", mode="keyword", kept=len(picked), recent_topics=recent_topics or [],
+            topics=[f"{c['keyword']}({c['n_articles']}건/{c['n_days']}일, 점수 {c['score']}, 최근 겹침 {c['recent_repeat']})" for c in picked])
         return picked
     by_key = {a["key"]: a for a in articles if a.get("key")}
     listing = "\n".join(f"{a['key']} | {a['title']}" for a in articles if a.get("key"))[:60000]
@@ -96,7 +97,7 @@ def pick_clusters(articles: List[Dict[str, Any]], used_keys: List[str]) -> List[
 def build_prompt(cluster: Dict[str, Any], editors: List[Dict[str, Any]], topics_text: str) -> str:
     tpl = PROMPT_TEMPLATE.read_text(encoding="utf-8")
     cand = "\n".join(f"- {a['title']} | {core.sedaily_url(a['key'])}" for a in cluster["articles"])
-    bodies = "\n\n".join(f"[기사 {a['key']}] {a['title']}\n{(a.get('content') or '')[:6000]}" for a in cluster["articles"])
+    bodies = "\n\n".join(f"[기사 {a['key']}] {a['title']} ({core.article_date_text(a) or '게재일 모름'})\n{(a.get('content') or '')[:6000]}" for a in cluster["articles"])
     eds = "\n".join(f"- {e['slug']}: {e['name']}, {e['role']}, 담당 분야: {'·'.join(e.get('topic_names') or [])}" for e in editors)
     return tpl.replace("{{TOPIC}}", cluster["topic"]).replace("{{CANDIDATES}}", cand).replace("{{BODIES}}", bodies).replace("{{EDITORS}}", eds).replace("{{SLUG_DATE}}", datetime.now(KST).strftime("%Y-%m-%d"))
 
@@ -153,7 +154,9 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
     c4, ed = api("GET", "/api/v2/issue-letters/editors", public=True)
     editors = ed.get("editors", []) if c4 == 200 else []
     prompt = build_prompt(cluster, editors, "")
-    sources_text = [a.get("content") or "" for a in cluster["articles"]] + [a["title"] for a in cluster["articles"]]
+    # 게재일도 대조 원문에 넣는다: "지난달 29일"을 게재일 기준 "2026년 9월 29일"로 바꾼 연도·월이 지어낸 숫자로 잡히지 않게(피드백 03)
+    sources_text = ([a.get("content") or "" for a in cluster["articles"]] + [a["title"] for a in cluster["articles"]]
+                    + [core.article_date_text(a) for a in cluster["articles"]])
     feedback = ""
     for attempt in range(1, ATTEMPTS_PER_CLUSTER + 1):
         draft = make_draft(prompt, feedback)
@@ -189,7 +192,7 @@ def _run_cluster(cluster: Dict[str, Any], result: Dict[str, Any], live: bool) ->
             continue
         unsupported = core.unsupported_numbers(draft, sources_text)
         if unsupported:
-            feedback = ("기사 본문에 없는 수치가 있습니다(지어내지 말고 기사에 있는 수치만 쓰세요). 연도는 '지난해'를 2025년으로 바꾸는 식으로 직접 계산하지 말고 기사의 표현 그대로 쓰세요. "
+            feedback = ("기사 본문에 없는 수치가 있습니다(지어내지 말고 기사에 있는 수치만 쓰세요). 날짜는 기사 게재일을 기준으로만 바꾸고, 그 밖의 합계·증감률 같은 새 숫자를 계산하지 마세요. "
                         "기사 번호(숫자 ID)는 본문·블록에 쓰지 마세요: " + ", ".join(unsupported))
             log("draft_unsupported_numbers", attempt=attempt, numbers=unsupported)
             continue
@@ -283,15 +286,19 @@ def run(dry_run: Optional[bool] = None) -> Dict[str, Any]:
     if sum(1 for l in letters if str(l.get("published_at") or "").startswith(today) and l.get("status") == "published") >= MAX_PER_DAY:
         return {**result, "stopped": "오늘 발행 상한 도달"}
     used: List[str] = []
+    details: List[Dict[str, Any]] = []
     for l in letters:
         c2, d = api("GET", f"/admin/issue-letters/{l['id']}")
-        for s in (d.get("letter", d).get("sources") or []):
+        full = d.get("letter", d) if isinstance(d, dict) else {}
+        details.append({"status": l.get("status"), "published_at": l.get("published_at"), "topics": full.get("topics") or l.get("topics") or []})
+        for s in (full.get("sources") or []):
             k = core.article_key_of(str(s.get("url") or ""))
             if k:
                 used.append(k)
+    recent_topics = core.recent_letter_topics(details)  # 최근 레터와 같은 주제는 감점해 분야가 한쪽으로 몰리지 않게 한다
     articles = fetch_recent_articles()
     log("articles", n=len(articles))
-    clusters = pick_clusters(articles, used)
+    clusters = pick_clusters(articles, used, recent_topics)
     c4, ed = api("GET", "/api/v2/issue-letters/editors", public=True)
     editor_list = ed.get("editors", []) if c4 == 200 else []
     if editor_list:  # 담당 에디터를 정할 수 없는 소재는 초안을 쓰기 전에 거른다(토큰 낭비 방지)

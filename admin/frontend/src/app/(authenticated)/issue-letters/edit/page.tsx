@@ -37,8 +37,8 @@ const EXAMPLE = `{
       "paragraphs": [["문장 ", { "text": "링크 걸 문구", "href": "https://www.sedaily.com/article/..." }, " 이어지는 문장"]] }
   ],
   "sources": [{ "url": "https://www.sedaily.com/article/...", "axes": ["news"] }],
-  "poll": { "kind": "emotion", "question": "처음 들었을 때 어떠셨나요?",
-    "options": [{ "key": "curious", "label": "신기했어요" }, { "key": "worried", "label": "걱정됐어요" }, { "key": "unsure", "label": "잘 모르겠어요" }] }
+  "poll": { "kind": "binary", "question": "AI 학습을 위한 저작물 사용, 어떻게 보세요?",
+    "options": [{ "key": "protect", "label": "창작자 권리 침해다, 허용하면 안 된다" }, { "key": "compensate", "label": "AI 발전을 위해 불가피하며 보상 체계로 풀어야 한다" }] }
 }`;
 
 /** 화면에서 읽은 레터를 저장용 JSON(입력 형식)으로 되돌린다 — 수정 시 편집 칸의 초기값. */

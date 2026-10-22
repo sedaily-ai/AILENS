@@ -148,7 +148,8 @@ export interface ChatThreadMessage {
    *  이미 커버). */
   videoPreview?: {
     input: string;
-    provider: "polly" | "elevenlabs";
+    /** google(2026-10-22)이면 voiceId가 Google 성우 이름이다. */
+    provider: "polly" | "elevenlabs" | "google";
     voiceId?: string;
     modelId?: string;
     voiceSettings?: { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean; speed: number };
