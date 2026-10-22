@@ -19,6 +19,10 @@ PROFILES = {
     "webtoon_script_sonnet5": ("us-east-1", "dy1fhtb04pon", "lens-webtoon-script-sonnet-5"),
     "webtoon_script_sonnet46": ("us-east-1", "yirjajon82n7", "lens-webtoon-script-sonnet-46"),
     "mustknow_sonnet5": ("us-east-1", "zmdham3vkj89", "lens-mustknow-sonnet-5"),
+    # PRISM 일괄 제작(2026-10-22) — 대본은 영상 프로파일(Sonnet 5), 장면 나누기는 Haiku 5.5(A/B 시험 결과, 비용 1/20).
+    # 대본 모델을 바꿀 때는 이미지 재빌드 없이 작업 정의 환경변수 BEDROCK_MODEL_PRISM_SCRIPT 로 덮어쓴다.
+    "prism_script": ("us-east-1", "044jm6k57jgh", "lens-video-sonnet-5"),
+    "prism_scene": ("us-east-1", "njzeyj54dn12", "lens-prism-haiku-5-5"),
     "image_stable_core": ("us-west-2", "5jauvzgplsjx", "lens-webtoon-image-stable-core"),
     "image_sd35_large": ("us-west-2", "52u16muojn2u", "lens-webtoon-image-sd35-large"),
     "image_sd_ultra": ("us-west-2", "htvjnctxyvs1", "lens-webtoon-image-sd-ultra"),

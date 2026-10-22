@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -25,7 +24,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 from config import CMS_MEDIA_BUCKET  # noqa: E402
 import ddb_prompt  # noqa: E402
-from bedrock_client import MODEL_ID, call_text  # noqa: E402
+from bedrock_client import call_text  # noqa: E402
+from bedrock_models import profile_arn  # noqa: E402
 
 from generate_script import fix_script, validate_script  # noqa: E402
 from render_from_script import _extract_render_script, _fill_missing_top_level, render_and_upload  # noqa: E402
@@ -41,8 +41,10 @@ _WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 _SCRIPT_CATEGORY = "prism"
 _SCENE_CATEGORY = "prism-scene"
 _MAX_TOKENS = 8000  # CMS PRISM 탭과 같다(admin/backend/routes/prompts.py::_CATEGORY_BEDROCK["prism"])
-# PRISM 전용 Bedrock 프로파일이 생기면 작업 정의 환경변수로 바꾼다(비용 태깅 규칙). 없으면 영상 프로파일.
-_MODEL = os.environ.get("PRISM_BEDROCK_MODEL") or MODEL_ID
+# 대본·장면 모델은 bedrock_models 별칭으로 따로 둔다 — 작업 정의 환경변수 BEDROCK_MODEL_PRISM_SCRIPT /
+# BEDROCK_MODEL_PRISM_SCENE 로 이미지 재빌드 없이 바꿀 수 있다.
+_SCRIPT_MODEL = profile_arn("prism_script")
+_SCENE_MODEL = profile_arn("prism_scene")
 
 
 def _status_key(batch_id: str, item_id: str) -> str:
@@ -100,13 +102,13 @@ def run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article
 
     try:
         script_guide = ddb_prompt.load_prompt(_SCRIPT_CATEGORY)
-        script_text = call_text(script_guide, user_message, model=_MODEL, max_tokens=_MAX_TOKENS)
+        script_text = call_text(script_guide, user_message, model=_SCRIPT_MODEL, max_tokens=_MAX_TOKENS)
         if not _looks_like_script(script_text, display_name):
             print(f"[prism-batch] 대본 형식 이상 — 1회 재요청. 앞부분: {script_text[:200]!r}")
             script_text = call_text(
                 script_guide,
                 user_message + "\n\n(TYPE·RECORDING DATE·WEEKDAY는 위에 있습니다. 질문하지 말고 지침의 출력 형식대로 바로 생성하세요.)",
-                model=_MODEL, max_tokens=_MAX_TOKENS,
+                model=_SCRIPT_MODEL, max_tokens=_MAX_TOKENS,
             )
             if not _looks_like_script(script_text, display_name):
                 return fail(f"대본 작성 응답이 지침 형식이 아닙니다: {script_text[:300]}")
@@ -127,7 +129,7 @@ def run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article
         problem = ""
         script: dict | None = None
         for attempt in (1, 2):
-            raw = call_text(scene_guide, scene_message + problem, model=_MODEL, max_tokens=_MAX_TOKENS)
+            raw = call_text(scene_guide, scene_message + problem, model=_SCENE_MODEL, max_tokens=_MAX_TOKENS)
             try:
                 candidate = _extract_render_script(raw)
             except (ValueError, json.JSONDecodeError) as e:
