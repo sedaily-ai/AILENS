@@ -3,6 +3,7 @@
 별도 ECS 태스크 정의(sedaily-lens-video-lab)로 실행되며, 완료·실패는 S3 오브젝트 존재 여부로만 알린다
 (성공 media/video-lab/{job_id}.mp4·.jpg, 실패 .error.json, 진행률 .progress.json).
 기사 조회·Bedrock 각본 생성은 건너뛰고, 텍스트를 generate_script.py의 fix_script → validate_script에 통과시킨다.
+예외: --prism-article-s3-key가 오면 PRISM 일괄 제작 한 편을 기사부터 끝까지 만든다(prism_batch.py).
 """
 import argparse
 import json
@@ -209,7 +210,8 @@ def _run_render_streaming(cmd: list[str], cwd: str, s3, job_id: str, env: dict |
 def main() -> None:
     parser = argparse.ArgumentParser(description="이미 생성된 각본 텍스트로 영상만 렌더(CMS 영상 랩 전용)")
     parser.add_argument("--job-id", required=True)
-    parser.add_argument("--script-s3-key", required=True)
+    # 렌더용 각본 텍스트(S3). PRISM 일괄 제작(--prism-article-s3-key)일 때는 각본을 이 태스크가 만들므로 쓰지 않는다.
+    parser.add_argument("--script-s3-key", default=None)
     # CMS 카드(VideoCardGenerator.tsx)의 "성우 미리듣기"에서 고른 provider/voice를 이 렌더 1회에도 쓰고
     # 싶을 때 chat_ws.py::_run_render_video_flow가 JSON으로 담아 넘긴다. 없으면(자동 발행 파이프라인 등)
     # 발행된 설정만 쓴다.
@@ -218,12 +220,33 @@ def main() -> None:
     # (영상 랩에서 붙여넣은 각본은 어느 기사인지 모르므로 지금처럼 사진 없이 렌더한다).
     parser.add_argument("--photo-url", default=None)
     parser.add_argument("--photo-credit", default=None)
+    # PRISM 일괄 제작(2026-10-22) — CMS "PRISM 제작" 화면이 기사 파일 1개당 이 태스크를 1개 띄운다.
+    # 같은 작업 정의(entryPoint)에 인자만 달리 줘서, 새 ECS family·IAM 없이 기사 → 대본 → 장면 → 렌더를
+    # 이 컨테이너 안에서 이어서 한다(prism_batch.py).
+    parser.add_argument("--prism-article-s3-key", default=None)
+    parser.add_argument("--prism-batch-id", default=None)
+    parser.add_argument("--prism-item-id", default=None)
+    parser.add_argument("--prism-type", default=None)
+    parser.add_argument("--prism-recording-date", default=None)
     args = parser.parse_args()
     settings_override = json.loads(args.settings_override) if args.settings_override else None
 
     s3 = boto3.client("s3", region_name="us-east-1")
     work_dir = Path("/tmp") / args.job_id
     work_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.prism_article_s3_key:
+        import prism_batch  # 같은 폴더 — 일괄 제작 경로에서만 필요
+
+        ok = prism_batch.run(
+            s3, work_dir,
+            batch_id=args.prism_batch_id, item_id=args.prism_item_id, job_id=args.job_id,
+            article_key=args.prism_article_s3_key, type_code=args.prism_type,
+            recording_date=args.prism_recording_date,
+        )
+        sys.exit(0 if ok else 1)
+    if not args.script_s3_key:
+        parser.error("--script-s3-key 또는 --prism-article-s3-key가 필요합니다")
 
     raw_path = work_dir / "raw.txt"
     s3.download_file(CMS_MEDIA_BUCKET, args.script_s3_key, str(raw_path))
@@ -249,6 +272,13 @@ def main() -> None:
         _upload_error(s3, args.job_id, "각본에 문제가 있습니다(직접 수정 후 다시 시도):\n" + "\n".join(f"- {e}" for e in errors))
         sys.exit(1)
 
+    if not render_and_upload(s3, args.job_id, script, work_dir, settings_override):
+        sys.exit(1)
+
+
+def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_override: dict | None = None) -> bool:
+    """검증을 마친 각본을 렌더해 media/video-lab/{job_id}.mp4·.jpg로 올린다. 실패하면 .error.json을 올리고 False.
+    CMS 영상 랩(main)과 PRISM 일괄 제작(prism_batch.run)이 같이 쓴다."""
     script_path = work_dir / "script.json"
     script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
 
@@ -272,16 +302,16 @@ def main() -> None:
             "--format", settings["format"],
             "--output", str(mp4_path.resolve()),
             "--voice", settings["voice"],
-            "--job-id", args.job_id,
+            "--job-id", job_id,
         ],
         cwd=str(VIDEO_DIR),
         s3=s3,
-        job_id=args.job_id,
+        job_id=job_id,
         env={**os.environ, **video_settings.get_render_env(settings_override, settings_category)},
     )
     if returncode != 0 or not mp4_path.exists():
-        _upload_error(s3, args.job_id, f"렌더 실패(returncode={returncode}): {output[-1000:]}")
-        sys.exit(1)
+        _upload_error(s3, job_id, f"렌더 실패(returncode={returncode}): {output[-1000:]}")
+        return False
 
     thumb_path = work_dir / "thumb.jpg"
     subprocess.run(
@@ -289,10 +319,11 @@ def main() -> None:
         capture_output=True,
     )
 
-    s3.upload_file(str(mp4_path), CMS_MEDIA_BUCKET, f"media/video-lab/{args.job_id}.mp4", ExtraArgs={"ContentType": "video/mp4"})
+    s3.upload_file(str(mp4_path), CMS_MEDIA_BUCKET, f"media/video-lab/{job_id}.mp4", ExtraArgs={"ContentType": "video/mp4"})
     if thumb_path.exists():
-        s3.upload_file(str(thumb_path), CMS_MEDIA_BUCKET, f"media/video-lab/{args.job_id}.jpg", ExtraArgs={"ContentType": "image/jpeg"})
-    print(f"완료 — media/video-lab/{args.job_id}.mp4")
+        s3.upload_file(str(thumb_path), CMS_MEDIA_BUCKET, f"media/video-lab/{job_id}.jpg", ExtraArgs={"ContentType": "image/jpeg"})
+    print(f"완료 — media/video-lab/{job_id}.mp4")
+    return True
 
 
 if __name__ == "__main__":

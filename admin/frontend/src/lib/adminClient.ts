@@ -37,6 +37,7 @@ import type {
   BigKindsSearchResponse,
   BigKindsArticle,
 } from "./types";
+import type { PrismBatchDetail, PrismBatchSummary } from "./prismBatch";
 
 const BASE = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
 if (!BASE) {
@@ -608,6 +609,29 @@ export const adminApi = {
         | { stage: "rendering"; percent: number; renderedFrames: number; totalFrames: number; encodedFrames: number }
         | null;
     }>(`/admin/video-lab/${encodeURIComponent(jobId)}${filename ? `?filename=${encodeURIComponent(filename)}` : ""}`),
+
+  // PRISM 일괄 제작(2026-10-22) — admin/backend/routes/prism_batch.py. 기사 파일은 upload_urls로 받은
+  // 서명 URL에 브라우저가 직접 PUT하고(WS 프레임 30KB 제한과 무관), start가 파일마다 렌더 태스크를 띄운다.
+  prismBatchUploadUrls: (count: number) =>
+    request<{ batch_id: string; uploads: { key: string; url: string }[] }>("/admin/prism-batch", {
+      method: "POST",
+      body: JSON.stringify({ action: "upload_urls", count }),
+    }),
+  prismBatchStart: (
+    batchId: string,
+    items: { input_key: string; file_name: string; type: string; recording_date: string }[]
+  ) =>
+    request<{ batch_id: string; started: number; failed: string[] }>("/admin/prism-batch", {
+      method: "POST",
+      body: JSON.stringify({ action: "start", batch_id: batchId, items }),
+    }),
+  prismBatchRetry: (batchId: string, itemId: string) =>
+    request<{ job_id: string }>("/admin/prism-batch", {
+      method: "POST",
+      body: JSON.stringify({ action: "retry", batch_id: batchId, item_id: itemId }),
+    }),
+  listPrismBatches: () => request<{ batches: PrismBatchSummary[] }>("/admin/prism-batch"),
+  getPrismBatch: (batchId: string) => request<PrismBatchDetail>(`/admin/prism-batch/${encodeURIComponent(batchId)}`),
 
   // 선정 실험실(2026-09-28) — mustknow_auto "일반" 선정 결과를 날짜별로
   // 모아 채점. 날짜 탭은 실제 회차가 있었던 날짜만(getSelectionDates) —
