@@ -1,4 +1,4 @@
-// 생일 영수증·1면 카드에 찍는 QR 코드. 스캔하면 결과 페이지(생일 입력)로 가고, 영수증 유입은 utm_source로 따로 집계된다
+// 생일 영수증·그날 신문 카드에 찍는 QR 코드. 스캔하면 결과 페이지(생일 입력)로 가고, 영수증 유입은 utm_source로 따로 집계된다
 // (app/providers.tsx 의 session_source 이벤트). 주소가 하나로 고정이라 무늬를 한 번 만들어 상수로 둔다(새 의존성 없음).
 // 주소를 바꾸면 아래 명령으로 다시 만들어 RECEIPT_QR_ROWS를 바꾼다. birthdayShare.test.ts 가 주소와 무늬 크기를 확인한다.
 //   uv run --no-project --with qrcode==8.2 python -c "import qrcode; q=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=0); q.add_data('<주소>'); q.make(fit=True); print('\n'.join(''.join('1' if c else '0' for c in r) for r in q.get_matrix()))"

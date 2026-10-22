@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
 import {
-  apartmentCell, assetBase, assetCells, assetInflation, assetMemo, assetResult, assetsAvailable, assetSourceLine, changeOf, depositCell, ecosOrgs,
+  apartmentCell, assetBase, assetCells, assetInflation, assetLead, assetMemo, assetOffLine, assetResult, assetsAvailable, assetSourceLine, changeOf, depositCell, ecosOrgs,
   goldCell, inflationLine, onOrBefore, periodLabel, usdCell, type AssetBase,
 } from './birthdayAssets';
 import { parseDate } from './birthdayModel';
@@ -216,4 +216,30 @@ test('하단 출처 작성기관: 국가데이터처는 물가를 보일 때, �
   expect(ecosOrgs(assetCells(base('2010-05-15'), file2010, latest()), true)).toEqual(['한국은행', '국가데이터처', '한국부동산원']);
   expect(ecosOrgs(assetCells(base('2000-03-01'), { year: 2000, cpi: [['2000-03', 62.962]] }, latest()), true)).toEqual(['한국은행', '국가데이터처']);
   expect(ecosOrgs([], false)).toEqual(['한국은행']);
+});
+
+// 줄바꿈 없는 공백(nb)과 U+2060(괄호 앞뒤)을 빼고 문장만 비교한다.
+const sentence = (text: string) => text.replaceAll('\u00a0', ' ').replaceAll('\u2060', '');
+
+test("제목 아래 한 줄은 제목의 '스무 살'·'태어난 날'에 기준일을 잇고, 서른 살 규칙과 '넣었다'를 쓰지 않는다", () => {
+  expect(sentence(assetLead(assetBase(birth('1996-06-01'), TODAY), 'personal'))).toBe('스무 살 생일인 2016년 6월 1일에 100만 원을 뒀다고 보고 계산했어요.');
+  expect(sentence(assetLead(assetBase(birth('2005-03-10'), TODAY), 'personal'))).toBe('태어난 날인 2005년 3월 10일에 100만 원을 뒀다고 보고 계산했어요.');
+  expect(sentence(assetLead(assetBase(birth('1990-01-01'), TODAY), 'year'))).toBe('출생연도만 공유돼서 스무 살이 된 해의 1월 1일(2010년 1월 1일)을 기준으로 계산했어요.');
+  expect(sentence(assetLead(assetBase(birth('1997-01-01'), TODAY), 'year'))).toBe('출생연도만 공유돼서 태어난 해의 1월 1일(1997년 1월 1일)을 기준으로 계산했어요.');
+  // 375px에서 갈라지면 어색한 덩어리는 묶여 있다.
+  expect(assetLead(base('2016-06-01'), 'personal')).toContain(`${nb('100만 원을')} ${nb('뒀다고 보고 계산했어요.')}`);
+  expect(assetLead(base('2010-01-01'), 'year')).toContain(`${nb('1월 1일')}\u2060(${nb('2010년 1월 1일')})\u2060을`);
+});
+
+test('공식 환율 기록 전 안내도 같은 말로 기준일을 부르고 뜻은 그대로다', () => {
+  const early = assetBase(birth('1944-05-03'), TODAY);
+  expect(sentence(assetOffLine(early, 'personal'))).toBe('스무 살 생일인 1964년 5월 3일이 공식 환율 기록이 시작된 1964년 5월 4일보다 앞서 100만 원 계산은 하지 않았어요.');
+  expect(sentence(assetOffLine({ date: '1960-01-01', kind: 'twentieth' }, 'year'))).toBe('스무 살이 된 해의 1월 1일(1960년 1월 1일)이 공식 환율 기록이 시작된 1964년 5월 4일보다 앞서 100만 원 계산은 하지 않았어요.');
+  expect(sentence(assetOffLine({ date: '1963-01-01', kind: 'birthday' }, 'year'))).toBe('태어난 해의 1월 1일(1963년 1월 1일)이 공식 환율 기록이 시작된 1964년 5월 4일보다 앞서 100만 원 계산은 하지 않았어요.');
+  for (const kind of ['twentieth', 'birthday'] as const) for (const mode of ['personal', 'year'] as const) {
+    for (const text of [assetLead({ date: '2010-05-15', kind }, mode), assetOffLine({ date: '1960-01-01', kind }, mode)]) {
+      expect(text).not.toContain('서른 살');
+      expect(text).not.toContain('넣었다');
+    }
+  }
 });

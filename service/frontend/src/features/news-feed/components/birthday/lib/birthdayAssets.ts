@@ -1,7 +1,7 @@
 // "스무 살의 내가 100만 원을 어디에 뒀다면" 칸 계산. 값은 수집 스크립트가 만든 연도 파일·latest.json(data/birthdayAssets.ts 형식)에서만 읽는다.
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { ASSET_SERIES_FROM, ASSET_SOURCE_INFO, type AssetLatest, type AssetPoint, type AssetYearFile } from '../data/birthdayAssets';
-import type { BirthdayDate } from '../data/birthdayTypes';
+import type { BirthdayDate, ViewMode } from '../data/birthdayTypes';
 import { anniversary, dateLabel, manwon, number, times, won } from './birthdayModel';
 import { nb } from './keepTogether';
 
@@ -59,6 +59,26 @@ export function assetBase(date: BirthdayDate, today = kstTodayStr()): AssetBase 
 
 /** 기준일이 공식 환율 기록 시작(1964-05-04) 이후인가. 아니면 칸도 파일 요청도 없다. */
 export const assetsAvailable = (base: AssetBase) => base.date >= FX_START;
+
+/**
+ * 100만 원 장면 제목 아래 한 줄 — 제목의 '스무 살'·'태어난 날'에 기준일을 바로 잇는다. 기준일을 고르는 규칙(서른 살, assetBase)은 화면에 쓰지 않는다.
+ * 연도 공유면 날짜가 그해 1월 1일이라는 것을 먼저 밝힌다. 375px에서 '100만 원을'·'뒀다고 보고 계산했어요.'가 갈라지지 않게 묶고,
+ * 괄호 앞뒤('1월 1일 / (2010년…', ') / 을')는 nb로 못 막아(nb는 공백만 묶는다) U+2060을 넣는다.
+ */
+export function assetLead(base: AssetBase, mode: ViewMode) {
+  const day = nb(dateLabel(base.date));
+  if (mode === 'year') return `${nb('출생연도만 공유돼서')} ${base.kind === 'twentieth' ? '스무 살이 된' : '태어난'} 해의 ${nb('1월 1일')}\u2060(${day})\u2060을 ${nb('기준으로 계산했어요.')}`;
+  return `${base.kind === 'twentieth' ? '스무 살 생일인' : '태어난 날인'} ${day}에 ${nb('100만 원을')} ${nb('뒀다고 보고 계산했어요.')}`;
+}
+
+/** 기준일이 공식 환율 기록 시작보다 앞설 때 장면 대신 두는 안내 — 기준일을 제목 아래 한 줄(assetLead)과 같은 말로 부른다. */
+export function assetOffLine(base: AssetBase, mode: ViewMode) {
+  const day = nb(dateLabel(base.date));
+  const when = mode === 'year'
+    ? `${base.kind === 'twentieth' ? '스무 살이 된' : '태어난'} 해의 ${nb('1월 1일')}\u2060(${day})\u2060`
+    : `${base.kind === 'twentieth' ? '스무 살 생일인' : '태어난 날인'} ${day}`;
+  return `${when}이 공식 환율 기록이 시작된 ${nb('1964년 5월 4일')}보다 앞서 ${nb('100만 원')} 계산은 하지 않았어요.`;
+}
 
 /** 'YYYY-MM' → 'YYYY년 M월', 'YYYY-MM-DD' → 'YYYY년 M월 D일'. */
 export function periodLabel(period: string) {
