@@ -68,21 +68,22 @@ def build_investment_scenarios(date: str) -> List[Dict[str, Any]]:
         })
 
     # 커피(스타벅스 아메리카노 톨) — 그때 가격과 표의 가장 최근 가격을 나란히 적는다.
+    # 앞 가격에도 가격표의 연도를 쓴다. 그해 가격이 표에 없어 가장 가까운 이전 해 가격을 쓸 때(2003년 → 1999년 가격)
+    # '그때'라고만 쓰면 그날 가격처럼 읽힌다. 날짜 연도와 같은 해여도 같은 형식으로 쓴다.
     if year >= COFFEE_MIN_YEAR:
         coffee_year = _nearest_year_at_or_before(COFFEE_YEAR_PRICE, year)
         if coffee_year:
             price = COFFEE_YEAR_PRICE[coffee_year]
             latest = COFFEE_YEAR_PRICE[COFFEE_LATEST_YEAR]
-            price_years = (f'{coffee_year}년' if coffee_year == COFFEE_LATEST_YEAR
-                           else f'{coffee_year}년·{COFFEE_LATEST_YEAR}년')
             scenarios.append({
                 'id': 'coffee',
                 'emoji': '☕',
                 'label': '스타벅스 아메리카노',
                 'description': '톨 사이즈 한 잔',
-                'result': f'그때 {_fmt_won(price)} → {COFFEE_LATEST_YEAR}년 {_fmt_won(latest)}',
+                'result': f'{coffee_year}년 {_fmt_won(price)} → {COFFEE_LATEST_YEAR}년 {_fmt_won(latest)}',
                 'story': None,
-                'source_label': f'당시 가격은 뉴스 보도 기준({price_years} 가격)',
+                # 가격 연도는 결과 줄에 있으므로 출처 줄에 다시 괄호로 적지 않는다.
+                'source_label': '가격은 뉴스 보도 기준',
             })
 
     return scenarios

@@ -68,12 +68,27 @@ def test_lotto_after_price_change_has_no_comparison_line():
 def test_coffee_then_and_latest_price():
     coffee = inv.build_investment_scenarios('2008-09-16')[1]
     assert coffee['label'] == '스타벅스 아메리카노'
-    assert coffee['result'] == '그때 3,300원 → 2025년 4,700원'
-    assert coffee['source_label'] == '당시 가격은 뉴스 보도 기준(2005년·2025년 가격)'
+    assert coffee['result'] == '2005년 3,300원 → 2025년 4,700원'
+    assert coffee['source_label'] == '가격은 뉴스 보도 기준'
     assert coffee['story'] is None
 
 
-def test_coffee_latest_year_source_is_not_repeated():
-    coffee = inv.build_investment_scenarios('2025-06-01')[1]
-    assert coffee['result'] == '그때 4,700원 → 2025년 4,700원'
-    assert coffee['source_label'] == '당시 가격은 뉴스 보도 기준(2025년 가격)'
+@pytest.mark.parametrize('date, result', [
+    ('1999-01-01', '1999년 3,000원 → 2025년 4,700원'),   # 가격 연도 = 날짜 연도
+    ('2003-07-22', '1999년 3,000원 → 2025년 4,700원'),   # 그해 가격이 없어 가장 가까운 이전 해(1999년)
+    ('2016-10-20', '2014년 4,100원 → 2025년 4,700원'),
+    ('2014-01-01', '2014년 4,100원 → 2025년 4,700원'),
+    ('2025-06-01', '2025년 4,700원 → 2025년 4,700원'),   # 표의 마지막 해도 같은 형식
+    ('2026-01-31', '2025년 4,700원 → 2025년 4,700원'),
+])
+def test_coffee_result_always_names_price_year(date, result):
+    coffee = inv.build_investment_scenarios(date)[-1]
+    assert coffee['result'] == result
+    assert '그때' not in coffee['result']
+
+
+def test_coffee_source_has_no_repeated_year():
+    for date in ('1999-01-01', '2003-07-22', '2016-10-20', '2025-06-01'):
+        coffee = inv.build_investment_scenarios(date)[-1]
+        assert coffee['source_label'] == '가격은 뉴스 보도 기준'
+        assert '년' not in coffee['source_label'] and '(' not in coffee['source_label']
