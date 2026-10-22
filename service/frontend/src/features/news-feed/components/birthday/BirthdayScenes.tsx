@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { CPI_LATEST } from './data/birthdayCatalog';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import { assetMemo, assetResult, assetSourceLine, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
+import { assetLead, assetMemo, assetOffLine, assetResult, assetSourceLine, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
 import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './lib/birthdayModel';
 import { itemValue, type ItemMultiple } from './lib/birthdayItemPrices';
 import type { AssetLoadState } from './lib/useBirthdayAssets';
@@ -48,18 +48,6 @@ export function ArrivalScene({ result, mode }: { result: BirthdayResult; mode: V
   </section>;
 }
 
-/** 100만 원을 넣었다고 보는 날의 설명 — 기준일 종류(서른 살부터 스무 살 생일, 그 전은 태어난 날)와 연도 공유 여부에 따라. 이유를 먼저 쓴다. */
-function assetLead(base: AssetBase, mode: ViewMode) {
-  const day = nb(dateLabel(base.date));
-  // 연도 공유 문장은 375px에서 '출생연도만 / 공유된', '넣었다고 / 보고'로 끊겨서 두 덩어리를 붙여 둔다.
-  // 괄호 앞('1월 1일 / (2010년…')은 nb로 못 막아서 괄호 없이 '스무 살이 된 해'·'태어난 해'를 앞 문장에 둔다.
-  if (mode === 'year') return `${base.kind === 'twentieth' ? '서른 살부터는 스무 살이 된 해' : '서른 살 전이라 태어난 해'} 기준이에요. `
-    + `${nb('출생연도만 공유된 결과라')} ${day}에 ${nb('넣었다고 보고 계산했어요.')}`;
-  return base.kind === 'twentieth'
-    ? `서른 살부터는 스무 살 생일 기준이에요. ${day}에 넣었다고 보고 계산했어요.`
-    : `서른 살 전이라 태어난 날(${day})에 넣었다고 보고 계산했어요.`;
-}
-
 /** 칸 아래 결과 줄 — 지금 금액(서울 아파트는 배수)만 굵게. 증감은 화살표(낭독 제외)와 부호로 읽히고, 그 위에 한국 금융 관례 색
  *  (오름 빨강·내림 파랑, data-dir)을 덧입힌다. 변화 없음(0%)은 화살표·색 없이 글자색 그대로.
  *  굵은 숫자와 괄호 사이에서 줄이 꺾이지 않게 U+2060을 넣는다(nb는 공백만 묶는다). */
@@ -79,10 +67,7 @@ export function AssetScene({ base, mode, state, cells, inflation, onRetry }: {
   base: AssetBase; mode: ViewMode; state: AssetLoadState; cells: AssetCell[]; inflation: AssetInflation | null; onRetry: () => void;
 }) {
   if (state.status === 'off') {
-    const when = base.kind === 'twentieth'
-      ? mode === 'year' ? '스무 살이 된 해의 1월 1일' : '스무 살 생일'
-      : mode === 'year' ? '태어난 해의 1월 1일' : '태어난 날';
-    return <p className={styles.soon}><strong>{`${when}(${nb(dateLabel(base.date))})이 공식 환율 기록이 시작된 ${nb('1964년 5월 4일')}보다 앞서 ${nb('100만 원')} 계산은 하지 않았어요.`}</strong>{`물가·환율 같은 공식 통계가 ${nb('그 뒤부터')} 있어요.`}</p>;
+    return <p className={styles.soon}><strong>{assetOffLine(base, mode)}</strong>{`물가·환율 같은 공식 통계가 ${nb('그 뒤부터')} 있어요.`}</p>;
   }
   if (state.status === 'ready' && !cells.length) {
     return <p className={styles.soon}><strong>이 날짜는 아직 계산할 자료가 없어요.</strong>물가·환율 같은 공식 통계가 발표되면 계산해요.</p>;

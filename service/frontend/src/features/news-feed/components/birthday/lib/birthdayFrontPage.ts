@@ -25,7 +25,7 @@ export type FrontPageState =
   | { status: 'notice'; date: string; notice: FrontPageNotice }
   | { status: 'error'; date: string };
 
-/** 생일 당일 1면이 아닌 것을 보여 줄 때 지면 위에 붙이는 안내. */
+/** 생일 당일이 아닌 날의 신문을 보여 줄 때 지면 위에 붙이는 안내. */
 export interface FrontNotice { title: string; lines: string[] }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -41,57 +41,46 @@ export function frontPageNotice(date: string): FrontPageNotice | null {
 }
 
 /**
- * 생일 당일 1면을 보여 주지 못할 때의 안내 — 왜 못 보여 주는지, 대신 무엇을 보여 주는지.
- * 생일 당일 1면이거나 아무것도 찾지 못했으면(kind none, 지면 안에서 따로 안내) null.
+ * 생일 당일 신문을 보여 주지 못할 때의 안내 — 왜 못 보여 주는지, 대신 어느 날 신문을 보여 주는지.
+ * 생일 당일 신문이거나(kind front·day 모두) 아무것도 찾지 못했으면(kind none, 지면 안에서 따로 안내) null.
+ * 우리는 실제 지면이 아니라 보관본에서 고른 기사를 보여 주므로 '1면'이라고 부르지 않는다. 기사를 고른 기준은 지면 아래 출처 줄(frontSourceNote)에 둔다.
  */
 export function frontNotice(data: FrontPageData): FrontNotice | null {
   const shown = data.shown_date;
-  if (data.kind === 'none' || !shown) return null;
-  const sameDay = shown === data.date;
-  if (data.kind === 'front' && sameDay) return null;
-  const count = nb(`${data.articles.length}건`);
+  if (data.kind === 'none' || !shown || shown === data.date) return null;
+  const birthday = nb(dateLabel(data.date));
   const lines: string[] = [];
-  let title = '이 시기는 1면 기록이 없어요';
-  if (!sameDay) {
-    const birthday = nb(dateLabel(data.date));
-    // 생일 쪽에서 없었던 것은 생일 시기(date_kind)로 말한다 — 면 번호 시기면 '1면', 아니면 '서울경제'(그날 기사 전체).
-    const missing = data.date_kind === 'front' ? '서울경제 1면이' : '서울경제가';
-    if (data.reason === 'sunday') {
-      title = '생일에는 신문이 나오지 않았어요';
-      lines.push(`${birthday}은 일요일이라 서울경제가 나오지 ${nb('않았어요.')}`);
-    } else if (data.reason === 'not_yet') {
-      title = '오늘 신문은 아직 보관본에 없어요';
-      lines.push(`오늘(${birthday})자 ${missing} 빅카인즈 보관본에 아직 들어오지 ${nb('않았어요.')}`);
-    } else {
-      title = '생일 당일 신문을 찾지 못했어요';
-      lines.push(`${birthday}자 ${missing} 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 ${nb('빠진 날이에요.')}`);
-    }
-    const shownLabel = nb(`${dateLabel(shown)} ${weekdayOf(shown)}요일자`);
-    lines.push(data.kind === 'front'
-      ? `대신 가장 가까운 지난 신문인 ${shownLabel} 1면을 ${nb('보여 줘요.')}`
-      : `대신 가장 가까운 지난 날짜인 ${shownLabel} 서울경제를 ${nb('찾았어요.')}`);
+  let title: string;
+  if (data.reason === 'sunday') {
+    title = '생일에는 신문이 나오지 않았어요';
+    lines.push(`${birthday}은 일요일이라 서울경제가 나오지 ${nb('않았어요.')}`);
+  } else if (data.reason === 'not_yet') {
+    title = '오늘 신문은 아직 보관본에 없어요';
+    lines.push(`오늘(${birthday})자 서울경제가 빅카인즈 보관본에 아직 들어오지 ${nb('않았어요.')}`);
+  } else {
+    title = '생일 당일 신문을 찾지 못했어요';
+    lines.push(`${birthday}자 서울경제가 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 ${nb('빠진 날이에요.')}`);
   }
-  if (data.kind === 'day') {
-    // 1면을 못 보여 주는 까닭(면 번호 기록이 없는 시기)과, 그 대신 무엇을 어떤 기준으로 골랐는지를 함께 적는다.
-    // '~' 앞에서 줄이 갈라져('1996년 8월 / ~2017년') 기간을 '부터 … 까지'로 쓴다. 2017-11-13부터는 면 번호가 있다.
-    lines.push(`1990~1993년, ${nb('1996년 8월부터')} ${nb('2017년 11월 12일까지')} 신문은 빅카인즈 보관본에 몇 면 기사인지 기록이 없어 1면을 가려낼 수 ${nb('없어요.')}`);
-    lines.push(dayBasisLine(data.basis, count));
-  }
+  lines.push(`대신 가장 가까운 지난 신문인 ${nb(`${dateLabel(shown)} ${weekdayOf(shown)}요일자`)} 서울경제를 ${nb('보여 줘요.')}`);
   return { title, lines };
 }
 
-/** 그날 기사를 고른 기준. 이슈 순위로 고르지 못했으면 왜 본문이 긴 순으로 대신했는지 적는다. */
-function dayBasisLine(basis: FrontPageData['basis'], count: string) {
-  const longest = `1면 대신 본문이 긴 서울경제 기사 ${count}을 ${nb('보여 줘요.')}`;
-  switch (basis) {
-    case 'issue': return `그래서 1면 대신, 그날 여러 언론이 가장 많이 다룬 소식을 서울경제 기사로 ${nb('보여 줘요.')}`;
-    case 'no_match': return `그날 많이 보도된 소식에 서울경제 기사가 연결되지 않아, ${longest}`;
-    case 'ranking_failed': return `지금은 그날 언론 이슈 순위를 불러오지 못해, ${longest}`;
-    default: return `그날은 언론 이슈 순위 자료가 없어, ${longest}`;
+/**
+ * 지면 아래 출처 줄 — 기사를 어떤 자료에서 어떤 기준으로 골랐는지. 실제 지면을 옮긴 것이 아니라고 함께 밝힌다.
+ * 그날 언론이 가장 많이 다룬 소식으로 골랐을 때(kind day, basis issue)만 기준 문장이 다르고, 나머지는 본문이 긴 순서다.
+ * 기사가 없는 상태(찾는 중·오류·안내·보관본에 없음)는 '고른 기사예요'라고 할 것이 없어 ''.
+ */
+export function frontSourceNote(data: FrontPageData | null) {
+  if (!data || data.kind === 'none') return '';
+  const base = `빅카인즈 보관본에서 고른 그날 서울경제 ${nb('기사예요.')} 실제 지면을 옮긴 ${nb('것이 아니에요.')}`;
+  if (data?.kind === 'day' && data.basis === 'issue') {
+    const filled = data.articles.some(article => !article.coverage);
+    return `${base} 그날 여러 언론이 가장 많이 다룬 소식을 ${nb('보여 줘요.')}${filled ? ` 이슈로 고르지 못한 칸은 본문이 긴 ${nb('기사로 채워요.')}` : ''}`;
   }
+  return `${base} 기사는 본문이 긴 순서로, 사진 설명은 맨 뒤에 ${nb('보여 줘요.')}`;
 }
 
-/** 공유 카드("내가 태어난 날 서울경제 1면")에 넣을 기사 — 생일 당일 1면일 때만. 대체한 신문·그날 기사는 넣지 않는다. */
+/** 그날 신문 카드에 넣을 기사 — 생일 당일 kind front일 때만. 대체한 날짜의 신문·kind day 기사는 넣지 않는다. */
 export function shareableFront(state: FrontPageState | null): BigKindsArticle[] {
   if (state?.status !== 'ok') return [];
   const { data } = state;

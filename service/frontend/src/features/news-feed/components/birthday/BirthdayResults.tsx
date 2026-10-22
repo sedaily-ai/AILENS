@@ -14,7 +14,7 @@ import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
 /**
- * 결과 — 한 장면에 숫자 하나. 순서: 도착 → 100만 원 → 그날 1면 → 최저시급 → 1억 원
+ * 결과 — 한 장면에 숫자 하나. 순서: 도착 → 100만 원 → 그날 서울경제 → 최저시급 → 1억 원
  * → 그때 나는 몇 살 → 연금 달력 → 공유(생일 카드). 공유는 화면 폭과 관계없이 맨 아래에 둔다.
  */
 export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResult; mode: ViewMode; onEdit: () => void }) {
@@ -29,7 +29,7 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
   // 1억 원 장면의 품목 배수 — 번들에 든 자료로 이 기기에서 계산한다(요청 없음). 1억 원 장면이 없으면 목록도 없다.
   const items = useMemo(() => result.cpi ? itemMultiples(result.birthDate) : [], [result.cpi, result.birthDate]);
   const front = useFrontPage(mode === 'year' ? null : result.birthDate);
-  // 공유 카드에는 생일 당일 1면만 넣는다. 대체한 신문이나 그날 기사를 "내가 태어난 날 1면"으로 찍지 않는다.
+  // 그날 신문 카드에는 생일 당일 kind front 기사만 넣는다. 대체한 날짜의 신문이나 kind day 기사는 카드로 찍지 않는다(동작 그대로).
   const frontArticles = useMemo(() => shareableFront(front.state), [front.state]);
   const [variant, setVariant] = useState<ShareVariant>('receipt');
 
