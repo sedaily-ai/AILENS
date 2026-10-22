@@ -188,6 +188,14 @@ def _dialogue_from_bubbles(c: dict) -> list[dict]:
     return lines
 
 
+class StoryboardRejected(ValueError):
+    """각본이 스토리보드 계약(컷 8개·image_prompt·근거 연결 등)을 통과하지 못했다.
+
+    이미지 생성 전 단계에서만 낸다. publishing.run_webtoon_with_retry()가 이 예외를 "각본에 cuts 없음"과
+    같이 보고 resume=False로 각본을 한 번 더 만든다(#163 이전에는 검증 없이 빈 cuts로 끝나 그 재시도를 탔다).
+    두 번째도 실패하면 그대로 올라가 웹툰 없이 발행한다."""
+
+
 def _normalize_cuts(script: dict) -> list[dict]:
     """단일 호출 결과의 cuts를 이미지 생성·compose_text.py가 기대하는 필드 이름
     (image_prompt/dialogue/title/narration/caption)으로 정규화한다.
@@ -307,8 +315,11 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                            cached_prefix=script_guide)
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    validate_storyboard(script, article)
-    cuts = _normalize_cuts(script)
+    try:
+        validate_storyboard(script, article)
+        cuts = _normalize_cuts(script)
+    except ValueError as e:
+        raise StoryboardRejected(str(e)) from e
 
     # 3단계: 이미지 생성
     print(f"{tag} 3단계 이미지 생성 ({N_CUTS}컷)")
