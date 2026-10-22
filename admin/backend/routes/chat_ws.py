@@ -900,7 +900,7 @@ def _run_render_video_flow(
             "elevenlabs_voice_settings": voice_settings or {},
         }
     elif provider == "google":
-        # Polly 성우는 발행 설정 그대로 둔다 — Google이 실패한 컷을 그 성우로 대신 읽는다(tts.ts).
+        # Polly 성우는 발행 설정 그대로 둔다 — Google이 실패하면 영상 전체를 그 성우로 다시 읽는다(resolveAudio.ts).
         settings_override = {"provider": "google", "google_voice": voice_id}
     elif polly_settings:
         settings_override = {

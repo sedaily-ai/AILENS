@@ -343,7 +343,7 @@ export const VideoRenderSettingsPanel = forwardRef<VideoRenderSettingsPanelHandl
         provider === "elevenlabs"
           ? "이 설정을 발행하면 다음 실제 영상 생성부터 ElevenLabs로 합성됩니다 — Polly보다 비용이 훨씬 높습니다(2026-08-27에 비용 때문에 Polly로 전환했던 이력 있음). 계속 발행할까요?"
           : provider === "google"
-            ? "이 설정을 발행하면 다음 실제 영상 생성부터 Google 성우로 합성됩니다(Google이 실패한 컷은 Polly로 대신 읽습니다). 발행할까요?"
+            ? "이 설정을 발행하면 다음 실제 영상 생성부터 Google 성우로 합성됩니다(Google이 실패하면 그 영상은 전체를 Polly로 읽습니다). 발행할까요?"
             : "이 설정을 발행하면 다음 실제 영상 생성부터 프로덕션에 바로 적용됩니다. 발행할까요?";
       if (!window.confirm(confirmMsg)) return;
     }

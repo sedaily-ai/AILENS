@@ -28,7 +28,7 @@ export type TtsVoiceConfig = {
   elevenLabsModelId?: string;
   elevenLabsApiKey?: string;
   elevenLabsVoiceSettings?: ElevenLabsVoiceSettings;
-  // Google Gemini(provider === 'google'일 때만 의미 있음). 실패한 컷은 위 Polly 설정으로 대신 읽는다.
+  // Google Gemini(provider === 'google'일 때만 의미 있음). 실패하면 영상 전체를 위 Polly 설정으로 다시 읽는다(resolveAudio.ts).
   googleVoice?: string;
   googleModel?: string;
   googleApiKey?: string;
@@ -229,7 +229,7 @@ async function synthesizeSpeechGoogle(text: string, voice: TtsVoiceConfig): Prom
   });
   if (!resp.ok) {
     const detail = await resp.text().catch(() => '');
-    throw new Error(`Google TTS 오류(${resp.status}, voice: ${voiceName}): ${detail.slice(0, 300)}`);
+    throw new GoogleHttpError(resp.status, detail, `Google TTS 오류(${resp.status}, voice: ${voiceName}): ${detail.slice(0, 300)}`);
   }
   const data = (await resp.json()) as {
     candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[];
@@ -263,33 +263,51 @@ function pcmWavHeader(dataLength: number, rate = 24000): Buffer {
   return h;
 }
 
-// Google은 일시 오류(429·5xx)가 있을 수 있어 두 번 더 시도하고, 그래도 실패하면 그 컷만 Polly로 읽는다 —
-// 영상 생성 자체가 멈추는 것보다 낫다. 대신 로그에 남겨 어느 컷이 Polly로 나갔는지 알 수 있게 한다.
-const GOOGLE_RETRY_DELAYS_MS = [2000, 5000];
+class GoogleHttpError extends Error {
+  constructor(readonly status: number, readonly body: string, message: string) {
+    super(message);
+  }
+}
 
-async function synthesizeSpeechGoogleWithFallback(text: string, voice: TtsVoiceConfig): Promise<Buffer> {
+/** Google로 이 컷을 끝내 못 읽었다는 뜻. resolveAudio.ts가 받아 영상 전체를 Polly로 다시 읽는다
+ *  (컷마다 따로 Polly로 바꾸면 한 영상 안에서 목소리가 섞인다). */
+export class GoogleTtsUnavailableError extends Error {}
+
+// 일시 오류(분당 한도 429·5xx)는 두 번 더 시도한다. 단, 하루 할당량이 끝난 429(구글이 알려 주는 재시도
+// 대기 시간이 길거나 없음)와 키 없음은 다시 해도 같으므로 바로 포기한다.
+const GOOGLE_RETRY_DELAYS_MS = [2000, 5000];
+const GOOGLE_MAX_WAIT_SECONDS = 20;
+
+function isHopeless(err: unknown, voice: TtsVoiceConfig): boolean {
+  if (!voice.googleApiKey) return true;
+  if (!(err instanceof GoogleHttpError)) return false;
+  if (err.status === 400 || err.status === 401 || err.status === 403) return true;
+  if (err.status !== 429) return false;
+  const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(err.body);
+  return !m || parseFloat(m[1]) > GOOGLE_MAX_WAIT_SECONDS;
+}
+
+async function synthesizeSpeechGoogleWithRetry(text: string, voice: TtsVoiceConfig): Promise<Buffer> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= GOOGLE_RETRY_DELAYS_MS.length; attempt++) {
     try {
       return await synthesizeSpeechGoogle(text, voice);
     } catch (err) {
       lastError = err;
-      if (!voice.googleApiKey) break; // 키가 없으면 다시 해도 같다
+      if (isHopeless(err, voice)) break;
       if (attempt < GOOGLE_RETRY_DELAYS_MS.length) {
         await new Promise((r) => setTimeout(r, GOOGLE_RETRY_DELAYS_MS[attempt]));
       }
     }
   }
-  const reason = lastError instanceof Error ? lastError.message : String(lastError);
-  console.warn(`[tts] Google 합성 실패 — 이 컷은 Polly(${voice.voiceId})로 대신 읽습니다: ${reason}`);
-  return synthesizeSpeechPolly(text, voice);
+  throw new GoogleTtsUnavailableError(lastError instanceof Error ? lastError.message : String(lastError));
 }
 
 export async function synthesizeSpeech(
   text: string,
   voice: TtsVoiceConfig = DEFAULT_VOICE
 ): Promise<Buffer> {
-  if (voice.provider === 'google') return synthesizeSpeechGoogleWithFallback(text, voice);
+  if (voice.provider === 'google') return synthesizeSpeechGoogleWithRetry(text, voice);
   return voice.provider === 'elevenlabs'
     ? synthesizeSpeechElevenLabs(text, voice)
     : synthesizeSpeechPolly(text, voice);

@@ -245,7 +245,7 @@ def get_render_env(override: dict | None = None, category: str = SETTINGS_CATEGO
     기본값·범위 클램프를 적용한다.
 
     provider가 "google"이면 GOOGLE_TTS_VOICE·GOOGLE_TTS_API_KEY를 넘긴다. Polly 성우(TTS_VOICE_ID 등)도
-    그대로 넘기는 이유는 tts.ts가 Google 합성에 실패한 컷을 Polly로 대신 읽기 때문이다. 키를 못 읽어도
+    그대로 넘기는 이유는 Google 합성에 실패하면 영상 전체를 Polly로 다시 읽기 때문이다(resolveAudio.ts). 키를 못 읽어도
     (권한 누락 등) 렌더를 막지 않고 빈 키로 넘겨 tts.ts가 Polly로 대신하게 한다.
     """
     settings = get_render_settings(override, category)
