@@ -2,7 +2,7 @@
 import { kstTodayStr } from '@/shared/lib/date/date';
 import { ASSET_SERIES_FROM, ASSET_SOURCE_INFO, type AssetLatest, type AssetPoint, type AssetYearFile } from '../data/birthdayAssets';
 import type { BirthdayDate } from '../data/birthdayTypes';
-import { anniversary, dateLabel, number, times } from './birthdayModel';
+import { anniversary, dateLabel, manwon, number, times, won } from './birthdayModel';
 import { nb } from './keepTogether';
 
 /** 오름차순 배열에서 key 이하인 마지막 원소(휴장일이면 직전 영업일). */
@@ -140,6 +140,24 @@ export function changeOf(multiple: number): { arrow: '▲' | '▼' | ''; signed:
   if (pct > 0) return { arrow: '▲', signed: `+${number(pct)}%` };
   if (pct < 0) return { arrow: '▼', signed: `\u2212${number(-pct)}%` };
   return { arrow: '', signed: '0%' };
+}
+
+/**
+ * 칸 아래 결과 줄 — 지금 금액(서울 아파트는 집값 배수)과 증감. 굵게 쓸 숫자(figure)를 따로 둔다.
+ * 증감은 색이 없어도 화살표와 부호로 읽힌다(화면은 그 위에 오르내림 색을 덧입힌다). 1달러 환율은 결과가 아니라 설명이라 assetMemo로 보낸다.
+ */
+export function assetResult(cell: AssetCell): { arrow: '▲' | '▼' | ''; label: string; figure: string; signed: string } {
+  const change = changeOf(cell.multiple);
+  return cell.nowAmount === null
+    ? { arrow: change.arrow, label: '서울 아파트값', figure: times(cell.multiple), signed: change.signed }
+    : { arrow: change.arrow, label: '지금', figure: manwon(cell.nowAmount), signed: change.signed };
+}
+
+/** 칸 아래 설명 줄 — 달러는 1달러 환율(그때 → 지금)을 맨 앞에, 그 뒤에 칸 주석(월평균·휴일 안내 등). 둘 다 없으면 ''. */
+export function assetMemo(cell: AssetCell) {
+  const unit = cell.unit && `${nb(`${cell.unit.label} = 그때 ${won(cell.unit.then)}`)} → ${nb(`지금 ${won(cell.unit.now)}`)}`;
+  // 구분점(·)이 줄 맨 앞에 오지 않게 앞말에 붙인다.
+  return [unit, cell.notes.join(' ')].filter(Boolean).join('\u00a0· ');
 }
 
 /** 한글 끝 글자에 받침이 있는가. ㄹ 받침 여부도 함께(조사 '로/으로'용). */
