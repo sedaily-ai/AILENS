@@ -5,16 +5,17 @@ import { kstTodayStr } from '@/shared/lib/date/date';
 import { RECEIPT_QR_ROWS } from '../data/birthdayQr';
 import type { AssetBase, AssetCell } from './birthdayAssets';
 import { elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './birthdayModel';
+import { nb } from './keepTogether';
 
 /** 인스타 스토리·카톡에 바로 올리는 9:16 카드. */
 export const SHARE_CARD = { width: 1080, height: 1920 };
-/** receipt = 생일 영수증(그때와 지금의 숫자), front = 그날 1면 스크랩. */
+/** receipt = 생일 영수증(그때와 지금의 숫자), front = 그날 신문 카드(그날 서울경제 기사 제목). */
 export type ShareVariant = 'receipt' | 'front';
 
 export interface ShareContent {
   variant: ShareVariant;
   mode: ViewMode;
-  /** 영수증에 월·일까지 표시할지(사용자가 고른 경우만). 1면 카드는 항상 날짜를 쓴다. */
+  /** 영수증에 월·일까지 표시할지(사용자가 고른 경우만). 그날 신문 카드는 항상 날짜를 쓴다. */
   includeDay: boolean;
   /** 그날 1면 기사(본문이 긴 순). 영수증에는 월·일을 표시할 때만 첫 제목을 담는다. */
   front: BigKindsArticle[];
@@ -50,7 +51,7 @@ export function receiptAssetLines(cells: AssetCell[]): ReceiptLine[] {
 /**
  * 영수증 출처 한 줄 — 이미지만 따로 퍼져도 출처가 남게 한다. 숫자 대부분(1억 원·100만 원 줄)이 ECOS라 '한국은행 ECOS'와 찍힌 줄의
  * 작성기관(정기예금·달러·금 한국은행, 1억 원 국가데이터처, 아파트 한국부동산원)을 앞에 두고, 시급(최저임금위원회)·연금(국민연금공단)·
- * 1면(빅카인즈)은 '외'로 묶는다. ECOS 숫자가 없으면 찍힌 줄의 출처만 적고, 출처를 밝힐 줄이 없으면 ''.
+ * 그날 서울경제 제목(빅카인즈)은 '외'로 묶는다. ECOS 숫자가 없으면 찍힌 줄의 출처만 적고, 출처를 밝힐 줄이 없으면 ''.
  */
 export function receiptSourceLine(result: BirthdayResult, assets: AssetCell[], headline: boolean) {
   const orgs = [
@@ -58,14 +59,14 @@ export function receiptSourceLine(result: BirthdayResult, assets: AssetCell[], h
     ...(result.cpi ? ['국가데이터처'] : []),
     ...(assets.some(cell => cell.id === 'apartment') ? ['한국부동산원'] : []),
   ];
-  // receiptLines와 같은 조건(시급·연금 줄), 1면은 제목이 찍힐 때만.
+  // receiptLines와 같은 조건(시급·연금 줄), 빅카인즈는 그날 서울경제 제목이 찍힐 때만.
   const others = [...(result.wage ? ['최저임금위원회'] : []), ...(result.calendar?.points[1] ? ['국민연금공단'] : []), ...(headline ? ['빅카인즈'] : [])];
   const main = orgs.length ? `한국은행 ECOS(${orgs.join('·')} 작성)${others.length ? ' 외' : ''}` : others.join('·');
   return main ? `출처 ${main}` : '';
 }
 
-/** 1면 카드 출처 한 줄 — 서울경제 기사 제목을 빅카인즈 보관본의 면 번호로 골랐다는 것(화면 1면 장면 출처 줄과 같은 기준). */
-export const FRONT_CARD_SOURCE = '출처 빅카인즈 보관본(면 번호 기준)';
+/** 그날 신문 카드 출처 한 줄 — 서울경제 기사 제목을 빅카인즈 보관본에서 가져왔다는 것. 실제 지면이 아니라서 면 번호를 말하지 않는다. */
+export const FRONT_CARD_SOURCE = '출처 빅카인즈 보관본';
 
 /** 100만 원 묶음 소제목 — 기준일이 스무 살 생일인지 태어난 날인지. */
 export function receiptAssetHeading(base: AssetBase) {
@@ -77,8 +78,26 @@ export function receiptElapsed(result: BirthdayResult, mode: ViewMode, today = k
   return mode === 'year' ? `약 ${Number(today.slice(0, 4)) - result.date.year}년` : elapsedLabel(result.birthDate, today);
 }
 
+/** 생일 영수증에 월·일을 찍는 체크박스 이름. 공유 버튼 위 안내(shareDayNotice)도 이 이름을 그대로 쓴다. */
+export const DAY_TOGGLE_LABEL = '내 생일 넣기';
+/** '내 생일 넣기' 기본값 — 켜짐. 결과가 새로 그려질 때(친구 생일로 해보기 포함)마다 이 값으로 시작한다. */
+export const INCLUDE_DAY_DEFAULT = true;
+
+/** '내 생일 넣기'를 보이는가 — 생일 영수증이고 날짜가 있는 결과일 때만. 연도 공유(mode year)에는 없다. */
+export const dayToggleShown = (variant: ShareVariant, mode: ViewMode) => variant === 'receipt' && mode !== 'year';
+
+/**
+ * 공유·이미지 저장 버튼 바로 위 안내 — 이미지에 생일 날짜가 찍힐 때마다(그날 신문 카드는 늘, 영수증은 '내 생일 넣기'가 켜졌을 때).
+ * 영수증은 빼는 방법을 체크박스 이름 그대로 함께 쓴다. 날짜가 찍히지 않으면 null.
+ */
+export function shareDayNotice(variant: ShareVariant, mode: ViewMode, includeDay: boolean) {
+  if (variant === 'front') return '생일 날짜가 이미지에 찍혀요.';
+  if (!includeDay || mode === 'year') return null;
+  return `생일 날짜가 이미지에 찍혀요. 빼려면 ${nb(`'${DAY_TOGGLE_LABEL}'를`)} ${nb('끄세요.')}`;
+}
+
 export function shareText(result: BirthdayResult, variant: ShareVariant) {
-  return variant === 'front' ? `내 생일날 서울경제 1면은? ${result.date.year}년 ${result.date.month}월 ${result.date.day}일 · 내 생일 타임머신` : `${result.date.year}년생의 생일 영수증 · 내 생일 타임머신`;
+  return variant === 'front' ? `내 생일날 서울경제는? ${result.date.year}년 ${result.date.month}월 ${result.date.day}일 · 내 생일 타임머신` : `${result.date.year}년생의 생일 영수증 · 내 생일 타임머신`;
 }
 
 const SANS = 'Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
@@ -151,7 +170,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
 
   const drawFront = () => {
     text(`${month}월 ${day}일, 내가 태어난 날`, 72, 300, 80, INK, 800);
-    text('서울경제 1면은', 72, 400, 80, INK, 800);
+    text('서울경제는', 72, 400, 80, INK, 800);
     const lead = wrap(content.front[0].title, 64, 900, SERIF, 776, 3);
     const rest = content.front.slice(1, 5).map(article => wrap(article.title, 36, 700, SERIF, 776, 1)[0]);
     const top = 500, leadTop = top + 300;
@@ -161,7 +180,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
       shadow(true); context.fillStyle = '#fff'; context.fillRect(96, top, 888, bottom - top); shadow(false);
       context.textAlign = 'center';
       text('서울경제', 540, top + 112, 64, INK, 900, 776, SERIF);
-      text(`${year}년 ${month}월 ${day}일 ${weekday(year, month, day)}요일 · 1면`, 540, top + 168, 28, GRAY, 500);
+      text(`${year}년 ${month}월 ${day}일 ${weekday(year, month, day)}요일`, 540, top + 168, 28, GRAY, 500);
       context.textAlign = 'left';
       context.fillStyle = INK; context.fillRect(152, top + 200, 776, 4); context.fillRect(152, top + 210, 776, 2);
       font(64, 900, SERIF);
@@ -180,14 +199,14 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
     context.fillStyle = '#fff';
     context.beginPath(); context.roundRect(1008 - box, 1848 - box, box, box, 16); context.fill();
     qr(1008 - box + pad, 1848 - box + pad, box - pad * 2);
-    // 받는 사람의 생일은 1면이 없는 시기(그날 기사)일 수 있어 '1면'이 아니라 '신문'으로 권한다.
+    // 화면 장면 이름(내가 태어난 날 서울경제)과 같이 '신문'으로 권한다.
     text('내 생일 신문도 찾아보기', 72, 1780, 40, INK, 800, 680);
     text('QR을 찍으면 바로 열려요', 72, 1836, 28, GRAY, 500, 680);
   };
 
   /**
    * 생일 영수증 — 높이를 먼저 재고(draw=false) 가운데에 맞춰 그린다. 넘치면 줄 간격과 QR 앞뒤 간격을 줄인다(compact).
-   * 줄이 가장 많은 경우(본문 4줄·100만 원 4줄·1면 제목 2줄)에도 맨 아래 고지와 출처 줄이 영수증 안에 들도록 compact 간격을 잡았다(1792 ≤ 1800).
+   * 줄이 가장 많은 경우(본문 4줄·100만 원 4줄·그날 서울경제 제목 2줄)에도 맨 아래 고지와 출처 줄이 영수증 안에 들도록 compact 간격을 잡았다(1792 ≤ 1800).
    */
   const drawReceipt = () => {
     const left = 120, right = 960, inLeft = 176, inRight = 904, width = inRight - inLeft;
@@ -239,7 +258,7 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
       if (headline.length) {
         at(() => dashed(inLeft, inRight, y - 24));
         y += 40;
-        at(() => text('그날 서울경제 1면', inLeft, y, 28, GRAY, 700));
+        at(() => text('그날 서울경제', inLeft, y, 28, GRAY, 700));
         y += 60;
         for (const row of headline) { at(() => { context.fillStyle = INK; font(40, 900, SERIF); context.fillText(row, inLeft, y); }); y += 56; }
         y += 8;
@@ -287,11 +306,11 @@ export function drawShare(canvas: HTMLCanvasElement, result: BirthdayResult, con
       context.translate(0, top);
       layout(true, compact);
     });
-    canvas.setAttribute('aria-label', `AI LENS 내 생일 영수증. 출생 ${birth}. ${[...lines, ...assetLines].map(line => `${line.label} ${line.value}`).join(', ')}${headline.length ? `. 그날 서울경제 1면 ${content.front[0].title}` : ''}. 지나온 시간 ${receiptElapsed(result, content.mode)}${source ? `. ${source}` : ''}`);
+    canvas.setAttribute('aria-label', `AI LENS 내 생일 영수증. 출생 ${birth}. ${[...lines, ...assetLines].map(line => `${line.label} ${line.value}`).join(', ')}${headline.length ? `. 그날 서울경제 ${content.front[0].title}` : ''}. 지나온 시간 ${receiptElapsed(result, content.mode)}${source ? `. ${source}` : ''}`);
   };
 
   if (content.variant === 'front' && hasFront) {
     drawFront();
-    canvas.setAttribute('aria-label', `AI LENS 내 생일 타임머신 1면 카드. ${shareText(result, 'front')}. ${content.front.slice(0, 4).map(article => article.title).join(', ')}. ${FRONT_CARD_SOURCE}`);
+    canvas.setAttribute('aria-label', `AI LENS 내 생일 타임머신 그날 신문 카드. ${shareText(result, 'front')}. ${content.front.slice(0, 4).map(article => article.title).join(', ')}. ${FRONT_CARD_SOURCE}`);
   } else drawReceipt();
 }
