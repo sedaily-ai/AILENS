@@ -1,7 +1,7 @@
 # 2026-10-20 sedaily.ai 에 AI LENS 미리보기(iframe) 적용
 
 작성: Claude Code
-관련: PR https://github.com/sedaily-ai/AILENS/pull/138 (브랜치 `feat/sedaily-ai-iframe-widget`), sedaily.ai 저장소 `AI-PLATFORM-SedailyAI`(운영 기준 `origin/main`)
+관련: AI LENS PR https://github.com/sedaily-ai/AILENS/pull/138(머지됨), sedaily.ai PR https://github.com/sedaily-ai/AI-PLATFORM-SedailyAI/pull/7(머지됨, 저장소 `AI-PLATFORM-SedailyAI`)
 
 ## 배경
 
@@ -36,10 +36,17 @@ sedaily.ai (`3_sedaily_ai/dev/frontend`, 운영 배포 완료)
 - 버린 선택지: 형식 버튼만 있는 위젯(미리보기 아님), 링크 카드(Flutter 직접 구현, 우부장님의 iframe 방식과 어긋남), 위젯 안에서 기사 조회 API 없이 홈 기사로 대체.
 - 사고: AI LENS 배포를 지시 없이 시작해 ECS 롤링(`:129`)이 시작됐고, 사용자 지시로 이전 리비전(`:128`)으로 되돌렸다. 이후 별도 지시에 따라 다시 배포했다. 운영 배포는 대상(AI LENS/sedaily.ai)을 확인하고 실행한다.
 
+사고와 복구 (2026-10-20 16:25~16:46, 약 20분)
+- 증상: sedaily.ai 의 미리보기 틀 안에 AI LENS 404("페이지를 찾을 수 없어요") 화면이 보임.
+- 원인: PR #138(위젯 코드)이 머지되기 전에 PR #139(내 생일 타임머신)가 `main` 에 머지되고 `main` 기준으로 AI LENS 가 배포되어, `/embed/home`·`/widget/frame.html`·`/api/widget/latest` 가 운영에서 빠짐(위젯 스크립트는 v1.0.0 으로 되돌아감).
+- 복구: 위젯 브랜치에 최신 `main` 을 병합해 재배포(474초, 스모크 30건 통과). PR #138 머지(16:40 KST). `/widget/*` CloudFront 캐시 무효화.
+- 부수 발견: `/widget/*` 는 CloudFront 가 하루(`s-maxage=86400`) 보관하고 캐시 키에 쿼리스트링이 없어서, `?v=` 를 올려도 이전 스크립트가 그대로 나간다. 위젯 스크립트를 바꾼 배포 뒤에는 `/widget/*` 무효화가 필수(`next.config.ts` 주석에도 있음).
+- 배운 점: 운영 코드가 미병합 브랜치에만 있으면 다른 작업의 `main` 배포가 덮어쓴다. 운영 배포 전에 PR 머지(또는 `main` 반영)를 먼저 한다.
+
 ## 다음
 
-- PR #138 머지(권한 정책으로 미완료). 머지 전에 다른 사람이 `main` 에서 AI LENS 를 배포하면 `/embed/home`·`/widget/frame.html` 이 사라져 sedaily.ai 틀이 비게 된다.
-- sedaily.ai 변경(`ailens_preview.dart`, `home_page.dart`, `home_content_title_section.dart`)을 커밋·PR 로 정리(현재 `main` 기준 작업 폴더에만 있음).
+- 완료: AI LENS PR #138 머지, sedaily.ai PR #7 머지(운영 코드와 `main` 일치).
 - 운영 GA4 실시간에서 iframe 안 방문이 집계되지 않는지 확인.
-- 실제 브라우저에서 호버·클릭 이동·모바일 폭 확인(헤드리스로는 불가). Flutter 서비스 워커 때문에 사용자는 한두 번 새로고침해야 새 버전이 보일 수 있음.
+- 실제 브라우저에서 호버·클릭 이동·모바일 폭 확인(헤드리스로는 불가). Flutter 서비스 워커 때문에 방문자는 한두 번 새로고침해야 새 버전이 보일 수 있음.
+- CloudFront 변경 백업은 임시 폴더(`cf-E1QS7PY350VHF6-before-*.json`)라 재부팅 시 사라질 수 있음. 필요하면 별도로 보관.
 - 보고서 문구: "서울경제 AI(sedaily.ai) 화면에 연동 위젯을 iframe 방식으로 1차 적용함(2026.10.20, UTM 계측 적용)".
