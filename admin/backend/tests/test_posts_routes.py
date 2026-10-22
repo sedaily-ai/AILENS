@@ -68,7 +68,8 @@ def test_create_returns_201(monkeypatch) -> None:
 
 
 def test_get_returns_404_when_missing(monkeypatch) -> None:
-    monkeypatch.setattr(posts.posts_repo, "get", lambda pid: None)
+    # 70d5a23c(2026-09-11)부터 handle_get 이 channel 을 두 번째 인자로 넘긴다 — repo.get 시그니처를 따른다.
+    monkeypatch.setattr(posts.posts_repo, "get", lambda pid, channel=None: None)
     resp = posts.handle_get({}, {"id": "11111111-1111-1111-1111-111111111111"}, {})
     assert resp["statusCode"] == 404
 
@@ -157,8 +158,9 @@ def test_create_writes_audit_row(monkeypatch, audit_table) -> None:
 
 
 def test_update_writes_audit_row(monkeypatch, audit_table) -> None:
+    # a76ecfe7(2026-09-11)부터 handle_update 가 channel 을 세 번째 인자로 넘긴다 — repo.update 시그니처를 따른다.
     monkeypatch.setattr(posts.posts_repo, "update",
-                        lambda post_id, body: _post(id=post_id, headline=body["headline"]))
+                        lambda post_id, body, channel=None: _post(id=post_id, headline=body["headline"]))
     resp = posts.handle_update(
         {"headline": "새 제목"}, {"id": "11111111-1111-1111-1111-111111111111"}, {})
     assert resp["statusCode"] == 200
