@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { CPI_LATEST } from './data/birthdayCatalog';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
-import { assetSourceLine, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
-import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW, won } from './lib/birthdayModel';
+import { assetMemo, assetResult, assetSourceLine, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
+import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW } from './lib/birthdayModel';
 import { itemValue, type ItemMultiple } from './lib/birthdayItemPrices';
 import type { AssetLoadState } from './lib/useBirthdayAssets';
 import { frontPageNotice } from './lib/birthdayFrontPage';
@@ -60,12 +60,13 @@ function assetLead(base: AssetBase, mode: ViewMode) {
     : `서른 살 전이라 태어난 날(${day})에 넣었다고 보고 계산했어요.`;
 }
 
-/** 칸 아래 첫 줄 — 지금 금액과 증감. 증감은 색 없이 화살표(낭독 제외)와 부호로 읽히게 한다. */
+/** 칸 아래 결과 줄 — 지금 금액(서울 아파트는 배수)만 굵게. 증감은 화살표(낭독 제외)와 부호로 읽히고, 그 위에 한국 금융 관례 색
+ *  (오름 빨강·내림 파랑, data-dir)을 덧입힌다. 변화 없음(0%)은 화살표·색 없이 글자색 그대로.
+ *  굵은 숫자와 괄호 사이에서 줄이 꺾이지 않게 U+2060을 넣는다(nb는 공백만 묶는다). */
 function cellDetail(cell: AssetCell) {
-  const change = changeOf(cell.multiple);
-  const arrow = change.arrow && <><span aria-hidden="true">{change.arrow}</span>{' '}</>;
-  if (cell.nowAmount === null) return <>{arrow}서울 아파트값 {nb(`${times(cell.multiple)}(${change.signed})`)}</>;
-  return <>{arrow}지금 {nb(`${manwon(cell.nowAmount)}(${change.signed})`)}{cell.unit && <> · {nb(`${cell.unit.label} = 그때 ${won(cell.unit.then)}`)} → {nb(`지금 ${won(cell.unit.now)}`)}</>}</>;
+  const result = assetResult(cell);
+  const dir = result.arrow === '▲' ? 'up' : result.arrow === '▼' ? 'down' : undefined;
+  return <>{result.arrow && <><span aria-hidden="true" data-dir={dir}>{result.arrow}</span>{' '}</>}{result.label} <strong>{nb(result.figure)}</strong>{'\u2060('}<span data-dir={dir}>{result.signed}</span>)</>;
 }
 
 /**
@@ -86,7 +87,7 @@ export function AssetScene({ base, mode, state, cells, inflation, onRetry }: {
   if (state.status === 'ready' && !cells.length) {
     return <p className={styles.soon}><strong>이 날짜는 아직 계산할 자료가 없어요.</strong>물가·환율 같은 공식 통계가 발표되면 계산해요.</p>;
   }
-  // 막대는 로그 눈금 — 보이는 칸 중 가장 큰 배수를 100%로.
+  // 막대는 정비례 — 배수 ÷ 보이는 칸 중 가장 큰 배수. 아주 작은 칸(1955년생 달러 2.7배 ÷ 금 77배 등)도 보이게 최소 4%.
   const max = Math.max(...cells.map(cell => cell.multiple));
   return <section className={styles.scene} aria-labelledby="birthday-assets">
     <p className={styles.kicker}>그때 100만 원, 지금은</p>
@@ -106,15 +107,15 @@ export function AssetScene({ base, mode, state, cells, inflation, onRetry }: {
         <ol className={styles.bars}>{cells.map(cell => <li key={cell.id}>
           <div className={styles.barRow}>
             <span>{cell.name}</span>
-            <span className={styles.barTrack} aria-hidden="true"><span style={{ width: `${Math.max(4, Math.log10(1 + cell.multiple) / Math.log10(1 + max) * 100)}%` }} /></span>
+            <span className={styles.barTrack} aria-hidden="true"><span style={{ width: `${Math.max(4, cell.multiple / max * 100)}%` }} /></span>
             <strong>{times(cell.multiple)}</strong>
           </div>
-          <p className={styles.barDetail}>{cellDetail(cell)}</p>
-          {cell.notes.length > 0 && <p className={styles.barDetail}>{cell.notes.join(' ')}</p>}
+          <p className={styles.barResult}>{cellDetail(cell)}</p>
+          {assetMemo(cell) && <p className={styles.barDetail}>{assetMemo(cell)}</p>}
         </li>)}</ol>
         {inflation && <p className={styles.lead}>{inflationLine(inflation)}</p>}
         <p className={styles.source}>{assetSourceLine(cells, inflation)}</p>
-        <p className={styles.source}>과거 자료로 계산한 가정이에요. 특정 자산을 사거나 팔라는 권유가 아니에요. 세금·수수료는 빼고 계산했고 막대는 로그 눈금이에요.</p>
+        <p className={styles.source}>과거 자료로 계산한 가정이에요. 특정 자산을 사거나 팔라는 권유가 아니에요. 세금·수수료는 빼고 계산했어요.</p>
         <p className={styles.links}><Link href={`/search?q=${encodeURIComponent('환율')}`} prefetch={false}>환율 기사 보기</Link><Link href="/search?q=%EB%B6%80%EB%8F%99%EC%82%B0" prefetch={false}>부동산 기사 보기</Link></p>
       </>}
   </section>;
@@ -133,7 +134,7 @@ export function WageScene({ result }: { result: BirthdayResult }) {
 
 /**
  * 그때 1억 원은 지금 — 주인공은 금액 숫자. 그 아래 생활 물가 품목 배수(lib/birthdayItemPrices.ts)는 같은 기간(cpiPeriod → 2026년 9월)이고,
- * 100만 원 장면의 막대 목록과 겹쳐 보이지 않게 막대·구분선 없이 글줄 목록으로 둔다. 품목이 하나도 없으면(1975년 전) 목록·주의·KOSIS 출처를 모두 뺀다.
+ * 100만 원 장면의 막대 목록과 겹쳐 보이지 않게 막대 없이 품목 타일(이름 위, 배수 아래)로 둔다. 품목이 하나도 없으면(1975년 전) 목록·주의·KOSIS 출처를 모두 뺀다.
  */
 export function MoneyScene({ result, items }: { result: BirthdayResult; items: ItemMultiple[] }) {
   if (!result.cpi) return null;
@@ -144,9 +145,10 @@ export function MoneyScene({ result, items }: { result: BirthdayResult; items: I
     {items.length > 0 && <>
       <div className={styles.lead}>
         <h4 className={styles.kicker}>물건값은 이만큼 올랐어요(서울 기준)</h4>
-        <ul className={styles.links}>{items.map(item => {
+        {/* 이름과 배수 사이 공백은 낭독기가 '짜장면 3배'로 띄어 읽게 둔다(두 줄 배치는 CSS가 한다). */}
+        <ul className={styles.items}>{items.map(item => {
           const value = itemValue(item.multiple);
-          return <li key={item.id}>{item.name} <strong>{value.arrow && <><span aria-hidden="true">{value.arrow}</span>{' '}</>}{nb(value.text)}</strong></li>;
+          return <li key={item.id}><span>{item.name}</span>{' '}<strong>{value.arrow && <><span aria-hidden="true">{value.arrow}</span>{' '}</>}{nb(value.text)}</strong></li>;
         })}</ul>
       </div>
       {/* 통계설명: 소비자물가지수는 가격변동을 재는 것이라 가격의 절대수준을 나타내지 않는다. */}

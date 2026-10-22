@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import type { AssetLatest, AssetYearFile } from '../data/birthdayAssets';
 import {
-  apartmentCell, assetBase, assetCells, assetInflation, assetsAvailable, assetSourceLine, changeOf, depositCell, ecosOrgs,
+  apartmentCell, assetBase, assetCells, assetInflation, assetMemo, assetResult, assetsAvailable, assetSourceLine, changeOf, depositCell, ecosOrgs,
   goldCell, inflationLine, onOrBefore, periodLabel, usdCell, type AssetBase,
 } from './birthdayAssets';
 import { parseDate } from './birthdayModel';
@@ -170,6 +170,22 @@ test('증감은 화살표와 부호로 — 감소는 U+2212', () => {
   expect(changeOf(0.68)).toEqual({ arrow: '▼', signed: '\u221232%' });
   expect(changeOf(1.004)).toEqual({ arrow: '', signed: '0%' });
   expect(changeOf(0.996)).toEqual({ arrow: '', signed: '0%' });
+});
+
+test('칸 아래 결과 줄은 지금 금액(아파트는 배수)과 증감만, 1달러 환율은 설명 줄 맨 앞', () => {
+  const [deposit, usd, apartment] = assetCells(base('2010-05-15'), file2010, latest());
+  expect(assetResult(deposit)).toEqual({ arrow: '▲', label: '지금', figure: '150만 원', signed: '+50%' });
+  expect(assetMemo(deposit)).toBe('세전 월복리로, 매달 그달 신규 정기예금 금리를 적용했어요.');
+  // 달러 결과 줄에는 환율이 없고, 환율은 설명 줄 맨 앞(그 뒤에 휴일 안내).
+  expect(assetResult(usd)).toEqual({ arrow: '▲', label: '지금', figure: '300만 원', signed: '+200%' });
+  expect(JSON.stringify(assetResult(usd))).not.toContain('1달러');
+  expect(assetMemo(usd)).toBe(`${nb('1달러 = 그때 1,000원')} → ${nb('지금 3,000원')}\u00a0· 휴일이라 직전 영업일 종가로 계산했어요.`);
+  expect(assetResult(apartment)).toEqual({ arrow: '▲', label: '서울 아파트값', figure: '3배', signed: '+200%' });
+  // 주석이 없는 달러 칸(그날 종가)은 환율만, 감소는 ▼와 U+2212.
+  const file1990: AssetYearFile = { year: 1990, usdkrw: { daily: [['1990-03-02', 4000]], monthly: [] } };
+  const down = usdCell(base('1990-03-02'), file1990, latest())!;
+  expect(assetResult(down)).toEqual({ arrow: '▼', label: '지금', figure: '75만 원', signed: '\u221225%' });
+  expect(assetMemo(down)).toBe(`${nb('1달러 = 그때 4,000원')} → ${nb('지금 3,000원')}`);
 });
 
 test('출처 문장: ECOS 제공, 보이는 칸(과 물가 줄)의 작성기관·통계, 지금 시점', () => {
