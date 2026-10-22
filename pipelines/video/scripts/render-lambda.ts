@@ -75,7 +75,7 @@ async function main() {
   const script = await loadScript(input);
   const voice = voiceName ? { ...DEFAULT_VOICE, voiceId: voiceName as VoiceId } : DEFAULT_VOICE;
 
-  console.log(`[1/3] TTS 처리 (${script.cuts.length}개 컷, voice: ${voice.voiceId})`);
+  console.log(`[1/3] TTS 처리 (${script.cuts.length}개 컷, provider: ${voice.provider}, voice: ${voice.provider === 'google' ? voice.googleVoice : voice.voiceId})`);
   // 로컬 렌더(render.ts)와 달리 오디오를 S3에 올려 URL로 넘긴다 —
   // resolveAudio.ts의 upload 옵션 설명 참고.
   const resolved = await resolveScriptAudio(script, {

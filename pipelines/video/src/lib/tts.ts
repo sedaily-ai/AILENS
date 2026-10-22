@@ -1,6 +1,7 @@
+import { spawn } from 'node:child_process';
 import { PollyClient, SynthesizeSpeechCommand, Engine, LanguageCode, VoiceId } from '@aws-sdk/client-polly';
 
-export type TtsProvider = 'polly' | 'elevenlabs';
+export type TtsProvider = 'polly' | 'elevenlabs' | 'google';
 
 export type ElevenLabsVoiceSettings = {
   stability: number;
@@ -27,6 +28,10 @@ export type TtsVoiceConfig = {
   elevenLabsModelId?: string;
   elevenLabsApiKey?: string;
   elevenLabsVoiceSettings?: ElevenLabsVoiceSettings;
+  // Google Gemini(provider === 'google'일 때만 의미 있음). 실패하면 영상 전체를 위 Polly 설정으로 다시 읽는다(resolveAudio.ts).
+  googleVoice?: string;
+  googleModel?: string;
+  googleApiKey?: string;
 };
 
 // pipelines/common/elevenlabs_tts.py::DEFAULT_VOICE_SETTINGS/VOICE_SETTINGS_RANGES와 값을 맞춘다.
@@ -86,6 +91,9 @@ export const DEFAULT_VOICE: TtsVoiceConfig = {
   elevenLabsModelId: process.env.ELEVENLABS_MODEL_ID,
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY,
   elevenLabsVoiceSettings: clampElevenLabsVoiceSettings(),
+  googleVoice: process.env.GOOGLE_TTS_VOICE,
+  googleModel: process.env.GOOGLE_TTS_MODEL,
+  googleApiKey: process.env.GOOGLE_TTS_API_KEY,
 };
 
 const REGION = process.env.AWS_REGION ?? 'us-east-1';
@@ -184,10 +192,122 @@ async function synthesizeSpeechElevenLabs(text: string, voice: TtsVoiceConfig): 
   return Buffer.from(await resp.arrayBuffer());
 }
 
+// WAV → mp3. 나머지 경로(resolveAudio.ts의 .mp3 캐시·audio/mpeg 업로드)가 mp3를 전제로 해서 맞춘다.
+// ffmpeg는 렌더 컨테이너에 이미 있다(render_from_script.py가 썸네일에 쓴다).
+function wavToMp3(wav: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', ['-v', 'error', '-i', 'pipe:0', '-f', 'mp3', '-b:a', '128k', 'pipe:1']);
+    const out: Buffer[] = [];
+    const err: Buffer[] = [];
+    proc.stdout.on('data', (c: Buffer) => out.push(c));
+    proc.stderr.on('data', (c: Buffer) => err.push(c));
+    proc.on('error', reject);
+    proc.on('close', (code) =>
+      code === 0 ? resolve(Buffer.concat(out)) : reject(new Error(`ffmpeg mp3 변환 실패(${code}): ${Buffer.concat(err).toString().slice(0, 300)}`))
+    );
+    proc.stdin.end(wav);
+  });
+}
+
+// pipelines/common/google_tts.py::synthesize()와 같은 요청(엔드포인트·바디·헤더). 응답은 WAV(24kHz·모노).
+async function synthesizeSpeechGoogle(text: string, voice: TtsVoiceConfig): Promise<Buffer> {
+  if (!voice.googleApiKey) {
+    throw new Error('Google TTS 요청 실패: GOOGLE_TTS_API_KEY가 없습니다(키 조회 실패 또는 Python 호출부에서 안 넘김)');
+  }
+  const voiceName = voice.googleVoice || 'Kore';
+  const model = voice.googleModel || 'gemini-3.8-flash-tts';
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'x-goog-api-key': voice.googleApiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+      },
+    }),
+  });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '');
+    throw new GoogleHttpError(resp.status, detail, `Google TTS 오류(${resp.status}, voice: ${voiceName}): ${detail.slice(0, 300)}`);
+  }
+  const data = (await resp.json()) as {
+    candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[];
+  };
+  const inline = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+  if (!inline?.data) {
+    throw new Error(`Google TTS 응답에 오디오가 없습니다(voice: ${voiceName})`);
+  }
+  const audio = Buffer.from(inline.data, 'base64');
+  // 스트리밍이 아니면 WAV로 오지만, 헤더 없는 PCM(audio/l16)이면 ffmpeg 입력 형식을 직접 알려 준다.
+  if ((inline.mimeType ?? '').toLowerCase().startsWith('audio/l16')) {
+    return wavToMp3(Buffer.concat([pcmWavHeader(audio.length), audio]));
+  }
+  return wavToMp3(audio);
+}
+
+function pcmWavHeader(dataLength: number, rate = 24000): Buffer {
+  const h = Buffer.alloc(44);
+  h.write('RIFF', 0);
+  h.writeUInt32LE(36 + dataLength, 4);
+  h.write('WAVEfmt ', 8);
+  h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20); // PCM
+  h.writeUInt16LE(1, 22); // 모노
+  h.writeUInt32LE(rate, 24);
+  h.writeUInt32LE(rate * 2, 28);
+  h.writeUInt16LE(2, 32);
+  h.writeUInt16LE(16, 34);
+  h.write('data', 36);
+  h.writeUInt32LE(dataLength, 40);
+  return h;
+}
+
+class GoogleHttpError extends Error {
+  constructor(readonly status: number, readonly body: string, message: string) {
+    super(message);
+  }
+}
+
+/** Google로 이 컷을 끝내 못 읽었다는 뜻. resolveAudio.ts가 받아 영상 전체를 Polly로 다시 읽는다
+ *  (컷마다 따로 Polly로 바꾸면 한 영상 안에서 목소리가 섞인다). */
+export class GoogleTtsUnavailableError extends Error {}
+
+// 일시 오류(분당 한도 429·5xx)는 두 번 더 시도한다. 단, 하루 할당량이 끝난 429(구글이 알려 주는 재시도
+// 대기 시간이 길거나 없음)와 키 없음은 다시 해도 같으므로 바로 포기한다.
+const GOOGLE_RETRY_DELAYS_MS = [2000, 5000];
+const GOOGLE_MAX_WAIT_SECONDS = 20;
+
+function isHopeless(err: unknown, voice: TtsVoiceConfig): boolean {
+  if (!voice.googleApiKey) return true;
+  if (!(err instanceof GoogleHttpError)) return false;
+  if (err.status === 400 || err.status === 401 || err.status === 403) return true;
+  if (err.status !== 429) return false;
+  const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(err.body);
+  return !m || parseFloat(m[1]) > GOOGLE_MAX_WAIT_SECONDS;
+}
+
+async function synthesizeSpeechGoogleWithRetry(text: string, voice: TtsVoiceConfig): Promise<Buffer> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= GOOGLE_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await synthesizeSpeechGoogle(text, voice);
+    } catch (err) {
+      lastError = err;
+      if (isHopeless(err, voice)) break;
+      if (attempt < GOOGLE_RETRY_DELAYS_MS.length) {
+        await new Promise((r) => setTimeout(r, GOOGLE_RETRY_DELAYS_MS[attempt]));
+      }
+    }
+  }
+  throw new GoogleTtsUnavailableError(lastError instanceof Error ? lastError.message : String(lastError));
+}
+
 export async function synthesizeSpeech(
   text: string,
   voice: TtsVoiceConfig = DEFAULT_VOICE
 ): Promise<Buffer> {
+  if (voice.provider === 'google') return synthesizeSpeechGoogleWithRetry(text, voice);
   return voice.provider === 'elevenlabs'
     ? synthesizeSpeechElevenLabs(text, voice)
     : synthesizeSpeechPolly(text, voice);

@@ -18,8 +18,9 @@ import {
 } from "./ElevenLabsVoiceSettingsFields";
 import { LENS_POLLY_PROFILE, type PollyVoiceProfile } from "./PollyVoiceSettingsFields";
 import { FORMATS, type ParsedDoc as VideoParsedDoc } from "./VideoRenderSettingsPanel";
+import { GOOGLE_DEFAULT_VOICE, GOOGLE_VOICES, VIDEO_PROVIDERS } from "./googleVoices";
 
-import { cardsStorageKey, loadStoredCards, extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard, restoredCard } from "./videoCardModel";
+import { cardsStorageKey, loadStoredCards, extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard, restoredCard, cardToParsedDoc } from "./videoCardModel";
 /* 영상 탭 중간 칼럼 "성우 미리듣기" + "영상 생성" 통합 카드 — 2026-09-24
    신설. 원래 VoicePreviewGenerator(format="video")와 VideoRenderGenerator가
    위/아래로 따로 떨어진 두 개의 독립 목록(각자 "+추가"로 따로 늘어남)
@@ -401,11 +402,12 @@ export function VideoCardGenerator({
     setCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   };
 
+  // voiceId는 ElevenLabs 성우 id 또는 Google 성우 이름(2026-10-22, provider로 구분)이다.
   const setCardProvider = (id: string, provider: Provider) => {
     if (provider === "elevenlabs") ensureElevenOptions();
     updateCard(id, {
       provider,
-      voiceId: provider === "elevenlabs" ? elevenVoices[0]?.id ?? "" : "",
+      voiceId: provider === "elevenlabs" ? elevenVoices[0]?.id ?? "" : provider === "google" ? GOOGLE_DEFAULT_VOICE : "",
       modelId: provider === "elevenlabs" ? elevenModels[0]?.id ?? "" : "",
       voiceSettings: voiceSettingsDefaults,
       pollySettings: pollyDefaults,
@@ -434,6 +436,9 @@ export function VideoCardGenerator({
         pollyProfile.engines[c.pollySettings.voice]?.find((e) => e.id === c.pollySettings.engine)?.label ?? c.pollySettings.engine;
       return `Polly · ${voiceLabel} · ${engineLabel}`;
     }
+    if (c.provider === "google") {
+      return `Google · ${GOOGLE_VOICES.find((v) => v.id === c.voiceId)?.label ?? c.voiceId}`;
+    }
     const voiceLabel = elevenVoices.find((v) => v.id === c.voiceId)?.label ?? c.voiceId;
     const modelLabel = elevenModels.find((m) => m.id === c.modelId)?.label ?? c.modelId;
     return `ElevenLabs · ${voiceLabel} · ${modelLabel}`;
@@ -455,7 +460,9 @@ export function VideoCardGenerator({
         "synthesize_audio",
         c.provider === "elevenlabs"
           ? { text: narration, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: audioFormat }
-          : { text: narration, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: audioFormat }
+          : c.provider === "google"
+            ? { text: narration, slot_id: id, provider: c.provider, voice_id: c.voiceId, format: audioFormat }
+            : { text: narration, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: audioFormat }
       );
       if (voiceResult.sent) {
         patch.voiceStatus = "pending";
@@ -482,7 +489,9 @@ export function VideoCardGenerator({
       "render_video",
       c.provider === "elevenlabs"
         ? { text: c.input, slot_id: id, provider: c.provider, voice_id: c.voiceId, model_id: c.modelId, voice_settings: c.voiceSettings, format: c.format, ...scriptFormat }
-        : { text: c.input, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: c.format, ...scriptFormat }
+        : c.provider === "google"
+          ? { text: c.input, slot_id: id, provider: c.provider, voice_id: c.voiceId, format: c.format, ...scriptFormat }
+          : { text: c.input, slot_id: id, provider: c.provider, polly_settings: c.pollySettings, format: c.format, ...scriptFormat }
     );
     if (renderResult.sent) {
       patch.renderStatus = "starting";
@@ -521,17 +530,7 @@ export function VideoCardGenerator({
   const handleApplyTestToProduction = async (c: CardState) => {
     if (!onApplyToProduction) return;
     await promptRefs.current[c.id]?.activateIfNeeded();
-    await onApplyToProduction({
-      provider: c.provider,
-      voice: c.pollySettings.voice,
-      engine: c.pollySettings.engine,
-      format: c.format,
-      rate: c.pollySettings.rate,
-      volume: c.pollySettings.volume,
-      elevenlabsVoice: c.voiceId,
-      elevenlabsModel: c.modelId,
-      elevenlabsSettings: c.voiceSettings,
-    });
+    await onApplyToProduction(cardToParsedDoc(c));
   };
   const reviewingCard = cards.find((c) => c.id === reviewCardId) ?? null;
 
@@ -572,17 +571,7 @@ export function VideoCardGenerator({
             serverVersion !== null &&
             info.version === serverVersion &&
             productionDefaults !== null &&
-            JSON.stringify({
-              provider: c.provider,
-              voice: c.pollySettings.voice,
-              engine: c.pollySettings.engine,
-              format: c.format,
-              rate: c.pollySettings.rate,
-              volume: c.pollySettings.volume,
-              elevenlabsVoice: c.voiceId,
-              elevenlabsModel: c.modelId,
-              elevenlabsSettings: c.voiceSettings,
-            }) === JSON.stringify(productionDefaults);
+            JSON.stringify(cardToParsedDoc(c)) === JSON.stringify(productionDefaults);
           return (
           <div key={c.id} className="overflow-hidden border-b bg-[var(--surface-card)]" style={{ borderColor: "var(--border-hairline)" }}>
           <CollapsibleSection
@@ -673,6 +662,9 @@ export function VideoCardGenerator({
                         compact
                         provider={c.provider}
                         onProviderChange={(p) => setCardProvider(c.id, p)}
+                        providers={VIDEO_PROVIDERS}
+                        googleVoice={c.voiceId}
+                        onGoogleVoiceChange={(v) => updateCard(c.id, { voiceId: v })}
                         pollyProfile={pollyProfile}
                         pollyVoice={c.pollySettings.voice}
                         pollyEngine={c.pollySettings.engine}

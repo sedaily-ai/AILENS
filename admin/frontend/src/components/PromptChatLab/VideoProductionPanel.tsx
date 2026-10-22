@@ -9,6 +9,7 @@ import { POLLY_VOICES, POLLY_VOICE_ENGINE_OPTIONS } from "./PollyVoiceSettingsFi
 import { FORMATS } from "./VideoRenderSettingsPanel";
 import { extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard } from "./videoCardModel";
 import { VideoDownloadButton } from "./VideoDownloadButton";
+import { GOOGLE_DEFAULT_VOICE, GOOGLE_VOICES, VIDEO_PROVIDERS } from "./googleVoices";
 
 /* 2026-09-27 — 사용자 요청: "프로덕션 카드에도, 테스트 카드와 동일하게,
    산출물 생성 가능하도록.. 4개 유형 전부요" → 이어서 지적: "프로덕션
@@ -124,7 +125,8 @@ export function VideoProductionPanel({
     setCard((prev) => ({
       ...prev,
       provider,
-      voiceId: provider === "elevenlabs" ? elevenVoices[0]?.id ?? "" : "",
+      // voiceId는 ElevenLabs 성우 id 또는 Google 성우 이름(provider로 구분)이다.
+      voiceId: provider === "elevenlabs" ? elevenVoices[0]?.id ?? "" : provider === "google" ? GOOGLE_DEFAULT_VOICE : "",
       modelId: provider === "elevenlabs" ? elevenModels[0]?.id ?? "" : "",
       voiceSettings: voiceSettingsDefaults,
       pollySettings: POLLY_DEFAULTS,
@@ -146,6 +148,9 @@ export function VideoProductionPanel({
         POLLY_VOICE_ENGINE_OPTIONS[c.pollySettings.voice]?.find((e) => e.id === c.pollySettings.engine)?.label ?? c.pollySettings.engine;
       return `Polly · ${voiceLabel} · ${engineLabel}`;
     }
+    if (c.provider === "google") {
+      return `Google · ${GOOGLE_VOICES.find((v) => v.id === c.voiceId)?.label ?? c.voiceId}`;
+    }
     const voiceLabel = elevenVoices.find((v) => v.id === c.voiceId)?.label ?? c.voiceId;
     const modelLabel = elevenModels.find((m) => m.id === c.modelId)?.label ?? c.modelId;
     return `ElevenLabs · ${voiceLabel} · ${modelLabel}`;
@@ -162,7 +167,9 @@ export function VideoProductionPanel({
         "synthesize_audio",
         card.provider === "elevenlabs"
           ? { text: narration, slot_id: "production", provider: card.provider, voice_id: card.voiceId, model_id: card.modelId, voice_settings: card.voiceSettings, format: "video" }
-          : { text: narration, slot_id: "production", provider: card.provider, polly_settings: card.pollySettings, format: "video" }
+          : card.provider === "google"
+            ? { text: narration, slot_id: "production", provider: card.provider, voice_id: card.voiceId, format: "video" }
+            : { text: narration, slot_id: "production", provider: card.provider, polly_settings: card.pollySettings, format: "video" }
       );
       if (voiceResult.sent) {
         patch.voiceStatus = "pending";
@@ -180,7 +187,9 @@ export function VideoProductionPanel({
       "render_video",
       card.provider === "elevenlabs"
         ? { text: card.input, slot_id: "production", provider: card.provider, voice_id: card.voiceId, model_id: card.modelId, voice_settings: card.voiceSettings, format: card.format }
-        : { text: card.input, slot_id: "production", provider: card.provider, polly_settings: card.pollySettings, format: card.format }
+        : card.provider === "google"
+          ? { text: card.input, slot_id: "production", provider: card.provider, voice_id: card.voiceId, format: card.format }
+          : { text: card.input, slot_id: "production", provider: card.provider, polly_settings: card.pollySettings, format: card.format }
     );
     if (renderResult.sent) {
       patch.renderStatus = "starting";
@@ -201,6 +210,9 @@ export function VideoProductionPanel({
         compact
         provider={card.provider}
         onProviderChange={setProvider}
+        providers={VIDEO_PROVIDERS}
+        googleVoice={card.voiceId}
+        onGoogleVoiceChange={(v) => setCard((prev) => ({ ...prev, voiceId: v }))}
         pollyVoice={card.pollySettings.voice}
         pollyEngine={card.pollySettings.engine}
         onPollyVoiceChange={(v) => updatePollySetting("voice", v)}
