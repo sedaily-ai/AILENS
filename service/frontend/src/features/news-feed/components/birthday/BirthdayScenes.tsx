@@ -5,6 +5,7 @@ import { CPI_LATEST } from './data/birthdayCatalog';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
 import { assetSourceLine, changeOf, inflationLine, type AssetBase, type AssetCell, type AssetInflation } from './lib/birthdayAssets';
 import { dateLabel, elapsedLabel, hundredMillionNow, manwon, number, times, WAGE_NOW, won } from './lib/birthdayModel';
+import { itemValue, type ItemMultiple } from './lib/birthdayItemPrices';
 import type { AssetLoadState } from './lib/useBirthdayAssets';
 import { frontPageNotice } from './lib/birthdayFrontPage';
 import { nb } from './lib/keepTogether';
@@ -130,15 +131,33 @@ export function WageScene({ result }: { result: BirthdayResult }) {
   </section>;
 }
 
-export function MoneyScene({ result }: { result: BirthdayResult }) {
+/**
+ * 그때 1억 원은 지금 — 주인공은 금액 숫자. 그 아래 생활 물가 품목 배수(lib/birthdayItemPrices.ts)는 같은 기간(cpiPeriod → 2026년 9월)이고,
+ * 100만 원 장면의 막대 목록과 겹쳐 보이지 않게 막대·구분선 없이 글줄 목록으로 둔다. 품목이 하나도 없으면(1975년 전) 목록·주의·KOSIS 출처를 모두 뺀다.
+ */
+export function MoneyScene({ result, items }: { result: BirthdayResult; items: ItemMultiple[] }) {
   if (!result.cpi) return null;
   return <section className={styles.scene} aria-labelledby="birthday-money">
     <p className={styles.kicker}>그때 1억 원은 지금</p>
     <h3 id="birthday-money" className={styles.figure}>{manwon(hundredMillionNow(result.cpi))}</h3>
     <p className={styles.lead}>같은 {nb('1억 원으로')} 살 수 있는 것이 그때의 {number(result.cpi / CPI_LATEST.value * 100)}% 수준이 됐어요.</p>
+    {items.length > 0 && <>
+      <div className={styles.lead}>
+        <h4 className={styles.kicker}>물건값은 이만큼 올랐어요(서울 기준)</h4>
+        <ul className={styles.links}>{items.map(item => {
+          const value = itemValue(item.multiple);
+          return <li key={item.id}>{item.name} <strong>{value.arrow && <><span aria-hidden="true">{value.arrow}</span>{' '}</>}{nb(value.text)}</strong></li>;
+        })}</ul>
+      </div>
+      {/* 통계설명: 소비자물가지수는 가격변동을 재는 것이라 가격의 절대수준을 나타내지 않는다. */}
+      <p className={styles.source}>{nb('지수 비율로')} 계산한 값이라 {nb('실제 가게 가격과')} {nb('다를 수 있어요.')}</p>
+    </>}
     {/* 문장 한가운데 괄호(기간·출처)가 끼어 'ECOS) / 로'처럼 엉뚱한 데서 꺾여서, 무엇을 무엇으로 바꿨는지를 한 문장으로 풀었다. */}
     {/* 작성기관(국가데이터처)을 제공처(한국은행 ECOS)와 함께 적는다 — 'ECOS 소비자물가지수'만 쓰면 한국은행 통계로 읽힌다. */}
-    <p className={styles.source}>{nb('한국은행 ECOS')}에서 받은 {nb('국가데이터처 소비자물가지수로')} {nb(result.cpiPeriod)} {nb('물가로 본')} {nb('1억 원을')} {nb('2026년 9월')} 가치로 환산했어요. {nb('실제 생활비')} 변화와는 {nb('다를 수 있어요')}.</p>
+    {/* 품목 배수는 KOSIS 약관 제7조에 따라 작성기관·통계명·KOSIS를 함께 적는다. 375px에서 '품목별 / (서울)'로 괄호 앞이 꺾여서
+        (nb는 공백만 묶는다) 괄호 앞에 줄바꿈을 막는 U+2060을 넣었다. */}
+    <p className={styles.source}>{nb('한국은행 ECOS')}에서 받은 {nb('국가데이터처 소비자물가지수로')} {nb(result.cpiPeriod)} {nb('물가로 본')} {nb('1억 원을')} {nb('2026년 9월')} 가치로 환산했어요. {nb('실제 생활비')} 변화와는 {nb('다를 수 있어요')}.
+      {items.length > 0 && <>{' '}물건값은 {nb('같은 기간을')} {nb('국가데이터처 소비자물가지수')} {nb('품목별\u2060(서울), KOSIS로')} {nb('비교했어요.')}</>}</p>
   </section>;
 }
 
