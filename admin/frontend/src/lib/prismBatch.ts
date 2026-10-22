@@ -76,7 +76,7 @@ export async function sha256(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export type PrismStage = "queued" | "script" | "scene" | "render" | "done" | "error";
+export type PrismStage = "queued" | "script" | "scene" | "render" | "upload" | "done" | "error";
 
 export interface PrismBatchItem {
   item_id: string;
@@ -92,6 +92,9 @@ export interface PrismBatchItem {
   progress?: RenderProgress | null;
   video_url?: string;
   thumb_url?: string;
+  /** 채널 연결(시크릿)이 있을 때만 — pipelines/video/youtube_upload.py */
+  youtube_url?: string | null;
+  youtube_error?: string | null;
 }
 
 export interface PrismBatchDetail {

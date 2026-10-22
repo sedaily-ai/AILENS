@@ -49,6 +49,7 @@ const STAGE_LABEL: Record<string, string> = {
   script: "대본 작성 중",
   scene: "장면 나누는 중",
   render: "렌더링",
+  upload: "유튜브 올리는 중",
   done: "완료",
   error: "실패",
 };
@@ -284,6 +285,9 @@ function ItemStatus({ item }: { item: PrismBatchItem }) {
         {STAGE_LABEL[stage] ?? stage}
       </span>
       {stage === "error" && item.message && <p className="mt-0.5 max-w-[360px] text-[11.5px] text-[var(--text-muted)]">{item.message}</p>}
+      {stage === "done" && item.youtube_error && (
+        <p className="mt-0.5 max-w-[360px] text-[11.5px] text-[var(--danger)]">유튜브 업로드 실패 — 내려받아 직접 올려 주세요 ({item.youtube_error})</p>
+      )}
     </div>
   );
 }
@@ -369,6 +373,11 @@ function BatchPanel({ batchId }: { batchId: string }) {
                     {it.script_url && (
                       <a href={it.script_url} target="_blank" rel="noreferrer" className="text-[11.5px] font-semibold text-[var(--accent)] hover:underline">
                         대본 보기
+                      </a>
+                    )}
+                    {it.stage === "done" && it.youtube_url && (
+                      <a href={it.youtube_url} target="_blank" rel="noreferrer" className="text-[11.5px] font-semibold text-[var(--ok)] hover:underline">
+                        유튜브
                       </a>
                     )}
                     {it.stage === "done" && it.video_url && (
