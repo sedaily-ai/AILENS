@@ -10,7 +10,7 @@ ROOT = Path(__file__).parent.parent
 ARN_RE = re.compile(r"arn:aws:bedrock:[a-z0-9-]+:%s:application-inference-profile/([a-z0-9]+)" % M.ACCOUNT_ID)
 # 정책에 반드시 있어야 하는 별칭(해당 태스크가 코드에서 쓰는 것)
 NEEDED = {
-    "frontpage_auto": ["letters_sonnet5", "letters_sonnet46", "podcast_sonnet5", "video_sonnet5", "webtoon_script_sonnet5"],
+    "frontpage_auto": ["letters_sonnet5", "letters_sonnet46", "podcast_sonnet5", "video_sonnet5", "webtoon_script_sonnet5", "prism_scene"],
     "issueletter_auto": ["letters_sonnet5"],
 }
 

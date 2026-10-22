@@ -42,7 +42,9 @@
       ],
       "Resource": [
         "arn:aws:secretsmanager:us-east-1:887078546492:secret:sedaily-mbti/openai-api-key-*",
-        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/elevenlabs-MjRuuL"
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/elevenlabs-MjRuuL",
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/google-tts-2V0vyG",
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/prism-youtube-rtTf27"
       ]
     },
     {
@@ -82,7 +84,11 @@
         "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-5",
         "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-5",
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dy1fhtb04pon",
-        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k",
+        "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/njzeyj54dn12",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-5-5",
+        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-5-5",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-5-5"
       ]
     },
     {
