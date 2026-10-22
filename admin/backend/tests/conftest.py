@@ -23,6 +23,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # service/backend/ 를 명시적으로 추가한다.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "service" / "backend"))
 
+# handler.py → routes/elevenlabs.py·chat_ws.py·webtoon/generate.py 가 bare import 하는
+# pipelines/common/*.py·pipelines/webtoon/compose_text.py 는 배포 때 zip 루트에 복사된다
+# (deploy-admin-api.sh). local_server.py 와 같은 두 경로를 얹어 그 배치를 재현한다 —
+# 없으면 test_handler_dispatch.py 가 수집 단계에서 ModuleNotFoundError 로 멈춘다.
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "pipelines" / "common"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "pipelines" / "webtoon"))
+
 # admin/backend/__init__.py 와 admin/backend/tests/__init__.py 가 둘 다 존재해
 # pytest 기본 import-mode(prepend)가 이 디렉터리를 `backend.tests` 패키지로
 # 인식, 루트로 admin/ 을 sys.path 에 넣는다 — admin/backend/tests/ 자체는
@@ -169,7 +176,6 @@ def block_real_aws(monkeypatch) -> None:
     from shared import ddb_client, ssm_client
 
     monkeypatch.setattr(ddb_client, "config_table", lambda: FakeTable())
-    monkeypatch.setattr(ddb_client, "prompts_table", lambda: FakeTable())
 
     def _no_ssm(*args, **kwargs):
         raise AssertionError(
