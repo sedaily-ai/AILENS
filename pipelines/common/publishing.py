@@ -81,6 +81,33 @@ MIN_LETTER_PARAGRAPHS = 6
 MAX_LETTER_RETRIES = 2
 
 
+def run_webtoon_with_retry(webtoon_mod, name: str, article_path: Path, out_dir: Path, *,
+                           manage_gpu: bool = True, log_prefix: str = "publish") -> dict:
+    """웹툰 run_article()을 부르고 저장된 각본(1_script.json)을 돌려준다.
+
+    웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어 한 번 더 생성한다
+    (이미지 생성 전 단계라 재시도 비용이 작다). 재시도는 resume=False로 부른다 —
+    resume=True면 첫 시도가 저장한 cuts 없는 1_script.json을 그대로 다시 읽어 재시도가 무의미하다.
+    각본 검증 실패(webtoon_mod.StoryboardRejected — 컷 수·빈 image_prompt 등)도 같은 재시도를 탄다.
+    두 번째 시도의 검증 실패는 그대로 올려 호출부가 웹툰 없이 발행하게 한다."""
+    import json  # noqa: lazy
+
+    webtoon_script: dict = {}
+    for _attempt in (1, 2):
+        try:
+            webtoon_mod.run_article(name, str(article_path), out_dir, resume=(_attempt == 1), manage_gpu=manage_gpu)
+        except webtoon_mod.StoryboardRejected as e:
+            if _attempt == 2:
+                raise
+            print(f"[{log_prefix}] {name} 웹툰 각본 검증 실패({e}) — 재생성 {_attempt}/2")
+            continue
+        webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
+        if webtoon_script.get("cuts"):
+            break
+        print(f"[{log_prefix}] {name} 웹툰 각본에 cuts 없음 — 재생성 {_attempt}/2")
+    return webtoon_script
+
+
 def already_published(source_url: str) -> bool:
     """이 source_url이 이미(다른 파이프라인 포함) 발행됐는지 확인한다.
 
@@ -306,16 +333,8 @@ def publish_article(
         MIN_WEBTOON_CUTS = max(1, webtoon_mod.N_CUTS - 2)
         webtoon_bullets, webtoon_images = [], []
         try:
-            # 웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어 한 번 더 생성한다
-            # (이미지 생성 전 단계라 재시도 비용이 작다). 재시도는 resume=False로 부른다 —
-            # resume=True면 첫 시도가 저장한 cuts 없는 1_script.json을 그대로 다시 읽어 재시도가 무의미하다.
-            webtoon_script = {}
-            for _attempt in (1, 2):
-                webtoon_mod.run_article(name, str(article_path), out_dir, resume=(_attempt == 1), manage_gpu=manage_gpu)
-                webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
-                if webtoon_script.get("cuts"):
-                    break
-                print(f"[{log_prefix}] {name} 웹툰 각본에 cuts 없음 — 재생성 {_attempt}/2")
+            webtoon_script = run_webtoon_with_retry(webtoon_mod, name, article_path, out_dir,
+                                                    manage_gpu=manage_gpu, log_prefix=log_prefix)
             for cut in webtoon_script["cuts"]:
                 n = cut["cut"]
                 cut_path = out_dir / name / f"컷{n}.png"
