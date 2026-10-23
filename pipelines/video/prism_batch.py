@@ -9,6 +9,7 @@ render_from_script.py가 --prism-article-s3-key를 받으면 이 모듈의 run()
   "누락 시 한 줄만 질문"). 사람이 없는 일괄 제작이라 코드가 파일 이름에서 정한 값으로 이 머리줄을 붙인다.
   요일도 AI가 아니라 여기서 계산한다(지침 "Claude 임의 계산 금지").
 - 렌더 뒤 채널 연결 정보가 있으면 유튜브에 올린다(youtube_upload.py). 없으면 영상까지만 만든다.
+- 묶음의 마지막 편이 끝나면 슬랙에 요약을 한 번 보낸다(prism_notify.py, Amazon Q Developer 경유).
 - 진행 상황은 media/prism-batch/{batch_id}/{item_id}.status.json에 덮어쓴다. 렌더 단계 진행률·mp4·실패는
   CMS 영상 랩과 같은 media/video-lab/{job_id}.* 를 쓴다(render_from_script.render_and_upload) — 화면은 기존
   GET /admin/video-lab/{job_id}로 진행률·내려받기를 그대로 쓴다.
@@ -31,6 +32,7 @@ from bedrock_models import profile_arn  # noqa: E402
 from generate_script import fix_script, validate_script  # noqa: E402
 from render_from_script import _extract_render_script, _fill_missing_top_level, render_and_upload  # noqa: E402
 import video_settings  # noqa: E402
+import prism_notify  # noqa: E402
 import youtube_upload  # noqa: E402
 
 # 지침(대본 작성 프롬프트)의 "12개 카테고리 개요" 표와 같은 코드·이름. 화면(PrismBatchPage)과 서버 라우트도 같은 표를 쓴다.
@@ -92,6 +94,18 @@ def _voice_override(type_code: str) -> dict | None:
 
 def run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article_key: str,
         type_code: str, recording_date: str) -> bool:
+    ok = _run(s3, work_dir, batch_id=batch_id, item_id=item_id, job_id=job_id, article_key=article_key,
+              type_code=type_code, recording_date=recording_date)
+    # 묶음의 마지막 편이면 슬랙에 요약을 한 번 보낸다(prism_notify.py). 알림 실패가 이 편의 결과를 바꾸지 않는다.
+    try:
+        prism_notify.notify_if_batch_done(s3, batch_id)
+    except Exception as e:  # noqa: BLE001
+        print(f"[prism-notify] 알림 실패(무시): {e}")
+    return ok
+
+
+def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article_key: str,
+         type_code: str, recording_date: str) -> bool:
     status_key = _status_key(batch_id, item_id)
     status: dict = {"job_id": job_id, "type": type_code}
 

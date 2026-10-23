@@ -164,6 +164,12 @@
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dy1fhtb04pon",
         "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/nrr81xvevv5k"
       ]
+    },
+    {
+      "Sid": "PrismBatchNotifyPublish",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:us-east-1:887078546492:prism-batch-notify"
     }
   ]
 }
