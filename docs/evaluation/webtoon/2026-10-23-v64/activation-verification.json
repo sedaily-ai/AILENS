@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-23T13:50:06+0900",
+  "prompt_version": 64,
+  "image_config_version": 30,
+  "sha256": "ad8a116968e3b6e8e152832a6ca55f5067da252c08a46e8c0fd128549593912f",
+  "published_matches": true,
+  "public_matches": true,
+  "draft_matches": true,
+  "image_config_unchanged": true
+}

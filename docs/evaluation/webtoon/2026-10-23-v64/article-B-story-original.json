@@ -1,0 +1,313 @@
+{
+  "generation_status": "ready",
+  "image_prompt_language": "en",
+  "layout": "8컷",
+  "aspect_ratio": "3:2",
+  "text_mode": "mixed",
+  "visual_mode": "presenter_led",
+  "core_question": "정부는 2031년 누리호로 국방용 정찰위성을 어떻게 발사할 계획인가요?",
+  "page_title": "누리호로 쏘는 정찰위성 계획",
+  "closing_title": "다음 단계는",
+  "characters": {
+    "A": "Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse.",
+    "B": "Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie."
+  },
+  "locations": [
+    {
+      "location_id": "L1",
+      "description": "Neutral modern explainer studio with warm neutral wall panels, one shared long bare tabletop, a small simple grey rocket display model on a low stand, soft upper-left daylight."
+    },
+    {
+      "location_id": "L2",
+      "description": "Close tabletop corner of the same neutral explainer studio, same warm neutral wall panels and shared bare tabletop, small simple grey satellite display model with flat side panels on a low stand."
+    }
+  ],
+  "selected_facts": [
+    {
+      "fact_id": "F1",
+      "importance": 6,
+      "fact_korean": "정부가 2031년 누리호로 국방용 정찰위성을 발사할 계획입니다.",
+      "source_excerpt": "정부가 2031년 한국형 발사체 누리호로 국방용 정찰위성을 발사한다.",
+      "certainty": "announced"
+    },
+    {
+      "fact_id": "F2",
+      "importance": 5,
+      "fact_korean": "그동안 군 정찰위성 발사는 미국 스페이스X에 맡겨왔습니다.",
+      "source_excerpt": "그동안 군 정찰위성 발사는 미국 우주기업 스페이스X에 맡겨왔다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F3",
+      "importance": 5,
+      "fact_korean": "계획대로면 국산 발사체로 군 정찰위성을 쏘는 첫 사례가 됩니다.",
+      "source_excerpt": "계획대로 추진되면 국산 발사체로 군 정찰위성을 쏘아 올리는 첫 사례가 된다.",
+      "certainty": "proposed"
+    },
+    {
+      "fact_id": "F4",
+      "importance": 6,
+      "fact_korean": "2027~2032년 누리호로 공공·국방 위성을 매년 1회 이상 발사할 계획입니다.",
+      "source_excerpt": "오태석 우주항공청장은 20일 열린 국무회의에서 2027년부터 2032년까지 누리호로 공공·국방 분야 국가 위성을 매년 한 차례 이상 발사하는 계획을 공개했다.",
+      "certainty": "announced"
+    },
+    {
+      "fact_id": "F5",
+      "importance": 4,
+      "fact_korean": "반복 발사로 누리호 신뢰성을 높이려는 계획입니다.",
+      "source_excerpt": "누리호 반복 발사를 통해 신뢰성을 제고하려는 계획이다.",
+      "certainty": "announced"
+    },
+    {
+      "fact_id": "F6",
+      "importance": 6,
+      "fact_korean": "2031년 누리호 11차 발사에 국방용 EO 위성 4기가 탑재됩니다.",
+      "source_excerpt": "계획안에 따르면 2031년 누리호 11차 발사에는 국방용 초소형위성체계의 전자광학(EO) 위성 4기가 탑재된다.",
+      "certainty": "announced"
+    },
+    {
+      "fact_id": "F7",
+      "importance": 4,
+      "fact_korean": "EO 위성은 빛을 감지하는 카메라로 지상을 촬영하는 정찰위성입니다.",
+      "source_excerpt": "‘EO 위성’은 빛을 감지하는 카메라로 지상을 촬영해 군사시설과 병력 이동 등을 감시하는 정찰위성이다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F8",
+      "importance": 5,
+      "fact_korean": "국방부 장관은 4기 발사 외 8기 정도 추가 협조 계획을 밝혔습니다.",
+      "source_excerpt": "강신철 국방부 장관은 “2031년 초소형위성체계 위성 4기를 발사하고 8기 정도는 추가 협조할 계획”이라고 덧붙였다.",
+      "certainty": "announced"
+    },
+    {
+      "fact_id": "F9",
+      "importance": 5,
+      "fact_korean": "대통령은 우주발사체와 위성 투자 확대 검토를 지시했습니다.",
+      "source_excerpt": "“우주발사체와 위성에 대한 투자 확대를 검토해달라”고 지시했다.",
+      "certainty": "announced"
+    },
+    {
+      "fact_id": "F10",
+      "importance": 6,
+      "fact_korean": "2032년 12차 발사에선 아리랑 8호와 함께 운용할 동반위성 3기를 올립니다.",
+      "source_excerpt": "아울러 2032년 12차 누리호 발사 때는 다목적실용위성 ‘아리랑 8호’와 함께 운용할 동반위성 3기를 쏘아 올린다.",
+      "certainty": "announced"
+    },
+    {
+      "fact_id": "F11",
+      "importance": 4,
+      "fact_korean": "아리랑 8호는 날씨와 밤낮에 관계없이 관측하는 SAR 위성입니다.",
+      "source_excerpt": "아리랑 8호는 날씨와 밤낮에 관계없이 지상을 관측할 수 있는 합성개구레이더(SAR) 위성이다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F12",
+      "importance": 5,
+      "fact_korean": "주위성이 전파를 쏘고 동반위성이 반사 신호를 받는 멀티스태틱을 처음 도입할 계획입니다.",
+      "source_excerpt": "주위성이 전파를 쏘고 서로 다른 위치에 있는 동반위성들이 반사 신호를 수신하는 ‘멀티스태틱’ 관측 방식을 처음 도입해 관측 정밀도를 높일 계획이다.",
+      "certainty": "announced"
+    }
+  ],
+  "image_seed": null,
+  "negative_prompt": "photograph, photorealistic, live action, skin pores, 3d render, watercolor, monochrome, grayscale, chibi, childlike presenters, character sheet, split panels, diptych, dividing line, portrait collage, third person, crowd, duplicate person, text, lettering, numbers, logos, watermark, name label, profile card, speech bubbles, extra limbs, malformed hands, extra fingers",
+  "cuts": [
+    {
+      "cut": 1,
+      "fact_ids": [
+        "F1",
+        "F3"
+      ],
+      "cut_function": "중심 계획 소개",
+      "scene_type": "establishing",
+      "location_id": "L1",
+      "narration": "계획대로면 국산 발사체로 군 정찰위성을 쏘는 첫 사례입니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "2031년 누리호 계획이 공개됐죠?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "국방용 정찰위성을 올릴 계획입니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two adult presenters stand behind one shared long bare tabletop in a neutral modern explainer studio, both turned slightly toward a small simple grey rocket display model on a low stand between them. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. She gestures once toward the model. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. He looks at her, calm expression. Warm neutral wall panels, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium wide view, faces well separated with headroom above. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 2,
+      "fact_ids": [
+        "F2"
+      ],
+      "cut_function": "기존 방식 비교",
+      "scene_type": "contrast",
+      "location_id": "L1",
+      "narration": "그동안 군 정찰위성 발사는 미국 스페이스X에 맡겨왔습니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "지금까지는 누가 쏘아 올렸나요?",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two adult presenters lean on the same shared long bare tabletop in the neutral modern explainer studio, the small simple grey rocket display model on its low stand pushed to the right end of the table. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. She turns her open palm outward in a short questioning gesture. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. He listens, one hand resting on the tabletop. Warm neutral wall panels, restrained navy, teal and warm neutral palette, soft upper-left daylight. Slight three-quarter angle, faces apart. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 3,
+      "fact_ids": [
+        "F4",
+        "F5"
+      ],
+      "cut_function": "연간 발사 계획 설명",
+      "scene_type": "explanation",
+      "location_id": "L1",
+      "narration": "오태석 우주항공청장이 20일 국무회의에서 공개한 계획입니다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "2027년부터 2032년까지 매년 1회 이상입니다.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "반복 발사에는 어떤 뜻이 있나요?",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two adult presenters stand on either side of the same shared long bare tabletop in the neutral modern explainer studio, the small simple grey rocket display model upright on its low stand at the table center. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. She tilts her head with an attentive look. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. He raises one index finger low near the table while explaining. Warm neutral wall panels, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium view, clear space above both heads. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 4,
+      "fact_ids": [
+        "F5",
+        "F6"
+      ],
+      "cut_function": "11차 탑재 위성 근접",
+      "scene_type": "detail",
+      "location_id": "L2",
+      "narration": "반복 발사로 신뢰성을 높이고, 11차에 EO 위성 4기를 실을 계획입니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. A close tabletop corner view with no people: one small simple grey satellite display model with flat side panels and a single round lens opening sits on a low stand, a plain blank sheet lying flat beside it on the shared bare tabletop. Same neutral modern explainer studio with warm neutral wall panels behind, restrained navy, teal and warm neutral palette, soft upper-left daylight casting a hard short shadow on the tabletop. Simple unmarked surfaces, no markings or symbols anywhere. Low close camera angle filling the upper two thirds with the model. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 5,
+      "fact_ids": [
+        "F7"
+      ],
+      "cut_function": "EO 위성 기능 풀이",
+      "scene_type": "mechanism",
+      "location_id": "L2",
+      "narration": "군사시설과 병력 이동을 감시하는 정찰위성입니다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "빛을 감지하는 카메라로 지상을 찍습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. One adult presenter stands at the close tabletop corner of the neutral modern explainer studio, pointing at the small simple grey satellite display model with flat side panels on its low stand on the shared bare tabletop. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. He leans in slightly, one hand indicating the round lens opening of the model. Warm neutral wall panels, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium close view from the left side, his face kept high in frame with headroom. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 6,
+      "fact_ids": [
+        "F8",
+        "F9"
+      ],
+      "cut_function": "추가 협조와 투자 지시",
+      "scene_type": "consequence",
+      "location_id": "L1",
+      "narration": "이재명 대통령은 발사체·위성 투자 확대 검토를 지시했습니다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "국방부는 8기 정도 추가 협조 계획을 밝혔습니다.",
+          "tone": "보통"
+        },
+        {
+          "speaker": "A",
+          "line": "왜 투자 확대를 검토하라는 건가요?",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two adult presenters face each other across the same shared long bare tabletop in the neutral modern explainer studio, the small simple grey rocket display model on its low stand at the left end of the table. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. She holds one hand up in a short asking gesture. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. He answers with a level, measured expression. Warm neutral wall panels, restrained navy, teal and warm neutral palette, soft upper-left daylight. Slightly wider side angle, faces separated. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 7,
+      "fact_ids": [
+        "F10",
+        "F12"
+      ],
+      "cut_function": "2032년 12차 발사 계획",
+      "scene_type": "next_step",
+      "location_id": "L1",
+      "narration": "주위성이 전파를 쏘고 동반위성이 반사 신호를 받는 방식입니다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "2032년엔 아리랑 8호 동반위성 3기를 올립니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. One adult presenter stands at the right side of the same shared long bare tabletop in the neutral modern explainer studio, moving his open hand in a wide arc above the tabletop, with the small simple grey rocket display model on its low stand near his elbow. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. He looks forward with a calm explaining expression. Warm neutral wall panels, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium view with empty wall space on the left and clear headroom. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 8,
+      "fact_ids": [
+        "F11",
+        "F12"
+      ],
+      "cut_function": "마무리와 남은 확인",
+      "scene_type": "explanation",
+      "location_id": "L1",
+      "narration": "멀티스태틱 방식을 처음 도입해 정밀도를 높일 계획입니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "아리랑 8호는 어떤 위성인가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "밤낮·날씨 관계없이 보는 SAR 위성입니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two adult presenters stand side by side behind the same shared long bare tabletop in the neutral modern explainer studio, both facing forward in a closing pose, the small simple grey rocket display model on its low stand between them at the table center. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. She rests one hand lightly on the tabletop edge. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. He gives a small settled nod. Warm neutral wall panels, restrained navy, teal and warm neutral palette, soft upper-left daylight. Symmetrical medium wide view with generous headroom. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    }
+  ],
+  "key_numbers": [],
+  "planning": "연간 발사 계획·EO 위성 기능·멀티스태틱 원리 등 조건과 구조 설명이 핵심이라 presenter_led 선택. 스튜디오 1곳과 근접 탁자 코너 2개 장소로 발사체·위성 모형을 반복 노출하고, 계획·예정 표현을 모든 컷에 유지."
+}

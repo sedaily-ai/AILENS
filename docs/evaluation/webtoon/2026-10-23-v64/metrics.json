@@ -1,0 +1,23 @@
+{
+  "sd_ultra": {
+    "n": 6,
+    "mean_seconds": 12.374427374833127,
+    "min_seconds": 10.964595665998786,
+    "max_seconds": 13.161379917000886,
+    "sequential_8_estimate_seconds": 98.99541899866502
+  },
+  "sd35_large": {
+    "n": 6,
+    "mean_seconds": 9.842894944499676,
+    "min_seconds": 8.032060542000181,
+    "max_seconds": 17.21948058399903,
+    "sequential_8_estimate_seconds": 78.74315955599741
+  },
+  "codex": {
+    "n": 6,
+    "mean_seconds": 23.177500000000002,
+    "min_seconds": 17.329,
+    "max_seconds": 31.918,
+    "sequential_8_estimate_seconds": 185.42000000000002
+  }
+}

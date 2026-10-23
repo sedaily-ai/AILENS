@@ -1,0 +1,299 @@
+{
+  "generation_status": "ready",
+  "image_prompt_language": "en",
+  "layout": "8컷",
+  "aspect_ratio": "3:2",
+  "text_mode": "mixed",
+  "visual_mode": "presenter_led",
+  "core_question": "서울 아파트 임대차 시장에서 월세 비중이 전세를 넘어선 이유와 그 영향은 무엇인가요?",
+  "page_title": "서울 아파트 월세가 전세를 넘다",
+  "closing_title": "월세화 가속",
+  "characters": {
+    "A": "Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse.",
+    "B": "Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie."
+  },
+  "locations": [
+    {
+      "location_id": "L1",
+      "description": "Compact modern explainer studio with a long bare wooden tabletop, plain warm neutral back wall, and a small simple white apartment block model with a flat teal roof placed on the table."
+    },
+    {
+      "location_id": "L2",
+      "description": "Close tabletop corner of the same explainer studio, bare wooden surface, plain warm neutral wall behind, holding the small white apartment block model with a flat teal roof and a single plain metal key."
+    }
+  ],
+  "selected_facts": [
+    {
+      "fact_id": "F1",
+      "importance": 6,
+      "fact_korean": "올해 1~9월 서울 아파트 임대차 계약의 51.0%가 월세였습니다.",
+      "source_excerpt": "올해 1~9월 서울 아파트 전월세 거래 17만 2027건 가운데 월세는 8만 7740건으로 51.0%를 차지했다",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F2",
+      "importance": 6,
+      "fact_korean": "1~9월 누적 월세 비중이 절반을 넘은 것은 2011년 통계 집계 이후 처음입니다.",
+      "source_excerpt": "지난해 같은 기간(43.7%)보다 7.3%포인트 높아진 수치로 1~9월 누적 기준 월세 비중이 절반을 넘어선 것은 관련 통계가 집계된 2011년 이후 처음이다",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F3",
+      "importance": 5,
+      "fact_korean": "연간 월세 비중은 지난해 44.5%였고 올해 50% 돌파 가능성이 커졌습니다.",
+      "source_excerpt": "연간 월세 비중은 지난해 44.5%로 역대 최고치를 기록한 데 이어 올해 처음으로 50%를 돌파할 가능성이 커졌다",
+      "certainty": "forecast"
+    },
+    {
+      "fact_id": "F4",
+      "importance": 5,
+      "fact_korean": "올해 1~9월 전세 거래는 8만 4287건으로 1년 전보다 27.5% 줄었습니다.",
+      "source_excerpt": "올해 1~9월 서울 아파트 전세 거래는 8만 4287건으로 지난해 같은 기간(11만 6272건)보다 27.5% 감소했다",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F5",
+      "importance": 5,
+      "fact_korean": "같은 기간 월세 거래는 2.8% 줄어 감소 폭이 전세의 약 10분의 1이었습니다.",
+      "source_excerpt": "반면 월세 거래는 9만 310건에서 8만 7740건으로 2.8% 줄어드는 데 그쳤다. 전세 거래 감소 폭이 월세의 약 10배에 달한 셈이다",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F6",
+      "importance": 5,
+      "fact_korean": "전세 매물 급감의 배경으로 입주 물량 부족, 실거주 의무 강화, 갭투자 금지가 꼽힙니다.",
+      "source_excerpt": "신규 입주 물량 부족과 실거주 의무 강화, 갭투자 금지로 인해 전세 매물이 급격히 줄어들면서 올해 체결된 임대차계약의 절반 이상이 월세로 채워진 것이다",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F7",
+      "importance": 5,
+      "fact_korean": "월세가 전세보다 많은 자치구는 4곳에서 올해 13곳으로 늘었습니다.",
+      "source_excerpt": "지난해 1~9월 월세 거래가 전세보다 많았던 자치구는 종로·중·금천·구로구 등 4곳에 불과했지만 올해는 13곳으로 확대됐다",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F8",
+      "importance": 4,
+      "fact_korean": "종로구 월세 비중이 65.6%로 가장 높고 강남·용산·마포구도 전세를 앞섰습니다.",
+      "source_excerpt": "종로구의 월세 비중이 65.6%로 가장 높았고 중랑구(64.9%), 구로구(63.1%), 중구(59.6%) 등이 뒤를 이었다. 강남구(54.0%)와 용산구(56.9%), 마포구(54.1%) 등에서도 월세 거래가 전세를 앞질렀다",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F9",
+      "importance": 5,
+      "fact_korean": "전문가는 전세에서 월세로 바뀌는 구조적 변화가 나타난다고 말했습니다.",
+      "source_excerpt": "남혁우 우리은행 부동산연구원은 “과거 전세가격 상승기와 달리 지금은 임대차 시장이 전세에서 월세로 전환되는 구조적 변화가 나타나고 있다”",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F10",
+      "importance": 5,
+      "fact_korean": "신규 전세 공급 부족과 기존 전세의 월세 전환이 맞물려 월세화가 더 빨라질 수 있습니다.",
+      "source_excerpt": "“신규 전세 공급 부족에 기존 전세 매물의 월세 전환까지 맞물리면서 임대차 시장의 월세화가 더욱 가속화할 수 있다”고 말했다",
+      "certainty": "forecast"
+    },
+    {
+      "fact_id": "F11",
+      "importance": 4,
+      "fact_korean": "전세의 월세화로 서민 주거비 부담이 커지고 있다는 분석이 나옵니다.",
+      "source_excerpt": "전세의 월세화가 가속화하면서 서민들의 주거비 부담이 더욱 커지고 있다는 분석이다",
+      "certainty": "confirmed"
+    }
+  ],
+  "image_seed": null,
+  "negative_prompt": "photograph, photorealistic, live action, skin pores, 3d render, watercolor, monochrome, grayscale, chibi, childlike presenters, character sheet, split panels, diptych, dividing line, portrait collage, third person, crowd, duplicate person, text, lettering, numbers, logos, watermark, name label, profile card, speech bubbles, extra limbs, malformed hands, extra fingers",
+  "cuts": [
+    {
+      "cut": 1,
+      "fact_ids": [
+        "F1",
+        "F2"
+      ],
+      "cut_function": "중심 변화 제시",
+      "scene_type": "establishing",
+      "location_id": "L1",
+      "narration": "서울부동산정보광장 집계로 월세가 8만 7740건이었습니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "올해 서울 아파트 월세 비중이 얼마인가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "1~9월 계약의 51.0%가 월세입니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters stand behind one long bare wooden tabletop in a compact studio, both looking toward the viewer while the woman gestures once at a small white apartment block model with a flat teal roof. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. Plain warm neutral back wall, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium wide view, faces clearly separated, calm expressions. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 2,
+      "fact_ids": [
+        "F2",
+        "F3"
+      ],
+      "cut_function": "기록 의미 설명",
+      "scene_type": "explanation",
+      "location_id": "L1",
+      "narration": "지난해 같은 기간 43.7%보다 7.3%포인트 높아진 수치입니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "절반을 넘은 게 왜 특별한가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "2011년 통계 집계 이후 처음입니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Seated side by side at the same long bare wooden tabletop, the man turns slightly toward the woman with one open palm while she rests both hands on the table and listens. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. The small white apartment block model with a flat teal roof sits between them. Plain warm neutral wall, restrained navy, teal and warm neutral palette, soft upper-left daylight. Three-quarter view, faces apart. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 3,
+      "fact_ids": [
+        "F4",
+        "F5"
+      ],
+      "cut_function": "전세 급감 근거",
+      "scene_type": "evidence",
+      "location_id": "L1",
+      "narration": "월세 거래는 2.8% 줄어 감소 폭이 전세의 약 10분의 1입니다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "전세 거래가 1년 새 27.5% 줄었습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. The man stands alone at the right side of the same long bare wooden tabletop, one hand lifted low beside the small white apartment block model with a flat teal roof as if weighing it. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. Plain warm neutral back wall, nothing else on the bare tabletop, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium shot from slightly left, steady serious expression, empty space on the left half. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 4,
+      "fact_ids": [
+        "F6"
+      ],
+      "cut_function": "매물 감소 배경",
+      "scene_type": "mechanism",
+      "location_id": "L2",
+      "narration": "입주 물량 부족과 실거주 의무 강화, 갭투자 금지가 배경입니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Close tabletop corner with no people: the small white apartment block model with a flat teal roof stands on bare wood, and a single plain metal key lies beside it, slightly turned away from the model. Plain warm neutral wall fills the background, restrained navy, teal and warm neutral palette, soft upper-left daylight casting one hard short shadow. Low close camera angle, large simple shapes, clean uncluttered surface, no documents or screens. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 5,
+      "fact_ids": [
+        "F7"
+      ],
+      "cut_function": "지역 확산 규모",
+      "scene_type": "consequence",
+      "location_id": "L1",
+      "narration": "지난해 같은 기간에는 4곳뿐이었던 자치구 수입니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "월세가 더 많은 자치구는 몇 곳인가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "서울 25개 구 중 13곳으로 늘었습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Standing at opposite ends of the same long bare wooden tabletop, the woman leans in with one hand raised in a short question gesture while the man answers with a calm nod. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. The small white apartment block model with a flat teal roof rests near the center of the table. Plain warm neutral wall, restrained navy, teal and warm neutral palette, soft upper-left daylight. Wide view, wide gap between faces. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 6,
+      "fact_ids": [
+        "F8"
+      ],
+      "cut_function": "지역별 비중 비교",
+      "scene_type": "contrast",
+      "location_id": "L2",
+      "narration": "강남 54.0%, 용산 56.9%, 마포 54.1%도 월세가 앞섰습니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Tight tabletop view with no people: the small white apartment block model with a flat teal roof stands on bare wood at the left, and the single plain metal key rests upright against its base. Plain warm neutral wall behind, restrained navy, teal and warm neutral palette, soft upper-left daylight making one crisp diagonal shadow across the wood. Eye-level close framing, simple silhouettes, no charts, labels or screens anywhere. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 7,
+      "fact_ids": [
+        "F9",
+        "F11"
+      ],
+      "cut_function": "전문가 진단 전달",
+      "scene_type": "explanation",
+      "location_id": "L1",
+      "narration": "월세화로 서민 주거비 부담이 커진다는 분석이 나옵니다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "남혁우 연구원은 구조적 변화라고 말했습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. The man stands centered behind the same long bare wooden tabletop, both hands resting lightly on the wood as he speaks straight ahead, the small white apartment block model with a flat teal roof placed just to his right. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. Plain warm neutral back wall, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium close framing, measured serious expression, generous clear space above his head. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 8,
+      "fact_ids": [
+        "F10",
+        "F3"
+      ],
+      "cut_function": "앞으로의 전망",
+      "scene_type": "next_step",
+      "location_id": "L1",
+      "narration": "연간 월세 비중이 올해 처음 50%를 넘을 가능성도 커졌습니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "앞으로 월세화는 더 빨라질까요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "전세 공급 부족이 겹치면 가속될 수 있습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Both presenters stand together behind the same long bare wooden tabletop for a closing exchange, the woman turned toward the man with a short questioning hand, the man answering with one open palm near the small white apartment block model with a flat teal roof. LEFT: Korean woman age 38, oval face, straight chestnut bob, rectangular black glasses, navy blazer, coral round-neck blouse. RIGHT: Korean man age 42, angular clean-shaven face, short black hair with silver temples, teal blazer, buttoned ivory collared shirt, no tie. Plain warm neutral wall, restrained navy, teal and warm neutral palette, soft upper-left daylight. Medium wide view, faces well separated. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    }
+  ],
+  "key_numbers": [],
+  "planning": "임대차 구조 변화와 비율·조건 설명이 핵심이라 presenter_led로 두 진행자가 질문·답을 나눴다. 스튜디오 1곳과 근접 탁자 1곳만 쓰고, 단순 아파트 모형과 열쇠를 반복 소품으로 고정해 연속성을 유지했다."
+}

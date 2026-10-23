@@ -1,0 +1,24 @@
+{
+  "article": "A",
+  "model_key": "opus-5",
+  "seconds": 61.34291095899971,
+  "usage": {
+    "inputTokens": 11080,
+    "outputTokens": 6130,
+    "totalTokens": 17210,
+    "cacheReadInputTokens": 0,
+    "cacheWriteInputTokens": 0
+  },
+  "stopReason": "end_turn",
+  "prompt_version": 64,
+  "image_config_version": 30,
+  "article_sha256": "9bcf55ce10c40a5e0e6d255d2ccb373af14f6941cbd18747dce063e467496b01",
+  "prompt_sha256": "ad8a116968e3b6e8e152832a6ca55f5067da252c08a46e8c0fd128549593912f",
+  "issues": [],
+  "visual_mode": "presenter_led",
+  "selected_cuts": [
+    1,
+    4,
+    8
+  ]
+}
