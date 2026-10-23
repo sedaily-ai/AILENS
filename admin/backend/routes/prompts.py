@@ -144,6 +144,11 @@ _CATEGORY_BEDROCK = {
 # PRISM(2026-10-20) — CMS 실험실 영상 탭 복제. 같은 영상 틀로 렌더하므로 모델·출력 상한도 영상과 같게 두고,
 # 프롬프트만 "prism" 카테고리에 따로 저장한다(LENS 영상 프롬프트와 분리). 아직 발행 파이프라인은 없다.
 _CATEGORY_BEDROCK["prism"] = {**_CATEGORY_BEDROCK["video"]}
+# 2026-10-23, 사용자 요청 — "하이쿠 모델 추가하고 기본으로 지정": 자동 일괄 제작(pipelines/video/prism_batch.py,
+# 작업 정의 BEDROCK_MODEL_PRISM_SCRIPT/SCENE)이 대본·장면 모두 Haiku 5.5라, 실험실 기본 모델(채팅·카드 장면 변환)도
+# 같은 프로파일로 맞춘다 — 실험실 결과와 실제 제작 결과가 어긋나지 않게.
+_CATEGORY_BEDROCK["prism"].update(model="arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/njzeyj54dn12",  # lens-prism-haiku-5-5
+                                  model_label="Claude Haiku 5.5")
 
 # 2026-09-20, 사용자 요청 — "좌측 채팅창에도 텍스트 모델 선택 가능하게
 # 해주시죠": 웹툰 스크립트·장면 연출(build_script_call) + 일반 대화
@@ -172,6 +177,7 @@ TEXT_MODELS: dict[str, str] = {
     "opus-5-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/izf9wzkcahnq",  # lens-textlab-opus-5-5
     "gpt-6-astra": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/uwlacvtlgavh",  # lens-textlab-gpt6-astra
     "gpt-6-sol": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j2pv1qbv1mlb",  # lens-textlab-gpt6-sol
+    "haiku-5-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/njzeyj54dn12",  # lens-prism-haiku-5-5 (2026-10-23, PRISM 기본 모델)
 }
 DEFAULT_TEXT_MODEL = "sonnet-5"
 # 2026-10-22 비용 최적화 — Opus 5를 선택 목록·기본값에서 뺐다(파이프라인은 10/11 Sonnet 5 전환 완료,
@@ -205,7 +211,7 @@ def resolve_text_model(model_id: str | None) -> str:
 # 풀었는데, 여기(chat_ws.py의 스트리밍 경로)는 기존 호출부가
 # temperature=0.7을 무조건 넣고 있어서 같은 방식으로 model_id 기준
 # on/off를 판단하는 헬퍼가 필요했다.
-_MODELS_WITHOUT_TEMPERATURE = {"opus-5", "sonnet-5", "opus-5-5", "gpt-6-astra", "gpt-6-sol"}
+_MODELS_WITHOUT_TEMPERATURE = {"opus-5", "sonnet-5", "opus-5-5", "gpt-6-astra", "gpt-6-sol", "haiku-5-5"}
 # 2026-09-24 — opus-5-5는 opus-5/sonnet-5와 같은 이유로 거부. GPT-6 Astra/
 # Sol은 메시지가 다르지만("This model doesn't support the temperature
 # field") 마찬가지로 거부 — 셋 다 직접 호출로 재현 확인.
@@ -247,6 +253,7 @@ _THINKING_CONFIG: dict[str, dict] = {
     "opus-5": {"thinking": {"type": "disabled"}},  # 옛 프런트가 보내는 키 — Sonnet 5로 폴백되며 같은 설정을 받는다
     "sonnet-5": {"thinking": {"type": "disabled"}},
     "opus-5-5": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}},
+    "haiku-5-5": {"thinking": {"type": "disabled"}},  # 기본 effort(medium)에서는 disabled 허용
 }
 
 

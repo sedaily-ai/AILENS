@@ -80,11 +80,14 @@ export function frontSourceNote(data: FrontPageData | null) {
   return `${base} 기사는 본문이 긴 순서로, 사진 설명은 맨 뒤에 ${nb('보여 줘요.')}`;
 }
 
-/** 그날 신문 카드에 넣을 기사 — 생일 당일 kind front일 때만. 대체한 날짜의 신문·kind day 기사는 넣지 않는다. */
+/**
+ * 그날 신문 카드·영수증 제목에 넣을 기사 — 생일 당일 신문이면 면 번호가 있든(kind front) 없든(kind day).
+ * 카드는 '1면'이 아니라 '그날 서울경제'라고 부르므로 시기를 가리지 않는다. 대체한 날짜의 신문(일요일·명절 등)은 넣지 않는다.
+ */
 export function shareableFront(state: FrontPageState | null): BigKindsArticle[] {
   if (state?.status !== 'ok') return [];
   const { data } = state;
-  return data.kind === 'front' && data.shown_date === state.date ? data.articles : [];
+  return (data.kind === 'front' || data.kind === 'day') && data.shown_date === state.date ? data.articles : [];
 }
 
 /**

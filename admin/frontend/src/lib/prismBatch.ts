@@ -9,13 +9,15 @@ export const PRISM_GROUPS = [
   { code: "SG3", name: "Founders", keyword: "스타트업" },
   { code: "SG4", name: "Global Investors", keyword: "글로벌" },
   { code: "SG5", name: "CEO", keyword: "기업" },
-  { code: "SG6", name: "Retail Investors", keyword: "개인투자자" },
+  // 2026-10-23 — 마케팅팀 8개 카테고리 파일의 "금융"은 개인투자자(SG6)다(지침 표 "금융(개인투자자)").
+  // 금융 지면(PG4)은 지금 만들지 않아 "금융지면"으로 둔다. aliases도 같은 그룹으로 읽는다.
+  { code: "SG6", name: "Retail Investors", keyword: "금융", aliases: ["개인투자자"] },
   { code: "SG7", name: "Real Estate", keyword: "부동산" },
   { code: "SG8", name: "Stock Investors", keyword: "주식" },
   { code: "PG1", name: "Front Page Daily", keyword: "1면" },
   { code: "PG2", name: "Securities Daily", keyword: "증권" },
   { code: "PG3", name: "Industry Daily", keyword: "산업" },
-  { code: "PG4", name: "Finance Daily", keyword: "금융" },
+  { code: "PG4", name: "Finance Daily", keyword: "금융지면" },
 ] as const;
 
 export type PrismGroupCode = (typeof PRISM_GROUPS)[number]["code"];
@@ -40,8 +42,9 @@ export function parseFileName(fileName: string): { type: PrismGroupCode | null; 
   const base = fileName.replace(/\.[^.]+$/, "");
   const m = base.match(/^(\d{2})(\d{2})[_\s-]+(.+)$/);
   const label = (m ? m[3] : base).replace(/\s*\(\d+\)\s*$/, "").trim();
-  const exact = PRISM_GROUPS.find((g) => g.keyword === label);
-  const partial = PRISM_GROUPS.find((g) => label.includes(g.keyword));
+  const names = (g: (typeof PRISM_GROUPS)[number]): readonly string[] => ["aliases" in g ? g.aliases : [], g.keyword].flat();
+  const exact = PRISM_GROUPS.find((g) => names(g).includes(label));
+  const partial = PRISM_GROUPS.find((g) => names(g).some((k) => label.includes(k)));
   const type = (exact ?? partial)?.code ?? null;
 
   const today = todayKst();

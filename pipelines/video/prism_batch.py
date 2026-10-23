@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -29,6 +30,7 @@ from bedrock_models import profile_arn  # noqa: E402
 
 from generate_script import fix_script, validate_script  # noqa: E402
 from render_from_script import _extract_render_script, _fill_missing_top_level, render_and_upload  # noqa: E402
+import video_settings  # noqa: E402
 import youtube_upload  # noqa: E402
 
 # 지침(대본 작성 프롬프트)의 "12개 카테고리 개요" 표와 같은 코드·이름. 화면(PrismBatchPage)과 서버 라우트도 같은 표를 쓴다.
@@ -45,6 +47,14 @@ _MAX_TOKENS = 8000  # CMS PRISM 탭과 같다(admin/backend/routes/prompts.py::_
 # BEDROCK_MODEL_PRISM_SCENE 로 이미지 재빌드 없이 바꿀 수 있다.
 _SCRIPT_MODEL = profile_arn("prism_script")
 _SCENE_MODEL = profile_arn("prism_scene")
+# 그룹별 Polly 성우(2026-10-23, 마케팅팀 지정). 표에 없는 그룹(PG1~PG4 지면 — 지금은 만들지 않음)은 CMS PRISM
+# "음성 설정"의 발행값(기본 Joanna)을 그대로 쓴다. 이미지 재빌드 없이 바꾸려면 작업 정의 환경변수
+# PRISM_GROUP_VOICES에 {"SG1": "Matthew", ...} JSON을 넣는다(넣은 키만 덮어씀).
+_GROUP_VOICES = {
+    "SG1": "Matthew", "SG2": "Joanna", "SG3": "Stephen", "SG4": "Joanna",
+    "SG5": "Matthew", "SG6": "Danielle", "SG7": "Stephen", "SG8": "Ruth",
+    **json.loads(os.environ.get("PRISM_GROUP_VOICES") or "{}"),
+}
 
 
 def _status_key(batch_id: str, item_id: str) -> str:
@@ -67,6 +77,17 @@ def _episode_title(script_text: str) -> str | None:
     """Block D의 "Episode Title:" 다음 줄 — 화면 목록·유튜브 제목용."""
     m = re.search(r"Episode Title:\s*\n\s*(.+)", script_text)
     return m.group(1).strip() if m else None
+
+
+def _voice_override(type_code: str) -> dict | None:
+    """그룹 성우를 렌더 설정 위에 덮어쓴다. 발행값의 엔진을 그 성우가 지원하지 않으면 성우의 첫 엔진으로."""
+    voice = _GROUP_VOICES.get(type_code)
+    engines = video_settings._PRISM_VOICE_ENGINE_OPTIONS.get(voice or "")
+    if not engines:
+        return None
+    current = video_settings.get_render_settings(None, video_settings.PRISM_SETTINGS_CATEGORY)
+    engine = current["engine"] if current["engine"] in engines else engines[0]
+    return {"provider": "polly", "voice": voice, "engine": engine}
 
 
 def run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article_key: str,
@@ -154,7 +175,7 @@ def run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article
 
     report("render", cuts=len(script["cuts"]))
     print(f"[prism-batch] {item_id} — 렌더 ({len(script['cuts'])}컷)")
-    if not render_and_upload(s3, job_id, script, work_dir):
+    if not render_and_upload(s3, job_id, script, work_dir, _voice_override(type_code)):
         return fail("렌더 실패 — 자세한 내용은 영상 진행 상태를 확인하세요")
 
     # 유튜브 자동 공개 — 채널 연결 정보(시크릿)가 있을 때만. 업로드가 실패해도 영상은 이미 만들어졌으므로
