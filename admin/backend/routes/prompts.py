@@ -174,7 +174,6 @@ TEXT_MODELS: dict[str, str] = {
     # 만들어 추가했다(비용태깅_규칙.md 3단계 그대로: 프로파일 생성 →
     # AdminPromptTestBedrockInvoke IAM에 3종 ARN 추가 → 여기 등록. IAM은
     # 이 세션 자동승인 범위 밖이라 사용자가 직접 put-role-policy 실행).
-    "opus-5-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/izf9wzkcahnq",  # lens-textlab-opus-5-5
     "gpt-6-astra": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/uwlacvtlgavh",  # lens-textlab-gpt6-astra
     "gpt-6-sol": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j2pv1qbv1mlb",  # lens-textlab-gpt6-sol
     "haiku-5-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/njzeyj54dn12",  # lens-prism-haiku-5-5 (2026-10-23, PRISM 기본 모델)
@@ -183,6 +182,7 @@ DEFAULT_TEXT_MODEL = "sonnet-5"
 # 2026-10-22 비용 최적화 — Opus 5를 선택 목록·기본값에서 뺐다(파이프라인은 10/11 Sonnet 5 전환 완료,
 # 이후에도 이 경로로 월 약 20달러가 남아 있었다). lens-webtoon-script-opus-5 프로파일·IAM은 그대로 둔다.
 # 옛 프런트가 "opus-5"를 보내면 resolve_text_model()이 Sonnet 5로 떨어진다.
+# 2026-10-23 — 같은 이유로 Opus 5.5도 선택 목록에서 뺐다(lens-textlab-opus-5-5 프로파일·IAM은 그대로 둔다). "opus-5-5"도 Sonnet 5로 폴백된다.
 
 # 2026-09-20, 실측 — sonnet-5는 이 웹툰 스크립트 생성(4만5천자 프롬프트+8컷
 # 구조화 JSON)에서 내부 reasoning이 max_tokens(8000) 예산을 전부 써버려
@@ -252,7 +252,7 @@ def text_model_supports_temperature(model_id: str | None) -> bool:
 _THINKING_CONFIG: dict[str, dict] = {
     "opus-5": {"thinking": {"type": "disabled"}},  # 옛 프런트가 보내는 키 — Sonnet 5로 폴백되며 같은 설정을 받는다
     "sonnet-5": {"thinking": {"type": "disabled"}},
-    "opus-5-5": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}},
+    "opus-5-5": {"thinking": {"type": "disabled"}},  # 옛 프런트가 보내는 키 — Sonnet 5로 폴백되며 같은 설정을 받는다
     "haiku-5-5": {"thinking": {"type": "disabled"}},  # 기본 effort(medium)에서는 disabled 허용
 }
 
