@@ -22,5 +22,7 @@ export const TEXT_MODELS: { id: string; label: string }[] = [
   { id: "opus-5-5", label: "Claude Opus 5.5" },
   { id: "gpt-6-astra", label: "GPT-6 Astra" },
   { id: "gpt-6-sol", label: "GPT-6 Sol" },
+  // 2026-10-23 — PRISM 탭 기본 모델(prompts.py::_CATEGORY_BEDROCK["prism"])과 같은 Haiku 5.5.
+  { id: "haiku-5-5", label: "Claude Haiku 5.5" },
 ];
 export const DEFAULT_TEXT_MODEL = "opus-5";
