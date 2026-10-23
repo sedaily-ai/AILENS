@@ -1,0 +1,28 @@
+{
+  "key": "candidate-scene-v3",
+  "prompt_sha256": "932f4187375ec02b7cb2b4f3e643e98d6ec35c5fdb49eb04ec7ee9f8cd20e1fa",
+  "seconds": 47.323,
+  "usage": {
+    "inputTokens": 8042,
+    "outputTokens": 5400,
+    "totalTokens": 13442,
+    "cacheReadInputTokens": 0,
+    "cacheWriteInputTokens": 0
+  },
+  "stopReason": "end_turn",
+  "status": "ready",
+  "cuts": 8,
+  "visual_mode": "scene_led",
+  "dialogue_cuts": 0,
+  "prompt_lengths": [
+    724,
+    751,
+    712,
+    694,
+    728,
+    767,
+    762,
+    781
+  ],
+  "issues": []
+}

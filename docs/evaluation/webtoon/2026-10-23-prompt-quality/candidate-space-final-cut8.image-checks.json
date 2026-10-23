@@ -1,0 +1,46 @@
+{
+  "key": "candidate-space-final-cut8",
+  "cut": 8,
+  "seconds": 13.402,
+  "raw_size": [
+    1216,
+    832
+  ],
+  "composed_size": [
+    1216,
+    1171
+  ],
+  "sha256": "6db7b8ed5febaaa84e5fed1183feef7961d520284cf2617e546790b1bfed0fcc",
+  "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters seated at the same long bare tabletop in the neutral explainer studio, the woman turning toward the man with a short upward palm, the man answering while a single blank sheet lies between them on the tabletop. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral back wall, navy and teal accent panels, soft even overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Slightly wider two-shot, faces apart and above center. Single continuous landscape panel. Keep the bottom quarter visually quiet.",
+  "dialogue": [
+    {
+      "speaker": "A",
+      "line": "다음 단계는 무엇인가요?",
+      "tone": "보통"
+    },
+    {
+      "speaker": "B",
+      "line": "2027년까지 기초 설계를 마친 뒤 심사받을 예정입니다.",
+      "tone": "보통"
+    }
+  ],
+  "narration": "심사 결과에 따라 발사 시기와 위성 수가 달라질 수 있습니다.",
+  "layout": [
+    {
+      "x": 0.25,
+      "y": 0.1477,
+      "w": 0.2014,
+      "h": 0.1277,
+      "tip_x": 0.25,
+      "tip_y": 0.2976
+    },
+    {
+      "x": 0.75,
+      "y": 0.1477,
+      "w": 0.462,
+      "h": 0.1263,
+      "tip_x": 0.75,
+      "tip_y": 0.2962
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "key": "candidate-short-cms",
+  "prompt_sha256": "6bbb025a752445b356b34413b0977038b7faff8562ebdbc948f9733a5e7643d2",
+  "seconds": 7.108,
+  "usage": {
+    "inputTokens": 6863,
+    "outputTokens": 298,
+    "totalTokens": 7161,
+    "cacheReadInputTokens": 0,
+    "cacheWriteInputTokens": 0
+  },
+  "stopReason": "end_turn",
+  "status": "needs_article",
+  "cuts": 0,
+  "visual_mode": "",
+  "dialogue_cuts": 0,
+  "prompt_lengths": [],
+  "issues": []
+}

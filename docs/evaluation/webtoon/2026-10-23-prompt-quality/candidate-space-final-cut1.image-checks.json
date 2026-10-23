@@ -1,0 +1,46 @@
+{
+  "key": "candidate-space-final-cut1",
+  "cut": 1,
+  "seconds": 12.749,
+  "raw_size": [
+    1216,
+    832
+  ],
+  "composed_size": [
+    1216,
+    1171
+  ],
+  "sha256": "26275f7d7c4e04ec1801fc109d18483b36501f17ece9fb9ec961d9cb299226da",
+  "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters seated side by side at one long bare tabletop in a neutral modern explainer studio, the woman turning slightly to ask a question, the man answering with one calm open palm. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral back wall with navy and teal accent panels, soft even overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Medium two-shot, faces well separated and kept above center. Single continuous landscape panel. Keep the bottom quarter visually quiet.",
+  "dialogue": [
+    {
+      "speaker": "A",
+      "line": "위성 4기를 한 번에 쏜다고요?",
+      "tone": "보통"
+    },
+    {
+      "speaker": "B",
+      "line": "2031년 공동 발사를 검토한다고 발표했습니다.",
+      "tone": "보통"
+    }
+  ],
+  "narration": "발사 계약과 예산은 아직 확정되지 않은 상태입니다.",
+  "layout": [
+    {
+      "x": 0.25,
+      "y": 0.1477,
+      "w": 0.2428,
+      "h": 0.1263,
+      "tip_x": 0.25,
+      "tip_y": 0.2962
+    },
+    {
+      "x": 0.75,
+      "y": 0.1477,
+      "w": 0.3961,
+      "h": 0.1263,
+      "tip_x": 0.75,
+      "tip_y": 0.2962
+    }
+  ]
+}

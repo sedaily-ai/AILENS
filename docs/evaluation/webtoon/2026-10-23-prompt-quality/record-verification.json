@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "scope": "offline preservation and contract checks; no new inference",
+  "source_artifacts_verified": 27,
+  "prompt_hashes_verified": 2,
+  "storyboards_validated": 2,
+  "insufficient_article_hold_validated": 1,
+  "png_files_verified": 6,
+  "text_trials_in_saved_usage": 13,
+  "staged_added_markdown_links": "passed",
+  "credential_pattern_scan": "passed",
+  "verification_date": "2026-10-23",
+  "validator": "pipelines/common/webtoon_contract.py at base bb3272b8; temporary local preservation checker"
+}

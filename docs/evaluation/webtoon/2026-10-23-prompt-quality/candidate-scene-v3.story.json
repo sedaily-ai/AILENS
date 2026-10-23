@@ -1,0 +1,211 @@
+{
+  "generation_status": "ready",
+  "image_prompt_language": "en",
+  "layout": "8컷",
+  "aspect_ratio": "3:2",
+  "text_mode": "mixed",
+  "visual_mode": "scene_led",
+  "core_question": "가람시 중앙도서관은 6개월 보수 후 무엇이 바뀌고 무엇이 그대로인가?",
+  "page_title": "가람시 중앙도서관 재개관",
+  "closing_title": "이용 불편 접수 예정",
+  "characters": {},
+  "locations": [
+    {
+      "location_id": "L1",
+      "description": "Exterior front entrance of a mid-size public library building, preserved beige stone facade, wide stone steps beside a newly built gently sloped ramp, automatic glass doors, daylight, small trimmed hedges along the walkway."
+    },
+    {
+      "location_id": "L2",
+      "description": "Interior first floor of the library, open reading area near an information desk, wide aisle between low bookshelves, large windows, warm daylight, modern elevator doors on one wall."
+    },
+    {
+      "location_id": "L3",
+      "description": "Interior second floor quiet reading room of the library, rows of individual desks each with a small reading lamp, tall bookshelves with widened aisles, a single-seat desk by a large window, calm afternoon light."
+    }
+  ],
+  "selected_facts": [
+    {
+      "fact_id": "F1",
+      "importance": 6,
+      "fact_korean": "가람시 중앙도서관이 6개월 보수를 마치고 2026년 10월 20일 재개관함",
+      "source_excerpt": "가람시 중앙도서관이 2026년 10월 20일 내부 보수를 마치고 다시 문을 열었다. 도서관은 6개월간 운영을 중단하고 낡은 시설을 고쳤다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F2",
+      "importance": 5,
+      "fact_korean": "외벽은 유지하고 경사로 신설, 출입문을 자동문으로 교체해 접근성을 높임",
+      "source_excerpt": "건물 외벽은 그대로 유지하고 정문 앞 계단 옆에 경사로를 새로 설치했다. 출입문은 자동문으로 교체해 휠체어 이용자가 드나들기 쉽게 했다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F3",
+      "importance": 4,
+      "fact_korean": "1층엔 안내데스크와 열린 독서공간, 2층은 조용한 열람공간으로 좌석마다 독서등 설치",
+      "source_excerpt": "1층에는 안내 데스크와 열린 독서 공간을 배치했다. 2층은 조용한 열람 공간으로 정비하고 좌석마다 독서등을 설치했다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F4",
+      "importance": 4,
+      "fact_korean": "두 층을 잇는 승강기 교체, 좌석수는 종전과 같은 120석으로 유지",
+      "source_excerpt": "두 층을 연결하는 기존 승강기도 교체했다. 전체 좌석 수는 종전과 같은 120석으로 늘어나지 않았다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F5",
+      "importance": 3,
+      "fact_korean": "서가 통로 폭 확대, 창가에 1인용 책상 배치",
+      "source_excerpt": "서가의 통로 폭은 이전보다 넓혔으며 창가에는 한 사람이 앉는 책상을 놓았다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F6",
+      "importance": 4,
+      "fact_korean": "어린이 자료실은 공사 대상 아니어서 별관을 계속 이용해야 함",
+      "source_excerpt": "어린이 자료실은 이번 공사에 포함되지 않아 별관을 계속 이용해야 한다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F7",
+      "importance": 5,
+      "fact_korean": "재개관 첫 달 이용 불편 접수 후 추가 보완 여부 검토 예정, 별관 공사 일정 미정",
+      "source_excerpt": "도서관 측은 재개관 첫 달 동안 이용자의 이동 동선과 시설 불편 사항을 접수해 추가 보완 여부를 검토할 예정이다. 현재는 정상 운영 중이며 별관 공사 일정은 정해지지 않았다.",
+      "certainty": "announced"
+    }
+  ],
+  "image_seed": null,
+  "negative_prompt": "photograph, photorealistic, live action, skin pores, 3d render, watercolor, monochrome, grayscale, chibi, childlike presenters, character sheet, split panels, collage, third person, crowd, duplicate person, text, lettering, numbers, logos, watermark, name label, profile card, speech bubbles, extra limbs, malformed hands, extra fingers",
+  "cuts": [
+    {
+      "cut": 1,
+      "fact_ids": [
+        "F1"
+      ],
+      "cut_function": "중심 사건: 6개월 보수 후 재개관",
+      "scene_type": "establishing",
+      "location_id": "L1",
+      "narration": "가람시 중앙도서관이 6개월 보수를 마치고 다시 문을 열었습니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on the library exterior. Natural skin tones, restrained navy, teal and warm neutral palette. Exterior front entrance of a mid-size public library building, preserved beige stone facade, wide stone steps beside a newly built gently sloped ramp, automatic glass doors, daylight, small trimmed hedges along the walkway. A wide establishing view shows the building freshly reopened with the entrance doors visible, no crowd, calm daytime atmosphere. Single wide shot, clear sense of the whole facade. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 2,
+      "fact_ids": [
+        "F2"
+      ],
+      "cut_function": "접근성 개선: 경사로·자동문",
+      "scene_type": "evidence",
+      "location_id": "L1",
+      "narration": "외벽은 유지했고 경사로와 자동문으로 휠체어 출입을 쉽게 했습니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on the entrance ramp and automatic doors. Natural skin tones, restrained navy, teal and warm neutral palette. Exterior front entrance of a mid-size public library building, preserved beige stone facade, wide stone steps beside a newly built gently sloped ramp, automatic glass doors, daylight, small trimmed hedges along the walkway. A closer angle highlights the new ramp beside the stone steps and the open automatic glass doors, emphasizing smooth ground-level access. Single medium shot, eye-level camera near the ramp. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 3,
+      "fact_ids": [
+        "F3"
+      ],
+      "cut_function": "1층 구성: 안내데스크와 열린 독서공간",
+      "scene_type": "detail",
+      "location_id": "L2",
+      "narration": "1층에는 안내 데스크와 열린 독서 공간이 새로 마련되었습니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on the first-floor open reading area. Natural skin tones, restrained navy, teal and warm neutral palette. Interior first floor of the library, open reading area near an information desk, wide aisle between low bookshelves, large windows, warm daylight, modern elevator doors on one wall. The information desk sits near the entrance with open soft seating nearby, low bookshelves arranged around a bright open space. Single medium-wide shot, slightly elevated angle showing the layout. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 4,
+      "fact_ids": [
+        "F3"
+      ],
+      "cut_function": "2층 구성: 좌석별 독서등",
+      "scene_type": "detail",
+      "location_id": "L3",
+      "narration": "2층은 조용한 열람 공간으로 꾸며 좌석마다 독서등을 달았습니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on the second-floor quiet reading room. Natural skin tones, restrained navy, teal and warm neutral palette. Interior second floor quiet reading room of the library, rows of individual desks each with a small reading lamp, tall bookshelves with widened aisles, a single-seat desk by a large window, calm afternoon light. Rows of desks each show a small lamp switched on, creating a calm orderly reading space. Single medium shot, straight-on view along the desk rows. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 5,
+      "fact_ids": [
+        "F4"
+      ],
+      "cut_function": "승강기 교체와 좌석수 유지",
+      "scene_type": "mechanism",
+      "location_id": "L2",
+      "narration": "두 층을 잇는 승강기를 교체했고 좌석은 종전처럼 120석입니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on the newly replaced elevator doors. Natural skin tones, restrained navy, teal and warm neutral palette. Interior first floor of the library, open reading area near an information desk, wide aisle between low bookshelves, large windows, warm daylight, modern elevator doors on one wall. A clean modern elevator panel stands against the wall near the open reading area, with rows of seating visible in the background. Single medium shot, angled to show both the elevator and part of the seating area. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 6,
+      "fact_ids": [
+        "F5"
+      ],
+      "cut_function": "서가 통로 확장과 창가 1인석",
+      "scene_type": "detail",
+      "location_id": "L3",
+      "narration": "서가 통로는 넓어졌고 창가에는 1인용 책상을 새로 놓았습니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on a widened bookshelf aisle and a window desk. Natural skin tones, restrained navy, teal and warm neutral palette. Interior second floor quiet reading room of the library, rows of individual desks each with a small reading lamp, tall bookshelves with widened aisles, a single-seat desk by a large window, calm afternoon light. Tall bookshelves line a noticeably wide walking aisle, and a single small desk with one chair sits beside the large window. Single medium shot, slight diagonal angle capturing both the aisle and the window desk. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 7,
+      "fact_ids": [
+        "F6"
+      ],
+      "cut_function": "예외: 어린이 자료실은 별관 유지",
+      "scene_type": "contrast",
+      "location_id": "L1",
+      "narration": "어린이 자료실은 이번 공사에서 빠져 별관을 계속 이용해야 합니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on a separate annex building beside the main library. Natural skin tones, restrained navy, teal and warm neutral palette. Exterior view showing the renovated main library facade with preserved stone walls and ramp on one side, and a smaller plain annex building standing apart on the other side, connected only by a short outdoor path, daylight. The annex building looks older and untouched compared to the refreshed main entrance, suggesting it was not part of the renovation. Single wide shot capturing both structures in one frame. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 8,
+      "fact_ids": [
+        "F7"
+      ],
+      "cut_function": "다음 절차: 불편 접수와 보완 검토",
+      "scene_type": "next_step",
+      "location_id": "L2",
+      "narration": "재개관 첫 달 동안 불편 사항을 접수해 추가 보완을 검토할 계획입니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "Draw as a 2D Korean webtoon: clean black ink lines, flat colors, hard-edged cel shadows, expressive illustrated adult faces. An unoccupied scene focused on the information desk area with a blank feedback sheet. Natural skin tones, restrained navy, teal and warm neutral palette. Interior first floor of the library, open reading area near an information desk, wide aisle between low bookshelves, large windows, warm daylight, modern elevator doors on one wall. A plain unmarked sheet of paper rests on the information desk counter beside a simple pen holder, suggesting a feedback collection point, with the open reading space visible behind it. Single medium shot, slightly angled toward the desk counter. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    }
+  ],
+  "key_numbers": [],
+  "planning": "scene_led를 선택: 리모델링 전후 시설 변화가 핵심이라 장소·실물 묘사 중심으로 구성하고 인물 없이 공간 변화를 순차적으로 전달함."
+}
