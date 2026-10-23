@@ -1,0 +1,46 @@
+{
+  "key": "candidate-space-final-cut4",
+  "cut": 4,
+  "seconds": 12.65,
+  "raw_size": [
+    1216,
+    832
+  ],
+  "composed_size": [
+    1216,
+    1171
+  ],
+  "sha256": "4302ebfd09117b943cbd9b1a74163ad0f600b7573fc44a48399a611752d70b8c",
+  "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters at the same long bare tabletop in the neutral explainer studio, the man leaning slightly forward with one hand raised in a simple counting gesture, the woman nodding with a notebook closed in front of her. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral back wall, navy and teal accent panels, soft even overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Tight two-shot from a low-medium angle. Single continuous landscape panel. Keep the bottom quarter visually quiet.",
+  "dialogue": [
+    {
+      "speaker": "A",
+      "line": "받은 영상은 어디에 쓰나요?",
+      "tone": "보통"
+    },
+    {
+      "speaker": "B",
+      "line": "지상국이 홍수와 산불 현장 파악에 쓸 예정입니다.",
+      "tone": "보통"
+    }
+  ],
+  "narration": "통신 중계용이 아니라 자료를 내려보내는 관측 위성입니다.",
+  "layout": [
+    {
+      "x": 0.25,
+      "y": 0.1477,
+      "w": 0.2428,
+      "h": 0.1277,
+      "tip_x": 0.25,
+      "tip_y": 0.2976
+    },
+    {
+      "x": 0.75,
+      "y": 0.1477,
+      "w": 0.405,
+      "h": 0.1277,
+      "tip_x": 0.75,
+      "tip_y": 0.2976
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "key": "candidate-space-final",
+  "prompt_sha256": "00b652e39c7aecb7f88f2872626856967a94b6232da7772eae27eb48a669e51c",
+  "seconds": 62.728,
+  "usage": {
+    "inputTokens": 8694,
+    "outputTokens": 5934,
+    "totalTokens": 14628,
+    "cacheReadInputTokens": 0,
+    "cacheWriteInputTokens": 0
+  },
+  "stopReason": "end_turn",
+  "status": "ready",
+  "cuts": 8,
+  "visual_mode": "presenter_led",
+  "dialogue_cuts": 6,
+  "prompt_lengths": [
+    764,
+    733,
+    656,
+    772,
+    781,
+    697,
+    636,
+    791
+  ],
+  "issues": []
+}

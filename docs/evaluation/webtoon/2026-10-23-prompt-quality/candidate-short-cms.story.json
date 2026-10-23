@@ -1,0 +1,19 @@
+{
+  "generation_status": "needs_article",
+  "image_prompt_language": "en",
+  "layout": "8컷",
+  "aspect_ratio": "3:2",
+  "text_mode": "mixed",
+  "visual_mode": "",
+  "core_question": "",
+  "page_title": "",
+  "closing_title": "",
+  "characters": {},
+  "locations": [],
+  "selected_facts": [],
+  "image_seed": null,
+  "negative_prompt": "",
+  "cuts": [],
+  "key_numbers": [],
+  "planning": "기사 전문이 두 문장뿐이며 노선 범위, 시행 시기, 개편 배경, 영향받는 구간, 절차 등 세부 정보가 전혀 없어 8개의 구별된 정보 역할을 구성할 근거가 부족함. 구체적 노선안, 개편 이유, 추진 일정, 시민 의견수렴 절차 등이 담긴 추가 기사 또는 보도자료가 필요함."
+}
