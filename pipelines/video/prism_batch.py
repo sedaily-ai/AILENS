@@ -71,8 +71,10 @@ def _put_json(s3, key: str, body: dict) -> None:
 
 
 def _looks_like_script(text: str, display_name: str) -> bool:
-    """대본 작성 응답이 EL Script 블록과 고정 아웃트로를 갖췄는가(되묻기·잘림 응답 걸러내기)."""
-    return "EL Script" in text and "```" in text and f"AI PRISM: {display_name}" in text
+    """대본 작성 응답이 EL Script 블록과 고정 아웃트로를 갖췄는가(되묻기·잘림 응답 걸러내기).
+    코드블록(```)은 보지 않는다 — 2026-10-23 Haiku 5.5가 대본은 맞게 쓰고 펜스만 두 번 연속 빼 SG8이 실패했다.
+    뒤 단계(장면 변환은 응답 전체를 넘기고, 유튜브 메타는 Block D를 찾는다)는 펜스를 쓰지 않는다."""
+    return "EL Script" in text and f"AI PRISM: {display_name}" in text
 
 
 def _episode_title(script_text: str) -> str | None:
@@ -146,7 +148,8 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
                 model=_SCRIPT_MODEL, max_tokens=_MAX_TOKENS,
             )
             if not _looks_like_script(script_text, display_name):
-                return fail(f"대본 작성 응답이 지침 형식이 아닙니다: {script_text[:300]}")
+                print(f"[prism-batch] 대본 형식 이상(재요청 후) — 앞부분: {script_text[:300]!r}")
+                return fail("대본 작성 응답이 지침 형식이 아닙니다(EL Script 제목이나 고정 아웃트로 없음) — 다시 시도해 주세요")
     except Exception as e:  # noqa: BLE001
         return fail(f"대본 작성 실패: {e}")
 

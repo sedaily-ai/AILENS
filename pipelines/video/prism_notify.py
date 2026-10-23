@@ -44,6 +44,12 @@ def _claim(s3, batch_id: str) -> bool:
         raise
 
 
+def _one_line(text: str, limit: int) -> str:
+    """알림 한 줄에 넣을 문장 — 줄바꿈·연속 공백을 하나로(이유 안의 줄바꿈이 알림 줄을 깨뜨렸다, 10/23)."""
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
     ok = sum(1 for _, s in rows if s.get("stage") == "done")
     date = rows[0][0].get("recording_date", "")
@@ -54,10 +60,10 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
         if s.get("stage") == "done" and s.get("youtube_url"):
             lines.append(f"✅ {group} — <{s['youtube_url']}|유튜브>")
         elif s.get("stage") == "done":
-            reason = f" ({s['youtube_error'][:80]})" if s.get("youtube_error") else ""
+            reason = f" ({_one_line(s['youtube_error'], 80)})" if s.get("youtube_error") else ""
             lines.append(f"⚠️ {group} — 영상 완료, 유튜브 미업로드{reason}")
         else:
-            lines.append(f"❌ {group} — {(s.get('message') or '실패')[:100]}")
+            lines.append(f"❌ {group} — {_one_line(s.get('message') or '실패', 100)}")
     lines.append(f"<{CMS_URL}/prism-batch?batch={batch_id}|CMS에서 보기>")
     return {"version": "1.0", "source": "custom", "content": {
         "textType": "client-markdown",
