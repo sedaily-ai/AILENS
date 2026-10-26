@@ -25,6 +25,8 @@ import boto3
 SECRET_ID = os.environ.get("PRISM_YOUTUBE_SECRET_ID", "ai-labs/prism-youtube")
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status"
+_THUMBNAIL_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId={video_id}&uploadType=media"
+_THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024  # YouTube 썸네일 상한 2MB
 _NEWS_CATEGORY_ID = "25"  # News & Politics
 _TITLE_MAX = 100  # YouTube 제목 상한
 _DESCRIPTION_MAX = 4900  # 상한 5,000바이트 — 영어 위주라 글자 수로 여유를 둔다
@@ -109,3 +111,20 @@ def upload(mp4_path: Path, meta: dict, creds: dict) -> str:
             return json.loads(res.read())["id"]
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"YouTube {e.code}: {e.read().decode('utf-8', 'replace')[:500]}") from e
+
+
+def set_thumbnail(video_id: str, jpg_path: Path, creds: dict) -> None:
+    """업로드한 영상에 썸네일(렌더 때 만든 2초 지점 장면, render_from_script의 thumb.jpg)을 지정한다(2026-10-26).
+    맞춤 썸네일은 채널이 전화번호 인증된 경우에만 허용된다. 실패하면 예외 — 호출부가 삼켜 업로드 결과는 그대로 둔다."""
+    data = jpg_path.read_bytes()
+    if len(data) > _THUMBNAIL_MAX_BYTES:
+        raise RuntimeError(f"썸네일이 2MB를 넘음({len(data)} bytes)")
+    req = urllib.request.Request(
+        _THUMBNAIL_URL.format(video_id=urllib.parse.quote(video_id)), data=data, method="POST",
+        headers={"Authorization": f"Bearer {_access_token(creds)}", "Content-Type": "image/jpeg", "Content-Length": str(len(data))},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as res:
+            res.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"YouTube 썸네일 {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from e
