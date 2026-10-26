@@ -1,0 +1,310 @@
+{
+  "generation_status": "ready",
+  "image_prompt_language": "en",
+  "layout": "8컷",
+  "aspect_ratio": "3:2",
+  "text_mode": "mixed",
+  "visual_mode": "presenter_led",
+  "core_question": "위성 4기를 한 발사체로 함께 쏘는 계획은 무엇이 확정되고 무엇이 남았나요?",
+  "page_title": "위성 4기 공동 발사 검토",
+  "closing_title": "설계 후 심사",
+  "characters": {
+    "A": "Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse.",
+    "B": "Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt."
+  },
+  "locations": [
+    {
+      "location_id": "L1",
+      "description": "Neutral modern explainer studio with a long bare tabletop, warm neutral back wall, soft even overhead light, navy and teal accent panels, no equipment on the desk."
+    },
+    {
+      "location_id": "L2",
+      "description": "Plain editorial display stand in the same neutral studio, pale gray backdrop, soft overhead light, holding a simple unmarked scale model of a launch vehicle and four small satellite mock-ups."
+    }
+  ],
+  "selected_facts": [
+    {
+      "fact_id": "F1",
+      "importance": 6,
+      "fact_korean": "우주임무연구원이 위성 4기를 한 발사체로 2031년 발사하는 계획을 검토한다고 발표했습니다.",
+      "source_excerpt": "우주임무연구원은 2026년 10월 20일 지구 관측 위성 4기를 하나의 발사체에 실어 2031년에 발사하는 계획을 검토한다고 발표했다.",
+      "certainty": "under_review"
+    },
+    {
+      "fact_id": "F2",
+      "importance": 5,
+      "fact_korean": "발사 계약과 예산은 아직 확정되지 않았습니다.",
+      "source_excerpt": "아직 발사 계약과 예산은 확정되지 않았다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F3",
+      "importance": 4,
+      "fact_korean": "연구원은 한 기씩 발사하는 방식과 비교해 공동 발사 일정 조정 방법을 연구할 예정입니다.",
+      "source_excerpt": "연구원은 기존의 한 기씩 발사하는 방식과 비교해 공동 발사 때 일정을 맞추는 방법을 연구할 예정이다.",
+      "certainty": "scheduled"
+    },
+    {
+      "fact_id": "F4",
+      "importance": 5,
+      "fact_korean": "위성 4기는 각각 다른 지역을 촬영하도록 설계할 계획입니다.",
+      "source_excerpt": "위성 4기는 각각 다른 지역을 촬영하도록 설계할 계획이다.",
+      "certainty": "proposed"
+    },
+    {
+      "fact_id": "F5",
+      "importance": 5,
+      "fact_korean": "지상국은 수신 영상을 종합해 홍수와 산불 현장 파악에 활용할 예정입니다.",
+      "source_excerpt": "지상국은 수신한 영상을 종합해 홍수와 산불 현장을 파악하는 데 활용할 예정이다.",
+      "certainty": "scheduled"
+    },
+    {
+      "fact_id": "F6",
+      "importance": 4,
+      "fact_korean": "이 위성들은 통신 중계용이 아니라 촬영 자료를 내려보내는 관측 위성입니다.",
+      "source_excerpt": "이 위성들은 통신 중계용 위성이 아니며 촬영한 자료를 내려보내는 관측 위성이다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F7",
+      "importance": 5,
+      "fact_korean": "연구원은 위성 수가 네 배여도 관측 정확도가 네 배가 되지는 않는다고 설명했습니다.",
+      "source_excerpt": "연구원은 위성 수가 네 배가 된다고 관측 정확도가 네 배로 높아지는 것은 아니라고 설명했다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F8",
+      "importance": 5,
+      "fact_korean": "공동 발사는 비용을 나눌 수 있지만 한 기 준비가 늦으면 다른 위성 일정에 영향을 줄 수 있습니다.",
+      "source_excerpt": "공동 발사 방식은 비용을 나눌 수 있다는 장점이 있지만 위성 한 기의 준비가 늦어지면 다른 위성의 발사 일정에도 영향을 줄 수 있다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F9",
+      "importance": 5,
+      "fact_korean": "위성 분리 순서와 안전거리는 지상 시험으로 먼저 확인할 계획입니다.",
+      "source_excerpt": "위성 분리 순서와 안전거리는 지상 시험으로 먼저 확인할 계획이다.",
+      "certainty": "proposed"
+    },
+    {
+      "fact_id": "F10",
+      "importance": 6,
+      "fact_korean": "실제 궤도 투입이나 교신 성공은 아직 일어나지 않았습니다.",
+      "source_excerpt": "실제 궤도 투입이나 교신 성공은 아직 일어나지 않았다.",
+      "certainty": "confirmed"
+    },
+    {
+      "fact_id": "F11",
+      "importance": 6,
+      "fact_korean": "2027년까지 기초 설계를 마친 뒤 사업 추진 여부를 심사받을 예정입니다.",
+      "source_excerpt": "연구원은 2027년까지 기초 설계를 마친 뒤 사업 추진 여부를 심사받을 예정이다.",
+      "certainty": "scheduled"
+    },
+    {
+      "fact_id": "F12",
+      "importance": 5,
+      "fact_korean": "심사 결과에 따라 발사 시기와 위성 수가 달라질 수 있습니다.",
+      "source_excerpt": "심사 결과에 따라 발사 시기와 위성 수가 달라질 수 있다.",
+      "certainty": "confirmed"
+    }
+  ],
+  "image_seed": null,
+  "negative_prompt": "photograph, photorealistic, live action, skin pores, 3d render, watercolor, monochrome, grayscale, chibi, childlike presenters, character sheet, split panels, diptych, dividing line, portrait collage, third person, crowd, duplicate person, text, lettering, numbers, logos, watermark, name label, profile card, speech bubbles, extra limbs, malformed hands, extra fingers",
+  "cuts": [
+    {
+      "cut": 1,
+      "fact_ids": [
+        "F1",
+        "F2"
+      ],
+      "cut_function": "중심 변화 제시",
+      "scene_type": "establishing",
+      "location_id": "L1",
+      "narration": "발사 계약과 예산은 아직 확정되지 않은 상태입니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "위성 4기를 한 번에 쏜다고요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "2031년 공동 발사를 검토한다고 발표했습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters seated side by side at one long bare tabletop in a neutral modern explainer studio, the woman turning slightly to ask a question, the man answering with one calm open palm. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral back wall with navy and teal accent panels, soft even overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Medium two-shot, faces well separated and kept above center. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 2,
+      "fact_ids": [
+        "F3"
+      ],
+      "cut_function": "비교 연구 계획",
+      "scene_type": "explanation",
+      "location_id": "L1",
+      "narration": "기존에는 위성을 한 기씩 따로 발사해 왔습니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "일정은 어떻게 맞추게 되나요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "그 방법을 비교해 연구할 예정입니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Same neutral explainer studio seen from a slightly higher angle, two presenters standing behind the same long bare tabletop, the man gesturing once toward an empty stretch of the tabletop while the woman listens with hands clasped. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral wall, navy and teal accent panels, soft overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 3,
+      "fact_ids": [
+        "F4"
+      ],
+      "cut_function": "설계 구상 설명",
+      "scene_type": "mechanism",
+      "location_id": "L2",
+      "narration": "위성 4기는 각각 다른 지역을 촬영하도록 설계할 계획입니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Close view of four small unmarked satellite mock-ups lined up on a plain editorial display stand, each tilted toward a different direction, no people in frame. Pale gray backdrop in the same neutral studio, soft overhead light, simple scale model of a launch vehicle resting behind the row, smooth matte surfaces without markings. Natural skin tones not needed; restrained navy, teal and warm neutral palette. Single eye-level viewpoint, large readable shapes, calm empty space above the models. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 4,
+      "fact_ids": [
+        "F5",
+        "F6"
+      ],
+      "cut_function": "활용 목적 설명",
+      "scene_type": "explanation",
+      "location_id": "L1",
+      "narration": "통신 중계용이 아니라 자료를 내려보내는 관측 위성입니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "받은 영상은 어디에 쓰나요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "지상국이 홍수와 산불 현장 파악에 쓸 예정입니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters at the same long bare tabletop in the neutral explainer studio, the man leaning slightly forward with one hand raised in a simple counting gesture, the woman nodding with a notebook closed in front of her. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral back wall, navy and teal accent panels, soft even overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Tight two-shot from a low-medium angle. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 5,
+      "fact_ids": [
+        "F7"
+      ],
+      "cut_function": "오해 바로잡기",
+      "scene_type": "contrast",
+      "location_id": "L1",
+      "narration": "연구원은 위성 수와 정확도가 비례하지는 않는다고 설명했습니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "위성이 네 배면 정확도도 네 배인가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "그렇지는 않다고 연구원이 밝혔습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters standing at opposite ends of the same long bare tabletop in the neutral explainer studio, the woman tilting her head with a questioning expression while the man shakes one hand in a small negating motion. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral wall with navy and teal accent panels, soft overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Wide medium shot, faces clearly apart and above center. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 6,
+      "fact_ids": [
+        "F8"
+      ],
+      "cut_function": "장점과 위험 정리",
+      "scene_type": "consequence",
+      "location_id": "L1",
+      "narration": "한 기 준비가 늦으면 다른 위성 일정에도 영향을 줄 수 있습니다.",
+      "dialogue": [
+        {
+          "speaker": "B",
+          "line": "공동 발사는 비용을 나눌 수 있습니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Single presenter alone at the long bare tabletop in the neutral explainer studio, seated at the right side, one hand resting flat on the tabletop and the other raised slightly as he explains with a measured expression. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Empty chair beside him, warm neutral back wall with navy and teal accent panels, soft even overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Medium close shot from eye level. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 7,
+      "fact_ids": [
+        "F9",
+        "F10"
+      ],
+      "cut_function": "남은 확인 절차",
+      "scene_type": "evidence",
+      "location_id": "L2",
+      "narration": "실제 궤도 투입이나 교신 성공은 아직 일어나지 않았습니다.",
+      "dialogue": [],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Editorial close-up of a simple unmarked launch vehicle scale model lying on the plain display stand with two small satellite mock-ups set apart from it at measured spacing, no people in frame. Pale gray backdrop in the same neutral studio, soft overhead light, matte unmarked surfaces, a plain unmarked display screen dark and blank on the wall behind. Restrained navy, teal and warm neutral palette. One steady three-quarter viewpoint, large clear shapes, quiet space above. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    },
+    {
+      "cut": 8,
+      "fact_ids": [
+        "F11",
+        "F12"
+      ],
+      "cut_function": "다음 절차와 변수",
+      "scene_type": "next_step",
+      "location_id": "L1",
+      "narration": "심사 결과에 따라 발사 시기와 위성 수가 달라질 수 있습니다.",
+      "dialogue": [
+        {
+          "speaker": "A",
+          "line": "다음 단계는 무엇인가요?",
+          "tone": "보통"
+        },
+        {
+          "speaker": "B",
+          "line": "2027년까지 기초 설계를 마친 뒤 심사받을 예정입니다.",
+          "tone": "보통"
+        }
+      ],
+      "caption": "",
+      "title": "",
+      "title_keyword": "",
+      "closing_caption": "",
+      "image_prompt": "2D Korean webtoon illustration, crisp black ink lines, flat colors, hard cel shadows. Two presenters seated at the same long bare tabletop in the neutral explainer studio, the woman turning toward the man with a short upward palm, the man answering while a single blank sheet lies between them on the tabletop. LEFT: Korean woman in her 30s, oval face, brown bob, black glasses, navy blazer, coral blouse. RIGHT: Korean man in his 40s, angular face, short silver-gray hair, black glasses, teal blazer, ivory shirt. Warm neutral back wall, navy and teal accent panels, soft even overhead light, natural skin tones, restrained navy, teal and warm neutral palette. Slightly wider two-shot, faces apart and above center. Single continuous landscape panel. Keep the bottom quarter visually quiet."
+    }
+  ],
+  "key_numbers": [],
+  "planning": "계획 단계의 조건과 오해 바로잡기가 핵심이라 presenter_led를 선택했다. 설명 컷은 스튜디오 L1, 설계·분리 시험 등 사물 근거 컷은 편집용 모형 스탠드 L2로 나눠 미래 계획을 실경으로 오인하지 않게 했다."
+}

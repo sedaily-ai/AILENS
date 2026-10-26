@@ -30,6 +30,7 @@ import json
 import logging
 import os
 import uuid
+from contextlib import closing
 from typing import Callable
 
 import boto3
@@ -372,9 +373,15 @@ def _stream_json_completion(
 
     use_cache(2026-09-24 추가) — _stream_completion과 같은 이유(그쪽
     docstring 참고). 웹툰 스크립트 프롬프트(4만5천자)가 이 함수를 거치므로
-    캐싱 효과가 가장 크다 — gpt-6 계열만 호출부가 False로 넘긴다."""
+    캐싱 효과가 가장 크다 — gpt-6 계열만 호출부가 False로 넘긴다.
+
+    미리보기 전송 실패는 생성 실패와 별개다. 전송에 실패하면 미리보기만
+    멈추고 같은 응답을 끝까지 받은 뒤, 정상 종료된 결과만 파싱하게 한다."""
     client = _get_bedrock_client()
     parts: list[str] = []
+    stop_reason: str | None = None
+    preview_available = True
+    output_tokens: int | None = None
     try:
         inference_config: dict = {"maxTokens": max_tokens}
         if use_temperature:
@@ -390,17 +397,41 @@ def _stream_json_completion(
         }
         if additional_fields:
             kwargs["additionalModelRequestFields"] = additional_fields
-        resp = client.converse_stream(**kwargs)
-        for chunk in resp["stream"]:
-            delta = (chunk.get("contentBlockDelta") or {}).get("delta") or {}
-            text = delta.get("text")
-            if text:
-                parts.append(text)
-                if not push({"type": f"{event_type}_chunk", "text": text}):
-                    break  # 연결이 끊겼으면 남은 청크를 계속 보낼 이유가 없다
+        with closing(client.converse_stream(**kwargs)["stream"]) as stream:
+            for chunk in stream:
+                if "messageStop" in chunk:
+                    stop_reason = chunk["messageStop"].get("stopReason")
+                if "metadata" in chunk:
+                    output_tokens = (chunk["metadata"].get("usage") or {}).get("outputTokens")
+                delta = (chunk.get("contentBlockDelta") or {}).get("delta") or {}
+                text = delta.get("text")
+                if text:
+                    parts.append(text)
+                    if preview_available and not push({"type": f"{event_type}_chunk", "text": text}):
+                        # 미리보기 전송 실패로 수신까지 중단하면 정상 생성 중인 JSON을 잘라버린다.
+                        # 같은 Bedrock 호출을 끝까지 받고 완성된 storyboard 전송은 별도로 시도한다.
+                        preview_available = False
+                        logger.warning("script 미리보기 전송 실패 — 최종 응답 수신 계속(model=%r)", model)
     finally:
+        logger.info(
+            "script stream 종료(model=%r, stop_reason=%r, chars=%d, output_tokens=%r, preview_available=%s)",
+            model, stop_reason, sum(map(len, parts)), output_tokens, preview_available,
+        )
         push({"type": f"{event_type}_chunk_done"})
-    return "".join(parts)
+    if stop_reason == "max_tokens":
+        raise ValueError("웹툰 응답이 출력 길이 제한에 도달해 중단됐습니다. 프롬프트의 출력 분량을 줄여 다시 시도해 주세요.")
+    if stop_reason == "model_context_window_exceeded":
+        raise ValueError("웹툰 요청이 모델의 입력·출력 길이 제한에 도달했습니다. 기사나 프롬프트를 줄여 다시 시도해 주세요.")
+    if stop_reason in {"guardrail_intervened", "content_filtered"}:
+        raise ValueError("웹툰 응답이 모델의 콘텐츠 정책에 따라 중단됐습니다. 기사와 프롬프트를 확인해 주세요.")
+    if stop_reason is None:
+        raise RuntimeError("웹툰 응답 수신이 완료되기 전에 중단됐습니다. 잠시 후 다시 시도해 주세요.")
+    if stop_reason not in {"end_turn", "stop_sequence"}:
+        raise RuntimeError("웹툰 응답이 정상적으로 완료되지 않았습니다. 잠시 후 다시 시도해 주세요.")
+    raw = "".join(parts)
+    if not raw.strip():
+        raise ValueError("웹툰 생성 응답이 비어 있습니다. 잠시 후 다시 시도해 주세요.")
+    return raw
 
 
 def _run_chat_flow(
@@ -576,25 +607,26 @@ def _run_article_flow(
         )
         try:
             script = extract_json_object(raw)
-        except ValueError:
+        except ValueError as e:
             # 2026-09-20 — 이 except 전체를 감싸는 바깥쪽 try/except(아래)는
             # 사용자에게 push만 하고 서버 로그는 전혀 안 남기고 있었다 —
             # "Bedrock 응답에서 JSON을 찾지 못했습니다" 신고를 실제 CloudWatch
             # 로그로 확인하려다 흔적이 아예 없어서 발견. 원문(최대 2000자)을
             # 로그에 남겨야 다음에 똑같은 신고가 오면 "무슨 모델이 어떻게
-            # 잘못 응답했는지" 바로 볼 수 있다 — 지금은 raw만 남기고 그대로
-            # 다시 던져 바깥 except가 사용자에게 안내하게 둔다.
+            # 잘못 응답했는지" 바로 볼 수 있다. 원문을 남기고 바깥 except가
+            # JSON 형식 오류임을 사용자에게 안내하게 둔다.
             logger.error(f"script JSON 파싱 실패(model_id={model_id!r}) 원문(최대 2000자): {raw[:2000]!r}")
-            raise
+            raise ValueError("웹툰 응답의 JSON 형식이 올바르지 않습니다. 다시 시도해 주세요.") from e
         webtoon_script.validate_storyboard(script, article)
         cuts = webtoon_script.normalize_cuts(script)
-        push({
+        if not push({
             "type": "storyboard",
             "core_question": script.get("core_question"),
             "characters": script.get("characters"),
             "cuts": cuts,
             "tested_version": version,  # 특정 과거 버전으로 시험 발화한 결과면 프론트가 배지로 표시
-        })
+        }):
+            raise ConnectionError("웹툰 결과를 전송하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.")
         # 컷 이미지 생성은 채팅에서 완전히 빠지고 우측 패널
         # (WebtoonCutGenerator, 독립된 WebSocket 연결)로 옮겨갔다(2026-09-16
         # 사용자 요청: "좌측 부분에서는 텍스트만 출력되는 걸로... 우측에서는
@@ -613,7 +645,7 @@ def _run_article_flow(
         # 는 이미 로깅하는데 여기만 빠져 있었음) — 사용자에게 에러 문구는
         # 보이는데 서버 쪽엔 흔적이 전혀 안 남아 사후 조사가 불가능했다.
         logger.exception(f"article flow 실패(model_id={model_id!r})")
-        push({"type": "error", "message": str(e)[:500]})
+        push({"type": "error", "scope": "script", "message": str(e)[:500]})
 
 
 def _run_cut_image_flow(push: Push, cut: dict, model: str = "sd_ultra") -> None:

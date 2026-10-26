@@ -1,0 +1,16 @@
+{
+  "prompt_sha256": "ad8a116968e3b6e8e152832a6ca55f5067da252c08a46e8c0fd128549593912f",
+  "prompt_version": 64,
+  "image_config_version": 30,
+  "story_cuts": 16,
+  "image_count": 18,
+  "core_prompts_shared": true,
+  "image_prompts_unedited": true,
+  "png_decode": true,
+  "links_exist": true,
+  "contract_regression_tests": 16,
+  "limitations": [
+    "기사 의미는 별도 수동 검수",
+    "개별 이미지 생성의 인물 일관성은 미달"
+  ]
+}

@@ -1,0 +1,145 @@
+[
+  {
+    "file": "candidate-housing-cms.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 7391,
+      "outputTokens": 5625,
+      "totalTokens": 13016,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-housing.response.json",
+    "stop_reason": "max_tokens",
+    "usage": {
+      "inputTokens": 7391,
+      "outputTokens": 16000,
+      "totalTokens": 23391,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-scene-v2.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 7911,
+      "outputTokens": 5211,
+      "totalTokens": 13122,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-scene-v3.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 8042,
+      "outputTokens": 5400,
+      "totalTokens": 13442,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-short-cms.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 6863,
+      "outputTokens": 298,
+      "totalTokens": 7161,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-short.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 6863,
+      "outputTokens": 456,
+      "totalTokens": 7319,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-space-cms.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 7384,
+      "outputTokens": 5837,
+      "totalTokens": 13221,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-space-final.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 8694,
+      "outputTokens": 5934,
+      "totalTokens": 14628,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-space-opus.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 8493,
+      "outputTokens": 5673,
+      "totalTokens": 14166,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-space-v2.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 7997,
+      "outputTokens": 6393,
+      "totalTokens": 14390,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-space-v3.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 8128,
+      "outputTokens": 5888,
+      "totalTokens": 14016,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-space-v4.response.json",
+    "stop_reason": "end_turn",
+    "usage": {
+      "inputTokens": 8493,
+      "outputTokens": 6500,
+      "totalTokens": 14993,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  },
+  {
+    "file": "candidate-space.response.json",
+    "stop_reason": "max_tokens",
+    "usage": {
+      "inputTokens": 7384,
+      "outputTokens": 16000,
+      "totalTokens": 23384,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    }
+  }
+]

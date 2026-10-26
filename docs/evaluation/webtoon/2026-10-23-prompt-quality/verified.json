@@ -1,0 +1,13 @@
+{
+  "webtoon": {
+    "version": 63,
+    "sha256": "00b652e39c7aecb7f88f2872626856967a94b6232da7772eae27eb48a669e51c",
+    "public_matches": true
+  },
+  "webtoon-image": {
+    "version": 30,
+    "sha256": "619cc211618c4892787139b16de647cdb32b7b10c1891cd940fdc16c4bfa0928",
+    "public_matches": true
+  },
+  "draft_matches": true
+}

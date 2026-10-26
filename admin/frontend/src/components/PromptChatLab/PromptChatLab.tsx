@@ -99,7 +99,7 @@ type WsPush =
   // tested_version(2026-09-21 추가) — 과거 버전 드롭다운으로 시험 발화한
   // 결과면 그 버전 번호, "최신"으로 보낸 평소 요청이면 null.
   | { type: "storyboard"; core_question: string | null; cuts: WebtoonStoryboardCut[]; tested_version?: number | null }
-  | { type: "error"; message: string }
+  | { type: "error"; message: string; scope?: "script" }
   // 2026-09-21, 사용자 요청 — "특정 대화에서 출력한 이미지들이 다시 그
   // 대화를 들어가면 날아가 있는데 저장할 수 있도록": 우측 패널
   // (WebtoonCutGenerator)에서 컷을 생성하면 이 이벤트가 오는데, 지금까지
@@ -459,6 +459,13 @@ export function PromptChatLab({
     return subscribe((raw) => {
         const msg = raw as WsPush;
         setWaiting(false); // 뭐가 됐든 서버에서 응답이 왔다는 뜻 — 대기 표시(점 세 개) 끔
+        // 중간 완료 알림이 유실돼도 최종 결과·생성 오류가 오면 입력을 다시 연다.
+        // 다른 이미지 작업의 error는 진행 중인 스크립트 생성 상태를 건드리지 않는다.
+        if (msg.type === "script_chunk_done" || msg.type === "storyboard" || (msg.type === "error" && msg.scope === "script")) {
+          resetLiveBuffer();
+          setLiveStepActive(false);
+          setLiveParsed(null);
+        }
         switch (msg.type) {
           case "text_chunk":
             setLiveText((prev) => (prev ?? "") + msg.text);
@@ -479,9 +486,6 @@ export function PromptChatLab({
             appendLiveText(msg.text);
             break;
           case "script_chunk_done":
-            resetLiveBuffer();
-            setLiveStepActive(false);
-            setLiveParsed(null);
             break;
           case "options_prompt":
             appendMessage({ role: "assistant", text: msg.message, animate: false });

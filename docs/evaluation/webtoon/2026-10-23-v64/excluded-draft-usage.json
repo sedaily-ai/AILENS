@@ -1,0 +1,61 @@
+[
+  {
+    "article": "A",
+    "model_key": "opus-5",
+    "seconds": 68.25727891699898,
+    "usage": {
+      "inputTokens": 10420,
+      "outputTokens": 6652,
+      "totalTokens": 17072,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    },
+    "stopReason": "end_turn",
+    "prompt_version": 64,
+    "image_config_version": 30,
+    "article_sha256": "9bcf55ce10c40a5e0e6d255d2ccb373af14f6941cbd18747dce063e467496b01",
+    "prompt_sha256": "69e4f112b34aa459f15afebadc132bed27e7cdb1dde70d014e64df49ee0fdb36",
+    "issues": [
+      "cut 1: speaker description not verbatim",
+      "cut 1: speaker description not verbatim"
+    ],
+    "visual_mode": "presenter_led",
+    "selected_cuts": [
+      1,
+      4,
+      8
+    ]
+  },
+  {
+    "article": "B",
+    "model_key": "opus-5",
+    "seconds": 63.27903999999944,
+    "usage": {
+      "inputTokens": 10106,
+      "outputTokens": 6315,
+      "totalTokens": 16421,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    },
+    "stopReason": "end_turn",
+    "prompt_version": 64,
+    "image_config_version": 30,
+    "article_sha256": "956c23d90ad9fe0edfaac721bebe3dfbe638b8e2a86f1e4e4a85e31fd8fb6614",
+    "prompt_sha256": "69e4f112b34aa459f15afebadc132bed27e7cdb1dde70d014e64df49ee0fdb36",
+    "issues": [
+      "cut 1: speaker description not verbatim",
+      "cut 1: speaker description not verbatim",
+      "cut 2: speaker description not verbatim",
+      "cut 3: speaker description not verbatim",
+      "cut 5: speaker description not verbatim",
+      "cut 8: speaker description not verbatim",
+      "cut 8: speaker description not verbatim"
+    ],
+    "visual_mode": "presenter_led",
+    "selected_cuts": [
+      1,
+      4,
+      8
+    ]
+  }
+]

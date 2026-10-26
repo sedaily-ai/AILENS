@@ -1,0 +1,118 @@
+{
+  "observed_date": "2026-10-23",
+  "scope": "Saved Bedrock test artifacts and CMS activation receipts from the prompt improvement session; no new inference or CMS mutation for this PR.",
+  "synthetic_articles": true,
+  "text_model": "CMS default Opus 5",
+  "image_model_alias": "image_sd_ultra",
+  "historical_checks_are_not_new_tests": true,
+  "files": {
+    "activation-receipts.json": {
+      "sha256": "3dea56fff02216c57015749a13f883f9b3338c407744fa573d7f5968fac6419a",
+      "bytes": 131
+    },
+    "all-text-usage.json": {
+      "sha256": "cff28c1d7efe1a6f517fb6074534e34142c814687d70d7e7e83b6006e0b83cb7",
+      "bytes": 3361
+    },
+    "candidate-scene-v3.article.txt": {
+      "sha256": "1f7ff5612f9820ff7a60c772dbae66a0371f78f2e2f0ae2c9b69b5df695da05c",
+      "bytes": 1155
+    },
+    "candidate-scene-v3.checks.json": {
+      "sha256": "9d73e6abd254a444764e189fd8f26c4579080209630161aa27f0c93ef7b97bc7",
+      "bytes": 527
+    },
+    "candidate-scene-v3.story.json": {
+      "sha256": "bd01c1927c551da80757718ba6645a351f91e678bc647bb3c213c11db8ad1675",
+      "bytes": 14125
+    },
+    "candidate-short-cms.article.txt": {
+      "sha256": "d5ac33be64602cc768d8366003e6129987e91a8ba926b9a78a60cb1329b8c158",
+      "bytes": 144
+    },
+    "candidate-short-cms.checks.json": {
+      "sha256": "c5f57f321b10a24ed709799037230852ca462e96c3709668697bc851c87ee662",
+      "bytes": 450
+    },
+    "candidate-short-cms.story.json": {
+      "sha256": "dd01a3247ca85c26dfdb20cf3ff224058371668e6efa119c0e0b9217cb69a2f1",
+      "bytes": 745
+    },
+    "candidate-space-final-cut1-raw.png": {
+      "sha256": "26275f7d7c4e04ec1801fc109d18483b36501f17ece9fb9ec961d9cb299226da",
+      "bytes": 1289463
+    },
+    "candidate-space-final-cut1.image-checks.json": {
+      "sha256": "93f61251f0634708e239335e42b32d70703ad3786448d2ce79c7aebc76ab65e5",
+      "bytes": 1663
+    },
+    "candidate-space-final-cut1.image-metadata.json": {
+      "sha256": "0c648bcd5a574e0c5c5688a15f9131a616e0ac6d1b9467c166c8c3e17d9ecde6",
+      "bytes": 40
+    },
+    "candidate-space-final-cut1.image-request.json": {
+      "sha256": "1f5718b5a008e2d968497f213122c82be610adb9cda699ffa90c1a904ff10173",
+      "bytes": 1528
+    },
+    "candidate-space-final-cut1.png": {
+      "sha256": "29b1a46b3aa4cd2b3d74940e560f5fa256215c894d64ef0ca1539b54a352cd5e",
+      "bytes": 1072321
+    },
+    "candidate-space-final-cut4-raw.png": {
+      "sha256": "4302ebfd09117b943cbd9b1a74163ad0f600b7573fc44a48399a611752d70b8c",
+      "bytes": 1408213
+    },
+    "candidate-space-final-cut4.image-checks.json": {
+      "sha256": "d568c0aac54f92a8912fe87140edf32a0641486ca627d5def0ec97660c426f59",
+      "bytes": 1683
+    },
+    "candidate-space-final-cut4.image-metadata.json": {
+      "sha256": "0c648bcd5a574e0c5c5688a15f9131a616e0ac6d1b9467c166c8c3e17d9ecde6",
+      "bytes": 40
+    },
+    "candidate-space-final-cut4.image-request.json": {
+      "sha256": "5d6954baf01ab662d13dda4f9817cf3768c7207e2cd382213cbbdd52c1f93931",
+      "bytes": 1536
+    },
+    "candidate-space-final-cut4.png": {
+      "sha256": "5fa037fb5750def0f3067eecc19fdf31c16d1bc9dd9717917dae469fdd437df7",
+      "bytes": 1147376
+    },
+    "candidate-space-final-cut8-raw.png": {
+      "sha256": "6db7b8ed5febaaa84e5fed1183feef7961d520284cf2617e546790b1bfed0fcc",
+      "bytes": 1162148
+    },
+    "candidate-space-final-cut8.image-checks.json": {
+      "sha256": "33e1245dcddf1912c1e9ce584ee31b70f31993c744ffcc364da6f1748cb2dfc1",
+      "bytes": 1706
+    },
+    "candidate-space-final-cut8.image-metadata.json": {
+      "sha256": "0c648bcd5a574e0c5c5688a15f9131a616e0ac6d1b9467c166c8c3e17d9ecde6",
+      "bytes": 40
+    },
+    "candidate-space-final-cut8.image-request.json": {
+      "sha256": "908b42c3f609a9ee9684b9e334ae06dc1fa7b2f45bf5760561b1632d2942d7fc",
+      "bytes": 1555
+    },
+    "candidate-space-final-cut8.png": {
+      "sha256": "d5082af174424da929e751258e2488dba3d125500fde0c1147cf17cb91150d4a",
+      "bytes": 935860
+    },
+    "candidate-space-final.article.txt": {
+      "sha256": "2521ce8ef5af95b560cc74b2283daaa98ac15ddee3a436e278cc680c42911fce",
+      "bytes": 1378
+    },
+    "candidate-space-final.checks.json": {
+      "sha256": "947158d9d1ebb3762cebffec721c226168bb35a388699cc75e5f4687802f8141",
+      "bytes": 534
+    },
+    "candidate-space-final.story.json": {
+      "sha256": "b061617e98c1c2632fc0577cb7ca3187be1cd8c9acd8cc7b715953d5e1afcd5c",
+      "bytes": 17026
+    },
+    "verified.json": {
+      "sha256": "1b716c702fe069619226f335bbcd93eebef07b1df5b4b35900bfba272a88692b",
+      "bytes": 330
+    }
+  }
+}
