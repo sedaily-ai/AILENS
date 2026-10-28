@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
-import { clearLensListMemo, fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
+import { markLensListMemoStale, fetchLensPosts, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { scheduleWarmArticles } from '@/shared/lib/cache/warmArticles';
 import { lensPath } from '@ailens/domain';
 import { pingIndexNow } from '@/shared/lib/seo/indexNow';
 
@@ -34,22 +35,42 @@ export async function POST(request: Request) {
   for (const tag of CONTENT_TAGS) {
     revalidateTag(tag, { expire: 0 });
   }
-  // 서버 메모리에 보관한 큰 기사 목록도 함께 비운다(cmsPostsApi.ts의 lensListMemo).
-  clearLensListMemo();
+  // 서버 메모리의 큰 기사 목록은 비우지 않고 "오래됨" 표시만 한다 — 다음 요청이 옛 목록으로 바로 그리고 뒤에서 새로 받는다
+  // (cmsPostsApi.ts의 markLensListMemoStale 주석 참조). 비우면 발행 직후 첫 기사 렌더가 1,000건을 다시 받느라 1~2초 걸린다.
+  markLensListMemoStale();
 
-  // IndexNow — 최근 3시간 안에 발행·수정된 기사와 홈·지면을 검색엔진에 바로 알린다(응답을 기다리지 않는다).
-  void notifyIndexNow();
+  // 응답을 기다리지 않는 후속 작업: IndexNow 알림과 새 기사 미리 열어 두기.
+  void afterRevalidate();
 
   return Response.json({ ok: true, revalidated: CONTENT_TAGS });
 }
 
-async function notifyIndexNow(): Promise<void> {
+async function afterRevalidate(): Promise<void> {
+  let latest: CmsLens[];
   try {
-    const since = Date.now() - 3 * 60 * 60 * 1000;
-    const recent = (await fetchLensPosts(40)).filter((l) => {
-      const t = Date.parse(l.updated_at || l.published_at || '');
-      return Number.isFinite(t) && t >= since;
-    });
+    latest = await fetchLensPosts(40);
+  } catch (e) {
+    // 발행 흐름과 무관하므로 응답은 막지 않되, 원인은 로그에 남긴다.
+    console.warn('[revalidate] 최근 기사 조회 실패 — IndexNow·미리 열기 생략', e);
+    return;
+  }
+  await notifyIndexNow(latest);
+  // 30분 안에 발행·수정된 기사만 미리 연다(홈 포함, 신호가 몰리면 마지막 신호 20초 뒤 한 번에).
+  scheduleWarmArticles(recentlyChanged(latest, 30 * 60 * 1000));
+}
+
+function recentlyChanged(posts: CmsLens[], withinMs: number): CmsLens[] {
+  const since = Date.now() - withinMs;
+  return posts.filter((l) => {
+    const t = Date.parse(l.updated_at || l.published_at || '');
+    return Number.isFinite(t) && t >= since;
+  });
+}
+
+// IndexNow — 최근 3시간 안에 발행·수정된 기사와 홈·지면을 검색엔진에 바로 알린다.
+async function notifyIndexNow(latest: CmsLens[]): Promise<void> {
+  try {
+    const recent = recentlyChanged(latest, 3 * 60 * 60 * 1000);
     const latestDate = recent.map((l) => l.date).sort().pop();
     await pingIndexNow(['/', ...(latestDate ? [`/paper/${latestDate}`] : []), ...recent.map((l) => lensPath(l))]);
   } catch (e) {

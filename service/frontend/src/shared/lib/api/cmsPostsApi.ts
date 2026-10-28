@@ -135,25 +135,41 @@ export function toLensPreviewSummaries(lenses: CmsLens[]): CmsLens[] {
 // 작은 값을 넘긴다. 전체 목록 응답(~3MB)은 Next 데이터 캐시 한도(2MB)를 넘어 캐시되지 않기 때문이다. 캐시 키·URL이 limit별로 갈린다.
 // 큰 목록(limit≥200, 1,000건이면 ~3MB)은 Next 데이터 캐시에 들어가지 않아 기사 첫 렌더·RSS·뉴스 사이트맵·사이트맵·분류 목록이 렌더마다 오리진에서 다시 받았다.
 // 봇이 서로 다른 글을 훑으면 오리진 응답이 폭주하므로, 서버(SSR) 프로세스 메모리에 5분 보관한다. 갱신이 실패하면 오래된 값을 대신 돌려준다(빈 목록보다 낫다).
-// admin 발행·수정·삭제 webhook(/api/revalidate)이 clearLensListMemo()로 즉시 비우므로 반영 속도는 그대로다.
+// 보관본이 있으면 오래됐어도 바로 돌려주고, 오래된 경우엔 뒤에서 새로 받아 바꿔 둔다(stale-while-revalidate).
+// 보관본이 아예 없을 때(서버 시작 직후)만 기다린다. 예전에는 webhook이 보관본을 비워, 발행 직후 첫 기사 렌더가
+// 1,000건(~2.9MB)을 다시 받느라 첫 바이트가 1~2초로 늘었다(2026-10-28 실측). 지금은 webhook이 "오래됨" 표시만 하고
+// (markLensListMemoStale) 다음 요청이 옛 목록으로 즉시 그린 뒤 새 목록으로 바꾼다 — 하단 추천·이전/다음만 몇 초 늦게 반영된다.
 const BIG_LIST_MIN = 200;
 const lensListMemo = new Map<number, { at: number; posts: CmsLens[] }>();
-export function clearLensListMemo(): void {
-  lensListMemo.clear();
-  allMemo.clear();
+/** 상세 렌더 시간 로그용 — 지금 보관본 상태(없음·신선·오래됨). */
+export function lensListMemoState(limit: number = 1000): 'empty' | 'fresh' | 'stale' {
+  const hit = lensListMemo.get(limit);
+  if (!hit) return 'empty';
+  return Date.now() - hit.at < CACHE_TTL_FALLBACK_SECONDS * 1000 ? 'fresh' : 'stale';
+}
+export function markLensListMemoStale(): void {
+  for (const entry of lensListMemo.values()) entry.at = 0;
+  for (const entry of allMemo.values()) entry.at = 0;
+}
+
+async function refreshLensListMemo(limit: number): Promise<CmsLens[]> {
+  const fresh = await fetchLensPostsFromApi(limit); // 같은 limit 동시 요청은 cached()가 하나로 묶는다.
+  if (fresh.length > 0) {
+    lensListMemo.set(limit, { at: Date.now(), posts: fresh });
+    return fresh;
+  }
+  return lensListMemo.get(limit)?.posts ?? fresh;
 }
 
 export async function fetchLensPosts(limit: number = 1000): Promise<CmsLens[]> {
   const server = typeof window === 'undefined';
   if (server && limit >= BIG_LIST_MIN) {
     const hit = lensListMemo.get(limit);
-    if (hit && Date.now() - hit.at < CACHE_TTL_FALLBACK_SECONDS * 1000) return hit.posts;
-    const fresh = await fetchLensPostsFromApi(limit);
-    if (fresh.length > 0) {
-      lensListMemo.set(limit, { at: Date.now(), posts: fresh });
-      return fresh;
+    if (!hit) return refreshLensListMemo(limit);
+    if (Date.now() - hit.at >= CACHE_TTL_FALLBACK_SECONDS * 1000) {
+      void refreshLensListMemo(limit).catch((e) => console.warn('[lens-list] 뒤에서 갱신 실패, 보관본 유지', e));
     }
-    return hit?.posts ?? fresh;
+    return hit.posts;
   }
   return fetchLensPostsFromApi(limit);
 }
@@ -265,15 +281,30 @@ let paperDatesMemo: { at: number; dates: string[] } | null = null;
 let paperDatesInFlight: Promise<string[]> | null = null;
 
 // 상한(1,000건) 밖 과거 글까지 이어 받는 전체 목록은 날짜별 호출이 수십 번이라 사이트맵·검색 색인이 요청마다 다시 만들면 오리진을 압박한다.
-// 서버 메모리에 5분 보관하고(실패한 빈 결과는 보관하지 않는다) webhook이 clearLensListMemo()로 함께 비운다.
+// 서버 메모리에 5분 보관하고(실패한 빈 결과는 보관하지 않는다) webhook이 markLensListMemoStale()로 "오래됨" 표시한다.
+// lensListMemo와 같은 방식으로, 오래된 보관본은 바로 돌려주고 뒤에서 새로 만든다(같은 key는 한 번만 만든다).
 const allMemo = new Map<string, { at: number; posts: unknown[] }>();
+const allMemoBuilding = new Map<string, Promise<unknown[]>>();
+function rebuildAll<T extends { id: string; date: string }>(key: 'lens' | 'video', build: () => Promise<T[]>): Promise<T[]> {
+  const inFlight = allMemoBuilding.get(key);
+  if (inFlight) return inFlight as Promise<T[]>;
+  const p = build()
+    .then((fresh) => {
+      if (fresh.length > 0) allMemo.set(key, { at: Date.now(), posts: fresh });
+      return fresh.length > 0 ? fresh : ((allMemo.get(key)?.posts as T[] | undefined) ?? fresh);
+    })
+    .finally(() => allMemoBuilding.delete(key));
+  allMemoBuilding.set(key, p);
+  return p;
+}
 async function memoAll<T extends { id: string; date: string }>(key: 'lens' | 'video', build: () => Promise<T[]>): Promise<T[]> {
   if (typeof window !== 'undefined') return build();
   const hit = allMemo.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL_FALLBACK_SECONDS * 1000) return hit.posts as T[];
-  const fresh = await build();
-  if (fresh.length > 0) allMemo.set(key, { at: Date.now(), posts: fresh });
-  return fresh.length > 0 ? fresh : ((hit?.posts as T[] | undefined) ?? fresh);
+  if (!hit) return rebuildAll(key, build);
+  if (Date.now() - hit.at >= CACHE_TTL_FALLBACK_SECONDS * 1000) {
+    void rebuildAll(key, build).catch((e) => console.warn(`[all-${key}] 뒤에서 갱신 실패, 보관본 유지`, e));
+  }
+  return hit.posts as T[];
 }
 
 export async function fetchAllLensPosts(): Promise<CmsLens[]> {
