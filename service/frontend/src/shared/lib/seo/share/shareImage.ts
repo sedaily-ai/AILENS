@@ -9,6 +9,7 @@ export const SHARE_IMAGE_MAX_ASPECT = 3; // 가로세로비가 이보다 크면 
 const PROBE_BYTES = 262_144; // JPEG은 EXIF가 길면 크기 마커가 앞 64KB 밖에 있을 수 있다.
 const PROBE_TIMEOUT_MS = 1_500;
 const CACHE_LIMIT = 6_000;
+const FAILURE_TTL_MS = 30 * 60_000;
 
 export type ImageSize = { width: number; height: number };
 export type ShareImage = { url: string; width?: number; height?: number };
@@ -69,8 +70,11 @@ export function isShareableSize(size: ImageSize): boolean {
 }
 
 // 같은 이미지를 generateMetadata와 페이지 본문이 각각 묻는다 — 진행 중인 요청까지 공유하도록 Promise를 캐시한다.
-// 실패(null)는 캐시에서 빼서 다음 재검증(revalidate 300초) 때 다시 시도한다.
+// 실패(null)도 30분 기억한다. 예전에는 실패를 바로 빼서, 미국 서버에서 한국 원본(wimg)이 1.5초 안에 안 오는 사진은
+// 재검증마다 다시 재느라 상세 렌더가 매번 1.5초씩 늘었다(2026-10-28 [detail-timing] 실측 p90 1.5s).
+// 한도를 넘으면 전부 비우지 않고 가장 오래 안 쓴 것부터 뺀다 — Map은 넣은 순서를 지키므로 쓸 때마다 맨 뒤로 다시 넣는다.
 const sizeCache = new Map<string, Promise<ImageSize | null>>();
+const failedAt = new Map<string, number>();
 
 // cache 옵션을 주지 않는다. 'no-store'를 명시하면 ISR 페이지가 런타임에 동적으로 바뀌려다 500이 난다(2026-10-09 배포 사고).
 // 기본값은 정적 렌더 중에도 허용되고 Data Cache에 저장되지 않으며, 중복 요청은 아래 sizeCache(프로세스 메모리)가 막는다.
@@ -106,12 +110,25 @@ async function probeSize(url: string): Promise<ImageSize | null> {
   }
 }
 
+function forget(url: string): void {
+  sizeCache.delete(url);
+  failedAt.delete(url);
+}
+
 function measure(url: string): Promise<ImageSize | null> {
   const hit = sizeCache.get(url);
-  if (hit) return hit;
-  if (sizeCache.size >= CACHE_LIMIT) sizeCache.clear();
+  if (hit) {
+    const failed = failedAt.get(url);
+    if (failed === undefined || Date.now() - failed < FAILURE_TTL_MS) {
+      sizeCache.delete(url);
+      sizeCache.set(url, hit);
+      return hit;
+    }
+    forget(url);
+  }
+  while (sizeCache.size >= CACHE_LIMIT) forget(sizeCache.keys().next().value!);
   const p = probeSize(url).then((size) => {
-    if (!size) sizeCache.delete(url);
+    if (!size) failedAt.set(url, Date.now());
     return size;
   });
   sizeCache.set(url, p);
