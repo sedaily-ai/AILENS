@@ -14,7 +14,7 @@ export function localOrigin(env: { HOSTNAME?: string; PORT?: string }): string {
   return `http://${host}:${env.PORT ?? 3000}`;
 }
 
-const LOCAL = localOrigin(process.env);
+const LOCAL = localOrigin({ HOSTNAME: process.env.HOSTNAME, PORT: process.env.PORT });
 // 상세 대표 사진 칸(sizes="(min-width: 760px) 720px, 100vw", q=75)에서 휴대폰(2~3배 화면)·PC(1~2배)가 고르는 폭.
 const HERO_WIDTHS = [768, 1024, 1280, 1600];
 // 자동 발행은 기사마다 webhook을 보내므로 신호가 몰린다. 마지막 신호 뒤 잠시 기다렸다가 한 번에 처리해 서버 부담을 줄인다.
