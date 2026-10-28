@@ -7,7 +7,14 @@ import type { CmsLens } from '@/shared/lib/api/cmsPostTypes';
 // 2026-10-28 실측: 처음 보는 변환 사진 첫 바이트 p50 0.72초·p90 2.67초(최대 4.58초), 다시 보면 0.06초.
 // 이 서버 안에서만 채우므로 CloudFront 엣지 캐시는 그대로 비어 있지만, 엣지가 원본에 물을 때 렌더·변환을 기다리지 않는다.
 
-const LOCAL = `http://127.0.0.1:${process.env.PORT ?? 3000}`;
+// Next standalone 서버는 HOSTNAME 주소로만 연결을 받는다. Fargate는 실행 시 HOSTNAME을 태스크 이름(ip-172-31-…ec2.internal)으로
+// 덮어써서(Dockerfile의 0.0.0.0이 무시됨) 127.0.0.1 요청이 전부 1ms 만에 거절됐다(2026-10-29 07:11 발행 로그, TypeError).
+export function localOrigin(env: { HOSTNAME?: string; PORT?: string }): string {
+  const host = !env.HOSTNAME || env.HOSTNAME === '0.0.0.0' ? '127.0.0.1' : env.HOSTNAME;
+  return `http://${host}:${env.PORT ?? 3000}`;
+}
+
+const LOCAL = localOrigin(process.env);
 // 상세 대표 사진 칸(sizes="(min-width: 760px) 720px, 100vw", q=75)에서 휴대폰(2~3배 화면)·PC(1~2배)가 고르는 폭.
 const HERO_WIDTHS = [768, 1024, 1280, 1600];
 // 자동 발행은 기사마다 webhook을 보내므로 신호가 몰린다. 마지막 신호 뒤 잠시 기다렸다가 한 번에 처리해 서버 부담을 줄인다.
