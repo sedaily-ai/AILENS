@@ -119,3 +119,45 @@ describe('resolveShareImages', () => {
     expect(r.isDefault).toBe(true);
   });
 });
+
+describe('크기 측정 캐시', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  const countingFetch = (fail: boolean) => {
+    const fn = vi.fn(async () => {
+      if (fail) throw new Error('timeout');
+      return new Response(png(1200, 630) as BodyInit, { status: 206 });
+    });
+    vi.stubGlobal('fetch', fn);
+    return fn;
+  };
+
+  it('실패도 30분 기억해 다시 재지 않고, 30분이 지나면 다시 잰다', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fetch = countingFetch(true);
+    await resolveShareImages(['https://x/slow-origin.jpg']);
+    await resolveShareImages(['https://x/slow-origin.jpg']);
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(Date.now() + 30 * 60_000 + 1);
+    await resolveShareImages(['https://x/slow-origin.jpg']);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('한도를 넘으면 전부 비우지 않고 가장 오래 안 쓴 것만 뺀다', async () => {
+    const fetch = countingFetch(false);
+    const url = (i: number) => `https://x/lru-${i}.png`;
+    for (let i = 0; i < 6_000; i++) await resolveShareImages([url(i)]);
+    await resolveShareImages([url(0)]); // 최근에 썼으니 남아야 한다
+    await resolveShareImages([url(6_000)]); // 한도 초과 → 가장 오래 안 쓴 lru-1이 빠진다
+    fetch.mockClear();
+
+    await resolveShareImages([url(0), url(2), url(5_999)]);
+    expect(fetch).not.toHaveBeenCalled();
+    await resolveShareImages([url(1)]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
