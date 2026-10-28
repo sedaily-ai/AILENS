@@ -42,8 +42,10 @@ const nextConfig: NextConfig = {
     qualities: [75, 85], // 75 = 기본, 85 = 웹툰 컷(글자가 많아 조금 더 높게)
     deviceSizes: [360, 480, 640, 768, 1024, 1280, 1600],
     imageSizes: [40, 72, 96, 132, 160, 200, 256, 320],
-    // 변환 결과를 하루 캐시 — CloudFront가 /_next/image를 같은 키로 캐시하면 서버는 같은 변환을 반복하지 않는다.
-    minimumCacheTTL: 86400,
+    // 변환 결과를 30일 캐시 — CloudFront가 /_next/image를 같은 키로 캐시하면 서버는 같은 변환을 반복하지 않는다.
+    // 기사 사진은 발행 뒤 바뀌지 않는다. 하루로 두면 매일 다시 변환해, 처음 보는 사진이 첫 바이트 p50 0.72초·p90 2.67초
+    // (2026-10-28 실측, 다시 보면 0.06초) 걸리는 일이 하루 지난 기사마다 반복된다.
+    minimumCacheTTL: 2592000,
   },
   // 사주는 별도 서비스(saju.sedaily.ai)다. 옛 /fortune·/saju-match 링크·북마크는 그쪽으로 보낸다.
   // 봇·AI 크롤러가 자주 가져가는 파일의 CDN 캐시를 명시한다(2026-10-09). 기본값(max-age=0 must-revalidate)이면 CloudFront가 캐시하지 않고 압축도 하지 않아

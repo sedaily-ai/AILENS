@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { permanentRedirect } from 'next/navigation';
-import { fetchLensPosts, fetchLensBySlug, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
+import { fetchLensPosts, fetchLensBySlug, lensListMemoState, type CmsLens } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { buildPageTitle } from '@/shared/lib/seo/meta/buildPageTitle';
 import { buildSeoDescription } from '@/shared/lib/seo/meta/sanitizeDescription';
@@ -293,9 +293,15 @@ export async function LensArticlePageContent(
 ) {
   const { year, month, day, slug: rawSlug } = await paramsPromise;
   const slug = decodeURIComponent(rawSlug);
+  // 단계별 렌더 시간(ms)을 한 줄로 남긴다(CloudWatch /ecs/sedaily-lens-frontend에서 "[detail-timing]"으로 검색).
+  // 캐시가 없어 서버가 새로 그릴 때만 이 함수가 돈다 — 캐시된 응답 시간은 여기 안 잡힌다.
+  const t0 = performance.now();
+  const listMemo = lensListMemoState();
   const [lens, hotLetters] = await Promise.all([findLens(slug), fetchFollowingLetters(10)]);
+  const tMain = performance.now();
   const { more: otherLens, related: relatedLens } = await findOtherLens(slug, lens);
   const neighbors = await findNeighbors(slug, lens);
+  const tList = performance.now();
 
   // 요청 경로(카테고리/연/월/일)가 실제 글의 정본 경로와 다르면(재분류, 잘못된 카테고리 폴더 링크 등) 정본으로 리다이렉트한다.
   // letters/[id]/page.tsx의 lensPost 리다이렉트와 같은 원칙이며, 같은 글이 두 URL로 색인되는 것을 막는다.
@@ -309,7 +315,17 @@ export async function LensArticlePageContent(
     }
   }
 
+  const tShareStart = performance.now();
   const jsonLd = lens ? buildJsonLd(lens, await pickShareImages(lens)) : null;
+  const tEnd = performance.now();
+  console.log(`[detail-timing] ${JSON.stringify({
+    slug,
+    listMemo,
+    lensAndLetters: Math.round(tMain - t0),
+    lensList: Math.round(tList - tMain),
+    shareImages: Math.round(tEnd - tShareStart),
+    total: Math.round(tEnd - t0),
+  })}`);
   return (
     <>
       {jsonLd && (
