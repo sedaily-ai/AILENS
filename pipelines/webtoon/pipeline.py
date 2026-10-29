@@ -189,11 +189,12 @@ def _dialogue_from_bubbles(c: dict) -> list[dict]:
 
 
 class StoryboardRejected(ValueError):
-    """각본이 스토리보드 계약(컷 8개·image_prompt·근거 연결 등)을 통과하지 못했다.
+    """각본을 쓸 수 없다: 스토리보드 계약(컷 8개·image_prompt·근거 인용 등)을 통과하지 못했거나
+    응답을 JSON으로 읽지 못했다.
 
-    이미지 생성 전 단계에서만 낸다. publishing.run_webtoon_with_retry()가 이 예외를 "각본에 cuts 없음"과
-    같이 보고 resume=False로 각본을 한 번 더 만든다(#163 이전에는 검증 없이 빈 cuts로 끝나 그 재시도를 탔다).
-    두 번째도 실패하면 그대로 올라가 웹툰 없이 발행한다."""
+    이미지 생성 전 단계에서만 낸다. publishing.run_webtoon_with_retry()가 이 예외를 받으면 resume=False로
+    각본을 다시 만들며, 2번째 시도부터는 이 예외 문구를 반려 이유로 프롬프트에 붙인다.
+    마지막 시도도 실패하면 그대로 올라가 웹툰 없이 발행한다."""
 
 
 def _normalize_cuts(script: dict) -> list[dict]:
@@ -277,11 +278,12 @@ def generate_image(prompt: str, out_path: Path, retries: int = 3) -> bool:
 
 
 def run_article(name: str, article_path: str, output_root: Path = Path("."), resume: bool = True,
-                 manage_gpu: bool = True):
+                 manage_gpu: bool = True, retry_feedback: str | None = None):
     """기사 1건 → 8컷 웹툰 전체 파이프라인. name은 출력 폴더명.
 
     manage_gpu는 호출 호환용으로 남긴 인자이며 현재 어떤 분기도 타지 않는다(GPU 기동 로직은 삭제됨).
-    frontpage_auto/mustknow_auto와 publishing가 여전히 이 인자를 넘긴다."""
+    frontpage_auto/mustknow_auto와 publishing가 여전히 이 인자를 넘긴다.
+    retry_feedback은 직전 각본이 반려된 이유다. 주면 각본 프롬프트 끝(캐시되지 않는 기사 쪽)에 붙인다."""
     out = output_root / name
     out.mkdir(parents=True, exist_ok=True)
     article = Path(article_path).read_text(encoding="utf-8")
@@ -308,18 +310,34 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             + article
             + _SCRIPT_OUTPUT_ADDENDUM
         )
+        if retry_feedback:
+            script_prompt += (
+                "\n\n---\n[직전 시도가 반려된 이유]\n" + retry_feedback[:1000]
+                + "\n같은 문제가 없도록 처음부터 다시 작성한다. 기사에 없는 사실은 만들지 않는다."
+                " 근거가 정말 부족하면 다시 보류해도 된다."
+            )
         # Opus 5는 컷당 영/한 image_prompt를 길게 써서 8000 토큰으로도 8컷을 채우기 전에 멀티바이트 문자
         # 중간에서 응답이 잘렸다(extract_json_object가 읽지 못해 웹툰 실패). admin/backend/routes/prompts.py::
         # _CATEGORY_BEDROCK["webtoon"]의 max_tokens도 같은 한도로 맞춰 어긋나지 않게 한다.
-        script = call_json(script_prompt, debug_path=out / "1_raw_response.txt", max_tokens=16000,
-                           cached_prefix=script_guide)
+        try:
+            script = call_json(script_prompt, debug_path=out / "1_raw_response.txt", max_tokens=16000,
+                               cached_prefix=script_guide)
+        except ValueError as e:
+            # 잘리거나 문법이 깨진 응답도 각본 반려와 같이 다시 만든다(2026-10-29 전에는 재시도 없이 웹툰을 포기했다).
+            raise StoryboardRejected(
+                "직전 응답을 JSON으로 읽지 못했다(문법 오류 또는 응답 잘림). JSON 객체 하나만 문법에 맞게 응답한다."
+            ) from e
         script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
     try:
-        validate_storyboard(script, article)
+        notes = validate_storyboard(script, article)
         cuts = _normalize_cuts(script)
     except ValueError as e:
         raise StoryboardRejected(str(e)) from e
+    if notes:
+        # 컷 번호·근거 번호·한글 제거 같은 보정을 저장해 발행 단계(1_script.json을 다시 읽음)와 재실행이 같은 각본을 쓰게 한다.
+        print(f"{tag} 각본 보정·기록: " + " / ".join(notes))
+        script_path.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # 3단계: 이미지 생성
     print(f"{tag} 3단계 이미지 생성 ({N_CUTS}컷)")
@@ -389,8 +407,13 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                         except Exception as e:  # noqa: BLE001 — 새 스타일 합성이 실패해도 기본 스타일로라도 글자는 얹는다
                             print(f"{tag} 컷{n} 웹툰식 합성 실패({type(e).__name__}: {e}) — 기본 스타일로 재시도")
                             compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
-                    except compose_text.NarrationOverflowError:
-                        raise
+                    except compose_text.NarrationOverflowError as e:
+                        # 자막이 그림 하단에 들어가지 않으면 이 컷만 뺀다. 글자 없는 배경이 발행되지 않게 파일을 지운다.
+                        # 발행 단계(publishing._make_webtoon)가 파일 없는 컷을 건너뛰고, 남은 컷이 최소 컷 수 이상이면 발행한다.
+                        # 2026-10-29 전에는 이 예외가 올라가 이미지를 다 만든 웹툰 전체를 버렸다.
+                        print(f"{tag} 컷{n} {e} — 이 컷만 빼고 진행")
+                        img_path.unlink(missing_ok=True)
+                        ok = False
                     except Exception as e:
                         print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:
