@@ -15,6 +15,9 @@ const PaperTransition: React.FC<TransitionPresentationComponentProps<Props>> = (
   const t = ease(presentationProgress);
   const entering = presentationDirection === "entering";
   const { kind, seed } = passedProps;
+  // 나가는 장면은 전환 구간 밖(진행 0)에서도 이 컴포넌트로 감싸져 그려진다(Remotion Lambda 렌더에서 확인 — 테이프 조각이
+  // 컷 내내 보였다). 전환 전에는 장식·그림자 없이 장면만 그린다.
+  if (!entering && presentationProgress <= 0) return <AbsoluteFill>{children}</AbsoluteFill>;
 
   if (kind === "cover") {
     // 종이 덮기 — 새 종이가 아래에서 비스듬히 올라와 덮는다.
