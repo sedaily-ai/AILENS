@@ -1,7 +1,9 @@
 import React from "react";
 import { AbsoluteFill, interpolate, random, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { PrismIcon, hasPrismIcon } from "./icons";
+import { hasPrismIcon, stickerFor } from "./icons";
 import { DisplayText, Kicker, PaperTag, useEnter, useStamp, type Seg } from "./parts";
+import { Em, PushPin, TapeStrip, TickerBand, Visual, clamp, risoShadow, useFxFrame, usePrismFx } from "./fx";
+import { StampMark } from "./extra";
 import { FONT, H, INK, MARGIN, MUTED, PAPERS, W, fitDisplay, fitDisplayLines, type PaperName } from "./theme";
 
 // PRISM 장면 — 샘플 영상(2026-10-19 Early Careers 편)의 화면 종류를 옮긴 것.
@@ -39,7 +41,8 @@ export const HeroScene: React.FC<{ tone: Tone; kicker?: string; big: string; seg
 }) => {
   const stamp = useStamp(4);
   const iconIn = useEnter(10);
-  const withIcon = hasPrismIcon(icon);
+  const { effect, scale, mark, riso } = usePrismFx();
+  const withIcon = hasPrismIcon(icon) || !!stickerFor(icon);
   const maxW = W - 2 * MARGIN - (withIcon ? 260 : 0);
   if (segs && segs.length > 1) {
     const full = segs.map((s) => s.text).join("").trim();
@@ -50,7 +53,7 @@ export const HeroScene: React.FC<{ tone: Tone; kicker?: string; big: string; seg
         <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
           {withIcon ? (
             <div style={iconIn}>
-              <PrismIcon name={icon} color={tone.spot} size={180} />
+              <Visual name={icon} color={tone.spot} size={180} />
             </div>
           ) : null}
           <div style={{ ...stamp, maxWidth: maxW }}>
@@ -63,7 +66,7 @@ export const HeroScene: React.FC<{ tone: Tone; kicker?: string; big: string; seg
     );
   }
   const n = splitNumber(big);
-  const size = fitDisplay(big, maxW, 300, 120);
+  const size = Math.round(fitDisplay(big, maxW, 300, 120) * clamp(scale, 0.6, 1.4, 1));
   const numColor = tone.dark ? tone.spot : INK;
   return (
     <AbsoluteFill style={{ top: TOP, height: CONTENT_H, justifyContent: "center", alignItems: "center", gap: 18 }}>
@@ -71,20 +74,23 @@ export const HeroScene: React.FC<{ tone: Tone; kicker?: string; big: string; seg
       <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
         {withIcon ? (
           <div style={iconIn}>
-            <PrismIcon name={icon} color={tone.spot} size={200} />
+            <Visual name={icon} color={tone.spot} size={200} />
           </div>
         ) : null}
-        <div style={{ ...stamp, fontFamily: FONT.display, lineHeight: 1, display: "flex", alignItems: "baseline", whiteSpace: "nowrap" }}>
+        <div style={{ ...stamp, fontFamily: FONT.display, lineHeight: 1, display: "flex", alignItems: "baseline", whiteSpace: "nowrap", textShadow: risoShadow(riso, tone.dark ? "#E8452C" : tone.spot) }}>
           {n ? (
             <>
               {n.sign ? <span style={{ fontSize: size * 0.6, color: tone.spot, marginRight: 10 }}>{n.sign}</span> : null}
-              <span style={{ fontSize: size, color: numColor }}>{n.num}</span>
+              <Em effect={effect} delay={14}>
+                <span style={{ fontSize: size, color: effect === "marker" ? INK : numColor }}>{n.num}</span>
+              </Em>
               {n.unit ? <span style={{ fontSize: n.small ? size * 0.5 : size * 0.38, color: tone.spot, marginLeft: 10 }}>{n.unit}</span> : null}
             </>
           ) : (
             <span style={{ fontSize: size, color: tone.dark ? tone.spot : tone.spot }}>{big}</span>
           )}
         </div>
+        {mark ? <StampMark dir={mark} size={Math.min(170, size * 0.6)} /> : null}
       </div>
       <PaperTag text={tag} />
       {note ? <Hand text={note} tone={tone} delay={16} /> : null}
@@ -109,9 +115,7 @@ export const TitleScene: React.FC<{ tone: Tone; kicker?: string; segs: Seg[]; su
       <Kicker text={kicker} color={textColor(tone)} dash={tone.dark ? "#fff" : tone.spot} />
       <div style={{ ...e, textAlign: "center" }}>
         {segs.map((s, i) => (
-          <div key={i} style={{ fontFamily: FONT.display, fontSize: size, lineHeight: 1.0, color: s.em ? emColor(tone) : textColor(tone) }}>
-            {s.text.trim()}
-          </div>
+          <DisplayText key={i} segs={[{ ...s, text: s.text.trim() }]} size={size} color={textColor(tone)} em={emColor(tone)} align="center" lineHeight={1.0} />
         ))}
       </div>
       {sub ? <SubLine text={sub} tone={tone} delay={10} /> : null}
@@ -181,7 +185,7 @@ export const SplitScene: React.FC<{
   const size = fitDisplayLines([lines.join(" ").length > 22 ? lines.join(" ").slice(0, 16) : lines.join(" ")], textW, 130, 70);
   const panel = (
     <div style={{ ...iconIn, width: panelW, display: "flex", flexDirection: "column", alignItems: "center", gap: 30 }}>
-      <PrismIcon name={icon && hasPrismIcon(icon) ? icon : "info"} color={tone.spot} size={240} />
+      <Visual name={icon} color={tone.spot} size={240} />
       {label ? <div style={{ fontFamily: FONT.display, fontSize: fitDisplay(label, panelW - 80, 66, 40), color: INK, textAlign: "center" }}>{label}</div> : null}
     </div>
   );
@@ -219,7 +223,7 @@ const Tape: React.FC = () => (
 );
 
 export const FlowScene: React.FC<{ tone: Tone; kicker?: string; segs: Seg[]; nodes: FlowNode[]; filled: number }> = ({ tone, kicker, segs, nodes, filled }) => {
-  const frame = useCurrentFrame();
+  const frame = useFxFrame();
   const { fps } = useVideoConfig();
   const head = useEnter(2);
   const n = Math.min(nodes.length, 3);
@@ -261,7 +265,7 @@ export const FlowScene: React.FC<{ tone: Tone; kicker?: string; segs: Seg[]; nod
                 }}
               >
                 <Tape />
-                <PrismIcon name={hasPrismIcon(node.icon) ? node.icon : "info"} color={isFilled ? "#fff" : tone.spot} size={110} />
+                <Visual name={node.icon} color={isFilled ? "#fff" : tone.spot} size={110} />
                 <div style={{ fontFamily: FONT.body, fontWeight: 800, fontSize: fitBody(node.label, cardW - 40, 40), color: isFilled ? "#fff" : INK, textAlign: "center", lineHeight: 1.15 }}>{node.label}</div>
                 {node.sub ? <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 24, color: isFilled ? "rgba(255,255,255,0.85)" : MUTED, textAlign: "center" }}>{node.sub}</div> : null}
               </div>
@@ -490,6 +494,100 @@ export const EndCardScene: React.FC<{ group?: string; lines: string[]; last?: st
         ))}
       </div>
       {last ? <div style={{ ...body, marginTop: 30, fontFamily: FONT.body, fontWeight: 800, fontSize: 38, color: "#fff" }}>{last}</div> : null}
+    </AbsoluteFill>
+  );
+};
+
+// ── 오려 붙인 종이 카드 2~4장(콜라주 보드) ─────────────────────────────
+type Card = { label: string; sub?: string; icon?: string };
+const CARD_PAPERS = ["#FBF7EE", "#F2EBDD", "#EDE6D3"];
+
+export const CardsScene: React.FC<{ tone: Tone; kicker?: string; segs: Seg[]; cards: Card[]; seed: string }> = ({ tone, kicker, segs, cards, seed }) => {
+  const frame = useFxFrame();
+  const { fps } = useVideoConfig();
+  const head = useEnter(2);
+  const n = cards.length;
+  const cardW = n === 2 ? 600 : Math.min(470, Math.floor((W - 2 * MARGIN - (n - 1) * 56) / n));
+  const title = segs.map((s) => s.text).join("");
+  return (
+    <AbsoluteFill style={{ top: TOP + 10, paddingLeft: MARGIN, paddingRight: MARGIN }}>
+      <div style={head}>
+        <Kicker text={kicker} color={tone.dark ? "#fff" : tone.spot} dash={tone.dark ? "#fff" : tone.spot} size={28} align="left" />
+        <div style={{ marginTop: 6 }}>
+          <DisplayText segs={segs} size={fitDisplay(title, W - 2 * MARGIN, 96, 60)} color={textColor(tone)} em={tone.spot} />
+        </div>
+      </div>
+      <div style={{ marginTop: 56, display: "flex", justifyContent: "center", gap: 56 }}>
+        {cards.map((c, i) => {
+          // 위에서 떨어져 놓이며 살짝 튕긴다(오버슈트), 놓인 뒤 ±0.5도 숨쉬기.
+          const p = spring({ frame: frame - (8 + i * 6), fps, config: { damping: 11, stiffness: 150 } });
+          const tilt = (random(`${seed}-card-${i}`) - 0.5) * 6 + Math.sin((frame + i * 20) / 18) * 0.5;
+          const pinned = i % 2 === 1;
+          const lead = i === n - 1;
+          return (
+            <div
+              key={i}
+              style={{
+                position: "relative",
+                width: cardW,
+                height: 360,
+                background: CARD_PAPERS[i % CARD_PAPERS.length],
+                boxShadow: "0 10px 22px rgba(0,0,0,0.22)",
+                clipPath: "polygon(0.6% 1.2%, 99% 0, 100% 98.6%, 1.4% 100%)",
+                transform: `translateY(${(1 - p) * -90}px) rotate(${tilt + (1 - p) * 8}deg)`,
+                opacity: interpolate(p, [0, 0.3], [0, 1], { extrapolateRight: "clamp" }),
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 16,
+                padding: "26px 30px",
+                borderBottom: lead ? `10px solid ${tone.spot}` : undefined,
+              }}
+            >
+              {c.icon ? <Visual name={c.icon} color={tone.spot} size={120} /> : null}
+              <div style={{ fontFamily: FONT.display, fontSize: fitDisplay(c.label, cardW - 70, 76, 40), color: lead ? tone.spot : INK, textAlign: "center", lineHeight: 1.05 }}>{c.label}</div>
+              {c.sub ? <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 26, color: MUTED, textAlign: "center", lineHeight: 1.25 }}>{c.sub}</div> : null}
+            </div>
+          );
+        })}
+      </div>
+      {/* 테이프·압정은 카드의 clipPath에 잘리지 않게 카드 밖 같은 자리에 얹는다. */}
+      <CardDecor n={n} cardW={cardW} frame={frame} />
+    </AbsoluteFill>
+  );
+};
+
+const CardDecor: React.FC<{ n: number; cardW: number; frame: number }> = ({ n, cardW, frame }) => {
+  const gap = 56;
+  const total = n * cardW + (n - 1) * gap;
+  const startX = (W - 2 * MARGIN - total) / 2;
+  return (
+    <>
+      {Array.from({ length: n }, (_, i) => {
+        const x = startX + i * (cardW + gap);
+        const shown = interpolate(frame, [18 + i * 6, 24 + i * 6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+        return i % 2 === 1 ? (
+          <PushPin key={i} style={{ left: x + cardW / 2 - 27, top: 172, opacity: shown }} />
+        ) : (
+          <TapeStrip key={i} style={{ left: x + cardW / 2 - 60, top: 180, transform: `rotate(${i === 0 ? -4 : 3}deg)`, opacity: shown }} />
+        );
+      })}
+    </>
+  );
+};
+
+// ── 흐르는 띠(티커) — 섹션 사이 호흡 ───────────────────────────────
+export const TickerScene: React.FC<{ tone: Tone; segs: Seg[]; items: string[] }> = ({ tone, segs, items }) => {
+  const mid = useEnter(8);
+  const title = segs.map((s) => s.text).join("");
+  return (
+    <AbsoluteFill style={{ top: TOP, height: CONTENT_H, justifyContent: "center", gap: 46 }}>
+      <TickerBand items={items} bg="rgba(240,226,180,0.95)" color={INK} rotate={-3} />
+      <div style={{ ...mid, padding: `0 ${MARGIN}px` }}>
+        <DisplayText segs={segs} size={fitDisplay(title, W - 2 * MARGIN, 130, 70)} color={textColor(tone)} em={tone.spot} align="center" />
+      </div>
+      <TickerBand items={items} bg={tone.spot} color="#fff" dir={-1} rotate={2} size={64} speed={5} sep="▲" />
     </AbsoluteFill>
   );
 };

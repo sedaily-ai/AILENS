@@ -4,11 +4,14 @@ import { linearTiming, TransitionSeries, type TransitionPresentation } from "@re
 import { fade } from "@remotion/transitions/fade";
 import { flip } from "@remotion/transitions/flip";
 import { slide } from "@remotion/transitions/slide";
-import { wipe } from "@remotion/transitions/wipe";
+import { iris } from "@remotion/transitions/iris";
 import { cutSeconds, type Cut, type NewsScript } from "../lib/schema";
 import { emphasisOf, segsOf, Shell } from "./parts";
-import { BarsScene, BeforeAfterScene, DateScene, DonutScene, EndCardScene, FlowScene, HeroScene, SplitScene, TitleScene, TwoStatsScene } from "./scenes";
-import { PAPERS, spotFor, type PaperName } from "./theme";
+import { BarsScene, BeforeAfterScene, CardsScene, DateScene, DonutScene, EndCardScene, FlowScene, HeroScene, SplitScene, TickerScene, TitleScene, TwoStatsScene } from "./scenes";
+import { H, PAPERS, W, spotFor, type PaperName } from "./theme";
+import { LineScene, NewspaperScene, TimelineScene } from "./extra";
+import { PrismFx } from "./fx";
+import { paperTransition } from "./transitions";
 
 // AI PRISM 컴포지션 — 사이트 각본(NewsScript, design.theme "prism")을 PRISM 장면으로 그린다.
 // 컷 하나 = 장면 하나. 길이는 TTS 음성 길이(+holdSeconds)를 따르고, 마지막 closing 컷이 엔드카드가 된다.
@@ -36,14 +39,52 @@ const paperOf = (cut: Cut, i: number): PaperName => {
 type AnyPresentation = TransitionPresentation<Record<string, unknown>>;
 const widen = <T extends Record<string, unknown>>(p: TransitionPresentation<T>) => p as unknown as AnyPresentation;
 
-const transitionOf = (cut: Cut, prev?: Cut): { presentation: AnyPresentation; timing: ReturnType<typeof linearTiming> } => {
-  const t = cut.style?.transition;
-  const timing = linearTiming({ durationInFrames: TRANSITION_FRAMES });
-  if (t === "flip" || (!t && prev && cut.style?.section !== prev.style?.section)) return { presentation: widen(flip({ direction: "from-right" })), timing };
-  if (t === "tear") return { presentation: widen(wipe({ direction: "from-left" })), timing };
-  if (t === "stampCut" || t === "zoom") return { presentation: widen(fade()), timing };
-  return { presentation: widen(slide({ direction: "from-right" })), timing };
+type TransitionName = NonNullable<NonNullable<Cut["style"]>["transition"]>;
+// 대본이 전환을 안 정하면 이 순서로 돌려 쓴다(같은 전환 2연속 금지). 섹션이 바뀌는 자리는 페이지 넘기기.
+const DEFAULT_CYCLE: TransitionName[] = ["slide", "cover", "tear", "zoom", "slideUp", "stampCut"];
+
+const pickTransitions = (cuts: Cut[]): TransitionName[] => {
+  const out: TransitionName[] = [];
+  cuts.forEach((cut, i) => {
+    const prev = out[i - 1];
+    let t: TransitionName | undefined = cut.style?.transition;
+    if (!t && i > 0 && cut.style?.section !== cuts[i - 1].style?.section) t = "pageTurn";
+    if (!t) {
+      t = DEFAULT_CYCLE[i % DEFAULT_CYCLE.length];
+      if (t === prev) t = DEFAULT_CYCLE[(i + 1) % DEFAULT_CYCLE.length];
+    }
+    out.push(t);
+  });
+  return out;
 };
+
+const transitionOf = (t: TransitionName, i: number): { presentation: AnyPresentation; timing: ReturnType<typeof linearTiming> } => {
+  const timing = linearTiming({ durationInFrames: TRANSITION_FRAMES });
+  const seed = `tr-${i}`;
+  switch (t) {
+    case "flip":
+      return { presentation: widen(flip({ direction: "from-right" })), timing };
+    case "iris":
+      return { presentation: widen(iris({ width: W, height: H })), timing };
+    case "fade":
+      return { presentation: widen(fade()), timing };
+    case "slideUp":
+      return { presentation: widen(slide({ direction: "from-bottom" })), timing };
+    case "cover":
+    case "tear":
+    case "tapePeel":
+    case "pageTurn":
+    case "zoom":
+    case "stampCut":
+      return { presentation: widen(paperTransition(t, seed)), timing };
+    default:
+      return { presentation: widen(slide({ direction: "from-right" })), timing };
+  }
+};
+
+/** 강조색이 종이색에 묻히는 조합(어두운 종이에 남색·검정, 밝은 종이에 흰색, 같은 이름의 종이·강조색)은 기본 색으로 돌린다. */
+const clashes = (paper: PaperName, spot?: string): boolean =>
+  !!spot && (paper === spot || (PAPERS[paper].dark ? spot === "navy" || spot === "black" : spot === "white"));
 
 const framesOf = (cut: Cut, fps: number) => Math.max(TRANSITION_FRAMES + 6, Math.round(cutSeconds(cut) * fps));
 
@@ -69,8 +110,8 @@ const sourceOf = (cut: Cut): string | undefined => {
   }
 };
 
-const SceneBody: React.FC<{ cut: Cut; i: number; paper: PaperName; spot: string; group?: string }> = ({ cut, i, paper, spot, group }) => {
-  const tone = { dark: PAPERS[paper].dark, spot };
+const SceneBody: React.FC<{ cut: Cut; i: number; paper: PaperName; spot: string; dark: boolean; group?: string }> = ({ cut, i, paper, spot, dark, group }) => {
+  const tone = { dark, spot };
   const st = cut.style ?? {};
   const segs = segsOf(cut.caption);
   const seed = `prism-${i}`;
@@ -114,6 +155,7 @@ const SceneBody: React.FC<{ cut: Cut; i: number; paper: PaperName; spot: string;
           />
         );
       }
+      if (cut.data.chartType === "line") return <LineScene tone={tone} kicker={st.kicker} segs={segs} points={cut.data.points} unit={cut.data.unit} />;
       return <BarsScene tone={tone} kicker={st.kicker} segs={segs} points={cut.data.points} unit={cut.data.unit} />;
     case "rank":
       return <BarsScene tone={tone} kicker={st.kicker} segs={segs} points={cut.data.items} unit={cut.data.unit} />;
@@ -121,12 +163,17 @@ const SceneBody: React.FC<{ cut: Cut; i: number; paper: PaperName; spot: string;
       const nodes = cut.data.nodes.flatMap((n) => (n.kind === "node" ? [{ icon: n.icon, label: n.label, sub: n.sub }] : []));
       const em = emphasisOf(cut.caption).toLowerCase();
       const hit = nodes.findIndex((n) => em && (n.label.toLowerCase().includes(em) || em.includes(n.label.toLowerCase())));
+      if (st.scene === "timeline") return <TimelineScene tone={tone} kicker={st.kicker} segs={segs} nodes={nodes} highlight={hit >= 0 ? hit : nodes.length - 1} seed={seed} />;
       return <FlowScene tone={tone} kicker={st.kicker} segs={segs} nodes={nodes} filled={hit >= 0 ? hit : nodes.length >= 3 ? 1 : 0} />;
     }
     case "highlight":
     case "opening":
     case "photo": {
       const scene = st.scene ?? "split";
+      if (scene === "newspaper") return <NewspaperScene tone={tone} kicker={st.kicker} segs={segs} sub={st.sub} columns={st.columns} narration={cut.narration} seed={seed} />;
+      if (scene === "timeline" && st.cards) return <TimelineScene tone={tone} kicker={st.kicker} segs={segs} nodes={st.cards} highlight={st.cards.length - 1} seed={seed} />;
+      if (scene === "cards" && st.cards) return <CardsScene tone={tone} kicker={st.kicker} segs={segs} cards={st.cards} seed={seed} />;
+      if (scene === "ticker") return <TickerScene tone={tone} segs={segs} items={st.ticker ?? segs.map((s) => s.text.trim())} />;
       if (scene === "title") return <TitleScene tone={tone} kicker={st.kicker} segs={segs} sub={st.sub} />;
       if (scene === "date") return <DateScene tone={tone} segs={segs} />;
       if (scene === "hero")
@@ -160,14 +207,28 @@ const SceneBody: React.FC<{ cut: Cut; i: number; paper: PaperName; spot: string;
 export const PrismVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
   const fps = 30;
   const totalSections = Math.max(0, ...script.cuts.map((c) => c.style?.section ?? 0));
+  const transitions = pickTransitions(script.cuts);
   return (
     <TransitionSeries>
       {script.cuts.map((cut, i) => {
         const paper = paperOf(cut, i);
         const section = cut.style?.section;
-        const spot = spotFor(paper, section, i);
+        const st = cut.style ?? {};
+        const dark = PAPERS[paper].dark;
+        const spot = spotFor(paper, section, i, clashes(paper, st.spot) ? undefined : st.spot);
         const frames = framesOf(cut, fps);
-        const t = transitionOf(cut, script.cuts[i - 1]);
+        const t = transitionOf(transitions[i], i);
+        // 노란 종이 위 노란 형광펜은 안 보이므로 흰 형광펜으로 바꾼다.
+        const fx = {
+          effect: st.effect,
+          iconStyle: st.iconStyle ?? script.design?.iconStyle,
+          seed: `fx-${i}`,
+          marker: paper === "yellow" ? "#FFFFFF" : undefined,
+          scale: st.textScale,
+          mark: st.mark,
+          riso: st.riso ?? script.design?.riso,
+          stopMotion: st.stopMotion ?? script.design?.stopMotion,
+        };
         const isEnd = cut.type === "closing";
         // 섹션 전환 제목(title)·엔드카드에는 번호를 달지 않는다.
         const showSection = section && totalSections && !isEnd && cut.style?.scene !== "title" ? { no: section, total: totalSections } : undefined;
@@ -175,9 +236,10 @@ export const PrismVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
           <React.Fragment key={i}>
             {i > 0 ? <TransitionSeries.Transition presentation={t.presentation} timing={t.timing} /> : null}
             <TransitionSeries.Sequence durationInFrames={frames}>
+              <PrismFx.Provider value={fx}>
               {cut.audioFile ? <Audio src={audioSrc(cut.audioFile)} /> : null}
               {isEnd ? (
-                <SceneBody cut={cut} i={i} paper={paper} spot={spot} group={script.keyword} />
+                <SceneBody cut={cut} i={i} paper={paper} spot={spot} dark={dark} group={script.keyword} />
               ) : (
                 <Shell
                   paper={paper}
@@ -188,10 +250,13 @@ export const PrismVideo: React.FC<{ script: NewsScript }> = ({ script }) => {
                   source={sourceOf(cut)}
                   line={cut.narration}
                   durationInFrames={frames}
+                  sticker={st.sticker}
+                  stickerPos={st.stickerPos}
                 >
-                  <SceneBody cut={cut} i={i} paper={paper} spot={spot} group={script.keyword} />
+                  <SceneBody cut={cut} i={i} paper={paper} spot={spot} dark={dark} group={script.keyword} />
                 </Shell>
               )}
+              </PrismFx.Provider>
             </TransitionSeries.Sequence>
           </React.Fragment>
         );

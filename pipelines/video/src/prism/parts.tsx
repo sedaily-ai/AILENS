@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CaptionValue } from "../lib/schema";
 import { FONT, INK, MARGIN, MUTED, PAPERS, type PaperName } from "./theme";
+import { Em, StickerPop, clamp, risoShadow, useFxFrame, usePrismFx, useTypewriter } from "./fx";
 
 // PRISM 공통 부품 — 화면 틀(배경·그룹 태그·섹션 번호·출처·자막 막대)과 등장 움직임.
 
@@ -27,7 +28,7 @@ export const emphasisOf = (caption: CaptionValue): string => {
 
 /** 등장 — 아래에서 살짝 올라오며 나타난다(스프링 14/170). */
 export const useEnter = (delay = 0) => {
-  const frame = useCurrentFrame();
+  const frame = useFxFrame();
   const { fps } = useVideoConfig();
   const p = spring({ frame: frame - delay, fps, config: { damping: 14, stiffness: 170 } });
   return { opacity: interpolate(p, [0, 0.4], [0, 1], { extrapolateRight: "clamp" }), transform: `translateY(${(1 - p) * 40}px)`, p };
@@ -35,7 +36,7 @@ export const useEnter = (delay = 0) => {
 
 /** 도장처럼 쾅 — 1.15배에서 1.0으로 내려앉고 놓일 때 3프레임 흔들린다(스프링 9/180). */
 export const useStamp = (delay = 0) => {
-  const frame = useCurrentFrame();
+  const frame = useFxFrame();
   const { fps } = useVideoConfig();
   const p = spring({ frame: frame - delay, fps, config: { damping: 9, stiffness: 180 } });
   const scale = interpolate(p, [0, 1], [1.15, 1]);
@@ -135,18 +136,23 @@ export type ShellProps = {
   source?: string;
   line?: string;
   durationInFrames: number;
+  sticker?: string;
+  stickerPos?: "tl" | "tr" | "bl" | "br";
   children: React.ReactNode;
 };
 
 /** 화면 틀 — 배경, 고정 요소, 그리고 본문은 장면 동안 1.00→1.03배로 천천히 다가온다. */
-export const Shell: React.FC<ShellProps> = ({ paper, spot, group, date, section, source, line, durationInFrames, children }) => {
+export const Shell: React.FC<ShellProps> = ({ paper, spot, group, date, section, source, line, durationInFrames, sticker, stickerPos, children }) => {
   const frame = useCurrentFrame();
   const { dark, bg } = PAPERS[paper];
   const zoom = interpolate(frame, [0, Math.max(1, durationInFrames)], [1, 1.03], { extrapolateRight: "clamp" });
   return (
     <AbsoluteFill style={{ background: bg }}>
       <Vignette dark={dark} />
-      <AbsoluteFill style={{ transform: `scale(${zoom})` }}>{children}</AbsoluteFill>
+      <AbsoluteFill style={{ transform: `scale(${zoom})` }}>
+        {children}
+        {sticker ? <StickerPop name={sticker} pos={stickerPos} /> : null}
+      </AbsoluteFill>
       <Header group={group} date={date} />
       {section ? <SectionNo section={section.no} total={section.total} spot={spot} dark={dark} /> : null}
       {source ? <Source text={source} dark={dark} hasSubtitle={!!line} /> : null}
@@ -198,7 +204,8 @@ export const PaperTag: React.FC<{ text?: string; delay?: number; size?: number }
   );
 };
 
-/** 큰 제목 — 강조 구간만 강조색. Anton. */
+/** 큰 제목 — 강조 구간만 강조색. Anton. 컷의 style.effect가 있으면 강조 구간에 효과(형광펜·동그라미·밑줄)를,
+ *  typewriter면 제목 전체를 한 글자씩 찍는다. 형광펜은 노란 띠 위라 강조 글자를 잉크색으로 둔다. */
 export const DisplayText: React.FC<{ segs: Seg[]; size: number; color: string; em: string; align?: "left" | "center"; lineHeight?: number }> = ({
   segs,
   size,
@@ -206,12 +213,32 @@ export const DisplayText: React.FC<{ segs: Seg[]; size: number; color: string; e
   em,
   align = "left",
   lineHeight = 1.02,
-}) => (
-  <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight, color, textAlign: align, letterSpacing: 0.5 }}>
-    {segs.map((s, i) => (
-      <span key={i} style={{ color: s.em ? em : color }}>
-        {s.text}
-      </span>
-    ))}
-  </div>
-);
+}) => {
+  const { effect, scale, riso } = usePrismFx();
+  size = Math.round(size * clamp(scale, 0.6, 1.6, 1));
+  const total = segs.reduce((n, s) => n + s.text.length, 0);
+  const tw = useTypewriter(total);
+  let left = effect === "typewriter" ? tw.shown : Infinity;
+  return (
+    <div style={{ fontFamily: FONT.display, fontSize: size, lineHeight, color, textAlign: align, letterSpacing: 0.5, textShadow: risoShadow(riso, em) }}>
+      {segs.map((s, i) => {
+        const text = effect === "typewriter" ? s.text.slice(0, Math.max(0, left)) : s.text;
+        left -= s.text.length;
+        const span = <span style={{ color: s.em ? (effect === "marker" ? INK : em) : color }}>{s.em ? text.trim() : text}</span>;
+        // 효과 상자(inline-block)는 앞뒤 공백을 지우므로 공백은 상자 밖에 둔다("Today's themes"가 붙어 보이지 않게).
+        return s.em ? (
+          <React.Fragment key={i}>
+            {/^\s/.test(text) ? " " : null}
+            <Em effect={effect} k={i}>
+              {span}
+            </Em>
+            {/\s$/.test(text) ? " " : null}
+          </React.Fragment>
+        ) : (
+          <React.Fragment key={i}>{span}</React.Fragment>
+        );
+      })}
+      {effect === "typewriter" && !tw.done && tw.cursorOn ? <span style={{ color: em }}>|</span> : null}
+    </div>
+  );
+};

@@ -1,7 +1,7 @@
 import type { CaptionValue, Cut, NewsScript } from "../lib/schema";
-import { cutSeconds } from "../lib/schema";
+import { cutSeconds, PAPER_NAMES } from "../lib/schema";
 import type { PaperName, SpotName } from "./theme";
-import type { TransitionName } from "./transitions";
+import { TRANSITIONS, type TransitionName } from "./transitions";
 import type { Bar, CardNode, EmStyle, PaperScene, Photo, Visual } from "./types";
 
 // 사이트 각본(NewsScript) → 종이 질감 장면 목록.
@@ -128,14 +128,14 @@ export const toPaperScenes = (script: NewsScript, fps: number): PaperScene[] => 
 
     // 종이 색 기본 규칙: 강조 장면(highlight·closing)은 검은 종이(직전이 검으면 스팟 색 종이), 나머지는 3종을 돌아가며.
     let paper: PaperName;
-    if (st.paper) paper = st.paper;
+    if (st.paper && (PAPER_NAMES as readonly string[]).includes(st.paper)) paper = st.paper as PaperName;
     else if (cut.type === "opening") paper = script.design?.paper ?? "kraft";
     else if (cut.type === "highlight" || cut.type === "closing") paper = prevPaper === "black" ? "spot" : "black";
     else paper = CONTENT_PAPERS[contentIdx++ % CONTENT_PAPERS.length];
     prevPaper = paper;
 
     const transitionIn: TransitionName =
-      st.transition ?? (cut.type === "highlight" ? "stampCut" : TRANSITION_CYCLE[i % TRANSITION_CYCLE.length]);
+      (st.transition && st.transition in TRANSITIONS ? (st.transition as TransitionName) : undefined) ?? (cut.type === "highlight" ? "stampCut" : TRANSITION_CYCLE[i % TRANSITION_CYCLE.length]);
 
     return {
       line: cut.narration,
