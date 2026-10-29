@@ -89,6 +89,51 @@ def test_english_image_contract_keeps_korean_captions():
     assert s["cuts"][0]["narration"] == "예산 승인 시 시행한다."
 
 
+def test_quote_dot_and_spacing_differences_still_match_article():
+    article = "김 장관은 “한ㆍ미 협의가 끝나면 1조 원을 투입한다”라고 말했다."
+    s = _storyboard()
+    s["selected_facts"][0]["source_excerpt"] = '"한·미 협의가 끝나면 1조원을 투입한다."'
+    assert validate_storyboard(s, article) == []
+    s["selected_facts"][0]["source_excerpt"] = "김 장관은 … 1조 원을 투입한다"
+    assert validate_storyboard(s, article) == []
+    s["selected_facts"][0]["source_excerpt"] = "김 장관은 … 2조 원을 투입한다"
+    with pytest.raises(ValueError, match="source_excerpt"):
+        validate_storyboard(s, article)
+
+
+def test_only_majority_of_unmatched_excerpts_rejects():
+    article = "예산 승인 시 시행한다. 대상은 중소기업이다. 내년 1월부터 신청받는다."
+    s = _storyboard()
+    s["selected_facts"] = [
+        {"fact_id": "F1", "source_excerpt": "예산 승인 시 시행한다"},
+        {"fact_id": "F2", "source_excerpt": "대상은 중소기업이다"},
+        {"fact_id": "F3", "source_excerpt": "대상은 소상공인이다"},
+    ]
+    notes = validate_storyboard(s, article)
+    assert any("F3" in n for n in notes)
+    s["selected_facts"][1]["source_excerpt"] = "대상은 대기업이다"
+    with pytest.raises(ValueError, match="3개 중 2개"):
+        validate_storyboard(s, article)
+
+
+def test_format_problems_are_repaired_instead_of_rejected():
+    s = _storyboard()
+    s["image_prompt_language"] = "en"
+    for i, cut in enumerate(s["cuts"]):
+        cut["cut"] = None if i == 7 else i + 1
+        cut["image_prompt"] = "A presenter points at a sign reading “금리 인하” in a studio."
+        cut["narration"] = "가" * 120
+    s["cuts"][2]["fact_ids"] = ["F1", "F9"]
+    s["cuts"][7]["fact_ids"] = []
+    notes = validate_storyboard(s, "예산 승인 시 시행")
+    assert [c["cut"] for c in s["cuts"]] == list(range(1, 9))
+    assert s["cuts"][0]["image_prompt"] == "A presenter points at a sign reading in a studio."
+    assert s["cuts"][2]["fact_ids"] == ["F1"]
+    assert s["cuts"][7]["fact_ids"] == []
+    assert len(notes) == 4
+    assert validate_storyboard(s, "예산 승인 시 시행") == ["근거 번호가 없는 컷: 8"]
+
+
 @pytest.mark.parametrize("model", ["sd_ultra", "sd35_large", "stable_image_core"])
 def test_dispatch_sends_request_local_options_without_leaking(monkeypatch, model):
     calls = []
