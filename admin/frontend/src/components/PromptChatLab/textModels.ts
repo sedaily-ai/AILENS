@@ -17,12 +17,12 @@
 // 삭제": sonnet-46 항목 제거 + 기본값을 opus-5로(admin/backend/routes/
 // prompts.py::TEXT_MODELS/DEFAULT_TEXT_MODEL과 반드시 같은 키를 유지할 것).
 export const TEXT_MODELS: { id: string; label: string }[] = [
-  { id: "opus-5", label: "Claude Opus 5" },
   { id: "sonnet-5", label: "Claude Sonnet 5" },
-  { id: "opus-5-5", label: "Claude Opus 5.5" },
   { id: "gpt-6-astra", label: "GPT-6 Astra" },
   { id: "gpt-6-sol", label: "GPT-6 Sol" },
   // 2026-10-23 — PRISM 탭 기본 모델(prompts.py::_CATEGORY_BEDROCK["prism"])과 같은 Haiku 5.5.
   { id: "haiku-5-5", label: "Claude Haiku 5.5" },
 ];
-export const DEFAULT_TEXT_MODEL = "opus-5";
+// 2026-10-22 비용 최적화 — Opus 5를 목록에서 빼고 기본값을 sonnet-5로(prompts.py와 같은 키 유지).
+// 2026-10-23 — Opus 5.5도 목록에서 뺐다(프롬프트 랩 테스트는 Sonnet 5 기준, prompts.py와 같은 키 유지).
+export const DEFAULT_TEXT_MODEL = "sonnet-5";

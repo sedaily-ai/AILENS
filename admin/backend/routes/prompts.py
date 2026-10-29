@@ -166,7 +166,6 @@ _CATEGORY_BEDROCK["prism"].update(model="arn:aws:bedrock:us-east-1:887078546492:
 # "모델 미지정 = Sonnet 4.6"이라는 옛 가정이 깨졌다(아래 get_thinking_config
 # 참고, 그 가정에 기대던 동작을 같이 고쳤다).
 TEXT_MODELS: dict[str, str] = {
-    "opus-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j5kfly25ohjo",  # lens-webtoon-script-opus-5
     "sonnet-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/dy1fhtb04pon",  # lens-webtoon-script-sonnet-5
     # 2026-09-24, 사용자 요청 — "opus 5.5나 5.1이나, sonnet도... 최신모델들은
     # 항상 가져오면 좋겠어요" + "gpt는 없나? 아스트라나 sol이나": Bedrock
@@ -175,12 +174,15 @@ TEXT_MODELS: dict[str, str] = {
     # 만들어 추가했다(비용태깅_규칙.md 3단계 그대로: 프로파일 생성 →
     # AdminPromptTestBedrockInvoke IAM에 3종 ARN 추가 → 여기 등록. IAM은
     # 이 세션 자동승인 범위 밖이라 사용자가 직접 put-role-policy 실행).
-    "opus-5-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/izf9wzkcahnq",  # lens-textlab-opus-5-5
     "gpt-6-astra": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/uwlacvtlgavh",  # lens-textlab-gpt6-astra
     "gpt-6-sol": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/j2pv1qbv1mlb",  # lens-textlab-gpt6-sol
     "haiku-5-5": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/njzeyj54dn12",  # lens-prism-haiku-5-5 (2026-10-23, PRISM 기본 모델)
 }
-DEFAULT_TEXT_MODEL = "opus-5"
+DEFAULT_TEXT_MODEL = "sonnet-5"
+# 2026-10-22 비용 최적화 — Opus 5를 선택 목록·기본값에서 뺐다(파이프라인은 10/11 Sonnet 5 전환 완료,
+# 이후에도 이 경로로 월 약 20달러가 남아 있었다). lens-webtoon-script-opus-5 프로파일·IAM은 그대로 둔다.
+# 옛 프런트가 "opus-5"를 보내면 resolve_text_model()이 Sonnet 5로 떨어진다.
+# 2026-10-23 — 같은 이유로 Opus 5.5도 선택 목록에서 뺐다(lens-textlab-opus-5-5 프로파일·IAM은 그대로 둔다). "opus-5-5"도 Sonnet 5로 폴백된다.
 
 # 2026-09-20, 실측 — sonnet-5는 이 웹툰 스크립트 생성(4만5천자 프롬프트+8컷
 # 구조화 JSON)에서 내부 reasoning이 max_tokens(8000) 예산을 전부 써버려
@@ -248,9 +250,9 @@ def text_model_supports_temperature(model_id: str | None) -> bool:
 #     경로에서 이 세션이 이미 겪은 "각본이 출력되다가 중단" 버그가
 #     그대로 재현된다).
 _THINKING_CONFIG: dict[str, dict] = {
-    "opus-5": {"thinking": {"type": "disabled"}},
+    "opus-5": {"thinking": {"type": "disabled"}},  # 옛 프런트가 보내는 키 — Sonnet 5로 폴백되며 같은 설정을 받는다
     "sonnet-5": {"thinking": {"type": "disabled"}},
-    "opus-5-5": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}},
+    "opus-5-5": {"thinking": {"type": "disabled"}},  # 옛 프런트가 보내는 키 — Sonnet 5로 폴백되며 같은 설정을 받는다
     "haiku-5-5": {"thinking": {"type": "disabled"}},  # 기본 effort(medium)에서는 disabled 허용
 }
 
@@ -258,9 +260,9 @@ _THINKING_CONFIG: dict[str, dict] = {
 def get_thinking_config(model_id: str | None) -> dict | None:
     """model_id(TEXT_MODELS의 키, resolve_text_model 이전의 원래 값) →
     Converse API의 additionalModelRequestFields. model_id가 없으면(카테고리
-    기본 모델 호출) "opus-5" 설정으로 폴백한다 — 2026-09-27부터 모든
-    카테고리 기본값이 Opus 5라(위 주석 참고) 기본 호출 경로도 예외가 아니다."""
-    return _THINKING_CONFIG.get(model_id or "opus-5")
+    기본 모델 호출) DEFAULT_TEXT_MODEL("sonnet-5") 설정으로 폴백한다 —
+    카테고리 기본값이 Claude 5 계열이라 기본 호출 경로도 예외가 아니다."""
+    return _THINKING_CONFIG.get(model_id or DEFAULT_TEXT_MODEL)
 
 
 # 2026-09-24 — 프롬프트 캐싱(system 배열에 {"cachePoint": {"type":
