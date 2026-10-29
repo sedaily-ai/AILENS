@@ -15,8 +15,20 @@ export const captionSchema = z.union([z.string().min(1), z.array(captionSegmentS
 // 버린다(.catch) — 장식 항목이라 사실 정보가 아니다.
 export const PAPER_NAMES = ['cream', 'newsprint', 'kraft', 'black', 'spot'] as const;
 export const SPOT_NAMES = ['red', 'orange', 'teal', 'blue', 'yellow'] as const;
-export const TRANSITION_NAMES = ['cover', 'tear', 'flip', 'stampCut', 'zoom'] as const;
-export const PRISM_SCENES = ['hero', 'title', 'date', 'split', 'quote'] as const;
+export const TRANSITION_NAMES = ['cover', 'tear', 'flip', 'stampCut', 'zoom', 'pageTurn', 'iris', 'slide', 'slideUp', 'fade', 'tapePeel'] as const;
+export const PRISM_SCENES = ['hero', 'title', 'date', 'split', 'quote', 'cards', 'ticker', 'newspaper', 'timeline'] as const;
+// PRISM 강조 효과 — 강조 구간(caption emphasis)에 거는 손맛 효과. typewriter는 큰 제목 전체가 한 글자씩 찍힌다.
+export const PRISM_EFFECTS = ['marker', 'circle', 'underline', 'typewriter', 'none'] as const;
+export const PRISM_STICKER_POS = ['tl', 'tr', 'bl', 'br'] as const;
+export const PRISM_ICON_STYLES = ['line', '3d'] as const;
+// PRISM 디자인 부품 — 컷 단위 종이·강조색 목록(src/prism/theme.ts의 PAPERS·SPOTS와 같은 이름).
+// 종이 질감 테마(src/paper)는 앞의 PAPER_NAMES·SPOT_NAMES만 알고, 나머지 값은 무시한다(convert.ts).
+export const PRISM_PAPER_NAMES = [
+  ...PAPER_NAMES,
+  'white', 'yellow', 'pink', 'mint', 'sky', 'lilac', 'sand',
+  'red', 'orange', 'teal', 'blue', 'forest', 'burgundy', 'plum', 'charcoal',
+] as const;
+export const PRISM_SPOT_NAMES = [...SPOT_NAMES, 'pink', 'purple', 'green', 'navy', 'sky', 'white', 'black'] as const;
 export const PAPER_LAYOUTS = [
   'newsFront',
   'stampNumber',
@@ -31,11 +43,12 @@ export const PAPER_LAYOUTS = [
 
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) => z.enum(values).optional().catch(undefined);
 const optionalText = () => z.string().optional().catch(undefined);
+const optionalNumber = () => z.number().finite().optional().catch(undefined);
 
 export const cutStyleSchema = z.object({
   // 종이 질감 테마에서 이 컷을 어떤 화면으로 그릴지. 컷 종류와 맞지 않으면 기본 화면으로 돌아간다.
   layout: optionalEnum(PAPER_LAYOUTS),
-  paper: optionalEnum(PAPER_NAMES),
+  paper: optionalEnum(PRISM_PAPER_NAMES),
   transition: optionalEnum(TRANSITION_NAMES),
   emStyle: optionalEnum(['stamp', 'marker'] as const),
   // 화면에 덧붙이는 작은 글: kicker = 큰 숫자 위 한 줄·문서 제목, sub = 헤드라인 아래 글,
@@ -53,6 +66,29 @@ export const cutStyleSchema = z.object({
   scene: optionalEnum(PRISM_SCENES),
   icon: optionalText(),
   section: z.number().int().min(1).max(9).optional().catch(undefined),
+  // ↓ PRISM 디자인 부품(2026-10-29). spot = 이 컷 강조색, effect = 강조 효과, sticker = 3D 스티커 이름(public/3d),
+  // stickerPos = 스티커 자리, iconStyle = 큰 그림을 선 아이콘/3D 스티커 중 무엇으로, cards = cards·timeline 장면의 종이 카드 2~4장,
+  // ticker = ticker 장면의 흐르는 띠 글자.
+  spot: optionalEnum(PRISM_SPOT_NAMES),
+  effect: optionalEnum(PRISM_EFFECTS),
+  sticker: optionalText(),
+  stickerPos: optionalEnum(PRISM_STICKER_POS),
+  iconStyle: optionalEnum(PRISM_ICON_STYLES),
+  cards: z
+    .array(z.object({ label: z.string().min(1), sub: z.string().optional(), icon: z.string().optional() }))
+    .min(2)
+    .max(4)
+    .optional()
+    .catch(undefined),
+  ticker: z.array(z.string().min(1)).min(1).max(8).optional().catch(undefined),
+  // columns = newspaper 장면의 본문 단(없으면 나레이션을 나눠 싣는다), mark = 큰 숫자 옆 화살표 도장,
+  // riso = 큰 글자 리소 인쇄 어긋남, stopMotion = 종이 움직임을 2프레임 스톱모션으로.
+  columns: z.array(z.string().min(1)).min(1).max(3).optional().catch(undefined),
+  mark: optionalEnum(['up', 'down', 'right'] as const),
+  riso: z.boolean().optional().catch(undefined),
+  stopMotion: z.boolean().optional().catch(undefined),
+  // textScale = 큰 글자 배율(0.6~1.6, 범위 밖이면 렌더러가 당긴다 — src/prism/fx.tsx::clamp).
+  textScale: optionalNumber(),
 });
 
 const baseCutFields = {
@@ -235,6 +271,10 @@ export const newsScriptSchema = z.object({
       paper: optionalEnum(PAPER_NAMES),
       spot: optionalEnum(SPOT_NAMES),
       endCard: z.boolean().optional().catch(undefined),
+      // PRISM 전용 — 영상 전체 기본 아이콘 모양(컷의 style.iconStyle이 있으면 그쪽이 우선).
+      iconStyle: optionalEnum(PRISM_ICON_STYLES),
+      riso: z.boolean().optional().catch(undefined),
+      stopMotion: z.boolean().optional().catch(undefined),
     })
     .optional()
     .catch(undefined),

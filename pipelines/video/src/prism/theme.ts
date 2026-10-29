@@ -30,6 +30,22 @@ export const PAPERS = {
   cream: { bg: "#F2EBDD", dark: false },
   newsprint: { bg: "#E6E2D6", dark: false },
   kraft: { bg: "#D9C3A0", dark: false },
+  // ↓ 2026-10-29 추가 — 컷마다 고를 수 있는 색 종이. dark면 글자가 흰색·노랑으로 바뀐다.
+  white: { bg: "#FAF8F3", dark: false },
+  yellow: { bg: "#F7C531", dark: false },
+  pink: { bg: "#F4C9C1", dark: false },
+  mint: { bg: "#CFE6DA", dark: false },
+  sky: { bg: "#CFDDF0", dark: false },
+  lilac: { bg: "#DDD4EC", dark: false },
+  sand: { bg: "#EAD9B8", dark: false },
+  red: { bg: "#C9372A", dark: true },
+  orange: { bg: "#E8601F", dark: true },
+  teal: { bg: "#0E6E58", dark: true },
+  blue: { bg: "#2A4A94", dark: true },
+  forest: { bg: "#1F3D33", dark: true },
+  burgundy: { bg: "#5A1E25", dark: true },
+  plum: { bg: "#3D2747", dark: true },
+  charcoal: { bg: "#2B2B2B", dark: true },
 } as const;
 export type PaperName = keyof typeof PAPERS;
 
@@ -39,12 +55,21 @@ export const SPOTS = {
   teal: "#0E8A6D",
   blue: "#3255A4",
   yellow: "#F7C531",
+  // ↓ 2026-10-29 추가
+  pink: "#E8578C",
+  purple: "#6B4FBB",
+  green: "#3E9B4F",
+  navy: "#1C2A4A",
+  sky: "#3FA7D6",
+  white: "#FFFFFF",
+  black: "#1B1B1B",
 } as const;
 export type SpotName = keyof typeof SPOTS;
 
 // 섹션 번호(01~05)마다 강조색을 바꾼다 — 샘플 영상: 01 파랑, 02 빨강, 03 틸, 04 주황, 05 파랑.
 const SECTION_SPOTS: SpotName[] = ["blue", "red", "teal", "orange"];
-export const spotFor = (paper: PaperName, section?: number, fallbackIndex = 0): string => {
+export const spotFor = (paper: PaperName, section?: number, fallbackIndex = 0, override?: SpotName): string => {
+  if (override) return SPOTS[override];
   if (PAPERS[paper].dark) return SPOTS.yellow;
   const i = section ? section - 1 : fallbackIndex;
   return SPOTS[SECTION_SPOTS[((i % SECTION_SPOTS.length) + SECTION_SPOTS.length) % SECTION_SPOTS.length]];

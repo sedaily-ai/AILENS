@@ -71,6 +71,16 @@ PRISM_ICON_WHITELIST = {
     "shield-alert", "smartphone", "phone", "phone-call", "coins", "coin", "credit-card",
     "alert-triangle", "alert", "file-warning", "megaphone", "map-pin", "pin", "scale", "car", "info",
 }
+# PRISM 3D 스티커(2026-10-29) — src/prism/icons.tsx의 STICKER_NAMES·public/3d 파일 이름과 반드시 같이 갱신할 것.
+# 대본이 그림(icon) 자리에 스티커 이름을 써도 렌더러가 3D 스티커로 그리므로 화이트리스트 밖으로 보지 않는다.
+PRISM_STICKER_NAMES = {
+    "airplane", "bank", "bar-chart", "battery", "bell", "brain", "briefcase", "bulb", "calendar", "car", "card", "cart",
+    "chart-down", "chart-up", "check", "clock", "coin", "computer", "cross", "developer", "dollar", "factory", "fire", "flag",
+    "gear", "government", "graduation", "handshake", "hourglass", "house", "key", "laptop", "lock", "megaphone", "microscope",
+    "money-wings", "money", "newspaper", "office", "package", "party", "people", "person", "phone", "pill", "pin", "puzzle",
+    "robot", "rocket", "satellite", "scale", "search", "seedling", "shield", "ship", "sparkles", "star", "student", "thinking",
+    "thumbs-up", "tools", "trophy", "voltage", "warning", "yen",
+}
 
 
 def _fix_icon(name: str, allowed: set[str] = ICON_WHITELIST) -> str:
@@ -96,7 +106,7 @@ def fix_script(
     applied: list[str] = []
     fixed_cuts = []
     is_prism = (script.get("design") or {}).get("theme") == "prism"
-    allowed_icons = PRISM_ICON_WHITELIST if is_prism else ICON_WHITELIST
+    allowed_icons = (PRISM_ICON_WHITELIST | PRISM_STICKER_NAMES) if is_prism else ICON_WHITELIST
     for i, cut in enumerate(script.get("cuts", [])):
         cut_type = cut.get("type")
         tag = f"cut[{i}]({cut_type})"

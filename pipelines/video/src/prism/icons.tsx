@@ -269,3 +269,29 @@ export const PrismIcon: React.FC<{ name?: string; color: string; size: number }>
 };
 
 export const hasPrismIcon = (name?: string): boolean => !!name && name in ICONS;
+
+// ── 3D 스티커(Microsoft Fluent Emoji 3D, MIT — public/3d/LICENSE) ──────────────
+/** public/3d에 있는 스티커 파일 이름(확장자 제외). */
+export const STICKER_NAMES = [
+  "airplane", "bank", "bar-chart", "battery", "bell", "brain", "briefcase", "bulb", "calendar", "car", "card", "cart",
+  "chart-down", "chart-up", "check", "clock", "coin", "computer", "cross", "developer", "dollar", "factory", "fire", "flag",
+  "gear", "government", "graduation", "handshake", "hourglass", "house", "key", "laptop", "lock", "megaphone", "microscope",
+  "money-wings", "money", "newspaper", "office", "package", "party", "people", "person", "phone", "pill", "pin", "puzzle",
+  "robot", "rocket", "satellite", "scale", "search", "seedling", "shield", "ship", "sparkles", "star", "student", "thinking",
+  "thumbs-up", "tools", "trophy", "voltage", "warning", "yen",
+] as const;
+
+// 선 아이콘 이름 → 같은 뜻의 3D 스티커(iconStyle "3d"일 때).
+const ICON_TO_STICKER: Record<string, string> = {
+  building: "office", office: "office", flask: "microscope", science: "microscope", chip: "computer", cpu: "computer",
+  moneybag: "money", "money-bag": "money", store: "cart", shop: "cart", quote: "newspaper", users: "people",
+  landmark: "government", "trending-up": "chart-up", chart: "chart-up", "trending-down": "chart-down", bot: "robot",
+  smartphone: "phone", "shield-alert": "shield", "phone-call": "phone", coins: "coin", "credit-card": "card",
+  "alert-triangle": "warning", alert: "warning", "file-warning": "warning", "map-pin": "pin", info: "bulb",
+};
+
+export const stickerFor = (name?: string): string | undefined => {
+  if (!name) return undefined;
+  if ((STICKER_NAMES as readonly string[]).includes(name)) return name;
+  return ICON_TO_STICKER[name];
+};
