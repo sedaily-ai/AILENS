@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isShareableSize, parseImageSize, resolveShareImages } from './shareImage';
+import { isShareableSize, measureShareImages, parseImageSize, resolveShareImages } from './shareImage';
 
 const bytes = (...n: number[]) => Uint8Array.from(n);
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
@@ -86,6 +86,7 @@ describe('resolveShareImages', () => {
 
   it('작은 본지 사진을 건너뛰고 조건을 채우는 다음 후보를 고른다', async () => {
     stubFetch({ 'https://x/photo-small.jpg': jpeg(386, 93), 'https://x/cut.png': png(1800, 1200) });
+    await measureShareImages(['https://x/photo-small.jpg', 'https://x/cut.png']);
     const r = await resolveShareImages(['https://x/photo-small.jpg', 'https://x/cut.png']);
     expect(r.primary).toEqual({ url: 'https://x/cut.png', width: 1800, height: 1200 });
     expect(r.all).toEqual(['https://x/cut.png']);
@@ -94,6 +95,7 @@ describe('resolveShareImages', () => {
 
   it('큰 본지 사진이 1순위면 그대로 쓴다', async () => {
     stubFetch({ 'https://x/photo-big.jpg': jpeg(1200, 800), 'https://x/cut2.png': png(1800, 1200) });
+    await measureShareImages(['https://x/photo-big.jpg', 'https://x/cut2.png']);
     const r = await resolveShareImages(['https://x/photo-big.jpg', 'https://x/cut2.png']);
     expect(r.primary.url).toBe('https://x/photo-big.jpg');
     expect(r.all).toEqual(['https://x/photo-big.jpg', 'https://x/cut2.png']);
@@ -101,6 +103,7 @@ describe('resolveShareImages', () => {
 
   it('전부 미달이면 /og-image.png(1200×630)로 폴백', async () => {
     stubFetch({ 'https://x/a.jpg': jpeg(400, 149), 'https://x/b.jpg': jpeg(600, 340) });
+    await measureShareImages(['https://x/a.jpg', 'https://x/b.jpg']);
     const r = await resolveShareImages(['https://x/a.jpg', 'https://x/b.jpg']);
     expect(r.primary.url).toMatch(/\/og-image\.png$/);
     expect(r.primary).toMatchObject({ width: 1200, height: 630 });
@@ -109,12 +112,34 @@ describe('resolveShareImages', () => {
 
   it('측정 실패는 기존 동작(첫 후보)으로 폴백', async () => {
     stubFetch({ 'https://x/unreachable.jpg': 'fail' });
+    await measureShareImages(['https://x/unreachable.jpg']);
     const r = await resolveShareImages(['https://x/unreachable.jpg']);
     expect(r.primary).toEqual({ url: 'https://x/unreachable.jpg' });
     expect(r.isDefault).toBe(false);
   });
 
+  it('크기를 아직 모르면 기다리지 않고 첫 후보로 바로 답한 뒤, 다음 렌더부터 잰 결과를 쓴다', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        await gate; // 한국 원본처럼 늦게 오는 응답
+        return new Response((url.endsWith('.png') ? png(1800, 1200) : jpeg(386, 93)) as BodyInit, { status: 206 });
+      }),
+    );
+    const candidates = ['https://x/slow-small.jpg', 'https://x/slow-cut.png'];
+    const first = await resolveShareImages(candidates);
+    expect(first.primary).toEqual({ url: 'https://x/slow-small.jpg' });
+
+    release();
+    await measureShareImages(candidates);
+    const next = await resolveShareImages(candidates);
+    expect(next.primary).toEqual({ url: 'https://x/slow-cut.png', width: 1800, height: 1200 });
+  });
+
   it('후보가 없으면 폴백', async () => {
+    await measureShareImages([]);
     const r = await resolveShareImages([]);
     expect(r.isDefault).toBe(true);
   });
@@ -138,26 +163,26 @@ describe('크기 측정 캐시', () => {
   it('실패도 30분 기억해 다시 재지 않고, 30분이 지나면 다시 잰다', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const fetch = countingFetch(true);
-    await resolveShareImages(['https://x/slow-origin.jpg']);
-    await resolveShareImages(['https://x/slow-origin.jpg']);
+    await measureShareImages(['https://x/slow-origin.jpg']);
+    await measureShareImages(['https://x/slow-origin.jpg']);
     expect(fetch).toHaveBeenCalledTimes(1);
 
     vi.setSystemTime(Date.now() + 30 * 60_000 + 1);
-    await resolveShareImages(['https://x/slow-origin.jpg']);
+    await measureShareImages(['https://x/slow-origin.jpg']);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('한도를 넘으면 전부 비우지 않고 가장 오래 안 쓴 것만 뺀다', async () => {
     const fetch = countingFetch(false);
     const url = (i: number) => `https://x/lru-${i}.png`;
-    for (let i = 0; i < 6_000; i++) await resolveShareImages([url(i)]);
-    await resolveShareImages([url(0)]); // 최근에 썼으니 남아야 한다
-    await resolveShareImages([url(6_000)]); // 한도 초과 → 가장 오래 안 쓴 lru-1이 빠진다
+    for (let i = 0; i < 6_000; i++) await measureShareImages([url(i)]);
+    await measureShareImages([url(0)]); // 최근에 썼으니 남아야 한다
+    await measureShareImages([url(6_000)]); // 한도 초과 → 가장 오래 안 쓴 lru-1이 빠진다
     fetch.mockClear();
 
-    await resolveShareImages([url(0), url(2), url(5_999)]);
+    await measureShareImages([url(0), url(2), url(5_999)]);
     expect(fetch).not.toHaveBeenCalled();
-    await resolveShareImages([url(1)]);
+    await measureShareImages([url(1)]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

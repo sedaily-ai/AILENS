@@ -1,4 +1,5 @@
-"""각본 검증 실패가 발행 경로의 '재생성 1/2'를 타는지 검사한다. Bedrock·이미지 실제 호출 없음."""
+"""각본 반려·깨진 JSON이 발행 경로의 재생성(최대 3번 시도)을 타는지, 자막이 넘치는 컷만 빠지는지 검사한다.
+Bedrock·이미지 실제 호출 없음."""
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -52,7 +53,10 @@ def _script_responses(mod, monkeypatch, scripts):
 
     def fake_call_json(prompt, **kwargs):
         calls.append(prompt)
-        return scripts[len(calls) - 1]
+        result = scripts[len(calls) - 1]
+        if isinstance(result, Exception):
+            raise result
+        return result
 
     monkeypatch.setattr(mod, "call_json", fake_call_json)
     return calls
@@ -69,15 +73,43 @@ def test_rejected_storyboard_is_regenerated_then_webtoon_built(webtoon, monkeypa
     script = publishing.run_webtoon_with_retry(webtoon, "a", _article(tmp_path), tmp_path,
                                                manage_gpu=False, log_prefix="test")
     assert len(calls) == 2
+    assert "[직전 시도가 반려된 이유]" not in calls[0]
+    assert "[직전 시도가 반려된 이유]" in calls[1] and "8개" in calls[1]
     assert len(script["cuts"]) == 8
     assert len(webtoon.image_calls) == 8
     assert all((tmp_path / "a" / f"컷{n}.png").exists() for n in range(1, 9))
 
 
-def test_storyboard_rejected_twice_fails_before_images(webtoon, monkeypatch, tmp_path):
-    calls = _script_responses(webtoon, monkeypatch, [{"cuts": []}, {"cuts": [{"cut": 1, "image_prompt": "x"}]}])
+def test_storyboard_rejected_on_every_attempt_fails_before_images(webtoon, monkeypatch, tmp_path):
+    bad = {"cuts": [{"cut": 1, "image_prompt": "x"}]}
+    calls = _script_responses(webtoon, monkeypatch, [{"cuts": []}, bad, bad])
     with pytest.raises(webtoon.StoryboardRejected, match="8개"):
         publishing.run_webtoon_with_retry(webtoon, "a", _article(tmp_path), tmp_path,
                                           manage_gpu=False, log_prefix="test")
-    assert len(calls) == 2
+    assert len(calls) == publishing.WEBTOON_SCRIPT_ATTEMPTS == 3
     assert webtoon.image_calls == []
+
+
+def test_unreadable_json_is_retried_with_reason(webtoon, monkeypatch, tmp_path):
+    calls = _script_responses(webtoon, monkeypatch, [ValueError("JSON 없음"), _valid_script()])
+    script = publishing.run_webtoon_with_retry(webtoon, "a", _article(tmp_path), tmp_path,
+                                               manage_gpu=False, log_prefix="test")
+    assert len(calls) == 2
+    assert "JSON으로 읽지 못했다" in calls[1]
+    assert len(script["cuts"]) == 8
+
+
+def test_overflowing_narration_drops_only_that_cut(webtoon, monkeypatch, tmp_path):
+    _script_responses(webtoon, monkeypatch, [_valid_script()])
+
+    def compose(img_path, cut, *args, **kwargs):
+        if cut["cut"] == 3:
+            raise webtoon.compose_text.NarrationOverflowError("자막이 하단 영역에 들어가지 않습니다.")
+        return []
+
+    monkeypatch.setattr(webtoon.compose_text, "compose", compose)
+    script = publishing.run_webtoon_with_retry(webtoon, "a", _article(tmp_path), tmp_path,
+                                               manage_gpu=False, log_prefix="test")
+    assert len(script["cuts"]) == 8
+    assert not (tmp_path / "a" / "컷3.png").exists()
+    assert all((tmp_path / "a" / f"컷{n}.png").exists() for n in range(1, 9) if n != 3)

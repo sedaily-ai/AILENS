@@ -81,30 +81,39 @@ MIN_LETTER_PARAGRAPHS = 6
 MAX_LETTER_RETRIES = 2
 
 
+# 웹툰 각본 시도 횟수(첫 시도 포함). 각본은 이미지 생성 전 단계라 한 번 더 시도하는 비용은 텍스트 호출 1번이다.
+# 2026-10-29 2회 → 3회. 2번째부터는 직전 반려 이유를 프롬프트에 붙여 같은 실수를 고치게 한다.
+WEBTOON_SCRIPT_ATTEMPTS = 3
+
+
 def run_webtoon_with_retry(webtoon_mod, name: str, article_path: Path, out_dir: Path, *,
                            manage_gpu: bool = True, log_prefix: str = "publish") -> dict:
     """웹툰 run_article()을 부르고 저장된 각본(1_script.json)을 돌려준다.
 
-    웹툰 각본에 "cuts"가 없는 모델 출력 이상이 가끔 있어 한 번 더 생성한다
-    (이미지 생성 전 단계라 재시도 비용이 작다). 재시도는 resume=False로 부른다 —
-    resume=True면 첫 시도가 저장한 cuts 없는 1_script.json을 그대로 다시 읽어 재시도가 무의미하다.
-    각본 검증 실패(webtoon_mod.StoryboardRejected — 컷 수·빈 image_prompt 등)도 같은 재시도를 탄다.
-    두 번째 시도의 검증 실패는 그대로 올려 호출부가 웹툰 없이 발행하게 한다."""
+    각본이 반려되면(webtoon_mod.StoryboardRejected — 검증 실패·JSON으로 못 읽은 응답) 또는 cuts가 비면
+    WEBTOON_SCRIPT_ATTEMPTS번까지 다시 만든다. 재시도는 resume=False로 부른다 —
+    resume=True면 첫 시도가 저장한 1_script.json을 그대로 다시 읽어 재시도가 무의미하다.
+    마지막 시도의 반려는 그대로 올려 호출부가 웹툰 없이 발행하게 한다."""
     import json  # noqa: lazy
 
     webtoon_script: dict = {}
-    for _attempt in (1, 2):
+    feedback: str | None = None
+    retries = WEBTOON_SCRIPT_ATTEMPTS - 1
+    for attempt in range(1, WEBTOON_SCRIPT_ATTEMPTS + 1):
         try:
-            webtoon_mod.run_article(name, str(article_path), out_dir, resume=(_attempt == 1), manage_gpu=manage_gpu)
+            webtoon_mod.run_article(name, str(article_path), out_dir, resume=(attempt == 1), manage_gpu=manage_gpu,
+                                    retry_feedback=feedback)
         except webtoon_mod.StoryboardRejected as e:
-            if _attempt == 2:
+            if attempt == WEBTOON_SCRIPT_ATTEMPTS:
                 raise
-            print(f"[{log_prefix}] {name} 웹툰 각본 검증 실패({e}) — 재생성 {_attempt}/2")
+            print(f"[{log_prefix}] {name} 웹툰 각본 반려({e}) — 재생성 {attempt}/{retries}")
+            feedback = str(e)
             continue
         webtoon_script = json.loads((out_dir / name / "1_script.json").read_text(encoding="utf-8"))
         if webtoon_script.get("cuts"):
             break
-        print(f"[{log_prefix}] {name} 웹툰 각본에 cuts 없음 — 재생성 {_attempt}/2")
+        print(f"[{log_prefix}] {name} 웹툰 각본에 cuts 없음 — 재생성 {attempt}/{retries}")
+        feedback = "각본의 cuts가 비어 있었다."
     return webtoon_script
 
 

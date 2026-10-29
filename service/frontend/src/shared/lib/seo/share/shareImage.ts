@@ -74,6 +74,7 @@ export function isShareableSize(size: ImageSize): boolean {
 // 재검증마다 다시 재느라 상세 렌더가 매번 1.5초씩 늘었다(2026-10-28 [detail-timing] 실측 p90 1.5s).
 // 한도를 넘으면 전부 비우지 않고 가장 오래 안 쓴 것부터 뺀다 — Map은 넣은 순서를 지키므로 쓸 때마다 맨 뒤로 다시 넣는다.
 const sizeCache = new Map<string, Promise<ImageSize | null>>();
+const measured = new Map<string, ImageSize>(); // 재기가 끝나 크기를 아는 것만(렌더가 기다리지 않고 바로 읽는다)
 const failedAt = new Map<string, number>();
 
 // cache 옵션을 주지 않는다. 'no-store'를 명시하면 ISR 페이지가 런타임에 동적으로 바뀌려다 500이 난다(2026-10-09 배포 사고).
@@ -112,6 +113,7 @@ async function probeSize(url: string): Promise<ImageSize | null> {
 
 function forget(url: string): void {
   sizeCache.delete(url);
+  measured.delete(url);
   failedAt.delete(url);
 }
 
@@ -128,20 +130,33 @@ function measure(url: string): Promise<ImageSize | null> {
   }
   while (sizeCache.size >= CACHE_LIMIT) forget(sizeCache.keys().next().value!);
   const p = probeSize(url).then((size) => {
-    if (!size) failedAt.set(url, Date.now());
+    if (sizeCache.get(url) !== p) return size; // 재는 사이 한도 정리로 빠졌으면 기록하지 않는다.
+    if (size) measured.set(url, size);
+    else failedAt.set(url, Date.now());
     return size;
   });
   sizeCache.set(url, p);
   return p;
 }
 
+/** 후보 크기를 모두 잴 때까지 기다린다. 렌더 경로는 기다리지 않으므로 테스트·미리 열기처럼 결과가 필요할 때만 쓴다. */
+export async function measureShareImages(candidates: string[]): Promise<void> {
+  await Promise.all([...new Set(candidates.filter(Boolean))].map((u) => measure(u)));
+}
+
 /**
  * 후보를 우선순위대로 훑어 조건(폭 1200px 이상, 가로세로비 3 이하)을 채우는 첫 이미지를 대표로 고른다.
- * 조건을 채우는 후보가 없으면 측정에 실패한 첫 후보(기존 동작), 그것도 없으면 /og-image.png(1200×630)를 쓴다.
+ * 조건을 채우는 후보가 없으면 크기를 모르는 첫 후보(기존 동작), 그것도 없으면 /og-image.png(1200×630)를 쓴다.
+ * 크기 재기를 기다리지 않는다 — 이미 잰 결과만 쓰고, 아직 모르는 후보는 뒤에서 재기 시작한 뒤 "모름"으로 둔다.
+ * 기다리면 한국 원본(wimg)을 미국 서버에서 재느라 상세 첫 렌더가 최대 1.5초 늘었다(2026-10-29 07:11 발행 [detail-timing]).
+ * 공유 이미지를 읽는 쪽은 카카오·구글 수집기라 독자를 기다리게 할 이유가 없고, 다음 재검증(5분) 렌더부터 잰 결과가 반영된다.
  */
 export async function resolveShareImages(candidates: string[]): Promise<ShareImages> {
   const urls = [...new Set(candidates.filter(Boolean))];
-  const sizes = await Promise.all(urls.map((u) => measure(u)));
+  const sizes = urls.map((u) => {
+    void measure(u);
+    return measured.get(u) ?? null;
+  });
   const ok = urls.flatMap((url, i) => (sizes[i] && isShareableSize(sizes[i]!) ? [{ url, ...sizes[i]! }] : []));
   const unknown = urls.filter((_, i) => !sizes[i]);
   if (ok.length > 0) {

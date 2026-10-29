@@ -617,7 +617,9 @@ def _run_article_flow(
             # JSON 형식 오류임을 사용자에게 안내하게 둔다.
             logger.error(f"script JSON 파싱 실패(model_id={model_id!r}) 원문(최대 2000자): {raw[:2000]!r}")
             raise ValueError("웹툰 응답의 JSON 형식이 올바르지 않습니다. 다시 시도해 주세요.") from e
-        webtoon_script.validate_storyboard(script, article)
+        notes = webtoon_script.validate_storyboard(script, article)
+        if notes:
+            logger.info("웹툰 각본 보정·기록: %s", notes)
         cuts = webtoon_script.normalize_cuts(script)
         if not push({
             "type": "storyboard",
