@@ -86,7 +86,9 @@ const transitionOf = (t: TransitionName, i: number): { presentation: AnyPresenta
 const clashes = (paper: PaperName, spot?: string): boolean =>
   !!spot && (paper === spot || (PAPERS[paper].dark ? spot === "navy" || spot === "black" : spot === "white"));
 
-const framesOf = (cut: Cut, fps: number) => Math.max(TRANSITION_FRAMES + 6, Math.round(cutSeconds(cut) * fps));
+// 컷 길이 = 음성 길이 + 전환 길이. 전환은 앞뒤 컷을 TRANSITION_FRAMES만큼 겹쳐 그리므로, 음성 길이만큼만 잡으면
+// 앞 컷 음성의 끝과 다음 컷 음성의 시작이 겹쳐 들렸다(2026-10-30 사용자 지적). 전환은 앞 컷 음성이 끝난 뒤 빈 구간에서 일어난다.
+const framesOf = (cut: Cut, fps: number) => Math.max(TRANSITION_FRAMES + 6, Math.round(cutSeconds(cut) * fps)) + TRANSITION_FRAMES;
 
 export const prismDurationInFrames = (script: NewsScript, fps: number): number => {
   const total = script.cuts.reduce((acc, c) => acc + framesOf(c, fps), 0);
