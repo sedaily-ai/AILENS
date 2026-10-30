@@ -1,91 +1,48 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { adminApi } from "@/lib/adminClient";
+import { forwardRef } from "react";
 import type { PromptHistoryEntry } from "@/lib/types";
 import { PromptVersionReference, type PromptVersionReferenceHandle } from "./PromptVersionReference";
 
 /* PRISM "장면 변환 프롬프트"(2026-10-21) — 사용자 요청: "원문기사를 붙여넣으면 영문 대본이 나오고, 그 대본
    붙여넣으면 영상 만들어지고". 왼쪽 채팅은 "prism"(대본 작성) 프롬프트를 쓰고, 카드에 붙여넣은 대본을 렌더용
    JSON으로 나누는 건 서버(chat_ws.py::_prism_script_to_render_json)가 이 "prism-scene" 프롬프트의 적용
-   버전으로 한다. 편집·버전 저장은 다른 탭과 같은 PromptVersionReference를 그대로 쓰고, 적용 버튼만 여기 둔다
-   (채팅 프롬프트의 "프로덕션에 적용"과 섞이지 않게). */
-const CATEGORY = "prism-scene";
-const NAME = "published";
+   버전으로 한다(시험 영상 카드가 버전을 고르면 그 버전으로).
+   2026-10-30 — 사용자 지적: "적용 버튼이 너무 많아서 뭘 누르면 뭐가 되는지 헷갈려". 이 칸의 "장면 변환에 적용"
+   버튼을 없애고, 실제 제작 설정 카드의 [운영에 적용] 하나가 ref(activateIfNeeded)로 이 칸까지 적용한다.
+   버전 목록·적용 버전은 부모(PromptTextLab)가 들고 시험 카드·상단 표시와 함께 쓴다. */
+export const PRISM_SCENE_CATEGORY = "prism-scene";
+export const PRISM_SCENE_NAME = "published";
 
-export function PrismScenePromptStep() {
-  const promptRef = useRef<PromptVersionReferenceHandle>(null);
-  const [serverVersion, setServerVersion] = useState<number | null>(null);
-  const [history, setHistory] = useState<PromptHistoryEntry[]>([]);
-  const [testVersion, setTestVersion] = useState<number | null>(null);
-  const [activeInfo, setActiveInfo] = useState<{ version: number; label: string | null } | null>(null);
-  const [applying, setApplying] = useState(false);
-
-  const refreshHistory = () => {
-    adminApi
-      .getPromptHistory(CATEGORY, NAME)
-      .then((r) => setHistory(r.history))
-      .catch((err) => console.error("장면 변환 프롬프트 버전 목록 불러오기 실패", err));
-  };
-
-  const refreshServerVersion = () => {
-    adminApi
-      .listPrompts()
-      .then((r) => {
-        const listed = r.prompts.find((p) => p.id === `${CATEGORY}/${NAME}`);
-        setServerVersion(listed ? listed.active_version : null);
-      })
-      .catch((err) => console.error("장면 변환 프롬프트 적용 버전 조회 실패", err));
-  };
-
-  useEffect(() => {
-    refreshHistory();
-    refreshServerVersion();
-  }, []);
-
-  const apply = async () => {
-    if (applying) return;
-    setApplying(true);
-    try {
-      await promptRef.current?.activateIfNeeded();
-      refreshServerVersion();
-    } finally {
-      setApplying(false);
-    }
-  };
-
-  const unchanged = activeInfo !== null && serverVersion !== null && activeInfo.version === serverVersion;
-
+export const PrismScenePromptStep = forwardRef<
+  PromptVersionReferenceHandle,
+  {
+    serverVersion: number | null;
+    history: PromptHistoryEntry[];
+    onServerVersionChange: (version: number) => void;
+    onHistoryRefresh: () => void;
+    onActiveInfoChange: (info: { version: number; label: string | null } | null) => void;
+  }
+>(function PrismScenePromptStep({ serverVersion, history, onServerVersionChange, onHistoryRefresh, onActiveInfoChange }, ref) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-2 px-3.5 pt-2">
-        <p className="text-[11px] leading-relaxed text-[var(--text-faint)]">
-          카드에 붙여넣은 영어 대본을 장면으로 나눌 때 쓰는 프롬프트입니다. 고친 뒤 버전을 저장하고 &quot;장면 변환에
-          적용&quot;을 눌러야 다음 영상부터 쓰입니다. 지금 적용: {serverVersion !== null ? `v${serverVersion}` : "없음"}
-        </p>
-        <button
-          type="button"
-          onClick={() => void apply()}
-          disabled={applying || activeInfo === null || unchanged}
-          title={unchanged ? "지금 불러온 버전이 이미 적용돼 있습니다" : undefined}
-          className="ui-btn ui-btn-primary flex-none rounded-lg px-2 py-1 text-[10.5px] font-semibold disabled:opacity-50"
-        >
-          {applying ? "적용 중..." : "장면 변환에 적용"}
-        </button>
-      </div>
+      <p className="px-3.5 pt-2 text-[11px] leading-relaxed text-[var(--text-faint)]">
+        카드에 붙여넣은 영어 대본을 장면(컷·화면·디자인)으로 나눌 때 쓰는 프롬프트입니다. 고친 뒤 [+ 새 버전]으로 저장하고, 아래
+        시험 영상 카드에서 그 버전을 골라 확인한 다음 위 [운영에 적용]을 누르세요.
+      </p>
       <PromptVersionReference
-        ref={promptRef}
-        category={CATEGORY}
-        name={NAME}
+        ref={ref}
+        category={PRISM_SCENE_CATEGORY}
+        name={PRISM_SCENE_NAME}
         serverVersion={serverVersion}
         promptHistory={history}
-        testVersion={testVersion}
-        onTestVersionChange={setTestVersion}
-        onServerVersionChange={setServerVersion}
-        onPromptHistoryRefresh={refreshHistory}
-        onActiveInfoChange={setActiveInfo}
+        testVersion={null}
+        onTestVersionChange={() => {}}
+        onServerVersionChange={onServerVersionChange}
+        onPromptHistoryRefresh={onHistoryRefresh}
+        onActiveInfoChange={onActiveInfoChange}
         bare
       />
     </div>
   );
-}
+});

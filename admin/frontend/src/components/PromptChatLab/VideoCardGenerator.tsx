@@ -19,6 +19,7 @@ import {
 import { LENS_POLLY_PROFILE, type PollyVoiceProfile } from "./PollyVoiceSettingsFields";
 import { FORMATS, type ParsedDoc as VideoParsedDoc } from "./VideoRenderSettingsPanel";
 import { GOOGLE_DEFAULT_VOICE, GOOGLE_VOICES, VIDEO_PROVIDERS } from "./googleVoices";
+import { PRISM_GROUPS, PRISM_GROUP_VOICES } from "@/lib/prismBatch";
 
 import { cardsStorageKey, loadStoredCards, extractNarration, Provider, PollySettings, POLLY_DEFAULTS, RenderProgress, progressLabel, progressPercent, POLL_INTERVAL_MS, CardState, newCard, restoredCard, cardToParsedDoc } from "./videoCardModel";
 /* 영상 탭 중간 칼럼 "성우 미리듣기" + "영상 생성" 통합 카드 — 2026-09-24
@@ -112,6 +113,8 @@ export function VideoCardGenerator({
   name,
   pollyProfile = LENS_POLLY_PROFILE,
   audioFormat = "video",
+  sceneHistory = [],
+  sceneServerVersion = null,
 }: {
   /** 2026-09-27 — "테스트 추가" 띠 sticky 고정용, WebtoonCutGenerator.tsx
    *  주석 참고(프로덕션 카드 실측 높이). */
@@ -159,7 +162,15 @@ export function VideoCardGenerator({
   pollyProfile?: PollyVoiceProfile;
   /** 성우 미리듣기(synthesize_audio)의 format — "prism"이면 서버가 PRISM 성우 목록·설정으로 합성한다. */
   audioFormat?: "video" | "prism";
+  /** PRISM 시험 카드(2026-10-30) — 장면 변환 프롬프트("prism-scene") 버전 목록·운영 중 버전. 카드마다 시험할 버전을 고른다. */
+  sceneHistory?: PromptHistoryEntry[];
+  sceneServerVersion?: number | null;
 }) {
+  // PRISM 시험 카드(2026-10-30) — 사용자 지적: "테스트 탭에 잘 쓰지도 않는 대본 작성 프롬프트 수정 칸이 있고",
+  // "프로덕션 탭이랑 테스트 탭이 뭐가 뭔지 헷갈린다". PRISM은 카드에 이미 쓴 대본을 넣으므로 대본 작성 프롬프트 칸을
+  // 빼고, 실제로 쓰이는 장면 변환 프롬프트 버전을 고르게 한다. 운영 반영 버튼은 두지 않는다(실제 제작 설정 카드의
+  // [운영에 적용] 하나). 성우는 실제 제작에선 그룹별 고정이라 여기서는 들어 보는 용도다.
+  const isPrismCards = audioFormat === "prism";
   // 새 카드의 Polly 기본값 — 탭의 기본 성우와 그 성우의 첫(권장) 엔진.
   const pollyDefaults: PollySettings = {
     ...POLLY_DEFAULTS,
@@ -484,7 +495,7 @@ export function VideoCardGenerator({
     // 같은 이유로 같이 보낸다(2026-09-25 후속, 사용자 지적: "동영상
     // 부분도.. 영상 탭에.. 추가되어야하는거 아닌가요?").
     // script_format(2026-10-21) — PRISM은 영어 대본을 그대로 보내고, 서버가 장면 변환 프롬프트로 JSON을 만든다.
-    const scriptFormat = isPrism ? { script_format: "prism" } : {};
+    const scriptFormat = isPrism ? { script_format: "prism", scene_version: c.sceneVersion ?? undefined } : {};
     const renderResult = send(
       "render_video",
       c.provider === "elevenlabs"
@@ -550,13 +561,13 @@ export function VideoCardGenerator({
         className="sticky z-10 flex items-center justify-between border-b px-2.5 py-1.5"
         style={{ top: stickyTop, background: "var(--surface-sunken)", borderColor: "var(--border-hairline)" }}
       >
-        <span className="text-[10.5px] font-semibold text-[var(--text-faint)]">테스트</span>
+        <span className="text-[10.5px] font-semibold text-[var(--text-faint)]">{isPrismCards ? "시험 영상 — 운영에 영향 없음" : "테스트"}</span>
         <button
           type="button"
           onClick={addCard}
           className="text-[11px] font-semibold text-[var(--accent)] hover:underline"
         >
-          + 테스트 추가
+          {isPrismCards ? "+ 시험 추가" : "+ 테스트 추가"}
         </button>
       </div>
       {/* 2026-09-27(후속) — 카드/그림자/간격 전부 제거, WebtoonCutGenerator.tsx 주석 참고. */}
@@ -575,9 +586,13 @@ export function VideoCardGenerator({
           return (
           <div key={c.id} className="overflow-hidden border-b bg-[var(--surface-card)]" style={{ borderColor: "var(--border-hairline)" }}>
           <CollapsibleSection
-            title={`테스트 ${i + 1}`}
+            title={isPrismCards ? `시험 영상 ${i + 1}` : `테스트 ${i + 1}`}
             titleExtra={
-              activeInfos[c.id] ? (
+              isPrismCards ? (
+                <span className="flex-none truncate rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: "var(--surface-sunken)", color: "var(--text-faint)" }}>
+                  장면 {c.sceneVersion != null ? `v${c.sceneVersion}` : sceneServerVersion !== null ? `v${sceneServerVersion} (운영 중)` : "운영 중"}
+                </span>
+              ) : activeInfos[c.id] ? (
                 <span
                   className="flex-none truncate rounded px-1.5 py-0.5 text-[10px] font-semibold"
                   style={
@@ -632,6 +647,33 @@ export function VideoCardGenerator({
           >
             <StepTabs
               steps={[
+                ...(isPrismCards
+                  ? [
+                      {
+                        key: "scene",
+                        label: "장면 변환 버전",
+                        content: (
+                          <div className="flex flex-col gap-1.5 px-3.5 py-2">
+                            <CustomSelect
+                              value={c.sceneVersion != null ? String(c.sceneVersion) : ""}
+                              onChange={(v) => updateCard(c.id, { sceneVersion: v ? Number(v) : null })}
+                              options={[
+                                { value: "", label: sceneServerVersion !== null ? `운영 중인 버전 (v${sceneServerVersion})` : "운영 중인 버전" },
+                                ...sceneHistory.map((h) => ({
+                                  value: String(h.version),
+                                  label: `v${h.version}${h.label ? ` · ${h.label}` : ""}${h.version === sceneServerVersion ? " · 운영 중" : " · 저장만 됨"}`,
+                                })),
+                              ]}
+                              scrollable
+                            />
+                            <p className="text-[10.5px] leading-relaxed text-[var(--text-faint)]">
+                              대본을 장면으로 나눌 때 이 버전을 씁니다. 운영에 적용하지 않은 버전도 여기서 먼저 시험할 수 있어요.
+                            </p>
+                          </div>
+                        ),
+                      },
+                    ]
+                  : [
                 {
                   key: "prompt",
                   label: "생성 프롬프트",
@@ -653,11 +695,25 @@ export function VideoCardGenerator({
                     />
                   ),
                 },
+                    ]),
                 {
                   key: "voice",
-                  label: "음성 설정",
+                  label: isPrismCards ? "성우 미리듣기" : "음성 설정",
                   content: (
                     <div className="flex flex-col gap-2 px-3.5 py-2">
+                      {isPrismCards && (
+                        <div className="rounded-lg px-2.5 py-2 text-[10.5px] leading-relaxed" style={{ background: "var(--surface-sunken)", color: "var(--text-secondary)" }}>
+                          <p className="mb-1 font-semibold">실제 PRISM 제작 영상은 그룹별 고정 성우로 만들어집니다</p>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                            {PRISM_GROUPS.filter((g) => PRISM_GROUP_VOICES[g.code]).map((g) => (
+                              <span key={g.code}>
+                                {g.code} {g.name} · <b>{PRISM_GROUP_VOICES[g.code]}</b>
+                              </span>
+                            ))}
+                          </div>
+                          <p className="mt-1">여기서 고른 성우는 이 시험 영상에만 쓰입니다.</p>
+                        </div>
+                      )}
                       <VoiceProviderFields
                         compact
                         provider={c.provider}
@@ -691,9 +747,11 @@ export function VideoCardGenerator({
                 },
                 {
                   key: "video",
-                  label: "영상 설정",
+                  label: isPrismCards ? "대본·영상" : "영상 설정",
                   content: (
                     <div className="flex flex-col gap-2.5 px-3.5 py-2">
+                      {/* PRISM은 가로 고정이라 포맷을 고르지 않는다. */}
+                      {!isPrismCards && (
                       <div className="flex flex-col gap-1">
                         <span className="text-[10.5px] font-medium text-[var(--text-faint)]">포맷</span>
                         <CustomSelect
@@ -702,6 +760,7 @@ export function VideoCardGenerator({
                           options={FORMATS.map((f) => ({ value: f.id, label: f.label }))}
                         />
                       </div>
+                      )}
                       <textarea
                         value={c.input}
                         onChange={(e) => updateCard(c.id, { input: e.target.value })}
@@ -725,7 +784,9 @@ export function VideoCardGenerator({
                             ? "렌더링 중..."
                             : c.voiceStatus === "pending"
                               ? "음성 생성 중..."
-                              : "생성"}
+                              : isPrismCards
+                                ? "시험 영상 만들기"
+                                : "생성"}
                       </button>
 
                       {/* 성우 미리듣기 결과 — 보통 영상보다 훨씬 먼저 도착한다. */}
