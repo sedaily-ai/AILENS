@@ -22,6 +22,22 @@ export const PRISM_GROUPS = [
 
 export type PrismGroupCode = (typeof PRISM_GROUPS)[number]["code"];
 
+/** 실제 PRISM 제작 영상의 그룹별 고정 성우 — pipelines/video/prism_batch.py::_GROUP_VOICES와 맞춰야 한다
+ *  (마케팅팀 지정, 2026-10-23). 표에 없는 PG1~PG4는 CMS PRISM 음성 설정 발행값을 쓴다. 화면에는 보기용으로만
+ *  보여 준다(2026-10-30 — 사용자: "성우는 이미 고정이니까 반영 버튼 없이 이리저리 들어볼 수나 있는 용도로"). */
+export const PRISM_GROUP_VOICES: Partial<Record<PrismGroupCode, string>> = {
+  SG1: "Matthew", SG2: "Joanna", SG3: "Stephen", SG4: "Joanna",
+  SG5: "Matthew", SG6: "Danielle", SG7: "Stephen", SG8: "Ruth",
+};
+
+const _WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** 대본 작성 지침이 요구하는 머리줄(pipelines/video/prism_batch.py::run과 같은 모양). 요일은 날짜로 계산한다. */
+export function prismHeader(type: PrismGroupCode, isoDate: string): string {
+  const weekday = _WEEKDAYS[new Date(`${isoDate}T00:00:00Z`).getUTCDay()];
+  return `[TYPE: ${type}]\n[RECORDING DATE: ${isoDate}]\n[WEEKDAY: ${weekday}]\n`;
+}
+
 export function groupName(code: string | null | undefined): string {
   return PRISM_GROUPS.find((g) => g.code === code)?.name ?? "";
 }
@@ -34,6 +50,9 @@ function todayKst(): Date {
 function iso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+/** 오늘 날짜(KST) "YYYY-MM-DD". */
+export const todayKstIso = (): string => iso(todayKst());
 
 /** 파일 이름 `MMDD_항목명.txt`(예: 1021_취준생.txt) → 그룹 코드·녹음일. 못 알아보면 null(화면에서 고른다).
  *  항목명은 정확히 같은 이름을 먼저 찾고, 없으면 이름에 포함된 키워드로 찾는다("신입직장인 (1)" 같은 사본 이름 대비).

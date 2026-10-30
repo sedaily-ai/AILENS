@@ -15,7 +15,9 @@ import { VoicePreviewGenerator } from "./VoicePreviewGenerator";
 import { VoiceProductionPanel } from "./VoiceProductionPanel";
 import { VideoCardGenerator } from "./VideoCardGenerator";
 import { VideoProductionPanel } from "./VideoProductionPanel";
-import { PrismScenePromptStep } from "./PrismScenePromptStep";
+import { PRISM_SCENE_CATEGORY, PRISM_SCENE_NAME, PrismScenePromptStep } from "./PrismScenePromptStep";
+import { PrismApplyModal } from "./PrismApplyModal";
+import { PRISM_GROUPS, prismHeader, todayKstIso, type PrismGroupCode } from "@/lib/prismBatch";
 import { VideoRenderSettingsPanel, type VideoRenderSettingsPanelHandle, type ParsedDoc as VideoParsedDoc } from "./VideoRenderSettingsPanel";
 import { LENS_POLLY_PROFILE, PRISM_POLLY_PROFILE } from "./PollyVoiceSettingsFields";
 import { CustomSelect } from "@/components/CustomSelect";
@@ -247,6 +249,21 @@ export function PromptTextLab({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [promptHistory, setPromptHistory] = useState<PromptHistoryEntry[]>([]);
   const [promptVersion, setPromptVersion] = useState<number | null>(null);
+  // PRISM(2026-10-30) — 사용자 지적: "프로덕션 탭이랑 테스트 탭이랑 뭐가 뭔지 헷갈리게 설계", "적용 버튼이 너무 많아서
+  // 뭘 누르면 뭐가 되는지 헷갈려". 실제 제작 설정 카드는 대본 작성·장면 변환 두 프롬프트만 두고 [운영에 적용] 하나로
+  // 둘 다 적용한다. 장면 변환 버전 목록·운영 중 버전은 시험 영상 카드도 같이 쓴다.
+  const scenePromptRef = useRef<PromptVersionReferenceHandle>(null);
+  const [sceneServerVersion, setSceneServerVersion] = useState<number | null>(null);
+  const [sceneHistory, setSceneHistory] = useState<PromptHistoryEntry[]>([]);
+  const [sceneActiveInfo, setSceneActiveInfo] = useState<{ version: number; label: string | null } | null>(null);
+  const [prismApplyOpen, setPrismApplyOpen] = useState(false);
+  // PRISM 대본 채팅(2026-10-30) — 사용자: "[TYPE]·[RECORDING DATE]·[WEEKDAY] 이거 넣는 거 꼭 필요해?". 지침이 요구하는
+  // 머리줄을 사람이 치지 않게, 그룹·날짜를 고르면 보낼 때 붙인다(실제 제작 prism_batch.py와 같은 모양, 요일은 계산).
+  const [prismGroup, setPrismGroup] = useState<PrismGroupCode>("SG1");
+  const [prismDate, setPrismDate] = useState<string>(() => todayKstIso());
+  const prismNothingToApply =
+    (scriptActiveInfo === null || scriptActiveInfo.version === scriptServerVersion) &&
+    (sceneActiveInfo === null || sceneActiveInfo.version === sceneServerVersion);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -268,14 +285,26 @@ export function PromptTextLab({
       .then((r) => {
         const listed = r.prompts.find((p) => p.id === `${category}/${PROMPT_NAME}`);
         setScriptServerVersion(listed ? listed.active_version : null);
+        if (isPrism) {
+          const scene = r.prompts.find((p) => p.id === `${PRISM_SCENE_CATEGORY}/${PRISM_SCENE_NAME}`);
+          setSceneServerVersion(scene ? scene.active_version : null);
+        }
       })
       .catch((err) => console.error("프로덕션 버전 조회 실패", err));
+  };
+
+  const refreshSceneHistory = () => {
+    adminApi
+      .getPromptHistory(PRISM_SCENE_CATEGORY, PRISM_SCENE_NAME)
+      .then((r) => setSceneHistory(r.history))
+      .catch((err) => console.error("장면 변환 프롬프트 버전 목록 불러오기 실패", err));
   };
 
   useEffect(() => {
     if (!open) return;
     refreshPromptHistory();
     refreshScriptServerVersion();
+    if (isPrism) refreshSceneHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshPromptHistory/refreshScriptServerVersion은 category에서만 파생되는 안정적 함수, open/category만 감시
   }, [open, category]);
 
@@ -382,10 +411,15 @@ export function PromptTextLab({
   };
 
   const sendInner = (text: string) => {
-    appendMessage({ role: "user", text });
+    appendMessage({
+      role: "user",
+      text: isPrism && text.length >= MIN_ARTICLE_LEN && !/\[TYPE:/.test(text) ? `${prismHeader(prismGroup, prismDate)}${text}` : text,
+    });
     setWaiting(true);
     if (text.length >= MIN_ARTICLE_LEN) {
-      sendWs("article", { article: text, category, model: textModel, version: promptVersion ?? undefined });
+      // PRISM — 사람이 머리줄을 직접 넣었으면 그대로 둔다.
+      const article = isPrism && !/\[TYPE:/.test(text) ? `${prismHeader(prismGroup, prismDate)}${text}` : text;
+      sendWs("article", { article, category, model: textModel, version: promptVersion ?? undefined });
     } else {
       const history = messages.slice(-10).map((m) => ({ role: m.role, text: m.text }));
       sendWs("chat", { message: text, history, category, model: textModel });
@@ -518,6 +552,26 @@ export function PromptTextLab({
 
   const composerNode = (
     <div className="ui-divider border-t px-4 py-3">
+      {isPrism && (
+        <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
+          <span className="text-[10.5px] text-[var(--text-faint)]">그룹</span>
+          <CustomSelect
+            value={prismGroup}
+            onChange={(v) => setPrismGroup(v as PrismGroupCode)}
+            options={PRISM_GROUPS.map((g) => ({ value: g.code, label: `${g.code} ${g.name}` }))}
+            openUp
+            scrollable
+          />
+          <span className="ml-1 text-[10.5px] text-[var(--text-faint)]">날짜</span>
+          <input
+            type="date"
+            value={prismDate}
+            onChange={(e) => e.target.value && setPrismDate(e.target.value)}
+            className="ui-input rounded-md px-1.5 py-0.5 text-[11px]"
+          />
+          <span className="text-[10.5px] text-[var(--text-faint)]">— 기사만 붙여넣으면 그룹·날짜·요일 머리줄을 자동으로 붙입니다</span>
+        </div>
+      )}
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
         <span className="text-[10.5px] text-[var(--text-faint)]">모델</span>
         <CustomSelect
@@ -647,9 +701,17 @@ export function PromptTextLab({
             >
               <div className="min-h-0 flex-1 overflow-y-auto">
               <CollapsibleSection
-                title="프로덕션"
+                title={isPrism ? "실제 제작 설정" : "프로덕션"}
                 titleExtra={
-                  scriptServerVersion !== null ? (
+                  isPrism ? (
+                    <span
+                      className="flex-none truncate rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                      style={{ background: "var(--ok-soft)", color: "var(--ok)" }}
+                      title="지금 [PRISM 제작]에 쓰이는 버전"
+                    >
+                      운영 중 · 대본 {scriptServerVersion !== null ? `v${scriptServerVersion}` : "-"} · 장면 {sceneServerVersion !== null ? `v${sceneServerVersion}` : "-"}
+                    </span>
+                  ) : scriptServerVersion !== null ? (
                     <span className="flex items-center gap-1">
                       <span className="flex-none truncate rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: "var(--surface-sunken)", color: "var(--text-faint)" }}>
                         v{scriptServerVersion}
@@ -676,6 +738,20 @@ export function PromptTextLab({
                   ) : undefined
                 }
                 badge={
+                  isPrism ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPrismApplyOpen(true);
+                      }}
+                      disabled={prismNothingToApply}
+                      title={prismNothingToApply ? "편집 칸에 불러온 버전이 모두 운영 중인 버전과 같습니다" : "PRISM 제작에 반영합니다"}
+                      className="ui-btn ui-btn-primary rounded-lg px-2 py-1 text-[10.5px] font-semibold disabled:opacity-50"
+                    >
+                      운영에 적용
+                    </button>
+                  ) : (
                   <div className="flex items-center gap-1.5">
                     {/* 2026-09-26(후속×3), 사용자 요청(PromptChatLab.tsx와
                         동일) — "프로덕션 부분 카드도.. 테스트 카드랑
@@ -695,6 +771,7 @@ export function PromptTextLab({
                     </button>
                     <span className="ui-badge ui-badge-published text-[10px]">발행 중</span>
                   </div>
+                  )
                 }
               >
                 {/* 2026-09-27 — PromptChatLab.tsx와 동일 요청 대응, 그
@@ -704,7 +781,45 @@ export function PromptTextLab({
                       대신 테스트 카드와 똑같은 PromptVersionReference를
                       그대로 쓴다(PromptChatLab.tsx와 동일, 그 파일 주석
                       참고). */}
-                  {hasCompanionPanel ? (
+                  {isPrism ? (
+                    <StepTabs
+                      steps={[
+                        {
+                          key: "prompt",
+                          label: "① 대본 작성 프롬프트",
+                          content: (
+                            <PromptVersionReference
+                              ref={scriptPromptRef}
+                              category={category}
+                              name={PROMPT_NAME}
+                              serverVersion={scriptServerVersion}
+                              promptHistory={promptHistory}
+                              testVersion={promptVersion}
+                              onTestVersionChange={setPromptVersion}
+                              onServerVersionChange={setScriptServerVersion}
+                              onPromptHistoryRefresh={refreshPromptHistory}
+                              onActiveInfoChange={setScriptActiveInfo}
+                              bare
+                            />
+                          ),
+                        },
+                        {
+                          key: "scene",
+                          label: "② 장면 변환 프롬프트",
+                          content: (
+                            <PrismScenePromptStep
+                              ref={scenePromptRef}
+                              serverVersion={sceneServerVersion}
+                              history={sceneHistory}
+                              onServerVersionChange={setSceneServerVersion}
+                              onHistoryRefresh={refreshSceneHistory}
+                              onActiveInfoChange={setSceneActiveInfo}
+                            />
+                          ),
+                        },
+                      ]}
+                    />
+                  ) : hasCompanionPanel ? (
                     category === "podcast" ? (
                       <StepTabs
                         steps={[
@@ -794,8 +909,6 @@ export function PromptTextLab({
                                   />
                                 ),
                               },
-                              // PRISM(2026-10-21) — 채팅 프롬프트는 대본 작성용, 카드 대본을 장면으로 나누는 프롬프트는 따로 둔다.
-                              ...(isPrism ? [{ key: "scene", label: "장면 변환 프롬프트", content: <PrismScenePromptStep /> }] : []),
                               // 음성 설정은 탭마다 다른 문서에 저장된다(영상 video-settings / PRISM prism-settings).
                               { key: "voice", label: "음성 설정", content: voiceSection },
                               // PRISM은 가로 고정이라 "영상 설정"(포맷·프로덕션 렌더) 단계를 띄우지 않는다(위 isPrism 주석).
@@ -900,10 +1013,12 @@ export function PromptTextLab({
                 wsOpen={wsOpen}
                 send={wsSend}
                 subscribe={subscribe}
-                onApplyToProduction={handleApplyVideoTest}
+                onApplyToProduction={isPrism ? undefined : handleApplyVideoTest}
                 productionDefaults={productionVideoDefaults}
                 pollyProfile={isPrism ? PRISM_POLLY_PROFILE : LENS_POLLY_PROFILE}
                 audioFormat={isPrism ? "prism" : "video"}
+                sceneHistory={sceneHistory}
+                sceneServerVersion={sceneServerVersion}
                 serverVersion={scriptServerVersion}
                 promptHistory={promptHistory}
                 testVersion={promptVersion}
@@ -920,7 +1035,45 @@ export function PromptTextLab({
     </div>
   );
 
-  if (embedded) return layout;
+  const prismApplyItems = [
+    {
+      key: "script",
+      label: "대본 작성 프롬프트",
+      liveVersion: scriptServerVersion,
+      nextVersion: scriptActiveInfo?.version ?? null,
+      nextLabel: scriptActiveInfo?.label ?? null,
+      apply: async () => {
+        await scriptPromptRef.current?.activateIfNeeded();
+      },
+    },
+    {
+      key: "scene",
+      label: "장면 변환 프롬프트",
+      liveVersion: sceneServerVersion,
+      nextVersion: sceneActiveInfo?.version ?? null,
+      nextLabel: sceneActiveInfo?.label ?? null,
+      apply: async () => {
+        await scenePromptRef.current?.activateIfNeeded();
+      },
+    },
+  ];
+  const content = (
+    <>
+      {layout}
+      {isPrism && prismApplyOpen && (
+        <PrismApplyModal
+          items={prismApplyItems}
+          onCancel={() => setPrismApplyOpen(false)}
+          onDone={() => {
+            setPrismApplyOpen(false);
+            refreshScriptServerVersion();
+          }}
+        />
+      )}
+    </>
+  );
+
+  if (embedded) return content;
 
   return (
     <aside
@@ -931,7 +1084,7 @@ export function PromptTextLab({
         open ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
-      {layout}
+      {content}
     </aside>
   );
 }

@@ -196,6 +196,9 @@ export interface CardState {
    *  starting/rendering)에 사용자가 다른 대화로 넘어가도, 결과는 이
    *  카드가 원래 속했던 대화에 저장돼야 한다. */
   ownerThreadId: number | null;
+  /** PRISM 시험 카드(2026-10-30) — 대본을 장면으로 나눌 "prism-scene" 프롬프트 버전. 없으면(null) 운영에
+   *  적용된 버전. 운영 적용 전에 저장만 한 버전을 시험해 보는 용도(chat_ws.py::_prism_script_to_render_json). */
+  sceneVersion?: number | null;
 }
 
 export function newCard(

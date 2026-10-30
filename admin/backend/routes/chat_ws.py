@@ -254,6 +254,7 @@ def run_async_job(payload: dict) -> None:
             photo_url=data.get("photo_url"),
             photo_credit=data.get("photo_credit"),
             script_format=data.get("script_format"),
+            scene_version=data.get("scene_version"),
         )
     elif kind == "remake_load":
         video_remake.run_load(push, data.get("post_id") or "")
@@ -832,11 +833,21 @@ def _has_render_json(text: str) -> bool:
     return isinstance(obj, dict) and isinstance(obj.get("cuts"), list) and len(obj["cuts"]) > 0
 
 
-def _prism_script_to_render_json(push: Push, slot_id: str, script: str) -> str | None:
+def _prism_script_to_render_json(push: Push, slot_id: str, script: str, scene_version: int | None = None) -> str | None:
     """PRISM 영어 대본 → 렌더용 JSON 텍스트. 발행된 prism-scene 프롬프트를 system으로, 대본을 영상 탭과 같은
-    "[입력 기사]" 템플릿으로 넘긴다(모델·출력 상한도 PRISM 채팅과 같다). 실패하면 render_error를 보내고 None."""
-    prompt = prompts_repo.get_prompt(_PRISM_SCENE_CATEGORY, "published")
-    content = (prompt or {}).get("active_content") or ""
+    "[입력 기사]" 템플릿으로 넘긴다(모델·출력 상한도 PRISM 채팅과 같다). 실패하면 render_error를 보내고 None.
+
+    scene_version(2026-10-30) — 사용자 요청: 장면 변환 프롬프트를 운영에 적용하기 전에 시험 영상으로 확인할 수
+    있게. 시험 카드가 고른 버전 번호가 오면 그 버전 본문으로 나누고, 없으면 지금처럼 적용된 버전을 쓴다."""
+    if scene_version is not None:
+        v = prompts_repo.get_prompt_version(_PRISM_SCENE_CATEGORY, "published", int(scene_version))
+        if not v:
+            push({"type": "render_error", "slot_id": slot_id, "message": f"장면 변환 프롬프트 v{scene_version}을 찾을 수 없습니다."})
+            return None
+        content = v.get("content") or ""
+    else:
+        prompt = prompts_repo.get_prompt(_PRISM_SCENE_CATEGORY, "published")
+        content = (prompt or {}).get("active_content") or ""
     if not content.strip():
         push({
             "type": "render_error", "slot_id": slot_id,
@@ -877,6 +888,7 @@ def _run_render_video_flow(
     voice_settings: dict | None = None, polly_settings: dict | None = None,
     photo_url: str | None = None, photo_credit: str | None = None,
     script_format: str | None = None,
+    scene_version: int | None = None,
 ) -> None:
     """영상 탭 우측 "영상 생성" 패널(VideoRenderGenerator.tsx, 팟캐스트의
     PodcastAudioGenerator.tsx와 같은 슬롯-리스트 구조) 전용. 여기서는 ECS
@@ -912,7 +924,7 @@ def _run_render_video_flow(
         })
         return
     if script_format == "prism" and not _has_render_json(text):
-        converted = _prism_script_to_render_json(push, slot_id, text)
+        converted = _prism_script_to_render_json(push, slot_id, text, scene_version)
         if converted is None:
             return
         text = converted
