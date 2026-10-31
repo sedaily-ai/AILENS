@@ -205,6 +205,14 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
             video_id = youtube_upload.upload(work_dir / "video.mp4", meta, creds)
             status["youtube_url"] = f"https://www.youtube.com/watch?v={video_id}"
             print(f"[prism-batch] {item_id} — 유튜브 업로드 {status['youtube_url']}")
+            # 썸네일은 렌더 때 만든 장면(thumb.jpg). 실패해도 업로드는 성공으로 두고 이유만 남긴다.
+            thumb = work_dir / "thumb.jpg"
+            if thumb.exists():
+                try:
+                    youtube_upload.set_thumbnail(video_id, thumb, creds)
+                except Exception as te:  # noqa: BLE001
+                    print(f"[prism-batch] 유튜브 썸네일 실패(영상은 업로드됨): {te}")
+                    status["youtube_thumbnail_error"] = str(te)[:300]
         except Exception as e:  # noqa: BLE001
             print(f"[prism-batch] 유튜브 업로드 실패: {e}")
             status["youtube_error"] = str(e)[:500]
