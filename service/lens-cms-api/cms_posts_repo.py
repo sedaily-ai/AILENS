@@ -113,6 +113,33 @@ _BASE_SELECT = """
     LEFT JOIN media_assets ma ON ma.rendition_id = r.id
 """
 
+# 목록 전용 가벼운 SELECT(2026-11-03) — webtoon·video·home_player 목록만 쓴다.
+# _BASE_SELECT는 글마다 웹툰 컷 전부와 본문 블록 전부를 jsonb_agg로 묶는데, 목록 shaper는
+# 웹툰 첫 컷(cover_image_url이 비었을 때 폴백, shape_webtoon)만 읽고 나머지는 버린다
+# (shape_webtoon_summary가 panels를 비우고, shape_video·shape_home_player_summary는 둘 다 안 읽음).
+# Database Insights 상위 SQL 1위가 이 묶음이었고(limit=1000 요청 3종이 같은 초에 몰림),
+# 그래서 첫 컷 1개만 가져오고 본문은 가져오지 않는다. letters 목록은 본문을 쓰므로 _BASE_SELECT 그대로.
+_LIST_SELECT = """
+    SELECT
+        p.id AS publication_id, p.slug, p.title, p.subtitle, p.cover_image_url,
+        p.source_url, p.status, p.published_at, p.created_at, p.updated_at,
+        p.admin_extra,
+        r.format,
+        ma.file_url AS video_url, ma.thumbnail_url AS media_thumbnail_url, ma.transcript,
+        (
+            SELECT jsonb_build_array(jsonb_build_object('url', wp.image_url, 'caption', wp.dialogue))
+            FROM webtoon_panels wp
+            WHERE wp.rendition_id = r.id AND wp.image_url IS NOT NULL AND wp.image_url <> ''
+            ORDER BY wp.position
+            LIMIT 1
+        ) AS images_json,
+        NULL::jsonb AS body_json
+    FROM publications p
+    LEFT JOIN renditions r ON r.publication_id = p.id AND r.format = %s
+    LEFT JOIN media_assets ma ON ma.rendition_id = r.id
+"""
+_LIGHT_LIST_CHANNELS = ("webtoon", "video", "home_player")
+
 _LENS_RENDITIONS_SELECT = """
     SELECT r.format,
            ma.file_url AS media_url, ma.thumbnail_url, ma.transcript,
@@ -215,7 +242,8 @@ def list_published_posts(channel: str, date: Optional[str], limit: int = 20) -> 
             fmt = _CHANNEL_TO_FORMAT.get(channel)
             if not fmt:
                 return []
-            sql = _BASE_SELECT + " WHERE p.status = %s AND p.deleted_at IS NULL AND r.id IS NOT NULL"
+            select = _LIST_SELECT if channel in _LIGHT_LIST_CHANNELS else _BASE_SELECT
+            sql = select + " WHERE p.status = %s AND p.deleted_at IS NULL AND r.id IS NOT NULL"
             params = [fmt, "published"]
             if date:
                 # 위 lens 분기와 같은 이유로 KST 하루 범위 비교(컬럼에 함수를 씌우지 않는다).
