@@ -1,10 +1,14 @@
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Info } from 'lucide-react';
 import type { FrontPageData } from '@/shared/lib/api/timelineApi';
-import type { FrontPageNotice, FrontPageState } from './lib/birthdayFrontPage';
+import type { FrontNotice, FrontPageNotice, FrontPageState } from './lib/birthdayFrontPage';
 import { FRONT_LOOKBACK_DAYS, frontArticleHref, frontNotice, frontSourceNote, shareableFront, weekdayOf } from './lib/birthdayFrontPage';
 import { dateLabel } from './lib/birthdayModel';
+import { NEWSPAPER_SCENE } from './lib/birthdayNewspaper';
+import { newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
 import { nb } from './lib/keepTogether';
+import { BirthdayNewspaperPhoto } from './BirthdayNewspaperPhoto';
 import styles from './birthdayStory.module.css';
 
 /** 지면에 보여 줄 기사 수 — 첫 기사와 아래 제목 몇 줄. */
@@ -28,6 +32,7 @@ function masthead(date: string) {
 /**
  * 장면 이름 — 생일 당일 신문이 아니면 '내 생일 무렵'이라고 부른다. 면 번호가 있는 시기(kind front)와 없는 시기(kind day)가 같은 이름을 쓴다.
  * 실제 지면이 아니라 보관본에서 고른 기사라서 '1면'이라고 부르지 않는다.
+ * (신문 장면 스위치가 켜지면 lib/birthdayNewspaperView.ts 가 이름을 정한다. 이 함수는 꺼져 있을 때와 찾는 중·오류·안내 상태에서 쓴다.)
  */
 function kicker(state: FrontPageState | null) {
   if (!state) return '그날 신문';
@@ -36,8 +41,7 @@ function kicker(state: FrontPageState | null) {
 }
 
 /** 지면 위 안내 — 생일 당일 신문을 못 보여 줄 때, 지면을 보기 전에 까닭과 대신 보여 주는 날짜를 먼저 읽게 한다. */
-function FrontNote({ data }: { data: FrontPageData }) {
-  const note = frontNotice(data);
+function FrontNote({ note }: { note: FrontNotice | null }) {
   if (!note) return null;
   return <div className={styles.frontNote} role="note" aria-labelledby="birthday-front-note">
     <Info size={20} aria-hidden="true" />
@@ -67,28 +71,44 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
   state: FrontPageState | null; birthDate: string;
   onRetry: () => void; onUseBirthday: () => void; onShare: () => void;
 }) {
+  // 신문 장면(스위치가 켜졌을 때)은 사진 날짜와 사진 상태를 먼저 정한 뒤, 거기에 맞는 목록·안내·문구(view)를 받는다.
+  // 꺼져 있으면 view가 null이라 아래는 지금과 같은 화면이다.
+  const [photo, setPhoto] = useState<{ date: string; status: 'ok' | 'missing' } | null>(null);
+  const photoDate = NEWSPAPER_SCENE && state ? newspaperPhotoDate(state, birthDate) : null;
+  const photoState: PhotoState = photo && photo.date === photoDate ? photo.status : 'loading';
+  const onPhotoStatus = useCallback((status: 'ok' | 'missing') => {
+    setPhoto(prev => prev && prev.date === photoDate && prev.status === status ? prev : { date: photoDate ?? '', status });
+  }, [photoDate]);
+  const view = NEWSPAPER_SCENE && state ? newspaperView(state, birthDate, photoState) : null;
   const data = state?.status === 'ok' ? state.data : null;
-  const shown = data?.shown_date ?? birthDate;
+  const shown = view?.shown ?? data?.shown_date ?? birthDate;
   const sameDay = shown === birthDate;
   const canShare = shareableFront(state).length > 0;
-  const source = frontSourceNote(data);
+  const source = view ? view.source : frontSourceNote(data);
   const [, month, day] = shown.split('-').map(Number);
   // 화면 낭독기용 상태 문장 — 늘 있는 요소의 글만 갈아 끼워야 읽힌다(로딩이 끝나 요소가 사라지면 결과가 알려지지 않는다).
+  const substituted = view ? view.substitute !== null : Boolean(data && data.kind !== 'none' && !sameDay);
   const spoken = state?.status === 'loading' ? '그날 신문을 찾고 있어요.'
-    : data && data.kind !== 'none' && !sameDay ? `생일 당일 신문이 없어 ${dateLabel(shown)}자 신문을 보여 줘요.` : '';
+    : substituted ? `생일 당일 신문이 없어 ${dateLabel(shown)}자 신문을 보여 줘요.` : '';
   return <section id="birthday-front" className={styles.scene} aria-labelledby="birthday-front-title">
-    <p className={styles.kicker}>{kicker(state)}</p>
-    <h3 id="birthday-front-title" className="sr-only">그날의 서울경제</h3>
+    <p className={styles.kicker}>{view ? view.kicker : kicker(state)}</p>
+    <h3 id="birthday-front-title" className="sr-only">{view ? view.heading : '그날의 서울경제'}</h3>
     <p className="sr-only" role="status">{spoken}</p>
-    {data && <FrontNote data={data} />}
+    {view ? <FrontNote note={view.substitute} /> : data && <FrontNote note={frontNotice(data)} />}
     <div className={styles.paper} aria-busy={state?.status === 'loading'}>
-      {/* 제호 줄은 날짜·요일만. 실제 지면이 아니라서 면 번호를 붙이지 않는다. */}
+      {/* 제호 줄은 날짜·요일만. 면 번호는 붙이지 않는다(1면 사진은 아래에 따로 있다). */}
       <div className={styles.masthead}><strong>서울경제</strong>{state && <span>{masthead(shown)}</span>}</div>
       {!state ? <div className={styles.paperEmpty}><strong>출생연도만 담긴 공유 링크예요</strong><p>내 생일을 넣으면 그날 신문을 볼 수 있어요.</p><button type="button" className={styles.sceneAction} onClick={onUseBirthday}>내 생일로 보기</button></div>
         : state.status === 'loading' ? <div className={styles.skeleton} aria-hidden="true"><span /><span /><span /></div>
         // 실패 원인(네트워크·보관본 응답·형식)을 화면에서는 가릴 수 없어 단정하지 않는다.
         : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>{`연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>
         : state.status === 'notice' ? <div className={styles.paperEmpty}><strong>{NOTICES[state.notice].title}</strong><p>{NOTICES[state.notice].body}</p></div>
+        : view ? <>
+          {photoDate && <BirthdayNewspaperPhoto key={photoDate} date={photoDate} status={photoState} onStatus={onPhotoStatus} />}
+          {view.empty && <div className={styles.paperEmpty}><strong>{view.empty.title}</strong><p>{view.empty.body}</p></div>}
+          {view.articles.length > 0 && <Headlines articles={view.articles} />}
+        </>
+        : state.status !== 'ok' ? null
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>
         : <Headlines articles={state.data.articles} />}
     </div>

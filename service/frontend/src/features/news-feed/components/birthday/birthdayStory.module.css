@@ -62,6 +62,22 @@
 .skeleton span:first-child { height: 40px; width: 85%; }
 .skeleton span:last-child { width: 60%; }
 
+/* ② 그날 서울경제의 1면 사진(새 패턴) — 원본 비율 그대로, 자르지 않는다. 뜨기 전에는 5:7(축소본 표본 1.37~1.39배, 2026-11-03 e-Paper 1.405배)로 자리를 잡아 화면이 튀지 않게 한다.
+   사진 아래 간격(버튼 12px) < 사진 덩어리와 기사 목록 사이(16px)로 관련 있는 것끼리 가깝게 둔다. */
+.photo { margin: 16px 0 0; }
+.photo > img { display: block; width: 100%; height: auto; border: 1px solid #d1d5db; background: #f3f4f6; }
+.photo[data-status='loading'] > img { aspect-ratio: 5 / 7; }
+.photoActions { display: flex; margin: 12px 0 16px; }
+.photoActions > .sceneAction { margin-top: 0; }
+/* 1면 크게 보기 — 화면 전체를 채우고 스크롤로 이동한다. 모바일에서는 사진 폭을 1200px로 키워 제목 글자를 읽을 수 있게 하고(원본의 절반), 넓은 화면은 화면 폭에 맞춘다.
+   닫혀 있을 때의 display:none 은 브라우저 기본값이라 display 를 덮어쓰지 않는다. */
+.zoom { width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #111827; overflow: auto; overscroll-behavior: contain; }
+.zoomImage { display: block; width: max(100%, 1200px); max-width: none; height: auto; }
+.story .zoomClose { position: fixed; top: 12px; right: 12px; z-index: 1; min-width: 44px; min-height: 44px; padding: 0 16px; border: 1px solid #6b7280; border-radius: 999px; background: #fff; color: #111827; font-size: 14px; font-weight: 700; }
+.story .zoomClose:hover { background: #f3f4f6; }
+/* 어두운 바탕에서는 기본 파란 포커스 링(#1d4ed8)이 잘 안 보여 흰 링을 쓴다. */
+.story .zoomClose:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
 /* ③ 숫자 장면 */
 /* 화살표는 연도+금액 두 줄 전체가 아니라 금액 줄의 세로 중앙에 둔다 — 가운데 정렬이면 연도와 금액 사이 빈 곳을 가리켰다.
    그래서 아래쪽으로 맞추고 화살표 상자를 금액 줄 높이(20px × 행간 1.5 = 30px)로 잡는다. .flow b 글자 크기를 바꾸면 이 높이도 같이 바꾼다.
