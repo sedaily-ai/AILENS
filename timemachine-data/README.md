@@ -10,6 +10,7 @@
 | `collect/crawl_naver_front.py` | 네이버 서울경제(언론사 011) 신문보기에서 1면 기사 목록 수집 → CSV | 완료(2026-01-01~11-03 샘플 1,171건) |
 | `collect/fetch_epaper_front.py` | e-Paper 최신호 1면 이미지 받기(→ 폴더 또는 S3 `timemachine-newspaper/img/`). 시험 `collect/test_fetch_epaper_front.py` | 작성(2026-11-03), 시험 13개 통과 |
 | `upload/check_images.py` | 원본 이미지 올리기 전 점검(→ `newspaper_manifest.csv`)·올린 뒤 S3 목록 대조 | 작성(2026-11-03) |
+| `upload/count_day_types.py` | 날짜 종류별 개수표: 날짜마다 1면 사진·네이버 1면 목록이 있는지 세어 연도별 표와 사진이 이어서 없는 구간을 만든다. 시험 `upload/test_count_day_types.py` | 작성(2026-11-03), 시험 18개 통과 |
 | `build/` | 연도 파일(`timemachine-newspaper/index/v1/YYYY.json`) 생성 | 네이버 과거 수집 뒤 작성 |
 | `261103_타임머신_지면1면_요구사항.html` | 개요, 로드맵, 과제와 목표, 수집 출처 | v1.3 |
 | `261103_타임머신_1면이미지_인수규격.md` | 이미지 저장소·형식·구조·업로드·검증 기준 | v1 |
@@ -36,6 +37,22 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 ## CSV 컬럼
 
 `date, page, rank, is_top, article_id, title, url, thumbnail` — `date`는 이미지 파일명 일자와 연결 키. `is_top`은 썸네일이 붙은 기사를 톱으로 보는 추정 기준.
+
+## 날짜 종류별 개수표
+
+사진 목록이 생기면(올리기 전 `newspaper_manifest.csv`, 올린 뒤 S3 목록) 날짜마다 무엇이 있는지 세어 연도별로 보여 준다. 읽기만 하고 아무것도 바꾸지 않는다.
+
+```
+cd timemachine-data/upload
+python3 count_day_types.py --manifest newspaper_manifest.csv [--year-files <index/v1이 든 폴더>] [--out <결과폴더>] [--until YYYY-MM-DD]
+python3 count_day_types.py --listing listing.json            [--year-files <폴더>]              # 올린 뒤
+python3 -m unittest test_count_day_types -v                                                       # 시험(이미지·네트워크·AWS 없이)
+```
+
+- 날짜는 창간일(1960-08-01)부터 `--until`(기본: 사진·목록 중 가장 늦은 날짜)까지 하나씩 센다. 종류는 발행 중단(1980-11-26~1988-07-31), 일요일 휴간(1996-09-29~), 옛 일요일(1996-09-29 전), 그리고 발행 예상일(사진+목록 · 사진만 · 목록만 · 둘 다 없음 · 목록 미확인).
+- 네이버 목록은 `--year-files`를 주면 연도 파일의 `days`(있음)와 `text_covers`(확인한 기간, 그 안에서 없으면 "없음")로 판단하고, 주지 않으면 모두 "미확인"이다.
+- `--out`을 주면 `day_types.csv`(날짜별 종류), `year_counts.csv`(연도별 표), `missing_runs.csv`(사진이 이어서 없는 구간)를 쓴다.
+- **확인할 것(2026-11-03 계산)**: 요구사항 HTML의 "사진 없는 구간"을 빼고 일요일(1996-09-29부터)을 뺀 발행 예상일은 16,307일, HTML의 사진은 16,254장이다. 1996-09-29 전의 일요일 1,177일에도 사진이 있다고 보면 차이가 1,230일로 커진다. 그 시기 일요일에는 사진이 거의 없을 가능성이 크며, 실제 목록으로 개수표의 "옛 일요일 사진" 열이 거의 0인지 확인한다. 그렇다면 일요일을 월요일 우선으로 처리하는 시작일(`birthdayNewspaper.ts`의 `NO_SUNDAY_FROM`)도 다시 본다.
 
 ## 데이터를 저장소에 넣지 않는 이유
 
