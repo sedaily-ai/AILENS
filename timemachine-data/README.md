@@ -51,7 +51,7 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 | 받은 자료 | `intake/check/`(점검 결과), `intake/text/`(네이버 CSV) |
 | 연도 파일 | `timemachine-newspaper/index/v1/YYYY.json`. 개발이 만든다. `Cache-Control: public, max-age=600` |
 | 태그 | Service=lens, Project=Sedaily-LENS, ServiceName=Sedaily-LENS, Environment=prod, CostCenter=sedaily-ai, Purpose=timemachine-newspaper, DoNotDelete=true |
-| AWS 상태 | 생성 전. 버킷 생성과 사이트 연결은 AWS를 쓰는 기기에서 실행한다 |
+| AWS 상태 | 버킷 생성 완료(2026-11-03). 태그·공개 차단·버전 관리·수명 주기·소유권을 만든 뒤 다시 조회해 확인했다. 업로드 전용 정책 `lens-timemachine-newspaper-upload`는 만들었고 아직 누구에게도 연결하지 않았다. 사이트 경로(`/timemachine-newspaper/*`) 연결은 이미지를 올린 뒤 AWS를 쓰는 기기에서 한다 |
 
 새 버킷을 쓰는 이유: 기존 미디어 버킷(`sedaily-mbti-cms-media-dev`)은 S3 주소로 공개 읽기·CloudFront 미경유이고, admin이 객체를 지운다. 21GB 원본 보관은 권한을 따로 둔다.
 
