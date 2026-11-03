@@ -88,8 +88,8 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 - 이미지 주소는 `CDN_URL + 면 폴더 + 파일명 + '?' + IMG_TOKEN_NAME + '=' + imgToken`이다. 서버가 토큰의 슬래시를 `\/`로 내보내서 풀어 써야 한다(안 풀면 403). Referer나 로그인은 필요 없다.
 - 2026-11-03 1면은 2495×3507, 905,533바이트 JPEG이고(보관 원본은 평균 1.3MB) `upload/check_images.py`를 오류 없이 통과한다. 가로세로 비율은 1.405배다.
 - 같은 날짜의 파일이 이미 있으면 내용이 같을 때 건너뛰고, 다르면 그대로 두고 알린다(`--force`로만 덮어쓴다). 토큰·서명값은 출력하지 않는다(시험이 확인).
-- `pdfData`의 1면 항목에는 기사 8개의 제목(`headLine`)과 영역(`poly`)이 있다. 아직 저장하지 않는다.
-- 아직 없는 것: 새 호가 올라오는 시각 측정, 새 호가 안 올라왔을 때 알림, AWS에서의 실제 실행 확인(아래 "AWS 일일 실행").
+- `pdfData`의 1면 항목에는 기사 8개(광고 칸 포함)의 번호·제목(`headLine`)·영역(`poly`)이 있고, 이것도 최신호만 무료라 이미지와 함께 저장한다: `timemachine-newspaper/epaper/YYYY/MM/YYYYMMDD.json`(폴더 모드는 `<out>/epaper/...`). 내용은 `schema`·`date`·`saved_at`·`image`(파일명·가로·세로·바이트)·`articles`(`id`·`headline`·`poly`)이고, 영역 좌표는 1면 이미지의 픽셀(`image.width × image.height`) 기준이다. `R(x1,y1,x2,y2)`는 사각형, `P(x,y;x,y;...)`는 다각형이다. 같은 날짜 기록이 이미 있으면 그대로 두고(`--force`로만 덮어쓴다), 저장에 실패해도 이미지는 저장하며 종료 코드는 이미지 기준이다. 11/3 기사 번호(`02100311.…`)는 빅카인즈의 서울경제 기사 번호와 앞부분이 같지만 서로 맞는지는 확인하지 않았다.
+- 아직 없는 것: 새 호가 올라오는 시각 측정, 새 호가 안 올라왔을 때 알림. AWS에서의 실제 실행은 2026-11-03에 확인했다(아래 "AWS 일일 실행").
 
 ```
 cd timemachine-data
@@ -103,8 +103,8 @@ cd collect && python3 -m unittest test_fetch_epaper_front -v                    
 
 - 매일 자동으로 받으려고 Lambda `sedaily-lens-timemachine-newspaper-capture`(이름 정본은 `config/resources.env`의 `TIMEMACHINE_CAPTURE_FUNCTION`)를 EventBridge가 **매시간 10분**에 부른다. 새 호가 올라오는 시각을 아직 몰라서이고, 같은 호는 건너뛰므로 여러 번 돌아도 안전하다. 시각을 알게 되면 `provision.sh`의 `SCHEDULE`만 줄여 다시 실행한다.
 - 진입점은 `collect/lambda_handler.py`(`handler`). 환경 변수 `NEWSPAPER_BUCKET`, 실행 제한 120초, 256MB, 파이썬 3.12(boto3는 기본 제공). 실패하면 예외로 끝나 Lambda `Errors`에 잡힌다. 로그는 한 줄 JSON(`event`·`status`·`date`·크기)이고 토큰은 들어가지 않는다.
-- 권한은 로그 쓰기, 버킷 `timemachine-newspaper/img/*` 목록 조회, 같은 경로 `PutObject`만이다. 없는 파일에 `head_object`를 하면 목록 권한이 없을 때 404와 403이 구분되지 않아, 접두어를 제한한 목록 조회로 있는지 본다.
-- 만들기: `bash timemachine-data/aws/provision.sh`(AWS 자격 증명이 있는 기기). 계정·버킷 확인 → 로그 그룹(30일) → IAM 역할 → 코드 묶음 → Lambda → 규칙·호출 권한·대상 → 태그를 다시 조회해 `Service=lens` 확인. 이미 있는 리소스는 건너뛴다. 코드만 바꿀 때는 `bash timemachine-data/aws/deploy.sh`(`CodeSha256`과 `State`·`LastUpdateStatus`로 확인).
+- 권한은 로그 쓰기, 버킷 `timemachine-newspaper/img/*`·`timemachine-newspaper/epaper/*` 목록 조회, 같은 경로 `PutObject`만이다. 없는 파일에 `head_object`를 하면 목록 권한이 없을 때 404와 403이 구분되지 않아, 접두어를 제한한 목록 조회로 있는지 본다.
+- 만들기: `bash timemachine-data/aws/provision.sh`(AWS 자격 증명이 있는 기기). 계정·버킷 확인 → 로그 그룹(30일) → IAM 역할 → 코드 묶음 → Lambda → 규칙·호출 권한·대상 → 태그를 다시 조회해 `Service=lens` 확인. 이미 있는 리소스는 건너뛴다. 코드만 바꿀 때는 `bash timemachine-data/aws/deploy.sh`(`CodeSha256`과 `State`·`LastUpdateStatus`로 확인). 권한과 코드가 함께 바뀌었으면 `provision.sh`(권한 정책을 덮어써 최신으로 맞춤) → `deploy.sh` 순서로 실행한다.
 - 태그는 `Project=Sedaily-LENS`, `CostCenter=sedaily-ai`, `ServiceName=Sedaily-LENS`, `Environment=prod`, `Service=lens`, `Workload=timemachine-newspaper-capture`.
 - 새 호가 올라오는 시각 확인(CloudWatch Logs Insights, 로그 그룹 `/aws/lambda/<함수 이름>`): `fields @timestamp, date, status | filter event = "capture" and status = "saved" | sort @timestamp asc`
 - 일일 수집이 올린 날짜(2026-11-03 이후)는 보관 이미지 점검 목록(`newspaper_manifest.csv`)에 없어서, 올린 뒤 대조(`check_images.py --compare`)에서 "목록에 없는데 올라간 파일"로 나오는 것이 정상이다.

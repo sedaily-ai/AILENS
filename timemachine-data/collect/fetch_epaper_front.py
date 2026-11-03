@@ -24,6 +24,7 @@ import sys
 import time
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -34,6 +35,9 @@ TIMEOUT_SECONDS = 30
 ATTEMPTS = 3
 S3_IMG_PREFIX = 'timemachine-newspaper/img/'
 S3_CACHE_CONTROL = 'public, max-age=2592000'
+# 그날 1면 기사 제목·영역 기록. 이미지(img/)와 폴더를 나눠 이미지 점검·대조에 섞이지 않게 한다.
+EPAPER_PREFIX = 'timemachine-newspaper/epaper/'
+EPAPER_CACHE_CONTROL = 'public, max-age=86400'
 # 1면 사진으로 볼 수 있는 최소 기준 — 오류 화면이나 잘린 파일을 걸러내는 값이다(2026-11-03 실측 2495×3507, 905,533바이트).
 MIN_BYTES = 100_000
 MIN_WIDTH = 1000
@@ -188,18 +192,25 @@ def save_local(root: Path, key: str, data: bytes, force: bool = False) -> str:
     return 'saved'
 
 
+def _s3_find(s3: Any, bucket: str, object_key: str) -> Optional[Dict[str, Any]]:
+    """객체가 있으면 목록 항목(Key·ETag·Size), 없으면 None.
+
+    head_object 대신 목록 조회로 있는지 본다 — 없는 파일에 head 를 하면 목록 권한이 없을 때 403 이 와서 404 와 구분되지 않고,
+    목록 권한을 접두어 제한 없이 줘야 한다. 목록 조회는 접두어 제한 그대로 쓸 수 있다.
+    """
+    try:
+        listed = s3.list_objects_v2(Bucket=bucket, Prefix=object_key, MaxKeys=1)
+    except Exception as e:  # noqa: BLE001
+        raise CaptureError(f'S3 확인 실패({type(e).__name__})') from None
+    return next((o for o in listed.get('Contents', []) if o['Key'] == object_key), None)
+
+
 def save_s3(bucket: str, region: str, key: str, data: bytes, force: bool = False) -> str:
     import boto3  # AWS 자격 증명이 있는 기기·Lambda 에서만 쓴다
 
     s3 = boto3.client('s3', region_name=region)
     object_key = S3_IMG_PREFIX + key
-    # head_object 대신 목록 조회로 있는지 본다 — 없는 파일에 head 를 하면 목록 권한이 없을 때 403 이 와서 404 와 구분되지 않고,
-    # 목록 권한을 접두어 제한 없이 줘야 한다. 목록 조회는 접두어 제한 그대로 쓸 수 있다.
-    try:
-        listed = s3.list_objects_v2(Bucket=bucket, Prefix=object_key, MaxKeys=1)
-    except Exception as e:  # noqa: BLE001
-        raise CaptureError(f'S3 확인 실패({type(e).__name__})') from None
-    existing = next((o for o in listed.get('Contents', []) if o['Key'] == object_key), None)
+    existing = _s3_find(s3, bucket, object_key)
     if existing:
         etag = existing['ETag'].strip('"')
         # 여러 조각으로 올린 파일(ETag 에 '-')은 해시를 비교할 수 없어 크기로 본다.
@@ -212,6 +223,58 @@ def save_s3(bucket: str, region: str, key: str, data: bytes, force: bool = False
         s3.put_object(Bucket=bucket, Key=object_key, Body=data, ContentType='image/jpeg', CacheControl=S3_CACHE_CONTROL)
     except Exception as e:  # noqa: BLE001
         raise CaptureError(f'S3 저장 실패({type(e).__name__})') from None
+    return 'saved'
+
+
+def epaper_key(issue: Issue) -> str:
+    return f'{issue.pub_date[:4]}/{issue.pub_date[4:6]}/{issue.pub_date}.json'
+
+
+def build_epaper_record(issue: Issue, width: int, height: int, size: int, saved_at: Optional[str] = None) -> Dict[str, Any]:
+    """그날 1면 기사 제목·영역 기록. 영역(poly)의 좌표는 1면 이미지의 픽셀(image.width × image.height) 기준이다.
+    광고 칸도 제목 '[광고]' 그대로 담는다(걸러내는 일은 쓰는 쪽이 한다). 토큰·서명값은 들어가지 않는다."""
+    return {
+        'schema': 1,
+        'date': issue.iso_date,
+        'source': PAGE_URL,
+        'saved_at': saved_at or datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
+        'page': 1,
+        'image': {'name': issue.image_name, 'width': width, 'height': height, 'bytes': size},
+        'articles': issue.articles,
+    }
+
+
+def encode_record(record: Dict[str, Any]) -> bytes:
+    return (json.dumps(record, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+
+
+def save_articles(issue: Issue, width: int, height: int, size: int, *, out: Optional[Path] = None,
+                  bucket: Optional[str] = None, region: str = 'us-east-1', force: bool = False) -> str:
+    """1면 기사 제목·영역을 저장한다. 'saved' | 'exists'(같은 날짜 기록이 이미 있어 그대로 둠). 실패는 CaptureError."""
+    if not issue.articles:
+        raise CaptureError('1면 기사 영역이 비어 있어요(페이지 구조가 달라졌을 수 있어요)')
+    body = encode_record(build_epaper_record(issue, width, height, size))
+    key = epaper_key(issue)
+    if bucket:
+        import boto3
+
+        s3 = boto3.client('s3', region_name=region)
+        object_key = EPAPER_PREFIX + key
+        if _s3_find(s3, bucket, object_key) and not force:
+            return 'exists'
+        try:
+            s3.put_object(Bucket=bucket, Key=object_key, Body=body, ContentType='application/json; charset=utf-8',
+                          CacheControl=EPAPER_CACHE_CONTROL)
+        except Exception as e:  # noqa: BLE001
+            raise CaptureError(f'S3 저장 실패({type(e).__name__})') from None
+        return 'saved'
+    path = out / 'epaper' / key  # type: ignore[operator]
+    if path.exists() and not force:
+        return 'exists'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix('.json.part')
+    tmp.write_bytes(body)
+    os.replace(tmp, path)
     return 'saved'
 
 
@@ -240,6 +303,13 @@ def capture(out: Optional[Path], bucket: Optional[str], region: str, force: bool
         'conflict': f'같은 날짜에 다른 파일이 이미 있어 그대로 뒀어요: {where} (덮어쓰려면 --force)',
     }
     print(messages[status])
+    if status != 'conflict':
+        # 기사 기록은 덤이다. 실패해도 이미지는 저장됐으므로 종료 코드는 이미지 기준으로 둔다.
+        try:
+            result = save_articles(issue, width, height, len(data), out=out, bucket=bucket, region=region, force=force)
+            print(f'1면 기사 {len(issue.articles)}개 제목·영역을 저장했어요' if result == 'saved' else '1면 기사 기록이 이미 있어요')
+        except CaptureError as e:
+            print(f'1면 기사 기록 저장 실패(이미지는 저장했어요): {mask(e)}', file=sys.stderr)
     return 1 if status == 'conflict' else 0
 
 
