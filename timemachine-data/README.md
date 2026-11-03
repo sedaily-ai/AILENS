@@ -10,6 +10,7 @@
 | `collect/crawl_naver_front.py` | 네이버 서울경제(언론사 011) 신문보기에서 1면 기사 목록 수집 → CSV | 완료(2026-01-01~11-03 샘플 1,171건) |
 | `collect/fetch_epaper_front.py` | e-Paper 최신호 1면 이미지 받기(→ 폴더 또는 S3 `timemachine-newspaper/img/`). 시험 `collect/test_fetch_epaper_front.py` | 작성(2026-11-03), 시험 13개 통과 |
 | `upload/check_images.py` | 원본 이미지 올리기 전 점검(→ `newspaper_manifest.csv`)·올린 뒤 S3 목록 대조 | 작성(2026-11-03) |
+| `collect/naver_daily.py`, `collect/daily_handler.py` | 네이버 1면 목록 일일 수집(연도 파일에 이어 붙임), 누락 목록, 알림 지표, 날짜 지정 재처리. 시험 `collect/test_naver_daily.py`. AWS: `aws/provision_daily.sh`(Lambda·EventBridge·SNS·알람), `aws/deploy_daily.sh` | 작성(2026-11-03), 시험 42개 통과. **네이버 수집은 꺼진 채**(`NAVER_DAILY`) |
 | `upload/count_day_types.py` | 날짜 종류별 개수표: 날짜마다 1면 사진·네이버 1면 목록이 있는지 세어 연도별 표와 사진이 이어서 없는 구간을 만든다. 시험 `upload/test_count_day_types.py` | 작성(2026-11-03), 시험 18개 통과 |
 | `build/` | 연도 파일(`timemachine-newspaper/index/v1/YYYY.json`) 생성 | 네이버 과거 수집 뒤 작성 |
 | `261103_타임머신_지면1면_요구사항.html` | 개요, 로드맵, 과제와 목표, 수집 출처 | v1.3 |
@@ -37,6 +38,24 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 ## CSV 컬럼
 
 `date, page, rank, is_top, article_id, title, url, thumbnail` — `date`는 이미지 파일명 일자와 연결 키. `is_top`은 썸네일이 붙은 기사를 톱으로 보는 추정 기준.
+
+## 일일 수집·누락 목록·알림·재처리(2026-11-03)
+
+이미지 수집(`lambda_handler.py`, 매시간 10분)과 별개 함수 `sedaily-lens-timemachine-newspaper-daily`(이름 정본 `config/resources.env`의 `TIMEMACHINE_DAILY_FUNCTION`)가 매시간 25분에 돈다.
+
+| 기능 | 동작 |
+|---|---|
+| 네이버 1면 목록 수집 | 오늘부터 7일 전까지 **확인하지 못한 날만** 받아 연도 파일(`index/v1/YYYY.json`)에 이어 붙인다. 일요일(1996-09-29~)은 받지 않고 확인 처리한다. 오늘은 06~14시(KST)에만 받고, 목록이 아직 없으면 확인 처리하지 않는다. 지난 날은 목록이 없으면 "1면 없음"으로 확인 처리한다. 있던 목록은 빈 화면이 와도 지우지 않는다 |
+| 재시도 | 요청 안에서 3번(2초·4초 대기). 확인하지 못한 날은 `text_covers`에 넣지 않아 다음 실행이 다시 받는다(그동안 화면은 빅카인즈로 채운다). 403·429는 재시도 없이 그 실행을 멈추고 오류로 끝낸다. 요청 간 0.7초, User-Agent는 수집기라고 밝힌다 |
+| 누락 목록 | 실행마다 `ops/status/missing.json`에 쓴다(공개 경로 `timemachine-newspaper/` 밖). `naver`는 `NAVER_DAILY_FROM` 이후 확인하지 못한 날, `image`는 2026-11-03 이후 사진이 없는 발행 예상일(정오 이후 오늘 포함), 둘 다 **최근 것부터** 60개. `naver_backfill`은 시작일 이전 2011-07-09~의 미확인 일수로 정보만 적는다(알림에 쓰지 않는다) |
+| 날짜 지정 재처리 | 이벤트 `{"dates": ["2026-11-03"]}` 또는 `{"from": "...", "to": "..."}`(최대 31일, `"force": true`면 확인한 날도 다시 받음). 네이버 수집이 켜져 있을 때만 |
+| 알림 | CloudWatch 알람 3개 → SNS 토픽 `TIMEMACHINE_ALERT_TOPIC`: 새 함수 오류, **이미지 수집 함수 오류**(지금까지 알림이 없었다), 마감(정오) 뒤에도 사진이 없는 발행 예상일이 3시간 연속. 받는 곳은 `provision_daily.sh`에 `ALERT_EMAIL`을 주거나 나중에 `aws sns subscribe`로 토픽에 붙인다. **받는 곳이 없으면 토픽만 만들고, 알람 상태는 CloudWatch 콘솔에서만 보이며 아무에게도 가지 않는다** |
+
+환경 변수: `NEWSPAPER_BUCKET`(필수), `NAVER_DAILY`(`on`이 아니면 **네이버에 요청하지 않는다**, 기본 꺼짐), `NAVER_DAILY_FROM`(켤 때 필수, 일일 수집 시작일). 꺼져 있어도 이미지 누락 목록과 지표는 만든다.
+
+**네이버 수집을 켜기 전에**: `media.naver.com/robots.txt`는 모든 봇의 전체 접근을 막고 AI 학습·RAG 목적 접근도 금지한다고 적고 있다(2026-11-03 확인). 하루 1~8건이라 규모는 작지만 같은 사안이어서 구성은 꺼진 채 만든다. 켜는 것은 별도 결정이다. 켜면 시작일 이후 연도 파일에는 그날들만 들어가므로, 2011~2025년은 별도 과거 수집이 채워야 한다.
+
+e-Paper 기록(`epaper/YYYY/MM/YYYYMMDD.json`)에는 이미 매일 1면 기사 id·제목·위치가 저장돼 있다. 네이버를 켜지 않아도 이 기록으로 2026-11-03 이후의 1면 목록을 만들 수 있을 가능성이 있다. 다만 기사 링크로 쓸 수 있는지(기사 id가 빅카인즈 기사 번호와 맞는지)는 확인하지 않았다.
 
 ## 날짜 종류별 개수표
 
